@@ -1,0 +1,22 @@
+﻿{
+    "tools": [
+        { "name": "SelectTool", "display": "Select", "shortcut": "Space" },
+        { "name": "LineTool", "display": "Line", "shortcut": "L" },
+        { "name": "PolyLineTool", "display": "PolyLine", "shortcut": "P" },
+        { "name": "PolygonTool", "display": "Polygon", "shortcut": "G" },
+        { "name": "CircleTool", "display": "Circle", "shortcut": "C" },
+        { "name": "ArcTool", "display": "Arc", "shortcut": "A" },
+        { "name": "EllipseTool", "display": "Ellipse", "shortcut": "E" },
+        { "name": "RectangleTool", "display": "Rectangle", "shortcut": "R" },
+        { "name": "TriangleTool", "display": "Triangle", "shortcut": "T" },
+        { "name": "Bezier2Tool", "display": "Bezier2", "shortcut": "B" },
+        { "name": "BezierTool", "display": "Bezier", "shortcut": "Shift+B" },
+        { "name": "SplineTool", "display": "Spline", "shortcut": "S" },
+        { "name": "NurbsTool", "display": "Nurbs", "shortcut": "N" },
+        { "name": "SmartLineTool", "display": "SmartLine", "shortcut": "Shift+L" },
+        { "name": "TextInputTool", "display": "Text", "shortcut": "Ctrl+T" },
+        { "name": "BitmapInputTool", "display": "Bitmap", "shortcut": "Ctrl+B" },
+        { "name": "QRCodeInputTool", "display": "QRCode", "shortcut": "Ctrl+Q" }
+    ],
+    "actions": []
+}

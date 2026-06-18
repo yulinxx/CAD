@@ -1,0 +1,102 @@
+# 配置文件
+# ====================================================================
+# 用户配置区域（请根据您的环境修改以下内容）
+# ====================================================================
+
+# --------------------------------------------------------------------
+# vcpkg 配置
+# --------------------------------------------------------------------
+if(WIN32)
+    set(VCPKG_DIR "C:/Users/xx/vcpkg/" CACHE PATH "VCPKG installation directory")
+elseif(UNIX AND NOT APPLE)
+    set(VCPKG_DIR "/home/x/Install/vcpkg/" CACHE PATH "VCPKG installation directory")
+elseif(APPLE)
+    set(VCPKG_DIR "/Users/ms/vcpkg/" CACHE PATH "VCPKG installation directory")
+endif()
+
+# --------------------------------------------------------------------
+# Qt 版本配置
+# --------------------------------------------------------------------
+# 设置要使用的Qt主版本。可设置为 5 或 6。
+set(QT_VERSION_MAJOR 5 CACHE STRING "Major version of Qt to use (5 or 6)")
+
+# --------------------------------------------------------------------
+# Qt 路径配置
+# --------------------------------------------------------------------
+if(QT_VERSION_MAJOR EQUAL 6)
+    if(WIN32)
+        set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.11.0/msvc2022_64" CACHE PATH "Qt installation directory")
+    elseif(UNIX AND NOT APPLE)
+        set(Qt_INSTALL_DIR "/home/x/Install/Qt/6.11.0/gcc_64" CACHE PATH "Qt installation directory")
+    elseif(APPLE)
+        set(Qt_INSTALL_DIR "/Users/ms/Qt/6.11.0/macos/" CACHE PATH "Qt installation directory")
+    endif()
+else()
+    if(WIN32)
+        set(Qt_INSTALL_DIR "C:/Users/xx/Qt/5.15.2/msvc2019_64" CACHE PATH "Qt installation directory")
+    elseif(UNIX AND NOT APPLE)
+        set(Qt_INSTALL_DIR "/home/x/Install/Qt/5.15.2/gcc_64" CACHE PATH "Qt installation directory")
+    elseif(APPLE)
+        set(Qt_INSTALL_DIR "/path/to/mac/Qt/5.15.2/clang_64" CACHE PATH "Qt installation directory")
+    endif()
+endif()
+
+# --------------------------------------------------------------------
+# 模块编译开关配置
+# --------------------------------------------------------------------
+# 以下开关用于控制可选模块的编译：
+#   ON  - 编译该模块
+#   OFF - 不编译
+
+set(BUILD_VISION OFF CACHE BOOL "Build Vision module (image processing, computer vision)" FORCE)
+set(BUILD_NETWORK OFF CACHE BOOL "Build Network module (HTTP, WebSocket, cloud sync)" FORCE)
+set(BUILD_HARDWARE OFF CACHE BOOL "Build Hardware module (laser control, material database)" FORCE)
+set(BUILD_ENGRAVING OFF CACHE BOOL "Build Engraving module (3D laser engraving)" FORCE)
+set(BUILD_GEOMODELCORE OFF CACHE BOOL "Build GeoModelCore module (OpenCASCADE-based geometry modeling)" FORCE)
+
+# ====================================================================
+# 自动配置区域（以下内容自动配置，无需手动修改）
+# ====================================================================
+
+# --------------------------------------------------------------------
+# Qt CMake 配置目录（自动从 Qt_INSTALL_DIR 派生）
+# --------------------------------------------------------------------
+if(QT_VERSION_MAJOR EQUAL 6)
+    set(Qt6_DIR "${Qt_INSTALL_DIR}/lib/cmake/Qt6" CACHE PATH "Qt CMake configuration directory")
+else()
+    set(Qt5_DIR "${Qt_INSTALL_DIR}/lib/cmake/Qt5" CACHE PATH "Qt CMake configuration directory")
+endif()
+
+# --------------------------------------------------------------------
+# 设置 CMAKE_PREFIX_PATH
+# --------------------------------------------------------------------
+list(INSERT CMAKE_PREFIX_PATH 0 "${Qt_INSTALL_DIR}")
+
+# --------------------------------------------------------------------
+# 输出Qt配置信息用于调试
+# --------------------------------------------------------------------
+get_filename_component(QT_VERSION_FULL "${Qt_INSTALL_DIR}" PATH)
+get_filename_component(QT_VERSION_FULL "${QT_VERSION_FULL}" NAME)
+message(STATUS "[Qt]")
+message(STATUS "  Version: ${QT_VERSION_FULL}")
+message(STATUS "  Install Directory: ${Qt_INSTALL_DIR}")
+if(QT_VERSION_MAJOR EQUAL 6)
+    message(STATUS "  Config Directory: ${Qt6_DIR}")
+else()
+    message(STATUS "  Config Directory: ${Qt5_DIR}")
+endif()
+message(STATUS "  CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}")
+
+#message(STATUS "[VCPKG]")
+#message(STATUS "  Directory: ${VCPKG_DIR}")
+
+# --------------------------------------------------------------------
+# 自动配置 CMAKE_PREFIX_PATH 和 运行时环境
+# --------------------------------------------------------------------
+if(EXISTS "${Qt_INSTALL_DIR}")
+    if(WIN32)
+        set(ENV{PATH} "${Qt_INSTALL_DIR}/bin;$ENV{PATH}")
+        # 设置Qt插件路径
+        set(QT_PLUGIN_PATH "${Qt_INSTALL_DIR}/plugins" CACHE PATH "Qt plugins directory")
+    endif()
+endif()
