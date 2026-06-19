@@ -23,6 +23,9 @@ project(CAD
 
 include("${PROJECT_SOURCE_DIR}/CMake/Utils.cmake")
 
+# 禁用 Qt6 查找 WrapVulkanHeaders 的警告 
+set(Vulkan_INCLUDE_DIR "" CACHE INTERNAL "Suppress WrapVulkanHeaders warning")
+
 message(STATUS "")
 message(STATUS "==========================================")
 message(STATUS "  SanYi CAD System Configuration")
@@ -110,7 +113,6 @@ add_subdirectory(Render/3D)
 add_subdirectory(UI/Common)
 add_subdirectory(UI/2D)
 add_subdirectory(UI/3D)
-add_subdirectory(UI/App)
 
 # 6. 功能模块
 add_subdirectory(FileIO/FileIO)

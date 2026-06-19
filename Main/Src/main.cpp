@@ -3,8 +3,7 @@
 #include <QSurfaceFormat>
 #include <QDebug>
 #include <QDir>
-#include "App/CADApplication.h"
-#include "App/ModeSwitcher.h"
+#include "UI2D/CADApplication.h"
 #include "GLVerDef.h"
 #include "Log/SyLogger.h"
 #include "Ut/AppPathManager.h"
@@ -29,11 +28,11 @@ static std::string truncateFunction(const char* func, size_t maxLen = 60)
     std::string s(func);
     if (s.length() <= maxLen)
         return s;
-    
+
     size_t lambdaPos = s.find("lambda");
     if (lambdaPos != std::string::npos)
         return s.substr(0, lambdaPos) + "lambda...";
-    
+
     return s.substr(0, maxLen - 3) + "...";
 }
 

@@ -1,0 +1,45 @@
+[submodule "Engine"]
+	path = Engine
+	url = git@gitcode.com:cscpp/Engine.git
+[submodule "Render"]
+	path = Render
+	url = git@gitcode.com:cscpp/Render.git
+[submodule "Utility"]
+	path = Utility
+	url = git@gitcode.com:cscpp/Utility.git
+[submodule "Core"]
+	path = Core
+	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\Core
+[submodule "Engraving"]
+	path = Engraving
+	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\Engraving
+[submodule "FileIO"]
+	path = FileIO
+	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\FileIO
+[submodule "GeoModelCore"]
+	path = GeoModelCore
+	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\GeoModelCore
+[submodule "Hardware"]
+	path = Hardware
+	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\Hardware
+[submodule "Log"]
+	path = Log
+	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\Log
+[submodule "Nesting"]
+	path = Nesting
+	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\Nesting
+[submodule "Network"]
+	path = Network
+	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\Network
+[submodule "PyExtend"]
+	path = PyExtend
+	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\PyExtend
+[submodule "ThirdParty"]
+	path = ThirdParty
+	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\ThirdParty
+[submodule "UI"]
+	path = UI
+	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\UI
+[submodule "Vision"]
+	path = Vision
+	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\Vision

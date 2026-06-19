@@ -14,12 +14,13 @@ function(deploy_qt_libraries target_name qt_major_version)
     endif()
 endfunction()
 
-file(GLOB_RECURSE MAIN_SOURCES CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/Src/*.cpp"
+set(MAIN_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/Src/main.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Src/Common/AppInitializer.cpp"
 )
 
-file(GLOB_RECURSE MAIN_HEADERS CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/Src/*.h"
+set(MAIN_HEADERS
+    "${CMAKE_CURRENT_SOURCE_DIR}/Src/Common/AppInitializer.h"
 )
 
 file(GLOB_RECURSE MAIN_RESOURCES CONFIGURE_DEPENDS
@@ -28,14 +29,22 @@ file(GLOB_RECURSE MAIN_RESOURCES CONFIGURE_DEPENDS
 
 set(app_name "CAD")
 
+# 版本号定义
+set(VERSION_MAJOR 1)
+set(VERSION_MINOR 0)
+set(VERSION_PATCH 0)
+set(PROJECT_VERSION_MAJOR ${VERSION_MAJOR})
+set(PROJECT_VERSION_MINOR ${VERSION_MINOR})
+set(PROJECT_VERSION_PATCH ${VERSION_PATCH})
+set(PROJECT_VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
+
 add_executable(${app_name}
     ${MAIN_SOURCES}
     ${MAIN_HEADERS}
     ${MAIN_RESOURCES}
 )
 
-source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "Header Files" FILES ${MAIN_HEADERS})
-source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "Source Files" FILES ${MAIN_SOURCES})
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${MAIN_SOURCES} ${MAIN_HEADERS})
 
 set(QT_COMPONENTS Core Gui Widgets)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS ${QT_COMPONENTS} REQUIRED)
@@ -66,7 +75,6 @@ target_include_directories(${app_name}
         "${CMAKE_SOURCE_DIR}/UI/Common/Include"
         "${CMAKE_SOURCE_DIR}/UI/2D/Include"
         "${CMAKE_SOURCE_DIR}/UI/3D/Include"
-        "${CMAKE_SOURCE_DIR}/UI/App/Include"
         "${CMAKE_SOURCE_DIR}/Log/Log/Include"
 )
 
@@ -82,7 +90,6 @@ target_link_libraries(${app_name}
         UICommon
         UI2D
         UI3D
-        UIApp
         Log
         ${QT_LIBRARIES}
 )
@@ -94,31 +101,12 @@ endif()
 # Qt 部署
 deploy_qt_libraries(${app_name} ${QT_VERSION_MAJOR})
 
-# 版本号
-set(LIB_VERSION_MAJOR 1)
-set(LIB_VERSION_MINOR 0)
-set(LIB_VERSION_PATCH 0)
-set(LIB_VERSION "${LIB_VERSION_MAJOR}.${LIB_VERSION_MINOR}.${LIB_VERSION_PATCH}")
-
-set_target_properties(${app_name} PROPERTIES VERSION ${LIB_VERSION})
-
-# 版本宏供源代码使用
-string(TOUPPER ${app_name} _VER_PREFIX)
-target_compile_definitions(${app_name} PUBLIC
-    ${_VER_PREFIX}_VERSION_MAJOR=${LIB_VERSION_MAJOR}
-    ${_VER_PREFIX}_VERSION_MINOR=${LIB_VERSION_MINOR}
-    ${_VER_PREFIX}_VERSION_PATCH=${LIB_VERSION_PATCH}
-    ${_VER_PREFIX}_VERSION_STRING="${LIB_VERSION}"
-)
-
 sanyi_add_version_info(${app_name} "${app_name}" "SanYi CAD Application")
 
 message(STATUS "[Main]")
 message(STATUS "  Application: ${app_name}")
-message(STATUS "  Version: ${LIB_VERSION}")
+message(STATUS "  Version: ${PROJECT_VERSION}")
 message(STATUS "  Platform: ${CMAKE_SYSTEM_NAME}(${CMAKE_SYSTEM_PROCESSOR})")
 message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
-
-message(STATUS "  C++ Standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "")
 message(STATUS "----------------------------------------")

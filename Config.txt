@@ -18,7 +18,7 @@ endif()
 # Qt 版本配置
 # --------------------------------------------------------------------
 # 设置要使用的Qt主版本。可设置为 5 或 6。
-set(QT_VERSION_MAJOR 5 CACHE STRING "Major version of Qt to use (5 or 6)")
+set(QT_VERSION_MAJOR 6 CACHE STRING "Major version of Qt to use (5 or 6)")
 
 # --------------------------------------------------------------------
 # Qt 路径配置
