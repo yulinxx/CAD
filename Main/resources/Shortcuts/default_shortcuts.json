@@ -1,0 +1,50 @@
+{
+    "tools": [
+        { "id": "tool.select",    "display": "Select Tool",        "shortcut": "Space",     "configurable": true },
+        { "id": "tool.point",     "display": "Point Tool",         "shortcut": "None",      "configurable": true },
+        { "id": "tool.line",      "display": "Line Tool",          "shortcut": "L",         "configurable": true },
+        { "id": "tool.polyline",  "display": "Polyline Tool",      "shortcut": "P",         "configurable": true },
+        { "id": "tool.polygon",   "display": "Polygon Tool",       "shortcut": "G",         "configurable": true },
+        { "id": "tool.circle",    "display": "Circle Tool",        "shortcut": "C",         "configurable": true },
+        { "id": "tool.arc",       "display": "Arc Tool",           "shortcut": "A",         "configurable": true },
+        { "id": "tool.ellipse",   "display": "Ellipse Tool",       "shortcut": "E",         "configurable": true },
+        { "id": "tool.rectangle", "display": "Rectangle Tool",     "shortcut": "R",         "configurable": true },
+        { "id": "tool.triangle",  "display": "Triangle Tool",      "shortcut": "T",         "configurable": true },
+        { "id": "tool.bezier2",   "display": "Quadratic Bezier",   "shortcut": "B",         "configurable": true },
+        { "id": "tool.bezier",    "display": "Cubic Bezier",       "shortcut": "Shift+B",   "configurable": true },
+        { "id": "tool.spline",    "display": "Spline Tool",        "shortcut": "S",         "configurable": true },
+        { "id": "tool.nurbs",     "display": "NURBS Tool",         "shortcut": "N",         "configurable": true },
+        { "id": "tool.smartline", "display": "Smart Line Tool",    "shortcut": "Shift+L",   "configurable": true },
+        { "id": "tool.text",      "display": "Text Tool",          "shortcut": "Ctrl+T",    "configurable": true },
+        { "id": "tool.bitmap",    "display": "Bitmap Tool",        "shortcut": "Ctrl+B",    "configurable": true },
+        { "id": "tool.qrcode",    "display": "QR Code Tool",       "shortcut": "Ctrl+Q",    "configurable": true }
+    ],
+    "actions": [
+        { "id": "edit.delete",          "display": "Delete",               "shortcut": "Delete",      "configurable": true },
+        { "id": "edit.copy",            "display": "Copy",                 "shortcut": "Ctrl+C",      "configurable": true },
+        { "id": "edit.cut",             "display": "Cut",                  "shortcut": "Ctrl+X",      "configurable": true },
+        { "id": "edit.paste",           "display": "Paste",                "shortcut": "Ctrl+V",      "configurable": true },
+        { "id": "edit.selectAll",       "display": "Select All",           "shortcut": "Ctrl+A",      "configurable": true },
+        { "id": "edit.undo",            "display": "Undo",                 "shortcut": "Ctrl+Z",      "configurable": true },
+        { "id": "edit.redo",            "display": "Redo",                 "shortcut": "Ctrl+Y",      "configurable": true },
+        { "id": "edit.save",            "display": "Save",                 "shortcut": "Ctrl+S",      "configurable": true },
+        { "id": "file.new",             "display": "New File",             "shortcut": "Ctrl+N",      "configurable": true },
+        { "id": "file.open",            "display": "Open File",            "shortcut": "Ctrl+O",      "configurable": true }
+    ],
+    "views": [
+        { "id": "view.zoomIn",      "display": "Zoom In",           "shortcut": "Ctrl+=",    "configurable": true },
+        { "id": "view.zoomOut",     "display": "Zoom Out",          "shortcut": "Ctrl+-",    "configurable": true },
+        { "id": "view.panUp",       "display": "Pan Up",            "shortcut": "Up",        "configurable": true },
+        { "id": "view.panDown",     "display": "Pan Down",          "shortcut": "Down",      "configurable": true },
+        { "id": "view.panLeft",     "display": "Pan Left",          "shortcut": "Left",      "configurable": true },
+        { "id": "view.panRight",    "display": "Pan Right",         "shortcut": "Right",     "configurable": true },
+        { "id": "view.resetView",   "display": "Reset View",        "shortcut": "Home",      "configurable": true },
+        { "id": "view.zoomToFit",   "display": "Zoom to Fit",       "shortcut": "Ctrl+Shift+F", "configurable": true }
+    ],
+    "render": [
+        { "id": "render.toggleAntialiasing", "display": "Toggle Antialiasing",  "shortcut": "F1",   "configurable": true },
+        { "id": "render.toggleWireframe",    "display": "Toggle Wireframe",      "shortcut": "F2",   "configurable": true },
+        { "id": "render.toggleDepthTest",    "display": "Toggle Depth Test",     "shortcut": "F3",   "configurable": true },
+        { "id": "render.resetRenderView",    "display": "Reset Render View",     "shortcut": "F4",   "configurable": true }
+    ]
+}
