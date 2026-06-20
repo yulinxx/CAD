@@ -31,7 +31,6 @@ message(STATUS "==========================================")
 message(STATUS "  SanYi CAD System Configuration")
 message(STATUS "==========================================")
 message(STATUS "")
-message(STATUS "[System]")
 message(STATUS "  Project: ${PROJECT_NAME}")
 message(STATUS "  VCPKG_DIR: ${VCPKG_DIR}")
 
@@ -86,15 +85,29 @@ find_package(GTest CONFIG QUIET)
 if(GTest_FOUND)
     include(GoogleTest)
     message(STATUS "  Google Test: Found, unit tests enabled")
+    
+    option(BUILD_ALL_TESTS "Build all unit tests" OFF)
+    option(BUILD_UTILITY_TESTS "Build Utility unit tests" ${BUILD_ALL_TESTS})
+    option(BUILD_LOG_TESTS "Build Log unit tests" ${BUILD_ALL_TESTS})
+    option(BUILD_ENGINE2D_TESTS "Build Engine2D unit tests" ${BUILD_ALL_TESTS})
+    option(BUILD_NESTING_TESTS "Build Nesting unit tests" ${BUILD_ALL_TESTS})
+    option(BUILD_FILEIO_TESTS "Build FileIO unit tests" ${BUILD_ALL_TESTS})
+    
+    enable_testing()
 else()
     message(STATUS "  Google Test: Not found, unit tests disabled")
+    set(BUILD_UTILITY_TESTS OFF CACHE BOOL "Build Utility unit tests" FORCE)
+    set(BUILD_LOG_TESTS OFF CACHE BOOL "Build Log unit tests" FORCE)
+    set(BUILD_ENGINE2D_TESTS OFF CACHE BOOL "Build Engine2D unit tests" FORCE)
+    set(BUILD_NESTING_TESTS OFF CACHE BOOL "Build Nesting unit tests" FORCE)
+    set(BUILD_FILEIO_TESTS OFF CACHE BOOL "Build FileIO unit tests" FORCE)
 endif()
 
 message(STATUS "")
 message(STATUS "***************************************************************")
 
 # 1. Core 层 - 共享基础设施
-add_subdirectory(Core/Utility)
+add_subdirectory(Utility/Utility)
 
 # 2. Log 层 - 日志库（Engine 层依赖）
 add_subdirectory(Log/Log)

@@ -65,7 +65,7 @@ target_compile_features(${app_name} PRIVATE cxx_std_17)
 
 target_include_directories(${app_name}
     PRIVATE
-        "${CMAKE_SOURCE_DIR}/Core/Utility/Include"
+        "${CMAKE_SOURCE_DIR}/Utility/Utility/Include"
         "${CMAKE_SOURCE_DIR}/Engine/Common/Include"
         "${CMAKE_SOURCE_DIR}/Engine/2D/Include"
         "${CMAKE_SOURCE_DIR}/Engine/3D/Include"
@@ -97,6 +97,32 @@ target_link_libraries(${app_name}
 if(MSVC)
     target_compile_options(${app_name} PRIVATE /utf-8)
 endif()
+
+# 复制翻译文件 (.qm) 到输出目录
+set(TRANSLATIONS_SRC_DIR "${CMAKE_SOURCE_DIR}/UI/Common/Translations")
+set(TRANSLATIONS_DST_DIR "$<TARGET_FILE_DIR:${app_name}>/translations")
+
+file(GLOB TRANSLATION_QM_FILES "${TRANSLATIONS_SRC_DIR}/*.qm")
+
+add_custom_command(TARGET ${app_name} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${TRANSLATIONS_DST_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${TRANSLATION_QM_FILES}
+        "${TRANSLATIONS_DST_DIR}/"
+    COMMENT "Copying translation .qm files to ${TRANSLATIONS_DST_DIR}"
+)
+
+# 复制资源文件 (Shortcuts 等) 到输出目录
+set(RESOURCES_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
+set(RESOURCES_DST_DIR "$<TARGET_FILE_DIR:${app_name}>/resources")
+
+add_custom_command(TARGET ${app_name} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${RESOURCES_DST_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${RESOURCES_SRC_DIR}"
+        "${RESOURCES_DST_DIR}"
+    COMMENT "Copying resource files to ${RESOURCES_DST_DIR}"
+)
 
 # Qt 部署
 deploy_qt_libraries(${app_name} ${QT_VERSION_MAJOR})
