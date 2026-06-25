@@ -6,7 +6,7 @@ function(deploy_qt_libraries target_name qt_major_version)
     set(QT_WINDEPLOYQT_EXECUTABLE "${QT_WINDEPLOYQT_EXECUTABLE}/windeployqt.exe")
     if(EXISTS ${QT_WINDEPLOYQT_EXECUTABLE})
         add_custom_command(TARGET ${target_name} POST_BUILD
-            COMMAND ${QT_WINDEPLOYQT_EXECUTABLE} --qmldir ${CMAKE_SOURCE_DIR} $<TARGET_FILE:${target_name}>
+            COMMAND ${QT_WINDEPLOYQT_EXECUTABLE} --qmldir ${CMAKE_CURRENT_SOURCE_DIR}/.. $<TARGET_FILE:${target_name}>
             COMMENT "Deploying Qt${qt_major_version} libraries using windeployqt"
         )
     else()
@@ -17,17 +17,19 @@ endfunction()
 set(MAIN_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/Src/main.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Src/Common/AppInitializer.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Src/Common/AppPathManager.cpp"
 )
 
 set(MAIN_HEADERS
     "${CMAKE_CURRENT_SOURCE_DIR}/Src/Common/AppInitializer.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Src/Common/AppPathManager.h"
 )
 
 file(GLOB_RECURSE MAIN_RESOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.qrc"
 )
 
-set(app_name "CAD")
+set(app_name "SanYiCAD")
 
 # 版本号定义
 set(VERSION_MAJOR 1)
@@ -65,22 +67,24 @@ target_compile_features(${app_name} PRIVATE cxx_std_17)
 
 target_include_directories(${app_name}
     PRIVATE
-        "${CMAKE_SOURCE_DIR}/Utility/Utility/Include"
-        "${CMAKE_SOURCE_DIR}/Engine/Common/Include"
-        "${CMAKE_SOURCE_DIR}/Engine/2D/Include"
-        "${CMAKE_SOURCE_DIR}/Engine/3D/Include"
-        "${CMAKE_SOURCE_DIR}/Render/Common/Include"
-        "${CMAKE_SOURCE_DIR}/Render/2D/Include"
-        "${CMAKE_SOURCE_DIR}/Render/3D/Include"
-        "${CMAKE_SOURCE_DIR}/UI/Common/Include"
-        "${CMAKE_SOURCE_DIR}/UI/2D/Include"
-        "${CMAKE_SOURCE_DIR}/UI/3D/Include"
-        "${CMAKE_SOURCE_DIR}/Log/Log/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../Utility/Utility/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler/CrashHandler/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/2D/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/3D/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../Render/Common/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../Render/2D/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../Render/3D/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Common/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../Log/Log/Include"
 )
 
 target_link_libraries(${app_name}
     PRIVATE
         Utility
+        CrashHandler
         EngineCommon
         Engine2D
         Engine3D
@@ -94,13 +98,39 @@ target_link_libraries(${app_name}
         ${QT_LIBRARIES}
 )
 
+if(SANYI_PYTHON_HOST)
+    target_compile_definitions(${app_name} PRIVATE SANYI_PYTHON_HOST=1)
+    target_compile_definitions(${app_name} PRIVATE "CMAKE_SOURCE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/..\"")
+    target_include_directories(${app_name}
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/../PythonHost/PythonHost/Include"
+    )
+    target_link_libraries(${app_name} PRIVATE PythonHost)
+    add_dependencies(${app_name} PythonHost)
+
+    add_custom_command(TARGET ${app_name} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Python"
+            "$<TARGET_FILE_DIR:${app_name}>/Python"
+        COMMENT "Deploying Python package to output directory"
+    )
+endif()
+
+if(SANYI_PYBIND_CORE AND SANYI_PYTHON_HOST)
+    add_dependencies(${app_name} SanYiPyBindCore)
+endif()
+
 if(MSVC)
     target_compile_options(${app_name} PRIVATE /utf-8)
 endif()
 
 # 复制翻译文件 (.qm) 到输出目录
-set(TRANSLATIONS_SRC_DIR "${CMAKE_SOURCE_DIR}/UI/Common/Translations")
+set(TRANSLATIONS_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Common/Translations")
 set(TRANSLATIONS_DST_DIR "$<TARGET_FILE_DIR:${app_name}>/translations")
+
+if(TARGET UICommon_translations)
+    add_dependencies(${app_name} UICommon_translations)
+endif()
 
 file(GLOB TRANSLATION_QM_FILES "${TRANSLATIONS_SRC_DIR}/*.qm")
 
@@ -128,6 +158,11 @@ add_custom_command(TARGET ${app_name} POST_BUILD
 deploy_qt_libraries(${app_name} ${QT_VERSION_MAJOR})
 
 sanyi_add_version_info(${app_name} "${app_name}" "SanYi CAD Application")
+
+option(SANYI_GENERATE_SYMBOLS "Generate debug symbols for crash analysis" ON)
+if(SANYI_GENERATE_SYMBOLS)
+    sanyi_add_debug_symbols(${app_name})
+endif()
 
 message(STATUS "[Main]")
 message(STATUS "  Application: ${app_name}")

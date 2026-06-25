@@ -1,5 +1,2 @@
 ﻿<RCC>
-    <qresource prefix="/Shortcuts">
-        <file>resources/Shortcuts/toolbar_shortcuts</file>
-    </qresource>
 </RCC>

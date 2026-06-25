@@ -1,0 +1,39 @@
+{
+    "actions": [
+        { "id": "file.openModel",       "display": "Open Model",           "shortcut": "Ctrl+O",       "configurable": true },
+        { "id": "file.importModel",     "display": "Import Model",         "shortcut": "Ctrl+Shift+O", "configurable": true },
+        { "id": "file.newScene",        "display": "New Scene",            "shortcut": "Ctrl+N",       "configurable": true },
+        { "id": "file.save",            "display": "Save",                 "shortcut": "Ctrl+S",       "configurable": true },
+        { "id": "file.saveAs",          "display": "Save As",              "shortcut": "Ctrl+Shift+S", "configurable": true },
+        { "id": "file.exit",            "display": "Exit",                 "shortcut": "Ctrl+Q",       "configurable": true },
+        { "id": "edit.undo",            "display": "Undo",                 "shortcut": "Ctrl+Z",       "configurable": true },
+        { "id": "edit.redo",            "display": "Redo",                 "shortcut": "Ctrl+Y",       "configurable": true },
+        { "id": "edit.selectAll",       "display": "Select All",           "shortcut": "Ctrl+A",       "configurable": true },
+        { "id": "edit.clearSelection",  "display": "Clear Selection",      "shortcut": "Esc",          "configurable": true },
+        { "id": "edit.delete",          "display": "Delete",               "shortcut": "Delete",       "configurable": true },
+        { "id": "edit.transformTranslate", "display": "Translate",         "shortcut": "T",            "configurable": true },
+        { "id": "edit.transformRotate", "display": "Rotate",               "shortcut": "R",            "configurable": true },
+        { "id": "edit.transformScale",  "display": "Scale",                "shortcut": "S",            "configurable": true }
+    ],
+    "views": [
+        { "id": "view.switchTo2D",      "display": "Switch to 2D",         "shortcut": "Ctrl+Shift+2", "configurable": true },
+        { "id": "view.reset",           "display": "Reset View",           "shortcut": "Ctrl+R",       "configurable": true },
+        { "id": "view.fitAll",          "display": "Fit All",              "shortcut": "Ctrl+F",       "configurable": true },
+        { "id": "view.wireframe",       "display": "Wireframe",            "shortcut": "W",            "configurable": true },
+        { "id": "view.grid",            "display": "Show Grid",            "shortcut": "G",            "configurable": true },
+        { "id": "view.bbox",            "display": "Show Bounding Box",    "shortcut": "B",            "configurable": true },
+        { "id": "view.floor",           "display": "Show Floor",           "shortcut": "Shift+F",      "configurable": true },
+        { "id": "view.front",           "display": "Front View",           "shortcut": "1",            "configurable": true },
+        { "id": "view.back",            "display": "Back View",            "shortcut": "2",            "configurable": true },
+        { "id": "view.left",            "display": "Left View",            "shortcut": "3",            "configurable": true },
+        { "id": "view.right",           "display": "Right View",           "shortcut": "4",            "configurable": true },
+        { "id": "view.top",             "display": "Top View",             "shortcut": "5",            "configurable": true },
+        { "id": "view.bottom",          "display": "Bottom View",          "shortcut": "6",            "configurable": true },
+        { "id": "view.isometric",       "display": "Isometric View",       "shortcut": "Alt+I",        "configurable": true },
+        { "id": "view.dimetric",        "display": "Dimetric View",        "shortcut": "Alt+D",        "configurable": true },
+        { "id": "view.trimetric",       "display": "Trimetric View",       "shortcut": "Alt+T",        "configurable": true }
+    ],
+    "help": [
+        { "id": "help.shortcuts",       "display": "Keyboard Shortcuts",   "shortcut": "F1",           "configurable": false }
+    ]
+}

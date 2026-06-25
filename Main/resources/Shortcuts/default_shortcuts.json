@@ -27,22 +27,24 @@
         { "id": "edit.selectAll",       "display": "Select All",           "shortcut": "Ctrl+A",      "configurable": true },
         { "id": "edit.undo",            "display": "Undo",                 "shortcut": "Ctrl+Z",      "configurable": true },
         { "id": "edit.redo",            "display": "Redo",                 "shortcut": "Ctrl+Y",      "configurable": true },
-        { "id": "edit.save",            "display": "Save",                 "shortcut": "Ctrl+S",      "configurable": true },
+        { "id": "file.save",            "display": "Save",                 "shortcut": "Ctrl+S",      "configurable": true },
+        { "id": "file.saveAs",          "display": "Save As",              "shortcut": "Ctrl+Shift+S","configurable": true },
         { "id": "file.new",             "display": "New File",             "shortcut": "Ctrl+N",      "configurable": true },
         { "id": "file.open",            "display": "Open File",            "shortcut": "Ctrl+O",      "configurable": true }
     ],
     "views": [
-        { "id": "view.zoomIn",      "display": "Zoom In",           "shortcut": "Ctrl+=",    "configurable": true },
-        { "id": "view.zoomOut",     "display": "Zoom Out",          "shortcut": "Ctrl+-",    "configurable": true },
-        { "id": "view.panUp",       "display": "Pan Up",            "shortcut": "Up",        "configurable": true },
-        { "id": "view.panDown",     "display": "Pan Down",          "shortcut": "Down",      "configurable": true },
-        { "id": "view.panLeft",     "display": "Pan Left",          "shortcut": "Left",      "configurable": true },
-        { "id": "view.panRight",    "display": "Pan Right",         "shortcut": "Right",     "configurable": true },
-        { "id": "view.resetView",   "display": "Reset View",        "shortcut": "Home",      "configurable": true },
-        { "id": "view.zoomToFit",   "display": "Zoom to Fit",       "shortcut": "Ctrl+Shift+F", "configurable": true }
+        { "id": "view.zoomIn",        "display": "Zoom In",              "shortcut": "Ctrl+=",       "configurable": true },
+        { "id": "view.zoomOut",       "display": "Zoom Out",             "shortcut": "Ctrl+-",       "configurable": true },
+        { "id": "view.panUp",         "display": "Pan Up",               "shortcut": "Up",           "configurable": true },
+        { "id": "view.panDown",       "display": "Pan Down",             "shortcut": "Down",         "configurable": true },
+        { "id": "view.panLeft",       "display": "Pan Left",             "shortcut": "Left",         "configurable": true },
+        { "id": "view.panRight",      "display": "Pan Right",            "shortcut": "Right",        "configurable": true },
+        { "id": "view.resetView",     "display": "Reset View",           "shortcut": "Home",         "configurable": true },
+        { "id": "view.zoomToFit",     "display": "Zoom to Fit",          "shortcut": "Ctrl+F",       "configurable": true },
+        { "id": "view.zoomSelection", "display": "Zoom to Selection",    "shortcut": "Ctrl+Shift+F", "configurable": true }
     ],
     "render": [
-        { "id": "render.toggleAntialiasing", "display": "Toggle Antialiasing",  "shortcut": "F1",   "configurable": true },
+        { "id": "render.toggleAntialiasing", "display": "Toggle Antialiasing",  "shortcut": "F5",   "configurable": true },
         { "id": "render.toggleWireframe",    "display": "Toggle Wireframe",      "shortcut": "F2",   "configurable": true },
         { "id": "render.toggleDepthTest",    "display": "Toggle Depth Test",     "shortcut": "F3",   "configurable": true },
         { "id": "render.resetRenderView",    "display": "Reset Render View",     "shortcut": "F4",   "configurable": true }

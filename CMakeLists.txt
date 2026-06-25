@@ -15,9 +15,9 @@ set(CMAKE_TOOLCHAIN_FILE "${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake" CACHE S
 # set(VCPKG_APPLOCAL_DEPS OFF CACHE BOOL "Disable automatic DLL deployment")
 
 # 项目基本信息
-project(CAD
+project(SanYiCAD
     VERSION 1.0.0
-    DESCRIPTION "SanYi CAD System - Unified 2D/3D"
+    DESCRIPTION "SanYi CAD System"
     LANGUAGES CXX
 )
 
@@ -109,6 +109,9 @@ message(STATUS "***************************************************************"
 # 1. Core 层 - 共享基础设施
 add_subdirectory(Utility/Utility)
 
+# 1.5 CrashHandler 层 - 崩溃捕获（在日志之前，确保初始化阶段崩溃也能捕获）
+add_subdirectory(CrashHandler/CrashHandler)
+
 # 2. Log 层 - 日志库（Engine 层依赖）
 add_subdirectory(Log/Log)
 
@@ -121,6 +124,12 @@ add_subdirectory(Engine/3D)
 add_subdirectory(Render/Common)
 add_subdirectory(Render/2D)
 add_subdirectory(Render/3D)
+
+# 4.5 独立渲染 DLL（纯 POD 契约，不依赖 Engine/Ut）
+option(BUILD_SANYI_RENDER "Build standalone SanYiRender DLL" ON)
+if(BUILD_SANYI_RENDER)
+    add_subdirectory(SanYiRender)
+endif()
 
 # 5. UI 层 - 用户界面
 add_subdirectory(UI/Common)
@@ -169,10 +178,24 @@ else()
 endif()
 message(STATUS "----------------------------------------")
 
-# 7. Python 扩展
-option(BUILD_PYEXTEND "Build Python extension module" ON)
-if(BUILD_PYEXTEND)
-    add_subdirectory(PyExtend)
+# 7. Python 集成
+option(SANYI_PYTHON_HOST "Enable PythonHost integration framework" ON)
+option(SANYI_PYTHON_EMBED "Enable in-process Python bridge (Phase 3)" OFF)
+set(SANYI_PYTHON_VERSION "3.11" CACHE STRING "Required Python version")
+
+if(SANYI_PYTHON_HOST)
+    add_subdirectory(PythonHost)
+    message(STATUS "  PythonHost: ENABLED")
+else()
+    message(STATUS "  PythonHost: DISABLED")
+endif()
+
+option(SANYI_PYBIND_CORE "Build PyBindCore facade extension (_sanyi_core)" ON)
+if(SANYI_PYBIND_CORE AND SANYI_PYTHON_HOST)
+    add_subdirectory(PyBindCore)
+    message(STATUS "  PyBindCore: ENABLED")
+else()
+    message(STATUS "  PyBindCore: DISABLED")
 endif()
 
 # 8. 应用入口

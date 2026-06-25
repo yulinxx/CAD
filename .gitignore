@@ -1,5 +1,6 @@
 # Build directories
 build/
+build*
 out/
 cmake-build-*/
 CMakeFiles/
@@ -44,6 +45,8 @@ __pycache__/
 *.pyo
 *.pyd
 *.egg-info/
+Python/venv/
+Python/.venv/
 
 # OS
 .DS_Store
@@ -58,5 +61,9 @@ desktop.ini
 *.log
 SVGnest/
 Doc/
+docs/
 Archive/
 RenderEngine/
+.gitmodules
+.github/
+scripts/

@@ -1,45 +1,42 @@
 [submodule "Engine"]
 	path = Engine
-	url = git@gitcode.com:cscpp/Engine.git
+	url = git@github.com:yulinxx/Engine.git
 [submodule "Render"]
 	path = Render
-	url = git@gitcode.com:cscpp/Render.git
+	url = git@github.com:yulinxx/Render.git
 [submodule "Utility"]
 	path = Utility
-	url = git@gitcode.com:cscpp/Utility.git
-[submodule "Core"]
-	path = Core
-	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\Core
+	url = git@github.com:yulinxx/Core.git
 [submodule "Engraving"]
 	path = Engraving
-	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\Engraving
+	url = git@github.com:yulinxx/Engraving.git
 [submodule "FileIO"]
 	path = FileIO
-	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\FileIO
+	url = git@github.com:yulinxx/FileIO.git
 [submodule "GeoModelCore"]
 	path = GeoModelCore
-	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\GeoModelCore
+	url = git@github.com:yulinxx/GeoModelCore.git
 [submodule "Hardware"]
 	path = Hardware
-	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\Hardware
+	url = git@github.com:yulinxx/Hardware.git
 [submodule "Log"]
 	path = Log
-	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\Log
+	url = git@github.com:yulinxx/Log.git
 [submodule "Nesting"]
 	path = Nesting
-	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\Nesting
+	url = git@github.com:yulinxx/Nesting.git
 [submodule "Network"]
 	path = Network
-	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\Network
-[submodule "PyExtend"]
-	path = PyExtend
-	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\PyExtend
+	url = git@github.com:yulinxx/Network.git
 [submodule "ThirdParty"]
 	path = ThirdParty
-	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\ThirdParty
+	url = git@github.com:yulinxx/ThirdParty.git
 [submodule "UI"]
 	path = UI
-	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\UI
+	url = git@github.com:yulinxx/UI.git
 [submodule "Vision"]
 	path = Vision
-	url = C:\\Users\\xx\\Documents\\Cpp\\SanYi_Max\\CAD\\Vision
+	url = git@github.com:yulinxx/Vision.git
+[submodule "CrashHandler"]
+	path = CrashHandler
+	url = git@github.com:yulinxx/CrashHandler.git
