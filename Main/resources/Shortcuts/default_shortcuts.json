@@ -1,6 +1,6 @@
 {
     "tools": [
-        { "id": "tool.select",    "display": "Select Tool",        "shortcut": "Space",     "configurable": true },
+        { "id": "tool.select",    "display": "Select Tool",        "shortcut": "None",      "configurable": true },
         { "id": "tool.point",     "display": "Point Tool",         "shortcut": "None",      "configurable": true },
         { "id": "tool.line",      "display": "Line Tool",          "shortcut": "L",         "configurable": true },
         { "id": "tool.polyline",  "display": "Polyline Tool",      "shortcut": "P",         "configurable": true },

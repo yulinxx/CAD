@@ -14,15 +14,12 @@ function(deploy_qt_libraries target_name qt_major_version)
     endif()
 endfunction()
 
-set(MAIN_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/Src/main.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Src/Common/AppInitializer.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Src/Common/AppPathManager.cpp"
+file(GLOB_RECURSE MAIN_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/Src/*.cpp"
 )
 
-set(MAIN_HEADERS
-    "${CMAKE_CURRENT_SOURCE_DIR}/Src/Common/AppInitializer.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Src/Common/AppPathManager.h"
+file(GLOB_RECURSE MAIN_HEADERS CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/Src/*.h"
 )
 
 file(GLOB_RECURSE MAIN_RESOURCES CONFIGURE_DEPENDS
@@ -67,6 +64,8 @@ target_compile_features(${app_name} PRIVATE cxx_std_17)
 
 target_include_directories(${app_name}
     PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/Src"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Src/Common"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Utility/Utility/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler/CrashHandler/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
@@ -121,10 +120,9 @@ if(SANYI_PYBIND_CORE AND SANYI_PYTHON_HOST)
 endif()
 
 if(MSVC)
-    target_compile_options(${app_name} PRIVATE /utf-8)
+    target_compile_options(${app_name} PRIVATE /utf-8 /FS)
 endif()
 
-# 复制翻译文件 (.qm) 到输出目录
 set(TRANSLATIONS_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Common/Translations")
 set(TRANSLATIONS_DST_DIR "$<TARGET_FILE_DIR:${app_name}>/translations")
 
@@ -142,7 +140,6 @@ add_custom_command(TARGET ${app_name} POST_BUILD
     COMMENT "Copying translation .qm files to ${TRANSLATIONS_DST_DIR}"
 )
 
-# 复制资源文件 (Shortcuts 等) 到输出目录
 set(RESOURCES_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 set(RESOURCES_DST_DIR "$<TARGET_FILE_DIR:${app_name}>/resources")
 
@@ -154,7 +151,6 @@ add_custom_command(TARGET ${app_name} POST_BUILD
     COMMENT "Copying resource files to ${RESOURCES_DST_DIR}"
 )
 
-# Qt 部署
 deploy_qt_libraries(${app_name} ${QT_VERSION_MAJOR})
 
 sanyi_add_version_info(${app_name} "${app_name}" "SanYi CAD Application")

@@ -1,2 +1,13 @@
-﻿<RCC>
+<RCC>
+    <qresource prefix="/">
+        <file>resources/Shortcuts/default_shortcuts.json</file>
+        <file>resources/Shortcuts/default_shortcuts_3d.json</file>
+        <file>resources/Shortcuts/default_navigation_3d.json</file>
+        <file>../UI/Common/Resources/Styles/common.qss</file>
+        <file>../UI/Common/Resources/Styles/light.qss</file>
+        <file>../UI/Common/Resources/Styles/dark.qss</file>
+        <file>../UI/Common/Resources/Styles/blue.qss</file>
+        <file>../UI/Common/Resources/Styles/slate.qss</file>
+        <file>../UI/Common/Resources/Styles/high_contrast.qss</file>
+    </qresource>
 </RCC>

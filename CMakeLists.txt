@@ -21,7 +21,9 @@ project(SanYiCAD
     LANGUAGES CXX
 )
 
-include("${PROJECT_SOURCE_DIR}/CMake/Utils.cmake")
+set(SANYI_ROOT "${PROJECT_SOURCE_DIR}" CACHE INTERNAL "SanYi CAD project root")
+include("${SANYI_ROOT}/CMake/SanYiPaths.cmake")
+include("${SANYI_ROOT}/CMake/Utils.cmake")
 
 # 禁用 Qt6 查找 WrapVulkanHeaders 的警告 
 set(Vulkan_INCLUDE_DIR "" CACHE INTERNAL "Suppress WrapVulkanHeaders warning")
@@ -59,8 +61,13 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# MSVC 编译选项：使用 UTF-8 编码，避免 C4819 警告
+# 符号可见性控制：默认隐藏，仅通过宏导出必要符号
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
+
+# 统一 MSVC 运行时库设置
 if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
     add_compile_options("/utf-8")
 endif()
 
@@ -90,8 +97,15 @@ if(GTest_FOUND)
     option(BUILD_UTILITY_TESTS "Build Utility unit tests" ${BUILD_ALL_TESTS})
     option(BUILD_LOG_TESTS "Build Log unit tests" ${BUILD_ALL_TESTS})
     option(BUILD_ENGINE2D_TESTS "Build Engine2D unit tests" ${BUILD_ALL_TESTS})
+    option(BUILD_ENGINE3D_TESTS "Build Engine3D unit tests" ${BUILD_ALL_TESTS})
     option(BUILD_NESTING_TESTS "Build Nesting unit tests" ${BUILD_ALL_TESTS})
+    option(BUILD_GEOMODELCORE_TESTS "Build GeoModelCore unit tests" ${BUILD_ALL_TESTS})
     option(BUILD_FILEIO_TESTS "Build FileIO unit tests" ${BUILD_ALL_TESTS})
+    if(BUILD_ENGRAVING)
+        option(BUILD_ENGRAVING_TESTS "Build Engraving unit tests" ON)
+    else()
+        option(BUILD_ENGRAVING_TESTS "Build Engraving unit tests" OFF)
+    endif()
     
     enable_testing()
 else()
@@ -99,8 +113,11 @@ else()
     set(BUILD_UTILITY_TESTS OFF CACHE BOOL "Build Utility unit tests" FORCE)
     set(BUILD_LOG_TESTS OFF CACHE BOOL "Build Log unit tests" FORCE)
     set(BUILD_ENGINE2D_TESTS OFF CACHE BOOL "Build Engine2D unit tests" FORCE)
+    set(BUILD_ENGINE3D_TESTS OFF CACHE BOOL "Build Engine3D unit tests" FORCE)
+    set(BUILD_GEOMODELCORE_TESTS OFF CACHE BOOL "Build GeoModelCore unit tests" FORCE)
     set(BUILD_NESTING_TESTS OFF CACHE BOOL "Build Nesting unit tests" FORCE)
     set(BUILD_FILEIO_TESTS OFF CACHE BOOL "Build FileIO unit tests" FORCE)
+    set(BUILD_ENGRAVING_TESTS OFF CACHE BOOL "Build Engraving unit tests" FORCE)
 endif()
 
 message(STATUS "")
@@ -131,6 +148,23 @@ if(BUILD_SANYI_RENDER)
     add_subdirectory(SanYiRender)
 endif()
 
+# 4.6 GeoModelCore（须在 UI3D 之前，以便 UI3D 链接并继承头文件路径）
+if(BUILD_GEOMODELCORE)
+    find_package(OpenCASCADE CONFIG REQUIRED)
+    add_subdirectory(GeoModelCore/GeoModelCore)
+    message(STATUS "  GeoModelCore: ENABLED")
+else()
+    message(STATUS "  GeoModelCore: DISABLED")
+endif()
+
+# 4.7 Engraving（须在 UI 之前，以便 UI2D/UI3D 链接）
+if(BUILD_ENGRAVING)
+    add_subdirectory(Engraving/Engraving)
+    message(STATUS "  Engraving: ENABLED")
+else()
+    message(STATUS "  Engraving: DISABLED")
+endif()
+
 # 5. UI 层 - 用户界面
 add_subdirectory(UI/Common)
 add_subdirectory(UI/2D)
@@ -148,13 +182,6 @@ else()
     message(STATUS "  Hardware: DISABLED")
 endif()
 
-if(BUILD_ENGRAVING)
-    add_subdirectory(Engraving/Engraving)
-    message(STATUS "  Engraving: ENABLED")
-else()
-    message(STATUS "  Engraving: DISABLED")
-endif()
-
 if(BUILD_NETWORK)
     add_subdirectory(Network/Network)
     message(STATUS "  Network: ENABLED")
@@ -169,13 +196,6 @@ else()
     message(STATUS "  Vision: DISABLED")
 endif()
 
-if(BUILD_GEOMODELCORE)
-    find_package(OpenCASCADE REQUIRED)
-    add_subdirectory(GeoModelCore/GeoModelCore)
-    message(STATUS "  GeoModelCore: ENABLED")
-else()
-    message(STATUS "  GeoModelCore: DISABLED")
-endif()
 message(STATUS "----------------------------------------")
 
 # 7. Python 集成

@@ -13,7 +13,11 @@
         { "id": "edit.delete",          "display": "Delete",               "shortcut": "Delete",       "configurable": true },
         { "id": "edit.transformTranslate", "display": "Translate",         "shortcut": "T",            "configurable": true },
         { "id": "edit.transformRotate", "display": "Rotate",               "shortcut": "R",            "configurable": true },
-        { "id": "edit.transformScale",  "display": "Scale",                "shortcut": "S",            "configurable": true }
+        { "id": "edit.transformScale",  "display": "Scale",                "shortcut": "S",            "configurable": true },
+        { "id": "algo.reliefEngraving", "display": "3D Relief Engraving",  "shortcut": "Ctrl+Shift+E", "configurable": true },
+        { "id": "process.generateReliefToolpath", "display": "Generate Relief Toolpath", "shortcut": "Ctrl+Shift+G", "configurable": true },
+        { "id": "process.exportReliefToolpath", "display": "Export Relief Toolpath", "shortcut": "",   "configurable": true },
+        { "id": "process.sendReliefToLaser",    "display": "Send Relief to Laser",   "shortcut": "Ctrl+Shift+L", "configurable": true }
     ],
     "views": [
         { "id": "view.switchTo2D",      "display": "Switch to 2D",         "shortcut": "Ctrl+Shift+2", "configurable": true },

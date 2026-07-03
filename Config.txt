@@ -50,9 +50,9 @@ endif()
 
 set(BUILD_VISION OFF CACHE BOOL "Build Vision module (image processing, computer vision)" FORCE)
 set(BUILD_NETWORK OFF CACHE BOOL "Build Network module (HTTP, WebSocket, cloud sync)" FORCE)
-set(BUILD_HARDWARE OFF CACHE BOOL "Build Hardware module (laser control, material database)" FORCE)
-set(BUILD_ENGRAVING OFF CACHE BOOL "Build Engraving module (3D laser engraving)" FORCE)
-set(BUILD_GEOMODELCORE OFF CACHE BOOL "Build GeoModelCore module (OpenCASCADE-based geometry modeling)" FORCE)
+set(BUILD_HARDWARE ON CACHE BOOL "Build Hardware module (laser control, material database)" FORCE)
+set(BUILD_ENGRAVING ON CACHE BOOL "Build Engraving module (3D laser engraving)" FORCE)
+set(BUILD_GEOMODELCORE ON CACHE BOOL "Build GeoModelCore module (OpenCASCADE-based geometry modeling)" FORCE)
 
 # ====================================================================
 # 自动配置区域（以下内容自动配置，无需手动修改）

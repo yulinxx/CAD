@@ -1,0 +1,148 @@
+{
+    "version": 1,
+    "defaultPreset": "blender",
+    "actions": {
+        "select": { "display": "Select", "statusShort": "LMB=Select" },
+        "rotate": { "display": "Rotate View", "statusShort": "MMB=Rotate" },
+        "pan": { "display": "Pan View", "statusShort": "Shift+MMB=Pan" },
+        "zoomDrag": { "display": "Zoom", "statusShort": "Ctrl+MMB=Zoom" },
+        "zoom": { "display": "Zoom", "statusShort": "Wheel=Zoom" },
+        "menu": { "display": "Context Menu", "statusShort": "RMB=Menu" },
+        "fly": { "display": "Fly Move", "statusShort": "WASD/QE=Move" }
+    },
+    "presets": [
+        {
+            "id": "blender",
+            "display": "Blender",
+            "controller": "orbit",
+            "rotateScale": 1.0,
+            "bindings": [
+                { "action": "rotate", "button": "Middle" },
+                { "action": "pan", "button": "Middle", "modifiers": ["Shift"] },
+                { "action": "zoomDrag", "button": "Middle", "modifiers": ["Ctrl"] },
+                { "action": "rotate", "button": "Right", "modifiers": ["Shift"] }
+            ],
+            "hints": ["select", "rotate", "pan", "zoomDrag", "zoom", "menu"]
+        },
+        {
+            "id": "maya",
+            "display": "Maya",
+            "controller": "orbit",
+            "rotateScale": 1.0,
+            "bindings": [
+                { "action": "rotate", "button": "Left", "modifiers": ["Alt"] },
+                { "action": "pan", "button": "Middle" },
+                { "action": "zoomDrag", "button": "Right" }
+            ],
+            "hints": ["select", "rotate", "pan", "zoomDrag", "zoom"]
+        },
+        {
+            "id": "3dsmax",
+            "display": "3ds Max",
+            "controller": "orbit",
+            "rotateScale": 1.0,
+            "bindings": [
+                { "action": "rotate", "button": "Middle" },
+                { "action": "pan", "button": "Middle", "modifiers": ["Ctrl"] },
+                { "action": "zoomDrag", "button": "Middle", "modifiers": ["Alt"] }
+            ],
+            "hints": ["select", "rotate", "pan", "zoomDrag", "zoom", "menu"]
+        },
+        {
+            "id": "solidworks",
+            "display": "SolidWorks",
+            "controller": "orbit",
+            "rotateScale": 1.0,
+            "bindings": [
+                { "action": "rotate", "button": "Middle" },
+                { "action": "pan", "button": "Middle", "modifiers": ["Ctrl"] }
+            ],
+            "hints": ["select", "rotate", "pan", "zoom", "menu"]
+        },
+        {
+            "id": "fusion360",
+            "display": "Fusion 360",
+            "controller": "orbit",
+            "rotateScale": 1.0,
+            "bindings": [
+                { "action": "rotate", "button": "Middle" },
+                { "action": "pan", "button": "Middle", "modifiers": ["Shift"] },
+                { "action": "zoomDrag", "button": "Middle", "modifiers": ["Ctrl"] }
+            ],
+            "hints": ["select", "rotate", "pan", "zoomDrag", "zoom", "menu"]
+        },
+        {
+            "id": "freecad",
+            "display": "FreeCAD",
+            "controller": "orbit",
+            "rotateScale": 1.0,
+            "bindings": [
+                { "action": "rotate", "button": "Middle" },
+                { "action": "pan", "button": "Middle", "modifiers": ["Shift"] },
+                { "action": "zoomDrag", "button": "Middle", "modifiers": ["Ctrl"] },
+                { "action": "rotate", "button": "Right" }
+            ],
+            "hints": ["select", "rotate", "pan", "zoomDrag", "zoom", "menu"]
+        },
+        {
+            "id": "creo",
+            "display": "Creo / ProE",
+            "controller": "orbit",
+            "rotateScale": 1.0,
+            "bindings": [
+                { "action": "rotate", "button": "Middle" },
+                { "action": "pan", "button": "Middle", "modifiers": ["Shift"] },
+                { "action": "zoomDrag", "button": "Right" }
+            ],
+            "hints": ["select", "rotate", "pan", "zoomDrag", "zoom", "menu"]
+        },
+        {
+            "id": "rhino",
+            "display": "Rhino",
+            "controller": "orbit",
+            "rotateScale": 1.0,
+            "bindings": [
+                { "action": "rotate", "button": "Right" },
+                { "action": "pan", "button": "Right", "modifiers": ["Shift"] },
+                { "action": "zoomDrag", "button": "Right", "modifiers": ["Ctrl"] }
+            ],
+            "hints": ["select", "rotate", "pan", "zoomDrag", "zoom", "menu"]
+        },
+        {
+            "id": "inventor",
+            "display": "Inventor",
+            "controller": "orbit",
+            "rotateScale": 1.0,
+            "bindings": [
+                { "action": "rotate", "button": "Middle" },
+                { "action": "pan", "button": "Middle", "modifiers": ["Shift"] },
+                { "action": "zoomDrag", "button": "Middle", "modifiers": ["Ctrl"] }
+            ],
+            "hints": ["select", "rotate", "pan", "zoomDrag", "zoom", "menu"]
+        },
+        {
+            "id": "trackball",
+            "display": "Trackball",
+            "controller": "trackball",
+            "rotateScale": 1.35,
+            "bindings": [
+                { "action": "rotate", "button": "Middle" },
+                { "action": "pan", "button": "Middle", "modifiers": ["Shift"] },
+                { "action": "zoomDrag", "button": "Middle", "modifiers": ["Ctrl"] },
+                { "action": "rotate", "button": "Right", "modifiers": ["Shift"] }
+            ],
+            "hints": ["select", "rotate", "pan", "zoomDrag", "zoom", "menu"]
+        },
+        {
+            "id": "fly",
+            "display": "Fly",
+            "controller": "fly",
+            "rotateScale": 1.0,
+            "bindings": [
+                { "action": "rotate", "button": "Right" },
+                { "action": "pan", "button": "Middle" }
+            ],
+            "hints": ["select", "rotate", "pan", "zoom", "menu", "fly"]
+        }
+    ]
+}
