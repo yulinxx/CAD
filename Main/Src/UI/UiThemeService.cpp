@@ -1,13 +1,8 @@
-/**
- * @file UiThemeService.cpp
- * @brief 主题服务实现
- */
-
 #include "UiThemeService.h"
 
- /// 根据主题 ID 加载对应的样式表
- /// @param themeId 主题标识符（system/light/dark/blue）
- /// @return 是否加载成功
+/// 根据主题 ID 加载对应的样式表
+/// @param themeId 主题标识符（system/light/dark/blue）
+/// @return 是否加载成功
 bool DefaultUiThemeService::loadThemeFromId(const QString& themeId)
 {
     if (themeId == QStringLiteral("system"))

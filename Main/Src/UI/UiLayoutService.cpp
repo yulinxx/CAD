@@ -1,17 +1,12 @@
-/**
- * @file UiLayoutService.cpp
- * @brief 布局服务实现
- */
-
 #include "UiLayoutService.h"
 
 #include <QSettings>
 
 #include "WorkbenchWindow.h"
 
- /// 保存布局快照到 QSettings
- /// @param workbenchId 工作台 ID
- /// @param window 主窗口指针
+/// 保存布局快照到 QSettings
+/// @param workbenchId 工作台 ID
+/// @param window 主窗口指针
 void DefaultUiLayoutService::saveLayout(const QString& workbenchId, WorkbenchWindow* window)
 {
     if (!window)

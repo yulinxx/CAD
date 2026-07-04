@@ -1,0 +1,128 @@
+#include "LicenseGuard.h"
+
+#include <ctime>
+
+LicenseGuard::GuardState LicenseGuard::s_state;
+
+// ---- 辅助 ----
+
+uint32_t LicenseGuard::Scramble(uint32_t val, uint32_t seed)
+{
+    // 简单的可逆混淆：ROL + XOR
+    uint32_t r = (val << 7) | (val >> 25);
+    return r ^ (seed + 0x9E3779B9);
+}
+
+uint32_t LicenseGuard::ComputeCrossSum()
+{
+    return s_state.tokenA_hi
+         ^ s_state.tokenA_lo
+         ^ s_state.tokenB_hi
+         ^ s_state.tokenB_lo
+         ^ kMagicScatter;
+}
+
+bool LicenseGuard::VerifyGroupA()
+{
+    // A 组：tokenA_lo 必须是 tokenA_hi 的混淆结果
+    // 使得 patch 时必须同时改两个值
+    return s_state.tokenA_lo == Scramble(s_state.tokenA_hi, kMagicBase);
+}
+
+bool LicenseGuard::VerifyGroupB()
+{
+    // B 组：tokenB_lo 必须是 tokenB_hi 的不同混淆
+    return s_state.tokenB_lo == Scramble(s_state.tokenB_hi, kMagicBase + 0x1234);
+}
+
+bool LicenseGuard::VerifyCrossSum()
+{
+    return s_state.crossSum == ComputeCrossSum();
+}
+
+bool LicenseGuard::VerifyTimestamp()
+{
+    // 时间戳必须在合理范围内（防止 freeze 时间戳）
+    uint32_t now = static_cast<uint32_t>(time(nullptr));
+    uint32_t diff = now - s_state.timestamp;
+    // 允许 ±1 秒误差 + 前向 10 年（防止 NTP 同步）
+    return diff < 3650u * 86400u && s_state.timestamp <= now + 1;
+}
+
+// ---- 公有 API ----
+
+void LicenseGuard::MarkValid()
+{
+    s_state.tokenA_hi = kMagicBase;
+    s_state.tokenA_lo = Scramble(kMagicBase, kMagicBase);
+
+    s_state.tokenB_hi = kMagicBase + 0x5678;
+    s_state.tokenB_lo = Scramble(kMagicBase + 0x5678, kMagicBase + 0x1234);
+
+    s_state.crossSum  = ComputeCrossSum();
+    s_state.timestamp = static_cast<uint32_t>(time(nullptr));
+}
+
+void LicenseGuard::MarkInvalid()
+{
+    s_state.tokenA_hi = 0;
+    s_state.tokenA_lo = 0;
+    s_state.tokenB_hi = 0;
+    s_state.tokenB_lo = 0;
+    s_state.crossSum  = 0;
+    s_state.timestamp = 0;
+}
+
+void LicenseGuard::Refresh()
+{
+    MarkInvalid();
+}
+
+bool LicenseGuard::Check(Flavor flavor)
+{
+    // 不同 Flavor 走不同检查路径，patch 难度大幅上升
+    switch (flavor)
+    {
+    case Flavor_Startup:
+        // 启动时全量校验
+        if (!VerifyGroupA())     return false;
+        if (!VerifyGroupB())     return false;
+        if (!VerifyCrossSum())   return false;
+        if (!VerifyTimestamp())  return false;
+        return true;
+
+    case Flavor_Save:
+        // 保存功能：检查 A 组 + 交叉和
+        if (!VerifyGroupA())     return false;
+        if (!VerifyCrossSum())   return false;
+        return true;
+
+    case Flavor_Export:
+        // 导出功能：检查 B 组 + 交叉和
+        if (!VerifyGroupB())     return false;
+        if (!VerifyCrossSum())   return false;
+        return true;
+
+    case Flavor_Render:
+        // 渲染功能：检查 A 组 + B 组 + 时间戳
+        if (!VerifyGroupA())     return false;
+        if (!VerifyGroupB())     return false;
+        if (!VerifyTimestamp())  return false;
+        return true;
+
+    case Flavor_Generic:
+    default:
+        // 通用：至少检查 A 组和交叉和
+        if (!VerifyGroupA())     return false;
+        if (!VerifyCrossSum())   return false;
+        return true;
+    }
+}
+
+bool LicenseGuard::IsQuickValid()
+{
+    // 快速路径：只检查 A 组是否有值（不校验数学关系）
+    // 用于 UI 显示，不用于安全判断
+    return s_state.tokenA_hi == kMagicBase
+        && s_state.tokenB_hi == kMagicBase + 0x5678;
+}

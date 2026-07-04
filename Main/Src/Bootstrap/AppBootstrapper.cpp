@@ -1,8 +1,3 @@
-/**
- * @file AppBootstrapper.cpp
- * @brief 应用程序引导器实现
- */
-
 #include "AppBootstrapper.h"
 
 #include <QDir>
@@ -32,8 +27,13 @@ AppBootstrapper::~AppBootstrapper() = default;
 bool AppBootstrapper::initialize()
 {
     m_compositionRoot = std::make_unique<ApplicationCompositionRoot>();
-    if (!m_compositionRoot || !m_compositionRoot->stateCenter() || !m_compositionRoot->themeService() || !m_compositionRoot->layoutService() || !m_compositionRoot->commandDispatcher() || !m_compositionRoot->shellHost())
+    if (!m_compositionRoot || !m_compositionRoot->stateCenter() || !m_compositionRoot->themeService()
+        || !m_compositionRoot->layoutService() || !m_compositionRoot->commandDispatcher()
+        || !m_compositionRoot->shellHost())
+    {
         return false;
+    }
+
     return true;
 }
 
@@ -42,20 +42,18 @@ void AppBootstrapper::bootstrap()
     if (!m_compositionRoot)
         return;
 
-    m_services = { m_compositionRoot->stateCenter(), m_compositionRoot->themeService(), m_compositionRoot->layoutService(), m_compositionRoot->commandDispatcher() };
+    m_services = { m_compositionRoot->stateCenter(), m_compositionRoot->themeService(), 
+        m_compositionRoot->layoutService(), m_compositionRoot->commandDispatcher() };
 
     if (m_compositionRoot->stateCenter())
-        m_compositionRoot->stateCenter()->setCurrentWorkbenchId(m_startWorkbenchId);
+        m_compositionRoot->stateCenter()->setCurrentWorkbenchId(QStringLiteral("2D"));
 
-    if (m_startWorkbenchId == QStringLiteral("3D"))
-        m_workbench = std::make_unique<Workbench3D>();
-    else
-        m_workbench = std::make_unique<Workbench2D>();
-
+    m_workbench = std::make_unique<Workbench2D>();
     if (!m_workbench->initialize(m_services))
         return;
 
     auto* shell = m_compositionRoot->shellHost();
+    shell->setUiServices(m_services);
     shell->setWorkbench(m_workbench.get());
     shell->initializeAndShow();
 }
@@ -64,8 +62,10 @@ void AppBootstrapper::shutdown()
 {
     if (m_workbench)
         m_workbench->shutdown();
+
     m_workbench.reset();
 }
+
 
 QString AppBootstrapper::startWorkbenchId() const
 {

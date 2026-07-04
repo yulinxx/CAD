@@ -67,3 +67,6 @@ RenderEngine/
 .gitmodules
 .github/
 scripts/
+
+# License - private keys
+*.pem

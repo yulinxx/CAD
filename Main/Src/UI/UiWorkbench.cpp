@@ -1,11 +1,7 @@
-/**
- * @file UiWorkbench.cpp
- * @brief 工作台实现 — 2D/3D 工作台的初始化、窗口绑定和生命周期管理
- */
-
 #include "UiWorkbench.h"
 
 #include <QAction>
+#include <QSizePolicy>
 #include <QTextEdit>
 #include <QToolBar>
 #include <QWidget>
@@ -57,6 +53,7 @@ namespace
         const QString& selectionSource,
         const QString& selectionText,
         const QString& selectionType,
+        const QString& commandType,
         const QString& viewportType,
         const QString& viewportStatus)
     {
@@ -75,12 +72,12 @@ namespace
             { QStringLiteral("selectionSource"), selectionSource },
             { QStringLiteral("selectionText"), selectionText },
             { QStringLiteral("selectionType"), selectionType },
+            { QStringLiteral("commandType"), commandType },
             { QStringLiteral("viewportType"), viewportType },
             { QStringLiteral("commandOwner"), QStringLiteral("none") },
-            { QStringLiteral("commandType"), QStringLiteral("none") },
             { QStringLiteral("commandState"), QStringLiteral("idle") },
             { QStringLiteral("viewportStatus"), viewportStatus }
-            });
+        });
     }
 
     /// 配置 2D 视口
@@ -101,10 +98,10 @@ namespace
                 services.stateCenter->setMetadata({
                     { QStringLiteral("viewportStatus"), status },
                     { QStringLiteral("viewportType"), QStringLiteral("2D") }
-                    });
+                });
             if (properties)
                 properties->setStateText(status);
-            });
+        });
     }
 
     /// 配置 3D 视口
@@ -127,10 +124,10 @@ namespace
                 services.stateCenter->setMetadata({
                     { QStringLiteral("viewportStatus"), status },
                     { QStringLiteral("viewportType"), QStringLiteral("3D") }
-                    });
+                });
             if (properties)
                 properties->setStateText(status);
-            });
+        });
         viewport->setSelectionCallback([tree, properties, &services](const QString& nodeId) {
             if (tree)
                 tree->refresh();
@@ -206,13 +203,21 @@ bool Workbench2D::initialize(const UiServices& services)
     return true;
 }
 
+void Workbench2D::setUseLegacyCanvasViewport(bool enabled)
+{
+    m_useLegacyCanvasViewport = enabled;
+}
+
+bool Workbench2D::useLegacyCanvasViewport() const
+{
+    return m_useLegacyCanvasViewport;
+}
+
 /// 附加到主窗口，构建 2D 工作台 UI
 /// @param window 工作台窗口
 void Workbench2D::attachToWindow(WorkbenchWindow& window)
 {
-    auto* sceneDock = new SceneTreeDockWidget(&window);
-    sceneDock->setSceneDocument(nullptr);
-    window.registerDockWidget(QStringLiteral("2D Layers"), sceneDock, Qt::LeftDockWidgetArea);
+    auto* sceneDock = createLayersDock(window);
 
     m_document = std::make_shared<EntityDocument2D>();
     auto firstLine = m_document->createLine(QPointF(-120, -80), QPointF(160, 100));
@@ -220,42 +225,19 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
     m_document->selection().add(firstLine);
 
     auto* properties = new PropertiesPanelWidget(&window);
+    properties->setWorkbenchMode(PropertiesPanelWidget::WorkbenchMode::TwoD);
     properties->setEntityDocument(m_document.get());
-    properties->setStateText(QStringLiteral("2D ready"));
-    properties->setSelectionText(QStringLiteral("Selected: %1, %2").arg(firstLine->id(), secondLine->id()));
-    update2DDetails(properties, m_document.get(), firstLine->id());
+    configureWorkbenchPanels(properties, firstLine, secondLine);
     window.registerDockWidget(QStringLiteral("2D Properties"), properties, Qt::RightDockWidgetArea);
 
     auto* commandPanel = createPanelWidget(QStringLiteral("Command panel"), &window);
     window.registerDockWidget(QStringLiteral("2D Command"), commandPanel, Qt::BottomDockWidgetArea);
 
     auto* mainBar = window.registerToolBar(QStringLiteral("2D Main"));
-    auto* drawLine = addWorkbenchAction(mainBar, QStringLiteral("Draw Line"));
-    auto* drawPolyline = addWorkbenchAction(mainBar, QStringLiteral("Draw Polyline"));
-    auto* measure = addWorkbenchAction(mainBar, QStringLiteral("Measure"));
-    auto* deleteEntity = addWorkbenchAction(mainBar, QStringLiteral("Delete"));
-    auto* editEntity = addWorkbenchAction(mainBar, QStringLiteral("Edit"));
-    auto* selectEntity = addWorkbenchAction(mainBar, QStringLiteral("Select"));
-
     auto* viewBar = window.registerToolBar(QStringLiteral("2D View"));
-    auto* zoomExtents = addWorkbenchAction(viewBar, QStringLiteral("Zoom Extents"));
-    auto* pan = addWorkbenchAction(viewBar, QStringLiteral("Pan"));
+    configureWorkbenchActions(mainBar, viewBar);
 
-    if (m_services && m_services->commandDispatcher)
-    {
-        m_services->commandDispatcher->bindAction(drawLine, QStringLiteral("2d.draw_line"));
-        m_services->commandDispatcher->bindAction(drawPolyline, QStringLiteral("2d.draw_polyline"));
-        m_services->commandDispatcher->bindAction(measure, QStringLiteral("2d.measure"));
-        m_services->commandDispatcher->bindAction(zoomExtents, QStringLiteral("2d.zoom_extents"));
-        m_services->commandDispatcher->bindAction(pan, QStringLiteral("2d.pan"));
-        m_services->commandDispatcher->bindAction(deleteEntity, QStringLiteral("2d.delete"));
-        m_services->commandDispatcher->bindAction(editEntity, QStringLiteral("2d.edit"));
-        m_services->commandDispatcher->bindAction(selectEntity, QStringLiteral("2d.select"));
-    }
-
-    auto* viewport = new CanvasViewport2D(&window);
-    configure2DViewport(viewport, *m_services, m_document.get(), properties);
-    window.setCentralWidget(viewport);
+    window.setCentralWidget(createCentralViewport(window, properties));
     if (properties)
     {
         properties->setSelectionText(QStringLiteral("Selected: %1, %2").arg(firstLine->id(), secondLine->id()));
@@ -274,26 +256,101 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
         QStringLiteral("2D-Init"),
         QStringLiteral("Selected: %1, %2").arg(firstLine->id(), secondLine->id()),
         QStringLiteral("2D"),
+        QStringLiteral("none"),
         QStringLiteral("2D"),
         QStringLiteral("2D ready"));
-
-    viewport->setDrawingEnabled(false);
-    viewport->setMeasureMode(false);
 }
 
-/// 激活工作台
+QWidget* Workbench2D::createCentralViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties)
+{
+    if (m_useLegacyCanvasViewport)
+    {
+        auto* legacyViewport = new CanvasViewport2D(&window);
+        configureLegacyViewport(legacyViewport, properties);
+        legacyViewport->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        legacyViewport->setMinimumSize(800, 600);
+        return legacyViewport;
+    }
+
+    auto* viewport = new CanvasViewport2D(&window);
+    configureModernViewport(viewport);
+    viewport->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    viewport->setMinimumSize(800, 600);
+    return viewport;
+}
+
+void Workbench2D::configureModernViewport(QWidget* viewport) const
+{
+    if (!viewport)
+        return;
+    viewport->setObjectName(QStringLiteral("Modern2DViewport"));
+}
+
+void Workbench2D::configureWorkbenchPanels(PropertiesPanelWidget* properties,
+    const std::shared_ptr<LineEntity2D>& firstLine,
+    const std::shared_ptr<LineEntity2D>& secondLine) const
+{
+    if (!properties || !firstLine || !secondLine)
+        return;
+
+    properties->setStateText(QStringLiteral("2D ready"));
+    properties->setSelectionText(QStringLiteral("Selected: %1, %2").arg(firstLine->id(), secondLine->id()));
+    if (m_document)
+        update2DDetails(properties, m_document.get(), firstLine->id());
+    properties->setObjectDetails(QStringLiteral("2D Selection"), {
+        QStringLiteral("Primary: %1").arg(firstLine->id()),
+        QStringLiteral("Secondary: %1").arg(secondLine->id()),
+        QStringLiteral("Mode: %1").arg(QStringLiteral("2D"))
+        });
+}
+
+void Workbench2D::configureWorkbenchActions(QToolBar* mainBar, QToolBar* viewBar) const
+{
+    if (!mainBar || !viewBar || !m_services || !m_services->commandDispatcher)
+        return;
+
+    auto* drawLine = addWorkbenchAction(mainBar, QStringLiteral("Draw Line"));
+    auto* drawPolyline = addWorkbenchAction(mainBar, QStringLiteral("Draw Polyline"));
+    auto* measure = addWorkbenchAction(mainBar, QStringLiteral("Measure"));
+    auto* deleteEntity = addWorkbenchAction(mainBar, QStringLiteral("Delete"));
+    auto* editEntity = addWorkbenchAction(mainBar, QStringLiteral("Edit"));
+    auto* selectEntity = addWorkbenchAction(mainBar, QStringLiteral("Select"));
+    auto* zoomExtents = addWorkbenchAction(viewBar, QStringLiteral("Zoom Extents"));
+    auto* pan = addWorkbenchAction(viewBar, QStringLiteral("Pan"));
+
+    m_services->commandDispatcher->bindAction(drawLine, QStringLiteral("2d.draw_line"));
+    m_services->commandDispatcher->bindAction(drawPolyline, QStringLiteral("2d.draw_polyline"));
+    m_services->commandDispatcher->bindAction(measure, QStringLiteral("2d.measure"));
+    m_services->commandDispatcher->bindAction(zoomExtents, QStringLiteral("2d.zoom_extents"));
+    m_services->commandDispatcher->bindAction(pan, QStringLiteral("2d.pan"));
+    m_services->commandDispatcher->bindAction(deleteEntity, QStringLiteral("2d.delete"));
+    m_services->commandDispatcher->bindAction(editEntity, QStringLiteral("2d.edit"));
+    m_services->commandDispatcher->bindAction(selectEntity, QStringLiteral("2d.select"));
+}
+
+SceneTreeDockWidget* Workbench2D::createLayersDock(WorkbenchWindow& window) const
+{
+    auto* sceneDock = new SceneTreeDockWidget(&window);
+    sceneDock->setObjectName(QStringLiteral("SceneTreeDock"));
+    window.registerDockWidget(QStringLiteral("2D Layers"), sceneDock, Qt::LeftDockWidgetArea);
+    return sceneDock;
+}
+
+void Workbench2D::configureLegacyViewport(CanvasViewport2D* viewport, PropertiesPanelWidget* properties)
+{
+    configure2DViewport(viewport, m_services ? *m_services : UiServices{}, m_document.get(), properties);
+}
+
 void Workbench2D::activate()
 {
     if (m_services && m_services->stateCenter)
         m_services->stateCenter->setCurrentWorkbenchId(id());
 }
 
-/// 停用工作台
 void Workbench2D::deactivate()
 {
 }
 
-/// 关闭工作台
 void Workbench2D::shutdown()
 {
     m_services = nullptr;
@@ -339,6 +396,9 @@ void Workbench3D::attachToWindow(WorkbenchWindow& window)
     m_scene->selection().add(root);
 
     auto* properties = new PropertiesPanelWidget(&window);
+    properties->setObjectName(QStringLiteral("PropertiesPanel3D"));
+    properties->setWindowTitle(QStringLiteral("3D Inspector"));
+    properties->setWorkbenchMode(PropertiesPanelWidget::WorkbenchMode::ThreeD);
     properties->setSceneDocument(m_scene.get());
     properties->setStateText(QStringLiteral("3D ready"));
     properties->setSelectionText(QStringLiteral("Root node: %1").arg(root->id()));
@@ -347,6 +407,8 @@ void Workbench3D::attachToWindow(WorkbenchWindow& window)
 
     auto* sceneDock = new SceneTreeDockWidget(&window);
     sceneDock->setSceneDocument(m_scene.get());
+    sceneDock->setObjectName(QStringLiteral("SceneTreeDock3D"));
+    sceneDock->setWindowTitle(QStringLiteral("3D Scene"));
     sceneDock->setSelectionCallback([this, sceneDock, properties, &window](const QString& nodeId) {
         if (!m_scene)
             return;
@@ -416,6 +478,7 @@ void Workbench3D::attachToWindow(WorkbenchWindow& window)
         QStringLiteral("3D-Init"),
         QStringLiteral("Root node: %1").arg(root->id()),
         QStringLiteral("3D"),
+        QStringLiteral("none"),
         QStringLiteral("3D"),
         QStringLiteral("3D ready"));
 

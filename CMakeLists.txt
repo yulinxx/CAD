@@ -218,5 +218,126 @@ else()
     message(STATUS "  PyBindCore: DISABLED")
 endif()
 
+# 7.5 KeygenTool - 离线注册码生成工具
+option(BUILD_KEYGEN_TOOL "Build KeygenTool (offline license key generator)" OFF)
+if(BUILD_KEYGEN_TOOL)
+    add_subdirectory(Tools/KeygenTool)
+    message(STATUS "  KeygenTool: ENABLED")
+endif()
+
 # 8. 应用入口
 add_subdirectory(Main)
+
+# ============================================================================
+# Installation Rules
+# ============================================================================
+# Install main executable
+install(TARGETS SanYiCAD
+    RUNTIME DESTINATION bin
+    BUNDLE DESTINATION .
+)
+
+# Install all project shared libraries
+set(SANYI_PROJECT_LIBS
+    Utility Log CrashHandler
+    EngineCommon Engine2D Engine3D
+    RenderCommon Render2D Render3D
+    UICommon UI2D UI3D
+    FileIO Nesting
+)
+
+if(BUILD_SANYI_RENDER)
+    list(APPEND SANYI_PROJECT_LIBS SanYiRender)
+endif()
+
+if(BUILD_HARDWARE)
+    list(APPEND SANYI_PROJECT_LIBS Hardware)
+endif()
+
+if(BUILD_ENGRAVING)
+    list(APPEND SANYI_PROJECT_LIBS Engraving)
+endif()
+
+if(BUILD_GEOMODELCORE)
+    list(APPEND SANYI_PROJECT_LIBS GeoModelCore)
+endif()
+
+if(BUILD_NETWORK)
+    list(APPEND SANYI_PROJECT_LIBS Network)
+endif()
+
+if(BUILD_VISION)
+    list(APPEND SANYI_PROJECT_LIBS Vision)
+endif()
+
+if(SANYI_PYTHON_HOST)
+    list(APPEND SANYI_PROJECT_LIBS PythonHost)
+endif()
+
+# Install all project DLLs/SOs
+install(TARGETS ${SANYI_PROJECT_LIBS}
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION bin
+    ARCHIVE DESTINATION lib
+)
+
+# Install PyBindCore module
+if(SANYI_PYBIND_CORE AND SANYI_PYTHON_HOST)
+    install(TARGETS SanYiPyBindCore
+        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION bin
+    )
+endif()
+
+# Install third-party DLLs (from vcpkg) and Qt plugins
+# windeployqt already places everything in the output directory
+# We just need to copy all .dll, .pyd files from the output dir
+if(WIN32)
+    install(DIRECTORY "$<TARGET_FILE_DIR:SanYiCAD>/"
+        DESTINATION bin
+        COMPONENT Runtime
+        PATTERN "*.dll"
+        PATTERN "*.pyd"
+        PATTERN "*.exe" EXCLUDE
+        PATTERN "gtest*" EXCLUDE
+        PATTERN "gmock*" EXCLUDE
+        PATTERN "*Tests.exe" EXCLUDE
+        PATTERN "*Benchmark*" EXCLUDE
+    )
+elseif(UNIX AND NOT APPLE)
+    install(DIRECTORY "$<TARGET_FILE_DIR:SanYiCAD>/"
+        DESTINATION bin
+        COMPONENT Libraries
+        PATTERN "*.so"
+        PATTERN "*.so.*"
+    )
+endif()
+
+# Install translations
+install(DIRECTORY "${CMAKE_BINARY_DIR}/translations"
+    DESTINATION bin
+    COMPONENT Translations
+    OPTIONAL
+)
+
+# Install resources
+install(DIRECTORY "${CMAKE_BINARY_DIR}/resources"
+    DESTINATION bin
+    COMPONENT Resources
+    OPTIONAL
+)
+
+# Install Python directory
+if(SANYI_PYTHON_HOST)
+    install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/Python"
+        DESTINATION bin
+        COMPONENT Python
+        PATTERN "__pycache__" EXCLUDE
+        PATTERN "*.pyc" EXCLUDE
+    )
+endif()
+
+# ============================================================================
+# CPack Configuration
+# ============================================================================
+include(CMake/Packaging.cmake)

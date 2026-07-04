@@ -1,0 +1,24 @@
+#pragma once
+
+#include <string>
+
+#define APP_NAME "@app_name@"
+#define APP_VERSION "@PROJECT_VERSION@"
+#define APP_ORGANIZATION_NAME "@APP_ORGANIZATION_NAME@"
+#define APP_ORGANIZATION_DOMAIN "@APP_ORGANIZATION_DOMAIN@"
+
+#define VERSION_MAJOR @VERSION_MAJOR@
+#define VERSION_MINOR @VERSION_MINOR@
+#define VERSION_PATCH @VERSION_PATCH@
+
+namespace MainApp
+{
+    inline const std::string appName() { return APP_NAME; }
+    inline const std::string appVersion() { return APP_VERSION; }
+    inline const std::string organizationName() { return APP_ORGANIZATION_NAME; }
+    inline const std::string organizationDomain() { return APP_ORGANIZATION_DOMAIN; }
+    
+    inline int versionMajor() { return VERSION_MAJOR; }
+    inline int versionMinor() { return VERSION_MINOR; }
+    inline int versionPatch() { return VERSION_PATCH; }
+}

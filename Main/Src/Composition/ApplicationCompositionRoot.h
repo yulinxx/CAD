@@ -1,55 +1,54 @@
-/**
- * @file Main/Src/Composition/ApplicationCompositionRoot.h
- */
 #pragma once
 
 #include <memory>
 
-#include "../UI/UiCommandDispatcher.h"
-#include "../UI/UiLayoutService.h"
-#include "../UI/UiShellHost.h"
-#include "../UI/UiStateCenter.h"
-#include "../UI/UiThemeService.h"
+#include "UI/UiCommandDispatcher.h"
+#include "UI/UiLayoutService.h"
+#include "UI/UiShellHost.h"
+#include "UI/UiStateCenter.h"
+#include "UI/UiThemeService.h"
 
- /**
-  * @file ApplicationCompositionRoot.h
-  * @brief 应用程序组合根定义
-  *
-  * 定义了应用程序的依赖注入组合根，负责创建和组装所有核心服务。
-  */
-
-  /**
-   * @class ApplicationCompositionRoot
-   * @brief 应用程序组合根类
-   *
-   * 负责创建和组装所有核心服务，包括状态中心、主题服务、
-   * 布局服务、命令分发器和 UI Shell 宿主。
-   */
+/**
+ * @class ApplicationCompositionRoot
+ * @brief 应用程序组合根类
+ * 
+ * 负责创建和组装所有核心服务，包括状态中心、主题服务、
+ * 布局服务、命令分发器和 UI Shell 宿主。
+ */
 class ApplicationCompositionRoot
 {
 public:
     ApplicationCompositionRoot();
 
+public:
     /// 获取 UI Shell 宿主
     UiShellHost* shellHost();
+
     /// 获取状态中心
     UiStateCenter* stateCenter();
+
     /// 获取主题服务
     UiThemeService* themeService();
+
     /// 获取布局服务
     UiLayoutService* layoutService();
+
     /// 获取命令分发器
     UiCommandDispatcher* commandDispatcher();
 
 private:
     /// UI Shell 宿主
     std::unique_ptr<UiShellHost> m_shellHost;
+
     /// UI 状态中心
     std::unique_ptr<UiStateCenter> m_stateCenter;
+
     /// 主题服务
     std::unique_ptr<UiThemeService> m_themeService;
+
     /// 布局服务
     std::unique_ptr<UiLayoutService> m_layoutService;
+
     /// 命令分发器
     std::unique_ptr<UiCommandDispatcher> m_commandDispatcher;
 };

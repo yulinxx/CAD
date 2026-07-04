@@ -1,8 +1,3 @@
-/**
- * @file ApplicationCompositionRoot.cpp
- * @brief 应用程序组合根实现
- */
-
 #include "ApplicationCompositionRoot.h"
 
 #include "../UI/UiCommandDispatcher.h"
@@ -24,23 +19,8 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     m_shellHost->setThemeService(m_themeService.get());
 }
 
-UiShellHost* ApplicationCompositionRoot::shellHost()
-{
-    return m_shellHost.get();
-}
-UiStateCenter* ApplicationCompositionRoot::stateCenter()
-{
-    return m_stateCenter.get();
-}
-UiThemeService* ApplicationCompositionRoot::themeService()
-{
-    return m_themeService.get();
-}
-UiLayoutService* ApplicationCompositionRoot::layoutService()
-{
-    return m_layoutService.get();
-}
-UiCommandDispatcher* ApplicationCompositionRoot::commandDispatcher()
-{
-    return m_commandDispatcher.get();
-}
+UiShellHost* ApplicationCompositionRoot::shellHost(){ return m_shellHost.get(); }
+UiStateCenter* ApplicationCompositionRoot::stateCenter(){ return m_stateCenter.get(); }
+UiThemeService* ApplicationCompositionRoot::themeService(){ return m_themeService.get(); }
+UiLayoutService* ApplicationCompositionRoot::layoutService(){ return m_layoutService.get(); }
+UiCommandDispatcher* ApplicationCompositionRoot::commandDispatcher(){ return m_commandDispatcher.get(); }

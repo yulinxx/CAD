@@ -1,9 +1,8 @@
-/**
- * @file Main/Src/UI/UiCommandDispatcher.h
- */
 #pragma once
 
 #include <QString>
+
+#include "UiFrameworkServices.h"
 
 class QAction;
 class UiStateCenter;
@@ -16,13 +15,13 @@ class UiLayoutService;
  * 定义了 UI 命令分发器接口，负责管理命令的执行生命周期。
  */
 
- /**
-  * @class UiCommandDispatcher
-  * @brief 命令分发器抽象接口
-  *
-  * 定义命令执行的标准流程：begin -> execute -> submit/cancel。
-  * 支持将 QAction 绑定到命令 ID，实现 UI 动作与命令的解耦。
-  */
+/**
+ * @class UiCommandDispatcher
+ * @brief 命令分发器抽象接口
+ *
+ * 定义命令执行的标准流程：begin -> execute -> submit/cancel。
+ * 支持将 QAction 绑定到命令 ID，实现 UI 动作与命令的解耦。
+ */
 class UiCommandDispatcher
 {
 public:
@@ -55,6 +54,10 @@ public:
     /// @param layoutService 布局服务
     virtual void setLayoutService(UiLayoutService* layoutService) = 0;
 
+    /// 设置框架级服务桥接
+    /// @param services 框架级服务集合
+    virtual void setFrameworkServices(const UiFrameworkServices& services) = 0;
+
     /// 获取当前活动命令 ID
     /// @return 当前命令标识符
     virtual QString activeCommandId() const = 0;
@@ -76,6 +79,7 @@ public:
     void begin(const QString& commandId) override;
     void setStateCenter(UiStateCenter* stateCenter) override;
     void setLayoutService(UiLayoutService* layoutService) override;
+    void setFrameworkServices(const UiFrameworkServices& services) override;
     QString activeCommandId() const override;
 
 private:
@@ -88,6 +92,8 @@ private:
     UiStateCenter* m_stateCenter{ nullptr };
     /// 布局服务
     UiLayoutService* m_layoutService{ nullptr };
+    /// 框架级服务桥接
+    UiFrameworkServices m_frameworkServices;
     /// 当前活动命令 ID
     QString m_activeCommandId;
 };

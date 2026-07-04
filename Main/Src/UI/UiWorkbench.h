@@ -1,6 +1,3 @@
-/**
- * @file Main/Src/UI/UiWorkbench.h
- */
 #pragma once
 
 #include <QString>
@@ -8,9 +5,15 @@
 #include <memory>
 
 #include "UiEntities.h"
+#include "UiViewWidgets.h"
 #include "UiServices.h"
 
+class QWidget;
+class QToolBar;
 class WorkbenchWindow;
+class PropertiesPanelWidget;
+class CanvasViewport2D;
+class SceneTreeDockWidget;
 
 /**
  * @file UiWorkbench.h
@@ -30,6 +33,7 @@ class UiWorkbench
 public:
     virtual ~UiWorkbench() = default;
 
+public:
     /// 获取工作台 ID
     virtual QString id() const = 0;
 
@@ -72,9 +76,54 @@ public:
     void deactivate() override;
     void shutdown() override;
 
+    /// 设置是否使用旧版 CanvasViewport2D 作为临时回退路径
+    /// @param enabled true 表示回退到旧视口，false 表示默认使用 ViewWidget
+    void setUseLegacyCanvasViewport(bool enabled);
+    /// 获取当前是否启用旧版 CanvasViewport2D 回退路径
+    /// @return true 表示当前使用旧版视口
+    bool useLegacyCanvasViewport() const;
+
+private:
+    /// 创建当前工作台应使用的中央视口
+    /// @param window 主窗口
+    /// @param properties 属性面板，用于旧版视口的状态回写
+    /// @return 可直接设置为 centralWidget 的视口部件
+    QWidget* createCentralViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties);
+    /// 配置新版本 ViewWidget 的最小运行状态
+    /// @param viewport 新版 2D 视图控件
+    void configureModernViewport(QWidget* viewport) const;
+    /// 配置工作台的默认对象与状态面板内容
+    /// @param properties 属性面板
+    /// @param firstLine 主选中线
+    /// @param secondLine 次选中线
+    void configureWorkbenchPanels(PropertiesPanelWidget* properties,
+        const std::shared_ptr<LineEntity2D>& firstLine,
+        const std::shared_ptr<LineEntity2D>& secondLine) const;
+    /// 创建并注册 2D 工具面板
+    /// @param window 主窗口
+    /// @return 创建后的停靠面板指针
+    SceneTreeDockWidget* createLayersDock(WorkbenchWindow& window) const;
+    /// 配置工具栏动作与命令分发绑定
+    /// @param mainBar 主工具栏
+    /// @param viewBar 视图工具栏
+    void configureWorkbenchActions(QToolBar* mainBar, QToolBar* viewBar) const;
+    /// 配置工作台初始状态与属性面板文本
+    /// @param properties 属性面板
+    /// @param firstLine 主选中线
+    /// @param secondLine 次选中线
+    void configureInitialWorkbenchState(PropertiesPanelWidget* properties,
+        const std::shared_ptr<LineEntity2D>& firstLine,
+        const std::shared_ptr<LineEntity2D>& secondLine) const;
+    /// 配置旧版 CanvasViewport2D 的运行状态
+    /// @param viewport 旧版 2D 视口
+    /// @param properties 属性面板
+    void configureLegacyViewport(CanvasViewport2D* viewport, PropertiesPanelWidget* properties);
+
 private:
     /// UI 服务引用
     const UiServices* m_services{ nullptr };
+    /// 是否使用旧版 CanvasViewport2D 作为临时回退
+    bool m_useLegacyCanvasViewport{ false };
     /// 2D 实体文档
     std::shared_ptr<EntityDocument2D> m_document;
 };
@@ -104,3 +153,6 @@ private:
     /// 默认相机控制器
     DefaultCameraController3D m_camera;
 };
+
+using Workbench2DMain = Workbench2D;
+

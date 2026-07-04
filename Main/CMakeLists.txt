@@ -37,6 +37,16 @@ set(PROJECT_VERSION_MINOR ${VERSION_MINOR})
 set(PROJECT_VERSION_PATCH ${VERSION_PATCH})
 set(PROJECT_VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
 
+# 应用程序配置
+set(APP_ORGANIZATION_NAME "SanYi")
+set(APP_ORGANIZATION_DOMAIN "sanyi-cad.com")
+
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/Src/Common/VersionInfo.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/VersionInfo.h"
+    @ONLY
+)
+
 add_executable(${app_name}
     ${MAIN_SOURCES}
     ${MAIN_HEADERS}
@@ -47,6 +57,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${MAIN_SOURCES} ${MAIN_HEA
 
 set(QT_COMPONENTS Core Gui Widgets)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS ${QT_COMPONENTS} REQUIRED)
+
+find_package(OpenSSL REQUIRED)
 
 set(QT_LIBRARIES)
 foreach(comp ${QT_COMPONENTS})
@@ -64,6 +76,7 @@ target_compile_features(${app_name} PRIVATE cxx_std_17)
 
 target_include_directories(${app_name}
     PRIVATE
+        "${CMAKE_CURRENT_BINARY_DIR}"
         "${CMAKE_CURRENT_SOURCE_DIR}/Src"
         "${CMAKE_CURRENT_SOURCE_DIR}/Src/Common"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Utility/Utility/Include"
@@ -95,6 +108,9 @@ target_link_libraries(${app_name}
         UI3D
         Log
         ${QT_LIBRARIES}
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        Iphlpapi.lib
 )
 
 if(SANYI_PYTHON_HOST)

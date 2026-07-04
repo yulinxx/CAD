@@ -1,8 +1,3 @@
-/**
- * @file UiViewWidgets.cpp
- * @brief 2D/3D 视口与辅助面板实现
- */
-
 #include "UiViewWidgets.h"
 
 #include <QContextMenuEvent>
@@ -70,11 +65,7 @@ void CanvasViewport2D::setDrawingEnabled(bool enabled)
     m_toolContext.measureMode = false;
     m_toolContext.tool = enabled ? ToolContext::DrawTool::Line : ToolContext::DrawTool::None;
     if (m_stateCenter)
-    {
-        m_stateCenter->setCurrentCommandPhase(enabled ? QStringLiteral("Waiting for first point") : QStringLiteral("Idle")); // 等待第一点 / 空闲
-        m_stateCenter->setCurrentCommandOwner(QStringLiteral("2D"));
-        m_stateCenter->setCurrentCommandType(QStringLiteral("2D"));
-    }
+        m_stateCenter->setCurrentCommandPhase(enabled ? QStringLiteral("等待第一点") : QStringLiteral("空闲"));
     updateStatus(enabled ? QStringLiteral("2D draw mode") : QStringLiteral("2D select mode"));
 }
 
@@ -84,11 +75,7 @@ void CanvasViewport2D::setMeasureMode(bool enabled)
     m_toolContext.drawing = false;
     m_toolContext.tool = ToolContext::DrawTool::None;
     if (m_stateCenter)
-    {
-        m_stateCenter->setCurrentCommandPhase(enabled ? QStringLiteral("Waiting for first point") : QStringLiteral("Idle")); // 等待第一点 / 空闲
-        m_stateCenter->setCurrentCommandOwner(QStringLiteral("2D"));
-        m_stateCenter->setCurrentCommandType(QStringLiteral("2D"));
-    }
+        m_stateCenter->setCurrentCommandPhase(enabled ? QStringLiteral("等待第一点") : QStringLiteral("空闲"));
     updateStatus(enabled ? QStringLiteral("2D measure mode") : QStringLiteral("2D select mode"));
 }
 
@@ -238,7 +225,7 @@ QPointF CanvasViewport2D::snapPoint(const QPointF& scenePos) const
 {
     constexpr double snapStep = 10.0;
     return QPointF(std::round(scenePos.x() / snapStep) * snapStep,
-        std::round(scenePos.y() / snapStep) * snapStep);
+                   std::round(scenePos.y() / snapStep) * snapStep);
 }
 
 void CanvasViewport2D::updateStatus(const QString& text)
@@ -250,7 +237,7 @@ void CanvasViewport2D::updateStatus(const QString& text)
         m_stateCenter->setMetadata({
             { QStringLiteral("viewportStatus"), text },
             { QStringLiteral("viewportType"), QStringLiteral("2D") }
-            });
+        });
     }
 }
 
@@ -263,25 +250,28 @@ void CanvasViewport2D::refreshFromDocument()
     ensureGrid();
     ensureAxes();
 
-    for (const auto& line : m_document->lines())
-        if (line) m_scene->addLine(QLineF(line->start(), line->end()), QPen(line->selected() ? QColor(80, 180, 255) : QColor(255, 220, 120), line->selected() ? 3 : 2));
-
-    for (const auto& polyline : m_document->polylines())
+    // 统一从实体集合渲染，避免上层同时维护多套容器遍历逻辑
+    for (const auto& entity : m_document->entities())
     {
-        if (!polyline) continue;
-        const auto pts = polyline->points();
-        for (int i = 1; i < pts.size(); ++i)
-            m_scene->addLine(QLineF(pts[i - 1], pts[i]), QPen(QColor(255, 180, 100), 2));
-    }
-
-    for (const auto& circle : m_document->circles())
-        if (circle) m_scene->addEllipse(circle->bounds(), QPen(QColor(255, 220, 120), 2));
-
-    for (const auto& arc : m_document->arcs())
-    {
-        if (!arc) continue;
-        const auto b = QRectF(arc->center().x() - arc->radius(), arc->center().y() - arc->radius(), arc->radius() * 2.0, arc->radius() * 2.0);
-        m_scene->addEllipse(b, QPen(QColor(255, 170, 120), 2, Qt::DashLine));
+        if (auto line = std::dynamic_pointer_cast<LineEntity2D>(entity))
+        {
+            m_scene->addLine(QLineF(line->start(), line->end()), QPen(line->selected() ? QColor(80, 180, 255) : QColor(255, 220, 120), line->selected() ? 3 : 2));
+        }
+        else if (auto polyline = std::dynamic_pointer_cast<PolylineEntity2D>(entity))
+        {
+            const auto pts = polyline->points();
+            for (int i = 1; i < pts.size(); ++i)
+                m_scene->addLine(QLineF(pts[i - 1], pts[i]), QPen(QColor(255, 180, 100), 2));
+        }
+        else if (auto circle = std::dynamic_pointer_cast<CircleEntity2D>(entity))
+        {
+            m_scene->addEllipse(circle->bounds(), QPen(QColor(255, 220, 120), 2));
+        }
+        else if (auto arc = std::dynamic_pointer_cast<ArcEntity2D>(entity))
+        {
+            const auto b = QRectF(arc->center().x() - arc->radius(), arc->center().y() - arc->radius(), arc->radius() * 2.0, arc->radius() * 2.0);
+            m_scene->addEllipse(b, QPen(QColor(255, 170, 120), 2, Qt::DashLine));
+        }
     }
 }
 
@@ -298,10 +288,7 @@ void CanvasViewport2D::refreshSelectionStyle()
     refreshFromDocument();
 }
 
-QString CanvasViewport2D::selectedEntityId() const
-{
-    return m_selectedEntityId;
-}
+QString CanvasViewport2D::selectedEntityId() const { return m_selectedEntityId; }
 
 void CanvasViewport2D::deleteSelectedEntity()
 {
@@ -328,7 +315,8 @@ void CanvasViewport2D::nudgeSelectedEndpoint(const QPointF& delta)
 {
     if (!m_document || m_selectedEntityId.isEmpty())
         return;
-    auto line = m_document->lineById(m_selectedEntityId);
+    auto entity = m_document->entityById(m_selectedEntityId);
+    auto line = std::dynamic_pointer_cast<LineEntity2D>(entity);
     if (!line)
         return;
     if (m_selectedEndpoint == 0) line->setStart(line->start() + delta);
@@ -387,9 +375,11 @@ void CanvasViewport2D::setSelectedFromHitTest(const QPointF& scenePos)
     QString bestLineId;
     int bestEndpoint = -1;
     bool bestIsEndpoint = false;
-    for (const auto& line : m_document->lines())
+    for (const auto& entity : m_document->entities())
     {
-        if (!line) continue;
+        auto line = std::dynamic_pointer_cast<LineEntity2D>(entity);
+        if (!line)
+            continue;
         const double ds = line->distanceToStart(scenePos);
         const double de = line->distanceToEnd(scenePos);
         const double dline = line->distanceToPoint(scenePos);
@@ -419,53 +409,30 @@ void CanvasViewport2D::setSelectedFromHitTest(const QPointF& scenePos)
 
 void CanvasViewport2D::startCommand(const QString& commandId)
 {
-    if (m_commandDispatcher) m_commandDispatcher->begin(commandId);
-    if (m_stateCenter)
-    {
-        m_stateCenter->setCurrentCommandId(commandId);
-        m_stateCenter->setCurrentCommandOwner(QStringLiteral("2D"));
-        m_stateCenter->setCurrentCommandType(QStringLiteral("2D"));
-        m_stateCenter->setBusy(true);
-        m_stateCenter->setMetadata({
-            { QStringLiteral("commandOwner"), QStringLiteral("2D") },
-            { QStringLiteral("commandId"), commandId },
-            { QStringLiteral("commandState"), QStringLiteral("begin") },
-            { QStringLiteral("commandType"), QStringLiteral("2D") }
-            });
-    }
+    if (m_commandDispatcher)
+        m_commandDispatcher->begin(commandId);
 }
 
 void CanvasViewport2D::finishCommand(bool committed)
 {
     if (m_commandDispatcher)
     {
-        if (committed) m_commandDispatcher->submit();
-        else m_commandDispatcher->cancel();
+        if (committed)
+            m_commandDispatcher->submit();
+        else
+            m_commandDispatcher->cancel();
     }
+
     m_toolContext.tool = ToolContext::DrawTool::None;
     m_toolContext.drawing = false;
     m_toolContext.measureMode = false;
     m_toolContext.hasDrawStart = false;
     m_toolContext.boxSelecting = false;
     m_toolContext.transformCopy = false;
-    setCommandStage(QStringLiteral("Idle")); // 空闲
+    setCommandStage(QStringLiteral("空闲"));
     if (m_stateCenter)
     {
-        m_stateCenter->setCurrentCommandPhase(QStringLiteral("idle"));
-        m_stateCenter->setCurrentCommandId(QStringLiteral("idle"));
-        m_stateCenter->setCurrentCommandOwner(QStringLiteral("none"));
-        m_stateCenter->setCurrentCommandType(QStringLiteral("none"));
-        m_stateCenter->setBusy(false);
-        m_stateCenter->setMetadata({
-            { QStringLiteral("commandState"), committed ? QStringLiteral("submit") : QStringLiteral("cancel") },
-            { QStringLiteral("commandId"), m_commandDispatcher ? m_commandDispatcher->activeCommandId() : QString() },
-            { QStringLiteral("commandOwner"), QStringLiteral("none") },
-            { QStringLiteral("commandType"), QStringLiteral("none") }
-            });
-        if (!committed)
-            m_stateCenter->setSelectionContext(QStringLiteral("2D-Cancel"), m_stateCenter->currentSelectionText());
-        else
-            m_stateCenter->setSelectionContext(QStringLiteral("2D-Commit"), m_stateCenter->currentSelectionText());
+        m_stateCenter->setSelectionContext(committed ? QStringLiteral("2D-Commit") : QStringLiteral("2D-Cancel"), m_stateCenter->currentSelectionText());
     }
 }
 
@@ -480,46 +447,49 @@ void CanvasViewport2D::setCommandStage(const QString& stage)
             { QStringLiteral("commandPhase"), stage },
             { QStringLiteral("commandOwner"), QStringLiteral("2D") },
             { QStringLiteral("commandType"), QStringLiteral("2D") }
-            });
+        });
     }
+}
+
+
+void CanvasViewport2D::activateDrawTool(ToolContext::DrawTool tool, const QString& commandId, const QString& statusText)
+{
+    m_toolContext.tool = tool;
+    m_toolContext.drawing = true;
+    m_toolContext.measureMode = false;
+    m_toolContext.hasDrawStart = false;
+    m_toolContext.boxSelecting = false;
+    m_toolContext.transformCopy = false;
+    startCommand(commandId);
+    updateStatus(statusText);
+}
+
+void CanvasViewport2D::activateTransformTool(ToolContext::DrawTool tool, const QString& commandId, const QString& statusText)
+{
+    m_toolContext.tool = tool;
+    m_toolContext.drawing = false;
+    m_toolContext.measureMode = false;
+    m_toolContext.hasDrawStart = false;
+    m_toolContext.boxSelecting = false;
+    m_toolContext.transformCopy = (tool == ToolContext::DrawTool::Copy);
+    startCommand(commandId);
+    updateStatus(statusText);
 }
 
 void CanvasViewport2D::enterPolylineMode()
 {
-    // 折线进入点输入阶段，双击后收尾
-    m_toolContext.tool = ToolContext::DrawTool::Polyline;
-    m_toolContext.drawing = true;
-    m_toolContext.measureMode = false;
-    m_toolContext.hasDrawStart = false;
-    m_toolContext.boxSelecting = false;
-    m_toolContext.transformCopy = false;
     m_polylinePoints.clear();
-    startCommand(QStringLiteral("2d.draw_polyline"));
-    updateStatus(QStringLiteral("2D polyline start"));
+    activateDrawTool(ToolContext::DrawTool::Polyline, QStringLiteral("2d.draw_polyline"), QStringLiteral("2D polyline start"));
 }
 
 void CanvasViewport2D::enterCircleMode()
 {
-    m_toolContext.tool = ToolContext::DrawTool::Circle;
-    m_toolContext.drawing = true;
-    m_toolContext.measureMode = false;
-    m_toolContext.hasDrawStart = false;
-    m_toolContext.boxSelecting = false;
-    m_toolContext.transformCopy = false;
-    startCommand(QStringLiteral("2d.draw_circle"));
-    updateStatus(QStringLiteral("2D circle start"));
+    activateDrawTool(ToolContext::DrawTool::Circle, QStringLiteral("2d.draw_circle"), QStringLiteral("2D circle start"));
 }
 
 void CanvasViewport2D::enterArcMode()
 {
-    m_toolContext.tool = ToolContext::DrawTool::Arc;
-    m_toolContext.drawing = true;
-    m_toolContext.measureMode = false;
-    m_toolContext.hasDrawStart = false;
-    m_toolContext.boxSelecting = false;
-    m_toolContext.transformCopy = false;
-    startCommand(QStringLiteral("2d.draw_arc"));
-    updateStatus(QStringLiteral("2D arc start"));
+    activateDrawTool(ToolContext::DrawTool::Arc, QStringLiteral("2d.draw_arc"), QStringLiteral("2D arc start"));
 }
 
 void CanvasViewport2D::enterSelectMode()
@@ -537,90 +507,50 @@ void CanvasViewport2D::enterSelectMode()
 
 void CanvasViewport2D::enterMoveMode()
 {
-    // 进入移动命令前，先清理复制标记，避免影响下一次操作
-    m_toolContext.tool = ToolContext::DrawTool::Move;
-    m_toolContext.drawing = false;
-    m_toolContext.measureMode = false;
-    m_toolContext.hasDrawStart = false;
-    m_toolContext.boxSelecting = false;
-    m_toolContext.transformCopy = false;
-    startCommand(QStringLiteral("2d.move"));
-    updateStatus(QStringLiteral("2D move start"));
+    activateTransformTool(ToolContext::DrawTool::Move, QStringLiteral("2d.move"), QStringLiteral("2D move start"));
 }
 
 void CanvasViewport2D::enterCopyMode()
 {
-    // 复制命令要求保留原对象，因此先打开复制标记
-    m_toolContext.tool = ToolContext::DrawTool::Copy;
-    m_toolContext.drawing = false;
-    m_toolContext.measureMode = false;
-    m_toolContext.hasDrawStart = false;
-    m_toolContext.boxSelecting = false;
-    m_toolContext.transformCopy = true;
-    startCommand(QStringLiteral("2d.copy"));
-    updateStatus(QStringLiteral("2D copy start"));
+    activateTransformTool(ToolContext::DrawTool::Copy, QStringLiteral("2d.copy"), QStringLiteral("2D copy start"));
 }
 
 void CanvasViewport2D::enterRotateMode()
 {
-    // 旋转命令先进入等待基点阶段，后面再接目标点形成角度
-    m_toolContext.tool = ToolContext::DrawTool::Rotate;
-    m_toolContext.drawing = false;
-    m_toolContext.measureMode = false;
-    m_toolContext.hasDrawStart = false;
-    m_toolContext.boxSelecting = false;
-    m_toolContext.transformCopy = false;
-    startCommand(QStringLiteral("2d.rotate"));
-    updateStatus(QStringLiteral("2D rotate start"));
+    activateTransformTool(ToolContext::DrawTool::Rotate, QStringLiteral("2d.rotate"), QStringLiteral("2D rotate start"));
 }
 
 void CanvasViewport2D::enterMirrorMode()
 {
-    m_toolContext.tool = ToolContext::DrawTool::Mirror;
-    m_toolContext.drawing = false;
-    m_toolContext.measureMode = false;
-    m_toolContext.hasDrawStart = false;
-    m_toolContext.boxSelecting = false;
-    m_toolContext.transformCopy = false;
-    startCommand(QStringLiteral("2d.mirror"));
-    updateStatus(QStringLiteral("2D mirror start"));
+    activateTransformTool(ToolContext::DrawTool::Mirror, QStringLiteral("2d.mirror"), QStringLiteral("2D mirror start"));
 }
 
 void CanvasViewport2D::enterTrimMode()
 {
-    m_toolContext.tool = ToolContext::DrawTool::Trim;
-    m_toolContext.drawing = false;
-    m_toolContext.measureMode = false;
-    m_toolContext.hasDrawStart = false;
-    m_toolContext.boxSelecting = false;
-    m_toolContext.transformCopy = false;
-    startCommand(QStringLiteral("2d.trim"));
-    updateStatus(QStringLiteral("2D trim start"));
+    activateTransformTool(ToolContext::DrawTool::Trim, QStringLiteral("2d.trim"), QStringLiteral("2D trim start"));
 }
 
 void CanvasViewport2D::enterExtendMode()
 {
-    m_toolContext.tool = ToolContext::DrawTool::Extend;
-    m_toolContext.drawing = false;
-    m_toolContext.measureMode = false;
-    m_toolContext.hasDrawStart = false;
-    m_toolContext.boxSelecting = false;
-    m_toolContext.transformCopy = false;
-    startCommand(QStringLiteral("2d.extend"));
-    updateStatus(QStringLiteral("2D extend start"));
+    activateTransformTool(ToolContext::DrawTool::Extend, QStringLiteral("2d.extend"), QStringLiteral("2D extend start"));
 }
 
-void CanvasViewport2D::beginBoxSelect(const QPointF& scenePos)
+void CanvasViewport2D::enterBoxSelectMode()
 {
     m_toolContext.tool = ToolContext::DrawTool::BoxSelect;
     m_toolContext.drawing = false;
     m_toolContext.measureMode = false;
     m_toolContext.hasDrawStart = false;
-    m_toolContext.boxSelecting = true;
+    m_toolContext.boxSelecting = false;
     m_toolContext.transformCopy = false;
-    m_boxSelectStart = scenePos;
     startCommand(QStringLiteral("2d.box_select"));
     updateStatus(QStringLiteral("2D box select start"));
+}
+
+void CanvasViewport2D::beginBoxSelect(const QPointF& scenePos)
+{
+    m_toolContext.boxSelecting = true;
+    m_boxSelectStart = scenePos;
 }
 
 void CanvasViewport2D::updateBoxSelect(const QPointF& scenePos)
@@ -642,14 +572,25 @@ void CanvasViewport2D::endBoxSelect(const QPointF& scenePos)
     m_selectedEndpoint = -1;
 
     // 框选时同时考虑对象边界和几何主体，尽量贴近 CAD 的选择体验
-    for (const auto& line : m_document->lines())
-        if (line && rect.normalized().intersects(line->bounds())) m_document->selection().add(line);
-    for (const auto& polyline : m_document->polylines())
-        if (polyline && rect.normalized().intersects(polyline->bounds())) m_document->selection().add(polyline);
-    for (const auto& circle : m_document->circles())
-        if (circle && rect.normalized().intersects(circle->bounds())) m_document->selection().add(circle);
-    for (const auto& arc : m_document->arcs())
-        if (arc && rect.normalized().intersects(QRectF(arc->center().x() - arc->radius(), arc->center().y() - arc->radius(), arc->radius() * 2.0, arc->radius() * 2.0))) m_document->selection().add(arc);
+    for (const auto& entity : m_document->entities())
+    {
+        if (auto line = std::dynamic_pointer_cast<LineEntity2D>(entity))
+        {
+            if (rect.normalized().intersects(line->bounds())) m_document->selection().add(line);
+        }
+        else if (auto polyline = std::dynamic_pointer_cast<PolylineEntity2D>(entity))
+        {
+            if (rect.normalized().intersects(polyline->bounds())) m_document->selection().add(polyline);
+        }
+        else if (auto circle = std::dynamic_pointer_cast<CircleEntity2D>(entity))
+        {
+            if (rect.normalized().intersects(circle->bounds())) m_document->selection().add(circle);
+        }
+        else if (auto arc = std::dynamic_pointer_cast<ArcEntity2D>(entity))
+        {
+            if (rect.normalized().intersects(QRectF(arc->center().x() - arc->radius(), arc->center().y() - arc->radius(), arc->radius() * 2.0, arc->radius() * 2.0))) m_document->selection().add(arc);
+        }
+    }
 
     m_toolContext.boxSelecting = false;
     finishCommand(true);
@@ -719,10 +660,7 @@ void CanvasViewport2D::contextMenuEvent(QContextMenuEvent* event)
     auto* selectEntity = menu.addAction(QStringLiteral("Select"));
 
     QAction* chosen = menu.exec(event->globalPos());
-    if (chosen == drawLine)
-    {
-        setDrawingEnabled(true); m_toolContext.tool = ToolContext::DrawTool::Line; startCommand(QStringLiteral("2d.draw_line"));
-    }
+    if (chosen == drawLine) { setDrawingEnabled(true); m_toolContext.tool = ToolContext::DrawTool::Line; startCommand(QStringLiteral("2d.draw_line")); }
     else if (chosen == drawPolyline) enterPolylineMode();
     else if (chosen == drawCircle) enterCircleMode();
     else if (chosen == drawArc) enterArcMode();
@@ -732,14 +670,8 @@ void CanvasViewport2D::contextMenuEvent(QContextMenuEvent* event)
     else if (chosen == mirror) enterMirrorMode();
     else if (chosen == trim) enterTrimMode();
     else if (chosen == extend) enterExtendMode();
-    else if (chosen == boxSelect)
-    {
-        m_toolContext.tool = ToolContext::DrawTool::BoxSelect; startCommand(QStringLiteral("2d.box_select"));
-    }
-    else if (chosen == measure)
-    {
-        setMeasureMode(true); startCommand(QStringLiteral("2d.measure"));
-    }
+    else if (chosen == boxSelect) enterBoxSelectMode();
+    else if (chosen == measure) { setMeasureMode(true); startCommand(QStringLiteral("2d.measure")); }
     else if (chosen == deleteEntity) deleteSelectedEntity();
     else if (chosen == editEntity) updateStatus(QStringLiteral("2D edit mode"));
     else if (chosen == selectEntity) enterSelectMode();
@@ -761,16 +693,14 @@ void CanvasViewport2D::mousePressEvent(QMouseEvent* event)
         m_toolContext.hasDrawStart = true;
         m_drawStartPoint = scenePos;
         addPreviewLine(scenePos, scenePos);
-        setCommandStage(QStringLiteral("Waiting for second point")); // 等待第二点
+        setCommandStage(QStringLiteral("等待第二点"));
         updateStatus(QStringLiteral("2D line start"));
         return;
     }
     if (event->button() == Qt::LeftButton && m_toolContext.tool == ToolContext::DrawTool::Polyline)
     {
-        if (m_polylinePoints.isEmpty())
-            startCommand(QStringLiteral("2d.draw_polyline"));
         commitPolylinePoint(scenePos);
-        setCommandStage(QStringLiteral("Polyline input")); // 折线点输入中
+        setCommandStage(QStringLiteral("折线点输入中"));
         updateStatus(QStringLiteral("2D polyline point"));
         return;
     }
@@ -779,7 +709,7 @@ void CanvasViewport2D::mousePressEvent(QMouseEvent* event)
         m_toolContext.hasDrawStart = true;
         m_drawStartPoint = scenePos;
         addPreviewLine(scenePos, scenePos);
-        setCommandStage(QStringLiteral("Waiting for radius point")); // 等待半径点
+        setCommandStage(QStringLiteral("等待半径点"));
         updateStatus(QStringLiteral("2D circle center"));
         return;
     }
@@ -788,7 +718,7 @@ void CanvasViewport2D::mousePressEvent(QMouseEvent* event)
         m_toolContext.hasDrawStart = true;
         m_drawStartPoint = scenePos;
         addPreviewLine(scenePos, scenePos);
-        setCommandStage(QStringLiteral("Waiting for arc radius point")); // 等待弧半径点
+        setCommandStage(QStringLiteral("等待弧半径点"));
         updateStatus(QStringLiteral("2D arc center"));
         return;
     }
@@ -801,7 +731,7 @@ void CanvasViewport2D::mousePressEvent(QMouseEvent* event)
     {
         m_toolContext.hasDrawStart = true;
         m_drawStartPoint = scenePos;
-        setCommandStage(QStringLiteral("Select move target")); // 选择移动目标点
+        setCommandStage(QStringLiteral("选择移动目标点"));
         updateStatus(QStringLiteral("2D move anchor"));
         return;
     }
@@ -809,7 +739,7 @@ void CanvasViewport2D::mousePressEvent(QMouseEvent* event)
     {
         m_toolContext.hasDrawStart = true;
         m_drawStartPoint = scenePos;
-        setCommandStage(QStringLiteral("Select copy target")); // 选择复制目标点
+        setCommandStage(QStringLiteral("选择复制目标点"));
         updateStatus(QStringLiteral("2D copy anchor"));
         return;
     }
@@ -817,7 +747,7 @@ void CanvasViewport2D::mousePressEvent(QMouseEvent* event)
     {
         m_toolContext.hasDrawStart = true;
         m_drawStartPoint = scenePos;
-        setCommandStage(QStringLiteral("Select rotate target")); // 选择旋转目标点
+        setCommandStage(QStringLiteral("选择旋转目标点"));
         updateStatus(QStringLiteral("2D rotate anchor"));
         return;
     }
@@ -825,20 +755,20 @@ void CanvasViewport2D::mousePressEvent(QMouseEvent* event)
     {
         m_toolContext.hasDrawStart = true;
         m_drawStartPoint = scenePos;
-        setCommandStage(QStringLiteral("Select mirror base point")); // 选择镜像基准点
+        setCommandStage(QStringLiteral("选择镜像基准点"));
         updateStatus(QStringLiteral("2D mirror anchor"));
         return;
     }
     if (event->button() == Qt::LeftButton && m_toolContext.tool == ToolContext::DrawTool::Trim)
     {
         trimSelectedByPoint(scenePos);
-        setCommandStage(QStringLiteral("Select trim target")); // 修剪目标选择
+        setCommandStage(QStringLiteral("修剪目标选择"));
         return;
     }
     if (event->button() == Qt::LeftButton && m_toolContext.tool == ToolContext::DrawTool::Extend)
     {
         extendSelectedByPoint(scenePos);
-        setCommandStage(QStringLiteral("Select extend target")); // 延伸目标选择
+        setCommandStage(QStringLiteral("延伸目标选择"));
         return;
     }
     if (event->button() == Qt::LeftButton)
@@ -857,26 +787,11 @@ void CanvasViewport2D::mouseMoveEvent(QMouseEvent* event)
         verticalScrollBar()->setValue(verticalScrollBar()->value() - static_cast<int>(delta.y()));
         return;
     }
-    if (m_toolContext.tool == ToolContext::DrawTool::BoxSelect && m_toolContext.boxSelecting)
-    {
-        updateBoxSelect(scenePos); return;
-    }
-    if (m_toolContext.tool == ToolContext::DrawTool::Line && m_toolContext.hasDrawStart)
-    {
-        addPreviewLine(m_drawStartPoint, scenePos); setCommandStage(QStringLiteral("Line preview")); updateStatus(QStringLiteral("2D line preview")); return;
-    } // 线段预览中
-    if (m_toolContext.tool == ToolContext::DrawTool::Circle && m_toolContext.hasDrawStart)
-    {
-        addPreviewLine(m_drawStartPoint, scenePos); setCommandStage(QStringLiteral("Circle preview")); updateStatus(QStringLiteral("2D circle preview")); return;
-    } // 圆预览中
-    if (m_toolContext.tool == ToolContext::DrawTool::Arc && m_toolContext.hasDrawStart)
-    {
-        addPreviewLine(m_drawStartPoint, scenePos); setCommandStage(QStringLiteral("Arc preview")); updateStatus(QStringLiteral("2D arc preview")); return;
-    } // 弧预览中
-    if ((m_toolContext.tool == ToolContext::DrawTool::Move || m_toolContext.tool == ToolContext::DrawTool::Copy || m_toolContext.tool == ToolContext::DrawTool::Rotate || m_toolContext.tool == ToolContext::DrawTool::Mirror) && m_toolContext.hasDrawStart)
-    {
-        setCommandStage(QStringLiteral("Transform preview")); applySelectionTransform(m_drawStartPoint, scenePos, QStringLiteral("transform")); return;
-    } // 变换预览中
+    if (m_toolContext.tool == ToolContext::DrawTool::BoxSelect && m_toolContext.boxSelecting) { updateBoxSelect(scenePos); return; }
+    if (m_toolContext.tool == ToolContext::DrawTool::Line && m_toolContext.hasDrawStart) { addPreviewLine(m_drawStartPoint, scenePos); setCommandStage(QStringLiteral("线段预览中")); updateStatus(QStringLiteral("2D line preview")); return; }
+    if (m_toolContext.tool == ToolContext::DrawTool::Circle && m_toolContext.hasDrawStart) { addPreviewLine(m_drawStartPoint, scenePos); setCommandStage(QStringLiteral("圆预览中")); updateStatus(QStringLiteral("2D circle preview")); return; }
+    if (m_toolContext.tool == ToolContext::DrawTool::Arc && m_toolContext.hasDrawStart) { addPreviewLine(m_drawStartPoint, scenePos); setCommandStage(QStringLiteral("弧预览中")); updateStatus(QStringLiteral("2D arc preview")); return; }
+    if ((m_toolContext.tool == ToolContext::DrawTool::Move || m_toolContext.tool == ToolContext::DrawTool::Copy || m_toolContext.tool == ToolContext::DrawTool::Rotate || m_toolContext.tool == ToolContext::DrawTool::Mirror) && m_toolContext.hasDrawStart) { setCommandStage(QStringLiteral("变换预览中")); applySelectionTransform(m_drawStartPoint, scenePos, QStringLiteral("transform")); return; }
     QGraphicsView::mouseMoveEvent(event);
 }
 
@@ -894,7 +809,7 @@ void CanvasViewport2D::mouseReleaseEvent(QMouseEvent* event)
     {
         commitLine(m_drawStartPoint, scenePos);
         m_toolContext.hasDrawStart = false;
-        setCommandStage(QStringLiteral("Submit completed")); // 提交完成
+        setCommandStage(QStringLiteral("提交完成"));
         finishCommand(true);
         updateStatus(QStringLiteral("2D line committed"));
         if (m_stateCenter) m_stateCenter->setDirty(true);
@@ -905,7 +820,7 @@ void CanvasViewport2D::mouseReleaseEvent(QMouseEvent* event)
         const double radius = QLineF(m_drawStartPoint, scenePos).length();
         commitCircle(m_drawStartPoint, radius);
         m_toolContext.hasDrawStart = false;
-        setCommandStage(QStringLiteral("Submit completed")); // 提交完成
+        setCommandStage(QStringLiteral("提交完成"));
         finishCommand(true);
         updateStatus(QStringLiteral("2D circle committed"));
         if (m_stateCenter) m_stateCenter->setDirty(true);
@@ -916,7 +831,7 @@ void CanvasViewport2D::mouseReleaseEvent(QMouseEvent* event)
         const double radius = QLineF(m_drawStartPoint, scenePos).length();
         commitArc(m_drawStartPoint, radius, 0.0, 90.0);
         m_toolContext.hasDrawStart = false;
-        setCommandStage(QStringLiteral("Submit completed")); // 提交完成
+        setCommandStage(QStringLiteral("提交完成"));
         finishCommand(true);
         updateStatus(QStringLiteral("2D arc committed"));
         if (m_stateCenter) m_stateCenter->setDirty(true);
@@ -931,7 +846,7 @@ void CanvasViewport2D::mouseReleaseEvent(QMouseEvent* event)
     {
         applySelectionTransform(m_drawStartPoint, scenePos, QStringLiteral("transform"));
         m_toolContext.hasDrawStart = false;
-        setCommandStage(QStringLiteral("Submit completed")); // 提交完成
+        setCommandStage(QStringLiteral("提交完成"));
         finishCommand(true);
         m_toolContext.transformCopy = false;
         return;
@@ -947,7 +862,8 @@ void Viewport3D::rebuildTreeHighlight()
     if (!m_document || m_selectedNodeId.isEmpty())
         return;
 
-    const auto node = m_document->nodeById(m_selectedNodeId);
+    const auto entity = m_document->entityById(m_selectedNodeId);
+    const auto node = std::dynamic_pointer_cast<SceneNode>(entity);
     if (!node)
         return;
 
@@ -980,7 +896,7 @@ SceneTreeDockWidget::SceneTreeDockWidget(QWidget* parent)
         if (m_selectionCallback)
             m_selectionCallback(nodeId);
         emit nodeActivated(nodeId);
-        });
+    });
 }
 
 void SceneTreeDockWidget::setSceneDocument(SceneDocument3D* document)
@@ -1029,8 +945,9 @@ void SceneTreeDockWidget::rebuildTree()
     if (!m_document)
         return;
 
-    for (const auto& node : m_document->rootNodes())
+    for (const auto& entity : m_document->entities())
     {
+        auto node = std::dynamic_pointer_cast<SceneNode>(entity);
         if (!node)
             continue;
         auto* item = new QTreeWidgetItem(m_tree, { node->name(), QStringLiteral("Node") });
@@ -1112,29 +1029,51 @@ PropertiesPanelWidget::PropertiesPanelWidget(QWidget* parent)
     layout->addWidget(m_tree);
 }
 
+void PropertiesPanelWidget::setWorkbenchMode(WorkbenchMode mode)
+{
+    m_workbenchMode = mode;
+    refresh();
+}
+
 void PropertiesPanelWidget::setEntityDocument(EntityDocument2D* document)
 {
-    m_entityDocument = document; refresh();
+    // 属性面板只接收文档指针，不在这里做任何实体遍历
+    m_entityDocument = document;
+    refresh();
 }
+
 void PropertiesPanelWidget::setSceneDocument(SceneDocument3D* document)
 {
-    m_sceneDocument = document; refresh();
+    // 3D 文档同样只负责挂接，不在这里引入额外业务逻辑
+    m_sceneDocument = document;
+    refresh();
 }
+
 void PropertiesPanelWidget::setStateText(const QString& text)
 {
-    m_stateText = text; refresh();
+    // 状态文本来自状态中心或外部同步逻辑，面板只负责展示
+    m_stateText = text;
+    refresh();
 }
+
 void PropertiesPanelWidget::setSelectionText(const QString& text)
 {
-    m_selectionText = text; refresh();
+    // 选择文本只作为展示内容，不在属性面板里反向写回业务状态
+    m_selectionText = text;
+    refresh();
 }
+
 void PropertiesPanelWidget::setObjectDetails(const QString& title, const QStringList& lines)
 {
-    m_objectTitle = title; m_objectLines = lines; refresh();
+    // 对象详情由外部整理后传入，面板只负责渲染字段列表
+    m_objectTitle = title;
+    m_objectLines = lines;
+    refresh();
 }
 
 void PropertiesPanelWidget::refresh()
 {
+    // 刷新时先清树再重建，避免残留旧字段
     if (m_tree)
         m_tree->clear();
     syncText();
@@ -1145,11 +1084,27 @@ void PropertiesPanelWidget::syncText()
     if (!m_tree)
         return;
 
+    // 所有展示字段都集中在这里构建，避免在多个入口散落拼接逻辑
     new QTreeWidgetItem(m_tree, { QStringLiteral("State"), m_stateText });
     new QTreeWidgetItem(m_tree, { QStringLiteral("Selection"), m_selectionText });
     new QTreeWidgetItem(m_tree, { QStringLiteral("Object"), m_objectTitle });
-    new QTreeWidgetItem(m_tree, { QStringLiteral("2D Doc"), m_entityDocument ? QStringLiteral("Ready") : QStringLiteral("None") });
-    new QTreeWidgetItem(m_tree, { QStringLiteral("3D Doc"), m_sceneDocument ? QStringLiteral("Ready") : QStringLiteral("None") });
+
+    if (m_workbenchMode == WorkbenchMode::TwoD)
+    {
+        new QTreeWidgetItem(m_tree, { QStringLiteral("2D Doc"), m_entityDocument ? QStringLiteral("Ready") : QStringLiteral("None") });
+        new QTreeWidgetItem(m_tree, { QStringLiteral("2D Mode"), QStringLiteral("Active") });
+    }
+    else if (m_workbenchMode == WorkbenchMode::ThreeD)
+    {
+        new QTreeWidgetItem(m_tree, { QStringLiteral("3D Doc"), m_sceneDocument ? QStringLiteral("Ready") : QStringLiteral("None") });
+        new QTreeWidgetItem(m_tree, { QStringLiteral("3D Mode"), QStringLiteral("Active") });
+    }
+    else
+    {
+        new QTreeWidgetItem(m_tree, { QStringLiteral("2D Doc"), m_entityDocument ? QStringLiteral("Ready") : QStringLiteral("None") });
+        new QTreeWidgetItem(m_tree, { QStringLiteral("3D Doc"), m_sceneDocument ? QStringLiteral("Ready") : QStringLiteral("None") });
+    }
+
     for (const auto& line : m_objectLines)
         new QTreeWidgetItem(m_tree, { QStringLiteral("Detail"), line });
 }
@@ -1222,8 +1177,8 @@ void Viewport3D::selectNodeById(const QString& nodeId)
     if (m_document)
     {
         m_document->selection().clear();
-        if (auto node = m_document->nodeById(nodeId))
-            m_document->selection().add(node);
+        if (auto entity = m_document->entityById(nodeId))
+            m_document->selection().add(entity);
     }
     rebuildTreeHighlight();
     if (m_selectionCallback)
@@ -1235,30 +1190,12 @@ void Viewport3D::selectNodeById(const QString& nodeId)
     update();
 }
 
-void Viewport3D::mousePressEvent(QMouseEvent* event)
-{
-    QWidget::mousePressEvent(event);
-}
-void Viewport3D::mouseMoveEvent(QMouseEvent* event)
-{
-    QWidget::mouseMoveEvent(event);
-}
-void Viewport3D::mouseReleaseEvent(QMouseEvent* event)
-{
-    QWidget::mouseReleaseEvent(event);
-}
-void Viewport3D::wheelEvent(QWheelEvent* event)
-{
-    QWidget::wheelEvent(event);
-}
-void Viewport3D::paintEvent(QPaintEvent* event)
-{
-    QWidget::paintEvent(event);
-}
-void Viewport3D::contextMenuEvent(QContextMenuEvent* event)
-{
-    QWidget::contextMenuEvent(event);
-}
+void Viewport3D::mousePressEvent(QMouseEvent* event) { QWidget::mousePressEvent(event); }
+void Viewport3D::mouseMoveEvent(QMouseEvent* event) { QWidget::mouseMoveEvent(event); }
+void Viewport3D::mouseReleaseEvent(QMouseEvent* event) { QWidget::mouseReleaseEvent(event); }
+void Viewport3D::wheelEvent(QWheelEvent* event) { QWidget::wheelEvent(event); }
+void Viewport3D::paintEvent(QPaintEvent* event) { QWidget::paintEvent(event); }
+void Viewport3D::contextMenuEvent(QContextMenuEvent* event) { QWidget::contextMenuEvent(event); }
 
 void Viewport3D::emitStatus(const QString& text)
 {
@@ -1266,15 +1203,8 @@ void Viewport3D::emitStatus(const QString& text)
         m_statusCallback(text);
 }
 
-void Viewport3D::drawAxes(QPainter& painter)
-{
-    Q_UNUSED(painter);
-}
-void Viewport3D::drawWireCube(QPainter& painter)
-{
-    Q_UNUSED(painter);
-}
-void Viewport3D::drawNodePathOverlay(QPainter& painter) const
-{
-    Q_UNUSED(painter);
-}
+void Viewport3D::drawAxes(QPainter& painter) { Q_UNUSED(painter); }
+void Viewport3D::drawWireCube(QPainter& painter) { Q_UNUSED(painter); }
+void Viewport3D::drawNodePathOverlay(QPainter& painter) const { Q_UNUSED(painter); }
+
+

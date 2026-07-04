@@ -1,6 +1,3 @@
-/**
- * @file Main/Src/Bootstrap/AppBootstrapper.h
- */
 #pragma once
 
 #include <memory>

@@ -1,26 +1,23 @@
-/**
- * @file Main/Src/UI/UiStateCenter.h
- */
 #pragma once
 
 #include <QObject>
 #include <QString>
 #include <QVariantMap>
 
- /**
-  * @file UiStateCenter.h
-  * @brief UI 状态中心定义
-  *
-  * 定义了 UI 状态中心类，负责管理和分发整个应用程序的 UI 状态。
-  * 提供状态快照功能和信号通知机制。
-  */
+/**
+ * @file UiStateCenter.h
+ * @brief UI 状态中心定义
+ *
+ * 定义了 UI 状态中心类，负责管理和分发整个应用程序的 UI 状态。
+ * 提供状态快照功能和信号通知机制。
+ */
 
-  /**
-   * @struct UiStateSnapshot
-   * @brief UI 状态快照
-   *
-   * 封装了 UI 状态的所有关键信息，用于状态保存和恢复。
-   */
+/**
+ * @struct UiStateSnapshot
+ * @brief UI 状态快照
+ *
+ * 封装了 UI 状态的所有关键信息，用于状态保存和恢复。
+ */
 struct UiStateSnapshot
 {
     /// 当前工作台 ID
@@ -67,10 +64,11 @@ class UiStateCenter final : public QObject
     Q_OBJECT
 
 public:
-    /// 构造函数
+    
     /// @param parent 父对象
     explicit UiStateCenter(QObject* parent = nullptr);
 
+public:
     /// 获取状态快照
     UiStateSnapshot snapshot() const;
 
@@ -221,24 +219,28 @@ private:
     QString m_themeId{ QStringLiteral("system") };
     /// 当前视图模式
     QString m_viewMode{ QStringLiteral("none") };
+
     /// 当前图层 ID
     QString m_layerId{ QStringLiteral("default") };
     /// 当前文档 ID
     QString m_documentId{ QStringLiteral("none") };
     /// 当前命令 ID
     QString m_commandId{ QStringLiteral("idle") };
+
     /// 当前命令阶段
     QString m_commandPhase{ QStringLiteral("idle") };
     /// 当前命令来源
     QString m_commandOwner{ QStringLiteral("none") };
     /// 当前命令类型
     QString m_commandType{ QStringLiteral("none") };
+
     /// 当前选择文本
     QString m_selectionText;
     /// 当前选择来源
     QString m_selectionSource{ QStringLiteral("none") };
     /// 当前选择类型
     QString m_selectionType{ QStringLiteral("none") };
+
     /// 繁忙状态
     bool m_busy{ false };
     /// 脏状态
