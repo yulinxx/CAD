@@ -4,11 +4,31 @@
 
 #include "VersionInfo.h"
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 int runCADApplication(int argc, char** argv)
 {
     auto appPaths = MainApp::buildAppPaths(MainApp::appName());
-    if (appPaths.appRootPath.empty() && argc > 0 && argv && argv[0])
-        appPaths.appRootPath = QFileInfo(QString::fromLocal8Bit(argv[0])).absolutePath().toStdString();
+    if (appPaths.appRootPath.empty())
+    {
+#ifdef _WIN32
+        wchar_t path[MAX_PATH];
+        if (GetModuleFileNameW(nullptr, path, MAX_PATH) > 0)
+        {
+            appPaths.appRootPath = QFileInfo(QString::fromWCharArray(path)).absolutePath().toStdString();
+        }
+#else
+        if (argc > 0 && argv && argv[0])
+        {
+            appPaths.appRootPath = QFileInfo(QString::fromLocal8Bit(argv[0])).absolutePath().toStdString();
+        }
+#endif
+    }
 
     if (appPaths.appRootPath.empty())
         return -1;
