@@ -6,6 +6,7 @@
 #include <QMainWindow>
 #include <QPointer>
 
+#include "UiCommandHandler.h"
 #include "UiFrameworkServices.h"
 #include "UiServices.h"
 
@@ -16,6 +17,7 @@ class QMenu;
 class QProgressBar;
 class QStatusBar;
 class QToolBar;
+class UiCommandDispatcher;
 class UiStateCenter;
 class UiThemeService;
 class UiWorkbench;
@@ -56,6 +58,12 @@ public:
     /// 设置主题服务
     /// @param themeService 主题服务
     void setThemeService(UiThemeService* themeService);
+    /// 设置命令分发器
+    /// @param dispatcher 命令分发器
+    void setCommandDispatcher(UiCommandDispatcher* dispatcher);
+    /// 设置撤销栈
+    /// @param undoStack 撤销栈
+    void setUndoStack(IUndoStack* undoStack);
     /// 统一设置服务依赖，作为主装配入口
     /// @param services UI 服务集合
     void configureServices(const UiServices& services);
@@ -129,6 +137,8 @@ private:
     void initializeThemeMenuSkeleton();
     /// 创建工作台切换菜单骨架，便于后续收口工作台入口
     void initializeWorkbenchMenuSkeleton();
+    /// 绑定全局快捷键（Ctrl+Z/Ctrl+Y 等）
+    void bindShortcuts();
     /// 构建菜单系统（文件、视图、工具）
     void buildMenus();
     /// 构建工具栏
@@ -194,6 +204,10 @@ private:
     UiStateCenter* m_stateCenter{ nullptr };
     /// 主题服务
     UiThemeService* m_themeService{ nullptr };
+    /// 命令分发器
+    UiCommandDispatcher* m_commandDispatcher{ nullptr };
+    /// 撤销栈
+    IUndoStack* m_undoStack{ nullptr };
     /// UI 服务集合
     UiServices m_uiServices;
     /// 框架级服务桥接

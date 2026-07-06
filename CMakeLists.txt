@@ -148,6 +148,9 @@ if(BUILD_SANYI_RENDER)
     add_subdirectory(SanYiRender)
 endif()
 
+# # 4.6 新渲染引擎 DLL（新一代统一渲染框架）
+# add_subdirectory(RenderEngine)
+
 # 4.6 GeoModelCore（须在 UI3D 之前，以便 UI3D 链接并继承头文件路径）
 if(BUILD_GEOMODELCORE)
     find_package(OpenCASCADE CONFIG REQUIRED)
@@ -164,6 +167,9 @@ if(BUILD_ENGRAVING)
 else()
     message(STATUS "  Engraving: DISABLED")
 endif()
+
+# 4.8 统一渲染抽象层（UiRenderCore）
+add_subdirectory(Main/Src/RenderCore)
 
 # 5. UI 层 - 用户界面
 add_subdirectory(UI/Common)
@@ -242,6 +248,7 @@ set(SANYI_PROJECT_LIBS
     Utility Log CrashHandler
     EngineCommon Engine2D Engine3D
     RenderCommon Render2D Render3D
+    UiRenderCore
     UICommon UI2D UI3D
     FileIO Nesting
 )

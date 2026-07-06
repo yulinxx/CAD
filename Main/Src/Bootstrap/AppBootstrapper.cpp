@@ -3,7 +3,8 @@
 #include <QDir>
 #include <QString>
 
-#include "../UI/UiWorkbench.h"
+#include "UI/UiWorkbench.h"
+#include "UI/WorkbenchWindow.h"
 
 AppPaths MainApp::buildAppPaths(const std::string& appName)
 {
@@ -22,14 +23,18 @@ AppBootstrapper::AppBootstrapper(const AppPaths& paths, const std::string& appNa
 {
 }
 
-AppBootstrapper::~AppBootstrapper() = default;
+AppBootstrapper::~AppBootstrapper()
+{
+    shutdown();
+    m_compositionRoot.reset();
+}
 
 bool AppBootstrapper::initialize()
 {
     m_compositionRoot = std::make_unique<ApplicationCompositionRoot>();
-    if (!m_compositionRoot || !m_compositionRoot->stateCenter() || !m_compositionRoot->themeService()
-        || !m_compositionRoot->layoutService() || !m_compositionRoot->commandDispatcher()
-        || !m_compositionRoot->shellHost())
+    if (!m_compositionRoot || !m_compositionRoot->stateCenter() || 
+        !m_compositionRoot->themeService()|| !m_compositionRoot->layoutService() || 
+        !m_compositionRoot->commandDispatcher()|| !m_compositionRoot->shellHost())
     {
         return false;
     }
@@ -42,13 +47,18 @@ void AppBootstrapper::bootstrap()
     if (!m_compositionRoot)
         return;
 
-    m_services = { m_compositionRoot->stateCenter(), m_compositionRoot->themeService(), 
+    m_services = { m_compositionRoot->stateCenter(), m_compositionRoot->themeService(),
         m_compositionRoot->layoutService(), m_compositionRoot->commandDispatcher() };
 
+    const auto startWorkbenchId = m_startWorkbenchId.isEmpty() ? QStringLiteral("2D") : m_startWorkbenchId;
     if (m_compositionRoot->stateCenter())
-        m_compositionRoot->stateCenter()->setCurrentWorkbenchId(QStringLiteral("2D"));
+        m_compositionRoot->stateCenter()->setCurrentWorkbenchId(startWorkbenchId);
 
-    m_workbench = std::make_unique<Workbench2D>();
+    if (startWorkbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0)
+        m_workbench = std::make_unique<Workbench3D>();
+    else
+        m_workbench = std::make_unique<Workbench2D>();
+
     if (!m_workbench->initialize(m_services))
         return;
 
@@ -60,8 +70,11 @@ void AppBootstrapper::bootstrap()
 
 void AppBootstrapper::shutdown()
 {
-    if (m_workbench)
-        m_workbench->shutdown();
+    if (m_compositionRoot)
+    {
+        if (auto* shell = m_compositionRoot->shellHost())
+            shell->shutdown();
+    }
 
     m_workbench.reset();
 }

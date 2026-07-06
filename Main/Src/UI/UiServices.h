@@ -4,10 +4,12 @@
 
 #include "UiFrameworkServices.h"
 
+class EntityDocument2D;
 class UiCommandDispatcher;
 class UiLayoutService;
 class UiStateCenter;
 class UiThemeService;
+class IUndoStack;
 
 /**
  * @file UiServices.h
@@ -21,7 +23,7 @@ class UiThemeService;
  * @brief UI 服务集合
  *
  * 聚合了 UI 层所需的所有服务，包括状态中心、主题服务、
- * 布局服务和命令分发器。通过组合模式统一管理服务依赖。
+ * 布局服务、命令分发器和撤销栈。通过组合模式统一管理服务依赖。
  */
 struct UiServices
 {
@@ -36,6 +38,12 @@ struct UiServices
 
     /// 命令分发器
     UiCommandDispatcher* commandDispatcher{ nullptr };
+
+    /// 撤销栈
+    IUndoStack* undoStack{ nullptr };
+
+    /// 2D 文档（命令系统需要访问文档进行实体操作）
+    EntityDocument2D* document2D{ nullptr };
 
     /// 将框架级桥接信息写入到服务集合中
     /// @param frameworkServices 框架级服务

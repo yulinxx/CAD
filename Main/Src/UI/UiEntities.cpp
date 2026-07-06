@@ -58,6 +58,48 @@ double LineEntity2D::distanceToPoint(const QPointF& point) const { return pointL
 double LineEntity2D::distanceToStart(const QPointF& point) const { return std::hypot(point.x() - m_start.x(), point.y() - m_start.y()); }
 double LineEntity2D::distanceToEnd(const QPointF& point) const { return std::hypot(point.x() - m_end.x(), point.y() - m_end.y()); }
 
+void LineEntity2D::rotate(const QPointF& center, double cosAngle, double sinAngle)
+{
+    double dx1 = m_start.x() - center.x();
+    double dy1 = m_start.y() - center.y();
+    m_start = QPointF(center.x() + dx1 * cosAngle - dy1 * sinAngle, center.y() + dx1 * sinAngle + dy1 * cosAngle);
+
+    double dx2 = m_end.x() - center.x();
+    double dy2 = m_end.y() - center.y();
+    m_end = QPointF(center.x() + dx2 * cosAngle - dy2 * sinAngle, center.y() + dx2 * sinAngle + dy2 * cosAngle);
+}
+
+void LineEntity2D::translate(const QPointF& delta)
+{
+    m_start += delta;
+    m_end += delta;
+}
+
+void LineEntity2D::scale(const QPointF& center, double factor)
+{
+    m_start = QPointF(center.x() + (m_start.x() - center.x()) * factor, center.y() + (m_start.y() - center.y()) * factor);
+    m_end = QPointF(center.x() + (m_end.x() - center.x()) * factor, center.y() + (m_end.y() - center.y()) * factor);
+}
+
+QPointF LineEntity2D::center() const
+{
+    return QPointF((m_start.x() + m_end.x()) / 2.0, (m_start.y() + m_end.y()) / 2.0);
+}
+
+QVector<QPointF> LineEntity2D::keyPoints() const
+{
+    return { m_start, m_end };
+}
+
+void LineEntity2D::setKeyPoints(const QVector<QPointF>& points)
+{
+    if (points.size() >= 2)
+    {
+        m_start = points[0];
+        m_end = points[1];
+    }
+}
+
 PolylineEntity2D::PolylineEntity2D(QString id, QVector<QPointF> points)
     : m_id(std::move(id))
     , m_points(std::move(points))
@@ -109,6 +151,37 @@ void CircleEntity2D::setCenter(const QPointF& center) { m_center = center; }
 void CircleEntity2D::setRadius(double radius) { m_radius = radius; }
 QRectF CircleEntity2D::bounds() const { return QRectF(m_center.x() - m_radius, m_center.y() - m_radius, m_radius * 2.0, m_radius * 2.0); }
 
+void CircleEntity2D::rotate(const QPointF& center, double cosAngle, double sinAngle)
+{
+    const double dx = m_center.x() - center.x();
+    const double dy = m_center.y() - center.y();
+    m_center.setX(center.x() + dx * cosAngle - dy * sinAngle);
+    m_center.setY(center.y() + dx * sinAngle + dy * cosAngle);
+}
+
+void CircleEntity2D::translate(const QPointF& delta)
+{
+    m_center += delta;
+}
+
+void CircleEntity2D::scale(const QPointF& center, double factor)
+{
+    m_center.setX(center.x() + (m_center.x() - center.x()) * factor);
+    m_center.setY(center.y() + (m_center.y() - center.y()) * factor);
+    m_radius *= factor;
+}
+
+QVector<QPointF> CircleEntity2D::keyPoints() const
+{
+    return { m_center };
+}
+
+void CircleEntity2D::setKeyPoints(const QVector<QPointF>& points)
+{
+    if (!points.isEmpty())
+        m_center = points[0];
+}
+
 ArcEntity2D::ArcEntity2D(QString id, QPointF center, double radius, double startAngleDeg, double spanDeg)
     : m_id(std::move(id))
     , m_center(center)
@@ -129,6 +202,37 @@ QPointF ArcEntity2D::center() const { return m_center; }
 double ArcEntity2D::radius() const { return m_radius; }
 double ArcEntity2D::startAngleDeg() const { return m_startAngleDeg; }
 double ArcEntity2D::spanDeg() const { return m_spanDeg; }
+
+void ArcEntity2D::rotate(const QPointF& center, double cosAngle, double sinAngle)
+{
+    const double dx = m_center.x() - center.x();
+    const double dy = m_center.y() - center.y();
+    m_center.setX(center.x() + dx * cosAngle - dy * sinAngle);
+    m_center.setY(center.y() + dx * sinAngle + dy * cosAngle);
+}
+
+void ArcEntity2D::translate(const QPointF& delta)
+{
+    m_center += delta;
+}
+
+void ArcEntity2D::scale(const QPointF& center, double factor)
+{
+    m_center.setX(center.x() + (m_center.x() - center.x()) * factor);
+    m_center.setY(center.y() + (m_center.y() - center.y()) * factor);
+    m_radius *= factor;
+}
+
+QVector<QPointF> ArcEntity2D::keyPoints() const
+{
+    return { m_center };
+}
+
+void ArcEntity2D::setKeyPoints(const QVector<QPointF>& points)
+{
+    if (!points.isEmpty())
+        m_center = points[0];
+}
 
 SceneNode::SceneNode(QString id, QString name)
     : m_id(std::move(id))
@@ -367,6 +471,38 @@ void EntityDocument2D::clear()
     m_circles.clear();
     m_arcs.clear();
     m_selection.clear();
+}
+
+std::shared_ptr<UiEntity> EntityDocument2D::hitTest(const QPointF& point, double tolerance) const
+{
+    std::shared_ptr<UiEntity> nearestEntity;
+    double nearestDistance = tolerance;
+
+    for (const auto& line : m_lines)
+    {
+        if (!line)
+            continue;
+        double dist = line->distanceToPoint(point);
+        if (dist < nearestDistance)
+        {
+            nearestDistance = dist;
+            nearestEntity = line;
+        }
+    }
+
+    for (const auto& circle : m_circles)
+    {
+        if (!circle)
+            continue;
+        double dist = std::abs(QPointF(circle->center() - point).manhattanLength() - circle->radius());
+        if (dist < nearestDistance)
+        {
+            nearestDistance = dist;
+            nearestEntity = circle;
+        }
+    }
+
+    return nearestEntity;
 }
 
 std::shared_ptr<SceneNode> SceneDocument3D::createNode(const QString& name)

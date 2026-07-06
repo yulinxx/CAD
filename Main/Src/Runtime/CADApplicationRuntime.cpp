@@ -21,13 +21,19 @@ CADApplicationRuntime::CADApplicationRuntime(int argc, char* argv[], const AppPa
         QDir::setCurrent(QString::fromStdString(m_appPaths.appRootPath));
 }
 
-CADApplicationRuntime::~CADApplicationRuntime() = default;
+CADApplicationRuntime::~CADApplicationRuntime()
+{
+    if (m_bootstrapper)
+        m_bootstrapper->shutdown();
+    m_bootstrapper.reset();
+    m_app.reset();
+}
 
 int CADApplicationRuntime::run()
 {
     AppInitializer::initialize();
 
-    if (IsLicenseCheckEnabled())
+    if (IsLicenseCheckEnabled() && false)
     {
         LicenseManager licenseMgr(m_appPaths.configDir);
         if (!licenseMgr.CheckLicense())

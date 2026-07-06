@@ -10,7 +10,7 @@ uint32_t LicenseGuard::Scramble(uint32_t val, uint32_t seed)
 {
     // 简单的可逆混淆：ROL + XOR
     uint32_t r = (val << 7) | (val >> 25);
-    return r ^ (seed + 0x9E3779B9);
+    return (r ^ (seed + 0x9E3779B9));
 }
 
 uint32_t LicenseGuard::ComputeCrossSum()
@@ -40,13 +40,38 @@ bool LicenseGuard::VerifyCrossSum()
     return s_state.crossSum == ComputeCrossSum();
 }
 
+//bool LicenseGuard::VerifyTimestamp()
+//{
+//    // 获取当前系统 Unix 时间戳（自 1970-01-01 以来的秒数）
+//    uint32_t now = static_cast<uint32_t>(time(nullptr));
+//    uint32_t diff = now - s_state.timestamp;
+//
+//    // 允许 ±1 秒误差 + 前向 10 年（防止 NTP 同步）
+//    return diff < 3650u * 86400u && s_state.timestamp <= now + 1;
+//}
+
 bool LicenseGuard::VerifyTimestamp()
 {
-    // 时间戳必须在合理范围内（防止 freeze 时间戳）
-    uint32_t now = static_cast<uint32_t>(time(nullptr));
-    uint32_t diff = now - s_state.timestamp;
-    // 允许 ±1 秒误差 + 前向 10 年（防止 NTP 同步）
-    return diff < 3650u * 86400u && s_state.timestamp <= now + 1;
+    // 1. 使用 64 位，彻底规避 2038/2106 问题
+    int64_t now = static_cast<int64_t>(time(nullptr));
+    int64_t ts = static_cast<int64_t>(s_state.timestamp);
+
+    // 2. 有符号差值，避免无符号下溢
+    int64_t diff = now - ts;
+
+    // 3. 容忍窗口（根据业务调整）
+    constexpr int64_t FUTURE_TOLERANCE = 300;   // 允许未来 5 分钟（NTP/时区）
+    constexpr int64_t PAST_MAX_AGE = 366 * 86400; // 最多早 1 年（根据 license 有效期定）
+
+    // 4. 时间戳不能来自未来（超过容忍窗口）
+    if (diff < -FUTURE_TOLERANCE)
+        return false;
+
+    // 5. 时间戳不能太旧（防止 freeze 旧时间）
+    if (diff > PAST_MAX_AGE)
+        return false;
+
+    return true;
 }
 
 // ---- 公有 API ----

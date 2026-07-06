@@ -1,8 +1,10 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 
 #include "UI/UiCommandDispatcher.h"
+#include "UI/UiCommandHandler.h"
 #include "UI/UiLayoutService.h"
 #include "UI/UiShellHost.h"
 #include "UI/UiStateCenter.h"
@@ -36,6 +38,13 @@ public:
     /// 获取命令分发器
     UiCommandDispatcher* commandDispatcher();
 
+    /// 获取撤销栈
+    IUndoStack* undoStack();
+
+private:
+    /// 注册所有命令处理器
+    void registerCommands();
+
 private:
     /// UI Shell 宿主
     std::unique_ptr<UiShellHost> m_shellHost;
@@ -51,4 +60,10 @@ private:
 
     /// 命令分发器
     std::unique_ptr<UiCommandDispatcher> m_commandDispatcher;
+
+    /// 撤销栈
+    std::unique_ptr<IUndoStack> m_undoStack;
+
+    /// 命令处理器实例集合
+    std::vector<std::unique_ptr<ICommandHandler>> m_commandHandlers;
 };

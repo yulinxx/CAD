@@ -14,6 +14,7 @@ class IOnlineVerifier
 public:
     virtual ~IOnlineVerifier() = default;
 
+public:
     // 联网验证许可有效性
     // 返回 true = 在线验证通过（或降级通过）
     virtual bool Verify(const LicenseInfo& info) = 0;

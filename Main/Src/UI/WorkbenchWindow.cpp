@@ -3,8 +3,10 @@
 #include <QAction>
 #include <QDockWidget>
 #include <QLabel>
+#include <QGuiApplication>
 #include <QMenuBar>
 #include <QProgressBar>
+#include <QScreen>
 #include <QSettings>
 #include <QStatusBar>
 #include <QToolBar>
@@ -27,6 +29,15 @@ WorkbenchWindow::WorkbenchWindow(QWidget* parent)
 {
     setWindowTitle(QString::fromStdString(MainApp::appName()));
     resize(1440, 900);
+
+    // 默认窗口先居中显示，避免双屏环境下直接落到某个屏幕边缘甚至只露出一部分。
+    if (const auto* screen = QGuiApplication::primaryScreen())
+    {
+        const auto available = screen->availableGeometry();
+        const int x = available.x() + (available.width() - width()) / 2;
+        const int y = available.y() + (available.height() - height()) / 2;
+        move(x, y);
+    }
 
     initializeWorkbenchShell();
 }
@@ -51,6 +62,22 @@ void WorkbenchWindow::setThemeService(UiThemeService* themeService)
     // 主题服务入口只替换引用，不在这里主动触发主题加载或界面刷新
     m_themeService = themeService;
     m_uiServices.themeService = themeService;
+}
+
+/// 设置命令分发器
+/// @param dispatcher 命令分发器
+void WorkbenchWindow::setCommandDispatcher(UiCommandDispatcher* dispatcher)
+{
+    m_commandDispatcher = dispatcher;
+    m_uiServices.commandDispatcher = dispatcher;
+}
+
+/// 设置撤销栈
+/// @param undoStack 撤销栈
+void WorkbenchWindow::setUndoStack(IUndoStack* undoStack)
+{
+    m_undoStack = undoStack;
+    m_uiServices.undoStack = undoStack;
 }
 
 void WorkbenchWindow::setFrameworkServices(const UiFrameworkServices& services)
@@ -78,6 +105,7 @@ void WorkbenchWindow::configureServices(const UiServices& services)
     m_themeService = services.themeService;
     if (services.commandDispatcher)
         services.commandDispatcher->setFrameworkServices(m_frameworkServices);
+
     // 服务重装载后只恢复信号绑定，不在这里触发额外刷新，避免配置入口带副作用
     bindStateSignals();
 }
@@ -131,6 +159,7 @@ void WorkbenchWindow::initializeWorkbenchShell()
     initializeThemeMenuSkeleton();
     initializeWorkbenchMenuSkeleton();
     bindStateSignals();
+    bindShortcuts();
     setCentralWidget(createInitialCentralWidget());
     updateWindowTitle();
     refreshStatusText();
@@ -180,6 +209,25 @@ void WorkbenchWindow::buildToolBars()
     m_panelState.mainToolBar->setMovable(true);
 }
 
+void WorkbenchWindow::bindShortcuts()
+{
+    auto* undoAction = new QAction(QStringLiteral("Undo"), this);
+    undoAction->setShortcut(QKeySequence::Undo);
+    connect(undoAction, &QAction::triggered, this, [this]() {
+        if (m_commandDispatcher)
+            m_commandDispatcher->undo();
+    });
+    addAction(undoAction);
+
+    auto* redoAction = new QAction(QStringLiteral("Redo"), this);
+    redoAction->setShortcut(QKeySequence::Redo);
+    connect(redoAction, &QAction::triggered, this, [this]() {
+        if (m_commandDispatcher)
+            m_commandDispatcher->redo();
+    });
+    addAction(redoAction);
+}
+
 /// 构建停靠区域（左侧项目面板、右侧属性面板）
 void WorkbenchWindow::initializeDockAreaSkeleton()
 {
@@ -189,16 +237,18 @@ void WorkbenchWindow::initializeDockAreaSkeleton()
 
 void WorkbenchWindow::buildDockAreas()
 {
-    // 先创建左右停靠区，后续工作台再向其中注册具体面板
-    // 停靠区只做容器，不直接持有工作台业务逻辑
-    m_panelState.leftDock = new QDockWidget(QStringLiteral("Project"), this);
-    m_panelState.leftDock->setObjectName(QStringLiteral("ProjectDock"));
-    m_panelState.leftDock->setWidget(new QWidget(m_panelState.leftDock));
+    // 场景树面板
+    m_panelState.sceneTreeDock = new SceneTreeDockWidget(this);
+    m_panelState.leftDock = new QDockWidget(QStringLiteral("Scene"), this);
+    m_panelState.leftDock->setObjectName(QStringLiteral("SceneDock"));
+    m_panelState.leftDock->setWidget(m_panelState.sceneTreeDock);
     addDockWidget(Qt::LeftDockWidgetArea, m_panelState.leftDock);
 
+    // 属性面板
+    m_panelState.propertiesDock = new PropertiesPanelWidget(this);
     m_panelState.rightDock = new QDockWidget(QStringLiteral("Properties"), this);
     m_panelState.rightDock->setObjectName(QStringLiteral("PropertiesDock"));
-    m_panelState.rightDock->setWidget(new QWidget(m_panelState.rightDock));
+    m_panelState.rightDock->setWidget(m_panelState.propertiesDock);
     addDockWidget(Qt::RightDockWidgetArea, m_panelState.rightDock);
 }
 

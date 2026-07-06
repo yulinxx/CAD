@@ -2,8 +2,10 @@
 
 #include <memory>
 
+#include "UiCommandHandler.h"
 #include "UiServices.h"
 
+class UiCommandDispatcher;
 class UiStateCenter;
 class UiThemeService;
 class UiWorkbench;
@@ -35,6 +37,14 @@ public:
     /// 仅转发引用，不提前加载主题
     void setThemeService(UiThemeService* themeService);
 
+    /// 设置命令分发器
+    /// @param dispatcher 命令分发器
+    void setCommandDispatcher(UiCommandDispatcher* dispatcher);
+
+    /// 设置撤销栈
+    /// @param undoStack 撤销栈
+    void setUndoStack(IUndoStack* undoStack);
+
     /// 设置 UI 服务集合
     /// @param services UI 服务集合
     void setUiServices(const UiServices& services);
@@ -57,6 +67,12 @@ public:
     /// 获取主窗口指针
     WorkbenchWindow* mainWindow();
 
+    /// 关闭宿主并释放工作台关联
+    void shutdown();
+
+    /// 是否允许在退出时触碰主窗口 UI
+    void setShutdownTouchesWindow(bool enabled);
+
 private:
     /// 主窗口
     std::unique_ptr<WorkbenchWindow> m_mainWindow;
@@ -64,12 +80,20 @@ private:
     UiStateCenter* m_stateCenter{ nullptr };
     /// 主题服务引用
     UiThemeService* m_themeService{ nullptr };
+    /// 命令分发器引用
+    UiCommandDispatcher* m_commandDispatcher{ nullptr };
+    /// 撤销栈引用
+    IUndoStack* m_undoStack{ nullptr };
     /// UI 服务集合
     UiServices m_services;
     /// 当前工作台引用
     UiWorkbench* m_workbench{ nullptr };
-    /// 2D 工作台（初始注入，非拥有）
-    UiWorkbench* m_workbench2D{ nullptr };
+    /// 退出时是否允许触碰主窗口
+    bool m_shutdownTouchesWindow{ false };
+    /// 是否已经执行过退出清理
+    bool m_shutdownCompleted{ false };
+    /// 当前是否正在关闭
+    bool m_isShuttingDown{ false };
     /// 3D 工作台（惰性创建，宿主拥有）
     std::unique_ptr<UiWorkbench> m_workbench3D;
 };

@@ -22,6 +22,11 @@ file(GLOB_RECURSE MAIN_HEADERS CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/Src/*.h"
 )
 
+list(FILTER MAIN_SOURCES EXCLUDE REGEX ".*Test/.*\\.cpp$")
+list(FILTER MAIN_HEADERS EXCLUDE REGEX ".*Test/.*\\.h$")
+list(FILTER MAIN_SOURCES EXCLUDE REGEX ".*RenderCore/.*\\.cpp$")
+list(FILTER MAIN_HEADERS EXCLUDE REGEX ".*RenderCore/.*\\.h$")
+
 file(GLOB_RECURSE MAIN_RESOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.qrc"
 )
@@ -55,7 +60,7 @@ add_executable(${app_name}
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${MAIN_SOURCES} ${MAIN_HEADERS})
 
-set(QT_COMPONENTS Core Gui Widgets)
+set(QT_COMPONENTS Core Gui Widgets OpenGLWidgets)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS ${QT_COMPONENTS} REQUIRED)
 
 find_package(OpenSSL REQUIRED)
@@ -79,6 +84,7 @@ target_include_directories(${app_name}
         "${CMAKE_CURRENT_BINARY_DIR}"
         "${CMAKE_CURRENT_SOURCE_DIR}/Src"
         "${CMAKE_CURRENT_SOURCE_DIR}/Src/Common"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Src/RenderCore"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Utility/Utility/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler/CrashHandler/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
@@ -103,6 +109,7 @@ target_link_libraries(${app_name}
         RenderCommon
         Render2D
         Render3D
+        UiRenderCore
         UICommon
         UI2D
         UI3D
@@ -183,3 +190,73 @@ message(STATUS "  Platform: ${CMAKE_SYSTEM_NAME}(${CMAKE_SYSTEM_PROCESSOR})")
 message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "")
 message(STATUS "----------------------------------------")
+
+option(BUILD_MAIN_TESTS "Build Main module unit tests" OFF)
+if(BUILD_MAIN_TESTS AND GTest_FOUND)
+    file(GLOB MAIN_TEST_SOURCES CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/Src/UI/Test/*.cpp"
+    )
+    
+    set(MAIN_TEST_DEP_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/Src/UI/SimpleRenderer3D.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Src/UI/UiEntities.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Src/UI/UiCommandDispatcher.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Src/UI/UiCommandHandler.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Src/UI/UiStateCenter.cpp"
+    )
+    
+    add_executable(MainTests
+        ${MAIN_TEST_SOURCES}
+        ${MAIN_TEST_DEP_SOURCES}
+    )
+    
+    target_compile_features(MainTests PRIVATE cxx_std_17)
+    
+    target_include_directories(MainTests
+        PRIVATE
+            "${CMAKE_CURRENT_BINARY_DIR}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/Src"
+            "${CMAKE_CURRENT_SOURCE_DIR}/Src/Common"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Utility/Utility/Include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler/CrashHandler/Include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/2D/Include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/3D/Include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Render/Common/Include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Render/2D/Include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Render/3D/Include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Common/Include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Log/Log/Include"
+    )
+    
+    target_link_libraries(MainTests
+        PRIVATE
+            Utility
+            EngineCommon
+            Engine2D
+            Engine3D
+            RenderCommon
+            Render3D
+            UICommon
+            UI2D
+            UI3D
+            Log
+            ${QT_LIBRARIES}
+            GTest::gtest
+            GTest::gtest_main
+    )
+    
+    set_target_properties(MainTests PROPERTIES
+        AUTOMOC ON
+        AUTOUIC ON
+    )
+    
+    gtest_discover_tests(MainTests)
+    
+    message(STATUS "[Main Tests]")
+    message(STATUS "  SimpleRenderer3DTests: Renderer lifecycle, render loop, selection")
+    message(STATUS "  CommandLifecycleTests: execute/cancel/submit, undo/redo, preview, selection, handlerFor")
+    message(STATUS "")
+endif()

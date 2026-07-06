@@ -8,6 +8,7 @@
 
 #include <memory>
 
+// ============================================================ 
 class UiEntity
 {
 public:
@@ -21,7 +22,21 @@ public:
     virtual bool highlighted() const = 0;
 };
 
-class LineEntity2D final : public UiEntity
+// ============================================================ 
+class ITransformable
+{
+public:
+    virtual ~ITransformable() = default;
+    virtual void rotate(const QPointF& center, double cosAngle, double sinAngle) = 0;
+    virtual void translate(const QPointF& delta) = 0;
+    virtual void scale(const QPointF& center, double factor) = 0;
+    virtual QPointF center() const = 0;
+    virtual QVector<QPointF> keyPoints() const = 0;
+    virtual void setKeyPoints(const QVector<QPointF>& points) = 0;
+};
+
+// ============================================================ 
+class LineEntity2D final : public UiEntity, public ITransformable
 {
 public:
     LineEntity2D(QString id, QPointF start, QPointF end);
@@ -43,6 +58,13 @@ public:
     double distanceToPoint(const QPointF& point) const;
     double distanceToStart(const QPointF& point) const;
     double distanceToEnd(const QPointF& point) const;
+
+    void rotate(const QPointF& center, double cosAngle, double sinAngle) override;
+    void translate(const QPointF& delta) override;
+    void scale(const QPointF& center, double factor) override;
+    QPointF center() const override;
+    QVector<QPointF> keyPoints() const override;
+    void setKeyPoints(const QVector<QPointF>& points) override;
 private:
     QString m_id;
     QPointF m_start;
@@ -51,6 +73,7 @@ private:
     bool m_highlighted{ false };
 };
 
+// ============================================================ 
 class PolylineEntity2D final : public UiEntity
 {
 public:
@@ -73,7 +96,8 @@ private:
     bool m_highlighted{ false };
 };
 
-class CircleEntity2D final : public UiEntity
+// ============================================================ 
+class CircleEntity2D final : public UiEntity, public ITransformable
 {
 public:
     CircleEntity2D(QString id, QPointF center, double radius);
@@ -89,6 +113,12 @@ public:
     void setCenter(const QPointF& center);
     void setRadius(double radius);
     QRectF bounds() const;
+
+    void rotate(const QPointF& center, double cosAngle, double sinAngle) override;
+    void translate(const QPointF& delta) override;
+    void scale(const QPointF& center, double factor) override;
+    QVector<QPointF> keyPoints() const override;
+    void setKeyPoints(const QVector<QPointF>& points) override;
 private:
     QString m_id;
     QPointF m_center;
@@ -97,7 +127,8 @@ private:
     bool m_highlighted{ false };
 };
 
-class ArcEntity2D final : public UiEntity
+// ============================================================ 
+class ArcEntity2D final : public UiEntity, public ITransformable
 {
 public:
     ArcEntity2D(QString id, QPointF center, double radius, double startAngleDeg, double spanDeg);
@@ -112,6 +143,12 @@ public:
     double radius() const;
     double startAngleDeg() const;
     double spanDeg() const;
+
+    void rotate(const QPointF& center, double cosAngle, double sinAngle) override;
+    void translate(const QPointF& delta) override;
+    void scale(const QPointF& center, double factor) override;
+    QVector<QPointF> keyPoints() const override;
+    void setKeyPoints(const QVector<QPointF>& points) override;
 private:
     QString m_id;
     QPointF m_center;
@@ -122,10 +159,14 @@ private:
     bool m_highlighted{ false };
 };
 
+
+// ============================================================ 
 class SceneNode final : public UiEntity
 {
 public:
     SceneNode(QString id, QString name);
+
+public:
     QString id() const override;
     QString name() const override;
     QString typeName() const override;
@@ -146,6 +187,7 @@ private:
     bool m_highlighted{ false };
 };
 
+// ============================================================ 
 class SelectionSet
 {
 public:
@@ -159,6 +201,7 @@ private:
     QVector<std::shared_ptr<UiEntity>> m_items;
 };
 
+// ============================================================ 
 class EntityDocument2D
 {
 public:
@@ -181,6 +224,7 @@ public:
     SelectionSet& selection();
     const SelectionSet& selection() const;
     void clear();
+    std::shared_ptr<UiEntity> hitTest(const QPointF& point, double tolerance = 5.0) const;
 private:
     QVector<std::shared_ptr<LineEntity2D>> m_lines;
     QVector<std::shared_ptr<PolylineEntity2D>> m_polylines;
@@ -189,6 +233,7 @@ private:
     SelectionSet m_selection;
 };
 
+// ============================================================ 
 class SceneDocument3D
 {
 public:
@@ -206,6 +251,7 @@ private:
     SelectionSet m_selection;
 };
 
+// ============================================================ 
 class CameraController3D
 {
 public:
@@ -216,6 +262,7 @@ public:
     virtual void reset() = 0;
 };
 
+// ============================================================ 
 class DefaultCameraController3D final : public CameraController3D
 {
 public:
