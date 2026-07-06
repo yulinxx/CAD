@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -26,7 +27,7 @@ struct LicenseInfo
 class LicenseManager
 {
 public:
-    explicit LicenseManager(const std::string& configDir);
+    explicit LicenseManager(const std::filesystem::path& configDir);
     ~LicenseManager();
 
     // ---------- 核心接口 ----------
@@ -54,7 +55,7 @@ private:
     bool        SaveLicense(const std::string& regCode) const;
     std::string ReadLicenseFile() const;
 
-    std::string m_configDir;
+    std::filesystem::path m_configDir;
     LicenseInfo m_info;
 
     // 在线验证器（可空，不设置则纯离线）

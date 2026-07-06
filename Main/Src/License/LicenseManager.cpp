@@ -176,7 +176,7 @@ std::string FromUrlSafe(const std::string& urlSafe)
 // LicenseManager 实现
 // ============================================================
 
-LicenseManager::LicenseManager(const std::string& configDir)
+LicenseManager::LicenseManager(const std::filesystem::path& configDir)
     : m_configDir(configDir)
 {
 }
@@ -261,9 +261,8 @@ void LicenseManager::ClearLicense()
 {
     m_info = {};
     LicenseGuard::MarkInvalid();
-    std::filesystem::path licensePath = std::filesystem::path(m_configDir) / "license.key";
     std::error_code ec;
-    std::filesystem::remove(licensePath, ec);
+    std::filesystem::remove(m_configDir / "license.key", ec);
 }
 
 bool LicenseManager::ReValidate()
@@ -426,16 +425,14 @@ bool LicenseManager::VerifyRegCode(const std::string& machineCode,
 
 bool LicenseManager::SaveLicense(const std::string& regCode) const
 {
-    std::filesystem::path dir(m_configDir);
     std::error_code ec;
-    if (!std::filesystem::exists(dir, ec))
+    if (!std::filesystem::exists(m_configDir, ec))
     {
-        if (!std::filesystem::create_directories(dir, ec))
+        if (!std::filesystem::create_directories(m_configDir, ec))
             return false;
     }
 
-    std::filesystem::path licensePath = dir / "license.key";
-    std::ofstream file(licensePath, std::ios::out | std::ios::trunc);
+    std::ofstream file(m_configDir / "license.key", std::ios::out | std::ios::trunc);
     if (!file)
         return false;
     file << regCode;
@@ -444,8 +441,7 @@ bool LicenseManager::SaveLicense(const std::string& regCode) const
 
 std::string LicenseManager::ReadLicenseFile() const
 {
-    std::filesystem::path licensePath = std::filesystem::path(m_configDir) / "license.key";
-    std::ifstream file(licensePath);
+    std::ifstream file(m_configDir / "license.key");
     if (!file)
         return {};
 
