@@ -83,9 +83,19 @@ const RenderContext& MinimalOpenGLBackend::context() const
 void MinimalOpenGLBackend::setScene(EntityDocument2D* document)
 {
     m_document2D = document;
+    m_scene = nullptr;
     m_document3D = nullptr;
     m_context.sceneType = QStringLiteral("2D");
-    m_context.markDirty(DirtyRegionType::Geometry);
+    m_context.markDirty();
+}
+
+void MinimalOpenGLBackend::setScene(Eg::SceneManager* scene)
+{
+    m_scene = scene;
+    m_document2D = nullptr;
+    m_document3D = nullptr;
+    m_context.sceneType = QStringLiteral("2D");
+    m_context.markDirty();
 }
 
 void MinimalOpenGLBackend::setScene(SceneDocument3D* document)
@@ -93,13 +103,13 @@ void MinimalOpenGLBackend::setScene(SceneDocument3D* document)
     m_document3D = document;
     m_document2D = nullptr;
     m_context.sceneType = QStringLiteral("3D");
-    m_context.markDirty(DirtyRegionType::Geometry);
+    m_context.markDirty();
 }
 
 void MinimalOpenGLBackend::setCamera(CameraController3D* controller)
 {
     m_camera = controller;
-    m_context.markDirty(DirtyRegionType::View);
+    m_context.markDirty();
 }
 
 // ============================================================================
@@ -172,7 +182,7 @@ void MinimalOpenGLBackend::endFrame()
 void MinimalOpenGLBackend::resize(const QSize& size)
 {
     m_context.viewportSize = size;
-    m_context.markDirty(DirtyRegionType::View);
+    m_context.markDirty();
 
     // 重建 FBO
     m_fbo.reset();
@@ -180,7 +190,7 @@ void MinimalOpenGLBackend::resize(const QSize& size)
 
 void MinimalOpenGLBackend::resetView()
 {
-    m_context.markDirty(DirtyRegionType::View);
+    m_context.markDirty();
 }
 
 // ============================================================================

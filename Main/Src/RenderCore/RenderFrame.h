@@ -2,7 +2,7 @@
 
 #include <QImage>
 #include <QString>
-#include <QVector>
+#include <QList>
 #include <cstdint>
 #include <chrono>
 
@@ -31,7 +31,7 @@ struct RENDER_CORE_API RenderFrame
     std::chrono::steady_clock::time_point timestamp;
 
     /// 渲染批次列表（场景编译后的输出）
-    QVector<RenderBatch> batches;
+    QList<RenderBatch> batches;
 
     /// 渲染完成后的颜色缓冲（软件后端直接绘制，GPU 后端作为调试快照）
     QImage colorBuffer;

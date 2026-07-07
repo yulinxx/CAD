@@ -2,17 +2,22 @@
 
 #include "SceneCompiler.h"
 
+#include "SceneTraverser.h"
+#include "CompilationStrategy.h"
+#include "BatchManager.h"
+
+#include <memory>
+
 /**
  * @file DefaultSceneCompiler.h
  * @brief 默认场景编译器实现
  *
- * 提供最小可运行的场景编译骨架：
- * - 遍历所有实体生成顶点数据
- * - 按图元类型分组生成批次
- * - 支持增量更新和缓存
- * - 支持视口裁剪
+ * 采用三层架构：
+ * - SceneTraverser：场景遍历，生成渲染批次
+ * - CompilationStrategy：编译策略决策（增量/全量）
+ * - BatchManager：批次缓存、合并、分组、裁剪
  *
- * 后续可替换为更高效的实现（如 GPU 驱动编译、多线程编译）。
+ * DefaultSceneCompiler 作为编排层，协调三层完成编译流程。
  */
 class DefaultSceneCompiler final : public SceneCompiler
 {
@@ -20,11 +25,15 @@ public:
     // ============ 全量编译 ============
 
     RenderFrame compile(EntityDocument2D* document, const RenderContext& context) override;
+    RenderFrame compile(Eg::SceneManager* scene, const RenderContext& context) override;
     RenderFrame compile(SceneDocument3D* document, const RenderContext& context) override;
 
     // ============ 增量编译 ============
 
     RenderFrame compileIncremental(EntityDocument2D* document,
+                                   const RenderContext& context,
+                                   const RenderFrame& previousFrame) override;
+    RenderFrame compileIncremental(Eg::SceneManager* scene,
                                    const RenderContext& context,
                                    const RenderFrame& previousFrame) override;
     RenderFrame compileIncremental(SceneDocument3D* document,
@@ -37,28 +46,27 @@ public:
     bool hasCachedFrame() const override;
     uint64_t cachedFrameId() const override;
 
+    // ============ 脏实体追踪 ============
+
+    void markEntityDirty(const QString& entityId) override;
+    void markAllDirty() override;
+
     // ============ 批次查询 ============
 
     QVector<int> groupBatchesByPrimitiveType(const RenderFrame& frame) const override;
     RenderFrame cullBatches(const RenderFrame& frame, const QRectF& viewportRect) const override;
 
 private:
-    /// 编译 2D 实体为批次列表
-    QVector<RenderBatch> compileEntities2D(EntityDocument2D* document, const RenderContext& context);
+    /// 编译核心逻辑（全量/增量自动路由）
+    RenderFrame compileInternal(EntityDocument2D* document, const RenderContext& context);
+    RenderFrame compileInternal(Eg::SceneManager* scene, const RenderContext& context);
+    RenderFrame compileInternal(SceneDocument3D* document, const RenderContext& context);
 
-    /// 编译 3D 实体为批次列表
-    QVector<RenderBatch> compileEntities3D(SceneDocument3D* document, const RenderContext& context);
+    SceneTraverser m_traverser;
+    CompilationStrategy m_strategy;
+    BatchManager m_batchManager;
 
-    /// 将圆近似为线段顶点
-    static QVector<RenderVertex> tessellateCircle(float cx, float cy, float radius,
-                                                   int segments = 64);
-
-    /// 将圆弧近似为线段顶点
-    static QVector<RenderVertex> tessellateArc(float cx, float cy, float radius,
-                                                float startAngleDeg, float spanDeg,
-                                                int segments = 64);
-
-    /// 缓存帧
-    RenderFrame m_cachedFrame;
-    bool m_hasCachedFrame{ false };
+    /// 上次编译的文档指针（用于检测场景切换，自动失效缓存）
+    void* m_lastDocument2D{ nullptr };
+    void* m_lastDocument3D{ nullptr };
 };

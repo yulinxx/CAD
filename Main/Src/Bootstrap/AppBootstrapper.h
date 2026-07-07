@@ -13,10 +13,10 @@ class UiWorkbench;
 
 struct AppPaths
 {
-    std::string appRootPath;
-    std::string configDir;
-    std::string resourcesDir;
-    std::string pluginsDir;
+    std::wstring appRootPath;
+    std::wstring configDir;
+    std::wstring resourcesDir;
+    std::wstring pluginsDir;
 };
 
 namespace MainApp
@@ -24,18 +24,12 @@ namespace MainApp
     AppPaths buildAppPaths(const std::string& appName);
 }
 
-/**
- * @file AppBootstrapper.h
- * @brief 应用程序引导器定义
+ /**
+ * @class AppBootstrapper
+ * @brief 应用程序引导器类
  *
  * 定义了应用程序的引导器类，负责初始化应用程序的各个组件。
- */
-
- /**
-  * @class AppBootstrapper
-  * @brief 应用程序引导器类
-  *
-  * 负责协调应用程序的启动流程，包括：
+  * 协调应用程序的启动流程，包括：
   * - 创建组合根
   * - 初始化工作台
   * - 启动 UI Shell

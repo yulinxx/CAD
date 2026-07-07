@@ -1,5 +1,11 @@
 #pragma once
 
+/**
+ * @deprecated 命令分发请优先使用 OperationBusBase (UI/Common/Command/) 体系。
+ *             UiCommandDispatcher 将在后续重构中逐步迁移至 OperationBus。
+ *             新功能请勿新增 ICommandHandler 子类。
+ */
+
 #include <QString>
 #include <memory>
 #include <map>
@@ -7,6 +13,7 @@
 
 #include "UiFrameworkServices.h"
 #include "UiCommandHandler.h"
+#include "UiInteractionDispatcher.h"
 #include "UiServices.h"
 
 class QAction;
@@ -167,7 +174,7 @@ public:
  * 
  * 支持命令处理器模式和撤销/重做功能。
  */
-class DefaultUiCommandDispatcher final : public UiCommandDispatcher
+class DefaultUiCommandDispatcher final : public UiCommandDispatcher, public IInteractionDispatcher
 {
 public:
     void bindAction(QAction* action, const QString& commandId) override;

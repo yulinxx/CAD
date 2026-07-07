@@ -5,6 +5,7 @@
 
 #include "UI/UiCommandDispatcher.h"
 #include "UI/UiCommandHandler.h"
+#include "UI/UiInteractionDispatcher.h"
 #include "UI/UiLayoutService.h"
 #include "UI/UiShellHost.h"
 #include "UI/UiStateCenter.h"
@@ -37,6 +38,9 @@ public:
 
     /// 获取命令分发器
     UiCommandDispatcher* commandDispatcher();
+
+    /// 获取交互式命令生命周期分发器
+    IInteractionDispatcher* interactionDispatcher();
 
     /// 获取撤销栈
     IUndoStack* undoStack();

@@ -1,27 +1,479 @@
 /**
  * @file FrameworkIntegrationTests.cpp
- * @brief 框架启动 / 切换 / 退出集成测试骨架
+ * @brief 框架启动/切换/退出集成测试
  *
- * 这些测试当前先作为骨架保留，后续可逐步补齐真实 Qt 窗口环境下的集成验证。
- * 目标是把启动、切换、退出这三个关键阶段固定下来，避免生命周期回归。
+ * 覆盖完整渲染管线的真实场景：
+ * - 启动阶段：渲染器初始化、编译缓存建立
+ * - 切换阶段：2D/3D 场景切换、后端切换
+ * - 退出阶段：资源释放、多次关闭幂等性
+ * - 渲染闭环：输入事件 → 脏标记 → 增量编译 → 渲染输出
+ * - 双屏场景：多渲染器并行、独立缓存
  */
 
 #include <gtest/gtest.h>
 
-TEST(FrameworkIntegrationTest, Startup_Skeleton)
+#include <QImage>
+#include <QPainter>
+#include <QProcessEnvironment>
+
+#include "RenderCore/RenderCoreRenderer.h"
+#include "RenderCore/DefaultSceneCompiler.h"
+#include "RenderCore/RenderBackendFactory.h"
+#include "RenderCore/IRenderBackend.h"
+#include "RenderCore/UiCamera3D.h"
+#include "UI/UiEntities.h"
+
+// ============================================================================
+// 启动/关闭集成测试
+// ============================================================================
+
+TEST(FrameworkIntegrationTest, Startup_InitializeAndShutdown)
 {
-    // 启动阶段集成测试骨架：后续在可控 Qt 环境下补充真实的 Application/Bootstrapper 验证。
-    SUCCEED();
+    RenderCoreRenderer renderer;
+
+    EXPECT_FALSE(renderer.isReady());
+    EXPECT_FALSE(renderer.isRenderLoopRunning());
+
+    bool initialized = renderer.initialize();
+    EXPECT_TRUE(initialized);
+    EXPECT_TRUE(renderer.isReady());
+
+    renderer.shutdown();
+    EXPECT_FALSE(renderer.isReady());
+    EXPECT_FALSE(renderer.isRenderLoopRunning());
 }
 
-TEST(FrameworkIntegrationTest, Switch_Skeleton)
+TEST(FrameworkIntegrationTest, Startup_ShutdownIdempotent)
 {
-    // 切换阶段集成测试骨架：后续补充 2D/3D 工作台切换的真实窗口验证。
-    SUCCEED();
+    RenderCoreRenderer renderer;
+    renderer.initialize();
+    EXPECT_TRUE(renderer.isReady());
+
+    renderer.shutdown();
+    renderer.shutdown();
+    renderer.shutdown();
+    EXPECT_FALSE(renderer.isReady());
 }
 
-TEST(FrameworkIntegrationTest, Shutdown_Skeleton)
+TEST(FrameworkIntegrationTest, Startup_Sequence)
 {
-    // 退出阶段集成测试骨架：后续补充窗口关闭、工作台收口、资源释放顺序验证。
-    SUCCEED();
+    RenderCoreRenderer renderer;
+
+    renderer.initialize();
+    EXPECT_TRUE(renderer.isReady());
+
+    renderer.resize(800, 600);
+
+    QImage image(800, 600, QImage::Format_ARGB32);
+    QPainter painter(&image);
+    renderer.render(painter, 800, 600);
+    painter.end();
+
+    renderer.shutdown();
+    EXPECT_FALSE(renderer.isReady());
+}
+
+// ============================================================================
+// 2D/3D 切换集成测试
+// ============================================================================
+
+TEST(FrameworkIntegrationTest, Switch_2DSceneSwitch)
+{
+    DefaultSceneCompiler compiler;
+    EntityDocument2D doc1;
+    doc1.createLine(QPointF(0, 0), QPointF(100, 100));
+
+    RenderContext ctx;
+    ctx.sceneType = QStringLiteral("2D");
+    ctx.clearDirty();
+
+    RenderFrame frame1 = compiler.compile(&doc1, ctx);
+    EXPECT_EQ(frame1.batchCount(), 1);
+    EXPECT_EQ(frame1.entityCount(), 1);
+
+    EntityDocument2D doc2;
+    doc2.createCircle(QPointF(50, 50), 30.0);
+
+    compiler.invalidateCache();
+    RenderFrame frame2 = compiler.compile(&doc2, ctx);
+    EXPECT_EQ(frame2.batchCount(), 1);
+    EXPECT_EQ(frame2.entityCount(), 1);
+}
+
+TEST(FrameworkIntegrationTest, Switch_3DSceneSwitch)
+{
+    DefaultSceneCompiler compiler;
+    SceneDocument3D doc1;
+    doc1.createNode(QStringLiteral("Node1"));
+
+    RenderContext ctx;
+    ctx.sceneType = QStringLiteral("3D");
+    ctx.clearDirty();
+
+    RenderFrame frame1 = compiler.compile(&doc1, ctx);
+    EXPECT_EQ(frame1.batchCount(), 1);
+
+    SceneDocument3D doc2;
+    doc2.createNode(QStringLiteral("Node2"));
+    doc2.createNode(QStringLiteral("Node3"));
+
+    compiler.invalidateCache();
+    RenderFrame frame2 = compiler.compile(&doc2, ctx);
+    EXPECT_EQ(frame2.batchCount(), 2);
+}
+
+TEST(FrameworkIntegrationTest, Switch_BackendSwitchStability)
+{
+    auto opengl = RenderBackendFactory::create(RenderBackendFactory::BackendType::OpenGL);
+    ASSERT_NE(opengl, nullptr);
+
+    auto software = RenderBackendFactory::create(RenderBackendFactory::BackendType::Software);
+    ASSERT_NE(software, nullptr);
+
+    bool openglReady = opengl->initialize();
+    bool softwareReady = software->initialize();
+
+    if (openglReady)
+    {
+        EXPECT_TRUE(opengl->isReady());
+        opengl->shutdown();
+        EXPECT_FALSE(opengl->isReady());
+    }
+
+    if (softwareReady)
+    {
+        EXPECT_TRUE(software->isReady());
+        software->shutdown();
+        EXPECT_FALSE(software->isReady());
+    }
+}
+
+// ============================================================================
+// 脏更新渲染集成测试
+// ============================================================================
+
+TEST(FrameworkIntegrationTest, DirtyUpdate_SingleEntityDirty)
+{
+    DefaultSceneCompiler compiler;
+    EntityDocument2D doc;
+    auto line = doc.createLine(QPointF(0, 0), QPointF(100, 100));
+
+    RenderContext ctx;
+    ctx.sceneType = QStringLiteral("2D");
+    ctx.clearDirty();
+
+    RenderFrame frame1 = compiler.compile(&doc, ctx);
+    EXPECT_EQ(frame1.batchCount(), 1);
+
+    line->translate(QPointF(50, 50));
+    compiler.markEntityDirty(line->id());
+    ctx.clearDirty();
+    ctx.advanceFrame();
+
+    RenderFrame frame2 = compiler.compile(&doc, ctx);
+    EXPECT_EQ(frame2.batchCount(), 1);
+    EXPECT_NE(frame2.frameId, frame1.frameId);
+}
+
+TEST(FrameworkIntegrationTest, DirtyUpdate_MultipleEntitiesDirty)
+{
+    DefaultSceneCompiler compiler;
+    EntityDocument2D doc;
+    auto line1 = doc.createLine(QPointF(0, 0), QPointF(100, 100));
+    auto line2 = doc.createLine(QPointF(200, 200), QPointF(300, 300));
+    auto circle = doc.createCircle(QPointF(50, 50), 20.0);
+
+    RenderContext ctx;
+    ctx.sceneType = QStringLiteral("2D");
+    ctx.clearDirty();
+
+    RenderFrame frame1 = compiler.compile(&doc, ctx);
+    EXPECT_EQ(frame1.batchCount(), 3);
+
+    line1->translate(QPointF(10, 10));
+    circle->setRadius(30.0);
+
+    compiler.markEntityDirty(line1->id());
+    compiler.markEntityDirty(circle->id());
+    ctx.clearDirty();
+
+    RenderFrame frame2 = compiler.compile(&doc, ctx);
+    EXPECT_EQ(frame2.batchCount(), 3);
+    EXPECT_TRUE(compiler.hasCachedFrame());
+}
+
+TEST(FrameworkIntegrationTest, DirtyUpdate_MarkAllDirty)
+{
+    DefaultSceneCompiler compiler;
+    EntityDocument2D doc;
+    doc.createLine(QPointF(0, 0), QPointF(100, 100));
+    doc.createCircle(QPointF(50, 50), 25.0);
+
+    RenderContext ctx;
+    ctx.sceneType = QStringLiteral("2D");
+    ctx.clearDirty();
+
+    compiler.compile(&doc, ctx);
+    EXPECT_TRUE(compiler.hasCachedFrame());
+
+    compiler.markAllDirty();
+    ctx.clearDirty();
+
+    RenderFrame frame = compiler.compile(&doc, ctx);
+    EXPECT_EQ(frame.batchCount(), 2);
+    EXPECT_GT(frame.statistics.compileTimeMs, 0);
+}
+
+// ============================================================================
+// 渲染闭环集成测试
+// ============================================================================
+
+TEST(FrameworkIntegrationTest, RenderLoop_InputToRender)
+{
+    RenderCoreRenderer renderer;
+    renderer.initialize();
+
+    QImage image(800, 600, QImage::Format_ARGB32);
+    QPainter painter(&image);
+
+    renderer.resize(800, 600);
+
+    renderer.render(painter, 800, 600);
+
+    renderer.onMousePress(400, 300, 1, 0, 800, 600);
+    renderer.onMouseMove(450, 320, 1, 800, 600);
+    renderer.onMouseRelease(450, 320, 1, 800, 600);
+
+    renderer.render(painter, 800, 600);
+
+    painter.end();
+    renderer.shutdown();
+}
+
+TEST(FrameworkIntegrationTest, RenderLoop_MultipleFramesWithInteraction)
+{
+    RenderCoreRenderer renderer;
+    renderer.initialize();
+
+    QImage image(800, 600, QImage::Format_ARGB32);
+    QPainter painter(&image);
+
+    renderer.resize(800, 600);
+
+    for (int i = 0; i < 3; ++i)
+    {
+        renderer.render(painter, 800, 600);
+
+        if (i == 1)
+        {
+            renderer.onMousePress(400, 300, 1, 0, 800, 600);
+            renderer.onMouseMove(420, 310, 1, 800, 600);
+            renderer.onMouseRelease(420, 310, 1, 800, 600);
+        }
+        else if (i == 2)
+        {
+            renderer.onWheel(120, 800, 600);
+        }
+    }
+
+    painter.end();
+    renderer.shutdown();
+}
+
+TEST(FrameworkIntegrationTest, RenderLoop_CameraInteractionSequence)
+{
+    UiCamera3D camera;
+    camera.setViewportSize(800, 600);
+
+    EXPECT_DOUBLE_EQ(camera.yaw(), 0.0);
+    EXPECT_DOUBLE_EQ(camera.pitch(), 15.0);
+    EXPECT_DOUBLE_EQ(camera.distance(), 10.0);
+
+    camera.onMousePress(400, 300, 1, 0, 800, 600);
+    EXPECT_TRUE(camera.isRotating());
+    EXPECT_TRUE(camera.isDirty());
+
+    camera.onMouseMove(500, 350, 1, 800, 600);
+    EXPECT_TRUE(camera.isDirty());
+
+    camera.onMouseRelease(500, 350, 1, 800, 600);
+    EXPECT_FALSE(camera.isRotating());
+
+    EXPECT_NE(camera.yaw(), 0.0);
+    EXPECT_NE(camera.pitch(), 15.0);
+
+    camera.onWheel(240, 800, 600);
+    EXPECT_TRUE(camera.isDirty());
+    EXPECT_NE(camera.distance(), 10.0);
+
+    camera.reset();
+    EXPECT_DOUBLE_EQ(camera.yaw(), 0.0);
+    EXPECT_DOUBLE_EQ(camera.pitch(), 15.0);
+    EXPECT_DOUBLE_EQ(camera.distance(), 10.0);
+}
+
+// ============================================================================
+// 双屏场景集成测试
+// ============================================================================
+
+TEST(FrameworkIntegrationTest, DualScreen_IndependentRenderers)
+{
+    RenderCoreRenderer renderer1;
+    RenderCoreRenderer renderer2;
+
+    renderer1.initialize();
+    renderer2.initialize();
+
+    EXPECT_TRUE(renderer1.isReady());
+    EXPECT_TRUE(renderer2.isReady());
+
+    renderer1.resize(800, 600);
+    renderer2.resize(1920, 1080);
+
+    QImage image1(800, 600, QImage::Format_ARGB32);
+    QImage image2(1920, 1080, QImage::Format_ARGB32);
+
+    QPainter painter1(&image1);
+    QPainter painter2(&image2);
+
+    renderer1.render(painter1, 800, 600);
+    renderer2.render(painter2, 1920, 1080);
+
+    painter1.end();
+    painter2.end();
+
+    renderer1.shutdown();
+    renderer2.shutdown();
+
+    EXPECT_FALSE(renderer1.isReady());
+    EXPECT_FALSE(renderer2.isReady());
+}
+
+TEST(FrameworkIntegrationTest, DualScreen_IndependentCameras)
+{
+    UiCamera3D camera1;
+    UiCamera3D camera2;
+
+    camera1.setViewportSize(800, 600);
+    camera2.setViewportSize(1280, 720);
+
+    camera1.orbit(30.0, 10.0);
+    camera2.orbit(-45.0, 20.0);
+
+    EXPECT_DOUBLE_EQ(camera1.yaw(), 30.0);
+    EXPECT_DOUBLE_EQ(camera2.yaw(), -45.0);
+    EXPECT_DOUBLE_EQ(camera1.pitch(), 25.0);
+    EXPECT_DOUBLE_EQ(camera2.pitch(), 35.0);
+}
+
+// ============================================================================
+// 完整渲染管线集成测试
+// ============================================================================
+
+TEST(FrameworkIntegrationTest, FullPipeline_2DWithEntities)
+{
+    DefaultSceneCompiler compiler;
+    EntityDocument2D doc;
+
+    doc.createLine(QPointF(0, 0), QPointF(100, 100));
+    doc.createLine(QPointF(50, 50), QPointF(150, 50));
+    doc.createCircle(QPointF(100, 100), 40.0);
+
+    RenderContext ctx;
+    ctx.sceneType = QStringLiteral("2D");
+    ctx.clearDirty();
+
+    RenderFrame frame = compiler.compile(&doc, ctx);
+    EXPECT_TRUE(frame.valid);
+    EXPECT_EQ(frame.batchCount(), 3);
+    EXPECT_GT(frame.totalVertexCount(), 0);
+    EXPECT_GT(frame.statistics.compileTimeMs, 0);
+
+    ctx.clearDirty();
+    RenderFrame cachedFrame = compiler.compile(&doc, ctx);
+    EXPECT_TRUE(cachedFrame.valid);
+    EXPECT_EQ(cachedFrame.batchCount(), 3);
+    EXPECT_LT(cachedFrame.statistics.compileTimeMs, 0.01);
+}
+
+TEST(FrameworkIntegrationTest, FullPipeline_3DWithNodes)
+{
+    DefaultSceneCompiler compiler;
+    SceneDocument3D doc;
+
+    doc.createNode(QStringLiteral("Root1"));
+    doc.createNode(QStringLiteral("Root2"));
+    doc.createNode(QStringLiteral("Root3"));
+
+    RenderContext ctx;
+    ctx.sceneType = QStringLiteral("3D");
+    ctx.clearDirty();
+
+    RenderFrame frame = compiler.compile(&doc, ctx);
+    EXPECT_TRUE(frame.valid);
+    EXPECT_EQ(frame.batchCount(), 3);
+}
+
+TEST(FrameworkIntegrationTest, FullPipeline_SelectionFeedback)
+{
+    DefaultSceneCompiler compiler;
+    EntityDocument2D doc;
+    auto line = doc.createLine(QPointF(0, 0), QPointF(100, 100));
+
+    RenderContext ctx;
+    ctx.sceneType = QStringLiteral("2D");
+    ctx.clearDirty();
+
+    RenderFrame frame1 = compiler.compile(&doc, ctx);
+    EXPECT_EQ(frame1.batchCount(), 1);
+    EXPECT_FALSE(frame1.batches[0].selected);
+
+    doc.selection().add(line);
+
+    compiler.invalidateCache();
+    RenderFrame frame2 = compiler.compile(&doc, ctx);
+    EXPECT_EQ(frame2.batchCount(), 1);
+    EXPECT_TRUE(frame2.batches[0].selected);
+}
+
+// ============================================================================
+// 配置驱动后端切换测试
+// ============================================================================
+
+TEST(FrameworkIntegrationTest, Config_DefaultBackend)
+{
+    auto backend = RenderBackendFactory::createConfigured();
+    EXPECT_NE(backend, nullptr);
+    EXPECT_FALSE(backend->backendName().isEmpty());
+}
+
+TEST(FrameworkIntegrationTest, Config_AvailableBackends)
+{
+    auto backends = RenderBackendFactory::availableBackends();
+    EXPECT_FALSE(backends.isEmpty());
+
+    bool hasSoftware = false;
+    bool hasOpenGL = false;
+    for (auto type : backends)
+    {
+        if (type == RenderBackendFactory::BackendType::Software)
+            hasSoftware = true;
+        if (type == RenderBackendFactory::BackendType::OpenGL)
+            hasOpenGL = true;
+    }
+
+    EXPECT_TRUE(hasSoftware || hasOpenGL);
+}
+
+TEST(FrameworkIntegrationTest, Config_StringRoundTrip)
+{
+    for (auto type : { RenderBackendFactory::BackendType::OpenGL,
+                       RenderBackendFactory::BackendType::Vulkan,
+                       RenderBackendFactory::BackendType::Metal,
+                       RenderBackendFactory::BackendType::Software })
+    {
+        QString name = RenderBackendFactory::toString(type);
+        EXPECT_FALSE(name.isEmpty());
+        EXPECT_EQ(RenderBackendFactory::fromString(name), type);
+    }
 }

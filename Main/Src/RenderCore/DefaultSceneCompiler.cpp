@@ -1,274 +1,84 @@
 #include "DefaultSceneCompiler.h"
 
-#include <QString>
-#include <QSet>
-#include <QtMath>
 #include <chrono>
 
-#include "../UI/UiEntities.h"
-
 // ============================================================================
-// 辅助函数
-// ============================================================================
-
-namespace
-{
-    /// 创建默认的选中颜色
-    RenderVertex makeVertex(float x, float y, float z, bool selected)
-    {
-        RenderVertex v;
-        v.x = x;
-        v.y = y;
-        v.z = z;
-        if (selected)
-        {
-            v.r = 0.2f;
-            v.g = 0.8f;
-            v.b = 1.0f;
-        }
-        else
-        {
-            v.r = 1.0f;
-            v.g = 1.0f;
-            v.b = 1.0f;
-        }
-        v.a = 1.0f;
-        return v;
-    }
-
-    /// 从线段创建批次
-    RenderBatch makeLineBatch(const QString& entityId, bool selected,
-                               const QVector<RenderVertex>& verts)
-    {
-        RenderBatch batch;
-        batch.entityId = entityId;
-        batch.selected = selected;
-        batch.primitiveType = PrimitiveType::Lines;
-        batch.vertices = verts;
-        batch.lineWidth = 1.0f;
-
-        if (!verts.isEmpty())
-        {
-            float minX = verts[0].x, minY = verts[0].y;
-            float maxX = verts[0].x, maxY = verts[0].y;
-            for (const auto& v : verts)
-            {
-                minX = qMin(minX, v.x); minY = qMin(minY, v.y);
-                maxX = qMax(maxX, v.x); maxY = qMax(maxY, v.y);
-            }
-            batch.boundingBox = QRectF(QPointF(minX, minY), QPointF(maxX, maxY));
-        }
-
-        return batch;
-    }
-
-    /// 编译单条线段
-    RenderBatch compileLine(const LineEntity2D& line, bool selected)
-    {
-        const auto& start = line.start();
-        const auto& end = line.end();
-        return makeLineBatch(line.id(), selected, {
-            makeVertex(start.x(), start.y(), 0.0f, selected),
-            makeVertex(end.x(), end.y(), 0.0f, selected)
-        });
-    }
-
-    /// 编译折线
-    RenderBatch compilePolyline(const PolylineEntity2D& polyline, bool selected)
-    {
-        const auto& points = polyline.points();
-        QVector<RenderVertex> verts;
-        verts.reserve(points.size());
-
-        for (const auto& p : points)
-            verts.append(makeVertex(p.x(), p.y(), 0.0f, selected));
-
-        RenderBatch batch = makeLineBatch(polyline.id(), selected, verts);
-        batch.primitiveType = PrimitiveType::LineStrip;
-        return batch;
-    }
-}
-
-// ============================================================================
-// 圆/圆弧细分
-// ============================================================================
-
-QVector<RenderVertex> DefaultSceneCompiler::tessellateCircle(float cx, float cy, float radius, int segments)
-{
-    QVector<RenderVertex> verts;
-    verts.reserve(segments * 2);
-
-    const float step = 360.0f / segments;
-    for (int i = 0; i < segments; ++i)
-    {
-        const float a1 = qDegreesToRadians(i * step);
-        const float a2 = qDegreesToRadians((i + 1) * step);
-
-        verts.append(makeVertex(cx + radius * qCos(a1), cy + radius * qSin(a1), 0.0f, false));
-        verts.append(makeVertex(cx + radius * qCos(a2), cy + radius * qSin(a2), 0.0f, false));
-    }
-
-    return verts;
-}
-
-QVector<RenderVertex> DefaultSceneCompiler::tessellateArc(float cx, float cy, float radius,
-                                                           float startAngleDeg, float spanDeg, int segments)
-{
-    QVector<RenderVertex> verts;
-    const float absSpan = qAbs(spanDeg);
-    const int actualSegments = qMax(1, qRound(segments * absSpan / 360.0f));
-    verts.reserve(actualSegments * 2);
-
-    const float step = spanDeg / actualSegments;
-    for (int i = 0; i < actualSegments; ++i)
-    {
-        const float a1 = qDegreesToRadians(startAngleDeg + i * step);
-        const float a2 = qDegreesToRadians(startAngleDeg + (i + 1) * step);
-
-        verts.append(makeVertex(cx + radius * qCos(a1), cy + radius * qSin(a1), 0.0f, false));
-        verts.append(makeVertex(cx + radius * qCos(a2), cy + radius * qSin(a2), 0.0f, false));
-    }
-
-    return verts;
-}
-
-// ============================================================================
-// 2D 场景编译
-// ============================================================================
-
-QVector<RenderBatch> DefaultSceneCompiler::compileEntities2D(EntityDocument2D* document,
-                                                              const RenderContext& context)
-{
-    Q_UNUSED(context);
-    QVector<RenderBatch> batches;
-
-    if (!document)
-        return batches;
-
-    const auto& selection = document->selection();
-    const auto selectedIds = selection.items();
-    QSet<QString> selectedIdSet;
-    for (const auto& item : selectedIds)
-    {
-        if (item)
-            selectedIdSet.insert(item->id());
-    }
-
-    // 线段
-    for (const auto& line : document->lines())
-    {
-        if (!line)
-            continue;
-        bool sel = selectedIdSet.contains(line->id());
-        batches.append(compileLine(*line, sel));
-    }
-
-    // 折线
-    for (const auto& polyline : document->polylines())
-    {
-        if (!polyline || polyline->points().isEmpty())
-            continue;
-        bool sel = selectedIdSet.contains(polyline->id());
-        batches.append(compilePolyline(*polyline, sel));
-    }
-
-    // 圆
-    for (const auto& circle : document->circles())
-    {
-        if (!circle)
-            continue;
-        bool sel = selectedIdSet.contains(circle->id());
-        auto verts = tessellateCircle(circle->center().x(), circle->center().y(), circle->radius());
-        // 应用选择颜色
-        if (sel)
-        {
-            for (auto& v : verts)
-            {
-                v.r = 0.2f; v.g = 0.8f; v.b = 1.0f;
-            }
-        }
-        batches.append(makeLineBatch(circle->id(), sel, verts));
-    }
-
-    // 圆弧
-    for (const auto& arc : document->arcs())
-    {
-        if (!arc)
-            continue;
-        bool sel = selectedIdSet.contains(arc->id());
-        auto verts = tessellateArc(arc->center().x(), arc->center().y(),
-                                    arc->radius(), arc->startAngleDeg(), arc->spanDeg());
-        if (sel)
-        {
-            for (auto& v : verts)
-            {
-                v.r = 0.2f; v.g = 0.8f; v.b = 1.0f;
-            }
-        }
-        batches.append(makeLineBatch(arc->id(), sel, verts));
-    }
-
-    return batches;
-}
-
-// ============================================================================
-// 3D 场景编译
-// ============================================================================
-
-QVector<RenderBatch> DefaultSceneCompiler::compileEntities3D(SceneDocument3D* document,
-                                                              const RenderContext& context)
-{
-    Q_UNUSED(context);
-    QVector<RenderBatch> batches;
-
-    if (!document)
-        return batches;
-
-    const auto& selection = document->selection();
-    const auto selectedItems = selection.items();
-    QSet<QString> selectedIdSet;
-    for (const auto& item : selectedItems)
-    {
-        if (item)
-            selectedIdSet.insert(item->id());
-    }
-
-    // 遍历根节点生成占位批次
-    for (const auto& node : document->rootNodes())
-    {
-        if (!node)
-            continue;
-
-        bool sel = selectedIdSet.contains(node->id());
-
-        // 每个节点生成一个简单的十字标记
-        RenderBatch batch;
-        batch.entityId = node->id();
-        batch.selected = sel;
-        batch.primitiveType = PrimitiveType::Lines;
-
-        const float s = 0.5f;
-        batch.vertices = {
-            makeVertex(-s,  0,  0, sel),
-            makeVertex( s,  0,  0, sel),
-            makeVertex( 0, -s,  0, sel),
-            makeVertex( 0,  s,  0, sel),
-            makeVertex( 0,  0, -s, sel),
-            makeVertex( 0,  0,  s, sel),
-        };
-        batch.boundingBox = QRectF(-s, -s, s * 2, s * 2);
-        batches.append(batch);
-    }
-
-    return batches;
-}
-
-// ============================================================================
-// 全量编译
+// 编译入口（全量/增量自动路由）
 // ============================================================================
 
 RenderFrame DefaultSceneCompiler::compile(EntityDocument2D* document, const RenderContext& context)
 {
+    // 检测文档切换，自动失效缓存
+    if (m_lastDocument2D != static_cast<void*>(document))
+    {
+        invalidateCache();
+        m_lastDocument2D = static_cast<void*>(document);
+    }
+    return compileInternal(document, context);
+}
+
+RenderFrame DefaultSceneCompiler::compile(Eg::SceneManager* scene, const RenderContext& context)
+{
+    invalidateCache();
+    return compileInternal(scene, context);
+}
+
+RenderFrame DefaultSceneCompiler::compile(SceneDocument3D* document, const RenderContext& context)
+{
+    // 检测文档切换，自动失效缓存
+    if (m_lastDocument3D != static_cast<void*>(document))
+    {
+        invalidateCache();
+        m_lastDocument3D = static_cast<void*>(document);
+    }
+    return compileInternal(document, context);
+}
+
+// ============================================================================
+// 编译核心逻辑（2D）：全量/增量自动路由
+// ============================================================================
+
+RenderFrame DefaultSceneCompiler::compileInternal(EntityDocument2D* document, const RenderContext& context)
+{
+    // 若能走增量路径
+    if (m_strategy.cacheValid() && !m_strategy.forceFullCompile() && !context.isDirty)
+    {
+        if (!m_strategy.hasDirtyEntities())
+        {
+            // 缓存命中：零开销返回
+            RenderFrame result = m_batchManager.cachedFrame();
+            result.frameId = context.frameId;
+            result.timestamp = std::chrono::steady_clock::now();
+            result.statistics.frameTimeMs = 0.0f;
+            result.statistics.compileTimeMs = 0.0f;
+            result.description = QStringLiteral("Compiled 2D scene (cached, %1 batches)")
+                .arg(result.batchCount());
+            return result;
+        }
+
+        // 增量编译：仅重编译脏实体
+        const auto t0 = std::chrono::steady_clock::now();
+        const auto compileStart = std::chrono::steady_clock::now();
+
+        QList<RenderBatch> newBatches = m_traverser.traverse2D(document, context);
+        RenderFrame result = m_batchManager.mergeIncremental(
+            m_batchManager.cachedFrame(), newBatches, m_strategy.dirtyEntityIds());
+        m_strategy.clearDirty();
+
+        const auto compileEnd = std::chrono::steady_clock::now();
+
+        result.frameId = context.frameId;
+        result.timestamp = t0;
+        result.valid = true;
+        result.description = QStringLiteral("Compiled 2D scene (incremental, %1 batches)")
+            .arg(result.batchCount());
+
+        m_batchManager.fillStatistics(result, context, t0, compileStart, compileEnd);
+        m_batchManager.cacheFrame(result);
+        return result;
+    }
+
+    // 全量编译
     const auto t0 = std::chrono::steady_clock::now();
 
     RenderFrame frame;
@@ -283,33 +93,138 @@ RenderFrame DefaultSceneCompiler::compile(EntityDocument2D* document, const Rend
     }
 
     const auto compileStart = std::chrono::steady_clock::now();
-    frame.batches = compileEntities2D(document, context);
+    frame.batches = m_traverser.traverse2D(document, context);
     const auto compileEnd = std::chrono::steady_clock::now();
 
     frame.valid = true;
-    frame.description = QStringLiteral("Compiled 2D scene with %1 entities on %2")
-        .arg(document->entities().size())
+    frame.description = QStringLiteral("Compiled 2D scene (full) on %1")
         .arg(context.backendName);
 
-    // 填充统计
-    auto& stats = frame.statistics;
-    stats.frameId = context.frameId;
-    stats.timestamp = t0;
-    stats.batchCount = frame.batchCount();
-    stats.totalVertexCount = frame.totalVertexCount();
-    stats.entityCount = frame.entityCount();
-    stats.compileTimeMs = std::chrono::duration<float, std::milli>(compileEnd - compileStart).count();
-    stats.frameTimeMs = std::chrono::duration<float, std::milli>(compileEnd - t0).count();
+    m_batchManager.fillStatistics(frame, context, t0, compileStart, compileEnd);
 
-    // 缓存帧
-    m_cachedFrame = frame;
-    m_hasCachedFrame = true;
+    m_batchManager.cacheFrame(frame);
+    m_strategy.setCacheValid(true);
+    m_strategy.setForceFullCompile(false);
 
     return frame;
 }
 
-RenderFrame DefaultSceneCompiler::compile(SceneDocument3D* document, const RenderContext& context)
+// ============================================================================
+// 编译核心逻辑（2D - Eg::SceneManager 路径）：全量/增量自动路由
+// ============================================================================
+
+RenderFrame DefaultSceneCompiler::compileInternal(Eg::SceneManager* scene, const RenderContext& context)
 {
+    if (m_strategy.cacheValid() && !m_strategy.forceFullCompile() && !context.isDirty)
+    {
+        if (!m_strategy.hasDirtyEntities())
+        {
+            RenderFrame result = m_batchManager.cachedFrame();
+            result.frameId = context.frameId;
+            result.timestamp = std::chrono::steady_clock::now();
+            result.statistics.frameTimeMs = 0.0f;
+            result.statistics.compileTimeMs = 0.0f;
+            result.description = QStringLiteral("Compiled 2D scene (cached, %1 batches)")
+                .arg(result.batchCount());
+            return result;
+        }
+
+        const auto t0 = std::chrono::steady_clock::now();
+        const auto compileStart = std::chrono::steady_clock::now();
+
+        QList<RenderBatch> newBatches = m_traverser.traverse2D(scene, context);
+        RenderFrame result = m_batchManager.mergeIncremental(
+            m_batchManager.cachedFrame(), newBatches, m_strategy.dirtyEntityIds());
+        m_strategy.clearDirty();
+
+        const auto compileEnd = std::chrono::steady_clock::now();
+
+        result.frameId = context.frameId;
+        result.timestamp = t0;
+        result.valid = true;
+        result.description = QStringLiteral("Compiled 2D scene (incremental, %1 batches)")
+            .arg(result.batchCount());
+
+        m_batchManager.fillStatistics(result, context, t0, compileStart, compileEnd);
+        m_batchManager.cacheFrame(result);
+        return result;
+    }
+
+    const auto t0 = std::chrono::steady_clock::now();
+
+    RenderFrame frame;
+    frame.frameId = context.frameId;
+    frame.timestamp = t0;
+
+    if (!scene)
+    {
+        frame.valid = false;
+        frame.description = QStringLiteral("No 2D scene");
+        return frame;
+    }
+
+    const auto compileStart = std::chrono::steady_clock::now();
+    frame.batches = m_traverser.traverse2D(scene, context);
+    const auto compileEnd = std::chrono::steady_clock::now();
+
+    frame.valid = true;
+    frame.description = QStringLiteral("Compiled 2D scene (full) on %1")
+        .arg(context.backendName);
+
+    m_batchManager.fillStatistics(frame, context, t0, compileStart, compileEnd);
+
+    m_batchManager.cacheFrame(frame);
+    m_strategy.setCacheValid(true);
+    m_strategy.setForceFullCompile(false);
+
+    return frame;
+}
+
+// ============================================================================
+// 编译核心逻辑（3D）：全量/增量自动路由
+// ============================================================================
+
+RenderFrame DefaultSceneCompiler::compileInternal(SceneDocument3D* document, const RenderContext& context)
+{
+    // 若能走增量路径
+    if (m_strategy.cacheValid() && !m_strategy.forceFullCompile() && !context.isDirty)
+    {
+        if (!m_strategy.hasDirtyEntities())
+        {
+            // 缓存命中：零开销返回
+            RenderFrame result = m_batchManager.cachedFrame();
+            result.frameId = context.frameId;
+            result.timestamp = std::chrono::steady_clock::now();
+            result.statistics.frameTimeMs = 0.0f;
+            result.statistics.compileTimeMs = 0.0f;
+            result.description = QStringLiteral("Compiled 3D scene (cached, %1 batches)")
+                .arg(result.batchCount());
+            return result;
+        }
+
+        // 增量编译：仅重编译脏实体
+        const auto t0 = std::chrono::steady_clock::now();
+        const auto compileStart = std::chrono::steady_clock::now();
+
+        QList<RenderBatch> newBatches = m_traverser.traverse3D(document, context);
+        RenderFrame result = m_batchManager.mergeIncremental(
+            m_batchManager.cachedFrame(), newBatches, m_strategy.dirtyEntityIds());
+        m_strategy.clearDirty();
+
+        const auto compileEnd = std::chrono::steady_clock::now();
+
+        result.frameId = context.frameId;
+        result.timestamp = t0;
+        result.valid = true;
+        result.description = QStringLiteral("Compiled 3D scene (incremental, %1 batches)")
+            .arg(result.batchCount());
+
+        m_batchManager.fillStatistics(result, context, t0, compileStart, compileEnd);
+        m_batchManager.cacheFrame(result);
+        return result;
+    }
+
+    // 全量编译
     const auto t0 = std::chrono::steady_clock::now();
 
     RenderFrame frame;
@@ -324,61 +239,170 @@ RenderFrame DefaultSceneCompiler::compile(SceneDocument3D* document, const Rende
     }
 
     const auto compileStart = std::chrono::steady_clock::now();
-    frame.batches = compileEntities3D(document, context);
+    frame.batches = m_traverser.traverse3D(document, context);
     const auto compileEnd = std::chrono::steady_clock::now();
 
     frame.valid = true;
-    frame.description = QStringLiteral("Compiled 3D scene with %1 entities on %2")
-        .arg(document->entities().size())
+    frame.description = QStringLiteral("Compiled 3D scene (full) on %1")
         .arg(context.backendName);
 
-    auto& stats = frame.statistics;
-    stats.frameId = context.frameId;
-    stats.timestamp = t0;
-    stats.batchCount = frame.batchCount();
-    stats.totalVertexCount = frame.totalVertexCount();
-    stats.entityCount = frame.entityCount();
-    stats.compileTimeMs = std::chrono::duration<float, std::milli>(compileEnd - compileStart).count();
-    stats.frameTimeMs = std::chrono::duration<float, std::milli>(compileEnd - t0).count();
+    m_batchManager.fillStatistics(frame, context, t0, compileStart, compileEnd);
 
-    m_cachedFrame = frame;
-    m_hasCachedFrame = true;
+    m_batchManager.cacheFrame(frame);
+    m_strategy.setCacheValid(true);
+    m_strategy.setForceFullCompile(false);
 
     return frame;
 }
 
 // ============================================================================
-// 增量编译
+// 增量编译（2D - EntityDocument2D）
 // ============================================================================
 
 RenderFrame DefaultSceneCompiler::compileIncremental(EntityDocument2D* document,
-                                                      const RenderContext& context,
-                                                      const RenderFrame& previousFrame)
+                                                       const RenderContext& context,
+                                                       const RenderFrame& previousFrame)
 {
-    // 如果没有脏标记或上下文未变化，直接返回缓存
-    if (!context.isDirty && m_hasCachedFrame && m_cachedFrame.frameId == previousFrame.frameId)
+    const auto t0 = std::chrono::steady_clock::now();
+
+    if (!m_strategy.cacheValid() || m_strategy.forceFullCompile())
+        return compile(document, context);
+
+    if (context.isDirty)
+        return compile(document, context);
+
+    if (!m_strategy.hasDirtyEntities())
     {
-        RenderFrame result = previousFrame;
+        RenderFrame result = m_batchManager.cachedFrame();
+        result.frameId = context.frameId;
+        result.timestamp = t0;
         result.statistics.frameTimeMs = 0.0f;
+        result.statistics.compileTimeMs = 0.0f;
+        result.description = QStringLiteral("Incremental 2D (cached, %1 batches)")
+            .arg(result.batchCount());
         return result;
     }
 
-    // 否则回退到全量编译
-    return compile(document, context);
+    const auto compileStart = std::chrono::steady_clock::now();
+
+    QList<RenderBatch> newBatches = m_traverser.traverse2D(document, context);
+    RenderFrame result = m_batchManager.mergeIncremental(
+        m_batchManager.cachedFrame(), newBatches, m_strategy.dirtyEntityIds());
+    m_strategy.clearDirty();
+
+    const auto compileEnd = std::chrono::steady_clock::now();
+
+    result.frameId = context.frameId;
+    result.timestamp = t0;
+    result.valid = true;
+    result.description = QStringLiteral("Incremental 2D (partial, %1 batches)")
+        .arg(result.batchCount());
+
+    m_batchManager.fillStatistics(result, context, t0, compileStart, compileEnd);
+
+    m_batchManager.cacheFrame(result);
+
+    return result;
 }
+
+// ============================================================================
+// 增量编译（2D - Eg::SceneManager）
+// ============================================================================
+
+RenderFrame DefaultSceneCompiler::compileIncremental(Eg::SceneManager* scene,
+                                                       const RenderContext& context,
+                                                       const RenderFrame& previousFrame)
+{
+    const auto t0 = std::chrono::steady_clock::now();
+
+    if (!m_strategy.cacheValid() || m_strategy.forceFullCompile())
+        return compile(scene, context);
+
+    if (context.isDirty)
+        return compile(scene, context);
+
+    if (!m_strategy.hasDirtyEntities())
+    {
+        RenderFrame result = m_batchManager.cachedFrame();
+        result.frameId = context.frameId;
+        result.timestamp = t0;
+        result.statistics.frameTimeMs = 0.0f;
+        result.statistics.compileTimeMs = 0.0f;
+        result.description = QStringLiteral("Incremental 2D (cached, %1 batches)")
+            .arg(result.batchCount());
+        return result;
+    }
+
+    const auto compileStart = std::chrono::steady_clock::now();
+
+    QList<RenderBatch> newBatches = m_traverser.traverse2D(scene, context);
+    RenderFrame result = m_batchManager.mergeIncremental(
+        m_batchManager.cachedFrame(), newBatches, m_strategy.dirtyEntityIds());
+    m_strategy.clearDirty();
+
+    const auto compileEnd = std::chrono::steady_clock::now();
+
+    result.frameId = context.frameId;
+    result.timestamp = t0;
+    result.valid = true;
+    result.description = QStringLiteral("Incremental 2D (partial, %1 batches)")
+        .arg(result.batchCount());
+
+    m_batchManager.fillStatistics(result, context, t0, compileStart, compileEnd);
+
+    m_batchManager.cacheFrame(result);
+
+    return result;
+}
+
+// ============================================================================
+// 增量编译（3D）
+// ============================================================================
 
 RenderFrame DefaultSceneCompiler::compileIncremental(SceneDocument3D* document,
                                                       const RenderContext& context,
                                                       const RenderFrame& previousFrame)
 {
-    if (!context.isDirty && m_hasCachedFrame && m_cachedFrame.frameId == previousFrame.frameId)
+    const auto t0 = std::chrono::steady_clock::now();
+
+    if (!m_strategy.cacheValid() || m_strategy.forceFullCompile())
+        return compile(document, context);
+
+    if (context.isDirty)
+        return compile(document, context);
+
+    if (!m_strategy.hasDirtyEntities())
     {
-        RenderFrame result = previousFrame;
+        RenderFrame result = m_batchManager.cachedFrame();
+        result.frameId = context.frameId;
+        result.timestamp = t0;
         result.statistics.frameTimeMs = 0.0f;
+        result.statistics.compileTimeMs = 0.0f;
+        result.description = QStringLiteral("Incremental 3D (cached, %1 batches)")
+            .arg(result.batchCount());
         return result;
     }
 
-    return compile(document, context);
+    const auto compileStart = std::chrono::steady_clock::now();
+
+    QList<RenderBatch> newBatches = m_traverser.traverse3D(document, context);
+    RenderFrame result = m_batchManager.mergeIncremental(
+        m_batchManager.cachedFrame(), newBatches, m_strategy.dirtyEntityIds());
+    m_strategy.clearDirty();
+
+    const auto compileEnd = std::chrono::steady_clock::now();
+
+    result.frameId = context.frameId;
+    result.timestamp = t0;
+    result.valid = true;
+    result.description = QStringLiteral("Incremental 3D (partial, %1 batches)")
+        .arg(result.batchCount());
+
+    m_batchManager.fillStatistics(result, context, t0, compileStart, compileEnd);
+
+    m_batchManager.cacheFrame(result);
+
+    return result;
 }
 
 // ============================================================================
@@ -387,53 +411,45 @@ RenderFrame DefaultSceneCompiler::compileIncremental(SceneDocument3D* document,
 
 void DefaultSceneCompiler::invalidateCache()
 {
-    m_hasCachedFrame = false;
-    m_cachedFrame = RenderFrame{};
+    m_batchManager.invalidateCache();
+    m_strategy.setCacheValid(false);
+    m_strategy.setForceFullCompile(true);
 }
 
 bool DefaultSceneCompiler::hasCachedFrame() const
 {
-    return m_hasCachedFrame;
+    return m_batchManager.hasCachedFrame();
 }
 
 uint64_t DefaultSceneCompiler::cachedFrameId() const
 {
-    return m_hasCachedFrame ? m_cachedFrame.frameId : 0;
+    return m_batchManager.hasCachedFrame() ? m_batchManager.cachedFrame().frameId : 0;
 }
 
 // ============================================================================
-// 批次查询
+// 脏实体追踪
+// ============================================================================
+
+void DefaultSceneCompiler::markEntityDirty(const QString& entityId)
+{
+    m_strategy.markEntityDirty(entityId);
+}
+
+void DefaultSceneCompiler::markAllDirty()
+{
+    m_strategy.markAllDirty();
+}
+
+// ============================================================================
+// 批次查询（委托 BatchManager）
 // ============================================================================
 
 QVector<int> DefaultSceneCompiler::groupBatchesByPrimitiveType(const RenderFrame& frame) const
 {
-    Q_UNUSED(frame);
-    // 返回空的批次索引列表（当前按实体独立批次，不合并）
-    return {};
+    return m_batchManager.groupByPrimitiveType(frame);
 }
 
 RenderFrame DefaultSceneCompiler::cullBatches(const RenderFrame& frame, const QRectF& viewportRect) const
 {
-    if (viewportRect.isNull() || !viewportRect.isValid())
-        return frame;
-
-    RenderFrame result = frame;
-    QVector<RenderBatch> visible;
-    int culled = 0;
-
-    for (const auto& batch : frame.batches)
-    {
-        if (batch.boundingBox.isValid() && !viewportRect.intersects(batch.boundingBox))
-        {
-            ++culled;
-            continue;
-        }
-        visible.append(batch);
-    }
-
-    result.batches = visible;
-    result.statistics.culledBatchCount = culled;
-    result.statistics.batchCount = visible.size();
-
-    return result;
+    return m_batchManager.cullByViewport(frame, viewportRect);
 }

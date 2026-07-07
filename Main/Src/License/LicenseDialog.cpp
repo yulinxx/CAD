@@ -14,7 +14,7 @@ LicenseDialog::LicenseDialog(const QString& configDir, QWidget* parent)
     : QDialog(parent)
     , m_configDir(configDir)
 {
-    LicenseManager mgr(configDir.toStdString());
+    LicenseManager mgr(std::filesystem::path(configDir.toStdWString()));
     m_machineCode = QString::fromStdString(mgr.GetMachineCode());
     SetupUi();
 }
@@ -97,7 +97,7 @@ void LicenseDialog::OnActivateClicked()
 
     QApplication::processEvents();
 
-    LicenseManager mgr(m_configDir.toStdString());
+    LicenseManager mgr(std::filesystem::path(m_configDir.toStdWString()));
     bool ok = mgr.Activate(regCode.toStdString());
 
     if (ok)

@@ -1,312 +1,114 @@
 #include "RenderBackendFactory.h"
 
 #include "IRenderBackend.h"
-#include "RenderContext.h"
-#include "RenderFrame.h"
+#include "DefaultRenderBackend.h"
+#include "BackendCapabilityRegistry.h"
+#include "BackendConfigResolver.h"
 
 #include <QDebug>
 
 // ============================================================================
-// 占位后端实现（实现完整 IRenderBackend 接口）
+// 类型转换辅助函数
 // ============================================================================
 
-namespace
+namespace {
+    constexpr int BackendType_OpenGL = 1;
+    constexpr int BackendType_Vulkan = 2;
+    constexpr int BackendType_Metal = 3;
+    constexpr int BackendType_Software = 4;
+}
+
+int RenderBackendFactory::toRegistryType(BackendType type)
 {
-    class PlaceholderBackend final : public IRenderBackend
+    switch (type)
     {
-    public:
-        explicit PlaceholderBackend(QString name, BackendCapability caps)
-            : m_name(std::move(name))
-            , m_capabilities(caps)
-        {
-            m_context.backendName = m_name;
-        }
+    case BackendType::OpenGL:   return BackendType_OpenGL;
+    case BackendType::Vulkan:   return BackendType_Vulkan;
+    case BackendType::Metal:    return BackendType_Metal;
+    case BackendType::Software: return BackendType_Software;
+    default:                    return BackendType_OpenGL;
+    }
+}
 
-        // ============ 生命周期 ============
-
-        bool initialize(void* nativeWindowHandle = nullptr) override
-        {
-            Q_UNUSED(nativeWindowHandle);
-            m_ready = true;
-            m_context.markDirty();
-            return true;
-        }
-
-        void shutdown() override
-        {
-            m_ready = false;
-        }
-
-        bool isReady() const override
-        {
-            return m_ready;
-        }
-
-        // ============ 上下文绑定 ============
-
-        void bindContext(const RenderContext& context) override
-        {
-            m_context = context;
-            m_context.markDirty();
-        }
-
-        const RenderContext& context() const override
-        {
-            return m_context;
-        }
-
-        // ============ 场景绑定 ============
-
-        void setScene(EntityDocument2D* document) override
-        {
-            m_document2D = document;
-            m_context.markDirty(DirtyRegionType::Geometry);
-        }
-
-        void setScene(SceneDocument3D* document) override
-        {
-            m_document3D = document;
-            m_context.markDirty(DirtyRegionType::Geometry);
-        }
-
-        void setCamera(CameraController3D* controller) override
-        {
-            m_camera = controller;
-            m_context.markDirty(DirtyRegionType::View);
-        }
-
-        // ============ 渲染管线 ============
-
-        void compile() override
-        {
-            m_stats.compileTimeMs = 0.0f;
-        }
-
-        void submitFrame(const RenderFrame& frame) override
-        {
-            m_lastFrame = frame;
-            m_stats.batchCount = frame.batchCount();
-            m_stats.totalVertexCount = frame.totalVertexCount();
-            m_stats.entityCount = frame.entityCount();
-        }
-
-        void render() override
-        {
-            // 占位后端不做实际渲染
-        }
-
-        void beginFrame() override
-        {
-            m_context.advanceFrame();
-            m_stats.frameId = m_context.frameId;
-            m_stats.timestamp = std::chrono::steady_clock::now();
-        }
-
-        void endFrame() override
-        {
-            m_context.clearDirty();
-        }
-
-        // ============ 视口控制 ============
-
-        void resize(const QSize& size) override
-        {
-            m_context.viewportSize = size;
-            m_context.markDirty(DirtyRegionType::View);
-        }
-
-        void resetView() override
-        {
-            m_context.markDirty(DirtyRegionType::View);
-        }
-
-        // ============ 模式切换 ============
-
-        void setOrbitMode(bool enabled) override
-        {
-            m_context.orbitMode = enabled;
-        }
-
-        void setMeasureMode(bool enabled) override
-        {
-            m_context.measureMode = enabled;
-        }
-
-        void setRenderMode(RenderMode mode) override
-        {
-            m_context.renderMode = mode;
-            m_context.markDirty();
-        }
-
-        RenderMode renderMode() const override
-        {
-            return m_context.renderMode;
-        }
-
-        // ============ 帧输出 ============
-
-        QImage captureFrame() const override
-        {
-            // 占位后端返回空图像
-            return QImage(m_context.viewportSize, QImage::Format_ARGB32);
-        }
-
-        RenderStatistics getStatistics() const override
-        {
-            return m_stats;
-        }
-
-        // ============ 后端信息 ============
-
-        QString backendName() const override
-        {
-            return m_name;
-        }
-
-        bool supportsCapability(BackendCapability cap) const override
-        {
-            return hasCapability(m_capabilities, cap);
-        }
-
-        BackendCapability capabilities() const override
-        {
-            return m_capabilities;
-        }
-
-    private:
-        QString m_name;
-        BackendCapability m_capabilities{ BackendCapability::None };
-        bool m_ready{ false };
-
-        RenderContext m_context;
-        RenderStatistics m_stats;
-
-        EntityDocument2D* m_document2D{ nullptr };
-        SceneDocument3D* m_document3D{ nullptr };
-        CameraController3D* m_camera{ nullptr };
-        RenderFrame m_lastFrame;
-    };
+RenderBackendFactory::BackendType RenderBackendFactory::fromRegistryType(int type)
+{
+    switch (type)
+    {
+    case BackendType_OpenGL:   return BackendType::OpenGL;
+    case BackendType_Vulkan:   return BackendType::Vulkan;
+    case BackendType_Metal:    return BackendType::Metal;
+    case BackendType_Software: return BackendType::Software;
+    default:                   return BackendType::OpenGL;
+    }
 }
 
 // ============================================================================
-// 工厂方法
+// 工厂方法（核心创建逻辑）
 // ============================================================================
 
 std::unique_ptr<IRenderBackend> RenderBackendFactory::create(BackendType type)
 {
-    switch (type)
-    {
-    case BackendType::OpenGL:
-        return std::make_unique<PlaceholderBackend>(
-            QStringLiteral("OpenGL"),
-            BackendCapability::HardwareAccelerated
-            | BackendCapability::AntiAliasing
-            | BackendCapability::HighDPI
-            | BackendCapability::OffscreenRendering);
-
-    case BackendType::Vulkan:
-        return std::make_unique<PlaceholderBackend>(
-            QStringLiteral("Vulkan"),
-            BackendCapability::HardwareAccelerated
-            | BackendCapability::MultiViewport
-            | BackendCapability::InstancedRendering
-            | BackendCapability::ComputeShader
-            | BackendCapability::AntiAliasing
-            | BackendCapability::HighDPI
-            | BackendCapability::OffscreenRendering);
-
-    case BackendType::Metal:
-        return std::make_unique<PlaceholderBackend>(
-            QStringLiteral("Metal"),
-            BackendCapability::HardwareAccelerated
-            | BackendCapability::MultiViewport
-            | BackendCapability::InstancedRendering
-            | BackendCapability::ComputeShader
-            | BackendCapability::AntiAliasing
-            | BackendCapability::HighDPI);
-
-    case BackendType::Software:
-        return std::make_unique<PlaceholderBackend>(
-            QStringLiteral("Software"),
-            BackendCapability::OffscreenRendering);
-
-    default:
-        return std::make_unique<PlaceholderBackend>(
-            QStringLiteral("Unknown"),
-            BackendCapability::None);
-    }
+    BackendCapability capabilities = capabilitiesFor(type);
+    QString name = backendTypeName(type);
+    return std::make_unique<DefaultRenderBackend>(name, capabilities);
 }
+
+// ============================================================================
+// 委托给 BackendCapabilityRegistry 的方法
+// ============================================================================
 
 QVector<RenderBackendFactory::BackendType> RenderBackendFactory::availableBackends()
 {
-    QVector<BackendType> backends;
-    backends.append(BackendType::OpenGL);
-
-#ifdef _WIN32
-    // Vulkan 在 Windows 上可用
-    // backends.append(BackendType::Vulkan);
-#endif
-
-#ifdef __APPLE__
-    backends.append(BackendType::Metal);
-#endif
-
-    backends.append(BackendType::Software);
-    return backends;
+    auto& registry = BackendCapabilityRegistry::instance();
+    QVector<BackendType> result;
+    for (int type : registry.availableBackends())
+    {
+        result.append(fromRegistryType(type));
+    }
+    return result;
 }
 
 QString RenderBackendFactory::backendTypeName(BackendType type)
 {
-    switch (type)
-    {
-    case BackendType::OpenGL:   return QStringLiteral("OpenGL");
-    case BackendType::Vulkan:   return QStringLiteral("Vulkan");
-    case BackendType::Metal:    return QStringLiteral("Metal");
-    case BackendType::Software: return QStringLiteral("Software");
-    default:                    return QStringLiteral("Unknown");
-    }
+    return BackendCapabilityRegistry::instance().nameFor(toRegistryType(type));
 }
 
 BackendCapability RenderBackendFactory::capabilitiesFor(BackendType type)
 {
-    switch (type)
-    {
-    case BackendType::OpenGL:
-        return BackendCapability::HardwareAccelerated
-             | BackendCapability::AntiAliasing
-             | BackendCapability::HighDPI
-             | BackendCapability::OffscreenRendering;
-
-    case BackendType::Vulkan:
-        return BackendCapability::HardwareAccelerated
-             | BackendCapability::MultiViewport
-             | BackendCapability::InstancedRendering
-             | BackendCapability::ComputeShader
-             | BackendCapability::AntiAliasing
-             | BackendCapability::HighDPI
-             | BackendCapability::OffscreenRendering;
-
-    case BackendType::Metal:
-        return BackendCapability::HardwareAccelerated
-             | BackendCapability::MultiViewport
-             | BackendCapability::InstancedRendering
-             | BackendCapability::ComputeShader
-             | BackendCapability::AntiAliasing
-             | BackendCapability::HighDPI;
-
-    case BackendType::Software:
-        return BackendCapability::OffscreenRendering;
-
-    default:
-        return BackendCapability::None;
-    }
+    return BackendCapabilityRegistry::instance().capabilitiesFor(toRegistryType(type));
 }
+
+RenderBackendFactory::BackendType RenderBackendFactory::fromString(const QString& name)
+{
+    int registryType = BackendCapabilityRegistry::instance().fromName(name);
+    return fromRegistryType(registryType);
+}
+
+QString RenderBackendFactory::toString(BackendType type)
+{
+    return backendTypeName(type);
+}
+
+// ============================================================================
+// 委托给 BackendConfigResolver 的方法
+// ============================================================================
 
 RenderBackendFactory::BackendType RenderBackendFactory::defaultBackendType()
 {
-#ifdef __APPLE__
-    return BackendType::Metal;
-#else
-    return BackendType::OpenGL;
-#endif
+    int registryType = BackendConfigResolver::instance().defaultBackendType();
+    return fromRegistryType(registryType);
+}
+
+RenderBackendFactory::BackendType RenderBackendFactory::backendFromEnvironment()
+{
+    int registryType = BackendConfigResolver::instance().fromEnvironment();
+    return fromRegistryType(registryType);
+}
+
+std::unique_ptr<IRenderBackend> RenderBackendFactory::createConfigured()
+{
+    int registryType = BackendConfigResolver::instance().resolveBackendType();
+    BackendType type = fromRegistryType(registryType);
+    qDebug() << "[RenderBackendFactory] 创建后端:" << toString(type);
+    return create(type);
 }

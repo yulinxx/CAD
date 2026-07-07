@@ -4,32 +4,31 @@
 #include "RenderContext.h"
 #include "RenderFrame.h"
 
-#include <QOpenGLContext>
-#include <QOpenGLFramebufferObject>
-#include <QOpenGLFunctions>
-#include <QOffscreenSurface>
 #include <memory>
+
+class EntityDocument2D;
+class SceneDocument3D;
+class CameraController3D;
 
 namespace Eg { class SceneManager; }
 
 /**
- * @file MinimalOpenGLBackend.h
- * @brief 最小可运行 OpenGL 后端骨架
+ * @file DefaultRenderBackend.h
+ * @brief 默认渲染后端（占位实现）
  *
- * 实现 IRenderBackend 接口，使用 Qt 的 OpenGL 4.5 Core Profile 封装：
- * - 支持离屏渲染（FBO）
- * - 支持帧捕获（glReadPixels）
- * - 支持基本图元渲染（后续接入 VBO + Shader）
- * - 支持视图变换
+ * 实现完整的 IRenderBackend 接口，但不做实际 GPU 渲染。
+ * 用于：
+ * - 验证渲染管线接口完整性
+ * - 作为未实现后端的占位符
+ * - 软件渲染路径的兜底
  *
- * 这是后续完整 OpenGL 后端的起点。
- * 当前阶段仅证明渲染管线可跑通，不追求性能。
+ * 后续完整后端（OpenGL/Vulkan/Metal）实现后，此占位实现可逐步替换。
  */
-class MinimalOpenGLBackend final : public IRenderBackend
+class DefaultRenderBackend final : public IRenderBackend
 {
 public:
-    MinimalOpenGLBackend();
-    ~MinimalOpenGLBackend() override;
+    explicit DefaultRenderBackend(QString name, BackendCapability caps);
+    ~DefaultRenderBackend() override = default;
 
     // ============ 生命周期 ============
 
@@ -81,39 +80,16 @@ public:
     BackendCapability capabilities() const override;
 
 private:
-    /// 确保 OpenGL 上下文已创建
-    bool ensureGLContext();
+    QString m_name;
+    BackendCapability m_capabilities{ BackendCapability::None };
+    bool m_ready{ false };
 
-    /// 确保 FBO 尺寸正确
-    bool ensureFBO();
-
-    /// 清屏并绘制测试网格
-    void renderTestGrid();
-
-private:
-    // Qt OpenGL 资源
-    std::unique_ptr<QOpenGLContext> m_glContext;
-    std::unique_ptr<QOffscreenSurface> m_offscreenSurface;
-    std::unique_ptr<QOpenGLFramebufferObject> m_fbo;
-
-    // 渲染上下文
     RenderContext m_context;
     RenderStatistics m_stats;
 
-    // 场景引用
     EntityDocument2D* m_document2D{ nullptr };
     Eg::SceneManager* m_scene{ nullptr };
     SceneDocument3D* m_document3D{ nullptr };
     CameraController3D* m_camera{ nullptr };
-
-    // 状态
-    bool m_ready{ false };
-    bool m_initialized{ false };
     RenderFrame m_lastFrame;
-    BackendCapability m_capabilities{
-        BackendCapability::HardwareAccelerated
-        | BackendCapability::AntiAliasing
-        | BackendCapability::HighDPI
-        | BackendCapability::OffscreenRendering
-    };
 };

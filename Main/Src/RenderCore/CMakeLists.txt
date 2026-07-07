@@ -13,16 +13,32 @@ set(HEADERS
     ${SRC_DIR}/IRenderBackend.h
     ${SRC_DIR}/SceneCompiler.h
     ${SRC_DIR}/DefaultSceneCompiler.h
+    ${SRC_DIR}/DefaultRenderBackend.h
     ${SRC_DIR}/RenderBackendFactory.h
     ${SRC_DIR}/MinimalOpenGLBackend.h
+    ${SRC_DIR}/UiCamera3D.h
     ${SRC_DIR}/RenderCoreRenderer.h
+    ${SRC_DIR}/SoftwareRenderer.h
+    ${SRC_DIR}/SceneTraverser.h
+    ${SRC_DIR}/CompilationStrategy.h
+    ${SRC_DIR}/BatchManager.h
+    ${SRC_DIR}/BackendCapabilityRegistry.h
+    ${SRC_DIR}/BackendConfigResolver.h
 )
 
 set(SOURCES
     ${SRC_DIR}/DefaultSceneCompiler.cpp
+    ${SRC_DIR}/DefaultRenderBackend.cpp
     ${SRC_DIR}/RenderBackendFactory.cpp
     ${SRC_DIR}/MinimalOpenGLBackend.cpp
+    ${SRC_DIR}/UiCamera3D.cpp
     ${SRC_DIR}/RenderCoreRenderer.cpp
+    ${SRC_DIR}/SoftwareRenderer.cpp
+    ${SRC_DIR}/SceneTraverser.cpp
+    ${SRC_DIR}/CompilationStrategy.cpp
+    ${SRC_DIR}/BatchManager.cpp
+    ${SRC_DIR}/BackendCapabilityRegistry.cpp
+    ${SRC_DIR}/BackendConfigResolver.cpp
 )
 
 # 查找 Qt
@@ -68,9 +84,10 @@ set_target_properties(${TARGET_NAME} PROPERTIES
     OUTPUT_NAME ${TARGET_NAME}
     POSITION_INDEPENDENT_CODE ON
     AUTOMOC ON
+    CXX_VISIBILITY_PRESET default
 )
 
 message(STATUS "[UiRenderCore]")
 message(STATUS "  Type: Static library")
-message(STATUS "  Sources: ${SOURCES}")
+# message(STATUS "  Sources: ${SOURCES}")
 message(STATUS "")

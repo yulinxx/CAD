@@ -2,30 +2,37 @@
 
 #include "Render3D/IRenderer3D.h"
 #include "RenderContext.h"
+#include "RenderFrame.h"
+#include "UiCamera3D.h"
 
 #include <memory>
-#include <QPoint>
 
 class SceneDocument3D;
 class CameraController3D;
 class SceneCompiler;
-class IRenderBackend;
-struct RenderContext;
-struct RenderFrame;
+class SoftwareRenderer;
 
 /**
  * @file RenderCoreRenderer.h
- * @brief 基于 RenderCore 统一渲染管线的 IRenderer3D 适配器
+ * @brief UI → RenderCore 渲染管线桥接器
  *
- * 桥接旧 IRenderer3D 接口与新 RenderCore 渲染管线。
- * 内部使用 SceneCompiler 编译场景、IRenderBackend 执行渲染。
+ * 实现 IRenderer3D 接口，将 Viewport3D 的渲染请求桥接到 RenderCore 统一管线。
  *
- * 两条渲染路径：
- * - 软件路径（默认）：SceneCompiler → RenderFrame → QPainter 直接绘制批次
- * - OpenGL 路径：SceneCompiler → IRenderBackend → FBO → 捕获 → QPainter 绘制
+ * 职责边界（严格遵循桥接模式，仅做调度与转发）：
+ * - 生命周期管理 → 初始化/关闭状态维护
+ * - 场景绑定 → 转发给 SceneCompiler
+ * - 编译调度 → 调用 SceneCompiler::compile()，不做编译决策
+ * - 渲染派发 → 委托 SoftwareRenderer 执行实际渲染
+ * - 选择管理 → 存储选中节点 ID，触发回调
+ * - 相机姿态 → 委托给 UiCamera3D
+ * - 输入事件 → 完全委托给 UiCamera3D
  *
- * 这是"最小可跑闭环"的核心组件，验证 SceneCompiler + IRenderBackend
- * 的抽象层是否真正可用。
+ * 不承担：
+ * - 相机投影计算（由 UiCamera3D 负责）
+ * - 场景遍历与批次生成（由 SceneCompiler 负责）
+ * - 渲染实现（由 SoftwareRenderer/IRenderBackend 负责）
+ * - 输入事件策略（完全委托给 UiCamera3D）
+ * - 场景编译决策（增量/全量由 SceneCompiler 内部决定）
  */
 class RenderCoreRenderer : public IRenderer3D
 {
@@ -33,7 +40,7 @@ public:
     RenderCoreRenderer();
     ~RenderCoreRenderer() override;
 
-    // ========== IRenderer3D 接口实现 ==========
+    // ========== IRenderer3D 接口 ==========
 
     bool initialize(void* windowHandle = nullptr) override;
     void shutdown() override;
@@ -65,25 +72,10 @@ public:
     void setPathCallback(PathCallback callback) override;
 
 private:
-    /// 软件渲染路径：将 RenderFrame 的批次绘制到 QPainter
-    void renderSoftware(QPainter& painter, const RenderFrame& frame);
-
-    /// OpenGL 渲染路径：使用 IRenderBackend 渲染后捕获帧
-    void renderOpenGL(QPainter& painter);
-
-    /// 编译当前场景
+    /// 编译场景 → RenderFrame（委托 SceneCompiler，不做编译决策）
     RenderFrame compileScene();
 
-    /// 3D 点投影到 2D 屏幕坐标
-    bool project3D(float x, float y, float z, int& sx, int& sy) const;
-
-    /// 绘制 3D 场景批次（带投影）
-    void renderBatches3D(QPainter& painter, const RenderFrame& frame);
-
-    /// 绘制坐标轴指示器
-    void drawAxesIndicator(QPainter& painter);
-
-    /// 发射状态文本
+    /// 发射状态文本到回调
     void emitStatus(const QString& text);
 
 private:
@@ -91,35 +83,20 @@ private:
     SceneDocument3D* m_document{ nullptr };
     CameraController3D* m_cameraController{ nullptr };
 
-    // 渲染管线
+    // 渲染管线核心
     std::unique_ptr<SceneCompiler> m_compiler;
-    std::unique_ptr<IRenderBackend> m_backend;
+    std::unique_ptr<SoftwareRenderer> m_softwareRenderer;
+    UiCamera3D m_camera;
     RenderContext m_context;
 
     // 生命周期
     bool m_ready{ false };
     bool m_renderLoopEnabled{ false };
-    bool m_useOpenGL{ false };
 
-    // 视口
-    int m_viewWidth{ 640 };
-    int m_viewHeight{ 480 };
+    // 上一帧缓存（用于增量编译）
+    RenderFrame m_lastFrame;
 
-    // 相机状态（无外部 CameraController3D 时使用内置参数）
-    double m_yaw{ 0.0 };
-    double m_pitch{ 15.0 };
-    double m_distance{ 10.0 };
-    double m_panX{ 0.0 };
-    double m_panY{ 0.0 };
-
-    // 交互状态
-    bool m_orbitMode{ true };
-    bool m_measureMode{ false };
-    bool m_rotating{ false };
-    bool m_panning{ false };
-    QPoint m_lastMousePos;
-
-    // 选中状态
+    // 选中
     QString m_selectedNodeId;
     QStringList m_selectedPathNames;
 

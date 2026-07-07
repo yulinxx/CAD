@@ -12,6 +12,8 @@
 #include "UiStateCenter.h"
 #include "UiViewWidgets.h"
 #include "DrawToolBarWidget.h"
+#include "SceneBuilder2D.h"
+#include "SceneBuilder3D.h"
 #include "WorkbenchWindow.h"
 
 namespace
@@ -236,10 +238,10 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
         drawToolBar->setCommandDispatcher(m_services.commandDispatcher);
     window.registerDockWidget(QStringLiteral("2D Draw Tools"), drawToolBar, Qt::LeftDockWidgetArea);
 
-    m_document = std::make_shared<EntityDocument2D>();
-    auto firstLine = m_document->createLine(QPointF(-120, -80), QPointF(160, 100));
-    auto secondLine = m_document->createLine(QPointF(-160, 120), QPointF(100, 180));
-    m_document->selection().add(firstLine);
+    auto sceneResult = SceneBuilder2D::createDefaultScene();
+    m_document = sceneResult.document;
+    auto firstLine = sceneResult.primaryLine;
+    auto secondLine = sceneResult.secondaryLine;
 
     auto* properties = new PropertiesPanelWidget(&window);
     properties->setWorkbenchMode(PropertiesPanelWidget::WorkbenchMode::TwoD);
@@ -401,18 +403,8 @@ bool Workbench3D::initialize(const UiServices& services)
 
 void Workbench3D::build3DScenePanels(WorkbenchWindow& window, PropertiesPanelWidget*& properties, SceneTreeDockWidget*& sceneDock, QString& rootNodeId)
 {
-    m_scene = std::make_shared<SceneDocument3D>();
-
-    auto root = m_scene->createNode(QStringLiteral("Root"));
-    auto mesh = m_scene->createNode(QStringLiteral("Mesh"));
-    auto childA = m_scene->createNode(QStringLiteral("Child A"));
-    auto childB = m_scene->createNode(QStringLiteral("Child B"));
-
-    mesh->addChild(childA);
-    mesh->addChild(childB);
-    root->addChild(mesh);
-    m_scene->selection().add(root);
-    rootNodeId = root->id();
+    auto sceneResult = SceneBuilder3D::createDefaultScene(rootNodeId);
+    m_scene = sceneResult;
 
     properties = new PropertiesPanelWidget(&window);
     properties->setObjectName(QStringLiteral("PropertiesPanel3D"));
@@ -421,7 +413,7 @@ void Workbench3D::build3DScenePanels(WorkbenchWindow& window, PropertiesPanelWid
     PropertiesPanelWidget::PropertiesData data;
     data.mode = PropertiesPanelWidget::WorkbenchMode::ThreeD;
     data.stateText = QStringLiteral("3D ready");
-    data.selectionText = QStringLiteral("Root node: %1").arg(root->id());
+    data.selectionText = QStringLiteral("Root node: %1").arg(rootNodeId);
     data.documentType = QStringLiteral("SceneDocument3D");
     data.documentStatus = QStringLiteral("Ready");
     data.modeSpecificFields = {
@@ -430,7 +422,7 @@ void Workbench3D::build3DScenePanels(WorkbenchWindow& window, PropertiesPanelWid
         QStringLiteral("Material: Default")
     };
     properties->setPropertiesData(data);
-    update3DDetails(properties, m_scene.get(), root->id());
+    update3DDetails(properties, m_scene.get(), rootNodeId);
     window.registerDockWidget(QStringLiteral("3D Inspector"), properties, Qt::RightDockWidgetArea);
 
     sceneDock = new SceneTreeDockWidget(&window);
@@ -438,35 +430,44 @@ void Workbench3D::build3DScenePanels(WorkbenchWindow& window, PropertiesPanelWid
     sceneDock->setObjectName(QStringLiteral("SceneTreeDock3D"));
     sceneDock->setWindowTitle(QStringLiteral("3D Scene"));
     sceneDock->setSelectionCallback([this, sceneDock, properties, &window](const QString& nodeId) {
-        if (!m_scene)
-            return;
-        m_scene->selection().clear();
-        auto node = m_scene->nodeById(nodeId);
-        if (node)
-            m_scene->selection().add(node);
-        sceneDock->refresh();
-        if (properties)
-        {
-            update3DDetails(properties, m_scene.get(), nodeId);
-            if (node)
-                properties->setObjectDetails(QStringLiteral("Node %1").arg(node->id()), {
-                    QStringLiteral("Name: %1").arg(node->name()),
-                    QStringLiteral("Children: %1").arg(node->children().size()),
-                    QStringLiteral("Path: %1").arg(node->pathNamesRecursive().join(QStringLiteral(" / "))),
-                    QStringLiteral("Selected: yes")
-                });
-        }
-
-        if (m_services.stateCenter)
-            m_services.stateCenter->setSelectionContext(QStringLiteral("3D-Tree"), QStringLiteral("3D node: %1").arg(nodeId));
-
-        if (auto* viewport = qobject_cast<Viewport3D*>(window.centralWidget()))
-            viewport->selectNodeById(nodeId);
+        onSceneTreeSelection(nodeId, sceneDock, properties, window);
     });
     window.registerDockWidget(QStringLiteral("3D Scene"), sceneDock, Qt::LeftDockWidgetArea);
 
     auto* history = createPanelWidget(QStringLiteral("Operation history"), &window);
     window.registerDockWidget(QStringLiteral("3D History"), history, Qt::BottomDockWidgetArea);
+}
+
+void Workbench3D::onSceneTreeSelection(const QString& nodeId, SceneTreeDockWidget* sceneDock,
+                                        PropertiesPanelWidget* properties, WorkbenchWindow& window)
+{
+    if (!m_scene)
+        return;
+
+    m_scene->selection().clear();
+    auto node = m_scene->nodeById(nodeId);
+    if (node)
+        m_scene->selection().add(node);
+
+    sceneDock->refresh();
+
+    if (properties)
+    {
+        update3DDetails(properties, m_scene.get(), nodeId);
+        if (node)
+            properties->setObjectDetails(QStringLiteral("Node %1").arg(node->id()), {
+                QStringLiteral("Name: %1").arg(node->name()),
+                QStringLiteral("Children: %1").arg(node->children().size()),
+                QStringLiteral("Path: %1").arg(node->pathNamesRecursive().join(QStringLiteral(" / "))),
+                QStringLiteral("Selected: yes")
+            });
+    }
+
+    if (m_services.stateCenter)
+        m_services.stateCenter->setSelectionContext(QStringLiteral("3D-Tree"), QStringLiteral("3D node: %1").arg(nodeId));
+
+    if (auto* viewport = qobject_cast<Viewport3D*>(window.centralWidget()))
+        viewport->selectNodeById(nodeId);
 }
 
 void Workbench3D::build3DToolBars(WorkbenchWindow& window)

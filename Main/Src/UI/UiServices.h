@@ -6,6 +6,7 @@
 
 class EntityDocument2D;
 class UiCommandDispatcher;
+class IInteractionDispatcher;
 class UiLayoutService;
 class UiStateCenter;
 class UiThemeService;
@@ -38,6 +39,9 @@ struct UiServices
 
     /// 命令分发器
     UiCommandDispatcher* commandDispatcher{ nullptr };
+
+    /// 交互式命令生命周期分发器
+    IInteractionDispatcher* interactionDispatcher{ nullptr };
 
     /// 撤销栈
     IUndoStack* undoStack{ nullptr };

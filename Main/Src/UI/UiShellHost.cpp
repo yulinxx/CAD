@@ -78,18 +78,11 @@ void UiShellHost::setWorkbench(UiWorkbench* workbench)
 /// 5. 显示主窗口
 void UiShellHost::initializeAndShow()
 {
-    if (!m_mainWindow)
+    if (!m_mainWindow || !m_workbench)
         return;
 
-    // 先挂接，再激活，最后显示窗口
-    if (m_workbench)
-        m_mainWindow->setWorkbench(m_workbench);
-
-    if (m_workbench)
-        m_workbench->attachToWindow(*m_mainWindow);
-
-    if (m_workbench)
-        m_workbench->activate();
+    m_workbench->attachToWindow(*m_mainWindow);
+    m_workbench->activate();
 
     m_mainWindow->setThemeChangeCallback([this](const QString& themeId) {
         if (m_themeService)
@@ -100,22 +93,7 @@ void UiShellHost::initializeAndShow()
     });
 
     m_mainWindow->setWorkbenchFactory([this](const QString& id) -> UiWorkbench* {
-        if (id == QStringLiteral("3D"))
-        {
-            if (!m_workbench3D)
-            {
-                auto wb3d = std::make_unique<Workbench3D>();
-                if (!wb3d->initialize(m_services))
-                    return m_workbench;
-                m_workbench3D = std::move(wb3d);
-            }
-            return m_workbench3D.get();
-        }
-
-        if (id == QStringLiteral("2D"))
-            return m_workbench;
-
-        return m_workbench;
+        return resolveWorkbench(id);
     });
 
     if (m_stateCenter)
@@ -124,36 +102,34 @@ void UiShellHost::initializeAndShow()
     m_mainWindow->show();
 }
 
-void UiShellHost::switchWorkbench(const QString& workbenchId)
+UiWorkbench* UiShellHost::resolveWorkbench(const QString& workbenchId)
 {
-    if (!m_mainWindow)
-        return;
+    // 2D 工作台由外部注入，直接返回
+    if (workbenchId == QStringLiteral("2D"))
+        return m_workbench;
 
-    if (m_workbench && m_workbench->id() == workbenchId)
-        return;
-
-    UiWorkbench* target = nullptr;
+    // 3D 工作台惰性创建（首次访问时初始化）
     if (workbenchId == QStringLiteral("3D"))
     {
         if (!m_workbench3D)
         {
             auto wb3d = std::make_unique<Workbench3D>();
             if (!wb3d->initialize(m_services))
-                return;
+                return m_workbench; // 初始化失败时回退到 2D
             m_workbench3D = std::move(wb3d);
         }
-        target = m_workbench3D.get();
-    }
-    else if (workbenchId == QStringLiteral("2D"))
-    {
-        target = m_workbench;
-    }
-    else
-    {
-        return;
+        return m_workbench3D.get();
     }
 
-    switchWorkbench(target);
+    // 未知工作台 ID 回退到 2D
+    return m_workbench;
+}
+
+void UiShellHost::switchWorkbench(const QString& workbenchId)
+{
+    UiWorkbench* target = resolveWorkbench(workbenchId);
+    if (target)
+        switchWorkbench(target);
 }
 
 void UiShellHost::switchWorkbench(UiWorkbench* workbench)
@@ -175,20 +151,14 @@ void UiShellHost::switchWorkbench(UiWorkbench* workbench)
 
 void UiShellHost::shutdown()
 {
-    if (m_shutdownCompleted || m_isShuttingDown)
-        return;
-    m_isShuttingDown = true;
-    m_shutdownCompleted = true;
-
-    // 退出时只清理宿主持有的指针和服务镜像，不再触碰工作台对象。
-    m_workbench = nullptr;
+    if (m_workbench)
+    {
+        m_workbench->shutdown();
+        m_workbench = nullptr;
+    }
     m_workbench3D.reset();
-    m_stateCenter = nullptr;
-    m_themeService = nullptr;
-    m_commandDispatcher = nullptr;
-    m_undoStack = nullptr;
+    m_mainWindow.reset();
     m_services = UiServices{};
-    m_isShuttingDown = false;
 }
 
 /// 获取主窗口指针

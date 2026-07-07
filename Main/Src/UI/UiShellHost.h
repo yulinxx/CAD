@@ -70,10 +70,10 @@ public:
     /// 关闭宿主并释放工作台关联
     void shutdown();
 
-    /// 是否允许在退出时触碰主窗口 UI
-    void setShutdownTouchesWindow(bool enabled);
-
 private:
+    /// 按 ID 解析工作台（惰性创建 3D 工作台）
+    UiWorkbench* resolveWorkbench(const QString& workbenchId);
+
     /// 主窗口
     std::unique_ptr<WorkbenchWindow> m_mainWindow;
     /// UI 状态中心引用
@@ -88,12 +88,6 @@ private:
     UiServices m_services;
     /// 当前工作台引用
     UiWorkbench* m_workbench{ nullptr };
-    /// 退出时是否允许触碰主窗口
-    bool m_shutdownTouchesWindow{ false };
-    /// 是否已经执行过退出清理
-    bool m_shutdownCompleted{ false };
-    /// 当前是否正在关闭
-    bool m_isShuttingDown{ false };
     /// 3D 工作台（惰性创建，宿主拥有）
     std::unique_ptr<UiWorkbench> m_workbench3D;
 };

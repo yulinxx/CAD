@@ -81,7 +81,9 @@ void RenderWidget3DAdapter::emitStatus(const QString& text)
 
 bool RenderWidget3DAdapter::initialize(void* windowHandle)
 {
-    Q_UNUSED(windowHandle);
+    // 将窗口句柄转为父控件，适配器内部据此创建 OpenGL 控件
+    if (windowHandle)
+        m_parentWidget = static_cast<QWidget*>(windowHandle);
     m_ready = ensureWidgetCreated();
     return m_ready;
 }
@@ -250,9 +252,4 @@ void RenderWidget3DAdapter::setPathCallback(PathCallback callback)
 RenderWidget3D* RenderWidget3DAdapter::widget() const
 {
     return m_renderWidget.get();
-}
-
-void RenderWidget3DAdapter::setParentWidget(QWidget* parent)
-{
-    m_parentWidget = parent;
 }

@@ -6,6 +6,9 @@
 #include "UiServices.h"
 #include "UiStateCenter.h"
 
+#include "UI2D/Operation/OperationBus.h"
+#include "UI2D/Operation/OperationId.h"
+
 void DefaultUiCommandDispatcher::bindAction(QAction* action, const QString& commandId)
 {
     if (!action)
@@ -83,6 +86,38 @@ void DefaultUiCommandDispatcher::begin(const QString& commandId)
     });
 }
 
+namespace {
+
+/// 将 QString 命令 ID（如 "2d.draw_line"）映射为 OperationId
+OperationId mapCommandIdToOperation(const QString& cmd)
+{
+    static const struct { const char* key; OperationId id; } map[] = {
+        { "2d.select",        OperationId::Tool_Select },
+        { "2d.draw_line",     OperationId::Tool_Line },
+        { "2d.draw_circle",   OperationId::Tool_Circle },
+        { "2d.draw_polyline", OperationId::Tool_Polyline },
+        { "2d.draw_arc",      OperationId::Tool_Arc },
+        { "2d.move",          OperationId::Edit_Move },
+        { "2d.copy",          OperationId::Edit_Copy },
+        { "2d.rotate",        OperationId::Edit_Rotate },
+        { "edit.undo",        OperationId::Edit_Undo },
+        { "edit.redo",        OperationId::Edit_Redo },
+        { "edit.delete",      OperationId::Edit_Delete },
+        { "edit.select_all",  OperationId::Edit_SelectAll },
+        { "view.zoom_fit",    OperationId::View_ZoomFit },
+        { "view.zoom_in",     OperationId::View_ZoomIn },
+        { "view.zoom_out",    OperationId::View_ZoomOut },
+    };
+    for (const auto& entry : map)
+    {
+        if (cmd == QLatin1String(entry.key))
+            return entry.id;
+    }
+    return OperationId::None;
+}
+
+} // anonymous namespace
+
 void DefaultUiCommandDispatcher::execute(const QString& commandId)
 {
     // P0-1: 工具切换时的生命周期顺序
@@ -92,20 +127,32 @@ void DefaultUiCommandDispatcher::execute(const QString& commandId)
         cancel();
     }
 
-    // 2. 按 commandId 查找 handler（不依赖 currentHandler）
+    // 2. 尝试通过 OperationBus 路由（非交互式操作优先）
+    auto opId = mapCommandIdToOperation(commandId);
+    if (opId != OperationId::None)
+    {
+        auto* bus = OperationBus::instance();
+        if (bus)
+        {
+            bus->run(opId);
+            return;
+        }
+    }
+
+    // 3. 按 commandId 查找 handler（不依赖 currentHandler）
     auto handler = handlerFor(commandId);
     if (handler)
     {
-        // 3. 重置 handler 到 Idle 状态
+        // 4. 重置 handler 到 Idle 状态
         handler->reset();
 
-        // 4. begin() 同步状态中心（先于 activate）
+        // 5. begin() 同步状态中心（先于 activate）
         begin(commandId);
 
-        // 5. 激活 handler
+        // 6. 激活 handler
         if (handler->activate(m_uiServices))
         {
-            // 6. 非交互式命令：直接提交
+            // 7. 非交互式命令：直接提交
             if (!handler->isInteractive())
             {
                 submit();

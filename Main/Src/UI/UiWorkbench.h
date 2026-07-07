@@ -210,6 +210,9 @@ private:
     void build3DToolBars(WorkbenchWindow& window);
     /// 初始化 3D 初始状态
     void init3DInitialState(const SceneDocument3D& scene, const QString& rootNodeId);
+    /// 场景树选择回调（提取自 build3DScenePanels 以减少闭包复杂度）
+    void onSceneTreeSelection(const QString& nodeId, SceneTreeDockWidget* sceneDock,
+                              PropertiesPanelWidget* properties, WorkbenchWindow& window);
 
 private:
     /// 3D 场景文档

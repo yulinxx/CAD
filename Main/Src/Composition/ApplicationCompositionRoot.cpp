@@ -25,6 +25,7 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     uiServices.themeService = m_themeService.get();
     uiServices.layoutService = m_layoutService.get();
     uiServices.commandDispatcher = m_commandDispatcher.get();
+    uiServices.interactionDispatcher = interactionDispatcher();
     uiServices.undoStack = m_undoStack.get();
     m_commandDispatcher->setUiServices(uiServices);
 
@@ -65,4 +66,5 @@ UiStateCenter* ApplicationCompositionRoot::stateCenter(){ return m_stateCenter.g
 UiThemeService* ApplicationCompositionRoot::themeService(){ return m_themeService.get(); }
 UiLayoutService* ApplicationCompositionRoot::layoutService(){ return m_layoutService.get(); }
 UiCommandDispatcher* ApplicationCompositionRoot::commandDispatcher(){ return m_commandDispatcher.get(); }
+IInteractionDispatcher* ApplicationCompositionRoot::interactionDispatcher(){ return dynamic_cast<IInteractionDispatcher*>(m_commandDispatcher.get()); }
 IUndoStack* ApplicationCompositionRoot::undoStack(){ return m_undoStack.get(); }

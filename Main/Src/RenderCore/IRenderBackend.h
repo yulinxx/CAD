@@ -16,6 +16,8 @@ class CameraController3D;
 struct RenderContext;
 struct RenderFrame;
 
+namespace Eg { class SceneManager; }
+
 /**
  * @file IRenderBackend.h
  * @brief 统一渲染后端抽象接口
@@ -62,8 +64,11 @@ public:
 
     // ============ 场景绑定 ============
 
-    /// 绑定 2D 场景文档
+    /// 绑定 2D 场景文档（旧版 EntityDocument2D 路径）
     virtual void setScene(EntityDocument2D* document) = 0;
+
+    /// 绑定 2D 场景（新版 Eg::SceneManager 路径）
+    virtual void setScene(Eg::SceneManager* scene) = 0;
 
     /// 绑定 3D 场景文档
     virtual void setScene(SceneDocument3D* document) = 0;

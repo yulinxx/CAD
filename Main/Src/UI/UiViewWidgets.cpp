@@ -945,18 +945,9 @@ void Viewport3D::setRenderer(std::unique_ptr<IRenderer3D> renderer)
     if (m_renderer)
         m_renderer->shutdown();
     m_renderer = std::move(renderer);
-
-    if (auto* adapter = dynamic_cast<RenderWidget3DAdapter*>(m_renderer.get()))
-    {
-        adapter->setParentWidget(this);
-        adapter->initialize();
-        if (auto* widget = adapter->widget())
-        {
-            widget->setGeometry(0, 0, width(), height());
-            widget->show();
-        }
-    }
-    
+    // 将视口自身作为窗口句柄传入，由渲染器自行处理初始化
+    if (m_renderer)
+        m_renderer->initialize(static_cast<void*>(this));
 }
 
 bool Viewport3D::initialize(void* windowHandle)

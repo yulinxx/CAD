@@ -13,6 +13,8 @@
 class EntityDocument2D;
 class SceneDocument3D;
 
+namespace Eg { class SceneManager; }
+
 /**
  * @file SceneCompiler.h
  * @brief 场景编译器抽象接口
@@ -39,26 +41,24 @@ public:
 
     // ============ 全量编译 ============
 
-    /// 全量编译 2D 场景
-    /// @param document 2D 场景文档
-    /// @param context 渲染上下文
-    /// @return 渲染帧结果
+    /// 全量编译 2D 场景（旧版 EntityDocument2D 路径）
     virtual RenderFrame compile(EntityDocument2D* document, const RenderContext& context) = 0;
 
+    /// 全量编译 2D 场景（新版 Eg::SceneManager 路径）
+    virtual RenderFrame compile(Eg::SceneManager* scene, const RenderContext& context) = 0;
+
     /// 全量编译 3D 场景
-    /// @param document 3D 场景文档
-    /// @param context 渲染上下文
-    /// @return 渲染帧结果
     virtual RenderFrame compile(SceneDocument3D* document, const RenderContext& context) = 0;
 
     // ============ 增量编译 ============
 
-    /// 增量编译（仅更新脏区域）
-    /// @param document 场景文档
-    /// @param context 渲染上下文（含 dirtyType 和 dirtyRegions）
-    /// @param previousFrame 上一帧结果（用于增量合并）
-    /// @return 增量更新后的渲染帧结果
+    /// 增量编译（仅更新脏区域，旧版 EntityDocument2D 路径）
     virtual RenderFrame compileIncremental(EntityDocument2D* document,
+                                           const RenderContext& context,
+                                           const RenderFrame& previousFrame) = 0;
+
+    /// 增量编译 2D 场景（新版 Eg::SceneManager 路径）
+    virtual RenderFrame compileIncremental(Eg::SceneManager* scene,
                                            const RenderContext& context,
                                            const RenderFrame& previousFrame) = 0;
 
@@ -77,6 +77,15 @@ public:
 
     /// 获取缓存帧号
     virtual uint64_t cachedFrameId() const = 0;
+
+    // ============ 脏实体追踪（增量编译） ============
+
+    /// 标记指定实体为脏（下次编译时仅重编译该实体及其关联批次）
+    /// @param entityId 实体 ID
+    virtual void markEntityDirty(const QString& entityId) = 0;
+
+    /// 标记所有实体为脏（强制全量编译）
+    virtual void markAllDirty() = 0;
 
     // ============ 批次查询 ============
 

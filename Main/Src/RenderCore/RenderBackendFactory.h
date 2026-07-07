@@ -16,9 +16,14 @@ class IRenderBackend;
  * 统一的后端创建入口。UI 层不要直接 new 某个具体渲染器，
  * 而是通过工厂获取抽象接口。
  *
+ * 职责单一：只做创建，不做策略膨胀。
+ * - 配置解析委托给 BackendConfigResolver
+ * - 能力查询委托给 BackendCapabilityRegistry
+ * - 字符串转换委托给 BackendCapabilityRegistry
+ *
  * 后端类型：
- * - OpenGL：跨平台 OpenGL 4.6 后端
- * - Vulkan：Vulkan 1.3 后端（预留）
+ * - OpenGL：跨平台 OpenGL 后端
+ * - Vulkan：Vulkan 后端（预留）
  * - Metal：Apple Metal 后端（预留）
  * - Software：纯 CPU 软件渲染后端（预留）
  */
@@ -33,18 +38,25 @@ public:
         Software,
     };
 
-    /// 创建指定类型的后端
     static std::unique_ptr<IRenderBackend> create(BackendType type);
 
-    /// 获取可用后端列表
     static QVector<BackendType> availableBackends();
 
-    /// 后端类型名称
     static QString backendTypeName(BackendType type);
 
-    /// 后端类型对应的能力
     static BackendCapability capabilitiesFor(BackendType type);
 
-    /// 默认后端类型（当前平台最佳选择）
     static BackendType defaultBackendType();
+
+    static BackendType fromString(const QString& name);
+
+    static QString toString(BackendType type);
+
+    static BackendType backendFromEnvironment();
+
+    static std::unique_ptr<IRenderBackend> createConfigured();
+
+private:
+    static int toRegistryType(BackendType type);
+    static BackendType fromRegistryType(int type);
 };

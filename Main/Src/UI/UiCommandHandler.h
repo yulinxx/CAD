@@ -259,6 +259,9 @@ public:
  *
  * 表示一个可以被撤销和重做的操作。
  * 命令提交时生成一个 UndoCommand 实例并压入撤销栈。
+ *
+ * @deprecated 请改用 IUndoRedoCommand (Engine/2D/Edit/IUndoRedoCommand.h)
+ *             此类型将在重构阶段 2 完成后移除。
  */
 class UndoCommand
 {
@@ -284,6 +287,9 @@ private:
  * @brief 撤销栈接口
  *
  * 管理可撤销操作的栈，支持 undo/redo 操作。
+ *
+ * @deprecated 请改用 IUndoRedoManager (Engine/2D/Edit/IUndoRedoManager.h)
+ *             此类型将在重构阶段 2 完成后移除。
  */
 class IUndoStack
 {
@@ -330,6 +336,9 @@ public:
 /**
  * @class DefaultUndoStack
  * @brief 默认撤销栈实现
+ *
+ * @deprecated 请改用 UndoRedoManager (Engine/2D/Edit/UndoRedoManager.h)
+ *             此类型将在重构阶段 2 完成后移除。
  */
 class DefaultUndoStack final : public IUndoStack
 {

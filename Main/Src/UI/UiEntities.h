@@ -8,7 +8,11 @@
 
 #include <memory>
 
-// ============================================================ 
+/**
+ * @deprecated UI 层实体基类。新功能应直接使用 Engine 层的 Eg::SyEntity / IEntity。
+ *             EntityDocument2D + UiEntity 系列将在文档模型统一后移除。
+ *             参见 Docs/refactoring-baseline.md 章节 1-2。
+ */
 class UiEntity
 {
 public:
@@ -22,7 +26,9 @@ public:
     virtual bool highlighted() const = 0;
 };
 
-// ============================================================ 
+/**
+ * @deprecated 见 UiEntity。变换操作将逐步迁移到 Engine 层。
+ */
 class ITransformable
 {
 public:
@@ -201,7 +207,12 @@ private:
     QVector<std::shared_ptr<UiEntity>> m_items;
 };
 
-// ============================================================ 
+/**
+ * @deprecated UI 层 2D 文档模型。与 Engine 层 Eg::SceneManager 职责完全重叠。
+ *             新功能禁止新增业务能力到此类型。
+ *             迁移目标: Eg::SceneManager (Engine/2D/Core/SceneManager.h)
+ *             EntityDocument2D 将在重构完成后移除。
+ */
 class EntityDocument2D
 {
 public:

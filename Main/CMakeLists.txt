@@ -155,13 +155,15 @@ endif()
 
 file(GLOB TRANSLATION_QM_FILES "${TRANSLATIONS_SRC_DIR}/*.qm")
 
-add_custom_command(TARGET ${app_name} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${TRANSLATIONS_DST_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${TRANSLATION_QM_FILES}
-        "${TRANSLATIONS_DST_DIR}/"
-    COMMENT "Copying translation .qm files to ${TRANSLATIONS_DST_DIR}"
-)
+if(TRANSLATION_QM_FILES)
+    add_custom_command(TARGET ${app_name} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${TRANSLATIONS_DST_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${TRANSLATION_QM_FILES}
+            "${TRANSLATIONS_DST_DIR}/"
+        COMMENT "Copying translation .qm files to ${TRANSLATIONS_DST_DIR}"
+    )
+endif()
 
 set(RESOURCES_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 set(RESOURCES_DST_DIR "$<TARGET_FILE_DIR:${app_name}>/resources")
@@ -217,6 +219,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             "${CMAKE_CURRENT_BINARY_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/Src"
             "${CMAKE_CURRENT_SOURCE_DIR}/Src/Common"
+            "${CMAKE_CURRENT_SOURCE_DIR}/Src/RenderCore"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Utility/Utility/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler/CrashHandler/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
@@ -239,6 +242,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             Engine3D
             RenderCommon
             Render3D
+            UiRenderCore
             UICommon
             UI2D
             UI3D
@@ -258,5 +262,6 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
     message(STATUS "[Main Tests]")
     message(STATUS "  SimpleRenderer3DTests: Renderer lifecycle, render loop, selection")
     message(STATUS "  CommandLifecycleTests: execute/cancel/submit, undo/redo, preview, selection, handlerFor")
+    message(STATUS "  RenderCoreTests: backend init/shutdown, SceneCompiler compile/incremental/cache, factory, Camera3D, Viewport3D")
     message(STATUS "")
 endif()

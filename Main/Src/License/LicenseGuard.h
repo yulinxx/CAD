@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <atomic>
 
 // ---------------------------------------------------------------
 // 散射状态校验器（替代单 bool 校验）
@@ -51,15 +52,15 @@ private:
     struct GuardState
     {
         // 主状态组 A
-        volatile uint32_t tokenA_hi = 0;
-        volatile uint32_t tokenA_lo = 0;
+        std::atomic<uint32_t> tokenA_hi{ 0 };
+        std::atomic<uint32_t> tokenA_lo{ 0 };
         // 主状态组 B
-        volatile uint32_t tokenB_hi = 0;
-        volatile uint32_t tokenB_lo = 0;
+        std::atomic<uint32_t> tokenB_hi{ 0 };
+        std::atomic<uint32_t> tokenB_lo{ 0 };
         // 交叉校验和
-        volatile uint32_t crossSum = 0;
+        std::atomic<uint32_t> crossSum{ 0 };
         // 有效期标记时间戳（防止重放）
-        volatile uint32_t timestamp = 0;
+        std::atomic<uint32_t> timestamp{ 0 };
     };
 
     static GuardState s_state;

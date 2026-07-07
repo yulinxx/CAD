@@ -18,7 +18,7 @@ CADApplicationRuntime::CADApplicationRuntime(int argc, char* argv[], const AppPa
     m_app->setOrganizationName(QString::fromStdString(MainApp::organizationName()));
     m_app->setOrganizationDomain(QString::fromStdString(MainApp::organizationDomain()));
     if (!m_appPaths.appRootPath.empty())
-        QDir::setCurrent(QString::fromStdString(m_appPaths.appRootPath));
+        QDir::setCurrent(QString::fromStdWString(m_appPaths.appRootPath));
 }
 
 CADApplicationRuntime::~CADApplicationRuntime()
@@ -35,10 +35,10 @@ int CADApplicationRuntime::run()
 
     if (IsLicenseCheckEnabled() && false)
     {
-        LicenseManager licenseMgr(m_appPaths.configDir);
+        LicenseManager licenseMgr(std::filesystem::path(m_appPaths.configDir));
         if (!licenseMgr.CheckLicense())
         {
-            LicenseDialog dlg(QString::fromStdString(m_appPaths.configDir));
+            LicenseDialog dlg(QString::fromStdWString(m_appPaths.configDir));
             if (dlg.exec() != QDialog::Accepted)
                 return -3;
         }

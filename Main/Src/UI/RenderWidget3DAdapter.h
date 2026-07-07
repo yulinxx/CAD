@@ -11,22 +11,32 @@ class CameraController3D;
 
 /**
  * @file RenderWidget3DAdapter.h
- * @brief RenderWidget3D 到 IRenderer3D 的适配器
+ * @brief RenderWidget3D 到 IRenderer3D 的适配器（过渡层）
  *
  * 将现有的 OpenGL 渲染器 RenderWidget3D 适配到统一的 IRenderer3D 接口。
- * 这样 Viewport3D 可以在 SimpleRenderer3D（软件渲染）和 RenderWidget3D（OpenGL）之间切换。
- * RenderWidget3DAdapter 负责：
- * - 将 IRenderer3D 接口调用转发到 RenderWidget3D
- * - 管理 RenderWidget3D 的生命周期
- * - 转换 SceneDocument3D 到 Eg::SceneManager3D
+ *
+ * ⚠️ 过渡期标记：此适配器是临时桥接方案。
+ * 当统一渲染链路（RenderCore）完全稳定后，此适配器将逐步退场。
+ *
+ * 退场条件：
+ * - RenderCore 统一渲染管线跑稳
+ * - 新路径成为默认渲染路线
+ * - UI 层不再依赖旧 RenderWidget3D 实现
+ *
+ * 过渡期间约束：
+ * - 不新增复杂业务逻辑
+ * - 不负责主渲染链路
+ * - 仅做接口适配和事件转发
  */
 
 /**
  * @class RenderWidget3DAdapter
- * @brief RenderWidget3D 的 IRenderer3D 适配器
+ * @brief RenderWidget3D 的 IRenderer3D 适配器（过渡层）
  *
  * 使用组合模式，内部持有 RenderWidget3D 实例，
  * 将 IRenderer3D 接口调用转换为 RenderWidget3D 的对应方法。
+ *
+ * 父窗口通过 initialize(void*) 传入，适配器负责创建内部控件。
  */
 class RenderWidget3DAdapter : public IRenderer3D
 {
@@ -70,11 +80,8 @@ public:
 
     // ========== 特殊访问器 ==========
 
-    /// 获取内部的 RenderWidget3D 实例（用于嵌入到 Qt 布局中）
+    /// 获取内部的 RenderWidget3D 实例（过渡期使用）
     RenderWidget3D* widget() const;
-
-    /// 设置父 widget（必须在 initialize 之前调用）
-    void setParentWidget(QWidget* parent);
 
 private:
     /// 创建内部渲染控件
@@ -85,7 +92,7 @@ private:
     void emitStatus(const QString& text);
 
 private:
-    /// 父 widget
+    /// 父窗口（由 initialize() 传入）
     QWidget* m_parentWidget{ nullptr };
     /// 内部 RenderWidget3D 实例
     std::unique_ptr<RenderWidget3D> m_renderWidget;
