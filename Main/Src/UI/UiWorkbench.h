@@ -14,6 +14,7 @@ class WorkbenchWindow;
 class PropertiesPanelWidget;
 class CanvasViewport2D;
 class SceneTreeDockWidget;
+class ViewWidgetAdapter;
 
 /**
  * @file UiWorkbench.h
@@ -177,6 +178,8 @@ private:
 private:
     /// 是否使用旧版 CanvasViewport2D 作为临时回退
     bool m_useLegacyCanvasViewport{ false };
+    /// ViewWidget 适配器，让 OperationBus 能在旧系统中工作
+    std::unique_ptr<class ViewWidgetAdapter> m_viewWidgetAdapter;
     /// 2D 实体文档
     std::shared_ptr<EntityDocument2D> m_document;
 };

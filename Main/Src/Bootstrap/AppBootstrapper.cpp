@@ -4,6 +4,7 @@
 #include <QString>
 
 #include "UI/UiWorkbench.h"
+#include "UI/ViewWidgetAdapter.h"
 #include "UI/WorkbenchWindow.h"
 
 AppPaths MainApp::buildAppPaths(const std::string& appName)

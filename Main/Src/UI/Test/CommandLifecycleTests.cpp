@@ -494,7 +494,7 @@ TEST(CommandLifecycleTest, RegisterHandler_OverwritesExisting)
 }
 
 // ============================================================================
-// MoveCommand 测试（新架构落地样板 P0-12）
+// MoveCommand 测试（新架构落地样板）
 // ============================================================================
 
 TEST(CommandLifecycleTest, MoveCommand_ExecuteAndSubmit)

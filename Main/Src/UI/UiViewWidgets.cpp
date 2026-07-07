@@ -18,16 +18,29 @@
 #include "Render3D/RenderWidget3D.h"
 #include "RenderCore/RenderCoreRenderer.h"
 #include "UiCommandDispatcher.h"
+#include "UiInteractionDispatcher.h"
 #include "UiEntities.h"
 #include "UiGeometryAlgorithms.h"
 #include "UiSelectionTools.h"
 #include "UiStateCenter.h"
+// 引入操作总线头文件
+#include "UI2D/Operation/OperationBus.h"
+#include "UI2D/Operation/OperationId.h"
 
 namespace
 {
     constexpr double kGridStep = 50.0;
     constexpr double kHitRadius = 10.0;
     constexpr double kLineHitTolerance = 8.0;
+
+    bool forwardActiveCommand(IInteractionDispatcher* dispatcher, QMouseEvent* event,
+        bool (IInteractionDispatcher::*forwardFn)(int, int))
+    {
+        if (!dispatcher || !dispatcher->hasActiveCommand() || !event)
+            return false;
+
+        return (dispatcher->*forwardFn)(event->x(), event->y());
+    }
 }
 
 CanvasViewport2D::CanvasViewport2D(QWidget* parent)
@@ -68,6 +81,18 @@ void CanvasViewport2D::setCommandDispatcher(UiCommandDispatcher* dispatcher)
     m_commandDispatcher = dispatcher;
 }
 
+void CanvasViewport2D::setInteractionDispatcher(IInteractionDispatcher* dispatcher)
+{
+    m_interactionDispatcher = dispatcher;
+}
+
+// 设置操作总线引用
+void CanvasViewport2D::setOperationBus(OperationBus* bus)
+{
+    m_operationBus = bus;
+}
+
+// 旧状态桥 — 后续迁移到 OperationBus 后删除
 void CanvasViewport2D::setDrawingEnabled(bool enabled)
 {
     m_toolContext.drawing = enabled;
@@ -78,6 +103,7 @@ void CanvasViewport2D::setDrawingEnabled(bool enabled)
     updateStatus(enabled ? QStringLiteral("2D draw mode") : QStringLiteral("2D select mode"));
 }
 
+// 旧状态桥 — 后续迁移到 OperationBus 后删除
 void CanvasViewport2D::setMeasureMode(bool enabled)
 {
     m_toolContext.measureMode = enabled;
@@ -130,11 +156,14 @@ void CanvasViewport2D::commitLine(const QPointF& start, const QPointF& end)
     if (m_document)
     {
         auto entity = m_document->createLine(start, end);
-        // P0-4: 选择走文档唯一事实源
+        // 选择走文档唯一事实源
         m_document->selection().clear();
         m_document->selection().add(entity);
     }
     refreshSelectionStyle();
+    // 通知 OperationBus 实体已创建（过渡期兼容）
+    if (m_operationBus)
+        m_operationBus->run(OperationId::Tool_Line, {}, OperationSource::DrawTool);
 }
 
 void CanvasViewport2D::commitPolylinePoint(const QPointF& pt)
@@ -164,7 +193,7 @@ void CanvasViewport2D::finishPolyline(const QPointF& pt)
     }
 
     auto entity = m_document->createPolyline(m_polylinePoints);
-    // P0-4: 选择走文档唯一事实源
+    // 选择走文档唯一事实源
     m_document->selection().clear();
     m_document->selection().add(entity);
     m_polylinePoints.clear();
@@ -174,6 +203,9 @@ void CanvasViewport2D::finishPolyline(const QPointF& pt)
         m_selectionCallback(QStringLiteral("2D-Commit"), QStringLiteral("polyline"));
 
     updateStatus(QStringLiteral("2D polyline committed"));
+    // 通知 OperationBus 实体已创建（过渡期兼容）
+    if (m_operationBus)
+        m_operationBus->run(OperationId::Tool_Polyline, {}, OperationSource::DrawTool);
 }
 
 void CanvasViewport2D::commitCircle(const QPointF& center, double radius)
@@ -182,11 +214,14 @@ void CanvasViewport2D::commitCircle(const QPointF& center, double radius)
     if (m_document)
     {
         auto entity = m_document->createCircle(center, radius);
-        // P0-4: 选择走文档唯一事实源
+        // 选择走文档唯一事实源
         m_document->selection().clear();
         m_document->selection().add(entity);
     }
     refreshSelectionStyle();
+    // 通知 OperationBus 实体已创建（过渡期兼容）
+    if (m_operationBus)
+        m_operationBus->run(OperationId::Tool_Circle, {}, OperationSource::DrawTool);
 }
 
 void CanvasViewport2D::commitArc(const QPointF& center, double radius, double startDeg, double spanDeg)
@@ -197,11 +232,14 @@ void CanvasViewport2D::commitArc(const QPointF& center, double radius, double st
     if (m_document)
     {
         auto entity = m_document->createArc(center, radius, startDeg, spanDeg);
-        // P0-4: 选择走文档唯一事实源
+        // 选择走文档唯一事实源
         m_document->selection().clear();
         m_document->selection().add(entity);
     }
     refreshSelectionStyle();
+    // 通知 OperationBus 实体已创建（过渡期兼容）
+    if (m_operationBus)
+        m_operationBus->run(OperationId::Tool_Arc, {}, OperationSource::DrawTool);
 }
 
 void CanvasViewport2D::refreshCopiedSelection()
@@ -213,7 +251,7 @@ void CanvasViewport2D::refreshCopiedSelection()
     if (m_copiedEntityIds.isEmpty())
         return;
 
-    // P0-4: 选择走文档唯一事实源
+    // 选择走文档唯一事实源
     m_document->selection().clear();
     for (const auto& id : m_copiedEntityIds)
     {
@@ -241,6 +279,7 @@ void CanvasViewport2D::updateStatus(const QString& text)
 
 void CanvasViewport2D::refreshFromDocument()
 {
+    // 确认只依赖文档，不依赖视口缓存
     if (!m_document)
         return;
 
@@ -275,6 +314,7 @@ void CanvasViewport2D::refreshFromDocument()
 
 void CanvasViewport2D::refreshSelectionStyle()
 {
+    // 从文档 selection 读取选中实体，统一刷新选择样式
     if (!m_document)
         return;
     for (const auto& entity : m_document->selection().items())
@@ -288,7 +328,7 @@ void CanvasViewport2D::refreshSelectionStyle()
 
 QString CanvasViewport2D::selectedEntityId() const
 {
-    // P0-4: 选择唯一事实源是 EntityDocument2D::selection()
+    // 选择唯一事实源是 EntityDocument2D::selection()
     if (!m_document || m_document->selection().empty())
         return {};
     auto items = m_document->selection().items();
@@ -297,7 +337,7 @@ QString CanvasViewport2D::selectedEntityId() const
 
 void CanvasViewport2D::deleteSelectedEntity()
 {
-    // P0-4: 从文档 selection 读取选中实体
+    // 从文档 selection 读取选中实体
     if (!m_document)
         return;
     auto selectedId = selectedEntityId();
@@ -307,11 +347,14 @@ void CanvasViewport2D::deleteSelectedEntity()
     clearSelection();
     updateStatus(QStringLiteral("2D entity deleted"));
     refreshFromDocument();
+    // 通知 OperationBus 实体已删除（过渡期兼容）
+    if (m_operationBus)
+        m_operationBus->run(OperationId::Edit_Delete, {}, OperationSource::DrawTool);
 }
 
 void CanvasViewport2D::clearSelection()
 {
-    // P0-4: 清空文档 selection，视口不再维护副本
+    // 清空文档 selection，视口不再维护副本
     if (m_document)
         m_document->selection().clear();
     m_copiedEntityIds.clear();
@@ -319,7 +362,7 @@ void CanvasViewport2D::clearSelection()
 
 void CanvasViewport2D::nudgeSelectedEndpoint(const QPointF& delta)
 {
-    // P0-4: 从文档 selection 读取
+    // 从文档 selection 读取
     if (!m_document)
         return;
     auto selectedId = selectedEntityId();
@@ -342,7 +385,7 @@ void CanvasViewport2D::selectEntityById(const QString& entityId)
 {
     if (!m_document)
         return;
-    // P0-4: 选择走文档唯一事实源
+    // 选择走文档唯一事实源
     m_document->selection().clear();
     if (auto entity = m_document->entityById(entityId))
         m_document->selection().add(entity);
@@ -351,11 +394,14 @@ void CanvasViewport2D::selectEntityById(const QString& entityId)
     updateStatus(QStringLiteral("2D entity selected"));
     if (m_selectionCallback)
         m_selectionCallback(QStringLiteral("2D-Select"), QStringLiteral("2D entity: %1").arg(entityId));
+    // 通知 OperationBus 选择已变更（过渡期兼容）
+    if (m_operationBus)
+        m_operationBus->run(OperationId::Tool_Select, {}, OperationSource::DrawTool);
 }
 
 void CanvasViewport2D::syncSelectionDetails()
 {
-    // P0-4: 从文档 selection 读取选中实体
+    // 从文档 selection 读取选中实体
     if (!m_document)
         return;
     auto selectedId = selectedEntityId();
@@ -415,7 +461,7 @@ void CanvasViewport2D::setSelectedFromHitTest(const QPointF& scenePos)
     if (!bestLineId.isEmpty())
     {
         selectEntityById(bestLineId);
-        // P0-4: 端点信息不再存储于视口，后续通过命令或工具管理
+        // 端点信息不再存储于视口，后续通过命令或工具管理
         syncSelectionDetails();
         updateStatus(QStringLiteral("2D hit %1").arg(bestLineId));
     }
@@ -423,23 +469,24 @@ void CanvasViewport2D::setSelectedFromHitTest(const QPointF& scenePos)
 
 void CanvasViewport2D::startCommand(const QString& commandId)
 {
-    // P0-3: 改为调用 execute() 而非 begin()
-    // execute() 会完成 handlerFor → reset → begin → activate 的完整流程
-    // 交互式命令激活后保持 Active 状态等待用户输入
+    // 过渡兼容层 — 旧命令系统入口
+    // 新操作应优先通过 OperationBus::run() 执行
+    // 保留此方法仅用于兼容旧工具桥
     if (m_commandDispatcher)
         m_commandDispatcher->execute(commandId);
 }
 
 void CanvasViewport2D::finishCommand(bool committed)
 {
-    // P0-3: finishCommand 仅负责调用 dispatcher 的 submit/cancel
-    // ToolContext 重置已移至各命令的 reset() 中处理
-    if (m_commandDispatcher)
+    // 过渡兼容层 — 旧命令系统入口
+    // 新操作应优先通过 OperationBus::run() 执行
+    // 保留此方法仅用于兼容旧工具桥
+    if (m_interactionDispatcher)
     {
         if (committed)
-            m_commandDispatcher->submit();
+            m_interactionDispatcher->submit();
         else
-            m_commandDispatcher->cancel();
+            m_interactionDispatcher->cancel();
     }
 
     // 过渡期：重置旧工具状态（后续各命令自己管理状态后移除）
@@ -485,17 +532,23 @@ void CanvasViewport2D::activateTransformTool(ToolContext::DrawTool tool, const Q
     updateStatus(statusText);
 }
 
+// 进入 polyline 绘制模式
+// TODO: 迁移时替换为 OperationBus::run(PolylineDraw, {})
 void CanvasViewport2D::enterPolylineMode()
 {
     m_polylinePoints.clear();
     activateDrawTool(ToolContext::DrawTool::Polyline, QStringLiteral("2d.draw_polyline"), QStringLiteral("2D polyline start"));
 }
 
+// 进入 circle 绘制模式
+// TODO: 迁移时替换为 OperationBus::run(CircleDraw, {})
 void CanvasViewport2D::enterCircleMode()
 {
     activateDrawTool(ToolContext::DrawTool::Circle, QStringLiteral("2d.draw_circle"), QStringLiteral("2D circle start"));
 }
 
+// 进入 arc 绘制模式
+// TODO: 迁移时替换为 OperationBus::run(ArcDraw, {})
 void CanvasViewport2D::enterArcMode()
 {
     activateDrawTool(ToolContext::DrawTool::Arc, QStringLiteral("2d.draw_arc"), QStringLiteral("2D arc start"));
@@ -514,36 +567,43 @@ void CanvasViewport2D::enterSelectMode()
     updateStatus(QStringLiteral("2D select mode"));
 }
 
+// TODO: 迁移时替换为 OperationBus::run(Edit_Move, {})
 void CanvasViewport2D::enterMoveMode()
 {
     activateTransformTool(ToolContext::DrawTool::Move, QStringLiteral("2d.move"), QStringLiteral("2D move start"));
 }
 
+// TODO: 迁移时替换为 OperationBus::run(Edit_Copy, {})
 void CanvasViewport2D::enterCopyMode()
 {
     activateTransformTool(ToolContext::DrawTool::Copy, QStringLiteral("2d.copy"), QStringLiteral("2D copy start"));
 }
 
+// TODO: 迁移时替换为 OperationBus::run(Edit_Rotate, {})
 void CanvasViewport2D::enterRotateMode()
 {
     activateTransformTool(ToolContext::DrawTool::Rotate, QStringLiteral("2d.rotate"), QStringLiteral("2D rotate start"));
 }
 
+// TODO: 迁移时替换为 OperationBus::run(Edit_Mirror, {})
 void CanvasViewport2D::enterMirrorMode()
 {
     activateTransformTool(ToolContext::DrawTool::Mirror, QStringLiteral("2d.mirror"), QStringLiteral("2D mirror start"));
 }
 
+// TODO: 迁移时替换为 OperationBus::run(Edit_Trim, {})
 void CanvasViewport2D::enterTrimMode()
 {
     activateTransformTool(ToolContext::DrawTool::Trim, QStringLiteral("2d.trim"), QStringLiteral("2D trim start"));
 }
 
+// TODO: 迁移时替换为 OperationBus::run(Edit_Extend, {})
 void CanvasViewport2D::enterExtendMode()
 {
     activateTransformTool(ToolContext::DrawTool::Extend, QStringLiteral("2d.extend"), QStringLiteral("2D extend start"));
 }
 
+// TODO: 迁移时替换为 OperationBus::run(Select_Box, {})
 void CanvasViewport2D::enterBoxSelectMode()
 {
     m_toolContext.tool = ToolContext::DrawTool::BoxSelect;
@@ -556,12 +616,14 @@ void CanvasViewport2D::enterBoxSelectMode()
     updateStatus(QStringLiteral("2D box select start"));
 }
 
+// TODO: 迁移时替换为 OperationBus::run(Select_Box, {}) 的开始阶段
 void CanvasViewport2D::beginBoxSelect(const QPointF& scenePos)
 {
     m_toolContext.boxSelecting = true;
     m_boxSelectStart = scenePos;
 }
 
+// TODO: 迁移时替换为 OperationBus::run(Select_Box, {}) 的更新阶段
 void CanvasViewport2D::updateBoxSelect(const QPointF& scenePos)
 {
     if (!m_toolContext.boxSelecting)
@@ -570,13 +632,14 @@ void CanvasViewport2D::updateBoxSelect(const QPointF& scenePos)
     m_scene->addRect(rect.normalized(), QPen(QColor(80, 180, 255), 1, Qt::DashLine));
 }
 
+// TODO: 迁移时替换为 OperationBus::run(Select_Box, {}) 的结束阶段
 void CanvasViewport2D::endBoxSelect(const QPointF& scenePos)
 {
     if (!m_document || !m_toolContext.boxSelecting)
         return;
 
     const QRectF rect(m_boxSelectStart, scenePos);
-    // P0-4: 选择走文档唯一事实源
+    // 选择走文档唯一事实源
     m_document->selection().clear();
 
     // 框选时同时考虑对象边界和几何主体，尽量贴近 CAD 的选择体验
@@ -693,9 +756,10 @@ void CanvasViewport2D::contextMenuEvent(QContextMenuEvent* event)
 
 void CanvasViewport2D::updateCommandPreview()
 {
-    // P0-2: 通过 ICommandHandler::preview() 通用接口获取预览数据
+    // 通过 ICommandHandler::preview() 通用接口获取预览数据
     // 视口不再依赖具体命令类（如 DrawLineCommand）
-    if (!m_commandDispatcher || !m_commandDispatcher->hasActiveCommand())
+    // 后续 OperationBus 中的 IOperation 也可通过此接口提供预览
+    if (!m_interactionDispatcher || !m_interactionDispatcher->hasActiveCommand())
     {
         if (m_previewLine)
         {
@@ -705,7 +769,7 @@ void CanvasViewport2D::updateCommandPreview()
         return;
     }
 
-    auto handler = m_commandDispatcher->currentHandler();
+    auto handler = m_interactionDispatcher->currentHandler();
     if (!handler)
         return;
 
@@ -727,19 +791,16 @@ void CanvasViewport2D::updateCommandPreview()
 
 void CanvasViewport2D::mousePressEvent(QMouseEvent* event)
 {
-    // P0-3: 事件路由优先级
-    // 1. 活动命令 → 转发给 Dispatcher（命令系统处理）
+    // 事件路由优先级（OperationBus 为主线）
+    // 1. 活动操作 → 转发给 IInteractionDispatcher（过渡期兼容层，后续统一到 OperationBus）
     // 2. 空闲态基础交互 → 中键平移、左键选择
-    // 3. 旧工具路径 → 过渡期兜底，后续逐步迁移到命令系统
+    // 3. 旧工具路径 → 过渡期兜底，后续逐步迁移到 OperationBus
 
-    // 优先级1：活动命令优先
-    if (m_commandDispatcher && m_commandDispatcher->hasActiveCommand())
+    // 优先级1：活动操作优先（过渡期通过 IInteractionDispatcher 转发）
+    if (forwardActiveCommand(m_interactionDispatcher, event, &IInteractionDispatcher::forwardMouseDown))
     {
-        if (m_commandDispatcher->forwardMouseDown(event->x(), event->y()))
-        {
-            updateCommandPreview();
-            return;
-        }
+        updateCommandPreview();
+        return;
     }
 
     const QPointF scenePos = snapPoint(mapToScene(event->pos()));
@@ -756,7 +817,7 @@ void CanvasViewport2D::mousePressEvent(QMouseEvent* event)
 
     // 空闲态左键选择（无活动命令且无旧工具激活时触发）
     if (event->button() == Qt::LeftButton
-        && (!m_commandDispatcher || !m_commandDispatcher->hasActiveCommand())
+        && (!m_interactionDispatcher || !m_interactionDispatcher->hasActiveCommand())
         && m_toolContext.tool == ToolContext::DrawTool::None)
     {
         setSelectedFromHitTest(scenePos);
@@ -766,7 +827,7 @@ void CanvasViewport2D::mousePressEvent(QMouseEvent* event)
 
     // 优先级3：旧工具路径（过渡期，仅当无活动命令时触发）
     // 已迁移命令（Line/Move/Rotate）的旧分支已删除，统一走命令系统
-    if (!m_commandDispatcher || !m_commandDispatcher->hasActiveCommand())
+    if (!m_interactionDispatcher || !m_interactionDispatcher->hasActiveCommand())
     {
         if (event->button() == Qt::LeftButton && m_toolContext.tool == ToolContext::DrawTool::Polyline)
         {
@@ -829,14 +890,11 @@ void CanvasViewport2D::mousePressEvent(QMouseEvent* event)
 
 void CanvasViewport2D::mouseMoveEvent(QMouseEvent* event)
 {
-    // P0-3: 事件路由优先级同 mousePressEvent
-    if (m_commandDispatcher && m_commandDispatcher->hasActiveCommand())
+    // 事件路由优先级同 mousePressEvent（OperationBus 为主线）
+    if (forwardActiveCommand(m_interactionDispatcher, event, &IInteractionDispatcher::forwardMouseMove))
     {
-        if (m_commandDispatcher->forwardMouseMove(event->x(), event->y()))
-        {
-            updateCommandPreview();
-            return;
-        }
+        updateCommandPreview();
+        return;
     }
 
     const QPointF scenePos = snapPoint(mapToScene(event->pos()));
@@ -853,7 +911,7 @@ void CanvasViewport2D::mouseMoveEvent(QMouseEvent* event)
 
     // 优先级3：旧工具路径（过渡期，仅当无活动命令时触发）
     // Line/Move/Rotate 已迁移到命令系统，旧分支已删除
-    if (!m_commandDispatcher || !m_commandDispatcher->hasActiveCommand())
+    if (!m_interactionDispatcher || !m_interactionDispatcher->hasActiveCommand())
     {
         if (m_toolContext.tool == ToolContext::DrawTool::Circle && m_toolContext.hasDrawStart) { addPreviewLine(m_drawStartPoint, scenePos); setCommandStage(QStringLiteral("圆预览中")); updateStatus(QStringLiteral("2D circle preview")); return; }
         if (m_toolContext.tool == ToolContext::DrawTool::Arc && m_toolContext.hasDrawStart) { addPreviewLine(m_drawStartPoint, scenePos); setCommandStage(QStringLiteral("弧预览中")); updateStatus(QStringLiteral("2D arc preview")); return; }
@@ -865,12 +923,9 @@ void CanvasViewport2D::mouseMoveEvent(QMouseEvent* event)
 
 void CanvasViewport2D::mouseReleaseEvent(QMouseEvent* event)
 {
-    // P0-3: 事件路由优先级
-    if (m_commandDispatcher && m_commandDispatcher->hasActiveCommand())
-    {
-        if (m_commandDispatcher->forwardMouseUp(event->x(), event->y()))
-            return;
-    }
+    // 事件路由优先级（OperationBus 为主线）
+    if (forwardActiveCommand(m_interactionDispatcher, event, &IInteractionDispatcher::forwardMouseUp))
+        return;
 
     // 优先级2：中键平移结束
     if (event->button() == Qt::MiddleButton && m_panning)
@@ -884,7 +939,7 @@ void CanvasViewport2D::mouseReleaseEvent(QMouseEvent* event)
     // 优先级3：旧工具路径（过渡期，仅当无活动命令时触发）
     // Line/Move/Rotate 已迁移到命令系统，旧分支已删除
     const QPointF scenePos = snapPoint(mapToScene(event->pos()));
-    if (!m_commandDispatcher || !m_commandDispatcher->hasActiveCommand())
+    if (!m_interactionDispatcher || !m_interactionDispatcher->hasActiveCommand())
     {
         if (event->button() == Qt::LeftButton && m_toolContext.tool == ToolContext::DrawTool::Circle && m_toolContext.hasDrawStart)
         {

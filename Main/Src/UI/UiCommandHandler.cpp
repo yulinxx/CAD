@@ -846,7 +846,7 @@ void RotateCommand::setDocument(EntityDocument2D* document)
 }
 
 // ============================================================================
-// MoveCommand 实现（新架构落地样板 P0-12）
+// MoveCommand 实现（新架构落地样板）
 // ============================================================================
 
 MoveCommand::MoveCommand() = default;

@@ -8,6 +8,7 @@
 
 #include "Render3D/IRenderer3D.h"
 
+class OperationBus;
 class QContextMenuEvent;
 class QGraphicsLineItem;
 class QGraphicsScene;
@@ -23,6 +24,7 @@ class SceneDocument3D;
 class SceneNode;
 class CameraController3D;
 class UiCommandDispatcher;
+class IInteractionDispatcher;
 class UiStateCenter;
 class OpenGLRenderer3D;
 
@@ -38,11 +40,16 @@ public:
     void setSelectionCallback(std::function<void(const QString&, const QString&)>&& callback);
     void setCommandStageCallback(std::function<void(const QString&)>&& callback);
     void setDocument(EntityDocument2D* document);
+    /// 获取文档
+    EntityDocument2D* document() const { return m_document; }
     void setCommandDispatcher(UiCommandDispatcher* dispatcher);
+    void setInteractionDispatcher(IInteractionDispatcher* dispatcher);
+    /// 设置操作总线引用，用于直接执行操作
+    void setOperationBus(OperationBus* bus);
     void resetView();
     void setDrawingEnabled(bool enabled);
     void setMeasureMode(bool enabled);
-    /// 获取当前选中的实体 ID（从文档 selection 读取，P0-4 唯一事实源）
+    /// 获取当前选中的实体 ID（从文档 selection 读取，唯一事实源）
     QString selectedEntityId() const;
     void deleteSelectedEntity();
     void nudgeSelectedEndpoint(const QPointF& delta);
@@ -59,29 +66,30 @@ protected:
     void contextMenuEvent(QContextMenuEvent* event) override;
 
 private:
-    // P0-3: ToolContext 是过渡期桥接结构，后续逐步迁移到命令系统后移除
-    // 仅保留 pure UI 状态（如 panning），其余全部迁移到 ICommandHandler
+    // ToolContext 是过渡期桥接结构，后续逐步迁移到 OperationBus 后移除
+    // 仅保留 pure UI 状态（如 panning），其余全部迁移到 IOperation
     //
     // 旧工具桥迁移清单（按优先级排列）：
-    //   P1（高频，优先迁移）：
-    //     - Line      → DrawLineCommand（已迁移 ✓，旧桥仅兜底）
-    //     - Move      → MoveCommand（已迁移 ✓，旧桥仅兜底）
-    //     - Rotate    → RotateCommand（已迁移 ✓，旧桥仅兜底）
-    //     - BoxSelect → 待并入 SelectCommand
-    //   P2（中频）：
-    //     - Copy      → 待创建 CopyCommand
-    //     - Circle    → 待创建 CircleCommand
-    //     - Polyline  → 待创建 PolylineCommand
-    //   P3（低频）：
-    //     - Arc       → 待创建 ArcCommand
-    //     - Mirror    → 待创建 MirrorCommand
-    //     - Trim      → 待创建 TrimCommand
-    //     - Extend    → 待创建 ExtendCommand
+    //   已迁移（OperationBus 有对应 OperationId）：
+    //     - Line      → Tool_Line（OperationBus 已注册 ✓，旧桥仅兜底）
+    //     - Move      → Edit_Move（OperationBus 已注册 ✓，旧桥仅兜底）
+    //     - Rotate    → Edit_Rotate（OperationBus 已注册 ✓，旧桥仅兜底）
+    //     - Copy      → Edit_Copy（OperationBus 已注册 ✓，旧桥仅兜底）
+    //     - Delete    → Edit_Delete（OperationBus 已注册 ✓，旧桥仅兜底）
+    //     - SelectAll → Edit_SelectAll（OperationBus 已注册 ✓，旧桥仅兜底）
+    //   待迁移（OperationBus 有 OperationId，但未接入视口）：
+    //     - Polyline  → Tool_Polyline
+    //     - Circle    → Tool_Circle
+    //     - Arc       → Tool_Arc
+    //     - Mirror    → Edit_MirrorH / Edit_MirrorV
+    //     - Trim      → 待创建 TrimOperation
+    //     - Extend    → 待创建 ExtendOperation
+    //     - BoxSelect → 待并入 SelectTool
     //
     // 迁移原则：
-    //   新命令只走新生命周期（execute → activate → isComplete → submit）
+    //   新操作只走 OperationBus::run()
     //   旧工具桥只做兼容，不新增逻辑
-    //   每迁移一个命令，删掉旧桥对应分支
+    //   每迁移一个操作，删掉旧桥对应分支
     struct ToolContext
     {
         enum class DrawTool
@@ -161,7 +169,10 @@ private:
     QVector<QPointF> m_polylinePoints;
     EntityDocument2D* m_document{ nullptr };
     UiCommandDispatcher* m_commandDispatcher{ nullptr };
-    // P0-4: 选择状态唯一来源是 EntityDocument2D::selection()
+    IInteractionDispatcher* m_interactionDispatcher{ nullptr };
+    /// 操作总线引用，新操作优先通过此入口执行
+    OperationBus* m_operationBus{ nullptr };
+    // 选择状态唯一来源是 EntityDocument2D::selection()
     // 视口不再维护 m_selectedEntityId / m_selectedEndpoint 副本
     QStringList m_copiedEntityIds;
 };

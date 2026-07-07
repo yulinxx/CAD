@@ -27,7 +27,7 @@ class UiLayoutService;
  * 定义了 UI 命令分发器接口，负责管理命令的执行生命周期。
  * 支持命令处理器注册、交互式命令、撤销/重做等功能。
  *
- * 统一命令生命周期协议（P0-1）：
+ * 统一命令生命周期协议：
  *   execute(commandId)
  *     → handlerFor(commandId)          // 按 ID 查找 handler，不依赖 currentHandler
  *     → handler->reset()               // 重置到 Idle 状态
@@ -39,7 +39,7 @@ class UiLayoutService;
  *   或
  *     → cancel()                       // 取消 + 清理（不进栈）
  *
- * 接口契约（P0-10）：
+ * 接口契约：
  *   execute()     → 创建/准备命令上下文，不直接做最终提交，不负责UI细节
  *   handlerFor()  → 负责把输入路由到正确handler，不做业务判断
  *   begin()       → 初始化命令状态，同步状态中心，标记busy

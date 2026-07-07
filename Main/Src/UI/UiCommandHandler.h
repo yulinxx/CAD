@@ -26,7 +26,7 @@ class ITransformable;
  * - 命令（Command）：一次意图执行，负责生命周期管理（activate/commit/cancel）和业务提交
  * - 工具（Tool）：命令的交互载体，负责事件处理（拾点、预览、拖拽、约束）
  *
- * 统一命令生命周期协议（P0-1）：
+ * 统一命令生命周期协议：
  *   execute(commandId)
  *     → handlerFor(commandId)          // 按 ID 查找 handler，不依赖 currentHandler
  *     → handler->reset()               // 重置到 Idle 状态
@@ -123,7 +123,7 @@ enum class CommandState
  * @brief 命令预览数据，视口通过此结构体获取预览信息，无需感知具体命令类型
  *
  * 设计目标：让视口不再依赖具体命令类（如 DrawLineCommand），
- * 通过统一接口获取预览几何数据，实现视口与命令的解耦（P0-2）。
+ * 通过统一接口获取预览几何数据，实现视口与命令的解耦。
  */
 struct CommandPreview
 {
@@ -146,7 +146,7 @@ struct CommandPreview
  * - 用户输入事件先到达命令，再转发给当前活动的工具
  * - 工具完成阶段后，通知命令进行状态转换或提交
  *
- * 接口契约（P0-10）：
+ * 接口契约：
  *   execute()     → 创建/准备命令上下文，不直接做最终提交，不负责UI细节
  *   handlerFor()  → 负责把输入事件路由到正确handler，不做业务判断
  *   begin()       → 初始化命令状态，同步状态中心，标记busy
@@ -157,7 +157,7 @@ struct CommandPreview
  *   cancel()      → 取消业务逻辑，不进栈，清理临时状态
  *   reset()       → 清理所有临时状态，确保下次可重入
  *
- * Undo 语义边界（P0-5）：
+ * Undo 语义边界：
  * - 绘图命令（DrawLine 等）：必须可 undo，commit() 后压栈
  * - 变换命令（Rotate 等）：必须可 undo，commit() 后压栈
  * - 选择命令（Select）：可 undo，commit() 后压栈
@@ -166,7 +166,7 @@ struct CommandPreview
  * - 预览阶段不进栈
  * - submit() 失败时（createUndoCommand 返回 nullptr）不进栈
  *
- * 状态机与视图刷新边界（P0-11）：
+ * 状态机与视图刷新边界：
  * - commit() 后统一发刷新信号（由 Dispatcher::submit() 统一触发）
  * - 选择变化统一发选择变更信号（由 EntityDocument2D::selection() 统一管理）
  * - 预览变化只刷新预览层（通过 CommandPreview 接口，不影响文档）
@@ -248,7 +248,7 @@ public:
     virtual bool isComplete() const { return false; }
 
     /// 获取命令预览数据
-    /// 视口通过此方法获取预览几何，无需知道具体命令类型（P0-2）
+    /// 视口通过此方法获取预览几何，无需知道具体命令类型
     /// @return 预览数据结构体
     virtual CommandPreview preview() const { return {}; }
 };
@@ -548,7 +548,7 @@ private:
 
 /**
  * @class MoveCommand
- * @brief 移动命令（新架构落地样板 P0-12）
+ * @brief 移动命令（新架构落地样板）
  *
  * 完整展示命令生命周期：execute → activate → 事件 → isComplete → submit → undo → reset
  *

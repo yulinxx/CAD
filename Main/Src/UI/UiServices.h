@@ -11,6 +11,7 @@ class UiLayoutService;
 class UiStateCenter;
 class UiThemeService;
 class IUndoStack;
+class OperationBus;
 
 /**
  * @file UiServices.h
@@ -45,6 +46,9 @@ struct UiServices
 
     /// 撤销栈
     IUndoStack* undoStack{ nullptr };
+
+    /// 操作总线（新操作主线）
+    OperationBus* operationBus{ nullptr };
 
     /// 2D 文档（命令系统需要访问文档进行实体操作）
     EntityDocument2D* document2D{ nullptr };

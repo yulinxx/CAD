@@ -194,6 +194,13 @@ private:
 };
 
 // ============================================================ 
+/**
+ * @brief 选择集容器
+ *
+ * 短期事实源 — 当前 UI 层选择状态以此为准。
+ * 长期目标：迁移到 Eg::SceneManager + Engine 层实体选择模型。
+ * 视口不再维护选择副本，所有选择读写均通过此容器。
+ */
 class SelectionSet
 {
 public:
@@ -212,6 +219,10 @@ private:
  *             新功能禁止新增业务能力到此类型。
  *             迁移目标: Eg::SceneManager (Engine/2D/Core/SceneManager.h)
  *             EntityDocument2D 将在重构完成后移除。
+ *
+ * 短期选择事实源 — selection() 作为 UI 层唯一选择状态来源。
+ * 长期目标：迁移到 Eg::SceneManager 的选择模型。
+ * 视口、属性面板、状态中心均从此处读取选择状态。
  */
 class EntityDocument2D
 {

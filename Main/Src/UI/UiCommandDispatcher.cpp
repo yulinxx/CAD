@@ -120,7 +120,7 @@ OperationId mapCommandIdToOperation(const QString& cmd)
 
 void DefaultUiCommandDispatcher::execute(const QString& commandId)
 {
-    // P0-1: 工具切换时的生命周期顺序
+    // 工具切换时的生命周期顺序
     // 1. 若有活动命令，先取消（不进 undo 栈）
     if (hasActiveCommand())
     {
@@ -181,7 +181,7 @@ void DefaultUiCommandDispatcher::execute(const QString& commandId)
 
 void DefaultUiCommandDispatcher::submit()
 {
-    // P0-1: submit() 是命令生命周期的唯一提交点
+    // submit() 是命令生命周期的唯一提交点
     // 1. 调用 handler->commit() 执行业务提交
     // 2. 创建 undo command 并压入撤销栈
     // 3. 清理状态中心和 handler
@@ -191,7 +191,7 @@ void DefaultUiCommandDispatcher::submit()
         // commit() 只调用一次，由 submit() 统一负责
         handler->commit();
 
-        // P0-5: 只有 createUndoCommand() 返回非空时才压栈
+        // 只有 createUndoCommand() 返回非空时才压栈
         // 纯视图命令（Zoom/Pan）返回 nullptr，不进栈
         if (m_undoStack)
         {
@@ -339,7 +339,7 @@ bool DefaultUiCommandDispatcher::forwardMouseDown(int x, int y)
 
     bool handled = handler->onMouseDown(x, y);
 
-    // P0-1: 事件转发后检测命令是否完成，若完成则自动提交
+    // 事件转发后检测命令是否完成，若完成则自动提交
     if (handler->isComplete())
     {
         submit();
@@ -365,7 +365,7 @@ bool DefaultUiCommandDispatcher::forwardMouseUp(int x, int y)
 
     bool handled = handler->onMouseUp(x, y);
 
-    // P0-1: 鼠标释放后检测命令是否完成
+    // 鼠标释放后检测命令是否完成
     if (handler->isComplete())
     {
         submit();
@@ -382,7 +382,7 @@ bool DefaultUiCommandDispatcher::forwardKeyPress(int key)
 
     bool handled = handler->onKeyPress(key);
 
-    // P0-1: 按键后检测命令是否完成（如 Enter 确认、Esc 取消等）
+    // 按键后检测命令是否完成（如 Enter 确认、Esc 取消等）
     if (handler->isComplete())
     {
         submit();

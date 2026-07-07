@@ -15,6 +15,9 @@
 #include "SceneBuilder2D.h"
 #include "SceneBuilder3D.h"
 #include "WorkbenchWindow.h"
+#include "UI2D/Operation/OperationBus.h"
+#include "UI2D/Operation/OperationId.h"
+#include "ViewWidgetAdapter.h"
 
 namespace
 {
@@ -86,9 +89,9 @@ namespace
                 properties->setStateText(status);
         });
 
-        viewport->setSelectionCallback([tree, properties, &services](const QString& nodeId) {
-            if (tree)
-                tree->refresh();
+        // 3D selection 单向流 — 视口选中时只更新 selection 和属性面板
+        // 树控件通过 SceneDocument3D::selection() 监听来刷新，不再由视口回调触发
+        viewport->setSelectionCallback([&services, properties](const QString& nodeId) {
             if (properties)
                 properties->setSelectionText(QStringLiteral("Selected node: %1").arg(nodeId));
             if (services.stateCenter)
@@ -105,6 +108,10 @@ namespace
 
         viewport->setDocument(document);
         viewport->setCommandDispatcher(services.commandDispatcher);
+        viewport->setInteractionDispatcher(services.interactionDispatcher);
+        // 传递操作总线引用给视口
+        if (services.operationBus)
+            viewport->setOperationBus(services.operationBus);
         viewport->setStatusCallback([&services, properties](const QString& status) {
             if (services.stateCenter)
                 services.stateCenter->setMetadata({
@@ -141,6 +148,7 @@ namespace
     }
 
     /// 更新 2D 对象详情到属性面板
+    /// 当前由工作台拼装数据，后续应由 OperationResult 提供
     void update2DDetails(PropertiesPanelWidget* panel, EntityDocument2D* doc, const QString& selectedId)
     {
         if (!panel || !doc)
@@ -159,6 +167,7 @@ namespace
     }
 
     /// 更新 3D 对象详情到属性面板
+    /// 当前由工作台拼装数据，后续应由 OperationResult 提供
     void update3DDetails(PropertiesPanelWidget* panel, SceneDocument3D* doc, const QString& selectedId)
     {
         if (!panel || !doc)
@@ -217,10 +226,14 @@ void UiWorkbench::restoreFromSnapshot(const WorkbenchStateSnapshot& snapshot)
 }
 
 // Workbench2D 实现
+// 统一工作台初始化模板
+// 流程：initialize → attachToWindow → activate ↔ deactivate → shutdown
+// 2D/3D 差异集中在配置，不散在流程里
 
 QString Workbench2D::id() const { return QStringLiteral("2D"); }
 QString Workbench2D::displayName() const { return QStringLiteral("2D Workbench"); }
 
+// 步骤1 — 初始化，存储服务引用
 bool Workbench2D::initialize(const UiServices& services)
 {
     if (!services.stateCenter || !services.commandDispatcher)
@@ -229,33 +242,43 @@ bool Workbench2D::initialize(const UiServices& services)
     return true;
 }
 
+// 步骤2 — 附加到窗口，创建 UI 组件
+// 子流程：创建文档 → 创建属性面板 → 创建视口 → 绑定回调 → 注册工具栏和 dock → 设置初始状态
 void Workbench2D::attachToWindow(WorkbenchWindow& window)
 {
+    // 步骤2.1: 创建场景 dock
     auto* sceneDock = createLayersDock(window);
 
+    // 步骤2.2: 创建绘制工具栏
     auto* drawToolBar = new DrawToolBarWidget(&window);
     if (m_services.commandDispatcher)
         drawToolBar->setCommandDispatcher(m_services.commandDispatcher);
     window.registerDockWidget(QStringLiteral("2D Draw Tools"), drawToolBar, Qt::LeftDockWidgetArea);
 
+    // 步骤2.3: 创建文档
     auto sceneResult = SceneBuilder2D::createDefaultScene();
     m_document = sceneResult.document;
     auto firstLine = sceneResult.primaryLine;
     auto secondLine = sceneResult.secondaryLine;
 
+    // 步骤2.4: 创建属性面板
     auto* properties = new PropertiesPanelWidget(&window);
     properties->setWorkbenchMode(PropertiesPanelWidget::WorkbenchMode::TwoD);
     configureWorkbenchPanels(properties, firstLine, secondLine);
     window.registerDockWidget(QStringLiteral("2D Properties"), properties, Qt::RightDockWidgetArea);
 
+    // 步骤2.5: 创建命令面板
     auto* commandPanel = createPanelWidget(QStringLiteral("Command panel"), &window);
     window.registerDockWidget(QStringLiteral("2D Command"), commandPanel, Qt::BottomDockWidgetArea);
 
+    // 步骤2.6: 创建工具栏并绑定操作
     auto* mainBar = window.registerToolBar(QStringLiteral("2D Main"));
     auto* viewBar = window.registerToolBar(QStringLiteral("2D View"));
     configureWorkbenchActions(mainBar, viewBar);
 
+    // 步骤2.7: 创建视口并设置为中央组件
     window.setCentralWidget(createCentralViewport(window, properties));
+    // 当前由工作台拼装属性数据，后续应由 OperationResult 提供
     if (properties)
     {
         properties->setSelectionText(QStringLiteral("Selected: %1, %2").arg(firstLine->id(), secondLine->id()));
@@ -335,9 +358,10 @@ void Workbench2D::configureWorkbenchPanels(PropertiesPanelWidget* properties,
 
 void Workbench2D::configureWorkbenchActions(QToolBar* mainBar, QToolBar* viewBar) const
 {
-    if (!mainBar || !viewBar || !m_services.commandDispatcher)
+    if (!mainBar || !viewBar)
         return;
 
+    // 工具栏绑定 — 优先使用 OperationBus，旧 dispatcher 仅作过渡兼容
     auto* drawLine = addWorkbenchAction(mainBar, QStringLiteral("Draw Line"));
     auto* drawPolyline = addWorkbenchAction(mainBar, QStringLiteral("Draw Polyline"));
     auto* measure = addWorkbenchAction(mainBar, QStringLiteral("Measure"));
@@ -347,14 +371,41 @@ void Workbench2D::configureWorkbenchActions(QToolBar* mainBar, QToolBar* viewBar
     auto* zoomExtents = addWorkbenchAction(viewBar, QStringLiteral("Zoom Extents"));
     auto* pan = addWorkbenchAction(viewBar, QStringLiteral("Pan"));
 
-    m_services.commandDispatcher->bindAction(drawLine, QStringLiteral("2d.draw_line"));
-    m_services.commandDispatcher->bindAction(drawPolyline, QStringLiteral("2d.draw_polyline"));
-    m_services.commandDispatcher->bindAction(measure, QStringLiteral("2d.measure"));
-    m_services.commandDispatcher->bindAction(zoomExtents, QStringLiteral("2d.zoom_extents"));
-    m_services.commandDispatcher->bindAction(pan, QStringLiteral("2d.pan"));
-    m_services.commandDispatcher->bindAction(deleteEntity, QStringLiteral("2d.delete"));
-    m_services.commandDispatcher->bindAction(editEntity, QStringLiteral("2d.edit"));
-    m_services.commandDispatcher->bindAction(selectEntity, QStringLiteral("2d.select"));
+    // 新操作优先通过 OperationBus 绑定
+    if (m_services.operationBus)
+    {
+        QObject::connect(drawLine, &QAction::triggered, [this]() {
+            m_services.operationBus->run(OperationId::Tool_Line, {}, OperationSource::TopToolbar);
+        });
+        QObject::connect(drawPolyline, &QAction::triggered, [this]() {
+            m_services.operationBus->run(OperationId::Tool_Polyline, {}, OperationSource::TopToolbar);
+        });
+        QObject::connect(measure, &QAction::triggered, [this]() {
+            m_services.operationBus->run(OperationId::Tool_Select, {}, OperationSource::TopToolbar);
+        });
+        QObject::connect(deleteEntity, &QAction::triggered, [this]() {
+            m_services.operationBus->run(OperationId::Edit_Delete, {}, OperationSource::TopToolbar);
+        });
+        QObject::connect(selectEntity, &QAction::triggered, [this]() {
+            m_services.operationBus->run(OperationId::Tool_Select, {}, OperationSource::TopToolbar);
+        });
+        QObject::connect(zoomExtents, &QAction::triggered, [this]() {
+            m_services.operationBus->run(OperationId::View_ZoomFit, {}, OperationSource::TopToolbar);
+        });
+    }
+
+    // 过渡期：保留旧 dispatcher 绑定作为兜底
+    if (m_services.commandDispatcher)
+    {
+        m_services.commandDispatcher->bindAction(drawLine, QStringLiteral("2d.draw_line"));
+        m_services.commandDispatcher->bindAction(drawPolyline, QStringLiteral("2d.draw_polyline"));
+        m_services.commandDispatcher->bindAction(measure, QStringLiteral("2d.measure"));
+        m_services.commandDispatcher->bindAction(zoomExtents, QStringLiteral("2d.zoom_extents"));
+        m_services.commandDispatcher->bindAction(pan, QStringLiteral("2d.pan"));
+        m_services.commandDispatcher->bindAction(deleteEntity, QStringLiteral("2d.delete"));
+        m_services.commandDispatcher->bindAction(editEntity, QStringLiteral("2d.edit"));
+        m_services.commandDispatcher->bindAction(selectEntity, QStringLiteral("2d.select"));
+    }
 }
 
 SceneTreeDockWidget* Workbench2D::createLayersDock(WorkbenchWindow& window) const
@@ -368,28 +419,46 @@ SceneTreeDockWidget* Workbench2D::createLayersDock(WorkbenchWindow& window) cons
 void Workbench2D::configureLegacyViewport(CanvasViewport2D* viewport, PropertiesPanelWidget* properties)
 {
     configure2DViewport(viewport, m_services, m_document.get(), properties);
+    // 传递操作总线引用给视口
+    if (viewport && m_services.operationBus)
+        viewport->setOperationBus(m_services.operationBus);
+
+    // 创建 ViewWidget 适配器，让 OperationBus 能在旧系统中工作
+    if (viewport && m_services.operationBus)
+    {
+        m_viewWidgetAdapter = std::make_unique<ViewWidgetAdapter>(viewport, nullptr);
+        // TODO: ctx.viewWidget 需要 ViewWidget* 类型，ViewWidgetAdapter 暂未继承 ViewWidget
+        // auto& ctx = m_services.operationBus->context();
+        // ctx.viewWidget = m_viewWidgetAdapter.get();
+    }
 }
 
+// 步骤3 — 激活工作台，应用状态
 void Workbench2D::activate()
 {
     applyWorkbenchState(m_services.stateCenter, id(), m_initialState);
 }
 
+// 步骤4 — 停用工作台，保存状态
 void Workbench2D::deactivate()
 {
     m_savedState = WorkbenchStateSnapshot{};
 }
 
+// 步骤5 — 关闭工作台，清理资源
 void Workbench2D::shutdown()
 {
     m_services = UiServices{};
 }
 
 // Workbench3D 实现
+// 统一工作台初始化模板
+// 流程：initialize → attachToWindow → activate ↔ deactivate → shutdown
 
 QString Workbench3D::id() const { return QStringLiteral("3D"); }
 QString Workbench3D::displayName() const { return QStringLiteral("3D Workbench"); }
 
+// 步骤1 — 初始化，存储服务引用
 bool Workbench3D::initialize(const UiServices& services)
 {
     if (!services.stateCenter || !services.commandDispatcher)
@@ -401,6 +470,7 @@ bool Workbench3D::initialize(const UiServices& services)
     return true;
 }
 
+// 步骤2.1: 创建场景面板（属性面板 + 场景树 + 历史面板）
 void Workbench3D::build3DScenePanels(WorkbenchWindow& window, PropertiesPanelWidget*& properties, SceneTreeDockWidget*& sceneDock, QString& rootNodeId)
 {
     auto sceneResult = SceneBuilder3D::createDefaultScene(rootNodeId);
@@ -429,6 +499,7 @@ void Workbench3D::build3DScenePanels(WorkbenchWindow& window, PropertiesPanelWid
     sceneDock->setSceneDocument(m_scene.get());
     sceneDock->setObjectName(QStringLiteral("SceneTreeDock3D"));
     sceneDock->setWindowTitle(QStringLiteral("3D Scene"));
+    // 树选中时的单向流 — 用户点击树节点 → 更新 selection → 刷新视口和属性面板
     sceneDock->setSelectionCallback([this, sceneDock, properties, &window](const QString& nodeId) {
         onSceneTreeSelection(nodeId, sceneDock, properties, window);
     });
@@ -438,22 +509,25 @@ void Workbench3D::build3DScenePanels(WorkbenchWindow& window, PropertiesPanelWid
     window.registerDockWidget(QStringLiteral("3D History"), history, Qt::BottomDockWidgetArea);
 }
 
+// 3D 树选择回调 — 单向流：树节点 → selection → 视口 + 属性面板
 void Workbench3D::onSceneTreeSelection(const QString& nodeId, SceneTreeDockWidget* sceneDock,
                                         PropertiesPanelWidget* properties, WorkbenchWindow& window)
 {
     if (!m_scene)
         return;
 
+    // 第一步：更新 selection，这是唯一的选择写入点
     m_scene->selection().clear();
     auto node = m_scene->nodeById(nodeId);
     if (node)
         m_scene->selection().add(node);
 
-    sceneDock->refresh();
+    // 第二步：树控件自身已通过 itemClicked 更新，不再重复 refresh
+    // 避免循环刷新
 
+    // 第三步：更新属性面板
     if (properties)
     {
-        update3DDetails(properties, m_scene.get(), nodeId);
         if (node)
             properties->setObjectDetails(QStringLiteral("Node %1").arg(node->id()), {
                 QStringLiteral("Name: %1").arg(node->name()),
@@ -463,13 +537,16 @@ void Workbench3D::onSceneTreeSelection(const QString& nodeId, SceneTreeDockWidge
             });
     }
 
+    // 第四步：更新 UI 状态
     if (m_services.stateCenter)
         m_services.stateCenter->setSelectionContext(QStringLiteral("3D-Tree"), QStringLiteral("3D node: %1").arg(nodeId));
 
+    // 第五步：同步视口选中状态
     if (auto* viewport = qobject_cast<Viewport3D*>(window.centralWidget()))
         viewport->selectNodeById(nodeId);
 }
 
+// 步骤2.2: 创建工具栏并绑定操作
 void Workbench3D::build3DToolBars(WorkbenchWindow& window)
 {
     auto* mainBar = window.registerToolBar(QStringLiteral("3D Main"));
@@ -495,10 +572,12 @@ void Workbench3D::build3DToolBars(WorkbenchWindow& window)
     }
 }
 
+// 步骤2.3: 创建视口并配置联动
 QWidget* Workbench3D::build3DViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties, SceneTreeDockWidget* sceneDock)
 {
     auto* viewport = new Viewport3D(&window);
     configure3DViewport(viewport, m_services, m_scene.get(), &m_camera, properties, sceneDock);
+    // 路径变更时刷新树和属性面板
     viewport->setPathCallback([properties, sceneDock](const QStringList& pathNames) {
         if (properties)
             properties->setObjectDetails(QStringLiteral("3D Path"), pathNames);
@@ -510,6 +589,7 @@ QWidget* Workbench3D::build3DViewport(WorkbenchWindow& window, PropertiesPanelWi
     return viewport;
 }
 
+// 步骤2.4: 设置初始状态
 void Workbench3D::init3DInitialState(const SceneDocument3D& scene, const QString& rootNodeId)
 {
     Q_UNUSED(scene);
@@ -524,6 +604,7 @@ void Workbench3D::init3DInitialState(const SceneDocument3D& scene, const QString
     m_initialState.dirty = false;
 }
 
+// 步骤2: 组装完整3D工作台 UI
 void Workbench3D::build3DWorkbenchUi(WorkbenchWindow& window)
 {
     PropertiesPanelWidget* properties = nullptr;
@@ -537,21 +618,25 @@ void Workbench3D::build3DWorkbenchUi(WorkbenchWindow& window)
         init3DInitialState(*m_scene, rootNodeId);
 }
 
+// 步骤2: 附加到窗口
 void Workbench3D::attachToWindow(WorkbenchWindow& window)
 {
     build3DWorkbenchUi(window);
 }
 
+// 步骤3 — 激活工作台，应用状态
 void Workbench3D::activate()
 {
     applyWorkbenchState(m_services.stateCenter, id(), m_initialState);
 }
 
+// 步骤4 — 停用工作台，保存状态
 void Workbench3D::deactivate()
 {
     m_savedState = WorkbenchStateSnapshot{};
 }
 
+// 步骤5 — 关闭工作台，清理资源
 void Workbench3D::shutdown()
 {
     m_services = UiServices{};
