@@ -25,8 +25,14 @@ set(SANYI_ROOT "${PROJECT_SOURCE_DIR}" CACHE INTERNAL "SanYi CAD project root")
 include("${SANYI_ROOT}/CMake/SanYiPaths.cmake")
 include("${SANYI_ROOT}/CMake/Utils.cmake")
 
-# 禁用 Qt6 查找 WrapVulkanHeaders 的警告 
-set(Vulkan_INCLUDE_DIR "" CACHE INTERNAL "Suppress WrapVulkanHeaders warning")
+# 可选: 启用 Vulkan 支持 (从 vcpkg 获取)
+find_package(Vulkan QUIET)
+if(Vulkan_FOUND)
+    message(STATUS "  Vulkan: FOUND (${Vulkan_INCLUDE_DIRS})")
+    add_compile_definitions(SANYI_VULKAN_ENABLED)
+else()
+    message(STATUS "  Vulkan: NOT found (optional, Vulkan backend will be unavailable)")
+endif()
 
 message(STATUS "")
 message(STATUS "==========================================")

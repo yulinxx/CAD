@@ -9,7 +9,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-MouseInteractionAdapter::MouseInteractionAdapter(CanvasViewport2D* viewport)
+MouseInteractionAdapter::MouseInteractionAdapter(Viewport2D* viewport)
     : m_viewport(viewport)
 {
 }

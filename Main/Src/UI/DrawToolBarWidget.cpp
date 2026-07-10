@@ -79,13 +79,11 @@ void DrawToolBarWidget::createToolButtons()
     };
 
     QList<ToolInfo> tools = {
-        { QStringLiteral("2d.select"),      QStringLiteral("选择"), QStringLiteral("选择工具"),    QStringLiteral("V") },
-        { QStringLiteral("2d.draw_line"),   QStringLiteral("直线"), QStringLiteral("绘制直线"),    QStringLiteral("L") },
-        { QStringLiteral("2d.draw_circle"), QStringLiteral("圆"),   QStringLiteral("绘制圆"),      QStringLiteral("C") },
-        { QStringLiteral("2d.draw_polyline"), QStringLiteral("多段线"), QStringLiteral("绘制多段线"), QStringLiteral("PL") },
-        { QStringLiteral("2d.move"),        QStringLiteral("移动"), QStringLiteral("移动对象"),    QStringLiteral("M") },
-        { QStringLiteral("2d.copy"),        QStringLiteral("复制"), QStringLiteral("复制对象"),    QStringLiteral("CO") },
-        { QStringLiteral("2d.rotate"),      QStringLiteral("旋转"), QStringLiteral("旋转对象"),    QStringLiteral("RO") },
+        { QStringLiteral("2d.select"),      tr("Select"),     tr("Select Tool"),    QStringLiteral("V") }, // 选择
+        { QStringLiteral("2d.draw_line"),   tr("Line"),       tr("Draw Line"),    QStringLiteral("L") }, // 直线
+        { QStringLiteral("2d.draw_circle"), tr("Circle"),     tr("Draw Circle"),  QStringLiteral("C") }, // 圆
+        { QStringLiteral("2d.draw_polyline"), tr("Polyline"), tr("Draw Polyline"), QStringLiteral("PL") }, // 多段线
+        { QStringLiteral("2d.move"),        tr("Move"),       tr("Move Object"),  QStringLiteral("M") }, // 移动
     };
 
     for (const auto& tool : tools)
@@ -94,7 +92,7 @@ void DrawToolBarWidget::createToolButtons()
         button->setCheckable(true);
         button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
         button->setText(tool.displayName);
-        button->setToolTip(QStringLiteral("%1 (%2)").arg(tool.tooltip, tool.shortcut));
+        button->setToolTip(tr("%1 (%2)").arg(tool.tooltip, tool.shortcut)); // %1=工具提示, %2=快捷键
         button->setProperty("toolId", tool.id);
         button->setProperty("shortcut", tool.shortcut);
 

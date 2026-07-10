@@ -26,24 +26,12 @@ class QButtonGroup;
 class QGroupBox;
 class QCheckBox;
 class QDialogButtonBox;
-class EntityDocument2D;
+class SceneDocument2D;
 
-/**
- * @brief TransformDialog 适配器 — 通用变换参数输入层
- *
- * 这是一个轻量级适配器，将参数收集逻辑封装为 ITransformInputProvider 接口，
- * 使得 Move / Copy / Rotate / Mirror 等操作可以复用同一套参数输入逻辑。
- *
- * 设计目标：
- * - 让 Operation 不直接依赖 UI
- * - 让参数收集和参数使用分离
- * - 支持多种输入方式（对话框、鼠标交互、脚本）
- * - 支持参数验证和预览
- */
 class TransformDialogAdapter : public ITransformInputProvider
 {
 public:
-    explicit TransformDialogAdapter(EntityDocument2D* document, QWidget* parent = nullptr);
+    explicit TransformDialogAdapter(SceneDocument2D* document, QWidget* parent = nullptr);
     ~TransformDialogAdapter() override = default;
 
     /**
@@ -158,7 +146,7 @@ private:
     void updatePreview(const TransformParameters& params);
 
 private:
-    EntityDocument2D* m_document{ nullptr };
+    SceneDocument2D* m_document{ nullptr };
     QWidget* m_parent{ nullptr };
     TransformType m_transformType{ TransformType::Move };
     TransformParameters m_parameters;

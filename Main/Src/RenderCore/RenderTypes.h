@@ -2,52 +2,75 @@
 
 #include "RenderCoreApi.h"
 
-#include <QString>
-#include <QVector>
-#include <QPointF>
-#include <QRectF>
 #include <cstdint>
 #include <chrono>
+#include <string>
+#include <vector>
 
-/**
- * @file RenderTypes.h
- * @brief 统一渲染抽象层的共享数据类型
- *
- * 这些类型贯穿整个渲染管线：从场景编译到后端渲染再到帧输出。
- * 所有渲染后端（OpenGL / Vulkan / Metal / 软件）都使用同一套数据结构。
- */
-
-// ============================================================================
-// 渲染模式
-// ============================================================================
-
-/// 渲染模式枚举
-enum class RenderMode : uint8_t
+struct RenderPointF
 {
-    Wireframe,   ///< 线框模式
-    Shaded,      ///< 着色模式
-    Solid,       ///< 实体模式
-    XRay,        ///< X 光透视模式
+    double x{ 0.0 };
+    double y{ 0.0 };
 };
 
-/// 渲染模式名称转换
-inline QString renderModeName(RenderMode mode)
+struct RenderRectF
+{
+    double x{ 0.0 };
+    double y{ 0.0 };
+    double width{ 0.0 };
+    double height{ 0.0 };
+
+    bool isValid() const { return width > 0 && height > 0; }
+
+    bool isNull() const { return width == 0 && height == 0; }
+
+    bool intersects(const RenderRectF& other) const
+    {
+        if (!isValid() || !other.isValid())
+            return false;
+        return (x < other.x + other.width) &&
+               (x + width > other.x) &&
+               (y < other.y + other.height) &&
+               (y + height > other.y);
+    }
+};
+
+struct ImageBuffer
+{
+    int width{ 0 };
+    int height{ 0 };
+    int channels{ 4 };
+    std::vector<uint8_t> data;
+};
+
+struct Size2D
+{
+    int width{ 0 };
+    int height{ 0 };
+
+    bool isValid() const { return width > 0 && height > 0; }
+};
+
+enum class RenderMode : uint8_t
+{
+    Wireframe,
+    Shaded,
+    Solid,
+    XRay,
+};
+
+inline const char* renderModeName(RenderMode mode)
 {
     switch (mode)
     {
-    case RenderMode::Wireframe: return QStringLiteral("Wireframe");
-    case RenderMode::Shaded:    return QStringLiteral("Shaded");
-    case RenderMode::Solid:     return QStringLiteral("Solid");
-    case RenderMode::XRay:      return QStringLiteral("XRay");
-    default:                    return QStringLiteral("Unknown");
+    case RenderMode::Wireframe: return "Wireframe";
+    case RenderMode::Shaded:    return "Shaded";
+    case RenderMode::Solid:     return "Solid";
+    case RenderMode::XRay:      return "XRay";
+    default:                    return "Unknown";
     }
 }
 
-// ============================================================================
-// 渲染图元类型
-// ============================================================================
-
-/// 图元类型
 enum class PrimitiveType : uint8_t
 {
     Points        = 0,
@@ -58,7 +81,6 @@ enum class PrimitiveType : uint8_t
     TriangleStrip = 5,
 };
 
-/// 顶点数据
 struct RenderVertex
 {
     float x{ 0.0f };
@@ -70,122 +92,78 @@ struct RenderVertex
     float a{ 1.0f };
 };
 
-/// 渲染批次
 struct RenderBatch
 {
-    /// 图元类型
     PrimitiveType primitiveType{ PrimitiveType::Lines };
-    /// 顶点数据
-    QVector<RenderVertex> vertices;
-    /// 线宽
+    std::vector<RenderVertex> vertices;
     float lineWidth{ 1.0f };
-    /// 点大小
     float pointSize{ 1.0f };
-    /// 所属实体 ID（用于选择高亮）
-    QString entityId;
-    /// 是否选中
+    std::string entityId;
     bool selected{ false };
-    /// 包围盒（用于视锥裁剪）
-    QRectF boundingBox;
+    RenderRectF boundingBox;
 
-    /// 顶点数量
-    int vertexCount() const { return vertices.size(); }
-    /// 是否为空批次
-    bool empty() const { return vertices.isEmpty(); }
+    int vertexCount() const { return static_cast<int>(vertices.size()); }
+    bool empty() const { return vertices.empty(); }
 };
 
-// ============================================================================
-// 渲染统计
-// ============================================================================
-
-/// 帧渲染统计
 struct RenderStatistics
 {
-    /// 帧号
     uint64_t frameId{ 0 };
-    /// 帧时间戳
     std::chrono::steady_clock::time_point timestamp;
 
-    /// 绘制调用次数
     int drawCallCount{ 0 };
-    /// 顶点总数
     int totalVertexCount{ 0 };
-    /// 实体总数
     int entityCount{ 0 };
-    /// 批次数
     int batchCount{ 0 };
-    /// 被裁剪的批次数
     int culledBatchCount{ 0 };
 
-    /// 帧渲染耗时（毫秒）
     float frameTimeMs{ 0.0f };
-    /// 场景编译耗时（毫秒）
     float compileTimeMs{ 0.0f };
 
-    /// GPU 内存使用量（字节）
     size_t gpuMemoryBytes{ 0 };
 
-    /// 生成描述字符串
-    QString description() const
+    std::string description() const
     {
-        return QStringLiteral("Frame %1 | %2 draws | %3 verts | %4 ents | %5 ms")
-            .arg(frameId)
-            .arg(drawCallCount)
-            .arg(totalVertexCount)
-            .arg(entityCount)
-            .arg(frameTimeMs, 0, 'f', 2);
+        return "Frame " + std::to_string(frameId)
+            + " | " + std::to_string(drawCallCount) + " draws"
+            + " | " + std::to_string(totalVertexCount) + " verts"
+            + " | " + std::to_string(entityCount) + " ents"
+            + " | " + std::to_string(frameTimeMs) + " ms";
     }
 };
 
-// ============================================================================
-// 覆盖层信息
-// ============================================================================
-
-/// 覆盖层文本项
 struct OverlayTextItem
 {
-    QString text;
-    QPointF position;
+    std::string text;
+    RenderPointF position;
     float r{ 1.0f };
     float g{ 1.0f };
     float b{ 1.0f };
     float a{ 1.0f };
 };
 
-/// 覆盖层信息
 struct RenderOverlay
 {
-    /// 文本覆盖层
-    QVector<OverlayTextItem> texts;
-    /// 视图中心十字线是否可见
+    std::vector<OverlayTextItem> texts;
     bool crosshairVisible{ false };
-    /// 网格是否可见
     bool gridVisible{ false };
-    /// 状态栏文本
-    QString statusText;
-    /// 坐标显示文本
-    QString coordinateText;
+    std::string statusText;
+    std::string coordinateText;
 };
 
-// ============================================================================
-// 脏区域
-// ============================================================================
-
-/// 脏区域标记
 struct DirtyRegion
 {
-    QRectF rect;
+    RenderRectF rect;
     uint64_t frameId{ 0 };
 };
 
-/// 脏区域类型
 enum class DirtyRegionType : uint8_t
 {
     None       = 0,
-    Transform  = 1 << 0,   ///< 变换变化
-    Geometry   = 1 << 1,   ///< 几何变化
-    Selection  = 1 << 2,   ///< 选择变化
-    View       = 1 << 3,   ///< 视图变化
+    Transform  = 1 << 0,
+    Geometry   = 1 << 1,
+    Selection  = 1 << 2,
+    View       = 1 << 3,
     All        = Transform | Geometry | Selection | View,
 };
 
@@ -199,22 +177,17 @@ inline bool hasDirtyFlag(DirtyRegionType flags, DirtyRegionType flag)
     return (static_cast<uint8_t>(flags) & static_cast<uint8_t>(flag)) != 0;
 }
 
-// ============================================================================
-// 后端能力
-// ============================================================================
-
-/// 后端能力标志
 enum class BackendCapability : uint32_t
 {
     None                = 0,
-    HardwareAccelerated = 1 << 0,   ///< 硬件加速
-    MultiViewport       = 1 << 1,   ///< 多视口
-    InstancedRendering  = 1 << 2,   ///< 实例化渲染
-    ComputeShader       = 1 << 3,   ///< 计算着色器
-    RayTracing          = 1 << 4,   ///< 光线追踪
-    AntiAliasing        = 1 << 5,   ///< 抗锯齿
-    HighDPI             = 1 << 6,   ///< 高 DPI
-    OffscreenRendering  = 1 << 7,   ///< 离屏渲染
+    HardwareAccelerated = 1 << 0,
+    MultiViewport       = 1 << 1,
+    InstancedRendering  = 1 << 2,
+    ComputeShader       = 1 << 3,
+    RayTracing          = 1 << 4,
+    AntiAliasing        = 1 << 5,
+    HighDPI             = 1 << 6,
+    OffscreenRendering  = 1 << 7,
 };
 
 inline BackendCapability operator|(BackendCapability a, BackendCapability b)

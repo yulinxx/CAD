@@ -3,7 +3,7 @@
  * @brief TransformDialog 适配器实现
  */
 #include "TransformDialogAdapter.h"
-#include "UiEntities.h"
+#include "SceneDocument2D.h"
 
 #include <QDialog>
 #include <QVBoxLayout>
@@ -20,7 +20,7 @@
 #include <QPushButton>
 #include <QMessageBox>
 
-TransformDialogAdapter::TransformDialogAdapter(EntityDocument2D* document, QWidget* parent)
+TransformDialogAdapter::TransformDialogAdapter(SceneDocument2D* document, QWidget* parent)
     : m_document(document), m_parent(parent)
 {
 }

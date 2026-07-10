@@ -266,6 +266,7 @@ private:
         /// 属性面板
         PropertiesPanelWidget* propertiesDock{ nullptr };
     } m_panelState;
+
     /// 注册的停靠面板列表
     std::vector<QDockWidget*> m_registeredDocks;
     /// 注册的工具栏列表

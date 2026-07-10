@@ -4,11 +4,11 @@
 #include "RenderFrame.h"
 #include "RenderContext.h"
 
-#include <QList>
-#include <QRectF>
-#include <QSet>
-#include <QString>
+#include <vector>
+#include <set>
+#include <string>
 #include <chrono>
+#include <unordered_map>
 
 /**
  * @file BatchManager.h
@@ -45,14 +45,14 @@ public:
 
     /// 合并增量批次（移除脏实体批次，添加新批次）
     RenderFrame mergeIncremental(const RenderFrame& cachedFrame,
-                                 const QList<RenderBatch>& newBatches,
-                                 const QSet<QString>& dirtyEntityIds);
+                                 const std::vector<RenderBatch>& newBatches,
+                                 const std::set<std::string>& dirtyEntityIds);
 
     /// 按图元类型分组，返回起始索引列表
-    QVector<int> groupByPrimitiveType(const RenderFrame& frame) const;
+    std::vector<int> groupByPrimitiveType(const RenderFrame& frame) const;
 
     /// 视口裁剪
-    RenderFrame cullByViewport(const RenderFrame& frame, const QRectF& viewportRect) const;
+    RenderFrame cullByViewport(const RenderFrame& frame, const RenderRectF& viewportRect) const;
 
     /// 填充帧统计信息
     void fillStatistics(RenderFrame& frame, const RenderContext& context,

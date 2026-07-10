@@ -5,7 +5,7 @@
 #include "BackendCapabilityRegistry.h"
 #include "BackendConfigResolver.h"
 
-#include <QDebug>
+#include <string>
 
 // ============================================================================
 // 类型转换辅助函数
@@ -49,7 +49,7 @@ RenderBackendFactory::BackendType RenderBackendFactory::fromRegistryType(int typ
 std::unique_ptr<IRenderBackend> RenderBackendFactory::create(BackendType type)
 {
     BackendCapability capabilities = capabilitiesFor(type);
-    QString name = backendTypeName(type);
+    std::string name = backendTypeName(type);
     return std::make_unique<DefaultRenderBackend>(name, capabilities);
 }
 
@@ -57,18 +57,18 @@ std::unique_ptr<IRenderBackend> RenderBackendFactory::create(BackendType type)
 // 委托给 BackendCapabilityRegistry 的方法
 // ============================================================================
 
-QVector<RenderBackendFactory::BackendType> RenderBackendFactory::availableBackends()
+std::vector<RenderBackendFactory::BackendType> RenderBackendFactory::availableBackends()
 {
     auto& registry = BackendCapabilityRegistry::instance();
-    QVector<BackendType> result;
+    std::vector<BackendType> result;
     for (int type : registry.availableBackends())
     {
-        result.append(fromRegistryType(type));
+        result.push_back(fromRegistryType(type));
     }
     return result;
 }
 
-QString RenderBackendFactory::backendTypeName(BackendType type)
+std::string RenderBackendFactory::backendTypeName(BackendType type)
 {
     return BackendCapabilityRegistry::instance().nameFor(toRegistryType(type));
 }
@@ -78,13 +78,13 @@ BackendCapability RenderBackendFactory::capabilitiesFor(BackendType type)
     return BackendCapabilityRegistry::instance().capabilitiesFor(toRegistryType(type));
 }
 
-RenderBackendFactory::BackendType RenderBackendFactory::fromString(const QString& name)
+RenderBackendFactory::BackendType RenderBackendFactory::fromString(const std::string& name)
 {
     int registryType = BackendCapabilityRegistry::instance().fromName(name);
     return fromRegistryType(registryType);
 }
 
-QString RenderBackendFactory::toString(BackendType type)
+std::string RenderBackendFactory::toString(BackendType type)
 {
     return backendTypeName(type);
 }
@@ -109,6 +109,5 @@ std::unique_ptr<IRenderBackend> RenderBackendFactory::createConfigured()
 {
     int registryType = BackendConfigResolver::instance().resolveBackendType();
     BackendType type = fromRegistryType(registryType);
-    qDebug() << "[RenderBackendFactory] 创建后端:" << toString(type);
     return create(type);
 }

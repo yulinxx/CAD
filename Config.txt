@@ -74,7 +74,6 @@ if(EXISTS "${Qt_INSTALL_DIR}")
         set(ENV{PATH} "${_SANYI_QT_BIN};${_SANYI_VCPKG_BIN};$ENV{PATH}")
         set(QT_PLUGIN_PATH "${Qt_INSTALL_DIR}/plugins" CACHE PATH "Qt plugins directory")
         
-        set(CMAKE_AUTOMOC_MOC_EXECUTABLE "C:/Users/xx/Qt/5.15.2/msvc2019_64/bin/moc.exe" CACHE PATH "MOC executable")
-        set(CMAKE_AUTORCC_RCC_EXECUTABLE "C:/Users/xx/Qt/5.15.2/msvc2019_64/bin/rcc.exe" CACHE PATH "RCC executable")
+        # Qt6 的 MOC/RCC 由 Qt6::moc / Qt6::rcc 目标自动管理，无需手动指定路径
     endif()
 endif()

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RenderFrame.h"
+#include "RenderTypes.h"
 #include "UiCamera3D.h"
 
 #include <QPainter>
@@ -28,7 +29,7 @@ class SoftwareRenderer
 public:
     /// 将渲染帧绘制到 QPainter
     void render(QPainter& painter, const RenderFrame& frame, const UiCamera3D& camera,
-                const QSize& viewportSize);
+                const Size2D& viewportSize);
 
 private:
     /// 绘制 3D 批次（使用 Camera3D 投影）

@@ -2,8 +2,8 @@
 
 #include "BackendCapabilityRegistry.h"
 
-#include <QProcessEnvironment>
-#include <QDebug>
+#include <cstdlib>
+#include <string>
 
 // ============================================================================
 // 全局后端类型定义（与 BackendCapabilityRegistry 保持一致）
@@ -38,13 +38,10 @@ BackendConfigResolver::BackendType BackendConfigResolver::resolveBackendType() c
 
 BackendConfigResolver::BackendType BackendConfigResolver::fromEnvironment() const
 {
-    const auto env = QProcessEnvironment::systemEnvironment();
-    const QString backendName = env.value(QStringLiteral("SAN_YI_RENDER_BACKEND"));
-    if (!backendName.isEmpty())
+    const char* envValue = std::getenv("SAN_YI_RENDER_BACKEND");
+    if (envValue && envValue[0] != '\0')
     {
-        BackendType type = BackendCapabilityRegistry::instance().fromName(backendName);
-        qDebug() << "[BackendConfigResolver] 从环境变量 SAN_YI_RENDER_BACKEND 读取后端配置:"
-                 << backendName << "→" << BackendCapabilityRegistry::instance().nameFor(type);
+        BackendType type = BackendCapabilityRegistry::instance().fromName(envValue);
         return type;
     }
     return 0;
@@ -59,7 +56,7 @@ BackendConfigResolver::BackendType BackendConfigResolver::defaultBackendType() c
 #endif
 }
 
-QString BackendConfigResolver::resolveBackendName() const
+std::string BackendConfigResolver::resolveBackendName() const
 {
     BackendType type = resolveBackendType();
     return BackendCapabilityRegistry::instance().nameFor(type);

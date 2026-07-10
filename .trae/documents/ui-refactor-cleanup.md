@@ -234,7 +234,7 @@ virtual IStatusBar* customStatusBar() const = 0;
 ### 4. 选择、几何、工具职责外置
 - `UiGeometryAlgorithms` 专注纯几何计算，例如点到线段投影、旋转、镜像。
 - `UiSelectionTools` 专注选择集相关动作：修剪、延伸、变换、复制。
-- `CanvasViewport2D` 逐步退回为输入事件和视图投影层，避免继续堆积业务逻辑。
+- `Viewport2D` 逐步退回为输入事件和视图投影层，避免继续堆积业务逻辑。
 - 这样做的好处是：几何可以单独复用，工具行为可以单独收口，视口不会继续膨胀。
 
 ### 5. 工作台切换链的稳定化过程

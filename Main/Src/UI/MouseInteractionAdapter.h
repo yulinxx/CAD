@@ -12,7 +12,7 @@
 #include "TransformInputProvider.h"
 #include <QPointF>
 
-class CanvasViewport2D;
+class Viewport2D;
 
 class MouseInteractionAdapter : public ITransformInputProvider
 {
@@ -27,7 +27,7 @@ public:
         Cancelled
     };
 
-    explicit MouseInteractionAdapter(CanvasViewport2D* viewport);
+    explicit MouseInteractionAdapter(Viewport2D* viewport);
     ~MouseInteractionAdapter() override = default;
 
     TransformParameters getParameters() override;
@@ -56,7 +56,7 @@ private:
     void resetState();
 
 private:
-    CanvasViewport2D* m_viewport{ nullptr };
+    Viewport2D* m_viewport{ nullptr };
     TransformType m_transformType{ TransformType::Move };
     TransformParameters m_parameters;
     State m_state{ State::Idle };

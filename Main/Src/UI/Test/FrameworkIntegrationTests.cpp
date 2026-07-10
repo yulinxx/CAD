@@ -22,6 +22,10 @@
 #include "RenderCore/IRenderBackend.h"
 #include "RenderCore/UiCamera3D.h"
 #include "UI/UiEntities.h"
+#include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/SyEntity/SyLine.h"
+#include "Engine2D/SyEntity/SyCircle.h"
+#include "Ut/Vec.h"
 
 // ============================================================================
 // 启动/关闭集成测试
@@ -80,22 +84,28 @@ TEST(FrameworkIntegrationTest, Startup_Sequence)
 TEST(FrameworkIntegrationTest, Switch_2DSceneSwitch)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc1;
-    doc1.createLine(QPointF(0, 0), QPointF(100, 100));
+
+    Eg::SceneManager scene1;
+    auto line1 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    scene1.addEntity(line1.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    RenderFrame frame1 = compiler.compile(&doc1, ctx);
+    RenderFrame frame1 = compiler.compile(&scene1, ctx);
     EXPECT_EQ(frame1.batchCount(), 1);
     EXPECT_EQ(frame1.entityCount(), 1);
 
-    EntityDocument2D doc2;
-    doc2.createCircle(QPointF(50, 50), 30.0);
+    Eg::SceneManager scene2;
+    auto circle2 = std::make_unique<Eg::SyCircle>();
+    circle2->basePoint = Ut::Vec2d(50, 50);
+    circle2->dRadius = 30.0;
+    scene2.addEntity(circle2.release());
 
     compiler.invalidateCache();
-    RenderFrame frame2 = compiler.compile(&doc2, ctx);
+    RenderFrame frame2 = compiler.compile(&scene2, ctx);
     EXPECT_EQ(frame2.batchCount(), 1);
     EXPECT_EQ(frame2.entityCount(), 1);
 }
@@ -155,22 +165,28 @@ TEST(FrameworkIntegrationTest, Switch_BackendSwitchStability)
 TEST(FrameworkIntegrationTest, DirtyUpdate_SingleEntityDirty)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
-    auto line = doc.createLine(QPointF(0, 0), QPointF(100, 100));
+
+    Eg::SceneManager scene;
+    auto line = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    auto lineId = line->id;
+    scene.addEntity(line.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    RenderFrame frame1 = compiler.compile(&doc, ctx);
+    RenderFrame frame1 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame1.batchCount(), 1);
 
-    line->translate(QPointF(50, 50));
-    compiler.markEntityDirty(line->id());
+    auto* entity = scene.findEntityById(lineId);
+    ASSERT_NE(entity, nullptr);
+    entity->transform(Ut::Mat3d::translate(50, 50));
+    compiler.markEntityDirty(QString::number(lineId));
     ctx.clearDirty();
     ctx.advanceFrame();
 
-    RenderFrame frame2 = compiler.compile(&doc, ctx);
+    RenderFrame frame2 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame2.batchCount(), 1);
     EXPECT_NE(frame2.frameId, frame1.frameId);
 }
@@ -178,26 +194,40 @@ TEST(FrameworkIntegrationTest, DirtyUpdate_SingleEntityDirty)
 TEST(FrameworkIntegrationTest, DirtyUpdate_MultipleEntitiesDirty)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
-    auto line1 = doc.createLine(QPointF(0, 0), QPointF(100, 100));
-    auto line2 = doc.createLine(QPointF(200, 200), QPointF(300, 300));
-    auto circle = doc.createCircle(QPointF(50, 50), 20.0);
+
+    Eg::SceneManager scene;
+
+    auto l1 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    auto id1 = l1->id;
+    scene.addEntity(l1.release());
+
+    auto l2 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(200, 200), Ut::Vec2d(300, 300) });
+    auto id2 = l2->id;
+    scene.addEntity(l2.release());
+
+    auto c = std::make_unique<Eg::SyCircle>();
+    c->basePoint = Ut::Vec2d(50, 50);
+    c->dRadius = 20.0;
+    auto cid = c->id;
+    scene.addEntity(c.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    RenderFrame frame1 = compiler.compile(&doc, ctx);
+    RenderFrame frame1 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame1.batchCount(), 3);
 
-    line1->translate(QPointF(10, 10));
-    circle->setRadius(30.0);
+    scene.findEntityById(id1)->transform(Ut::Mat3d::translate(10, 10));
+    static_cast<Eg::SyCircle*>(scene.findEntityById(cid))->dRadius = 30.0;
 
-    compiler.markEntityDirty(line1->id());
-    compiler.markEntityDirty(circle->id());
+    compiler.markEntityDirty(QString::number(id1));
+    compiler.markEntityDirty(QString::number(cid));
     ctx.clearDirty();
 
-    RenderFrame frame2 = compiler.compile(&doc, ctx);
+    RenderFrame frame2 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame2.batchCount(), 3);
     EXPECT_TRUE(compiler.hasCachedFrame());
 }
@@ -205,21 +235,29 @@ TEST(FrameworkIntegrationTest, DirtyUpdate_MultipleEntitiesDirty)
 TEST(FrameworkIntegrationTest, DirtyUpdate_MarkAllDirty)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
-    doc.createLine(QPointF(0, 0), QPointF(100, 100));
-    doc.createCircle(QPointF(50, 50), 25.0);
+
+    Eg::SceneManager scene;
+
+    auto line = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    scene.addEntity(line.release());
+
+    auto circle = std::make_unique<Eg::SyCircle>();
+    circle->basePoint = Ut::Vec2d(50, 50);
+    circle->dRadius = 25.0;
+    scene.addEntity(circle.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    compiler.compile(&doc, ctx);
+    compiler.compile(&scene, ctx);
     EXPECT_TRUE(compiler.hasCachedFrame());
 
     compiler.markAllDirty();
     ctx.clearDirty();
 
-    RenderFrame frame = compiler.compile(&doc, ctx);
+    RenderFrame frame = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame.batchCount(), 2);
     EXPECT_GT(frame.statistics.compileTimeMs, 0);
 }
@@ -373,24 +411,34 @@ TEST(FrameworkIntegrationTest, DualScreen_IndependentCameras)
 TEST(FrameworkIntegrationTest, FullPipeline_2DWithEntities)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
 
-    doc.createLine(QPointF(0, 0), QPointF(100, 100));
-    doc.createLine(QPointF(50, 50), QPointF(150, 50));
-    doc.createCircle(QPointF(100, 100), 40.0);
+    Eg::SceneManager scene;
+
+    auto l1 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    scene.addEntity(l1.release());
+
+    auto l2 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(50, 50), Ut::Vec2d(150, 50) });
+    scene.addEntity(l2.release());
+
+    auto c = std::make_unique<Eg::SyCircle>();
+    c->basePoint = Ut::Vec2d(100, 100);
+    c->dRadius = 40.0;
+    scene.addEntity(c.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    RenderFrame frame = compiler.compile(&doc, ctx);
+    RenderFrame frame = compiler.compile(&scene, ctx);
     EXPECT_TRUE(frame.valid);
     EXPECT_EQ(frame.batchCount(), 3);
     EXPECT_GT(frame.totalVertexCount(), 0);
     EXPECT_GT(frame.statistics.compileTimeMs, 0);
 
     ctx.clearDirty();
-    RenderFrame cachedFrame = compiler.compile(&doc, ctx);
+    RenderFrame cachedFrame = compiler.compile(&scene, ctx);
     EXPECT_TRUE(cachedFrame.valid);
     EXPECT_EQ(cachedFrame.batchCount(), 3);
     EXPECT_LT(cachedFrame.statistics.compileTimeMs, 0.01);
@@ -417,21 +465,27 @@ TEST(FrameworkIntegrationTest, FullPipeline_3DWithNodes)
 TEST(FrameworkIntegrationTest, FullPipeline_SelectionFeedback)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
-    auto line = doc.createLine(QPointF(0, 0), QPointF(100, 100));
+
+    Eg::SceneManager scene;
+    auto line = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    auto lineId = line->id;
+    scene.addEntity(line.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    RenderFrame frame1 = compiler.compile(&doc, ctx);
+    RenderFrame frame1 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame1.batchCount(), 1);
     EXPECT_FALSE(frame1.batches[0].selected);
 
-    doc.selection().add(line);
+    auto* storedEntity = scene.findEntityById(lineId);
+    ASSERT_NE(storedEntity, nullptr);
+    scene.selectEntity(storedEntity);
 
     compiler.invalidateCache();
-    RenderFrame frame2 = compiler.compile(&doc, ctx);
+    RenderFrame frame2 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame2.batchCount(), 1);
     EXPECT_TRUE(frame2.batches[0].selected);
 }

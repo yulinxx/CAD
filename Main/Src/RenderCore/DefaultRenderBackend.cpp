@@ -1,13 +1,12 @@
 #include "DefaultRenderBackend.h"
 
-#include <QDebug>
 #include <chrono>
 
 // ============================================================================
 // 构造/析构
 // ============================================================================
 
-DefaultRenderBackend::DefaultRenderBackend(QString name, BackendCapability caps)
+DefaultRenderBackend::DefaultRenderBackend(std::string name, BackendCapability caps)
     : m_name(std::move(name))
     , m_capabilities(caps)
 {
@@ -20,7 +19,7 @@ DefaultRenderBackend::DefaultRenderBackend(QString name, BackendCapability caps)
 
 bool DefaultRenderBackend::initialize(void* nativeWindowHandle)
 {
-    Q_UNUSED(nativeWindowHandle);
+    (void)nativeWindowHandle;
     m_ready = true;
     m_context.markDirty();
     return true;
@@ -55,23 +54,9 @@ const RenderContext& DefaultRenderBackend::context() const
 // 场景绑定
 // ============================================================================
 
-void DefaultRenderBackend::setScene(EntityDocument2D* document)
-{
-    m_document2D = document;
-    m_scene = nullptr;
-    m_context.markDirty();
-}
-
 void DefaultRenderBackend::setScene(Eg::SceneManager* scene)
 {
     m_scene = scene;
-    m_document2D = nullptr;
-    m_context.markDirty();
-}
-
-void DefaultRenderBackend::setScene(SceneDocument3D* document)
-{
-    m_document3D = document;
     m_context.markDirty();
 }
 
@@ -100,7 +85,6 @@ void DefaultRenderBackend::submitFrame(const RenderFrame& frame)
 
 void DefaultRenderBackend::render()
 {
-    // 占位后端不做实际渲染
 }
 
 void DefaultRenderBackend::beginFrame()
@@ -119,7 +103,7 @@ void DefaultRenderBackend::endFrame()
 // 视口控制
 // ============================================================================
 
-void DefaultRenderBackend::resize(const QSize& size)
+void DefaultRenderBackend::resize(const Size2D& size)
 {
     m_context.viewportSize = size;
     m_context.markDirty();
@@ -159,9 +143,14 @@ RenderMode DefaultRenderBackend::renderMode() const
 // 帧输出
 // ============================================================================
 
-QImage DefaultRenderBackend::captureFrame() const
+ImageBuffer DefaultRenderBackend::captureFrame() const
 {
-    return QImage(m_context.viewportSize, QImage::Format_ARGB32);
+    ImageBuffer result;
+    result.width = m_context.viewportSize.width;
+    result.height = m_context.viewportSize.height;
+    result.channels = 4;
+    result.data.resize(result.width * result.height * 4);
+    return result;
 }
 
 RenderStatistics DefaultRenderBackend::getStatistics() const
@@ -173,7 +162,7 @@ RenderStatistics DefaultRenderBackend::getStatistics() const
 // 后端信息
 // ============================================================================
 
-QString DefaultRenderBackend::backendName() const
+std::string DefaultRenderBackend::backendName() const
 {
     return m_name;
 }

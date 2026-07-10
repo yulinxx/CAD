@@ -1,109 +1,85 @@
 #include "UiSelectionTools.h"
 
-#include <memory>
-
-#include "UiEntities.h"
+#include "SceneDocument2D.h"
 #include "UiGeometryAlgorithms.h"
 #include "UiStateCenter.h"
 
+#include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/SyEntity/SyLine.h"
+#include "Engine2D/SyEntity/SyCircle.h"
+#include "Engine2D/SyEntity/SyArc.h"
+#include "Mat/Mat.hpp"
+
+#include <memory>
+
 namespace UiSelectionTools
 {
-    namespace
-    {
-        std::shared_ptr<UiEntity> cloneAndTranslate(const std::shared_ptr<UiEntity>& entity, const QPointF& delta)
-        {
-            if (!entity)
-                return {};
-
-            if (auto line = std::dynamic_pointer_cast<LineEntity2D>(entity))
-                return std::make_shared<LineEntity2D>(line->id(), line->start() + delta, line->end() + delta);
-            if (auto circle = std::dynamic_pointer_cast<CircleEntity2D>(entity))
-                return std::make_shared<CircleEntity2D>(circle->id(), circle->center() + delta, circle->radius());
-            if (auto polyline = std::dynamic_pointer_cast<PolylineEntity2D>(entity))
-            {
-                auto pts = polyline->points();
-                for (auto& pt : pts)
-                    pt += delta;
-                return std::make_shared<PolylineEntity2D>(polyline->id(), pts);
-            }
-            return {};
-        }
-    }
-
-    void trimSelectedByPoint(EntityDocument2D* document, const QPointF& point, UiStateCenter* stateCenter)
+    void trimSelectedByPoint(SceneDocument2D* document, const QPointF& point, UiStateCenter* stateCenter)
     {
         if (!document)
             return;
-        for (const auto& line : document->lines())
+        auto* sm = document->sceneManager();
+        if (!sm) return;
+        const Ut::Vec2d pt(point.x(), point.y());
+        for (auto* entity : sm->getAllEntities())
         {
-            if (!line)
+            if (entity->eType != Eg::EType::LINE)
                 continue;
-            if (line->distanceToPoint(point) > 8.0)
+            auto* line = static_cast<Eg::SyLine*>(entity);
+            if (line->vPoints.size() < 2)
                 continue;
-            const QPointF hit = UiGeometryAlgorithms::projectPointToLine(point, line->start(), line->end());
-            if (line->distanceToStart(hit) < line->distanceToEnd(hit))
-                line->setStart(hit);
+            const auto& a = line->vPoints[0];
+            const auto& b = line->vPoints[1];
+            const double segLen = (b - a).length();
+            const double dline = (segLen < 1e-12)
+                ? (pt - a).length()
+                : std::abs((b.x() - a.x()) * (a.y() - pt.y()) - (a.x() - pt.x()) * (b.y() - a.y())) / segLen;
+            if (dline > 8.0)
+                continue;
+            const double distA = (pt - a).length();
+            const double distB = (pt - b).length();
+            const QPointF hit = UiGeometryAlgorithms::projectPointToLine(
+                point, QPointF(a.x(), a.y()), QPointF(b.x(), b.y()));
+            if (distA < distB)
+                line->vPoints[0] = Ut::Vec2d(hit.x(), hit.y());
             else
-                line->setEnd(hit);
+                line->vPoints[1] = Ut::Vec2d(hit.x(), hit.y());
             break;
         }
         if (stateCenter)
             stateCenter->setDirty(true);
     }
 
-    void extendSelectedByPoint(EntityDocument2D* document, const QPointF& point, UiStateCenter* stateCenter)
+    void extendSelectedByPoint(SceneDocument2D* document, const QPointF& point, UiStateCenter* stateCenter)
     {
         trimSelectedByPoint(document, point, stateCenter);
     }
 
-    void applySelectionTransform(EntityDocument2D* document, const QPointF& anchor, const QPointF& target, bool transformCopy, const QString& mode, UiStateCenter* stateCenter, const QString& toolName)
+    void applySelectionTransform(SceneDocument2D* document, const QPointF& anchor, const QPointF& target, bool transformCopy, const QString& mode, UiStateCenter* stateCenter, const QString& toolName)
     {
         Q_UNUSED(mode);
         Q_UNUSED(toolName);
         if (!document)
             return;
+        auto* sm = document->sceneManager();
+        if (!sm) return;
 
         const QPointF delta = target - anchor;
-        for (const auto& entity : document->selection().items())
+        const auto transMat = Ut::Mat3d::translate(delta.x(), delta.y());
+
+        for (auto* entity : sm->getSelectedEntities())
         {
-            if (!entity)
-                continue;
-            if (auto line = std::dynamic_pointer_cast<LineEntity2D>(entity))
-            {
-                line->setStart(line->start() + delta);
-                line->setEnd(line->end() + delta);
-            }
-            else if (auto circle = std::dynamic_pointer_cast<CircleEntity2D>(entity))
-            {
-                circle->setCenter(circle->center() + delta);
-            }
-            else if (auto polyline = std::dynamic_pointer_cast<PolylineEntity2D>(entity))
-            {
-                polyline->translate(delta);
-            }
+            entity->transform(transMat);
         }
 
         if (transformCopy)
         {
-            std::vector<std::shared_ptr<UiEntity>> copies;
-            for (const auto& entity : document->selection().items())
+            for (auto* entity : sm->getSelectedEntities())
             {
-                if (!entity)
-                    continue;
-                if (auto line = std::dynamic_pointer_cast<LineEntity2D>(entity))
-                    copies.push_back(document->createLine(line->start() + delta, line->end() + delta));
-                else if (auto circle = std::dynamic_pointer_cast<CircleEntity2D>(entity))
-                    copies.push_back(document->createCircle(circle->center() + delta, circle->radius()));
-                else if (auto polyline = std::dynamic_pointer_cast<PolylineEntity2D>(entity))
-                {
-                    auto pts = polyline->points();
-                    for (auto& pt : pts)
-                        pt += delta;
-                    copies.push_back(document->createPolyline(pts));
-                }
+                auto copy = entity->clone();
+                copy->transform(transMat);
+                sm->addEntity(copy.release());
             }
-            for (const auto& copy : copies)
-                document->selection().add(copy);
         }
 
         if (stateCenter)

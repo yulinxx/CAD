@@ -1,59 +1,34 @@
 #pragma once
 
-#include <QImage>
-#include <QString>
-#include <QList>
 #include <cstdint>
 #include <chrono>
+#include <string>
+#include <vector>
+#include <algorithm>
 
 #include "RenderCoreApi.h"
 #include "RenderTypes.h"
 
-/**
- * @file RenderFrame.h
- * @brief 渲染帧结果
- *
- * 封装一帧渲染的完整输出：
- * - 渲染批次列表（用于后续渲染）
- * - 颜色缓冲（软件后端/调试快照）
- * - 统计信息
- * - 覆盖层数据
- *
- * 不同后端渲染完成后，统一通过此结构返回结果。
- * 上层（Viewport / ShellHost）通过此结构获取渲染反馈。
- */
 struct RENDER_CORE_API RenderFrame
 {
-    /// 帧号
     uint64_t frameId{ 0 };
 
-    /// 帧时间戳
     std::chrono::steady_clock::time_point timestamp;
 
-    /// 渲染批次列表（场景编译后的输出）
-    QList<RenderBatch> batches;
+    std::vector<RenderBatch> batches;
 
-    /// 渲染完成后的颜色缓冲（软件后端直接绘制，GPU 后端作为调试快照）
-    QImage colorBuffer;
+    ImageBuffer colorBuffer;
 
-    /// 帧描述信息
-    QString description;
+    std::string description;
 
-    /// 渲染统计
     RenderStatistics statistics;
 
-    /// 覆盖层信息
     RenderOverlay overlay;
 
-    /// 是否有效
     bool valid{ false };
 
-    // ============ 便捷方法 ============
+    int batchCount() const { return static_cast<int>(batches.size()); }
 
-    /// 批次总数
-    int batchCount() const { return batches.size(); }
-
-    /// 顶点总数
     int totalVertexCount() const
     {
         int count = 0;
@@ -62,27 +37,24 @@ struct RENDER_CORE_API RenderFrame
         return count;
     }
 
-    /// 实体总数（去重）
     int entityCount() const
     {
-        QStringList ids;
+        std::vector<std::string> ids;
         for (const auto& batch : batches)
         {
-            if (!batch.entityId.isEmpty() && !ids.contains(batch.entityId))
-                ids.append(batch.entityId);
+            if (!batch.entityId.empty() && std::find(ids.begin(), ids.end(), batch.entityId) == ids.end())
+                ids.push_back(batch.entityId);
         }
-        return ids.size();
+        return static_cast<int>(ids.size());
     }
 
-    /// 生成完整描述
-    QString fullDescription() const
+    std::string fullDescription() const
     {
-        return QStringLiteral("[Frame %1] %2 | %3 batches | %4 verts | %5 ents | %6")
-            .arg(frameId)
-            .arg(description)
-            .arg(batchCount())
-            .arg(totalVertexCount())
-            .arg(entityCount())
-            .arg(valid ? QStringLiteral("valid") : QStringLiteral("INVALID"));
+        return "[Frame " + std::to_string(frameId) + "] "
+            + description + " | "
+            + std::to_string(batchCount()) + " batches | "
+            + std::to_string(totalVertexCount()) + " verts | "
+            + std::to_string(entityCount()) + " ents | "
+            + (valid ? "valid" : "INVALID");
     }
 };

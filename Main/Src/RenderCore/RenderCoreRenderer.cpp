@@ -17,8 +17,8 @@ RenderCoreRenderer::RenderCoreRenderer()
 {
     m_compiler = std::make_unique<DefaultSceneCompiler>();
     m_softwareRenderer = std::make_unique<SoftwareRenderer>();
-    m_context.backendName = QStringLiteral("RenderCore");
-    m_context.sceneType = QStringLiteral("3D");
+    m_context.backendName = "RenderCore";
+    m_context.sceneType = "3D";
     m_context.renderMode = RenderMode::Wireframe;
 }
 
@@ -116,7 +116,7 @@ void RenderCoreRenderer::render(QPainter& painter, int width, int height)
         return;
 
     m_camera.setViewportSize(width, height);
-    m_context.viewportSize = QSize(width, height);
+    m_context.viewportSize = Size2D{ width, height };
 
     if (m_camera.isDirty())
     {
@@ -135,7 +135,7 @@ void RenderCoreRenderer::render(QPainter& painter, int width, int height)
 void RenderCoreRenderer::resize(int width, int height)
 {
     m_camera.setViewportSize(width, height);
-    m_context.viewportSize = QSize(width, height);
+    m_context.viewportSize = Size2D{ width, height };
     m_context.markDirty();
 }
 

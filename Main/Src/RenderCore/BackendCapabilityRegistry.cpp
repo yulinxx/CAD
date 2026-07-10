@@ -1,6 +1,7 @@
 #include "BackendCapabilityRegistry.h"
 
-#include <QString>
+#include <algorithm>
+#include <string>
 
 // ============================================================================
 // 全局后端类型定义（与 RenderBackendFactory 保持一致）
@@ -19,7 +20,7 @@ namespace {
 
 BackendCapabilityRegistry::BackendCapabilityRegistry()
 {
-    registerBackend(BackendType_OpenGL, QStringLiteral("OpenGL"),
+    registerBackend(BackendType_OpenGL, "OpenGL",
         BackendCapability::HardwareAccelerated
         | BackendCapability::AntiAliasing
         | BackendCapability::HighDPI
@@ -27,7 +28,7 @@ BackendCapabilityRegistry::BackendCapabilityRegistry()
         true);
 
 #ifdef _WIN32
-    registerBackend(BackendType_Vulkan, QStringLiteral("Vulkan"),
+    registerBackend(BackendType_Vulkan, "Vulkan",
         BackendCapability::HardwareAccelerated
         | BackendCapability::MultiViewport
         | BackendCapability::InstancedRendering
@@ -39,7 +40,7 @@ BackendCapabilityRegistry::BackendCapabilityRegistry()
 #endif
 
 #ifdef __APPLE__
-    registerBackend(BackendType_Metal, QStringLiteral("Metal"),
+    registerBackend(BackendType_Metal, "Metal",
         BackendCapability::HardwareAccelerated
         | BackendCapability::MultiViewport
         | BackendCapability::InstancedRendering
@@ -48,7 +49,7 @@ BackendCapabilityRegistry::BackendCapabilityRegistry()
         | BackendCapability::HighDPI,
         true);
 #else
-    registerBackend(BackendType_Metal, QStringLiteral("Metal"),
+    registerBackend(BackendType_Metal, "Metal",
         BackendCapability::HardwareAccelerated
         | BackendCapability::MultiViewport
         | BackendCapability::InstancedRendering
@@ -58,7 +59,7 @@ BackendCapabilityRegistry::BackendCapabilityRegistry()
         false);
 #endif
 
-    registerBackend(BackendType_Software, QStringLiteral("Software"),
+    registerBackend(BackendType_Software, "Software",
         BackendCapability::OffscreenRendering,
         true);
 }
@@ -69,7 +70,7 @@ BackendCapabilityRegistry& BackendCapabilityRegistry::instance()
     return instance;
 }
 
-void BackendCapabilityRegistry::registerBackend(BackendType type, const QString& name, BackendCapability capabilities, bool available)
+void BackendCapabilityRegistry::registerBackend(BackendType type, const std::string& name, BackendCapability capabilities, bool available)
 {
     BackendInfo info;
     info.name = name;
@@ -77,7 +78,11 @@ void BackendCapabilityRegistry::registerBackend(BackendType type, const QString&
     info.available = available;
 
     m_backends[type] = info;
-    m_nameToType[name.toLower()] = type;
+
+    std::string lowerName = name;
+    std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
+        [](unsigned char c) { return std::tolower(c); });
+    m_nameToType[lowerName] = type;
 }
 
 bool BackendCapabilityRegistry::isAvailable(BackendType type) const
@@ -92,32 +97,35 @@ BackendCapability BackendCapabilityRegistry::capabilitiesFor(BackendType type) c
     return it != m_backends.end() ? it->second.capabilities : BackendCapability::None;
 }
 
-QString BackendCapabilityRegistry::nameFor(BackendType type) const
+std::string BackendCapabilityRegistry::nameFor(BackendType type) const
 {
     auto it = m_backends.find(type);
-    return it != m_backends.end() ? it->second.name : QStringLiteral("Unknown");
+    return it != m_backends.end() ? it->second.name : "Unknown";
 }
 
-QVector<BackendCapabilityRegistry::BackendType> BackendCapabilityRegistry::availableBackends() const
+std::vector<BackendCapabilityRegistry::BackendType> BackendCapabilityRegistry::availableBackends() const
 {
-    QVector<BackendType> result;
+    std::vector<BackendType> result;
     for (const auto& pair : m_backends)
     {
         if (pair.second.available)
         {
-            result.append(pair.first);
+            result.push_back(pair.first);
         }
     }
     return result;
 }
 
-BackendCapabilityRegistry::BackendType BackendCapabilityRegistry::fromName(const QString& name) const
+BackendCapabilityRegistry::BackendType BackendCapabilityRegistry::fromName(const std::string& name) const
 {
-    auto it = m_nameToType.find(name.toLower());
+    std::string lowerName = name;
+    std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
+        [](unsigned char c) { return std::tolower(c); });
+    auto it = m_nameToType.find(lowerName);
     return it != m_nameToType.end() ? it->second : BackendType_OpenGL;
 }
 
-QString BackendCapabilityRegistry::toName(BackendType type) const
+std::string BackendCapabilityRegistry::toName(BackendType type) const
 {
     return nameFor(type);
 }

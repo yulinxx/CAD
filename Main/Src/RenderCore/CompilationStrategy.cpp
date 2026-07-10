@@ -9,12 +9,12 @@ bool CompilationStrategy::canIncrementalCompile(const RenderContext& context) co
     return m_cacheValid && !context.isDirty && !m_forceFullCompile;
 }
 
-const QSet<QString>& CompilationStrategy::dirtyEntityIds() const
+const std::set<std::string>& CompilationStrategy::dirtyEntityIds() const
 {
     return m_dirtyEntityIds;
 }
 
-void CompilationStrategy::markEntityDirty(const QString& entityId)
+void CompilationStrategy::markEntityDirty(const std::string& entityId)
 {
     m_dirtyEntityIds.insert(entityId);
 }
@@ -32,7 +32,7 @@ void CompilationStrategy::clearDirty()
 
 bool CompilationStrategy::hasDirtyEntities() const
 {
-    return !m_dirtyEntityIds.isEmpty();
+    return !m_dirtyEntityIds.empty();
 }
 
 void CompilationStrategy::setForceFullCompile(bool force)

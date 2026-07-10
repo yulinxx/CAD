@@ -1,8 +1,8 @@
 #pragma once
 
 #include <memory>
-#include <QString>
-#include <QVector>
+#include <string>
+#include <vector>
 
 #include "RenderCoreApi.h"
 #include "RenderTypes.h"
@@ -40,17 +40,17 @@ public:
 
     static std::unique_ptr<IRenderBackend> create(BackendType type);
 
-    static QVector<BackendType> availableBackends();
+    static std::vector<BackendType> availableBackends();
 
-    static QString backendTypeName(BackendType type);
+    static std::string backendTypeName(BackendType type);
 
     static BackendCapability capabilitiesFor(BackendType type);
 
     static BackendType defaultBackendType();
 
-    static BackendType fromString(const QString& name);
+    static BackendType fromString(const std::string& name);
 
-    static QString toString(BackendType type);
+    static std::string toString(BackendType type);
 
     static BackendType backendFromEnvironment();
 

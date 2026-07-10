@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QString>
+#include <string>
 
 #include "RenderCoreApi.h"
 
@@ -17,7 +17,7 @@ public:
 
     BackendType defaultBackendType() const;
 
-    QString resolveBackendName() const;
+    std::string resolveBackendName() const;
 
 private:
     BackendConfigResolver() = default;

@@ -26,6 +26,10 @@
 #include "RenderCore/DefaultSceneCompiler.h"
 #include "RenderCore/UiCamera3D.h"
 #include "UI/UiEntities.h"
+#include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/SyEntity/SyLine.h"
+#include "Engine2D/SyEntity/SyCircle.h"
+#include "Ut/Vec.h"
 
 // ============================================================================
 // 端到端测试：完整渲染管线
@@ -127,21 +131,28 @@ TEST(BackendE2ETest, BackendCapability_Consistency)
 TEST(BackendE2ETest, SceneCompiler_2DEntities)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
 
-    doc.createLine(QPointF(0, 0), QPointF(100, 100));
-    doc.createCircle(QPointF(50, 50), 30.0);
+    Eg::SceneManager scene;
+
+    auto line = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    scene.addEntity(line.release());
+
+    auto circle = std::make_unique<Eg::SyCircle>();
+    circle->basePoint = Ut::Vec2d(50, 50);
+    circle->dRadius = 30.0;
+    scene.addEntity(circle.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    RenderFrame frame = compiler.compile(&doc, ctx);
+    RenderFrame frame = compiler.compile(&scene, ctx);
     EXPECT_TRUE(frame.valid);
     EXPECT_EQ(frame.batchCount(), 2);
 
     ctx.clearDirty();
-    RenderFrame cached = compiler.compile(&doc, ctx);
+    RenderFrame cached = compiler.compile(&scene, ctx);
     EXPECT_EQ(cached.batchCount(), 2);
     EXPECT_LT(cached.statistics.compileTimeMs, 0.01);
 }

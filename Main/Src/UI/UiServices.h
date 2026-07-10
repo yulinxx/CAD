@@ -4,7 +4,6 @@
 
 #include "UiFrameworkServices.h"
 
-class EntityDocument2D;
 class UiCommandDispatcher;
 class IInteractionDispatcher;
 class UiLayoutService;
@@ -50,8 +49,8 @@ struct UiServices
     /// 操作总线（新操作主线）
     OperationBus* operationBus{ nullptr };
 
-    /// 2D 文档（命令系统需要访问文档进行实体操作）
-    EntityDocument2D* document2D{ nullptr };
+    /// 2D 场景管理器（命令系统通过此入口操作 2D 图元）
+    class SceneDocument2D* document2D{ nullptr };
 
     /// 将框架级桥接信息写入到服务集合中
     /// @param frameworkServices 框架级服务

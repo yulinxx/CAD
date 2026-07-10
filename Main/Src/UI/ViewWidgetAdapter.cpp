@@ -4,12 +4,12 @@
  */
 #include "ViewWidgetAdapter.h"
 #include "UiViewWidgets.h"
-#include "UiEntities.h"
+#include "SceneDocument2D.h"
 #include "SceneEditServiceAdapter.h"
 
 #include <QPoint>
 
-ViewWidgetAdapter::ViewWidgetAdapter(CanvasViewport2D* viewport, QObject* parent)
+ViewWidgetAdapter::ViewWidgetAdapter(Viewport2D* viewport, QObject* parent)
     : QObject(parent)
     , m_viewport(viewport)
 {
@@ -64,7 +64,7 @@ QPointF ViewWidgetAdapter::screenToWorld(const QPoint& screenPos) const
     return QPointF(0, 0);
 }
 
-EntityDocument2D* ViewWidgetAdapter::document() const
+SceneDocument2D* ViewWidgetAdapter::document() const
 {
     if (m_viewport)
         return m_viewport->document();

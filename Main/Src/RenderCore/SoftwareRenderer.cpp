@@ -9,24 +9,24 @@
 // ============================================================================
 
 void SoftwareRenderer::render(QPainter& painter, const RenderFrame& frame,
-                              const UiCamera3D& camera, const QSize& viewportSize)
+                              const UiCamera3D& camera, const Size2D& viewportSize)
 {
     // 清屏
-    painter.fillRect(0, 0, viewportSize.width(), viewportSize.height(), QColor(30, 30, 30));
+    painter.fillRect(0, 0, viewportSize.width, viewportSize.height, QColor(30, 30, 30));
 
-    if (!frame.valid || frame.batches.isEmpty())
+    if (!frame.valid || frame.batches.empty())
     {
         painter.setPen(QColor(120, 120, 120));
         painter.setFont(QFont(QStringLiteral("Microsoft YaHei"), 12));
-        painter.drawText(QRect(0, 0, viewportSize.width(), viewportSize.height()),
+        painter.drawText(QRect(0, 0, viewportSize.width, viewportSize.height),
                          Qt::AlignCenter,
                          QStringLiteral("RenderCore 渲染管线就绪\n等待场景数据..."));
         return;
     }
 
     drawBatches3D(painter, frame, camera);
-    drawAxesIndicator(painter, camera, viewportSize.width(), viewportSize.height());
-    drawStatisticsOverlay(painter, frame, viewportSize.width(), viewportSize.height());
+    drawAxesIndicator(painter, camera, viewportSize.width, viewportSize.height);
+    drawStatisticsOverlay(painter, frame, viewportSize.width, viewportSize.height);
 }
 
 // ============================================================================

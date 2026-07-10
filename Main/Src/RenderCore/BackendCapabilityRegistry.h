@@ -1,7 +1,7 @@
 #pragma once
 
-#include <QString>
-#include <QVector>
+#include <string>
+#include <vector>
 #include <unordered_map>
 
 #include "RenderCoreApi.h"
@@ -14,26 +14,26 @@ public:
 
     struct BackendInfo
     {
-        QString name;
+        std::string name;
         BackendCapability capabilities;
         bool available;
     };
 
     static BackendCapabilityRegistry& instance();
 
-    void registerBackend(BackendType type, const QString& name, BackendCapability capabilities, bool available = true);
+    void registerBackend(BackendType type, const std::string& name, BackendCapability capabilities, bool available = true);
 
     bool isAvailable(BackendType type) const;
 
     BackendCapability capabilitiesFor(BackendType type) const;
 
-    QString nameFor(BackendType type) const;
+    std::string nameFor(BackendType type) const;
 
-    QVector<BackendType> availableBackends() const;
+    std::vector<BackendType> availableBackends() const;
 
-    BackendType fromName(const QString& name) const;
+    BackendType fromName(const std::string& name) const;
 
-    QString toName(BackendType type) const;
+    std::string toName(BackendType type) const;
 
 private:
     BackendCapabilityRegistry();
@@ -43,5 +43,5 @@ private:
     BackendCapabilityRegistry& operator=(const BackendCapabilityRegistry&) = delete;
 
     std::unordered_map<BackendType, BackendInfo> m_backends;
-    std::unordered_map<QString, BackendType> m_nameToType;
+    std::unordered_map<std::string, BackendType> m_nameToType;
 };

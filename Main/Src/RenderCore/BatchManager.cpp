@@ -1,6 +1,6 @@
 #include "BatchManager.h"
 
-#include <QHash>
+#include <unordered_map>
 #include <chrono>
 
 // ============================================================================
@@ -34,26 +34,26 @@ void BatchManager::invalidateCache()
 // ============================================================================
 
 RenderFrame BatchManager::mergeIncremental(const RenderFrame& cachedFrame,
-                                           const QList<RenderBatch>& newBatches,
-                                           const QSet<QString>& dirtyEntityIds)
+                                           const std::vector<RenderBatch>& newBatches,
+                                           const std::set<std::string>& dirtyEntityIds)
 {
     RenderFrame result = cachedFrame;
 
-    QList<RenderBatch> mergedBatches;
+    std::vector<RenderBatch> mergedBatches;
     for (const auto& batch : cachedFrame.batches)
     {
-        if (!dirtyEntityIds.contains(batch.entityId))
-            mergedBatches.append(batch);
+        if (dirtyEntityIds.find(batch.entityId) == dirtyEntityIds.end())
+            mergedBatches.push_back(batch);
     }
 
-    QList<RenderBatch> dirtyOnlyBatches;
+    std::vector<RenderBatch> dirtyOnlyBatches;
     for (const auto& batch : newBatches)
     {
-        if (dirtyEntityIds.contains(batch.entityId))
-            dirtyOnlyBatches.append(batch);
+        if (dirtyEntityIds.find(batch.entityId) != dirtyEntityIds.end())
+            dirtyOnlyBatches.push_back(batch);
     }
 
-    mergedBatches.append(dirtyOnlyBatches);
+    mergedBatches.insert(mergedBatches.end(), dirtyOnlyBatches.begin(), dirtyOnlyBatches.end());
     result.batches = mergedBatches;
 
     return result;
@@ -63,20 +63,20 @@ RenderFrame BatchManager::mergeIncremental(const RenderFrame& cachedFrame,
 // 批次分组
 // ============================================================================
 
-QVector<int> BatchManager::groupByPrimitiveType(const RenderFrame& frame) const
+std::vector<int> BatchManager::groupByPrimitiveType(const RenderFrame& frame) const
 {
-    QVector<int> groupIndices;
-    if (frame.batches.isEmpty())
+    std::vector<int> groupIndices;
+    if (frame.batches.empty())
         return groupIndices;
 
-    QHash<int, int> firstIndex;
-    for (int i = 0; i < frame.batches.size(); ++i)
+    std::unordered_map<int, int> firstIndex;
+    for (int i = 0; i < static_cast<int>(frame.batches.size()); ++i)
     {
         const int typeKey = static_cast<int>(frame.batches[i].primitiveType);
-        if (!firstIndex.contains(typeKey))
+        if (firstIndex.find(typeKey) == firstIndex.end())
         {
             firstIndex[typeKey] = i;
-            groupIndices.append(i);
+            groupIndices.push_back(i);
         }
     }
 
@@ -87,13 +87,13 @@ QVector<int> BatchManager::groupByPrimitiveType(const RenderFrame& frame) const
 // 视口裁剪
 // ============================================================================
 
-RenderFrame BatchManager::cullByViewport(const RenderFrame& frame, const QRectF& viewportRect) const
+RenderFrame BatchManager::cullByViewport(const RenderFrame& frame, const RenderRectF& viewportRect) const
 {
     if (viewportRect.isNull() || !viewportRect.isValid())
         return frame;
 
     RenderFrame result = frame;
-    QList<RenderBatch> visible;
+    std::vector<RenderBatch> visible;
     int culled = 0;
 
     for (const auto& batch : frame.batches)
@@ -103,12 +103,12 @@ RenderFrame BatchManager::cullByViewport(const RenderFrame& frame, const QRectF&
             ++culled;
             continue;
         }
-        visible.append(batch);
+        visible.push_back(batch);
     }
 
     result.batches = visible;
     result.statistics.culledBatchCount = culled;
-    result.statistics.batchCount = visible.size();
+    result.statistics.batchCount = static_cast<int>(visible.size());
 
     return result;
 }

@@ -25,7 +25,11 @@
 #include "RenderCore/RenderFrame.h"
 #include "RenderCore/UiCamera3D.h"
 #include "RenderCore/RenderCoreRenderer.h"
-#include "UI/UiEntities.h"
+#include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/SyEntity/SyLine.h"
+#include "Engine2D/SyEntity/SyCircle.h"
+#include "Engine2D/SyEntity/SyArc.h"
+#include "Ut/Vec.h"
 
 // ============================================================================
 // RenderContext 测试
@@ -197,11 +201,12 @@ TEST(DefaultRenderBackendTest, CaptureFrame)
 TEST(SceneCompilerTest, CompileEmpty2D)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
+
+    Eg::SceneManager scene;
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
 
-    RenderFrame frame = compiler.compile(&doc, ctx);
+    RenderFrame frame = compiler.compile(&scene, ctx);
     EXPECT_TRUE(frame.valid);
     EXPECT_EQ(frame.batchCount(), 0);
     EXPECT_EQ(frame.entityCount(), 0);
@@ -210,60 +215,68 @@ TEST(SceneCompilerTest, CompileEmpty2D)
 TEST(SceneCompilerTest, Compile2DWithLines)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
-    doc.createLine(QPointF(0, 0), QPointF(100, 100));
-    doc.createLine(QPointF(50, 50), QPointF(150, 150));
+
+    Eg::SceneManager scene;
+    auto l1 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    scene.addEntity(l1.release());
+    auto l2 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(50, 50), Ut::Vec2d(150, 150) });
+    scene.addEntity(l2.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
 
-    RenderFrame frame = compiler.compile(&doc, ctx);
+    RenderFrame frame = compiler.compile(&scene, ctx);
     EXPECT_TRUE(frame.valid);
-    EXPECT_EQ(frame.batchCount(), 2); // 两条线段
+    EXPECT_EQ(frame.batchCount(), 2);
     EXPECT_EQ(frame.entityCount(), 2);
 }
 
 TEST(SceneCompilerTest, IncrementalCompileCacheHit)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
-    doc.createLine(QPointF(0, 0), QPointF(100, 100));
+
+    Eg::SceneManager scene;
+    auto line = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    scene.addEntity(line.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    // 第一次编译（全量）
-    RenderFrame frame1 = compiler.compile(&doc, ctx);
+    RenderFrame frame1 = compiler.compile(&scene, ctx);
     EXPECT_TRUE(frame1.valid);
     EXPECT_EQ(frame1.batchCount(), 1);
 
-    // 第二次编译（缓存命中，无脏实体）
-    RenderFrame frame2 = compiler.compile(&doc, ctx);
+    RenderFrame frame2 = compiler.compile(&scene, ctx);
     EXPECT_TRUE(frame2.valid);
     EXPECT_EQ(frame2.batchCount(), 1);
-    EXPECT_LT(frame2.statistics.compileTimeMs, 0.01); // 零开销
+    EXPECT_LT(frame2.statistics.compileTimeMs, 0.01);
 }
 
 TEST(SceneCompilerTest, IncrementalCompileWithDirtyEntity)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
-    auto line = doc.createLine(QPointF(0, 0), QPointF(100, 100));
+
+    Eg::SceneManager scene;
+    auto line = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    auto lineId = line->id;
+    scene.addEntity(line.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    // 第一次全量编译
-    RenderFrame frame1 = compiler.compile(&doc, ctx);
+    RenderFrame frame1 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame1.batchCount(), 1);
 
-    // 标记脏实体，增量编译
-    compiler.markEntityDirty(line->id());
+    compiler.markEntityDirty(QString::number(lineId));
     ctx.clearDirty();
 
-    RenderFrame frame2 = compiler.compile(&doc, ctx);
+    RenderFrame frame2 = compiler.compile(&scene, ctx);
     EXPECT_TRUE(frame2.valid);
     EXPECT_EQ(frame2.batchCount(), 1);
 }
@@ -271,14 +284,17 @@ TEST(SceneCompilerTest, IncrementalCompileWithDirtyEntity)
 TEST(SceneCompilerTest, CacheInvalidation)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
-    doc.createLine(QPointF(0, 0), QPointF(100, 100));
+
+    Eg::SceneManager scene;
+    auto line = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    scene.addEntity(line.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    compiler.compile(&doc, ctx);
+    compiler.compile(&scene, ctx);
     EXPECT_TRUE(compiler.hasCachedFrame());
 
     compiler.invalidateCache();
@@ -289,12 +305,17 @@ TEST(SceneCompilerTest, CacheInvalidation)
 TEST(SceneCompilerTest, BatchGrouping)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
-    doc.createLine(QPointF(0, 0), QPointF(100, 100));
-    doc.createLine(QPointF(50, 50), QPointF(150, 150));
+
+    Eg::SceneManager scene;
+    auto l1 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    scene.addEntity(l1.release());
+    auto l2 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(50, 50), Ut::Vec2d(150, 150) });
+    scene.addEntity(l2.release());
 
     RenderContext ctx;
-    RenderFrame frame = compiler.compile(&doc, ctx);
+    RenderFrame frame = compiler.compile(&scene, ctx);
 
     QVector<int> groups = compiler.groupBatchesByPrimitiveType(frame);
     EXPECT_FALSE(groups.isEmpty());
@@ -303,27 +324,33 @@ TEST(SceneCompilerTest, BatchGrouping)
 TEST(SceneCompilerTest, Culling)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
-    doc.createLine(QPointF(0, 0), QPointF(100, 100));
+
+    Eg::SceneManager scene;
+    auto line = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    scene.addEntity(line.release());
 
     RenderContext ctx;
-    RenderFrame frame = compiler.compile(&doc, ctx);
+    RenderFrame frame = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame.batchCount(), 1);
 
-    // 裁剪到视口外的区域
     RenderFrame culled = compiler.cullBatches(frame, QRectF(1000, 1000, 100, 100));
-    EXPECT_EQ(culled.batchCount(), 0); // 所有批次被裁剪
+    EXPECT_EQ(culled.batchCount(), 0);
     EXPECT_GT(culled.statistics.culledBatchCount, 0);
 }
 
 TEST(SceneCompilerTest, CompileCircle)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
-    doc.createCircle(QPointF(0, 0), 50.0);
+
+    Eg::SceneManager scene;
+    auto circle = std::make_unique<Eg::SyCircle>();
+    circle->basePoint = Ut::Vec2d(0, 0);
+    circle->dRadius = 50.0;
+    scene.addEntity(circle.release());
 
     RenderContext ctx;
-    RenderFrame frame = compiler.compile(&doc, ctx);
+    RenderFrame frame = compiler.compile(&scene, ctx);
     EXPECT_TRUE(frame.valid);
     EXPECT_EQ(frame.batchCount(), 1);
     EXPECT_GT(frame.totalVertexCount(), 0);
@@ -332,56 +359,63 @@ TEST(SceneCompilerTest, CompileCircle)
 TEST(SceneCompilerTest, DirtyEntityUpdate_CacheConsistency)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
-    auto line = doc.createLine(QPointF(0, 0), QPointF(100, 100));
+
+    Eg::SceneManager scene;
+    auto line = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    auto lineId = line->id;
+    scene.addEntity(line.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    // 初始编译
-    RenderFrame frame1 = compiler.compile(&doc, ctx);
+    RenderFrame frame1 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame1.batchCount(), 1);
     const uint64_t frameId1 = frame1.frameId;
 
-    // 修改实体后标记脏
-    line->translate(QPointF(50, 50));
-    compiler.markEntityDirty(line->id());
+    auto* entity = scene.findEntityById(lineId);
+    ASSERT_NE(entity, nullptr);
+    entity->transform(Ut::Mat3d::translate(50, 50));
+    compiler.markEntityDirty(QString::number(lineId));
     ctx.clearDirty();
     ctx.advanceFrame();
 
-    // 增量编译后批次仍为1，但内容应更新
-    RenderFrame frame2 = compiler.compile(&doc, ctx);
+    RenderFrame frame2 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame2.batchCount(), 1);
     EXPECT_NE(frame2.frameId, frameId1);
 
-    // 验证缓存状态
     EXPECT_TRUE(compiler.hasCachedFrame());
 }
 
 TEST(SceneCompilerTest, EntityDeletion_OldBatchRemoved)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
-    auto line1 = doc.createLine(QPointF(0, 0), QPointF(100, 100));
-    auto line2 = doc.createLine(QPointF(200, 200), QPointF(300, 300));
+
+    Eg::SceneManager scene;
+    auto l1 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    auto id1 = l1->id;
+    scene.addEntity(l1.release());
+    auto l2 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(200, 200), Ut::Vec2d(300, 300) });
+    auto id2 = l2->id;
+    scene.addEntity(l2.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    // 初始编译（2个批次）
-    RenderFrame frame1 = compiler.compile(&doc, ctx);
+    RenderFrame frame1 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame1.batchCount(), 2);
 
-    // 删除一个实体并标记脏
-    const QString deletedId = line1->id();
-    doc.removeEntity(deletedId);
-    compiler.markEntityDirty(deletedId);
+    auto* e1 = scene.findEntityById(id1);
+    ASSERT_NE(e1, nullptr);
+    scene.deleteEntity(e1);
+    compiler.markEntityDirty(QString::number(id1));
     ctx.clearDirty();
 
-    // 再次编译应只剩1个批次
-    RenderFrame frame2 = compiler.compile(&doc, ctx);
+    RenderFrame frame2 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame2.batchCount(), 1);
     EXPECT_EQ(frame2.entityCount(), 1);
 }
@@ -389,49 +423,53 @@ TEST(SceneCompilerTest, EntityDeletion_OldBatchRemoved)
 TEST(SceneCompilerTest, MarkAllDirty_RecreatesFullFrame)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
-    doc.createLine(QPointF(0, 0), QPointF(100, 100));
-    doc.createLine(QPointF(50, 50), QPointF(150, 150));
+
+    Eg::SceneManager scene;
+    auto l1 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    scene.addEntity(l1.release());
+    auto l2 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(50, 50), Ut::Vec2d(150, 150) });
+    scene.addEntity(l2.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    // 初始编译
-    RenderFrame frame1 = compiler.compile(&doc, ctx);
+    RenderFrame frame1 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame1.batchCount(), 2);
 
-    // markAllDirty 强制全量编译
     compiler.markAllDirty();
     ctx.clearDirty();
 
-    // 重新编译后仍有2个批次（完整重建）
-    RenderFrame frame2 = compiler.compile(&doc, ctx);
+    RenderFrame frame2 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame2.batchCount(), 2);
-    EXPECT_GT(frame2.statistics.compileTimeMs, 0); // 有编译开销，不是零开销缓存
+    EXPECT_GT(frame2.statistics.compileTimeMs, 0);
 }
 
 TEST(SceneCompilerTest, SceneSwitch_CacheCleared)
 {
     DefaultSceneCompiler compiler;
 
-    // 第一个场景
-    EntityDocument2D doc1;
-    doc1.createLine(QPointF(0, 0), QPointF(100, 100));
+    Eg::SceneManager scene1;
+    auto line = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    scene1.addEntity(line.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    compiler.compile(&doc1, ctx);
+    compiler.compile(&scene1, ctx);
     EXPECT_TRUE(compiler.hasCachedFrame());
 
-    // 切换到第二个场景
-    EntityDocument2D doc2;
-    doc2.createCircle(QPointF(0, 0), 50.0);
+    Eg::SceneManager scene2;
+    auto circle = std::make_unique<Eg::SyCircle>();
+    circle->basePoint = Ut::Vec2d(0, 0);
+    circle->dRadius = 50.0;
+    scene2.addEntity(circle.release());
 
-    // 新场景首次编译应该是全量编译
-    RenderFrame frame = compiler.compile(&doc2, ctx);
+    RenderFrame frame = compiler.compile(&scene2, ctx);
     EXPECT_EQ(frame.batchCount(), 1);
     EXPECT_TRUE(frame.valid);
 }
@@ -439,33 +477,39 @@ TEST(SceneCompilerTest, SceneSwitch_CacheCleared)
 TEST(SceneCompilerTest, MultipleDirtyUpdates_NoAccumulation)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
-    auto line1 = doc.createLine(QPointF(0, 0), QPointF(100, 100));
-    auto line2 = doc.createLine(QPointF(200, 200), QPointF(300, 300));
-    auto line3 = doc.createLine(QPointF(400, 400), QPointF(500, 500));
+
+    Eg::SceneManager scene;
+    auto l1 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    auto id1 = l1->id;
+    scene.addEntity(l1.release());
+    auto l2 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(200, 200), Ut::Vec2d(300, 300) });
+    auto id2 = l2->id;
+    scene.addEntity(l2.release());
+    auto l3 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(400, 400), Ut::Vec2d(500, 500) });
+    auto id3 = l3->id;
+    scene.addEntity(l3.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    // 初始编译（3个批次）
-    RenderFrame frame0 = compiler.compile(&doc, ctx);
+    RenderFrame frame0 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame0.batchCount(), 3);
 
-    // 多次标记脏实体
-    compiler.markEntityDirty(line1->id());
-    compiler.markEntityDirty(line2->id());
-    compiler.markEntityDirty(line3->id());
-    compiler.markEntityDirty(line1->id()); // 重复标记同一实体
+    compiler.markEntityDirty(QString::number(id1));
+    compiler.markEntityDirty(QString::number(id2));
+    compiler.markEntityDirty(QString::number(id3));
+    compiler.markEntityDirty(QString::number(id1)); // 重复标记
     ctx.clearDirty();
 
-    // 编译后仍应为3个批次（无累积错误）
-    RenderFrame frame1 = compiler.compile(&doc, ctx);
+    RenderFrame frame1 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame1.batchCount(), 3);
 
-    // 再次编译（无脏实体）应零开销
     ctx.clearDirty();
-    RenderFrame frame2 = compiler.compile(&doc, ctx);
+    RenderFrame frame2 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame2.batchCount(), 3);
     EXPECT_LT(frame2.statistics.compileTimeMs, 0.01);
 }
@@ -473,24 +517,27 @@ TEST(SceneCompilerTest, MultipleDirtyUpdates_NoAccumulation)
 TEST(SceneCompilerTest, DirtyEntityAdded_NewBatchCreated)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
-    doc.createLine(QPointF(0, 0), QPointF(100, 100));
+
+    Eg::SceneManager scene;
+    auto l1 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    scene.addEntity(l1.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    // 初始编译（1个批次）
-    RenderFrame frame1 = compiler.compile(&doc, ctx);
+    RenderFrame frame1 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame1.batchCount(), 1);
 
-    // 添加新实体并标记脏
-    auto newLine = doc.createLine(QPointF(200, 200), QPointF(300, 300));
-    compiler.markEntityDirty(newLine->id());
+    auto newLine = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(200, 200), Ut::Vec2d(300, 300) });
+    auto newId = newLine->id;
+    scene.addEntity(newLine.release());
+    compiler.markEntityDirty(QString::number(newId));
     ctx.clearDirty();
 
-    // 增量编译后应为2个批次
-    RenderFrame frame2 = compiler.compile(&doc, ctx);
+    RenderFrame frame2 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame2.batchCount(), 2);
     EXPECT_EQ(frame2.entityCount(), 2);
 }
@@ -502,33 +549,36 @@ TEST(SceneCompilerTest, DirtyEntityAdded_NewBatchCreated)
 TEST(SceneCompilerTest, IncrementalCompile_DeleteEntityCachePurged)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
-    auto line1 = doc.createLine(QPointF(0, 0), QPointF(100, 100));
-    auto line2 = doc.createLine(QPointF(200, 200), QPointF(300, 300));
+
+    Eg::SceneManager scene;
+    auto l1 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    auto id1 = l1->id;
+    scene.addEntity(l1.release());
+    auto l2 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(200, 200), Ut::Vec2d(300, 300) });
+    scene.addEntity(l2.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    // 初始编译（2个批次）
-    RenderFrame frame1 = compiler.compile(&doc, ctx);
+    RenderFrame frame1 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame1.batchCount(), 2);
     EXPECT_TRUE(compiler.hasCachedFrame());
 
-    // 删除实体并标记脏
-    const QString deletedId = line1->id();
-    doc.removeEntity(deletedId);
-    compiler.markEntityDirty(deletedId);
+    auto* e = scene.findEntityById(id1);
+    ASSERT_NE(e, nullptr);
+    scene.deleteEntity(e);
+    compiler.markEntityDirty(QString::number(id1));
     ctx.clearDirty();
 
-    // 增量编译后不应残留已删除实体的批次
-    RenderFrame frame2 = compiler.compile(&doc, ctx);
+    RenderFrame frame2 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame2.batchCount(), 1);
     EXPECT_EQ(frame2.entityCount(), 1);
 
-    // 验证缓存一致性：再次编译应零开销命中
     ctx.clearDirty();
-    RenderFrame frame3 = compiler.compile(&doc, ctx);
+    RenderFrame frame3 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame3.batchCount(), 1);
     EXPECT_LT(frame3.statistics.compileTimeMs, 0.01);
 }
@@ -537,32 +587,33 @@ TEST(SceneCompilerTest, IncrementalCompile_SceneSwitchCacheRebuilt)
 {
     DefaultSceneCompiler compiler;
 
-    // 第一个场景
-    EntityDocument2D doc1;
-    doc1.createLine(QPointF(0, 0), QPointF(100, 100));
+    Eg::SceneManager scene1;
+    auto line = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    scene1.addEntity(line.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    compiler.compile(&doc1, ctx);
+    compiler.compile(&scene1, ctx);
     EXPECT_TRUE(compiler.hasCachedFrame());
 
-    // 切换到第二个场景（编译器自动检测文档变更，失效缓存）
-    EntityDocument2D doc2;
-    doc2.createCircle(QPointF(0, 0), 50.0);
+    Eg::SceneManager scene2;
+    auto circle = std::make_unique<Eg::SyCircle>();
+    circle->basePoint = Ut::Vec2d(0, 0);
+    circle->dRadius = 50.0;
+    scene2.addEntity(circle.release());
     ctx.clearDirty();
 
-    RenderFrame frame = compiler.compile(&doc2, ctx);
+    RenderFrame frame = compiler.compile(&scene2, ctx);
     EXPECT_EQ(frame.batchCount(), 1);
     EXPECT_TRUE(frame.valid);
 
-    // 新场景的缓存应已建立
     EXPECT_TRUE(compiler.hasCachedFrame());
 
-    // 再次编译新场景应零开销命中
     ctx.clearDirty();
-    RenderFrame frame2 = compiler.compile(&doc2, ctx);
+    RenderFrame frame2 = compiler.compile(&scene2, ctx);
     EXPECT_EQ(frame2.batchCount(), 1);
     EXPECT_LT(frame2.statistics.compileTimeMs, 0.01);
 }
@@ -570,38 +621,44 @@ TEST(SceneCompilerTest, IncrementalCompile_SceneSwitchCacheRebuilt)
 TEST(SceneCompilerTest, IncrementalCompile_CacheHitAfterMultipleDirty)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
-    auto line1 = doc.createLine(QPointF(0, 0), QPointF(100, 100));
-    auto line2 = doc.createLine(QPointF(200, 200), QPointF(300, 300));
-    auto line3 = doc.createLine(QPointF(400, 400), QPointF(500, 500));
+
+    Eg::SceneManager scene;
+    auto l1 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    auto id1 = l1->id;
+    scene.addEntity(l1.release());
+    auto l2 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(200, 200), Ut::Vec2d(300, 300) });
+    auto id2 = l2->id;
+    scene.addEntity(l2.release());
+    auto l3 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(400, 400), Ut::Vec2d(500, 500) });
+    auto id3 = l3->id;
+    scene.addEntity(l3.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    // 初始编译（3个批次）
-    RenderFrame frame0 = compiler.compile(&doc, ctx);
+    RenderFrame frame0 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame0.batchCount(), 3);
 
-    // 第一轮脏更新
-    line1->translate(QPointF(10, 10));
-    compiler.markEntityDirty(line1->id());
+    scene.findEntityById(id1)->transform(Ut::Mat3d::translate(10, 10));
+    compiler.markEntityDirty(QString::number(id1));
     ctx.clearDirty();
-    RenderFrame frame1 = compiler.compile(&doc, ctx);
+    RenderFrame frame1 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame1.batchCount(), 3);
 
-    // 第二轮脏更新（多实体）
-    line2->translate(QPointF(20, 20));
-    line3->translate(QPointF(30, 30));
-    compiler.markEntityDirty(line2->id());
-    compiler.markEntityDirty(line3->id());
+    scene.findEntityById(id2)->transform(Ut::Mat3d::translate(20, 20));
+    scene.findEntityById(id3)->transform(Ut::Mat3d::translate(30, 30));
+    compiler.markEntityDirty(QString::number(id2));
+    compiler.markEntityDirty(QString::number(id3));
     ctx.clearDirty();
-    RenderFrame frame2 = compiler.compile(&doc, ctx);
+    RenderFrame frame2 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame2.batchCount(), 3);
 
-    // 第三轮：无脏实体，应缓存命中
     ctx.clearDirty();
-    RenderFrame frame3 = compiler.compile(&doc, ctx);
+    RenderFrame frame3 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame3.batchCount(), 3);
     EXPECT_LT(frame3.statistics.compileTimeMs, 0.01);
 }
@@ -609,42 +666,49 @@ TEST(SceneCompilerTest, IncrementalCompile_CacheHitAfterMultipleDirty)
 TEST(SceneCompilerTest, IncrementalCompile_NoPhantomBatches)
 {
     DefaultSceneCompiler compiler;
-    EntityDocument2D doc;
-    doc.createLine(QPointF(0, 0), QPointF(100, 100));
-    doc.createLine(QPointF(50, 50), QPointF(150, 50));
-    doc.createCircle(QPointF(100, 100), 40.0);
+
+    Eg::SceneManager scene;
+    auto l1 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    scene.addEntity(l1.release());
+    auto l2 = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(50, 50), Ut::Vec2d(150, 50) });
+    scene.addEntity(l2.release());
+    auto c = std::make_unique<Eg::SyCircle>();
+    c->basePoint = Ut::Vec2d(100, 100);
+    c->dRadius = 40.0;
+    scene.addEntity(c.release());
 
     RenderContext ctx;
     ctx.sceneType = QStringLiteral("2D");
     ctx.clearDirty();
 
-    // 全量编译作为基准
-    RenderFrame fullFrame = compiler.compile(&doc, ctx);
+    RenderFrame fullFrame = compiler.compile(&scene, ctx);
     const int fullBatchCount = fullFrame.batchCount();
     const int fullVertexCount = fullFrame.totalVertexCount();
     const int fullEntityCount = fullFrame.entityCount();
     EXPECT_EQ(fullBatchCount, 3);
 
-    // 增量编译（无脏实体，缓存命中）
     ctx.clearDirty();
-    RenderFrame incFrame = compiler.compile(&doc, ctx);
+    RenderFrame incFrame = compiler.compile(&scene, ctx);
     EXPECT_EQ(incFrame.batchCount(), fullBatchCount);
     EXPECT_EQ(incFrame.totalVertexCount(), fullVertexCount);
     EXPECT_EQ(incFrame.entityCount(), fullEntityCount);
     EXPECT_LT(incFrame.statistics.compileTimeMs, 0.01);
 
-    // 增量编译（有脏实体）应与全量编译结果等价
     compiler.invalidateCache();
     ctx.clearDirty();
-    RenderFrame fullFrame2 = compiler.compile(&doc, ctx);
+    RenderFrame fullFrame2 = compiler.compile(&scene, ctx);
 
-    auto line = doc.createLine(QPointF(300, 300), QPointF(400, 400));
-    compiler.markEntityDirty(line->id());
+    auto newLine = std::make_unique<Eg::SyLine>(
+        std::vector<Ut::Vec2d>{ Ut::Vec2d(300, 300), Ut::Vec2d(400, 400) });
+    auto newId = newLine->id;
+    scene.addEntity(newLine.release());
+    compiler.markEntityDirty(QString::number(newId));
     ctx.clearDirty();
-    RenderFrame incFrame2 = compiler.compile(&doc, ctx);
+    RenderFrame incFrame2 = compiler.compile(&scene, ctx);
 
-    // 增量编译后 batchCount 应与全量编译一致
-    EXPECT_EQ(incFrame2.batchCount(), fullFrame2.batchCount() + 1); // 新增1个实体
+    EXPECT_EQ(incFrame2.batchCount(), fullFrame2.batchCount() + 1);
     EXPECT_EQ(incFrame2.entityCount(), fullFrame2.entityCount() + 1);
 }
 

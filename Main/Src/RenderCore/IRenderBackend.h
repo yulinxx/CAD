@@ -1,17 +1,11 @@
 #pragma once
 
-#include <QString>
-#include <QStringList>
-#include <QSize>
-#include <QImage>
-
 #include <memory>
+#include <string>
 
 #include "RenderCoreApi.h"
 #include "RenderTypes.h"
 
-class EntityDocument2D;
-class SceneDocument3D;
 class CameraController3D;
 struct RenderContext;
 struct RenderFrame;
@@ -64,14 +58,8 @@ public:
 
     // ============ 场景绑定 ============
 
-    /// 绑定 2D 场景文档（旧版 EntityDocument2D 路径）
-    virtual void setScene(EntityDocument2D* document) = 0;
-
-    /// 绑定 2D 场景（新版 Eg::SceneManager 路径）
+    /// 绑定场景（通过 Eg::SceneManager 统一入口，2D/3D 场景均通过此接口）
     virtual void setScene(Eg::SceneManager* scene) = 0;
-
-    /// 绑定 3D 场景文档
-    virtual void setScene(SceneDocument3D* document) = 0;
 
     /// 绑定相机控制器
     virtual void setCamera(CameraController3D* controller) = 0;
@@ -96,7 +84,7 @@ public:
     // ============ 视口控制 ============
 
     /// 调整视口大小
-    virtual void resize(const QSize& size) = 0;
+    virtual void resize(const Size2D& size) = 0;
 
     /// 重置视图
     virtual void resetView() = 0;
@@ -118,7 +106,7 @@ public:
     // ============ 帧输出 ============
 
     /// 捕获当前帧为调试快照（软件后端直接使用，GPU 后端通过 glReadPixels）
-    virtual QImage captureFrame() const = 0;
+    virtual ImageBuffer captureFrame() const = 0;
 
     /// 获取上一帧的渲染统计
     virtual RenderStatistics getStatistics() const = 0;
@@ -126,7 +114,7 @@ public:
     // ============ 后端信息 ============
 
     /// 当前后端类型名称
-    virtual QString backendName() const = 0;
+    virtual std::string backendName() const = 0;
 
     /// 查询后端是否支持指定能力
     virtual bool supportsCapability(BackendCapability cap) const = 0;

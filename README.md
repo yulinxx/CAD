@@ -271,7 +271,7 @@ set(VCPKG_DIR "C:/Users/xx/vcpkg/" CACHE PATH "VCPKG installation directory")
 set(QT_VERSION_MAJOR 6 CACHE STRING "Major version of Qt")
 
 # Qt 安装路径
-set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.11.0/msvc2022_64" CACHE PATH "Qt installation directory")
+set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.11.1/msvc2022_64" CACHE PATH "Qt installation directory")
 ```
 
 2. 编译选项配置：

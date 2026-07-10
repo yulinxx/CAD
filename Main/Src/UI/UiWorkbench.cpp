@@ -6,11 +6,16 @@
 #include <QToolBar>
 #include <QWidget>
 
+#include "SceneDocument2D.h"
 #include "UiCommandDispatcher.h"
 #include "UiEntities.h"
 #include "UiServices.h"
 #include "UiStateCenter.h"
+#include "UiViewport3D.h"
+#include "UiSceneTreeDock.h"
+#include "UiPropertiesPanel.h"
 #include "UiViewWidgets.h"
+#include "Engine2D/SyEntity/SyLine.h"
 #include "DrawToolBarWidget.h"
 #include "SceneBuilder2D.h"
 #include "SceneBuilder3D.h"
@@ -37,7 +42,7 @@ namespace
     /// @param text 动作文本
     QAction* addWorkbenchAction(QToolBar* bar, const QString& text)
     {
-        return bar->addAction(text);
+        return bar->addAction(QObject::tr(text.toUtf8().constData()));
     }
 
     /// 统一设置工作台初始状态
@@ -100,8 +105,8 @@ namespace
     }
 
     /// 配置 2D 视口
-    void configure2DViewport(CanvasViewport2D* viewport, const UiServices& services,
-        EntityDocument2D* document, PropertiesPanelWidget* properties)
+    void configure2DViewport(Viewport2D* viewport, const UiServices& services,
+        SceneDocument2D* document, PropertiesPanelWidget* properties)
     {
         if (!viewport)
             return;
@@ -148,21 +153,21 @@ namespace
     }
 
     /// 更新 2D 对象详情到属性面板
-    /// 当前由工作台拼装数据，后续应由 OperationResult 提供
-    void update2DDetails(PropertiesPanelWidget* panel, EntityDocument2D* doc, const QString& selectedId)
+    void update2DDetails(PropertiesPanelWidget* panel, SceneDocument2D* doc, const QString& selectedId)
     {
         if (!panel || !doc)
             return;
 
-        auto line = doc->lineById(selectedId);
-        if (!line)
+        auto* entity = doc->entityByStringId(selectedId);
+        if (!entity || entity->eType != Eg::EType::LINE)
+            return;
+        auto* line = static_cast<Eg::SyLine*>(entity);
+        if (line->vPoints.size() < 2)
             return;
 
-        panel->setObjectDetails(QStringLiteral("Line %1").arg(line->id()), {
-            QStringLiteral("Start: %1,%2").arg(line->start().x()).arg(line->start().y()),
-            QStringLiteral("End: %1,%2").arg(line->end().x()).arg(line->end().y()),
-            QStringLiteral("Bounds: %1,%2 -> %3,%4").arg(line->bounds().left()).arg(line->bounds().top())
-                .arg(line->bounds().right()).arg(line->bounds().bottom())
+        panel->setObjectDetails(QObject::tr("Line %1").arg(selectedId), {
+            QObject::tr("Start: %1,%2").arg(line->vPoints[0].x()).arg(line->vPoints[0].y()),
+            QObject::tr("End: %1,%2").arg(line->vPoints[1].x()).arg(line->vPoints[1].y()),
         });
     }
 
@@ -173,15 +178,24 @@ namespace
         if (!panel || !doc)
             return;
 
-        auto node = doc->nodeById(selectedId);
+        auto node = doc->nodeById(selectedId.toStdString());
         if (!node)
             return;
 
-        panel->setObjectDetails(QStringLiteral("Node %1").arg(node->id()), {
-            QStringLiteral("Name: %1").arg(node->name()),
-            QStringLiteral("Children: %1").arg(node->children().size()),
-            QStringLiteral("Path: %1").arg(node->pathNamesRecursive().join(QStringLiteral(" / "))),
-            QStringLiteral("Selected: yes")
+        const auto pathNames = node->pathNamesRecursive();
+        QString pathStr;
+        for (size_t i = 0; i < pathNames.size(); ++i)
+        {
+            if (i > 0)
+                pathStr += QObject::tr(" / ");
+            pathStr += QString::fromStdString(pathNames[i]);
+        }
+
+        panel->setObjectDetails(QObject::tr("Node %1").arg(QString::fromStdString(node->id())), {
+            QObject::tr("Name: %1").arg(QString::fromStdString(node->name())),
+            QObject::tr("Children: %1").arg(node->children().size()),
+            QObject::tr("Path: %1").arg(pathStr),
+            QObject::tr("Selected: yes")
         });
     }
 }
@@ -257,46 +271,45 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
 
     // 步骤2.3: 创建文档
     auto sceneResult = SceneBuilder2D::createDefaultScene();
-    m_document = sceneResult.document;
-    auto firstLine = sceneResult.primaryLine;
-    auto secondLine = sceneResult.secondaryLine;
+    m_document = std::move(sceneResult.document);
+    auto primaryId = sceneResult.primaryLineId;
+    auto secondaryId = sceneResult.secondaryLineId;
 
     // 步骤2.4: 创建属性面板
     auto* properties = new PropertiesPanelWidget(&window);
     properties->setWorkbenchMode(PropertiesPanelWidget::WorkbenchMode::TwoD);
-    configureWorkbenchPanels(properties, firstLine, secondLine);
+    configureWorkbenchPanels(properties);
     window.registerDockWidget(QStringLiteral("2D Properties"), properties, Qt::RightDockWidgetArea);
 
     // 步骤2.5: 创建命令面板
-    auto* commandPanel = createPanelWidget(QStringLiteral("Command panel"), &window);
-    window.registerDockWidget(QStringLiteral("2D Command"), commandPanel, Qt::BottomDockWidgetArea);
+    auto* commandPanel = createPanelWidget(QObject::tr("Command panel"), &window); // 命令面板
+    window.registerDockWidget(QObject::tr("2D Command"), commandPanel, Qt::BottomDockWidgetArea); // 2D 命令
 
     // 步骤2.6: 创建工具栏并绑定操作
-    auto* mainBar = window.registerToolBar(QStringLiteral("2D Main"));
-    auto* viewBar = window.registerToolBar(QStringLiteral("2D View"));
+    auto* mainBar = window.registerToolBar(QObject::tr("2D Main")); // 2D 主工具栏
+    auto* viewBar = window.registerToolBar(QObject::tr("2D View")); // 2D 视图工具栏
     configureWorkbenchActions(mainBar, viewBar);
 
     // 步骤2.7: 创建视口并设置为中央组件
     window.setCentralWidget(createCentralViewport(window, properties));
-    // 当前由工作台拼装属性数据，后续应由 OperationResult 提供
     if (properties)
     {
-        properties->setSelectionText(QStringLiteral("Selected: %1, %2").arg(firstLine->id(), secondLine->id()));
-        properties->setObjectDetails(QStringLiteral("2D Selection"), {
-            QStringLiteral("Primary: %1").arg(firstLine->id()),
-            QStringLiteral("Secondary: %1").arg(secondLine->id()),
-            QStringLiteral("Mode: %1").arg(QStringLiteral("2D"))
+        properties->setSelectionText(QObject::tr("Selected: %1, %2").arg(primaryId, secondaryId)); // 已选: %1, %2
+        properties->setObjectDetails(QObject::tr("2D Selection"), { // 2D 选择
+            QObject::tr("Primary: %1").arg(primaryId), // 主选: %1
+            QObject::tr("Secondary: %1").arg(secondaryId), // 次选: %1
+            QObject::tr("Mode: %1").arg(QObject::tr("2D")) // 模式: 2D
         });
     }
 
-    m_initialState.viewMode = QStringLiteral("2D Canvas");
-    m_initialState.layerId = QStringLiteral("Default");
-    m_initialState.documentId = QStringLiteral("2D Document");
-    m_initialState.selectionSource = QStringLiteral("2D-Init");
-    m_initialState.selectionText = QStringLiteral("Selected: %1, %2").arg(firstLine->id(), secondLine->id());
-    m_initialState.selectionType = QStringLiteral("2D");
-    m_initialState.viewportType = QStringLiteral("2D");
-    m_initialState.viewportStatus = QStringLiteral("2D ready");
+    m_initialState.viewMode = QObject::tr("2D Canvas"); // 2D 画布
+    m_initialState.layerId = QObject::tr("Default"); // 默认
+    m_initialState.documentId = QObject::tr("2D Document"); // 2D 文档
+    m_initialState.selectionSource = QObject::tr("2D-Init"); // 2D-初始化
+    m_initialState.selectionText = QObject::tr("Selected: %1, %2").arg(primaryId, secondaryId); // 已选: %1, %2
+    m_initialState.selectionType = QObject::tr("2D"); // 2D
+    m_initialState.viewportType = QObject::tr("2D"); // 2D
+    m_initialState.viewportStatus = QObject::tr("2D ready"); // 2D 就绪
     m_initialState.dirty = false;
 }
 
@@ -304,14 +317,14 @@ QWidget* Workbench2D::createCentralViewport(WorkbenchWindow& window, PropertiesP
 {
     if (m_useLegacyCanvasViewport)
     {
-        auto* legacyViewport = new CanvasViewport2D(&window);
+        auto* legacyViewport = new Viewport2D(&window);
         configureLegacyViewport(legacyViewport, properties);
         legacyViewport->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         legacyViewport->setMinimumSize(800, 600);
         return legacyViewport;
     }
 
-    auto* viewport = new CanvasViewport2D(&window);
+    auto* viewport = new Viewport2D(&window);
     configureModernViewport(viewport);
     viewport->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     viewport->setMinimumSize(800, 600);
@@ -325,35 +338,23 @@ void Workbench2D::configureModernViewport(QWidget* viewport) const
     viewport->setObjectName(QStringLiteral("Modern2DViewport"));
 }
 
-void Workbench2D::configureWorkbenchPanels(PropertiesPanelWidget* properties,
-    const std::shared_ptr<LineEntity2D>& firstLine,
-    const std::shared_ptr<LineEntity2D>& secondLine) const
+void Workbench2D::configureWorkbenchPanels(PropertiesPanelWidget* properties) const
 {
-    if (!properties || !firstLine || !secondLine)
+    if (!properties)
         return;
 
     PropertiesPanelWidget::PropertiesData data;
     data.mode = PropertiesPanelWidget::WorkbenchMode::TwoD;
-    data.stateText = QStringLiteral("2D ready");
-    data.selectionText = QStringLiteral("Selected: %1, %2").arg(firstLine->id(), secondLine->id());
-    data.documentType = QStringLiteral("EntityDocument2D");
-    data.documentStatus = QStringLiteral("Ready");
+    data.stateText = QObject::tr("2D ready"); // 2D 就绪
+    data.documentType = QObject::tr("SceneDocument2D"); // 场景文档2D
+    data.documentStatus = QObject::tr("Ready"); // 就绪
     data.modeSpecificFields = {
-        QStringLiteral("Mode: 2D Canvas"),
-        QStringLiteral("Layers: Default"),
-        QStringLiteral("View: Canvas")
-    };
-    data.objectTitle = QStringLiteral("2D Selection");
-    data.objectLines = {
-        QStringLiteral("Primary: %1").arg(firstLine->id()),
-        QStringLiteral("Secondary: %1").arg(secondLine->id()),
-        QStringLiteral("Mode: %1").arg(QStringLiteral("2D"))
+        QObject::tr("Mode: 2D Canvas"), // 模式: 2D 画布
+        QObject::tr("Layers: Default"), // 图层: 默认
+        QObject::tr("View: Canvas") // 视图: 画布
     };
 
     properties->setPropertiesData(data);
-
-    if (m_document)
-        update2DDetails(properties, m_document.get(), firstLine->id());
 }
 
 void Workbench2D::configureWorkbenchActions(QToolBar* mainBar, QToolBar* viewBar) const
@@ -362,32 +363,25 @@ void Workbench2D::configureWorkbenchActions(QToolBar* mainBar, QToolBar* viewBar
         return;
 
     // 工具栏绑定 — 优先使用 OperationBus，旧 dispatcher 仅作过渡兼容
-    auto* drawLine = addWorkbenchAction(mainBar, QStringLiteral("Draw Line"));
-    auto* drawPolyline = addWorkbenchAction(mainBar, QStringLiteral("Draw Polyline"));
-    auto* measure = addWorkbenchAction(mainBar, QStringLiteral("Measure"));
-    auto* deleteEntity = addWorkbenchAction(mainBar, QStringLiteral("Delete"));
-    auto* editEntity = addWorkbenchAction(mainBar, QStringLiteral("Edit"));
-    auto* selectEntity = addWorkbenchAction(mainBar, QStringLiteral("Select"));
-    auto* zoomExtents = addWorkbenchAction(viewBar, QStringLiteral("Zoom Extents"));
-    auto* pan = addWorkbenchAction(viewBar, QStringLiteral("Pan"));
+    // 绘图工具（Draw Line、Draw Polyline、Select、Measure）已移至左侧工具栏，此处只保留编辑和视图操作
+    auto* deleteEntity = addWorkbenchAction(mainBar, QStringLiteral("Delete")); // 删除
+    auto* editEntity = addWorkbenchAction(mainBar, QStringLiteral("Edit"));     // 编辑
+    auto* copyEntity = addWorkbenchAction(mainBar, QStringLiteral("Copy"));     // 复制
+    auto* rotateEntity = addWorkbenchAction(mainBar, QStringLiteral("Rotate")); // 旋转
+    auto* zoomExtents = addWorkbenchAction(viewBar, QStringLiteral("Zoom Extents")); // 缩放全图
+    auto* pan = addWorkbenchAction(viewBar, QStringLiteral("Pan"));             // 平移
 
     // 新操作优先通过 OperationBus 绑定
     if (m_services.operationBus)
     {
-        QObject::connect(drawLine, &QAction::triggered, [this]() {
-            m_services.operationBus->run(OperationId::Tool_Line, {}, OperationSource::TopToolbar);
-        });
-        QObject::connect(drawPolyline, &QAction::triggered, [this]() {
-            m_services.operationBus->run(OperationId::Tool_Polyline, {}, OperationSource::TopToolbar);
-        });
-        QObject::connect(measure, &QAction::triggered, [this]() {
-            m_services.operationBus->run(OperationId::Tool_Select, {}, OperationSource::TopToolbar);
-        });
         QObject::connect(deleteEntity, &QAction::triggered, [this]() {
             m_services.operationBus->run(OperationId::Edit_Delete, {}, OperationSource::TopToolbar);
         });
-        QObject::connect(selectEntity, &QAction::triggered, [this]() {
-            m_services.operationBus->run(OperationId::Tool_Select, {}, OperationSource::TopToolbar);
+        QObject::connect(copyEntity, &QAction::triggered, [this]() {
+            m_services.operationBus->run(OperationId::Edit_Copy, {}, OperationSource::TopToolbar);
+        });
+        QObject::connect(rotateEntity, &QAction::triggered, [this]() {
+            m_services.operationBus->run(OperationId::Edit_Rotate, {}, OperationSource::TopToolbar);
         });
         QObject::connect(zoomExtents, &QAction::triggered, [this]() {
             m_services.operationBus->run(OperationId::View_ZoomFit, {}, OperationSource::TopToolbar);
@@ -397,14 +391,12 @@ void Workbench2D::configureWorkbenchActions(QToolBar* mainBar, QToolBar* viewBar
     // 过渡期：保留旧 dispatcher 绑定作为兜底
     if (m_services.commandDispatcher)
     {
-        m_services.commandDispatcher->bindAction(drawLine, QStringLiteral("2d.draw_line"));
-        m_services.commandDispatcher->bindAction(drawPolyline, QStringLiteral("2d.draw_polyline"));
-        m_services.commandDispatcher->bindAction(measure, QStringLiteral("2d.measure"));
         m_services.commandDispatcher->bindAction(zoomExtents, QStringLiteral("2d.zoom_extents"));
         m_services.commandDispatcher->bindAction(pan, QStringLiteral("2d.pan"));
         m_services.commandDispatcher->bindAction(deleteEntity, QStringLiteral("2d.delete"));
         m_services.commandDispatcher->bindAction(editEntity, QStringLiteral("2d.edit"));
-        m_services.commandDispatcher->bindAction(selectEntity, QStringLiteral("2d.select"));
+        m_services.commandDispatcher->bindAction(copyEntity, QStringLiteral("2d.copy"));
+        m_services.commandDispatcher->bindAction(rotateEntity, QStringLiteral("2d.rotate"));
     }
 }
 
@@ -416,7 +408,7 @@ SceneTreeDockWidget* Workbench2D::createLayersDock(WorkbenchWindow& window) cons
     return sceneDock;
 }
 
-void Workbench2D::configureLegacyViewport(CanvasViewport2D* viewport, PropertiesPanelWidget* properties)
+void Workbench2D::configureLegacyViewport(Viewport2D* viewport, PropertiesPanelWidget* properties)
 {
     configure2DViewport(viewport, m_services, m_document.get(), properties);
     // 传递操作总线引用给视口
@@ -478,35 +470,35 @@ void Workbench3D::build3DScenePanels(WorkbenchWindow& window, PropertiesPanelWid
 
     properties = new PropertiesPanelWidget(&window);
     properties->setObjectName(QStringLiteral("PropertiesPanel3D"));
-    properties->setWindowTitle(QStringLiteral("3D Inspector"));
+    properties->setWindowTitle(QObject::tr("3D Inspector")); // 3D 检查器
 
     PropertiesPanelWidget::PropertiesData data;
     data.mode = PropertiesPanelWidget::WorkbenchMode::ThreeD;
-    data.stateText = QStringLiteral("3D ready");
-    data.selectionText = QStringLiteral("Root node: %1").arg(rootNodeId);
-    data.documentType = QStringLiteral("SceneDocument3D");
-    data.documentStatus = QStringLiteral("Ready");
+    data.stateText = QObject::tr("3D ready"); // 3D 就绪
+    data.selectionText = QObject::tr("Root node: %1").arg(rootNodeId); // 根节点: %1
+    data.documentType = QObject::tr("SceneDocument3D"); // 场景文档3D
+    data.documentStatus = QObject::tr("Ready"); // 就绪
     data.modeSpecificFields = {
-        QStringLiteral("Mode: 3D Viewport"),
-        QStringLiteral("Transform: Position/Rotation/Scale"),
-        QStringLiteral("Material: Default")
+        QObject::tr("Mode: 3D Viewport"), // 模式: 3D 视口
+        QObject::tr("Transform: Position/Rotation/Scale"), // 变换: 位置/旋转/缩放
+        QObject::tr("Material: Default") // 材质: 默认
     };
     properties->setPropertiesData(data);
     update3DDetails(properties, m_scene.get(), rootNodeId);
-    window.registerDockWidget(QStringLiteral("3D Inspector"), properties, Qt::RightDockWidgetArea);
+    window.registerDockWidget(QObject::tr("3D Inspector"), properties, Qt::RightDockWidgetArea); // 3D 检查器
 
     sceneDock = new SceneTreeDockWidget(&window);
     sceneDock->setSceneDocument(m_scene.get());
     sceneDock->setObjectName(QStringLiteral("SceneTreeDock3D"));
-    sceneDock->setWindowTitle(QStringLiteral("3D Scene"));
+    sceneDock->setWindowTitle(QObject::tr("3D Scene")); // 3D 场景
     // 树选中时的单向流 — 用户点击树节点 → 更新 selection → 刷新视口和属性面板
     sceneDock->setSelectionCallback([this, sceneDock, properties, &window](const QString& nodeId) {
         onSceneTreeSelection(nodeId, sceneDock, properties, window);
     });
-    window.registerDockWidget(QStringLiteral("3D Scene"), sceneDock, Qt::LeftDockWidgetArea);
+    window.registerDockWidget(QObject::tr("3D Scene"), sceneDock, Qt::LeftDockWidgetArea); // 3D 场景
 
-    auto* history = createPanelWidget(QStringLiteral("Operation history"), &window);
-    window.registerDockWidget(QStringLiteral("3D History"), history, Qt::BottomDockWidgetArea);
+    auto* history = createPanelWidget(QObject::tr("Operation history"), &window); // 操作历史
+    window.registerDockWidget(QObject::tr("3D History"), history, Qt::BottomDockWidgetArea); // 3D 历史
 }
 
 // 3D 树选择回调 — 单向流：树节点 → selection → 视口 + 属性面板
@@ -518,7 +510,7 @@ void Workbench3D::onSceneTreeSelection(const QString& nodeId, SceneTreeDockWidge
 
     // 第一步：更新 selection，这是唯一的选择写入点
     m_scene->selection().clear();
-    auto node = m_scene->nodeById(nodeId);
+    auto node = m_scene->nodeById(nodeId.toStdString());
     if (node)
         m_scene->selection().add(node);
 
@@ -529,17 +521,28 @@ void Workbench3D::onSceneTreeSelection(const QString& nodeId, SceneTreeDockWidge
     if (properties)
     {
         if (node)
-            properties->setObjectDetails(QStringLiteral("Node %1").arg(node->id()), {
-                QStringLiteral("Name: %1").arg(node->name()),
-                QStringLiteral("Children: %1").arg(node->children().size()),
-                QStringLiteral("Path: %1").arg(node->pathNamesRecursive().join(QStringLiteral(" / "))),
-                QStringLiteral("Selected: yes")
+        {
+            const auto pathNames = node->pathNamesRecursive();
+            QString pathStr;
+            for (size_t i = 0; i < pathNames.size(); ++i)
+            {
+                if (i > 0)
+                    pathStr += QObject::tr(" / ");
+                pathStr += QString::fromStdString(pathNames[i]);
+            }
+
+            properties->setObjectDetails(QObject::tr("Node %1").arg(QString::fromStdString(node->id())), {
+                QObject::tr("Name: %1").arg(QString::fromStdString(node->name())),
+                QObject::tr("Children: %1").arg(node->children().size()),
+                QObject::tr("Path: %1").arg(pathStr),
+                QObject::tr("Selected: yes")
             });
+        }
     }
 
     // 第四步：更新 UI 状态
     if (m_services.stateCenter)
-        m_services.stateCenter->setSelectionContext(QStringLiteral("3D-Tree"), QStringLiteral("3D node: %1").arg(nodeId));
+        m_services.stateCenter->setSelectionContext(QObject::tr("3D-Tree"), QObject::tr("3D node: %1").arg(nodeId));
 
     // 第五步：同步视口选中状态
     if (auto* viewport = qobject_cast<Viewport3D*>(window.centralWidget()))
@@ -549,16 +552,16 @@ void Workbench3D::onSceneTreeSelection(const QString& nodeId, SceneTreeDockWidge
 // 步骤2.2: 创建工具栏并绑定操作
 void Workbench3D::build3DToolBars(WorkbenchWindow& window)
 {
-    auto* mainBar = window.registerToolBar(QStringLiteral("3D Main"));
-    auto* orbit = addWorkbenchAction(mainBar, QStringLiteral("Orbit"));
-    auto* orbitSelected = addWorkbenchAction(mainBar, QStringLiteral("Orbit Selected"));
-    auto* measure = addWorkbenchAction(mainBar, QStringLiteral("Measure"));
-    auto* selectEntity = addWorkbenchAction(mainBar, QStringLiteral("Select"));
+    auto* mainBar = window.registerToolBar(QObject::tr("3D Main")); // 3D 主工具栏
+    auto* orbit = addWorkbenchAction(mainBar, QObject::tr("Orbit")); // 轨道旋转
+    auto* orbitSelected = addWorkbenchAction(mainBar, QObject::tr("Orbit Selected")); // 轨道选中
+    auto* measure = addWorkbenchAction(mainBar, QObject::tr("Measure")); // 测量
+    auto* selectEntity = addWorkbenchAction(mainBar, QObject::tr("Select")); // 选择
 
-    auto* navBar = window.registerToolBar(QStringLiteral("3D Navigation"));
-    auto* top = addWorkbenchAction(navBar, QStringLiteral("Top"));
-    auto* front = addWorkbenchAction(navBar, QStringLiteral("Front"));
-    auto* right = addWorkbenchAction(navBar, QStringLiteral("Right"));
+    auto* navBar = window.registerToolBar(QObject::tr("3D Navigation")); // 3D 导航
+    auto* top = addWorkbenchAction(navBar, QObject::tr("Top")); // 顶视
+    auto* front = addWorkbenchAction(navBar, QObject::tr("Front")); // 前视
+    auto* right = addWorkbenchAction(navBar, QObject::tr("Right")); // 右视
 
     if (m_services.commandDispatcher)
     {
@@ -580,7 +583,7 @@ QWidget* Workbench3D::build3DViewport(WorkbenchWindow& window, PropertiesPanelWi
     // 路径变更时刷新树和属性面板
     viewport->setPathCallback([properties, sceneDock](const QStringList& pathNames) {
         if (properties)
-            properties->setObjectDetails(QStringLiteral("3D Path"), pathNames);
+            properties->setObjectDetails(QObject::tr("3D Path"), pathNames); // 3D 路径
         if (sceneDock)
             sceneDock->refresh();
     });
@@ -593,14 +596,14 @@ QWidget* Workbench3D::build3DViewport(WorkbenchWindow& window, PropertiesPanelWi
 void Workbench3D::init3DInitialState(const SceneDocument3D& scene, const QString& rootNodeId)
 {
     Q_UNUSED(scene);
-    m_initialState.viewMode = QStringLiteral("3D Viewport");
-    m_initialState.layerId = QStringLiteral("Scene");
-    m_initialState.documentId = QStringLiteral("3D Scene");
-    m_initialState.selectionSource = QStringLiteral("3D-Init");
-    m_initialState.selectionText = QStringLiteral("Root node: %1").arg(rootNodeId);
-    m_initialState.selectionType = QStringLiteral("3D");
-    m_initialState.viewportType = QStringLiteral("3D");
-    m_initialState.viewportStatus = QStringLiteral("3D ready");
+    m_initialState.viewMode = QObject::tr("3D Viewport"); // 3D 视口
+    m_initialState.layerId = QObject::tr("Scene"); // 场景
+    m_initialState.documentId = QObject::tr("3D Scene"); // 3D 场景
+    m_initialState.selectionSource = QObject::tr("3D-Init"); // 3D 初始化
+    m_initialState.selectionText = QObject::tr("Root node: %1").arg(rootNodeId); // 根节点: %1
+    m_initialState.selectionType = QObject::tr("3D"); // 3D
+    m_initialState.viewportType = QObject::tr("3D"); // 3D
+    m_initialState.viewportStatus = QObject::tr("3D ready"); // 3D 就绪
     m_initialState.dirty = false;
 }
 

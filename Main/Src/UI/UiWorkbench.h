@@ -5,14 +5,13 @@
 #include <memory>
 
 #include "UiEntities.h"
-#include "UiViewWidgets.h"
 #include "UiServices.h"
 
 class QWidget;
 class QToolBar;
 class WorkbenchWindow;
 class PropertiesPanelWidget;
-class CanvasViewport2D;
+class Viewport2D;
 class SceneTreeDockWidget;
 class ViewWidgetAdapter;
 
@@ -150,11 +149,7 @@ private:
     void configureModernViewport(QWidget* viewport) const;
     /// 配置工作台的默认对象与状态面板内容
     /// @param properties 属性面板
-    /// @param firstLine 主选中线
-    /// @param secondLine 次选中线
-    void configureWorkbenchPanels(PropertiesPanelWidget* properties,
-        const std::shared_ptr<LineEntity2D>& firstLine,
-        const std::shared_ptr<LineEntity2D>& secondLine) const;
+    void configureWorkbenchPanels(PropertiesPanelWidget* properties) const;
     /// 创建并注册 2D 工具面板
     /// @param window 主窗口
     /// @return 创建后的停靠面板指针
@@ -165,23 +160,19 @@ private:
     void configureWorkbenchActions(QToolBar* mainBar, QToolBar* viewBar) const;
     /// 配置工作台初始状态与属性面板文本
     /// @param properties 属性面板
-    /// @param firstLine 主选中线
-    /// @param secondLine 次选中线
-    void configureInitialWorkbenchState(PropertiesPanelWidget* properties,
-        const std::shared_ptr<LineEntity2D>& firstLine,
-        const std::shared_ptr<LineEntity2D>& secondLine) const;
-    /// 配置旧版 CanvasViewport2D 的运行状态
-    /// @param viewport 旧版 2D 视口
+    void configureInitialWorkbenchState(PropertiesPanelWidget* properties) const;
+    /// 配置旧版 Viewport2D 的运行状态
+    /// @param viewport 2D 视口
     /// @param properties 属性面板
-    void configureLegacyViewport(CanvasViewport2D* viewport, PropertiesPanelWidget* properties);
+    void configureLegacyViewport(Viewport2D* viewport, PropertiesPanelWidget* properties);
 
 private:
-    /// 是否使用旧版 CanvasViewport2D 作为临时回退
+    /// 是否使用旧版 Viewport2D 作为临时回退
     bool m_useLegacyCanvasViewport{ false };
     /// ViewWidget 适配器，让 OperationBus 能在旧系统中工作
     std::unique_ptr<class ViewWidgetAdapter> m_viewWidgetAdapter;
-    /// 2D 实体文档
-    std::shared_ptr<EntityDocument2D> m_document;
+    /// 2D 场景文档
+    std::shared_ptr<SceneDocument2D> m_document;
 };
 
 // ============================================================ 

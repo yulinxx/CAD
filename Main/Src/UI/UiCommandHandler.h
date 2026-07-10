@@ -9,11 +9,9 @@
 #include <vector>
 
 #include "UiServices.h"
-#include "UiEntities.h"
 
-class EntityDocument2D;
+class SceneDocument2D;
 class UndoCommand;
-class ITransformable;
 
 /**
  * @file UiCommandHandler.h
@@ -168,7 +166,7 @@ struct CommandPreview
  *
  * 状态机与视图刷新边界：
  * - commit() 后统一发刷新信号（由 Dispatcher::submit() 统一触发）
- * - 选择变化统一发选择变更信号（由 EntityDocument2D::selection() 统一管理）
+ * - 选择变化由 SceneDocument2D / Eg::SceneManager 统一管理
  * - 预览变化只刷新预览层（通过 CommandPreview 接口，不影响文档）
  * - 命令状态变化不直接操作 UI 细节（通过 StateCenter 统一同步）
  */
@@ -433,13 +431,13 @@ public:
     bool isComplete() const override;
     CommandPreview preview() const override;
 
-    void setDocument(EntityDocument2D* document);
+    void setDocument(SceneDocument2D* document);
 
 private:
     CommandState m_state{ CommandState::Idle };
     PointPickerTool m_pointPicker;
     const UiServices* m_services{ nullptr };
-    EntityDocument2D* m_document{ nullptr };
+    SceneDocument2D* m_document{ nullptr };
     QPointF m_previewStart;
     QPointF m_previewEnd;
     QString m_createdEntityId;
@@ -474,7 +472,7 @@ public:
     bool isComplete() const override;
     CommandPreview preview() const override;
 
-    void setDocument(EntityDocument2D* document);
+    void setDocument(SceneDocument2D* document);
     void setSelectedEntityId(const QString& entityId);
 
 private:
@@ -482,7 +480,7 @@ private:
 
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
-    EntityDocument2D* m_document{ nullptr };
+    SceneDocument2D* m_document{ nullptr };
     QString m_selectedEntityId;
     QString m_oldSelectedId;
     bool m_boxSelecting{ false };
@@ -497,14 +495,14 @@ private:
 class MoveUndoCommand : public UndoCommand
 {
 public:
-    MoveUndoCommand(EntityDocument2D* document,
+    MoveUndoCommand(SceneDocument2D* document,
                     std::map<QString, std::vector<QPointF>> originalPositions);
 
     void undo() override;
     void redo() override;
 
 private:
-    EntityDocument2D* m_document{ nullptr };
+    SceneDocument2D* m_document{ nullptr };
     std::map<QString, std::vector<QPointF>> m_originalPositions;
     std::map<QString, std::vector<QPointF>> m_newPositions;
 };
@@ -512,11 +510,11 @@ private:
 class CircleUndoCommand : public UndoCommand
 {
 public:
-    CircleUndoCommand(EntityDocument2D* document, const QString& entityId);
+    CircleUndoCommand(SceneDocument2D* document, const QString& entityId);
     void undo() override;
     void redo() override;
 private:
-    EntityDocument2D* m_document{ nullptr };
+    SceneDocument2D* m_document{ nullptr };
     QString m_entityId;
     QPointF m_center;
     double m_radius{ 0.0 };
@@ -525,11 +523,11 @@ private:
 class PolylineUndoCommand : public UndoCommand
 {
 public:
-    PolylineUndoCommand(EntityDocument2D* document, const QString& entityId);
+    PolylineUndoCommand(SceneDocument2D* document, const QString& entityId);
     void undo() override;
     void redo() override;
 private:
-    EntityDocument2D* m_document{ nullptr };
+    SceneDocument2D* m_document{ nullptr };
     QString m_entityId;
     QVector<QPointF> m_points;
 };
@@ -537,13 +535,12 @@ private:
 class CopyUndoCommand : public UndoCommand
 {
 public:
-    CopyUndoCommand(EntityDocument2D* document, const QStringList& copiedEntityIds);
+    CopyUndoCommand(SceneDocument2D* document, const QStringList& copiedEntityIds);
     void undo() override;
     void redo() override;
 private:
-    EntityDocument2D* m_document{ nullptr };
+    SceneDocument2D* m_document{ nullptr };
     QStringList m_copiedEntityIds;
-    std::vector<std::shared_ptr<UiEntity>> m_copiedEntities;
 };
 
 /**
@@ -584,7 +581,7 @@ public:
     bool isComplete() const override;
     CommandPreview preview() const override;
 
-    void setDocument(EntityDocument2D* document);
+    void setDocument(SceneDocument2D* document);
 
 private:
     /// 保存选中实体的原始位置（用于撤销）
@@ -594,7 +591,7 @@ private:
 
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
-    EntityDocument2D* m_document{ nullptr };
+    SceneDocument2D* m_document{ nullptr };
     QPointF m_anchorPoint;       ///< 移动起点
     QPointF m_targetPoint;       ///< 移动终点
     bool m_hasAnchor{ false };   ///< 是否已拾取锚点
@@ -625,7 +622,7 @@ public:
     UndoCommand* createUndoCommand() override;
     bool isComplete() const override;
 
-    void setDocument(EntityDocument2D* document);
+    void setDocument(SceneDocument2D* document);
 
     const QPointF& rotationCenter() const { return m_rotationCenter; }
     double startAngle() const { return m_startAngle; }
@@ -637,7 +634,7 @@ private:
 
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
-    EntityDocument2D* m_document{ nullptr };
+    SceneDocument2D* m_document{ nullptr };
     QPointF m_rotationCenter;
     QPointF m_startPoint;
     double m_startAngle{ 0.0 };
@@ -669,12 +666,12 @@ public:
     bool isComplete() const override;
     CommandPreview preview() const override;
 
-    void setDocument(EntityDocument2D* document);
+    void setDocument(SceneDocument2D* document);
 
 private:
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
-    EntityDocument2D* m_document{ nullptr };
+    SceneDocument2D* m_document{ nullptr };
     QPointF m_center;
     QPointF m_endPoint;
     QString m_createdEntityId;
@@ -704,13 +701,13 @@ public:
     bool isComplete() const override;
     CommandPreview preview() const override;
 
-    void setDocument(EntityDocument2D* document);
+    void setDocument(SceneDocument2D* document);
     void finish();
 
 private:
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
-    EntityDocument2D* m_document{ nullptr };
+    SceneDocument2D* m_document{ nullptr };
     QVector<QPointF> m_points;
     QPointF m_currentPoint;
     bool m_completed{ false };
@@ -740,12 +737,12 @@ public:
     bool isComplete() const override;
     CommandPreview preview() const override;
 
-    void setDocument(EntityDocument2D* document);
+    void setDocument(SceneDocument2D* document);
 
 private:
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
-    EntityDocument2D* m_document{ nullptr };
+    SceneDocument2D* m_document{ nullptr };
     QPointF m_anchorPoint;
     QPointF m_targetPoint;
     bool m_hasAnchor{ false };

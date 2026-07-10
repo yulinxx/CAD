@@ -5,9 +5,8 @@
 #include "RenderFrame.h"
 
 #include <memory>
+#include <string>
 
-class EntityDocument2D;
-class SceneDocument3D;
 class CameraController3D;
 
 namespace Eg { class SceneManager; }
@@ -27,28 +26,18 @@ namespace Eg { class SceneManager; }
 class DefaultRenderBackend final : public IRenderBackend
 {
 public:
-    explicit DefaultRenderBackend(QString name, BackendCapability caps);
+    explicit DefaultRenderBackend(std::string name, BackendCapability caps);
     ~DefaultRenderBackend() override = default;
-
-    // ============ 生命周期 ============
 
     bool initialize(void* nativeWindowHandle = nullptr) override;
     void shutdown() override;
     bool isReady() const override;
 
-    // ============ 上下文绑定 ============
-
     void bindContext(const RenderContext& context) override;
     const RenderContext& context() const override;
 
-    // ============ 场景绑定 ============
-
-    void setScene(EntityDocument2D* document) override;
     void setScene(Eg::SceneManager* scene) override;
-    void setScene(SceneDocument3D* document) override;
     void setCamera(CameraController3D* controller) override;
-
-    // ============ 渲染管线 ============
 
     void compile() override;
     void submitFrame(const RenderFrame& frame) override;
@@ -56,40 +45,30 @@ public:
     void beginFrame() override;
     void endFrame() override;
 
-    // ============ 视口控制 ============
-
-    void resize(const QSize& size) override;
+    void resize(const Size2D& size) override;
     void resetView() override;
-
-    // ============ 模式切换 ============
 
     void setOrbitMode(bool enabled) override;
     void setMeasureMode(bool enabled) override;
     void setRenderMode(RenderMode mode) override;
     RenderMode renderMode() const override;
 
-    // ============ 帧输出 ============
-
-    QImage captureFrame() const override;
+    ImageBuffer captureFrame() const override;
     RenderStatistics getStatistics() const override;
 
-    // ============ 后端信息 ============
-
-    QString backendName() const override;
+    std::string backendName() const override;
     bool supportsCapability(BackendCapability cap) const override;
     BackendCapability capabilities() const override;
 
 private:
-    QString m_name;
+    std::string m_name;
     BackendCapability m_capabilities{ BackendCapability::None };
     bool m_ready{ false };
 
     RenderContext m_context;
     RenderStatistics m_stats;
 
-    EntityDocument2D* m_document2D{ nullptr };
     Eg::SceneManager* m_scene{ nullptr };
-    SceneDocument3D* m_document3D{ nullptr };
     CameraController3D* m_camera{ nullptr };
     RenderFrame m_lastFrame;
 };

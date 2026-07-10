@@ -19,7 +19,8 @@
 #include "UiStateCenter.h"
 #include "UiThemeService.h"
 #include "UiWorkbench.h"
-#include "UiViewWidgets.h"
+#include "UiSceneTreeDock.h"
+#include "UiPropertiesPanel.h"
 #include "UiCommandDispatcher.h"
 
 /// 初始化主窗口组件
@@ -188,9 +189,9 @@ QWidget* WorkbenchWindow::createInitialCentralWidget()
 void WorkbenchWindow::buildMenus()
 {
     // 顶层菜单只负责建立菜单容器，不在这里混入业务逻辑
-    m_menuState.fileMenu = menuBar()->addMenu(QStringLiteral("File"));
-    m_menuState.viewMenu = menuBar()->addMenu(QStringLiteral("View"));
-    m_menuState.toolsMenu = menuBar()->addMenu(QStringLiteral("Tools"));
+    m_menuState.fileMenu = menuBar()->addMenu(tr("File")); // 文件
+    m_menuState.viewMenu = menuBar()->addMenu(tr("View")); // 视图
+    m_menuState.toolsMenu = menuBar()->addMenu(tr("Tools")); // 工具
 }
 
 /// 构建工具栏
@@ -211,7 +212,7 @@ void WorkbenchWindow::buildToolBars()
 
 void WorkbenchWindow::bindShortcuts()
 {
-    auto* undoAction = new QAction(QStringLiteral("Undo"), this);
+    auto* undoAction = new QAction(tr("Undo"), this); // 撤销
     undoAction->setShortcut(QKeySequence::Undo);
     connect(undoAction, &QAction::triggered, this, [this]() {
         if (m_commandDispatcher)
@@ -219,7 +220,7 @@ void WorkbenchWindow::bindShortcuts()
     });
     addAction(undoAction);
 
-    auto* redoAction = new QAction(QStringLiteral("Redo"), this);
+    auto* redoAction = new QAction(tr("Redo"), this); // 重做
     redoAction->setShortcut(QKeySequence::Redo);
     connect(redoAction, &QAction::triggered, this, [this]() {
         if (m_commandDispatcher)
@@ -239,14 +240,14 @@ void WorkbenchWindow::buildDockAreas()
 {
     // 场景树面板
     m_panelState.sceneTreeDock = new SceneTreeDockWidget(this);
-    m_panelState.leftDock = new QDockWidget(QStringLiteral("Scene"), this);
+    m_panelState.leftDock = new QDockWidget(tr("Scene"), this); // 场景
     m_panelState.leftDock->setObjectName(QStringLiteral("SceneDock"));
     m_panelState.leftDock->setWidget(m_panelState.sceneTreeDock);
     addDockWidget(Qt::LeftDockWidgetArea, m_panelState.leftDock);
 
     // 属性面板
     m_panelState.propertiesDock = new PropertiesPanelWidget(this);
-    m_panelState.rightDock = new QDockWidget(QStringLiteral("Properties"), this);
+    m_panelState.rightDock = new QDockWidget(tr("Properties"), this); // 属性
     m_panelState.rightDock->setObjectName(QStringLiteral("PropertiesDock"));
     m_panelState.rightDock->setWidget(m_panelState.propertiesDock);
     addDockWidget(Qt::RightDockWidgetArea, m_panelState.rightDock);
@@ -281,7 +282,7 @@ void WorkbenchWindow::buildThemeMenu()
 {
     // 主题菜单挂在工具菜单下，保持入口层次清晰
     // 这里仅负责入口，不处理主题加载策略，避免框架职责变宽
-    m_menuState.themeMenu = m_menuState.toolsMenu->addMenu(QStringLiteral("Theme"));
+    m_menuState.themeMenu = m_menuState.toolsMenu->addMenu(tr("Theme"));
 
     const auto addThemeAction = [this](const QString& text, const QString& themeId) {
         QAction* action = m_menuState.themeMenu->addAction(text);
@@ -291,10 +292,10 @@ void WorkbenchWindow::buildThemeMenu()
             });
         };
 
-    addThemeAction(QStringLiteral("System"), QStringLiteral("system"));
-    addThemeAction(QStringLiteral("Light"), QStringLiteral("light"));
-    addThemeAction(QStringLiteral("Dark"), QStringLiteral("dark"));
-    addThemeAction(QStringLiteral("Blue"), QStringLiteral("blue"));
+    addThemeAction(tr("System"), QStringLiteral("system"));
+    addThemeAction(tr("Light"), QStringLiteral("light"));
+    addThemeAction(tr("Dark"), QStringLiteral("dark"));
+    addThemeAction(tr("Blue"), QStringLiteral("blue"));
 }
 
 /// 构建工作台切换菜单
@@ -308,7 +309,7 @@ void WorkbenchWindow::buildWorkbenchMenu()
 {
     // 工作台切换入口挂在视图菜单下，统一处理工作台切换
     // 这里只负责入口挂载，不直接碰工作台生命周期，避免职责越界
-    m_menuState.workbenchMenu = m_menuState.viewMenu->addMenu(QStringLiteral("Workbench"));
+    m_menuState.workbenchMenu = m_menuState.viewMenu->addMenu(tr("Workbench"));
 
     const auto addWorkbenchAction = [this](const QString& text, const QString& workbenchId) {
         QAction* action = m_menuState.workbenchMenu->addAction(text);
@@ -318,8 +319,8 @@ void WorkbenchWindow::buildWorkbenchMenu()
             });
         };
 
-    addWorkbenchAction(QStringLiteral("2D"), QStringLiteral("2D"));
-    addWorkbenchAction(QStringLiteral("3D"), QStringLiteral("3D"));
+    addWorkbenchAction(tr("2D"), QStringLiteral("2D"));
+    addWorkbenchAction(tr("3D"), QStringLiteral("3D"));
 }
 
 /// 同步窗口本地状态与状态中心，避免本地状态与全局状态漂移
@@ -355,34 +356,34 @@ void WorkbenchWindow::refreshStatusText()
     // 如果后续状态栏内容继续变复杂，应该继续往状态对象里收，而不是把窗口层写厚
     // 这里不做状态写入，只做展示更新，状态写入由同步函数统一负责
     // 这里是展示层刷新，不是状态编排层，边界必须保持清晰
-    if (m_stateCenter)
-    {
-        syncWindowStateFromStateCenter();
-        const auto state = m_stateCenter->snapshot();
+if (m_stateCenter)
+        {
+            syncWindowStateFromStateCenter();
+            const auto state = m_stateCenter->snapshot();
 
-        if (m_panelState.workbenchLabel)
-            m_panelState.workbenchLabel->setText(QStringLiteral("WB:%1 | Doc:%2 | Cmd:%3(%4) | Layer:%5 | View:%6 | Dirty:%7")
-                .arg(state.currentWorkbenchId)
-                .arg(state.currentDocumentId)
-                .arg(state.currentCommandId)
-                .arg(state.currentCommandPhase)
-                .arg(state.currentLayerId)
-                .arg(state.currentViewMode)
-                .arg(state.dirty ? QStringLiteral("Y") : QStringLiteral("N")));
+            if (m_panelState.workbenchLabel)
+                m_panelState.workbenchLabel->setText(tr("WB:%1 | Doc:%2 | Cmd:%3(%4) | Layer:%5 | View:%6 | Dirty:%7")
+                    .arg(state.currentWorkbenchId)
+                    .arg(state.currentDocumentId)
+                    .arg(state.currentCommandId)
+                    .arg(state.currentCommandPhase)
+                    .arg(state.currentLayerId)
+                    .arg(state.currentViewMode)
+                    .arg(state.dirty ? tr("Y") : tr("N")));
 
-        if (m_panelState.busyLabel)
-            m_panelState.busyLabel->setText(state.busy ? QStringLiteral("Busy") : QStringLiteral("Idle"));
+            if (m_panelState.busyLabel)
+                m_panelState.busyLabel->setText(state.busy ? tr("Busy") : tr("Idle"));
 
-        // 这里仍然只做展示，不把状态写回状态中心，避免循环同步
-        updateBusyIndicator(state.busy);
-        updateWindowTitle();
-        return;
-    }
+            // 这里仍然只做展示，不把状态写回状态中心，避免循环同步
+            updateBusyIndicator(state.busy);
+            updateWindowTitle();
+            return;
+        }
 
     if (m_panelState.workbenchLabel)
-        m_panelState.workbenchLabel->setText(QStringLiteral("Workbench: %1").arg(m_windowState.workbenchId));
+        m_panelState.workbenchLabel->setText(tr("Workbench: %1").arg(m_windowState.workbenchId));
     if (m_panelState.busyLabel)
-        m_panelState.busyLabel->setText(m_windowState.busy ? QStringLiteral("Busy") : QStringLiteral("Idle"));
+        m_panelState.busyLabel->setText(m_windowState.busy ? tr("Busy") : tr("Idle"));
     updateBusyIndicator(m_windowState.busy);
     updateWindowTitle();
 }
@@ -401,45 +402,45 @@ void WorkbenchWindow::refreshFromState()
     refreshStatusText();
     // 属性面板使用状态中心快照作为输入，不在这里额外拼接窗口本地状态
     // 这里也不读取窗口本地镜像，避免展示层继续依赖两套来源
-    if (m_panelState.propertiesDock && m_stateCenter)
-    {
-        const auto state = m_stateCenter->snapshot();
-        // 属性面板同样以状态中心为准，避免单独维护一套展示状态
-        m_panelState.propertiesDock->setStateText(QStringLiteral("WB=%1 | View=%2 | Cmd=%3(%4) | Dirty=%5 | Layer=%6 | Doc=%7 | Busy=%8")
-            .arg(state.currentWorkbenchId)
-            .arg(state.currentViewMode)
-            .arg(state.currentCommandId)
-            .arg(state.currentCommandPhase)
-            .arg(state.dirty ? QStringLiteral("Y") : QStringLiteral("N"))
-            .arg(state.currentLayerId)
-            .arg(state.currentDocumentId)
-            .arg(state.busy ? QStringLiteral("Y") : QStringLiteral("N")));
+if (m_panelState.propertiesDock && m_stateCenter)
+        {
+            const auto state = m_stateCenter->snapshot();
+            // 属性面板同样以状态中心为准，避免单独维护一套展示状态
+            m_panelState.propertiesDock->setStateText(tr("WB=%1 | View=%2 | Cmd=%3(%4) | Dirty=%5 | Layer=%6 | Doc=%7 | Busy=%8")
+                .arg(state.currentWorkbenchId)
+                .arg(state.currentViewMode)
+                .arg(state.currentCommandId)
+                .arg(state.currentCommandPhase)
+                .arg(state.dirty ? tr("Y") : tr("N"))
+                .arg(state.currentLayerId)
+                .arg(state.currentDocumentId)
+                .arg(state.busy ? tr("Y") : tr("N")));
 
-        QString selectionText = QStringLiteral("Sel=%1 | SelSrc=%2 | CmdSrc=%3 | SelType=%4 | CmdType=%5")
-            .arg(state.currentSelectionText)
-            .arg(state.currentSelectionSource)
-            .arg(state.currentCommandOwner)
-            .arg(state.currentSelectionType)
-            .arg(state.currentCommandType);
-        if (state.currentWorkbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0)
-        {
-            selectionText = QStringLiteral("3D Sel=%1 | NodeType=%2 | CmdSrc=%3 | CmdType=%4")
+            QString selectionText = tr("Sel=%1 | SelSrc=%2 | CmdSrc=%3 | SelType=%4 | CmdType=%5")
                 .arg(state.currentSelectionText)
-                .arg(state.currentSelectionType)
+                .arg(state.currentSelectionSource)
                 .arg(state.currentCommandOwner)
-                .arg(state.currentCommandType);
-        }
-        else if (state.currentWorkbenchId.compare(QStringLiteral("2D"), Qt::CaseInsensitive) == 0)
-        {
-            selectionText = QStringLiteral("2D Sel=%1 | SelType=%2 | CmdSrc=%3 | CmdType=%4")
-                .arg(state.currentSelectionText)
                 .arg(state.currentSelectionType)
-                .arg(state.currentCommandOwner)
                 .arg(state.currentCommandType);
+            if (state.currentWorkbenchId.compare(tr("3D"), Qt::CaseInsensitive) == 0)
+            {
+                selectionText = tr("3D Sel=%1 | NodeType=%2 | CmdSrc=%3 | CmdType=%4")
+                    .arg(state.currentSelectionText)
+                    .arg(state.currentSelectionType)
+                    .arg(state.currentCommandOwner)
+                    .arg(state.currentCommandType);
+            }
+            else if (state.currentWorkbenchId.compare(tr("2D"), Qt::CaseInsensitive) == 0)
+            {
+                selectionText = tr("2D Sel=%1 | SelType=%2 | CmdSrc=%3 | CmdType=%4")
+                    .arg(state.currentSelectionText)
+                    .arg(state.currentSelectionType)
+                    .arg(state.currentCommandOwner)
+                    .arg(state.currentCommandType);
+            }
+            m_panelState.propertiesDock->setSelectionText(selectionText);
+            // 属性面板的选择文本同样只走状态中心快照，不拼窗口本地镜像
         }
-        m_panelState.propertiesDock->setSelectionText(selectionText);
-        // 属性面板的选择文本同样只走状态中心快照，不拼窗口本地镜像
-    }
 
     recordPerformance(QStringLiteral("WorkbenchWindow::refreshFromState"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());

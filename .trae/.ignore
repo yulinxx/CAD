@@ -1,0 +1,6 @@
+build/
+build*/
+Archive/
+SanYiRender
+x64/
+RUN_TESTS.dir/

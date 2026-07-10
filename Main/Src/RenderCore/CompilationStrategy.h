@@ -2,8 +2,8 @@
 
 #include "RenderContext.h"
 
-#include <QSet>
-#include <QString>
+#include <set>
+#include <string>
 
 /**
  * @file CompilationStrategy.h
@@ -29,10 +29,10 @@ public:
     bool canIncrementalCompile(const RenderContext& context) const;
 
     /// 获取当前脏实体 ID 集合
-    const QSet<QString>& dirtyEntityIds() const;
+    const std::set<std::string>& dirtyEntityIds() const;
 
     /// 标记单个实体为脏
-    void markEntityDirty(const QString& entityId);
+    void markEntityDirty(const std::string& entityId);
 
     /// 标记所有实体为脏（强制全量编译）
     void markAllDirty();
@@ -58,5 +58,5 @@ public:
 private:
     bool m_cacheValid{ false };
     bool m_forceFullCompile{ false };
-    QSet<QString> m_dirtyEntityIds;
+    std::set<std::string> m_dirtyEntityIds;
 };

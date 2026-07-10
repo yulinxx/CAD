@@ -55,14 +55,14 @@ void RenderWidget3DAdapter::bindWidgetSignals()
                 m_selectedNodeId = QString::number(entities[0]->id);
                 if (m_selectionCallback)
                     m_selectionCallback(m_selectedNodeId);
-                emitStatus(QStringLiteral("3D selected: %1").arg(m_selectedNodeId));
+                emitStatus(QObject::tr("3D selected: %1").arg(m_selectedNodeId)); // 3D 已选中: %1
                 return;
             }
 
             m_selectedNodeId.clear();
             if (m_selectionCallback)
                 m_selectionCallback(QString());
-            emitStatus(QStringLiteral("3D selection cleared"));
+            emitStatus(QObject::tr("3D selection cleared")); // 3D 选择已清除
         });
 
     // 相机变化只转发状态提示，不在这里写任何 UI 业务。
@@ -221,7 +221,7 @@ void RenderWidget3DAdapter::selectNodeById(const QString& nodeId)
     m_selectedNodeId = nodeId;
     if (m_selectionCallback)
         m_selectionCallback(nodeId);
-    emitStatus(QStringLiteral("3D selected: %1").arg(nodeId));
+    emitStatus(QObject::tr("3D selected: %1").arg(nodeId));
 }
 
 QString RenderWidget3DAdapter::selectedNodeId() const

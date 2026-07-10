@@ -2,6 +2,7 @@
 
 #include <QPainter>
 #include <QtMath>
+#include <QObject>
 
 #include "UiEntities.h"
 
@@ -84,7 +85,7 @@ void SimpleRenderer3D::resetView()
     m_distance = kDefaultDistance;
     m_panX = 0.0;
     m_panY = 0.0;
-    emitStatus(QStringLiteral("3D view reset"));
+    emitStatus(QObject::tr("3D view reset"));
 }
 
 // ========== 模式 ==========
@@ -254,7 +255,7 @@ void SimpleRenderer3D::drawSceneNodes(QPainter& painter)
         const float ny = static_cast<float>(nodeIndex) * 0.5f - 1.0f;
         const float nz = std::sin(angle) * radius;
 
-        const bool isSelected = (node->id() == m_selectedNodeId);
+        const bool isSelected = (node->id() == m_selectedNodeId.toStdString());
         const float nodeSize = isSelected ? kNodeHalfSize * 1.5f : kNodeHalfSize;
         const QColor color = isSelected ? QColor(80, 200, 255) : QColor(140, 160, 180);
 
@@ -264,7 +265,7 @@ void SimpleRenderer3D::drawSceneNodes(QPainter& painter)
         if (project(nx, ny + nodeSize + 0.2f, nz, sx, sy))
         {
             painter.setPen(color);
-            painter.drawText(sx - 20, sy, 40, 16, Qt::AlignCenter, node->name());
+            painter.drawText(sx - 20, sy, 40, 16, Qt::AlignCenter, QString::fromStdString(node->name()));
         }
 
         ++nodeIndex;
@@ -276,8 +277,8 @@ void SimpleRenderer3D::drawNodePathOverlay(QPainter& painter)
     if (m_selectedNodeId.isEmpty() || m_selectedPathNames.isEmpty())
         return;
 
-    const QString pathText = QStringLiteral("Path: ") + m_selectedPathNames.join(QStringLiteral(" / "));
-    const QString nodeText = QStringLiteral("Node: ") + m_selectedNodeId;
+    const QString pathText = QObject::tr("Path: ") + m_selectedPathNames.join(QObject::tr(" / ")); // 路径: / 节点: 
+    const QString nodeText = QObject::tr("Node: ") + m_selectedNodeId; // 节点: 
 
     painter.setPen(Qt::NoPen);
     painter.setBrush(QColor(0, 0, 0, 160));
@@ -302,7 +303,7 @@ void SimpleRenderer3D::onMousePress(int x, int y, int button, int modifiers, int
         if (m_orbitMode)
         {
             m_rotating = true;
-            emitStatus(QStringLiteral("3D orbit"));
+            emitStatus(QObject::tr("3D orbit")); // 3D 轨道旋转
         }
         else
         {
@@ -316,7 +317,7 @@ void SimpleRenderer3D::onMousePress(int x, int y, int button, int modifiers, int
     else if (button == 4) // Qt::MiddleButton
     {
         m_panning = true;
-        emitStatus(QStringLiteral("3D pan"));
+        emitStatus(QObject::tr("3D pan")); // 3D 平移
     }
 }
 
@@ -335,14 +336,14 @@ void SimpleRenderer3D::onMouseMove(int x, int y, int buttons, int viewW, int vie
         m_yaw += dx * kRotateSpeed * kRadToDeg;
         m_pitch += dy * kRotateSpeed * kRadToDeg;
         m_pitch = std::clamp(m_pitch, -kMaxPitch, kMaxPitch);
-        emitStatus(QStringLiteral("3D orbiting"));
+        emitStatus(QObject::tr("3D orbiting")); // 3D 轨道旋转中
     }
     else if (m_panning)
     {
         const double panScale = m_distance * kPanSpeed;
         m_panX -= dx * panScale;
         m_panY += dy * panScale;
-        emitStatus(QStringLiteral("3D panning"));
+        emitStatus(QObject::tr("3D panning")); // 3D 平移中
     }
 }
 
@@ -358,13 +359,13 @@ void SimpleRenderer3D::onMouseRelease(int x, int y, int button, int viewW, int v
         if (m_rotating)
         {
             m_rotating = false;
-            emitStatus(QStringLiteral("3D ready"));
+            emitStatus(QObject::tr("3D ready")); // 3D 就绪
         }
     }
     else if (button == 4) // Qt::MiddleButton
     {
         m_panning = false;
-        emitStatus(QStringLiteral("3D ready"));
+        emitStatus(QObject::tr("3D ready")); // 3D 就绪
     }
 }
 
@@ -375,7 +376,7 @@ void SimpleRenderer3D::onWheel(int delta, int viewW, int viewH)
 
     m_distance -= delta * kZoomSpeed;
     m_distance = std::clamp(m_distance, kMinDistance, kMaxDistance);
-    emitStatus(QStringLiteral("3D zoom: %.1f").arg(m_distance));
+    emitStatus(QObject::tr("3D zoom: %.1f").arg(m_distance));
 }
 
 // ========== 选择管理 ==========
@@ -386,7 +387,7 @@ void SimpleRenderer3D::selectNodeById(const QString& nodeId)
     if (m_document)
     {
         m_document->selection().clear();
-        if (auto entity = m_document->entityById(nodeId))
+        if (auto entity = m_document->nodeById(nodeId.toStdString()))
             m_document->selection().add(entity);
     }
     rebuildTreeHighlight();
@@ -396,7 +397,7 @@ void SimpleRenderer3D::selectNodeById(const QString& nodeId)
     if (m_pathCallback)
         m_pathCallback(m_selectedPathNames);
     if (m_statusCallback)
-        m_statusCallback(QStringLiteral("3D selected: %1").arg(nodeId));
+        m_statusCallback(QObject::tr("3D selected: %1").arg(nodeId)); // 3D 已选中: %1
 }
 
 QString SimpleRenderer3D::selectedNodeId() const
@@ -469,7 +470,7 @@ QString SimpleRenderer3D::hitTest(int screenX, int screenY) const
         if (dist < bestDist)
         {
             bestDist = dist;
-            bestId = node->id();
+            bestId = QString::fromStdString(node->id());
         }
 
         ++nodeIndex;
@@ -485,15 +486,16 @@ void SimpleRenderer3D::rebuildTreeHighlight()
     if (!m_document || m_selectedNodeId.isEmpty())
         return;
 
-    const auto entity = m_document->entityById(m_selectedNodeId);
-    const auto node = std::dynamic_pointer_cast<SceneNode>(entity);
+    const auto node = m_document->nodeById(m_selectedNodeId.toStdString());
     if (!node)
         return;
 
-    m_selectedPathNames = node->pathNamesRecursive();
+    const auto names = node->pathNamesRecursive();
+    for (const auto& name : names)
+        m_selectedPathNames.append(QString::fromStdString(name));
 
     if (m_pathCallback)
         m_pathCallback(m_selectedPathNames);
     if (m_statusCallback)
-        m_statusCallback(QStringLiteral("3D path: %1").arg(m_selectedPathNames.join(QStringLiteral(" / "))));
+        m_statusCallback(QObject::tr("3D path: %1").arg(m_selectedPathNames.join(QObject::tr(" / "))));
 }

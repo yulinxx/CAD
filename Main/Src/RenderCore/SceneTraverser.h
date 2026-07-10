@@ -4,10 +4,9 @@
 #include "RenderTypes.h"
 #include "RenderFrame.h"
 
-#include <QList>
-#include <QSet>
+#include <vector>
+#include <set>
 
-class EntityDocument2D;
 class SceneDocument3D;
 struct RenderContext;
 
@@ -33,16 +32,6 @@ namespace Eg { class SceneManager; }
 class RENDER_CORE_API SceneTraverser
 {
 public:
-    /// 遍历 2D 文档生成批次（旧版 EntityDocument2D 路径）
-    QList<RenderBatch> traverse2D(EntityDocument2D* document, const RenderContext& context);
-
-    /// 遍历 2D 场景生成批次（新版 Eg::SceneManager 路径）
-    QList<RenderBatch> traverse2D(Eg::SceneManager* scene, const RenderContext& context);
-
-    /// 遍历 3D 文档生成批次
-    QList<RenderBatch> traverse3D(SceneDocument3D* document, const RenderContext& context);
-
-private:
-    /// 从文档选择中提取选中 ID 集合
-    static QSet<QString> extractSelectedIds(void* document);
+    std::vector<RenderBatch> traverse2D(Eg::SceneManager* scene, const RenderContext& context);
+    std::vector<RenderBatch> traverse3D(SceneDocument3D* document, const RenderContext& context);
 };

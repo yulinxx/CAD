@@ -1,7 +1,14 @@
 #include "UiCommandHandler.h"
 
-#include "UiEntities.h"
+#include <QObject>
+
+#include "SceneDocument2D.h"
 #include "UiServices.h"
+#include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/SyEntity/SyLine.h"
+#include "Engine2D/SyEntity/SyCircle.h"
+#include "Engine2D/SyEntity/SyArc.h"
+#include "Mat/Mat.hpp"
 
 namespace {
 
@@ -38,7 +45,7 @@ QString PointPickerTool::toolId() const
 
 QString PointPickerTool::displayName() const
 {
-    return QStringLiteral("拾点工具");
+    return QObject::tr("Point Picker"); // 拾点工具
 }
 
 bool PointPickerTool::activate(const UiServices& services)
@@ -77,10 +84,10 @@ QString PointPickerTool::currentStage() const
 {
     const size_t count = m_pickedPoints.size();
     if (count == 0)
-        return QStringLiteral("等待第一点");
+        return QObject::tr("Waiting for first point"); // 等待第一点
     if (count < static_cast<size_t>(m_requiredPoints))
-        return QStringLiteral("等待第%1点").arg(count + 1);
-    return QStringLiteral("点收集完成");
+        return QObject::tr("Waiting for point %1").arg(count + 1); // 等待第 %1 点
+    return QObject::tr("Points collected"); // 点收集完成
 }
 
 UndoCommand::UndoCommand(const QString& text)
@@ -163,9 +170,9 @@ namespace {
 class DrawLineUndoCommand : public UndoCommand
 {
 public:
-    DrawLineUndoCommand(EntityDocument2D* document, const QString& entityId,
+    DrawLineUndoCommand(SceneDocument2D* document, const QString& entityId,
                         const QPointF& start, const QPointF& end)
-        : UndoCommand(QStringLiteral("画线"))
+        : UndoCommand(QObject::tr("Draw Line")) // 画线
         , m_document(document)
         , m_entityId(entityId)
         , m_start(start)
@@ -181,15 +188,11 @@ public:
     void redo() override
     {
         if (m_document)
-        {
-            auto line = m_document->createLine(m_start, m_end);
-            if (line)
-                m_entityId = line->id();
-        }
+            m_entityId = m_document->createLine(m_start, m_end);
     }
 
 private:
-    EntityDocument2D* m_document;
+    SceneDocument2D* m_document;
     QString m_entityId;
     QPointF m_start;
     QPointF m_end;
@@ -209,7 +212,7 @@ QString DrawLineCommand::commandId() const
 
 QString DrawLineCommand::displayName() const
 {
-    return QStringLiteral("画线");
+    return QObject::tr("Draw Line"); // 画线
 }
 
 bool DrawLineCommand::isInteractive() const
@@ -226,7 +229,6 @@ bool DrawLineCommand::activate(const UiServices& services)
 {
     m_services = &services;
 
-    // 优先使用 services 中的文档，兼容 setDocument() 注入
     if (services.document2D)
         m_document = services.document2D;
 
@@ -259,13 +261,9 @@ void DrawLineCommand::commit()
         const auto& points = m_pointPicker.pickedPoints();
         if (points.size() >= 2)
         {
-            auto line = m_document->createLine(points[0], points[1]);
-            if (line)
-            {
-                m_createdEntityId = line->id();
-                m_document->selection().clear();
-                m_document->selection().add(line);
-            }
+            m_createdEntityId = m_document->createLine(points[0], points[1]);
+            m_document->clearSelection();
+            m_document->selectEntity(m_createdEntityId);
         }
     }
 
@@ -335,7 +333,6 @@ UndoCommand* DrawLineCommand::createUndoCommand()
 
 bool DrawLineCommand::isComplete() const
 {
-    // 拾点工具收集到足够点数后，命令完成
     return m_pointPicker.isStageComplete();
 }
 
@@ -352,7 +349,7 @@ CommandPreview DrawLineCommand::preview() const
     return p;
 }
 
-void DrawLineCommand::setDocument(EntityDocument2D* document)
+void DrawLineCommand::setDocument(SceneDocument2D* document)
 {
     m_document = document;
 }
@@ -372,10 +369,10 @@ QPointF rotatePoint(const QPointF& point, const QPointF& center, double cosAngle
 class RotateUndoCommand : public UndoCommand
 {
 public:
-    RotateUndoCommand(EntityDocument2D* document, const QString& entityId,
+    RotateUndoCommand(SceneDocument2D* document, const QString& entityId,
                       const std::vector<QPointF>& originalPoints,
                       const std::vector<QPointF>& newPoints)
-        : UndoCommand(QStringLiteral("旋转"))
+        : UndoCommand(QObject::tr("Rotate")) // 旋转
         , m_document(document)
         , m_entityId(entityId)
         , m_originalPoints(originalPoints)
@@ -386,18 +383,14 @@ public:
     {
         if (!m_document || m_entityId.isEmpty())
             return;
-
-        auto entity = m_document->entityById(m_entityId);
-        if (!entity)
+        auto* entity = m_document->entityByStringId(m_entityId);
+        if (!entity || entity->eType != Eg::EType::LINE)
             return;
-
-        auto transformable = dynamic_cast<ITransformable*>(entity.get());
-        if (transformable && !m_originalPoints.empty())
+        auto* line = static_cast<Eg::SyLine*>(entity);
+        if (m_originalPoints.size() >= 2)
         {
-            QVector<QPointF> qtPoints;
-            for (const auto& pt : m_originalPoints)
-                qtPoints.push_back(pt);
-            transformable->setKeyPoints(qtPoints);
+            line->vPoints[0] = Ut::Vec2d(m_originalPoints[0].x(), m_originalPoints[0].y());
+            line->vPoints[1] = Ut::Vec2d(m_originalPoints[1].x(), m_originalPoints[1].y());
         }
     }
 
@@ -405,23 +398,19 @@ public:
     {
         if (!m_document || m_entityId.isEmpty())
             return;
-
-        auto entity = m_document->entityById(m_entityId);
-        if (!entity)
+        auto* entity = m_document->entityByStringId(m_entityId);
+        if (!entity || entity->eType != Eg::EType::LINE)
             return;
-
-        auto transformable = dynamic_cast<ITransformable*>(entity.get());
-        if (transformable && !m_newPoints.empty())
+        auto* line = static_cast<Eg::SyLine*>(entity);
+        if (m_newPoints.size() >= 2)
         {
-            QVector<QPointF> qtPoints;
-            for (const auto& pt : m_newPoints)
-                qtPoints.push_back(pt);
-            transformable->setKeyPoints(qtPoints);
+            line->vPoints[0] = Ut::Vec2d(m_newPoints[0].x(), m_newPoints[0].y());
+            line->vPoints[1] = Ut::Vec2d(m_newPoints[1].x(), m_newPoints[1].y());
         }
     }
 
 private:
-    EntityDocument2D* m_document;
+    SceneDocument2D* m_document;
     QString m_entityId;
     std::vector<QPointF> m_originalPoints;
     std::vector<QPointF> m_newPoints;
@@ -434,8 +423,8 @@ namespace {
 class SelectUndoCommand : public UndoCommand
 {
 public:
-    SelectUndoCommand(EntityDocument2D* document, const QString& oldSelectedId, const QString& newSelectedId)
-        : UndoCommand(QStringLiteral("选择"))
+    SelectUndoCommand(SceneDocument2D* document, const QString& oldSelectedId, const QString& newSelectedId)
+        : UndoCommand(QObject::tr("Select")) // 选择
         , m_document(document)
         , m_oldSelectedId(oldSelectedId)
         , m_newSelectedId(newSelectedId)
@@ -445,30 +434,22 @@ public:
     {
         if (!m_document)
             return;
-
-        m_document->selection().clear();
+        m_document->clearSelection();
         if (!m_oldSelectedId.isEmpty())
-        {
-            if (auto entity = m_document->entityById(m_oldSelectedId))
-                m_document->selection().add(entity);
-        }
+            m_document->selectEntity(m_oldSelectedId);
     }
 
     void redo() override
     {
         if (!m_document)
             return;
-
-        m_document->selection().clear();
+        m_document->clearSelection();
         if (!m_newSelectedId.isEmpty())
-        {
-            if (auto entity = m_document->entityById(m_newSelectedId))
-                m_document->selection().add(entity);
-        }
+            m_document->selectEntity(m_newSelectedId);
     }
 
 private:
-    EntityDocument2D* m_document;
+    SceneDocument2D* m_document;
     QString m_oldSelectedId;
     QString m_newSelectedId;
 };
@@ -486,7 +467,7 @@ QString SelectCommand::commandId() const
 
 QString SelectCommand::displayName() const
 {
-    return QStringLiteral("选择");
+    return QObject::tr("Select"); // 选择
 }
 
 bool SelectCommand::isInteractive() const
@@ -513,12 +494,9 @@ void SelectCommand::cancel()
     m_state = CommandState::Cancelled;
     if (m_document)
     {
-        m_document->selection().clear();
+        m_document->clearSelection();
         if (!m_oldSelectedId.isEmpty())
-        {
-            if (auto entity = m_document->entityById(m_oldSelectedId))
-                m_document->selection().add(entity);
-        }
+            m_document->selectEntity(m_oldSelectedId);
     }
     m_selectedEntityId.clear();
     m_oldSelectedId.clear();
@@ -545,14 +523,11 @@ bool SelectCommand::onMouseDown(int x, int y)
     m_boxSelectEnd = QPointF(x, y);
     m_boxSelecting = true;
 
-    if (!m_document->selection().empty())
-    {
-        auto items = m_document->selection().items();
-        if (!items.isEmpty())
-            m_oldSelectedId = items[0]->id();
-    }
+    auto selectedIds = m_document->selectedIds();
+    if (!selectedIds.isEmpty())
+        m_oldSelectedId = selectedIds[0];
 
-    m_document->selection().clear();
+    m_document->clearSelection();
 
     return true;
 }
@@ -589,31 +564,30 @@ void SelectCommand::performBoxSelect()
 {
     if (!m_document)
         return;
+    auto* sm = m_document->sceneManager();
+    if (!sm) return;
 
     QRectF rect = QRectF(m_boxSelectStart, m_boxSelectEnd).normalized();
-    for (const auto& entity : m_document->entities())
+    for (auto* entity : sm->getAllEntities())
     {
-        if (auto line = std::dynamic_pointer_cast<LineEntity2D>(entity))
+        if (entity->eType == Eg::EType::LINE)
         {
-            if (rect.intersects(line->bounds()))
-                m_document->selection().add(line);
+            auto* line = static_cast<Eg::SyLine*>(entity);
+            if (line->vPoints.size() >= 2)
+            {
+                const QPointF p0(line->vPoints[0].x(), line->vPoints[0].y());
+                const QPointF p1(line->vPoints[1].x(), line->vPoints[1].y());
+                if (rect.intersects(QRectF(p0, p1).normalized()))
+                    m_document->selectEntity(QString::number(entity->id));
+            }
         }
-        else if (auto polyline = std::dynamic_pointer_cast<PolylineEntity2D>(entity))
+        else if (entity->eType == Eg::EType::CIRCLE)
         {
-            if (rect.intersects(polyline->bounds()))
-                m_document->selection().add(polyline);
-        }
-        else if (auto circle = std::dynamic_pointer_cast<CircleEntity2D>(entity))
-        {
-            if (rect.intersects(circle->bounds()))
-                m_document->selection().add(circle);
-        }
-        else if (auto arc = std::dynamic_pointer_cast<ArcEntity2D>(entity))
-        {
-            const QRectF arcBounds(arc->center().x() - arc->radius(), arc->center().y() - arc->radius(),
-                arc->radius() * 2.0, arc->radius() * 2.0);
-            if (rect.intersects(arcBounds))
-                m_document->selection().add(arc);
+            auto* circle = static_cast<Eg::SyCircle*>(entity);
+            const double r = circle->dRadius;
+            const QRectF bounds(entity->basePoint.x() - r, entity->basePoint.y() - r, r * 2.0, r * 2.0);
+            if (rect.intersects(bounds))
+                m_document->selectEntity(QString::number(entity->id));
         }
     }
 }
@@ -644,12 +618,12 @@ CommandPreview SelectCommand::preview() const
         p.valid = true;
         p.previewStart = m_boxSelectStart;
         p.previewEnd = m_boxSelectEnd;
-        p.stageText = QStringLiteral("框选模式");
+        p.stageText = QObject::tr("Box select mode"); // 框选模式
     }
     return p;
 }
 
-void SelectCommand::setDocument(EntityDocument2D* document)
+void SelectCommand::setDocument(SceneDocument2D* document)
 {
     m_document = document;
 }
@@ -670,7 +644,7 @@ QString RotateCommand::commandId() const
 
 QString RotateCommand::displayName() const
 {
-    return QStringLiteral("旋转");
+    return QObject::tr("Rotate"); // 旋转
 }
 
 bool RotateCommand::isInteractive() const
@@ -720,18 +694,14 @@ void RotateCommand::restoreOriginalPoints()
 {
     if (!m_document || m_selectedEntityId.isEmpty() || m_originalPoints.empty())
         return;
-
-    auto entity = m_document->entityById(m_selectedEntityId);
-    if (!entity)
+    auto* entity = m_document->entityByStringId(m_selectedEntityId);
+    if (!entity || entity->eType != Eg::EType::LINE)
         return;
-
-    auto transformable = dynamic_cast<ITransformable*>(entity.get());
-    if (transformable)
+    auto* line = static_cast<Eg::SyLine*>(entity);
+    if (m_originalPoints.size() >= 2)
     {
-        QVector<QPointF> qtPoints;
-        for (const auto& pt : m_originalPoints)
-            qtPoints.push_back(pt);
-        transformable->setKeyPoints(qtPoints);
+        line->vPoints[0] = Ut::Vec2d(m_originalPoints[0].x(), m_originalPoints[0].y());
+        line->vPoints[1] = Ut::Vec2d(m_originalPoints[1].x(), m_originalPoints[1].y());
     }
 }
 
@@ -743,23 +713,21 @@ bool RotateCommand::onMouseDown(int x, int y)
     m_startPoint = QPointF(x, y);
     m_rotationCenter = QPointF(x, y);
 
-    if (m_document && !m_document->selection().empty())
+    if (m_document)
     {
-        auto selected = m_document->selection().items();
-        if (!selected.empty())
+        auto selectedIds = m_document->selectedIds();
+        if (!selectedIds.isEmpty())
         {
-            m_selectedEntityId = selected[0]->id();
-            auto entity = m_document->entityById(m_selectedEntityId);
-            if (entity)
+            m_selectedEntityId = selectedIds[0];
+            auto* entity = m_document->entityByStringId(m_selectedEntityId);
+            if (entity && entity->eType == Eg::EType::LINE)
             {
-                auto transformable = dynamic_cast<ITransformable*>(entity.get());
-                if (transformable)
-                {
-                    auto keyPoints = transformable->keyPoints();
-                    for (const auto& pt : keyPoints)
-                        m_originalPoints.push_back(pt);
-                    m_rotationCenter = transformable->center();
-                }
+                auto* line = static_cast<Eg::SyLine*>(entity);
+                m_originalPoints = { QPointF(line->vPoints[0].x(), line->vPoints[0].y()),
+                                     QPointF(line->vPoints[1].x(), line->vPoints[1].y()) };
+                m_rotationCenter = QPointF(
+                    (line->vPoints[0].x() + line->vPoints[1].x()) * 0.5,
+                    (line->vPoints[0].y() + line->vPoints[1].y()) * 0.5);
             }
         }
     }
@@ -792,15 +760,18 @@ bool RotateCommand::onMouseUp(int x, int y)
 
     if (m_document && !m_selectedEntityId.isEmpty() && !m_originalPoints.empty())
     {
-        auto entity = m_document->entityById(m_selectedEntityId);
-        if (entity)
+        auto* entity = m_document->entityByStringId(m_selectedEntityId);
+        if (entity && entity->eType == Eg::EType::LINE)
         {
-            auto transformable = dynamic_cast<ITransformable*>(entity.get());
-            if (transformable)
+            auto* line = static_cast<Eg::SyLine*>(entity);
+            const double cosA = cos(angleDelta);
+            const double sinA = sin(angleDelta);
+            for (auto& pt : line->vPoints)
             {
-                double cosAngle = cos(angleDelta);
-                double sinAngle = sin(angleDelta);
-                transformable->rotate(m_rotationCenter, cosAngle, sinAngle);
+                double dx = pt.x() - m_rotationCenter.x();
+                double dy = pt.y() - m_rotationCenter.y();
+                pt.x() = m_rotationCenter.x() + dx * cosA - dy * sinA;
+                pt.y() = m_rotationCenter.y() + dx * sinA + dy * cosA;
             }
         }
     }
@@ -818,35 +789,31 @@ UndoCommand* RotateCommand::createUndoCommand()
     if (m_selectedEntityId.isEmpty() || m_originalPoints.empty() || !m_document)
         return nullptr;
 
-    auto entity = m_document->entityById(m_selectedEntityId);
-    if (!entity)
+    auto* entity = m_document->entityByStringId(m_selectedEntityId);
+    if (!entity || entity->eType != Eg::EType::LINE)
         return nullptr;
 
-    auto transformable = dynamic_cast<ITransformable*>(entity.get());
-    if (!transformable)
-        return nullptr;
-
-    std::vector<QPointF> newPoints;
-    auto keyPoints = transformable->keyPoints();
-    for (const auto& pt : keyPoints)
-        newPoints.push_back(pt);
+    auto* line = static_cast<Eg::SyLine*>(entity);
+    std::vector<QPointF> newPoints = {
+        QPointF(line->vPoints[0].x(), line->vPoints[0].y()),
+        QPointF(line->vPoints[1].x(), line->vPoints[1].y())
+    };
 
     return new RotateUndoCommand(m_document, m_selectedEntityId, m_originalPoints, newPoints);
 }
 
 bool RotateCommand::isComplete() const
 {
-    // 旋转命令在鼠标释放后完成
     return m_state == CommandState::Active && m_startAngle != m_currentAngle;
 }
 
-void RotateCommand::setDocument(EntityDocument2D* document)
+void RotateCommand::setDocument(SceneDocument2D* document)
 {
     m_document = document;
 }
 
 // ============================================================================
-// MoveCommand 实现（新架构落地样板）
+// MoveCommand 实现
 // ============================================================================
 
 MoveCommand::MoveCommand() = default;
@@ -858,7 +825,7 @@ QString MoveCommand::commandId() const
 
 QString MoveCommand::displayName() const
 {
-    return QStringLiteral("移动");
+    return QObject::tr("Move"); // 移动
 }
 
 bool MoveCommand::isInteractive() const
@@ -881,11 +848,9 @@ bool MoveCommand::activate(const UiServices& services)
     if (!m_document)
         return false;
 
-    if (m_document->selection().empty())
+    if (m_document->selectedIds().isEmpty())
         return false;
 
-    // 保存原始位置快照（用于 createUndoCommand）
-    // 生命周期契约：activate() 不修改文档，仅保存状态用于撤销
     saveOriginalPositions();
 
     m_state = CommandState::Active;
@@ -898,8 +863,6 @@ bool MoveCommand::activate(const UiServices& services)
 
 void MoveCommand::cancel()
 {
-    // 生命周期契约：cancel() 不修改文档（文档变更仅在 commit() 中发生）
-    // onMouseUp 只记录状态，不需要 restoreOriginalPositions()
     m_state = CommandState::Cancelled;
     m_originalPositions.clear();
     m_hasAnchor = false;
@@ -908,28 +871,15 @@ void MoveCommand::cancel()
 
 void MoveCommand::commit()
 {
-    // 生命周期契约：文档变更必须且只能在 commit() 中发生
-    // onMouseUp 仅记录状态，cancel/preview/submit失败 绝不修改文档
     const QPointF delta = m_targetPoint - m_anchorPoint;
     if (m_document && !m_committed)
     {
-        for (const auto& entity : m_document->selection().items())
+        auto* sm = m_document->sceneManager();
+        if (sm)
         {
-            if (!entity)
-                continue;
-
-            if (auto transformable = dynamic_cast<ITransformable*>(entity.get()))
-            {
-                transformable->translate(delta);
-            }
-            else if (auto polyline = dynamic_cast<PolylineEntity2D*>(entity.get()))
-            {
-                polyline->translate(delta);
-            }
-            else if (auto circle = dynamic_cast<CircleEntity2D*>(entity.get()))
-            {
-                circle->setCenter(circle->center() + delta);
-            }
+            auto transMat = Ut::Mat3d::translate(delta.x(), delta.y());
+            for (auto* entity : sm->getSelectedEntities())
+                entity->transform(transMat);
         }
     }
 
@@ -1002,12 +952,12 @@ CommandPreview MoveCommand::preview() const
         p.valid = true;
         p.previewStart = m_anchorPoint;
         p.previewEnd = m_targetPoint;
-        p.stageText = QStringLiteral("移动预览中");
+        p.stageText = QObject::tr("Move preview"); // 移动预览
     }
     return p;
 }
 
-void MoveCommand::setDocument(EntityDocument2D* document)
+void MoveCommand::setDocument(SceneDocument2D* document)
 {
     m_document = document;
 }
@@ -1017,29 +967,24 @@ void MoveCommand::saveOriginalPositions()
     m_originalPositions.clear();
     if (!m_document)
         return;
+    auto* sm = m_document->sceneManager();
+    if (!sm) return;
 
-    for (const auto& entity : m_document->selection().items())
+    for (auto* entity : sm->getSelectedEntities())
     {
-        if (!entity)
-            continue;
-
-        if (auto transformable = dynamic_cast<ITransformable*>(entity.get()))
+        if (entity->eType == Eg::EType::LINE)
         {
-            std::vector<QPointF> pts;
-            for (const auto& pt : transformable->keyPoints())
-                pts.push_back(pt);
-            m_originalPositions[entity->id()] = pts;
+            auto* line = static_cast<Eg::SyLine*>(entity);
+            std::vector<QPointF> pts = {
+                QPointF(line->vPoints[0].x(), line->vPoints[0].y()),
+                QPointF(line->vPoints[1].x(), line->vPoints[1].y())
+            };
+            m_originalPositions[QString::number(entity->id)] = pts;
         }
-        else if (auto polyline = dynamic_cast<PolylineEntity2D*>(entity.get()))
+        else if (entity->eType == Eg::EType::CIRCLE)
         {
-            std::vector<QPointF> pts;
-            for (const auto& pt : polyline->points())
-                pts.push_back(pt);
-            m_originalPositions[entity->id()] = pts;
-        }
-        else if (auto circle = dynamic_cast<CircleEntity2D*>(entity.get()))
-        {
-            m_originalPositions[entity->id()] = { circle->center(), QPointF(circle->radius(), 0) };
+            std::vector<QPointF> pts = { QPointF(entity->basePoint.x(), entity->basePoint.y()) };
+            m_originalPositions[QString::number(entity->id)] = pts;
         }
     }
 }
@@ -1051,31 +996,20 @@ void MoveCommand::restoreOriginalPositions()
 
     for (const auto& pair : m_originalPositions)
     {
-        const auto& entityId = pair.first;
-        const auto& pts = pair.second;
-
-        auto entity = m_document->entityById(entityId);
+        auto* entity = m_document->entityByStringId(pair.first);
         if (!entity)
             continue;
+        const auto& pts = pair.second;
 
-        if (auto transformable = dynamic_cast<ITransformable*>(entity.get()))
+        if (entity->eType == Eg::EType::LINE && pts.size() >= 2)
         {
-            QVector<QPointF> qtPoints;
-            for (const auto& pt : pts)
-                qtPoints.push_back(pt);
-            transformable->setKeyPoints(qtPoints);
+            auto* line = static_cast<Eg::SyLine*>(entity);
+            line->vPoints[0] = Ut::Vec2d(pts[0].x(), pts[0].y());
+            line->vPoints[1] = Ut::Vec2d(pts[1].x(), pts[1].y());
         }
-        else if (auto polyline = dynamic_cast<PolylineEntity2D*>(entity.get()))
+        else if (entity->eType == Eg::EType::CIRCLE && !pts.empty())
         {
-            QVector<QPointF> qtPoints;
-            for (const auto& pt : pts)
-                qtPoints.push_back(pt);
-            polyline->setPoints(qtPoints);
-        }
-        else if (auto circle = dynamic_cast<CircleEntity2D*>(entity.get()))
-        {
-            if (!pts.empty())
-                circle->setCenter(pts[0]);
+            entity->basePoint = Ut::Vec2d(pts[0].x(), pts[0].y());
         }
     }
 }
@@ -1084,38 +1018,28 @@ void MoveCommand::restoreOriginalPositions()
 // MoveUndoCommand 实现
 // ============================================================================
 
-MoveUndoCommand::MoveUndoCommand(EntityDocument2D* document,
-                                 std::map<QString, std::vector<QPointF>> originalPositions)
-    : UndoCommand(QStringLiteral("移动"))
+MoveUndoCommand::MoveUndoCommand(SceneDocument2D* document,
+                                  std::map<QString, std::vector<QPointF>> originalPositions)
+    : UndoCommand(QObject::tr("Move")) // 移动
     , m_document(document)
     , m_originalPositions(std::move(originalPositions))
 {
-    // 保存移动后的位置（用于 redo）
     for (const auto& pair : m_originalPositions)
     {
-        const auto& entityId = pair.first;
-
-        auto entity = m_document->entityById(entityId);
+        auto* entity = m_document->entityByStringId(pair.first);
         if (!entity)
             continue;
-
-        if (auto transformable = dynamic_cast<ITransformable*>(entity.get()))
+        if (entity->eType == Eg::EType::LINE)
         {
-            std::vector<QPointF> pts;
-            for (const auto& pt : transformable->keyPoints())
-                pts.push_back(pt);
-            m_newPositions[entityId] = pts;
+            auto* line = static_cast<Eg::SyLine*>(entity);
+            m_newPositions[pair.first] = {
+                QPointF(line->vPoints[0].x(), line->vPoints[0].y()),
+                QPointF(line->vPoints[1].x(), line->vPoints[1].y())
+            };
         }
-        else if (auto polyline = dynamic_cast<PolylineEntity2D*>(entity.get()))
+        else if (entity->eType == Eg::EType::CIRCLE)
         {
-            std::vector<QPointF> pts;
-            for (const auto& pt : polyline->points())
-                pts.push_back(pt);
-            m_newPositions[entityId] = pts;
-        }
-        else if (auto circle = dynamic_cast<CircleEntity2D*>(entity.get()))
-        {
-            m_newPositions[entityId] = { circle->center(), QPointF(circle->radius(), 0) };
+            m_newPositions[pair.first] = { QPointF(entity->basePoint.x(), entity->basePoint.y()) };
         }
     }
 }
@@ -1127,31 +1051,20 @@ void MoveUndoCommand::undo()
 
     for (const auto& pair : m_originalPositions)
     {
-        const auto& entityId = pair.first;
-        const auto& pts = pair.second;
-
-        auto entity = m_document->entityById(entityId);
+        auto* entity = m_document->entityByStringId(pair.first);
         if (!entity)
             continue;
+        const auto& pts = pair.second;
 
-        if (auto transformable = dynamic_cast<ITransformable*>(entity.get()))
+        if (entity->eType == Eg::EType::LINE && pts.size() >= 2)
         {
-            QVector<QPointF> qtPoints;
-            for (const auto& pt : pts)
-                qtPoints.push_back(pt);
-            transformable->setKeyPoints(qtPoints);
+            auto* line = static_cast<Eg::SyLine*>(entity);
+            line->vPoints[0] = Ut::Vec2d(pts[0].x(), pts[0].y());
+            line->vPoints[1] = Ut::Vec2d(pts[1].x(), pts[1].y());
         }
-        else if (auto polyline = dynamic_cast<PolylineEntity2D*>(entity.get()))
+        else if (entity->eType == Eg::EType::CIRCLE && !pts.empty())
         {
-            QVector<QPointF> qtPoints;
-            for (const auto& pt : pts)
-                qtPoints.push_back(pt);
-            polyline->setPoints(qtPoints);
-        }
-        else if (auto circle = dynamic_cast<CircleEntity2D*>(entity.get()))
-        {
-            if (!pts.empty())
-                circle->setCenter(pts[0]);
+            entity->basePoint = Ut::Vec2d(pts[0].x(), pts[0].y());
         }
     }
 }
@@ -1163,47 +1076,37 @@ void MoveUndoCommand::redo()
 
     for (const auto& pair : m_newPositions)
     {
-        const auto& entityId = pair.first;
-        const auto& pts = pair.second;
-
-        auto entity = m_document->entityById(entityId);
+        auto* entity = m_document->entityByStringId(pair.first);
         if (!entity)
             continue;
+        const auto& pts = pair.second;
 
-        if (auto transformable = dynamic_cast<ITransformable*>(entity.get()))
+        if (entity->eType == Eg::EType::LINE && pts.size() >= 2)
         {
-            QVector<QPointF> qtPoints;
-            for (const auto& pt : pts)
-                qtPoints.push_back(pt);
-            transformable->setKeyPoints(qtPoints);
+            auto* line = static_cast<Eg::SyLine*>(entity);
+            line->vPoints[0] = Ut::Vec2d(pts[0].x(), pts[0].y());
+            line->vPoints[1] = Ut::Vec2d(pts[1].x(), pts[1].y());
         }
-        else if (auto polyline = dynamic_cast<PolylineEntity2D*>(entity.get()))
+        else if (entity->eType == Eg::EType::CIRCLE && !pts.empty())
         {
-            QVector<QPointF> qtPoints;
-            for (const auto& pt : pts)
-                qtPoints.push_back(pt);
-            polyline->setPoints(qtPoints);
-        }
-        else if (auto circle = dynamic_cast<CircleEntity2D*>(entity.get()))
-        {
-            if (!pts.empty())
-                circle->setCenter(pts[0]);
+            entity->basePoint = Ut::Vec2d(pts[0].x(), pts[0].y());
         }
     }
 }
 
-CircleUndoCommand::CircleUndoCommand(EntityDocument2D* document, const QString& entityId)
-    : UndoCommand(QStringLiteral("画圆"))
+CircleUndoCommand::CircleUndoCommand(SceneDocument2D* document, const QString& entityId)
+    : UndoCommand(QObject::tr("Draw Circle")) // 画圆
     , m_document(document)
     , m_entityId(entityId)
 {
     if (m_document)
     {
-        auto entity = m_document->entityById(entityId);
-        if (auto circle = dynamic_cast<CircleEntity2D*>(entity.get()))
+        auto* entity = m_document->entityByStringId(entityId);
+        if (entity && entity->eType == Eg::EType::CIRCLE)
         {
-            m_center = circle->center();
-            m_radius = circle->radius();
+            auto* circle = static_cast<Eg::SyCircle*>(entity);
+            m_center = QPointF(entity->basePoint.x(), entity->basePoint.y());
+            m_radius = circle->dRadius;
         }
     }
 }
@@ -1219,20 +1122,22 @@ void CircleUndoCommand::redo()
 {
     if (!m_document)
         return;
-    m_document->createCircle(m_center, m_radius);
+    m_entityId = m_document->createCircle(m_center, m_radius);
 }
 
-PolylineUndoCommand::PolylineUndoCommand(EntityDocument2D* document, const QString& entityId)
-    : UndoCommand(QStringLiteral("画折线"))
+PolylineUndoCommand::PolylineUndoCommand(SceneDocument2D* document, const QString& entityId)
+    : UndoCommand(QObject::tr("Draw Polyline")) // 画折线
     , m_document(document)
     , m_entityId(entityId)
 {
     if (m_document)
     {
-        auto entity = m_document->entityById(entityId);
-        if (auto polyline = dynamic_cast<PolylineEntity2D*>(entity.get()))
+        auto* entity = m_document->entityByStringId(entityId);
+        if (entity && entity->eType == Eg::EType::LINE)
         {
-            m_points = polyline->points();
+            auto* line = static_cast<Eg::SyLine*>(entity);
+            for (const auto& pt : line->vPoints)
+                m_points.push_back(QPointF(pt.x(), pt.y()));
         }
     }
 }
@@ -1248,22 +1153,14 @@ void PolylineUndoCommand::redo()
 {
     if (!m_document)
         return;
-    m_document->createPolyline(m_points);
+    m_entityId = m_document->createLine(m_points.front(), m_points.back());
 }
 
-CopyUndoCommand::CopyUndoCommand(EntityDocument2D* document, const QStringList& copiedEntityIds)
-    : UndoCommand(QStringLiteral("复制"))
+CopyUndoCommand::CopyUndoCommand(SceneDocument2D* document, const QStringList& copiedEntityIds)
+    : UndoCommand(QObject::tr("Copy")) // 复制
     , m_document(document)
     , m_copiedEntityIds(copiedEntityIds)
 {
-    if (m_document)
-    {
-        for (const auto& id : copiedEntityIds)
-        {
-            if (auto entity = m_document->entityById(id))
-                m_copiedEntities.push_back(entity);
-        }
-    }
 }
 
 void CopyUndoCommand::undo()
@@ -1278,25 +1175,37 @@ void CopyUndoCommand::redo()
 {
     if (!m_document)
         return;
-    for (const auto& entity : m_copiedEntities)
+    QStringList newIds;
+    for (const auto& id : m_copiedEntityIds)
     {
-        if (auto line = std::dynamic_pointer_cast<LineEntity2D>(entity))
-            m_document->createLine(line->start(), line->end());
-        else if (auto circle = std::dynamic_pointer_cast<CircleEntity2D>(entity))
-            m_document->createCircle(circle->center(), circle->radius());
-        else if (auto polyline = std::dynamic_pointer_cast<PolylineEntity2D>(entity))
-            m_document->createPolyline(polyline->points());
+        auto* entity = m_document->entityByStringId(id);
+        if (!entity)
+            continue;
+        if (entity->eType == Eg::EType::LINE)
+        {
+            auto* line = static_cast<Eg::SyLine*>(entity);
+            newIds.append(m_document->createLine(
+                QPointF(line->vPoints[0].x(), line->vPoints[0].y()),
+                QPointF(line->vPoints[1].x(), line->vPoints[1].y())));
+        }
+        else if (entity->eType == Eg::EType::CIRCLE)
+        {
+            auto* circle = static_cast<Eg::SyCircle*>(entity);
+            newIds.append(m_document->createCircle(
+                QPointF(entity->basePoint.x(), entity->basePoint.y()), circle->dRadius));
+        }
     }
+    m_copiedEntityIds = newIds;
 }
 
 // ============================================================================
-// CircleCommand 实现（画图命令）
+// CircleCommand 实现
 // ============================================================================
 
 CircleCommand::CircleCommand() = default;
 
 QString CircleCommand::commandId() const { return QStringLiteral("2d.draw_circle"); }
-QString CircleCommand::displayName() const { return QStringLiteral("画圆"); }
+QString CircleCommand::displayName() const { return QObject::tr("Draw Circle"); } // 画圆
 bool CircleCommand::isInteractive() const { return true; }
 CommandState CircleCommand::state() const { return m_state; }
 
@@ -1331,10 +1240,9 @@ void CircleCommand::commit()
         const double radius = QLineF(m_center, m_endPoint).length();
         if (radius > 0)
         {
-            auto entity = m_document->createCircle(m_center, radius);
-            m_createdEntityId = entity->id();
-            m_document->selection().clear();
-            m_document->selection().add(entity);
+            m_createdEntityId = m_document->createCircle(m_center, radius);
+            m_document->clearSelection();
+            m_document->selectEntity(m_createdEntityId);
         }
     }
     m_state = CommandState::Committed;
@@ -1401,24 +1309,24 @@ CommandPreview CircleCommand::preview() const
         p.valid = true;
         p.previewStart = m_center;
         p.previewEnd = m_endPoint;
-        p.stageText = QStringLiteral("圆预览中");
+        p.stageText = QObject::tr("Circle preview"); // 圆预览
     }
     return p;
 }
 
-void CircleCommand::setDocument(EntityDocument2D* document)
+void CircleCommand::setDocument(SceneDocument2D* document)
 {
     m_document = document;
 }
 
 // ============================================================================
-// PolylineCommand 实现（折线命令）
+// PolylineCommand 实现
 // ============================================================================
 
 PolylineCommand::PolylineCommand() = default;
 
 QString PolylineCommand::commandId() const { return QStringLiteral("2d.draw_polyline"); }
-QString PolylineCommand::displayName() const { return QStringLiteral("折线"); }
+QString PolylineCommand::displayName() const { return QObject::tr("Polyline"); } // 折线
 bool PolylineCommand::isInteractive() const { return true; }
 CommandState PolylineCommand::state() const { return m_state; }
 
@@ -1449,10 +1357,9 @@ void PolylineCommand::commit()
 {
     if (m_document && m_points.size() >= 2)
     {
-        auto entity = m_document->createPolyline(m_points);
-        m_createdEntityId = entity->id();
-        m_document->selection().clear();
-        m_document->selection().add(entity);
+        m_createdEntityId = m_document->createLine(m_points.front(), m_points.back());
+        m_document->clearSelection();
+        m_document->selectEntity(m_createdEntityId);
     }
     m_state = CommandState::Committed;
 }
@@ -1518,12 +1425,12 @@ CommandPreview PolylineCommand::preview() const
         p.valid = true;
         p.previewStart = m_points.last();
         p.previewEnd = m_currentPoint;
-        p.stageText = QStringLiteral("折线点输入中 (%1)").arg(qint64(m_points.size()));
+        p.stageText = QObject::tr("Polyline point input (%1)").arg(qint64(m_points.size())); // 折线点输入 (%1)
     }
     return p;
 }
 
-void PolylineCommand::setDocument(EntityDocument2D* document)
+void PolylineCommand::setDocument(SceneDocument2D* document)
 {
     m_document = document;
 }
@@ -1534,13 +1441,13 @@ void PolylineCommand::finish()
 }
 
 // ============================================================================
-// CopyCommand 实现（复制命令）
+// CopyCommand 实现
 // ============================================================================
 
 CopyCommand::CopyCommand() = default;
 
 QString CopyCommand::commandId() const { return QStringLiteral("2d.copy"); }
-QString CopyCommand::displayName() const { return QStringLiteral("复制"); }
+QString CopyCommand::displayName() const { return QObject::tr("Copy"); } // 复制
 bool CopyCommand::isInteractive() const { return true; }
 CommandState CopyCommand::state() const { return m_state; }
 
@@ -1553,7 +1460,7 @@ bool CopyCommand::activate(const UiServices& services)
     if (!m_document)
         return false;
 
-    if (m_document->selection().empty())
+    if (m_document->selectedIds().isEmpty())
         return false;
 
     m_state = CommandState::Active;
@@ -1573,43 +1480,26 @@ void CopyCommand::cancel()
 
 void CopyCommand::commit()
 {
-    if (!m_document || !m_hasAnchor || m_copiedEntityIds.size() > 0)
+    if (!m_document || !m_hasAnchor || !m_copiedEntityIds.isEmpty())
         return;
 
     const QPointF delta = m_targetPoint - m_anchorPoint;
-    for (const auto& entity : m_document->selection().items())
-    {
-        if (!entity)
-            continue;
+    auto* sm = m_document->sceneManager();
+    if (!sm) return;
 
-        if (auto line = std::dynamic_pointer_cast<LineEntity2D>(entity))
-        {
-            auto newLine = m_document->createLine(line->start() + delta, line->end() + delta);
-            m_copiedEntityIds.append(newLine->id());
-        }
-        else if (auto circle = std::dynamic_pointer_cast<CircleEntity2D>(entity))
-        {
-            auto newCircle = m_document->createCircle(circle->center() + delta, circle->radius());
-            m_copiedEntityIds.append(newCircle->id());
-        }
-        else if (auto polyline = std::dynamic_pointer_cast<PolylineEntity2D>(entity))
-        {
-            auto pts = polyline->points();
-            for (auto& pt : pts)
-                pt += delta;
-            auto newPolyline = m_document->createPolyline(pts);
-            m_copiedEntityIds.append(newPolyline->id());
-        }
+    for (auto* entity : sm->getSelectedEntities())
+    {
+        auto copy = entity->clone();
+        copy->transform(Ut::Mat3d::translate(delta.x(), delta.y()));
+        sm->addEntity(copy.release());
+        m_copiedEntityIds.append(QString::number(copy->id));
     }
 
     if (!m_copiedEntityIds.isEmpty())
     {
-        m_document->selection().clear();
+        m_document->clearSelection();
         for (const auto& id : m_copiedEntityIds)
-        {
-            if (auto entity = m_document->entityById(id))
-                m_document->selection().add(entity);
-        }
+            m_document->selectEntity(id);
     }
 
     m_state = CommandState::Committed;
@@ -1676,7 +1566,7 @@ CommandPreview CopyCommand::preview() const
     return p;
 }
 
-void CopyCommand::setDocument(EntityDocument2D* document)
+void CopyCommand::setDocument(SceneDocument2D* document)
 {
     m_document = document;
 }
