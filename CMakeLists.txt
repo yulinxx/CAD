@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+﻿cmake_minimum_required(VERSION 4.3)
 
 # ============ CMake 策略设置 ============
 # CMP0167: FindBoost 模块从 CMake 3.25 开始已被移除，必须使用 CONFIG 模式
@@ -136,6 +136,7 @@ add_subdirectory(Log/Log)
 add_subdirectory(Engine/Common)
 add_subdirectory(Engine/2D)
 add_subdirectory(Engine/3D)
+add_subdirectory(Engine/Persistence)
 
 # 4. Render 层 - 渲染
 add_subdirectory(Render/Common)

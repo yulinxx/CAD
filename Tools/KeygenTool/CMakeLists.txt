@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+﻿cmake_minimum_required(VERSION 4.3)
 
 # KeygenTool - 离线注册码生成工具
 # 编译方法：cmake 时设置 -DBUILD_KEYGEN_TOOL=ON

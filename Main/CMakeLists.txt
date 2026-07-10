@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 4.3)
 
 function(deploy_qt_libraries target_name qt_major_version)
     get_target_property(QT_QMAKE_EXECUTABLE Qt${qt_major_version}::qmake IMPORTED_LOCATION)
@@ -14,13 +14,19 @@ function(deploy_qt_libraries target_name qt_major_version)
     endif()
 endfunction()
 
+set(SRC_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/Src)
+set(UI_ROOT ${SRC_ROOT}/UI)
+
 file(GLOB_RECURSE MAIN_SOURCES CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/Src/*.cpp"
+    "${SRC_ROOT}/**/*.cpp"
 )
 
 file(GLOB_RECURSE MAIN_HEADERS CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/Src/*.h"
+    "${SRC_ROOT}/**/*.h"
 )
+
+list(REMOVE_DUPLICATES MAIN_SOURCES)
+list(REMOVE_DUPLICATES MAIN_HEADERS)
 
 list(FILTER MAIN_SOURCES EXCLUDE REGEX ".*Test/.*\\.cpp$")
 list(FILTER MAIN_HEADERS EXCLUDE REGEX ".*Test/.*\\.h$")
@@ -33,7 +39,6 @@ file(GLOB_RECURSE MAIN_RESOURCES CONFIGURE_DEPENDS
 
 set(app_name "SanYiCAD")
 
-# 版本号定义
 set(VERSION_MAJOR 1)
 set(VERSION_MINOR 0)
 set(VERSION_PATCH 0)
@@ -42,17 +47,17 @@ set(PROJECT_VERSION_MINOR ${VERSION_MINOR})
 set(PROJECT_VERSION_PATCH ${VERSION_PATCH})
 set(PROJECT_VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
 
-# 应用程序配置
 set(APP_ORGANIZATION_NAME "SanYi")
 set(APP_ORGANIZATION_DOMAIN "sanyi-cad.com")
 
 configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/Src/Common/VersionInfo.h.in"
+    "${SRC_ROOT}/Common/VersionInfo.h.in"
     "${CMAKE_CURRENT_BINARY_DIR}/VersionInfo.h"
     @ONLY
 )
 
 add_executable(${app_name}
+    ${SRC_ROOT}/main.cpp
     ${MAIN_SOURCES}
     ${MAIN_HEADERS}
     ${MAIN_RESOURCES}
@@ -62,7 +67,6 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${MAIN_SOURCES} ${MAIN_HEA
 
 set(QT_COMPONENTS Core Gui Widgets OpenGLWidgets)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS ${QT_COMPONENTS} REQUIRED)
-
 find_package(OpenSSL REQUIRED)
 
 set(QT_LIBRARIES)
@@ -72,7 +76,7 @@ endforeach()
 
 set_target_properties(${app_name} PROPERTIES
     AUTOMOC ON
-    AUTOUIC ON
+    AUTOUIC OFF
     AUTORCC ON
     WIN32_EXECUTABLE ON
 )
@@ -82,9 +86,22 @@ target_compile_features(${app_name} PRIVATE cxx_std_17)
 target_include_directories(${app_name}
     PRIVATE
         "${CMAKE_CURRENT_BINARY_DIR}"
-        "${CMAKE_CURRENT_SOURCE_DIR}/Src"
-        "${CMAKE_CURRENT_SOURCE_DIR}/Src/Common"
-        "${CMAKE_CURRENT_SOURCE_DIR}/Src/RenderCore"
+        "${SRC_ROOT}"
+        "${SRC_ROOT}/Common"
+        "${SRC_ROOT}/RenderCore"
+        "${SRC_ROOT}/RenderCore/Backend"
+        "${SRC_ROOT}/RenderCore/Compiler"
+        "${SRC_ROOT}/RenderCore/Strategy"
+        "${SRC_ROOT}/RenderCore/Utils"
+        "${UI_ROOT}"
+        "${UI_ROOT}/Adapters"
+        "${UI_ROOT}/Dispatchers"
+        "${UI_ROOT}/Documents"
+        "${UI_ROOT}/Entities"
+        "${UI_ROOT}/Render"
+        "${UI_ROOT}/Services"
+        "${UI_ROOT}/Widgets"
+        "${UI_ROOT}/Workbench"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Utility/Utility/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler/CrashHandler/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
@@ -193,33 +210,42 @@ message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "")
 message(STATUS "----------------------------------------")
 
-option(BUILD_MAIN_TESTS "Build Main module unit tests" OFF)
+option(BUILD_MAIN_TESTS "Build Main module unit tests" ON)
 if(BUILD_MAIN_TESTS AND GTest_FOUND)
     file(GLOB MAIN_TEST_SOURCES CONFIGURE_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/Src/UI/Test/*.cpp"
+        "${UI_ROOT}/Test/*.cpp"
     )
-    
-    set(MAIN_TEST_DEP_SOURCES
-        "${CMAKE_CURRENT_SOURCE_DIR}/Src/UI/SimpleRenderer3D.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/Src/UI/UiEntities.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/Src/UI/UiCommandDispatcher.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/Src/UI/UiCommandHandler.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/Src/UI/UiStateCenter.cpp"
+
+    file(GLOB MAIN_TEST_DEP_SOURCES CONFIGURE_DEPENDS
+        "${UI_ROOT}/*.cpp"
     )
-    
+
     add_executable(MainTests
         ${MAIN_TEST_SOURCES}
         ${MAIN_TEST_DEP_SOURCES}
     )
-    
+
     target_compile_features(MainTests PRIVATE cxx_std_17)
-    
+
     target_include_directories(MainTests
         PRIVATE
             "${CMAKE_CURRENT_BINARY_DIR}"
-            "${CMAKE_CURRENT_SOURCE_DIR}/Src"
-            "${CMAKE_CURRENT_SOURCE_DIR}/Src/Common"
-            "${CMAKE_CURRENT_SOURCE_DIR}/Src/RenderCore"
+            "${SRC_ROOT}"
+            "${SRC_ROOT}/Common"
+            "${SRC_ROOT}/RenderCore"
+            "${SRC_ROOT}/RenderCore/Backend"
+            "${SRC_ROOT}/RenderCore/Compiler"
+            "${SRC_ROOT}/RenderCore/Strategy"
+            "${SRC_ROOT}/RenderCore/Utils"
+            "${UI_ROOT}"
+            "${UI_ROOT}/Adapters"
+            "${UI_ROOT}/Dispatchers"
+            "${UI_ROOT}/Documents"
+            "${UI_ROOT}/Entities"
+            "${UI_ROOT}/Render"
+            "${UI_ROOT}/Services"
+            "${UI_ROOT}/Widgets"
+            "${UI_ROOT}/Workbench"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Utility/Utility/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler/CrashHandler/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
@@ -233,7 +259,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Log/Log/Include"
     )
-    
+
     target_link_libraries(MainTests
         PRIVATE
             Utility
@@ -241,6 +267,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             Engine2D
             Engine3D
             RenderCommon
+            Render2D
             Render3D
             UiRenderCore
             UICommon
@@ -249,19 +276,28 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             Log
             ${QT_LIBRARIES}
             GTest::gtest
-            GTest::gtest_main
+            GTest::gmock
     )
-    
+
     set_target_properties(MainTests PROPERTIES
         AUTOMOC ON
-        AUTOUIC ON
+        AUTOUIC OFF
     )
-    
+
+    if(MSVC)
+        set_target_properties(MainTests PROPERTIES
+            LINK_FLAGS "/OPT:NOREF /OPT:NOICF"
+        )
+        target_compile_options(MainTests PRIVATE /utf-8 /FS)
+    endif()
+
     gtest_discover_tests(MainTests)
-    
+
     message(STATUS "[Main Tests]")
-    message(STATUS "  SimpleRenderer3DTests: Renderer lifecycle, render loop, selection")
-    message(STATUS "  CommandLifecycleTests: execute/cancel/submit, undo/redo, preview, selection, handlerFor")
-    message(STATUS "  RenderCoreTests: backend init/shutdown, SceneCompiler compile/incremental/cache, factory, Camera3D, Viewport3D")
+    # message(STATUS "  SimpleRenderer3DTests: Renderer lifecycle, render loop, selection")
+    # message(STATUS "  CommandLifecycleTests: execute/cancel/submit, undo/redo, preview, selection, handlerFor")
+    # message(STATUS "  RenderCoreTests: backend init/shutdown, SceneCompiler compile/incremental/cache, factory, Camera3D, Viewport3D")
+    # message(STATUS "  RenderPipelineTests: SceneEditServiceAdapter commit/preview/cancel + scene-changed signal/callback")
+    # message(STATUS "  GpuSceneRenderer2DTests: GPU 桥接器编译/投递/选择/overlay 路径 + Main→Render2D 格式翻译")
     message(STATUS "")
 endif()
