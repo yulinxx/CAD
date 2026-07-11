@@ -2,14 +2,23 @@
 
 #include "RenderTypes.h"
 
+#include <QCoreApplication>
 #include <QFont>
+
+namespace
+{
+    QString trSoftwareRenderer(const char* text)
+    {
+        return QCoreApplication::translate("SoftwareRenderer", text);
+    }
+}
 
 // ============================================================================
 // 主渲染入口
 // ============================================================================
 
 void SoftwareRenderer::render(QPainter& painter, const RenderFrame& frame,
-                              const UiCamera3D& camera, const Size2D& viewportSize)
+                              const ViewCamera3D& camera, const Size2D& viewportSize)
 {
     // 清屏
     painter.fillRect(0, 0, viewportSize.width, viewportSize.height, QColor(30, 30, 30));
@@ -20,7 +29,7 @@ void SoftwareRenderer::render(QPainter& painter, const RenderFrame& frame,
         painter.setFont(QFont(QStringLiteral("Microsoft YaHei"), 12));
         painter.drawText(QRect(0, 0, viewportSize.width, viewportSize.height),
                          Qt::AlignCenter,
-                         QStringLiteral("RenderCore 渲染管线就绪\n等待场景数据..."));
+                         trSoftwareRenderer("RenderCore pipeline ready\nWaiting for scene data..."));
         return;
     }
 
@@ -34,7 +43,7 @@ void SoftwareRenderer::render(QPainter& painter, const RenderFrame& frame,
 // ============================================================================
 
 void SoftwareRenderer::drawBatches3D(QPainter& painter, const RenderFrame& frame,
-                                     const UiCamera3D& camera)
+                                     const ViewCamera3D& camera)
 {
     painter.setRenderHint(QPainter::Antialiasing, true);
 
@@ -109,15 +118,15 @@ void SoftwareRenderer::drawBatches3D(QPainter& painter, const RenderFrame& frame
 // 坐标轴指示器（静态工具方法）
 // ============================================================================
 
-void SoftwareRenderer::drawAxesIndicator(QPainter& painter, const UiCamera3D& camera,
+void SoftwareRenderer::drawAxesIndicator(QPainter& painter, const ViewCamera3D& camera,
                                          int viewW, int viewH)
 {
     const int cx = viewW - 80;
     const int cy = viewH - 80;
     const int len = 50;
 
-    const double yawRad = qDegreesToRadians(camera.yaw());
-    const double pitchRad = qDegreesToRadians(camera.pitch());
+    const double yawRad = camera.yaw() * M_PI / 180.0;
+    const double pitchRad = camera.pitch() * M_PI / 180.0;
 
     auto projAxis = [&](double ax, double ay, double az) -> QPoint {
         double rx = ax * qCos(yawRad) + az * qSin(yawRad);

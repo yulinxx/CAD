@@ -1,5 +1,6 @@
 #include "MinimalOpenGLBackend.h"
 
+#include "Log/SyLogger.h"
 #include "RenderFrame.h"
 #include "RenderTypes.h"
 
@@ -9,7 +10,6 @@
 #include <QOffscreenSurface>
 #include <QSurfaceFormat>
 #include <QImage>
-#include <QDebug>
 
 #include <chrono>
 #include <string>
@@ -50,7 +50,7 @@ bool MinimalOpenGLBackend::initialize(void* nativeWindowHandle)
 
     if (!ensureGLContext())
     {
-        qWarning() << "[MinimalOpenGLBackend] 无法创建 OpenGL 上下文";
+        SY_WARN("[MinimalOpenGLBackend] Failed to create OpenGL context");
         return false;
     }
 
@@ -58,7 +58,7 @@ bool MinimalOpenGLBackend::initialize(void* nativeWindowHandle)
     m_ready = true;
     m_context.markDirty();
 
-    qDebug() << "[MinimalOpenGLBackend] 初始化完成, 后端:" << m_context.backendName.c_str();
+    SY_INFOF("[MinimalOpenGLBackend] Initialized, backend: %s", m_context.backendName.c_str());
     return true;
 }
 
@@ -296,7 +296,7 @@ bool MinimalOpenGLBackend::ensureGLContext()
 
     if (!m_glResources->glContext->create())
     {
-        qWarning() << "[MinimalOpenGLBackend] 创建 OpenGL 4.5 Core 上下文失败，尝试兼容格式";
+        SY_WARN("[MinimalOpenGLBackend] Failed to create OpenGL 4.5 Core context, trying compatibility format");
 
         QSurfaceFormat fallbackFormat;
         fallbackFormat.setDepthBufferSize(24);
@@ -304,7 +304,7 @@ bool MinimalOpenGLBackend::ensureGLContext()
 
         if (!m_glResources->glContext->create())
         {
-            qWarning() << "[MinimalOpenGLBackend] 回退格式也失败";
+            SY_WARN("[MinimalOpenGLBackend] Fallback OpenGL format also failed");
             return false;
         }
     }
@@ -315,14 +315,14 @@ bool MinimalOpenGLBackend::ensureGLContext()
 
     if (!m_glResources->glContext->makeCurrent(m_glResources->offscreenSurface.get()))
     {
-        qWarning() << "[MinimalOpenGLBackend] makeCurrent 失败";
+        SY_WARN("[MinimalOpenGLBackend] makeCurrent failed");
         return false;
     }
 
-    qDebug() << "[MinimalOpenGLBackend] OpenGL 上下文创建成功";
-    qDebug() << "  Version:" << m_glResources->glContext->format().majorVersion() << "."
-             << m_glResources->glContext->format().minorVersion();
-    qDebug() << "  Profile:" << (m_glResources->glContext->format().profile() == QSurfaceFormat::CoreProfile ? "Core" : "Compatibility");
+    SY_INFOF("[MinimalOpenGLBackend] OpenGL context created: version %d.%d, profile %s",
+        m_glResources->glContext->format().majorVersion(),
+        m_glResources->glContext->format().minorVersion(),
+        m_glResources->glContext->format().profile() == QSurfaceFormat::CoreProfile ? "Core" : "Compatibility");
 
     m_glResources->glContext->doneCurrent();
     return true;
@@ -351,7 +351,7 @@ bool MinimalOpenGLBackend::ensureFBO()
 
     if (!m_glResources->fbo->isValid())
     {
-        qWarning() << "[MinimalOpenGLBackend] FBO 创建失败";
+        SY_WARN("[MinimalOpenGLBackend] FBO creation failed");
         m_glResources->glContext->doneCurrent();
         return false;
     }

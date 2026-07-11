@@ -10,6 +10,8 @@
 #include <cmath>
 #include <set>
 
+#include "Log/SyLogger.h"
+
 // ============================================================================
 // 辅助函数（批次生成工具）
 // ============================================================================
@@ -113,7 +115,12 @@ std::vector<RenderBatch> SceneTraverser::traverse2D(Eg::SceneManager* scene, con
     std::vector<RenderBatch> batches;
 
     if (!scene)
+    {
+        SY_WARN("[SceneTraverser] traverse2D called with null scene");
         return batches;
+    }
+
+    SY_DEBUG("[SceneTraverser] traverse2D started");
 
     auto selectedEntities = scene->getSelectedEntities();
     std::set<std::string> selectedIds;
@@ -124,6 +131,9 @@ std::vector<RenderBatch> SceneTraverser::traverse2D(Eg::SceneManager* scene, con
     }
 
     auto allEntities = scene->getAllEntities();
+    SY_DEBUG("[SceneTraverser] traverse2D processing %d entities, %d selected",
+        static_cast<int>(allEntities.size()), static_cast<int>(selectedIds.size()));
+
     for (const auto* entity : allEntities)
     {
         if (!entity)
@@ -197,6 +207,7 @@ std::vector<RenderBatch> SceneTraverser::traverse2D(Eg::SceneManager* scene, con
         }
     }
 
+    SY_INFO("[SceneTraverser] traverse2D completed batches=%d", static_cast<int>(batches.size()));
     return batches;
 }
 
@@ -210,7 +221,12 @@ std::vector<RenderBatch> SceneTraverser::traverse3D(SceneDocument3D* document, c
     std::vector<RenderBatch> batches;
 
     if (!document)
+    {
+        SY_WARN("[SceneTraverser] traverse3D called with null document");
         return batches;
+    }
+
+    SY_DEBUG("[SceneTraverser] traverse3D started");
 
     const auto& selection = document->selection();
     const auto selectedItems = selection.items();
@@ -220,6 +236,9 @@ std::vector<RenderBatch> SceneTraverser::traverse3D(SceneDocument3D* document, c
         if (item)
             selectedIdSet.insert(item->id());
     }
+
+    SY_DEBUG("[SceneTraverser] traverse3D processing %d nodes, %d selected",
+        static_cast<int>(document->rootNodes().size()), static_cast<int>(selectedIdSet.size()));
 
     for (const auto& node : document->rootNodes())
     {
@@ -247,5 +266,6 @@ std::vector<RenderBatch> SceneTraverser::traverse3D(SceneDocument3D* document, c
         batches.push_back(batch);
     }
 
+    SY_INFO("[SceneTraverser] traverse3D completed batches=%d", static_cast<int>(batches.size()));
     return batches;
 }

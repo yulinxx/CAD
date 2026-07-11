@@ -1,8 +1,8 @@
-#include "UiCamera3D.h"
+#include "ViewCamera3D.h"
 
-UiCamera3D::UiCamera3D() = default;
+ViewCamera3D::ViewCamera3D() = default;
 
-void UiCamera3D::reset()
+void ViewCamera3D::reset()
 {
     m_yaw = 0.0;
     m_pitch = 15.0;
@@ -12,13 +12,13 @@ void UiCamera3D::reset()
     m_dirty = true;
 }
 
-void UiCamera3D::setViewportSize(int width, int height)
+void ViewCamera3D::setViewportSize(int width, int height)
 {
     m_viewWidth = width;
     m_viewHeight = height;
 }
 
-bool UiCamera3D::project(float x, float y, float z, int& sx, int& sy) const
+bool ViewCamera3D::project(float x, float y, float z, int& sx, int& sy) const
 {
     const double yawRad = qDegreesToRadians(m_yaw);
     const double pitchRad = qDegreesToRadians(m_pitch);
@@ -46,7 +46,7 @@ bool UiCamera3D::project(float x, float y, float z, int& sx, int& sy) const
     return true;
 }
 
-void UiCamera3D::orbit(float deltaYawDeg, float deltaPitchDeg)
+void ViewCamera3D::orbit(float deltaYawDeg, float deltaPitchDeg)
 {
     m_yaw += deltaYawDeg;
     m_pitch += deltaPitchDeg;
@@ -54,21 +54,21 @@ void UiCamera3D::orbit(float deltaYawDeg, float deltaPitchDeg)
     m_dirty = true;
 }
 
-void UiCamera3D::pan(float deltaX, float deltaY)
+void ViewCamera3D::pan(float deltaX, float deltaY)
 {
     m_panX += deltaX;
     m_panY += deltaY;
     m_dirty = true;
 }
 
-void UiCamera3D::zoom(float delta)
+void ViewCamera3D::zoom(float delta)
 {
     m_distance -= delta;
     m_distance = qBound(1.0, m_distance, 100.0);
     m_dirty = true;
 }
 
-bool UiCamera3D::onMousePress(int x, int y, int button, int modifiers, int viewW, int viewH)
+bool ViewCamera3D::onMousePress(int x, int y, int button, int modifiers, int viewW, int viewH)
 {
     Q_UNUSED(modifiers);
     setViewportSize(viewW, viewH);
@@ -87,7 +87,7 @@ bool UiCamera3D::onMousePress(int x, int y, int button, int modifiers, int viewW
     return false;
 }
 
-bool UiCamera3D::onMouseMove(int x, int y, int buttons, int viewW, int viewH)
+bool ViewCamera3D::onMouseMove(int x, int y, int buttons, int viewW, int viewH)
 {
     Q_UNUSED(buttons);
     setViewportSize(viewW, viewH);
@@ -109,7 +109,7 @@ bool UiCamera3D::onMouseMove(int x, int y, int buttons, int viewW, int viewH)
     return false;
 }
 
-bool UiCamera3D::onMouseRelease(int x, int y, int button, int viewW, int viewH)
+bool ViewCamera3D::onMouseRelease(int x, int y, int button, int viewW, int viewH)
 {
     Q_UNUSED(x); Q_UNUSED(y);
     setViewportSize(viewW, viewH);
@@ -120,7 +120,7 @@ bool UiCamera3D::onMouseRelease(int x, int y, int button, int viewW, int viewH)
     return false;
 }
 
-bool UiCamera3D::onWheel(int delta, int viewW, int viewH)
+bool ViewCamera3D::onWheel(int delta, int viewW, int viewH)
 {
     setViewportSize(viewW, viewH);
     zoom(delta * 0.01f);

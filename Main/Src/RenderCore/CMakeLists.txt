@@ -16,7 +16,7 @@ set(HEADERS
     ${SRC_DIR}/DefaultRenderBackend.h
     ${SRC_DIR}/RenderBackendFactory.h
     ${SRC_DIR}/MinimalOpenGLBackend.h
-    ${SRC_DIR}/UiCamera3D.h
+    ${SRC_DIR}/ViewCamera3D.h
     ${SRC_DIR}/RenderCoreRenderer.h
     ${SRC_DIR}/SoftwareRenderer.h
     ${SRC_DIR}/SceneTraverser.h
@@ -31,7 +31,7 @@ set(SOURCES
     ${SRC_DIR}/DefaultRenderBackend.cpp
     ${SRC_DIR}/RenderBackendFactory.cpp
     ${SRC_DIR}/MinimalOpenGLBackend.cpp
-    ${SRC_DIR}/UiCamera3D.cpp
+    ${SRC_DIR}/ViewCamera3D.cpp
     ${SRC_DIR}/RenderCoreRenderer.cpp
     ${SRC_DIR}/SoftwareRenderer.cpp
     ${SRC_DIR}/SceneTraverser.cpp
@@ -55,16 +55,19 @@ target_include_directories(${TARGET_NAME} PUBLIC
     ${SRC_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/..
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../Utility/Utility/Include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../Log/Log/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../Engine/Common/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../Engine/2D/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../Engine/3D/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../Render/Common/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../Render/2D/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../Render/3D/Include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../UI/Common/Include
 )
 
 # 链接 Qt
 target_link_libraries(${TARGET_NAME} PUBLIC
+    Log
     Qt${QT_VERSION_MAJOR}::Core
     Qt${QT_VERSION_MAJOR}::Gui
     Qt${QT_VERSION_MAJOR}::OpenGL

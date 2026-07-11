@@ -9,6 +9,9 @@
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
 
+#include "Log/SyLogger.h"
+
+// 将QAction与命令ID绑定，点击时自动执行对应命令
 void DefaultUiCommandDispatcher::bindAction(QAction* action, const QString& commandId)
 {
     if (!action)
@@ -25,6 +28,7 @@ void DefaultUiCommandDispatcher::bindAction(QAction* action, const QString& comm
     });
 }
 
+// 设置当前命令类型，并同步到状态中心
 void DefaultUiCommandDispatcher::setCommandType(const QString& commandType)
 {
     m_commandType = commandType;
@@ -37,6 +41,7 @@ void DefaultUiCommandDispatcher::setCommandType(const QString& commandType)
     }
 }
 
+// 根据命令ID解析对应的命令类型（2D/3D/View/Edit/File等）
 QString DefaultUiCommandDispatcher::resolveCommandType(const QString& commandId) const
 {
     if (commandId.startsWith(QStringLiteral("2d.")))
@@ -52,6 +57,7 @@ QString DefaultUiCommandDispatcher::resolveCommandType(const QString& commandId)
     return QStringLiteral("Other");
 }
 
+// 更新命令阶段状态到状态中心
 void DefaultUiCommandDispatcher::updatePhase(const QString& phase)
 {
     if (!m_stateCenter)
@@ -61,17 +67,20 @@ void DefaultUiCommandDispatcher::updatePhase(const QString& phase)
     m_stateCenter->setCurrentCommandId(m_activeCommandId);
 }
 
+// 命令开始阶段：设置活动命令ID、类型，并同步到状态中心
 void DefaultUiCommandDispatcher::begin(const QString& commandId)
 {
     m_activeCommandId = commandId;
     m_commandType = resolveCommandType(commandId);
 
+    // 通知工具变化回调
     if (m_toolChangedCallback)
         m_toolChangedCallback(commandId);
 
     if (!m_stateCenter)
         return;
 
+    // 更新状态中心的命令状态
     m_stateCenter->setBusy(true);
     m_stateCenter->setCurrentCommandId(commandId);
     m_stateCenter->setCurrentCommandOwner(QStringLiteral("dispatcher"));
@@ -88,7 +97,7 @@ void DefaultUiCommandDispatcher::begin(const QString& commandId)
 
 namespace {
 
-/// 将 QString 命令 ID（如 "2d.draw_line"）映射为 OperationId
+// 将QString命令ID映射为OperationId，用于OperationBus路由
 OperationId mapCommandIdToOperation(const QString& cmd)
 {
     static const struct { const char* key; OperationId id; } map[] = {
@@ -97,9 +106,12 @@ OperationId mapCommandIdToOperation(const QString& cmd)
         { "2d.draw_circle",   OperationId::Tool_Circle },
         { "2d.draw_polyline", OperationId::Tool_Polyline },
         { "2d.draw_arc",      OperationId::Tool_Arc },
+        { "2d.draw_polygon",  OperationId::Tool_Polygon },
         { "2d.move",          OperationId::Edit_Move },
         { "2d.copy",          OperationId::Edit_Copy },
         { "2d.rotate",        OperationId::Edit_Rotate },
+        { "2d.mirror",        OperationId::Edit_Mirror },
+        { "2d.delete",        OperationId::Edit_Delete },
         { "edit.undo",        OperationId::Edit_Undo },
         { "edit.redo",        OperationId::Edit_Redo },
         { "edit.delete",      OperationId::Edit_Delete },
@@ -118,19 +130,61 @@ OperationId mapCommandIdToOperation(const QString& cmd)
 
 } // anonymous namespace
 
+// 执行命令的主入口，按优先级查找处理程序并执行
 void DefaultUiCommandDispatcher::execute(const QString& commandId)
 {
-    // 工具切换时的生命周期顺序
-    // 1. 若有活动命令，先取消（不进 undo 栈）
+    SY_INFOF("[UiCommandDispatcher] execute: command=%s", commandId.toUtf8().constData());
+    
+    // 1. 若有活动命令，先取消（不进undo栈）
     if (hasActiveCommand())
     {
+        SY_DEBUGF("[UiCommandDispatcher] Canceling active command: %s", m_activeCommandId.toUtf8().constData());
         cancel();
     }
 
-    // 2. 尝试通过 OperationBus 路由（非交互式操作优先）
+    // 2. 优先查找已注册的handler（测试场景和直接调用场景）
+    auto handler = handlerFor(commandId);
+    if (handler)
+    {
+        SY_DEBUGF("[UiCommandDispatcher] Found handler for command: %s", commandId.toUtf8().constData());
+        
+        // 3. 重置handler到Idle状态
+        handler->reset();
+
+        // 4. begin()同步状态中心（先于activate）
+        begin(commandId);
+
+        // 5. 激活handler
+        if (handler->activate(m_uiServices))
+        {
+            SY_INFOF("[UiCommandDispatcher] Command activated: %s, interactive=%s", 
+                commandId.toUtf8().constData(), 
+                handler->isInteractive() ? "true" : "false");
+            
+            // 6. 非交互式命令：直接提交
+            if (!handler->isInteractive())
+            {
+                SY_DEBUGF("[UiCommandDispatcher] Non-interactive command, submitting immediately: %s", commandId.toUtf8().constData());
+                submit();
+            }
+            // 交互式命令：保持Active状态，等待事件循环中的用户输入
+        }
+        else
+        {
+            // 激活失败 → 取消，不进undo栈
+            SY_ERRORF("[UiCommandDispatcher] error code=command.activate_failed message=Failed to activate command: %s", commandId.toUtf8().constData());
+            if (m_frameworkServices.reportError)
+                m_frameworkServices.reportError(QStringLiteral("command.activate_failed"), QStringLiteral("Failed to activate command: %1").arg(commandId), QStringLiteral("DefaultUiCommandDispatcher::execute"));
+            cancel();
+        }
+        return;
+    }
+
+    // 7. 尝试通过OperationBus路由（非交互式操作优先）
     auto opId = mapCommandIdToOperation(commandId);
     if (opId != OperationId::None)
     {
+        SY_DEBUGF("[UiCommandDispatcher] Routing command through OperationBus: %s", commandId.toUtf8().constData());
         auto* bus = OperationBus::instance();
         if (bus)
         {
@@ -139,71 +193,50 @@ void DefaultUiCommandDispatcher::execute(const QString& commandId)
         }
     }
 
-    // 3. 按 commandId 查找 handler（不依赖 currentHandler）
-    auto handler = handlerFor(commandId);
-    if (handler)
-    {
-        // 4. 重置 handler 到 Idle 状态
-        handler->reset();
+    // 8. 无handler的命令：仅标记begin → submit完成状态同步
+    SY_DEBUGF("[UiCommandDispatcher] No handler found, doing state sync only: %s", commandId.toUtf8().constData());
+    begin(commandId);
 
-        // 5. begin() 同步状态中心（先于 activate）
-        begin(commandId);
+    if (!m_stateCenter && m_frameworkServices.reportError)
+        m_frameworkServices.reportError(QStringLiteral("command.execute_no_state"), QStringLiteral("Command executed without state center: %1").arg(commandId), QStringLiteral("DefaultUiCommandDispatcher::execute"));
 
-        // 6. 激活 handler
-        if (handler->activate(m_uiServices))
-        {
-            // 7. 非交互式命令：直接提交
-            if (!handler->isInteractive())
-            {
-                submit();
-            }
-            // 交互式命令：保持 Active 状态，等待事件循环中的用户输入
-        }
-        else
-        {
-            // 激活失败 → 取消，不进 undo 栈
-            if (m_frameworkServices.reportError)
-                m_frameworkServices.reportError(QStringLiteral("command.activate_failed"), QStringLiteral("Failed to activate command: %1").arg(commandId), QStringLiteral("DefaultUiCommandDispatcher::execute"));
-            cancel();
-        }
-    }
-    else
-    {
-        // 无 handler 的命令：仅标记 begin → submit 完成状态同步
-        begin(commandId);
-
-        if (!m_stateCenter && m_frameworkServices.reportError)
-            m_frameworkServices.reportError(QStringLiteral("command.execute_no_state"), QStringLiteral("Command executed without state center: %1").arg(commandId), QStringLiteral("DefaultUiCommandDispatcher::execute"));
-
-        submit();
-    }
+    submit();
 }
 
+// 提交命令：执行业务提交、创建undo命令、清理状态
 void DefaultUiCommandDispatcher::submit()
 {
-    // submit() 是命令生命周期的唯一提交点
-    // 1. 调用 handler->commit() 执行业务提交
-    // 2. 创建 undo command 并压入撤销栈
-    // 3. 清理状态中心和 handler
+    SY_INFOF("[UiCommandDispatcher] submit: command=%s", m_activeCommandId.toUtf8().constData());
+    
+    // submit()是命令生命周期的唯一提交点
+    // 1. 调用handler->commit()执行业务提交
+    // 2. 创建undo command并压入撤销栈
+    // 3. 清理状态中心和handler
     auto handler = currentHandler();
     if (handler)
     {
-        // commit() 只调用一次，由 submit() 统一负责
+        // commit()只调用一次，由submit()统一负责
         handler->commit();
 
-        // 只有 createUndoCommand() 返回非空时才压栈
-        // 纯视图命令（Zoom/Pan）返回 nullptr，不进栈
+        // 只有createUndoCommand()返回非空时才压栈
+        // 纯视图命令（Zoom/Pan）返回nullptr，不进栈
         if (m_undoStack)
         {
             if (auto undoCmd = handler->createUndoCommand())
             {
+                SY_DEBUGF("[UiCommandDispatcher] Pushing undo command: %s", m_activeCommandId.toUtf8().constData());
                 m_undoStack->push(undoCmd);
+            }
+            else
+            {
+                SY_DEBUGF("[UiCommandDispatcher] No undo command created: %s", m_activeCommandId.toUtf8().constData());
             }
         }
     }
 
     updatePhase(QStringLiteral("submit"));
 
+    // 清理状态中心的命令状态
     if (m_stateCenter)
     {
         m_stateCenter->setBusy(false);
@@ -231,21 +264,29 @@ void DefaultUiCommandDispatcher::submit()
     {
         handler->reset();
     }
+    
+    SY_DEBUG("[UiCommandDispatcher] Command submit complete");
 }
 
+// 取消命令：调用handler的cancel方法并清理状态
 void DefaultUiCommandDispatcher::cancel()
 {
+    SY_INFOF("[UiCommandDispatcher] cancel: command=%s", m_activeCommandId.toUtf8().constData());
+    
     auto handler = currentHandler();
     if (handler)
     {
+        SY_DEBUGF("[UiCommandDispatcher] Calling handler cancel: %s", m_activeCommandId.toUtf8().constData());
         handler->cancel();
     }
 
+    // 取消后默认切换回选择工具
     if (m_toolChangedCallback)
         m_toolChangedCallback(QStringLiteral("2d.select"));
 
     updatePhase(QStringLiteral("cancel"));
 
+    // 清理状态中心的命令状态
     if (m_stateCenter)
     {
         m_stateCenter->setBusy(false);
@@ -273,28 +314,35 @@ void DefaultUiCommandDispatcher::cancel()
     {
         handler->reset();
     }
+    
+    SY_DEBUG("[UiCommandDispatcher] Command cancel complete");
 }
 
+// 设置状态中心引用
 void DefaultUiCommandDispatcher::setStateCenter(UiStateCenter* stateCenter)
 {
     m_stateCenter = stateCenter;
 }
 
+// 设置布局服务引用
 void DefaultUiCommandDispatcher::setLayoutService(UiLayoutService* layoutService)
 {
     m_layoutService = layoutService;
 }
 
+// 设置框架服务集合
 void DefaultUiCommandDispatcher::setFrameworkServices(const UiFrameworkServices& services)
 {
     m_frameworkServices = services;
 }
 
+// 获取当前活动命令ID
 QString DefaultUiCommandDispatcher::activeCommandId() const
 {
     return m_activeCommandId;
 }
 
+// 注册命令处理程序
 void DefaultUiCommandDispatcher::registerHandler(ICommandHandler* handler)
 {
     if (!handler)
@@ -302,35 +350,53 @@ void DefaultUiCommandDispatcher::registerHandler(ICommandHandler* handler)
     m_handlers[handler->commandId()] = handler;
 }
 
+// 执行撤销操作
 bool DefaultUiCommandDispatcher::undo()
 {
+    SY_INFO("[UiCommandDispatcher] undo");
     if (!m_undoStack)
+    {
+        SY_WARN("[UiCommandDispatcher] No undo stack available");
         return false;
-    return m_undoStack->undo();
+    }
+    bool result = m_undoStack->undo();
+    SY_DEBUGF("[UiCommandDispatcher] undo result: %s", result ? "true" : "false");
+    return result;
 }
 
+// 执行重做操作
 bool DefaultUiCommandDispatcher::redo()
 {
+    SY_INFO("[UiCommandDispatcher] redo");
     if (!m_undoStack)
+    {
+        SY_WARN("[UiCommandDispatcher] No undo stack available");
         return false;
-    return m_undoStack->redo();
+    }
+    bool result = m_undoStack->redo();
+    SY_DEBUGF("[UiCommandDispatcher] redo result: %s", result ? "true" : "false");
+    return result;
 }
 
+// 设置撤销栈引用
 void DefaultUiCommandDispatcher::setUndoStack(IUndoStack* undoStack)
 {
     m_undoStack = undoStack;
 }
 
+// 设置UI服务集合
 void DefaultUiCommandDispatcher::setUiServices(const UiServices& services)
 {
     m_uiServices = services;
 }
 
+// 设置工具变化回调
 void DefaultUiCommandDispatcher::setToolChangedCallback(std::function<void(const QString&)> callback)
 {
     m_toolChangedCallback = callback;
 }
 
+// 转发鼠标按下事件给当前handler
 bool DefaultUiCommandDispatcher::forwardMouseDown(int x, int y)
 {
     auto handler = currentHandler();
@@ -348,6 +414,7 @@ bool DefaultUiCommandDispatcher::forwardMouseDown(int x, int y)
     return handled;
 }
 
+// 转发鼠标移动事件给当前handler
 bool DefaultUiCommandDispatcher::forwardMouseMove(int x, int y)
 {
     auto handler = currentHandler();
@@ -357,6 +424,7 @@ bool DefaultUiCommandDispatcher::forwardMouseMove(int x, int y)
     return handler->onMouseMove(x, y);
 }
 
+// 转发鼠标释放事件给当前handler
 bool DefaultUiCommandDispatcher::forwardMouseUp(int x, int y)
 {
     auto handler = currentHandler();
@@ -374,6 +442,7 @@ bool DefaultUiCommandDispatcher::forwardMouseUp(int x, int y)
     return handled;
 }
 
+// 转发键盘按键事件给当前handler
 bool DefaultUiCommandDispatcher::forwardKeyPress(int key)
 {
     auto handler = currentHandler();
@@ -382,7 +451,7 @@ bool DefaultUiCommandDispatcher::forwardKeyPress(int key)
 
     bool handled = handler->onKeyPress(key);
 
-    // 按键后检测命令是否完成（如 Enter 确认、Esc 取消等）
+    // 按键后检测命令是否完成（如Enter确认、Esc取消等）
     if (handler->isComplete())
     {
         submit();
@@ -391,11 +460,13 @@ bool DefaultUiCommandDispatcher::forwardKeyPress(int key)
     return handled;
 }
 
+// 判断是否有活动命令
 bool DefaultUiCommandDispatcher::hasActiveCommand() const
 {
     return !m_activeCommandId.isEmpty();
 }
 
+// 获取当前活动命令的handler
 ICommandHandler* DefaultUiCommandDispatcher::currentHandler() const
 {
     if (m_activeCommandId.isEmpty())
@@ -408,6 +479,7 @@ ICommandHandler* DefaultUiCommandDispatcher::currentHandler() const
     return nullptr;
 }
 
+// 根据命令ID查找对应的handler
 ICommandHandler* DefaultUiCommandDispatcher::handlerFor(const QString& commandId) const
 {
     auto it = m_handlers.find(commandId);

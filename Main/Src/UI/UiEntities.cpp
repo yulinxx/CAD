@@ -182,6 +182,58 @@ std::vector<std::shared_ptr<SceneNode>> SceneDocument3D::rootNodes() const { ret
 SelectionSet& SceneDocument3D::selection() { return m_selection; }
 const SelectionSet& SceneDocument3D::selection() const { return m_selection; }
 
+// ---- SceneDocumentBase 接口 ----
+
+std::vector<std::string> SceneDocument3D::allEntityIds() const
+{
+    std::vector<std::string> ids;
+    for (const auto& node : m_roots)
+    {
+        if (node)
+            ids.push_back(node->id());
+    }
+    return ids;
+}
+
+void SceneDocument3D::selectEntity(const std::string& id)
+{
+    for (const auto& node : m_roots)
+    {
+        if (node && node->id() == id)
+        {
+            m_selection.add(node);
+            return;
+        }
+    }
+}
+
+void SceneDocument3D::clearSelection()
+{
+    m_selection.clear();
+}
+
+std::vector<std::string> SceneDocument3D::selectedIds() const
+{
+    std::vector<std::string> ids;
+    for (const auto& item : m_selection.items())
+    {
+        if (item)
+            ids.push_back(item->id());
+    }
+    return ids;
+}
+
+void SceneDocument3D::removeEntity(const std::string& id)
+{
+    removeNode(id);
+}
+
+void SceneDocument3D::clear()
+{
+    m_selection.clear();
+    m_roots.clear();
+}
+
 // ============================================================================
 // DefaultCameraController3D
 // ============================================================================

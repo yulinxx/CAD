@@ -15,7 +15,7 @@ DrawToolBarWidget::DrawToolBarWidget(QWidget* parent)
 
     createToolButtons();
 
-    updateActiveTool(QStringLiteral("2d.select"));
+    m_activeToolId.clear();
 }
 
 void DrawToolBarWidget::setCommandDispatcher(UiCommandDispatcher* dispatcher)
@@ -79,11 +79,11 @@ void DrawToolBarWidget::createToolButtons()
     };
 
     QList<ToolInfo> tools = {
-        { QStringLiteral("2d.select"),      tr("Select"),     tr("Select Tool"),    QStringLiteral("V") }, // 选择
         { QStringLiteral("2d.draw_line"),   tr("Line"),       tr("Draw Line"),    QStringLiteral("L") }, // 直线
-        { QStringLiteral("2d.draw_circle"), tr("Circle"),     tr("Draw Circle"),  QStringLiteral("C") }, // 圆
         { QStringLiteral("2d.draw_polyline"), tr("Polyline"), tr("Draw Polyline"), QStringLiteral("PL") }, // 多段线
-        { QStringLiteral("2d.move"),        tr("Move"),       tr("Move Object"),  QStringLiteral("M") }, // 移动
+        { QStringLiteral("2d.draw_circle"), tr("Circle"),     tr("Draw Circle"),  QStringLiteral("C") }, // 圆
+        { QStringLiteral("2d.draw_arc"),    tr("Arc"),        tr("Draw Arc"),     QStringLiteral("A") }, // 圆弧
+        { QStringLiteral("2d.draw_polygon"), tr("Polygon"),   tr("Draw Polygon"), QStringLiteral("PG") }, // 多边形
     };
 
     for (const auto& tool : tools)

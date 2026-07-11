@@ -4,10 +4,21 @@
 #include "RenderFrame.h"
 #include "RenderTypes.h"
 #include "SoftwareRenderer.h"
+#include "Log/SyLogger.h"
 
 #include "../UI/UiEntities.h"
 
+#include <QCoreApplication>
 #include <QPainter>
+#include <stdexcept>
+
+namespace
+{
+    QString trRenderCore(const char* text)
+    {
+        return QCoreApplication::translate("RenderCoreRenderer", text);
+    }
+}
 
 // ============================================================================
 // 构造/析构
@@ -15,15 +26,28 @@
 
 RenderCoreRenderer::RenderCoreRenderer()
 {
-    m_compiler = std::make_unique<DefaultSceneCompiler>();
-    m_softwareRenderer = std::make_unique<SoftwareRenderer>();
-    m_context.backendName = "RenderCore";
-    m_context.sceneType = "3D";
-    m_context.renderMode = RenderMode::Wireframe;
+    SY_DEBUG("[RenderCoreRenderer] constructed");
+
+    try
+    {
+        m_compiler = std::make_unique<DefaultSceneCompiler>();
+        m_softwareRenderer = std::make_unique<SoftwareRenderer>();
+        m_context.backendName = "RenderCore";
+        m_context.sceneType = "3D";
+        m_context.renderMode = RenderMode::Wireframe;
+
+        SY_INFO("[RenderCoreRenderer] initialized with SoftwareRenderer backend");
+    }
+    catch (const std::exception& e)
+    {
+        SY_ERRORF("[RenderCoreRenderer] error code=render.construct_failed message=construction failed: %s", e.what());
+        throw;
+    }
 }
 
 RenderCoreRenderer::~RenderCoreRenderer()
 {
+    SY_DEBUG("[RenderCoreRenderer] destroying");
     shutdown();
 }
 
@@ -33,15 +57,34 @@ RenderCoreRenderer::~RenderCoreRenderer()
 
 bool RenderCoreRenderer::initialize(void* windowHandle)
 {
-    Q_UNUSED(windowHandle);
-    m_ready = true;
-    emitStatus(QStringLiteral("RenderCore 渲染器就绪"));
-    return true;
+    SY_DEBUG("[RenderCoreRenderer] initializing with window handle");
+
+    try
+    {
+        Q_UNUSED(windowHandle);
+        m_ready = true;
+        emitStatus(trRenderCore("RenderCore renderer ready"));
+
+        SY_INFO("[RenderCoreRenderer] initialization completed successfully");
+        return true;
+    }
+    catch (const std::exception& e)
+    {
+        SY_ERRORF("[RenderCoreRenderer] error code=render.init_failed message=initialization failed: %s", e.what());
+        m_ready = false;
+        return false;
+    }
 }
 
 void RenderCoreRenderer::shutdown()
 {
+    SY_DEBUG("[RenderCoreRenderer] shutting down");
+
     m_ready = false;
+    m_document = nullptr;
+    m_cameraController = nullptr;
+
+    SY_INFO("[RenderCoreRenderer] shutdown completed");
 }
 
 bool RenderCoreRenderer::isReady() const
@@ -65,7 +108,7 @@ bool RenderCoreRenderer::isOpenGL() const
 }
 
 // ============================================================================
-// 场景与相机
+// 场景与相机（纯转发）
 // ============================================================================
 
 void RenderCoreRenderer::setScene(SceneDocument3D* document)
@@ -87,19 +130,37 @@ void RenderCoreRenderer::setCamera(CameraController3D* controller)
 RenderFrame RenderCoreRenderer::compileScene()
 {
     if (!m_document)
+    {
+        SY_WARN("[RenderCoreRenderer] compileScene called with null document");
         return {};
+    }
 
     m_context.advanceFrame();
 
     RenderFrame frame;
-    if (m_context.isDirty || !m_compiler->hasCachedFrame())
+    try
     {
-        frame = m_compiler->compile(m_document, m_context);
-        m_context.clearDirty();
+        if (m_context.isDirty || !m_compiler->hasCachedFrame())
+        {
+            SY_DEBUG("[RenderCoreRenderer] compileScene performing full scene compilation");
+            frame = m_compiler->compile(m_document, m_context);
+            m_context.clearDirty();
+            SY_INFOF("[RenderCoreRenderer] compileScene full compilation completed frameId=%d",
+                m_context.frameId);
+        }
+        else
+        {
+            SY_DEBUG("[RenderCoreRenderer] compileScene performing incremental scene compilation");
+            frame = m_compiler->compileIncremental(m_document, m_context, m_lastFrame);
+            SY_INFOF("[RenderCoreRenderer] compileScene incremental compilation completed frameId=%d",
+                m_context.frameId);
+        }
     }
-    else
+    catch (const std::exception& e)
     {
-        frame = m_compiler->compileIncremental(m_document, m_context, m_lastFrame);
+        SY_ERRORF("[RenderCoreRenderer] error code=render.compile_failed message=compileScene failed: %s", e.what());
+        m_context.markDirty();
+        return {};
     }
 
     m_lastFrame = frame;
@@ -107,13 +168,23 @@ RenderFrame RenderCoreRenderer::compileScene()
 }
 
 // ============================================================================
-// 渲染派发（委托 SoftwareRenderer，不承担渲染实现）
+// 渲染派发（单一入口，委托 SoftwareRenderer）
 // ============================================================================
 
 void RenderCoreRenderer::render(QPainter& painter, int width, int height)
 {
     if (!m_ready)
+    {
+        SY_WARN("[RenderCoreRenderer] render called before initialization");
         return;
+    }
+
+    if (width <= 0 || height <= 0)
+    {
+        SY_WARNF("[RenderCoreRenderer] render called with invalid viewport size: %dx%d",
+            width, height);
+        return;
+    }
 
     m_camera.setViewportSize(width, height);
     m_context.viewportSize = Size2D{ width, height };
@@ -124,12 +195,28 @@ void RenderCoreRenderer::render(QPainter& painter, int width, int height)
         m_camera.clearDirty();
     }
 
-    RenderFrame frame = compileScene();
-    m_softwareRenderer->render(painter, frame, m_camera, m_context.viewportSize);
+    try
+    {
+        RenderFrame frame = compileScene();
+
+        if (!frame.frameId)
+        {
+            SY_DEBUG("[RenderCoreRenderer] render skipping render with empty frame");
+            return;
+        }
+
+        m_softwareRenderer->render(painter, frame, m_camera, m_context.viewportSize);
+        SY_DEBUGF("[RenderCoreRenderer] render completed frameId=%d viewport=%dx%d",
+            frame.frameId, width, height);
+    }
+    catch (const std::exception& e)
+    {
+        SY_ERRORF("[RenderCoreRenderer] error code=render.render_failed message=render failed: %s", e.what());
+    }
 }
 
 // ============================================================================
-// 视口控制
+// 视口控制（委托相机）
 // ============================================================================
 
 void RenderCoreRenderer::resize(int width, int height)
@@ -146,7 +233,7 @@ void RenderCoreRenderer::resetView()
 }
 
 // ============================================================================
-// 模式
+// 模式（委托相机）
 // ============================================================================
 
 void RenderCoreRenderer::setOrbitMode(bool enabled)
@@ -174,9 +261,9 @@ void RenderCoreRenderer::onMousePress(int x, int y, int button, int modifiers,
     m_camera.onMousePress(x, y, button, modifiers, viewW, viewH);
 
     if (m_camera.isRotating())
-        emitStatus(QStringLiteral("旋转"));
+        emitStatus(trRenderCore("Rotate"));
     else if (m_camera.isPanning())
-        emitStatus(QStringLiteral("平移"));
+        emitStatus(trRenderCore("Pan"));
 }
 
 void RenderCoreRenderer::onMouseMove(int x, int y, int buttons, int viewW, int viewH)
@@ -188,7 +275,7 @@ void RenderCoreRenderer::onMouseMove(int x, int y, int buttons, int viewW, int v
 void RenderCoreRenderer::onMouseRelease(int x, int y, int button, int viewW, int viewH)
 {
     m_camera.onMouseRelease(x, y, button, viewW, viewH);
-    emitStatus(m_camera.isMeasureMode() ? QStringLiteral("测量模式") : QStringLiteral("就绪"));
+    emitStatus(m_camera.isMeasureMode() ? trRenderCore("Measure mode") : trRenderCore("Ready"));
 }
 
 void RenderCoreRenderer::onWheel(int delta, int viewW, int viewH)
@@ -198,7 +285,7 @@ void RenderCoreRenderer::onWheel(int delta, int viewW, int viewH)
 }
 
 // ============================================================================
-// 选择状态管理
+// 选择状态管理（纯数据传递）
 // ============================================================================
 
 void RenderCoreRenderer::selectNodeById(const QString& nodeId)
@@ -220,7 +307,7 @@ QStringList RenderCoreRenderer::selectedPathNames() const
 }
 
 // ============================================================================
-// 回调管理
+// 回调管理（纯转发）
 // ============================================================================
 
 void RenderCoreRenderer::setStatusCallback(StatusCallback callback)

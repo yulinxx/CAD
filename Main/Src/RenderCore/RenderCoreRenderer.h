@@ -3,7 +3,7 @@
 #include "Render3D/IRenderer3D.h"
 #include "RenderContext.h"
 #include "RenderFrame.h"
-#include "UiCamera3D.h"
+#include "ViewCamera3D.h"
 
 #include <memory>
 
@@ -24,14 +24,14 @@ class SoftwareRenderer;
  * - 编译调度 → 调用 SceneCompiler::compile()，不做编译决策
  * - 渲染派发 → 委托 SoftwareRenderer 执行实际渲染
  * - 选择管理 → 存储选中节点 ID，触发回调
- * - 相机姿态 → 委托给 UiCamera3D
- * - 输入事件 → 完全委托给 UiCamera3D
+ * - 相机姿态 → 委托给 ViewCamera3D
+ * - 输入事件 → 完全委托给 ViewCamera3D
  *
  * 不承担：
- * - 相机投影计算（由 UiCamera3D 负责）
+ * - 相机投影计算（由 ViewCamera3D 负责）
  * - 场景遍历与批次生成（由 SceneCompiler 负责）
  * - 渲染实现（由 SoftwareRenderer/IRenderBackend 负责）
- * - 输入事件策略（完全委托给 UiCamera3D）
+ * - 输入事件策略（完全委托给 ViewCamera3D）
  * - 场景编译决策（增量/全量由 SceneCompiler 内部决定）
  */
 class RenderCoreRenderer : public IRenderer3D
@@ -86,7 +86,7 @@ private:
     // 渲染管线核心
     std::unique_ptr<SceneCompiler> m_compiler;
     std::unique_ptr<SoftwareRenderer> m_softwareRenderer;
-    UiCamera3D m_camera;
+    ViewCamera3D m_camera;
     RenderContext m_context;
 
     // 生命周期

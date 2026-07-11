@@ -251,8 +251,6 @@ private:
     {
         /// 状态栏
         QStatusBar* statusBar{ nullptr };
-        /// 主工具栏
-        QToolBar* mainToolBar{ nullptr };
         /// 左侧停靠面板
         QDockWidget* leftDock{ nullptr };
         /// 右侧停靠面板

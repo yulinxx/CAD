@@ -13,7 +13,6 @@ class WorkbenchWindow;
 class PropertiesPanelWidget;
 class Viewport2D;
 class SceneTreeDockWidget;
-class ViewWidgetAdapter;
 
 /**
  * @file UiWorkbench.h
@@ -131,12 +130,7 @@ public:
     void deactivate() override;
     void shutdown() override;
 
-    /// 设置是否使用旧版 CanvasViewport2D 作为临时回退路径
-    /// @param enabled true 表示回退到旧视口，false 表示默认使用 ViewWidget
-    void setUseLegacyCanvasViewport(bool enabled);
-    /// 获取当前是否启用旧版 CanvasViewport2D 回退路径
-    /// @return true 表示当前使用旧版视口
-    bool useLegacyCanvasViewport() const;
+    
 
 private:
     /// 创建当前工作台应使用的中央视口
@@ -161,17 +155,9 @@ private:
     /// 配置工作台初始状态与属性面板文本
     /// @param properties 属性面板
     void configureInitialWorkbenchState(PropertiesPanelWidget* properties) const;
-    /// 配置旧版 Viewport2D 的运行状态
-    /// @param viewport 2D 视口
-    /// @param properties 属性面板
-    void configureLegacyViewport(Viewport2D* viewport, PropertiesPanelWidget* properties);
+    
 
 private:
-    /// 是否使用旧版 Viewport2D 作为临时回退
-    bool m_useLegacyCanvasViewport{ false };
-    /// ViewWidget 适配器，让 OperationBus 能在旧系统中工作
-    std::unique_ptr<class ViewWidgetAdapter> m_viewWidgetAdapter;
-    /// 2D 场景文档
     std::shared_ptr<SceneDocument2D> m_document;
 };
 

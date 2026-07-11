@@ -12,15 +12,17 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
 #include <QImage>
 #include <QPainter>
-#include <QProcessEnvironment>
 
 #include "RenderCore/RenderCoreRenderer.h"
 #include "RenderCore/DefaultSceneCompiler.h"
 #include "RenderCore/RenderBackendFactory.h"
 #include "RenderCore/IRenderBackend.h"
-#include "RenderCore/UiCamera3D.h"
+#include "RenderCore/ViewCamera3D.h"
 #include "UI/UiEntities.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/SyEntity/SyLine.h"
@@ -91,7 +93,7 @@ TEST(FrameworkIntegrationTest, Switch_2DSceneSwitch)
     scene1.addEntity(line1.release());
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     RenderFrame frame1 = compiler.compile(&scene1, ctx);
@@ -114,18 +116,18 @@ TEST(FrameworkIntegrationTest, Switch_3DSceneSwitch)
 {
     DefaultSceneCompiler compiler;
     SceneDocument3D doc1;
-    doc1.createNode(QStringLiteral("Node1"));
+    doc1.createNode("Node1");
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("3D");
+    ctx.sceneType = "3D";
     ctx.clearDirty();
 
     RenderFrame frame1 = compiler.compile(&doc1, ctx);
     EXPECT_EQ(frame1.batchCount(), 1);
 
     SceneDocument3D doc2;
-    doc2.createNode(QStringLiteral("Node2"));
-    doc2.createNode(QStringLiteral("Node3"));
+    doc2.createNode("Node2");
+    doc2.createNode("Node3");
 
     compiler.invalidateCache();
     RenderFrame frame2 = compiler.compile(&doc2, ctx);
@@ -173,7 +175,7 @@ TEST(FrameworkIntegrationTest, DirtyUpdate_SingleEntityDirty)
     scene.addEntity(line.release());
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     RenderFrame frame1 = compiler.compile(&scene, ctx);
@@ -182,7 +184,7 @@ TEST(FrameworkIntegrationTest, DirtyUpdate_SingleEntityDirty)
     auto* entity = scene.findEntityById(lineId);
     ASSERT_NE(entity, nullptr);
     entity->transform(Ut::Mat3d::translate(50, 50));
-    compiler.markEntityDirty(QString::number(lineId));
+    compiler.markEntityDirty(std::to_string(lineId));
     ctx.clearDirty();
     ctx.advanceFrame();
 
@@ -214,7 +216,7 @@ TEST(FrameworkIntegrationTest, DirtyUpdate_MultipleEntitiesDirty)
     scene.addEntity(c.release());
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     RenderFrame frame1 = compiler.compile(&scene, ctx);
@@ -223,8 +225,8 @@ TEST(FrameworkIntegrationTest, DirtyUpdate_MultipleEntitiesDirty)
     scene.findEntityById(id1)->transform(Ut::Mat3d::translate(10, 10));
     static_cast<Eg::SyCircle*>(scene.findEntityById(cid))->dRadius = 30.0;
 
-    compiler.markEntityDirty(QString::number(id1));
-    compiler.markEntityDirty(QString::number(cid));
+    compiler.markEntityDirty(std::to_string(id1));
+    compiler.markEntityDirty(std::to_string(cid));
     ctx.clearDirty();
 
     RenderFrame frame2 = compiler.compile(&scene, ctx);
@@ -248,7 +250,7 @@ TEST(FrameworkIntegrationTest, DirtyUpdate_MarkAllDirty)
     scene.addEntity(circle.release());
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     compiler.compile(&scene, ctx);
@@ -320,7 +322,7 @@ TEST(FrameworkIntegrationTest, RenderLoop_MultipleFramesWithInteraction)
 
 TEST(FrameworkIntegrationTest, RenderLoop_CameraInteractionSequence)
 {
-    UiCamera3D camera;
+    ViewCamera3D camera;
     camera.setViewportSize(800, 600);
 
     EXPECT_DOUBLE_EQ(camera.yaw(), 0.0);
@@ -389,8 +391,8 @@ TEST(FrameworkIntegrationTest, DualScreen_IndependentRenderers)
 
 TEST(FrameworkIntegrationTest, DualScreen_IndependentCameras)
 {
-    UiCamera3D camera1;
-    UiCamera3D camera2;
+    ViewCamera3D camera1;
+    ViewCamera3D camera2;
 
     camera1.setViewportSize(800, 600);
     camera2.setViewportSize(1280, 720);
@@ -428,7 +430,7 @@ TEST(FrameworkIntegrationTest, FullPipeline_2DWithEntities)
     scene.addEntity(c.release());
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     RenderFrame frame = compiler.compile(&scene, ctx);
@@ -449,12 +451,12 @@ TEST(FrameworkIntegrationTest, FullPipeline_3DWithNodes)
     DefaultSceneCompiler compiler;
     SceneDocument3D doc;
 
-    doc.createNode(QStringLiteral("Root1"));
-    doc.createNode(QStringLiteral("Root2"));
-    doc.createNode(QStringLiteral("Root3"));
+    doc.createNode("Root1");
+    doc.createNode("Root2");
+    doc.createNode("Root3");
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("3D");
+    ctx.sceneType = "3D";
     ctx.clearDirty();
 
     RenderFrame frame = compiler.compile(&doc, ctx);
@@ -473,7 +475,7 @@ TEST(FrameworkIntegrationTest, FullPipeline_SelectionFeedback)
     scene.addEntity(line.release());
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     RenderFrame frame1 = compiler.compile(&scene, ctx);
@@ -498,13 +500,13 @@ TEST(FrameworkIntegrationTest, Config_DefaultBackend)
 {
     auto backend = RenderBackendFactory::createConfigured();
     EXPECT_NE(backend, nullptr);
-    EXPECT_FALSE(backend->backendName().isEmpty());
+    EXPECT_FALSE(backend->backendName().empty());
 }
 
 TEST(FrameworkIntegrationTest, Config_AvailableBackends)
 {
     auto backends = RenderBackendFactory::availableBackends();
-    EXPECT_FALSE(backends.isEmpty());
+    EXPECT_FALSE(backends.empty());
 
     bool hasSoftware = false;
     bool hasOpenGL = false;
@@ -526,8 +528,8 @@ TEST(FrameworkIntegrationTest, Config_StringRoundTrip)
                        RenderBackendFactory::BackendType::Metal,
                        RenderBackendFactory::BackendType::Software })
     {
-        QString name = RenderBackendFactory::toString(type);
-        EXPECT_FALSE(name.isEmpty());
+        std::string name = RenderBackendFactory::toString(type);
+        EXPECT_FALSE(name.empty());
         EXPECT_EQ(RenderBackendFactory::fromString(name), type);
     }
 }

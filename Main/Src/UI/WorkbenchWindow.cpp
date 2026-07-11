@@ -1,5 +1,6 @@
 #include "WorkbenchWindow.h"
 
+#include "Log/SyLogger.h"
 #include <QAction>
 #include <QDockWidget>
 #include <QLabel>
@@ -28,10 +29,10 @@
 WorkbenchWindow::WorkbenchWindow(QWidget* parent)
     : QMainWindow(parent)
 {
+    SY_INFO("[WorkbenchWindow] Creating main window");
     setWindowTitle(QString::fromStdString(MainApp::appName()));
     resize(1440, 900);
 
-    // 默认窗口先居中显示，避免双屏环境下直接落到某个屏幕边缘甚至只露出一部分。
     if (const auto* screen = QGuiApplication::primaryScreen())
     {
         const auto available = screen->availableGeometry();
@@ -40,7 +41,9 @@ WorkbenchWindow::WorkbenchWindow(QWidget* parent)
         move(x, y);
     }
 
+    SY_INFO("[WorkbenchWindow] Initializing workbench shell");
     initializeWorkbenchShell();
+    SY_INFO("[WorkbenchWindow] Main window created successfully");
 }
 
 WorkbenchWindow::~WorkbenchWindow() = default;
@@ -203,11 +206,8 @@ void WorkbenchWindow::initializeToolBarSkeleton()
 
 void WorkbenchWindow::buildToolBars()
 {
-    // 主工具栏只负责提供基础承载，不在这里绑定具体动作
-    // 这里保持空骨架，避免工具栏直接承担工作台业务编排
-    m_panelState.mainToolBar = addToolBar(QStringLiteral("Main"));
-    m_panelState.mainToolBar->setObjectName(QStringLiteral("MainToolBar"));
-    m_panelState.mainToolBar->setMovable(true);
+    // 工具栏由各工作台（Workbench2D/Workbench3D）在 attachToWindow 中动态注册
+    // 不在初始化阶段创建空骨架，避免出现空工具栏
 }
 
 void WorkbenchWindow::bindShortcuts()
@@ -836,10 +836,9 @@ namespace
 
 void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
 {
-    // 工作台切换只做协调和编排，不直接承载工作台实现细节
-    // 这里如果继续变厚，就会把主窗口又拉回“全能容器”的老路
-    // 这里不创建工作台内部 UI，也不直接拼接工作台业务对象，统一交给工作台实现
     const auto start = std::chrono::steady_clock::now();
+    SY_INFOF("[WorkbenchWindow] triggerWorkbench: switching to %s", workbenchId.toUtf8().constData());
+
     if (!canExecuteCommand(QStringLiteral("workbench.switch.%1").arg(workbenchId), QStringLiteral("WorkbenchWindow::triggerWorkbench")))
     {
         reportFrameworkError(QStringLiteral("workbench.switch_denied"), QStringLiteral("Workbench switch denied: %1").arg(workbenchId), QStringLiteral("WorkbenchWindow::triggerWorkbench"));
@@ -848,12 +847,9 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         return;
     }
 
-    // 没有工作台时，只同步状态并更新菜单，不进入完整切换流程
-    // 这里保留轻量路径，避免空工作台场景也走完整切换链
-    // 轻量路径只处理最少状态，不在这里创建临时占位工作台
     if (!m_workbench)
     {
-        // 没有工作台时只做轻量状态同步和菜单刷新，避免无意义地走完整切换链
+        SY_INFOF("[WorkbenchWindow] triggerWorkbench: no workbench, setting state to %s", workbenchId.toUtf8().constData());
         if (m_stateCenter)
         {
             m_stateCenter->setCurrentWorkbenchId(workbenchId);
@@ -869,11 +865,9 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         return;
     }
 
-    // 同一个工作台再次点击时，不重复执行停用、清理和恢复布局
-    // 这个分支是幂等保护，防止重复点击把界面状态抖乱
     if (workbenchId.compare(m_windowState.workbenchId, Qt::CaseInsensitive) == 0)
     {
-        // 同工作台幂等分支：只刷新菜单和状态，不重复执行切换流程
+        SY_INFOF("[WorkbenchWindow] triggerWorkbench: same workbench %s, skipping", workbenchId.toUtf8().constData());
         refreshWorkbenchMenuChecks(workbenchId);
         recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.sameWorkbench"),
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
@@ -883,11 +877,10 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     const auto previousWorkbenchId = m_windowState.workbenchId;
     const auto switchContextText = workbenchSwitchText(workbenchId);
 
-    // 切换前先冻结界面状态，避免中间态被其它监听逻辑误读
-    // 这里严格按“先冻结、再清理、后重建”的顺序执行，避免出现半切换状态
+    SY_INFOF("[WorkbenchWindow] triggerWorkbench: switching from %s to %s", previousWorkbenchId.toUtf8().constData(), workbenchId.toUtf8().constData());
+
     if (m_stateCenter)
     {
-        // 冻结阶段只负责锁定切换前状态，不在这里做任何重建动作
         saveLayoutSnapshot(previousWorkbenchId);
         m_stateCenter->setBusy(true);
         resetCommandStateToIdle();
@@ -903,56 +896,56 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         });
     }
 
-    // 先停用旧工作台，再清空临时 UI 容器，避免旧页面残留
-    // 这里不做额外状态写入，避免停用动作和状态编排耦合
+    SY_INFO("[WorkbenchWindow] triggerWorkbench: deactivating old workbench");
     m_workbench->deactivate();
     recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.deactivate"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+
+    SY_INFO("[WorkbenchWindow] triggerWorkbench: resetting transient state");
     resetWorkbenchTransientState();
+
+    SY_INFO("[WorkbenchWindow] triggerWorkbench: clearing workbench content");
     clearWorkbenchContent();
 
-    // 切换目标工作台时，提前把状态中心的工作台 ID 更新掉
-    // 切换上下文本身已经在上面的冻结阶段写过一次，这里再次调用是为了确保重建阶段结束前状态仍保持一致
     setWorkbenchSwitchContext(workbenchId, switchContextText);
-    // 本地工作台 ID 也在这里提前更新，后续幂等分支与状态展示都以它为准
     m_windowState.workbenchId = workbenchId;
 
-    // 通过工厂解析目标工作台实例，支持 2D↔3D 之间切换不同的工作台对象
-    // 工厂返回 nullptr 或同一实例时保持当前 m_workbench 不变
     if (m_workbenchFactory)
     {
         auto* target = m_workbenchFactory(workbenchId);
         if (target && target != m_workbench)
+        {
+            SY_INFOF("[WorkbenchWindow] triggerWorkbench: factory created new workbench %s", workbenchId.toUtf8().constData());
             m_workbench = target;
+        }
     }
 
-    // 重新挂接新工作台、恢复布局并激活，最后再刷新菜单和状态显示
-    // 这里是切换链的重建阶段，任何附加动作都应优先收敛到工作台自身实现中
-    // 这里不直接操作工作台内部状态，避免主窗口越界承担工作台细节
-    // 重建阶段只恢复工作台承载，不在这里额外处理选择或命令细节
-    // 如果后续需要加重建前后钩子，也必须放在工作台链内部，不要散到窗口层
+    SY_INFO("[WorkbenchWindow] triggerWorkbench: attaching workbench to window");
     m_workbench->attachToWindow(*this);
     recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.attach"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+
+    SY_INFO("[WorkbenchWindow] triggerWorkbench: restoring layout");
     restoreLayoutSnapshot(workbenchId);
     recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.restoreLayout"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+
+    SY_INFO("[WorkbenchWindow] triggerWorkbench: activating new workbench");
     m_workbench->activate();
     recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.activate"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+
     refreshWorkbenchMenuChecks(workbenchId);
     refreshFromState();
-    // 切换链完成后再补一次显式刷新，避免状态中心信号时序导致标题/状态栏停留旧值
     refreshStatusText();
     updateWindowTitle();
 
     if (m_stateCenter)
         m_stateCenter->setBusy(false);
-    // 切换完成后同步本地忙闲状态，保证窗口侧与状态中心一致
     m_windowState.busy = false;
-    // 切换完成后再次同步本地工作台 ID，避免任何中间状态沿用旧值
     m_windowState.workbenchId = workbenchId;
 
+    SY_INFOF("[WorkbenchWindow] triggerWorkbench: switch completed to %s", workbenchId.toUtf8().constData());
     recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.switch"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 }

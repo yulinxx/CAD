@@ -17,6 +17,9 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
 #include <QImage>
 #include <QPainter>
 
@@ -24,7 +27,7 @@
 #include "RenderCore/RenderCoreRenderer.h"
 #include "RenderCore/RenderBackendFactory.h"
 #include "RenderCore/DefaultSceneCompiler.h"
-#include "RenderCore/UiCamera3D.h"
+#include "RenderCore/ViewCamera3D.h"
 #include "UI/UiEntities.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/SyEntity/SyLine.h"
@@ -100,13 +103,13 @@ TEST(BackendE2ETest, ConfiguredBackend_Lifecycle)
 TEST(BackendE2ETest, AvailableBackends_Creation)
 {
     auto types = RenderBackendFactory::availableBackends();
-    ASSERT_FALSE(types.isEmpty());
+    ASSERT_FALSE(types.empty());
 
     for (auto type : types)
     {
         auto backend = RenderBackendFactory::create(type);
         ASSERT_NE(backend, nullptr);
-        EXPECT_FALSE(backend->backendName().isEmpty());
+        EXPECT_FALSE(backend->backendName().empty());
     }
 }
 
@@ -144,7 +147,7 @@ TEST(BackendE2ETest, SceneCompiler_2DEntities)
     scene.addEntity(circle.release());
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     RenderFrame frame = compiler.compile(&scene, ctx);
@@ -162,11 +165,11 @@ TEST(BackendE2ETest, SceneCompiler_3DNodes)
     DefaultSceneCompiler compiler;
     SceneDocument3D doc;
 
-    doc.createNode(QStringLiteral("Node1"));
-    doc.createNode(QStringLiteral("Node2"));
+    doc.createNode("Node1");
+    doc.createNode("Node2");
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("3D");
+    ctx.sceneType = "3D";
     ctx.clearDirty();
 
     RenderFrame frame = compiler.compile(&doc, ctx);
@@ -180,7 +183,7 @@ TEST(BackendE2ETest, SceneCompiler_3DNodes)
 
 TEST(BackendE2ETest, CameraInteraction_FullSequence)
 {
-    UiCamera3D camera;
+    ViewCamera3D camera;
     camera.setViewportSize(800, 600);
 
     camera.onMousePress(400, 300, 1, 0, 800, 600);

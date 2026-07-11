@@ -4,7 +4,7 @@
 #include <QtMath>
 
 /**
- * @file UiCamera3D.h
+ * @file ViewCamera3D.h
  * @brief UI 层 3D 透视相机工具类
  *
  * 封装 3D 视图的相机状态、投影计算和鼠标交互。
@@ -24,10 +24,10 @@
  * - 渲染后端选择
  * - UI 状态同步
  */
-class UiCamera3D
+class ViewCamera3D
 {
 public:
-    UiCamera3D();
+    ViewCamera3D();
 
     // ============ 相机状态 ============
 

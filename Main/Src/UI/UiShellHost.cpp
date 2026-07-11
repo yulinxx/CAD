@@ -1,5 +1,6 @@
 #include "UiShellHost.h"
 
+#include "Log/SyLogger.h"
 #include "UiCommandDispatcher.h"
 #include "UiCommandHandler.h"
 #include "UiStateCenter.h"
@@ -57,6 +58,14 @@ void UiShellHost::setUndoStack(IUndoStack* undoStack)
 void UiShellHost::setUiServices(const UiServices& services)
 {
     m_services = services;
+    if (m_mainWindow)
+        m_mainWindow->setUiServices(services);
+}
+
+void UiShellHost::setFrameworkServices(const UiFrameworkServices& services)
+{
+    if (m_mainWindow)
+        m_mainWindow->setFrameworkServices(services);
 }
 
 /// 设置工作台并传递给主窗口
@@ -79,7 +88,10 @@ void UiShellHost::setWorkbench(UiWorkbench* workbench)
 void UiShellHost::initializeAndShow()
 {
     if (!m_mainWindow || !m_workbench)
+    {
+        SY_ERROR("[UiShellHost] error code=shell.init_failed message=initializeAndShow called without main window or workbench");
         return;
+    }
 
     m_workbench->attachToWindow(*m_mainWindow);
     m_workbench->activate();
@@ -115,13 +127,17 @@ UiWorkbench* UiShellHost::resolveWorkbench(const QString& workbenchId)
         {
             auto wb3d = std::make_unique<Workbench3D>();
             if (!wb3d->initialize(m_services))
-                return m_workbench; // 初始化失败时回退到 2D
+            {
+                SY_WARN("Workbench3D initialization failed, falling back to 2D");
+                return m_workbench;
+            }
             m_workbench3D = std::move(wb3d);
         }
         return m_workbench3D.get();
     }
 
-    // 未知工作台 ID 回退到 2D
+    SY_WARNF("Unknown workbench id '%s', falling back to 2D",
+        workbenchId.toUtf8().constData());
     return m_workbench;
 }
 

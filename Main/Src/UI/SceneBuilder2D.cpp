@@ -1,7 +1,7 @@
 #include "SceneBuilder2D.h"
 #include "SceneDocument2D.h"
 
-SceneBuilder2D::DefaultSceneResult SceneBuilder2D::createDefaultScene()
+SceneBuilder2D::DefaultSceneResult SceneBuilder2D::createDefault2DScene()
 {
     DefaultSceneResult result;
     result.document = std::make_unique<SceneDocument2D>();
@@ -20,4 +20,14 @@ QString SceneBuilder2D::createDemoLine(
     auto id = doc.createLine(p1, p2);
     doc.selectEntity(id);
     return id;
+}
+
+std::shared_ptr<UI::SceneDocumentBase> SceneBuilder2D::createDefaultScene()
+{
+    return std::make_shared<SceneDocument2D>();
+}
+
+std::string SceneBuilder2D::defaultRootName() const
+{
+    return "2D Scene";
 }

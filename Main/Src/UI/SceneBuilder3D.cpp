@@ -25,3 +25,14 @@ QString SceneBuilder3D::defaultRootNodeName()
 {
     return QObject::tr("Root"); // 根节点
 }
+
+std::shared_ptr<UI::SceneDocumentBase> SceneBuilder3D::createDefaultScene()
+{
+    QString dummyId;
+    return createDefaultScene(dummyId);
+}
+
+std::string SceneBuilder3D::defaultRootName() const
+{
+    return defaultRootNodeName().toStdString();
+}

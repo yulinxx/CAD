@@ -19,10 +19,14 @@
    * - 设置应用程序路径
    * - 注册资源文件
    * - 初始化日志系统
+   * - 加载翻译文件
    */
 class AppInitializer
 {
 public:
     /// 执行应用程序初始化
     static void initialize();
+
+    /// 执行应用程序退出清理
+    static void shutdown();
 };

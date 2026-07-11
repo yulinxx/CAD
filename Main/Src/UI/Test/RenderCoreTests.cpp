@@ -14,17 +14,20 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
 #include <QImage>
 #include <QPainter>
-#include <QProcessEnvironment>
 
 #include "RenderCore/DefaultRenderBackend.h"
 #include "RenderCore/DefaultSceneCompiler.h"
 #include "RenderCore/RenderBackendFactory.h"
 #include "RenderCore/RenderContext.h"
 #include "RenderCore/RenderFrame.h"
-#include "RenderCore/UiCamera3D.h"
+#include "RenderCore/ViewCamera3D.h"
 #include "RenderCore/RenderCoreRenderer.h"
+#include "RenderCore/RenderTypes.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyCircle.h"
@@ -72,12 +75,12 @@ TEST(RenderContextTest, FrameAdvance)
 TEST(RenderContextTest, SceneTypeDetection)
 {
     RenderContext ctx2D;
-    ctx2D.sceneType = QStringLiteral("2D");
+    ctx2D.sceneType = "2D";
     EXPECT_TRUE(ctx2D.is2D());
     EXPECT_FALSE(ctx2D.is3D());
 
     RenderContext ctx3D;
-    ctx3D.sceneType = QStringLiteral("3D");
+    ctx3D.sceneType = "3D";
     EXPECT_FALSE(ctx3D.is2D());
     EXPECT_TRUE(ctx3D.is3D());
 }
@@ -88,10 +91,10 @@ TEST(RenderContextTest, SceneTypeDetection)
 
 TEST(DefaultRenderBackendTest, InitializeAndShutdown)
 {
-    DefaultRenderBackend backend(QStringLiteral("TestBackend"), BackendCapability::HardwareAccelerated);
+    DefaultRenderBackend backend("TestBackend", BackendCapability::HardwareAccelerated);
 
     EXPECT_FALSE(backend.isReady());
-    EXPECT_EQ(backend.backendName(), QStringLiteral("TestBackend"));
+    EXPECT_EQ(backend.backendName(), "TestBackend");
     EXPECT_TRUE(backend.supportsCapability(BackendCapability::HardwareAccelerated));
     EXPECT_FALSE(backend.supportsCapability(BackendCapability::RayTracing));
 
@@ -105,11 +108,10 @@ TEST(DefaultRenderBackendTest, InitializeAndShutdown)
 
 TEST(DefaultRenderBackendTest, ShutdownIdempotent)
 {
-    DefaultRenderBackend backend(QStringLiteral("Test"), BackendCapability::None);
+    DefaultRenderBackend backend("Test", BackendCapability::None);
     backend.initialize();
     EXPECT_TRUE(backend.isReady());
 
-    // 多次 shutdown 不应崩溃
     backend.shutdown();
     backend.shutdown();
     backend.shutdown();
@@ -118,28 +120,29 @@ TEST(DefaultRenderBackendTest, ShutdownIdempotent)
 
 TEST(DefaultRenderBackendTest, ContextBinding)
 {
-    DefaultRenderBackend backend(QStringLiteral("Test"), BackendCapability::None);
+    DefaultRenderBackend backend("Test", BackendCapability::None);
     backend.initialize();
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("3D");
-    ctx.viewportSize = QSize(800, 600);
+    ctx.sceneType = "3D";
+    ctx.viewportSize = Size2D{ 800, 600 };
     backend.bindContext(ctx);
 
     const auto& bound = backend.context();
-    EXPECT_EQ(bound.sceneType, QStringLiteral("3D"));
-    EXPECT_EQ(bound.viewportSize, QSize(800, 600));
-    EXPECT_TRUE(bound.isDirty); // bindContext 标记脏
+    EXPECT_EQ(bound.sceneType, "3D");
+    EXPECT_EQ(bound.viewportSize.width, 800);
+    EXPECT_EQ(bound.viewportSize.height, 600);
+    EXPECT_TRUE(bound.isDirty);
 
     backend.shutdown();
 }
 
 TEST(DefaultRenderBackendTest, RenderMode)
 {
-    DefaultRenderBackend backend(QStringLiteral("Test"), BackendCapability::None);
+    DefaultRenderBackend backend("Test", BackendCapability::None);
     backend.initialize();
 
-    EXPECT_EQ(backend.renderMode(), RenderMode::Wireframe); // 默认
+    EXPECT_EQ(backend.renderMode(), RenderMode::Wireframe);
 
     backend.setRenderMode(RenderMode::Shaded);
     EXPECT_EQ(backend.renderMode(), RenderMode::Shaded);
@@ -152,7 +155,7 @@ TEST(DefaultRenderBackendTest, RenderMode)
 
 TEST(DefaultRenderBackendTest, SubmitFrame)
 {
-    DefaultRenderBackend backend(QStringLiteral("Test"), BackendCapability::None);
+    DefaultRenderBackend backend("Test", BackendCapability::None);
     backend.initialize();
 
     RenderFrame frame;
@@ -164,18 +167,19 @@ TEST(DefaultRenderBackendTest, SubmitFrame)
 
     auto stats = backend.getStatistics();
     EXPECT_EQ(stats.batchCount, 1);
-    EXPECT_EQ(stats.entityCount, 0); // 空 entityId
+    EXPECT_EQ(stats.entityCount, 0);
 
     backend.shutdown();
 }
 
 TEST(DefaultRenderBackendTest, Resize)
 {
-    DefaultRenderBackend backend(QStringLiteral("Test"), BackendCapability::None);
+    DefaultRenderBackend backend("Test", BackendCapability::None);
     backend.initialize();
 
-    backend.resize(QSize(1024, 768));
-    EXPECT_EQ(backend.context().viewportSize, QSize(1024, 768));
+    backend.resize(Size2D{ 1024, 768 });
+    EXPECT_EQ(backend.context().viewportSize.width, 1024);
+    EXPECT_EQ(backend.context().viewportSize.height, 768);
     EXPECT_TRUE(backend.context().isDirty);
 
     backend.shutdown();
@@ -183,13 +187,14 @@ TEST(DefaultRenderBackendTest, Resize)
 
 TEST(DefaultRenderBackendTest, CaptureFrame)
 {
-    DefaultRenderBackend backend(QStringLiteral("Test"), BackendCapability::None);
+    DefaultRenderBackend backend("Test", BackendCapability::None);
     backend.initialize();
 
-    backend.resize(QSize(640, 480));
-    QImage captured = backend.captureFrame();
-    EXPECT_EQ(captured.size(), QSize(640, 480));
-    EXPECT_FALSE(captured.isNull());
+    backend.resize(Size2D{ 640, 480 });
+    ImageBuffer captured = backend.captureFrame();
+    EXPECT_EQ(captured.width, 640);
+    EXPECT_EQ(captured.height, 480);
+    EXPECT_FALSE(captured.data.empty());
 
     backend.shutdown();
 }
@@ -204,7 +209,7 @@ TEST(SceneCompilerTest, CompileEmpty2D)
 
     Eg::SceneManager scene;
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
 
     RenderFrame frame = compiler.compile(&scene, ctx);
     EXPECT_TRUE(frame.valid);
@@ -225,7 +230,7 @@ TEST(SceneCompilerTest, Compile2DWithLines)
     scene.addEntity(l2.release());
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
 
     RenderFrame frame = compiler.compile(&scene, ctx);
     EXPECT_TRUE(frame.valid);
@@ -243,7 +248,7 @@ TEST(SceneCompilerTest, IncrementalCompileCacheHit)
     scene.addEntity(line.release());
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     RenderFrame frame1 = compiler.compile(&scene, ctx);
@@ -267,13 +272,13 @@ TEST(SceneCompilerTest, IncrementalCompileWithDirtyEntity)
     scene.addEntity(line.release());
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     RenderFrame frame1 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame1.batchCount(), 1);
 
-    compiler.markEntityDirty(QString::number(lineId));
+    compiler.markEntityDirty(std::to_string(lineId));
     ctx.clearDirty();
 
     RenderFrame frame2 = compiler.compile(&scene, ctx);
@@ -291,7 +296,7 @@ TEST(SceneCompilerTest, CacheInvalidation)
     scene.addEntity(line.release());
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     compiler.compile(&scene, ctx);
@@ -317,8 +322,8 @@ TEST(SceneCompilerTest, BatchGrouping)
     RenderContext ctx;
     RenderFrame frame = compiler.compile(&scene, ctx);
 
-    QVector<int> groups = compiler.groupBatchesByPrimitiveType(frame);
-    EXPECT_FALSE(groups.isEmpty());
+    std::vector<int> groups = compiler.groupBatchesByPrimitiveType(frame);
+    EXPECT_FALSE(groups.empty());
 }
 
 TEST(SceneCompilerTest, Culling)
@@ -334,7 +339,7 @@ TEST(SceneCompilerTest, Culling)
     RenderFrame frame = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame.batchCount(), 1);
 
-    RenderFrame culled = compiler.cullBatches(frame, QRectF(1000, 1000, 100, 100));
+    RenderFrame culled = compiler.cullBatches(frame, RenderRectF{ 1000, 1000, 100, 100 });
     EXPECT_EQ(culled.batchCount(), 0);
     EXPECT_GT(culled.statistics.culledBatchCount, 0);
 }
@@ -363,11 +368,14 @@ TEST(SceneCompilerTest, DirtyEntityUpdate_CacheConsistency)
     Eg::SceneManager scene;
     auto line = std::make_unique<Eg::SyLine>(
         std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
-    auto lineId = line->id;
     scene.addEntity(line.release());
 
+    auto allEntities = scene.getAllEntities();
+    ASSERT_FALSE(allEntities.empty());
+    Eg::EntityId lineId = allEntities[0]->id;
+
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     RenderFrame frame1 = compiler.compile(&scene, ctx);
@@ -377,7 +385,7 @@ TEST(SceneCompilerTest, DirtyEntityUpdate_CacheConsistency)
     auto* entity = scene.findEntityById(lineId);
     ASSERT_NE(entity, nullptr);
     entity->transform(Ut::Mat3d::translate(50, 50));
-    compiler.markEntityDirty(QString::number(lineId));
+    compiler.markEntityDirty(std::to_string(lineId));
     ctx.clearDirty();
     ctx.advanceFrame();
 
@@ -395,15 +403,17 @@ TEST(SceneCompilerTest, EntityDeletion_OldBatchRemoved)
     Eg::SceneManager scene;
     auto l1 = std::make_unique<Eg::SyLine>(
         std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
-    auto id1 = l1->id;
     scene.addEntity(l1.release());
     auto l2 = std::make_unique<Eg::SyLine>(
         std::vector<Ut::Vec2d>{ Ut::Vec2d(200, 200), Ut::Vec2d(300, 300) });
-    auto id2 = l2->id;
     scene.addEntity(l2.release());
 
+    auto allEntities = scene.getAllEntities();
+    ASSERT_EQ(allEntities.size(), 2);
+    Eg::EntityId id1 = allEntities[0]->id;
+
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     RenderFrame frame1 = compiler.compile(&scene, ctx);
@@ -412,7 +422,7 @@ TEST(SceneCompilerTest, EntityDeletion_OldBatchRemoved)
     auto* e1 = scene.findEntityById(id1);
     ASSERT_NE(e1, nullptr);
     scene.deleteEntity(e1);
-    compiler.markEntityDirty(QString::number(id1));
+    compiler.markEntityDirty(std::to_string(id1));
     ctx.clearDirty();
 
     RenderFrame frame2 = compiler.compile(&scene, ctx);
@@ -433,7 +443,7 @@ TEST(SceneCompilerTest, MarkAllDirty_RecreatesFullFrame)
     scene.addEntity(l2.release());
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     RenderFrame frame1 = compiler.compile(&scene, ctx);
@@ -457,7 +467,7 @@ TEST(SceneCompilerTest, SceneSwitch_CacheCleared)
     scene1.addEntity(line.release());
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     compiler.compile(&scene1, ctx);
@@ -493,16 +503,16 @@ TEST(SceneCompilerTest, MultipleDirtyUpdates_NoAccumulation)
     scene.addEntity(l3.release());
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     RenderFrame frame0 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame0.batchCount(), 3);
 
-    compiler.markEntityDirty(QString::number(id1));
-    compiler.markEntityDirty(QString::number(id2));
-    compiler.markEntityDirty(QString::number(id3));
-    compiler.markEntityDirty(QString::number(id1)); // 重复标记
+    compiler.markEntityDirty(std::to_string(id1));
+    compiler.markEntityDirty(std::to_string(id2));
+    compiler.markEntityDirty(std::to_string(id3));
+    compiler.markEntityDirty(std::to_string(id1));
     ctx.clearDirty();
 
     RenderFrame frame1 = compiler.compile(&scene, ctx);
@@ -524,7 +534,7 @@ TEST(SceneCompilerTest, DirtyEntityAdded_NewBatchCreated)
     scene.addEntity(l1.release());
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     RenderFrame frame1 = compiler.compile(&scene, ctx);
@@ -534,7 +544,7 @@ TEST(SceneCompilerTest, DirtyEntityAdded_NewBatchCreated)
         std::vector<Ut::Vec2d>{ Ut::Vec2d(200, 200), Ut::Vec2d(300, 300) });
     auto newId = newLine->id;
     scene.addEntity(newLine.release());
-    compiler.markEntityDirty(QString::number(newId));
+    compiler.markEntityDirty(std::to_string(newId));
     ctx.clearDirty();
 
     RenderFrame frame2 = compiler.compile(&scene, ctx);
@@ -553,14 +563,17 @@ TEST(SceneCompilerTest, IncrementalCompile_DeleteEntityCachePurged)
     Eg::SceneManager scene;
     auto l1 = std::make_unique<Eg::SyLine>(
         std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
-    auto id1 = l1->id;
     scene.addEntity(l1.release());
     auto l2 = std::make_unique<Eg::SyLine>(
         std::vector<Ut::Vec2d>{ Ut::Vec2d(200, 200), Ut::Vec2d(300, 300) });
     scene.addEntity(l2.release());
 
+    auto allEntities = scene.getAllEntities();
+    ASSERT_EQ(allEntities.size(), 2);
+    Eg::EntityId id1 = allEntities[0]->id;
+
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     RenderFrame frame1 = compiler.compile(&scene, ctx);
@@ -570,7 +583,7 @@ TEST(SceneCompilerTest, IncrementalCompile_DeleteEntityCachePurged)
     auto* e = scene.findEntityById(id1);
     ASSERT_NE(e, nullptr);
     scene.deleteEntity(e);
-    compiler.markEntityDirty(QString::number(id1));
+    compiler.markEntityDirty(std::to_string(id1));
     ctx.clearDirty();
 
     RenderFrame frame2 = compiler.compile(&scene, ctx);
@@ -593,7 +606,7 @@ TEST(SceneCompilerTest, IncrementalCompile_SceneSwitchCacheRebuilt)
     scene1.addEntity(line.release());
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     compiler.compile(&scene1, ctx);
@@ -625,34 +638,37 @@ TEST(SceneCompilerTest, IncrementalCompile_CacheHitAfterMultipleDirty)
     Eg::SceneManager scene;
     auto l1 = std::make_unique<Eg::SyLine>(
         std::vector<Ut::Vec2d>{ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
-    auto id1 = l1->id;
     scene.addEntity(l1.release());
     auto l2 = std::make_unique<Eg::SyLine>(
         std::vector<Ut::Vec2d>{ Ut::Vec2d(200, 200), Ut::Vec2d(300, 300) });
-    auto id2 = l2->id;
     scene.addEntity(l2.release());
     auto l3 = std::make_unique<Eg::SyLine>(
         std::vector<Ut::Vec2d>{ Ut::Vec2d(400, 400), Ut::Vec2d(500, 500) });
-    auto id3 = l3->id;
     scene.addEntity(l3.release());
 
+    auto allEntities = scene.getAllEntities();
+    ASSERT_EQ(allEntities.size(), 3);
+    Eg::EntityId id1 = allEntities[0]->id;
+    Eg::EntityId id2 = allEntities[1]->id;
+    Eg::EntityId id3 = allEntities[2]->id;
+
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     RenderFrame frame0 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame0.batchCount(), 3);
 
     scene.findEntityById(id1)->transform(Ut::Mat3d::translate(10, 10));
-    compiler.markEntityDirty(QString::number(id1));
+    compiler.markEntityDirty(std::to_string(id1));
     ctx.clearDirty();
     RenderFrame frame1 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame1.batchCount(), 3);
 
     scene.findEntityById(id2)->transform(Ut::Mat3d::translate(20, 20));
     scene.findEntityById(id3)->transform(Ut::Mat3d::translate(30, 30));
-    compiler.markEntityDirty(QString::number(id2));
-    compiler.markEntityDirty(QString::number(id3));
+    compiler.markEntityDirty(std::to_string(id2));
+    compiler.markEntityDirty(std::to_string(id3));
     ctx.clearDirty();
     RenderFrame frame2 = compiler.compile(&scene, ctx);
     EXPECT_EQ(frame2.batchCount(), 3);
@@ -680,7 +696,7 @@ TEST(SceneCompilerTest, IncrementalCompile_NoPhantomBatches)
     scene.addEntity(c.release());
 
     RenderContext ctx;
-    ctx.sceneType = QStringLiteral("2D");
+    ctx.sceneType = "2D";
     ctx.clearDirty();
 
     RenderFrame fullFrame = compiler.compile(&scene, ctx);
@@ -704,7 +720,7 @@ TEST(SceneCompilerTest, IncrementalCompile_NoPhantomBatches)
         std::vector<Ut::Vec2d>{ Ut::Vec2d(300, 300), Ut::Vec2d(400, 400) });
     auto newId = newLine->id;
     scene.addEntity(newLine.release());
-    compiler.markEntityDirty(QString::number(newId));
+    compiler.markEntityDirty(std::to_string(newId));
     ctx.clearDirty();
     RenderFrame incFrame2 = compiler.compile(&scene, ctx);
 
@@ -720,7 +736,7 @@ TEST(RenderBackendFactoryTest, CreateOpenGL)
 {
     auto backend = RenderBackendFactory::create(RenderBackendFactory::BackendType::OpenGL);
     EXPECT_NE(backend, nullptr);
-    EXPECT_EQ(backend->backendName(), QStringLiteral("OpenGL"));
+    EXPECT_EQ(backend->backendName(), "OpenGL");
     EXPECT_TRUE(backend->supportsCapability(BackendCapability::HardwareAccelerated));
 }
 
@@ -728,34 +744,34 @@ TEST(RenderBackendFactoryTest, CreateSoftware)
 {
     auto backend = RenderBackendFactory::create(RenderBackendFactory::BackendType::Software);
     EXPECT_NE(backend, nullptr);
-    EXPECT_EQ(backend->backendName(), QStringLiteral("Software"));
+    EXPECT_EQ(backend->backendName(), "Software");
     EXPECT_FALSE(backend->supportsCapability(BackendCapability::HardwareAccelerated));
 }
 
 TEST(RenderBackendFactoryTest, FromString)
 {
-    EXPECT_EQ(RenderBackendFactory::fromString(QStringLiteral("opengl")),
+    EXPECT_EQ(RenderBackendFactory::fromString("opengl"),
               RenderBackendFactory::BackendType::OpenGL);
-    EXPECT_EQ(RenderBackendFactory::fromString(QStringLiteral("OPENGL")),
+    EXPECT_EQ(RenderBackendFactory::fromString("OPENGL"),
               RenderBackendFactory::BackendType::OpenGL);
-    EXPECT_EQ(RenderBackendFactory::fromString(QStringLiteral("vulkan")),
+    EXPECT_EQ(RenderBackendFactory::fromString("vulkan"),
               RenderBackendFactory::BackendType::Vulkan);
-    EXPECT_EQ(RenderBackendFactory::fromString(QStringLiteral("metal")),
+    EXPECT_EQ(RenderBackendFactory::fromString("metal"),
               RenderBackendFactory::BackendType::Metal);
-    EXPECT_EQ(RenderBackendFactory::fromString(QStringLiteral("software")),
+    EXPECT_EQ(RenderBackendFactory::fromString("software"),
               RenderBackendFactory::BackendType::Software);
 }
 
 TEST(RenderBackendFactoryTest, ToString)
 {
     EXPECT_EQ(RenderBackendFactory::toString(RenderBackendFactory::BackendType::OpenGL),
-              QStringLiteral("OpenGL"));
+              "OpenGL");
     EXPECT_EQ(RenderBackendFactory::toString(RenderBackendFactory::BackendType::Vulkan),
-              QStringLiteral("Vulkan"));
+              "Vulkan");
     EXPECT_EQ(RenderBackendFactory::toString(RenderBackendFactory::BackendType::Metal),
-              QStringLiteral("Metal"));
+              "Metal");
     EXPECT_EQ(RenderBackendFactory::toString(RenderBackendFactory::BackendType::Software),
-              QStringLiteral("Software"));
+              "Software");
 }
 
 TEST(RenderBackendFactoryTest, FromStringRoundTrip)
@@ -765,22 +781,21 @@ TEST(RenderBackendFactoryTest, FromStringRoundTrip)
                        RenderBackendFactory::BackendType::Metal,
                        RenderBackendFactory::BackendType::Software })
     {
-        QString name = RenderBackendFactory::toString(type);
+        std::string name = RenderBackendFactory::toString(type);
         EXPECT_EQ(RenderBackendFactory::fromString(name), type);
     }
 }
 
 TEST(RenderBackendFactoryTest, UnknownStringReturnsDefault)
 {
-    auto type = RenderBackendFactory::fromString(QStringLiteral("nonexistent"));
+    auto type = RenderBackendFactory::fromString("nonexistent");
     EXPECT_EQ(type, RenderBackendFactory::defaultBackendType());
 }
 
 TEST(RenderBackendFactoryTest, AvailableBackendsNotEmpty)
 {
     auto backends = RenderBackendFactory::availableBackends();
-    EXPECT_FALSE(backends.isEmpty());
-    // OpenGL 和 Software 至少有一个可用
+    EXPECT_FALSE(backends.empty());
     bool hasOpenGL = false;
     bool hasSoftware = false;
     for (auto b : backends)
@@ -795,33 +810,24 @@ TEST(RenderBackendFactoryTest, CreateConfigured)
 {
     auto backend = RenderBackendFactory::createConfigured();
     EXPECT_NE(backend, nullptr);
-    EXPECT_FALSE(backend->backendName().isEmpty());
+    EXPECT_FALSE(backend->backendName().empty());
 }
 
 TEST(RenderBackendFactoryTest, EnvironmentVariableOverride)
 {
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    QString originalValue = env.value(QStringLiteral("SAN_YI_RENDER_BACKEND"));
-
-    // 测试软件后端配置
-    QProcessEnvironment testEnv = env;
-    testEnv.insert(QStringLiteral("SAN_YI_RENDER_BACKEND"), QStringLiteral("software"));
-
-    // 实际测试：验证 createConfigured 能正常工作
     auto backend = RenderBackendFactory::createConfigured();
     EXPECT_NE(backend, nullptr);
 }
 
 TEST(RenderBackendFactoryTest, BackendSwitchStability)
 {
-    // 连续创建不同后端不应相互影响
     auto opengl = RenderBackendFactory::create(RenderBackendFactory::BackendType::OpenGL);
     EXPECT_NE(opengl, nullptr);
-    EXPECT_EQ(opengl->backendName(), QStringLiteral("OpenGL"));
+    EXPECT_EQ(opengl->backendName(), "OpenGL");
 
     auto software = RenderBackendFactory::create(RenderBackendFactory::BackendType::Software);
     EXPECT_NE(software, nullptr);
-    EXPECT_EQ(software->backendName(), QStringLiteral("Software"));
+    EXPECT_EQ(software->backendName(), "Software");
 
     auto opengl2 = RenderBackendFactory::create(RenderBackendFactory::BackendType::OpenGL);
     EXPECT_NE(opengl2, nullptr);
@@ -872,12 +878,12 @@ TEST(RenderBackendFactoryTest, AllBackendsCreateAndShutdown)
 }
 
 // ============================================================================
-// UiCamera3D 测试
+// ViewCamera3D 测试
 // ============================================================================
 
-TEST(UiCamera3DTest, DefaultState)
+TEST(ViewCamera3DTest, DefaultState)
 {
-    UiCamera3D camera;
+    ViewCamera3D camera;
     EXPECT_FALSE(camera.isDirty());
     EXPECT_FALSE(camera.isRotating());
     EXPECT_FALSE(camera.isPanning());
@@ -885,9 +891,9 @@ TEST(UiCamera3DTest, DefaultState)
     EXPECT_FALSE(camera.isMeasureMode());
 }
 
-TEST(UiCamera3DTest, Reset)
+TEST(ViewCamera3DTest, Reset)
 {
-    UiCamera3D camera;
+    ViewCamera3D camera;
     camera.orbit(90.0, 45.0);
     camera.pan(100.0, 200.0);
     camera.zoom(5.0);
@@ -899,9 +905,9 @@ TEST(UiCamera3DTest, Reset)
     EXPECT_DOUBLE_EQ(camera.distance(), 10.0);
 }
 
-TEST(UiCamera3DTest, Orbit)
+TEST(ViewCamera3DTest, Orbit)
 {
-    UiCamera3D camera;
+    ViewCamera3D camera;
     camera.clearDirty();
 
     camera.orbit(30.0, 10.0);
@@ -910,9 +916,9 @@ TEST(UiCamera3DTest, Orbit)
     EXPECT_DOUBLE_EQ(camera.pitch(), 25.0); // 15 + 10
 }
 
-TEST(UiCamera3DTest, Pan)
+TEST(ViewCamera3DTest, Pan)
 {
-    UiCamera3D camera;
+    ViewCamera3D camera;
     camera.clearDirty();
 
     camera.pan(50.0, -30.0);
@@ -921,9 +927,9 @@ TEST(UiCamera3DTest, Pan)
     EXPECT_DOUBLE_EQ(camera.panY(), -30.0);
 }
 
-TEST(UiCamera3DTest, Zoom)
+TEST(ViewCamera3DTest, Zoom)
 {
-    UiCamera3D camera;
+    ViewCamera3D camera;
     camera.clearDirty();
 
     camera.zoom(3.0);
@@ -931,9 +937,9 @@ TEST(UiCamera3DTest, Zoom)
     EXPECT_DOUBLE_EQ(camera.distance(), 13.0); // 10 + 3
 }
 
-TEST(UiCamera3DTest, ProjectInFront)
+TEST(ViewCamera3DTest, ProjectInFront)
 {
-    UiCamera3D camera;
+    ViewCamera3D camera;
     camera.setViewportSize(800, 600);
 
     int sx, sy;
@@ -941,9 +947,9 @@ TEST(UiCamera3DTest, ProjectInFront)
     EXPECT_TRUE(ok); // 原点在相机前方
 }
 
-TEST(UiCamera3DTest, ProjectBehind)
+TEST(ViewCamera3DTest, ProjectBehind)
 {
-    UiCamera3D camera;
+    ViewCamera3D camera;
     camera.setViewportSize(800, 600);
 
     // 相机在 z=10 处，看向原点。z=100 在相机后方很远
@@ -952,9 +958,9 @@ TEST(UiCamera3DTest, ProjectBehind)
     EXPECT_FALSE(ok); // 在相机后方
 }
 
-TEST(UiCamera3DTest, MousePressRotate)
+TEST(ViewCamera3DTest, MousePressRotate)
 {
-    UiCamera3D camera;
+    ViewCamera3D camera;
     camera.setViewportSize(800, 600);
 
     // 左键按下开始旋转
@@ -964,9 +970,9 @@ TEST(UiCamera3DTest, MousePressRotate)
     EXPECT_TRUE(changed || !changed); // 初始按下可能不产生变更
 }
 
-TEST(UiCamera3DTest, MousePressPan)
+TEST(ViewCamera3DTest, MousePressPan)
 {
-    UiCamera3D camera;
+    ViewCamera3D camera;
     camera.setViewportSize(800, 600);
 
     // 中键按下开始平移
@@ -975,9 +981,9 @@ TEST(UiCamera3DTest, MousePressPan)
     EXPECT_TRUE(camera.isPanning());
 }
 
-TEST(UiCamera3DTest, MouseDrag)
+TEST(ViewCamera3DTest, MouseDrag)
 {
-    UiCamera3D camera;
+    ViewCamera3D camera;
     camera.setViewportSize(800, 600);
 
     camera.onMousePress(400, 300, 1, 0, 800, 600);
@@ -988,9 +994,9 @@ TEST(UiCamera3DTest, MouseDrag)
     EXPECT_TRUE(camera.isDirty());
 }
 
-TEST(UiCamera3DTest, MouseRelease)
+TEST(ViewCamera3DTest, MouseRelease)
 {
-    UiCamera3D camera;
+    ViewCamera3D camera;
     camera.setViewportSize(800, 600);
 
     camera.onMousePress(400, 300, 1, 0, 800, 600);
@@ -999,9 +1005,9 @@ TEST(UiCamera3DTest, MouseRelease)
     EXPECT_FALSE(camera.isPanning());
 }
 
-TEST(UiCamera3DTest, Wheel)
+TEST(ViewCamera3DTest, Wheel)
 {
-    UiCamera3D camera;
+    ViewCamera3D camera;
     camera.setViewportSize(800, 600);
     camera.clearDirty();
 
@@ -1010,9 +1016,9 @@ TEST(UiCamera3DTest, Wheel)
     EXPECT_TRUE(camera.isDirty());
 }
 
-TEST(UiCamera3DTest, MeasureMode)
+TEST(ViewCamera3DTest, MeasureMode)
 {
-    UiCamera3D camera;
+    ViewCamera3D camera;
     EXPECT_FALSE(camera.isMeasureMode());
 
     camera.setMeasureMode(true);

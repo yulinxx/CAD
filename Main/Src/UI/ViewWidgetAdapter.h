@@ -26,14 +26,9 @@ public:
     explicit ViewWidgetAdapter(Viewport2D* viewport, QObject* parent = nullptr);
     ~ViewWidgetAdapter() override = default;
 
-    void setActiveTool(const QString& toolName);
-    void syncSelectionFromScene();
-    void updateRenderData();
     void resetView();
     void zoomToFit();
-    QPointF getCurrentMouseWorldPos() const;
     QPointF screenToWorld(const QPoint& screenPos) const;
-    Eg::SceneManager* getSceneManager() const { return nullptr; }
     SceneDocument2D* document() const;
     SceneEditServiceAdapter* sceneEditService() const { return m_sceneEditAdapter; }
     Viewport2D* viewport() const { return m_viewport; }

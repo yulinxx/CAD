@@ -2,7 +2,7 @@
 
 #include "RenderFrame.h"
 #include "RenderTypes.h"
-#include "UiCamera3D.h"
+#include "ViewCamera3D.h"
 
 #include <QPainter>
 
@@ -20,7 +20,7 @@
  *
  * 不承担：
  * - 场景编译（由 SceneCompiler 负责）
- * - 相机交互（由 UiCamera3D 负责）
+ * - 相机交互（由 ViewCamera3D 负责）
  * - 输入事件处理（由上层负责）
  * - 生命周期管理（由调用方负责）
  */
@@ -28,15 +28,15 @@ class SoftwareRenderer
 {
 public:
     /// 将渲染帧绘制到 QPainter
-    void render(QPainter& painter, const RenderFrame& frame, const UiCamera3D& camera,
+    void render(QPainter& painter, const RenderFrame& frame, const ViewCamera3D& camera,
                 const Size2D& viewportSize);
 
 private:
     /// 绘制 3D 批次（使用 Camera3D 投影）
-    void drawBatches3D(QPainter& painter, const RenderFrame& frame, const UiCamera3D& camera);
+    void drawBatches3D(QPainter& painter, const RenderFrame& frame, const ViewCamera3D& camera);
 
     /// 绘制坐标轴指示器
-    static void drawAxesIndicator(QPainter& painter, const UiCamera3D& camera,
+    static void drawAxesIndicator(QPainter& painter, const ViewCamera3D& camera,
                                    int viewW, int viewH);
 
     /// 绘制帧统计覆盖层

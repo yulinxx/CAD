@@ -10,6 +10,7 @@
 #include "UI/UiShellHost.h"
 #include "UI/UiStateCenter.h"
 #include "UI/UiThemeService.h"
+#include "UI/SceneDocument2D.h"
 
 /**
  * @class ApplicationCompositionRoot
@@ -70,4 +71,7 @@ private:
 
     /// 命令处理器实例集合
     std::vector<std::unique_ptr<ICommandHandler>> m_commandHandlers;
+
+    /// 2D 场景文档
+    std::unique_ptr<SceneDocument2D> m_document2D;
 };

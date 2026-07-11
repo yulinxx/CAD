@@ -42,7 +42,7 @@ namespace
     /// @param text 动作文本
     QAction* addWorkbenchAction(QToolBar* bar, const QString& text)
     {
-        return bar->addAction(QObject::tr(text.toUtf8().constData()));
+        return bar->addAction(text);
     }
 
     /// 统一设置工作台初始状态
@@ -98,9 +98,11 @@ namespace
         // 树控件通过 SceneDocument3D::selection() 监听来刷新，不再由视口回调触发
         viewport->setSelectionCallback([&services, properties](const QString& nodeId) {
             if (properties)
-                properties->setSelectionText(QStringLiteral("Selected node: %1").arg(nodeId));
+                properties->setSelectionText(QObject::tr("Selected node: %1").arg(nodeId));
             if (services.stateCenter)
-                services.stateCenter->setSelectionContext(QStringLiteral("3D-Viewport"), QStringLiteral("3D node: %1").arg(nodeId));
+                services.stateCenter->setSelectionContext(
+                    QObject::tr("3D-Viewport"),
+                    QObject::tr("3D node: %1").arg(nodeId));
         });
     }
 
@@ -245,7 +247,7 @@ void UiWorkbench::restoreFromSnapshot(const WorkbenchStateSnapshot& snapshot)
 // 2D/3D 差异集中在配置，不散在流程里
 
 QString Workbench2D::id() const { return QStringLiteral("2D"); }
-QString Workbench2D::displayName() const { return QStringLiteral("2D Workbench"); }
+QString Workbench2D::displayName() const { return QObject::tr("2D Workbench"); }
 
 // 步骤1 — 初始化，存储服务引用
 bool Workbench2D::initialize(const UiServices& services)
@@ -267,11 +269,17 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
     auto* drawToolBar = new DrawToolBarWidget(&window);
     if (m_services.commandDispatcher)
         drawToolBar->setCommandDispatcher(m_services.commandDispatcher);
-    window.registerDockWidget(QStringLiteral("2D Draw Tools"), drawToolBar, Qt::LeftDockWidgetArea);
+    window.registerDockWidget(QObject::tr("2D Draw Tools"), drawToolBar, Qt::LeftDockWidgetArea);
 
     // 步骤2.3: 创建文档
-    auto sceneResult = SceneBuilder2D::createDefaultScene();
+    auto sceneResult = SceneBuilder2D::createDefault2DScene();
     m_document = std::move(sceneResult.document);
+    // 把文档注入到服务集合，使命令系统能通过 services.document2D 访问文档
+    m_services.document2D = m_document.get();
+    // 同步到命令分发器，使其内部的 m_uiServices 也包含文档引用
+    // （Dispatcher 在 AppBootstrapper 构造时设置的 m_uiServices 不含 document2D）
+    if (m_services.commandDispatcher)
+        m_services.commandDispatcher->setUiServices(m_services);
     auto primaryId = sceneResult.primaryLineId;
     auto secondaryId = sceneResult.secondaryLineId;
 
@@ -279,7 +287,7 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
     auto* properties = new PropertiesPanelWidget(&window);
     properties->setWorkbenchMode(PropertiesPanelWidget::WorkbenchMode::TwoD);
     configureWorkbenchPanels(properties);
-    window.registerDockWidget(QStringLiteral("2D Properties"), properties, Qt::RightDockWidgetArea);
+    window.registerDockWidget(QObject::tr("2D Properties"), properties, Qt::RightDockWidgetArea);
 
     // 步骤2.5: 创建命令面板
     auto* commandPanel = createPanelWidget(QObject::tr("Command panel"), &window); // 命令面板
@@ -315,17 +323,9 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
 
 QWidget* Workbench2D::createCentralViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties)
 {
-    if (m_useLegacyCanvasViewport)
-    {
-        auto* legacyViewport = new Viewport2D(&window);
-        configureLegacyViewport(legacyViewport, properties);
-        legacyViewport->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-        legacyViewport->setMinimumSize(800, 600);
-        return legacyViewport;
-    }
-
     auto* viewport = new Viewport2D(&window);
-    configureModernViewport(viewport);
+    // 接入命令系统：注入 document/dispatcher/interactionDispatcher/operationBus 和回调
+    configure2DViewport(viewport, m_services, m_document.get(), properties);
     viewport->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     viewport->setMinimumSize(800, 600);
     return viewport;
@@ -362,41 +362,45 @@ void Workbench2D::configureWorkbenchActions(QToolBar* mainBar, QToolBar* viewBar
     if (!mainBar || !viewBar)
         return;
 
-    // 工具栏绑定 — 优先使用 OperationBus，旧 dispatcher 仅作过渡兼容
-    // 绘图工具（Draw Line、Draw Polyline、Select、Measure）已移至左侧工具栏，此处只保留编辑和视图操作
-    auto* deleteEntity = addWorkbenchAction(mainBar, QStringLiteral("Delete")); // 删除
-    auto* editEntity = addWorkbenchAction(mainBar, QStringLiteral("Edit"));     // 编辑
-    auto* copyEntity = addWorkbenchAction(mainBar, QStringLiteral("Copy"));     // 复制
-    auto* rotateEntity = addWorkbenchAction(mainBar, QStringLiteral("Rotate")); // 旋转
-    auto* zoomExtents = addWorkbenchAction(viewBar, QStringLiteral("Zoom Extents")); // 缩放全图
-    auto* pan = addWorkbenchAction(viewBar, QStringLiteral("Pan"));             // 平移
+    // 顶部工具栏只放编辑操作（处理已有图形）
+    auto* moveEntity = addWorkbenchAction(mainBar, QObject::tr("Move"));
+    auto* copyEntity = addWorkbenchAction(mainBar, QObject::tr("Copy"));
+    auto* rotateEntity = addWorkbenchAction(mainBar, QObject::tr("Rotate"));
+    auto* mirrorEntity = addWorkbenchAction(mainBar, QObject::tr("Mirror"));
+    auto* deleteEntity = addWorkbenchAction(mainBar, QObject::tr("Delete"));
+    auto* zoomExtents = addWorkbenchAction(viewBar, QObject::tr("Zoom Extents"));
+    auto* pan = addWorkbenchAction(viewBar, QObject::tr("Pan"));
 
-    // 新操作优先通过 OperationBus 绑定
-    if (m_services.operationBus)
+    // 统一走 commandDispatcher（阶段 3：消除两条命令路径并存）
+    auto* dispatcher = m_services.commandDispatcher;
+    if (dispatcher)
     {
-        QObject::connect(deleteEntity, &QAction::triggered, [this]() {
-            m_services.operationBus->run(OperationId::Edit_Delete, {}, OperationSource::TopToolbar);
+        QObject::connect(moveEntity, &QAction::triggered, [dispatcher]() {
+            dispatcher->execute(QStringLiteral("2d.move"));
         });
-        QObject::connect(copyEntity, &QAction::triggered, [this]() {
-            m_services.operationBus->run(OperationId::Edit_Copy, {}, OperationSource::TopToolbar);
+        QObject::connect(copyEntity, &QAction::triggered, [dispatcher]() {
+            dispatcher->execute(QStringLiteral("2d.copy"));
         });
-        QObject::connect(rotateEntity, &QAction::triggered, [this]() {
-            m_services.operationBus->run(OperationId::Edit_Rotate, {}, OperationSource::TopToolbar);
+        QObject::connect(rotateEntity, &QAction::triggered, [dispatcher]() {
+            dispatcher->execute(QStringLiteral("2d.rotate"));
         });
-        QObject::connect(zoomExtents, &QAction::triggered, [this]() {
-            m_services.operationBus->run(OperationId::View_ZoomFit, {}, OperationSource::TopToolbar);
+        QObject::connect(mirrorEntity, &QAction::triggered, [dispatcher]() {
+            dispatcher->execute(QStringLiteral("2d.mirror"));
+        });
+        QObject::connect(deleteEntity, &QAction::triggered, [dispatcher]() {
+            dispatcher->execute(QStringLiteral("2d.delete"));
         });
     }
 
-    // 过渡期：保留旧 dispatcher 绑定作为兜底
-    if (m_services.commandDispatcher)
+    // 视图操作仍走 OperationBus（非业务命令）
+    if (m_services.operationBus)
     {
-        m_services.commandDispatcher->bindAction(zoomExtents, QStringLiteral("2d.zoom_extents"));
-        m_services.commandDispatcher->bindAction(pan, QStringLiteral("2d.pan"));
-        m_services.commandDispatcher->bindAction(deleteEntity, QStringLiteral("2d.delete"));
-        m_services.commandDispatcher->bindAction(editEntity, QStringLiteral("2d.edit"));
-        m_services.commandDispatcher->bindAction(copyEntity, QStringLiteral("2d.copy"));
-        m_services.commandDispatcher->bindAction(rotateEntity, QStringLiteral("2d.rotate"));
+        QObject::connect(zoomExtents, &QAction::triggered, [this]() {
+            m_services.operationBus->run(OperationId::View_ZoomFit, {}, OperationSource::TopToolbar);
+        });
+        QObject::connect(pan, &QAction::triggered, [this]() {
+            m_services.operationBus->run(OperationId::View_Pan, {}, OperationSource::TopToolbar);
+        });
     }
 }
 
@@ -404,25 +408,8 @@ SceneTreeDockWidget* Workbench2D::createLayersDock(WorkbenchWindow& window) cons
 {
     auto* sceneDock = new SceneTreeDockWidget(&window);
     sceneDock->setObjectName(QStringLiteral("SceneTreeDock"));
-    window.registerDockWidget(QStringLiteral("2D Layers"), sceneDock, Qt::LeftDockWidgetArea);
+    window.registerDockWidget(QObject::tr("2D Layers"), sceneDock, Qt::LeftDockWidgetArea);
     return sceneDock;
-}
-
-void Workbench2D::configureLegacyViewport(Viewport2D* viewport, PropertiesPanelWidget* properties)
-{
-    configure2DViewport(viewport, m_services, m_document.get(), properties);
-    // 传递操作总线引用给视口
-    if (viewport && m_services.operationBus)
-        viewport->setOperationBus(m_services.operationBus);
-
-    // 创建 ViewWidget 适配器，让 OperationBus 能在旧系统中工作
-    if (viewport && m_services.operationBus)
-    {
-        m_viewWidgetAdapter = std::make_unique<ViewWidgetAdapter>(viewport, nullptr);
-        // TODO: ctx.viewWidget 需要 ViewWidget* 类型，ViewWidgetAdapter 暂未继承 ViewWidget
-        // auto& ctx = m_services.operationBus->context();
-        // ctx.viewWidget = m_viewWidgetAdapter.get();
-    }
 }
 
 // 步骤3 — 激活工作台，应用状态
@@ -448,7 +435,7 @@ void Workbench2D::shutdown()
 // 流程：initialize → attachToWindow → activate ↔ deactivate → shutdown
 
 QString Workbench3D::id() const { return QStringLiteral("3D"); }
-QString Workbench3D::displayName() const { return QStringLiteral("3D Workbench"); }
+QString Workbench3D::displayName() const { return QObject::tr("3D Workbench"); }
 
 // 步骤1 — 初始化，存储服务引用
 bool Workbench3D::initialize(const UiServices& services)

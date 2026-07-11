@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "UiCommandHandler.h"
+#include "UiFrameworkServices.h"
 #include "UiServices.h"
 
 class UiCommandDispatcher;
@@ -48,6 +49,9 @@ public:
     /// 设置 UI 服务集合
     /// @param services UI 服务集合
     void setUiServices(const UiServices& services);
+
+    /// 设置框架级横切服务（错误上报、权限、性能采样）
+    void setFrameworkServices(const UiFrameworkServices& services);
 
     /// 设置工作台
     /// @param workbench 工作台实例

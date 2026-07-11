@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Render3D/IRenderer3D.h"
-#include <QPoint>
+#include "RenderCore/ViewCamera3D.h"
 #include <QString>
 
 class SceneDocument3D;
@@ -90,32 +90,14 @@ private:
     SceneDocument3D* m_document{ nullptr };
     CameraController3D* m_cameraController{ nullptr };
 
-    /// 生命周期状态
     bool m_ready{ false };
     bool m_renderLoopEnabled{ false };
 
-    int m_viewWidth{ 640 };
-    int m_viewHeight{ 480 };
+    ViewCamera3D m_camera;
 
-    /// 相机状态（无外部 CameraController3D 时使用内置参数）
-    double m_yaw{ 0.0 };
-    double m_pitch{ 15.0 };
-    double m_distance{ 10.0 };
-    double m_panX{ 0.0 };
-    double m_panY{ 0.0 };
-
-    /// 交互状态
-    bool m_orbitMode{ true };
-    bool m_measureMode{ false };
-    bool m_rotating{ false };
-    bool m_panning{ false };
-    QPoint m_lastMousePos;
-
-    /// 选中状态
     QString m_selectedNodeId;
     QStringList m_selectedPathNames;
 
-    /// 回调
     StatusCallback m_statusCallback;
     SelectionCallback m_selectionCallback;
     PathCallback m_pathCallback;

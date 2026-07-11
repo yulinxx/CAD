@@ -276,6 +276,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             Log
             ${QT_LIBRARIES}
             GTest::gtest
+            GTest::gtest_main
             GTest::gmock
     )
 

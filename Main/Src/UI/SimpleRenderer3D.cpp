@@ -1,28 +1,16 @@
 #include "SimpleRenderer3D.h"
 
 #include <QPainter>
-#include <QtMath>
 #include <QObject>
 
 #include "UiEntities.h"
 
 namespace
 {
-    constexpr double kPi = 3.14159265358979323846;
-    constexpr double kDegToRad = kPi / 180.0;
-    constexpr double kRadToDeg = 180.0 / kPi;
     constexpr double kHitRadius = 12.0;
-    constexpr double kZoomSpeed = 0.1;
-    constexpr double kRotateSpeed = 0.005;
-    constexpr double kPanSpeed = 0.02;
-    constexpr double kDefaultDistance = 10.0;
-    constexpr double kMinDistance = 1.0;
-    constexpr double kMaxDistance = 100.0;
-    constexpr double kMaxPitch = 89.0;
     constexpr double kAxisLength = 3.0;
     constexpr double kCubeHalfSize = 1.0;
     constexpr double kNodeHalfSize = 0.3;
-    constexpr double kNodeSpacing = 2.0;
 }
 
 SimpleRenderer3D::SimpleRenderer3D() = default;
@@ -72,98 +60,37 @@ void SimpleRenderer3D::setCamera(CameraController3D* controller)
 
 void SimpleRenderer3D::resize(int width, int height)
 {
-    m_viewWidth = width;
-    m_viewHeight = height;
+    m_camera.setViewportSize(width, height);
 }
 
 void SimpleRenderer3D::resetView()
 {
     if (m_cameraController)
         m_cameraController->reset();
-    m_yaw = 0.0;
-    m_pitch = 15.0;
-    m_distance = kDefaultDistance;
-    m_panX = 0.0;
-    m_panY = 0.0;
+    m_camera.reset();
     emitStatus(QObject::tr("3D view reset"));
 }
 
-// ========== 模式 ==========
-
 void SimpleRenderer3D::setOrbitMode(bool enabled)
 {
-    m_orbitMode = enabled;
+    m_camera.setOrbitMode(enabled);
 }
 
 void SimpleRenderer3D::setMeasureMode(bool enabled)
 {
-    m_measureMode = enabled;
+    m_camera.setMeasureMode(enabled);
 }
 
 bool SimpleRenderer3D::isOrbitMode() const
 {
-    return m_orbitMode;
+    return m_camera.isOrbitMode();
 }
 
 // ========== 3D 投影 ==========
 
 bool SimpleRenderer3D::project(float x, float y, float z, int& sx, int& sy) const
 {
-    // 相机球坐标 → 世界坐标
-    const double pitchRad = m_pitch * kDegToRad;
-    const double yawRad = m_yaw * kDegToRad;
-
-    const double camX = m_distance * std::cos(pitchRad) * std::sin(yawRad) + m_panX;
-    const double camY = m_distance * std::sin(pitchRad) + m_panY;
-    const double camZ = m_distance * std::cos(pitchRad) * std::cos(yawRad);
-
-    // 目标点
-    const double targetX = m_panX;
-    const double targetY = m_panY;
-    const double targetZ = 0.0;
-
-    // 前方向量
-    double fx = targetX - camX;
-    double fy = targetY - camY;
-    double fz = targetZ - camZ;
-    const double fLen = std::sqrt(fx * fx + fy * fy + fz * fz);
-    if (fLen < 1e-6) return false;
-    fx /= fLen;
-    fy /= fLen;
-    fz /= fLen;
-
-    // 右方向量 = forward × worldUp(0,1,0)
-    double rx = fy * 0.0 - fz * 1.0;
-    double ry = fz * 0.0 - fx * 0.0;
-    double rz = fx * 1.0 - fy * 0.0;
-    const double rLen = std::sqrt(rx * rx + ry * ry + rz * rz);
-    if (rLen < 1e-6) return false;
-    rx /= rLen;
-    ry /= rLen;
-    rz /= rLen;
-
-    // 上方向量 = right × forward
-    const double ux = ry * fz - rz * fy;
-    const double uy = rz * fx - rx * fz;
-    const double uz = rx * fy - ry * fx;
-
-    // 世界坐标 → 相机空间
-    const double dx = x - camX;
-    const double dy = y - camY;
-    const double dz = z - camZ;
-
-    const double depth = dx * fx + dy * fy + dz * fz;
-    if (depth < 0.01) return false;
-
-    const double screenX = dx * rx + dy * ry + dz * rz;
-    const double screenY = dx * ux + dy * uy + dz * uz;
-
-    // 透视投影 + 屏幕映射
-    const double scale = std::min(m_viewWidth, m_viewHeight) * 0.5;
-    sx = static_cast<int>(screenX / depth * scale + m_viewWidth * 0.5);
-    sy = static_cast<int>(-screenY / depth * scale + m_viewHeight * 0.5);
-
-    return true;
+    return m_camera.project(x, y, z, sx, sy);
 }
 
 // ========== 渲染 ==========
@@ -172,7 +99,8 @@ void SimpleRenderer3D::render(QPainter& painter, int width, int height)
 {
     painter.setRenderHint(QPainter::Antialiasing, true);
 
-    // 背景
+    m_camera.setViewportSize(width, height);
+
     painter.fillRect(0, 0, width, height, QColor(40, 42, 48));
 
     drawAxes(painter);
@@ -277,106 +205,61 @@ void SimpleRenderer3D::drawNodePathOverlay(QPainter& painter)
     if (m_selectedNodeId.isEmpty() || m_selectedPathNames.isEmpty())
         return;
 
-    const QString pathText = QObject::tr("Path: ") + m_selectedPathNames.join(QObject::tr(" / ")); // 路径: / 节点: 
-    const QString nodeText = QObject::tr("Node: ") + m_selectedNodeId; // 节点: 
+    const QString pathText = QObject::tr("Path: ") + m_selectedPathNames.join(QObject::tr(" / "));
+    const QString nodeText = QObject::tr("Node: ") + m_selectedNodeId;
 
     painter.setPen(Qt::NoPen);
     painter.setBrush(QColor(0, 0, 0, 160));
-    painter.drawRect(8, m_viewHeight - 48, 400, 40);
+    painter.drawRect(8, painter.viewport().height() - 48, 400, 40);
 
     painter.setPen(QColor(200, 220, 240));
-    painter.drawText(16, m_viewHeight - 30, pathText);
-    painter.drawText(16, m_viewHeight - 12, nodeText);
+    painter.drawText(16, painter.viewport().height() - 30, pathText);
+    painter.drawText(16, painter.viewport().height() - 12, nodeText);
 }
 
 // ========== 输入事件 ==========
 
 void SimpleRenderer3D::onMousePress(int x, int y, int button, int modifiers, int viewW, int viewH)
 {
-    Q_UNUSED(modifiers);
-    m_viewWidth = viewW;
-    m_viewHeight = viewH;
-    m_lastMousePos = QPoint(x, y);
+    if (button == 1 && !m_camera.isOrbitMode())
+    {
+        const QString hitId = hitTest(x, y);
+        if (!hitId.isEmpty())
+        {
+            selectNodeById(hitId);
+            return;
+        }
+    }
 
-    if (button == 1) // Qt::LeftButton
-    {
-        if (m_orbitMode)
-        {
-            m_rotating = true;
-            emitStatus(QObject::tr("3D orbit")); // 3D 轨道旋转
-        }
-        else
-        {
-            const QString hitId = hitTest(x, y);
-            if (!hitId.isEmpty())
-            {
-                selectNodeById(hitId);
-            }
-        }
-    }
-    else if (button == 4) // Qt::MiddleButton
-    {
-        m_panning = true;
-        emitStatus(QObject::tr("3D pan")); // 3D 平移
-    }
+    m_camera.onMousePress(x, y, button, modifiers, viewW, viewH);
+
+    if (m_camera.isRotating())
+        emitStatus(QObject::tr("3D orbit"));
+    else if (m_camera.isPanning())
+        emitStatus(QObject::tr("3D pan"));
 }
 
 void SimpleRenderer3D::onMouseMove(int x, int y, int buttons, int viewW, int viewH)
 {
-    Q_UNUSED(buttons);
-    m_viewWidth = viewW;
-    m_viewHeight = viewH;
-
-    const int dx = x - m_lastMousePos.x();
-    const int dy = y - m_lastMousePos.y();
-    m_lastMousePos = QPoint(x, y);
-
-    if (m_rotating)
+    if (m_camera.onMouseMove(x, y, buttons, viewW, viewH))
     {
-        m_yaw += dx * kRotateSpeed * kRadToDeg;
-        m_pitch += dy * kRotateSpeed * kRadToDeg;
-        m_pitch = std::clamp(m_pitch, -kMaxPitch, kMaxPitch);
-        emitStatus(QObject::tr("3D orbiting")); // 3D 轨道旋转中
-    }
-    else if (m_panning)
-    {
-        const double panScale = m_distance * kPanSpeed;
-        m_panX -= dx * panScale;
-        m_panY += dy * panScale;
-        emitStatus(QObject::tr("3D panning")); // 3D 平移中
+        if (m_camera.isRotating())
+            emitStatus(QObject::tr("3D orbiting"));
+        else if (m_camera.isPanning())
+            emitStatus(QObject::tr("3D panning"));
     }
 }
 
 void SimpleRenderer3D::onMouseRelease(int x, int y, int button, int viewW, int viewH)
 {
-    Q_UNUSED(x);
-    Q_UNUSED(y);
-    m_viewWidth = viewW;
-    m_viewHeight = viewH;
-
-    if (button == 1) // Qt::LeftButton
-    {
-        if (m_rotating)
-        {
-            m_rotating = false;
-            emitStatus(QObject::tr("3D ready")); // 3D 就绪
-        }
-    }
-    else if (button == 4) // Qt::MiddleButton
-    {
-        m_panning = false;
-        emitStatus(QObject::tr("3D ready")); // 3D 就绪
-    }
+    m_camera.onMouseRelease(x, y, button, viewW, viewH);
+    emitStatus(QObject::tr("3D ready"));
 }
 
 void SimpleRenderer3D::onWheel(int delta, int viewW, int viewH)
 {
-    m_viewWidth = viewW;
-    m_viewHeight = viewH;
-
-    m_distance -= delta * kZoomSpeed;
-    m_distance = std::clamp(m_distance, kMinDistance, kMaxDistance);
-    emitStatus(QObject::tr("3D zoom: %.1f").arg(m_distance));
+    m_camera.onWheel(delta, viewW, viewH);
+    emitStatus(QObject::tr("3D zoom: %.1f").arg(m_camera.distance()));
 }
 
 // ========== 选择管理 ==========

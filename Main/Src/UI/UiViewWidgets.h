@@ -56,44 +56,15 @@ protected:
     void mouseReleaseEvent(QMouseEvent* event) override;
     void mouseDoubleClickEvent(QMouseEvent* event) override;
     void contextMenuEvent(QContextMenuEvent* event) override;
-
-private:
-    struct ToolContext
-    {
-        enum class DrawTool
-        {
-            None,
-            Line,
-            Polyline,
-            Circle,
-            Arc,
-            Move,
-            Copy,
-            Rotate,
-            Mirror,
-            Trim,
-            Extend,
-            BoxSelect
-        };
-
-        DrawTool tool{ DrawTool::None };
-        bool drawing{ false };
-        bool measureMode{ false };
-        bool hasDrawStart{ false };
-        bool boxSelecting{ false };
-        bool transformCopy{ false };
-    };
+    void keyPressEvent(QKeyEvent* event) override;
 
 private:
     void ensureGrid();
     void ensureAxes();
     void addPreviewLine(const QPointF& start, const QPointF& end);
-    void commitLine(const QPointF& start, const QPointF& end);
-    void commitPolylinePoint(const QPointF& pt);
-    void finishPolyline(const QPointF& pt);
-    void commitCircle(const QPointF& center, double radius);
-    void commitArc(const QPointF& center, double radius, double startDeg, double spanDeg);
-    void refreshCopiedSelection();
+    void addPreviewCircle(const QPointF& center, double radius);
+    void addPreviewPolyline(const QVector<QPointF>& points);
+    void clearPreviewItems();
     QPointF snapPoint(const QPointF& scenePos) const;
     void updateStatus(const QString& text);
     void refreshFromDocument();
@@ -101,26 +72,10 @@ private:
     void setSelectedFromHitTest(const QPointF& scenePos);
     void startCommand(const QString& commandId);
     void finishCommand(bool committed);
-    void enterPolylineMode();
-    void enterCircleMode();
-    void enterArcMode();
-    void enterSelectMode();
-    void enterMoveMode();
-    void enterCopyMode();
-    void enterRotateMode();
-    void enterMirrorMode();
-    void enterTrimMode();
-    void enterExtendMode();
-    void enterBoxSelectMode();
-    void activateDrawTool(ToolContext::DrawTool tool, const QString& commandId, const QString& statusText);
-    void activateTransformTool(ToolContext::DrawTool tool, const QString& commandId, const QString& statusText);
     void beginBoxSelect(const QPointF& scenePos);
     void updateBoxSelect(const QPointF& scenePos);
     void endBoxSelect(const QPointF& scenePos);
-    void applySelectionTransform(const QPointF& anchor, const QPointF& target, const QString& mode);
     void updateCommandPreview();
-    void trimSelectedByPoint(const QPointF& point);
-    void extendSelectedByPoint(const QPointF& point);
     void setCommandStage(const QString& stage);
 
 private:
@@ -129,16 +84,15 @@ private:
     std::function<void(const QString&)> m_commandStageCallback;
     QGraphicsScene* m_scene{ nullptr };
     QGraphicsLineItem* m_previewLine{ nullptr };
+    QGraphicsEllipseItem* m_previewEllipse{ nullptr };
+    QList<QGraphicsLineItem*> m_previewPolylineItems;
     QPointF m_lastPanPoint;
-    QPointF m_drawStartPoint;
     QPointF m_boxSelectStart;
     bool m_panning{ false };
-    ToolContext m_toolContext;
-    QVector<QPointF> m_polylinePoints;
+    bool m_boxSelecting{ false };
     SceneDocument2D* m_document{ nullptr };
     UiCommandDispatcher* m_commandDispatcher{ nullptr };
     IInteractionDispatcher* m_interactionDispatcher{ nullptr };
     OperationBus* m_operationBus{ nullptr };
-    QStringList m_copiedEntityIds;
 };
 

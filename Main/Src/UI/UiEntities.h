@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "UI/SceneDocumentBase.h"
+
 // ============================================================
 /**
  * @brief 3D 场景树节点
@@ -68,7 +70,7 @@ private:
  * 管理 3D 场景的层次结构（SceneNode 树）和选择状态。
  * 2D 场景请使用 Eg::SceneManager (Engine/2D/Core/SceneManager.h)
  */
-class SceneDocument3D
+class SceneDocument3D : public UI::SceneDocumentBase
 {
 public:
     std::shared_ptr<SceneNode> createNode(const std::string& name);
@@ -79,6 +81,15 @@ public:
     std::vector<std::shared_ptr<SceneNode>> rootNodes() const;
     SelectionSet& selection();
     const SelectionSet& selection() const;
+
+    // ---- SceneDocumentBase 接口 ----
+
+    std::vector<std::string> allEntityIds() const override;
+    void selectEntity(const std::string& id) override;
+    void clearSelection() override;
+    std::vector<std::string> selectedIds() const override;
+    void removeEntity(const std::string& id) override;
+    void clear() override;
 
 private:
     std::vector<std::shared_ptr<SceneNode>> m_roots;

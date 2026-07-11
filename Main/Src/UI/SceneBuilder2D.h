@@ -3,6 +3,9 @@
 #include <memory>
 #include <QString>
 #include <QPointF>
+#include <string>
+
+#include "UI/SceneBuilderBase.h"
 
 class SceneDocument2D;
 
@@ -13,7 +16,7 @@ class SceneDocument2D;
  * 负责创建默认的 2D 场景文档及初始图元。
  * 基于 SceneDocument2D / Eg::SceneManager。
  */
-class SceneBuilder2D
+class SceneBuilder2D : public UI::SceneBuilderBase
 {
 public:
     struct DefaultSceneResult
@@ -23,10 +26,15 @@ public:
         QString secondaryLineId;
     };
 
-    static DefaultSceneResult createDefaultScene();
+    static DefaultSceneResult createDefault2DScene();
 
     static QString createDemoLine(
         SceneDocument2D& doc,
         const QPointF& p1,
         const QPointF& p2);
+
+    // ---- SceneBuilderBase 接口 ----
+
+    std::shared_ptr<UI::SceneDocumentBase> createDefaultScene() override;
+    std::string defaultRootName() const override;
 };

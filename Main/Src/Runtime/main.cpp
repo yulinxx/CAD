@@ -2,6 +2,8 @@
 
 #include <QFileInfo>
 
+#include "Log/SyLogger.h"
+
 #include "VersionInfo.h"
 
 #ifdef _WIN32
@@ -31,7 +33,12 @@ int runCADApplication(int argc, char** argv)
     }
 
     if (appPaths.appRootPath.empty())
+    {
+        SyLogger::GetInstance().Initialize("SanYiCAD");
+        SY_ERROR("[main] error code=app.root_path_empty message=Application root path is empty");
+        SyLogger::GetInstance().Shutdown();
         return -1;
+    }
 
     CADApplicationRuntime runtime(argc, argv, appPaths);
     runtime.setStartWorkbenchId(QStringLiteral("2D"));

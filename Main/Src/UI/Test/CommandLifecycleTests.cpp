@@ -1,5 +1,8 @@
 #include "UI/UiCommandDispatcher.h"
 #include "UI/UiCommandHandler.h"
+#include "UI/CreateCommands.h"
+#include "UI/TransformCommands.h"
+#include "UI/SelectCommands.h"
 #include "SceneDocument2D.h"
 #include "UI/UiServices.h"
 #include "Engine2D/Core/SceneManager.h"
@@ -86,7 +89,7 @@ TEST(CommandLifecycleTest, CommitInteractive_PushesUndoAndResets)
     EXPECT_FALSE(dispatcher.hasActiveCommand());
     EXPECT_EQ(undoStack.count(), 1);
 
-    EXPECT_FALSE(doc.selectedIds().isEmpty());
+    EXPECT_FALSE(doc.selectedIdsQ().isEmpty());
 }
 
 TEST(CommandLifecycleTest, CancelInteractive_DoesNotPushUndo)
@@ -221,7 +224,7 @@ TEST(CommandLifecycleTest, CancelMidLine_RestoresSelection)
 
     dispatcher.execute(QStringLiteral("2d.draw_line"));
     handler->onMouseDown(10, 20);
-    EXPECT_TRUE(doc.selectedIds().isEmpty());
+    EXPECT_TRUE(doc.selectedIdsQ().isEmpty());
 
     dispatcher.cancel();
     EXPECT_FALSE(dispatcher.hasActiveCommand());
@@ -245,13 +248,13 @@ TEST(CommandLifecycleTest, RedoAfterCommit_SelectsEntity)
     handler->onMouseDown(100, 200);
     dispatcher.submit();
 
-    EXPECT_FALSE(doc.selectedIds().isEmpty());
+    EXPECT_FALSE(doc.selectedIdsQ().isEmpty());
 
     undoStack.undo();
-    EXPECT_TRUE(doc.selectedIds().isEmpty());
+    EXPECT_TRUE(doc.selectedIdsQ().isEmpty());
 
     undoStack.redo();
-    EXPECT_FALSE(doc.selectedIds().isEmpty());
+    EXPECT_FALSE(doc.selectedIdsQ().isEmpty());
 }
 
 TEST(CommandLifecycleTest, SelectCommand_ChangesSelection)
@@ -270,7 +273,7 @@ TEST(CommandLifecycleTest, SelectCommand_ChangesSelection)
 
     doc.clearSelection();
     doc.selectEntity(id1);
-    EXPECT_EQ(doc.selectedIds().size(), 1);
+    EXPECT_EQ(doc.selectedIdsQ().size(), 1);
 }
 
 TEST(CommandLifecycleTest, RedoAfterMove_EntityReturnsToNewPosition)
@@ -336,7 +339,7 @@ TEST(CommandLifecycleTest, SelectCommand_BoxSelect_MultipleEntities)
     select.onMouseUp(50, 50);
     select.commit();
 
-    EXPECT_FALSE(doc.selectedIds().isEmpty());
+    EXPECT_FALSE(doc.selectedIdsQ().isEmpty());
 }
 
 TEST(CommandLifecycleTest, DrawLine_UndoRemovesRedoRestores)
@@ -414,7 +417,7 @@ TEST(CommandLifecycleTest, Move_UndoRedo_SelectionPreserved)
     EXPECT_DOUBLE_EQ(line->vPoints[0].x(), 20.0);
     EXPECT_DOUBLE_EQ(line->vPoints[0].y(), 30.0);
 
-    EXPECT_FALSE(doc.selectedIds().isEmpty());
+    EXPECT_FALSE(doc.selectedIdsQ().isEmpty());
 }
 
 TEST(CommandLifecycleTest, SelectCommand_BoxSelectNoEntities)
@@ -429,7 +432,7 @@ TEST(CommandLifecycleTest, SelectCommand_BoxSelectNoEntities)
     select.onMouseUp(5, 5);
     select.commit();
 
-    EXPECT_TRUE(doc.selectedIds().isEmpty());
+    EXPECT_TRUE(doc.selectedIdsQ().isEmpty());
 }
 
 TEST(CommandLifecycleTest, DrawLine_UndoRedo_SelectionTracks)
@@ -480,11 +483,11 @@ TEST(CommandLifecycleTest, DrawLine_UndoRedo_SelectionFromDoc)
     handler->onMouseDown(10, 10);
     dispatcher.submit();
 
-    EXPECT_FALSE(doc.selectedIds().isEmpty());
+    EXPECT_FALSE(doc.selectedIdsQ().isEmpty());
 
     undoStack.undo();
-    EXPECT_TRUE(doc.selectedIds().isEmpty());
+    EXPECT_TRUE(doc.selectedIdsQ().isEmpty());
 
     undoStack.redo();
-    EXPECT_FALSE(doc.selectedIds().isEmpty());
+    EXPECT_FALSE(doc.selectedIdsQ().isEmpty());
 }

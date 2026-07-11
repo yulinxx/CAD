@@ -5,6 +5,7 @@
 #include "TransformDialogAdapter.h"
 #include "SceneDocument2D.h"
 
+#include <QCoreApplication>
 #include <QDialog>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -19,6 +20,14 @@
 #include <QDialogButtonBox>
 #include <QPushButton>
 #include <QMessageBox>
+
+namespace
+{
+    QString trTransform(const char* text)
+    {
+        return QCoreApplication::translate("TransformDialog", text);
+    }
+}
 
 TransformDialogAdapter::TransformDialogAdapter(SceneDocument2D* document, QWidget* parent)
     : m_document(document), m_parent(parent)
@@ -82,13 +91,13 @@ QString TransformDialogAdapter::getDialogTitle() const
 {
     switch (m_transformType)
     {
-        case TransformType::Move: return "移动";
-        case TransformType::Copy: return "复制";
-        case TransformType::Rotate: return "旋转";
-        case TransformType::Mirror: return "镜像";
-        case TransformType::Scale: return "缩放";
-        case TransformType::Shear: return "拉伸";
-        default: return "变换";
+        case TransformType::Move: return trTransform("Move");
+        case TransformType::Copy: return trTransform("Copy");
+        case TransformType::Rotate: return trTransform("Rotate");
+        case TransformType::Mirror: return trTransform("Mirror");
+        case TransformType::Scale: return trTransform("Scale");
+        case TransformType::Shear: return trTransform("Shear");
+        default: return trTransform("Transform");
     }
 }
 
@@ -126,7 +135,7 @@ QDialog* TransformDialogAdapter::createDialog()
     }
 
     // 添加状态标签
-    m_statusLabel = new QLabel("请输入参数");
+    m_statusLabel = new QLabel(trTransform("Enter parameters"));
     layout->addWidget(m_statusLabel);
 
     // 添加按钮
@@ -150,11 +159,11 @@ QDialog* TransformDialogAdapter::createDialog()
                 {
                     m_parametersChangedCallback(params);
                 }
-                m_statusLabel->setText("参数已应用");
+                m_statusLabel->setText(trTransform("Parameters applied"));
             }
             else
             {
-                m_statusLabel->setText("参数无效");
+                m_statusLabel->setText(trTransform("Invalid parameters"));
             }
         });
     }
@@ -164,7 +173,7 @@ QDialog* TransformDialogAdapter::createDialog()
 
 void TransformDialogAdapter::addMoveInputs(QVBoxLayout* layout)
 {
-    auto group = new QGroupBox("移动参数");
+    auto group = new QGroupBox(trTransform("Move Parameters"));
     auto groupLayout = new QVBoxLayout(group);
 
     // X 偏移
@@ -192,12 +201,12 @@ void TransformDialogAdapter::addMoveInputs(QVBoxLayout* layout)
 
 void TransformDialogAdapter::addCopyInputs(QVBoxLayout* layout)
 {
-    auto group = new QGroupBox("复制参数");
+    auto group = new QGroupBox(trTransform("Copy Parameters"));
     auto groupLayout = new QVBoxLayout(group);
 
     // 复制数量
     auto countLayout = new QHBoxLayout();
-    countLayout->addWidget(new QLabel("数量:"));
+    countLayout->addWidget(new QLabel(trTransform("Count:")));
     m_copyCountSpinBox = new QSpinBox();
     m_copyCountSpinBox->setRange(1, 100);
     m_copyCountSpinBox->setValue(1);
@@ -206,7 +215,7 @@ void TransformDialogAdapter::addCopyInputs(QVBoxLayout* layout)
 
     // X 间距
     auto spacingXLayout = new QHBoxLayout();
-    spacingXLayout->addWidget(new QLabel("X 间距:"));
+    spacingXLayout->addWidget(new QLabel(trTransform("X Spacing:")));
     m_copySpacingXSpinBox = new QDoubleSpinBox();
     m_copySpacingXSpinBox->setRange(-10000, 10000);
     m_copySpacingXSpinBox->setSingleStep(0.1);
@@ -216,7 +225,7 @@ void TransformDialogAdapter::addCopyInputs(QVBoxLayout* layout)
 
     // Y 间距
     auto spacingYLayout = new QHBoxLayout();
-    spacingYLayout->addWidget(new QLabel("Y 间距:"));
+    spacingYLayout->addWidget(new QLabel(trTransform("Y Spacing:")));
     m_copySpacingYSpinBox = new QDoubleSpinBox();
     m_copySpacingYSpinBox->setRange(-10000, 10000);
     m_copySpacingYSpinBox->setSingleStep(0.1);
@@ -229,12 +238,12 @@ void TransformDialogAdapter::addCopyInputs(QVBoxLayout* layout)
 
 void TransformDialogAdapter::addRotateInputs(QVBoxLayout* layout)
 {
-    auto group = new QGroupBox("旋转参数");
+    auto group = new QGroupBox(trTransform("Rotate Parameters"));
     auto groupLayout = new QVBoxLayout(group);
 
     // 旋转角度
     auto angleLayout = new QHBoxLayout();
-    angleLayout->addWidget(new QLabel("角度:"));
+    angleLayout->addWidget(new QLabel(trTransform("Angle:")));
     m_rotateAngleSpinBox = new QDoubleSpinBox();
     m_rotateAngleSpinBox->setRange(-360, 360);
     m_rotateAngleSpinBox->setSingleStep(0.1);
@@ -245,7 +254,7 @@ void TransformDialogAdapter::addRotateInputs(QVBoxLayout* layout)
 
     // 旋转中心 X
     auto centerXLayout = new QHBoxLayout();
-    centerXLayout->addWidget(new QLabel("中心 X:"));
+    centerXLayout->addWidget(new QLabel(trTransform("Center X:")));
     m_rotateCenterXSpinBox = new QDoubleSpinBox();
     m_rotateCenterXSpinBox->setRange(-10000, 10000);
     m_rotateCenterXSpinBox->setSingleStep(0.1);
@@ -255,7 +264,7 @@ void TransformDialogAdapter::addRotateInputs(QVBoxLayout* layout)
 
     // 旋转中心 Y
     auto centerYLayout = new QHBoxLayout();
-    centerYLayout->addWidget(new QLabel("中心 Y:"));
+    centerYLayout->addWidget(new QLabel(trTransform("Center Y:")));
     m_rotateCenterYSpinBox = new QDoubleSpinBox();
     m_rotateCenterYSpinBox->setRange(-10000, 10000);
     m_rotateCenterYSpinBox->setSingleStep(0.1);
@@ -268,32 +277,32 @@ void TransformDialogAdapter::addRotateInputs(QVBoxLayout* layout)
 
 void TransformDialogAdapter::addMirrorInputs(QVBoxLayout* layout, QDialog* dialog)
 {
-    auto group = new QGroupBox("镜像参数");
+    auto group = new QGroupBox(trTransform("Mirror Parameters"));
     auto groupLayout = new QVBoxLayout(group);
 
     // 镜像轴选择
     auto axisGroup = new QButtonGroup(group);
 
-    auto xRadio = new QRadioButton("X 轴");
+    auto xRadio = new QRadioButton(trTransform("X Axis"));
     axisGroup->addButton(xRadio, 0);
     groupLayout->addWidget(xRadio);
 
-    auto yRadio = new QRadioButton("Y 轴");
+    auto yRadio = new QRadioButton(trTransform("Y Axis"));
     axisGroup->addButton(yRadio, 1);
     yRadio->setChecked(true);
     groupLayout->addWidget(yRadio);
 
-    auto customRadio = new QRadioButton("自定义轴");
+    auto customRadio = new QRadioButton(trTransform("Custom Axis"));
     axisGroup->addButton(customRadio, 2);
     groupLayout->addWidget(customRadio);
 
     // 自定义轴输入（默认隐藏）
-    auto customGroup = new QGroupBox("自定义轴参数");
+    auto customGroup = new QGroupBox(trTransform("Custom Axis Parameters"));
     auto customLayout = new QVBoxLayout(customGroup);
 
     // 起点 X
     auto x1Layout = new QHBoxLayout();
-    x1Layout->addWidget(new QLabel("起点 X:"));
+    x1Layout->addWidget(new QLabel(trTransform("Start X:")));
     m_mirrorLineX1SpinBox = new QDoubleSpinBox();
     m_mirrorLineX1SpinBox->setRange(-10000, 10000);
     m_mirrorLineX1SpinBox->setSingleStep(0.1);
@@ -303,7 +312,7 @@ void TransformDialogAdapter::addMirrorInputs(QVBoxLayout* layout, QDialog* dialo
 
     // 起点 Y
     auto y1Layout = new QHBoxLayout();
-    y1Layout->addWidget(new QLabel("起点 Y:"));
+    y1Layout->addWidget(new QLabel(trTransform("Start Y:")));
     m_mirrorLineY1SpinBox = new QDoubleSpinBox();
     m_mirrorLineY1SpinBox->setRange(-10000, 10000);
     m_mirrorLineY1SpinBox->setSingleStep(0.1);
@@ -313,7 +322,7 @@ void TransformDialogAdapter::addMirrorInputs(QVBoxLayout* layout, QDialog* dialo
 
     // 终点 X
     auto x2Layout = new QHBoxLayout();
-    x2Layout->addWidget(new QLabel("终点 X:"));
+    x2Layout->addWidget(new QLabel(trTransform("End X:")));
     m_mirrorLineX2SpinBox = new QDoubleSpinBox();
     m_mirrorLineX2SpinBox->setRange(-10000, 10000);
     m_mirrorLineX2SpinBox->setSingleStep(0.1);
@@ -323,7 +332,7 @@ void TransformDialogAdapter::addMirrorInputs(QVBoxLayout* layout, QDialog* dialo
 
     // 终点 Y
     auto y2Layout = new QHBoxLayout();
-    y2Layout->addWidget(new QLabel("终点 Y:"));
+    y2Layout->addWidget(new QLabel(trTransform("End Y:")));
     m_mirrorLineY2SpinBox = new QDoubleSpinBox();
     m_mirrorLineY2SpinBox->setRange(-10000, 10000);
     m_mirrorLineY2SpinBox->setSingleStep(0.1);
@@ -347,7 +356,7 @@ void TransformDialogAdapter::addMirrorInputs(QVBoxLayout* layout, QDialog* dialo
 
 void TransformDialogAdapter::addPreviewControls(QVBoxLayout* layout, QDialog* dialog)
 {
-    auto previewCheck = new QCheckBox("实时预览");
+    auto previewCheck = new QCheckBox(trTransform("Live Preview"));
     previewCheck->setChecked(m_showPreview);
     QObject::connect(previewCheck, &QCheckBox::toggled, dialog, [this](bool checked)
     {
