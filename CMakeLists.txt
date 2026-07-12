@@ -107,6 +107,7 @@ if(GTest_FOUND)
     option(BUILD_NESTING_TESTS "Build Nesting unit tests" ${BUILD_ALL_TESTS})
     option(BUILD_GEOMODELCORE_TESTS "Build GeoModelCore unit tests" ${BUILD_ALL_TESTS})
     option(BUILD_FILEIO_TESTS "Build FileIO unit tests" ${BUILD_ALL_TESTS})
+    option(BUILD_LICENSE_TESTS "Build License unit tests" ON)
     if(BUILD_ENGRAVING)
         option(BUILD_ENGRAVING_TESTS "Build Engraving unit tests" ON)
     else()
@@ -123,6 +124,7 @@ else()
     set(BUILD_GEOMODELCORE_TESTS OFF CACHE BOOL "Build GeoModelCore unit tests" FORCE)
     set(BUILD_NESTING_TESTS OFF CACHE BOOL "Build Nesting unit tests" FORCE)
     set(BUILD_FILEIO_TESTS OFF CACHE BOOL "Build FileIO unit tests" FORCE)
+    set(BUILD_LICENSE_TESTS OFF CACHE BOOL "Build License unit tests" FORCE)
     set(BUILD_ENGRAVING_TESTS OFF CACHE BOOL "Build Engraving unit tests" FORCE)
 endif()
 
@@ -134,6 +136,9 @@ add_subdirectory(Utility/Utility)
 
 # 1.5 CrashHandler 层 - 崩溃捕获（在日志之前，确保初始化阶段崩溃也能捕获）
 add_subdirectory(CrashHandler/CrashHandler)
+
+# 1.6 License 层 - 软件注册与许可校验
+add_subdirectory(License/License)
 
 # 2. Log 层 - 日志库（Engine 层依赖）
 add_subdirectory(Log/Log)
@@ -252,7 +257,7 @@ install(TARGETS SanYiCAD
 
 # Install all project shared libraries
 set(SANYI_PROJECT_LIBS
-    Utility Log CrashHandler
+    Utility Log CrashHandler License
     EngineCommon Engine2D Engine3D
     RenderCommon Render2D Render3D
     UiRenderCore

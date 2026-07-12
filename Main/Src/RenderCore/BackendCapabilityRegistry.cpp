@@ -7,7 +7,8 @@
 // 全局后端类型定义（与 RenderBackendFactory 保持一致）
 // ============================================================================
 
-namespace {
+namespace
+{
     constexpr int BackendType_OpenGL = 1;
     constexpr int BackendType_Vulkan = 2;
     constexpr int BackendType_Metal = 3;

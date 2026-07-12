@@ -10,6 +10,10 @@
 #include "../UI/CreateCommands.h"
 #include "../UI/TransformCommands.h"
 #include "../UI/SelectCommands.h"
+#include "../UI/CommandHandlerAdapter.h"
+
+#include "UI2D/Operation/OperationId.h"
+#include "Log/SyLogger.h"
 
 // 应用组合根组件，负责创建和组装所有核心服务
 // 作为依赖注入的中心点，管理UI层和命令系统的生命周期
@@ -21,6 +25,7 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     , m_undoStack(std::make_unique<DefaultUndoStack>())
     , m_shellHost(std::make_unique<UiShellHost>())
     , m_document2D(std::make_unique<SceneDocument2D>())
+    , m_operationBus(std::make_unique<OperationBus>())
 {
     // 配置命令分发器的核心依赖
     m_commandDispatcher->setStateCenter(m_stateCenter.get());
@@ -35,6 +40,7 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     uiServices.commandDispatcher = m_commandDispatcher.get();
     uiServices.interactionDispatcher = interactionDispatcher();
     uiServices.undoStack = m_undoStack.get();
+    uiServices.operationBus = m_operationBus.get();
     uiServices.document2D = m_document2D.get();
     m_commandDispatcher->setUiServices(uiServices);
 
@@ -46,6 +52,14 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
 
     // 注册所有命令处理器
     registerCommands();
+
+    // 将 OperationBus 设为活动实例，供无上下文调用方使用
+    OperationBus::setActiveInstance(m_operationBus.get());
+
+    // 通过适配器将旧命令注册到 OperationBus
+    registerCommandAdapters();
+
+    SY_INFO("[ApplicationCompositionRoot] initialized with OperationBus + CommandHandlerAdapters");
 }
 
 // 注册所有命令处理器到命令分发器
@@ -91,10 +105,72 @@ void ApplicationCompositionRoot::registerCommands()
     m_commandDispatcher->registerHandler(m_commandHandlers.back().get());
 }
 
-UiShellHost* ApplicationCompositionRoot::shellHost(){ return m_shellHost.get(); }
-UiStateCenter* ApplicationCompositionRoot::stateCenter(){ return m_stateCenter.get(); }
-UiThemeService* ApplicationCompositionRoot::themeService(){ return m_themeService.get(); }
-UiLayoutService* ApplicationCompositionRoot::layoutService(){ return m_layoutService.get(); }
-UiCommandDispatcher* ApplicationCompositionRoot::commandDispatcher(){ return m_commandDispatcher.get(); }
-IInteractionDispatcher* ApplicationCompositionRoot::interactionDispatcher(){ return dynamic_cast<IInteractionDispatcher*>(m_commandDispatcher.get()); }
-IUndoStack* ApplicationCompositionRoot::undoStack(){ return m_undoStack.get(); }
+UiShellHost* ApplicationCompositionRoot::shellHost()
+{
+    return m_shellHost.get();
+}
+UiStateCenter* ApplicationCompositionRoot::stateCenter()
+{
+    return m_stateCenter.get();
+}
+UiThemeService* ApplicationCompositionRoot::themeService()
+{
+    return m_themeService.get();
+}
+UiLayoutService* ApplicationCompositionRoot::layoutService()
+{
+    return m_layoutService.get();
+}
+UiCommandDispatcher* ApplicationCompositionRoot::commandDispatcher()
+{
+    return m_commandDispatcher.get();
+}
+IInteractionDispatcher* ApplicationCompositionRoot::interactionDispatcher()
+{
+    return dynamic_cast<IInteractionDispatcher*>(m_commandDispatcher.get());
+}
+IUndoStack* ApplicationCompositionRoot::undoStack()
+{
+    return m_undoStack.get();
+}
+
+OperationBus* ApplicationCompositionRoot::operationBus()
+{
+    return m_operationBus.get();
+}
+
+// 为所有旧式 ICommandHandler 创建适配器并注册到 OperationBus
+void ApplicationCompositionRoot::registerCommandAdapters()
+{
+    if (!m_operationBus)
+        return;
+
+    // 构建 UiServices（与构造函数保持一致）
+    UiServices uiServices;
+    uiServices.stateCenter = m_stateCenter.get();
+    uiServices.themeService = m_themeService.get();
+    uiServices.layoutService = m_layoutService.get();
+    uiServices.commandDispatcher = m_commandDispatcher.get();
+    uiServices.interactionDispatcher = interactionDispatcher();
+    uiServices.undoStack = m_undoStack.get();
+    uiServices.operationBus = m_operationBus.get();
+    uiServices.document2D = m_document2D.get();
+
+    int count = 0;
+    for (const auto& handler : m_commandHandlers)
+    {
+        auto opId = CommandHandlerAdapter::mapCommandId(handler->commandId());
+        if (opId == OperationId::None)
+        {
+            SY_DEBUGF("[ApplicationCompositionRoot] No OperationId mapping for handler: %s",
+                handler->commandId().toUtf8().constData());
+            continue;
+        }
+
+        auto adapter = std::make_unique<CommandHandlerAdapter>(handler.get(), uiServices);
+        m_operationBus->registry().registerOperation(std::move(adapter));
+        ++count;
+    }
+
+    SY_INFOF("[ApplicationCompositionRoot] Registered %d CommandHandlerAdapters on OperationBus", count);
+}

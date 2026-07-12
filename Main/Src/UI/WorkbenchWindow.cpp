@@ -191,10 +191,18 @@ QWidget* WorkbenchWindow::createInitialCentralWidget()
 
 void WorkbenchWindow::buildMenus()
 {
-    // 顶层菜单只负责建立菜单容器，不在这里混入业务逻辑
+    // 顶层菜单负责建立统一入口，具体动作填充由各子菜单方法完成
     m_menuState.fileMenu = menuBar()->addMenu(tr("File")); // 文件
+    m_menuState.editMenu = menuBar()->addMenu(tr("Edit")); // 编辑
+    m_menuState.drawMenu = menuBar()->addMenu(tr("Draw")); // 绘图
+    m_menuState.modifyMenu = menuBar()->addMenu(tr("Modify")); // 图元操作
     m_menuState.viewMenu = menuBar()->addMenu(tr("View")); // 视图
     m_menuState.toolsMenu = menuBar()->addMenu(tr("Tools")); // 工具
+    buildFileMenu();
+    buildEditMenu();
+    buildDrawMenu();
+    buildModifyMenu();
+    buildViewMenu();
 }
 
 /// 构建工具栏
@@ -210,6 +218,123 @@ void WorkbenchWindow::buildToolBars()
     // 不在初始化阶段创建空骨架，避免出现空工具栏
 }
 
+void WorkbenchWindow::buildFileMenu()
+{
+    if (!m_menuState.fileMenu)
+        return;
+
+    auto* newAction = m_menuState.fileMenu->addAction(tr("New"));
+    auto* openAction = m_menuState.fileMenu->addAction(tr("Open"));
+    auto* saveAction = m_menuState.fileMenu->addAction(tr("Save"));
+    auto* saveAsAction = m_menuState.fileMenu->addAction(tr("Save As"));
+    m_menuState.fileMenu->addSeparator();
+    auto* exitAction = m_menuState.fileMenu->addAction(tr("Exit"));
+
+    if (m_commandDispatcher)
+    {
+        QObject::connect(newAction, &QAction::triggered, this, [this]() { m_commandDispatcher->execute(QStringLiteral("file.new")); });
+        QObject::connect(openAction, &QAction::triggered, this, [this]() { m_commandDispatcher->execute(QStringLiteral("file.open")); });
+        QObject::connect(saveAction, &QAction::triggered, this, [this]() { m_commandDispatcher->execute(QStringLiteral("file.save")); });
+        QObject::connect(saveAsAction, &QAction::triggered, this, [this]() { m_commandDispatcher->execute(QStringLiteral("file.save_as")); });
+    }
+    QObject::connect(exitAction, &QAction::triggered, this, &QWidget::close);
+}
+
+void WorkbenchWindow::buildEditMenu()
+{
+    if (!m_menuState.editMenu)
+        return;
+
+    auto* undoAction = m_menuState.editMenu->addAction(tr("Undo"));
+    undoAction->setShortcut(QKeySequence::Undo);
+    if (m_commandDispatcher)
+        QObject::connect(undoAction, &QAction::triggered, this, [this]() { m_commandDispatcher->undo(); });
+
+    auto* redoAction = m_menuState.editMenu->addAction(tr("Redo"));
+    redoAction->setShortcut(QKeySequence::Redo);
+    if (m_commandDispatcher)
+        QObject::connect(redoAction, &QAction::triggered, this, [this]() { m_commandDispatcher->redo(); });
+
+    m_menuState.editMenu->addSeparator();
+    auto* selectAllAction = m_menuState.editMenu->addAction(tr("Select All"));
+    if (m_commandDispatcher)
+        QObject::connect(selectAllAction, &QAction::triggered, this, [this]() { m_commandDispatcher->execute(QStringLiteral("edit.select_all")); });
+    auto* deleteAction = m_menuState.editMenu->addAction(tr("Delete"));
+    if (m_commandDispatcher)
+        QObject::connect(deleteAction, &QAction::triggered, this, [this]() { m_commandDispatcher->execute(QStringLiteral("edit.delete")); });
+}
+
+void WorkbenchWindow::buildDrawMenu()
+{
+    if (!m_menuState.drawMenu)
+        return;
+
+    const auto addDrawAction = [this](const QString& text, const QString& commandId) {
+        auto* action = m_menuState.drawMenu->addAction(text);
+        if (m_commandDispatcher)
+            QObject::connect(action, &QAction::triggered, this, [this, commandId]() { m_commandDispatcher->execute(commandId); });
+        return action;
+        };
+
+    addDrawAction(tr("Select"), QStringLiteral("2d.select"));
+    addDrawAction(tr("Line"), QStringLiteral("2d.draw_line"));
+    addDrawAction(tr("Polyline"), QStringLiteral("2d.draw_polyline"));
+    addDrawAction(tr("Circle"), QStringLiteral("2d.draw_circle"));
+    addDrawAction(tr("Arc"), QStringLiteral("2d.draw_arc"));
+    addDrawAction(tr("Polygon"), QStringLiteral("2d.draw_polygon"));
+    addDrawAction(tr("NURBS Curve"), QStringLiteral("2d.draw_nurbs"));
+    addDrawAction(tr("Quadratic Bezier"), QStringLiteral("2d.draw_bezier2"));
+    addDrawAction(tr("Cubic Bezier"), QStringLiteral("2d.draw_bezier"));
+    addDrawAction(tr("SmartLine"), QStringLiteral("2d.draw_smartline"));
+}
+
+void WorkbenchWindow::buildModifyMenu()
+{
+    if (!m_menuState.modifyMenu)
+        return;
+
+    const auto addModifyAction = [this](const QString& text, const QString& commandId) {
+        auto* action = m_menuState.modifyMenu->addAction(text);
+        if (m_commandDispatcher)
+            QObject::connect(action, &QAction::triggered, this, [this, commandId]() { m_commandDispatcher->execute(commandId); });
+        return action;
+        };
+
+    addModifyAction(tr("Move"), QStringLiteral("2d.move"));
+    addModifyAction(tr("Rotate"), QStringLiteral("2d.rotate"));
+    addModifyAction(tr("Copy"), QStringLiteral("2d.copy"));
+    addModifyAction(tr("Mirror"), QStringLiteral("2d.mirror"));
+    addModifyAction(tr("Delete"), QStringLiteral("2d.delete"));
+}
+
+void WorkbenchWindow::buildViewMenu()
+{
+    if (!m_menuState.viewMenu)
+        return;
+
+    auto* zoomFit = m_menuState.viewMenu->addAction(tr("Zoom Fit"));
+    if (m_commandDispatcher)
+        QObject::connect(zoomFit, &QAction::triggered, this, [this]() { m_commandDispatcher->execute(QStringLiteral("view.zoom_fit")); });
+
+    auto* pan = m_menuState.viewMenu->addAction(tr("Pan"));
+    if (m_commandDispatcher)
+        QObject::connect(pan, &QAction::triggered, this, [this]() { m_commandDispatcher->execute(QStringLiteral("view.pan")); });
+
+    m_menuState.workbenchMenu = m_menuState.viewMenu->addMenu(tr("Workbench"));
+    if (m_menuState.workbenchMenu)
+    {
+        auto* workbench2D = m_menuState.workbenchMenu->addAction(tr("2D"));
+        auto* workbench3D = m_menuState.workbenchMenu->addAction(tr("3D"));
+        workbench2D->setCheckable(true);
+        workbench3D->setCheckable(true);
+        if (m_commandDispatcher)
+        {
+            QObject::connect(workbench2D, &QAction::triggered, this, [this]() { triggerWorkbench(QStringLiteral("2D")); });
+            QObject::connect(workbench3D, &QAction::triggered, this, [this]() { triggerWorkbench(QStringLiteral("3D")); });
+        }
+    }
+}
+
 void WorkbenchWindow::bindShortcuts()
 {
     auto* undoAction = new QAction(tr("Undo"), this); // 撤销
@@ -217,7 +342,7 @@ void WorkbenchWindow::bindShortcuts()
     connect(undoAction, &QAction::triggered, this, [this]() {
         if (m_commandDispatcher)
             m_commandDispatcher->undo();
-    });
+        });
     addAction(undoAction);
 
     auto* redoAction = new QAction(tr("Redo"), this); // 重做
@@ -225,7 +350,7 @@ void WorkbenchWindow::bindShortcuts()
     connect(redoAction, &QAction::triggered, this, [this]() {
         if (m_commandDispatcher)
             m_commandDispatcher->redo();
-    });
+        });
     addAction(redoAction);
 }
 
@@ -356,29 +481,29 @@ void WorkbenchWindow::refreshStatusText()
     // 如果后续状态栏内容继续变复杂，应该继续往状态对象里收，而不是把窗口层写厚
     // 这里不做状态写入，只做展示更新，状态写入由同步函数统一负责
     // 这里是展示层刷新，不是状态编排层，边界必须保持清晰
-if (m_stateCenter)
-        {
-            syncWindowStateFromStateCenter();
-            const auto state = m_stateCenter->snapshot();
+    if (m_stateCenter)
+    {
+        syncWindowStateFromStateCenter();
+        const auto state = m_stateCenter->snapshot();
 
-            if (m_panelState.workbenchLabel)
-                m_panelState.workbenchLabel->setText(tr("WB:%1 | Doc:%2 | Cmd:%3(%4) | Layer:%5 | View:%6 | Dirty:%7")
-                    .arg(state.currentWorkbenchId)
-                    .arg(state.currentDocumentId)
-                    .arg(state.currentCommandId)
-                    .arg(state.currentCommandPhase)
-                    .arg(state.currentLayerId)
-                    .arg(state.currentViewMode)
-                    .arg(state.dirty ? tr("Y") : tr("N")));
+        if (m_panelState.workbenchLabel)
+            m_panelState.workbenchLabel->setText(tr("WB:%1 | Doc:%2 | Cmd:%3(%4) | Layer:%5 | View:%6 | Dirty:%7")
+                .arg(state.currentWorkbenchId)
+                .arg(state.currentDocumentId)
+                .arg(state.currentCommandId)
+                .arg(state.currentCommandPhase)
+                .arg(state.currentLayerId)
+                .arg(state.currentViewMode)
+                .arg(state.dirty ? tr("Y") : tr("N")));
 
-            if (m_panelState.busyLabel)
-                m_panelState.busyLabel->setText(state.busy ? tr("Busy") : tr("Idle"));
+        if (m_panelState.busyLabel)
+            m_panelState.busyLabel->setText(state.busy ? tr("Busy") : tr("Idle"));
 
-            // 这里仍然只做展示，不把状态写回状态中心，避免循环同步
-            updateBusyIndicator(state.busy);
-            updateWindowTitle();
-            return;
-        }
+        // 这里仍然只做展示，不把状态写回状态中心，避免循环同步
+        updateBusyIndicator(state.busy);
+        updateWindowTitle();
+        return;
+    }
 
     if (m_panelState.workbenchLabel)
         m_panelState.workbenchLabel->setText(tr("Workbench: %1").arg(m_windowState.workbenchId));
@@ -402,45 +527,45 @@ void WorkbenchWindow::refreshFromState()
     refreshStatusText();
     // 属性面板使用状态中心快照作为输入，不在这里额外拼接窗口本地状态
     // 这里也不读取窗口本地镜像，避免展示层继续依赖两套来源
-if (m_panelState.propertiesDock && m_stateCenter)
-        {
-            const auto state = m_stateCenter->snapshot();
-            // 属性面板同样以状态中心为准，避免单独维护一套展示状态
-            m_panelState.propertiesDock->setStateText(tr("WB=%1 | View=%2 | Cmd=%3(%4) | Dirty=%5 | Layer=%6 | Doc=%7 | Busy=%8")
-                .arg(state.currentWorkbenchId)
-                .arg(state.currentViewMode)
-                .arg(state.currentCommandId)
-                .arg(state.currentCommandPhase)
-                .arg(state.dirty ? tr("Y") : tr("N"))
-                .arg(state.currentLayerId)
-                .arg(state.currentDocumentId)
-                .arg(state.busy ? tr("Y") : tr("N")));
+    if (m_panelState.propertiesDock && m_stateCenter)
+    {
+        const auto state = m_stateCenter->snapshot();
+        // 属性面板同样以状态中心为准，避免单独维护一套展示状态
+        m_panelState.propertiesDock->setStateText(tr("WB=%1 | View=%2 | Cmd=%3(%4) | Dirty=%5 | Layer=%6 | Doc=%7 | Busy=%8")
+            .arg(state.currentWorkbenchId)
+            .arg(state.currentViewMode)
+            .arg(state.currentCommandId)
+            .arg(state.currentCommandPhase)
+            .arg(state.dirty ? tr("Y") : tr("N"))
+            .arg(state.currentLayerId)
+            .arg(state.currentDocumentId)
+            .arg(state.busy ? tr("Y") : tr("N")));
 
-            QString selectionText = tr("Sel=%1 | SelSrc=%2 | CmdSrc=%3 | SelType=%4 | CmdType=%5")
+        QString selectionText = tr("Sel=%1 | SelSrc=%2 | CmdSrc=%3 | SelType=%4 | CmdType=%5")
+            .arg(state.currentSelectionText)
+            .arg(state.currentSelectionSource)
+            .arg(state.currentCommandOwner)
+            .arg(state.currentSelectionType)
+            .arg(state.currentCommandType);
+        if (state.currentWorkbenchId.compare(tr("3D"), Qt::CaseInsensitive) == 0)
+        {
+            selectionText = tr("3D Sel=%1 | NodeType=%2 | CmdSrc=%3 | CmdType=%4")
                 .arg(state.currentSelectionText)
-                .arg(state.currentSelectionSource)
-                .arg(state.currentCommandOwner)
                 .arg(state.currentSelectionType)
+                .arg(state.currentCommandOwner)
                 .arg(state.currentCommandType);
-            if (state.currentWorkbenchId.compare(tr("3D"), Qt::CaseInsensitive) == 0)
-            {
-                selectionText = tr("3D Sel=%1 | NodeType=%2 | CmdSrc=%3 | CmdType=%4")
-                    .arg(state.currentSelectionText)
-                    .arg(state.currentSelectionType)
-                    .arg(state.currentCommandOwner)
-                    .arg(state.currentCommandType);
-            }
-            else if (state.currentWorkbenchId.compare(tr("2D"), Qt::CaseInsensitive) == 0)
-            {
-                selectionText = tr("2D Sel=%1 | SelType=%2 | CmdSrc=%3 | CmdType=%4")
-                    .arg(state.currentSelectionText)
-                    .arg(state.currentSelectionType)
-                    .arg(state.currentCommandOwner)
-                    .arg(state.currentCommandType);
-            }
-            m_panelState.propertiesDock->setSelectionText(selectionText);
-            // 属性面板的选择文本同样只走状态中心快照，不拼窗口本地镜像
         }
+        else if (state.currentWorkbenchId.compare(tr("2D"), Qt::CaseInsensitive) == 0)
+        {
+            selectionText = tr("2D Sel=%1 | SelType=%2 | CmdSrc=%3 | CmdType=%4")
+                .arg(state.currentSelectionText)
+                .arg(state.currentSelectionType)
+                .arg(state.currentCommandOwner)
+                .arg(state.currentCommandType);
+        }
+        m_panelState.propertiesDock->setSelectionText(selectionText);
+        // 属性面板的选择文本同样只走状态中心快照，不拼窗口本地镜像
+    }
 
     recordPerformance(QStringLiteral("WorkbenchWindow::refreshFromState"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
@@ -574,7 +699,7 @@ void WorkbenchWindow::clearSelectionState()
         { QStringLiteral("selectionSource"), QStringLiteral("none") },
         { QStringLiteral("selectionText"), QString() },
         { QStringLiteral("selectionType"), QStringLiteral("none") }
-    });
+        });
 }
 
 void WorkbenchWindow::setWorkbenchSwitchContext(const QString& workbenchId, const QString& switchContextText)
@@ -590,7 +715,7 @@ void WorkbenchWindow::setWorkbenchSwitchContext(const QString& workbenchId, cons
         { QStringLiteral("selectionSource"), QStringLiteral("Workbench-Switch") },
         { QStringLiteral("selectionText"), switchContextText },
         { QStringLiteral("selectionType"), QStringLiteral("none") }
-    });
+        });
 }
 
 void WorkbenchWindow::resetWorkbenchTransientState()
@@ -611,7 +736,7 @@ void WorkbenchWindow::resetWorkbenchTransientState()
             { QStringLiteral("selectionText"), QString() },
             { QStringLiteral("selectionType"), QStringLiteral("none") },
             { QStringLiteral("viewportStatus"), QStringLiteral("Idle") }
-        });
+            });
         clearSelectionState();
         m_stateCenter->setDirty(false);
     }
@@ -740,7 +865,7 @@ void WorkbenchWindow::refreshThemeMenuChecks(const QString& themeId)
     {
         if (!action->isCheckable())
             continue;
-        
+
         action->setChecked(action->text().compare(themeId, Qt::CaseInsensitive) == 0);
     }
 }
@@ -810,7 +935,7 @@ void WorkbenchWindow::reportFrameworkError(const QString& errorCode, const QStri
             { QStringLiteral("lastErrorCode"), errorCode },
             { QStringLiteral("lastErrorMessage"), message },
             { QStringLiteral("lastErrorContext"), context }
-        });
+            });
 }
 
 bool WorkbenchWindow::canExecuteCommand(const QString& commandId, const QString& context) const
@@ -893,7 +1018,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
             { QStringLiteral("selectionText"), switchContextText },
             { QStringLiteral("selectionType"), QStringLiteral("none") },
             { QStringLiteral("viewportStatus"), QStringLiteral("Switching") }
-        });
+            });
     }
 
     SY_INFO("[WorkbenchWindow] triggerWorkbench: deactivating old workbench");

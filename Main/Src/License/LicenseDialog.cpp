@@ -1,21 +1,60 @@
 #include "LicenseDialog.h"
-#include "LicenseManager.h"
 
-#include <QVBoxLayout>
+#include "License/LicenseDLL.h"
+
+#include <QApplication>
+#include <QClipboard>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
-#include <QPushButton>
 #include <QMessageBox>
-#include <QClipboard>
-#include <QApplication>
+#include <QPushButton>
+#include <QVBoxLayout>
+
+namespace
+{
+    class LicenseContextHolder
+    {
+    public:
+        explicit LicenseContextHolder(const QString& configDir)
+        {
+            License_ConfigInit(&m_config);
+            m_configDirUtf8 = configDir.toUtf8();
+            m_config.configDir = m_configDirUtf8.constData();
+            m_context = License_Create(&m_config);
+        }
+
+        ~LicenseContextHolder()
+        {
+            License_Destroy(m_context);
+        }
+
+        LicenseContext* get() const
+        {
+            return m_context;
+        }
+
+    private:
+        LicenseConfig m_config{};
+        QByteArray m_configDirUtf8;
+        LicenseContext* m_context = nullptr;
+    };
+} // namespace
 
 LicenseDialog::LicenseDialog(const QString& configDir, QWidget* parent)
     : QDialog(parent)
     , m_configDir(configDir)
 {
-    LicenseManager mgr(std::filesystem::path(configDir.toStdWString()));
-    m_machineCode = QString::fromStdString(mgr.GetMachineCode());
+    LicenseContextHolder holder(m_configDir);
+    if (holder.get())
+    {
+        char machineCode[128] = {};
+        if (License_GetMachineCode(holder.get(), machineCode, sizeof(machineCode)) == LICENSE_OK)
+        {
+            m_machineCode = QString::fromUtf8(machineCode);
+        }
+    }
+
     SetupUi();
 }
 
@@ -81,10 +120,7 @@ void LicenseDialog::SetupUi()
 
 void LicenseDialog::OnActivateClicked()
 {
-    accept();
-    return;
-
-    QString regCode = m_regCodeEdit->text().trimmed();
+    const QString regCode = m_regCodeEdit->text().trimmed();
     if (regCode.isEmpty())
     {
         m_statusLabel->setText(tr("Please enter a registration code."));
@@ -97,22 +133,53 @@ void LicenseDialog::OnActivateClicked()
 
     QApplication::processEvents();
 
-    LicenseManager mgr(std::filesystem::path(m_configDir.toStdWString()));
-    bool ok = mgr.Activate(regCode.toStdString());
-
-    if (ok)
+    LicenseContextHolder holder(m_configDir);
+    if (!holder.get())
     {
-        QMessageBox::information(this, tr("Activation Successful"),
+        m_statusLabel->setStyleSheet(QStringLiteral("color: red;"));
+        m_statusLabel->setText(tr("Failed to initialize license module."));
+        m_activateBtn->setEnabled(true);
+        return;
+    }
+
+    const QByteArray regCodeUtf8 = regCode.toUtf8();
+    const int activateResult = License_Activate(holder.get(), regCodeUtf8.constData());
+    if (activateResult == LICENSE_OK)
+    {
+        LicenseInfo info{};
+        info.structSize = sizeof(LicenseInfo);
+        License_GetInfo(holder.get(), &info);
+
+        QMessageBox::information(
+            this,
+            tr("Activation Successful"),
             tr("License has been activated successfully.\n\n"
                 "Expires: %1\nFeatures: %2")
-            .arg(QString::fromStdString(mgr.GetLicenseInfo().expiryDate))
-            .arg(QString::fromStdString(mgr.GetLicenseInfo().features)));
+            .arg(QString::fromUtf8(info.expiryDate))
+            .arg(QString::fromUtf8(info.features)));
         accept();
+        return;
+    }
+
+    char errMsg[512] = {};
+    License_GetLastErrorMessage(errMsg, sizeof(errMsg));
+
+    LicenseInfo info{};
+    info.structSize = sizeof(LicenseInfo);
+    License_GetInfo(holder.get(), &info);
+
+    m_statusLabel->setStyleSheet(QStringLiteral("color: red;"));
+    if (info.errorMessage[0] != '\0')
+    {
+        m_statusLabel->setText(QString::fromUtf8(info.errorMessage));
+    }
+    else if (errMsg[0] != '\0')
+    {
+        m_statusLabel->setText(QString::fromUtf8(errMsg));
     }
     else
     {
-        m_statusLabel->setStyleSheet(QStringLiteral("color: red;"));
-        m_statusLabel->setText(QString::fromStdString(mgr.GetLicenseInfo().errorMsg));
-        m_activateBtn->setEnabled(true);
+        m_statusLabel->setText(tr("Activation failed."));
     }
+    m_activateBtn->setEnabled(true);
 }

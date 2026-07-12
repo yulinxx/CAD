@@ -19,14 +19,35 @@ class SceneNode
 public:
     SceneNode(std::string id, std::string name);
 
-    std::string id() const { return m_id; }
-    std::string name() const { return m_name; }
-    std::string typeName() const { return "SceneNode"; }
+    std::string id() const
+    {
+        return m_id;
+    }
+    std::string name() const
+    {
+        return m_name;
+    }
+    std::string typeName() const
+    {
+        return "SceneNode";
+    }
 
-    bool selected() const { return m_selected; }
-    void setSelected(bool selected) { m_selected = selected; }
-    bool highlighted() const { return m_highlighted; }
-    void setHighlighted(bool highlighted) { m_highlighted = highlighted; }
+    bool selected() const
+    {
+        return m_selected;
+    }
+    void setSelected(bool selected)
+    {
+        m_selected = selected;
+    }
+    bool highlighted() const
+    {
+        return m_highlighted;
+    }
+    void setHighlighted(bool highlighted)
+    {
+        m_highlighted = highlighted;
+    }
 
     void addChild(const std::shared_ptr<SceneNode>& child);
     std::vector<std::shared_ptr<SceneNode>> children() const;

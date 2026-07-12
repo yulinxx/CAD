@@ -7,7 +7,10 @@
 #include <memory>
 #include <string>
 
-namespace Eg { class SceneManager; }
+namespace Eg
+{
+    class SceneManager;
+}
 
 class MinimalOpenGLBackend final : public IRenderBackend
 {

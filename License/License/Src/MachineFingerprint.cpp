@@ -11,29 +11,29 @@
 // 平台特定头文件
 // ============================================================
 #ifdef _WIN32
-    #ifndef WIN32_LEAN_AND_MEAN
-    #define WIN32_LEAN_AND_MEAN
-    #endif
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #include <iphlpapi.h>
-    #include <windows.h>
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <iphlpapi.h>
+#include <windows.h>
 #else
-    #include <unistd.h>
-    #if defined(__APPLE__)
-        #include <IOKit/IOKitLib.h>
-        #include <sys/socket.h>
-        #include <sys/stat.h>
-        #include <sys/statvfs.h>
-        #include <net/if.h>
-        #include <ifaddrs.h>
-    #elif defined(__linux__)
-        #include <sys/socket.h>
-        #include <sys/stat.h>
-        #include <net/if.h>
-        #include <ifaddrs.h>
-        #include <fstream>
-    #endif
+#include <unistd.h>
+#if defined(__APPLE__)
+#include <IOKit/IOKitLib.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/statvfs.h>
+#include <net/if.h>
+#include <ifaddrs.h>
+#elif defined(__linux__)
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <net/if.h>
+#include <ifaddrs.h>
+#include <fstream>
+#endif
 #endif
 
 // ============================================================
@@ -66,12 +66,12 @@ static std::string GetMachineGuid()
     HKEY hKey;
     std::string guid;
     if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Cryptography",
-                      0, KEY_READ | KEY_WOW64_64KEY, &hKey) == ERROR_SUCCESS)
+        0, KEY_READ | KEY_WOW64_64KEY, &hKey) == ERROR_SUCCESS)
     {
         wchar_t buffer[256];
         DWORD size = sizeof(buffer);
         if (RegQueryValueExW(hKey, L"MachineGuid", nullptr, nullptr,
-                            reinterpret_cast<LPBYTE>(buffer), &size) == ERROR_SUCCESS)
+            reinterpret_cast<LPBYTE>(buffer), &size) == ERROR_SUCCESS)
         {
             int len = WideCharToMultiByte(CP_UTF8, 0, buffer, -1, nullptr, 0, nullptr, nullptr);
             if (len > 0)
@@ -102,7 +102,7 @@ static std::string GetMachineGuid()
 
     char buffer[256];
     Boolean ok = CFStringGetCString(static_cast<CFStringRef>(serialCF),
-                                    buffer, sizeof(buffer), kCFStringEncodingUTF8);
+        buffer, sizeof(buffer), kCFStringEncodingUTF8);
     CFRelease(serialCF);
     return ok ? buffer : "";
 }
@@ -124,7 +124,10 @@ static std::string GetMachineGuid()
 }
 
 #else
-static std::string GetMachineGuid() { return {}; }
+static std::string GetMachineGuid()
+{
+    return {};
+}
 #endif
 
 // ============================================================
@@ -185,13 +188,13 @@ static std::string GetMacAddress()
 {
     ULONG outBufLen = 0;
     if (GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_PREFIX,
-                            nullptr, nullptr, &outBufLen) != ERROR_BUFFER_OVERFLOW)
+        nullptr, nullptr, &outBufLen) != ERROR_BUFFER_OVERFLOW)
         return {};
 
     std::vector<BYTE> buf(outBufLen);
     PIP_ADAPTER_ADDRESSES adapters = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buf.data());
     if (GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_PREFIX,
-                            nullptr, adapters, &outBufLen) != NO_ERROR)
+        nullptr, adapters, &outBufLen) != NO_ERROR)
         return {};
 
     for (PIP_ADAPTER_ADDRESSES adapter = adapters; adapter; adapter = adapter->Next)
@@ -203,7 +206,7 @@ static std::string GetMacAddress()
             std::ostringstream oss;
             for (UINT i = 0; i < adapter->PhysicalAddressLength; ++i)
                 oss << std::hex << std::setw(2) << std::setfill('0')
-                    << static_cast<int>(adapter->PhysicalAddress[i]);
+                << static_cast<int>(adapter->PhysicalAddress[i]);
             return oss.str();
         }
     }

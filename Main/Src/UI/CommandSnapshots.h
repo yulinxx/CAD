@@ -2,7 +2,8 @@
 
 #include "UiCommandHandler.h"
 
-namespace Eg {
+namespace Eg
+{
     struct SyEntity;
 }
 class SceneDocument2D;
@@ -14,11 +15,11 @@ class SceneDocument2D;
  * 提供实体几何快照的生成、恢复等辅助功能，支持 undo/redo 操作。
  */
 
-/**
- * 从实体生成几何快照
- * @param entity 实体指针
- * @return EntitySnapshot 快照结构体
- */
+ /**
+  * 从实体生成几何快照
+  * @param entity 实体指针
+  * @return EntitySnapshot 快照结构体
+  */
 EntitySnapshot takeSnapshot(const Eg::SyEntity* entity);
 
 /**

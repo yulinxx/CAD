@@ -34,8 +34,8 @@ void BatchManager::invalidateCache()
 // ============================================================================
 
 RenderFrame BatchManager::mergeIncremental(const RenderFrame& cachedFrame,
-                                           const std::vector<RenderBatch>& newBatches,
-                                           const std::set<std::string>& dirtyEntityIds)
+    const std::vector<RenderBatch>& newBatches,
+    const std::set<std::string>& dirtyEntityIds)
 {
     RenderFrame result = cachedFrame;
 
@@ -118,9 +118,9 @@ RenderFrame BatchManager::cullByViewport(const RenderFrame& frame, const RenderR
 // ============================================================================
 
 void BatchManager::fillStatistics(RenderFrame& frame, const RenderContext& context,
-                                  const std::chrono::steady_clock::time_point& t0,
-                                  const std::chrono::steady_clock::time_point& compileStart,
-                                  const std::chrono::steady_clock::time_point& compileEnd)
+    const std::chrono::steady_clock::time_point& t0,
+    const std::chrono::steady_clock::time_point& compileStart,
+    const std::chrono::steady_clock::time_point& compileEnd)
 {
     auto& stats = frame.statistics;
     stats.frameId = context.frameId;

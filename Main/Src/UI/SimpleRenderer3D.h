@@ -17,13 +17,13 @@ class CameraController3D;
  * 位于 Main 模块中作为默认渲染器，后续可替换为 RenderWidget3D。
  */
 
-/**
- * @class SimpleRenderer3D
- * @brief 最小 3D 软件渲染器
- *
- * 使用简单的透视投影将 3D 场景渲染到 QPainter 上。
- * 不依赖 OpenGL，仅使用 Qt 的 QPainter 绘制。
- */
+ /**
+  * @class SimpleRenderer3D
+  * @brief 最小 3D 软件渲染器
+  *
+  * 使用简单的透视投影将 3D 场景渲染到 QPainter 上。
+  * 不依赖 OpenGL，仅使用 Qt 的 QPainter 绘制。
+  */
 class SimpleRenderer3D : public IRenderer3D
 {
 public:

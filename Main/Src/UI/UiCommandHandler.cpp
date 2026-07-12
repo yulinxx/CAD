@@ -7,27 +7,40 @@
 #include "CommandSnapshots.h"
 #include "Engine2D/Core/SceneManager.h"
 
-namespace {
-
-class DefaultTool : public ITool
+namespace
 {
-public:
-    explicit DefaultTool(const QString& toolId, const QString& displayName)
-        : m_toolId(toolId)
-        , m_displayName(displayName)
-    {}
+    class DefaultTool : public ITool
+    {
+    public:
+        explicit DefaultTool(const QString& toolId, const QString& displayName)
+            : m_toolId(toolId)
+            , m_displayName(displayName)
+        {
+        }
 
-    QString toolId() const override { return m_toolId; }
-    QString displayName() const override { return m_displayName; }
-    bool activate(const UiServices& /*services*/) override { return true; }
-    void cancel() override {}
-    void reset() override {}
+        QString toolId() const override
+        {
+            return m_toolId;
+        }
+        QString displayName() const override
+        {
+            return m_displayName;
+        }
+        bool activate(const UiServices& /*services*/) override
+        {
+            return true;
+        }
+        void cancel() override
+        {
+        }
+        void reset() override
+        {
+        }
 
-private:
-    QString m_toolId;
-    QString m_displayName;
-};
-
+    private:
+        QString m_toolId;
+        QString m_displayName;
+    };
 } // namespace
 
 PointPickerTool::PointPickerTool(int requiredPoints)
@@ -105,7 +118,7 @@ void DefaultUndoStack::push(UndoCommand* command)
     m_stack.resize(m_currentIndex + 1);
     m_stack.push_back(std::unique_ptr<UndoCommand>(command));
     m_currentIndex++;
-    
+
     // 命令压栈后通知视图刷新
     notifyRefresh();
 }
@@ -176,7 +189,7 @@ void DefaultUndoStack::notifyRefresh()
 {
     if (m_isNotifying)
         return;
-    
+
     m_isNotifying = true;
     if (m_refreshCallback)
         m_refreshCallback();

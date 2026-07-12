@@ -34,9 +34,9 @@
 #include "Engine2D/SyEntity/SyArc.h"
 #include "Ut/Vec.h"
 
-// ============================================================================
-// RenderContext 测试
-// ============================================================================
+ // ============================================================================
+ // RenderContext 测试
+ // ============================================================================
 
 TEST(RenderContextTest, DefaultState)
 {
@@ -751,27 +751,27 @@ TEST(RenderBackendFactoryTest, CreateSoftware)
 TEST(RenderBackendFactoryTest, FromString)
 {
     EXPECT_EQ(RenderBackendFactory::fromString("opengl"),
-              RenderBackendFactory::BackendType::OpenGL);
+        RenderBackendFactory::BackendType::OpenGL);
     EXPECT_EQ(RenderBackendFactory::fromString("OPENGL"),
-              RenderBackendFactory::BackendType::OpenGL);
+        RenderBackendFactory::BackendType::OpenGL);
     EXPECT_EQ(RenderBackendFactory::fromString("vulkan"),
-              RenderBackendFactory::BackendType::Vulkan);
+        RenderBackendFactory::BackendType::Vulkan);
     EXPECT_EQ(RenderBackendFactory::fromString("metal"),
-              RenderBackendFactory::BackendType::Metal);
+        RenderBackendFactory::BackendType::Metal);
     EXPECT_EQ(RenderBackendFactory::fromString("software"),
-              RenderBackendFactory::BackendType::Software);
+        RenderBackendFactory::BackendType::Software);
 }
 
 TEST(RenderBackendFactoryTest, ToString)
 {
     EXPECT_EQ(RenderBackendFactory::toString(RenderBackendFactory::BackendType::OpenGL),
-              "OpenGL");
+        "OpenGL");
     EXPECT_EQ(RenderBackendFactory::toString(RenderBackendFactory::BackendType::Vulkan),
-              "Vulkan");
+        "Vulkan");
     EXPECT_EQ(RenderBackendFactory::toString(RenderBackendFactory::BackendType::Metal),
-              "Metal");
+        "Metal");
     EXPECT_EQ(RenderBackendFactory::toString(RenderBackendFactory::BackendType::Software),
-              "Software");
+        "Software");
 }
 
 TEST(RenderBackendFactoryTest, FromStringRoundTrip)
@@ -838,7 +838,7 @@ TEST(RenderBackendFactoryTest, DefaultStrategyOnWindows)
     auto defaultType = RenderBackendFactory::defaultBackendType();
     // Windows 默认应该是 OpenGL 或 Software
     bool isExpected = (defaultType == RenderBackendFactory::BackendType::OpenGL) ||
-                      (defaultType == RenderBackendFactory::BackendType::Software);
+        (defaultType == RenderBackendFactory::BackendType::Software);
     EXPECT_TRUE(isExpected);
 }
 

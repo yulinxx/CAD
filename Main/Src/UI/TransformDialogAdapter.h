@@ -87,12 +87,18 @@ public:
      * @brief 设置是否显示预览
      * @param show true 表示显示预览
      */
-    void setShowPreview(bool show) { m_showPreview = show; }
+    void setShowPreview(bool show)
+    {
+        m_showPreview = show;
+    }
 
     /**
      * @brief 获取是否显示预览
      */
-    bool showPreview() const { return m_showPreview; }
+    bool showPreview() const
+    {
+        return m_showPreview;
+    }
 
 private:
     /**

@@ -67,8 +67,6 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${MAIN_SOURCES} ${MAIN_HEA
 
 set(QT_COMPONENTS Core Gui Widgets OpenGLWidgets)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS ${QT_COMPONENTS} REQUIRED)
-find_package(OpenSSL REQUIRED)
-
 set(QT_LIBRARIES)
 foreach(comp ${QT_COMPONENTS})
     list(APPEND QT_LIBRARIES Qt${QT_VERSION_MAJOR}::${comp})
@@ -104,6 +102,7 @@ target_include_directories(${app_name}
         "${UI_ROOT}/Workbench"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Utility/Utility/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler/CrashHandler/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../License/License/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/2D/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/3D/Include"
@@ -120,6 +119,7 @@ target_link_libraries(${app_name}
     PRIVATE
         Utility
         CrashHandler
+        License
         EngineCommon
         Engine2D
         Engine3D
@@ -132,9 +132,6 @@ target_link_libraries(${app_name}
         UI3D
         Log
         ${QT_LIBRARIES}
-        OpenSSL::SSL
-        OpenSSL::Crypto
-        Iphlpapi.lib
 )
 
 if(SANYI_PYTHON_HOST)
@@ -248,6 +245,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             "${UI_ROOT}/Workbench"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Utility/Utility/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler/CrashHandler/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../License/License/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/2D/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/3D/Include"
@@ -284,6 +282,8 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
         AUTOMOC ON
         AUTOUIC OFF
     )
+
+    deploy_qt_libraries(MainTests ${QT_VERSION_MAJOR})
 
     if(MSVC)
         set_target_properties(MainTests PROPERTIES

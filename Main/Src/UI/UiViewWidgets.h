@@ -9,6 +9,7 @@
 class OperationBus;
 class QContextMenuEvent;
 class QGraphicsLineItem;
+class QGraphicsPathItem;
 class QGraphicsScene;
 class QMenu;
 class QMouseEvent;
@@ -35,11 +36,20 @@ public:
     void setSelectionCallback(std::function<void(const QString&, const QString&)>&& callback);
     void setCommandStageCallback(std::function<void(const QString&)>&& callback);
     void setDocument(SceneDocument2D* document);
-    SceneDocument2D* document() const { return m_document; }
+    SceneDocument2D* document() const
+    {
+        return m_document;
+    }
     void setCommandDispatcher(UiCommandDispatcher* dispatcher);
     void setInteractionDispatcher(IInteractionDispatcher* dispatcher);
     void setOperationBus(OperationBus* bus);
     void resetView();
+    void zoomToFit();
+    void setPanModeEnabled(bool enabled);
+    bool isPanModeEnabled() const
+    {
+        return m_panModeEnabled;
+    }
     void setDrawingEnabled(bool enabled);
     void setMeasureMode(bool enabled);
     QString selectedEntityId() const;
@@ -64,6 +74,7 @@ private:
     void addPreviewLine(const QPointF& start, const QPointF& end);
     void addPreviewCircle(const QPointF& center, double radius);
     void addPreviewPolyline(const QVector<QPointF>& points);
+    void addPreviewBezier(const QVector<QPointF>& endpoints, const QVector<QPointF>& controlPoints);
     void clearPreviewItems();
     QPointF snapPoint(const QPointF& scenePos) const;
     void updateStatus(const QString& text);
@@ -77,6 +88,7 @@ private:
     void endBoxSelect(const QPointF& scenePos);
     void updateCommandPreview();
     void setCommandStage(const QString& stage);
+    QRectF documentBounds() const;
 
 private:
     std::function<void(const QString&)> m_statusCallback;
@@ -86,13 +98,14 @@ private:
     QGraphicsLineItem* m_previewLine{ nullptr };
     QGraphicsEllipseItem* m_previewEllipse{ nullptr };
     QList<QGraphicsLineItem*> m_previewPolylineItems;
+    QList<QGraphicsPathItem*> m_previewPathItems;
     QPointF m_lastPanPoint;
     QPointF m_boxSelectStart;
     bool m_panning{ false };
     bool m_boxSelecting{ false };
+    bool m_panModeEnabled{ false };
     SceneDocument2D* m_document{ nullptr };
     UiCommandDispatcher* m_commandDispatcher{ nullptr };
     IInteractionDispatcher* m_interactionDispatcher{ nullptr };
     OperationBus* m_operationBus{ nullptr };
 };
-

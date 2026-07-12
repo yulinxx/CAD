@@ -20,7 +20,10 @@ void SceneNode::addChild(const std::shared_ptr<SceneNode>& child)
     if (child) m_children.push_back(child);
 }
 
-std::vector<std::shared_ptr<SceneNode>> SceneNode::children() const { return m_children; }
+std::vector<std::shared_ptr<SceneNode>> SceneNode::children() const
+{
+    return m_children;
+}
 
 std::shared_ptr<SceneNode> SceneNode::childByIdRecursive(const std::string& id) const
 {
@@ -113,8 +116,14 @@ bool SelectionSet::contains(const std::string& nodeId) const
         });
 }
 
-std::vector<std::shared_ptr<SceneNode>> SelectionSet::items() const { return m_items; }
-bool SelectionSet::empty() const { return m_items.empty(); }
+std::vector<std::shared_ptr<SceneNode>> SelectionSet::items() const
+{
+    return m_items;
+}
+bool SelectionSet::empty() const
+{
+    return m_items.empty();
+}
 
 // ============================================================================
 // SceneDocument3D
@@ -178,9 +187,18 @@ std::vector<std::shared_ptr<SceneNode>> SceneDocument3D::entities() const
     return items;
 }
 
-std::vector<std::shared_ptr<SceneNode>> SceneDocument3D::rootNodes() const { return m_roots; }
-SelectionSet& SceneDocument3D::selection() { return m_selection; }
-const SelectionSet& SceneDocument3D::selection() const { return m_selection; }
+std::vector<std::shared_ptr<SceneNode>> SceneDocument3D::rootNodes() const
+{
+    return m_roots;
+}
+SelectionSet& SceneDocument3D::selection()
+{
+    return m_selection;
+}
+const SelectionSet& SceneDocument3D::selection() const
+{
+    return m_selection;
+}
 
 // ---- SceneDocumentBase 接口 ----
 
@@ -263,6 +281,15 @@ void DefaultCameraController3D::reset()
     m_panOffset = RenderPointF();
 }
 
-double DefaultCameraController3D::yaw() const { return m_yaw; }
-double DefaultCameraController3D::pitch() const { return m_pitch; }
-double DefaultCameraController3D::distance() const { return m_distance; }
+double DefaultCameraController3D::yaw() const
+{
+    return m_yaw;
+}
+double DefaultCameraController3D::pitch() const
+{
+    return m_pitch;
+}
+double DefaultCameraController3D::distance() const
+{
+    return m_distance;
+}

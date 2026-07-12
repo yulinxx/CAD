@@ -11,11 +11,12 @@
 #include "UI/UiStateCenter.h"
 #include "UI/UiThemeService.h"
 #include "UI/SceneDocument2D.h"
+#include "UI2D/Operation/OperationBus.h"
 
 /**
  * @class ApplicationCompositionRoot
  * @brief 应用程序组合根类
- * 
+ *
  * 负责创建和组装所有核心服务，包括状态中心、主题服务、
  * 布局服务、命令分发器和 UI Shell 宿主。
  */
@@ -46,9 +47,15 @@ public:
     /// 获取撤销栈
     IUndoStack* undoStack();
 
+    /// 获取操作总线
+    OperationBus* operationBus();
+
 private:
     /// 注册所有命令处理器
     void registerCommands();
+
+    /// 通过 CommandHandlerAdapter 将旧命令注册到 OperationBus
+    void registerCommandAdapters();
 
 private:
     /// UI Shell 宿主
@@ -71,6 +78,9 @@ private:
 
     /// 命令处理器实例集合
     std::vector<std::unique_ptr<ICommandHandler>> m_commandHandlers;
+
+    /// 操作总线（新命令主线）
+    std::unique_ptr<OperationBus> m_operationBus;
 
     /// 2D 场景文档
     std::unique_ptr<SceneDocument2D> m_document2D;

@@ -21,11 +21,11 @@ private slots:
 private:
     void SetupUi();
 
-    QLineEdit*   m_regCodeEdit   = nullptr;
-    QLabel*      m_machineCodeLabel = nullptr;
-    QLabel*      m_statusLabel   = nullptr;
-    QPushButton* m_activateBtn   = nullptr;
-    QPushButton* m_exitBtn       = nullptr;
+    QLineEdit* m_regCodeEdit = nullptr;
+    QLabel* m_machineCodeLabel = nullptr;
+    QLabel* m_statusLabel = nullptr;
+    QPushButton* m_activateBtn = nullptr;
+    QPushButton* m_exitBtn = nullptr;
 
     QString m_configDir;
     QString m_machineCode;

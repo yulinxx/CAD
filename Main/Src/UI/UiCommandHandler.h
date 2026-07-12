@@ -14,7 +14,8 @@
 class SceneDocument2D;
 class UndoCommand;
 
-namespace Eg {
+namespace Eg
+{
     struct SyEntity;
 }
 
@@ -30,10 +31,10 @@ namespace Eg {
  * - 工具（Tool）：命令的交互载体，负责事件处理（拾点、预览、拖拽、约束）
  */
 
-/**
- * @class ITool
- * @brief 工具接口
- */
+ /**
+  * @class ITool
+  * @brief 工具接口
+  */
 class ITool
 {
 public:
@@ -45,12 +46,30 @@ public:
     virtual bool activate(const UiServices& services) = 0;
     virtual void cancel() = 0;
     virtual void reset() = 0;
-    virtual bool onMouseDown(int x, int y) { (void)x; (void)y; return false; }
-    virtual bool onMouseMove(int x, int y) { (void)x; (void)y; return false; }
-    virtual bool onMouseUp(int x, int y) { (void)x; (void)y; return false; }
-    virtual bool onKeyPress(int key) { (void)key; return false; }
-    virtual bool isStageComplete() const { return false; }
-    virtual QString currentStage() const { return QStringLiteral("idle"); }
+    virtual bool onMouseDown(int x, int y)
+    {
+        (void)x; (void)y; return false;
+    }
+    virtual bool onMouseMove(int x, int y)
+    {
+        (void)x; (void)y; return false;
+    }
+    virtual bool onMouseUp(int x, int y)
+    {
+        (void)x; (void)y; return false;
+    }
+    virtual bool onKeyPress(int key)
+    {
+        (void)key; return false;
+    }
+    virtual bool isStageComplete() const
+    {
+        return false;
+    }
+    virtual QString currentStage() const
+    {
+        return QStringLiteral("idle");
+    }
 };
 
 /**
@@ -76,7 +95,11 @@ enum class PreviewType
     Circle,
     Arc,
     Polyline,
-    Polygon
+    Polygon,
+    Bezier2,
+    Bezier,
+    Nurbs,
+    SmartLine
 };
 
 /**
@@ -94,14 +117,19 @@ struct CommandPreview
     double previewStartAngle{ 0.0 };
     double previewEndAngle{ 0.0 };
     QVector<QPointF> previewPoints;
+    QVector<QPointF> controlPoints;
     QString stageText;
 };
 
 /**
  * @class ICommandHandler
  * @brief 命令处理器抽象接口
+ *
+ * @deprecated 请优先使用 IOperation + OperationBus (UI/2D/Include/UI2D/Operation/IOperation.h) 体系。
+ *             ICommandHandler 将在后续重构中逐步迁移至 OperationBus。
+ *             新功能请勿新增 ICommandHandler 子类。
  */
-class ICommandHandler
+class [[deprecated("Use IOperation + OperationBus instead (see UI/2D/Include/UI2D/Operation/IOperation.h)")]] ICommandHandler
 {
 public:
     virtual ~ICommandHandler() = default;
@@ -114,15 +142,43 @@ public:
     virtual bool activate(const UiServices& services) = 0;
     virtual void cancel() = 0;
     virtual void commit() = 0;
-    virtual bool onMouseDown(int x, int y) { (void)x; (void)y; return false; }
-    virtual bool onMouseMove(int x, int y) { (void)x; (void)y; return false; }
-    virtual bool onMouseUp(int x, int y) { (void)x; (void)y; return false; }
-    virtual bool onKeyPress(int key) { (void)key; return false; }
+    virtual bool onMouseDown(int x, int y)
+    {
+        (void)x; (void)y; return false;
+    }
+    virtual bool onMouseMove(int x, int y)
+    {
+        (void)x; (void)y; return false;
+    }
+    virtual bool onMouseUp(int x, int y)
+    {
+        (void)x; (void)y; return false;
+    }
+    virtual bool onKeyPress(int key)
+    {
+        (void)key; return false;
+    }
+    virtual bool onWheel(int delta)
+    {
+        (void)delta; return false;
+    }
     virtual void reset() = 0;
-    virtual ITool* activeTool() const { return nullptr; }
-    virtual UndoCommand* createUndoCommand() { return nullptr; }
-    virtual bool isComplete() const { return false; }
-    virtual CommandPreview preview() const { return {}; }
+    virtual ITool* activeTool() const
+    {
+        return nullptr;
+    }
+    virtual UndoCommand* createUndoCommand()
+    {
+        return nullptr;
+    }
+    virtual bool isComplete() const
+    {
+        return false;
+    }
+    virtual CommandPreview preview() const
+    {
+        return {};
+    }
 };
 
 /**
@@ -245,9 +301,18 @@ public:
     bool isStageComplete() const override;
     QString currentStage() const override;
 
-    const QPointF& lastPoint() const { return m_lastPoint; }
-    const std::vector<QPointF>& pickedPoints() const { return m_pickedPoints; }
-    bool hasEnoughPoints() const { return m_pickedPoints.size() >= static_cast<size_t>(m_requiredPoints); }
+    const QPointF& lastPoint() const
+    {
+        return m_lastPoint;
+    }
+    const std::vector<QPointF>& pickedPoints() const
+    {
+        return m_pickedPoints;
+    }
+    bool hasEnoughPoints() const
+    {
+        return m_pickedPoints.size() >= static_cast<size_t>(m_requiredPoints);
+    }
 
 private:
     int m_requiredPoints;

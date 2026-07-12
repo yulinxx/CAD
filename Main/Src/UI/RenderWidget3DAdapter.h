@@ -29,15 +29,15 @@ class CameraController3D;
  * - 仅做接口适配和事件转发
  */
 
-/**
- * @class RenderWidget3DAdapter
- * @brief RenderWidget3D 的 IRenderer3D 适配器（过渡层）
- *
- * 使用组合模式，内部持有 RenderWidget3D 实例，
- * 将 IRenderer3D 接口调用转换为 RenderWidget3D 的对应方法。
- *
- * 父窗口通过 initialize(void*) 传入，适配器负责创建内部控件。
- */
+ /**
+  * @class RenderWidget3DAdapter
+  * @brief RenderWidget3D 的 IRenderer3D 适配器（过渡层）
+  *
+  * 使用组合模式，内部持有 RenderWidget3D 实例，
+  * 将 IRenderer3D 接口调用转换为 RenderWidget3D 的对应方法。
+  *
+  * 父窗口通过 initialize(void*) 传入，适配器负责创建内部控件。
+  */
 class RenderWidget3DAdapter : public IRenderer3D
 {
 public:
@@ -63,7 +63,10 @@ public:
     bool isOrbitMode() const override;
 
     /// 判断是否使用 OpenGL 渲染
-    bool isOpenGL() const override { return true; }
+    bool isOpenGL() const override
+    {
+        return true;
+    }
 
     void onMousePress(int x, int y, int button, int modifiers, int viewW, int viewH) override;
     void onMouseMove(int x, int y, int buttons, int viewW, int viewH) override;

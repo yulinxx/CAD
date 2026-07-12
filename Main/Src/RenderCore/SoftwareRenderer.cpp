@@ -18,7 +18,7 @@ namespace
 // ============================================================================
 
 void SoftwareRenderer::render(QPainter& painter, const RenderFrame& frame,
-                              const ViewCamera3D& camera, const Size2D& viewportSize)
+    const ViewCamera3D& camera, const Size2D& viewportSize)
 {
     // 清屏
     painter.fillRect(0, 0, viewportSize.width, viewportSize.height, QColor(30, 30, 30));
@@ -28,8 +28,8 @@ void SoftwareRenderer::render(QPainter& painter, const RenderFrame& frame,
         painter.setPen(QColor(120, 120, 120));
         painter.setFont(QFont(QStringLiteral("Microsoft YaHei"), 12));
         painter.drawText(QRect(0, 0, viewportSize.width, viewportSize.height),
-                         Qt::AlignCenter,
-                         trSoftwareRenderer("RenderCore pipeline ready\nWaiting for scene data..."));
+            Qt::AlignCenter,
+            trSoftwareRenderer("RenderCore pipeline ready\nWaiting for scene data..."));
         return;
     }
 
@@ -43,7 +43,7 @@ void SoftwareRenderer::render(QPainter& painter, const RenderFrame& frame,
 // ============================================================================
 
 void SoftwareRenderer::drawBatches3D(QPainter& painter, const RenderFrame& frame,
-                                     const ViewCamera3D& camera)
+    const ViewCamera3D& camera)
 {
     painter.setRenderHint(QPainter::Antialiasing, true);
 
@@ -67,35 +67,35 @@ void SoftwareRenderer::drawBatches3D(QPainter& painter, const RenderFrame& frame
 
         switch (batch.primitiveType)
         {
-        case PrimitiveType::Lines:
-            for (int i = 0; i < batch.vertices.size() - 1; i += 2)
-            {
-                int sx1, sy1, sx2, sy2;
-                const auto& v1 = batch.vertices[i];
-                const auto& v2 = batch.vertices[i + 1];
-                if (camera.project(v1.x, v1.y, v1.z, sx1, sy1) &&
-                    camera.project(v2.x, v2.y, v2.z, sx2, sy2))
+            case PrimitiveType::Lines:
+                for (int i = 0; i < batch.vertices.size() - 1; i += 2)
                 {
-                    painter.drawLine(sx1, sy1, sx2, sy2);
+                    int sx1, sy1, sx2, sy2;
+                    const auto& v1 = batch.vertices[i];
+                    const auto& v2 = batch.vertices[i + 1];
+                    if (camera.project(v1.x, v1.y, v1.z, sx1, sy1) &&
+                        camera.project(v2.x, v2.y, v2.z, sx2, sy2))
+                    {
+                        painter.drawLine(sx1, sy1, sx2, sy2);
+                    }
                 }
-            }
-            break;
+                break;
 
-        case PrimitiveType::LineStrip:
-            for (int i = 0; i < batch.vertices.size() - 1; ++i)
-            {
-                int sx1, sy1, sx2, sy2;
-                const auto& v1 = batch.vertices[i];
-                const auto& v2 = batch.vertices[i + 1];
-                if (camera.project(v1.x, v1.y, v1.z, sx1, sy1) &&
-                    camera.project(v2.x, v2.y, v2.z, sx2, sy2))
+            case PrimitiveType::LineStrip:
+                for (int i = 0; i < batch.vertices.size() - 1; ++i)
                 {
-                    painter.drawLine(sx1, sy1, sx2, sy2);
+                    int sx1, sy1, sx2, sy2;
+                    const auto& v1 = batch.vertices[i];
+                    const auto& v2 = batch.vertices[i + 1];
+                    if (camera.project(v1.x, v1.y, v1.z, sx1, sy1) &&
+                        camera.project(v2.x, v2.y, v2.z, sx2, sy2))
+                    {
+                        painter.drawLine(sx1, sy1, sx2, sy2);
+                    }
                 }
-            }
-            break;
+                break;
 
-        case PrimitiveType::Points:
+            case PrimitiveType::Points:
             {
                 QPen ptPen(color, batch.pointSize > 0 ? batch.pointSize : 3);
                 painter.setPen(ptPen);
@@ -108,8 +108,8 @@ void SoftwareRenderer::drawBatches3D(QPainter& painter, const RenderFrame& frame
             }
             break;
 
-        default:
-            break;
+            default:
+                break;
         }
     }
 }
@@ -119,7 +119,7 @@ void SoftwareRenderer::drawBatches3D(QPainter& painter, const RenderFrame& frame
 // ============================================================================
 
 void SoftwareRenderer::drawAxesIndicator(QPainter& painter, const ViewCamera3D& camera,
-                                         int viewW, int viewH)
+    int viewW, int viewH)
 {
     const int cx = viewW - 80;
     const int cy = viewH - 80;
@@ -137,8 +137,8 @@ void SoftwareRenderer::drawAxesIndicator(QPainter& painter, const ViewCamera3D& 
         double camZ = rz2 + 10.0;
         double scale = 50.0 / camZ;
         return QPoint(cx + static_cast<int>(rx * scale),
-                      cy - static_cast<int>(ry2 * scale));
-    };
+            cy - static_cast<int>(ry2 * scale));
+        };
 
     QPoint origin = projAxis(0, 0, 0);
 
@@ -168,16 +168,16 @@ void SoftwareRenderer::drawAxesIndicator(QPainter& painter, const ViewCamera3D& 
 // ============================================================================
 
 void SoftwareRenderer::drawStatisticsOverlay(QPainter& painter,
-                                            const RenderFrame& frame,
-                                            int viewW, int viewH)
+    const RenderFrame& frame,
+    int viewW, int viewH)
 {
     painter.setPen(QColor(100, 100, 100));
     painter.setFont(QFont(QStringLiteral("Consolas"), 9));
     painter.drawText(10, viewH - 30,
-                     QStringLiteral("Frame %1 | %2 batches | %3 verts | %4 ents | %5 ms")
-                         .arg(frame.frameId)
-                         .arg(frame.statistics.batchCount)
-                         .arg(frame.statistics.totalVertexCount)
-                         .arg(frame.statistics.entityCount)
-                         .arg(frame.statistics.compileTimeMs, 0, 'f', 2));
+        QStringLiteral("Frame %1 | %2 batches | %3 verts | %4 ents | %5 ms")
+        .arg(frame.frameId)
+        .arg(frame.statistics.batchCount)
+        .arg(frame.statistics.totalVertexCount)
+        .arg(frame.statistics.entityCount)
+        .arg(frame.statistics.compileTimeMs, 0, 'f', 2));
 }

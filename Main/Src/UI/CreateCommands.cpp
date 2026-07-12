@@ -10,18 +10,21 @@
 #include "Engine2D/SyEntity/SyCircle.h"
 #include "Engine2D/SyEntity/SyArc.h"
 #include "Engine2D/SyEntity/SyPolygon.h"
+#include "Engine2D/SyEntity/SyBezier2.h"
+#include "Engine2D/SyEntity/SyBezier.h"
+#include "Engine2D/SyEntity/SyNurbs.h"
+#include "Engine2D/SyEntity/SySmartLine.h"
 #include "Mat/Mat.hpp"
 #include "CommandSnapshots.h"
 #include "Log/SyLogger.h"
 
-namespace {
-
-// 将QPointF转换为Ut::Vec2d
-inline Ut::Vec2d toVec2d(const QPointF& p)
+namespace
 {
-    return Ut::Vec2d(p.x(), p.y());
-}
-
+    // 将QPointF转换为Ut::Vec2d
+    inline Ut::Vec2d toVec2d(const QPointF& p)
+    {
+        return Ut::Vec2d(p.x(), p.y());
+    }
 } // namespace
 
 // 构造函数：初始化点拾取器为2点模式
@@ -567,7 +570,7 @@ void PolylineCommand::commit()
 {
     if (m_points.size() >= 2 && m_document)
         m_createdEntityId = m_document->createPolyline(m_points);
-    SY_INFOF("[CreateCommands] PolylineCommand committed: entity=%s, points=%d", 
+    SY_INFOF("[CreateCommands] PolylineCommand committed: entity=%s, points=%d",
         m_createdEntityId.toUtf8().constData(), m_points.size());
     m_state = CommandState::Committed;
 }
@@ -606,13 +609,13 @@ bool PolylineCommand::onMouseUp(int x, int y)
     return false;
 }
 
-// 键盘事件：Enter完成绘制，Backspace删除最后一点，Esc取消
+// 键盘事件：Enter/空格完成绘制，Backspace删除最后一点，Esc取消
 bool PolylineCommand::onKeyPress(int key)
 {
     if (m_state != CommandState::Active)
         return false;
 
-    if (key == Qt::Key_Enter || key == Qt::Key_Return)
+    if (key == Qt::Key_Enter || key == Qt::Key_Return || key == Qt::Key_Space)
     {
         if (m_points.size() >= 2)
         {
@@ -708,14 +711,19 @@ CommandState PolygonCommand::state() const
     return m_state;
 }
 
+// 激活命令：初始化状态、边数和阶段
 bool PolygonCommand::activate(const UiServices& services)
 {
     SY_INFO("[CreateCommands] PolygonCommand activated");
     m_services = &services;
     m_document = services.document2D;
     m_state = CommandState::Active;
-    m_points.clear();
+    m_stage = 0;
+    m_sides = 6;
+    m_center = QPointF();
+    m_radiusPoint = QPointF();
     m_currentPoint = QPointF();
+    m_previewPoints.clear();
     m_completed = false;
     m_createdEntityId.clear();
     return true;
@@ -729,43 +737,87 @@ void PolygonCommand::cancel()
 
 void PolygonCommand::commit()
 {
-    if (m_points.size() >= 3 && m_document)
+    if (!m_center.isNull() && !m_radiusPoint.isNull() && m_sides >= 3 && m_document)
     {
-        m_createdEntityId = m_document->createPolygon(m_points);
+        m_createdEntityId = m_document->createPolygon(m_previewPoints);
     }
-    SY_INFOF("[CreateCommands] PolygonCommand committed: entity=%s, vertices=%d", 
-        m_createdEntityId.toUtf8().constData(), m_points.size());
+    SY_INFOF("[CreateCommands] PolygonCommand committed: entity=%s, sides=%d",
+        m_createdEntityId.toUtf8().constData(), m_sides);
     m_state = CommandState::Committed;
 }
 
 void PolygonCommand::reset()
 {
     m_state = CommandState::Idle;
-    m_points.clear();
+    m_stage = 0;
+    m_sides = 6;
+    m_center = QPointF();
+    m_radiusPoint = QPointF();
     m_currentPoint = QPointF();
+    m_previewPoints.clear();
     m_completed = false;
     m_createdEntityId.clear();
 }
 
+// 更新多边形预览顶点
+void PolygonCommand::updatePreviewPoints()
+{
+    m_previewPoints.clear();
+    if (m_center.isNull() || m_radiusPoint.isNull())
+        return;
+
+    const double dx = m_radiusPoint.x() - m_center.x();
+    const double dy = m_radiusPoint.y() - m_center.y();
+    const double radius = std::hypot(dx, dy);
+    const double startAngle = std::atan2(dy, dx) - M_PI / 2.0;
+    const double stepAngle = 2.0 * M_PI / m_sides;
+
+    for (int i = 0; i < m_sides; ++i)
+    {
+        const double angle = startAngle + i * stepAngle;
+        m_previewPoints.append(QPointF(
+            m_center.x() + radius * std::cos(angle),
+            m_center.y() + radius * std::sin(angle)));
+    }
+}
+
+// 鼠标按下事件：两阶段绘制多边形（中心→半径）
 bool PolygonCommand::onMouseDown(int x, int y)
 {
     if (m_state != CommandState::Active)
         return false;
 
-    m_points.append(QPointF(x, y));
+    const QPointF pt(x, y);
+
+    if (m_stage == 0)
+    {
+        m_center = pt;
+        m_stage = 1;
+    }
+    else if (m_stage == 1)
+    {
+        m_radiusPoint = pt;
+        updatePreviewPoints();
+        commit();
+    }
     return true;
 }
 
+// 鼠标移动事件：更新半径点用于预览
 bool PolygonCommand::onMouseMove(int x, int y)
 {
     if (m_state != CommandState::Active)
         return false;
 
-    m_currentPoint = QPointF(x, y);
+    if (m_stage == 1)
+    {
+        m_radiusPoint = QPointF(x, y);
+        updatePreviewPoints();
+    }
     return true;
 }
 
-// 键盘事件：Enter完成绘制，Backspace删除最后一点，Esc取消
+// 键盘事件：Enter完成绘制，Backspace回退阶段，Esc取消
 bool PolygonCommand::onKeyPress(int key)
 {
     if (m_state != CommandState::Active)
@@ -773,14 +825,19 @@ bool PolygonCommand::onKeyPress(int key)
 
     if (key == Qt::Key_Enter || key == Qt::Key_Return)
     {
-        if (m_points.size() >= 3)
+        if (m_stage == 1 && !m_center.isNull() && !m_radiusPoint.isNull())
             finish();
         return true;
     }
-    else if (key == Qt::Key_Backspace && !m_points.isEmpty())
+    else if (key == Qt::Key_Backspace)
     {
-        m_points.removeLast();
-        return true;
+        if (m_stage > 0)
+        {
+            m_stage--;
+            if (m_stage == 0)
+                m_radiusPoint = QPointF();
+            return true;
+        }
     }
     else if (key == Qt::Key_Escape)
     {
@@ -788,6 +845,19 @@ bool PolygonCommand::onKeyPress(int key)
         return true;
     }
     return false;
+}
+
+// 滚轮事件：Ctrl+滚轮调整边数
+bool PolygonCommand::onWheel(int delta)
+{
+    if (m_state != CommandState::Active)
+        return false;
+
+    const int step = delta > 0 ? 1 : -1;
+    m_sides = std::max(3, std::min(36, m_sides + step));
+    SY_INFOF("[CreateCommands] PolygonCommand sides changed: %d", m_sides);
+    updatePreviewPoints();
+    return true;
 }
 
 ITool* PolygonCommand::activeTool() const
@@ -816,14 +886,11 @@ bool PolygonCommand::isComplete() const
 CommandPreview PolygonCommand::preview() const
 {
     CommandPreview p;
-    if (m_points.size() >= 2)
+    if (m_stage == 1 && !m_radiusPoint.isNull())
     {
         p.valid = true;
         p.type = PreviewType::Polygon;
-        p.previewPoints = m_points;
-        if (!m_currentPoint.isNull())
-            p.previewPoints.append(m_currentPoint);
-        p.previewPoints.append(m_points.first());
+        p.previewPoints = m_previewPoints;
     }
     return p;
 }
@@ -861,11 +928,11 @@ void CircleUndoCommand::undo()
 {
     if (!m_document)
         return;
-    
+
     auto* sm = m_document->sceneManager();
     if (!sm)
         return;
-    
+
     auto eid = static_cast<Eg::EntityId>(m_entityId.toULongLong());
     auto entity = sm->extractEntityById(eid);
     if (entity)
@@ -878,11 +945,11 @@ void CircleUndoCommand::redo()
 {
     if (!m_document)
         return;
-    
+
     auto* sm = m_document->sceneManager();
     if (!sm)
         return;
-    
+
     if (m_storedEntity)
     {
         sm->insertEntityPreserveId(std::move(m_storedEntity));
@@ -917,11 +984,11 @@ void LineUndoCommand::undo()
 {
     if (!m_document)
         return;
-    
+
     auto* sm = m_document->sceneManager();
     if (!sm)
         return;
-    
+
     auto eid = static_cast<Eg::EntityId>(m_entityId.toULongLong());
     auto entity = sm->extractEntityById(eid);
     if (entity)
@@ -934,11 +1001,11 @@ void LineUndoCommand::redo()
 {
     if (!m_document)
         return;
-    
+
     auto* sm = m_document->sceneManager();
     if (!sm)
         return;
-    
+
     if (m_storedEntity)
     {
         sm->insertEntityPreserveId(std::move(m_storedEntity));
@@ -975,11 +1042,11 @@ void ArcUndoCommand::undo()
 {
     if (!m_document)
         return;
-    
+
     auto* sm = m_document->sceneManager();
     if (!sm)
         return;
-    
+
     auto eid = static_cast<Eg::EntityId>(m_entityId.toULongLong());
     auto entity = sm->extractEntityById(eid);
     if (entity)
@@ -992,11 +1059,11 @@ void ArcUndoCommand::redo()
 {
     if (!m_document)
         return;
-    
+
     auto* sm = m_document->sceneManager();
     if (!sm)
         return;
-    
+
     if (m_storedEntity)
     {
         sm->insertEntityPreserveId(std::move(m_storedEntity));
@@ -1029,11 +1096,11 @@ void PolylineUndoCommand::undo()
 {
     if (!m_document)
         return;
-    
+
     auto* sm = m_document->sceneManager();
     if (!sm)
         return;
-    
+
     auto eid = static_cast<Eg::EntityId>(m_entityId.toULongLong());
     auto entity = sm->extractEntityById(eid);
     if (entity)
@@ -1046,11 +1113,11 @@ void PolylineUndoCommand::redo()
 {
     if (!m_document)
         return;
-    
+
     auto* sm = m_document->sceneManager();
     if (!sm)
         return;
-    
+
     if (m_storedEntity)
     {
         sm->insertEntityPreserveId(std::move(m_storedEntity));
@@ -1058,6 +1125,816 @@ void PolylineUndoCommand::redo()
     else
     {
         restoreFromSnapshot(m_document, m_snapshot);
+    }
+    m_document->selectEntity(m_entityId);
+}
+
+// Bezier2Command - 绘制二阶贝塞尔曲线命令
+
+Bezier2Command::Bezier2Command()
+{
+}
+
+QString Bezier2Command::commandId() const
+{
+    return QStringLiteral("2d.draw_bezier2");
+}
+
+QString Bezier2Command::displayName() const
+{
+    return QObject::tr("Draw Bezier2");
+}
+
+bool Bezier2Command::isInteractive() const
+{
+    return true;
+}
+
+CommandState Bezier2Command::state() const
+{
+    return m_state;
+}
+
+// 激活命令：初始化状态和阶段
+bool Bezier2Command::activate(const UiServices& services)
+{
+    SY_INFO("[CreateCommands] Bezier2Command activated");
+    m_services = &services;
+    m_document = services.document2D;
+    m_state = CommandState::Active;
+    m_stage = 0;
+    m_startPoint = QPointF();
+    m_controlPoint = QPointF();
+    m_endPoint = QPointF();
+    m_createdEntityId.clear();
+    return true;
+}
+
+void Bezier2Command::cancel()
+{
+    SY_INFO("[CreateCommands] Bezier2Command cancelled");
+    m_state = CommandState::Cancelled;
+}
+
+void Bezier2Command::commit()
+{
+    SY_INFOF("[CreateCommands] Bezier2Command committed: entity=%s", m_createdEntityId.toUtf8().constData());
+    m_state = CommandState::Committed;
+}
+
+void Bezier2Command::reset()
+{
+    m_state = CommandState::Idle;
+    m_stage = 0;
+    m_startPoint = QPointF();
+    m_controlPoint = QPointF();
+    m_endPoint = QPointF();
+    m_createdEntityId.clear();
+}
+
+// 鼠标按下事件：三阶段绘制二阶贝塞尔曲线（起点→控制点→终点）
+bool Bezier2Command::onMouseDown(int x, int y)
+{
+    if (m_state != CommandState::Active)
+        return false;
+
+    const QPointF pt(x, y);
+
+    if (m_stage == 0)
+    {
+        m_startPoint = pt;
+        m_stage = 1;
+    }
+    else if (m_stage == 1)
+    {
+        m_controlPoint = pt;
+        m_stage = 2;
+    }
+    else if (m_stage == 2)
+    {
+        m_endPoint = pt;
+        if (m_document)
+            m_createdEntityId = m_document->createBezier2(m_startPoint, m_controlPoint, m_endPoint);
+        commit();
+    }
+    return true;
+}
+
+// 鼠标移动事件：更新当前点用于预览
+bool Bezier2Command::onMouseMove(int x, int y)
+{
+    if (m_state != CommandState::Active)
+        return false;
+
+    if (m_stage == 1)
+        m_controlPoint = QPointF(x, y);
+    else if (m_stage == 2)
+        m_endPoint = QPointF(x, y);
+    return true;
+}
+
+// 键盘事件：Backspace回退阶段，Esc取消命令
+bool Bezier2Command::onKeyPress(int key)
+{
+    if (m_state != CommandState::Active)
+        return false;
+
+    if (key == Qt::Key_Backspace)
+    {
+        if (m_stage > 0)
+        {
+            m_stage--;
+            return true;
+        }
+    }
+    else if (key == Qt::Key_Escape)
+    {
+        cancel();
+        return true;
+    }
+
+    return false;
+}
+
+ITool* Bezier2Command::activeTool() const
+{
+    return nullptr;
+}
+
+UndoCommand* Bezier2Command::createUndoCommand()
+{
+    if (m_createdEntityId.isEmpty())
+        return nullptr;
+
+    return new BezierUndoCommand(m_document, m_createdEntityId);
+}
+
+bool Bezier2Command::isComplete() const
+{
+    return m_createdEntityId.isEmpty() == false;
+}
+
+CommandPreview Bezier2Command::preview() const
+{
+    CommandPreview p;
+    if (m_stage >= 2 && !m_endPoint.isNull())
+    {
+        p.valid = true;
+        p.type = PreviewType::Bezier2;
+        p.previewPoints.append(m_startPoint);
+        p.previewPoints.append(m_endPoint);
+        p.controlPoints.append(m_controlPoint);
+    }
+    return p;
+}
+
+void Bezier2Command::setDocument(SceneDocument2D* document)
+{
+    m_document = document;
+}
+
+// BezierCommand - 绘制三阶贝塞尔曲线命令
+
+BezierCommand::BezierCommand()
+{
+}
+
+QString BezierCommand::commandId() const
+{
+    return QStringLiteral("2d.draw_bezier");
+}
+
+QString BezierCommand::displayName() const
+{
+    return QObject::tr("Draw Bezier");
+}
+
+bool BezierCommand::isInteractive() const
+{
+    return true;
+}
+
+CommandState BezierCommand::state() const
+{
+    return m_state;
+}
+
+// 激活命令：初始化状态和阶段
+bool BezierCommand::activate(const UiServices& services)
+{
+    SY_INFO("[CreateCommands] BezierCommand activated");
+    m_services = &services;
+    m_document = services.document2D;
+    m_state = CommandState::Active;
+    m_stage = 0;
+    m_startPoint = QPointF();
+    m_controlPoint1 = QPointF();
+    m_controlPoint2 = QPointF();
+    m_endPoint = QPointF();
+    m_createdEntityId.clear();
+    return true;
+}
+
+void BezierCommand::cancel()
+{
+    SY_INFO("[CreateCommands] BezierCommand cancelled");
+    m_state = CommandState::Cancelled;
+}
+
+void BezierCommand::commit()
+{
+    SY_INFOF("[CreateCommands] BezierCommand committed: entity=%s", m_createdEntityId.toUtf8().constData());
+    m_state = CommandState::Committed;
+}
+
+void BezierCommand::reset()
+{
+    m_state = CommandState::Idle;
+    m_stage = 0;
+    m_startPoint = QPointF();
+    m_controlPoint1 = QPointF();
+    m_controlPoint2 = QPointF();
+    m_endPoint = QPointF();
+    m_createdEntityId.clear();
+}
+
+// 鼠标按下事件：四阶段绘制三阶贝塞尔曲线（起点→控制点1→控制点2→终点）
+bool BezierCommand::onMouseDown(int x, int y)
+{
+    if (m_state != CommandState::Active)
+        return false;
+
+    const QPointF pt(x, y);
+
+    if (m_stage == 0)
+    {
+        m_startPoint = pt;
+        m_stage = 1;
+    }
+    else if (m_stage == 1)
+    {
+        m_controlPoint1 = pt;
+        m_stage = 2;
+    }
+    else if (m_stage == 2)
+    {
+        m_controlPoint2 = pt;
+        m_stage = 3;
+    }
+    else if (m_stage == 3)
+    {
+        m_endPoint = pt;
+        if (m_document)
+            m_createdEntityId = m_document->createBezier(m_startPoint, m_controlPoint1, m_controlPoint2, m_endPoint);
+        commit();
+    }
+    return true;
+}
+
+// 鼠标移动事件：更新当前点用于预览
+bool BezierCommand::onMouseMove(int x, int y)
+{
+    if (m_state != CommandState::Active)
+        return false;
+
+    if (m_stage == 1)
+        m_controlPoint1 = QPointF(x, y);
+    else if (m_stage == 2)
+        m_controlPoint2 = QPointF(x, y);
+    else if (m_stage == 3)
+        m_endPoint = QPointF(x, y);
+    return true;
+}
+
+// 键盘事件：Backspace回退阶段，Esc取消命令
+bool BezierCommand::onKeyPress(int key)
+{
+    if (m_state != CommandState::Active)
+        return false;
+
+    if (key == Qt::Key_Backspace)
+    {
+        if (m_stage > 0)
+        {
+            m_stage--;
+            return true;
+        }
+    }
+    else if (key == Qt::Key_Escape)
+    {
+        cancel();
+        return true;
+    }
+
+    return false;
+}
+
+ITool* BezierCommand::activeTool() const
+{
+    return nullptr;
+}
+
+UndoCommand* BezierCommand::createUndoCommand()
+{
+    if (m_createdEntityId.isEmpty())
+        return nullptr;
+
+    return new BezierUndoCommand(m_document, m_createdEntityId);
+}
+
+bool BezierCommand::isComplete() const
+{
+    return m_createdEntityId.isEmpty() == false;
+}
+
+CommandPreview BezierCommand::preview() const
+{
+    CommandPreview p;
+    if (m_stage >= 3 && !m_endPoint.isNull())
+    {
+        p.valid = true;
+        p.type = PreviewType::Bezier;
+        p.previewPoints.append(m_startPoint);
+        p.previewPoints.append(m_endPoint);
+        p.controlPoints.append(m_controlPoint1);
+        p.controlPoints.append(m_controlPoint2);
+    }
+    return p;
+}
+
+void BezierCommand::setDocument(SceneDocument2D* document)
+{
+    m_document = document;
+}
+
+// NurbsCommand - 绘制NURBS曲线命令
+
+NurbsCommand::NurbsCommand()
+{
+}
+
+QString NurbsCommand::commandId() const
+{
+    return QStringLiteral("2d.draw_nurbs");
+}
+
+QString NurbsCommand::displayName() const
+{
+    return QObject::tr("Draw NURBS");
+}
+
+bool NurbsCommand::isInteractive() const
+{
+    return true;
+}
+
+CommandState NurbsCommand::state() const
+{
+    return m_state;
+}
+
+bool NurbsCommand::activate(const UiServices& services)
+{
+    SY_INFO("[CreateCommands] NurbsCommand activated");
+    m_services = &services;
+    m_document = services.document2D;
+    m_state = CommandState::Active;
+    m_controlPoints.clear();
+    m_currentPoint = QPointF();
+    m_completed = false;
+    m_createdEntityId.clear();
+    return true;
+}
+
+void NurbsCommand::cancel()
+{
+    SY_INFO("[CreateCommands] NurbsCommand cancelled");
+    m_state = CommandState::Cancelled;
+}
+
+void NurbsCommand::commit()
+{
+    if (m_controlPoints.size() >= 2 && m_document)
+        m_createdEntityId = m_document->createNurbs(m_controlPoints);
+    SY_INFOF("[CreateCommands] NurbsCommand committed: entity=%s, points=%d",
+        m_createdEntityId.toUtf8().constData(), m_controlPoints.size());
+    m_state = CommandState::Committed;
+}
+
+void NurbsCommand::reset()
+{
+    m_state = CommandState::Idle;
+    m_controlPoints.clear();
+    m_currentPoint = QPointF();
+    m_completed = false;
+    m_createdEntityId.clear();
+}
+
+bool NurbsCommand::onMouseDown(int x, int y)
+{
+    if (m_state != CommandState::Active)
+        return false;
+
+    m_controlPoints.append(QPointF(x, y));
+    return true;
+}
+
+bool NurbsCommand::onMouseMove(int x, int y)
+{
+    if (m_state != CommandState::Active)
+        return false;
+
+    m_currentPoint = QPointF(x, y);
+    return true;
+}
+
+// 键盘事件：Enter完成绘制，Backspace删除最后一点，Esc取消
+bool NurbsCommand::onKeyPress(int key)
+{
+    if (m_state != CommandState::Active)
+        return false;
+
+    if (key == Qt::Key_Enter || key == Qt::Key_Return)
+    {
+        if (m_controlPoints.size() >= 2)
+        {
+            m_completed = true;
+            commit();
+        }
+        return true;
+    }
+    else if (key == Qt::Key_Backspace && !m_controlPoints.isEmpty())
+    {
+        m_controlPoints.removeLast();
+        return true;
+    }
+    else if (key == Qt::Key_Escape)
+    {
+        cancel();
+        return true;
+    }
+
+    return false;
+}
+
+ITool* NurbsCommand::activeTool() const
+{
+    return nullptr;
+}
+
+UndoCommand* NurbsCommand::createUndoCommand()
+{
+    if (m_createdEntityId.isEmpty())
+        return nullptr;
+
+    return new NurbsUndoCommand(m_document, m_createdEntityId);
+}
+
+bool NurbsCommand::isComplete() const
+{
+    return m_completed;
+}
+
+CommandPreview NurbsCommand::preview() const
+{
+    CommandPreview p;
+    if (!m_controlPoints.isEmpty())
+    {
+        p.valid = true;
+        p.type = PreviewType::Nurbs;
+        p.controlPoints = m_controlPoints;
+        if (!m_currentPoint.isNull())
+            p.controlPoints.append(m_currentPoint);
+    }
+    return p;
+}
+
+void NurbsCommand::setDocument(SceneDocument2D* document)
+{
+    m_document = document;
+}
+
+// SmartLineCommand - 绘制复合图元命令
+
+SmartLineCommand::SmartLineCommand()
+{
+}
+
+QString SmartLineCommand::commandId() const
+{
+    return QStringLiteral("2d.draw_smartline");
+}
+
+QString SmartLineCommand::displayName() const
+{
+    return QObject::tr("Draw SmartLine");
+}
+
+bool SmartLineCommand::isInteractive() const
+{
+    return true;
+}
+
+CommandState SmartLineCommand::state() const
+{
+    return m_state;
+}
+
+bool SmartLineCommand::activate(const UiServices& services)
+{
+    SY_INFO("[CreateCommands] SmartLineCommand activated");
+    m_services = &services;
+    m_document = services.document2D;
+    m_state = CommandState::Active;
+    m_points.clear();
+    m_currentPoint = QPointF();
+    m_completed = false;
+    m_createdEntityId.clear();
+    return true;
+}
+
+void SmartLineCommand::cancel()
+{
+    SY_INFO("[CreateCommands] SmartLineCommand cancelled");
+    m_state = CommandState::Cancelled;
+}
+
+void SmartLineCommand::commit()
+{
+    if (m_points.size() >= 2 && m_document)
+        m_createdEntityId = m_document->createSmartLine(m_points);
+    SY_INFOF("[CreateCommands] SmartLineCommand committed: entity=%s, points=%d",
+        m_createdEntityId.toUtf8().constData(), m_points.size());
+    m_state = CommandState::Committed;
+}
+
+void SmartLineCommand::reset()
+{
+    m_state = CommandState::Idle;
+    m_points.clear();
+    m_currentPoint = QPointF();
+    m_completed = false;
+    m_createdEntityId.clear();
+}
+
+bool SmartLineCommand::onMouseDown(int x, int y)
+{
+    if (m_state != CommandState::Active)
+        return false;
+
+    m_points.append(QPointF(x, y));
+    return true;
+}
+
+bool SmartLineCommand::onMouseMove(int x, int y)
+{
+    if (m_state != CommandState::Active)
+        return false;
+
+    m_currentPoint = QPointF(x, y);
+    return true;
+}
+
+// 键盘事件：Enter完成绘制，Backspace删除最后一点，Esc取消
+bool SmartLineCommand::onKeyPress(int key)
+{
+    if (m_state != CommandState::Active)
+        return false;
+
+    if (key == Qt::Key_Enter || key == Qt::Key_Return)
+    {
+        if (m_points.size() >= 2)
+        {
+            m_completed = true;
+            commit();
+        }
+        return true;
+    }
+    else if (key == Qt::Key_Backspace && !m_points.isEmpty())
+    {
+        m_points.removeLast();
+        return true;
+    }
+    else if (key == Qt::Key_Escape)
+    {
+        cancel();
+        return true;
+    }
+
+    return false;
+}
+
+ITool* SmartLineCommand::activeTool() const
+{
+    return nullptr;
+}
+
+UndoCommand* SmartLineCommand::createUndoCommand()
+{
+    if (m_createdEntityId.isEmpty())
+        return nullptr;
+
+    return new SmartLineUndoCommand(m_document, m_createdEntityId);
+}
+
+bool SmartLineCommand::isComplete() const
+{
+    return m_completed;
+}
+
+CommandPreview SmartLineCommand::preview() const
+{
+    CommandPreview p;
+    if (!m_points.isEmpty())
+    {
+        p.valid = true;
+        p.type = PreviewType::SmartLine;
+        p.previewPoints = m_points;
+        if (!m_currentPoint.isNull())
+            p.previewPoints.append(m_currentPoint);
+    }
+    return p;
+}
+
+void SmartLineCommand::setDocument(SceneDocument2D* document)
+{
+    m_document = document;
+}
+
+// BezierUndoCommand - 贝塞尔曲线的撤销命令
+
+BezierUndoCommand::BezierUndoCommand(SceneDocument2D* document, const QString& entityId)
+    : UndoCommand(QObject::tr("Draw Bezier"))
+    , m_document(document)
+    , m_entityId(entityId)
+    , m_isBezier2(false)
+{
+    auto* sm = document->sceneManager();
+    if (sm)
+    {
+        auto* bezier2 = dynamic_cast<Eg::SyBezier2*>(sm->findEntityById(entityId.toULongLong()));
+        if (bezier2)
+        {
+            m_isBezier2 = true;
+            m_start = QPointF(bezier2->basePoint.x(), bezier2->basePoint.y());
+            m_ctrl1 = QPointF(bezier2->ptCtrl.x(), bezier2->ptCtrl.y());
+            m_end = QPointF(bezier2->ptEnd.x(), bezier2->ptEnd.y());
+        }
+        else
+        {
+            auto* bezier = dynamic_cast<Eg::SyBezier*>(sm->findEntityById(entityId.toULongLong()));
+            if (bezier)
+            {
+                m_isBezier2 = false;
+                m_start = QPointF(bezier->basePoint.x(), bezier->basePoint.y());
+                m_ctrl1 = QPointF(bezier->ptCtrl0.x(), bezier->ptCtrl0.y());
+                m_ctrl2 = QPointF(bezier->ptCtrl1.x(), bezier->ptCtrl1.y());
+                m_end = QPointF(bezier->ptEnd.x(), bezier->ptEnd.y());
+            }
+        }
+    }
+}
+
+void BezierUndoCommand::undo()
+{
+    if (!m_document)
+        return;
+
+    auto* sm = m_document->sceneManager();
+    if (!sm)
+        return;
+
+    auto eid = static_cast<Eg::EntityId>(m_entityId.toULongLong());
+    auto entity = sm->extractEntityById(eid);
+    if (entity)
+    {
+        m_storedEntity = std::move(entity);
+    }
+}
+
+void BezierUndoCommand::redo()
+{
+    if (!m_document)
+        return;
+
+    auto* sm = m_document->sceneManager();
+    if (!sm)
+        return;
+
+    if (m_storedEntity)
+    {
+        sm->insertEntityPreserveId(std::move(m_storedEntity));
+    }
+    else
+    {
+        if (m_isBezier2)
+            m_entityId = m_document->createBezier2(m_start, m_ctrl1, m_end);
+        else
+            m_entityId = m_document->createBezier(m_start, m_ctrl1, m_ctrl2, m_end);
+    }
+    m_document->selectEntity(m_entityId);
+}
+
+// NurbsUndoCommand - NURBS曲线的撤销命令
+
+NurbsUndoCommand::NurbsUndoCommand(SceneDocument2D* document, const QString& entityId)
+    : UndoCommand(QObject::tr("Draw NURBS"))
+    , m_document(document)
+    , m_entityId(entityId)
+{
+    auto* sm = document->sceneManager();
+    if (sm)
+    {
+        auto* nurbs = dynamic_cast<Eg::SyNurbs*>(sm->findEntityById(entityId.toULongLong()));
+        if (nurbs)
+        {
+            for (const auto& pt : nurbs->vControlPoints)
+                m_controlPoints.append(QPointF(pt.x(), pt.y()));
+        }
+    }
+}
+
+void NurbsUndoCommand::undo()
+{
+    if (!m_document)
+        return;
+
+    auto* sm = m_document->sceneManager();
+    if (!sm)
+        return;
+
+    auto eid = static_cast<Eg::EntityId>(m_entityId.toULongLong());
+    auto entity = sm->extractEntityById(eid);
+    if (entity)
+    {
+        m_storedEntity = std::move(entity);
+    }
+}
+
+void NurbsUndoCommand::redo()
+{
+    if (!m_document)
+        return;
+
+    auto* sm = m_document->sceneManager();
+    if (!sm)
+        return;
+
+    if (m_storedEntity)
+    {
+        sm->insertEntityPreserveId(std::move(m_storedEntity));
+    }
+    else
+    {
+        m_entityId = m_document->createNurbs(m_controlPoints);
+    }
+    m_document->selectEntity(m_entityId);
+}
+
+// SmartLineUndoCommand - 复合图元的撤销命令
+
+SmartLineUndoCommand::SmartLineUndoCommand(SceneDocument2D* document, const QString& entityId)
+    : UndoCommand(QObject::tr("Draw SmartLine"))
+    , m_document(document)
+    , m_entityId(entityId)
+{
+    // SmartLine 是容器型图元，撤销时直接保存其 ID 即可，
+    // 具体的子段信息在 undo/redo 时通过场景管理器整体提取/恢复。
+}
+
+void SmartLineUndoCommand::undo()
+{
+    if (!m_document)
+        return;
+
+    auto* sm = m_document->sceneManager();
+    if (!sm)
+        return;
+
+    auto eid = static_cast<Eg::EntityId>(m_entityId.toULongLong());
+    auto entity = sm->extractEntityById(eid);
+    if (entity)
+    {
+        m_storedEntity = std::move(entity);
+    }
+}
+
+void SmartLineUndoCommand::redo()
+{
+    if (!m_document)
+        return;
+
+    auto* sm = m_document->sceneManager();
+    if (!sm)
+        return;
+
+    if (m_storedEntity)
+    {
+        sm->insertEntityPreserveId(std::move(m_storedEntity));
+    }
+    else
+    {
+        m_entityId = m_document->createSmartLine(m_points);
     }
     m_document->selectEntity(m_entityId);
 }

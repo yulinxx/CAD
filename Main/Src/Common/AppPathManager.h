@@ -2,12 +2,12 @@
 
 #include <QString>
 
- /**
-  * @file AppPathManager.h
-  * @brief 应用程序路径管理器定义
-  *
-  * 定义了应用程序路径管理类，负责管理配置文件、资源文件、插件等路径。
-  */
+/**
+ * @file AppPathManager.h
+ * @brief 应用程序路径管理器定义
+ *
+ * 定义了应用程序路径管理类，负责管理配置文件、资源文件、插件等路径。
+ */
 
 class AppPathManager
 {
@@ -30,4 +30,7 @@ public:
     /// 获取应用程序根目录
     /// @return 根目录绝对路径
     static QString appRootDir();
+
+    /// 获取崩溃 minidump 存储目录（跨平台，可写）
+    static QString crashDumpsDir();
 };

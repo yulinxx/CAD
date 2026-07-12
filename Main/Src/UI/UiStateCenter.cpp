@@ -1,6 +1,5 @@
 #include "UiStateCenter.h"
 
-
 /// @param parent 父对象
 UiStateCenter::UiStateCenter(QObject* parent) : QObject(parent)
 {

@@ -18,15 +18,15 @@
 #include "UI/TransformParameters.h"
 #include <functional>
 
-/**
- * @brief 变换参数输入接口 — 让 Operation 不直接依赖 UI
- *
- * 这是一个抽象接口，用于收集变换操作所需的参数。
- * 不同的实现可以支持不同的输入方式：
- * - TransformDialogAdapter: 对话框输入
- * - MouseInteractionAdapter: 鼠标交互输入
- * - ScriptAdapter: 脚本输入
- */
+ /**
+  * @brief 变换参数输入接口 — 让 Operation 不直接依赖 UI
+  *
+  * 这是一个抽象接口，用于收集变换操作所需的参数。
+  * 不同的实现可以支持不同的输入方式：
+  * - TransformDialogAdapter: 对话框输入
+  * - MouseInteractionAdapter: 鼠标交互输入
+  * - ScriptAdapter: 脚本输入
+  */
 class ITransformInputProvider
 {
 public:

@@ -10,7 +10,10 @@ class CameraController3D;
 struct RenderContext;
 struct RenderFrame;
 
-namespace Eg { class SceneManager; }
+namespace Eg
+{
+    class SceneManager;
+}
 
 /**
  * @file IRenderBackend.h

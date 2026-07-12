@@ -34,9 +34,9 @@
 #include "Engine2D/SyEntity/SyCircle.h"
 #include "Ut/Vec.h"
 
-// ============================================================================
-// 端到端测试：完整渲染管线
-// ============================================================================
+ // ============================================================================
+ // 端到端测试：完整渲染管线
+ // ============================================================================
 
 TEST(BackendE2ETest, FullRenderPipeline_SoftwareBackend)
 {
@@ -123,7 +123,7 @@ TEST(BackendE2ETest, BackendCapability_Consistency)
 
         auto caps = RenderBackendFactory::capabilitiesFor(type);
         EXPECT_EQ(backend->supportsCapability(BackendCapability::HardwareAccelerated),
-                  hasCapability(caps, BackendCapability::HardwareAccelerated));
+            hasCapability(caps, BackendCapability::HardwareAccelerated));
     }
 }
 

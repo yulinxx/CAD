@@ -23,7 +23,10 @@ public:
     std::vector<Eg::EntityId> getSelectedEntityIds() const;
     std::vector<Eg::EntityId> getAllEntityIds() const;
     void notifySceneChanged();
-    SceneDocument2D* document() const { return m_document; }
+    SceneDocument2D* document() const
+    {
+        return m_document;
+    }
 
 private:
     SceneDocument2D* m_document{ nullptr };

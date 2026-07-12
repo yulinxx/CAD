@@ -12,12 +12,12 @@
  * 提供状态快照功能和信号通知机制。
  */
 
-/**
- * @struct UiStateSnapshot
- * @brief UI 状态快照
- *
- * 封装了 UI 状态的所有关键信息，用于状态保存和恢复。
- */
+ /**
+  * @struct UiStateSnapshot
+  * @brief UI 状态快照
+  *
+  * 封装了 UI 状态的所有关键信息，用于状态保存和恢复。
+  */
 struct UiStateSnapshot
 {
     /// 当前工作台 ID
@@ -64,7 +64,7 @@ class UiStateCenter final : public QObject
     Q_OBJECT
 
 public:
-    
+
     /// @param parent 父对象
     explicit UiStateCenter(QObject* parent = nullptr);
 

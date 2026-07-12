@@ -33,7 +33,7 @@ namespace
     // 将活动命令的鼠标事件转发给交互分发器
     // 传入场景坐标（而非视口坐标），确保命令系统拿到的是世界坐标系下的点位
     bool forwardActiveCommand(IInteractionDispatcher* dispatcher, const QPointF& scenePos,
-        bool (IInteractionDispatcher::*forwardFn)(int, int))
+        bool (IInteractionDispatcher::* forwardFn)(int, int))
     {
         if (!dispatcher || !dispatcher->hasActiveCommand())
             return false;
@@ -113,6 +113,74 @@ void Viewport2D::resetView()
     updateStatus(tr("2D view reset")); // 2D 视图重置
 }
 
+void Viewport2D::zoomToFit()
+{
+    const QRectF bounds = documentBounds();
+    if (bounds.isNull() || bounds.isEmpty())
+    {
+        resetView();
+        return;
+    }
+
+    constexpr double margin = 50.0;
+    QRectF padded = bounds.adjusted(-margin, -margin, margin, margin);
+    fitInView(padded, Qt::KeepAspectRatio);
+    updateStatus(tr("2D zoom extents"));
+}
+
+void Viewport2D::setPanModeEnabled(bool enabled)
+{
+    m_panModeEnabled = enabled;
+    setDragMode(enabled ? QGraphicsView::ScrollHandDrag : QGraphicsView::RubberBandDrag);
+    updateStatus(enabled ? tr("2D pan mode") : tr("2D select mode"));
+}
+
+QRectF Viewport2D::documentBounds() const
+{
+    if (!m_document)
+        return {};
+
+    auto* sm = m_document->sceneManager();
+    if (!sm)
+        return {};
+
+    QRectF bounds;
+    for (const auto* entity : sm->getAllEntities())
+    {
+        if (!entity)
+            continue;
+
+        if (entity->eType == Eg::EType::LINE)
+        {
+            auto* line = static_cast<const Eg::SyLine*>(entity);
+            for (const auto& pt : line->vPoints)
+                bounds |= QRectF(pt.x(), pt.y(), 0, 0);
+        }
+        else if (entity->eType == Eg::EType::CIRCLE)
+        {
+            auto* circle = static_cast<const Eg::SyCircle*>(entity);
+            const auto& c = entity->basePoint;
+            const double r = circle->dRadius;
+            bounds |= QRectF(c.x() - r, c.y() - r, r * 2.0, r * 2.0);
+        }
+        else if (entity->eType == Eg::EType::ARC)
+        {
+            auto* arc = static_cast<const Eg::SyArc*>(entity);
+            const auto& c = entity->basePoint;
+            const double r = arc->dRadius;
+            bounds |= QRectF(c.x() - r, c.y() - r, r * 2.0, r * 2.0);
+        }
+        else if (entity->eType == Eg::EType::POLYGON)
+        {
+            auto* polygon = static_cast<const Eg::SyPolygon*>(entity);
+            for (const auto& v : polygon->vVertices)
+                bounds |= QRectF(v.x(), v.y(), 0, 0);
+        }
+    }
+
+    return bounds;
+}
+
 void Viewport2D::ensureGrid()
 {
     // 绘制网格线，便于捕捉和定位
@@ -185,7 +253,7 @@ void Viewport2D::refreshFromDocument()
     auto selected = sm->getSelectedEntities();
     auto isSelected = [&](const Eg::SyEntity* e) {
         return std::find(selected.begin(), selected.end(), e) != selected.end();
-    };
+        };
 
     for (const auto* entity : sm->getAllEntities())
     {
@@ -519,6 +587,21 @@ void Viewport2D::endBoxSelect(const QPointF& scenePos)
 
 void Viewport2D::wheelEvent(QWheelEvent* event)
 {
+    // Ctrl+滚轮优先转发给活动命令（如多边形调整边数）
+    if (event->modifiers() & Qt::ControlModifier)
+    {
+        if (m_interactionDispatcher && m_interactionDispatcher->hasActiveCommand())
+        {
+            auto handler = m_interactionDispatcher->currentHandler();
+            if (handler && handler->onWheel(event->angleDelta().y()))
+            {
+                updateCommandPreview();
+                updateStatus(tr("2D command wheel"));
+                return;
+            }
+        }
+    }
+
     const double factor = event->angleDelta().y() > 0 ? 1.15 : 0.87;
     scale(factor, factor);
     updateStatus(tr("2D zoom"));
@@ -560,7 +643,7 @@ void Viewport2D::mouseDoubleClickEvent(QMouseEvent* event)
     // 双击事件处理：对于交互式命令，双击可作为提交结束信号
     // Polyline 等命令已通过 Enter 键或命令内部逻辑处理结束，此处仅保留基础转发
     const QPointF scenePos = snapPoint(mapToScene(event->pos()));
-    
+
     // 如果有活动命令，将双击视为结束命令的信号
     if (m_interactionDispatcher && m_interactionDispatcher->hasActiveCommand())
     {
@@ -582,6 +665,11 @@ void Viewport2D::contextMenuEvent(QContextMenuEvent* event)
     auto* drawCircle = menu.addAction(tr("Draw Circle")); // 绘制圆
     auto* drawArc = menu.addAction(tr("Draw Arc")); // 绘制弧
     auto* drawPolygon = menu.addAction(tr("Draw Polygon")); // 绘制多边形
+    auto* drawBezier2 = menu.addAction(tr("Draw Bezier2")); // 二阶贝塞尔
+    auto* drawBezier = menu.addAction(tr("Draw Bezier")); // 三阶贝塞尔
+    auto* drawNurbs = menu.addAction(tr("Draw NURBS")); // NURBS曲线
+    auto* drawSmartLine = menu.addAction(tr("Draw SmartLine")); // 复合图元
+    menu.addSeparator();
     auto* move = menu.addAction(tr("Move")); // 移动
     auto* copy = menu.addAction(tr("Copy")); // 复制
     auto* rotate = menu.addAction(tr("Rotate")); // 旋转
@@ -597,13 +685,17 @@ void Viewport2D::contextMenuEvent(QContextMenuEvent* event)
     auto triggerCommand = [this](const QString& commandId) {
         if (m_commandDispatcher)
             m_commandDispatcher->execute(commandId);
-    };
+        };
 
     if (chosen == drawLine)       triggerCommand(QStringLiteral("2d.draw_line"));
     else if (chosen == drawPolyline) triggerCommand(QStringLiteral("2d.draw_polyline"));
     else if (chosen == drawCircle)   triggerCommand(QStringLiteral("2d.draw_circle"));
     else if (chosen == drawArc)      triggerCommand(QStringLiteral("2d.draw_arc"));
     else if (chosen == drawPolygon)  triggerCommand(QStringLiteral("2d.draw_polygon"));
+    else if (chosen == drawBezier2)  triggerCommand(QStringLiteral("2d.draw_bezier2"));
+    else if (chosen == drawBezier)   triggerCommand(QStringLiteral("2d.draw_bezier"));
+    else if (chosen == drawNurbs)    triggerCommand(QStringLiteral("2d.draw_nurbs"));
+    else if (chosen == drawSmartLine) triggerCommand(QStringLiteral("2d.draw_smartline"));
     else if (chosen == move)         triggerCommand(QStringLiteral("2d.move"));
     else if (chosen == copy)         triggerCommand(QStringLiteral("2d.copy"));
     else if (chosen == rotate)       triggerCommand(QStringLiteral("2d.rotate"));
@@ -640,30 +732,42 @@ void Viewport2D::updateCommandPreview()
     // 根据预览类型选择对应的绘制方式
     switch (preview.type)
     {
-    case PreviewType::Line:
-        addPreviewLine(preview.previewStart, preview.previewEnd);
-        break;
-    case PreviewType::Circle:
-        addPreviewCircle(preview.previewCenter, preview.previewRadius);
-        break;
-    case PreviewType::Arc:
-    {
-        QVector<QPointF> arcPreviewPts;
-        arcPreviewPts.append(preview.previewCenter);
-        arcPreviewPts.append(preview.previewPoints.value(0));
-        arcPreviewPts.append(preview.previewPoints.value(1));
-        addPreviewPolyline(arcPreviewPts);
-        break;
-    }
-    case PreviewType::Polyline:
-        addPreviewPolyline(preview.previewPoints);
-        break;
-    case PreviewType::Polygon:
-        addPreviewPolyline(preview.previewPoints);
-        break;
-    default:
-        clearPreviewItems();
-        break;
+        case PreviewType::Line:
+            addPreviewLine(preview.previewStart, preview.previewEnd);
+            break;
+        case PreviewType::Circle:
+            addPreviewCircle(preview.previewCenter, preview.previewRadius);
+            break;
+        case PreviewType::Arc:
+        {
+            QVector<QPointF> arcPreviewPts;
+            arcPreviewPts.append(preview.previewCenter);
+            arcPreviewPts.append(preview.previewPoints.value(0));
+            arcPreviewPts.append(preview.previewPoints.value(1));
+            addPreviewPolyline(arcPreviewPts);
+            break;
+        }
+        case PreviewType::Polyline:
+            addPreviewPolyline(preview.previewPoints);
+            break;
+        case PreviewType::Polygon:
+            addPreviewPolyline(preview.previewPoints);
+            break;
+        case PreviewType::Bezier2:
+            addPreviewBezier(preview.previewPoints, preview.controlPoints);
+            break;
+        case PreviewType::Bezier:
+            addPreviewBezier(preview.previewPoints, preview.controlPoints);
+            break;
+        case PreviewType::Nurbs:
+            addPreviewPolyline(preview.controlPoints);
+            break;
+        case PreviewType::SmartLine:
+            addPreviewPolyline(preview.previewPoints);
+            break;
+        default:
+            clearPreviewItems();
+            break;
     }
 }
 
@@ -687,6 +791,12 @@ void Viewport2D::clearPreviewItems()
         delete item;
     }
     m_previewPolylineItems.clear();
+    for (auto* item : m_previewPathItems)
+    {
+        m_scene->removeItem(item);
+        delete item;
+    }
+    m_previewPathItems.clear();
 }
 
 void Viewport2D::addPreviewCircle(const QPointF& center, double radius)
@@ -750,6 +860,74 @@ void Viewport2D::addPreviewPolyline(const QVector<QPointF>& points)
             QPen(QColor(80, 180, 255, 180), 2, Qt::DashLine));
         m_previewPolylineItems.append(item);
     }
+}
+
+void Viewport2D::addPreviewBezier(const QVector<QPointF>& endpoints, const QVector<QPointF>& controlPoints)
+{
+    // 清除旧的线预览和椭圆预览
+    if (m_previewLine)
+    {
+        m_scene->removeItem(m_previewLine);
+        delete m_previewLine;
+        m_previewLine = nullptr;
+    }
+    if (m_previewEllipse)
+    {
+        m_scene->removeItem(m_previewEllipse);
+        delete m_previewEllipse;
+        m_previewEllipse = nullptr;
+    }
+
+    // 清除旧的多段线预览
+    for (auto* item : m_previewPolylineItems)
+    {
+        m_scene->removeItem(item);
+        delete item;
+    }
+    m_previewPolylineItems.clear();
+
+    // 清除旧的贝塞尔路径预览
+    for (auto* item : m_previewPathItems)
+    {
+        m_scene->removeItem(item);
+        delete item;
+    }
+    m_previewPathItems.clear();
+
+    if (endpoints.size() < 2)
+        return;
+
+    const QPointF& start = endpoints[0];
+    const QPointF& end = endpoints[1];
+
+    // 绘制控制线（虚线）
+    QPen controlPen(QColor(255, 100, 100, 150), 1, Qt::DashLine);
+    for (const auto& cp : controlPoints)
+    {
+        auto* cLine1 = m_scene->addLine(QLineF(start, cp), controlPen);
+        auto* cLine2 = m_scene->addLine(QLineF(cp, end), controlPen);
+        m_previewPolylineItems.append(cLine1);
+        m_previewPolylineItems.append(cLine2);
+    }
+
+    // 绘制贝塞尔曲线（实线）
+    QPen curvePen(QColor(80, 180, 255, 200), 2, Qt::SolidLine);
+    QPainterPath path;
+    path.moveTo(start);
+
+    if (controlPoints.size() == 1)
+    {
+        // 二阶贝塞尔
+        path.quadTo(controlPoints[0], end);
+    }
+    else if (controlPoints.size() >= 2)
+    {
+        // 三阶贝塞尔
+        path.cubicTo(controlPoints[0], controlPoints[1], end);
+    }
+
+    auto* pathItem = m_scene->addPath(path, curvePen);
+    m_previewPathItems.append(pathItem);
 }
 
 void Viewport2D::mousePressEvent(QMouseEvent* event)
@@ -841,7 +1019,3 @@ void Viewport2D::mouseReleaseEvent(QMouseEvent* event)
 
     QGraphicsView::mouseReleaseEvent(event);
 }
-
-
-
-

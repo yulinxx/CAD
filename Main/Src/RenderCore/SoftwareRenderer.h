@@ -29,7 +29,7 @@ class SoftwareRenderer
 public:
     /// 将渲染帧绘制到 QPainter
     void render(QPainter& painter, const RenderFrame& frame, const ViewCamera3D& camera,
-                const Size2D& viewportSize);
+        const Size2D& viewportSize);
 
 private:
     /// 绘制 3D 批次（使用 Camera3D 投影）
@@ -37,9 +37,9 @@ private:
 
     /// 绘制坐标轴指示器
     static void drawAxesIndicator(QPainter& painter, const ViewCamera3D& camera,
-                                   int viewW, int viewH);
+        int viewW, int viewH);
 
     /// 绘制帧统计覆盖层
     static void drawStatisticsOverlay(QPainter& painter, const RenderFrame& frame,
-                                       int viewW, int viewH);
+        int viewW, int viewH);
 };

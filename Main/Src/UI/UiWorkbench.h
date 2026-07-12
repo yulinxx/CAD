@@ -21,7 +21,7 @@ class SceneTreeDockWidget;
  * 定义了 UI 工作台接口及其实现类，包括 2D 和 3D 工作台。
  */
 
- // ============================================================ 
+ // ============================================================
  /**
  * @struct WorkbenchStateSnapshot
  * @brief 工作台状态快照
@@ -51,14 +51,14 @@ struct WorkbenchStateSnapshot
     bool dirty{ false };
 };
 
-// ============================================================ 
+// ============================================================
 /**
  * @class UiWorkbench
  * @brief 工作台抽象接口
  *
  * 定义工作台的生命周期管理：初始化、附加到窗口、激活、停用、关闭。
  * 工作台切换时通过状态快照机制保存和恢复状态。
- * 
+ *
  * 基类提供状态快照的通用实现，子类只需在 attachToWindow 中填充 m_initialState。
  */
 class UiWorkbench
@@ -112,7 +112,7 @@ protected:
     WorkbenchStateSnapshot m_savedState;
 };
 
-// ============================================================ 
+// ============================================================
 /**
  * @class Workbench2D
  * @brief 2D 工作台实现
@@ -129,8 +129,6 @@ public:
     void activate() override;
     void deactivate() override;
     void shutdown() override;
-
-    
 
 private:
     /// 创建当前工作台应使用的中央视口
@@ -155,13 +153,12 @@ private:
     /// 配置工作台初始状态与属性面板文本
     /// @param properties 属性面板
     void configureInitialWorkbenchState(PropertiesPanelWidget* properties) const;
-    
 
 private:
     std::shared_ptr<SceneDocument2D> m_document;
 };
 
-// ============================================================ 
+// ============================================================
 /**
  * @class Workbench3D
  * @brief 3D 工作台实现
@@ -192,7 +189,7 @@ private:
     void init3DInitialState(const SceneDocument3D& scene, const QString& rootNodeId);
     /// 场景树选择回调（提取自 build3DScenePanels 以减少闭包复杂度）
     void onSceneTreeSelection(const QString& nodeId, SceneTreeDockWidget* sceneDock,
-                              PropertiesPanelWidget* properties, WorkbenchWindow& window);
+        PropertiesPanelWidget* properties, WorkbenchWindow& window);
 
 private:
     /// 3D 场景文档
@@ -201,6 +198,5 @@ private:
     DefaultCameraController3D m_camera;
 };
 
-// ============================================================ 
+// ============================================================
 using Workbench2DMain = Workbench2D;
-

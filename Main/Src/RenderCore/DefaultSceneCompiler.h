@@ -26,11 +26,11 @@ public:
     RenderFrame compile(SceneDocument3D* document, const RenderContext& context) override;
 
     RenderFrame compileIncremental(Eg::SceneManager* scene,
-                                   const RenderContext& context,
-                                   const RenderFrame& previousFrame) override;
+        const RenderContext& context,
+        const RenderFrame& previousFrame) override;
     RenderFrame compileIncremental(SceneDocument3D* document,
-                                   const RenderContext& context,
-                                   const RenderFrame& previousFrame) override;
+        const RenderContext& context,
+        const RenderFrame& previousFrame) override;
 
     void invalidateCache() override;
     bool hasCachedFrame() const override;

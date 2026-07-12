@@ -8,5 +8,5 @@
  * 若未来改为独立 DLL，只需修改此文件即可切换导出模式。
  */
 
-// 静态库模式：不需要 dllimport/dllexport
+ // 静态库模式：不需要 dllimport/dllexport
 #define RENDER_CORE_API

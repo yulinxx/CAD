@@ -256,7 +256,7 @@ bool RenderCoreRenderer::isOrbitMode() const
 // ============================================================================
 
 void RenderCoreRenderer::onMousePress(int x, int y, int button, int modifiers,
-                                       int viewW, int viewH)
+    int viewW, int viewH)
 {
     m_camera.onMousePress(x, y, button, modifiers, viewW, viewH);
 

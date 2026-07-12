@@ -15,8 +15,8 @@ namespace
     using TraverseFunc = std::function<std::vector<RenderBatch>(const RenderContext&)>;
 
     RenderFrame compileGeneric(TraverseFunc traverse, const RenderContext& context,
-                               const std::string& sceneType, CompilationStrategy& strategy,
-                               BatchManager& batchManager, void* lastDocumentPtr, void* currentDocumentPtr)
+        const std::string& sceneType, CompilationStrategy& strategy,
+        BatchManager& batchManager, void* lastDocumentPtr, void* currentDocumentPtr)
     {
         if (lastDocumentPtr != currentDocumentPtr)
         {
@@ -37,7 +37,7 @@ namespace
                 result.statistics.frameTimeMs = 0.0f;
                 result.statistics.compileTimeMs = 0.0f;
                 result.description = "Compiled " + sceneType + " scene (cached, " +
-                                    std::to_string(result.batchCount()) + " batches)";
+                    std::to_string(result.batchCount()) + " batches)";
                 return result;
             }
 
@@ -57,11 +57,11 @@ namespace
             result.timestamp = t0;
             result.valid = true;
             result.description = "Compiled " + sceneType + " scene (incremental, " +
-                                std::to_string(result.batchCount()) + " batches)";
+                std::to_string(result.batchCount()) + " batches)";
 
             batchManager.fillStatistics(result, context, t0, compileStart, compileEnd);
             batchManager.cacheFrame(result);
-            
+
             SY_INFO("[SceneCompiler] compile sceneType=%s incremental completed batches=%d time=%.2fms",
                 sceneType.c_str(), result.batchCount(), compileTime);
             return result;
@@ -95,8 +95,8 @@ namespace
     }
 
     RenderFrame compileIncrementalGeneric(TraverseFunc traverse, const RenderContext& context,
-                                          const std::string& sceneType, CompilationStrategy& strategy,
-                                          BatchManager& batchManager)
+        const std::string& sceneType, CompilationStrategy& strategy,
+        BatchManager& batchManager)
     {
         SY_DEBUG("[SceneCompiler] compileIncremental sceneType=%s", sceneType.c_str());
         const auto t0 = std::chrono::steady_clock::now();
@@ -122,7 +122,7 @@ namespace
             result.statistics.frameTimeMs = 0.0f;
             result.statistics.compileTimeMs = 0.0f;
             result.description = "Incremental " + sceneType + " (cached, " +
-                                std::to_string(result.batchCount()) + " batches)";
+                std::to_string(result.batchCount()) + " batches)";
             return result;
         }
 
@@ -141,7 +141,7 @@ namespace
         result.timestamp = t0;
         result.valid = true;
         result.description = "Incremental " + sceneType + " (partial, " +
-                            std::to_string(result.batchCount()) + " batches)";
+            std::to_string(result.batchCount()) + " batches)";
 
         batchManager.fillStatistics(result, context, t0, compileStart, compileEnd);
         batchManager.cacheFrame(result);
@@ -180,7 +180,7 @@ RenderFrame DefaultSceneCompiler::compileInternal(Eg::SceneManager* scene, const
 {
     auto traverse = [this, scene](const RenderContext& ctx) {
         return m_traverser.traverse2D(scene, ctx);
-    };
+        };
     return compileGeneric(traverse, context, "2D", m_strategy, m_batchManager, nullptr, nullptr);
 }
 
@@ -192,7 +192,7 @@ RenderFrame DefaultSceneCompiler::compileInternal(SceneDocument3D* document, con
 {
     auto traverse = [this, document](const RenderContext& ctx) {
         return m_traverser.traverse3D(document, ctx);
-    };
+        };
     return compileGeneric(traverse, context, "3D", m_strategy, m_batchManager, m_lastDocument3D, document);
 }
 
@@ -201,13 +201,13 @@ RenderFrame DefaultSceneCompiler::compileInternal(SceneDocument3D* document, con
 // ============================================================================
 
 RenderFrame DefaultSceneCompiler::compileIncremental(Eg::SceneManager* scene,
-                                                       const RenderContext& context,
-                                                       const RenderFrame& previousFrame)
+    const RenderContext& context,
+    const RenderFrame& previousFrame)
 {
     (void)previousFrame;
     auto traverse = [this, scene](const RenderContext& ctx) {
         return m_traverser.traverse2D(scene, ctx);
-    };
+        };
     return compileIncrementalGeneric(traverse, context, "2D", m_strategy, m_batchManager);
 }
 
@@ -216,13 +216,13 @@ RenderFrame DefaultSceneCompiler::compileIncremental(Eg::SceneManager* scene,
 // ============================================================================
 
 RenderFrame DefaultSceneCompiler::compileIncremental(SceneDocument3D* document,
-                                                      const RenderContext& context,
-                                                      const RenderFrame& previousFrame)
+    const RenderContext& context,
+    const RenderFrame& previousFrame)
 {
     (void)previousFrame;
     auto traverse = [this, document](const RenderContext& ctx) {
         return m_traverser.traverse3D(document, ctx);
-    };
+        };
     return compileIncrementalGeneric(traverse, context, "3D", m_strategy, m_batchManager);
 }
 

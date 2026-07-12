@@ -11,7 +11,10 @@
 
 class SceneDocument3D;
 
-namespace Eg { class SceneManager; }
+namespace Eg
+{
+    class SceneManager;
+}
 
 /**
  * @file SceneCompiler.h
@@ -49,13 +52,13 @@ public:
 
     /// 增量编译 2D 场景
     virtual RenderFrame compileIncremental(Eg::SceneManager* scene,
-                                           const RenderContext& context,
-                                           const RenderFrame& previousFrame) = 0;
+        const RenderContext& context,
+        const RenderFrame& previousFrame) = 0;
 
     /// 增量编译 3D 场景
     virtual RenderFrame compileIncremental(SceneDocument3D* document,
-                                           const RenderContext& context,
-                                           const RenderFrame& previousFrame) = 0;
+        const RenderContext& context,
+        const RenderFrame& previousFrame) = 0;
 
     // ============ 缓存控制 ============
 

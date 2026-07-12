@@ -35,8 +35,14 @@ public:
 
     void setViewportSize(int width, int height);
 
-    bool isDirty() const { return m_dirty; }
-    void clearDirty() { m_dirty = false; }
+    bool isDirty() const
+    {
+        return m_dirty;
+    }
+    void clearDirty()
+    {
+        m_dirty = false;
+    }
 
     // ============ 投影 ============
 
@@ -62,24 +68,57 @@ public:
 
     // ============ 模式 ============
 
-    void setOrbitMode(bool enabled) { m_orbitMode = enabled; }
-    bool isOrbitMode() const { return m_orbitMode; }
+    void setOrbitMode(bool enabled)
+    {
+        m_orbitMode = enabled;
+    }
+    bool isOrbitMode() const
+    {
+        return m_orbitMode;
+    }
 
-    void setMeasureMode(bool enabled) { m_measureMode = enabled; }
-    bool isMeasureMode() const { return m_measureMode; }
+    void setMeasureMode(bool enabled)
+    {
+        m_measureMode = enabled;
+    }
+    bool isMeasureMode() const
+    {
+        return m_measureMode;
+    }
 
     // ============ 交互状态查询 ============
 
-    bool isRotating() const { return m_rotating; }
-    bool isPanning() const { return m_panning; }
+    bool isRotating() const
+    {
+        return m_rotating;
+    }
+    bool isPanning() const
+    {
+        return m_panning;
+    }
 
     // ============ 访问器 ============
 
-    double yaw() const { return m_yaw; }
-    double pitch() const { return m_pitch; }
-    double distance() const { return m_distance; }
-    double panX() const { return m_panX; }
-    double panY() const { return m_panY; }
+    double yaw() const
+    {
+        return m_yaw;
+    }
+    double pitch() const
+    {
+        return m_pitch;
+    }
+    double distance() const
+    {
+        return m_distance;
+    }
+    double panX() const
+    {
+        return m_panX;
+    }
+    double panY() const
+    {
+        return m_panY;
+    }
 
 private:
     double m_yaw{ 0.0 };

@@ -20,18 +20,24 @@ struct RenderRectF
     double width{ 0.0 };
     double height{ 0.0 };
 
-    bool isValid() const { return width > 0 && height > 0; }
+    bool isValid() const
+    {
+        return width > 0 && height > 0;
+    }
 
-    bool isNull() const { return width == 0 && height == 0; }
+    bool isNull() const
+    {
+        return width == 0 && height == 0;
+    }
 
     bool intersects(const RenderRectF& other) const
     {
         if (!isValid() || !other.isValid())
             return false;
         return (x < other.x + other.width) &&
-               (x + width > other.x) &&
-               (y < other.y + other.height) &&
-               (y + height > other.y);
+            (x + width > other.x) &&
+            (y < other.y + other.height) &&
+            (y + height > other.y);
     }
 };
 
@@ -48,7 +54,10 @@ struct Size2D
     int width{ 0 };
     int height{ 0 };
 
-    bool isValid() const { return width > 0 && height > 0; }
+    bool isValid() const
+    {
+        return width > 0 && height > 0;
+    }
 };
 
 enum class RenderMode : uint8_t
@@ -63,21 +72,21 @@ inline const char* renderModeName(RenderMode mode)
 {
     switch (mode)
     {
-    case RenderMode::Wireframe: return "Wireframe";
-    case RenderMode::Shaded:    return "Shaded";
-    case RenderMode::Solid:     return "Solid";
-    case RenderMode::XRay:      return "XRay";
-    default:                    return "Unknown";
+        case RenderMode::Wireframe: return "Wireframe";
+        case RenderMode::Shaded:    return "Shaded";
+        case RenderMode::Solid:     return "Solid";
+        case RenderMode::XRay:      return "XRay";
+        default:                    return "Unknown";
     }
 }
 
 enum class PrimitiveType : uint8_t
 {
-    Points        = 0,
-    Lines         = 1,
-    LineStrip     = 2,
-    LineLoop      = 3,
-    Triangles     = 4,
+    Points = 0,
+    Lines = 1,
+    LineStrip = 2,
+    LineLoop = 3,
+    Triangles = 4,
     TriangleStrip = 5,
 };
 
@@ -102,8 +111,14 @@ struct RenderBatch
     bool selected{ false };
     RenderRectF boundingBox;
 
-    int vertexCount() const { return static_cast<int>(vertices.size()); }
-    bool empty() const { return vertices.empty(); }
+    int vertexCount() const
+    {
+        return static_cast<int>(vertices.size());
+    }
+    bool empty() const
+    {
+        return vertices.empty();
+    }
 };
 
 struct RenderStatistics
@@ -159,12 +174,12 @@ struct DirtyRegion
 
 enum class DirtyRegionType : uint8_t
 {
-    None       = 0,
-    Transform  = 1 << 0,
-    Geometry   = 1 << 1,
-    Selection  = 1 << 2,
-    View       = 1 << 3,
-    All        = Transform | Geometry | Selection | View,
+    None = 0,
+    Transform = 1 << 0,
+    Geometry = 1 << 1,
+    Selection = 1 << 2,
+    View = 1 << 3,
+    All = Transform | Geometry | Selection | View,
 };
 
 inline DirtyRegionType operator|(DirtyRegionType a, DirtyRegionType b)
@@ -179,15 +194,15 @@ inline bool hasDirtyFlag(DirtyRegionType flags, DirtyRegionType flag)
 
 enum class BackendCapability : uint32_t
 {
-    None                = 0,
+    None = 0,
     HardwareAccelerated = 1 << 0,
-    MultiViewport       = 1 << 1,
-    InstancedRendering  = 1 << 2,
-    ComputeShader       = 1 << 3,
-    RayTracing          = 1 << 4,
-    AntiAliasing        = 1 << 5,
-    HighDPI             = 1 << 6,
-    OffscreenRendering  = 1 << 7,
+    MultiViewport = 1 << 1,
+    InstancedRendering = 1 << 2,
+    ComputeShader = 1 << 3,
+    RayTracing = 1 << 4,
+    AntiAliasing = 1 << 5,
+    HighDPI = 1 << 6,
+    OffscreenRendering = 1 << 7,
 };
 
 inline BackendCapability operator|(BackendCapability a, BackendCapability b)

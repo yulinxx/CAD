@@ -3,7 +3,8 @@
 #include "UiCommandHandler.h"
 #include "Ut/Vec.h"
 
-namespace Eg {
+namespace Eg
+{
     class SyEntity;
 }
 
@@ -14,14 +15,14 @@ namespace Eg {
  * 提供镜像、旋转等几何变换的辅助功能。
  */
 
-/**
- * 旋转一个点（弧度）
- * @param point 原始点
- * @param center 旋转中心
- * @param cosAngle 角度余弦值
- * @param sinAngle 角度正弦值
- * @return 旋转后的点
- */
+ /**
+  * 旋转一个点（弧度）
+  * @param point 原始点
+  * @param center 旋转中心
+  * @param cosAngle 角度余弦值
+  * @param sinAngle 角度正弦值
+  * @return 旋转后的点
+  */
 QPointF rotatePoint(const QPointF& point, const QPointF& center, double cosAngle, double sinAngle);
 
 /**

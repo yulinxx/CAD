@@ -48,17 +48,17 @@ class UiLayoutService;
  *   forward*()    → 转发事件到当前handler，事件后自动检测isComplete并提交
  */
 
-/**
- * @class UiCommandDispatcher
- * @brief 命令分发器抽象接口
- *
- * 定义命令执行的标准流程：begin -> execute -> submit/cancel。
- * 支持将 QAction 绑定到命令 ID，实现 UI 动作与命令的解耦。
- * 命令执行过程中会自动同步状态到状态中心，确保命令状态与 UI 状态一致。
- * 
- * 支持命令处理器模式：每个命令 ID 可以注册一个 ICommandHandler，
- * 交互式命令在激活后进入等待状态，接收用户输入后提交或取消。
- */
+ /**
+  * @class UiCommandDispatcher
+  * @brief 命令分发器抽象接口
+  *
+  * 定义命令执行的标准流程：begin -> execute -> submit/cancel。
+  * 支持将 QAction 绑定到命令 ID，实现 UI 动作与命令的解耦。
+  * 命令执行过程中会自动同步状态到状态中心，确保命令状态与 UI 状态一致。
+  *
+  * 支持命令处理器模式：每个命令 ID 可以注册一个 ICommandHandler，
+  * 交互式命令在激活后进入等待状态，接收用户输入后提交或取消。
+  */
 class UiCommandDispatcher
 {
 public:
@@ -171,7 +171,7 @@ public:
  *
  * 实现命令分发逻辑，管理命令生命周期并同步状态到状态中心。
  * 命令执行时自动更新状态中心的命令相关字段，确保 UI 状态与命令状态一致。
- * 
+ *
  * 支持命令处理器模式和撤销/重做功能。
  */
 class DefaultUiCommandDispatcher final : public UiCommandDispatcher, public IInteractionDispatcher

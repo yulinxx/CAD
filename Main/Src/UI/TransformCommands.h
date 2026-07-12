@@ -12,7 +12,7 @@ class MoveUndoCommand : public UndoCommand
 {
 public:
     MoveUndoCommand(SceneDocument2D* document,
-                    std::map<QString, std::vector<QPointF>> originalPositions);
+        std::map<QString, std::vector<QPointF>> originalPositions);
 
     void undo() override;
     void redo() override;
@@ -24,21 +24,34 @@ private:
 };
 
 /**
+ * @enum UndoMode
+ * @brief 撤销模式：区分复制/删除操作方向
+ */
+enum class UndoMode
+{
+    Copy,   // 撤销时删除新建实体，重做时恢复
+    Delete  // 撤销时恢复已删实体，重做时再次删除
+};
+
+/**
  * @class CopyUndoCommand
- * @brief 复制命令的撤销操作
+ * @brief 复制命令的撤销操作（也用于删除命令的撤销/重做）
  */
 class CopyUndoCommand : public UndoCommand
 {
 public:
-    CopyUndoCommand(SceneDocument2D* document, const QStringList& copiedEntityIds);
-    CopyUndoCommand(SceneDocument2D* document, const QVector<EntitySnapshot>& snapshots);
+    CopyUndoCommand(const QString& text, SceneDocument2D* document,
+        const QVector<EntitySnapshot>& snapshots,
+        const QStringList& entityIds,
+        UndoMode mode);
     void undo() override;
     void redo() override;
 private:
     SceneDocument2D* m_document{ nullptr };
-    QStringList m_copiedEntityIds;
-    QVector<EntitySnapshot> m_snapshots;
-    QStringList m_oldSelection;
+    QVector<EntitySnapshot> m_snapshots;     // 实体快照（undo/redo 时用于重建）
+    QStringList m_entityIds;                 // 关联的实体 ID 列表
+    UndoMode m_mode{ UndoMode::Copy };
+    std::vector<std::unique_ptr<Eg::SyEntity>> m_storedEntities;
 };
 
 /**
@@ -105,18 +118,35 @@ public:
     bool onMouseDown(int x, int y) override;
     bool onMouseMove(int x, int y) override;
     bool onMouseUp(int x, int y) override;
+    bool onKeyPress(int key) override;
 
     ITool* activeTool() const override;
     UndoCommand* createUndoCommand() override;
     bool isComplete() const override;
+    CommandPreview preview() const override;
 
     void setDocument(SceneDocument2D* document);
 
-    const QPointF& rotationCenter() const { return m_rotationCenter; }
-    double startAngle() const { return m_startAngle; }
-    double currentAngle() const { return m_currentAngle; }
-    bool isRotating() const { return m_state == CommandState::Active && m_stage >= 2; }
-    int stage() const { return m_stage; }
+    const QPointF& rotationCenter() const
+    {
+        return m_rotationCenter;
+    }
+    double startAngle() const
+    {
+        return m_startAngle;
+    }
+    double currentAngle() const
+    {
+        return m_currentAngle;
+    }
+    bool isRotating() const
+    {
+        return m_state == CommandState::Active && m_stage >= 2;
+    }
+    int stage() const
+    {
+        return m_stage;
+    }
 
 private:
     void restoreOriginalPoints();
@@ -156,6 +186,7 @@ public:
     bool onMouseDown(int x, int y) override;
     bool onMouseMove(int x, int y) override;
     bool onMouseUp(int x, int y) override;
+    bool onKeyPress(int key) override;
 
     ITool* activeTool() const override;
     UndoCommand* createUndoCommand() override;
@@ -171,6 +202,7 @@ private:
     QPointF m_anchorPoint;
     QPointF m_targetPoint;
     bool m_hasAnchor{ false };
+    int m_stage{ 0 };
     QStringList m_copiedEntityIds;
     QVector<EntitySnapshot> m_copiedSnapshots;
 };
@@ -229,6 +261,7 @@ public:
 
     bool onMouseDown(int x, int y) override;
     bool onMouseMove(int x, int y) override;
+    bool onKeyPress(int key) override;
 
     ITool* activeTool() const override;
     UndoCommand* createUndoCommand() override;

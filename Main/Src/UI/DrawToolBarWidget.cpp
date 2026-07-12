@@ -31,7 +31,7 @@ void DrawToolBarWidget::connectToolChanged()
 
     m_commandDispatcher->setToolChangedCallback([this](const QString& toolId) {
         updateActiveTool(toolId);
-    });
+        });
 }
 
 void DrawToolBarWidget::updateActiveTool(const QString& toolId)
@@ -71,7 +71,8 @@ void DrawToolBarWidget::createToolButtons()
     layout->setSpacing(4);
     layout->setContentsMargins(4, 4, 4, 4);
 
-    struct ToolInfo {
+    struct ToolInfo
+    {
         QString id;
         QString displayName;
         QString tooltip;
@@ -84,6 +85,10 @@ void DrawToolBarWidget::createToolButtons()
         { QStringLiteral("2d.draw_circle"), tr("Circle"),     tr("Draw Circle"),  QStringLiteral("C") }, // 圆
         { QStringLiteral("2d.draw_arc"),    tr("Arc"),        tr("Draw Arc"),     QStringLiteral("A") }, // 圆弧
         { QStringLiteral("2d.draw_polygon"), tr("Polygon"),   tr("Draw Polygon"), QStringLiteral("PG") }, // 多边形
+        { QStringLiteral("2d.draw_bezier2"), tr("Bezier2"),   tr("Draw Bezier2"), QStringLiteral("B2") }, // 二阶贝塞尔
+        { QStringLiteral("2d.draw_bezier"), tr("Bezier"),     tr("Draw Bezier"),  QStringLiteral("B") }, // 三阶贝塞尔
+        { QStringLiteral("2d.draw_nurbs"),  tr("NURBS"),      tr("Draw NURBS"),   QStringLiteral("N") }, // NURBS曲线
+        { QStringLiteral("2d.draw_smartline"), tr("SmartLine"), tr("Draw SmartLine"), QStringLiteral("SL") }, // 复合图元
     };
 
     for (const auto& tool : tools)

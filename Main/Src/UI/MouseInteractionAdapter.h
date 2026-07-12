@@ -42,7 +42,10 @@ public:
     void startInteraction();
     void endInteraction();
     void confirm();
-    State state() const { return m_state; }
+    State state() const
+    {
+        return m_state;
+    }
     bool isInteracting() const;
 
     void onMousePressed(const QPointF& worldPos);

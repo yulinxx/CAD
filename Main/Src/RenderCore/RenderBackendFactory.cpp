@@ -11,7 +11,8 @@
 // 类型转换辅助函数
 // ============================================================================
 
-namespace {
+namespace
+{
     constexpr int BackendType_OpenGL = 1;
     constexpr int BackendType_Vulkan = 2;
     constexpr int BackendType_Metal = 3;
@@ -22,11 +23,11 @@ int RenderBackendFactory::toRegistryType(BackendType type)
 {
     switch (type)
     {
-    case BackendType::OpenGL:   return BackendType_OpenGL;
-    case BackendType::Vulkan:   return BackendType_Vulkan;
-    case BackendType::Metal:    return BackendType_Metal;
-    case BackendType::Software: return BackendType_Software;
-    default:                    return BackendType_OpenGL;
+        case BackendType::OpenGL:   return BackendType_OpenGL;
+        case BackendType::Vulkan:   return BackendType_Vulkan;
+        case BackendType::Metal:    return BackendType_Metal;
+        case BackendType::Software: return BackendType_Software;
+        default:                    return BackendType_OpenGL;
     }
 }
 
@@ -34,11 +35,11 @@ RenderBackendFactory::BackendType RenderBackendFactory::fromRegistryType(int typ
 {
     switch (type)
     {
-    case BackendType_OpenGL:   return BackendType::OpenGL;
-    case BackendType_Vulkan:   return BackendType::Vulkan;
-    case BackendType_Metal:    return BackendType::Metal;
-    case BackendType_Software: return BackendType::Software;
-    default:                   return BackendType::OpenGL;
+        case BackendType_OpenGL:   return BackendType::OpenGL;
+        case BackendType_Vulkan:   return BackendType::Vulkan;
+        case BackendType_Metal:    return BackendType::Metal;
+        case BackendType_Software: return BackendType::Software;
+        default:                   return BackendType::OpenGL;
     }
 }
 

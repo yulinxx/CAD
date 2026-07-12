@@ -70,7 +70,7 @@ namespace
             { QStringLiteral("commandOwner"), QStringLiteral("none") },
             { QStringLiteral("commandState"), QStringLiteral("idle") },
             { QStringLiteral("viewportStatus"), snapshot.viewportStatus }
-        });
+            });
     }
 
     /// 配置 3D 视口
@@ -89,10 +89,10 @@ namespace
                 services.stateCenter->setMetadata({
                     { QStringLiteral("viewportStatus"), status },
                     { QStringLiteral("viewportType"), QStringLiteral("3D") }
-                });
+                    });
             if (properties)
                 properties->setStateText(status);
-        });
+            });
 
         // 3D selection 单向流 — 视口选中时只更新 selection 和属性面板
         // 树控件通过 SceneDocument3D::selection() 监听来刷新，不再由视口回调触发
@@ -103,7 +103,7 @@ namespace
                 services.stateCenter->setSelectionContext(
                     QObject::tr("3D-Viewport"),
                     QObject::tr("3D node: %1").arg(nodeId));
-        });
+            });
     }
 
     /// 配置 2D 视口
@@ -124,10 +124,10 @@ namespace
                 services.stateCenter->setMetadata({
                     { QStringLiteral("viewportStatus"), status },
                     { QStringLiteral("viewportType"), QStringLiteral("2D") }
-                });
+                    });
             if (properties)
                 properties->setStateText(status);
-        });
+            });
         viewport->setSelectionCallback([&services](const QString& context, const QString& text) {
             if (services.stateCenter)
             {
@@ -136,9 +136,9 @@ namespace
                     { QStringLiteral("selectionSource"), context },
                     { QStringLiteral("selectionText"), text },
                     { QStringLiteral("selectionType"), QStringLiteral("2D") }
-                });
+                    });
             }
-        });
+            });
         viewport->setCommandStageCallback([&services](const QString& stage) {
             if (services.stateCenter)
             {
@@ -149,9 +149,9 @@ namespace
                     { QStringLiteral("commandPhase"), stage },
                     { QStringLiteral("commandOwner"), QStringLiteral("2D") },
                     { QStringLiteral("commandType"), QStringLiteral("2D") }
-                });
+                    });
             }
-        });
+            });
     }
 
     /// 更新 2D 对象详情到属性面板
@@ -170,7 +170,7 @@ namespace
         panel->setObjectDetails(QObject::tr("Line %1").arg(selectedId), {
             QObject::tr("Start: %1,%2").arg(line->vPoints[0].x()).arg(line->vPoints[0].y()),
             QObject::tr("End: %1,%2").arg(line->vPoints[1].x()).arg(line->vPoints[1].y()),
-        });
+            });
     }
 
     /// 更新 3D 对象详情到属性面板
@@ -198,7 +198,7 @@ namespace
             QObject::tr("Children: %1").arg(node->children().size()),
             QObject::tr("Path: %1").arg(pathStr),
             QObject::tr("Selected: yes")
-        });
+            });
     }
 }
 
@@ -246,8 +246,14 @@ void UiWorkbench::restoreFromSnapshot(const WorkbenchStateSnapshot& snapshot)
 // 流程：initialize → attachToWindow → activate ↔ deactivate → shutdown
 // 2D/3D 差异集中在配置，不散在流程里
 
-QString Workbench2D::id() const { return QStringLiteral("2D"); }
-QString Workbench2D::displayName() const { return QObject::tr("2D Workbench"); }
+QString Workbench2D::id() const
+{
+    return QStringLiteral("2D");
+}
+QString Workbench2D::displayName() const
+{
+    return QObject::tr("2D Workbench");
+}
 
 // 步骤1 — 初始化，存储服务引用
 bool Workbench2D::initialize(const UiServices& services)
@@ -307,7 +313,7 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
             QObject::tr("Primary: %1").arg(primaryId), // 主选: %1
             QObject::tr("Secondary: %1").arg(secondaryId), // 次选: %1
             QObject::tr("Mode: %1").arg(QObject::tr("2D")) // 模式: 2D
-        });
+            });
     }
 
     m_initialState.viewMode = QObject::tr("2D Canvas"); // 2D 画布
@@ -377,19 +383,19 @@ void Workbench2D::configureWorkbenchActions(QToolBar* mainBar, QToolBar* viewBar
     {
         QObject::connect(moveEntity, &QAction::triggered, [dispatcher]() {
             dispatcher->execute(QStringLiteral("2d.move"));
-        });
+            });
         QObject::connect(copyEntity, &QAction::triggered, [dispatcher]() {
             dispatcher->execute(QStringLiteral("2d.copy"));
-        });
+            });
         QObject::connect(rotateEntity, &QAction::triggered, [dispatcher]() {
             dispatcher->execute(QStringLiteral("2d.rotate"));
-        });
+            });
         QObject::connect(mirrorEntity, &QAction::triggered, [dispatcher]() {
             dispatcher->execute(QStringLiteral("2d.mirror"));
-        });
+            });
         QObject::connect(deleteEntity, &QAction::triggered, [dispatcher]() {
             dispatcher->execute(QStringLiteral("2d.delete"));
-        });
+            });
     }
 
     // 视图操作仍走 OperationBus（非业务命令）
@@ -397,10 +403,10 @@ void Workbench2D::configureWorkbenchActions(QToolBar* mainBar, QToolBar* viewBar
     {
         QObject::connect(zoomExtents, &QAction::triggered, [this]() {
             m_services.operationBus->run(OperationId::View_ZoomFit, {}, OperationSource::TopToolbar);
-        });
+            });
         QObject::connect(pan, &QAction::triggered, [this]() {
             m_services.operationBus->run(OperationId::View_Pan, {}, OperationSource::TopToolbar);
-        });
+            });
     }
 }
 
@@ -434,8 +440,14 @@ void Workbench2D::shutdown()
 // 统一工作台初始化模板
 // 流程：initialize → attachToWindow → activate ↔ deactivate → shutdown
 
-QString Workbench3D::id() const { return QStringLiteral("3D"); }
-QString Workbench3D::displayName() const { return QObject::tr("3D Workbench"); }
+QString Workbench3D::id() const
+{
+    return QStringLiteral("3D");
+}
+QString Workbench3D::displayName() const
+{
+    return QObject::tr("3D Workbench");
+}
 
 // 步骤1 — 初始化，存储服务引用
 bool Workbench3D::initialize(const UiServices& services)
@@ -481,7 +493,7 @@ void Workbench3D::build3DScenePanels(WorkbenchWindow& window, PropertiesPanelWid
     // 树选中时的单向流 — 用户点击树节点 → 更新 selection → 刷新视口和属性面板
     sceneDock->setSelectionCallback([this, sceneDock, properties, &window](const QString& nodeId) {
         onSceneTreeSelection(nodeId, sceneDock, properties, window);
-    });
+        });
     window.registerDockWidget(QObject::tr("3D Scene"), sceneDock, Qt::LeftDockWidgetArea); // 3D 场景
 
     auto* history = createPanelWidget(QObject::tr("Operation history"), &window); // 操作历史
@@ -490,7 +502,7 @@ void Workbench3D::build3DScenePanels(WorkbenchWindow& window, PropertiesPanelWid
 
 // 3D 树选择回调 — 单向流：树节点 → selection → 视口 + 属性面板
 void Workbench3D::onSceneTreeSelection(const QString& nodeId, SceneTreeDockWidget* sceneDock,
-                                        PropertiesPanelWidget* properties, WorkbenchWindow& window)
+    PropertiesPanelWidget* properties, WorkbenchWindow& window)
 {
     if (!m_scene)
         return;
@@ -523,7 +535,7 @@ void Workbench3D::onSceneTreeSelection(const QString& nodeId, SceneTreeDockWidge
                 QObject::tr("Children: %1").arg(node->children().size()),
                 QObject::tr("Path: %1").arg(pathStr),
                 QObject::tr("Selected: yes")
-            });
+                });
         }
     }
 
@@ -573,7 +585,7 @@ QWidget* Workbench3D::build3DViewport(WorkbenchWindow& window, PropertiesPanelWi
             properties->setObjectDetails(QObject::tr("3D Path"), pathNames); // 3D 路径
         if (sceneDock)
             sceneDock->refresh();
-    });
+        });
     viewport->setOrbitMode(true);
     viewport->setMeasureMode(false);
     return viewport;

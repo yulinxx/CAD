@@ -23,7 +23,7 @@ struct UiFrameworkServices
 
     /// 命令权限判定回调
     std::function<bool(const QString& commandId, const QString& context)> canExecuteCommand;
-    
+
     /// 性能记录回调
     std::function<void(const QString& scope, qint64 elapsedMs)> recordPerformance;
 };

@@ -30,8 +30,14 @@ public:
     void zoomToFit();
     QPointF screenToWorld(const QPoint& screenPos) const;
     SceneDocument2D* document() const;
-    SceneEditServiceAdapter* sceneEditService() const { return m_sceneEditAdapter; }
-    Viewport2D* viewport() const { return m_viewport; }
+    SceneEditServiceAdapter* sceneEditService() const
+    {
+        return m_sceneEditAdapter;
+    }
+    Viewport2D* viewport() const
+    {
+        return m_viewport;
+    }
 
 private:
     Viewport2D* m_viewport{ nullptr };

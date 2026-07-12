@@ -3,7 +3,6 @@
 #include <QFileInfo>
 
 #include "Log/SyLogger.h"
-
 #include "VersionInfo.h"
 
 #ifdef _WIN32

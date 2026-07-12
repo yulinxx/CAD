@@ -13,10 +13,117 @@
 #include "Mat/Mat.hpp"
 #include "CommandSnapshots.h"
 #include "CommandGeometry.h"
+#include "Engine2D/SyEntity/SyBezier2.h"
+#include "Engine2D/SyEntity/SyBezier.h"
+#include "Engine2D/SyEntity/SyNurbs.h"
+#include "Engine2D/SyEntity/SySmartLine.h"
 #include "Log/SyLogger.h"
 
+CopyUndoCommand::CopyUndoCommand(const QString& text, SceneDocument2D* document,
+    const QVector<EntitySnapshot>& snapshots,
+    const QStringList& entityIds,
+    UndoMode mode)
+    : UndoCommand(text)
+    , m_document(document)
+    , m_snapshots(snapshots)
+    , m_entityIds(entityIds)
+    , m_mode(mode)
+{
+}
+
+void CopyUndoCommand::undo()
+{
+    if (!m_document)
+        return;
+
+    auto* sm = m_document->sceneManager();
+    if (!sm)
+        return;
+
+    if (m_mode == UndoMode::Copy)
+    {
+        // 复制撤销：删除新建的实体，保存快照以便重做
+        m_storedEntities.clear();
+        for (const QString& id : m_entityIds)
+        {
+            bool ok = false;
+            Eg::EntityId eid = static_cast<Eg::EntityId>(id.toULongLong(&ok));
+            if (!ok) continue;
+            auto entity = sm->extractEntityById(eid);
+            if (entity)
+                m_storedEntities.push_back(std::move(entity));
+        }
+        m_document->clearSelection();
+    }
+    else // UndoMode::Delete
+    {
+        // 删除撤销：从快照恢复已删除的实体
+        for (const auto& snap : m_snapshots)
+            restoreFromSnapshot(m_document, snap);
+        // 选中恢复的实体
+        m_document->clearSelection();
+        for (const QString& id : m_entityIds)
+            m_document->selectEntity(id);
+    }
+}
+
+void CopyUndoCommand::redo()
+{
+    if (!m_document)
+        return;
+
+    auto* sm = m_document->sceneManager();
+    if (!sm)
+        return;
+
+    if (m_mode == UndoMode::Copy)
+    {
+        // 复制重做：重新插入之前提取的实体
+        if (!m_storedEntities.empty())
+        {
+            QStringList newIds;
+            for (auto& entity : m_storedEntities)
+            {
+                QString idStr = QString::number(entity->id);
+                sm->insertEntityPreserveId(std::move(entity));
+                newIds.append(idStr);
+            }
+            m_storedEntities.clear();
+            m_document->clearSelection();
+            m_document->setSelectedEntityIds(newIds.toVector());
+        }
+        else
+        {
+            // 从快照恢复
+            QStringList newIds;
+            for (const auto& snap : m_snapshots)
+            {
+                if (restoreFromSnapshot(m_document, snap))
+                    newIds.append(snap.id);
+            }
+            m_document->clearSelection();
+            m_document->setSelectedEntityIds(newIds.toVector());
+        }
+    }
+    else // UndoMode::Delete
+    {
+        // 删除重做：再次删除这些实体
+        m_storedEntities.clear();
+        for (const QString& id : m_entityIds)
+        {
+            bool ok = false;
+            Eg::EntityId eid = static_cast<Eg::EntityId>(id.toULongLong(&ok));
+            if (!ok) continue;
+            auto entity = sm->extractEntityById(eid);
+            if (entity)
+                m_storedEntities.push_back(std::move(entity));
+        }
+        m_document->clearSelection();
+    }
+}
+
 MoveUndoCommand::MoveUndoCommand(SceneDocument2D* document,
-                                 std::map<QString, std::vector<QPointF>> originalPositions)
+    std::map<QString, std::vector<QPointF>> originalPositions)
     : UndoCommand(QObject::tr("Move"))
     , m_document(document)
     , m_originalPositions(std::move(originalPositions))
@@ -44,48 +151,48 @@ void MoveUndoCommand::undo()
         std::vector<QPointF> currentPoints;
         switch (entity->eType)
         {
-        case Eg::EType::LINE:
-        {
-            auto* line = static_cast<Eg::SyLine*>(entity);
-            for (const auto& pt : line->vPoints)
-                currentPoints.emplace_back(pt.x(), pt.y());
-            line->vPoints.clear();
-            for (const auto& pt : points)
-                line->vPoints.push_back(toVec2d(pt));
-            line->basePoint = line->vPoints.front();
-            line->setModified();
-            break;
-        }
-        case Eg::EType::POLYGON:
-        {
-            auto* polygon = static_cast<Eg::SyPolygon*>(entity);
-            for (const auto& v : polygon->vVertices)
-                currentPoints.emplace_back(v.x(), v.y());
-            polygon->vVertices.clear();
-            for (const auto& pt : points)
-                polygon->vVertices.push_back(toVec2d(pt));
-            polygon->basePoint = polygon->vVertices.front();
-            polygon->setModified();
-            break;
-        }
-        case Eg::EType::ARC:
-        {
-            auto* arc = static_cast<Eg::SyArc*>(entity);
-            currentPoints.emplace_back(arc->basePoint.x(), arc->basePoint.y());
-            arc->basePoint = toVec2d(points.front());
-            arc->setModified();
-            break;
-        }
-        case Eg::EType::CIRCLE:
-        {
-            auto* circle = static_cast<Eg::SyCircle*>(entity);
-            currentPoints.emplace_back(circle->basePoint.x(), circle->basePoint.y());
-            circle->basePoint = toVec2d(points.front());
-            circle->setModified();
-            break;
-        }
-        default:
-            break;
+            case Eg::EType::LINE:
+            {
+                auto* line = static_cast<Eg::SyLine*>(entity);
+                for (const auto& pt : line->vPoints)
+                    currentPoints.emplace_back(pt.x(), pt.y());
+                line->vPoints.clear();
+                for (const auto& pt : points)
+                    line->vPoints.push_back(toVec2d(pt));
+                line->basePoint = line->vPoints.front();
+                line->setModified();
+                break;
+            }
+            case Eg::EType::POLYGON:
+            {
+                auto* polygon = static_cast<Eg::SyPolygon*>(entity);
+                for (const auto& v : polygon->vVertices)
+                    currentPoints.emplace_back(v.x(), v.y());
+                polygon->vVertices.clear();
+                for (const auto& pt : points)
+                    polygon->vVertices.push_back(toVec2d(pt));
+                polygon->basePoint = polygon->vVertices.front();
+                polygon->setModified();
+                break;
+            }
+            case Eg::EType::ARC:
+            {
+                auto* arc = static_cast<Eg::SyArc*>(entity);
+                currentPoints.emplace_back(arc->basePoint.x(), arc->basePoint.y());
+                arc->basePoint = toVec2d(points.front());
+                arc->setModified();
+                break;
+            }
+            case Eg::EType::CIRCLE:
+            {
+                auto* circle = static_cast<Eg::SyCircle*>(entity);
+                currentPoints.emplace_back(circle->basePoint.x(), circle->basePoint.y());
+                circle->basePoint = toVec2d(points.front());
+                circle->setModified();
+                break;
+            }
+            default:
+                break;
         }
         m_newPositions[id] = currentPoints;
     }
@@ -110,82 +217,44 @@ void MoveUndoCommand::redo()
 
         switch (entity->eType)
         {
-        case Eg::EType::LINE:
-        {
-            auto* line = static_cast<Eg::SyLine*>(entity);
-            line->vPoints.clear();
-            for (const auto& pt : points)
-                line->vPoints.push_back(toVec2d(pt));
-            line->basePoint = line->vPoints.front();
-            line->setModified();
-            break;
-        }
-        case Eg::EType::POLYGON:
-        {
-            auto* polygon = static_cast<Eg::SyPolygon*>(entity);
-            polygon->vVertices.clear();
-            for (const auto& pt : points)
-                polygon->vVertices.push_back(toVec2d(pt));
-            polygon->basePoint = polygon->vVertices.front();
-            polygon->setModified();
-            break;
-        }
-        case Eg::EType::ARC:
-        {
-            auto* arc = static_cast<Eg::SyArc*>(entity);
-            arc->basePoint = toVec2d(points.front());
-            arc->setModified();
-            break;
-        }
-        case Eg::EType::CIRCLE:
-        {
-            auto* circle = static_cast<Eg::SyCircle*>(entity);
-            circle->basePoint = toVec2d(points.front());
-            circle->setModified();
-            break;
-        }
-        default:
-            break;
+            case Eg::EType::LINE:
+            {
+                auto* line = static_cast<Eg::SyLine*>(entity);
+                line->vPoints.clear();
+                for (const auto& pt : points)
+                    line->vPoints.push_back(toVec2d(pt));
+                line->basePoint = line->vPoints.front();
+                line->setModified();
+                break;
+            }
+            case Eg::EType::POLYGON:
+            {
+                auto* polygon = static_cast<Eg::SyPolygon*>(entity);
+                polygon->vVertices.clear();
+                for (const auto& pt : points)
+                    polygon->vVertices.push_back(toVec2d(pt));
+                polygon->basePoint = polygon->vVertices.front();
+                polygon->setModified();
+                break;
+            }
+            case Eg::EType::ARC:
+            {
+                auto* arc = static_cast<Eg::SyArc*>(entity);
+                arc->basePoint = toVec2d(points.front());
+                arc->setModified();
+                break;
+            }
+            case Eg::EType::CIRCLE:
+            {
+                auto* circle = static_cast<Eg::SyCircle*>(entity);
+                circle->basePoint = toVec2d(points.front());
+                circle->setModified();
+                break;
+            }
+            default:
+                break;
         }
     }
-}
-
-CopyUndoCommand::CopyUndoCommand(SceneDocument2D* document, const QStringList& copiedEntityIds)
-    : UndoCommand(QObject::tr("Copy"))
-    , m_document(document)
-    , m_copiedEntityIds(copiedEntityIds)
-{
-}
-
-CopyUndoCommand::CopyUndoCommand(SceneDocument2D* document, const QVector<EntitySnapshot>& snapshots)
-    : UndoCommand(QObject::tr("Copy"))
-    , m_document(document)
-    , m_snapshots(snapshots)
-{
-}
-
-void CopyUndoCommand::undo()
-{
-    if (!m_document)
-        return;
-
-    for (const auto& id : m_copiedEntityIds)
-        m_document->removeEntity(id);
-
-    if (!m_oldSelection.isEmpty() && m_document)
-        m_document->setSelectedEntityIds(m_oldSelection);
-}
-
-void CopyUndoCommand::redo()
-{
-    if (!m_document)
-        return;
-
-    for (const auto& snap : m_snapshots)
-        restoreFromSnapshot(m_document, snap);
-
-    if (!m_copiedEntityIds.isEmpty() && m_document)
-        m_document->setSelectedEntityIds(m_copiedEntityIds);
 }
 
 MoveCommand::MoveCommand()
@@ -276,34 +345,34 @@ void MoveCommand::saveOriginalPositions()
         std::vector<QPointF> points;
         switch (entity->eType)
         {
-        case Eg::EType::LINE:
-        {
-            auto* line = static_cast<Eg::SyLine*>(entity);
-            for (const auto& pt : line->vPoints)
-                points.emplace_back(pt.x(), pt.y());
-            break;
-        }
-        case Eg::EType::POLYGON:
-        {
-            auto* polygon = static_cast<Eg::SyPolygon*>(entity);
-            for (const auto& v : polygon->vVertices)
-                points.emplace_back(v.x(), v.y());
-            break;
-        }
-        case Eg::EType::ARC:
-        {
-            auto* arc = static_cast<Eg::SyArc*>(entity);
-            points.emplace_back(arc->basePoint.x(), arc->basePoint.y());
-            break;
-        }
-        case Eg::EType::CIRCLE:
-        {
-            auto* circle = static_cast<Eg::SyCircle*>(entity);
-            points.emplace_back(circle->basePoint.x(), circle->basePoint.y());
-            break;
-        }
-        default:
-            break;
+            case Eg::EType::LINE:
+            {
+                auto* line = static_cast<Eg::SyLine*>(entity);
+                for (const auto& pt : line->vPoints)
+                    points.emplace_back(pt.x(), pt.y());
+                break;
+            }
+            case Eg::EType::POLYGON:
+            {
+                auto* polygon = static_cast<Eg::SyPolygon*>(entity);
+                for (const auto& v : polygon->vVertices)
+                    points.emplace_back(v.x(), v.y());
+                break;
+            }
+            case Eg::EType::ARC:
+            {
+                auto* arc = static_cast<Eg::SyArc*>(entity);
+                points.emplace_back(arc->basePoint.x(), arc->basePoint.y());
+                break;
+            }
+            case Eg::EType::CIRCLE:
+            {
+                auto* circle = static_cast<Eg::SyCircle*>(entity);
+                points.emplace_back(circle->basePoint.x(), circle->basePoint.y());
+                break;
+            }
+            default:
+                break;
         }
         m_originalPositions[idStr] = points;
     }
@@ -333,42 +402,42 @@ void MoveCommand::restoreOriginalPositions()
 
         switch (entity->eType)
         {
-        case Eg::EType::LINE:
-        {
-            auto* line = static_cast<Eg::SyLine*>(entity);
-            line->vPoints.clear();
-            for (const auto& pt : points)
-                line->vPoints.push_back(toVec2d(pt));
-            line->basePoint = line->vPoints.front();
-            line->setModified();
-            break;
-        }
-        case Eg::EType::POLYGON:
-        {
-            auto* polygon = static_cast<Eg::SyPolygon*>(entity);
-            polygon->vVertices.clear();
-            for (const auto& pt : points)
-                polygon->vVertices.push_back(toVec2d(pt));
-            polygon->basePoint = polygon->vVertices.front();
-            polygon->setModified();
-            break;
-        }
-        case Eg::EType::ARC:
-        {
-            auto* arc = static_cast<Eg::SyArc*>(entity);
-            arc->basePoint = toVec2d(points.front());
-            arc->setModified();
-            break;
-        }
-        case Eg::EType::CIRCLE:
-        {
-            auto* circle = static_cast<Eg::SyCircle*>(entity);
-            circle->basePoint = toVec2d(points.front());
-            circle->setModified();
-            break;
-        }
-        default:
-            break;
+            case Eg::EType::LINE:
+            {
+                auto* line = static_cast<Eg::SyLine*>(entity);
+                line->vPoints.clear();
+                for (const auto& pt : points)
+                    line->vPoints.push_back(toVec2d(pt));
+                line->basePoint = line->vPoints.front();
+                line->setModified();
+                break;
+            }
+            case Eg::EType::POLYGON:
+            {
+                auto* polygon = static_cast<Eg::SyPolygon*>(entity);
+                polygon->vVertices.clear();
+                for (const auto& pt : points)
+                    polygon->vVertices.push_back(toVec2d(pt));
+                polygon->basePoint = polygon->vVertices.front();
+                polygon->setModified();
+                break;
+            }
+            case Eg::EType::ARC:
+            {
+                auto* arc = static_cast<Eg::SyArc*>(entity);
+                arc->basePoint = toVec2d(points.front());
+                arc->setModified();
+                break;
+            }
+            case Eg::EType::CIRCLE:
+            {
+                auto* circle = static_cast<Eg::SyCircle*>(entity);
+                circle->basePoint = toVec2d(points.front());
+                circle->setModified();
+                break;
+            }
+            default:
+                break;
         }
     }
 }
@@ -423,44 +492,44 @@ bool MoveCommand::onMouseMove(int x, int y)
 
         switch (entity->eType)
         {
-        case Eg::EType::LINE:
-        {
-            auto* line = static_cast<Eg::SyLine*>(entity);
-            for (size_t i = 0; i < points.size() && i < line->vPoints.size(); ++i)
+            case Eg::EType::LINE:
             {
-                line->vPoints[i] = Ut::Vec2d(points[i].x() + dx, points[i].y() + dy);
+                auto* line = static_cast<Eg::SyLine*>(entity);
+                for (size_t i = 0; i < points.size() && i < line->vPoints.size(); ++i)
+                {
+                    line->vPoints[i] = Ut::Vec2d(points[i].x() + dx, points[i].y() + dy);
+                }
+                line->basePoint = line->vPoints.front();
+                line->setModified();
+                break;
             }
-            line->basePoint = line->vPoints.front();
-            line->setModified();
-            break;
-        }
-        case Eg::EType::POLYGON:
-        {
-            auto* polygon = static_cast<Eg::SyPolygon*>(entity);
-            for (size_t i = 0; i < points.size() && i < polygon->vVertices.size(); ++i)
+            case Eg::EType::POLYGON:
             {
-                polygon->vVertices[i] = Ut::Vec2d(points[i].x() + dx, points[i].y() + dy);
+                auto* polygon = static_cast<Eg::SyPolygon*>(entity);
+                for (size_t i = 0; i < points.size() && i < polygon->vVertices.size(); ++i)
+                {
+                    polygon->vVertices[i] = Ut::Vec2d(points[i].x() + dx, points[i].y() + dy);
+                }
+                polygon->basePoint = polygon->vVertices.front();
+                polygon->setModified();
+                break;
             }
-            polygon->basePoint = polygon->vVertices.front();
-            polygon->setModified();
-            break;
-        }
-        case Eg::EType::ARC:
-        {
-            auto* arc = static_cast<Eg::SyArc*>(entity);
-            arc->basePoint = Ut::Vec2d(points.front().x() + dx, points.front().y() + dy);
-            arc->setModified();
-            break;
-        }
-        case Eg::EType::CIRCLE:
-        {
-            auto* circle = static_cast<Eg::SyCircle*>(entity);
-            circle->basePoint = Ut::Vec2d(points.front().x() + dx, points.front().y() + dy);
-            circle->setModified();
-            break;
-        }
-        default:
-            break;
+            case Eg::EType::ARC:
+            {
+                auto* arc = static_cast<Eg::SyArc*>(entity);
+                arc->basePoint = Ut::Vec2d(points.front().x() + dx, points.front().y() + dy);
+                arc->setModified();
+                break;
+            }
+            case Eg::EType::CIRCLE:
+            {
+                auto* circle = static_cast<Eg::SyCircle*>(entity);
+                circle->basePoint = Ut::Vec2d(points.front().x() + dx, points.front().y() + dy);
+                circle->setModified();
+                break;
+            }
+            default:
+                break;
         }
     }
     return true;
@@ -528,7 +597,15 @@ bool MoveCommand::isComplete() const
 
 CommandPreview MoveCommand::preview() const
 {
-    return CommandPreview();
+    CommandPreview p;
+    if (m_hasAnchor)
+    {
+        p.valid = true;
+        p.type = PreviewType::Line;
+        p.previewStart = m_anchorPoint;
+        p.previewEnd = m_targetPoint;
+    }
+    return p;
 }
 
 void MoveCommand::setDocument(SceneDocument2D* document)
@@ -601,28 +678,28 @@ bool RotateCommand::activate(const UiServices& services)
                     {
                         switch (entity->eType)
                         {
-                        case Eg::EType::LINE:
-                        {
-                            auto* line = static_cast<Eg::SyLine*>(entity);
-                            for (const auto& pt : line->vPoints)
-                                m_originalPoints.emplace_back(pt.x(), pt.y());
-                            break;
-                        }
-                        case Eg::EType::POLYGON:
-                        {
-                            auto* polygon = static_cast<Eg::SyPolygon*>(entity);
-                            for (const auto& v : polygon->vVertices)
-                                m_originalPoints.emplace_back(v.x(), v.y());
-                            break;
-                        }
-                        case Eg::EType::ARC:
-                        case Eg::EType::CIRCLE:
-                        {
-                            m_originalPoints.emplace_back(entity->basePoint.x(), entity->basePoint.y());
-                            break;
-                        }
-                        default:
-                            break;
+                            case Eg::EType::LINE:
+                            {
+                                auto* line = static_cast<Eg::SyLine*>(entity);
+                                for (const auto& pt : line->vPoints)
+                                    m_originalPoints.emplace_back(pt.x(), pt.y());
+                                break;
+                            }
+                            case Eg::EType::POLYGON:
+                            {
+                                auto* polygon = static_cast<Eg::SyPolygon*>(entity);
+                                for (const auto& v : polygon->vVertices)
+                                    m_originalPoints.emplace_back(v.x(), v.y());
+                                break;
+                            }
+                            case Eg::EType::ARC:
+                            case Eg::EType::CIRCLE:
+                            {
+                                m_originalPoints.emplace_back(entity->basePoint.x(), entity->basePoint.y());
+                                break;
+                            }
+                            default:
+                                break;
                         }
                     }
                 }
@@ -765,6 +842,60 @@ bool RotateCommand::onMouseUp(int x, int y)
     return true;
 }
 
+bool RotateCommand::onKeyPress(int key)
+{
+    if (key == Qt::Key_Escape)
+    {
+        cancel();
+        return true;
+    }
+    else if (key == Qt::Key_Return || key == Qt::Key_Enter)
+    {
+        if (m_stage >= 2 && m_state == CommandState::Active)
+            commit();
+        else if (m_state == CommandState::Active)
+            m_state = CommandState::Committed;
+        return true;
+    }
+    else if (key == Qt::Key_Space)
+    {
+        if (m_stage == 0 && m_state == CommandState::Active)
+            computeDefaultCenter();
+        else if (m_stage >= 2 && m_state == CommandState::Active)
+            commit();
+        return true;
+    }
+    else if (key == Qt::Key_Backspace)
+    {
+        if (m_stage > 0 && m_state == CommandState::Active)
+        {
+            restoreOriginalPoints();
+            m_stage = 0;
+        }
+        return true;
+    }
+    return false;
+}
+
+CommandPreview RotateCommand::preview() const
+{
+    CommandPreview preview;
+    if (m_state != CommandState::Active)
+        return preview;
+
+    if (m_stage == 2 && m_rotationCenter != QPointF(0, 0))
+    {
+        preview.valid = true;
+        preview.type = PreviewType::Line;
+        preview.previewCenter = m_rotationCenter;
+        const double len = 50.0;
+        preview.previewStart = m_rotationCenter;
+        preview.previewEnd = QPointF(m_rotationCenter.x() + len * std::cos(m_currentAngle + m_startAngle),
+                                     m_rotationCenter.y() + len * std::sin(m_currentAngle + m_startAngle));
+    }
+    return preview;
+}
+
 ITool* RotateCommand::activeTool() const
 {
     return nullptr;
@@ -899,44 +1030,44 @@ bool CopyCommand::onMouseDown(int x, int y)
             std::unique_ptr<Eg::SyEntity> copy;
             switch (entity->eType)
             {
-            case Eg::EType::LINE:
-                copy = std::make_unique<Eg::SyLine>(*static_cast<Eg::SyLine*>(entity));
-                break;
-            case Eg::EType::CIRCLE:
-                copy = std::make_unique<Eg::SyCircle>(*static_cast<Eg::SyCircle*>(entity));
-                break;
-            case Eg::EType::ARC:
-                copy = std::make_unique<Eg::SyArc>(*static_cast<Eg::SyArc*>(entity));
-                break;
-            case Eg::EType::POLYGON:
-                copy = std::make_unique<Eg::SyPolygon>(*static_cast<Eg::SyPolygon*>(entity));
-                break;
-            default:
-                continue;
+                case Eg::EType::LINE:
+                    copy = std::make_unique<Eg::SyLine>(*static_cast<Eg::SyLine*>(entity));
+                    break;
+                case Eg::EType::CIRCLE:
+                    copy = std::make_unique<Eg::SyCircle>(*static_cast<Eg::SyCircle*>(entity));
+                    break;
+                case Eg::EType::ARC:
+                    copy = std::make_unique<Eg::SyArc>(*static_cast<Eg::SyArc*>(entity));
+                    break;
+                case Eg::EType::POLYGON:
+                    copy = std::make_unique<Eg::SyPolygon>(*static_cast<Eg::SyPolygon*>(entity));
+                    break;
+                default:
+                    continue;
             }
 
             switch (copy->eType)
             {
-            case Eg::EType::LINE:
-            {
-                auto* line = static_cast<Eg::SyLine*>(copy.get());
-                for (auto& pt : line->vPoints)
+                case Eg::EType::LINE:
                 {
-                    pt = Ut::Vec2d(pt.x() + dx, pt.y() + dy);
+                    auto* line = static_cast<Eg::SyLine*>(copy.get());
+                    for (auto& pt : line->vPoints)
+                    {
+                        pt = Ut::Vec2d(pt.x() + dx, pt.y() + dy);
+                    }
+                    break;
                 }
-                break;
-            }
-            case Eg::EType::POLYGON:
-            {
-                auto* polygon = static_cast<Eg::SyPolygon*>(copy.get());
-                for (auto& v : polygon->vVertices)
+                case Eg::EType::POLYGON:
                 {
-                    v = Ut::Vec2d(v.x() + dx, v.y() + dy);
+                    auto* polygon = static_cast<Eg::SyPolygon*>(copy.get());
+                    for (auto& v : polygon->vVertices)
+                    {
+                        v = Ut::Vec2d(v.x() + dx, v.y() + dy);
+                    }
+                    break;
                 }
-                break;
-            }
-            default:
-                break;
+                default:
+                    break;
             }
             copy->basePoint = Ut::Vec2d(copy->basePoint.x() + dx, copy->basePoint.y() + dy);
 
@@ -968,6 +1099,37 @@ bool CopyCommand::onMouseUp(int x, int y)
     return false;
 }
 
+bool CopyCommand::onKeyPress(int key)
+{
+    if (key == Qt::Key_Escape)
+    {
+        cancel();
+        return true;
+    }
+    else if (key == Qt::Key_Return || key == Qt::Key_Enter)
+    {
+        if (m_hasAnchor && m_state == CommandState::Active)
+            commit();
+        return true;
+    }
+    else if (key == Qt::Key_Space)
+    {
+        if (m_hasAnchor && m_state == CommandState::Active)
+            commit();
+        return true;
+    }
+    else if (key == Qt::Key_Backspace)
+    {
+        if (m_hasAnchor && m_state == CommandState::Active)
+        {
+            m_hasAnchor = false;
+            m_stage = 0;
+        }
+        return true;
+    }
+    return false;
+}
+
 ITool* CopyCommand::activeTool() const
 {
     return nullptr;
@@ -978,7 +1140,7 @@ UndoCommand* CopyCommand::createUndoCommand()
     if (m_copiedEntityIds.isEmpty())
         return nullptr;
 
-    return new CopyUndoCommand(m_document, m_copiedSnapshots);
+    return new CopyUndoCommand(QObject::tr("Copy"), m_document, m_copiedSnapshots, m_copiedEntityIds, UndoMode::Copy);
 }
 
 bool CopyCommand::isComplete() const
@@ -988,7 +1150,15 @@ bool CopyCommand::isComplete() const
 
 CommandPreview CopyCommand::preview() const
 {
-    return CommandPreview();
+    CommandPreview p;
+    if (m_hasAnchor)
+    {
+        p.valid = true;
+        p.type = PreviewType::Line;
+        p.previewStart = m_anchorPoint;
+        p.previewEnd = m_targetPoint;
+    }
+    return p;
 }
 
 void CopyCommand::setDocument(SceneDocument2D* document)
@@ -1090,7 +1260,7 @@ UndoCommand* DeleteCommand::createUndoCommand()
     if (m_snapshots.isEmpty())
         return nullptr;
 
-    return new CopyUndoCommand(m_document, m_snapshots);
+    return new CopyUndoCommand(QObject::tr("Delete"), m_document, m_snapshots, m_deletedEntityIds, UndoMode::Delete);
 }
 
 bool DeleteCommand::isComplete() const
@@ -1237,6 +1407,22 @@ bool MirrorCommand::onMouseMove(int x, int y)
     return true;
 }
 
+bool MirrorCommand::onKeyPress(int key)
+{
+    if (key == Qt::Key_Escape)
+    {
+        cancel();
+        return true;
+    }
+    else if (key == Qt::Key_Return || key == Qt::Key_Enter)
+    {
+        if (m_stage >= 1 && m_state == CommandState::Active)
+            commit();
+        return true;
+    }
+    return false;
+}
+
 ITool* MirrorCommand::activeTool() const
 {
     return nullptr;
@@ -1257,7 +1443,15 @@ bool MirrorCommand::isComplete() const
 
 CommandPreview MirrorCommand::preview() const
 {
-    return CommandPreview();
+    CommandPreview p;
+    if (m_stage >= 1)
+    {
+        p.valid = true;
+        p.type = PreviewType::Line;
+        p.previewStart = m_mirrorStart;
+        p.previewEnd = m_mirrorEnd;
+    }
+    return p;
 }
 
 void MirrorCommand::setDocument(SceneDocument2D* document)

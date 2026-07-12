@@ -36,12 +36,13 @@ public:
 
 private:
     void performBoxSelect();
+    bool isShiftPressed() const;
 
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
     SceneDocument2D* m_document{ nullptr };
-    QString m_selectedEntityId;
-    QString m_oldSelectedId;
+    QVector<QString> m_selectedEntityIds;
+    QVector<QString> m_oldSelectedIds;
     bool m_boxSelecting{ false };
     QPointF m_boxSelectStart;
     QPointF m_boxSelectEnd;

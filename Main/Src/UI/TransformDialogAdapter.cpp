@@ -150,22 +150,22 @@ QDialog* TransformDialogAdapter::createDialog()
     if (auto applyButton = buttonBox->button(QDialogButtonBox::Apply))
     {
         QObject::connect(applyButton, &QPushButton::clicked, dialog, [this, dialog]()
-        {
-            auto params = collectParametersFromUI(dialog);
-            if (validateParameters(params))
             {
-                m_parameters = params;
-                if (m_parametersChangedCallback)
+                auto params = collectParametersFromUI(dialog);
+                if (validateParameters(params))
                 {
-                    m_parametersChangedCallback(params);
+                    m_parameters = params;
+                    if (m_parametersChangedCallback)
+                    {
+                        m_parametersChangedCallback(params);
+                    }
+                    m_statusLabel->setText(trTransform("Parameters applied"));
                 }
-                m_statusLabel->setText(trTransform("Parameters applied"));
-            }
-            else
-            {
-                m_statusLabel->setText(trTransform("Invalid parameters"));
-            }
-        });
+                else
+                {
+                    m_statusLabel->setText(trTransform("Invalid parameters"));
+                }
+            });
     }
 
     return dialog;
@@ -359,9 +359,9 @@ void TransformDialogAdapter::addPreviewControls(QVBoxLayout* layout, QDialog* di
     auto previewCheck = new QCheckBox(trTransform("Live Preview"));
     previewCheck->setChecked(m_showPreview);
     QObject::connect(previewCheck, &QCheckBox::toggled, dialog, [this](bool checked)
-    {
-        m_showPreview = checked;
-    });
+        {
+            m_showPreview = checked;
+        });
     layout->addWidget(previewCheck);
 }
 

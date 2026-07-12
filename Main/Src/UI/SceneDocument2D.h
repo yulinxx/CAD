@@ -10,7 +10,10 @@
 
 #include "UI/SceneDocumentBase.h"
 
-namespace Eg { class SceneManager; class SyEntity; }
+namespace Eg
+{
+    class SceneManager; class SyEntity;
+}
 
 /**
  * @brief 2D 场景文档 — 围绕 Eg::SceneManager 的 UI 层适配
@@ -28,7 +31,10 @@ public:
     SceneDocument2D(const SceneDocument2D&) = delete;
     SceneDocument2D& operator=(const SceneDocument2D&) = delete;
 
-    Eg::SceneManager* sceneManager() const { return m_scene; }
+    Eg::SceneManager* sceneManager() const
+    {
+        return m_scene;
+    }
 
     // ---- 图元创建 (返回 Eg 实体 ID) ----
 
@@ -37,6 +43,10 @@ public:
     QString createCircle(const QPointF& center, double radius);
     QString createArc(const QPointF& center, double radius, double startDeg, double endDeg);
     QString createPolygon(const QVector<QPointF>& vertices);
+    QString createBezier2(const QPointF& start, const QPointF& control, const QPointF& end);
+    QString createBezier(const QPointF& start, const QPointF& control1, const QPointF& control2, const QPointF& end);
+    QString createNurbs(const QVector<QPointF>& controlPoints);
+    QString createSmartLine(const QVector<QPointF>& points);
 
     // ---- 查询 ----
 

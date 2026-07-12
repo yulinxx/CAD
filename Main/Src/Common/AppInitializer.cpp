@@ -6,6 +6,7 @@
 #include "AppInitializer.h"
 
 #include "AppPathManager.h"
+#include "CrashHandlerBootstrap.h"
 #include "VersionInfo.h"
 
 #include "Log/SyLogger.h"
@@ -62,6 +63,8 @@ void AppInitializer::initialize()
         true,
         true);
     SY_INFOF("Starting %s v%s", MainApp::appName().c_str(), MainApp::appVersion().c_str());
+
+    CrashHandlerBootstrap::logPendingDumps();
 
     QApplication::setFont(QFont(QStringLiteral("Segoe UI"), 9));
 

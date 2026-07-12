@@ -27,7 +27,10 @@ struct RENDER_CORE_API RenderFrame
 
     bool valid{ false };
 
-    int batchCount() const { return static_cast<int>(batches.size()); }
+    int batchCount() const
+    {
+        return static_cast<int>(batches.size());
+    }
 
     int totalVertexCount() const
     {

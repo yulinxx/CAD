@@ -25,7 +25,7 @@ void DefaultUiCommandDispatcher::bindAction(QAction* action, const QString& comm
             return;
         }
         execute(commandId);
-    });
+        });
 }
 
 // 设置当前命令类型，并同步到状态中心
@@ -37,7 +37,7 @@ void DefaultUiCommandDispatcher::setCommandType(const QString& commandType)
         m_stateCenter->setCurrentCommandType(commandType);
         m_stateCenter->setMetadata({
             { QStringLiteral("commandType"), commandType }
-        });
+            });
     }
 }
 
@@ -92,49 +92,55 @@ void DefaultUiCommandDispatcher::begin(const QString& commandId)
         { QStringLiteral("commandOwner"), QStringLiteral("dispatcher") },
         { QStringLiteral("commandPhase"), QStringLiteral("begin") },
         { QStringLiteral("commandType"), m_commandType }
-    });
+        });
 }
 
-namespace {
-
-// 将QString命令ID映射为OperationId，用于OperationBus路由
-OperationId mapCommandIdToOperation(const QString& cmd)
+namespace
 {
-    static const struct { const char* key; OperationId id; } map[] = {
-        { "2d.select",        OperationId::Tool_Select },
-        { "2d.draw_line",     OperationId::Tool_Line },
-        { "2d.draw_circle",   OperationId::Tool_Circle },
-        { "2d.draw_polyline", OperationId::Tool_Polyline },
-        { "2d.draw_arc",      OperationId::Tool_Arc },
-        { "2d.draw_polygon",  OperationId::Tool_Polygon },
-        { "2d.move",          OperationId::Edit_Move },
-        { "2d.copy",          OperationId::Edit_Copy },
-        { "2d.rotate",        OperationId::Edit_Rotate },
-        { "2d.mirror",        OperationId::Edit_Mirror },
-        { "2d.delete",        OperationId::Edit_Delete },
-        { "edit.undo",        OperationId::Edit_Undo },
-        { "edit.redo",        OperationId::Edit_Redo },
-        { "edit.delete",      OperationId::Edit_Delete },
-        { "edit.select_all",  OperationId::Edit_SelectAll },
-        { "view.zoom_fit",    OperationId::View_ZoomFit },
-        { "view.zoom_in",     OperationId::View_ZoomIn },
-        { "view.zoom_out",    OperationId::View_ZoomOut },
-    };
-    for (const auto& entry : map)
+    // 将QString命令ID映射为OperationId，用于OperationBus路由
+    OperationId mapCommandIdToOperation(const QString& cmd)
     {
-        if (cmd == QLatin1String(entry.key))
-            return entry.id;
+        static const struct
+        {
+            const char* key; OperationId id;
+        } map[] = {
+{ "2d.select",        OperationId::Tool_Select },
+{ "2d.draw_line",     OperationId::Tool_Line },
+{ "2d.draw_circle",   OperationId::Tool_Circle },
+{ "2d.draw_polyline", OperationId::Tool_Polyline },
+{ "2d.draw_arc",      OperationId::Tool_Arc },
+{ "2d.draw_polygon",  OperationId::Tool_Polygon },
+{ "2d.draw_bezier2",  OperationId::Tool_Bezier2 },
+{ "2d.draw_bezier",   OperationId::Tool_Bezier },
+{ "2d.draw_nurbs",    OperationId::Tool_Nurbs },
+{ "2d.draw_smartline", OperationId::Tool_SmartLine },
+{ "2d.move",          OperationId::Edit_Move },
+{ "2d.copy",          OperationId::Edit_Copy },
+{ "2d.rotate",        OperationId::Edit_Rotate },
+{ "2d.mirror",        OperationId::Edit_Mirror },
+{ "2d.delete",        OperationId::Edit_Delete },
+{ "edit.undo",        OperationId::Edit_Undo },
+{ "edit.redo",        OperationId::Edit_Redo },
+{ "edit.delete",      OperationId::Edit_Delete },
+{ "edit.select_all",  OperationId::Edit_SelectAll },
+{ "view.zoom_fit",    OperationId::View_ZoomFit },
+{ "view.zoom_in",     OperationId::View_ZoomIn },
+{ "view.zoom_out",    OperationId::View_ZoomOut },
+        };
+        for (const auto& entry : map)
+        {
+            if (cmd == QLatin1String(entry.key))
+                return entry.id;
+        }
+        return OperationId::None;
     }
-    return OperationId::None;
-}
-
 } // anonymous namespace
 
 // 执行命令的主入口，按优先级查找处理程序并执行
 void DefaultUiCommandDispatcher::execute(const QString& commandId)
 {
     SY_INFOF("[UiCommandDispatcher] execute: command=%s", commandId.toUtf8().constData());
-    
+
     // 1. 若有活动命令，先取消（不进undo栈）
     if (hasActiveCommand())
     {
@@ -147,7 +153,7 @@ void DefaultUiCommandDispatcher::execute(const QString& commandId)
     if (handler)
     {
         SY_DEBUGF("[UiCommandDispatcher] Found handler for command: %s", commandId.toUtf8().constData());
-        
+
         // 3. 重置handler到Idle状态
         handler->reset();
 
@@ -157,10 +163,10 @@ void DefaultUiCommandDispatcher::execute(const QString& commandId)
         // 5. 激活handler
         if (handler->activate(m_uiServices))
         {
-            SY_INFOF("[UiCommandDispatcher] Command activated: %s, interactive=%s", 
-                commandId.toUtf8().constData(), 
+            SY_INFOF("[UiCommandDispatcher] Command activated: %s, interactive=%s",
+                commandId.toUtf8().constData(),
                 handler->isInteractive() ? "true" : "false");
-            
+
             // 6. 非交互式命令：直接提交
             if (!handler->isInteractive())
             {
@@ -207,7 +213,7 @@ void DefaultUiCommandDispatcher::execute(const QString& commandId)
 void DefaultUiCommandDispatcher::submit()
 {
     SY_INFOF("[UiCommandDispatcher] submit: command=%s", m_activeCommandId.toUtf8().constData());
-    
+
     // submit()是命令生命周期的唯一提交点
     // 1. 调用handler->commit()执行业务提交
     // 2. 创建undo command并压入撤销栈
@@ -250,7 +256,7 @@ void DefaultUiCommandDispatcher::submit()
             { QStringLiteral("commandOwner"), QStringLiteral("none") },
             { QStringLiteral("commandPhase"), QStringLiteral("idle") },
             { QStringLiteral("commandType"), QStringLiteral("none") }
-        });
+            });
     }
     else if (m_frameworkServices.reportError)
     {
@@ -264,7 +270,7 @@ void DefaultUiCommandDispatcher::submit()
     {
         handler->reset();
     }
-    
+
     SY_DEBUG("[UiCommandDispatcher] Command submit complete");
 }
 
@@ -272,7 +278,7 @@ void DefaultUiCommandDispatcher::submit()
 void DefaultUiCommandDispatcher::cancel()
 {
     SY_INFOF("[UiCommandDispatcher] cancel: command=%s", m_activeCommandId.toUtf8().constData());
-    
+
     auto handler = currentHandler();
     if (handler)
     {
@@ -300,7 +306,7 @@ void DefaultUiCommandDispatcher::cancel()
             { QStringLiteral("commandOwner"), QStringLiteral("none") },
             { QStringLiteral("commandPhase"), QStringLiteral("idle") },
             { QStringLiteral("commandType"), QStringLiteral("none") }
-        });
+            });
     }
     else if (m_frameworkServices.reportError)
     {
@@ -314,7 +320,7 @@ void DefaultUiCommandDispatcher::cancel()
     {
         handler->reset();
     }
-    
+
     SY_DEBUG("[UiCommandDispatcher] Command cancel complete");
 }
 

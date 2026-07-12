@@ -10,7 +10,10 @@
 class SceneDocument3D;
 struct RenderContext;
 
-namespace Eg { class SceneManager; }
+namespace Eg
+{
+    class SceneManager;
+}
 
 /**
  * @file SceneTraverser.h

@@ -45,8 +45,8 @@ public:
 
     /// 合并增量批次（移除脏实体批次，添加新批次）
     RenderFrame mergeIncremental(const RenderFrame& cachedFrame,
-                                 const std::vector<RenderBatch>& newBatches,
-                                 const std::set<std::string>& dirtyEntityIds);
+        const std::vector<RenderBatch>& newBatches,
+        const std::set<std::string>& dirtyEntityIds);
 
     /// 按图元类型分组，返回起始索引列表
     std::vector<int> groupByPrimitiveType(const RenderFrame& frame) const;
@@ -56,9 +56,9 @@ public:
 
     /// 填充帧统计信息
     void fillStatistics(RenderFrame& frame, const RenderContext& context,
-                        const std::chrono::steady_clock::time_point& t0,
-                        const std::chrono::steady_clock::time_point& compileStart,
-                        const std::chrono::steady_clock::time_point& compileEnd);
+        const std::chrono::steady_clock::time_point& t0,
+        const std::chrono::steady_clock::time_point& compileStart,
+        const std::chrono::steady_clock::time_point& compileEnd);
 
 private:
     RenderFrame m_cachedFrame;

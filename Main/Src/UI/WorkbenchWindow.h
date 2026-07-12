@@ -25,12 +25,12 @@ class SceneTreeDockWidget;
 class PropertiesPanelWidget;
 
 /// 工作台切换工厂：按 ID 返回对应的工作台实例
-using WorkbenchFactory = std::function<UiWorkbench*(const QString& workbenchId)>;
+using WorkbenchFactory = std::function<UiWorkbench* (const QString& workbenchId)>;
 
 /**
  * @class WorkbenchWindow
  * @brief 工作台主窗口类
- * 
+ *
  * 应用程序的主窗口，管理所有 UI 组件的布局和交互。
  * 通过状态中心（UiStateCenter）监听状态变化并更新界面。
  * - 菜单系统管理（文件、视图、工具）
@@ -46,7 +46,7 @@ class WorkbenchWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    
+
     /// @param parent 父部件
     explicit WorkbenchWindow(QWidget* parent = nullptr);
     ~WorkbenchWindow() override;
@@ -141,6 +141,16 @@ private:
     void bindShortcuts();
     /// 构建菜单系统（文件、视图、工具）
     void buildMenus();
+    /// 填充文件菜单
+    void buildFileMenu();
+    /// 填充编辑菜单（Undo/Redo）
+    void buildEditMenu();
+    /// 填充绘图菜单
+    void buildDrawMenu();
+    /// 填充图元操作菜单
+    void buildModifyMenu();
+    /// 填充视图菜单
+    void buildViewMenu();
     /// 构建工具栏
     void buildToolBars();
     /// 构建停靠区域（左侧项目面板、右侧属性面板）
@@ -237,14 +247,20 @@ private:
     {
         /// 文件菜单
         QMenu* fileMenu{ nullptr };
+        /// 编辑菜单
+        QMenu* editMenu{ nullptr };
+        /// 绘图菜单
+        QMenu* drawMenu{ nullptr };
+        /// 图元操作菜单
+        QMenu* modifyMenu{ nullptr };
         /// 视图菜单
         QMenu* viewMenu{ nullptr };
         /// 工具菜单
         QMenu* toolsMenu{ nullptr };
+        /// 视图菜单中的工作台子菜单
+        QMenu* workbenchMenu{ nullptr };
         /// 主题子菜单
         QMenu* themeMenu{ nullptr };
-        /// 工作台切换子菜单
-        QMenu* workbenchMenu{ nullptr };
     } m_menuState;
     /// 面板状态：集中管理状态栏、工具栏与停靠面板指针
     struct PanelState

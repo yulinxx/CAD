@@ -9,7 +9,10 @@
 
 class CameraController3D;
 
-namespace Eg { class SceneManager; }
+namespace Eg
+{
+    class SceneManager;
+}
 
 /**
  * @file DefaultRenderBackend.h

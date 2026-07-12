@@ -10,34 +10,32 @@
 
 namespace
 {
+    // 构建框架服务集合，将应用根组件的服务注入到UI框架层
+    UiFrameworkServices buildFrameworkServices(ApplicationCompositionRoot* root)
+    {
+        UiFrameworkServices services;
 
-// 构建框架服务集合，将应用根组件的服务注入到UI框架层
-UiFrameworkServices buildFrameworkServices(ApplicationCompositionRoot* root)
-{
-    UiFrameworkServices services;
+        if (!root)
+            return services;
 
-    if (!root)
+        services.stateCenter = root->stateCenter();
+        services.commandDispatcher = root->commandDispatcher();
+
+        // 错误报告回调：将错误信息输出到日志系统
+        services.reportError = [](const QString& errorCode, const QString& message, const QString& context) {
+            SY_ERRORF("[Error] code=%s message=%s context=%s",
+                errorCode.toUtf8().constData(),
+                message.toUtf8().constData(),
+                context.toUtf8().constData());
+            };
+
+        // 性能记录回调：记录关键操作的耗时
+        services.recordPerformance = [](const QString& scope, qint64 elapsedMs) {
+            SY_DEBUGF("[perf] %s: %lld ms", scope.toUtf8().constData(), static_cast<long long>(elapsedMs));
+            };
+
         return services;
-
-    services.stateCenter = root->stateCenter();
-    services.commandDispatcher = root->commandDispatcher();
-
-    // 错误报告回调：将错误信息输出到日志系统
-    services.reportError = [](const QString& errorCode, const QString& message, const QString& context) {
-        SY_ERRORF("[Error] code=%s message=%s context=%s",
-            errorCode.toUtf8().constData(),
-            message.toUtf8().constData(),
-            context.toUtf8().constData());
-    };
-
-    // 性能记录回调：记录关键操作的耗时
-    services.recordPerformance = [](const QString& scope, qint64 elapsedMs) {
-        SY_DEBUGF("[perf] %s: %lld ms", scope.toUtf8().constData(), static_cast<long long>(elapsedMs));
-    };
-
-    return services;
-}
-
+    }
 }
 
 // 构建应用路径集合，从路径管理器获取各目录的标准路径
@@ -73,7 +71,7 @@ AppBootstrapper::~AppBootstrapper()
 bool AppBootstrapper::initialize()
 {
     SY_INFO("[AppBootstrapper] Initializing composition root");
-    
+
     m_compositionRoot = std::make_unique<ApplicationCompositionRoot>();
 
     if (!m_compositionRoot)
@@ -132,7 +130,7 @@ bool AppBootstrapper::initialize()
 void AppBootstrapper::bootstrap()
 {
     SY_INFO("[AppBootstrapper] Starting bootstrap sequence");
-    
+
     if (!m_compositionRoot)
     {
         SY_ERROR("[AppBootstrapper] error code=bootstrap.no_root message=bootstrap() called without composition root");
@@ -182,7 +180,7 @@ void AppBootstrapper::bootstrap()
     shell->setUiServices(m_services);
     shell->setWorkbench(m_workbench.get());
     shell->initializeAndShow();
-    
+
     SY_INFO("[AppBootstrapper] UI shell initialized and shown");
 }
 
@@ -201,7 +199,7 @@ void AppBootstrapper::shutdown()
 
     SY_DEBUG("[AppBootstrapper] Cleaning up workbench");
     m_workbench.reset();
-    
+
     SY_INFO("[AppBootstrapper] Shutdown complete");
 }
 

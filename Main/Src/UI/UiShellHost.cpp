@@ -102,11 +102,11 @@ void UiShellHost::initializeAndShow()
             m_themeService->loadThemeFromId(themeId);
             m_mainWindow->applyTheme(m_themeService->styleSheet());
         }
-    });
+        });
 
     m_mainWindow->setWorkbenchFactory([this](const QString& id) -> UiWorkbench* {
         return resolveWorkbench(id);
-    });
+        });
 
     if (m_stateCenter)
         m_stateCenter->setBusy(false);
