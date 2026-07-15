@@ -4,8 +4,10 @@
 #include <cmath>
 
 #include "SceneDocument2D.h"
+#include "ISelectionService.h"
 #include "UiServices.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine/EntityIdUtils.h"
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyCircle.h"
 #include "Engine2D/SyEntity/SyArc.h"
@@ -22,9 +24,11 @@
 CopyUndoCommand::CopyUndoCommand(const QString& text, SceneDocument2D* document,
     const QVector<EntitySnapshot>& snapshots,
     const QStringList& entityIds,
-    UndoMode mode)
+    UndoMode mode,
+    ISelectionService* selService)
     : UndoCommand(text)
     , m_document(document)
+    , m_selectionService(selService)
     , m_snapshots(snapshots)
     , m_entityIds(entityIds)
     , m_mode(mode)
@@ -53,17 +57,18 @@ void CopyUndoCommand::undo()
             if (entity)
                 m_storedEntities.push_back(std::move(entity));
         }
-        m_document->clearSelection();
+        m_selectionService->clear();
     }
     else // UndoMode::Delete
     {
         // 删除撤销：从快照恢复已删除的实体
         for (const auto& snap : m_snapshots)
             restoreFromSnapshot(m_document, snap);
-        // 选中恢复的实体
-        m_document->clearSelection();
+        std::vector<std::string> ids;
+        ids.reserve(static_cast<size_t>(m_entityIds.size()));
         for (const QString& id : m_entityIds)
-            m_document->selectEntity(id);
+            ids.push_back(id.toStdString());
+        m_selectionService->selectMultiple(ids);
     }
 }
 
@@ -81,28 +86,25 @@ void CopyUndoCommand::redo()
         // 复制重做：重新插入之前提取的实体
         if (!m_storedEntities.empty())
         {
-            QStringList newIds;
+            std::vector<std::string> newIds;
             for (auto& entity : m_storedEntities)
             {
-                QString idStr = QString::number(entity->id);
+                std::string idStr = std::to_string(entity->id);
                 sm->insertEntityPreserveId(std::move(entity));
-                newIds.append(idStr);
+                newIds.push_back(idStr);
             }
             m_storedEntities.clear();
-            m_document->clearSelection();
-            m_document->setSelectedEntityIds(newIds.toVector());
+            m_selectionService->selectMultiple(newIds);
         }
         else
         {
-            // 从快照恢复
-            QStringList newIds;
+            std::vector<std::string> newIds;
             for (const auto& snap : m_snapshots)
             {
                 if (restoreFromSnapshot(m_document, snap))
-                    newIds.append(snap.id);
+                    newIds.push_back(snap.id.toStdString());
             }
-            m_document->clearSelection();
-            m_document->setSelectedEntityIds(newIds.toVector());
+            m_selectionService->selectMultiple(newIds);
         }
     }
     else // UndoMode::Delete
@@ -118,7 +120,7 @@ void CopyUndoCommand::redo()
             if (entity)
                 m_storedEntities.push_back(std::move(entity));
         }
-        m_document->clearSelection();
+        m_selectionService->clear();
     }
 }
 
@@ -166,12 +168,12 @@ void MoveUndoCommand::undo()
             case Eg::EType::POLYGON:
             {
                 auto* polygon = static_cast<Eg::SyPolygon*>(entity);
-                for (const auto& v : polygon->vVertices)
+                for (const auto& v : polygon->verticesMutable())
                     currentPoints.emplace_back(v.x(), v.y());
-                polygon->vVertices.clear();
+                polygon->verticesMutable().clear();
                 for (const auto& pt : points)
-                    polygon->vVertices.push_back(toVec2d(pt));
-                polygon->basePoint = polygon->vVertices.front();
+                    polygon->verticesMutable().push_back(toVec2d(pt));
+                polygon->basePoint = polygon->verticesMutable().front();
                 polygon->setModified();
                 break;
             }
@@ -230,10 +232,10 @@ void MoveUndoCommand::redo()
             case Eg::EType::POLYGON:
             {
                 auto* polygon = static_cast<Eg::SyPolygon*>(entity);
-                polygon->vVertices.clear();
+                polygon->verticesMutable().clear();
                 for (const auto& pt : points)
-                    polygon->vVertices.push_back(toVec2d(pt));
-                polygon->basePoint = polygon->vVertices.front();
+                    polygon->verticesMutable().push_back(toVec2d(pt));
+                polygon->basePoint = polygon->verticesMutable().front();
                 polygon->setModified();
                 break;
             }
@@ -286,6 +288,7 @@ bool MoveCommand::activate(const UiServices& services)
     SY_INFO("[TransformCommands] MoveCommand activated");
     m_services = &services;
     m_document = services.document2D;
+    m_selectionService = services.selectionService;
     m_state = CommandState::Active;
     m_anchorPoint = QPointF();
     m_targetPoint = QPointF();
@@ -326,22 +329,9 @@ void MoveCommand::saveOriginalPositions()
     if (!m_document)
         return;
 
-    auto* sm = m_document->sceneManager();
-    if (!sm)
-        return;
-
-    const QStringList selectedIds = m_document->selectedIdsQ();
-    for (const QString& idStr : selectedIds)
+    const auto selectedEntities = m_selectionService->selectedEntities();
+    for (Eg::SyEntity* entity : selectedEntities)
     {
-        bool ok = false;
-        const Eg::EntityId id = static_cast<Eg::EntityId>(idStr.toULongLong(&ok));
-        if (!ok)
-            continue;
-
-        auto* entity = sm->findEntityById(id);
-        if (!entity)
-            continue;
-
         std::vector<QPointF> points;
         switch (entity->eType)
         {
@@ -355,7 +345,7 @@ void MoveCommand::saveOriginalPositions()
             case Eg::EType::POLYGON:
             {
                 auto* polygon = static_cast<Eg::SyPolygon*>(entity);
-                for (const auto& v : polygon->vVertices)
+                for (const auto& v : polygon->verticesMutable())
                     points.emplace_back(v.x(), v.y());
                 break;
             }
@@ -374,7 +364,7 @@ void MoveCommand::saveOriginalPositions()
             default:
                 break;
         }
-        m_originalPositions[idStr] = points;
+        m_originalPositions[QString::number(entity->id)] = points;
     }
 }
 
@@ -415,10 +405,10 @@ void MoveCommand::restoreOriginalPositions()
             case Eg::EType::POLYGON:
             {
                 auto* polygon = static_cast<Eg::SyPolygon*>(entity);
-                polygon->vVertices.clear();
+                polygon->verticesMutable().clear();
                 for (const auto& pt : points)
-                    polygon->vVertices.push_back(toVec2d(pt));
-                polygon->basePoint = polygon->vVertices.front();
+                    polygon->verticesMutable().push_back(toVec2d(pt));
+                polygon->basePoint = polygon->verticesMutable().front();
                 polygon->setModified();
                 break;
             }
@@ -506,11 +496,11 @@ bool MoveCommand::onMouseMove(int x, int y)
             case Eg::EType::POLYGON:
             {
                 auto* polygon = static_cast<Eg::SyPolygon*>(entity);
-                for (size_t i = 0; i < points.size() && i < polygon->vVertices.size(); ++i)
+                for (size_t i = 0; i < points.size() && i < polygon->verticesMutable().size(); ++i)
                 {
-                    polygon->vVertices[i] = Ut::Vec2d(points[i].x() + dx, points[i].y() + dy);
+                    polygon->verticesMutable()[i] = Ut::Vec2d(points[i].x() + dx, points[i].y() + dy);
                 }
-                polygon->basePoint = polygon->vVertices.front();
+                polygon->basePoint = polygon->verticesMutable().front();
                 polygon->setModified();
                 break;
             }
@@ -642,6 +632,7 @@ bool RotateCommand::activate(const UiServices& services)
     SY_INFO("[TransformCommands] RotateCommand activated");
     m_services = &services;
     m_document = services.document2D;
+    m_selectionService = services.selectionService;
     m_state = CommandState::Active;
     m_stage = 0;
     m_selectedEntityId.clear();
@@ -650,59 +641,39 @@ bool RotateCommand::activate(const UiServices& services)
 
     if (m_document)
     {
-        const QStringList selectedIds = m_document->selectedIdsQ();
-        if (!selectedIds.isEmpty())
+        const auto selectedEntities = m_selectionService->selectedEntities();
+        if (!selectedEntities.empty())
         {
-            m_selectedEntityId = selectedIds.first();
-            auto* sm = m_document->sceneManager();
-            if (sm)
-            {
-                for (const QString& idStr : selectedIds)
-                {
-                    bool ok = false;
-                    const Eg::EntityId id = static_cast<Eg::EntityId>(idStr.toULongLong(&ok));
-                    if (!ok)
-                        continue;
-                    auto* entity = sm->findEntityById(id);
-                    if (entity)
-                        m_originalSnapshots.append(takeSnapshot(entity));
-                }
-                SY_DEBUGF("[TransformCommands] RotateCommand saved %d snapshots", m_originalSnapshots.size());
+            m_selectedEntityId = QString::number(selectedEntities[0]->id);
+            for (Eg::SyEntity* entity : selectedEntities)
+                m_originalSnapshots.append(takeSnapshot(entity));
+            SY_DEBUGF("[TransformCommands] RotateCommand saved %d snapshots", m_originalSnapshots.size());
 
-                bool ok = false;
-                const Eg::EntityId id = static_cast<Eg::EntityId>(m_selectedEntityId.toULongLong(&ok));
-                if (ok)
+            Eg::SyEntity* firstEntity = selectedEntities[0];
+            switch (firstEntity->eType)
+            {
+                case Eg::EType::LINE:
                 {
-                    auto* entity = sm->findEntityById(id);
-                    if (entity)
-                    {
-                        switch (entity->eType)
-                        {
-                            case Eg::EType::LINE:
-                            {
-                                auto* line = static_cast<Eg::SyLine*>(entity);
-                                for (const auto& pt : line->vPoints)
-                                    m_originalPoints.emplace_back(pt.x(), pt.y());
-                                break;
-                            }
-                            case Eg::EType::POLYGON:
-                            {
-                                auto* polygon = static_cast<Eg::SyPolygon*>(entity);
-                                for (const auto& v : polygon->vVertices)
-                                    m_originalPoints.emplace_back(v.x(), v.y());
-                                break;
-                            }
-                            case Eg::EType::ARC:
-                            case Eg::EType::CIRCLE:
-                            {
-                                m_originalPoints.emplace_back(entity->basePoint.x(), entity->basePoint.y());
-                                break;
-                            }
-                            default:
-                                break;
-                        }
-                    }
+                    auto* line = static_cast<Eg::SyLine*>(firstEntity);
+                    for (const auto& pt : line->vPoints)
+                        m_originalPoints.emplace_back(pt.x(), pt.y());
+                    break;
                 }
+                case Eg::EType::POLYGON:
+                {
+                    auto* polygon = static_cast<Eg::SyPolygon*>(firstEntity);
+                    for (const auto& v : polygon->verticesMutable())
+                        m_originalPoints.emplace_back(v.x(), v.y());
+                    break;
+                }
+                case Eg::EType::ARC:
+                case Eg::EType::CIRCLE:
+                {
+                    m_originalPoints.emplace_back(firstEntity->basePoint.x(), firstEntity->basePoint.y());
+                    break;
+                }
+                default:
+                    break;
             }
             computeDefaultCenter();
         }
@@ -813,22 +784,9 @@ bool RotateCommand::onMouseMove(int x, int y)
     if (!m_document)
         return true;
 
-    auto* sm = m_document->sceneManager();
-    if (!sm)
-        return true;
-
-    const QStringList selectedIds = m_document->selectedIdsQ();
-    for (const QString& idStr : selectedIds)
-    {
-        bool ok = false;
-        const Eg::EntityId id = static_cast<Eg::EntityId>(idStr.toULongLong(&ok));
-        if (!ok)
-            continue;
-
-        auto* entity = sm->findEntityById(id);
-        if (entity)
-            applyRotationToEntity(entity, m_rotationCenter, delta);
-    }
+    const auto selectedEntities = m_selectionService->selectedEntities();
+    for (Eg::SyEntity* entity : selectedEntities)
+        applyRotationToEntity(entity, m_rotationCenter, delta);
     return true;
 }
 
@@ -948,6 +906,7 @@ bool CopyCommand::activate(const UiServices& services)
     SY_INFO("[TransformCommands] CopyCommand activated");
     m_services = &services;
     m_document = services.document2D;
+    m_selectionService = services.selectionService;
     m_state = CommandState::Active;
     m_anchorPoint = QPointF();
     m_targetPoint = QPointF();
@@ -1015,18 +974,9 @@ bool CopyCommand::onMouseDown(int x, int y)
             return true;
         }
 
-        const QStringList selectedIds = m_document->selectedIdsQ();
-        for (const QString& idStr : selectedIds)
+        const auto selectedEntities = m_selectionService->selectedEntities();
+        for (Eg::SyEntity* entity : selectedEntities)
         {
-            bool ok = false;
-            const Eg::EntityId id = static_cast<Eg::EntityId>(idStr.toULongLong(&ok));
-            if (!ok)
-                continue;
-
-            auto* entity = sm->findEntityById(id);
-            if (!entity)
-                continue;
-
             std::unique_ptr<Eg::SyEntity> copy;
             switch (entity->eType)
             {
@@ -1052,18 +1002,15 @@ bool CopyCommand::onMouseDown(int x, int y)
                 {
                     auto* line = static_cast<Eg::SyLine*>(copy.get());
                     for (auto& pt : line->vPoints)
-                    {
                         pt = Ut::Vec2d(pt.x() + dx, pt.y() + dy);
-                    }
                     break;
                 }
                 case Eg::EType::POLYGON:
                 {
                     auto* polygon = static_cast<Eg::SyPolygon*>(copy.get());
-                    for (auto& v : polygon->vVertices)
-                    {
+                    auto& verts = polygon->verticesMutable();
+                    for (auto& v : verts)
                         v = Ut::Vec2d(v.x() + dx, v.y() + dy);
-                    }
                     break;
                 }
                 default:
@@ -1140,7 +1087,7 @@ UndoCommand* CopyCommand::createUndoCommand()
     if (m_copiedEntityIds.isEmpty())
         return nullptr;
 
-    return new CopyUndoCommand(QObject::tr("Copy"), m_document, m_copiedSnapshots, m_copiedEntityIds, UndoMode::Copy);
+    return new CopyUndoCommand(QObject::tr("Copy"), m_document, m_copiedSnapshots, m_copiedEntityIds, UndoMode::Copy, m_selectionService);
 }
 
 bool CopyCommand::isComplete() const
@@ -1195,6 +1142,7 @@ bool DeleteCommand::activate(const UiServices& services)
     SY_INFO("[TransformCommands] DeleteCommand activated");
     m_services = &services;
     m_document = services.document2D;
+    m_selectionService = services.selectionService;
     m_state = CommandState::Active;
     m_deletedEntityIds.clear();
     m_snapshots.clear();
@@ -1204,20 +1152,11 @@ bool DeleteCommand::activate(const UiServices& services)
         auto* sm = m_document->sceneManager();
         if (sm)
         {
-            const QStringList selectedIds = m_document->selectedIdsQ();
-            for (const QString& idStr : selectedIds)
+            const auto selectedEntities = m_selectionService->selectedEntities();
+            for (Eg::SyEntity* entity : selectedEntities)
             {
-                bool ok = false;
-                const Eg::EntityId id = static_cast<Eg::EntityId>(idStr.toULongLong(&ok));
-                if (!ok)
-                    continue;
-
-                auto* entity = sm->findEntityById(id);
-                if (entity)
-                {
-                    m_snapshots.append(takeSnapshot(entity));
-                    m_deletedEntityIds.append(idStr);
-                }
+                m_snapshots.append(takeSnapshot(entity));
+                m_deletedEntityIds.append(QString::number(entity->id));
             }
             for (const QString& id : m_deletedEntityIds)
                 m_document->removeEntity(id);
@@ -1260,7 +1199,7 @@ UndoCommand* DeleteCommand::createUndoCommand()
     if (m_snapshots.isEmpty())
         return nullptr;
 
-    return new CopyUndoCommand(QObject::tr("Delete"), m_document, m_snapshots, m_deletedEntityIds, UndoMode::Delete);
+    return new CopyUndoCommand(QObject::tr("Delete"), m_document, m_snapshots, m_deletedEntityIds, UndoMode::Delete, m_selectionService);
 }
 
 bool DeleteCommand::isComplete() const
@@ -1307,6 +1246,7 @@ bool MirrorCommand::activate(const UiServices& services)
     SY_INFO("[TransformCommands] MirrorCommand activated");
     m_services = &services;
     m_document = services.document2D;
+    m_selectionService = services.selectionService;
     m_state = CommandState::Active;
     m_stage = 0;
     m_mirrorStart = QPointF();
@@ -1375,22 +1315,13 @@ bool MirrorCommand::onMouseDown(int x, int y)
             return true;
         }
 
-        const QStringList selectedIds = m_document->selectedIdsQ();
-        for (const QString& idStr : selectedIds)
+        const auto selectedEntities = m_selectionService->selectedEntities();
+        for (Eg::SyEntity* entity : selectedEntities)
         {
-            bool ok = false;
-            const Eg::EntityId id = static_cast<Eg::EntityId>(idStr.toULongLong(&ok));
-            if (!ok)
-                continue;
-
-            auto* entity = sm->findEntityById(id);
-            if (!entity)
-                continue;
-
             m_originalSnapshots.append(takeSnapshot(entity));
             applyMirrorToEntity(entity, m_mirrorStart, m_mirrorEnd);
             m_mirroredSnapshots.append(takeSnapshot(entity));
-            m_mirroredEntityIds.append(idStr);
+            m_mirroredEntityIds.append(QString::number(entity->id));
         }
         commit();
     }

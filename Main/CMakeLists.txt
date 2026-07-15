@@ -30,8 +30,14 @@ list(REMOVE_DUPLICATES MAIN_HEADERS)
 
 list(FILTER MAIN_SOURCES EXCLUDE REGEX ".*Test/.*\\.cpp$")
 list(FILTER MAIN_HEADERS EXCLUDE REGEX ".*Test/.*\\.h$")
-list(FILTER MAIN_SOURCES EXCLUDE REGEX ".*RenderCore/.*\\.cpp$")
-list(FILTER MAIN_HEADERS EXCLUDE REGEX ".*RenderCore/.*\\.h$")
+if(NOT BUILD_UI3D OR NOT BUILD_RENDERCORE)
+    list(FILTER MAIN_SOURCES EXCLUDE REGEX ".*SimpleRenderer3D\\.cpp$")
+    list(FILTER MAIN_HEADERS EXCLUDE REGEX ".*SimpleRenderer3D\\.h$")
+    list(FILTER MAIN_SOURCES EXCLUDE REGEX ".*UiViewport3D\\.cpp$")
+    list(FILTER MAIN_HEADERS EXCLUDE REGEX ".*UiViewport3D\\.h$")
+    list(FILTER MAIN_SOURCES EXCLUDE REGEX ".*RenderWidget3DAdapter\\.cpp$")
+    list(FILTER MAIN_HEADERS EXCLUDE REGEX ".*RenderWidget3DAdapter\\.h$")
+endif()
 
 file(GLOB_RECURSE MAIN_RESOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.qrc"
@@ -86,11 +92,9 @@ target_include_directories(${app_name}
         "${CMAKE_CURRENT_BINARY_DIR}"
         "${SRC_ROOT}"
         "${SRC_ROOT}/Common"
-        "${SRC_ROOT}/RenderCore"
-        "${SRC_ROOT}/RenderCore/Backend"
-        "${SRC_ROOT}/RenderCore/Compiler"
-        "${SRC_ROOT}/RenderCore/Strategy"
-        "${SRC_ROOT}/RenderCore/Utils"
+        "${SANYI_RENDERX_DIR}/include"
+        "${SANYI_RENDERX_DIR}/src"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../UI/RenderCompat/Include"
         "${UI_ROOT}"
         "${UI_ROOT}/Adapters"
         "${UI_ROOT}/Dispatchers"
@@ -106,9 +110,9 @@ target_include_directories(${app_name}
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/2D/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/3D/Include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../Render/Common/Include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../Render/2D/Include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../Render/3D/Include"
+        # "${CMAKE_CURRENT_SOURCE_DIR}/../Render/Common/Include"
+        # "${CMAKE_CURRENT_SOURCE_DIR}/../Render/2D/Include"
+        # "${CMAKE_CURRENT_SOURCE_DIR}/../Render/3D/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Common/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Include"
@@ -122,17 +126,17 @@ target_link_libraries(${app_name}
         License
         EngineCommon
         Engine2D
-        Engine3D
-        RenderCommon
-        Render2D
-        Render3D
-        UiRenderCore
+        SanYiRender
         UICommon
         UI2D
-        UI3D
         Log
+        RenderCompat
         ${QT_LIBRARIES}
 )
+
+if(BUILD_UI3D)
+    target_link_libraries(${app_name} PRIVATE UI3D Engine3D)
+endif()
 
 if(SANYI_PYTHON_HOST)
     target_compile_definitions(${app_name} PRIVATE SANYI_PYTHON_HOST=1)
@@ -213,9 +217,26 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
         "${UI_ROOT}/Test/*.cpp"
     )
 
+    if(NOT BUILD_UI3D OR NOT BUILD_RENDERCORE)
+        list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*SimpleRenderer3DTests\\.cpp$")
+        list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*FrameworkLifecycleTests\\.cpp$")
+    endif()
+
+    if(NOT BUILD_RENDERCORE)
+        list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*RenderCoreTests\\.cpp$")
+        list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*BackendE2ETests\\.cpp$")
+        list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*FrameworkIntegrationTests\\.cpp$")
+    endif()
+
     file(GLOB MAIN_TEST_DEP_SOURCES CONFIGURE_DEPENDS
         "${UI_ROOT}/*.cpp"
     )
+
+    if(NOT BUILD_UI3D OR NOT BUILD_RENDERCORE)
+        list(FILTER MAIN_TEST_DEP_SOURCES EXCLUDE REGEX ".*SimpleRenderer3D\\.cpp$")
+        list(FILTER MAIN_TEST_DEP_SOURCES EXCLUDE REGEX ".*UiViewport3D\\.cpp$")
+        list(FILTER MAIN_TEST_DEP_SOURCES EXCLUDE REGEX ".*RenderWidget3DAdapter\\.cpp$")
+    endif()
 
     add_executable(MainTests
         ${MAIN_TEST_SOURCES}
@@ -229,11 +250,6 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             "${CMAKE_CURRENT_BINARY_DIR}"
             "${SRC_ROOT}"
             "${SRC_ROOT}/Common"
-            "${SRC_ROOT}/RenderCore"
-            "${SRC_ROOT}/RenderCore/Backend"
-            "${SRC_ROOT}/RenderCore/Compiler"
-            "${SRC_ROOT}/RenderCore/Strategy"
-            "${SRC_ROOT}/RenderCore/Utils"
             "${UI_ROOT}"
             "${UI_ROOT}/Adapters"
             "${UI_ROOT}/Dispatchers"
@@ -249,9 +265,9 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/2D/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/3D/Include"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../Render/Common/Include"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../Render/2D/Include"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../Render/3D/Include"
+            # "${CMAKE_CURRENT_SOURCE_DIR}/../Render/Common/Include"
+            # "${CMAKE_CURRENT_SOURCE_DIR}/../Render/2D/Include"
+            # "${CMAKE_CURRENT_SOURCE_DIR}/../Render/3D/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Common/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Include"
@@ -263,20 +279,20 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             Utility
             EngineCommon
             Engine2D
-            Engine3D
-            RenderCommon
-            Render2D
-            Render3D
-            UiRenderCore
+            RenderCompat
             UICommon
             UI2D
-            UI3D
             Log
+            SanYiRender
             ${QT_LIBRARIES}
             GTest::gtest
             GTest::gtest_main
             GTest::gmock
     )
+
+    if(BUILD_UI3D)
+        target_link_libraries(MainTests PRIVATE Engine3D UI3D)
+    endif()
 
     set_target_properties(MainTests PROPERTIES
         AUTOMOC ON
@@ -297,7 +313,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
     message(STATUS "[Main Tests]")
     # message(STATUS "  SimpleRenderer3DTests: Renderer lifecycle, render loop, selection")
     # message(STATUS "  CommandLifecycleTests: execute/cancel/submit, undo/redo, preview, selection, handlerFor")
-    # message(STATUS "  RenderCoreTests: backend init/shutdown, SceneCompiler compile/incremental/cache, factory, Camera3D, Viewport3D")
+    # (RenderCoreTests/BackendE2ETests/FrameworkIntegrationTests 已删除，依赖 RenderCore 且无实装)
     # message(STATUS "  RenderPipelineTests: SceneEditServiceAdapter commit/preview/cancel + scene-changed signal/callback")
     # message(STATUS "  GpuSceneRenderer2DTests: GPU 桥接器编译/投递/选择/overlay 路径 + Main→Render2D 格式翻译")
     message(STATUS "")

@@ -1,53 +1,39 @@
 #pragma once
 
-#include "../RenderCore/RenderTypes.h"
-
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "UI/SceneDocumentBase.h"
 
-// ============================================================
+#include "Engine3D/SceneManager3D.h"
+
 /**
- * @brief 3D 场景树节点
+ * @brief 3D 场景树节点（纯 UI 显示层）
  *
- * 构成 SceneDocument3D 的层次结构，支持父子节点和递归查询。
+ * 不存储实体数据，所有属性（id/name/selected）委托给引擎实体查询。
+ * 仅维护：
+ * - m_engineEntityId：关联的引擎实体 ID
+ * - m_children：UI 树层次结构（父子关系）
+ * - m_highlighted：UI 高亮状态
  */
 class SceneNode
 {
 public:
-    SceneNode(std::string id, std::string name);
+    /// 构造：必须关联引擎实体
+    explicit SceneNode(Eg::EntityId entityId, std::string name);
 
     std::string id() const
     {
-        return m_id;
+        return std::to_string(m_engineEntityId);
     }
-    std::string name() const
-    {
-        return m_name;
-    }
-    std::string typeName() const
-    {
-        return "SceneNode";
-    }
+    std::string name() const { return m_name; }
+    std::string typeName() const { return "SceneNode"; }
 
-    bool selected() const
-    {
-        return m_selected;
-    }
-    void setSelected(bool selected)
-    {
-        m_selected = selected;
-    }
-    bool highlighted() const
-    {
-        return m_highlighted;
-    }
-    void setHighlighted(bool highlighted)
-    {
-        m_highlighted = highlighted;
-    }
+    bool selected() const;
+    void setSelected(bool selected);
+    bool highlighted() const { return m_highlighted; }
+    void setHighlighted(bool highlighted) { m_highlighted = highlighted; }
 
     void addChild(const std::shared_ptr<SceneNode>& child);
     std::vector<std::shared_ptr<SceneNode>> children() const;
@@ -55,20 +41,21 @@ public:
     std::vector<std::string> pathIdsRecursive() const;
     std::vector<std::string> pathNamesRecursive() const;
 
+    Eg::EntityId engineEntityId() const { return m_engineEntityId; }
+    void setEngineEntityId(Eg::EntityId id) { m_engineEntityId = id; }
+
 private:
-    std::string m_id;
+    Eg::EntityId m_engineEntityId;
     std::string m_name;
     std::vector<std::shared_ptr<SceneNode>> m_children;
-    bool m_selected{ false };
     bool m_highlighted{ false };
 };
 
-// ============================================================
 /**
- * @brief 选择集容器（3D 场景树专用）
+ * @brief 选择集容器（基于引擎场景）
  *
- * 管理 SceneDocument3D 中 SceneNode 的选择状态。
- * 不再服务于已移除的 EntityDocument2D。
+ * 将选中实体 ID 委托给 SceneManager3D 管理。
+ * SceneNode 的 selected() 直接读取引擎实体状态。
  */
 class SelectionSet
 {
@@ -76,20 +63,22 @@ public:
     void clear();
     void add(const std::shared_ptr<SceneNode>& node);
     void remove(const std::string& nodeId);
-    bool contains(const std::string& nodeId) const;
+    bool contains(const std::string& entityId) const;
     std::vector<std::shared_ptr<SceneNode>> items() const;
     bool empty() const;
 
 private:
-    std::vector<std::shared_ptr<SceneNode>> m_items;
+    Eg::SceneManager3D* m_scene{ nullptr };
+    friend class SceneDocument3D;
+    void setScene(Eg::SceneManager3D* scene) { m_scene = scene; }
 };
 
-// ============================================================
 /**
- * @brief 3D 场景文档
+ * @brief 3D 场景文档（引擎场景适配层）
  *
- * 管理 3D 场景的层次结构（SceneNode 树）和选择状态。
- * 2D 场景请使用 Eg::SceneManager (Engine/2D/Core/SceneManager.h)
+ * 数据全部由 Eg::SceneManager3D 管理，SceneNode 仅用于 UI 树层次显示。
+ * - m_uiRoot：UI 树根节点，维护父子层次
+ * - m_engineScene：引擎场景，维护实体数据
  */
 class SceneDocument3D : public UI::SceneDocumentBase
 {
@@ -103,6 +92,11 @@ public:
     SelectionSet& selection();
     const SelectionSet& selection() const;
 
+    // ---- 引擎场景管理 ----
+
+    std::shared_ptr<Eg::SceneManager3D> engineScene() const { return m_engineScene; }
+    void setEngineScene(std::shared_ptr<Eg::SceneManager3D> scene);
+
     // ---- SceneDocumentBase 接口 ----
 
     std::vector<std::string> allEntityIds() const override;
@@ -113,36 +107,7 @@ public:
     void clear() override;
 
 private:
-    std::vector<std::shared_ptr<SceneNode>> m_roots;
-    SelectionSet m_selection;
-};
-
-// ============================================================
-class CameraController3D
-{
-public:
-    virtual ~CameraController3D() = default;
-    virtual void orbit(double deltaYaw, double deltaPitch) = 0;
-    virtual void zoom(double delta) = 0;
-    virtual void pan(const RenderPointF& delta) = 0;
-    virtual void reset() = 0;
-};
-
-// ============================================================
-class DefaultCameraController3D final : public CameraController3D
-{
-public:
-    void orbit(double deltaYaw, double deltaPitch) override;
-    void zoom(double delta) override;
-    void pan(const RenderPointF& delta) override;
-    void reset() override;
-    double yaw() const;
-    double pitch() const;
-    double distance() const;
-
-private:
-    double m_yaw{ 0.0 };
-    double m_pitch{ 15.0 };
-    double m_distance{ 10.0 };
-    RenderPointF m_panOffset;
+    mutable SelectionSet m_selection;
+    std::shared_ptr<Eg::SceneManager3D> m_engineScene;
+    std::shared_ptr<SceneNode> m_uiRoot;
 };

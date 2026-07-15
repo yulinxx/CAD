@@ -13,7 +13,17 @@
 #include "../UI/CommandHandlerAdapter.h"
 
 #include "UI2D/Operation/OperationId.h"
+#include "UI2D/Operation/IOperation.h"
 #include "Log/SyLogger.h"
+
+#include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Edit/UndoRedoManager.h"
+#include "Engine2D/Edit/SceneEditService.h"
+
+#include <unordered_set>
+#include <cmath>
+
+#include "Ut/Mat.h"
 
 // 应用组合根组件，负责创建和组装所有核心服务
 // 作为依赖注入的中心点，管理UI层和命令系统的生命周期
@@ -24,8 +34,11 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     , m_commandDispatcher(std::make_unique<DefaultUiCommandDispatcher>())
     , m_undoStack(std::make_unique<DefaultUndoStack>())
     , m_shellHost(std::make_unique<UiShellHost>())
-    , m_document2D(std::make_unique<SceneDocument2D>())
     , m_operationBus(std::make_unique<OperationBus>())
+    , m_sceneManager(std::make_unique<Eg::SceneManager>())
+    , m_undoRedoManager(std::make_unique<UndoRedoManager>(m_sceneManager.get()))
+    , m_sceneEditService(std::make_unique<SceneEditService>(m_sceneManager.get(), m_undoRedoManager.get()))
+    , m_document2D(std::make_unique<SceneDocument2D>(m_sceneEditService.get()))
 {
     // 配置命令分发器的核心依赖
     m_commandDispatcher->setStateCenter(m_stateCenter.get());
@@ -59,7 +72,10 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     // 通过适配器将旧命令注册到 OperationBus
     registerCommandAdapters();
 
-    SY_INFO("[ApplicationCompositionRoot] initialized with OperationBus + CommandHandlerAdapters");
+    // 注册核心编辑操作（新命令系统直接实现）
+    registerCoreOperations();
+
+    SY_INFO("[ApplicationCompositionRoot] initialized with OperationBus + CommandHandlerAdapters + CoreOperations");
 }
 
 // 注册所有命令处理器到命令分发器
@@ -173,4 +189,141 @@ void ApplicationCompositionRoot::registerCommandAdapters()
     }
 
     SY_INFOF("[ApplicationCompositionRoot] Registered %d CommandHandlerAdapters on OperationBus", count);
+}
+
+// 注册核心编辑操作到 OperationBus（新命令系统直接实现）
+void ApplicationCompositionRoot::registerCoreOperations()
+{
+    if (!m_operationBus || !m_sceneEditService || !m_undoRedoManager)
+        return;
+
+    auto& reg = m_operationBus->registry();
+    auto* editService = m_sceneEditService.get();
+    auto* undoManager = m_undoRedoManager.get();
+
+    // ---- 撤销/重做 ----
+    reg.registerOperation(std::make_unique<LambdaOperation>(
+        OperationId::Edit_Undo, [undoManager] {
+            SY_INFO("[CoreOperations] Edit_Undo");
+            if (undoManager && undoManager->canUndo())
+                undoManager->undo();
+        }));
+
+    reg.registerOperation(std::make_unique<LambdaOperation>(
+        OperationId::Edit_Redo, [undoManager] {
+            SY_INFO("[CoreOperations] Edit_Redo");
+            if (undoManager && undoManager->canRedo())
+                undoManager->redo();
+        }));
+
+    // ---- 删除/移动/复制 ----
+    reg.registerOperation(std::make_unique<LambdaOperation>(
+        OperationId::Edit_Delete, [editService] {
+            SY_INFO("[CoreOperations] Edit_Delete");
+            editService->deleteSelected("Delete");
+        }));
+
+    reg.registerOperation(std::make_unique<ParamLambdaOperation>(
+        OperationId::Edit_Move, [editService](const QVariantMap& params) {
+            double dx = params.value("dx").toDouble();
+            double dy = params.value("dy").toDouble();
+            SY_INFOF("[CoreOperations] Edit_Move: dx=%f, dy=%f", dx, dy);
+            editService->nudgeSelected(dx, dy, "Move");
+        }));
+
+    reg.registerOperation(std::make_unique<LambdaOperation>(
+        OperationId::Edit_Duplicate, [editService] {
+            SY_INFO("[CoreOperations] Edit_Duplicate");
+            auto* scene = editService->sceneManager();
+            auto selectedEntities = scene->getSelectedEntities();
+            std::vector<Eg::EntityId> selectedIds;
+            for (auto* e : selectedEntities)
+                selectedIds.push_back(e->id);
+            auto snapshots = editService->captureSnapshots(selectedIds);
+            if (!snapshots.empty())
+            {
+                editService->addEntities(std::move(snapshots), "Duplicate");
+            }
+        }));
+
+    // ---- 选择操作 ----
+    reg.registerOperation(std::make_unique<LambdaOperation>(
+        OperationId::Edit_SelectAll, [editService] {
+            SY_INFO("[CoreOperations] Edit_SelectAll");
+            auto* scene = editService->sceneManager();
+            scene->clearSelection();
+            // SceneManager 无 selectEntities(vector<EntityId>) 重载，逐个选中
+            auto allIds = scene->getAllEntityIds();
+            for (const auto& id : allIds)
+            {
+                auto* entity = scene->findEntityById(id);
+                if (entity)
+                    scene->selectEntity(entity);
+            }
+        }));
+
+    reg.registerOperation(std::make_unique<LambdaOperation>(
+        OperationId::Edit_ClearSelection, [editService] {
+            SY_INFO("[CoreOperations] Edit_ClearSelection");
+            editService->sceneManager()->clearSelection();
+        }));
+
+    reg.registerOperation(std::make_unique<LambdaOperation>(
+        OperationId::Edit_InvertSelection, [editService] {
+            SY_INFO("[CoreOperations] Edit_InvertSelection");
+            auto* scene = editService->sceneManager();
+            scene->invertSelection();
+        }));
+
+    // ---- 变换操作（旋转/镜像） ----
+    reg.registerOperation(std::make_unique<ParamLambdaOperation>(
+        OperationId::Edit_Rotate, [editService](const QVariantMap& params) {
+            double angleDeg = params.value("angle").toDouble();
+            SY_INFOF("[CoreOperations] Edit_Rotate: angle=%f", angleDeg);
+            double angleRad = angleDeg * M_PI / 180.0;
+            auto* scene = editService->sceneManager();
+            editService->transformSelected([angleRad, scene]() {
+                auto selected = scene->getSelectedEntities();
+                for (auto* e : selected)
+                {
+                    Ut::Mat3d mat = Ut::Mat3d::rotate(angleRad);
+                    e->transform(mat);
+                    scene->updateEntityBounds(e);
+                }
+            }, "Rotate");
+        }));
+
+    reg.registerOperation(std::make_unique<ParamLambdaOperation>(
+        OperationId::Edit_Mirror, [editService](const QVariantMap& params) {
+            bool horizontal = params.value("horizontal", false).toBool();
+            SY_INFOF("[CoreOperations] Edit_Mirror: horizontal=%s", horizontal ? "true" : "false");
+            auto* scene = editService->sceneManager();
+            editService->transformSelected([horizontal, scene]() {
+                auto selected = scene->getSelectedEntities();
+                for (auto* e : selected)
+                {
+                    Ut::Mat3d mat = horizontal ? Ut::Mat3d::mirrorX() : Ut::Mat3d::mirrorY();
+                    e->transform(mat);
+                    scene->updateEntityBounds(e);
+                }
+            }, "Mirror");
+        }));
+
+    // ---- 视图操作 ----
+    reg.registerOperation(std::make_unique<LambdaOperation>(
+        OperationId::View_ZoomFit, [] {
+            SY_INFO("[CoreOperations] View_ZoomFit");
+        }));
+
+    reg.registerOperation(std::make_unique<LambdaOperation>(
+        OperationId::View_ZoomIn, [] {
+            SY_INFO("[CoreOperations] View_ZoomIn");
+        }));
+
+    reg.registerOperation(std::make_unique<LambdaOperation>(
+        OperationId::View_ZoomOut, [] {
+            SY_INFO("[CoreOperations] View_ZoomOut");
+        }));
+
+    SY_INFO("[ApplicationCompositionRoot] Registered core edit operations on OperationBus");
 }

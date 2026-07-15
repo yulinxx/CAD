@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "SceneDocument2D.h"
+#include "ISelectionService.h"
 #include "UiServices.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/SyEntity/SyLine.h"
@@ -63,6 +64,7 @@ bool DrawLineCommand::activate(const UiServices& services)
     SY_INFO("[CreateCommands] DrawLineCommand activated");
     m_services = &services;
     m_document = services.document2D;
+    m_selectionService = services.selectionService;
     m_state = CommandState::Active;
     m_pointPicker.activate(services);
     m_previewStart = QPointF();
@@ -85,7 +87,7 @@ void DrawLineCommand::commit()
     SY_INFOF("[CreateCommands] DrawLineCommand committed: entity=%s", m_createdEntityId.toUtf8().constData());
     m_state = CommandState::Committed;
     if (m_document && !m_createdEntityId.isEmpty())
-        m_document->selectEntity(m_createdEntityId);
+        m_selectionService->select(m_createdEntityId.toStdString());
 }
 
 // 重置命令状态到初始状态
@@ -157,7 +159,7 @@ UndoCommand* DrawLineCommand::createUndoCommand()
     if (m_createdEntityId.isEmpty())
         return nullptr;
 
-    return new LineUndoCommand(m_document, m_createdEntityId);
+    return new LineUndoCommand(m_document, m_createdEntityId, m_selectionService);
 }
 
 // 判断命令是否完成
@@ -218,6 +220,7 @@ bool CircleCommand::activate(const UiServices& services)
     SY_INFO("[CreateCommands] CircleCommand activated");
     m_services = &services;
     m_document = services.document2D;
+    m_selectionService = services.selectionService;
     m_state = CommandState::Active;
     m_center = QPointF();
     m_endPoint = QPointF();
@@ -311,7 +314,7 @@ UndoCommand* CircleCommand::createUndoCommand()
     if (m_createdEntityId.isEmpty())
         return nullptr;
 
-    return new CircleUndoCommand(m_document, m_createdEntityId);
+    return new CircleUndoCommand(m_document, m_createdEntityId, m_selectionService);
 }
 
 bool CircleCommand::isComplete() const
@@ -370,6 +373,7 @@ bool ArcCommand::activate(const UiServices& services)
     SY_INFO("[CreateCommands] ArcCommand activated");
     m_services = &services;
     m_document = services.document2D;
+    m_selectionService = services.selectionService;
     m_state = CommandState::Active;
     m_stage = 0;
     m_center = QPointF();
@@ -490,7 +494,7 @@ UndoCommand* ArcCommand::createUndoCommand()
     if (!entity)
         return nullptr;
 
-    return new ArcUndoCommand(m_document, m_createdEntityId);
+    return new ArcUndoCommand(m_document, m_createdEntityId, m_selectionService);
 }
 
 bool ArcCommand::isComplete() const
@@ -552,6 +556,7 @@ bool PolylineCommand::activate(const UiServices& services)
     SY_INFO("[CreateCommands] PolylineCommand activated");
     m_services = &services;
     m_document = services.document2D;
+    m_selectionService = services.selectionService;
     m_state = CommandState::Active;
     m_points.clear();
     m_currentPoint = QPointF();
@@ -653,7 +658,7 @@ UndoCommand* PolylineCommand::createUndoCommand()
         return nullptr;
 
     EntitySnapshot snap = takeSnapshot(entity);
-    return new PolylineUndoCommand(m_document, snap);
+    return new PolylineUndoCommand(m_document, snap, m_selectionService);
 }
 
 bool PolylineCommand::isComplete() const
@@ -717,6 +722,7 @@ bool PolygonCommand::activate(const UiServices& services)
     SY_INFO("[CreateCommands] PolygonCommand activated");
     m_services = &services;
     m_document = services.document2D;
+    m_selectionService = services.selectionService;
     m_state = CommandState::Active;
     m_stage = 0;
     m_sides = 6;
@@ -875,7 +881,7 @@ UndoCommand* PolygonCommand::createUndoCommand()
         return nullptr;
 
     EntitySnapshot snap = takeSnapshot(entity);
-    return new PolylineUndoCommand(m_document, snap);
+    return new PolylineUndoCommand(m_document, snap, m_selectionService);
 }
 
 bool PolygonCommand::isComplete() const
@@ -907,9 +913,10 @@ void PolygonCommand::finish()
 
 // CircleUndoCommand - 圆的撤销命令
 
-CircleUndoCommand::CircleUndoCommand(SceneDocument2D* document, const QString& entityId)
+CircleUndoCommand::CircleUndoCommand(SceneDocument2D* document, const QString& entityId, ISelectionService* selService)
     : UndoCommand(QObject::tr("Draw Circle"))
     , m_document(document)
+    , m_selectionService(selService)
     , m_entityId(entityId)
 {
     auto* sm = document->sceneManager();
@@ -958,14 +965,15 @@ void CircleUndoCommand::redo()
     {
         m_entityId = m_document->createCircle(m_center, m_radius);
     }
-    m_document->selectEntity(m_entityId);
+    m_selectionService->select(m_entityId.toStdString());
 }
 
 // LineUndoCommand - 线段的撤销命令
 
-LineUndoCommand::LineUndoCommand(SceneDocument2D* document, const QString& entityId)
+LineUndoCommand::LineUndoCommand(SceneDocument2D* document, const QString& entityId, ISelectionService* selService)
     : UndoCommand(QObject::tr("Draw Line"))
     , m_document(document)
+    , m_selectionService(selService)
     , m_entityId(entityId)
 {
     auto* sm = document->sceneManager();
@@ -1014,14 +1022,15 @@ void LineUndoCommand::redo()
     {
         m_entityId = m_document->createLine(m_start, m_end);
     }
-    m_document->selectEntity(m_entityId);
+    m_selectionService->select(m_entityId.toStdString());
 }
 
 // ArcUndoCommand - 圆弧的撤销命令
 
-ArcUndoCommand::ArcUndoCommand(SceneDocument2D* document, const QString& entityId)
+ArcUndoCommand::ArcUndoCommand(SceneDocument2D* document, const QString& entityId, ISelectionService* selService)
     : UndoCommand(QObject::tr("Draw Arc"))
     , m_document(document)
+    , m_selectionService(selService)
     , m_entityId(entityId)
 {
     auto* sm = document->sceneManager();
@@ -1072,21 +1081,23 @@ void ArcUndoCommand::redo()
     {
         m_entityId = m_document->createArc(m_center, m_radius, m_startAngle, m_endAngle);
     }
-    m_document->selectEntity(m_entityId);
+    m_selectionService->select(m_entityId.toStdString());
 }
 
 // PolylineUndoCommand - 多段线的撤销命令
 
-PolylineUndoCommand::PolylineUndoCommand(SceneDocument2D* document, const QString& entityId)
+PolylineUndoCommand::PolylineUndoCommand(SceneDocument2D* document, const QString& entityId, ISelectionService* selService)
     : UndoCommand(QObject::tr("Draw Polyline"))
     , m_document(document)
+    , m_selectionService(selService)
     , m_entityId(entityId)
 {
 }
 
-PolylineUndoCommand::PolylineUndoCommand(SceneDocument2D* document, const EntitySnapshot& snapshot)
+PolylineUndoCommand::PolylineUndoCommand(SceneDocument2D* document, const EntitySnapshot& snapshot, ISelectionService* selService)
     : UndoCommand(QObject::tr("Draw Polyline"))
     , m_document(document)
+    , m_selectionService(selService)
     , m_entityId(snapshot.id)
     , m_snapshot(snapshot)
 {
@@ -1126,7 +1137,7 @@ void PolylineUndoCommand::redo()
     {
         restoreFromSnapshot(m_document, m_snapshot);
     }
-    m_document->selectEntity(m_entityId);
+    m_selectionService->select(m_entityId.toStdString());
 }
 
 // Bezier2Command - 绘制二阶贝塞尔曲线命令
@@ -1161,6 +1172,7 @@ bool Bezier2Command::activate(const UiServices& services)
     SY_INFO("[CreateCommands] Bezier2Command activated");
     m_services = &services;
     m_document = services.document2D;
+    m_selectionService = services.selectionService;
     m_state = CommandState::Active;
     m_stage = 0;
     m_startPoint = QPointF();
@@ -1266,7 +1278,7 @@ UndoCommand* Bezier2Command::createUndoCommand()
     if (m_createdEntityId.isEmpty())
         return nullptr;
 
-    return new BezierUndoCommand(m_document, m_createdEntityId);
+    return new BezierUndoCommand(m_document, m_createdEntityId, m_selectionService);
 }
 
 bool Bezier2Command::isComplete() const
@@ -1325,6 +1337,7 @@ bool BezierCommand::activate(const UiServices& services)
     SY_INFO("[CreateCommands] BezierCommand activated");
     m_services = &services;
     m_document = services.document2D;
+    m_selectionService = services.selectionService;
     m_state = CommandState::Active;
     m_stage = 0;
     m_startPoint = QPointF();
@@ -1439,7 +1452,7 @@ UndoCommand* BezierCommand::createUndoCommand()
     if (m_createdEntityId.isEmpty())
         return nullptr;
 
-    return new BezierUndoCommand(m_document, m_createdEntityId);
+    return new BezierUndoCommand(m_document, m_createdEntityId, m_selectionService);
 }
 
 bool BezierCommand::isComplete() const
@@ -1498,6 +1511,7 @@ bool NurbsCommand::activate(const UiServices& services)
     SY_INFO("[CreateCommands] NurbsCommand activated");
     m_services = &services;
     m_document = services.document2D;
+    m_selectionService = services.selectionService;
     m_state = CommandState::Active;
     m_controlPoints.clear();
     m_currentPoint = QPointF();
@@ -1587,7 +1601,7 @@ UndoCommand* NurbsCommand::createUndoCommand()
     if (m_createdEntityId.isEmpty())
         return nullptr;
 
-    return new NurbsUndoCommand(m_document, m_createdEntityId);
+    return new NurbsUndoCommand(m_document, m_createdEntityId, m_selectionService);
 }
 
 bool NurbsCommand::isComplete() const
@@ -1645,6 +1659,7 @@ bool SmartLineCommand::activate(const UiServices& services)
     SY_INFO("[CreateCommands] SmartLineCommand activated");
     m_services = &services;
     m_document = services.document2D;
+    m_selectionService = services.selectionService;
     m_state = CommandState::Active;
     m_points.clear();
     m_currentPoint = QPointF();
@@ -1734,7 +1749,7 @@ UndoCommand* SmartLineCommand::createUndoCommand()
     if (m_createdEntityId.isEmpty())
         return nullptr;
 
-    return new SmartLineUndoCommand(m_document, m_createdEntityId);
+    return new SmartLineUndoCommand(m_document, m_createdEntityId, m_selectionService);
 }
 
 bool SmartLineCommand::isComplete() const
@@ -1763,9 +1778,10 @@ void SmartLineCommand::setDocument(SceneDocument2D* document)
 
 // BezierUndoCommand - 贝塞尔曲线的撤销命令
 
-BezierUndoCommand::BezierUndoCommand(SceneDocument2D* document, const QString& entityId)
+BezierUndoCommand::BezierUndoCommand(SceneDocument2D* document, const QString& entityId, ISelectionService* selService)
     : UndoCommand(QObject::tr("Draw Bezier"))
     , m_document(document)
+    , m_selectionService(selService)
     , m_entityId(entityId)
     , m_isBezier2(false)
 {
@@ -1832,14 +1848,15 @@ void BezierUndoCommand::redo()
         else
             m_entityId = m_document->createBezier(m_start, m_ctrl1, m_ctrl2, m_end);
     }
-    m_document->selectEntity(m_entityId);
+    m_selectionService->select(m_entityId.toStdString());
 }
 
 // NurbsUndoCommand - NURBS曲线的撤销命令
 
-NurbsUndoCommand::NurbsUndoCommand(SceneDocument2D* document, const QString& entityId)
+NurbsUndoCommand::NurbsUndoCommand(SceneDocument2D* document, const QString& entityId, ISelectionService* selService)
     : UndoCommand(QObject::tr("Draw NURBS"))
     , m_document(document)
+    , m_selectionService(selService)
     , m_entityId(entityId)
 {
     auto* sm = document->sceneManager();
@@ -1888,14 +1905,15 @@ void NurbsUndoCommand::redo()
     {
         m_entityId = m_document->createNurbs(m_controlPoints);
     }
-    m_document->selectEntity(m_entityId);
+    m_selectionService->select(m_entityId.toStdString());
 }
 
 // SmartLineUndoCommand - 复合图元的撤销命令
 
-SmartLineUndoCommand::SmartLineUndoCommand(SceneDocument2D* document, const QString& entityId)
+SmartLineUndoCommand::SmartLineUndoCommand(SceneDocument2D* document, const QString& entityId, ISelectionService* selService)
     : UndoCommand(QObject::tr("Draw SmartLine"))
     , m_document(document)
+    , m_selectionService(selService)
     , m_entityId(entityId)
 {
     // SmartLine 是容器型图元，撤销时直接保存其 ID 即可，
@@ -1936,5 +1954,5 @@ void SmartLineUndoCommand::redo()
     {
         m_entityId = m_document->createSmartLine(m_points);
     }
-    m_document->selectEntity(m_entityId);
+    m_selectionService->select(m_entityId.toStdString());
 }

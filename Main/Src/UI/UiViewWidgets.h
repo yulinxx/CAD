@@ -15,17 +15,22 @@ class QMenu;
 class QMouseEvent;
 class QWheelEvent;
 class SceneDocument2D;
+class ISelectionService;
 class UiCommandDispatcher;
 class IInteractionDispatcher;
 
 /**
- * @brief 2D 视口 — 基于 QGraphicsView 的 2D 编辑视图
+ * @brief 2D 视口 — 基于 QGraphicsView 的 2D 编辑视图（已弃用）
+ *
+ * @deprecated 2D 生产渲染路径已确定为 Render/2D/ + RenderWidget (QOpenGLWidget) +
+ *             UI/2D/ViewWidget 体系。Viewport2D (QGraphicsView) 将在后续重构中逐步替换。
+ *             新功能请勿依赖 Viewport2D，应使用 UI/2D/ 模块的 ViewWidget + RenderWidget。
  *
  * 取代旧的 CanvasViewport2D。
  * 继承 QGraphicsView 提供缩放/平移/编辑交互。
  * 通过 SceneDocument2D 与 Eg::SceneManager 交互。
  */
-class Viewport2D final : public QGraphicsView
+class [[deprecated("Use Render/2D/ + RenderWidget (QOpenGLWidget) + UI/2D/ViewWidget instead")]] Viewport2D final : public QGraphicsView
 {
     Q_OBJECT
 public:
@@ -36,6 +41,7 @@ public:
     void setSelectionCallback(std::function<void(const QString&, const QString&)>&& callback);
     void setCommandStageCallback(std::function<void(const QString&)>&& callback);
     void setDocument(SceneDocument2D* document);
+    void setSelectionService(ISelectionService* service);
     SceneDocument2D* document() const
     {
         return m_document;
@@ -105,6 +111,7 @@ private:
     bool m_boxSelecting{ false };
     bool m_panModeEnabled{ false };
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     UiCommandDispatcher* m_commandDispatcher{ nullptr };
     IInteractionDispatcher* m_interactionDispatcher{ nullptr };
     OperationBus* m_operationBus{ nullptr };

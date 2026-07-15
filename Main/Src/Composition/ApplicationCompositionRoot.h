@@ -13,6 +13,10 @@
 #include "UI/SceneDocument2D.h"
 #include "UI2D/Operation/OperationBus.h"
 
+#include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Edit/UndoRedoManager.h"
+#include "Engine2D/Edit/SceneEditService.h"
+
 /**
  * @class ApplicationCompositionRoot
  * @brief 应用程序组合根类
@@ -57,6 +61,9 @@ private:
     /// 通过 CommandHandlerAdapter 将旧命令注册到 OperationBus
     void registerCommandAdapters();
 
+    /// 注册核心编辑操作到 OperationBus（新命令系统直接实现）
+    void registerCoreOperations();
+
 private:
     /// UI Shell 宿主
     std::unique_ptr<UiShellHost> m_shellHost;
@@ -73,7 +80,7 @@ private:
     /// 命令分发器
     std::unique_ptr<UiCommandDispatcher> m_commandDispatcher;
 
-    /// 撤销栈
+    /// 撤销栈（旧系统兼容）
     std::unique_ptr<IUndoStack> m_undoStack;
 
     /// 命令处理器实例集合
@@ -82,6 +89,15 @@ private:
     /// 操作总线（新命令主线）
     std::unique_ptr<OperationBus> m_operationBus;
 
-    /// 2D 场景文档
+    /// 场景管理器（新系统核心）
+    std::unique_ptr<Eg::SceneManager> m_sceneManager;
+
+    /// 撤销重做管理器（新系统）
+    std::unique_ptr<UndoRedoManager> m_undoRedoManager;
+
+    /// 场景编辑服务（新系统）
+    std::unique_ptr<SceneEditService> m_sceneEditService;
+
+    /// 2D 场景文档（依赖 SceneEditService）
     std::unique_ptr<SceneDocument2D> m_document2D;
 };

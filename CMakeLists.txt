@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 4.3)
+cmake_minimum_required(VERSION 4.3)
 
 # ============ CMake 策略设置 ============
 # CMP0167: FindBoost 模块从 CMake 3.25 开始已被移除，必须使用 CONFIG 模式
@@ -143,25 +143,19 @@ add_subdirectory(License/License)
 # 2. Log 层 - 日志库（Engine 层依赖）
 add_subdirectory(Log/Log)
 
+# Core 模块已移除（保留 SyEntity + Protobuf 方案）
+
 # 3. Engine 层 - 引擎核心
 add_subdirectory(Engine/Common)
 add_subdirectory(Engine/2D)
 add_subdirectory(Engine/3D)
 add_subdirectory(Engine/Persistence)
 
-# 4. Render 层 - 渲染
-add_subdirectory(Render/Common)
-add_subdirectory(Render/2D)
-add_subdirectory(Render/3D)
-
-# 4.5 独立渲染 DLL（纯 POD 契约，不依赖 Engine/Ut）
-option(BUILD_SANYI_RENDER "Build standalone SanYiRender DLL" ON)
-if(BUILD_SANYI_RENDER)
-    add_subdirectory(SanYiRender)
+# 4. Render 层 - 渲染引擎（Renderx C API）
+option(BUILD_RENDERX "Build Renderx rendering engine" ON)
+if(BUILD_RENDERX)
+    add_subdirectory(Renderx)
 endif()
-
-# # 4.6 新渲染引擎 DLL（新一代统一渲染框架）
-# add_subdirectory(RenderEngine)
 
 # 4.6 GeoModelCore（须在 UI3D 之前，以便 UI3D 链接并继承头文件路径）
 if(BUILD_GEOMODELCORE)
@@ -180,13 +174,26 @@ else()
     message(STATUS "  Engraving: DISABLED")
 endif()
 
-# 4.8 统一渲染抽象层（UiRenderCore）
-add_subdirectory(Main/Src/RenderCore)
+# 4.8 统一渲染抽象层（UiRenderCore — 已弃用，由 Renderx 替代）
+option(BUILD_RENDERCORE "Build UiRenderCore (deprecated)" OFF)
+if(BUILD_RENDERCORE)
+    add_subdirectory(Main/Src/RenderCore)
+    message(STATUS "  UiRenderCore: ENABLED (deprecated)")
+else()
+    message(STATUS "  UiRenderCore: DISABLED (replaced by Renderx)")
+endif()
+
+# 4.8 UI Render Compat 层 - Render/ 旧 API 兼容头文件（委托到 Renderx C API）
+add_subdirectory(UI/RenderCompat)
 
 # 5. UI 层 - 用户界面
 add_subdirectory(UI/Common)
 add_subdirectory(UI/2D)
-add_subdirectory(UI/3D)
+if(BUILD_UI3D)
+    add_subdirectory(UI/3D)
+else()
+    message(STATUS "  UI3D: DISABLED")
+endif()
 
 # 6. 功能模块
 add_subdirectory(FileIO/FileIO)
@@ -258,14 +265,21 @@ install(TARGETS SanYiCAD
 # Install all project shared libraries
 set(SANYI_PROJECT_LIBS
     Utility Log CrashHandler License
-    EngineCommon Engine2D Engine3D
-    RenderCommon Render2D Render3D
-    UiRenderCore
-    UICommon UI2D UI3D
+    # EngineCommon Engine2D
+    # RenderCommon Render2D
+    UICommon UI2D
     FileIO Nesting
 )
 
-if(BUILD_SANYI_RENDER)
+if(BUILD_UI3D)
+    list(APPEND SANYI_PROJECT_LIBS Engine3D UI3D)
+endif()
+
+if(BUILD_RENDERCORE)
+    list(APPEND SANYI_PROJECT_LIBS UiRenderCore)
+endif()
+
+if(BUILD_RENDERX)
     list(APPEND SANYI_PROJECT_LIBS SanYiRender)
 endif()
 

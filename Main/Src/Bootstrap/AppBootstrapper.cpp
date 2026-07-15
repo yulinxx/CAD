@@ -156,11 +156,12 @@ void AppBootstrapper::bootstrap()
         SY_DEBUGF("[AppBootstrapper] Set current workbench in state center: %s", startWorkbenchId.toUtf8().constData());
     }
 
-    // 根据工作台ID创建对应的工作台实例
     SY_DEBUGF("[AppBootstrapper] Creating workbench instance: %s", startWorkbenchId.toUtf8().constData());
+#if BUILD_UI3D
     if (startWorkbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0)
         m_workbench = std::make_unique<Workbench3D>();
     else
+#endif
         m_workbench = std::make_unique<Workbench2D>();
     SY_DEBUGF("[AppBootstrapper] Workbench instance created: %s", startWorkbenchId.toUtf8().constData());
 

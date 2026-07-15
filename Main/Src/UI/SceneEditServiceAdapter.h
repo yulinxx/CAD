@@ -8,7 +8,7 @@ class SceneDocument2D;
 namespace Eg
 {
     using EntityId = int64_t;
-    class SyEntity;
+    struct SyEntity;
     class SceneManager;
 }
 

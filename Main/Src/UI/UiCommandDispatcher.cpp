@@ -136,7 +136,7 @@ namespace
     }
 } // anonymous namespace
 
-// 执行命令的主入口，按优先级查找处理程序并执行
+// 执行命令的主入口，优先通过 OperationBus 路由，旧 ICommandHandler 仅作为兜底
 void DefaultUiCommandDispatcher::execute(const QString& commandId)
 {
     SY_INFOF("[UiCommandDispatcher] execute: command=%s", commandId.toUtf8().constData());
@@ -148,36 +148,49 @@ void DefaultUiCommandDispatcher::execute(const QString& commandId)
         cancel();
     }
 
-    // 2. 优先查找已注册的handler（测试场景和直接调用场景）
+    // 2. 优先尝试通过 OperationBus 路由（新命令系统为主路径）
+    auto opId = mapCommandIdToOperation(commandId);
+    if (opId != OperationId::None)
+    {
+        auto* bus = OperationBus::instance();
+        if (bus && bus->registry().has(opId))
+        {
+            SY_DEBUGF("[UiCommandDispatcher] Routing command through OperationBus (primary): %s -> %d",
+                commandId.toUtf8().constData(), static_cast<int>(opId));
+            begin(commandId);
+            OperationResult result = bus->run(opId);
+            if (!result.success)
+            {
+                SY_WARNF("[UiCommandDispatcher] OperationBus execution failed: %s", result.message.toUtf8().constData());
+            }
+            submit();
+            return;
+        }
+    }
+
+    // 3. 回退到已注册的 ICommandHandler（旧系统兜底）
     auto handler = handlerFor(commandId);
     if (handler)
     {
-        SY_DEBUGF("[UiCommandDispatcher] Found handler for command: %s", commandId.toUtf8().constData());
+        SY_DEBUGF("[UiCommandDispatcher] Falling back to ICommandHandler: %s", commandId.toUtf8().constData());
 
-        // 3. 重置handler到Idle状态
         handler->reset();
-
-        // 4. begin()同步状态中心（先于activate）
         begin(commandId);
 
-        // 5. 激活handler
         if (handler->activate(m_uiServices))
         {
             SY_INFOF("[UiCommandDispatcher] Command activated: %s, interactive=%s",
                 commandId.toUtf8().constData(),
                 handler->isInteractive() ? "true" : "false");
 
-            // 6. 非交互式命令：直接提交
             if (!handler->isInteractive())
             {
                 SY_DEBUGF("[UiCommandDispatcher] Non-interactive command, submitting immediately: %s", commandId.toUtf8().constData());
                 submit();
             }
-            // 交互式命令：保持Active状态，等待事件循环中的用户输入
         }
         else
         {
-            // 激活失败 → 取消，不进undo栈
             SY_ERRORF("[UiCommandDispatcher] error code=command.activate_failed message=Failed to activate command: %s", commandId.toUtf8().constData());
             if (m_frameworkServices.reportError)
                 m_frameworkServices.reportError(QStringLiteral("command.activate_failed"), QStringLiteral("Failed to activate command: %1").arg(commandId), QStringLiteral("DefaultUiCommandDispatcher::execute"));
@@ -186,20 +199,7 @@ void DefaultUiCommandDispatcher::execute(const QString& commandId)
         return;
     }
 
-    // 7. 尝试通过OperationBus路由（非交互式操作优先）
-    auto opId = mapCommandIdToOperation(commandId);
-    if (opId != OperationId::None)
-    {
-        SY_DEBUGF("[UiCommandDispatcher] Routing command through OperationBus: %s", commandId.toUtf8().constData());
-        auto* bus = OperationBus::instance();
-        if (bus)
-        {
-            bus->run(opId);
-            return;
-        }
-    }
-
-    // 8. 无handler的命令：仅标记begin → submit完成状态同步
+    // 4. 无handler的命令：仅标记begin → submit完成状态同步
     SY_DEBUGF("[UiCommandDispatcher] No handler found, doing state sync only: %s", commandId.toUtf8().constData());
     begin(commandId);
 

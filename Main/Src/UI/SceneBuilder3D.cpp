@@ -6,6 +6,8 @@
 std::shared_ptr<SceneDocument3D> SceneBuilder3D::createDefaultScene(QString& rootNodeId)
 {
     auto scene = std::make_shared<SceneDocument3D>();
+    auto engineScene = std::make_shared<Eg::SceneManager3D>();
+    scene->setEngineScene(engineScene);
 
     auto root = scene->createNode(defaultRootNodeName().toStdString());
     auto mesh = scene->createNode("Mesh");

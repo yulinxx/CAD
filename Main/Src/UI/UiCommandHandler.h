@@ -129,7 +129,7 @@ struct CommandPreview
  *             ICommandHandler 将在后续重构中逐步迁移至 OperationBus。
  *             新功能请勿新增 ICommandHandler 子类。
  */
-class [[deprecated("Use IOperation + OperationBus instead (see UI/2D/Include/UI2D/Operation/IOperation.h)")]] ICommandHandler
+class ICommandHandler
 {
 public:
     virtual ~ICommandHandler() = default;

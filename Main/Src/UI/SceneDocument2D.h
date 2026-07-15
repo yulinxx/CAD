@@ -10,22 +10,26 @@
 
 #include "UI/SceneDocumentBase.h"
 
+class SceneEditService;
+
 namespace Eg
 {
-    class SceneManager; class SyEntity;
+    class SceneManager; struct SyEntity;
 }
 
 /**
- * @brief 2D 场景文档 — 围绕 Eg::SceneManager 的 UI 层适配
+ * @brief 2D 场景文档 — UI 层对 Engine2D 的适配层
  *
- * 取代已移除的 EntityDocument2D。
- * 内部托管 Eg::SceneManager，提供 UI 层便利方法（QPointF 接口）。
- * 长期目标：UI 层直接使用 Eg::SceneManager + Ut::Vec2d。
+ * 内部托管 Eg::SceneManager，通过 SceneEditService 执行所有编辑操作，
+ * 确保事务和撤销支持。提供 Qt 类型便利方法（QPointF 接口）供 UI 层使用。
+ *
+ * 新代码应优先通过 SceneEditService 操作，本类仅作为兼容旧 API 的适配层。
  */
 class SceneDocument2D : public UI::SceneDocumentBase
 {
 public:
     SceneDocument2D();
+    explicit SceneDocument2D(SceneEditService* editService);
     ~SceneDocument2D() override;
 
     SceneDocument2D(const SceneDocument2D&) = delete;
@@ -34,6 +38,12 @@ public:
     Eg::SceneManager* sceneManager() const
     {
         return m_scene;
+    }
+
+    void setEditService(SceneEditService* editService);
+    SceneEditService* editService() const
+    {
+        return m_editService;
     }
 
     // ---- 图元创建 (返回 Eg 实体 ID) ----
@@ -51,31 +61,28 @@ public:
     // ---- 查询 ----
 
     QString entityIdAt(const QPointF& point, double tolerance = 5.0) const;
-    // Qt 类型便利方法，供 UI 层使用
     QVector<QString> allEntityIdsQ() const;
     Eg::SyEntity* entityByStringId(const QString& id) const;
 
-    // ---- 选择 ----
-
-    void selectEntity(const QString& id);
-    void setSelectedEntityId(const QString& id);
-    void setSelectedEntityIds(const QVector<QString>& ids);
-    // Qt 类型便利方法，供 UI 层使用
-    QVector<QString> selectedIdsQ() const;
+    
 
     // ---- 编辑 ----
 
     void removeEntity(const QString& id);
 
-    // ---- SceneDocumentBase 接口 ----
+    // ---- SceneDocumentBase 接口 (选择方法已废弃，迁移至 SelectionService) ----
 
     std::vector<std::string> allEntityIds() const override;
+    [[deprecated("Use SelectionService::select() instead")]]
     void selectEntity(const std::string& id) override;
+    [[deprecated("Use SelectionService::clear() instead")]]
     void clearSelection() override;
+    [[deprecated("Use SelectionService::selectedIds() instead")]]
     std::vector<std::string> selectedIds() const override;
     void removeEntity(const std::string& id) override;
     void clear() override;
 
 private:
-    Eg::SceneManager* m_scene;
+    Eg::SceneManager* m_scene{ nullptr };
+    SceneEditService* m_editService{ nullptr };
 };

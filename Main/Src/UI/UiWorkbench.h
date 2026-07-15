@@ -4,8 +4,8 @@
 
 #include <memory>
 
-#include "UiEntities.h"
 #include "UiServices.h"
+#include "SelectionService.h"
 
 class QWidget;
 class QToolBar;
@@ -13,6 +13,10 @@ class WorkbenchWindow;
 class PropertiesPanelWidget;
 class Viewport2D;
 class SceneTreeDockWidget;
+
+#if BUILD_UI3D
+#include "UiEntities.h"
+#endif
 
 /**
  * @file UiWorkbench.h
@@ -156,14 +160,14 @@ private:
 
 private:
     std::shared_ptr<SceneDocument2D> m_document;
+    std::unique_ptr<SelectionService> m_selectionService;
 };
 
+#if BUILD_UI3D
 // ============================================================
 /**
  * @class Workbench3D
  * @brief 3D 工作台实现
- *
- * 提供 3D 场景浏览功能，包括轨道旋转、缩放、节点选择等操作。
  */
 class Workbench3D final : public UiWorkbench
 {
@@ -177,26 +181,19 @@ public:
     void shutdown() override;
 
 private:
-    /// 组装 3D 工作台 UI
     void build3DWorkbenchUi(WorkbenchWindow& window);
-    /// 创建 3D 场景树与属性面板
     void build3DScenePanels(WorkbenchWindow& window, PropertiesPanelWidget*& properties, SceneTreeDockWidget*& sceneDock, QString& rootNodeId);
-    /// 创建 3D 视口
     QWidget* build3DViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties, SceneTreeDockWidget* sceneDock);
-    /// 创建 3D 工具栏
     void build3DToolBars(WorkbenchWindow& window);
-    /// 初始化 3D 初始状态
     void init3DInitialState(const SceneDocument3D& scene, const QString& rootNodeId);
-    /// 场景树选择回调（提取自 build3DScenePanels 以减少闭包复杂度）
     void onSceneTreeSelection(const QString& nodeId, SceneTreeDockWidget* sceneDock,
         PropertiesPanelWidget* properties, WorkbenchWindow& window);
 
 private:
-    /// 3D 场景文档
     std::shared_ptr<SceneDocument3D> m_scene;
-    /// 默认相机控制器
-    DefaultCameraController3D m_camera;
+    class DefaultCameraController3D* m_camera{ nullptr };
 };
+#endif
 
 // ============================================================
 using Workbench2DMain = Workbench2D;

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Render3D/IRenderer3D.h"
-#include "RenderCore/ViewCamera3D.h"
+#include "ViewCamera3D.h"
 #include <QString>
 
 class SceneDocument3D;

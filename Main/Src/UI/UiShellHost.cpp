@@ -120,7 +120,7 @@ UiWorkbench* UiShellHost::resolveWorkbench(const QString& workbenchId)
     if (workbenchId == QStringLiteral("2D"))
         return m_workbench;
 
-    // 3D 工作台惰性创建（首次访问时初始化）
+    #if BUILD_UI3D
     if (workbenchId == QStringLiteral("3D"))
     {
         if (!m_workbench3D)
@@ -135,6 +135,7 @@ UiWorkbench* UiShellHost::resolveWorkbench(const QString& workbenchId)
         }
         return m_workbench3D.get();
     }
+#endif
 
     SY_WARNF("Unknown workbench id '%s', falling back to 2D",
         workbenchId.toUtf8().constData());

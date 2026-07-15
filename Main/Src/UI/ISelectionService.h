@@ -8,6 +8,11 @@
 #include <string>
 #include <vector>
 
+namespace Eg
+{
+    struct SyEntity;
+}
+
 class ISelectionService
 {
 public:
@@ -20,4 +25,6 @@ public:
     virtual void deselect(const std::string& id) = 0;
     virtual void clear() = 0;
     virtual void toggle(const std::string& id) = 0;
+
+    virtual std::vector<Eg::SyEntity*> selectedEntities() const = 0;
 };

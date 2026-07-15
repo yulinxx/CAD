@@ -9,6 +9,7 @@ namespace Eg
     struct SyEntity;
 }
 class SceneDocument2D;
+class ISelectionService;
 
 /**
  * @class DrawLineCommand
@@ -44,6 +45,7 @@ private:
     PointPickerTool m_pointPicker;
     const UiServices* m_services{ nullptr };
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QPointF m_previewStart;
     QPointF m_previewEnd;
     QString m_createdEntityId;
@@ -83,6 +85,7 @@ private:
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QPointF m_center;
     QPointF m_endPoint;
     QString m_createdEntityId;
@@ -122,6 +125,7 @@ private:
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QPointF m_center;
     QPointF m_startPoint;
     QPointF m_endPoint;
@@ -164,6 +168,7 @@ private:
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QVector<QPointF> m_points;
     QPointF m_currentPoint;
     bool m_completed{ false };
@@ -179,6 +184,7 @@ class PolygonCommand : public ICommandHandler
 public:
     PolygonCommand();
 
+public:
     QString commandId() const override;
     QString displayName() const override;
     bool isInteractive() const override;
@@ -207,6 +213,7 @@ private:
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QPointF m_center;
     QPointF m_radiusPoint;
     QPointF m_currentPoint;
@@ -224,11 +231,12 @@ private:
 class CircleUndoCommand : public UndoCommand
 {
 public:
-    CircleUndoCommand(SceneDocument2D* document, const QString& entityId);
+    CircleUndoCommand(SceneDocument2D* document, const QString& entityId, ISelectionService* selService);
     void undo() override;
     void redo() override;
 private:
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QString m_entityId;
     QPointF m_center;
     double m_radius{ 0.0 };
@@ -238,11 +246,12 @@ private:
 class LineUndoCommand : public UndoCommand
 {
 public:
-    LineUndoCommand(SceneDocument2D* document, const QString& entityId);
+    LineUndoCommand(SceneDocument2D* document, const QString& entityId, ISelectionService* selService);
     void undo() override;
     void redo() override;
 private:
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QString m_entityId;
     QPointF m_start;
     QPointF m_end;
@@ -252,11 +261,12 @@ private:
 class ArcUndoCommand : public UndoCommand
 {
 public:
-    ArcUndoCommand(SceneDocument2D* document, const QString& entityId);
+    ArcUndoCommand(SceneDocument2D* document, const QString& entityId, ISelectionService* selService);
     void undo() override;
     void redo() override;
 private:
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QString m_entityId;
     QPointF m_center;
     double m_radius{ 0.0 };
@@ -272,12 +282,13 @@ private:
 class PolylineUndoCommand : public UndoCommand
 {
 public:
-    PolylineUndoCommand(SceneDocument2D* document, const QString& entityId);
-    PolylineUndoCommand(SceneDocument2D* document, const EntitySnapshot& snapshot);
+    PolylineUndoCommand(SceneDocument2D* document, const QString& entityId, ISelectionService* selService);
+    PolylineUndoCommand(SceneDocument2D* document, const EntitySnapshot& snapshot, ISelectionService* selService);
     void undo() override;
     void redo() override;
 private:
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QString m_entityId;
     QVector<QPointF> m_points;
     EntitySnapshot m_snapshot;
@@ -317,6 +328,7 @@ private:
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QPointF m_startPoint;
     QPointF m_controlPoint;
     QPointF m_endPoint;
@@ -357,6 +369,7 @@ private:
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QPointF m_startPoint;
     QPointF m_controlPoint1;
     QPointF m_controlPoint2;
@@ -398,6 +411,7 @@ private:
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QVector<QPointF> m_controlPoints;
     QPointF m_currentPoint;
     bool m_completed{ false };
@@ -437,6 +451,7 @@ private:
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QVector<QPointF> m_points;
     QPointF m_currentPoint;
     bool m_completed{ false };
@@ -450,11 +465,12 @@ private:
 class BezierUndoCommand : public UndoCommand
 {
 public:
-    BezierUndoCommand(SceneDocument2D* document, const QString& entityId);
+    BezierUndoCommand(SceneDocument2D* document, const QString& entityId, ISelectionService* selService);
     void undo() override;
     void redo() override;
 private:
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QString m_entityId;
     QPointF m_start;
     QPointF m_ctrl1;
@@ -471,11 +487,12 @@ private:
 class NurbsUndoCommand : public UndoCommand
 {
 public:
-    NurbsUndoCommand(SceneDocument2D* document, const QString& entityId);
+    NurbsUndoCommand(SceneDocument2D* document, const QString& entityId, ISelectionService* selService);
     void undo() override;
     void redo() override;
 private:
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QString m_entityId;
     QVector<QPointF> m_controlPoints;
     std::unique_ptr<Eg::SyEntity> m_storedEntity;
@@ -488,11 +505,12 @@ private:
 class SmartLineUndoCommand : public UndoCommand
 {
 public:
-    SmartLineUndoCommand(SceneDocument2D* document, const QString& entityId);
+    SmartLineUndoCommand(SceneDocument2D* document, const QString& entityId, ISelectionService* selService);
     void undo() override;
     void redo() override;
 private:
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QString m_entityId;
     QVector<QPointF> m_points;
     std::unique_ptr<Eg::SyEntity> m_storedEntity;

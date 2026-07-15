@@ -1,5 +1,6 @@
 #include "SceneBuilder2D.h"
 #include "SceneDocument2D.h"
+#include "SelectionService.h"
 
 SceneBuilder2D::DefaultSceneResult SceneBuilder2D::createDefault2DScene()
 {
@@ -18,7 +19,8 @@ QString SceneBuilder2D::createDemoLine(
     const QPointF& p2)
 {
     auto id = doc.createLine(p1, p2);
-    doc.selectEntity(id);
+    SelectionService selService(doc.sceneManager());
+    selService.selectEntity(id);
     return id;
 }
 

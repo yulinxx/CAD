@@ -1,6 +1,7 @@
 #include "UiSceneTreeDock.h"
 
 #include "UiEntities.h"
+#include "Engine3D/SyEntity/SyMeshEntity.h"
 
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
@@ -17,9 +18,15 @@ SceneTreeDockWidget::SceneTreeDockWidget(QWidget* parent)
     connect(m_tree, &QTreeWidget::itemClicked, this, [this](QTreeWidgetItem* item, int) {
         if (!item)
             return;
+
+        // UserRole = SceneNode id（即引擎实体 ID 字符串）
+        // UserRole+1 = 引擎实体 ID（备用，与 UserRole 相同）
         const QString nodeId = item->data(0, Qt::UserRole).toString();
+
         selectPathParents(nodeId);
         highlightPathInTree(nodeId);
+
+        // 向外界发送节点 ID，工作台通过 onSceneTreeSelection 同步引擎场景
         if (m_selectionCallback)
             m_selectionCallback(nodeId);
         emit nodeActivated(nodeId);
@@ -72,13 +79,23 @@ void SceneTreeDockWidget::rebuildTree()
     if (!m_document)
         return;
 
+    const auto engineScene = m_document->engineScene();
+    constexpr Eg::EntityId kNoEntity = static_cast<Eg::EntityId>(-1);
+
     for (const auto& entity : m_document->entities())
     {
         auto node = std::dynamic_pointer_cast<SceneNode>(entity);
         if (!node)
             continue;
+
         auto* item = new QTreeWidgetItem(m_tree, { QString::fromStdString(node->name()), tr("Node") });
         item->setData(0, Qt::UserRole, QString::fromStdString(node->id()));
+        if (engineScene && node->engineEntityId() != kNoEntity)
+        {
+            item->setData(0, Qt::UserRole + 1, QString::number(node->engineEntityId()));
+            if (auto* mesh = engineScene->findMeshById(node->engineEntityId()))
+                item->setText(1, tr("Mesh #%1").arg(mesh->getId()));
+        }
         for (const auto& child : node->children())
             addNodeItem(item, child);
     }
@@ -91,8 +108,17 @@ void SceneTreeDockWidget::addNodeItem(QTreeWidgetItem* parent, const std::shared
     if (!parent || !node)
         return;
 
+    const auto engineScene = m_document ? m_document->engineScene() : nullptr;
+    constexpr Eg::EntityId kNoEntity = static_cast<Eg::EntityId>(-1);
+
     auto* item = new QTreeWidgetItem(parent, { QString::fromStdString(node->name()), tr("Node") });
     item->setData(0, Qt::UserRole, QString::fromStdString(node->id()));
+    if (engineScene && node->engineEntityId() != kNoEntity)
+    {
+        item->setData(0, Qt::UserRole + 1, QString::number(node->engineEntityId()));
+        if (auto* mesh = engineScene->findMeshById(node->engineEntityId()))
+            item->setText(1, tr("Mesh #%1").arg(mesh->getId()));
+    }
     for (const auto& child : node->children())
         addNodeItem(item, child);
 }
@@ -108,7 +134,9 @@ void SceneTreeDockWidget::highlightPathInTree(const QString& nodeId)
         if (!item)
             continue;
 
-        const bool matched = item->data(0, Qt::UserRole).toString() == nodeId;
+        const auto storedId = item->data(0, Qt::UserRole).toString();
+        const auto engineId = item->data(0, Qt::UserRole + 1).toString();
+        const bool matched = (storedId == nodeId) || (!engineId.isEmpty() && engineId == nodeId);
         item->setSelected(matched);
         item->setBackground(0, matched ? QColor(80, 180, 255, 120) : QColor());
     }
@@ -140,7 +168,11 @@ QTreeWidgetItem* SceneTreeDockWidget::findItemByNodeId(const QString& nodeId) co
     const auto items = m_tree->findItems(QString(), Qt::MatchContains | Qt::MatchRecursive, 0);
     for (auto* item : items)
     {
-        if (item && item->data(0, Qt::UserRole).toString() == nodeId)
+        if (!item)
+            continue;
+        const auto storedId = item->data(0, Qt::UserRole).toString();
+        const auto engineId = item->data(0, Qt::UserRole + 1).toString();
+        if (storedId == nodeId || (!engineId.isEmpty() && engineId == nodeId))
             return item;
     }
     return nullptr;

@@ -3,6 +3,7 @@
 #include "UiCommandHandler.h"
 
 class SceneDocument2D;
+class ISelectionService;
 
 /**
  * @class MoveUndoCommand
@@ -43,11 +44,13 @@ public:
     CopyUndoCommand(const QString& text, SceneDocument2D* document,
         const QVector<EntitySnapshot>& snapshots,
         const QStringList& entityIds,
-        UndoMode mode);
+        UndoMode mode,
+        ISelectionService* selService = nullptr);
     void undo() override;
     void redo() override;
 private:
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QVector<EntitySnapshot> m_snapshots;     // 实体快照（undo/redo 时用于重建）
     QStringList m_entityIds;                 // 关联的实体 ID 列表
     UndoMode m_mode{ UndoMode::Copy };
@@ -90,6 +93,7 @@ private:
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QPointF m_anchorPoint;
     QPointF m_targetPoint;
     bool m_hasAnchor{ false };
@@ -155,6 +159,7 @@ private:
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QPointF m_rotationCenter;
     QPointF m_startPoint;
     double m_startAngle{ 0.0 };
@@ -199,6 +204,7 @@ private:
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QPointF m_anchorPoint;
     QPointF m_targetPoint;
     bool m_hasAnchor{ false };
@@ -236,6 +242,7 @@ private:
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QStringList m_deletedEntityIds;
     QVector<EntitySnapshot> m_snapshots;
     bool m_committed{ false };
@@ -274,6 +281,7 @@ private:
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QPointF m_mirrorStart;
     QPointF m_mirrorEnd;
     int m_stage{ 0 };

@@ -57,7 +57,8 @@ EntitySnapshot takeSnapshot(const Eg::SyEntity* entity)
         {
             const auto* polygon = static_cast<const Eg::SyPolygon*>(entity);
             snap.radius = polygon->dCircumRadius;
-            for (const auto& v : polygon->vVertices)
+            // 通过 vertices() 只读接口获取多边形顶点列表
+            for (const auto& v : polygon->vertices())
                 snap.points.append(QPointF(v.x(), v.y()));
             break;
         }
@@ -127,11 +128,13 @@ bool restoreFromSnapshot(SceneDocument2D* document, const EntitySnapshot& snap)
             polygon->bCCW = snap.ccw;
             polygon->nSides = snap.points.size();
             polygon->dCircumRadius = snap.radius;
-            polygon->vVertices.reserve(snap.points.size());
+            // 通过 verticesMutable() 可写接口填充多边形顶点
+            auto& verts = polygon->verticesMutable();
+            verts.reserve(snap.points.size());
             for (const auto& pt : snap.points)
-                polygon->vVertices.push_back(toVec2d(pt));
-            if (!polygon->vVertices.empty())
-                polygon->basePoint = polygon->vVertices[0];
+                verts.push_back(toVec2d(pt));
+            if (!verts.empty())
+                polygon->basePoint = verts[0];
             entity = std::move(polygon);
             break;
         }
@@ -191,14 +194,16 @@ void restoreEntityGeometryFromSnapshot(Eg::SyEntity* entity, const EntitySnapsho
         case Eg::EType::POLYGON:
         {
             auto* polygon = static_cast<Eg::SyPolygon*>(entity);
-            polygon->vVertices.clear();
-            polygon->vVertices.reserve(snap.points.size());
+            // 通过 verticesMutable() 可写接口恢复多边形顶点
+            auto& verts = polygon->verticesMutable();
+            verts.clear();
+            verts.reserve(snap.points.size());
             for (const auto& pt : snap.points)
-                polygon->vVertices.push_back(toVec2d(pt));
+                verts.push_back(toVec2d(pt));
             polygon->nSides = snap.points.size();
             polygon->dCircumRadius = snap.radius;
-            if (!polygon->vVertices.empty())
-                polygon->basePoint = polygon->vVertices[0];
+            if (!verts.empty())
+                polygon->basePoint = verts[0];
             polygon->setModified();
             break;
         }

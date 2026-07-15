@@ -161,12 +161,19 @@ void WorkbenchWindow::initializeWorkbenchShell()
     initializeDockAreaSkeleton();
     initializeStatusBarSkeleton();
     initializeThemeMenuSkeleton();
-    initializeWorkbenchMenuSkeleton();
     bindStateSignals();
     bindShortcuts();
     setCentralWidget(createInitialCentralWidget());
     updateWindowTitle();
     refreshStatusText();
+    // 初始化工作台菜单状态，优先从状态中心获取当前工作台 ID
+    QString initialWorkbenchId = m_windowState.workbenchId;
+    if (m_stateCenter)
+        initialWorkbenchId = m_stateCenter->currentWorkbenchId();
+    // 默认启动 2D 工作台，状态中心不可用时使用默认值
+    if (initialWorkbenchId.isEmpty() || initialWorkbenchId == QStringLiteral("default"))
+        initialWorkbenchId = QStringLiteral("2D");
+    refreshWorkbenchMenuChecks(initialWorkbenchId);
 }
 
 void WorkbenchWindow::createBaseMenus()
@@ -320,19 +327,15 @@ void WorkbenchWindow::buildViewMenu()
     if (m_commandDispatcher)
         QObject::connect(pan, &QAction::triggered, this, [this]() { m_commandDispatcher->execute(QStringLiteral("view.pan")); });
 
-    m_menuState.workbenchMenu = m_menuState.viewMenu->addMenu(tr("Workbench"));
-    if (m_menuState.workbenchMenu)
-    {
-        auto* workbench2D = m_menuState.workbenchMenu->addAction(tr("2D"));
-        auto* workbench3D = m_menuState.workbenchMenu->addAction(tr("3D"));
-        workbench2D->setCheckable(true);
-        workbench3D->setCheckable(true);
-        if (m_commandDispatcher)
-        {
-            QObject::connect(workbench2D, &QAction::triggered, this, [this]() { triggerWorkbench(QStringLiteral("2D")); });
-            QObject::connect(workbench3D, &QAction::triggered, this, [this]() { triggerWorkbench(QStringLiteral("3D")); });
-        }
-    }
+    m_menuState.viewMenu->addSeparator();
+
+    m_menuState.workbench2DAction = m_menuState.viewMenu->addAction(tr("Switch to 2D"));
+    m_menuState.workbench2DAction->setCheckable(true);
+    QObject::connect(m_menuState.workbench2DAction, &QAction::triggered, this, [this]() { triggerWorkbench(QStringLiteral("2D")); });
+
+    m_menuState.workbench3DAction = m_menuState.viewMenu->addAction(tr("Switch to 3D"));
+    m_menuState.workbench3DAction->setCheckable(true);
+    QObject::connect(m_menuState.workbench3DAction, &QAction::triggered, this, [this]() { triggerWorkbench(QStringLiteral("3D")); });
 }
 
 void WorkbenchWindow::bindShortcuts()
@@ -421,31 +424,6 @@ void WorkbenchWindow::buildThemeMenu()
     addThemeAction(tr("Light"), QStringLiteral("light"));
     addThemeAction(tr("Dark"), QStringLiteral("dark"));
     addThemeAction(tr("Blue"), QStringLiteral("blue"));
-}
-
-/// 构建工作台切换菜单
-void WorkbenchWindow::initializeWorkbenchMenuSkeleton()
-{
-    // 工作台入口先挂在视图菜单下，具体切换行为交给工作台链处理
-    buildWorkbenchMenu();
-}
-
-void WorkbenchWindow::buildWorkbenchMenu()
-{
-    // 工作台切换入口挂在视图菜单下，统一处理工作台切换
-    // 这里只负责入口挂载，不直接碰工作台生命周期，避免职责越界
-    m_menuState.workbenchMenu = m_menuState.viewMenu->addMenu(tr("Workbench"));
-
-    const auto addWorkbenchAction = [this](const QString& text, const QString& workbenchId) {
-        QAction* action = m_menuState.workbenchMenu->addAction(text);
-        action->setCheckable(true);
-        connect(action, &QAction::triggered, this, [this, workbenchId]() {
-            triggerWorkbench(workbenchId);
-            });
-        };
-
-    addWorkbenchAction(tr("2D"), QStringLiteral("2D"));
-    addWorkbenchAction(tr("3D"), QStringLiteral("3D"));
 }
 
 /// 同步窗口本地状态与状态中心，避免本地状态与全局状态漂移
@@ -878,14 +856,18 @@ void WorkbenchWindow::refreshWorkbenchMenuChecks(const QString& workbenchId)
     // 这里是菜单状态刷新点，不是工作台执行点，职责必须分开
     m_windowState.workbenchId = workbenchId;
     refreshStatusText();
-    if (!m_menuState.workbenchMenu)
-        return;
 
-    for (QAction* action : m_menuState.workbenchMenu->actions())
+    // 根据当前工作台模式，只显示目标模式的切换选项（2D下显示3D，3D下显示2D）
+    const bool is2D = workbenchId.compare(QStringLiteral("2D"), Qt::CaseInsensitive) == 0;
+    if (m_menuState.workbench2DAction)
     {
-        if (!action->isCheckable())
-            continue;
-        action->setChecked(action->text().compare(workbenchId, Qt::CaseInsensitive) == 0);
+        m_menuState.workbench2DAction->setVisible(!is2D);
+        m_menuState.workbench2DAction->setChecked(is2D);
+    }
+    if (m_menuState.workbench3DAction)
+    {
+        m_menuState.workbench3DAction->setVisible(is2D);
+        m_menuState.workbench3DAction->setChecked(!is2D);
     }
 }
 

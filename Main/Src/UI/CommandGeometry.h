@@ -5,7 +5,7 @@
 
 namespace Eg
 {
-    class SyEntity;
+    struct SyEntity;
 }
 
 /**

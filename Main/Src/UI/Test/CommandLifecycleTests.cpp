@@ -4,6 +4,7 @@
 #include "UI/TransformCommands.h"
 #include "UI/SelectCommands.h"
 #include "SceneDocument2D.h"
+#include "SelectionService.h"
 #include "UI/UiServices.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/SyEntity/SyLine.h"
@@ -14,10 +15,11 @@
 
 namespace
 {
-    UiServices makeTestServices(SceneDocument2D* doc = nullptr)
+    UiServices makeTestServices(SceneDocument2D* doc = nullptr, ISelectionService* selSvc = nullptr)
     {
         UiServices svc;
         svc.document2D = doc;
+        svc.selectionService = selSvc;
         return svc;
     }
 }
@@ -72,8 +74,9 @@ TEST(CommandLifecycleTest, CommitInteractive_PushesUndoAndResets)
     dispatcher.registerHandler(handler);
 
     SceneDocument2D doc;
+    SelectionService selService(doc.sceneManager());
     handler->setDocument(&doc);
-    dispatcher.setUiServices(makeTestServices(&doc));
+    dispatcher.setUiServices(makeTestServices(&doc, &selService));
 
     dispatcher.execute(QStringLiteral("2d.draw_line"));
     EXPECT_TRUE(dispatcher.hasActiveCommand());
@@ -89,7 +92,7 @@ TEST(CommandLifecycleTest, CommitInteractive_PushesUndoAndResets)
     EXPECT_FALSE(dispatcher.hasActiveCommand());
     EXPECT_EQ(undoStack.count(), 1);
 
-    EXPECT_FALSE(doc.selectedIdsQ().isEmpty());
+    EXPECT_FALSE(selService.selectedIdsQ().isEmpty());
 }
 
 TEST(CommandLifecycleTest, CancelInteractive_DoesNotPushUndo)
@@ -219,12 +222,13 @@ TEST(CommandLifecycleTest, CancelMidLine_RestoresSelection)
     dispatcher.registerHandler(handler);
 
     SceneDocument2D doc;
+    SelectionService selService(doc.sceneManager());
     handler->setDocument(&doc);
-    dispatcher.setUiServices(makeTestServices(&doc));
+    dispatcher.setUiServices(makeTestServices(&doc, &selService));
 
     dispatcher.execute(QStringLiteral("2d.draw_line"));
     handler->onMouseDown(10, 20);
-    EXPECT_TRUE(doc.selectedIdsQ().isEmpty());
+    EXPECT_TRUE(selService.selectedIdsQ().isEmpty());
 
     dispatcher.cancel();
     EXPECT_FALSE(dispatcher.hasActiveCommand());
@@ -240,21 +244,22 @@ TEST(CommandLifecycleTest, RedoAfterCommit_SelectsEntity)
     dispatcher.registerHandler(handler);
 
     SceneDocument2D doc;
+    SelectionService selService(doc.sceneManager());
     handler->setDocument(&doc);
-    dispatcher.setUiServices(makeTestServices(&doc));
+    dispatcher.setUiServices(makeTestServices(&doc, &selService));
 
     dispatcher.execute(QStringLiteral("2d.draw_line"));
     handler->onMouseDown(10, 20);
     handler->onMouseDown(100, 200);
     dispatcher.submit();
 
-    EXPECT_FALSE(doc.selectedIdsQ().isEmpty());
+    EXPECT_FALSE(selService.selectedIdsQ().isEmpty());
 
     undoStack.undo();
-    EXPECT_TRUE(doc.selectedIdsQ().isEmpty());
+    EXPECT_TRUE(selService.selectedIdsQ().isEmpty());
 
     undoStack.redo();
-    EXPECT_FALSE(doc.selectedIdsQ().isEmpty());
+    EXPECT_FALSE(selService.selectedIdsQ().isEmpty());
 }
 
 TEST(CommandLifecycleTest, SelectCommand_ChangesSelection)
@@ -262,18 +267,19 @@ TEST(CommandLifecycleTest, SelectCommand_ChangesSelection)
     DefaultUndoStack undoStack;
 
     SceneDocument2D doc;
+    SelectionService selService(doc.sceneManager());
     QString id1 = doc.createLine(QPointF(0, 0), QPointF(10, 10));
     QString id2 = doc.createLine(QPointF(20, 20), QPointF(30, 30));
 
     SelectCommand select;
     select.setDocument(&doc);
-    select.activate(makeTestServices(&doc));
+    select.activate(makeTestServices(&doc, &selService));
     select.setSelectedEntityId(id1);
     select.commit();
 
-    doc.clearSelection();
-    doc.selectEntity(id1);
-    EXPECT_EQ(doc.selectedIdsQ().size(), 1);
+    selService.clear();
+    selService.selectEntity(id1);
+    EXPECT_EQ(selService.selectedIdsQ().size(), 1);
 }
 
 TEST(CommandLifecycleTest, RedoAfterMove_EntityReturnsToNewPosition)
@@ -286,12 +292,13 @@ TEST(CommandLifecycleTest, RedoAfterMove_EntityReturnsToNewPosition)
     dispatcher.registerHandler(handler);
 
     SceneDocument2D doc;
+    SelectionService selService(doc.sceneManager());
     handler->setDocument(&doc);
-    dispatcher.setUiServices(makeTestServices(&doc));
+    dispatcher.setUiServices(makeTestServices(&doc, &selService));
 
     QString id = doc.createLine(QPointF(0, 0), QPointF(10, 10));
-    doc.clearSelection();
-    doc.selectEntity(id);
+    selService.clear();
+    selService.selectEntity(id);
 
     dispatcher.execute(QStringLiteral("2d.move"));
     handler->onMouseDown(0, 0);
@@ -327,19 +334,20 @@ TEST(CommandLifecycleTest, RedoAfterMove_EntityReturnsToNewPosition)
 TEST(CommandLifecycleTest, SelectCommand_BoxSelect_MultipleEntities)
 {
     SceneDocument2D doc;
+    SelectionService selService(doc.sceneManager());
 
     QString id1 = doc.createLine(QPointF(0, 0), QPointF(10, 10));
     QString id2 = doc.createLine(QPointF(100, 100), QPointF(110, 110));
 
     SelectCommand select;
     select.setDocument(&doc);
-    select.activate(makeTestServices(&doc));
+    select.activate(makeTestServices(&doc, &selService));
     select.onMouseDown(0, 0);
     select.onMouseMove(50, 50);
     select.onMouseUp(50, 50);
     select.commit();
 
-    EXPECT_FALSE(doc.selectedIdsQ().isEmpty());
+    EXPECT_FALSE(selService.selectedIdsQ().isEmpty());
 }
 
 TEST(CommandLifecycleTest, DrawLine_UndoRemovesRedoRestores)
@@ -380,12 +388,13 @@ TEST(CommandLifecycleTest, Move_UndoRedo_SelectionPreserved)
     dispatcher.registerHandler(handler);
 
     SceneDocument2D doc;
+    SelectionService selService(doc.sceneManager());
     handler->setDocument(&doc);
-    dispatcher.setUiServices(makeTestServices(&doc));
+    dispatcher.setUiServices(makeTestServices(&doc, &selService));
 
     QString id = doc.createLine(QPointF(0, 0), QPointF(10, 10));
-    doc.clearSelection();
-    doc.selectEntity(id);
+    selService.clear();
+    selService.selectEntity(id);
 
     dispatcher.execute(QStringLiteral("2d.move"));
     handler->onMouseDown(0, 0);
@@ -417,22 +426,23 @@ TEST(CommandLifecycleTest, Move_UndoRedo_SelectionPreserved)
     EXPECT_DOUBLE_EQ(line->vPoints[0].x(), 20.0);
     EXPECT_DOUBLE_EQ(line->vPoints[0].y(), 30.0);
 
-    EXPECT_FALSE(doc.selectedIdsQ().isEmpty());
+    EXPECT_FALSE(selService.selectedIdsQ().isEmpty());
 }
 
 TEST(CommandLifecycleTest, SelectCommand_BoxSelectNoEntities)
 {
     SceneDocument2D doc;
+    SelectionService selService(doc.sceneManager());
 
     SelectCommand select;
     select.setDocument(&doc);
-    select.activate(makeTestServices(&doc));
+    select.activate(makeTestServices(&doc, &selService));
     select.onMouseDown(0, 0);
     select.onMouseMove(5, 5);
     select.onMouseUp(5, 5);
     select.commit();
 
-    EXPECT_TRUE(doc.selectedIdsQ().isEmpty());
+    EXPECT_TRUE(selService.selectedIdsQ().isEmpty());
 }
 
 TEST(CommandLifecycleTest, DrawLine_UndoRedo_SelectionTracks)
@@ -475,19 +485,20 @@ TEST(CommandLifecycleTest, DrawLine_UndoRedo_SelectionFromDoc)
     dispatcher.registerHandler(handler);
 
     SceneDocument2D doc;
+    SelectionService selService(doc.sceneManager());
     handler->setDocument(&doc);
-    dispatcher.setUiServices(makeTestServices(&doc));
+    dispatcher.setUiServices(makeTestServices(&doc, &selService));
 
     dispatcher.execute(QStringLiteral("2d.draw_line"));
     handler->onMouseDown(0, 0);
     handler->onMouseDown(10, 10);
     dispatcher.submit();
 
-    EXPECT_FALSE(doc.selectedIdsQ().isEmpty());
+    EXPECT_FALSE(selService.selectedIdsQ().isEmpty());
 
     undoStack.undo();
-    EXPECT_TRUE(doc.selectedIdsQ().isEmpty());
+    EXPECT_TRUE(selService.selectedIdsQ().isEmpty());
 
     undoStack.redo();
-    EXPECT_FALSE(doc.selectedIdsQ().isEmpty());
+    EXPECT_FALSE(selService.selectedIdsQ().isEmpty());
 }

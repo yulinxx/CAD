@@ -4,6 +4,7 @@
 #include <QObject>
 
 #include "UiEntities.h"
+#include "Engine3D/SyEntity/SyMeshEntity.h"
 
 namespace
 {
@@ -65,8 +66,6 @@ void SimpleRenderer3D::resize(int width, int height)
 
 void SimpleRenderer3D::resetView()
 {
-    if (m_cameraController)
-        m_cameraController->reset();
     m_camera.reset();
     emitStatus(QObject::tr("3D view reset"));
 }
@@ -168,6 +167,39 @@ void SimpleRenderer3D::drawSceneNodes(QPainter& painter)
     if (!m_document)
         return;
 
+    const auto engineScene = m_document->engineScene();
+    if (engineScene)
+    {
+        int nodeIndex = 0;
+        for (const auto& entity : engineScene->getAllEntities())
+        {
+            if (!entity)
+                continue;
+
+            const auto bbox = entity->getBBox();
+            const auto center = bbox.isValid() ? bbox.center() : Ut::Vec3f(0, 0, 0);
+
+            const bool isSelected = entity->selected();
+            const float nodeSize = isSelected ? kNodeHalfSize * 1.5f : kNodeHalfSize;
+            const QColor color = isSelected ? QColor(80, 200, 255) : QColor(140, 160, 180);
+
+            drawWireCube(painter, center.x(), center.y(), center.z(), nodeSize);
+
+            int sx, sy;
+            if (project(center.x(), center.y() + nodeSize + 0.2f, center.z(), sx, sy))
+            {
+                const auto displayName = entity->strName.empty()
+                    ? QStringLiteral("Entity #%1").arg(entity->getId())
+                    : QString::fromStdString(entity->strName);
+                painter.setPen(color);
+                painter.drawText(sx - 20, sy, 40, 16, Qt::AlignCenter, displayName);
+            }
+            ++nodeIndex;
+        }
+        return;
+    }
+
+    // 无引擎场景时回退到旧螺旋布局
     int nodeIndex = 0;
     const auto& entities = m_document->entities();
     for (const auto& entity : entities)
@@ -176,7 +208,6 @@ void SimpleRenderer3D::drawSceneNodes(QPainter& painter)
         if (!node)
             continue;
 
-        // 按索引排列节点
         const float angle = static_cast<float>(nodeIndex) * 0.8f;
         const float radius = 3.0f;
         const float nx = std::cos(angle) * radius;
@@ -269,9 +300,33 @@ void SimpleRenderer3D::selectNodeById(const QString& nodeId)
     m_selectedNodeId = nodeId;
     if (m_document)
     {
-        m_document->selection().clear();
-        if (auto entity = m_document->nodeById(nodeId.toStdString()))
+        const auto engineScene = m_document->engineScene();
+        if (engineScene)
+        {
+            // 尝试解析为引擎实体 ID（数字字符串）
+            Eg::EntityId entityId = static_cast<Eg::EntityId>(nodeId.toULongLong());
+            auto* entity = engineScene->findEntityById(entityId);
+
+            // 若未命中，尝试作为 SceneNode ID 查找并桥接
+            if (!entity)
+            {
+                const auto node = m_document->nodeById(nodeId.toStdString());
+                if (node && node->engineEntityId() != static_cast<Eg::EntityId>(-1))
+                {
+                    entityId = node->engineEntityId();
+                    entity = engineScene->findEntityById(entityId);
+                }
+            }
+
+            engineScene->clearSelection();
+            if (entity)
+                engineScene->selectMesh(entity);
+        }
+        else if (auto entity = m_document->nodeById(nodeId.toStdString()))
+        {
+            m_document->selection().clear();
             m_document->selection().add(entity);
+        }
     }
     rebuildTreeHighlight();
 
@@ -280,7 +335,7 @@ void SimpleRenderer3D::selectNodeById(const QString& nodeId)
     if (m_pathCallback)
         m_pathCallback(m_selectedPathNames);
     if (m_statusCallback)
-        m_statusCallback(QObject::tr("3D selected: %1").arg(nodeId)); // 3D 已选中: %1
+        m_statusCallback(QObject::tr("3D selected: %1").arg(nodeId));
 }
 
 QString SimpleRenderer3D::selectedNodeId() const
@@ -322,6 +377,38 @@ QString SimpleRenderer3D::hitTest(int screenX, int screenY) const
 {
     if (!m_document)
         return {};
+
+    const auto engineScene = m_document->engineScene();
+    if (engineScene)
+    {
+        double bestDist = kHitRadius;
+        QString bestId;
+
+        for (const auto& entity : engineScene->getAllEntities())
+        {
+            if (!entity)
+                continue;
+
+            const auto bbox = entity->getBBox();
+            const auto center = bbox.isValid() ? bbox.center() : Ut::Vec3f(0, 0, 0);
+
+            int sx, sy;
+            if (!project(center.x(), center.y(), center.z(), sx, sy))
+                continue;
+
+            const double dx = screenX - sx;
+            const double dy = screenY - sy;
+            const double dist = std::sqrt(dx * dx + dy * dy);
+
+            if (dist < bestDist)
+            {
+                bestDist = dist;
+                bestId = QString::number(entity->getId());
+            }
+        }
+
+        return bestId;
+    }
 
     double bestDist = kHitRadius;
     QString bestId;
@@ -369,13 +456,28 @@ void SimpleRenderer3D::rebuildTreeHighlight()
     if (!m_document || m_selectedNodeId.isEmpty())
         return;
 
-    const auto node = m_document->nodeById(m_selectedNodeId.toStdString());
-    if (!node)
-        return;
+    const auto engineScene = m_document->engineScene();
+    if (engineScene)
+    {
+        const auto entityId = static_cast<Eg::EntityId>(m_selectedNodeId.toULongLong());
+        if (auto* entity = engineScene->findEntityById(entityId))
+        {
+            const auto& name = entity->strName;
+            m_selectedPathNames.append(name.empty()
+                ? QStringLiteral("Entity #%1").arg(entityId)
+                : QString::fromStdString(name));
+        }
+    }
+    else
+    {
+        const auto node = m_document->nodeById(m_selectedNodeId.toStdString());
+        if (!node)
+            return;
 
-    const auto names = node->pathNamesRecursive();
-    for (const auto& name : names)
-        m_selectedPathNames.append(QString::fromStdString(name));
+        const auto names = node->pathNamesRecursive();
+        for (const auto& name : names)
+            m_selectedPathNames.append(QString::fromStdString(name));
+    }
 
     if (m_pathCallback)
         m_pathCallback(m_selectedPathNames);

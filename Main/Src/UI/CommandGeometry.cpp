@@ -83,10 +83,12 @@ void applyMirrorToEntity(Eg::SyEntity* entity, const QPointF& axisStart, const Q
         case Eg::EType::POLYGON:
         {
             auto* polygon = static_cast<Eg::SyPolygon*>(entity);
-            for (auto& v : polygon->vVertices)
+            // 镜像变换多边形顶点
+            auto& verts = polygon->verticesMutable();
+            for (auto& v : verts)
                 v = mirrorVec2d(v, aStart, aEnd);
-            if (!polygon->vVertices.empty())
-                polygon->basePoint = polygon->vVertices[0];
+            if (!verts.empty())
+                polygon->basePoint = verts[0];
             polygon->setModified();
             break;
         }
@@ -158,10 +160,12 @@ void applyRotationToEntity(Eg::SyEntity* entity, const QPointF& center, double a
         case Eg::EType::POLYGON:
         {
             auto* polygon = static_cast<Eg::SyPolygon*>(entity);
-            for (auto& v : polygon->vVertices)
+            // 旋转变换多边形顶点
+            auto& verts = polygon->verticesMutable();
+            for (auto& v : verts)
                 v = toVec2d(rotatePoint(QPointF(v.x(), v.y()), center, cosAngle, sinAngle));
-            if (!polygon->vVertices.empty())
-                polygon->basePoint = polygon->vVertices.front();
+            if (!verts.empty())
+                polygon->basePoint = verts.front();
             polygon->setModified();
             break;
         }

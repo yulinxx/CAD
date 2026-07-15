@@ -5,24 +5,27 @@
 #include <QTextEdit>
 #include <QToolBar>
 #include <QWidget>
-
 #include "SceneDocument2D.h"
+#include "SelectionService.h"
 #include "UiCommandDispatcher.h"
-#include "UiEntities.h"
 #include "UiServices.h"
 #include "UiStateCenter.h"
-#include "UiViewport3D.h"
 #include "UiSceneTreeDock.h"
 #include "UiPropertiesPanel.h"
 #include "UiViewWidgets.h"
 #include "Engine2D/SyEntity/SyLine.h"
 #include "DrawToolBarWidget.h"
 #include "SceneBuilder2D.h"
-#include "SceneBuilder3D.h"
 #include "WorkbenchWindow.h"
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
 #include "ViewWidgetAdapter.h"
+
+#if BUILD_UI3D
+#include "UiEntities.h"
+#include "UiViewport3D.h"
+#include "SceneBuilder3D.h"
+#endif
 
 namespace
 {
@@ -73,6 +76,7 @@ namespace
             });
     }
 
+    #if BUILD_UI3D
     /// 配置 3D 视口
     void configure3DViewport(Viewport3D* viewport, const UiServices& services,
         SceneDocument3D* document, CameraController3D* controller,
@@ -94,17 +98,18 @@ namespace
                 properties->setStateText(status);
             });
 
-        // 3D selection 单向流 — 视口选中时只更新 selection 和属性面板
-        // 树控件通过 SceneDocument3D::selection() 监听来刷新，不再由视口回调触发
-        viewport->setSelectionCallback([&services, properties](const QString& nodeId) {
+        viewport->setSelectionCallback([&services, properties, tree](const QString& nodeId) {
             if (properties)
                 properties->setSelectionText(QObject::tr("Selected node: %1").arg(nodeId));
             if (services.stateCenter)
                 services.stateCenter->setSelectionContext(
                     QObject::tr("3D-Viewport"),
                     QObject::tr("3D node: %1").arg(nodeId));
+            if (tree)
+                tree->refresh();
             });
     }
+#endif
 
     /// 配置 2D 视口
     void configure2DViewport(Viewport2D* viewport, const UiServices& services,
@@ -114,6 +119,7 @@ namespace
             return;
 
         viewport->setDocument(document);
+        viewport->setSelectionService(services.selectionService);
         viewport->setCommandDispatcher(services.commandDispatcher);
         viewport->setInteractionDispatcher(services.interactionDispatcher);
         // 传递操作总线引用给视口
@@ -173,8 +179,8 @@ namespace
             });
     }
 
+    #if BUILD_UI3D
     /// 更新 3D 对象详情到属性面板
-    /// 当前由工作台拼装数据，后续应由 OperationResult 提供
     void update3DDetails(PropertiesPanelWidget* panel, SceneDocument3D* doc, const QString& selectedId)
     {
         if (!panel || !doc)
@@ -200,6 +206,7 @@ namespace
             QObject::tr("Selected: yes")
             });
     }
+#endif
 }
 
 // UiWorkbench 基类实现
@@ -282,6 +289,9 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
     m_document = std::move(sceneResult.document);
     // 把文档注入到服务集合，使命令系统能通过 services.document2D 访问文档
     m_services.document2D = m_document.get();
+    // 创建选择服务并注入，将选择状态从文档中分离
+    m_selectionService = std::make_unique<SelectionService>(m_document->sceneManager());
+    m_services.selectionService = m_selectionService.get();
     // 同步到命令分发器，使其内部的 m_uiServices 也包含文档引用
     // （Dispatcher 在 AppBootstrapper 构造时设置的 m_uiServices 不含 document2D）
     if (m_services.commandDispatcher)
@@ -436,9 +446,11 @@ void Workbench2D::shutdown()
     m_services = UiServices{};
 }
 
+#if BUILD_UI3D
 // Workbench3D 实现
 // 统一工作台初始化模板
 // 流程：initialize → attachToWindow → activate ↔ deactivate → shutdown
+// 3D/2D 差异集中在配置，不散在流程里
 
 QString Workbench3D::id() const
 {
@@ -455,13 +467,12 @@ bool Workbench3D::initialize(const UiServices& services)
     if (!services.stateCenter || !services.commandDispatcher)
         return false;
     m_services = services;
-    m_camera.reset();
     m_savedState = WorkbenchStateSnapshot{};
     m_initialState = WorkbenchStateSnapshot{};
     return true;
 }
 
-// 步骤2.1: 创建场景面板（属性面板 + 场景树 + 历史面板）
+// 步骤2 — 构建 3D 场景面板（属性面板 + 场景树 + 操作历史）
 void Workbench3D::build3DScenePanels(WorkbenchWindow& window, PropertiesPanelWidget*& properties, SceneTreeDockWidget*& sceneDock, QString& rootNodeId)
 {
     auto sceneResult = SceneBuilder3D::createDefaultScene(rootNodeId);
@@ -469,98 +480,88 @@ void Workbench3D::build3DScenePanels(WorkbenchWindow& window, PropertiesPanelWid
 
     properties = new PropertiesPanelWidget(&window);
     properties->setObjectName(QStringLiteral("PropertiesPanel3D"));
-    properties->setWindowTitle(QObject::tr("3D Inspector")); // 3D 检查器
+    properties->setWindowTitle(QObject::tr("3D Inspector"));
 
     PropertiesPanelWidget::PropertiesData data;
     data.mode = PropertiesPanelWidget::WorkbenchMode::ThreeD;
-    data.stateText = QObject::tr("3D ready"); // 3D 就绪
-    data.selectionText = QObject::tr("Root node: %1").arg(rootNodeId); // 根节点: %1
-    data.documentType = QObject::tr("SceneDocument3D"); // 场景文档3D
-    data.documentStatus = QObject::tr("Ready"); // 就绪
+    data.stateText = QObject::tr("3D ready");
+    data.selectionText = QObject::tr("Root node: %1").arg(rootNodeId);
+    data.documentType = QObject::tr("SceneDocument3D");
+    data.documentStatus = QObject::tr("Ready");
     data.modeSpecificFields = {
-        QObject::tr("Mode: 3D Viewport"), // 模式: 3D 视口
-        QObject::tr("Transform: Position/Rotation/Scale"), // 变换: 位置/旋转/缩放
-        QObject::tr("Material: Default") // 材质: 默认
+        QObject::tr("Mode: 3D Viewport"),
+        QObject::tr("Transform: Position/Rotation/Scale"),
+        QObject::tr("Material: Default")
     };
     properties->setPropertiesData(data);
     update3DDetails(properties, m_scene.get(), rootNodeId);
-    window.registerDockWidget(QObject::tr("3D Inspector"), properties, Qt::RightDockWidgetArea); // 3D 检查器
+    window.registerDockWidget(QObject::tr("3D Inspector"), properties, Qt::RightDockWidgetArea);
 
     sceneDock = new SceneTreeDockWidget(&window);
     sceneDock->setSceneDocument(m_scene.get());
     sceneDock->setObjectName(QStringLiteral("SceneTreeDock3D"));
-    sceneDock->setWindowTitle(QObject::tr("3D Scene")); // 3D 场景
-    // 树选中时的单向流 — 用户点击树节点 → 更新 selection → 刷新视口和属性面板
+    sceneDock->setWindowTitle(QObject::tr("3D Scene"));
     sceneDock->setSelectionCallback([this, sceneDock, properties, &window](const QString& nodeId) {
         onSceneTreeSelection(nodeId, sceneDock, properties, window);
         });
-    window.registerDockWidget(QObject::tr("3D Scene"), sceneDock, Qt::LeftDockWidgetArea); // 3D 场景
 
-    auto* history = createPanelWidget(QObject::tr("Operation history"), &window); // 操作历史
-    window.registerDockWidget(QObject::tr("3D History"), history, Qt::BottomDockWidgetArea); // 3D 历史
+    window.registerDockWidget(QObject::tr("3D Scene"), sceneDock, Qt::LeftDockWidgetArea);
+
+    auto* history = createPanelWidget(QObject::tr("Operation history"), &window);
+    window.registerDockWidget(QObject::tr("3D History"), history, Qt::BottomDockWidgetArea);
 }
 
-// 3D 树选择回调 — 单向流：树节点 → selection → 视口 + 属性面板
+// 场景树选中回调：同步选中状态到文档、属性面板和视口
 void Workbench3D::onSceneTreeSelection(const QString& nodeId, SceneTreeDockWidget* sceneDock,
     PropertiesPanelWidget* properties, WorkbenchWindow& window)
 {
     if (!m_scene)
         return;
 
-    // 第一步：更新 selection，这是唯一的选择写入点
     m_scene->selection().clear();
     auto node = m_scene->nodeById(nodeId.toStdString());
     if (node)
         m_scene->selection().add(node);
 
-    // 第二步：树控件自身已通过 itemClicked 更新，不再重复 refresh
-    // 避免循环刷新
-
-    // 第三步：更新属性面板
-    if (properties)
+    if (properties && node)
     {
-        if (node)
+        const auto pathNames = node->pathNamesRecursive();
+        QString pathStr;
+        for (size_t i = 0; i < pathNames.size(); ++i)
         {
-            const auto pathNames = node->pathNamesRecursive();
-            QString pathStr;
-            for (size_t i = 0; i < pathNames.size(); ++i)
-            {
-                if (i > 0)
-                    pathStr += QObject::tr(" / ");
-                pathStr += QString::fromStdString(pathNames[i]);
-            }
-
-            properties->setObjectDetails(QObject::tr("Node %1").arg(QString::fromStdString(node->id())), {
-                QObject::tr("Name: %1").arg(QString::fromStdString(node->name())),
-                QObject::tr("Children: %1").arg(node->children().size()),
-                QObject::tr("Path: %1").arg(pathStr),
-                QObject::tr("Selected: yes")
-                });
+            if (i > 0)
+                pathStr += QObject::tr(" / ");
+            pathStr += QString::fromStdString(pathNames[i]);
         }
+
+        properties->setObjectDetails(QObject::tr("Node %1").arg(QString::fromStdString(node->id())), {
+            QObject::tr("Name: %1").arg(QString::fromStdString(node->name())),
+            QObject::tr("Children: %1").arg(node->children().size()),
+            QObject::tr("Path: %1").arg(pathStr),
+            QObject::tr("Selected: yes")
+            });
     }
 
-    // 第四步：更新 UI 状态
     if (m_services.stateCenter)
         m_services.stateCenter->setSelectionContext(QObject::tr("3D-Tree"), QObject::tr("3D node: %1").arg(nodeId));
 
-    // 第五步：同步视口选中状态
     if (auto* viewport = qobject_cast<Viewport3D*>(window.centralWidget()))
         viewport->selectNodeById(nodeId);
 }
 
-// 步骤2.2: 创建工具栏并绑定操作
+// 步骤3 — 构建 3D 工具栏（主操作栏 + 视角导航栏）
 void Workbench3D::build3DToolBars(WorkbenchWindow& window)
 {
-    auto* mainBar = window.registerToolBar(QObject::tr("3D Main")); // 3D 主工具栏
-    auto* orbit = addWorkbenchAction(mainBar, QObject::tr("Orbit")); // 轨道旋转
-    auto* orbitSelected = addWorkbenchAction(mainBar, QObject::tr("Orbit Selected")); // 轨道选中
-    auto* measure = addWorkbenchAction(mainBar, QObject::tr("Measure")); // 测量
-    auto* selectEntity = addWorkbenchAction(mainBar, QObject::tr("Select")); // 选择
+    auto* mainBar = window.registerToolBar(QObject::tr("3D Main"));
+    auto* orbit = addWorkbenchAction(mainBar, QObject::tr("Orbit"));
+    auto* orbitSelected = addWorkbenchAction(mainBar, QObject::tr("Orbit Selected"));
+    auto* measure = addWorkbenchAction(mainBar, QObject::tr("Measure"));
+    auto* selectEntity = addWorkbenchAction(mainBar, QObject::tr("Select"));
 
-    auto* navBar = window.registerToolBar(QObject::tr("3D Navigation")); // 3D 导航
-    auto* top = addWorkbenchAction(navBar, QObject::tr("Top")); // 顶视
-    auto* front = addWorkbenchAction(navBar, QObject::tr("Front")); // 前视
-    auto* right = addWorkbenchAction(navBar, QObject::tr("Right")); // 右视
+    auto* navBar = window.registerToolBar(QObject::tr("3D Navigation"));
+    auto* top = addWorkbenchAction(navBar, QObject::tr("Top"));
+    auto* front = addWorkbenchAction(navBar, QObject::tr("Front"));
+    auto* right = addWorkbenchAction(navBar, QObject::tr("Right"));
 
     if (m_services.commandDispatcher)
     {
@@ -574,15 +575,14 @@ void Workbench3D::build3DToolBars(WorkbenchWindow& window)
     }
 }
 
-// 步骤2.3: 创建视口并配置联动
+// 步骤4 — 构建 3D 视口并配置回调
 QWidget* Workbench3D::build3DViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties, SceneTreeDockWidget* sceneDock)
 {
     auto* viewport = new Viewport3D(&window);
-    configure3DViewport(viewport, m_services, m_scene.get(), &m_camera, properties, sceneDock);
-    // 路径变更时刷新树和属性面板
+    configure3DViewport(viewport, m_services, m_scene.get(), nullptr, properties, sceneDock);
     viewport->setPathCallback([properties, sceneDock](const QStringList& pathNames) {
         if (properties)
-            properties->setObjectDetails(QObject::tr("3D Path"), pathNames); // 3D 路径
+            properties->setObjectDetails(QObject::tr("3D Path"), pathNames);
         if (sceneDock)
             sceneDock->refresh();
         });
@@ -591,22 +591,22 @@ QWidget* Workbench3D::build3DViewport(WorkbenchWindow& window, PropertiesPanelWi
     return viewport;
 }
 
-// 步骤2.4: 设置初始状态
+// 步骤5 — 初始化 3D 工作台状态快照
 void Workbench3D::init3DInitialState(const SceneDocument3D& scene, const QString& rootNodeId)
 {
     Q_UNUSED(scene);
-    m_initialState.viewMode = QObject::tr("3D Viewport"); // 3D 视口
-    m_initialState.layerId = QObject::tr("Scene"); // 场景
-    m_initialState.documentId = QObject::tr("3D Scene"); // 3D 场景
-    m_initialState.selectionSource = QObject::tr("3D-Init"); // 3D 初始化
-    m_initialState.selectionText = QObject::tr("Root node: %1").arg(rootNodeId); // 根节点: %1
-    m_initialState.selectionType = QObject::tr("3D"); // 3D
-    m_initialState.viewportType = QObject::tr("3D"); // 3D
-    m_initialState.viewportStatus = QObject::tr("3D ready"); // 3D 就绪
+    m_initialState.viewMode = QObject::tr("3D Viewport");
+    m_initialState.layerId = QObject::tr("Scene");
+    m_initialState.documentId = QObject::tr("3D Scene");
+    m_initialState.selectionSource = QObject::tr("3D-Init");
+    m_initialState.selectionText = QObject::tr("Root node: %1").arg(rootNodeId);
+    m_initialState.selectionType = QObject::tr("3D");
+    m_initialState.viewportType = QObject::tr("3D");
+    m_initialState.viewportStatus = QObject::tr("3D ready");
     m_initialState.dirty = false;
 }
 
-// 步骤2: 组装完整3D工作台 UI
+// 步骤6 — 组装 3D 工作台 UI（面板 + 工具栏 + 视口）
 void Workbench3D::build3DWorkbenchUi(WorkbenchWindow& window)
 {
     PropertiesPanelWidget* properties = nullptr;
@@ -620,27 +620,28 @@ void Workbench3D::build3DWorkbenchUi(WorkbenchWindow& window)
         init3DInitialState(*m_scene, rootNodeId);
 }
 
-// 步骤2: 附加到窗口
+// 步骤7 — 附加到窗口，触发 UI 构建
 void Workbench3D::attachToWindow(WorkbenchWindow& window)
 {
     build3DWorkbenchUi(window);
 }
 
-// 步骤3 — 激活工作台，应用状态
+// 步骤8 — 激活工作台，应用初始状态
 void Workbench3D::activate()
 {
     applyWorkbenchState(m_services.stateCenter, id(), m_initialState);
 }
 
-// 步骤4 — 停用工作台，保存状态
+// 步骤9 — 停用工作台，清空状态
 void Workbench3D::deactivate()
 {
     m_savedState = WorkbenchStateSnapshot{};
 }
 
-// 步骤5 — 关闭工作台，清理资源
+// 步骤10 — 关闭工作台，清理资源
 void Workbench3D::shutdown()
 {
     m_services = UiServices{};
     m_scene.reset();
 }
+#endif

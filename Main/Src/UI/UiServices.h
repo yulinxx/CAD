@@ -10,6 +10,7 @@ class UiLayoutService;
 class UiStateCenter;
 class UiThemeService;
 class IUndoStack;
+class ISelectionService;
 class OperationBus;
 
 /**
@@ -48,6 +49,9 @@ struct UiServices
 
     /// 操作总线（新操作主线）
     OperationBus* operationBus{ nullptr };
+
+    /// 选择服务（选择状态与文档事实分离）
+    ISelectionService* selectionService{ nullptr };
 
     /// 2D 场景管理器（命令系统通过此入口操作 2D 图元）
     class SceneDocument2D* document2D{ nullptr };

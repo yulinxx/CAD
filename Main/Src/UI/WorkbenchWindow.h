@@ -135,8 +135,6 @@ private:
     void initializeStatusBarSkeleton();
     /// 创建主题菜单骨架，便于后续把主题项与主题服务分离
     void initializeThemeMenuSkeleton();
-    /// 创建工作台切换菜单骨架，便于后续收口工作台入口
-    void initializeWorkbenchMenuSkeleton();
     /// 绑定全局快捷键（Ctrl+Z/Ctrl+Y 等）
     void bindShortcuts();
     /// 构建菜单系统（文件、视图、工具）
@@ -159,8 +157,6 @@ private:
     void buildStatusBar();
     /// 构建主题菜单
     void buildThemeMenu();
-    /// 构建工作台切换菜单
-    void buildWorkbenchMenu();
     /// 绑定状态中心信号
     void bindStateSignals();
     /// 解除状态中心信号绑定，避免重复连接
@@ -257,8 +253,10 @@ private:
         QMenu* viewMenu{ nullptr };
         /// 工具菜单
         QMenu* toolsMenu{ nullptr };
-        /// 视图菜单中的工作台子菜单
-        QMenu* workbenchMenu{ nullptr };
+        /// 工作台切换动作（2D）
+        QAction* workbench2DAction{ nullptr };
+        /// 工作台切换动作（3D）
+        QAction* workbench3DAction{ nullptr };
         /// 主题子菜单
         QMenu* themeMenu{ nullptr };
     } m_menuState;

@@ -1,18 +1,28 @@
 #include "UiEntities.h"
 
+#include "Engine/EntityIdUtils.h"
 #include <algorithm>
-#include <random>
-#include <sstream>
-#include <iomanip>
 
 // ============================================================================
 // SceneNode
 // ============================================================================
 
-SceneNode::SceneNode(std::string id, std::string name)
-    : m_id(std::move(id))
+SceneNode::SceneNode(Eg::EntityId entityId, std::string name)
+    : m_engineEntityId(entityId)
     , m_name(std::move(name))
 {
+}
+
+bool SceneNode::selected() const
+{
+    // 由 SelectionSet::items() 统一包装查询，此处返回 false
+    return false;
+}
+
+void SceneNode::setSelected(bool selected)
+{
+    (void)selected;
+    // 选中状态由引擎场景管理
 }
 
 void SceneNode::addChild(const std::shared_ptr<SceneNode>& child)
@@ -43,14 +53,14 @@ std::shared_ptr<SceneNode> SceneNode::childByIdRecursive(const std::string& id) 
 std::vector<std::string> SceneNode::pathIdsRecursive() const
 {
     std::vector<std::string> ids;
-    ids.push_back(m_id);
+    ids.push_back(id());
     for (const auto& child : m_children)
     {
         if (!child)
             continue;
         const auto childIds = child->pathIdsRecursive();
-        for (const auto& id : childIds)
-            ids.push_back(id);
+        for (const auto& cid : childIds)
+            ids.push_back(cid);
     }
     return ids;
 }
@@ -76,101 +86,111 @@ std::vector<std::string> SceneNode::pathNamesRecursive() const
 
 void SelectionSet::clear()
 {
-    for (auto& item : m_items)
-    {
-        if (!item)
-            continue;
-        item->setSelected(false);
-        item->setHighlighted(false);
-    }
-    m_items.clear();
+    if (m_scene)
+        m_scene->clearSelection();
 }
 
 void SelectionSet::add(const std::shared_ptr<SceneNode>& node)
 {
-    if (!node || contains(node->id()))
+    if (!node || !m_scene)
         return;
-    m_items.push_back(node);
-    node->setSelected(true);
-    node->setHighlighted(true);
+    m_scene->selectMesh(m_scene->findMeshById(node->engineEntityId()));
 }
 
 void SelectionSet::remove(const std::string& nodeId)
 {
-    auto it = std::remove_if(m_items.begin(), m_items.end(),
-        [&](const std::shared_ptr<SceneNode>& item) {
-            if (!item || item->id() != nodeId)
-                return false;
-            item->setSelected(false);
-            item->setHighlighted(false);
-            return true;
-        });
-    m_items.erase(it, m_items.end());
+    if (!m_scene)
+        return;
+    auto eid = Eg::parseEntityId(nodeId);
+    if (!eid)
+        return;
+    auto selIds = m_scene->selectedEntityIds();
+    m_scene->clearSelection();
+    for (auto id : selIds)
+    {
+        if (id != *eid)
+            if (auto* m = m_scene->findMeshById(id))
+                m_scene->selectMesh(m);
+    }
 }
 
-bool SelectionSet::contains(const std::string& nodeId) const
+bool SelectionSet::contains(const std::string& entityId) const
 {
-    return std::any_of(m_items.begin(), m_items.end(),
-        [&](const std::shared_ptr<SceneNode>& item) {
-            return item && item->id() == nodeId;
-        });
+    if (!m_scene)
+        return false;
+    auto eid = Eg::parseEntityId(entityId);
+    if (!eid)
+        return false;
+    const auto selIds = m_scene->selectedEntityIds();
+    return std::find(selIds.begin(), selIds.end(), *eid) != selIds.end();
 }
 
 std::vector<std::shared_ptr<SceneNode>> SelectionSet::items() const
 {
-    return m_items;
+    std::vector<std::shared_ptr<SceneNode>> result;
+    if (!m_scene)
+        return result;
+    for (auto* mesh : m_scene->getSelectedMeshes())
+    {
+        auto node = std::make_shared<SceneNode>(mesh->getId(), mesh->strName);
+        result.push_back(node);
+    }
+    return result;
 }
+
 bool SelectionSet::empty() const
 {
-    return m_items.empty();
+    return m_scene ? !m_scene->hasSelection() : true;
 }
 
 // ============================================================================
 // SceneDocument3D
 // ============================================================================
 
-static std::string generateUuid()
+static std::string engineIdStr(Eg::EntityId id)
 {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(0, 15);
+    return std::to_string(id);
+}
 
-    std::stringstream ss;
-    ss << std::hex << std::uppercase;
-    for (int i = 0; i < 32; ++i)
-    {
-        if (i == 8 || i == 12 || i == 16 || i == 20)
-            ss << '-';
-        ss << dis(gen);
-    }
-    return ss.str();
+void SceneDocument3D::setEngineScene(std::shared_ptr<Eg::SceneManager3D> scene)
+{
+    m_engineScene = std::move(scene);
+    m_selection.setScene(m_engineScene.get());
+    m_uiRoot = std::make_shared<SceneNode>(static_cast<Eg::EntityId>(-1), "Root");
 }
 
 std::shared_ptr<SceneNode> SceneDocument3D::createNode(const std::string& name)
 {
-    auto node = std::make_shared<SceneNode>(generateUuid(), name);
-    m_roots.push_back(node);
+    if (!m_engineScene)
+    {
+        setEngineScene(std::make_shared<Eg::SceneManager3D>());
+    }
+
+    auto mesh = std::make_shared<Eg::SyMeshEntity>(name);
+    m_engineScene->addEntity(mesh);
+
+    auto node = std::make_shared<SceneNode>(mesh->id, name);
+    if (m_uiRoot)
+        m_uiRoot->addChild(node);
     return node;
 }
 
 std::shared_ptr<SceneNode> SceneDocument3D::nodeById(const std::string& id) const
 {
-    for (const auto& node : m_roots)
-    {
-        if (node && node->id() == id)
-            return node;
-    }
-    return {};
+    if (!m_uiRoot)
+        return {};
+    return m_uiRoot->childByIdRecursive(id);
 }
 
 void SceneDocument3D::removeNode(const std::string& id)
 {
-    m_selection.remove(id);
-    auto it = std::remove_if(m_roots.begin(), m_roots.end(),
-        [&](const std::shared_ptr<SceneNode>& node) {
-            return node && node->id() == id;
-        });
-    m_roots.erase(it, m_roots.end());
+    if (!m_engineScene)
+        return;
+    auto eid = Eg::parseEntityId(id);
+    if (!eid)
+        return;
+    if (auto* mesh = m_engineScene->findMeshById(*eid))
+        m_engineScene->removeEntity(mesh);
 }
 
 void SceneDocument3D::removeNode(const std::shared_ptr<SceneNode>& node)
@@ -181,20 +201,24 @@ void SceneDocument3D::removeNode(const std::shared_ptr<SceneNode>& node)
 
 std::vector<std::shared_ptr<SceneNode>> SceneDocument3D::entities() const
 {
-    std::vector<std::shared_ptr<SceneNode>> items;
-    items.reserve(m_roots.size());
-    for (const auto& e : m_roots) items.push_back(e);
-    return items;
+    if (!m_uiRoot)
+        return {};
+    // m_uiRoot 的子节点即为根层节点，与旧 m_roots 语义一致
+    return m_uiRoot->children();
 }
 
 std::vector<std::shared_ptr<SceneNode>> SceneDocument3D::rootNodes() const
 {
-    return m_roots;
+    if (m_uiRoot)
+        return m_uiRoot->children();
+    return {};
 }
+
 SelectionSet& SceneDocument3D::selection()
 {
     return m_selection;
 }
+
 const SelectionSet& SceneDocument3D::selection() const
 {
     return m_selection;
@@ -205,39 +229,36 @@ const SelectionSet& SceneDocument3D::selection() const
 std::vector<std::string> SceneDocument3D::allEntityIds() const
 {
     std::vector<std::string> ids;
-    for (const auto& node : m_roots)
-    {
-        if (node)
-            ids.push_back(node->id());
-    }
+    if (!m_engineScene)
+        return ids;
+    for (auto eid : m_engineScene->getAllEntityIds())
+        ids.push_back(engineIdStr(eid));
     return ids;
 }
 
 void SceneDocument3D::selectEntity(const std::string& id)
 {
-    for (const auto& node : m_roots)
-    {
-        if (node && node->id() == id)
-        {
-            m_selection.add(node);
-            return;
-        }
-    }
+    if (!m_engineScene)
+        return;
+    Eg::EntityId eid = static_cast<Eg::EntityId>(std::stoull(id));
+    m_engineScene->clearSelection();
+    if (auto* entity = m_engineScene->findEntityById(eid))
+        m_engineScene->selectEntity(entity);
 }
 
 void SceneDocument3D::clearSelection()
 {
-    m_selection.clear();
+    if (m_engineScene)
+        m_engineScene->clearSelection();
 }
 
 std::vector<std::string> SceneDocument3D::selectedIds() const
 {
     std::vector<std::string> ids;
-    for (const auto& item : m_selection.items())
-    {
-        if (item)
-            ids.push_back(item->id());
-    }
+    if (!m_engineScene)
+        return ids;
+    for (auto eid : m_engineScene->selectedEntityIds())
+        ids.push_back(engineIdStr(eid));
     return ids;
 }
 
@@ -248,48 +269,8 @@ void SceneDocument3D::removeEntity(const std::string& id)
 
 void SceneDocument3D::clear()
 {
-    m_selection.clear();
-    m_roots.clear();
-}
-
-// ============================================================================
-// DefaultCameraController3D
-// ============================================================================
-
-void DefaultCameraController3D::orbit(double deltaYaw, double deltaPitch)
-{
-    m_yaw += deltaYaw;
-    m_pitch = std::clamp(m_pitch + deltaPitch, -89.0, 89.0);
-}
-
-void DefaultCameraController3D::zoom(double delta)
-{
-    m_distance = std::clamp(m_distance + delta, 2.0, 500.0);
-}
-
-void DefaultCameraController3D::pan(const RenderPointF& delta)
-{
-    m_panOffset.x += delta.x;
-    m_panOffset.y += delta.y;
-}
-
-void DefaultCameraController3D::reset()
-{
-    m_yaw = 0.0;
-    m_pitch = 15.0;
-    m_distance = 10.0;
-    m_panOffset = RenderPointF();
-}
-
-double DefaultCameraController3D::yaw() const
-{
-    return m_yaw;
-}
-double DefaultCameraController3D::pitch() const
-{
-    return m_pitch;
-}
-double DefaultCameraController3D::distance() const
-{
-    return m_distance;
+    if (m_engineScene)
+        m_engineScene->clearScene();
+    m_uiRoot.reset();
+    m_selection.setScene(nullptr);
 }

@@ -14,6 +14,7 @@
 #include <QWheelEvent>
 
 #include "SceneDocument2D.h"
+#include "ISelectionService.h"
 #include "UiCommandDispatcher.h"
 #include "UiInteractionDispatcher.h"
 #include "Engine2D/SyEntity/SyLine.h"
@@ -63,6 +64,11 @@ void Viewport2D::setDocument(SceneDocument2D* document)
 {
     m_document = document;
     refreshFromDocument();
+}
+
+void Viewport2D::setSelectionService(ISelectionService* service)
+{
+    m_selectionService = service;
 }
 
 void Viewport2D::setSelectionCallback(std::function<void(const QString&, const QString&)>&& callback)
@@ -173,7 +179,7 @@ QRectF Viewport2D::documentBounds() const
         else if (entity->eType == Eg::EType::POLYGON)
         {
             auto* polygon = static_cast<const Eg::SyPolygon*>(entity);
-            for (const auto& v : polygon->vVertices)
+            for (const auto& v : polygon->vertices())
                 bounds |= QRectF(v.x(), v.y(), 0, 0);
         }
     }
@@ -300,12 +306,12 @@ void Viewport2D::refreshFromDocument()
         }
         else if (entity->eType == Eg::EType::POLYGON)
         {
-            // 多边形：连接所有顶点并闭合
             auto* polygon = static_cast<const Eg::SyPolygon*>(entity);
-            if (polygon->vVertices.size() >= 2)
+            const auto& verts = polygon->vertices();
+            if (verts.size() >= 2)
             {
                 QPolygonF qpoly;
-                for (const auto& v : polygon->vVertices)
+                for (const auto& v : verts)
                     qpoly.append(QPointF(v.x(), v.y()));
                 if (polygon->bClosed && !qpoly.isClosed())
                     qpoly.append(qpoly.first());
@@ -326,8 +332,8 @@ QString Viewport2D::selectedEntityId() const
 {
     if (!m_document)
         return {};
-    auto ids = m_document->selectedIdsQ();
-    return ids.isEmpty() ? QString() : ids.first();
+    auto ids = m_selectionService->selectedIds();
+    return ids.empty() ? QString() : QString::fromStdString(ids[0]);
 }
 
 void Viewport2D::deleteSelectedEntity()
@@ -350,7 +356,7 @@ void Viewport2D::deleteSelectedEntity()
 void Viewport2D::clearSelection()
 {
     if (m_document)
-        m_document->clearSelection();
+        m_selectionService->clear();
 }
 
 void Viewport2D::nudgeSelectedEndpoint(const QPointF& delta)
@@ -383,8 +389,8 @@ void Viewport2D::selectEntityById(const QString& entityId)
 {
     if (!m_document)
         return;
-    m_document->clearSelection();
-    m_document->selectEntity(entityId);
+    m_selectionService->clear();
+    m_selectionService->select(entityId.toStdString());
     syncSelectionDetails();
     refreshSelectionStyle();
     updateStatus(tr("2D entity selected")); // 2D 实体已选中

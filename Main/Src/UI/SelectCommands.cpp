@@ -5,6 +5,7 @@
 #include "Log/SyLogger.h"
 
 #include "SceneDocument2D.h"
+#include "ISelectionService.h"
 #include "UiServices.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/SyEntity/SyLine.h"
@@ -47,6 +48,7 @@ bool SelectCommand::activate(const UiServices& services)
     SY_INFO("[SelectCommands] SelectCommand activated");
     m_services = &services;
     m_document = services.document2D;
+    m_selectionService = services.selectionService;
     m_state = CommandState::Active;
     m_selectedEntityIds.clear();
     m_oldSelectedIds.clear();
@@ -170,11 +172,12 @@ static bool hitTestEntity(SyEntity* entity, const QPointF& clickPt, double toler
         case Eg::EType::POLYGON:
         {
             auto* polygon = static_cast<Eg::SyPolygon*>(entity);
-            for (size_t i = 0; i < polygon->vVertices.size(); ++i)
+            const auto& verts = polygon->vertices();
+            for (size_t i = 0; i < verts.size(); ++i)
             {
-                size_t j = (i + 1) % polygon->vVertices.size();
-                const QPointF p0(polygon->vVertices[i].x(), polygon->vVertices[i].y());
-                const QPointF p1(polygon->vVertices[j].x(), polygon->vVertices[j].y());
+                size_t j = (i + 1) % verts.size();
+                const QPointF p0(verts[i].x(), verts[i].y());
+                const QPointF p1(verts[j].x(), verts[j].y());
                 QLineF lineSeg(p0, p1);
                 double dx = p1.x() - p0.x();
                 double dy = p1.y() - p0.y();
@@ -305,7 +308,10 @@ bool SelectCommand::onMouseUp(int x, int y)
 
     if (isClick)
     {
-        m_oldSelectedIds = m_document->selectedIdsQ();
+        // 记录当前选中列表，用于 Shift+点击 的累加选择
+        const auto currentIds = m_selectionService->selectedIds();
+        for (const std::string& id : currentIds)
+            m_oldSelectedIds.append(QString::fromStdString(id));
 
         auto* sm = m_document->sceneManager();
         if (sm)
@@ -327,33 +333,24 @@ bool SelectCommand::onMouseUp(int x, int y)
             if (isShiftPressed())
             {
                 m_selectedEntityIds = m_oldSelectedIds;
-                if (hitId.isEmpty())
-                {
-                    m_document->setSelectedEntityIds(m_selectedEntityIds);
-                }
-                else if (m_selectedEntityIds.contains(hitId))
-                {
-                    m_selectedEntityIds.removeAll(hitId);
-                    m_document->setSelectedEntityIds(m_selectedEntityIds);
-                }
-                else
-                {
-                    m_selectedEntityIds.append(hitId);
-                    m_document->setSelectedEntityIds(m_selectedEntityIds);
-                }
+                std::vector<std::string> ids;
+                ids.reserve(static_cast<size_t>(m_selectedEntityIds.size()));
+                for (const QString& sid : m_selectedEntityIds)
+                    ids.push_back(sid.toStdString());
+                m_selectionService->selectMultiple(ids);
             }
             else
             {
                 if (hitId.isEmpty())
                 {
                     m_selectedEntityIds.clear();
-                    m_document->clearSelection();
+                    m_selectionService->clear();
                 }
                 else
                 {
                     m_selectedEntityIds.clear();
                     m_selectedEntityIds.append(hitId);
-                    m_document->setSelectedEntityIds(m_selectedEntityIds);
+                    m_selectionService->selectMultiple({ hitId.toStdString() });
                 }
             }
         }
@@ -411,7 +408,7 @@ void SelectCommand::performBoxSelect()
             case Eg::EType::POLYGON:
             {
                 auto* polygon = static_cast<Eg::SyPolygon*>(entity);
-                for (const auto& v : polygon->vVertices)
+                for (const auto& v : polygon->vertices())
                 {
                     if (rect.contains(QPointF(v.x(), v.y())))
                     {
@@ -448,21 +445,33 @@ void SelectCommand::performBoxSelect()
 
     if (isShiftPressed())
     {
-        m_selectedEntityIds = m_document->selectedIdsQ();
+        const auto currentIds = m_selectionService->selectedIds();
+        for (const std::string& id : currentIds)
+            m_selectedEntityIds.append(QString::fromStdString(id));
         for (const QString& id : selectedIds)
         {
             if (!m_selectedEntityIds.contains(id))
                 m_selectedEntityIds.append(id);
         }
-        m_document->setSelectedEntityIds(m_selectedEntityIds);
+        std::vector<std::string> ids;
+        ids.reserve(static_cast<size_t>(m_selectedEntityIds.size()));
+        for (const QString& sid : m_selectedEntityIds)
+            ids.push_back(sid.toStdString());
+        m_selectionService->selectMultiple(ids);
     }
     else
     {
         m_selectedEntityIds = selectedIds;
         if (selectedIds.isEmpty())
-            m_document->clearSelection();
+            m_selectionService->clear();
         else
-            m_document->setSelectedEntityIds(selectedIds);
+        {
+            std::vector<std::string> ids;
+            ids.reserve(static_cast<size_t>(selectedIds.size()));
+            for (const QString& id : selectedIds)
+                ids.push_back(id.toStdString());
+            m_selectionService->selectMultiple(ids);
+        }
     }
 }
 
@@ -497,9 +506,9 @@ void SelectCommand::setSelectedEntityId(const QString& entityId)
     m_selectedEntityIds.append(entityId);
 }
 
-SelectUndoCommand::SelectUndoCommand(SceneDocument2D* document, const QString& oldId, const QString& newId)
+SelectUndoCommand::SelectUndoCommand(ISelectionService* selService, const QString& oldId, const QString& newId)
     : UndoCommand(QObject::tr("Select"))
-    , m_document(document)
+    , m_selectionService(selService)
     , m_oldId(oldId)
     , m_newId(newId)
 {
@@ -507,22 +516,30 @@ SelectUndoCommand::SelectUndoCommand(SceneDocument2D* document, const QString& o
 
 void SelectUndoCommand::undo()
 {
-    if (!m_document)
+    if (!m_selectionService)
         return;
 
+    // 恢复到撤销前的选中实体
     if (m_oldId.isEmpty())
-        m_document->clearSelection();
+        m_selectionService->clear();
     else
-        m_document->setSelectedEntityId(m_oldId);
+    {
+        m_selectionService->clear();
+        m_selectionService->select(m_oldId.toStdString());
+    }
 }
 
 void SelectUndoCommand::redo()
 {
-    if (!m_document)
+    if (!m_selectionService)
         return;
 
+    // 重做到撤销后的选中实体
     if (m_newId.isEmpty())
-        m_document->clearSelection();
+        m_selectionService->clear();
     else
-        m_document->setSelectedEntityId(m_newId);
+    {
+        m_selectionService->clear();
+        m_selectionService->select(m_newId.toStdString());
+    }
 }

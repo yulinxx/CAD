@@ -3,6 +3,7 @@
 #include "UiCommandHandler.h"
 
 class SceneDocument2D;
+class ISelectionService;
 
 /**
  * @class SelectCommand
@@ -41,6 +42,7 @@ private:
     CommandState m_state{ CommandState::Idle };
     const UiServices* m_services{ nullptr };
     SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QVector<QString> m_selectedEntityIds;
     QVector<QString> m_oldSelectedIds;
     bool m_boxSelecting{ false };
@@ -55,12 +57,12 @@ private:
 class SelectUndoCommand : public UndoCommand
 {
 public:
-    SelectUndoCommand(SceneDocument2D* document, const QString& oldId, const QString& newId);
+    SelectUndoCommand(ISelectionService* selService, const QString& oldId, const QString& newId);
     void undo() override;
     void redo() override;
 
 private:
-    SceneDocument2D* m_document{ nullptr };
+    ISelectionService* m_selectionService{ nullptr };
     QString m_oldId;
     QString m_newId;
 };

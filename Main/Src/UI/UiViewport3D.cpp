@@ -1,9 +1,6 @@
 #include "UiViewport3D.h"
 
 #include "SimpleRenderer3D.h"
-#include "RenderWidget3DAdapter.h"
-#include "Render3D/RenderWidget3D.h"
-#include "RenderCore/RenderCoreRenderer.h"
 
 #include <QContextMenuEvent>
 #include <QMouseEvent>
@@ -18,7 +15,7 @@ Viewport3D::Viewport3D(QWidget* parent)
     setMinimumSize(640, 480);
     setAutoFillBackground(true);
 
-    m_renderer = std::make_unique<RenderCoreRenderer>();
+    m_renderer = std::make_unique<SimpleRenderer3D>();
     m_renderer->initialize();
 }
 

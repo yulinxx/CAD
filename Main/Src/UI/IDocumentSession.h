@@ -10,7 +10,7 @@
 
 namespace Eg
 {
-    class SyEntity;
+    struct SyEntity;
 }
 
 class IDocumentSession
