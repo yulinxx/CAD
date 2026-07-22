@@ -6,6 +6,7 @@
 #include <QPainter>
 
 #include "Render3D/RenderWidget3D.h"
+#include "Engine3D/SyEntity/SyMeshEntity.h"
 
 namespace
 {
@@ -48,7 +49,7 @@ void RenderWidget3DAdapter::bindWidgetSignals()
 
     // 场景选择变化只同步到适配器，再由适配器回调上层。
     QObject::connect(m_renderWidget.get(), &RenderWidget3D::sigSelectionChanged,
-        [this](const auto& entities)
+        [this](const std::vector<Eg::SyMeshEntity*>& entities)
         {
             if (!entities.empty() && entities[0])
             {

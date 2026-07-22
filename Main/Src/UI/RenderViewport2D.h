@@ -1,0 +1,230 @@
+/**
+ * @file RenderViewport2D.h
+ * @brief 基于 Renderx 的 2D 渲染视口 — 替换旧的 QGraphicsView 视口
+ *
+ * 使用 RenderWidget (QOpenGLWidget + Renderx) 作为渲染内核，
+ * 内置 2D 相机管理，SceneManager 作为数据源（ISceneDataSource）。
+ * 对外接口与 Viewport2D 保持兼容，便于无缝替换。
+ */
+#pragma once
+
+#include <QWidget>
+#include <QPointF>
+#include <QString>
+#include <QPoint>
+#include <functional>
+#include <memory>
+#include <unordered_set>
+
+#include "Render/RenderTypes.h"
+
+#include "Engine/EntityIdGenerator.h"
+#include "Engine2D/Core/SceneNotifier.h"
+
+class RenderWidget;
+class SceneDocument2D;
+class ISelectionService;
+class IInteractionDispatcher;
+class OperationBus;
+
+class QMouseEvent;
+class QWheelEvent;
+class QContextMenuEvent;
+class QKeyEvent;
+class QTimer;
+class QResizeEvent;
+
+namespace Eg
+{
+    class SceneManager;
+}
+
+/**
+ * @brief 简单的 2D 正交相机
+ */
+struct Camera2D
+{
+    float zoom = 1.0f;
+    QPointF panOffset;
+
+    static constexpr float MIN_ZOOM = 0.001f;
+    static constexpr float MAX_ZOOM = 10000.0f;
+
+    // 计算视图矩阵（3x3，列优先，9个float）
+    void computeViewMatrix(float outMat[9], float vpW, float vpH) const;
+
+    // 屏幕坐标转世界坐标
+    QPointF screenToWorld(const QPoint& screenPos, float vpW, float vpH) const;
+
+    // 缩放
+    void zoomIn(float factor, const QPointF& anchorWorld, float vpW, float vpH);
+    void zoomOut(float factor, const QPointF& anchorWorld, float vpW, float vpH);
+
+    // 平移
+    void pan(float dx, float dy);
+
+    // 重置
+    void reset();
+
+    // 缩放到适合
+    void zoomToFit(float vpW, float vpH, float sceneW, float sceneH);
+
+    // 设置视图范围：以 (centerX, centerY) 为中心，可见半宽半高为 halfW/halfH
+    // 根据视口尺寸计算合适的 zoom，使世界范围 [-halfW, halfW] x [-halfH, halfH] 可见
+    void setViewExtent(float vpW, float vpH, float centerX, float centerY, float halfW, float halfH);
+};
+
+/**
+ * @brief 2D 渲染视口 — 基于 Renderx 的 OpenGL 渲染
+ *
+ * 取代旧的 Viewport2D (QGraphicsView)，使用 RenderWidget + Renderx 进行硬件加速渲染。
+ * 数据层通过 ISceneDataSource 接口推送几何原语，渲染层自行处理细分和缓存。
+ */
+class RenderViewport2D : public QWidget
+                         , private Eg::SceneNotifier::IObserver
+{
+    Q_OBJECT
+public:
+    explicit RenderViewport2D(QWidget* parent = nullptr);
+    ~RenderViewport2D() override;
+
+public:
+    // ==================== 外部接口（与 Viewport2D 兼容）====================
+
+    void setStatusCallback(std::function<void(const QString&)>&& callback);
+    void setSelectionCallback(std::function<void(const QString&, const QString&)>&& callback);
+    void setCommandStageCallback(std::function<void(const QString&)>&& callback);
+    // 设置鼠标位置回调，用于在状态栏显示当前光标坐标
+    void setPositionCallback(std::function<void(double, double)>&& callback);
+
+    void setDocument(SceneDocument2D* document);
+    SceneDocument2D* document() const
+    {
+        return m_document;
+    }
+    void setSelectionService(ISelectionService* service);
+    void setInteractionDispatcher(IInteractionDispatcher* dispatcher);
+    void setOperationBus(OperationBus* bus);
+
+    
+
+    void resetView();
+    void zoomToFit();
+    void zoomToSelection();
+    void zoomIn();
+    void zoomOut();
+    void requestSceneRefresh();
+    /// 轻量级重绘请求，不触发全量 gather，用于选中变化等仅需视觉刷新场景
+    void requestRepaint();
+    /// 全量刷新请求，强制完整 gather + submit（导入、大批量修改后）
+    void requestFullRefresh();
+    void setPanModeEnabled(bool enabled);
+    bool isPanModeEnabled() const;
+    void setDrawingEnabled(bool enabled);
+    void setMeasureMode(bool enabled);
+
+    QString selectedEntityId() const;
+    void deleteSelectedEntity();
+    void nudgeSelectedEndpoint(const QPointF& delta);
+    void selectEntityById(const QString& entityId);
+    void syncSelectionDetails();
+    void clearSelection();
+
+    // 坐标转换
+    QPointF mapToScene(const QPoint& screenPos) const;
+
+signals:
+    void sceneChanged();
+
+protected:
+    void resizeEvent(QResizeEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
+    void wheelEvent(QWheelEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
+    void contextMenuEvent(QContextMenuEvent* event) override;
+    void showEvent(QShowEvent* event) override;
+    // RenderWidget 是 QOpenGLWidget 原生窗口，鼠标事件不会传递到父控件，
+    // 通过事件过滤器将 RenderWidget 上的鼠标事件转发到本视口处理
+    bool eventFilter(QObject* obj, QEvent* event) override;
+
+private:
+    // ==================== 内部方法 ====================
+
+    // 初始化
+    void initRenderWidget();
+    void initTimers();
+
+    // IObserver 实现
+    void onSceneChanged() override;
+    void onSelectionChanged() override;
+
+    // 渲染更新
+    void updateSceneRender();
+    void scheduleSceneUpdate();
+
+    // 视图控制
+    void updateViewMatrix();
+
+    // 选择
+    void handleLeftClick(const QPointF& worldPos);
+    void performHitTest(const QPointF& worldPos);
+    void beginBoxSelect(const QPointF& worldPos);
+    void updateBoxSelect(const QPointF& worldPos);
+    void endBoxSelect(const QPointF& worldPos);
+
+    // 辅助
+    void updateStatus(const QString& text);
+    Eg::SceneManager* sceneManager() const;
+
+private:
+    // 渲染控件
+    RenderWidget* m_renderWidget{ nullptr };
+
+    // 相机
+    Camera2D m_camera;
+
+    // 文档和服务
+    SceneDocument2D* m_document{ nullptr };
+    Eg::SceneManager* m_sceneManager{ nullptr };
+    std::shared_ptr<bool> m_alive{ std::make_shared<bool>(true) };
+    ISelectionService* m_selectionService{ nullptr };
+    IInteractionDispatcher* m_interactionDispatcher{ nullptr };
+    OperationBus* m_operationBus{ nullptr };
+
+    // 回调
+    std::function<void(const QString&)> m_statusCallback;
+    std::function<void(const QString&, const QString&)> m_selectionCallback;
+    std::function<void(const QString&)> m_commandStageCallback;
+    // 鼠标位置回调，参数为世界坐标 (x, y)
+    std::function<void(double, double)> m_positionCallback;
+
+    // 交互状态
+    bool m_panning{ false };
+    bool m_boxSelecting{ false };
+    bool m_panModeEnabled{ false };
+    QPoint m_lastMousePos;
+    QPointF m_boxSelectStart;
+    QPointF m_boxSelectEnd;
+
+    // 刷新级别（增量渲染策略）
+    enum class RefreshLevel
+    {
+        None,         // 无待办，不要触发任何 GL 操作
+        Repaint,      // 仅重绘（选择变化等纯视觉刷新，不触碰渲染数据）
+        LightUpdate,  // 仅提交脏/删除实体到渲染设备（依赖 RenderWidget 增量 API）
+        FullRefresh   // 全量 gather + submit（导入、大批量修改后）
+    };
+    RefreshLevel m_refreshLevel{ RefreshLevel::None };
+
+    // 场景更新节流
+    QTimer* m_sceneUpdateTimer{ nullptr };
+
+    // 脏标记集合（用于增量渲染）
+    std::unordered_set<Eg::EntityId> m_pendingDirtyIds;
+    std::unordered_set<Eg::EntityId> m_pendingDeletedIds;
+
+    // 连接管理
+    QMetaObject::Connection m_sceneChangedConn;
+};

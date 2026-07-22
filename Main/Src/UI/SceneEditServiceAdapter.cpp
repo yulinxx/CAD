@@ -37,4 +37,6 @@ std::vector<Eg::EntityId> SceneEditServiceAdapter::getAllEntityIds() const
 
 void SceneEditServiceAdapter::notifySceneChanged()
 {
+    // 发送场景变更信号，触发视口刷新和状态同步
+    emit sceneChanged();
 }

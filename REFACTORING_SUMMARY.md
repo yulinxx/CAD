@@ -1,5 +1,16 @@
 # CAD 架构现状
 
+## 最近重构记录
+
+### 2026-07-22 架构清理
+
+1. **OperationBus 合并**：移除 `ServiceLocator` 中的重复 `OperationBus` 实例，全局统一使用 `ApplicationCompositionRoot` 创建的单例
+2. **死代码清理**：删除 `ICommandHandler` 接口（`UiCommandManager.h/cpp`）和 `CommandHandlerAdapter` 引用
+3. **SceneManager 解耦**：Engine2D 算法头文件（`INestingJobRunner.h`、`NestingPartPreparer.h`、`EntityBoolean.h`、`EntityOffset.h`）改用前向声明，不再 include 具体 `SceneManager.h`
+4. **RenderX 边界修复**：移除 `Main/CMakeLists.txt`、`UI/2D/CMakeLists.txt`、`UI/3D/CMakeLists.txt`、`UI/RenderCompat/CMakeLists.txt` 中对 `${SANYI_RENDERX_DIR}/src` 的引用；Renderx 改用 `target_link_libraries(Log)` 替代 `include_directories/link_directories`
+
+---
+
 ## 当前架构
 
 当前框架保留 **SyEntity 多态模型 + Protobuf 序列化** 方案，EntityRecord 相关的新架构尝试已移除。
@@ -56,8 +67,9 @@
 
 ## 后续优化方向
 
-1. **命令系统统一**：完成 `OperationBus` 迁移，替代 `ICommandHandler`
+1. **命令系统统一**：✅ 已完成 — `ICommandHandler` 接口已删除，`CommandHandlerAdapter` 已移除，所有命令统一走 `OperationBus`
 2. **事务与 Undo 统一**：将 Undo/Redo 绑定到事务回放
 3. **文档与编辑服务统一**：收敛文档事实源
-4. **渲染路径收口**：清理历史 2D 渲染路径
+4. **渲染路径收口**：✅ 已完成 — `Renderx/` 为唯一生产路径，旧路径已删除
 5. **空壳模块清理**：移除 Network/Hardware/PythonHost 等空壳模块
+6. **SceneManager 接口扩展**：将 `addEntities`/`deleteEntitiesBatch` 等 2D 专用方法下沉到 `ISceneManager` 接口或专用接口

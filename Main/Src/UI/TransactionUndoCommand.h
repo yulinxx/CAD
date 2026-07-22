@@ -13,16 +13,16 @@
  *   undoStack->push(new TransactionUndoCommand("绘制线段", std::move(txn)));
  * @endcode
  */
-#include "UI/UiCommandHandler.h"
+#include "IUndoService.h"
 #include "Engine2D/Core/DocumentTransaction.h"
 
-/**
- * @class TransactionUndoCommand
- * @brief 包装 DocumentTransaction 的 UndoCommand
- *
- * 撤销时回滚事务，重做时重放事务。
- * 替代 SnapshotUndoCommand 的快照模式，实现真正的事务级撤销。
- */
+ /**
+  * @class TransactionUndoCommand
+  * @brief 包装 DocumentTransaction 的 UndoCommand
+  *
+  * 撤销时回滚事务，重做时重放事务。
+  * 替代 SnapshotUndoCommand 的快照模式，实现真正的事务级撤销。
+  */
 class TransactionUndoCommand : public UndoCommand
 {
 public:

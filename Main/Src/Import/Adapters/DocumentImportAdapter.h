@@ -1,0 +1,37 @@
+#pragma once
+
+#include <memory>
+
+#include <QString>
+
+#include "FileIO/FileFormat.h"
+
+namespace Eg { class SceneManager; class SyEntity; }
+class SceneEditService;
+
+/// 文档导入适配器：将导入的实体数据落地到场景文档
+class DocumentImportAdapter
+{
+public:
+    explicit DocumentImportAdapter(Eg::SceneManager* sceneManager,
+        SceneEditService* editService = nullptr);
+
+    /// 将导入的实体应用到 2D 场景文档
+    /// @param entities 导入的实体列表
+    /// @param preserveColors 是否保留源文件颜色
+    /// @param preserveLayers 是否保留源文件图层
+    /// @return 成功添加的实体数量
+    int apply2D(Fio::VecSyEntityPtr& entities,
+        bool preserveColors = true, bool preserveLayers = true);
+
+    /// 将导入的实体应用到 3D 场景文档
+    /// @param entities 导入的实体列表
+    /// @return 成功添加的实体数量
+    int apply3D(Fio::VecSyEntityPtr& entities);
+
+private:
+    /// 场景管理器（非拥有指针）
+    Eg::SceneManager* m_sceneManager{ nullptr };
+    /// 场景编辑服务（非拥有指针，支持 Undo 时使用）
+    SceneEditService* m_editService{ nullptr };
+};

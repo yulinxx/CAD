@@ -166,10 +166,11 @@ std::shared_ptr<SceneNode> SceneDocument3D::createNode(const std::string& name)
         setEngineScene(std::make_shared<Eg::SceneManager3D>());
     }
 
-    auto mesh = std::make_shared<Eg::SyMeshEntity>(name);
-    m_engineScene->addEntity(mesh);
+    auto mesh = std::make_unique<Eg::SyMeshEntity>(name);
+    Eg::EntityId meshId = mesh->id;
+    m_engineScene->addEntity(std::move(mesh));
 
-    auto node = std::make_shared<SceneNode>(mesh->id, name);
+    auto node = std::make_shared<SceneNode>(meshId, name);
     if (m_uiRoot)
         m_uiRoot->addChild(node);
     return node;

@@ -3,8 +3,6 @@
 #include <memory>
 #include <vector>
 
-#include "UI/UiCommandDispatcher.h"
-#include "UI/UiCommandHandler.h"
 #include "UI/UiInteractionDispatcher.h"
 #include "UI/UiLayoutService.h"
 #include "UI/UiShellHost.h"
@@ -16,6 +14,21 @@
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/UndoRedoManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
+#include "Engine2D/Edit/LayerEditService.h"
+#include "Engine2D/Interaction/LayerManager.h"
+#include "UI2D/Edit/QtLayerManagerBridge.h"
+
+#include "FileIO/FileIOManager.h"
+
+class PersistenceService;
+class LayerPersistenceBridge;
+class ImportService;
+class ImportDispatcher;
+class ExportService;
+class ExportDispatcher;
+class FileDialogService;
+class RecentFileService;
+class HelpDialogService;
 
 /**
  * @class ApplicationCompositionRoot
@@ -28,6 +41,7 @@ class ApplicationCompositionRoot
 {
 public:
     ApplicationCompositionRoot();
+    ~ApplicationCompositionRoot();
 
 public:
     /// 获取 UI Shell 宿主
@@ -42,27 +56,105 @@ public:
     /// 获取布局服务
     UiLayoutService* layoutService();
 
-    /// 获取命令分发器
-    UiCommandDispatcher* commandDispatcher();
-
     /// 获取交互式命令生命周期分发器
     IInteractionDispatcher* interactionDispatcher();
-
-    /// 获取撤销栈
-    IUndoStack* undoStack();
 
     /// 获取操作总线
     OperationBus* operationBus();
 
+    /// 获取撤销重做管理器
+    IUndoRedoManager* undoRedoManager();
+
+    /// 获取图层管理器
+    LayerManager* layerManager();
+
+    /// 获取图层管理器 Qt 桥接
+    QtLayerManagerBridge* layerManagerBridge();
+
+    /// 获取图层编辑服务
+    LayerEditService* layerEditService();
+
+    /// 获取图层持久化桥接器
+    LayerPersistenceBridge* layerPersistenceBridge();
+
+    /// 获取持久化服务
+    PersistenceService* persistenceService();
+
+    /// 获取导入服务
+    ImportService* importService()
+    {
+        return m_importService.get();
+    }
+
+    /// 获取导入分发器
+    ImportDispatcher* importDispatcher()
+    {
+        return m_importDispatcher.get();
+    }
+
+    /// 获取导出服务
+    ExportService* exportService()
+    {
+        return m_exportService.get();
+    }
+
+    /// 获取2D场景文档
+    SceneDocument2D* document2D()
+    {
+        return m_document2D.get();
+    }
+
+    /// 获取导出分发器
+    ExportDispatcher* exportDispatcher()
+    {
+        return m_exportDispatcher.get();
+    }
+
+    /// 获取文件对话框服务
+    FileDialogService* fileDialogService()
+    {
+        return m_fileDialogService.get();
+    }
+
+    /// 获取最近文件服务
+    RecentFileService* recentFileService()
+    {
+        return m_recentFileService.get();
+    }
+
+    /// 获取帮助弹窗服务
+    HelpDialogService* helpDialogService()
+    {
+        return m_helpDialogService.get();
+    }
+
+    /// 获取场景管理器
+    Eg::SceneManager* sceneManager()
+    {
+        return m_sceneManager.get();
+    }
+
+    /// 获取场景编辑服务
+    SceneEditService* sceneEditService()
+    {
+        return m_sceneEditService.get();
+    }
+
 private:
-    /// 注册所有命令处理器
-    void registerCommands();
-
-    /// 通过 CommandHandlerAdapter 将旧命令注册到 OperationBus
-    void registerCommandAdapters();
-
     /// 注册核心编辑操作到 OperationBus（新命令系统直接实现）
     void registerCoreOperations();
+
+    /// 注册文件操作（导入/导出/新建/打开/保存）
+    void registerFileOperations();
+
+    /// 注册帮助操作（About / Settings / Docs / Shortcuts）
+    void registerHelpOperations();
+
+    /// 注册缺失的工具切换操作（提示暂未实现）
+    void registerPendingToolOperations();
+
+    /// 注册缺失的算法/编辑操作（提示暂未实现）
+    void registerPendingAlgorithmOperations();
 
 private:
     /// UI Shell 宿主
@@ -77,14 +169,8 @@ private:
     /// 布局服务
     std::unique_ptr<UiLayoutService> m_layoutService;
 
-    /// 命令分发器
-    std::unique_ptr<UiCommandDispatcher> m_commandDispatcher;
-
-    /// 撤销栈（旧系统兼容）
-    std::unique_ptr<IUndoStack> m_undoStack;
-
-    /// 命令处理器实例集合
-    std::vector<std::unique_ptr<ICommandHandler>> m_commandHandlers;
+    /// 交互式命令生命周期分发器
+    std::unique_ptr<IInteractionDispatcher> m_interactionDispatcher;
 
     /// 操作总线（新命令主线）
     std::unique_ptr<OperationBus> m_operationBus;
@@ -100,4 +186,40 @@ private:
 
     /// 2D 场景文档（依赖 SceneEditService）
     std::unique_ptr<SceneDocument2D> m_document2D;
+
+    /// 图层管理器（管理图层创建/删除/属性/实体关联）
+    std::unique_ptr<LayerManager> m_layerManager;
+
+    /// 图层管理器 Qt 桥接（将观察者回调转为 Qt 信号）
+    std::unique_ptr<QtLayerManagerBridge> m_layerManagerBridge;
+
+    /// 图层编辑服务（带 Undo 的图层操作入口）
+    std::unique_ptr<LayerEditService> m_layerEditService;
+
+    /// 图层持久化桥接器（将运行态图层变更同步写入数据库）
+    std::unique_ptr<LayerPersistenceBridge> m_layerPersistenceBridge;
+
+    /// 文件IO管理器（导入/导出底层库）
+    std::unique_ptr<Fio::FileIOManager> m_fileIOManager;
+
+    /// 导入服务（高层导入入口）
+    std::unique_ptr<ImportService> m_importService;
+    /// 导入分发器（管理格式读取器注册）
+    std::unique_ptr<ImportDispatcher> m_importDispatcher;
+    /// 导出服务（高层导出入口）
+    std::unique_ptr<ExportService> m_exportService;
+    /// 导出分发器（管理格式写入器注册）
+    std::unique_ptr<ExportDispatcher> m_exportDispatcher;
+
+    /// 文件对话框服务
+    std::unique_ptr<FileDialogService> m_fileDialogService;
+
+    /// 最近文件服务
+    std::unique_ptr<RecentFileService> m_recentFileService;
+
+    /// 帮助弹窗服务
+    std::unique_ptr<HelpDialogService> m_helpDialogService;
+
+    /// 持久化服务（非拥有指针，由 AppInitializer 管理生命周期）
+    PersistenceService* m_persistenceService{ nullptr };
 };

@@ -30,7 +30,7 @@ list(REMOVE_DUPLICATES MAIN_HEADERS)
 
 list(FILTER MAIN_SOURCES EXCLUDE REGEX ".*Test/.*\\.cpp$")
 list(FILTER MAIN_HEADERS EXCLUDE REGEX ".*Test/.*\\.h$")
-if(NOT BUILD_UI3D OR NOT BUILD_RENDERCORE)
+if(NOT BUILD_UI3D)
     list(FILTER MAIN_SOURCES EXCLUDE REGEX ".*SimpleRenderer3D\\.cpp$")
     list(FILTER MAIN_HEADERS EXCLUDE REGEX ".*SimpleRenderer3D\\.h$")
     list(FILTER MAIN_SOURCES EXCLUDE REGEX ".*UiViewport3D\\.cpp$")
@@ -44,14 +44,6 @@ file(GLOB_RECURSE MAIN_RESOURCES CONFIGURE_DEPENDS
 )
 
 set(app_name "SanYiCAD")
-
-set(VERSION_MAJOR 1)
-set(VERSION_MINOR 0)
-set(VERSION_PATCH 0)
-set(PROJECT_VERSION_MAJOR ${VERSION_MAJOR})
-set(PROJECT_VERSION_MINOR ${VERSION_MINOR})
-set(PROJECT_VERSION_PATCH ${VERSION_PATCH})
-set(PROJECT_VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
 
 set(APP_ORGANIZATION_NAME "SanYi")
 set(APP_ORGANIZATION_DOMAIN "sanyi-cad.com")
@@ -93,7 +85,6 @@ target_include_directories(${app_name}
         "${SRC_ROOT}"
         "${SRC_ROOT}/Common"
         "${SANYI_RENDERX_DIR}/include"
-        "${SANYI_RENDERX_DIR}/src"
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/RenderCompat/Include"
         "${UI_ROOT}"
         "${UI_ROOT}/Adapters"
@@ -110,13 +101,12 @@ target_include_directories(${app_name}
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/2D/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/3D/Include"
-        # "${CMAKE_CURRENT_SOURCE_DIR}/../Render/Common/Include"
-        # "${CMAKE_CURRENT_SOURCE_DIR}/../Render/2D/Include"
-        # "${CMAKE_CURRENT_SOURCE_DIR}/../Render/3D/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Persistence/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Common/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Log/Log/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Include"
 )
 
 target_link_libraries(${app_name}
@@ -126,16 +116,19 @@ target_link_libraries(${app_name}
         License
         EngineCommon
         Engine2D
+        EnginePersistence
         SanYiRender
         UICommon
         UI2D
         Log
         RenderCompat
+        FileIO
         ${QT_LIBRARIES}
 )
 
 if(BUILD_UI3D)
     target_link_libraries(${app_name} PRIVATE UI3D Engine3D)
+    target_compile_definitions(${app_name} PRIVATE BUILD_UI3D=1)
 endif()
 
 if(SANYI_PYTHON_HOST)
@@ -217,7 +210,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
         "${UI_ROOT}/Test/*.cpp"
     )
 
-    if(NOT BUILD_UI3D OR NOT BUILD_RENDERCORE)
+    if(NOT BUILD_UI3D)
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*SimpleRenderer3DTests\\.cpp$")
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*FrameworkLifecycleTests\\.cpp$")
     endif()
@@ -230,9 +223,12 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
 
     file(GLOB MAIN_TEST_DEP_SOURCES CONFIGURE_DEPENDS
         "${UI_ROOT}/*.cpp"
+        "${SRC_ROOT}/Persistence/*.cpp"
+        "${SRC_ROOT}/Persistence/Repositories/*.cpp"
+        "${SRC_ROOT}/Import/*.cpp"
     )
 
-    if(NOT BUILD_UI3D OR NOT BUILD_RENDERCORE)
+    if(NOT BUILD_UI3D)
         list(FILTER MAIN_TEST_DEP_SOURCES EXCLUDE REGEX ".*SimpleRenderer3D\\.cpp$")
         list(FILTER MAIN_TEST_DEP_SOURCES EXCLUDE REGEX ".*UiViewport3D\\.cpp$")
         list(FILTER MAIN_TEST_DEP_SOURCES EXCLUDE REGEX ".*RenderWidget3DAdapter\\.cpp$")
@@ -250,6 +246,9 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             "${CMAKE_CURRENT_BINARY_DIR}"
             "${SRC_ROOT}"
             "${SRC_ROOT}/Common"
+            "${SRC_ROOT}/Persistence"
+            "${SRC_ROOT}/Persistence/Repositories"
+            "${SRC_ROOT}/Import"
             "${UI_ROOT}"
             "${UI_ROOT}/Adapters"
             "${UI_ROOT}/Dispatchers"
@@ -261,17 +260,16 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             "${UI_ROOT}/Workbench"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Utility/Utility/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler/CrashHandler/Include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../License/License/Include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../License/License/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/2D/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/3D/Include"
-            # "${CMAKE_CURRENT_SOURCE_DIR}/../Render/Common/Include"
-            # "${CMAKE_CURRENT_SOURCE_DIR}/../Render/2D/Include"
-            # "${CMAKE_CURRENT_SOURCE_DIR}/../Render/3D/Include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Persistence/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Common/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Log/Log/Include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Include"
     )
 
     target_link_libraries(MainTests
@@ -279,11 +277,13 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             Utility
             EngineCommon
             Engine2D
+            EnginePersistence
             RenderCompat
             UICommon
             UI2D
             Log
             SanYiRender
+            FileIO
             ${QT_LIBRARIES}
             GTest::gtest
             GTest::gtest_main
@@ -292,6 +292,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
 
     if(BUILD_UI3D)
         target_link_libraries(MainTests PRIVATE Engine3D UI3D)
+        target_compile_definitions(MainTests PRIVATE BUILD_UI3D=1)
     endif()
 
     set_target_properties(MainTests PROPERTIES

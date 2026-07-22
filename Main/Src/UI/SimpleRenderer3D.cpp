@@ -30,6 +30,8 @@ void SimpleRenderer3D::shutdown()
 {
     m_ready = false;
     m_renderLoopEnabled = false;
+    m_document = nullptr;
+    m_cameraController = nullptr;
 }
 
 bool SimpleRenderer3D::isReady() const
@@ -61,12 +63,12 @@ void SimpleRenderer3D::setCamera(CameraController3D* controller)
 
 void SimpleRenderer3D::resize(int width, int height)
 {
-    m_camera.setViewportSize(width, height);
+    m_camera.setViewport(width, height);
 }
 
 void SimpleRenderer3D::resetView()
 {
-    m_camera.reset();
+    m_camera.resetView();
     emitStatus(QObject::tr("3D view reset"));
 }
 
@@ -85,6 +87,11 @@ bool SimpleRenderer3D::isOrbitMode() const
     return m_camera.isOrbitMode();
 }
 
+bool SimpleRenderer3D::isOpenGL() const
+{
+    return false;  // 基于 QPainter 的软件渲染器，不使用 OpenGL
+}
+
 // ========== 3D 投影 ==========
 
 bool SimpleRenderer3D::project(float x, float y, float z, int& sx, int& sy) const
@@ -98,9 +105,10 @@ void SimpleRenderer3D::render(QPainter& painter, int width, int height)
 {
     painter.setRenderHint(QPainter::Antialiasing, true);
 
-    m_camera.setViewportSize(width, height);
+    m_camera.setViewport(width, height);
 
-    painter.fillRect(0, 0, width, height, QColor(40, 42, 48));
+    // 3D 深蓝灰背景，区别于 2D 浅灰背景
+    painter.fillRect(0, 0, width, height, QColor(30, 35, 50));
 
     drawAxes(painter);
     drawWireCube(painter, 0.0f, 0.0f, 0.0f, static_cast<float>(kCubeHalfSize));
@@ -272,13 +280,11 @@ void SimpleRenderer3D::onMousePress(int x, int y, int button, int modifiers, int
 
 void SimpleRenderer3D::onMouseMove(int x, int y, int buttons, int viewW, int viewH)
 {
-    if (m_camera.onMouseMove(x, y, buttons, viewW, viewH))
-    {
-        if (m_camera.isRotating())
-            emitStatus(QObject::tr("3D orbiting"));
-        else if (m_camera.isPanning())
-            emitStatus(QObject::tr("3D panning"));
-    }
+    m_camera.onMouseMove(x, y, buttons, viewW, viewH);
+    if (m_camera.isRotating())
+        emitStatus(QObject::tr("3D orbiting"));
+    else if (m_camera.isPanning())
+        emitStatus(QObject::tr("3D panning"));
 }
 
 void SimpleRenderer3D::onMouseRelease(int x, int y, int button, int viewW, int viewH)
@@ -290,7 +296,7 @@ void SimpleRenderer3D::onMouseRelease(int x, int y, int button, int viewW, int v
 void SimpleRenderer3D::onWheel(int delta, int viewW, int viewH)
 {
     m_camera.onWheel(delta, viewW, viewH);
-    emitStatus(QObject::tr("3D zoom: %.1f").arg(m_camera.distance()));
+    emitStatus(QObject::tr("3D zoom: %1").arg(m_camera.distance(), 0, 'f', 1));
 }
 
 // ========== 选择管理 ==========

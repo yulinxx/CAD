@@ -27,13 +27,25 @@ public:
     {
         return std::to_string(m_engineEntityId);
     }
-    std::string name() const { return m_name; }
-    std::string typeName() const { return "SceneNode"; }
+    std::string name() const
+    {
+        return m_name;
+    }
+    std::string typeName() const
+    {
+        return "SceneNode";
+    }
 
     bool selected() const;
     void setSelected(bool selected);
-    bool highlighted() const { return m_highlighted; }
-    void setHighlighted(bool highlighted) { m_highlighted = highlighted; }
+    bool highlighted() const
+    {
+        return m_highlighted;
+    }
+    void setHighlighted(bool highlighted)
+    {
+        m_highlighted = highlighted;
+    }
 
     void addChild(const std::shared_ptr<SceneNode>& child);
     std::vector<std::shared_ptr<SceneNode>> children() const;
@@ -41,8 +53,14 @@ public:
     std::vector<std::string> pathIdsRecursive() const;
     std::vector<std::string> pathNamesRecursive() const;
 
-    Eg::EntityId engineEntityId() const { return m_engineEntityId; }
-    void setEngineEntityId(Eg::EntityId id) { m_engineEntityId = id; }
+    Eg::EntityId engineEntityId() const
+    {
+        return m_engineEntityId;
+    }
+    void setEngineEntityId(Eg::EntityId id)
+    {
+        m_engineEntityId = id;
+    }
 
 private:
     Eg::EntityId m_engineEntityId;
@@ -70,7 +88,10 @@ public:
 private:
     Eg::SceneManager3D* m_scene{ nullptr };
     friend class SceneDocument3D;
-    void setScene(Eg::SceneManager3D* scene) { m_scene = scene; }
+    void setScene(Eg::SceneManager3D* scene)
+    {
+        m_scene = scene;
+    }
 };
 
 /**
@@ -94,7 +115,10 @@ public:
 
     // ---- 引擎场景管理 ----
 
-    std::shared_ptr<Eg::SceneManager3D> engineScene() const { return m_engineScene; }
+    std::shared_ptr<Eg::SceneManager3D> engineScene() const
+    {
+        return m_engineScene;
+    }
     void setEngineScene(std::shared_ptr<Eg::SceneManager3D> scene);
 
     // ---- SceneDocumentBase 接口 ----

@@ -2,11 +2,10 @@
 
 #include <memory>
 
-#include "UiCommandHandler.h"
 #include "UiFrameworkServices.h"
 #include "UiServices.h"
 
-class UiCommandDispatcher;
+class OperationBus;
 class UiStateCenter;
 class UiThemeService;
 class UiWorkbench;
@@ -38,13 +37,9 @@ public:
     /// 仅转发引用，不提前加载主题
     void setThemeService(UiThemeService* themeService);
 
-    /// 设置命令分发器
-    /// @param dispatcher 命令分发器
-    void setCommandDispatcher(UiCommandDispatcher* dispatcher);
-
-    /// 设置撤销栈
-    /// @param undoStack 撤销栈
-    void setUndoStack(IUndoStack* undoStack);
+    /// 设置操作总线
+    /// @param bus 操作总线
+    void setOperationBus(OperationBus* bus);
 
     /// 设置 UI 服务集合
     /// @param services UI 服务集合
@@ -84,10 +79,8 @@ private:
     UiStateCenter* m_stateCenter{ nullptr };
     /// 主题服务引用
     UiThemeService* m_themeService{ nullptr };
-    /// 命令分发器引用
-    UiCommandDispatcher* m_commandDispatcher{ nullptr };
-    /// 撤销栈引用
-    IUndoStack* m_undoStack{ nullptr };
+    /// 操作总线
+    OperationBus* m_operationBus{ nullptr };
     /// UI 服务集合
     UiServices m_services;
     /// 当前工作台引用

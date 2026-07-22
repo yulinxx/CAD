@@ -14,6 +14,8 @@ UiStateSnapshot UiStateCenter::snapshot() const
     state.currentViewMode = m_viewMode;
 
     state.currentLayerId = m_layerId;
+    state.layerVisible = m_layerVisible;
+    state.layerLocked = m_layerLocked;
     state.currentDocumentId = m_documentId;
     state.currentCommandId = m_commandId;
 
@@ -27,7 +29,15 @@ UiStateSnapshot UiStateCenter::snapshot() const
 
     state.busy = m_busy;
     state.dirty = m_dirty;
+    state.commandFailed = m_commandFailed;
+    state.failedCommandId = m_failedCommandId;
+    state.failureMessage = m_failureMessage;
+    state.progress = m_progress;
+    state.statusMessage = m_statusMessage;
+    state.taskPhase = m_taskPhase;
+    state.errorCode = m_errorCode;
     state.metadata = m_metadata;
+    state.refreshState = m_refreshState;
 
     return state;
 }
@@ -93,9 +103,43 @@ bool UiStateCenter::dirty() const
     return m_dirty;
 }
 
+int UiStateCenter::progress() const
+{
+    return m_progress;
+}
+
+QString UiStateCenter::statusMessage() const
+{
+    return m_statusMessage;
+}
+
+QString UiStateCenter::taskPhase() const
+{
+    return m_taskPhase;
+}
+
+int UiStateCenter::errorCode() const
+{
+    return m_errorCode;
+}
+
 QVariantMap UiStateCenter::metadata() const
 {
     return m_metadata;
+}
+
+QString UiStateCenter::refreshState() const
+{
+    return m_refreshState;
+}
+
+void UiStateCenter::setRefreshState(const QString& state)
+{
+    if (m_refreshState == state)
+        return;
+    m_refreshState = state;
+    emit refreshStateChanged(state);
+    emit stateChanged();
 }
 
 // 状态设置方法（带变更检测和信号发射）
@@ -138,6 +182,34 @@ void UiStateCenter::setCurrentLayerId(const QString& layerId)
     m_layerId = layerId;
     emit currentLayerChanged(layerId);
     emit stateChanged();
+}
+
+void UiStateCenter::setLayerVisibilityState(bool visible)
+{
+    if (m_layerVisible == visible)
+        return;
+    m_layerVisible = visible;
+    emit layerVisibilityChanged(visible);
+    emit stateChanged();
+}
+
+bool UiStateCenter::layerVisibilityState() const
+{
+    return m_layerVisible;
+}
+
+void UiStateCenter::setLayerLockState(bool locked)
+{
+    if (m_layerLocked == locked)
+        return;
+    m_layerLocked = locked;
+    emit layerLockChanged(locked);
+    emit stateChanged();
+}
+
+bool UiStateCenter::layerLockState() const
+{
+    return m_layerLocked;
 }
 
 void UiStateCenter::setCurrentDocumentId(const QString& documentId)
@@ -238,6 +310,41 @@ void UiStateCenter::setDirty(bool dirty)
     emit stateChanged();
 }
 
+/// 统一设置命令失败状态，触发 commandFailed 信号
+/// @param commandId 失败的命令 ID
+/// @param message 失败原因描述
+void UiStateCenter::setCommandFailed(const QString& commandId, const QString& message)
+{
+    m_commandFailed = true;
+    m_failedCommandId = commandId;
+    m_failureMessage = message;
+
+    // 同时写入元数据，方便展示层读取
+    m_metadata.insert(QStringLiteral("commandFailed"), true);
+    m_metadata.insert(QStringLiteral("failedCommandId"), commandId);
+    m_metadata.insert(QStringLiteral("failureMessage"), message);
+
+    emit commandFailed(commandId, message);
+    emit stateChanged();
+}
+
+/// 清除命令失败状态
+void UiStateCenter::clearCommandFailed()
+{
+    if (!m_commandFailed)
+        return;
+
+    m_commandFailed = false;
+    m_failedCommandId.clear();
+    m_failureMessage.clear();
+
+    m_metadata.insert(QStringLiteral("commandFailed"), false);
+    m_metadata.insert(QStringLiteral("failedCommandId"), QString());
+    m_metadata.insert(QStringLiteral("failureMessage"), QString());
+
+    emit stateChanged();
+}
+
 void UiStateCenter::setMetadata(const QVariantMap& metadata)
 {
     m_metadata = metadata;
@@ -255,5 +362,89 @@ void UiStateCenter::setMetadata(const QVariantMap& metadata)
         m_commandType = m_metadata.value(QStringLiteral("commandType")).toString();
 
     emit metadataChanged();
+    emit stateChanged();
+}
+
+/// 统一设置任务进度和消息
+/// @param progress 进度值 (0-100)，-1 表示清除进度
+/// @param message 状态消息
+void UiStateCenter::setProgress(int progress, const QString& message)
+{
+    if (m_progress == progress && m_statusMessage == message)
+        return;
+
+    m_progress = progress;
+    m_statusMessage = message;
+
+    // 同步写入元数据，方便状态栏等展示层读取
+    m_metadata.insert(QStringLiteral("progress"), progress);
+    m_metadata.insert(QStringLiteral("statusMessage"), message);
+
+    emit progressChanged(progress, message);
+    emit stateChanged();
+}
+
+/// 设置任务阶段和消息
+/// @param phase 阶段标识
+/// @param message 阶段描述
+void UiStateCenter::setTaskPhase(const QString& phase, const QString& message)
+{
+    if (m_taskPhase == phase && m_statusMessage == message)
+        return;
+
+    m_taskPhase = phase;
+    m_statusMessage = message;
+
+    m_metadata.insert(QStringLiteral("taskPhase"), phase);
+    m_metadata.insert(QStringLiteral("statusMessage"), message);
+
+    emit taskPhaseChanged(phase, message);
+    emit stateChanged();
+}
+
+/// 统一设置错误状态
+/// @param code 错误码
+/// @param message 错误描述
+void UiStateCenter::setError(int code, const QString& message)
+{
+    m_errorCode = code;
+    m_statusMessage = message;
+
+    m_metadata.insert(QStringLiteral("errorCode"), code);
+    m_metadata.insert(QStringLiteral("errorMessage"), message);
+
+    emit errorOccurred(code, message);
+    emit stateChanged();
+}
+
+/// 清除错误状态
+void UiStateCenter::clearError()
+{
+    if (m_errorCode == 0 && m_statusMessage.isEmpty())
+        return;
+
+    m_errorCode = 0;
+    m_statusMessage.clear();
+
+    m_metadata.insert(QStringLiteral("errorCode"), 0);
+    m_metadata.insert(QStringLiteral("errorMessage"), QString());
+
+    emit stateChanged();
+}
+
+/// 清除任务进度和阶段（任务完成时调用）
+void UiStateCenter::clearTask()
+{
+    if (m_progress == -1 && m_taskPhase.isEmpty() && m_statusMessage.isEmpty())
+        return;
+
+    m_progress = -1;
+    m_taskPhase.clear();
+    m_statusMessage.clear();
+
+    m_metadata.insert(QStringLiteral("progress"), -1);
+    m_metadata.insert(QStringLiteral("taskPhase"), QString());
+    m_metadata.insert(QStringLiteral("statusMessage"), QString());
+
     emit stateChanged();
 }

@@ -4,23 +4,25 @@
 #include <vector>
 
 #include <QMainWindow>
+#include <QMetaObject>
 #include <QPointer>
 
-#include "UiCommandHandler.h"
 #include "UiFrameworkServices.h"
 #include "UiServices.h"
 
 class QAction;
+class QActionGroup;
 class QDockWidget;
 class QLabel;
 class QMenu;
 class QProgressBar;
 class QStatusBar;
 class QToolBar;
-class UiCommandDispatcher;
+class OperationBus;
 class UiStateCenter;
 class UiThemeService;
 class UiWorkbench;
+class WorkbenchMenuManager;
 class SceneTreeDockWidget;
 class PropertiesPanelWidget;
 
@@ -51,6 +53,12 @@ public:
     explicit WorkbenchWindow(QWidget* parent = nullptr);
     ~WorkbenchWindow() override;
 
+protected:
+    /// 语言切换事件处理
+    void changeEvent(QEvent* event) override;
+    /// 窗口关闭事件处理（拦截未保存更改）
+    void closeEvent(QCloseEvent* event) override;
+
 public:
     /// 设置状态中心
     /// @param stateCenter UI 状态中心
@@ -58,12 +66,9 @@ public:
     /// 设置主题服务
     /// @param themeService 主题服务
     void setThemeService(UiThemeService* themeService);
-    /// 设置命令分发器
-    /// @param dispatcher 命令分发器
-    void setCommandDispatcher(UiCommandDispatcher* dispatcher);
-    /// 设置撤销栈
-    /// @param undoStack 撤销栈
-    void setUndoStack(IUndoStack* undoStack);
+    /// 设置操作总线
+    /// @param bus 操作总线
+    void setOperationBus(OperationBus* bus);
     /// 统一设置服务依赖，作为主装配入口
     /// @param services UI 服务集合
     void configureServices(const UiServices& services);
@@ -76,6 +81,9 @@ public:
     /// 设置 UI 服务集合，并同步到底层框架桥接
     /// @param services UI 服务集合
     void setUiServices(const UiServices& services);
+    /// 获取当前 UI 服务集合
+    /// @return UI 服务集合引用
+    const UiServices& uiServices() const;
     /// 设置当前工作台
     /// @param workbench 工作台实例
     void setWorkbench(UiWorkbench* workbench);
@@ -88,6 +96,29 @@ public:
     /// 设置主题切换回调
     /// @param callback 主题切换回调函数
     void setThemeChangeCallback(std::function<void(const QString&)> callback);
+    /// 设置视口缩放操作回调（Zoom In/Out/Fit/Selection/Reset）
+    /// 由工作台在创建视口后注入，将菜单缩放操作转发到视口
+    /// @param handler 缩放操作处理函数，参数为 "zoom_in"/"zoom_out"/"zoom_fit"/"zoom_selection"/"reset"
+    void setViewportZoomHandler(std::function<void(const QString&)> handler);
+    /// 设置视口鼠标位置回调，由工作台在创建视口后注入，用于更新状态栏坐标显示
+    /// @param handler 位置处理函数，参数为世界坐标 (x, y)
+    void setViewportPositionHandler(std::function<void(double, double)> handler);
+    /// 更新状态栏鼠标坐标显示
+    /// @param x 世界坐标 X
+    /// @param y 世界坐标 Y
+    void updatePositionLabel(double x, double y);
+
+    // ==================== 最近文件菜单 ====================
+
+    /// 将文件路径添加到最近文件列表
+    /// @param filePath 文件完整路径
+    void addRecentFile(const QString& filePath);
+    /// 从设置中加载最近文件列表
+    QStringList loadRecentFiles() const;
+    /// 将最近文件列表保存到设置
+    void saveRecentFiles(const QStringList& files) const;
+    /// 填充最近文件子菜单
+    void populateRecentFilesMenu();
 
     /// 注册停靠面板
     /// @param title 面板标题
@@ -119,12 +150,17 @@ public:
     /// 触发工作台切换
     /// @param workbenchId 工作台 ID
     void triggerWorkbench(const QString& workbenchId);
+    /// 触发主题切换
+    /// @param themeId 主题 ID
+    void triggerTheme(const QString& themeId);
+    /// 刷新主题菜单选中状态
+    /// @param themeId 当前主题 ID
+    void refreshThemeMenuChecks(const QString& themeId);
+
+    /// 菜单管理器
+    WorkbenchMenuManager* menuManager() const { return m_menuManager; }
 
 private:
-    /// 创建基础菜单项，降低 buildMenus 的耦合度
-    void createBaseMenus();
-    /// 创建文件、视图、工具的基础菜单骨架
-    void initializeMenuSkeleton();
     /// 创建窗口初始占位内容，作为工作台首次挂接前的安全兜底
     QWidget* createInitialCentralWidget();
     /// 创建工具栏基础骨架，便于后续拆出更多工具栏分组
@@ -133,30 +169,14 @@ private:
     void initializeDockAreaSkeleton();
     /// 创建状态栏骨架，统一承接状态文本与繁忙指示
     void initializeStatusBarSkeleton();
-    /// 创建主题菜单骨架，便于后续把主题项与主题服务分离
-    void initializeThemeMenuSkeleton();
-    /// 绑定全局快捷键（Ctrl+Z/Ctrl+Y 等）
-    void bindShortcuts();
-    /// 构建菜单系统（文件、视图、工具）
-    void buildMenus();
-    /// 填充文件菜单
-    void buildFileMenu();
-    /// 填充编辑菜单（Undo/Redo）
-    void buildEditMenu();
-    /// 填充绘图菜单
-    void buildDrawMenu();
-    /// 填充图元操作菜单
-    void buildModifyMenu();
-    /// 填充视图菜单
-    void buildViewMenu();
+    /// 重新翻译所有 UI 文字（语言切换时调用）
+    void retranslateUi();
     /// 构建工具栏
     void buildToolBars();
     /// 构建停靠区域（左侧项目面板、右侧属性面板）
     void buildDockAreas();
     /// 构建状态栏
     void buildStatusBar();
-    /// 构建主题菜单
-    void buildThemeMenu();
     /// 绑定状态中心信号
     void bindStateSignals();
     /// 解除状态中心信号绑定，避免重复连接
@@ -170,15 +190,6 @@ private:
     void refreshStatusText();
     /// 更新窗口标题，避免状态栏刷新时分散拼接标题逻辑
     void updateWindowTitle();
-    /// 触发主题切换
-    /// @param themeId 主题 ID
-    void triggerTheme(const QString& themeId);
-    /// 刷新主题菜单选中状态
-    /// @param themeId 当前主题 ID
-    void refreshThemeMenuChecks(const QString& themeId);
-    /// 刷新工作台菜单选中状态
-    /// @param workbenchId 当前工作台 ID
-    void refreshWorkbenchMenuChecks(const QString& workbenchId);
     /// 更新繁忙指示器
     /// @param busy 是否繁忙
     void updateBusyIndicator(bool busy);
@@ -210,10 +221,8 @@ private:
     UiStateCenter* m_stateCenter{ nullptr };
     /// 主题服务
     UiThemeService* m_themeService{ nullptr };
-    /// 命令分发器
-    UiCommandDispatcher* m_commandDispatcher{ nullptr };
-    /// 撤销栈
-    IUndoStack* m_undoStack{ nullptr };
+    /// 操作总线
+    OperationBus* m_operationBus{ nullptr };
     /// UI 服务集合
     UiServices m_uiServices;
     /// 框架级服务桥接
@@ -222,6 +231,10 @@ private:
     UiWorkbench* m_workbench{ nullptr };
     /// 主题切换回调
     std::function<void(const QString&)> m_themeChangeCallback;
+    /// 视口缩放操作回调，由工作台注入
+    std::function<void(const QString&)> m_viewportZoomHandler;
+    /// 视口鼠标位置回调，由工作台注入
+    std::function<void(double, double)> m_viewportPositionHandler;
     /// 窗口状态：只保存与窗口语义直接相关的高层状态
     struct WindowState
     {
@@ -238,28 +251,6 @@ private:
         /// 当前选择类型
         QString selectionType;
     } m_windowState;
-    /// 菜单状态：集中管理菜单对象指针，避免散落在类成员中
-    struct MenuState
-    {
-        /// 文件菜单
-        QMenu* fileMenu{ nullptr };
-        /// 编辑菜单
-        QMenu* editMenu{ nullptr };
-        /// 绘图菜单
-        QMenu* drawMenu{ nullptr };
-        /// 图元操作菜单
-        QMenu* modifyMenu{ nullptr };
-        /// 视图菜单
-        QMenu* viewMenu{ nullptr };
-        /// 工具菜单
-        QMenu* toolsMenu{ nullptr };
-        /// 工作台切换动作（2D）
-        QAction* workbench2DAction{ nullptr };
-        /// 工作台切换动作（3D）
-        QAction* workbench3DAction{ nullptr };
-        /// 主题子菜单
-        QMenu* themeMenu{ nullptr };
-    } m_menuState;
     /// 面板状态：集中管理状态栏、工具栏与停靠面板指针
     struct PanelState
     {
@@ -273,6 +264,12 @@ private:
         QLabel* workbenchLabel{ nullptr };
         /// 状态栏中的繁忙标签
         QLabel* busyLabel{ nullptr };
+        /// 状态栏中的鼠标坐标标签
+        QLabel* posLabel{ nullptr };
+        /// 状态栏中的选中信息标签
+        QLabel* selLabel{ nullptr };
+        /// 状态栏中的消息标签
+        QLabel* msgLabel{ nullptr };
         /// 场景树停靠面板
         SceneTreeDockWidget* sceneTreeDock{ nullptr };
         /// 属性面板
@@ -287,4 +284,6 @@ private:
     WorkbenchFactory m_workbenchFactory;
     /// 繁忙进度条（避免 findChild 级联查找）
     QPointer<QProgressBar> m_busyProgressBar;
+    /// 菜单管理器
+    WorkbenchMenuManager* m_menuManager{ nullptr };
 };

@@ -1,12 +1,11 @@
 #include "UiShellHost.h"
 
 #include "Log/SyLogger.h"
-#include "UiCommandDispatcher.h"
-#include "UiCommandHandler.h"
 #include "UiStateCenter.h"
 #include "UiThemeService.h"
 #include "UiWorkbench.h"
 #include "WorkbenchWindow.h"
+#include "UI2D/Operation/OperationBus.h"
 
 /// 创建主窗口实例
 UiShellHost::UiShellHost()
@@ -37,20 +36,12 @@ void UiShellHost::setThemeService(UiThemeService* themeService)
     m_mainWindow->setThemeService(themeService);
 }
 
-/// 设置命令分发器
-/// @param dispatcher 命令分发器
-void UiShellHost::setCommandDispatcher(UiCommandDispatcher* dispatcher)
+/// 设置操作总线
+/// @param bus 操作总线
+void UiShellHost::setOperationBus(OperationBus* bus)
 {
-    m_commandDispatcher = dispatcher;
-    m_mainWindow->setCommandDispatcher(dispatcher);
-}
-
-/// 设置撤销栈
-/// @param undoStack 撤销栈
-void UiShellHost::setUndoStack(IUndoStack* undoStack)
-{
-    m_undoStack = undoStack;
-    m_mainWindow->setUndoStack(undoStack);
+    m_operationBus = bus;
+    m_mainWindow->setOperationBus(bus);
 }
 
 /// 设置 UI 服务集合
@@ -120,7 +111,7 @@ UiWorkbench* UiShellHost::resolveWorkbench(const QString& workbenchId)
     if (workbenchId == QStringLiteral("2D"))
         return m_workbench;
 
-    #if BUILD_UI3D
+#if BUILD_UI3D
     if (workbenchId == QStringLiteral("3D"))
     {
         if (!m_workbench3D)
@@ -157,11 +148,13 @@ void UiShellHost::switchWorkbench(UiWorkbench* workbench)
     if (m_workbench == workbench)
         return;
 
-    if (m_workbench)
-        m_workbench->deactivate();
-
+    // 更新宿主层的工作台引用
     m_workbench = workbench;
-    m_mainWindow->setWorkbench(workbench);
+
+    // 统一走 triggerWorkbench 处理完整的切换生命周期:
+    //   保存旧状态 → 停用旧工作台 → 清理 UI → 创建新工作台 → 附加 → 激活
+    // 不在这里单独调用 deactivate() 或 setWorkbench()，
+    // 避免 triggerWorkbench 内部看到的是已被替换的新工作台
     m_mainWindow->triggerWorkbench(workbench->id());
     m_mainWindow->syncWorkbenchStateFromStateCenter();
 }

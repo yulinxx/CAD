@@ -2,24 +2,25 @@
 
 #include <QString>
 #include <functional>
+#include <memory>
 
-class ICommandHandler;
+#include "UiServices.h"
+#include "UiFrameworkServices.h"
+
 class UiStateCenter;
 class UiLayoutService;
-struct UiServices;
-struct UiFrameworkServices;
 
 /**
  * @brief 交互式命令生命周期分发器
  *
  * 处理需要用户交互的命令（绘图、选择、编辑等）的鼠标转发和生命周期管理。
- * 从 UiCommandDispatcher 拆分而来，使视口层仅依赖交互接口而非完整调度器。
+ * 视口层仅依赖此交互接口，实现与具体命令调度器的解耦。
  *
  * 统一生命周期：
- *   begin(commandId) → handler->activate(services)
- *   forwardMouseDown/Move/Up/KeyPress → handler->onMouse*()
- *   submit() → handler->commit() + undo push
- *   cancel() → handler->cancel() + cleanup
+ *   begin(commandId) → 标记命令开始并同步状态
+ *   forwardMouseDown/Move/Up/KeyPress → 转发鼠标和键盘事件
+ *   submit() → 收尾并同步状态
+ *   cancel() → 取消并回退状态
  */
 class IInteractionDispatcher
 {
@@ -41,12 +42,6 @@ public:
     /// 判断是否有活动命令
     virtual bool hasActiveCommand() const = 0;
 
-    /// 获取当前活动的命令处理器
-    virtual ICommandHandler* currentHandler() const = 0;
-
-    /// 根据命令 ID 获取命令处理器
-    virtual ICommandHandler* handlerFor(const QString& commandId) const = 0;
-
     /// 转发鼠标按下事件
     virtual bool forwardMouseDown(int x, int y) = 0;
 
@@ -58,9 +53,6 @@ public:
 
     /// 转发键盘按键事件
     virtual bool forwardKeyPress(int key) = 0;
-
-    /// 注册命令处理器
-    virtual void registerHandler(ICommandHandler* handler) = 0;
 
     /// 设置状态中心
     virtual void setStateCenter(UiStateCenter* stateCenter) = 0;
@@ -79,4 +71,42 @@ public:
 
     /// 更新命令类型
     virtual void setCommandType(const QString& commandType) = 0;
+};
+
+/**
+ * @brief 默认交互式命令生命周期分发器实现
+ */
+class DefaultInteractionDispatcher final : public IInteractionDispatcher
+{
+public:
+    DefaultInteractionDispatcher();
+    ~DefaultInteractionDispatcher() override;
+
+    void begin(const QString& commandId) override;
+    void submit() override;
+    void cancel() override;
+    QString activeCommandId() const override;
+    bool hasActiveCommand() const override;
+    bool forwardMouseDown(int x, int y) override;
+    bool forwardMouseMove(int x, int y) override;
+    bool forwardMouseUp(int x, int y) override;
+    bool forwardKeyPress(int key) override;
+    void setStateCenter(UiStateCenter* stateCenter) override;
+    void setUiServices(const UiServices& services) override;
+    void setLayoutService(UiLayoutService* layoutService) override;
+    void setFrameworkServices(const UiFrameworkServices& services) override;
+    void setToolChangedCallback(std::function<void(const QString&)> callback) override;
+    void setCommandType(const QString& commandType) override;
+
+private:
+    QString resolveCommandType(const QString& commandId) const;
+
+private:
+    UiStateCenter* m_stateCenter{ nullptr };
+    UiLayoutService* m_layoutService{ nullptr };
+    UiServices m_uiServices;
+    UiFrameworkServices m_frameworkServices;
+    QString m_activeCommandId;
+    QString m_commandType;
+    std::function<void(const QString&)> m_toolChangedCallback;
 };

@@ -47,6 +47,7 @@ public:
     void setOrbitMode(bool enabled) override;
     void setMeasureMode(bool enabled) override;
     bool isOrbitMode() const override;
+    bool isOpenGL() const override;
 
     void onMousePress(int x, int y, int button, int modifiers, int viewW, int viewH) override;
     void onMouseMove(int x, int y, int buttons, int viewW, int viewH) override;

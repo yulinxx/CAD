@@ -15,8 +15,8 @@
 
 #include "SceneDocument2D.h"
 #include "ISelectionService.h"
-#include "UiCommandDispatcher.h"
 #include "UiInteractionDispatcher.h"
+#include "UI2D/Operation/CommandCatalog.h"
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyCircle.h"
 #include "Engine2D/SyEntity/SyArc.h"
@@ -79,11 +79,6 @@ void Viewport2D::setSelectionCallback(std::function<void(const QString&, const Q
 void Viewport2D::setCommandStageCallback(std::function<void(const QString&)>&& callback)
 {
     m_commandStageCallback = std::move(callback);
-}
-
-void Viewport2D::setCommandDispatcher(UiCommandDispatcher* dispatcher)
-{
-    m_commandDispatcher = dispatcher;
 }
 
 void Viewport2D::setInteractionDispatcher(IInteractionDispatcher* dispatcher)
@@ -496,11 +491,9 @@ void Viewport2D::setSelectedFromHitTest(const QPointF& scenePos)
 
 void Viewport2D::startCommand(const QString& commandId)
 {
-    // 过渡兼容层 — 旧命令系统入口
-    // 新操作应优先通过 OperationBus::run() 执行
-    // 保留此方法仅用于兼容旧工具桥
-    if (m_commandDispatcher)
-        m_commandDispatcher->execute(commandId);
+    // 通过 OperationBus 执行命令
+    if (m_operationBus)
+        m_operationBus->run(CommandCatalog::operationForCommandId(commandId));
 }
 
 void Viewport2D::finishCommand(bool committed)
@@ -593,21 +586,6 @@ void Viewport2D::endBoxSelect(const QPointF& scenePos)
 
 void Viewport2D::wheelEvent(QWheelEvent* event)
 {
-    // Ctrl+滚轮优先转发给活动命令（如多边形调整边数）
-    if (event->modifiers() & Qt::ControlModifier)
-    {
-        if (m_interactionDispatcher && m_interactionDispatcher->hasActiveCommand())
-        {
-            auto handler = m_interactionDispatcher->currentHandler();
-            if (handler && handler->onWheel(event->angleDelta().y()))
-            {
-                updateCommandPreview();
-                updateStatus(tr("2D command wheel"));
-                return;
-            }
-        }
-    }
-
     const double factor = event->angleDelta().y() > 0 ? 1.15 : 0.87;
     scale(factor, factor);
     updateStatus(tr("2D zoom"));
@@ -689,8 +667,8 @@ void Viewport2D::contextMenuEvent(QContextMenuEvent* event)
         return;
 
     auto triggerCommand = [this](const QString& commandId) {
-        if (m_commandDispatcher)
-            m_commandDispatcher->execute(commandId);
+        if (m_operationBus)
+            m_operationBus->run(CommandCatalog::operationForCommandId(commandId));
         };
 
     if (chosen == drawLine)       triggerCommand(QStringLiteral("2d.draw_line"));
@@ -712,69 +690,9 @@ void Viewport2D::contextMenuEvent(QContextMenuEvent* event)
 
 void Viewport2D::updateCommandPreview()
 {
-    // 通过 ICommandHandler::preview() 通用接口获取预览数据
-    // 视口不再依赖具体命令类（如 DrawLineCommand）
-    // 后续 OperationBus 中的 IOperation 也可通过此接口提供预览
-    if (!m_interactionDispatcher || !m_interactionDispatcher->hasActiveCommand())
-    {
-        clearPreviewItems();
-        return;
-    }
-
-    auto handler = m_interactionDispatcher->currentHandler();
-    if (!handler)
-    {
-        clearPreviewItems();
-        return;
-    }
-
-    CommandPreview preview = handler->preview();
-    if (!preview.valid)
-    {
-        clearPreviewItems();
-        return;
-    }
-
-    // 根据预览类型选择对应的绘制方式
-    switch (preview.type)
-    {
-        case PreviewType::Line:
-            addPreviewLine(preview.previewStart, preview.previewEnd);
-            break;
-        case PreviewType::Circle:
-            addPreviewCircle(preview.previewCenter, preview.previewRadius);
-            break;
-        case PreviewType::Arc:
-        {
-            QVector<QPointF> arcPreviewPts;
-            arcPreviewPts.append(preview.previewCenter);
-            arcPreviewPts.append(preview.previewPoints.value(0));
-            arcPreviewPts.append(preview.previewPoints.value(1));
-            addPreviewPolyline(arcPreviewPts);
-            break;
-        }
-        case PreviewType::Polyline:
-            addPreviewPolyline(preview.previewPoints);
-            break;
-        case PreviewType::Polygon:
-            addPreviewPolyline(preview.previewPoints);
-            break;
-        case PreviewType::Bezier2:
-            addPreviewBezier(preview.previewPoints, preview.controlPoints);
-            break;
-        case PreviewType::Bezier:
-            addPreviewBezier(preview.previewPoints, preview.controlPoints);
-            break;
-        case PreviewType::Nurbs:
-            addPreviewPolyline(preview.controlPoints);
-            break;
-        case PreviewType::SmartLine:
-            addPreviewPolyline(preview.previewPoints);
-            break;
-        default:
-            clearPreviewItems();
-            break;
-    }
+    // 预览系统待迁移到 OperationBus IOperation 体系
+    clearPreviewItems();
+    return;
 }
 
 void Viewport2D::clearPreviewItems()

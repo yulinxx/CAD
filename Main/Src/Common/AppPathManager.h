@@ -12,6 +12,12 @@
 class AppPathManager
 {
 public:
+    /// 获取应用程序本地数据根目录（唯一路径控制源）
+    /// Windows: C:/Users/<user>/AppData/Local/SanYiCAD/
+    /// macOS:   ~/Library/Application Support/SanYiCAD/
+    /// Linux:   ~/.local/share/SanYiCAD/
+    static QString appLocalDataDir();
+
     /// 获取配置文件目录路径
     static QString configDir();
 
@@ -33,4 +39,11 @@ public:
 
     /// 获取崩溃 minidump 存储目录（跨平台，可写）
     static QString crashDumpsDir();
+
+    /// 获取日志文件存储目录
+    static QString logsDir();
+
+    /// 获取数据库文件存储目录
+    /// Windows: C:/Users/<user>/AppData/Local/SanYiCAD/data/
+    static QString dataDir();
 };

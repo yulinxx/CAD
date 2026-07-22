@@ -3,13 +3,13 @@
  * @brief ViewWidget 适配器实现
  */
 #include "ViewWidgetAdapter.h"
-#include "UiViewWidgets.h"
+#include "RenderViewport2D.h"
 #include "SceneDocument2D.h"
 #include "SceneEditServiceAdapter.h"
 
 #include <QPoint>
 
-ViewWidgetAdapter::ViewWidgetAdapter(Viewport2D* viewport, QObject* parent)
+ViewWidgetAdapter::ViewWidgetAdapter(RenderViewport2D* viewport, QObject* parent)
     : QObject(parent)
     , m_viewport(viewport)
 {
@@ -28,7 +28,7 @@ void ViewWidgetAdapter::resetView()
 void ViewWidgetAdapter::zoomToFit()
 {
     if (m_viewport)
-        m_viewport->resetView();
+        m_viewport->zoomToFit();
 }
 
 QPointF ViewWidgetAdapter::screenToWorld(const QPoint& screenPos) const

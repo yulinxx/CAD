@@ -28,6 +28,10 @@ struct UiStateSnapshot
     QString currentViewMode{ QStringLiteral("none") };
     /// 当前图层 ID
     QString currentLayerId{ QStringLiteral("default") };
+    /// 图层可见性
+    bool layerVisible{ true };
+    /// 图层锁定状态
+    bool layerLocked{ false };
     /// 当前文档 ID
     QString currentDocumentId{ QStringLiteral("none") };
     /// 当前命令 ID
@@ -48,8 +52,24 @@ struct UiStateSnapshot
     bool busy{ false };
     /// 是否有未保存更改
     bool dirty{ false };
+    /// 命令是否最近失败了（UI 回退的判定依据）
+    bool commandFailed{ false };
+    /// 失败的命令 ID
+    QString failedCommandId;
+    /// 失败原因描述
+    QString failureMessage;
+    /// 当前任务进度 (0-100)，-1 表示无进行中的任务
+    int progress{ -1 };
+    /// 当前状态消息（用于状态栏/进度提示）
+    QString statusMessage;
+    /// 当前任务阶段标识（如 "parsing", "building", "applying", "writing"）
+    QString taskPhase;
+    /// 最近一次错误码（0 表示无错误）
+    int errorCode{ 0 };
     /// 元数据
     QVariantMap metadata;
+    /// 渲染刷新状态（"idle", "incremental", "full", "pending"）
+    QString refreshState{ QStringLiteral("idle") };
 };
 
 /**
@@ -114,6 +134,21 @@ public:
     /// 是否有未保存更改
     bool dirty() const;
 
+    /// 获取当前任务进度 (-1 表示无任务)
+    int progress() const;
+
+    /// 获取当前状态消息
+    QString statusMessage() const;
+
+    /// 获取当前任务阶段
+    QString taskPhase() const;
+
+    /// 获取最近错误码
+    int errorCode() const;
+
+    /// 获取渲染刷新状态
+    QString refreshState() const;
+
     /// 获取元数据
     QVariantMap metadata() const;
 
@@ -133,6 +168,16 @@ public slots:
     /// 设置当前图层 ID
     /// @param layerId 图层 ID
     void setCurrentLayerId(const QString& layerId);
+
+    /// 设置图层可见性状态
+    void setLayerVisibilityState(bool visible);
+    /// 返回图层可见性状态
+    bool layerVisibilityState() const;
+
+    /// 设置图层锁定状态
+    void setLayerLockState(bool locked);
+    /// 返回图层锁定状态
+    bool layerLockState() const;
 
     /// 设置当前文档 ID
     /// @param documentId 文档 ID
@@ -171,9 +216,42 @@ public slots:
     /// @param dirty 是否有未保存更改
     void setDirty(bool dirty);
 
+    /// 统一设置命令失败状态（触发 UI 回退）
+    /// @param commandId 失败的命令 ID
+    /// @param message 失败原因
+    void setCommandFailed(const QString& commandId, const QString& message);
+
+    /// 清除命令失败状态
+    void clearCommandFailed();
+
+    /// 设置渲染刷新状态
+    /// @param state 刷新状态标识（"idle", "incremental", "full", "pending"）
+    void setRefreshState(const QString& state);
+
     /// 设置元数据
     /// @param metadata 元数据映射
     void setMetadata(const QVariantMap& metadata);
+
+    /// 统一设置任务进度和消息
+    /// @param progress 进度值 (0-100)，-1 表示清除进度
+    /// @param message 状态消息
+    void setProgress(int progress, const QString& message);
+
+    /// 设置任务阶段和消息（用于导入/导出/保存等阶段性任务）
+    /// @param phase 阶段标识（如 "parsing", "building", "writing"）
+    /// @param message 阶段描述消息
+    void setTaskPhase(const QString& phase, const QString& message);
+
+    /// 设置错误状态（统一错误通知入口）
+    /// @param code 错误码
+    /// @param message 错误描述
+    void setError(int code, const QString& message);
+
+    /// 清除错误状态
+    void clearError();
+
+    /// 清除任务进度和阶段（任务完成时调用）
+    void clearTask();
 
 signals:
     /// 状态变更信号（所有状态变更都会触发）
@@ -190,6 +268,11 @@ signals:
 
     /// 图层变更信号
     void currentLayerChanged(const QString& layerId);
+
+    /// 图层可见性变更信号
+    void layerVisibilityChanged(bool visible);
+    /// 图层锁定状态变更信号
+    void layerLockChanged(bool locked);
 
     /// 文档变更信号
     void currentDocumentChanged(const QString& documentId);
@@ -209,8 +292,29 @@ signals:
     /// 脏状态变更信号
     void dirtyChanged(bool dirty);
 
+    /// 命令失败信号（UI 回退的触发入口）
+    void commandFailed(const QString& commandId, const QString& message);
+
+    /// 渲染刷新状态变更信号
+    void refreshStateChanged(const QString& state);
+
     /// 元数据变更信号
     void metadataChanged();
+
+    /// 任务进度变更信号
+    /// @param progress 进度值 (0-100)，-1 表示无任务
+    /// @param message 状态消息
+    void progressChanged(int progress, const QString& message);
+
+    /// 任务阶段变更信号
+    /// @param phase 阶段标识
+    /// @param message 阶段描述
+    void taskPhaseChanged(const QString& phase, const QString& message);
+
+    /// 错误状态变更信号
+    /// @param code 错误码
+    /// @param message 错误描述
+    void errorOccurred(int code, const QString& message);
 
 private:
     /// 当前工作台 ID
@@ -222,6 +326,10 @@ private:
 
     /// 当前图层 ID
     QString m_layerId{ QStringLiteral("default") };
+    /// 图层可见性状态
+    bool m_layerVisible{ true };
+    /// 图层锁定状态
+    bool m_layerLocked{ false };
     /// 当前文档 ID
     QString m_documentId{ QStringLiteral("none") };
     /// 当前命令 ID
@@ -245,6 +353,22 @@ private:
     bool m_busy{ false };
     /// 脏状态
     bool m_dirty{ false };
+    /// 命令是否处于失败状态（触发 UI 回退的标识）
+    bool m_commandFailed{ false };
+    /// 失败的命令 ID
+    QString m_failedCommandId;
+    /// 失败原因描述
+    QString m_failureMessage;
+    /// 当前任务进度 (0-100)，-1 表示无进行中的任务
+    int m_progress{ -1 };
+    /// 当前状态消息
+    QString m_statusMessage;
+    /// 当前任务阶段
+    QString m_taskPhase;
+    /// 最近错误码
+    int m_errorCode{ 0 };
     /// 元数据
     QVariantMap m_metadata;
+    /// 渲染刷新状态
+    QString m_refreshState{ QStringLiteral("idle") };
 };

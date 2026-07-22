@@ -13,7 +13,7 @@ Viewport3D::Viewport3D(QWidget* parent)
     : QWidget(parent)
 {
     setMinimumSize(640, 480);
-    setAutoFillBackground(true);
+    setAutoFillBackground(false);  // 由 render() 方法自行填充背景，避免调色板颜色干扰
 
     m_renderer = std::make_unique<SimpleRenderer3D>();
     m_renderer->initialize();

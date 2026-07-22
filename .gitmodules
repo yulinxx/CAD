@@ -1,42 +1,54 @@
 [submodule "Engine"]
 	path = Engine
-	url = git@github.com:yulinxx/Engine.git
+	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\Engine
 [submodule "Render"]
 	path = Render
 	url = git@github.com:yulinxx/Render.git
 [submodule "Utility"]
 	path = Utility
-	url = git@github.com:yulinxx/Core.git
+	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\Utility
 [submodule "Engraving"]
 	path = Engraving
-	url = git@github.com:yulinxx/Engraving.git
+	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\Engraving
 [submodule "FileIO"]
 	path = FileIO
-	url = git@github.com:yulinxx/FileIO.git
+	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\FileIO
 [submodule "GeoModelCore"]
 	path = GeoModelCore
-	url = git@github.com:yulinxx/GeoModelCore.git
+	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\GeoModelCore
 [submodule "Hardware"]
 	path = Hardware
-	url = git@github.com:yulinxx/Hardware.git
+	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\Hardware
 [submodule "Log"]
 	path = Log
-	url = git@github.com:yulinxx/Log.git
+	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\Log
 [submodule "Nesting"]
 	path = Nesting
-	url = git@github.com:yulinxx/Nesting.git
+	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\Nesting
 [submodule "Network"]
 	path = Network
 	url = git@github.com:yulinxx/Network.git
 [submodule "ThirdParty"]
 	path = ThirdParty
-	url = git@github.com:yulinxx/ThirdParty.git
+	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\ThirdParty
 [submodule "UI"]
 	path = UI
 	url = git@github.com:yulinxx/UI.git
 [submodule "Vision"]
 	path = Vision
-	url = git@github.com:yulinxx/Vision.git
+	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\Vision
 [submodule "CrashHandler"]
 	path = CrashHandler
 	url = git@github.com:yulinxx/CrashHandler.git
+[submodule "PyBindCore"]
+	path = PyBindCore
+	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\PyBindCore
+[submodule "Python"]
+	path = Python
+	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\Python
+[submodule "PythonHost"]
+	path = PythonHost
+	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\PythonHost
+[submodule "Renderx"]
+	path = Renderx
+	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\Renderx

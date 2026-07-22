@@ -57,14 +57,14 @@ public:
     QString createBezier(const QPointF& start, const QPointF& control1, const QPointF& control2, const QPointF& end);
     QString createNurbs(const QVector<QPointF>& controlPoints);
     QString createSmartLine(const QVector<QPointF>& points);
+    QString createText(const QPointF& position, const QString& text, double height);
+    QString createSpline(const QVector<QPointF>& points);
 
     // ---- 查询 ----
 
     QString entityIdAt(const QPointF& point, double tolerance = 5.0) const;
     QVector<QString> allEntityIdsQ() const;
     Eg::SyEntity* entityByStringId(const QString& id) const;
-
-    
 
     // ---- 编辑 ----
 

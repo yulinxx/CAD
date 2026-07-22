@@ -23,6 +23,12 @@ public:
     std::vector<Eg::EntityId> getSelectedEntityIds() const;
     std::vector<Eg::EntityId> getAllEntityIds() const;
     void notifySceneChanged();
+
+signals:
+    /// 场景内容变更信号（视口监听此信号刷新显示）
+    void sceneChanged();
+
+public:
     SceneDocument2D* document() const
     {
         return m_document;

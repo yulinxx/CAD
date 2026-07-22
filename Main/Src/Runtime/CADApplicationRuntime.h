@@ -1,11 +1,11 @@
 #pragma once
 
 #include <memory>
-
 #include <QString>
 
-class QApplication;
 #include "../Bootstrap/AppBootstrapper.h"
+
+class QApplication;
 
 class CADApplicationRuntime
 {
@@ -15,7 +15,7 @@ public:
 
 public:
     int run();
-    void setStartWorkbenchId(const QString& workbenchId);
+    void setStartWorkbenchId(const QString& workbenchId);   // 设置启动时使用的工作台ID
 
 private:
     std::unique_ptr<QApplication> m_app;

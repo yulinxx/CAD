@@ -159,7 +159,6 @@ private:
     void configureInitialWorkbenchState(PropertiesPanelWidget* properties) const;
 
 private:
-    std::shared_ptr<SceneDocument2D> m_document;
     std::unique_ptr<SelectionService> m_selectionService;
 };
 
@@ -191,7 +190,6 @@ private:
 
 private:
     std::shared_ptr<SceneDocument3D> m_scene;
-    class DefaultCameraController3D* m_camera{ nullptr };
 };
 #endif
 

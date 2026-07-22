@@ -16,7 +16,6 @@ class QMouseEvent;
 class QWheelEvent;
 class SceneDocument2D;
 class ISelectionService;
-class UiCommandDispatcher;
 class IInteractionDispatcher;
 
 /**
@@ -34,7 +33,7 @@ class [[deprecated("Use Render/2D/ + RenderWidget (QOpenGLWidget) + UI/2D/ViewWi
 {
     Q_OBJECT
 public:
-    explicit Viewport2D(QWidget* parent = nullptr);
+    explicit Viewport2D(QWidget * parent = nullptr);
 
 public:
     void setStatusCallback(std::function<void(const QString&)>&& callback);
@@ -46,7 +45,6 @@ public:
     {
         return m_document;
     }
-    void setCommandDispatcher(UiCommandDispatcher* dispatcher);
     void setInteractionDispatcher(IInteractionDispatcher* dispatcher);
     void setOperationBus(OperationBus* bus);
     void resetView();
@@ -112,7 +110,6 @@ private:
     bool m_panModeEnabled{ false };
     SceneDocument2D* m_document{ nullptr };
     ISelectionService* m_selectionService{ nullptr };
-    UiCommandDispatcher* m_commandDispatcher{ nullptr };
     IInteractionDispatcher* m_interactionDispatcher{ nullptr };
     OperationBus* m_operationBus{ nullptr };
 };

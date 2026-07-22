@@ -66,7 +66,10 @@ public:
     QString entityIdAt(const QPointF& point, double tolerance = 5.0) const;
 
     /// 获取底层场景管理器
-    Eg::SceneManager* sceneManager() const { return m_sceneManager; }
+    Eg::SceneManager* sceneManager() const
+    {
+        return m_sceneManager;
+    }
 
     std::vector<Eg::SyEntity*> selectedEntities() const override;
 

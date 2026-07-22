@@ -10,7 +10,7 @@
 - `TransformParameters` 负责强类型参数传递
 - `SceneEditServiceAdapter` 负责文档执行、预览、提交与取消
 - `UiEntity` / `EntityDocument2D` 负责实体数据存储与修改
-- 旧 `UiCommandDispatcher` 仅作为兼容层保留
+- `IInteractionDispatcher` 负责交互式命令生命周期管理（begin/submit/cancel）
 
 本计划目标是：先在现有框架上稳定 `Move / Rotate / Mirror` 三条核心变换链，确保“对话框输入”和“鼠标交互”两条路径得到一致结果；再扩展到 `Copy / Trim / Extend`；最后继续收口旧桥，并让渲染刷新链路更加稳定。
 
@@ -389,14 +389,15 @@ Render refresh callback / viewport update
 
 ### 4.5 旧桥收口准备
 
-#### `UiCommandDispatcher`
+> **2026-07-22 更新**：`UiCommandDispatcher` 已移除，命令路由统一通过 `OperationBus`，交互式命令生命周期由 `IInteractionDispatcher` 管理。
+
 #### `UiCommandHandler`
 #### `Viewport2D::enter*Mode()`
 
 **修改目标**
 - 停止新增旧路径
-- 仅保留兼容
-- 等新链路稳定后再逐步收口
+- `UiCommandHandler` 仅作为旧命令桥接使用，逐步迁移到 `OperationBus`
+- `Viewport2D::enter*Mode()` 逐步替换为 `IInteractionDispatcher::begin()`
 
 ---
 

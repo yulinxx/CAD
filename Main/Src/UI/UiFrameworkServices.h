@@ -5,7 +5,6 @@
 #include <functional>
 
 class UiStateCenter;
-class UiCommandDispatcher;
 
 /**
  * @brief 框架级服务桥接接口
@@ -16,8 +15,6 @@ struct UiFrameworkServices
 {
     /// 状态中心
     UiStateCenter* stateCenter{ nullptr };
-    /// 命令分发器
-    UiCommandDispatcher* commandDispatcher{ nullptr };
     /// 错误上报回调
     std::function<void(const QString& errorCode, const QString& message, const QString& context)> reportError;
 

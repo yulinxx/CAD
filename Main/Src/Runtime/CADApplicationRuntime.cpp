@@ -8,19 +8,16 @@
 
 #include "Log/SyLogger.h"
 #include "VersionInfo.h"
-#include "../Common/AppInitializer.h"
-#include "../Common/CrashHandlerBootstrap.h"
+#include "Common/AppInitializer.h"
+#include "Common/CrashHandlerBootstrap.h"
+#include "License/LicenseDialog.h"
 #include "License/LicenseDLL.h"
-#include "../License/LicenseDialog.h"
 
 // 构造函数：初始化QApplication并设置应用基本信息
 CADApplicationRuntime::CADApplicationRuntime(int argc, char* argv[], const AppPaths& appPaths)
     : m_app(std::make_unique<QApplication>(argc, argv))
     , m_appPaths(appPaths)
 {
-    SY_INFOF("[CADApplicationRuntime] Initializing application: name=%s, version=%s",
-        MainApp::appName().c_str(), MainApp::appVersion().c_str());
-
     m_app->setApplicationName(QString::fromStdString(MainApp::appName()));
     m_app->setApplicationVersion(QString::fromStdString(MainApp::appVersion()));
     m_app->setOrganizationName(QString::fromStdString(MainApp::organizationName()));
@@ -30,26 +27,14 @@ CADApplicationRuntime::CADApplicationRuntime(int argc, char* argv[], const AppPa
     if (!m_appPaths.appRootPath.empty())
     {
         QDir::setCurrent(QString::fromStdWString(m_appPaths.appRootPath));
-        SY_DEBUGF("[CADApplicationRuntime] Set current directory: %ls", m_appPaths.appRootPath.c_str());
     }
-
-    if (!CrashHandlerBootstrap::initialize(MainApp::appName(), MainApp::appVersion()))
-    {
-        std::fprintf(stderr,
-            "[CADApplicationRuntime] CrashHandler initialization failed, continuing without crash capture\n");
-    }
-
-    SY_INFO("[CADApplicationRuntime] QApplication created successfully");
 }
 
 // 析构函数：按顺序关闭引导器和应用初始化器
 CADApplicationRuntime::~CADApplicationRuntime()
 {
-    SY_INFO("[CADApplicationRuntime] Application shutting down");
-
     if (m_bootstrapper)
     {
-        SY_DEBUG("[CADApplicationRuntime] Shutting down bootstrapper");
         m_bootstrapper->shutdown();
         m_bootstrapper.reset();
     }
@@ -65,16 +50,24 @@ CADApplicationRuntime::~CADApplicationRuntime()
 // 运行应用主循环，执行初始化、许可证检查、引导和事件循环
 int CADApplicationRuntime::run()
 {
-    SY_INFO("[CADApplicationRuntime] Starting application runtime");
-
     // 初始化应用基础服务
-    SY_DEBUG("[CADApplicationRuntime] Initializing application services");
     AppInitializer::initialize();
 
-    // 执行许可证检查（如果启用）
+    SY_INFOF("[CADApplicationRuntime] Initializing application: name=%s, version=%s",
+        MainApp::appName().c_str(), MainApp::appVersion().c_str());
+
+    // 初始化崩溃处理
+    //SY_DEBUG("[CADApplicationRuntime] Initializing crash handler");
+    if (!CrashHandlerBootstrap::initialize(MainApp::appName(), MainApp::appVersion()))
+    {
+        SY_WARN("[CADApplicationRuntime] CrashHandler initialization failed, continuing without crash capture");
+    }
+    //SY_INFO("[CADApplicationRuntime] Crash handler initialized");
+
+    // 执行许可证检查
     if (License_IsCheckEnabled())
     {
-        SY_DEBUG("[CADApplicationRuntime] License check enabled, verifying license");
+        //SY_DEBUG("[CADApplicationRuntime] License check enabled, verifying license");
 
         LicenseConfig config{};
         License_ConfigInit(&config);
@@ -91,14 +84,14 @@ int CADApplicationRuntime::run()
 
         if (!licenseOk)
         {
-            SY_DEBUG("[CADApplicationRuntime] License check failed, showing license dialog");
+            //SY_DEBUG("[CADApplicationRuntime] License check failed, showing license dialog");
             LicenseDialog dlg(configDir);
             if (dlg.exec() != QDialog::Accepted)
             {
-                SY_WARN("[CADApplicationRuntime] License check rejected by user");
+                //SY_WARN("[CADApplicationRuntime] License check rejected by user");
                 return -3;
             }
-            SY_INFO("[CADApplicationRuntime] License accepted by user");
+            //SY_INFO("[CADApplicationRuntime] License accepted by user");
         }
         else
         {
@@ -107,21 +100,18 @@ int CADApplicationRuntime::run()
     }
 
     // 创建应用引导器并设置启动工作台
-    SY_INFOF("[CADApplicationRuntime] Creating bootstrapper: workbench=%s", m_startWorkbenchId.toUtf8().constData());
     m_bootstrapper = std::make_unique<AppBootstrapper>(m_appPaths, MainApp::appName(), MainApp::appVersion());
     m_bootstrapper->setStartWorkbenchId(m_startWorkbenchId);
 
     // 初始化引导器
-    SY_DEBUG("[CADApplicationRuntime] Initializing bootstrapper");
+    //SY_DEBUG("[CADApplicationRuntime] Initializing bootstrapper");
     if (!m_bootstrapper->initialize())
     {
         SY_ERROR("[CADApplicationRuntime] error code=app.bootstrap_init_failed message=AppBootstrapper initialization failed");
         return -2;
     }
-    SY_INFO("[CADApplicationRuntime] Bootstrapper initialized successfully");
 
     // 执行引导序列
-    SY_DEBUG("[CADApplicationRuntime] Running bootstrap sequence");
     m_bootstrapper->bootstrap();
 
     // 验证引导结果
@@ -130,16 +120,12 @@ int CADApplicationRuntime::run()
         SY_ERROR("[CADApplicationRuntime] error code=app.bootstrap_no_root message=Bootstrap completed without a valid composition root");
         return -2;
     }
-    SY_INFO("[CADApplicationRuntime] Bootstrap completed successfully");
 
-    // 进入Qt事件循环
-    SY_INFO("[CADApplicationRuntime] Entering Qt event loop");
     const int exitCode = m_app->exec();
     SY_INFOF("[CADApplicationRuntime] Application exited with code %d", exitCode);
     return exitCode;
 }
 
-// 设置启动时使用的工作台ID
 void CADApplicationRuntime::setStartWorkbenchId(const QString& workbenchId)
 {
     m_startWorkbenchId = workbenchId;
