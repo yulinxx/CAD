@@ -2,7 +2,10 @@
 
 #include <string>
 
-namespace Eg { class Database; }
+namespace Eg
+{
+    class Database;
+}
 
 /**
  * @brief 数据库初始化器 — 负责创建和升级数据库表结构

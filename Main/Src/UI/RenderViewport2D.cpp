@@ -15,6 +15,11 @@
 #include "Engine2D/SyEntity/SyArc.h"
 #include "Engine2D/SyEntity/SyPolygon.h"
 #include "Engine/Scene/SceneRenderContract.h"
+#include "UI2D/DrawTools/ToolManager.h"
+#include "Ui/DrawTools/ToolContext.h"
+#include "Ui/DrawTools/ITool.h"
+#include "Ui/ViewWidget/ToolInitializer.h"
+#include "Ui/ViewWidget/ViewRenderCoordinator.h"
 
 #include <QVBoxLayout>
 #include <QMouseEvent>
@@ -83,24 +88,20 @@ void Camera2D::computeViewMatrix(float outMat[9], float vpW, float vpH) const
         return;
     }
 
-    // 稳定、明确的 2D 正交映射：
-    // world -> NDC
-    // x_ndc =  2 * zoom * (x - centerX) / vpW
-    // y_ndc = -2 * zoom * (y - centerY) / vpH
-    const float scaleX = 2.0f * zoom / vpW;
-    const float scaleY = 2.0f * zoom / vpH;
-    const float centerX = -panOffset.x();
-    const float centerY = -panOffset.y();
+    const float scaleX = 2.0f * zoomX / vpW;
+    const float scaleY = 2.0f * zoomY / vpH;
+    const float tx = scaleX * panOffset.x();
+    const float ty = -scaleY * panOffset.y();
 
     Render::Mat3f view = Render::Mat3f::identity();
     view.at(0, 0) = scaleX;
     view.at(1, 0) = 0.0f;
-    view.at(2, 0) = -centerX * scaleX;
+    view.at(2, 0) = 0.0f;
     view.at(0, 1) = 0.0f;
     view.at(1, 1) = -scaleY;
-    view.at(2, 1) = centerY * scaleY;
-    view.at(0, 2) = 0.0f;
-    view.at(1, 2) = 0.0f;
+    view.at(2, 1) = 0.0f;
+    view.at(0, 2) = tx;
+    view.at(1, 2) = ty;
     view.at(2, 2) = 1.0f;
 
     mat3ToArray(view, outMat);
@@ -114,32 +115,39 @@ QPointF Camera2D::screenToWorld(const QPoint& screenPos, float vpW, float vpH) c
     float nx = (2.0f * screenPos.x() - vpW) / vpW;
     float ny = (2.0f * screenPos.y() - vpH) / vpH;
 
-    if (zoom < 1e-6f)
+    if (zoomX < 1e-6f || zoomY < 1e-6f)
         return QPointF(nx, ny);
 
-    float scaleX = 2.0f * zoom / vpW;
-    float scaleY = 2.0f * zoom / vpH;
+    float scaleX = 2.0f * zoomX / vpW;
+    float scaleY = 2.0f * zoomY / vpH;
 
     float wx = (nx / scaleX) - panOffset.x();
     float wy = -(ny / scaleY) - panOffset.y();
+
+    static int logCount = 0;
+    if ((logCount++ % 50) == 0) {
+        SY_INFOF("Camera2D::screenToWorld: screen=(%d,%d), vp=(%.0f,%.0f), zoom=(%.6f,%.6f), pan=(%.2f,%.2f), world=(%.2f,%.2f)",
+            screenPos.x(), screenPos.y(), vpW, vpH, zoomX, zoomY, panOffset.x(), panOffset.y(), wx, wy);
+    }
 
     return QPointF(wx, wy);
 }
 
 void Camera2D::zoomIn(float factor, const QPointF& anchorWorld, float vpW, float vpH)
 {
-    float newZoom = zoom * factor;
-    if (newZoom > MAX_ZOOM)
-        newZoom = MAX_ZOOM;
-    if (newZoom < MIN_ZOOM)
-        newZoom = MIN_ZOOM;
+    float newZoomX = zoomX * factor;
+    float newZoomY = zoomY * factor;
+    if (newZoomX > MAX_ZOOM) newZoomX = MAX_ZOOM;
+    if (newZoomX < MIN_ZOOM) newZoomX = MIN_ZOOM;
+    if (newZoomY > MAX_ZOOM) newZoomY = MAX_ZOOM;
+    if (newZoomY < MIN_ZOOM) newZoomY = MIN_ZOOM;
 
-    // 以鼠标位置为锚点缩放
-    float ratio = newZoom / zoom;
+    float ratio = newZoomX / zoomX;
     panOffset.setX(panOffset.x() + anchorWorld.x() * (1.0f - ratio));
     panOffset.setY(panOffset.y() + anchorWorld.y() * (1.0f - ratio));
 
-    zoom = newZoom;
+    zoomX = newZoomX;
+    zoomY = newZoomY;
 }
 
 void Camera2D::zoomOut(float factor, const QPointF& anchorWorld, float vpW, float vpH)
@@ -155,7 +163,8 @@ void Camera2D::pan(float dx, float dy)
 
 void Camera2D::reset()
 {
-    zoom = 1.0f;
+    zoomX = 1.0f;
+    zoomY = 1.0f;
     panOffset = QPointF(0, 0);
 }
 
@@ -166,30 +175,34 @@ void Camera2D::zoomToFit(float vpW, float vpH, float sceneW, float sceneH)
 
     float scaleX = vpW / sceneW;
     float scaleY = vpH / sceneH;
-    zoom = std::min(scaleX, scaleY) * 0.9f; // 留 10% 边距
+    float zoom = std::min(scaleX, scaleY) * 0.9f;
 
     if (zoom < MIN_ZOOM) zoom = MIN_ZOOM;
     if (zoom > MAX_ZOOM) zoom = MAX_ZOOM;
 
+    zoomX = zoom;
+    zoomY = zoom;
     panOffset = QPointF(0, 0);
 }
 
 void Camera2D::setViewExtent(float vpW, float vpH, float centerX, float centerY, float halfW, float halfH)
 {
-    if (halfW <= 0 || halfH <= 0)
+    if (halfW <= 0 || halfH <= 0 || vpW <= 0 || vpH <= 0)
         return;
 
-    // screenToWorld 中可见世界宽度 = 2/zoom
-    // 要让可见范围 >= 2*halfW 且 >= 2*halfH，取 zoom = 1/max(halfW, halfH)
-    zoom = 1.0f / std::max(halfW, halfH);
+    float targetZoomX = vpW / (2.0f * halfW);
+    float targetZoomY = vpH / (2.0f * halfH);
+    float zoom = std::min(targetZoomX, targetZoomY);
 
     if (zoom < MIN_ZOOM) zoom = MIN_ZOOM;
     if (zoom > MAX_ZOOM) zoom = MAX_ZOOM;
 
-    // panOffset 使 centerX/Y 位于视口中心
-    // screenToWorld: wx = nx/zoom - panOffset.x，视口中心 nx=0 时 wx=centerX
-    // 所以 panOffset.x = -centerX, panOffset.y = -centerY
+    zoomX = zoom;
+    zoomY = zoom;
     panOffset = QPointF(-centerX, -centerY);
+
+    SY_INFOF("Camera2D::setViewExtent: vpW=%.0f, vpH=%.0f, center=(%.2f,%.2f), half=(%.2f,%.2f), zoom=(%.6f,%.6f), pan=(%.2f,%.2f)",
+        vpW, vpH, centerX, centerY, halfW, halfH, zoomX, zoomY, panOffset.x(), panOffset.y());
 }
 
 // ==================== RenderViewport2D 实现 ====================
@@ -297,6 +310,77 @@ void RenderViewport2D::setInteractionDispatcher(IInteractionDispatcher* dispatch
 void RenderViewport2D::setOperationBus(OperationBus* bus)
 {
     m_operationBus = bus;
+}
+
+void RenderViewport2D::setSceneEditService(SceneEditService* service)
+{
+    m_sceneEditService = service;
+}
+
+void RenderViewport2D::initializeTools()
+{
+    if (!m_renderWidget || !m_sceneManager)
+        return;
+
+    m_toolManager = std::make_unique<ToolManager>();
+
+    // 创建渲染协调器
+    auto* coordinator = new Ui2D::ViewRenderCoordinator();
+    coordinator->setRenderWidget(m_renderWidget);
+
+    // 注册所有工具
+    ToolInitializer::registerAllTools(*m_toolManager, m_sceneManager, m_renderWidget, coordinator);
+
+    // 设置图元提交回调（通过 SceneEditService，支持 Undo）
+    if (m_sceneEditService)
+    {
+        m_toolManager->setEntityCallbackForAllTools([this](Eg::SyEntity* e) {
+            if (e) m_sceneEditService->addEntityFromPointer(e, "Draw");
+            });
+    }
+
+    // 设置工具切换回调
+    m_toolManager->setSwitchToolCallbackForAllTools([this](const QString& name) {
+        setActiveTool(name);
+        });
+
+    // 注册图元编辑器
+    ToolInitializer::registerAllEditors();
+
+    updateStatus(tr("2D tools initialized"));
+}
+
+bool RenderViewport2D::setActiveTool(const QString& toolName)
+{
+    if (!m_toolManager)
+        return false;
+
+    bool ok = m_toolManager->setActiveTool(toolName);
+    if (ok)
+    {
+        updateStatus(tr("2D tool: %1").arg(toolName));
+        if (toolName == "SelectTool")
+        {
+            unsetCursor();
+        }
+        else
+        {
+            setCursor(Qt::CrossCursor);
+        }
+    }
+    return ok;
+}
+
+QString RenderViewport2D::activeToolName() const
+{
+    if (!m_toolManager)
+        return QString();
+    return m_toolManager->getActiveToolName();
+}
+
+ToolManager* RenderViewport2D::toolManager() const
+{
+    return m_toolManager.get();
 }
 
 void RenderViewport2D::resetView()
@@ -564,10 +648,26 @@ QPointF RenderViewport2D::mapToScene(const QPoint& screenPos) const
 void RenderViewport2D::showEvent(QShowEvent* event)
 {
     QWidget::showEvent(event);
-    // 首次显示时设置默认视图范围：中心 (0,0)，可见 (-500,-500)~(500,500)
     QTimer::singleShot(0, this, [this]() {
         resetView();
-    });
+        updateViewMatrix();
+
+        if (m_sceneUpdateTimer && m_sceneUpdateTimer->isActive())
+            m_sceneUpdateTimer->stop();
+
+        if (!m_document && m_renderWidget && m_renderWidget->isInitialized())
+        {
+            m_renderWidget->submitDefaultSceneEnv();
+        }
+        else if (m_document)
+        {
+            m_refreshLevel = RefreshLevel::FullRefresh;
+            if (m_sceneUpdateTimer)
+                m_sceneUpdateTimer->start();
+            else
+                updateSceneRender();
+        }
+        });
 }
 
 void RenderViewport2D::resizeEvent(QResizeEvent* event)
@@ -583,53 +683,53 @@ bool RenderViewport2D::eventFilter(QObject* obj, QEvent* event)
 
     switch (event->type())
     {
-    case QEvent::MouseButtonPress:
-    case QEvent::MouseMove:
-    case QEvent::MouseButtonRelease:
-    {
-        // 将 RenderWidget 坐标系的鼠标事件转发到本视口处理
-        // RenderWidget 是 QOpenGLWidget 原生窗口，事件不会自动冒泡到父控件
-        auto* me = static_cast<QMouseEvent*>(event);
-        QPoint parentPos = m_renderWidget->mapToParent(me->pos());
-        QMouseEvent parentEvent(me->type(), parentPos, me->globalPos(),
-            me->button(), me->buttons(), me->modifiers());
-
-        switch (event->type())
-        {
         case QEvent::MouseButtonPress:
-            mousePressEvent(&parentEvent);
-            break;
         case QEvent::MouseMove:
-            mouseMoveEvent(&parentEvent);
-            break;
         case QEvent::MouseButtonRelease:
-            mouseReleaseEvent(&parentEvent);
-            break;
+        {
+            // 将 RenderWidget 坐标系的鼠标事件转发到本视口处理
+            // RenderWidget 是 QOpenGLWidget 原生窗口，事件不会自动冒泡到父控件
+            auto* me = static_cast<QMouseEvent*>(event);
+            QPoint parentPos = m_renderWidget->mapToParent(me->pos());
+            QMouseEvent parentEvent(me->type(), parentPos, me->globalPos(),
+                me->button(), me->buttons(), me->modifiers());
+
+            switch (event->type())
+            {
+                case QEvent::MouseButtonPress:
+                    mousePressEvent(&parentEvent);
+                    break;
+                case QEvent::MouseMove:
+                    mouseMoveEvent(&parentEvent);
+                    break;
+                case QEvent::MouseButtonRelease:
+                    mouseReleaseEvent(&parentEvent);
+                    break;
+                default:
+                    break;
+            }
+            return true; // 事件已处理，不再传播
+        }
+        case QEvent::Wheel:
+        {
+            auto* we = static_cast<QWheelEvent*>(event);
+            wheelEvent(we);
+            return true;
+        }
+        case QEvent::KeyPress:
+        {
+            auto* ke = static_cast<QKeyEvent*>(event);
+            keyPressEvent(ke);
+            return true;
+        }
+        case QEvent::ContextMenu:
+        {
+            auto* ce = static_cast<QContextMenuEvent*>(event);
+            contextMenuEvent(ce);
+            return true;
+        }
         default:
             break;
-        }
-        return true; // 事件已处理，不再传播
-    }
-    case QEvent::Wheel:
-    {
-        auto* we = static_cast<QWheelEvent*>(event);
-        wheelEvent(we);
-        return true;
-    }
-    case QEvent::KeyPress:
-    {
-        auto* ke = static_cast<QKeyEvent*>(event);
-        keyPressEvent(ke);
-        return true;
-    }
-    case QEvent::ContextMenu:
-    {
-        auto* ce = static_cast<QContextMenuEvent*>(event);
-        contextMenuEvent(ce);
-        return true;
-    }
-    default:
-        break;
     }
 
     return QWidget::eventFilter(obj, event);
@@ -656,7 +756,7 @@ void RenderViewport2D::mousePressEvent(QMouseEvent* event)
     if (event->button() == Qt::MiddleButton)
     {
         m_panning = true;
-        m_lastMousePos = event->pos();
+        m_lastMousePos = m_renderWidget->mapFromParent(event->pos());
         setCursor(Qt::ClosedHandCursor);
         event->accept();
         return;
@@ -667,7 +767,7 @@ void RenderViewport2D::mousePressEvent(QMouseEvent* event)
         if (m_panModeEnabled)
         {
             m_panning = true;
-            m_lastMousePos = event->pos();
+            m_lastMousePos = m_renderWidget->mapFromParent(event->pos());
             setCursor(Qt::ClosedHandCursor);
         }
         else if (m_interactionDispatcher && m_interactionDispatcher->hasActiveCommand())
@@ -675,6 +775,11 @@ void RenderViewport2D::mousePressEvent(QMouseEvent* event)
             m_interactionDispatcher->forwardMouseDown(
                 static_cast<int>(worldPos.x()),
                 static_cast<int>(worldPos.y()));
+        }
+        else if (m_toolManager && m_toolManager->getActiveTool() && m_toolManager->getActiveToolName() != "SelectTool")
+        {
+            // 转发鼠标事件到活动工具
+            m_toolManager->getActiveTool()->onMousePress(worldPos, event);
         }
         else
         {
@@ -711,11 +816,13 @@ void RenderViewport2D::mouseMoveEvent(QMouseEvent* event)
 
     if (m_panning)
     {
-        QPoint delta = event->pos() - m_lastMousePos;
-        m_lastMousePos = event->pos();
+        QPoint widgetPos = m_renderWidget->mapFromParent(event->pos());
+        QPoint delta = widgetPos - m_lastMousePos;
+        m_lastMousePos = widgetPos;
 
-        float worldDx = -static_cast<float>(delta.x()) / m_camera.zoom;
-        float worldDy = static_cast<float>(delta.y()) / m_camera.zoom;
+        float dpr = static_cast<float>(m_renderWidget->devicePixelRatioF());
+        float worldDx = static_cast<float>(delta.x()) * dpr / m_camera.zoomX;
+        float worldDy = static_cast<float>(delta.y()) * dpr / m_camera.zoomY;
 
         m_camera.pan(worldDx, worldDy);
         updateViewMatrix();
@@ -735,6 +842,13 @@ void RenderViewport2D::mouseMoveEvent(QMouseEvent* event)
         m_interactionDispatcher->forwardMouseMove(
             static_cast<int>(worldPos.x()),
             static_cast<int>(worldPos.y()));
+        event->accept();
+        return;
+    }
+
+    if (m_toolManager && m_toolManager->getActiveTool() && m_toolManager->getActiveToolName() != "SelectTool")
+    {
+        m_toolManager->getActiveTool()->onMouseMove(worldPos, event);
         event->accept();
         return;
     }
@@ -790,6 +904,13 @@ void RenderViewport2D::mouseReleaseEvent(QMouseEvent* event)
             m_interactionDispatcher->forwardMouseUp(
                 static_cast<int>(worldPos.x()),
                 static_cast<int>(worldPos.y()));
+            event->accept();
+            return;
+        }
+
+        if (m_toolManager && m_toolManager->getActiveTool() && m_toolManager->getActiveToolName() != "SelectTool")
+        {
+            m_toolManager->getActiveTool()->onMouseRelease(worldPos, event);
             event->accept();
             return;
         }
@@ -886,8 +1007,17 @@ void RenderViewport2D::updateViewMatrix()
     for (int i = 0; i < 9; ++i)
         mat.data[i] = viewMat[i];
 
+    SY_INFOF("RenderViewport2D::updateViewMatrix: vpW=%.0f, vpH=%.0f, zoom=(%.6f,%.6f), pan=(%.2f,%.2f)",
+        vpW, vpH, m_camera.zoomX, m_camera.zoomY, m_camera.panOffset.x(), m_camera.panOffset.y());
+
     // 即使渲染设备尚未初始化，也先缓存视图矩阵；initializeGL 后会补发一次
     m_renderWidget->setViewMatrix(mat);
+
+    // 如果没有文档，视图矩阵变化后需要重新提交场景环境（网格背景）
+    if (!m_document && m_renderWidget->isInitialized())
+    {
+        m_renderWidget->submitDefaultSceneEnv();
+    }
 }
 
 void RenderViewport2D::scheduleSceneUpdate()
@@ -961,7 +1091,7 @@ void RenderViewport2D::updateSceneRender()
         return;
 
     qInfo() << "RenderViewport2D::updateSceneRender: refreshLevel=" << static_cast<int>(m_refreshLevel)
-            << "initialized=" << m_renderWidget->isInitialized();
+        << "initialized=" << m_renderWidget->isInitialized();
 
     // GL 尚未初始化时保留刷新标记，延迟重试
     if (!m_renderWidget->isInitialized())
@@ -1005,6 +1135,8 @@ void RenderViewport2D::updateSceneRender()
     {
         // 全量 gather + submit（兜底路径，也是当前唯一实现）
         m_renderWidget->submitSceneFromDataSource(sm);
+        // 提交网格背景
+        m_renderWidget->submitDefaultSceneEnv();
     }
 
     // 清理已处理的脏实体标记
@@ -1025,7 +1157,7 @@ void RenderViewport2D::performHitTest(const QPointF& worldPos)
         return;
 
     auto* sm = sceneManager();
-    double tol = kHitTolerance / m_camera.zoom; // 转换为世界坐标容差
+    double tol = kHitTolerance / m_camera.zoomX; // 转换为世界坐标容差
 
     std::string hitId;
     double minDist = tol;
@@ -1132,7 +1264,7 @@ void RenderViewport2D::endBoxSelect(const QPointF& worldPos)
     // 如果起点和终点几乎相同，视为点击
     double dx = std::abs(worldPos.x() - m_boxSelectStart.x());
     double dy = std::abs(worldPos.y() - m_boxSelectStart.y());
-    double tol = kHitTolerance / m_camera.zoom;
+    double tol = kHitTolerance / m_camera.zoomX;
 
     if (dx < tol && dy < tol)
     {

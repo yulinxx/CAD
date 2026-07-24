@@ -19,6 +19,15 @@ void ImportDispatcher::registerReader(std::unique_ptr<IImportReader> reader)
 ImportResult ImportDispatcher::dispatch(const ImportContext& context,
     Fio::VecSyEntityPtr& outEntities)
 {
+    // 文件存在性检查
+    QFileInfo fi(context.sourcePath);
+    if (!fi.exists())
+    {
+        QString msg = QStringLiteral("File not found: %1").arg(context.sourcePath);
+        SY_ERRORF("[ImportDispatcher] %s", msg.toUtf8().constData());
+        return ImportResult::fail(msg, ImportErrorType::FileNotFound);
+    }
+
     // 如果未指定格式，自动检测
     Fio::FileFormat fmt = context.format;
     if (fmt == Fio::FileFormat::Unknown)
@@ -26,9 +35,9 @@ ImportResult ImportDispatcher::dispatch(const ImportContext& context,
 
     if (fmt == Fio::FileFormat::Unknown)
     {
-        QString msg = QStringLiteral("Cannot detect format for: %1").arg(context.sourcePath);
+        QString msg = QStringLiteral("Unsupported file format: %1").arg(fi.suffix().toUpper());
         SY_ERRORF("[ImportDispatcher] %s", msg.toUtf8().constData());
-        return ImportResult::fail(msg);
+        return ImportResult::fail(msg, ImportErrorType::FormatNotSupported);
     }
 
     IImportReader* reader = findReader(fmt);
@@ -37,7 +46,7 @@ ImportResult ImportDispatcher::dispatch(const ImportContext& context,
         QString msg = QStringLiteral("No reader registered for format=%1")
             .arg(static_cast<int>(fmt));
         SY_ERRORF("[ImportDispatcher] %s", msg.toUtf8().constData());
-        return ImportResult::fail(msg);
+        return ImportResult::fail(msg, ImportErrorType::FormatNotSupported);
     }
 
     // 构造完整上下文（注入检测到的格式）

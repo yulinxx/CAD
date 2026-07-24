@@ -83,8 +83,6 @@ void WorkbenchMenuManager::setViewportZoomHandler(std::function<void(const QStri
     m_viewportZoomHandler = std::move(handler);
 }
 
-
-
 void WorkbenchMenuManager::rebuildAllMenus()
 {
     if (auto* mb = m_window->menuBar())
@@ -138,11 +136,11 @@ void WorkbenchMenuManager::buildFileMenu()
     connect(newAction, &QAction::triggered, this, [this]() {
         if (m_operationBus)
             m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("file.new")));
-    });
+        });
     connect(openAction, &QAction::triggered, this, [this]() {
         if (m_operationBus)
             m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("file.open")));
-    });
+        });
     m_menuState.fileMenu->addSeparator();
 
     auto* saveAction = m_menuState.fileMenu->addAction(m_window->tr("Save"));
@@ -154,11 +152,11 @@ void WorkbenchMenuManager::buildFileMenu()
     connect(saveAction, &QAction::triggered, this, [this]() {
         if (m_operationBus)
             m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("file.save")));
-    });
+        });
     connect(saveAsAction, &QAction::triggered, this, [this]() {
         if (m_operationBus)
             m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("file.save_as")));
-    });
+        });
     m_menuState.fileMenu->addSeparator();
 
     refreshFileMenuForWorkbench(m_stateCenter ? m_stateCenter->currentWorkbenchId() : QStringLiteral("2D"));
@@ -212,7 +210,7 @@ void WorkbenchMenuManager::refreshFileMenuForWorkbench(const QString& workbenchI
             connect(act, &QAction::triggered, this, [this, cmdId]() {
                 if (m_operationBus)
                     m_operationBus->run(CommandCatalog::operationForCommandId(cmdId));
-            });
+                });
         }
 #endif
     }
@@ -235,7 +233,7 @@ void WorkbenchMenuManager::refreshFileMenuForWorkbench(const QString& workbenchI
             connect(act, &QAction::triggered, this, [this, cmdId]() {
                 if (m_operationBus)
                     m_operationBus->run(CommandCatalog::operationForCommandId(cmdId));
-            });
+                });
         }
         m_menuState.importMenu->addSeparator();
         auto* importImage = m_menuState.importMenu->addAction(m_window->tr("Image..."));
@@ -244,7 +242,7 @@ void WorkbenchMenuManager::refreshFileMenuForWorkbench(const QString& workbenchI
         connect(importImage, &QAction::triggered, this, [this, imgCmdId]() {
             if (m_operationBus)
                 m_operationBus->run(CommandCatalog::operationForCommandId(imgCmdId));
-        });
+            });
     }
 
     m_menuState.exportMenu = m_menuState.fileMenu->addMenu(m_window->tr("Export"));
@@ -267,7 +265,7 @@ void WorkbenchMenuManager::refreshFileMenuForWorkbench(const QString& workbenchI
             connect(act, &QAction::triggered, this, [this, cmdId]() {
                 if (m_operationBus)
                     m_operationBus->run(CommandCatalog::operationForCommandId(cmdId));
-            });
+                });
         }
     }
     else
@@ -289,7 +287,7 @@ void WorkbenchMenuManager::refreshFileMenuForWorkbench(const QString& workbenchI
             connect(act, &QAction::triggered, this, [this, cmdId]() {
                 if (m_operationBus)
                     m_operationBus->run(CommandCatalog::operationForCommandId(cmdId));
-            });
+                });
         }
     }
 }
@@ -305,13 +303,13 @@ void WorkbenchMenuManager::buildViewMenu()
     m_menuState.workbench2DAction->setCheckable(true);
     QObject::connect(m_menuState.workbench2DAction, &QAction::triggered, this, [this]() {
         m_window->triggerWorkbench(QStringLiteral("2D"));
-    });
+        });
 
     m_menuState.workbench3DAction = m_menuState.viewMenu->addAction(m_window->tr("Switch to 3D"));
     m_menuState.workbench3DAction->setCheckable(true);
     QObject::connect(m_menuState.workbench3DAction, &QAction::triggered, this, [this]() {
         m_window->triggerWorkbench(QStringLiteral("3D"));
-    });
+        });
 
     m_menuState.viewMenu->addSeparator();
 
@@ -324,7 +322,7 @@ void WorkbenchMenuManager::buildViewMenu()
             if (w)
                 LayerManagerDialog::showDialog(m_uiServices->layerEditService, w);
         }
-    });
+        });
     m_menuState.layerMenu->addSeparator();
     auto* newLayer = m_menuState.layerMenu->addAction(m_window->tr("New Layer"));
     QObject::connect(newLayer, &QAction::triggered, this, [this]() {
@@ -335,7 +333,7 @@ void WorkbenchMenuManager::buildViewMenu()
             SY_INFOF("[WorkbenchMenuManager] New layer created, id=%d", id);
         else
             SY_ERRORF("[WorkbenchMenuManager] Failed to create layer, id=%d", id);
-    });
+        });
     auto* delLayer = m_menuState.layerMenu->addAction(m_window->tr("Delete Layer"));
     QObject::connect(delLayer, &QAction::triggered, this, [this]() {
         if (!m_uiServices || !m_uiServices->layerEditService || !m_uiServices->layerManager)
@@ -344,7 +342,7 @@ void WorkbenchMenuManager::buildViewMenu()
         if (currentId < 0)
             return;
         m_uiServices->layerEditService->deleteLayer(currentId);
-    });
+        });
 
     m_menuState.layerMenu->addSeparator();
     auto* layerCtxMenu = new QMenu(m_window->tr("More Layer Operations"), m_window);
@@ -367,7 +365,7 @@ void WorkbenchMenuManager::buildViewMenu()
             m_uiServices->layerEditService->renameLayer(currentId, newName.toStdString());
             SY_INFOF("[WorkbenchMenuManager] Layer renamed: id=%d", currentId);
         }
-    });
+        });
 
     auto* toggleLock = layerCtxMenu->addAction(m_window->tr("Toggle Lock"));
     QObject::connect(toggleLock, &QAction::triggered, this, [this]() {
@@ -378,7 +376,7 @@ void WorkbenchMenuManager::buildViewMenu()
             return;
         bool locked = m_uiServices->layerManager->isLayerLocked(currentId);
         m_uiServices->layerManager->setLayerLocked(currentId, !locked);
-    });
+        });
 
     auto* toggleVisible = layerCtxMenu->addAction(m_window->tr("Toggle Visibility"));
     QObject::connect(toggleVisible, &QAction::triggered, this, [this]() {
@@ -389,7 +387,7 @@ void WorkbenchMenuManager::buildViewMenu()
             return;
         bool visible = m_uiServices->layerManager->isLayerVisible(currentId);
         m_uiServices->layerManager->setLayerVisible(currentId, !visible);
-    });
+        });
 
     m_menuState.viewMenu->addSeparator();
 
@@ -397,10 +395,13 @@ void WorkbenchMenuManager::buildViewMenu()
     m_menuState.unitActionGroup = new QActionGroup(m_window);
     m_menuState.unitActionGroup->setExclusive(true);
 
-    const struct { const char* text; const char* cmdId; bool checked; } units[] = {
-        { "mm", "view.unit_mm", true },
-        { "cm", "view.unit_cm", false },
-        { "inch", "view.unit_inch", false }
+    const struct
+    {
+        const char* text; const char* cmdId; bool checked;
+    } units[] = {
+{ "mm", "view.unit_mm", true },
+{ "cm", "view.unit_cm", false },
+{ "inch", "view.unit_inch", false }
     };
     for (const auto& u : units)
     {
@@ -413,7 +414,7 @@ void WorkbenchMenuManager::buildViewMenu()
         connect(act, &QAction::triggered, this, [this, cmdId]() {
             if (m_operationBus)
                 m_operationBus->run(CommandCatalog::operationForCommandId(cmdId));
-        });
+            });
     }
 
     m_menuState.viewMenu->addSeparator();
@@ -424,25 +425,25 @@ void WorkbenchMenuManager::buildViewMenu()
     QObject::connect(showGrid, &QAction::toggled, this, [this](bool checked) {
         if (m_stateCenter)
             m_stateCenter->setMetadata({ { QStringLiteral("gridVisible"), checked } });
-    });
+        });
     auto* snapEnabled = m_menuState.gridSnapMenu->addAction(m_window->tr("Snap Enabled"));
     snapEnabled->setCheckable(true);
     QObject::connect(snapEnabled, &QAction::toggled, this, [this](bool checked) {
         if (m_stateCenter)
             m_stateCenter->setMetadata({ { QStringLiteral("snapEnabled"), checked } });
-    });
+        });
     auto* orthoMode = m_menuState.gridSnapMenu->addAction(m_window->tr("Ortho Mode"));
     orthoMode->setCheckable(true);
     QObject::connect(orthoMode, &QAction::toggled, this, [this](bool checked) {
         if (m_stateCenter)
             m_stateCenter->setMetadata({ { QStringLiteral("orthoMode"), checked } });
-    });
+        });
     auto* angleSnap = m_menuState.gridSnapMenu->addAction(m_window->tr("Angle Snap"));
     angleSnap->setCheckable(true);
     QObject::connect(angleSnap, &QAction::toggled, this, [this](bool checked) {
         if (m_stateCenter)
             m_stateCenter->setMetadata({ { QStringLiteral("angleSnap"), checked } });
-    });
+        });
 
     m_menuState.viewMenu->addSeparator();
 
@@ -452,33 +453,33 @@ void WorkbenchMenuManager::buildViewMenu()
     QObject::connect(zoomIn, &QAction::triggered, this, [this]() {
         if (m_viewportZoomHandler)
             m_viewportZoomHandler(QStringLiteral("zoom_in"));
-    });
+        });
     auto* zoomOut = m_menuState.zoomMenu->addAction(m_window->tr("Zoom Out"));
     zoomOut->setShortcut(QKeySequence::ZoomOut);
     QObject::connect(zoomOut, &QAction::triggered, this, [this]() {
         if (m_viewportZoomHandler)
             m_viewportZoomHandler(QStringLiteral("zoom_out"));
-    });
+        });
     m_menuState.zoomMenu->addSeparator();
     auto* zoomFit = m_menuState.zoomMenu->addAction(m_window->tr("Zoom to Fit"));
     zoomFit->setShortcut(QStringLiteral("Ctrl+F"));
     QObject::connect(zoomFit, &QAction::triggered, this, [this]() {
         if (m_viewportZoomHandler)
             m_viewportZoomHandler(QStringLiteral("zoom_fit"));
-    });
+        });
     auto* zoomSel = m_menuState.zoomMenu->addAction(m_window->tr("Zoom to Selection"));
     zoomSel->setShortcut(QStringLiteral("Ctrl+Shift+F"));
     QObject::connect(zoomSel, &QAction::triggered, this, [this]() {
         if (m_viewportZoomHandler)
             m_viewportZoomHandler(QStringLiteral("zoom_selection"));
-    });
+        });
     m_menuState.zoomMenu->addSeparator();
     auto* resetView = m_menuState.zoomMenu->addAction(m_window->tr("Reset View"));
     resetView->setShortcut(QStringLiteral("Ctrl+0"));
     QObject::connect(resetView, &QAction::triggered, this, [this]() {
         if (m_viewportZoomHandler)
             m_viewportZoomHandler(QStringLiteral("reset"));
-    });
+        });
 }
 
 void WorkbenchMenuManager::refreshDrawMenuForWorkbench(const QString& workbenchId)
@@ -496,9 +497,9 @@ void WorkbenchMenuManager::refreshDrawMenuForWorkbench(const QString& workbenchI
         connect(action, &QAction::triggered, this, [this, commandId]() {
             if (m_operationBus)
                 m_operationBus->run(CommandCatalog::operationForCommandId(commandId));
-        });
+            });
         return action;
-    };
+        };
 
     if (is3D)
     {
@@ -548,9 +549,9 @@ void WorkbenchMenuManager::refreshEditMenuForWorkbench(const QString& workbenchI
         connect(act, &QAction::triggered, this, [this, commandId]() {
             if (m_operationBus)
                 m_operationBus->run(CommandCatalog::operationForCommandId(commandId));
-        });
+            });
         return act;
-    };
+        };
 
     auto* undoAction = m_menuState.editMenu->addAction(m_window->tr("Undo"));
     undoAction->setShortcut(QKeySequence::Undo);
@@ -559,11 +560,11 @@ void WorkbenchMenuManager::refreshEditMenuForWorkbench(const QString& workbenchI
     connect(undoAction, &QAction::triggered, this, [this]() {
         if (m_operationBus)
             m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("edit.undo")));
-    });
+        });
     connect(redoAction, &QAction::triggered, this, [this]() {
         if (m_operationBus)
             m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("edit.redo")));
-    });
+        });
     m_menuState.editMenu->addSeparator();
 
     addEditAction(m_menuState.editMenu, m_window->tr("Select All"), QStringLiteral("edit.select_all"));
@@ -607,14 +608,14 @@ void WorkbenchMenuManager::refreshEditMenuForWorkbench(const QString& workbenchI
         connect(groupAction, &QAction::triggered, this, [this]() {
             if (m_operationBus)
                 m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("edit.group")));
-        });
+            });
 
         auto* ungroupAction = m_menuState.editMenu->addAction(m_window->tr("Ungroup"));
         setCmdId(ungroupAction, QStringLiteral("edit.ungroup"));
         connect(ungroupAction, &QAction::triggered, this, [this]() {
             if (m_operationBus)
                 m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("edit.ungroup")));
-        });
+            });
 
         m_menuState.editMenu->addSeparator();
 
@@ -642,9 +643,9 @@ void WorkbenchMenuManager::refreshModifyMenuForWorkbench(const QString& workbenc
         connect(action, &QAction::triggered, this, [this, commandId]() {
             if (m_operationBus)
                 m_operationBus->run(CommandCatalog::operationForCommandId(commandId));
-        });
+            });
         return action;
-    };
+        };
 
     if (is3D)
     {
@@ -696,9 +697,9 @@ void WorkbenchMenuManager::refreshAlgorithmMenuForWorkbench(const QString& workb
         connect(act, &QAction::triggered, this, [this, commandId]() {
             if (m_operationBus)
                 m_operationBus->run(CommandCatalog::operationForCommandId(commandId));
-        });
+            });
         return act;
-    };
+        };
 
     if (is3D)
     {
@@ -735,7 +736,7 @@ void WorkbenchMenuManager::buildHelpMenu()
     connect(docsAction, &QAction::triggered, this, [this]() {
         if (m_operationBus)
             m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("help.docs")));
-    });
+        });
 
     auto* shortcutAction = m_menuState.helpMenu->addAction(m_window->tr("Keyboard Shortcuts"));
     shortcutAction->setShortcut(Qt::Key_F1);
@@ -743,7 +744,7 @@ void WorkbenchMenuManager::buildHelpMenu()
     connect(shortcutAction, &QAction::triggered, this, [this]() {
         if (m_operationBus)
             m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("help.shortcuts")));
-    });
+        });
     m_menuState.helpMenu->addSeparator();
 
     auto* settingsAction = m_menuState.helpMenu->addAction(m_window->tr("Settings..."));
@@ -751,7 +752,7 @@ void WorkbenchMenuManager::buildHelpMenu()
     connect(settingsAction, &QAction::triggered, this, [this]() {
         if (m_operationBus)
             m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("help.settings")));
-    });
+        });
     m_menuState.helpMenu->addSeparator();
 
     m_menuState.languageMenu = m_menuState.helpMenu->addMenu(m_window->tr("Language"));
@@ -767,7 +768,7 @@ void WorkbenchMenuManager::buildHelpMenu()
         langGroup->addAction(act);
         connect(act, &QAction::triggered, this, [lang]() {
             LM->setLanguage(lang);
-        });
+            });
     }
     if (m_languageChangedConn)
         disconnect(m_languageChangedConn);
@@ -786,7 +787,7 @@ void WorkbenchMenuManager::buildHelpMenu()
                 act->setChecked(langs[idx] == newLang);
             }
         }
-    });
+        });
 
     m_menuState.helpThemeMenu = m_menuState.helpMenu->addMenu(m_window->tr("Theme"));
     auto* themeGroup = new QActionGroup(m_window);
@@ -801,7 +802,7 @@ void WorkbenchMenuManager::buildHelpMenu()
         themeGroup->addAction(act);
         connect(act, &QAction::triggered, this, [theme]() {
             TM->setTheme(theme);
-        });
+            });
     }
     if (m_themeChangedConn)
         disconnect(m_themeChangedConn);
@@ -820,7 +821,7 @@ void WorkbenchMenuManager::buildHelpMenu()
                 act->setChecked(themes[idx] == newTheme);
             }
         }
-    });
+        });
 
     m_menuState.helpMenu->addSeparator();
 
@@ -829,7 +830,7 @@ void WorkbenchMenuManager::buildHelpMenu()
     connect(aboutAction, &QAction::triggered, this, [this]() {
         if (m_operationBus)
             m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("help.about")));
-    });
+        });
 }
 
 void WorkbenchMenuManager::initializeThemeMenuSkeleton()
@@ -846,8 +847,8 @@ void WorkbenchMenuManager::buildThemeMenu()
         action->setCheckable(true);
         connect(action, &QAction::triggered, this, [this, themeId]() {
             m_window->triggerTheme(themeId);
-        });
-    };
+            });
+        };
 
     addThemeAction(m_window->tr("System"), QStringLiteral("system"));
     addThemeAction(m_window->tr("Light"), QStringLiteral("light"));
@@ -867,7 +868,7 @@ void WorkbenchMenuManager::bindShortcuts()
     connect(undoAction, &QAction::triggered, this, [this]() {
         if (m_operationBus)
             m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("edit.undo")));
-    });
+        });
     m_window->addAction(undoAction);
 
     auto* redoAction = new QAction(m_window->tr("Redo"), m_window);
@@ -875,7 +876,7 @@ void WorkbenchMenuManager::bindShortcuts()
     connect(redoAction, &QAction::triggered, this, [this]() {
         if (m_operationBus)
             m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("edit.redo")));
-    });
+        });
     m_window->addAction(redoAction);
 }
 

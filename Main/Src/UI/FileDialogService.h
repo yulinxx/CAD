@@ -3,7 +3,10 @@
 #include <QString>
 
 class QWidget;
-namespace Fio { enum class FileFormat; }
+namespace Fio
+{
+    enum class FileFormat;
+}
 
 /**
  * @class FileDialogService

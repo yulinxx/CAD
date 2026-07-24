@@ -52,7 +52,7 @@ ExportResult ExportService::exportWithContext(const ExportContext& context,
         m_stateCenter->setMetadata({
             { QStringLiteral("statusPrompt"),
               QStringLiteral("Exporting: %1").arg(context.targetPath) }
-        });
+            });
     }
 
     emit exportStarted(context.targetPath);
@@ -78,7 +78,7 @@ ExportResult ExportService::exportWithContext(const ExportContext& context,
             m_stateCenter->setBusy(false);
             m_stateCenter->setMetadata({
                 { QStringLiteral("statusPrompt"), QStringLiteral("Export: no entities") }
-            });
+                });
         }
         emit exportFinished(emptyResult);
         return emptyResult;
@@ -111,11 +111,11 @@ ExportResult ExportService::exportWithContext(const ExportContext& context,
         m_stateCenter->setBusy(false);
         QString prompt = result.success
             ? QStringLiteral("Export completed: %1 entities")
-                .arg(result.exportedEntityCount)
+            .arg(result.exportedEntityCount)
             : QStringLiteral("Export failed: %1").arg(result.message);
         m_stateCenter->setMetadata({
             { QStringLiteral("statusPrompt"), prompt }
-        });
+            });
     }
 
     emit exportFinished(result);

@@ -6,16 +6,25 @@
 class BmpExportWriter : public IExportWriter
 {
 public:
-    Fio::FileFormat format() const override { return Fio::FileFormat::BMP; }
+    Fio::FileFormat format() const override
+    {
+        return Fio::FileFormat::BMP;
+    }
 
     QStringList supportedExtensions() const override
     {
         return { QStringLiteral("bmp") };
     }
 
-    QString formatName() const override { return QStringLiteral("BMP"); }
+    QString formatName() const override
+    {
+        return QStringLiteral("BMP");
+    }
 
-    QString defaultExtension() const override { return QStringLiteral("bmp"); }
+    QString defaultExtension() const override
+    {
+        return QStringLiteral("bmp");
+    }
 
     ExportResult write(const ExportContext& context,
         const Fio::VecSyEntityPtr& entities) override;

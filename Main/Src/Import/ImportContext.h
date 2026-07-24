@@ -1,9 +1,22 @@
 #pragma once
 
+#include <functional>
+
 #include <QString>
 #include <QStringList>
 
 #include "FileIO/FileFormat.h"
+
+/// 导入阶段枚举：标识当前导入流程所处的阶段
+enum class ImportPhase
+{
+    Unknown,                 ///< 未知阶段
+    DetectFormat,            ///< 识别格式阶段
+    Parse,                   ///< 解析文件阶段
+    BuildDocument,           ///< 构建文档阶段
+    RefreshDisplay,          ///< 刷新显示阶段
+    WriteBackState           ///< 回写状态阶段
+};
 
 /// 统一导入上下文：承载导入操作所需的所有参数和状态信息
 struct ImportContext
@@ -28,4 +41,14 @@ struct ImportContext
     bool preserveText{ true };
     /// 附加元数据（扩展用）
     QStringList warnings;
+
+    /// 取消回调：返回 true 表示用户已取消，导入流程应提前终止
+    std::function<bool()> cancelCallback;
+    /// 进度回调：参数为当前阶段和进度值（0.0 ~ 1.0）
+    std::function<void(ImportPhase, float)> progressCallback;
+
+    /// 最近文件添加回调（阶段5回写状态使用）
+    std::function<void(const QString&)> recentFileAddCallback;
+    /// 当前文档路径更新回调（阶段5回写状态使用）
+    std::function<void(const QString&)> currentDocumentPathCallback;
 };

@@ -6,16 +6,25 @@
 class PdfExportWriter : public IExportWriter
 {
 public:
-    Fio::FileFormat format() const override { return Fio::FileFormat::PDF; }
+    Fio::FileFormat format() const override
+    {
+        return Fio::FileFormat::PDF;
+    }
 
     QStringList supportedExtensions() const override
     {
         return { QStringLiteral("pdf") };
     }
 
-    QString formatName() const override { return QStringLiteral("PDF"); }
+    QString formatName() const override
+    {
+        return QStringLiteral("PDF");
+    }
 
-    QString defaultExtension() const override { return QStringLiteral("pdf"); }
+    QString defaultExtension() const override
+    {
+        return QStringLiteral("pdf");
+    }
 
     ExportResult write(const ExportContext& context,
         const Fio::VecSyEntityPtr& entities) override;

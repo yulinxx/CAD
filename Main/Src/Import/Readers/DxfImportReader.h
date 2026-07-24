@@ -6,14 +6,20 @@
 class DxfImportReader : public IImportReader
 {
 public:
-    Fio::FileFormat format() const override { return Fio::FileFormat::DXF; }
+    Fio::FileFormat format() const override
+    {
+        return Fio::FileFormat::DXF;
+    }
 
     QStringList supportedExtensions() const override
     {
         return { QStringLiteral("dxf") };
     }
 
-    QString formatName() const override { return QStringLiteral("DXF"); }
+    QString formatName() const override
+    {
+        return QStringLiteral("DXF");
+    }
 
     ImportResult read(const ImportContext& context,
         Fio::VecSyEntityPtr& outEntities) override;

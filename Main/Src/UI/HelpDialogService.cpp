@@ -86,7 +86,7 @@ int HelpDialogService::showQuestion(QWidget* parent, const QString& title, const
 }
 
 double HelpDialogService::getDouble(QWidget* parent, const QString& title, const QString& label,
-                                     double value, double min, double max, int decimals, bool* ok)
+    double value, double min, double max, int decimals, bool* ok)
 {
     return QInputDialog::getDouble(parent, title, label, value, min, max, decimals, ok);
 }

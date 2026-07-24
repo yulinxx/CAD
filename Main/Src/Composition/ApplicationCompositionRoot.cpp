@@ -1,16 +1,17 @@
 #include "ApplicationCompositionRoot.h"
 
-#include "../UI/UiLayoutService.h"
-#include "../UI/UiServices.h"
-#include "../UI/UiShellHost.h"
-#include "../UI/WorkbenchWindow.h"
-#include "../UI/UiStateCenter.h"
-#include "../UI/UiThemeService.h"
-#include "../Common/AppInitializer.h"
-#include "../Persistence/LayerPersistenceBridge.h"
-#include "../Persistence/PersistenceService.h"
-#include "../Persistence/Models/DocumentRecord.h"
-#include "../Persistence/Repositories/DocumentRepository.h"
+#include "UI/UiLayoutService.h"
+#include "UI/UiServices.h"
+#include "UI/UiShellHost.h"
+#include "UI/WorkbenchWindow.h"
+#include "UI/UiStateCenter.h"
+#include "UI/UiThemeService.h"
+#include "UI/RenderViewport2D.h"
+#include "Common/AppInitializer.h"
+#include "Persistence/LayerPersistenceBridge.h"
+#include "Persistence/PersistenceService.h"
+#include "Persistence/Models/DocumentRecord.h"
+#include "Persistence/Repositories/DocumentRepository.h"
 
 #include "UI2D/Operation/OperationId.h"
 #include "UI2D/Operation/IOperation.h"
@@ -19,6 +20,7 @@
 #include <QFileInfo>
 #include <QDateTime>
 #include <QMessageBox>
+#include <QApplication>
 
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/UndoRedoManager.h"
@@ -117,6 +119,21 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     m_importService->setSceneManager(m_sceneManager.get());
     m_importService->setEditService(m_sceneEditService.get());
     m_importService->setStateCenter(m_stateCenter.get());
+    // 设置文档持久化回调（阶段5回写状态使用）
+    m_importService->setDocumentPersistenceCallback([this](const QString& filePath, int entityCount) {
+        if (!m_persistenceService || !m_persistenceService->documents()) return;
+        QFileInfo fi(filePath);
+        auto existing = m_persistenceService->documents()->loadByPath(filePath.toStdString());
+        QString now = QDateTime::currentDateTime().toString(Qt::ISODate);
+        DocumentRecord rec;
+        rec.filePath = filePath.toStdString();
+        rec.title = fi.fileName().toStdString();
+        rec.format = fi.suffix().toUpper().toStdString();
+        rec.entityCount = entityCount;
+        rec.lastOpenedAt = now.toStdString();
+        rec.createdAt = existing.id > 0 ? existing.createdAt : now.toStdString();
+        m_persistenceService->documents()->save(rec);
+        });
     // 注册导出写入器
     m_exportDispatcher->registerWriter(std::make_unique<DxfExportWriter>());
     m_exportDispatcher->registerWriter(std::make_unique<SvgExportWriter>());
@@ -257,9 +274,47 @@ PersistenceService* ApplicationCompositionRoot::persistenceService()
     return m_persistenceService;
 }
 
-// 注册缺失的工具切换操作
-// 这些工具在旧框架中通过 ToolSwitchOperation 注册到 ViewWidget 工具系统
-// 新框架 RenderViewport2D 暂未实现工具系统，此处注册占位提示
+// 注册工具切换操作
+// 通过 OperationBus 连接到 RenderViewport2D 的工具系统
+// 工具名称映射：OperationId -> ToolManager 中的工具名称
+namespace
+{
+    QString toolNameFromOperationId(OperationId opId)
+    {
+        switch (opId)
+        {
+            case OperationId::Tool_Select:       return "SelectTool";
+            case OperationId::Tool_Point:        return "PointTool";
+            case OperationId::Tool_Line:         return "LineTool";
+            case OperationId::Tool_Rectangle:    return "RectangleTool";
+            case OperationId::Tool_Ellipse:      return "EllipseTool";
+            case OperationId::Tool_Circle:       return "CircleTool";
+            case OperationId::Tool_Triangle:     return "TriangleTool";
+            case OperationId::Tool_Arc:          return "ArcTool";
+            case OperationId::Tool_Polygon:      return "PolygonTool";
+            case OperationId::Tool_Spline:       return "SplineTool";
+            case OperationId::Tool_Text:         return "TextTool";
+            case OperationId::Tool_Bitmap:       return "BitmapTool";
+            case OperationId::Tool_QRCode:       return "QRCodeTool";
+            default:                             return QString();
+        }
+    }
+
+    RenderViewport2D* findActiveViewport2D()
+    {
+        // 通过全局获取当前活动窗口的 2D 视口
+        QWidget* activeWindow = QApplication::activeWindow();
+        if (!activeWindow)
+            return nullptr;
+
+        auto* workbenchWindow = qobject_cast<WorkbenchWindow*>(activeWindow);
+        if (!workbenchWindow)
+            return nullptr;
+
+        return qobject_cast<RenderViewport2D*>(workbenchWindow->centralWidget());
+    }
+}
+
 void ApplicationCompositionRoot::registerPendingToolOperations()
 {
     if (!m_operationBus)
@@ -267,31 +322,47 @@ void ApplicationCompositionRoot::registerPendingToolOperations()
 
     auto& reg = m_operationBus->registry();
 
-    // 尚未实现的绘图工具占位
+    // 工具操作列表：已接入 ToolManager 的工具
     const OperationId toolOps[] = {
+        OperationId::Tool_Select,
         OperationId::Tool_Point,
+        OperationId::Tool_Line,
         OperationId::Tool_Rectangle,
         OperationId::Tool_Ellipse,
+        OperationId::Tool_Circle,
         OperationId::Tool_Triangle,
+        OperationId::Tool_Arc,
+        OperationId::Tool_Polygon,
         OperationId::Tool_Spline,
         OperationId::Tool_Text,
         OperationId::Tool_Bitmap,
         OperationId::Tool_QRCode,
     };
+
+    int registered = 0;
     for (const auto& opId : toolOps)
     {
-        // 仅在 OperationBus 中未注册时才添加占位
         if (!reg.has(opId))
         {
+            QString toolName = toolNameFromOperationId(opId);
             reg.registerOperation(std::make_unique<LambdaOperation>(
-                opId, [opId] {
-                    SY_WARNF("[PendingTool] OperationId=%d not yet implemented in new framework",
-                        static_cast<int>(opId));
+                opId, [toolName] {
+                    auto* viewport = findActiveViewport2D();
+                    if (viewport)
+                    {
+                        viewport->setActiveTool(toolName);
+                    }
+                    else
+                    {
+                        SY_WARNF("[ToolOperation] No active 2D viewport found for tool: %s",
+                            qPrintable(toolName));
+                    }
                 }));
+            registered++;
         }
     }
 
-    SY_INFO("[ApplicationCompositionRoot] Registered pending tool operations (placeholders)");
+    SY_INFOF("[ApplicationCompositionRoot] Registered %d tool operations to ToolManager", registered);
 }
 
 // 注册缺失的算法/编辑操作
@@ -575,7 +646,6 @@ void ApplicationCompositionRoot::registerFileOperations()
             if (filePath.isEmpty())
                 return false;
 
-            QFileInfo fi(filePath);
             SY_INFOF("[FileOperations] Opening: %s", filePath.toUtf8().constData());
 
             if (!m_importService)
@@ -585,42 +655,32 @@ void ApplicationCompositionRoot::registerFileOperations()
             opts.importAsNewDocument = true;
             opts.autoFit = true;
             opts.autoSwitchWorkbench = false;
-            ImportResult result = m_importService->importFile(filePath, opts);
+
+            // 创建导入上下文，注入回调
+            ImportContext context;
+            context.sourcePath = filePath;
+            context.recentFileAddCallback = [recentFiles](const QString& path) {
+                if (recentFiles)
+                    recentFiles->addRecentFile(path);
+                };
+            context.currentDocumentPathCallback = [currentFilePath](const QString& path) {
+                *currentFilePath = path.toStdString();
+                };
+
+            ImportResult result = m_importService->importWithContext(context, opts);
 
             if (!result.success)
             {
-                SY_ERRORF("[FileOperations] Import failed: %s", result.message.toUtf8().constData());
+                SY_ERRORF("[FileOperations] Import failed: %s (errorType=%d)",
+                    result.message.toUtf8().constData(),
+                    static_cast<int>(result.errorType));
                 HelpDialogService::showWarning(parentWidget, QObject::tr("Import Error"), result.message);
                 return false;
             }
 
             SY_INFOF("[FileOperations] Imported %d entities from %s", result.entityCount, filePath.toUtf8().constData());
 
-            if (m_persistenceService && m_persistenceService->documents())
-            {
-                auto existing = m_persistenceService->documents()->loadByPath(filePath.toStdString());
-                QString now = QDateTime::currentDateTime().toString(Qt::ISODate);
-                DocumentRecord rec;
-                rec.filePath = filePath.toStdString();
-                rec.title = fi.fileName().toStdString();
-                rec.format = fi.suffix().toUpper().toStdString();
-                rec.entityCount = result.entityCount;
-                rec.lastOpenedAt = now.toStdString();
-                rec.createdAt = existing.id > 0 ? existing.createdAt : now.toStdString();
-                m_persistenceService->documents()->save(rec);
-            }
-
-            if (recentFiles)
-                recentFiles->addRecentFile(filePath);
-
-            *currentFilePath = filePath.toStdString();
-
-            if (m_stateCenter)
-            {
-                m_stateCenter->setDirty(false);
-                m_stateCenter->setCurrentDocumentId(filePath);
-            }
-
+            // 更新图层持久化桥接（由外部调用者处理，不在阶段5中）
             if (m_layerPersistenceBridge)
                 m_layerPersistenceBridge->setDocumentId(filePath.toStdString());
 
@@ -681,9 +741,16 @@ void ApplicationCompositionRoot::registerFileOperations()
                 ImportOptions opts;
                 opts.importAsNewDocument = false;
                 opts.autoFit = true;
-                ImportResult result = m_importService->importFile(filePath, opts);
+
+                ImportContext context;
+                context.sourcePath = filePath;
+                ImportResult result = m_importService->importWithContext(context, opts);
+
                 if (!result.success)
                 {
+                    SY_ERRORF("[FileOperations] Import failed: %s (errorType=%d)",
+                        result.message.toUtf8().constData(),
+                        static_cast<int>(result.errorType));
                     HelpDialogService::showWarning(parentWidget, QObject::tr("Import Error"), result.message);
                     return;
                 }
@@ -704,6 +771,7 @@ void ApplicationCompositionRoot::registerFileOperations()
         OperationId::File_ExportDXF, OperationId::File_ExportSVG,
         OperationId::File_ExportPLT, OperationId::File_ExportBMP, OperationId::File_ExportPNG,
     };
+
     for (const auto& opId : exportOps)
     {
         reg.registerOperation(std::make_unique<LambdaOperation>(
@@ -711,15 +779,19 @@ void ApplicationCompositionRoot::registerFileOperations()
                 auto fmt = operationIdToExportFormat(opId);
                 QString filePath = FileDialogService::getSaveFileName(
                     parentWidget, QObject::tr("Export File"), FileDialogService::exportFilterForFormat(fmt));
+
                 if (filePath.isEmpty()) return;
                 if (!m_exportService) return;
+
                 ExportResult result = m_exportService->exportFile(filePath);
                 if (!result.success)
                 {
                     HelpDialogService::showWarning(parentWidget, QObject::tr("Export Error"), result.message);
                     return;
                 }
-                SY_INFOF("[FileOperations] Exported %d entities to %s", result.exportedEntityCount, filePath.toUtf8().constData());
+
+                SY_INFOF("[FileOperations] Exported %d entities to %s", 
+                    result.exportedEntityCount, filePath.toUtf8().constData());
             }));
     }
 

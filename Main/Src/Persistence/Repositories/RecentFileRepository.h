@@ -6,7 +6,10 @@
 #include <vector>
 #include <string>
 
-namespace Eg { class Database; }
+namespace Eg
+{
+    class Database;
+}
 
 /**
  * @brief 最近文件仓储 — 封装 recent_files 表的 CRUD 操作

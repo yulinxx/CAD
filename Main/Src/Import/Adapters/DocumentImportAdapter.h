@@ -6,7 +6,10 @@
 
 #include "FileIO/FileFormat.h"
 
-namespace Eg { class SceneManager; class SyEntity; }
+namespace Eg
+{
+    class SceneManager; class SyEntity;
+}
 class SceneEditService;
 
 /// 文档导入适配器：将导入的实体数据落地到场景文档

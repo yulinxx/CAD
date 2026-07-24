@@ -158,7 +158,10 @@ public:
     void refreshThemeMenuChecks(const QString& themeId);
 
     /// 菜单管理器
-    WorkbenchMenuManager* menuManager() const { return m_menuManager; }
+    WorkbenchMenuManager* menuManager() const
+    {
+        return m_menuManager;
+    }
 
 private:
     /// 创建窗口初始占位内容，作为工作台首次挂接前的安全兜底

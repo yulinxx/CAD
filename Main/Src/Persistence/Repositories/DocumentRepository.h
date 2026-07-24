@@ -6,7 +6,10 @@
 #include <vector>
 #include <string>
 
-namespace Eg { class Database; }
+namespace Eg
+{
+    class Database;
+}
 
 /**
  * @brief 文档元数据仓储 — 封装 documents 表的 CRUD 操作

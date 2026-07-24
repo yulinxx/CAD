@@ -6,16 +6,25 @@
 class ObjExportWriter : public IExportWriter
 {
 public:
-    Fio::FileFormat format() const override { return Fio::FileFormat::Unknown; }
+    Fio::FileFormat format() const override
+    {
+        return Fio::FileFormat::Unknown;
+    }
 
     QStringList supportedExtensions() const override
     {
         return { QStringLiteral("obj") };
     }
 
-    QString formatName() const override { return QStringLiteral("OBJ"); }
+    QString formatName() const override
+    {
+        return QStringLiteral("OBJ");
+    }
 
-    QString defaultExtension() const override { return QStringLiteral("obj"); }
+    QString defaultExtension() const override
+    {
+        return QStringLiteral("obj");
+    }
 
     ExportResult write(const ExportContext& context,
         const Fio::VecSyEntityPtr& entities) override;

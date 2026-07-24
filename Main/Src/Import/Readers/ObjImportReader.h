@@ -7,14 +7,20 @@
 class ObjImportReader : public IImportReader
 {
 public:
-    Fio::FileFormat format() const override { return Fio::FileFormat::Unknown; }
+    Fio::FileFormat format() const override
+    {
+        return Fio::FileFormat::Unknown;
+    }
 
     QStringList supportedExtensions() const override
     {
         return { QStringLiteral("obj") };
     }
 
-    QString formatName() const override { return QStringLiteral("OBJ"); }
+    QString formatName() const override
+    {
+        return QStringLiteral("OBJ");
+    }
 
     ImportResult read(const ImportContext& context,
         Fio::VecSyEntityPtr& outEntities) override;

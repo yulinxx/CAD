@@ -65,7 +65,7 @@ void AppInitializer::initialize()
 {
     SyLogger::SetLogPathCallback([]() {
         return AppPathManager::logsDir().toStdString();
-    });
+        });
 
     SyLogger::GetInstance().Initialize(
         MainApp::appName().c_str(),

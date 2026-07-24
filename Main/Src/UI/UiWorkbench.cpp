@@ -6,6 +6,7 @@
 #include <QToolBar>
 #include <QWidget>
 #include <QTimer>
+#include <QStatusBar>
 
 #include "SceneDocument2D.h"
 #include "SelectionService.h"
@@ -15,7 +16,7 @@
 #include "UiSceneTreeDock.h"
 #include "UiPropertiesPanel.h"
 #include "UiViewWidgets.h"
-#include "ViewWidgetAdapter.h"
+#include "RenderViewportAdapter.h"
 #include "RenderViewport2D.h"
 #include "DrawToolBarWidget.h"
 #include "WorkbenchWindow.h"
@@ -158,7 +159,8 @@ namespace
 
     /// 配置 2D 视口（使用 Renderx 渲染路径）
     void configure2DViewport(RenderViewport2D* viewport, const UiServices& services,
-        SceneDocument2D* document, PropertiesPanelWidget* properties)
+        SceneDocument2D* document, PropertiesPanelWidget* properties,
+        SceneEditService* sceneEditService = nullptr)
     {
         if (!viewport)
             return;
@@ -169,6 +171,9 @@ namespace
         // 传递操作总线引用给视口
         if (services.operationBus)
             viewport->setOperationBus(services.operationBus);
+        // 设置场景编辑服务（工具提交图元时使用）
+        if (sceneEditService)
+            viewport->setSceneEditService(sceneEditService);
 
         viewport->setStatusCallback([&services, properties](const QString& status) {
             if (services.stateCenter)
@@ -437,7 +442,7 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
             if (!currentWorkbenchId.isEmpty() && currentWorkbenchId.compare(workbenchId, Qt::CaseInsensitive) == 0)
                 return;
             window.triggerWorkbench(workbenchId);
-        });
+            });
         windowServices.importService->setViewportFitCallback([viewport]() {
             if (!viewport)
                 return;
@@ -466,19 +471,25 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
                         return;
                     viewport->zoomToFit();
                     viewport->requestSceneRefresh();
-                });
-            };
+                    });
+                };
 
             QTimer::singleShot(0, viewport, refreshAfterReady);
-        });
+            });
         windowServices.importService->setTreeRebuildCallback([sceneTreeDock]() {
             if (sceneTreeDock)
                 sceneTreeDock->refresh();
-        });
+            });
         windowServices.importService->setPropertyRefreshCallback([properties]() {
             if (properties)
                 properties->refresh();
-        });
+            });
+        // 设置状态栏更新回调
+        windowServices.importService->setStatusBarUpdateCallback([&window](const QString& message) {
+            // 不使用 showMessage，它会临时覆盖状态栏永久 widget（导致坐标标签被覆盖）
+            // 导入状态已通过 stateCenter->statusPrompt -> msgLabel 展示
+            SY_INFOF("[Import] Status: %s", message.toUtf8().constData());
+            });
     }
     if (properties)
     {
@@ -506,13 +517,15 @@ QWidget* Workbench2D::createCentralViewport(WorkbenchWindow& window, PropertiesP
     // 使用基于 Renderx 的 2D 渲染视口
     auto* viewport = new RenderViewport2D(&window);
     // 接入命令系统：注入 document/dispatcher/interactionDispatcher/operationBus 和回调
-    configure2DViewport(viewport, m_services, m_services.document2D, properties);
+    configure2DViewport(viewport, m_services, m_services.document2D, properties, m_services.sceneEditService);
     // 连接鼠标位置回调到状态栏 posLabel
     viewport->setPositionCallback([&window](double x, double y) {
         window.updatePositionLabel(x, y);
-    });
+        });
     viewport->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     viewport->setMinimumSize(800, 600);
+    // 初始化工具系统
+    viewport->initializeTools();
     return viewport;
 }
 

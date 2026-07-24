@@ -328,7 +328,6 @@ void SceneDocument2D::removeEntity(const QString& id)
         if (entity)
             m_scene->deleteEntity(entity);
     }
-
 }
 
 Eg::SyEntity* SceneDocument2D::entityByStringId(const QString& id) const

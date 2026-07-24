@@ -11,7 +11,7 @@
 #include <QDir>
 #include <QStandardPaths>
 
-/// 应用名称常量（唯一路径控制源）
+ /// 应用名称常量（唯一路径控制源）
 static const QString APP_NAME = QStringLiteral("SanYiCAD");
 
 /**

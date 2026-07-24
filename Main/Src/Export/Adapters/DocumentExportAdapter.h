@@ -4,7 +4,10 @@
 
 #include "FileIO/FileFormat.h"
 
-namespace Eg { class SceneManager; }
+namespace Eg
+{
+    class SceneManager;
+}
 
 /// 文档导出适配器：从场景文档收集实体数据供导出使用
 class DocumentExportAdapter

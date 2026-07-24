@@ -17,9 +17,13 @@ class SceneTreeDockWidget;
 class PropertiesPanelWidget;
 class SceneEditService;
 
-namespace Eg { class SceneManager; }
+namespace Eg
+{
+    class SceneManager;
+}
 
 /// 导入服务：导入操作的总入口，协调格式识别、解析、文档构建和 UI 刷新
+/// 导入流程：识别格式 → 解析 → 构建文档 → 刷新显示 → 回写状态
 class ImportService : public QObject
 {
     Q_OBJECT
@@ -53,6 +57,18 @@ public:
     /// @param callback 参数为目标工作台 ID
     void setWorkbenchSwitchCallback(std::function<void(const QString&)> callback);
 
+    /// 设置状态栏更新回调（导入完成后更新状态栏）
+    void setStatusBarUpdateCallback(std::function<void(const QString&)> callback);
+
+    /// 设置最近文件添加回调（导入完成后添加到最近文件列表）
+    void setRecentFileAddCallback(std::function<void(const QString&)> callback);
+
+    /// 设置当前文档路径更新回调（导入完成后更新当前文档路径）
+    void setCurrentDocumentPathCallback(std::function<void(const QString&)> callback);
+
+    /// 设置文档持久化回调（导入完成后保存文档记录）
+    void setDocumentPersistenceCallback(std::function<void(const QString&, int)> callback);
+
     /// 执行文件导入
     /// @param filePath 源文件路径
     /// @param options 导入选项
@@ -76,15 +92,38 @@ public:
 signals:
     /// 导入开始信号
     void importStarted(const QString& filePath);
+    /// 导入阶段变化信号
+    void importPhaseChanged(ImportPhase phase);
     /// 导入进度信号（0.0 ~ 1.0）
     void importProgress(float progress);
     /// 导入完成信号
     void importFinished(const ImportResult& result);
 
 private:
-    /// 导入后的统一 UI 刷新流程
-    void postImportRefresh(const ImportResult& result,
+    /// 阶段1：识别文件格式
+    ImportResult phaseDetectFormat(ImportContext& context);
+
+    /// 阶段2：解析文件
+    ImportResult phaseParse(const ImportContext& context,
+        Fio::VecSyEntityPtr& outEntities);
+
+    /// 阶段3：构建文档（将实体添加到场景）
+    ImportResult phaseBuildDocument(const ImportContext& context,
+        Fio::VecSyEntityPtr& entities, const ImportOptions& options);
+
+    /// 阶段4：刷新显示（工作台、视口、树、属性面板）
+    void phaseRefreshDisplay(const ImportResult& result,
         const ImportOptions& options);
+
+    /// 阶段5：回写状态（状态栏、最近文件、文档记录）
+    void phaseWriteBackState(const ImportContext& context,
+        const ImportResult& result);
+
+    /// 更新进度
+    void updateProgress(ImportPhase phase, float progress);
+
+    /// 检查是否已取消
+    bool isCanceled(const ImportContext& context) const;
 
     /// 导入分发器（非拥有指针，由组合根管理生命周期）
     ImportDispatcher* m_dispatcher{ nullptr };
@@ -103,4 +142,12 @@ private:
     std::function<void()> m_propertyRefreshCallback;
     /// 工作台切换回调
     std::function<void(const QString&)> m_workbenchSwitchCallback;
+    /// 状态栏更新回调
+    std::function<void(const QString&)> m_statusBarUpdateCallback;
+    /// 最近文件添加回调
+    std::function<void(const QString&)> m_recentFileAddCallback;
+    /// 当前文档路径更新回调
+    std::function<void(const QString&)> m_currentDocumentPathCallback;
+    /// 文档持久化回调
+    std::function<void(const QString&, int)> m_documentPersistenceCallback;
 };

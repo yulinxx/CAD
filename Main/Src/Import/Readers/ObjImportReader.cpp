@@ -13,5 +13,5 @@ ImportResult ObjImportReader::read(const ImportContext& context,
         msg.toUtf8().constData(),
         context.sourcePath.toUtf8().constData());
 
-    return ImportResult::fail(msg);
+    return ImportResult::fail(msg, ImportErrorType::FormatNotSupported);
 }

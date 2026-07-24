@@ -54,8 +54,14 @@ int DatabaseBootstrapper::schemaVersion() const
     if (version.empty())
         return 0;
 
-    try { return std::stoi(version); }
-    catch (...) { return 0; }
+    try
+    {
+        return std::stoi(version);
+    }
+    catch (...)
+    {
+        return 0;
+    }
 }
 
 int DatabaseBootstrapper::latestSchemaVersion()

@@ -21,7 +21,15 @@ ImportResult PdfImportReader::read(const ImportContext& context,
         for (const auto& w : parseResult.warnings)
             warns.append(QString::fromStdString(w));
 
-        return ImportResult::fail(msg, warns);
+        // 根据错误信息判断错误类型
+        ImportErrorType errorType = ImportErrorType::ParseFailed;
+        if (msg.contains(QStringLiteral("file not found"), Qt::CaseInsensitive) ||
+            msg.contains(QStringLiteral("cannot open"), Qt::CaseInsensitive))
+        {
+            errorType = ImportErrorType::FileNotFound;
+        }
+
+        return ImportResult::fail(msg, errorType, warns);
     }
 
     QStringList warns;

@@ -122,7 +122,7 @@
 
 #include <QCloseEvent>
 #include <QMessageBox>
-    
+
 WorkbenchWindow::WorkbenchWindow(QWidget* parent)
     : QMainWindow(parent)
 {
@@ -741,7 +741,7 @@ void WorkbenchWindow::populateRecentFilesMenu()
                 // 兜底：走文件打开对话框（用户手动选取）
                 m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("file.open")));
             }
-        });
+            });
 
         ++index;
     }
@@ -1065,8 +1065,8 @@ void WorkbenchWindow::triggerTheme(const QString& themeId)
     else
     {
         // 主题加载失败时只做错误上报，不在这里尝试额外回退逻辑，避免主题链复杂化
-        reportFrameworkError(QStringLiteral("theme.load_failed"), 
-        QStringLiteral("Failed to load theme %1").arg(themeId), QStringLiteral("WorkbenchWindow::triggerTheme"));
+        reportFrameworkError(QStringLiteral("theme.load_failed"),
+            QStringLiteral("Failed to load theme %1").arg(themeId), QStringLiteral("WorkbenchWindow::triggerTheme"));
     }
 
     if (m_stateCenter)
@@ -1130,7 +1130,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
 
     if (!canExecuteCommand(QStringLiteral("workbench.switch.%1").arg(workbenchId), QStringLiteral("WorkbenchWindow::triggerWorkbench")))
     {
-        reportFrameworkError(QStringLiteral("workbench.switch_denied"), QStringLiteral("Workbench switch denied: %1").arg(workbenchId), 
+        reportFrameworkError(QStringLiteral("workbench.switch_denied"), QStringLiteral("Workbench switch denied: %1").arg(workbenchId),
             QStringLiteral("WorkbenchWindow::triggerWorkbench"));
 
         recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.denied"),

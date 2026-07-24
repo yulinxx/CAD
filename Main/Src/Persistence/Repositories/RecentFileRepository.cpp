@@ -66,7 +66,7 @@ bool RecentFileRepository::append(const RecentFileRecord& record)
     // 控制列表上限，删除超出上限的最旧记录
     constexpr int kMaxRecentFiles = 10;
     std::string deleteSql = "DELETE FROM recent_files WHERE id NOT IN "
-        "(SELECT id FROM recent_files ORDER BY last_opened_at DESC LIMIT " 
+        "(SELECT id FROM recent_files ORDER BY last_opened_at DESC LIMIT "
         + std::to_string(kMaxRecentFiles) + ")";
     if (!m_database.execute(deleteSql))
     {

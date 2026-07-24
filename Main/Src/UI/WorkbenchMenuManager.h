@@ -52,12 +52,30 @@ public:
     void syncGridSnapMenuState();
     void refreshGridSnapMenuChecks();
 
-    QMenu* fileMenu() const { return m_menuState.fileMenu; }
-    QMenu* recentFilesMenu() const { return m_menuState.recentFilesMenu; }
-    QMenu* importMenu() const { return m_menuState.importMenu; }
-    QMenu* exportMenu() const { return m_menuState.exportMenu; }
-    QAction* workbench2DAction() const { return m_menuState.workbench2DAction; }
-    QAction* workbench3DAction() const { return m_menuState.workbench3DAction; }
+    QMenu* fileMenu() const
+    {
+        return m_menuState.fileMenu;
+    }
+    QMenu* recentFilesMenu() const
+    {
+        return m_menuState.recentFilesMenu;
+    }
+    QMenu* importMenu() const
+    {
+        return m_menuState.importMenu;
+    }
+    QMenu* exportMenu() const
+    {
+        return m_menuState.exportMenu;
+    }
+    QAction* workbench2DAction() const
+    {
+        return m_menuState.workbench2DAction;
+    }
+    QAction* workbench3DAction() const
+    {
+        return m_menuState.workbench3DAction;
+    }
 
 private:
     void buildFileMenu();

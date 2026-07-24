@@ -104,6 +104,7 @@ target_include_directories(${app_name}
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Persistence/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Common/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Src"
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Log/Log/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Include"

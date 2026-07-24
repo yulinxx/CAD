@@ -1,6 +1,6 @@
 /**
- * @file ViewWidgetAdapter.h
- * @brief ViewWidget 适配器 — 让 Viewport2D/RenderViewport2D 能被 OperationBus 使用
+ * @file RenderViewportAdapter.h
+ * @brief RenderViewport2D 适配器 — 让 RenderViewport2D 能被 OperationBus 使用
  */
 #pragma once
 
@@ -18,14 +18,15 @@ namespace Eg
     class SceneManager;
 }
 
-class ViewWidgetAdapter : public QObject
+class RenderViewportAdapter : public QObject
 {
     Q_OBJECT
 
 public:
-    explicit ViewWidgetAdapter(RenderViewport2D* viewport, QObject* parent = nullptr);
-    ~ViewWidgetAdapter() override = default;
+    explicit RenderViewportAdapter(RenderViewport2D* viewport, QObject* parent = nullptr);
+    ~RenderViewportAdapter() override = default;
 
+public:
     void resetView();
     void zoomToFit();
     QPointF screenToWorld(const QPoint& screenPos) const;

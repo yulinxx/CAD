@@ -49,5 +49,5 @@ public:
     /// @param ok 输出：用户是否点击了确定
     /// @return 用户输入的数值
     static double getDouble(QWidget* parent, const QString& title, const QString& label,
-                            double value, double min, double max, int decimals, bool* ok);
+        double value, double min, double max, int decimals, bool* ok);
 };

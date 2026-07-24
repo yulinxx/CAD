@@ -6,7 +6,10 @@
 #include <vector>
 #include <string>
 
-namespace Eg { class Database; }
+namespace Eg
+{
+    class Database;
+}
 
 /**
  * @brief 工作台布局快照仓储 — 封装 workspace_snapshots 表的 CRUD 操作

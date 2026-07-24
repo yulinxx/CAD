@@ -13,7 +13,10 @@
 class ExportDispatcher;
 class UiStateCenter;
 
-namespace Eg { class SceneManager; }
+namespace Eg
+{
+    class SceneManager;
+}
 
 /// 导出服务：导出操作的总入口，协调数据收集、格式写入和状态回写
 class ExportService : public QObject

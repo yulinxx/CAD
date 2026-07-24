@@ -6,14 +6,20 @@
 class SvgImportReader : public IImportReader
 {
 public:
-    Fio::FileFormat format() const override { return Fio::FileFormat::SVG; }
+    Fio::FileFormat format() const override
+    {
+        return Fio::FileFormat::SVG;
+    }
 
     QStringList supportedExtensions() const override
     {
         return { QStringLiteral("svg"), QStringLiteral("svgz") };
     }
 
-    QString formatName() const override { return QStringLiteral("SVG"); }
+    QString formatName() const override
+    {
+        return QStringLiteral("SVG");
+    }
 
     ImportResult read(const ImportContext& context,
         Fio::VecSyEntityPtr& outEntities) override;

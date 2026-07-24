@@ -20,12 +20,15 @@
 
 #include "Engine/EntityIdGenerator.h"
 #include "Engine2D/Core/SceneNotifier.h"
+#include "Engine2D/Edit/SceneEditService.h"
 
 class RenderWidget;
 class SceneDocument2D;
 class ISelectionService;
 class IInteractionDispatcher;
 class OperationBus;
+class ToolManager;
+struct ToolContext;
 
 class QMouseEvent;
 class QWheelEvent;
@@ -44,7 +47,8 @@ namespace Eg
  */
 struct Camera2D
 {
-    float zoom = 1.0f;
+    float zoomX = 1.0f;
+    float zoomY = 1.0f;
     QPointF panOffset;
 
     static constexpr float MIN_ZOOM = 0.001f;
@@ -70,7 +74,7 @@ struct Camera2D
     void zoomToFit(float vpW, float vpH, float sceneW, float sceneH);
 
     // 设置视图范围：以 (centerX, centerY) 为中心，可见半宽半高为 halfW/halfH
-    // 根据视口尺寸计算合适的 zoom，使世界范围 [-halfW, halfW] x [-halfH, halfH] 可见
+    // 根据视口尺寸计算合适的 zoomX/zoomY，使世界范围 [-halfW, halfW] x [-halfH, halfH] 可见
     void setViewExtent(float vpW, float vpH, float centerX, float centerY, float halfW, float halfH);
 };
 
@@ -81,7 +85,7 @@ struct Camera2D
  * 数据层通过 ISceneDataSource 接口推送几何原语，渲染层自行处理细分和缓存。
  */
 class RenderViewport2D : public QWidget
-                         , private Eg::SceneNotifier::IObserver
+    , private Eg::SceneNotifier::IObserver
 {
     Q_OBJECT
 public:
@@ -98,6 +102,18 @@ public:
     void setPositionCallback(std::function<void(double, double)>&& callback);
 
     void setDocument(SceneDocument2D* document);
+
+    // ==================== 工具系统接口 ====================
+    /// 设置场景编辑服务（工具提交图元时使用）
+    void setSceneEditService(SceneEditService* service);
+    /// 初始化工具系统
+    void initializeTools();
+    /// 设置活动工具
+    bool setActiveTool(const QString& toolName);
+    /// 获取活动工具名称
+    QString activeToolName() const;
+    /// 获取工具管理器
+    ToolManager* toolManager() const;
     SceneDocument2D* document() const
     {
         return m_document;
@@ -105,8 +121,6 @@ public:
     void setSelectionService(ISelectionService* service);
     void setInteractionDispatcher(IInteractionDispatcher* dispatcher);
     void setOperationBus(OperationBus* bus);
-
-    
 
     void resetView();
     void zoomToFit();
@@ -192,6 +206,10 @@ private:
     ISelectionService* m_selectionService{ nullptr };
     IInteractionDispatcher* m_interactionDispatcher{ nullptr };
     OperationBus* m_operationBus{ nullptr };
+    SceneEditService* m_sceneEditService{ nullptr };
+
+    // 工具系统
+    std::unique_ptr<ToolManager> m_toolManager;
 
     // 回调
     std::function<void(const QString&)> m_statusCallback;

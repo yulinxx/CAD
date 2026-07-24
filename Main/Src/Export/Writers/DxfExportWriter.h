@@ -6,16 +6,25 @@
 class DxfExportWriter : public IExportWriter
 {
 public:
-    Fio::FileFormat format() const override { return Fio::FileFormat::DXF; }
+    Fio::FileFormat format() const override
+    {
+        return Fio::FileFormat::DXF;
+    }
 
     QStringList supportedExtensions() const override
     {
         return { QStringLiteral("dxf") };
     }
 
-    QString formatName() const override { return QStringLiteral("DXF"); }
+    QString formatName() const override
+    {
+        return QStringLiteral("DXF");
+    }
 
-    QString defaultExtension() const override { return QStringLiteral("dxf"); }
+    QString defaultExtension() const override
+    {
+        return QStringLiteral("dxf");
+    }
 
     ExportResult write(const ExportContext& context,
         const Fio::VecSyEntityPtr& entities) override;

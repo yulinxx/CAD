@@ -2,6 +2,8 @@
 #include "ImportDispatcher.h"
 #include "ImportResult.h"
 
+#include <QFileInfo>
+
 #include "Log/SyLogger.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
@@ -55,6 +57,30 @@ void ImportService::setWorkbenchSwitchCallback(
     m_workbenchSwitchCallback = std::move(callback);
 }
 
+void ImportService::setStatusBarUpdateCallback(
+    std::function<void(const QString&)> callback)
+{
+    m_statusBarUpdateCallback = std::move(callback);
+}
+
+void ImportService::setRecentFileAddCallback(
+    std::function<void(const QString&)> callback)
+{
+    m_recentFileAddCallback = std::move(callback);
+}
+
+void ImportService::setCurrentDocumentPathCallback(
+    std::function<void(const QString&)> callback)
+{
+    m_currentDocumentPathCallback = std::move(callback);
+}
+
+void ImportService::setDocumentPersistenceCallback(
+    std::function<void(const QString&, int)> callback)
+{
+    m_documentPersistenceCallback = std::move(callback);
+}
+
 ImportResult ImportService::importFile(const QString& filePath,
     const ImportOptions& options)
 {
@@ -70,7 +96,7 @@ ImportResult ImportService::importWithContext(const ImportContext& context,
     {
         QString msg = QStringLiteral("ImportDispatcher not set");
         SY_ERRORF("[ImportService] %s", msg.toUtf8().constData());
-        return ImportResult::fail(msg);
+        return ImportResult::fail(msg, ImportErrorType::Unknown);
     }
 
     // 状态中心：标记繁忙
@@ -80,87 +106,66 @@ ImportResult ImportService::importWithContext(const ImportContext& context,
         m_stateCenter->setMetadata({
             { QStringLiteral("statusPrompt"),
               QStringLiteral("Importing: %1").arg(context.sourcePath) }
-        });
+            });
     }
 
     emit importStarted(context.sourcePath);
 
-    // 通过分发器执行导入
+    // 创建可修改的上下文副本（用于注入检测到的格式）
+    ImportContext mutableCtx = context;
+
+    // 提前声明，避免 goto 跳过初始化
     Fio::VecSyEntityPtr importedEntities;
-    ImportResult result = m_dispatcher->dispatch(context, importedEntities);
 
-    if (result.success && !importedEntities.empty())
+    // ===== 阶段1：识别文件格式 =====
+    ImportResult result = phaseDetectFormat(mutableCtx);
+    if (!result.success)
     {
-        // ---- 实体合法性过滤：拒绝坏数据进入 SceneManager / RenderWorld ----
-        Fio::VecSyEntityPtr validEntities;
-        validEntities.reserve(importedEntities.size());
-        for (auto& entity : importedEntities)
-        {
-            if (entity && entity->isValid())
-                validEntities.push_back(std::move(entity));
-            else
-            {
-                SY_WARNF("[ImportService] Skipping invalid entity (null or degenerate geometry)");
-                result.warnings.append(QStringLiteral("Skipped an invalid entity"));
-            }
-        }
-        importedEntities = std::move(validEntities);
-
-        result.entityCount = static_cast<int>(importedEntities.size());
-
-        if (importedEntities.empty())
-        {
-            SY_WARN("[ImportService] All entities were invalid — nothing to import");
-            result.message = QStringLiteral("No valid entities to import");
-            result.success = false;
-            if (m_stateCenter) m_stateCenter->setBusy(false);
-            return result;
-        }
-
-        SY_INFOF("[ImportService] Preparing scene update: path=%s entities=%d newDocument=%d sceneManager=%p",
-            context.sourcePath.toUtf8().constData(),
-            result.entityCount,
-            options.importAsNewDocument ? 1 : 0,
-            m_sceneManager);
-
-        // 如果作为新文档导入，先清空场景
-        if (options.importAsNewDocument && m_sceneManager)
-        {
-            SY_INFO("[ImportService] Clearing scene before import");
-            m_sceneManager->clearScene();
-        }
-
-        // 将导入的实体添加到场景（通过 SceneEditService 确保 Undo/图层分配/ID 冲突处理）
-        int addedCount = static_cast<int>(importedEntities.size());
-        if (m_editService)
-        {
-            m_editService->addEntities(std::move(importedEntities), "Import " + context.sourcePath.toStdString());
-        }
-        else if (m_sceneManager)
-        {
-            // 回退：无 SceneEditService 时直写 SceneManager（无 Undo）
-            for (auto& entity : importedEntities)
-            {
-                if (entity)
-                    m_sceneManager->addEntity(entity.release());
-            }
-        }
-
-        SY_INFOF("[ImportService] Imported %d entities from: %s (added=%d)",
-            result.entityCount, context.sourcePath.toUtf8().constData(), addedCount);
-
-        result.message = QStringLiteral("Imported %1 entities successfully")
-            .arg(result.entityCount);
-
-        // 导入完成后统一 UI 刷新
-        postImportRefresh(result, options);
-    }
-    else if (!result.success)
-    {
-        SY_ERRORF("[ImportService] Import failed: %s",
-            result.message.toUtf8().constData());
+        goto cleanup;
     }
 
+    if (isCanceled(mutableCtx))
+    {
+        result = ImportResult::fail(QStringLiteral("Import canceled"),
+            ImportErrorType::Canceled);
+        goto cleanup;
+    }
+
+    // ===== 阶段2：解析文件 =====
+    result = phaseParse(mutableCtx, importedEntities);
+    if (!result.success)
+    {
+        goto cleanup;
+    }
+
+    if (isCanceled(mutableCtx))
+    {
+        result = ImportResult::fail(QStringLiteral("Import canceled"),
+            ImportErrorType::Canceled);
+        goto cleanup;
+    }
+
+    // ===== 阶段3：构建文档 =====
+    result = phaseBuildDocument(mutableCtx, importedEntities, options);
+    if (!result.success)
+    {
+        goto cleanup;
+    }
+
+    if (isCanceled(mutableCtx))
+    {
+        result = ImportResult::fail(QStringLiteral("Import canceled"),
+            ImportErrorType::Canceled);
+        goto cleanup;
+    }
+
+    // ===== 阶段4：刷新显示 =====
+    phaseRefreshDisplay(result, options);
+
+    // ===== 阶段5：回写状态 =====
+    phaseWriteBackState(mutableCtx, result);
+
+cleanup:
     // 状态中心：清除繁忙
     if (m_stateCenter)
     {
@@ -170,7 +175,7 @@ ImportResult ImportService::importWithContext(const ImportContext& context,
             m_stateCenter->setMetadata({
                 { QStringLiteral("statusPrompt"),
                   QStringLiteral("Import failed: %1").arg(result.message) }
-            });
+                });
         }
         else
         {
@@ -178,7 +183,7 @@ ImportResult ImportService::importWithContext(const ImportContext& context,
                 { QStringLiteral("statusPrompt"),
                   QStringLiteral("Import completed: %1 entities")
                       .arg(result.entityCount) }
-            });
+                });
         }
     }
 
@@ -196,18 +201,167 @@ QStringList ImportService::supportedExtensions() const
     return m_dispatcher ? m_dispatcher->supportedExtensions() : QStringList();
 }
 
-void ImportService::postImportRefresh(const ImportResult& result,
+// ===== 阶段1：识别文件格式 =====
+ImportResult ImportService::phaseDetectFormat(ImportContext& context)
+{
+    updateProgress(ImportPhase::DetectFormat, 0.0f);
+    emit importPhaseChanged(ImportPhase::DetectFormat);
+
+    SY_INFOF("[ImportService] Phase 1: Detecting format for: %s",
+        context.sourcePath.toUtf8().constData());
+
+    // 文件存在性检查
+    QFileInfo fi(context.sourcePath);
+    if (!fi.exists())
+    {
+        QString msg = QStringLiteral("File not found: %1").arg(context.sourcePath);
+        SY_ERRORF("[ImportService] %s", msg.toUtf8().constData());
+        return ImportResult::fail(msg, ImportErrorType::FileNotFound);
+    }
+
+    // 格式检测
+    if (context.format == Fio::FileFormat::Unknown)
+        context.format = ImportDispatcher::detectFormat(context.sourcePath);
+
+    if (context.format == Fio::FileFormat::Unknown)
+    {
+        QString msg = QStringLiteral("Unsupported file format: %1")
+            .arg(fi.suffix().toUpper());
+        SY_ERRORF("[ImportService] %s", msg.toUtf8().constData());
+        return ImportResult::fail(msg, ImportErrorType::FormatNotSupported);
+    }
+
+    // 检查是否有对应的读取器
+    if (!m_dispatcher->canImport(context.sourcePath))
+    {
+        QString msg = QStringLiteral("No reader registered for format: %1")
+            .arg(fi.suffix().toUpper());
+        SY_ERRORF("[ImportService] %s", msg.toUtf8().constData());
+        return ImportResult::fail(msg, ImportErrorType::FormatNotSupported);
+    }
+
+    SY_INFOF("[ImportService] Format detected: %d", static_cast<int>(context.format));
+    updateProgress(ImportPhase::DetectFormat, 1.0f);
+
+    return ImportResult::ok();
+}
+
+// ===== 阶段2：解析文件 =====
+ImportResult ImportService::phaseParse(const ImportContext& context,
+    Fio::VecSyEntityPtr& outEntities)
+{
+    updateProgress(ImportPhase::Parse, 0.0f);
+    emit importPhaseChanged(ImportPhase::Parse);
+
+    SY_INFOF("[ImportService] Phase 2: Parsing file: %s",
+        context.sourcePath.toUtf8().constData());
+
+    // 通过分发器执行解析
+    ImportResult result = m_dispatcher->dispatch(context, outEntities);
+
+    if (!result.success)
+    {
+        // 将通用失败转换为解析失败
+        if (result.errorType == ImportErrorType::None)
+            result.errorType = ImportErrorType::ParseFailed;
+        SY_ERRORF("[ImportService] Parse failed: %s",
+            result.message.toUtf8().constData());
+        return result;
+    }
+
+    SY_INFOF("[ImportService] Parsed %d entities",
+        static_cast<int>(outEntities.size()));
+    updateProgress(ImportPhase::Parse, 1.0f);
+
+    return result;
+}
+
+// ===== 阶段3：构建文档 =====
+ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
+    Fio::VecSyEntityPtr& entities, const ImportOptions& options)
+{
+    updateProgress(ImportPhase::BuildDocument, 0.0f);
+    emit importPhaseChanged(ImportPhase::BuildDocument);
+
+    SY_INFOF("[ImportService] Phase 3: Building document, entities=%d, newDoc=%d",
+        static_cast<int>(entities.size()),
+        options.importAsNewDocument ? 1 : 0);
+
+    // 实体合法性过滤：拒绝坏数据进入 SceneManager / RenderWorld
+    Fio::VecSyEntityPtr validEntities;
+    validEntities.reserve(entities.size());
+    for (auto& entity : entities)
+    {
+        if (entity && entity->isValid())
+            validEntities.push_back(std::move(entity));
+        else
+        {
+            SY_WARNF("[ImportService] Skipping invalid entity");
+        }
+    }
+    entities = std::move(validEntities);
+
+    if (entities.empty())
+    {
+        SY_WARN("[ImportService] All entities were invalid — nothing to import");
+        return ImportResult::fail(QStringLiteral("No valid entities to import"),
+            ImportErrorType::ParseFailed);
+    }
+
+    int entityCount = static_cast<int>(entities.size());
+
+    // 如果作为新文档导入，先清空场景
+    if (options.importAsNewDocument && m_sceneManager)
+    {
+        SY_INFO("[ImportService] Clearing scene before import");
+        m_sceneManager->clearScene();
+    }
+
+    // 将导入的实体添加到场景（通过 SceneEditService 确保 Undo/图层分配/ID 冲突处理）
+    if (m_editService)
+    {
+        m_editService->addEntities(std::move(entities),
+            "Import " + context.sourcePath.toStdString());
+    }
+    else if (m_sceneManager)
+    {
+        // 回退：无 SceneEditService 时直写 SceneManager（无 Undo）
+        for (auto& entity : entities)
+        {
+            if (entity)
+                m_sceneManager->addEntity(entity.release());
+        }
+    }
+    else
+    {
+        SY_ERROR("[ImportService] Neither SceneEditService nor SceneManager available");
+        return ImportResult::fail(QStringLiteral("No scene manager available"),
+            ImportErrorType::Unknown);
+    }
+
+    SY_INFOF("[ImportService] Document built: %d entities", entityCount);
+    updateProgress(ImportPhase::BuildDocument, 1.0f);
+
+    return ImportResult::ok(
+        QStringLiteral("Imported %1 entities successfully").arg(entityCount),
+        entityCount);
+}
+
+// ===== 阶段4：刷新显示 =====
+void ImportService::phaseRefreshDisplay(const ImportResult& result,
     const ImportOptions& options)
 {
+    updateProgress(ImportPhase::RefreshDisplay, 0.0f);
+    emit importPhaseChanged(ImportPhase::RefreshDisplay);
+
+    SY_INFO("[ImportService] Phase 4: Refreshing display");
+
     // 工作台切换
     if (options.autoSwitchWorkbench && m_workbenchSwitchCallback)
     {
         QString targetId = result.usedWorkbenchId;
         if (targetId.isEmpty())
-        {
-            // 根据导入实体类型推断：3D 实体切到 3D，否则保持 2D
             targetId = QStringLiteral("2D");
-        }
         m_workbenchSwitchCallback(targetId);
     }
 
@@ -223,5 +377,56 @@ void ImportService::postImportRefresh(const ImportResult& result,
     if (m_propertyRefreshCallback)
         m_propertyRefreshCallback();
 
-    SY_INFO("[ImportService] Post-import refresh completed");
+    SY_INFO("[ImportService] Display refreshed");
+    updateProgress(ImportPhase::RefreshDisplay, 1.0f);
+}
+
+// ===== 阶段5：回写状态 =====
+void ImportService::phaseWriteBackState(const ImportContext& context,
+    const ImportResult& result)
+{
+    updateProgress(ImportPhase::WriteBackState, 0.0f);
+    emit importPhaseChanged(ImportPhase::WriteBackState);
+
+    SY_INFO("[ImportService] Phase 5: Writing back state");
+
+    // 更新当前文档路径（优先使用 context 中的回调）
+    if (context.currentDocumentPathCallback)
+        context.currentDocumentPathCallback(context.sourcePath);
+    else if (m_currentDocumentPathCallback)
+        m_currentDocumentPathCallback(context.sourcePath);
+
+    // 添加到最近文件（优先使用 context 中的回调）
+    if (context.recentFileAddCallback)
+        context.recentFileAddCallback(context.sourcePath);
+    else if (m_recentFileAddCallback)
+        m_recentFileAddCallback(context.sourcePath);
+
+    // 文档持久化（使用成员变量回调，全局配置）
+    if (m_documentPersistenceCallback)
+        m_documentPersistenceCallback(context.sourcePath, result.entityCount);
+
+    // 更新状态栏（使用成员变量回调，全局配置）
+    if (m_statusBarUpdateCallback)
+    {
+        QString statusMsg = QStringLiteral("Imported %1 entities from %2")
+            .arg(result.entityCount)
+            .arg(QFileInfo(context.sourcePath).fileName());
+        m_statusBarUpdateCallback(statusMsg);
+    }
+
+    SY_INFO("[ImportService] State written back");
+    updateProgress(ImportPhase::WriteBackState, 1.0f);
+}
+
+void ImportService::updateProgress(ImportPhase phase, float progress)
+{
+    emit importProgress(progress);
+}
+
+bool ImportService::isCanceled(const ImportContext& context) const
+{
+    if (context.cancelCallback)
+        return context.cancelCallback();
+    return false;
 }

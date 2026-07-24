@@ -6,7 +6,10 @@
 #include <vector>
 #include <string>
 
-namespace Eg { class Database; }
+namespace Eg
+{
+    class Database;
+}
 
 /**
  * @brief 设置仓储 — 封装 settings 表的 CRUD 操作

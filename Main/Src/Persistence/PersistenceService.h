@@ -3,7 +3,10 @@
 #include <memory>
 #include <string>
 
-namespace Eg { class Database; }
+namespace Eg
+{
+    class Database;
+}
 class DatabaseBootstrapper;
 class RecentFileRepository;
 class WorkspaceSnapshotRepository;
