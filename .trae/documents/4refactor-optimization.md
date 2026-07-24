@@ -91,7 +91,7 @@ submitEntity(std::move(line));  // ownership 直接进入 SceneChangeSet
 - 修改 `UI/2D/Src/Ui/DrawTools/BaseTool.h` / `BaseTool.cpp`（加 2 方法 + 改 `initialize` 接收新字段）
 - 修改 `UI/2D/Src/Ui/DrawTools/ToolManager.cpp:20-33`（注入新 lambda）
 - 修改 16 个 Tool 的 `*Tool.cpp` 完成方法
-- 注释 `SceneEditService::addEntityFromPointer` 标 `@deprecated`
+- ✅ 注释 `SceneEditService::addEntityFromPointer` 标 `@deprecated`
 
 ### 验证
 

@@ -348,31 +348,6 @@ std::vector<std::string> SceneDocument2D::allEntityIds() const
     return ids;
 }
 
-void SceneDocument2D::selectEntity(const std::string& id)
-{
-    auto eid = Eg::parseEntityId(id);
-    if (!eid)
-        return;
-    auto* entity = m_scene->findSyEntityById(*eid);
-    if (entity)
-        m_scene->selectEntity(entity);
-}
-
-void SceneDocument2D::clearSelection()
-{
-    m_scene->clearSelection();
-}
-
-std::vector<std::string> SceneDocument2D::selectedIds() const
-{
-    auto selected = m_scene->getSelectedEntities();
-    std::vector<std::string> ids;
-    ids.reserve(selected.size());
-    for (const auto& e : selected)
-        ids.push_back(std::to_string(e->id));
-    return ids;
-}
-
 void SceneDocument2D::removeEntity(const std::string& id)
 {
     auto eid = Eg::parseEntityId(id);

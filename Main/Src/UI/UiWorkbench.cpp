@@ -15,8 +15,6 @@
 #include "UI2D/Operation/CommandCatalog.h"
 #include "UiSceneTreeDock.h"
 #include "UiPropertiesPanel.h"
-#include "UiViewWidgets.h"
-#include "RenderViewportAdapter.h"
 #include "RenderViewport2D.h"
 #include "DrawToolBarWidget.h"
 #include "WorkbenchWindow.h"

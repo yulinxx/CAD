@@ -11,7 +11,6 @@ class QWidget;
 class QToolBar;
 class WorkbenchWindow;
 class PropertiesPanelWidget;
-class Viewport2D;
 class SceneTreeDockWidget;
 
 #if BUILD_UI3D

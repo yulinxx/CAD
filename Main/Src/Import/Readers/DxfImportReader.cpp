@@ -8,11 +8,22 @@
 ImportResult DxfImportReader::read(const ImportContext& context,
     Fio::VecSyEntityPtr& outEntities)
 {
+    SY_INFOF("[DxfImportReader] read START: path=%s", context.sourcePath.toUtf8().constData());
+
     Fio::FileIOManager fileIO;
+    SY_INFO("[DxfImportReader] Creating FileIOManager");
+
+    std::string pathStr = context.sourcePath.toUtf8().toStdString();
+    SY_INFOF("[DxfImportReader] Calling fileIO.importFile: path=%s, format=%d",
+        pathStr.c_str(), static_cast<int>(Fio::FileFormat::DXF));
+
     Fio::ParseResult parseResult = fileIO.importFile(
-        context.sourcePath.toUtf8().toStdString(),
+        pathStr,
         Fio::FileFormat::DXF,
         outEntities);
+
+    SY_INFOF("[DxfImportReader] fileIO.importFile returned: success=%d, entities=%zu",
+        parseResult.success ? 1 : 0, outEntities.size());
 
     if (!parseResult.success)
     {
@@ -23,7 +34,6 @@ ImportResult DxfImportReader::read(const ImportContext& context,
         for (const auto& w : parseResult.warnings)
             warns.append(QString::fromStdString(w));
 
-        // 根据错误信息判断错误类型
         ImportErrorType errorType = ImportErrorType::ParseFailed;
         if (msg.contains(QStringLiteral("file not found"), Qt::CaseInsensitive) ||
             msg.contains(QStringLiteral("cannot open"), Qt::CaseInsensitive))
@@ -41,12 +51,16 @@ ImportResult DxfImportReader::read(const ImportContext& context,
             errorType = ImportErrorType::CoordinateSystemIncompatible;
         }
 
+        SY_INFO("[DxfImportReader] read END: fail");
         return ImportResult::fail(msg, errorType, warns);
     }
 
     QStringList warns;
     for (const auto& w : parseResult.warnings)
         warns.append(QString::fromStdString(w));
+
+    SY_INFOF("[DxfImportReader] read END: success, entities=%zu, layers=%zu",
+        outEntities.size(), parseResult.dxfLayers.size());
 
     return ImportResult::ok(
         QStringLiteral("DXF import successful"),

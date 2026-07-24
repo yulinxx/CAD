@@ -29,6 +29,7 @@ class ExportDispatcher;
 class FileDialogService;
 class RecentFileService;
 class HelpDialogService;
+class FileOperationRegistry;
 
 /**
  * @class ApplicationCompositionRoot
@@ -141,12 +142,6 @@ public:
     }
 
 private:
-    /// 注册核心编辑操作到 OperationBus（新命令系统直接实现）
-    void registerCoreOperations();
-
-    /// 注册文件操作（导入/导出/新建/打开/保存）
-    void registerFileOperations();
-
     /// 注册帮助操作（About / Settings / Docs / Shortcuts）
     void registerHelpOperations();
 
@@ -155,6 +150,9 @@ private:
 
     /// 注册缺失的算法/编辑操作（提示暂未实现）
     void registerPendingAlgorithmOperations();
+
+    /// 保存文档持久化记录
+    void saveDocumentPersistenceRecord(const QString& filePath, int entityCount);
 
 private:
     /// UI Shell 宿主
@@ -222,4 +220,7 @@ private:
 
     /// 持久化服务（非拥有指针，由 AppInitializer 管理生命周期）
     PersistenceService* m_persistenceService{ nullptr };
+
+    /// 文件操作注册表
+    std::unique_ptr<FileOperationRegistry> m_fileOperationRegistry;
 };

@@ -70,15 +70,9 @@ public:
 
     void removeEntity(const QString& id);
 
-    // ---- SceneDocumentBase 接口 (选择方法已废弃，迁移至 SelectionService) ----
+    // ---- SceneDocumentBase 接口 ----
 
     std::vector<std::string> allEntityIds() const override;
-    [[deprecated("Use SelectionService::select() instead")]]
-    void selectEntity(const std::string& id) override;
-    [[deprecated("Use SelectionService::clear() instead")]]
-    void clearSelection() override;
-    [[deprecated("Use SelectionService::selectedIds() instead")]]
-    std::vector<std::string> selectedIds() const override;
     void removeEntity(const std::string& id) override;
     void clear() override;
 

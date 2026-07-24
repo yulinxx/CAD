@@ -220,11 +220,13 @@ void WorkbenchMenuManager::refreshFileMenuForWorkbench(const QString& workbenchI
             m_window->tr("DXF (*.dxf)"), m_window->tr("PLT (*.plt, *.hpgl)"), m_window->tr("STEP (*.stp, *.step)"),
             m_window->tr("SVG (*.svg)"), m_window->tr("PDF (*.pdf)")
         };
+
         const QStringList importCmdIds = {
             QStringLiteral("file.import_dxf"), QStringLiteral("file.import_plt"),
             QStringLiteral("file.import_step"), QStringLiteral("file.import_svg"),
             QStringLiteral("file.import_pdf")
         };
+
         for (int i = 0; i < importFormats.size(); ++i)
         {
             auto* act = m_menuState.importMenu->addAction(importFormats[i]);
@@ -235,6 +237,7 @@ void WorkbenchMenuManager::refreshFileMenuForWorkbench(const QString& workbenchI
                     m_operationBus->run(CommandCatalog::operationForCommandId(cmdId));
                 });
         }
+
         m_menuState.importMenu->addSeparator();
         auto* importImage = m_menuState.importMenu->addAction(m_window->tr("Image..."));
         QString imgCmdId = QStringLiteral("file.import_image");

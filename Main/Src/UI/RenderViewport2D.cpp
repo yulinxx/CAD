@@ -11,10 +11,6 @@
 #include "UI2D/Operation/OperationId.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/SyEntity/SyLine.h"
-#include "Engine2D/SyEntity/SyCircle.h"
-#include "Engine2D/SyEntity/SyArc.h"
-#include "Engine2D/SyEntity/SyPolygon.h"
-#include "Engine/Scene/SceneRenderContract.h"
 #include "UI2D/DrawTools/ToolManager.h"
 #include "Ui/DrawTools/ToolContext.h"
 #include "Ui/DrawTools/ITool.h"
@@ -31,14 +27,8 @@
 #include <cmath>
 #include <array>
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-
 namespace
 {
-    // 命中测试容差（像素）
-    constexpr double kHitTolerance = 8.0;
     // 网格步长
     constexpr double kGridStep = 50.0;
     // 场景更新节流时间（毫秒）
@@ -47,162 +37,6 @@ namespace
     constexpr float kDefaultViewHalfW = 500.0f;
     constexpr float kDefaultViewHalfH = 500.0f;
 
-    // 点到线段的距离
-    double distPointToSegment(const QPointF& p, const QPointF& a, const QPointF& b)
-    {
-        double abx = b.x() - a.x();
-        double aby = b.y() - a.y();
-        double apx = p.x() - a.x();
-        double apy = p.y() - a.y();
-
-        double lenSq = abx * abx + aby * aby;
-        if (lenSq < 1e-12)
-            return std::hypot(apx, apy);
-
-        double t = (apx * abx + apy * aby) / lenSq;
-        t = std::max(0.0, std::min(1.0, t));
-
-        double closestX = a.x() + t * abx;
-        double closestY = a.y() + t * aby;
-
-        return std::hypot(p.x() - closestX, p.y() - closestY);
-    }
-
-    // 将 Ut::Mat3f / Render::Mat3f 格式转换为 9 个 float 数组
-    void mat3ToArray(const Render::Mat3f& mat, float out[9])
-    {
-        for (int i = 0; i < 9; ++i)
-            out[i] = mat.data[i];
-    }
-}
-
-// ==================== Camera2D 实现 ====================
-
-void Camera2D::computeViewMatrix(float outMat[9], float vpW, float vpH) const
-{
-    if (vpW <= 0 || vpH <= 0)
-    {
-        for (int i = 0; i < 9; ++i)
-            outMat[i] = (i == 0 || i == 4 || i == 8) ? 1.0f : 0.0f;
-        SY_WARNF("Camera2D::computeViewMatrix: invalid viewport %.2fx%.2f, returning identity", vpW, vpH);
-        return;
-    }
-
-    const float scaleX = 2.0f * zoomX / vpW;
-    const float scaleY = 2.0f * zoomY / vpH;
-    const float tx = scaleX * panOffset.x();
-    const float ty = -scaleY * panOffset.y();
-
-    Render::Mat3f view = Render::Mat3f::identity();
-    view.at(0, 0) = scaleX;
-    view.at(1, 0) = 0.0f;
-    view.at(2, 0) = 0.0f;
-    view.at(0, 1) = 0.0f;
-    view.at(1, 1) = -scaleY;
-    view.at(2, 1) = 0.0f;
-    view.at(0, 2) = tx;
-    view.at(1, 2) = ty;
-    view.at(2, 2) = 1.0f;
-
-    mat3ToArray(view, outMat);
-}
-
-QPointF Camera2D::screenToWorld(const QPoint& screenPos, float vpW, float vpH) const
-{
-    if (vpW <= 0 || vpH <= 0)
-        return QPointF(0, 0);
-
-    float nx = (2.0f * screenPos.x() - vpW) / vpW;
-    float ny = (2.0f * screenPos.y() - vpH) / vpH;
-
-    if (zoomX < 1e-6f || zoomY < 1e-6f)
-        return QPointF(nx, ny);
-
-    float scaleX = 2.0f * zoomX / vpW;
-    float scaleY = 2.0f * zoomY / vpH;
-
-    float wx = (nx / scaleX) - panOffset.x();
-    float wy = -(ny / scaleY) - panOffset.y();
-
-    static int logCount = 0;
-    if ((logCount++ % 50) == 0) {
-        SY_INFOF("Camera2D::screenToWorld: screen=(%d,%d), vp=(%.0f,%.0f), zoom=(%.6f,%.6f), pan=(%.2f,%.2f), world=(%.2f,%.2f)",
-            screenPos.x(), screenPos.y(), vpW, vpH, zoomX, zoomY, panOffset.x(), panOffset.y(), wx, wy);
-    }
-
-    return QPointF(wx, wy);
-}
-
-void Camera2D::zoomIn(float factor, const QPointF& anchorWorld, float vpW, float vpH)
-{
-    float newZoomX = zoomX * factor;
-    float newZoomY = zoomY * factor;
-    if (newZoomX > MAX_ZOOM) newZoomX = MAX_ZOOM;
-    if (newZoomX < MIN_ZOOM) newZoomX = MIN_ZOOM;
-    if (newZoomY > MAX_ZOOM) newZoomY = MAX_ZOOM;
-    if (newZoomY < MIN_ZOOM) newZoomY = MIN_ZOOM;
-
-    float ratio = newZoomX / zoomX;
-    panOffset.setX(panOffset.x() + anchorWorld.x() * (1.0f - ratio));
-    panOffset.setY(panOffset.y() + anchorWorld.y() * (1.0f - ratio));
-
-    zoomX = newZoomX;
-    zoomY = newZoomY;
-}
-
-void Camera2D::zoomOut(float factor, const QPointF& anchorWorld, float vpW, float vpH)
-{
-    zoomIn(1.0f / factor, anchorWorld, vpW, vpH);
-}
-
-void Camera2D::pan(float dx, float dy)
-{
-    panOffset.setX(panOffset.x() + dx);
-    panOffset.setY(panOffset.y() + dy);
-}
-
-void Camera2D::reset()
-{
-    zoomX = 1.0f;
-    zoomY = 1.0f;
-    panOffset = QPointF(0, 0);
-}
-
-void Camera2D::zoomToFit(float vpW, float vpH, float sceneW, float sceneH)
-{
-    if (sceneW <= 0 || sceneH <= 0 || vpW <= 0 || vpH <= 0)
-        return;
-
-    float scaleX = vpW / sceneW;
-    float scaleY = vpH / sceneH;
-    float zoom = std::min(scaleX, scaleY) * 0.9f;
-
-    if (zoom < MIN_ZOOM) zoom = MIN_ZOOM;
-    if (zoom > MAX_ZOOM) zoom = MAX_ZOOM;
-
-    zoomX = zoom;
-    zoomY = zoom;
-    panOffset = QPointF(0, 0);
-}
-
-void Camera2D::setViewExtent(float vpW, float vpH, float centerX, float centerY, float halfW, float halfH)
-{
-    if (halfW <= 0 || halfH <= 0 || vpW <= 0 || vpH <= 0)
-        return;
-
-    float targetZoomX = vpW / (2.0f * halfW);
-    float targetZoomY = vpH / (2.0f * halfH);
-    float zoom = std::min(targetZoomX, targetZoomY);
-
-    if (zoom < MIN_ZOOM) zoom = MIN_ZOOM;
-    if (zoom > MAX_ZOOM) zoom = MAX_ZOOM;
-
-    zoomX = zoom;
-    zoomY = zoom;
-    panOffset = QPointF(-centerX, -centerY);
-
-    SY_INFOF("Camera2D::setViewExtent: vpW=%.0f, vpH=%.0f, center=(%.2f,%.2f), half=(%.2f,%.2f), zoom=(%.6f,%.6f), pan=(%.2f,%.2f)",
-        vpW, vpH, centerX, centerY, halfW, halfH, zoomX, zoomY, panOffset.x(), panOffset.y());
 }
 
 // ==================== RenderViewport2D 实现 ====================
@@ -212,9 +46,15 @@ RenderViewport2D::RenderViewport2D(QWidget* parent)
 {
     setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
+    setAutoFillBackground(false);
 
     initRenderWidget();
     initTimers();
+
+    // 初始相机状态：台面中心 (600,400)，可见范围 (0,0)~(1200,800)
+    m_camera.panOffset = QPointF(-600.0f, -400.0f);
+
+    m_selector = std::make_unique<ViewportSelector>(nullptr, nullptr, &m_camera, m_renderWidget);
 }
 
 RenderViewport2D::~RenderViewport2D()
@@ -257,11 +97,15 @@ Eg::SceneManager* RenderViewport2D::sceneManager() const
 void RenderViewport2D::setStatusCallback(std::function<void(const QString&)>&& callback)
 {
     m_statusCallback = std::move(callback);
+    if (m_selector)
+        m_selector->setStatusCallback(m_statusCallback);
 }
 
 void RenderViewport2D::setSelectionCallback(std::function<void(const QString&, const QString&)>&& callback)
 {
     m_selectionCallback = std::move(callback);
+    if (m_selector)
+        m_selector->setSelectionCallback(m_selectionCallback);
 }
 
 void RenderViewport2D::setCommandStageCallback(std::function<void(const QString&)>&& callback)
@@ -289,6 +133,10 @@ void RenderViewport2D::setDocument(SceneDocument2D* document)
     if (m_document)
         m_sceneManager = m_document->sceneManager();
 
+    // 同步选择控制器
+    if (m_selector)
+        m_selector->setSceneManager(m_sceneManager);
+
     // 注册为新文档的观察者（同时接收场景变更和选择变更通知）
     if (m_sceneManager)
         m_sceneManager->notifier().addObserver(this);
@@ -300,6 +148,8 @@ void RenderViewport2D::setDocument(SceneDocument2D* document)
 void RenderViewport2D::setSelectionService(ISelectionService* service)
 {
     m_selectionService = service;
+    if (m_selector)
+        m_selector->setSelectionService(service);
 }
 
 void RenderViewport2D::setInteractionDispatcher(IInteractionDispatcher* dispatcher)
@@ -385,12 +235,14 @@ ToolManager* RenderViewport2D::toolManager() const
 
 void RenderViewport2D::resetView()
 {
-    // 重置到默认视图范围：中心 (0,0)，可见 (-500,-500)~(500,500)
+    // 重置到台面范围：左下角 (0,0)，右上角 (1200,800)，中心在 (600,400)
+    const float tableW = 1200.0f;
+    const float tableH = 800.0f;
     float dpr = static_cast<float>(m_renderWidget ? m_renderWidget->devicePixelRatioF() : 1.0);
     float vpW = static_cast<float>(m_renderWidget ? m_renderWidget->width() : width()) * dpr;
     float vpH = static_cast<float>(m_renderWidget ? m_renderWidget->height() : height()) * dpr;
     if (vpW > 0 && vpH > 0)
-        m_camera.setViewExtent(vpW, vpH, 0.0f, 0.0f, kDefaultViewHalfW, kDefaultViewHalfH);
+        m_camera.setViewExtent(vpW, vpH, tableW / 2.0f, tableH / 2.0f, tableW / 2.0f, tableH / 2.0f);
     else
         m_camera.reset();
     updateViewMatrix();
@@ -781,9 +633,9 @@ void RenderViewport2D::mousePressEvent(QMouseEvent* event)
             // 转发鼠标事件到活动工具
             m_toolManager->getActiveTool()->onMousePress(worldPos, event);
         }
-        else
+        else if (m_selector)
         {
-            beginBoxSelect(worldPos);
+            m_selector->beginBoxSelect(worldPos);
         }
         event->accept();
         return;
@@ -822,7 +674,7 @@ void RenderViewport2D::mouseMoveEvent(QMouseEvent* event)
 
         float dpr = static_cast<float>(m_renderWidget->devicePixelRatioF());
         float worldDx = static_cast<float>(delta.x()) * dpr / m_camera.zoomX;
-        float worldDy = static_cast<float>(delta.y()) * dpr / m_camera.zoomY;
+        float worldDy = -static_cast<float>(delta.y()) * dpr / m_camera.zoomY;
 
         m_camera.pan(worldDx, worldDy);
         updateViewMatrix();
@@ -830,9 +682,9 @@ void RenderViewport2D::mouseMoveEvent(QMouseEvent* event)
         return;
     }
 
-    if (m_boxSelecting)
+    if (m_selector && m_selector->isBoxSelecting())
     {
-        updateBoxSelect(worldPos);
+        m_selector->updateBoxSelect(worldPos);
         event->accept();
         return;
     }
@@ -892,9 +744,9 @@ void RenderViewport2D::mouseReleaseEvent(QMouseEvent* event)
             return;
         }
 
-        if (m_boxSelecting)
+        if (m_selector && m_selector->isBoxSelecting())
         {
-            endBoxSelect(worldPos);
+            m_selector->endBoxSelect(worldPos);
             event->accept();
             return;
         }
@@ -915,7 +767,10 @@ void RenderViewport2D::mouseReleaseEvent(QMouseEvent* event)
             return;
         }
 
-        handleLeftClick(worldPos);
+        if (m_selector)
+        {
+            m_selector->handleClick(worldPos);
+        }
         event->accept();
         return;
     }
@@ -931,14 +786,13 @@ void RenderViewport2D::wheelEvent(QWheelEvent* event)
         return;
     }
 
-    float dpr = static_cast<float>(m_renderWidget->devicePixelRatioF());
-    float vpW = static_cast<float>(m_renderWidget->width()) * dpr;
-    float vpH = static_cast<float>(m_renderWidget->height()) * dpr;
+    float vpW = static_cast<float>(m_renderWidget->width());
+    float vpH = static_cast<float>(m_renderWidget->height());
 
     if (vpW <= 0 || vpH <= 0)
         return;
 
-    QPoint widgetPos = m_renderWidget->mapFromParent(event->position().toPoint());
+    QPoint widgetPos = event->position().toPoint();
     QPointF worldPos = m_camera.screenToWorld(widgetPos, vpW, vpH);
 
     float factor = (event->angleDelta().y() > 0) ? 1.1f : 0.9f;
@@ -1007,14 +861,16 @@ void RenderViewport2D::updateViewMatrix()
     for (int i = 0; i < 9; ++i)
         mat.data[i] = viewMat[i];
 
-    SY_INFOF("RenderViewport2D::updateViewMatrix: vpW=%.0f, vpH=%.0f, zoom=(%.6f,%.6f), pan=(%.2f,%.2f)",
+    SY_TRACEF("RenderViewport2D::updateViewMatrix: vpW=%.0f, vpH=%.0f, zoom=(%.6f,%.6f), pan=(%.2f,%.2f)",
         vpW, vpH, m_camera.zoomX, m_camera.zoomY, m_camera.panOffset.x(), m_camera.panOffset.y());
 
     // 即使渲染设备尚未初始化，也先缓存视图矩阵；initializeGL 后会补发一次
     m_renderWidget->setViewMatrix(mat);
 
-    // 如果没有文档，视图矩阵变化后需要重新提交场景环境（网格背景）
-    if (!m_document && m_renderWidget->isInitialized())
+    // 视图矩阵变化后，场景环境（网格、台面、标尺）需要重新提交以跟随视图变化
+    SY_INFOF("RenderViewport2D::updateViewMatrix: calling submitDefaultSceneEnv, document=%p, initialized=%d",
+        m_document, m_renderWidget->isInitialized());
+    if (m_renderWidget->isInitialized())
     {
         m_renderWidget->submitDefaultSceneEnv();
     }
@@ -1145,207 +1001,7 @@ void RenderViewport2D::updateSceneRender()
     m_pendingDeletedIds.clear();
 }
 
-void RenderViewport2D::handleLeftClick(const QPointF& worldPos)
-{
-    // 简单的点击选择
-    performHitTest(worldPos);
-}
 
-void RenderViewport2D::performHitTest(const QPointF& worldPos)
-{
-    if (!m_document || !sceneManager() || !m_selectionService)
-        return;
-
-    auto* sm = sceneManager();
-    double tol = kHitTolerance / m_camera.zoomX; // 转换为世界坐标容差
-
-    std::string hitId;
-    double minDist = tol;
-
-    for (const auto* entity : sm->getAllEntities())
-    {
-        if (!entity) continue;
-
-        double dist = std::numeric_limits<double>::max();
-
-        if (entity->eType == Eg::EType::LINE)
-        {
-            auto* line = static_cast<const Eg::SyLine*>(entity);
-            if (line->vPoints.size() >= 2)
-            {
-                for (size_t i = 1; i < line->vPoints.size(); ++i)
-                {
-                    const auto& p0 = line->vPoints[i - 1];
-                    const auto& p1 = line->vPoints[i];
-                    double d = distPointToSegment(worldPos,
-                        QPointF(p0.x(), p0.y()),
-                        QPointF(p1.x(), p1.y()));
-                    if (d < dist) dist = d;
-                }
-            }
-        }
-        else if (entity->eType == Eg::EType::CIRCLE)
-        {
-            auto* circle = static_cast<const Eg::SyCircle*>(entity);
-            const auto& c = entity->basePoint;
-            double d = std::abs(std::hypot(worldPos.x() - c.x(), worldPos.y() - c.y()) - circle->dRadius);
-            if (d < dist) dist = d;
-        }
-        else if (entity->eType == Eg::EType::ARC)
-        {
-            auto* arc = static_cast<const Eg::SyArc*>(entity);
-            const auto& c = entity->basePoint;
-            double d = std::abs(std::hypot(worldPos.x() - c.x(), worldPos.y() - c.y()) - arc->dRadius);
-            if (d < dist) dist = d;
-        }
-
-        if (dist < minDist)
-        {
-            minDist = dist;
-            hitId = std::to_string(entity->id);
-        }
-    }
-
-    m_selectionService->clear();
-    if (!hitId.empty())
-    {
-        m_selectionService->select(hitId);
-        updateStatus(tr("2D entity selected"));
-        if (m_selectionCallback)
-            m_selectionCallback(tr("2D-Select"), tr("2D entity: %1").arg(QString::fromStdString(hitId)));
-    }
-    else
-    {
-        updateStatus(tr("2D selection cleared"));
-    }
-
-    scheduleSceneUpdate();
-}
-
-void RenderViewport2D::beginBoxSelect(const QPointF& worldPos)
-{
-    m_boxSelecting = true;
-    m_boxSelectStart = worldPos;
-    m_boxSelectEnd = worldPos;
-
-    // 设置选择框
-    if (m_renderWidget)
-    {
-        Render::BBox2d bbox(
-            worldPos.x(), worldPos.y(),
-            worldPos.x(), worldPos.y());
-        m_renderWidget->setSelectionBox(&bbox, QColor(204, 102, 0, 200));
-    }
-}
-
-void RenderViewport2D::updateBoxSelect(const QPointF& worldPos)
-{
-    m_boxSelectEnd = worldPos;
-
-    if (m_renderWidget)
-    {
-        Render::BBox2d bbox(
-            m_boxSelectStart.x(), m_boxSelectStart.y(),
-            worldPos.x(), worldPos.y());
-        m_renderWidget->setSelectionBox(&bbox, QColor(204, 102, 0, 200));
-    }
-}
-
-void RenderViewport2D::endBoxSelect(const QPointF& worldPos)
-{
-    m_boxSelecting = false;
-
-    // 清除选择框
-    if (m_renderWidget)
-    {
-        m_renderWidget->setSelectionBox(nullptr, QColor());
-    }
-
-    // 如果起点和终点几乎相同，视为点击
-    double dx = std::abs(worldPos.x() - m_boxSelectStart.x());
-    double dy = std::abs(worldPos.y() - m_boxSelectStart.y());
-    double tol = kHitTolerance / m_camera.zoomX;
-
-    if (dx < tol && dy < tol)
-    {
-        handleLeftClick(worldPos);
-        return;
-    }
-
-    // 框选
-    if (!m_document || !sceneManager() || !m_selectionService)
-        return;
-
-    auto* sm = sceneManager();
-    double minX = std::min(m_boxSelectStart.x(), worldPos.x());
-    double maxX = std::max(m_boxSelectStart.x(), worldPos.x());
-    double minY = std::min(m_boxSelectStart.y(), worldPos.y());
-    double maxY = std::max(m_boxSelectStart.y(), worldPos.y());
-
-    std::vector<std::string> hitIds;
-
-    for (const auto* entity : sm->getAllEntities())
-    {
-        if (!entity) continue;
-
-        bool inside = false;
-
-        if (entity->eType == Eg::EType::LINE)
-        {
-            auto* line = static_cast<const Eg::SyLine*>(entity);
-            for (const auto& pt : line->vPoints)
-            {
-                if (pt.x() >= minX && pt.x() <= maxX &&
-                    pt.y() >= minY && pt.y() <= maxY)
-                {
-                    inside = true;
-                    break;
-                }
-            }
-        }
-        else if (entity->eType == Eg::EType::CIRCLE || entity->eType == Eg::EType::ARC)
-        {
-            const auto& c = entity->basePoint;
-            if (c.x() >= minX && c.x() <= maxX &&
-                c.y() >= minY && c.y() <= maxY)
-            {
-                inside = true;
-            }
-        }
-        else if (entity->eType == Eg::EType::POLYGON)
-        {
-            auto* polygon = static_cast<const Eg::SyPolygon*>(entity);
-            for (const auto& v : polygon->vertices())
-            {
-                if (v.x() >= minX && v.x() <= maxX &&
-                    v.y() >= minY && v.y() <= maxY)
-                {
-                    inside = true;
-                    break;
-                }
-            }
-        }
-
-        if (inside)
-            hitIds.push_back(std::to_string(entity->id));
-    }
-
-    m_selectionService->clear();
-    if (!hitIds.empty())
-    {
-        std::vector<std::string> ids;
-        for (const auto& id : hitIds)
-            ids.push_back(id);
-        m_selectionService->selectMultiple(ids);
-        updateStatus(tr("2D %n entities selected", "", static_cast<int>(hitIds.size())));
-    }
-    else
-    {
-        updateStatus(tr("2D selection cleared"));
-    }
-
-    scheduleSceneUpdate();
-}
 
 void RenderViewport2D::updateStatus(const QString& text)
 {

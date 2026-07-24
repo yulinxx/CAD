@@ -237,32 +237,6 @@ std::vector<std::string> SceneDocument3D::allEntityIds() const
     return ids;
 }
 
-void SceneDocument3D::selectEntity(const std::string& id)
-{
-    if (!m_engineScene)
-        return;
-    Eg::EntityId eid = static_cast<Eg::EntityId>(std::stoull(id));
-    m_engineScene->clearSelection();
-    if (auto* entity = m_engineScene->findEntityById(eid))
-        m_engineScene->selectEntity(entity);
-}
-
-void SceneDocument3D::clearSelection()
-{
-    if (m_engineScene)
-        m_engineScene->clearSelection();
-}
-
-std::vector<std::string> SceneDocument3D::selectedIds() const
-{
-    std::vector<std::string> ids;
-    if (!m_engineScene)
-        return ids;
-    for (auto eid : m_engineScene->selectedEntityIds())
-        ids.push_back(engineIdStr(eid));
-    return ids;
-}
-
 void SceneDocument3D::removeEntity(const std::string& id)
 {
     removeNode(id);

@@ -4,12 +4,20 @@
 #include <QWidget>
 
 #include "FileIO/FileFormat.h"
+#include "Log/SyLogger.h"
 
 // ==================== 对话框调用 ====================
 
 QString FileDialogService::getOpenFileName(QWidget* parent, const QString& title, const QString& filter)
 {
-    return QFileDialog::getOpenFileName(parent, title, QString(), filter);
+    SY_INFOF("[FileDialogService] getOpenFileName: title=%s, filter=%s",
+        title.toUtf8().constData(), filter.toUtf8().constData());
+
+    QString result = QFileDialog::getOpenFileName(parent, title, QString(), filter);
+
+    SY_INFOF("[FileDialogService] getOpenFileName returned: %s", result.toUtf8().constData());
+
+    return result;
 }
 
 QString FileDialogService::getSaveFileName(QWidget* parent, const QString& title, const QString& filter)

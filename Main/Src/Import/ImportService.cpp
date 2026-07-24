@@ -92,12 +92,20 @@ ImportResult ImportService::importFile(const QString& filePath,
 ImportResult ImportService::importWithContext(const ImportContext& context,
     const ImportOptions& options)
 {
+    SY_INFOF("[ImportService] importWithContext START: path=%s, newDoc=%d, autoFit=%d",
+        context.sourcePath.toUtf8().constData(),
+        options.importAsNewDocument ? 1 : 0,
+        options.autoFit ? 1 : 0);
+
     if (!m_dispatcher)
     {
         QString msg = QStringLiteral("ImportDispatcher not set");
         SY_ERRORF("[ImportService] %s", msg.toUtf8().constData());
         return ImportResult::fail(msg, ImportErrorType::Unknown);
     }
+
+    SY_INFOF("[ImportService] stateCenter=%p, sceneManager=%p, editService=%p",
+        m_stateCenter, m_sceneManager, m_editService);
 
     // 状态中心：标记繁忙
     if (m_stateCenter)
@@ -118,11 +126,14 @@ ImportResult ImportService::importWithContext(const ImportContext& context,
     Fio::VecSyEntityPtr importedEntities;
 
     // ===== 阶段1：识别文件格式 =====
+    SY_INFO("[ImportService] Phase 1: Detect format");
     ImportResult result = phaseDetectFormat(mutableCtx);
     if (!result.success)
     {
+        SY_ERRORF("[ImportService] Phase 1 failed: %s", result.message.toUtf8().constData());
         goto cleanup;
     }
+    SY_INFOF("[ImportService] Phase 1 completed: format=%d", static_cast<int>(mutableCtx.format));
 
     if (isCanceled(mutableCtx))
     {
@@ -132,11 +143,14 @@ ImportResult ImportService::importWithContext(const ImportContext& context,
     }
 
     // ===== 阶段2：解析文件 =====
+    SY_INFO("[ImportService] Phase 2: Parse file");
     result = phaseParse(mutableCtx, importedEntities);
     if (!result.success)
     {
+        SY_ERRORF("[ImportService] Phase 2 failed: %s", result.message.toUtf8().constData());
         goto cleanup;
     }
+    SY_INFOF("[ImportService] Phase 2 completed: entities=%zu", importedEntities.size());
 
     if (isCanceled(mutableCtx))
     {
@@ -146,11 +160,14 @@ ImportResult ImportService::importWithContext(const ImportContext& context,
     }
 
     // ===== 阶段3：构建文档 =====
+    SY_INFO("[ImportService] Phase 3: Build document");
     result = phaseBuildDocument(mutableCtx, importedEntities, options);
     if (!result.success)
     {
+        SY_ERRORF("[ImportService] Phase 3 failed: %s", result.message.toUtf8().constData());
         goto cleanup;
     }
+    SY_INFOF("[ImportService] Phase 3 completed: entityCount=%d", result.entityCount);
 
     if (isCanceled(mutableCtx))
     {
@@ -160,10 +177,14 @@ ImportResult ImportService::importWithContext(const ImportContext& context,
     }
 
     // ===== 阶段4：刷新显示 =====
+    SY_INFO("[ImportService] Phase 4: Refresh display");
     phaseRefreshDisplay(result, options);
+    SY_INFO("[ImportService] Phase 4 completed");
 
     // ===== 阶段5：回写状态 =====
+    SY_INFO("[ImportService] Phase 5: Write back state");
     phaseWriteBackState(mutableCtx, result);
+    SY_INFO("[ImportService] Phase 5 completed");
 
 cleanup:
     // 状态中心：清除繁忙
@@ -188,6 +209,10 @@ cleanup:
     }
 
     emit importFinished(result);
+
+    SY_INFOF("[ImportService] importWithContext END: success=%d, message=%s",
+        result.success ? 1 : 0, result.message.toUtf8().constData());
+
     return result;
 }
 
@@ -320,17 +345,23 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     // 将导入的实体添加到场景（通过 SceneEditService 确保 Undo/图层分配/ID 冲突处理）
     if (m_editService)
     {
+        SY_INFOF("[ImportService] Calling addEntities: editService=%p, entities=%d", 
+            m_editService, static_cast<int>(entities.size()));
         m_editService->addEntities(std::move(entities),
             "Import " + context.sourcePath.toStdString());
+        SY_INFO("[ImportService] addEntities completed successfully");
     }
     else if (m_sceneManager)
     {
         // 回退：无 SceneEditService 时直写 SceneManager（无 Undo）
+        SY_INFOF("[ImportService] Direct adding to sceneManager=%p, entities=%d", 
+            m_sceneManager, static_cast<int>(entities.size()));
         for (auto& entity : entities)
         {
             if (entity)
                 m_sceneManager->addEntity(entity.release());
         }
+        SY_INFO("[ImportService] Direct add completed");
     }
     else
     {

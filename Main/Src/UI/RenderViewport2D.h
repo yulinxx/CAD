@@ -16,6 +16,8 @@
 #include <memory>
 #include <unordered_set>
 
+#include "Camera2D.h"
+#include "ViewportSelector.h"
 #include "Render/RenderTypes.h"
 
 #include "Engine/EntityIdGenerator.h"
@@ -41,42 +43,6 @@ namespace Eg
 {
     class SceneManager;
 }
-
-/**
- * @brief 简单的 2D 正交相机
- */
-struct Camera2D
-{
-    float zoomX = 1.0f;
-    float zoomY = 1.0f;
-    QPointF panOffset;
-
-    static constexpr float MIN_ZOOM = 0.001f;
-    static constexpr float MAX_ZOOM = 10000.0f;
-
-    // 计算视图矩阵（3x3，列优先，9个float）
-    void computeViewMatrix(float outMat[9], float vpW, float vpH) const;
-
-    // 屏幕坐标转世界坐标
-    QPointF screenToWorld(const QPoint& screenPos, float vpW, float vpH) const;
-
-    // 缩放
-    void zoomIn(float factor, const QPointF& anchorWorld, float vpW, float vpH);
-    void zoomOut(float factor, const QPointF& anchorWorld, float vpW, float vpH);
-
-    // 平移
-    void pan(float dx, float dy);
-
-    // 重置
-    void reset();
-
-    // 缩放到适合
-    void zoomToFit(float vpW, float vpH, float sceneW, float sceneH);
-
-    // 设置视图范围：以 (centerX, centerY) 为中心，可见半宽半高为 halfW/halfH
-    // 根据视口尺寸计算合适的 zoomX/zoomY，使世界范围 [-halfW, halfW] x [-halfH, halfH] 可见
-    void setViewExtent(float vpW, float vpH, float centerX, float centerY, float halfW, float halfH);
-};
 
 /**
  * @brief 2D 渲染视口 — 基于 Renderx 的 OpenGL 渲染
@@ -181,13 +147,6 @@ private:
     // 视图控制
     void updateViewMatrix();
 
-    // 选择
-    void handleLeftClick(const QPointF& worldPos);
-    void performHitTest(const QPointF& worldPos);
-    void beginBoxSelect(const QPointF& worldPos);
-    void updateBoxSelect(const QPointF& worldPos);
-    void endBoxSelect(const QPointF& worldPos);
-
     // 辅助
     void updateStatus(const QString& text);
     Eg::SceneManager* sceneManager() const;
@@ -211,6 +170,9 @@ private:
     // 工具系统
     std::unique_ptr<ToolManager> m_toolManager;
 
+    // 选择控制器
+    std::unique_ptr<ViewportSelector> m_selector;
+
     // 回调
     std::function<void(const QString&)> m_statusCallback;
     std::function<void(const QString&, const QString&)> m_selectionCallback;
@@ -220,11 +182,8 @@ private:
 
     // 交互状态
     bool m_panning{ false };
-    bool m_boxSelecting{ false };
     bool m_panModeEnabled{ false };
     QPoint m_lastMousePos;
-    QPointF m_boxSelectStart;
-    QPointF m_boxSelectEnd;
 
     // 刷新级别（增量渲染策略）
     enum class RefreshLevel

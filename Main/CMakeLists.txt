@@ -21,6 +21,10 @@ file(GLOB_RECURSE MAIN_SOURCES CONFIGURE_DEPENDS
     "${SRC_ROOT}/**/*.cpp"
 )
 
+list(APPEND MAIN_SOURCES
+    "${UI_ROOT}/ViewportSelector.cpp"
+)
+
 file(GLOB_RECURSE MAIN_HEADERS CONFIGURE_DEPENDS
     "${SRC_ROOT}/**/*.h"
 )
@@ -75,6 +79,7 @@ set_target_properties(${app_name} PROPERTIES
     AUTOUIC OFF
     AUTORCC ON
     WIN32_EXECUTABLE ON
+    CXX_VISIBILITY_PRESET default
 )
 
 target_compile_features(${app_name} PRIVATE cxx_std_17)
@@ -224,6 +229,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
 
     file(GLOB MAIN_TEST_DEP_SOURCES CONFIGURE_DEPENDS
         "${UI_ROOT}/*.cpp"
+        "${UI_ROOT}/**/*.cpp"
         "${SRC_ROOT}/Persistence/*.cpp"
         "${SRC_ROOT}/Persistence/Repositories/*.cpp"
         "${SRC_ROOT}/Import/*.cpp"

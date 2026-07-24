@@ -124,9 +124,6 @@ public:
     // ---- SceneDocumentBase 接口 ----
 
     std::vector<std::string> allEntityIds() const override;
-    void selectEntity(const std::string& id) override;
-    void clearSelection() override;
-    std::vector<std::string> selectedIds() const override;
     void removeEntity(const std::string& id) override;
     void clear() override;
 
