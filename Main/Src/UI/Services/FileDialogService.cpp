@@ -29,10 +29,10 @@ QString FileDialogService::getSaveFileName(QWidget* parent, const QString& title
 
 QString FileDialogService::allSupportedFilter()
 {
-    return QObject::tr("All Supported Files (*.sy *.dxf *.plt *.stp *.step *.svg *.pdf *.ai);;"
+    return QObject::tr("All Supported Files (*.sy *.dxf *.plt *.stp *.step *.svg *.pdf *.ai *.obj *.stl);;"
         "SanYi Files (*.sy);;DXF Files (*.dxf);;PLT Files (*.plt);;"
         "STEP Files (*.stp *.step);;SVG Files (*.svg);;PDF Files (*.pdf);;"
-        "AI Files (*.ai);;All Files (*.*)");
+        "AI Files (*.ai);;OBJ Files (*.obj);;STL Files (*.stl);;All Files (*.*)");
 }
 
 QString FileDialogService::importFilterForFormat(Fio::FileFormat fmt)
@@ -44,6 +44,8 @@ QString FileDialogService::importFilterForFormat(Fio::FileFormat fmt)
         case Fio::FileFormat::PLT:  return QObject::tr("PLT Files (*.plt *.hpgl);;All Files (*.*)");
         case Fio::FileFormat::STEP: return QObject::tr("STEP Files (*.stp *.step);;All Files (*.*)");
         case Fio::FileFormat::PDF:  return QObject::tr("PDF Files (*.pdf);;All Files (*.*)");
+        case Fio::FileFormat::OBJ:  return QObject::tr("OBJ Files (*.obj);;All Files (*.*)");
+        case Fio::FileFormat::STL:  return QObject::tr("STL Files (*.stl);;All Files (*.*)");
         default:                   return QObject::tr("All Files (*.*)");
     }
 }

@@ -19,8 +19,8 @@ SceneTreeDockWidget::SceneTreeDockWidget(QWidget* parent)
         if (!item)
             return;
 
-        // UserRole = SceneNode id（即引擎实体 ID 字符串）
-        // UserRole+1 = 引擎实体 ID（备用，与 UserRole 相同）
+        // UserRole = SceneNode id（即引擎图元 ID 字符串）
+        // UserRole+1 = 引擎图元 ID（备用，与 UserRole 相同）
         const QString nodeId = item->data(0, Qt::UserRole).toString();
 
         selectPathParents(nodeId);

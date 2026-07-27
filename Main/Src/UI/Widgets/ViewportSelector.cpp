@@ -167,11 +167,15 @@ size_t ViewportSelector::endBoxSelect(const QPointF& worldPos)
         m_selectionService->selectMultiple(hitIds);
         if (m_statusCallback)
             m_statusCallback(QStringLiteral("2D %1 entities selected").arg(static_cast<int>(hitIds.size())));
+        if (m_selectionCallback)
+            m_selectionCallback(QStringLiteral("2D-Select"), QStringLiteral("2D %1 entities selected").arg(static_cast<int>(hitIds.size())));
     }
     else
     {
         if (m_statusCallback)
             m_statusCallback(QStringLiteral("2D selection cleared"));
+        if (m_selectionCallback)
+            m_selectionCallback(QStringLiteral("2D-Select"), QStringLiteral("none"));
     }
 
     return hitIds.size();
@@ -244,5 +248,7 @@ void ViewportSelector::performHitTest(const QPointF& worldPos)
     {
         if (m_statusCallback)
             m_statusCallback(QStringLiteral("2D selection cleared"));
+        if (m_selectionCallback)
+            m_selectionCallback(QStringLiteral("2D-Select"), QStringLiteral("none"));
     }
 }

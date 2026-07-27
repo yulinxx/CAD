@@ -121,6 +121,7 @@ protected:
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
+    void mouseDoubleClickEvent(QMouseEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     void contextMenuEvent(QContextMenuEvent* event) override;
@@ -190,7 +191,7 @@ private:
     {
         None,         // 无待办，不要触发任何 GL 操作
         Repaint,      // 仅重绘（选择变化等纯视觉刷新，不触碰渲染数据）
-        LightUpdate,  // 仅提交脏/删除实体到渲染设备（依赖 RenderWidget 增量 API）
+        LightUpdate,  // 仅提交脏/删除图元到渲染设备（依赖 RenderWidget 增量 API）
         FullRefresh   // 全量 gather + submit（导入、大批量修改后）
     };
     RefreshLevel m_refreshLevel{ RefreshLevel::None };

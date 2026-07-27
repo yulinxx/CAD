@@ -145,6 +145,9 @@ public:
     void restoreLayoutSnapshot(const QString& workbenchId);
     /// 重新设置所有注册的 dock widget 的标题
     void restoreDockWidgetTitles();
+    /// 设置骨架停靠面板的可见性（SceneDock / PropertiesDock）
+    /// 3D 工作台不需要这些面板，需要隐藏以免挤压视口
+    void setSkeletonDocksVisible(bool visible);
     /// 从状态中心刷新界面
     void refreshFromState();
     /// 触发工作台切换

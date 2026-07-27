@@ -3,7 +3,7 @@
  * @file TransactionUndoCommand.h
  * @brief 事务级撤销命令
  *
- * 将 DocumentTransaction 包装为 UndoCommand，使撤销/重做基于事务回放而非实体快照。
+ * 将 DocumentTransaction 包装为 UndoCommand，使撤销/重做基于事务回放而非图元快照。
  * 使用方式：
  * @code
  *   DocumentTransaction txn(sceneManager);

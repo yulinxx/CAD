@@ -1,17 +1,35 @@
 #include "ObjImportReader.h"
 
+#include "Engine3D/Loader/ObjLoader.h"
 #include "Log/SyLogger.h"
 
+/**
+ * @brief OBJ 文件导入实现
+ * 使用 Eg::ObjLoader 加载网格，包装为 SyMeshEntity 后通过基类指针返回。
+ * 日志关键位置：加载错误 / 成功
+ */
 ImportResult ObjImportReader::read(const ImportContext& context,
     Fio::VecSyEntityPtr& outEntities)
 {
-    // OBJ 导入需要 3D 引擎的 ObjLoader，当前版本暂未直接集成
-    // 后续可通过 Engine3D::ObjLoader 加载网格数据后转换为 SyEntity
-    QString msg = QStringLiteral("OBJ import not yet implemented in ImportService. "
-        "Please use Engine3D::ObjLoader directly for now.");
-    SY_WARNF("[ObjImportReader] %s (path=%s)",
-        msg.toUtf8().constData(),
-        context.sourcePath.toUtf8().constData());
+    std::string error;
+    auto mesh = Eg::ObjLoader::load(context.sourcePath.toUtf8().toStdString(), error);
 
-    return ImportResult::fail(msg, ImportErrorType::FormatNotSupported);
+    if (!mesh)
+    {
+        QString msg = QString::fromStdString(error);
+        SY_ERRORF("[ObjImportReader] Failed to load OBJ file: %s (path=%s)",
+            msg.toUtf8().constData(),
+            context.sourcePath.toUtf8().constData());
+        return ImportResult::fail(msg, ImportErrorType::ParseFailed);
+    }
+
+    SY_INFOF("[ObjImportReader] OBJ loaded successfully: %s, triangles=%zu, verts=%zu",
+        mesh->strName.c_str(), mesh->triangleCount(), mesh->vertices.size());
+
+    // 通过基类指针存入输出列表（IImportReader 接口使用 SyEntity 基类）
+    outEntities.push_back(std::move(mesh));
+
+    return ImportResult::ok(
+        QStringLiteral("OBJ import successful: 1 mesh entity"),
+        1);
 }

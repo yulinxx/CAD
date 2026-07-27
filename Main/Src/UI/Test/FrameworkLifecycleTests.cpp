@@ -17,8 +17,8 @@
 
 #include <gtest/gtest.h>
 
-#include "UI/SimpleRenderer3D.h"
-#include "UI/UiWorkbench.h"
+#include "UI/Render/SimpleRenderer3D.h"
+#include "UI/Workbench/UiWorkbench.h"
 
 TEST(FrameworkLifecycleTest, StableChecklist_IsDocumented)
 {

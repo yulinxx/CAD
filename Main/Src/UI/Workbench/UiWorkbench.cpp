@@ -1,6 +1,7 @@
 #include "UiWorkbench.h"
 
 #include <QAction>
+#include <QShortcut>
 #include <QSizePolicy>
 #include <QTextEdit>
 #include <QToolBar>
@@ -36,6 +37,8 @@
 #include "UiEntities.h"
 #include "UiViewport3D.h"
 #include "SceneBuilder3D.h"
+#include "Ui/TopToolBar/TopToolBar3D.h"
+#include "Ui/StatusBar/StatusBar3D.h"
 #endif
 
 namespace
@@ -59,21 +62,22 @@ namespace
         return bar->addAction(text);
     }
 
-    /// 从 CommandCatalog 的 toolCommands 中提取绘图工具定义
+    /// 从 CommandCatalog 的 commands 中提取绘图工具定义
     /// 保证工具栏和菜单使用同一套命令 ID（单一命令定义源）
     QVector<DrawToolEntry> buildDrawToolEntries()
     {
         QVector<DrawToolEntry> entries;
-        for (const ToolCommandEntry& catEntry : CommandCatalog::toolCommands())
+        for (const CommandEntry2D& catEntry : CommandCatalog::commands())
         {
-            // 只取标记为 LeftToolbar 表面的工具
-            if (!hasSurface(catEntry.surfaces, CommandSurface::LeftToolbar))
+            if (!catEntry.toolName)
+                continue;
+            if (!hasSurface(catEntry.surfaces, CommandSurface2D::LeftToolbar))
                 continue;
 
             DrawToolEntry entry;
             entry.commandId = QString::fromUtf8(catEntry.toolName);
-            entry.displayName = QObject::tr(catEntry.menuText);
-            entry.tooltip = QObject::tr("Draw %1").arg(QObject::tr(catEntry.menuText));
+            entry.displayName = QObject::tr(catEntry.text);
+            entry.tooltip = QObject::tr("Draw %1").arg(QObject::tr(catEntry.text));
             // 从 shortcutId 中提取快捷键提示
             if (catEntry.shortcutId)
             {
@@ -337,7 +341,7 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
 
     // 步骤2.3: 使用全局共享的 document2D（与 ImportService 共用同一个 SceneManager）
     // 注意：document2D 由 ApplicationCompositionRoot 初始化，
-    // 使用全局 SceneManager，确保导入的实体和视口渲染使用同一数据源
+    // 使用全局 SceneManager，确保导入的图元和视口渲染使用同一数据源
     // 从 window 获取最新的 UI 服务，避免切换过程中 m_services 失效
     const auto& windowServices = window.uiServices();
     SceneDocument2D* document = windowServices.document2D;
@@ -629,7 +633,26 @@ void Workbench2D::shutdown()
 // Workbench3D 实现
 // 统一工作台初始化模板
 // 流程：initialize → attachToWindow → activate ↔ deactivate → shutdown
-// 3D/2D 差异集中在配置，不散在流程里
+// 使用 MainWindow3D + ServiceLocator3D 架构
+// 渲染链路：Viewport3D -> IRenderer3D -> RenderWidget3DAdapter -> RenderWidget3D
+
+#include "UI3D/Service/ServiceLocator3D.h"
+#include "UI3D/Operation/OperationBus3D.h"
+#include "UI3D/Operation/CommandCatalog3D.h"
+#include "UI3D/Operation/CommandActionHub3D.h"
+#include "UI3D/Operation/CommandRegistry3D.h"
+#include "Render3D/RenderWidget3D.h"
+#include "RenderWidget3DAdapter.h"
+#include "Ui/MainWindow/MainWindow3D.h"
+#include "Ui/LeftToolBar/LeftToolBar3D.h"
+#include "Ui/MenuManager/MenuManager3D.h"
+#include "Ui/MenuManager/FileMenu3D.h"
+#include "Ui/MenuManager/EditMenu3D.h"
+#include "Ui/MenuManager/ViewMenu3D.h"
+#include "Ui/MenuManager/HelpMenu3D.h"
+#include "Engine3D/SceneManager3D.h"
+#include "Renderer3DFactory.h"
+#include "Log/SyLogger.h"
 
 QString Workbench3D::id() const
 {
@@ -640,187 +663,378 @@ QString Workbench3D::displayName() const
     return QObject::tr("3D Workbench");
 }
 
-// 步骤1 — 初始化，存储服务引用
+// 步骤1 — 初始化，存储服务引用并初始化 ServiceLocator3D
 bool Workbench3D::initialize(const UiServices& services)
 {
     if (!services.stateCenter || !services.interactionDispatcher)
         return false;
     m_services = services;
+
+    // 使用 ApplicationCompositionRoot 中的共享 SceneManager3D，
+    // 确保导入的 3D 图元与 3D 工作台使用同一数据源
+    if (services.importService && services.importService->sceneManager3D())
+    {
+        m_sceneManager3D = services.importService->sceneManager3D();
+        SY_INFO("[Workbench3D] Using shared SceneManager3D from ImportService");
+    }
+    else
+    {
+        SY_ERROR("[Workbench3D] No shared SceneManager3D available from ImportService");
+        return false;
+    }
+
+    SY_INFO("[Workbench3D] Initializing ServiceLocator3D...");
+    ServiceLocator3D::initialize(m_sceneManager3D, nullptr, nullptr);
+    SY_INFO("[Workbench3D] ServiceLocator3D initialized");
+
     m_savedState = WorkbenchStateSnapshot{};
     m_initialState = WorkbenchStateSnapshot{};
     return true;
 }
 
-// 步骤2 — 构建 3D 场景面板（属性面板 + 场景树 + 操作历史）
-void Workbench3D::build3DScenePanels(WorkbenchWindow& window, PropertiesPanelWidget*& properties, SceneTreeDockWidget*& sceneDock, QString& rootNodeId)
+// 步骤2 — 构建 3D 工作台 UI
+// 核心架构：Viewport3D -> IRenderer3D -> RenderWidget3DAdapter -> RenderWidget3D
+// 通过 Viewport3D 统一视图宿主，Renderer 通过外部注入
+void Workbench3D::build3DWorkbenchUi(WorkbenchWindow& window)
 {
-    auto sceneResult = SceneBuilder3D::createDefaultScene(rootNodeId);
-    m_scene = sceneResult;
+    // ServiceLocator3D 初始化（如果尚未初始化或已关闭，重新初始化）
+    // 注：initialize() 内部会判断是否已初始化，防止重复创建
+    ServiceLocator3D::initialize(m_sceneManager3D, nullptr, nullptr);
 
-    properties = new PropertiesPanelWidget(&window);
-    properties->setObjectName(QStringLiteral("PropertiesPanel3D"));
-    properties->setWindowTitle(QObject::tr("3D Inspector"));
+    // 隐藏骨架停靠面板（SceneDock / PropertiesDock），3D 工作台不需要这些面板
+    // 这些面板在 initializeWorkbenchShell() 中创建，不在 m_registeredDocks 中，
+    // clearWorkbenchContent() 无法清除它们，需要手动隐藏
+    window.setSkeletonDocksVisible(false);
 
-    PropertiesPanelWidget::PropertiesData data;
-    data.mode = PropertiesPanelWidget::WorkbenchMode::ThreeD;
-    data.stateText = QObject::tr("3D ready");
-    data.selectionText = QObject::tr("Root node: %1").arg(rootNodeId);
-    data.documentType = QObject::tr("SceneDocument3D");
-    data.documentStatus = QObject::tr("Ready");
-    data.modeSpecificFields = {
-        QObject::tr("Mode: 3D Viewport"),
-        QObject::tr("Transform: Position/Rotation/Scale"),
-        QObject::tr("Material: Default")
-    };
-    properties->setPropertiesData(data);
-    update3DDetails(properties, m_scene.get(), rootNodeId);
-    window.registerDockWidget(QObject::tr("3D Inspector"), properties, Qt::RightDockWidgetArea);
+    SY_INFO("[Workbench3D] Creating MainWindow3D wrapper...");
+    m_mainWindow3D = std::make_unique<MainWindow3D>(&window);
+    SY_INFO("[Workbench3D] MainWindow3D created");
 
-    sceneDock = new SceneTreeDockWidget(&window);
-    sceneDock->setSceneDocument(m_scene.get());
-    sceneDock->setObjectName(QStringLiteral("SceneTreeDock3D"));
-    sceneDock->setWindowTitle(QObject::tr("3D Scene"));
-    sceneDock->setSelectionCallback([this, sceneDock, properties, &window](const QString& nodeId) {
-        onSceneTreeSelection(nodeId, sceneDock, properties, window);
+    // 连接切换到2D的信号到工作台切换
+    connect(m_mainWindow3D.get(), &MainWindow3D::sigSwitchTo2D, &window, [&window]() {
+        SY_INFO("[Workbench3D] sigSwitchTo2D triggered, switching to 2D workbench");
+        window.triggerWorkbench(QStringLiteral("2D"));
         });
 
-    window.registerDockWidget(QObject::tr("3D Scene"), sceneDock, Qt::LeftDockWidgetArea);
-
-    auto* history = createPanelWidget(QObject::tr("Operation history"), &window);
-    window.registerDockWidget(QObject::tr("3D History"), history, Qt::BottomDockWidgetArea);
-}
-
-// 场景树选中回调：同步选中状态到文档、属性面板和视口
-void Workbench3D::onSceneTreeSelection(const QString& nodeId, SceneTreeDockWidget* sceneDock,
-    PropertiesPanelWidget* properties, WorkbenchWindow& window)
-{
-    if (!m_scene)
-        return;
-
-    m_scene->selection().clear();
-    auto node = m_scene->nodeById(nodeId.toStdString());
-    if (node)
-        m_scene->selection().add(node);
-
-    if (properties && node)
-    {
-        const auto pathNames = node->pathNamesRecursive();
-        QString pathStr;
-        for (size_t i = 0; i < pathNames.size(); ++i)
-        {
-            if (i > 0)
-                pathStr += QObject::tr(" / ");
-            pathStr += QString::fromStdString(pathNames[i]);
-        }
-
-        properties->setObjectDetails(QObject::tr("Node %1").arg(QString::fromStdString(node->id())), {
-            QObject::tr("Name: %1").arg(QString::fromStdString(node->name())),
-            QObject::tr("Children: %1").arg(node->children().size()),
-            QObject::tr("Path: %1").arg(pathStr),
-            QObject::tr("Selected: yes")
-            });
-    }
-
-    if (m_services.stateCenter)
-        m_services.stateCenter->setSelectionContext(QObject::tr("3D-Tree"), QObject::tr("3D node: %1").arg(nodeId));
-
-    if (auto* viewport = qobject_cast<Viewport3D*>(window.centralWidget()))
-        viewport->selectNodeById(nodeId);
-}
-
-// 步骤3 — 构建 3D 工具栏（主操作栏 + 视角导航栏）
-void Workbench3D::build3DToolBars(WorkbenchWindow& window)
-{
-    auto* mainBar = window.registerToolBar(QObject::tr("3D Main"));
-    auto* orbit = addWorkbenchAction(mainBar, QObject::tr("Orbit"));
-    auto* orbitSelected = addWorkbenchAction(mainBar, QObject::tr("Orbit Selected"));
-    auto* measure = addWorkbenchAction(mainBar, QObject::tr("Measure"));
-    auto* selectEntity = addWorkbenchAction(mainBar, QObject::tr("Select"));
-
-    auto* navBar = window.registerToolBar(QObject::tr("3D Navigation"));
-    auto* top = addWorkbenchAction(navBar, QObject::tr("Top"));
-    auto* front = addWorkbenchAction(navBar, QObject::tr("Front"));
-    auto* right = addWorkbenchAction(navBar, QObject::tr("Right"));
-
-    if (m_services.operationBus)
-    {
-        QObject::connect(orbit, &QAction::triggered, [this]() { m_services.operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("3d.orbit"))); });
-        QObject::connect(orbitSelected, &QAction::triggered, [this]() { m_services.operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("3d.orbit_selected"))); });
-        QObject::connect(measure, &QAction::triggered, [this]() { m_services.operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("3d.measure"))); });
-        QObject::connect(selectEntity, &QAction::triggered, [this]() { m_services.operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("3d.select"))); });
-        QObject::connect(top, &QAction::triggered, [this]() { m_services.operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("3d.view_top"))); });
-        QObject::connect(front, &QAction::triggered, [this]() { m_services.operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("3d.view_front"))); });
-        QObject::connect(right, &QAction::triggered, [this]() { m_services.operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("3d.view_right"))); });
-    }
-}
-
-// 步骤4 — 构建 3D 视口并配置回调
-QWidget* Workbench3D::build3DViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties, SceneTreeDockWidget* sceneDock)
-{
+    // ========== Phase 0A: 使用 Viewport3D + RenderWidget3DAdapter ==========
+    // 创建标准 3D 视图宿主 Viewport3D
+    SY_INFO("[Workbench3D] Creating Viewport3D...");
     auto* viewport = new Viewport3D(&window);
-    configure3DViewport(viewport, m_services, m_scene.get(), nullptr, properties, sceneDock);
-    viewport->setPathCallback([properties, sceneDock](const QStringList& pathNames) {
-        if (properties)
-            properties->setObjectDetails(QObject::tr("3D Path"), pathNames);
-        if (sceneDock)
-            sceneDock->refresh();
-        });
-    viewport->setOrbitMode(true);
-    viewport->setMeasureMode(false);
-    return viewport;
-}
+    SY_INFOF("[Workbench3D] Viewport3D created: %p", viewport);
 
-// 步骤5 — 初始化 3D 工作台状态快照
-void Workbench3D::init3DInitialState(const SceneDocument3D& scene, const QString& rootNodeId)
-{
-    Q_UNUSED(scene);
+    // 通过统一工厂创建默认 renderer（兼容链）
+    // 所有 IRenderer3D 实例必须通过 Renderer3DFactory 创建，禁止在宿主层分散 new
+    SY_INFO("[Workbench3D] Creating renderer via Renderer3DFactory...");
+    auto renderer = Renderer3DFactory::createDefault();
+    SY_INFO("[Workbench3D] Renderer created via factory");
+
+    // 通过组合根注入 renderer（当前使用兼容链，未来可无缝切换到新渲染后端）
+    viewport->setRenderer(std::move(renderer));
+
+    // 获取内部的 RenderWidget3D，以便设置场景管理器和连接信号
+    auto* adapter = dynamic_cast<RenderWidget3DAdapter*>(viewport->renderer());
+    if (adapter)
+    {
+        auto* renderWidget = adapter->widget();
+        if (renderWidget)
+        {
+            // 设置场景管理器（RenderWidget3D 的原有接口）
+            renderWidget->setSceneManager(m_sceneManager3D);
+            SY_INFO("[Workbench3D] SceneManager3D set to RenderWidget3D");
+
+            // 通过 ServiceLocator3D 注册 RenderWidget3D，保持向后兼容性
+            ServiceLocator3D::instance().setRenderWidget(renderWidget);
+            SY_INFO("[Workbench3D] RenderWidget3D registered in ServiceLocator3D");
+
+            // 连接 RenderWidget3D 的信号到状态栏（通过适配器的回调机制）
+            connect(renderWidget, &RenderWidget3D::sigCursorWorldPosition,
+                [mainWindow3D = m_mainWindow3D.get()](float x, float y, float z, bool valid) {
+                    if (mainWindow3D->statusBar3D())
+                    {
+                        if (valid)
+                            mainWindow3D->statusBar3D()->setPositionText(
+                                QObject::tr("Position: (%1, %2, %3) mm").arg(x, 0, 'f', 2).arg(y, 0, 'f', 2).arg(z, 0, 'f', 2));
+                        else
+                            mainWindow3D->statusBar3D()->setPositionText(QObject::tr("Position: -"));
+                    }
+                });
+
+            connect(renderWidget, &RenderWidget3D::sigSelectionChanged,
+                [mainWindow3D = m_mainWindow3D.get()](const std::vector<Eg::SyMeshEntity*>& entities) {
+                    if (mainWindow3D->statusBar3D())
+                    {
+                        int count = static_cast<int>(entities.size());
+                        QString modelName;
+                        int triangleCount = 0;
+                        if (count > 0 && entities[0])
+                        {
+                            modelName = QString::number(entities[0]->id);
+                            triangleCount = static_cast<int>(entities[0]->vertices.size() / 3);
+                        }
+                        mainWindow3D->statusBar3D()->setSelectionInfo(count, modelName, triangleCount);
+                    }
+                });
+
+            // 连接 Delete/Backspace 键删除选中对象（渲染 widget 有焦点时生效）
+            connect(renderWidget, &RenderWidget3D::sigKeyPressed,
+                this, [this](int key, Qt::KeyboardModifiers) {
+                    if (key == Qt::Key_Delete || key == Qt::Key_Backspace)
+                    {
+                        auto* bus = ServiceLocator3D::instance().operationBus();
+                        if (bus)
+                        {
+                            SY_INFO("[Workbench3D] Delete key pressed (renderWidget signal), running Edit_Delete operation");
+                            bus->run(OperationId3D::Edit_Delete);
+                        }
+                    }
+                });
+
+            // 全局 Delete/Backspace 快捷键（渲染 widget 无焦点时也生效）
+            // 存储到成员变量，以便在 shutdown() 中清理，避免切换到 2D 后仍触发 3D 操作
+            m_deleteShortcut = new QShortcut(QKeySequence(Qt::Key_Delete), &window);
+            m_deleteShortcut->setContext(Qt::ApplicationShortcut);
+            connect(m_deleteShortcut, &QShortcut::activated, this, [this]() {
+                auto* bus = ServiceLocator3D::instance().operationBus();
+                if (bus)
+                {
+                    SY_INFO("[Workbench3D] Delete shortcut activated, running Edit_Delete operation");
+                    bus->run(OperationId3D::Edit_Delete);
+                }
+            });
+            m_backspaceShortcut = new QShortcut(QKeySequence(Qt::Key_Backspace), &window);
+            m_backspaceShortcut->setContext(Qt::ApplicationShortcut);
+            connect(m_backspaceShortcut, &QShortcut::activated, this, [this]() {
+                auto* bus = ServiceLocator3D::instance().operationBus();
+                if (bus)
+                {
+                    SY_INFO("[Workbench3D] Backspace shortcut activated, running Edit_Delete operation");
+                    bus->run(OperationId3D::Edit_Delete);
+                }
+            });
+        }
+        else
+        {
+            SY_ERROR("[Workbench3D] RenderWidget3DAdapter::widget() returned null");
+        }
+    }
+    else
+    {
+        SY_ERROR("[Workbench3D] Failed to cast renderer to RenderWidget3DAdapter");
+    }
+
+    // 设置 SceneDocument（通过 ServiceLocator3D 获取）
+    auto* sceneDocument = ServiceLocator3D::instance().sceneDocument();
+    viewport->setSceneDocument(sceneDocument);
+    SY_INFOF("[Workbench3D] SceneDocument3D set to Viewport3D: %p", sceneDocument);
+
+    // 设置 CameraController（通过 ServiceLocator3D 获取）
+    auto* cameraController = ServiceLocator3D::instance().cameraController();
+    viewport->setCameraController(cameraController);
+    SY_INFOF("[Workbench3D] CameraController3D set to Viewport3D: %p", cameraController);
+
+    // 将 Viewport3D 设为中央组件，并设置最小尺寸避免被工具栏挤压到不可见
+    viewport->setMinimumSize(400, 300);
+    window.setCentralWidget(viewport);
+    SY_INFO("[Workbench3D] Viewport3D set as central widget");
+
+    // ========== 工具栏和状态栏设置 ==========
+    auto* mainWindow3D = m_mainWindow3D.get();
+
+    // 把 MainWindow3D 创建的左侧工具栏提取到 WorkbenchWindow
+    window.addToolBar(Qt::LeftToolBarArea, mainWindow3D->leftToolBar());
+
+    // 把顶部工具栏添加到 WorkbenchWindow
+    if (mainWindow3D->topToolBar())
+        window.addToolBar(Qt::TopToolBarArea, mainWindow3D->topToolBar());
+
+    // 使用 MainWindow3D 的状态栏
+    if (mainWindow3D->statusBar3D())
+    {
+        auto* sb = window.statusBar();
+        if (sb)
+        {
+            sb->clearMessage();
+            sb->addWidget(mainWindow3D->statusBar3D(), 1);
+        }
+    }
+
+    // MainWindow3D 本身不需要可见（它只是工具栏的宿主和协调器）
+    mainWindow3D->hide();
+
+    SY_INFO("[Workbench3D] Calling ServiceLocator3D::initializeDeferred()...");
+    ServiceLocator3D::instance().initializeDeferred(mainWindow3D);
+    SY_INFO("[Workbench3D] ServiceLocator3D::initializeDeferred() completed");
+
+    SY_INFO("[Workbench3D] Calling CommandRegistry3D::registerAll()...");
+    CommandRegistry3D::registerAll(mainWindow3D);
+    SY_INFO("[Workbench3D] CommandRegistry3D::registerAll() completed");
+
+    auto* menuBar = window.menuBar();
+    if (!menuBar)
+    {
+        menuBar = new QMenuBar(&window);
+        window.setMenuBar(menuBar);
+    }
+
+    SY_INFO("[Workbench3D] Creating MenuManager3D...");
+    m_menuManager3D = std::make_unique<MenuManager3D>(mainWindow3D);
+    SY_INFO("[Workbench3D] MenuManager3D created");
+
+    m_menuManager3D->createMenus(menuBar);
+
+    auto* fileMenu = static_cast<FileMenu3D*>(m_menuManager3D->fileMenu());
+    auto* editMenu = m_menuManager3D->editMenu();
+    auto* viewMenu = m_menuManager3D->viewMenu();
+
+    auto* hub = ServiceLocator3D::instance().commandActionHub();
+    if (hub)
+    {
+        // 注入 OperationBus，使 wireAction 能够正确连接 QAction 信号
+        hub->setOperationBus(ServiceLocator3D::instance().operationBus());
+
+        SY_INFO("[Workbench3D] Calling CommandActionHub3D::rebuildAll()...");
+        hub->rebuildAll(mainWindow3D->shortcutManager3D());
+        SY_INFO("[Workbench3D] CommandActionHub3D::rebuildAll() completed");
+
+        hub->bindFileMenu(fileMenu);
+        hub->bindEditMenu(editMenu);
+        hub->bindViewMenu(viewMenu);
+        hub->bindLeftToolBar(mainWindow3D->leftToolBar());
+        hub->bindTopToolBar(mainWindow3D->topToolBar());
+    }
+    else
+    {
+        SY_ERROR("[Workbench3D] CommandActionHub3D is null, menu binding skipped");
+    }
+
+    m_menuManager3D->connectMenuSignals();
+
+    connect(m_menuManager3D.get(), &MenuManager3D::sigMenuAction,
+        this, &Workbench3D::onMenuAction);
+
+    // 设置 Viewport3D 的状态回调和选择回调（通过统一接口）
+    viewport->setStatusCallback([mainWindow3D](const QString& status) {
+        SY_INFOF("[Viewport3D] Status callback: %s", status.toUtf8().constData());
+        if (mainWindow3D->statusBar3D())
+        {
+            mainWindow3D->statusBar3D()->setMessageText(status);
+        }
+    });
+
+    viewport->setSelectionCallback([mainWindow3D](const QString& nodeId) {
+        SY_INFOF("[Viewport3D] Selection callback: nodeId=%s", nodeId.toUtf8().constData());
+        if (!nodeId.isEmpty())
+        {
+            mainWindow3D->statusBar3D()->setSelectionInfo(1, nodeId, 0);
+        }
+        else
+        {
+            mainWindow3D->statusBar3D()->setSelectionInfo(0, QString(), 0);
+        }
+    });
+
     m_initialState.viewMode = QObject::tr("3D Viewport");
     m_initialState.layerId = QObject::tr("Scene");
-    m_initialState.documentId.clear(); // 初始无文档，由 ApplicationCompositionRoot 在文件打开时设置
+    m_initialState.documentId.clear();
     m_initialState.selectionSource = QObject::tr("3D-Init");
-    m_initialState.selectionText = QObject::tr("Root node: %1").arg(rootNodeId);
+    m_initialState.selectionText = QObject::tr("Ready");
     m_initialState.selectionType = QObject::tr("3D");
     m_initialState.viewportType = QObject::tr("3D");
     m_initialState.viewportStatus = QObject::tr("3D ready");
     m_initialState.dirty = false;
 }
 
-// 步骤6 — 组装 3D 工作台 UI（面板 + 工具栏 + 视口）
-void Workbench3D::build3DWorkbenchUi(WorkbenchWindow& window)
+void Workbench3D::onMenuAction(int actionId, const QVariantMap& params)
 {
-    PropertiesPanelWidget* properties = nullptr;
-    SceneTreeDockWidget* sceneDock = nullptr;
-    QString rootNodeId;
-    build3DScenePanels(window, properties, sceneDock, rootNodeId);
-    build3DToolBars(window);
-    auto* viewport = build3DViewport(window, properties, sceneDock);
-    window.setCentralWidget(viewport);
-    if (m_scene)
-        init3DInitialState(*m_scene, rootNodeId);
+    SY_INFOF("[Workbench3D] Menu action triggered: id=%d (0x%x)", actionId, actionId);
+
+    auto* bus = ServiceLocator3D::instance().operationBus();
+    if (!bus)
+    {
+        SY_ERROR("[Workbench3D] OperationBus3D is null");
+        return;
+    }
+
+    SY_INFOF("[Workbench3D] OperationBus3D=%p, registry size=%zu", bus, bus->registrySize());
+
+    UI3D::MenuActionId3D menuId = static_cast<UI3D::MenuActionId3D>(actionId);
+    if (CommandCatalog3D::mapsToOperation(menuId))
+    {
+        OperationId3D opId = CommandCatalog3D::operationForMenu(menuId);
+        SY_INFOF("[Workbench3D] Running operation: menuId=%d (0x%x), opId=%d, hasOp=%d",
+            actionId, actionId, static_cast<int>(opId), bus->hasOperation(opId));
+        bus->run(opId);
+    }
+    else
+    {
+        // 可能 actionId 本身已经是 OperationId3D（来自非 hub action 的直接触发）
+        OperationId3D directOpId = static_cast<OperationId3D>(actionId);
+        if (bus->hasOperation(directOpId))
+        {
+            SY_INFOF("[Workbench3D] actionId is direct operationId, running: opId=%d", static_cast<int>(directOpId));
+            bus->run(directOpId);
+        }
+        else
+        {
+            SY_WARNF("[Workbench3D] No operation found for action id: %d", actionId);
+        }
+    }
 }
 
-// 步骤7 — 附加到窗口，触发 UI 构建
+// 步骤3 — 附加到窗口，触发 UI 构建
 void Workbench3D::attachToWindow(WorkbenchWindow& window)
 {
     build3DWorkbenchUi(window);
 }
 
-// 步骤8 — 激活工作台，应用初始状态
+// 步骤4 — 激活工作台，应用初始状态
 void Workbench3D::activate()
 {
     applyWorkbenchState(m_services.stateCenter, id(), m_initialState);
 }
 
-// 步骤9 — 停用工作台，清空状态
+// 步骤5 — 停用工作台，保存状态并清理资源
 void Workbench3D::deactivate()
 {
-    m_savedState = WorkbenchStateSnapshot{};
+    m_savedState = currentSnapshot();
+
+    // 清理全局快捷键（Qt::ApplicationShortcut 不会随父窗口销毁），
+    // 避免切换到 2D 后仍触发 3D 操作导致崩溃
+    delete m_deleteShortcut;
+    m_deleteShortcut = nullptr;
+    delete m_backspaceShortcut;
+    m_backspaceShortcut = nullptr;
+
+    // 先关闭 ServiceLocator3D 释放所有服务（它们可能持有 MainWindow3D 的 QObject parent），
+    // 再销毁 MainWindow3D 以避免 Qt parent 机制导致的二次析构崩溃
+    SY_INFO("[Workbench3D] Deactivating, shutting down ServiceLocator3D first...");
+    ServiceLocator3D::shutdown();
+    SY_INFO("[Workbench3D] ServiceLocator3D::shutdown() completed");
+
+    // 注意：MenuManager3D 的父对象是 MainWindow3D，
+    // 如果先销毁 MainWindow3D，Qt 会自动销毁 MenuManager3D，
+    // 导致 m_menuManager3D.reset() 时双重释放崩溃
+    // 所以先重置 m_menuManager3D（解除父子关系），再销毁 MainWindow3D
+    SY_INFO("[Workbench3D] Destroying MenuManager3D...");
+    m_menuManager3D.reset();
+    SY_INFO("[Workbench3D] Destroying MainWindow3D...");
+    m_mainWindow3D.reset();
 }
 
-// 步骤10 — 关闭工作台，清理资源
+// 步骤6 — 关闭工作台，清理资源
 void Workbench3D::shutdown()
 {
     m_services = UiServices{};
     m_scene.reset();
+    // 清理全局快捷键（Qt::ApplicationShortcut 不会随父窗口销毁）
+    delete m_deleteShortcut;
+    m_deleteShortcut = nullptr;
+    delete m_backspaceShortcut;
+    m_backspaceShortcut = nullptr;
+    // 先关闭 ServiceLocator3D 释放所有服务，再销毁 MainWindow3D
+    ServiceLocator3D::shutdown();
+    m_menuManager3D.reset();
+    m_mainWindow3D.reset();
+    // m_sceneManager3D 由 ApplicationCompositionRoot 管理，此处不释放
 }
 #endif

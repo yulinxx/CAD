@@ -76,7 +76,8 @@ Fio::FileFormat ImportDispatcher::detectFormat(const QString& filePath)
         ext == QStringLiteral("iges"))    return Fio::FileFormat::UG;
     if (ext == QStringLiteral("sy"))      return Fio::FileFormat::Native;
     if (ext == QStringLiteral("syx"))     return Fio::FileFormat::Native3D;
-    if (ext == QStringLiteral("obj"))     return Fio::FileFormat::Unknown; // OBJ 暂用 Unknown，由 ObjImportReader 特殊处理
+    if (ext == QStringLiteral("obj"))     return Fio::FileFormat::OBJ;
+    if (ext == QStringLiteral("stl"))     return Fio::FileFormat::STL;
     if (ext == QStringLiteral("bmp"))     return Fio::FileFormat::BMP;
     if (ext == QStringLiteral("png"))     return Fio::FileFormat::PNG;
 

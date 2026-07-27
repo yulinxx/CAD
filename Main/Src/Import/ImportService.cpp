@@ -7,7 +7,9 @@
 #include "Log/SyLogger.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
-#include "../UI/UiStateCenter.h"
+#include "Engine3D/SceneManager3D.h"
+#include "Engine3D/SyEntity/SyMeshEntity.h"
+#include "../UI/Services/UiStateCenter.h"
 
 ImportService::ImportService(QObject* parent)
     : QObject(parent)
@@ -24,6 +26,11 @@ void ImportService::setDispatcher(ImportDispatcher* dispatcher)
 void ImportService::setSceneManager(Eg::SceneManager* sceneManager)
 {
     m_sceneManager = sceneManager;
+}
+
+void ImportService::setSceneManager3D(Eg::SceneManager3D* sceneManager3D)
+{
+    m_sceneManager3D = sceneManager3D;
 }
 
 void ImportService::setEditService(SceneEditService* editService)
@@ -125,7 +132,7 @@ ImportResult ImportService::importWithContext(const ImportContext& context,
     // 提前声明，避免 goto 跳过初始化
     Fio::VecSyEntityPtr importedEntities;
 
-    // ===== 阶段1：识别文件格式 =====
+    // ===== 1：识别文件格式 =====
     SY_INFO("[ImportService] Phase 1: Detect format");
     ImportResult result = phaseDetectFormat(mutableCtx);
     if (!result.success)
@@ -142,7 +149,7 @@ ImportResult ImportService::importWithContext(const ImportContext& context,
         goto cleanup;
     }
 
-    // ===== 阶段2：解析文件 =====
+    // ===== 2：解析文件 =====
     SY_INFO("[ImportService] Phase 2: Parse file");
     result = phaseParse(mutableCtx, importedEntities);
     if (!result.success)
@@ -159,7 +166,7 @@ ImportResult ImportService::importWithContext(const ImportContext& context,
         goto cleanup;
     }
 
-    // ===== 阶段3：构建文档 =====
+    // ===== 3：构建文档 =====
     SY_INFO("[ImportService] Phase 3: Build document");
     result = phaseBuildDocument(mutableCtx, importedEntities, options);
     if (!result.success)
@@ -176,12 +183,12 @@ ImportResult ImportService::importWithContext(const ImportContext& context,
         goto cleanup;
     }
 
-    // ===== 阶段4：刷新显示 =====
+    // ===== 4：刷新显示 =====
     SY_INFO("[ImportService] Phase 4: Refresh display");
     phaseRefreshDisplay(result, options);
     SY_INFO("[ImportService] Phase 4 completed");
 
-    // ===== 阶段5：回写状态 =====
+    // ===== 5：回写状态 =====
     SY_INFO("[ImportService] Phase 5: Write back state");
     phaseWriteBackState(mutableCtx, result);
     SY_INFO("[ImportService] Phase 5 completed");
@@ -226,7 +233,7 @@ QStringList ImportService::supportedExtensions() const
     return m_dispatcher ? m_dispatcher->supportedExtensions() : QStringList();
 }
 
-// ===== 阶段1：识别文件格式 =====
+// ===== 1：识别文件格式 =====
 ImportResult ImportService::phaseDetectFormat(ImportContext& context)
 {
     updateProgress(ImportPhase::DetectFormat, 0.0f);
@@ -271,7 +278,7 @@ ImportResult ImportService::phaseDetectFormat(ImportContext& context)
     return ImportResult::ok();
 }
 
-// ===== 阶段2：解析文件 =====
+// ===== 2：解析文件 =====
 ImportResult ImportService::phaseParse(const ImportContext& context,
     Fio::VecSyEntityPtr& outEntities)
 {
@@ -301,7 +308,7 @@ ImportResult ImportService::phaseParse(const ImportContext& context,
     return result;
 }
 
-// ===== 阶段3：构建文档 =====
+// ===== 3：构建文档 =====
 ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     Fio::VecSyEntityPtr& entities, const ImportOptions& options)
 {
@@ -312,7 +319,7 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
         static_cast<int>(entities.size()),
         options.importAsNewDocument ? 1 : 0);
 
-    // 实体合法性过滤：拒绝坏数据进入 SceneManager / RenderWorld
+    // 图元合法性过滤：拒绝坏数据进入 SceneManager / RenderWorld
     Fio::VecSyEntityPtr validEntities;
     validEntities.reserve(entities.size());
     for (auto& entity : entities)
@@ -342,8 +349,41 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
         m_sceneManager->clearScene();
     }
 
-    // 将导入的实体添加到场景（通过 SceneEditService 确保 Undo/图层分配/ID 冲突处理）
-    if (m_editService)
+    // 判断是否为 3D 网格图元
+    bool hasMeshEntities = false;
+    for (const auto& entity : entities)
+    {
+        if (entity && entity->eType == Eg::EType::MESH)
+        {
+            hasMeshEntities = true;
+            break;
+        }
+    }
+
+    // 将导入的图元添加到场景（通过 SceneEditService 确保 Undo/图层分配/ID 冲突处理）
+    if (hasMeshEntities && m_sceneManager3D)
+    {
+        // 3D 网格图元添加到 3D 场景管理器
+        SY_INFOF("[ImportService] Adding mesh entities to SceneManager3D: %d entities",
+            static_cast<int>(entities.size()));
+
+        if (options.importAsNewDocument)
+            m_sceneManager3D->clearScene();
+
+        for (auto& entity : entities)
+        {
+            if (entity && entity->eType == Eg::EType::MESH)
+            {
+                // 安全转换：SyMeshEntity 继承自 SyEntity
+                auto* meshPtr = static_cast<Eg::SyMeshEntity*>(entity.release());
+                m_sceneManager3D->addEntity(
+                    std::unique_ptr<Eg::SyMeshEntity>(meshPtr));
+            }
+        }
+        m_sceneManager3D->markDataChanged();
+        SY_INFO("[ImportService] Mesh entities added to SceneManager3D successfully");
+    }
+    else if (m_editService)
     {
         SY_INFOF("[ImportService] Calling addEntities: editService=%p, entities=%d", 
             m_editService, static_cast<int>(entities.size()));
@@ -373,12 +413,15 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     SY_INFOF("[ImportService] Document built: %d entities", entityCount);
     updateProgress(ImportPhase::BuildDocument, 1.0f);
 
-    return ImportResult::ok(
+    // 根据图元类型设置目标工作台 ID
+    auto result = ImportResult::ok(
         QStringLiteral("Imported %1 entities successfully").arg(entityCount),
         entityCount);
+    result.usedWorkbenchId = hasMeshEntities ? QStringLiteral("3D") : QStringLiteral("2D");
+    return result;
 }
 
-// ===== 阶段4：刷新显示 =====
+// ===== 4：刷新显示 =====
 void ImportService::phaseRefreshDisplay(const ImportResult& result,
     const ImportOptions& options)
 {
@@ -412,7 +455,7 @@ void ImportService::phaseRefreshDisplay(const ImportResult& result,
     updateProgress(ImportPhase::RefreshDisplay, 1.0f);
 }
 
-// ===== 阶段5：回写状态 =====
+// ===== 5：回写状态 =====
 void ImportService::phaseWriteBackState(const ImportContext& context,
     const ImportResult& result)
 {

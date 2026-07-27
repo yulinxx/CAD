@@ -21,7 +21,7 @@ public:
 
     /// 执行导入操作
     /// @param context 导入上下文（含源路径和参数）
-    /// @param outEntities 输出：导入的实体列表
+    /// @param outEntities 输出：导入的图元列表
     /// @return 导入结果
     virtual ImportResult read(const ImportContext& context,
         Fio::VecSyEntityPtr& outEntities) = 0;

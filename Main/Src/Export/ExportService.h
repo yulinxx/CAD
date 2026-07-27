@@ -30,7 +30,7 @@ public:
     /// 设置导出分发器
     void setDispatcher(ExportDispatcher* dispatcher);
 
-    /// 设置场景管理器（用于收集场景中的实体数据）
+    /// 设置场景管理器（用于收集场景中的图元数据）
     void setSceneManager(Eg::SceneManager* sceneManager);
 
     /// 设置状态中心（用于导出过程中的状态同步）
@@ -56,7 +56,7 @@ public:
     /// 获取所有支持的导出扩展名列表
     QStringList supportedExtensions() const;
 
-    /// 获取场景中所有实体（用于导出前预览或收集）
+    /// 获取场景中所有图元（用于导出前预览或收集）
     Fio::VecSyEntityPtr collectAllEntities() const;
 
 signals:

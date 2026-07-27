@@ -57,12 +57,17 @@ public:
     const std::string& lastError() const;
 
 private:
-    std::unique_ptr<Eg::Database> m_database;
-    std::unique_ptr<DatabaseBootstrapper> m_bootstrapper;
-    std::unique_ptr<RecentFileRepository> m_recentFiles;
+    // 数据库与引导
+    std::unique_ptr<Eg::Database>          m_database;
+    std::unique_ptr<DatabaseBootstrapper>    m_bootstrapper;
+
+    // 仓储对象
+    std::unique_ptr<RecentFileRepository>      m_recentFiles;
     std::unique_ptr<WorkspaceSnapshotRepository> m_workspaceSnapshots;
-    std::unique_ptr<LayerRepository> m_layers;
-    std::unique_ptr<SettingsRepository> m_settings;
-    std::unique_ptr<DocumentRepository> m_documents;
-    std::string m_lastError;
+    std::unique_ptr<LayerRepository>         m_layers;
+    std::unique_ptr<SettingsRepository>      m_settings;
+    std::unique_ptr<DocumentRepository>      m_documents;
+
+    // 状态
+    std::string                             m_lastError;
 };

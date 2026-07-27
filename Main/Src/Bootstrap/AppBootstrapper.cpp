@@ -4,9 +4,9 @@
 #include <QString>
 
 #include "Log/SyLogger.h"
-#include "UI/UiWorkbench.h"
-#include "UI/WorkbenchWindow.h"
-#include "UI/UiFrameworkServices.h"
+#include "UI/Workbench/UiWorkbench.h"
+#include "UI/Workbench/WorkbenchWindow.h"
+#include "UI/Services/UiFrameworkServices.h"
 
 namespace
 {

@@ -9,6 +9,11 @@ class RenderWidget3D;
 class SceneDocument3D;
 class CameraController3D;
 
+namespace Eg
+{
+    class SceneManager3D;
+}
+
 /**
  * @file RenderWidget3DAdapter.h
  * @brief RenderWidget3D 到 IRenderer3D 的适配器（过渡层）
@@ -68,9 +73,32 @@ public:
         return true;
     }
 
+    /**
+     * @deprecated 事件不再通过此接口转发，RenderWidget3D 作为子控件直接接收 Qt 事件
+     * 此接口仅为满足 IRenderer3D 接口兼容性保留，不执行任何操作
+     */
+    [[deprecated("事件已由 RenderWidget3D 子控件直接处理，此接口不再使用")]]
     void onMousePress(int x, int y, int button, int modifiers, int viewW, int viewH) override;
+
+    /**
+     * @deprecated 事件不再通过此接口转发，RenderWidget3D 作为子控件直接接收 Qt 事件
+     * 此接口仅为满足 IRenderer3D 接口兼容性保留，不执行任何操作
+     */
+    [[deprecated("事件已由 RenderWidget3D 子控件直接处理，此接口不再使用")]]
     void onMouseMove(int x, int y, int buttons, int viewW, int viewH) override;
+
+    /**
+     * @deprecated 事件不再通过此接口转发，RenderWidget3D 作为子控件直接接收 Qt 事件
+     * 此接口仅为满足 IRenderer3D 接口兼容性保留，不执行任何操作
+     */
+    [[deprecated("事件已由 RenderWidget3D 子控件直接处理，此接口不再使用")]]
     void onMouseRelease(int x, int y, int button, int viewW, int viewH) override;
+
+    /**
+     * @deprecated 事件不再通过此接口转发，RenderWidget3D 作为子控件直接接收 Qt 事件
+     * 此接口仅为满足 IRenderer3D 接口兼容性保留，不执行任何操作
+     */
+    [[deprecated("事件已由 RenderWidget3D 子控件直接处理，此接口不再使用")]]
     void onWheel(int delta, int viewW, int viewH) override;
 
     void selectNodeById(const QString& nodeId) override;
@@ -99,6 +127,8 @@ private:
     QWidget* m_parentWidget{ nullptr };
     /// 内部 RenderWidget3D 实例
     std::unique_ptr<RenderWidget3D> m_renderWidget;
+    /// 场景管理器引用（在 setScene() 时保存）
+    Eg::SceneManager3D* m_sceneManager{ nullptr };
     /// 是否就绪
     bool m_ready{ false };
     /// 是否启用渲染循环

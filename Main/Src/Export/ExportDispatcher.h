@@ -24,7 +24,7 @@ public:
 
     /// 根据文件路径自动检测格式并分发到对应写入器
     /// @param context 导出上下文
-    /// @param entities 要导出的实体列表
+    /// @param entities 要导出的图元列表
     /// @return 导出结果
     ExportResult dispatch(const ExportContext& context,
         const Fio::VecSyEntityPtr& entities);

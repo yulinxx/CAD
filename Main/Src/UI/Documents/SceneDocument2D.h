@@ -46,7 +46,7 @@ public:
         return m_editService;
     }
 
-    // ---- 图元创建 (返回 Eg 实体 ID) ----
+    // ---- 图元创建 (返回 Eg 图元 ID) ----
 
     QString createLine(const QPointF& start, const QPointF& end);
     QString createPolyline(const QVector<QPointF>& points);

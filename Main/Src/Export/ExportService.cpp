@@ -3,7 +3,7 @@
 
 #include "Log/SyLogger.h"
 #include "Engine2D/Core/SceneManager.h"
-#include "../UI/UiStateCenter.h"
+#include "../UI/Services/UiStateCenter.h"
 
 ExportService::ExportService(QObject* parent)
     : QObject(parent)
@@ -57,7 +57,7 @@ ExportResult ExportService::exportWithContext(const ExportContext& context,
 
     emit exportStarted(context.targetPath);
 
-    // 收集场景实体（如果场景管理器可用）
+    // 收集场景图元（如果场景管理器可用）
     Fio::VecSyEntityPtr entities;
     if (m_sceneManager)
     {

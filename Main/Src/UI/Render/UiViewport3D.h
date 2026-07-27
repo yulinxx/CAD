@@ -36,6 +36,10 @@ public:
     QStringList selectedPathNames() const;
     bool isUsingOpenGL() const;
 
+    // 获取当前渲染器（供外部访问内部适配器使用）
+    IRenderer3D* renderer() const;
+    bool isRendererReady() const;
+
 protected:
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;

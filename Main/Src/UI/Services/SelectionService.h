@@ -50,19 +50,19 @@ public:
 
     // ---- Qt 便利方法 (QString) ----
 
-    /// 获取当前选中的实体 ID 列表（Qt 类型）
+    /// 获取当前选中的图元 ID 列表（Qt 类型）
     QVector<QString> selectedIdsQ() const;
 
-    /// 选中指定实体（不清除已有选择）
+    /// 选中指定图元（不清除已有选择）
     void selectEntity(const QString& id);
 
-    /// 设置唯一选中实体（清除已有选择）
+    /// 设置唯一选中图元（清除已有选择）
     void setSelectedEntityId(const QString& id);
 
-    /// 设置多个选中实体（清除已有选择）
+    /// 设置多个选中图元（清除已有选择）
     void setSelectedEntityIds(const QVector<QString>& ids);
 
-    /// 点查询：返回点击位置最近的实体 ID
+    /// 点查询：返回点击位置最近的图元 ID
     QString entityIdAt(const QPointF& point, double tolerance = 5.0) const;
 
     /// 获取底层场景管理器

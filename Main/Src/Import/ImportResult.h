@@ -27,7 +27,7 @@ struct ImportResult
     QString message;
     /// 警告列表（解析过程中的非致命问题）
     QStringList warnings;
-    /// 导入的实体数量
+    /// 导入的图元数量
     int entityCount{ 0 };
     /// 导入的节点数量（3D 模型树节点）
     int nodeCount{ 0 };

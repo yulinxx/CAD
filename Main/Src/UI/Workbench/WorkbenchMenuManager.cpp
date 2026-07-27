@@ -21,6 +21,7 @@
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QMenuBar>
+#include <QSet>
 #include <QSignalBlocker>
 
 #if BUILD_UI3D
@@ -195,21 +196,26 @@ void WorkbenchMenuManager::refreshFileMenuForWorkbench(const QString& workbenchI
     if (is3D)
     {
 #if BUILD_UI3D
-        const int importBase = static_cast<int>(UI3D::MenuActionId3D::File_ImportModel);
-        const int importEnd = static_cast<int>(UI3D::MenuActionId3D::File_ImportSTEP);
+        const QSet<UI3D::MenuActionId3D> importMenuIds = {
+            UI3D::MenuActionId3D::File_ImportModel,
+            UI3D::MenuActionId3D::File_ImportOBJ,
+            UI3D::MenuActionId3D::File_ImportSTL,
+            UI3D::MenuActionId3D::File_ImportSTEP,
+            UI3D::MenuActionId3D::File_OpenStep,
+            UI3D::MenuActionId3D::File_ImportStep,
+        };
         for (const auto& entry : CommandCatalog3D::commands())
         {
             if (!hasSurface(entry.surfaces, CommandSurface3D::Menu))
                 continue;
-            int menuId = static_cast<int>(entry.menuId);
-            if (menuId < importBase || menuId > importEnd)
+            if (!importMenuIds.contains(entry.menuId))
                 continue;
             auto* act = m_menuState.importMenu->addAction(m_window->tr(entry.text));
             QString cmdId = QString::fromUtf8(entry.shortcutId);
             setCmdId(act, cmdId);
             connect(act, &QAction::triggered, this, [this, cmdId]() {
                 if (m_operationBus)
-                    m_operationBus->run(CommandCatalog::operationForCommandId(cmdId));
+                    m_operationBus->run(CommandCatalog3D::operationForCommandId(cmdId));
                 });
         }
 #endif
@@ -217,14 +223,13 @@ void WorkbenchMenuManager::refreshFileMenuForWorkbench(const QString& workbenchI
     else
     {
         const QStringList importFormats = {
-            m_window->tr("DXF (*.dxf)"), m_window->tr("PLT (*.plt, *.hpgl)"), m_window->tr("STEP (*.stp, *.step)"),
+            m_window->tr("DXF (*.dxf)"), m_window->tr("PLT (*.plt, *.hpgl)"),
             m_window->tr("SVG (*.svg)"), m_window->tr("PDF (*.pdf)")
         };
 
         const QStringList importCmdIds = {
             QStringLiteral("file.import_dxf"), QStringLiteral("file.import_plt"),
-            QStringLiteral("file.import_step"), QStringLiteral("file.import_svg"),
-            QStringLiteral("file.import_pdf")
+            QStringLiteral("file.import_svg"), QStringLiteral("file.import_pdf")
         };
 
         for (int i = 0; i < importFormats.size(); ++i)
@@ -302,17 +307,24 @@ void WorkbenchMenuManager::buildViewMenu()
 
     m_menuState.viewMenu->addSeparator();
 
-    m_menuState.workbench2DAction = m_menuState.viewMenu->addAction(m_window->tr("Switch to 2D"));
-    m_menuState.workbench2DAction->setCheckable(true);
-    QObject::connect(m_menuState.workbench2DAction, &QAction::triggered, this, [this]() {
-        m_window->triggerWorkbench(QStringLiteral("2D"));
-        });
+    QString currentWorkbenchId = m_stateCenter ? m_stateCenter->currentWorkbenchId() : QStringLiteral("2D");
 
-    m_menuState.workbench3DAction = m_menuState.viewMenu->addAction(m_window->tr("Switch to 3D"));
-    m_menuState.workbench3DAction->setCheckable(true);
-    QObject::connect(m_menuState.workbench3DAction, &QAction::triggered, this, [this]() {
-        m_window->triggerWorkbench(QStringLiteral("3D"));
-        });
+    if (currentWorkbenchId == QStringLiteral("2D"))
+    {
+        m_menuState.workbench3DAction = m_menuState.viewMenu->addAction(m_window->tr("Switch to 3D"));
+        m_menuState.workbench3DAction->setCheckable(true);
+        QObject::connect(m_menuState.workbench3DAction, &QAction::triggered, this, [this]() {
+            m_window->triggerWorkbench(QStringLiteral("3D"));
+            });
+    }
+    else if (currentWorkbenchId == QStringLiteral("3D"))
+    {
+        m_menuState.workbench2DAction = m_menuState.viewMenu->addAction(m_window->tr("Switch to 2D"));
+        m_menuState.workbench2DAction->setCheckable(true);
+        QObject::connect(m_menuState.workbench2DAction, &QAction::triggered, this, [this]() {
+            m_window->triggerWorkbench(QStringLiteral("2D"));
+            });
+    }
 
     m_menuState.viewMenu->addSeparator();
 
@@ -523,16 +535,18 @@ void WorkbenchMenuManager::refreshDrawMenuForWorkbench(const QString& workbenchI
     else
     {
         bool firstSeparatorAdded = false;
-        for (const ToolCommandEntry& cmdEntry : CommandCatalog::toolCommands())
+        for (const CommandEntry2D& cmdEntry : CommandCatalog::commands())
         {
-            if (!hasSurface(cmdEntry.surfaces, CommandSurface::Menu))
+            if (!cmdEntry.toolName)
                 continue;
-            if (!firstSeparatorAdded && cmdEntry.menuActionId != UI::MenuActionId::Draw_Select)
+            if (!hasSurface(cmdEntry.surfaces, CommandSurface2D::Menu))
+                continue;
+            if (!firstSeparatorAdded && cmdEntry.menuId != UI::MenuActionId::Draw_Select)
             {
                 m_menuState.drawMenu->addSeparator();
                 firstSeparatorAdded = true;
             }
-            addDrawAction(m_window->tr(cmdEntry.menuText), QString::fromUtf8(cmdEntry.toolName));
+            addDrawAction(m_window->tr(cmdEntry.text), QString::fromUtf8(cmdEntry.toolName));
         }
     }
 }
@@ -888,15 +902,39 @@ void WorkbenchMenuManager::refreshWorkbenchMenuChecks(const QString& workbenchId
     const bool is2D = workbenchId.compare(QStringLiteral("2D"), Qt::CaseInsensitive) == 0;
     const bool is3D = workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0;
 
-    if (m_menuState.workbench2DAction)
+    if (is2D)
     {
-        m_menuState.workbench2DAction->setVisible(is3D);
-        m_menuState.workbench2DAction->setChecked(false);
+        if (m_menuState.workbench2DAction)
+        {
+            m_menuState.workbench2DAction->deleteLater();
+            m_menuState.workbench2DAction = nullptr;
+        }
+        if (!m_menuState.workbench3DAction && m_menuState.viewMenu)
+        {
+            m_menuState.workbench3DAction = new QAction(m_window->tr("Switch to 3D"), this);
+            m_menuState.workbench3DAction->setCheckable(true);
+            m_menuState.viewMenu->insertAction(m_menuState.viewMenu->actions().first(), m_menuState.workbench3DAction);
+            QObject::connect(m_menuState.workbench3DAction, &QAction::triggered, this, [this]() {
+                m_window->triggerWorkbench(QStringLiteral("3D"));
+                });
+        }
     }
-    if (m_menuState.workbench3DAction)
+    else if (is3D)
     {
-        m_menuState.workbench3DAction->setVisible(is2D);
-        m_menuState.workbench3DAction->setChecked(false);
+        if (m_menuState.workbench3DAction)
+        {
+            m_menuState.workbench3DAction->deleteLater();
+            m_menuState.workbench3DAction = nullptr;
+        }
+        if (!m_menuState.workbench2DAction && m_menuState.viewMenu)
+        {
+            m_menuState.workbench2DAction = new QAction(m_window->tr("Switch to 2D"), this);
+            m_menuState.workbench2DAction->setCheckable(true);
+            m_menuState.viewMenu->insertAction(m_menuState.viewMenu->actions().first(), m_menuState.workbench2DAction);
+            QObject::connect(m_menuState.workbench2DAction, &QAction::triggered, this, [this]() {
+                m_window->triggerWorkbench(QStringLiteral("2D"));
+                });
+        }
     }
 }
 

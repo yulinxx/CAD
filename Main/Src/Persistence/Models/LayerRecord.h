@@ -6,7 +6,7 @@
  * @brief 图层记录 — 数据库持久化模型
  *
  * 保存图层的基本属性，与文档关联。LayerRepository 负责读写。
- * 注意：图层实体关联关系由 Engine 层的 LayerManager 管理，不在此模型范围。
+ * 注意：图层图元关联关系由 Engine 层的 LayerManager 管理，不在此模型范围。
  */
 struct LayerRecord
 {

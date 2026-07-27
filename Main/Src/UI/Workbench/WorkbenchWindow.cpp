@@ -93,6 +93,7 @@
 #include <QInputDialog>
 #include <QMenuBar>
 #include <QProgressBar>
+#include <QRegularExpression>
 #include <QScreen>
 #include <QSettings>
 #include <QStatusBar>
@@ -305,7 +306,7 @@ QWidget* WorkbenchWindow::createInitialCentralWidget()
 
 void WorkbenchWindow::initializeToolBarSkeleton()
 {
-    // 工具栏骨架只创建承载容器，不在初始化阶段绑定具体动作
+    // 工具栏骨架只创建承载容器，不在初始化绑定具体动作
     buildToolBars();
 }
 
@@ -326,6 +327,8 @@ void WorkbenchWindow::buildDockAreas()
     m_panelState.leftDock = new QDockWidget(tr("Scene"), this); // 场景
     m_panelState.leftDock->setObjectName(QStringLiteral("SceneDock"));
     m_panelState.leftDock->setWidget(m_panelState.sceneTreeDock);
+    m_panelState.leftDock->setMinimumWidth(180);
+    m_panelState.leftDock->setMaximumWidth(400);
     addDockWidget(Qt::LeftDockWidgetArea, m_panelState.leftDock);
 
     // 属性面板
@@ -333,6 +336,8 @@ void WorkbenchWindow::buildDockAreas()
     m_panelState.rightDock = new QDockWidget(tr("Properties"), this); // 属性
     m_panelState.rightDock->setObjectName(QStringLiteral("PropertiesDock"));
     m_panelState.rightDock->setWidget(m_panelState.propertiesDock);
+    m_panelState.rightDock->setMinimumWidth(200);
+    m_panelState.rightDock->setMaximumWidth(450);
     addDockWidget(Qt::RightDockWidgetArea, m_panelState.rightDock);
 }
 
@@ -358,6 +363,7 @@ void WorkbenchWindow::buildStatusBar()
     m_panelState.selLabel = new QLabel(tr("Selected: 0"), this);
     m_panelState.selLabel->setMinimumWidth(200);
     m_panelState.statusBar->addWidget(m_panelState.selLabel, 1);
+    m_panelState.selLabel->setText(tr("Selected: 0"));
 
     // 消息标签（居中扩展）
     m_panelState.msgLabel = new QLabel(tr("Ready"), this);
@@ -483,6 +489,31 @@ void WorkbenchWindow::refreshFromState()
             prompt = tr("Ready");
         m_panelState.msgLabel->setText(prompt);
     }
+    if (m_panelState.selLabel && m_stateCenter)
+    {
+        const auto state = m_stateCenter->snapshot();
+        const QString selectionText = state.currentSelectionText.trimmed();
+        int selectedCount = 0;
+
+        if (selectionText.isEmpty() || selectionText == QStringLiteral("none"))
+        {
+            selectedCount = 0;
+        }
+        else if (selectionText.contains(QStringLiteral("entities selected")))
+        {
+            QRegularExpression re(QStringLiteral("(\\d+)"));
+            auto match = re.match(selectionText);
+            if (match.hasMatch())
+                selectedCount = match.captured(1).toInt();
+        }
+        else
+        {
+            selectedCount = 1;
+        }
+
+        m_panelState.selLabel->setText(tr("Selected: %1").arg(selectedCount));
+    }
+
     if (m_menuManager)
         m_menuManager->refreshGridSnapMenuChecks();
     // 属性面板使用状态中心快照作为输入，不在这里额外拼接窗口本地状态
@@ -611,7 +642,7 @@ void WorkbenchWindow::setThemeChangeCallback(std::function<void(const QString&)>
 {
     // 主题回调只作为外部扩展点，不在这里绑定额外业务行为
     // 回调一旦注入，就应被视为主题链的唯一扩展入口之一
-    // 这里不触发立即执行，避免回调设置阶段产生副作用
+    // 这里不触发立即执行，避免回调设置产生副作用
     m_themeChangeCallback = std::move(callback);
 }
 
@@ -797,12 +828,20 @@ void WorkbenchWindow::clearWorkbenchContent()
     }
     m_registeredDocks.clear();
 
-    for (auto* toolBar : m_registeredToolBars)
+    // 清理所有工具栏（包括通过 addToolBar 直接添加而未注册的工具栏，如3D左侧工具栏）
+    // 先收集所有工具栏指针，避免遍历过程中容器被修改
+    QList<QToolBar*> allToolBars = findChildren<QToolBar*>();
+    for (auto* toolBar : allToolBars)
     {
         removeToolBar(toolBar);
         delete toolBar;
     }
     m_registeredToolBars.clear();
+
+    // 清理菜单栏 - 3D 工作台使用 MenuManager3D 独立管理菜单，
+    // 切换到 2D 时需要清空菜单栏，避免 3D 菜单残留导致混乱
+    if (auto* mb = menuBar())
+        mb->clear();
 
     m_panelState.sceneTreeDock = nullptr;
     m_panelState.propertiesDock = nullptr;
@@ -1010,6 +1049,21 @@ void WorkbenchWindow::restoreDockWidgetTitles()
     }
 }
 
+void WorkbenchWindow::setSkeletonDocksVisible(bool visible)
+{
+    if (m_panelState.leftDock)
+        m_panelState.leftDock->setVisible(visible);
+    if (m_panelState.rightDock)
+        m_panelState.rightDock->setVisible(visible);
+
+    if (m_panelState.posLabel)
+        m_panelState.posLabel->setVisible(visible);
+    if (m_panelState.selLabel)
+        m_panelState.selLabel->setVisible(visible);
+    if (m_panelState.msgLabel)
+        m_panelState.msgLabel->setVisible(visible);
+}
+
 /// 更新繁忙指示器
 /// @param busy 是否繁忙
 void WorkbenchWindow::updateBusyIndicator(bool busy)
@@ -1147,19 +1201,16 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
             m_stateCenter->setCurrentViewMode(QStringLiteral("none"));
             m_stateCenter->setSelectionContext(QStringLiteral("Workbench-Switch"), QStringLiteral("Ready"));
         }
-        if (m_menuManager)
+        const bool is3DNoWb = workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0;
+        if (!is3DNoWb && m_menuManager)
+        {
             m_menuManager->refreshWorkbenchMenuChecks(workbenchId);
-        // 根据新工作台刷新所有菜单
-        if (m_menuManager)
             m_menuManager->refreshEditMenuForWorkbench(workbenchId);
-        if (m_menuManager)
             m_menuManager->refreshDrawMenuForWorkbench(workbenchId);
-        if (m_menuManager)
             m_menuManager->refreshModifyMenuForWorkbench(workbenchId);
-        if (m_menuManager)
             m_menuManager->refreshAlgorithmMenuForWorkbench(workbenchId);
-        if (m_menuManager)
             m_menuManager->refreshFileMenuForWorkbench(workbenchId);
+        }
         refreshFromState();
         refreshStatusText();
         updateWindowTitle();
@@ -1183,7 +1234,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
 
     SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: switching from %s to %s", previousWorkbenchId.toUtf8().constData(), workbenchId.toUtf8().constData());
 
-    // 阶段1: 保存旧工作台布局快照，标记繁忙
+    // 1: 保存旧工作台布局快照，标记繁忙
     if (m_stateCenter)
     {
         saveLayoutSnapshot(previousWorkbenchId);
@@ -1193,24 +1244,24 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
             });
     }
 
-    // 阶段2: 停用旧工作台
+    // 2: 停用旧工作台
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: deactivating old workbench");
     m_workbench->deactivate();
     recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.deactivate"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 
-    // 阶段3: 清理旧工作台的 transient 状态（命令、选择、镜像状态）
+    // 3: 清理旧工作台的 transient 状态（命令、选择、镜像状态）
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: resetting transient state");
     resetWorkbenchTransientState();
 
-    // 阶段4: 清除旧工作台 UI 内容（面板、工具栏、中央控件）
+    // 4: 清除旧工作台 UI 内容（面板、工具栏、中央控件）
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: clearing workbench content");
     clearWorkbenchContent();
 
-    // 阶段5: 设置新工作台上下文（在 attach 之前，确保新工作台能看到正确的状态）
+    // 5: 设置新工作台上下文（在 attach 之前，确保新工作台能看到正确的状态）
     setWorkbenchSwitchContext(workbenchId, switchContextText);
 
-    // 阶段6: 通过工厂获取或创建新工作台实例
+    // 6: 通过工厂获取或创建新工作台实例
     if (m_workbenchFactory)
     {
         auto* target = m_workbenchFactory(workbenchId);
@@ -1221,38 +1272,36 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         }
     }
 
-    // 阶段7: 附加新工作台到窗口（注册面板、工具栏、中央控件）
+    // 7: 附加新工作台到窗口（注册面板、工具栏、中央控件）
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: attaching workbench to window");
     m_workbench->attachToWindow(*this);
     recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.attach"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 
-    // 阶段8: 恢复新工作台布局快照
+    // 8: 恢复新工作台布局快照
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: restoring layout");
     restoreLayoutSnapshot(workbenchId);
     recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.restoreLayout"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 
-    // 阶段9: 激活新工作台（应用初始状态）
+    // 9: 激活新工作台（应用初始状态）
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: activating new workbench");
     m_workbench->activate();
     recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.activate"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 
-    // 阶段10: 刷新 UI 并清除繁忙状态
-    if (m_menuManager)
-        m_menuManager->refreshWorkbenchMenuChecks(workbenchId);
-    // 根据新工作台刷新所有菜单
-    if (m_menuManager)
-        m_menuManager->refreshEditMenuForWorkbench(workbenchId);
-    if (m_menuManager)
-        m_menuManager->refreshDrawMenuForWorkbench(workbenchId);
-    if (m_menuManager)
-        m_menuManager->refreshModifyMenuForWorkbench(workbenchId);
-    if (m_menuManager)
-        m_menuManager->refreshAlgorithmMenuForWorkbench(workbenchId);
-    if (m_menuManager)
-        m_menuManager->refreshFileMenuForWorkbench(workbenchId);
+    // 10: 刷新 UI 并清除繁忙状态
+    // 3D 工作台由 MenuManager3D 独立管理菜单，不需要 WorkbenchMenuManager 刷新
+    // 否则 WorkbenchMenuManager 会用 2D OperationBus 连接 3D 菜单项，导致 "Operation not registered" 错误
+    const bool is3D = workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0;
+    if (!is3D && m_menuManager)
+    {
+        // 从3D切换到2D时，菜单栏已被清空，需要完全重建2D菜单
+        m_menuManager->rebuildAllMenus();
+    }
+    // 3D 工作台不需要骨架停靠面板，隐藏以免挤压视口
+    // 2D 工作台需要显示骨架停靠面板
+    setSkeletonDocksVisible(!is3D);
     refreshFromState();
     refreshStatusText();
     updateWindowTitle();

@@ -7,7 +7,7 @@
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Edit/UndoRedoManager.h"
 #include "Engine2D/Edit/FilletChamfer.h"
-#include "UI/HelpDialogService.h"
+#include "UI/Services/HelpDialogService.h"
 #include "Log/SyLogger.h"
 
 #include <QObject>

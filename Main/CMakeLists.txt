@@ -21,9 +21,7 @@ file(GLOB_RECURSE MAIN_SOURCES CONFIGURE_DEPENDS
     "${SRC_ROOT}/**/*.cpp"
 )
 
-list(APPEND MAIN_SOURCES
-    "${UI_ROOT}/ViewportSelector.cpp"
-)
+
 
 file(GLOB_RECURSE MAIN_HEADERS CONFIGURE_DEPENDS
     "${SRC_ROOT}/**/*.h"
@@ -93,7 +91,7 @@ target_include_directories(${app_name}
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/RenderCompat/Include"
         "${UI_ROOT}"
         "${UI_ROOT}/Adapters"
-        "${UI_ROOT}/Dispatchers"
+        "${UI_ROOT}/Interaction"
         "${UI_ROOT}/Documents"
         "${UI_ROOT}/Entities"
         "${UI_ROOT}/Render"
@@ -111,6 +109,7 @@ target_include_directories(${app_name}
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Src"
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Src"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Log/Log/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Include"
 )
@@ -193,6 +192,108 @@ add_custom_command(TARGET ${app_name} POST_BUILD
     COMMENT "Copying resource files to ${RESOURCES_DST_DIR}"
 )
 
+# ============ 部署第三方外部工具 (poppler / ghostscript) ============
+# 从 ThirdParty/<tool>/<platform>/<arch>/ 下的 bin/ 和 lib/ 复制到输出目录
+# 支持格式:
+#   Windows: ThirdParty/poppler/windows/x64/bin/
+#   Linux:   ThirdParty/poppler/linux/x86_64/{bin,lib}/
+#   macOS:   ThirdParty/poppler/macos/arm64/{bin,lib}/ 或 macos/x86_64/
+#
+# 工作原理:
+#   - Windows: dll 和 exe 都在 bin/，直接全部复制到输出目录
+#   - Linux/macOS: bin/ 放可执行文件，lib/ 放依赖库；
+#                  调用 PdfToSvgConverter 运行时会自动设置 LD_LIBRARY_PATH / DYLD_LIBRARY_PATH
+set(SANYI_THIRDPARTY_TOOLS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../ThirdParty")
+
+if(WIN32)
+    set(_tools_platform "windows")
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(_tools_arch "x64")
+    else()
+        set(_tools_arch "x86")
+    endif()
+elseif(APPLE)
+    set(_tools_platform "macos")
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+        set(_tools_arch "arm64")
+    else()
+        set(_tools_arch "x86_64")
+    endif()
+elseif(UNIX)
+    set(_tools_platform "linux")
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")
+        set(_tools_arch "x86_64")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+        set(_tools_arch "arm64")
+    else()
+        set(_tools_arch "${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+endif()
+
+# 要部署的工具列表（按优先级/依赖顺序）
+set(_deploy_tools "poppler" "ghostscript")
+
+foreach(_tool ${_deploy_tools})
+    set(_tool_root_dir "${SANYI_THIRDPARTY_TOOLS_DIR}/${_tool}/${_tools_platform}/${_tools_arch}")
+    set(_tool_bin_dir "${_tool_root_dir}/bin")
+    set(_tool_lib_dir "${_tool_root_dir}/lib")
+
+    set(_tool_deployed FALSE)
+
+    # 部署 bin/ 目录
+    if(EXISTS "${_tool_bin_dir}")
+        file(GLOB _tool_bin_files "${_tool_bin_dir}/*")
+        list(LENGTH _tool_bin_files _tool_bin_file_count)
+        if(_tool_bin_file_count GREATER 0)
+            # Windows: 直接复制到输出目录（dll + exe 在一起）
+            if(WIN32)
+                add_custom_command(TARGET ${app_name} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_directory
+                        "${_tool_bin_dir}"
+                        "$<TARGET_FILE_DIR:${app_name}>"
+                    COMMENT "Deploying ${_tool} binaries to output directory"
+                )
+            else()
+                # Linux/macOS: 复制 bin/ 到输出目录的 bin/ 子目录，保持结构
+                add_custom_command(TARGET ${app_name} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${app_name}>/tools/${_tool}/bin"
+                    COMMAND ${CMAKE_COMMAND} -E copy_directory
+                        "${_tool_bin_dir}"
+                        "$<TARGET_FILE_DIR:${app_name}>/tools/${_tool}/bin"
+                    COMMENT "Deploying ${_tool} bin/ to tools/${_tool}/bin"
+                )
+            endif()
+            set(_tool_deployed TRUE)
+            message(STATUS "  [Main] ${_tool} bin: ${_tool_bin_dir} (${_tool_bin_file_count} files)")
+        else()
+            message(STATUS "  [Main] ${_tool}: bin/ exists but empty (${_tool_bin_dir})")
+        endif()
+    else()
+        message(STATUS "  [Main] ${_tool}: no bin/ directory at ${_tool_bin_dir}")
+    endif()
+
+    # 部署 lib/ 目录（仅 Linux/macOS）
+    if(NOT WIN32 AND EXISTS "${_tool_lib_dir}")
+        file(GLOB _tool_lib_files "${_tool_lib_dir}/*.so*" "${_tool_lib_dir}/*.dylib")
+        list(LENGTH _tool_lib_files _tool_lib_file_count)
+        if(_tool_lib_file_count GREATER 0)
+            add_custom_command(TARGET ${app_name} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${app_name}>/tools/${_tool}/lib"
+                COMMAND ${CMAKE_COMMAND} -E copy_directory
+                    "${_tool_lib_dir}"
+                    "$<TARGET_FILE_DIR:${app_name}>/tools/${_tool}/lib"
+                COMMENT "Deploying ${_tool} lib/ to tools/${_tool}/lib"
+            )
+            set(_tool_deployed TRUE)
+            message(STATUS "  [Main] ${_tool} lib: ${_tool_lib_dir} (${_tool_lib_file_count} files)")
+        endif()
+    endif()
+
+    if(NOT _tool_deployed)
+        message(STATUS "  [Main] ${_tool}: nothing to deploy (will use system PATH if available)")
+    endif()
+endforeach()
+
 deploy_qt_libraries(${app_name} ${QT_VERSION_MAJOR})
 
 sanyi_add_version_info(${app_name} "${app_name}" "SanYi CAD Application")
@@ -258,7 +359,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             "${SRC_ROOT}/Import"
             "${UI_ROOT}"
             "${UI_ROOT}/Adapters"
-            "${UI_ROOT}/Dispatchers"
+            "${UI_ROOT}/Interaction"
             "${UI_ROOT}/Documents"
             "${UI_ROOT}/Entities"
             "${UI_ROOT}/Render"
@@ -275,6 +376,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Common/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Src"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Log/Log/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Include"
     )

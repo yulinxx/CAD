@@ -2,13 +2,13 @@
 #include "FileOperationRegistry.h"
 #include "CoreOperationRegistry.h"
 
-#include "UI/UiLayoutService.h"
-#include "UI/UiServices.h"
-#include "UI/UiShellHost.h"
-#include "UI/WorkbenchWindow.h"
-#include "UI/UiStateCenter.h"
-#include "UI/UiThemeService.h"
-#include "UI/RenderViewport2D.h"
+#include "UI/Services/UiLayoutService.h"
+#include "UI/Services/UiServices.h"
+#include "UI/Services/UiShellHost.h"
+#include "UI/Workbench/WorkbenchWindow.h"
+#include "UI/Services/UiStateCenter.h"
+#include "UI/Services/UiThemeService.h"
+#include "UI/Render/RenderViewport2D.h"
 #include "Common/AppInitializer.h"
 #include "Persistence/LayerPersistenceBridge.h"
 #include "Persistence/PersistenceService.h"
@@ -21,15 +21,15 @@
 #include <QFileInfo>
 #include <QDateTime>
 
-#include "UI/FileDialogService.h"
-#include "UI/RecentFileService.h"
+#include "UI/Services/FileDialogService.h"
+#include "UI/Services/RecentFileService.h"
 #include "Persistence/Models/DocumentRecord.h"
 #include "Persistence/Repositories/DocumentRepository.h"
 
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/UndoRedoManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
-#include "UI/HelpDialogService.h"
+#include "UI/Services/HelpDialogService.h"
 #include "Engine2D/Interaction/LayerManager.h"
 #include "UI2D/Edit/QtLayerManagerBridge.h"
 
@@ -40,6 +40,8 @@
 #include "Import/Readers/PdfImportReader.h"
 #include "Import/Readers/StepImportReader.h"
 #include "Import/Readers/ObjImportReader.h"
+#include "Import/Readers/StlImportReader.h"
+#include "Import/Readers/PltImportReader.h"
 #include "Export/ExportService.h"
 #include "Export/ExportDispatcher.h"
 #include "Export/Writers/DxfExportWriter.h"
@@ -62,6 +64,7 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     , m_shellHost(std::make_unique<UiShellHost>())
     , m_operationBus(std::make_unique<OperationBus>())
     , m_sceneManager(std::make_unique<Eg::SceneManager>())
+    , m_sceneManager3D(std::make_unique<Eg::SceneManager3D>())
     , m_undoRedoManager(std::make_unique<UndoRedoManager>(m_sceneManager.get()))
     , m_sceneEditService(std::make_unique<SceneEditService>(m_sceneManager.get(), m_undoRedoManager.get()))
     , m_document2D(std::make_unique<SceneDocument2D>(m_sceneEditService.get()))
@@ -100,7 +103,7 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
         SY_INFO("[ApplicationCompositionRoot] LayerPersistenceBridge attached");
     }
 
-    // 将 LayerManager 注入到 SceneEditService，使其在添加实体时自动分配图层
+    // 将 LayerManager 注入到 SceneEditService，使其在添加图元时自动分配图层
     m_sceneEditService->setLayerManager(m_layerManager.get());
 
     // 配置UI壳宿主的核心依赖
@@ -115,9 +118,12 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     m_importDispatcher->registerReader(std::make_unique<PdfImportReader>());
     m_importDispatcher->registerReader(std::make_unique<StepImportReader>());
     m_importDispatcher->registerReader(std::make_unique<ObjImportReader>());
+    m_importDispatcher->registerReader(std::make_unique<StlImportReader>());
+    m_importDispatcher->registerReader(std::make_unique<PltImportReader>());
     // 配置导入服务
     m_importService->setDispatcher(m_importDispatcher.get());
     m_importService->setSceneManager(m_sceneManager.get());
+    m_importService->setSceneManager3D(m_sceneManager3D.get());
     m_importService->setEditService(m_sceneEditService.get());
     m_importService->setStateCenter(m_stateCenter.get());
     // 设置文档持久化回调（阶段5回写状态使用）

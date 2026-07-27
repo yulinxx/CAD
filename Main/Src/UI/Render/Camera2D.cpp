@@ -35,10 +35,10 @@ void Camera2D::computeViewMatrix(float outMat[9], float vpW, float vpH) const
     view.at(1, 0) = 0.0f;
     view.at(2, 0) = 0.0f;
     view.at(0, 1) = 0.0f;
-    view.at(1, 1) = -scaleY;
+    view.at(1, 1) = scaleY;
     view.at(2, 1) = 0.0f;
     view.at(0, 2) = tx;
-    view.at(1, 2) = -ty;
+    view.at(1, 2) = ty;
     view.at(2, 2) = 1.0f;
 
     // SY_INFOF("Camera2D::computeViewMatrix: vp=(%.0f,%.0f), zoom=(%.6f,%.6f), pan=(%.2f,%.2f), mat=[%.4f,%.4f,%.4f, %.4f,%.4f,%.4f]",
@@ -53,8 +53,9 @@ QPointF Camera2D::screenToWorld(const QPoint& screenPos, float vpW, float vpH) c
     if (vpW <= 0 || vpH <= 0)
         return QPointF(0, 0);
 
+    // 屏幕坐标转换为标准 OpenGL NDC（x: -1左~1右, y: -1下~1上）
     float nx = (2.0f * screenPos.x() - vpW) / vpW;
-    float ny = (2.0f * screenPos.y() - vpH) / vpH;
+    float ny = (vpH - 2.0f * screenPos.y()) / vpH;
 
     if (zoomX < 1e-6f || zoomY < 1e-6f)
         return QPointF(nx, ny);
@@ -63,7 +64,7 @@ QPointF Camera2D::screenToWorld(const QPoint& screenPos, float vpW, float vpH) c
     float scaleY = 2.0f * zoomY / vpH;
 
     float wx = (nx / scaleX) - panOffset.x();
-    float wy = -(ny / scaleY) - panOffset.y();
+    float wy = (ny / scaleY) - panOffset.y();
 
     // SY_INFOF("Camera2D::screenToWorld: screen=(%d,%d), vp=(%.0f,%.0f), ndc=(%.3f,%.3f), zoom=(%.6f,%.6f), pan=(%.2f,%.2f), world=(%.2f,%.2f)",
     //     screenPos.x(), screenPos.y(), vpW, vpH, nx, ny, zoomX, zoomY, panOffset.x(), panOffset.y(), wx, wy);

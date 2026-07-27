@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <QObject>
 
 #include <memory>
 
@@ -15,6 +16,9 @@ class SceneTreeDockWidget;
 
 #if BUILD_UI3D
 #include "UiEntities.h"
+#include "Ui/MainWindow/MainWindow3D.h"
+#include "Ui/MenuManager/MenuManager3D.h"
+#include "Engine3D/SceneManager3D.h"
 #endif
 
 /**
@@ -64,10 +68,13 @@ struct WorkbenchStateSnapshot
  *
  * 基类提供状态快照的通用实现，子类只需在 attachToWindow 中填充 m_initialState。
  */
-class UiWorkbench
+class UiWorkbench : public QObject
 {
+    Q_OBJECT
+
 public:
-    virtual ~UiWorkbench() = default;
+    explicit UiWorkbench(QObject* parent = nullptr) : QObject(parent) {}
+    ~UiWorkbench() override = default;
 
 public:
     /// 获取工作台 ID
@@ -166,9 +173,12 @@ private:
 /**
  * @class Workbench3D
  * @brief 3D 工作台实现
+ * 使用 MainWindow3D + ServiceLocator3D 架构
  */
 class Workbench3D final : public UiWorkbench
 {
+    Q_OBJECT
+
 public:
     QString id() const override;
     QString displayName() const override;
@@ -180,15 +190,15 @@ public:
 
 private:
     void build3DWorkbenchUi(WorkbenchWindow& window);
-    void build3DScenePanels(WorkbenchWindow& window, PropertiesPanelWidget*& properties, SceneTreeDockWidget*& sceneDock, QString& rootNodeId);
-    QWidget* build3DViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties, SceneTreeDockWidget* sceneDock);
-    void build3DToolBars(WorkbenchWindow& window);
-    void init3DInitialState(const SceneDocument3D& scene, const QString& rootNodeId);
-    void onSceneTreeSelection(const QString& nodeId, SceneTreeDockWidget* sceneDock,
-        PropertiesPanelWidget* properties, WorkbenchWindow& window);
+    void onMenuAction(int actionId, const QVariantMap& params);
 
 private:
     std::shared_ptr<SceneDocument3D> m_scene;
+    std::unique_ptr<class MainWindow3D> m_mainWindow3D;
+    std::unique_ptr<class MenuManager3D> m_menuManager3D;
+    Eg::SceneManager3D* m_sceneManager3D{ nullptr };
+    QShortcut* m_deleteShortcut{ nullptr };
+    QShortcut* m_backspaceShortcut{ nullptr };
 };
 #endif
 

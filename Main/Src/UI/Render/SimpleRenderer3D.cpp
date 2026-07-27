@@ -309,7 +309,7 @@ void SimpleRenderer3D::selectNodeById(const QString& nodeId)
         const auto engineScene = m_document->engineScene();
         if (engineScene)
         {
-            // 尝试解析为引擎实体 ID（数字字符串）
+            // 尝试解析为引擎图元 ID（数字字符串）
             Eg::EntityId entityId = static_cast<Eg::EntityId>(nodeId.toULongLong());
             auto* entity = engineScene->findEntityById(entityId);
 

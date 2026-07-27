@@ -7,6 +7,11 @@
 
 #include "Render3D/RenderWidget3D.h"
 #include "Engine3D/SyEntity/SyMeshEntity.h"
+#include "Engine3D/SceneManager3D.h"
+#include "Engine3D/Selection/SelectionManager3D.h"
+#include "UI3D/Service/SceneDocument3D.h"
+#include "UI3D/Service/CameraController3D.h"
+#include "Log/SyLogger.h"
 
 namespace
 {
@@ -35,10 +40,15 @@ bool RenderWidget3DAdapter::ensureWidgetCreated()
     if (!m_parentWidget)
         return false;
 
-    // 这里只负责创建内部 OpenGL 控件，不参与业务状态编排。
+    // 创建内部 OpenGL 控件，直接设置为父窗口的子控件
+    // 这样 RenderWidget3D 会直接接收 Qt 事件，避免通过 sendEvent 转发导致的死循环
     m_renderWidget = std::make_unique<RenderWidget3D>(m_parentWidget);
     m_renderWidget->setMinimumSize(640, 480);
+    m_renderWidget->setGeometry(m_parentWidget->rect());
+    m_renderWidget->setParent(m_parentWidget);
+    m_renderWidget->show();
     bindWidgetSignals();
+    SY_INFO("[RenderWidget3DAdapter] RenderWidget3D created as child widget");
     return true;
 }
 
@@ -54,16 +64,27 @@ void RenderWidget3DAdapter::bindWidgetSignals()
             if (!entities.empty() && entities[0])
             {
                 m_selectedNodeId = QString::number(entities[0]->id);
+
+                // 同步路径名称
+                m_selectedPathNames.clear();
+                if (!entities[0]->strName.empty())
+                    m_selectedPathNames.append(QString::fromStdString(entities[0]->strName));
+
                 if (m_selectionCallback)
                     m_selectionCallback(m_selectedNodeId);
-                emitStatus(QObject::tr("3D selected: %1").arg(m_selectedNodeId)); // 3D 已选中: %1
+                if (m_pathCallback)
+                    m_pathCallback(m_selectedPathNames);
+                emitStatus(QObject::tr("3D selected: %1").arg(m_selectedNodeId));
                 return;
             }
 
             m_selectedNodeId.clear();
+            m_selectedPathNames.clear();
             if (m_selectionCallback)
                 m_selectionCallback(QString());
-            emitStatus(QObject::tr("3D selection cleared")); // 3D 选择已清除
+            if (m_pathCallback)
+                m_pathCallback({});
+            emitStatus(QObject::tr("3D selection cleared"));
         });
 
     // 相机变化只转发状态提示，不在这里写任何 UI 业务。
@@ -118,15 +139,32 @@ bool RenderWidget3DAdapter::isRenderLoopRunning() const
 
 void RenderWidget3DAdapter::setScene(SceneDocument3D* document)
 {
-    Q_UNUSED(document);
-    // 这里预留 SceneDocument3D -> RenderWidget3D 的场景转换入口。
-    // 当前版本先保持适配器可用，但不强行耦合到具体场景管理实现。
+    if (!document || !m_renderWidget)
+        return;
+
+    // 将 SceneDocument3D 中的 SceneManager3D 设置给 RenderWidget3D
+    auto* sceneManager = document->sceneManager();
+    if (sceneManager)
+    {
+        m_sceneManager = sceneManager;
+        m_renderWidget->setSceneManager(sceneManager);
+        SY_INFOF("[RenderWidget3DAdapter] SceneManager3D set: %p", sceneManager);
+        emitStatus(QObject::tr("Scene loaded"));
+    }
 }
 
 void RenderWidget3DAdapter::setCamera(CameraController3D* controller)
 {
-    Q_UNUSED(controller);
-    // 这里预留 CameraController3D -> RenderWidget3D 的相机同步入口。
+    if (!controller || !m_renderWidget)
+        return;
+
+    // 将 CameraController3D 连接到 RenderWidget3D 的 Camera3D
+    // 这样控制器就能真正操作相机，实现视图控制
+    controller->setCamera(&m_renderWidget->camera());
+    SY_INFOF("[RenderWidget3DAdapter] CameraController3D connected to Camera3D at %p", &m_renderWidget->camera());
+
+    // 同步轨道模式
+    setOrbitMode(controller->isOrbitMode());
 }
 
 void RenderWidget3DAdapter::render(QPainter& painter, int width, int height)
@@ -170,58 +208,74 @@ bool RenderWidget3DAdapter::isOrbitMode() const
 
 void RenderWidget3DAdapter::onMousePress(int x, int y, int button, int modifiers, int viewW, int viewH)
 {
+    Q_UNUSED(x);
+    Q_UNUSED(y);
+    Q_UNUSED(button);
+    Q_UNUSED(modifiers);
     Q_UNUSED(viewW);
     Q_UNUSED(viewH);
-    if (!m_renderWidget)
-        return;
-
-    QMouseEvent event(QEvent::MouseButtonPress, QPoint(x, y),
-        toMouseButton(button), toMouseButton(button), static_cast<Qt::KeyboardModifiers>(modifiers));
-    QCoreApplication::sendEvent(m_renderWidget.get(), &event);
+    // 事件不再通过此接口转发，RenderWidget3D 作为子控件直接接收 Qt 事件
 }
 
 void RenderWidget3DAdapter::onMouseMove(int x, int y, int buttons, int viewW, int viewH)
 {
+    Q_UNUSED(x);
+    Q_UNUSED(y);
+    Q_UNUSED(buttons);
     Q_UNUSED(viewW);
     Q_UNUSED(viewH);
-    if (!m_renderWidget)
-        return;
-
-    QMouseEvent event(QEvent::MouseMove, QPoint(x, y),
-        Qt::NoButton, toMouseButtons(buttons), Qt::NoModifier);
-    QCoreApplication::sendEvent(m_renderWidget.get(), &event);
+    // 事件不再通过此接口转发，RenderWidget3D 作为子控件直接接收 Qt 事件
 }
 
 void RenderWidget3DAdapter::onMouseRelease(int x, int y, int button, int viewW, int viewH)
 {
+    Q_UNUSED(x);
+    Q_UNUSED(y);
+    Q_UNUSED(button);
     Q_UNUSED(viewW);
     Q_UNUSED(viewH);
-    if (!m_renderWidget)
-        return;
-
-    QMouseEvent event(QEvent::MouseButtonRelease, QPoint(x, y),
-        toMouseButton(button), Qt::NoButton, Qt::NoModifier);
-    QCoreApplication::sendEvent(m_renderWidget.get(), &event);
+    // 事件不再通过此接口转发，RenderWidget3D 作为子控件直接接收 Qt 事件
 }
 
 void RenderWidget3DAdapter::onWheel(int delta, int viewW, int viewH)
 {
+    Q_UNUSED(delta);
     Q_UNUSED(viewW);
     Q_UNUSED(viewH);
-    if (!m_renderWidget)
-        return;
-
-    // 这里沿用现有 wheel 事件转发，后续可以再切换成更明确的视图输入模型。
-    QWheelEvent event(QPoint(0, 0), QPoint(delta, 0),
-        QPoint(delta, 0), QPoint(), Qt::NoButton, Qt::NoModifier, Qt::ScrollBegin, false);
-    QCoreApplication::sendEvent(m_renderWidget.get(), &event);
+    // 事件不再通过此接口转发，RenderWidget3D 作为子控件直接接收 Qt 事件
 }
 
 void RenderWidget3DAdapter::selectNodeById(const QString& nodeId)
 {
+    if (!m_renderWidget || !m_sceneManager)
+        return;
+
+    bool ok = false;
+    Eg::EntityId entityId = nodeId.toLongLong(&ok);
+    if (!ok)
+        return;
+
+    // 通过 SceneManager3D 查找图元
+    Eg::SyMeshEntity* entity = m_sceneManager->findEntityById(entityId);
+    if (!entity)
+        return;
+
+    // 通过 SelectionManager3D 选中图元
+    m_renderWidget->selectionManager().select(entity);
     m_selectedNodeId = nodeId;
+
+    // 同步路径名称（使用图元名称作为路径的最后一级）
+    m_selectedPathNames.clear();
+    if (!entity->strName.empty())
+        m_selectedPathNames.append(QString::fromStdString(entity->strName));
+
+    SY_INFOF("[RenderWidget3DAdapter] Selected node by ID: %s, path: %s", 
+        qPrintable(nodeId), qPrintable(m_selectedPathNames.join("/")));
+
     if (m_selectionCallback)
         m_selectionCallback(nodeId);
+    if (m_pathCallback)
+        m_pathCallback(m_selectedPathNames);
     emitStatus(QObject::tr("3D selected: %1").arg(nodeId));
 }
 

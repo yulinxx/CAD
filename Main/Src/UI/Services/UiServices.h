@@ -58,7 +58,7 @@ struct UiServices
     /// 2D 场景管理器（命令系统通过此入口操作 2D 图元）
     class SceneDocument2D* document2D{ nullptr };
 
-    /// 图层管理器（管理图层创建/删除/属性/实体关联）
+    /// 图层管理器（管理图层创建/删除/属性/图元关联）
     LayerManager* layerManager{ nullptr };
 
     /// 图层管理器 Qt 桥接（将观察者回调转为 Qt 信号）
@@ -79,10 +79,10 @@ struct UiServices
     /// 导出服务（文件导出总入口）
     ExportService* exportService{ nullptr };
 
-    /// 场景管理器（管理所有2D实体）
+    /// 场景管理器（管理所有2D图元）
     Eg::SceneManager* sceneManager{ nullptr };
 
-    /// 场景编辑服务（带Undo的实体操作入口）
+    /// 场景编辑服务（带Undo的图元操作入口）
     class SceneEditService* sceneEditService{ nullptr };
 
     /// 最近文件回调：当文件被打开时调用，参数为文件完整路径

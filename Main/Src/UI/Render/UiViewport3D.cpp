@@ -1,6 +1,6 @@
 #include "UiViewport3D.h"
 
-#include "SimpleRenderer3D.h"
+#include "Render3D/IRenderer3D.h"
 
 #include <QContextMenuEvent>
 #include <QMouseEvent>
@@ -8,15 +8,14 @@
 #include <QPaintEvent>
 #include <QResizeEvent>
 #include <QWheelEvent>
+#include "Log/SyLogger.h"
 
 Viewport3D::Viewport3D(QWidget* parent)
     : QWidget(parent)
 {
     setMinimumSize(640, 480);
-    setAutoFillBackground(false);  // 由 render() 方法自行填充背景，避免调色板颜色干扰
-
-    m_renderer = std::make_unique<SimpleRenderer3D>();
-    m_renderer->initialize();
+    setAutoFillBackground(false);
+    SY_INFO("[Viewport3D] Constructed without default renderer, must be injected externally");
 }
 
 Viewport3D::~Viewport3D()
@@ -112,36 +111,39 @@ bool Viewport3D::isUsingOpenGL() const
     return m_renderer && m_renderer->isOpenGL();
 }
 
+IRenderer3D* Viewport3D::renderer() const
+{
+    return m_renderer.get();
+}
+
+bool Viewport3D::isRendererReady() const
+{
+    return m_renderer && m_renderer->isReady();
+}
+
 void Viewport3D::mousePressEvent(QMouseEvent* event)
 {
-    if (m_renderer)
-        m_renderer->onMousePress(event->pos().x(), event->pos().y(),
-            static_cast<int>(event->button()), static_cast<int>(event->modifiers()),
-            width(), height());
-    update();
+    // RenderWidget3D 作为子控件直接接收鼠标事件，不需要在这里转发
+    // 避免通过 IRenderer3D 接口转发导致的事件循环
+    QWidget::mousePressEvent(event);
 }
 
 void Viewport3D::mouseMoveEvent(QMouseEvent* event)
 {
-    if (m_renderer)
-        m_renderer->onMouseMove(event->pos().x(), event->pos().y(),
-            static_cast<int>(event->buttons()), width(), height());
-    update();
+    // RenderWidget3D 作为子控件直接接收鼠标事件，不需要在这里转发
+    QWidget::mouseMoveEvent(event);
 }
 
 void Viewport3D::mouseReleaseEvent(QMouseEvent* event)
 {
-    if (m_renderer)
-        m_renderer->onMouseRelease(event->pos().x(), event->pos().y(),
-            static_cast<int>(event->button()), width(), height());
-    update();
+    // RenderWidget3D 作为子控件直接接收鼠标事件，不需要在这里转发
+    QWidget::mouseReleaseEvent(event);
 }
 
 void Viewport3D::wheelEvent(QWheelEvent* event)
 {
-    if (m_renderer)
-        m_renderer->onWheel(event->angleDelta().y(), width(), height());
-    update();
+    // RenderWidget3D 作为子控件直接接收滚轮事件，不需要在这里转发
+    QWidget::wheelEvent(event);
 }
 
 void Viewport3D::paintEvent(QPaintEvent* event)

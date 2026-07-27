@@ -20,6 +20,7 @@ class SceneEditService;
 namespace Eg
 {
     class SceneManager;
+    class SceneManager3D;
 }
 
 /// 导入服务：导入操作的总入口，协调格式识别、解析、文档构建和 UI 刷新
@@ -38,7 +39,13 @@ public:
     /// 设置场景管理器（用于清空场景等操作）
     void setSceneManager(Eg::SceneManager* sceneManager);
 
-    /// 设置场景编辑服务（用于将导入的实体通过事务写入文档，支持 Undo）
+    /// 设置 3D 场景管理器（用于导入网格图元到 3D 场景）
+    void setSceneManager3D(Eg::SceneManager3D* sceneManager3D);
+
+    /// 获取 3D 场景管理器
+    Eg::SceneManager3D* sceneManager3D() const { return m_sceneManager3D; }
+
+    /// 设置场景编辑服务（用于将导入的图元通过事务写入文档，支持 Undo）
     void setEditService(SceneEditService* editService);
 
     /// 设置状态中心（用于导入过程中的状态同步）
@@ -100,22 +107,22 @@ signals:
     void importFinished(const ImportResult& result);
 
 private:
-    /// 阶段1：识别文件格式
+    /// 1：识别文件格式
     ImportResult phaseDetectFormat(ImportContext& context);
 
-    /// 阶段2：解析文件
+    /// 2：解析文件
     ImportResult phaseParse(const ImportContext& context,
         Fio::VecSyEntityPtr& outEntities);
 
-    /// 阶段3：构建文档（将实体添加到场景）
+    /// 3：构建文档（将图元添加到场景）
     ImportResult phaseBuildDocument(const ImportContext& context,
         Fio::VecSyEntityPtr& entities, const ImportOptions& options);
 
-    /// 阶段4：刷新显示（工作台、视口、树、属性面板）
+    /// 4：刷新显示（工作台、视口、树、属性面板）
     void phaseRefreshDisplay(const ImportResult& result,
         const ImportOptions& options);
 
-    /// 阶段5：回写状态（状态栏、最近文件、文档记录）
+    /// 5：回写状态（状态栏、最近文件、文档记录）
     void phaseWriteBackState(const ImportContext& context,
         const ImportResult& result);
 
@@ -129,7 +136,9 @@ private:
     ImportDispatcher* m_dispatcher{ nullptr };
     /// 场景管理器（非拥有指针，用于 clearScene）
     Eg::SceneManager* m_sceneManager{ nullptr };
-    /// 场景编辑服务（非拥有指针，用于事务化添加实体）
+    /// 3D 场景管理器（非拥有指针，用于导入网格图元）
+    Eg::SceneManager3D* m_sceneManager3D{ nullptr };
+    /// 场景编辑服务（非拥有指针，用于事务化添加图元）
     SceneEditService* m_editService{ nullptr };
     /// 状态中心（非拥有指针）
     UiStateCenter* m_stateCenter{ nullptr };

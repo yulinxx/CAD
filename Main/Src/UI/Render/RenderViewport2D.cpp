@@ -14,6 +14,7 @@
 #include "UI2D/DrawTools/ToolManager.h"
 #include "Ui/DrawTools/ToolContext.h"
 #include "Ui/DrawTools/ITool.h"
+#include "Ui/DrawTools/SelectTool.h"
 #include "Ui/ViewWidget/ToolInitializer.h"
 #include "Ui/ViewWidget/ViewRenderCoordinator.h"
 
@@ -23,9 +24,9 @@
 #include <QKeyEvent>
 #include <QContextMenuEvent>
 #include <QTimer>
-#include <QDebug>
 #include <cmath>
 #include <array>
+#include "Log/SyLogger.h"
 
 namespace
 {
@@ -60,8 +61,10 @@ RenderViewport2D::RenderViewport2D(QWidget* parent)
 RenderViewport2D::~RenderViewport2D()
 {
     *m_alive = false;
-    // m_sceneManager 可能已是悬垂指针（SceneManager 先于本对象析构），
-    // 因此不在此处反注册回调，改为在 Callback 中通过 m_alive 标志防范。
+    // 从场景管理器移除观察者，避免已销毁对象被通知导致崩溃
+    // SceneManager 由 ApplicationCompositionRoot 管理，生命周期长于 RenderViewport2D
+    if (m_sceneManager)
+        m_sceneManager->notifier().removeObserver(this);
 }
 
 void RenderViewport2D::initRenderWidget()
@@ -179,7 +182,9 @@ void RenderViewport2D::initializeTools()
     coordinator->setRenderWidget(m_renderWidget);
 
     // 注册所有工具
-    ToolInitializer::registerAllTools(*m_toolManager, m_sceneManager, m_renderWidget, coordinator);
+    // 将状态栏回调传入，SelectTool 选择变化时自动更新状态栏显示 "Selected: N"
+    ToolInitializer::registerAllTools(*m_toolManager, m_sceneManager, m_renderWidget, coordinator,
+        [this](const QString& msg) { updateStatus(msg); });
 
     // 设置图元提交回调（通过 SceneEditService，支持 Undo）
     if (m_sceneEditService)
@@ -238,9 +243,8 @@ void RenderViewport2D::resetView()
     // 重置到台面范围：左下角 (0,0)，右上角 (1200,800)，中心在 (600,400)
     const float tableW = 1200.0f;
     const float tableH = 800.0f;
-    float dpr = static_cast<float>(m_renderWidget ? m_renderWidget->devicePixelRatioF() : 1.0);
-    float vpW = static_cast<float>(m_renderWidget ? m_renderWidget->width() : width()) * dpr;
-    float vpH = static_cast<float>(m_renderWidget ? m_renderWidget->height() : height()) * dpr;
+    float vpW = static_cast<float>(m_renderWidget ? m_renderWidget->width() : width());
+    float vpH = static_cast<float>(m_renderWidget ? m_renderWidget->height() : height());
     if (vpW > 0 && vpH > 0)
         m_camera.setViewExtent(vpW, vpH, tableW / 2.0f, tableH / 2.0f, tableW / 2.0f, tableH / 2.0f);
     else
@@ -277,9 +281,8 @@ void RenderViewport2D::zoomToFit()
         sceneH = 1000.0f;
     }
 
-    float dpr = static_cast<float>(m_renderWidget ? m_renderWidget->devicePixelRatioF() : 1.0);
-    float vpW = static_cast<float>(m_renderWidget ? m_renderWidget->width() : width()) * dpr;
-    float vpH = static_cast<float>(m_renderWidget ? m_renderWidget->height() : height()) * dpr;
+    float vpW = static_cast<float>(m_renderWidget ? m_renderWidget->width() : width());
+    float vpH = static_cast<float>(m_renderWidget ? m_renderWidget->height() : height());
 
     m_camera.zoomToFit(vpW, vpH, sceneW, sceneH);
     m_camera.pan(-centerX, -centerY);
@@ -303,7 +306,7 @@ void RenderViewport2D::zoomToSelection()
         return;
     }
 
-    // 计算所有选中实体的合并包围盒
+    // 计算所有选中图元的合并包围盒
     Ut::BBox2d combinedBbox;
     for (auto* entity : selected)
     {
@@ -330,9 +333,8 @@ void RenderViewport2D::zoomToSelection()
         sceneH = 100.0f;
     }
 
-    float dpr = static_cast<float>(m_renderWidget ? m_renderWidget->devicePixelRatioF() : 1.0);
-    float vpW = static_cast<float>(m_renderWidget ? m_renderWidget->width() : width()) * dpr;
-    float vpH = static_cast<float>(m_renderWidget ? m_renderWidget->height() : height()) * dpr;
+    float vpW = static_cast<float>(m_renderWidget ? m_renderWidget->width() : width());
+    float vpH = static_cast<float>(m_renderWidget ? m_renderWidget->height() : height());
 
     m_camera.zoomToFit(vpW, vpH, sceneW, sceneH);
 
@@ -349,13 +351,12 @@ void RenderViewport2D::zoomIn()
     // 以视口中心为锚点放大
     if (!m_renderWidget)
         return;
-    float dpr = static_cast<float>(m_renderWidget->devicePixelRatioF());
-    float vpW = static_cast<float>(m_renderWidget->width()) * dpr;
-    float vpH = static_cast<float>(m_renderWidget->height()) * dpr;
+    float vpW = static_cast<float>(m_renderWidget->width());
+    float vpH = static_cast<float>(m_renderWidget->height());
     if (vpW <= 0 || vpH <= 0)
         return;
     QPointF center(vpW / 2.0f, vpH / 2.0f);
-    QPointF worldCenter = m_camera.screenToWorld(QPoint(static_cast<int>(center.x() / dpr), static_cast<int>(center.y() / dpr)), vpW, vpH);
+    QPointF worldCenter = m_camera.screenToWorld(QPoint(static_cast<int>(center.x()), static_cast<int>(center.y())), vpW, vpH);
     m_camera.zoomIn(1.25f, worldCenter, vpW, vpH);
     updateViewMatrix();
 }
@@ -365,13 +366,12 @@ void RenderViewport2D::zoomOut()
     // 以视口中心为锚点缩小
     if (!m_renderWidget)
         return;
-    float dpr = static_cast<float>(m_renderWidget->devicePixelRatioF());
-    float vpW = static_cast<float>(m_renderWidget->width()) * dpr;
-    float vpH = static_cast<float>(m_renderWidget->height()) * dpr;
+    float vpW = static_cast<float>(m_renderWidget->width());
+    float vpH = static_cast<float>(m_renderWidget->height());
     if (vpW <= 0 || vpH <= 0)
         return;
     QPointF center(vpW / 2.0f, vpH / 2.0f);
-    QPointF worldCenter = m_camera.screenToWorld(QPoint(static_cast<int>(center.x() / dpr), static_cast<int>(center.y() / dpr)), vpW, vpH);
+    QPointF worldCenter = m_camera.screenToWorld(QPoint(static_cast<int>(center.x()), static_cast<int>(center.y())), vpW, vpH);
     m_camera.zoomOut(1.25f, worldCenter, vpW, vpH);
     updateViewMatrix();
 }
@@ -483,9 +483,8 @@ void RenderViewport2D::clearSelection()
 
 QPointF RenderViewport2D::mapToScene(const QPoint& screenPos) const
 {
-    float dpr = static_cast<float>(m_renderWidget ? m_renderWidget->devicePixelRatioF() : 1.0);
-    float vpW = static_cast<float>(m_renderWidget ? m_renderWidget->width() : width()) * dpr;
-    float vpH = static_cast<float>(m_renderWidget ? m_renderWidget->height() : height()) * dpr;
+    float vpW = static_cast<float>(m_renderWidget ? m_renderWidget->width() : width());
+    float vpH = static_cast<float>(m_renderWidget ? m_renderWidget->height() : height());
 
     // 将相对于 RenderViewport2D 的坐标转换为相对于 m_renderWidget 的坐标
     QPoint widgetPos = screenPos;
@@ -535,6 +534,7 @@ bool RenderViewport2D::eventFilter(QObject* obj, QEvent* event)
 
     switch (event->type())
     {
+        case QEvent::MouseButtonDblClick:
         case QEvent::MouseButtonPress:
         case QEvent::MouseMove:
         case QEvent::MouseButtonRelease:
@@ -548,6 +548,9 @@ bool RenderViewport2D::eventFilter(QObject* obj, QEvent* event)
 
             switch (event->type())
             {
+                case QEvent::MouseButtonDblClick:
+                    mouseDoubleClickEvent(&parentEvent);
+                    break;
                 case QEvent::MouseButtonPress:
                     mousePressEvent(&parentEvent);
                     break;
@@ -595,9 +598,8 @@ void RenderViewport2D::mousePressEvent(QMouseEvent* event)
         return;
     }
 
-    float dpr = static_cast<float>(m_renderWidget->devicePixelRatioF());
-    float vpW = static_cast<float>(m_renderWidget->width()) * dpr;
-    float vpH = static_cast<float>(m_renderWidget->height()) * dpr;
+    float vpW = static_cast<float>(m_renderWidget->width());
+    float vpH = static_cast<float>(m_renderWidget->height());
 
     if (vpW <= 0 || vpH <= 0)
         return;
@@ -628,9 +630,9 @@ void RenderViewport2D::mousePressEvent(QMouseEvent* event)
                 static_cast<int>(worldPos.x()),
                 static_cast<int>(worldPos.y()));
         }
-        else if (m_toolManager && m_toolManager->getActiveTool() && m_toolManager->getActiveToolName() != "SelectTool")
+        else if (m_toolManager && m_toolManager->getActiveTool())
         {
-            // 转发鼠标事件到活动工具
+            // 转发鼠标事件到活动工具（包括 SelectTool）
             m_toolManager->getActiveTool()->onMousePress(worldPos, event);
         }
         else if (m_selector)
@@ -652,9 +654,8 @@ void RenderViewport2D::mouseMoveEvent(QMouseEvent* event)
         return;
     }
 
-    float dpr = static_cast<float>(m_renderWidget->devicePixelRatioF());
-    float vpW = static_cast<float>(m_renderWidget->width()) * dpr;
-    float vpH = static_cast<float>(m_renderWidget->height()) * dpr;
+    float vpW = static_cast<float>(m_renderWidget->width());
+    float vpH = static_cast<float>(m_renderWidget->height());
 
     if (vpW <= 0 || vpH <= 0)
         return;
@@ -672,19 +673,11 @@ void RenderViewport2D::mouseMoveEvent(QMouseEvent* event)
         QPoint delta = widgetPos - m_lastMousePos;
         m_lastMousePos = widgetPos;
 
-        float dpr = static_cast<float>(m_renderWidget->devicePixelRatioF());
-        float worldDx = static_cast<float>(delta.x()) * dpr / m_camera.zoomX;
-        float worldDy = -static_cast<float>(delta.y()) * dpr / m_camera.zoomY;
+        float worldDx = static_cast<float>(delta.x()) / m_camera.zoomX;
+        float worldDy = -static_cast<float>(delta.y()) / m_camera.zoomY;
 
         m_camera.pan(worldDx, worldDy);
         updateViewMatrix();
-        event->accept();
-        return;
-    }
-
-    if (m_selector && m_selector->isBoxSelecting())
-    {
-        m_selector->updateBoxSelect(worldPos);
         event->accept();
         return;
     }
@@ -698,7 +691,7 @@ void RenderViewport2D::mouseMoveEvent(QMouseEvent* event)
         return;
     }
 
-    if (m_toolManager && m_toolManager->getActiveTool() && m_toolManager->getActiveToolName() != "SelectTool")
+    if (m_toolManager && m_toolManager->getActiveTool())
     {
         m_toolManager->getActiveTool()->onMouseMove(worldPos, event);
         event->accept();
@@ -716,9 +709,8 @@ void RenderViewport2D::mouseReleaseEvent(QMouseEvent* event)
         return;
     }
 
-    float dpr = static_cast<float>(m_renderWidget->devicePixelRatioF());
-    float vpW = static_cast<float>(m_renderWidget->width()) * dpr;
-    float vpH = static_cast<float>(m_renderWidget->height()) * dpr;
+    float vpW = static_cast<float>(m_renderWidget->width());
+    float vpH = static_cast<float>(m_renderWidget->height());
 
     if (vpW <= 0 || vpH <= 0)
         return;
@@ -744,13 +736,6 @@ void RenderViewport2D::mouseReleaseEvent(QMouseEvent* event)
             return;
         }
 
-        if (m_selector && m_selector->isBoxSelecting())
-        {
-            m_selector->endBoxSelect(worldPos);
-            event->accept();
-            return;
-        }
-
         if (m_interactionDispatcher && m_interactionDispatcher->hasActiveCommand())
         {
             m_interactionDispatcher->forwardMouseUp(
@@ -760,8 +745,9 @@ void RenderViewport2D::mouseReleaseEvent(QMouseEvent* event)
             return;
         }
 
-        if (m_toolManager && m_toolManager->getActiveTool() && m_toolManager->getActiveToolName() != "SelectTool")
+        if (m_toolManager && m_toolManager->getActiveTool())
         {
+            // 转发鼠标释放事件到活动工具（包括 SelectTool）
             m_toolManager->getActiveTool()->onMouseRelease(worldPos, event);
             event->accept();
             return;
@@ -776,6 +762,37 @@ void RenderViewport2D::mouseReleaseEvent(QMouseEvent* event)
     }
 
     QWidget::mouseReleaseEvent(event);
+}
+
+void RenderViewport2D::mouseDoubleClickEvent(QMouseEvent* event)
+{
+    if (!m_renderWidget)
+    {
+        QWidget::mouseDoubleClickEvent(event);
+        return;
+    }
+
+    float vpW = static_cast<float>(m_renderWidget->width());
+    float vpH = static_cast<float>(m_renderWidget->height());
+
+    if (vpW <= 0 || vpH <= 0)
+        return;
+
+    QPoint widgetPos = m_renderWidget->mapFromParent(event->pos());
+    QPointF worldPos = m_camera.screenToWorld(widgetPos, vpW, vpH);
+
+    if (event->button() == Qt::LeftButton)
+    {
+        if (m_toolManager && m_toolManager->getActiveTool())
+        {
+            // 转发双击事件到活动工具（SelectTool 用于进入图元编辑）
+            m_toolManager->getActiveTool()->onMouseDoubleClick(worldPos, event);
+            event->accept();
+            return;
+        }
+    }
+
+    QWidget::mouseDoubleClickEvent(event);
 }
 
 void RenderViewport2D::wheelEvent(QWheelEvent* event)
@@ -819,6 +836,16 @@ void RenderViewport2D::keyPressEvent(QKeyEvent* event)
         }
     }
 
+    // 转发键盘事件到活动工具（包括 SelectTool，用于处理快捷键）
+    if (m_toolManager && m_toolManager->getActiveTool())
+    {
+        if (m_toolManager->getActiveTool()->onKeyPress(event))
+        {
+            event->accept();
+            return;
+        }
+    }
+
     if (event->key() == Qt::Key_Delete)
     {
         deleteSelectedEntity();
@@ -847,9 +874,8 @@ void RenderViewport2D::updateViewMatrix()
     if (!m_renderWidget)
         return;
 
-    float dpr = static_cast<float>(m_renderWidget->devicePixelRatioF());
-    float vpW = static_cast<float>(m_renderWidget->width()) * dpr;
-    float vpH = static_cast<float>(m_renderWidget->height()) * dpr;
+    float vpW = static_cast<float>(m_renderWidget->width());
+    float vpH = static_cast<float>(m_renderWidget->height());
 
     if (vpW <= 0 || vpH <= 0)
         return;
@@ -924,7 +950,7 @@ void RenderViewport2D::requestFullRefresh()
 
 void RenderViewport2D::onSceneChanged()
 {
-    // 记录脏实体 ID，为未来增量渲染提供输入
+    // 记录脏图元 ID，为未来增量渲染提供输入
     if (auto* sm = sceneManager())
     {
         for (auto id : sm->dirtyEntities())
@@ -937,6 +963,13 @@ void RenderViewport2D::onSceneChanged()
 
 void RenderViewport2D::onSelectionChanged()
 {
+    // 同步选择工具的选择状态，处理删除后悬空指针问题
+    if (m_toolManager)
+    {
+        auto* selectTool = dynamic_cast<SelectTool*>(m_toolManager->getActiveTool());
+        if (selectTool)
+            selectTool->syncSelectionFromScene();
+    }
     // 选择变更仅需重绘，无需全量 gather
     requestRepaint();
 }
@@ -946,8 +979,9 @@ void RenderViewport2D::updateSceneRender()
     if (!m_renderWidget || m_refreshLevel == RefreshLevel::None)
         return;
 
-    qInfo() << "RenderViewport2D::updateSceneRender: refreshLevel=" << static_cast<int>(m_refreshLevel)
-        << "initialized=" << m_renderWidget->isInitialized();
+    SY_INFOF("RenderViewport2D::updateSceneRender: refreshLevel=%d initialized=%d",
+        static_cast<int>(m_refreshLevel),
+        m_renderWidget->isInitialized() ? 1 : 0);
 
     // GL 尚未初始化时保留刷新标记，延迟重试
     if (!m_renderWidget->isInitialized())
@@ -975,14 +1009,14 @@ void RenderViewport2D::updateSceneRender()
 
     if (level == RefreshLevel::LightUpdate && !m_pendingDeletedIds.empty())
     {
-        // 增量删除路径 — 先移除已删除的实体
+        // 增量删除路径 — 先移除已删除的图元
         // TODO: 当 RenderWidget 支持 removeEntity() 时，逐个移除
         // 目前 fallback 到全量 gather
     }
 
     if (level == RefreshLevel::LightUpdate && !m_pendingDirtyIds.empty())
     {
-        // 增量更新路径 — 对脏实体逐个更新
+        // 增量更新路径 — 对脏图元逐个更新
         // TODO: 当 RenderWidget 支持 updateEntity()/addEntity() 时，逐个增/改
         // 目前 fallback 到全量 gather
     }
@@ -995,7 +1029,7 @@ void RenderViewport2D::updateSceneRender()
         m_renderWidget->submitDefaultSceneEnv();
     }
 
-    // 清理已处理的脏实体标记
+    // 清理已处理的脏图元标记
     sm->markClean();
     m_pendingDirtyIds.clear();
     m_pendingDeletedIds.clear();

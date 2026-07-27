@@ -12,7 +12,7 @@ struct ExportResult
     QString message;
     /// 警告列表
     QStringList warnings;
-    /// 导出的实体数量
+    /// 导出的图元数量
     int exportedEntityCount{ 0 };
     /// 导出的节点数量
     int exportedNodeCount{ 0 };

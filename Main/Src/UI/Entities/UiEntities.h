@@ -11,16 +11,16 @@
 /**
  * @brief 3D 场景树节点（纯 UI 显示层）
  *
- * 不存储实体数据，所有属性（id/name/selected）委托给引擎实体查询。
+ * 不存储图元数据，所有属性（id/name/selected）委托给引擎图元查询。
  * 仅维护：
- * - m_engineEntityId：关联的引擎实体 ID
+ * - m_engineEntityId：关联的引擎图元 ID
  * - m_children：UI 树层次结构（父子关系）
  * - m_highlighted：UI 高亮状态
  */
 class SceneNode
 {
 public:
-    /// 构造：必须关联引擎实体
+    /// 构造：必须关联引擎图元
     explicit SceneNode(Eg::EntityId entityId, std::string name);
 
     std::string id() const
@@ -72,8 +72,8 @@ private:
 /**
  * @brief 选择集容器（基于引擎场景）
  *
- * 将选中实体 ID 委托给 SceneManager3D 管理。
- * SceneNode 的 selected() 直接读取引擎实体状态。
+ * 将选中图元 ID 委托给 SceneManager3D 管理。
+ * SceneNode 的 selected() 直接读取引擎图元状态。
  */
 class SelectionSet
 {
@@ -99,7 +99,7 @@ private:
  *
  * 数据全部由 Eg::SceneManager3D 管理，SceneNode 仅用于 UI 树层次显示。
  * - m_uiRoot：UI 树根节点，维护父子层次
- * - m_engineScene：引擎场景，维护实体数据
+ * - m_engineScene：引擎场景，维护图元数据
  */
 class SceneDocument3D : public UI::SceneDocumentBase
 {

@@ -3,12 +3,12 @@
 #include <memory>
 #include <vector>
 
-#include "UI/UiInteractionDispatcher.h"
-#include "UI/UiLayoutService.h"
-#include "UI/UiShellHost.h"
-#include "UI/UiStateCenter.h"
-#include "UI/UiThemeService.h"
-#include "UI/SceneDocument2D.h"
+#include "UI/Interaction/UiInteractionDispatcher.h"
+#include "UI/Services/UiLayoutService.h"
+#include "UI/Services/UiShellHost.h"
+#include "UI/Services/UiStateCenter.h"
+#include "UI/Services/UiThemeService.h"
+#include "UI/Documents/SceneDocument2D.h"
 #include "UI2D/Operation/OperationBus.h"
 
 #include "Engine2D/Core/SceneManager.h"
@@ -17,6 +17,7 @@
 #include "Engine2D/Edit/LayerEditService.h"
 #include "Engine2D/Interaction/LayerManager.h"
 #include "UI2D/Edit/QtLayerManagerBridge.h"
+#include "Engine3D/SceneManager3D.h"
 
 #include "FileIO/FileIOManager.h"
 
@@ -129,6 +130,12 @@ public:
         return m_helpDialogService.get();
     }
 
+    /// 获取3D场景管理器
+    Eg::SceneManager3D* sceneManager3D()
+    {
+        return m_sceneManager3D.get();
+    }
+
     /// 获取场景管理器
     Eg::SceneManager* sceneManager()
     {
@@ -176,6 +183,9 @@ private:
     /// 场景管理器（新系统核心）
     std::unique_ptr<Eg::SceneManager> m_sceneManager;
 
+    /// 3D 场景管理器
+    std::unique_ptr<Eg::SceneManager3D> m_sceneManager3D;
+
     /// 撤销重做管理器（新系统）
     std::unique_ptr<UndoRedoManager> m_undoRedoManager;
 
@@ -185,7 +195,7 @@ private:
     /// 2D 场景文档（依赖 SceneEditService）
     std::unique_ptr<SceneDocument2D> m_document2D;
 
-    /// 图层管理器（管理图层创建/删除/属性/实体关联）
+    /// 图层管理器（管理图层创建/删除/属性/图元关联）
     std::unique_ptr<LayerManager> m_layerManager;
 
     /// 图层管理器 Qt 桥接（将观察者回调转为 Qt 信号）

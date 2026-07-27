@@ -11,6 +11,6 @@ struct ImportOptions
     bool autoSwitchWorkbench{ true };
     /// 作为新文档导入（清空当前场景）
     bool importAsNewDocument{ true };
-    /// 合并到当前文档（不清空场景，追加实体）
+    /// 合并到当前文档（不清空场景，追加图元）
     bool mergeIntoCurrentDocument{ false };
 };

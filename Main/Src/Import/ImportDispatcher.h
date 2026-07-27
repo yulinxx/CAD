@@ -22,7 +22,7 @@ public:
 
     /// 根据文件路径自动检测格式并分发到对应读取器
     /// @param context 导入上下文
-    /// @param outEntities 输出：导入的实体列表
+    /// @param outEntities 输出：导入的图元列表
     /// @return 导入结果
     ImportResult dispatch(const ImportContext& context,
         Fio::VecSyEntityPtr& outEntities);
