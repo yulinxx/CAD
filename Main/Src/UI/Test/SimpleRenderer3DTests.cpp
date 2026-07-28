@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "UI/SimpleRenderer3D.h"
+#include "UI/Render/SimpleRenderer3D.h"
 #include <QPainter>
 #include <QImage>
 

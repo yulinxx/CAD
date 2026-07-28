@@ -7,7 +7,7 @@
 
 class QTreeWidget;
 class QTreeWidgetItem;
-class SceneDocument3D;
+class SceneDocument3DAdapter;
 class SceneNode;
 
 class SceneTreeDockWidget final : public QWidget
@@ -17,7 +17,7 @@ public:
     explicit SceneTreeDockWidget(QWidget* parent = nullptr);
 
 public:
-    void setSceneDocument(SceneDocument3D* document);
+    void setSceneDocument(SceneDocument3DAdapter* document);
     void setSelectionCallback(std::function<void(const QString&)>&& callback);
     void setPathCallback(std::function<void(const QStringList&)>&& callback);
     void refresh();
@@ -35,7 +35,7 @@ private:
 
 private:
     QTreeWidget* m_tree{ nullptr };
-    SceneDocument3D* m_document{ nullptr };
+    SceneDocument3DAdapter* m_document{ nullptr };
     std::function<void(const QString&)> m_selectionCallback;
     std::function<void(const QStringList&)> m_pathCallback;
 };

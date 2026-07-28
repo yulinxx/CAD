@@ -13,10 +13,10 @@
 #include <QObject>
 
 CoreOperationRegistry::CoreOperationRegistry(OperationBus* bus,
-                                             SceneEditService* editService,
-                                             IUndoRedoManager* undoManager,
-                                             HelpDialogService* helpDialog,
-                                             QWidget* parentWidget)
+    SceneEditService* editService,
+    IUndoRedoManager* undoManager,
+    HelpDialogService* helpDialog,
+    QWidget* parentWidget)
     : m_bus(bus)
     , m_editService(editService)
     , m_undoManager(undoManager)

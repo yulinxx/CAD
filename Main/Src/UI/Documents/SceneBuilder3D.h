@@ -6,7 +6,7 @@
 
 #include "UI/SceneBuilderBase.h"
 
-class SceneDocument3D;
+class SceneDocument3DAdapter;
 
 /**
  * @class SceneBuilder3D
@@ -18,7 +18,7 @@ class SceneDocument3D;
 class SceneBuilder3D : public UI::SceneBuilderBase
 {
 public:
-    static std::shared_ptr<SceneDocument3D> createDefaultScene(QString& rootNodeId);
+    static std::shared_ptr<SceneDocument3DAdapter> createDefaultScene(QString& rootNodeId);
     static QString defaultRootNodeName();
 
     // ---- SceneBuilderBase 接口 ----

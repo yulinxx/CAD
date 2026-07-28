@@ -3,9 +3,9 @@
 #include "UiEntities.h"
 #include <QObject>
 
-std::shared_ptr<SceneDocument3D> SceneBuilder3D::createDefaultScene(QString& rootNodeId)
+std::shared_ptr<SceneDocument3DAdapter> SceneBuilder3D::createDefaultScene(QString& rootNodeId)
 {
-    auto scene = std::make_shared<SceneDocument3D>();
+    auto scene = std::make_shared<SceneDocument3DAdapter>();
     auto engineScene = std::make_shared<Eg::SceneManager3D>();
     scene->setEngineScene(engineScene);
 

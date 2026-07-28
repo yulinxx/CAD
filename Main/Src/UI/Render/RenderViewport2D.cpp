@@ -11,6 +11,20 @@
 #include "UI2D/Operation/OperationId.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/SyEntity/SyLine.h"
+#include "Engine2D/SyEntity/SyCircle.h"
+#include "Engine2D/SyEntity/SyArc.h"
+#include "Engine2D/SyEntity/SyEllipse.h"
+#include "Engine2D/SyEntity/SyPolygon.h"
+#include "Engine2D/SyEntity/SyText.h"
+#include "Engine2D/SyEntity/SyImage.h"
+#include "Engine2D/SyEntity/SyPoint.h"
+#include "Engine2D/SyEntity/SyBezier.h"
+#include "Engine2D/SyEntity/SyBezier2.h"
+#include "Engine2D/SyEntity/SyNurbs.h"
+#include "Engine2D/SyEntity/SySmartLine.h"
+#include "Engine2D/Geometry/BezierAlgorithms.h"
+#include "Engine/SyEntity/EType.h"
+#include "Engine/Layer/SyLayer.h"
 #include "UI2D/DrawTools/ToolManager.h"
 #include "Ui/DrawTools/ToolContext.h"
 #include "Ui/DrawTools/ITool.h"
@@ -37,7 +51,193 @@ namespace
     // 默认视图范围：中心 (0,0)，半宽半高 500，即可见范围 (-500,-500)~(500,500)
     constexpr float kDefaultViewHalfW = 500.0f;
     constexpr float kDefaultViewHalfH = 500.0f;
+    // 圆弧/椭圆 tessellation 分段数
+    constexpr int kCircleSegments = 72;
 
+    using namespace Eg;
+    using namespace render;
+
+    // 颜色转换：Ut::Color -> float[4]
+    inline void colorToRGBA(const Ut::Color& c, float out[4])
+    {
+        out[0] = c.r(); out[1] = c.g(); out[2] = c.b(); out[3] = c.a();
+    }
+
+    // 将单个引擎实体转换为 VertexP3C3 顶点数组 + PrimitiveType
+    // 用于增量渲染的 addRenderEntity / modifyRenderEntity 调用
+    // 返回 false 表示该类型不支持（如文本），跳过
+    bool entityToVertices(const Eg::SyEntity* entity,
+        std::vector<render::VertexP3C3>& outVertices,
+        render::PrimitiveType& outType)
+    {
+        if (!entity || !entity->visible())
+            return false;
+        if (entity->layer() && !entity->layer()->isVisible())
+            return false;
+
+        const Ut::Color& color = entity->getColor();
+        float rgba[4];
+        colorToRGBA(color, rgba);
+
+        auto addVertex = [&](double x, double y) {
+            render::VertexP3C3 v;
+            v.px = static_cast<float>(x);
+            v.py = static_cast<float>(y);
+            v.pz = 0.0f;
+            v.cr = rgba[0]; v.cg = rgba[1]; v.cb = rgba[2];
+            outVertices.push_back(v);
+            };
+
+        switch (entity->eType)
+        {
+            case EType::LINE:
+            {
+                auto* line = static_cast<const Eg::SyLine*>(entity);
+                outType = line->bClosed ? render::PrimitiveType::LineLoop
+                    : render::PrimitiveType::LineStrip;
+                for (const auto& p : line->vPoints)
+                    addVertex(p.x(), p.y());
+                return outVertices.size() >= 2;
+            }
+            case EType::CIRCLE:
+            {
+                auto* circle = static_cast<const Eg::SyCircle*>(entity);
+                outType = render::PrimitiveType::LineLoop;
+                const double cx = circle->basePoint.x();
+                const double cy = circle->basePoint.y();
+                const double r = circle->dRadius;
+                for (int i = 0; i < kCircleSegments; ++i)
+                {
+                    double angle = 2.0 * M_PI * i / kCircleSegments;
+                    addVertex(cx + r * std::cos(angle), cy + r * std::sin(angle));
+                }
+                return true;
+            }
+            case EType::ARC:
+            {
+                auto* arc = static_cast<const Eg::SyArc*>(entity);
+                outType = render::PrimitiveType::LineStrip;
+                const double cx = arc->basePoint.x();
+                const double cy = arc->basePoint.y();
+                const double r = arc->dRadius;
+                double start = arc->dStartAngle;
+                double end = arc->dEndAngle;
+                if (end < start) end += 2.0 * M_PI;
+                const int segs = std::max(8, kCircleSegments / 4);
+                for (int i = 0; i <= segs; ++i)
+                {
+                    double t = start + (end - start) * i / segs;
+                    addVertex(cx + r * std::cos(t), cy + r * std::sin(t));
+                }
+                return true;
+            }
+            case EType::ELLIPSE:
+            {
+                auto* ellipse = static_cast<const Eg::SyEllipse*>(entity);
+                const double cx = ellipse->basePoint.x();
+                const double cy = ellipse->basePoint.y();
+                const double rx = ellipse->dRadiusX;
+                const double ry = ellipse->dRadiusY;
+                const double rot = ellipse->dRotation;
+                const double start = ellipse->dStartAngle;
+                const double end = ellipse->dEndAngle;
+                const bool isFull = (start == 0.0 && end == 0.0);
+                outType = isFull ? render::PrimitiveType::LineLoop
+                    : render::PrimitiveType::LineStrip;
+                const int segs = isFull ? kCircleSegments : std::max(8, kCircleSegments / 4);
+                double startA = isFull ? 0.0 : start;
+                double endA = isFull ? 2.0 * M_PI : end;
+                if (!isFull && endA < startA) endA += 2.0 * M_PI;
+                const double cosR = std::cos(rot);
+                const double sinR = std::sin(rot);
+                for (int i = 0; i <= segs; ++i)
+                {
+                    double t = startA + (endA - startA) * i / segs;
+                    double lx = rx * std::cos(t);
+                    double ly = ry * std::sin(t);
+                    double wx = cx + lx * cosR - ly * sinR;
+                    double wy = cy + lx * sinR + ly * cosR;
+                    addVertex(wx, wy);
+                }
+                return true;
+            }
+            case EType::POLYGON:
+            {
+                auto* polygon = static_cast<const Eg::SyPolygon*>(entity);
+                outType = render::PrimitiveType::LineLoop;
+                for (const auto& p : polygon->vertices())
+                    addVertex(p.x(), p.y());
+                return outVertices.size() >= 3;
+            }
+            case EType::POINT:
+            {
+                auto* point = static_cast<const Eg::SyPoint*>(entity);
+                outType = render::PrimitiveType::PointList;
+                addVertex(point->basePoint.x(), point->basePoint.y());
+                return true;
+            }
+            case EType::BEZIER:
+            {
+                auto* bezier = static_cast<const Eg::SyBezier*>(entity);
+                auto points = Eg::BezierAlgorithms::discretizeEntity(bezier, 0.05, true);
+                outType = bezier->bClosed ? render::PrimitiveType::LineLoop
+                    : render::PrimitiveType::LineStrip;
+                for (const auto& p : points)
+                    addVertex(p.x(), p.y());
+                return outVertices.size() >= 2;
+            }
+            case EType::BEZIER2:
+            {
+                auto* bezier2 = static_cast<const Eg::SyBezier2*>(entity);
+                auto points = Eg::BezierAlgorithms::discretizeEntity(bezier2, 0.05, true);
+                outType = bezier2->bClosed ? render::PrimitiveType::LineLoop
+                    : render::PrimitiveType::LineStrip;
+                for (const auto& p : points)
+                    addVertex(p.x(), p.y());
+                return outVertices.size() >= 2;
+            }
+            case EType::NURBS:
+            {
+                auto* nurbs = static_cast<const Eg::SyNurbs*>(entity);
+                auto points = Eg::BezierAlgorithms::discretizeEntity(nurbs, 0.05, true);
+                outType = nurbs->bClosed ? render::PrimitiveType::LineLoop
+                    : render::PrimitiveType::LineStrip;
+                for (const auto& p : points)
+                    addVertex(p.x(), p.y());
+                return outVertices.size() >= 2;
+            }
+            case EType::SMARTLINE:
+            {
+                auto* smartLine = static_cast<const Eg::SySmartLine*>(entity);
+                outType = smartLine->bClosed ? render::PrimitiveType::LineLoop
+                    : render::PrimitiveType::LineStrip;
+                for (size_t i = 0; i < smartLine->segmentCount(); ++i)
+                {
+                    Eg::SyEntity* seg = smartLine->segment(i);
+                    if (seg)
+                        addVertex(seg->basePoint.x(), seg->basePoint.y());
+                }
+                return outVertices.size() >= 2;
+            }
+            case EType::IMAGE:
+            {
+                auto* image = static_cast<const Eg::SyImage*>(entity);
+                outType = render::PrimitiveType::TriangleList;
+                // 两个三角形组成的四边形
+                addVertex(image->topLeft.x(), image->topLeft.y());
+                addVertex(image->topRight.x(), image->topRight.y());
+                addVertex(image->bottomLeft.x(), image->bottomLeft.y());
+                addVertex(image->topRight.x(), image->topRight.y());
+                addVertex(image->bottomRight.x(), image->bottomRight.y());
+                addVertex(image->bottomLeft.x(), image->bottomLeft.y());
+                return true;
+            }
+            case EType::TEXT:
+            default:
+                // 文本等复杂类型暂不支持增量路径，走全量刷新
+                return false;
+        }
+    }
 }
 
 // ==================== RenderViewport2D 实现 ====================
@@ -61,6 +261,12 @@ RenderViewport2D::RenderViewport2D(QWidget* parent)
 RenderViewport2D::~RenderViewport2D()
 {
     *m_alive = false;
+
+    // 显式停止场景更新定时器，防止在析构过程中触发 updateSceneRender()
+    // 导致访问已释放的 RenderWidget 或正处于释放中的 OpenGL 资源
+    if (m_sceneUpdateTimer)
+        m_sceneUpdateTimer->stop();
+
     // 从场景管理器移除观察者，避免已销毁对象被通知导致崩溃
     // SceneManager 由 ApplicationCompositionRoot 管理，生命周期长于 RenderViewport2D
     if (m_sceneManager)
@@ -144,8 +350,8 @@ void RenderViewport2D::setDocument(SceneDocument2D* document)
     if (m_sceneManager)
         m_sceneManager->notifier().addObserver(this);
 
-    // 初始刷新
-    scheduleSceneUpdate();
+    // 初始刷新 - 新文档需要全量 gather，不能用增量路径
+    requestFullRefresh();
 }
 
 void RenderViewport2D::setSelectionService(ISelectionService* service)
@@ -205,6 +411,8 @@ void RenderViewport2D::initializeTools()
     updateStatus(tr("2D tools initialized"));
 }
 
+// 设置活动工具
+// 调用链路：CommandActionHubActions2D（快速路径）或 OperationBus（回退路径）→ 此函数 → ToolManager::setActiveTool
 bool RenderViewport2D::setActiveTool(const QString& toolName)
 {
     if (!m_toolManager)
@@ -222,6 +430,10 @@ bool RenderViewport2D::setActiveTool(const QString& toolName)
         {
             setCursor(Qt::CrossCursor);
         }
+    }
+    else
+    {
+        SY_WARNF("[RenderViewport2D] Failed to set active tool: %s", qPrintable(toolName));
     }
     return ok;
 }
@@ -902,6 +1114,7 @@ void RenderViewport2D::updateViewMatrix()
     }
 }
 
+// 场景更新节流：通过定时器合并短时间内的多次场景变更到一次 updateSceneRender() 调用
 void RenderViewport2D::scheduleSceneUpdate()
 {
     if (m_refreshLevel < RefreshLevel::LightUpdate)
@@ -948,9 +1161,11 @@ void RenderViewport2D::requestFullRefresh()
     }
 }
 
+// 场景变更通知入口（SceneNotifier::IObserver 接口实现）
+// 通知链路：SceneNotifier::notifySceneChanged() → 此函数 → scheduleSceneUpdate() → updateSceneRender()
 void RenderViewport2D::onSceneChanged()
 {
-    // 记录脏图元 ID，为未来增量渲染提供输入
+    // 收集脏图元 ID，供增量渲染路径使用
     if (auto* sm = sceneManager())
     {
         for (auto id : sm->dirtyEntities())
@@ -974,6 +1189,10 @@ void RenderViewport2D::onSelectionChanged()
     requestRepaint();
 }
 
+// 渲染刷新分发：按 RefreshLevel 级别选择刷新策略
+// Repaint → 仅 update()（纯视觉重绘，选择变化等）
+// LightUpdate → 增量提交脏/删除图元（高频绘图主路径）
+// FullRefresh → 全量 gather + submit（导入、大批量修改后）
 void RenderViewport2D::updateSceneRender()
 {
     if (!m_renderWidget || m_refreshLevel == RefreshLevel::None)
@@ -1007,24 +1226,58 @@ void RenderViewport2D::updateSceneRender()
         return;
     }
 
-    if (level == RefreshLevel::LightUpdate && !m_pendingDeletedIds.empty())
+    if (level == RefreshLevel::LightUpdate)
     {
-        // 增量删除路径 — 先移除已删除的图元
-        // TODO: 当 RenderWidget 支持 removeEntity() 时，逐个移除
-        // 目前 fallback 到全量 gather
+        // === 增量渲染路径 ===
+        // 基于渲染引擎实体管理 API (addRenderEntity / modifyRenderEntity / removeRenderEntity)
+        // 仅提交脏图元和删除已删除图元，避免全场景 gather
+
+        // 1. 处理删除的图元
+        for (auto id : m_pendingDeletedIds)
+        {
+            auto uid = static_cast<uint64_t>(id);
+            m_renderWidget->removeRenderEntity(uid);
+            m_renderedEntityIds.erase(uid);
+        }
+
+        // 2. 处理脏图元（新增或修改）
+        for (auto id : m_pendingDirtyIds)
+        {
+            auto* entity = sm->findEntityById(id);
+            if (!entity) continue;
+
+            std::vector<render::VertexP3C3> vertices;
+            render::PrimitiveType primType;
+            if (!entityToVertices(entity, vertices, primType))
+                continue;
+
+            auto uid = static_cast<uint64_t>(id);
+            if (m_renderedEntityIds.count(uid))
+            {
+                m_renderWidget->modifyRenderEntity(uid, vertices.data(),
+                    static_cast<uint32_t>(vertices.size()));
+            }
+            else
+            {
+                m_renderWidget->addRenderEntity(uid, vertices.data(),
+                    static_cast<uint32_t>(vertices.size()), primType);
+                m_renderedEntityIds.insert(uid);
+            }
+        }
+
+        // 3. 提交网格背景
+        m_renderWidget->submitDefaultSceneEnv();
+
+        // 4. 请求重绘
+        m_renderWidget->update();
     }
 
-    if (level == RefreshLevel::LightUpdate && !m_pendingDirtyIds.empty())
+    if (level >= RefreshLevel::FullRefresh)
     {
-        // 增量更新路径 — 对脏图元逐个更新
-        // TODO: 当 RenderWidget 支持 updateEntity()/addEntity() 时，逐个增/改
-        // 目前 fallback 到全量 gather
-    }
-
-    if (level >= RefreshLevel::LightUpdate)
-    {
-        // 全量 gather + submit（兜底路径，也是当前唯一实现）
+        // 全量 gather + submit（兜底路径）
         m_renderWidget->submitSceneFromDataSource(sm);
+        // 全量刷新后清空追踪集合（下次增量路径重新建立）
+        m_renderedEntityIds.clear();
         // 提交网格背景
         m_renderWidget->submitDefaultSceneEnv();
     }
@@ -1034,8 +1287,6 @@ void RenderViewport2D::updateSceneRender()
     m_pendingDirtyIds.clear();
     m_pendingDeletedIds.clear();
 }
-
-
 
 void RenderViewport2D::updateStatus(const QString& text)
 {

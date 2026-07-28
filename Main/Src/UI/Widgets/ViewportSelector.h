@@ -20,13 +20,16 @@ class ViewportSelector
 {
 public:
     ViewportSelector(Eg::SceneManager* sceneManager,
-                     ISelectionService* selectionService,
-                     const Camera2D* camera,
-                     RenderWidget* renderWidget);
+        ISelectionService* selectionService,
+        const Camera2D* camera,
+        RenderWidget* renderWidget);
 
     bool handleClick(const QPointF& worldPos);
 
-    bool isBoxSelecting() const { return m_boxSelecting; }
+    bool isBoxSelecting() const
+    {
+        return m_boxSelecting;
+    }
 
     void beginBoxSelect(const QPointF& worldPos);
     void updateBoxSelect(const QPointF& worldPos);

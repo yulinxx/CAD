@@ -87,7 +87,7 @@ public:
 
 private:
     Eg::SceneManager3D* m_scene{ nullptr };
-    friend class SceneDocument3D;
+    friend class SceneDocument3DAdapter;
     void setScene(Eg::SceneManager3D* scene)
     {
         m_scene = scene;
@@ -101,7 +101,7 @@ private:
  * - m_uiRoot：UI 树根节点，维护父子层次
  * - m_engineScene：引擎场景，维护图元数据
  */
-class SceneDocument3D : public UI::SceneDocumentBase
+class SceneDocument3DAdapter : public UI::SceneDocumentBase
 {
 public:
     std::shared_ptr<SceneNode> createNode(const std::string& name);

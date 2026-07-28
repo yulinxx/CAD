@@ -10,10 +10,10 @@ class CoreOperationRegistry
 {
 public:
     CoreOperationRegistry(OperationBus* bus,
-                          SceneEditService* editService,
-                          IUndoRedoManager* undoManager,
-                          HelpDialogService* helpDialog,
-                          QWidget* parentWidget);
+        SceneEditService* editService,
+        IUndoRedoManager* undoManager,
+        HelpDialogService* helpDialog,
+        QWidget* parentWidget);
 
     void registerAll();
 

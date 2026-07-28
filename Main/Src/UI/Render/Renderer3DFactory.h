@@ -9,9 +9,9 @@ class Renderer3DFactory
 public:
     enum class RendererType
     {
-        Simple,          
-        Compatible,      
-        None             
+        Simple,
+        Compatible,
+        None
     };
 
     static std::unique_ptr<IRenderer3D> create(RendererType type);

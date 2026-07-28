@@ -25,16 +25,16 @@ class FileOperationRegistry
 {
 public:
     FileOperationRegistry(OperationBus* bus,
-                          Eg::SceneManager* sceneManager,
-                          ImportService* importService,
-                          ExportService* exportService,
-                          FileDialogService* fileDialog,
-                          RecentFileService* recentFiles,
-                          HelpDialogService* helpDialog,
-                          UiStateCenter* stateCenter,
-                          LayerPersistenceBridge* layerPersistence,
-                          PersistenceService* persistence,
-                          QWidget* parentWidget);
+        Eg::SceneManager* sceneManager,
+        ImportService* importService,
+        ExportService* exportService,
+        FileDialogService* fileDialog,
+        RecentFileService* recentFiles,
+        HelpDialogService* helpDialog,
+        UiStateCenter* stateCenter,
+        LayerPersistenceBridge* layerPersistence,
+        PersistenceService* persistence,
+        QWidget* parentWidget);
 
     void registerAll();
 

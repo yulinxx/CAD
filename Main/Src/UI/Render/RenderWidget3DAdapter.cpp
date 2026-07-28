@@ -11,6 +11,7 @@
 #include "Engine3D/Selection/SelectionManager3D.h"
 #include "UI3D/Service/SceneDocument3D.h"
 #include "UI3D/Service/CameraController3D.h"
+#include "UiEntities.h"
 #include "Log/SyLogger.h"
 
 namespace
@@ -137,13 +138,14 @@ bool RenderWidget3DAdapter::isRenderLoopRunning() const
     return m_renderLoopEnabled && m_ready;
 }
 
-void RenderWidget3DAdapter::setScene(SceneDocument3D* document)
+void RenderWidget3DAdapter::setScene(SceneDocument3DAdapter* document)
 {
     if (!document || !m_renderWidget)
         return;
 
-    // 将 SceneDocument3D 中的 SceneManager3D 设置给 RenderWidget3D
-    auto* sceneManager = document->sceneManager();
+    // 将 SceneDocument3DAdapter 中的 SceneManager3D 设置给 RenderWidget3D
+    auto engineScene = document->engineScene();
+    auto* sceneManager = engineScene ? engineScene.get() : nullptr;
     if (sceneManager)
     {
         m_sceneManager = sceneManager;
@@ -269,7 +271,7 @@ void RenderWidget3DAdapter::selectNodeById(const QString& nodeId)
     if (!entity->strName.empty())
         m_selectedPathNames.append(QString::fromStdString(entity->strName));
 
-    SY_INFOF("[RenderWidget3DAdapter] Selected node by ID: %s, path: %s", 
+    SY_INFOF("[RenderWidget3DAdapter] Selected node by ID: %s, path: %s",
         qPrintable(nodeId), qPrintable(m_selectedPathNames.join("/")));
 
     if (m_selectionCallback)

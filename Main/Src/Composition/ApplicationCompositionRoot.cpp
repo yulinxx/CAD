@@ -56,6 +56,9 @@
 // 作为依赖注入的中心点，管理UI层和命令系统的生命周期
 ApplicationCompositionRoot::~ApplicationCompositionRoot() = default;
 
+// 应用组合根构造函数
+// 职责：创建所有核心服务实例，完成依赖注入和信号连接
+// 装配顺序：UI 基础服务 → 场景/编辑/图层 → 导入导出 → 对话框服务 → 脏状态同步 → 操作注册
 ApplicationCompositionRoot::ApplicationCompositionRoot()
     : m_stateCenter(std::make_unique<UiStateCenter>())
     , m_themeService(std::make_unique<DefaultUiThemeService>())
@@ -308,25 +311,43 @@ namespace
             case OperationId::Tool_Arc:          return "ArcTool";
             case OperationId::Tool_Polygon:      return "PolygonTool";
             case OperationId::Tool_Spline:       return "SplineTool";
-            case OperationId::Tool_Text:         return "TextTool";
-            case OperationId::Tool_Bitmap:       return "BitmapTool";
-            case OperationId::Tool_QRCode:       return "QRCodeTool";
-            default:                             return QString();
+            case OperationId::Tool_Text:         return "TextInputTool";
+            case OperationId::Tool_Bitmap:       return "BitmapInputTool";
+            case OperationId::Tool_QRCode:       return "QRCodeInputTool";
+            default:
+                SY_WARNF("[ToolOperation] Unmapped OperationId=%d in toolNameFromOperationId",
+                    static_cast<int>(opId));
+                return QString();
         }
     }
 
+    // 查找当前活动窗口的 2D 视口
+    // 链路：QApplication::activeWindow() → WorkbenchWindow → centralWidget() → RenderViewport2D
+    // 用于工具切换操作的兜底查找（快速路径在 CommandActionHubActions2D 中直接调用）
     RenderViewport2D* findActiveViewport2D()
     {
         // 通过全局获取当前活动窗口的 2D 视口
         QWidget* activeWindow = QApplication::activeWindow();
         if (!activeWindow)
+        {
+            SY_DEBUGF("[ToolOperation] No active window found");
             return nullptr;
+        }
 
         auto* workbenchWindow = qobject_cast<WorkbenchWindow*>(activeWindow);
         if (!workbenchWindow)
+        {
+            SY_DEBUGF("[ToolOperation] Active window is not WorkbenchWindow: %s",
+                activeWindow->metaObject()->className());
             return nullptr;
+        }
 
-        return qobject_cast<RenderViewport2D*>(workbenchWindow->centralWidget());
+        auto* viewport = qobject_cast<RenderViewport2D*>(workbenchWindow->centralWidget());
+        if (!viewport)
+        {
+            SY_DEBUGF("[ToolOperation] Central widget is not RenderViewport2D");
+        }
+        return viewport;
     }
 }
 
@@ -366,6 +387,7 @@ void ApplicationCompositionRoot::registerPendingToolOperations()
                     if (viewport)
                     {
                         viewport->setActiveTool(toolName);
+                        SY_DEBUGF("[ToolOperation] Activated tool: %s", qPrintable(toolName));
                     }
                     else
                     {
@@ -377,12 +399,16 @@ void ApplicationCompositionRoot::registerPendingToolOperations()
         }
     }
 
-    // SY_INFOF("[ApplicationCompositionRoot] Registered %d tool operations to ToolManager", registered);
+    if (registered > 0)
+    {
+        SY_INFOF("[Composition] Registered %d tool operations (fast path -> ToolManager)", registered);
+    }
 }
 
-// 注册缺失的算法/编辑操作
-// 这些操作在旧框架中通过 OperationAlgo/OperationEdit 注册，依赖 AlgorithmRunner
-// 新框架暂未接入 AlgorithmApplicationService，此处注册占位提示
+// 注册尚未接入的算法/编辑/视图操作
+// 这些操作在旧框架中通过 AlgorithmRunner 注册，新框架暂未接入对应服务
+// 占位策略：注册 LambdaOperation 打印警告，避免菜单/工具栏点击时静默无响应
+// 清理标准：接入真实实现后从此函数移除；长期不实现的应从 OperationId 枚举中删除
 void ApplicationCompositionRoot::registerPendingAlgorithmOperations()
 {
     if (!m_operationBus)
@@ -390,8 +416,8 @@ void ApplicationCompositionRoot::registerPendingAlgorithmOperations()
 
     auto& reg = m_operationBus->registry();
 
-    const OperationId pendingOps[] = {
-        // 算法操作
+    // ---- 算法操作占位（待接入 AlgorithmApplicationService）----
+    const OperationId algoOps[] = {
         OperationId::Algo_Fill,
         OperationId::Algo_Nesting,
         OperationId::Algo_Offset,
@@ -401,17 +427,23 @@ void ApplicationCompositionRoot::registerPendingAlgorithmOperations()
         OperationId::Algo_BooleanDifference,
         OperationId::Algo_BooleanXor,
         OperationId::Algo_ReliefEngravingFromImage,
-        // 编辑操作
+    };
+
+    // ---- 编辑操作占位（待接入 GeometryEditService）----
+    const OperationId editOps[] = {
         OperationId::Edit_Trim,
         OperationId::Edit_Extend,
         OperationId::Edit_Align,
         OperationId::Edit_Cut,
         OperationId::Edit_Paste,
-        // Edit_GroupToggle, 已在 registerCoreOperations 中实现
-        // Edit_Ungroup,     已在 registerCoreOperations 中实现
+        // Edit_GroupToggle, 已在 CoreOperationRegistry 中实现
+        // Edit_Ungroup,     已在 CoreOperationRegistry 中实现
         OperationId::Edit_MirrorH,
         OperationId::Edit_MirrorV,
-        // 视图操作
+    };
+
+    // ---- 视图操作占位（待接入 ViewController）----
+    const OperationId viewOps[] = {
         OperationId::View_ZoomSelection,
         OperationId::View_Pan,
         OperationId::View_Reset,
@@ -425,26 +457,30 @@ void ApplicationCompositionRoot::registerPendingAlgorithmOperations()
         OperationId::View_SetDisplayUnit,
     };
 
-    int count = 0;
-    for (const auto& opId : pendingOps)
-    {
-        if (!reg.has(opId))
+    auto registerPlaceholders = [&reg](const OperationId* ops, size_t count, const char* category) {
+        int registered = 0;
+        for (size_t i = 0; i < count; ++i)
         {
-            reg.registerOperation(std::make_unique<LambdaOperation>(
-                opId, [opId] {
-                    SY_WARNF("[PendingOperation] OperationId=%d not yet implemented in new framework",
-                        static_cast<int>(opId));
-                }));
-            ++count;
+            if (!reg.has(ops[i]))
+            {
+                reg.registerOperation(std::make_unique<LambdaOperation>(
+                    ops[i], [opId = ops[i], category] {
+                        SY_WARNF("[PendingOp] %s: OperationId=%d not yet implemented",
+                            category, static_cast<int>(opId));
+                    }));
+                ++registered;
+            }
         }
-    }
+        if (registered > 0)
+        {
+            SY_INFOF("[Composition] Registered %d placeholder operations for %s", registered, category);
+        }
+        };
 
-    // SY_INFOF("[ApplicationCompositionRoot] Registered %d pending algorithm/edit/view operations (placeholders)", count);
+    registerPlaceholders(algoOps, std::size(algoOps), "Algorithm");
+    registerPlaceholders(editOps, std::size(editOps), "Edit");
+    registerPlaceholders(viewOps, std::size(viewOps), "View");
 }
-
-
-
-
 
 void ApplicationCompositionRoot::registerHelpOperations()
 {

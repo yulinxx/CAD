@@ -39,9 +39,9 @@ namespace
 }
 
 ViewportSelector::ViewportSelector(Eg::SceneManager* sceneManager,
-                                   ISelectionService* selectionService,
-                                   const Camera2D* camera,
-                                   RenderWidget* renderWidget)
+    ISelectionService* selectionService,
+    const Camera2D* camera,
+    RenderWidget* renderWidget)
     : m_sceneManager(sceneManager)
     , m_selectionService(selectionService)
     , m_camera(camera)

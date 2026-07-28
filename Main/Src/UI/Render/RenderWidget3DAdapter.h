@@ -6,7 +6,7 @@
 #include <QWidget>
 
 class RenderWidget3D;
-class SceneDocument3D;
+class SceneDocument3DAdapter;
 class CameraController3D;
 
 namespace Eg
@@ -58,7 +58,7 @@ public:
     void setRenderLoopEnabled(bool enabled) override;
     bool isRenderLoopRunning() const override;
 
-    void setScene(SceneDocument3D* document) override;
+    void setScene(SceneDocument3DAdapter* document) override;
     void setCamera(CameraController3D* controller) override;
     void render(QPainter& painter, int width, int height) override;
     void resize(int width, int height) override;

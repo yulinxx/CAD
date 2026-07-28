@@ -1,4 +1,4 @@
-#include "UI/HelpDialogService.h"
+#include "UI/Services/HelpDialogService.h"
 
 #include <QInputDialog>
 #include <QMessageBox>

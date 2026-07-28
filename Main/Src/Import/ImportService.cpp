@@ -385,7 +385,7 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     }
     else if (m_editService)
     {
-        SY_INFOF("[ImportService] Calling addEntities: editService=%p, entities=%d", 
+        SY_INFOF("[ImportService] Calling addEntities: editService=%p, entities=%d",
             m_editService, static_cast<int>(entities.size()));
         m_editService->addEntities(std::move(entities),
             "Import " + context.sourcePath.toStdString());
@@ -394,7 +394,7 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     else if (m_sceneManager)
     {
         // 回退：无 SceneEditService 时直写 SceneManager（无 Undo）
-        SY_INFOF("[ImportService] Direct adding to sceneManager=%p, entities=%d", 
+        SY_INFOF("[ImportService] Direct adding to sceneManager=%p, entities=%d",
             m_sceneManager, static_cast<int>(entities.size()));
         for (auto& entity : entities)
         {

@@ -51,7 +51,7 @@ bool SimpleRenderer3D::isRenderLoopRunning() const
 
 // ========== 场景与相机 ==========
 
-void SimpleRenderer3D::setScene(SceneDocument3D* document)
+void SimpleRenderer3D::setScene(SceneDocument3DAdapter* document)
 {
     m_document = document;
 }

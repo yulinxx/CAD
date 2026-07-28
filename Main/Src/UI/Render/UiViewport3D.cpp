@@ -46,7 +46,7 @@ void Viewport3D::setStatusCallback(std::function<void(const QString&)>&& callbac
         m_renderer->setStatusCallback(std::move(callback));
 }
 
-void Viewport3D::setSceneDocument(SceneDocument3D* document)
+void Viewport3D::setSceneDocument(SceneDocument3DAdapter* document)
 {
     if (m_renderer)
         m_renderer->setScene(document);

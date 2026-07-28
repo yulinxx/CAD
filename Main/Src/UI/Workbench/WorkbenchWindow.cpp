@@ -87,6 +87,7 @@
 #include <QFileInfo>
 #include <functional>
 
+#include <QCoreApplication>
 #include <QDockWidget>
 #include <QLabel>
 #include <QGuiApplication>
@@ -818,17 +819,13 @@ QToolBar* WorkbenchWindow::registerToolBar(const QString& title)
 /// 清空工作台内容（移除所有注册的面板和工具栏）
 void WorkbenchWindow::clearWorkbenchContent()
 {
-    // 清空工作台内容时只做容器层收尾，不在这里恢复业务状态
     const auto start = std::chrono::steady_clock::now();
 
-    for (auto* dock : m_registeredDocks)
-    {
-        removeDockWidget(dock);
-        delete dock;
-    }
-    m_registeredDocks.clear();
+    // 1: 清理所有注册的全局快捷键（Qt::ApplicationShortcut 不会随父窗口销毁）
+    // 必须在 UI 清理之前执行，避免快捷键仍指向已销毁的对象
+    clearAllShortcuts();
 
-    // 清理所有工具栏（包括通过 addToolBar 直接添加而未注册的工具栏，如3D左侧工具栏）
+    // 2: 清理所有工具栏（包括通过 addToolBar 直接添加而未注册的工具栏，如3D左侧工具栏）
     // 先收集所有工具栏指针，避免遍历过程中容器被修改
     QList<QToolBar*> allToolBars = findChildren<QToolBar*>();
     for (auto* toolBar : allToolBars)
@@ -838,26 +835,90 @@ void WorkbenchWindow::clearWorkbenchContent()
     }
     m_registeredToolBars.clear();
 
-    // 清理菜单栏 - 3D 工作台使用 MenuManager3D 独立管理菜单，
+    // 3: 清理菜单栏 - 3D 工作台使用 MenuManager3D 独立管理菜单，
     // 切换到 2D 时需要清空菜单栏，避免 3D 菜单残留导致混乱
     if (auto* mb = menuBar())
         mb->clear();
 
+    // 4: 清理所有停靠面板
+    for (auto* dock : m_registeredDocks)
+    {
+        removeDockWidget(dock);
+        delete dock;
+    }
+    m_registeredDocks.clear();
+
     m_panelState.sceneTreeDock = nullptr;
     m_panelState.propertiesDock = nullptr;
 
+    // 5: 清理状态栏附加的自定义 widget（如 3D 状态栏）
+    if (auto* sb = statusBar())
+    {
+        // 移除所有非框架自带的 widget
+        QList<QWidget*> sbWidgets = sb->findChildren<QWidget*>();
+        for (auto* widget : sbWidgets)
+        {
+            // 保留框架骨架创建的标签，移除工作台添加的自定义控件
+            if (widget != m_panelState.workbenchLabel &&
+                widget != m_panelState.busyLabel &&
+                widget != m_panelState.posLabel &&
+                widget != m_panelState.selLabel &&
+                widget != m_panelState.msgLabel &&
+                !qobject_cast<QProgressBar*>(widget))
+            {
+                sb->removeWidget(widget);
+                widget->deleteLater();
+            }
+        }
+    }
+
+    // 6: 清理中央控件
     // 先解除旧中央控件绑定，再安排延迟删除，避免 Qt 布局冲突
     auto* oldCentral = centralWidget();
     if (oldCentral)
     {
-        setCentralWidget(nullptr);  // 先解除旧中央控件与 QMainWindow 的绑定
+        setCentralWidget(nullptr);
         oldCentral->hide();
         oldCentral->deleteLater();
     }
     setCentralWidget(createInitialCentralWidget());
 
+    // 7: 强制处理所有排队的 DeferredDelete 事件
+    // 旧中央控件（如 RenderViewport2D）内部包含 QOpenGLWidget，
+    // 延迟删除会导致其析构滞后于新视口（如 Viewport3D）的创建，
+    // 两个 OpenGL widget 共存期间调用 makeCurrent() 易引发访问冲突。
+    // 在此处立即刷出延迟删除队列，确保旧渲染资源在新视口初始化前彻底释放。
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+
     recordPerformance(QStringLiteral("WorkbenchWindow::clearWorkbenchContent"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+}
+
+/// 注册全局快捷键（由工作台调用，切换时自动清理）
+void WorkbenchWindow::registerShortcut(QShortcut* shortcut)
+{
+    if (shortcut)
+        m_registeredShortcuts.push_back(shortcut);
+}
+
+/// 注销全局快捷键
+void WorkbenchWindow::unregisterShortcut(QShortcut* shortcut)
+{
+    auto it = std::find(m_registeredShortcuts.begin(), m_registeredShortcuts.end(), shortcut);
+    if (it != m_registeredShortcuts.end())
+    {
+        m_registeredShortcuts.erase(it);
+    }
+}
+
+/// 清理所有注册的快捷键
+void WorkbenchWindow::clearAllShortcuts()
+{
+    for (auto* shortcut : m_registeredShortcuts)
+    {
+        delete shortcut;
+    }
+    m_registeredShortcuts.clear();
 }
 
 void WorkbenchWindow::resetCommandStateToIdle()
@@ -935,7 +996,8 @@ void WorkbenchWindow::resetWorkbenchTransientState()
             { QStringLiteral("viewportStatus"), QStringLiteral("Idle") }
             });
         clearSelectionState();
-        m_stateCenter->setDirty(false);
+        // 保留 dirty 标记：切换工作台不应清除"未保存"状态
+        // 用户在 2D 修改后切到 3D 再切回，仍应看到未保存提示
     }
     // 本地镜像收尾单独处理，避免状态中心清理和窗口镜像清理混在一起
     resetWorkbenchLocalMirror();
@@ -1182,6 +1244,13 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     const auto start = std::chrono::steady_clock::now();
     SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: switching to %s", workbenchId.toUtf8().constData());
 
+    // 保护：防止重复切换（快速连续点击可能导致状态混乱）
+    if (m_switchingWorkbench)
+    {
+        SY_WARN("[WorkbenchWindow] triggerWorkbench: already switching, ignoring request");
+        return;
+    }
+
     if (!canExecuteCommand(QStringLiteral("workbench.switch.%1").arg(workbenchId), QStringLiteral("WorkbenchWindow::triggerWorkbench")))
     {
         reportFrameworkError(QStringLiteral("workbench.switch_denied"), QStringLiteral("Workbench switch denied: %1").arg(workbenchId),
@@ -1229,6 +1298,9 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         return;
     }
 
+    // 设置切换中标志，防止重复触发
+    m_switchingWorkbench = true;
+
     const auto previousWorkbenchId = m_windowState.workbenchId;
     const auto switchContextText = workbenchSwitchText(workbenchId);
 
@@ -1244,7 +1316,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
             });
     }
 
-    // 2: 停用旧工作台
+    // 2: 停用旧工作台（释放资源、清理快捷键等）
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: deactivating old workbench");
     m_workbench->deactivate();
     recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.deactivate"),
@@ -1254,7 +1326,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: resetting transient state");
     resetWorkbenchTransientState();
 
-    // 4: 清除旧工作台 UI 内容（面板、工具栏、中央控件）
+    // 4: 清除旧工作台 UI 内容（面板、工具栏、快捷键、中央控件）
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: clearing workbench content");
     clearWorkbenchContent();
 
@@ -1310,6 +1382,9 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         m_stateCenter->setBusy(false);
     m_windowState.busy = false;
     m_windowState.workbenchId = workbenchId;
+
+    // 取消切换中标志，允许下次切换
+    m_switchingWorkbench = false;
 
     SY_INFOF("[WorkbenchWindow] triggerWorkbench: switch completed to %s", workbenchId.toUtf8().constData());
     recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.switch"),

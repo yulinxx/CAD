@@ -144,7 +144,7 @@ bool SelectionSet::empty() const
 }
 
 // ============================================================================
-// SceneDocument3D
+// SceneDocument3DAdapter
 // ============================================================================
 
 static std::string engineIdStr(Eg::EntityId id)
@@ -152,14 +152,14 @@ static std::string engineIdStr(Eg::EntityId id)
     return std::to_string(id);
 }
 
-void SceneDocument3D::setEngineScene(std::shared_ptr<Eg::SceneManager3D> scene)
+void SceneDocument3DAdapter::setEngineScene(std::shared_ptr<Eg::SceneManager3D> scene)
 {
     m_engineScene = std::move(scene);
     m_selection.setScene(m_engineScene.get());
     m_uiRoot = std::make_shared<SceneNode>(static_cast<Eg::EntityId>(-1), "Root");
 }
 
-std::shared_ptr<SceneNode> SceneDocument3D::createNode(const std::string& name)
+std::shared_ptr<SceneNode> SceneDocument3DAdapter::createNode(const std::string& name)
 {
     if (!m_engineScene)
     {
@@ -176,14 +176,14 @@ std::shared_ptr<SceneNode> SceneDocument3D::createNode(const std::string& name)
     return node;
 }
 
-std::shared_ptr<SceneNode> SceneDocument3D::nodeById(const std::string& id) const
+std::shared_ptr<SceneNode> SceneDocument3DAdapter::nodeById(const std::string& id) const
 {
     if (!m_uiRoot)
         return {};
     return m_uiRoot->childByIdRecursive(id);
 }
 
-void SceneDocument3D::removeNode(const std::string& id)
+void SceneDocument3DAdapter::removeNode(const std::string& id)
 {
     if (!m_engineScene)
         return;
@@ -194,13 +194,13 @@ void SceneDocument3D::removeNode(const std::string& id)
         m_engineScene->removeEntity(mesh);
 }
 
-void SceneDocument3D::removeNode(const std::shared_ptr<SceneNode>& node)
+void SceneDocument3DAdapter::removeNode(const std::shared_ptr<SceneNode>& node)
 {
     if (node)
         removeNode(node->id());
 }
 
-std::vector<std::shared_ptr<SceneNode>> SceneDocument3D::entities() const
+std::vector<std::shared_ptr<SceneNode>> SceneDocument3DAdapter::entities() const
 {
     if (!m_uiRoot)
         return {};
@@ -208,26 +208,26 @@ std::vector<std::shared_ptr<SceneNode>> SceneDocument3D::entities() const
     return m_uiRoot->children();
 }
 
-std::vector<std::shared_ptr<SceneNode>> SceneDocument3D::rootNodes() const
+std::vector<std::shared_ptr<SceneNode>> SceneDocument3DAdapter::rootNodes() const
 {
     if (m_uiRoot)
         return m_uiRoot->children();
     return {};
 }
 
-SelectionSet& SceneDocument3D::selection()
+SelectionSet& SceneDocument3DAdapter::selection()
 {
     return m_selection;
 }
 
-const SelectionSet& SceneDocument3D::selection() const
+const SelectionSet& SceneDocument3DAdapter::selection() const
 {
     return m_selection;
 }
 
 // ---- SceneDocumentBase 接口 ----
 
-std::vector<std::string> SceneDocument3D::allEntityIds() const
+std::vector<std::string> SceneDocument3DAdapter::allEntityIds() const
 {
     std::vector<std::string> ids;
     if (!m_engineScene)
@@ -237,12 +237,12 @@ std::vector<std::string> SceneDocument3D::allEntityIds() const
     return ids;
 }
 
-void SceneDocument3D::removeEntity(const std::string& id)
+void SceneDocument3DAdapter::removeEntity(const std::string& id)
 {
     removeNode(id);
 }
 
-void SceneDocument3D::clear()
+void SceneDocument3DAdapter::clear()
 {
     if (m_engineScene)
         m_engineScene->clearScene();

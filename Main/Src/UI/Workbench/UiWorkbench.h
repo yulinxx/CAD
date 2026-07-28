@@ -19,6 +19,23 @@ class SceneTreeDockWidget;
 #include "Ui/MainWindow/MainWindow3D.h"
 #include "Ui/MenuManager/MenuManager3D.h"
 #include "Engine3D/SceneManager3D.h"
+#include "UI3D/Service/ServicePack3D.h"
+#include "UI3D/Operation/OperationBus3D.h"
+#include "UI3D/Manager/DocumentManager3D.h"
+#include "UI3D/Edit/UndoRedoManager3D.h"
+#include "UI3D/Edit/SceneEditService3D.h"
+#include "UI3D/Service/SceneMonitor3D.h"
+#include "UI3D/Shortcut/ShortcutManager3D.h"
+#include "UI3D/Navigation/NavigationConfig3D.h"
+#include "UI3D/Service/SceneDocument3D.h"
+#include "UI3D/Service/CameraController3D.h"
+#include "UI3D/Settings/SettingsUiCoordinator3D.h"
+#include "UI3D/Operation/CommandActionHub3D.h"
+#include "UI3D/Operation/AlgorithmRunner3D.h"
+#include "UI/Algorithm/AlgorithmApplicationService.h"
+#ifdef ENABLE_GEOMODELCORE
+#include "UI3D/Service/BRepModelService3D.h"
+#endif
 #endif
 
 /**
@@ -29,7 +46,7 @@ class SceneTreeDockWidget;
  */
 
  // ============================================================
- /**
+/**
  * @struct WorkbenchStateSnapshot
  * @brief 工作台状态快照
  *
@@ -73,7 +90,9 @@ class UiWorkbench : public QObject
     Q_OBJECT
 
 public:
-    explicit UiWorkbench(QObject* parent = nullptr) : QObject(parent) {}
+    explicit UiWorkbench(QObject* parent = nullptr) : QObject(parent)
+    {
+    }
     ~UiWorkbench() override = default;
 
 public:
@@ -132,6 +151,9 @@ protected:
 class Workbench2D final : public UiWorkbench
 {
 public:
+    Workbench2D() = default;
+    ~Workbench2D() override;
+
     QString id() const override;
     QString displayName() const override;
     bool initialize(const UiServices& services) override;
@@ -166,6 +188,13 @@ private:
 
 private:
     std::unique_ptr<SelectionService> m_selectionService;
+
+    /// 命令动作中枢：管理所有 QAction 的创建、绑定、刷新（裸指针，生命周期由 deactivate/shutdown 管理）
+    class CommandActionHub* m_commandHub{ nullptr };
+    /// 顶部工具栏（编辑命令）
+    class TopToolBar* m_topToolBar{ nullptr };
+    /// 右侧工具栏（颜色/图层）
+    class RightToolBar* m_rightToolBar{ nullptr };
 };
 
 #if BUILD_UI3D
@@ -178,6 +207,9 @@ private:
 class Workbench3D final : public UiWorkbench
 {
     Q_OBJECT
+
+public:
+    ~Workbench3D() override;
 
 public:
     QString id() const override;
@@ -193,10 +225,36 @@ private:
     void onMenuAction(int actionId, const QVariantMap& params);
 
 private:
-    std::shared_ptr<SceneDocument3D> m_scene;
+    struct ServiceOwner
+    {
+        std::unique_ptr<OperationBus3D> operationBus;
+        std::unique_ptr<DocumentManager3D> documentManager;
+        std::unique_ptr<UndoRedoManager3D> undoRedoManager;
+        std::unique_ptr<SceneEditService3D> sceneEditService;
+        std::unique_ptr<SceneMonitor3D> sceneMonitor;
+        std::unique_ptr<ShortcutManager3D> shortcutManager;
+        std::unique_ptr<NavigationConfig3D> navigationConfig;
+        std::unique_ptr<SceneDocument3D> sceneDocument;
+        std::unique_ptr<SceneDocument3DAdapter> sceneDocumentAdapter;
+        std::unique_ptr<CameraController3D> cameraController;
+        std::unique_ptr<AlgorithmApplicationService> algorithmService;
+        std::unique_ptr<SettingsUiCoordinator3D> settingsCoordinator;
+        std::unique_ptr<CommandActionHub3D> commandActionHub;
+        std::unique_ptr<AlgorithmRunner3D> algorithmRunner;
+
+#ifdef ENABLE_GEOMODELCORE
+        std::unique_ptr<BRepModelService3D> brepModelService;
+#endif
+    };
+
+    std::unique_ptr<ServiceOwner> m_serviceOwner;
+    ServicePack3D m_services3D{};
+
     std::unique_ptr<class MainWindow3D> m_mainWindow3D;
     std::unique_ptr<class MenuManager3D> m_menuManager3D;
+
     Eg::SceneManager3D* m_sceneManager3D{ nullptr };
+
     QShortcut* m_deleteShortcut{ nullptr };
     QShortcut* m_backspaceShortcut{ nullptr };
 };

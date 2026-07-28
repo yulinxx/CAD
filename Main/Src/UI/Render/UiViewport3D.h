@@ -12,7 +12,7 @@ class QPaintEvent;
 class QResizeEvent;
 class QWheelEvent;
 class IRenderer3D;
-class SceneDocument3D;
+class SceneDocument3DAdapter;
 
 class Viewport3D final : public QWidget
 {
@@ -24,7 +24,7 @@ public:
     void setRenderer(std::unique_ptr<IRenderer3D> renderer);
     bool initialize(void* windowHandle = nullptr);
     void setStatusCallback(std::function<void(const QString&)>&& callback);
-    void setSceneDocument(SceneDocument3D* document);
+    void setSceneDocument(SceneDocument3DAdapter* document);
     void setCameraController(CameraController3D* controller);
     void setSelectionCallback(std::function<void(const QString&)>&& callback);
     void setPathCallback(std::function<void(const QStringList&)>&& callback);

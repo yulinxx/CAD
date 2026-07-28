@@ -4,7 +4,7 @@
 #include "ViewCamera3D.h"
 #include <QString>
 
-class SceneDocument3D;
+class SceneDocument3DAdapter;
 class CameraController3D;
 
 /**
@@ -39,7 +39,7 @@ public:
     void setRenderLoopEnabled(bool enabled) override;
     bool isRenderLoopRunning() const override;
 
-    void setScene(SceneDocument3D* document) override;
+    void setScene(SceneDocument3DAdapter* document) override;
     void setCamera(CameraController3D* controller) override;
     void render(QPainter& painter, int width, int height) override;
     void resize(int width, int height) override;
@@ -88,7 +88,7 @@ private:
     void rebuildTreeHighlight();
 
 private:
-    SceneDocument3D* m_document{ nullptr };
+    SceneDocument3DAdapter* m_document{ nullptr };
     CameraController3D* m_cameraController{ nullptr };
 
     bool m_ready{ false };

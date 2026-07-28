@@ -33,7 +33,7 @@ SceneTreeDockWidget::SceneTreeDockWidget(QWidget* parent)
         });
 }
 
-void SceneTreeDockWidget::setSceneDocument(SceneDocument3D* document)
+void SceneTreeDockWidget::setSceneDocument(SceneDocument3DAdapter* document)
 {
     m_document = document;
     refresh();

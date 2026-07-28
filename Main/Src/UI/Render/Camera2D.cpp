@@ -141,5 +141,5 @@ void Camera2D::setViewExtent(float vpW, float vpH, float centerX, float centerY,
     panOffset = QPointF(-centerX, -centerY);
 
     SY_TRACEF("Camera2D::setViewExtent: vpW=%.0f, vpH=%.0f, center=(%.2f,%.2f), half=(%.2f,%.2f), zoom=(%.6f,%.6f), pan=(%.2f,%.2f)",
-            vpW, vpH, centerX, centerY, halfW, halfH, zoomX, zoomY, panOffset.x(), panOffset.y());
+        vpW, vpH, centerX, centerY, halfW, halfH, zoomX, zoomY, panOffset.x(), panOffset.y());
 }

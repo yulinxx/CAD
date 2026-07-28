@@ -3,6 +3,7 @@
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
 #include "UI2D/Operation/IOperation.h"
+#include "UI/FileOperationUtils.h"
 #include "UI/Services/UiStateCenter.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "UI/Services/FileDialogService.h"
@@ -50,16 +51,16 @@ namespace
 }
 
 FileOperationRegistry::FileOperationRegistry(OperationBus* bus,
-                                             Eg::SceneManager* sceneManager,
-                                             ImportService* importService,
-                                             ExportService* exportService,
-                                             FileDialogService* fileDialog,
-                                             RecentFileService* recentFiles,
-                                             HelpDialogService* helpDialog,
-                                             UiStateCenter* stateCenter,
-                                             LayerPersistenceBridge* layerPersistence,
-                                             PersistenceService* persistence,
-                                             QWidget* parentWidget)
+    Eg::SceneManager* sceneManager,
+    ImportService* importService,
+    ExportService* exportService,
+    FileDialogService* fileDialog,
+    RecentFileService* recentFiles,
+    HelpDialogService* helpDialog,
+    UiStateCenter* stateCenter,
+    LayerPersistenceBridge* layerPersistence,
+    PersistenceService* persistence,
+    QWidget* parentWidget)
     : m_bus(bus)
     , m_sceneManager(sceneManager)
     , m_importService(importService)
@@ -267,13 +268,13 @@ void FileOperationRegistry::registerAll()
                 catch (const std::exception& e)
                 {
                     SY_ERRORF("[FileOperation] Import exception: %s", e.what());
-                    HelpDialogService::showWarning(m_parentWidget, QObject::tr("Import Error"), 
+                    HelpDialogService::showWarning(m_parentWidget, QObject::tr("Import Error"),
                         QStringLiteral("Import failed with exception: %1").arg(e.what()));
                 }
                 catch (...)
                 {
                     SY_ERROR("[FileOperation] Import unknown exception");
-                    HelpDialogService::showWarning(m_parentWidget, QObject::tr("Import Error"), 
+                    HelpDialogService::showWarning(m_parentWidget, QObject::tr("Import Error"),
                         QStringLiteral("Import failed with unknown exception"));
                 }
             }));
@@ -315,6 +316,6 @@ void FileOperationRegistry::registerAll()
     // ---- 退出 ----
     reg.registerOperation(std::make_unique<LambdaOperation>(
         OperationId::File_Exit, [this] {
-            if (m_parentWidget) m_parentWidget->close();
+            FileOperationUtils::exitApplication(m_parentWidget);
         }));
 }

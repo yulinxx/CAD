@@ -286,10 +286,29 @@ private:
     std::vector<QDockWidget*> m_registeredDocks;
     /// 注册的工具栏列表
     std::vector<QToolBar*> m_registeredToolBars;
+    /// 注册的全局快捷键列表（由工作台注册，切换时统一清理）
+    std::vector<QShortcut*> m_registeredShortcuts;
     /// 工作台切换工厂
     WorkbenchFactory m_workbenchFactory;
     /// 繁忙进度条（避免 findChild 级联查找）
     QPointer<QProgressBar> m_busyProgressBar;
     /// 菜单管理器
     WorkbenchMenuManager* m_menuManager{ nullptr };
+    /// 是否正在切换工作台（防止重复触发）
+    bool m_switchingWorkbench{ false };
+
+public:
+    /// 注册全局快捷键（由工作台调用，切换时自动清理）
+    /// @param shortcut 快捷键实例
+    void registerShortcut(QShortcut* shortcut);
+    /// 注销全局快捷键
+    /// @param shortcut 快捷键实例
+    void unregisterShortcut(QShortcut* shortcut);
+    /// 清理所有注册的快捷键
+    void clearAllShortcuts();
+    /// 获取当前是否正在切换工作台
+    bool isSwitchingWorkbench() const
+    {
+        return m_switchingWorkbench;
+    }
 };

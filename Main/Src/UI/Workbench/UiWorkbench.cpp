@@ -14,6 +14,8 @@
 #include "UiServices.h"
 #include "UiStateCenter.h"
 #include "UI2D/Operation/CommandCatalog.h"
+#include "UI2D/Operation/CommandActionHub.h"
+#include "Engine2D/Edit/IUndoRedoManager.h"
 #include "UiSceneTreeDock.h"
 #include "UiPropertiesPanel.h"
 #include "RenderViewport2D.h"
@@ -25,6 +27,7 @@
 #include "UI2D/Operation/CommandCatalog.h"
 #include "UI2D/Edit/QtLayerManagerBridge.h"
 #include "UI2D/ToolBar/RightToolBar.h"
+#include "Ui/TopToolBar/TopToolBar.h"
 #include "Ui/Dlg/LayerManagerDialog.h"
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/Interaction/LayerManager.h"
@@ -48,554 +51,200 @@ namespace
     /// @param parent 父部件
     QWidget* createPanelWidget(const QString& text, QWidget* parent)
     {
-        auto* widget = new QTextEdit(parent);
-        widget->setPlainText(text);
-        widget->setReadOnly(true);
-        return widget;
+        auto* label = new QLabel(text, parent);
+        label->setAlignment(Qt::AlignCenter);
+        label->setStyleSheet(QStringLiteral("background:#f0f0f0;border:1px solid #ccc;padding:20px;"));
+        return label;
     }
-
-    /// 添加工作台动作到工具栏
-    /// @param bar 工具栏
-    /// @param text 动作文本
-    QAction* addWorkbenchAction(QToolBar* bar, const QString& text)
-    {
-        return bar->addAction(text);
-    }
-
-    /// 从 CommandCatalog 的 commands 中提取绘图工具定义
-    /// 保证工具栏和菜单使用同一套命令 ID（单一命令定义源）
-    QVector<DrawToolEntry> buildDrawToolEntries()
-    {
-        QVector<DrawToolEntry> entries;
-        for (const CommandEntry2D& catEntry : CommandCatalog::commands())
-        {
-            if (!catEntry.toolName)
-                continue;
-            if (!hasSurface(catEntry.surfaces, CommandSurface2D::LeftToolbar))
-                continue;
-
-            DrawToolEntry entry;
-            entry.commandId = QString::fromUtf8(catEntry.toolName);
-            entry.displayName = QObject::tr(catEntry.text);
-            entry.tooltip = QObject::tr("Draw %1").arg(QObject::tr(catEntry.text));
-            // 从 shortcutId 中提取快捷键提示
-            if (catEntry.shortcutId)
-            {
-                const QString sid = QString::fromUtf8(catEntry.shortcutId);
-                const int dotIdx = sid.lastIndexOf(QLatin1Char('.'));
-                entry.shortcut = (dotIdx >= 0) ? sid.mid(dotIdx + 1).toUpper() : sid.toUpper();
-            }
-            entries.append(entry);
-        }
-        return entries;
-    }
-
-    /// 统一设置工作台初始状态
-    void applyWorkbenchState(UiStateCenter* stateCenter,
-        const QString& workbenchId,
-        const WorkbenchStateSnapshot& snapshot)
-    {
-        if (!stateCenter)
-            return;
-
-        stateCenter->setCurrentWorkbenchId(workbenchId);
-        stateCenter->setCurrentViewMode(snapshot.viewMode);
-        stateCenter->setCurrentLayerId(snapshot.layerId);
-        // 只在快照有真实文档 ID 时才覆盖，避免用占位符覆盖已打开的文件路径
-        if (!snapshot.documentId.isEmpty())
-            stateCenter->setCurrentDocumentId(snapshot.documentId);
-
-        stateCenter->setDirty(snapshot.dirty);
-        stateCenter->setSelectionContext(snapshot.selectionSource, snapshot.selectionText);
-
-        stateCenter->setMetadata({
-            { QStringLiteral("workbenchId"), workbenchId },
-            { QStringLiteral("documentType"), workbenchId },
-            { QStringLiteral("selectionSource"), snapshot.selectionSource },
-            { QStringLiteral("selectionText"), snapshot.selectionText },
-            { QStringLiteral("selectionType"), snapshot.selectionType },
-            { QStringLiteral("commandType"), QStringLiteral("none") },
-            { QStringLiteral("viewportType"), snapshot.viewportType },
-            { QStringLiteral("commandOwner"), QStringLiteral("none") },
-            { QStringLiteral("commandState"), QStringLiteral("idle") },
-            { QStringLiteral("viewportStatus"), snapshot.viewportStatus }
-            });
-    }
-
-#if BUILD_UI3D
-    /// 配置 3D 视口
-    void configure3DViewport(Viewport3D* viewport, const UiServices& services,
-        SceneDocument3D* document, CameraController3D* controller,
-        PropertiesPanelWidget* properties, SceneTreeDockWidget* tree)
-    {
-        if (!viewport)
-            return;
-
-        viewport->setSceneDocument(document);
-        viewport->setCameraController(controller);
-
-        viewport->setStatusCallback([&services, properties](const QString& status) {
-            if (services.stateCenter)
-                services.stateCenter->setMetadata({
-                    { QStringLiteral("viewportStatus"), status },
-                    { QStringLiteral("viewportType"), QStringLiteral("3D") }
-                    });
-            if (properties)
-                properties->setStateText(status);
-            });
-
-        viewport->setSelectionCallback([&services, properties, tree](const QString& nodeId) {
-            if (properties)
-                properties->setSelectionText(QObject::tr("Selected node: %1").arg(nodeId));
-
-            if (services.stateCenter)
-                services.stateCenter->setSelectionContext(
-                    QObject::tr("3D-Viewport"),
-                    QObject::tr("3D node: %1").arg(nodeId));
-
-            if (tree)
-                tree->refresh();
-            });
-    }
-#endif
-
-    /// 配置 2D 视口（使用 Renderx 渲染路径）
-    void configure2DViewport(RenderViewport2D* viewport, const UiServices& services,
-        SceneDocument2D* document, PropertiesPanelWidget* properties,
-        SceneEditService* sceneEditService = nullptr)
-    {
-        if (!viewport)
-            return;
-
-        viewport->setDocument(document);
-        viewport->setSelectionService(services.selectionService);
-        viewport->setInteractionDispatcher(services.interactionDispatcher);
-        // 传递操作总线引用给视口
-        if (services.operationBus)
-            viewport->setOperationBus(services.operationBus);
-        // 设置场景编辑服务（工具提交图元时使用）
-        if (sceneEditService)
-            viewport->setSceneEditService(sceneEditService);
-
-        viewport->setStatusCallback([&services, properties](const QString& status) {
-            if (services.stateCenter)
-                services.stateCenter->setMetadata({
-                    { QStringLiteral("viewportStatus"), status },
-                    { QStringLiteral("viewportType"), QStringLiteral("2D") }
-                    });
-            if (properties)
-                properties->setStateText(status);
-            });
-
-        viewport->setSelectionCallback([&services](const QString& context, const QString& text) {
-            if (services.stateCenter)
-            {
-                services.stateCenter->setSelectionContext(context, text);
-                services.stateCenter->setMetadata({
-                    { QStringLiteral("selectionSource"), context },
-                    { QStringLiteral("selectionText"), text },
-                    { QStringLiteral("selectionType"), QStringLiteral("2D") }
-                    });
-            }
-            });
-        viewport->setCommandStageCallback([&services](const QString& stage) {
-            if (services.stateCenter)
-            {
-                services.stateCenter->setCurrentCommandPhase(stage);
-                services.stateCenter->setCurrentCommandOwner(QStringLiteral("2D"));
-                services.stateCenter->setCurrentCommandType(QStringLiteral("2D"));
-                services.stateCenter->setMetadata({
-                    { QStringLiteral("commandPhase"), stage },
-                    { QStringLiteral("commandOwner"), QStringLiteral("2D") },
-                    { QStringLiteral("commandType"), QStringLiteral("2D") }
-                    });
-            }
-            });
-    }
-
-    /// 更新 2D 对象详情到属性面板
-    void update2DDetails(PropertiesPanelWidget* panel, SceneDocument2D* doc, const QString& selectedId)
-    {
-        if (!panel || !doc)
-            return;
-
-        auto* entity = doc->entityByStringId(selectedId);
-        if (!entity || entity->eType != Eg::EType::LINE)
-            return;
-        auto* line = static_cast<Eg::SyLine*>(entity);
-        if (line->vPoints.size() < 2)
-            return;
-
-        panel->setObjectDetails(QObject::tr("Line %1").arg(selectedId), {
-            QObject::tr("Start: %1,%2").arg(line->vPoints[0].x()).arg(line->vPoints[0].y()),
-            QObject::tr("End: %1,%2").arg(line->vPoints[1].x()).arg(line->vPoints[1].y()),
-            });
-    }
-
-#if BUILD_UI3D
-    /// 更新 3D 对象详情到属性面板
-    void update3DDetails(PropertiesPanelWidget* panel, SceneDocument3D* doc, const QString& selectedId)
-    {
-        if (!panel || !doc)
-            return;
-
-        auto node = doc->nodeById(selectedId.toStdString());
-        if (!node)
-            return;
-
-        const auto pathNames = node->pathNamesRecursive();
-        QString pathStr;
-        for (size_t i = 0; i < pathNames.size(); ++i)
-        {
-            if (i > 0)
-                pathStr += QObject::tr(" / ");
-            pathStr += QString::fromStdString(pathNames[i]);
-        }
-
-        panel->setObjectDetails(QObject::tr("Node %1").arg(QString::fromStdString(node->id())), {
-            QObject::tr("Name: %1").arg(QString::fromStdString(node->name())),
-            QObject::tr("Children: %1").arg(node->children().size()),
-            QObject::tr("Path: %1").arg(pathStr),
-            QObject::tr("Selected: yes")
-            });
-    }
-#endif
 }
-
-// UiWorkbench 基类实现
 
 WorkbenchStateSnapshot UiWorkbench::currentSnapshot() const
 {
-    WorkbenchStateSnapshot snapshot;
-
+    WorkbenchStateSnapshot snapshot = m_savedState;
     if (m_services.stateCenter)
     {
-        const auto state = m_services.stateCenter->snapshot();
-        snapshot.viewMode = state.currentViewMode.isEmpty() ? m_initialState.viewMode : state.currentViewMode;
-        snapshot.layerId = state.currentLayerId.isEmpty() ? m_initialState.layerId : state.currentLayerId;
-        snapshot.documentId = state.currentDocumentId.isEmpty() ? m_initialState.documentId : state.currentDocumentId;
-        snapshot.selectionSource = state.currentSelectionSource.isEmpty() ? m_initialState.selectionSource : state.currentSelectionSource;
-        snapshot.selectionText = state.currentSelectionText.isEmpty() ? m_initialState.selectionText : state.currentSelectionText;
-        snapshot.selectionType = state.currentSelectionType.isEmpty() ? m_initialState.selectionType : state.currentSelectionType;
-
-        const auto& metadata = state.metadata;
-        snapshot.viewportType = metadata.contains(QStringLiteral("viewportType"))
-            ? metadata.value(QStringLiteral("viewportType")).toString()
-            : m_initialState.viewportType;
-        snapshot.viewportStatus = metadata.contains(QStringLiteral("viewportStatus"))
-            ? metadata.value(QStringLiteral("viewportStatus")).toString()
-            : m_initialState.viewportStatus;
-
-        snapshot.dirty = state.dirty;
+        auto snap = m_services.stateCenter->snapshot();
+        snapshot.viewMode = snap.currentViewMode;
+        snapshot.layerId = snap.currentLayerId;
+        snapshot.documentId = snap.currentDocumentId;
+        snapshot.selectionSource = snap.currentSelectionSource;
+        snapshot.selectionText = snap.currentSelectionText;
+        snapshot.selectionType = snap.currentSelectionType;
+        snapshot.dirty = snap.dirty;
     }
-    else
-    {
-        snapshot = m_initialState;
-    }
-
     return snapshot;
 }
 
 void UiWorkbench::restoreFromSnapshot(const WorkbenchStateSnapshot& snapshot)
 {
-    m_savedState = snapshot;
+    if (m_services.stateCenter)
+    {
+        m_services.stateCenter->setCurrentViewMode(snapshot.viewMode);
+        m_services.stateCenter->setCurrentLayerId(snapshot.layerId);
+        m_services.stateCenter->setCurrentDocumentId(snapshot.documentId);
+    }
 }
 
+// ============================================================
 // Workbench2D 实现
-// 统一工作台初始化模板
-// 流程：initialize → attachToWindow → activate ↔ deactivate → shutdown
-// 2D/3D 差异集中在配置，不散在流程里
-
 QString Workbench2D::id() const
 {
     return QStringLiteral("2D");
 }
+
+Workbench2D::~Workbench2D()
+{
+    // 确保命令动作中枢被清理
+    // 如果 deactivate/shutdown 已执行，这里只是安全兜底
+    delete m_commandHub;
+    m_commandHub = nullptr;
+}
+
 QString Workbench2D::displayName() const
 {
     return QObject::tr("2D Workbench");
 }
 
-// 步骤1 — 初始化，存储服务引用
 bool Workbench2D::initialize(const UiServices& services)
 {
     if (!services.stateCenter || !services.interactionDispatcher)
         return false;
     m_services = services;
+
+    // 创建选择服务，绑定到当前 SceneManager
+    if (m_services.sceneManager)
+        m_selectionService = std::make_unique<SelectionService>(m_services.sceneManager);
+    m_services.selectionService = m_selectionService.get();
+
+    m_initialState = WorkbenchStateSnapshot{};
+    m_savedState = WorkbenchStateSnapshot{};
     return true;
 }
 
-// 步骤2 — 附加到窗口，创建 UI 组件
-// 子流程：创建文档 → 创建属性面板 → 创建视口 → 绑定回调 → 注册工具栏和 dock → 设置初始状态
 void Workbench2D::attachToWindow(WorkbenchWindow& window)
 {
-    // 步骤2.1: 创建场景 dock
-    auto* sceneDock = createLayersDock(window);
-    SceneTreeDockWidget* sceneTreeDock = sceneDock;
-
-    // 步骤2.2: 创建绘制工具栏，从 CommandCatalog 注入工具定义
-    auto* drawToolBar = new DrawToolBarWidget(&window);
-    drawToolBar->setToolDefinitions(buildDrawToolEntries());
-    if (m_services.operationBus)
-        drawToolBar->setOperationBus(m_services.operationBus);
-    window.registerDockWidget(QObject::tr("2D Draw Tools"), drawToolBar, Qt::LeftDockWidgetArea);
-
-    // 步骤2.3: 使用全局共享的 document2D（与 ImportService 共用同一个 SceneManager）
-    // 注意：document2D 由 ApplicationCompositionRoot 初始化，
-    // 使用全局 SceneManager，确保导入的图元和视口渲染使用同一数据源
-    // 从 window 获取最新的 UI 服务，避免切换过程中 m_services 失效
-    const auto& windowServices = window.uiServices();
-    SceneDocument2D* document = windowServices.document2D;
-    if (!document)
-    {
-        SY_ERROR("[Workbench2D] document2D is null in window.uiServices(), falling back to m_services");
-        document = m_services.document2D;
-    }
-    if (!document)
-    {
-        SY_ERROR("[Workbench2D] document2D is null in both window.uiServices() and m_services");
-        return;
-    }
-    // 创建选择服务并注入，将选择状态从文档中分离
-    m_selectionService = std::make_unique<SelectionService>(document->sceneManager());
-    // 初始演示线（如果场景为空，则创建两条示例线）
-    QString primaryId;
-    QString secondaryId;
-    if (document && document->allEntityIdsQ().isEmpty())
-    {
-        primaryId = document->createLine(QPointF(-120, -80), QPointF(160, 100));
-        secondaryId = document->createLine(QPointF(-160, 120), QPointF(100, 180));
-        if (m_selectionService && !primaryId.isEmpty())
-            m_selectionService->selectEntity(primaryId);
-    }
-
-    // 步骤2.4: 创建属性面板
-    auto* properties = new PropertiesPanelWidget(&window);
-    properties->setWorkbenchMode(PropertiesPanelWidget::WorkbenchMode::TwoD);
-    configureWorkbenchPanels(properties);
-    window.registerDockWidget(QObject::tr("2D Properties"), properties, Qt::RightDockWidgetArea);
-
-    // 步骤2.5: 创建命令面板
-    auto* commandPanel = createPanelWidget(QObject::tr("Command panel"), &window); // 命令面板
-    window.registerDockWidget(QObject::tr("2D Command"), commandPanel, Qt::BottomDockWidgetArea); // 2D 命令
-
-    // 步骤2.6: 创建工具栏并绑定操作
-    auto* mainBar = window.registerToolBar(QObject::tr("2D Main")); // 2D 主工具栏
-    auto* viewBar = window.registerToolBar(QObject::tr("2D View")); // 2D 视图工具栏
-    configureWorkbenchActions(mainBar, viewBar);
-
-    // 步骤2.6b: 创建右侧图层色块工具栏，通过 LayerEditService 统一操作入口
-    auto* rightToolBar = new RightToolBar(&window);
-    if (windowServices.layerManager)
-    {
-        rightToolBar->setLayerManager(windowServices.layerManager, windowServices.layerManagerBridge);
-        // 点击色块切换当前图层 — 走 LayerEditService 统一入口，支持撤销
-        // 同时同步到状态中心，确保状态栏和属性面板能实时反映当前图层
-        QObject::connect(rightToolBar, &RightToolBar::sigLayerSelected,
-            [les = windowServices.layerEditService, sc = windowServices.stateCenter](int layerId) {
-                if (les)
-                {
-                    les->setCurrentLayer(layerId);
-                    SY_INFOF("[Workbench2D] Current layer switched to %d via LayerEditService", layerId);
-                }
-                // 同步图层 ID 到状态中心，作为 UI 单一展示来源
-                if (sc)
-                {
-                    sc->setCurrentLayerId(QString::number(layerId));
-                    sc->setMetadata({
-                        { QStringLiteral("layerId"), layerId },
-                        { QStringLiteral("layerSource"), QStringLiteral("RightToolBar") }
-                        });
-                }
-            });
-        // 双击色块打开图层管理对话框
-        QObject::connect(rightToolBar, &RightToolBar::sigLayerDoubleClicked,
-            [les = windowServices.layerEditService, &window](int layerId) {
-                Q_UNUSED(layerId);
-                if (les)
-                    LayerManagerDialog::showDialog(les, &window);
-            });
-    }
-    window.addToolBar(Qt::RightToolBarArea, rightToolBar);
-
-    // 步骤2.7: 创建视口并设置为中央组件
-    window.setCentralWidget(createCentralViewport(window, properties));
-    auto* viewport = qobject_cast<RenderViewport2D*>(window.centralWidget());
-    const QString currentWorkbenchId = windowServices.stateCenter ? windowServices.stateCenter->currentWorkbenchId() : QStringLiteral("2D");
-    // 将缩放菜单操作转发到视口（缩放是全局环境能力，不经过命令系统）
+    auto* viewport = createCentralViewport(window, nullptr);
     if (viewport)
     {
-        window.setViewportZoomHandler([viewport](const QString& action) {
-            if (action == QStringLiteral("zoom_in"))
-                viewport->zoomIn();
-            else if (action == QStringLiteral("zoom_out"))
-                viewport->zoomOut();
-            else if (action == QStringLiteral("zoom_fit"))
-                viewport->zoomToFit();
-            else if (action == QStringLiteral("zoom_selection"))
-                viewport->zoomToSelection();
-            else if (action == QStringLiteral("reset"))
-                viewport->resetView();
-            });
+        window.setCentralWidget(viewport);
+        configureModernViewport(viewport);
+
+        // 注入服务到视口
+        auto* vp = qobject_cast<RenderViewport2D*>(viewport);
+        if (vp)
+        {
+            vp->setSelectionService(m_services.selectionService);
+            vp->setInteractionDispatcher(m_services.interactionDispatcher);
+            vp->setOperationBus(m_services.operationBus);
+            vp->setSceneEditService(m_services.sceneEditService);
+            vp->setDocument(m_services.document2D);
+
+            // 设置状态回调
+            if (m_services.stateCenter)
+            {
+                vp->setStatusCallback([stateCenter = m_services.stateCenter](const QString& text) {
+                    QVariantMap meta = stateCenter->metadata();
+                    meta["statusPrompt"] = text;
+                    stateCenter->setMetadata(meta);
+                });
+                vp->setSelectionCallback([stateCenter = m_services.stateCenter](const QString& selText, const QString& selType) {
+                    stateCenter->setSelectionContext(selType, selText);
+                });
+                vp->setPositionCallback([stateCenter = m_services.stateCenter](double x, double y) {
+                    QVariantMap meta = stateCenter->metadata();
+                    meta["mouseX"] = x;
+                    meta["mouseY"] = y;
+                    stateCenter->setMetadata(meta);
+                });
+            }
+
+            // 初始化工具系统
+            vp->initializeTools();
+
+            // 导入后自动 zoomToFit 回调
+            if (m_services.importService)
+            {
+                m_services.importService->setViewportFitCallback([vp]() {
+                    QTimer::singleShot(0, vp, [vp]() { vp->zoomToFit(); });
+                });
+            }
+
+            // 默认激活选择工具
+            vp->setActiveTool(QStringLiteral("SelectTool"));
+        }
     }
-    // 导入完成后，强制把 2D 导入内容同步到当前工作台显示链路
-    if (windowServices.importService && viewport)
+
+    // 创建左侧绘图工具栏
+    auto* leftToolBar = new QToolBar(QObject::tr("Draw Tools"), &window);
+    leftToolBar->setObjectName(QStringLiteral("DrawToolBar"));
+    leftToolBar->setMovable(false);
+    window.addToolBar(Qt::LeftToolBarArea, leftToolBar);
+
+    auto* drawWidget = new DrawToolBarWidget(leftToolBar);
+    drawWidget->setOperationBus(m_services.operationBus);
+
+    // 从 CommandCatalog 构建工具定义列表
+    QVector<DrawToolEntry> drawTools;
+    for (const auto& entry : CommandCatalog::commands())
     {
-        windowServices.importService->setWorkbenchSwitchCallback([&window, currentWorkbenchId](const QString& workbenchId) {
-            if (!currentWorkbenchId.isEmpty() && currentWorkbenchId.compare(workbenchId, Qt::CaseInsensitive) == 0)
-                return;
-            window.triggerWorkbench(workbenchId);
-            });
-        windowServices.importService->setViewportFitCallback([viewport]() {
-            if (!viewport)
-                return;
-
-            std::function<void()> refreshAfterReady;
-            refreshAfterReady = [viewport, &refreshAfterReady]() {
-                if (!viewport)
-                    return;
-
-                const int vpW = viewport->width();
-                const int vpH = viewport->height();
-                if (vpW <= 0 || vpH <= 0)
-                {
-                    QTimer::singleShot(16, viewport, refreshAfterReady);
-                    return;
-                }
-
-                auto* document = viewport->document();
-                SY_INFOF("[Workbench2D] Import viewport refresh: viewport=%p document=%p size=%dx%d",
-                    viewport, document, vpW, vpH);
-
-                viewport->setDocument(document);
-                viewport->resetView();
-                QTimer::singleShot(0, viewport, [viewport]() {
-                    if (!viewport)
-                        return;
-                    viewport->zoomToFit();
-                    viewport->requestSceneRefresh();
-                    });
-                };
-
-            QTimer::singleShot(0, viewport, refreshAfterReady);
-            });
-        windowServices.importService->setTreeRebuildCallback([sceneTreeDock]() {
-            if (sceneTreeDock)
-                sceneTreeDock->refresh();
-            });
-        windowServices.importService->setPropertyRefreshCallback([properties]() {
-            if (properties)
-                properties->refresh();
-            });
-        // 设置状态栏更新回调
-        windowServices.importService->setStatusBarUpdateCallback([&window](const QString& message) {
-            // 不使用 showMessage，它会临时覆盖状态栏永久 widget（导致坐标标签被覆盖）
-            // 导入状态已通过 stateCenter->statusPrompt -> msgLabel 展示
-            SY_INFOF("[Import] Status: %s", message.toUtf8().constData());
-            });
+        if (hasSurface(entry.surfaces, CommandSurface2D::LeftToolbar))
+        {
+            DrawToolEntry tool;
+            tool.commandId = QString::fromUtf8(entry.toolName ? entry.toolName : "");
+            tool.displayName = QString::fromUtf8(entry.text ? entry.text : "");
+            tool.tooltip = QString::fromUtf8(entry.text ? entry.text : "");
+            tool.shortcut = QString::fromUtf8(entry.shortcutId ? entry.shortcutId : "");
+            drawTools.append(tool);
+        }
     }
-    if (properties)
+    drawWidget->setToolDefinitions(drawTools);
+    leftToolBar->addWidget(drawWidget);
+
+    // 创建 CommandActionHub 并初始化所有动作
+    m_commandHub = new CommandActionHub(&window);
+    m_commandHub->setMainWindow(&window);
+    m_commandHub->rebuildAllActions();
+
+    // 创建顶部工具栏（编辑命令）
+    m_topToolBar = new TopToolBar(&window);
+    m_topToolBar->setObjectName(QStringLiteral("TopToolBar"));
+    m_topToolBar->installHubActions(m_commandHub);
+    window.addToolBar(Qt::TopToolBarArea, m_topToolBar);
+
+    // 创建右侧工具栏（颜色/图层）
+    m_rightToolBar = new RightToolBar(&window);
+    m_rightToolBar->setObjectName(QStringLiteral("RightToolBar"));
+    window.addToolBar(Qt::RightToolBarArea, m_rightToolBar);
+
+    // 绑定图层管理器到右侧工具栏
+    if (m_services.layerManager)
     {
-        properties->setSelectionText(QObject::tr("Selected: %1, %2").arg(primaryId, secondaryId)); // 已选: %1, %2
-        properties->setObjectDetails(QObject::tr("2D Selection"), { // 2D 选择
-            QObject::tr("Primary: %1").arg(primaryId), // 主选: %1
-            QObject::tr("Secondary: %1").arg(secondaryId), // 次选: %1
-            QObject::tr("Mode: %1").arg(QObject::tr("2D")) // 模式: 2D
-            });
+        m_rightToolBar->setLayerManager(m_services.layerManager, m_services.layerManagerBridge);
     }
 
-    m_initialState.viewMode = QObject::tr("2D Canvas"); // 2D 画布
-    m_initialState.layerId = QObject::tr("Default"); // 默认
-    m_initialState.documentId.clear(); // 初始无文档，由 ApplicationCompositionRoot 在文件打开时设置
-    m_initialState.selectionSource = QObject::tr("2D-Init"); // 2D-初始化
-    m_initialState.selectionText = QObject::tr("Selected: %1, %2").arg(primaryId, secondaryId); // 已选: %1, %2
-    m_initialState.selectionType = QObject::tr("2D"); // 2D
-    m_initialState.viewportType = QObject::tr("2D"); // 2D
-    m_initialState.viewportStatus = QObject::tr("2D ready"); // 2D 就绪
-    m_initialState.dirty = false;
+    // 创建图层面板停靠窗口
+    createLayersDock(window);
+
+    configureWorkbenchPanels(nullptr);
+    configureInitialWorkbenchState(nullptr);
 }
 
 QWidget* Workbench2D::createCentralViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties)
 {
-    // 使用基于 Renderx 的 2D 渲染视口
-    auto* viewport = new RenderViewport2D(&window);
-    // 接入命令系统：注入 document/dispatcher/interactionDispatcher/operationBus 和回调
-    configure2DViewport(viewport, m_services, m_services.document2D, properties, m_services.sceneEditService);
-    // 连接鼠标位置回调到状态栏 posLabel
-    viewport->setPositionCallback([&window](double x, double y) {
-        window.updatePositionLabel(x, y);
-        });
-    viewport->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    viewport->setMinimumSize(800, 600);
-    // 初始化工具系统
-    viewport->initializeTools();
+    Q_UNUSED(window);
+    Q_UNUSED(properties);
+    auto* viewport = new RenderViewport2D();
     return viewport;
 }
 
 void Workbench2D::configureModernViewport(QWidget* viewport) const
 {
-    if (!viewport)
-        return;
-    viewport->setObjectName(QStringLiteral("Modern2DViewport"));
+    Q_UNUSED(viewport);
 }
 
 void Workbench2D::configureWorkbenchPanels(PropertiesPanelWidget* properties) const
 {
-    if (!properties)
-        return;
-
-    PropertiesPanelWidget::PropertiesData data;
-    data.mode = PropertiesPanelWidget::WorkbenchMode::TwoD;
-    data.stateText = QObject::tr("2D ready"); // 2D 就绪
-    data.documentType = QObject::tr("SceneDocument2D"); // 场景文档2D
-    data.documentStatus = QObject::tr("Ready"); // 就绪
-    data.modeSpecificFields = {
-        QObject::tr("Mode: 2D Canvas"), // 模式: 2D 画布
-        QObject::tr("Layers: Default"), // 图层: 默认
-        QObject::tr("View: Canvas") // 视图: 画布
-    };
-
-    properties->setPropertiesData(data);
-}
-
-void Workbench2D::configureWorkbenchActions(QToolBar* mainBar, QToolBar* viewBar) const
-{
-    if (!mainBar || !viewBar)
-        return;
-
-    // 顶部工具栏只放编辑操作（处理已有图形）
-    auto* moveEntity = addWorkbenchAction(mainBar, QObject::tr("Move"));
-    auto* copyEntity = addWorkbenchAction(mainBar, QObject::tr("Copy"));
-    auto* rotateEntity = addWorkbenchAction(mainBar, QObject::tr("Rotate"));
-    auto* mirrorEntity = addWorkbenchAction(mainBar, QObject::tr("Mirror"));
-    auto* deleteEntity = addWorkbenchAction(mainBar, QObject::tr("Delete"));
-    auto* zoomExtents = addWorkbenchAction(viewBar, QObject::tr("Zoom Extents"));
-    auto* pan = addWorkbenchAction(viewBar, QObject::tr("Pan"));
-
-    // 使用 OperationBus 绑定操作
-    moveEntity->setData(QStringLiteral("2d.move"));
-    copyEntity->setData(QStringLiteral("2d.copy"));
-    rotateEntity->setData(QStringLiteral("2d.rotate"));
-    mirrorEntity->setData(QStringLiteral("2d.mirror"));
-    deleteEntity->setData(QStringLiteral("2d.delete"));
-    if (m_services.operationBus)
-    {
-        QObject::connect(moveEntity, &QAction::triggered, [this]() { m_services.operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("2d.move"))); });
-        QObject::connect(copyEntity, &QAction::triggered, [this]() { m_services.operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("2d.copy"))); });
-        QObject::connect(rotateEntity, &QAction::triggered, [this]() { m_services.operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("2d.rotate"))); });
-        QObject::connect(mirrorEntity, &QAction::triggered, [this]() { m_services.operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("2d.mirror"))); });
-        QObject::connect(deleteEntity, &QAction::triggered, [this]() { m_services.operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("2d.delete"))); });
-    }
-
-    // 视图操作仍走 OperationBus（非业务命令）
-    if (m_services.operationBus)
-    {
-        QObject::connect(zoomExtents, &QAction::triggered, [this]() {
-            m_services.operationBus->run(OperationId::View_ZoomFit, {}, OperationSource::TopToolbar);
-            });
-        QObject::connect(pan, &QAction::triggered, [this]() {
-            m_services.operationBus->run(OperationId::View_Pan, {}, OperationSource::TopToolbar);
-            });
-    }
+    Q_UNUSED(properties);
 }
 
 SceneTreeDockWidget* Workbench2D::createLayersDock(WorkbenchWindow& window) const
@@ -606,26 +255,62 @@ SceneTreeDockWidget* Workbench2D::createLayersDock(WorkbenchWindow& window) cons
     return sceneDock;
 }
 
-// 步骤3 — 激活工作台，应用状态
-// 优先使用上次停用前保存的快照，首次激活使用初始状态
+void Workbench2D::configureWorkbenchActions(QToolBar* mainBar, QToolBar* viewBar) const
+{
+    Q_UNUSED(mainBar);
+    Q_UNUSED(viewBar);
+}
+
+void Workbench2D::configureInitialWorkbenchState(PropertiesPanelWidget* properties) const
+{
+    Q_UNUSED(properties);
+}
+
 void Workbench2D::activate()
 {
+    // 从状态快照恢复（首次激活使用 m_initialState，后续使用 m_savedState）
     const auto& snapshot = m_savedState.viewMode.isEmpty()
         ? m_initialState
         : m_savedState;
-    applyWorkbenchState(m_services.stateCenter, id(), snapshot);
+    restoreFromSnapshot(snapshot);
+
+    // 激活时刷新一次动作状态（撤销/重做可用性）
+    if (m_commandHub && m_services.undoManager)
+    {
+        CommandUiSnapshot snap;
+        snap.canUndo = m_services.undoManager->canUndo();
+        snap.canRedo = m_services.undoManager->canRedo();
+        m_commandHub->refreshActionStates(snap);
+    }
 }
 
-// 步骤4 — 停用工作台，保存当前状态
 void Workbench2D::deactivate()
 {
-    // 从状态中心保存当前快照，供下次激活时恢复
     m_savedState = currentSnapshot();
+
+    // 清除 ImportService 中持有的视口回调，防止切换后悬空指针
+    // ImportService 生命周期长于工作台，不清理会导致 use-after-free
+    if (m_services.importService)
+    {
+        m_services.importService->setViewportFitCallback(nullptr);
+        m_services.importService->setTreeRebuildCallback(nullptr);
+        m_services.importService->setPropertyRefreshCallback(nullptr);
+    }
+
+    // 清理命令动作中枢
+    // CommandActionHub 以 window 为 parent，Qt 会在窗口销毁时删除它
+    // 但在工作台切换时需要显式清理，避免重复创建导致动作叠加
+    delete m_commandHub;
+    m_commandHub = nullptr;
+
+    // 工具栏指针会随窗口清理而失效（clearWorkbenchContent 会 delete QToolBar）
+    m_topToolBar = nullptr;
+    m_rightToolBar = nullptr;
 }
 
-// 步骤5 — 关闭工作台，清理资源
 void Workbench2D::shutdown()
 {
+    deactivate();
     m_services = UiServices{};
 }
 
@@ -637,10 +322,26 @@ void Workbench2D::shutdown()
 // 渲染链路：Viewport3D -> IRenderer3D -> RenderWidget3DAdapter -> RenderWidget3D
 
 #include "UI3D/Service/ServiceLocator3D.h"
+#include "UI3D/Service/ServicePack3D.h"
 #include "UI3D/Operation/OperationBus3D.h"
 #include "UI3D/Operation/CommandCatalog3D.h"
 #include "UI3D/Operation/CommandActionHub3D.h"
 #include "UI3D/Operation/CommandRegistry3D.h"
+#include "UI3D/Manager/DocumentManager3D.h"
+#include "UI3D/Edit/UndoRedoManager3D.h"
+#include "UI3D/Edit/SceneEditService3D.h"
+#include "UI3D/Service/SceneMonitor3D.h"
+#include "UI3D/Shortcut/ShortcutManager3D.h"
+#include "UI3D/Navigation/NavigationConfig3D.h"
+#include "UI3D/Service/SceneDocument3D.h"
+#include "UI3D/Service/CameraController3D.h"
+#include "UI3D/Settings/SettingsUiCoordinator3D.h"
+#include "UI3D/Algorithm/AlgorithmTaskRegistration3D.h"
+#include "UI3D/Operation/AlgorithmRunner3D.h"
+#include "UI/Algorithm/AlgorithmApplicationService.h"
+#ifdef ENABLE_GEOMODELCORE
+#include "UI3D/Service/BRepModelService3D.h"
+#endif
 #include "Render3D/RenderWidget3D.h"
 #include "RenderWidget3DAdapter.h"
 #include "Ui/MainWindow/MainWindow3D.h"
@@ -663,7 +364,7 @@ QString Workbench3D::displayName() const
     return QObject::tr("3D Workbench");
 }
 
-// 步骤1 — 初始化，存储服务引用并初始化 ServiceLocator3D
+// 步骤1 — 初始化，存储服务引用
 bool Workbench3D::initialize(const UiServices& services)
 {
     if (!services.stateCenter || !services.interactionDispatcher)
@@ -683,31 +384,78 @@ bool Workbench3D::initialize(const UiServices& services)
         return false;
     }
 
-    SY_INFO("[Workbench3D] Initializing ServiceLocator3D...");
-    ServiceLocator3D::initialize(m_sceneManager3D, nullptr, nullptr);
-    SY_INFO("[Workbench3D] ServiceLocator3D initialized");
-
     m_savedState = WorkbenchStateSnapshot{};
     m_initialState = WorkbenchStateSnapshot{};
     return true;
 }
+
+Workbench3D::~Workbench3D() = default;
 
 // 步骤2 — 构建 3D 工作台 UI
 // 核心架构：Viewport3D -> IRenderer3D -> RenderWidget3DAdapter -> RenderWidget3D
 // 通过 Viewport3D 统一视图宿主，Renderer 通过外部注入
 void Workbench3D::build3DWorkbenchUi(WorkbenchWindow& window)
 {
-    // ServiceLocator3D 初始化（如果尚未初始化或已关闭，重新初始化）
-    // 注：initialize() 内部会判断是否已初始化，防止重复创建
-    ServiceLocator3D::initialize(m_sceneManager3D, nullptr, nullptr);
-
     // 隐藏骨架停靠面板（SceneDock / PropertiesDock），3D 工作台不需要这些面板
-    // 这些面板在 initializeWorkbenchShell() 中创建，不在 m_registeredDocks 中，
-    // clearWorkbenchContent() 无法清除它们，需要手动隐藏
     window.setSkeletonDocksVisible(false);
 
+    // ========== 创建所有 3D 服务 ==========
+    SY_INFO("[Workbench3D] Creating 3D services...");
+    m_serviceOwner = std::make_unique<ServiceOwner>();
+    auto& own = *m_serviceOwner;
+
+    own.operationBus = std::make_unique<OperationBus3D>(nullptr);
+    own.documentManager = std::make_unique<DocumentManager3D>(nullptr);
+    own.undoRedoManager = std::make_unique<UndoRedoManager3D>(nullptr);
+    own.sceneEditService = std::make_unique<SceneEditService3D>(
+        m_sceneManager3D, own.undoRedoManager.get(), own.documentManager.get());
+    own.sceneMonitor = std::make_unique<SceneMonitor3D>(nullptr);
+    own.shortcutManager = std::make_unique<ShortcutManager3D>(nullptr);
+    own.navigationConfig = std::make_unique<NavigationConfig3D>();
+    own.sceneDocument = std::make_unique<SceneDocument3D>(m_sceneManager3D);
+    own.sceneDocumentAdapter = std::make_unique<SceneDocument3DAdapter>();
+    // 使用非拥有的 shared_ptr 别名包装 m_sceneManager3D
+    auto sceneManagerAlias = std::shared_ptr<Eg::SceneManager3D>(
+        m_sceneManager3D, [](Eg::SceneManager3D*) {});
+    own.sceneDocumentAdapter->setEngineScene(sceneManagerAlias);
+    own.cameraController = std::make_unique<CameraController3D>();
+    own.algorithmService = std::make_unique<AlgorithmApplicationService>(nullptr);
+    own.settingsCoordinator = std::make_unique<SettingsUiCoordinator3D>(nullptr, own.navigationConfig.get());
+
+#ifdef ENABLE_GEOMODELCORE
+    own.brepModelService = std::make_unique<BRepModelService3D>(m_sceneManager3D);
+#endif
+
+    if (own.undoRedoManager)
+        own.undoRedoManager->setSceneManager(m_sceneManager3D);
+    if (own.sceneMonitor)
+        own.sceneMonitor->rewatch(m_sceneManager3D);
+
+    AlgorithmTaskRegistration3D::registerAll(*own.algorithmService);
+
+    // Populate ServicePack3D
+    m_services3D.sceneManager = m_sceneManager3D;
+    m_services3D.operationBus = own.operationBus.get();
+    m_services3D.documentManager = own.documentManager.get();
+    m_services3D.undoRedoManager = own.undoRedoManager.get();
+    m_services3D.sceneEditService = own.sceneEditService.get();
+    m_services3D.sceneMonitor = own.sceneMonitor.get();
+    m_services3D.shortcutManager = own.shortcutManager.get();
+    m_services3D.navigationConfig = own.navigationConfig.get();
+    m_services3D.sceneDocument = own.sceneDocument.get();
+    m_services3D.cameraController = own.cameraController.get();
+    m_services3D.algorithmService = own.algorithmService.get();
+
+#ifdef ENABLE_GEOMODELCORE
+    m_services3D.brepModelService = own.brepModelService.get();
+#endif
+
+    // Adopt to ServiceLocator3D for backward compatibility
+    ServiceLocator3D::adopt(m_services3D);
+    SY_INFO("[Workbench3D] 3D services created and adopted");
+
     SY_INFO("[Workbench3D] Creating MainWindow3D wrapper...");
-    m_mainWindow3D = std::make_unique<MainWindow3D>(&window);
+    m_mainWindow3D = std::make_unique<MainWindow3D>(m_services3D, &window);
     SY_INFO("[Workbench3D] MainWindow3D created");
 
     // 连接切换到2D的信号到工作台切换
@@ -742,37 +490,44 @@ void Workbench3D::build3DWorkbenchUi(WorkbenchWindow& window)
             renderWidget->setSceneManager(m_sceneManager3D);
             SY_INFO("[Workbench3D] SceneManager3D set to RenderWidget3D");
 
-            // 通过 ServiceLocator3D 注册 RenderWidget3D，保持向后兼容性
-            ServiceLocator3D::instance().setRenderWidget(renderWidget);
+            // 通过 ServicePack3D 注册 RenderWidget3D
+            m_services3D.renderWidget = renderWidget;
             SY_INFO("[Workbench3D] RenderWidget3D registered in ServiceLocator3D");
 
-            // 连接 RenderWidget3D 的信号到状态栏（通过适配器的回调机制）
+            // 连接 RenderWidget3D 的信号到状态栏 — 通过 UiStateCenter 统一路由
             connect(renderWidget, &RenderWidget3D::sigCursorWorldPosition,
-                [mainWindow3D = m_mainWindow3D.get()](float x, float y, float z, bool valid) {
-                    if (mainWindow3D->statusBar3D())
-                    {
-                        if (valid)
-                            mainWindow3D->statusBar3D()->setPositionText(
-                                QObject::tr("Position: (%1, %2, %3) mm").arg(x, 0, 'f', 2).arg(y, 0, 'f', 2).arg(z, 0, 'f', 2));
-                        else
-                            mainWindow3D->statusBar3D()->setPositionText(QObject::tr("Position: -"));
-                    }
+                [stateCenter = m_services.stateCenter](float x, float y, float z, bool valid) {
+                    if (!stateCenter) return;
+                    QVariantMap meta;
+                    if (valid)
+                        meta[QStringLiteral("positionText")] = QObject::tr("Position: (%1, %2, %3) mm")
+                        .arg(x, 0, 'f', 2).arg(y, 0, 'f', 2).arg(z, 0, 'f', 2);
+                    else
+                        meta[QStringLiteral("positionText")] = QObject::tr("Position: -");
+                    stateCenter->setMetadata(meta);
                 });
 
             connect(renderWidget, &RenderWidget3D::sigSelectionChanged,
-                [mainWindow3D = m_mainWindow3D.get()](const std::vector<Eg::SyMeshEntity*>& entities) {
-                    if (mainWindow3D->statusBar3D())
-                    {
-                        int count = static_cast<int>(entities.size());
-                        QString modelName;
-                        int triangleCount = 0;
-                        if (count > 0 && entities[0])
-                        {
-                            modelName = QString::number(entities[0]->id);
-                            triangleCount = static_cast<int>(entities[0]->vertices.size() / 3);
-                        }
-                        mainWindow3D->statusBar3D()->setSelectionInfo(count, modelName, triangleCount);
-                    }
+                [stateCenter = m_services.stateCenter](const std::vector<Eg::SyMeshEntity*>& entities) {
+                    if (!stateCenter) return;
+                    int count = static_cast<int>(entities.size());
+                    QString modelName;
+                    if (count > 0 && entities[0])
+                        modelName = QString::number(entities[0]->id);
+
+                    QVariantMap meta;
+                    meta[QStringLiteral("3d_selCount")] = count;
+                    meta[QStringLiteral("3d_modelName")] = modelName;
+
+                    if (count > 0)
+                        stateCenter->setSelectionContext(
+                            QObject::tr("3D-Viewport"),
+                            QObject::tr("%1 entities selected").arg(count));
+                    else
+                        stateCenter->setSelectionContext(
+                            QObject::tr("3D-Viewport"),
+                            QStringLiteral("none"));
+                    stateCenter->setMetadata(meta);
                 });
 
             // 连接 Delete/Backspace 键删除选中对象（渲染 widget 有焦点时生效）
@@ -780,37 +535,37 @@ void Workbench3D::build3DWorkbenchUi(WorkbenchWindow& window)
                 this, [this](int key, Qt::KeyboardModifiers) {
                     if (key == Qt::Key_Delete || key == Qt::Key_Backspace)
                     {
-                        auto* bus = ServiceLocator3D::instance().operationBus();
-                        if (bus)
+                        if (m_services3D.operationBus)
                         {
                             SY_INFO("[Workbench3D] Delete key pressed (renderWidget signal), running Edit_Delete operation");
-                            bus->run(OperationId3D::Edit_Delete);
+                            m_services3D.operationBus->run(OperationId3D::Edit_Delete);
                         }
                     }
                 });
 
             // 全局 Delete/Backspace 快捷键（渲染 widget 无焦点时也生效）
-            // 存储到成员变量，以便在 shutdown() 中清理，避免切换到 2D 后仍触发 3D 操作
+            // 通过 WorkbenchWindow::registerShortcut 注册，切换时自动清理
             m_deleteShortcut = new QShortcut(QKeySequence(Qt::Key_Delete), &window);
             m_deleteShortcut->setContext(Qt::ApplicationShortcut);
             connect(m_deleteShortcut, &QShortcut::activated, this, [this]() {
-                auto* bus = ServiceLocator3D::instance().operationBus();
-                if (bus)
+                if (m_services3D.operationBus)
                 {
                     SY_INFO("[Workbench3D] Delete shortcut activated, running Edit_Delete operation");
-                    bus->run(OperationId3D::Edit_Delete);
+                    m_services3D.operationBus->run(OperationId3D::Edit_Delete);
                 }
-            });
+                });
+            window.registerShortcut(m_deleteShortcut);
+
             m_backspaceShortcut = new QShortcut(QKeySequence(Qt::Key_Backspace), &window);
             m_backspaceShortcut->setContext(Qt::ApplicationShortcut);
             connect(m_backspaceShortcut, &QShortcut::activated, this, [this]() {
-                auto* bus = ServiceLocator3D::instance().operationBus();
-                if (bus)
+                if (m_services3D.operationBus)
                 {
                     SY_INFO("[Workbench3D] Backspace shortcut activated, running Edit_Delete operation");
-                    bus->run(OperationId3D::Edit_Delete);
+                    m_services3D.operationBus->run(OperationId3D::Edit_Delete);
                 }
-            });
+                });
+            window.registerShortcut(m_backspaceShortcut);
         }
         else
         {
@@ -822,162 +577,88 @@ void Workbench3D::build3DWorkbenchUi(WorkbenchWindow& window)
         SY_ERROR("[Workbench3D] Failed to cast renderer to RenderWidget3DAdapter");
     }
 
-    // 设置 SceneDocument（通过 ServiceLocator3D 获取）
-    auto* sceneDocument = ServiceLocator3D::instance().sceneDocument();
-    viewport->setSceneDocument(sceneDocument);
-    SY_INFOF("[Workbench3D] SceneDocument3D set to Viewport3D: %p", sceneDocument);
+    // 设置 SceneDocument3DAdapter
+    viewport->setSceneDocument(m_serviceOwner->sceneDocumentAdapter.get());
+    SY_INFOF("[Workbench3D] SceneDocument3DAdapter set to Viewport3D: %p", m_serviceOwner->sceneDocumentAdapter.get());
 
-    // 设置 CameraController（通过 ServiceLocator3D 获取）
-    auto* cameraController = ServiceLocator3D::instance().cameraController();
-    viewport->setCameraController(cameraController);
-    SY_INFOF("[Workbench3D] CameraController3D set to Viewport3D: %p", cameraController);
+    // 设置 CameraController3D
+    viewport->setCameraController(own.cameraController.get());
+    SY_INFO("[Workbench3D] CameraController3D set to Viewport3D");
 
-    // 将 Viewport3D 设为中央组件，并设置最小尺寸避免被工具栏挤压到不可见
-    viewport->setMinimumSize(400, 300);
+    // 隐藏默认视口占位符并设置自定义 Viewport3D 为中央部件
     window.setCentralWidget(viewport);
     SY_INFO("[Workbench3D] Viewport3D set as central widget");
 
-    // ========== 工具栏和状态栏设置 ==========
+    // ========== 创建需要 MainWindow3D 的服务 ==========
     auto* mainWindow3D = m_mainWindow3D.get();
-
-    // 把 MainWindow3D 创建的左侧工具栏提取到 WorkbenchWindow
-    window.addToolBar(Qt::LeftToolBarArea, mainWindow3D->leftToolBar());
-
-    // 把顶部工具栏添加到 WorkbenchWindow
-    if (mainWindow3D->topToolBar())
-        window.addToolBar(Qt::TopToolBarArea, mainWindow3D->topToolBar());
-
-    // 使用 MainWindow3D 的状态栏
-    if (mainWindow3D->statusBar3D())
-    {
-        auto* sb = window.statusBar();
-        if (sb)
-        {
-            sb->clearMessage();
-            sb->addWidget(mainWindow3D->statusBar3D(), 1);
-        }
-    }
-
-    // MainWindow3D 本身不需要可见（它只是工具栏的宿主和协调器）
     mainWindow3D->hide();
 
-    SY_INFO("[Workbench3D] Calling ServiceLocator3D::initializeDeferred()...");
-    ServiceLocator3D::instance().initializeDeferred(mainWindow3D);
-    SY_INFO("[Workbench3D] ServiceLocator3D::initializeDeferred() completed");
+    own.commandActionHub = std::make_unique<CommandActionHub3D>(mainWindow3D);
+    own.algorithmRunner = std::make_unique<AlgorithmRunner3D>(
+        own.algorithmService.get(), m_sceneManager3D,
+        own.sceneEditService.get(), mainWindow3D);
+    m_services3D.commandActionHub = own.commandActionHub.get();
+    m_services3D.algorithmRunner = own.algorithmRunner.get();
+    if (own.settingsCoordinator)
+        own.settingsCoordinator->init();
 
     SY_INFO("[Workbench3D] Calling CommandRegistry3D::registerAll()...");
     CommandRegistry3D::registerAll(mainWindow3D);
     SY_INFO("[Workbench3D] CommandRegistry3D::registerAll() completed");
 
-    auto* menuBar = window.menuBar();
-    if (!menuBar)
-    {
-        menuBar = new QMenuBar(&window);
-        window.setMenuBar(menuBar);
-    }
-
-    SY_INFO("[Workbench3D] Creating MenuManager3D...");
+    // 初始化菜单管理器
+    // MenuManager3D 自动创建 File/Edit/View/Help 菜单
     m_menuManager3D = std::make_unique<MenuManager3D>(mainWindow3D);
-    SY_INFO("[Workbench3D] MenuManager3D created");
-
-    m_menuManager3D->createMenus(menuBar);
-
-    auto* fileMenu = static_cast<FileMenu3D*>(m_menuManager3D->fileMenu());
-    auto* editMenu = m_menuManager3D->editMenu();
-    auto* viewMenu = m_menuManager3D->viewMenu();
-
-    auto* hub = ServiceLocator3D::instance().commandActionHub();
-    if (hub)
-    {
-        // 注入 OperationBus，使 wireAction 能够正确连接 QAction 信号
-        hub->setOperationBus(ServiceLocator3D::instance().operationBus());
-
-        SY_INFO("[Workbench3D] Calling CommandActionHub3D::rebuildAll()...");
-        hub->rebuildAll(mainWindow3D->shortcutManager3D());
-        SY_INFO("[Workbench3D] CommandActionHub3D::rebuildAll() completed");
-
-        hub->bindFileMenu(fileMenu);
-        hub->bindEditMenu(editMenu);
-        hub->bindViewMenu(viewMenu);
-        hub->bindLeftToolBar(mainWindow3D->leftToolBar());
-        hub->bindTopToolBar(mainWindow3D->topToolBar());
-    }
-    else
-    {
-        SY_ERROR("[Workbench3D] CommandActionHub3D is null, menu binding skipped");
-    }
-
+    m_menuManager3D->createMenus(mainWindow3D->menuBar());
     m_menuManager3D->connectMenuSignals();
+    SY_INFO("[Workbench3D] MenuManager3D initialized");
 
+    // 配置 CommandActionHub3D：注入操作总线并绑定菜单
+    own.commandActionHub->setOperationBus(own.operationBus.get());
+    if (auto* fm = qobject_cast<FileMenu3D*>(m_menuManager3D->fileMenu()))
+        own.commandActionHub->bindFileMenu(fm);
+    if (auto* em = m_menuManager3D->editMenu())
+        own.commandActionHub->bindEditMenu(em);
+    if (auto* vm = m_menuManager3D->viewMenu())
+        own.commandActionHub->bindViewMenu(vm);
+    own.commandActionHub->rebuildAll(own.shortcutManager.get());
+    SY_INFO("[Workbench3D] CommandActionHub3D configured");
+
+    // 连接菜单动作信号到操作总线
     connect(m_menuManager3D.get(), &MenuManager3D::sigMenuAction,
         this, &Workbench3D::onMenuAction);
 
-    // 设置 Viewport3D 的状态回调和选择回调（通过统一接口）
-    viewport->setStatusCallback([mainWindow3D](const QString& status) {
-        SY_INFOF("[Viewport3D] Status callback: %s", status.toUtf8().constData());
-        if (mainWindow3D->statusBar3D())
-        {
-            mainWindow3D->statusBar3D()->setMessageText(status);
-        }
-    });
-
-    viewport->setSelectionCallback([mainWindow3D](const QString& nodeId) {
-        SY_INFOF("[Viewport3D] Selection callback: nodeId=%s", nodeId.toUtf8().constData());
-        if (!nodeId.isEmpty())
-        {
-            mainWindow3D->statusBar3D()->setSelectionInfo(1, nodeId, 0);
-        }
-        else
-        {
-            mainWindow3D->statusBar3D()->setSelectionInfo(0, QString(), 0);
-        }
-    });
-
-    m_initialState.viewMode = QObject::tr("3D Viewport");
-    m_initialState.layerId = QObject::tr("Scene");
-    m_initialState.documentId.clear();
-    m_initialState.selectionSource = QObject::tr("3D-Init");
-    m_initialState.selectionText = QObject::tr("Ready");
-    m_initialState.selectionType = QObject::tr("3D");
-    m_initialState.viewportType = QObject::tr("3D");
-    m_initialState.viewportStatus = QObject::tr("3D ready");
-    m_initialState.dirty = false;
+    SY_INFO("[Workbench3D] 3D workbench UI build completed");
 }
 
 void Workbench3D::onMenuAction(int actionId, const QVariantMap& params)
 {
-    SY_INFOF("[Workbench3D] Menu action triggered: id=%d (0x%x)", actionId, actionId);
+    Q_UNUSED(params);
 
-    auto* bus = ServiceLocator3D::instance().operationBus();
-    if (!bus)
+    const auto menuId = UI3D::fromCommonMenuId(actionId);
+    if (menuId == UI3D::MenuActionId3D::Help_Settings)
     {
-        SY_ERROR("[Workbench3D] OperationBus3D is null");
+        if (m_mainWindow3D)
+        {
+            m_mainWindow3D->showSettingsDialog();
+            return;
+        }
+
+        SY_WARN("[Workbench3D] Help_Settings received but MainWindow3D is null");
         return;
     }
 
-    SY_INFOF("[Workbench3D] OperationBus3D=%p, registry size=%zu", bus, bus->registrySize());
+    if (!m_services3D.operationBus)
+        return;
 
-    UI3D::MenuActionId3D menuId = static_cast<UI3D::MenuActionId3D>(actionId);
-    if (CommandCatalog3D::mapsToOperation(menuId))
+    const auto operationId = CommandCatalog3D::operationForMenu(menuId);
+    if (operationId != OperationId3D::None)
     {
-        OperationId3D opId = CommandCatalog3D::operationForMenu(menuId);
-        SY_INFOF("[Workbench3D] Running operation: menuId=%d (0x%x), opId=%d, hasOp=%d",
-            actionId, actionId, static_cast<int>(opId), bus->hasOperation(opId));
-        bus->run(opId);
+        m_services3D.operationBus->run(operationId);
     }
     else
     {
-        // 可能 actionId 本身已经是 OperationId3D（来自非 hub action 的直接触发）
-        OperationId3D directOpId = static_cast<OperationId3D>(actionId);
-        if (bus->hasOperation(directOpId))
-        {
-            SY_INFOF("[Workbench3D] actionId is direct operationId, running: opId=%d", static_cast<int>(directOpId));
-            bus->run(directOpId);
-        }
-        else
-        {
-            SY_WARNF("[Workbench3D] No operation found for action id: %d", actionId);
-        }
+        SY_WARNF("[Workbench3D] No operation found for menu action id: %d", actionId);
     }
 }
 
@@ -990,7 +671,16 @@ void Workbench3D::attachToWindow(WorkbenchWindow& window)
 // 步骤4 — 激活工作台，应用初始状态
 void Workbench3D::activate()
 {
-    applyWorkbenchState(m_services.stateCenter, id(), m_initialState);
+    // 从状态快照恢复（与 2D 保持一致）
+    const auto& snapshot = m_savedState.viewMode.isEmpty()
+        ? m_initialState
+        : m_savedState;
+    restoreFromSnapshot(snapshot);
+
+    if (m_services.stateCenter)
+    {
+        m_services.stateCenter->setCurrentWorkbenchId(id());
+    }
 }
 
 // 步骤5 — 停用工作台，保存状态并清理资源
@@ -998,43 +688,29 @@ void Workbench3D::deactivate()
 {
     m_savedState = currentSnapshot();
 
-    // 清理全局快捷键（Qt::ApplicationShortcut 不会随父窗口销毁），
-    // 避免切换到 2D 后仍触发 3D 操作导致崩溃
-    delete m_deleteShortcut;
+    SY_INFO("[Workbench3D] Deactivating, releasing services...");
+    m_serviceOwner.reset();
+    m_services3D = ServicePack3D{};
+    ServiceLocator3D::shutdown();
+    SY_INFO("[Workbench3D] Service released");
+
+    // 快捷键已由 clearAllShortcuts() 删除，此处置空避免悬空指针
     m_deleteShortcut = nullptr;
-    delete m_backspaceShortcut;
     m_backspaceShortcut = nullptr;
 
-    // 先关闭 ServiceLocator3D 释放所有服务（它们可能持有 MainWindow3D 的 QObject parent），
-    // 再销毁 MainWindow3D 以避免 Qt parent 机制导致的二次析构崩溃
-    SY_INFO("[Workbench3D] Deactivating, shutting down ServiceLocator3D first...");
-    ServiceLocator3D::shutdown();
-    SY_INFO("[Workbench3D] ServiceLocator3D::shutdown() completed");
-
-    // 注意：MenuManager3D 的父对象是 MainWindow3D，
-    // 如果先销毁 MainWindow3D，Qt 会自动销毁 MenuManager3D，
-    // 导致 m_menuManager3D.reset() 时双重释放崩溃
-    // 所以先重置 m_menuManager3D（解除父子关系），再销毁 MainWindow3D
     SY_INFO("[Workbench3D] Destroying MenuManager3D...");
     m_menuManager3D.reset();
+    SY_INFO("[Workbench3D] MenuManager3D destroyed");
+
     SY_INFO("[Workbench3D] Destroying MainWindow3D...");
     m_mainWindow3D.reset();
+    SY_INFO("[Workbench3D] MainWindow3D destroyed");
 }
 
-// 步骤6 — 关闭工作台，清理资源
+// 步骤6 — 关闭工作台，清理所有资源
 void Workbench3D::shutdown()
 {
+    deactivate();
     m_services = UiServices{};
-    m_scene.reset();
-    // 清理全局快捷键（Qt::ApplicationShortcut 不会随父窗口销毁）
-    delete m_deleteShortcut;
-    m_deleteShortcut = nullptr;
-    delete m_backspaceShortcut;
-    m_backspaceShortcut = nullptr;
-    // 先关闭 ServiceLocator3D 释放所有服务，再销毁 MainWindow3D
-    ServiceLocator3D::shutdown();
-    m_menuManager3D.reset();
-    m_mainWindow3D.reset();
-    // m_sceneManager3D 由 ApplicationCompositionRoot 管理，此处不释放
 }
 #endif

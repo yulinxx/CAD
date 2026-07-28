@@ -43,7 +43,10 @@ public:
     void setSceneManager3D(Eg::SceneManager3D* sceneManager3D);
 
     /// 获取 3D 场景管理器
-    Eg::SceneManager3D* sceneManager3D() const { return m_sceneManager3D; }
+    Eg::SceneManager3D* sceneManager3D() const
+    {
+        return m_sceneManager3D;
+    }
 
     /// 设置场景编辑服务（用于将导入的图元通过事务写入文档，支持 Undo）
     void setEditService(SceneEditService* editService);

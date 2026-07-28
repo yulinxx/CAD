@@ -203,6 +203,6 @@ private:
     std::unordered_set<Eg::EntityId> m_pendingDirtyIds;
     std::unordered_set<Eg::EntityId> m_pendingDeletedIds;
 
-    // 连接管理
-    QMetaObject::Connection m_sceneChangedConn;
+    // 已提交到渲染系统的实体 ID 集合（用于区分新增 vs 修改）
+    std::unordered_set<uint64_t> m_renderedEntityIds;
 };
