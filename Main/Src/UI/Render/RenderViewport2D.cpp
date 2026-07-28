@@ -7,8 +7,10 @@
 #include "SceneDocument2D.h"
 #include "ISelectionService.h"
 #include "UiInteractionDispatcher.h"
+
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
+
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyCircle.h"
@@ -23,9 +25,11 @@
 #include "Engine2D/SyEntity/SyNurbs.h"
 #include "Engine2D/SyEntity/SySmartLine.h"
 #include "Engine2D/Geometry/BezierAlgorithms.h"
+
 #include "Engine/SyEntity/EType.h"
 #include "Engine/Layer/SyLayer.h"
-#include "UI2D/DrawTools/ToolManager.h"
+
+#include "UI/DrawTools/ToolManager.h"
 #include "Ui/DrawTools/ToolContext.h"
 #include "Ui/DrawTools/ITool.h"
 #include "Ui/DrawTools/SelectTool.h"

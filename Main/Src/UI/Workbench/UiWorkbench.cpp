@@ -26,7 +26,8 @@
 #include "UI2D/Operation/OperationId.h"
 #include "UI2D/Operation/CommandCatalog.h"
 #include "UI2D/Edit/QtLayerManagerBridge.h"
-#include "UI2D/ToolBar/RightToolBar.h"
+#include "UI/RightToolBar/RightToolBar.h"
+
 #include "Ui/TopToolBar/TopToolBar.h"
 #include "Ui/Dlg/LayerManagerDialog.h"
 #include "Engine2D/SyEntity/SyLine.h"
@@ -146,16 +147,16 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
                     QVariantMap meta = stateCenter->metadata();
                     meta["statusPrompt"] = text;
                     stateCenter->setMetadata(meta);
-                });
+                    });
                 vp->setSelectionCallback([stateCenter = m_services.stateCenter](const QString& selText, const QString& selType) {
                     stateCenter->setSelectionContext(selType, selText);
-                });
+                    });
                 vp->setPositionCallback([stateCenter = m_services.stateCenter](double x, double y) {
                     QVariantMap meta = stateCenter->metadata();
                     meta["mouseX"] = x;
                     meta["mouseY"] = y;
                     stateCenter->setMetadata(meta);
-                });
+                    });
             }
 
             // 初始化工具系统
@@ -166,7 +167,7 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
             {
                 m_services.importService->setViewportFitCallback([vp]() {
                     QTimer::singleShot(0, vp, [vp]() { vp->zoomToFit(); });
-                });
+                    });
             }
 
             // 默认激活选择工具
@@ -364,7 +365,7 @@ QString Workbench3D::displayName() const
     return QObject::tr("3D Workbench");
 }
 
-// 步骤1 — 初始化，存储服务引用
+// 1 — 初始化，存储服务引用
 bool Workbench3D::initialize(const UiServices& services)
 {
     if (!services.stateCenter || !services.interactionDispatcher)
@@ -391,7 +392,7 @@ bool Workbench3D::initialize(const UiServices& services)
 
 Workbench3D::~Workbench3D() = default;
 
-// 步骤2 — 构建 3D 工作台 UI
+// 2 — 构建 3D 工作台 UI
 // 核心架构：Viewport3D -> IRenderer3D -> RenderWidget3DAdapter -> RenderWidget3D
 // 通过 Viewport3D 统一视图宿主，Renderer 通过外部注入
 void Workbench3D::build3DWorkbenchUi(WorkbenchWindow& window)
@@ -662,13 +663,13 @@ void Workbench3D::onMenuAction(int actionId, const QVariantMap& params)
     }
 }
 
-// 步骤3 — 附加到窗口，触发 UI 构建
+// 3 — 附加到窗口，触发 UI 构建
 void Workbench3D::attachToWindow(WorkbenchWindow& window)
 {
     build3DWorkbenchUi(window);
 }
 
-// 步骤4 — 激活工作台，应用初始状态
+// 4 — 激活工作台，应用初始状态
 void Workbench3D::activate()
 {
     // 从状态快照恢复（与 2D 保持一致）
@@ -683,7 +684,7 @@ void Workbench3D::activate()
     }
 }
 
-// 步骤5 — 停用工作台，保存状态并清理资源
+// 5 — 停用工作台，保存状态并清理资源
 void Workbench3D::deactivate()
 {
     m_savedState = currentSnapshot();
@@ -707,7 +708,7 @@ void Workbench3D::deactivate()
     SY_INFO("[Workbench3D] MainWindow3D destroyed");
 }
 
-// 步骤6 — 关闭工作台，清理所有资源
+// 6 — 关闭工作台，清理所有资源
 void Workbench3D::shutdown()
 {
     deactivate();
