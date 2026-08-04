@@ -1,54 +1,54 @@
 [submodule "Engine"]
 	path = Engine
-	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\Engine
+	url = git@github.com:yulinxx/Engine.git
 [submodule "Render"]
 	path = Render
 	url = git@github.com:yulinxx/Render.git
 [submodule "Utility"]
 	path = Utility
-	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\Utility
+	url = git@github.com:yulinxx/Utility.git
 [submodule "Engraving"]
 	path = Engraving
-	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\Engraving
+	url = git@github.com:yulinxx/Engraving.git
 [submodule "FileIO"]
 	path = FileIO
-	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\FileIO
+	url = git@github.com:yulinxx/FileIO.git
 [submodule "GeoModelCore"]
 	path = GeoModelCore
-	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\GeoModelCore
+	url = git@github.com:yulinxx/GeoModelCore.git
 [submodule "Hardware"]
 	path = Hardware
-	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\Hardware
+	url = git@github.com:yulinxx/Hardware.git
 [submodule "Log"]
 	path = Log
-	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\Log
+	url = git@github.com:yulinxx/Log.git
 [submodule "Nesting"]
 	path = Nesting
-	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\Nesting
+	url = git@github.com:yulinxx/Nesting.git
 [submodule "Network"]
 	path = Network
 	url = git@github.com:yulinxx/Network.git
 [submodule "ThirdParty"]
 	path = ThirdParty
-	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\ThirdParty
+	url = git@github.com:yulinxx/ThirdParty.git
 [submodule "UI"]
 	path = UI
 	url = git@github.com:yulinxx/UI.git
 [submodule "Vision"]
 	path = Vision
-	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\Vision
+	url = git@github.com:yulinxx/Vision.git
 [submodule "CrashHandler"]
 	path = CrashHandler
 	url = git@github.com:yulinxx/CrashHandler.git
 [submodule "PyBindCore"]
 	path = PyBindCore
-	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\PyBindCore
+	url = git@github.com:yulinxx/PyBindCore.git
 [submodule "Python"]
 	path = Python
-	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\Python
+	url = git@github.com:yulinxx/Python.git
 [submodule "PythonHost"]
 	path = PythonHost
-	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\PythonHost
+	url = git@github.com:yulinxx/PythonHost.git
 [submodule "Renderx"]
 	path = Renderx
-	url = C:\\Users\\xx\\Documents\\Cpp\\CAD\\Renderx
+	url = git@github.com:yulinxx/Renderx.git
