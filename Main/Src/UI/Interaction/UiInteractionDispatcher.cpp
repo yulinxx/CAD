@@ -58,25 +58,32 @@ namespace
 
         return QStringLiteral("Ready");
     }
-
-    void updateStatusPrompt(UiStateCenter* stateCenter, const QString& commandId, const QString& subAction)
-    {
-        if (!stateCenter)
-            return;
-
-        QString prompt = statusPromptForCommand(commandId);
-        if (!subAction.isEmpty())
-            prompt = prompt + QStringLiteral(" — ") + subAction;
-
-        stateCenter->setMetadata({
-            { QStringLiteral("statusPrompt"), prompt },
-            { QStringLiteral("statusSubAction"), subAction }
-            });
-    }
-} // namespace
+}
 
 DefaultInteractionDispatcher::DefaultInteractionDispatcher() = default;
 DefaultInteractionDispatcher::~DefaultInteractionDispatcher() = default;
+
+void DefaultInteractionDispatcher::syncCommandFinishState()
+{
+    if (!m_stateCenter)
+        return;
+
+    m_stateCenter->setBusy(false);
+    m_stateCenter->setCurrentCommandPhase(QStringLiteral("idle"));
+    m_stateCenter->setCurrentCommandId(QString());
+    m_stateCenter->setCurrentCommandType(QString());
+    m_stateCenter->setStatusPrompt(QStringLiteral("Ready"));
+    m_stateCenter->clearInteractionState();
+
+    QVariantMap meta = m_stateCenter->metadata();
+    meta.remove(QStringLiteral("commandId"));
+    meta.remove(QStringLiteral("commandType"));
+    meta.insert(QStringLiteral("statusPrompt"), QStringLiteral("Ready"));
+    m_stateCenter->setMetadata(meta);
+
+    m_activeCommandId.clear();
+    m_commandType.clear();
+}
 
 void DefaultInteractionDispatcher::begin(const QString& commandId)
 {
@@ -85,12 +92,17 @@ void DefaultInteractionDispatcher::begin(const QString& commandId)
 
     if (m_stateCenter)
     {
-        m_stateCenter->setMetadata({
-            { QStringLiteral("commandId"), commandId },
-            { QStringLiteral("commandType"), m_commandType }
-            });
-        updateStatusPrompt(m_stateCenter, commandId, QString());
+        m_stateCenter->setCurrentCommandId(commandId);
+        m_stateCenter->setCurrentCommandType(m_commandType);
+        m_stateCenter->setStatusPrompt(statusPromptForCommand(commandId));
+        m_stateCenter->clearInteractionState();
+        m_stateCenter->setCurrentCommandPhase(QStringLiteral("active"));
+        m_stateCenter->setBusy(true);
     }
+
+    SY_INFOF("[InteractionDispatcher] Begin command: id=%s type=%s",
+        commandId.toUtf8().constData(),
+        m_commandType.toUtf8().constData());
 
     if (m_toolChangedCallback)
         m_toolChangedCallback(commandId);
@@ -104,14 +116,8 @@ void DefaultInteractionDispatcher::submit()
         return;
     }
 
-    m_stateCenter->setMetadata({
-        { QStringLiteral("commandId"), QString() },
-        { QStringLiteral("commandType"), QString() },
-        { QStringLiteral("statusPrompt"), QStringLiteral("Ready") },
-        { QStringLiteral("statusSubAction"), QString() }
-        });
-    m_activeCommandId.clear();
-    m_commandType.clear();
+    SY_INFOF("[InteractionDispatcher] Submit command: id=%s", m_activeCommandId.toUtf8().constData());
+    syncCommandFinishState();
 }
 
 void DefaultInteractionDispatcher::cancel()
@@ -122,14 +128,8 @@ void DefaultInteractionDispatcher::cancel()
         return;
     }
 
-    m_stateCenter->setMetadata({
-        { QStringLiteral("commandId"), QString() },
-        { QStringLiteral("commandType"), QString() },
-        { QStringLiteral("statusPrompt"), QStringLiteral("Ready") },
-        { QStringLiteral("statusSubAction"), QString() }
-        });
-    m_activeCommandId.clear();
-    m_commandType.clear();
+    SY_INFOF("[InteractionDispatcher] Cancel command: id=%s", m_activeCommandId.toUtf8().constData());
+    syncCommandFinishState();
 }
 
 QString DefaultInteractionDispatcher::activeCommandId() const
@@ -142,31 +142,39 @@ bool DefaultInteractionDispatcher::hasActiveCommand() const
     return !m_activeCommandId.isEmpty();
 }
 
-bool DefaultInteractionDispatcher::forwardMouseDown(int x, int y)
+void DefaultInteractionDispatcher::setEventHandler(InteractionEventHandler handler)
 {
-    Q_UNUSED(x);
-    Q_UNUSED(y);
-    return false;
+    m_eventHandler = std::move(handler);
 }
 
-bool DefaultInteractionDispatcher::forwardMouseMove(int x, int y)
+bool DefaultInteractionDispatcher::dispatchEvent(const InteractionEvent& event)
 {
-    Q_UNUSED(x);
-    Q_UNUSED(y);
-    return false;
-}
+    if (!m_stateCenter || !hasActiveCommand())
+        return false;
 
-bool DefaultInteractionDispatcher::forwardMouseUp(int x, int y)
-{
-    Q_UNUSED(x);
-    Q_UNUSED(y);
-    return false;
-}
+    const bool consumed = m_eventHandler && m_eventHandler(event);
 
-bool DefaultInteractionDispatcher::forwardKeyPress(int key)
-{
-    Q_UNUSED(key);
-    return false;
+    QString kind;
+    switch (event.type)
+    {
+        case InteractionEventType::MouseDown:
+            kind = QStringLiteral("mouseDown");
+            break;
+        case InteractionEventType::MouseMove:
+            kind = QStringLiteral("mouseMove");
+            break;
+        case InteractionEventType::MouseUp:
+            kind = QStringLiteral("mouseUp");
+            break;
+        case InteractionEventType::KeyPress:
+            kind = QStringLiteral("key");
+            break;
+    }
+
+    m_stateCenter->setInteractionState(kind, event.x, event.y, event.key);
+    SY_DEBUGF("[InteractionDispatcher] Event dispatched: kind=%s x=%d y=%d key=%d consumed=%d",
+        kind.toUtf8().constData(), event.x, event.y, event.key, consumed ? 1 : 0);
+    return consumed;
 }
 
 void DefaultInteractionDispatcher::setStateCenter(UiStateCenter* stateCenter)
@@ -197,6 +205,8 @@ void DefaultInteractionDispatcher::setToolChangedCallback(std::function<void(con
 void DefaultInteractionDispatcher::setCommandType(const QString& commandType)
 {
     m_commandType = commandType;
+    if (m_stateCenter)
+        m_stateCenter->setCurrentCommandType(commandType);
 }
 
 QString DefaultInteractionDispatcher::resolveCommandType(const QString& commandId) const

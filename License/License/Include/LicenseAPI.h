@@ -1,5 +1,4 @@
-#ifndef LICENSE_API_H
-#define LICENSE_API_H
+#pragma once
 
 #if defined(_WIN32) || defined(_WIN64)
 #ifdef LICENSE_EXPORTS
@@ -21,6 +20,4 @@
 #define LICENSE_C_API extern "C"
 #else
 #define LICENSE_C_API extern
-#endif
-
 #endif

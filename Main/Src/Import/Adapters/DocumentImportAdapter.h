@@ -5,6 +5,7 @@
 #include <QString>
 
 #include "FileIO/FileFormat.h"
+#include "FileIO/IFileParser.h"
 
 namespace Eg
 {
@@ -19,6 +20,7 @@ public:
     explicit DocumentImportAdapter(Eg::SceneManager* sceneManager,
         SceneEditService* editService = nullptr);
 
+public:
     /// 将导入的图元应用到 2D 场景文档
     /// @param entities 导入的图元列表
     /// @param preserveColors 是否保留源文件颜色

@@ -3,6 +3,7 @@
 #include "ExportContext.h"
 #include "ExportResult.h"
 #include "FileIO/FileFormat.h"
+#include "FileIO/IFileParser.h"
 
 /// 导出写入器接口：每种格式的导出适配器需要实现此接口
 class IExportWriter

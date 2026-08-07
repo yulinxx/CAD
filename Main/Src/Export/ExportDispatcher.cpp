@@ -1,8 +1,7 @@
 #include "ExportDispatcher.h"
 
-#include <QFileInfo>
-
 #include "Log/SyLogger.h"
+#include <QFileInfo>
 
 void ExportDispatcher::registerWriter(std::unique_ptr<IExportWriter> writer)
 {
@@ -75,6 +74,7 @@ QStringList ExportDispatcher::supportedExtensions() const
     QStringList exts;
     for (const auto& w : m_writers)
         exts.append(w->supportedExtensions());
+
     return exts;
 }
 

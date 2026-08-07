@@ -1,8 +1,7 @@
 #include "ImportDispatcher.h"
+#include "Log/SyLogger.h"
 
 #include <QFileInfo>
-
-#include "Log/SyLogger.h"
 
 void ImportDispatcher::registerReader(std::unique_ptr<IImportReader> reader)
 {
@@ -45,7 +44,9 @@ ImportResult ImportDispatcher::dispatch(const ImportContext& context,
     {
         QString msg = QStringLiteral("No reader registered for format=%1")
             .arg(static_cast<int>(fmt));
+
         SY_ERRORF("[ImportDispatcher] %s", msg.toUtf8().constData());
+
         return ImportResult::fail(msg, ImportErrorType::FormatNotSupported);
     }
 
@@ -68,12 +69,16 @@ Fio::FileFormat ImportDispatcher::detectFormat(const QString& filePath)
     if (ext == QStringLiteral("pdf"))     return Fio::FileFormat::PDF;
     if (ext == QStringLiteral("plt") ||
         ext == QStringLiteral("hpgl"))    return Fio::FileFormat::PLT;
+
     if (ext == QStringLiteral("stp") ||
         ext == QStringLiteral("step"))    return Fio::FileFormat::STEP;
+
     if (ext == QStringLiteral("ai"))      return Fio::FileFormat::AI;
+
     if (ext == QStringLiteral("prt") ||
         ext == QStringLiteral("igs") ||
         ext == QStringLiteral("iges"))    return Fio::FileFormat::UG;
+
     if (ext == QStringLiteral("sy"))      return Fio::FileFormat::Native;
     if (ext == QStringLiteral("syx"))     return Fio::FileFormat::Native3D;
     if (ext == QStringLiteral("obj"))     return Fio::FileFormat::OBJ;

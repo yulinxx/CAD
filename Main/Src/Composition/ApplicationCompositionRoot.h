@@ -31,6 +31,9 @@ class FileDialogService;
 class RecentFileService;
 class HelpDialogService;
 class FileOperationRegistry;
+class PendingOperationRegistry;
+class SelectionService;
+class ISelectionService;
 
 /**
  * @class ApplicationCompositionRoot
@@ -148,20 +151,22 @@ public:
         return m_sceneEditService.get();
     }
 
-private:
-    /// 注册帮助操作（About / Settings / Docs / Shortcuts）
-    void registerHelpOperations();
-
-    /// 注册缺失的工具切换操作（提示暂未实现）
-    void registerPendingToolOperations();
-
-    /// 注册缺失的算法/编辑操作（提示暂未实现）
-    void registerPendingAlgorithmOperations();
-
-    /// 保存文档持久化记录
-    void saveDocumentPersistenceRecord(const QString& filePath, int entityCount);
+    /// 获取选择服务（阶段1收口：由组合根统一创建并经 UiServices 注入）
+    ISelectionService* selectionService();
 
 private:
+    // ---- 构造函数拆分（P5 结构性优化）----
+    // 组装 UI 服务集合（RecentFileService + 图层桥接 + ShellHost 配置）
+    UiServices assembleUiServices();
+    // 初始化导入/导出服务层（读取器/写入器注册 + 信号槽连接）
+    void setupImportExportServices(UiServices& uiServices);
+    // 创建文件/帮助对话框服务
+    void setupDialogServices();
+    // 场景变更 → 脏状态同步
+    void setupDirtyStateSync();
+    // 注册各模块操作到 OperationBus
+    void registerAllOperations();
+
     /// UI Shell 宿主
     std::unique_ptr<UiShellHost> m_shellHost;
 
@@ -191,6 +196,9 @@ private:
 
     /// 场景编辑服务（新系统）
     std::unique_ptr<SceneEditService> m_sceneEditService;
+
+    /// 选择服务（阶段1收口：绑定 SceneManager，由组合根统一创建）
+    std::unique_ptr<SelectionService> m_selectionService;
 
     /// 2D 场景文档（依赖 SceneEditService）
     std::unique_ptr<SceneDocument2D> m_document2D;

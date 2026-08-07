@@ -41,11 +41,30 @@ void Camera2D::computeViewMatrix(float outMat[9], float vpW, float vpH) const
     view.at(1, 2) = ty;
     view.at(2, 2) = 1.0f;
 
-    // SY_INFOF("Camera2D::computeViewMatrix: vp=(%.0f,%.0f), zoom=(%.6f,%.6f), pan=(%.2f,%.2f), mat=[%.4f,%.4f,%.4f, %.4f,%.4f,%.4f]",
-    //     vpW, vpH, zoomX, zoomY, panOffset.x(), panOffset.y(),
-    //     view.at(0,0), view.at(0,2), view.at(1,1), view.at(1,2));
+    // 验证矩阵：计算视图边界（世界空间）
+    float invScaleX = 1.0f / scaleX;
+    float invScaleY = 1.0f / scaleY;
+    float invTx = -tx / scaleX;
+    float invTy = -ty / scaleY;
+
+    float wMinX = -invScaleX + invTx;
+    float wMaxX = invScaleX + invTx;
+    float wMinY = -invScaleY + invTy;
+    float wMaxY = invScaleY + invTy;
+
 
     mat3ToArray(view, outMat);
+}
+
+Render::Mat3f Camera2D::viewMatrix(float vpW, float vpH) const
+{
+    float mat[9];
+    computeViewMatrix(mat, vpW, vpH);
+
+    Render::Mat3f result;
+    for (int i = 0; i < 9; ++i)
+        result.data[i] = mat[i];
+    return result;
 }
 
 QPointF Camera2D::screenToWorld(const QPoint& screenPos, float vpW, float vpH) const
@@ -53,7 +72,7 @@ QPointF Camera2D::screenToWorld(const QPoint& screenPos, float vpW, float vpH) c
     if (vpW <= 0 || vpH <= 0)
         return QPointF(0, 0);
 
-    // 屏幕坐标转换为标准 OpenGL NDC（x: -1左~1右, y: -1下~1上）
+    // 屏幕坐标转换为标准 OpenGL NDC
     float nx = (2.0f * screenPos.x() - vpW) / vpW;
     float ny = (vpH - 2.0f * screenPos.y()) / vpH;
 
@@ -65,9 +84,6 @@ QPointF Camera2D::screenToWorld(const QPoint& screenPos, float vpW, float vpH) c
 
     float wx = (nx / scaleX) - panOffset.x();
     float wy = (ny / scaleY) - panOffset.y();
-
-    // SY_INFOF("Camera2D::screenToWorld: screen=(%d,%d), vp=(%.0f,%.0f), ndc=(%.3f,%.3f), zoom=(%.6f,%.6f), pan=(%.2f,%.2f), world=(%.2f,%.2f)",
-    //     screenPos.x(), screenPos.y(), vpW, vpH, nx, ny, zoomX, zoomY, panOffset.x(), panOffset.y(), wx, wy);
 
     return QPointF(wx, wy);
 }
@@ -122,9 +138,64 @@ void Camera2D::zoomToFit(float vpW, float vpH, float sceneW, float sceneH)
     zoomX = zoom;
     zoomY = zoom;
     panOffset = QPointF(0, 0);
+
+    // 计算生成的视图边界，用于验证
+    float finalScaleX = 2.0f * zoom / vpW;
+    float finalScaleY = 2.0f * zoom / vpH;
+    float wMinX = -1.0f / finalScaleX;
+    float wMaxX = 1.0f / finalScaleX;
+    float wMinY = -1.0f / finalScaleY;
+    float wMaxY = 1.0f / finalScaleY;
+
+    SY_INFOF("Camera2D::zoomToFit: vp=(%.0f,%.0f), scene=(%.2f,%.2f), zoom=%.6f, scaleX=%.8f, scaleY=%.8f, initialViewBounds=[%.2f,%.2f]-[%.2f,%.2f]",
+        vpW, vpH, sceneW, sceneH, zoom, finalScaleX, finalScaleY,
+        wMinX, wMinY, wMaxX, wMaxY);
 }
 
-void Camera2D::setViewExtent(float vpW, float vpH, float centerX, float centerY, float halfW, float halfH)
+void Camera2D::zoomToBBox(float vpW, float vpH,
+    float minX, float minY, float maxX, float maxY)
+{
+    if (vpW <= 0 || vpH <= 0)
+        return;
+
+    float sceneW = maxX - minX;
+    float sceneH = maxY - minY;
+
+    // 退化场景：给一个默认大小
+    if (sceneW <= 0 || sceneH <= 0)
+    {
+        sceneW = 1000.0f;
+        sceneH = 1000.0f;
+    }
+
+    float centerX = (minX + maxX) * 0.5f;
+    float centerY = (minY + maxY) * 0.5f;
+
+    // 先缩放到边界框尺寸，再平移使中心点对齐
+    zoomToFit(vpW, vpH, sceneW, sceneH);
+    pan(-centerX, -centerY);
+
+    SY_INFOF("Camera2D::zoomToBBox: bbox=[%.2f,%.2f]-[%.2f,%.2f], center=(%.2f,%.2f), zoom=(%.6f,%.6f), pan=(%.2f,%.2f)",
+        minX, minY, maxX, maxY, centerX, centerY, zoomX, zoomY,
+        panOffset.x(), panOffset.y());
+}
+
+void Camera2D::zoomAtCenter(float factor, float vpW, float vpH)
+{
+    if (vpW <= 0 || vpH <= 0)
+        return;
+
+    // 以视口中心为锚点缩放
+    QPoint centerScreen(static_cast<int>(vpW * 0.5f), static_cast<int>(vpH * 0.5f));
+    QPointF anchorWorld = screenToWorld(centerScreen, vpW, vpH);
+    zoomIn(factor, anchorWorld, vpW, vpH);
+
+    SY_TRACEF("Camera2D::zoomAtCenter: factor=%.3f, vp=(%.0f,%.0f), anchor=(%.2f,%.2f), zoom=(%.6f,%.6f)",
+        factor, vpW, vpH, anchorWorld.x(), anchorWorld.y(), zoomX, zoomY);
+}
+
+void Camera2D::setViewExtent(float vpW, float vpH,
+    float centerX, float centerY, float halfW, float halfH)
 {
     if (halfW <= 0 || halfH <= 0 || vpW <= 0 || vpH <= 0)
         return;
@@ -142,4 +213,21 @@ void Camera2D::setViewExtent(float vpW, float vpH, float centerX, float centerY,
 
     SY_TRACEF("Camera2D::setViewExtent: vpW=%.0f, vpH=%.0f, center=(%.2f,%.2f), half=(%.2f,%.2f), zoom=(%.6f,%.6f), pan=(%.2f,%.2f)",
         vpW, vpH, centerX, centerY, halfW, halfH, zoomX, zoomY, panOffset.x(), panOffset.y());
+}
+
+void Camera2D::resetToDefault(float vpW, float vpH)
+{
+    // 默认台面范围：1200x800，中心 (600,400)
+    constexpr float kTableW = 1200.0f;
+    constexpr float kTableH = 800.0f;
+    constexpr float kCenterX = kTableW * 0.5f;
+    constexpr float kCenterY = kTableH * 0.5f;
+
+    if (vpW > 0 && vpH > 0)
+        setViewExtent(vpW, vpH, kCenterX, kCenterY, kCenterX, kCenterY);
+    else
+        reset();
+
+    SY_INFOF("Camera2D::resetToDefault: vp=(%.0f,%.0f), zoom=(%.6f,%.6f), pan=(%.2f,%.2f)",
+        vpW, vpH, zoomX, zoomY, panOffset.x(), panOffset.y());
 }

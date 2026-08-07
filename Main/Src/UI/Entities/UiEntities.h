@@ -123,8 +123,8 @@ public:
 
     // ---- SceneDocumentBase 接口 ----
 
-    std::vector<std::string> allEntityIds() const override;
-    void removeEntity(const std::string& id) override;
+    void forEachEntityId(void(*visitor)(const char*, void*), void* ctx) const override;
+    void removeEntity(const char* id) override;
     void clear() override;
 
 private:

@@ -18,6 +18,9 @@ public:
     void registerAll();
 
 private:
+    /// 注册帮助操作（About / Settings / Docs / Shortcuts）
+    void registerHelpOperations();
+
     OperationBus* m_bus;
     SceneEditService* m_editService;
     IUndoRedoManager* m_undoManager;

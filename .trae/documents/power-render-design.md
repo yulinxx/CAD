@@ -1,5 +1,9 @@
 # PowerRender — 下一代渲染 DLL 实现计划
 
+> **文档状态（2026-08-02）**：设计方案，不是当前生产实现清单。
+>
+> 当前代码已使用 `Renderx` 相关路径，但本文对 `Render/NextGen`、`SanYiRender`、`RenderEngine` 等模块的比较和目标架构，不能直接解释当前运行时调用链。后续若决定采用 PowerRender，应另行记录迁移范围、兼容期和验收标准。
+
 ## Context（背景）
 
 工程内同时存在 4 套并行渲染模块：
@@ -46,7 +50,7 @@ C:\Users\xx\Documents\Cpp\CAD\PowerRender\
 │   │   ├── mesh_manager.h           # port from Renderx + hash dedup
 │   │   └── mesh_manager.cpp
 │   ├── world\
-│   │   ├── power_world.h            # 核心：实体 SlotMap + VertexArena + QuadTree
+│   │   ├── power_world.h            # 核心：图元 SlotMap + VertexArena + QuadTree
 │   │   └── power_world.cpp
 │   ├── view\
 │   │   ├── power_view.h
@@ -61,7 +65,7 @@ C:\Users\xx\Documents\Cpp\CAD\PowerRender\
 │   └── internal.h
 └── demo\
     ├── CMakeLists.txt
-    └── main.cpp                     # 1M 实体 + 文字 + 共享 Mesh
+    └── main.cpp                     # 1M 图元 + 文字 + 共享 Mesh
 ```
 
 ## 关键设计
@@ -81,7 +85,7 @@ PRDevice ── GPU 上下文 + 窗口
 PRWorld  ── 纯数据容器（SlotMap + VertexArena + QuadTree + TextAtlas + MeshManager）
 PRView   ── 相机 + 视口，绑 1 个 World + 1 个 Device；多 View 可共享 1 个 World
 ```
-- 实体按 ID 直接寻址：`prWorldModifyEntity(world, id, verts, n)` → 自动定位 VBO 稳定 offset
+- 图元按 ID 直接寻址：`prWorldModifyEntity(world, id, verts, n)` → 自动定位 VBO 稳定 offset
 - 批量：`prWorldApplyUpdates(world, updates[], n)` → 一次 packet 提交
 - 文字：`prWorldLoadFontDefault` + `prWorldSetTexts`
 - Mesh 共享：`prWorldRegisterMesh` 用 hash(pos,nor,idx) 自动去重；`prWorldAddMeshInstance` 1000 个实例共享 1 个 VBO/IBO

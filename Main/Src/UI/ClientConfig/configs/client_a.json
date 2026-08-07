@@ -1,0 +1,38 @@
+{
+  "meta": {
+    "clientId": "client_a",
+    "clientName": "客户 A 精简版",
+    "version": "1.0"
+  },
+  "extends": "base",
+  "menus": [
+    {
+      "id": "tools",
+      "label": "Tools",
+      "items": [
+        { "type": "action", "id": "tool.measure", "label": "Measure", "command": "2d.measure" }
+      ]
+    }
+  ],
+  "toolbars": [
+    {
+      "id": "DrawToolBar",
+      "title": "Draw Tools",
+      "position": "left",
+      "workbench": "2D",
+      "items": []
+    }
+  ],
+  "docks": [
+    {
+      "id": "SceneDock",
+      "title": "Scene",
+      "position": "left",
+      "widgetType": "SceneTreePanel",
+      "visible": true
+    }
+  ],
+  "shortcuts": [
+    { "command": "edit.redo", "keys": "Ctrl+Y" }
+  ]
+}

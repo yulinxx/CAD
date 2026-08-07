@@ -94,7 +94,7 @@ void SelectionSet::add(const std::shared_ptr<SceneNode>& node)
 {
     if (!node || !m_scene)
         return;
-    m_scene->selectMesh(m_scene->findMeshById(node->engineEntityId()));
+    m_scene->selectEntity(m_scene->findMeshById(node->engineEntityId()));
 }
 
 void SelectionSet::remove(const std::string& nodeId)
@@ -104,13 +104,18 @@ void SelectionSet::remove(const std::string& nodeId)
     auto eid = Eg::parseEntityId(nodeId);
     if (!eid)
         return;
-    auto selIds = m_scene->selectedEntityIds();
+    std::vector<Eg::EntityId> selIds;
+    m_scene->forEachSelectedEntityId([](Eg::EntityId id, void* ctx) -> bool {
+        auto* vec = static_cast<std::vector<Eg::EntityId>*>(ctx);
+        vec->push_back(id);
+        return true;
+        }, &selIds);
     m_scene->clearSelection();
     for (auto id : selIds)
     {
         if (id != *eid)
             if (auto* m = m_scene->findMeshById(id))
-                m_scene->selectMesh(m);
+                m_scene->selectEntity(m);
     }
 }
 
@@ -121,8 +126,21 @@ bool SelectionSet::contains(const std::string& entityId) const
     auto eid = Eg::parseEntityId(entityId);
     if (!eid)
         return false;
-    const auto selIds = m_scene->selectedEntityIds();
-    return std::find(selIds.begin(), selIds.end(), *eid) != selIds.end();
+    struct FindCtx
+    {
+        bool found; Eg::EntityId target;
+    };
+    FindCtx ctx{ false, *eid };
+    m_scene->forEachSelectedEntityId([](Eg::EntityId id, void* rawCtx) {
+        auto* c = static_cast<FindCtx*>(rawCtx);
+        if (id == c->target)
+        {
+            c->found = true;
+            return false; // 停止遍历
+        }
+        return true;
+        }, &ctx);
+    return ctx.found;
 }
 
 std::vector<std::shared_ptr<SceneNode>> SelectionSet::items() const
@@ -130,11 +148,14 @@ std::vector<std::shared_ptr<SceneNode>> SelectionSet::items() const
     std::vector<std::shared_ptr<SceneNode>> result;
     if (!m_scene)
         return result;
-    for (auto* mesh : m_scene->getSelectedMeshes())
-    {
-        auto node = std::make_shared<SceneNode>(mesh->getId(), mesh->strName);
-        result.push_back(node);
-    }
+    // ABI 收口：通过回调收集选中图元（替代 getSelectedMeshes() 返回值）
+    m_scene->forEachSelectedMesh([](Eg::SyMeshEntity* mesh, void* ctx) {
+        auto* vec = static_cast<std::vector<std::shared_ptr<SceneNode>>*>(ctx);
+        if (!mesh)
+            return;
+        auto node = std::make_shared<SceneNode>(mesh->getId(), std::string(mesh->name()));
+        vec->push_back(node);
+        }, &result);
     return result;
 }
 
@@ -168,7 +189,7 @@ std::shared_ptr<SceneNode> SceneDocument3DAdapter::createNode(const std::string&
 
     auto mesh = std::make_unique<Eg::SyMeshEntity>(name);
     Eg::EntityId meshId = mesh->id;
-    m_engineScene->addEntity(std::move(mesh));
+    m_engineScene->addEntity(mesh.release());
 
     auto node = std::make_shared<SceneNode>(meshId, name);
     if (m_uiRoot)
@@ -191,7 +212,10 @@ void SceneDocument3DAdapter::removeNode(const std::string& id)
     if (!eid)
         return;
     if (auto* mesh = m_engineScene->findMeshById(*eid))
-        m_engineScene->removeEntity(mesh);
+    {
+        // removeEntity 转移所有权，销毁后移除 UI 节点
+        delete m_engineScene->removeEntity(mesh);
+    }
 }
 
 void SceneDocument3DAdapter::removeNode(const std::shared_ptr<SceneNode>& node)
@@ -227,19 +251,32 @@ const SelectionSet& SceneDocument3DAdapter::selection() const
 
 // ---- SceneDocumentBase 接口 ----
 
-std::vector<std::string> SceneDocument3DAdapter::allEntityIds() const
+void SceneDocument3DAdapter::forEachEntityId(void(*visitor)(const char*, void*), void* ctx) const
 {
-    std::vector<std::string> ids;
     if (!m_engineScene)
-        return ids;
-    for (auto eid : m_engineScene->getAllEntityIds())
-        ids.push_back(engineIdStr(eid));
-    return ids;
+        return;
+
+    // 将两个回调参数打包，避免捕获 lambda 无法转为函数指针
+    struct VisitorCtx
+    {
+        void(*visitor)(const char*, void*);
+        void* ctx;
+    };
+    VisitorCtx vctx{ visitor, ctx };
+
+    m_engineScene->forEachEntityId(
+        [](Eg::EntityId eid, void* userData) -> bool {
+            auto* vc = static_cast<VisitorCtx*>(userData);
+            std::string idStr = engineIdStr(eid);
+            vc->visitor(idStr.c_str(), vc->ctx);
+            return true;
+        },
+        &vctx);
 }
 
-void SceneDocument3DAdapter::removeEntity(const std::string& id)
+void SceneDocument3DAdapter::removeEntity(const char* id)
 {
-    removeNode(id);
+    removeNode(std::string(id));
 }
 
 void SceneDocument3DAdapter::clear()

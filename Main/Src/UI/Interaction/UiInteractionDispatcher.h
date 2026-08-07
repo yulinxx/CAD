@@ -9,6 +9,26 @@
 
 class UiStateCenter;
 class UiLayoutService;
+class QMouseEvent;
+class QKeyEvent;
+
+enum class InteractionEventType
+{
+    MouseDown,
+    MouseMove,
+    MouseUp,
+    KeyPress
+};
+
+struct InteractionEvent
+{
+    InteractionEventType type{ InteractionEventType::MouseMove };
+    int x{ -1 };
+    int y{ -1 };
+    int key{ -1 };
+};
+
+using InteractionEventHandler = std::function<bool(const InteractionEvent&)>;
 
 /**
  * @brief 交互式命令生命周期分发器
@@ -18,7 +38,7 @@ class UiLayoutService;
  *
  * 统一生命周期：
  *   begin(commandId) → 标记命令开始并同步状态
- *   forwardMouseDown/Move/Up/KeyPress → 转发鼠标和键盘事件
+ *   dispatchEvent(event) → 接收统一的鼠标/键盘交互事件
  *   submit() → 收尾并同步状态
  *   cancel() → 取消并回退状态
  */
@@ -42,17 +62,35 @@ public:
     /// 判断是否有活动命令
     virtual bool hasActiveCommand() const = 0;
 
-    /// 转发鼠标按下事件
-    virtual bool forwardMouseDown(int x, int y) = 0;
+    /// 设置活动命令的事件消费回调
+    virtual void setEventHandler(InteractionEventHandler handler) = 0;
 
-    /// 转发鼠标移动事件
-    virtual bool forwardMouseMove(int x, int y) = 0;
+    /// 接收统一交互事件；返回 true 表示事件已被消费
+    virtual bool dispatchEvent(const InteractionEvent& event) = 0;
 
-    /// 转发鼠标释放事件
-    virtual bool forwardMouseUp(int x, int y) = 0;
+    /// 兼容旧调用方的鼠标按下入口
+    bool forwardMouseDown(int x, int y)
+    {
+        return dispatchEvent({ InteractionEventType::MouseDown, x, y, -1 });
+    }
 
-    /// 转发键盘按键事件
-    virtual bool forwardKeyPress(int key) = 0;
+    /// 兼容旧调用方的鼠标移动入口
+    bool forwardMouseMove(int x, int y)
+    {
+        return dispatchEvent({ InteractionEventType::MouseMove, x, y, -1 });
+    }
+
+    /// 兼容旧调用方的鼠标释放入口
+    bool forwardMouseUp(int x, int y)
+    {
+        return dispatchEvent({ InteractionEventType::MouseUp, x, y, -1 });
+    }
+
+    /// 兼容旧调用方的键盘入口
+    bool forwardKeyPress(int key)
+    {
+        return dispatchEvent({ InteractionEventType::KeyPress, -1, -1, key });
+    }
 
     /// 设置状态中心
     virtual void setStateCenter(UiStateCenter* stateCenter) = 0;
@@ -87,10 +125,8 @@ public:
     void cancel() override;
     QString activeCommandId() const override;
     bool hasActiveCommand() const override;
-    bool forwardMouseDown(int x, int y) override;
-    bool forwardMouseMove(int x, int y) override;
-    bool forwardMouseUp(int x, int y) override;
-    bool forwardKeyPress(int key) override;
+    void setEventHandler(InteractionEventHandler handler) override;
+    bool dispatchEvent(const InteractionEvent& event) override;
     void setStateCenter(UiStateCenter* stateCenter) override;
     void setUiServices(const UiServices& services) override;
     void setLayoutService(UiLayoutService* layoutService) override;
@@ -100,6 +136,7 @@ public:
 
 private:
     QString resolveCommandType(const QString& commandId) const;
+    void syncCommandFinishState();
 
 private:
     UiStateCenter* m_stateCenter{ nullptr };
@@ -108,5 +145,6 @@ private:
     UiFrameworkServices m_frameworkServices;
     QString m_activeCommandId;
     QString m_commandType;
+    InteractionEventHandler m_eventHandler;
     std::function<void(const QString&)> m_toolChangedCallback;
 };

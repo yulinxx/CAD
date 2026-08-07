@@ -11,6 +11,7 @@
 #include "Log/SyLogger.h"
 
 #include <QObject>
+#include <QWidget>
 
 CoreOperationRegistry::CoreOperationRegistry(OperationBus* bus,
     SceneEditService* editService,
@@ -55,19 +56,8 @@ void CoreOperationRegistry::registerAll()
                 editService->deleteSelected("Delete");
         }));
 
-    // ---- 全选 ----
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::Edit_SelectAll, [] {
-        }));
-
-    // ---- 群组/取消群组 ----
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::Edit_GroupToggle, [editService] {
-        }));
-
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::Edit_Ungroup, [editService] {
-        }));
+    // 选择、群组操作已在 EditOperations.cpp 中注册（SelectAll/ClearSelection/InvertSelection/GroupToggle），
+    // 此处不再重复注册。
 
     // ---- 圆角 ----
     reg.registerOperation(std::make_unique<ParamLambdaOperation>(
@@ -81,10 +71,13 @@ void CoreOperationRegistry::registerAll()
                 {
                     return;
                 }
+
                 bool ok = false;
                 radius = HelpDialogService::getDouble(nullptr, QObject::tr("Fillet Radius"),
                     QObject::tr("Radius:"), 5.0, 0.1, 10000.0, 2, &ok);
-                if (!ok || radius < 0.1) return;
+
+                if (!ok || radius < 0.1)
+                    return;
             }
             Eg::FilletChamfer::applyFillet(*editService, radius);
         }));
@@ -109,16 +102,42 @@ void CoreOperationRegistry::registerAll()
             Eg::FilletChamfer::applyChamfer(*editService, distance);
         }));
 
-    // ---- 视图操作 ----
+    // 视图操作（View_ZoomFit/ZoomIn/ZoomOut）已移至 PendingOperationRegistry
+    // 由 PendingOperationRegistry 统一管理视图类占位操作
+
+    // ---- 帮助操作 ----
+    registerHelpOperations();
+}
+
+void CoreOperationRegistry::registerHelpOperations()
+{
+    if (!m_bus)
+        return;
+
+    auto& reg = m_bus->registry();
+    QWidget* parentWidget = m_parentWidget;
+
+    // ---- Help: About ----
     reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::View_ZoomFit, [] {
+        OperationId::Help_About, [parentWidget] {
+            HelpDialogService::showAboutDialog(parentWidget);
         }));
 
+    // ---- Help: Settings ----
     reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::View_ZoomIn, [] {
+        OperationId::Help_Settings, [parentWidget] {
+            HelpDialogService::showSettingsDialog(parentWidget);
         }));
 
+    // ---- Help: Documentation ----
     reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::View_ZoomOut, [] {
+        OperationId::Help_Docs, [parentWidget] {
+            HelpDialogService::showDocumentationDialog(parentWidget);
+        }));
+
+    // ---- Help: Keyboard Shortcuts ----
+    reg.registerOperation(std::make_unique<LambdaOperation>(
+        OperationId::Help_Shortcut, [parentWidget] {
+            HelpDialogService::showShortcutsDialog(parentWidget);
         }));
 }

@@ -1,6 +1,5 @@
 {
     "actions": [
-        { "id": "file.open_model",       "display": "Open Model",           "shortcut": "Ctrl+O",       "configurable": true },
         { "id": "file.import_model",     "display": "Import Model",         "shortcut": "Ctrl+Shift+O", "configurable": true },
         { "id": "file.new_scene",        "display": "New Scene",            "shortcut": "Ctrl+N",       "configurable": true },
         { "id": "file.save",            "display": "Save",                 "shortcut": "Ctrl+S",       "configurable": true },

@@ -6,35 +6,42 @@
 #include <memory>
 
 #include "UiServices.h"
-#include "SelectionService.h"
 
 class QWidget;
 class QToolBar;
 class WorkbenchWindow;
 class PropertiesPanelWidget;
 class SceneTreeDockWidget;
+class RenderViewport2D;
+class StatusBar;
 
+// 3D 类型前向声明（避免头文件膨胀，实际 include 下沉到 .cpp）
 #if BUILD_UI3D
-#include "UiEntities.h"
-#include "Ui/MainWindow/MainWindow3D.h"
-#include "Ui/MenuManager/MenuManager3D.h"
-#include "Engine3D/SceneManager3D.h"
-#include "UI3D/Service/ServicePack3D.h"
-#include "UI3D/Operation/OperationBus3D.h"
-#include "UI3D/Manager/DocumentManager3D.h"
-#include "UI3D/Edit/UndoRedoManager3D.h"
-#include "UI3D/Edit/SceneEditService3D.h"
-#include "UI3D/Service/SceneMonitor3D.h"
-#include "UI3D/Shortcut/ShortcutManager3D.h"
-#include "UI3D/Navigation/NavigationConfig3D.h"
-#include "UI3D/Service/SceneDocument3D.h"
-#include "UI3D/Service/CameraController3D.h"
-#include "UI3D/Settings/SettingsUiCoordinator3D.h"
-#include "UI3D/Operation/CommandActionHub3D.h"
-#include "UI3D/Operation/AlgorithmRunner3D.h"
-#include "UI/Algorithm/AlgorithmApplicationService.h"
+#include <QShortcut>
+#include "UI3D/Service/ServicePack3D.h"  // 值成员需要完整定义
+#include "UI/MainWindow/MainWindow3D.h"   // unique_ptr 成员，MOC 需要完整类型
+#include "UI/MenuManager/MenuManager3D.h" // unique_ptr 成员，MOC 需要完整类型
+namespace Eg
+{
+    class SceneManager3D;
+}
+class OperationBus3D;
+class DocumentManager3D;
+class UndoRedoManager3D;
+class SceneEditService3D;
+class SceneMonitor3D;
+class ShortcutManager3D;
+class NavigationConfig3D;
+class SceneDocument3D;
+class CameraController3D;
+class SettingsUiCoordinator3D;
+class CommandActionHub3D;
+class AlgorithmRunner3D;
+class AlgorithmApplicationService;
+class SceneDocument3DAdapter;
+class StatusBar3D;
 #ifdef ENABLE_GEOMODELCORE
-#include "UI3D/Service/BRepModelService3D.h"
+class BRepModelService3D;
 #endif
 #endif
 
@@ -52,6 +59,12 @@ class SceneTreeDockWidget;
  *
  * 用于工作台切换时保存和恢复状态，避免切换后丢失当前选择、视图模式等信息。
  * 每个工作台在 deactivate() 时保存状态，在 activate() 时恢复状态。
+ *
+ * 状态字段覆盖：
+ *   - 文档/视图：documentId, viewMode, viewportType, viewportStatus
+ *   - 图层/选择：layerId, selectionSource, selectionText, selectionType
+ *   - 工具/输入：activeToolId, inputFocusWidget
+ *   - 脏状态：dirty
  */
 struct WorkbenchStateSnapshot
 {
@@ -71,6 +84,10 @@ struct WorkbenchStateSnapshot
     QString viewportType;
     /// 视口状态
     QString viewportStatus;
+    /// 当前激活工具 ID（切换后恢复工具状态）
+    QString activeToolId;
+    /// 当前输入焦点控件名称（切换后恢复焦点）
+    QString inputFocusWidget;
     /// 是否有未保存更改
     bool dirty{ false };
 };
@@ -151,7 +168,7 @@ protected:
 class Workbench2D final : public UiWorkbench
 {
 public:
-    Workbench2D() = default;
+    Workbench2D();
     ~Workbench2D() override;
 
     QString id() const override;
@@ -163,38 +180,28 @@ public:
     void shutdown() override;
 
 private:
-    /// 创建当前工作台应使用的中央视口
-    /// @param window 主窗口
-    /// @param properties 属性面板，用于旧版视口的状态回写
-    /// @return 可直接设置为 centralWidget 的视口部件
+    /// 创建中央视口
     QWidget* createCentralViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties);
-    /// 配置新版本 ViewWidget 的最小运行状态
-    /// @param viewport 新版 2D 视图控件
-    void configureModernViewport(QWidget* viewport) const;
-    /// 配置工作台的默认对象与状态面板内容
-    /// @param properties 属性面板
-    void configureWorkbenchPanels(PropertiesPanelWidget* properties) const;
-    /// 创建并注册 2D 工具面板
-    /// @param window 主窗口
-    /// @return 创建后的停靠面板指针
+    /// 注入服务到视口：选择/交互/操作总线 + 编辑服务信号连接 + 状态回调 + 工具初始化
+    void setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& window);
+    /// 设置导入服务回调：zoomToFit / 场景树刷新 / 属性面板刷新
+    void setupImportCallbacks(RenderViewport2D* vp, WorkbenchWindow& window);
+    /// 创建左侧绘图工具栏 + 顶部编辑工具栏 + 右侧颜色/图层工具栏
+    void createToolbars(WorkbenchWindow& window);
+    /// 创建并注册 2D 图层面板
     SceneTreeDockWidget* createLayersDock(WorkbenchWindow& window) const;
-    /// 配置工具栏动作与命令分发绑定
-    /// @param mainBar 主工具栏
-    /// @param viewBar 视图工具栏
-    void configureWorkbenchActions(QToolBar* mainBar, QToolBar* viewBar) const;
-    /// 配置工作台初始状态与属性面板文本
-    /// @param properties 属性面板
-    void configureInitialWorkbenchState(PropertiesPanelWidget* properties) const;
 
 private:
-    std::unique_ptr<SelectionService> m_selectionService;
-
-    /// 命令动作中枢：管理所有 QAction 的创建、绑定、刷新（裸指针，生命周期由 deactivate/shutdown 管理）
-    class CommandActionHub* m_commandHub{ nullptr };
-    /// 顶部工具栏（编辑命令）
+    /// 命令动作中枢：管理所有 QAction 的创建、绑定、刷新
+    std::unique_ptr<class CommandActionHub> m_commandHub;
+    /// 顶部工具栏（编辑命令）— Qt 父对象管理生命周期
     class TopToolBar* m_topToolBar{ nullptr };
-    /// 右侧工具栏（颜色/图层）
+    /// 右侧工具栏（颜色/图层）— Qt 父对象管理生命周期
     class RightToolBar* m_rightToolBar{ nullptr };
+    /// 2D 渲染视口 — Qt 父对象管理生命周期（工作台切换时用于恢复工具状态）
+    class RenderViewport2D* m_viewport{ nullptr };
+    /// 2D 状态栏 widget — 由 StatusBar 基类管理，通过 mountStatusBar 挂载到 WorkbenchWindow
+    StatusBar* m_statusBar2D{ nullptr };
 };
 
 #if BUILD_UI3D
@@ -221,37 +228,33 @@ public:
     void shutdown() override;
 
 private:
+    // ServiceOwner 定义在 .cpp 中（PIMPL 模式，避免头文件引入 20+ 3D 依赖）
+    struct ServiceOwner;
+    /// 自定义删除器：声明在此，定义在 .cpp（ServiceOwner 完整定义处）
+    struct ServiceOwnerDeleter { void operator()(ServiceOwner*) const; };
+
     void build3DWorkbenchUi(WorkbenchWindow& window);
+    void create3DServices();
+    void setup3DViewportAndSignals(WorkbenchWindow& window);
+    void setup3DMenuAndShortcuts(WorkbenchWindow& window);
     void onMenuAction(int actionId, const QVariantMap& params);
+    void create3DViewport(WorkbenchWindow& window);
+    void bind3DRenderSignals(ServiceOwner& own);
+    void bind3DCursorSignal();
+    void bind3DSelectionSignal();
+    void bind3DDeleteKeySignal();
+    void setup3DDeleteShortcuts(WorkbenchWindow& window);
 
 private:
-    struct ServiceOwner
-    {
-        std::unique_ptr<OperationBus3D> operationBus;
-        std::unique_ptr<DocumentManager3D> documentManager;
-        std::unique_ptr<UndoRedoManager3D> undoRedoManager;
-        std::unique_ptr<SceneEditService3D> sceneEditService;
-        std::unique_ptr<SceneMonitor3D> sceneMonitor;
-        std::unique_ptr<ShortcutManager3D> shortcutManager;
-        std::unique_ptr<NavigationConfig3D> navigationConfig;
-        std::unique_ptr<SceneDocument3D> sceneDocument;
-        std::unique_ptr<SceneDocument3DAdapter> sceneDocumentAdapter;
-        std::unique_ptr<CameraController3D> cameraController;
-        std::unique_ptr<AlgorithmApplicationService> algorithmService;
-        std::unique_ptr<SettingsUiCoordinator3D> settingsCoordinator;
-        std::unique_ptr<CommandActionHub3D> commandActionHub;
-        std::unique_ptr<AlgorithmRunner3D> algorithmRunner;
-
-#ifdef ENABLE_GEOMODELCORE
-        std::unique_ptr<BRepModelService3D> brepModelService;
-#endif
-    };
-
-    std::unique_ptr<ServiceOwner> m_serviceOwner;
+    // PIMPL + 自定义删除器：避免 MOC 编译时需要 ServiceOwner 完整定义
+    std::unique_ptr<ServiceOwner, ServiceOwnerDeleter> m_serviceOwner;
     ServicePack3D m_services3D{};
 
     std::unique_ptr<class MainWindow3D> m_mainWindow3D;
     std::unique_ptr<class MenuManager3D> m_menuManager3D;
+
+    /// 3D 状态栏 widget — 由 StatusBar3D 基类管理，通过 mountStatusBar 挂载到 WorkbenchWindow
+    StatusBar3D* m_statusBar3D{ nullptr };
 
     Eg::SceneManager3D* m_sceneManager3D{ nullptr };
 

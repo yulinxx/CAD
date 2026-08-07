@@ -9,9 +9,9 @@
 #include "ExportContext.h"
 #include "ExportOptions.h"
 #include "ExportResult.h"
+#include "FileIO/IFileParser.h"
 
 class ExportDispatcher;
-class UiStateCenter;
 
 namespace Eg
 {
@@ -33,8 +33,10 @@ public:
     /// 设置场景管理器（用于收集场景中的图元数据）
     void setSceneManager(Eg::SceneManager* sceneManager);
 
-    /// 设置状态中心（用于导出过程中的状态同步）
-    void setStateCenter(UiStateCenter* stateCenter);
+    /// 设置忙状态回调（替代旧的 UiStateCenter 直接依赖）
+    void setBusyStateCallback(std::function<void(bool)> callback);
+    /// 设置状态栏提示回调（替代旧的 UiStateCenter 直接依赖）
+    void setStatusPromptCallback(std::function<void(const QString&)> callback);
 
     /// 执行文件导出
     /// @param filePath 目标文件路径
@@ -76,6 +78,8 @@ private:
     ExportDispatcher* m_dispatcher{ nullptr };
     /// 场景管理器（非拥有指针）
     Eg::SceneManager* m_sceneManager{ nullptr };
-    /// 状态中心（非拥有指针）
-    UiStateCenter* m_stateCenter{ nullptr };
+    /// 忙状态回调（替代 UiStateCenter 直接调用）
+    std::function<void(bool)> m_busyStateCallback;
+    /// 状态栏提示回调（替代 UiStateCenter 直接调用）
+    std::function<void(const QString&)> m_statusPromptCallback;
 };

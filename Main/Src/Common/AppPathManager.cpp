@@ -7,8 +7,8 @@
 
 #include "AppPathManager.h"
 
-#include <QCoreApplication>
 #include <QDir>
+#include <QCoreApplication>
 #include <QStandardPaths>
 
  /// 应用名称常量（唯一路径控制源）

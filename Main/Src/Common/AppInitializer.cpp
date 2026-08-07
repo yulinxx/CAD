@@ -20,10 +20,27 @@
 #include <QFont>
 #include <QLocale>
 
+#include <cstring>
+
 namespace
 {
     // 全局持久化服务指针（AppInitializer 创建，CompositionRoot 获取）
     static PersistenceService* s_persistenceService = nullptr;
+
+    // SyLogger 日志目录回调 thunk：C 函数指针 + void* ctx，
+    // 返回静态缓冲（避免 std::function/std::string 跨 DLL 传递）
+    static char s_logPathBuffer[1024];
+
+    const char* appLogPathThunk(void*)
+    {
+        const QByteArray utf8 = AppPathManager::logsDir().toUtf8();
+        const size_t copyLen = (static_cast<size_t>(utf8.size()) < sizeof(s_logPathBuffer))
+            ? static_cast<size_t>(utf8.size())
+            : sizeof(s_logPathBuffer) - 1;
+        std::memcpy(s_logPathBuffer, utf8.constData(), copyLen);
+        s_logPathBuffer[copyLen] = '\0';
+        return s_logPathBuffer;
+    }
 
     AppLanguage detectSystemLanguage()
     {
@@ -63,15 +80,14 @@ namespace
 
 void AppInitializer::initialize()
 {
-    SyLogger::SetLogPathCallback([]() {
-        return AppPathManager::logsDir().toStdString();
-        });
+    SyLogger::SetLogPathCallback(&appLogPathThunk, nullptr);
 
     SyLogger::GetInstance().Initialize(
         MainApp::appName().c_str(),
         SyLogLevel::Debug,
         true,
         true);
+
     SY_INFOF("Starting %s v%s", MainApp::appName().c_str(), MainApp::appVersion().c_str());
 
     CrashHandlerBootstrap::logPendingDumps();
@@ -97,6 +113,7 @@ void AppInitializer::initialize()
     QDir().mkpath(dataDir);
     const QString dbPath = dataDir + QStringLiteral("/cad_database.sqlite");
     auto* persistenceService = new PersistenceService();
+
     if (persistenceService->initialize(dbPath.toStdString()))
     {
         SY_INFOF("[AppInitializer] Database initialized: %s", dbPath.toUtf8().constData());
@@ -107,6 +124,7 @@ void AppInitializer::initialize()
             persistenceService->lastError().c_str());
         // 数据库初始化失败不阻塞启动，UI 层将回退到 QSettings
     }
+
     // 将 PersistenceService 所有权转移给全局指针（供 CompositionRoot 获取）
     s_persistenceService = persistenceService;
 }

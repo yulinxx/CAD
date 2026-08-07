@@ -1,10 +1,12 @@
-/**
+﻿/**
  * @file RenderViewport2D.h
  * @brief 基于 Renderx 的 2D 渲染视口 — 替换旧的 QGraphicsView 视口
  *
  * 使用 RenderWidget (QOpenGLWidget + Renderx) 作为渲染内核，
  * 内置 2D 相机管理，SceneManager 作为数据源（ISceneDataSource）。
  * 对外接口与 Viewport2D 保持兼容，便于无缝替换。
+ *
+ * 输入路由委托给 ViewportInputRouter（P5 大文件收口）。
  */
 #pragma once
 
@@ -14,15 +16,11 @@
 #include <QPoint>
 #include <functional>
 #include <memory>
-#include <unordered_set>
 
 #include "Camera2D.h"
 #include "ViewportSelector.h"
-#include "Render/RenderTypes.h"
 
-#include "Engine/EntityIdGenerator.h"
-#include "Engine2D/Core/SceneNotifier.h"
-#include "Engine2D/Edit/SceneEditService.h"
+#include "UI/IViewportHost.h"  // P1: 2D/3D 公共视口宿主接口
 
 class RenderWidget;
 class SceneDocument2D;
@@ -30,6 +28,9 @@ class ISelectionService;
 class IInteractionDispatcher;
 class OperationBus;
 class ToolManager;
+class ITool;
+class SceneRefreshCoordinator;
+class ViewportInputRouter;
 struct ToolContext;
 
 class QMouseEvent;
@@ -42,6 +43,7 @@ class QResizeEvent;
 namespace Eg
 {
     class SceneManager;
+    class SyEntity;
 }
 
 /**
@@ -49,9 +51,11 @@ namespace Eg
  *
  * 取代旧的 Viewport2D (QGraphicsView)，使用 RenderWidget + Renderx 进行硬件加速渲染。
  * 数据层通过 ISceneDataSource 接口推送几何原语，渲染层自行处理细分和缓存。
+ *
+ * 输入路由委托给 ViewportInputRouter（P5 大文件收口）。
  */
 class RenderViewport2D : public QWidget
-    , private Eg::SceneNotifier::IObserver
+    , public UI::IViewportHost       // P1: 实现 2D/3D 公共视口宿主接口
 {
     Q_OBJECT
 public:
@@ -61,17 +65,37 @@ public:
 public:
     // ==================== 外部接口（与 Viewport2D 兼容）====================
 
-    void setStatusCallback(std::function<void(const QString&)>&& callback);
-    void setSelectionCallback(std::function<void(const QString&, const QString&)>&& callback);
-    void setCommandStageCallback(std::function<void(const QString&)>&& callback);
+    // ==================== UI::IViewportHost 接口实现 ====================
+    int viewportWidth() const override
+    {
+        return width();
+    }
+    int viewportHeight() const override
+    {
+        return height();
+    }
+    double devicePixelRatio() const override
+    {
+        return devicePixelRatioF();
+    }
+    QWidget* viewportWidget() const override
+    {
+        return const_cast<RenderViewport2D*>(this);
+    }
+    UI::ViewportDimension dimension() const override
+    {
+        return UI::ViewportDimension::Dim2D;
+    }
+
+    void setStatusCallback(std::function<void(const QString&)> callback);
+    void setSelectionCallback(std::function<void(const QString&, const QString&)> callback);
+    void setCommandStageCallback(std::function<void(const QString&)> callback);
     // 设置鼠标位置回调，用于在状态栏显示当前光标坐标
-    void setPositionCallback(std::function<void(double, double)>&& callback);
+    void setPositionCallback(std::function<void(double, double)> callback);
 
     void setDocument(SceneDocument2D* document);
 
     // ==================== 工具系统接口 ====================
-    /// 设置场景编辑服务（工具提交图元时使用）
-    void setSceneEditService(SceneEditService* service);
     /// 初始化工具系统
     void initializeTools();
     /// 设置活动工具
@@ -88,21 +112,27 @@ public:
     void setInteractionDispatcher(IInteractionDispatcher* dispatcher);
     void setOperationBus(OperationBus* bus);
 
+    /// 在 native window 销毁前显式释放 OpenGL 资源，避免析构时访问无效句柄崩溃
+    void releaseGLResources();
+
     void resetView();
     void zoomToFit();
     void zoomToSelection();
     void zoomIn();
     void zoomOut();
-    void requestSceneRefresh();
-    /// 轻量级重绘请求，不触发全量 gather，用于选中变化等仅需视觉刷新场景
+    // 刷新 API（P5 语义统一：三级刷新，语义明确）
+    /// 轻量重绘 — 纯视觉刷新，不触碰渲染数据（选择变化、光标移动等）
     void requestRepaint();
-    /// 全量刷新请求，强制完整 gather + submit（导入、大批量修改后）
+    /// 增量刷新 — 提交脏/删除图元到渲染设备（图元修改、少量增删后）
+    void requestLightRefresh();
+    /// 全量刷新 — 完整 gather + submit（导入、大批量修改、文档加载后）
     void requestFullRefresh();
     void setPanModeEnabled(bool enabled);
     bool isPanModeEnabled() const;
     void setDrawingEnabled(bool enabled);
     void setMeasureMode(bool enabled);
 
+    // 选择/编辑操作（P5 已下沉：选择管理 → ViewportSelector，编辑 → SceneEditService）
     QString selectedEntityId() const;
     void deleteSelectedEntity();
     void nudgeSelectedEndpoint(const QPointF& delta);
@@ -112,12 +142,18 @@ public:
 
     // 坐标转换
     QPointF mapToScene(const QPoint& screenPos) const;
+    /// 将 RenderWidget 本地坐标转换为世界坐标（物理像素 → 相机反算）
+    QPointF widgetToWorld(QPoint widgetLocalPos) const;
 
 signals:
     void sceneChanged();
+    // P1: 视口不直接持有编辑服务，通过信号通知上层
+    void entitySubmitRequested(Eg::SyEntity* entity);
+    void nudgeRequested(double dx, double dy);
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
+    // 以下事件委托给 ViewportInputRouter（P5 大文件收口）
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
@@ -126,8 +162,6 @@ protected:
     void keyPressEvent(QKeyEvent* event) override;
     void contextMenuEvent(QContextMenuEvent* event) override;
     void showEvent(QShowEvent* event) override;
-    // RenderWidget 是 QOpenGLWidget 原生窗口，鼠标事件不会传递到父控件，
-    // 通过事件过滤器将 RenderWidget 上的鼠标事件转发到本视口处理
     bool eventFilter(QObject* obj, QEvent* event) override;
 
 private:
@@ -135,22 +169,27 @@ private:
 
     // 初始化
     void initRenderWidget();
-    void initTimers();
-
-    // IObserver 实现
-    void onSceneChanged() override;
-    void onSelectionChanged() override;
-
-    // 渲染更新
-    void updateSceneRender();
-    void scheduleSceneUpdate();
 
     // 视图控制
     void updateViewMatrix();
+    /// 将相机矩阵提交给渲染控件并标记场景环境为脏
+    void applyCameraToWidget();
+
+    // 获取物理像素视口尺寸（与 GPU 渲染一致）
+    QSizeF physicalViewportSize() const;
 
     // 辅助
     void updateStatus(const QString& text);
+    void syncStatusMode(const QString& text);
+    void syncCommandStage(const QString& text);
+    void syncSelectionCallback(const QString& source, const QString& text);
+    void syncSelectionToolState();
+
     Eg::SceneManager* sceneManager() const;
+
+    // 连接输入路由器的依赖
+    void wireInputRouter();
+    void syncInputRouterCallbacks();
 
 private:
     // 渲染控件
@@ -166,7 +205,6 @@ private:
     ISelectionService* m_selectionService{ nullptr };
     IInteractionDispatcher* m_interactionDispatcher{ nullptr };
     OperationBus* m_operationBus{ nullptr };
-    SceneEditService* m_sceneEditService{ nullptr };
 
     // 工具系统
     std::unique_ptr<ToolManager> m_toolManager;
@@ -181,28 +219,9 @@ private:
     // 鼠标位置回调，参数为世界坐标 (x, y)
     std::function<void(double, double)> m_positionCallback;
 
-    // 交互状态
-    bool m_panning{ false };
-    bool m_panModeEnabled{ false };
-    QPoint m_lastMousePos;
+    // 刷新协调器（四级刷新策略 + 增量渲染管线）
+    std::unique_ptr<SceneRefreshCoordinator> m_refreshCoordinator;
 
-    // 刷新级别（增量渲染策略）
-    enum class RefreshLevel
-    {
-        None,         // 无待办，不要触发任何 GL 操作
-        Repaint,      // 仅重绘（选择变化等纯视觉刷新，不触碰渲染数据）
-        LightUpdate,  // 仅提交脏/删除图元到渲染设备（依赖 RenderWidget 增量 API）
-        FullRefresh   // 全量 gather + submit（导入、大批量修改后）
-    };
-    RefreshLevel m_refreshLevel{ RefreshLevel::None };
-
-    // 场景更新节流
-    QTimer* m_sceneUpdateTimer{ nullptr };
-
-    // 脏标记集合（用于增量渲染）
-    std::unordered_set<Eg::EntityId> m_pendingDirtyIds;
-    std::unordered_set<Eg::EntityId> m_pendingDeletedIds;
-
-    // 已提交到渲染系统的实体 ID 集合（用于区分新增 vs 修改）
-    std::unordered_set<uint64_t> m_renderedEntityIds;
+    // 输入路由器（P5 大文件收口：从 RenderViewport2D 中抽取事件分发逻辑）
+    std::unique_ptr<ViewportInputRouter> m_inputRouter;
 };

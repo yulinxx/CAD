@@ -13,8 +13,10 @@
 #include "Engine2D/SyEntity/SyText.h"
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Ut/Vec.h"
+#include "Log/SyLogger.h"
 
 #include <QUuid>
+#include <typeinfo>
 
 static Ut::Vec2d toVec2d(const QPointF& p)
 {
@@ -205,9 +207,9 @@ QString SceneDocument2D::createNurbs(const QVector<QPointF>& controlPoints)
         return {};
     auto nurbs = std::make_unique<Eg::SyNurbs>();
     nurbs->nDegree = std::min(3, static_cast<int>(controlPoints.size()) - 1);
-    nurbs->vControlPoints.reserve(controlPoints.size());
+    nurbs->reserveControlPoints(controlPoints.size());
     for (const auto& p : controlPoints)
-        nurbs->vControlPoints.push_back(toVec2d(p));
+        nurbs->addControlPoint(toVec2d(p));
     nurbs->updateKnots();
     Eg::SyEntity* added = nullptr;
 
@@ -232,7 +234,7 @@ QString SceneDocument2D::createSmartLine(const QVector<QPointF>& points)
     {
         auto segment = std::make_unique<Eg::SyLine>(
             std::vector<Ut::Vec2d>{ toVec2d(points[i]), toVec2d(points[i + 1]) });
-        smartLine->addSegment(std::move(segment), true);
+        smartLine->addSegment(segment.release(), true);
     }
     Eg::SyEntity* added = nullptr;
 
@@ -253,8 +255,9 @@ QString SceneDocument2D::createText(const QPointF& position, const QString& text
     if (text.isEmpty() || height <= 0.0)
         return {};
     auto textEntity = std::make_unique<Eg::SyText>();
+    const auto strText = text.toStdString();
     textEntity->basePoint = toVec2d(position);
-    textEntity->strText = text.toStdString();
+    textEntity->setText(strText.c_str());
     textEntity->dHeight = height;
     Eg::SyEntity* added = nullptr;
 
@@ -276,9 +279,9 @@ QString SceneDocument2D::createSpline(const QVector<QPointF>& points)
         return {};
     auto nurbs = std::make_unique<Eg::SyNurbs>();
     nurbs->nDegree = std::min(3, static_cast<int>(points.size()) - 1);
-    nurbs->vControlPoints.reserve(points.size());
+    nurbs->reserveControlPoints(points.size());
     for (const auto& p : points)
-        nurbs->vControlPoints.push_back(toVec2d(p));
+        nurbs->addControlPoint(toVec2d(p));
     nurbs->updateKnots();
     Eg::SyEntity* added = nullptr;
 
@@ -312,11 +315,36 @@ QVector<QString> SceneDocument2D::allEntityIdsQ() const
     return ids;
 }
 
-void SceneDocument2D::removeEntity(const QString& id)
+QVector<SceneEntityInfo2D> SceneDocument2D::entityInfos() const
+{
+    auto all = m_scene->getAllEntities();
+    QVector<SceneEntityInfo2D> infos;
+    infos.reserve(static_cast<int>(all.size()));
+    for (const auto& e : all)
+    {
+        SceneEntityInfo2D info;
+        info.id = QString::number(e->id);
+        info.type = QString::fromLatin1(typeid(*e).name());
+        infos.push_back(info);
+    }
+    return infos;
+}
+
+bool SceneDocument2D::tryRemoveEntity(const QString& id)
 {
     bool ok = false;
-    Eg::EntityId eid = static_cast<Eg::EntityId>(id.toULongLong(&ok));
-    if (!ok) return;
+    const Eg::EntityId eid = static_cast<Eg::EntityId>(id.toULongLong(&ok));
+    if (!ok || !m_scene)
+    {
+        SY_WARNF("[SceneDocument2D] remove rejected: invalid entity id '%s'", qPrintable(id));
+        return false;
+    }
+
+    if (!m_scene->findSyEntityById(eid))
+    {
+        SY_WARNF("[SceneDocument2D] remove rejected: entity not found '%s'", qPrintable(id));
+        return false;
+    }
 
     if (m_editService)
     {
@@ -324,49 +352,46 @@ void SceneDocument2D::removeEntity(const QString& id)
     }
     else
     {
-        auto* entity = m_scene->findSyEntityById(eid);
-        if (entity)
-            m_scene->deleteEntity(entity);
+        m_scene->deleteEntity(m_scene->findSyEntityById(eid));
     }
+
+    SY_INFOF("[SceneDocument2D] entity removed: id=%s via=%s",
+        qPrintable(id), m_editService ? "SceneEditService" : "SceneManager");
+    return true;
 }
 
-Eg::SyEntity* SceneDocument2D::entityByStringId(const QString& id) const
+void SceneDocument2D::removeEntity(const QString& id)
 {
-    bool ok = false;
-    Eg::EntityId eid = static_cast<Eg::EntityId>(id.toULongLong(&ok));
-    if (!ok) return nullptr;
-    return m_scene->findSyEntityById(eid);
+    (void)tryRemoveEntity(id);
 }
 
-std::vector<std::string> SceneDocument2D::allEntityIds() const
+void SceneDocument2D::forEachEntityId(void(*visitor)(const char*, void*), void* ctx) const
 {
     auto all = m_scene->getAllEntities();
-    std::vector<std::string> ids;
-    ids.reserve(all.size());
     for (const auto& e : all)
-        ids.push_back(std::to_string(e->id));
-    return ids;
+    {
+        std::string idStr = std::to_string(e->id);
+        visitor(idStr.c_str(), ctx);
+    }
 }
 
-void SceneDocument2D::removeEntity(const std::string& id)
+void SceneDocument2D::removeEntity(const char* id)
 {
-    auto eid = Eg::parseEntityId(id);
-    if (!eid)
+    if (!id)
+    {
+        SY_WARN("[SceneDocument2D] remove rejected: null entity id");
         return;
+    }
 
-    if (m_editService)
-    {
-        m_editService->deleteEntities({ *eid }, "Delete Entity");
-    }
-    else
-    {
-        auto* entity = m_scene->findSyEntityById(*eid);
-        if (entity)
-            m_scene->deleteEntity(entity);
-    }
+    (void)tryRemoveEntity(QString::fromUtf8(id));
 }
 
 void SceneDocument2D::clear()
 {
+    if (!m_scene)
+        return;
+
+    const auto count = m_scene->getAllEntities().size();
     m_scene->clearScene();
+    SY_INFOF("[SceneDocument2D] document cleared: entities=%zu", count);
 }

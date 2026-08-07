@@ -1,27 +1,36 @@
 #include "StepImportReader.h"
 
 #include "FileIO/FileIOManager.h"
+#include "Import/FioEntityConverter.h"
 #include "Log/SyLogger.h"
+#include "Engine/SyEntity/SyEntity.h"
 
 ImportResult StepImportReader::read(const ImportContext& context,
     Fio::VecSyEntityPtr& outEntities)
 {
-    Fio::FileIOManager fileIO;
-    Fio::ParseResult parseResult = fileIO.importFile(
-        context.sourcePath.toUtf8().toStdString(),
-        Fio::FileFormat::STEP,
-        outEntities);
+    SY_INFOF("[StepImportReader] read START: path=%s",
+        context.sourcePath.toUtf8().constData());
 
-    if (!parseResult.success)
+    Fio::FileIOManager fileIO;
+    std::string pathStr = context.sourcePath.toUtf8().toStdString();
+
+    // IR 主链路：parseToIR → FioEntityConverter
+    // StepParser 仅实现 IR 路径（STEP 逻辑简单，无需旧路径回退）
+    Fio::FioParseResult ir;
+    char errBuf[1024] = { 0 };
+    bool ok = fileIO.importToIR(
+        pathStr.c_str(),
+        Fio::FileFormat::STEP,
+        &ir,
+        errBuf, sizeof(errBuf));
+
+    if (!ok || ir.entityCount == 0)
     {
-        QString msg = QString::fromStdString(parseResult.errorMessage);
+        QString msg = QString::fromUtf8(errBuf);
+        if (msg.isEmpty())
+            msg = QStringLiteral("STEP import produced no entities");
         SY_ERRORF("[StepImportReader] Failed: %s", msg.toUtf8().constData());
 
-        QStringList warns;
-        for (const auto& w : parseResult.warnings)
-            warns.append(QString::fromStdString(w));
-
-        // 根据错误信息判断错误类型
         ImportErrorType errorType = ImportErrorType::ParseFailed;
         if (msg.contains(QStringLiteral("file not found"), Qt::CaseInsensitive) ||
             msg.contains(QStringLiteral("cannot open"), Qt::CaseInsensitive))
@@ -33,15 +42,20 @@ ImportResult StepImportReader::read(const ImportContext& context,
             errorType = ImportErrorType::UnitIncompatible;
         }
 
-        return ImportResult::fail(msg, errorType, warns);
+        return ImportResult::fail(msg, errorType, QStringList{});
     }
 
-    QStringList warns;
-    for (const auto& w : parseResult.warnings)
-        warns.append(QString::fromStdString(w));
+    auto converted = FioEntityConverter::convertAll(ir);
+    outEntities.clear();
+    outEntities.reserve(converted.size());
+    for (auto& e : converted)
+        outEntities.emplace_back(std::move(e));
+
+    SY_INFOF("[StepImportReader] read END: success, entities=%zu", outEntities.size());
 
     return ImportResult::ok(
         QStringLiteral("STEP import successful"),
         static_cast<int>(outEntities.size()),
-        0, warns);
+        static_cast<int>(ir.layerCount),
+        QStringList{});
 }

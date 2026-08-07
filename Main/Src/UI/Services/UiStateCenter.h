@@ -42,6 +42,14 @@ struct UiStateSnapshot
     QString currentCommandOwner{ QStringLiteral("none") };
     /// 当前命令类型
     QString currentCommandType{ QStringLiteral("none") };
+    /// 当前交互事件类型（commandBegin / mouseDown / mouseMove / mouseUp / key）
+    QString interactionKind;
+    /// 当前交互事件指针 X
+    int interactionPointerX{ -1 };
+    /// 当前交互事件指针 Y
+    int interactionPointerY{ -1 };
+    /// 当前交互事件按键
+    int interactionKey{ -1 };
     /// 当前选择文本
     QString currentSelectionText;
     /// 当前选择来源
@@ -62,6 +70,8 @@ struct UiStateSnapshot
     int progress{ -1 };
     /// 当前状态消息（用于状态栏/进度提示）
     QString statusMessage;
+    /// 当前状态提示（用于命令引导、导入导出提示等展示文本）
+    QString statusPrompt;
     /// 当前任务阶段标识（如 "parsing", "building", "applying", "writing"）
     QString taskPhase;
     /// 最近一次错误码（0 表示无错误）
@@ -70,6 +80,10 @@ struct UiStateSnapshot
     QVariantMap metadata;
     /// 渲染刷新状态（"idle", "incremental", "full", "pending"）
     QString refreshState{ QStringLiteral("idle") };
+    /// 当前激活工具 ID（工作台切换时恢复工具状态）
+    QString activeToolId;
+    /// 当前输入焦点控件名称（工作台切换时恢复焦点）
+    QString inputFocusWidget;
 };
 
 /**
@@ -125,6 +139,18 @@ public:
     /// 获取当前命令类型
     QString currentCommandType() const;
 
+    /// 获取当前交互事件类型
+    QString interactionKind() const;
+
+    /// 获取当前交互事件指针 X
+    int interactionPointerX() const;
+
+    /// 获取当前交互事件指针 Y
+    int interactionPointerY() const;
+
+    /// 获取当前交互事件按键
+    int interactionKey() const;
+
     /// 获取当前选择类型
     QString currentSelectionType() const;
 
@@ -140,6 +166,9 @@ public:
     /// 获取当前状态消息
     QString statusMessage() const;
 
+    /// 获取当前状态提示
+    QString statusPrompt() const;
+
     /// 获取当前任务阶段
     QString taskPhase() const;
 
@@ -148,6 +177,12 @@ public:
 
     /// 获取渲染刷新状态
     QString refreshState() const;
+
+    /// 获取当前激活工具 ID
+    QString activeToolId() const;
+
+    /// 获取当前输入焦点控件名称
+    QString inputFocusWidget() const;
 
     /// 获取元数据
     QVariantMap metadata() const;
@@ -199,6 +234,16 @@ public slots:
     /// @param type 命令类型
     void setCurrentCommandType(const QString& type);
 
+    /// 设置当前交互事件状态
+    /// @param kind 事件类型
+    /// @param pointerX 指针 X
+    /// @param pointerY 指针 Y
+    /// @param key 按键码
+    void setInteractionState(const QString& kind, int pointerX = -1, int pointerY = -1, int key = -1);
+
+    /// 清除当前交互事件状态
+    void clearInteractionState();
+
     /// 设置当前选择文本
     /// @param text 选择文本
     void setCurrentSelectionText(const QString& text);
@@ -232,6 +277,10 @@ public slots:
     /// @param metadata 元数据映射
     void setMetadata(const QVariantMap& metadata);
 
+    /// 设置当前状态提示
+    /// @param prompt 状态提示内容
+    void setStatusPrompt(const QString& prompt);
+
     /// 统一设置任务进度和消息
     /// @param progress 进度值 (0-100)，-1 表示清除进度
     /// @param message 状态消息
@@ -252,6 +301,14 @@ public slots:
 
     /// 清除任务进度和阶段（任务完成时调用）
     void clearTask();
+
+    /// 设置当前激活工具 ID
+    /// @param toolId 工具 ID
+    void setActiveToolId(const QString& toolId);
+
+    /// 设置当前输入焦点控件名称
+    /// @param widgetName 控件 objectName
+    void setInputFocusWidget(const QString& widgetName);
 
 signals:
     /// 状态变更信号（所有状态变更都会触发）
@@ -283,6 +340,9 @@ signals:
     /// 命令阶段变更信号
     void currentCommandPhaseChanged(const QString& phase);
 
+    /// 交互事件状态变更信号
+    void interactionStateChanged(const QString& kind, int pointerX, int pointerY, int key);
+
     /// 选择文本变更信号
     void currentSelectionTextChanged(const QString& text);
 
@@ -297,6 +357,9 @@ signals:
 
     /// 渲染刷新状态变更信号
     void refreshStateChanged(const QString& state);
+
+    /// 状态提示变更信号
+    void statusPromptChanged(const QString& prompt);
 
     /// 元数据变更信号
     void metadataChanged();
@@ -315,6 +378,14 @@ signals:
     /// @param code 错误码
     /// @param message 错误描述
     void errorOccurred(int code, const QString& message);
+
+    /// 激活工具变更信号
+    /// @param toolId 工具 ID
+    void activeToolChanged(const QString& toolId);
+
+    /// 输入焦点控件变更信号
+    /// @param widgetName 控件名称
+    void inputFocusWidgetChanged(const QString& widgetName);
 
 private:
     /// 当前工作台 ID
@@ -341,6 +412,14 @@ private:
     QString m_commandOwner{ QStringLiteral("none") };
     /// 当前命令类型
     QString m_commandType{ QStringLiteral("none") };
+    /// 当前交互事件类型
+    QString m_interactionKind;
+    /// 当前交互事件指针 X
+    int m_interactionPointerX{ -1 };
+    /// 当前交互事件指针 Y
+    int m_interactionPointerY{ -1 };
+    /// 当前交互事件按键
+    int m_interactionKey{ -1 };
 
     /// 当前选择文本
     QString m_selectionText;
@@ -363,6 +442,8 @@ private:
     int m_progress{ -1 };
     /// 当前状态消息
     QString m_statusMessage;
+    /// 当前状态提示
+    QString m_statusPrompt;
     /// 当前任务阶段
     QString m_taskPhase;
     /// 最近错误码
@@ -371,4 +452,8 @@ private:
     QVariantMap m_metadata;
     /// 渲染刷新状态
     QString m_refreshState{ QStringLiteral("idle") };
+    /// 当前激活工具 ID
+    QString m_activeToolId;
+    /// 当前输入焦点控件名称
+    QString m_inputFocusWidget;
 };

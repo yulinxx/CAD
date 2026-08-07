@@ -1,52 +1,68 @@
 #include "SelectionService.h"
 
 #include "Engine2D/Core/SceneManager.h"
+#include "Log/SyLogger.h"
 #include "Engine/EntityIdUtils.h"
 #include "Ut/Vec.h"
 
-#include <algorithm>
+#include <string>
 
 SelectionService::SelectionService(Eg::SceneManager* sceneManager)
     : m_sceneManager(sceneManager)
 {
+    SY_INFO("[SelectionService] initialized");
 }
 
-std::vector<std::string> SelectionService::selectedIds() const
+// ==================== POD 安全接口实现 ====================
+
+void SelectionService::visitSelectedIds(SelectedIdVisitor visitor, void* context) const
 {
-    if (!m_sceneManager)
-        return {};
+    if (!m_sceneManager || !visitor)
+        return;
 
     auto selected = m_sceneManager->getSelectedEntities();
-    std::vector<std::string> ids;
-    ids.reserve(selected.size());
     for (const auto& e : selected)
-        ids.push_back(std::to_string(e->id));
-    return ids;
+    {
+        // 将 EntityId 转为临时 std::string 再传 C string 给回调
+        auto idStr = std::to_string(e->id);
+        visitor(idStr.c_str(), context);
+    }
 }
 
-bool SelectionService::isSelected(const std::string& id) const
+bool SelectionService::isSelected(const char* id) const
 {
-    if (!m_sceneManager)
+    if (!m_sceneManager || !id)
         return false;
 
-    auto eid = Eg::parseEntityId(id);
+    auto eid = Eg::parseEntityId(std::string(id));
     if (!eid)
         return false;
 
-    // SceneManager 未提供直接查询接口，需遍历当前选中 ID 列表
-    auto selectedIds = m_sceneManager->selectedEntityIds();
-    for (const auto& sid : selectedIds)
-        if (sid == *eid)
-            return true;
-    return false;
+    struct FindCtx
+    {
+        bool found = false; Eg::EntityId target;
+    };
+    FindCtx ctx{ false, *eid };
+    m_sceneManager->forEachSelectedEntityId([](Eg::EntityId sid, void* rawCtx) {
+        auto* data = static_cast<FindCtx*>(rawCtx);
+        if (sid == data->target)
+        {
+            data->found = true;
+            return false; // 停止遍历
+        }
+        return true;
+        }, &ctx);
+    return ctx.found;
 }
 
-void SelectionService::select(const std::string& id)
+void SelectionService::select(const char* id)
 {
-    if (!m_sceneManager)
+    if (!m_sceneManager || !id)
         return;
 
-    auto eid = Eg::parseEntityId(id);
+    SY_DEBUGF("[SelectionService] Select entity: id=%s", id);
+
+    auto eid = Eg::parseEntityId(std::string(id));
     if (!eid)
         return;
 
@@ -55,30 +71,37 @@ void SelectionService::select(const std::string& id)
         m_sceneManager->selectEntity(entity);
 }
 
-void SelectionService::selectMultiple(const std::vector<std::string>& ids)
+void SelectionService::selectMultiple(const char* const* ids, size_t count)
 {
-    if (!m_sceneManager)
+    if (!m_sceneManager || !ids || count == 0)
         return;
 
-    m_sceneManager->clearSelection();
-    for (const auto& id : ids)
+    // 批量入口：收集实体后一次性批量选择（selectRange 整体替换选择集），
+    // 而非循环调用 selectEntity（单选择替换语义，会导致只保留最后一个）。
+    std::vector<Eg::IEntity*> entities;
+    entities.reserve(count);
+    for (size_t i = 0; i < count; ++i)
     {
-        auto eid = Eg::parseEntityId(id);
+        if (!ids[i])
+            continue;
+
+        auto eid = Eg::parseEntityId(std::string(ids[i]));
         if (!eid)
             continue;
 
         auto* entity = m_sceneManager->findEntityById(*eid);
         if (entity)
-            m_sceneManager->selectEntity(entity);
+            entities.push_back(entity);
     }
+    m_sceneManager->selectEntities(entities);
 }
 
-void SelectionService::deselect(const std::string& id)
+void SelectionService::deselect(const char* id)
 {
-    if (!m_sceneManager)
+    if (!m_sceneManager || !id)
         return;
 
-    auto eid = Eg::parseEntityId(id);
+    auto eid = Eg::parseEntityId(std::string(id));
     if (!eid)
         return;
 
@@ -88,10 +111,13 @@ void SelectionService::deselect(const std::string& id)
 void SelectionService::clear()
 {
     if (m_sceneManager)
+    {
+        SY_DEBUG("[SelectionService] Clear selection");
         m_sceneManager->clearSelection();
+    }
 }
 
-void SelectionService::toggle(const std::string& id)
+void SelectionService::toggle(const char* id)
 {
     if (isSelected(id))
         deselect(id);
@@ -99,26 +125,24 @@ void SelectionService::toggle(const std::string& id)
         select(id);
 }
 
-std::vector<Eg::SyEntity*> SelectionService::selectedEntities() const
-{
-    if (!m_sceneManager)
-        return {};
-    return m_sceneManager->getSelectedEntities();
-}
+// ==================== Qt 便利方法 ====================
 
 QVector<QString> SelectionService::selectedIdsQ() const
 {
-    auto ids = selectedIds();
     QVector<QString> result;
-    result.reserve(static_cast<int>(ids.size()));
-    for (const auto& id : ids)
-        result.push_back(QString::fromStdString(id));
+    visitSelectedIds(
+        [](const char* id, void* ctx) {
+            auto* vec = static_cast<QVector<QString>*>(ctx);
+            vec->push_back(QString::fromUtf8(id));
+        },
+        &result);
     return result;
 }
 
 void SelectionService::selectEntity(const QString& id)
 {
-    select(id.toStdString());
+    auto utf8 = id.toUtf8();
+    select(utf8.constData());
 }
 
 void SelectionService::setSelectedEntityId(const QString& id)
@@ -135,17 +159,21 @@ void SelectionService::setSelectedEntityIds(const QVector<QString>& ids)
     if (!m_sceneManager)
         return;
 
-    m_sceneManager->clearSelection();
+    SY_DEBUGF("[SelectionService] Set selected entities: count=%d", ids.size());
+    std::vector<Eg::IEntity*> entities;
+    entities.reserve(ids.size());
     for (const QString& id : ids)
     {
-        auto eid = Eg::parseEntityId(id.toStdString());
+        auto utf8 = id.toUtf8();
+        auto eid = Eg::parseEntityId(std::string(utf8.constData()));
         if (!eid)
             continue;
 
         auto* entity = m_sceneManager->findEntityById(*eid);
         if (entity)
-            m_sceneManager->selectEntity(entity);
+            entities.push_back(entity);
     }
+    m_sceneManager->selectEntities(entities);
 }
 
 QString SelectionService::entityIdAt(const QPointF& point, double tolerance) const

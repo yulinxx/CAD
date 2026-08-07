@@ -3,6 +3,7 @@
 #include "ImportContext.h"
 #include "ImportResult.h"
 #include "FileIO/FileFormat.h"
+#include "FileIO/IFileParser.h"
 
 /// 导入读取器接口：每种格式的导入适配器需要实现此接口
 class IImportReader

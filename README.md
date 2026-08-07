@@ -26,7 +26,7 @@ SanYiCAD/
 │   └── CMakeLists.txt        # 主应用构建配置
 ├── Engine/                   # 图形引擎
 │   ├── Common/               # 通用几何算法、数学工具
-│   ├── 2D/                   # 2D 实体定义、布尔运算、CAM 路径生成
+│   ├── 2D/                   # 2D 图元定义、布尔运算、CAM 路径生成
 │   └── 3D/                   # 3D 场景管理、网格操作
 ├── Render/                   # 渲染层
 │   ├── Common/               # 渲染公共类型、着色器管理
@@ -78,7 +78,7 @@ SanYiCAD/
 | 模块 | 职责 | 技术栈 | 依赖 |
 |------|------|--------|------|
 | **EngineCommon** | 通用几何算法、数学工具、图元定义 | C++17 + Boost.Geometry | Utility, Log |
-| **Engine2D** | 2D 实体（线/圆/弧/多边形）、布尔运算、CAM 路径 | Clipper2, SQLiteCpp, FreeType | EngineCommon, Log |
+| **Engine2D** | 2D 图元（线/圆/弧/多边形）、布尔运算、CAM 路径 | Clipper2, SQLiteCpp, FreeType | EngineCommon, Log |
 | **Engine3D** | 3D 场景图、网格操作、布尔运算 | Boost | EngineCommon, Log |
 
 ### Render 层（渲染）

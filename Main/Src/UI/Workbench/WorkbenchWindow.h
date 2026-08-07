@@ -1,7 +1,7 @@
 #pragma once
 
 #include <functional>
-#include <vector>
+#include <memory>
 
 #include <QMainWindow>
 #include <QMetaObject>
@@ -19,10 +19,14 @@ class QProgressBar;
 class QStatusBar;
 class QToolBar;
 class OperationBus;
+class StatusBarBase;
 class UiStateCenter;
 class UiThemeService;
 class UiWorkbench;
 class WorkbenchMenuManager;
+class WorkbenchLayoutManager;
+class WorkbenchActionManager;
+class WorkbenchStateManager;
 class SceneTreeDockWidget;
 class PropertiesPanelWidget;
 
@@ -100,9 +104,6 @@ public:
     /// 由工作台在创建视口后注入，将菜单缩放操作转发到视口
     /// @param handler 缩放操作处理函数，参数为 "zoom_in"/"zoom_out"/"zoom_fit"/"zoom_selection"/"reset"
     void setViewportZoomHandler(std::function<void(const QString&)> handler);
-    /// 设置视口鼠标位置回调，由工作台在创建视口后注入，用于更新状态栏坐标显示
-    /// @param handler 位置处理函数，参数为世界坐标 (x, y)
-    void setViewportPositionHandler(std::function<void(double, double)> handler);
     /// 更新状态栏鼠标坐标显示
     /// @param x 世界坐标 X
     /// @param y 世界坐标 Y
@@ -130,6 +131,19 @@ public:
     QToolBar* registerToolBar(const QString& title);
     /// 清空工作台内容（移除所有注册的面板和工具栏）
     void clearWorkbenchContent();
+
+    // ==================== 状态栏挂载/卸载 ====================
+
+    /// 挂载工作台状态栏 widget 到 QStatusBar
+    /// 由 Workbench2D / Workbench3D 在 attachToWindow 时调用，
+    /// 将各自独立的 StatusBarBase 子类实例挂载到窗口状态栏。
+    /// @param statusBarWidget 工作台状态栏 widget（生命周期由调用方管理）
+    void mountStatusBar(StatusBarBase* statusBarWidget);
+    /// 卸载当前工作台状态栏 widget，从 QStatusBar 移除
+    /// 由 clearWorkbenchContent 在工作台切换时调用
+    void unmountStatusBar();
+    /// 获取当前挂载的工作台状态栏 widget
+    StatusBarBase* activeStatusBar() const { return m_activeStatusBar; }
 
     /// 清理工作台切换期间的状态
     void resetWorkbenchTransientState();
@@ -231,69 +245,24 @@ private:
     OperationBus* m_operationBus{ nullptr };
     /// UI 服务集合
     UiServices m_uiServices;
-    /// 框架级服务桥接
-    UiFrameworkServices m_frameworkServices;
     /// 当前工作台
     UiWorkbench* m_workbench{ nullptr };
     /// 主题切换回调
     std::function<void(const QString&)> m_themeChangeCallback;
-    /// 视口缩放操作回调，由工作台注入
-    std::function<void(const QString&)> m_viewportZoomHandler;
-    /// 视口鼠标位置回调，由工作台注入
-    std::function<void(double, double)> m_viewportPositionHandler;
-    /// 窗口状态：只保存与窗口语义直接相关的高层状态
-    struct WindowState
-    {
-        /// 当前工作台 ID
-        QString workbenchId{ QStringLiteral("default") };
-        /// 当前主题 ID
-        QString themeId{ QStringLiteral("system") };
-        /// 当前是否处于繁忙状态
-        bool busy{ false };
-        /// 当前选择文本
-        QString selectionText;
-        /// 当前选择来源
-        QString selectionSource;
-        /// 当前选择类型
-        QString selectionType;
-    } m_windowState;
-    /// 面板状态：集中管理状态栏、工具栏与停靠面板指针
-    struct PanelState
-    {
-        /// 状态栏
-        QStatusBar* statusBar{ nullptr };
-        /// 左侧停靠面板
-        QDockWidget* leftDock{ nullptr };
-        /// 右侧停靠面板
-        QDockWidget* rightDock{ nullptr };
-        /// 状态栏中的工作台标签
-        QLabel* workbenchLabel{ nullptr };
-        /// 状态栏中的繁忙标签
-        QLabel* busyLabel{ nullptr };
-        /// 状态栏中的鼠标坐标标签
-        QLabel* posLabel{ nullptr };
-        /// 状态栏中的选中信息标签
-        QLabel* selLabel{ nullptr };
-        /// 状态栏中的消息标签
-        QLabel* msgLabel{ nullptr };
-        /// 场景树停靠面板
-        SceneTreeDockWidget* sceneTreeDock{ nullptr };
-        /// 属性面板
-        PropertiesPanelWidget* propertiesDock{ nullptr };
-    } m_panelState;
+    /// 当前挂载的工作台状态栏 widget（由 StatusBarBase 子类管理位置/选择/消息显示）
+    /// 工作台切换时通过 mountStatusBar/unmountStatusBar 替换
+    StatusBarBase* m_activeStatusBar{ nullptr };
 
-    /// 注册的停靠面板列表
-    std::vector<QDockWidget*> m_registeredDocks;
-    /// 注册的工具栏列表
-    std::vector<QToolBar*> m_registeredToolBars;
-    /// 注册的全局快捷键列表（由工作台注册，切换时统一清理）
-    std::vector<QShortcut*> m_registeredShortcuts;
     /// 工作台切换工厂
     WorkbenchFactory m_workbenchFactory;
-    /// 繁忙进度条（避免 findChild 级联查找）
-    QPointer<QProgressBar> m_busyProgressBar;
     /// 菜单管理器
     WorkbenchMenuManager* m_menuManager{ nullptr };
+    /// 布局管理器：集中管理工具栏、停靠面板、状态栏骨架与布局快照
+    std::unique_ptr<WorkbenchLayoutManager> m_layoutManager;
+    /// 操作管理器：管理快捷键、命令权限检查、错误上报、性能记录
+    std::unique_ptr<WorkbenchActionManager> m_actionManager;
+    /// 状态管理器：统一管理状态中心同步、窗口状态镜像、状态栏刷新
+    std::unique_ptr<WorkbenchStateManager> m_stateManager;
     /// 是否正在切换工作台（防止重复触发）
     bool m_switchingWorkbench{ false };
 
@@ -311,4 +280,8 @@ public:
     {
         return m_switchingWorkbench;
     }
+
+    // 面板访问器（供工作台设置回调使用）
+    SceneTreeDockWidget* sceneTreeDock() const;
+    PropertiesPanelWidget* propertiesDock() const;
 };

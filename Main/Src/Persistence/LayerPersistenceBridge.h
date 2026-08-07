@@ -38,7 +38,7 @@ public:
 
     // ---- ILayerManagerObserver 接口实现 ----
 
-    void onLayerAdded(int nLayerId, const std::string& name) override;
+    void onLayerAdded(int nLayerId, const char* name) override;
     void onLayerRemoved(int nLayerId) override;
     void onLayerChanged(int nLayerId) override;
     void onCurrentLayerChanged(int nLayerId) override;

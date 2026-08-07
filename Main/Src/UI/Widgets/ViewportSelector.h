@@ -6,6 +6,9 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <optional>
+
+#include "BBox/BBox2d.hpp"
 
 struct Camera2D;
 class ISelectionService;
@@ -34,6 +37,19 @@ public:
     void beginBoxSelect(const QPointF& worldPos);
     void updateBoxSelect(const QPointF& worldPos);
     size_t endBoxSelect(const QPointF& worldPos);
+
+    // ---- 选择查询/管理（P5 从 RenderViewport2D 下沉） ----
+
+    // 获取第一个选中图元的 ID
+    QString selectedEntityId() const;
+    // 按 ID 选中图元（先清空再选中）
+    void selectEntityById(const QString& entityId);
+    // 清空选择
+    void clearSelection();
+
+    // 计算选中图元的合并 BBox（P5 从 RenderViewport2D 下沉）
+    // 返回 nullopt 表示无选中或 BBox 无效
+    std::optional<Ut::BBox2d> selectionBBox() const;
 
     void setSceneManager(Eg::SceneManager* sm)
     {

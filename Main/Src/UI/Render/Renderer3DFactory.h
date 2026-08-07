@@ -14,11 +14,10 @@ public:
         None
     };
 
+public:
     static std::unique_ptr<IRenderer3D> create(RendererType type);
-
     static std::unique_ptr<IRenderer3D> createDefault();
 
     static RendererType fromString(const std::string& name);
-
     static std::string toString(RendererType type);
 };

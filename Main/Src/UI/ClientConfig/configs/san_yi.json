@@ -1,0 +1,98 @@
+{
+  "meta": {
+    "clientId": "san_yi",
+    "clientName": "三益标准版",
+    "version": "1.0"
+  },
+  "menus": [
+    {
+      "id": "file",
+      "label": "File",
+      "items": [
+        { "type": "action", "id": "file.new", "label": "New", "command": "file.new", "shortcut": "Ctrl+N" },
+        { "type": "action", "id": "file.open", "label": "Open...", "command": "file.open", "shortcut": "Ctrl+O" },
+        { "type": "separator" },
+        { "type": "action", "id": "file.save", "label": "Save", "command": "file.save", "shortcut": "Ctrl+S" },
+        { "type": "action", "id": "file.save_as", "label": "Save As...", "command": "file.save_as", "shortcut": "Ctrl+Shift+S" },
+        { "type": "separator" },
+        { "type": "action", "id": "file.exit", "label": "Exit", "command": "app.exit", "shortcut": "Ctrl+Q" }
+      ]
+    },
+    {
+      "id": "edit",
+      "label": "Edit",
+      "items": [
+        { "type": "action", "id": "edit.undo", "label": "Undo", "command": "edit.undo", "shortcut": "Ctrl+Z" },
+        { "type": "action", "id": "edit.redo", "label": "Redo", "command": "edit.redo", "shortcut": "Ctrl+Y" },
+        { "type": "separator" },
+        { "type": "action", "id": "edit.delete", "label": "Delete", "command": "edit.delete", "shortcut": "Delete" }
+      ]
+    },
+    {
+      "id": "view",
+      "label": "View",
+      "items": [
+        { "type": "separator" },
+        { "type": "action", "id": "view.unit_mm", "label": "mm", "command": "view.unit_mm", "checkable": true },
+        { "type": "action", "id": "view.unit_cm", "label": "cm", "command": "view.unit_cm", "checkable": true },
+        { "type": "action", "id": "view.unit_inch", "label": "inch", "command": "view.unit_inch", "checkable": true },
+        { "type": "separator" },
+        { "type": "action", "id": "view.zoom_in", "label": "Zoom In", "command": "view.zoom_in", "shortcut": "Ctrl++" },
+        { "type": "action", "id": "view.zoom_out", "label": "Zoom Out", "command": "view.zoom_out", "shortcut": "Ctrl+-" },
+        { "type": "action", "id": "view.zoom_fit", "label": "Zoom to Fit", "command": "view.zoom_fit", "shortcut": "Ctrl+F" },
+        { "type": "action", "id": "view.reset", "label": "Reset View", "command": "view.reset", "shortcut": "Ctrl+0" }
+      ]
+    },
+    {
+      "id": "tools",
+      "label": "Tools",
+      "items": [
+        { "type": "action", "id": "tool.measure", "label": "Measure", "command": "2d.measure" }
+      ]
+    }
+  ],
+  "toolbars": [
+    {
+      "id": "DrawToolBar",
+      "title": "Draw Tools",
+      "position": "left",
+      "workbench": "2D",
+      "items": []
+    },
+    {
+      "id": "TopToolBar",
+      "title": "Top Tools",
+      "position": "top",
+      "workbench": "global",
+      "items": []
+    },
+    {
+      "id": "RightToolBar",
+      "title": "Right Tools",
+      "position": "right",
+      "workbench": "global",
+      "items": []
+    }
+  ],
+  "docks": [
+    {
+      "id": "SceneDock",
+      "title": "Scene",
+      "position": "left",
+      "widgetType": "SceneTreePanel",
+      "visible": true
+    },
+    {
+      "id": "PropertiesDock",
+      "title": "Properties",
+      "position": "right",
+      "widgetType": "PropertiesPanel",
+      "visible": true
+    }
+  ],
+  "shortcuts": [
+    { "command": "edit.undo", "keys": "Ctrl+Z" },
+    { "command": "edit.redo", "keys": "Ctrl+Y" },
+    { "command": "edit.delete", "keys": "Delete" }
+  ]
+}

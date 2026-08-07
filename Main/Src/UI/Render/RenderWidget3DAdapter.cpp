@@ -4,6 +4,7 @@
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QPainter>
+#include <QVBoxLayout>
 
 #include "Render3D/RenderWidget3D.h"
 #include "Engine3D/SyEntity/SyMeshEntity.h"
@@ -13,19 +14,6 @@
 #include "UI3D/Service/CameraController3D.h"
 #include "UiEntities.h"
 #include "Log/SyLogger.h"
-
-namespace
-{
-    Qt::MouseButton toMouseButton(int button)
-    {
-        return static_cast<Qt::MouseButton>(button);
-    }
-
-    Qt::MouseButtons toMouseButtons(int buttons)
-    {
-        return static_cast<Qt::MouseButtons>(buttons);
-    }
-}
 
 RenderWidget3DAdapter::RenderWidget3DAdapter() = default;
 RenderWidget3DAdapter::~RenderWidget3DAdapter()
@@ -39,15 +27,27 @@ bool RenderWidget3DAdapter::ensureWidgetCreated()
         return true;
 
     if (!m_parentWidget)
+    {
+        SY_WARN("[RenderWidget3DAdapter] ensureWidgetCreated called without a valid QWidget parent");
         return false;
+    }
 
-    // 创建内部 OpenGL 控件，直接设置为父窗口的子控件
-    // 这样 RenderWidget3D 会直接接收 Qt 事件，避免通过 sendEvent 转发导致的死循环
+    if (!m_parentWidget->isWidgetType())
+    {
+        SY_ERROR("[RenderWidget3DAdapter] Parent object is not a QWidget, refusing to create RenderWidget3D");
+        return false;
+    }
+
     m_renderWidget = std::make_unique<RenderWidget3D>(m_parentWidget);
     m_renderWidget->setMinimumSize(640, 480);
-    m_renderWidget->setGeometry(m_parentWidget->rect());
-    m_renderWidget->setParent(m_parentWidget);
-    m_renderWidget->show();
+    // 使用布局管理，让 RenderWidget3D 自动跟随父控件尺寸变化
+    // 避免手动 setGeometry 导致的尺寸不同步和 native window 状态不一致
+    // 注意：不要显式调用 show()，QOpenGLWidget 会随父控件自动显示
+    // 提前 show() 会在父控件 native window 未就绪时强制创建原生窗口，
+    // 导致 Windows 窗口句柄无效（INVALID_HANDLE_VALUE），引发访问冲突
+    auto* layout = new QVBoxLayout(m_parentWidget);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(m_renderWidget.get());
     bindWidgetSignals();
     SY_INFO("[RenderWidget3DAdapter] RenderWidget3D created as child widget");
     return true;
@@ -59,17 +59,19 @@ void RenderWidget3DAdapter::bindWidgetSignals()
         return;
 
     // 场景选择变化只同步到适配器，再由适配器回调上层。
+    // 跨 DLL 安全：信号参数改为 POD 指针数组
     QObject::connect(m_renderWidget.get(), &RenderWidget3D::sigSelectionChanged,
-        [this](const std::vector<Eg::SyMeshEntity*>& entities)
+        [this](const Eg::SyMeshEntity** entities, int count)
         {
-            if (!entities.empty() && entities[0])
+            if (count > 0 && entities && entities[0])
             {
                 m_selectedNodeId = QString::number(entities[0]->id);
 
                 // 同步路径名称
                 m_selectedPathNames.clear();
-                if (!entities[0]->strName.empty())
-                    m_selectedPathNames.append(QString::fromStdString(entities[0]->strName));
+                const char* name = entities[0]->name();
+                if (name && name[0] != '\0')
+                    m_selectedPathNames.append(QString::fromUtf8(name));
 
                 if (m_selectionCallback)
                     m_selectionCallback(m_selectedNodeId);
@@ -104,17 +106,42 @@ void RenderWidget3DAdapter::emitStatus(const QString& text)
 
 bool RenderWidget3DAdapter::initialize(void* windowHandle)
 {
-    // 将窗口句柄转为父控件，适配器内部据此创建 OpenGL 控件
-    if (windowHandle)
-        m_parentWidget = static_cast<QWidget*>(windowHandle);
+    // 这里预期传入的是 QWidget*；若上层传入的是原生句柄或其他类型，
+    // 直接按失败处理，避免把非法地址当作 QObject/QWidget 使用。
+    m_parentWidget = static_cast<QWidget*>(windowHandle);
+    if (!m_parentWidget)
+    {
+        SY_WARN("[RenderWidget3DAdapter] initialize called with null windowHandle");
+        m_ready = false;
+        return false;
+    }
+
     m_ready = ensureWidgetCreated();
     return m_ready;
 }
 
 void RenderWidget3DAdapter::shutdown()
 {
-    // 退出时只释放内部控件，不回调上层，避免 Qt 销毁链与业务链交叉。
-    m_renderWidget.reset();
+    // 退出时先断开所有信号与回调，再延迟释放内部控件，避免 Qt 销毁链与业务链交叉。
+    if (m_renderWidget)
+    {
+        QObject::disconnect(m_renderWidget.get(), nullptr, nullptr, nullptr);
+        m_renderWidget->setTransformUndoHandler(nullptr, nullptr);
+        m_renderWidget->setDocumentModifiedHandler(nullptr, nullptr);
+        m_renderWidget->setMeshSurfacePickHandler(nullptr, nullptr);
+        m_renderWidget->setMeshSurfacePickActive(false);
+
+        // 关键：先断开所有回调，再把 widget 从父对象和布局中彻底脱离，
+        // 然后交给 Qt 事件循环安全删除。
+        // 必须用 release() 放弃 unique_ptr 所有权，否则 reset() 会立即析构对象，
+        // 与 deleteLater() 形成双重释放。
+        m_renderWidget->setParent(nullptr);
+        m_renderWidget->deleteLater();
+        m_renderWidget.release();
+    }
+
+    m_sceneManager = nullptr;
+    m_parentWidget = nullptr;
     m_ready = false;
     m_renderLoopEnabled = false;
     m_selectedNodeId.clear();
@@ -208,45 +235,6 @@ bool RenderWidget3DAdapter::isOrbitMode() const
     return true;
 }
 
-void RenderWidget3DAdapter::onMousePress(int x, int y, int button, int modifiers, int viewW, int viewH)
-{
-    Q_UNUSED(x);
-    Q_UNUSED(y);
-    Q_UNUSED(button);
-    Q_UNUSED(modifiers);
-    Q_UNUSED(viewW);
-    Q_UNUSED(viewH);
-    // 事件不再通过此接口转发，RenderWidget3D 作为子控件直接接收 Qt 事件
-}
-
-void RenderWidget3DAdapter::onMouseMove(int x, int y, int buttons, int viewW, int viewH)
-{
-    Q_UNUSED(x);
-    Q_UNUSED(y);
-    Q_UNUSED(buttons);
-    Q_UNUSED(viewW);
-    Q_UNUSED(viewH);
-    // 事件不再通过此接口转发，RenderWidget3D 作为子控件直接接收 Qt 事件
-}
-
-void RenderWidget3DAdapter::onMouseRelease(int x, int y, int button, int viewW, int viewH)
-{
-    Q_UNUSED(x);
-    Q_UNUSED(y);
-    Q_UNUSED(button);
-    Q_UNUSED(viewW);
-    Q_UNUSED(viewH);
-    // 事件不再通过此接口转发，RenderWidget3D 作为子控件直接接收 Qt 事件
-}
-
-void RenderWidget3DAdapter::onWheel(int delta, int viewW, int viewH)
-{
-    Q_UNUSED(delta);
-    Q_UNUSED(viewW);
-    Q_UNUSED(viewH);
-    // 事件不再通过此接口转发，RenderWidget3D 作为子控件直接接收 Qt 事件
-}
-
 void RenderWidget3DAdapter::selectNodeById(const QString& nodeId)
 {
     if (!m_renderWidget || !m_sceneManager)
@@ -268,8 +256,9 @@ void RenderWidget3DAdapter::selectNodeById(const QString& nodeId)
 
     // 同步路径名称（使用图元名称作为路径的最后一级）
     m_selectedPathNames.clear();
-    if (!entity->strName.empty())
-        m_selectedPathNames.append(QString::fromStdString(entity->strName));
+    const char* entityName = entity->name();
+    if (entityName && entityName[0] != '\0')
+        m_selectedPathNames.append(QString::fromUtf8(entityName));
 
     SY_INFOF("[RenderWidget3DAdapter] Selected node by ID: %s, path: %s",
         qPrintable(nodeId), qPrintable(m_selectedPathNames.join("/")));

@@ -1,0 +1,127 @@
+/**
+ * @file SceneRefreshCoordinator.h
+ * @brief 场景刷新协调器 — 管理四级刷新策略与增量渲染管线
+ *
+ * 从 RenderViewport2D 中抽取，封装刷新级别管理、脏 ID 收集、
+ * 定时器节流、GPU 数据提交等职责，降低视口类的复杂度。
+ *
+ * 刷新级别（严格单调升级，不可降级）：
+ *   - None:        无待办
+ *   - Repaint:     仅重绘（选择变化等纯视觉刷新，不触碰渲染数据）
+ *   - LightUpdate: 增量提交脏/删除图元到渲染设备（图元修改后）
+ *   - FullRefresh: 全量 gather + submit（导入、大批量修改、文档加载后）
+ *
+ * 公开 API 语义：
+ *   - requestRepaint():      纯视觉刷新，调用方知道渲染数据未变
+ *   - requestLightRefresh():  增量刷新，调用方知道图元被修改/增删
+ *   - requestFullRefresh():   全量刷新，调用方知道需要重建所有渲染数据
+ *
+ * P5 刷新语义统一 (2026-08-02)
+ */
+#pragma once
+
+#include <QObject>
+#include <QTimer>
+#include <memory>
+#include <unordered_set>
+
+#include "Engine/EntityIdGenerator.h"
+#include "Engine2D/Core/SceneNotifier.h"
+
+class FrameTimer;
+
+class RenderWidget;
+namespace Eg
+{
+    class SceneManager;
+}
+
+class SceneRefreshCoordinator : public QObject
+    , private Eg::SceneNotifier::IObserver  // P5: 观察者注册收敛到协调器
+{
+    Q_OBJECT
+
+public:
+    explicit SceneRefreshCoordinator(QObject* parent = nullptr);
+    ~SceneRefreshCoordinator() override;
+
+    /// 设置渲染控件（必须）
+    void setRenderWidget(RenderWidget* widget);
+
+    /// 设置场景管理器（必须）— 同时负责观察者注册/注销
+    void setSceneManager(Eg::SceneManager* sm);
+
+    // ==================== 公开刷新 API（三级，语义明确） ====================
+
+    /// 轻量重绘 — 纯视觉刷新，不触碰渲染数据（选择变化、光标移动等）
+    void requestRepaint();
+
+    /// 增量刷新 — 提交脏/删除图元到渲染设备（图元修改、少量增删后）
+    void requestLightRefresh();
+
+    /// 全量刷新 — 完整 gather + submit（导入、大批量修改、文档加载后）
+    void requestFullRefresh();
+
+    // ==================== 场景变更回调（IObserver 实现） ====================
+
+    /// 场景数据变更通知（图元增删改）
+    void onSceneChanged() override;
+
+    /// 选择变更通知 — 发射信号 + 纯视觉重绘
+    void onSelectionChanged() override;
+
+    /// 停止定时器，防止析构过程中访问已释放资源
+    void stop();
+
+    /// 获取帧计时器（用于外部读取性能数据）
+    FrameTimer* frameTimer() const
+    {
+        return m_frameTimer.get();
+    }
+
+    /// 启用/禁用帧性能监控
+    void setPerfMonitorEnabled(bool enabled);
+
+signals:
+    /// 选择变更信号（视口连接后用于同步工具状态）
+    void selectionChanged();
+
+private slots:
+    void updateSceneRender();
+
+private:
+    enum class RefreshLevel
+    {
+        None,         // 无待办
+        Repaint,      // 仅重绘
+        LightUpdate,  // 增量提交脏/删除图元
+        FullRefresh   // 全量 gather + submit
+    };
+
+    void scheduleSceneUpdate();
+    void scheduleFullRefresh();
+    void applyRepaintRefresh();
+    void applyLightRefresh(Eg::SceneManager* sm);
+    void applyFullRefresh(Eg::SceneManager* sm);
+
+    RenderWidget* m_renderWidget{ nullptr };
+    Eg::SceneManager* m_sceneManager{ nullptr };
+
+    // 场景更新节流定时器
+    QTimer* m_sceneUpdateTimer{ nullptr };
+
+    RefreshLevel m_refreshLevel{ RefreshLevel::None };
+
+    // 增量刷新回退标志：脏图元无法转换为顶点（如文本）时置位，触发全量刷新
+    bool m_pendingFullRefreshFallback{ false };
+
+    // 脏标记集合（增量渲染）
+    std::unordered_set<Eg::EntityId> m_pendingDirtyIds;
+    std::unordered_set<Eg::EntityId> m_pendingDeletedIds;
+
+    // 已提交到渲染系统的实体 ID 集合（区分新增 vs 修改）
+    std::unordered_set<uint64_t> m_renderedEntityIds;
+
+    // 帧耗时追踪器（性能监控基础设施）
+    std::unique_ptr<FrameTimer> m_frameTimer;
+};

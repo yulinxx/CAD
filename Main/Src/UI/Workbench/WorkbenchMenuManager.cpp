@@ -12,7 +12,7 @@
 #include "UiFrameworkServices.h"
 #include "UI/LanguageManager.h"
 #include "UI/ThemeManager.h"
-#include "Ui/Dlg/LayerManagerDialog.h"
+#include "UI/Dlg/LayerManagerDialog.h"
 #include "Engine2D/Interaction/LayerManager.h"
 #include "Engine2D/Edit/LayerEditService.h"
 
@@ -86,11 +86,17 @@ void WorkbenchMenuManager::setViewportZoomHandler(std::function<void(const QStri
 
 void WorkbenchMenuManager::rebuildAllMenus()
 {
+    // 先清理旧的全局快捷键动作，防止 2D 的 Undo/Redo 泄漏到 3D 模式
+    clearGlobalShortcuts();
     if (auto* mb = m_window->menuBar())
         mb->clear();
     m_menuState = {};
     buildMenus();
     bindMenuCommands();
+    // 仅 2D 工作台需要全局 Undo/Redo 快捷键（3D 通过 CommandActionHub3D 管理）
+    QString wbId = m_stateCenter ? m_stateCenter->currentWorkbenchId() : QStringLiteral("2D");
+    if (wbId.compare(QStringLiteral("2D"), Qt::CaseInsensitive) == 0)
+        bindShortcuts();
 }
 
 void WorkbenchMenuManager::createBaseMenus()
@@ -878,23 +884,42 @@ void WorkbenchMenuManager::bindMenuCommands()
     SY_INFO("[WorkbenchMenuManager] bindMenuCommands: menu actions are now directly connected to OperationBus");
 }
 
+void WorkbenchMenuManager::clearGlobalShortcuts()
+{
+    if (m_undoAction)
+    {
+        m_window->removeAction(m_undoAction);
+        delete m_undoAction;
+        m_undoAction = nullptr;
+    }
+    if (m_redoAction)
+    {
+        m_window->removeAction(m_redoAction);
+        delete m_redoAction;
+        m_redoAction = nullptr;
+    }
+}
+
 void WorkbenchMenuManager::bindShortcuts()
 {
-    auto* undoAction = new QAction(m_window->tr("Undo"), m_window);
-    undoAction->setShortcut(QKeySequence::Undo);
-    connect(undoAction, &QAction::triggered, this, [this]() {
+    // 先清理旧动作，防止重复叠加
+    clearGlobalShortcuts();
+
+    m_undoAction = new QAction(m_window->tr("Undo"), m_window);
+    m_undoAction->setShortcut(QKeySequence::Undo);
+    connect(m_undoAction, &QAction::triggered, this, [this]() {
         if (m_operationBus)
             m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("edit.undo")));
         });
-    m_window->addAction(undoAction);
+    m_window->addAction(m_undoAction);
 
-    auto* redoAction = new QAction(m_window->tr("Redo"), m_window);
-    redoAction->setShortcut(QKeySequence::Redo);
-    connect(redoAction, &QAction::triggered, this, [this]() {
+    m_redoAction = new QAction(m_window->tr("Redo"), m_window);
+    m_redoAction->setShortcut(QKeySequence::Redo);
+    connect(m_redoAction, &QAction::triggered, this, [this]() {
         if (m_operationBus)
             m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("edit.redo")));
         });
-    m_window->addAction(redoAction);
+    m_window->addAction(m_redoAction);
 }
 
 void WorkbenchMenuManager::refreshWorkbenchMenuChecks(const QString& workbenchId)

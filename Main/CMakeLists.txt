@@ -17,29 +17,101 @@ endfunction()
 set(SRC_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/Src)
 set(UI_ROOT ${SRC_ROOT}/UI)
 
-file(GLOB_RECURSE MAIN_SOURCES CONFIGURE_DEPENDS
-    "${SRC_ROOT}/**/*.cpp"
+set(MAIN_APP_SOURCES
+    ${SRC_ROOT}/main.cpp
+    ${SRC_ROOT}/Common/AppInitializer.cpp
+    ${SRC_ROOT}/Common/AppPathManager.cpp
+    ${SRC_ROOT}/Common/CrashHandlerBootstrap.cpp
+    ${SRC_ROOT}/Bootstrap/AppBootstrapper.cpp
+    ${SRC_ROOT}/Composition/ApplicationCompositionRoot.cpp
+    ${SRC_ROOT}/Composition/CoreOperationRegistry.cpp
+    ${SRC_ROOT}/Composition/DocumentPersistenceHelper.cpp
+    ${SRC_ROOT}/Composition/FileOperationRegistry.cpp
+    ${SRC_ROOT}/Composition/PendingOperationRegistry.cpp
+    ${SRC_ROOT}/Export/Adapters/DocumentExportAdapter.cpp
+    ${SRC_ROOT}/Export/Adapters/MetadataExportAdapter.cpp
+    ${SRC_ROOT}/Export/Adapters/ViewportExportAdapter.cpp
+    ${SRC_ROOT}/Export/ExportDispatcher.cpp
+    ${SRC_ROOT}/Export/ExportService.cpp
+    ${SRC_ROOT}/Export/Writers/BmpExportWriter.cpp
+    ${SRC_ROOT}/Export/Writers/DxfExportWriter.cpp
+    ${SRC_ROOT}/Export/Writers/ObjExportWriter.cpp
+    ${SRC_ROOT}/Export/Writers/PdfExportWriter.cpp
+    ${SRC_ROOT}/Export/Writers/PngExportWriter.cpp
+    ${SRC_ROOT}/Export/Writers/StepExportWriter.cpp
+    ${SRC_ROOT}/Export/Writers/SvgExportWriter.cpp
+    ${SRC_ROOT}/Import/Adapters/DocumentImportAdapter.cpp
+    ${SRC_ROOT}/Import/Adapters/PropertyImportAdapter.cpp
+    ${SRC_ROOT}/Import/Adapters/TreeImportAdapter.cpp
+    ${SRC_ROOT}/Import/Adapters/ViewportImportAdapter.cpp
+    ${SRC_ROOT}/Import/FioEntityConverter.cpp
+    ${SRC_ROOT}/Import/ImportDispatcher.cpp
+    ${SRC_ROOT}/Import/ImportService.cpp
+    ${SRC_ROOT}/Import/Readers/DxfImportReader.cpp
+    ${SRC_ROOT}/Import/Readers/ObjImportReader.cpp
+    ${SRC_ROOT}/Import/Readers/PdfImportReader.cpp
+    ${SRC_ROOT}/Import/Readers/PltImportReader.cpp
+    ${SRC_ROOT}/Import/Readers/StepImportReader.cpp
+    ${SRC_ROOT}/Import/Readers/StlImportReader.cpp
+    ${SRC_ROOT}/Import/Readers/SvgImportReader.cpp
+    ${SRC_ROOT}/License/LicenseDialog.cpp
+    ${SRC_ROOT}/Persistence/DatabaseBootstrapper.cpp
+    ${SRC_ROOT}/Persistence/LayerPersistenceBridge.cpp
+    ${SRC_ROOT}/Persistence/PersistenceService.cpp
+    ${SRC_ROOT}/Persistence/Repositories/DocumentRepository.cpp
+    ${SRC_ROOT}/Persistence/Repositories/LayerRepository.cpp
+    ${SRC_ROOT}/Persistence/Repositories/RecentFileRepository.cpp
+    ${SRC_ROOT}/Persistence/Repositories/SettingsRepository.cpp
+    ${SRC_ROOT}/Persistence/Repositories/WorkspaceSnapshotRepository.cpp
+    ${SRC_ROOT}/Runtime/CADApplicationEntry.cpp
+    ${SRC_ROOT}/Runtime/CADApplicationRuntime.cpp
+    ${SRC_ROOT}/UI/Adapters/TransformDialogAdapter.cpp
+    ${SRC_ROOT}/UI/Documents/SceneBuilder3D.cpp
+    ${SRC_ROOT}/UI/Documents/SceneDocument2D.cpp
+    ${SRC_ROOT}/UI/Entities/UiEntities.cpp
+    ${SRC_ROOT}/UI/Entities/UiGeometryAlgorithms.cpp
+    ${SRC_ROOT}/UI/Interaction/UiInteractionDispatcher.cpp
+    ${SRC_ROOT}/UI/Render/Camera2D.cpp
+    ${SRC_ROOT}/UI/Render/EntityToVertices.cpp
+    ${SRC_ROOT}/UI/Render/RenderViewport2D.cpp
+    ${SRC_ROOT}/UI/Render/Renderer3DFactory.cpp
+    ${SRC_ROOT}/UI/Render/SceneRefreshCoordinator.cpp
+    ${SRC_ROOT}/UI/Render/ViewportInputRouter.cpp
+    ${SRC_ROOT}/UI/Services/FileDialogService.cpp
+    ${SRC_ROOT}/UI/Services/HelpDialogService.cpp
+    ${SRC_ROOT}/UI/Services/RecentFileService.cpp
+    ${SRC_ROOT}/UI/Services/SelectionService.cpp
+    ${SRC_ROOT}/UI/Services/UiLayoutService.cpp
+    ${SRC_ROOT}/UI/Services/UiShellHost.cpp
+    ${SRC_ROOT}/UI/Services/UiStateCenter.cpp
+    ${SRC_ROOT}/UI/Services/UiThemeService.cpp
+    ${SRC_ROOT}/UI/ClientConfig/UiConfigLoader.cpp
+    ${SRC_ROOT}/UI/ClientConfig/UiConfigurationManager.cpp
+    ${SRC_ROOT}/UI/ClientConfig/UiLayoutBuilder.cpp
+    ${SRC_ROOT}/UI/ClientConfig/UiPanelRegistry.cpp
+    ${SRC_ROOT}/UI/Workbench/UiWorkbench.cpp
+    ${SRC_ROOT}/UI/Workbench/WorkbenchActionManager.cpp
+    ${SRC_ROOT}/UI/Workbench/WorkbenchLayoutManager.cpp
+    ${SRC_ROOT}/UI/Workbench/WorkbenchMenuManager.cpp
+    ${SRC_ROOT}/UI/Workbench/WorkbenchStateManager.cpp
+    ${SRC_ROOT}/UI/Workbench/WorkbenchWindow.cpp
+    ${SRC_ROOT}/UI/Widgets/DrawToolBarWidget.cpp
+    ${SRC_ROOT}/UI/Widgets/UiPropertiesPanel.cpp
+    ${SRC_ROOT}/UI/Widgets/UiSceneTreeDock.cpp
+    ${SRC_ROOT}/UI/Widgets/ViewportSelector.cpp
 )
 
-
-
-file(GLOB_RECURSE MAIN_HEADERS CONFIGURE_DEPENDS
-    "${SRC_ROOT}/**/*.h"
-)
-
-list(REMOVE_DUPLICATES MAIN_SOURCES)
-list(REMOVE_DUPLICATES MAIN_HEADERS)
-
-list(FILTER MAIN_SOURCES EXCLUDE REGEX ".*Test/.*\\.cpp$")
-list(FILTER MAIN_HEADERS EXCLUDE REGEX ".*Test/.*\\.h$")
-if(NOT BUILD_UI3D)
-    list(FILTER MAIN_SOURCES EXCLUDE REGEX ".*SimpleRenderer3D\\.cpp$")
-    list(FILTER MAIN_HEADERS EXCLUDE REGEX ".*SimpleRenderer3D\\.h$")
-    list(FILTER MAIN_SOURCES EXCLUDE REGEX ".*UiViewport3D\\.cpp$")
-    list(FILTER MAIN_HEADERS EXCLUDE REGEX ".*UiViewport3D\\.h$")
-    list(FILTER MAIN_SOURCES EXCLUDE REGEX ".*RenderWidget3DAdapter\\.cpp$")
-    list(FILTER MAIN_HEADERS EXCLUDE REGEX ".*RenderWidget3DAdapter\\.h$")
+if(BUILD_UI3D)
+    list(APPEND MAIN_APP_SOURCES
+        ${SRC_ROOT}/UI/Render/RenderWidget3DAdapter.cpp
+        ${SRC_ROOT}/UI/Render/SimpleRenderer3D.cpp
+        ${SRC_ROOT}/UI/Render/UiViewport3D.cpp
+    )
 endif()
+
+set(MAIN_APP_HEADERS
+    ${SRC_ROOT}/Common/VersionInfo.h.in
+)
 
 file(GLOB_RECURSE MAIN_RESOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.qrc"
@@ -50,20 +122,18 @@ set(app_name "SanYiCAD")
 set(APP_ORGANIZATION_NAME "SanYi")
 set(APP_ORGANIZATION_DOMAIN "sanyi-cad.com")
 
-configure_file(
-    "${SRC_ROOT}/Common/VersionInfo.h.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/VersionInfo.h"
-    @ONLY
-)
+# CMake 4.3 configure_file 兼容性：改用 file(READ) + string(CONFIGURE) + file(WRITE)
+file(READ "${SRC_ROOT}/Common/VersionInfo.h.in" _version_info_content)
+string(CONFIGURE "${_version_info_content}" _version_info_configured @ONLY)
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/VersionInfo.h" "${_version_info_configured}")
 
 add_executable(${app_name}
-    ${SRC_ROOT}/main.cpp
-    ${MAIN_SOURCES}
-    ${MAIN_HEADERS}
+    ${MAIN_APP_SOURCES}
+    ${MAIN_APP_HEADERS}
     ${MAIN_RESOURCES}
 )
 
-source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${MAIN_SOURCES} ${MAIN_HEADERS})
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${MAIN_APP_SOURCES} ${MAIN_APP_HEADERS})
 
 set(QT_COMPONENTS Core Gui Widgets OpenGLWidgets)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS ${QT_COMPONENTS} REQUIRED)
@@ -88,7 +158,6 @@ target_include_directories(${app_name}
         "${SRC_ROOT}"
         "${SRC_ROOT}/Common"
         "${SANYI_RENDERX_DIR}/include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../UI/RenderCompat/Include"
         "${UI_ROOT}"
         "${UI_ROOT}/Adapters"
         "${UI_ROOT}/Interaction"
@@ -126,14 +195,24 @@ target_link_libraries(${app_name}
         UICommon
         UI2D
         Log
-        RenderCompat
         FileIO
         ${QT_LIBRARIES}
 )
 
+# 客户化 UI 配置
+target_compile_definitions(${app_name} PRIVATE SANYI_CLIENT_ID="${SANYI_CLIENT_ID}")
+if(SANYI_ENABLE_CONFIG_DRIVEN_UI)
+    target_compile_definitions(${app_name} PRIVATE SANYI_ENABLE_CONFIG_DRIVEN_UI=1)
+endif()
+
 if(BUILD_UI3D)
     target_link_libraries(${app_name} PRIVATE UI3D Engine3D)
     target_compile_definitions(${app_name} PRIVATE BUILD_UI3D=1)
+    # 显式传播 ENABLE_GEOMODELCORE：SceneEditService3D / ServicePack3D 等导出类
+    # 含 #ifdef ENABLE_GEOMODELCORE 条件数据成员，EXE 必须与 DLL 的 sizeof 一致
+    if(BUILD_GEOMODELCORE)
+        target_compile_definitions(${app_name} PRIVATE ENABLE_GEOMODELCORE)
+    endif()
 endif()
 
 if(SANYI_PYTHON_HOST)
@@ -319,32 +398,111 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
 
     if(NOT BUILD_UI3D)
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*SimpleRenderer3DTests\\.cpp$")
+        list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*RenderWidget3DAdapterTests\\.cpp$")
+        list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*Scene3DRegressionTests\\.cpp$")
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*FrameworkLifecycleTests\\.cpp$")
     endif()
 
-    if(NOT BUILD_RENDERCORE)
-        list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*RenderCoreTests\\.cpp$")
-        list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*BackendE2ETests\\.cpp$")
-        list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*FrameworkIntegrationTests\\.cpp$")
-    endif()
-
-    file(GLOB MAIN_TEST_DEP_SOURCES CONFIGURE_DEPENDS
-        "${UI_ROOT}/*.cpp"
-        "${UI_ROOT}/**/*.cpp"
-        "${SRC_ROOT}/Persistence/*.cpp"
-        "${SRC_ROOT}/Persistence/Repositories/*.cpp"
-        "${SRC_ROOT}/Import/*.cpp"
+    set(MAIN_TEST_DEP_SOURCES
+        ${SRC_ROOT}/Common/AppInitializer.cpp
+        ${SRC_ROOT}/Common/AppPathManager.cpp
+        ${SRC_ROOT}/Common/CrashHandlerBootstrap.cpp
+        ${SRC_ROOT}/Composition/ApplicationCompositionRoot.cpp
+        ${SRC_ROOT}/Composition/CoreOperationRegistry.cpp
+        ${SRC_ROOT}/Composition/DocumentPersistenceHelper.cpp
+        ${SRC_ROOT}/Composition/FileOperationRegistry.cpp
+        ${SRC_ROOT}/Composition/PendingOperationRegistry.cpp
+        ${SRC_ROOT}/Export/Adapters/DocumentExportAdapter.cpp
+        ${SRC_ROOT}/Export/Adapters/MetadataExportAdapter.cpp
+        ${SRC_ROOT}/Export/Adapters/ViewportExportAdapter.cpp
+        ${SRC_ROOT}/Export/ExportDispatcher.cpp
+        ${SRC_ROOT}/Export/ExportService.cpp
+        ${SRC_ROOT}/Export/Writers/BmpExportWriter.cpp
+        ${SRC_ROOT}/Export/Writers/DxfExportWriter.cpp
+        ${SRC_ROOT}/Export/Writers/ObjExportWriter.cpp
+        ${SRC_ROOT}/Export/Writers/PdfExportWriter.cpp
+        ${SRC_ROOT}/Export/Writers/PngExportWriter.cpp
+        ${SRC_ROOT}/Export/Writers/StepExportWriter.cpp
+        ${SRC_ROOT}/Export/Writers/SvgExportWriter.cpp
+        ${SRC_ROOT}/Import/Adapters/DocumentImportAdapter.cpp
+        ${SRC_ROOT}/Import/Adapters/PropertyImportAdapter.cpp
+        ${SRC_ROOT}/Import/Adapters/TreeImportAdapter.cpp
+        ${SRC_ROOT}/Import/Adapters/ViewportImportAdapter.cpp
+        ${SRC_ROOT}/Import/FioEntityConverter.cpp
+        ${SRC_ROOT}/Import/ImportDispatcher.cpp
+        ${SRC_ROOT}/Import/ImportService.cpp
+        ${SRC_ROOT}/Import/Readers/DxfImportReader.cpp
+        ${SRC_ROOT}/Import/Readers/ObjImportReader.cpp
+        ${SRC_ROOT}/Import/Readers/PdfImportReader.cpp
+        ${SRC_ROOT}/Import/Readers/PltImportReader.cpp
+        ${SRC_ROOT}/Import/Readers/StepImportReader.cpp
+        ${SRC_ROOT}/Import/Readers/StlImportReader.cpp
+        ${SRC_ROOT}/Import/Readers/SvgImportReader.cpp
+        ${SRC_ROOT}/Persistence/DatabaseBootstrapper.cpp
+        ${SRC_ROOT}/Persistence/LayerPersistenceBridge.cpp
+        ${SRC_ROOT}/Persistence/PersistenceService.cpp
+        ${SRC_ROOT}/Persistence/Repositories/DocumentRepository.cpp
+        ${SRC_ROOT}/Persistence/Repositories/LayerRepository.cpp
+        ${SRC_ROOT}/Persistence/Repositories/RecentFileRepository.cpp
+        ${SRC_ROOT}/Persistence/Repositories/SettingsRepository.cpp
+        ${SRC_ROOT}/Persistence/Repositories/WorkspaceSnapshotRepository.cpp
+        ${SRC_ROOT}/UI/Adapters/TransformDialogAdapter.cpp
+        ${SRC_ROOT}/UI/ClientConfig/UiConfigLoader.cpp
+        ${SRC_ROOT}/UI/ClientConfig/UiConfigurationManager.cpp
+        ${SRC_ROOT}/UI/ClientConfig/UiLayoutBuilder.cpp
+        ${SRC_ROOT}/UI/ClientConfig/UiPanelRegistry.cpp
+        ${SRC_ROOT}/UI/Documents/SceneDocument2D.cpp
+        ${SRC_ROOT}/UI/Entities/UiEntities.cpp
+        ${SRC_ROOT}/UI/Entities/UiGeometryAlgorithms.cpp
+        ${SRC_ROOT}/UI/Interaction/UiInteractionDispatcher.cpp
+        ${SRC_ROOT}/UI/Render/Camera2D.cpp
+        ${SRC_ROOT}/UI/Render/EntityToVertices.cpp
+        ${SRC_ROOT}/UI/Render/RenderViewport2D.cpp
+        ${SRC_ROOT}/UI/Render/Renderer3DFactory.cpp
+        ${SRC_ROOT}/UI/Render/SceneRefreshCoordinator.cpp
+        ${SRC_ROOT}/UI/Render/ViewportInputRouter.cpp
+        ${SRC_ROOT}/UI/Services/FileDialogService.cpp
+        ${SRC_ROOT}/UI/Services/HelpDialogService.cpp
+        ${SRC_ROOT}/UI/Services/RecentFileService.cpp
+        ${SRC_ROOT}/UI/Services/SelectionService.cpp
+        ${SRC_ROOT}/UI/Services/UiLayoutService.cpp
+        ${SRC_ROOT}/UI/Services/UiShellHost.cpp
+        ${SRC_ROOT}/UI/Services/UiStateCenter.cpp
+        ${SRC_ROOT}/UI/Services/UiThemeService.cpp
+        ${SRC_ROOT}/UI/Workbench/UiWorkbench.cpp
+        ${SRC_ROOT}/UI/Workbench/WorkbenchActionManager.cpp
+        ${SRC_ROOT}/UI/Workbench/WorkbenchLayoutManager.cpp
+        ${SRC_ROOT}/UI/Workbench/WorkbenchMenuManager.cpp
+        ${SRC_ROOT}/UI/Workbench/WorkbenchStateManager.cpp
+        ${SRC_ROOT}/UI/Workbench/WorkbenchWindow.cpp
+        ${SRC_ROOT}/UI/Widgets/DrawToolBarWidget.cpp
+        ${SRC_ROOT}/UI/Widgets/UiPropertiesPanel.cpp
+        ${SRC_ROOT}/UI/Widgets/UiSceneTreeDock.cpp
+        ${SRC_ROOT}/UI/Widgets/ViewportSelector.cpp
     )
 
-    if(NOT BUILD_UI3D)
-        list(FILTER MAIN_TEST_DEP_SOURCES EXCLUDE REGEX ".*SimpleRenderer3D\\.cpp$")
-        list(FILTER MAIN_TEST_DEP_SOURCES EXCLUDE REGEX ".*UiViewport3D\\.cpp$")
-        list(FILTER MAIN_TEST_DEP_SOURCES EXCLUDE REGEX ".*RenderWidget3DAdapter\\.cpp$")
+    if(BUILD_UI3D)
+        list(APPEND MAIN_TEST_DEP_SOURCES
+            ${SRC_ROOT}/UI/Render/RenderWidget3DAdapter.cpp
+            ${SRC_ROOT}/UI/Render/SimpleRenderer3D.cpp
+            ${SRC_ROOT}/UI/Render/UiViewport3D.cpp
+        )
     endif()
+
+    # P2 测试扩展: 添加 protobuf 生成的源文件以支持 SyEntitySerializer 测试
+    set(PROTO_GEN_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Generated/Proto/SanYiDocument.pb.cc")
+
+    # P5 测试扩展: 添加 BaseTool.cpp（非导出类，UI2D 库不导出其符号）
+    set(BASE_TOOL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Src/Ui/DrawTools/BaseTool.cpp")
+
+    find_package(protobuf CONFIG REQUIRED)
 
     add_executable(MainTests
         ${MAIN_TEST_SOURCES}
         ${MAIN_TEST_DEP_SOURCES}
+        ${PROTO_GEN_SRC}
+        ${BASE_TOOL_SRC}
+        ${SRC_ROOT}/UI/ClientConfig/configs.qrc
     )
 
     target_compile_features(MainTests PRIVATE cxx_std_17)
@@ -357,6 +515,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             "${SRC_ROOT}/Persistence"
             "${SRC_ROOT}/Persistence/Repositories"
             "${SRC_ROOT}/Import"
+            "${SRC_ROOT}/Export"
             "${UI_ROOT}"
             "${UI_ROOT}/Adapters"
             "${UI_ROOT}/Interaction"
@@ -375,24 +534,28 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Persistence/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Common/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Src"
             "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Src"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Log/Log/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Src"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Generated/Proto"
     )
 
     target_link_libraries(MainTests
         PRIVATE
             Utility
+            CrashHandler
             EngineCommon
             Engine2D
             EnginePersistence
-            RenderCompat
             UICommon
             UI2D
             Log
             SanYiRender
             FileIO
+            protobuf::libprotobuf-lite
             ${QT_LIBRARIES}
             GTest::gtest
             GTest::gtest_main
@@ -402,11 +565,21 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
     if(BUILD_UI3D)
         target_link_libraries(MainTests PRIVATE Engine3D UI3D)
         target_compile_definitions(MainTests PRIVATE BUILD_UI3D=1)
+        if(BUILD_GEOMODELCORE)
+            target_compile_definitions(MainTests PRIVATE ENABLE_GEOMODELCORE)
+        endif()
+    endif()
+
+    # 客户化 UI 配置（测试目标同样需要访问资源）
+    target_compile_definitions(MainTests PRIVATE SANYI_CLIENT_ID="${SANYI_CLIENT_ID}")
+    if(SANYI_ENABLE_CONFIG_DRIVEN_UI)
+        target_compile_definitions(MainTests PRIVATE SANYI_ENABLE_CONFIG_DRIVEN_UI=1)
     endif()
 
     set_target_properties(MainTests PROPERTIES
         AUTOMOC ON
         AUTOUIC OFF
+        AUTORCC ON
     )
 
     deploy_qt_libraries(MainTests ${QT_VERSION_MAJOR})
@@ -421,10 +594,5 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
     gtest_discover_tests(MainTests)
 
     message(STATUS "[Main Tests]")
-    # message(STATUS "  SimpleRenderer3DTests: Renderer lifecycle, render loop, selection")
-    # message(STATUS "  CommandLifecycleTests: execute/cancel/submit, undo/redo, preview, selection, handlerFor")
-    # (RenderCoreTests/BackendE2ETests/FrameworkIntegrationTests 已删除，依赖 RenderCore 且无实装)
-    # message(STATUS "  RenderPipelineTests: SceneEditServiceAdapter commit/preview/cancel + scene-changed signal/callback")
-    # message(STATUS "  GpuSceneRenderer2DTests: GPU 桥接器编译/投递/选择/overlay 路径 + Main→Render2D 格式翻译")
     message(STATUS "")
 endif()

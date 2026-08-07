@@ -24,7 +24,7 @@ ImportResult ObjImportReader::read(const ImportContext& context,
     }
 
     SY_INFOF("[ObjImportReader] OBJ loaded successfully: %s, triangles=%zu, verts=%zu",
-        mesh->strName.c_str(), mesh->triangleCount(), mesh->vertices.size());
+        mesh->name(), mesh->triangleCount(), mesh->vertices.size());
 
     // 通过基类指针存入输出列表（IImportReader 接口使用 SyEntity 基类）
     outEntities.push_back(std::move(mesh));

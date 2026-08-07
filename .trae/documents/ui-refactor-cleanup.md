@@ -1,5 +1,9 @@
 # UI 架构清理与接口抽取方案
 
+> **文档状态（2026-08-02）**：重构记录/待复核。
+>
+> `WorkbenchLayoutManager`、`WorkbenchStateManager`、`WorkbenchActionManager` 三个 Manager 已于 2026-08-02 作为死代码删除（从未被实例化，逻辑与 WorkbenchWindow 内联实现逐行一致）。`ViewportInputRouter` 等其他新结构仍在使用。`WorkbenchWindow` 保留内联实现（1244 行）。
+
 ## Context
 
 项目当前存在三类技术债:(1) `BaseTool::switchToSelectTool()` 标注 `@deprecated` 仍未删除,`ToolFactories.h` 与 `ToolManager` 模板注册功能重叠;(2) 绘图态下 `Ctrl+Z` 被劫持为局部 `stepBack()`,与用户"全局撤销"心智模型冲突;(3) `StatusBar`/`StatusBar3D` 大量平行存在但共享抽象仅到 `IMainWindow`,2D/3D 状态栏无法通过统一接口访问。
@@ -186,7 +190,7 @@ virtual IStatusBar* customStatusBar() const = 0;
 
 1. **命令调度稳定化**：`dispatchOperation` 兼容 C++17，支持轻量测试请求与完整业务请求共存。
 2. **工作台切换稳定化**：`WorkbenchWindow / UiShellHost` 负责切换生命周期，确保旧工作台停用、布局保存、新工作台激活、状态中心同步形成闭环。
-3. **实体/文档统一访问**：`UiEntity` 作为统一实体基类，`EntityDocument2D / SceneDocument3D` 逐步提供 `entityById()`、`entities()`、按对象删除等统一入口。
+3. **图元/文档统一访问**：`UiEntity` 作为统一实体基类，`EntityDocument2D / SceneDocument3D` 逐步提供 `entityById()`、`entities()`、按对象删除等统一入口。
 4. **选择与几何外置**：`UiSelectionTools` 处理修剪、延伸、变换；`UiGeometryAlgorithms` 处理纯几何计算；视口逐步回到输入与投影职责。
 5. **状态中心单点写入**：命令阶段、工作台、选择上下文、繁忙状态等尽量通过 `UiStateCenter` 聚合，减少 UI 各层重复写状态。
 
@@ -225,10 +229,10 @@ virtual IStatusBar* customStatusBar() const = 0;
 - `dispatchOperation(...)` 已改为更宽容的模板模式，避免测试结构与模板要求不一致。
 - 后续所有命令分发相关改动，都要先保证接口向后兼容，再补测试。
 
-### 3. 实体与文档统一访问
-- 引入 `UiEntity` 统一实体接口，作为 2D / 3D 实体的共同抽象。
+### 3. 图元与文档统一访问
+- 引入 `UiEntity` 统一图元接口，作为 2D / 3D 图元的共同抽象。
 - `EntityDocument2D / SceneDocument3D` 逐步提供统一入口：`entityById()`、`entities()`、按对象删除。
-- 视口层不再过度依赖 `lineById / circleById / arcById` 这种分散接口，而是优先走统一实体入口。
+- 视口层不再过度依赖 `lineById / circleById / arcById` 这种分散接口，而是优先走统一图元入口。
 - 目的：让上层逻辑更像操作统一对象模型，而不是拼接多个具体类型。
 
 ### 4. 选择、几何、工具职责外置
@@ -283,7 +287,7 @@ virtual IStatusBar* customStatusBar() const = 0;
 ### 当前已完成的收口
 - 命令分发更宽容、更适合 C++17。
 - UI 主工作台切换链更稳定。
-- 实体/文档访问风格正在统一。
+- 图元/文档访问风格正在统一。
 - 选择与几何处理已明显外置。
 
 ### 下一步建议

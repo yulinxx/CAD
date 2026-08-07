@@ -1,5 +1,9 @@
 # 渲染框架演进计划
 
+> **文档状态（2026-08-02）**：设计/待核实，不等同于当前生产实现。
+>
+> 当前已确认的生产渲染主线主要包括 `RenderViewport2D`、`RenderWidget`、`Renderx`、`PersistentEntityManager`、`RenderWidget3DAdapter` 和 `UiViewport3D`。本文中的 `SceneCompiler`、`RenderCoreRenderer` 等名称只在代码和构建目标实际接入后，才能标记为生产主路径。
+
 ## Context
 
 当前渲染框架已具备基础架构：SceneCompiler 三层抽象（SceneTraverser + CompilationStrategy + BatchManager）、RenderCoreRenderer 桥接层、Backend 工厂与配置体系、UiShellHost/Workbench3D 宿主层。测试覆盖约 120 个用例。
@@ -79,7 +83,7 @@
 
 3. **新增测试**（在 RenderCoreTests.cpp 中）：
 
-   * `SceneCompilerTest, IncrementalCompile_DeleteEntityCachePurged` — 删除实体后增量编译不残留旧批次
+   * `SceneCompilerTest, IncrementalCompile_DeleteEntityCachePurged` — 删除图元后增量编译不残留旧批次
 
    * `SceneCompilerTest, IncrementalCompile_SceneSwitchCacheRebuilt` — 场景切换 + invalidateCache 后缓存重建
 
@@ -91,7 +95,7 @@
 
 * 增量编译结果与全量编译结果等价（batchCount、entityCount、vertexCount 一致）
 
-* 删除实体后增量编译不残留旧批次
+* 删除图元后增量编译不残留旧批次
 
 * 场景切换 + invalidateCache 后缓存可重建
 

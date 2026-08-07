@@ -1,7 +1,8 @@
 #pragma once
 
 #include "Render3D/IRenderer3D.h"
-#include "ViewCamera3D.h"
+#include "Render3D/ViewCamera3D.h"
+#include "UI/IRenderSurface.h"  // P1: 2D/3D 公共渲染表面接口
 #include <QString>
 
 class SceneDocument3DAdapter;
@@ -25,6 +26,7 @@ class CameraController3D;
   * 不依赖 OpenGL，仅使用 Qt 的 QPainter 绘制。
   */
 class SimpleRenderer3D : public IRenderer3D
+    , public UI::IRenderSurface  // P1: 实现 2D/3D 公共渲染表面接口
 {
 public:
     SimpleRenderer3D();

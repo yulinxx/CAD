@@ -1,4 +1,5 @@
 #include "FileOperationRegistry.h"
+#include "DocumentPersistenceHelper.h"
 
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
@@ -13,159 +14,215 @@
 #include "Export/ExportService.h"
 #include "Persistence/PersistenceService.h"
 #include "Persistence/LayerPersistenceBridge.h"
-#include "Persistence/Models/DocumentRecord.h"
-#include "Persistence/Repositories/DocumentRepository.h"
 #include "FileIO/FileIOManager.h"
+#include "Log/SyLogger.h"
 
 #include <QFileInfo>
 #include <QDateTime>
 #include <QMessageBox>
+#include <array>
 
 namespace
 {
-    Fio::FileFormat operationIdToImportFormat(OperationId id)
+    // 统一格式映射表：OperationId → FileFormat，替代旧的 switch 分支
+    struct FormatMappingEntry
     {
-        switch (id)
-        {
-            case OperationId::File_ImportDXF:  return Fio::FileFormat::DXF;
-            case OperationId::File_ImportSVG:  return Fio::FileFormat::SVG;
-            case OperationId::File_ImportPLT:  return Fio::FileFormat::PLT;
-            case OperationId::File_ImportStep: return Fio::FileFormat::STEP;
-            case OperationId::File_ImportPDF:  return Fio::FileFormat::PDF;
-            default:                          return Fio::FileFormat::Unknown;
-        }
-    }
+        OperationId opId;
+        Fio::FileFormat format;
+    };
 
-    Fio::FileFormat operationIdToExportFormat(OperationId id)
+    constexpr std::array<FormatMappingEntry, 5> kImportFormatMap = { {
+        { OperationId::File_ImportDXF,  Fio::FileFormat::DXF },
+        { OperationId::File_ImportSVG,  Fio::FileFormat::SVG },
+        { OperationId::File_ImportPLT,  Fio::FileFormat::PLT },
+        { OperationId::File_ImportStep, Fio::FileFormat::STEP },
+        { OperationId::File_ImportPDF,  Fio::FileFormat::PDF },
+    } };
+
+    constexpr std::array<FormatMappingEntry, 5> kExportFormatMap = { {
+        { OperationId::File_ExportDXF, Fio::FileFormat::DXF },
+        { OperationId::File_ExportSVG, Fio::FileFormat::SVG },
+        { OperationId::File_ExportPLT, Fio::FileFormat::PLT },
+        { OperationId::File_ExportBMP, Fio::FileFormat::BMP },
+        { OperationId::File_ExportPNG, Fio::FileFormat::PNG },
+    } };
+
+    // P5 收口: 统一按格式映射批量注册操作，消除 registerImportOps/registerExportOps 的重复循环
+    void registerFromFormatMap(OperationRegistry& reg,
+        const std::array<FormatMappingEntry, 5>& map,
+        std::function<void(Fio::FileFormat)> handler)
     {
-        switch (id)
+        for (const auto& entry : map)
         {
-            case OperationId::File_ExportDXF: return Fio::FileFormat::DXF;
-            case OperationId::File_ExportSVG: return Fio::FileFormat::SVG;
-            case OperationId::File_ExportPLT: return Fio::FileFormat::PLT;
-            case OperationId::File_ExportBMP: return Fio::FileFormat::BMP;
-            case OperationId::File_ExportPNG: return Fio::FileFormat::PNG;
-            default:                         return Fio::FileFormat::Unknown;
+            reg.registerOperation(std::make_unique<LambdaOperation>(
+                entry.opId, [handler, fmt = entry.format] {
+                    handler(fmt);
+                }));
         }
     }
 }
 
-FileOperationRegistry::FileOperationRegistry(OperationBus* bus,
-    Eg::SceneManager* sceneManager,
-    ImportService* importService,
-    ExportService* exportService,
-    FileDialogService* fileDialog,
-    RecentFileService* recentFiles,
-    HelpDialogService* helpDialog,
-    UiStateCenter* stateCenter,
-    LayerPersistenceBridge* layerPersistence,
-    PersistenceService* persistence,
-    QWidget* parentWidget)
-    : m_bus(bus)
-    , m_sceneManager(sceneManager)
-    , m_importService(importService)
-    , m_exportService(exportService)
-    , m_fileDialog(fileDialog)
-    , m_recentFiles(recentFiles)
-    , m_helpDialog(helpDialog)
-    , m_stateCenter(stateCenter)
-    , m_layerPersistence(layerPersistence)
-    , m_persistence(persistence)
-    , m_parentWidget(parentWidget)
+FileOperationRegistry::FileOperationRegistry(const FileOperationConfig& config)
+    : m_bus(config.bus)
+    , m_sceneManager(config.sceneManager)
+    , m_importService(config.importService)
+    , m_exportService(config.exportService)
+    , m_recentFiles(config.recentFiles)
+    , m_helpDialog(config.helpDialog)
+    , m_stateCenter(config.stateCenter)
+    , m_layerPersistence(config.layerPersistence)
+    , m_persistence(config.persistence)
+    , m_parentWidget(config.parentWidget)
 {
 }
 
-void FileOperationRegistry::registerAll()
-{
-    if (!m_bus || !m_sceneManager)
-        return;
+// ==================== 公共辅助方法 ====================
 
+void FileOperationRegistry::showFileError(const QString& title, const QString& message)
+{
+    HelpDialogService::showWarning(m_parentWidget, title, message);
+}
+
+void FileOperationRegistry::executeWithExceptionGuard(const char* operationName,
+    std::function<void()> action)
+{
+    try
+    {
+        action();
+    }
+    catch (const std::exception& e)
+    {
+        SY_ERRORF("[FileOperation] %s exception: %s", operationName, e.what());
+        showFileError(QObject::tr("%1 Error").arg(QString::fromLatin1(operationName)),
+            QStringLiteral("%1 failed: %2").arg(QString::fromLatin1(operationName), e.what()));
+    }
+    catch (...)
+    {
+        SY_ERRORF("[FileOperation] %s unknown exception", operationName);
+        showFileError(QObject::tr("%1 Error").arg(QString::fromLatin1(operationName)),
+            QStringLiteral("%1 failed with unknown exception").arg(QString::fromLatin1(operationName)));
+    }
+}
+
+// ==================== 公共模板方法 ====================
+
+void FileOperationRegistry::saveDocumentRecord(const std::string& filePath, int entityCount)
+{
+    DocumentPersistenceHelper::recordExport(m_persistence, filePath, entityCount);
+}
+
+bool FileOperationRegistry::doExport(const std::string& filePath)
+{
+    if (!m_exportService)
+        return false;
+
+    ExportResult result = m_exportService->exportFile(QString::fromStdString(filePath));
+    if (!result.success)
+    {
+        showFileError(QObject::tr("Save Error"), result.message);
+        return false;
+    }
+
+    *m_currentFilePath = filePath;
+    saveDocumentRecord(filePath, result.exportedEntityCount);
+
+    if (m_stateCenter)
+    {
+        m_stateCenter->setDirty(false);
+        m_stateCenter->setCurrentDocumentId(QString::fromStdString(filePath));
+    }
+    if (m_layerPersistence)
+        m_layerPersistence->setDocumentId(filePath);
+    if (m_recentFiles)
+        m_recentFiles->addRecentFile(QString::fromStdString(filePath));
+
+    return true;
+}
+
+bool FileOperationRegistry::doOpenFile(const QString& filePath)
+{
+    if (filePath.isEmpty() || !m_importService)
+        return false;
+
+    ImportOptions opts;
+    opts.importAsNewDocument = true;
+    opts.autoFit = true;
+    opts.autoSwitchWorkbench = false;
+
+    ImportContext context;
+    context.sourcePath = filePath;
+    context.recentFileAddCallback = [this](const QString& path) {
+        if (m_recentFiles)
+            m_recentFiles->addRecentFile(path);
+        };
+    context.currentDocumentPathCallback = [this](const QString& path) {
+        *m_currentFilePath = path.toStdString();
+        };
+
+    ImportResult result = m_importService->importWithContext(context, opts);
+    if (!result.success)
+    {
+        showFileError(QObject::tr("Import Error"), result.message);
+        return false;
+    }
+
+    if (m_layerPersistence)
+        m_layerPersistence->setDocumentId(filePath.toStdString());
+
+    return true;
+}
+
+void FileOperationRegistry::doImportByFormat(Fio::FileFormat fmt)
+{
+    executeWithExceptionGuard("Import", [this, fmt] {
+        QString filePath = FileDialogService::getOpenFileName(
+            m_parentWidget, QObject::tr("Import File"), FileDialogService::importFilterForFormat(fmt));
+        if (filePath.isEmpty() || !m_importService)
+            return;
+
+        SY_INFOF("[FileOperation] Importing via ImportService: format=%d, path=%s",
+            static_cast<int>(fmt), filePath.toUtf8().constData());
+
+        ImportOptions opts;
+        opts.importAsNewDocument = false;
+        opts.autoFit = true;
+
+        ImportContext context;
+        context.sourcePath = filePath;
+
+        ImportResult result = m_importService->importWithContext(context, opts);
+        if (!result.success)
+        {
+            showFileError(QObject::tr("Import Error"), result.message);
+            SY_ERRORF("[FileOperation] Import failed: %s", result.message.toUtf8().constData());
+        }
+    });
+}
+
+void FileOperationRegistry::doExportByFormat(Fio::FileFormat fmt)
+{
+    executeWithExceptionGuard("Export", [this, fmt] {
+        QString filePath = FileDialogService::getSaveFileName(
+            m_parentWidget, QObject::tr("Export File"), FileDialogService::exportFilterForFormat(fmt));
+        if (filePath.isEmpty() || !m_exportService)
+            return;
+
+        ExportResult result = m_exportService->exportFile(filePath);
+        if (!result.success)
+        {
+            showFileError(QObject::tr("Export Error"), result.message);
+            SY_ERRORF("[FileOperation] Export failed: %s", result.message.toUtf8().constData());
+        }
+    });
+}
+
+// ==================== 操作注册子方法 ====================
+
+void FileOperationRegistry::registerFileNewOps()
+{
     auto& reg = m_bus->registry();
     auto* scene = m_sceneManager;
-    auto* fileDlg = m_fileDialog;
-    auto* recentFiles = m_recentFiles;
-    auto* helpDlg = m_helpDialog;
 
-    auto currentFilePath = std::make_shared<std::string>();
-
-    auto saveDocumentRecord = [this](const std::string& filePath, int entityCount) {
-        if (!m_persistence || !m_persistence->documents())
-            return;
-        auto existing = m_persistence->documents()->loadByPath(filePath);
-        QString now = QDateTime::currentDateTime().toString(Qt::ISODate);
-        DocumentRecord dr;
-        dr.filePath = filePath;
-        dr.title = QFileInfo(QString::fromStdString(filePath)).fileName().toStdString();
-        dr.format = QFileInfo(QString::fromStdString(filePath)).suffix().toUpper().toStdString();
-        dr.entityCount = entityCount;
-        dr.lastSavedAt = now.toStdString();
-        dr.lastOpenedAt = existing.id > 0 ? existing.lastOpenedAt : now.toStdString();
-        dr.createdAt = existing.id > 0 ? existing.createdAt : now.toStdString();
-        m_persistence->documents()->save(dr);
-        };
-
-    auto doExport = [this, currentFilePath, saveDocumentRecord, recentFiles](
-        const std::string& filePath) -> bool {
-            if (!m_exportService)
-                return false;
-            ExportResult result = m_exportService->exportFile(QString::fromStdString(filePath));
-            if (!result.success)
-            {
-                HelpDialogService::showWarning(m_parentWidget, QObject::tr("Save Error"), result.message);
-                return false;
-            }
-            *currentFilePath = filePath;
-            saveDocumentRecord(filePath, result.exportedEntityCount);
-            if (m_stateCenter)
-            {
-                m_stateCenter->setDirty(false);
-                m_stateCenter->setCurrentDocumentId(QString::fromStdString(filePath));
-            }
-            if (m_layerPersistence)
-                m_layerPersistence->setDocumentId(filePath);
-            if (recentFiles)
-                recentFiles->addRecentFile(QString::fromStdString(filePath));
-            return true;
-        };
-
-    auto doOpenFile = [this, currentFilePath, recentFiles](
-        const QString& filePath) -> bool {
-            if (filePath.isEmpty())
-                return false;
-
-            if (!m_importService)
-                return false;
-
-            ImportOptions opts;
-            opts.importAsNewDocument = true;
-            opts.autoFit = true;
-            opts.autoSwitchWorkbench = false;
-
-            ImportContext context;
-            context.sourcePath = filePath;
-            context.recentFileAddCallback = [recentFiles](const QString& path) {
-                if (recentFiles)
-                    recentFiles->addRecentFile(path);
-                };
-            context.currentDocumentPathCallback = [currentFilePath](const QString& path) {
-                *currentFilePath = path.toStdString();
-                };
-
-            ImportResult result = m_importService->importWithContext(context, opts);
-
-            if (!result.success)
-            {
-                HelpDialogService::showWarning(m_parentWidget, QObject::tr("Import Error"), result.message);
-                return false;
-            }
-
-            if (m_layerPersistence)
-                m_layerPersistence->setDocumentId(filePath.toStdString());
-
-            return true;
-        };
-
-    // ---- 新建文件 ----
     reg.registerOperation(std::make_unique<LambdaOperation>(
         OperationId::File_New, [this, scene] {
             bool needsSave = (m_stateCenter && m_stateCenter->dirty());
@@ -181,25 +238,32 @@ void FileOperationRegistry::registerAll()
             scene->clearScene();
             if (m_stateCenter) m_stateCenter->setDirty(false);
         }));
+}
 
-    // ---- 打开文件 ----
+void FileOperationRegistry::registerFileOpenOps()
+{
+    auto& reg = m_bus->registry();
+
     reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::File_Open, [this, doOpenFile] {
+        OperationId::File_Open, [this] {
             QString filePath = FileDialogService::getOpenFileName(
                 m_parentWidget, QObject::tr("Open File"), FileDialogService::openFileFilter());
             doOpenFile(filePath);
         }));
 
-    // ---- 打开最近文件 ----
     reg.registerOperation(std::make_unique<ParamLambdaOperation>(
-        OperationId::File_OpenRecent, [doOpenFile](const QVariantMap& params) {
+        OperationId::File_OpenRecent, [this](const QVariantMap& params) {
             doOpenFile(params.value(QStringLiteral("filePath")).toString());
         }));
+}
 
-    // ---- 保存 ----
+void FileOperationRegistry::registerFileSaveOps()
+{
+    auto& reg = m_bus->registry();
+
     reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::File_Save, [this, scene, currentFilePath, doExport] {
-            if (currentFilePath->empty())
+        OperationId::File_Save, [this] {
+            if (m_currentFilePath->empty())
             {
                 QString filePath = FileDialogService::getSaveFileName(
                     m_parentWidget, QObject::tr("Save"), FileDialogService::saveFileFilter());
@@ -208,113 +272,59 @@ void FileOperationRegistry::registerAll()
             }
             else
             {
-                doExport(*currentFilePath);
+                doExport(*m_currentFilePath);
             }
         }));
 
-    // ---- 另存为 ----
     reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::File_SaveAs, [this, scene, currentFilePath, doExport] {
+        OperationId::File_SaveAs, [this] {
             QString filePath = FileDialogService::getSaveFileName(
                 m_parentWidget, QObject::tr("Save As"), FileDialogService::saveFileFilter());
             if (!filePath.isEmpty()) doExport(filePath.toStdString());
         }));
+}
 
-    // ---- 导入操作 ----
-    const OperationId importOps[] = {
-        OperationId::File_ImportDXF, OperationId::File_ImportSVG,
-        OperationId::File_ImportPLT, OperationId::File_ImportStep, OperationId::File_ImportPDF,
-    };
-    for (const auto& opId : importOps)
-    {
-        reg.registerOperation(std::make_unique<LambdaOperation>(
-            opId, [this, opId] {
-                try
-                {
-                    SY_INFOF("[FileOperation] Import triggered: op=%d", static_cast<int>(opId));
-                    auto fmt = operationIdToImportFormat(opId);
-                    SY_INFOF("[FileOperation] Format determined: format=%d", static_cast<int>(fmt));
-                    QString filePath = FileDialogService::getOpenFileName(
-                        m_parentWidget, QObject::tr("Import File"), FileDialogService::importFilterForFormat(fmt));
-                    SY_INFOF("[FileOperation] File dialog result: filePath=%s", filePath.toUtf8().constData());
-                    if (filePath.isEmpty())
-                    {
-                        SY_INFO("[FileOperation] Import canceled - empty path");
-                        return;
-                    }
-                    if (!m_importService)
-                    {
-                        SY_ERROR("[FileOperation] ImportService is null");
-                        return;
-                    }
-                    SY_INFOF("[FileOperation] ImportService=%p, SceneManager=%p", m_importService, m_sceneManager);
-                    ImportOptions opts;
-                    opts.importAsNewDocument = false;
-                    opts.autoFit = true;
+void FileOperationRegistry::registerImportOps()
+{
+    auto& reg = m_bus->registry();
 
-                    ImportContext context;
-                    context.sourcePath = filePath;
-                    SY_INFOF("[FileOperation] Calling importWithContext: path=%s", filePath.toUtf8().constData());
-                    ImportResult result = m_importService->importWithContext(context, opts);
-                    SY_INFOF("[FileOperation] Import completed: success=%d, message=%s",
-                        result.success ? 1 : 0, result.message.toUtf8().constData());
+    // P5 收口: 统一使用 registerFromFormatMap 批量注册
+    registerFromFormatMap(reg, kImportFormatMap,
+        [this](Fio::FileFormat fmt) { doImportByFormat(fmt); });
 
-                    if (!result.success)
-                    {
-                        HelpDialogService::showWarning(m_parentWidget, QObject::tr("Import Error"), result.message);
-                        return;
-                    }
-                }
-                catch (const std::exception& e)
-                {
-                    SY_ERRORF("[FileOperation] Import exception: %s", e.what());
-                    HelpDialogService::showWarning(m_parentWidget, QObject::tr("Import Error"),
-                        QStringLiteral("Import failed with exception: %1").arg(e.what()));
-                }
-                catch (...)
-                {
-                    SY_ERROR("[FileOperation] Import unknown exception");
-                    HelpDialogService::showWarning(m_parentWidget, QObject::tr("Import Error"),
-                        QStringLiteral("Import failed with unknown exception"));
-                }
-            }));
-    }
-
-    // ---- 导入图片 ----
+    // 导入图片（特殊处理，不走格式映射）
     reg.registerOperation(std::make_unique<LambdaOperation>(
         OperationId::File_ImportImage, [this] {
             QString filePath = FileDialogService::getOpenFileName(
                 m_parentWidget, QObject::tr("Import Image"), FileDialogService::imageImportFilter());
         }));
+}
 
-    // ---- 导出操作 ----
-    const OperationId exportOps[] = {
-        OperationId::File_ExportDXF, OperationId::File_ExportSVG,
-        OperationId::File_ExportPLT, OperationId::File_ExportBMP, OperationId::File_ExportPNG,
-    };
+void FileOperationRegistry::registerExportOps()
+{
+    auto& reg = m_bus->registry();
 
-    for (const auto& opId : exportOps)
-    {
-        reg.registerOperation(std::make_unique<LambdaOperation>(
-            opId, [this, opId] {
-                auto fmt = operationIdToExportFormat(opId);
-                QString filePath = FileDialogService::getSaveFileName(
-                    m_parentWidget, QObject::tr("Export File"), FileDialogService::exportFilterForFormat(fmt));
+    // P5 收口: 统一使用 registerFromFormatMap 批量注册
+    registerFromFormatMap(reg, kExportFormatMap,
+        [this](Fio::FileFormat fmt) { doExportByFormat(fmt); });
+}
 
-                if (filePath.isEmpty()) return;
-                if (!m_exportService) return;
+void FileOperationRegistry::registerAll()
+{
+    if (!m_bus || !m_sceneManager)
+        return;
 
-                ExportResult result = m_exportService->exportFile(filePath);
-                if (!result.success)
-                {
-                    HelpDialogService::showWarning(m_parentWidget, QObject::tr("Export Error"), result.message);
-                    return;
-                }
-            }));
-    }
+    // 初始化共享文件路径状态
+    m_currentFilePath = std::make_shared<std::string>();
 
-    // ---- 退出 ----
-    reg.registerOperation(std::make_unique<LambdaOperation>(
+    registerFileNewOps();
+    registerFileOpenOps();
+    registerFileSaveOps();
+    registerImportOps();
+    registerExportOps();
+
+    // 退出操作
+    m_bus->registry().registerOperation(std::make_unique<LambdaOperation>(
         OperationId::File_Exit, [this] {
             FileOperationUtils::exitApplication(m_parentWidget);
         }));

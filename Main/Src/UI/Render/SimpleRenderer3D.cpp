@@ -2,9 +2,11 @@
 
 #include <QPainter>
 #include <QObject>
+#include <unordered_set>
 
 #include "UiEntities.h"
-#include "Engine3D/SyEntity/SyMeshEntity.h"
+#include "Engine/Scene/SceneGeometryCollector.h"  // 统一渲染数据源收集器
+#include "Engine/Scene/SceneRenderContract.h"      // ISceneDataSource 接口
 
 namespace
 {
@@ -178,16 +180,28 @@ void SimpleRenderer3D::drawSceneNodes(QPainter& painter)
     const auto engineScene = m_document->engineScene();
     if (engineScene)
     {
-        int nodeIndex = 0;
-        for (const auto& entity : engineScene->getAllEntities())
-        {
-            if (!entity)
-                continue;
+        // 通过 ISceneDataSource 统一接口收集包围盒数据（替代直接遍历 getAllEntities()）
+        Eg::SceneGeometryCollector collector;
+        engineScene->gatherGeometry(collector);
 
-            const auto bbox = entity->getBBox();
+        const auto& bboxes = collector.bboxes();
+        if (bboxes.empty())
+            return;
+
+        // 获取选中图元 ID 集合，用于高亮渲染
+        std::unordered_set<uint64_t> selectedSet;
+        engineScene->forEachSelectedEntityId([](Eg::EntityId eid, void* ctx) -> bool {
+            auto* set = static_cast<std::unordered_set<uint64_t>*>(ctx);
+            set->insert(eid);
+            return true;
+            }, &selectedSet);
+
+        for (const auto& item : bboxes)
+        {
+            const auto& bbox = item.bbox;
             const auto center = bbox.isValid() ? bbox.center() : Ut::Vec3f(0, 0, 0);
 
-            const bool isSelected = entity->selected();
+            const bool isSelected = (selectedSet.find(item.entityId) != selectedSet.end());
             const float nodeSize = isSelected ? kNodeHalfSize * 1.5f : kNodeHalfSize;
             const QColor color = isSelected ? QColor(80, 200, 255) : QColor(140, 160, 180);
 
@@ -196,13 +210,15 @@ void SimpleRenderer3D::drawSceneNodes(QPainter& painter)
             int sx, sy;
             if (project(center.x(), center.y() + nodeSize + 0.2f, center.z(), sx, sy))
             {
-                const auto displayName = entity->strName.empty()
-                    ? QStringLiteral("Entity #%1").arg(entity->getId())
-                    : QString::fromStdString(entity->strName);
+                // 通过 ISceneDataSource 统一接口查询图元名称
+                char nameBuf[128] = {};
+                size_t nameLen = engineScene->entityName(item.entityId, nameBuf, sizeof(nameBuf));
+                const auto displayName = (nameLen > 0)
+                    ? QString::fromUtf8(nameBuf)
+                    : QStringLiteral("Entity #%1").arg(item.entityId);
                 painter.setPen(color);
                 painter.drawText(sx - 20, sy, 40, 16, Qt::AlignCenter, displayName);
             }
-            ++nodeIndex;
         }
         return;
     }
@@ -326,7 +342,7 @@ void SimpleRenderer3D::selectNodeById(const QString& nodeId)
 
             engineScene->clearSelection();
             if (entity)
-                engineScene->selectMesh(entity);
+                engineScene->selectEntity(entity);
         }
         else if (auto entity = m_document->nodeById(nodeId.toStdString()))
         {
@@ -387,15 +403,16 @@ QString SimpleRenderer3D::hitTest(int screenX, int screenY) const
     const auto engineScene = m_document->engineScene();
     if (engineScene)
     {
+        // 通过 ISceneDataSource 统一接口收集包围盒数据（替代直接遍历 getAllEntities()）
+        Eg::SceneGeometryCollector collector;
+        engineScene->gatherGeometry(collector);
+
         double bestDist = kHitRadius;
         QString bestId;
 
-        for (const auto& entity : engineScene->getAllEntities())
+        for (const auto& item : collector.bboxes())
         {
-            if (!entity)
-                continue;
-
-            const auto bbox = entity->getBBox();
+            const auto& bbox = item.bbox;
             const auto center = bbox.isValid() ? bbox.center() : Ut::Vec3f(0, 0, 0);
 
             int sx, sy;
@@ -409,7 +426,7 @@ QString SimpleRenderer3D::hitTest(int screenX, int screenY) const
             if (dist < bestDist)
             {
                 bestDist = dist;
-                bestId = QString::number(entity->getId());
+                bestId = QString::number(item.entityId);
             }
         }
 
@@ -466,12 +483,16 @@ void SimpleRenderer3D::rebuildTreeHighlight()
     if (engineScene)
     {
         const auto entityId = static_cast<Eg::EntityId>(m_selectedNodeId.toULongLong());
-        if (auto* entity = engineScene->findEntityById(entityId))
+        // 通过 ISceneDataSource 统一接口查询图元名称（替代直接访问 entity->strName）
+        char nameBuf[128] = {};
+        size_t nameLen = engineScene->entityName(entityId, nameBuf, sizeof(nameBuf));
+        if (nameLen > 0)
         {
-            const auto& name = entity->strName;
-            m_selectedPathNames.append(name.empty()
-                ? QStringLiteral("Entity #%1").arg(entityId)
-                : QString::fromStdString(name));
+            m_selectedPathNames.append(QString::fromUtf8(nameBuf));
+        }
+        else
+        {
+            m_selectedPathNames.append(QStringLiteral("Entity #%1").arg(entityId));
         }
     }
     else

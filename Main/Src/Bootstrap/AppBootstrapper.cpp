@@ -4,6 +4,7 @@
 #include <QString>
 
 #include "Log/SyLogger.h"
+
 #include "UI/Workbench/UiWorkbench.h"
 #include "UI/Workbench/WorkbenchWindow.h"
 #include "UI/Services/UiFrameworkServices.h"
@@ -120,16 +121,21 @@ void AppBootstrapper::bootstrap()
     m_services.layoutService = m_compositionRoot->layoutService();
     m_services.interactionDispatcher = m_compositionRoot->interactionDispatcher();
     m_services.undoManager = m_compositionRoot->undoRedoManager();
+
     m_services.operationBus = m_compositionRoot->operationBus();
     m_services.layerManager = m_compositionRoot->layerManager();
     m_services.layerManagerBridge = m_compositionRoot->layerManagerBridge();
     m_services.layerEditService = m_compositionRoot->layerEditService();
     m_services.persistenceService = m_compositionRoot->persistenceService();
+
     m_services.layerPersistenceBridge = m_compositionRoot->layerPersistenceBridge();
     m_services.document2D = m_compositionRoot->document2D();
     m_services.importService = m_compositionRoot->importService();
     m_services.exportService = m_compositionRoot->exportService();
-    m_services.sceneManager = m_compositionRoot->sceneManager();
+
+    // 阶段1收口：选择服务由组合根统一创建，不再直接暴露 SceneManager
+    m_services.selectionService = m_compositionRoot->selectionService();
+
     m_services.sceneEditService = m_compositionRoot->sceneEditService();
 
     const auto startWorkbenchId = m_startWorkbenchId.isEmpty() ? QStringLiteral("2D") : m_startWorkbenchId;
@@ -147,7 +153,9 @@ void AppBootstrapper::bootstrap()
 
     if (!m_workbench->initialize(m_services))
     {
-        SY_ERRORF("[AppBootstrapper] error code=bootstrap.workbench_init_failed message=Workbench '%s' initialization failed", startWorkbenchId.toUtf8().constData());
+        SY_ERRORF("[AppBootstrapper] error code=bootstrap.workbench_init_failed message=Workbench '%s' initialization failed",
+            startWorkbenchId.toUtf8().constData());
+
         return;
     }
     SY_INFOF("[AppBootstrapper] Workbench '%s' initialized successfully", startWorkbenchId.toUtf8().constData());

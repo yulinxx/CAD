@@ -9,13 +9,14 @@
 #include "ImportContext.h"
 #include "ImportOptions.h"
 #include "ImportResult.h"
+#include "FileIO/IFileParser.h"
 
-class ImportDispatcher;
-class UiStateCenter;
-class SceneDocument2D;
-class SceneTreeDockWidget;
-class PropertiesPanelWidget;
-class SceneEditService;
+ class ImportDispatcher;
+ class SceneDocument2D;
+ class SceneTreeDockWidget;
+ class PropertiesPanelWidget;
+ class SceneEditService;
+ class SceneEditService3D;
 
 namespace Eg
 {
@@ -33,26 +34,42 @@ public:
     explicit ImportService(QObject* parent = nullptr);
     ~ImportService() override;
 
+public:
     /// 设置导入分发器（注入已注册好所有读取器的分发器实例）
     void setDispatcher(ImportDispatcher* dispatcher);
 
     /// 设置场景管理器（用于清空场景等操作）
     void setSceneManager(Eg::SceneManager* sceneManager);
 
-    /// 设置 3D 场景管理器（用于导入网格图元到 3D 场景）
-    void setSceneManager3D(Eg::SceneManager3D* sceneManager3D);
+     /// 设置 3D 场景管理器（用于导入网格图元到 3D 场景）
+     void setSceneManager3D(Eg::SceneManager3D* sceneManager3D);
 
-    /// 获取 3D 场景管理器
-    Eg::SceneManager3D* sceneManager3D() const
-    {
-        return m_sceneManager3D;
-    }
+     /// 获取 3D 场景管理器
+     Eg::SceneManager3D* sceneManager3D() const
+     {
+         return m_sceneManager3D;
+     }
+
+     /// 设置 3D 场景编辑服务（用于将导入的 3D 图元通过事务写入，支持 Undo）
+     void setSceneEditService3D(SceneEditService3D* sceneEditService3D);
 
     /// 设置场景编辑服务（用于将导入的图元通过事务写入文档，支持 Undo）
     void setEditService(SceneEditService* editService);
 
-    /// 设置状态中心（用于导入过程中的状态同步）
-    void setStateCenter(UiStateCenter* stateCenter);
+    /// 设置忙状态回调（替代旧的 UiStateCenter 直接依赖）
+    void setBusyStateCallback(std::function<void(bool)> callback);
+    /// 获取忙状态回调（供 RAII 守卫使用）
+    const std::function<void(bool)>& busyStateCallback() const
+    {
+        return m_busyStateCallback;
+    }
+    /// 设置状态栏提示回调（替代旧的 UiStateCenter 直接依赖）
+    void setStatusPromptCallback(std::function<void(const QString&)> callback);
+    /// 获取状态栏提示回调（供 RAII 守卫使用）
+    const std::function<void(const QString&)>& statusPromptCallback() const
+    {
+        return m_statusPromptCallback;
+    }
 
     /// 设置视口适配回调（导入完成后刷新视口）
     void setViewportFitCallback(std::function<void()> callback);
@@ -86,12 +103,20 @@ public:
     ImportResult importFile(const QString& filePath,
         const ImportOptions& options = ImportOptions{});
 
-    /// 执行带完整上下文的导入
-    /// @param context 导入上下文
-    /// @param options 导入选项
-    /// @return 导入结果
-    ImportResult importWithContext(const ImportContext& context,
-        const ImportOptions& options = ImportOptions{});
+      /// 执行带完整上下文的导入
+     /// @param context 导入上下文
+     /// @param options 导入选项
+     /// @return 导入结果
+     ImportResult importWithContext(const ImportContext& context,
+         const ImportOptions& options = ImportOptions{});
+
+     /// 执行异步导入（Phase 1-2 在后台线程，Phase 3-5 回到主线程）
+     /// @param context 导入上下文
+     /// @param options 导入选项
+     /// @param onComplete 导入完成回调（在主线程执行）
+     void importAsync(const ImportContext& context,
+         const ImportOptions& options = ImportOptions{},
+         std::function<void(const ImportResult&)> onComplete = nullptr);
 
     /// 检查指定路径是否可导入
     bool canImport(const QString& filePath) const;
@@ -129,22 +154,28 @@ private:
     void phaseWriteBackState(const ImportContext& context,
         const ImportResult& result);
 
+private:
     /// 更新进度
     void updateProgress(ImportPhase phase, float progress);
 
     /// 检查是否已取消
     bool isCanceled(const ImportContext& context) const;
 
+private:
     /// 导入分发器（非拥有指针，由组合根管理生命周期）
     ImportDispatcher* m_dispatcher{ nullptr };
     /// 场景管理器（非拥有指针，用于 clearScene）
     Eg::SceneManager* m_sceneManager{ nullptr };
-    /// 3D 场景管理器（非拥有指针，用于导入网格图元）
-    Eg::SceneManager3D* m_sceneManager3D{ nullptr };
-    /// 场景编辑服务（非拥有指针，用于事务化添加图元）
-    SceneEditService* m_editService{ nullptr };
-    /// 状态中心（非拥有指针）
-    UiStateCenter* m_stateCenter{ nullptr };
+     /// 3D 场景管理器（非拥有指针，用于导入网格图元）
+     Eg::SceneManager3D* m_sceneManager3D{ nullptr };
+     /// 3D 场景编辑服务（非拥有指针，用于事务化添加 3D 图元）
+     SceneEditService3D* m_sceneEditService3D{ nullptr };
+     /// 场景编辑服务（非拥有指针，用于事务化添加图元）
+     SceneEditService* m_editService{ nullptr };
+    /// 忙状态回调（替代 UiStateCenter 直接调用）
+    std::function<void(bool)> m_busyStateCallback;
+    /// 状态栏提示回调（替代 UiStateCenter 直接调用）
+    std::function<void(const QString&)> m_statusPromptCallback;
 
     /// 视口适配回调
     std::function<void()> m_viewportFitCallback;

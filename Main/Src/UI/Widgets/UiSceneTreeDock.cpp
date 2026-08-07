@@ -1,4 +1,4 @@
-#include "UiSceneTreeDock.h"
+﻿#include "UiSceneTreeDock.h"
 
 #include "UiEntities.h"
 #include "Engine3D/SyEntity/SyMeshEntity.h"
@@ -39,12 +39,12 @@ void SceneTreeDockWidget::setSceneDocument(SceneDocument3DAdapter* document)
     refresh();
 }
 
-void SceneTreeDockWidget::setSelectionCallback(std::function<void(const QString&)>&& callback)
+void SceneTreeDockWidget::setSelectionCallback(std::function<void(const QString&)> callback)
 {
     m_selectionCallback = std::move(callback);
 }
 
-void SceneTreeDockWidget::setPathCallback(std::function<void(const QStringList&)>&& callback)
+void SceneTreeDockWidget::setPathCallback(std::function<void(const QStringList&)> callback)
 {
     m_pathCallback = std::move(callback);
 }

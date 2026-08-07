@@ -3,7 +3,6 @@
 
 #include "Log/SyLogger.h"
 #include "Engine2D/Core/SceneManager.h"
-#include "../UI/Services/UiStateCenter.h"
 
 ExportService::ExportService(QObject* parent)
     : QObject(parent)
@@ -22,9 +21,14 @@ void ExportService::setSceneManager(Eg::SceneManager* sceneManager)
     m_sceneManager = sceneManager;
 }
 
-void ExportService::setStateCenter(UiStateCenter* stateCenter)
+void ExportService::setBusyStateCallback(std::function<void(bool)> callback)
 {
-    m_stateCenter = stateCenter;
+    m_busyStateCallback = std::move(callback);
+}
+
+void ExportService::setStatusPromptCallback(std::function<void(const QString&)> callback)
+{
+    m_statusPromptCallback = std::move(callback);
 }
 
 ExportResult ExportService::exportFile(const QString& filePath,
@@ -45,27 +49,16 @@ ExportResult ExportService::exportWithContext(const ExportContext& context,
         return ExportResult::fail(msg);
     }
 
-    // 状态中心：标记繁忙
-    if (m_stateCenter)
-    {
-        m_stateCenter->setBusy(true);
-        m_stateCenter->setMetadata({
-            { QStringLiteral("statusPrompt"),
-              QStringLiteral("Exporting: %1").arg(context.targetPath) }
-            });
-    }
+    // 通过回调通知忙状态（替代旧的 UiStateCenter 直接依赖）
+    if (m_busyStateCallback)
+        m_busyStateCallback(true);
+    if (m_statusPromptCallback)
+        m_statusPromptCallback(QStringLiteral("Exporting: %1").arg(context.targetPath));
 
     emit exportStarted(context.targetPath);
 
-    // 收集场景图元（如果场景管理器可用）
-    Fio::VecSyEntityPtr entities;
-    if (m_sceneManager)
-    {
-        auto allEntities = m_sceneManager->getAllEntities();
-        entities.reserve(allEntities.size());
-        for (auto* e : allEntities)
-            entities.push_back(e->clone());
-    }
+    // 收集场景图元（P5 收口: 复用 collectAllEntities 消除重复）
+    Fio::VecSyEntityPtr entities = collectAllEntities();
 
     if (entities.empty())
     {
@@ -73,13 +66,10 @@ ExportResult ExportService::exportWithContext(const ExportContext& context,
         SY_WARNF("[ExportService] %s", msg.toUtf8().constData());
 
         ExportResult emptyResult = ExportResult::fail(msg);
-        if (m_stateCenter)
-        {
-            m_stateCenter->setBusy(false);
-            m_stateCenter->setMetadata({
-                { QStringLiteral("statusPrompt"), QStringLiteral("Export: no entities") }
-                });
-        }
+        if (m_busyStateCallback)
+            m_busyStateCallback(false);
+        if (m_statusPromptCallback)
+            m_statusPromptCallback(QStringLiteral("Export: no entities"));
         emit exportFinished(emptyResult);
         return emptyResult;
     }
@@ -105,17 +95,15 @@ ExportResult ExportService::exportWithContext(const ExportContext& context,
             result.message.toUtf8().constData());
     }
 
-    // 状态中心：清除繁忙
-    if (m_stateCenter)
+    // 通过回调清除忙状态（替代旧的 UiStateCenter 直接依赖）
+    if (m_busyStateCallback)
+        m_busyStateCallback(false);
+    if (m_statusPromptCallback)
     {
-        m_stateCenter->setBusy(false);
         QString prompt = result.success
-            ? QStringLiteral("Export completed: %1 entities")
-            .arg(result.exportedEntityCount)
+            ? QStringLiteral("Export completed: %1 entities").arg(result.exportedEntityCount)
             : QStringLiteral("Export failed: %1").arg(result.message);
-        m_stateCenter->setMetadata({
-            { QStringLiteral("statusPrompt"), prompt }
-            });
+        m_statusPromptCallback(prompt);
     }
 
     emit exportFinished(result);
@@ -140,7 +128,8 @@ Fio::VecSyEntityPtr ExportService::collectAllEntities() const
         auto allEntities = m_sceneManager->getAllEntities();
         entities.reserve(allEntities.size());
         for (auto* e : allEntities)
-            entities.push_back(e->clone());
+            // ABI: clone 在 Engine2D 分配，/MD 共享堆下跨 DLL delete 安全
+            entities.push_back(std::unique_ptr<Eg::SyEntity>(e->clone()));
     }
     return entities;
 }

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 /**
  * @file TransactionUndoCommand.h
  * @brief 事务级撤销命令
@@ -26,7 +26,7 @@
 class TransactionUndoCommand : public UndoCommand
 {
 public:
-    TransactionUndoCommand(const QString& text, Eg::DocumentTransaction&& txn)
+    TransactionUndoCommand(const QString& text, Eg::DocumentTransaction txn)
         : UndoCommand(text)
         , m_transaction(std::move(txn))
     {

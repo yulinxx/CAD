@@ -25,6 +25,16 @@ set(SANYI_ROOT "${PROJECT_SOURCE_DIR}" CACHE INTERNAL "SanYi CAD project root")
 include("${SANYI_ROOT}/CMake/SanYiPaths.cmake")
 include("${SANYI_ROOT}/CMake/Utils.cmake")
 
+# 客户化 UI 配置选项：选择目标客户版本（编译期嵌入对应的 JSON 配置）
+set(SANYI_CLIENT_ID "san_yi" CACHE STRING "Target UI client ID")
+set_property(CACHE SANYI_CLIENT_ID PROPERTY STRINGS
+    "san_yi"
+    "client_a"
+    "client_b"
+)
+# 客户 UI 配置驱动开关：默认关闭，启用后由 JSON 配置驱动 UI 构建
+option(SANYI_ENABLE_CONFIG_DRIVEN_UI "Enable config-driven UI layout" OFF)
+
 # 可选: 启用 Vulkan 支持 (从 vcpkg 获取)
 find_package(Vulkan QUIET)
 if(Vulkan_FOUND)
@@ -143,8 +153,6 @@ add_subdirectory(License/License)
 # 2. Log 层 - 日志库（Engine 层依赖）
 add_subdirectory(Log/Log)
 
-# Core 模块已移除（保留 SyEntity + Protobuf 方案）
-
 # 3. Engine 层 - 引擎核心
 add_subdirectory(Engine/Common)
 add_subdirectory(Engine/2D)
@@ -173,18 +181,6 @@ if(BUILD_ENGRAVING)
 else()
     message(STATUS "  Engraving: DISABLED")
 endif()
-
-# 4.8 统一渲染抽象层（UiRenderCore — 已弃用，由 Renderx 替代）
-option(BUILD_RENDERCORE "Build UiRenderCore (deprecated)" OFF)
-if(BUILD_RENDERCORE)
-    add_subdirectory(Main/Src/RenderCore)
-    message(STATUS "  UiRenderCore: ENABLED (deprecated)")
-else()
-    message(STATUS "  UiRenderCore: DISABLED (replaced by Renderx)")
-endif()
-
-# 4.8 UI Render Compat 层 - Render/ 旧 API 兼容头文件（委托到 Renderx C API）
-add_subdirectory(UI/RenderCompat)
 
 # 5. UI 层 - 用户界面
 add_subdirectory(UI/Common)
@@ -273,10 +269,6 @@ set(SANYI_PROJECT_LIBS
 
 if(BUILD_UI3D)
     list(APPEND SANYI_PROJECT_LIBS Engine3D UI3D)
-endif()
-
-if(BUILD_RENDERCORE)
-    list(APPEND SANYI_PROJECT_LIBS UiRenderCore)
 endif()
 
 if(BUILD_RENDERX)

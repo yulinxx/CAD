@@ -2,14 +2,72 @@
 #include "ImportDispatcher.h"
 #include "ImportResult.h"
 
-#include <QFileInfo>
+#include <QCoreApplication>
+#include <QMetaObject>
+#include <thread>
 
 #include "Log/SyLogger.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine3D/SceneManager3D.h"
 #include "Engine3D/SyEntity/SyMeshEntity.h"
-#include "../UI/Services/UiStateCenter.h"
+#include "UI3D/Edit/SceneEditService3D.h"
+
+#include <QFileInfo>
+
+// ==================== RAII 导入守卫 ====================
+// 替代 goto cleanup 模式：构造时设忙状态，析构时清除忙状态 + 写最终状态
+// 解决五阶段流程中 goto cleanup 的代码可读性和维护性问题
+namespace
+{
+    class ScopedImportGuard
+    {
+    public:
+        ScopedImportGuard(ImportService* svc, const QString& sourcePath)
+            : m_svc(svc), m_sourcePath(sourcePath)
+        {
+            if (m_svc)
+            {
+                // 通知忙状态开始
+                const auto& cb = m_svc->busyStateCallback();
+                if (cb) cb(true);
+            }
+        }
+
+        ~ScopedImportGuard()
+        {
+            if (!m_svc)
+                return;
+
+            // 通知忙状态结束
+            const auto& busyCb = m_svc->busyStateCallback();
+            if (busyCb)
+                busyCb(false);
+
+            // 最终状态提示
+            const auto& promptCb = m_svc->statusPromptCallback();
+            if (promptCb)
+            {
+                if (m_result.success)
+                    promptCb(QStringLiteral("Import completed: %1 entities").arg(m_result.entityCount));
+                else
+                    promptCb(QStringLiteral("Import failed: %1").arg(m_result.message));
+            }
+        }
+
+        void setResult(const ImportResult& result)
+        {
+            m_result = result;
+        }
+
+    private:
+        ImportService* m_svc;
+        QString m_sourcePath;
+        ImportResult m_result;
+    };
+} // anonymous namespace
+
+// ==================== ImportService 实现 ====================
 
 ImportService::ImportService(QObject* parent)
     : QObject(parent)
@@ -22,70 +80,61 @@ void ImportService::setDispatcher(ImportDispatcher* dispatcher)
 {
     m_dispatcher = dispatcher;
 }
-
 void ImportService::setSceneManager(Eg::SceneManager* sceneManager)
 {
     m_sceneManager = sceneManager;
 }
-
 void ImportService::setSceneManager3D(Eg::SceneManager3D* sceneManager3D)
 {
     m_sceneManager3D = sceneManager3D;
 }
-
+void ImportService::setSceneEditService3D(SceneEditService3D* sceneEditService3D)
+{
+    m_sceneEditService3D = sceneEditService3D;
+}
 void ImportService::setEditService(SceneEditService* editService)
 {
     m_editService = editService;
 }
-
-void ImportService::setStateCenter(UiStateCenter* stateCenter)
+void ImportService::setBusyStateCallback(std::function<void(bool)> cb)
 {
-    m_stateCenter = stateCenter;
+    m_busyStateCallback = std::move(cb);
 }
-
-void ImportService::setViewportFitCallback(std::function<void()> callback)
+void ImportService::setStatusPromptCallback(std::function<void(const QString&)> cb)
 {
-    m_viewportFitCallback = std::move(callback);
+    m_statusPromptCallback = std::move(cb);
 }
-
-void ImportService::setTreeRebuildCallback(std::function<void()> callback)
+void ImportService::setViewportFitCallback(std::function<void()> cb)
 {
-    m_treeRebuildCallback = std::move(callback);
+    m_viewportFitCallback = std::move(cb);
 }
-
-void ImportService::setPropertyRefreshCallback(std::function<void()> callback)
+void ImportService::setTreeRebuildCallback(std::function<void()> cb)
 {
-    m_propertyRefreshCallback = std::move(callback);
+    m_treeRebuildCallback = std::move(cb);
 }
-
-void ImportService::setWorkbenchSwitchCallback(
-    std::function<void(const QString&)> callback)
+void ImportService::setPropertyRefreshCallback(std::function<void()> cb)
 {
-    m_workbenchSwitchCallback = std::move(callback);
+    m_propertyRefreshCallback = std::move(cb);
 }
-
-void ImportService::setStatusBarUpdateCallback(
-    std::function<void(const QString&)> callback)
+void ImportService::setWorkbenchSwitchCallback(std::function<void(const QString&)> cb)
 {
-    m_statusBarUpdateCallback = std::move(callback);
+    m_workbenchSwitchCallback = std::move(cb);
 }
-
-void ImportService::setRecentFileAddCallback(
-    std::function<void(const QString&)> callback)
+void ImportService::setStatusBarUpdateCallback(std::function<void(const QString&)> cb)
 {
-    m_recentFileAddCallback = std::move(callback);
+    m_statusBarUpdateCallback = std::move(cb);
 }
-
-void ImportService::setCurrentDocumentPathCallback(
-    std::function<void(const QString&)> callback)
+void ImportService::setRecentFileAddCallback(std::function<void(const QString&)> cb)
 {
-    m_currentDocumentPathCallback = std::move(callback);
+    m_recentFileAddCallback = std::move(cb);
 }
-
-void ImportService::setDocumentPersistenceCallback(
-    std::function<void(const QString&, int)> callback)
+void ImportService::setCurrentDocumentPathCallback(std::function<void(const QString&)> cb)
 {
-    m_documentPersistenceCallback = std::move(callback);
+    m_currentDocumentPathCallback = std::move(cb);
+}
+void ImportService::setDocumentPersistenceCallback(std::function<void(const QString&, int)> cb)
+{
+    m_documentPersistenceCallback = std::move(cb);
 }
 
 ImportResult ImportService::importFile(const QString& filePath,
@@ -111,25 +160,28 @@ ImportResult ImportService::importWithContext(const ImportContext& context,
         return ImportResult::fail(msg, ImportErrorType::Unknown);
     }
 
-    SY_INFOF("[ImportService] stateCenter=%p, sceneManager=%p, editService=%p",
-        m_stateCenter, m_sceneManager, m_editService);
+    SY_INFOF("[ImportService] sceneManager=%p, editService=%p",
+        m_sceneManager, m_editService);
 
-    // 状态中心：标记繁忙
-    if (m_stateCenter)
-    {
-        m_stateCenter->setBusy(true);
-        m_stateCenter->setMetadata({
-            { QStringLiteral("statusPrompt"),
-              QStringLiteral("Importing: %1").arg(context.sourcePath) }
-            });
-    }
+    // RAII 守卫：自动管理忙状态和最终状态提示
+    ScopedImportGuard guard(this, context.sourcePath);
+
+    // P5 收口: 统一错误/取消处理 lambda，消除 6 处重复的 guard.setResult + emit + return 模式
+    auto fail = [&](ImportResult r) {
+        guard.setResult(r);
+        emit importFinished(r);
+        return r;
+        };
+
+    if (m_statusPromptCallback)
+        m_statusPromptCallback(QStringLiteral("Importing: %1").arg(context.sourcePath));
 
     emit importStarted(context.sourcePath);
 
     // 创建可修改的上下文副本（用于注入检测到的格式）
     ImportContext mutableCtx = context;
 
-    // 提前声明，避免 goto 跳过初始化
+    // 提前声明，避免 goto 跳过初始化 → RAII 守卫下无需此约束
     Fio::VecSyEntityPtr importedEntities;
 
     // ===== 1：识别文件格式 =====
@@ -138,16 +190,12 @@ ImportResult ImportService::importWithContext(const ImportContext& context,
     if (!result.success)
     {
         SY_ERRORF("[ImportService] Phase 1 failed: %s", result.message.toUtf8().constData());
-        goto cleanup;
+        return fail(result);
     }
     SY_INFOF("[ImportService] Phase 1 completed: format=%d", static_cast<int>(mutableCtx.format));
 
     if (isCanceled(mutableCtx))
-    {
-        result = ImportResult::fail(QStringLiteral("Import canceled"),
-            ImportErrorType::Canceled);
-        goto cleanup;
-    }
+        return fail(ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
 
     // ===== 2：解析文件 =====
     SY_INFO("[ImportService] Phase 2: Parse file");
@@ -155,16 +203,12 @@ ImportResult ImportService::importWithContext(const ImportContext& context,
     if (!result.success)
     {
         SY_ERRORF("[ImportService] Phase 2 failed: %s", result.message.toUtf8().constData());
-        goto cleanup;
+        return fail(result);
     }
     SY_INFOF("[ImportService] Phase 2 completed: entities=%zu", importedEntities.size());
 
     if (isCanceled(mutableCtx))
-    {
-        result = ImportResult::fail(QStringLiteral("Import canceled"),
-            ImportErrorType::Canceled);
-        goto cleanup;
-    }
+        return fail(ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
 
     // ===== 3：构建文档 =====
     SY_INFO("[ImportService] Phase 3: Build document");
@@ -172,16 +216,12 @@ ImportResult ImportService::importWithContext(const ImportContext& context,
     if (!result.success)
     {
         SY_ERRORF("[ImportService] Phase 3 failed: %s", result.message.toUtf8().constData());
-        goto cleanup;
+        return fail(result);
     }
     SY_INFOF("[ImportService] Phase 3 completed: entityCount=%d", result.entityCount);
 
     if (isCanceled(mutableCtx))
-    {
-        result = ImportResult::fail(QStringLiteral("Import canceled"),
-            ImportErrorType::Canceled);
-        goto cleanup;
-    }
+        return fail(ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
 
     // ===== 4：刷新显示 =====
     SY_INFO("[ImportService] Phase 4: Refresh display");
@@ -193,27 +233,8 @@ ImportResult ImportService::importWithContext(const ImportContext& context,
     phaseWriteBackState(mutableCtx, result);
     SY_INFO("[ImportService] Phase 5 completed");
 
-cleanup:
-    // 状态中心：清除繁忙
-    if (m_stateCenter)
-    {
-        m_stateCenter->setBusy(false);
-        if (!result.success)
-        {
-            m_stateCenter->setMetadata({
-                { QStringLiteral("statusPrompt"),
-                  QStringLiteral("Import failed: %1").arg(result.message) }
-                });
-        }
-        else
-        {
-            m_stateCenter->setMetadata({
-                { QStringLiteral("statusPrompt"),
-                  QStringLiteral("Import completed: %1 entities")
-                      .arg(result.entityCount) }
-                });
-        }
-    }
+    // RAII 守卫在析构时自动清除忙状态并写最终提示
+    guard.setResult(result);
 
     emit importFinished(result);
 
@@ -221,6 +242,100 @@ cleanup:
         result.success ? 1 : 0, result.message.toUtf8().constData());
 
     return result;
+}
+
+void ImportService::importAsync(const ImportContext& context,
+    const ImportOptions& options,
+    std::function<void(const ImportResult&)> onComplete)
+{
+    SY_INFOF("[ImportService] importAsync START: path=%s",
+        context.sourcePath.toUtf8().constData());
+
+    if (!m_dispatcher)
+    {
+        QString msg = QStringLiteral("ImportDispatcher not set");
+        SY_ERRORF("[ImportService] %s", msg.toUtf8().constData());
+        if (onComplete)
+            onComplete(ImportResult::fail(msg, ImportErrorType::Unknown));
+        return;
+    }
+
+    // 获取 shared_ptr 用于跨线程安全传递
+    // 使用 std::shared_ptr<ImportService> 需要 enable_shared_from_this
+    // 这里使用简单的裸指针 + 标志位，调用方需确保 ImportService 在回调前存活
+
+    auto* self = this;
+    auto sourcePath = context.sourcePath;
+
+    // 启动后台线程执行 Phase 1-2
+    std::thread([self, context, options, onComplete, sourcePath]() {
+        ImportContext mutableCtx = context;
+        auto importedEntities = std::make_shared<Fio::VecSyEntityPtr>();
+
+        emit self->importStarted(sourcePath);
+
+        if (self->m_statusPromptCallback)
+            self->m_statusPromptCallback(QStringLiteral("Importing: %1").arg(sourcePath));
+
+        // Phase 1: 识别格式
+        SY_INFO("[ImportService] Async Phase 1: Detect format");
+        ImportResult result = self->phaseDetectFormat(mutableCtx);
+        if (!result.success)
+        {
+            SY_ERRORF("[ImportService] Async Phase 1 failed: %s",
+                result.message.toUtf8().constData());
+            if (onComplete)
+                onComplete(result);
+            return;
+        }
+
+        // Phase 2: 解析文件
+        SY_INFO("[ImportService] Async Phase 2: Parse file");
+        result = self->phaseParse(mutableCtx, *importedEntities);
+        if (!result.success)
+        {
+            SY_ERRORF("[ImportService] Async Phase 2 failed: %s",
+                result.message.toUtf8().constData());
+            if (onComplete)
+                onComplete(result);
+            return;
+        }
+
+        SY_INFOF("[ImportService] Async parse completed: entities=%zu",
+            importedEntities->size());
+
+        // Phase 3-5 必须在主线程执行（UI 操作）
+        auto entities = importedEntities;
+        QMetaObject::invokeMethod(qApp, [self, mutableCtx, entities, options,
+            onComplete, sourcePath]() mutable {
+                ImportContext mainCtx = mutableCtx;
+
+                SY_INFO("[ImportService] Async Phase 3: Build document (main thread)");
+                ImportResult result = self->phaseBuildDocument(mainCtx, *entities, options);
+                if (!result.success)
+                {
+                    SY_ERRORF("[ImportService] Async Phase 3 failed: %s",
+                        result.message.toUtf8().constData());
+                    if (onComplete)
+                        onComplete(result);
+                    return;
+                }
+
+                SY_INFO("[ImportService] Async Phase 4: Refresh display");
+                self->phaseRefreshDisplay(result, options);
+
+                SY_INFO("[ImportService] Async Phase 5: Write back state");
+                self->phaseWriteBackState(mainCtx, result);
+
+                if (onComplete)
+                    onComplete(result);
+
+                emit self->importFinished(result);
+
+                SY_INFOF("[ImportService] importAsync END: success=%d",
+                    result.success ? 1 : 0);
+            }, Qt::QueuedConnection);
+        }).detach();
 }
 
 bool ImportService::canImport(const QString& filePath) const
@@ -327,10 +442,9 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
         if (entity && entity->isValid())
             validEntities.push_back(std::move(entity));
         else
-        {
             SY_WARNF("[ImportService] Skipping invalid entity");
-        }
     }
+
     entities = std::move(validEntities);
 
     if (entities.empty())
@@ -370,16 +484,42 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
         if (options.importAsNewDocument)
             m_sceneManager3D->clearScene();
 
+        // 收集所有网格图元
+        std::vector<std::unique_ptr<Eg::SyMeshEntity>> meshEntities;
+        std::vector<std::unique_ptr<Eg::SyEntity>> remainingEntities;
         for (auto& entity : entities)
         {
             if (entity && entity->eType == Eg::EType::MESH)
             {
-                // 安全转换：SyMeshEntity 继承自 SyEntity
-                auto* meshPtr = static_cast<Eg::SyMeshEntity*>(entity.release());
-                m_sceneManager3D->addEntity(
-                    std::unique_ptr<Eg::SyMeshEntity>(meshPtr));
+                meshEntities.push_back(
+                    std::unique_ptr<Eg::SyMeshEntity>(
+                        static_cast<Eg::SyMeshEntity*>(entity.release())));
+            }
+            else
+            {
+                remainingEntities.push_back(std::move(entity));
             }
         }
+        entities = std::move(remainingEntities);
+
+        // 如果有 SceneEditService3D，通过它添加以支持 Undo
+        if (m_sceneEditService3D && !meshEntities.empty())
+        {
+            SY_INFOF("[ImportService] Using SceneEditService3D for undoable import: %zu entities",
+                meshEntities.size());
+            m_sceneEditService3D->addEntities(std::move(meshEntities),
+                "Import 3D mesh");
+        }
+        else
+        {
+            // 回退：直接添加到 SceneManager3D（无 Undo 支持）
+            for (auto& mesh : meshEntities)
+            {
+                auto* meshPtr = mesh.release();
+                m_sceneManager3D->addEntity(meshPtr);
+            }
+        }
+
         m_sceneManager3D->markDataChanged();
         SY_INFO("[ImportService] Mesh entities added to SceneManager3D successfully");
     }
@@ -388,7 +528,8 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
         SY_INFOF("[ImportService] Calling addEntities: editService=%p, entities=%d",
             m_editService, static_cast<int>(entities.size()));
         m_editService->addEntities(std::move(entities),
-            "Import " + context.sourcePath.toStdString());
+            "Import " + context.sourcePath.toStdString(),
+            CommitMode::Direct);
         SY_INFO("[ImportService] addEntities completed successfully");
     }
     else if (m_sceneManager)
@@ -502,5 +643,6 @@ bool ImportService::isCanceled(const ImportContext& context) const
 {
     if (context.cancelCallback)
         return context.cancelCallback();
+
     return false;
 }

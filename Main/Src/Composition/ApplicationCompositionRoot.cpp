@@ -1,6 +1,8 @@
 #include "ApplicationCompositionRoot.h"
 #include "FileOperationRegistry.h"
 #include "CoreOperationRegistry.h"
+#include "PendingOperationRegistry.h"
+#include "DocumentPersistenceHelper.h"
 
 #include "UI/Services/UiLayoutService.h"
 #include "UI/Services/UiServices.h"
@@ -8,30 +10,27 @@
 #include "UI/Workbench/WorkbenchWindow.h"
 #include "UI/Services/UiStateCenter.h"
 #include "UI/Services/UiThemeService.h"
-#include "UI/Render/RenderViewport2D.h"
+#include "UI/Services/HelpDialogService.h"
+
+#include "UI2D/Edit/QtLayerManagerBridge.h"
+
 #include "Common/AppInitializer.h"
+
 #include "Persistence/LayerPersistenceBridge.h"
 #include "Persistence/PersistenceService.h"
 
-#include "UI2D/Operation/OperationId.h"
-#include "UI2D/Operation/IOperation.h"
 #include "Log/SyLogger.h"
-
-#include <QApplication>
-#include <QFileInfo>
-#include <QDateTime>
 
 #include "UI/Services/FileDialogService.h"
 #include "UI/Services/RecentFileService.h"
-#include "Persistence/Models/DocumentRecord.h"
-#include "Persistence/Repositories/DocumentRepository.h"
 
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/UndoRedoManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
-#include "UI/Services/HelpDialogService.h"
 #include "Engine2D/Interaction/LayerManager.h"
-#include "UI2D/Edit/QtLayerManagerBridge.h"
+
+#include "UI/Services/SelectionService.h"
+#include "UI/Services/ISelectionService.h"
 
 #include "Import/ImportService.h"
 #include "Import/ImportDispatcher.h"
@@ -42,6 +41,7 @@
 #include "Import/Readers/ObjImportReader.h"
 #include "Import/Readers/StlImportReader.h"
 #include "Import/Readers/PltImportReader.h"
+
 #include "Export/ExportService.h"
 #include "Export/ExportDispatcher.h"
 #include "Export/Writers/DxfExportWriter.h"
@@ -52,13 +52,20 @@
 #include "Export/Writers/ObjExportWriter.h"
 #include "Export/Writers/StepExportWriter.h"
 
+#include <QWidget>
+
 // 应用组合根组件，负责创建和组装所有核心服务
 // 作为依赖注入的中心点，管理UI层和命令系统的生命周期
 ApplicationCompositionRoot::~ApplicationCompositionRoot() = default;
 
+ISelectionService* ApplicationCompositionRoot::selectionService()
+{
+    return m_selectionService.get();
+}
+
 // 应用组合根构造函数
 // 职责：创建所有核心服务实例，完成依赖注入和信号连接
-// 装配顺序：UI 基础服务 → 场景/编辑/图层 → 导入导出 → 对话框服务 → 脏状态同步 → 操作注册
+// 装配顺序：UI 基础服务 → 导入导出 → 对话框服务 → 脏状态同步 → 操作注册
 ApplicationCompositionRoot::ApplicationCompositionRoot()
     : m_stateCenter(std::make_unique<UiStateCenter>())
     , m_themeService(std::make_unique<DefaultUiThemeService>())
@@ -70,6 +77,7 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     , m_sceneManager3D(std::make_unique<Eg::SceneManager3D>())
     , m_undoRedoManager(std::make_unique<UndoRedoManager>(m_sceneManager.get()))
     , m_sceneEditService(std::make_unique<SceneEditService>(m_sceneManager.get(), m_undoRedoManager.get()))
+    , m_selectionService(std::make_unique<SelectionService>(m_sceneManager.get()))
     , m_document2D(std::make_unique<SceneDocument2D>(m_sceneEditService.get()))
     , m_layerManager(std::make_unique<LayerManager>(m_sceneManager.get()))
     , m_layerManagerBridge(std::make_unique<QtLayerManagerBridge>(nullptr))
@@ -80,7 +88,25 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     , m_exportService(std::make_unique<ExportService>())
     , m_exportDispatcher(std::make_unique<ExportDispatcher>())
 {
-    // 组装UI服务集合
+    // 装配顺序：UI 服务 → 导入导出 → 对话框 → 脏状态 → 操作注册
+    UiServices uiServices = assembleUiServices();
+    setupImportExportServices(uiServices);
+    m_shellHost->setUiServices(uiServices);
+    setupDialogServices();
+    setupDirtyStateSync();
+    registerAllOperations();
+
+    SY_INFO("[ApplicationCompositionRoot] initialized with module-based operation registration");
+}
+
+// ==================== 构造函数拆分子方法（P5 结构性优化） ====================
+
+UiServices ApplicationCompositionRoot::assembleUiServices()
+{
+    // 创建最近文件服务
+    m_recentFileService = std::make_unique<RecentFileService>(persistenceService());
+
+    // 组装 UI 服务集合
     UiServices uiServices;
     uiServices.stateCenter = m_stateCenter.get();
     uiServices.themeService = m_themeService.get();
@@ -88,33 +114,40 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     uiServices.interactionDispatcher = interactionDispatcher();
     uiServices.operationBus = m_operationBus.get();
     uiServices.document2D = m_document2D.get();
+    uiServices.selectionService = m_selectionService.get();
     uiServices.layerManager = m_layerManager.get();
     uiServices.layerManagerBridge = m_layerManagerBridge.get();
     uiServices.layerEditService = m_layerEditService.get();
     uiServices.persistenceService = persistenceService();
+    uiServices.recentFileService = m_recentFileService.get();
 
-    // 将 LayerManagerBridge 注册为 LayerManager 的观察者
+    // LayerManagerBridge 注册为 LayerManager 观察者
     m_layerManager->addObserver(m_layerManagerBridge.get());
 
-    // 创建图层持久化桥接器（将运行态图层变更同步写入数据库）
+    // 创建图层持久化桥接器（运行态图层变更同步写入数据库）
     if (persistenceService() && persistenceService()->isOpen() && persistenceService()->layers())
     {
         m_layerPersistenceBridge = std::make_unique<LayerPersistenceBridge>(
             m_layerManager.get(), persistenceService()->layers());
+
         m_layerPersistenceBridge->attach();
         uiServices.layerPersistenceBridge = m_layerPersistenceBridge.get();
         SY_INFO("[ApplicationCompositionRoot] LayerPersistenceBridge attached");
     }
 
-    // 将 LayerManager 注入到 SceneEditService，使其在添加图元时自动分配图层
+    // LayerManager 注入 SceneEditService，添加图元时自动分配图层
     m_sceneEditService->setLayerManager(m_layerManager.get());
 
-    // 配置UI壳宿主的核心依赖
+    // 配置 ShellHost 核心依赖
     m_shellHost->setStateCenter(m_stateCenter.get());
     m_shellHost->setThemeService(m_themeService.get());
     m_shellHost->setOperationBus(m_operationBus.get());
 
-    // ---- 初始化导入/导出服务层 ----
+    return uiServices;
+}
+
+void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiServices)
+{
     // 注册导入读取器
     m_importDispatcher->registerReader(std::make_unique<DxfImportReader>());
     m_importDispatcher->registerReader(std::make_unique<SvgImportReader>());
@@ -123,16 +156,26 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     m_importDispatcher->registerReader(std::make_unique<ObjImportReader>());
     m_importDispatcher->registerReader(std::make_unique<StlImportReader>());
     m_importDispatcher->registerReader(std::make_unique<PltImportReader>());
+
     // 配置导入服务
     m_importService->setDispatcher(m_importDispatcher.get());
     m_importService->setSceneManager(m_sceneManager.get());
     m_importService->setSceneManager3D(m_sceneManager3D.get());
     m_importService->setEditService(m_sceneEditService.get());
-    m_importService->setStateCenter(m_stateCenter.get());
-    // 设置文档持久化回调（阶段5回写状态使用）
-    m_importService->setDocumentPersistenceCallback([this](const QString& filePath, int entityCount) {
-        this->saveDocumentPersistenceRecord(filePath, entityCount);
+    m_importService->setBusyStateCallback(
+        [this](bool busy) {
+            if (m_stateCenter) m_stateCenter->setBusy(busy); 
         });
+
+    m_importService->setStatusPromptCallback(
+        [this](const QString& prompt) {
+            if (m_stateCenter) m_stateCenter->setMetadata({ { QStringLiteral("statusPrompt"), prompt } });
+        });
+
+    m_importService->setDocumentPersistenceCallback([this](const QString& filePath, int entityCount) {
+        DocumentPersistenceHelper::recordImport(m_persistenceService, filePath, entityCount);
+        });
+
     // 注册导出写入器
     m_exportDispatcher->registerWriter(std::make_unique<DxfExportWriter>());
     m_exportDispatcher->registerWriter(std::make_unique<SvgExportWriter>());
@@ -141,20 +184,31 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     m_exportDispatcher->registerWriter(std::make_unique<PngExportWriter>());
     m_exportDispatcher->registerWriter(std::make_unique<ObjExportWriter>());
     m_exportDispatcher->registerWriter(std::make_unique<StepExportWriter>());
+
     // 配置导出服务
     m_exportService->setDispatcher(m_exportDispatcher.get());
     m_exportService->setSceneManager(m_sceneManager.get());
-    m_exportService->setStateCenter(m_stateCenter.get());
-    // 将导入/导出服务注入到 UI 服务集合
+    m_exportService->setBusyStateCallback(
+        [this](bool busy) {
+            if (m_stateCenter) m_stateCenter->setBusy(busy);
+        });
+
+    m_exportService->setStatusPromptCallback(
+        [this](const QString& prompt) {
+            if (m_stateCenter)
+                m_stateCenter->setMetadata({ { QStringLiteral("statusPrompt"), prompt } });
+        });
+
+    // 注入到 UI 服务集合
     uiServices.importService = m_importService.get();
     uiServices.exportService = m_exportService.get();
-    m_shellHost->setUiServices(uiServices);
 
     // 导入进度 → 状态中心
     QObject::connect(m_importService.get(), &ImportService::importStarted,
         m_stateCenter.get(), [this](const QString&) {
             if (m_stateCenter) m_stateCenter->setBusy(true);
         });
+
     QObject::connect(m_importService.get(), &ImportService::importFinished,
         m_stateCenter.get(), [this](const ImportResult& result) {
             if (!m_stateCenter) return;
@@ -172,64 +226,78 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
         m_stateCenter.get(), [this](const QString&) {
             if (m_stateCenter) m_stateCenter->setBusy(true);
         });
+
     QObject::connect(m_exportService.get(), &ExportService::exportFinished,
         m_stateCenter.get(), [this](const ExportResult& result) {
-            if (!m_stateCenter) return;
+            if (!m_stateCenter)
+                return;
+
             m_stateCenter->setBusy(false);
+
             QVariantMap meta = m_stateCenter->metadata();
             meta["statusPrompt"] = result.success
                 ? QString("Export complete: %1 entities").arg(result.exportedEntityCount)
                 : QString("Export failed: %1").arg(result.message);
             meta["notificationType"] = result.success ? "info" : "error";
+
             m_stateCenter->setMetadata(meta);
         });
-    // ---- 导入/导出服务层初始化完成 ----
+}
 
-    // ---- UI 对话框服务 ----
+void ApplicationCompositionRoot::setupDialogServices()
+{
     m_fileDialogService = std::make_unique<FileDialogService>();
-    m_recentFileService = std::make_unique<RecentFileService>(persistenceService());
     m_helpDialogService = std::make_unique<HelpDialogService>();
+}
 
-    // 脏状态同步：场景变更 → 标记为未保存
+void ApplicationCompositionRoot::setupDirtyStateSync()
+{
+    // 场景变更 → 标记为未保存
     if (m_sceneManager)
     {
-        m_sceneManager->setSceneChangedCallback([this]() {
-            if (m_stateCenter && !m_stateCenter->dirty())
-                m_stateCenter->setDirty(true);
-            });
+        m_sceneManager->setSceneChangedCallback([](void* ctx) {
+            auto* self = static_cast<ApplicationCompositionRoot*>(ctx);
+            if (self->m_stateCenter && !self->m_stateCenter->dirty())
+                self->m_stateCenter->setDirty(true);
+            }, this);
     }
+}
 
-    // 将 OperationBus 设为活动实例，供无上下文调用方使用
+void ApplicationCompositionRoot::registerAllOperations()
+{
+    // OperationBus 设为活动实例
     OperationBus::setActiveInstance(m_operationBus.get());
 
-    // 注册各模块操作到 OperationBus
     SY_INFO("[ApplicationCompositionRoot] registering module operations on OperationBus");
-    {
-        CoreOperationRegistry coreOps(m_operationBus.get(),
-            m_sceneEditService.get(),
-            m_undoRedoManager.get(),
-            m_helpDialogService.get(),
-            m_shellHost ? m_shellHost->mainWindow() : nullptr);
-        coreOps.registerAll();
-    }
-    m_fileOperationRegistry = std::make_unique<FileOperationRegistry>(
-        m_operationBus.get(),
-        m_sceneManager.get(),
-        m_importService.get(),
-        m_exportService.get(),
-        m_fileDialogService.get(),
-        m_recentFileService.get(),
-        m_helpDialogService.get(),
-        m_stateCenter.get(),
-        m_layerPersistenceBridge.get(),
-        persistenceService(),
-        m_shellHost ? m_shellHost->mainWindow() : nullptr);
-    m_fileOperationRegistry->registerAll();
-    registerHelpOperations();
-    registerPendingToolOperations();
-    registerPendingAlgorithmOperations();
 
-    SY_INFO("[ApplicationCompositionRoot] initialized with module-based operation registration");
+    // 核心操作（撤销/重做/删除/圆角/倒角/帮助）
+    CoreOperationRegistry coreOps(m_operationBus.get(),
+        m_sceneEditService.get(),
+        m_undoRedoManager.get(),
+        m_helpDialogService.get(),
+        m_shellHost ? m_shellHost->mainWindow() : nullptr);
+
+    coreOps.registerAll();
+
+    // 文件操作（导入/导出/打开/保存）
+    FileOperationConfig fileConfig;
+    fileConfig.bus = m_operationBus.get();
+    fileConfig.sceneManager = m_sceneManager.get();
+    fileConfig.importService = m_importService.get();
+    fileConfig.exportService = m_exportService.get();
+    fileConfig.recentFiles = m_recentFileService.get();
+    fileConfig.helpDialog = m_helpDialogService.get();
+    fileConfig.stateCenter = m_stateCenter.get();
+    fileConfig.layerPersistence = m_layerPersistenceBridge.get();
+    fileConfig.persistence = persistenceService();
+    fileConfig.parentWidget = m_shellHost ? m_shellHost->mainWindow() : nullptr;
+
+    m_fileOperationRegistry = std::make_unique<FileOperationRegistry>(fileConfig);
+    m_fileOperationRegistry->registerAll();
+
+    // 占位操作（视图缩放等）由 PendingOperationRegistry 统一管理
+    PendingOperationRegistry pendingOps(m_operationBus.get());
+    pendingOps.registerAll();
 }
 
 UiShellHost* ApplicationCompositionRoot::shellHost()
@@ -289,247 +357,6 @@ PersistenceService* ApplicationCompositionRoot::persistenceService()
     // 从 AppInitializer 获取已初始化的持久化服务
     if (!m_persistenceService)
         m_persistenceService = AppInitializer::persistenceService();
+
     return m_persistenceService;
-}
-
-// 注册工具切换操作
-// 通过 OperationBus 连接到 RenderViewport2D 的工具系统
-// 工具名称映射：OperationId -> ToolManager 中的工具名称
-namespace
-{
-    QString toolNameFromOperationId(OperationId opId)
-    {
-        switch (opId)
-        {
-            case OperationId::Tool_Select:       return "SelectTool";
-            case OperationId::Tool_Point:        return "PointTool";
-            case OperationId::Tool_Line:         return "LineTool";
-            case OperationId::Tool_Rectangle:    return "RectangleTool";
-            case OperationId::Tool_Ellipse:      return "EllipseTool";
-            case OperationId::Tool_Circle:       return "CircleTool";
-            case OperationId::Tool_Triangle:     return "TriangleTool";
-            case OperationId::Tool_Arc:          return "ArcTool";
-            case OperationId::Tool_Polygon:      return "PolygonTool";
-            case OperationId::Tool_Spline:       return "SplineTool";
-            case OperationId::Tool_Text:         return "TextInputTool";
-            case OperationId::Tool_Bitmap:       return "BitmapInputTool";
-            case OperationId::Tool_QRCode:       return "QRCodeInputTool";
-            default:
-                SY_WARNF("[ToolOperation] Unmapped OperationId=%d in toolNameFromOperationId",
-                    static_cast<int>(opId));
-                return QString();
-        }
-    }
-
-    // 查找当前活动窗口的 2D 视口
-    // 链路：QApplication::activeWindow() → WorkbenchWindow → centralWidget() → RenderViewport2D
-    // 用于工具切换操作的兜底查找（快速路径在 CommandActionHubActions2D 中直接调用）
-    RenderViewport2D* findActiveViewport2D()
-    {
-        // 通过全局获取当前活动窗口的 2D 视口
-        QWidget* activeWindow = QApplication::activeWindow();
-        if (!activeWindow)
-        {
-            SY_DEBUGF("[ToolOperation] No active window found");
-            return nullptr;
-        }
-
-        auto* workbenchWindow = qobject_cast<WorkbenchWindow*>(activeWindow);
-        if (!workbenchWindow)
-        {
-            SY_DEBUGF("[ToolOperation] Active window is not WorkbenchWindow: %s",
-                activeWindow->metaObject()->className());
-            return nullptr;
-        }
-
-        auto* viewport = qobject_cast<RenderViewport2D*>(workbenchWindow->centralWidget());
-        if (!viewport)
-        {
-            SY_DEBUGF("[ToolOperation] Central widget is not RenderViewport2D");
-        }
-        return viewport;
-    }
-}
-
-void ApplicationCompositionRoot::registerPendingToolOperations()
-{
-    if (!m_operationBus)
-        return;
-
-    auto& reg = m_operationBus->registry();
-
-    // 工具操作列表：已接入 ToolManager 的工具
-    const OperationId toolOps[] = {
-        OperationId::Tool_Select,
-        OperationId::Tool_Point,
-        OperationId::Tool_Line,
-        OperationId::Tool_Rectangle,
-        OperationId::Tool_Ellipse,
-        OperationId::Tool_Circle,
-        OperationId::Tool_Triangle,
-        OperationId::Tool_Arc,
-        OperationId::Tool_Polygon,
-        OperationId::Tool_Spline,
-        OperationId::Tool_Text,
-        OperationId::Tool_Bitmap,
-        OperationId::Tool_QRCode,
-    };
-
-    int registered = 0;
-    for (const auto& opId : toolOps)
-    {
-        if (!reg.has(opId))
-        {
-            QString toolName = toolNameFromOperationId(opId);
-            reg.registerOperation(std::make_unique<LambdaOperation>(
-                opId, [toolName] {
-                    auto* viewport = findActiveViewport2D();
-                    if (viewport)
-                    {
-                        viewport->setActiveTool(toolName);
-                        SY_DEBUGF("[ToolOperation] Activated tool: %s", qPrintable(toolName));
-                    }
-                    else
-                    {
-                        SY_WARNF("[ToolOperation] No active 2D viewport found for tool: %s",
-                            qPrintable(toolName));
-                    }
-                }));
-            registered++;
-        }
-    }
-
-    if (registered > 0)
-    {
-        SY_INFOF("[Composition] Registered %d tool operations (fast path -> ToolManager)", registered);
-    }
-}
-
-// 注册尚未接入的算法/编辑/视图操作
-// 这些操作在旧框架中通过 AlgorithmRunner 注册，新框架暂未接入对应服务
-// 占位策略：注册 LambdaOperation 打印警告，避免菜单/工具栏点击时静默无响应
-// 清理标准：接入真实实现后从此函数移除；长期不实现的应从 OperationId 枚举中删除
-void ApplicationCompositionRoot::registerPendingAlgorithmOperations()
-{
-    if (!m_operationBus)
-        return;
-
-    auto& reg = m_operationBus->registry();
-
-    // ---- 算法操作占位（待接入 AlgorithmApplicationService）----
-    const OperationId algoOps[] = {
-        OperationId::Algo_Fill,
-        OperationId::Algo_Nesting,
-        OperationId::Algo_Offset,
-        OperationId::Algo_Array,
-        OperationId::Algo_BooleanUnion,
-        OperationId::Algo_BooleanIntersection,
-        OperationId::Algo_BooleanDifference,
-        OperationId::Algo_BooleanXor,
-        OperationId::Algo_ReliefEngravingFromImage,
-    };
-
-    // ---- 编辑操作占位（待接入 GeometryEditService）----
-    const OperationId editOps[] = {
-        OperationId::Edit_Trim,
-        OperationId::Edit_Extend,
-        OperationId::Edit_Align,
-        OperationId::Edit_Cut,
-        OperationId::Edit_Paste,
-        // Edit_GroupToggle, 已在 CoreOperationRegistry 中实现
-        // Edit_Ungroup,     已在 CoreOperationRegistry 中实现
-        OperationId::Edit_MirrorH,
-        OperationId::Edit_MirrorV,
-    };
-
-    // ---- 视图操作占位（待接入 ViewController）----
-    const OperationId viewOps[] = {
-        OperationId::View_ZoomSelection,
-        OperationId::View_Pan,
-        OperationId::View_Reset,
-        OperationId::View_GridVisible,
-        OperationId::View_SnapEnabled,
-        OperationId::View_OrthoMode,
-        OperationId::View_AngleSnap,
-        OperationId::View_LayerManager,
-        OperationId::View_NewLayer,
-        OperationId::View_DeleteLayer,
-        OperationId::View_SetDisplayUnit,
-    };
-
-    auto registerPlaceholders = [&reg](const OperationId* ops, size_t count, const char* category) {
-        int registered = 0;
-        for (size_t i = 0; i < count; ++i)
-        {
-            if (!reg.has(ops[i]))
-            {
-                reg.registerOperation(std::make_unique<LambdaOperation>(
-                    ops[i], [opId = ops[i], category] {
-                        SY_WARNF("[PendingOp] %s: OperationId=%d not yet implemented",
-                            category, static_cast<int>(opId));
-                    }));
-                ++registered;
-            }
-        }
-        if (registered > 0)
-        {
-            SY_INFOF("[Composition] Registered %d placeholder operations for %s", registered, category);
-        }
-        };
-
-    registerPlaceholders(algoOps, std::size(algoOps), "Algorithm");
-    registerPlaceholders(editOps, std::size(editOps), "Edit");
-    registerPlaceholders(viewOps, std::size(viewOps), "View");
-}
-
-void ApplicationCompositionRoot::registerHelpOperations()
-{
-    if (!m_operationBus)
-        return;
-
-    auto& reg = m_operationBus->registry();
-    QWidget* parentWidget = m_shellHost ? m_shellHost->mainWindow() : nullptr;
-
-    // ---- Help: About ----
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::Help_About, [parentWidget] {
-            HelpDialogService::showAboutDialog(parentWidget);
-        }));
-
-    // ---- Help: Settings ----
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::Help_Settings, [parentWidget] {
-            HelpDialogService::showSettingsDialog(parentWidget);
-        }));
-
-    // ---- Help: Documentation ----
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::Help_Docs, [parentWidget] {
-            HelpDialogService::showDocumentationDialog(parentWidget);
-        }));
-
-    // ---- Help: Keyboard Shortcuts ----
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::Help_Shortcut, [parentWidget] {
-            HelpDialogService::showShortcutsDialog(parentWidget);
-        }));
-}
-
-void ApplicationCompositionRoot::saveDocumentPersistenceRecord(const QString& filePath, int entityCount)
-{
-    if (!m_persistenceService || !m_persistenceService->documents())
-        return;
-
-    auto existing = m_persistenceService->documents()->loadByPath(filePath.toStdString());
-    QString now = QDateTime::currentDateTime().toString(Qt::ISODate);
-
-    DocumentRecord dr;
-    dr.filePath = filePath.toStdString();
-    dr.title = QFileInfo(filePath).fileName().toStdString();
-    dr.format = QFileInfo(filePath).suffix().toUpper().toStdString();
-    dr.entityCount = entityCount;
-    dr.lastOpenedAt = now.toStdString();
-    dr.createdAt = existing.id > 0 ? existing.createdAt : now.toStdString();
-
-    m_persistenceService->documents()->save(dr);
 }

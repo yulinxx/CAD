@@ -22,6 +22,10 @@ UiStateSnapshot UiStateCenter::snapshot() const
     state.currentCommandPhase = m_commandPhase;
     state.currentCommandOwner = m_commandOwner;
     state.currentCommandType = m_commandType;
+    state.interactionKind = m_interactionKind;
+    state.interactionPointerX = m_interactionPointerX;
+    state.interactionPointerY = m_interactionPointerY;
+    state.interactionKey = m_interactionKey;
 
     state.currentSelectionText = m_selectionText;
     state.currentSelectionSource = m_selectionSource;
@@ -34,10 +38,13 @@ UiStateSnapshot UiStateCenter::snapshot() const
     state.failureMessage = m_failureMessage;
     state.progress = m_progress;
     state.statusMessage = m_statusMessage;
+    state.statusPrompt = m_statusPrompt;
     state.taskPhase = m_taskPhase;
     state.errorCode = m_errorCode;
     state.metadata = m_metadata;
     state.refreshState = m_refreshState;
+    state.activeToolId = m_activeToolId;
+    state.inputFocusWidget = m_inputFocusWidget;
 
     return state;
 }
@@ -93,6 +100,26 @@ QString UiStateCenter::currentCommandType() const
     return m_commandType;
 }
 
+QString UiStateCenter::interactionKind() const
+{
+    return m_interactionKind;
+}
+
+int UiStateCenter::interactionPointerX() const
+{
+    return m_interactionPointerX;
+}
+
+int UiStateCenter::interactionPointerY() const
+{
+    return m_interactionPointerY;
+}
+
+int UiStateCenter::interactionKey() const
+{
+    return m_interactionKey;
+}
+
 bool UiStateCenter::busy() const
 {
     return m_busy;
@@ -111,6 +138,11 @@ int UiStateCenter::progress() const
 QString UiStateCenter::statusMessage() const
 {
     return m_statusMessage;
+}
+
+QString UiStateCenter::statusPrompt() const
+{
+    return m_statusPrompt;
 }
 
 QString UiStateCenter::taskPhase() const
@@ -133,12 +165,53 @@ QString UiStateCenter::refreshState() const
     return m_refreshState;
 }
 
+QString UiStateCenter::activeToolId() const
+{
+    return m_activeToolId;
+}
+
+QString UiStateCenter::inputFocusWidget() const
+{
+    return m_inputFocusWidget;
+}
+
 void UiStateCenter::setRefreshState(const QString& state)
 {
     if (m_refreshState == state)
         return;
     m_refreshState = state;
     emit refreshStateChanged(state);
+    emit stateChanged();
+}
+
+void UiStateCenter::setInteractionState(const QString& kind, int pointerX, int pointerY, int key)
+{
+    if (m_interactionKind == kind && m_interactionPointerX == pointerX && m_interactionPointerY == pointerY && m_interactionKey == key)
+        return;
+
+    m_interactionKind = kind;
+    m_interactionPointerX = pointerX;
+    m_interactionPointerY = pointerY;
+    m_interactionKey = key;
+
+    emit interactionStateChanged(kind, pointerX, pointerY, key);
+    emit stateChanged();
+}
+
+void UiStateCenter::clearInteractionState()
+{
+    setInteractionState(QString(), -1, -1, -1);
+}
+
+void UiStateCenter::setStatusPrompt(const QString& prompt)
+{
+    if (m_statusPrompt == prompt)
+        return;
+
+    m_statusPrompt = prompt;
+    m_metadata.insert(QStringLiteral("statusPrompt"), prompt);
+    emit statusPromptChanged(prompt);
+    emit metadataChanged();
     emit stateChanged();
 }
 
@@ -360,6 +433,8 @@ void UiStateCenter::setMetadata(const QVariantMap& metadata)
         m_commandOwner = m_metadata.value(QStringLiteral("commandOwner")).toString();
     if (m_metadata.contains(QStringLiteral("commandType")))
         m_commandType = m_metadata.value(QStringLiteral("commandType")).toString();
+    if (m_metadata.contains(QStringLiteral("statusPrompt")))
+        m_statusPrompt = m_metadata.value(QStringLiteral("statusPrompt")).toString();
 
     emit metadataChanged();
     emit stateChanged();
@@ -446,5 +521,25 @@ void UiStateCenter::clearTask()
     m_metadata.insert(QStringLiteral("taskPhase"), QString());
     m_metadata.insert(QStringLiteral("statusMessage"), QString());
 
+    emit stateChanged();
+}
+
+void UiStateCenter::setActiveToolId(const QString& toolId)
+{
+    if (m_activeToolId == toolId)
+        return;
+
+    m_activeToolId = toolId;
+    emit activeToolChanged(toolId);
+    emit stateChanged();
+}
+
+void UiStateCenter::setInputFocusWidget(const QString& widgetName)
+{
+    if (m_inputFocusWidget == widgetName)
+        return;
+
+    m_inputFocusWidget = widgetName;
+    emit inputFocusWidgetChanged(widgetName);
     emit stateChanged();
 }

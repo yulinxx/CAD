@@ -73,34 +73,6 @@ public:
         return true;
     }
 
-    /**
-     * @deprecated 事件不再通过此接口转发，RenderWidget3D 作为子控件直接接收 Qt 事件
-     * 此接口仅为满足 IRenderer3D 接口兼容性保留，不执行任何操作
-     */
-    [[deprecated("事件已由 RenderWidget3D 子控件直接处理，此接口不再使用")]]
-    void onMousePress(int x, int y, int button, int modifiers, int viewW, int viewH) override;
-
-    /**
-     * @deprecated 事件不再通过此接口转发，RenderWidget3D 作为子控件直接接收 Qt 事件
-     * 此接口仅为满足 IRenderer3D 接口兼容性保留，不执行任何操作
-     */
-    [[deprecated("事件已由 RenderWidget3D 子控件直接处理，此接口不再使用")]]
-    void onMouseMove(int x, int y, int buttons, int viewW, int viewH) override;
-
-    /**
-     * @deprecated 事件不再通过此接口转发，RenderWidget3D 作为子控件直接接收 Qt 事件
-     * 此接口仅为满足 IRenderer3D 接口兼容性保留，不执行任何操作
-     */
-    [[deprecated("事件已由 RenderWidget3D 子控件直接处理，此接口不再使用")]]
-    void onMouseRelease(int x, int y, int button, int viewW, int viewH) override;
-
-    /**
-     * @deprecated 事件不再通过此接口转发，RenderWidget3D 作为子控件直接接收 Qt 事件
-     * 此接口仅为满足 IRenderer3D 接口兼容性保留，不执行任何操作
-     */
-    [[deprecated("事件已由 RenderWidget3D 子控件直接处理，此接口不再使用")]]
-    void onWheel(int delta, int viewW, int viewH) override;
-
     void selectNodeById(const QString& nodeId) override;
     QString selectedNodeId() const override;
     QStringList selectedPathNames() const override;

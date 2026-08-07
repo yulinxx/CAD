@@ -1,5 +1,9 @@
 # OperationBus 优先的变换命令稳定化计划
 
+> **文档状态（2026-08-02）**：目标方案/部分过时，不能直接视为当前实现说明。
+>
+> 当前代码仍需以实际的 `OperationBus`、`SceneEditService`、`ViewportSelector`、`RenderViewport2D` 和 3D 独立编辑服务调用链为准。本文保留参数统一、预览/提交/取消一致性等原则，但文中的部分 adapter 类名和调用链需要后续按生产代码重新核实。
+
 ## 背景
 
 当前项目的变换能力已经从单一命令分发，演进为以 `OperationBus` 为主线的操作系统：
@@ -9,7 +13,7 @@
 - `MouseInteractionAdapter` 负责鼠标交互式参数收集
 - `TransformParameters` 负责强类型参数传递
 - `SceneEditServiceAdapter` 负责文档执行、预览、提交与取消
-- `UiEntity` / `EntityDocument2D` 负责实体数据存储与修改
+- `UiEntity` / `EntityDocument2D` 负责图元数据存储与修改
 - `IInteractionDispatcher` 负责交互式命令生命周期管理（begin/submit/cancel）
 
 本计划目标是：先在现有框架上稳定 `Move / Rotate / Mirror` 三条核心变换链，确保“对话框输入”和“鼠标交互”两条路径得到一致结果；再扩展到 `Copy / Trim / Extend`；最后继续收口旧桥，并让渲染刷新链路更加稳定。
@@ -21,7 +25,7 @@
 - 以现有框架为基础，不再大规模搭新框架
 - 先验收 `Move / Rotate / Mirror` 的结果一致性，再做功能复制扩展
 - 输入层只负责收集参数，不负责执行和调度
-- 文档执行层只负责实体变换，不负责 UI 和命令调度
+- 文档执行层只负责图元变换，不负责 UI 和命令调度
 - 预览、提交、取消必须走同一条参数模型
 - 渲染刷新由文档变更触发，不由旧 Dispatcher 兜底
 - 旧 Dispatcher 仅保留历史兼容与过渡期接入
@@ -65,7 +69,7 @@ Render refresh callback / viewport update
 - 取消后是否完全回滚
 
 #### 检查方式
-1. 对同一组实体，分别走对话框路径和鼠标路径
+1. 对同一组图元，分别走对话框路径和鼠标路径
 2. 记录最终变换结果
 3. 对比几何结果、selection 结果、渲染结果
 4. 对比确认与取消后的最终状态
@@ -146,7 +150,7 @@ Render refresh callback / viewport update
 ##### Move
 - 对话框路径输出 `moveX / moveY`
 - 鼠标路径输出同一组位移参数
-- 选中实体是否正确移动
+- 选中图元是否正确移动
 - `Enter` 是否确认，`Esc` 是否取消
 - 提交后是否刷新
 - 取消后是否回到原位
@@ -193,7 +197,7 @@ Render refresh callback / viewport update
 ### 2.3 第三阶段：同步开始做渲染主链
 
 #### 目标
-在实体可修改后，把“实体数据如何进入渲染器”打通。
+在图元可修改后，把“图元数据如何进入渲染器”打通。
 
 #### 主链
 - 文档
@@ -205,7 +209,7 @@ Render refresh callback / viewport update
 
 ##### 2.3.1 文档层发出“已变更”信号
 
-目标是让所有实体修改都能通知视图，而不是由某个操作类直接刷新 UI。
+目标是让所有图元修改都能通知视图，而不是由某个操作类直接刷新 UI。
 
 需要确认：
 - 变更来自 `commitTransform()` 后能通知到视图
@@ -213,7 +217,7 @@ Render refresh callback / viewport update
 - 预览和取消不污染正式变更通知
 
 建议拆成两个语义：
-- **场景已变更**：实体数据真的改了
+- **场景已变更**：图元数据真的改了
 - **选择已变更**：高亮状态或 selection 发生变化
 
 这样后面调试时很清楚是“数据变了”还是“只选中态变了”。
@@ -270,7 +274,7 @@ Render refresh callback / viewport update
 - 不能在 viewport 里维护一份独立 selection 真相
 
 需要确认的点：
-- 选中实体与高亮实体完全一致
+- 选中图元与高亮图元完全一致
 - 执行 Move/Rotate/Mirror/Copy/Trim/Extend 后，selection 不丢、不乱
 - 取消时 selection 不被错误清空或错误保留
 
@@ -357,7 +361,7 @@ Render refresh callback / viewport update
 
 **修改目标**
 - 只读取 `TransformParameters`
-- 只操作选中实体
+- 只操作选中图元
 - 统一预览 / 提交 / 取消流程
 
 ---
@@ -368,7 +372,7 @@ Render refresh callback / viewport update
 #### `EntityDocument2D` / `UiEntity`
 
 **修改目标**
-- 负责实体级变换执行
+- 负责图元级变换执行
 - 负责预览回滚
 - 负责提交后状态同步
 
@@ -404,12 +408,12 @@ Render refresh callback / viewport update
 ## 第五部分：验证方案
 
 ### Move 验证
-1. 选中实体
+1. 选中图元
 2. 对话框输入 `moveX / moveY`
 3. 鼠标拖拽输入同样位移
 4. 比较结果一致
 5. 提交后视图刷新
-6. 取消后实体回到原位
+6. 取消后图元回到原位
 
 ### Rotate 验证
 1. 对话框输入角度和中心点

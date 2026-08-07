@@ -1,5 +1,7 @@
 #include "PdfExportWriter.h"
 
+#include <vector>
+
 #include "FileIO/FileIOManager.h"
 #include "Log/SyLogger.h"
 
@@ -7,14 +9,22 @@ ExportResult PdfExportWriter::write(const ExportContext& context,
     const Fio::VecSyEntityPtr& entities)
 {
     Fio::FileIOManager fileIO;
-    Fio::WriteResult writeResult = fileIO.exportFile(
-        context.targetPath.toUtf8().toStdString(),
-        Fio::FileFormat::PDF,
-        entities);
 
-    if (!writeResult.success)
+    std::vector<const Eg::SyEntity*> raw;
+    raw.reserve(entities.size());
+    for (const auto& entity : entities)
+        raw.push_back(entity.get());
+
+    char errBuf[1024] = { 0 };
+    bool ok = fileIO.exportFile(
+        context.targetPath.toUtf8().toStdString().c_str(),
+        Fio::FileFormat::PDF,
+        raw.data(), raw.size(),
+        errBuf, sizeof(errBuf));
+
+    if (!ok)
     {
-        QString msg = QString::fromStdString(writeResult.errorMessage);
+        QString msg = QString::fromUtf8(errBuf);
         SY_ERRORF("[PdfExportWriter] Failed: %s", msg.toUtf8().constData());
         return ExportResult::fail(msg);
     }

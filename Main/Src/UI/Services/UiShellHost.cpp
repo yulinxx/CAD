@@ -161,6 +161,16 @@ void UiShellHost::switchWorkbench(UiWorkbench* workbench)
 
 void UiShellHost::shutdown()
 {
+    // 3D 工作台惰性创建，UiShellHost::m_workbench 在 triggerWorkbench 路径下
+    // 不会更新为 3D 实例。若用户从 3D 模式直接退出，m_workbench 仍指向 2D，
+    // 上面的 shutdown() 只会关闭 2D，3D 的 deactivate() 永远不会被调用，
+    // 导致 RenderWidget3D 信号未断开、服务在析构中被访问 → 堆损坏。
+    // 修复：显式对 3D 工作台调用 shutdown（与当前 m_workbench 不同时）
+    if (m_workbench3D && m_workbench3D.get() != m_workbench)
+    {
+        m_workbench3D->shutdown();
+    }
+
     if (m_workbench)
     {
         m_workbench->shutdown();

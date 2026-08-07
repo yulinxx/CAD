@@ -3,6 +3,7 @@
 #include <QString>
 
 class QWidget;
+
 namespace Fio
 {
     enum class FileFormat;

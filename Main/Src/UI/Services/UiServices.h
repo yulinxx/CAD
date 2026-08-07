@@ -19,11 +19,7 @@ class PersistenceService;
 class LayerPersistenceBridge;
 class ImportService;
 class ExportService;
-
-namespace Eg
-{
-    class SceneManager;
-}
+class RecentFileService;
 
 /**
  * @struct UiServices
@@ -79,11 +75,11 @@ struct UiServices
     /// 导出服务（文件导出总入口）
     ExportService* exportService{ nullptr };
 
-    /// 场景管理器（管理所有2D图元）
-    Eg::SceneManager* sceneManager{ nullptr };
-
-    /// 场景编辑服务（带Undo的图元操作入口）
+    /// 场景编辑服务（带Undo的图元操作入口，阶段1收口：不再暴露底层 SceneManager）
     class SceneEditService* sceneEditService{ nullptr };
+
+    /// 最近文件服务（统一管理最近文件列表的读写）
+    RecentFileService* recentFileService{ nullptr };
 
     /// 最近文件回调：当文件被打开时调用，参数为文件完整路径
     /// 由 WorkbenchWindow 注入，用于刷新最近文件菜单

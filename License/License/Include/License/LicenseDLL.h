@@ -1,5 +1,4 @@
-#ifndef LICENSE_LICENSE_DLL_H
-#define LICENSE_LICENSE_DLL_H
+#pragma once
 
 /**
  * @file LicenseDLL.h
@@ -134,6 +133,4 @@ extern "C" {
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

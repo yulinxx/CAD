@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <QString>
 #include <QWidget>
@@ -18,8 +18,8 @@ public:
 
 public:
     void setSceneDocument(SceneDocument3DAdapter* document);
-    void setSelectionCallback(std::function<void(const QString&)>&& callback);
-    void setPathCallback(std::function<void(const QStringList&)>&& callback);
+    void setSelectionCallback(std::function<void(const QString&)> callback);
+    void setPathCallback(std::function<void(const QStringList&)> callback);
     void refresh();
     QString currentNodeId() const;
 

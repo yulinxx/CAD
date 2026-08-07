@@ -1,5 +1,4 @@
-#ifndef LICENSE_LICENSE_TEST_HOOKS_H
-#define LICENSE_LICENSE_TEST_HOOKS_H
+#pragma once
 
 /**
  * @file LicenseTestHooks.h
@@ -26,5 +25,3 @@ extern "C" {
 #endif
 
 #endif // LICENSE_TEST_HOOKS
-
-#endif

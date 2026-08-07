@@ -25,6 +25,14 @@ namespace Eg
  *
  * 新代码应优先通过 SceneEditService 操作，本类仅作为兼容旧 API 的适配层。
  */
+struct SceneEntityInfo2D
+{
+    /// 图元稳定 ID
+    QString id;
+    /// 图元类型名称
+    QString type;
+};
+
 class SceneDocument2D : public UI::SceneDocumentBase
 {
 public:
@@ -35,11 +43,9 @@ public:
     SceneDocument2D(const SceneDocument2D&) = delete;
     SceneDocument2D& operator=(const SceneDocument2D&) = delete;
 
-    Eg::SceneManager* sceneManager() const
-    {
-        return m_scene;
-    }
-
+    /// 阶段1收口：不再向 UI 暴露底层 SceneManager。
+    /// 需要场景对象的渲染桥接层请通过 editService()->sceneManager() 获取，
+    /// 其余 UI 一律通过本类外观方法或 SceneEditService 操作场景。
     void setEditService(SceneEditService* editService);
     SceneEditService* editService() const
     {
@@ -64,16 +70,18 @@ public:
 
     QString entityIdAt(const QPointF& point, double tolerance = 5.0) const;
     QVector<QString> allEntityIdsQ() const;
-    Eg::SyEntity* entityByStringId(const QString& id) const;
+    QVector<SceneEntityInfo2D> entityInfos() const;
 
     // ---- 编辑 ----
 
+    /// 通过稳定 ID 删除图元，统一经过编辑服务以保留撤销语义。
+    bool tryRemoveEntity(const QString& id);
     void removeEntity(const QString& id);
 
     // ---- SceneDocumentBase 接口 ----
 
-    std::vector<std::string> allEntityIds() const override;
-    void removeEntity(const std::string& id) override;
+    void forEachEntityId(void(*visitor)(const char*, void*), void* ctx) const override;
+    void removeEntity(const char* id) override;
     void clear() override;
 
 private:

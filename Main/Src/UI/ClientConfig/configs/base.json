@@ -1,0 +1,46 @@
+{
+  "meta": {
+    "clientId": "base",
+    "clientName": "基础配置（公共部分）",
+    "version": "1.0"
+  },
+  "menus": [
+    {
+      "id": "file",
+      "label": "File",
+      "items": [
+        { "type": "action", "id": "file.open", "label": "Open...", "command": "file.open", "shortcut": "Ctrl+O" },
+        { "type": "separator" },
+        { "type": "action", "id": "file.exit", "label": "Exit", "command": "app.exit", "shortcut": "Ctrl+Q" }
+      ]
+    },
+    {
+      "id": "edit",
+      "label": "Edit",
+      "items": [
+        { "type": "action", "id": "edit.undo", "label": "Undo", "command": "edit.undo", "shortcut": "Ctrl+Z" }
+      ]
+    }
+  ],
+  "toolbars": [
+    {
+      "id": "TopToolBar",
+      "title": "Top Tools",
+      "position": "top",
+      "workbench": "global",
+      "items": []
+    }
+  ],
+  "docks": [
+    {
+      "id": "PropertiesDock",
+      "title": "Properties",
+      "position": "right",
+      "widgetType": "PropertiesPanel",
+      "visible": true
+    }
+  ],
+  "shortcuts": [
+    { "command": "edit.undo", "keys": "Ctrl+Z" }
+  ]
+}

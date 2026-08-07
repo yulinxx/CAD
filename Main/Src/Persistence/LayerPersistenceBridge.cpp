@@ -45,9 +45,9 @@ void LayerPersistenceBridge::detach()
 }
 
 /// 图层新增时同步写入数据库
-void LayerPersistenceBridge::onLayerAdded(int nLayerId, const std::string& name)
+void LayerPersistenceBridge::onLayerAdded(int nLayerId, const char* name)
 {
-    SY_INFOF("[LayerPersistenceBridge] Layer added: id=%d, name=%s", nLayerId, name.c_str());
+    SY_INFOF("[LayerPersistenceBridge] Layer added: id=%d, name=%s", nLayerId, name);
     syncLayerToDb(nLayerId);
 }
 

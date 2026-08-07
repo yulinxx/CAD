@@ -1,5 +1,4 @@
-#ifndef LICENSE_LICENSE_KEYGEN_H
-#define LICENSE_LICENSE_KEYGEN_H
+#pragma once
 
 /**
  * @file LicenseKeygen.h
@@ -35,6 +34,4 @@ extern "C" {
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

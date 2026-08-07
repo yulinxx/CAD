@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "FileIO/FileFormat.h"
+#include "FileIO/IFileParser.h"
 
 namespace Eg
 {
@@ -15,6 +16,7 @@ class DocumentExportAdapter
 public:
     explicit DocumentExportAdapter(Eg::SceneManager* sceneManager);
 
+public:
     /// 收集 2D 场景中的所有图元
     /// @return 图元列表（克隆的副本，原场景不受影响）
     Fio::VecSyEntityPtr collect2D();
