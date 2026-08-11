@@ -196,8 +196,7 @@ def select_remotes(repo: Dict, prompt: str = "选择远程") -> List[str]:
     if len(remotes) == 1:
         return remotes
 
-    print(f"
-  {repo['name']} 的远程仓库:")
+    print(f"  {repo['name']} 的远程仓库:")
     for i, remote in enumerate(remotes, 1):
         url = repo["remote_urls"].get(remote, "")
         print(f"    [{i}] {remote} → {c(url, Colors.DIM)}")
@@ -221,8 +220,7 @@ def select_remotes(repo: Dict, prompt: str = "选择远程") -> List[str]:
 
 def git_status(repos: List[Dict]):
     for repo in repos:
-        print(c(f"
-📊 {repo['name']}", Colors.BOLD + Colors.OKCYAN))
+        print(c(f"📊 {repo['name']}", Colors.BOLD + Colors.OKCYAN))
         rc, out, _ = run_cmd(["git", "status", "-sb"], repo["path"])
         if out:
             print(out)
@@ -240,8 +238,7 @@ def git_status(repos: List[Dict]):
 def git_pull(repos: List[Dict], auto_all: bool = False):
     """拉取：支持多远程，批量自动处理"""
     for repo in repos:
-        print(c(f"
-📥 {repo['name']}", Colors.BOLD + Colors.OKGREEN))
+        print(c(f"📥 {repo['name']}", Colors.BOLD + Colors.OKGREEN))
 
         remotes = select_remotes(repo, "选择要拉取的远程")
         if not remotes:
@@ -266,8 +263,7 @@ def git_pull(repos: List[Dict], auto_all: bool = False):
 
 def git_fetch(repos: List[Dict]):
     for repo in repos:
-        print(c(f"
-🌐 {repo['name']}", Colors.BOLD + Colors.OKGREEN))
+        print(c(f"🌐 {repo['name']}", Colors.BOLD + Colors.OKGREEN))
 
         remotes = select_remotes(repo, "选择要获取的远程")
         if not remotes:
@@ -286,8 +282,7 @@ def git_fetch(repos: List[Dict]):
 
 def git_add(repos: List[Dict]):
     for repo in repos:
-        print(c(f"
-📦 {repo['name']}", Colors.BOLD + Colors.OKCYAN))
+        print(c(f"📦 {repo['name']}", Colors.BOLD + Colors.OKCYAN))
 
         rc, out, _ = run_cmd(["git", "status", "--short"], repo["path"])
         if not out.strip():
@@ -300,8 +295,7 @@ def git_add(repos: List[Dict]):
         if len(out.strip().splitlines()) > 15:
             print(c(f"  ... 还有 {len(out.strip().splitlines()) - 15} 个文件", Colors.DIM))
 
-        print("
-  [1] 全部暂存(add -A)  [2] 交互式暂存(-p)  [3] 指定文件  [回车] 跳过")
+        print("  [1] 全部暂存(add -A)  [2] 交互式暂存(-p)  [3] 指定文件  [回车] 跳过")
         choice = input("  >>> ").strip()
 
         if choice == "1" or not choice:
@@ -325,8 +319,7 @@ def git_add(repos: List[Dict]):
 
 def git_commit(repos: List[Dict], batch_msg: str = None):
     for repo in repos:
-        print(c(f"
-💾 {repo['name']}", Colors.BOLD + Colors.OKCYAN))
+        print(c(f"💾 {repo['name']}", Colors.BOLD + Colors.OKCYAN))
 
         rc, _, _ = run_cmd(["git", "diff", "--cached", "--quiet"], repo["path"])
         if rc == 0:
@@ -365,8 +358,7 @@ def git_commit(repos: List[Dict], batch_msg: str = None):
 
 def git_push(repos: List[Dict], force: bool = False):
     for repo in repos:
-        print(c(f"
-🚀 {repo['name']}", Colors.BOLD + Colors.OKGREEN))
+        print(c(f"🚀 {repo['name']}", Colors.BOLD + Colors.OKGREEN))
 
         remotes = select_remotes(repo, "选择要推送的远程")
         if not remotes:
@@ -393,14 +385,12 @@ def git_push(repos: List[Dict], force: bool = False):
 
 def git_branch(repos: List[Dict]):
     for repo in repos:
-        print(c(f"
-🌿 {repo['name']}", Colors.BOLD + Colors.OKCYAN))
+        print(c(f"🌿 {repo['name']}", Colors.BOLD + Colors.OKCYAN))
         rc, out, _ = run_cmd(["git", "branch", "-a"], repo["path"])
         if out:
             print(out)
 
-        print("
-  [1] 新建分支  [2] 切换分支  [3] 删除分支  [4] 合并分支  [回车] 跳过")
+        print("  [1] 新建分支  [2] 切换分支  [3] 删除分支  [4] 合并分支  [回车] 跳过")
         choice = input("  >>> ").strip()
 
         if choice == "1":
@@ -430,8 +420,7 @@ def git_branch(repos: List[Dict]):
 
 def git_log(repos: List[Dict]):
     for repo in repos:
-        print(c(f"
-📜 {repo['name']}", Colors.BOLD + Colors.OKCYAN))
+        print(c(f"📜 {repo['name']}", Colors.BOLD + Colors.OKCYAN))
         rc, out, _ = run_cmd(["git", "log", "--oneline", "--graph", "--decorate", "-15"], repo["path"])
         if out:
             print(out)
@@ -439,8 +428,7 @@ def git_log(repos: List[Dict]):
 
 def git_stash(repos: List[Dict]):
     for repo in repos:
-        print(c(f"
-📂 {repo['name']}", Colors.BOLD + Colors.OKCYAN))
+        print(c(f"📂 {repo['name']}", Colors.BOLD + Colors.OKCYAN))
         rc, out, _ = run_cmd(["git", "stash", "list"], repo["path"])
         if out:
             print("当前 stash:")
@@ -448,8 +436,7 @@ def git_stash(repos: List[Dict]):
         else:
             print(c("  暂无 stash", Colors.DIM))
 
-        print("
-  [1] 保存stash  [2] 弹出最新  [3] 查看内容  [回车] 跳过")
+        print("  [1] 保存stash  [2] 弹出最新  [3] 查看内容  [回车] 跳过")
         choice = input("  >>> ").strip()
 
         if choice == "1":
@@ -471,8 +458,7 @@ def git_stash(repos: List[Dict]):
 
 def git_reset(repos: List[Dict]):
     for repo in repos:
-        print(c(f"
-↩️  {repo['name']}", Colors.BOLD + Colors.WARNING))
+        print(c(f"↩️  {repo['name']}", Colors.BOLD + Colors.WARNING))
         print(c("  ⚠️ 重置可能丢失变更！", Colors.WARNING))
         print("  [1] 软重置(保留工作区)  [2] 混合重置(取消暂存)  [3] 硬重置(丢弃变更)  [回车] 跳过")
         choice = input("  >>> ").strip()
@@ -490,12 +476,10 @@ def git_reset(repos: List[Dict]):
 
 
 def git_remote_url(repos: List[Dict]):
-    print(c("
-🔗 远程URL列表", Colors.BOLD + Colors.HEADER))
+    print(c("🔗 远程URL列表", Colors.BOLD + Colors.HEADER))
     for repo in repos:
         color = Colors.OKCYAN if repo["is_submodule"] else Colors.OKGREEN
-        print(f"
-  {color}{repo['name']}{Colors.ENDC}")
+        print(f"  {color}{repo['name']}{Colors.ENDC}")
         if repo["remotes"]:
             for remote, url in repo["remote_urls"].items():
                 print(f"    {remote}: {url}")
@@ -503,11 +487,126 @@ def git_remote_url(repos: List[Dict]):
             print(c("    (无远程)", Colors.DIM))
 
 
+
+
+def get_default_branch(repo_path: str) -> str:
+    """自动检测仓库的默认分支（main / master / 其他）"""
+    # 先尝试获取当前分支
+    _, branch, _ = run_cmd(["git", "rev-parse", "--abbrev-ref", "HEAD"], repo_path)
+    current = branch.strip()
+
+    # 尝试获取远程默认分支
+    _, out, _ = run_cmd(["git", "symbolic-ref", "refs/remotes/origin/HEAD"], repo_path)
+    if out.strip() and "refs/remotes/origin/" in out:
+        return out.strip().split("/")[-1]
+
+    # 检查本地分支
+    _, out, _ = run_cmd(["git", "branch", "--list", "main", "master"], repo_path)
+    branches = [b.strip().lstrip("* ") for b in out.strip().splitlines() if b.strip()]
+    if "main" in branches:
+        return "main"
+    if "master" in branches:
+        return "master"
+
+    # 检查远程分支
+    _, out, _ = run_cmd(["git", "branch", "-r"], repo_path)
+    remote_branches = [b.strip() for b in out.strip().splitlines() if b.strip()]
+    for candidate in ["origin/main", "origin/master"]:
+        if candidate in remote_branches:
+            return candidate.split("/")[-1]
+
+    return current if current != "HEAD" else "main"
+
+
+def checkout_latest(repos: List[Dict]):
+    """
+    将所有仓库切换到最前端（默认分支最新提交）
+    流程: 保存当前变更(stash) → 切默认分支 → 拉取最新
+    """
+    print(c("\n🎯 切换到最前端模式", Colors.BOLD + Colors.OKGREEN))
+    print("  流程: 检测默认分支 → 切换 → 拉取最新")
+    print("  如果工作区有未提交变更，会先自动 stash\n")
+
+    auto_stash = input("  有未提交变更时自动 stash? (y/n, 默认y): ").strip().lower() != "n"
+    auto_pull = input("  切换后自动拉取最新? (y/n, 默认y): ").strip().lower() != "n"
+
+    results = []
+    for repo in repos:
+        print(c(f"\n  ── {repo['name']} ──", Colors.OKCYAN))
+        result = {"name": repo["name"], "steps": []}
+
+        # 1. 检测默认分支
+        default_branch = get_default_branch(repo["path"])
+        print(f"    默认分支: {c(default_branch, Colors.OKBLUE)}")
+
+        # 2. 检查是否有未提交变更
+        _, diff_out, _ = run_cmd(["git", "status", "--porcelain"], repo["path"])
+        has_changes = bool(diff_out.strip())
+
+        if has_changes:
+            if auto_stash:
+                print(f"    检测到未提交变更，自动 stash...", end=" ")
+                rc, _, err = run_cmd(["git", "stash", "push", "-m", "auto-stash before checkout-latest"], repo["path"])
+                if rc == 0:
+                    print(c("✅", Colors.OKGREEN))
+                    result["steps"].append(("stash", True))
+                else:
+                    print(c(f"❌ {err}", Colors.FAIL))
+                    result["steps"].append(("stash", False))
+                    results.append(result)
+                    continue
+            else:
+                print(c("    ⚠️ 有未提交变更，跳过 (未启用自动stash)", Colors.WARNING))
+                result["steps"].append(("stash", None))
+                results.append(result)
+                continue
+
+        # 3. 切换分支
+        print(f"    切换到 {default_branch}...", end=" ")
+        rc, _, err = run_cmd(["git", "checkout", default_branch], repo["path"])
+        if rc == 0:
+            print(c("✅", Colors.OKGREEN))
+            result["steps"].append(("checkout", True))
+        else:
+            print(c(f"❌ {err}", Colors.FAIL))
+            result["steps"].append(("checkout", False))
+            results.append(result)
+            continue
+
+        # 4. 拉取最新
+        if auto_pull:
+            for remote in repo["remotes"]:
+                print(f"    从 {remote} 拉取 {default_branch}...", end=" ")
+                rc, out, err = run_cmd(["git", "pull", remote, default_branch], repo["path"])
+                if rc == 0:
+                    print(c("✅", Colors.OKGREEN))
+                    result["steps"].append((f"pull({remote})", True))
+                else:
+                    print(c("❌", Colors.FAIL))
+                    if err:
+                        print(c(f"      {err}", Colors.FAIL))
+                    result["steps"].append((f"pull({remote})", False))
+
+        results.append(result)
+
+    # 汇总
+    print(c("\n" + "═" * 50, Colors.HEADER))
+    print(c("  切换到最前端结果汇总", Colors.HEADER + Colors.BOLD))
+    print(c("═" * 50, Colors.HEADER))
+    for r in results:
+        print(f"\n  {r['name']}:")
+        for step, ok in r["steps"]:
+            if ok is True:
+                print(f"    ✅ {step}")
+            elif ok is False:
+                print(f"    ❌ {step}")
+            else:
+                print(f"    ⏭️  {step} (跳过)")
+
 def git_submodule_update(repos: List[Dict]):
     main_repos = [r for r in repos if not r["is_submodule"] or r["rel_path"] == "."]
     for repo in main_repos:
-        print(c(f"
-🔄 {repo['name']}", Colors.BOLD + Colors.OKGREEN))
+        print(c(f"🔄 {repo['name']}", Colors.BOLD + Colors.OKGREEN))
         print("  [1] 初始化并更新  [2] 仅更新  [3] 递归更新  [回车] 跳过")
         choice = input("  >>> ").strip()
 
@@ -521,11 +620,9 @@ def git_submodule_update(repos: List[Dict]):
 
 def quick_sync(repos: List[Dict]):
     """快速同步：暂存 -> 提交 -> 拉取 -> 推送，批量自动"""
-    print(c("
-⚡ 快速同步模式", Colors.BOLD + Colors.OKGREEN))
+    print(c("⚡ 快速同步模式", Colors.BOLD + Colors.OKGREEN))
     print("  流程: 暂存 → 提交 → 拉取 → 推送")
-    print("  所有仓库将自动处理，无需逐个确认
-")
+    print("  所有仓库将自动处理，无需逐个确认")
 
     msg = input("  统一提交信息 (回车使用默认): ").strip()
     if not msg:
@@ -535,8 +632,7 @@ def quick_sync(repos: List[Dict]):
 
     results = []
     for repo in repos:
-        print(c(f"
-  ── {repo['name']} ──", Colors.OKCYAN))
+        print(c(f"  ── {repo['name']} ──", Colors.OKCYAN))
         result = {"name": repo["name"], "steps": []}
 
         # 1. 暂存
@@ -579,13 +675,11 @@ def quick_sync(repos: List[Dict]):
         results.append(result)
 
     # 汇总
-    print(c("
-" + "═" * 50, Colors.HEADER))
+    print(c("" + "═" * 50, Colors.HEADER))
     print(c("  快速同步结果汇总", Colors.HEADER + Colors.BOLD))
     print(c("═" * 50, Colors.HEADER))
     for r in results:
-        print(f"
-  {r['name']}:")
+        print(f"  {r['name']}:")
         for step, ok in r["steps"]:
             if ok is True:
                 print(f"    ✅ {step}")
@@ -597,14 +691,11 @@ def quick_sync(repos: List[Dict]):
 
 def batch_pull(repos: List[Dict]):
     """批量拉取所有远程"""
-    print(c("
-📥 批量拉取模式", Colors.BOLD + Colors.OKGREEN))
-    print("  将自动从所有远程拉取当前分支
-")
+    print(c("📥 批量拉取模式", Colors.BOLD + Colors.OKGREEN))
+    print("  将自动从所有远程拉取当前分支")
 
     for repo in repos:
-        print(c(f"
-  ── {repo['name']} ──", Colors.OKCYAN))
+        print(c(f"  ── {repo['name']} ──", Colors.OKCYAN))
         branch = repo["current_branch"]
 
         if not repo["remotes"]:
@@ -624,16 +715,13 @@ def batch_pull(repos: List[Dict]):
 
 def batch_push(repos: List[Dict]):
     """批量推送到所有远程"""
-    print(c("
-🚀 批量推送模式", Colors.BOLD + Colors.OKGREEN))
-    print("  将自动推送到所有远程的当前分支
-")
+    print(c("🚀 批量推送模式", Colors.BOLD + Colors.OKGREEN))
+    print("  将自动推送到所有远程的当前分支")
 
     force = input("  强制推送? (y/n, 默认n): ").strip().lower() == "y"
 
     for repo in repos:
-        print(c(f"
-  ── {repo['name']} ──", Colors.OKCYAN))
+        print(c(f"  ── {repo['name']} ──", Colors.OKCYAN))
         branch = repo["current_branch"]
 
         if not repo["remotes"]:
@@ -682,8 +770,7 @@ def main():
     show_repo_list(repos)
 
     while True:
-        print(c("
-" + "═" * 52, Colors.HEADER))
+        print(c("" + "═" * 52, Colors.HEADER))
         print(c("  Git 批量管理菜单", Colors.HEADER + Colors.BOLD))
         print(c("═" * 52, Colors.HEADER))
         print("""
@@ -705,6 +792,7 @@ def main():
   [23] 🚀 批量推送 (所有远程)              ← 全自动批量
   [24] 📦 批量暂存 (所有仓库)              ← 全自动批量
   [25] 💾 批量提交 (所有仓库)              ← 全自动批量
+  [26] 🎯 切换到最前端 (切默认分支+拉取)    ← 全自动批量
   ──────────────────────────────────────────────────
   [99] 📝 重新扫描仓库
   [0]  ❌ 退出
@@ -774,6 +862,8 @@ def main():
         elif choice == "25":
             msg = input("统一提交信息 (回车使用默认): ").strip() or "update: batch commit"
             git_commit(selected, batch_msg=msg)
+        elif choice == "26":
+            checkout_latest(selected)
         else:
             print(c("无效选项", Colors.FAIL))
 
