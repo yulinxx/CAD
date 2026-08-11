@@ -25,6 +25,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
+#include <sys/mount.h>
 #include <net/if.h>
 #include <ifaddrs.h>
 #elif defined(__linux__)

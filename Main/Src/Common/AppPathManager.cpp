@@ -7,12 +7,14 @@
 
 #include "AppPathManager.h"
 
+#include "VersionInfo.h"
+
 #include <QDir>
 #include <QCoreApplication>
 #include <QStandardPaths>
 
  /// 应用名称常量（唯一路径控制源）
-static const QString APP_NAME = QStringLiteral("SanYiCAD");
+static const QString kAppName = QStringLiteral("SanYiCAD");
 
 /**
  * @brief 获取应用程序本地数据根目录（唯一路径控制源）
@@ -29,27 +31,27 @@ QString AppPathManager::appLocalDataDir()
     const QString baseDir = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
     if (baseDir.isEmpty())
     {
-        return QCoreApplication::applicationDirPath() + QStringLiteral("/") + APP_NAME;
+        return QCoreApplication::applicationDirPath() + QStringLiteral("/") + kAppName;
     }
-    return baseDir + QStringLiteral("/") + APP_NAME;
+    return baseDir + QStringLiteral("/") + kAppName;
 #else
     const QString baseDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
     if (baseDir.isEmpty())
     {
-        return QCoreApplication::applicationDirPath() + QStringLiteral("/") + APP_NAME;
+        return QCoreApplication::applicationDirPath() + QStringLiteral("/") + kAppName;
     }
     // 移除 Qt 默认添加的组织名/应用名后缀，只保留基础路径
     QString result = baseDir;
-    if (result.endsWith(QStringLiteral("/") + APP_NAME))
+    if (result.endsWith(QStringLiteral("/") + kAppName))
     {
-        result.chop(APP_NAME.length() + 1);
+        result.chop(kAppName.length() + 1);
     }
     const QString orgName = QString::fromStdString(MainApp::organizationName());
     if (result.endsWith(QStringLiteral("/") + orgName))
     {
         result.chop(orgName.length() + 1);
     }
-    return result + QStringLiteral("/") + APP_NAME;
+    return result + QStringLiteral("/") + kAppName;
 #endif
 }
 

@@ -7,7 +7,7 @@ if(POLICY CMP0167)
 endif()
 
 # 包含项配置文件
-include(Config.txt)
+include(Config.cmake)
 
 # 集成VCPKG
 set(CMAKE_TOOLCHAIN_FILE "${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "Vcpkg toolchain file")

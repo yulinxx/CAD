@@ -57,7 +57,7 @@ SanYiCAD/
 ├── ThirdParty/               # 第三方库
 ├── Doc/                      # 架构分析文档
 ├── CMakeLists.txt            # 根构建配置
-├── Config.txt                # 用户配置（vcpkg/Qt 路径、编译开关）
+├── Config.cmake                # 用户配置（vcpkg/Qt 路径、编译开关）
 └── README.md                 # 项目说明（本文档）
 ```
 
@@ -261,7 +261,7 @@ vcpkg install pybind11:x64-windows
 
 ### 配置
 
-1. 编辑 `Config.txt`，设置 `VCPKG_DIR` 和 `Qt_INSTALL_DIR`：
+1. 编辑 `Config.cmake`，设置 `VCPKG_DIR` 和 `Qt_INSTALL_DIR`：
 
 ```cmake
 # vcpkg 路径

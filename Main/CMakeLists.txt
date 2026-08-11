@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 4.3)
 
 function(deploy_qt_libraries target_name qt_major_version)
+    if(NOT WIN32)
+        return()
+    endif()
     get_target_property(QT_QMAKE_EXECUTABLE Qt${qt_major_version}::qmake IMPORTED_LOCATION)
     get_filename_component(QT_WINDEPLOYQT_EXECUTABLE ${QT_QMAKE_EXECUTABLE} PATH)
     set(QT_WINDEPLOYQT_EXECUTABLE "${QT_WINDEPLOYQT_EXECUTABLE}/windeployqt.exe")

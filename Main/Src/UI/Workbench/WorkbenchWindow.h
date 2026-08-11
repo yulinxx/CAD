@@ -16,6 +16,7 @@ class QDockWidget;
 class QLabel;
 class QMenu;
 class QProgressBar;
+class QShortcut;
 class QStatusBar;
 class QToolBar;
 class OperationBus;
