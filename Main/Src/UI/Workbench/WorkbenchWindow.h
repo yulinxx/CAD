@@ -145,6 +145,9 @@ public:
     /// 获取当前挂载的工作台状态栏 widget
     StatusBarBase* activeStatusBar() const { return m_activeStatusBar; }
 
+    /// 获取当前工作台实例
+    UiWorkbench* currentWorkbench() const { return m_workbench; }
+
     /// 清理工作台切换期间的状态
     void resetWorkbenchTransientState();
     /// 同步当前工作台菜单状态

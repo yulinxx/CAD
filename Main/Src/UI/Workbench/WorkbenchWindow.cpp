@@ -119,8 +119,6 @@
 #include "UiStateCenter.h"
 #include "UiThemeService.h"
 #include "UiWorkbench.h"
-#include "Render/RenderViewport2D.h"
-#include "Render/UiViewport3D.h"
 #include "UiSceneTreeDock.h"
 #include "UiPropertiesPanel.h"
 #include "Engine2D/Edit/LayerEditService.h"
@@ -171,8 +169,16 @@ void WorkbenchWindow::retranslateUi()
 {
     setWindowTitle(QString::fromStdString(MainApp::appName()));
 
+    // 语言切换时重建菜单文案。由工作台自行管理菜单（legacy 模式下 3D 使用 MenuManager3D）时，
+    // 不能交给 WorkbenchMenuManager 重建，否则会用 2D 菜单覆盖 3D 菜单栏。
+#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
+    // 配置驱动模式下菜单统一由 WorkbenchMenuManager 生成，始终需要重建以刷新文案。
     if (m_menuManager)
         m_menuManager->rebuildAllMenus();
+#else
+    if (m_menuManager && (!m_workbench || !m_workbench->managesOwnMenus()))
+        m_menuManager->rebuildAllMenus();
+#endif
 
     refreshStatusText();
     SY_DEBUG("[WorkbenchWindow] retranslateUi completed");
@@ -260,7 +266,8 @@ void WorkbenchWindow::configureServices(const UiServices& services)
         m_menuManager->setThemeService(services.themeService);
         m_menuManager->setUiServices(&m_uiServices);
         m_menuManager->setWorkbench(m_workbench);
-        m_menuManager->rebuildAllMenus();
+        if (m_workbench)
+            m_menuManager->rebuildAllMenus();
     }
 }
 
@@ -984,19 +991,15 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 
     // 10: 刷新 UI 并清除繁忙状态
-    // 3D 工作台由 MenuManager3D 独立管理菜单，不需要 WorkbenchMenuManager 刷新
-    // 否则 WorkbenchMenuManager 会用 2D OperationBus 连接 3D 菜单项，导致 "Operation not registered" 错误
-    const bool is3D = workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0;
-    if (!is3D && m_menuManager)
+    // 新工作台自行决定是否需要 WorkbenchMenuManager 刷新菜单
+    if (!m_workbench->managesOwnMenus() && m_menuManager)
     {
-        // 从3D切换到2D时，菜单栏已被清空，需要完全重建2D菜单
         m_menuManager->rebuildAllMenus();
     }
     // 状态栏 widget 由各 Workbench 在 attachToWindow 中创建并通过 mountStatusBar 挂载，
     // 此处不再需要手动 buildStatusBar() 重建
-    // 3D 工作台不需要骨架停靠面板，隐藏以免挤压视口
-    // 2D 工作台需要显示骨架停靠面板
-    setSkeletonDocksVisible(!is3D);
+    // 新工作台自行决定是否需要骨架停靠面板
+    setSkeletonDocksVisible(m_workbench->requiresSkeletonDocks());
     refreshFromState();
     refreshStatusText();
     updateWindowTitle();

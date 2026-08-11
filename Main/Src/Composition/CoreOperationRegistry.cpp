@@ -7,6 +7,7 @@
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Edit/UndoRedoManager.h"
 #include "Engine2D/Edit/FilletChamfer.h"
+#include "Engine2D/Core/EntityClipboard.h"
 #include "UI/Services/HelpDialogService.h"
 #include "Log/SyLogger.h"
 
@@ -56,9 +57,6 @@ void CoreOperationRegistry::registerAll()
                 editService->deleteSelected("Delete");
         }));
 
-    // 选择、群组操作已在 EditOperations.cpp 中注册（SelectAll/ClearSelection/InvertSelection/GroupToggle），
-    // 此处不再重复注册。
-
     // ---- 圆角 ----
     reg.registerOperation(std::make_unique<ParamLambdaOperation>(
         OperationId::Edit_Fillet, [editService, helpDlg](const QVariantMap& params) {
@@ -102,8 +100,8 @@ void CoreOperationRegistry::registerAll()
             Eg::FilletChamfer::applyChamfer(*editService, distance);
         }));
 
-    // 视图操作（View_ZoomFit/ZoomIn/ZoomOut）已移至 PendingOperationRegistry
-    // 由 PendingOperationRegistry 统一管理视图类占位操作
+    // ---- 编辑操作（选择/变换/剪贴板等） ----
+    registerEditOperations();
 
     // ---- 帮助操作 ----
     registerHelpOperations();
@@ -140,4 +138,26 @@ void CoreOperationRegistry::registerHelpOperations()
         OperationId::Help_Shortcut, [parentWidget] {
             HelpDialogService::showShortcutsDialog(parentWidget);
         }));
+}
+
+void CoreOperationRegistry::registerEditOperations()
+{
+    if (!m_bus)
+        return;
+
+    auto& reg = m_bus->registry();
+
+    // NOTE: EditOperations.cpp 的 OperationEdit::registerAll() 已在 ApplicationCompositionRoot
+    //       中优先注册 (first-wins)，覆盖以下操作:
+    //       SelectAll, ClearSelection, InvertSelection, Copy, Cut, Paste, Duplicate,
+    //       Rotate, MirrorH, MirrorV, Mirror, Align, Move, Nudge,
+    //       Trim, Extend, GroupToggle, BezierToggle, SplitBezier, MergeBezier,
+    //       GetBbox, Discretize, Array
+    // 此处仅保留 EditOperations.cpp 未覆盖的占位操作。
+
+    // ---- 颜色/图层（占位，依赖旧框架 MiscOperations/ViewOperations） ----
+    reg.registerOperation(std::make_unique<LambdaOperation>(
+        OperationId::Edit_SetColor, [] {}));
+    reg.registerOperation(std::make_unique<LambdaOperation>(
+        OperationId::Edit_MoveToLayer, [] {}));
 }

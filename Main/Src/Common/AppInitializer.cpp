@@ -14,6 +14,8 @@
 #include "UI/FontManager.h"
 #include "Persistence/PersistenceService.h"
 
+#include "render/render_types.h"
+
 #include <QApplication>
 #include <QCoreApplication>
 #include <QDir>
@@ -89,6 +91,7 @@ void AppInitializer::initialize()
         true);
 
     SY_INFOF("Starting %s v%s", MainApp::appName().c_str(), MainApp::appVersion().c_str());
+    SY_INFOF("[Render] Active render backend: %s", render::backendName(render::BackendType::OpenGL));
 
     CrashHandlerBootstrap::logPendingDumps();
 

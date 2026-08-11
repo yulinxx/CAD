@@ -1,3 +1,7 @@
+/**
+ * @file CoreOperationRegistry.h
+ * @brief 核心操作注册表
+ */
 #pragma once
 
 class OperationBus;
@@ -18,8 +22,8 @@ public:
     void registerAll();
 
 private:
-    /// 注册帮助操作（About / Settings / Docs / Shortcuts）
     void registerHelpOperations();
+    void registerEditOperations();
 
     OperationBus* m_bus;
     SceneEditService* m_editService;

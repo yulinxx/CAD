@@ -10,6 +10,7 @@
 #include <QMainWindow>
 #include <QMenu>
 #include <QMenuBar>
+#include <QMenuBar>
 #include <QShortcut>
 #include <QToolBar>
 #include <QWidget>
@@ -65,15 +66,42 @@ UiLayoutBuilder::UiLayoutBuilder(QMainWindow* window,
 {
 }
 
+void UiLayoutBuilder::clearBuiltLayout()
+{
+    m_builtDocks.clear();
+    m_builtToolBars.clear();
+}
+
 void UiLayoutBuilder::bindAction(QAction* action, const QString& commandId)
+{
+    bindAction(action, commandId, QString(), QString(), QString());
+}
+
+void UiLayoutBuilder::bindAction(QAction* action,
+    const QString& commandId,
+    const QString& text,
+    const QString& iconResource,
+    const QString& workbenchId)
 {
     if (!action || commandId.isEmpty())
         return;
 
+    if (!text.isEmpty())
+        action->setText(text);
+    if (!iconResource.isEmpty())
+        action->setIcon(QIcon(iconResource));
+    if (!workbenchId.isEmpty())
+        action->setProperty("workbenchId", workbenchId);
+    action->setProperty("commandId", commandId);
+
     if (m_dispatcher && m_dispatcher->isCommandRegistered(commandId))
     {
         QObject::connect(action, &QAction::triggered,
-            [this, commandId](bool) { m_dispatcher->dispatch(commandId); });
+            [this, action, commandId](bool) {
+                SY_INFOF("[Menu] trigger text='%s' command='%s'",
+                    qPrintable(action->text()), qPrintable(commandId));
+                m_dispatcher->dispatch(commandId);
+            });
     }
     else
     {
@@ -92,17 +120,26 @@ void UiLayoutBuilder::buildMenus(const std::vector<MenuDef>& menus)
     QMenuBar* menuBar = m_window->menuBar();
     if (!menuBar)
         return;
+    if (!menuBar)
+        return;
 
     for (const auto& menu : menus)
     {
-        if (menu.id.isEmpty())
+        if (menu.id.isEmpty() || !menu.visible)
             continue;
         QMenu* qMenu = menuBar->addMenu(actionLabel(menu.label, menu.id));
         if (!qMenu)
             continue;
         qMenu->setObjectName(menu.id);
+        if (!menu.iconName.isEmpty())
+            qMenu->menuAction()->setIcon(QIcon(menu.iconName));
+        qMenu->setProperty("workbenches", menu.workbenches);
         for (const auto& item : menu.items)
             buildMenuItem(qMenu, item);
+
+        SY_INFOF("[UiLayoutBuilder] Menu built id='%s' workbench='%s' items=%d",
+            qPrintable(menu.id), qPrintable(menu.workbenches.join(QStringLiteral(","))),
+            qMenu->actions().size());
     }
 }
 
@@ -122,24 +159,35 @@ void UiLayoutBuilder::buildMenuItem(QMenu* parent,
     if (std::holds_alternative<SubMenuDef>(item))
     {
         const SubMenuDef& sub = std::get<SubMenuDef>(item);
+        if (!sub.visible)
+            return;
         QMenu* subMenu = parent->addMenu(actionLabel(sub.label, sub.id));
         if (!subMenu)
             return;
         subMenu->setObjectName(sub.id);
+        if (!sub.iconName.isEmpty())
+            subMenu->menuAction()->setIcon(QIcon(sub.iconName));
+        subMenu->setProperty("workbenchId", sub.workbenches.join(QStringLiteral(",")));
+        subMenu->setProperty("checkable", sub.checkable);
+        subMenu->setProperty("checked", sub.checked);
         for (const auto& subItem : sub.items)
             buildMenuItem(subMenu, subItem);
         return;
     }
 
     const MenuActionDef& actionDef = std::get<MenuActionDef>(item);
+    if (!actionDef.visible)
+        return;
     QAction* action = parent->addAction(actionLabel(actionDef.label, actionDef.id));
     if (!action)
         return;
     action->setObjectName(actionDef.id);
     action->setCheckable(actionDef.checkable);
+    action->setChecked(actionDef.checked);
     if (!actionDef.shortcut.isEmpty())
         action->setShortcut(QKeySequence(actionDef.shortcut));
-    bindAction(action, actionDef.commandId);
+    bindAction(action, actionDef.commandId, actionDef.label, actionDef.iconName,
+        actionDef.workbenches.join(QStringLiteral(",")));
 }
 
 void UiLayoutBuilder::buildToolBars(const std::vector<ToolBarDef>& toolBars)
@@ -155,6 +203,7 @@ void UiLayoutBuilder::buildToolBars(const std::vector<ToolBarDef>& toolBars)
         QToolBar* toolBar = new QToolBar(actionLabel(tb.title, tb.id), m_window);
         toolBar->setObjectName(tb.id);
         toolBar->setMovable(true);
+        toolBar->setProperty("workbenchId", tb.workbenchId);
         m_window->addToolBar(toToolBarArea(tb.position), toolBar);
         m_builtToolBars.push_back(toolBar);
 
@@ -177,7 +226,7 @@ void UiLayoutBuilder::buildToolBars(const std::vector<ToolBarDef>& toolBars)
                 action->setShortcut(QKeySequence(actionDef.shortcut));
             if (!actionDef.iconName.isEmpty())
                 action->setIcon(QIcon(actionDef.iconName));
-            bindAction(action, actionDef.commandId);
+            bindAction(action, actionDef.commandId, actionDef.label, actionDef.iconName, tb.workbenchId);
         }
     }
 }
@@ -207,6 +256,7 @@ void UiLayoutBuilder::buildDocks(const std::vector<DockDef>& docks)
         dockWidget->setObjectName(dock.id);
         dockWidget->setWidget(panel);
         dockWidget->setVisible(dock.visible);
+        dockWidget->setProperty("widgetType", dock.widgetType);
         m_window->addDockWidget(toDockArea(dock.position), dockWidget);
         m_builtDocks.push_back(dockWidget);
     }
@@ -227,6 +277,9 @@ void UiLayoutBuilder::buildShortcuts(const std::vector<ShortcutDef>& shortcuts)
         auto* shortcut = new QShortcut(QKeySequence(sc.keySequence), m_window);
         shortcut->setContext(Qt::ApplicationShortcut);
         QObject::connect(shortcut, &QShortcut::activated,
-            [this, commandId = sc.commandId]() { m_dispatcher->dispatch(commandId); });
+            [this, commandId = sc.commandId]() {
+                SY_INFOF("[Menu] shortcut command='%s'", qPrintable(commandId));
+                m_dispatcher->dispatch(commandId);
+            });
     }
 }

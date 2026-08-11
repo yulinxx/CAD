@@ -222,8 +222,10 @@ TEST(UndoRedoRegressionTest, EntitySnapshotsCommand_RoundTrip)
     EXPECT_EQ(scene.getEntityCount(), 2u);
 
     // 拍摄修改前快照
-    auto before = captureEntitySnapshots(&scene, { lineId, circleId });
-    ASSERT_EQ(before.size(), 2u);
+    Eg::EntityId snapIds[2] = { lineId, circleId };
+    Eg::SyEntity* beforeSnap[2] = { nullptr, nullptr };
+    size_t beforeCount = Eg::captureEntitySnapshots(&scene, snapIds, 2, beforeSnap, 2);
+    ASSERT_EQ(beforeCount, 2u);
 
     // 修改图元
     auto* linePtr = scene.findSyEntityById(lineId);
@@ -235,13 +237,14 @@ TEST(UndoRedoRegressionTest, EntitySnapshotsCommand_RoundTrip)
     circlePtr->dRadius = 5.0;
 
     // 拍摄修改后快照
-    auto after = captureEntitySnapshots(&scene, { lineId, circleId });
-    ASSERT_EQ(after.size(), 2u);
+    Eg::SyEntity* afterSnap[2] = { nullptr, nullptr };
+    size_t afterCount = Eg::captureEntitySnapshots(&scene, snapIds, 2, afterSnap, 2);
+    ASSERT_EQ(afterCount, 2u);
 
     // 执行快照命令
-    auto snapCmd = std::make_unique<EntitySnapshotsCommand>(
-        &scene, std::move(before), std::move(after), "Modify line and circle");
-    undoMgr.executeCommand(std::move(snapCmd).release());
+    undoMgr.executeCommand(Eg::createEntitySnapshotsCommand(
+        &scene, beforeSnap, beforeCount, afterSnap, afterCount,
+        "Modify line and circle"));
 
     // 验证修改生效
     auto* modifiedLine = scene.findSyEntityById(lineId);
@@ -536,9 +539,7 @@ TEST(UndoRedoRegressionTest, DeleteEntitiesCommand_EmptyList)
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
-    auto cmd = std::make_unique<DeleteEntitiesCommand>(&scene,
-        std::vector<Eg::EntityId>{}, "Delete empty");
-    undoMgr.executeCommand(std::move(cmd).release());
+    undoMgr.executeCommand(Eg::createDeleteEntitiesCommand(&scene, nullptr, 0, "Delete empty"));
 
     EXPECT_EQ(scene.getEntityCount(), 0u);
     EXPECT_TRUE(undoMgr.canUndo());
@@ -562,8 +563,13 @@ TEST(UndoRedoRegressionTest, AddEntitiesCommand_BatchAddAndUndo)
         entities.push_back(std::move(line));
     }
 
-    auto cmd = std::make_unique<AddEntitiesCommand>(&scene, std::move(entities), "Add 3 lines");
-    undoMgr.executeCommand(std::move(cmd).release());
+    std::vector<const Eg::SyEntity*> rawEntities;
+    rawEntities.reserve(entities.size());
+    for (const auto& e : entities)
+        rawEntities.push_back(e.get());
+
+    undoMgr.executeCommand(Eg::createAddEntitiesCommand(
+        &scene, rawEntities.data(), rawEntities.size(), "Add 3 lines"));
 
     EXPECT_EQ(scene.getEntityCount(), 3u);
     EXPECT_TRUE(undoMgr.canUndo());
@@ -708,28 +714,35 @@ TEST(UndoRedoRegressionTest, EntitySnapshots_MergeTwoCommands)
     scene.addEntities(std::move(vec));
 
     // 快照 V1 → V2
-    auto before1 = captureEntitySnapshots(&scene, { lineId });
+    Eg::EntityId snapId[1] = { lineId };
+    Eg::SyEntity* beforeSnap1[1] = { nullptr };
+    size_t beforeCount1 = Eg::captureEntitySnapshots(&scene, snapId, 1, beforeSnap1, 1);
+
     auto* l1 = scene.findSyEntityById(lineId);
     l1->setName("V2");
 
-    auto after1 = captureEntitySnapshots(&scene, { lineId });
+    Eg::SyEntity* afterSnap1[1] = { nullptr };
+    size_t afterCount1 = Eg::captureEntitySnapshots(&scene, snapId, 1, afterSnap1, 1);
 
-    auto snap1 = std::make_unique<EntitySnapshotsCommand>(
-        &scene, std::move(before1), std::move(after1), "snap");
-    undoMgr.executeCommand(std::move(snap1).release());
+    auto* snap1 = Eg::createEntitySnapshotsCommand(
+        &scene, beforeSnap1, beforeCount1, afterSnap1, afterCount1, "snap");
+    undoMgr.executeCommand(snap1);
     EXPECT_STREQ(scene.findSyEntityById(lineId)->name(), "V2");
 
     // 快照 V2 → V3，使用相同 description 以触发合并
-    auto before2 = captureEntitySnapshots(&scene, { lineId });
+    Eg::SyEntity* beforeSnap2[1] = { nullptr };
+    size_t beforeCount2 = Eg::captureEntitySnapshots(&scene, snapId, 1, beforeSnap2, 1);
+
     auto* l2 = scene.findSyEntityById(lineId);
     l2->setName("V3");
 
-    auto after2 = captureEntitySnapshots(&scene, { lineId });
+    Eg::SyEntity* afterSnap2[1] = { nullptr };
+    size_t afterCount2 = Eg::captureEntitySnapshots(&scene, snapId, 1, afterSnap2, 1);
 
-    auto snap2 = std::make_unique<EntitySnapshotsCommand>(
-        &scene, std::move(before2), std::move(after2), "snap");
+    auto* snap2 = Eg::createEntitySnapshotsCommand(
+        &scene, beforeSnap2, beforeCount2, afterSnap2, afterCount2, "snap");
     snap2->execute();
-    undoMgr.pushExecutedCommand(std::move(snap2).release());
+    undoMgr.pushExecutedCommand(snap2);
     EXPECT_STREQ(scene.findSyEntityById(lineId)->name(), "V3");
 
     // 合并后一次 undo 回到 V1

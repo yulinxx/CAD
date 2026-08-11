@@ -49,6 +49,9 @@ private:
     std::optional<DockDef> parseDock(const QJsonObject& obj);
     std::optional<ShortcutDef> parseShortcut(const QJsonObject& obj);
 
+    /// 菜单可见性判断（按工作台）
+    static bool isVisibleForWorkbench(const QStringList& workbenches, const QString& workbenchId);
+
     /// 解析菜单/子菜单条目列表（variant 类型）
     bool parseMenuItems(const QJsonArray& array,
         std::vector<std::variant<MenuActionDef, SubMenuDef, MenuItemType>>& out);

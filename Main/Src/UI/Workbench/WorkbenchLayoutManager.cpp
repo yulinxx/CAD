@@ -17,8 +17,36 @@
 #include <QSettings>
 #include <QStatusBar>
 #include <QToolBar>
+#include <QDateTime>
+#include <QDockWidget>
+#include <QLabel>
+#include <QMenuBar>
+#include <QProgressBar>
+#include <QSettings>
+#include <QStatusBar>
+#include <QToolBar>
 #include <QWidget>
 #include <QPointer>
+
+#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
+#include "ClientConfig/UiConfigLoader.h"
+#include "ClientConfig/UiConfigurationManager.h"
+#include "ClientConfig/UiLayoutBuilder.h"
+#include "ClientConfig/UiPanelRegistry.h"
+
+namespace
+{
+    /// 客户配置资源路径（编译期由 SANYI_CLIENT_ID 决定）
+    QString clientConfigResourcePath()
+    {
+#ifndef SANYI_CLIENT_ID
+        return QStringLiteral(":/configs/san_yi.json");
+#else
+        return QStringLiteral(":/configs/%1.json").arg(QString::fromUtf8(SANYI_CLIENT_ID));
+#endif
+    }
+}
+#endif
 
 WorkbenchLayoutManager::WorkbenchLayoutManager(QMainWindow* parent, WorkbenchMenuManager* menuManager)
     : m_parent(parent)
@@ -49,6 +77,17 @@ void WorkbenchLayoutManager::initializeDockAreaSkeleton()
 
 void WorkbenchLayoutManager::buildDockAreas()
 {
+#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
+    // 配置驱动优先：成功则由 JSON 构建骨架停靠面板
+    if (buildDockAreasFromConfig())
+    {
+        SY_INFO("[WorkbenchLayoutManager] Dock areas built from client config");
+        return;
+    }
+    SY_WARNF("[WorkbenchLayoutManager] Config-driven dock build failed, "
+             "falling back to hardcoded skeleton");
+#endif
+
     // 场景树面板
     m_panelState.sceneTreeDock = new SceneTreeDockWidget(m_parent);
     m_panelState.leftDock = new QDockWidget(m_parent->tr("Scene"), m_parent); // 场景
@@ -67,6 +106,71 @@ void WorkbenchLayoutManager::buildDockAreas()
     m_panelState.rightDock->setMaximumWidth(450);
     m_parent->addDockWidget(Qt::RightDockWidgetArea, m_panelState.rightDock);
 }
+
+#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
+bool WorkbenchLayoutManager::buildDockAreasFromConfig()
+{
+    // 懒加载配置管理器与面板注册表
+    if (!m_configManager)
+    {
+        m_configManager = std::make_unique<UiConfigurationManager>();
+        m_panelRegistry = std::make_unique<UiPanelRegistry>();
+
+        // 注册内置面板工厂：与 JSON 中的 widgetType 对应
+        m_panelRegistry->registerPanel(QStringLiteral("SceneTreePanel"),
+            [](QWidget* parent) { return static_cast<QWidget*>(new SceneTreeDockWidget(parent)); });
+        m_panelRegistry->registerPanel(QStringLiteral("PropertiesPanel"),
+            [](QWidget* parent) { return static_cast<QWidget*>(new PropertiesPanelWidget(parent)); });
+    }
+
+    const QString resourcePath = clientConfigResourcePath();
+    if (!m_configManager->applyConfiguration(resourcePath, ConfigFallbackPolicy::Strict))
+    {
+        SY_ERRORF("[WorkbenchLayoutManager] Failed to load client config: %s",
+            qPrintable(resourcePath));
+        return false;
+    }
+
+    const UiConfigData* config = m_configManager->configData();
+    if (!config)
+        return false;
+
+    // 数据驱动构建 Dock（命令分发器此处不参与，仅为构造签名提供空实现）
+    struct NullDispatcher : public IUiCommandDispatcher
+    {
+        bool isCommandRegistered(const QString&) const override { return false; }
+        void dispatch(const QString&) override {}
+    };
+    NullDispatcher dispatcher;
+    UiLayoutBuilder builder(m_parent, &dispatcher, m_panelRegistry.get());
+    builder.buildDocks(config->docks);
+
+    // 将构建出的 Dock widget 挂入布局管理器注册表，与硬编码路径行为一致
+    // 便于统一清理（clearLayoutContent）与布局快照（restoreLayoutSnapshot）
+    for (QWidget* dockWidget : builder.builtDocks())
+    {
+        if (auto* dock = qobject_cast<QDockWidget*>(dockWidget))
+        {
+            dock->setProperty("_workbench_dock_title", dock->windowTitle());
+            m_registeredDocks.push_back(dock);
+
+            // 同步面板状态引用，保持与硬编码路径一致的对外接口
+            const QString dockId = dock->objectName();
+            if (dockId == QStringLiteral("SceneDock"))
+                m_panelState.leftDock = dock;
+            else if (dockId == QStringLiteral("PropertiesDock"))
+                m_panelState.rightDock = dock;
+
+            if (auto* tree = qobject_cast<SceneTreeDockWidget*>(dock->widget()))
+                m_panelState.sceneTreeDock = tree;
+            if (auto* props = qobject_cast<PropertiesPanelWidget*>(dock->widget()))
+                m_panelState.propertiesDock = props;
+        }
+    }
+
+    return !m_registeredDocks.empty();
+}
+#endif
 
 void WorkbenchLayoutManager::initializeStatusBarSkeleton()
 {

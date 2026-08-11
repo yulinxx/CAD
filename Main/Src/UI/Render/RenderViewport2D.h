@@ -150,6 +150,8 @@ signals:
     // P1: 视口不直接持有编辑服务，通过信号通知上层
     void entitySubmitRequested(Eg::SyEntity* entity);
     void nudgeRequested(double dx, double dy);
+    // 活动工具切换成功时发出，供工具栏等上层同步按钮高亮状态
+    void activeToolChanged(const QString& toolName);
 
 protected:
     void resizeEvent(QResizeEvent* event) override;

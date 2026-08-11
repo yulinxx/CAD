@@ -90,6 +90,7 @@ set(MAIN_APP_SOURCES
     ${SRC_ROOT}/UI/ClientConfig/UiLayoutBuilder.cpp
     ${SRC_ROOT}/UI/ClientConfig/UiPanelRegistry.cpp
     ${SRC_ROOT}/UI/Workbench/UiWorkbench.cpp
+    ${SRC_ROOT}/UI/Workbench/DrawToolSwitchRegistry.cpp
     ${SRC_ROOT}/UI/Workbench/WorkbenchActionManager.cpp
     ${SRC_ROOT}/UI/Workbench/WorkbenchLayoutManager.cpp
     ${SRC_ROOT}/UI/Workbench/WorkbenchMenuManager.cpp
@@ -470,6 +471,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
         ${SRC_ROOT}/UI/Services/UiStateCenter.cpp
         ${SRC_ROOT}/UI/Services/UiThemeService.cpp
         ${SRC_ROOT}/UI/Workbench/UiWorkbench.cpp
+        ${SRC_ROOT}/UI/Workbench/DrawToolSwitchRegistry.cpp
         ${SRC_ROOT}/UI/Workbench/WorkbenchActionManager.cpp
         ${SRC_ROOT}/UI/Workbench/WorkbenchLayoutManager.cpp
         ${SRC_ROOT}/UI/Workbench/WorkbenchMenuManager.cpp

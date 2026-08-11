@@ -43,6 +43,12 @@ public:
     /// 已加载的配置数据（未加载时为 nullptr）
     const UiConfigData* configData() const { return m_configData.get(); }
 
+    /// 菜单配置数据（当前与主配置共用，便于菜单/工具栏/Dock 同源生成）
+    const UiConfigData* menuConfigData() const { return m_configData.get(); }
+
+    /// 当前配置是否已加载
+    bool hasConfig() const { return m_configData != nullptr; }
+
     /// 清空已加载配置
     void reset();
 

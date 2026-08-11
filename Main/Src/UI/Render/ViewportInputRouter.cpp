@@ -549,5 +549,30 @@ bool ViewportInputRouter::handleKeyPressDispatch(QKeyEvent* event)
     if (handleToolKeyPress(event))
         return true;
 
-    return handleDeleteKeyPress(event);
+    if (handleDeleteKeyPress(event))
+        return true;
+
+    return handleEscapeKeyPress(event);
+}
+
+bool ViewportInputRouter::handleEscapeKeyPress(QKeyEvent* event)
+{
+    if (event->key() != Qt::Key_Escape)
+        return false;
+
+    // 仅当左侧绘图工具栏的工具（非选择工具）处于激活状态时处理：
+    // 丢弃当前工具未完成的草图，并切回选择工具。
+    const QString activeTool = m_toolManager ? m_toolManager->getActiveToolName() : QString();
+    if (activeTool.isEmpty() || activeTool == QStringLiteral("SelectTool"))
+        return false;
+
+    if (m_toolManager)
+        m_toolManager->cancelCurrentTool();
+
+    // 走 OperationBus：UI 入口 → Tool_Select → 视口激活选择工具 → activeToolChanged → 工具栏高亮同步
+    if (m_operationBus)
+        m_operationBus->run(OperationId::Tool_Select, {}, OperationSource::Keyboard);
+
+    event->accept();
+    return true;
 }

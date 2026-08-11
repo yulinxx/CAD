@@ -12,6 +12,7 @@ class UiThemeService;
 class StatusBarBase;
 class WorkbenchMenuManager;
 class WorkbenchLayoutManager;
+class WorkbenchWindow;
 
 /// 窗口状态：只保存与窗口语义直接相关的高层状态
 /// 从 WorkbenchWindow::WindowState 提升为独立类型
@@ -40,7 +41,7 @@ public:
     /// @param parent 主窗口指针（用于 setWindowTitle）
     /// @param menuManager 菜单管理器
     /// @param layoutManager 布局管理器（用于访问 PanelState 和 busyIndicator）
-    explicit WorkbenchStateManager(QMainWindow* parent,
+    explicit WorkbenchStateManager(WorkbenchWindow* parent,
         WorkbenchMenuManager* menuManager,
         WorkbenchLayoutManager* layoutManager);
 
@@ -110,7 +111,7 @@ private:
     /// 统一写入工作台切换阶段，避免直接操作 metadata
     void setWorkbenchTransitionState(const QString& phase, const QString& status);
 
-    QMainWindow* m_parent;
+    WorkbenchWindow* m_parent;
     WorkbenchMenuManager* m_menuManager;
     WorkbenchLayoutManager* m_layoutManager;
 

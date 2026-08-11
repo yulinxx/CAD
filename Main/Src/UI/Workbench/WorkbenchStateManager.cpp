@@ -1,6 +1,8 @@
 #include "WorkbenchStateManager.h"
 #include "WorkbenchMenuManager.h"
 #include "WorkbenchLayoutManager.h"
+#include "WorkbenchWindow.h"
+#include "UiWorkbench.h"
 #include "UiStateCenter.h"
 #include "UiThemeService.h"
 #include "UiPropertiesPanel.h"
@@ -16,7 +18,7 @@
 #include <QObject>
 #include <QRegularExpression>
 
-WorkbenchStateManager::WorkbenchStateManager(QMainWindow* parent,
+WorkbenchStateManager::WorkbenchStateManager(WorkbenchWindow* parent,
     WorkbenchMenuManager* menuManager,
     WorkbenchLayoutManager* layoutManager)
     : m_parent(parent)
@@ -234,7 +236,12 @@ void WorkbenchStateManager::refreshFromState()
     // 状态栏消息与选择信息在上方通过 m_activeStatusBar 接口统一更新
 
     if (m_menuManager)
+    {
+        const auto state = m_stateCenter->snapshot();
+        m_menuManager->refreshWorkbenchMenuChecks(state.currentWorkbenchId);
+        m_menuManager->refreshThemeMenuChecks(state.currentThemeId);
         m_menuManager->refreshGridSnapMenuChecks();
+    }
     // 属性面板使用状态中心快照作为输入，不在这里额外拼接窗口本地状态
     if (panel.propertiesDock && m_stateCenter)
     {
@@ -256,28 +263,17 @@ void WorkbenchStateManager::refreshFromState()
             .arg(state.busy ? m_parent->tr("Y") : m_parent->tr("N"))
             .arg(statusPrompt));
 
-        QString selectionText = m_parent->tr("Sel=%1 | SelSrc=%2 | CmdSrc=%3 | SelType=%4 | CmdType=%5")
-            .arg(state.currentSelectionText)
-            .arg(state.currentSelectionSource)
-            .arg(state.currentCommandOwner)
-            .arg(state.currentSelectionType)
-            .arg(state.currentCommandType);
-        if (state.currentWorkbenchId.compare(m_parent->tr("3D"), Qt::CaseInsensitive) == 0)
-        {
-            selectionText = m_parent->tr("3D Sel=%1 | NodeType=%2 | CmdSrc=%3 | CmdType=%4")
+        // 选择文本格式化委托给当前工作台（2D/3D 各自定义格式）
+        QString selectionText;
+        if (auto* wb = m_parent->currentWorkbench())
+            selectionText = wb->formatSelectionText(state);
+        else
+            selectionText = m_parent->tr("Sel=%1 | SelSrc=%2 | CmdSrc=%3 | SelType=%4 | CmdType=%5")
                 .arg(state.currentSelectionText)
-                .arg(state.currentSelectionType)
+                .arg(state.currentSelectionSource)
                 .arg(state.currentCommandOwner)
-                .arg(state.currentCommandType);
-        }
-        else if (state.currentWorkbenchId.compare(m_parent->tr("2D"), Qt::CaseInsensitive) == 0)
-        {
-            selectionText = m_parent->tr("2D Sel=%1 | SelType=%2 | CmdSrc=%3 | CmdType=%4")
-                .arg(state.currentSelectionText)
                 .arg(state.currentSelectionType)
-                .arg(state.currentCommandOwner)
                 .arg(state.currentCommandType);
-        }
         panel.propertiesDock->setSelectionText(selectionText);
     }
 }

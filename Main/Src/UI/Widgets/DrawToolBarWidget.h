@@ -16,10 +16,11 @@ class OperationBus;
  */
 struct DrawToolEntry
 {
-    QString commandId;   // 命令 ID，与 CommandCatalog 的 toolName 对齐
-    QString displayName; // 按钮显示文本
-    QString tooltip;     // 详细提示文本
-    QString shortcut;    // 快捷键提示（可选）
+    QString commandId;    // 命令 ID，与 CommandCatalog 的 toolName 对齐
+    QString displayName;  // 按钮显示文本
+    QString tooltip;      // 详细提示文本
+    QString shortcut;     // 快捷键提示（可选）
+    QString iconResource; // SVG 图标资源路径（如 ":/ui/common/Icons/Tools/line.svg"），为空时回退为文字按钮
 };
 
 class DrawToolBarWidget : public QWidget

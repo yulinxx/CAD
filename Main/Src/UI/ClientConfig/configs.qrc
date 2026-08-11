@@ -1,7 +1,7 @@
 <RCC>
     <qresource prefix="/configs">
-        <file>configs/san_yi.json</file>
-        <file>configs/base.json</file>
-        <file>configs/client_a.json</file>
+        <file alias="san_yi.json">configs/san_yi.json</file>
+        <file alias="base.json">configs/base.json</file>
+        <file alias="client_a.json">configs/client_a.json</file>
     </qresource>
 </RCC>

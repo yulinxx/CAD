@@ -14,6 +14,7 @@ class PropertiesPanelWidget;
 class SceneTreeDockWidget;
 class RenderViewport2D;
 class StatusBar;
+struct UiStateSnapshot;
 
 // 3D 类型前向声明（避免头文件膨胀，实际 include 下沉到 .cpp）
 #if BUILD_UI3D
@@ -116,6 +117,17 @@ public:
     /// 获取工作台 ID
     virtual QString id() const = 0;
 
+    /// 判断当前工作台是否提供命令
+    /// 菜单构建器通过该接口复用 2D / 3D 各自的命令目录。
+    virtual bool isCommandRegistered(const QString& commandId) const;
+
+    /// 从当前工作台命令目录分发命令
+    /// 菜单层只传递 commandId，不直接依赖具体 OperationBus 类型。
+    virtual void dispatchCommand(const QString& commandId);
+
+    /// 获取工作台的命令显示名和图标等元数据
+    virtual QString commandText(const QString& commandId) const;
+
     /// 获取工作台显示名称
     virtual QString displayName() const = 0;
 
@@ -138,6 +150,28 @@ public:
 
     /// 关闭工作台
     virtual void shutdown() = 0;
+
+    // ==================== 框架层委托接口 ====================
+    // 以下虚函数提供默认实现，子类按需重写。
+    // 框架层（WorkbenchWindow / WorkbenchStateManager）通过这些接口
+    // 将 2D/3D 差异化逻辑委托给各工作台，避免框架层直接依赖具体类型。
+
+    /// 释放中央视口的 OpenGL 资源（工作台切换时调用）
+    /// @param centralWidget 当前中央视口 widget
+    virtual void releaseCentralWidgetGLResources(QWidget* centralWidget) const;
+
+    /// 格式化选择信息文本（用于属性面板显示）
+    /// @param state 当前 UI 状态快照
+    /// @return 格式化后的选择文本
+    virtual QString formatSelectionText(const UiStateSnapshot& state) const;
+
+    /// 是否需要显示骨架停靠面板（SceneDock / PropertiesDock）
+    /// 2D 工作台返回 true（默认），3D 工作台返回 false
+    virtual bool requiresSkeletonDocks() const;
+
+    /// 是否自行管理菜单（跳过 WorkbenchMenuManager 的菜单重建）
+    /// 2D 工作台返回 false（默认），3D 工作台返回 true
+    virtual bool managesOwnMenus() const;
 
 protected:
     /// 获取当前状态快照
@@ -173,11 +207,18 @@ public:
 
     QString id() const override;
     QString displayName() const override;
+    bool isCommandRegistered(const QString& commandId) const override;
+    void dispatchCommand(const QString& commandId) override;
+    QString commandText(const QString& commandId) const override;
     bool initialize(const UiServices& services) override;
     void attachToWindow(WorkbenchWindow& window) override;
     void activate() override;
     void deactivate() override;
     void shutdown() override;
+
+    // 框架层委托接口
+    void releaseCentralWidgetGLResources(QWidget* centralWidget) const override;
+    QString formatSelectionText(const UiStateSnapshot& state) const override;
 
 private:
     /// 创建中央视口
@@ -221,11 +262,20 @@ public:
 public:
     QString id() const override;
     QString displayName() const override;
+    bool isCommandRegistered(const QString& commandId) const override;
+    void dispatchCommand(const QString& commandId) override;
+    QString commandText(const QString& commandId) const override;
     bool initialize(const UiServices& services) override;
     void attachToWindow(WorkbenchWindow& window) override;
     void activate() override;
     void deactivate() override;
     void shutdown() override;
+
+    // 框架层委托接口
+    void releaseCentralWidgetGLResources(QWidget* centralWidget) const override;
+    QString formatSelectionText(const UiStateSnapshot& state) const override;
+    bool requiresSkeletonDocks() const override;
+    bool managesOwnMenus() const override;
 
 private:
     // ServiceOwner 定义在 .cpp 中（PIMPL 模式，避免头文件引入 20+ 3D 依赖）

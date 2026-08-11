@@ -1,21 +1,25 @@
 cmake_minimum_required(VERSION 4.3)
 
+# --- 模块元信息 ---
 set(LIB_NAME "License")
 set(LIB_FOLDER "Core")
 set(LIB_DESCRIPTION "License Verification Library")
 set(LIB_EXPORT_MACRO "LICENSE_EXPORTS")
 
+# --- 版本（按模块独立）---
 set(VERSION_MAJOR 1)
 set(VERSION_MINOR 0)
 set(VERSION_PATCH 0)
 set(PROJECT_VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
 
+# --- 路径 ---
 if(NOT SANYI_ROOT)
     get_filename_component(SANYI_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 endif()
 include("${SANYI_ROOT}/CMake/SanYiPaths.cmake")
 include("${SANYI_ROOT}/CMake/Utils.cmake")
 
+# --- 源文件 ---
 file(GLOB_RECURSE LIB_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/Src/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Src/*.cxx"
@@ -29,39 +33,31 @@ file(GLOB_RECURSE LIB_HEADERS CONFIGURE_DEPENDS
 list(FILTER LIB_SOURCES EXCLUDE REGEX "${SANYI_SOURCE_EXCLUDE_REGEX}")
 list(FILTER LIB_HEADERS EXCLUDE REGEX "${SANYI_HEADER_EXCLUDE_REGEX}")
 
+# --- 第三方依赖 ---
 find_package(OpenSSL REQUIRED)
 
-add_library(${LIB_NAME} SHARED
-    ${LIB_SOURCES}
-    ${LIB_HEADERS}
-)
-source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${LIB_SOURCES} ${LIB_HEADERS})
+# 统一入口已无条件生成调试符号（version.rc / PDB-DWARF），
+# 该 option 仅为兼容旧构建参数保留，实际始终生效。
+option(SANYI_LICENSE_SYMBOLS "Generate debug symbols for License" ON)
 
-target_include_directories(${LIB_NAME}
-    PUBLIC
-        "${CMAKE_CURRENT_SOURCE_DIR}/Include"
-    PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/Src"
-)
-
-target_compile_features(${LIB_NAME} PUBLIC cxx_std_17)
-target_compile_definitions(${LIB_NAME} PRIVATE ${LIB_EXPORT_MACRO})
-
-set_target_properties(${LIB_NAME} PROPERTIES
+# --- 统一入口创建 DLL ---
+sanyi_add_shared_library(${LIB_NAME}
     FOLDER "${LIB_FOLDER}"
-    DEBUG_POSTFIX "_d"
-)
-
-if(MSVC)
-    target_compile_options(${LIB_NAME} PRIVATE /utf-8 /FS)
-else()
-    target_compile_options(${LIB_NAME} PRIVATE -Wall -Wextra -Wpedantic)
-endif()
-
-target_link_libraries(${LIB_NAME}
-    PRIVATE
-        OpenSSL::SSL
-        OpenSSL::Crypto
+    DESCRIPTION "${LIB_DESCRIPTION}"
+    EXPORT_MACRO "${LIB_EXPORT_MACRO}"
+    VERSION_MAJOR ${VERSION_MAJOR}
+    VERSION_MINOR ${VERSION_MINOR}
+    VERSION_PATCH ${VERSION_PATCH}
+    SOURCES ${LIB_SOURCES}
+    HEADERS ${LIB_HEADERS}
+    PUBLIC_INCLUDE_DIRS
+        "${CMAKE_CURRENT_SOURCE_DIR}/Include"
+    PRIVATE_INCLUDE_DIRS
+        "${CMAKE_CURRENT_SOURCE_DIR}/Src"
+    LINK_LIBRARIES
+        PRIVATE
+            OpenSSL::SSL
+            OpenSSL::Crypto
 )
 
 if(WIN32)
@@ -76,19 +72,6 @@ elseif(APPLE)
         target_link_libraries(${LIB_NAME} PRIVATE ${CORE_FOUNDATION_FRAMEWORK})
     endif()
 endif()
-
-sanyi_add_version_info(${LIB_NAME} "${LIB_NAME}" "${LIB_DESCRIPTION}")
-
-option(SANYI_LICENSE_SYMBOLS "Generate debug symbols for License" ON)
-if(SANYI_LICENSE_SYMBOLS)
-    sanyi_add_debug_symbols(${LIB_NAME})
-endif()
-
-message(STATUS "[${LIB_NAME}]")
-message(STATUS "  Version: ${PROJECT_VERSION}")
-message(STATUS "  Platform: ${CMAKE_SYSTEM_NAME}(${CMAKE_SYSTEM_PROCESSOR})")
-message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
-message(STATUS "----------------------------------------")
 
 if(BUILD_LICENSE_TESTS)
     target_compile_definitions(${LIB_NAME} PRIVATE LICENSE_TEST_HOOKS)

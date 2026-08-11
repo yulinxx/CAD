@@ -46,6 +46,7 @@ public:
     void buildToolBars(const std::vector<ToolBarDef>& toolBars);
     void buildDocks(const std::vector<DockDef>& docks);
     void buildShortcuts(const std::vector<ShortcutDef>& shortcuts);
+    void clearBuiltLayout();
 
     /// 本次构建创建的 Dock widget（供上层注册到布局管理器，统一清理）
     const std::vector<QWidget*>& builtDocks() const { return m_builtDocks; }
@@ -54,6 +55,13 @@ public:
 
     /// 将动作绑定到命令；命令未注册时禁用动作并给出提示
     void bindAction(QAction* action, const QString& commandId);
+
+    /// 带菜单/工作台上下文的动作绑定（用于菜单、子菜单、工具栏统一行为）
+    void bindAction(QAction* action,
+        const QString& commandId,
+        const QString& text,
+        const QString& iconResource = QString(),
+        const QString& workbenchId = QString());
 
 private:
     void buildMenuItem(QMenu* parent,

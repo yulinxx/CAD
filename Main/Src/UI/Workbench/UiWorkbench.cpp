@@ -1,6 +1,7 @@
 #include "UiWorkbench.h"
 
 #include <QAction>
+#include <QActionGroup>
 #include <QShortcut>
 #include <QSizePolicy>
 #include <QTextEdit>
@@ -19,11 +20,13 @@
 #include "UiPropertiesPanel.h"
 #include "RenderViewport2D.h"
 #include "DrawToolBarWidget.h"
+#include "DrawToolSwitchRegistry.h"
 #include "WorkbenchWindow.h"
 
 #include "UI2D/Operation/CommandActionHub.h"
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
+#include "UI2D/Operation/OperationRouting.h"
 #include "UI2D/Operation/CommandCatalog.h"
 #include "UI2D/Edit/QtLayerManagerBridge.h"
 
@@ -34,6 +37,10 @@
 #include "Engine2D/Edit/LayerEditService.h"
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Interaction/LayerManager.h"
+#include "UI2D/Operation/CommandCatalog.h"
+#include "UI2D/Operation/OperationId.h"
+#include "UI2D/Operation/OperationBus.h"
+#include "UiStateCenter.h"
 
 #include "Import/ImportService.h"
 #include "Color/Color.hpp"
@@ -55,6 +62,7 @@
 #include "Engine3D/SceneManager3D.h"
 #include "UI3D/Service/ServicePack3D.h"
 #include "UI3D/Operation/OperationBus3D.h"
+#include "UI3D/Operation/CommandCatalog3D.h"
 #include "UI3D/Manager/DocumentManager3D.h"
 #include "UI3D/Edit/UndoRedoManager3D.h"
 #include "UI3D/Edit/SceneEditService3D.h"
@@ -66,6 +74,7 @@
 #include "UI3D/Settings/SettingsUiCoordinator3D.h"
 #include "UI3D/Operation/CommandActionHub3D.h"
 #include "UI3D/Operation/AlgorithmRunner3D.h"
+#include "UI/Settings/SettingsService.h"
 
 #ifdef ENABLE_GEOMODELCORE
 #include "UI3D/Service/BRepModelService3D.h"
@@ -86,6 +95,7 @@ struct Workbench3D::ServiceOwner
     std::unique_ptr<CameraController3D> cameraController;
     std::unique_ptr<AlgorithmApplicationService> algorithmService;
     std::unique_ptr<SettingsUiCoordinator3D> settingsCoordinator;
+    std::unique_ptr<SettingsService> settingsService;
     std::unique_ptr<CommandActionHub3D> commandActionHub;
     std::unique_ptr<AlgorithmRunner3D> algorithmRunner;
 
@@ -145,11 +155,113 @@ void UiWorkbench::restoreFromSnapshot(const WorkbenchStateSnapshot& snapshot)
     }
 }
 
+// ==================== 框架层委托接口（默认实现） ====================
+
+bool UiWorkbench::isCommandRegistered(const QString& /*commandId*/) const
+{
+    return false;
+}
+
+void UiWorkbench::dispatchCommand(const QString& /*commandId*/)
+{
+    SY_WARN("[UiWorkbench] Command dispatch requested without a workbench adapter");
+}
+
+QString UiWorkbench::commandText(const QString& /*commandId*/) const
+{
+    return QString();
+}
+
+void UiWorkbench::releaseCentralWidgetGLResources(QWidget* /*centralWidget*/) const
+{
+    // 默认不释放任何资源，子类按需重写
+}
+
+QString UiWorkbench::formatSelectionText(const UiStateSnapshot& state) const
+{
+    // 默认格式：通用格式，子类按需重写（如 2D/3D 专用格式）
+    return QObject::tr("Sel=%1 | SelSrc=%2 | CmdSrc=%3 | SelType=%4 | CmdType=%5")
+        .arg(state.currentSelectionText)
+        .arg(state.currentSelectionSource)
+        .arg(state.currentCommandOwner)
+        .arg(state.currentSelectionType)
+        .arg(state.currentCommandType);
+}
+
+bool UiWorkbench::requiresSkeletonDocks() const
+{
+    return true;
+}
+
+bool UiWorkbench::managesOwnMenus() const
+{
+    return false;
+}
+
 // ============================================================
 // Workbench2D 实现
 QString Workbench2D::id() const
 {
     return QStringLiteral("2D");
+}
+
+namespace
+{
+    bool workbenchFlagEnabled(const QStringList& workbenches, const QString& workbenchId)
+    {
+        if (workbenches.isEmpty())
+            return true;
+        for (const auto& wb : workbenches)
+        {
+            if (wb.compare(workbenchId, Qt::CaseInsensitive) == 0)
+                return true;
+        }
+        return false;
+    }
+}
+
+bool Workbench2D::isCommandRegistered(const QString& commandId) const
+{
+    return CommandCatalog::operationForCommandId(commandId) != OperationId::None;
+}
+
+void Workbench2D::dispatchCommand(const QString& commandId)
+{
+    if (!m_services.operationBus)
+    {
+        SY_WARNF("[Workbench2D] Cannot dispatch command without OperationBus: %s",
+            qPrintable(commandId));
+        return;
+    }
+
+    // 优先走 OperationRouting::dispatch：与工具栏/右键/快捷键同一条路径，
+    // 保证 Edit_Rotate/Align 的 angle/mode 参数、Move/Mirror 的对话框分发完全一致。
+    const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(commandId);
+    if (menuId != static_cast<UI::MenuActionId>(0))
+    {
+        SY_INFOF("[Workbench2D] Dispatch command='%s' menuId=%d source=Menu",
+            qPrintable(commandId), static_cast<int>(menuId));
+        OperationRouting::dispatch(menuId);
+        return;
+    }
+
+    // 无法精确定位菜单项（工具名、无目录条目的命令）时回退到 OperationId 直接分发
+    const OperationId operation = CommandCatalog::operationForCommandId(commandId);
+    if (operation == OperationId::None)
+    {
+        SY_WARNF("[Workbench2D] Unknown command: %s", qPrintable(commandId));
+        return;
+    }
+
+    SY_INFOF("[Workbench2D] Dispatch command='%s'", qPrintable(commandId));
+    m_services.operationBus->run(operation, {}, OperationSource::Menu);
+}
+
+QString Workbench2D::commandText(const QString& commandId) const
+{
+    const auto operation = CommandCatalog::operationForCommandId(commandId);
+    const auto* entry = CommandCatalog::findByOperation(operation);
+    return entry && entry->text ? QString::fromUtf8(entry->text) : QString();
 }
 
 Workbench2D::Workbench2D() = default;
@@ -299,11 +411,22 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
             tool.displayName = QString::fromUtf8(entry.text ? entry.text : "");
             tool.tooltip = QString::fromUtf8(entry.text ? entry.text : "");
             tool.shortcut = QString::fromUtf8(entry.shortcutId ? entry.shortcutId : "");
+            tool.iconResource = QString::fromUtf8(entry.iconResource ? entry.iconResource : "");
             drawTools.append(tool);
         }
     }
     drawWidget->setToolDefinitions(drawTools);
     leftToolBar->addWidget(drawWidget);
+
+    // 接通「工具栏 → OperationBus → 视口」：把工具栏展示的 Tool_* 操作注册到操作总线，
+    // 点击按钮后经总线转发表驱动的 LambdaOperation 激活视口对应工具。
+    // 必须在视口（m_viewport）创建完成后再注册，故放在这里而非组合根。
+    DrawToolSwitchRegistry(m_services.operationBus, m_viewport).registerAll();
+
+    // 双向状态同步：视口切换工具后高亮对应按钮；启动时初始化为当前活动工具（SelectTool）。
+    QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged,
+        drawWidget, &DrawToolBarWidget::updateActiveTool);
+    drawWidget->updateActiveTool(m_viewport->activeToolName());
 
     // CommandActionHub：管理所有 QAction 的创建与绑定
     m_commandHub = std::make_unique<CommandActionHub>();
@@ -389,6 +512,21 @@ void Workbench2D::shutdown()
     m_services = UiServices{};
 }
 
+void Workbench2D::releaseCentralWidgetGLResources(QWidget* centralWidget) const
+{
+    if (auto* vp = qobject_cast<RenderViewport2D*>(centralWidget))
+        vp->releaseGLResources();
+}
+
+QString Workbench2D::formatSelectionText(const UiStateSnapshot& state) const
+{
+    return QObject::tr("2D Sel=%1 | SelType=%2 | CmdSrc=%3 | CmdType=%4")
+        .arg(state.currentSelectionText)
+        .arg(state.currentSelectionType)
+        .arg(state.currentCommandOwner)
+        .arg(state.currentCommandType);
+}
+
 #if BUILD_UI3D
 // Workbench3D 实现
 // 统一工作台初始化模板
@@ -438,6 +576,38 @@ QString Workbench3D::id() const
 QString Workbench3D::displayName() const
 {
     return QObject::tr("3D Workbench");
+}
+
+bool Workbench3D::isCommandRegistered(const QString& commandId) const
+{
+    return CommandCatalog3D::operationForCommandId(commandId) != OperationId3D::None;
+}
+
+void Workbench3D::dispatchCommand(const QString& commandId)
+{
+    if (!m_services3D.operationBus)
+    {
+        SY_WARNF("[Workbench3D] Cannot dispatch command without OperationBus3D: %s",
+            qPrintable(commandId));
+        return;
+    }
+
+    const OperationId3D operation = CommandCatalog3D::operationForCommandId(commandId);
+    if (operation == OperationId3D::None)
+    {
+        SY_WARNF("[Workbench3D] Unknown command: %s", qPrintable(commandId));
+        return;
+    }
+
+    SY_INFOF("[Workbench3D] Dispatch command='%s'", qPrintable(commandId));
+    m_services3D.operationBus->run(operation);
+}
+
+QString Workbench3D::commandText(const QString& commandId) const
+{
+    const auto operation = CommandCatalog3D::operationForCommandId(commandId);
+    const auto* entry = CommandCatalog3D::findByOperation(operation);
+    return entry && entry->text ? QString::fromUtf8(entry->text) : QString();
 }
 
 // 1 — 初始化，存储服务引用
@@ -512,7 +682,9 @@ void Workbench3D::create3DServices()
     own.sceneDocumentAdapter->setEngineScene(sceneManagerAlias);
     own.cameraController = std::make_unique<CameraController3D>();
     own.algorithmService = std::make_unique<AlgorithmApplicationService>(nullptr);
-    own.settingsCoordinator = std::make_unique<SettingsUiCoordinator3D>(nullptr, own.navigationConfig.get());
+    own.settingsService = std::make_unique<SettingsService>(nullptr);
+    own.settingsService->init();
+    own.settingsCoordinator = std::make_unique<SettingsUiCoordinator3D>(own.settingsService.get(), own.navigationConfig.get());
 
 #ifdef ENABLE_GEOMODELCORE
     own.brepModelService = std::make_unique<BRepModelService3D>();
@@ -536,6 +708,8 @@ void Workbench3D::create3DServices()
     m_services3D.sceneDocument = own.sceneDocument.get();
     m_services3D.cameraController = own.cameraController.get();
     m_services3D.algorithmService = own.algorithmService.get();
+    m_services3D.settingsService = own.settingsService.get();
+    m_services3D.settingsCoordinator = own.settingsCoordinator.get();
 
 #ifdef ENABLE_GEOMODELCORE
     m_services3D.brepModelService = own.brepModelService.get();
@@ -761,9 +935,16 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     SY_INFO("[Workbench3D] CommandActionHub3D rebuilt with all actions");
 
     // 2. 创建菜单骨架到 WorkbenchWindow 菜单栏
+#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
+    // 配置驱动模式下，WorkbenchMenuManager 负责统一创建 2D / 3D 菜单。
+    // MenuManager3D 仍保留为 3D 专用 ActionHub/菜单适配器，不再直接清空并创建窗口菜单。
+    SY_INFO("[Workbench3D] Config-driven menu mode: using WorkbenchMenuManager");
+#else
     m_menuManager3D = std::make_unique<MenuManager3D>(mainWindow3D);
     m_menuManager3D->createMenus(window.menuBar());
+#endif
 
+#ifndef SANYI_ENABLE_CONFIG_DRIVEN_UI
     // 3. 绑定菜单 Action（在 rebuildAll 之后，action() 才有有效指针）
     if (auto* fm = qobject_cast<FileMenu3D*>(m_menuManager3D->fileMenu()))
         own.commandActionHub->bindFileMenu(fm);
@@ -780,7 +961,12 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     m_menuManager3D->connectMenuSignals();
     SY_INFO("[Workbench3D] MenuManager3D initialized on WorkbenchWindow menubar");
 
-    // 5. 转移并绑定工具栏
+    connect(m_menuManager3D.get(), &MenuManager3D::sigMenuAction,
+        this, &Workbench3D::onMenuAction);
+#endif
+
+    // 5. 转移并绑定工具栏。
+    // 菜单由统一配置路径生成，3D CommandActionHub 继续负责高频工具栏动作。
     // 注意：mainWindow3D->hide() 会隐藏所有子控件，removeToolBar 也会显式隐藏工具栏，
     // 因此 reparent 后必须显式 show() 才能恢复可见性
     // LeftToolBar3D：reparent 到 WorkbenchWindow 后填充视角导航按钮
@@ -842,9 +1028,6 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
             });
     }
 
-    connect(m_menuManager3D.get(), &MenuManager3D::sigMenuAction,
-        this, &Workbench3D::onMenuAction);
-
     SY_INFO("[Workbench3D] 3D workbench UI build completed");
 }
 
@@ -897,6 +1080,17 @@ void Workbench3D::activate()
     if (m_services.stateCenter)
     {
         m_services.stateCenter->setCurrentWorkbenchId(id());
+    }
+
+    if (m_mainWindow3D)
+    {
+        QTimer::singleShot(0, m_mainWindow3D.get(), [this]() {
+            if (m_mainWindow3D)
+            {
+                m_mainWindow3D->refreshCommandUiState();
+                m_mainWindow3D->syncViewDisplayUi();
+            }
+        });
     }
 
     // 刷新命令动作状态（撤销/重做可用性）
@@ -960,5 +1154,36 @@ void Workbench3D::shutdown()
 {
     deactivate();
     m_services = UiServices{};
+}
+
+void Workbench3D::releaseCentralWidgetGLResources(QWidget* centralWidget) const
+{
+    if (auto* vp = qobject_cast<Viewport3D*>(centralWidget))
+        vp->releaseGLResources();
+}
+
+QString Workbench3D::formatSelectionText(const UiStateSnapshot& state) const
+{
+    return QObject::tr("3D Sel=%1 | NodeType=%2 | CmdSrc=%3 | CmdType=%4")
+        .arg(state.currentSelectionText)
+        .arg(state.currentSelectionType)
+        .arg(state.currentCommandOwner)
+        .arg(state.currentCommandType);
+}
+
+bool Workbench3D::requiresSkeletonDocks() const
+{
+    return false;
+}
+
+bool Workbench3D::managesOwnMenus() const
+{
+    // 配置驱动模式下由 WorkbenchMenuManager 统一构建 2D/3D 菜单（见 setup3DMenuAndShortcuts），
+    // 3D 不再自行管理窗口菜单栏；仅旧路径（MenuManager3D）由本工作台自理。
+#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
+    return false;
+#else
+    return true;
+#endif
 }
 #endif

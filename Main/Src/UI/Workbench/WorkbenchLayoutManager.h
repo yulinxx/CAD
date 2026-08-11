@@ -6,6 +6,10 @@
 #include <QPointer>
 #include <QProgressBar>
 
+#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
+#include <memory>
+#endif
+
 class QDockWidget;
 class QLabel;
 class QShortcut;
@@ -16,6 +20,10 @@ class WorkbenchMenuManager;
 class PersistenceService;
 class SceneTreeDockWidget;
 class PropertiesPanelWidget;
+#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
+class UiConfigurationManager;
+class UiPanelRegistry;
+#endif
 
 /// 面板状态：集中管理状态栏、工具栏与停靠面板指针
 /// 从 WorkbenchWindow::PanelState 提升为独立类型，供 WorkbenchLayoutManager 使用
@@ -60,6 +68,11 @@ public:
     void initializeDockAreaSkeleton();
     /// 构建停靠区域
     void buildDockAreas();
+#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
+    /// 由 JSON 配置驱动构建停靠区域
+    /// @return 是否成功应用配置（失败时调用方回退到硬编码骨架）
+    bool buildDockAreasFromConfig();
+#endif
     /// 初始化状态栏骨架
     void initializeStatusBarSkeleton();
     /// 构建状态栏
@@ -116,4 +129,10 @@ private:
     std::vector<QDockWidget*> m_registeredDocks;
     std::vector<QToolBar*> m_registeredToolBars;
     QPointer<QProgressBar> m_busyProgressBar;
+#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
+    /// 客户化 UI 配置管理器（Dock 骨架配置化）
+    std::unique_ptr<UiConfigurationManager> m_configManager;
+    /// 面板工厂注册表（Dock 配置化）
+    std::unique_ptr<UiPanelRegistry> m_panelRegistry;
+#endif
 };

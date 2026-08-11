@@ -164,7 +164,7 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_importService->setEditService(m_sceneEditService.get());
     m_importService->setBusyStateCallback(
         [this](bool busy) {
-            if (m_stateCenter) m_stateCenter->setBusy(busy); 
+            if (m_stateCenter) m_stateCenter->setBusy(busy);
         });
 
     m_importService->setStatusPromptCallback(
@@ -270,7 +270,7 @@ void ApplicationCompositionRoot::registerAllOperations()
 
     SY_INFO("[ApplicationCompositionRoot] registering module operations on OperationBus");
 
-    // 核心操作（撤销/重做/删除/圆角/倒角/帮助）
+    // 核心操作（撤销/重做/删除/圆角/倒角/帮助 + 编辑操作）
     CoreOperationRegistry coreOps(m_operationBus.get(),
         m_sceneEditService.get(),
         m_undoRedoManager.get(),

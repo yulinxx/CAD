@@ -6,6 +6,8 @@
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QStringList>
+#include <QVariant>
 
 #include <algorithm>
 
@@ -32,6 +34,39 @@ namespace
             return DockPosition::Bottom;
         return DockPosition::Right;
     }
+
+    QString parseVisibilityScope(const QJsonObject& obj)
+    {
+        return obj.value(QStringLiteral("visibilityScope")).toString();
+    }
+
+    QString normalizeVisibilityScope(const QString& explicitScope, const QStringList& workbenches)
+    {
+        if (!explicitScope.trimmed().isEmpty())
+            return explicitScope.trimmed();
+
+        const bool has2D = workbenches.contains(QStringLiteral("2D"), Qt::CaseInsensitive);
+        const bool has3D = workbenches.contains(QStringLiteral("3D"), Qt::CaseInsensitive);
+        if (has2D && has3D)
+            return QStringLiteral("shared");
+        if (has2D)
+            return QStringLiteral("2D");
+        if (has3D)
+            return QStringLiteral("3D");
+        return QString();
+    }
+}
+
+bool UiConfigLoader::isVisibleForWorkbench(const QStringList& workbenches, const QString& workbenchId)
+{
+    if (workbenches.isEmpty())
+        return true;
+    for (const auto& wb : workbenches)
+    {
+        if (wb.compare(workbenchId, Qt::CaseInsensitive) == 0)
+            return true;
+    }
+    return false;
 }
 
 UiConfigLoader::UiConfigLoader(const QString& resourcePath)
@@ -238,6 +273,11 @@ std::optional<MenuDef> UiConfigLoader::parseMenu(const QJsonObject& obj)
     MenuDef menu;
     menu.id = obj.value(QStringLiteral("id")).toString();
     menu.label = obj.value(QStringLiteral("label")).toString();
+    menu.iconName = obj.value(QStringLiteral("icon")).toString();
+    menu.visible = obj.value(QStringLiteral("visible")).toBool(true);
+    const auto workbenchList = obj.value(QStringLiteral("workbenches")).toVariant().toStringList();
+    menu.workbenches = workbenchList;
+    menu.visibilityScope = normalizeVisibilityScope(parseVisibilityScope(obj), menu.workbenches);
     if (menu.id.isEmpty())
         return std::nullopt;
 
@@ -251,10 +291,16 @@ std::optional<MenuActionDef> UiConfigLoader::parseMenuAction(const QJsonObject& 
     MenuActionDef action;
     action.id = obj.value(QStringLiteral("id")).toString();
     action.label = obj.value(QStringLiteral("label")).toString();
-    action.commandId = obj.value(QStringLiteral("command")).toString();
+    action.commandId = obj.value(QStringLiteral("commandId")).toString();
+    if (action.commandId.isEmpty())
+        action.commandId = obj.value(QStringLiteral("command")).toString();
+    action.iconName = obj.value(QStringLiteral("icon")).toString();
     action.shortcut = obj.value(QStringLiteral("shortcut")).toString();
     action.feature = obj.value(QStringLiteral("feature")).toString();
+    action.visible = obj.value(QStringLiteral("visible")).toBool(true);
     action.checkable = obj.value(QStringLiteral("checkable")).toBool(false);
+    action.workbenches = obj.value(QStringLiteral("workbenches")).toVariant().toStringList();
+    action.visibilityScope = normalizeVisibilityScope(parseVisibilityScope(obj), action.workbenches);
     if (action.commandId.isEmpty())
         return std::nullopt;
     return action;
@@ -265,6 +311,10 @@ std::optional<SubMenuDef> UiConfigLoader::parseSubMenu(const QJsonObject& obj)
     SubMenuDef sub;
     sub.id = obj.value(QStringLiteral("id")).toString();
     sub.label = obj.value(QStringLiteral("label")).toString();
+    sub.iconName = obj.value(QStringLiteral("icon")).toString();
+    sub.visible = obj.value(QStringLiteral("visible")).toBool(true);
+    sub.workbenches = obj.value(QStringLiteral("workbenches")).toVariant().toStringList();
+    sub.visibilityScope = normalizeVisibilityScope(parseVisibilityScope(obj), sub.workbenches);
     if (sub.id.isEmpty())
         return std::nullopt;
 
@@ -351,7 +401,9 @@ std::optional<ToolBarActionDef> UiConfigLoader::parseToolBarAction(const QJsonOb
     action.id = obj.value(QStringLiteral("id")).toString();
     action.label = obj.value(QStringLiteral("label")).toString();
     action.iconName = obj.value(QStringLiteral("icon")).toString();
-    action.commandId = obj.value(QStringLiteral("command")).toString();
+    action.commandId = obj.value(QStringLiteral("commandId")).toString();
+    if (action.commandId.isEmpty())
+        action.commandId = obj.value(QStringLiteral("command")).toString();
     action.shortcut = obj.value(QStringLiteral("shortcut")).toString();
     action.feature = obj.value(QStringLiteral("feature")).toString();
     action.checkable = obj.value(QStringLiteral("checkable")).toBool(false);

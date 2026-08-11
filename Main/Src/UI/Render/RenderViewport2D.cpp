@@ -344,6 +344,9 @@ bool RenderViewport2D::setActiveTool(const QString& toolName)
         {
             setCursor(Qt::CrossCursor);
         }
+        SY_INFOF("[RenderViewport2D] active tool=%s", qPrintable(toolName));
+        // 通知上层（如绘图工具栏）同步活动工具状态
+        emit activeToolChanged(toolName);
     }
     else
     {

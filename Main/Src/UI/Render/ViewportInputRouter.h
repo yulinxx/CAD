@@ -5,7 +5,7 @@
  * 职责：
  *   - RenderWidget → 视口之间的事件转发（eventFilter）
  *   - 鼠标事件三级优先级分发：平移 → 交互分发器 → 活动工具 → 选择器
- *   - 键盘事件三级优先级分发：交互分发器 → 活动工具 → Delete
+ *   - 键盘事件优先级分发：交互分发器 → 活动工具 → Delete → Esc（回到选择工具）
  *   - 滚轮缩放
  *   - 双击事件转发到活动工具
  *
@@ -131,6 +131,7 @@ private:
     bool handleInteractionDispatcherKeyPress(QKeyEvent* event);
     bool handleToolKeyPress(QKeyEvent* event);
     bool handleDeleteKeyPress(QKeyEvent* event);
+    bool handleEscapeKeyPress(QKeyEvent* event);
 
     // ==================== 内部状态 ====================
 
