@@ -214,7 +214,7 @@ void ViewportInputRouter::handleMouseDoubleClick(QMouseEvent *event)
     if (!m_renderWidget || !event)
         return;
 
-    QPointF worldPos = widgetToWorld(event->pos());
+    QPointF worldPos = widgetToWorld(event->pos().toPointF());
     if (worldPos.isNull())
         return;
 
@@ -236,7 +236,7 @@ void ViewportInputRouter::handleWheel(QWheelEvent *event)
     if (!m_renderWidget || !m_camera || !event)
         return;
 
-    QPointF worldPos = widgetToWorld(event->position().toPoint());
+    QPointF worldPos = widgetToWorld(event->position());
     if (worldPos.isNull())
         return;
 
@@ -284,7 +284,7 @@ QSizeF ViewportInputRouter::physicalViewportSize() const
     return QSizeF(m_renderWidget->width() * dpr, m_renderWidget->height() * dpr);
 }
 
-QPointF ViewportInputRouter::widgetToWorld(QPoint widgetLocalPos) const
+QPointF ViewportInputRouter::widgetToWorld(QPointF widgetLocalPos) const
 {
     if (!m_renderWidget || !m_camera)
         return QPointF();
@@ -439,7 +439,6 @@ bool ViewportInputRouter::handlePanMouseMove(const QPoint &physWidgetPos, QMouse
     float worldDx = static_cast<float>(delta.x()) / m_camera->zoomX;
     float worldDy = -static_cast<float>(delta.y()) / m_camera->zoomY;
     m_camera->pan(worldDx, worldDy);
-    // 相机参数已变，通知视口提交新矩阵并重绘
     if (m_cameraChangedCallback)
         m_cameraChangedCallback();
     event->accept();

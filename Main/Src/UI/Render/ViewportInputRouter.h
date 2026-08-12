@@ -101,7 +101,7 @@ public:
 
     // ==================== 坐标转换（P5 收口: RenderViewport2D 也委托至此，消除重复） ====================
 
-    QPointF widgetToWorld(QPoint widgetLocalPos) const;
+    QPointF widgetToWorld(QPointF widgetLocalPos) const;
     QSizeF physicalViewportSize() const;
 
 private:

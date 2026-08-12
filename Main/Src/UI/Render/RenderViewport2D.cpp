@@ -28,6 +28,8 @@
 #include <QWheelEvent>
 #include <QKeyEvent>
 #include <QContextMenuEvent>
+
+#include "Log/SyLogger.h"
 #include <QTimer>
 #include "Log/SyLogger.h"
 
