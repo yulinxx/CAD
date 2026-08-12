@@ -26,50 +26,50 @@
 
 namespace
 {
-// 全局持久化服务指针（AppInitializer 创建，CompositionRoot 获取）
-static PersistenceService *s_persistenceService = nullptr;
+    // 全局持久化服务指针（AppInitializer 创建，CompositionRoot 获取）
+    static PersistenceService* s_persistenceService = nullptr;
 
-// SyLogger 日志目录回调 thunk：C 函数指针 + void* ctx，
-// 返回静态缓冲（避免 std::function/std::string 跨 DLL 传递）
-static char s_logPathBuffer[1024];
+    // SyLogger 日志目录回调 thunk：C 函数指针 + void* ctx，
+    // 返回静态缓冲（避免 std::function/std::string 跨 DLL 传递）
+    static char s_logPathBuffer[1024];
 
-const char *appLogPathThunk(void *)
-{
-    const QByteArray utf8 = AppPathManager::logsDir().toUtf8();
-    const size_t copyLen = (static_cast<size_t>(utf8.size()) < sizeof(s_logPathBuffer))
-                               ? static_cast<size_t>(utf8.size())
-                               : sizeof(s_logPathBuffer) - 1;
-    std::memcpy(s_logPathBuffer, utf8.constData(), copyLen);
-    s_logPathBuffer[copyLen] = '\0';
-    return s_logPathBuffer;
-}
-
-AppLanguage detectSystemLanguage()
-{
-    const QString locale = QLocale::system().name();
-
-    struct LocaleMapping
+    const char* appLogPathThunk(void*)
     {
-        const char *prefix;
-        AppLanguage language;
-    };
-
-    static const LocaleMapping mappings[] = {
-        {"zh", AppLanguage::Chinese},    {"ja", AppLanguage::Japanese}, {"ko", AppLanguage::Korean},
-        {"fr", AppLanguage::French},     {"de", AppLanguage::German},   {"es", AppLanguage::Spanish},
-        {"pt", AppLanguage::Portuguese}, {"ru", AppLanguage::Russian},  {"ar", AppLanguage::Arabic},
-        {"it", AppLanguage::Italian},    {"hi", AppLanguage::Hindi},    {"tr", AppLanguage::Turkish},
-        {"vi", AppLanguage::Vietnamese},
-    };
-
-    for (const auto &mapping : mappings)
-    {
-        if (locale.startsWith(QString::fromLatin1(mapping.prefix)))
-            return mapping.language;
+        const QByteArray utf8 = AppPathManager::logsDir().toUtf8();
+        const size_t copyLen = (static_cast<size_t>(utf8.size()) < sizeof(s_logPathBuffer))
+            ? static_cast<size_t>(utf8.size())
+            : sizeof(s_logPathBuffer) - 1;
+        std::memcpy(s_logPathBuffer, utf8.constData(), copyLen);
+        s_logPathBuffer[copyLen] = '\0';
+        return s_logPathBuffer;
     }
 
-    return AppLanguage::English;
-}
+    AppLanguage detectSystemLanguage()
+    {
+        const QString locale = QLocale::system().name();
+
+        struct LocaleMapping
+        {
+            const char* prefix;
+            AppLanguage language;
+        };
+
+        static const LocaleMapping mappings[] = {
+            {"zh", AppLanguage::Chinese},    {"ja", AppLanguage::Japanese}, {"ko", AppLanguage::Korean},
+            {"fr", AppLanguage::French},     {"de", AppLanguage::German},   {"es", AppLanguage::Spanish},
+            {"pt", AppLanguage::Portuguese}, {"ru", AppLanguage::Russian},  {"ar", AppLanguage::Arabic},
+            {"it", AppLanguage::Italian},    {"hi", AppLanguage::Hindi},    {"tr", AppLanguage::Turkish},
+            {"vi", AppLanguage::Vietnamese},
+        };
+
+        for (const auto& mapping : mappings)
+        {
+            if (locale.startsWith(QString::fromLatin1(mapping.prefix)))
+                return mapping.language;
+        }
+
+        return AppLanguage::English;
+    }
 } // namespace
 
 void AppInitializer::initialize()
@@ -83,7 +83,7 @@ void AppInitializer::initialize()
 
     CrashHandlerBootstrap::logPendingDumps();
 
-    auto *languageManager = LanguageManager::instance();
+    auto* languageManager = LanguageManager::instance();
     const QString translationsDir = QCoreApplication::applicationDirPath() + QStringLiteral("/translations");
     languageManager->setTranslationsDir(translationsDir);
 
@@ -94,14 +94,14 @@ void AppInitializer::initialize()
     fontConfig.fontSize = 9;
     FontManager::apply(fontConfig);
     SY_INFOF("Language set to: %s (dir: %s)", languageManager->currentLanguageName().toUtf8().constData(),
-             translationsDir.toUtf8().constData());
+        translationsDir.toUtf8().constData());
 
     // 初始化数据库持久化服务
     // 数据库文件存放在 AppPathManager::dataDir() 下，确保目录存在
     const QString dataDir = AppPathManager::dataDir();
     QDir().mkpath(dataDir);
     const QString dbPath = dataDir + QStringLiteral("/cad_database.sqlite");
-    auto *persistenceService = new PersistenceService();
+    auto* persistenceService = new PersistenceService();
 
     if (persistenceService->initialize(dbPath.toStdString()))
     {
@@ -125,7 +125,7 @@ void AppInitializer::shutdown()
     SyLogger::GetInstance().Shutdown();
 }
 
-PersistenceService *AppInitializer::persistenceService()
+PersistenceService* AppInitializer::persistenceService()
 {
     return s_persistenceService;
 }

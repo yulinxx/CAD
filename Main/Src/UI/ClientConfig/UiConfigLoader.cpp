@@ -108,7 +108,7 @@ std::optional<UiConfigData> UiConfigLoader::loadWithInheritance(const QString& p
     if (parseError.error != QJsonParseError::NoError || !doc.isObject())
     {
         m_lastError = QStringLiteral("Invalid JSON in %1: %2")
-                          .arg(path, parseError.errorString());
+            .arg(path, parseError.errorString());
         SY_ERRORF("[UiConfigLoader] %s", qPrintable(m_lastError));
         return std::nullopt;
     }
@@ -137,7 +137,7 @@ std::optional<UiConfigData> UiConfigLoader::loadWithInheritance(const QString& p
         if (!parent)
         {
             m_lastError = QStringLiteral("Failed to load parent config '%1' referenced by %2")
-                              .arg(extends, path);
+                .arg(extends, path);
             SY_ERRORF("[UiConfigLoader] %s", qPrintable(m_lastError));
             return std::nullopt;
         }
@@ -156,7 +156,7 @@ std::optional<UiConfigData> UiConfigLoader::loadWithInheritance(const QString& p
     return config;
 }
 
-void UiConfigLoader::mergeConfig(UiConfigData& base, const UiConfigData& override)
+void UiConfigLoader::mergeConfig(UiConfigData& base, const UiConfigData & override)
 {
     // 菜单合并：同 id 覆盖，新 id 追加
     for (const auto& menu : override.menus)

@@ -11,7 +11,7 @@
 #include <QPainter>
 #include <QImage>
 
-// ==================== 生命周期测试 ====================
+ // ==================== 生命周期测试 ====================
 
 TEST(SimpleRenderer3DTest, Lifecycle)
 {
@@ -385,7 +385,7 @@ TEST(SimpleRenderer3DTest, StatusCallback_EmitsOnResetView)
     renderer.initialize();
 
     QString lastStatus;
-    renderer.setStatusCallback([&lastStatus](const QString &msg) { lastStatus = msg; });
+    renderer.setStatusCallback([&lastStatus](const QString& msg) { lastStatus = msg; });
 
     renderer.resetView();
     EXPECT_FALSE(lastStatus.isEmpty());
@@ -399,7 +399,7 @@ TEST(SimpleRenderer3DTest, SelectionCallback_EmitsOnSelectNode)
     renderer.initialize();
 
     QString lastSelection;
-    renderer.setSelectionCallback([&lastSelection](const QString &id) { lastSelection = id; });
+    renderer.setSelectionCallback([&lastSelection](const QString& id) { lastSelection = id; });
 
     renderer.selectNodeById("test_entity");
     EXPECT_EQ(lastSelection.toStdString(), "test_entity");
@@ -414,10 +414,10 @@ TEST(SimpleRenderer3DTest, PathCallback_EmitsEmptyPathWithoutDocument)
 
     QStringList lastPath;
     bool pathCalled = false;
-    renderer.setPathCallback([&lastPath, &pathCalled](const QStringList &path) {
+    renderer.setPathCallback([&lastPath, &pathCalled](const QStringList& path) {
         lastPath = path;
         pathCalled = true;
-    });
+        });
 
     renderer.selectNodeById("node_with_path");
     // 回调被调用，但路径列表为空（无文档时 rebuildTreeHighlight 提前返回）
@@ -482,7 +482,7 @@ TEST(SimpleRenderer3DTest, IRenderSurface_Lifecycle)
     SimpleRenderer3D renderer;
 
     // 通过 IRenderSurface 接口操作生命周期
-    UI::IRenderSurface *surface = &renderer;
+    UI::IRenderSurface* surface = &renderer;
     EXPECT_FALSE(surface->isReady());
 
     EXPECT_TRUE(surface->initialize());
@@ -497,7 +497,7 @@ TEST(SimpleRenderer3DTest, IRenderSurface_RenderLoop)
     SimpleRenderer3D renderer;
     renderer.initialize();
 
-    UI::IRenderSurface *surface = &renderer;
+    UI::IRenderSurface* surface = &renderer;
     EXPECT_FALSE(surface->isRenderLoopRunning());
 
     surface->setRenderLoopEnabled(true);
@@ -514,7 +514,7 @@ TEST(SimpleRenderer3DTest, IRenderSurface_Resize)
     SimpleRenderer3D renderer;
     renderer.initialize();
 
-    UI::IRenderSurface *surface = &renderer;
+    UI::IRenderSurface* surface = &renderer;
     surface->resize(1024, 768);
     surface->resize(1920, 1080);
 
@@ -524,7 +524,7 @@ TEST(SimpleRenderer3DTest, IRenderSurface_Resize)
 TEST(SimpleRenderer3DTest, IRenderSurface_IsNotOpenGL)
 {
     SimpleRenderer3D renderer;
-    UI::IRenderSurface *surface = &renderer;
+    UI::IRenderSurface* surface = &renderer;
     EXPECT_FALSE(surface->isOpenGL());
 }
 
@@ -605,8 +605,8 @@ TEST(SimpleRenderer3DTest, Callbacks_FireInCorrectOrder)
     renderer.initialize();
 
     std::vector<QString> callOrder;
-    renderer.setStatusCallback([&](const QString &msg) { callOrder.push_back("status:" + msg); });
-    renderer.setSelectionCallback([&](const QString &id) { callOrder.push_back("select:" + id); });
+    renderer.setStatusCallback([&](const QString& msg) { callOrder.push_back("status:" + msg); });
+    renderer.setSelectionCallback([&](const QString& id) { callOrder.push_back("select:" + id); });
 
     renderer.selectNodeById("ordered_entity");
     // 选择回调应先于状态回调触发

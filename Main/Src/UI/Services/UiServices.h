@@ -88,9 +88,8 @@ struct UiServices
     /// 将框架级桥接信息写入到服务集合中
     /// @param frameworkServices 框架级服务
     /// @return 当前服务集合引用
-    UiServices& withFrameworkServices(const UiFrameworkServices& frameworkServices)
+    UiServices& withFrameworkServices(const UiFrameworkServices& /*frameworkServices*/)
     {
-        (void)frameworkServices;
         return *this;
     }
 };

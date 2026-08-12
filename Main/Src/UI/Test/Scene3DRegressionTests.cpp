@@ -25,18 +25,18 @@
 #include <QImage>
 #include <QPainter>
 
-// ==================== SceneManager3D 基础测试 ====================
+ // ==================== SceneManager3D 基础测试 ====================
 
 namespace
 {
-// 构造一个带单个三角形（合法网格）的图元，满足 SceneManager3D::addEntity 的 isValid() 约束
-std::unique_ptr<Eg::SyMeshEntity> makeTriangleMesh(const char *name = nullptr)
-{
-    auto mesh = std::make_unique<Eg::SyMeshEntity>(name ? name : "");
-    mesh->vertices = {{0.f, 0.f, 0.f}, {1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}};
-    mesh->normals = mesh->vertices;
-    return mesh;
-}
+    // 构造一个带单个三角形（合法网格）的图元，满足 SceneManager3D::addEntity 的 isValid() 约束
+    std::unique_ptr<Eg::SyMeshEntity> makeTriangleMesh(const char* name = nullptr)
+    {
+        auto mesh = std::make_unique<Eg::SyMeshEntity>(name ? name : "");
+        mesh->vertices = { {0.f, 0.f, 0.f}, {1.f, 0.f, 0.f}, {0.f, 1.f, 0.f} };
+        mesh->normals = mesh->vertices;
+        return mesh;
+    }
 } // namespace
 
 TEST(Scene3DRegressionTest, SceneManager3D_DefaultConstruction)
@@ -55,7 +55,7 @@ TEST(Scene3DRegressionTest, SceneManager3D_AddMeshEntity)
     scene.addEntity(mesh.release());
 
     EXPECT_EQ(scene.getEntityCount(), 1u);
-    auto *found = scene.findEntityById(meshId);
+    auto* found = scene.findEntityById(meshId);
     ASSERT_NE(found, nullptr);
     EXPECT_STREQ(found->name(), "TestMesh");
 }
@@ -111,14 +111,14 @@ TEST(Scene3DRegressionTest, SceneManager3D_SelectEntity)
 
     auto mesh = makeTriangleMesh("SelectableMesh");
 
-    auto *rawPtr = mesh.get();
+    auto* rawPtr = mesh.get();
     scene.addEntity(mesh.release());
 
     scene.selectEntity(rawPtr);
     size_t selCount = 0;
     scene.forEachSelectedEntityId(
-        [](Eg::EntityId, void *ctx) -> bool {
-            ++*static_cast<size_t *>(ctx);
+        [](Eg::EntityId, void* ctx) -> bool {
+            ++*static_cast<size_t*>(ctx);
             return true;
         },
         &selCount);
@@ -131,14 +131,14 @@ TEST(Scene3DRegressionTest, SceneManager3D_ClearSelection)
     Eg::SceneManager3D scene;
 
     auto mesh = makeTriangleMesh();
-    auto *rawPtr = mesh.get();
+    auto* rawPtr = mesh.get();
     scene.addEntity(mesh.release());
 
     scene.selectEntity(rawPtr);
     size_t selCount1 = 0;
     scene.forEachSelectedEntityId(
-        [](Eg::EntityId, void *ctx) -> bool {
-            ++*static_cast<size_t *>(ctx);
+        [](Eg::EntityId, void* ctx) -> bool {
+            ++*static_cast<size_t*>(ctx);
             return true;
         },
         &selCount1);
@@ -147,8 +147,8 @@ TEST(Scene3DRegressionTest, SceneManager3D_ClearSelection)
     scene.clearSelection();
     size_t selCount2 = 0;
     scene.forEachSelectedEntityId(
-        [](Eg::EntityId, void *ctx) -> bool {
-            ++*static_cast<size_t *>(ctx);
+        [](Eg::EntityId, void* ctx) -> bool {
+            ++*static_cast<size_t*>(ctx);
             return true;
         },
         &selCount2);
@@ -160,7 +160,7 @@ TEST(Scene3DRegressionTest, SceneManager3D_DeleteSelected)
     Eg::SceneManager3D scene;
 
     auto mesh = makeTriangleMesh();
-    auto *rawPtr = mesh.get();
+    auto* rawPtr = mesh.get();
     scene.addEntity(mesh.release());
 
     scene.selectEntity(rawPtr);
@@ -170,8 +170,8 @@ TEST(Scene3DRegressionTest, SceneManager3D_DeleteSelected)
     EXPECT_EQ(scene.getEntityCount(), 0u);
     size_t selCount = 0;
     scene.forEachSelectedEntityId(
-        [](Eg::EntityId, void *ctx) -> bool {
-            ++*static_cast<size_t *>(ctx);
+        [](Eg::EntityId, void* ctx) -> bool {
+            ++*static_cast<size_t*>(ctx);
             return true;
         },
         &selCount);
@@ -277,7 +277,7 @@ TEST(Scene3DRegressionTest, RenderWidget3DAdapter_StatusCallback)
     adapter.initialize();
 
     QString lastStatus;
-    adapter.setStatusCallback([&](const QString &msg) { lastStatus = msg; });
+    adapter.setStatusCallback([&](const QString& msg) { lastStatus = msg; });
 
     SUCCEED();
     adapter.shutdown();
@@ -289,7 +289,7 @@ TEST(Scene3DRegressionTest, RenderWidget3DAdapter_SelectionCallback)
     adapter.initialize();
 
     QString lastId;
-    adapter.setSelectionCallback([&](const QString &id) { lastId = id; });
+    adapter.setSelectionCallback([&](const QString& id) { lastId = id; });
 
     SUCCEED();
     adapter.shutdown();
@@ -301,7 +301,7 @@ TEST(Scene3DRegressionTest, RenderWidget3DAdapter_PathCallback)
     adapter.initialize();
 
     QStringList lastPaths;
-    adapter.setPathCallback([&](const QStringList &paths) { lastPaths = paths; });
+    adapter.setPathCallback([&](const QStringList& paths) { lastPaths = paths; });
 
     SUCCEED();
     adapter.shutdown();
@@ -359,7 +359,7 @@ TEST(Scene3DRegressionTest, SimpleRenderer3D_ImplementsIRenderSurface)
 {
     SimpleRenderer3D renderer;
     // 验证 SimpleRenderer3D 实现了 IRenderSurface 接口
-    UI::IRenderSurface *surface = dynamic_cast<UI::IRenderSurface *>(&renderer);
+    UI::IRenderSurface* surface = dynamic_cast<UI::IRenderSurface*>(&renderer);
     EXPECT_NE(surface, nullptr);
 }
 

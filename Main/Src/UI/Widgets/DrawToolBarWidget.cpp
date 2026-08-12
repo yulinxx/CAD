@@ -12,7 +12,7 @@
 #include "UI/UiMetrics.h"
 #include "Log/SyLogger.h"
 
-DrawToolBarWidget::DrawToolBarWidget(QWidget *parent) : QWidget(parent)
+DrawToolBarWidget::DrawToolBarWidget(QWidget* parent) : QWidget(parent)
 {
     setObjectName(QStringLiteral("DrawToolBarWidget"));
     setMinimumWidth(48);
@@ -25,18 +25,18 @@ DrawToolBarWidget::~DrawToolBarWidget()
 {
 }
 
-void DrawToolBarWidget::setToolDefinitions(const QVector<DrawToolEntry> &tools)
+void DrawToolBarWidget::setToolDefinitions(const QVector<DrawToolEntry>& tools)
 {
     m_toolDefinitions = tools;
     createToolButtons();
 }
 
-void DrawToolBarWidget::setOperationBus(OperationBus *bus)
+void DrawToolBarWidget::setOperationBus(OperationBus* bus)
 {
     m_operationBus = bus;
 }
 
-void DrawToolBarWidget::updateActiveTool(const QString &toolId)
+void DrawToolBarWidget::updateActiveTool(const QString& toolId)
 {
     m_activeToolId = toolId;
     setButtonChecked(toolId, true);
@@ -49,7 +49,7 @@ QString DrawToolBarWidget::currentActiveTool() const
 
 void DrawToolBarWidget::onToolButtonClicked()
 {
-    auto *button = qobject_cast<QToolButton *>(sender());
+    auto* button = qobject_cast<QToolButton*>(sender());
     if (!button)
         return;
 
@@ -84,7 +84,7 @@ void DrawToolBarWidget::createToolButtons()
     // 清除旧按钮，重建布局
     if (layout())
     {
-        QLayoutItem *item;
+        QLayoutItem* item;
         while ((item = layout()->takeAt(0)) != nullptr)
         {
             if (item->widget())
@@ -97,14 +97,14 @@ void DrawToolBarWidget::createToolButtons()
 
     const int iconSize = UiMetrics::toolbarIconSizeLarge();
 
-    auto *layout = new QVBoxLayout(this);
+    auto* layout = new QVBoxLayout(this);
     layout->setSpacing(4);
     layout->setContentsMargins(4, 4, 4, 4);
 
     // 使用外部注入的工具定义，保证与 CommandCatalog 命令 ID 一致
-    for (const auto &tool : m_toolDefinitions)
+    for (const auto& tool : m_toolDefinitions)
     {
-        auto *button = new QToolButton(this);
+        auto* button = new QToolButton(this);
         button->setCheckable(true);
         // 互斥选中（单选组语义）：点击已选中的按钮不会取消选中，保证始终有一个工具处于高亮
         button->setAutoExclusive(true);
@@ -142,7 +142,7 @@ void DrawToolBarWidget::createToolButtons()
     layout->addStretch();
 }
 
-void DrawToolBarWidget::setButtonChecked(const QString &toolId, bool checked)
+void DrawToolBarWidget::setButtonChecked(const QString& toolId, bool checked)
 {
     for (auto it = m_toolButtons.begin(); it != m_toolButtons.end(); ++it)
     {

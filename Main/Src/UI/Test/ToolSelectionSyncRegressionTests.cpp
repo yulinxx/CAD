@@ -27,7 +27,7 @@
 #include <memory>
 #include <vector>
 
-// ==================== ToolManager 构造与生命周期 ====================
+ // ==================== ToolManager 构造与生命周期 ====================
 
 TEST(ToolSelectionSyncRegressionTest, ToolManager_DefaultConstruction)
 {
@@ -206,7 +206,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_EntityCallback)
     tm.initializeTools(ctx);
 
     bool entityCallbackSet = false;
-    tm.setEntityCallbackForAllTools([&entityCallbackSet](Eg::SyEntity *) { entityCallbackSet = true; });
+    tm.setEntityCallbackForAllTools([&entityCallbackSet](Eg::SyEntity*) { entityCallbackSet = true; });
     // 回调已设置，不应崩溃
     SUCCEED();
 }
@@ -223,7 +223,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_SwitchToolCallback)
     tm.initializeTools(ctx);
 
     QString lastSwitch;
-    tm.setSwitchToolCallbackForAllTools([&lastSwitch](const QString &name) { lastSwitch = name; });
+    tm.setSwitchToolCallbackForAllTools([&lastSwitch](const QString& name) { lastSwitch = name; });
     // 回调已设置，不应崩溃
     SUCCEED();
 }
@@ -317,7 +317,7 @@ TEST(SelectToolRegressionTest, SyncSelectionFromScene_WithEntities)
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -341,7 +341,7 @@ TEST(SelectionSyncExtendedTest, AddEntity_SelectionStateUnchanged)
     Eg::SceneManager scene;
 
     auto line1 = std::make_unique<Eg::SyLine>();
-    line1->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId id1 = line1->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -353,7 +353,7 @@ TEST(SelectionSyncExtendedTest, AddEntity_SelectionStateUnchanged)
 
     // 添加新实体不影响已有选中
     auto line2 = std::make_unique<Eg::SyLine>();
-    line2->setPointVector({Ut::Vec2d(20, 20), Ut::Vec2d(30, 30)});
+    line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
     std::vector<std::unique_ptr<Eg::SyEntity>> entities2;
     entities2.push_back(std::move(line2));
     scene.addEntities(std::move(entities2));
@@ -368,11 +368,11 @@ TEST(SelectionSyncExtendedTest, DeleteUnselectedEntity_SelectionUnchanged)
     Eg::SceneManager scene;
 
     auto line1 = std::make_unique<Eg::SyLine>();
-    line1->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId id1 = line1->id;
 
     auto line2 = std::make_unique<Eg::SyLine>();
-    line2->setPointVector({Ut::Vec2d(20, 20), Ut::Vec2d(30, 30)});
+    line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
     Eg::EntityId id2 = line2->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -396,7 +396,7 @@ TEST(SelectionSyncExtendedTest, InvertSelection_AllToggled)
     for (int i = 0; i < 3; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i)});
+        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         std::vector<std::unique_ptr<Eg::SyEntity>> entities;
         entities.push_back(std::move(line));
         scene.addEntities(std::move(entities));
@@ -421,7 +421,7 @@ TEST(SelectionSyncExtendedTest, SelectAllThenDeselectOne)
     for (int i = 0; i < 3; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i)});
+        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         ids.push_back(line->id);
         std::vector<std::unique_ptr<Eg::SyEntity>> entities;
         entities.push_back(std::move(line));
@@ -442,7 +442,7 @@ TEST(SelectionSyncExtendedTest, DeleteAllEntities_ClearsSelection)
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -462,7 +462,7 @@ TEST(SelectionSyncExtendedTest, ClearSceneThenSelect_NoCrash)
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
     scene.addEntities(std::move(entities));
@@ -481,7 +481,7 @@ TEST(SelectionSyncExtendedTest, SelectMixedEntityTypes)
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     auto circle = std::make_unique<Eg::SyCircle>();
@@ -490,7 +490,7 @@ TEST(SelectionSyncExtendedTest, SelectMixedEntityTypes)
     Eg::EntityId circleId = circle->id;
 
     auto poly = std::make_unique<Eg::SyPolygon>();
-    poly->setVertices({Ut::Vec2d(0, 0), Ut::Vec2d(10, 0), Ut::Vec2d(10, 10)});
+    poly->setVertices({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId polyId = poly->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -513,7 +513,7 @@ TEST(SelectionSyncExtendedTest, SelectMixedTypes_DeleteOne_CheckOthers)
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     auto circle = std::make_unique<Eg::SyCircle>();
@@ -542,7 +542,7 @@ TEST(SelectionSyncExtendedTest, DeleteSelectedViaDeleteEntity_ClearsSelection)
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -566,7 +566,7 @@ TEST(SelectionSyncExtendedTest, DeleteAllSelected_OneByOne)
     for (int i = 0; i < 4; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i)});
+        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         ids.push_back(line->id);
         std::vector<std::unique_ptr<Eg::SyEntity>> entities;
         entities.push_back(std::move(line));
@@ -579,7 +579,7 @@ TEST(SelectionSyncExtendedTest, DeleteAllSelected_OneByOne)
     // 逐个删除选中实体，每次删除后选中数应减少
     for (size_t i = 0; i < ids.size(); ++i)
     {
-        auto *entity = scene.findSyEntityById(ids[i]);
+        auto* entity = scene.findSyEntityById(ids[i]);
         ASSERT_NE(entity, nullptr);
         scene.deleteEntity(entity);
         EXPECT_EQ(scene.getSelectedEntityCount(), ids.size() - i - 1);
@@ -594,7 +594,7 @@ TEST(SelectionSyncExtendedTest, DeleteEntity_CheckDirtyAndDeleted)
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -605,7 +605,7 @@ TEST(SelectionSyncExtendedTest, DeleteEntity_CheckDirtyAndDeleted)
     scene.deleteEntity(scene.findSyEntityById(lineId));
 
     // 删除后应有 deletedEntityIds
-    const auto &deleted = scene.deletedEntityIds();
+    const auto& deleted = scene.deletedEntityIds();
     EXPECT_FALSE(deleted.empty());
     // 删除后不应有悬空选中
     EXPECT_EQ(scene.getSelectedEntityCount(), 0u);
@@ -619,7 +619,7 @@ TEST(SelectToolRegressionTest, SyncFromScene_AfterExternalDelete)
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -646,7 +646,7 @@ TEST(SelectToolRegressionTest, SyncFromScene_AfterExternalClear)
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
@@ -672,11 +672,11 @@ TEST(SelectToolRegressionTest, SyncFromScene_AfterExternalSelectChange)
     Eg::SceneManager scene;
 
     auto line1 = std::make_unique<Eg::SyLine>();
-    line1->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId id1 = line1->id;
 
     auto line2 = std::make_unique<Eg::SyLine>();
-    line2->setPointVector({Ut::Vec2d(20, 20), Ut::Vec2d(30, 30)});
+    line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
     Eg::EntityId id2 = line2->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -764,7 +764,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_AllToolsReceiveEntityCallback)
     tm.initializeTools(ctx);
 
     int callbackCount = 0;
-    tm.setEntityCallbackForAllTools([&callbackCount](Eg::SyEntity *) { callbackCount++; });
+    tm.setEntityCallbackForAllTools([&callbackCount](Eg::SyEntity*) { callbackCount++; });
 
     EXPECT_NE(tm.getTool("SelectTool"), nullptr);
     SUCCEED();
@@ -790,11 +790,11 @@ TEST(SelectToolRegressionTest, HasSelectedEntities_AfterPartialDeselect)
     Eg::SceneManager scene;
 
     auto line1 = std::make_unique<Eg::SyLine>();
-    line1->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId id1 = line1->id;
 
     auto line2 = std::make_unique<Eg::SyLine>();
-    line2->setPointVector({Ut::Vec2d(20, 20), Ut::Vec2d(30, 30)});
+    line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
     Eg::EntityId id2 = line2->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -825,7 +825,7 @@ TEST(SelectToolRegressionTest, Deactivate_DoesNotAffectSelection)
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -897,7 +897,7 @@ TEST(SelectionSyncExtendedTest, ClearSceneAfterSelect_NoCrash)
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -923,11 +923,11 @@ TEST(SelectionSyncExtendedTest, DeleteEntityThenSelectAgain)
     Eg::SceneManager scene;
 
     auto line1 = std::make_unique<Eg::SyLine>();
-    line1->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId id1 = line1->id;
 
     auto line2 = std::make_unique<Eg::SyLine>();
-    line2->setPointVector({Ut::Vec2d(20, 20), Ut::Vec2d(30, 30)});
+    line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
     Eg::EntityId id2 = line2->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -953,7 +953,7 @@ TEST(SelectionSyncExtendedTest, AddEntityWhileSelected_SelectionUnchanged)
     Eg::SceneManager scene;
 
     auto line1 = std::make_unique<Eg::SyLine>();
-    line1->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId id1 = line1->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -965,7 +965,7 @@ TEST(SelectionSyncExtendedTest, AddEntityWhileSelected_SelectionUnchanged)
 
     // 添加新实体不应影响已有选中
     auto line2 = std::make_unique<Eg::SyLine>();
-    line2->setPointVector({Ut::Vec2d(20, 20), Ut::Vec2d(30, 30)});
+    line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
     std::vector<std::unique_ptr<Eg::SyEntity>> entities2;
     entities2.push_back(std::move(line2));
     scene.addEntities(std::move(entities2));
@@ -981,7 +981,7 @@ TEST(SelectionSyncExtendedTest, DeselectAllThenSelectAll)
     for (int i = 0; i < 5; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i)});
+        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         std::vector<std::unique_ptr<Eg::SyEntity>> entities;
         entities.push_back(std::move(line));
         scene.addEntities(std::move(entities));
@@ -1009,7 +1009,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_AllToolsReceiveSwitchCallback)
     tm.initializeTools(ctx);
 
     QString lastSwitch;
-    tm.setSwitchToolCallbackForAllTools([&lastSwitch](const QString &name) { lastSwitch = name; });
+    tm.setSwitchToolCallbackForAllTools([&lastSwitch](const QString& name) { lastSwitch = name; });
 
     EXPECT_NE(tm.getTool("SelectTool"), nullptr);
     SUCCEED();
@@ -1024,7 +1024,7 @@ TEST(ToolSelectionSyncRegressionTest, ExternalModify_SyncAfterSceneDelete)
     SelectionService svc(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -1053,13 +1053,13 @@ TEST(ToolSelectionSyncRegressionTest, ExternalModify_SyncAfterSceneClear)
     for (int i = 0; i < 3; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i)});
+        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         ids[i] = std::to_string(line->id);
         entities.push_back(std::move(line));
     }
     scene.addEntities(std::move(entities));
 
-    const char *idPtrs[] = {ids[0].c_str(), ids[1].c_str(), ids[2].c_str()};
+    const char* idPtrs[] = { ids[0].c_str(), ids[1].c_str(), ids[2].c_str() };
     svc.selectMultiple(idPtrs, 3);
     EXPECT_TRUE(svc.isSelected(ids[0].c_str()));
     EXPECT_TRUE(svc.isSelected(ids[1].c_str()));
@@ -1084,7 +1084,7 @@ TEST(ToolSelectionSyncRegressionTest, ExternalModify_DeselectAllAfterSelectAll)
     for (int i = 0; i < 3; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i)});
+        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         ids[i] = std::to_string(line->id);
         entities.push_back(std::move(line));
     }
@@ -1106,7 +1106,7 @@ TEST(ToolSelectionSyncRegressionTest, SelectTool_ConsistencyWithScene)
     SelectionService svc(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -1138,7 +1138,7 @@ TEST(ToolSelectionSyncRegressionTest, NoDangling_DeleteAllEntitiesOneByOne)
     for (int i = 0; i < 5; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i)});
+        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         entityIds.push_back(line->id);
         entities.push_back(std::move(line));
     }
@@ -1171,7 +1171,7 @@ TEST(ToolSelectionSyncRegressionTest, NoDangling_DeleteMixedTypes)
 
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+        line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
         idLine = line->id;
         entities.push_back(std::move(line));
     }
@@ -1184,7 +1184,7 @@ TEST(ToolSelectionSyncRegressionTest, NoDangling_DeleteMixedTypes)
     }
     {
         auto poly = std::make_unique<Eg::SyPolygon>();
-        poly->setVertices({Ut::Vec2d(0, 0), Ut::Vec2d(10, 0), Ut::Vec2d(10, 10)});
+        poly->setVertices({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 0), Ut::Vec2d(10, 10) });
         idPoly = poly->id;
         entities.push_back(std::move(poly));
     }

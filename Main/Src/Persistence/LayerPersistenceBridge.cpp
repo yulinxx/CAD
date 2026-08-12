@@ -73,9 +73,8 @@ void LayerPersistenceBridge::onLayerChanged(int nLayerId)
 }
 
 /// 当前图层切换时同步（将当前图层标记为最新）
-void LayerPersistenceBridge::onCurrentLayerChanged(int nLayerId)
+void LayerPersistenceBridge::onCurrentLayerChanged(int /*nLayerId*/)
 {
-    (void)nLayerId;
 }
 
 /// 图层可见性变更时只写 visible 字段

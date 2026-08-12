@@ -42,7 +42,7 @@
 #include <algorithm>
 #include <cstring>
 
-// ==================== SceneRefreshCoordinator 完整生命周期测试 ====================
+ // ==================== SceneRefreshCoordinator 完整生命周期测试 ====================
 
 TEST(RenderViewport2DRegressionTest, RefreshCoordinator_ConstructWithoutWidget)
 {
@@ -196,7 +196,7 @@ TEST(RenderViewport2DRegressionTest, DirtyFlag_AddEntityTriggersSceneChanged)
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
@@ -212,7 +212,7 @@ TEST(RenderViewport2DRegressionTest, DirtyFlag_ModifyEntityTriggersDirty)
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -220,7 +220,7 @@ TEST(RenderViewport2DRegressionTest, DirtyFlag_ModifyEntityTriggersDirty)
     scene.addEntities(std::move(entities));
 
     // 修改实体属性
-    auto *entity = scene.findSyEntityById(lineId);
+    auto* entity = scene.findSyEntityById(lineId);
     ASSERT_NE(entity, nullptr);
     entity->setVisible(false);
     // 修改后应有脏标记
@@ -231,7 +231,7 @@ TEST(RenderViewport2DRegressionTest, DirtyFlag_DeleteEntityTriggersDirty)
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -252,7 +252,7 @@ TEST(RenderViewport2DRegressionTest, SelectionChange_TriggersRepaint)
     coordinator.setSceneManager(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -276,7 +276,7 @@ TEST(RenderViewport2DRegressionTest, SelectionChange_ClearSelectionTriggersRepai
     coordinator.setSceneManager(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -297,7 +297,7 @@ TEST(RenderViewport2DRegressionTest, SelectionChange_DeleteSelectedClearsSelecti
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -320,7 +320,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_SceneChangeRefreshesWithEntitie
 
     // 添加实体
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
@@ -343,7 +343,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_SceneChangeWithMultipleEntities
     for (int i = 0; i < 5; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i * 10, 10.0 + i * 10)});
+        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i * 10, 10.0 + i * 10) });
         entities.push_back(std::move(line));
     }
     scene.addEntities(std::move(entities));
@@ -364,7 +364,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_MixedTypeEntities)
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+        line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
         entities.push_back(std::move(line));
     }
     {
@@ -375,7 +375,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_MixedTypeEntities)
     }
     {
         auto poly = std::make_unique<Eg::SyPolygon>();
-        poly->setVertices({Ut::Vec2d(0, 0), Ut::Vec2d(10, 0), Ut::Vec2d(10, 10)});
+        poly->setVertices({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 0), Ut::Vec2d(10, 10) });
         entities.push_back(std::move(poly));
     }
     scene.addEntities(std::move(entities));
@@ -519,7 +519,7 @@ TEST(RenderViewport2DRegressionTest, Stress_LargeBatchEntityAdd)
     for (int i = 0; i < 100; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i * 0.1, 10.0 + i * 0.1)});
+        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i * 0.1, 10.0 + i * 0.1) });
         entities.push_back(std::move(line));
     }
     scene.addEntities(std::move(entities));
@@ -544,14 +544,14 @@ TEST(RenderViewport2DRegressionTest, Stress_RepeatedAddAndDelete)
         for (int i = 0; i < 10; ++i)
         {
             auto line = std::make_unique<Eg::SyLine>();
-            line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0, 10.0)});
+            line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0, 10.0) });
             ids.push_back(line->id);
             entities.push_back(std::move(line));
         }
         scene.addEntities(std::move(entities));
         coordinator.onSceneChanged();
 
-        for (auto &id : ids)
+        for (auto& id : ids)
         {
             scene.deleteEntity(scene.findSyEntityById(id));
         }
@@ -650,7 +650,7 @@ TEST(RenderViewport2DRegressionTest, EntityPropertyChange_VisibilityToggle)
     coordinator.setSceneManager(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -658,7 +658,7 @@ TEST(RenderViewport2DRegressionTest, EntityPropertyChange_VisibilityToggle)
     scene.addEntities(std::move(entities));
 
     // 切换可见性
-    auto *entity = scene.findSyEntityById(lineId);
+    auto* entity = scene.findSyEntityById(lineId);
     ASSERT_NE(entity, nullptr);
     entity->setVisible(false);
     EXPECT_FALSE(entity->visible());
@@ -675,14 +675,14 @@ TEST(RenderViewport2DRegressionTest, EntityPropertyChange_LockToggle)
     coordinator.setSceneManager(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
     scene.addEntities(std::move(entities));
 
-    auto *entity = scene.findSyEntityById(lineId);
+    auto* entity = scene.findSyEntityById(lineId);
     ASSERT_NE(entity, nullptr);
     entity->setLocked(true);
     EXPECT_TRUE(entity->locked());
@@ -699,7 +699,7 @@ TEST(RenderViewport2DRegressionTest, SelectionChain_SelectDeselectReselect)
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -726,7 +726,7 @@ TEST(RenderViewport2DRegressionTest, SelectionChain_SelectAllInvertClear)
     for (int i = 0; i < 3; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i)});
+        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         std::vector<std::unique_ptr<Eg::SyEntity>> entities;
         entities.push_back(std::move(line));
         scene.addEntities(std::move(entities));
@@ -758,7 +758,7 @@ TEST(RenderViewport2DRegressionTest, SelectionChain_MultipleSelectWithMixedTypes
 
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+        line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
         idLine = line->id;
         entities.push_back(std::move(line));
     }
@@ -771,15 +771,15 @@ TEST(RenderViewport2DRegressionTest, SelectionChain_MultipleSelectWithMixedTypes
     }
     {
         auto poly = std::make_unique<Eg::SyPolygon>();
-        poly->setVertices({Ut::Vec2d(0, 0), Ut::Vec2d(10, 0), Ut::Vec2d(10, 10)});
+        poly->setVertices({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 0), Ut::Vec2d(10, 10) });
         idPoly = poly->id;
         entities.push_back(std::move(poly));
     }
     scene.addEntities(std::move(entities));
 
     // 逐个选中（单选语义：selectEntity 会替换当前选择，多选走批量入口 selectEntities）
-    std::vector<Eg::SyEntity *> toSelect = {scene.findSyEntityById(idLine), scene.findSyEntityById(idCircle),
-                                            scene.findSyEntityById(idPoly)};
+    std::vector<Eg::SyEntity*> toSelect = { scene.findSyEntityById(idLine), scene.findSyEntityById(idCircle),
+                                            scene.findSyEntityById(idPoly) };
     scene.selectEntities(toSelect);
     EXPECT_EQ(scene.getSelectedEntityCount(), 3u);
 
@@ -797,7 +797,7 @@ TEST(RenderViewport2DRegressionTest, NoDanglingSelection_DeleteAllSelected)
     for (int i = 0; i < 3; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i)});
+        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         std::vector<std::unique_ptr<Eg::SyEntity>> entities;
         entities.push_back(std::move(line));
         scene.addEntities(std::move(entities));
@@ -816,11 +816,11 @@ TEST(RenderViewport2DRegressionTest, NoDanglingSelection_DeleteIndividualEntity)
     Eg::SceneManager scene;
 
     auto line1 = std::make_unique<Eg::SyLine>();
-    line1->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId id1 = line1->id;
 
     auto line2 = std::make_unique<Eg::SyLine>();
-    line2->setPointVector({Ut::Vec2d(20, 20), Ut::Vec2d(30, 30)});
+    line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
     Eg::EntityId id2 = line2->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -829,7 +829,7 @@ TEST(RenderViewport2DRegressionTest, NoDanglingSelection_DeleteIndividualEntity)
     scene.addEntities(std::move(entities));
 
     // 批量选中两个（selectEntity 为单选替换语义，多选走批量入口）
-    std::vector<Eg::SyEntity *> toSelect = {scene.findSyEntityById(id1), scene.findSyEntityById(id2)};
+    std::vector<Eg::SyEntity*> toSelect = { scene.findSyEntityById(id1), scene.findSyEntityById(id2) };
     scene.selectEntities(toSelect);
     EXPECT_EQ(scene.getSelectedEntityCount(), 2u);
 
@@ -849,7 +849,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_SceneChangeAfterClear)
     coordinator.setSceneManager(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
@@ -873,7 +873,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_SelectionChangeSequence)
     coordinator.setSceneManager(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -1013,7 +1013,7 @@ TEST(RenderViewport2DRegressionTest, InputRouter_PositionCallback)
         called = true;
         lastX = x;
         lastY = y;
-    });
+        });
     // 回调注入不崩溃
     SUCCEED();
 }
@@ -1022,7 +1022,7 @@ TEST(RenderViewport2DRegressionTest, InputRouter_StatusCallback)
 {
     ViewportInputRouter router;
     QString lastMsg;
-    router.setStatusCallback([&](const QString &msg) { lastMsg = msg; });
+    router.setStatusCallback([&](const QString& msg) { lastMsg = msg; });
     // 回调注入不崩溃
     SUCCEED();
 }
@@ -1101,7 +1101,7 @@ TEST(RenderViewport2DRegressionTest, InputRouter_MousePressNullRenderWidget)
 {
     ViewportInputRouter router;
     QMouseEvent pressEvent(QEvent::MouseButtonPress, QPointF(0, 0), QPointF(0, 0), Qt::LeftButton, Qt::LeftButton,
-                           Qt::NoModifier);
+        Qt::NoModifier);
     // 无 RenderWidget 时不崩溃
     router.handleMousePress(&pressEvent);
     SUCCEED();
@@ -1111,7 +1111,7 @@ TEST(RenderViewport2DRegressionTest, InputRouter_MouseMoveNullRenderWidget)
 {
     ViewportInputRouter router;
     QMouseEvent moveEvent(QEvent::MouseMove, QPointF(10, 10), QPointF(10, 10), Qt::NoButton, Qt::NoButton,
-                          Qt::NoModifier);
+        Qt::NoModifier);
     // 无 RenderWidget 时不崩溃
     router.handleMouseMove(&moveEvent);
     SUCCEED();
@@ -1121,7 +1121,7 @@ TEST(RenderViewport2DRegressionTest, InputRouter_MouseReleaseNullRenderWidget)
 {
     ViewportInputRouter router;
     QMouseEvent releaseEvent(QEvent::MouseButtonRelease, QPointF(0, 0), QPointF(0, 0), Qt::LeftButton, Qt::LeftButton,
-                             Qt::NoModifier);
+        Qt::NoModifier);
     // 无 RenderWidget 时不崩溃
     router.handleMouseRelease(&releaseEvent);
     SUCCEED();
@@ -1131,7 +1131,7 @@ TEST(RenderViewport2DRegressionTest, InputRouter_MouseDoubleClickNullRenderWidge
 {
     ViewportInputRouter router;
     QMouseEvent dblClickEvent(QEvent::MouseButtonDblClick, QPointF(0, 0), QPointF(0, 0), Qt::LeftButton, Qt::LeftButton,
-                              Qt::NoModifier);
+        Qt::NoModifier);
     // 无 RenderWidget 时不崩溃
     router.handleMouseDoubleClick(&dblClickEvent);
     SUCCEED();
@@ -1183,7 +1183,7 @@ TEST(RenderViewport2DRegressionTest, InputRouter_PanModeBlocksToolDispatch)
     EXPECT_TRUE(router.isPanModeEnabled());
 
     QMouseEvent pressEvent(QEvent::MouseButtonPress, QPointF(0, 0), QPointF(0, 0), Qt::LeftButton, Qt::LeftButton,
-                           Qt::NoModifier);
+        Qt::NoModifier);
     router.handleMousePress(&pressEvent);
     SUCCEED();
 }
@@ -1333,66 +1333,66 @@ TEST(RenderViewport2DRegressionTest, Camera2D_ZoomToBBoxMatchesZoomToFitPlusPan)
 
 namespace
 {
-// ISelectionService 桩实现 — 用于 ViewportSelector 组件级测试
-class StubSelectionService : public ISelectionService
-{
-  public:
-    std::vector<std::string> selectedIds;
-
-    void visitSelectedIds(SelectedIdVisitor visitor, void *context) const override
+    // ISelectionService 桩实现 — 用于 ViewportSelector 组件级测试
+    class StubSelectionService : public ISelectionService
     {
-        for (const auto &id : selectedIds)
-            visitor(id.c_str(), context);
-    }
+    public:
+        std::vector<std::string> selectedIds;
 
-    bool isSelected(const char *id) const override
-    {
-        if (!id)
+        void visitSelectedIds(SelectedIdVisitor visitor, void* context) const override
+        {
+            for (const auto& id : selectedIds)
+                visitor(id.c_str(), context);
+        }
+
+        bool isSelected(const char* id) const override
+        {
+            if (!id)
+                return false;
+            for (const auto& s : selectedIds)
+                if (s == id)
+                    return true;
             return false;
-        for (const auto &s : selectedIds)
-            if (s == id)
-                return true;
-        return false;
-    }
+        }
 
-    void select(const char *id) override
-    {
-        if (!id)
-            return;
-        selectedIds.clear();
-        selectedIds.push_back(id);
-    }
-
-    void selectMultiple(const char *const *ids, size_t count) override
-    {
-        selectedIds.clear();
-        for (size_t i = 0; i < count; ++i)
-            if (ids[i])
-                selectedIds.push_back(ids[i]);
-    }
-
-    void deselect(const char *id) override
-    {
-        if (!id)
-            return;
-        selectedIds.erase(std::remove(selectedIds.begin(), selectedIds.end(), std::string(id)), selectedIds.end());
-    }
-
-    void clear() override
-    {
-        selectedIds.clear();
-    }
-
-    void toggle(const char *id) override
-    {
-        if (!id)
-            return;
-        if (isSelected(id))
-            deselect(id);
-        else
+        void select(const char* id) override
+        {
+            if (!id)
+                return;
+            selectedIds.clear();
             selectedIds.push_back(id);
-    }
-};
+        }
+
+        void selectMultiple(const char* const* ids, size_t count) override
+        {
+            selectedIds.clear();
+            for (size_t i = 0; i < count; ++i)
+                if (ids[i])
+                    selectedIds.push_back(ids[i]);
+        }
+
+        void deselect(const char* id) override
+        {
+            if (!id)
+                return;
+            selectedIds.erase(std::remove(selectedIds.begin(), selectedIds.end(), std::string(id)), selectedIds.end());
+        }
+
+        void clear() override
+        {
+            selectedIds.clear();
+        }
+
+        void toggle(const char* id) override
+        {
+            if (!id)
+                return;
+            if (isSelected(id))
+                deselect(id);
+            else
+                selectedIds.push_back(id);
+        }
+    };
 } // namespace
 
 TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectedEntityIdEmpty)
@@ -1408,7 +1408,7 @@ TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectedEntityIdEmpty)
 TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectedEntityIdReturnsFirst)
 {
     StubSelectionService svc;
-    svc.selectedIds = {"42", "99"};
+    svc.selectedIds = { "42", "99" };
     Camera2D camera;
     ViewportSelector selector(nullptr, &svc, &camera, nullptr);
 
@@ -1419,7 +1419,7 @@ TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectedEntityIdReturnsFir
 TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectEntityById)
 {
     StubSelectionService svc;
-    svc.selectedIds = {"1", "2"};
+    svc.selectedIds = { "1", "2" };
     Camera2D camera;
     ViewportSelector selector(nullptr, &svc, &camera, nullptr);
 
@@ -1439,11 +1439,11 @@ TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectEntityByIdFiresCallb
     QString lastStatus;
     QString lastCallbackSource;
     QString lastCallbackText;
-    selector.setStatusCallback([&](const QString &s) { lastStatus = s; });
-    selector.setSelectionCallback([&](const QString &src, const QString &t) {
+    selector.setStatusCallback([&](const QString& s) { lastStatus = s; });
+    selector.setSelectionCallback([&](const QString& src, const QString& t) {
         lastCallbackSource = src;
         lastCallbackText = t;
-    });
+        });
 
     selector.selectEntityById(QStringLiteral("55"));
 
@@ -1456,7 +1456,7 @@ TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectEntityByIdFiresCallb
 TEST(RenderViewport2DRegressionTest, ViewportSelector_ClearSelection)
 {
     StubSelectionService svc;
-    svc.selectedIds = {"1", "2", "3"};
+    svc.selectedIds = { "1", "2", "3" };
     Camera2D camera;
     ViewportSelector selector(nullptr, &svc, &camera, nullptr);
 
@@ -1468,12 +1468,12 @@ TEST(RenderViewport2DRegressionTest, ViewportSelector_ClearSelection)
 TEST(RenderViewport2DRegressionTest, ViewportSelector_ClearSelectionFiresCallback)
 {
     StubSelectionService svc;
-    svc.selectedIds = {"1"};
+    svc.selectedIds = { "1" };
     Camera2D camera;
     ViewportSelector selector(nullptr, &svc, &camera, nullptr);
 
     QString lastStatus;
-    selector.setStatusCallback([&](const QString &s) { lastStatus = s; });
+    selector.setStatusCallback([&](const QString& s) { lastStatus = s; });
 
     selector.clearSelection();
 

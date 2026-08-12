@@ -19,9 +19,8 @@ bool SceneNode::selected() const
     return false;
 }
 
-void SceneNode::setSelected(bool selected)
+void SceneNode::setSelected(bool /*selected*/)
 {
-    (void)selected;
     // 选中状态由引擎场景管理
 }
 

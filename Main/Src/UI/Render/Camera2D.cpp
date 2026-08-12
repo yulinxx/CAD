@@ -52,7 +52,6 @@ void Camera2D::computeViewMatrix(float outMat[9], float vpW, float vpH) const
     float wMinY = -invScaleY + invTy;
     float wMaxY = invScaleY + invTy;
 
-
     mat3ToArray(view, outMat);
 }
 

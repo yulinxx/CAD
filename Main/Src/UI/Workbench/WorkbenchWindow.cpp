@@ -128,13 +128,13 @@
 #include <QCloseEvent>
 #include <QMessageBox>
 
-WorkbenchWindow::WorkbenchWindow(QWidget *parent) : QMainWindow(parent)
+WorkbenchWindow::WorkbenchWindow(QWidget* parent) : QMainWindow(parent)
 {
     SY_DEBUG("[WorkbenchWindow] Creating main window");
     setWindowTitle(QString::fromStdString(MainApp::appName()));
     resize(1440, 900);
 
-    if (const auto *screen = QGuiApplication::primaryScreen())
+    if (const auto* screen = QGuiApplication::primaryScreen())
     {
         const auto available = screen->availableGeometry();
         const int x = available.x() + (available.width() - width()) / 2;
@@ -155,7 +155,7 @@ WorkbenchWindow::WorkbenchWindow(QWidget *parent) : QMainWindow(parent)
 
 WorkbenchWindow::~WorkbenchWindow() = default;
 
-void WorkbenchWindow::changeEvent(QEvent *event)
+void WorkbenchWindow::changeEvent(QEvent* event)
 {
     if (event->type() == QEvent::LanguageChange)
     {
@@ -185,7 +185,7 @@ void WorkbenchWindow::retranslateUi()
 
 /// 设置状态中心
 /// @param stateCenter UI 状态中心
-void WorkbenchWindow::setUiStateCenter(UiStateCenter *stateCenter)
+void WorkbenchWindow::setUiStateCenter(UiStateCenter* stateCenter)
 {
     // 状态中心入口只负责替换源头引用，不在这里做额外状态编排
     m_stateCenter = stateCenter;
@@ -198,7 +198,7 @@ void WorkbenchWindow::setUiStateCenter(UiStateCenter *stateCenter)
 
 /// 设置主题服务
 /// @param themeService 主题服务
-void WorkbenchWindow::setThemeService(UiThemeService *themeService)
+void WorkbenchWindow::setThemeService(UiThemeService* themeService)
 {
     // 主题服务入口只替换引用，不在这里主动触发主题加载或界面刷新
     m_themeService = themeService;
@@ -209,7 +209,7 @@ void WorkbenchWindow::setThemeService(UiThemeService *themeService)
 
 /// 设置操作总线
 /// @param bus 操作总线
-void WorkbenchWindow::setOperationBus(OperationBus *bus)
+void WorkbenchWindow::setOperationBus(OperationBus* bus)
 {
     m_operationBus = bus;
     m_uiServices.operationBus = bus;
@@ -217,7 +217,7 @@ void WorkbenchWindow::setOperationBus(OperationBus *bus)
         m_actionManager->setOperationBus(bus);
 }
 
-void WorkbenchWindow::setFrameworkServices(const UiFrameworkServices &services)
+void WorkbenchWindow::setFrameworkServices(const UiFrameworkServices& services)
 {
     // 框架级能力统一从这里注入，后续错误、权限、性能都必须走同一条框架路径
     // 这里仅更新桥接对象，不主动触发任何 UI 刷新或工作台切换
@@ -228,19 +228,19 @@ void WorkbenchWindow::setFrameworkServices(const UiFrameworkServices &services)
     // 框架服务更新后不做自动回放，避免入口函数产生隐式副作用
 }
 
-void WorkbenchWindow::setUiServices(const UiServices &services)
+void WorkbenchWindow::setUiServices(const UiServices& services)
 {
     // UI 服务集合入口只负责转交统一装配流程，避免出现两套依赖装配逻辑
     // 这里不做额外装配分支，保持入口单一
     configureServices(services);
 }
 
-const UiServices &WorkbenchWindow::uiServices() const
+const UiServices& WorkbenchWindow::uiServices() const
 {
     return m_uiServices;
 }
 
-void WorkbenchWindow::configureServices(const UiServices &services)
+void WorkbenchWindow::configureServices(const UiServices& services)
 {
     m_uiServices = services;
     m_stateCenter = services.stateCenter;
@@ -272,7 +272,7 @@ void WorkbenchWindow::configureServices(const UiServices &services)
 
 /// 设置当前工作台
 /// @param workbench 工作台实例
-void WorkbenchWindow::setWorkbench(UiWorkbench *workbench)
+void WorkbenchWindow::setWorkbench(UiWorkbench* workbench)
 {
     m_workbench = workbench;
     if (m_menuManager)
@@ -326,17 +326,17 @@ void WorkbenchWindow::initializeWorkbenchShell()
     updateWindowTitle();
 }
 
-QWidget *WorkbenchWindow::createInitialCentralWidget()
+QWidget* WorkbenchWindow::createInitialCentralWidget()
 {
     return m_layoutManager->createInitialCentralWidget();
 }
 
-SceneTreeDockWidget *WorkbenchWindow::sceneTreeDock() const
+SceneTreeDockWidget* WorkbenchWindow::sceneTreeDock() const
 {
     return m_layoutManager->panelState().sceneTreeDock;
 }
 
-PropertiesPanelWidget *WorkbenchWindow::propertiesDock() const
+PropertiesPanelWidget* WorkbenchWindow::propertiesDock() const
 {
     return m_layoutManager->panelState().propertiesDock;
 }
@@ -374,7 +374,7 @@ void WorkbenchWindow::buildStatusBar()
 
 // ==================== 状态栏挂载/卸载 ====================
 
-void WorkbenchWindow::mountStatusBar(StatusBarBase *statusBarWidget)
+void WorkbenchWindow::mountStatusBar(StatusBarBase* statusBarWidget)
 {
     if (!statusBarWidget)
     {
@@ -456,13 +456,13 @@ void WorkbenchWindow::updateWindowTitle()
 
 /// 应用样式表
 /// @param styleSheet 样式表内容
-void WorkbenchWindow::closeEvent(QCloseEvent *event)
+void WorkbenchWindow::closeEvent(QCloseEvent* event)
 {
     if (m_stateCenter && m_stateCenter->dirty())
     {
         auto result =
             QMessageBox::question(this, tr("Unsaved Changes"), tr("Do you want to save changes before closing?"),
-                                  QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+                QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
         if (result == QMessageBox::Cancel)
         {
             event->ignore();
@@ -477,14 +477,14 @@ void WorkbenchWindow::closeEvent(QCloseEvent *event)
     event->accept();
 }
 
-void WorkbenchWindow::applyTheme(const QString &styleSheet)
+void WorkbenchWindow::applyTheme(const QString& styleSheet)
 {
     setStyleSheet(styleSheet);
 }
 
 /// 设置主题切换回调
 /// @param callback 主题切换回调函数
-void WorkbenchWindow::setThemeChangeCallback(std::function<void(const QString &)> callback)
+void WorkbenchWindow::setThemeChangeCallback(std::function<void(const QString&)> callback)
 {
     // 主题回调只作为外部扩展点，不在这里绑定额外业务行为
     // 回调一旦注入，就应被视为主题链的唯一扩展入口之一
@@ -494,7 +494,7 @@ void WorkbenchWindow::setThemeChangeCallback(std::function<void(const QString &)
 
 /// 设置视口缩放操作回调
 /// @param handler 缩放操作处理函数
-void WorkbenchWindow::setViewportZoomHandler(std::function<void(const QString &)> handler)
+void WorkbenchWindow::setViewportZoomHandler(std::function<void(const QString&)> handler)
 {
     if (m_menuManager)
         m_menuManager->setViewportZoomHandler(std::move(handler));
@@ -510,13 +510,13 @@ void WorkbenchWindow::updatePositionLabel(double x, double y)
 
 /// 将文件路径添加到最近文件列表
 /// @param filePath 文件完整路径
-void WorkbenchWindow::addRecentFile(const QString &filePath)
+void WorkbenchWindow::addRecentFile(const QString& filePath)
 {
     if (filePath.isEmpty())
         return;
 
     // 优先使用数据库持久化，失败时回退到 QSettings
-    auto *ps = m_uiServices.persistenceService;
+    auto* ps = m_uiServices.persistenceService;
     if (ps && ps->isOpen() && ps->recentFiles())
     {
         QFileInfo fileInfo(filePath);
@@ -543,14 +543,14 @@ void WorkbenchWindow::addRecentFile(const QString &filePath)
 /// 从设置中加载最近文件列表（数据库优先，QSettings 兜底）
 QStringList WorkbenchWindow::loadRecentFiles() const
 {
-    auto *ps = m_uiServices.persistenceService;
+    auto* ps = m_uiServices.persistenceService;
     if (ps && ps->isOpen() && ps->recentFiles())
     {
         auto records = ps->recentFiles()->loadAll();
         if (!records.empty())
         {
             QStringList result;
-            for (const auto &rec : records)
+            for (const auto& rec : records)
                 result.append(QString::fromStdString(rec.filePath));
             return result;
         }
@@ -562,7 +562,7 @@ QStringList WorkbenchWindow::loadRecentFiles() const
 }
 
 /// 将最近文件列表保存到设置（数据库优先，QSettings 兜底）
-void WorkbenchWindow::saveRecentFiles(const QStringList &files) const
+void WorkbenchWindow::saveRecentFiles(const QStringList& files) const
 {
     // 数据库端：由 addRecentFile 逐条写入，此处不做批量覆盖
     // QSettings 兜底：保留旧版兼容性
@@ -573,7 +573,7 @@ void WorkbenchWindow::saveRecentFiles(const QStringList &files) const
 /// 填充最近文件子菜单
 void WorkbenchWindow::populateRecentFilesMenu()
 {
-    QMenu *recentMenu = m_menuManager ? m_menuManager->recentFilesMenu() : nullptr;
+    QMenu* recentMenu = m_menuManager ? m_menuManager->recentFilesMenu() : nullptr;
     if (!recentMenu)
         return;
 
@@ -583,24 +583,24 @@ void WorkbenchWindow::populateRecentFilesMenu()
 
     if (files.isEmpty())
     {
-        auto *empty = recentMenu->addAction(tr("(No recent files)"));
+        auto* empty = recentMenu->addAction(tr("(No recent files)"));
         empty->setEnabled(false);
         return;
     }
 
     // 添加最近文件菜单项
     int index = 1;
-    for (const QString &filePath : files)
+    for (const QString& filePath : files)
     {
         QFileInfo fileInfo(filePath);
         QString displayText = QStringLiteral("%1. %2").arg(index).arg(fileInfo.fileName());
 
-        auto *action = recentMenu->addAction(displayText);
+        auto* action = recentMenu->addAction(displayText);
         action->setData(filePath);
 
         // 点击时打开文件（通过 OperationBus 直接传入路径）
         QObject::connect(action, &QAction::triggered, this, [this, filePath]() {
-            auto *bus = m_uiServices.operationBus;
+            auto* bus = m_uiServices.operationBus;
             if (bus && bus->registry().has(OperationId::File_OpenRecent))
             {
                 QVariantMap params;
@@ -612,7 +612,7 @@ void WorkbenchWindow::populateRecentFilesMenu()
                 // 兜底：走文件打开对话框（用户手动选取）
                 m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("file.open")));
             }
-        });
+            });
 
         ++index;
     }
@@ -622,14 +622,14 @@ void WorkbenchWindow::populateRecentFilesMenu()
 /// @param title 面板标题
 /// @param widget 面板内容部件
 /// @param area 停靠区域
-QDockWidget *WorkbenchWindow::registerDockWidget(const QString &title, QWidget *widget, Qt::DockWidgetArea area)
+QDockWidget* WorkbenchWindow::registerDockWidget(const QString& title, QWidget* widget, Qt::DockWidgetArea area)
 {
     return m_layoutManager->registerDockWidget(title, widget, area);
 }
 
 /// 注册工具栏
 /// @param title 工具栏标题
-QToolBar *WorkbenchWindow::registerToolBar(const QString &title)
+QToolBar* WorkbenchWindow::registerToolBar(const QString& title)
 {
     return m_layoutManager->registerToolBar(title);
 }
@@ -639,8 +639,8 @@ void WorkbenchWindow::clearWorkbenchContent()
 {
     const auto start = std::chrono::steady_clock::now();
     SY_DEBUGF("[WorkbenchWindow] clearing workbench content: toolbars=%d docks=%d shortcuts=%d",
-              m_layoutManager->registeredToolBars().size(), m_layoutManager->registeredDocks().size(),
-              m_actionManager ? m_actionManager->shortcutCount() : 0);
+        m_layoutManager->registeredToolBars().size(), m_layoutManager->registeredDocks().size(),
+        m_actionManager ? m_actionManager->shortcutCount() : 0);
 
     // 1: 清理所有注册的全局快捷键（Qt::ApplicationShortcut 不会随父窗口销毁）
     // 必须在 UI 清理之前执行，避免快捷键仍指向已销毁的对象
@@ -651,9 +651,9 @@ void WorkbenchWindow::clearWorkbenchContent()
     unmountStatusBar();
 
     // 3: 清理繁忙进度条（布局管理器只负责创建，框架在此显式回收）
-    if (auto *sb = statusBar())
+    if (auto* sb = statusBar())
     {
-        if (auto *progress = m_layoutManager->busyProgressBar())
+        if (auto* progress = m_layoutManager->busyProgressBar())
         {
             sb->removeWidget(progress);
             progress->deleteLater();
@@ -676,14 +676,14 @@ void WorkbenchWindow::clearWorkbenchContent()
 }
 
 /// 注册全局快捷键（由工作台调用，切换时自动清理）
-void WorkbenchWindow::registerShortcut(QShortcut *shortcut)
+void WorkbenchWindow::registerShortcut(QShortcut* shortcut)
 {
     if (m_actionManager)
         m_actionManager->registerShortcut(shortcut);
 }
 
 /// 注销全局快捷键
-void WorkbenchWindow::unregisterShortcut(QShortcut *shortcut)
+void WorkbenchWindow::unregisterShortcut(QShortcut* shortcut)
 {
     if (m_actionManager)
         m_actionManager->unregisterShortcut(shortcut);
@@ -714,7 +714,7 @@ void WorkbenchWindow::clearSelectionState()
         m_stateManager->clearSelectionState();
 }
 
-void WorkbenchWindow::setWorkbenchSwitchContext(const QString &workbenchId, const QString &switchContextText)
+void WorkbenchWindow::setWorkbenchSwitchContext(const QString& workbenchId, const QString& switchContextText)
 {
     if (m_stateManager)
         m_stateManager->setWorkbenchSwitchContext(workbenchId, switchContextText);
@@ -752,7 +752,7 @@ void WorkbenchWindow::syncWorkbenchStateFromStateCenter()
 
 /// 保存布局快照
 /// @param workbenchId 工作台 ID
-void WorkbenchWindow::saveLayoutSnapshot(const QString &workbenchId)
+void WorkbenchWindow::saveLayoutSnapshot(const QString& workbenchId)
 {
     // 布局快照只保存窗口外观，不保存业务状态；业务状态由状态中心负责
     const auto start = std::chrono::steady_clock::now();
@@ -764,7 +764,7 @@ void WorkbenchWindow::saveLayoutSnapshot(const QString &workbenchId)
 
 /// 恢复布局快照
 /// @param workbenchId 工作台 ID
-void WorkbenchWindow::restoreLayoutSnapshot(const QString &workbenchId)
+void WorkbenchWindow::restoreLayoutSnapshot(const QString& workbenchId)
 {
     // 布局恢复只还原窗口外观，不在这里恢复业务状态，避免状态源不统一
     const auto start = std::chrono::steady_clock::now();
@@ -799,7 +799,7 @@ void WorkbenchWindow::updateBusyIndicator(bool busy)
 
 /// 刷新主题菜单选中状态
 /// @param themeId 当前主题 ID
-void WorkbenchWindow::refreshThemeMenuChecks(const QString &themeId)
+void WorkbenchWindow::refreshThemeMenuChecks(const QString& themeId)
 {
     if (m_stateManager)
         m_stateManager->windowState().themeId = themeId;
@@ -810,7 +810,7 @@ void WorkbenchWindow::refreshThemeMenuChecks(const QString &themeId)
 
 /// 触发主题切换
 /// @param themeId 主题 ID
-void WorkbenchWindow::triggerTheme(const QString &themeId)
+void WorkbenchWindow::triggerTheme(const QString& themeId)
 {
     // 主题切换只负责调度，不在这里扩展额外 UI 行为，避免主题逻辑和工作台逻辑互相污染
     if (m_themeChangeCallback)
@@ -822,8 +822,8 @@ void WorkbenchWindow::triggerTheme(const QString &themeId)
     {
         // 主题加载失败时只做错误上报，不在这里尝试额外回退逻辑，避免主题链复杂化
         reportFrameworkError(QStringLiteral("theme.load_failed"),
-                             QStringLiteral("Failed to load theme %1").arg(themeId),
-                             QStringLiteral("WorkbenchWindow::triggerTheme"));
+            QStringLiteral("Failed to load theme %1").arg(themeId),
+            QStringLiteral("WorkbenchWindow::triggerTheme"));
     }
 
     if (m_stateCenter)
@@ -838,19 +838,19 @@ void WorkbenchWindow::triggerTheme(const QString &themeId)
     refreshThemeMenuChecks(themeId);
 }
 
-void WorkbenchWindow::recordPerformance(const QString &scope, qint64 elapsedMs)
+void WorkbenchWindow::recordPerformance(const QString& scope, qint64 elapsedMs)
 {
     if (m_actionManager)
         m_actionManager->recordPerformance(scope, elapsedMs);
 }
 
-void WorkbenchWindow::reportFrameworkError(const QString &errorCode, const QString &message, const QString &context)
+void WorkbenchWindow::reportFrameworkError(const QString& errorCode, const QString& message, const QString& context)
 {
     if (m_actionManager)
         m_actionManager->reportFrameworkError(errorCode, message, context);
 }
 
-bool WorkbenchWindow::canExecuteCommand(const QString &commandId, const QString &context) const
+bool WorkbenchWindow::canExecuteCommand(const QString& commandId, const QString& context) const
 {
     if (m_actionManager)
         return m_actionManager->canExecuteCommand(commandId, context);
@@ -862,14 +862,14 @@ bool WorkbenchWindow::canExecuteCommand(const QString &commandId, const QString 
 /// @param workbenchId 工作台 ID
 namespace
 {
-// 统一工作台切换时展示的上下文文本，避免切换链中多处拼接文案
-QString workbenchSwitchText(const QString &workbenchId)
-{
-    return QStringLiteral("Switching to %1").arg(workbenchId);
-}
+    // 统一工作台切换时展示的上下文文本，避免切换链中多处拼接文案
+    QString workbenchSwitchText(const QString& workbenchId)
+    {
+        return QStringLiteral("Switching to %1").arg(workbenchId);
+    }
 } // namespace
 
-void WorkbenchWindow::triggerWorkbench(const QString &workbenchId)
+void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
 {
     const auto start = std::chrono::steady_clock::now();
     SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: switching to %s", workbenchId.toUtf8().constData());
@@ -882,11 +882,11 @@ void WorkbenchWindow::triggerWorkbench(const QString &workbenchId)
     }
 
     if (!canExecuteCommand(QStringLiteral("workbench.switch.%1").arg(workbenchId),
-                           QStringLiteral("WorkbenchWindow::triggerWorkbench")))
+        QStringLiteral("WorkbenchWindow::triggerWorkbench")))
     {
         reportFrameworkError(QStringLiteral("workbench.switch_denied"),
-                             QStringLiteral("Workbench switch denied: %1").arg(workbenchId),
-                             QStringLiteral("WorkbenchWindow::triggerWorkbench"));
+            QStringLiteral("Workbench switch denied: %1").arg(workbenchId),
+            QStringLiteral("WorkbenchWindow::triggerWorkbench"));
 
         recordPerformance(
             QStringLiteral("WorkbenchWindow::triggerWorkbench.denied"),
@@ -897,7 +897,7 @@ void WorkbenchWindow::triggerWorkbench(const QString &workbenchId)
     if (!m_workbench)
     {
         SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: no workbench, setting state to %s",
-                  workbenchId.toUtf8().constData());
+            workbenchId.toUtf8().constData());
         if (m_stateCenter)
         {
             m_stateCenter->setCurrentWorkbenchId(workbenchId);
@@ -944,14 +944,14 @@ void WorkbenchWindow::triggerWorkbench(const QString &workbenchId)
     const auto switchContextText = workbenchSwitchText(workbenchId);
 
     SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: switching from %s to %s", previousWorkbenchId.toUtf8().constData(),
-              workbenchId.toUtf8().constData());
+        workbenchId.toUtf8().constData());
 
     // 1: 保存旧工作台布局快照，标记繁忙
     if (m_stateCenter)
     {
         saveLayoutSnapshot(previousWorkbenchId);
         m_stateCenter->setBusy(true);
-        m_stateCenter->setMetadata({{QStringLiteral("viewportStatus"), QStringLiteral("Switching")}});
+        m_stateCenter->setMetadata({ {QStringLiteral("viewportStatus"), QStringLiteral("Switching")} });
     }
 
     // 2: 停用旧工作台（释放资源、清理快捷键等）
@@ -975,11 +975,11 @@ void WorkbenchWindow::triggerWorkbench(const QString &workbenchId)
     // 6: 通过工厂获取或创建新工作台实例
     if (m_workbenchFactory)
     {
-        auto *target = m_workbenchFactory(workbenchId);
+        auto* target = m_workbenchFactory(workbenchId);
         if (target && target != m_workbench)
         {
             SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: factory created new workbench %s",
-                      workbenchId.toUtf8().constData());
+                workbenchId.toUtf8().constData());
             m_workbench = target;
         }
     }

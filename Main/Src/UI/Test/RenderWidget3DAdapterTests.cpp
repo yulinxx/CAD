@@ -11,7 +11,7 @@
 #include <gtest/gtest.h>
 #include "UI/Render/RenderWidget3DAdapter.h"
 
-// ==================== 生命周期测试 ====================
+ // ==================== 生命周期测试 ====================
 
 TEST(RenderWidget3DAdapterTest, Construction)
 {
@@ -148,7 +148,7 @@ TEST(RenderWidget3DAdapterTest, StatusCallback_IsStored)
 {
     RenderWidget3DAdapter adapter;
     bool called = false;
-    adapter.setStatusCallback([&called](const QString &) { called = true; });
+    adapter.setStatusCallback([&called](const QString&) { called = true; });
     // 回调已存储，但无 widget 时不会触发
     SUCCEED();
 }
@@ -209,9 +209,9 @@ TEST(RenderWidget3DAdapterTest, Callbacks_AllThreeCanBeSet)
     int selectionCalls = 0;
     int pathCalls = 0;
 
-    adapter.setStatusCallback([&](const QString &) { statusCalls++; });
-    adapter.setSelectionCallback([&](const QString &) { selectionCalls++; });
-    adapter.setPathCallback([&](const QStringList &) { pathCalls++; });
+    adapter.setStatusCallback([&](const QString&) { statusCalls++; });
+    adapter.setSelectionCallback([&](const QString&) { selectionCalls++; });
+    adapter.setPathCallback([&](const QStringList&) { pathCalls++; });
 
     // 回调已存储，无 widget 时不会触发
     SUCCEED();
@@ -221,13 +221,13 @@ TEST(RenderWidget3DAdapterTest, Callbacks_ResetWithNull)
 {
     RenderWidget3DAdapter adapter;
 
-    adapter.setStatusCallback([](const QString &) {});
+    adapter.setStatusCallback([](const QString&) {});
     adapter.setStatusCallback(nullptr); // 重置为 nullptr 不崩溃
 
-    adapter.setSelectionCallback([](const QString &) {});
+    adapter.setSelectionCallback([](const QString&) {});
     adapter.setSelectionCallback(nullptr);
 
-    adapter.setPathCallback([](const QStringList &) {});
+    adapter.setPathCallback([](const QStringList&) {});
     adapter.setPathCallback(nullptr);
 
     SUCCEED();

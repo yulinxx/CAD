@@ -105,11 +105,11 @@ namespace
     bool isCacheableType(Eg::EType type)
     {
         return type == Eg::EType::BEZIER ||
-               type == Eg::EType::BEZIER2 ||
-               type == Eg::EType::NURBS ||
-               type == Eg::EType::CIRCLE ||
-               type == Eg::EType::ARC ||
-               type == Eg::EType::ELLIPSE;
+            type == Eg::EType::BEZIER2 ||
+            type == Eg::EType::NURBS ||
+            type == Eg::EType::CIRCLE ||
+            type == Eg::EType::ARC ||
+            type == Eg::EType::ELLIPSE;
     }
 
     // ==================== 增量路径几何接收器 ====================
@@ -127,12 +127,17 @@ namespace
         {
         }
 
-        bool emitted() const { return m_emitted; }
-        bool sawText() const { return m_sawText; }
-
-        void setCurrentEntityId(uint64_t id) override
+        bool emitted() const
         {
-            (void)id;
+            return m_emitted;
+        }
+        bool sawText() const
+        {
+            return m_sawText;
+        }
+
+        void setCurrentEntityId(uint64_t /*id*/) override
+        {
         }
 
         void emitPolyline(const Ut::Vec2d* points, size_t count, bool bClosed,
@@ -240,19 +245,16 @@ namespace
             m_emitted = true;
         }
 
-        void emitText(const Ut::Vec2d& position, const char* text,
-            const Ut::Color& color) override
+        void emitText(const Ut::Vec2d& /*position*/, const char* /*text*/,
+            const Ut::Color& /*color*/) override
         {
-            (void)position; (void)text; (void)color;
             m_sawText = true;
         }
 
-        void emitTextEx(const Ut::Vec2d& position, const char* text,
-            const Ut::Color& color, float fontSize, float rotationRad,
-            int hAlign, int vAlign) override
+        void emitTextEx(const Ut::Vec2d& /*position*/, const char* /*text*/,
+            const Ut::Color& /*color*/, float /*fontSize*/, float /*rotationRad*/,
+            int /*hAlign*/, int /*vAlign*/) override
         {
-            (void)position; (void)text; (void)color;
-            (void)fontSize; (void)rotationRad; (void)hAlign; (void)vAlign;
             m_sawText = true;
         }
 
@@ -274,13 +276,11 @@ namespace
             m_emitted = true;
         }
 
-        void emitTriangleSoup(const Ut::Vec3f* vertices, size_t vertexCount,
-            const Ut::Vec3f* normals, size_t normalCount,
-            const Ut::Color& color) override
+        void emitTriangleSoup(const Ut::Vec3f* /*vertices*/, size_t /*vertexCount*/,
+            const Ut::Vec3f* /*normals*/, size_t /*normalCount*/,
+            const Ut::Color& /*color*/) override
         {
             // 2D 增量路径不支持三角形网格，忽略（3D 场景走全量路径）
-            (void)vertices; (void)vertexCount; (void)normals;
-            (void)normalCount; (void)color;
         }
 
     private:

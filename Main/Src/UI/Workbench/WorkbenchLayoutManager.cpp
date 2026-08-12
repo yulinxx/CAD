@@ -85,7 +85,7 @@ void WorkbenchLayoutManager::buildDockAreas()
         return;
     }
     SY_WARNF("[WorkbenchLayoutManager] Config-driven dock build failed, "
-             "falling back to hardcoded skeleton");
+        "falling back to hardcoded skeleton");
 #endif
 
     // 场景树面板
@@ -138,8 +138,13 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
     // 数据驱动构建 Dock（命令分发器此处不参与，仅为构造签名提供空实现）
     struct NullDispatcher : public IUiCommandDispatcher
     {
-        bool isCommandRegistered(const QString&) const override { return false; }
-        void dispatch(const QString&) override {}
+        bool isCommandRegistered(const QString&) const override
+        {
+            return false;
+        }
+        void dispatch(const QString&) override
+        {
+        }
     };
     NullDispatcher dispatcher;
     UiLayoutBuilder builder(m_parent, &dispatcher, m_panelRegistry.get());
