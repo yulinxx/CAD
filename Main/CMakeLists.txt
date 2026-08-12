@@ -596,7 +596,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
         target_compile_options(MainTests PRIVATE /utf-8 /FS)
     endif()
 
-    gtest_discover_tests(MainTests)
+    gtest_discover_tests(MainTests DISCOVERY_TIMEOUT 120)
 
     message(STATUS "[Main Tests]")
     message(STATUS "")

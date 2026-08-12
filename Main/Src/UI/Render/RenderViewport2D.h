@@ -20,7 +20,7 @@
 #include "Camera2D.h"
 #include "ViewportSelector.h"
 
-#include "UI/IViewportHost.h"  // P1: 2D/3D 公共视口宿主接口
+#include "UI/IViewportHost.h" // P1: 2D/3D 公共视口宿主接口
 
 class RenderWidget;
 class SceneDocument2D;
@@ -42,9 +42,9 @@ class QResizeEvent;
 
 namespace Eg
 {
-    class SceneManager;
-    class SyEntity;
-}
+class SceneManager;
+struct SyEntity;
+} // namespace Eg
 
 /**
  * @brief 2D 渲染视口 — 基于 Renderx 的 OpenGL 渲染
@@ -54,15 +54,14 @@ namespace Eg
  *
  * 输入路由委托给 ViewportInputRouter（P5 大文件收口）。
  */
-class RenderViewport2D : public QWidget
-    , public UI::IViewportHost       // P1: 实现 2D/3D 公共视口宿主接口
+class RenderViewport2D : public QWidget, public UI::IViewportHost // P1: 实现 2D/3D 公共视口宿主接口
 {
     Q_OBJECT
-public:
-    explicit RenderViewport2D(QWidget* parent = nullptr);
+  public:
+    explicit RenderViewport2D(QWidget *parent = nullptr);
     ~RenderViewport2D() override;
 
-public:
+  public:
     // ==================== 外部接口（与 Viewport2D 兼容）====================
 
     // ==================== UI::IViewportHost 接口实现 ====================
@@ -78,39 +77,39 @@ public:
     {
         return devicePixelRatioF();
     }
-    QWidget* viewportWidget() const override
+    QWidget *viewportWidget() const override
     {
-        return const_cast<RenderViewport2D*>(this);
+        return const_cast<RenderViewport2D *>(this);
     }
     UI::ViewportDimension dimension() const override
     {
         return UI::ViewportDimension::Dim2D;
     }
 
-    void setStatusCallback(std::function<void(const QString&)> callback);
-    void setSelectionCallback(std::function<void(const QString&, const QString&)> callback);
-    void setCommandStageCallback(std::function<void(const QString&)> callback);
+    void setStatusCallback(std::function<void(const QString &)> callback);
+    void setSelectionCallback(std::function<void(const QString &, const QString &)> callback);
+    void setCommandStageCallback(std::function<void(const QString &)> callback);
     // 设置鼠标位置回调，用于在状态栏显示当前光标坐标
     void setPositionCallback(std::function<void(double, double)> callback);
 
-    void setDocument(SceneDocument2D* document);
+    void setDocument(SceneDocument2D *document);
 
     // ==================== 工具系统接口 ====================
     /// 初始化工具系统
     void initializeTools();
     /// 设置活动工具
-    bool setActiveTool(const QString& toolName);
+    bool setActiveTool(const QString &toolName);
     /// 获取活动工具名称
     QString activeToolName() const;
     /// 获取工具管理器
-    ToolManager* toolManager() const;
-    SceneDocument2D* document() const
+    ToolManager *toolManager() const;
+    SceneDocument2D *document() const
     {
         return m_document;
     }
-    void setSelectionService(ISelectionService* service);
-    void setInteractionDispatcher(IInteractionDispatcher* dispatcher);
-    void setOperationBus(OperationBus* bus);
+    void setSelectionService(ISelectionService *service);
+    void setInteractionDispatcher(IInteractionDispatcher *dispatcher);
+    void setOperationBus(OperationBus *bus);
 
     /// 在 native window 销毁前显式释放 OpenGL 资源，避免析构时访问无效句柄崩溃
     void releaseGLResources();
@@ -135,38 +134,38 @@ public:
     // 选择/编辑操作（P5 已下沉：选择管理 → ViewportSelector，编辑 → SceneEditService）
     QString selectedEntityId() const;
     void deleteSelectedEntity();
-    void nudgeSelectedEndpoint(const QPointF& delta);
-    void selectEntityById(const QString& entityId);
+    void nudgeSelectedEndpoint(const QPointF &delta);
+    void selectEntityById(const QString &entityId);
     void syncSelectionDetails();
     void clearSelection();
 
     // 坐标转换
-    QPointF mapToScene(const QPoint& screenPos) const;
+    QPointF mapToScene(const QPoint &screenPos) const;
     /// 将 RenderWidget 本地坐标转换为世界坐标（物理像素 → 相机反算）
     QPointF widgetToWorld(QPoint widgetLocalPos) const;
 
-signals:
+  signals:
     void sceneChanged();
     // P1: 视口不直接持有编辑服务，通过信号通知上层
-    void entitySubmitRequested(Eg::SyEntity* entity);
+    void entitySubmitRequested(Eg::SyEntity *entity);
     void nudgeRequested(double dx, double dy);
     // 活动工具切换成功时发出，供工具栏等上层同步按钮高亮状态
-    void activeToolChanged(const QString& toolName);
+    void activeToolChanged(const QString &toolName);
 
-protected:
-    void resizeEvent(QResizeEvent* event) override;
+  protected:
+    void resizeEvent(QResizeEvent *event) override;
     // 以下事件委托给 ViewportInputRouter（P5 大文件收口）
-    void mousePressEvent(QMouseEvent* event) override;
-    void mouseMoveEvent(QMouseEvent* event) override;
-    void mouseReleaseEvent(QMouseEvent* event) override;
-    void mouseDoubleClickEvent(QMouseEvent* event) override;
-    void wheelEvent(QWheelEvent* event) override;
-    void keyPressEvent(QKeyEvent* event) override;
-    void contextMenuEvent(QContextMenuEvent* event) override;
-    void showEvent(QShowEvent* event) override;
-    bool eventFilter(QObject* obj, QEvent* event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
+    void mouseDoubleClickEvent(QMouseEvent *event) override;
+    void wheelEvent(QWheelEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
+    void contextMenuEvent(QContextMenuEvent *event) override;
+    void showEvent(QShowEvent *event) override;
+    bool eventFilter(QObject *obj, QEvent *event) override;
 
-private:
+  private:
     // ==================== 内部方法 ====================
 
     // 初始化
@@ -181,32 +180,32 @@ private:
     QSizeF physicalViewportSize() const;
 
     // 辅助
-    void updateStatus(const QString& text);
-    void syncStatusMode(const QString& text);
-    void syncCommandStage(const QString& text);
-    void syncSelectionCallback(const QString& source, const QString& text);
+    void updateStatus(const QString &text);
+    void syncStatusMode(const QString &text);
+    void syncCommandStage(const QString &text);
+    void syncSelectionCallback(const QString &source, const QString &text);
     void syncSelectionToolState();
 
-    Eg::SceneManager* sceneManager() const;
+    Eg::SceneManager *sceneManager() const;
 
     // 连接输入路由器的依赖
     void wireInputRouter();
     void syncInputRouterCallbacks();
 
-private:
+  private:
     // 渲染控件
-    RenderWidget* m_renderWidget{ nullptr };
+    RenderWidget *m_renderWidget{nullptr};
 
     // 相机
     Camera2D m_camera;
 
     // 文档和服务
-    SceneDocument2D* m_document{ nullptr };
-    Eg::SceneManager* m_sceneManager{ nullptr };
-    std::shared_ptr<bool> m_alive{ std::make_shared<bool>(true) };
-    ISelectionService* m_selectionService{ nullptr };
-    IInteractionDispatcher* m_interactionDispatcher{ nullptr };
-    OperationBus* m_operationBus{ nullptr };
+    SceneDocument2D *m_document{nullptr};
+    Eg::SceneManager *m_sceneManager{nullptr};
+    std::shared_ptr<bool> m_alive{std::make_shared<bool>(true)};
+    ISelectionService *m_selectionService{nullptr};
+    IInteractionDispatcher *m_interactionDispatcher{nullptr};
+    OperationBus *m_operationBus{nullptr};
 
     // 工具系统
     std::unique_ptr<ToolManager> m_toolManager;
@@ -215,9 +214,9 @@ private:
     std::unique_ptr<ViewportSelector> m_selector;
 
     // 回调
-    std::function<void(const QString&)> m_statusCallback;
-    std::function<void(const QString&, const QString&)> m_selectionCallback;
-    std::function<void(const QString&)> m_commandStageCallback;
+    std::function<void(const QString &)> m_statusCallback;
+    std::function<void(const QString &, const QString &)> m_selectionCallback;
+    std::function<void(const QString &)> m_commandStageCallback;
     // 鼠标位置回调，参数为世界坐标 (x, y)
     std::function<void(double, double)> m_positionCallback;
 

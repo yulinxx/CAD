@@ -44,122 +44,122 @@ class ISelectionService;
  */
 class ApplicationCompositionRoot
 {
-public:
+  public:
     ApplicationCompositionRoot();
     ~ApplicationCompositionRoot();
 
-public:
+  public:
     /// 获取 UI Shell 宿主
-    UiShellHost* shellHost();
+    UiShellHost *shellHost();
 
     /// 获取状态中心
-    UiStateCenter* stateCenter();
+    UiStateCenter *stateCenter();
 
     /// 获取主题服务
-    UiThemeService* themeService();
+    UiThemeService *themeService();
 
     /// 获取布局服务
-    UiLayoutService* layoutService();
+    UiLayoutService *layoutService();
 
     /// 获取交互式命令生命周期分发器
-    IInteractionDispatcher* interactionDispatcher();
+    IInteractionDispatcher *interactionDispatcher();
 
     /// 获取操作总线
-    OperationBus* operationBus();
+    OperationBus *operationBus();
 
     /// 获取撤销重做管理器
-    IUndoRedoManager* undoRedoManager();
+    IUndoRedoManager *undoRedoManager();
 
     /// 获取图层管理器
-    LayerManager* layerManager();
+    LayerManager *layerManager();
 
     /// 获取图层管理器 Qt 桥接
-    QtLayerManagerBridge* layerManagerBridge();
+    QtLayerManagerBridge *layerManagerBridge();
 
     /// 获取图层编辑服务
-    LayerEditService* layerEditService();
+    LayerEditService *layerEditService();
 
     /// 获取图层持久化桥接器
-    LayerPersistenceBridge* layerPersistenceBridge();
+    LayerPersistenceBridge *layerPersistenceBridge();
 
     /// 获取持久化服务
-    PersistenceService* persistenceService();
+    PersistenceService *persistenceService();
 
     /// 获取导入服务
-    ImportService* importService()
+    ImportService *importService()
     {
         return m_importService.get();
     }
 
     /// 获取导入分发器
-    ImportDispatcher* importDispatcher()
+    ImportDispatcher *importDispatcher()
     {
         return m_importDispatcher.get();
     }
 
     /// 获取导出服务
-    ExportService* exportService()
+    ExportService *exportService()
     {
         return m_exportService.get();
     }
 
     /// 获取2D场景文档
-    SceneDocument2D* document2D()
+    SceneDocument2D *document2D()
     {
         return m_document2D.get();
     }
 
     /// 获取导出分发器
-    ExportDispatcher* exportDispatcher()
+    ExportDispatcher *exportDispatcher()
     {
         return m_exportDispatcher.get();
     }
 
     /// 获取文件对话框服务
-    FileDialogService* fileDialogService()
+    FileDialogService *fileDialogService()
     {
         return m_fileDialogService.get();
     }
 
     /// 获取最近文件服务
-    RecentFileService* recentFileService()
+    RecentFileService *recentFileService()
     {
         return m_recentFileService.get();
     }
 
     /// 获取帮助弹窗服务
-    HelpDialogService* helpDialogService()
+    HelpDialogService *helpDialogService()
     {
         return m_helpDialogService.get();
     }
 
     /// 获取3D场景管理器
-    Eg::SceneManager3D* sceneManager3D()
+    Eg::SceneManager3D *sceneManager3D()
     {
         return m_sceneManager3D.get();
     }
 
     /// 获取场景管理器
-    Eg::SceneManager* sceneManager()
+    Eg::SceneManager *sceneManager()
     {
         return m_sceneManager.get();
     }
 
     /// 获取场景编辑服务
-    SceneEditService* sceneEditService()
+    SceneEditService *sceneEditService()
     {
         return m_sceneEditService.get();
     }
 
     /// 获取选择服务（阶段1收口：由组合根统一创建并经 UiServices 注入）
-    ISelectionService* selectionService();
+    ISelectionService *selectionService();
 
-private:
+  private:
     // ---- 构造函数拆分（P5 结构性优化）----
     // 组装 UI 服务集合（RecentFileService + 图层桥接 + ShellHost 配置）
     UiServices assembleUiServices();
     // 初始化导入/导出服务层（读取器/写入器注册 + 信号槽连接）
-    void setupImportExportServices(UiServices& uiServices);
+    void setupImportExportServices(UiServices &uiServices);
     // 创建文件/帮助对话框服务
     void setupDialogServices();
     // 场景变更 → 脏状态同步
@@ -237,7 +237,7 @@ private:
     std::unique_ptr<HelpDialogService> m_helpDialogService;
 
     /// 持久化服务（非拥有指针，由 AppInitializer 管理生命周期）
-    PersistenceService* m_persistenceService{ nullptr };
+    PersistenceService *m_persistenceService{nullptr};
 
     /// 文件操作注册表
     std::unique_ptr<FileOperationRegistry> m_fileOperationRegistry;

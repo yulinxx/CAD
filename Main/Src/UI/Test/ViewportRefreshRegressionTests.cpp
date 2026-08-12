@@ -23,8 +23,8 @@
 #include <memory>
 #include <thread>
 
- // 记录一帧，并保证两次时钟读取间隔非零（避免高精度时钟落在同一 tick 导致 avg==0 的抖动失败）
-static void recordOneFrame(FrameTimer& timer)
+// 记录一帧，并保证两次时钟读取间隔非零（避免高精度时钟落在同一 tick 导致 avg==0 的抖动失败）
+static void recordOneFrame(FrameTimer &timer)
 {
     timer.beginFrame();
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -59,14 +59,14 @@ TEST(ViewportRefreshRegressionTest, Coordinator_StopWithoutRenderWidget)
 TEST(ViewportRefreshRegressionTest, Coordinator_RequestRepaintWithoutWidget)
 {
     SceneRefreshCoordinator coordinator;
-    coordinator.requestRepaint();  // 无 RenderWidget 时不应崩溃
+    coordinator.requestRepaint(); // 无 RenderWidget 时不应崩溃
     SUCCEED();
 }
 
 TEST(ViewportRefreshRegressionTest, Coordinator_OnSelectionChangedWithoutWidget)
 {
     SceneRefreshCoordinator coordinator;
-    coordinator.onSelectionChanged();  // 无 RenderWidget 时不应崩溃
+    coordinator.onSelectionChanged(); // 无 RenderWidget 时不应崩溃
     SUCCEED();
 }
 
@@ -151,14 +151,14 @@ TEST(ViewportRefreshRegressionTest, SceneManager_DirtyTracking)
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
     scene.addEntities(std::move(entities));
 
     // 添加图元后应有脏标记
-    const auto& dirty = scene.dirtyEntities();
+    const auto &dirty = scene.dirtyEntities();
     EXPECT_FALSE(dirty.empty());
 
     // 清理后应空
@@ -173,7 +173,7 @@ TEST(ViewportRefreshRegressionTest, SceneManager_MultipleAddsDirtyTracking)
     for (int i = 0; i < 5; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
+        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i)});
         std::vector<std::unique_ptr<Eg::SyEntity>> entities;
         entities.push_back(std::move(line));
         scene.addEntities(std::move(entities));
@@ -191,7 +191,7 @@ TEST(ViewportRefreshRegressionTest, SceneManager_DeletedEntityIds)
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     Eg::EntityId entityId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -237,21 +237,21 @@ TEST(ViewportRefreshRegressionTest, Coordinator_SetSceneManager)
 TEST(ViewportRefreshRegressionTest, Coordinator_RequestLightRefreshWithoutWidget)
 {
     SceneRefreshCoordinator coordinator;
-    coordinator.requestLightRefresh();  // 无 RenderWidget 时不应崩溃
+    coordinator.requestLightRefresh(); // 无 RenderWidget 时不应崩溃
     SUCCEED();
 }
 
 TEST(ViewportRefreshRegressionTest, Coordinator_RequestFullRefreshWithoutWidget)
 {
     SceneRefreshCoordinator coordinator;
-    coordinator.requestFullRefresh();  // 无 RenderWidget 时不应崩溃
+    coordinator.requestFullRefresh(); // 无 RenderWidget 时不应崩溃
     SUCCEED();
 }
 
 TEST(ViewportRefreshRegressionTest, Coordinator_OnSceneChangedWithoutWidget)
 {
     SceneRefreshCoordinator coordinator;
-    coordinator.onSceneChanged();  // 无 RenderWidget / SceneManager 时不应崩溃
+    coordinator.onSceneChanged(); // 无 RenderWidget / SceneManager 时不应崩溃
     SUCCEED();
 }
 
@@ -260,7 +260,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_OnSceneChangedWithSceneManager)
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
     coordinator.setSceneManager(&scene);
-    coordinator.onSceneChanged();  // 有 SceneManager 但无 Widget 时不应崩溃
+    coordinator.onSceneChanged(); // 有 SceneManager 但无 Widget 时不应崩溃
     SUCCEED();
 }
 
@@ -310,7 +310,7 @@ TEST(RefreshChainRegressionTest, SceneChanged_SchedulesSceneUpdate)
     coordinator.setSceneManager(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
@@ -329,7 +329,7 @@ TEST(RefreshChainRegressionTest, SceneChanged_CollectsDirtyIds)
     coordinator.setSceneManager(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
@@ -349,7 +349,7 @@ TEST(RefreshChainRegressionTest, SceneChanged_CollectsDeletedIds)
     coordinator.setSceneManager(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -395,7 +395,7 @@ TEST(RefreshPathRegressionTest, LightUpdatePath_RequiresSceneManager)
     coordinator.setSceneManager(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
@@ -414,7 +414,7 @@ TEST(RefreshPathRegressionTest, FullRefreshPath_RequiresSceneManager)
     coordinator.setSceneManager(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
@@ -432,7 +432,7 @@ TEST(RefreshPathRegressionTest, FullRefreshPath_MarksSceneClean)
     coordinator.setSceneManager(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
@@ -496,7 +496,7 @@ TEST(RefreshPathRegressionTest, MultipleIncrementalUpdates)
     for (int i = 0; i < 10; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
+        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i)});
         std::vector<std::unique_ptr<Eg::SyEntity>> entities;
         entities.push_back(std::move(line));
         scene.addEntities(std::move(entities));
@@ -515,7 +515,7 @@ TEST(RefreshCleanupRegressionTest, MarkClean_AfterUpdateSceneRender)
     coordinator.setSceneManager(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
@@ -536,7 +536,7 @@ TEST(RefreshCleanupRegressionTest, PendingIds_ClearedAfterFullRefresh)
     coordinator.setSceneManager(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -562,7 +562,7 @@ TEST(RefreshStressRegressionTest, BulkEntities_SceneChanged)
     for (int i = 0; i < 50; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
+        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i)});
         entities.push_back(std::move(line));
     }
     scene.addEntities(std::move(entities));
@@ -585,7 +585,7 @@ TEST(RefreshStressRegressionTest, BulkEntities_FullRefresh)
     for (int i = 0; i < 50; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
+        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i)});
         entities.push_back(std::move(line));
     }
     scene.addEntities(std::move(entities));
@@ -604,7 +604,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_OnSceneChangedWithDirtyEntities)
     coordinator.setSceneManager(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
     scene.addEntities(std::move(entities));
@@ -624,7 +624,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_OnSceneChangedWithDeletedEntitie
     coordinator.setSceneManager(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -632,7 +632,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_OnSceneChangedWithDeletedEntitie
     scene.addEntities(std::move(entities));
 
     scene.markClean();
-    auto* entity = scene.findSyEntityById(lineId);
+    auto *entity = scene.findSyEntityById(lineId);
     ASSERT_NE(entity, nullptr);
 
     scene.selectEntity(entity);
@@ -712,8 +712,10 @@ TEST(ViewportRefreshRegressionTest, FrameTimer_RecordMultipleFrames)
 TEST(ViewportRefreshRegressionTest, FrameTimer_ResetResetsCount)
 {
     FrameTimer timer;
-    timer.beginFrame(); timer.endFrame();
-    timer.beginFrame(); timer.endFrame();
+    timer.beginFrame();
+    timer.endFrame();
+    timer.beginFrame();
+    timer.endFrame();
     EXPECT_EQ(timer.frameCount(), 2u);
 
     timer.reset();
@@ -753,7 +755,7 @@ TEST(RefreshPathRegressionTest, IncrementalToFull_BackToIncremental)
     coordinator.setSceneManager(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
     scene.addEntities(std::move(entities));
@@ -782,7 +784,7 @@ TEST(RefreshPathRegressionTest, MultipleIncrementalUpdates_NoDataLoss)
     for (int i = 0; i < 10; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
+        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i)});
         std::vector<std::unique_ptr<Eg::SyEntity>> entities;
         entities.push_back(std::move(line));
         scene.addEntities(std::move(entities));
@@ -804,7 +806,7 @@ TEST(RefreshPathRegressionTest, FullRefreshAfterSeriesOfIncremental)
     for (int i = 0; i < 5; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
+        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i)});
         std::vector<std::unique_ptr<Eg::SyEntity>> entities;
         entities.push_back(std::move(line));
         scene.addEntities(std::move(entities));

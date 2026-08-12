@@ -9,7 +9,7 @@
 
 namespace Eg
 {
-    class SceneManager; class SyEntity;
+    class SceneManager; struct SyEntity;
 }
 class SceneEditService;
 

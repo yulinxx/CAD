@@ -8,22 +8,21 @@
 #include "Persistence/Repositories/RecentFileRepository.h"
 #include "Persistence/Models/RecentFileRecord.h"
 
-RecentFileService::RecentFileService(PersistenceService* persistence)
-    : m_persistence(persistence)
+RecentFileService::RecentFileService(PersistenceService *persistence) : m_persistence(persistence)
 {
 }
 
-void RecentFileService::setPersistenceService(PersistenceService* persistence)
+void RecentFileService::setPersistenceService(PersistenceService *persistence)
 {
     m_persistence = persistence;
 }
 
-PersistenceService* RecentFileService::persistenceService() const
+PersistenceService *RecentFileService::persistenceService() const
 {
     return m_persistence;
 }
 
-void RecentFileService::addRecentFile(const QString& filePath)
+void RecentFileService::addRecentFile(const QString &filePath)
 {
     if (filePath.isEmpty())
         return;
@@ -59,7 +58,7 @@ QStringList RecentFileService::loadRecentFiles() const
         {
             QStringList result;
             result.reserve(static_cast<int>(records.size()));
-            for (const auto& rec : records)
+            for (const auto &rec : records)
                 result.append(QString::fromStdString(rec.filePath));
             return result;
         }
@@ -70,7 +69,7 @@ QStringList RecentFileService::loadRecentFiles() const
     return settings.value(QStringLiteral("RecentFiles"), QStringList()).toStringList();
 }
 
-void RecentFileService::saveRecentFiles(const QStringList& files) const
+void RecentFileService::saveRecentFiles(const QStringList &files) const
 {
     // 数据库端由 addRecentFile 逐条写入，此处不做批量覆盖
     // QSettings 兜底：保留旧版兼容性

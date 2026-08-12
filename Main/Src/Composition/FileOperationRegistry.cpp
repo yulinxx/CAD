@@ -24,94 +24,84 @@
 
 namespace
 {
-    // 统一格式映射表：OperationId → FileFormat，替代旧的 switch 分支
-    struct FormatMappingEntry
+// 统一格式映射表：OperationId → FileFormat，替代旧的 switch 分支
+struct FormatMappingEntry
+{
+    OperationId opId;
+    Fio::FileFormat format;
+};
+
+constexpr std::array<FormatMappingEntry, 5> kImportFormatMap = {{
+    {OperationId::File_ImportDXF, Fio::FileFormat::DXF},
+    {OperationId::File_ImportSVG, Fio::FileFormat::SVG},
+    {OperationId::File_ImportPLT, Fio::FileFormat::PLT},
+    {OperationId::File_ImportStep, Fio::FileFormat::STEP},
+    {OperationId::File_ImportPDF, Fio::FileFormat::PDF},
+}};
+
+constexpr std::array<FormatMappingEntry, 5> kExportFormatMap = {{
+    {OperationId::File_ExportDXF, Fio::FileFormat::DXF},
+    {OperationId::File_ExportSVG, Fio::FileFormat::SVG},
+    {OperationId::File_ExportPLT, Fio::FileFormat::PLT},
+    {OperationId::File_ExportBMP, Fio::FileFormat::BMP},
+    {OperationId::File_ExportPNG, Fio::FileFormat::PNG},
+}};
+
+// P5 收口: 统一按格式映射批量注册操作，消除 registerImportOps/registerExportOps 的重复循环
+void registerFromFormatMap(OperationRegistry &reg, const std::array<FormatMappingEntry, 5> &map,
+                           std::function<void(Fio::FileFormat)> handler)
+{
+    for (const auto &entry : map)
     {
-        OperationId opId;
-        Fio::FileFormat format;
-    };
-
-    constexpr std::array<FormatMappingEntry, 5> kImportFormatMap = { {
-        { OperationId::File_ImportDXF,  Fio::FileFormat::DXF },
-        { OperationId::File_ImportSVG,  Fio::FileFormat::SVG },
-        { OperationId::File_ImportPLT,  Fio::FileFormat::PLT },
-        { OperationId::File_ImportStep, Fio::FileFormat::STEP },
-        { OperationId::File_ImportPDF,  Fio::FileFormat::PDF },
-    } };
-
-    constexpr std::array<FormatMappingEntry, 5> kExportFormatMap = { {
-        { OperationId::File_ExportDXF, Fio::FileFormat::DXF },
-        { OperationId::File_ExportSVG, Fio::FileFormat::SVG },
-        { OperationId::File_ExportPLT, Fio::FileFormat::PLT },
-        { OperationId::File_ExportBMP, Fio::FileFormat::BMP },
-        { OperationId::File_ExportPNG, Fio::FileFormat::PNG },
-    } };
-
-    // P5 收口: 统一按格式映射批量注册操作，消除 registerImportOps/registerExportOps 的重复循环
-    void registerFromFormatMap(OperationRegistry& reg,
-        const std::array<FormatMappingEntry, 5>& map,
-        std::function<void(Fio::FileFormat)> handler)
-    {
-        for (const auto& entry : map)
-        {
-            reg.registerOperation(std::make_unique<LambdaOperation>(
-                entry.opId, [handler, fmt = entry.format] {
-                    handler(fmt);
-                }));
-        }
+        reg.registerOperation(
+            std::make_unique<LambdaOperation>(entry.opId, [handler, fmt = entry.format] { handler(fmt); }));
     }
 }
+} // namespace
 
-FileOperationRegistry::FileOperationRegistry(const FileOperationConfig& config)
-    : m_bus(config.bus)
-    , m_sceneManager(config.sceneManager)
-    , m_importService(config.importService)
-    , m_exportService(config.exportService)
-    , m_recentFiles(config.recentFiles)
-    , m_helpDialog(config.helpDialog)
-    , m_stateCenter(config.stateCenter)
-    , m_layerPersistence(config.layerPersistence)
-    , m_persistence(config.persistence)
-    , m_parentWidget(config.parentWidget)
+FileOperationRegistry::FileOperationRegistry(const FileOperationConfig &config)
+    : m_bus(config.bus), m_sceneManager(config.sceneManager), m_importService(config.importService),
+      m_exportService(config.exportService), m_recentFiles(config.recentFiles), m_helpDialog(config.helpDialog),
+      m_stateCenter(config.stateCenter), m_layerPersistence(config.layerPersistence), m_persistence(config.persistence),
+      m_parentWidget(config.parentWidget)
 {
 }
 
 // ==================== 公共辅助方法 ====================
 
-void FileOperationRegistry::showFileError(const QString& title, const QString& message)
+void FileOperationRegistry::showFileError(const QString &title, const QString &message)
 {
     HelpDialogService::showWarning(m_parentWidget, title, message);
 }
 
-void FileOperationRegistry::executeWithExceptionGuard(const char* operationName,
-    std::function<void()> action)
+void FileOperationRegistry::executeWithExceptionGuard(const char *operationName, std::function<void()> action)
 {
     try
     {
         action();
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         SY_ERRORF("[FileOperation] %s exception: %s", operationName, e.what());
         showFileError(QObject::tr("%1 Error").arg(QString::fromLatin1(operationName)),
-            QStringLiteral("%1 failed: %2").arg(QString::fromLatin1(operationName), e.what()));
+                      QStringLiteral("%1 failed: %2").arg(QString::fromLatin1(operationName), e.what()));
     }
     catch (...)
     {
         SY_ERRORF("[FileOperation] %s unknown exception", operationName);
         showFileError(QObject::tr("%1 Error").arg(QString::fromLatin1(operationName)),
-            QStringLiteral("%1 failed with unknown exception").arg(QString::fromLatin1(operationName)));
+                      QStringLiteral("%1 failed with unknown exception").arg(QString::fromLatin1(operationName)));
     }
 }
 
 // ==================== 公共模板方法 ====================
 
-void FileOperationRegistry::saveDocumentRecord(const std::string& filePath, int entityCount)
+void FileOperationRegistry::saveDocumentRecord(const std::string &filePath, int entityCount)
 {
     DocumentPersistenceHelper::recordExport(m_persistence, filePath, entityCount);
 }
 
-bool FileOperationRegistry::doExport(const std::string& filePath)
+bool FileOperationRegistry::doExport(const std::string &filePath)
 {
     if (!m_exportService)
         return false;
@@ -139,7 +129,7 @@ bool FileOperationRegistry::doExport(const std::string& filePath)
     return true;
 }
 
-bool FileOperationRegistry::doOpenFile(const QString& filePath)
+bool FileOperationRegistry::doOpenFile(const QString &filePath)
 {
     if (filePath.isEmpty() || !m_importService)
         return false;
@@ -151,13 +141,11 @@ bool FileOperationRegistry::doOpenFile(const QString& filePath)
 
     ImportContext context;
     context.sourcePath = filePath;
-    context.recentFileAddCallback = [this](const QString& path) {
+    context.recentFileAddCallback = [this](const QString &path) {
         if (m_recentFiles)
             m_recentFiles->addRecentFile(path);
-        };
-    context.currentDocumentPathCallback = [this](const QString& path) {
-        *m_currentFilePath = path.toStdString();
-        };
+    };
+    context.currentDocumentPathCallback = [this](const QString &path) { *m_currentFilePath = path.toStdString(); };
 
     ImportResult result = m_importService->importWithContext(context, opts);
     if (!result.success)
@@ -175,13 +163,13 @@ bool FileOperationRegistry::doOpenFile(const QString& filePath)
 void FileOperationRegistry::doImportByFormat(Fio::FileFormat fmt)
 {
     executeWithExceptionGuard("Import", [this, fmt] {
-        QString filePath = FileDialogService::getOpenFileName(
-            m_parentWidget, QObject::tr("Import File"), FileDialogService::importFilterForFormat(fmt));
+        QString filePath = FileDialogService::getOpenFileName(m_parentWidget, QObject::tr("Import File"),
+                                                              FileDialogService::importFilterForFormat(fmt));
         if (filePath.isEmpty() || !m_importService)
             return;
 
-        SY_INFOF("[FileOperation] Importing via ImportService: format=%d, path=%s",
-            static_cast<int>(fmt), filePath.toUtf8().constData());
+        SY_INFOF("[FileOperation] Importing via ImportService: format=%d, path=%s", static_cast<int>(fmt),
+                 filePath.toUtf8().constData());
 
         ImportOptions opts;
         opts.importAsNewDocument = false;
@@ -202,8 +190,8 @@ void FileOperationRegistry::doImportByFormat(Fio::FileFormat fmt)
 void FileOperationRegistry::doExportByFormat(Fio::FileFormat fmt)
 {
     executeWithExceptionGuard("Export", [this, fmt] {
-        QString filePath = FileDialogService::getSaveFileName(
-            m_parentWidget, QObject::tr("Export File"), FileDialogService::exportFilterForFormat(fmt));
+        QString filePath = FileDialogService::getSaveFileName(m_parentWidget, QObject::tr("Export File"),
+                                                              FileDialogService::exportFilterForFormat(fmt));
         if (filePath.isEmpty() || !m_exportService)
             return;
 
@@ -220,93 +208,89 @@ void FileOperationRegistry::doExportByFormat(Fio::FileFormat fmt)
 
 void FileOperationRegistry::registerFileNewOps()
 {
-    auto& reg = m_bus->registry();
-    auto* scene = m_sceneManager;
+    auto &reg = m_bus->registry();
+    auto *scene = m_sceneManager;
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::File_New, [this, scene] {
-            bool needsSave = (m_stateCenter && m_stateCenter->dirty());
-            if (needsSave)
-            {
-                auto result = HelpDialogService::showQuestion(
-                    m_parentWidget, QObject::tr("Unsaved Changes"),
-                    QObject::tr("Do you want to save the current file?"));
-                if (result == QMessageBox::Cancel) return;
-                if (result == QMessageBox::Yes)
-                    m_bus->run(OperationId::File_Save, {});
-            }
-            scene->clearScene();
-            if (m_stateCenter) m_stateCenter->setDirty(false);
-        }));
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::File_New, [this, scene] {
+        bool needsSave = (m_stateCenter && m_stateCenter->dirty());
+        if (needsSave)
+        {
+            auto result = HelpDialogService::showQuestion(m_parentWidget, QObject::tr("Unsaved Changes"),
+                                                          QObject::tr("Do you want to save the current file?"));
+            if (result == QMessageBox::Cancel)
+                return;
+            if (result == QMessageBox::Yes)
+                m_bus->run(OperationId::File_Save, {});
+        }
+        scene->clearScene();
+        if (m_stateCenter)
+            m_stateCenter->setDirty(false);
+    }));
 }
 
 void FileOperationRegistry::registerFileOpenOps()
 {
-    auto& reg = m_bus->registry();
+    auto &reg = m_bus->registry();
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::File_Open, [this] {
-            QString filePath = FileDialogService::getOpenFileName(
-                m_parentWidget, QObject::tr("Open File"), FileDialogService::openFileFilter());
-            doOpenFile(filePath);
-        }));
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::File_Open, [this] {
+        QString filePath = FileDialogService::getOpenFileName(m_parentWidget, QObject::tr("Open File"),
+                                                              FileDialogService::openFileFilter());
+        doOpenFile(filePath);
+    }));
 
-    reg.registerOperation(std::make_unique<ParamLambdaOperation>(
-        OperationId::File_OpenRecent, [this](const QVariantMap& params) {
+    reg.registerOperation(
+        std::make_unique<ParamLambdaOperation>(OperationId::File_OpenRecent, [this](const QVariantMap &params) {
             doOpenFile(params.value(QStringLiteral("filePath")).toString());
         }));
 }
 
 void FileOperationRegistry::registerFileSaveOps()
 {
-    auto& reg = m_bus->registry();
+    auto &reg = m_bus->registry();
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::File_Save, [this] {
-            if (m_currentFilePath->empty())
-            {
-                QString filePath = FileDialogService::getSaveFileName(
-                    m_parentWidget, QObject::tr("Save"), FileDialogService::saveFileFilter());
-                if (filePath.isEmpty()) return;
-                doExport(filePath.toStdString());
-            }
-            else
-            {
-                doExport(*m_currentFilePath);
-            }
-        }));
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::File_Save, [this] {
+        if (m_currentFilePath->empty())
+        {
+            QString filePath = FileDialogService::getSaveFileName(m_parentWidget, QObject::tr("Save"),
+                                                                  FileDialogService::saveFileFilter());
+            if (filePath.isEmpty())
+                return;
+            doExport(filePath.toStdString());
+        }
+        else
+        {
+            doExport(*m_currentFilePath);
+        }
+    }));
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::File_SaveAs, [this] {
-            QString filePath = FileDialogService::getSaveFileName(
-                m_parentWidget, QObject::tr("Save As"), FileDialogService::saveFileFilter());
-            if (!filePath.isEmpty()) doExport(filePath.toStdString());
-        }));
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::File_SaveAs, [this] {
+        QString filePath = FileDialogService::getSaveFileName(m_parentWidget, QObject::tr("Save As"),
+                                                              FileDialogService::saveFileFilter());
+        if (!filePath.isEmpty())
+            doExport(filePath.toStdString());
+    }));
 }
 
 void FileOperationRegistry::registerImportOps()
 {
-    auto& reg = m_bus->registry();
+    auto &reg = m_bus->registry();
 
     // P5 收口: 统一使用 registerFromFormatMap 批量注册
-    registerFromFormatMap(reg, kImportFormatMap,
-        [this](Fio::FileFormat fmt) { doImportByFormat(fmt); });
+    registerFromFormatMap(reg, kImportFormatMap, [this](Fio::FileFormat fmt) { doImportByFormat(fmt); });
 
     // 导入图片（特殊处理，不走格式映射）
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::File_ImportImage, [this] {
-            QString filePath = FileDialogService::getOpenFileName(
-                m_parentWidget, QObject::tr("Import Image"), FileDialogService::imageImportFilter());
-        }));
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::File_ImportImage, [this] {
+        QString filePath = FileDialogService::getOpenFileName(m_parentWidget, QObject::tr("Import Image"),
+                                                              FileDialogService::imageImportFilter());
+    }));
 }
 
 void FileOperationRegistry::registerExportOps()
 {
-    auto& reg = m_bus->registry();
+    auto &reg = m_bus->registry();
 
     // P5 收口: 统一使用 registerFromFormatMap 批量注册
-    registerFromFormatMap(reg, kExportFormatMap,
-        [this](Fio::FileFormat fmt) { doExportByFormat(fmt); });
+    registerFromFormatMap(reg, kExportFormatMap, [this](Fio::FileFormat fmt) { doExportByFormat(fmt); });
 }
 
 void FileOperationRegistry::registerAll()
@@ -325,7 +309,5 @@ void FileOperationRegistry::registerAll()
 
     // 退出操作
     m_bus->registry().registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::File_Exit, [this] {
-            FileOperationUtils::exitApplication(m_parentWidget);
-        }));
+        OperationId::File_Exit, [this] { FileOperationUtils::exitApplication(m_parentWidget); }));
 }

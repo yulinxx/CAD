@@ -26,7 +26,7 @@
 #include <string>
 #include <cstring>
 
- // ==================== ISelectionService 窄接口测试 ====================
+// ==================== ISelectionService 窄接口测试 ====================
 
 TEST(SelectionServiceTest, ConstructWithSceneManager)
 {
@@ -49,7 +49,7 @@ TEST(SelectionServiceTest, SelectSingle)
     SelectionService svc(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -67,7 +67,7 @@ TEST(SelectionServiceTest, Deselect)
     SelectionService svc(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -88,7 +88,7 @@ TEST(SelectionServiceTest, Clear)
     SelectionService svc(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -107,7 +107,7 @@ TEST(SelectionServiceTest, Toggle)
     SelectionService svc(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -136,13 +136,13 @@ TEST(SelectionServiceTest, SelectMultiple)
     for (int i = 0; i < 3; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
+        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i)});
         ids[i] = std::to_string(line->id);
         entities.push_back(std::move(line));
     }
     scene.addEntities(std::move(entities));
 
-    const char* idPtrs[] = { ids[0].c_str(), ids[1].c_str(), ids[2].c_str() };
+    const char *idPtrs[] = {ids[0].c_str(), ids[1].c_str(), ids[2].c_str()};
     svc.selectMultiple(idPtrs, 3);
 
     EXPECT_TRUE(svc.isSelected(ids[0].c_str()));
@@ -159,17 +159,19 @@ TEST(SelectionServiceTest, SelectMultipleClearsPrevious)
     for (int i = 0; i < 3; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
+        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i)});
         entities.push_back(std::move(line));
     }
     scene.addEntities(std::move(entities));
 
     // 先选中一个
     auto allIds = std::vector<Eg::EntityId>{};
-    scene.forEachEntityId([](Eg::EntityId eid, void* ctx) -> bool {
-        static_cast<std::vector<Eg::EntityId>*>(ctx)->push_back(eid);
-        return true;
-        }, &allIds);
+    scene.forEachEntityId(
+        [](Eg::EntityId eid, void *ctx) -> bool {
+            static_cast<std::vector<Eg::EntityId> *>(ctx)->push_back(eid);
+            return true;
+        },
+        &allIds);
     ASSERT_GE(allIds.size(), 3u);
     std::string firstId = std::to_string(allIds[0]);
     svc.select(firstId.c_str());
@@ -178,7 +180,7 @@ TEST(SelectionServiceTest, SelectMultipleClearsPrevious)
     // 批量选中另外两个 → 应清除第一个
     std::string id1 = std::to_string(allIds[1]);
     std::string id2 = std::to_string(allIds[2]);
-    const char* idPtrs[] = { id1.c_str(), id2.c_str() };
+    const char *idPtrs[] = {id1.c_str(), id2.c_str()};
     svc.selectMultiple(idPtrs, 2);
 
     EXPECT_FALSE(svc.isSelected(firstId.c_str()));
@@ -195,27 +197,31 @@ TEST(SelectionServiceTest, VisitSelectedIds)
     for (int i = 0; i < 3; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
+        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i)});
         entities.push_back(std::move(line));
     }
     scene.addEntities(std::move(entities));
 
     auto allIds = std::vector<Eg::EntityId>{};
-    scene.forEachEntityId([](Eg::EntityId eid, void* ctx) -> bool {
-        static_cast<std::vector<Eg::EntityId>*>(ctx)->push_back(eid);
-        return true;
-        }, &allIds);
+    scene.forEachEntityId(
+        [](Eg::EntityId eid, void *ctx) -> bool {
+            static_cast<std::vector<Eg::EntityId> *>(ctx)->push_back(eid);
+            return true;
+        },
+        &allIds);
     ASSERT_GE(allIds.size(), 3u);
     std::string id0 = std::to_string(allIds[0]);
     std::string id1 = std::to_string(allIds[1]);
-    const char* idPtrs[] = { id0.c_str(), id1.c_str() };
+    const char *idPtrs[] = {id0.c_str(), id1.c_str()};
     svc.selectMultiple(idPtrs, 2);
 
     int count = 0;
-    svc.visitSelectedIds([](const char* id, void* ctx) {
-        int* c = static_cast<int*>(ctx);
-        (*c)++;
-        }, &count);
+    svc.visitSelectedIds(
+        [](const char *id, void *ctx) {
+            int *c = static_cast<int *>(ctx);
+            (*c)++;
+        },
+        &count);
 
     EXPECT_EQ(count, 2);
 }
@@ -226,10 +232,12 @@ TEST(SelectionServiceTest, VisitSelectedIds_Empty)
     SelectionService svc(&scene);
 
     int count = 0;
-    svc.visitSelectedIds([](const char* id, void* ctx) {
-        int* c = static_cast<int*>(ctx);
-        (*c)++;
-        }, &count);
+    svc.visitSelectedIds(
+        [](const char *id, void *ctx) {
+            int *c = static_cast<int *>(ctx);
+            (*c)++;
+        },
+        &count);
 
     EXPECT_EQ(count, 0);
 }
@@ -240,7 +248,7 @@ TEST(SelectionServiceTest, VisitSelectedIds_AfterSelect)
     SelectionService svc(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -252,10 +260,12 @@ TEST(SelectionServiceTest, VisitSelectedIds_AfterSelect)
 
     // 通过 ID 遍历验证选择已生效（ISelectionService 不再泄漏 SyEntity*）
     int count = 0;
-    svc.visitSelectedIds([](const char* id, void* ctx) {
-        int* c = static_cast<int*>(ctx);
-        (*c)++;
-        }, &count);
+    svc.visitSelectedIds(
+        [](const char *id, void *ctx) {
+            int *c = static_cast<int *>(ctx);
+            (*c)++;
+        },
+        &count);
 
     EXPECT_EQ(count, 1);
 }
@@ -277,7 +287,7 @@ TEST(SelectionServiceTest, Qt_SelectedIdsQ_WithSelection)
     SelectionService svc(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -297,7 +307,7 @@ TEST(SelectionServiceTest, Qt_SelectEntity)
     SelectionService svc(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -317,11 +327,11 @@ TEST(SelectionServiceTest, Qt_SetSelectedEntityId)
     SelectionService svc(&scene);
 
     auto line1 = std::make_unique<Eg::SyLine>();
-    line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line1->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     Eg::EntityId id1 = line1->id;
 
     auto line2 = std::make_unique<Eg::SyLine>();
-    line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
+    line2->setPointVector({Ut::Vec2d(20, 20), Ut::Vec2d(30, 30)});
     Eg::EntityId id2 = line2->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -350,7 +360,7 @@ TEST(SelectionServiceTest, Qt_SetSelectedEntityIds)
     for (int i = 0; i < 3; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
+        line->setPointVector({Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i)});
         ids.append(QString::fromStdString(std::to_string(line->id)));
         entities.push_back(std::move(line));
     }
@@ -376,7 +386,7 @@ TEST(SelectionServiceTest, Qt_EntityIdAt_WithEntity)
     SelectionService svc(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -397,7 +407,7 @@ TEST(SelectionServiceTest, Integration_AddEntityDoesNotSelect)
     SelectionService svc(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
@@ -414,7 +424,7 @@ TEST(SelectionServiceTest, Integration_DeleteEntityClearsSelection)
     SelectionService svc(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -440,7 +450,7 @@ TEST(SelectionServiceTest, Integration_SelectMultipleMixedTypes)
 
     {
         auto line = std::make_unique<Eg::SyLine>();
-        line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+        line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
         idLine = std::to_string(line->id);
         entities.push_back(std::move(line));
     }
@@ -453,13 +463,13 @@ TEST(SelectionServiceTest, Integration_SelectMultipleMixedTypes)
     }
     {
         auto poly = std::make_unique<Eg::SyPolygon>();
-        poly->setVertices({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 0), Ut::Vec2d(10, 10) });
+        poly->setVertices({Ut::Vec2d(0, 0), Ut::Vec2d(10, 0), Ut::Vec2d(10, 10)});
         idPoly = std::to_string(poly->id);
         entities.push_back(std::move(poly));
     }
     scene.addEntities(std::move(entities));
 
-    const char* idPtrs[] = { idLine.c_str(), idCircle.c_str(), idPoly.c_str() };
+    const char *idPtrs[] = {idLine.c_str(), idCircle.c_str(), idPoly.c_str()};
     svc.selectMultiple(idPtrs, 3);
 
     EXPECT_TRUE(svc.isSelected(idLine.c_str()));
@@ -527,7 +537,7 @@ TEST(SelectionServiceTest, Boundary_ClearWhenEmpty)
     SelectionService svc(&scene);
 
     svc.clear();
-    svc.clear();  // 重复清除
+    svc.clear(); // 重复清除
     SUCCEED();
 }
 
@@ -537,7 +547,7 @@ TEST(SelectionServiceTest, Boundary_QuickToggleSequence)
     SelectionService svc(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -580,7 +590,7 @@ TEST(SelectionServiceTest, SceneManager_SelectReflectsInScene)
     SelectionService svc(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -600,7 +610,7 @@ TEST(SelectionServiceTest, SceneManager_ClearReflectsInScene)
     SelectionService svc(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     Eg::EntityId lineId = line->id;
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;

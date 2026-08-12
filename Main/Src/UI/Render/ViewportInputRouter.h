@@ -72,7 +72,7 @@ public:
 
     // ==================== 事件过滤器（转发 RenderWidget 事件到视口） ====================
 
-    bool eventFilter(QObject* obj, QEvent* event);
+    bool eventFilter(QObject* obj, QEvent* event) override;
 
     // ==================== 事件处理器（由 RenderViewport2D 委托） ====================
 

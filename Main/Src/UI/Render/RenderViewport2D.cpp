@@ -33,8 +33,7 @@
 
 // ==================== RenderViewport2D 实现 ====================
 
-RenderViewport2D::RenderViewport2D(QWidget* parent)
-    : QWidget(parent)
+RenderViewport2D::RenderViewport2D(QWidget *parent) : QWidget(parent)
 {
     setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
@@ -47,8 +46,8 @@ RenderViewport2D::RenderViewport2D(QWidget* parent)
     m_refreshCoordinator->setRenderWidget(m_renderWidget);
 
     // P5: 观察者注册收敛到 SceneRefreshCoordinator，视口通过信号同步工具状态
-    QObject::connect(m_refreshCoordinator.get(), &SceneRefreshCoordinator::selectionChanged,
-        this, [this]() { syncSelectionDetails(); });
+    QObject::connect(m_refreshCoordinator.get(), &SceneRefreshCoordinator::selectionChanged, this,
+                     [this]() { syncSelectionDetails(); });
 
     // 初始相机状态：台面中心 (600,400)，可见范围 (0,0)~(1200,800)
     m_camera.panOffset = QPointF(-600.0f, -400.0f);
@@ -80,7 +79,7 @@ void RenderViewport2D::releaseGLResources()
 
     // 先从布局中移除子 RenderWidget（QOpenGLWidget），
     // 阻止 Qt 在 makeCurrent() 之后继续向它派发布局/绘制事件。
-    if (auto* layout = this->layout())
+    if (auto *layout = this->layout())
         layout->removeWidget(m_renderWidget);
 
     // 再释放 GL 资源（内部会判断可见性，避免在无效 surface 上 makeCurrent）
@@ -121,7 +120,7 @@ void RenderViewport2D::syncInputRouterCallbacks()
 
 void RenderViewport2D::initRenderWidget()
 {
-    auto* layout = new QVBoxLayout(this);
+    auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
@@ -134,14 +133,14 @@ void RenderViewport2D::initRenderWidget()
     layout->addWidget(m_renderWidget);
 }
 
-Eg::SceneManager* RenderViewport2D::sceneManager() const
+Eg::SceneManager *RenderViewport2D::sceneManager() const
 {
     return m_sceneManager;
 }
 
 // ==================== 外部接口实现 ====================
 
-void RenderViewport2D::setStatusCallback(std::function<void(const QString&)> callback)
+void RenderViewport2D::setStatusCallback(std::function<void(const QString &)> callback)
 {
     m_statusCallback = std::move(callback);
     if (m_selector)
@@ -150,14 +149,14 @@ void RenderViewport2D::setStatusCallback(std::function<void(const QString&)> cal
         syncInputRouterCallbacks();
 }
 
-void RenderViewport2D::setSelectionCallback(std::function<void(const QString&, const QString&)> callback)
+void RenderViewport2D::setSelectionCallback(std::function<void(const QString &, const QString &)> callback)
 {
     m_selectionCallback = std::move(callback);
     if (m_selector)
         m_selector->setSelectionCallback(m_selectionCallback);
 }
 
-void RenderViewport2D::setCommandStageCallback(std::function<void(const QString&)> callback)
+void RenderViewport2D::setCommandStageCallback(std::function<void(const QString &)> callback)
 {
     m_commandStageCallback = std::move(callback);
 }
@@ -169,19 +168,19 @@ void RenderViewport2D::setPositionCallback(std::function<void(double, double)> c
         syncInputRouterCallbacks();
 }
 
-void RenderViewport2D::syncStatusMode(const QString& text)
+void RenderViewport2D::syncStatusMode(const QString &text)
 {
     if (m_statusCallback)
         m_statusCallback(text);
 }
 
-void RenderViewport2D::syncCommandStage(const QString& text)
+void RenderViewport2D::syncCommandStage(const QString &text)
 {
     if (m_commandStageCallback)
         m_commandStageCallback(text);
 }
 
-void RenderViewport2D::syncSelectionCallback(const QString& source, const QString& text)
+void RenderViewport2D::syncSelectionCallback(const QString &source, const QString &text)
 {
     if (m_selectionCallback)
         m_selectionCallback(source, text);
@@ -192,12 +191,12 @@ void RenderViewport2D::syncSelectionToolState()
     if (!m_toolManager)
         return;
 
-    auto* selectTool = dynamic_cast<SelectTool*>(m_toolManager->getActiveTool());
+    auto *selectTool = dynamic_cast<SelectTool *>(m_toolManager->getActiveTool());
     if (selectTool)
         selectTool->syncSelectionFromScene();
 }
 
-void RenderViewport2D::setDocument(SceneDocument2D* document)
+void RenderViewport2D::setDocument(SceneDocument2D *document)
 {
     m_document = document;
 
@@ -227,7 +226,7 @@ void RenderViewport2D::setDocument(SceneDocument2D* document)
         m_refreshCoordinator->requestFullRefresh();
 }
 
-void RenderViewport2D::setSelectionService(ISelectionService* service)
+void RenderViewport2D::setSelectionService(ISelectionService *service)
 {
     m_selectionService = service;
     if (m_selector)
@@ -236,14 +235,14 @@ void RenderViewport2D::setSelectionService(ISelectionService* service)
         m_inputRouter->setSelectionService(service);
 }
 
-void RenderViewport2D::setInteractionDispatcher(IInteractionDispatcher* dispatcher)
+void RenderViewport2D::setInteractionDispatcher(IInteractionDispatcher *dispatcher)
 {
     m_interactionDispatcher = dispatcher;
     if (m_inputRouter)
         m_inputRouter->setInteractionDispatcher(dispatcher);
 }
 
-void RenderViewport2D::setOperationBus(OperationBus* bus)
+void RenderViewport2D::setOperationBus(OperationBus *bus)
 {
     m_operationBus = bus;
     if (m_inputRouter)
@@ -258,22 +257,21 @@ void RenderViewport2D::initializeTools()
     m_toolManager = std::make_unique<ToolManager>();
 
     // 创建渲染协调器
-    auto* coordinator = new Ui2D::ViewRenderCoordinator();
+    auto *coordinator = new Ui2D::ViewRenderCoordinator();
     coordinator->setRenderWidget(m_renderWidget);
 
     // 注册所有工具
     ToolInitializer::registerAllTools(*m_toolManager, m_sceneManager, m_renderWidget, coordinator,
-        [this](const QString& msg) { updateStatus(msg); });
+                                      [this](const QString &msg) { updateStatus(msg); });
 
     // P1: 通过信号通知上层提交图元，视口不直接持有编辑服务
-    m_toolManager->setEntityCallbackForAllTools([this](Eg::SyEntity* e) {
-        if (e) emit entitySubmitRequested(e);
-        });
+    m_toolManager->setEntityCallbackForAllTools([this](Eg::SyEntity *e) {
+        if (e)
+            emit entitySubmitRequested(e);
+    });
 
     // 设置工具切换回调
-    m_toolManager->setSwitchToolCallbackForAllTools([this](const QString& name) {
-        setActiveTool(name);
-        });
+    m_toolManager->setSwitchToolCallbackForAllTools([this](const QString &name) { setActiveTool(name); });
 
     // 注册图元编辑器
     ToolInitializer::registerAllEditors();
@@ -285,40 +283,35 @@ void RenderViewport2D::initializeTools()
     // 活动命令的事件消费绑定到工具层；输入路由器不再直接决定命令事件如何落到工具。
     if (m_interactionDispatcher)
     {
-        m_interactionDispatcher->setEventHandler([this](const InteractionEvent& interaction) {
+        m_interactionDispatcher->setEventHandler([this](const InteractionEvent &interaction) {
             if (!m_toolManager)
                 return false;
 
-            auto* tool = m_toolManager->getActiveTool();
+            auto *tool = m_toolManager->getActiveTool();
             if (!tool)
                 return false;
 
             const QPointF worldPos(interaction.x, interaction.y);
             switch (interaction.type)
             {
-                case InteractionEventType::MouseDown:
-                {
-                    QMouseEvent event(QEvent::MouseButtonPress, worldPos,
-                        Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
-                    return tool->onMousePress(worldPos, &event);
-                }
-                case InteractionEventType::MouseMove:
-                {
-                    QMouseEvent event(QEvent::MouseMove, worldPos,
-                        Qt::NoButton, Qt::NoButton, Qt::NoModifier);
-                    return tool->onMouseMove(worldPos, &event);
-                }
-                case InteractionEventType::MouseUp:
-                {
-                    QMouseEvent event(QEvent::MouseButtonRelease, worldPos,
-                        Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
-                    return tool->onMouseRelease(worldPos, &event);
-                }
-                case InteractionEventType::KeyPress:
-                {
-                    QKeyEvent event(QEvent::KeyPress, interaction.key, Qt::NoModifier);
-                    return tool->onKeyPress(&event);
-                }
+            case InteractionEventType::MouseDown: {
+                QMouseEvent event(QEvent::MouseButtonPress, worldPos, worldPos, Qt::LeftButton, Qt::LeftButton,
+                                  Qt::NoModifier);
+                return tool->onMousePress(worldPos, &event);
+            }
+            case InteractionEventType::MouseMove: {
+                QMouseEvent event(QEvent::MouseMove, worldPos, worldPos, Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+                return tool->onMouseMove(worldPos, &event);
+            }
+            case InteractionEventType::MouseUp: {
+                QMouseEvent event(QEvent::MouseButtonRelease, worldPos, worldPos, Qt::LeftButton, Qt::LeftButton,
+                                  Qt::NoModifier);
+                return tool->onMouseRelease(worldPos, &event);
+            }
+            case InteractionEventType::KeyPress: {
+                QKeyEvent event(QEvent::KeyPress, interaction.key, Qt::NoModifier);
+                return tool->onKeyPress(&event);
+            }
             }
             return false;
         });
@@ -327,7 +320,7 @@ void RenderViewport2D::initializeTools()
     updateStatus(tr("2D tools initialized"));
 }
 
-bool RenderViewport2D::setActiveTool(const QString& toolName)
+bool RenderViewport2D::setActiveTool(const QString &toolName)
 {
     if (!m_toolManager)
         return false;
@@ -362,7 +355,7 @@ QString RenderViewport2D::activeToolName() const
     return m_toolManager->getActiveToolName();
 }
 
-ToolManager* RenderViewport2D::toolManager() const
+ToolManager *RenderViewport2D::toolManager() const
 {
     return m_toolManager.get();
 }
@@ -371,8 +364,7 @@ void RenderViewport2D::resetView()
 {
     // 相机重置到默认台面范围，视口只负责传视口尺寸和提交矩阵
     QSizeF physSize = physicalViewportSize();
-    m_camera.resetToDefault(static_cast<float>(physSize.width()),
-                            static_cast<float>(physSize.height()));
+    m_camera.resetToDefault(static_cast<float>(physSize.width()), static_cast<float>(physSize.height()));
     applyCameraToWidget();
     updateStatus(tr("2D view reset"));
 }
@@ -395,12 +387,9 @@ void RenderViewport2D::zoomToFit()
 
     // 相机编排逻辑已下沉到 Camera2D::zoomToBBox
     QSizeF physSize = physicalViewportSize();
-    m_camera.zoomToBBox(static_cast<float>(physSize.width()),
-                         static_cast<float>(physSize.height()),
-                         static_cast<float>(bbox.minPt.x()),
-                         static_cast<float>(bbox.minPt.y()),
-                         static_cast<float>(bbox.maxPt.x()),
-                         static_cast<float>(bbox.maxPt.y()));
+    m_camera.zoomToBBox(static_cast<float>(physSize.width()), static_cast<float>(physSize.height()),
+                        static_cast<float>(bbox.minPt.x()), static_cast<float>(bbox.minPt.y()),
+                        static_cast<float>(bbox.maxPt.x()), static_cast<float>(bbox.maxPt.y()));
     applyCameraToWidget();
     updateStatus(tr("2D zoom extents"));
 }
@@ -423,12 +412,9 @@ void RenderViewport2D::zoomToSelection()
 
     // 相机编排逻辑已下沉到 Camera2D::zoomToBBox
     QSizeF physSize = physicalViewportSize();
-    m_camera.zoomToBBox(static_cast<float>(physSize.width()),
-                         static_cast<float>(physSize.height()),
-                         static_cast<float>(bboxOpt->minPt.x()),
-                         static_cast<float>(bboxOpt->minPt.y()),
-                         static_cast<float>(bboxOpt->maxPt.x()),
-                         static_cast<float>(bboxOpt->maxPt.y()));
+    m_camera.zoomToBBox(static_cast<float>(physSize.width()), static_cast<float>(physSize.height()),
+                        static_cast<float>(bboxOpt->minPt.x()), static_cast<float>(bboxOpt->minPt.y()),
+                        static_cast<float>(bboxOpt->maxPt.x()), static_cast<float>(bboxOpt->maxPt.y()));
     applyCameraToWidget();
     updateStatus(tr("2D zoom to selection"));
 }
@@ -507,7 +493,7 @@ void RenderViewport2D::deleteSelectedEntity()
     updateStatus(tr("2D entity deleted"));
 }
 
-void RenderViewport2D::nudgeSelectedEndpoint(const QPointF& delta)
+void RenderViewport2D::nudgeSelectedEndpoint(const QPointF &delta)
 {
     if (!m_document)
         return;
@@ -525,7 +511,7 @@ void RenderViewport2D::nudgeSelectedEndpoint(const QPointF& delta)
         m_refreshCoordinator->requestLightRefresh();
 }
 
-void RenderViewport2D::selectEntityById(const QString& entityId)
+void RenderViewport2D::selectEntityById(const QString &entityId)
 {
     if (!m_document)
         return;
@@ -550,7 +536,7 @@ void RenderViewport2D::clearSelection()
     requestRepaint();
 }
 
-QPointF RenderViewport2D::mapToScene(const QPoint& screenPos) const
+QPointF RenderViewport2D::mapToScene(const QPoint &screenPos) const
 {
     // P5 收口: 简化坐标转换，委托给 widgetToWorld
     QPoint widgetPos = screenPos;
@@ -561,7 +547,7 @@ QPointF RenderViewport2D::mapToScene(const QPoint& screenPos) const
 
 // ==================== 事件处理（委托给 ViewportInputRouter） ====================
 
-void RenderViewport2D::showEvent(QShowEvent* event)
+void RenderViewport2D::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
     QTimer::singleShot(0, this, [this]() {
@@ -581,58 +567,58 @@ void RenderViewport2D::showEvent(QShowEvent* event)
             if (m_refreshCoordinator)
                 m_refreshCoordinator->requestFullRefresh();
         }
-        });
+    });
 }
 
-void RenderViewport2D::resizeEvent(QResizeEvent* event)
+void RenderViewport2D::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
     updateViewMatrix();
 }
 
-bool RenderViewport2D::eventFilter(QObject* obj, QEvent* event)
+bool RenderViewport2D::eventFilter(QObject *obj, QEvent *event)
 {
     return m_inputRouter->eventFilter(obj, event);
 }
 
-void RenderViewport2D::mousePressEvent(QMouseEvent* event)
+void RenderViewport2D::mousePressEvent(QMouseEvent *event)
 {
     if (m_inputRouter)
         m_inputRouter->handleMousePress(event);
 }
 
-void RenderViewport2D::mouseMoveEvent(QMouseEvent* event)
+void RenderViewport2D::mouseMoveEvent(QMouseEvent *event)
 {
     if (m_inputRouter)
         m_inputRouter->handleMouseMove(event);
 }
 
-void RenderViewport2D::mouseReleaseEvent(QMouseEvent* event)
+void RenderViewport2D::mouseReleaseEvent(QMouseEvent *event)
 {
     if (m_inputRouter)
         m_inputRouter->handleMouseRelease(event);
 }
 
-void RenderViewport2D::mouseDoubleClickEvent(QMouseEvent* event)
+void RenderViewport2D::mouseDoubleClickEvent(QMouseEvent *event)
 {
     if (m_inputRouter)
         m_inputRouter->handleMouseDoubleClick(event);
 }
 
-void RenderViewport2D::wheelEvent(QWheelEvent* event)
+void RenderViewport2D::wheelEvent(QWheelEvent *event)
 {
     if (m_inputRouter)
         m_inputRouter->handleWheel(event);
     updateViewMatrix();
 }
 
-void RenderViewport2D::keyPressEvent(QKeyEvent* event)
+void RenderViewport2D::keyPressEvent(QKeyEvent *event)
 {
     if (m_inputRouter)
         m_inputRouter->handleKeyPress(event);
 }
 
-void RenderViewport2D::contextMenuEvent(QContextMenuEvent* event)
+void RenderViewport2D::contextMenuEvent(QContextMenuEvent *event)
 {
     if (m_inputRouter)
         m_inputRouter->handleContextMenu(event);
@@ -704,7 +690,7 @@ void RenderViewport2D::requestFullRefresh()
 // P5: onSceneChanged / onSelectionChanged 已收敛到 SceneRefreshCoordinator（IObserver）
 // 视口不再直接实现 IObserver，通过 selectionChanged 信号同步工具状态
 
-void RenderViewport2D::updateStatus(const QString& text)
+void RenderViewport2D::updateStatus(const QString &text)
 {
     syncStatusMode(text);
 }

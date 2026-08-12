@@ -18,12 +18,9 @@
 #include <QObject>
 #include <QRegularExpression>
 
-WorkbenchStateManager::WorkbenchStateManager(WorkbenchWindow* parent,
-    WorkbenchMenuManager* menuManager,
-    WorkbenchLayoutManager* layoutManager)
-    : m_parent(parent)
-    , m_menuManager(menuManager)
-    , m_layoutManager(layoutManager)
+WorkbenchStateManager::WorkbenchStateManager(WorkbenchWindow *parent, WorkbenchMenuManager *menuManager,
+                                             WorkbenchLayoutManager *layoutManager)
+    : m_parent(parent), m_menuManager(menuManager), m_layoutManager(layoutManager)
 {
 }
 
@@ -31,7 +28,7 @@ WorkbenchStateManager::~WorkbenchStateManager() = default;
 
 // ==================== 服务注入 ====================
 
-void WorkbenchStateManager::setUiStateCenter(UiStateCenter* stateCenter)
+void WorkbenchStateManager::setUiStateCenter(UiStateCenter *stateCenter)
 {
     // 状态中心入口只负责替换源头引用，不在这里做额外状态编排
     unbindStateSignals();
@@ -40,25 +37,25 @@ void WorkbenchStateManager::setUiStateCenter(UiStateCenter* stateCenter)
     bindStateSignals();
 }
 
-void WorkbenchStateManager::setThemeService(UiThemeService* themeService)
+void WorkbenchStateManager::setThemeService(UiThemeService *themeService)
 {
     // 主题服务入口只替换引用，不在这里主动触发主题加载或界面刷新
     m_themeService = themeService;
     m_uiServices.themeService = themeService;
 }
 
-void WorkbenchStateManager::setFrameworkServices(const UiFrameworkServices& services)
+void WorkbenchStateManager::setFrameworkServices(const UiFrameworkServices &services)
 {
     // 框架级能力统一从这里注入，后续错误、权限、性能都必须走同一条框架路径
     m_frameworkServices = services;
 }
 
-void WorkbenchStateManager::setActiveStatusBar(StatusBarBase* statusBarWidget)
+void WorkbenchStateManager::setActiveStatusBar(StatusBarBase *statusBarWidget)
 {
     m_activeStatusBar = statusBarWidget;
 }
 
-void WorkbenchStateManager::configureServices(const UiServices& services)
+void WorkbenchStateManager::configureServices(const UiServices &services)
 {
     unbindStateSignals();
     m_uiServices = services;
@@ -136,7 +133,7 @@ void WorkbenchStateManager::refreshStatusText()
     {
         syncWindowStateFromStateCenter();
         const auto state = m_stateCenter->snapshot();
-        const auto& panel = m_layoutManager->panelState();
+        const auto &panel = m_layoutManager->panelState();
 
         if (panel.workbenchLabel)
         {
@@ -157,15 +154,16 @@ void WorkbenchStateManager::refreshStatusText()
                 docDisplay = fi.fileName();
             }
 
-            panel.workbenchLabel->setText(m_parent->tr("WB:%1 | Doc:%2 | Cmd:%3(%4) | Layer:%5 | View:%6 | Dirty:%7 | %8")
-                .arg(state.currentWorkbenchId)
-                .arg(docDisplay)
-                .arg(state.currentCommandId)
-                .arg(state.currentCommandPhase)
-                .arg(state.currentLayerId)
-                .arg(state.currentViewMode)
-                .arg(state.dirty ? m_parent->tr("Y") : m_parent->tr("N"))
-                .arg(statusPrompt));
+            panel.workbenchLabel->setText(
+                m_parent->tr("WB:%1 | Doc:%2 | Cmd:%3(%4) | Layer:%5 | View:%6 | Dirty:%7 | %8")
+                    .arg(state.currentWorkbenchId)
+                    .arg(docDisplay)
+                    .arg(state.currentCommandId)
+                    .arg(state.currentCommandPhase)
+                    .arg(state.currentLayerId)
+                    .arg(state.currentViewMode)
+                    .arg(state.dirty ? m_parent->tr("Y") : m_parent->tr("N"))
+                    .arg(statusPrompt));
             panel.workbenchLabel->setToolTip(docTooltip);
         }
 
@@ -177,7 +175,7 @@ void WorkbenchStateManager::refreshStatusText()
         return;
     }
 
-    const auto& panel = m_layoutManager->panelState();
+    const auto &panel = m_layoutManager->panelState();
     if (panel.workbenchLabel)
         panel.workbenchLabel->setText(m_parent->tr("Workbench: %1").arg(m_windowState.workbenchId));
     if (panel.busyLabel)
@@ -230,7 +228,7 @@ void WorkbenchStateManager::refreshFromState()
         m_activeStatusBar->setSelectionInfo(selectedCount, m_parent->tr("Selected: %1").arg(selectedCount));
     }
 
-    const auto& panel = m_layoutManager->panelState();
+    const auto &panel = m_layoutManager->panelState();
 
     // 注意：posLabel/selLabel/msgLabel 已移除 —— 这些由 StatusBarBase 子类管理，
     // 状态栏消息与选择信息在上方通过 m_activeStatusBar 接口统一更新
@@ -252,28 +250,29 @@ void WorkbenchStateManager::refreshFromState()
             statusPrompt = state.metadata.value(QStringLiteral("statusPrompt")).toString();
         if (statusPrompt.isEmpty())
             statusPrompt = m_parent->tr("Ready");
-        panel.propertiesDock->setStateText(m_parent->tr("WB=%1 | View=%2 | Cmd=%3(%4) | Dirty=%5 | Layer=%6 | Doc=%7 | Busy=%8 | %9")
-            .arg(state.currentWorkbenchId)
-            .arg(state.currentViewMode)
-            .arg(state.currentCommandId)
-            .arg(state.currentCommandPhase)
-            .arg(state.dirty ? m_parent->tr("Y") : m_parent->tr("N"))
-            .arg(state.currentLayerId)
-            .arg(state.currentDocumentId)
-            .arg(state.busy ? m_parent->tr("Y") : m_parent->tr("N"))
-            .arg(statusPrompt));
+        panel.propertiesDock->setStateText(
+            m_parent->tr("WB=%1 | View=%2 | Cmd=%3(%4) | Dirty=%5 | Layer=%6 | Doc=%7 | Busy=%8 | %9")
+                .arg(state.currentWorkbenchId)
+                .arg(state.currentViewMode)
+                .arg(state.currentCommandId)
+                .arg(state.currentCommandPhase)
+                .arg(state.dirty ? m_parent->tr("Y") : m_parent->tr("N"))
+                .arg(state.currentLayerId)
+                .arg(state.currentDocumentId)
+                .arg(state.busy ? m_parent->tr("Y") : m_parent->tr("N"))
+                .arg(statusPrompt));
 
         // 选择文本格式化委托给当前工作台（2D/3D 各自定义格式）
         QString selectionText;
-        if (auto* wb = m_parent->currentWorkbench())
+        if (auto *wb = m_parent->currentWorkbench())
             selectionText = wb->formatSelectionText(state);
         else
             selectionText = m_parent->tr("Sel=%1 | SelSrc=%2 | CmdSrc=%3 | SelType=%4 | CmdType=%5")
-                .arg(state.currentSelectionText)
-                .arg(state.currentSelectionSource)
-                .arg(state.currentCommandOwner)
-                .arg(state.currentSelectionType)
-                .arg(state.currentCommandType);
+                                .arg(state.currentSelectionText)
+                                .arg(state.currentSelectionSource)
+                                .arg(state.currentCommandOwner)
+                                .arg(state.currentSelectionType)
+                                .arg(state.currentCommandType);
         panel.propertiesDock->setSelectionText(selectionText);
     }
 }
@@ -295,16 +294,13 @@ void WorkbenchStateManager::updateWindowTitle()
 
         QString title;
         if (docFile.isEmpty())
-            title = QStringLiteral("%1 - %2 - %3").arg(
-                QString::fromStdString(MainApp::appName()),
-                state.currentWorkbenchId,
-                state.currentViewMode);
+            title =
+                QStringLiteral("%1 - %2 - %3")
+                    .arg(QString::fromStdString(MainApp::appName()), state.currentWorkbenchId, state.currentViewMode);
         else
-            title = QStringLiteral("%1 - %2 [%3 - %4]").arg(
-                docFile,
-                QString::fromStdString(MainApp::appName()),
-                state.currentWorkbenchId,
-                state.currentViewMode);
+            title = QStringLiteral("%1 - %2 [%3 - %4]")
+                        .arg(docFile, QString::fromStdString(MainApp::appName()), state.currentWorkbenchId,
+                             state.currentViewMode);
 
         if (state.dirty)
             title.prepend(QStringLiteral("* "));
@@ -312,9 +308,8 @@ void WorkbenchStateManager::updateWindowTitle()
         return;
     }
 
-    m_parent->setWindowTitle(QStringLiteral("%1 - %2").arg(
-        QString::fromStdString(MainApp::appName()),
-        m_windowState.workbenchId));
+    m_parent->setWindowTitle(
+        QStringLiteral("%1 - %2").arg(QString::fromStdString(MainApp::appName()), m_windowState.workbenchId));
 }
 
 // ==================== 工作台切换状态收尾 ====================
@@ -350,14 +345,12 @@ void WorkbenchStateManager::clearSelectionState()
     // 清空选择相关状态，避免工作台切换后沿用旧选择文本
     m_stateCenter->setCurrentSelectionText(QString());
     m_stateCenter->setSelectionContext(QStringLiteral("none"), QString());
-    m_stateCenter->setMetadata({
-        { QStringLiteral("selectionSource"), QStringLiteral("none") },
-        { QStringLiteral("selectionText"), QString() },
-        { QStringLiteral("selectionType"), QStringLiteral("none") }
-        });
+    m_stateCenter->setMetadata({{QStringLiteral("selectionSource"), QStringLiteral("none")},
+                                {QStringLiteral("selectionText"), QString()},
+                                {QStringLiteral("selectionType"), QStringLiteral("none")}});
 }
 
-void WorkbenchStateManager::setWorkbenchSwitchContext(const QString& workbenchId, const QString& switchContextText)
+void WorkbenchStateManager::setWorkbenchSwitchContext(const QString &workbenchId, const QString &switchContextText)
 {
     if (!m_stateCenter)
         return;
@@ -378,7 +371,7 @@ void WorkbenchStateManager::setWorkbenchSwitchContext(const QString& workbenchId
     m_stateCenter->setMetadata(meta);
 }
 
-void WorkbenchStateManager::setWorkbenchTransitionState(const QString& phase, const QString& status)
+void WorkbenchStateManager::setWorkbenchTransitionState(const QString &phase, const QString &status)
 {
     if (!m_stateCenter)
         return;

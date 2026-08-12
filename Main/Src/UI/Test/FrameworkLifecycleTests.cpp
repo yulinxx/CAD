@@ -42,26 +42,24 @@
 
 namespace
 {
-    // 序列化辅助：查询大小 → 分配 → 写入，返回完整数据（C3 blob 化接口适配）
-    Fio::SerializeResult serializeDoc(Fio::SySerializer& s, const Fio::SyDocument& doc,
-        std::vector<uint8_t>& out)
-    {
-        Fio::BinaryBlobOut query;
-        auto r = s.serializeToMemory(doc, &query);
-        if (!r.success)
-            return r;
-        out.resize(query.written);
-        Fio::BinaryBlobOut blobOut{ out.data(), out.size(), 0 };
-        return s.serializeToMemory(doc, &blobOut);
-    }
-
-    Fio::SerializeResult deserializeDoc(Fio::SySerializer& s, const std::vector<uint8_t>& data,
-        Fio::SyDocument& doc)
-    {
-        Fio::BinaryBlob in{ const_cast<uint8_t*>(data.data()), data.size() };
-        return s.deserializeFromMemory(in, doc);
-    }
+// 序列化辅助：查询大小 → 分配 → 写入，返回完整数据（C3 blob 化接口适配）
+Fio::SerializeResult serializeDoc(Fio::SySerializer &s, const Fio::SyDocument &doc, std::vector<uint8_t> &out)
+{
+    Fio::BinaryBlobOut query;
+    auto r = s.serializeToMemory(doc, &query);
+    if (!r.success)
+        return r;
+    out.resize(query.written);
+    Fio::BinaryBlobOut blobOut{out.data(), out.size(), 0};
+    return s.serializeToMemory(doc, &blobOut);
 }
+
+Fio::SerializeResult deserializeDoc(Fio::SySerializer &s, const std::vector<uint8_t> &data, Fio::SyDocument &doc)
+{
+    Fio::BinaryBlob in{const_cast<uint8_t *>(data.data()), data.size()};
+    return s.deserializeFromMemory(in, doc);
+}
+} // namespace
 
 TEST(FrameworkLifecycleTest, StableChecklist_IsDocumented)
 {
@@ -139,7 +137,7 @@ TEST(FrameworkRegressionTest, WorkbenchStateSnapshot_AllFieldsHaveDefaults)
     EXPECT_TRUE(snapshot.viewportType.isEmpty());
     EXPECT_TRUE(snapshot.viewportStatus.isEmpty());
     EXPECT_TRUE(snapshot.activeToolId.isEmpty());     // P0: 工具状态恢复
-    EXPECT_TRUE(snapshot.inputFocusWidget.isEmpty());  // P0: 焦点状态恢复
+    EXPECT_TRUE(snapshot.inputFocusWidget.isEmpty()); // P0: 焦点状态恢复
     EXPECT_FALSE(snapshot.dirty);
 }
 
@@ -173,7 +171,7 @@ TEST(FrameworkRegressionTest, SceneGeometryCollector_CollectsBBoxData)
     collector.emitBBox(bbox2);
 
     EXPECT_EQ(collector.bboxCount(), 2u);
-    const auto& bboxes = collector.bboxes();
+    const auto &bboxes = collector.bboxes();
     ASSERT_EQ(bboxes.size(), 2u);
 
     EXPECT_EQ(bboxes[0].entityId, 42u);
@@ -207,7 +205,7 @@ TEST(FrameworkRegressionTest, ISceneDataSource_DefaultImplementations)
     // 创建一个最小实现来测试默认行为
     struct MinimalDataSource : Eg::ISceneDataSource
     {
-        void gatherGeometry(Eg::ISceneGeometrySink&) const override
+        void gatherGeometry(Eg::ISceneGeometrySink &) const override
         {
         }
         Ut::BBox2d sceneBBox2D() const override
@@ -229,8 +227,8 @@ TEST(FrameworkRegressionTest, ISceneDataSource_DefaultImplementations)
 
     // ABI 收口：forEachSelectedEntityId 默认实现为空遍历
     bool visited = false;
-    ds.forEachSelectedEntityId([](Eg::EntityId, void* ctx) { *static_cast<bool*>(ctx) = true; }, &visited);
-    EXPECT_FALSE(visited);  // 默认实现不遍历任何实体
+    ds.forEachSelectedEntityId([](Eg::EntityId, void *ctx) { *static_cast<bool *>(ctx) = true; }, &visited);
+    EXPECT_FALSE(visited); // 默认实现不遍历任何实体
 
     // ABI 收口：entityName 改为 buffer 模式，默认实现返回空字符串
     char nameBuf[64] = {};
@@ -243,25 +241,26 @@ TEST(FrameworkRegressionTest, ISceneGeometrySink_EmitBBoxDefaultIsNoop)
     // 验证 emitBBox 默认实现为空操作（不强制子类覆盖）
     struct MinimalSink : Eg::ISceneGeometrySink
     {
-        void emitPolyline(const Ut::Vec2d*, size_t, bool, const Ut::Color&) override
+        void emitPolyline(const Ut::Vec2d *, size_t, bool, const Ut::Color &) override
         {
         }
-        void emitCircle(const Ut::Vec2d&, double, const Ut::Color&) override
+        void emitCircle(const Ut::Vec2d &, double, const Ut::Color &) override
         {
         }
-        void emitArc(const Ut::Vec2d&, double, double, double, const Ut::Color&) override
+        void emitArc(const Ut::Vec2d &, double, double, double, const Ut::Color &) override
         {
         }
-        void emitEllipse(const Ut::Vec2d&, double, double, double, double, double, bool, const Ut::Color&) override
+        void emitEllipse(const Ut::Vec2d &, double, double, double, double, double, bool, const Ut::Color &) override
         {
         }
-        void emitText(const Ut::Vec2d&, const char*, const Ut::Color&) override
+        void emitText(const Ut::Vec2d &, const char *, const Ut::Color &) override
         {
         }
-        void emitImagePlaceholder(const Ut::Vec2d&, const Ut::Vec2d&, const Ut::Vec2d&, const Ut::Vec2d&, const Ut::Color&) override
+        void emitImagePlaceholder(const Ut::Vec2d &, const Ut::Vec2d &, const Ut::Vec2d &, const Ut::Vec2d &,
+                                  const Ut::Color &) override
         {
         }
-        void emitTriangleSoup(const Ut::Vec3f*, size_t, const Ut::Vec3f*, size_t, const Ut::Color&) override
+        void emitTriangleSoup(const Ut::Vec3f *, size_t, const Ut::Vec3f *, size_t, const Ut::Color &) override
         {
         }
     };
@@ -280,7 +279,7 @@ TEST(FrameworkRegressionTest, SerializationRoundtrip_EntityCountAndTypes)
     Fio::SyDocument doc;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     line->setName("TestLine");
 
     auto circle = std::make_unique<Eg::SyCircle>();
@@ -289,10 +288,7 @@ TEST(FrameworkRegressionTest, SerializationRoundtrip_EntityCountAndTypes)
     circle->setName("TestCircle");
 
     auto polygon = std::make_unique<Eg::SyPolygon>();
-    polygon->setVertices({
-        Ut::Vec2d(0, 0), Ut::Vec2d(10, 0),
-        Ut::Vec2d(10, 10), Ut::Vec2d(0, 10)
-        });
+    polygon->setVertices({Ut::Vec2d(0, 0), Ut::Vec2d(10, 0), Ut::Vec2d(10, 10), Ut::Vec2d(0, 10)});
     polygon->setName("TestPolygon");
 
     polygon->bClosed = true;
@@ -328,7 +324,7 @@ TEST(FrameworkRegressionTest, SerializationRoundtrip_EntityProperties)
     Fio::SyDocument doc;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(1.5, 2.5), Ut::Vec2d(3.5, 4.5) });
+    line->setPointVector({Ut::Vec2d(1.5, 2.5), Ut::Vec2d(3.5, 4.5)});
     line->setName("PropLine");
 
     line->bClosed = false;
@@ -343,9 +339,7 @@ TEST(FrameworkRegressionTest, SerializationRoundtrip_EntityProperties)
     doc.addEntity(circle.release());
 
     auto polygon = std::make_unique<Eg::SyPolygon>();
-    polygon->setVertices({
-        Ut::Vec2d(0, 0), Ut::Vec2d(5, 0), Ut::Vec2d(5, 5)
-        });
+    polygon->setVertices({Ut::Vec2d(0, 0), Ut::Vec2d(5, 0), Ut::Vec2d(5, 5)});
     polygon->setName("PropPolygon");
 
     polygon->bClosed = true;
@@ -360,7 +354,7 @@ TEST(FrameworkRegressionTest, SerializationRoundtrip_EntityProperties)
     ASSERT_EQ(loaded.entityCount(), 3u);
 
     // 验证线属性
-    auto* loadedLine = dynamic_cast<Eg::SyLine*>(loaded.entityAt(0));
+    auto *loadedLine = dynamic_cast<Eg::SyLine *>(loaded.entityAt(0));
     ASSERT_NE(loadedLine, nullptr);
     ASSERT_EQ(loadedLine->pointRef().size(), 2u);
     EXPECT_DOUBLE_EQ(loadedLine->pointRef()[0].x(), 1.5);
@@ -371,7 +365,7 @@ TEST(FrameworkRegressionTest, SerializationRoundtrip_EntityProperties)
     EXPECT_FALSE(loadedLine->bClosed);
 
     // 验证圆属性
-    auto* loadedCircle = dynamic_cast<Eg::SyCircle*>(loaded.entityAt(1));
+    auto *loadedCircle = dynamic_cast<Eg::SyCircle *>(loaded.entityAt(1));
     ASSERT_NE(loadedCircle, nullptr);
     EXPECT_DOUBLE_EQ(loadedCircle->basePoint.x(), 7.5);
     EXPECT_DOUBLE_EQ(loadedCircle->basePoint.y(), 8.5);
@@ -380,7 +374,7 @@ TEST(FrameworkRegressionTest, SerializationRoundtrip_EntityProperties)
     EXPECT_TRUE(loadedCircle->bClosed);
 
     // 验证多边形属性
-    auto* loadedPolygon = dynamic_cast<Eg::SyPolygon*>(loaded.entityAt(2));
+    auto *loadedPolygon = dynamic_cast<Eg::SyPolygon *>(loaded.entityAt(2));
     ASSERT_NE(loadedPolygon, nullptr);
     EXPECT_EQ(loadedPolygon->vertices().size(), 3u);
     EXPECT_STREQ(loadedPolygon->name(), "PropPolygon");
@@ -505,8 +499,8 @@ TEST(FrameworkRegressionTest, SceneGeometryCollector_DeterministicOutput)
     collector1.setCurrentEntityId(1);
     collector1.emitBBox(Ut::BBox3f(Ut::Vec3f(0, 0, 0), Ut::Vec3f(10, 10, 10)));
     collector1.setCurrentEntityId(2);
-    const Ut::Vec3f verts[] = { Ut::Vec3f(0, 0, 0), Ut::Vec3f(1, 0, 0), Ut::Vec3f(0, 1, 0) };
-    const Ut::Vec3f norms[] = { Ut::Vec3f(0, 0, 1), Ut::Vec3f(0, 0, 1), Ut::Vec3f(0, 0, 1) };
+    const Ut::Vec3f verts[] = {Ut::Vec3f(0, 0, 0), Ut::Vec3f(1, 0, 0), Ut::Vec3f(0, 1, 0)};
+    const Ut::Vec3f norms[] = {Ut::Vec3f(0, 0, 1), Ut::Vec3f(0, 0, 1), Ut::Vec3f(0, 0, 1)};
     collector1.emitTriangleSoup(verts, 3, norms, 3, Ut::Color());
 
     // 第二次收集（相同输入）
@@ -519,8 +513,8 @@ TEST(FrameworkRegressionTest, SceneGeometryCollector_DeterministicOutput)
     EXPECT_EQ(collector1.bboxCount(), collector2.bboxCount());
     EXPECT_EQ(collector1.meshCount(), collector2.meshCount());
 
-    const auto& bboxes1 = collector1.bboxes();
-    const auto& bboxes2 = collector2.bboxes();
+    const auto &bboxes1 = collector1.bboxes();
+    const auto &bboxes2 = collector2.bboxes();
     ASSERT_EQ(bboxes1.size(), bboxes2.size());
 
     for (size_t i = 0; i < bboxes1.size(); ++i)
@@ -531,8 +525,8 @@ TEST(FrameworkRegressionTest, SceneGeometryCollector_DeterministicOutput)
         EXPECT_EQ(bboxes1[i].bbox.minPt[2], bboxes2[i].bbox.minPt[2]);
     }
 
-    const auto& meshes1 = collector1.meshes();
-    const auto& meshes2 = collector2.meshes();
+    const auto &meshes1 = collector1.meshes();
+    const auto &meshes2 = collector2.meshes();
     ASSERT_EQ(meshes1.size(), meshes2.size());
 
     for (size_t i = 0; i < meshes1.size(); ++i)
@@ -548,15 +542,15 @@ TEST(FrameworkRegressionTest, ISceneDataSource_GatherGeometryDeterministic)
     // 验证 ISceneDataSource::gatherGeometry() 对相同场景产生确定性输出
     struct DeterministicSource : Eg::ISceneDataSource
     {
-        void gatherGeometry(Eg::ISceneGeometrySink& sink) const override
+        void gatherGeometry(Eg::ISceneGeometrySink &sink) const override
         {
             sink.setCurrentEntityId(10);
             sink.emitBBox(Ut::BBox3f(Ut::Vec3f(-1, -1, -1), Ut::Vec3f(1, 1, 1)));
 
             sink.setCurrentEntityId(20);
             // ABI 收口：emitTriangleSoup 参数改为原始指针
-            Ut::Vec3f verts[] = { Ut::Vec3f(0, 0, 0), Ut::Vec3f(2, 0, 0), Ut::Vec3f(0, 2, 0) };
-            Ut::Vec3f norms[] = { Ut::Vec3f(0, 0, 1), Ut::Vec3f(0, 0, 1), Ut::Vec3f(0, 0, 1) };
+            Ut::Vec3f verts[] = {Ut::Vec3f(0, 0, 0), Ut::Vec3f(2, 0, 0), Ut::Vec3f(0, 2, 0)};
+            Ut::Vec3f norms[] = {Ut::Vec3f(0, 0, 1), Ut::Vec3f(0, 0, 1), Ut::Vec3f(0, 0, 1)};
             sink.emitTriangleSoup(verts, 3, norms, 3, Ut::Color());
         }
         Ut::BBox2d sceneBBox2D() const override
@@ -588,13 +582,13 @@ TEST(FrameworkRegressionTest, ISceneDataSource_GatherGeometryDeterministic)
     EXPECT_EQ(collector1.meshCount(), 1u);
 
     // 验证收集到的数据内容一致
-    const auto& bboxes1 = collector1.bboxes();
-    const auto& bboxes2 = collector2.bboxes();
+    const auto &bboxes1 = collector1.bboxes();
+    const auto &bboxes2 = collector2.bboxes();
     ASSERT_EQ(bboxes1.size(), bboxes2.size());
     EXPECT_EQ(bboxes1[0].entityId, bboxes2[0].entityId);
 
-    const auto& meshes1 = collector1.meshes();
-    const auto& meshes2 = collector2.meshes();
+    const auto &meshes1 = collector1.meshes();
+    const auto &meshes2 = collector2.meshes();
     ASSERT_EQ(meshes1.size(), meshes2.size());
     EXPECT_EQ(meshes1[0].entityId, meshes2[0].entityId);
     EXPECT_EQ(meshes1[0].vertices.size(), meshes2[0].vertices.size());
@@ -642,7 +636,7 @@ TEST(FrameworkRegressionTest, UndoRedo_CreateUndoEntityRemoved)
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     Eg::EntityId entityId = line->id;
 
     // 创建（添加图元）
@@ -658,7 +652,7 @@ TEST(FrameworkRegressionTest, UndoRedo_CreateUndoEntityRemoved)
     EXPECT_EQ(extracted->id, entityId);
 
     // 验证提取的图元属性完整
-    auto* extractedLine = dynamic_cast<Eg::SyLine*>(extracted.get());
+    auto *extractedLine = dynamic_cast<Eg::SyLine *>(extracted.get());
     ASSERT_NE(extractedLine, nullptr);
     EXPECT_EQ(extractedLine->pointRef().size(), 2u);
 }
@@ -669,7 +663,7 @@ TEST(FrameworkRegressionTest, UndoRedo_RedoEntityRestoredWithProperties)
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(1, 2), Ut::Vec2d(3, 4) });
+    line->setPointVector({Ut::Vec2d(1, 2), Ut::Vec2d(3, 4)});
     line->setName("RedoLine");
 
     Eg::EntityId entityId = line->id;
@@ -692,11 +686,11 @@ TEST(FrameworkRegressionTest, UndoRedo_RedoEntityRestoredWithProperties)
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
     // 验证属性恢复
-    auto* restored = scene.findSyEntityById(entityId);
+    auto *restored = scene.findSyEntityById(entityId);
     ASSERT_NE(restored, nullptr);
     EXPECT_STREQ(restored->name(), "RedoLine");
 
-    auto* restoredLine = dynamic_cast<Eg::SyLine*>(restored);
+    auto *restoredLine = dynamic_cast<Eg::SyLine *>(restored);
     ASSERT_NE(restoredLine, nullptr);
     EXPECT_EQ(restoredLine->pointRef().size(), 2u);
     EXPECT_DOUBLE_EQ(restoredLine->pointRef()[0].x(), pt0.x());
@@ -712,7 +706,7 @@ TEST(FrameworkRegressionTest, UndoRedo_MultipleUndoRedoSequence)
 
     // 步骤1: 创建实体
     auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    line->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(10, 10)});
     line->setName("Original");
 
     Eg::EntityId entityId = line->id;
@@ -729,12 +723,12 @@ TEST(FrameworkRegressionTest, UndoRedo_MultipleUndoRedoSequence)
 
     auto modified = std::make_unique<Eg::SyLine>();
     modified->id = entityId;
-    modified->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(20, 20) });
+    modified->setPointVector({Ut::Vec2d(0, 0), Ut::Vec2d(20, 20)});
     modified->setName("Modified");
 
     scene.insertEntityPreserveId(std::move(modified));
 
-    auto* current = scene.findSyEntityById(entityId);
+    auto *current = scene.findSyEntityById(entityId);
     ASSERT_NE(current, nullptr);
     EXPECT_STREQ(current->name(), "Modified");
 
