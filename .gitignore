@@ -1,72 +1,196 @@
-# Build directories
+# ============================================================
+# 根仓库 .gitignore（跨平台 / 多 IDE 统一规则）
+# ============================================================
+
+# ---- 构建输出目录 ----
 build/
 build*
+build-*/
+build_*/
 out/
 cmake-build-*/
+
+# ---- CMake 中间文件 ----
 CMakeFiles/
 CMakeCache.txt
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
 *.cmake
+CMakeUserPresets.json
 
-# IDE
-.vs/
-.vscode/
-*.user
-*.suo
-*.sln
-*.vcxproj*
-*.xcodeproj
-*.xcworkspace
+# ---- Ninja 中间文件 ----
+*.ninja
+*.ninja_deps
+*.ninja_log
 
-# Compiled binaries
+# ---- 编译产物（跨平台）----
+# Windows
+*.obj
+*.lib
+*.exp
+*.pdb
+*.ilk
+*.idb
 *.exe
 *.dll
-*.so
-*.dylib
-*.lib
-*.a
-*.obj
+*.tlog
+*.lastbuildstate
+# Linux / Unix
 *.o
-*.pdb
+*.so
+*.so.*
+*.a
+*.la
+*.lai
+*.slo
+*.lo
+*.out
+# macOS
+*.dylib
+*.app
+*.dSYM/
 
-# Qt
+# ---- 预编译头 / Fortran ----
+*.gch
+*.pch
+*.mod
+*.smod
+
+# ---- 调试信息 / dump 文件 ----
+*.dwo
+*.dump
+core
+core.*
+
+# ---- IDE: Visual Studio ----
+.vs/
+*.suo
+*.sln
+*.sdf
+*.opensdf
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.vcproj
+*.vspscc
+*.vssscc
+
+# ---- IDE: VSCode ----
+.vscode/
+
+# ---- IDE: Xcode ----
+*.xcodeproj
+*.xcworkspace
+*.xcuserdata
+*.xcuserstate
+DerivedData/
+xcuserdata/
+*.swiftpm/
+
+# ---- IDE: CLion / JetBrains ----
+.idea/
+*.iml
+
+# ---- IDE: QtCreator ----
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+*.autosave
+*.qmlproject.user
+*.qmlproject.user.*
+CMakeLists.txt.user*
+*creator.user*
+/.qmake.cache
+/.qmake.stash
+
+# ---- Qt 生成文件 ----
 moc_*.cpp
-ui_*.h
+moc_*.h
 qrc_*.cpp
+ui_*.h
 *.qm
+*.qmlc
+*.jsc
+*.prl
+*.qmlls.ini
+*_qmlcache.qrc
+*_plugin_import.cpp
+object_script.*.Release
+object_script.*.Debug
+target_wrapper.*
 
-# Generated files
+# ---- Protobuf 生成文件 ----
 Generated/
-*_pb.cc
-*_pb.h
+*.pb.cc
+*.pb.h
+*_pb2.py
 
-# Python
+# ---- Python ----
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
 *.egg-info/
+.eggs/
 Python/venv/
 Python/.venv/
+venv/
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
 
-# OS
-.DS_Store
+# ---- vcpkg ----
+vcpkg_installed/
+
+# ---- OS 系统临时文件 ----
+# Windows
 Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
 desktop.ini
+$RECYCLE.BIN/
+*.lnk
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+# Linux
+*~
+.directory
+.Trash-*
 
-# Temporary
+# ---- 临时 / 日志 / 备份文件 ----
 *.tmp
+*.temp
 *.swp
 *.swo
-*~
+*.bak
+*.orig
 *.log
+*.old
+
+# ---- 项目特定目录 ----
 SVGnest/
 Doc/
 docs/
 Archive/
 RenderEngine/
-.gitmodules
-.github/
 scripts/
+.github/
 
-# License - private keys
+# ---- 凭证 / 密钥 ----
 *.pem
+*.key
+*.p12
+*.pfx
+.env
+.env.local
