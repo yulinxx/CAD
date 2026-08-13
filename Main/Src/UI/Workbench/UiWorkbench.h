@@ -300,6 +300,9 @@ public:
     bool requiresSkeletonDocks() const override;
     bool managesOwnMenus() const override;
 
+    // 3D 工作台接管设置对话框，避免 CoreOperationRegistry 兜底弹出冗余提示
+    bool showSettingsDialog(QWidget* parent) override;
+
 private:
     // ServiceOwner 定义在 .cpp 中（PIMPL 模式，避免头文件引入 20+ 3D 依赖）
     struct ServiceOwner;

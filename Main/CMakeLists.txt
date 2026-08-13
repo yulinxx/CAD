@@ -495,7 +495,14 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
     endif()
 
     # P2 测试扩展: 添加 protobuf 生成的源文件以支持 SyEntitySerializer 测试
-    set(PROTO_GEN_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Generated/Proto/SanYiDocument.pb.cc")
+    # 生成目录由 FileIO target 通过 INTERFACE_SANYI_PROTO_GEN_DIR 属性暴露，位于构建树中
+    get_target_property(_proto_gen_dir FileIO INTERFACE_SANYI_PROTO_GEN_DIR)
+    if(NOT _proto_gen_dir)
+        message(FATAL_ERROR "FileIO target does not expose INTERFACE_SANYI_PROTO_GEN_DIR property, cannot locate protobuf generated sources")
+    endif()
+    set(PROTO_GEN_SRC "${_proto_gen_dir}/SanYiDocument.pb.cc")
+    # 标记为生成文件，避免 CMake 配置阶段检查文件是否存在（实际由 FileIO 的 protobuf_generate 在构建期产出）
+    set_source_files_properties(${PROTO_GEN_SRC} PROPERTIES GENERATED TRUE)
 
     # P5 测试扩展: 添加 BaseTool.cpp（非导出类，UI2D 库不导出其符号）
     set(BASE_TOOL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Src/Ui/DrawTools/BaseTool.cpp")
@@ -545,7 +552,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             "${CMAKE_CURRENT_SOURCE_DIR}/../Log/Log/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Src"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Generated/Proto"
+            # protobuf 生成头文件目录由 FileIO target 的 PUBLIC_INCLUDE_DIRS 自动传播
     )
 
     target_link_libraries(MainTests

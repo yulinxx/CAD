@@ -305,6 +305,11 @@ void RenderViewport2D::setOperationBus(OperationBus* bus)
     }
 }
 
+void RenderViewport2D::setLayerManager(LayerManager* manager)
+{
+    m_layerManager = manager;
+}
+
 void RenderViewport2D::initializeTools()
 {
     if (!m_renderWidget || !m_sceneManager)
@@ -318,11 +323,18 @@ void RenderViewport2D::initializeTools()
     auto* coordinator = new Ui2D::ViewRenderCoordinator();
     coordinator->setRenderWidget(m_renderWidget);
 
-    // 注册所有工具
+    // 注册所有工具。
+    // 额外注入场景编辑服务（Gizmo 变换 Undo）、图层管理器（锁定图层过滤）、
+    // 重置视图回调（空格键）等选择工具所需的依赖。
     ToolInitializer::registerAllTools(
-        *m_toolManager, m_sceneManager, m_renderWidget, coordinator, [this](const QString& msg) {
+        *m_toolManager, m_sceneManager, m_renderWidget, coordinator,
+        [this](const QString& msg) {
             updateStatus(msg);
-        });
+        },
+        /*sceneEdit=*/m_document ? m_document->editService() : nullptr,
+        /*layerManager=*/m_layerManager,
+        /*onResetView=*/[this]() { zoomToFit(); },
+        /*onEntityDoubleClick=*/nullptr);
 
     // P1: 通过信号通知上层提交图元，视口不直接持有编辑服务
     m_toolManager->setEntityCallbackForAllTools([this](Eg::SyEntity* e) {
@@ -577,10 +589,11 @@ void RenderViewport2D::deleteSelectedEntity()
         return;
     }
 
-    // 删除走 OperationBus 命令路径，场景变更自动触发 SceneNotifier → 增量刷新
-    if (m_operationBus)
+    // 删除直接走文档的 SceneEditService（P5 下沉），场景变更自动触发 SceneNotifier → 增量刷新。
+    // 旧 OperationBus 的 OperationContext 在生产路径不绑定场景，经它执行 Edit_Delete 只会被拒绝并刷告警。
+    if (m_document->editService())
     {
-        m_operationBus->run(OperationId::Edit_Delete, {}, OperationSource::DrawTool);
+        m_document->editService()->deleteSelected("Delete");
     }
 
     // 清除选择（SceneNotifier 已通过 onSceneChanged 触发增量刷新，无需显式 requestFullRefresh）

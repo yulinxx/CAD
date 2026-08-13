@@ -31,6 +31,7 @@ class ToolManager;
 class ITool;
 class SceneRefreshCoordinator;
 class ViewportInputRouter;
+class LayerManager;
 struct ToolContext;
 
 class QMouseEvent;
@@ -117,6 +118,8 @@ public:
     void setSelectionService(ISelectionService* service);
     void setInteractionDispatcher(IInteractionDispatcher* dispatcher);
     void setOperationBus(OperationBus* bus);
+    /// 注入图层管理器，供选择工具过滤锁定图层
+    void setLayerManager(LayerManager* manager);
 
     /// 在 native window 销毁前显式释放 OpenGL 资源，避免析构时访问无效句柄崩溃
     void releaseGLResources();
@@ -219,6 +222,7 @@ private:
     ISelectionService* m_selectionService{ nullptr };
     IInteractionDispatcher* m_interactionDispatcher{ nullptr };
     OperationBus* m_operationBus{ nullptr };
+    LayerManager* m_layerManager{ nullptr };
 
     // 工具系统
     std::unique_ptr<ToolManager> m_toolManager;

@@ -26,17 +26,6 @@
 
 #include "UI/Settings/SettingsService.h"
 
-SettingsService* getSettingsService()
-{
-    static std::unique_ptr<SettingsService> s;
-    if (!s)
-    {
-        s = std::make_unique<SettingsService>(nullptr);
-        s->init();
-    }
-    return s.get();
-}
-
 #include "UI/Services/FileDialogService.h"
 #include "UI/Services/RecentFileService.h"
 

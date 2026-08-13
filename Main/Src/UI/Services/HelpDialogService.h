@@ -17,9 +17,6 @@ public:
     /// 显示关于对话框
     static void showAboutDialog(QWidget* parent);
 
-    /// 显示设置提示对话框
-    static void showSettingsDialog(QWidget* parent);
-
     /// 显示文档提示对话框
     static void showDocumentationDialog(QWidget* parent);
 

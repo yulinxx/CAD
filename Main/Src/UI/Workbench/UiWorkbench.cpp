@@ -309,6 +309,12 @@ bool Workbench2D::initialize(const UiServices& services)
     m_settingsCoordinator = std::make_unique<SettingsUiCoordinator2D>(ApplicationCompositionRoot::getSettingsService());
     m_services.settingsService = ApplicationCompositionRoot::getSettingsService();
 
+    // 注册 2D 专属设置表，确保保存时表已存在
+    if (m_settingsCoordinator)
+    {
+        m_settingsCoordinator->init();
+    }
+
     return true;
 }
 
@@ -334,6 +340,12 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
 
     createToolbars(window);
     createLayersDock(window);
+
+    // 启动时从数据库加载并应用已保存的 2D 专属设置（画布/网格/标尺）
+    if (m_settingsCoordinator && m_viewport)
+    {
+        m_settingsCoordinator->loadAndApplySettings(m_viewport->renderWidget(), nullptr, nullptr);
+    }
 
     // 创建 2D 状态栏 widget 并挂载到窗口
     // StatusBar 封装了坐标/选择/消息/状态信息的显示，与 3D StatusBar3D 完全独立
@@ -372,6 +384,7 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
     vp->setSelectionService(m_services.selectionService);
     vp->setInteractionDispatcher(m_services.interactionDispatcher);
     vp->setOperationBus(m_services.operationBus);
+    vp->setLayerManager(m_services.layerManager);
 
     // P1: 视口通过信号通知上层，不直接持有编辑服务
     if (m_services.sceneEditService)
@@ -1007,6 +1020,11 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     if (own.settingsCoordinator)
     {
         own.settingsCoordinator->init();
+        // 启动时从数据库加载并应用已保存的 3D 专属设置（渲染/相机/光照）
+        if (m_mainWindow3D)
+        {
+            own.settingsCoordinator->loadAndApplySettings(m_mainWindow3D->renderWidget());
+        }
     }
 
     SY_INFO("[Workbench3D] Calling CommandRegistry3D::registerAll()...");
@@ -1137,17 +1155,6 @@ void Workbench3D::onMenuAction(int actionId, const QVariantMap& params)
     Q_UNUSED(params);
 
     const auto menuId = UI3D::fromCommonMenuId(actionId);
-    if (menuId == UI3D::MenuActionId3D::Help_Settings)
-    {
-        if (m_mainWindow3D)
-        {
-            m_mainWindow3D->showSettingsDialog();
-            return;
-        }
-
-        SY_WARN("[Workbench3D] Help_Settings received but MainWindow3D is null");
-        return;
-    }
 
     if (!m_services3D.operationBus)
     {
@@ -1288,5 +1295,16 @@ bool Workbench3D::managesOwnMenus() const
     #else
     return true;
     #endif
+}
+
+bool Workbench3D::showSettingsDialog(QWidget* /*parent*/)
+{
+    if (!m_mainWindow3D)
+    {
+        SY_WARN("[Workbench3D] showSettingsDialog: MainWindow3D is null");
+        return false;
+    }
+    m_mainWindow3D->showSettingsDialog();
+    return true;
 }
 #endif

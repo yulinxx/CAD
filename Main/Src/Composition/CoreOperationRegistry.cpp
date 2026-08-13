@@ -129,15 +129,13 @@ void CoreOperationRegistry::registerHelpOperations()
 
     // ---- Help: Settings ----
     reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Help_Settings, [parentWidget] {
-        // 路由到活动工作台的设置对话框：2D 工作台接管真实设置（保存到 settings.db），
-        // 3D/其他未接管时退化为 HelpDialogService 的兜底提示。
+        // 路由到活动工作台的设置对话框（2D/3D 均已接管，保存到 settings.db）
         auto* window = qobject_cast<WorkbenchWindow*>(parentWidget);
         UiWorkbench* activeWb = window ? window->currentWorkbench() : nullptr;
-        if (activeWb && activeWb->showSettingsDialog(parentWidget))
+        if (activeWb)
         {
-            return;
+            activeWb->showSettingsDialog(parentWidget);
         }
-        HelpDialogService::showSettingsDialog(parentWidget);
     }));
 
     // ---- Help: Documentation ----

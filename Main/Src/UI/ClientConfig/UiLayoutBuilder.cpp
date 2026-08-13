@@ -105,7 +105,9 @@ void UiLayoutBuilder::bindAction(QAction* action,
     if (m_dispatcher && m_dispatcher->isCommandRegistered(commandId))
     {
         QObject::connect(action, &QAction::triggered, [this, action, commandId](bool) {
-            SY_INFOF("[Menu] trigger text='%s' command='%s'", qPrintable(action->text()), qPrintable(commandId));
+            SY_INFOF("[Menu] trigger text='%s' command='%s'",
+                action->text().toUtf8().constData(),
+                commandId.toUtf8().constData());
             m_dispatcher->dispatch(commandId);
         });
     }

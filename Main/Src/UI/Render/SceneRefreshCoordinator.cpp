@@ -172,7 +172,7 @@ void SceneRefreshCoordinator::requestFullRefresh()
     // 全量刷新：重建所有渲染数据
     m_refreshLevel = RefreshLevel::FullRefresh;
     scheduleFullRefresh();
-    SY_INFO("[SceneRefreshCoordinator] requestFullRefresh: 全量刷新");
+    SY_INFO("[SceneRefreshCoordinator] requestFullRefresh: FullRefresh");
 }
 
 // 场景变更通知入口

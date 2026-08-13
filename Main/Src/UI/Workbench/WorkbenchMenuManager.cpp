@@ -58,9 +58,11 @@ namespace
     }
 
     // 统一的菜单点击日志，2D 菜单均遵循该格式，便于按 command 检索。
+    // 注意：不能用 qPrintable（Windows 下走 toLocal8Bit 产生 GBK 字节），
+    // 中文菜单文本（如语言名）会写入 GBK 导致日志乱码；统一用 UTF-8 输出。
     void logMenuTrigger(const QString& text, const QString& commandId)
     {
-        SY_INFOF("[Menu] trigger text='%s' command='%s'", qPrintable(text), qPrintable(commandId));
+        SY_INFOF("[Menu] trigger text='%s' command='%s'", text.toUtf8().constData(), commandId.toUtf8().constData());
     }
 
     // 清空菜单全部动作，并连带删除子菜单对象。

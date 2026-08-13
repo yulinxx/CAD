@@ -17,6 +17,7 @@
 #include "UI2D/Operation/OperationId.h"
 
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Edit/SceneEditService.h"
 
 #include "UI/DrawTools/ToolManager.h"
 #include "UI/DrawTools/ITool.h"
@@ -588,19 +589,21 @@ bool ViewportInputRouter::handleDeleteKeyPress(QKeyEvent* event)
         return false;
     }
 
-    // 删除操作委托给外部（通过 OperationBus）
-    if (m_operationBus)
+    // 删除选中图元：直接走文档的 SceneEditService（P5 下沉）。
+    // 旧 OperationBus 的 OperationContext 在生产路径不绑定场景，
+    // 经它执行 Edit_Delete 只会被拒绝并刷告警，且必须先删除再清空选择。
+    if (m_document && m_document->editService())
     {
-        if (m_selectionService)
-        {
-            m_selectionService->clear();
-        }
-        m_operationBus->run(OperationId::Edit_Delete, {}, OperationSource::DrawTool);
-        // 删除后全量刷新：重建渲染数据，确保已删除图元从 GPU 端清除
-        if (m_refreshCoordinator)
-        {
-            m_refreshCoordinator->requestFullRefresh();
-        }
+        m_document->editService()->deleteSelected("Delete");
+    }
+    if (m_selectionService)
+    {
+        m_selectionService->clear();
+    }
+    // 删除后全量刷新：重建渲染数据，确保已删除图元从 GPU 端清除
+    if (m_refreshCoordinator)
+    {
+        m_refreshCoordinator->requestFullRefresh();
     }
     event->accept();
     return true;

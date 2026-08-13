@@ -23,16 +23,6 @@ void HelpDialogService::showAboutDialog(QWidget* parent)
     msgBox.exec();
 }
 
-void HelpDialogService::showSettingsDialog(QWidget* parent)
-{
-    QMessageBox::information(parent,
-        QObject::tr("Settings"),
-        QObject::tr("Settings dialog will be available in a future update.\n\n"
-                    "Currently you can configure the following via the menu:\n"
-                    "  - View > Show Grid / Snap Enabled / Ortho Mode / Angle Snap\n"
-                    "  - Help > Language / Theme"));
-}
-
 void HelpDialogService::showDocumentationDialog(QWidget* parent)
 {
     QMessageBox::information(parent,
