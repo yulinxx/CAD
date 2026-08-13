@@ -12,6 +12,7 @@
 #include <QTimer>
 #include <QStatusBar>
 
+#include "Composition/ApplicationCompositionRoot.h"
 #include "SceneDocument2D.h"
 #include "UiServices.h"
 #include "UiStateCenter.h"
@@ -47,6 +48,9 @@
 #include "Log/SyLogger.h"
 #include "Ui/StatusBar/StatusBar.h"
 
+#include "UI/Settings/SettingsService.h"
+#include "UI2D/Settings/SettingsUiCoordinator2D.h"
+
 #if BUILD_UI3D
 #include "UiEntities.h"
 #include "UiViewport3D.h"
@@ -55,6 +59,7 @@
 // 3D 服务与操作头文件（从 UiWorkbench.h 前向声明下沉）
 #include "UI/TopToolBar/TopToolBar3D.h"
 #include "UI/StatusBar/StatusBar3D.h"
+#include "UI/Settings/SettingsService.h"
 #include "UI/MainWindow/MainWindow3D.h"
 #include "UI/MenuManager/MenuManager3D.h"
 #include "UI/Algorithm/AlgorithmApplicationService.h"
@@ -66,6 +71,7 @@
 #include "UI3D/Manager/DocumentManager3D.h"
 #include "UI3D/Edit/UndoRedoManager3D.h"
 #include "UI3D/Edit/SceneEditService3D.h"
+
 #include "UI3D/Service/SceneMonitor3D.h"
 #include "UI3D/Shortcut/ShortcutManager3D.h"
 #include "UI3D/Navigation/NavigationConfig3D.h"
@@ -74,7 +80,6 @@
 #include "UI3D/Settings/SettingsUiCoordinator3D.h"
 #include "UI3D/Operation/CommandActionHub3D.h"
 #include "UI3D/Operation/AlgorithmRunner3D.h"
-#include "UI/Settings/SettingsService.h"
 
 #ifdef ENABLE_GEOMODELCORE
 #include "UI3D/Service/BRepModelService3D.h"
@@ -91,11 +96,13 @@ struct Workbench3D::ServiceOwner
     std::unique_ptr<ShortcutManager3D> shortcutManager;
     std::unique_ptr<NavigationConfig3D> navigationConfig;
     std::unique_ptr<SceneDocument3D> sceneDocument;
+
     std::unique_ptr<SceneDocument3DAdapter> sceneDocumentAdapter;
     std::unique_ptr<CameraController3D> cameraController;
     std::unique_ptr<AlgorithmApplicationService> algorithmService;
     std::unique_ptr<SettingsUiCoordinator3D> settingsCoordinator;
-    std::unique_ptr<SettingsService> settingsService;
+    // 共享 singleton，非 ServiceOwner 所有，使用裸指针避免误删
+    SettingsService* settingsService{nullptr};
     std::unique_ptr<CommandActionHub3D> commandActionHub;
     std::unique_ptr<AlgorithmRunner3D> algorithmRunner;
 
@@ -198,6 +205,11 @@ bool UiWorkbench::managesOwnMenus() const
     return false;
 }
 
+bool UiWorkbench::showSettingsDialog(QWidget* /*parent*/)
+{
+    return false;
+}
+
 // ============================================================
 // Workbench2D 实现
 QString Workbench2D::id() const
@@ -283,6 +295,11 @@ bool Workbench2D::initialize(const UiServices& services)
 
     m_initialState = WorkbenchStateSnapshot{};
     m_savedState = WorkbenchStateSnapshot{};
+
+    // 使用应用共享 SettingsService singleton（2D/3D 逻辑一致）
+    m_settingsCoordinator = std::make_unique<SettingsUiCoordinator2D>(ApplicationCompositionRoot::getSettingsService());
+    m_services.settingsService = ApplicationCompositionRoot::getSettingsService();
+
     return true;
 }
 
@@ -315,6 +332,16 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
         SY_INFO("[Workbench2D] StatusBar created");
     }
     window.mountStatusBar(m_statusBar2D);
+}
+
+bool Workbench2D::showSettingsDialog(QWidget* /*parent*/)
+{
+    if (!m_settingsCoordinator || !m_viewport)
+        return false;
+
+    // 2D 无 GridSnapManager/UnitManager 实例，传递 nullptr（coordinator 已做空指针保护）
+    RenderWidget* widget = m_viewport->renderWidget();
+    return m_settingsCoordinator->showSettingsDialog(widget, nullptr, nullptr);
 }
 
 QWidget* Workbench2D::createCentralViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties)
@@ -354,9 +381,11 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         vp->setStatusCallback([stateCenter = m_services.stateCenter](const QString& text) {
             stateCenter->setStatusPrompt(text);
         });
+
         vp->setSelectionCallback([stateCenter = m_services.stateCenter](const QString& selText, const QString& selType) {
             stateCenter->setSelectionContext(selType, selText);
         });
+
         // 鼠标移动时实时更新状态栏位置标签
         vp->setPositionCallback([stateCenter = m_services.stateCenter, &window](double x, double y) {
             QVariantMap meta = stateCenter->metadata();
@@ -377,11 +406,13 @@ void Workbench2D::setupImportCallbacks(RenderViewport2D* vp, WorkbenchWindow& wi
     m_services.importService->setViewportFitCallback([vp]() {
         QTimer::singleShot(0, vp, [vp]() { vp->zoomToFit(); });
     });
+
     // 场景树刷新（导入后重建树结构）
     m_services.importService->setTreeRebuildCallback([&window]() {
         auto* dock = window.sceneTreeDock();
         if (dock) dock->refresh();
     });
+
     // 属性面板刷新（导入后更新属性显示）
     m_services.importService->setPropertyRefreshCallback([&window]() {
         auto* props = window.propertiesDock();
@@ -541,6 +572,7 @@ QString Workbench2D::formatSelectionText(const UiStateSnapshot& state) const
 #include "UI3D/Operation/CommandActionHub3D.h"
 #include "UI3D/Operation/CommandRegistry3D.h"
 #include "UI3D/Manager/DocumentManager3D.h"
+
 #include "UI3D/Edit/UndoRedoManager3D.h"
 #include "UI3D/Edit/SceneEditService3D.h"
 #include "UI3D/Service/SceneMonitor3D.h"
@@ -552,14 +584,17 @@ QString Workbench2D::formatSelectionText(const UiStateSnapshot& state) const
 #include "UI3D/Algorithm/AlgorithmTaskRegistration3D.h"
 #include "UI3D/Operation/AlgorithmRunner3D.h"
 #include "UI/Algorithm/AlgorithmApplicationService.h"
+
 #ifdef ENABLE_GEOMODELCORE
 #include "UI3D/Service/BRepModelService3D.h"
 #endif
+
 #include "Render3D/RenderWidget3D.h"
 #include "RenderWidget3DAdapter.h"
 #include "UI/MainWindow/MainWindow3D.h"
 #include "UI/LeftToolBar/LeftToolBar3D.h"
 #include "UI/RightToolBar/RightToolBar3D.h"
+
 #include "UI/MenuManager/MenuManager3D.h"
 #include "UI/MenuManager/FileMenu3D.h"
 #include "UI/MenuManager/EditMenu3D.h"
@@ -682,9 +717,9 @@ void Workbench3D::create3DServices()
     own.sceneDocumentAdapter->setEngineScene(sceneManagerAlias);
     own.cameraController = std::make_unique<CameraController3D>();
     own.algorithmService = std::make_unique<AlgorithmApplicationService>(nullptr);
-    own.settingsService = std::make_unique<SettingsService>(nullptr);
+    own.settingsService = ApplicationCompositionRoot::getSettingsService();
     own.settingsService->init();
-    own.settingsCoordinator = std::make_unique<SettingsUiCoordinator3D>(own.settingsService.get(), own.navigationConfig.get());
+    own.settingsCoordinator = std::make_unique<SettingsUiCoordinator3D>(own.settingsService, own.navigationConfig.get());
 
 #ifdef ENABLE_GEOMODELCORE
     own.brepModelService = std::make_unique<BRepModelService3D>();
@@ -708,7 +743,7 @@ void Workbench3D::create3DServices()
     m_services3D.sceneDocument = own.sceneDocument.get();
     m_services3D.cameraController = own.cameraController.get();
     m_services3D.algorithmService = own.algorithmService.get();
-    m_services3D.settingsService = own.settingsService.get();
+    m_services3D.settingsService = own.settingsService;
     m_services3D.settingsCoordinator = own.settingsCoordinator.get();
 
 #ifdef ENABLE_GEOMODELCORE

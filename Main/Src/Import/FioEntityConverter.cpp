@@ -187,6 +187,13 @@ std::unique_ptr<Eg::SyEntity> FioEntityConverter::convertEntity(
                     info.extensionDataSize);
             }
             e->topLeft = Ut::Vec2d(info.line.x1, info.line.y1);
+            // 补全其余三角：以 topLeft 为锚点，按像素宽高建立世界坐标四边形
+            // （无 dpi 信息，采用 1 像素 = 1 世界单位的近似；Y 轴向上为正）
+            const double w = static_cast<double>(info.imageWidth);
+            const double h = static_cast<double>(info.imageHeight);
+            e->topRight = Ut::Vec2d(info.line.x1 + w, info.line.y1);
+            e->bottomLeft = Ut::Vec2d(info.line.x1, info.line.y1 - h);
+            e->bottomRight = Ut::Vec2d(info.line.x1 + w, info.line.y1 - h);
             //SY_INFOF("[FioEntityConverter] Converted Image: %dx%d", e->nWidth, e->nHeight);
             return std::move(e);
         }

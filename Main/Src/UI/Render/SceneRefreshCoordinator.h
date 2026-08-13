@@ -122,6 +122,15 @@ private:
     // 已提交到渲染系统的实体 ID 集合（区分新增 vs 修改）
     std::unordered_set<uint64_t> m_renderedEntityIds;
 
+    // 当前已同步到位图渲染层的 SyImage 实体 ID 集合（多图支持，本地账本）
+    std::unordered_set<uint64_t> m_bitmapImageIds;
+
+    // 位图层协调（单源真值 = 场景中可见 SyImage 集合）：
+    // 统一处理 新增/修改/删除/图层显隐/全量重建，增量与全量路径收敛于此。
+    //   fullReconcile=true：先清空位图层（renderBeginScene 已清 GPU 位图），整体重传
+    //   fullReconcile=false：仅按 dirty/新增增量上传，并移除场景中已不存在的位图
+    void reconcileBitmaps(Eg::SceneManager* sm, bool fullReconcile);
+
     // 帧耗时追踪器（性能监控基础设施）
     std::unique_ptr<FrameTimer> m_frameTimer;
 };

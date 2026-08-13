@@ -24,6 +24,19 @@
 
 #include "Log/SyLogger.h"
 
+#include "UI/Settings/SettingsService.h"
+
+SettingsService* getSettingsService()
+{
+    static std::unique_ptr<SettingsService> s;
+    if (!s)
+    {
+        s = std::make_unique<SettingsService>(nullptr);
+        s->init();
+    }
+    return s.get();
+}
+
 #include "UI/Services/FileDialogService.h"
 #include "UI/Services/RecentFileService.h"
 
@@ -280,15 +293,10 @@ void ApplicationCompositionRoot::registerAllOperations()
     }
 
     // 核心操作（撤销/重做/删除/圆角/倒角/帮助 + 编辑操作）
-//// <<<<<<< Updated upstream
-//    CoreOperationRegistry coreOps(m_operationBus.get(), m_sceneEditService.get(), m_undoRedoManager.get(),
-//        m_helpDialogService.get(), m_shellHost ? m_shellHost->mainWindow() : nullptr);
-//    // =======
-         CoreOperationRegistry coreOps(m_operationBus.get(),
-             m_sceneEditService.get(),
-             m_undoRedoManager.get(),
-             m_shellHost ? m_shellHost->mainWindow() : nullptr);
-    // >>>>>>> Stashed changes
+    CoreOperationRegistry coreOps(m_operationBus.get(),
+        m_sceneEditService.get(),
+        m_undoRedoManager.get(),
+        m_shellHost ? m_shellHost->mainWindow() : nullptr);
 
     coreOps.registerAll();
 
@@ -372,4 +380,15 @@ PersistenceService* ApplicationCompositionRoot::persistenceService()
         m_persistenceService = AppInitializer::persistenceService();
 
     return m_persistenceService;
+}
+
+SettingsService* ApplicationCompositionRoot::getSettingsService()
+{
+    static std::unique_ptr<SettingsService> s;
+    if (!s)
+    {
+        s = std::make_unique<SettingsService>(nullptr);
+        s->init();
+    }
+    return s.get();
 }

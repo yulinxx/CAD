@@ -11,6 +11,8 @@
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine/SyEntity/SyEntity.h"
 #include "Engine/Layer/SyLayer.h"
+#include "Engine2D/SyEntity/SyImage.h"
+#include "Engine/SyEntity/EType.h"
 
 #include "Log/SyLogger.h"
 #include "Log/SyPerfCounter.h"
@@ -188,6 +190,10 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         if (!entity)
             continue;
 
+        // 位图（SyImage）不走折线/线框顶点路径，统一由 reconcileBitmaps 处理
+        if (entity->eType == Eg::EType::IMAGE)
+            continue;
+
         std::vector<render::VertexP3C3> vertices;
         render::PrimitiveType primType;
         if (!entityToVertices(entity, vertices, primType))
@@ -208,6 +214,9 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             m_renderedEntityIds.insert(uid);
         }
     }
+
+    // 位图层协调：以场景为真源，增量处理新增/修改/删除/图层显隐
+    reconcileBitmaps(sm, /*fullReconcile=*/false);
 
     // 遍历完成后，若存在不可增量图元（如文本），自动升级为全量刷新
     // 全量刷新会重建所有渲染数据，覆盖前面的增量更新，确保文本显示正确
@@ -235,6 +244,74 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     {
         if (e && e->visible() && (!e->layer() || e->layer()->isVisible()))
             m_renderedEntityIds.insert(static_cast<uint64_t>(e->id));
+    }
+
+    // 位图层全量协调：submitSceneFromDataSource 内部 renderBeginScene 已清空 GPU 位图，
+    // 这里以场景为真源整体重建，保证与场景生命周期完全一致
+    reconcileBitmaps(sm, /*fullReconcile=*/true);
+}
+
+void SceneRefreshCoordinator::reconcileBitmaps(Eg::SceneManager* sm, bool fullReconcile)
+{
+    if (!m_renderWidget || !sm)
+        return;
+
+    if (fullReconcile)
+    {
+        // 全量重建：GPU 位图已被 renderBeginScene 清空，重置本地账本后整体重传
+        m_renderWidget->clearBitmaps();
+        m_bitmapImageIds.clear();
+    }
+
+    // 期望集合：场景中所有可见 SyImage（可见 = 实体可见 && 图层可见）
+    std::unordered_set<uint64_t> desired;
+    for (auto* e : sm->getAllEntities())
+    {
+        if (!e || e->eType != Eg::EType::IMAGE || !e->visible())
+            continue;
+        if (e->layer() && !e->layer()->isVisible())
+            continue;
+        desired.insert(static_cast<uint64_t>(e->id));
+    }
+
+    // 移除：本地账本中存在但场景已不期望（删除 / 隐藏 / 图层隐藏）
+    for (auto it = m_bitmapImageIds.begin(); it != m_bitmapImageIds.end();)
+    {
+        if (!desired.count(*it))
+        {
+            m_renderWidget->removeBitmapImage(*it);
+            it = m_bitmapImageIds.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
+    // 新增/更新：期望但尚未上传 → 上传；已上传但本轮 dirty（内容/几何变化）→ 重新上传。
+    // 图层显隐切换由上面的"移除逻辑"间接驱动：隐藏时从账本去除 → 重新显示时 isNew=true。
+    for (auto id : desired)
+    {
+        const bool isNew = m_bitmapImageIds.count(id) == 0;
+        const bool isDirty = m_pendingDirtyIds.count(id) > 0;
+        if (!isNew && !isDirty)
+            continue;
+
+        auto* e = sm->findEntityById(static_cast<Eg::EntityId>(id));
+        if (!e)
+            continue;
+
+        // 无像素数据的 SyImage 不纳入位图层（移除残留，且不记入账本）
+        const auto* image = static_cast<const Eg::SyImage*>(e);
+        if (!image->pixelData() || image->nWidth <= 0 || image->nHeight <= 0)
+        {
+            m_renderWidget->removeBitmapImage(id);
+            m_bitmapImageIds.erase(id);
+            continue;
+        }
+
+        m_renderWidget->setBitmapImage(id, image);
+        m_bitmapImageIds.insert(id);
     }
 }
 

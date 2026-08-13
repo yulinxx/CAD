@@ -8,6 +8,8 @@
 #include "Engine2D/Edit/IUndoRedoManager.h"
 #include "Engine2D/Edit/FilletChamfer.h"
 #include "UI/Services/HelpDialogService.h"
+#include "UiWorkbench.h"
+#include "WorkbenchWindow.h"
 
 #include <QObject>
 #include <QWidget>
@@ -113,8 +115,15 @@ void CoreOperationRegistry::registerHelpOperations()
         OperationId::Help_About, [parentWidget] { HelpDialogService::showAboutDialog(parentWidget); }));
 
     // ---- Help: Settings ----
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::Help_Settings, [parentWidget] { HelpDialogService::showSettingsDialog(parentWidget); }));
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Help_Settings, [parentWidget] {
+        // 路由到活动工作台的设置对话框：2D 工作台接管真实设置（保存到 settings.db），
+        // 3D/其他未接管时退化为 HelpDialogService 的兜底提示。
+        auto* window = qobject_cast<WorkbenchWindow*>(parentWidget);
+        UiWorkbench* activeWb = window ? window->currentWorkbench() : nullptr;
+        if (activeWb && activeWb->showSettingsDialog(parentWidget))
+            return;
+        HelpDialogService::showSettingsDialog(parentWidget);
+    }));
 
     // ---- Help: Documentation ----
     reg.registerOperation(std::make_unique<LambdaOperation>(

@@ -7,6 +7,7 @@
 #include "UI/FileOperationUtils.h"
 #include "UI/Services/UiStateCenter.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/SyEntity/SyImage.h"
 #include "UI/Services/FileDialogService.h"
 #include "UI/Services/RecentFileService.h"
 #include "UI/Services/HelpDialogService.h"
@@ -15,11 +16,14 @@
 #include "Persistence/PersistenceService.h"
 #include "Persistence/LayerPersistenceBridge.h"
 #include "FileIO/FileIOManager.h"
+#include "FileIO/ImageUtils.h"
 #include "Log/SyLogger.h"
 
 #include <QFileInfo>
 #include <QDateTime>
 #include <QMessageBox>
+#include <QImage>
+#include <QVariantMap>
 #include <array>
 
 namespace
@@ -187,6 +191,50 @@ void FileOperationRegistry::doImportByFormat(Fio::FileFormat fmt)
         });
 }
 
+void FileOperationRegistry::doImportImage(const QString& filePath)
+{
+    executeWithExceptionGuard("ImportImage", [this, filePath] {
+        QString path = filePath;
+        if (path.isEmpty())
+        {
+            path = FileDialogService::getOpenFileName(m_parentWidget, QObject::tr("Import Image"),
+                FileDialogService::imageImportFilter());
+            if (path.isEmpty())
+                return;
+        }
+
+        QImage image(path);
+        if (image.isNull())
+        {
+            QMessageBox::warning(m_parentWidget, QObject::tr("Import Image"),
+                QObject::tr("Failed to load image: %1").arg(path));
+            return;
+        }
+
+        QImage rgba = image.convertToFormat(QImage::Format_RGBA8888);
+        Fio::ImageInfo info = Fio::readImageInfo(path.toUtf8().constData());
+        const float worldW = Fio::pixelsToUnit(rgba.width(), info.dpiX, Fio::UnitType::Millimeter);
+        const float worldH = Fio::pixelsToUnit(rgba.height(), info.dpiY, Fio::UnitType::Millimeter);
+
+        auto* imgEntity = new Eg::SyImage();
+        imgEntity->nWidth = rgba.width();
+        imgEntity->nHeight = rgba.height();
+        imgEntity->ePixelFormat = Eg::SyPixelFormat::RGBA32;
+        imgEntity->setPixelData(rgba.constBits(), static_cast<size_t>(rgba.sizeInBytes()));
+
+        const double halfW = worldW / 2.0;
+        const double halfH = worldH / 2.0;
+        imgEntity->basePoint = Ut::Vec2d(0, 0);
+        imgEntity->topLeft = Ut::Vec2d(-halfW, halfH);
+        imgEntity->topRight = Ut::Vec2d(halfW, halfH);
+        imgEntity->bottomLeft = Ut::Vec2d(-halfW, -halfH);
+        imgEntity->bottomRight = Ut::Vec2d(halfW, -halfH);
+
+        m_sceneManager->addEntity(imgEntity);
+        SY_INFOF("[FileOperation] Imported image: %s (%dx%d)", path.toUtf8().constData(), rgba.width(), rgba.height());
+        });
+}
+
 void FileOperationRegistry::doExportByFormat(Fio::FileFormat fmt)
 {
     executeWithExceptionGuard("Export", [this, fmt] {
@@ -278,15 +326,11 @@ void FileOperationRegistry::registerImportOps()
     // P5 收口: 统一使用 registerFromFormatMap 批量注册
     registerFromFormatMap(reg, kImportFormatMap, [this](Fio::FileFormat fmt) { doImportByFormat(fmt); });
 
-    // <<<<<<< Updated upstream
-        // 导入图片（特殊处理，不走格式映射）
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::File_ImportImage, [this] {
-        QString filePath = FileDialogService::getOpenFileName(m_parentWidget, QObject::tr("Import Image"),
-            FileDialogService::imageImportFilter());
-        }));
-    // =======
-    //     // 导入图片由 UI/2D 层的 FileOperations 注册（含实际导入逻辑），此处不再重复注册
-    // >>>>>>> Stashed changes
+    // 导入图片（特殊处理，不走格式映射；支持拖放 filePath 参数或弹文件对话框）
+    reg.registerOperation(std::make_unique<ParamLambdaOperation>(OperationId::File_ImportImage,
+        [this](const QVariantMap& params) {
+            doImportImage(params.value(QStringLiteral("filePath")).toString());
+            }));
 }
 
 void FileOperationRegistry::registerExportOps()

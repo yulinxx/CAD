@@ -114,6 +114,9 @@ class RenderViewport2D : public QWidget, public UI::IViewportHost // P1: 实现 
     /// 在 native window 销毁前显式释放 OpenGL 资源，避免析构时访问无效句柄崩溃
     void releaseGLResources();
 
+    /// 获取内部渲染控件（用于场景环境参数的读取/回写）
+    RenderWidget *renderWidget() const { return m_renderWidget; }
+
     void resetView();
     void zoomToFit();
     void zoomToSelection();

@@ -20,6 +20,7 @@ class LayerPersistenceBridge;
 class ImportService;
 class ExportService;
 class RecentFileService;
+class SettingsService;
 
 /**
  * @struct UiServices
@@ -80,6 +81,9 @@ struct UiServices
 
     /// 最近文件服务（统一管理最近文件列表的读写）
     RecentFileService* recentFileService{ nullptr };
+
+    /// 共享 SettingsService singleton（app-level 共享，非每工作台私有）
+    SettingsService* settingsService{ nullptr };
 
     /// 最近文件回调：当文件被打开时调用，参数为文件完整路径
     /// 由 WorkbenchWindow 注入，用于刷新最近文件菜单

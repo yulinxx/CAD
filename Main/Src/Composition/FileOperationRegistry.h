@@ -72,6 +72,9 @@ private:
     /// 执行导入流程（按格式选文件 → 调用导入服务 → 异常保护）
     void doImportByFormat(Fio::FileFormat fmt);
 
+    /// 执行导入图片流程（filePath 可为空：为空则弹文件对话框）
+    void doImportImage(const QString& filePath);
+
     /// 执行导出流程（按格式选文件 → 调用导出服务 → 异常保护）
     void doExportByFormat(Fio::FileFormat fmt);
 

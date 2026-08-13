@@ -14,6 +14,8 @@ class PropertiesPanelWidget;
 class SceneTreeDockWidget;
 class RenderViewport2D;
 class StatusBar;
+class SettingsService;
+class SettingsUiCoordinator2D;
 struct UiStateSnapshot;
 
 // 3D 类型前向声明（避免头文件膨胀，实际 include 下沉到 .cpp）
@@ -173,6 +175,14 @@ class UiWorkbench : public QObject
     /// 2D 工作台返回 false（默认），3D 工作台返回 true
     virtual bool managesOwnMenus() const;
 
+    /// 显示设置对话框（Help → Settings），由活动工作台接管
+    /// @param parent 父窗口
+    /// @return true=工作台已处理，false=未处理（调用方退化为兜底提示）
+    virtual bool showSettingsDialog(QWidget* parent);
+
+    /// 获取工作台的共享 SettingsService singleton（app-level）
+    SettingsService* settingsService() const { return m_settingsService; }
+
   protected:
     /// 获取当前状态快照
     /// 从状态中心读取当前状态，若无状态中心则使用初始化时的缓存状态
@@ -190,6 +200,8 @@ class UiWorkbench : public QObject
     WorkbenchStateSnapshot m_initialState;
     /// 上次停用前保存的状态快照，供下次激活时恢复
     WorkbenchStateSnapshot m_savedState;
+    /// 共享 SettingsService singleton（app-level 共享，非每工作台私有）
+    SettingsService* m_settingsService{nullptr};
 };
 
 // ============================================================
@@ -220,6 +232,8 @@ class Workbench2D final : public UiWorkbench
     void releaseCentralWidgetGLResources(QWidget *centralWidget) const override;
     QString formatSelectionText(const UiStateSnapshot &state) const override;
 
+    bool showSettingsDialog(QWidget* parent) override;
+
   private:
     /// 创建中央视口
     QWidget *createCentralViewport(WorkbenchWindow &window, PropertiesPanelWidget *properties);
@@ -243,6 +257,9 @@ class Workbench2D final : public UiWorkbench
     class RenderViewport2D *m_viewport{nullptr};
     /// 2D 状态栏 widget — 由 StatusBar 基类管理，通过 mountStatusBar 挂载到 WorkbenchWindow
     StatusBar *m_statusBar2D{nullptr};
+
+    /// 2D 设置协调器（共享 SettingsService  singleton）
+    std::unique_ptr<SettingsUiCoordinator2D> m_settingsCoordinator;
 };
 
 #if BUILD_UI3D

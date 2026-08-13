@@ -21,7 +21,8 @@
 
 #include "FileIO/FileIOManager.h"
 
-class PersistenceService;
+class SettingsService;  // forward
+
 class LayerPersistenceBridge;
 class ImportService;
 class ImportDispatcher;
@@ -32,6 +33,7 @@ class RecentFileService;
 class HelpDialogService;
 class FileOperationRegistry;
 class PendingOperationRegistry;
+
 class SelectionService;
 class ISelectionService;
 
@@ -47,6 +49,9 @@ class ApplicationCompositionRoot
   public:
     ApplicationCompositionRoot();
     ~ApplicationCompositionRoot();
+
+    /// 获取应用共享 SettingsService singleton
+    static SettingsService* getSettingsService();
 
   public:
     /// 获取 UI Shell 宿主
