@@ -12,13 +12,14 @@ std::vector<LayerRecord> LayerRepository::loadByDocument(const std::string& docu
 {
     std::vector<LayerRecord> result;
 
-    std::string sql =
-        "SELECT * FROM layers WHERE document_id = ? ORDER BY order_index ASC";
+    std::string sql = "SELECT * FROM layers WHERE document_id = ? ORDER BY order_index ASC";
     std::vector<std::string> params = { documentId };
     auto rows = m_database.query(sql, params);
 
     for (const auto& row : rows)
+    {
         result.push_back(rowToRecord(row));
+    }
 
     return result;
 }
@@ -47,22 +48,22 @@ bool LayerRepository::save(const LayerRecord& record)
         values["locked"] = record.locked ? "1" : "0";
         values["order_index"] = std::to_string(record.orderIndex);
         if (!record.updatedAt.empty())
+        {
             values["updated_at"] = record.updatedAt;
+        }
 
         std::map<std::string, std::string> whereParams;
         whereParams["document_id"] = record.documentId;
         whereParams["layer_id"] = std::to_string(record.layerId);
 
-        if (!m_database.update("layers", values,
-            "document_id = :document_id AND layer_id = :layer_id", whereParams))
+        if (!m_database.update("layers", values, "document_id = :document_id AND layer_id = :layer_id", whereParams))
         {
             m_lastError = "Failed to update layer: " + m_database.lastError();
             SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
             return false;
         }
 
-        SY_DEBUGF("[LayerRepository] Updated layer: doc=%s, layer=%d",
-            record.documentId.c_str(), record.layerId);
+        SY_DEBUGF("[LayerRepository] Updated layer: doc=%s, layer=%d", record.documentId.c_str(), record.layerId);
         return true;
     }
 
@@ -75,8 +76,7 @@ bool LayerRepository::save(const LayerRecord& record)
         return false;
     }
 
-    SY_DEBUGF("[LayerRepository] Inserted layer: doc=%s, layer=%d",
-        record.documentId.c_str(), record.layerId);
+    SY_DEBUGF("[LayerRepository] Inserted layer: doc=%s, layer=%d", record.documentId.c_str(), record.layerId);
     return true;
 }
 
@@ -86,8 +86,7 @@ bool LayerRepository::remove(const std::string& documentId, int layerId)
     whereParams["document_id"] = documentId;
     whereParams["layer_id"] = std::to_string(layerId);
 
-    if (!m_database.deleteRows("layers",
-        "document_id = :document_id AND layer_id = :layer_id", whereParams))
+    if (!m_database.deleteRows("layers", "document_id = :document_id AND layer_id = :layer_id", whereParams))
     {
         m_lastError = "Failed to remove layer: " + m_database.lastError();
         SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
@@ -109,7 +108,9 @@ std::vector<int> LayerRepository::listByDocument(const std::string& documentId)
     {
         auto it = row.find("layer_id");
         if (it != row.end())
+        {
             result.push_back(std::stoi(it->second));
+        }
     }
 
     return result;
@@ -123,8 +124,7 @@ bool LayerRepository::rename(const std::string& documentId, int layerId, const s
     std::map<std::string, std::string> whereParams;
     whereParams["document_id"] = documentId;
     whereParams["layer_id"] = std::to_string(layerId);
-    if (!m_database.update("layers", values,
-        "document_id = :document_id AND layer_id = :layer_id", whereParams))
+    if (!m_database.update("layers", values, "document_id = :document_id AND layer_id = :layer_id", whereParams))
     {
         m_lastError = "Failed to rename layer: " + m_database.lastError();
         SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
@@ -141,8 +141,7 @@ bool LayerRepository::updateVisibility(const std::string& documentId, int layerI
     std::map<std::string, std::string> whereParams;
     whereParams["document_id"] = documentId;
     whereParams["layer_id"] = std::to_string(layerId);
-    if (!m_database.update("layers", values,
-        "document_id = :document_id AND layer_id = :layer_id", whereParams))
+    if (!m_database.update("layers", values, "document_id = :document_id AND layer_id = :layer_id", whereParams))
     {
         m_lastError = "Failed to update layer visibility: " + m_database.lastError();
         SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
@@ -159,8 +158,7 @@ bool LayerRepository::updateLocked(const std::string& documentId, int layerId, b
     std::map<std::string, std::string> whereParams;
     whereParams["document_id"] = documentId;
     whereParams["layer_id"] = std::to_string(layerId);
-    if (!m_database.update("layers", values,
-        "document_id = :document_id AND layer_id = :layer_id", whereParams))
+    if (!m_database.update("layers", values, "document_id = :document_id AND layer_id = :layer_id", whereParams))
     {
         m_lastError = "Failed to update layer lock: " + m_database.lastError();
         SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
@@ -177,8 +175,7 @@ bool LayerRepository::updateColor(const std::string& documentId, int layerId, co
     std::map<std::string, std::string> whereParams;
     whereParams["document_id"] = documentId;
     whereParams["layer_id"] = std::to_string(layerId);
-    if (!m_database.update("layers", values,
-        "document_id = :document_id AND layer_id = :layer_id", whereParams))
+    if (!m_database.update("layers", values, "document_id = :document_id AND layer_id = :layer_id", whereParams))
     {
         m_lastError = "Failed to update layer color: " + m_database.lastError();
         SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
@@ -187,8 +184,8 @@ bool LayerRepository::updateColor(const std::string& documentId, int layerId, co
     return true;
 }
 
-bool LayerRepository::batchUpdateOrder(const std::string& documentId,
-    const std::vector<std::pair<int, int>>& layerIdAndOrders)
+bool LayerRepository::batchUpdateOrder(
+    const std::string& documentId, const std::vector<std::pair<int, int>>& layerIdAndOrders)
 {
     Eg::Database::Transaction txn(m_database);
 
@@ -199,11 +196,9 @@ bool LayerRepository::batchUpdateOrder(const std::string& documentId,
         std::map<std::string, std::string> whereParams;
         whereParams["document_id"] = documentId;
         whereParams["layer_id"] = std::to_string(layerId);
-        if (!m_database.update("layers", values,
-            "document_id = :document_id AND layer_id = :layer_id", whereParams))
+        if (!m_database.update("layers", values, "document_id = :document_id AND layer_id = :layer_id", whereParams))
         {
-            m_lastError = "Failed to update order for layer " + std::to_string(layerId)
-                + ": " + m_database.lastError();
+            m_lastError = "Failed to update order for layer " + std::to_string(layerId) + ": " + m_database.lastError();
             SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
             return false;
         }
@@ -229,30 +224,60 @@ LayerRecord LayerRepository::rowToRecord(const std::map<std::string, std::string
 {
     LayerRecord rec;
     auto it = row.find("id");
-    if (it != row.end()) rec.id = std::stoi(it->second);
+    if (it != row.end())
+    {
+        rec.id = std::stoi(it->second);
+    }
     it = row.find("document_id");
-    if (it != row.end()) rec.documentId = it->second;
+    if (it != row.end())
+    {
+        rec.documentId = it->second;
+    }
     it = row.find("layer_id");
-    if (it != row.end()) rec.layerId = std::stoi(it->second);
+    if (it != row.end())
+    {
+        rec.layerId = std::stoi(it->second);
+    }
     it = row.find("name");
-    if (it != row.end()) rec.name = it->second;
+    if (it != row.end())
+    {
+        rec.name = it->second;
+    }
     it = row.find("color");
-    if (it != row.end()) rec.color = it->second;
+    if (it != row.end())
+    {
+        rec.color = it->second;
+    }
     it = row.find("visible");
-    if (it != row.end()) rec.visible = (it->second == "1");
+    if (it != row.end())
+    {
+        rec.visible = (it->second == "1");
+    }
     it = row.find("locked");
-    if (it != row.end()) rec.locked = (it->second == "1");
+    if (it != row.end())
+    {
+        rec.locked = (it->second == "1");
+    }
     it = row.find("order_index");
-    if (it != row.end()) rec.orderIndex = std::stoi(it->second);
+    if (it != row.end())
+    {
+        rec.orderIndex = std::stoi(it->second);
+    }
     it = row.find("updated_at");
-    if (it != row.end()) rec.updatedAt = it->second;
+    if (it != row.end())
+    {
+        rec.updatedAt = it->second;
+    }
     return rec;
 }
 
 std::map<std::string, std::string> LayerRepository::recordToRow(const LayerRecord& rec) const
 {
     std::map<std::string, std::string> row;
-    if (rec.id > 0) row["id"] = std::to_string(rec.id);
+    if (rec.id > 0)
+    {
+        row["id"] = std::to_string(rec.id);
+    }
     row["document_id"] = rec.documentId;
     row["layer_id"] = std::to_string(rec.layerId);
     row["name"] = rec.name;

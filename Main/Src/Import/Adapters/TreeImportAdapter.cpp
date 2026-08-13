@@ -8,5 +8,7 @@ void TreeImportAdapter::setRebuildCallback(std::function<void()> callback)
 void TreeImportAdapter::rebuild()
 {
     if (m_rebuildCallback)
+    {
         m_rebuildCallback();
+    }
 }

@@ -9,6 +9,7 @@ class QTreeWidgetItem;
 class PropertiesPanelWidget final : public QWidget
 {
     Q_OBJECT
+
 public:
     explicit PropertiesPanelWidget(QWidget* parent = nullptr);
 

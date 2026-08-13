@@ -21,6 +21,5 @@ public:
         return QStringLiteral("DXF");
     }
 
-    ImportResult read(const ImportContext& context,
-        Fio::VecSyEntityPtr& outEntities) override;
+    ImportResult read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities) override;
 };

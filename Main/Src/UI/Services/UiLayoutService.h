@@ -11,12 +11,12 @@ class WorkbenchWindow;
  * 定义了 UI 布局服务接口，负责管理窗口布局的保存和恢复。
  */
 
- /**
-  * @class UiLayoutService
-  * @brief 布局服务抽象接口
-  *
-  * 提供布局快照的保存和恢复功能，支持不同工作台的布局管理。
-  */
+/**
+ * @class UiLayoutService
+ * @brief 布局服务抽象接口
+ *
+ * 提供布局快照的保存和恢复功能，支持不同工作台的布局管理。
+ */
 class UiLayoutService
 {
 public:

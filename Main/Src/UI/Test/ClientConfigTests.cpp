@@ -56,6 +56,7 @@ namespace
 
     // 注册全局测试环境（在第一个测试运行前执行 SetUp）
     ::testing::Environment* const g_testEnv = ::testing::AddGlobalTestEnvironment((new TestAppEnvironment));
+
     QString writeTempConfig(const QString& fileName, const QString& json)
     {
         static QTemporaryDir tempDir;
@@ -79,12 +80,13 @@ namespace
         {
             return registered.contains(commandId);
         }
+
         void dispatch(const QString& commandId) override
         {
             dispatched.push_back(commandId);
         }
     };
-} // namespace
+}  // namespace
 
 // ==================== UiConfigLoader ====================
 
@@ -141,7 +143,9 @@ TEST(ClientConfigLoaderTest, SupportsCheckableEntries)
                 for (const auto& subItem : sub.items)
                 {
                     if (!std::holds_alternative<MenuActionDef>(subItem))
+                    {
                         continue;
+                    }
                     const auto& action = std::get<MenuActionDef>(subItem);
                     if (action.commandId == QStringLiteral("view.grid"))
                     {
@@ -182,8 +186,8 @@ TEST(ClientConfigLoaderTest, ExtendsMergesParentConfig)
             ],
             "docks": [ { "id": "DockBase", "title": "Base", "position": "right", "widgetType": "P", "visible": true } ]
         })"));
-    const QString childPath =
-        writeTempConfig(QStringLiteral("child_merge.json"), QStringLiteral(R"({
+    const QString childPath = writeTempConfig(QStringLiteral("child_merge.json"),
+        QStringLiteral(R"({
             "meta": { "clientId": "child" },
             "extends": "<BASE>",
             "menus": [
@@ -210,7 +214,9 @@ TEST(ClientConfigLoaderTest, ExtendsMergesParentConfig)
             EXPECT_EQ(menu.items.size(), 1u);
         }
         if (menu.id == QStringLiteral("edit"))
+        {
             foundEdit = true;
+        }
     }
     EXPECT_TRUE(foundFile);
     EXPECT_TRUE(foundEdit);
@@ -228,7 +234,9 @@ TEST(ClientConfigPanelRegistryTest, RegisterCreateQuery)
 
     EXPECT_FALSE(registry.isPanelRegistered(QStringLiteral("PanelA")));
 
-    registry.registerPanel(QStringLiteral("PanelA"), [](QWidget* parent) { return new QWidget(parent); });
+    registry.registerPanel(QStringLiteral("PanelA"), [](QWidget* parent) {
+        return new QWidget(parent);
+    });
 
     EXPECT_TRUE(registry.isPanelRegistered(QStringLiteral("PanelA")));
     EXPECT_TRUE(registry.registeredPanelIds().contains(QStringLiteral("PanelA")));
@@ -251,8 +259,12 @@ TEST(ClientConfigPanelRegistryTest, UnregisteredReturnsNull)
 TEST(ClientConfigPanelRegistryTest, OverrideReplacesFactory)
 {
     UiPanelRegistry registry;
-    registry.registerPanel(QStringLiteral("P"), [](QWidget* parent) -> QWidget* { return new QWidget(parent); });
-    registry.registerPanel(QStringLiteral("P"), [](QWidget* parent) -> QWidget* { return new QMainWindow(parent); });
+    registry.registerPanel(QStringLiteral("P"), [](QWidget* parent) -> QWidget* {
+        return new QWidget(parent);
+    });
+    registry.registerPanel(QStringLiteral("P"), [](QWidget* parent) -> QWidget* {
+        return new QMainWindow(parent);
+    });
 
     QWidget host;
     QWidget* created = registry.createPanel(QStringLiteral("P"), &host);
@@ -266,7 +278,9 @@ TEST(ClientConfigPanelRegistryTest, OverrideReplacesFactory)
 TEST(ClientConfigLayoutBuilderTest, BuildsDocksFromConfig)
 {
     UiPanelRegistry registry;
-    registry.registerPanel(QStringLiteral("PanelX"), [](QWidget* parent) { return new QWidget(parent); });
+    registry.registerPanel(QStringLiteral("PanelX"), [](QWidget* parent) {
+        return new QWidget(parent);
+    });
 
     FakeDispatcher dispatcher;
     QMainWindow window;
@@ -457,7 +471,7 @@ TEST(ClientConfigLoaderTest, ThreeDMenuFilterDropsUnknownGroups)
 {
     auto commandAvailable = [](const QString& commandId) {
         return commandId == QStringLiteral("view.front") || commandId == QStringLiteral("model.make_box");
-        };
+    };
 
     MenuDef viewMenu;
     viewMenu.id = QStringLiteral("view");
@@ -489,8 +503,8 @@ TEST(ClientConfigLoaderTest, ThreeDMenuFilterDropsUnknownGroups)
     badTools.workbenches = { QStringLiteral("3D") };
     toolsMenu.items.push_back(badTools);
 
-    const auto filtered = WorkbenchMenuManager::filterMenusForWorkbench({ viewMenu, toolsMenu }, QStringLiteral("3D"),
-        commandAvailable, QStringLiteral("3D"));
+    const auto filtered = WorkbenchMenuManager::filterMenusForWorkbench(
+        { viewMenu, toolsMenu }, QStringLiteral("3D"), commandAvailable, QStringLiteral("3D"));
 
     ASSERT_EQ(filtered.size(), 1u);
     EXPECT_EQ(filtered[0].id, QStringLiteral("view"));
@@ -505,7 +519,7 @@ TEST(ClientConfigLoaderTest, HelpMenuKeepsOnlyApprovedSharedEntries)
         return commandId == QStringLiteral("help.about") || commandId == QStringLiteral("help.settings") ||
             commandId == QStringLiteral("help.shortcuts") || commandId == QStringLiteral("help.docs") ||
             commandId == QStringLiteral("theme.dark");
-        };
+    };
 
     MenuDef helpMenu;
     helpMenu.id = QStringLiteral("help");
@@ -543,8 +557,8 @@ TEST(ClientConfigLoaderTest, HelpMenuKeepsOnlyApprovedSharedEntries)
     dark.visibilityScope = QStringLiteral("shared");
     themeMenu.items.push_back(dark);
 
-    const auto filtered3D = WorkbenchMenuManager::filterMenusForWorkbench({ helpMenu, themeMenu }, QStringLiteral("3D"),
-        commandAvailable, QStringLiteral("3D"));
+    const auto filtered3D = WorkbenchMenuManager::filterMenusForWorkbench(
+        { helpMenu, themeMenu }, QStringLiteral("3D"), commandAvailable, QStringLiteral("3D"));
 
     ASSERT_EQ(filtered3D.size(), 2u);
     EXPECT_EQ(filtered3D[0].visibilityScope, QStringLiteral("shared"));
@@ -554,8 +568,8 @@ TEST(ClientConfigLoaderTest, HelpMenuKeepsOnlyApprovedSharedEntries)
     ASSERT_EQ(filtered3D[1].items.size(), 1u);
     EXPECT_EQ(std::get<MenuActionDef>(filtered3D[1].items[0]).commandId, QStringLiteral("theme.dark"));
 
-    const auto filtered2D = WorkbenchMenuManager::filterMenusForWorkbench({ helpMenu, themeMenu }, QStringLiteral("2D"),
-        commandAvailable, QStringLiteral("2D"));
+    const auto filtered2D = WorkbenchMenuManager::filterMenusForWorkbench(
+        { helpMenu, themeMenu }, QStringLiteral("2D"), commandAvailable, QStringLiteral("2D"));
     ASSERT_EQ(filtered2D.size(), 2u);
     EXPECT_EQ(filtered2D[0].visibilityScope, QStringLiteral("shared"));
     EXPECT_EQ(filtered2D[1].visibilityScope, QStringLiteral("shared"));
@@ -567,7 +581,7 @@ TEST(ClientConfigLoaderTest, WorkbenchSwitchDoesNotLeakMenuEntries)
         return commandId == QStringLiteral("file.open") || commandId == QStringLiteral("view.grid") ||
             commandId == QStringLiteral("view.wireframe") || commandId == QStringLiteral("model.make_box") ||
             commandId == QStringLiteral("help.about");
-        };
+    };
 
     MenuDef fileMenu;
     fileMenu.id = QStringLiteral("file");
@@ -635,12 +649,12 @@ TEST(ClientConfigLoaderTest, WorkbenchSwitchDoesNotLeakMenuEntries)
 
     const std::vector<MenuDef> configMenus{ fileMenu, viewMenu, modelMenu, helpMenu };
 
-    const auto filtered2D = WorkbenchMenuManager::filterMenusForWorkbench(configMenus, QStringLiteral("2D"),
-        commandAvailable, QStringLiteral("2D"));
-    const auto filtered3D = WorkbenchMenuManager::filterMenusForWorkbench(configMenus, QStringLiteral("3D"),
-        commandAvailable, QStringLiteral("3D"));
-    const auto filtered2DAgain = WorkbenchMenuManager::filterMenusForWorkbench(configMenus, QStringLiteral("2D"),
-        commandAvailable, QStringLiteral("2D"));
+    const auto filtered2D = WorkbenchMenuManager::filterMenusForWorkbench(
+        configMenus, QStringLiteral("2D"), commandAvailable, QStringLiteral("2D"));
+    const auto filtered3D = WorkbenchMenuManager::filterMenusForWorkbench(
+        configMenus, QStringLiteral("3D"), commandAvailable, QStringLiteral("3D"));
+    const auto filtered2DAgain = WorkbenchMenuManager::filterMenusForWorkbench(
+        configMenus, QStringLiteral("2D"), commandAvailable, QStringLiteral("2D"));
 
     ASSERT_EQ(filtered2D.size(), 2u);
     ASSERT_EQ(filtered3D.size(), 4u);
@@ -650,10 +664,12 @@ TEST(ClientConfigLoaderTest, WorkbenchSwitchDoesNotLeakMenuEntries)
         for (const auto& menu : menus)
         {
             if (menu.id == id)
+            {
                 return true;
+            }
         }
         return false;
-        };
+    };
 
     EXPECT_TRUE(hasMenu(filtered2D, QStringLiteral("file")));
     EXPECT_TRUE(hasMenu(filtered2D, QStringLiteral("help")));

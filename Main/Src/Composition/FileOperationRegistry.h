@@ -84,8 +84,7 @@ private:
     void showFileError(const QString& title, const QString& message);
 
     /// 统一异常保护包装器：执行操作并在异常时显示错误对话框
-    void executeWithExceptionGuard(const char* operationName,
-        std::function<void()> action);
+    void executeWithExceptionGuard(const char* operationName, std::function<void()> action);
 
     // ==================== 操作注册子方法 ====================
 

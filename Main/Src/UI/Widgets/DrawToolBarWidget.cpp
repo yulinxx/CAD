@@ -12,7 +12,8 @@
 #include "UI/UiMetrics.h"
 #include "Log/SyLogger.h"
 
-DrawToolBarWidget::DrawToolBarWidget(QWidget* parent) : QWidget(parent)
+DrawToolBarWidget::DrawToolBarWidget(QWidget* parent)
+    : QWidget(parent)
 {
     setObjectName(QStringLiteral("DrawToolBarWidget"));
     setMinimumWidth(48);
@@ -21,9 +22,7 @@ DrawToolBarWidget::DrawToolBarWidget(QWidget* parent) : QWidget(parent)
     m_activeToolId.clear();
 }
 
-DrawToolBarWidget::~DrawToolBarWidget()
-{
-}
+DrawToolBarWidget::~DrawToolBarWidget() {}
 
 void DrawToolBarWidget::setToolDefinitions(const QVector<DrawToolEntry>& tools)
 {
@@ -51,11 +50,15 @@ void DrawToolBarWidget::onToolButtonClicked()
 {
     auto* button = qobject_cast<QToolButton*>(sender());
     if (!button)
+    {
         return;
+    }
 
     QString toolId = button->property("toolId").toString();
     if (toolId.isEmpty())
+    {
         return;
+    }
 
     // 按钮存的是 CommandCatalog 的 toolName（如 "LineTool"），
     // 因此必须用 operationForToolName 解析，而不是 operationForCommandId（后者只认识 "2d.draw_line" 这类命令键）。
@@ -71,12 +74,16 @@ void DrawToolBarWidget::onToolButtonClicked()
     m_activeToolId = toolId;
     setButtonChecked(toolId, true);
     if (alreadyActive)
+    {
         return;
+    }
 
     // 统一走 OperationBus：UI 入口 → 操作总线 → 已注册的 Tool_* 操作 → 视口激活对应工具
     SY_INFOF("[DrawToolBarWidget] activate tool=%s op=%s", qPrintable(toolId), Cmd::operationIdToString(opId));
     if (m_operationBus)
+    {
         m_operationBus->run(opId, {}, OperationSource::DrawTool);
+    }
 }
 
 void DrawToolBarWidget::createToolButtons()
@@ -88,7 +95,9 @@ void DrawToolBarWidget::createToolButtons()
         while ((item = layout()->takeAt(0)) != nullptr)
         {
             if (item->widget())
+            {
                 item->widget()->deleteLater();
+            }
             delete item;
         }
         delete layout();
@@ -114,7 +123,9 @@ void DrawToolBarWidget::createToolButtons()
 
         QString tooltip = tool.tooltip;
         if (!tool.shortcut.isEmpty())
+        {
             tooltip = QStringLiteral("%1 (%2)").arg(tool.tooltip, tool.shortcut);
+        }
 
         if (tool.iconResource.isEmpty())
         {

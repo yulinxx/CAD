@@ -10,12 +10,12 @@
 /// 导入阶段枚举：标识当前导入流程所处的阶段
 enum class ImportPhase
 {
-    Unknown,                 ///< 未知阶段
-    DetectFormat,            ///< 识别格式阶段
-    Parse,                   ///< 解析文件阶段
-    BuildDocument,           ///< 构建文档阶段
-    RefreshDisplay,          ///< 刷新显示阶段
-    WriteBackState           ///< 回写状态阶段
+    Unknown,         ///< 未知阶段
+    DetectFormat,    ///< 识别格式阶段
+    Parse,           ///< 解析文件阶段
+    BuildDocument,   ///< 构建文档阶段
+    RefreshDisplay,  ///< 刷新显示阶段
+    WriteBackState   ///< 回写状态阶段
 };
 
 /// 统一导入上下文：承载导入操作所需的所有参数和状态信息

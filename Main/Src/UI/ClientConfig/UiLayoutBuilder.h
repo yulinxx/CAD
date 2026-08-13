@@ -38,9 +38,7 @@ public:
 class UiLayoutBuilder
 {
 public:
-    UiLayoutBuilder(QMainWindow* window,
-        IUiCommandDispatcher* dispatcher,
-        UiPanelRegistry* panelRegistry);
+    UiLayoutBuilder(QMainWindow* window, IUiCommandDispatcher* dispatcher, UiPanelRegistry* panelRegistry);
 
     void buildMenus(const std::vector<MenuDef>& menus);
     void buildToolBars(const std::vector<ToolBarDef>& toolBars);
@@ -49,9 +47,16 @@ public:
     void clearBuiltLayout();
 
     /// 本次构建创建的 Dock widget（供上层注册到布局管理器，统一清理）
-    const std::vector<QWidget*>& builtDocks() const { return m_builtDocks; }
+    const std::vector<QWidget*>& builtDocks() const
+    {
+        return m_builtDocks;
+    }
+
     /// 本次构建创建的工具栏（供上层注册到布局管理器，统一清理）
-    const std::vector<QToolBar*>& builtToolBars() const { return m_builtToolBars; }
+    const std::vector<QToolBar*>& builtToolBars() const
+    {
+        return m_builtToolBars;
+    }
 
     /// 将动作绑定到命令；命令未注册时禁用动作并给出提示
     void bindAction(QAction* action, const QString& commandId);
@@ -64,8 +69,7 @@ public:
         const QString& workbenchId = QString());
 
 private:
-    void buildMenuItem(QMenu* parent,
-        const std::variant<MenuActionDef, SubMenuDef, MenuItemType>& item);
+    void buildMenuItem(QMenu* parent, const std::variant<MenuActionDef, SubMenuDef, MenuItemType>& item);
 
     QMainWindow* m_window;
     IUiCommandDispatcher* m_dispatcher;

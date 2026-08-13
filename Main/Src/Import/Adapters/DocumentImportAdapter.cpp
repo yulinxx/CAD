@@ -5,24 +5,26 @@
 #include "Engine/SyEntity/SyEntity.h"
 #include "Log/SyLogger.h"
 
-DocumentImportAdapter::DocumentImportAdapter(
-    Eg::SceneManager* sceneManager, SceneEditService* editService)
+DocumentImportAdapter::DocumentImportAdapter(Eg::SceneManager* sceneManager, SceneEditService* editService)
     : m_sceneManager(sceneManager)
     , m_editService(editService)
 {
 }
 
-int DocumentImportAdapter::apply2D(Fio::VecSyEntityPtr& entities,
-    bool preserveColors, bool preserveLayers)
+int DocumentImportAdapter::apply2D(Fio::VecSyEntityPtr& entities, bool preserveColors, bool preserveLayers)
 {
     if (!m_sceneManager || entities.empty())
+    {
         return 0;
+    }
 
     int count = 0;
     for (auto& entity : entities)
     {
         if (!entity)
+        {
             continue;
+        }
 
         // 通过 SceneEditService 添加（支持 Undo），或直接添加
         if (m_editService)

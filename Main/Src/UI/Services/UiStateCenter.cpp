@@ -1,7 +1,8 @@
 #include "UiStateCenter.h"
 
 /// @param parent 父对象
-UiStateCenter::UiStateCenter(QObject* parent) : QObject(parent)
+UiStateCenter::UiStateCenter(QObject* parent)
+    : QObject(parent)
 {
 }
 
@@ -55,46 +56,57 @@ QString UiStateCenter::currentWorkbenchId() const
 {
     return m_workbenchId;
 }
+
 QString UiStateCenter::currentThemeId() const
 {
     return m_themeId;
 }
+
 QString UiStateCenter::currentViewMode() const
 {
     return m_viewMode;
 }
+
 QString UiStateCenter::currentLayerId() const
 {
     return m_layerId;
 }
+
 QString UiStateCenter::currentDocumentId() const
 {
     return m_documentId;
 }
+
 QString UiStateCenter::currentCommandId() const
 {
     return m_commandId;
 }
+
 QString UiStateCenter::currentCommandPhase() const
 {
     return m_commandPhase;
 }
+
 QString UiStateCenter::currentSelectionText() const
 {
     return m_selectionText;
 }
+
 QString UiStateCenter::currentSelectionSource() const
 {
     return m_selectionSource;
 }
+
 QString UiStateCenter::currentSelectionType() const
 {
     return m_selectionType;
 }
+
 QString UiStateCenter::currentCommandOwner() const
 {
     return m_commandOwner;
 }
+
 QString UiStateCenter::currentCommandType() const
 {
     return m_commandType;
@@ -178,7 +190,9 @@ QString UiStateCenter::inputFocusWidget() const
 void UiStateCenter::setRefreshState(const QString& state)
 {
     if (m_refreshState == state)
+    {
         return;
+    }
     m_refreshState = state;
     emit refreshStateChanged(state);
     emit stateChanged();
@@ -186,8 +200,11 @@ void UiStateCenter::setRefreshState(const QString& state)
 
 void UiStateCenter::setInteractionState(const QString& kind, int pointerX, int pointerY, int key)
 {
-    if (m_interactionKind == kind && m_interactionPointerX == pointerX && m_interactionPointerY == pointerY && m_interactionKey == key)
+    if (m_interactionKind == kind && m_interactionPointerX == pointerX && m_interactionPointerY == pointerY &&
+        m_interactionKey == key)
+    {
         return;
+    }
 
     m_interactionKind = kind;
     m_interactionPointerX = pointerX;
@@ -206,7 +223,9 @@ void UiStateCenter::clearInteractionState()
 void UiStateCenter::setStatusPrompt(const QString& prompt)
 {
     if (m_statusPrompt == prompt)
+    {
         return;
+    }
 
     m_statusPrompt = prompt;
     m_metadata.insert(QStringLiteral("statusPrompt"), prompt);
@@ -220,7 +239,9 @@ void UiStateCenter::setStatusPrompt(const QString& prompt)
 void UiStateCenter::setCurrentWorkbenchId(const QString& id)
 {
     if (m_workbenchId == id)
+    {
         return;
+    }
 
     m_workbenchId = id;
     emit currentWorkbenchChanged(id);
@@ -230,7 +251,9 @@ void UiStateCenter::setCurrentWorkbenchId(const QString& id)
 void UiStateCenter::setCurrentThemeId(const QString& id)
 {
     if (m_themeId == id)
+    {
         return;
+    }
 
     m_themeId = id;
     emit currentThemeChanged(id);
@@ -240,7 +263,9 @@ void UiStateCenter::setCurrentThemeId(const QString& id)
 void UiStateCenter::setCurrentViewMode(const QString& mode)
 {
     if (m_viewMode == mode)
+    {
         return;
+    }
 
     m_viewMode = mode;
     emit currentViewModeChanged(mode);
@@ -250,7 +275,9 @@ void UiStateCenter::setCurrentViewMode(const QString& mode)
 void UiStateCenter::setCurrentLayerId(const QString& layerId)
 {
     if (m_layerId == layerId)
+    {
         return;
+    }
 
     m_layerId = layerId;
     emit currentLayerChanged(layerId);
@@ -260,7 +287,9 @@ void UiStateCenter::setCurrentLayerId(const QString& layerId)
 void UiStateCenter::setLayerVisibilityState(bool visible)
 {
     if (m_layerVisible == visible)
+    {
         return;
+    }
     m_layerVisible = visible;
     emit layerVisibilityChanged(visible);
     emit stateChanged();
@@ -274,7 +303,9 @@ bool UiStateCenter::layerVisibilityState() const
 void UiStateCenter::setLayerLockState(bool locked)
 {
     if (m_layerLocked == locked)
+    {
         return;
+    }
     m_layerLocked = locked;
     emit layerLockChanged(locked);
     emit stateChanged();
@@ -288,7 +319,9 @@ bool UiStateCenter::layerLockState() const
 void UiStateCenter::setCurrentDocumentId(const QString& documentId)
 {
     if (m_documentId == documentId)
+    {
         return;
+    }
 
     m_documentId = documentId;
     emit currentDocumentChanged(documentId);
@@ -298,7 +331,9 @@ void UiStateCenter::setCurrentDocumentId(const QString& documentId)
 void UiStateCenter::setCurrentCommandId(const QString& commandId)
 {
     if (m_commandId == commandId)
+    {
         return;
+    }
 
     m_commandId = commandId;
     emit currentCommandChanged(commandId);
@@ -308,7 +343,9 @@ void UiStateCenter::setCurrentCommandId(const QString& commandId)
 void UiStateCenter::setCurrentCommandPhase(const QString& phase)
 {
     if (m_commandPhase == phase)
+    {
         return;
+    }
 
     m_commandPhase = phase;
     emit currentCommandPhaseChanged(phase);
@@ -318,7 +355,9 @@ void UiStateCenter::setCurrentCommandPhase(const QString& phase)
 void UiStateCenter::setCurrentCommandOwner(const QString& owner)
 {
     if (m_commandOwner == owner)
+    {
         return;
+    }
 
     m_commandOwner = owner;
     m_metadata.insert(QStringLiteral("commandOwner"), owner);
@@ -329,7 +368,9 @@ void UiStateCenter::setCurrentCommandOwner(const QString& owner)
 void UiStateCenter::setCurrentCommandType(const QString& type)
 {
     if (m_commandType == type)
+    {
         return;
+    }
     m_commandType = type;
     m_metadata.insert(QStringLiteral("commandType"), type);
     emit metadataChanged();
@@ -339,7 +380,9 @@ void UiStateCenter::setCurrentCommandType(const QString& type)
 void UiStateCenter::setCurrentSelectionText(const QString& text)
 {
     if (m_selectionText == text)
+    {
         return;
+    }
     m_selectionText = text;
     emit currentSelectionTextChanged(text);
     emit stateChanged();
@@ -348,7 +391,9 @@ void UiStateCenter::setCurrentSelectionText(const QString& text)
 void UiStateCenter::setSelectionContext(const QString& source, const QString& text)
 {
     if (m_selectionText == text && m_selectionSource == source)
+    {
         return;
+    }
 
     m_selectionText = text;
     m_selectionSource = source;
@@ -366,7 +411,9 @@ void UiStateCenter::setSelectionContext(const QString& source, const QString& te
 void UiStateCenter::setBusy(bool busy)
 {
     if (m_busy == busy)
+    {
         return;
+    }
 
     m_busy = busy;
     emit busyChanged(busy);
@@ -376,7 +423,9 @@ void UiStateCenter::setBusy(bool busy)
 void UiStateCenter::setDirty(bool dirty)
 {
     if (m_dirty == dirty)
+    {
         return;
+    }
 
     m_dirty = dirty;
     emit dirtyChanged(dirty);
@@ -405,7 +454,9 @@ void UiStateCenter::setCommandFailed(const QString& commandId, const QString& me
 void UiStateCenter::clearCommandFailed()
 {
     if (!m_commandFailed)
+    {
         return;
+    }
 
     m_commandFailed = false;
     m_failedCommandId.clear();
@@ -423,18 +474,30 @@ void UiStateCenter::setMetadata(const QVariantMap& metadata)
     m_metadata = metadata;
 
     if (m_metadata.contains(QStringLiteral("selectionSource")))
+    {
         m_selectionSource = m_metadata.value(QStringLiteral("selectionSource")).toString();
+    }
     if (m_metadata.contains(QStringLiteral("selectionText")))
+    {
         m_selectionText = m_metadata.value(QStringLiteral("selectionText")).toString();
+    }
     if (m_metadata.contains(QStringLiteral("selectionType")))
+    {
         m_selectionType = m_metadata.value(QStringLiteral("selectionType")).toString();
+    }
 
     if (m_metadata.contains(QStringLiteral("commandOwner")))
+    {
         m_commandOwner = m_metadata.value(QStringLiteral("commandOwner")).toString();
+    }
     if (m_metadata.contains(QStringLiteral("commandType")))
+    {
         m_commandType = m_metadata.value(QStringLiteral("commandType")).toString();
+    }
     if (m_metadata.contains(QStringLiteral("statusPrompt")))
+    {
         m_statusPrompt = m_metadata.value(QStringLiteral("statusPrompt")).toString();
+    }
 
     emit metadataChanged();
     emit stateChanged();
@@ -446,7 +509,9 @@ void UiStateCenter::setMetadata(const QVariantMap& metadata)
 void UiStateCenter::setProgress(int progress, const QString& message)
 {
     if (m_progress == progress && m_statusMessage == message)
+    {
         return;
+    }
 
     m_progress = progress;
     m_statusMessage = message;
@@ -465,7 +530,9 @@ void UiStateCenter::setProgress(int progress, const QString& message)
 void UiStateCenter::setTaskPhase(const QString& phase, const QString& message)
 {
     if (m_taskPhase == phase && m_statusMessage == message)
+    {
         return;
+    }
 
     m_taskPhase = phase;
     m_statusMessage = message;
@@ -496,7 +563,9 @@ void UiStateCenter::setError(int code, const QString& message)
 void UiStateCenter::clearError()
 {
     if (m_errorCode == 0 && m_statusMessage.isEmpty())
+    {
         return;
+    }
 
     m_errorCode = 0;
     m_statusMessage.clear();
@@ -511,7 +580,9 @@ void UiStateCenter::clearError()
 void UiStateCenter::clearTask()
 {
     if (m_progress == -1 && m_taskPhase.isEmpty() && m_statusMessage.isEmpty())
+    {
         return;
+    }
 
     m_progress = -1;
     m_taskPhase.clear();
@@ -527,7 +598,9 @@ void UiStateCenter::clearTask()
 void UiStateCenter::setActiveToolId(const QString& toolId)
 {
     if (m_activeToolId == toolId)
+    {
         return;
+    }
 
     m_activeToolId = toolId;
     emit activeToolChanged(toolId);
@@ -537,7 +610,9 @@ void UiStateCenter::setActiveToolId(const QString& toolId)
 void UiStateCenter::setInputFocusWidget(const QString& widgetName)
 {
     if (m_inputFocusWidget == widgetName)
+    {
         return;
+    }
 
     m_inputFocusWidget = widgetName;
     emit inputFocusWidgetChanged(widgetName);

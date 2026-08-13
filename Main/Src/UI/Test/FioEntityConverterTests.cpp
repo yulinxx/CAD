@@ -18,7 +18,7 @@
 #include "FioEntityConverter.h"
 #include "FileIO/FioTypes.h"
 
- // Engine2D 实体类型
+// Engine2D 实体类型
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyArc.h"
 #include "Engine2D/SyEntity/SyCircle.h"
@@ -150,7 +150,7 @@ TEST(FioEntityConverterTest, ConvertBezierEntity)
 {
     Fio::EntityInfo info;
     info.type = Fio::EntityType::Bezier;
-    info.line.x1 = 0.0;   // 起点 P0
+    info.line.x1 = 0.0;  // 起点 P0
     info.line.y1 = 0.0;
     info.bezier.c0x = 50.0;
     info.bezier.c0y = 100.0;
@@ -164,7 +164,7 @@ TEST(FioEntityConverterTest, ConvertBezierEntity)
     EXPECT_EQ(entity->eType, Eg::EType::BEZIER);
 
     auto* bz = static_cast<Eg::SyBezier*>(entity.get());
-    EXPECT_DOUBLE_EQ(bz->basePoint.x(), 0.0);   // P0
+    EXPECT_DOUBLE_EQ(bz->basePoint.x(), 0.0);  // P0
     EXPECT_DOUBLE_EQ(bz->ptCtrl0.x(), 50.0);
     EXPECT_DOUBLE_EQ(bz->ptCtrl0.y(), 100.0);
     EXPECT_DOUBLE_EQ(bz->ptCtrl1.x(), 100.0);
@@ -179,7 +179,7 @@ TEST(FioEntityConverterTest, ConvertBezier2Entity)
 {
     Fio::EntityInfo info;
     info.type = Fio::EntityType::Bezier2;
-    info.line.x1 = 0.0;   // 起点 P0
+    info.line.x1 = 0.0;  // 起点 P0
     info.line.y1 = 0.0;
     info.bezier2.cx = 50.0;
     info.bezier2.cy = 100.0;
@@ -191,7 +191,7 @@ TEST(FioEntityConverterTest, ConvertBezier2Entity)
     EXPECT_EQ(entity->eType, Eg::EType::BEZIER2);
 
     auto* bz = static_cast<Eg::SyBezier2*>(entity.get());
-    EXPECT_DOUBLE_EQ(bz->basePoint.x(), 0.0);   // P0
+    EXPECT_DOUBLE_EQ(bz->basePoint.x(), 0.0);  // P0
     EXPECT_DOUBLE_EQ(bz->ptCtrl.x(), 50.0);
     EXPECT_DOUBLE_EQ(bz->ptCtrl.y(), 100.0);
     EXPECT_DOUBLE_EQ(bz->ptEnd.x(), 100.0);
@@ -335,11 +335,20 @@ TEST(FioEntityConverterTest, ConvertNurbsWithExtensionData)
     // 控制点(3个), 节点(5个), 权重(3个)
     // 扩展数据布局: [控制点(6 doubles)] [节点(5 doubles)] [权重(3 doubles)]
     double extData[] = {
-        0.0, 0.0,   // 控制点 0
-        5.0, 10.0,  // 控制点 1
-        10.0, 0.0,  // 控制点 2
-        0.0, 0.0, 0.0, 0.5, 1.0,  // 节点
-        1.0, 1.0, 1.0               // 权重
+        0.0,
+        0.0,  // 控制点 0
+        5.0,
+        10.0,  // 控制点 1
+        10.0,
+        0.0,  // 控制点 2
+        0.0,
+        0.0,
+        0.0,
+        0.5,
+        1.0,  // 节点
+        1.0,
+        1.0,
+        1.0  // 权重
     };
     uint8_t blobBuffer[sizeof(extData)];
     std::memcpy(blobBuffer, extData, sizeof(extData));
@@ -416,13 +425,16 @@ TEST(FioEntityConverterTest, ConvertAllBatch)
 {
     Fio::EntityInfo entities[3];
     entities[0].type = Fio::EntityType::Line;
-    entities[0].line.x1 = 0.0; entities[0].line.y1 = 0.0;
-    entities[0].line.x2 = 10.0; entities[0].line.y2 = 10.0;
+    entities[0].line.x1 = 0.0;
+    entities[0].line.y1 = 0.0;
+    entities[0].line.x2 = 10.0;
+    entities[0].line.y2 = 10.0;
     entities[0].visible = true;
     entities[0].locked = false;
 
     entities[1].type = Fio::EntityType::Circle;
-    entities[1].circle.cx = 50.0; entities[1].circle.cy = 50.0;
+    entities[1].circle.cx = 50.0;
+    entities[1].circle.cy = 50.0;
     entities[1].circle.r = 20.0;
     entities[1].visible = true;
     entities[1].locked = false;
@@ -524,26 +536,25 @@ TEST(FioEntityConverterTest, EntityInfoLayoutIsStable)
 {
     // 确保 EntityInfo 结构体大小跨 DLL 边界一致
     // 这是 P2 ABI 收口后的回归验证
-    constexpr size_t expectedSize =
-        sizeof(uint64_t) +           // sourceId
-        sizeof(uint8_t) +            // EntityType (enum : uint8_t)
-        sizeof(char) * 256 +         // name[256]
-        sizeof(uint32_t) +           // layerSourceId
-        sizeof(double) +             // lineWidth
-        sizeof(bool) + sizeof(bool) + // visible, locked
-        sizeof(double) * 4 +          // line (4 doubles)
-        sizeof(double) * 5 +          // arc (5 doubles)
-        sizeof(double) * 3 +          // circle (3 doubles)
-        sizeof(double) * 7 +          // ellipse (7 doubles)
-        sizeof(double) * 4 + sizeof(char) * 256 +  // text (2 doubles + 256 chars + 2 doubles)
-        sizeof(double) * 6 +          // bezier (6 doubles)
-        sizeof(double) * 4 +          // bezier2 (4 doubles)
-        sizeof(uint32_t) +           // vertexCount
-        sizeof(int32_t) + sizeof(uint32_t) * 3 +   // nurbs params
-        sizeof(int32_t) * 2 +        // image params
-        sizeof(double) * 2 +         // barCode params
-        sizeof(double) +             // moduleSize
-        sizeof(uint32_t) * 2;        // extensionDataOffset, extensionDataSize
+    constexpr size_t expectedSize = sizeof(uint64_t) +  // sourceId
+        sizeof(uint8_t) +                               // EntityType (enum : uint8_t)
+        sizeof(char) * 256 +                            // name[256]
+        sizeof(uint32_t) +                              // layerSourceId
+        sizeof(double) +                                // lineWidth
+        sizeof(bool) + sizeof(bool) +                   // visible, locked
+        sizeof(double) * 4 +                            // line (4 doubles)
+        sizeof(double) * 5 +                            // arc (5 doubles)
+        sizeof(double) * 3 +                            // circle (3 doubles)
+        sizeof(double) * 7 +                            // ellipse (7 doubles)
+        sizeof(double) * 4 + sizeof(char) * 256 +       // text (2 doubles + 256 chars + 2 doubles)
+        sizeof(double) * 6 +                            // bezier (6 doubles)
+        sizeof(double) * 4 +                            // bezier2 (4 doubles)
+        sizeof(uint32_t) +                              // vertexCount
+        sizeof(int32_t) + sizeof(uint32_t) * 3 +        // nurbs params
+        sizeof(int32_t) * 2 +                           // image params
+        sizeof(double) * 2 +                            // barCode params
+        sizeof(double) +                                // moduleSize
+        sizeof(uint32_t) * 2;                           // extensionDataOffset, extensionDataSize
 
     // 结构体大小必须稳定，跨 DLL 边界时 layout 一致
     EXPECT_GE(sizeof(Fio::EntityInfo), 300u);

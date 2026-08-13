@@ -83,22 +83,27 @@ ISelectionService* ApplicationCompositionRoot::selectionService()
 // 职责：创建所有核心服务实例，完成依赖注入和信号连接
 // 装配顺序：UI 基础服务 → 导入导出 → 对话框服务 → 脏状态同步 → 操作注册
 ApplicationCompositionRoot::ApplicationCompositionRoot()
-    : m_stateCenter(std::make_unique<UiStateCenter>()), m_themeService(std::make_unique<DefaultUiThemeService>()),
-    m_layoutService(std::make_unique<DefaultUiLayoutService>()),
-    m_interactionDispatcher(std::make_unique<DefaultInteractionDispatcher>()),
-    m_shellHost(std::make_unique<UiShellHost>()), m_operationBus(std::make_unique<OperationBus>()),
-    m_sceneManager(std::make_unique<Eg::SceneManager>()), m_sceneManager3D(std::make_unique<Eg::SceneManager3D>()),
-    m_undoRedoManager(std::make_unique<UndoRedoManager>(m_sceneManager.get())),
-    m_sceneEditService(std::make_unique<SceneEditService>(m_sceneManager.get(), m_undoRedoManager.get())),
-    m_selectionService(std::make_unique<SelectionService>(m_sceneManager.get())),
-    m_document2D(std::make_unique<SceneDocument2D>(m_sceneEditService.get())),
-    m_layerManager(std::make_unique<LayerManager>(m_sceneManager.get())),
-    m_layerManagerBridge(std::make_unique<QtLayerManagerBridge>(nullptr)),
-    m_layerEditService(
-        std::make_unique<LayerEditService>(m_layerManager.get(), m_undoRedoManager.get(), m_sceneManager.get())),
-    m_fileIOManager(std::make_unique<Fio::FileIOManager>()), m_importService(std::make_unique<ImportService>()),
-    m_importDispatcher(std::make_unique<ImportDispatcher>()), m_exportService(std::make_unique<ExportService>()),
-    m_exportDispatcher(std::make_unique<ExportDispatcher>())
+    : m_stateCenter(std::make_unique<UiStateCenter>())
+    , m_themeService(std::make_unique<DefaultUiThemeService>())
+    , m_layoutService(std::make_unique<DefaultUiLayoutService>())
+    , m_interactionDispatcher(std::make_unique<DefaultInteractionDispatcher>())
+    , m_shellHost(std::make_unique<UiShellHost>())
+    , m_operationBus(std::make_unique<OperationBus>())
+    , m_sceneManager(std::make_unique<Eg::SceneManager>())
+    , m_sceneManager3D(std::make_unique<Eg::SceneManager3D>())
+    , m_undoRedoManager(std::make_unique<UndoRedoManager>(m_sceneManager.get()))
+    , m_sceneEditService(std::make_unique<SceneEditService>(m_sceneManager.get(), m_undoRedoManager.get()))
+    , m_selectionService(std::make_unique<SelectionService>(m_sceneManager.get()))
+    , m_document2D(std::make_unique<SceneDocument2D>(m_sceneEditService.get()))
+    , m_layerManager(std::make_unique<LayerManager>(m_sceneManager.get()))
+    , m_layerManagerBridge(std::make_unique<QtLayerManagerBridge>(nullptr))
+    , m_layerEditService(
+          std::make_unique<LayerEditService>(m_layerManager.get(), m_undoRedoManager.get(), m_sceneManager.get()))
+    , m_fileIOManager(std::make_unique<Fio::FileIOManager>())
+    , m_importService(std::make_unique<ImportService>())
+    , m_importDispatcher(std::make_unique<ImportDispatcher>())
+    , m_exportService(std::make_unique<ExportService>())
+    , m_exportDispatcher(std::make_unique<ExportDispatcher>())
 {
     // 装配顺序：UI 服务 → 导入导出 → 对话框 → 脏状态 → 操作注册
     UiServices uiServices = assembleUiServices();
@@ -176,17 +181,21 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_importService->setEditService(m_sceneEditService.get());
     m_importService->setBusyStateCallback([this](bool busy) {
         if (m_stateCenter)
+        {
             m_stateCenter->setBusy(busy);
-        });
+        }
+    });
 
     m_importService->setStatusPromptCallback([this](const QString& prompt) {
         if (m_stateCenter)
-            m_stateCenter->setMetadata({ {QStringLiteral("statusPrompt"), prompt} });
-        });
+        {
+            m_stateCenter->setMetadata({ { QStringLiteral("statusPrompt"), prompt } });
+        }
+    });
 
     m_importService->setDocumentPersistenceCallback([this](const QString& filePath, int entityCount) {
         DocumentPersistenceHelper::recordImport(m_persistenceService, filePath, entityCount);
-        });
+    });
 
     // 注册导出写入器
     m_exportDispatcher->registerWriter(std::make_unique<DxfExportWriter>());
@@ -202,54 +211,64 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_exportService->setSceneManager(m_sceneManager.get());
     m_exportService->setBusyStateCallback([this](bool busy) {
         if (m_stateCenter)
+        {
             m_stateCenter->setBusy(busy);
-        });
+        }
+    });
 
     m_exportService->setStatusPromptCallback([this](const QString& prompt) {
         if (m_stateCenter)
-            m_stateCenter->setMetadata({ {QStringLiteral("statusPrompt"), prompt} });
-        });
+        {
+            m_stateCenter->setMetadata({ { QStringLiteral("statusPrompt"), prompt } });
+        }
+    });
 
     // 注入到 UI 服务集合
     uiServices.importService = m_importService.get();
     uiServices.exportService = m_exportService.get();
 
     // 导入进度 → 状态中心
-    QObject::connect(m_importService.get(), &ImportService::importStarted, m_stateCenter.get(),
-        [this](const QString&) {
-            if (m_stateCenter)
-                m_stateCenter->setBusy(true);
-        });
+    QObject::connect(m_importService.get(), &ImportService::importStarted, m_stateCenter.get(), [this](const QString&) {
+        if (m_stateCenter)
+        {
+            m_stateCenter->setBusy(true);
+        }
+    });
 
     QObject::connect(
         m_importService.get(), &ImportService::importFinished, m_stateCenter.get(), [this](const ImportResult& result) {
             if (!m_stateCenter)
+            {
                 return;
+            }
             m_stateCenter->setBusy(false);
             QVariantMap meta = m_stateCenter->metadata();
             meta["statusPrompt"] = result.success ? QString("Import complete: %1 entities").arg(result.entityCount)
-                : QString("Import failed: %1").arg(result.message);
+                                                  : QString("Import failed: %1").arg(result.message);
             meta["notificationType"] = result.success ? "info" : "error";
             m_stateCenter->setMetadata(meta);
         });
 
     // 导出进度 → 状态中心
-    QObject::connect(m_exportService.get(), &ExportService::exportStarted, m_stateCenter.get(),
-        [this](const QString&) {
-            if (m_stateCenter)
-                m_stateCenter->setBusy(true);
-        });
+    QObject::connect(m_exportService.get(), &ExportService::exportStarted, m_stateCenter.get(), [this](const QString&) {
+        if (m_stateCenter)
+        {
+            m_stateCenter->setBusy(true);
+        }
+    });
 
-    QObject::connect(m_exportService.get(), &ExportService::exportFinished, m_stateCenter.get(),
-        [this](const ExportResult& result) {
+    QObject::connect(
+        m_exportService.get(), &ExportService::exportFinished, m_stateCenter.get(), [this](const ExportResult& result) {
             if (!m_stateCenter)
+            {
                 return;
+            }
 
             m_stateCenter->setBusy(false);
 
             QVariantMap meta = m_stateCenter->metadata();
-            meta["statusPrompt"] =
-                result.success ? QString("Export complete: %1 entities").arg(result.exportedEntityCount)
+            meta["statusPrompt"] = result.success
+                ? QString("Export complete: %1 entities").arg(result.exportedEntityCount)
                 : QString("Export failed: %1").arg(result.message);
             meta["notificationType"] = result.success ? "info" : "error";
 
@@ -272,7 +291,9 @@ void ApplicationCompositionRoot::setupDirtyStateSync()
             [](void* ctx) {
                 auto* self = static_cast<ApplicationCompositionRoot*>(ctx);
                 if (self->m_stateCenter && !self->m_stateCenter->dirty())
+                {
                     self->m_stateCenter->setDirty(true);
+                }
             },
             this);
     }
@@ -325,14 +346,17 @@ UiShellHost* ApplicationCompositionRoot::shellHost()
 {
     return m_shellHost.get();
 }
+
 UiStateCenter* ApplicationCompositionRoot::stateCenter()
 {
     return m_stateCenter.get();
 }
+
 UiThemeService* ApplicationCompositionRoot::themeService()
 {
     return m_themeService.get();
 }
+
 UiLayoutService* ApplicationCompositionRoot::layoutService()
 {
     return m_layoutService.get();
@@ -377,7 +401,9 @@ PersistenceService* ApplicationCompositionRoot::persistenceService()
 {
     // 从 AppInitializer 获取已初始化的持久化服务
     if (!m_persistenceService)
+    {
         m_persistenceService = AppInitializer::persistenceService();
+    }
 
     return m_persistenceService;
 }

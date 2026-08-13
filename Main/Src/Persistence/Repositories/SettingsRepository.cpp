@@ -8,8 +8,8 @@ SettingsRepository::SettingsRepository(Eg::Database& database)
 {
 }
 
-std::string SettingsRepository::loadValue(const std::string& groupName,
-    const std::string& key, const std::string& defaultValue)
+std::string SettingsRepository::loadValue(
+    const std::string& groupName, const std::string& key, const std::string& defaultValue)
 {
     std::string whereClause = "group_name = :group_name AND key = :key";
     std::map<std::string, std::string> whereParams;
@@ -20,8 +20,8 @@ std::string SettingsRepository::loadValue(const std::string& groupName,
     return value;
 }
 
-bool SettingsRepository::saveValue(const std::string& groupName,
-    const std::string& key, const std::string& value, const std::string& dataType)
+bool SettingsRepository::saveValue(
+    const std::string& groupName, const std::string& key, const std::string& value, const std::string& dataType)
 {
     std::map<std::string, std::string> values;
     values["group_name"] = groupName;
@@ -45,8 +45,7 @@ bool SettingsRepository::removeValue(const std::string& groupName, const std::st
     whereParams["group_name"] = groupName;
     whereParams["key"] = key;
 
-    if (!m_database.deleteRows("settings",
-        "group_name = :group_name AND key = :key", whereParams))
+    if (!m_database.deleteRows("settings", "group_name = :group_name AND key = :key", whereParams))
     {
         m_lastError = "Failed to remove setting: " + m_database.lastError();
         SY_ERRORF("[SettingsRepository] %s", m_lastError.c_str());
@@ -65,7 +64,9 @@ std::vector<SettingRecord> SettingsRepository::loadGroup(const std::string& grou
     auto rows = m_database.query(sql, params);
 
     for (const auto& row : rows)
+    {
         result.push_back(rowToRecord(row));
+    }
 
     return result;
 }
@@ -75,29 +76,49 @@ const std::string& SettingsRepository::lastError() const
     return m_lastError;
 }
 
-SettingRecord SettingsRepository::rowToRecord(
-    const std::map<std::string, std::string>& row) const
+SettingRecord SettingsRepository::rowToRecord(const std::map<std::string, std::string>& row) const
 {
     SettingRecord rec;
     auto it = row.find("id");
-    if (it != row.end()) rec.id = std::stoi(it->second);
+    if (it != row.end())
+    {
+        rec.id = std::stoi(it->second);
+    }
     it = row.find("group_name");
-    if (it != row.end()) rec.groupName = it->second;
+    if (it != row.end())
+    {
+        rec.groupName = it->second;
+    }
     it = row.find("key");
-    if (it != row.end()) rec.key = it->second;
+    if (it != row.end())
+    {
+        rec.key = it->second;
+    }
     it = row.find("value");
-    if (it != row.end()) rec.value = it->second;
+    if (it != row.end())
+    {
+        rec.value = it->second;
+    }
     it = row.find("data_type");
-    if (it != row.end()) rec.dataType = it->second;
+    if (it != row.end())
+    {
+        rec.dataType = it->second;
+    }
     it = row.find("updated_at");
-    if (it != row.end()) rec.updatedAt = it->second;
+    if (it != row.end())
+    {
+        rec.updatedAt = it->second;
+    }
     return rec;
 }
 
 std::map<std::string, std::string> SettingsRepository::recordToRow(const SettingRecord& rec) const
 {
     std::map<std::string, std::string> row;
-    if (rec.id > 0) row["id"] = std::to_string(rec.id);
+    if (rec.id > 0)
+    {
+        row["id"] = std::to_string(rec.id);
+    }
     row["group_name"] = rec.groupName;
     row["key"] = rec.key;
     row["value"] = rec.value;

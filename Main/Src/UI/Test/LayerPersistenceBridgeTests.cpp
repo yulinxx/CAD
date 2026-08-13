@@ -23,7 +23,7 @@
 
 #include <memory>
 
- // ==================== 测试夹具：提供内存数据库 + LayerManager + LayerRepository ====================
+// ==================== 测试夹具：提供内存数据库 + LayerManager + LayerRepository ====================
 
 class LayerPersistenceBridgeTest : public ::testing::Test
 {
@@ -57,14 +57,15 @@ protected:
         m_layerRepository = std::make_unique<LayerRepository>(*m_database);
 
         // 创建桥接器
-        m_bridge = std::make_unique<LayerPersistenceBridge>(
-            m_layerManager.get(), m_layerRepository.get());
+        m_bridge = std::make_unique<LayerPersistenceBridge>(m_layerManager.get(), m_layerRepository.get());
     }
 
     void TearDown() override
     {
         if (m_bridge)
+        {
             m_bridge->detach();
+        }
         m_bridge.reset();
         m_layerRepository.reset();
         m_layerManager.reset();
@@ -79,7 +80,9 @@ protected:
         for (const auto& layer : layers)
         {
             if (layer.layerId == layerId)
+            {
                 return true;
+            }
         }
         return false;
     }
@@ -91,7 +94,9 @@ protected:
         for (const auto& layer : layers)
         {
             if (layer.layerId == layerId)
+            {
                 return layer;
+            }
         }
         return std::nullopt;
     }
@@ -272,9 +277,18 @@ TEST_F(LayerPersistenceBridgeTest, OnLayerOrderChanged_BatchUpdatesOrder)
     bool foundA = false, foundB = false, foundC = false;
     for (const auto& layer : layers)
     {
-        if (layer.layerId == layerA) foundA = true;
-        if (layer.layerId == layerB) foundB = true;
-        if (layer.layerId == layerC) foundC = true;
+        if (layer.layerId == layerA)
+        {
+            foundA = true;
+        }
+        if (layer.layerId == layerB)
+        {
+            foundB = true;
+        }
+        if (layer.layerId == layerC)
+        {
+            foundC = true;
+        }
     }
     EXPECT_TRUE(foundA);
     EXPECT_TRUE(foundB);
@@ -302,7 +316,9 @@ TEST_F(LayerPersistenceBridgeTest, MultipleLayers_AllSynced)
     EXPECT_EQ(layers.size(), 5u);
 
     for (int id : layerIds)
+    {
         EXPECT_TRUE(layerExistsInDb("doc_001", id));
+    }
 }
 
 TEST_F(LayerPersistenceBridgeTest, MultipleLayers_DeleteSome)
@@ -354,17 +370,16 @@ TEST(LayerPersistenceBridgeNullTest, NullLayerManager_AttachIsSafe)
 {
     Eg::Database db;
     ASSERT_TRUE(db.open(":memory:"));
-    ASSERT_TRUE(db.execute(
-        "CREATE TABLE IF NOT EXISTS layers ("
-        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-        "document_id TEXT NOT NULL,"
-        "layer_id INTEGER NOT NULL,"
-        "name TEXT DEFAULT '',"
-        "color TEXT DEFAULT '#000000',"
-        "visible INTEGER DEFAULT 1,"
-        "locked INTEGER DEFAULT 0,"
-        "order_index INTEGER DEFAULT 0,"
-        "updated_at TEXT DEFAULT (datetime('now')))"));
+    ASSERT_TRUE(db.execute("CREATE TABLE IF NOT EXISTS layers ("
+                           "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                           "document_id TEXT NOT NULL,"
+                           "layer_id INTEGER NOT NULL,"
+                           "name TEXT DEFAULT '',"
+                           "color TEXT DEFAULT '#000000',"
+                           "visible INTEGER DEFAULT 1,"
+                           "locked INTEGER DEFAULT 0,"
+                           "order_index INTEGER DEFAULT 0,"
+                           "updated_at TEXT DEFAULT (datetime('now')))"));
 
     LayerRepository repo(db);
     LayerPersistenceBridge bridge(nullptr, &repo);

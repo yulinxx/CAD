@@ -10,15 +10,13 @@ public:
 
     /// 设置元数据应用回调
     /// @param callback 参数为目标路径、格式和图元数量
-    void setApplyCallback(
-        std::function<void(const QString&, const QString&, int)> callback);
+    void setApplyCallback(std::function<void(const QString&, const QString&, int)> callback);
 
     /// 应用导出元数据（记录导出信息到数据库或日志）
     /// @param targetPath 目标路径
     /// @param format 导出格式
     /// @param entityCount 导出的图元数量
-    void apply(const QString& targetPath, const QString& format,
-        int entityCount);
+    void apply(const QString& targetPath, const QString& format, int entityCount);
 
 private:
     /// 元数据应用回调

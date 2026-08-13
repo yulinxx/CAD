@@ -34,7 +34,7 @@
 #include <filesystem>
 #include <atomic>
 
- // ==================== ImportService 基础流程测试 ====================
+// ==================== ImportService 基础流程测试 ====================
 
 TEST(ImportExportRegressionTest, ImportService_DefaultConstruction)
 {
@@ -61,9 +61,15 @@ TEST(ImportExportRegressionTest, ImportService_BusyStateCallback)
     bool idleCalled = false;
 
     service.setBusyStateCallback([&](bool busy) {
-        if (busy) busyCalled = true;
-        else idleCalled = true;
-        });
+        if (busy)
+        {
+            busyCalled = true;
+        }
+        else
+        {
+            idleCalled = true;
+        }
+    });
 
     // 回调注入不崩溃
     SUCCEED();
@@ -76,7 +82,7 @@ TEST(ImportExportRegressionTest, ImportService_StatusPromptCallback)
     QString lastMsg;
     service.setStatusPromptCallback([&](const QString& msg) {
         lastMsg = msg;
-        });
+    });
 
     SUCCEED();
 }
@@ -88,7 +94,7 @@ TEST(ImportExportRegressionTest, ImportService_ViewportFitCallback)
     bool called = false;
     service.setViewportFitCallback([&]() {
         called = true;
-        });
+    });
 
     SUCCEED();
 }
@@ -100,7 +106,7 @@ TEST(ImportExportRegressionTest, ImportService_TreeRebuildCallback)
     bool called = false;
     service.setTreeRebuildCallback([&]() {
         called = true;
-        });
+    });
 
     SUCCEED();
 }
@@ -112,7 +118,7 @@ TEST(ImportExportRegressionTest, ImportService_PropertyRefreshCallback)
     bool called = false;
     service.setPropertyRefreshCallback([&]() {
         called = true;
-        });
+    });
 
     SUCCEED();
 }
@@ -124,7 +130,7 @@ TEST(ImportExportRegressionTest, ImportService_WorkbenchSwitchCallback)
     QString lastTarget;
     service.setWorkbenchSwitchCallback([&](const QString& target) {
         lastTarget = target;
-        });
+    });
 
     SUCCEED();
 }
@@ -136,7 +142,7 @@ TEST(ImportExportRegressionTest, ImportService_StatusBarUpdateCallback)
     QString lastMsg;
     service.setStatusBarUpdateCallback([&](const QString& msg) {
         lastMsg = msg;
-        });
+    });
 
     SUCCEED();
 }
@@ -148,7 +154,7 @@ TEST(ImportExportRegressionTest, ImportService_RecentFileCallback)
     QString lastPath;
     service.setRecentFileAddCallback([&](const QString& path) {
         lastPath = path;
-        });
+    });
 
     SUCCEED();
 }
@@ -160,7 +166,7 @@ TEST(ImportExportRegressionTest, ImportService_CurrentDocumentPathCallback)
     QString lastPath;
     service.setCurrentDocumentPathCallback([&](const QString& path) {
         lastPath = path;
-        });
+    });
 
     SUCCEED();
 }
@@ -172,7 +178,7 @@ TEST(ImportExportRegressionTest, ImportService_DocumentPersistenceCallback)
     bool called = false;
     service.setDocumentPersistenceCallback([&](const QString& path, int entityCount) {
         called = true;
-        });
+    });
 
     SUCCEED();
 }
@@ -221,8 +227,11 @@ TEST(ImportExportRegressionTest, ExportService_BusyStateCallback)
 
     bool busyCalled = false;
     service.setBusyStateCallback([&](bool busy) {
-        if (busy) busyCalled = true;
-        });
+        if (busy)
+        {
+            busyCalled = true;
+        }
+    });
 
     SUCCEED();
 }
@@ -234,7 +243,7 @@ TEST(ImportExportRegressionTest, ExportService_StatusPromptCallback)
     QString lastMsg;
     service.setStatusPromptCallback([&](const QString& msg) {
         lastMsg = msg;
-        });
+    });
 
     SUCCEED();
 }
@@ -288,8 +297,10 @@ TEST(ImportExportRegressionTest, FioEntityConverter_MetadataTransfer)
     // 构造带元数据的 ParseResult
     Fio::EntityInfo entity;
     entity.type = Fio::EntityType::Line;
-    entity.line.x1 = 0.0; entity.line.y1 = 0.0;
-    entity.line.x2 = 10.0; entity.line.y2 = 10.0;
+    entity.line.x1 = 0.0;
+    entity.line.y1 = 0.0;
+    entity.line.x2 = 10.0;
+    entity.line.y2 = 10.0;
     entity.visible = true;
     entity.locked = false;
     entity.lineWidth = 2.0;
@@ -308,7 +319,8 @@ TEST(ImportExportRegressionTest, FioEntityConverter_NameTransfer)
 {
     Fio::EntityInfo info;
     info.type = Fio::EntityType::Circle;
-    info.circle.cx = 0.0; info.circle.cy = 0.0;
+    info.circle.cx = 0.0;
+    info.circle.cy = 0.0;
     info.circle.r = 5.0;
     std::strncpy(info.name, "MyCircle", sizeof(info.name));
 
@@ -323,8 +335,10 @@ TEST(ImportExportRegressionTest, FioEntityConverter_VisibleTransfer)
 {
     Fio::EntityInfo info;
     info.type = Fio::EntityType::Line;
-    info.line.x1 = 0.0; info.line.y1 = 0.0;
-    info.line.x2 = 10.0; info.line.y2 = 10.0;
+    info.line.x1 = 0.0;
+    info.line.y1 = 0.0;
+    info.line.x2 = 10.0;
+    info.line.y2 = 10.0;
     info.visible = false;
     info.locked = true;
 
@@ -340,8 +354,10 @@ TEST(ImportExportRegressionTest, FioEntityConverter_LayerSourceIdTransfer)
 {
     Fio::EntityInfo info;
     info.type = Fio::EntityType::Line;
-    info.line.x1 = 0.0; info.line.y1 = 0.0;
-    info.line.x2 = 10.0; info.line.y2 = 10.0;
+    info.line.x1 = 0.0;
+    info.line.y1 = 0.0;
+    info.line.x2 = 10.0;
+    info.line.y2 = 10.0;
     info.layerSourceId = 42;
 
     auto result = FioEntityConverter::convertEntity(info);
@@ -356,20 +372,26 @@ TEST(ImportExportRegressionTest, FioEntityConverter_MixedTypeBatch)
     Fio::EntityInfo entities[4];
     // Line
     entities[0].type = Fio::EntityType::Line;
-    entities[0].line.x1 = 0.0; entities[0].line.y1 = 0.0;
-    entities[0].line.x2 = 10.0; entities[0].line.y2 = 10.0;
+    entities[0].line.x1 = 0.0;
+    entities[0].line.y1 = 0.0;
+    entities[0].line.x2 = 10.0;
+    entities[0].line.y2 = 10.0;
     // Circle
     entities[1].type = Fio::EntityType::Circle;
-    entities[1].circle.cx = 50.0; entities[1].circle.cy = 50.0;
+    entities[1].circle.cx = 50.0;
+    entities[1].circle.cy = 50.0;
     entities[1].circle.r = 20.0;
     // Arc
     entities[2].type = Fio::EntityType::Arc;
-    entities[2].arc.cx = 0.0; entities[2].arc.cy = 0.0;
+    entities[2].arc.cx = 0.0;
+    entities[2].arc.cy = 0.0;
     entities[2].arc.r = 30.0;
-    entities[2].arc.sa = 0.0; entities[2].arc.ea = 3.14159;
+    entities[2].arc.sa = 0.0;
+    entities[2].arc.ea = 3.14159;
     // Point
     entities[3].type = Fio::EntityType::Point;
-    entities[3].line.x1 = 100.0; entities[3].line.y1 = 200.0;
+    entities[3].line.x1 = 100.0;
+    entities[3].line.y1 = 200.0;
 
     Fio::FioParseResult parseData;
     parseData.entities = entities;
@@ -390,11 +412,14 @@ TEST(ImportExportRegressionTest, FioEntityConverter_SkipUnknownInBatch)
 {
     Fio::EntityInfo entities[3];
     entities[0].type = Fio::EntityType::Line;
-    entities[0].line.x1 = 0.0; entities[0].line.y1 = 0.0;
-    entities[0].line.x2 = 10.0; entities[0].line.y2 = 10.0;
+    entities[0].line.x1 = 0.0;
+    entities[0].line.y1 = 0.0;
+    entities[0].line.x2 = 10.0;
+    entities[0].line.y2 = 10.0;
     entities[1].type = Fio::EntityType::Unknown;
     entities[2].type = Fio::EntityType::Circle;
-    entities[2].circle.cx = 0.0; entities[2].circle.cy = 0.0;
+    entities[2].circle.cx = 0.0;
+    entities[2].circle.cy = 0.0;
     entities[2].circle.r = 5.0;
 
     Fio::FioParseResult parseData;
@@ -436,8 +461,10 @@ TEST(ImportExportRegressionTest, FioEntityConverter_SourceFormatPreserved)
 {
     Fio::EntityInfo entity;
     entity.type = Fio::EntityType::Line;
-    entity.line.x1 = 0.0; entity.line.y1 = 0.0;
-    entity.line.x2 = 10.0; entity.line.y2 = 10.0;
+    entity.line.x1 = 0.0;
+    entity.line.y1 = 0.0;
+    entity.line.x2 = 10.0;
+    entity.line.y2 = 10.0;
 
     Fio::FioParseResult parseData;
     parseData.entities = &entity;
@@ -458,8 +485,10 @@ TEST(ImportExportRegressionTest, Chain_EntityCountAfterImport)
 
     Fio::EntityInfo info;
     info.type = Fio::EntityType::Line;
-    info.line.x1 = 0.0; info.line.y1 = 0.0;
-    info.line.x2 = 10.0; info.line.y2 = 10.0;
+    info.line.x1 = 0.0;
+    info.line.y1 = 0.0;
+    info.line.x2 = 10.0;
+    info.line.y2 = 10.0;
 
     auto entity = FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
@@ -478,15 +507,20 @@ TEST(ImportExportRegressionTest, Chain_ExportCollectMatchesImport)
     // 导入 3 个不同实体
     Fio::EntityInfo infos[3];
     infos[0].type = Fio::EntityType::Line;
-    infos[0].line.x1 = 0.0; infos[0].line.y1 = 0.0;
-    infos[0].line.x2 = 10.0; infos[0].line.y2 = 10.0;
+    infos[0].line.x1 = 0.0;
+    infos[0].line.y1 = 0.0;
+    infos[0].line.x2 = 10.0;
+    infos[0].line.y2 = 10.0;
     infos[1].type = Fio::EntityType::Circle;
-    infos[1].circle.cx = 50.0; infos[1].circle.cy = 50.0;
+    infos[1].circle.cx = 50.0;
+    infos[1].circle.cy = 50.0;
     infos[1].circle.r = 20.0;
     infos[2].type = Fio::EntityType::Arc;
-    infos[2].arc.cx = 0.0; infos[2].arc.cy = 0.0;
+    infos[2].arc.cx = 0.0;
+    infos[2].arc.cy = 0.0;
     infos[2].arc.r = 30.0;
-    infos[2].arc.sa = 0.0; infos[2].arc.ea = 1.57;
+    infos[2].arc.sa = 0.0;
+    infos[2].arc.ea = 1.57;
 
     Fio::FioParseResult parseData;
     parseData.entities = infos;
@@ -601,10 +635,10 @@ TEST(ImportExportRegressionTest, ImportService_Signals)
 
     QObject::connect(&service, &ImportService::importStarted, [&](const QString&) {
         started = true;
-        });
+    });
     QObject::connect(&service, &ImportService::importFinished, [&](const ImportResult&) {
         finished = true;
-        });
+    });
 
     // 信号连接不崩溃
     SUCCEED();
@@ -619,10 +653,10 @@ TEST(ImportExportRegressionTest, ExportService_Signals)
 
     QObject::connect(&service, &ExportService::exportStarted, [&](const QString&) {
         started = true;
-        });
+    });
     QObject::connect(&service, &ExportService::exportFinished, [&](const ExportResult&) {
         finished = true;
-        });
+    });
 
     SUCCEED();
 }
@@ -675,8 +709,10 @@ TEST(ImportExportRegressionTest, FioEntityConverter_ConvertLineEntity)
     Fio::EntityInfo info;
     info.type = Fio::EntityType::Line;
     std::strncpy(info.name, "TestLine", sizeof(info.name) - 1);
-    info.line.x1 = 10.0; info.line.y1 = 20.0;
-    info.line.x2 = 100.0; info.line.y2 = 200.0;
+    info.line.x1 = 10.0;
+    info.line.y1 = 20.0;
+    info.line.x2 = 100.0;
+    info.line.y2 = 200.0;
 
     auto entity = FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
@@ -689,7 +725,8 @@ TEST(ImportExportRegressionTest, FioEntityConverter_ConvertCircleEntity)
     Fio::EntityInfo info;
     info.type = Fio::EntityType::Circle;
     std::strncpy(info.name, "TestCircle", sizeof(info.name) - 1);
-    info.circle.cx = 50.0; info.circle.cy = 50.0;
+    info.circle.cx = 50.0;
+    info.circle.cy = 50.0;
     info.circle.r = 25.0;
 
     auto entity = FioEntityConverter::convertEntity(info);
@@ -703,9 +740,11 @@ TEST(ImportExportRegressionTest, FioEntityConverter_ConvertArcEntity)
     Fio::EntityInfo info;
     info.type = Fio::EntityType::Arc;
     std::strncpy(info.name, "TestArc", sizeof(info.name) - 1);
-    info.arc.cx = 0.0; info.arc.cy = 0.0;
+    info.arc.cx = 0.0;
+    info.arc.cy = 0.0;
     info.arc.r = 30.0;
-    info.arc.sa = 0.0; info.arc.ea = 1.5708;
+    info.arc.sa = 0.0;
+    info.arc.ea = 1.5708;
 
     auto entity = FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
@@ -766,8 +805,10 @@ TEST(ImportExportRegressionTest, FioEntityConverter_EntityInfoWithLayerId)
     Fio::EntityInfo info;
     info.type = Fio::EntityType::Line;
     std::strncpy(info.name, "LayeredLine", sizeof(info.name) - 1);
-    info.line.x1 = 0.0; info.line.y1 = 0.0;
-    info.line.x2 = 10.0; info.line.y2 = 10.0;
+    info.line.x1 = 0.0;
+    info.line.y1 = 0.0;
+    info.line.x2 = 10.0;
+    info.line.y2 = 10.0;
     info.layerSourceId = 42;
 
     auto entity = FioEntityConverter::convertEntity(info);
@@ -886,15 +927,22 @@ TEST(ImportExportRegressionTest, FioEntityConverter_EntityCountAfterBatch)
     // 批量转换后实体数正确（使用 POD 数组）
     Fio::EntityInfo infos[3];
     infos[0].type = Fio::EntityType::Line;
-    infos[0].line.x1 = 0; infos[0].line.y1 = 0;
-    infos[0].line.x2 = 10; infos[0].line.y2 = 10;
+    infos[0].line.x1 = 0;
+    infos[0].line.y1 = 0;
+    infos[0].line.x2 = 10;
+    infos[0].line.y2 = 10;
 
     infos[1].type = Fio::EntityType::Circle;
-    infos[1].circle.cx = 5; infos[1].circle.cy = 5; infos[1].circle.r = 3;
+    infos[1].circle.cx = 5;
+    infos[1].circle.cy = 5;
+    infos[1].circle.r = 3;
 
     infos[2].type = Fio::EntityType::Arc;
-    infos[2].arc.cx = 0; infos[2].arc.cy = 0; infos[2].arc.r = 5;
-    infos[2].arc.sa = 0; infos[2].arc.ea = 90;
+    infos[2].arc.cx = 0;
+    infos[2].arc.cy = 0;
+    infos[2].arc.r = 5;
+    infos[2].arc.sa = 0;
+    infos[2].arc.ea = 90;
 
     Fio::FioParseResult parseData;
     parseData.entities = infos;
@@ -929,8 +977,10 @@ TEST(ImportExportRegressionTest, FioEntityConverter_LayerNameTransfer)
 
     Fio::EntityInfo infos[1];
     infos[0].type = Fio::EntityType::Line;
-    infos[0].line.x1 = 0; infos[0].line.y1 = 0;
-    infos[0].line.x2 = 10; infos[0].line.y2 = 10;
+    infos[0].line.x1 = 0;
+    infos[0].line.y1 = 0;
+    infos[0].line.x2 = 10;
+    infos[0].line.y2 = 10;
     std::strncpy(infos[0].name, "TestLine", sizeof(infos[0].name));
 
     Fio::FioParseResult parseData;
@@ -983,10 +1033,12 @@ TEST(ImportExportRegressionTest, SelectionState_PreservedAfterImport)
     scene.addEntity(line.release());
 
     auto allIds = std::vector<Eg::EntityId>{};
-    scene.forEachEntityId([](Eg::EntityId eid, void* ctx) -> bool {
-        static_cast<std::vector<Eg::EntityId>*>(ctx)->push_back(eid);
-        return true;
-        }, &allIds);
+    scene.forEachEntityId(
+        [](Eg::EntityId eid, void* ctx) -> bool {
+            static_cast<std::vector<Eg::EntityId>*>(ctx)->push_back(eid);
+            return true;
+        },
+        &allIds);
     ASSERT_FALSE(allIds.empty());
     scene.selectEntity(scene.findSyEntityById(allIds[0]));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
@@ -1000,10 +1052,12 @@ TEST(ImportExportRegressionTest, SelectionState_ClearAfterImport)
     scene.addEntity(line.release());
 
     auto allIds = std::vector<Eg::EntityId>{};
-    scene.forEachEntityId([](Eg::EntityId eid, void* ctx) -> bool {
-        static_cast<std::vector<Eg::EntityId>*>(ctx)->push_back(eid);
-        return true;
-        }, &allIds);
+    scene.forEachEntityId(
+        [](Eg::EntityId eid, void* ctx) -> bool {
+            static_cast<std::vector<Eg::EntityId>*>(ctx)->push_back(eid);
+            return true;
+        },
+        &allIds);
     scene.selectEntity(scene.findSyEntityById(allIds[0]));
     scene.clearSelection();
     EXPECT_EQ(scene.getSelectedEntityCount(), 0u);
@@ -1020,7 +1074,7 @@ TEST(ImportExportRegressionTest, ImportService_MultipleFormats_MetadataConsisten
     bool metaCallbackCalled = false;
     service.setDocumentPersistenceCallback([&](const QString& path, int count) {
         metaCallbackCalled = true;
-        });
+    });
     EXPECT_FALSE(metaCallbackCalled);  // 未触发导入，回调不应被调用
 }
 
@@ -1032,27 +1086,35 @@ TEST(ImportExportRegressionTest, FioEntityConverter_AllSupportedTypes)
     Fio::EntityInfo infos[6];
     // Line
     infos[0].type = Fio::EntityType::Line;
-    infos[0].line.x1 = 0.0; infos[0].line.y1 = 0.0;
-    infos[0].line.x2 = 10.0; infos[0].line.y2 = 10.0;
+    infos[0].line.x1 = 0.0;
+    infos[0].line.y1 = 0.0;
+    infos[0].line.x2 = 10.0;
+    infos[0].line.y2 = 10.0;
     // Circle
     infos[1].type = Fio::EntityType::Circle;
-    infos[1].circle.cx = 50.0; infos[1].circle.cy = 50.0;
+    infos[1].circle.cx = 50.0;
+    infos[1].circle.cy = 50.0;
     infos[1].circle.r = 20.0;
     // Arc
     infos[2].type = Fio::EntityType::Arc;
-    infos[2].arc.cx = 0.0; infos[2].arc.cy = 0.0;
+    infos[2].arc.cx = 0.0;
+    infos[2].arc.cy = 0.0;
     infos[2].arc.r = 30.0;
-    infos[2].arc.sa = 0.0; infos[2].arc.ea = 3.14159;
+    infos[2].arc.sa = 0.0;
+    infos[2].arc.ea = 3.14159;
     // Point
     infos[3].type = Fio::EntityType::Point;
-    infos[3].line.x1 = 100.0; infos[3].line.y1 = 200.0;
+    infos[3].line.x1 = 100.0;
+    infos[3].line.y1 = 200.0;
     // Polygon
     infos[4].type = Fio::EntityType::Polygon;
     infos[4].vertexCount = 4;
     // Ellipse
     infos[5].type = Fio::EntityType::Ellipse;
-    infos[5].ellipse.cx = 0.0; infos[5].ellipse.cy = 0.0;
-    infos[5].ellipse.rx = 30.0; infos[5].ellipse.ry = 20.0;
+    infos[5].ellipse.cx = 0.0;
+    infos[5].ellipse.cy = 0.0;
+    infos[5].ellipse.rx = 30.0;
+    infos[5].ellipse.ry = 20.0;
 
     Fio::FioParseResult parseData;
     parseData.entities = infos;
@@ -1065,10 +1127,22 @@ TEST(ImportExportRegressionTest, FioEntityConverter_AllSupportedTypes)
     size_t lineCount = 0, circleCount = 0, arcCount = 0, pointCount = 0;
     for (auto& e : result)
     {
-        if (e->eType == Eg::EType::LINE) lineCount++;
-        else if (e->eType == Eg::EType::CIRCLE) circleCount++;
-        else if (e->eType == Eg::EType::ARC) arcCount++;
-        else if (e->eType == Eg::EType::POINT) pointCount++;
+        if (e->eType == Eg::EType::LINE)
+        {
+            lineCount++;
+        }
+        else if (e->eType == Eg::EType::CIRCLE)
+        {
+            circleCount++;
+        }
+        else if (e->eType == Eg::EType::ARC)
+        {
+            arcCount++;
+        }
+        else if (e->eType == Eg::EType::POINT)
+        {
+            pointCount++;
+        }
     }
     EXPECT_GE(lineCount, 1u);
     EXPECT_GE(circleCount, 1u);
@@ -1101,8 +1175,10 @@ TEST(ImportExportRegressionTest, FioEntityConverter_EmptyEntityName)
 {
     Fio::EntityInfo info;
     info.type = Fio::EntityType::Line;
-    info.line.x1 = 0.0; info.line.y1 = 0.0;
-    info.line.x2 = 10.0; info.line.y2 = 10.0;
+    info.line.x1 = 0.0;
+    info.line.y1 = 0.0;
+    info.line.x2 = 10.0;
+    info.line.y2 = 10.0;
     info.name[0] = '\0';  // 空名称
 
     auto entity = FioEntityConverter::convertEntity(info);
@@ -1115,7 +1191,8 @@ TEST(ImportExportRegressionTest, FioEntityConverter_LongEntityName)
 {
     Fio::EntityInfo info;
     info.type = Fio::EntityType::Circle;
-    info.circle.cx = 0.0; info.circle.cy = 0.0;
+    info.circle.cx = 0.0;
+    info.circle.cy = 0.0;
     info.circle.r = 5.0;
     std::strncpy(info.name, "VeryLongEntityNameThatExceedsTypicalLimits", sizeof(info.name) - 1);
 
@@ -1226,27 +1303,35 @@ TEST(ImportExportRegressionTest, FioEntityConverter_BatchConsistency_AllFormats)
     Fio::EntityInfo infos[6];
     // Line
     infos[0].type = Fio::EntityType::Line;
-    infos[0].line.x1 = 0.0; infos[0].line.y1 = 0.0;
-    infos[0].line.x2 = 10.0; infos[0].line.y2 = 10.0;
+    infos[0].line.x1 = 0.0;
+    infos[0].line.y1 = 0.0;
+    infos[0].line.x2 = 10.0;
+    infos[0].line.y2 = 10.0;
     // Circle
     infos[1].type = Fio::EntityType::Circle;
-    infos[1].circle.cx = 50.0; infos[1].circle.cy = 50.0;
+    infos[1].circle.cx = 50.0;
+    infos[1].circle.cy = 50.0;
     infos[1].circle.r = 20.0;
     // Arc
     infos[2].type = Fio::EntityType::Arc;
-    infos[2].arc.cx = 0.0; infos[2].arc.cy = 0.0;
+    infos[2].arc.cx = 0.0;
+    infos[2].arc.cy = 0.0;
     infos[2].arc.r = 30.0;
-    infos[2].arc.sa = 0.0; infos[2].arc.ea = 3.14159;
+    infos[2].arc.sa = 0.0;
+    infos[2].arc.ea = 3.14159;
     // Polygon（顶点数据在扩展数据块中，这里仅设置 vertexCount）
     infos[3].type = Fio::EntityType::Polygon;
     infos[3].vertexCount = 3;
     // Ellipse
     infos[4].type = Fio::EntityType::Ellipse;
-    infos[4].ellipse.cx = 30.0; infos[4].ellipse.cy = 40.0;
-    infos[4].ellipse.rx = 15.0; infos[4].ellipse.ry = 10.0;
+    infos[4].ellipse.cx = 30.0;
+    infos[4].ellipse.cy = 40.0;
+    infos[4].ellipse.rx = 15.0;
+    infos[4].ellipse.ry = 10.0;
     // Point（使用 line 字段存储位置）
     infos[5].type = Fio::EntityType::Point;
-    infos[5].line.x1 = 100.0; infos[5].line.y1 = 200.0;
+    infos[5].line.x1 = 100.0;
+    infos[5].line.y1 = 200.0;
 
     Fio::FioParseResult parseData;
     parseData.entities = infos;
@@ -1262,12 +1347,15 @@ TEST(ImportExportRegressionTest, FioEntityConverter_EntityNamePreservedInBatch)
     // 验证实体名称在批量转换中保留
     Fio::EntityInfo infos[2];
     infos[0].type = Fio::EntityType::Line;
-    infos[0].line.x1 = 0.0; infos[0].line.y1 = 0.0;
-    infos[0].line.x2 = 10.0; infos[0].line.y2 = 10.0;
+    infos[0].line.x1 = 0.0;
+    infos[0].line.y1 = 0.0;
+    infos[0].line.x2 = 10.0;
+    infos[0].line.y2 = 10.0;
     std::strncpy(infos[0].name, "NamedLine", sizeof(infos[0].name));
 
     infos[1].type = Fio::EntityType::Circle;
-    infos[1].circle.cx = 50.0; infos[1].circle.cy = 50.0;
+    infos[1].circle.cx = 50.0;
+    infos[1].circle.cy = 50.0;
     infos[1].circle.r = 20.0;
     std::strncpy(infos[1].name, "NamedCircle", sizeof(infos[1].name));
 
@@ -1286,12 +1374,15 @@ TEST(ImportExportRegressionTest, FioEntityConverter_LayerIdPreservedInBatch)
     // 验证图层 sourceId 在批量转换中保留（layerSourceId 为 uint32_t，仅在 EntityInfo 层面使用）
     Fio::EntityInfo infos[2];
     infos[0].type = Fio::EntityType::Line;
-    infos[0].line.x1 = 0.0; infos[0].line.y1 = 0.0;
-    infos[0].line.x2 = 10.0; infos[0].line.y2 = 10.0;
+    infos[0].line.x1 = 0.0;
+    infos[0].line.y1 = 0.0;
+    infos[0].line.x2 = 10.0;
+    infos[0].line.y2 = 10.0;
     infos[0].layerSourceId = 101;
 
     infos[1].type = Fio::EntityType::Circle;
-    infos[1].circle.cx = 50.0; infos[1].circle.cy = 50.0;
+    infos[1].circle.cx = 50.0;
+    infos[1].circle.cy = 50.0;
     infos[1].circle.r = 20.0;
     infos[1].layerSourceId = 202;
 
@@ -1442,11 +1533,10 @@ namespace
     // 构造一个最小 DXF R12 文件内容（LINE + CIRCLE）
     std::string makeMinimalDxf()
     {
-        return std::string(
-            "0\nSECTION\n2\nENTITIES\n"
-            "0\nLINE\n8\n0\n10\n0.0\n20\n0.0\n30\n0.0\n11\n100.0\n21\n50.0\n31\n0.0\n"
-            "0\nCIRCLE\n8\n0\n10\n50.0\n20\n25.0\n30\n0.0\n40\n10.0\n"
-            "0\nENDSEC\n0\nEOF\n");
+        return std::string("0\nSECTION\n2\nENTITIES\n"
+                           "0\nLINE\n8\n0\n10\n0.0\n20\n0.0\n30\n0.0\n11\n100.0\n21\n50.0\n31\n0.0\n"
+                           "0\nCIRCLE\n8\n0\n10\n50.0\n20\n25.0\n30\n0.0\n40\n10.0\n"
+                           "0\nENDSEC\n0\nEOF\n");
     }
 
     std::string writeTempFile(const std::string& ext, const std::string& content)
@@ -1459,7 +1549,7 @@ namespace
         ofs.close();
         return path.string();
     }
-} // namespace
+}  // namespace
 
 TEST(ImportExportRegressionTest, IrPipeline_RealDxf_ParseAndConvert)
 {
@@ -1469,8 +1559,7 @@ TEST(ImportExportRegressionTest, IrPipeline_RealDxf_ParseAndConvert)
     Fio::FioParseResult ir;
     char errBuf[1024] = { 0 };
 
-    bool ok = fileIO.importToIR(path.c_str(), Fio::FileFormat::DXF,
-        &ir, errBuf, sizeof(errBuf));
+    bool ok = fileIO.importToIR(path.c_str(), Fio::FileFormat::DXF, &ir, errBuf, sizeof(errBuf));
 
     std::filesystem::remove(path);
 
@@ -1488,20 +1577,18 @@ TEST(ImportExportRegressionTest, IrPipeline_RealDxf_LwPolylineKeepsVertices)
 {
     // 最小 DXF：一条带 3 个顶点的 LWPOLYLINE。
     // 回归：vertexCount 未填充时转换出的 SyPolygon 顶点为空 → 无法显示。
-    std::string dxf =
-        "0\nSECTION\n2\nENTITIES\n"
-        "0\nLWPOLYLINE\n8\n0\n90\n3\n70\n0\n"
-        "10\n0.0\n20\n0.0\n"
-        "10\n10.0\n20\n0.0\n"
-        "10\n10.0\n20\n10.0\n"
-        "0\nENDSEC\n0\nEOF\n";
+    std::string dxf = "0\nSECTION\n2\nENTITIES\n"
+                      "0\nLWPOLYLINE\n8\n0\n90\n3\n70\n0\n"
+                      "10\n0.0\n20\n0.0\n"
+                      "10\n10.0\n20\n0.0\n"
+                      "10\n10.0\n20\n10.0\n"
+                      "0\nENDSEC\n0\nEOF\n";
 
     std::string path = writeTempFile("dxf", dxf);
     Fio::FileIOManager fileIO;
     Fio::FioParseResult ir;
     char errBuf[1024] = { 0 };
-    bool ok = fileIO.importToIR(path.c_str(), Fio::FileFormat::DXF,
-        &ir, errBuf, sizeof(errBuf));
+    bool ok = fileIO.importToIR(path.c_str(), Fio::FileFormat::DXF, &ir, errBuf, sizeof(errBuf));
     std::filesystem::remove(path);
 
     ASSERT_TRUE(ok) << errBuf;
@@ -1526,21 +1613,19 @@ TEST(ImportExportRegressionTest, IrPipeline_RealDxf_SplineKeepsControlPoints)
 {
     // 最小 DXF：一条 3 阶、3 个控制点的 SPLINE。
     // 回归：旧实现输出 EntityType::Spline（转换层未处理）+ 扩展数据布局不匹配 → 图元丢失。
-    std::string dxf =
-        "0\nSECTION\n2\nENTITIES\n"
-        "0\nSPLINE\n8\n0\n70\n0\n71\n3\n72\n7\n73\n3\n"
-        "40\n0.0\n40\n0.0\n40\n0.0\n40\n0.5\n40\n1.0\n40\n1.0\n40\n1.0\n"
-        "10\n0.0\n20\n0.0\n"
-        "10\n5.0\n20\n10.0\n"
-        "10\n10.0\n20\n0.0\n"
-        "0\nENDSEC\n0\nEOF\n";
+    std::string dxf = "0\nSECTION\n2\nENTITIES\n"
+                      "0\nSPLINE\n8\n0\n70\n0\n71\n3\n72\n7\n73\n3\n"
+                      "40\n0.0\n40\n0.0\n40\n0.0\n40\n0.5\n40\n1.0\n40\n1.0\n40\n1.0\n"
+                      "10\n0.0\n20\n0.0\n"
+                      "10\n5.0\n20\n10.0\n"
+                      "10\n10.0\n20\n0.0\n"
+                      "0\nENDSEC\n0\nEOF\n";
 
     std::string path = writeTempFile("dxf", dxf);
     Fio::FileIOManager fileIO;
     Fio::FioParseResult ir;
     char errBuf[1024] = { 0 };
-    bool ok = fileIO.importToIR(path.c_str(), Fio::FileFormat::DXF,
-        &ir, errBuf, sizeof(errBuf));
+    bool ok = fileIO.importToIR(path.c_str(), Fio::FileFormat::DXF, &ir, errBuf, sizeof(errBuf));
     std::filesystem::remove(path);
 
     ASSERT_TRUE(ok) << errBuf;

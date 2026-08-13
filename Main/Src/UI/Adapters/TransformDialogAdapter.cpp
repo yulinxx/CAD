@@ -27,10 +27,11 @@ namespace
     {
         return QCoreApplication::translate("TransformDialog", text);
     }
-}
+}  // namespace
 
 TransformDialogAdapter::TransformDialogAdapter(SceneDocument2D* document, QWidget* parent)
-    : m_document(document), m_parent(parent)
+    : m_document(document)
+    , m_parent(parent)
 {
 }
 
@@ -91,13 +92,20 @@ QString TransformDialogAdapter::getDialogTitle() const
 {
     switch (m_transformType)
     {
-        case TransformType::Move: return trTransform("Move");
-        case TransformType::Copy: return trTransform("Copy");
-        case TransformType::Rotate: return trTransform("Rotate");
-        case TransformType::Mirror: return trTransform("Mirror");
-        case TransformType::Scale: return trTransform("Scale");
-        case TransformType::Shear: return trTransform("Shear");
-        default: return trTransform("Transform");
+    case TransformType::Move:
+        return trTransform("Move");
+    case TransformType::Copy:
+        return trTransform("Copy");
+    case TransformType::Rotate:
+        return trTransform("Rotate");
+    case TransformType::Mirror:
+        return trTransform("Mirror");
+    case TransformType::Scale:
+        return trTransform("Scale");
+    case TransformType::Shear:
+        return trTransform("Shear");
+    default:
+        return trTransform("Transform");
     }
 }
 
@@ -112,20 +120,20 @@ QDialog* TransformDialogAdapter::createDialog()
     // 根据变换类型添加输入控件
     switch (m_transformType)
     {
-        case TransformType::Move:
-            addMoveInputs(layout);
-            break;
-        case TransformType::Copy:
-            addCopyInputs(layout);
-            break;
-        case TransformType::Rotate:
-            addRotateInputs(layout);
-            break;
-        case TransformType::Mirror:
-            addMirrorInputs(layout, dialog);
-            break;
-        default:
-            break;
+    case TransformType::Move:
+        addMoveInputs(layout);
+        break;
+    case TransformType::Copy:
+        addCopyInputs(layout);
+        break;
+    case TransformType::Rotate:
+        addRotateInputs(layout);
+        break;
+    case TransformType::Mirror:
+        addMirrorInputs(layout, dialog);
+        break;
+    default:
+        break;
     }
 
     // 添加预览控件
@@ -149,23 +157,22 @@ QDialog* TransformDialogAdapter::createDialog()
     // 应用按钮
     if (auto applyButton = buttonBox->button(QDialogButtonBox::Apply))
     {
-        QObject::connect(applyButton, &QPushButton::clicked, dialog, [this, dialog]()
+        QObject::connect(applyButton, &QPushButton::clicked, dialog, [this, dialog]() {
+            auto params = collectParametersFromUI(dialog);
+            if (validateParameters(params))
             {
-                auto params = collectParametersFromUI(dialog);
-                if (validateParameters(params))
+                m_parameters = params;
+                if (m_parametersChangedCallback)
                 {
-                    m_parameters = params;
-                    if (m_parametersChangedCallback)
-                    {
-                        m_parametersChangedCallback(params);
-                    }
-                    m_statusLabel->setText(trTransform("Parameters applied"));
+                    m_parametersChangedCallback(params);
                 }
-                else
-                {
-                    m_statusLabel->setText(trTransform("Invalid parameters"));
-                }
-            });
+                m_statusLabel->setText(trTransform("Parameters applied"));
+            }
+            else
+            {
+                m_statusLabel->setText(trTransform("Invalid parameters"));
+            }
+        });
     }
 
     return dialog;
@@ -344,12 +351,13 @@ void TransformDialogAdapter::addMirrorInputs(QVBoxLayout* layout, QDialog* dialo
     groupLayout->addWidget(customGroup);
 
     // 连接信号：切换轴类型时显示/隐藏自定义参数
-    QObject::connect(axisGroup, &QButtonGroup::buttonClicked, dialog,
-        [customGroup](QAbstractButton* btn) {
-            auto* group = btn->group();
-            if (group)
-                customGroup->setVisible(group->checkedId() == 2);
-        });
+    QObject::connect(axisGroup, &QButtonGroup::buttonClicked, dialog, [customGroup](QAbstractButton* btn) {
+        auto* group = btn->group();
+        if (group)
+        {
+            customGroup->setVisible(group->checkedId() == 2);
+        }
+    });
 
     layout->addWidget(group);
 }
@@ -358,10 +366,9 @@ void TransformDialogAdapter::addPreviewControls(QVBoxLayout* layout, QDialog* di
 {
     auto previewCheck = new QCheckBox(trTransform("Live Preview"));
     previewCheck->setChecked(m_showPreview);
-    QObject::connect(previewCheck, &QCheckBox::toggled, dialog, [this](bool checked)
-        {
-            m_showPreview = checked;
-        });
+    QObject::connect(previewCheck, &QCheckBox::toggled, dialog, [this](bool checked) {
+        m_showPreview = checked;
+    });
     layout->addWidget(previewCheck);
 }
 
@@ -372,73 +379,97 @@ TransformParameters TransformDialogAdapter::collectParametersFromUI(QDialog* dia
 
     switch (m_transformType)
     {
-        case TransformType::Move:
+    case TransformType::Move:
+    {
+        if (m_moveXSpinBox)
         {
-            if (m_moveXSpinBox)
-                params.moveX = m_moveXSpinBox->value();
-            if (m_moveYSpinBox)
-                params.moveY = m_moveYSpinBox->value();
-            break;
+            params.moveX = m_moveXSpinBox->value();
         }
-        case TransformType::Copy:
+        if (m_moveYSpinBox)
         {
-            if (m_copyCountSpinBox)
-                params.copyCount = m_copyCountSpinBox->value();
-            if (m_copySpacingXSpinBox)
-                params.moveX = m_copySpacingXSpinBox->value();
-            if (m_copySpacingYSpinBox)
-                params.moveY = m_copySpacingYSpinBox->value();
-            break;
+            params.moveY = m_moveYSpinBox->value();
         }
-        case TransformType::Rotate:
+        break;
+    }
+    case TransformType::Copy:
+    {
+        if (m_copyCountSpinBox)
         {
-            if (m_rotateAngleSpinBox)
-                params.rotateAngle = m_rotateAngleSpinBox->value();
-            if (m_rotateCenterXSpinBox)
-                params.anchorX = m_rotateCenterXSpinBox->value();
-            if (m_rotateCenterYSpinBox)
-                params.anchorY = m_rotateCenterYSpinBox->value();
-            break;
+            params.copyCount = m_copyCountSpinBox->value();
         }
-        case TransformType::Mirror:
+        if (m_copySpacingXSpinBox)
         {
-            // 根据选择的轴设置参数
-            auto axisGroup = dialog->findChild<QButtonGroup*>();
-            if (axisGroup)
+            params.moveX = m_copySpacingXSpinBox->value();
+        }
+        if (m_copySpacingYSpinBox)
+        {
+            params.moveY = m_copySpacingYSpinBox->value();
+        }
+        break;
+    }
+    case TransformType::Rotate:
+    {
+        if (m_rotateAngleSpinBox)
+        {
+            params.rotateAngle = m_rotateAngleSpinBox->value();
+        }
+        if (m_rotateCenterXSpinBox)
+        {
+            params.anchorX = m_rotateCenterXSpinBox->value();
+        }
+        if (m_rotateCenterYSpinBox)
+        {
+            params.anchorY = m_rotateCenterYSpinBox->value();
+        }
+        break;
+    }
+    case TransformType::Mirror:
+    {
+        // 根据选择的轴设置参数
+        auto axisGroup = dialog->findChild<QButtonGroup*>();
+        if (axisGroup)
+        {
+            int axis = axisGroup->checkedId();
+            if (axis == 0)
             {
-                int axis = axisGroup->checkedId();
-                if (axis == 0)
+                // X 轴
+                params.mirrorAxis = 0;
+                params.mirrorCenterX = 0;
+                params.mirrorCenterY = 0;
+            }
+            else if (axis == 1)
+            {
+                // Y 轴
+                params.mirrorAxis = 1;
+                params.mirrorCenterX = 0;
+                params.mirrorCenterY = 0;
+            }
+            else
+            {
+                // 自定义轴
+                params.mirrorAxis = 2;
+                if (m_mirrorLineX1SpinBox)
                 {
-                    // X 轴
-                    params.mirrorAxis = 0;
-                    params.mirrorCenterX = 0;
-                    params.mirrorCenterY = 0;
+                    params.mirrorLineX1 = m_mirrorLineX1SpinBox->value();
                 }
-                else if (axis == 1)
+                if (m_mirrorLineY1SpinBox)
                 {
-                    // Y 轴
-                    params.mirrorAxis = 1;
-                    params.mirrorCenterX = 0;
-                    params.mirrorCenterY = 0;
+                    params.mirrorLineY1 = m_mirrorLineY1SpinBox->value();
                 }
-                else
+                if (m_mirrorLineX2SpinBox)
                 {
-                    // 自定义轴
-                    params.mirrorAxis = 2;
-                    if (m_mirrorLineX1SpinBox)
-                        params.mirrorLineX1 = m_mirrorLineX1SpinBox->value();
-                    if (m_mirrorLineY1SpinBox)
-                        params.mirrorLineY1 = m_mirrorLineY1SpinBox->value();
-                    if (m_mirrorLineX2SpinBox)
-                        params.mirrorLineX2 = m_mirrorLineX2SpinBox->value();
-                    if (m_mirrorLineY2SpinBox)
-                        params.mirrorLineY2 = m_mirrorLineY2SpinBox->value();
+                    params.mirrorLineX2 = m_mirrorLineX2SpinBox->value();
+                }
+                if (m_mirrorLineY2SpinBox)
+                {
+                    params.mirrorLineY2 = m_mirrorLineY2SpinBox->value();
                 }
             }
-            break;
         }
-        default:
-            break;
+        break;
+    }
+    default:
+        break;
     }
 
     params.isInteractive = false;
@@ -451,32 +482,34 @@ bool TransformDialogAdapter::validateParameters(const TransformParameters& param
 {
     switch (params.type)
     {
-        case TransformType::Move:
-        {
-            return true; // 移动操作总是有效的
-        }
-        case TransformType::Copy:
-        {
-            return params.copyCount > 0;
-        }
-        case TransformType::Rotate:
-        {
-            // 角度不能为 0
-            return params.rotateAngle != 0.0;
-        }
-        case TransformType::Mirror:
-        {
-            return true; // 镜像操作总是有效的
-        }
-        default:
-            return false;
+    case TransformType::Move:
+    {
+        return true;  // 移动操作总是有效的
+    }
+    case TransformType::Copy:
+    {
+        return params.copyCount > 0;
+    }
+    case TransformType::Rotate:
+    {
+        // 角度不能为 0
+        return params.rotateAngle != 0.0;
+    }
+    case TransformType::Mirror:
+    {
+        return true;  // 镜像操作总是有效的
+    }
+    default:
+        return false;
     }
 }
 
 void TransformDialogAdapter::updatePreview(const TransformParameters& params)
 {
     if (!m_showPreview)
+    {
         return;
+    }
 
     // 更新预览
     if (m_parametersChangedCallback)

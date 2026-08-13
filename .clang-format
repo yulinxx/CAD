@@ -1,30 +1,369 @@
-BasedOnStyle: LLVM
-IndentWidth: 4
-TabWidth: 4
-UseTab: Never
+# ============================================================
+# clang-format 配置文件
+# ------------------------------------------------------------
+# 适用工程: /Users/ms/Documents/CAD
+# 语言定位: 传统 C++ 风格（Allman 大括号 / 4 空格缩进 / 120 列）
+# 作者偏好: 传统 C++，避免过度贴近 C 风格的紧凑写法。
+#
+# ------------------------------------------------------------
+# 批量格式化: 在工程根目录执行
+#
+# 【macOS / Linux】
+#   全量格式化并显示文件清单:
+#     find . \( -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) \
+#         -exec clang-format -i -verbose {} +
+#
+#   带进度提示、可中途查看版本:
+#     find . \( -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) \
+#         -print0 | xargs -0 -I {} sh -c 'echo "Formatting {}" && clang-format -i "{}"'
+#
+#   只检查不修改（CI 集成，列出需格式化文件并返回非零）:
+#     find . \( -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) \
+#         -exec clang-format --dry-run --Werror {} +
+#
+# 【Windows】(PowerShell 5.1+ / 7+)
+#   全量格式化（先 cd 到工程根目录）:
+#     Get-ChildItem -Recurse -Include *.cpp,*.h,*.hpp |
+#         Where-Object { $_.FullName -notmatch '\\(build|cmake-build|ThirdParty|3rdparty|vcpkg|\\.git\\)' } |
+#         ForEach-Object { clang-format -i $_.FullName }
+#
+#   只检查不修改（CI）:
+#     Get-ChildItem -Recurse -Include *.cpp,*.h,*.hpp |
+#         Where-Object { $_.FullName -notmatch '\\(build|cmake-build|ThirdParty|3rdparty|vcpkg|\\.git\\)' } |
+#         ForEach-Object { clang-format --dry-run --Werror $_.FullName }
+#
+# 【Windows】(CMD 批处理, 存为 format.bat 使用)
+#     @echo off
+#     for /r %%f in (*.cpp *.h *.hpp) do (
+#         echo Formatting %%f
+#         clang-format -i "%%f"
+#     )
+#
+# 要点:
+#   - clang-format 需 16+ 版本（启用 InsertBraces 等新规则）。
+#   - 示例中的 find / Get-ChildItem 已排除 build / 第三方目录，
+#     正式使用请按实际目录结构调整排除规则。
+#   - 只格式化单个文件:  clang-format -i 文件路径
+#
+# 注意: 本文件使用 YAML 语法，行首 '#' 之后为注释。
+#       "Never" / "false" 等取值表示禁止/关闭，语义与 C++ 关键字相同，
+#       便于记忆，但注意它们是 YAML 的关键字字面量。
+# ============================================================
 
-# 短语句强制换行
-AllowShortIfStatementsOnASingleLine: false
-AllowShortBlocksOnASingleLine: false
-AllowShortLoopsOnASingleLine: false
-AllowShortFunctionsOnASingleLine: None
 
-# 大括号各自独占一行
+# ============================================================
+# 0. 基础风格与 C++ 标准
+# ============================================================
+
+# BasedOnStyle 提供一套合理默认值，随后每一项显式覆盖。
+# Microsoft 风格内建 Allman 大括号与 4 空格缩进，契合传统 C++ 写法，
+# 用它做起点可减少需要手工指定的规则数量。
+BasedOnStyle: Microsoft
+
+# 控制格式化所依据的 C++ 语言标准，影响：
+#   - lambda 捕获/返回类型换行
+#   - 折叠表达式、概念等新语法的格式化
+# c++17 足够现代，同时避免 Latest 引入尚未落地的激进规则。
+Standard: c++17
+
+
+# ============================================================
+# 1. 缩进与制表符
+# ============================================================
+IndentWidth: 4                  # 每次缩进 4 个空格
+TabWidth: 4                     # 制表符的显示宽度（若 UseTab 启用）
+UseTab: Never                   # 一律使用空格，禁用 Tab（跨编辑器一致）
+
+# 续行缩进：当某行超过列宽被拆成多行时，后续行额外缩进的宽度。
+# 与 AlignAfterOpenBracket: DontAlign 配合，保证续行始终使用固定缩进，
+# 而非对齐到括号位置（后者在深层嵌套时易错乱）。
+ContinuationIndentWidth: 4
+
+# 访问限定符（public/private/protected）自身的缩进宽度。
+# 见下方 "访问限定符" 一节，两者需保持一致。
+AccessModifierOffset: -4
+
+# 构造函数初始化列表换行时的缩进宽度。
+ConstructorInitializerIndentWidth: 4
+
+
+# ============================================================
+# 2. 大括号风格 (传统 C++ / Allman)
+# ============================================================
+
+# 大括号风格：默认使用 Allman（{ 独占一行，如 if/for/函数/命名空间）。
+# 但由于 Allman 会把 lambda 的 { 也放到下一行，而本工程要求 lambda 的 {
+# 放在参数列表同行（{ 前留一个空格），因此这里改用 Custom 风格：
+#   用 BreakBeforeBraces: Custom + 下方 BraceWrapping 显式列出所有开关，
+#   ——除 BeforeLambdaBody: false 外，其余全部与 Allman 一致。
+# 例:
+#   [](unsigned char c) {   <- 想要（BeforeLambdaBody: false）
+#   [](unsigned char c)     <- 不想要（Allman 默认会把 { 放到下一行）
 BreakBeforeBraces: Custom
+
 BraceWrapping:
-  AfterClass: true
-  AfterControlStatement: Always
-  AfterEnum: true
-  AfterFunction: true
-  AfterNamespace: true
-  AfterStruct: true
-  AfterUnion: true
-  AfterExternBlock: true
-  BeforeCatch: true
-  BeforeElse: true
-  BeforeLambdaBody: false
-  BeforeWhile: false
-  IndentBraces: false
-  SplitEmptyFunction: true
-  SplitEmptyRecord: true
-  SplitEmptyNamespace: true
+  AfterCaseLabel:       true     # case 标签后
+  AfterClass:           true     # class 左大括号另起一行
+  AfterControlStatement: Always  # if/for/while/switch 的左大括号另起一行
+  AfterEnum:            true     # enum 左大括号另起一行
+  AfterExternBlock:     true     # extern "C" 块左大括号另起一行
+  AfterFunction:        true     # 函数体左大括号另起一行
+  AfterNamespace:       true     # namespace 左大括号另起一行
+  AfterObjCDeclaration: true
+  AfterStruct:          true     # struct 左大括号另起一行
+  AfterUnion:           true     # union 左大括号另起一行
+  BeforeCatch:          true     # catch 前的大括号另起一行
+  BeforeElse:           true     # else 前的大括号另起一行
+  BeforeLambdaBody:     false    # lambda 的 { 放在参数列表同行，{ 前留一个空格:
+                                 #   [](unsigned char c) { return std::tolower(c); }
+  BeforeWhile:          false
+  IndentBraces:         false
+  SplitEmptyFunction:   true
+  SplitEmptyRecord:     true
+  SplitEmptyNamespace:  true
+
+
+# ============================================================
+# 3. 命名空间
+# ============================================================
+NamespaceIndentation: All       # 命名空间内的内容额外缩进
+CompactNamespaces: false        # 禁止合并嵌套命名空间 (namespace a::b {)
+FixNamespaceComments: true      # 在命名空间结束处自动补全注释，便于长文件定位
+                                # (如 namespace render 的结尾 // namespace render)
+
+
+# ============================================================
+# 4. 空行控制
+# ============================================================
+MaxEmptyLinesToKeep: 1          # 最多保留 1 个连续空行
+KeepEmptyLinesAtTheStartOfBlocks: true
+SeparateDefinitionBlocks: Always  # 相邻成员函数定义之间强制加空行，增强可读性
+EmptyLineBeforeAccessModifier: Always # 访问限定符前预留空行
+EmptyLineAfterAccessModifier: Never   # 访问限定符后不额外加空行（保持紧凑）
+
+
+# ============================================================
+# 5. 类 / 结构体 (传统 C++)
+# ============================================================
+
+# 访问限定符相对类体缩进：缩进量为 AccessModifierOffset（-4）。
+# IndentAccessModifiers: false 表示访问限定符与 class 左括号"齐平"：
+#   class Widget {
+#   public:        <- public 与 class 平齐，不额外缩进
+#       void foo();
+#   };
+IndentAccessModifiers: false
+
+
+# ============================================================
+# 6. 指针与引用 (传统 C++ 左对齐)
+# ============================================================
+PointerAlignment: Left          # int* p;  —— '*' 紧贴类型
+ReferenceAlignment: Pointer     # int& r;  —— '&' 与指针一致靠左
+DerivePointerAlignment: false   # 不根据代码推断，固定用上述规则
+# 若想让 const 也统一靠左（更常见的传统写法），取消下行注释：
+# QualifierAlignment: Left       # const int* p;（需 clang-format >= 15）
+
+
+# ============================================================
+# 7. C++11 大括号初始化与 Lambda
+# ============================================================
+# false = 采用旧式对齐（列表内不加空格）
+Cpp11BracedListStyle: false
+# "变量名/返回值 与 '{' 之间"不加空格（C++11 花括号初始化）：
+#   Fio::BinaryBlobOut o1{ data1.data(), data1.size(), 0 };  <- 变量声明
+#   return FioParseResult{};                                  <- 返回值
+#   Foo x{1, 2};                                              <- 普通花括号初始化
+# （花括号内部元素之间仍保留常规空格，如 { 1, 2 }）
+SpaceBeforeCpp11BracedList: false
+# lambda 只有主体为空时允许单行，否则始终展开，利于阅读：
+AllowShortLambdasOnASingleLine: Empty
+
+
+# ============================================================
+# 8. 换行与列宽
+# ============================================================
+ColumnLimit: 120             # 单行理想上限 120 字符（可容忍少量溢出）
+
+# 换行惩罚系数：
+#   值越小越倾向于在该处换行。
+PenaltyBreakAssignment: 1                 # 赋值号处换行惩罚很低 => 优先在=处断行
+PenaltyBreakBeforeFirstCallParameter: 19  # 函数调用的第一个参数前换行惩罚
+PenaltyBreakComment: 300                  # 注释尽量不强制拆行（保留原貌）
+PenaltyExcessCharacter: 20                # 每超出一个字符的惩罚（驱动断行）
+PenaltyReturnTypeOnItsOwnLine: 60         # 返回类型单独一行的惩罚
+
+# 二元运算符断行策略：
+#   None       => 运算符留在行首（不主动在运算符前断行）
+#   true(不建议) => 在运算符之后断行
+BreakBeforeBinaryOperators: None
+# 三元运算符（?:）在 ? 之前断行，阅读更清晰
+BreakBeforeTernaryOperators: true
+
+# 返回类型换行策略：
+#   None => 尽量不强制把返回类型单独拆行（传统 C++ 风格）
+AlwaysBreakAfterReturnType: None
+BreakAfterReturnType: None
+IndentWrappedFunctionNames: false   # 换行的函数名不额外缩进
+
+# 短函数 / 短语句是否允许单行：
+#   Empty => 仅当函数体为空时允许单行 (void f() {})
+AllowShortFunctionsOnASingleLine: Empty
+# 无 else 且仅一行的 if：强制换行为多行，但不自动增删大括号：
+#   if (v.empty()) return "";     ->  if (v.empty())
+#                                        return "";
+# （成对与否由 InsertBraces 决定；见第16节。设为 false=c 换行但保留原括号）
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false  # case 标签不与其他语句挤在同一行
+
+
+# ============================================================
+# 9. 函数参数与调用
+# ============================================================
+# BinPack = "装箱"，即把多个参数压缩到尽可能少的行内。
+# 传统风格倾向于一个参数一行，更利于阅读与 diff。
+BinPackParameters: false    # 函数声明/定义：每个参数各自换行
+BinPackArguments: false     # 函数调用：每个参数各自换行
+
+# 换行后参数缩进策略：
+#   DontAlign => 不使用括号对齐，采用 4 空格（ContinuationIndentWidth）
+AlignAfterOpenBracket: DontAlign
+
+# 所有参数是否允许全部放到下一行（声明语句）。
+# false => 优先采用拆分成多行的展开式写法。
+AllowAllParametersOfDeclarationOnNextLine: true
+
+
+# ============================================================
+# 10. 对齐选项
+# ============================================================
+# "连续对齐"会把相邻多行的一组符号排成等宽列，类似表格。
+# 过度对齐有贴近 C 风格账本式排版、且在高频增删时会触发大量 diff 的问题，
+# 因此除少数必要项外统一关闭。
+AlignConsecutiveAssignments: false     # 连续赋值 '=' 不对齐
+AlignConsecutiveBitFields: false       # 连续位域不对齐
+AlignConsecutiveDeclarations: false    # 连续声明不对齐（保留 C++ 自然排布）
+AlignConsecutiveMacros: true           # 连续宏定义对齐（#define）
+# 操作数对齐：DontAlign 使表达式续行采用固定缩进，覆盖新式 AlignOperands 规则
+AlignOperands: DontAlign
+
+# 多行 ASCII 注释块靠右对齐 & 行尾注释间距
+AlignTrailingComments: true
+SpacesBeforeTrailingComments: 2        # 行尾注释前保留 2 个空格
+
+
+# ============================================================
+# 11. 预处理指令 (#define / #if)
+# ============================================================
+IndentPPDirectives: BeforeHash   # 条件编译内的代码相对 '#' 缩进
+PPIndentWidth: 4                 # 预处理器缩进宽度
+AlignEscapedNewlines: Left       # '\\' 续行符统一靠左对齐
+
+
+# ============================================================
+# 12. 构造函数初始化列表
+# ============================================================
+# 期望样式（传统 C++，"逐项换行，: 与 , 置于行首"）：
+#   NsvgInterpreter(...)
+#   : m_outEntities(outEntities)
+#   , m_extensionBlob(extensionBlob)
+#   , m_warnings(warnings)
+#   , m_success(false)
+#
+# 说明：
+#   - BeforeComma => 在逗号前换行，使每个 , 位于续行行首（leading comma）
+#   - PackConstructorInitializers: Never => 每个初始化项独占一行
+BreakConstructorInitializers: BeforeComma
+PackConstructorInitializers: Never
+
+# ============================================================
+# 13. 模板 (传统 C++)
+# ============================================================
+# 模板声明头 (template <...>) 始终单独占一行
+AlwaysBreakTemplateDeclarations: true
+SpaceAfterTemplateKeyword: false   # template<，而非 template <
+
+
+# ============================================================
+# 14. Include 管理
+# ============================================================
+SortIncludes: false          # 不做自动排序（保留作者手写的 include 顺序）
+SortUsingDeclarations: false # 不排序 using 声明
+IncludeBlocks: Regroup       # 仍按类别分组整理（系统/第三方/项目 分块）
+
+# include 分组规则（配合 IncludeBlocks + 启用排序后生效）
+# 当前 SortIncludes: false 表示不做自动重排，以下类别仅作文档参考；
+# 若将来希望按类别自动重排头文件，把 SortIncludes 改为 true 即可。
+# 数值越小优先级越高；正则按顺序匹配。
+IncludeCategories:
+  - Regex: '^<.*>'                   # 系统与标准库头
+    Priority: 1
+  - Regex: '^(<[Qq][^/]*>|"[Qq][^/]*")'  # Qt 头（第三方）
+    Priority: 2
+  - Regex: '^"[^"]+"$'          # 项目/外部引号头文件
+    Priority: 3
+
+
+# ============================================================
+# 15. 空格规则
+# ============================================================
+# C 风格类型转换不加空格：T* p = (T*)v;  （此时无空格贴近 C）
+# 但我们更推荐传统 C++ 的 static_cast，见注释。
+SpaceAfterCStyleCast: false
+
+# 括号内不补空格：
+SpacesInParentheses: false
+SpacesInSquareBrackets: false    # v[i]，而非 v[ i ]
+SpaceInEmptyParentheses: false   # f()，而非 f( )
+SpaceInEmptyBlock: false         # {}，而非 { }
+SpaceBeforeParens: ControlStatements # 仅控制语句 (if/for/...) 前留空格
+SpaceAroundPointerQualifiers: Default # const/volatile 两侧空格交给默认
+
+# 大括号初始化内逗号后空格交给默认规则
+
+
+# ============================================================
+# 16. 其它增强
+# ============================================================
+
+# 是否自动补大括号（与第8节 AllowShortIfStatementsOnASingleLine 联动）:
+#   当前组合: InsertBraces=false + AllowShortIfStatementsOnASingleLine=false
+#   => 一行 if 会被强制换行（见规则1），但大括号维持原样：
+#       不新增、也不删除，作者手写的 {} 原样保留。
+#   （若日后希望"超过一行/if/else 强制补括号且对称"，改回 true 即可，
+#     但那样连单行 if 也会被补上括号。）
+
+# 注释的自动换行：允许 clang-format 对较长注释重新排版（提升注释可读性）
+ReflowComments: true
+# 命中该正则的注释不做重排（含 '@' 接口注释、@author、@date 等）
+CommentPragmas: '^ IWYU pragma:|@file|@brief|@author|@date'
+
+# 宏列表：以下宏按"函数调用"而非"函数定义"处理，括号内部的缩进
+# 遵循函数调用规则而非类函数定义，可避免误格式化：
+# ForEachMacros: [ foreach, Q_FOREACH, BOOST_FOREACH ]
+
+# 允许的最大连续空行由上方 MaxEmptyLinesToKeep 控制。
+
+
+# ============================================================
+# 17. 人工约定（clang-format 无法自动实现，需手写 / review 把关）
+# ============================================================
+# clang-format 只能"保留/整理"已有的空行，无法根据语义自动生成空行。
+# 下面两条属于团队阅读性约定，需在写码或 code review 时人为遵守：
+#
+#   A) return 之后若仍有其它代码，return 语句后补一个空行:
+#          if (v.empty())
+#              return "";
+#                          <- 空行
+#          doWork(v);
+#
+#   B) 一段连续的命令式代码中，按逻辑小组之间补空行，便于分段阅读:
+#          data1.resize(q1.written);
+#          data2.resize(q2.written);
+#                          <- 空行
+#          Fio::BinaryBlobOut o1 { ... };
+#          Fio::BinaryBlobOut o2 { ... };
+#
+# 若希望以后由工具辅助检查，可考虑用 clang-tidy / 自定义脚本做
+# "return 后无空行"的 lint，但 clang-format 本身不提供该能力。

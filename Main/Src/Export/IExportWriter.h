@@ -27,6 +27,5 @@ public:
     /// @param context 导出上下文（含目标路径和参数）
     /// @param entities 要导出的图元列表
     /// @return 导出结果
-    virtual ExportResult write(const ExportContext& context,
-        const Fio::VecSyEntityPtr& entities) = 0;
+    virtual ExportResult write(const ExportContext& context, const Fio::VecSyEntityPtr& entities) = 0;
 };

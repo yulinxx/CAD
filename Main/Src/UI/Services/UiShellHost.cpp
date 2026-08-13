@@ -50,13 +50,17 @@ void UiShellHost::setUiServices(const UiServices& services)
 {
     m_services = services;
     if (m_mainWindow)
+    {
         m_mainWindow->setUiServices(services);
+    }
 }
 
 void UiShellHost::setFrameworkServices(const UiFrameworkServices& services)
 {
     if (m_mainWindow)
+    {
         m_mainWindow->setFrameworkServices(services);
+    }
 }
 
 /// 设置工作台并传递给主窗口
@@ -80,7 +84,8 @@ void UiShellHost::initializeAndShow()
 {
     if (!m_mainWindow || !m_workbench)
     {
-        SY_ERROR("[UiShellHost] error code=shell.init_failed message=initializeAndShow called without main window or workbench");
+        SY_ERROR("[UiShellHost] error code=shell.init_failed message=initializeAndShow called without main window or "
+                 "workbench");
         return;
     }
 
@@ -93,14 +98,16 @@ void UiShellHost::initializeAndShow()
             m_themeService->loadThemeFromId(themeId);
             m_mainWindow->applyTheme(m_themeService->styleSheet());
         }
-        });
+    });
 
     m_mainWindow->setWorkbenchFactory([this](const QString& id) -> UiWorkbench* {
         return resolveWorkbench(id);
-        });
+    });
 
     if (m_stateCenter)
+    {
         m_stateCenter->setBusy(false);
+    }
 
     m_mainWindow->show();
 }
@@ -109,7 +116,9 @@ UiWorkbench* UiShellHost::resolveWorkbench(const QString& workbenchId)
 {
     // 2D 工作台由外部注入，直接返回
     if (workbenchId == QStringLiteral("2D"))
+    {
         return m_workbench;
+    }
 
 #if BUILD_UI3D
     if (workbenchId == QStringLiteral("3D"))
@@ -128,8 +137,7 @@ UiWorkbench* UiShellHost::resolveWorkbench(const QString& workbenchId)
     }
 #endif
 
-    SY_WARNF("Unknown workbench id '%s', falling back to 2D",
-        workbenchId.toUtf8().constData());
+    SY_WARNF("Unknown workbench id '%s', falling back to 2D", workbenchId.toUtf8().constData());
     return m_workbench;
 }
 
@@ -137,16 +145,22 @@ void UiShellHost::switchWorkbench(const QString& workbenchId)
 {
     UiWorkbench* target = resolveWorkbench(workbenchId);
     if (target)
+    {
         switchWorkbench(target);
+    }
 }
 
 void UiShellHost::switchWorkbench(UiWorkbench* workbench)
 {
     if (!workbench || !m_mainWindow)
+    {
         return;
+    }
 
     if (m_workbench == workbench)
+    {
         return;
+    }
 
     // 更新宿主层的工作台引用
     m_workbench = workbench;

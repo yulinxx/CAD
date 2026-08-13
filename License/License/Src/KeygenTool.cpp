@@ -19,10 +19,8 @@ namespace
 
         const int outLen = 4 * ((static_cast<int>(len) + 2) / 3);
         std::string result(static_cast<size_t>(outLen), '\0');
-        const int written = EVP_EncodeBlock(
-            reinterpret_cast<unsigned char*>(result.data()),
-            data,
-            static_cast<int>(len));
+        const int written =
+            EVP_EncodeBlock(reinterpret_cast<unsigned char*>(result.data()), data, static_cast<int>(len));
         if (written < 0)
         {
             return {};
@@ -43,7 +41,7 @@ namespace
         std::replace(s.begin(), s.end(), '/', '_');
         return s;
     }
-} // anonymous namespace
+}  // anonymous namespace
 
 bool KeygenTool::GenerateKeyPair(const std::string& privKeyFile, const std::string& pubKeyFile)
 {
@@ -93,8 +91,7 @@ bool KeygenTool::GenerateKeyPair(const std::string& privKeyFile, const std::stri
     return ok;
 }
 
-std::string KeygenTool::GenerateRegCode(
-    const std::string& machineCode,
+std::string KeygenTool::GenerateRegCode(const std::string& machineCode,
     const std::string& expiryDate,
     const std::string& features,
     const std::string& issueDate,
@@ -152,9 +149,7 @@ std::string KeygenTool::GenerateRegCode(
         return {};
     }
 
-    const std::string payloadB64 = Base64Encode(
-        reinterpret_cast<const unsigned char*>(payload.data()),
-        payload.size());
+    const std::string payloadB64 = Base64Encode(reinterpret_cast<const unsigned char*>(payload.data()), payload.size());
     const std::string sigB64 = Base64Encode(sig.data(), sigLen);
 
     return ToUrlSafe(payloadB64) + "." + ToUrlSafe(sigB64);

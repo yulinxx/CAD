@@ -25,6 +25,5 @@ public:
         return QStringLiteral("OBJ");
     }
 
-    ImportResult read(const ImportContext& context,
-        Fio::VecSyEntityPtr& outEntities) override;
+    ImportResult read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities) override;
 };

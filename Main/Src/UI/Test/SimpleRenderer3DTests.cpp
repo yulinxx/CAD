@@ -11,7 +11,7 @@
 #include <QPainter>
 #include <QImage>
 
- // ==================== 生命周期测试 ====================
+// ==================== 生命周期测试 ====================
 
 TEST(SimpleRenderer3DTest, Lifecycle)
 {
@@ -168,7 +168,7 @@ TEST(SimpleRenderer3DTest, DoubleInitializeIsSafe)
 {
     SimpleRenderer3D renderer;
     EXPECT_TRUE(renderer.initialize());
-    EXPECT_TRUE(renderer.initialize()); // 二次初始化不应崩溃
+    EXPECT_TRUE(renderer.initialize());  // 二次初始化不应崩溃
     EXPECT_TRUE(renderer.isReady());
     renderer.shutdown();
 }
@@ -178,7 +178,7 @@ TEST(SimpleRenderer3DTest, DoubleShutdownIsSafe)
     SimpleRenderer3D renderer;
     renderer.initialize();
     renderer.shutdown();
-    renderer.shutdown(); // 二次关闭不应崩溃
+    renderer.shutdown();  // 二次关闭不应崩溃
     EXPECT_FALSE(renderer.isReady());
 }
 
@@ -385,7 +385,9 @@ TEST(SimpleRenderer3DTest, StatusCallback_EmitsOnResetView)
     renderer.initialize();
 
     QString lastStatus;
-    renderer.setStatusCallback([&lastStatus](const QString& msg) { lastStatus = msg; });
+    renderer.setStatusCallback([&lastStatus](const QString& msg) {
+        lastStatus = msg;
+    });
 
     renderer.resetView();
     EXPECT_FALSE(lastStatus.isEmpty());
@@ -399,7 +401,9 @@ TEST(SimpleRenderer3DTest, SelectionCallback_EmitsOnSelectNode)
     renderer.initialize();
 
     QString lastSelection;
-    renderer.setSelectionCallback([&lastSelection](const QString& id) { lastSelection = id; });
+    renderer.setSelectionCallback([&lastSelection](const QString& id) {
+        lastSelection = id;
+    });
 
     renderer.selectNodeById("test_entity");
     EXPECT_EQ(lastSelection.toStdString(), "test_entity");
@@ -417,7 +421,7 @@ TEST(SimpleRenderer3DTest, PathCallback_EmitsEmptyPathWithoutDocument)
     renderer.setPathCallback([&lastPath, &pathCalled](const QStringList& path) {
         lastPath = path;
         pathCalled = true;
-        });
+    });
 
     renderer.selectNodeById("node_with_path");
     // 回调被调用，但路径列表为空（无文档时 rebuildTreeHighlight 提前返回）
@@ -549,7 +553,7 @@ TEST(SimpleRenderer3DTest, SelectNodeById_RepeatedSelectionKeepsLatest)
 
     renderer.selectNodeById("node_a");
     renderer.selectNodeById("node_b");
-    renderer.selectNodeById("node_a"); // 重复选中同一节点
+    renderer.selectNodeById("node_a");  // 重复选中同一节点
 
     EXPECT_EQ(renderer.selectedNodeId(), QString("node_a"));
 
@@ -605,8 +609,12 @@ TEST(SimpleRenderer3DTest, Callbacks_FireInCorrectOrder)
     renderer.initialize();
 
     std::vector<QString> callOrder;
-    renderer.setStatusCallback([&](const QString& msg) { callOrder.push_back("status:" + msg); });
-    renderer.setSelectionCallback([&](const QString& id) { callOrder.push_back("select:" + id); });
+    renderer.setStatusCallback([&](const QString& msg) {
+        callOrder.push_back("status:" + msg);
+    });
+    renderer.setSelectionCallback([&](const QString& id) {
+        callOrder.push_back("select:" + id);
+    });
 
     renderer.selectNodeById("ordered_entity");
     // 选择回调应先于状态回调触发
@@ -680,7 +688,7 @@ TEST(SimpleRenderer3DTest, OrbitModeToggle)
     SimpleRenderer3D renderer;
     renderer.initialize();
 
-    EXPECT_TRUE(renderer.isOrbitMode()); // 默认轨道模式开启（与 InitialState_AllDefaults 一致）
+    EXPECT_TRUE(renderer.isOrbitMode());  // 默认轨道模式开启（与 InitialState_AllDefaults 一致）
 
     renderer.setOrbitMode(true);
     EXPECT_TRUE(renderer.isOrbitMode());

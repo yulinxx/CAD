@@ -9,12 +9,12 @@
  * 定义了 UI 主题服务接口，负责管理应用程序的主题样式。
  */
 
- /**
-  * @class UiThemeService
-  * @brief 主题服务抽象接口
-  *
-  * 提供主题加载和样式表管理功能，支持系统、浅色、深色、蓝色等主题。
-  */
+/**
+ * @class UiThemeService
+ * @brief 主题服务抽象接口
+ *
+ * 提供主题加载和样式表管理功能，支持系统、浅色、深色、蓝色等主题。
+ */
 class UiThemeService
 {
 public:

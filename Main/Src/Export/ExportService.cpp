@@ -31,16 +31,14 @@ void ExportService::setStatusPromptCallback(std::function<void(const QString&)> 
     m_statusPromptCallback = std::move(callback);
 }
 
-ExportResult ExportService::exportFile(const QString& filePath,
-    const ExportOptions& options)
+ExportResult ExportService::exportFile(const QString& filePath, const ExportOptions& options)
 {
     ExportContext context;
     context.targetPath = filePath;
     return exportWithContext(context, options);
 }
 
-ExportResult ExportService::exportWithContext(const ExportContext& context,
-    const ExportOptions& options)
+ExportResult ExportService::exportWithContext(const ExportContext& context, const ExportOptions& options)
 {
     if (!m_dispatcher)
     {
@@ -51,9 +49,13 @@ ExportResult ExportService::exportWithContext(const ExportContext& context,
 
     // 通过回调通知忙状态（替代旧的 UiStateCenter 直接依赖）
     if (m_busyStateCallback)
+    {
         m_busyStateCallback(true);
+    }
     if (m_statusPromptCallback)
+    {
         m_statusPromptCallback(QStringLiteral("Exporting: %1").arg(context.targetPath));
+    }
 
     emit exportStarted(context.targetPath);
 
@@ -67,9 +69,13 @@ ExportResult ExportService::exportWithContext(const ExportContext& context,
 
         ExportResult emptyResult = ExportResult::fail(msg);
         if (m_busyStateCallback)
+        {
             m_busyStateCallback(false);
+        }
         if (m_statusPromptCallback)
+        {
             m_statusPromptCallback(QStringLiteral("Export: no entities"));
+        }
         emit exportFinished(emptyResult);
         return emptyResult;
     }
@@ -80,9 +86,8 @@ ExportResult ExportService::exportWithContext(const ExportContext& context,
     if (result.success)
     {
         result.exportedEntityCount = static_cast<int>(entities.size());
-        result.message = QStringLiteral("Exported %1 entities to: %2")
-            .arg(result.exportedEntityCount)
-            .arg(context.targetPath);
+        result.message =
+            QStringLiteral("Exported %1 entities to: %2").arg(result.exportedEntityCount).arg(context.targetPath);
 
         SY_INFOF("[ExportService] %s", result.message.toUtf8().constData());
 
@@ -91,18 +96,18 @@ ExportResult ExportService::exportWithContext(const ExportContext& context,
     }
     else
     {
-        SY_ERRORF("[ExportService] Export failed: %s",
-            result.message.toUtf8().constData());
+        SY_ERRORF("[ExportService] Export failed: %s", result.message.toUtf8().constData());
     }
 
     // 通过回调清除忙状态（替代旧的 UiStateCenter 直接依赖）
     if (m_busyStateCallback)
+    {
         m_busyStateCallback(false);
+    }
     if (m_statusPromptCallback)
     {
-        QString prompt = result.success
-            ? QStringLiteral("Export completed: %1 entities").arg(result.exportedEntityCount)
-            : QStringLiteral("Export failed: %1").arg(result.message);
+        QString prompt = result.success ? QStringLiteral("Export completed: %1 entities").arg(result.exportedEntityCount)
+                                        : QStringLiteral("Export failed: %1").arg(result.message);
         m_statusPromptCallback(prompt);
     }
 
@@ -128,14 +133,15 @@ Fio::VecSyEntityPtr ExportService::collectAllEntities() const
         auto allEntities = m_sceneManager->getAllEntities();
         entities.reserve(allEntities.size());
         for (auto* e : allEntities)
+        {
             // ABI: clone 在 Engine2D 分配，/MD 共享堆下跨 DLL delete 安全
             entities.push_back(std::unique_ptr<Eg::SyEntity>(e->clone()));
+        }
     }
     return entities;
 }
 
-void ExportService::postExportRecord(const ExportResult& result,
-    const ExportContext& context)
+void ExportService::postExportRecord(const ExportResult& result, const ExportContext& context)
 {
     SY_INFOF("[ExportService] Export recorded: format=%d, entities=%d, path=%s",
         static_cast<int>(context.format),

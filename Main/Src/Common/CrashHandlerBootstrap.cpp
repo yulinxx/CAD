@@ -38,7 +38,7 @@ namespace
         }
         return dir.mkpath(QStringLiteral("."));
     }
-}
+}  // namespace
 
 bool CrashHandlerBootstrap::initialize(const std::string& appName, const std::string& appVersion)
 {
@@ -50,9 +50,7 @@ bool CrashHandlerBootstrap::initialize(const std::string& appName, const std::st
     const QString dumpDir = AppPathManager::crashDumpsDir();
     if (!ensureCrashDumpDirectory(dumpDir))
     {
-        std::fprintf(stderr,
-            "[CrashHandler] failed to create dump directory: %s\n",
-            dumpDir.toUtf8().constData());
+        std::fprintf(stderr, "[CrashHandler] failed to create dump directory: %s\n", dumpDir.toUtf8().constData());
         return false;
     }
 
@@ -109,9 +107,7 @@ void CrashHandlerBootstrap::logPendingDumps()
         return;
     }
 
-    SY_WARNF("[CrashHandler] found %d previous crash dump(s) in: %s",
-        count,
-        g_dumpPath.c_str());
+    SY_WARNF("[CrashHandler] found %d previous crash dump(s) in: %s", count, g_dumpPath.c_str());
 
     for (int i = 0; i < count; ++i)
     {

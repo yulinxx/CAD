@@ -53,11 +53,10 @@ private:
     static bool isVisibleForWorkbench(const QStringList& workbenches, const QString& workbenchId);
 
     /// 解析菜单/子菜单条目列表（variant 类型）
-    bool parseMenuItems(const QJsonArray& array,
-        std::vector<std::variant<MenuActionDef, SubMenuDef, MenuItemType>>& out);
+    bool parseMenuItems(
+        const QJsonArray& array, std::vector<std::variant<MenuActionDef, SubMenuDef, MenuItemType>>& out);
     /// 解析工具栏条目列表（variant 类型）
-    bool parseToolBarItems(const QJsonArray& array,
-        std::vector<std::variant<ToolBarActionDef, MenuItemType>>& out);
+    bool parseToolBarItems(const QJsonArray& array, std::vector<std::variant<ToolBarActionDef, MenuItemType>>& out);
 
     /// 读取配置文件的原始字节（支持 Qt 资源路径与本地文件）
     static QByteArray readConfigFile(const QString& path);

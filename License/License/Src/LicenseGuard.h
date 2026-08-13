@@ -21,11 +21,11 @@ public:
     // 不同调用场景使用不同 Flavor，导致检查路径不同
     enum Flavor : uint32_t
     {
-        Flavor_Startup  = 0x1A3C,
-        Flavor_Save     = 0x2B4D,
-        Flavor_Export   = 0x3C5E,
-        Flavor_Render   = 0x4D6F,
-        Flavor_Generic  = 0x5E7A,
+        Flavor_Startup = 0x1A3C,
+        Flavor_Save = 0x2B4D,
+        Flavor_Export = 0x3C5E,
+        Flavor_Render = 0x4D6F,
+        Flavor_Generic = 0x5E7A,
     };
 
     // ---------- 生命周期 ----------
@@ -66,15 +66,15 @@ private:
     static GuardState s_state;
 
     // 内部常量
-    static constexpr uint32_t kMagicBase    = 0x3E1F5A8C;
+    static constexpr uint32_t kMagicBase = 0x3E1F5A8C;
     static constexpr uint32_t kMagicScatter = 0x7C3D9B1E;
 
     // ---------- 辅助函数 ----------
 
     static uint32_t Scramble(uint32_t val, uint32_t seed);
     static uint32_t ComputeCrossSum();
-    static bool     VerifyGroupA();
-    static bool     VerifyGroupB();
-    static bool     VerifyCrossSum();
-    static bool     VerifyTimestamp();
+    static bool VerifyGroupA();
+    static bool VerifyGroupB();
+    static bool VerifyCrossSum();
+    static bool VerifyTimestamp();
 };

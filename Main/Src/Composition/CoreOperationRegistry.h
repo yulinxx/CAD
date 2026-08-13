@@ -12,10 +12,8 @@ class QWidget;
 class CoreOperationRegistry
 {
 public:
-    CoreOperationRegistry(OperationBus* bus,
-        SceneEditService* editService,
-        IUndoRedoManager* undoManager,
-        QWidget* parentWidget);
+    CoreOperationRegistry(
+        OperationBus* bus, SceneEditService* editService, IUndoRedoManager* undoManager, QWidget* parentWidget);
 
 public:
     void registerAll();

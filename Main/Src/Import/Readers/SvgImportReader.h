@@ -21,6 +21,5 @@ public:
         return QStringLiteral("SVG");
     }
 
-    ImportResult read(const ImportContext& context,
-        Fio::VecSyEntityPtr& outEntities) override;
+    ImportResult read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities) override;
 };

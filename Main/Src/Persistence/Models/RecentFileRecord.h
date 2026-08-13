@@ -10,9 +10,9 @@
  */
 struct RecentFileRecord
 {
-    int id{ 0 };                    // 自增主键
-    std::string filePath;           // 文件完整路径
-    std::string title;              // 文件标题（不含路径）
-    std::string format;             // 文件格式（如 DXF, PLT, SVG）
-    std::string lastOpenedTime;     // 最后打开时间（ISO 8601 格式）
+    int id{ 0 };                 // 自增主键
+    std::string filePath;        // 文件完整路径
+    std::string title;           // 文件标题（不含路径）
+    std::string format;          // 文件格式（如 DXF, PLT, SVG）
+    std::string lastOpenedTime;  // 最后打开时间（ISO 8601 格式）
 };

@@ -23,7 +23,7 @@
 #include <memory>
 #include <thread>
 
- // 记录一帧，并保证两次时钟读取间隔非零（避免高精度时钟落在同一 tick 导致 avg==0 的抖动失败）
+// 记录一帧，并保证两次时钟读取间隔非零（避免高精度时钟落在同一 tick 导致 avg==0 的抖动失败）
 static void recordOneFrame(FrameTimer& timer)
 {
     timer.beginFrame();
@@ -59,14 +59,14 @@ TEST(ViewportRefreshRegressionTest, Coordinator_StopWithoutRenderWidget)
 TEST(ViewportRefreshRegressionTest, Coordinator_RequestRepaintWithoutWidget)
 {
     SceneRefreshCoordinator coordinator;
-    coordinator.requestRepaint(); // 无 RenderWidget 时不应崩溃
+    coordinator.requestRepaint();  // 无 RenderWidget 时不应崩溃
     SUCCEED();
 }
 
 TEST(ViewportRefreshRegressionTest, Coordinator_OnSelectionChangedWithoutWidget)
 {
     SceneRefreshCoordinator coordinator;
-    coordinator.onSelectionChanged(); // 无 RenderWidget 时不应崩溃
+    coordinator.onSelectionChanged();  // 无 RenderWidget 时不应崩溃
     SUCCEED();
 }
 
@@ -115,7 +115,9 @@ TEST(ViewportRefreshRegressionTest, FrameTimer_AverageCalculation)
     FrameTimer timer;
 
     for (int i = 0; i < 100; ++i)
+    {
         recordOneFrame(timer);
+    }
 
     EXPECT_EQ(timer.frameCount(), 100u);
     EXPECT_GT(timer.avgFrameMs(), 0.0);
@@ -237,21 +239,21 @@ TEST(ViewportRefreshRegressionTest, Coordinator_SetSceneManager)
 TEST(ViewportRefreshRegressionTest, Coordinator_RequestLightRefreshWithoutWidget)
 {
     SceneRefreshCoordinator coordinator;
-    coordinator.requestLightRefresh(); // 无 RenderWidget 时不应崩溃
+    coordinator.requestLightRefresh();  // 无 RenderWidget 时不应崩溃
     SUCCEED();
 }
 
 TEST(ViewportRefreshRegressionTest, Coordinator_RequestFullRefreshWithoutWidget)
 {
     SceneRefreshCoordinator coordinator;
-    coordinator.requestFullRefresh(); // 无 RenderWidget 时不应崩溃
+    coordinator.requestFullRefresh();  // 无 RenderWidget 时不应崩溃
     SUCCEED();
 }
 
 TEST(ViewportRefreshRegressionTest, Coordinator_OnSceneChangedWithoutWidget)
 {
     SceneRefreshCoordinator coordinator;
-    coordinator.onSceneChanged(); // 无 RenderWidget / SceneManager 时不应崩溃
+    coordinator.onSceneChanged();  // 无 RenderWidget / SceneManager 时不应崩溃
     SUCCEED();
 }
 
@@ -260,7 +262,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_OnSceneChangedWithSceneManager)
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
     coordinator.setSceneManager(&scene);
-    coordinator.onSceneChanged(); // 有 SceneManager 但无 Widget 时不应崩溃
+    coordinator.onSceneChanged();  // 有 SceneManager 但无 Widget 时不应崩溃
     SUCCEED();
 }
 

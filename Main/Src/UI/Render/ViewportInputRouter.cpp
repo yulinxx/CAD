@@ -28,9 +28,10 @@
 #include <cmath>
 #include "Log/SyLogger.h"
 
- // ==================== ViewportInputRouter 实现 ====================
+// ==================== ViewportInputRouter 实现 ====================
 
-ViewportInputRouter::ViewportInputRouter(QObject* parent) : QObject(parent)
+ViewportInputRouter::ViewportInputRouter(QObject* parent)
+    : QObject(parent)
 {
 }
 
@@ -103,55 +104,57 @@ void ViewportInputRouter::setCameraChangedCallback(std::function<void()> callbac
 bool ViewportInputRouter::eventFilter(QObject* obj, QEvent* event)
 {
     if (obj != m_renderWidget || !m_renderWidget)
+    {
         return QObject::eventFilter(obj, event);
+    }
 
     switch (event->type())
     {
+    case QEvent::MouseButtonDblClick:
+    case QEvent::MouseButtonPress:
+    case QEvent::MouseMove:
+    case QEvent::MouseButtonRelease:
+    {
+        // RenderWidget 的事件已经处于自身坐标系，直接按视口本地坐标处理即可
+        switch (event->type())
+        {
         case QEvent::MouseButtonDblClick:
+            handleMouseDoubleClick(static_cast<QMouseEvent*>(event));
+            break;
         case QEvent::MouseButtonPress:
+            handleMousePress(static_cast<QMouseEvent*>(event));
+            break;
         case QEvent::MouseMove:
+            handleMouseMove(static_cast<QMouseEvent*>(event));
+            break;
         case QEvent::MouseButtonRelease:
-        {
-            // RenderWidget 的事件已经处于自身坐标系，直接按视口本地坐标处理即可
-            switch (event->type())
-            {
-                case QEvent::MouseButtonDblClick:
-                    handleMouseDoubleClick(static_cast<QMouseEvent*>(event));
-                    break;
-                case QEvent::MouseButtonPress:
-                    handleMousePress(static_cast<QMouseEvent*>(event));
-                    break;
-                case QEvent::MouseMove:
-                    handleMouseMove(static_cast<QMouseEvent*>(event));
-                    break;
-                case QEvent::MouseButtonRelease:
-                    handleMouseRelease(static_cast<QMouseEvent*>(event));
-                    break;
-                default:
-                    break;
-            }
-            return true;
-        }
-        case QEvent::Wheel:
-        {
-            auto* we = static_cast<QWheelEvent*>(event);
-            handleWheel(we);
-            return true;
-        }
-        case QEvent::KeyPress:
-        {
-            auto* ke = static_cast<QKeyEvent*>(event);
-            handleKeyPress(ke);
-            return true;
-        }
-        case QEvent::ContextMenu:
-        {
-            auto* ce = static_cast<QContextMenuEvent*>(event);
-            handleContextMenu(ce);
-            return true;
-        }
+            handleMouseRelease(static_cast<QMouseEvent*>(event));
+            break;
         default:
             break;
+        }
+        return true;
+    }
+    case QEvent::Wheel:
+    {
+        auto* we = static_cast<QWheelEvent*>(event);
+        handleWheel(we);
+        return true;
+    }
+    case QEvent::KeyPress:
+    {
+        auto* ke = static_cast<QKeyEvent*>(event);
+        handleKeyPress(ke);
+        return true;
+    }
+    case QEvent::ContextMenu:
+    {
+        auto* ce = static_cast<QContextMenuEvent*>(event);
+        handleContextMenu(ce);
+        return true;
+    }
+    default:
+        break;
     }
 
     return QObject::eventFilter(obj, event);
@@ -165,13 +168,19 @@ void ViewportInputRouter::handleMousePress(QMouseEvent* event)
     QPoint widgetPos;
     QPoint physWidgetPos;
     if (!mouseEventToWorld(event, worldPos, widgetPos, physWidgetPos))
+    {
         return;
+    }
 
     if (handlePanMousePress(physWidgetPos, event))
+    {
         return;
+    }
 
     if (dispatchMousePressToInput(worldPos, event))
+    {
         return;
+    }
 
     event->ignore();
 }
@@ -182,16 +191,24 @@ void ViewportInputRouter::handleMouseMove(QMouseEvent* event)
     QPoint widgetPos;
     QPoint physWidgetPos;
     if (!mouseEventToWorld(event, worldPos, widgetPos, physWidgetPos))
+    {
         return;
+    }
 
     if (m_positionCallback)
+    {
         m_positionCallback(worldPos.x(), worldPos.y());
+    }
 
     if (handlePanMouseMove(physWidgetPos, event))
+    {
         return;
+    }
 
     if (dispatchMouseMoveToInput(worldPos, event))
+    {
         return;
+    }
 
     event->ignore();
 }
@@ -202,13 +219,19 @@ void ViewportInputRouter::handleMouseRelease(QMouseEvent* event)
     QPoint widgetPos;
     QPoint physWidgetPos;
     if (!mouseEventToWorld(event, worldPos, widgetPos, physWidgetPos))
+    {
         return;
+    }
 
     if (handlePanMouseRelease(event))
+    {
         return;
+    }
 
     if (dispatchMouseReleaseToInput(worldPos, event))
+    {
         return;
+    }
 
     event->ignore();
 }
@@ -216,11 +239,15 @@ void ViewportInputRouter::handleMouseRelease(QMouseEvent* event)
 void ViewportInputRouter::handleMouseDoubleClick(QMouseEvent* event)
 {
     if (!m_renderWidget || !event)
+    {
         return;
+    }
 
     QPointF worldPos = widgetToWorld(event->pos().toPointF());
     if (worldPos.isNull())
+    {
         return;
+    }
 
     if (event->button() == Qt::LeftButton)
     {
@@ -238,11 +265,15 @@ void ViewportInputRouter::handleMouseDoubleClick(QMouseEvent* event)
 void ViewportInputRouter::handleWheel(QWheelEvent* event)
 {
     if (!m_renderWidget || !m_camera || !event)
+    {
         return;
+    }
 
     QPointF worldPos = widgetToWorld(event->position());
     if (worldPos.isNull())
+    {
         return;
+    }
 
     QSizeF physSize = physicalViewportSize();
     float vpW = static_cast<float>(physSize.width());
@@ -252,17 +283,23 @@ void ViewportInputRouter::handleWheel(QWheelEvent* event)
     m_camera->zoomIn(factor, worldPos, vpW, vpH);
     // 相机参数已变，通知视口提交新矩阵并重绘
     if (m_cameraChangedCallback)
+    {
         m_cameraChangedCallback();
+    }
     event->accept();
 }
 
 void ViewportInputRouter::handleKeyPress(QKeyEvent* event)
 {
     if (!event)
+    {
         return;
+    }
 
     if (handleKeyPressDispatch(event))
+    {
         return;
+    }
 
     event->ignore();
 }
@@ -283,7 +320,9 @@ void ViewportInputRouter::handleContextMenu(QContextMenuEvent* event)
 QSizeF ViewportInputRouter::physicalViewportSize() const
 {
     if (!m_renderWidget)
+    {
         return QSizeF(0, 0);
+    }
     const float dpr = static_cast<float>(m_renderWidget->devicePixelRatio());
     return QSizeF(m_renderWidget->width() * dpr, m_renderWidget->height() * dpr);
 }
@@ -291,24 +330,30 @@ QSizeF ViewportInputRouter::physicalViewportSize() const
 QPointF ViewportInputRouter::widgetToWorld(QPointF widgetLocalPos) const
 {
     if (!m_renderWidget || !m_camera)
+    {
         return QPointF();
+    }
 
     QSizeF physSize = physicalViewportSize();
     float vpW = static_cast<float>(physSize.width());
     float vpH = static_cast<float>(physSize.height());
     if (vpW <= 0 || vpH <= 0)
+    {
         return QPointF();
+    }
 
     const float dpr = static_cast<float>(m_renderWidget->devicePixelRatio());
     QPoint physPos(static_cast<int>(widgetLocalPos.x() * dpr), static_cast<int>(widgetLocalPos.y() * dpr));
     return m_camera->screenToWorld(physPos, vpW, vpH);
 }
 
-bool ViewportInputRouter::mouseEventToWorld(QMouseEvent* event, QPointF& worldPos, QPoint& widgetPos,
-    QPoint& physWidgetPos) const
+bool ViewportInputRouter::mouseEventToWorld(
+    QMouseEvent* event, QPointF& worldPos, QPoint& widgetPos, QPoint& physWidgetPos) const
 {
     if (!m_renderWidget || !m_camera || !event)
+    {
         return false;
+    }
 
     widgetPos = event->pos();
     const float dpr = static_cast<float>(m_renderWidget->devicePixelRatio());
@@ -318,7 +363,9 @@ bool ViewportInputRouter::mouseEventToWorld(QMouseEvent* event, QPointF& worldPo
     float vpW = static_cast<float>(physSize.width());
     float vpH = static_cast<float>(physSize.height());
     if (vpW <= 0 || vpH <= 0)
+    {
         return false;
+    }
 
     worldPos = m_camera->screenToWorld(physWidgetPos, vpW, vpH);
     return !worldPos.isNull();
@@ -326,15 +373,19 @@ bool ViewportInputRouter::mouseEventToWorld(QMouseEvent* event, QPointF& worldPo
 
 // ==================== 鼠标事件分发 ====================
 
-bool ViewportInputRouter::dispatchToActiveTool(const QPointF& worldPos, QMouseEvent* event,
-    bool (ITool::* handler)(const QPointF&, QMouseEvent*))
+bool ViewportInputRouter::dispatchToActiveTool(
+    const QPointF& worldPos, QMouseEvent* event, bool (ITool::*handler)(const QPointF&, QMouseEvent*))
 {
     if (!m_toolManager)
+    {
         return false;
+    }
 
     auto* tool = m_toolManager->getActiveTool();
     if (!tool)
+    {
         return false;
+    }
 
     (tool->*handler)(worldPos, event);
     event->accept();
@@ -344,7 +395,9 @@ bool ViewportInputRouter::dispatchToActiveTool(const QPointF& worldPos, QMouseEv
 bool ViewportInputRouter::dispatchToSelectorPress(const QPointF& worldPos, QMouseEvent* event)
 {
     if (!m_selector)
+    {
         return false;
+    }
 
     m_selector->beginBoxSelect(worldPos);
     event->accept();
@@ -354,7 +407,9 @@ bool ViewportInputRouter::dispatchToSelectorPress(const QPointF& worldPos, QMous
 bool ViewportInputRouter::dispatchToSelectorRelease(const QPointF& worldPos, QMouseEvent* event)
 {
     if (!m_selector)
+    {
         return false;
+    }
 
     m_selector->handleClick(worldPos);
     event->accept();
@@ -364,7 +419,9 @@ bool ViewportInputRouter::dispatchToSelectorRelease(const QPointF& worldPos, QMo
 bool ViewportInputRouter::dispatchMousePressToInput(const QPointF& worldPos, QMouseEvent* event)
 {
     if (event->button() != Qt::LeftButton || m_panModeEnabled)
+    {
         return false;
+    }
 
     if (m_interactionDispatcher && m_interactionDispatcher->hasActiveCommand() &&
         m_interactionDispatcher->dispatchEvent(
@@ -375,7 +432,9 @@ bool ViewportInputRouter::dispatchMousePressToInput(const QPointF& worldPos, QMo
     }
 
     if (dispatchToActiveTool(worldPos, event, &ITool::onMousePress))
+    {
         return true;
+    }
 
     return dispatchToSelectorPress(worldPos, event);
 }
@@ -396,7 +455,9 @@ bool ViewportInputRouter::dispatchMouseMoveToInput(const QPointF& worldPos, QMou
 bool ViewportInputRouter::dispatchMouseReleaseToInput(const QPointF& worldPos, QMouseEvent* event)
 {
     if (event->button() != Qt::LeftButton)
+    {
         return false;
+    }
 
     if (m_interactionDispatcher && m_interactionDispatcher->hasActiveCommand() &&
         m_interactionDispatcher->dispatchEvent(
@@ -407,7 +468,9 @@ bool ViewportInputRouter::dispatchMouseReleaseToInput(const QPointF& worldPos, Q
     }
 
     if (dispatchToActiveTool(worldPos, event, &ITool::onMouseRelease))
+    {
         return true;
+    }
 
     return dispatchToSelectorRelease(worldPos, event);
 }
@@ -436,7 +499,9 @@ bool ViewportInputRouter::handlePanMousePress(const QPoint& physWidgetPos, QMous
 bool ViewportInputRouter::handlePanMouseMove(const QPoint& physWidgetPos, QMouseEvent* event)
 {
     if (!m_panning || !m_camera)
+    {
         return false;
+    }
 
     QPoint delta = physWidgetPos - m_lastMousePos;
     m_lastMousePos = physWidgetPos;
@@ -444,7 +509,9 @@ bool ViewportInputRouter::handlePanMouseMove(const QPoint& physWidgetPos, QMouse
     float worldDy = -static_cast<float>(delta.y()) / m_camera->zoomY;
     m_camera->pan(worldDx, worldDy);
     if (m_cameraChangedCallback)
+    {
         m_cameraChangedCallback();
+    }
     event->accept();
     return true;
 }
@@ -465,7 +532,9 @@ bool ViewportInputRouter::handlePanMouseRelease(QMouseEvent* event)
 bool ViewportInputRouter::handleInteractionDispatcherKeyPress(QKeyEvent* event)
 {
     if (!m_interactionDispatcher || !m_interactionDispatcher->hasActiveCommand())
+    {
         return false;
+    }
 
     if (event->key() != Qt::Key_Escape && event->key() != Qt::Key_Return && event->key() != Qt::Key_Enter)
     {
@@ -494,11 +563,15 @@ bool ViewportInputRouter::handleInteractionDispatcherKeyPress(QKeyEvent* event)
 bool ViewportInputRouter::handleToolKeyPress(QKeyEvent* event)
 {
     if (!m_toolManager)
+    {
         return false;
+    }
 
     auto* tool = m_toolManager->getActiveTool();
     if (!tool)
+    {
         return false;
+    }
 
     if (tool->onKeyPress(event))
     {
@@ -511,17 +584,23 @@ bool ViewportInputRouter::handleToolKeyPress(QKeyEvent* event)
 bool ViewportInputRouter::handleDeleteKeyPress(QKeyEvent* event)
 {
     if (event->key() != Qt::Key_Delete)
+    {
         return false;
+    }
 
     // 删除操作委托给外部（通过 OperationBus）
     if (m_operationBus)
     {
         if (m_selectionService)
+        {
             m_selectionService->clear();
+        }
         m_operationBus->run(OperationId::Edit_Delete, {}, OperationSource::DrawTool);
         // 删除后全量刷新：重建渲染数据，确保已删除图元从 GPU 端清除
         if (m_refreshCoordinator)
+        {
             m_refreshCoordinator->requestFullRefresh();
+        }
     }
     event->accept();
     return true;
@@ -530,13 +609,19 @@ bool ViewportInputRouter::handleDeleteKeyPress(QKeyEvent* event)
 bool ViewportInputRouter::handleKeyPressDispatch(QKeyEvent* event)
 {
     if (handleInteractionDispatcherKeyPress(event))
+    {
         return true;
+    }
 
     if (handleToolKeyPress(event))
+    {
         return true;
+    }
 
     if (handleDeleteKeyPress(event))
+    {
         return true;
+    }
 
     return handleEscapeKeyPress(event);
 }
@@ -544,20 +629,28 @@ bool ViewportInputRouter::handleKeyPressDispatch(QKeyEvent* event)
 bool ViewportInputRouter::handleEscapeKeyPress(QKeyEvent* event)
 {
     if (event->key() != Qt::Key_Escape)
+    {
         return false;
+    }
 
     // 仅当左侧绘图工具栏的工具（非选择工具）处于激活状态时处理：
     // 丢弃当前工具未完成的草图，并切回选择工具。
     const QString activeTool = m_toolManager ? m_toolManager->getActiveToolName() : QString();
     if (activeTool.isEmpty() || activeTool == QStringLiteral("SelectTool"))
+    {
         return false;
+    }
 
     if (m_toolManager)
+    {
         m_toolManager->cancelCurrentTool();
+    }
 
     // 走 OperationBus：UI 入口 → Tool_Select → 视口激活选择工具 → activeToolChanged → 工具栏高亮同步
     if (m_operationBus)
+    {
         m_operationBus->run(OperationId::Tool_Select, {}, OperationSource::Keyboard);
+    }
 
     event->accept();
     return true;

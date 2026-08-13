@@ -11,37 +11,31 @@ bool DefaultUiThemeService::loadThemeFromId(const QString& themeId)
     }
     else if (themeId == QStringLiteral("light"))
     {
-        m_styleSheet = QStringLiteral(
-            "QMainWindow { background-color: #f0f0f0; }"
-            "QWidget { color: #333333; }"
-            "QToolBar { background-color: #e8e8e8; border: none; }"
-            "QDockWidget::title { background-color: #e8e8e8; padding: 4px; }"
-            "QStatusBar { background-color: #e8e8e8; }"
-        );
+        m_styleSheet = QStringLiteral("QMainWindow { background-color: #f0f0f0; }"
+                                      "QWidget { color: #333333; }"
+                                      "QToolBar { background-color: #e8e8e8; border: none; }"
+                                      "QDockWidget::title { background-color: #e8e8e8; padding: 4px; }"
+                                      "QStatusBar { background-color: #e8e8e8; }");
     }
     else if (themeId == QStringLiteral("dark"))
     {
-        m_styleSheet = QStringLiteral(
-            "QMainWindow { background-color: #2d2d2d; }"
-            "QWidget { color: #e0e0e0; }"
-            "QToolBar { background-color: #3d3d3d; border: none; }"
-            "QDockWidget::title { background-color: #3d3d3d; padding: 4px; }"
-            "QStatusBar { background-color: #3d3d3d; }"
-            "QMenuBar { background-color: #3d3d3d; }"
-            "QMenu { background-color: #3d3d3d; }"
-        );
+        m_styleSheet = QStringLiteral("QMainWindow { background-color: #2d2d2d; }"
+                                      "QWidget { color: #e0e0e0; }"
+                                      "QToolBar { background-color: #3d3d3d; border: none; }"
+                                      "QDockWidget::title { background-color: #3d3d3d; padding: 4px; }"
+                                      "QStatusBar { background-color: #3d3d3d; }"
+                                      "QMenuBar { background-color: #3d3d3d; }"
+                                      "QMenu { background-color: #3d3d3d; }");
     }
     else if (themeId == QStringLiteral("blue"))
     {
-        m_styleSheet = QStringLiteral(
-            "QMainWindow { background-color: #1a237e; }"
-            "QWidget { color: #e3f2fd; }"
-            "QToolBar { background-color: #283593; border: none; }"
-            "QDockWidget::title { background-color: #283593; padding: 4px; }"
-            "QStatusBar { background-color: #283593; }"
-            "QMenuBar { background-color: #283593; }"
-            "QMenu { background-color: #283593; }"
-        );
+        m_styleSheet = QStringLiteral("QMainWindow { background-color: #1a237e; }"
+                                      "QWidget { color: #e3f2fd; }"
+                                      "QToolBar { background-color: #283593; border: none; }"
+                                      "QDockWidget::title { background-color: #283593; padding: 4px; }"
+                                      "QStatusBar { background-color: #283593; }"
+                                      "QMenuBar { background-color: #283593; }"
+                                      "QMenu { background-color: #283593; }");
     }
     else
     {

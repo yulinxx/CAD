@@ -27,7 +27,7 @@ SceneDocument3DAdapter* SceneBuilder3D::createDefaultScene(QString& rootNodeId)
 
 QString SceneBuilder3D::defaultRootNodeName()
 {
-    return QObject::tr("Root"); // 根节点
+    return QObject::tr("Root");  // 根节点
 }
 
 // ABI 安全：返回裸指针而非 shared_ptr（2026-07-31 P0 修复）
@@ -43,7 +43,9 @@ size_t SceneBuilder3D::defaultRootName(char* buffer, size_t bufferSize) const
 {
     std::string name = defaultRootNodeName().toStdString();
     if (bufferSize == 0 || !buffer)
+    {
         return name.size();
+    }
     size_t copyLen = (name.size() < bufferSize - 1) ? name.size() : (bufferSize - 1);
     std::memcpy(buffer, name.c_str(), copyLen);
     buffer[copyLen] = '\0';

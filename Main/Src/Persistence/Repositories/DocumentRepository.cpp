@@ -54,7 +54,9 @@ DocumentRecord DocumentRepository::loadByPath(const std::string& filePath)
         auto rows = m_database.query(sql, params);
 
         if (rows.empty())
+        {
             return DocumentRecord();
+        }
 
         return rowToRecord(rows[0]);
     }
@@ -98,11 +100,17 @@ bool DocumentRepository::save(const DocumentRecord& record)
         values["file_size"] = record.fileSize;
         // 只在调用方明确提供了时间字段时才更新
         if (!record.lastOpenedAt.empty())
+        {
             values["last_opened_at"] = record.lastOpenedAt;
+        }
         if (!record.lastSavedAt.empty())
+        {
             values["last_saved_at"] = record.lastSavedAt;
+        }
         if (!record.createdAt.empty())
+        {
             values["created_at"] = record.createdAt;
+        }
 
         std::string whereClause = "id = :id";
         std::map<std::string, std::string> whereParams;
@@ -176,29 +184,54 @@ DocumentRecord DocumentRepository::rowToRecord(const std::map<std::string, std::
     {
         auto it = row.find("id");
         if (it != row.end() && !it->second.empty())
+        {
             rec.id = std::stoi(it->second);
+        }
         it = row.find("file_path");
-        if (it != row.end()) rec.filePath = it->second;
+        if (it != row.end())
+        {
+            rec.filePath = it->second;
+        }
         it = row.find("title");
-        if (it != row.end()) rec.title = it->second;
+        if (it != row.end())
+        {
+            rec.title = it->second;
+        }
         it = row.find("format");
-        if (it != row.end()) rec.format = it->second;
+        if (it != row.end())
+        {
+            rec.format = it->second;
+        }
         it = row.find("entity_count");
         if (it != row.end() && !it->second.empty())
+        {
             rec.entityCount = std::stoi(it->second);
+        }
         it = row.find("file_size");
-        if (it != row.end()) rec.fileSize = it->second;
+        if (it != row.end())
+        {
+            rec.fileSize = it->second;
+        }
         it = row.find("last_opened_at");
-        if (it != row.end()) rec.lastOpenedAt = it->second;
+        if (it != row.end())
+        {
+            rec.lastOpenedAt = it->second;
+        }
         it = row.find("last_saved_at");
-        if (it != row.end()) rec.lastSavedAt = it->second;
+        if (it != row.end())
+        {
+            rec.lastSavedAt = it->second;
+        }
         it = row.find("created_at");
-        if (it != row.end()) rec.createdAt = it->second;
+        if (it != row.end())
+        {
+            rec.createdAt = it->second;
+        }
     }
     catch (const std::exception& e)
     {
         SY_ERRORF("[DocumentRepository] rowToRecord failed: %s", e.what());
-        throw; // 向上传播让调用方决定是否忽略本条记录
+        throw;  // 向上传播让调用方决定是否忽略本条记录
     }
     return rec;
 }
@@ -206,7 +239,10 @@ DocumentRecord DocumentRepository::rowToRecord(const std::map<std::string, std::
 std::map<std::string, std::string> DocumentRepository::recordToRow(const DocumentRecord& rec) const
 {
     std::map<std::string, std::string> row;
-    if (rec.id > 0) row["id"] = std::to_string(rec.id);
+    if (rec.id > 0)
+    {
+        row["id"] = std::to_string(rec.id);
+    }
     row["file_path"] = rec.filePath;
     row["title"] = rec.title;
     row["format"] = rec.format;

@@ -26,8 +26,7 @@ public:
     /// @param context 导出上下文
     /// @param entities 要导出的图元列表
     /// @return 导出结果
-    ExportResult dispatch(const ExportContext& context,
-        const Fio::VecSyEntityPtr& entities);
+    ExportResult dispatch(const ExportContext& context, const Fio::VecSyEntityPtr& entities);
 
     /// 根据文件扩展名推断格式
     static Fio::FileFormat detectFormat(const QString& filePath);

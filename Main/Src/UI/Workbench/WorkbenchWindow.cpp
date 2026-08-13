@@ -128,7 +128,8 @@
 #include <QCloseEvent>
 #include <QMessageBox>
 
-WorkbenchWindow::WorkbenchWindow(QWidget* parent) : QMainWindow(parent)
+WorkbenchWindow::WorkbenchWindow(QWidget* parent)
+    : QMainWindow(parent)
 {
     SY_DEBUG("[WorkbenchWindow] Creating main window");
     setWindowTitle(QString::fromStdString(MainApp::appName()));
@@ -173,10 +174,14 @@ void WorkbenchWindow::retranslateUi()
 #ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
     // 配置驱动模式下菜单统一由 WorkbenchMenuManager 生成，始终需要重建以刷新文案。
     if (m_menuManager)
+    {
         m_menuManager->rebuildAllMenus();
+    }
 #else
     if (m_menuManager && (!m_workbench || !m_workbench->managesOwnMenus()))
+    {
         m_menuManager->rebuildAllMenus();
+    }
 #endif
 
     refreshStatusText();
@@ -191,9 +196,13 @@ void WorkbenchWindow::setUiStateCenter(UiStateCenter* stateCenter)
     m_stateCenter = stateCenter;
     m_uiServices.stateCenter = stateCenter;
     if (m_actionManager)
+    {
         m_actionManager->setStateCenter(stateCenter);
+    }
     if (m_stateManager)
+    {
         m_stateManager->setUiStateCenter(stateCenter);
+    }
 }
 
 /// 设置主题服务
@@ -204,7 +213,9 @@ void WorkbenchWindow::setThemeService(UiThemeService* themeService)
     m_themeService = themeService;
     m_uiServices.themeService = themeService;
     if (m_stateManager)
+    {
         m_stateManager->setThemeService(themeService);
+    }
 }
 
 /// 设置操作总线
@@ -214,7 +225,9 @@ void WorkbenchWindow::setOperationBus(OperationBus* bus)
     m_operationBus = bus;
     m_uiServices.operationBus = bus;
     if (m_actionManager)
+    {
         m_actionManager->setOperationBus(bus);
+    }
 }
 
 void WorkbenchWindow::setFrameworkServices(const UiFrameworkServices& services)
@@ -222,9 +235,13 @@ void WorkbenchWindow::setFrameworkServices(const UiFrameworkServices& services)
     // 框架级能力统一从这里注入，后续错误、权限、性能都必须走同一条框架路径
     // 这里仅更新桥接对象，不主动触发任何 UI 刷新或工作台切换
     if (m_actionManager)
+    {
         m_actionManager->setFrameworkServices(services);
+    }
     if (m_stateManager)
+    {
         m_stateManager->setFrameworkServices(services);
+    }
     // 框架服务更新后不做自动回放，避免入口函数产生隐式副作用
 }
 
@@ -247,7 +264,9 @@ void WorkbenchWindow::configureServices(const UiServices& services)
     m_themeService = services.themeService;
 
     if (m_actionManager)
+    {
         m_actionManager->setStateCenter(services.stateCenter);
+    }
 
     if (m_stateManager)
     {
@@ -256,7 +275,9 @@ void WorkbenchWindow::configureServices(const UiServices& services)
     }
 
     if (m_layoutManager)
+    {
         m_layoutManager->setPersistenceService(services.persistenceService);
+    }
 
     if (m_menuManager)
     {
@@ -266,7 +287,9 @@ void WorkbenchWindow::configureServices(const UiServices& services)
         m_menuManager->setUiServices(&m_uiServices);
         m_menuManager->setWorkbench(m_workbench);
         if (m_workbench)
+        {
             m_menuManager->rebuildAllMenus();
+        }
     }
 }
 
@@ -276,7 +299,9 @@ void WorkbenchWindow::setWorkbench(UiWorkbench* workbench)
 {
     m_workbench = workbench;
     if (m_menuManager)
+    {
         m_menuManager->setWorkbench(workbench);
+    }
 }
 
 /// 设置工作台切换工厂
@@ -291,14 +316,18 @@ void WorkbenchWindow::bindStateSignals()
 {
     // 信号绑定下沉到 WorkbenchStateManager，统一管理连接上下文与解绑范围
     if (m_stateManager)
+    {
         m_stateManager->bindStateSignals();
+    }
 }
 
 void WorkbenchWindow::unbindStateSignals()
 {
     // 解绑下沉到 WorkbenchStateManager，避免与窗口其他连接互相干扰
     if (m_stateManager)
+    {
         m_stateManager->unbindStateSignals();
+    }
 }
 
 void WorkbenchWindow::initializeWorkbenchShell()
@@ -318,11 +347,17 @@ void WorkbenchWindow::initializeWorkbenchShell()
     refreshStatusText();
     QString initialWorkbenchId = m_stateManager ? m_stateManager->windowState().workbenchId : QStringLiteral("default");
     if (m_stateCenter)
+    {
         initialWorkbenchId = m_stateCenter->currentWorkbenchId();
+    }
     if (initialWorkbenchId.isEmpty() || initialWorkbenchId == QStringLiteral("default"))
+    {
         initialWorkbenchId = QStringLiteral("2D");
+    }
     if (m_menuManager)
+    {
         m_menuManager->refreshWorkbenchMenuChecks(initialWorkbenchId);
+    }
     updateWindowTitle();
 }
 
@@ -390,13 +425,17 @@ void WorkbenchWindow::mountStatusBar(StatusBarBase* statusBarWidget)
     }
 
     if (!m_layoutManager->panelState().statusBar)
+    {
         m_layoutManager->panelState().statusBar = statusBar();
+    }
 
     m_activeStatusBar = statusBarWidget;
     m_layoutManager->panelState().statusBar->addWidget(m_activeStatusBar, 1);
     m_activeStatusBar->show();
     if (m_stateManager)
+    {
         m_stateManager->setActiveStatusBar(m_activeStatusBar);
+    }
 
     SY_INFOF("[WorkbenchWindow] StatusBar mounted: %s", m_activeStatusBar->metaObject()->className());
 }
@@ -404,16 +443,22 @@ void WorkbenchWindow::mountStatusBar(StatusBarBase* statusBarWidget)
 void WorkbenchWindow::unmountStatusBar()
 {
     if (!m_activeStatusBar)
+    {
         return;
+    }
 
     if (m_layoutManager->panelState().statusBar)
+    {
         m_layoutManager->panelState().statusBar->removeWidget(m_activeStatusBar);
+    }
 
     // 不在这里 delete —— StatusBarBase 的生命周期由创建它的 Workbench 负责
     // Workbench2D/Workbench3D 在析构时会清理自己创建的 StatusBar
     m_activeStatusBar = nullptr;
     if (m_stateManager)
+    {
         m_stateManager->setActiveStatusBar(nullptr);
+    }
 
     SY_DEBUG("[WorkbenchWindow] StatusBar unmounted");
 }
@@ -422,13 +467,17 @@ void WorkbenchWindow::unmountStatusBar()
 void WorkbenchWindow::syncWindowStateFromStateCenter()
 {
     if (m_stateManager)
+    {
         m_stateManager->syncWindowStateFromStateCenter();
+    }
 }
 
 void WorkbenchWindow::syncWorkbenchSelectionFromStateCenter()
 {
     if (m_stateManager)
+    {
         m_stateManager->syncWorkbenchSelectionFromStateCenter();
+    }
 }
 
 void WorkbenchWindow::refreshStatusText()
@@ -436,7 +485,9 @@ void WorkbenchWindow::refreshStatusText()
     // 这里只刷新全局状态展示，不在此处拼接工作台业务流程
     // 具体实现已下沉到 WorkbenchStateManager，本方法保留为窗口的稳定入口
     if (m_stateManager)
+    {
         m_stateManager->refreshStatusText();
+    }
 }
 
 /// 从状态中心刷新界面
@@ -445,13 +496,17 @@ void WorkbenchWindow::refreshFromState()
     // 这里是框架层的总刷新入口，不把工作台实现逻辑写进来
     // 具体实现已下沉到 WorkbenchStateManager，本方法保留为窗口的稳定入口
     if (m_stateManager)
+    {
         m_stateManager->refreshFromState();
+    }
 }
 
 void WorkbenchWindow::updateWindowTitle()
 {
     if (m_stateManager)
+    {
         m_stateManager->updateWindowTitle();
+    }
 }
 
 /// 应用样式表
@@ -460,9 +515,10 @@ void WorkbenchWindow::closeEvent(QCloseEvent* event)
 {
     if (m_stateCenter && m_stateCenter->dirty())
     {
-        auto result =
-            QMessageBox::question(this, tr("Unsaved Changes"), tr("Do you want to save changes before closing?"),
-                QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+        auto result = QMessageBox::question(this,
+            tr("Unsaved Changes"),
+            tr("Do you want to save changes before closing?"),
+            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
         if (result == QMessageBox::Cancel)
         {
             event->ignore();
@@ -471,7 +527,9 @@ void WorkbenchWindow::closeEvent(QCloseEvent* event)
         if (result == QMessageBox::Save)
         {
             if (m_uiServices.operationBus)
+            {
                 m_uiServices.operationBus->run(OperationId::File_Save, {});
+            }
         }
     }
     event->accept();
@@ -497,13 +555,17 @@ void WorkbenchWindow::setThemeChangeCallback(std::function<void(const QString&)>
 void WorkbenchWindow::setViewportZoomHandler(std::function<void(const QString&)> handler)
 {
     if (m_menuManager)
+    {
         m_menuManager->setViewportZoomHandler(std::move(handler));
+    }
 }
 
 void WorkbenchWindow::updatePositionLabel(double x, double y)
 {
     if (m_activeStatusBar)
+    {
         m_activeStatusBar->setPositionText(tr("Position: (%1, %2) mm").arg(x, 0, 'f', 2).arg(y, 0, 'f', 2));
+    }
 }
 
 // ==================== 最近文件菜单实现 ====================
@@ -513,7 +575,9 @@ void WorkbenchWindow::updatePositionLabel(double x, double y)
 void WorkbenchWindow::addRecentFile(const QString& filePath)
 {
     if (filePath.isEmpty())
+    {
         return;
+    }
 
     // 优先使用数据库持久化，失败时回退到 QSettings
     auto* ps = m_uiServices.persistenceService;
@@ -535,7 +599,9 @@ void WorkbenchWindow::addRecentFile(const QString& filePath)
     files.prepend(filePath);
     constexpr int kMaxRecentFiles = 10;
     while (files.size() > kMaxRecentFiles)
+    {
         files.removeLast();
+    }
     saveRecentFiles(files);
     populateRecentFilesMenu();
 }
@@ -551,7 +617,9 @@ QStringList WorkbenchWindow::loadRecentFiles() const
         {
             QStringList result;
             for (const auto& rec : records)
+            {
                 result.append(QString::fromStdString(rec.filePath));
+            }
             return result;
         }
     }
@@ -575,7 +643,9 @@ void WorkbenchWindow::populateRecentFilesMenu()
 {
     QMenu* recentMenu = m_menuManager ? m_menuManager->recentFilesMenu() : nullptr;
     if (!recentMenu)
+    {
         return;
+    }
 
     qDeleteAll(recentMenu->actions());
 
@@ -612,7 +682,7 @@ void WorkbenchWindow::populateRecentFilesMenu()
                 // 兜底：走文件打开对话框（用户手动选取）
                 m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("file.open")));
             }
-            });
+        });
 
         ++index;
     }
@@ -639,7 +709,8 @@ void WorkbenchWindow::clearWorkbenchContent()
 {
     const auto start = std::chrono::steady_clock::now();
     SY_DEBUGF("[WorkbenchWindow] clearing workbench content: toolbars=%d docks=%d shortcuts=%d",
-        m_layoutManager->registeredToolBars().size(), m_layoutManager->registeredDocks().size(),
+        m_layoutManager->registeredToolBars().size(),
+        m_layoutManager->registeredDocks().size(),
         m_actionManager ? m_actionManager->shortcutCount() : 0);
 
     // 1: 清理所有注册的全局快捷键（Qt::ApplicationShortcut 不会随父窗口销毁）
@@ -670,8 +741,7 @@ void WorkbenchWindow::clearWorkbenchContent()
     // 在此处立即刷出延迟删除队列，确保旧渲染资源在新视口初始化前彻底释放。
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
 
-    recordPerformance(
-        QStringLiteral("WorkbenchWindow::clearWorkbenchContent"),
+    recordPerformance(QStringLiteral("WorkbenchWindow::clearWorkbenchContent"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 }
 
@@ -679,45 +749,59 @@ void WorkbenchWindow::clearWorkbenchContent()
 void WorkbenchWindow::registerShortcut(QShortcut* shortcut)
 {
     if (m_actionManager)
+    {
         m_actionManager->registerShortcut(shortcut);
+    }
 }
 
 /// 注销全局快捷键
 void WorkbenchWindow::unregisterShortcut(QShortcut* shortcut)
 {
     if (m_actionManager)
+    {
         m_actionManager->unregisterShortcut(shortcut);
+    }
 }
 
 /// 清理所有注册的快捷键
 void WorkbenchWindow::clearAllShortcuts()
 {
     if (m_actionManager)
+    {
         m_actionManager->clearAllShortcuts();
+    }
 }
 
 void WorkbenchWindow::resetCommandStateToIdle()
 {
     if (m_stateManager)
+    {
         m_stateManager->resetCommandStateToIdle();
+    }
 }
 
 void WorkbenchWindow::resetWorkbenchLocalMirror()
 {
     if (m_stateManager)
+    {
         m_stateManager->resetWorkbenchLocalMirror();
+    }
 }
 
 void WorkbenchWindow::clearSelectionState()
 {
     if (m_stateManager)
+    {
         m_stateManager->clearSelectionState();
+    }
 }
 
 void WorkbenchWindow::setWorkbenchSwitchContext(const QString& workbenchId, const QString& switchContextText)
 {
     if (m_stateManager)
+    {
         m_stateManager->setWorkbenchSwitchContext(workbenchId, switchContextText);
+    }
 }
 
 void WorkbenchWindow::resetWorkbenchTransientState()
@@ -725,17 +809,20 @@ void WorkbenchWindow::resetWorkbenchTransientState()
     const auto start = std::chrono::steady_clock::now();
     SY_DEBUG("[WorkbenchWindow] resetting transient workbench state");
     if (m_stateManager)
+    {
         m_stateManager->resetWorkbenchTransientState();
+    }
 
-    recordPerformance(
-        QStringLiteral("WorkbenchWindow::resetWorkbenchTransientState"),
+    recordPerformance(QStringLiteral("WorkbenchWindow::resetWorkbenchTransientState"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 }
 
 void WorkbenchWindow::syncWorkbenchStateFromStateCenter()
 {
     if (!m_stateCenter)
+    {
         return;
+    }
 
     const auto start = std::chrono::steady_clock::now();
     const auto state = m_stateCenter->snapshot();
@@ -745,8 +832,7 @@ void WorkbenchWindow::syncWorkbenchStateFromStateCenter()
         m_menuManager->refreshThemeMenuChecks(state.currentThemeId);
     }
     updateWindowTitle();
-    recordPerformance(
-        QStringLiteral("WorkbenchWindow::syncWorkbenchStateFromStateCenter"),
+    recordPerformance(QStringLiteral("WorkbenchWindow::syncWorkbenchStateFromStateCenter"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 }
 
@@ -757,8 +843,7 @@ void WorkbenchWindow::saveLayoutSnapshot(const QString& workbenchId)
     // 布局快照只保存窗口外观，不保存业务状态；业务状态由状态中心负责
     const auto start = std::chrono::steady_clock::now();
     m_layoutManager->saveLayoutSnapshot(workbenchId);
-    recordPerformance(
-        QStringLiteral("WorkbenchWindow::saveLayoutSnapshot"),
+    recordPerformance(QStringLiteral("WorkbenchWindow::saveLayoutSnapshot"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 }
 
@@ -769,8 +854,7 @@ void WorkbenchWindow::restoreLayoutSnapshot(const QString& workbenchId)
     // 布局恢复只还原窗口外观，不在这里恢复业务状态，避免状态源不统一
     const auto start = std::chrono::steady_clock::now();
     m_layoutManager->restoreLayoutSnapshot(workbenchId);
-    recordPerformance(
-        QStringLiteral("WorkbenchWindow::restoreLayoutSnapshot"),
+    recordPerformance(QStringLiteral("WorkbenchWindow::restoreLayoutSnapshot"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 }
 
@@ -787,7 +871,9 @@ void WorkbenchWindow::setSkeletonDocksVisible(bool visible)
 
     // 工作台状态栏 widget 整体显示/隐藏（3D 工作台隐藏，2D 工作台显示）
     if (m_activeStatusBar)
+    {
         m_activeStatusBar->setVisible(visible);
+    }
 }
 
 /// 更新繁忙指示器
@@ -802,10 +888,14 @@ void WorkbenchWindow::updateBusyIndicator(bool busy)
 void WorkbenchWindow::refreshThemeMenuChecks(const QString& themeId)
 {
     if (m_stateManager)
+    {
         m_stateManager->windowState().themeId = themeId;
+    }
     updateWindowTitle();
     if (m_menuManager)
+    {
         m_menuManager->refreshThemeMenuChecks(themeId);
+    }
 }
 
 /// 触发主题切换
@@ -814,10 +904,14 @@ void WorkbenchWindow::triggerTheme(const QString& themeId)
 {
     // 主题切换只负责调度，不在这里扩展额外 UI 行为，避免主题逻辑和工作台逻辑互相污染
     if (m_themeChangeCallback)
+    {
         m_themeChangeCallback(themeId);
+    }
 
     if (m_themeService && m_themeService->loadThemeFromId(themeId))
+    {
         applyTheme(m_themeService->styleSheet());
+    }
     else
     {
         // 主题加载失败时只做错误上报，不在这里尝试额外回退逻辑，避免主题链复杂化
@@ -831,7 +925,9 @@ void WorkbenchWindow::triggerTheme(const QString& themeId)
         m_stateCenter->setCurrentThemeId(themeId);
         // 主题状态变化后同步本地状态，避免窗口与状态中心短时间不一致
         if (m_stateManager)
+        {
             m_stateManager->windowState().themeId = themeId;
+        }
     }
     updateWindowTitle();
 
@@ -841,19 +937,25 @@ void WorkbenchWindow::triggerTheme(const QString& themeId)
 void WorkbenchWindow::recordPerformance(const QString& scope, qint64 elapsedMs)
 {
     if (m_actionManager)
+    {
         m_actionManager->recordPerformance(scope, elapsedMs);
+    }
 }
 
 void WorkbenchWindow::reportFrameworkError(const QString& errorCode, const QString& message, const QString& context)
 {
     if (m_actionManager)
+    {
         m_actionManager->reportFrameworkError(errorCode, message, context);
+    }
 }
 
 bool WorkbenchWindow::canExecuteCommand(const QString& commandId, const QString& context) const
 {
     if (m_actionManager)
+    {
         return m_actionManager->canExecuteCommand(commandId, context);
+    }
 
     return true;
 }
@@ -867,7 +969,7 @@ namespace
     {
         return QStringLiteral("Switching to %1").arg(workbenchId);
     }
-} // namespace
+}  // namespace
 
 void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
 {
@@ -882,22 +984,21 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     }
 
     if (!canExecuteCommand(QStringLiteral("workbench.switch.%1").arg(workbenchId),
-        QStringLiteral("WorkbenchWindow::triggerWorkbench")))
+            QStringLiteral("WorkbenchWindow::triggerWorkbench")))
     {
         reportFrameworkError(QStringLiteral("workbench.switch_denied"),
             QStringLiteral("Workbench switch denied: %1").arg(workbenchId),
             QStringLiteral("WorkbenchWindow::triggerWorkbench"));
 
-        recordPerformance(
-            QStringLiteral("WorkbenchWindow::triggerWorkbench.denied"),
+        recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.denied"),
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
         return;
     }
 
     if (!m_workbench)
     {
-        SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: no workbench, setting state to %s",
-            workbenchId.toUtf8().constData());
+        SY_DEBUGF(
+            "[WorkbenchWindow] triggerWorkbench: no workbench, setting state to %s", workbenchId.toUtf8().constData());
         if (m_stateCenter)
         {
             m_stateCenter->setCurrentWorkbenchId(workbenchId);
@@ -917,8 +1018,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         refreshFromState();
         refreshStatusText();
         updateWindowTitle();
-        recordPerformance(
-            QStringLiteral("WorkbenchWindow::triggerWorkbench.noWorkbench"),
+        recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.noWorkbench"),
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
         return;
     }
@@ -929,9 +1029,10 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     {
         SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: same workbench %s, skipping", workbenchId.toUtf8().constData());
         if (m_menuManager)
+        {
             m_menuManager->refreshWorkbenchMenuChecks(workbenchId);
-        recordPerformance(
-            QStringLiteral("WorkbenchWindow::triggerWorkbench.sameWorkbench"),
+        }
+        recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.sameWorkbench"),
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
         return;
     }
@@ -943,7 +1044,8 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         m_stateManager ? m_stateManager->windowState().workbenchId : QStringLiteral("default");
     const auto switchContextText = workbenchSwitchText(workbenchId);
 
-    SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: switching from %s to %s", previousWorkbenchId.toUtf8().constData(),
+    SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: switching from %s to %s",
+        previousWorkbenchId.toUtf8().constData(),
         workbenchId.toUtf8().constData());
 
     // 1: 保存旧工作台布局快照，标记繁忙
@@ -951,14 +1053,13 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     {
         saveLayoutSnapshot(previousWorkbenchId);
         m_stateCenter->setBusy(true);
-        m_stateCenter->setMetadata({ {QStringLiteral("viewportStatus"), QStringLiteral("Switching")} });
+        m_stateCenter->setMetadata({ { QStringLiteral("viewportStatus"), QStringLiteral("Switching") } });
     }
 
     // 2: 停用旧工作台（释放资源、清理快捷键等）
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: deactivating old workbench");
     m_workbench->deactivate();
-    recordPerformance(
-        QStringLiteral("WorkbenchWindow::triggerWorkbench.deactivate"),
+    recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.deactivate"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 
     // 3: 清理旧工作台的 transient 状态（命令、选择、镜像状态）
@@ -987,22 +1088,19 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     // 7: 附加新工作台到窗口（注册面板、工具栏、中央控件）
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: attaching workbench to window");
     m_workbench->attachToWindow(*this);
-    recordPerformance(
-        QStringLiteral("WorkbenchWindow::triggerWorkbench.attach"),
+    recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.attach"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 
     // 8: 恢复新工作台布局快照
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: restoring layout");
     restoreLayoutSnapshot(workbenchId);
-    recordPerformance(
-        QStringLiteral("WorkbenchWindow::triggerWorkbench.restoreLayout"),
+    recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.restoreLayout"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 
     // 9: 激活新工作台（应用初始状态）
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: activating new workbench");
     m_workbench->activate();
-    recordPerformance(
-        QStringLiteral("WorkbenchWindow::triggerWorkbench.activate"),
+    recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.activate"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 
     // 10: 刷新 UI 并清除繁忙状态
@@ -1020,7 +1118,9 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     updateWindowTitle();
 
     if (m_stateCenter)
+    {
         m_stateCenter->setBusy(false);
+    }
     if (m_stateManager)
     {
         m_stateManager->windowState().busy = false;
@@ -1032,7 +1132,6 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     m_switchingWorkbench = false;
 
     SY_INFOF("[WorkbenchWindow] triggerWorkbench: switch completed to %s", workbenchId.toUtf8().constData());
-    recordPerformance(
-        QStringLiteral("WorkbenchWindow::triggerWorkbench.switch"),
+    recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.switch"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 }

@@ -27,7 +27,7 @@
 #include <memory>
 #include <vector>
 
- // ==================== ToolManager 构造与生命周期 ====================
+// ==================== ToolManager 构造与生命周期 ====================
 
 TEST(ToolSelectionSyncRegressionTest, ToolManager_DefaultConstruction)
 {
@@ -52,7 +52,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_RegisterSelectTool)
 {
     ToolManager tm;
     tm.registerTool<SelectTool>("SelectTool");
-    EXPECT_EQ(tm.getToolCount(), 0u); // 注册后不会立即实例化，需 initializeTools
+    EXPECT_EQ(tm.getToolCount(), 0u);  // 注册后不会立即实例化，需 initializeTools
 }
 
 TEST(ToolSelectionSyncRegressionTest, ToolManager_RegisterMultipleTools)
@@ -103,7 +103,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_DoubleInitialize)
     ctx.sceneManager = &scene;
 
     tm.initializeTools(ctx);
-    tm.initializeTools(ctx); // 二次初始化不应崩溃
+    tm.initializeTools(ctx);  // 二次初始化不应崩溃
     EXPECT_TRUE(tm.isInitialized());
 }
 
@@ -188,7 +188,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_CancelCurrentTool_NoActive)
     ctx.sceneManager = &scene;
 
     tm.initializeTools(ctx);
-    tm.cancelCurrentTool(); // 无活动工具时不崩溃
+    tm.cancelCurrentTool();  // 无活动工具时不崩溃
     SUCCEED();
 }
 
@@ -206,7 +206,9 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_EntityCallback)
     tm.initializeTools(ctx);
 
     bool entityCallbackSet = false;
-    tm.setEntityCallbackForAllTools([&entityCallbackSet](Eg::SyEntity*) { entityCallbackSet = true; });
+    tm.setEntityCallbackForAllTools([&entityCallbackSet](Eg::SyEntity*) {
+        entityCallbackSet = true;
+    });
     // 回调已设置，不应崩溃
     SUCCEED();
 }
@@ -223,7 +225,9 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_SwitchToolCallback)
     tm.initializeTools(ctx);
 
     QString lastSwitch;
-    tm.setSwitchToolCallbackForAllTools([&lastSwitch](const QString& name) { lastSwitch = name; });
+    tm.setSwitchToolCallbackForAllTools([&lastSwitch](const QString& name) {
+        lastSwitch = name;
+    });
     // 回调已设置，不应崩溃
     SUCCEED();
 }
@@ -468,9 +472,9 @@ TEST(SelectionSyncExtendedTest, ClearSceneThenSelect_NoCrash)
     scene.addEntities(std::move(entities));
 
     scene.clearScene();
-    scene.selectAll();       // 空场景全选不崩溃
-    scene.invertSelection(); // 空场景反转不崩溃
-    scene.deleteSelected();  // 空场景删除选中不崩溃
+    scene.selectAll();        // 空场景全选不崩溃
+    scene.invertSelection();  // 空场景反转不崩溃
+    scene.deleteSelected();   // 空场景删除选中不崩溃
     SUCCEED();
 }
 
@@ -764,7 +768,9 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_AllToolsReceiveEntityCallback)
     tm.initializeTools(ctx);
 
     int callbackCount = 0;
-    tm.setEntityCallbackForAllTools([&callbackCount](Eg::SyEntity*) { callbackCount++; });
+    tm.setEntityCallbackForAllTools([&callbackCount](Eg::SyEntity*) {
+        callbackCount++;
+    });
 
     EXPECT_NE(tm.getTool("SelectTool"), nullptr);
     SUCCEED();
@@ -1009,7 +1015,9 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_AllToolsReceiveSwitchCallback)
     tm.initializeTools(ctx);
 
     QString lastSwitch;
-    tm.setSwitchToolCallbackForAllTools([&lastSwitch](const QString& name) { lastSwitch = name; });
+    tm.setSwitchToolCallbackForAllTools([&lastSwitch](const QString& name) {
+        lastSwitch = name;
+    });
 
     EXPECT_NE(tm.getTool("SelectTool"), nullptr);
     SUCCEED();

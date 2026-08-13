@@ -48,7 +48,9 @@ namespace
         Fio::BinaryBlobOut query;
         auto r = s.serializeToMemory(doc, &query);
         if (!r.success)
+        {
             return r;
+        }
         out.resize(query.written);
         Fio::BinaryBlobOut blobOut{ out.data(), out.size(), 0 };
         return s.serializeToMemory(doc, &blobOut);
@@ -59,7 +61,7 @@ namespace
         Fio::BinaryBlob in{ const_cast<uint8_t*>(data.data()), data.size() };
         return s.deserializeFromMemory(in, doc);
     }
-} // namespace
+}  // namespace
 
 TEST(FrameworkLifecycleTest, StableChecklist_IsDocumented)
 {
@@ -136,8 +138,8 @@ TEST(FrameworkRegressionTest, WorkbenchStateSnapshot_AllFieldsHaveDefaults)
     EXPECT_TRUE(snapshot.selectionType.isEmpty());
     EXPECT_TRUE(snapshot.viewportType.isEmpty());
     EXPECT_TRUE(snapshot.viewportStatus.isEmpty());
-    EXPECT_TRUE(snapshot.activeToolId.isEmpty());     // P0: 工具状态恢复
-    EXPECT_TRUE(snapshot.inputFocusWidget.isEmpty()); // P0: 焦点状态恢复
+    EXPECT_TRUE(snapshot.activeToolId.isEmpty());      // P0: 工具状态恢复
+    EXPECT_TRUE(snapshot.inputFocusWidget.isEmpty());  // P0: 焦点状态恢复
     EXPECT_FALSE(snapshot.dirty);
 }
 
@@ -205,17 +207,18 @@ TEST(FrameworkRegressionTest, ISceneDataSource_DefaultImplementations)
     // 创建一个最小实现来测试默认行为
     struct MinimalDataSource : Eg::ISceneDataSource
     {
-        void gatherGeometry(Eg::ISceneGeometrySink&) const override
-        {
-        }
+        void gatherGeometry(Eg::ISceneGeometrySink&) const override {}
+
         Ut::BBox2d sceneBBox2D() const override
         {
             return Ut::BBox2d();
         }
+
         Ut::BBox3f sceneBBox3D() const override
         {
             return Ut::BBox3f();
         }
+
         size_t entityCount() const override
         {
             return 0;
@@ -227,8 +230,12 @@ TEST(FrameworkRegressionTest, ISceneDataSource_DefaultImplementations)
 
     // ABI 收口：forEachSelectedEntityId 默认实现为空遍历
     bool visited = false;
-    ds.forEachSelectedEntityId([](Eg::EntityId, void* ctx) { *static_cast<bool*>(ctx) = true; }, &visited);
-    EXPECT_FALSE(visited); // 默认实现不遍历任何实体
+    ds.forEachSelectedEntityId(
+        [](Eg::EntityId, void* ctx) {
+            *static_cast<bool*>(ctx) = true;
+        },
+        &visited);
+    EXPECT_FALSE(visited);  // 默认实现不遍历任何实体
 
     // ABI 收口：entityName 改为 buffer 模式，默认实现返回空字符串
     char nameBuf[64] = {};
@@ -241,28 +248,22 @@ TEST(FrameworkRegressionTest, ISceneGeometrySink_EmitBBoxDefaultIsNoop)
     // 验证 emitBBox 默认实现为空操作（不强制子类覆盖）
     struct MinimalSink : Eg::ISceneGeometrySink
     {
-        void emitPolyline(const Ut::Vec2d*, size_t, bool, const Ut::Color&) override
+        void emitPolyline(const Ut::Vec2d*, size_t, bool, const Ut::Color&) override {}
+
+        void emitCircle(const Ut::Vec2d&, double, const Ut::Color&) override {}
+
+        void emitArc(const Ut::Vec2d&, double, double, double, const Ut::Color&) override {}
+
+        void emitEllipse(const Ut::Vec2d&, double, double, double, double, double, bool, const Ut::Color&) override {}
+
+        void emitText(const Ut::Vec2d&, const char*, const Ut::Color&) override {}
+
+        void emitImagePlaceholder(
+            const Ut::Vec2d&, const Ut::Vec2d&, const Ut::Vec2d&, const Ut::Vec2d&, const Ut::Color&) override
         {
         }
-        void emitCircle(const Ut::Vec2d&, double, const Ut::Color&) override
-        {
-        }
-        void emitArc(const Ut::Vec2d&, double, double, double, const Ut::Color&) override
-        {
-        }
-        void emitEllipse(const Ut::Vec2d&, double, double, double, double, double, bool, const Ut::Color&) override
-        {
-        }
-        void emitText(const Ut::Vec2d&, const char*, const Ut::Color&) override
-        {
-        }
-        void emitImagePlaceholder(const Ut::Vec2d&, const Ut::Vec2d&, const Ut::Vec2d&, const Ut::Vec2d&,
-            const Ut::Color&) override
-        {
-        }
-        void emitTriangleSoup(const Ut::Vec3f*, size_t, const Ut::Vec3f*, size_t, const Ut::Color&) override
-        {
-        }
+
+        void emitTriangleSoup(const Ut::Vec3f*, size_t, const Ut::Vec3f*, size_t, const Ut::Color&) override {}
     };
 
     MinimalSink sink;
@@ -405,7 +406,7 @@ TEST(FrameworkRegressionTest, ViewportSwitch_WorkbenchSnapshotPreservesState)
     snapshot3D.viewportType = QStringLiteral("3D_Viewport");
     snapshot3D.viewportStatus = QStringLiteral("zoom=2.0;pan=50,50;orbit=30,45");
     snapshot3D.activeToolId = QStringLiteral("OrbitTool");
-    snapshot3D.documentId = QStringLiteral("doc_001"); // 活动文档应保持不变
+    snapshot3D.documentId = QStringLiteral("doc_001");  // 活动文档应保持不变
 
     // 验证 3D 和 2D 状态不同
     EXPECT_NE(saved2D.viewMode, snapshot3D.viewMode);
@@ -553,14 +554,17 @@ TEST(FrameworkRegressionTest, ISceneDataSource_GatherGeometryDeterministic)
             Ut::Vec3f norms[] = { Ut::Vec3f(0, 0, 1), Ut::Vec3f(0, 0, 1), Ut::Vec3f(0, 0, 1) };
             sink.emitTriangleSoup(verts, 3, norms, 3, Ut::Color());
         }
+
         Ut::BBox2d sceneBBox2D() const override
         {
             return Ut::BBox2d();
         }
+
         Ut::BBox3f sceneBBox3D() const override
         {
             return Ut::BBox3f();
         }
+
         size_t entityCount() const override
         {
             return 2;

@@ -71,7 +71,8 @@ namespace
         {
             LicenseConfig config{};
             License_ConfigInit(&config);
-            config.configDir = m_tempDir.string().c_str();
+            std::string configDirStr = m_tempDir.string();
+            config.configDir = configDirStr.c_str();
             return License_Create(&config);
         }
 
@@ -80,9 +81,8 @@ namespace
             const auto privateKeyPath = m_tempDir / "private.pem";
             const auto publicKeyPath = m_tempDir / "public.pem";
 
-            if (LicenseKeygen_GenerateKeyPair(
-                privateKeyPath.string().c_str(),
-                publicKeyPath.string().c_str()) != LICENSE_OK)
+            if (LicenseKeygen_GenerateKeyPair(privateKeyPath.string().c_str(), publicKeyPath.string().c_str()) !=
+                LICENSE_OK)
             {
                 return false;
             }
@@ -100,14 +100,11 @@ namespace
         }
 
         std::string GenerateRegCodeForMachine(
-            const std::string& machineCode,
-            const std::string& expiryDate,
-            const std::string& issueDate = "2026-01-01")
+            const std::string& machineCode, const std::string& expiryDate, const std::string& issueDate = "2026-01-01")
         {
             const auto privateKeyPath = m_tempDir / "private.pem";
             char regCode[4096] = {};
-            const int result = LicenseKeygen_GenerateRegCode(
-                machineCode.c_str(),
+            const int result = LicenseKeygen_GenerateRegCode(machineCode.c_str(),
                 expiryDate.c_str(),
                 "all",
                 issueDate.c_str(),
@@ -125,7 +122,7 @@ namespace
 
         std::filesystem::path m_tempDir;
     };
-} // namespace
+}  // namespace
 
 // ========== C API 基础契约 ==========
 
@@ -389,7 +386,8 @@ TEST_F(LicenseFixture, CheckEnabledBypassesVerification)
     LicenseConfig config{};
     License_ConfigInit(&config);
     config.enableCheck = 0;
-    config.configDir = m_tempDir.string().c_str();
+    std::string configDirStr = m_tempDir.string();
+    config.configDir = configDirStr.c_str();
 
     LicenseContext* ctx = License_Create(&config);
     ASSERT_NE(ctx, nullptr);
@@ -409,10 +407,7 @@ TEST_F(LicenseFixture, KeygenGenerateKeyPair)
     const auto publicKeyPath = m_tempDir / "public.pem";
 
     EXPECT_EQ(
-        LicenseKeygen_GenerateKeyPair(
-            privateKeyPath.string().c_str(),
-            publicKeyPath.string().c_str()),
-        LICENSE_OK);
+        LicenseKeygen_GenerateKeyPair(privateKeyPath.string().c_str(), publicKeyPath.string().c_str()), LICENSE_OK);
     EXPECT_TRUE(std::filesystem::exists(privateKeyPath));
     EXPECT_TRUE(std::filesystem::exists(publicKeyPath));
 }
@@ -422,22 +417,17 @@ TEST_F(LicenseFixture, KeygenSignOnly)
     const auto privateKeyPath = m_tempDir / "private.pem";
     const auto publicKeyPath = m_tempDir / "public.pem";
     ASSERT_EQ(
-        LicenseKeygen_GenerateKeyPair(
-            privateKeyPath.string().c_str(),
-            publicKeyPath.string().c_str()),
-        LICENSE_OK);
+        LicenseKeygen_GenerateKeyPair(privateKeyPath.string().c_str(), publicKeyPath.string().c_str()), LICENSE_OK);
 
     char regCode[4096] = {};
-    EXPECT_EQ(
-        LicenseKeygen_GenerateRegCode(
-            "test_machine_code",
-            "2099-12-31",
-            "all",
-            "2026-01-01",
-            "TestCustomer",
-            privateKeyPath.string().c_str(),
-            regCode,
-            sizeof(regCode)),
+    EXPECT_EQ(LicenseKeygen_GenerateRegCode("test_machine_code",
+                  "2099-12-31",
+                  "all",
+                  "2026-01-01",
+                  "TestCustomer",
+                  privateKeyPath.string().c_str(),
+                  regCode,
+                  sizeof(regCode)),
         LICENSE_OK);
     EXPECT_NE(std::strlen(regCode), 0u);
 }

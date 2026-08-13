@@ -10,7 +10,9 @@
 void DefaultUiLayoutService::saveLayout(const QString& workbenchId, WorkbenchWindow* window)
 {
     if (!window)
+    {
         return;
+    }
 
     QSettings settings;
     settings.beginGroup(QStringLiteral("Layout"));
@@ -25,16 +27,22 @@ void DefaultUiLayoutService::saveLayout(const QString& workbenchId, WorkbenchWin
 void DefaultUiLayoutService::restoreLayout(const QString& workbenchId, WorkbenchWindow* window)
 {
     if (!window)
+    {
         return;
+    }
 
     QSettings settings;
     settings.beginGroup(QStringLiteral("Layout"));
 
     if (settings.contains(QStringLiteral("%1/geometry").arg(workbenchId)))
+    {
         window->restoreGeometry(settings.value(QStringLiteral("%1/geometry").arg(workbenchId)).toByteArray());
+    }
 
     if (settings.contains(QStringLiteral("%1/state").arg(workbenchId)))
+    {
         window->restoreState(settings.value(QStringLiteral("%1/state").arg(workbenchId)).toByteArray());
+    }
 
     settings.endGroup();
 }

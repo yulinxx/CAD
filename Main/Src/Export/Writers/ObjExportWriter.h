@@ -26,6 +26,5 @@ public:
         return QStringLiteral("obj");
     }
 
-    ExportResult write(const ExportContext& context,
-        const Fio::VecSyEntityPtr& entities) override;
+    ExportResult write(const ExportContext& context, const Fio::VecSyEntityPtr& entities) override;
 };

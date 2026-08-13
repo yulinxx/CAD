@@ -28,7 +28,10 @@ namespace
     // 颜色转换：Ut::Color → float[4]
     inline void colorToRGBA(const Ut::Color& c, float out[4])
     {
-        out[0] = c.r(); out[1] = c.g(); out[2] = c.b(); out[3] = c.a();
+        out[0] = c.r();
+        out[1] = c.g();
+        out[2] = c.b();
+        out[3] = c.a();
     }
 
     // ==================== 曲线离散化缓存 ====================
@@ -69,14 +72,17 @@ namespace
     }
 
     // 尝试从缓存命中：几何未变时仅更新颜色，跳过离散化
-    bool tryCacheHit(uint64_t entityId, uint64_t geomHash,
+    bool tryCacheHit(uint64_t entityId,
+        uint64_t geomHash,
         const Ut::Color& color,
         std::vector<render::VertexP3C3>& outVertices,
         render::PrimitiveType& outType)
     {
         auto it = s_vertexCache.find(entityId);
         if (it == s_vertexCache.end() || it->second.geometryHash != geomHash)
+        {
             return false;
+        }
 
         // 几何未变，拷贝缓存顶点并更新颜色
         outVertices = it->second.vertices;
@@ -85,13 +91,16 @@ namespace
         colorToRGBA(color, rgba);
         for (auto& v : outVertices)
         {
-            v.cr = rgba[0]; v.cg = rgba[1]; v.cb = rgba[2];
+            v.cr = rgba[0];
+            v.cg = rgba[1];
+            v.cb = rgba[2];
         }
         return true;
     }
 
     // 存入缓存
-    void storeCache(uint64_t entityId, uint64_t geomHash,
+    void storeCache(uint64_t entityId,
+        uint64_t geomHash,
         const std::vector<render::VertexP3C3>& vertices,
         render::PrimitiveType primType)
     {
@@ -104,12 +113,8 @@ namespace
     // 判断图元类型是否值得缓存（曲线类离散化开销大）
     bool isCacheableType(Eg::EType type)
     {
-        return type == Eg::EType::BEZIER ||
-            type == Eg::EType::BEZIER2 ||
-            type == Eg::EType::NURBS ||
-            type == Eg::EType::CIRCLE ||
-            type == Eg::EType::ARC ||
-            type == Eg::EType::ELLIPSE;
+        return type == Eg::EType::BEZIER || type == Eg::EType::BEZIER2 || type == Eg::EType::NURBS ||
+            type == Eg::EType::CIRCLE || type == Eg::EType::ARC || type == Eg::EType::ELLIPSE;
     }
 
     // ==================== 增量路径几何接收器 ====================
@@ -120,8 +125,7 @@ namespace
     class IncrementalVertexSink : public Eg::ISceneGeometrySink
     {
     public:
-        IncrementalVertexSink(std::vector<render::VertexP3C3>& outVertices,
-            render::PrimitiveType& outType)
+        IncrementalVertexSink(std::vector<render::VertexP3C3>& outVertices, render::PrimitiveType& outType)
             : m_vertices(outVertices)
             , m_outType(outType)
         {
@@ -131,31 +135,31 @@ namespace
         {
             return m_emitted;
         }
+
         bool sawText() const
         {
             return m_sawText;
         }
 
-        void setCurrentEntityId(uint64_t /*id*/) override
-        {
-        }
+        void setCurrentEntityId(uint64_t /*id*/) override {}
 
-        void emitPolyline(const Ut::Vec2d* points, size_t count, bool bClosed,
-            const Ut::Color& color) override
+        void emitPolyline(const Ut::Vec2d* points, size_t count, bool bClosed, const Ut::Color& color) override
         {
             if (!points || count < 2)
+            {
                 return;
-            m_outType = bClosed ? render::PrimitiveType::LineLoop
-                : render::PrimitiveType::LineStrip;
+            }
+            m_outType = bClosed ? render::PrimitiveType::LineLoop : render::PrimitiveType::LineStrip;
             float rgba[4];
             colorToRGBA(color, rgba);
             for (size_t i = 0; i < count; ++i)
+            {
                 addVertex(points[i].x(), points[i].y(), rgba);
+            }
             m_emitted = true;
         }
 
-        void emitPoint(const Ut::Vec2d& position,
-            const Ut::Color& color) override
+        void emitPoint(const Ut::Vec2d& position, const Ut::Color& color) override
         {
             m_outType = render::PrimitiveType::PointList;
             float rgba[4];
@@ -164,11 +168,12 @@ namespace
             m_emitted = true;
         }
 
-        void emitCircle(const Ut::Vec2d& center, double radius,
-            const Ut::Color& color) override
+        void emitCircle(const Ut::Vec2d& center, double radius, const Ut::Color& color) override
         {
             if (radius <= 0)
+            {
                 return;
+            }
             m_outType = render::PrimitiveType::LineLoop;
             float rgba[4];
             colorToRGBA(color, rgba);
@@ -176,46 +181,51 @@ namespace
             for (int i = 0; i < segments; ++i)
             {
                 double angle = (2.0 * render::tess::kPi * i) / segments;
-                addVertex(center.x() + radius * std::cos(angle),
-                    center.y() + radius * std::sin(angle), rgba);
+                addVertex(center.x() + radius * std::cos(angle), center.y() + radius * std::sin(angle), rgba);
             }
             m_emitted = true;
         }
 
-        void emitArc(const Ut::Vec2d& center, double radius,
-            double startAngle, double endAngle,
-            const Ut::Color& color) override
+        void emitArc(
+            const Ut::Vec2d& center, double radius, double startAngle, double endAngle, const Ut::Color& color) override
         {
             if (radius <= 0)
+            {
                 return;
+            }
             m_outType = render::PrimitiveType::LineStrip;
             float rgba[4];
             colorToRGBA(color, rgba);
             double start = startAngle;
             double end = endAngle;
             if (end < start)
+            {
                 end += 2.0 * render::tess::kPi;
+            }
             const double angleRange = end - start;
             const int segments = render::tess::arcSegments(angleRange);
             for (int i = 0; i <= segments; ++i)
             {
                 double t = static_cast<double>(i) / segments;
                 double angle = start + t * angleRange;
-                addVertex(center.x() + radius * std::cos(angle),
-                    center.y() + radius * std::sin(angle), rgba);
+                addVertex(center.x() + radius * std::cos(angle), center.y() + radius * std::sin(angle), rgba);
             }
             m_emitted = true;
         }
 
         void emitEllipse(const Ut::Vec2d& center,
-            double radiusX, double radiusY,
+            double radiusX,
+            double radiusY,
             double rotation,
-            double startAngle, double endAngle,
+            double startAngle,
+            double endAngle,
             bool bFullEllipse,
             const Ut::Color& color) override
         {
             if (radiusX <= 0 || radiusY <= 0)
+            {
                 return;
+            }
             float rgba[4];
             colorToRGBA(color, rgba);
             double start = startAngle;
@@ -226,10 +236,11 @@ namespace
                 end = 2.0 * render::tess::kPi;
             }
             if (end < start)
+            {
                 end += 2.0 * render::tess::kPi;
+            }
             const double angleRange = end - start;
-            m_outType = bFullEllipse ? render::PrimitiveType::LineLoop
-                : render::PrimitiveType::LineStrip;
+            m_outType = bFullEllipse ? render::PrimitiveType::LineLoop : render::PrimitiveType::LineStrip;
             const int segments = render::tess::ellipseSegments(angleRange);
             const double cosR = std::cos(rotation);
             const double sinR = std::sin(rotation);
@@ -239,21 +250,23 @@ namespace
                 double angle = start + t * angleRange;
                 double lx = radiusX * std::cos(angle);
                 double ly = radiusY * std::sin(angle);
-                addVertex(center.x() + lx * cosR - ly * sinR,
-                    center.y() + lx * sinR + ly * cosR, rgba);
+                addVertex(center.x() + lx * cosR - ly * sinR, center.y() + lx * sinR + ly * cosR, rgba);
             }
             m_emitted = true;
         }
 
-        void emitText(const Ut::Vec2d& /*position*/, const char* /*text*/,
-            const Ut::Color& /*color*/) override
+        void emitText(const Ut::Vec2d& /*position*/, const char* /*text*/, const Ut::Color& /*color*/) override
         {
             m_sawText = true;
         }
 
-        void emitTextEx(const Ut::Vec2d& /*position*/, const char* /*text*/,
-            const Ut::Color& /*color*/, float /*fontSize*/, float /*rotationRad*/,
-            int /*hAlign*/, int /*vAlign*/) override
+        void emitTextEx(const Ut::Vec2d& /*position*/,
+            const char* /*text*/,
+            const Ut::Color& /*color*/,
+            float /*fontSize*/,
+            float /*rotationRad*/,
+            int /*hAlign*/,
+            int /*vAlign*/) override
         {
             m_sawText = true;
         }
@@ -276,8 +289,10 @@ namespace
             m_emitted = true;
         }
 
-        void emitTriangleSoup(const Ut::Vec3f* /*vertices*/, size_t /*vertexCount*/,
-            const Ut::Vec3f* /*normals*/, size_t /*normalCount*/,
+        void emitTriangleSoup(const Ut::Vec3f* /*vertices*/,
+            size_t /*vertexCount*/,
+            const Ut::Vec3f* /*normals*/,
+            size_t /*normalCount*/,
             const Ut::Color& /*color*/) override
         {
             // 2D 增量路径不支持三角形网格，忽略（3D 场景走全量路径）
@@ -290,7 +305,9 @@ namespace
             v.px = static_cast<float>(x);
             v.py = static_cast<float>(y);
             v.pz = 0.0f;
-            v.cr = rgba[0]; v.cg = rgba[1]; v.cb = rgba[2];
+            v.cr = rgba[0];
+            v.cg = rgba[1];
+            v.cb = rgba[2];
             m_vertices.push_back(v);
         }
 
@@ -299,7 +316,7 @@ namespace
         bool m_emitted = false;
         bool m_sawText = false;
     };
-}
+}  // namespace
 
 // 供外部调用：全量刷新时清空缓存
 void clearEntityVertexCache()
@@ -322,12 +339,13 @@ void clearEntityVertexCache()
  *   → scheduleSceneUpdate → updateSceneRender → applyLightRefresh → 此函数
  * 此函数处于渲染数据准备层，不涉及 OpenGL 调用。
  */
-bool entityToVertices(const Eg::SyEntity* entity,
-    std::vector<render::VertexP3C3>& outVertices,
-    render::PrimitiveType& outType)
+bool entityToVertices(
+    const Eg::SyEntity* entity, std::vector<render::VertexP3C3>& outVertices, render::PrimitiveType& outType)
 {
     if (!entity)
+    {
         return false;
+    }
 
     const Ut::Color& color = entity->getColor();
 
@@ -338,20 +356,30 @@ bool entityToVertices(const Eg::SyEntity* entity,
     {
         geomHash = computeGeometryHash(entity);
         if (tryCacheHit(entityId, geomHash, color, outVertices, outType))
+        {
             return true;
+        }
     }
 
     // 通过 Engine 侧统一边界分解图元，本地 sink 离散化
     IncrementalVertexSink sink(outVertices, outType);
     if (!Eg::emitEntityGeometry(*entity, sink))
+    {
         return false;
+    }
     // 文本等复杂类型无法走增量路径（全量刷新已由渲染器处理文本渲染）
     if (sink.sawText())
+    {
         return false;
+    }
     if (!sink.emitted())
+    {
         return false;
+    }
 
     if (isCacheableType(entity->eType))
+    {
         storeCache(entityId, geomHash, outVertices, outType);
+    }
     return true;
 }

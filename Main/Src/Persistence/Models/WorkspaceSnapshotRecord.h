@@ -10,9 +10,9 @@
  */
 struct WorkspaceSnapshotRecord
 {
-    int id{ 0 };                    // 自增主键
-    std::string workbenchId;        // 工作台标识（如 "2D", "3D"）
-    std::string geometry;           // QWidget::saveGeometry() 的 Base64 编码
-    std::string windowState;        // QWidget::saveState() 的 Base64 编码
-    std::string updatedAt;          // 最近更新时间（ISO 8601 格式）
+    int id{ 0 };              // 自增主键
+    std::string workbenchId;  // 工作台标识（如 "2D", "3D"）
+    std::string geometry;     // QWidget::saveGeometry() 的 Base64 编码
+    std::string windowState;  // QWidget::saveState() 的 Base64 编码
+    std::string updatedAt;    // 最近更新时间（ISO 8601 格式）
 };

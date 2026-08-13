@@ -42,15 +42,13 @@ public:
     /// @param filePath 目标文件路径
     /// @param options 导出选项
     /// @return 导出结果
-    ExportResult exportFile(const QString& filePath,
-        const ExportOptions& options = ExportOptions{});
+    ExportResult exportFile(const QString& filePath, const ExportOptions& options = ExportOptions{});
 
     /// 执行带完整上下文的导出
     /// @param context 导出上下文
     /// @param options 导出选项
     /// @return 导出结果
-    ExportResult exportWithContext(const ExportContext& context,
-        const ExportOptions& options = ExportOptions{});
+    ExportResult exportWithContext(const ExportContext& context, const ExportOptions& options = ExportOptions{});
 
     /// 检查指定路径是否可导出
     bool canExport(const QString& filePath) const;
@@ -71,8 +69,7 @@ signals:
 
 private:
     /// 导出后的状态回写
-    void postExportRecord(const ExportResult& result,
-        const ExportContext& context);
+    void postExportRecord(const ExportResult& result, const ExportContext& context);
 
     /// 导出分发器（非拥有指针）
     ExportDispatcher* m_dispatcher{ nullptr };

@@ -33,21 +33,21 @@ namespace LicenseInternal
 
 #ifdef LICENSE_TEST_HOOKS
 
-    std::string& LicenseInternal::GetTestPublicKeyOverride()
+    std::string& GetTestPublicKeyOverride()
     {
         static std::string s_override;
         return s_override;
     }
 
-    void LicenseInternal::SetTestPublicKeyOverride(const std::string& pem)
+    void SetTestPublicKeyOverride(const std::string& pem)
     {
         GetTestPublicKeyOverride() = pem;
     }
 
-    void LicenseInternal::ClearTestPublicKeyOverride()
+    void ClearTestPublicKeyOverride()
     {
         GetTestPublicKeyOverride().clear();
     }
 
 #endif
-} // namespace LicenseInternal
+}  // namespace LicenseInternal

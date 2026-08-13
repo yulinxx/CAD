@@ -39,8 +39,7 @@ public:
     /// @param extensionBlob 扩展数据块（多边形顶点、NURBS控制点等）
     /// @return 领域图元对象，失败返回 nullptr
     static std::unique_ptr<Eg::SyEntity> convertEntity(
-        const Fio::EntityInfo& info,
-        const Fio::BinaryBlob& extensionBlob);
+        const Fio::EntityInfo& info, const Fio::BinaryBlob& extensionBlob);
 
     /// 将 FioParseResult 中的所有图元批量转换为 SyEntity 列表
     /// @param parseData 解析结果（中立 IR）
@@ -54,7 +53,5 @@ public:
 
 private:
     /// 从 EntityInfo 的扩展数据中读取顶点数组
-    static std::vector<Fio::Point2D> readExtensionPoints(
-        const Fio::EntityInfo& info,
-        const Fio::BinaryBlob& blob);
+    static std::vector<Fio::Point2D> readExtensionPoints(const Fio::EntityInfo& info, const Fio::BinaryBlob& blob);
 };

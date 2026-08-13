@@ -11,18 +11,18 @@
 #include "ImportResult.h"
 #include "FileIO/IFileParser.h"
 
- class ImportDispatcher;
- class SceneDocument2D;
- class SceneTreeDockWidget;
- class PropertiesPanelWidget;
- class SceneEditService;
- class SceneEditService3D;
+class ImportDispatcher;
+class SceneDocument2D;
+class SceneTreeDockWidget;
+class PropertiesPanelWidget;
+class SceneEditService;
+class SceneEditService3D;
 
 namespace Eg
 {
     class SceneManager;
     class SceneManager3D;
-}
+}  // namespace Eg
 
 /// 导入服务：导入操作的总入口，协调格式识别、解析、文档构建和 UI 刷新
 /// 导入流程：识别格式 → 解析 → 构建文档 → 刷新显示 → 回写状态
@@ -41,30 +41,33 @@ public:
     /// 设置场景管理器（用于清空场景等操作）
     void setSceneManager(Eg::SceneManager* sceneManager);
 
-     /// 设置 3D 场景管理器（用于导入网格图元到 3D 场景）
-     void setSceneManager3D(Eg::SceneManager3D* sceneManager3D);
+    /// 设置 3D 场景管理器（用于导入网格图元到 3D 场景）
+    void setSceneManager3D(Eg::SceneManager3D* sceneManager3D);
 
-     /// 获取 3D 场景管理器
-     Eg::SceneManager3D* sceneManager3D() const
-     {
-         return m_sceneManager3D;
-     }
+    /// 获取 3D 场景管理器
+    Eg::SceneManager3D* sceneManager3D() const
+    {
+        return m_sceneManager3D;
+    }
 
-     /// 设置 3D 场景编辑服务（用于将导入的 3D 图元通过事务写入，支持 Undo）
-     void setSceneEditService3D(SceneEditService3D* sceneEditService3D);
+    /// 设置 3D 场景编辑服务（用于将导入的 3D 图元通过事务写入，支持 Undo）
+    void setSceneEditService3D(SceneEditService3D* sceneEditService3D);
 
     /// 设置场景编辑服务（用于将导入的图元通过事务写入文档，支持 Undo）
     void setEditService(SceneEditService* editService);
 
     /// 设置忙状态回调（替代旧的 UiStateCenter 直接依赖）
     void setBusyStateCallback(std::function<void(bool)> callback);
+
     /// 获取忙状态回调（供 RAII 守卫使用）
     const std::function<void(bool)>& busyStateCallback() const
     {
         return m_busyStateCallback;
     }
+
     /// 设置状态栏提示回调（替代旧的 UiStateCenter 直接依赖）
     void setStatusPromptCallback(std::function<void(const QString&)> callback);
+
     /// 获取状态栏提示回调（供 RAII 守卫使用）
     const std::function<void(const QString&)>& statusPromptCallback() const
     {
@@ -100,23 +103,21 @@ public:
     /// @param filePath 源文件路径
     /// @param options 导入选项
     /// @return 导入结果
-    ImportResult importFile(const QString& filePath,
-        const ImportOptions& options = ImportOptions{});
+    ImportResult importFile(const QString& filePath, const ImportOptions& options = ImportOptions{});
 
-      /// 执行带完整上下文的导入
-     /// @param context 导入上下文
-     /// @param options 导入选项
-     /// @return 导入结果
-     ImportResult importWithContext(const ImportContext& context,
-         const ImportOptions& options = ImportOptions{});
+    /// 执行带完整上下文的导入
+    /// @param context 导入上下文
+    /// @param options 导入选项
+    /// @return 导入结果
+    ImportResult importWithContext(const ImportContext& context, const ImportOptions& options = ImportOptions{});
 
-     /// 执行异步导入（Phase 1-2 在后台线程，Phase 3-5 回到主线程）
-     /// @param context 导入上下文
-     /// @param options 导入选项
-     /// @param onComplete 导入完成回调（在主线程执行）
-     void importAsync(const ImportContext& context,
-         const ImportOptions& options = ImportOptions{},
-         std::function<void(const ImportResult&)> onComplete = nullptr);
+    /// 执行异步导入（Phase 1-2 在后台线程，Phase 3-5 回到主线程）
+    /// @param context 导入上下文
+    /// @param options 导入选项
+    /// @param onComplete 导入完成回调（在主线程执行）
+    void importAsync(const ImportContext& context,
+        const ImportOptions& options = ImportOptions{},
+        std::function<void(const ImportResult&)> onComplete = nullptr);
 
     /// 检查指定路径是否可导入
     bool canImport(const QString& filePath) const;
@@ -139,20 +140,17 @@ private:
     ImportResult phaseDetectFormat(ImportContext& context);
 
     /// 2：解析文件
-    ImportResult phaseParse(const ImportContext& context,
-        Fio::VecSyEntityPtr& outEntities);
+    ImportResult phaseParse(const ImportContext& context, Fio::VecSyEntityPtr& outEntities);
 
     /// 3：构建文档（将图元添加到场景）
-    ImportResult phaseBuildDocument(const ImportContext& context,
-        Fio::VecSyEntityPtr& entities, const ImportOptions& options);
+    ImportResult phaseBuildDocument(
+        const ImportContext& context, Fio::VecSyEntityPtr& entities, const ImportOptions& options);
 
     /// 4：刷新显示（工作台、视口、树、属性面板）
-    void phaseRefreshDisplay(const ImportResult& result,
-        const ImportOptions& options);
+    void phaseRefreshDisplay(const ImportResult& result, const ImportOptions& options);
 
     /// 5：回写状态（状态栏、最近文件、文档记录）
-    void phaseWriteBackState(const ImportContext& context,
-        const ImportResult& result);
+    void phaseWriteBackState(const ImportContext& context, const ImportResult& result);
 
 private:
     /// 更新进度
@@ -166,12 +164,12 @@ private:
     ImportDispatcher* m_dispatcher{ nullptr };
     /// 场景管理器（非拥有指针，用于 clearScene）
     Eg::SceneManager* m_sceneManager{ nullptr };
-     /// 3D 场景管理器（非拥有指针，用于导入网格图元）
-     Eg::SceneManager3D* m_sceneManager3D{ nullptr };
-     /// 3D 场景编辑服务（非拥有指针，用于事务化添加 3D 图元）
-     SceneEditService3D* m_sceneEditService3D{ nullptr };
-     /// 场景编辑服务（非拥有指针，用于事务化添加图元）
-     SceneEditService* m_editService{ nullptr };
+    /// 3D 场景管理器（非拥有指针，用于导入网格图元）
+    Eg::SceneManager3D* m_sceneManager3D{ nullptr };
+    /// 3D 场景编辑服务（非拥有指针，用于事务化添加 3D 图元）
+    SceneEditService3D* m_sceneEditService3D{ nullptr };
+    /// 场景编辑服务（非拥有指针，用于事务化添加图元）
+    SceneEditService* m_editService{ nullptr };
     /// 忙状态回调（替代 UiStateCenter 直接调用）
     std::function<void(bool)> m_busyStateCallback;
     /// 状态栏提示回调（替代 UiStateCenter 直接调用）

@@ -16,6 +16,7 @@
 #include "Log/SyLogger.h"
 
 RenderWidget3DAdapter::RenderWidget3DAdapter() = default;
+
 RenderWidget3DAdapter::~RenderWidget3DAdapter()
 {
     shutdown();
@@ -24,7 +25,9 @@ RenderWidget3DAdapter::~RenderWidget3DAdapter()
 bool RenderWidget3DAdapter::ensureWidgetCreated()
 {
     if (m_renderWidget)
+    {
         return true;
+    }
 
     if (!m_parentWidget)
     {
@@ -56,13 +59,14 @@ bool RenderWidget3DAdapter::ensureWidgetCreated()
 void RenderWidget3DAdapter::bindWidgetSignals()
 {
     if (!m_renderWidget)
+    {
         return;
+    }
 
     // 场景选择变化只同步到适配器，再由适配器回调上层。
     // 跨 DLL 安全：信号参数改为 POD 指针数组
-    QObject::connect(m_renderWidget.get(), &RenderWidget3D::sigSelectionChanged,
-        [this](const Eg::SyMeshEntity** entities, int count)
-        {
+    QObject::connect(
+        m_renderWidget.get(), &RenderWidget3D::sigSelectionChanged, [this](const Eg::SyMeshEntity** entities, int count) {
             if (count > 0 && entities && entities[0])
             {
                 m_selectedNodeId = QString::number(entities[0]->id);
@@ -71,12 +75,18 @@ void RenderWidget3DAdapter::bindWidgetSignals()
                 m_selectedPathNames.clear();
                 const char* name = entities[0]->name();
                 if (name && name[0] != '\0')
+                {
                     m_selectedPathNames.append(QString::fromUtf8(name));
+                }
 
                 if (m_selectionCallback)
+                {
                     m_selectionCallback(m_selectedNodeId);
+                }
                 if (m_pathCallback)
+                {
                     m_pathCallback(m_selectedPathNames);
+                }
                 emitStatus(QObject::tr("3D selected: %1").arg(m_selectedNodeId));
                 return;
             }
@@ -84,24 +94,28 @@ void RenderWidget3DAdapter::bindWidgetSignals()
             m_selectedNodeId.clear();
             m_selectedPathNames.clear();
             if (m_selectionCallback)
+            {
                 m_selectionCallback(QString());
+            }
             if (m_pathCallback)
+            {
                 m_pathCallback({});
+            }
             emitStatus(QObject::tr("3D selection cleared"));
         });
 
     // 相机变化只转发状态提示，不在这里写任何 UI 业务。
-    QObject::connect(m_renderWidget.get(), &RenderWidget3D::sigCameraChanged,
-        [this]()
-        {
-            emitStatus(m_renderWidget ? m_renderWidget->navigationStatusHint() : QStringLiteral("3D ready"));
-        });
+    QObject::connect(m_renderWidget.get(), &RenderWidget3D::sigCameraChanged, [this]() {
+        emitStatus(m_renderWidget ? m_renderWidget->navigationStatusHint() : QStringLiteral("3D ready"));
+    });
 }
 
 void RenderWidget3DAdapter::emitStatus(const QString& text)
 {
     if (m_statusCallback)
+    {
         m_statusCallback(text);
+    }
 }
 
 bool RenderWidget3DAdapter::initialize(void* windowHandle)
@@ -157,7 +171,9 @@ void RenderWidget3DAdapter::setRenderLoopEnabled(bool enabled)
 {
     m_renderLoopEnabled = enabled;
     if (m_renderWidget)
+    {
         m_renderWidget->setUpdatesEnabled(enabled);
+    }
 }
 
 bool RenderWidget3DAdapter::isRenderLoopRunning() const
@@ -168,7 +184,9 @@ bool RenderWidget3DAdapter::isRenderLoopRunning() const
 void RenderWidget3DAdapter::setScene(SceneDocument3DAdapter* document)
 {
     if (!document || !m_renderWidget)
+    {
         return;
+    }
 
     // 将 SceneDocument3DAdapter 中的 SceneManager3D 设置给 RenderWidget3D
     auto engineScene = document->engineScene();
@@ -185,7 +203,9 @@ void RenderWidget3DAdapter::setScene(SceneDocument3DAdapter* document)
 void RenderWidget3DAdapter::setCamera(CameraController3D* controller)
 {
     if (!controller || !m_renderWidget)
+    {
         return;
+    }
 
     // 将 CameraController3D 连接到 RenderWidget3D 的 Camera3D
     // 这样控制器就能真正操作相机，实现视图控制
@@ -204,19 +224,25 @@ void RenderWidget3DAdapter::render(QPainter& painter, int width, int height)
 
     // RenderWidget3D 自己在 paintGL 中绘制，这里只触发刷新。
     if (m_renderWidget)
+    {
         m_renderWidget->update();
+    }
 }
 
 void RenderWidget3DAdapter::resize(int width, int height)
 {
     if (m_renderWidget)
+    {
         m_renderWidget->resize(width, height);
+    }
 }
 
 void RenderWidget3DAdapter::resetView()
 {
     if (m_renderWidget)
+    {
         m_renderWidget->resetView();
+    }
 }
 
 void RenderWidget3DAdapter::setOrbitMode(bool enabled)
@@ -238,17 +264,23 @@ bool RenderWidget3DAdapter::isOrbitMode() const
 void RenderWidget3DAdapter::selectNodeById(const QString& nodeId)
 {
     if (!m_renderWidget || !m_sceneManager)
+    {
         return;
+    }
 
     bool ok = false;
     Eg::EntityId entityId = nodeId.toLongLong(&ok);
     if (!ok)
+    {
         return;
+    }
 
     // 通过 SceneManager3D 查找图元
     Eg::SyMeshEntity* entity = m_sceneManager->findEntityById(entityId);
     if (!entity)
+    {
         return;
+    }
 
     // 通过 SelectionManager3D 选中图元
     m_renderWidget->selectionManager().select(entity);
@@ -258,15 +290,22 @@ void RenderWidget3DAdapter::selectNodeById(const QString& nodeId)
     m_selectedPathNames.clear();
     const char* entityName = entity->name();
     if (entityName && entityName[0] != '\0')
+    {
         m_selectedPathNames.append(QString::fromUtf8(entityName));
+    }
 
     SY_INFOF("[RenderWidget3DAdapter] Selected node by ID: %s, path: %s",
-        qPrintable(nodeId), qPrintable(m_selectedPathNames.join("/")));
+        qPrintable(nodeId),
+        qPrintable(m_selectedPathNames.join("/")));
 
     if (m_selectionCallback)
+    {
         m_selectionCallback(nodeId);
+    }
     if (m_pathCallback)
+    {
         m_pathCallback(m_selectedPathNames);
+    }
     emitStatus(QObject::tr("3D selected: %1").arg(nodeId));
 }
 

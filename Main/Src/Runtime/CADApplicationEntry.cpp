@@ -9,10 +9,10 @@
 #include "VersionInfo.h"
 
 #ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+    #include <windows.h>
 #endif
 
 // 附加到父进程控制台（如 cmd/PowerShell），终端启动时 stdout/stderr/stdin 可正常收发
@@ -43,8 +43,7 @@ static void attachParentConsoleIfAny()
 static void printVersionInfo()
 {
     std::printf("%s %s\n", MainApp::appName().c_str(), MainApp::appVersion().c_str());
-    std::printf("Version: %d.%d.%d\n",
-        MainApp::versionMajor(), MainApp::versionMinor(), MainApp::versionPatch());
+    std::printf("Version: %d.%d.%d\n", MainApp::versionMajor(), MainApp::versionMinor(), MainApp::versionPatch());
     std::printf("Organization: %s\n", MainApp::organizationName().c_str());
     std::printf("Domain: %s\n", MainApp::organizationDomain().c_str());
     std::fflush(stdout);

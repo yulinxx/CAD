@@ -21,7 +21,8 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 #define LICENSE_VERSION_MAJOR 1
@@ -31,11 +32,7 @@ extern "C" {
 #define LICENSE_MAKE_VERSION(major, minor, patch) \
     (((uint32_t)(major) << 16) | ((uint32_t)(minor) << 8) | (uint32_t)(patch))
 
-#define LICENSE_VERSION \
-    LICENSE_MAKE_VERSION( \
-        LICENSE_VERSION_MAJOR, \
-        LICENSE_VERSION_MINOR, \
-        LICENSE_VERSION_PATCH)
+#define LICENSE_VERSION LICENSE_MAKE_VERSION(LICENSE_VERSION_MAJOR, LICENSE_VERSION_MINOR, LICENSE_VERSION_PATCH)
 
     typedef enum LicenseResult
     {
@@ -108,14 +105,9 @@ extern "C" {
 
     LICENSE_C_API LICENSE_API int License_Clear(LicenseContext* ctx);
 
-    LICENSE_C_API LICENSE_API int License_GetMachineCode(
-        LicenseContext* ctx,
-        char* buffer,
-        size_t bufferSize);
+    LICENSE_C_API LICENSE_API int License_GetMachineCode(LicenseContext* ctx, char* buffer, size_t bufferSize);
 
-    LICENSE_C_API LICENSE_API int License_GetInfo(
-        LicenseContext* ctx,
-        LicenseInfo* outInfo);
+    LICENSE_C_API LICENSE_API int License_GetInfo(LicenseContext* ctx, LicenseInfo* outInfo);
 
     LICENSE_C_API LICENSE_API int License_GuardMarkValid(void);
 
@@ -127,9 +119,7 @@ extern "C" {
 
     LICENSE_C_API LICENSE_API int License_GuardIsQuickValid(void);
 
-    LICENSE_C_API LICENSE_API int License_GetLastErrorMessage(
-        char* buffer,
-        size_t bufferSize);
+    LICENSE_C_API LICENSE_API int License_GetLastErrorMessage(char* buffer, size_t bufferSize);
 
 #ifdef __cplusplus
 }

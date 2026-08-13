@@ -7,8 +7,7 @@
 #include "Log/SyLogger.h"
 #include "Engine/SyEntity/SyEntity.h"
 
-ImportResult DxfImportReader::read(const ImportContext& context,
-    Fio::VecSyEntityPtr& outEntities)
+ImportResult DxfImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
 {
     SY_INFOF("[DxfImportReader] read START: path=%s", context.sourcePath.toUtf8().constData());
 
@@ -17,12 +16,13 @@ ImportResult DxfImportReader::read(const ImportContext& context,
 
     std::string pathStr = context.sourcePath.toUtf8().toStdString();
     SY_INFOF("[DxfImportReader] Calling fileIO.importFile: path=%s, format=%d",
-        pathStr.c_str(), static_cast<int>(Fio::FileFormat::DXF));
+        pathStr.c_str(),
+        static_cast<int>(Fio::FileFormat::DXF));
 
     QStringList warns;
     Fio::FileIOManager::WarningCallback warningCb = [](const char* warning, void* ctx) {
         static_cast<QStringList*>(ctx)->append(QString::fromUtf8(warning));
-        };
+    };
 
     // ===== 主链路：中立 IR 导入（parseToIR → FioEntityConverter） =====
     // FileIO 不再直接实例化 Engine 对象，IR 为跨 DLL 安全的 POD；
@@ -30,11 +30,7 @@ ImportResult DxfImportReader::read(const ImportContext& context,
     {
         Fio::FioParseResult ir;
         char irErrBuf[1024] = { 0 };
-        bool irOk = fileIO.importToIR(
-            pathStr.c_str(),
-            Fio::FileFormat::DXF,
-            &ir,
-            irErrBuf, sizeof(irErrBuf));
+        bool irOk = fileIO.importToIR(pathStr.c_str(), Fio::FileFormat::DXF, &ir, irErrBuf, sizeof(irErrBuf));
 
         if (irOk && ir.entityCount > 0)
         {
@@ -44,13 +40,14 @@ ImportResult DxfImportReader::read(const ImportContext& context,
                 outEntities.clear();
                 outEntities.reserve(converted.size());
                 for (auto& e : converted)
+                {
                     outEntities.emplace_back(std::move(e));
+                }
 
-                SY_INFOF("[DxfImportReader] IR path succeeded: entities=%zu, layers=%u",
-                    outEntities.size(), ir.layerCount);
+                SY_INFOF(
+                    "[DxfImportReader] IR path succeeded: entities=%zu, layers=%u", outEntities.size(), ir.layerCount);
 
-                return ImportResult::ok(
-                    QStringLiteral("DXF import successful"),
+                return ImportResult::ok(QStringLiteral("DXF import successful"),
                     static_cast<int>(outEntities.size()),
                     static_cast<int>(ir.layerCount),
                     warns);
@@ -67,15 +64,9 @@ ImportResult DxfImportReader::read(const ImportContext& context,
     char errBuf[1024] = { 0 };
 
     bool ok = fileIO.importFile(
-        pathStr.c_str(),
-        Fio::FileFormat::DXF,
-        &raw, &count,
-        errBuf, sizeof(errBuf),
-        warningCb, &warns,
-        &layerCount);
+        pathStr.c_str(), Fio::FileFormat::DXF, &raw, &count, errBuf, sizeof(errBuf), warningCb, &warns, &layerCount);
 
-    SY_INFOF("[DxfImportReader] fileIO.importFile returned: success=%d, entities=%zu",
-        ok ? 1 : 0, count);
+    SY_INFOF("[DxfImportReader] fileIO.importFile returned: success=%d, entities=%zu", ok ? 1 : 0, count);
 
     if (!ok)
     {
@@ -106,15 +97,13 @@ ImportResult DxfImportReader::read(const ImportContext& context,
     outEntities.clear();
     outEntities.reserve(count);
     for (size_t i = 0; i < count; ++i)
+    {
         outEntities.emplace_back(raw[i]);
+    }
     Fio::FileIOManager::freeEntityArray(raw);
 
-    SY_INFOF("[DxfImportReader] read END: success, entities=%zu, layers=%zu",
-        count, layerCount);
+    SY_INFOF("[DxfImportReader] read END: success, entities=%zu, layers=%zu", count, layerCount);
 
     return ImportResult::ok(
-        QStringLiteral("DXF import successful"),
-        static_cast<int>(count),
-        static_cast<int>(layerCount),
-        warns);
+        QStringLiteral("DXF import successful"), static_cast<int>(count), static_cast<int>(layerCount), warns);
 }

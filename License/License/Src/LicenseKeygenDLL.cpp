@@ -23,8 +23,7 @@ extern "C"
         }
     }
 
-    int LicenseKeygen_GenerateRegCode(
-        const char* machineCode,
+    int LicenseKeygen_GenerateRegCode(const char* machineCode,
         const char* expiryDate,
         const char* features,
         const char* issueDate,
@@ -45,13 +44,8 @@ extern "C"
                 return LICENSE_ERR_NULL_POINTER;
             }
 
-            const std::string regCode = KeygenTool::GenerateRegCode(
-                machineCode,
-                expiryDate,
-                features,
-                issueDate,
-                customerName,
-                privateKeyPath);
+            const std::string regCode =
+                KeygenTool::GenerateRegCode(machineCode, expiryDate, features, issueDate, customerName, privateKeyPath);
 
             if (regCode.empty())
             {

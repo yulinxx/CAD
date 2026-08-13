@@ -7,11 +7,12 @@
 #include <QDateTime>
 #include <QFileInfo>
 
-void DocumentPersistenceHelper::recordImport(PersistenceService* persistence,
-    const QString& filePath, int entityCount)
+void DocumentPersistenceHelper::recordImport(PersistenceService* persistence, const QString& filePath, int entityCount)
 {
     if (!persistence || !persistence->documents())
+    {
         return;
+    }
 
     auto existing = persistence->documents()->loadByPath(filePath.toStdString());
     QString now = QDateTime::currentDateTime().toString(Qt::ISODate);
@@ -28,11 +29,13 @@ void DocumentPersistenceHelper::recordImport(PersistenceService* persistence,
     persistence->documents()->save(dr);
 }
 
-void DocumentPersistenceHelper::recordExport(PersistenceService* persistence,
-    const std::string& filePath, int entityCount)
+void DocumentPersistenceHelper::recordExport(
+    PersistenceService* persistence, const std::string& filePath, int entityCount)
 {
     if (!persistence || !persistence->documents())
+    {
         return;
+    }
 
     auto existing = persistence->documents()->loadByPath(filePath);
     QString now = QDateTime::currentDateTime().toString(Qt::ISODate);

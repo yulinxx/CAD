@@ -15,7 +15,7 @@ public:
 
 public:
     int run();
-    void setStartWorkbenchId(const QString& workbenchId);   // 设置启动时使用的工作台ID
+    void setStartWorkbenchId(const QString& workbenchId);  // 设置启动时使用的工作台ID
 
 private:
     std::unique_ptr<QApplication> m_app;

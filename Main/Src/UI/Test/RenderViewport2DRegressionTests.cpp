@@ -42,7 +42,7 @@
 #include <algorithm>
 #include <cstring>
 
- // ==================== SceneRefreshCoordinator 完整生命周期测试 ====================
+// ==================== SceneRefreshCoordinator 完整生命周期测试 ====================
 
 TEST(RenderViewport2DRegressionTest, RefreshCoordinator_ConstructWithoutWidget)
 {
@@ -80,7 +80,7 @@ TEST(RenderViewport2DRegressionTest, RefreshCoordinator_StopTwice)
 {
     SceneRefreshCoordinator coordinator;
     coordinator.stop();
-    coordinator.stop(); // 重复停止不崩溃
+    coordinator.stop();  // 重复停止不崩溃
     SUCCEED();
 }
 
@@ -499,9 +499,9 @@ TEST(RenderViewport2DRegressionTest, Coordinator_PerfMonitorDoubleToggle)
     SceneRefreshCoordinator coordinator;
 
     coordinator.setPerfMonitorEnabled(true);
-    coordinator.setPerfMonitorEnabled(true); // 重复启用
+    coordinator.setPerfMonitorEnabled(true);  // 重复启用
     coordinator.setPerfMonitorEnabled(false);
-    coordinator.setPerfMonitorEnabled(false); // 重复禁用
+    coordinator.setPerfMonitorEnabled(false);  // 重复禁用
     coordinator.stop();
     SUCCEED();
 }
@@ -595,8 +595,8 @@ TEST(RenderViewport2DRegressionTest, Camera2D_ViewMatrixAfterPan)
     EXPECT_NE(mat[4], 0.0f);
     // 平移后视图矩阵应反映偏移（Mat3f 为列主序：平移分量在 mat[6]/mat[7]）
     // scaleX = 2*zoomX/vpW = 0.0025，tx = scaleX * panX = 0.25
-    EXPECT_NEAR(mat[6], 0.25f, 1e-4f);      // tx 分量
-    EXPECT_NEAR(mat[7], 0.1666667f, 1e-4f); // ty 分量
+    EXPECT_NEAR(mat[6], 0.25f, 1e-4f);       // tx 分量
+    EXPECT_NEAR(mat[7], 0.1666667f, 1e-4f);  // ty 分量
 }
 
 TEST(RenderViewport2DRegressionTest, Camera2D_ViewMatrixAfterZoom)
@@ -778,8 +778,9 @@ TEST(RenderViewport2DRegressionTest, SelectionChain_MultipleSelectWithMixedTypes
     scene.addEntities(std::move(entities));
 
     // 逐个选中（单选语义：selectEntity 会替换当前选择，多选走批量入口 selectEntities）
-    std::vector<Eg::SyEntity*> toSelect = { scene.findSyEntityById(idLine), scene.findSyEntityById(idCircle),
-                                            scene.findSyEntityById(idPoly) };
+    std::vector<Eg::SyEntity*> toSelect = {
+        scene.findSyEntityById(idLine), scene.findSyEntityById(idCircle), scene.findSyEntityById(idPoly)
+    };
     scene.selectEntities(toSelect);
     EXPECT_EQ(scene.getSelectedEntityCount(), 3u);
 
@@ -1013,7 +1014,7 @@ TEST(RenderViewport2DRegressionTest, InputRouter_PositionCallback)
         called = true;
         lastX = x;
         lastY = y;
-        });
+    });
     // 回调注入不崩溃
     SUCCEED();
 }
@@ -1022,7 +1023,9 @@ TEST(RenderViewport2DRegressionTest, InputRouter_StatusCallback)
 {
     ViewportInputRouter router;
     QString lastMsg;
-    router.setStatusCallback([&](const QString& msg) { lastMsg = msg; });
+    router.setStatusCallback([&](const QString& msg) {
+        lastMsg = msg;
+    });
     // 回调注入不崩溃
     SUCCEED();
 }
@@ -1100,8 +1103,8 @@ TEST(RenderViewport2DRegressionTest, InputRouter_KeyboardPriority_EnterKey)
 TEST(RenderViewport2DRegressionTest, InputRouter_MousePressNullRenderWidget)
 {
     ViewportInputRouter router;
-    QMouseEvent pressEvent(QEvent::MouseButtonPress, QPointF(0, 0), QPointF(0, 0), Qt::LeftButton, Qt::LeftButton,
-        Qt::NoModifier);
+    QMouseEvent pressEvent(
+        QEvent::MouseButtonPress, QPointF(0, 0), QPointF(0, 0), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
     // 无 RenderWidget 时不崩溃
     router.handleMousePress(&pressEvent);
     SUCCEED();
@@ -1110,8 +1113,8 @@ TEST(RenderViewport2DRegressionTest, InputRouter_MousePressNullRenderWidget)
 TEST(RenderViewport2DRegressionTest, InputRouter_MouseMoveNullRenderWidget)
 {
     ViewportInputRouter router;
-    QMouseEvent moveEvent(QEvent::MouseMove, QPointF(10, 10), QPointF(10, 10), Qt::NoButton, Qt::NoButton,
-        Qt::NoModifier);
+    QMouseEvent moveEvent(
+        QEvent::MouseMove, QPointF(10, 10), QPointF(10, 10), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
     // 无 RenderWidget 时不崩溃
     router.handleMouseMove(&moveEvent);
     SUCCEED();
@@ -1120,8 +1123,8 @@ TEST(RenderViewport2DRegressionTest, InputRouter_MouseMoveNullRenderWidget)
 TEST(RenderViewport2DRegressionTest, InputRouter_MouseReleaseNullRenderWidget)
 {
     ViewportInputRouter router;
-    QMouseEvent releaseEvent(QEvent::MouseButtonRelease, QPointF(0, 0), QPointF(0, 0), Qt::LeftButton, Qt::LeftButton,
-        Qt::NoModifier);
+    QMouseEvent releaseEvent(
+        QEvent::MouseButtonRelease, QPointF(0, 0), QPointF(0, 0), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
     // 无 RenderWidget 时不崩溃
     router.handleMouseRelease(&releaseEvent);
     SUCCEED();
@@ -1130,8 +1133,8 @@ TEST(RenderViewport2DRegressionTest, InputRouter_MouseReleaseNullRenderWidget)
 TEST(RenderViewport2DRegressionTest, InputRouter_MouseDoubleClickNullRenderWidget)
 {
     ViewportInputRouter router;
-    QMouseEvent dblClickEvent(QEvent::MouseButtonDblClick, QPointF(0, 0), QPointF(0, 0), Qt::LeftButton, Qt::LeftButton,
-        Qt::NoModifier);
+    QMouseEvent dblClickEvent(
+        QEvent::MouseButtonDblClick, QPointF(0, 0), QPointF(0, 0), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
     // 无 RenderWidget 时不崩溃
     router.handleMouseDoubleClick(&dblClickEvent);
     SUCCEED();
@@ -1182,8 +1185,8 @@ TEST(RenderViewport2DRegressionTest, InputRouter_PanModeBlocksToolDispatch)
     router.setPanModeEnabled(true);
     EXPECT_TRUE(router.isPanModeEnabled());
 
-    QMouseEvent pressEvent(QEvent::MouseButtonPress, QPointF(0, 0), QPointF(0, 0), Qt::LeftButton, Qt::LeftButton,
-        Qt::NoModifier);
+    QMouseEvent pressEvent(
+        QEvent::MouseButtonPress, QPointF(0, 0), QPointF(0, 0), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
     router.handleMousePress(&pressEvent);
     SUCCEED();
 }
@@ -1202,7 +1205,9 @@ TEST(RenderViewport2DRegressionTest, Camera2D_ViewMatrixReturnsMat3f)
     camera.computeViewMatrix(raw, 800.0f, 600.0f);
 
     for (int i = 0; i < 9; ++i)
+    {
         EXPECT_NEAR(mat.data[i], raw[i], 1e-6f);
+    }
 }
 
 TEST(RenderViewport2DRegressionTest, Camera2D_ViewMatrixZeroViewport)
@@ -1342,23 +1347,33 @@ namespace
         void visitSelectedIds(SelectedIdVisitor visitor, void* context) const override
         {
             for (const auto& id : selectedIds)
+            {
                 visitor(id.c_str(), context);
+            }
         }
 
         bool isSelected(const char* id) const override
         {
             if (!id)
+            {
                 return false;
+            }
             for (const auto& s : selectedIds)
+            {
                 if (s == id)
+                {
                     return true;
+                }
+            }
             return false;
         }
 
         void select(const char* id) override
         {
             if (!id)
+            {
                 return;
+            }
             selectedIds.clear();
             selectedIds.push_back(id);
         }
@@ -1367,14 +1382,20 @@ namespace
         {
             selectedIds.clear();
             for (size_t i = 0; i < count; ++i)
+            {
                 if (ids[i])
+                {
                     selectedIds.push_back(ids[i]);
+                }
+            }
         }
 
         void deselect(const char* id) override
         {
             if (!id)
+            {
                 return;
+            }
             selectedIds.erase(std::remove(selectedIds.begin(), selectedIds.end(), std::string(id)), selectedIds.end());
         }
 
@@ -1386,14 +1407,20 @@ namespace
         void toggle(const char* id) override
         {
             if (!id)
+            {
                 return;
+            }
             if (isSelected(id))
+            {
                 deselect(id);
+            }
             else
+            {
                 selectedIds.push_back(id);
+            }
         }
     };
-} // namespace
+}  // namespace
 
 TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectedEntityIdEmpty)
 {
@@ -1439,11 +1466,13 @@ TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectEntityByIdFiresCallb
     QString lastStatus;
     QString lastCallbackSource;
     QString lastCallbackText;
-    selector.setStatusCallback([&](const QString& s) { lastStatus = s; });
+    selector.setStatusCallback([&](const QString& s) {
+        lastStatus = s;
+    });
     selector.setSelectionCallback([&](const QString& src, const QString& t) {
         lastCallbackSource = src;
         lastCallbackText = t;
-        });
+    });
 
     selector.selectEntityById(QStringLiteral("55"));
 
@@ -1473,7 +1502,9 @@ TEST(RenderViewport2DRegressionTest, ViewportSelector_ClearSelectionFiresCallbac
     ViewportSelector selector(nullptr, &svc, &camera, nullptr);
 
     QString lastStatus;
-    selector.setStatusCallback([&](const QString& s) { lastStatus = s; });
+    selector.setStatusCallback([&](const QString& s) {
+        lastStatus = s;
+    });
 
     selector.clearSelection();
 

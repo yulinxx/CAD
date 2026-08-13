@@ -17,15 +17,15 @@ class SceneDocument3DAdapter;
  */
 class SceneBuilder3D : public UI::SceneBuilderBase
 {
-  public:
+public:
     // 返回裸指针（调用方通过 SceneBuilderBase::destroyScene 释放）
-    static SceneDocument3DAdapter *createDefaultScene(QString &rootNodeId);
+    static SceneDocument3DAdapter* createDefaultScene(QString& rootNodeId);
     static QString defaultRootNodeName();
 
     // ---- SceneBuilderBase 接口 ----
 
     // SceneBuilderBase override — 返回裸指针，由 caller 管理生命周期
     // 内部委托给静态 createDefaultScene(QString&) 完成实际构建
-    UI::SceneDocumentBase *createDefaultScene() override;
-    size_t defaultRootName(char *buffer, size_t bufferSize) const override;
+    UI::SceneDocumentBase* createDefaultScene() override;
+    size_t defaultRootName(char* buffer, size_t bufferSize) const override;
 };

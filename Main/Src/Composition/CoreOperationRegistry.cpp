@@ -14,10 +14,8 @@
 #include <QObject>
 #include <QWidget>
 
-CoreOperationRegistry::CoreOperationRegistry(OperationBus* bus,
-    SceneEditService* editService,
-    IUndoRedoManager* undoManager,
-    QWidget* parentWidget)
+CoreOperationRegistry::CoreOperationRegistry(
+    OperationBus* bus, SceneEditService* editService, IUndoRedoManager* undoManager, QWidget* parentWidget)
     : m_bus(bus)
     , m_editService(editService)
     , m_undoManager(undoManager)
@@ -28,7 +26,9 @@ CoreOperationRegistry::CoreOperationRegistry(OperationBus* bus,
 void CoreOperationRegistry::registerAll()
 {
     if (!m_bus || !m_editService || !m_undoManager)
+    {
         return;
+    }
 
     auto& reg = m_bus->registry();
     auto* editService = m_editService;
@@ -37,23 +37,29 @@ void CoreOperationRegistry::registerAll()
     // ---- 撤销/重做 ----
     reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Undo, [undoManager] {
         if (undoManager && undoManager->canUndo())
+        {
             undoManager->undo();
-        }));
+        }
+    }));
 
     reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Redo, [undoManager] {
         if (undoManager && undoManager->canRedo())
+        {
             undoManager->redo();
-        }));
+        }
+    }));
 
     // ---- 删除 ----
     reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Delete, [editService] {
         if (editService)
+        {
             editService->deleteSelected("Delete");
-        }));
+        }
+    }));
 
     // ---- 圆角 ----
-    reg.registerOperation(std::make_unique<ParamLambdaOperation>(
-        OperationId::Edit_Fillet, [editService](const QVariantMap& params) {
+    reg.registerOperation(
+        std::make_unique<ParamLambdaOperation>(OperationId::Edit_Fillet, [editService](const QVariantMap& params) {
             double radius = params.value("radius", -1.0).toDouble();
             if (radius < 0.0)
             {
@@ -65,18 +71,20 @@ void CoreOperationRegistry::registerAll()
                 }
 
                 bool ok = false;
-                radius = HelpDialogService::getDouble(nullptr, QObject::tr("Fillet Radius"), QObject::tr("Radius:"),
-                    5.0, 0.1, 10000.0, 2, &ok);
+                radius = HelpDialogService::getDouble(
+                    nullptr, QObject::tr("Fillet Radius"), QObject::tr("Radius:"), 5.0, 0.1, 10000.0, 2, &ok);
 
                 if (!ok || radius < 0.1)
+                {
                     return;
+                }
             }
             Eg::FilletChamfer::applyFillet(*editService, radius);
         }));
 
     // ---- 倒角 ----
-    reg.registerOperation(std::make_unique<ParamLambdaOperation>(
-        OperationId::Edit_Chamfer, [editService](const QVariantMap& params) {
+    reg.registerOperation(
+        std::make_unique<ParamLambdaOperation>(OperationId::Edit_Chamfer, [editService](const QVariantMap& params) {
             double distance = params.value("distance", -1.0).toDouble();
             if (distance < 0.0)
             {
@@ -87,10 +95,12 @@ void CoreOperationRegistry::registerAll()
                     return;
                 }
                 bool ok = false;
-                distance = HelpDialogService::getDouble(nullptr, QObject::tr("Chamfer Distance"),
-                    QObject::tr("Distance:"), 5.0, 0.1, 10000.0, 2, &ok);
+                distance = HelpDialogService::getDouble(
+                    nullptr, QObject::tr("Chamfer Distance"), QObject::tr("Distance:"), 5.0, 0.1, 10000.0, 2, &ok);
                 if (!ok || distance < 0.1)
+                {
                     return;
+                }
             }
             Eg::FilletChamfer::applyChamfer(*editService, distance);
         }));
@@ -105,14 +115,17 @@ void CoreOperationRegistry::registerAll()
 void CoreOperationRegistry::registerHelpOperations()
 {
     if (!m_bus)
+    {
         return;
+    }
 
     auto& reg = m_bus->registry();
     QWidget* parentWidget = m_parentWidget;
 
     // ---- Help: About ----
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::Help_About, [parentWidget] { HelpDialogService::showAboutDialog(parentWidget); }));
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Help_About, [parentWidget] {
+        HelpDialogService::showAboutDialog(parentWidget);
+    }));
 
     // ---- Help: Settings ----
     reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Help_Settings, [parentWidget] {
@@ -121,23 +134,29 @@ void CoreOperationRegistry::registerHelpOperations()
         auto* window = qobject_cast<WorkbenchWindow*>(parentWidget);
         UiWorkbench* activeWb = window ? window->currentWorkbench() : nullptr;
         if (activeWb && activeWb->showSettingsDialog(parentWidget))
+        {
             return;
+        }
         HelpDialogService::showSettingsDialog(parentWidget);
     }));
 
     // ---- Help: Documentation ----
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::Help_Docs, [parentWidget] { HelpDialogService::showDocumentationDialog(parentWidget); }));
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Help_Docs, [parentWidget] {
+        HelpDialogService::showDocumentationDialog(parentWidget);
+    }));
 
     // ---- Help: Keyboard Shortcuts ----
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::Help_Shortcut, [parentWidget] { HelpDialogService::showShortcutsDialog(parentWidget); }));
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Help_Shortcut, [parentWidget] {
+        HelpDialogService::showShortcutsDialog(parentWidget);
+    }));
 }
 
 void CoreOperationRegistry::registerEditOperations()
 {
     if (!m_bus)
+    {
         return;
+    }
 
     auto& reg = m_bus->registry();
 

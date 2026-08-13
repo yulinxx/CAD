@@ -26,18 +26,27 @@ namespace
     class ScopedFrameTimer
     {
     public:
-        explicit ScopedFrameTimer(FrameTimer* timer) : m_timer(timer)
+        explicit ScopedFrameTimer(FrameTimer* timer)
+            : m_timer(timer)
         {
-            if (m_timer) m_timer->beginFrame();
+            if (m_timer)
+            {
+                m_timer->beginFrame();
+            }
         }
+
         ~ScopedFrameTimer()
         {
-            if (m_timer) m_timer->endFrame();
+            if (m_timer)
+            {
+                m_timer->endFrame();
+            }
         }
+
     private:
         FrameTimer* m_timer;
     };
-}
+}  // namespace
 
 SceneRefreshCoordinator::SceneRefreshCoordinator(QObject* parent)
     : QObject(parent)
@@ -62,16 +71,22 @@ void SceneRefreshCoordinator::setSceneManager(Eg::SceneManager* sm)
 {
     // P5: 观察者注册收敛 — 切换 SceneManager 时自动注销旧观察者、注册新观察者
     if (m_sceneManager)
+    {
         m_sceneManager->removeObserver(this);
+    }
     m_sceneManager = sm;
     if (m_sceneManager)
+    {
         m_sceneManager->addObserver(this);
+    }
 }
 
 void SceneRefreshCoordinator::stop()
 {
     if (m_sceneUpdateTimer)
+    {
         m_sceneUpdateTimer->stop();
+    }
     // P5: 观察者注销 — 在 stop() 中统一处理，避免析构时 SceneManager 已销毁（UAF）
     if (m_sceneManager)
     {
@@ -90,7 +105,9 @@ void SceneRefreshCoordinator::setPerfMonitorEnabled(bool enabled)
     else if (!enabled && m_frameTimer)
     {
         if (m_frameTimer->frameCount() > 0)
+        {
             m_frameTimer->report();
+        }
         m_frameTimer.reset();
         SY_INFO("[SceneRefreshCoordinator] 帧性能监控已禁用");
     }
@@ -100,27 +117,39 @@ void SceneRefreshCoordinator::setPerfMonitorEnabled(bool enabled)
 void SceneRefreshCoordinator::scheduleSceneUpdate()
 {
     if (m_refreshLevel < RefreshLevel::LightUpdate)
+    {
         m_refreshLevel = RefreshLevel::LightUpdate;
+    }
     if (m_sceneUpdateTimer && !m_sceneUpdateTimer->isActive())
+    {
         m_sceneUpdateTimer->start();
+    }
 }
 
 void SceneRefreshCoordinator::requestRepaint()
 {
     // 纯视觉刷新：仅调用 update()，不启动定时器，不触碰渲染数据
     if (m_refreshLevel < RefreshLevel::Repaint)
+    {
         m_refreshLevel = RefreshLevel::Repaint;
+    }
     if (m_renderWidget)
+    {
         m_renderWidget->update();
+    }
     SY_TRACE("[SceneRefreshCoordinator] requestRepaint: 纯视觉刷新");
 }
 
 void SceneRefreshCoordinator::scheduleFullRefresh()
 {
     if (m_sceneUpdateTimer && !m_sceneUpdateTimer->isActive())
+    {
         m_sceneUpdateTimer->start();
+    }
     else if (!m_sceneUpdateTimer)
+    {
         updateSceneRender();
+    }
 }
 
 void SceneRefreshCoordinator::requestLightRefresh()
@@ -128,9 +157,13 @@ void SceneRefreshCoordinator::requestLightRefresh()
     // 增量刷新：通过定时器合并，收集脏 ID 后增量提交
     // 如果当前已经是 FullRefresh，不降级
     if (m_refreshLevel < RefreshLevel::LightUpdate)
+    {
         m_refreshLevel = RefreshLevel::LightUpdate;
+    }
     if (m_sceneUpdateTimer && !m_sceneUpdateTimer->isActive())
+    {
         m_sceneUpdateTimer->start();
+    }
     SY_TRACE("[SceneRefreshCoordinator] requestLightRefresh: 增量刷新");
 }
 
@@ -150,13 +183,18 @@ void SceneRefreshCoordinator::onSceneChanged()
     if (m_sceneManager)
     {
         for (auto id : m_sceneManager->dirtyEntities())
+        {
             m_pendingDirtyIds.insert(id);
+        }
         for (auto id : m_sceneManager->deletedEntityIds())
+        {
             m_pendingDeletedIds.insert(id);
+        }
     }
     scheduleSceneUpdate();
     SY_TRACEF("[SceneRefreshCoordinator] onSceneChanged: dirty=%zu, deleted=%zu",
-        m_pendingDirtyIds.size(), m_pendingDeletedIds.size());
+        m_pendingDirtyIds.size(),
+        m_pendingDeletedIds.size());
 }
 
 void SceneRefreshCoordinator::onSelectionChanged()
@@ -169,13 +207,17 @@ void SceneRefreshCoordinator::onSelectionChanged()
 void SceneRefreshCoordinator::applyRepaintRefresh()
 {
     if (m_renderWidget)
+    {
         m_renderWidget->update();
+    }
 }
 
 void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
 {
     if (!m_renderWidget || !sm)
+    {
         return;
+    }
 
     for (auto id : m_pendingDeletedIds)
     {
@@ -188,11 +230,15 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     {
         auto* entity = sm->findEntityById(id);
         if (!entity)
+        {
             continue;
+        }
 
         // 位图（SyImage）不走折线/线框顶点路径，统一由 reconcileBitmaps 处理
         if (entity->eType == Eg::EType::IMAGE)
+        {
             continue;
+        }
 
         std::vector<render::VertexP3C3> vertices;
         render::PrimitiveType primType;
@@ -232,7 +278,9 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
 void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
 {
     if (!m_renderWidget || !sm)
+    {
         return;
+    }
 
     // 全量重建时清空曲线离散化缓存，避免持有已删除实体的旧数据
     clearEntityVertexCache();
@@ -243,7 +291,9 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     for (auto* e : allEntities)
     {
         if (e && e->visible() && (!e->layer() || e->layer()->isVisible()))
+        {
             m_renderedEntityIds.insert(static_cast<uint64_t>(e->id));
+        }
     }
 
     // 位图层全量协调：submitSceneFromDataSource 内部 renderBeginScene 已清空 GPU 位图，
@@ -254,7 +304,9 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
 void SceneRefreshCoordinator::reconcileBitmaps(Eg::SceneManager* sm, bool fullReconcile)
 {
     if (!m_renderWidget || !sm)
+    {
         return;
+    }
 
     if (fullReconcile)
     {
@@ -268,9 +320,13 @@ void SceneRefreshCoordinator::reconcileBitmaps(Eg::SceneManager* sm, bool fullRe
     for (auto* e : sm->getAllEntities())
     {
         if (!e || e->eType != Eg::EType::IMAGE || !e->visible())
+        {
             continue;
+        }
         if (e->layer() && !e->layer()->isVisible())
+        {
             continue;
+        }
         desired.insert(static_cast<uint64_t>(e->id));
     }
 
@@ -295,11 +351,15 @@ void SceneRefreshCoordinator::reconcileBitmaps(Eg::SceneManager* sm, bool fullRe
         const bool isNew = m_bitmapImageIds.count(id) == 0;
         const bool isDirty = m_pendingDirtyIds.count(id) > 0;
         if (!isNew && !isDirty)
+        {
             continue;
+        }
 
         auto* e = sm->findEntityById(static_cast<Eg::EntityId>(id));
         if (!e)
+        {
             continue;
+        }
 
         // 无像素数据的 SyImage 不纳入位图层（移除残留，且不记入账本）
         const auto* image = static_cast<const Eg::SyImage*>(e);
@@ -319,12 +379,16 @@ void SceneRefreshCoordinator::reconcileBitmaps(Eg::SceneManager* sm, bool fullRe
 void SceneRefreshCoordinator::updateSceneRender()
 {
     if (!m_renderWidget || m_refreshLevel == RefreshLevel::None)
+    {
         return;
+    }
 
     if (!m_renderWidget->isInitialized())
     {
         if (m_sceneUpdateTimer && !m_sceneUpdateTimer->isActive())
+        {
             m_sceneUpdateTimer->start();
+        }
         return;
     }
 
@@ -336,7 +400,9 @@ void SceneRefreshCoordinator::updateSceneRender()
 
     auto* sm = m_sceneManager;
     if (!sm)
+    {
         return;
+    }
 
     if (level == RefreshLevel::Repaint)
     {
@@ -348,11 +414,15 @@ void SceneRefreshCoordinator::updateSceneRender()
     // 会通过 m_pendingFullRefreshFallback 自动回退到 applyFullRefresh，
     // 因此此处无需对 LightUpdate 再做全量处理
     if (level == RefreshLevel::LightUpdate)
+    {
         applyLightRefresh(sm);
+    }
 
     // 仅显式 FullRefresh 级别走此分支，避免与 LightUpdate 的内部回退重复执行
     if (level >= RefreshLevel::FullRefresh)
+    {
         applyFullRefresh(sm);
+    }
 
     sm->markClean();
     m_pendingDirtyIds.clear();

@@ -22,7 +22,9 @@ PendingOperationRegistry::PendingOperationRegistry(OperationBus* bus)
 void PendingOperationRegistry::registerAll()
 {
     if (!m_bus)
+    {
         return;
+    }
 
     auto& reg = m_bus->registry();
     int totalRegistered = 0;
@@ -69,32 +71,28 @@ void PendingOperationRegistry::registerAll()
         OperationId::View_SetDisplayUnit,
     };
 
-    auto registerPlaceholders = [&reg, &totalRegistered](
-        const OperationId* ops, size_t count, const char* category) {
-            int registered = 0;
-            for (size_t i = 0; i < count; ++i)
+    auto registerPlaceholders = [&reg, &totalRegistered](const OperationId* ops, size_t count, const char* category) {
+        int registered = 0;
+        for (size_t i = 0; i < count; ++i)
+        {
+            if (!reg.has(ops[i]))
             {
-                if (!reg.has(ops[i]))
-                {
-                    reg.registerOperation(std::make_unique<LambdaOperation>(
-                        ops[i], [opId = ops[i], category] {
-                            SY_WARNF("[PendingOp] %s: OperationId=%d not yet implemented",
-                                category, static_cast<int>(opId));
-                        }));
-                    ++registered;
-                }
+                reg.registerOperation(std::make_unique<LambdaOperation>(ops[i], [opId = ops[i], category] {
+                    SY_WARNF("[PendingOp] %s: OperationId=%d not yet implemented", category, static_cast<int>(opId));
+                }));
+                ++registered;
             }
-            if (registered > 0)
-            {
-                SY_INFOF("[Composition] Registered %d placeholder operations for %s", registered, category);
-                totalRegistered += registered;
-            }
-        };
+        }
+        if (registered > 0)
+        {
+            SY_INFOF("[Composition] Registered %d placeholder operations for %s", registered, category);
+            totalRegistered += registered;
+        }
+    };
 
     registerPlaceholders(algoOps, std::size(algoOps), "Algorithm");
     registerPlaceholders(editOps, std::size(editOps), "Edit");
     registerPlaceholders(viewOps, std::size(viewOps), "View");
 
-    SY_INFOF("[Composition] Total %d placeholder operations registered across all categories",
-        totalRegistered);
+    SY_INFOF("[Composition] Total %d placeholder operations registered across all categories", totalRegistered);
 }

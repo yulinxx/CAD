@@ -41,8 +41,7 @@ public:
     bool updateColor(const std::string& documentId, int layerId, const std::string& color);
 
     /// 批量更新图层顺序（在一个事务中完成）
-    bool batchUpdateOrder(const std::string& documentId,
-        const std::vector<std::pair<int, int>>& layerIdAndOrders);
+    bool batchUpdateOrder(const std::string& documentId, const std::vector<std::pair<int, int>>& layerIdAndOrders);
 
     const std::string& lastError() const;
 

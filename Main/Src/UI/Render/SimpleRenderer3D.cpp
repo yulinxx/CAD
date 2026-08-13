@@ -6,7 +6,7 @@
 
 #include "UiEntities.h"
 #include "Engine/Scene/SceneGeometryCollector.h"  // 统一渲染数据源收集器
-#include "Engine/Scene/SceneRenderContract.h"      // ISceneDataSource 接口
+#include "Engine/Scene/SceneRenderContract.h"     // ISceneDataSource 接口
 
 namespace
 {
@@ -14,7 +14,7 @@ namespace
     constexpr double kAxisLength = 3.0;
     constexpr double kCubeHalfSize = 1.0;
     constexpr double kNodeHalfSize = 0.3;
-}
+}  // namespace
 
 SimpleRenderer3D::SimpleRenderer3D() = default;
 SimpleRenderer3D::~SimpleRenderer3D() = default;
@@ -120,11 +120,7 @@ void SimpleRenderer3D::render(QPainter& painter, int width, int height)
 
 void SimpleRenderer3D::drawAxes(QPainter& painter)
 {
-    const QColor axisColors[3] = {
-        QColor(220, 80, 80),
-        QColor(80, 220, 120),
-        QColor(80, 140, 255)
-    };
+    const QColor axisColors[3] = { QColor(220, 80, 80), QColor(80, 220, 120), QColor(80, 140, 255) };
     const QString axisLabels[3] = { QStringLiteral("X"), QStringLiteral("Y"), QStringLiteral("Z") };
 
     for (int axis = 0; axis < 3; ++axis)
@@ -134,8 +130,14 @@ void SimpleRenderer3D::drawAxes(QPainter& painter)
         end[axis] = static_cast<float>(kAxisLength);
 
         int sx0, sy0, sx1, sy1;
-        if (!project(start[0], start[1], start[2], sx0, sy0)) continue;
-        if (!project(end[0], end[1], end[2], sx1, sy1)) continue;
+        if (!project(start[0], start[1], start[2], sx0, sy0))
+        {
+            continue;
+        }
+        if (!project(end[0], end[1], end[2], sx1, sy1))
+        {
+            continue;
+        }
 
         painter.setPen(QPen(axisColors[axis], 2));
         painter.drawLine(sx0, sy0, sx1, sy1);
@@ -148,17 +150,17 @@ void SimpleRenderer3D::drawAxes(QPainter& painter)
 void SimpleRenderer3D::drawWireCube(QPainter& painter, float cx, float cy, float cz, float halfSize)
 {
     const float hs = halfSize;
-    const float verts[8][3] = {
-        {cx - hs, cy - hs, cz - hs}, {cx + hs, cy - hs, cz - hs},
-        {cx + hs, cy + hs, cz - hs}, {cx - hs, cy + hs, cz - hs},
-        {cx - hs, cy - hs, cz + hs}, {cx + hs, cy - hs, cz + hs},
-        {cx + hs, cy + hs, cz + hs}, {cx - hs, cy + hs, cz + hs}
-    };
+    const float verts[8][3] = { { cx - hs, cy - hs, cz - hs },
+        { cx + hs, cy - hs, cz - hs },
+        { cx + hs, cy + hs, cz - hs },
+        { cx - hs, cy + hs, cz - hs },
+        { cx - hs, cy - hs, cz + hs },
+        { cx + hs, cy - hs, cz + hs },
+        { cx + hs, cy + hs, cz + hs },
+        { cx - hs, cy + hs, cz + hs } };
 
     const int edges[12][2] = {
-        {0,1}, {1,2}, {2,3}, {3,0},
-        {4,5}, {5,6}, {6,7}, {7,4},
-        {0,4}, {1,5}, {2,6}, {3,7}
+        { 0, 1 }, { 1, 2 }, { 2, 3 }, { 3, 0 }, { 4, 5 }, { 5, 6 }, { 6, 7 }, { 7, 4 }, { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 }
     };
 
     painter.setPen(QPen(QColor(180, 200, 220), 1));
@@ -166,8 +168,14 @@ void SimpleRenderer3D::drawWireCube(QPainter& painter, float cx, float cy, float
     for (const auto& edge : edges)
     {
         int sx0, sy0, sx1, sy1;
-        if (!project(verts[edge[0]][0], verts[edge[0]][1], verts[edge[0]][2], sx0, sy0)) continue;
-        if (!project(verts[edge[1]][0], verts[edge[1]][1], verts[edge[1]][2], sx1, sy1)) continue;
+        if (!project(verts[edge[0]][0], verts[edge[0]][1], verts[edge[0]][2], sx0, sy0))
+        {
+            continue;
+        }
+        if (!project(verts[edge[1]][0], verts[edge[1]][1], verts[edge[1]][2], sx1, sy1))
+        {
+            continue;
+        }
         painter.drawLine(sx0, sy0, sx1, sy1);
     }
 }
@@ -175,7 +183,9 @@ void SimpleRenderer3D::drawWireCube(QPainter& painter, float cx, float cy, float
 void SimpleRenderer3D::drawSceneNodes(QPainter& painter)
 {
     if (!m_document)
+    {
         return;
+    }
 
     const auto engineScene = m_document->engineScene();
     if (engineScene)
@@ -186,15 +196,19 @@ void SimpleRenderer3D::drawSceneNodes(QPainter& painter)
 
         const auto& bboxes = collector.bboxes();
         if (bboxes.empty())
+        {
             return;
+        }
 
         // 获取选中图元 ID 集合，用于高亮渲染
         std::unordered_set<uint64_t> selectedSet;
-        engineScene->forEachSelectedEntityId([](Eg::EntityId eid, void* ctx) -> bool {
-            auto* set = static_cast<std::unordered_set<uint64_t>*>(ctx);
-            set->insert(eid);
-            return true;
-            }, &selectedSet);
+        engineScene->forEachSelectedEntityId(
+            [](Eg::EntityId eid, void* ctx) -> bool {
+                auto* set = static_cast<std::unordered_set<uint64_t>*>(ctx);
+                set->insert(eid);
+                return true;
+            },
+            &selectedSet);
 
         for (const auto& item : bboxes)
         {
@@ -213,9 +227,8 @@ void SimpleRenderer3D::drawSceneNodes(QPainter& painter)
                 // 通过 ISceneDataSource 统一接口查询图元名称
                 char nameBuf[128] = {};
                 size_t nameLen = engineScene->entityName(item.entityId, nameBuf, sizeof(nameBuf));
-                const auto displayName = (nameLen > 0)
-                    ? QString::fromUtf8(nameBuf)
-                    : QStringLiteral("Entity #%1").arg(item.entityId);
+                const auto displayName =
+                    (nameLen > 0) ? QString::fromUtf8(nameBuf) : QStringLiteral("Entity #%1").arg(item.entityId);
                 painter.setPen(color);
                 painter.drawText(sx - 20, sy, 40, 16, Qt::AlignCenter, displayName);
             }
@@ -230,7 +243,9 @@ void SimpleRenderer3D::drawSceneNodes(QPainter& painter)
     {
         auto node = std::dynamic_pointer_cast<SceneNode>(entity);
         if (!node)
+        {
             continue;
+        }
 
         const float angle = static_cast<float>(nodeIndex) * 0.8f;
         const float radius = 3.0f;
@@ -258,7 +273,9 @@ void SimpleRenderer3D::drawSceneNodes(QPainter& painter)
 void SimpleRenderer3D::drawNodePathOverlay(QPainter& painter)
 {
     if (m_selectedNodeId.isEmpty() || m_selectedPathNames.isEmpty())
+    {
         return;
+    }
 
     const QString pathText = QObject::tr("Path: ") + m_selectedPathNames.join(QObject::tr(" / "));
     const QString nodeText = QObject::tr("Node: ") + m_selectedNodeId;
@@ -289,18 +306,26 @@ void SimpleRenderer3D::onMousePress(int x, int y, int button, int modifiers, int
     m_camera.onMousePress(x, y, button, modifiers, viewW, viewH);
 
     if (m_camera.isRotating())
+    {
         emitStatus(QObject::tr("3D orbit"));
+    }
     else if (m_camera.isPanning())
+    {
         emitStatus(QObject::tr("3D pan"));
+    }
 }
 
 void SimpleRenderer3D::onMouseMove(int x, int y, int buttons, int viewW, int viewH)
 {
     m_camera.onMouseMove(x, y, buttons, viewW, viewH);
     if (m_camera.isRotating())
+    {
         emitStatus(QObject::tr("3D orbiting"));
+    }
     else if (m_camera.isPanning())
+    {
         emitStatus(QObject::tr("3D panning"));
+    }
 }
 
 void SimpleRenderer3D::onMouseRelease(int x, int y, int button, int viewW, int viewH)
@@ -342,7 +367,9 @@ void SimpleRenderer3D::selectNodeById(const QString& nodeId)
 
             engineScene->clearSelection();
             if (entity)
+            {
                 engineScene->selectEntity(entity);
+            }
         }
         else if (auto entity = m_document->nodeById(nodeId.toStdString()))
         {
@@ -353,11 +380,17 @@ void SimpleRenderer3D::selectNodeById(const QString& nodeId)
     rebuildTreeHighlight();
 
     if (m_selectionCallback)
+    {
         m_selectionCallback(nodeId);
+    }
     if (m_pathCallback)
+    {
         m_pathCallback(m_selectedPathNames);
+    }
     if (m_statusCallback)
+    {
         m_statusCallback(QObject::tr("3D selected: %1").arg(nodeId));
+    }
 }
 
 QString SimpleRenderer3D::selectedNodeId() const
@@ -392,13 +425,17 @@ void SimpleRenderer3D::setPathCallback(PathCallback callback)
 void SimpleRenderer3D::emitStatus(const QString& text)
 {
     if (m_statusCallback)
+    {
         m_statusCallback(text);
+    }
 }
 
 QString SimpleRenderer3D::hitTest(int screenX, int screenY) const
 {
     if (!m_document)
+    {
         return {};
+    }
 
     const auto engineScene = m_document->engineScene();
     if (engineScene)
@@ -417,7 +454,9 @@ QString SimpleRenderer3D::hitTest(int screenX, int screenY) const
 
             int sx, sy;
             if (!project(center.x(), center.y(), center.z(), sx, sy))
+            {
                 continue;
+            }
 
             const double dx = screenX - sx;
             const double dy = screenY - sy;
@@ -441,7 +480,9 @@ QString SimpleRenderer3D::hitTest(int screenX, int screenY) const
     {
         auto node = std::dynamic_pointer_cast<SceneNode>(entity);
         if (!node)
+        {
             continue;
+        }
 
         const float angle = static_cast<float>(nodeIndex) * 0.8f;
         const float radius = 3.0f;
@@ -477,7 +518,9 @@ void SimpleRenderer3D::rebuildTreeHighlight()
     m_selectedPathNames.clear();
 
     if (!m_document || m_selectedNodeId.isEmpty())
+    {
         return;
+    }
 
     const auto engineScene = m_document->engineScene();
     if (engineScene)
@@ -499,15 +542,23 @@ void SimpleRenderer3D::rebuildTreeHighlight()
     {
         const auto node = m_document->nodeById(m_selectedNodeId.toStdString());
         if (!node)
+        {
             return;
+        }
 
         const auto names = node->pathNamesRecursive();
         for (const auto& name : names)
+        {
             m_selectedPathNames.append(QString::fromStdString(name));
+        }
     }
 
     if (m_pathCallback)
+    {
         m_pathCallback(m_selectedPathNames);
+    }
     if (m_statusCallback)
+    {
         m_statusCallback(QObject::tr("3D path: %1").arg(m_selectedPathNames.join(QObject::tr(" / "))));
+    }
 }

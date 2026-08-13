@@ -13,7 +13,11 @@ public:
     virtual bool Verify(const LicenseInfoData& info) = 0;
     virtual bool IsAvailable() const = 0;
     virtual const char* GetName() const = 0;
-    virtual bool IsRequired() const { return false; }
+
+    virtual bool IsRequired() const
+    {
+        return false;
+    }
 };
 
 struct LicenseInfoData

@@ -7,7 +7,7 @@
 #include <QProgressBar>
 
 #ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
-#include <memory>
+    #include <memory>
 #endif
 
 class QDockWidget;
@@ -111,14 +111,31 @@ public:
 
     // ==================== 数据访问 ====================
 
-    PanelState& panelState() { return m_panelState; }
-    const PanelState& panelState() const { return m_panelState; }
+    PanelState& panelState()
+    {
+        return m_panelState;
+    }
 
-    const std::vector<QDockWidget*>& registeredDocks() const { return m_registeredDocks; }
-    const std::vector<QToolBar*>& registeredToolBars() const { return m_registeredToolBars; }
+    const PanelState& panelState() const
+    {
+        return m_panelState;
+    }
+
+    const std::vector<QDockWidget*>& registeredDocks() const
+    {
+        return m_registeredDocks;
+    }
+
+    const std::vector<QToolBar*>& registeredToolBars() const
+    {
+        return m_registeredToolBars;
+    }
 
     /// 获取繁忙进度条指针（供 WorkbenchWindow 清理时使用）
-    QProgressBar* busyProgressBar() const { return m_busyProgressBar; }
+    QProgressBar* busyProgressBar() const
+    {
+        return m_busyProgressBar;
+    }
 
 private:
     QMainWindow* m_parent;

@@ -24,8 +24,7 @@ public:
     /// @param context 导入上下文
     /// @param outEntities 输出：导入的图元列表
     /// @return 导入结果
-    ImportResult dispatch(const ImportContext& context,
-        Fio::VecSyEntityPtr& outEntities);
+    ImportResult dispatch(const ImportContext& context, Fio::VecSyEntityPtr& outEntities);
 
     /// 根据文件扩展名推断格式
     static Fio::FileFormat detectFormat(const QString& filePath);

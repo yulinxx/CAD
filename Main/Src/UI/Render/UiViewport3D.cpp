@@ -56,44 +56,58 @@ void Viewport3D::setRenderer(std::unique_ptr<IRenderer3D> renderer)
     }
     m_renderer = std::move(renderer);
     if (m_renderer)
+    {
         m_renderer->initialize(static_cast<void*>(this));
+    }
 }
 
 bool Viewport3D::initialize(void* windowHandle)
 {
     if (m_renderer)
+    {
         return m_renderer->initialize(windowHandle);
+    }
     return false;
 }
 
 void Viewport3D::setStatusCallback(std::function<void(const QString&)> callback)
 {
     if (m_renderer)
+    {
         m_renderer->setStatusCallback(std::move(callback));
+    }
 }
 
 void Viewport3D::setSceneDocument(SceneDocument3DAdapter* document)
 {
     if (m_renderer)
+    {
         m_renderer->setScene(document);
+    }
 }
 
 void Viewport3D::setCameraController(CameraController3D* controller)
 {
     if (m_renderer)
+    {
         m_renderer->setCamera(controller);
+    }
 }
 
 void Viewport3D::setSelectionCallback(std::function<void(const QString&)> callback)
 {
     if (m_renderer)
+    {
         m_renderer->setSelectionCallback(std::move(callback));
+    }
 }
 
 void Viewport3D::setPathCallback(std::function<void(const QStringList&)> callback)
 {
     if (m_renderer)
+    {
         m_renderer->setPathCallback(std::move(callback));
+    }
 }
 
 void Viewport3D::setInputHandler(std::function<bool(QEvent* event)> handler)
@@ -104,20 +118,26 @@ void Viewport3D::setInputHandler(std::function<bool(QEvent* event)> handler)
 void Viewport3D::resetCamera()
 {
     if (m_renderer)
+    {
         m_renderer->resetView();
+    }
     update();
 }
 
 void Viewport3D::setOrbitMode(bool enabled)
 {
     if (m_renderer)
+    {
         m_renderer->setOrbitMode(enabled);
+    }
 }
 
 void Viewport3D::setMeasureMode(bool enabled)
 {
     if (m_renderer)
+    {
         m_renderer->setMeasureMode(enabled);
+    }
 }
 
 QString Viewport3D::selectedNodeId() const
@@ -128,7 +148,9 @@ QString Viewport3D::selectedNodeId() const
 void Viewport3D::selectNodeById(const QString& nodeId)
 {
     if (m_renderer)
+    {
         m_renderer->selectNodeById(nodeId);
+    }
     update();
 }
 
@@ -205,11 +227,15 @@ void Viewport3D::paintEvent(QPaintEvent* event)
 {
     Q_UNUSED(event);
     if (isUsingOpenGL())
+    {
         return;
+    }
 
     QPainter painter(this);
     if (m_renderer)
+    {
         m_renderer->render(painter, width(), height());
+    }
 }
 
 void Viewport3D::contextMenuEvent(QContextMenuEvent* event)
@@ -227,5 +253,7 @@ void Viewport3D::resizeEvent(QResizeEvent* event)
 {
     QWidget::resizeEvent(event);
     if (m_renderer)
+    {
         m_renderer->resize(width(), height());
+    }
 }

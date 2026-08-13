@@ -11,13 +11,13 @@
  */
 struct DocumentRecord
 {
-    int id{ 0 };                    // 自增主键
-    std::string filePath;           // 文件完整路径
-    std::string title;              // 文件标题（不含路径）
-    std::string format;             // 文件格式（如 DXF, SVG, SY）
-    int entityCount{ 0 };           // 文件中图元数量
-    std::string fileSize;           // 文件大小（格式化字符串）
-    std::string lastOpenedAt;       // 最后打开时间（ISO 8601 格式）
-    std::string lastSavedAt;        // 最后保存时间（ISO 8601 格式）
-    std::string createdAt;          // 创建时间（ISO 8601 格式）
+    int id{ 0 };               // 自增主键
+    std::string filePath;      // 文件完整路径
+    std::string title;         // 文件标题（不含路径）
+    std::string format;        // 文件格式（如 DXF, SVG, SY）
+    int entityCount{ 0 };      // 文件中图元数量
+    std::string fileSize;      // 文件大小（格式化字符串）
+    std::string lastOpenedAt;  // 最后打开时间（ISO 8601 格式）
+    std::string lastSavedAt;   // 最后保存时间（ISO 8601 格式）
+    std::string createdAt;     // 创建时间（ISO 8601 格式）
 };

@@ -22,7 +22,6 @@ class WorkbenchWindow;
 class UiShellHost
 {
 public:
-
     UiShellHost();
     ~UiShellHost();
 

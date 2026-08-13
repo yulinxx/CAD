@@ -23,12 +23,13 @@ public:
     explicit SettingsRepository(Eg::Database& database);
 
     /// 读取单个设置值
-    std::string loadValue(const std::string& groupName, const std::string& key,
-        const std::string& defaultValue = "");
+    std::string loadValue(const std::string& groupName, const std::string& key, const std::string& defaultValue = "");
 
     /// 保存或更新单个设置值
-    bool saveValue(const std::string& groupName, const std::string& key,
-        const std::string& value, const std::string& dataType = "string");
+    bool saveValue(const std::string& groupName,
+        const std::string& key,
+        const std::string& value,
+        const std::string& dataType = "string");
 
     /// 删除指定设置
     bool removeValue(const std::string& groupName, const std::string& key);

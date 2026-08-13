@@ -13,6 +13,7 @@ class SceneNode;
 class SceneTreeDockWidget final : public QWidget
 {
     Q_OBJECT
+
 public:
     explicit SceneTreeDockWidget(QWidget* parent = nullptr);
 

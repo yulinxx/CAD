@@ -16,22 +16,34 @@ namespace
     ToolBarPosition parseToolBarPosition(const QString& value)
     {
         if (value.compare(QStringLiteral("left"), Qt::CaseInsensitive) == 0)
+        {
             return ToolBarPosition::Left;
+        }
         if (value.compare(QStringLiteral("right"), Qt::CaseInsensitive) == 0)
+        {
             return ToolBarPosition::Right;
+        }
         if (value.compare(QStringLiteral("bottom"), Qt::CaseInsensitive) == 0)
+        {
             return ToolBarPosition::Bottom;
+        }
         return ToolBarPosition::Top;
     }
 
     DockPosition parseDockPosition(const QString& value)
     {
         if (value.compare(QStringLiteral("left"), Qt::CaseInsensitive) == 0)
+        {
             return DockPosition::Left;
+        }
         if (value.compare(QStringLiteral("top"), Qt::CaseInsensitive) == 0)
+        {
             return DockPosition::Top;
+        }
         if (value.compare(QStringLiteral("bottom"), Qt::CaseInsensitive) == 0)
+        {
             return DockPosition::Bottom;
+        }
         return DockPosition::Right;
     }
 
@@ -43,28 +55,40 @@ namespace
     QString normalizeVisibilityScope(const QString& explicitScope, const QStringList& workbenches)
     {
         if (!explicitScope.trimmed().isEmpty())
+        {
             return explicitScope.trimmed();
+        }
 
         const bool has2D = workbenches.contains(QStringLiteral("2D"), Qt::CaseInsensitive);
         const bool has3D = workbenches.contains(QStringLiteral("3D"), Qt::CaseInsensitive);
         if (has2D && has3D)
+        {
             return QStringLiteral("shared");
+        }
         if (has2D)
+        {
             return QStringLiteral("2D");
+        }
         if (has3D)
+        {
             return QStringLiteral("3D");
+        }
         return QString();
     }
-}
+}  // namespace
 
 bool UiConfigLoader::isVisibleForWorkbench(const QStringList& workbenches, const QString& workbenchId)
 {
     if (workbenches.isEmpty())
+    {
         return true;
+    }
     for (const auto& wb : workbenches)
     {
         if (wb.compare(workbenchId, Qt::CaseInsensitive) == 0)
+        {
             return true;
+        }
     }
     return false;
 }
@@ -83,7 +107,9 @@ QByteArray UiConfigLoader::readConfigFile(const QString& path)
 {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly))
+    {
         return {};
+    }
     return file.readAll();
 }
 
@@ -107,8 +133,7 @@ std::optional<UiConfigData> UiConfigLoader::loadWithInheritance(const QString& p
     const QJsonDocument doc = QJsonDocument::fromJson(raw, &parseError);
     if (parseError.error != QJsonParseError::NoError || !doc.isObject())
     {
-        m_lastError = QStringLiteral("Invalid JSON in %1: %2")
-            .arg(path, parseError.errorString());
+        m_lastError = QStringLiteral("Invalid JSON in %1: %2").arg(path, parseError.errorString());
         SY_ERRORF("[UiConfigLoader] %s", qPrintable(m_lastError));
         return std::nullopt;
     }
@@ -118,7 +143,9 @@ std::optional<UiConfigData> UiConfigLoader::loadWithInheritance(const QString& p
     // 先解析当前配置
     auto config = parseConfig(doc);
     if (!config)
+    {
         return std::nullopt;
+    }
 
     // 处理 extends 继承：父配置在前，子配置覆盖/追加
     const QString extends = root.value(QStringLiteral("extends")).toString();
@@ -136,8 +163,7 @@ std::optional<UiConfigData> UiConfigLoader::loadWithInheritance(const QString& p
         auto parent = loadWithInheritance(parentPath);
         if (!parent)
         {
-            m_lastError = QStringLiteral("Failed to load parent config '%1' referenced by %2")
-                .arg(extends, path);
+            m_lastError = QStringLiteral("Failed to load parent config '%1' referenced by %2").arg(extends, path);
             SY_ERRORF("[UiConfigLoader] %s", qPrintable(m_lastError));
             return std::nullopt;
         }
@@ -145,65 +171,93 @@ std::optional<UiConfigData> UiConfigLoader::loadWithInheritance(const QString& p
         mergeConfig(*parent, *config);
         // 子配置的 meta 覆盖父配置（客户 ID 以子配置为准）
         if (!config->meta.clientId.isEmpty())
+        {
             parent->meta.clientId = config->meta.clientId;
+        }
         if (!config->meta.clientName.isEmpty())
+        {
             parent->meta.clientName = config->meta.clientName;
+        }
         if (!config->meta.version.isEmpty())
+        {
             parent->meta.version = config->meta.version;
+        }
         return parent;
     }
 
     return config;
 }
 
-void UiConfigLoader::mergeConfig(UiConfigData& base, const UiConfigData & override)
+void UiConfigLoader::mergeConfig(UiConfigData& base, const UiConfigData& override)
 {
     // 菜单合并：同 id 覆盖，新 id 追加
     for (const auto& menu : override.menus)
     {
-        auto it = std::find_if(base.menus.begin(), base.menus.end(),
-            [&menu](const MenuDef& m) { return m.id == menu.id; });
+        auto it = std::find_if(base.menus.begin(), base.menus.end(), [&menu](const MenuDef& m) {
+            return m.id == menu.id;
+        });
         if (it != base.menus.end())
+        {
             *it = menu;
+        }
         else
+        {
             base.menus.push_back(menu);
+        }
     }
 
     // 工具栏合并
     for (const auto& tb : override.toolBars)
     {
-        auto it = std::find_if(base.toolBars.begin(), base.toolBars.end(),
-            [&tb](const ToolBarDef& t) { return t.id == tb.id; });
+        auto it = std::find_if(base.toolBars.begin(), base.toolBars.end(), [&tb](const ToolBarDef& t) {
+            return t.id == tb.id;
+        });
         if (it != base.toolBars.end())
+        {
             *it = tb;
+        }
         else
+        {
             base.toolBars.push_back(tb);
+        }
     }
 
     // Dock 合并
     for (const auto& dock : override.docks)
     {
-        auto it = std::find_if(base.docks.begin(), base.docks.end(),
-            [&dock](const DockDef& d) { return d.id == dock.id; });
+        auto it = std::find_if(base.docks.begin(), base.docks.end(), [&dock](const DockDef& d) {
+            return d.id == dock.id;
+        });
         if (it != base.docks.end())
+        {
             *it = dock;
+        }
         else
+        {
             base.docks.push_back(dock);
+        }
     }
 
     // 快捷键合并（按 commandId 覆盖）
     for (const auto& sc : override.shortcuts)
     {
-        auto it = std::find_if(base.shortcuts.begin(), base.shortcuts.end(),
-            [&sc](const ShortcutDef& s) { return s.commandId == sc.commandId; });
+        auto it = std::find_if(base.shortcuts.begin(), base.shortcuts.end(), [&sc](const ShortcutDef& s) {
+            return s.commandId == sc.commandId;
+        });
         if (it != base.shortcuts.end())
+        {
             *it = sc;
+        }
         else
+        {
             base.shortcuts.push_back(sc);
+        }
     }
 
     if (!override.themeStyle.isEmpty())
+    {
         base.themeStyle = override.themeStyle;
+    }
 }
 
 std::optional<UiConfigData> UiConfigLoader::parseConfig(const QJsonDocument& doc)
@@ -224,12 +278,18 @@ std::optional<UiConfigData> UiConfigLoader::parseConfig(const QJsonDocument& doc
     for (const auto& value : menus)
     {
         if (!value.isObject())
+        {
             continue;
+        }
         auto menu = parseMenu(value.toObject());
         if (menu)
+        {
             data.menus.push_back(std::move(*menu));
+        }
         else
+        {
             m_lastError = QStringLiteral("Invalid menu definition");
+        }
     }
 
     // toolbars
@@ -237,10 +297,14 @@ std::optional<UiConfigData> UiConfigLoader::parseConfig(const QJsonDocument& doc
     for (const auto& value : toolbars)
     {
         if (!value.isObject())
+        {
             continue;
+        }
         auto tb = parseToolBar(value.toObject());
         if (tb)
+        {
             data.toolBars.push_back(std::move(*tb));
+        }
     }
 
     // docks
@@ -248,10 +312,14 @@ std::optional<UiConfigData> UiConfigLoader::parseConfig(const QJsonDocument& doc
     for (const auto& value : docks)
     {
         if (!value.isObject())
+        {
             continue;
+        }
         auto dock = parseDock(value.toObject());
         if (dock)
+        {
             data.docks.push_back(std::move(*dock));
+        }
     }
 
     // shortcuts
@@ -259,10 +327,14 @@ std::optional<UiConfigData> UiConfigLoader::parseConfig(const QJsonDocument& doc
     for (const auto& value : shortcuts)
     {
         if (!value.isObject())
+        {
             continue;
+        }
         auto sc = parseShortcut(value.toObject());
         if (sc)
+        {
             data.shortcuts.push_back(std::move(*sc));
+        }
     }
 
     return data;
@@ -279,10 +351,14 @@ std::optional<MenuDef> UiConfigLoader::parseMenu(const QJsonObject& obj)
     menu.workbenches = workbenchList;
     menu.visibilityScope = normalizeVisibilityScope(parseVisibilityScope(obj), menu.workbenches);
     if (menu.id.isEmpty())
+    {
         return std::nullopt;
+    }
 
     if (!parseMenuItems(obj.value(QStringLiteral("items")).toArray(), menu.items))
+    {
         return std::nullopt;
+    }
     return menu;
 }
 
@@ -293,7 +369,9 @@ std::optional<MenuActionDef> UiConfigLoader::parseMenuAction(const QJsonObject& 
     action.label = obj.value(QStringLiteral("label")).toString();
     action.commandId = obj.value(QStringLiteral("commandId")).toString();
     if (action.commandId.isEmpty())
+    {
         action.commandId = obj.value(QStringLiteral("command")).toString();
+    }
     action.iconName = obj.value(QStringLiteral("icon")).toString();
     action.shortcut = obj.value(QStringLiteral("shortcut")).toString();
     action.feature = obj.value(QStringLiteral("feature")).toString();
@@ -302,7 +380,9 @@ std::optional<MenuActionDef> UiConfigLoader::parseMenuAction(const QJsonObject& 
     action.workbenches = obj.value(QStringLiteral("workbenches")).toVariant().toStringList();
     action.visibilityScope = normalizeVisibilityScope(parseVisibilityScope(obj), action.workbenches);
     if (action.commandId.isEmpty())
+    {
         return std::nullopt;
+    }
     return action;
 }
 
@@ -316,23 +396,26 @@ std::optional<SubMenuDef> UiConfigLoader::parseSubMenu(const QJsonObject& obj)
     sub.workbenches = obj.value(QStringLiteral("workbenches")).toVariant().toStringList();
     sub.visibilityScope = normalizeVisibilityScope(parseVisibilityScope(obj), sub.workbenches);
     if (sub.id.isEmpty())
+    {
         return std::nullopt;
+    }
 
     if (!parseMenuItems(obj.value(QStringLiteral("items")).toArray(), sub.items))
+    {
         return std::nullopt;
+    }
     return sub;
 }
 
-bool UiConfigLoader::parseMenuItems(const QJsonArray& array,
-    std::vector<std::variant<MenuActionDef, SubMenuDef, MenuItemType>>& out)
+bool UiConfigLoader::parseMenuItems(
+    const QJsonArray& array, std::vector<std::variant<MenuActionDef, SubMenuDef, MenuItemType>>& out)
 {
     for (const auto& value : array)
     {
         if (!value.isObject())
         {
             // 纯字符串或非对象项：仅识别 "separator" 文本
-            if (value.isString()
-                && value.toString().compare(QStringLiteral("separator"), Qt::CaseInsensitive) == 0)
+            if (value.isString() && value.toString().compare(QStringLiteral("separator"), Qt::CaseInsensitive) == 0)
             {
                 out.push_back(MenuItemType::Separator);
             }
@@ -350,17 +433,25 @@ bool UiConfigLoader::parseMenuItems(const QJsonArray& array,
         {
             auto sub = parseSubMenu(item);
             if (sub)
+            {
                 out.push_back(std::move(*sub));
+            }
             else
+            {
                 return false;
+            }
         }
-        else // action（默认）
+        else  // action（默认）
         {
             auto action = parseMenuAction(item);
             if (action)
+            {
                 out.push_back(std::move(*action));
+            }
             else
+            {
                 return false;
+            }
         }
     }
     return true;
@@ -375,13 +466,17 @@ std::optional<ToolBarDef> UiConfigLoader::parseToolBar(const QJsonObject& obj)
     tb.workbenchId = obj.value(QStringLiteral("workbench")).toString(QStringLiteral("global"));
     tb.feature = obj.value(QStringLiteral("feature")).toString();
     if (tb.id.isEmpty())
+    {
         return std::nullopt;
+    }
 
     const QJsonArray items = obj.value(QStringLiteral("items")).toArray();
     for (const auto& value : items)
     {
         if (!value.isObject())
+        {
             continue;
+        }
         const QJsonObject item = value.toObject();
         if (item.value(QStringLiteral("type")).toString().toLower() == QStringLiteral("separator"))
         {
@@ -390,7 +485,9 @@ std::optional<ToolBarDef> UiConfigLoader::parseToolBar(const QJsonObject& obj)
         }
         auto action = parseToolBarAction(item);
         if (action)
+        {
             tb.items.push_back(std::move(*action));
+        }
     }
     return tb;
 }
@@ -403,12 +500,16 @@ std::optional<ToolBarActionDef> UiConfigLoader::parseToolBarAction(const QJsonOb
     action.iconName = obj.value(QStringLiteral("icon")).toString();
     action.commandId = obj.value(QStringLiteral("commandId")).toString();
     if (action.commandId.isEmpty())
+    {
         action.commandId = obj.value(QStringLiteral("command")).toString();
+    }
     action.shortcut = obj.value(QStringLiteral("shortcut")).toString();
     action.feature = obj.value(QStringLiteral("feature")).toString();
     action.checkable = obj.value(QStringLiteral("checkable")).toBool(false);
     if (action.commandId.isEmpty())
+    {
         return std::nullopt;
+    }
     return action;
 }
 
@@ -421,7 +522,9 @@ std::optional<DockDef> UiConfigLoader::parseDock(const QJsonObject& obj)
     dock.widgetType = obj.value(QStringLiteral("widgetType")).toString();
     dock.visible = obj.value(QStringLiteral("visible")).toBool(true);
     if (dock.id.isEmpty() || dock.widgetType.isEmpty())
+    {
         return std::nullopt;
+    }
     return dock;
 }
 
@@ -431,6 +534,8 @@ std::optional<ShortcutDef> UiConfigLoader::parseShortcut(const QJsonObject& obj)
     sc.commandId = obj.value(QStringLiteral("command")).toString();
     sc.keySequence = obj.value(QStringLiteral("keys")).toString();
     if (sc.commandId.isEmpty() || sc.keySequence.isEmpty())
+    {
         return std::nullopt;
+    }
     return sc;
 }

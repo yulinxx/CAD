@@ -11,30 +11,30 @@
 // 平台特定头文件
 // ============================================================
 #ifdef _WIN32
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <iphlpapi.h>
-#include <windows.h>
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #include <iphlpapi.h>
+    #include <windows.h>
 #else
-#include <unistd.h>
-#if defined(__APPLE__)
-#include <IOKit/IOKitLib.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/statvfs.h>
-#include <sys/mount.h>
-#include <net/if.h>
-#include <ifaddrs.h>
-#elif defined(__linux__)
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <net/if.h>
-#include <ifaddrs.h>
-#include <fstream>
-#endif
+    #include <unistd.h>
+    #if defined(__APPLE__)
+        #include <IOKit/IOKitLib.h>
+        #include <sys/socket.h>
+        #include <sys/stat.h>
+        #include <sys/statvfs.h>
+        #include <sys/mount.h>
+        #include <net/if.h>
+        #include <ifaddrs.h>
+    #elif defined(__linux__)
+        #include <sys/socket.h>
+        #include <sys/stat.h>
+        #include <net/if.h>
+        #include <ifaddrs.h>
+        #include <fstream>
+    #endif
 #endif
 
 // ============================================================
@@ -52,7 +52,9 @@ static std::string Sha256Hex(const std::string& input)
 
     std::ostringstream oss;
     for (unsigned int i = 0; i < hashLen; ++i)
+    {
         oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[i]);
+    }
     return oss.str();
 }
 
@@ -66,13 +68,13 @@ static std::string GetMachineGuid()
 {
     HKEY hKey;
     std::string guid;
-    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Cryptography",
-        0, KEY_READ | KEY_WOW64_64KEY, &hKey) == ERROR_SUCCESS)
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Cryptography", 0, KEY_READ | KEY_WOW64_64KEY, &hKey) ==
+        ERROR_SUCCESS)
     {
         wchar_t buffer[256];
         DWORD size = sizeof(buffer);
-        if (RegQueryValueExW(hKey, L"MachineGuid", nullptr, nullptr,
-            reinterpret_cast<LPBYTE>(buffer), &size) == ERROR_SUCCESS)
+        if (RegQueryValueExW(hKey, L"MachineGuid", nullptr, nullptr, reinterpret_cast<LPBYTE>(buffer), &size) ==
+            ERROR_SUCCESS)
         {
             int len = WideCharToMultiByte(CP_UTF8, 0, buffer, -1, nullptr, 0, nullptr, nullptr);
             if (len > 0)
@@ -90,20 +92,28 @@ static std::string GetMachineGuid()
 
 static std::string GetMachineGuid()
 {
-    io_registry_entry_t ioPort = IOServiceGetMatchingService(
-        kIOMasterPortDefault, IOServiceMatching("IOPlatformExpertDevice"));
+    // macOS 12.0+ 使用 kIOMainPortDefault 替代已废弃的 kIOMasterPortDefault
+#if defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 120000
+    mach_port_t mainPort = kIOMainPortDefault;
+#else
+    mach_port_t mainPort = kIOMasterPortDefault;
+#endif
+    io_registry_entry_t ioPort =
+        IOServiceGetMatchingService(mainPort, IOServiceMatching("IOPlatformExpertDevice"));
     if (ioPort == IO_OBJECT_NULL)
+    {
         return {};
+    }
 
-    CFTypeRef serialCF = IORegistryEntryCreateCFProperty(
-        ioPort, CFSTR(kIOPlatformUUIDKey), kCFAllocatorDefault, 0);
+    CFTypeRef serialCF = IORegistryEntryCreateCFProperty(ioPort, CFSTR(kIOPlatformUUIDKey), kCFAllocatorDefault, 0);
     IOObjectRelease(ioPort);
     if (!serialCF)
+    {
         return {};
+    }
 
     char buffer[256];
-    Boolean ok = CFStringGetCString(static_cast<CFStringRef>(serialCF),
-        buffer, sizeof(buffer), kCFStringEncodingUTF8);
+    Boolean ok = CFStringGetCString(static_cast<CFStringRef>(serialCF), buffer, sizeof(buffer), kCFStringEncodingUTF8);
     CFRelease(serialCF);
     return ok ? buffer : "";
 }
@@ -116,11 +126,15 @@ static std::string GetMachineGuid()
     std::ifstream file("/etc/machine-id");
     std::string id;
     if (std::getline(file, id) && !id.empty())
+    {
         return id;
+    }
     // 回退：/var/lib/dbus/machine-id
     std::ifstream file2("/var/lib/dbus/machine-id");
     if (std::getline(file2, id) && !id.empty())
+    {
         return id;
+    }
     return {};
 }
 
@@ -188,26 +202,31 @@ static std::string GetVolumeSerial()
 static std::string GetMacAddress()
 {
     ULONG outBufLen = 0;
-    if (GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_PREFIX,
-        nullptr, nullptr, &outBufLen) != ERROR_BUFFER_OVERFLOW)
+    if (GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_PREFIX, nullptr, nullptr, &outBufLen) != ERROR_BUFFER_OVERFLOW)
+    {
         return {};
+    }
 
     std::vector<BYTE> buf(outBufLen);
     PIP_ADAPTER_ADDRESSES adapters = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buf.data());
-    if (GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_PREFIX,
-        nullptr, adapters, &outBufLen) != NO_ERROR)
+    if (GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_PREFIX, nullptr, adapters, &outBufLen) != NO_ERROR)
+    {
         return {};
+    }
 
     for (PIP_ADAPTER_ADDRESSES adapter = adapters; adapter; adapter = adapter->Next)
     {
         if (adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK)
+        {
             continue;
+        }
         if (adapter->PhysicalAddressLength == 6)
         {
             std::ostringstream oss;
             for (UINT i = 0; i < adapter->PhysicalAddressLength; ++i)
-                oss << std::hex << std::setw(2) << std::setfill('0')
-                << static_cast<int>(adapter->PhysicalAddress[i]);
+            {
+                oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(adapter->PhysicalAddress[i]);
+            }
             return oss.str();
         }
     }
@@ -217,23 +236,31 @@ static std::string GetMacAddress()
 #elif defined(__APPLE__)
 // macOS: getifaddrs + AF_LINK + sockaddr_dl
 
-#include <net/if_dl.h>
+    #include <net/if_dl.h>
 
 static std::string GetMacAddress()
 {
     struct ifaddrs* ifaddr = nullptr;
     if (getifaddrs(&ifaddr) == -1)
+    {
         return {};
+    }
 
     std::string result;
     for (struct ifaddrs* ifa = ifaddr; ifa; ifa = ifa->ifa_next)
     {
         if (!ifa->ifa_addr)
+        {
             continue;
+        }
         if (ifa->ifa_addr->sa_family != AF_LINK)
+        {
             continue;
+        }
         if (std::string(ifa->ifa_name).find("lo") == 0)
+        {
             continue;
+        }
 
         auto* sdl = reinterpret_cast<struct sockaddr_dl*>(ifa->ifa_addr);
         if (sdl->sdl_alen == 6)
@@ -241,7 +268,9 @@ static std::string GetMacAddress()
             const unsigned char* mac = reinterpret_cast<const unsigned char*>(sdl->sdl_data + sdl->sdl_nlen);
             std::ostringstream oss;
             for (int i = 0; i < 6; ++i)
+            {
                 oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(mac[i]);
+            }
             result = oss.str();
             break;
         }
@@ -253,24 +282,32 @@ static std::string GetMacAddress()
 #elif defined(__linux__)
 // Linux: getifaddrs + AF_PACKET + sockaddr_ll
 
-#include <net/if_packet.h>
-#include <sys/ioctl.h>
+    #include <net/if_packet.h>
+    #include <sys/ioctl.h>
 
 static std::string GetMacAddress()
 {
     struct ifaddrs* ifaddr = nullptr;
     if (getifaddrs(&ifaddr) == -1)
+    {
         return {};
+    }
 
     std::string result;
     for (struct ifaddrs* ifa = ifaddr; ifa; ifa = ifa->ifa_next)
     {
         if (!ifa->ifa_addr)
+        {
             continue;
+        }
         if (ifa->ifa_addr->sa_family != AF_PACKET)
+        {
             continue;
+        }
         if (std::string(ifa->ifa_name).find("lo") == 0)
+        {
             continue;
+        }
 
         auto* sll = reinterpret_cast<struct sockaddr_ll*>(ifa->ifa_addr);
         if (sll->sll_halen == 6)
@@ -278,7 +315,9 @@ static std::string GetMacAddress()
             const unsigned char* mac = sll->sll_addr;
             std::ostringstream oss;
             for (int i = 0; i < 6; ++i)
+            {
                 oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(mac[i]);
+            }
             result = oss.str();
             break;
         }
@@ -297,6 +336,8 @@ std::string MachineFingerprint::Generate()
 {
     std::string raw = GetMachineGuid() + "|" + GetVolumeSerial() + "|" + GetMacAddress();
     if (raw == "||")
+    {
         return {};
+    }
     return Sha256Hex(raw);
 }

@@ -15,11 +15,7 @@ uint32_t LicenseGuard::Scramble(uint32_t val, uint32_t seed)
 
 uint32_t LicenseGuard::ComputeCrossSum()
 {
-    return s_state.tokenA_hi
-        ^ s_state.tokenA_lo
-        ^ s_state.tokenB_hi
-        ^ s_state.tokenB_lo
-        ^ kMagicScatter;
+    return s_state.tokenA_hi ^ s_state.tokenA_lo ^ s_state.tokenB_hi ^ s_state.tokenB_lo ^ kMagicScatter;
 }
 
 bool LicenseGuard::VerifyGroupA()
@@ -40,15 +36,15 @@ bool LicenseGuard::VerifyCrossSum()
     return s_state.crossSum == ComputeCrossSum();
 }
 
-//bool LicenseGuard::VerifyTimestamp()
+// bool LicenseGuard::VerifyTimestamp()
 //{
-//    // 获取当前系统 Unix 时间戳（自 1970-01-01 以来的秒数）
-//    uint32_t now = static_cast<uint32_t>(time(nullptr));
-//    uint32_t diff = now - s_state.timestamp;
+//     // 获取当前系统 Unix 时间戳（自 1970-01-01 以来的秒数）
+//     uint32_t now = static_cast<uint32_t>(time(nullptr));
+//     uint32_t diff = now - s_state.timestamp;
 //
-//    // 允许 ±1 秒误差 + 前向 10 年（防止 NTP 同步）
-//    return diff < 3650u * 86400u && s_state.timestamp <= now + 1;
-//}
+//     // 允许 ±1 秒误差 + 前向 10 年（防止 NTP 同步）
+//     return diff < 3650u * 86400u && s_state.timestamp <= now + 1;
+// }
 
 bool LicenseGuard::VerifyTimestamp()
 {
@@ -60,16 +56,20 @@ bool LicenseGuard::VerifyTimestamp()
     int64_t diff = now - ts;
 
     // 3. 容忍窗口（根据业务调整）
-    constexpr int64_t FUTURE_TOLERANCE = 300;   // 允许未来 5 分钟（NTP/时区）
-    constexpr int64_t PAST_MAX_AGE = 366 * 86400; // 最多早 1 年（根据 license 有效期定）
+    constexpr int64_t FUTURE_TOLERANCE = 300;      // 允许未来 5 分钟（NTP/时区）
+    constexpr int64_t PAST_MAX_AGE = 366 * 86400;  // 最多早 1 年（根据 license 有效期定）
 
     // 4. 时间戳不能来自未来（超过容忍窗口）
     if (diff < -FUTURE_TOLERANCE)
+    {
         return false;
+    }
 
     // 5. 时间戳不能太旧（防止 freeze 旧时间）
     if (diff > PAST_MAX_AGE)
+    {
         return false;
+    }
 
     return true;
 }
@@ -108,39 +108,78 @@ bool LicenseGuard::Check(Flavor flavor)
     // 不同 Flavor 走不同检查路径，patch 难度大幅上升
     switch (flavor)
     {
-        case Flavor_Startup:
-            // 启动时全量校验
-            if (!VerifyGroupA())     return false;
-            if (!VerifyGroupB())     return false;
-            if (!VerifyCrossSum())   return false;
-            if (!VerifyTimestamp())  return false;
-            return true;
+    case Flavor_Startup:
+        // 启动时全量校验
+        if (!VerifyGroupA())
+        {
+            return false;
+        }
+        if (!VerifyGroupB())
+        {
+            return false;
+        }
+        if (!VerifyCrossSum())
+        {
+            return false;
+        }
+        if (!VerifyTimestamp())
+        {
+            return false;
+        }
+        return true;
 
-        case Flavor_Save:
-            // 保存功能：检查 A 组 + 交叉和
-            if (!VerifyGroupA())     return false;
-            if (!VerifyCrossSum())   return false;
-            return true;
+    case Flavor_Save:
+        // 保存功能：检查 A 组 + 交叉和
+        if (!VerifyGroupA())
+        {
+            return false;
+        }
+        if (!VerifyCrossSum())
+        {
+            return false;
+        }
+        return true;
 
-        case Flavor_Export:
-            // 导出功能：检查 B 组 + 交叉和
-            if (!VerifyGroupB())     return false;
-            if (!VerifyCrossSum())   return false;
-            return true;
+    case Flavor_Export:
+        // 导出功能：检查 B 组 + 交叉和
+        if (!VerifyGroupB())
+        {
+            return false;
+        }
+        if (!VerifyCrossSum())
+        {
+            return false;
+        }
+        return true;
 
-        case Flavor_Render:
-            // 渲染功能：检查 A 组 + B 组 + 时间戳
-            if (!VerifyGroupA())     return false;
-            if (!VerifyGroupB())     return false;
-            if (!VerifyTimestamp())  return false;
-            return true;
+    case Flavor_Render:
+        // 渲染功能：检查 A 组 + B 组 + 时间戳
+        if (!VerifyGroupA())
+        {
+            return false;
+        }
+        if (!VerifyGroupB())
+        {
+            return false;
+        }
+        if (!VerifyTimestamp())
+        {
+            return false;
+        }
+        return true;
 
-        case Flavor_Generic:
-        default:
-            // 通用：至少检查 A 组和交叉和
-            if (!VerifyGroupA())     return false;
-            if (!VerifyCrossSum())   return false;
-            return true;
+    case Flavor_Generic:
+    default:
+        // 通用：至少检查 A 组和交叉和
+        if (!VerifyGroupA())
+        {
+            return false;
+        }
+        if (!VerifyCrossSum())
+        {
+            return false;
+        }
+        return true;
     }
 }
 
@@ -148,6 +187,5 @@ bool LicenseGuard::IsQuickValid()
 {
     // 快速路径：只检查 A 组是否有值（不校验数学关系）
     // 用于 UI 显示，不用于安全判断
-    return s_state.tokenA_hi == kMagicBase
-        && s_state.tokenB_hi == kMagicBase + 0x5678;
+    return s_state.tokenA_hi == kMagicBase && s_state.tokenB_hi == kMagicBase + 0x5678;
 }

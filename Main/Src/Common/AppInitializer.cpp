@@ -55,22 +55,32 @@ namespace
         };
 
         static const LocaleMapping mappings[] = {
-            {"zh", AppLanguage::Chinese},    {"ja", AppLanguage::Japanese}, {"ko", AppLanguage::Korean},
-            {"fr", AppLanguage::French},     {"de", AppLanguage::German},   {"es", AppLanguage::Spanish},
-            {"pt", AppLanguage::Portuguese}, {"ru", AppLanguage::Russian},  {"ar", AppLanguage::Arabic},
-            {"it", AppLanguage::Italian},    {"hi", AppLanguage::Hindi},    {"tr", AppLanguage::Turkish},
-            {"vi", AppLanguage::Vietnamese},
+            { "zh", AppLanguage::Chinese },
+            { "ja", AppLanguage::Japanese },
+            { "ko", AppLanguage::Korean },
+            { "fr", AppLanguage::French },
+            { "de", AppLanguage::German },
+            { "es", AppLanguage::Spanish },
+            { "pt", AppLanguage::Portuguese },
+            { "ru", AppLanguage::Russian },
+            { "ar", AppLanguage::Arabic },
+            { "it", AppLanguage::Italian },
+            { "hi", AppLanguage::Hindi },
+            { "tr", AppLanguage::Turkish },
+            { "vi", AppLanguage::Vietnamese },
         };
 
         for (const auto& mapping : mappings)
         {
             if (locale.startsWith(QString::fromLatin1(mapping.prefix)))
+            {
                 return mapping.language;
+            }
         }
 
         return AppLanguage::English;
     }
-} // namespace
+}  // namespace
 
 void AppInitializer::initialize()
 {
@@ -93,7 +103,8 @@ void AppInitializer::initialize()
     FontConfig fontConfig;
     fontConfig.fontSize = 9;
     FontManager::apply(fontConfig);
-    SY_INFOF("Language set to: %s (dir: %s)", languageManager->currentLanguageName().toUtf8().constData(),
+    SY_INFOF("Language set to: %s (dir: %s)",
+        languageManager->currentLanguageName().toUtf8().constData(),
         translationsDir.toUtf8().constData());
 
     // 初始化数据库持久化服务

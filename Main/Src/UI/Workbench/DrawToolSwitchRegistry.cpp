@@ -34,19 +34,24 @@ void DrawToolSwitchRegistry::registerAll()
     for (const CommandEntry2D& entry : CommandCatalog::commands())
     {
         if (!hasSurface(entry.surfaces, CommandSurface2D::LeftToolbar))
+        {
             continue;
+        }
         if (entry.operationId == OperationId::None || !entry.toolName || !*entry.toolName)
+        {
             continue;
+        }
 
         const QString toolName = QString::fromUtf8(entry.toolName);
 
         // LambdaOperation 是框架推荐的依赖注入方式（见 OperationBus.cpp 头注释）：
         // 直接捕获视口，不依赖已废弃的 OperationContext。
-        registry.registerOperation(std::make_unique<LambdaOperation>(
-            entry.operationId,
-            [viewport = m_viewport, toolName]() {
+        registry.registerOperation(
+            std::make_unique<LambdaOperation>(entry.operationId, [viewport = m_viewport, toolName]() {
                 if (viewport)
+                {
                     viewport->setActiveTool(toolName);
+                }
             }));
 
         ++registered;

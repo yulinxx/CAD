@@ -29,7 +29,7 @@
  */
 class ITransformInputProvider
 {
-  public:
+public:
     virtual ~ITransformInputProvider() = default;
 
     /**
@@ -56,7 +56,7 @@ class ITransformInputProvider
      * @brief 设置参数变更回调
      * @param callback 参数变更时调用的回调函数
      */
-    virtual void setParametersChangedCallback(std::function<void(const TransformParameters &)> callback) = 0;
+    virtual void setParametersChangedCallback(std::function<void(const TransformParameters&)> callback) = 0;
 
     /**
      * @brief 设置确认回调

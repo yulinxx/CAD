@@ -32,7 +32,7 @@ class SceneTreeDockWidget;
 class PropertiesPanelWidget;
 
 /// 工作台切换工厂：按 ID 返回对应的工作台实例
-using WorkbenchFactory = std::function<UiWorkbench* (const QString& workbenchId)>;
+using WorkbenchFactory = std::function<UiWorkbench*(const QString& workbenchId)>;
 
 /**
  * @class WorkbenchWindow
@@ -53,7 +53,6 @@ class WorkbenchWindow : public QMainWindow
     Q_OBJECT
 
 public:
-
     /// @param parent 父部件
     explicit WorkbenchWindow(QWidget* parent = nullptr);
     ~WorkbenchWindow() override;
@@ -143,11 +142,18 @@ public:
     /// 卸载当前工作台状态栏 widget，从 QStatusBar 移除
     /// 由 clearWorkbenchContent 在工作台切换时调用
     void unmountStatusBar();
+
     /// 获取当前挂载的工作台状态栏 widget
-    StatusBarBase* activeStatusBar() const { return m_activeStatusBar; }
+    StatusBarBase* activeStatusBar() const
+    {
+        return m_activeStatusBar;
+    }
 
     /// 获取当前工作台实例
-    UiWorkbench* currentWorkbench() const { return m_workbench; }
+    UiWorkbench* currentWorkbench() const
+    {
+        return m_workbench;
+    }
 
     /// 清理工作台切换期间的状态
     void resetWorkbenchTransientState();
@@ -279,6 +285,7 @@ public:
     void unregisterShortcut(QShortcut* shortcut);
     /// 清理所有注册的快捷键
     void clearAllShortcuts();
+
     /// 获取当前是否正在切换工作台
     bool isSwitchingWorkbench() const
     {

@@ -25,10 +25,10 @@ namespace MainApp
 }
 
 /**
-* @class AppBootstrapper
-* @brief 应用程序引导器类
-*
-* 定义了应用程序的引导器类，负责初始化应用程序的各个组件。
+ * @class AppBootstrapper
+ * @brief 应用程序引导器类
+ *
+ * 定义了应用程序的引导器类，负责初始化应用程序的各个组件。
  * 协调应用程序的启动流程，包括：
  * - 创建组合根
  * - 初始化工作台

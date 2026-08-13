@@ -6,8 +6,7 @@ UiConfigurationManager::UiConfigurationManager() = default;
 
 UiConfigurationManager::~UiConfigurationManager() = default;
 
-bool UiConfigurationManager::applyConfiguration(const QString& resourcePath,
-    ConfigFallbackPolicy fallback)
+bool UiConfigurationManager::applyConfiguration(const QString& resourcePath, ConfigFallbackPolicy fallback)
 {
     UiConfigLoader loader(resourcePath);
     auto config = loader.load();
@@ -23,11 +22,9 @@ bool UiConfigurationManager::applyConfiguration(const QString& resourcePath,
     }
 
     // 加载失败，按策略处理
-    if (fallback == ConfigFallbackPolicy::Fallback
-        && !resourcePath.endsWith(QStringLiteral("/san_yi.json")))
+    if (fallback == ConfigFallbackPolicy::Fallback && !resourcePath.endsWith(QStringLiteral("/san_yi.json")))
     {
-        SY_WARNF("[UiConfigurationManager] Loading '%s' failed, falling back to san_yi.json",
-            qPrintable(resourcePath));
+        SY_WARNF("[UiConfigurationManager] Loading '%s' failed, falling back to san_yi.json", qPrintable(resourcePath));
         UiConfigLoader fallbackLoader(QStringLiteral(":/configs/san_yi.json"));
         auto fallbackConfig = fallbackLoader.load();
         if (fallbackConfig)
@@ -38,7 +35,8 @@ bool UiConfigurationManager::applyConfiguration(const QString& resourcePath,
     }
 
     SY_ERRORF("[UiConfigurationManager] Failed to load config: %s (%s)",
-        qPrintable(resourcePath), qPrintable(loader.lastError()));
+        qPrintable(resourcePath),
+        qPrintable(loader.lastError()));
     m_configData.reset();
     return false;
 }

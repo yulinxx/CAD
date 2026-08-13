@@ -19,7 +19,7 @@
  */
 class SceneNode
 {
-  public:
+public:
     /// 构造：必须关联引擎图元
     explicit SceneNode(Eg::EntityId entityId, std::string name);
 
@@ -27,10 +27,12 @@ class SceneNode
     {
         return std::to_string(m_engineEntityId);
     }
+
     std::string name() const
     {
         return m_name;
     }
+
     std::string typeName() const
     {
         return "SceneNode";
@@ -38,18 +40,20 @@ class SceneNode
 
     bool selected() const;
     void setSelected(bool selected);
+
     bool highlighted() const
     {
         return m_highlighted;
     }
+
     void setHighlighted(bool highlighted)
     {
         m_highlighted = highlighted;
     }
 
-    void addChild(const std::shared_ptr<SceneNode> &child);
+    void addChild(const std::shared_ptr<SceneNode>& child);
     std::vector<std::shared_ptr<SceneNode>> children() const;
-    std::shared_ptr<SceneNode> childByIdRecursive(const std::string &id) const;
+    std::shared_ptr<SceneNode> childByIdRecursive(const std::string& id) const;
     std::vector<std::string> pathIdsRecursive() const;
     std::vector<std::string> pathNamesRecursive() const;
 
@@ -57,16 +61,17 @@ class SceneNode
     {
         return m_engineEntityId;
     }
+
     void setEngineEntityId(Eg::EntityId id)
     {
         m_engineEntityId = id;
     }
 
-  private:
+private:
     Eg::EntityId m_engineEntityId;
     std::string m_name;
     std::vector<std::shared_ptr<SceneNode>> m_children;
-    bool m_highlighted{false};
+    bool m_highlighted{ false };
 };
 
 /**
@@ -77,18 +82,19 @@ class SceneNode
  */
 class SelectionSet
 {
-  public:
+public:
     void clear();
-    void add(const std::shared_ptr<SceneNode> &node);
-    void remove(const std::string &nodeId);
-    bool contains(const std::string &entityId) const;
+    void add(const std::shared_ptr<SceneNode>& node);
+    void remove(const std::string& nodeId);
+    bool contains(const std::string& entityId) const;
     std::vector<std::shared_ptr<SceneNode>> items() const;
     bool empty() const;
 
-  private:
-    Eg::SceneManager3D *m_scene{nullptr};
+private:
+    Eg::SceneManager3D* m_scene{ nullptr };
     friend class SceneDocument3DAdapter;
-    void setScene(Eg::SceneManager3D *scene)
+
+    void setScene(Eg::SceneManager3D* scene)
     {
         m_scene = scene;
     }
@@ -103,15 +109,15 @@ class SelectionSet
  */
 class SceneDocument3DAdapter : public UI::SceneDocumentBase
 {
-  public:
-    std::shared_ptr<SceneNode> createNode(const std::string &name);
-    std::shared_ptr<SceneNode> nodeById(const std::string &id) const;
-    void removeNode(const std::string &id);
-    void removeNode(const std::shared_ptr<SceneNode> &node);
+public:
+    std::shared_ptr<SceneNode> createNode(const std::string& name);
+    std::shared_ptr<SceneNode> nodeById(const std::string& id) const;
+    void removeNode(const std::string& id);
+    void removeNode(const std::shared_ptr<SceneNode>& node);
     std::vector<std::shared_ptr<SceneNode>> entities() const;
     std::vector<std::shared_ptr<SceneNode>> rootNodes() const;
-    SelectionSet &selection();
-    const SelectionSet &selection() const;
+    SelectionSet& selection();
+    const SelectionSet& selection() const;
 
     // ---- 引擎场景管理 ----
 
@@ -119,15 +125,16 @@ class SceneDocument3DAdapter : public UI::SceneDocumentBase
     {
         return m_engineScene;
     }
+
     void setEngineScene(std::shared_ptr<Eg::SceneManager3D> scene);
 
     // ---- SceneDocumentBase 接口 ----
 
-    void forEachEntityId(void (*visitor)(const char *, void *), void *ctx) const override;
-    void removeEntity(const char *id) override;
+    void forEachEntityId(void (*visitor)(const char*, void*), void* ctx) const override;
+    void removeEntity(const char* id) override;
     void clear() override;
 
-  private:
+private:
     mutable SelectionSet m_selection;
     std::shared_ptr<Eg::SceneManager3D> m_engineScene;
     std::shared_ptr<SceneNode> m_uiRoot;

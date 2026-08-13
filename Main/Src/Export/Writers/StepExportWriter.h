@@ -26,6 +26,5 @@ public:
         return QStringLiteral("step");
     }
 
-    ExportResult write(const ExportContext& context,
-        const Fio::VecSyEntityPtr& entities) override;
+    ExportResult write(const ExportContext& context, const Fio::VecSyEntityPtr& entities) override;
 };

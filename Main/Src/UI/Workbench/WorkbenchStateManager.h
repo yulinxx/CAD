@@ -41,9 +41,8 @@ public:
     /// @param parent 主窗口指针（用于 setWindowTitle）
     /// @param menuManager 菜单管理器
     /// @param layoutManager 布局管理器（用于访问 PanelState 和 busyIndicator）
-    explicit WorkbenchStateManager(WorkbenchWindow* parent,
-        WorkbenchMenuManager* menuManager,
-        WorkbenchLayoutManager* layoutManager);
+    explicit WorkbenchStateManager(
+        WorkbenchWindow* parent, WorkbenchMenuManager* menuManager, WorkbenchLayoutManager* layoutManager);
 
     ~WorkbenchStateManager();
 
@@ -95,17 +94,37 @@ public:
     void setWorkbenchSwitchContext(const QString& workbenchId, const QString& switchContextText);
 
     // ==================== 数据访问 ====================
-    WindowState& windowState() { return m_windowState; }
-    const WindowState& windowState() const { return m_windowState; }
+    WindowState& windowState()
+    {
+        return m_windowState;
+    }
 
-    UiStateCenter* stateCenter() const { return m_stateCenter; }
-    UiThemeService* themeService() const { return m_themeService; }
+    const WindowState& windowState() const
+    {
+        return m_windowState;
+    }
+
+    UiStateCenter* stateCenter() const
+    {
+        return m_stateCenter;
+    }
+
+    UiThemeService* themeService() const
+    {
+        return m_themeService;
+    }
 
     /// 获取框架级服务引用
-    const UiFrameworkServices& frameworkServices() const { return m_frameworkServices; }
+    const UiFrameworkServices& frameworkServices() const
+    {
+        return m_frameworkServices;
+    }
 
     /// 获取当前 UI 服务集合
-    const UiServices& uiServices() const { return m_uiServices; }
+    const UiServices& uiServices() const
+    {
+        return m_uiServices;
+    }
 
 private:
     /// 统一写入工作台切换阶段，避免直接操作 metadata

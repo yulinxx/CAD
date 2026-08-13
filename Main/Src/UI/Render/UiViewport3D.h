@@ -19,6 +19,7 @@ class SceneDocument3DAdapter;
 class Viewport3D final : public QWidget
 {
     Q_OBJECT
+
 public:
     explicit Viewport3D(QWidget* parent = nullptr);
     ~Viewport3D() override;

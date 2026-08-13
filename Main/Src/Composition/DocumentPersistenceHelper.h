@@ -15,10 +15,8 @@ class DocumentPersistenceHelper
 {
 public:
     /// 导入/打开文件后记录文档信息（更新 lastOpenedAt）
-    static void recordImport(PersistenceService* persistence,
-        const QString& filePath, int entityCount);
+    static void recordImport(PersistenceService* persistence, const QString& filePath, int entityCount);
 
     /// 导出/保存文件后记录文档信息（更新 lastSavedAt）
-    static void recordExport(PersistenceService* persistence,
-        const std::string& filePath, int entityCount);
+    static void recordExport(PersistenceService* persistence, const std::string& filePath, int entityCount);
 };

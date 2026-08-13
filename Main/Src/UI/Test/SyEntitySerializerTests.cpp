@@ -12,7 +12,7 @@
 #include "SyEntitySerializer.h"
 #include "FileIO/SyDocument.h"
 
- // Engine2D 瀹炰綋绫诲瀷
+// Engine2D 瀹炰綋绫诲瀷
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyArc.h"
 #include "Engine2D/SyEntity/SyCircle.h"
@@ -33,8 +33,7 @@ namespace
 {
     /// 杈呭姪锛氬皢瀹炰綋搴忓垪鍖栧悗绔嬪嵆鍙嶅簭鍒楀寲锛岄獙璇侀棴鐜?
     template<typename T>
-    std::pair<std::unique_ptr<Eg::SyEntity>, sanyi::proto::EntityData>
-        roundTrip(const Eg::SyEntity& entity)
+    std::pair<std::unique_ptr<Eg::SyEntity>, sanyi::proto::EntityData> roundTrip(const Eg::SyEntity& entity)
     {
         sanyi::proto::EntityData protoData;
         Fio::SyEntitySerializer::serializeEntity(entity, &protoData);
@@ -49,7 +48,7 @@ namespace
         EXPECT_DOUBLE_EQ(a.x(), b.x());
         EXPECT_DOUBLE_EQ(a.y(), b.y());
     }
-}
+}  // namespace
 
 // ==================== 绾挎搴忓垪鍖栭棴鐜?====================
 
@@ -163,12 +162,7 @@ TEST(SyEntitySerializerTest, PolygonRoundTrip)
     original.bClosed = true;
     original.bCCW = false;
 
-    original.setVertices({
-        Ut::Vec2d(0.0, 0.0),
-        Ut::Vec2d(10.0, 0.0),
-        Ut::Vec2d(10.0, 10.0),
-        Ut::Vec2d(0.0, 10.0)
-        });
+    original.setVertices({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0, 0.0), Ut::Vec2d(10.0, 10.0), Ut::Vec2d(0.0, 10.0) });
 
     auto [deserialized, proto] = roundTrip<Eg::SyPolygon>(original);
     ASSERT_NE(deserialized, nullptr);

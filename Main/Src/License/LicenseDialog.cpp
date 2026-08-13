@@ -39,7 +39,7 @@ namespace
         QByteArray m_configDirUtf8;
         LicenseContext* m_context = nullptr;
     };
-} // namespace
+}  // namespace
 
 LicenseDialog::LicenseDialog(const QString& configDir, QWidget* parent)
     : QDialog(parent)
@@ -76,7 +76,8 @@ void LicenseDialog::SetupUi()
     auto* mcLabel = new QLabel(tr("Machine Code:"));
     m_machineCodeLabel = new QLabel(m_machineCode);
     m_machineCodeLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    m_machineCodeLabel->setStyleSheet(QStringLiteral("font-family: monospace; padding: 4px; background: #f0f0f0; border: 1px solid #ccc;"));
+    m_machineCodeLabel->setStyleSheet(
+        QStringLiteral("font-family: monospace; padding: 4px; background: #f0f0f0; border: 1px solid #ccc;"));
     machineCodeLayout->addWidget(mcLabel);
     machineCodeLayout->addWidget(m_machineCodeLabel, 1);
     mainLayout->addLayout(machineCodeLayout);
@@ -113,7 +114,7 @@ void LicenseDialog::SetupUi()
         auto* copyBtn = new QPushButton(tr("Copy Machine Code"));
         connect(copyBtn, &QPushButton::clicked, this, [this]() {
             QApplication::clipboard()->setText(m_machineCode);
-            });
+        });
         btnLayout->insertWidget(1, copyBtn);
     }
 }
@@ -150,13 +151,12 @@ void LicenseDialog::OnActivateClicked()
         info.structSize = sizeof(LicenseInfo);
         License_GetInfo(holder.get(), &info);
 
-        QMessageBox::information(
-            this,
+        QMessageBox::information(this,
             tr("Activation Successful"),
             tr("License has been activated successfully.\n\n"
-                "Expires: %1\nFeatures: %2")
-            .arg(QString::fromUtf8(info.expiryDate))
-            .arg(QString::fromUtf8(info.features)));
+               "Expires: %1\nFeatures: %2")
+                .arg(QString::fromUtf8(info.expiryDate))
+                .arg(QString::fromUtf8(info.features)));
         accept();
         return;
     }

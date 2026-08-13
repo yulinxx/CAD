@@ -20,16 +20,14 @@ struct ExportResult
     int exportedLayerCount{ 0 };
 
     /// 创建成功结果
-    static ExportResult ok(const QString& msg = QString(),
-        int entities = 0, int layers = 0,
-        const QStringList& warns = {})
+    static ExportResult ok(
+        const QString& msg = QString(), int entities = 0, int layers = 0, const QStringList& warns = {})
     {
         return { true, msg, warns, entities, 0, layers };
     }
 
     /// 创建失败结果
-    static ExportResult fail(const QString& msg,
-        const QStringList& warns = {})
+    static ExportResult fail(const QString& msg, const QStringList& warns = {})
     {
         return { false, msg, warns, 0, 0, 0 };
     }

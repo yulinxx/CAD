@@ -12,16 +12,17 @@
 
 #ifdef LICENSE_TEST_HOOKS
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+    #ifdef __cplusplus
+extern "C"
+{
+    #endif
 
     LICENSE_C_API LICENSE_API int LicenseTest_SetPublicKeyPem(const char* pem);
 
     LICENSE_C_API LICENSE_API void LicenseTest_ClearPublicKeyPem(void);
 
-#ifdef __cplusplus
+    #ifdef __cplusplus
 }
-#endif
+    #endif
 
-#endif // LICENSE_TEST_HOOKS
+#endif  // LICENSE_TEST_HOOKS

@@ -26,7 +26,7 @@
 #include <string>
 #include <cstring>
 
- // ==================== ISelectionService 窄接口测试 ====================
+// ==================== ISelectionService 窄接口测试 ====================
 
 TEST(SelectionServiceTest, ConstructWithSceneManager)
 {
@@ -537,7 +537,7 @@ TEST(SelectionServiceTest, Boundary_ClearWhenEmpty)
     SelectionService svc(&scene);
 
     svc.clear();
-    svc.clear(); // 重复清除
+    svc.clear();  // 重复清除
     SUCCEED();
 }
 

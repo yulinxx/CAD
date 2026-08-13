@@ -6,14 +6,14 @@
 /// 导入错误类型：区分不同的失败原因，便于上层展示和处理
 enum class ImportErrorType
 {
-    None,                    ///< 无错误（成功）
-    FileNotFound,            ///< 文件不存在或路径无效
-    FormatNotSupported,      ///< 文件格式不支持
-    ParseFailed,             ///< 解析失败（文件损坏、格式错误）
-    UnitIncompatible,        ///< 单位不兼容
-    CoordinateSystemIncompatible, ///< 坐标系不兼容
-    Canceled,                ///< 用户取消导入
-    Unknown                  ///< 未知错误
+    None,                          ///< 无错误（成功）
+    FileNotFound,                  ///< 文件不存在或路径无效
+    FormatNotSupported,            ///< 文件格式不支持
+    ParseFailed,                   ///< 解析失败（文件损坏、格式错误）
+    UnitIncompatible,              ///< 单位不兼容
+    CoordinateSystemIncompatible,  ///< 坐标系不兼容
+    Canceled,                      ///< 用户取消导入
+    Unknown                        ///< 未知错误
 };
 
 /// 导入结果：封装导入操作的结果状态和统计信息
@@ -37,9 +37,8 @@ struct ImportResult
     QString usedWorkbenchId;
 
     /// 创建成功结果
-    static ImportResult ok(const QString& msg = QString(),
-        int entities = 0, int layers = 0,
-        const QStringList& warns = {})
+    static ImportResult ok(
+        const QString& msg = QString(), int entities = 0, int layers = 0, const QStringList& warns = {})
     {
         ImportResult r;
         r.success = true;
@@ -52,9 +51,8 @@ struct ImportResult
     }
 
     /// 创建失败结果（带错误类型）
-    static ImportResult fail(const QString& msg,
-        ImportErrorType errorType = ImportErrorType::Unknown,
-        const QStringList& warns = {})
+    static ImportResult fail(
+        const QString& msg, ImportErrorType errorType = ImportErrorType::Unknown, const QStringList& warns = {})
     {
         ImportResult r;
         r.success = false;

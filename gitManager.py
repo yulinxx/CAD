@@ -1,8 +1,14 @@
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Git 仓库/子模块批量管理脚本 v2.0
 人性化设计：默认全选、多远程支持、批量自动处理、减少交互
+
+Mac使用:
+cd /Users/ms/Documents/CAD
+find . \( -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) -exec clang-format -i {} +
+
 """
 
 import os

@@ -10,10 +10,10 @@
  */
 struct SettingRecord
 {
-    int id{ 0 };                    // 自增主键
-    std::string groupName;          // 设置分组（如 "ui", "viewport", "file"）
-    std::string key;                // 设置键名
-    std::string value;              // 设置值（字符串形式存储）
-    std::string dataType;           // 值类型标记（"string", "int", "bool", "double"）
-    std::string updatedAt;          // 最近更新时间（ISO 8601 格式）
+    int id{ 0 };            // 自增主键
+    std::string groupName;  // 设置分组（如 "ui", "viewport", "file"）
+    std::string key;        // 设置键名
+    std::string value;      // 设置值（字符串形式存储）
+    std::string dataType;   // 值类型标记（"string", "int", "bool", "double"）
+    std::string updatedAt;  // 最近更新时间（ISO 8601 格式）
 };

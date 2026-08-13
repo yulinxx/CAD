@@ -29,16 +29,22 @@ bool DatabaseBootstrapper::ensureSchema()
         // 首次创建：建表
         SY_INFO("[DatabaseBootstrapper] First run, creating schema v1");
         if (!createMetaTable())
+        {
             return false;
+        }
         if (!createBusinessTables())
+        {
             return false;
+        }
     }
     else if (currentVersion < kSchemaVersion)
     {
         // 需要迁移
         SY_INFOF("[DatabaseBootstrapper] Migrating schema from v%d to v%d", currentVersion, kSchemaVersion);
         if (!runMigrations(currentVersion, kSchemaVersion))
+        {
             return false;
+        }
     }
 
     SY_INFOF("[DatabaseBootstrapper] Schema is up to date (v%d)", kSchemaVersion);
@@ -48,11 +54,15 @@ bool DatabaseBootstrapper::ensureSchema()
 int DatabaseBootstrapper::schemaVersion() const
 {
     if (!m_database.isOpen())
+    {
         return 0;
+    }
 
     std::string version = m_database.get("app_meta", "value", "key = 'schema_version'");
     if (version.empty())
+    {
         return 0;
+    }
 
     try
     {

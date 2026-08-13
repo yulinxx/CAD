@@ -54,20 +54,21 @@ int CADApplicationRuntime::run()
     AppInitializer::initialize();
 
     SY_INFOF("[CADApplicationRuntime] Initializing application: name=%s, version=%s",
-        MainApp::appName().c_str(), MainApp::appVersion().c_str());
+        MainApp::appName().c_str(),
+        MainApp::appVersion().c_str());
 
     // 初始化崩溃处理
-    //SY_DEBUG("[CADApplicationRuntime] Initializing crash handler");
+    // SY_DEBUG("[CADApplicationRuntime] Initializing crash handler");
     if (!CrashHandlerBootstrap::initialize(MainApp::appName(), MainApp::appVersion()))
     {
         SY_WARN("[CADApplicationRuntime] CrashHandler initialization failed, continuing without crash capture");
     }
-    //SY_INFO("[CADApplicationRuntime] Crash handler initialized");
+    // SY_INFO("[CADApplicationRuntime] Crash handler initialized");
 
     // 执行许可证检查
     if (License_IsCheckEnabled())
     {
-        //SY_DEBUG("[CADApplicationRuntime] License check enabled, verifying license");
+        // SY_DEBUG("[CADApplicationRuntime] License check enabled, verifying license");
 
         LicenseConfig config{};
         License_ConfigInit(&config);
@@ -84,14 +85,14 @@ int CADApplicationRuntime::run()
 
         if (!licenseOk)
         {
-            //SY_DEBUG("[CADApplicationRuntime] License check failed, showing license dialog");
+            // SY_DEBUG("[CADApplicationRuntime] License check failed, showing license dialog");
             LicenseDialog dlg(configDir);
             if (dlg.exec() != QDialog::Accepted)
             {
-                //SY_WARN("[CADApplicationRuntime] License check rejected by user");
+                // SY_WARN("[CADApplicationRuntime] License check rejected by user");
                 return -3;
             }
-            //SY_INFO("[CADApplicationRuntime] License accepted by user");
+            // SY_INFO("[CADApplicationRuntime] License accepted by user");
         }
         else
         {
@@ -104,10 +105,11 @@ int CADApplicationRuntime::run()
     m_bootstrapper->setStartWorkbenchId(m_startWorkbenchId);
 
     // 初始化引导器
-    //SY_DEBUG("[CADApplicationRuntime] Initializing bootstrapper");
+    // SY_DEBUG("[CADApplicationRuntime] Initializing bootstrapper");
     if (!m_bootstrapper->initialize())
     {
-        SY_ERROR("[CADApplicationRuntime] error code=app.bootstrap_init_failed message=AppBootstrapper initialization failed");
+        SY_ERROR("[CADApplicationRuntime] error code=app.bootstrap_init_failed message=AppBootstrapper initialization "
+                 "failed");
         return -2;
     }
 
@@ -117,7 +119,8 @@ int CADApplicationRuntime::run()
     // 验证引导结果
     if (!m_bootstrapper->compositionRoot())
     {
-        SY_ERROR("[CADApplicationRuntime] error code=app.bootstrap_no_root message=Bootstrap completed without a valid composition root");
+        SY_ERROR("[CADApplicationRuntime] error code=app.bootstrap_no_root message=Bootstrap completed without a valid "
+                 "composition root");
         return -2;
     }
 

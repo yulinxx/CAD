@@ -38,20 +38,23 @@ SceneDocument2D::SceneDocument2D(SceneEditService* editService)
 SceneDocument2D::~SceneDocument2D()
 {
     if (!m_editService)
+    {
         delete m_scene;
+    }
 }
 
 void SceneDocument2D::setEditService(SceneEditService* editService)
 {
     m_editService = editService;
     if (editService && !m_scene)
+    {
         m_scene = editService->sceneManager();
+    }
 }
 
 QString SceneDocument2D::createLine(const QPointF& start, const QPointF& end)
 {
-    auto line = std::make_unique<Eg::SyLine>(
-        std::vector<Ut::Vec2d>{ toVec2d(start), toVec2d(end) });
+    auto line = std::make_unique<Eg::SyLine>(std::vector<Ut::Vec2d>{ toVec2d(start), toVec2d(end) });
     Eg::SyEntity* added = nullptr;
 
     if (m_editService)
@@ -71,16 +74,22 @@ QString SceneDocument2D::createLine(const QPointF& start, const QPointF& end)
 QString SceneDocument2D::createPolyline(const QVector<QPointF>& points)
 {
     if (points.size() < 2)
+    {
         return {};
+    }
     std::vector<Ut::Vec2d> pts;
     pts.reserve(points.size());
     for (const auto& p : points)
+    {
         pts.push_back(toVec2d(p));
+    }
     auto line = std::make_unique<Eg::SyLine>(pts);
     Eg::SyEntity* added = nullptr;
 
     if (m_editService)
+    {
         added = m_editService->addEntity(std::move(line), "Create Polyline");
+    }
     else
     {
         m_scene->addEntity(line.release());
@@ -99,7 +108,9 @@ QString SceneDocument2D::createCircle(const QPointF& center, double radius)
     Eg::SyEntity* added = nullptr;
 
     if (m_editService)
+    {
         added = m_editService->addEntity(std::move(circle), "Create Circle");
+    }
     else
     {
         m_scene->addEntity(circle.release());
@@ -110,8 +121,7 @@ QString SceneDocument2D::createCircle(const QPointF& center, double radius)
     return id;
 }
 
-QString SceneDocument2D::createArc(const QPointF& center, double radius,
-    double startDeg, double endDeg)
+QString SceneDocument2D::createArc(const QPointF& center, double radius, double startDeg, double endDeg)
 {
     auto arc = std::make_unique<Eg::SyArc>();
     arc->basePoint = toVec2d(center);
@@ -121,7 +131,9 @@ QString SceneDocument2D::createArc(const QPointF& center, double radius,
     Eg::SyEntity* added = nullptr;
 
     if (m_editService)
+    {
         added = m_editService->addEntity(std::move(arc), "Create Arc");
+    }
     else
     {
         m_scene->addEntity(arc.release());
@@ -135,20 +147,26 @@ QString SceneDocument2D::createArc(const QPointF& center, double radius,
 QString SceneDocument2D::createPolygon(const QVector<QPointF>& vertices)
 {
     if (vertices.size() < 3)
+    {
         return {};
+    }
     auto polygon = std::make_unique<Eg::SyPolygon>();
     polygon->nSides = static_cast<int>(vertices.size());
     // 通过 verticesMutable() 可写接口填充多边形顶点
     auto& verts = polygon->verticesMutable();
     verts.reserve(vertices.size());
     for (const auto& v : vertices)
+    {
         verts.push_back(toVec2d(v));
+    }
     polygon->basePoint = verts.front();
     Eg::SyEntity* added = nullptr;
 
     // 优先通过编辑服务添加（支持撤销），否则直接添加到场景
     if (m_editService)
+    {
         added = m_editService->addEntity(std::move(polygon), "Create Polygon");
+    }
     else
     {
         m_scene->addEntity(polygon.release());
@@ -168,7 +186,9 @@ QString SceneDocument2D::createBezier2(const QPointF& start, const QPointF& cont
     Eg::SyEntity* added = nullptr;
 
     if (m_editService)
+    {
         added = m_editService->addEntity(std::move(bezier), "Create Bezier2");
+    }
     else
     {
         m_scene->addEntity(bezier.release());
@@ -179,8 +199,8 @@ QString SceneDocument2D::createBezier2(const QPointF& start, const QPointF& cont
     return id;
 }
 
-QString SceneDocument2D::createBezier(const QPointF& start, const QPointF& control1,
-    const QPointF& control2, const QPointF& end)
+QString SceneDocument2D::createBezier(
+    const QPointF& start, const QPointF& control1, const QPointF& control2, const QPointF& end)
 {
     auto bezier = std::make_unique<Eg::SyBezier>();
     bezier->basePoint = toVec2d(start);
@@ -190,7 +210,9 @@ QString SceneDocument2D::createBezier(const QPointF& start, const QPointF& contr
     Eg::SyEntity* added = nullptr;
 
     if (m_editService)
+    {
         added = m_editService->addEntity(std::move(bezier), "Create Bezier");
+    }
     else
     {
         m_scene->addEntity(bezier.release());
@@ -204,17 +226,23 @@ QString SceneDocument2D::createBezier(const QPointF& start, const QPointF& contr
 QString SceneDocument2D::createNurbs(const QVector<QPointF>& controlPoints)
 {
     if (controlPoints.size() < 2)
+    {
         return {};
+    }
     auto nurbs = std::make_unique<Eg::SyNurbs>();
     nurbs->nDegree = std::min(3, static_cast<int>(controlPoints.size()) - 1);
     nurbs->reserveControlPoints(controlPoints.size());
     for (const auto& p : controlPoints)
+    {
         nurbs->addControlPoint(toVec2d(p));
+    }
     nurbs->updateKnots();
     Eg::SyEntity* added = nullptr;
 
     if (m_editService)
+    {
         added = m_editService->addEntity(std::move(nurbs), "Create NURBS");
+    }
     else
     {
         m_scene->addEntity(nurbs.release());
@@ -228,18 +256,22 @@ QString SceneDocument2D::createNurbs(const QVector<QPointF>& controlPoints)
 QString SceneDocument2D::createSmartLine(const QVector<QPointF>& points)
 {
     if (points.size() < 2)
+    {
         return {};
+    }
     auto smartLine = std::make_unique<Eg::SySmartLine>();
     for (int i = 0; i < points.size() - 1; ++i)
     {
-        auto segment = std::make_unique<Eg::SyLine>(
-            std::vector<Ut::Vec2d>{ toVec2d(points[i]), toVec2d(points[i + 1]) });
+        auto segment =
+            std::make_unique<Eg::SyLine>(std::vector<Ut::Vec2d>{ toVec2d(points[i]), toVec2d(points[i + 1]) });
         smartLine->addSegment(segment.release(), true);
     }
     Eg::SyEntity* added = nullptr;
 
     if (m_editService)
+    {
         added = m_editService->addEntity(std::move(smartLine), "Create SmartLine");
+    }
     else
     {
         m_scene->addEntity(smartLine.release());
@@ -253,7 +285,9 @@ QString SceneDocument2D::createSmartLine(const QVector<QPointF>& points)
 QString SceneDocument2D::createText(const QPointF& position, const QString& text, double height)
 {
     if (text.isEmpty() || height <= 0.0)
+    {
         return {};
+    }
     auto textEntity = std::make_unique<Eg::SyText>();
     const auto strText = text.toStdString();
     textEntity->basePoint = toVec2d(position);
@@ -262,7 +296,9 @@ QString SceneDocument2D::createText(const QPointF& position, const QString& text
     Eg::SyEntity* added = nullptr;
 
     if (m_editService)
+    {
         added = m_editService->addEntity(std::move(textEntity), "Create Text");
+    }
     else
     {
         m_scene->addEntity(textEntity.release());
@@ -276,17 +312,23 @@ QString SceneDocument2D::createText(const QPointF& position, const QString& text
 QString SceneDocument2D::createSpline(const QVector<QPointF>& points)
 {
     if (points.size() < 2)
+    {
         return {};
+    }
     auto nurbs = std::make_unique<Eg::SyNurbs>();
     nurbs->nDegree = std::min(3, static_cast<int>(points.size()) - 1);
     nurbs->reserveControlPoints(points.size());
     for (const auto& p : points)
+    {
         nurbs->addControlPoint(toVec2d(p));
+    }
     nurbs->updateKnots();
     Eg::SyEntity* added = nullptr;
 
     if (m_editService)
+    {
         added = m_editService->addEntity(std::move(nurbs), "Create Spline");
+    }
     else
     {
         m_scene->addEntity(nurbs.release());
@@ -301,7 +343,9 @@ QString SceneDocument2D::entityIdAt(const QPointF& point, double tolerance) cons
 {
     auto hits = m_scene->queryByPoint(toVec2d(point), tolerance);
     if (hits.empty())
+    {
         return {};
+    }
     return QString::number(hits.front()->id);
 }
 
@@ -311,7 +355,9 @@ QVector<QString> SceneDocument2D::allEntityIdsQ() const
     QVector<QString> ids;
     ids.reserve(static_cast<int>(all.size()));
     for (const auto& e : all)
+    {
         ids.push_back(QString::number(e->id));
+    }
     return ids;
 }
 
@@ -356,7 +402,8 @@ bool SceneDocument2D::tryRemoveEntity(const QString& id)
     }
 
     SY_INFOF("[SceneDocument2D] entity removed: id=%s via=%s",
-        qPrintable(id), m_editService ? "SceneEditService" : "SceneManager");
+        qPrintable(id),
+        m_editService ? "SceneEditService" : "SceneManager");
     return true;
 }
 
@@ -365,7 +412,7 @@ void SceneDocument2D::removeEntity(const QString& id)
     (void)tryRemoveEntity(id);
 }
 
-void SceneDocument2D::forEachEntityId(void(*visitor)(const char*, void*), void* ctx) const
+void SceneDocument2D::forEachEntityId(void (*visitor)(const char*, void*), void* ctx) const
 {
     auto all = m_scene->getAllEntities();
     for (const auto& e : all)
@@ -389,7 +436,9 @@ void SceneDocument2D::removeEntity(const char* id)
 void SceneDocument2D::clear()
 {
     if (!m_scene)
+    {
         return;
+    }
 
     const auto count = m_scene->getAllEntities().size();
     m_scene->clearScene();

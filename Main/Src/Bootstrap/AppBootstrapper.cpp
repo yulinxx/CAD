@@ -17,24 +17,28 @@ namespace
         UiFrameworkServices services;
 
         if (!root)
+        {
             return services;
+        }
 
         services.stateCenter = root->stateCenter();
 
         // 错误报告回调：将错误信息输出到日志系统
         services.reportError = [](const QString& errorCode, const QString& message, const QString& context) {
-            SY_ERRORF("[Error] code=%s message=%s context=%s", errorCode.toUtf8().constData(), message.toUtf8().constData(),
+            SY_ERRORF("[Error] code=%s message=%s context=%s",
+                errorCode.toUtf8().constData(),
+                message.toUtf8().constData(),
                 context.toUtf8().constData());
-            };
+        };
 
         // 性能记录回调：记录关键操作的耗时
         services.recordPerformance = [](const QString& scope, qint64 elapsedMs) {
             SY_DEBUGF("[perf] %s: %lld ms", scope.toUtf8().constData(), static_cast<long long>(elapsedMs));
-            };
+        };
 
         return services;
     }
-} // namespace
+}  // namespace
 
 // 构建应用路径集合，从路径管理器获取各目录的标准路径
 AppPaths MainApp::buildAppPaths(const std::string& appName)
@@ -51,7 +55,9 @@ AppPaths MainApp::buildAppPaths(const std::string& appName)
 
 // 构造函数：初始化应用引导器，保存应用路径和版本信息
 AppBootstrapper::AppBootstrapper(const AppPaths& paths, const std::string& appName, const std::string& version)
-    : m_paths(paths), m_appName(appName), m_version(version)
+    : m_paths(paths)
+    , m_appName(appName)
+    , m_version(version)
 {
     // SY_INFOF("[AppBootstrapper] Created: name=%s, version=%s", appName.c_str(), version.c_str());
 }
@@ -73,32 +79,32 @@ bool AppBootstrapper::initialize()
     if (!m_compositionRoot)
     {
         SY_ERROR("[AppBootstrapper] error code=bootstrap.root_create_failed message=Failed to create "
-            "ApplicationCompositionRoot");
+                 "ApplicationCompositionRoot");
         return false;
     }
 
     if (!m_compositionRoot->stateCenter())
     {
         SY_ERROR("[AppBootstrapper] error code=bootstrap.root_missing_service message=ApplicationCompositionRoot "
-            "missing state center");
+                 "missing state center");
         return false;
     }
     if (!m_compositionRoot->themeService())
     {
         SY_ERROR("[AppBootstrapper] error code=bootstrap.root_missing_service message=ApplicationCompositionRoot "
-            "missing theme service");
+                 "missing theme service");
         return false;
     }
     if (!m_compositionRoot->layoutService())
     {
         SY_ERROR("[AppBootstrapper] error code=bootstrap.root_missing_service message=ApplicationCompositionRoot "
-            "missing layout service");
+                 "missing layout service");
         return false;
     }
     if (!m_compositionRoot->shellHost())
     {
         SY_ERROR("[AppBootstrapper] error code=bootstrap.root_missing_service message=ApplicationCompositionRoot "
-            "missing shell host");
+                 "missing shell host");
         return false;
     }
 
@@ -143,11 +149,15 @@ void AppBootstrapper::bootstrap()
     // SY_INFOF("[AppBootstrapper] Bootstrapping workbench: %s", startWorkbenchId.toUtf8().constData());
 
     if (m_compositionRoot->stateCenter())
+    {
         m_compositionRoot->stateCenter()->setCurrentWorkbenchId(startWorkbenchId);
+    }
 
 #if BUILD_UI3D
     if (startWorkbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0)
+    {
         m_workbench = std::make_unique<Workbench3D>();
+    }
     else
 #endif
         m_workbench = std::make_unique<Workbench2D>();
@@ -179,7 +189,9 @@ void AppBootstrapper::shutdown()
     if (m_compositionRoot)
     {
         if (auto* shell = m_compositionRoot->shellHost())
+        {
             shell->shutdown();
+        }
     }
 
     m_workbench.reset();

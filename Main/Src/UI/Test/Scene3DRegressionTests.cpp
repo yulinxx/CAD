@@ -25,7 +25,7 @@
 #include <QImage>
 #include <QPainter>
 
- // ==================== SceneManager3D 基础测试 ====================
+// ==================== SceneManager3D 基础测试 ====================
 
 namespace
 {
@@ -33,11 +33,11 @@ namespace
     std::unique_ptr<Eg::SyMeshEntity> makeTriangleMesh(const char* name = nullptr)
     {
         auto mesh = std::make_unique<Eg::SyMeshEntity>(name ? name : "");
-        mesh->vertices = { {0.f, 0.f, 0.f}, {1.f, 0.f, 0.f}, {0.f, 1.f, 0.f} };
+        mesh->vertices = { { 0.f, 0.f, 0.f }, { 1.f, 0.f, 0.f }, { 0.f, 1.f, 0.f } };
         mesh->normals = mesh->vertices;
         return mesh;
     }
-} // namespace
+}  // namespace
 
 TEST(Scene3DRegressionTest, SceneManager3D_DefaultConstruction)
 {
@@ -187,7 +187,9 @@ TEST(Scene3DRegressionTest, SimpleRenderer3D_RenderWithoutScene)
     // 时字体引擎未初始化会崩溃（0xC0000409）；与 SimpleRenderer3DTests.cpp 的 Render 测试约定一致：
     // 无 GUI 上下文时跳过实际渲染，仅保留可安全执行的冒烟部分。
     if (!qGuiApp)
+    {
         GTEST_SKIP() << "Render test requires Qt GUI context";
+    }
 
     SimpleRenderer3D renderer;
     renderer.initialize();
@@ -277,7 +279,9 @@ TEST(Scene3DRegressionTest, RenderWidget3DAdapter_StatusCallback)
     adapter.initialize();
 
     QString lastStatus;
-    adapter.setStatusCallback([&](const QString& msg) { lastStatus = msg; });
+    adapter.setStatusCallback([&](const QString& msg) {
+        lastStatus = msg;
+    });
 
     SUCCEED();
     adapter.shutdown();
@@ -289,7 +293,9 @@ TEST(Scene3DRegressionTest, RenderWidget3DAdapter_SelectionCallback)
     adapter.initialize();
 
     QString lastId;
-    adapter.setSelectionCallback([&](const QString& id) { lastId = id; });
+    adapter.setSelectionCallback([&](const QString& id) {
+        lastId = id;
+    });
 
     SUCCEED();
     adapter.shutdown();
@@ -301,7 +307,9 @@ TEST(Scene3DRegressionTest, RenderWidget3DAdapter_PathCallback)
     adapter.initialize();
 
     QStringList lastPaths;
-    adapter.setPathCallback([&](const QStringList& paths) { lastPaths = paths; });
+    adapter.setPathCallback([&](const QStringList& paths) {
+        lastPaths = paths;
+    });
 
     SUCCEED();
     adapter.shutdown();
@@ -310,7 +318,7 @@ TEST(Scene3DRegressionTest, RenderWidget3DAdapter_PathCallback)
 TEST(Scene3DRegressionTest, RenderWidget3DAdapter_IsOpenGL)
 {
     RenderWidget3DAdapter adapter;
-    EXPECT_TRUE(adapter.isOpenGL()); // Adapter 使用 OpenGL 渲染
+    EXPECT_TRUE(adapter.isOpenGL());  // Adapter 使用 OpenGL 渲染
 }
 
 TEST(Scene3DRegressionTest, RenderWidget3DAdapter_OrbitMode)
@@ -366,5 +374,5 @@ TEST(Scene3DRegressionTest, SimpleRenderer3D_ImplementsIRenderSurface)
 TEST(Scene3DRegressionTest, SimpleRenderer3D_IsNotOpenGL)
 {
     SimpleRenderer3D renderer;
-    EXPECT_FALSE(renderer.isOpenGL()); // SimpleRenderer3D 是软件渲染
+    EXPECT_FALSE(renderer.isOpenGL());  // SimpleRenderer3D 是软件渲染
 }

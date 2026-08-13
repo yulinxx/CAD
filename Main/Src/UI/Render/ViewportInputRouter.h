@@ -90,10 +90,12 @@ public:
     {
         return m_panning;
     }
+
     bool isPanModeEnabled() const
     {
         return m_panModeEnabled;
     }
+
     void setPanModeEnabled(bool enabled)
     {
         m_panModeEnabled = enabled;
@@ -114,8 +116,8 @@ private:
     bool dispatchMousePressToInput(const QPointF& worldPos, QMouseEvent* event);
     bool dispatchMouseMoveToInput(const QPointF& worldPos, QMouseEvent* event);
     bool dispatchMouseReleaseToInput(const QPointF& worldPos, QMouseEvent* event);
-    bool dispatchToActiveTool(const QPointF& worldPos, QMouseEvent* event,
-        bool (ITool::* handler)(const QPointF&, QMouseEvent*));
+    bool dispatchToActiveTool(
+        const QPointF& worldPos, QMouseEvent* event, bool (ITool::*handler)(const QPointF&, QMouseEvent*));
     bool dispatchToSelectorPress(const QPointF& worldPos, QMouseEvent* event);
     bool dispatchToSelectorRelease(const QPointF& worldPos, QMouseEvent* event);
 

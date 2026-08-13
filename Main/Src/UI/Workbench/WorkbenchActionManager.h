@@ -52,9 +52,16 @@ public:
 
     // ==================== 数据访问 ====================
 
-    OperationBus* operationBus() const { return m_operationBus; }
+    OperationBus* operationBus() const
+    {
+        return m_operationBus;
+    }
+
     /// 当前注册的快捷键数量（用于清理时的统计日志）
-    int shortcutCount() const { return static_cast<int>(m_registeredShortcuts.size()); }
+    int shortcutCount() const
+    {
+        return static_cast<int>(m_registeredShortcuts.size());
+    }
 
 private:
     /// 操作总线

@@ -38,15 +38,13 @@ struct Camera2D
     void zoomToFit(float vpW, float vpH, float sceneW, float sceneH);
 
     /// 缩放到世界空间 BBox，内部完成 zoomToFit + 居中平移
-    void zoomToBBox(float vpW, float vpH,
-        float minX, float minY, float maxX, float maxY);
+    void zoomToBBox(float vpW, float vpH, float minX, float minY, float maxX, float maxY);
 
     /// 以视口中心为锚点缩放（zoomIn/zoomOut 的便捷封装）
     void zoomAtCenter(float factor, float vpW, float vpH);
 
     /// 设置可见范围：以 (centerX, centerY) 为中心，半宽半高为 halfW/halfH
-    void setViewExtent(float vpW, float vpH,
-        float centerX, float centerY, float halfW, float halfH);
+    void setViewExtent(float vpW, float vpH, float centerX, float centerY, float halfW, float halfH);
 
     /// 重置到默认台面范围（1200x800，中心 600,400）
     void resetToDefault(float vpW, float vpH);

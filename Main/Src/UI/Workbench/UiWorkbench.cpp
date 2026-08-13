@@ -46,44 +46,44 @@
 #include "Import/ImportService.h"
 #include "Color/Color.hpp"
 #include "Log/SyLogger.h"
-#include "Ui/StatusBar/StatusBar.h"
+#include "UI/StatusBar/StatusBar.h"
 
 #include "UI/Settings/SettingsService.h"
 #include "UI2D/Settings/SettingsUiCoordinator2D.h"
 
 #if BUILD_UI3D
-#include "UiEntities.h"
-#include "UiViewport3D.h"
-#include "SceneBuilder3D.h"
+    #include "UiEntities.h"
+    #include "UiViewport3D.h"
+    #include "SceneBuilder3D.h"
 
-// 3D 服务与操作头文件（从 UiWorkbench.h 前向声明下沉）
-#include "UI/TopToolBar/TopToolBar3D.h"
-#include "UI/StatusBar/StatusBar3D.h"
-#include "UI/Settings/SettingsService.h"
-#include "UI/MainWindow/MainWindow3D.h"
-#include "UI/MenuManager/MenuManager3D.h"
-#include "UI/Algorithm/AlgorithmApplicationService.h"
+    // 3D 服务与操作头文件（从 UiWorkbench.h 前向声明下沉）
+    #include "UI/TopToolBar/TopToolBar3D.h"
+    #include "UI/StatusBar/StatusBar3D.h"
+    #include "UI/Settings/SettingsService.h"
+    #include "UI/MainWindow/MainWindow3D.h"
+    #include "UI/MenuManager/MenuManager3D.h"
+    #include "UI/Algorithm/AlgorithmApplicationService.h"
 
-#include "Engine3D/SceneManager3D.h"
-#include "UI3D/Service/ServicePack3D.h"
-#include "UI3D/Operation/OperationBus3D.h"
-#include "UI3D/Operation/CommandCatalog3D.h"
-#include "UI3D/Manager/DocumentManager3D.h"
-#include "UI3D/Edit/UndoRedoManager3D.h"
-#include "UI3D/Edit/SceneEditService3D.h"
+    #include "Engine3D/SceneManager3D.h"
+    #include "UI3D/Service/ServicePack3D.h"
+    #include "UI3D/Operation/OperationBus3D.h"
+    #include "UI3D/Operation/CommandCatalog3D.h"
+    #include "UI3D/Manager/DocumentManager3D.h"
+    #include "UI3D/Edit/UndoRedoManager3D.h"
+    #include "UI3D/Edit/SceneEditService3D.h"
 
-#include "UI3D/Service/SceneMonitor3D.h"
-#include "UI3D/Shortcut/ShortcutManager3D.h"
-#include "UI3D/Navigation/NavigationConfig3D.h"
-#include "UI3D/Service/SceneDocument3D.h"
-#include "UI3D/Service/CameraController3D.h"
-#include "UI3D/Settings/SettingsUiCoordinator3D.h"
-#include "UI3D/Operation/CommandActionHub3D.h"
-#include "UI3D/Operation/AlgorithmRunner3D.h"
+    #include "UI3D/Service/SceneMonitor3D.h"
+    #include "UI3D/Shortcut/ShortcutManager3D.h"
+    #include "UI3D/Navigation/NavigationConfig3D.h"
+    #include "UI3D/Service/SceneDocument3D.h"
+    #include "UI3D/Service/CameraController3D.h"
+    #include "UI3D/Settings/SettingsUiCoordinator3D.h"
+    #include "UI3D/Operation/CommandActionHub3D.h"
+    #include "UI3D/Operation/AlgorithmRunner3D.h"
 
-#ifdef ENABLE_GEOMODELCORE
-#include "UI3D/Service/BRepModelService3D.h"
-#endif
+    #ifdef ENABLE_GEOMODELCORE
+        #include "UI3D/Service/BRepModelService3D.h"
+    #endif
 
 // Workbench3D::ServiceOwner 定义（PIMPL：从 UiWorkbench.h 移至此）
 struct Workbench3D::ServiceOwner
@@ -102,17 +102,20 @@ struct Workbench3D::ServiceOwner
     std::unique_ptr<AlgorithmApplicationService> algorithmService;
     std::unique_ptr<SettingsUiCoordinator3D> settingsCoordinator;
     // 共享 singleton，非 ServiceOwner 所有，使用裸指针避免误删
-    SettingsService* settingsService{nullptr};
+    SettingsService* settingsService{ nullptr };
     std::unique_ptr<CommandActionHub3D> commandActionHub;
     std::unique_ptr<AlgorithmRunner3D> algorithmRunner;
 
-#ifdef ENABLE_GEOMODELCORE
+    #ifdef ENABLE_GEOMODELCORE
     std::unique_ptr<BRepModelService3D> brepModelService;
-#endif
+    #endif
 };
 
 // 自定义删除器定义（ServiceOwner 在此处已完整定义）
-void Workbench3D::ServiceOwnerDeleter::operator()(ServiceOwner* p) const { delete p; }
+void Workbench3D::ServiceOwnerDeleter::operator()(ServiceOwner* p) const
+{
+    delete p;
+}
 #endif
 
 namespace
@@ -127,7 +130,7 @@ namespace
         label->setStyleSheet(QStringLiteral("background:#f0f0f0;border:1px solid #ccc;padding:20px;"));
         return label;
     }
-}
+}  // namespace
 
 WorkbenchStateSnapshot UiWorkbench::currentSnapshot() const
 {
@@ -222,15 +225,19 @@ namespace
     bool workbenchFlagEnabled(const QStringList& workbenches, const QString& workbenchId)
     {
         if (workbenches.isEmpty())
+        {
             return true;
+        }
         for (const auto& wb : workbenches)
         {
             if (wb.compare(workbenchId, Qt::CaseInsensitive) == 0)
+            {
                 return true;
+            }
         }
         return false;
     }
-}
+}  // namespace
 
 bool Workbench2D::isCommandRegistered(const QString& commandId) const
 {
@@ -241,8 +248,7 @@ void Workbench2D::dispatchCommand(const QString& commandId)
 {
     if (!m_services.operationBus)
     {
-        SY_WARNF("[Workbench2D] Cannot dispatch command without OperationBus: %s",
-            qPrintable(commandId));
+        SY_WARNF("[Workbench2D] Cannot dispatch command without OperationBus: %s", qPrintable(commandId));
         return;
     }
 
@@ -252,7 +258,8 @@ void Workbench2D::dispatchCommand(const QString& commandId)
     if (menuId != static_cast<UI::MenuActionId>(0))
     {
         SY_INFOF("[Workbench2D] Dispatch command='%s' menuId=%d source=Menu",
-            qPrintable(commandId), static_cast<int>(menuId));
+            qPrintable(commandId),
+            static_cast<int>(menuId));
         OperationRouting::dispatch(menuId);
         return;
     }
@@ -287,7 +294,9 @@ QString Workbench2D::displayName() const
 bool Workbench2D::initialize(const UiServices& services)
 {
     if (!services.stateCenter || !services.interactionDispatcher)
+    {
         return false;
+    }
     m_services = services;
 
     // 阶段1收口：SelectionService 已由组合根创建并经 UiServices.selectionService 注入，
@@ -307,7 +316,9 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
 {
     auto* viewport = createCentralViewport(window, nullptr);
     if (!viewport)
+    {
         return;
+    }
 
     window.setCentralWidget(viewport);
 
@@ -337,7 +348,9 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
 bool Workbench2D::showSettingsDialog(QWidget* /*parent*/)
 {
     if (!m_settingsCoordinator || !m_viewport)
+    {
         return false;
+    }
 
     // 2D 无 GridSnapManager/UnitManager 实例，传递 nullptr（coordinator 已做空指针保护）
     RenderWidget* widget = m_viewport->renderWidget();
@@ -363,12 +376,15 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
     // P1: 视口通过信号通知上层，不直接持有编辑服务
     if (m_services.sceneEditService)
     {
-        QObject::connect(vp, &RenderViewport2D::entitySubmitRequested,
-            [service = m_services.sceneEditService](Eg::SyEntity* e) {
-                if (e) service->addEntityFromPointer(e, "Draw");
+        QObject::connect(
+            vp, &RenderViewport2D::entitySubmitRequested, [service = m_services.sceneEditService](Eg::SyEntity* e) {
+                if (e)
+                {
+                    service->addEntityFromPointer(e, "Draw");
+                }
             });
-        QObject::connect(vp, &RenderViewport2D::nudgeRequested,
-            [service = m_services.sceneEditService](double dx, double dy) {
+        QObject::connect(
+            vp, &RenderViewport2D::nudgeRequested, [service = m_services.sceneEditService](double dx, double dy) {
                 service->nudgeSelected(dx, dy, "Move endpoint");
             });
     }
@@ -400,23 +416,33 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
 void Workbench2D::setupImportCallbacks(RenderViewport2D* vp, WorkbenchWindow& window)
 {
     if (!m_services.importService)
+    {
         return;
+    }
 
     // 导入后自动 zoomToFit
     m_services.importService->setViewportFitCallback([vp]() {
-        QTimer::singleShot(0, vp, [vp]() { vp->zoomToFit(); });
+        QTimer::singleShot(0, vp, [vp]() {
+            vp->zoomToFit();
+        });
     });
 
     // 场景树刷新（导入后重建树结构）
     m_services.importService->setTreeRebuildCallback([&window]() {
         auto* dock = window.sceneTreeDock();
-        if (dock) dock->refresh();
+        if (dock)
+        {
+            dock->refresh();
+        }
     });
 
     // 属性面板刷新（导入后更新属性显示）
     m_services.importService->setPropertyRefreshCallback([&window]() {
         auto* props = window.propertiesDock();
-        if (props) props->refresh();
+        if (props)
+        {
+            props->refresh();
+        }
     });
 }
 
@@ -455,8 +481,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     DrawToolSwitchRegistry(m_services.operationBus, m_viewport).registerAll();
 
     // 双向状态同步：视口切换工具后高亮对应按钮；启动时初始化为当前活动工具（SelectTool）。
-    QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged,
-        drawWidget, &DrawToolBarWidget::updateActiveTool);
+    QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged, drawWidget, &DrawToolBarWidget::updateActiveTool);
     drawWidget->updateActiveTool(m_viewport->activeToolName());
 
     // CommandActionHub：管理所有 QAction 的创建与绑定
@@ -492,9 +517,7 @@ SceneTreeDockWidget* Workbench2D::createLayersDock(WorkbenchWindow& window) cons
 void Workbench2D::activate()
 {
     // 从状态快照恢复（首次激活使用 m_initialState，后续使用 m_savedState）
-    const auto& snapshot = m_savedState.viewMode.isEmpty()
-        ? m_initialState
-        : m_savedState;
+    const auto& snapshot = m_savedState.viewMode.isEmpty() ? m_initialState : m_savedState;
     restoreFromSnapshot(snapshot);
 
     // 恢复工具状态：将快照中的工具 ID 应用到视口
@@ -546,7 +569,9 @@ void Workbench2D::shutdown()
 void Workbench2D::releaseCentralWidgetGLResources(QWidget* centralWidget) const
 {
     if (auto* vp = qobject_cast<RenderViewport2D*>(centralWidget))
+    {
         vp->releaseGLResources();
+    }
 }
 
 QString Workbench2D::formatSelectionText(const UiStateSnapshot& state) const
@@ -565,49 +590,50 @@ QString Workbench2D::formatSelectionText(const UiStateSnapshot& state) const
 // 使用 MainWindow3D + ServiceLocator3D 架构
 // 渲染链路：Viewport3D -> IRenderer3D -> RenderWidget3DAdapter -> RenderWidget3D
 
-#include "UI3D/Service/ServiceLocator3D.h"
-#include "UI3D/Service/ServicePack3D.h"
-#include "UI3D/Operation/OperationBus3D.h"
-#include "UI3D/Operation/CommandCatalog3D.h"
-#include "UI3D/Operation/CommandActionHub3D.h"
-#include "UI3D/Operation/CommandRegistry3D.h"
-#include "UI3D/Manager/DocumentManager3D.h"
+    #include "UI3D/Service/ServiceLocator3D.h"
+    #include "UI3D/Service/ServicePack3D.h"
+    #include "UI3D/Operation/OperationBus3D.h"
+    #include "UI3D/Operation/CommandCatalog3D.h"
+    #include "UI3D/Operation/CommandActionHub3D.h"
+    #include "UI3D/Operation/CommandRegistry3D.h"
+    #include "UI3D/Manager/DocumentManager3D.h"
 
-#include "UI3D/Edit/UndoRedoManager3D.h"
-#include "UI3D/Edit/SceneEditService3D.h"
-#include "UI3D/Service/SceneMonitor3D.h"
-#include "UI3D/Shortcut/ShortcutManager3D.h"
-#include "UI3D/Navigation/NavigationConfig3D.h"
-#include "UI3D/Service/SceneDocument3D.h"
-#include "UI3D/Service/CameraController3D.h"
-#include "UI3D/Settings/SettingsUiCoordinator3D.h"
-#include "UI3D/Algorithm/AlgorithmTaskRegistration3D.h"
-#include "UI3D/Operation/AlgorithmRunner3D.h"
-#include "UI/Algorithm/AlgorithmApplicationService.h"
+    #include "UI3D/Edit/UndoRedoManager3D.h"
+    #include "UI3D/Edit/SceneEditService3D.h"
+    #include "UI3D/Service/SceneMonitor3D.h"
+    #include "UI3D/Shortcut/ShortcutManager3D.h"
+    #include "UI3D/Navigation/NavigationConfig3D.h"
+    #include "UI3D/Service/SceneDocument3D.h"
+    #include "UI3D/Service/CameraController3D.h"
+    #include "UI3D/Settings/SettingsUiCoordinator3D.h"
+    #include "UI3D/Algorithm/AlgorithmTaskRegistration3D.h"
+    #include "UI3D/Operation/AlgorithmRunner3D.h"
+    #include "UI/Algorithm/AlgorithmApplicationService.h"
 
-#ifdef ENABLE_GEOMODELCORE
-#include "UI3D/Service/BRepModelService3D.h"
-#endif
+    #ifdef ENABLE_GEOMODELCORE
+        #include "UI3D/Service/BRepModelService3D.h"
+    #endif
 
-#include "Render3D/RenderWidget3D.h"
-#include "RenderWidget3DAdapter.h"
-#include "UI/MainWindow/MainWindow3D.h"
-#include "UI/LeftToolBar/LeftToolBar3D.h"
-#include "UI/RightToolBar/RightToolBar3D.h"
+    #include "Render3D/RenderWidget3D.h"
+    #include "RenderWidget3DAdapter.h"
+    #include "UI/MainWindow/MainWindow3D.h"
+    #include "UI/LeftToolBar/LeftToolBar3D.h"
+    #include "UI/RightToolBar/RightToolBar3D.h"
 
-#include "UI/MenuManager/MenuManager3D.h"
-#include "UI/MenuManager/FileMenu3D.h"
-#include "UI/MenuManager/EditMenu3D.h"
-#include "UI/MenuManager/ViewMenu3D.h"
-#include "UI/MenuManager/HelpMenu3D.h"
-#include "Engine3D/SceneManager3D.h"
-#include "Renderer3DFactory.h"
-#include "Log/SyLogger.h"
+    #include "UI/MenuManager/MenuManager3D.h"
+    #include "UI/MenuManager/FileMenu3D.h"
+    #include "UI/MenuManager/EditMenu3D.h"
+    #include "UI/MenuManager/ViewMenu3D.h"
+    #include "UI/MenuManager/HelpMenu3D.h"
+    #include "Engine3D/SceneManager3D.h"
+    #include "Renderer3DFactory.h"
+    #include "Log/SyLogger.h"
 
 QString Workbench3D::id() const
 {
     return QStringLiteral("3D");
 }
+
 QString Workbench3D::displayName() const
 {
     return QObject::tr("3D Workbench");
@@ -622,8 +648,7 @@ void Workbench3D::dispatchCommand(const QString& commandId)
 {
     if (!m_services3D.operationBus)
     {
-        SY_WARNF("[Workbench3D] Cannot dispatch command without OperationBus3D: %s",
-            qPrintable(commandId));
+        SY_WARNF("[Workbench3D] Cannot dispatch command without OperationBus3D: %s", qPrintable(commandId));
         return;
     }
 
@@ -649,7 +674,9 @@ QString Workbench3D::commandText(const QString& commandId) const
 bool Workbench3D::initialize(const UiServices& services)
 {
     if (!services.stateCenter || !services.interactionDispatcher)
+    {
         return false;
+    }
     m_services = services;
 
     // 使用 ApplicationCompositionRoot 中的共享 SceneManager3D，
@@ -675,7 +702,9 @@ bool Workbench3D::initialize(const UiServices& services)
 Workbench3D::~Workbench3D()
 {
     if (m_serviceOwner)
+    {
         shutdown();
+    }
 }
 
 // 2 — 构建 3D 工作台 UI
@@ -705,15 +734,14 @@ void Workbench3D::create3DServices()
     own.operationBus = std::make_unique<OperationBus3D>(nullptr);
     own.documentManager = std::make_unique<DocumentManager3D>(nullptr);
     own.undoRedoManager = std::make_unique<UndoRedoManager3D>(nullptr);
-    own.sceneEditService = std::make_unique<SceneEditService3D>(
-        m_sceneManager3D, own.undoRedoManager.get(), own.documentManager.get());
+    own.sceneEditService =
+        std::make_unique<SceneEditService3D>(m_sceneManager3D, own.undoRedoManager.get(), own.documentManager.get());
     own.sceneMonitor = std::make_unique<SceneMonitor3D>(nullptr);
     own.shortcutManager = std::make_unique<ShortcutManager3D>(nullptr);
     own.navigationConfig = std::make_unique<NavigationConfig3D>();
     own.sceneDocument = std::make_unique<SceneDocument3D>(m_sceneManager3D);
     own.sceneDocumentAdapter = std::make_unique<SceneDocument3DAdapter>();
-    auto sceneManagerAlias = std::shared_ptr<Eg::SceneManager3D>(
-        m_sceneManager3D, [](Eg::SceneManager3D*) {});
+    auto sceneManagerAlias = std::shared_ptr<Eg::SceneManager3D>(m_sceneManager3D, [](Eg::SceneManager3D*) {});
     own.sceneDocumentAdapter->setEngineScene(sceneManagerAlias);
     own.cameraController = std::make_unique<CameraController3D>();
     own.algorithmService = std::make_unique<AlgorithmApplicationService>(nullptr);
@@ -721,14 +749,18 @@ void Workbench3D::create3DServices()
     own.settingsService->init();
     own.settingsCoordinator = std::make_unique<SettingsUiCoordinator3D>(own.settingsService, own.navigationConfig.get());
 
-#ifdef ENABLE_GEOMODELCORE
+    #ifdef ENABLE_GEOMODELCORE
     own.brepModelService = std::make_unique<BRepModelService3D>();
-#endif
+    #endif
 
     if (own.undoRedoManager)
+    {
         own.undoRedoManager->setSceneManager(m_sceneManager3D);
+    }
     if (own.sceneMonitor)
+    {
         own.sceneMonitor->rewatch(m_sceneManager3D);
+    }
 
     AlgorithmTaskRegistration3D::registerAll(*own.algorithmService);
 
@@ -746,9 +778,9 @@ void Workbench3D::create3DServices()
     m_services3D.settingsService = own.settingsService;
     m_services3D.settingsCoordinator = own.settingsCoordinator.get();
 
-#ifdef ENABLE_GEOMODELCORE
+    #ifdef ENABLE_GEOMODELCORE
     m_services3D.brepModelService = own.brepModelService.get();
-#endif
+    #endif
 
     ServiceLocator3D::adopt(m_services3D);
     SY_INFO("[Workbench3D] 3D services created and adopted");
@@ -766,7 +798,7 @@ void Workbench3D::setup3DViewportAndSignals(WorkbenchWindow& window)
     connect(m_mainWindow3D.get(), &MainWindow3D::sigSwitchTo2D, &window, [&window]() {
         SY_INFO("[Workbench3D] sigSwitchTo2D triggered, switching to 2D workbench");
         window.triggerWorkbench(QStringLiteral("2D"));
-        });
+    });
 
     // 创建视口并设置渲染器
     create3DViewport(window);
@@ -796,18 +828,18 @@ void Workbench3D::create3DViewport(WorkbenchWindow& window)
 
     viewport->setRenderer(std::move(renderer));
     viewport->setSceneDocument(m_serviceOwner->sceneDocumentAdapter.get());
-    SY_INFOF("[Workbench3D] SceneDocument3DAdapter set to Viewport3D: %p",
-        m_serviceOwner->sceneDocumentAdapter.get());
+    SY_INFOF("[Workbench3D] SceneDocument3DAdapter set to Viewport3D: %p", m_serviceOwner->sceneDocumentAdapter.get());
 
     // 从适配器中取出内部 RenderWidget3D 指针，注册到 ServicePack3D
     // 这样新号绑定、SceneEditService3D、操作注册等都能访问到实际的渲染控件
     if (auto* r3dAdapter = dynamic_cast<RenderWidget3DAdapter*>(viewport->renderer()))
     {
         m_services3D.renderWidget = r3dAdapter->widget();
-        SY_INFOF("[Workbench3D] RenderWidget3D registered to ServicePack3D: %p",
-            m_services3D.renderWidget);
+        SY_INFOF("[Workbench3D] RenderWidget3D registered to ServicePack3D: %p", m_services3D.renderWidget);
         if (m_services3D.sceneEditService && m_services3D.renderWidget)
+        {
             m_services3D.sceneEditService->bindRenderWidget(m_services3D.renderWidget);
+        }
     }
     else
     {
@@ -836,7 +868,9 @@ void Workbench3D::bind3DRenderSignals(ServiceOwner& own)
     {
         viewport->setInputHandler([this](QEvent* event) {
             if (!event || !m_services3D.operationBus)
+            {
                 return false;
+            }
 
             if (event->type() == QEvent::KeyPress)
             {
@@ -856,15 +890,23 @@ void Workbench3D::bind3DRenderSignals(ServiceOwner& own)
 void Workbench3D::bind3DCursorSignal()
 {
     auto* renderWidget = m_services3D.renderWidget;
-    connect(renderWidget, &RenderWidget3D::sigCursorWorldPosition,
+    connect(renderWidget,
+        &RenderWidget3D::sigCursorWorldPosition,
         [stateCenter = m_services.stateCenter](float x, float y, float z, bool valid) {
-            if (!stateCenter) return;
+            if (!stateCenter)
+            {
+                return;
+            }
             QVariantMap meta;
             if (valid)
-                meta[QStringLiteral("positionText")] = QObject::tr("Position: (%1, %2, %3) mm")
-                .arg(x, 0, 'f', 2).arg(y, 0, 'f', 2).arg(z, 0, 'f', 2);
+            {
+                meta[QStringLiteral("positionText")] =
+                    QObject::tr("Position: (%1, %2, %3) mm").arg(x, 0, 'f', 2).arg(y, 0, 'f', 2).arg(z, 0, 'f', 2);
+            }
             else
+            {
                 meta[QStringLiteral("positionText")] = QObject::tr("Position: -");
+            }
             stateCenter->setMetadata(meta);
         });
 }
@@ -874,25 +916,32 @@ void Workbench3D::bind3DSelectionSignal()
 {
     auto* renderWidget = m_services3D.renderWidget;
     // 跨 DLL 安全：信号参数改为 POD 指针数组
-    connect(renderWidget, &RenderWidget3D::sigSelectionChanged,
+    connect(renderWidget,
+        &RenderWidget3D::sigSelectionChanged,
         [stateCenter = m_services.stateCenter](const Eg::SyMeshEntity** entities, int count) {
-            if (!stateCenter) return;
+            if (!stateCenter)
+            {
+                return;
+            }
             QString modelName;
             if (count > 0 && entities && entities[0])
+            {
                 modelName = QString::number(entities[0]->id);
+            }
 
             QVariantMap meta;
             meta[QStringLiteral("3d_selCount")] = count;
             meta[QStringLiteral("3d_modelName")] = modelName;
 
             if (count > 0)
+            {
                 stateCenter->setSelectionContext(
-                    QObject::tr("3D-Viewport"),
-                    QObject::tr("%1 entities selected").arg(count));
+                    QObject::tr("3D-Viewport"), QObject::tr("%1 entities selected").arg(count));
+            }
             else
-                stateCenter->setSelectionContext(
-                    QObject::tr("3D-Viewport"),
-                    QStringLiteral("none"));
+            {
+                stateCenter->setSelectionContext(QObject::tr("3D-Viewport"), QStringLiteral("none"));
+            }
             stateCenter->setMetadata(meta);
         });
 }
@@ -901,17 +950,16 @@ void Workbench3D::bind3DSelectionSignal()
 void Workbench3D::bind3DDeleteKeySignal()
 {
     auto* renderWidget = m_services3D.renderWidget;
-    connect(renderWidget, &RenderWidget3D::sigKeyPressed,
-        this, [this](int key, Qt::KeyboardModifiers) {
-            if (key == Qt::Key_Delete || key == Qt::Key_Backspace)
+    connect(renderWidget, &RenderWidget3D::sigKeyPressed, this, [this](int key, Qt::KeyboardModifiers) {
+        if (key == Qt::Key_Delete || key == Qt::Key_Backspace)
+        {
+            if (m_services3D.operationBus)
             {
-                if (m_services3D.operationBus)
-                {
-                    SY_INFO("[Workbench3D] Delete key pressed (renderWidget signal), running Edit_Delete operation");
-                    m_services3D.operationBus->run(OperationId3D::Edit_Delete);
-                }
+                SY_INFO("[Workbench3D] Delete key pressed (renderWidget signal), running Edit_Delete operation");
+                m_services3D.operationBus->run(OperationId3D::Edit_Delete);
             }
-        });
+        }
+    });
 }
 
 /// 创建全局删除快捷键
@@ -926,7 +974,7 @@ void Workbench3D::setup3DDeleteShortcuts(WorkbenchWindow& window)
             SY_INFO("[Workbench3D] Delete shortcut activated, running Edit_Delete operation");
             m_services3D.operationBus->run(OperationId3D::Edit_Delete);
         }
-        });
+    });
     window.registerShortcut(m_deleteShortcut);
 
     // 全局 Backspace 快捷键
@@ -938,7 +986,7 @@ void Workbench3D::setup3DDeleteShortcuts(WorkbenchWindow& window)
             SY_INFO("[Workbench3D] Backspace shortcut activated, running Edit_Delete operation");
             m_services3D.operationBus->run(OperationId3D::Edit_Delete);
         }
-        });
+    });
     window.registerShortcut(m_backspaceShortcut);
 }
 
@@ -953,12 +1001,13 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
 
     own.commandActionHub = std::make_unique<CommandActionHub3D>(mainWindow3D);
     own.algorithmRunner = std::make_unique<AlgorithmRunner3D>(
-        own.algorithmService.get(), m_sceneManager3D,
-        own.sceneEditService.get(), mainWindow3D);
+        own.algorithmService.get(), m_sceneManager3D, own.sceneEditService.get(), mainWindow3D);
     m_services3D.commandActionHub = own.commandActionHub.get();
     m_services3D.algorithmRunner = own.algorithmRunner.get();
     if (own.settingsCoordinator)
+    {
         own.settingsCoordinator->init();
+    }
 
     SY_INFO("[Workbench3D] Calling CommandRegistry3D::registerAll()...");
     CommandRegistry3D::registerAll(mainWindow3D);
@@ -970,35 +1019,42 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     SY_INFO("[Workbench3D] CommandActionHub3D rebuilt with all actions");
 
     // 2. 创建菜单骨架到 WorkbenchWindow 菜单栏
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
+    #ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
     // 配置驱动模式下，WorkbenchMenuManager 负责统一创建 2D / 3D 菜单。
     // MenuManager3D 仍保留为 3D 专用 ActionHub/菜单适配器，不再直接清空并创建窗口菜单。
     SY_INFO("[Workbench3D] Config-driven menu mode: using WorkbenchMenuManager");
-#else
+    #else
     m_menuManager3D = std::make_unique<MenuManager3D>(mainWindow3D);
     m_menuManager3D->createMenus(window.menuBar());
-#endif
+    #endif
 
-#ifndef SANYI_ENABLE_CONFIG_DRIVEN_UI
+    #ifndef SANYI_ENABLE_CONFIG_DRIVEN_UI
     // 3. 绑定菜单 Action（在 rebuildAll 之后，action() 才有有效指针）
     if (auto* fm = qobject_cast<FileMenu3D*>(m_menuManager3D->fileMenu()))
+    {
         own.commandActionHub->bindFileMenu(fm);
+    }
     if (auto* em = m_menuManager3D->editMenu())
+    {
         own.commandActionHub->bindEditMenu(em);
+    }
     if (auto* vm = m_menuManager3D->viewMenu())
+    {
         own.commandActionHub->bindViewMenu(vm);
-#ifdef ENABLE_GEOMODELCORE
+    }
+        #ifdef ENABLE_GEOMODELCORE
     if (auto* sm = m_menuManager3D->solidMenu())
+    {
         own.commandActionHub->bindSolidMenu(sm);
-#endif
+    }
+        #endif
 
     // 4. 连接非 hub 菜单信号（hub action 已由 wireAction 直接连接 OperationBus）
     m_menuManager3D->connectMenuSignals();
     SY_INFO("[Workbench3D] MenuManager3D initialized on WorkbenchWindow menubar");
 
-    connect(m_menuManager3D.get(), &MenuManager3D::sigMenuAction,
-        this, &Workbench3D::onMenuAction);
-#endif
+    connect(m_menuManager3D.get(), &MenuManager3D::sigMenuAction, this, &Workbench3D::onMenuAction);
+    #endif
 
     // 5. 转移并绑定工具栏。
     // 菜单由统一配置路径生成，3D CommandActionHub 继续负责高频工具栏动作。
@@ -1044,21 +1100,31 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     // 将光标世界坐标信号直接连接到 StatusBar3D 的位置标签
     if (m_services3D.renderWidget)
     {
-        connect(m_services3D.renderWidget, &RenderWidget3D::sigCursorWorldPosition,
-            m_statusBar3D, [sb3d = m_statusBar3D](float x, float y, float z, bool valid) {
+        connect(m_services3D.renderWidget,
+            &RenderWidget3D::sigCursorWorldPosition,
+            m_statusBar3D,
+            [sb3d = m_statusBar3D](float x, float y, float z, bool valid) {
                 if (valid)
-                    sb3d->setPositionText(QObject::tr("Position: (%1, %2, %3) mm")
-                        .arg(x, 0, 'f', 2).arg(y, 0, 'f', 2).arg(z, 0, 'f', 2));
+                {
+                    sb3d->setPositionText(
+                        QObject::tr("Position: (%1, %2, %3) mm").arg(x, 0, 'f', 2).arg(y, 0, 'f', 2).arg(z, 0, 'f', 2));
+                }
                 else
+                {
                     sb3d->setPositionText(QObject::tr("Position: -"));
+                }
             });
 
         // 将选中变化信号直接连接到 StatusBar3D 的选择/模型标签
-        connect(m_services3D.renderWidget, &RenderWidget3D::sigSelectionChanged,
-            m_statusBar3D, [sb3d = m_statusBar3D](const Eg::SyMeshEntity** entities, int count) {
+        connect(m_services3D.renderWidget,
+            &RenderWidget3D::sigSelectionChanged,
+            m_statusBar3D,
+            [sb3d = m_statusBar3D](const Eg::SyMeshEntity** entities, int count) {
                 QString modelName;
                 if (count > 0 && entities && entities[0])
+                {
                     modelName = QString::number(entities[0]->id);
+                }
                 sb3d->setSelectionInfo(count, modelName, 0);
             });
     }
@@ -1084,7 +1150,9 @@ void Workbench3D::onMenuAction(int actionId, const QVariantMap& params)
     }
 
     if (!m_services3D.operationBus)
+    {
         return;
+    }
 
     const auto operationId = CommandCatalog3D::operationForMenu(menuId);
     if (operationId != OperationId3D::None)
@@ -1107,9 +1175,7 @@ void Workbench3D::attachToWindow(WorkbenchWindow& window)
 void Workbench3D::activate()
 {
     // 从状态快照恢复（与 2D 保持一致）
-    const auto& snapshot = m_savedState.viewMode.isEmpty()
-        ? m_initialState
-        : m_savedState;
+    const auto& snapshot = m_savedState.viewMode.isEmpty() ? m_initialState : m_savedState;
     restoreFromSnapshot(snapshot);
 
     if (m_services.stateCenter)
@@ -1194,7 +1260,9 @@ void Workbench3D::shutdown()
 void Workbench3D::releaseCentralWidgetGLResources(QWidget* centralWidget) const
 {
     if (auto* vp = qobject_cast<Viewport3D*>(centralWidget))
+    {
         vp->releaseGLResources();
+    }
 }
 
 QString Workbench3D::formatSelectionText(const UiStateSnapshot& state) const
@@ -1215,10 +1283,10 @@ bool Workbench3D::managesOwnMenus() const
 {
     // 配置驱动模式下由 WorkbenchMenuManager 统一构建 2D/3D 菜单（见 setup3DMenuAndShortcuts），
     // 3D 不再自行管理窗口菜单栏；仅旧路径（MenuManager3D）由本工作台自理。
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
+    #ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
     return false;
-#else
+    #else
     return true;
-#endif
+    #endif
 }
 #endif

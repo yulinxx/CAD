@@ -7,7 +7,9 @@
 void UiPanelRegistry::registerPanel(const QString& id, PanelFactory factory)
 {
     if (id.isEmpty() || !factory)
+    {
         return;
+    }
     m_factories.insert(id, std::move(factory));
 }
 

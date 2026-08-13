@@ -28,7 +28,9 @@ namespace
 
         double lenSq = abx * abx + aby * aby;
         if (lenSq < 1e-12)
+        {
             return std::hypot(apx, apy);
+        }
 
         double t = (apx * abx + apy * aby) / lenSq;
         t = std::max(0.0, std::min(1.0, t));
@@ -38,7 +40,7 @@ namespace
 
         return std::hypot(p.x() - closestX, p.y() - closestY);
     }
-}
+}  // namespace
 
 ViewportSelector::ViewportSelector(Eg::SceneManager* sceneManager,
     ISelectionService* selectionService,
@@ -54,7 +56,9 @@ ViewportSelector::ViewportSelector(Eg::SceneManager* sceneManager,
 bool ViewportSelector::handleClick(const QPointF& worldPos)
 {
     if (!m_sceneManager || !m_selectionService)
+    {
         return false;
+    }
 
     performHitTest(worldPos);
     return true;
@@ -68,11 +72,11 @@ void ViewportSelector::beginBoxSelect(const QPointF& worldPos)
     m_boxSelectEnd = worldPos;
 
     if (!m_renderWidget)
+    {
         return;
+    }
 
-    Render::BBox2d bbox(
-        worldPos.x(), worldPos.y(),
-        worldPos.x(), worldPos.y());
+    Render::BBox2d bbox(worldPos.x(), worldPos.y(), worldPos.x(), worldPos.y());
     m_renderWidget->setSelectionBox(&bbox, QColor(204, 102, 0, 200));
 }
 
@@ -81,11 +85,11 @@ void ViewportSelector::updateBoxSelect(const QPointF& worldPos)
     m_boxSelectEnd = worldPos;
 
     if (!m_renderWidget)
+    {
         return;
+    }
 
-    Render::BBox2d bbox(
-        m_boxSelectStart.x(), m_boxSelectStart.y(),
-        worldPos.x(), worldPos.y());
+    Render::BBox2d bbox(m_boxSelectStart.x(), m_boxSelectStart.y(), worldPos.x(), worldPos.y());
     m_renderWidget->setSelectionBox(&bbox, QColor(204, 102, 0, 200));
 }
 
@@ -94,10 +98,14 @@ size_t ViewportSelector::endBoxSelect(const QPointF& worldPos)
     m_boxSelecting = false;
 
     if (m_renderWidget)
+    {
         m_renderWidget->setSelectionBox(nullptr, QColor());
+    }
 
     if (!m_camera || !m_sceneManager || !m_selectionService)
+    {
         return 0;
+    }
 
     double dx = std::abs(worldPos.x() - m_boxSelectStart.x());
     double dy = std::abs(worldPos.y() - m_boxSelectStart.y());
@@ -110,7 +118,9 @@ size_t ViewportSelector::endBoxSelect(const QPointF& worldPos)
     }
 
     if (!m_sceneManager || !m_selectionService)
+    {
         return 0;
+    }
 
     double minX = std::min(m_boxSelectStart.x(), worldPos.x());
     double maxX = std::max(m_boxSelectStart.x(), worldPos.x());
@@ -121,7 +131,10 @@ size_t ViewportSelector::endBoxSelect(const QPointF& worldPos)
 
     for (const auto* entity : m_sceneManager->getAllEntities())
     {
-        if (!entity) continue;
+        if (!entity)
+        {
+            continue;
+        }
 
         bool inside = false;
 
@@ -130,8 +143,7 @@ size_t ViewportSelector::endBoxSelect(const QPointF& worldPos)
             auto* line = static_cast<const Eg::SyLine*>(entity);
             for (const auto& pt : line->pointRef())
             {
-                if (pt.x() >= minX && pt.x() <= maxX &&
-                    pt.y() >= minY && pt.y() <= maxY)
+                if (pt.x() >= minX && pt.x() <= maxX && pt.y() >= minY && pt.y() <= maxY)
                 {
                     inside = true;
                     break;
@@ -141,8 +153,7 @@ size_t ViewportSelector::endBoxSelect(const QPointF& worldPos)
         else if (entity->eType == Eg::EType::CIRCLE || entity->eType == Eg::EType::ARC)
         {
             const auto& c = entity->basePoint;
-            if (c.x() >= minX && c.x() <= maxX &&
-                c.y() >= minY && c.y() <= maxY)
+            if (c.x() >= minX && c.x() <= maxX && c.y() >= minY && c.y() <= maxY)
             {
                 inside = true;
             }
@@ -152,8 +163,7 @@ size_t ViewportSelector::endBoxSelect(const QPointF& worldPos)
             auto* polygon = static_cast<const Eg::SyPolygon*>(entity);
             for (const auto& v : polygon->vertices())
             {
-                if (v.x() >= minX && v.x() <= maxX &&
-                    v.y() >= minY && v.y() <= maxY)
+                if (v.x() >= minX && v.x() <= maxX && v.y() >= minY && v.y() <= maxY)
                 {
                     inside = true;
                     break;
@@ -162,7 +172,9 @@ size_t ViewportSelector::endBoxSelect(const QPointF& worldPos)
         }
 
         if (inside)
+        {
             hitIds.push_back(std::to_string(entity->id));
+        }
     }
 
     m_selectionService->clear();
@@ -172,19 +184,30 @@ size_t ViewportSelector::endBoxSelect(const QPointF& worldPos)
         std::vector<const char*> idPtrs;
         idPtrs.reserve(hitIds.size());
         for (const auto& id : hitIds)
+        {
             idPtrs.push_back(id.c_str());
+        }
         m_selectionService->selectMultiple(idPtrs.data(), idPtrs.size());
         if (m_statusCallback)
+        {
             m_statusCallback(QStringLiteral("2D %1 entities selected").arg(static_cast<int>(hitIds.size())));
+        }
         if (m_selectionCallback)
-            m_selectionCallback(QStringLiteral("2D-Select"), QStringLiteral("2D %1 entities selected").arg(static_cast<int>(hitIds.size())));
+        {
+            m_selectionCallback(QStringLiteral("2D-Select"),
+                QStringLiteral("2D %1 entities selected").arg(static_cast<int>(hitIds.size())));
+        }
     }
     else
     {
         if (m_statusCallback)
+        {
             m_statusCallback(QStringLiteral("2D selection cleared"));
+        }
         if (m_selectionCallback)
+        {
             m_selectionCallback(QStringLiteral("2D-Select"), QStringLiteral("none"));
+        }
     }
 
     return hitIds.size();
@@ -195,14 +218,18 @@ size_t ViewportSelector::endBoxSelect(const QPointF& worldPos)
 QString ViewportSelector::selectedEntityId() const
 {
     if (!m_selectionService)
+    {
         return {};
+    }
 
     QString firstId;
     m_selectionService->visitSelectedIds(
         [](const char* id, void* ctx) {
             auto* out = static_cast<QString*>(ctx);
             if (out->isEmpty())
+            {
                 *out = QString::fromUtf8(id);
+            }
         },
         &firstId);
     return firstId;
@@ -211,32 +238,43 @@ QString ViewportSelector::selectedEntityId() const
 void ViewportSelector::selectEntityById(const QString& entityId)
 {
     if (!m_selectionService)
+    {
         return;
+    }
 
     m_selectionService->clear();
     auto utf8 = entityId.toUtf8();
     m_selectionService->select(utf8.constData());
 
     if (m_statusCallback)
+    {
         m_statusCallback(QStringLiteral("2D entity selected"));
+    }
     if (m_selectionCallback)
-        m_selectionCallback(QStringLiteral("2D-Select"),
-            QStringLiteral("2D entity: %1").arg(entityId));
+    {
+        m_selectionCallback(QStringLiteral("2D-Select"), QStringLiteral("2D entity: %1").arg(entityId));
+    }
 }
 
 void ViewportSelector::clearSelection()
 {
     if (m_selectionService)
+    {
         m_selectionService->clear();
+    }
 
     if (m_statusCallback)
+    {
         m_statusCallback(QStringLiteral("2D selection cleared"));
+    }
 }
 
 std::optional<Ut::BBox2d> ViewportSelector::selectionBBox() const
 {
     if (!m_selectionService || !m_sceneManager)
+    {
         return std::nullopt;
+    }
 
     // 通过 ID 遍历选中项，再用 SceneManager 查询实体指针合并 BBox
     // 这样 ISelectionService 保持纯 ID 接口，不泄漏 SyEntity*
@@ -246,20 +284,27 @@ std::optional<Ut::BBox2d> ViewportSelector::selectionBBox() const
         bool hasEntity = false;
         Eg::SceneManager* sceneManager = nullptr;
     } ctx;
+
     ctx.sceneManager = m_sceneManager;
 
     m_selectionService->visitSelectedIds(
         [](const char* id, void* context) {
             if (!id)
+            {
                 return;
+            }
             auto* bc = static_cast<BBoxContext*>(context);
             // ID 字符串 -> EntityId -> SyEntity*
             auto eid = Eg::parseEntityId(std::string(id));
             if (!eid)
+            {
                 return;
+            }
             Eg::SyEntity* entity = bc->sceneManager->findEntityById(*eid);
             if (!entity)
+            {
                 return;
+            }
             Ut::BBox2d bbox = entity->getBbox();
             if (bbox.isValid())
             {
@@ -270,7 +315,9 @@ std::optional<Ut::BBox2d> ViewportSelector::selectionBBox() const
         &ctx);
 
     if (!ctx.hasEntity || !ctx.combined.isValid())
+    {
         return std::nullopt;
+    }
 
     return ctx.combined;
 }
@@ -278,7 +325,9 @@ std::optional<Ut::BBox2d> ViewportSelector::selectionBBox() const
 void ViewportSelector::performHitTest(const QPointF& worldPos)
 {
     if (!m_sceneManager || !m_selectionService)
+    {
         return;
+    }
 
     double tol = kHitTolerancePx / m_camera->zoomX;
 
@@ -287,7 +336,10 @@ void ViewportSelector::performHitTest(const QPointF& worldPos)
 
     for (const auto* entity : m_sceneManager->getAllEntities())
     {
-        if (!entity) continue;
+        if (!entity)
+        {
+            continue;
+        }
 
         double dist = std::numeric_limits<double>::max();
 
@@ -300,10 +352,11 @@ void ViewportSelector::performHitTest(const QPointF& worldPos)
                 {
                     const auto& p0 = line->pointRef()[i - 1];
                     const auto& p1 = line->pointRef()[i];
-                    double d = distPointToSegment(worldPos,
-                        QPointF(p0.x(), p0.y()),
-                        QPointF(p1.x(), p1.y()));
-                    if (d < dist) dist = d;
+                    double d = distPointToSegment(worldPos, QPointF(p0.x(), p0.y()), QPointF(p1.x(), p1.y()));
+                    if (d < dist)
+                    {
+                        dist = d;
+                    }
                 }
             }
         }
@@ -312,14 +365,20 @@ void ViewportSelector::performHitTest(const QPointF& worldPos)
             auto* circle = static_cast<const Eg::SyCircle*>(entity);
             const auto& c = entity->basePoint;
             double d = std::abs(std::hypot(worldPos.x() - c.x(), worldPos.y() - c.y()) - circle->dRadius);
-            if (d < dist) dist = d;
+            if (d < dist)
+            {
+                dist = d;
+            }
         }
         else if (entity->eType == Eg::EType::ARC)
         {
             auto* arc = static_cast<const Eg::SyArc*>(entity);
             const auto& c = entity->basePoint;
             double d = std::abs(std::hypot(worldPos.x() - c.x(), worldPos.y() - c.y()) - arc->dRadius);
-            if (d < dist) dist = d;
+            if (d < dist)
+            {
+                dist = d;
+            }
         }
 
         if (dist < minDist)
@@ -334,15 +393,24 @@ void ViewportSelector::performHitTest(const QPointF& worldPos)
     {
         m_selectionService->select(hitId.c_str());  // P2 ABI 收口: const char* 替代 std::string
         if (m_statusCallback)
+        {
             m_statusCallback(QStringLiteral("2D entity selected"));
+        }
         if (m_selectionCallback)
-            m_selectionCallback(QStringLiteral("2D-Select"), QStringLiteral("2D entity: %1").arg(QString::fromStdString(hitId)));
+        {
+            m_selectionCallback(
+                QStringLiteral("2D-Select"), QStringLiteral("2D entity: %1").arg(QString::fromStdString(hitId)));
+        }
     }
     else
     {
         if (m_statusCallback)
+        {
             m_statusCallback(QStringLiteral("2D selection cleared"));
+        }
         if (m_selectionCallback)
+        {
             m_selectionCallback(QStringLiteral("2D-Select"), QStringLiteral("none"));
+        }
     }
 }

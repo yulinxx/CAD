@@ -23,9 +23,9 @@
 #include <vector>
 #include <string>
 
- // ============================================================================
- // 测试用观察者 — 记录所有收到的通知
- // ============================================================================
+// ============================================================================
+// 测试用观察者 — 记录所有收到的通知
+// ============================================================================
 
 class TestObserver : public Eg::SceneNotifier::IObserver
 {
@@ -119,7 +119,7 @@ TEST(SceneNotifierTest, AddRemoveObserver_Multiple)
     notifier.notifySceneChanged();
 
     EXPECT_EQ(obs1.m_calls.size(), 1u);
-    EXPECT_TRUE(obs2.m_calls.empty());   // 已移除，不应收到
+    EXPECT_TRUE(obs2.m_calls.empty());  // 已移除，不应收到
     EXPECT_EQ(obs3.m_calls.size(), 1u);
 }
 
@@ -437,10 +437,10 @@ TEST(SceneNotifierTest, Batch_NestedBatch)
     notifier.beginBatch();  // 嵌套批量
     notifier.notifySceneChanged();
 
-    notifier.endBatch();    // 内层结束，不刷新
+    notifier.endBatch();  // 内层结束，不刷新
     EXPECT_TRUE(obs.m_calls.empty());
 
-    notifier.endBatch();    // 外层结束，刷新
+    notifier.endBatch();  // 外层结束，刷新
     EXPECT_EQ(obs.m_calls.size(), 1u);
 }
 

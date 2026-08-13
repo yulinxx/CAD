@@ -31,13 +31,13 @@
 class FrameTimer;
 
 class RenderWidget;
+
 namespace Eg
 {
     class SceneManager;
 }
 
-class SceneRefreshCoordinator : public QObject
-    , private Eg::SceneNotifier::IObserver  // P5: 观察者注册收敛到协调器
+class SceneRefreshCoordinator : public QObject, private Eg::SceneNotifier::IObserver  // P5: 观察者注册收敛到协调器
 {
     Q_OBJECT
 

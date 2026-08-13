@@ -30,9 +30,8 @@ namespace Eg
  * @param outType     输出图元类型（LineStrip/LineLoop/PointList）
  * @return true 转换成功，false 表示该类型不支持增量路径（如文本）
  */
-bool entityToVertices(const Eg::SyEntity* entity,
-    std::vector<render::VertexP3C3>& outVertices,
-    render::PrimitiveType& outType);
+bool entityToVertices(
+    const Eg::SyEntity* entity, std::vector<render::VertexP3C3>& outVertices, render::PrimitiveType& outType);
 
 /**
  * @brief 清空曲线离散化缓存

@@ -66,13 +66,12 @@ bool RecentFileRepository::append(const RecentFileRecord& record)
     // 控制列表上限，删除超出上限的最旧记录
     constexpr int kMaxRecentFiles = 10;
     std::string deleteSql = "DELETE FROM recent_files WHERE id NOT IN "
-        "(SELECT id FROM recent_files ORDER BY last_opened_at DESC LIMIT "
-        + std::to_string(kMaxRecentFiles) + ")";
+                            "(SELECT id FROM recent_files ORDER BY last_opened_at DESC LIMIT " +
+        std::to_string(kMaxRecentFiles) + ")";
     if (!m_database.execute(deleteSql))
     {
         // 删除超限记录失败不影响主流程，记录警告即可
-        SY_WARNF("[RecentFileRepository] Failed to trim excess records: %s",
-            m_database.lastError().c_str());
+        SY_WARNF("[RecentFileRepository] Failed to trim excess records: %s", m_database.lastError().c_str());
     }
 
     SY_DEBUGF("[RecentFileRepository] Appended recent file: %s", record.filePath.c_str());
@@ -103,22 +102,40 @@ RecentFileRecord RecentFileRepository::rowToRecord(const std::map<std::string, s
 {
     RecentFileRecord rec;
     auto it = row.find("id");
-    if (it != row.end()) rec.id = std::stoi(it->second);
+    if (it != row.end())
+    {
+        rec.id = std::stoi(it->second);
+    }
     it = row.find("file_path");
-    if (it != row.end()) rec.filePath = it->second;
+    if (it != row.end())
+    {
+        rec.filePath = it->second;
+    }
     it = row.find("title");
-    if (it != row.end()) rec.title = it->second;
+    if (it != row.end())
+    {
+        rec.title = it->second;
+    }
     it = row.find("format");
-    if (it != row.end()) rec.format = it->second;
+    if (it != row.end())
+    {
+        rec.format = it->second;
+    }
     it = row.find("last_opened_at");
-    if (it != row.end()) rec.lastOpenedTime = it->second;
+    if (it != row.end())
+    {
+        rec.lastOpenedTime = it->second;
+    }
     return rec;
 }
 
 std::map<std::string, std::string> RecentFileRepository::recordToRow(const RecentFileRecord& rec) const
 {
     std::map<std::string, std::string> row;
-    if (rec.id > 0) row["id"] = std::to_string(rec.id);
+    if (rec.id > 0)
+    {
+        row["id"] = std::to_string(rec.id);
+    }
     row["file_path"] = rec.filePath;
     row["title"] = rec.title;
     row["format"] = rec.format;

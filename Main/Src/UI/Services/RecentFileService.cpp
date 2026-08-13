@@ -8,7 +8,8 @@
 #include "Persistence/Repositories/RecentFileRepository.h"
 #include "Persistence/Models/RecentFileRecord.h"
 
-RecentFileService::RecentFileService(PersistenceService* persistence) : m_persistence(persistence)
+RecentFileService::RecentFileService(PersistenceService* persistence)
+    : m_persistence(persistence)
 {
 }
 
@@ -25,7 +26,9 @@ PersistenceService* RecentFileService::persistenceService() const
 void RecentFileService::addRecentFile(const QString& filePath)
 {
     if (filePath.isEmpty())
+    {
         return;
+    }
 
     // 数据库端写入
     if (m_persistence && m_persistence->isOpen() && m_persistence->recentFiles())
@@ -44,7 +47,9 @@ void RecentFileService::addRecentFile(const QString& filePath)
     files.removeAll(filePath);
     files.prepend(filePath);
     while (files.size() > kMaxRecentFiles)
+    {
         files.removeLast();
+    }
     saveRecentFiles(files);
 }
 
@@ -59,7 +64,9 @@ QStringList RecentFileService::loadRecentFiles() const
             QStringList result;
             result.reserve(static_cast<int>(records.size()));
             for (const auto& rec : records)
+            {
                 result.append(QString::fromStdString(rec.filePath));
+            }
             return result;
         }
     }

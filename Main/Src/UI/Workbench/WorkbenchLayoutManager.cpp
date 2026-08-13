@@ -29,23 +29,23 @@
 #include <QPointer>
 
 #ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
-#include "ClientConfig/UiConfigLoader.h"
-#include "ClientConfig/UiConfigurationManager.h"
-#include "ClientConfig/UiLayoutBuilder.h"
-#include "ClientConfig/UiPanelRegistry.h"
+    #include "ClientConfig/UiConfigLoader.h"
+    #include "ClientConfig/UiConfigurationManager.h"
+    #include "ClientConfig/UiLayoutBuilder.h"
+    #include "ClientConfig/UiPanelRegistry.h"
 
 namespace
 {
     /// 客户配置资源路径（编译期由 SANYI_CLIENT_ID 决定）
     QString clientConfigResourcePath()
     {
-#ifndef SANYI_CLIENT_ID
+    #ifndef SANYI_CLIENT_ID
         return QStringLiteral(":/configs/san_yi.json");
-#else
+    #else
         return QStringLiteral(":/configs/%1.json").arg(QString::fromUtf8(SANYI_CLIENT_ID));
-#endif
+    #endif
     }
-}
+}  // namespace
 #endif
 
 WorkbenchLayoutManager::WorkbenchLayoutManager(QMainWindow* parent, WorkbenchMenuManager* menuManager)
@@ -85,12 +85,12 @@ void WorkbenchLayoutManager::buildDockAreas()
         return;
     }
     SY_WARNF("[WorkbenchLayoutManager] Config-driven dock build failed, "
-        "falling back to hardcoded skeleton");
+             "falling back to hardcoded skeleton");
 #endif
 
     // 场景树面板
     m_panelState.sceneTreeDock = new SceneTreeDockWidget(m_parent);
-    m_panelState.leftDock = new QDockWidget(m_parent->tr("Scene"), m_parent); // 场景
+    m_panelState.leftDock = new QDockWidget(m_parent->tr("Scene"), m_parent);  // 场景
     m_panelState.leftDock->setObjectName(QStringLiteral("SceneDock"));
     m_panelState.leftDock->setWidget(m_panelState.sceneTreeDock);
     m_panelState.leftDock->setMinimumWidth(180);
@@ -99,7 +99,7 @@ void WorkbenchLayoutManager::buildDockAreas()
 
     // 属性面板
     m_panelState.propertiesDock = new PropertiesPanelWidget(m_parent);
-    m_panelState.rightDock = new QDockWidget(m_parent->tr("Properties"), m_parent); // 属性
+    m_panelState.rightDock = new QDockWidget(m_parent->tr("Properties"), m_parent);  // 属性
     m_panelState.rightDock->setObjectName(QStringLiteral("PropertiesDock"));
     m_panelState.rightDock->setWidget(m_panelState.propertiesDock);
     m_panelState.rightDock->setMinimumWidth(200);
@@ -117,23 +117,26 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
         m_panelRegistry = std::make_unique<UiPanelRegistry>();
 
         // 注册内置面板工厂：与 JSON 中的 widgetType 对应
-        m_panelRegistry->registerPanel(QStringLiteral("SceneTreePanel"),
-            [](QWidget* parent) { return static_cast<QWidget*>(new SceneTreeDockWidget(parent)); });
-        m_panelRegistry->registerPanel(QStringLiteral("PropertiesPanel"),
-            [](QWidget* parent) { return static_cast<QWidget*>(new PropertiesPanelWidget(parent)); });
+        m_panelRegistry->registerPanel(QStringLiteral("SceneTreePanel"), [](QWidget* parent) {
+            return static_cast<QWidget*>(new SceneTreeDockWidget(parent));
+        });
+        m_panelRegistry->registerPanel(QStringLiteral("PropertiesPanel"), [](QWidget* parent) {
+            return static_cast<QWidget*>(new PropertiesPanelWidget(parent));
+        });
     }
 
     const QString resourcePath = clientConfigResourcePath();
     if (!m_configManager->applyConfiguration(resourcePath, ConfigFallbackPolicy::Strict))
     {
-        SY_ERRORF("[WorkbenchLayoutManager] Failed to load client config: %s",
-            qPrintable(resourcePath));
+        SY_ERRORF("[WorkbenchLayoutManager] Failed to load client config: %s", qPrintable(resourcePath));
         return false;
     }
 
     const UiConfigData* config = m_configManager->configData();
     if (!config)
+    {
         return false;
+    }
 
     // 数据驱动构建 Dock（命令分发器此处不参与，仅为构造签名提供空实现）
     struct NullDispatcher : public IUiCommandDispatcher
@@ -142,10 +145,10 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
         {
             return false;
         }
-        void dispatch(const QString&) override
-        {
-        }
+
+        void dispatch(const QString&) override {}
     };
+
     NullDispatcher dispatcher;
     UiLayoutBuilder builder(m_parent, &dispatcher, m_panelRegistry.get());
     builder.buildDocks(config->docks);
@@ -162,14 +165,22 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
             // 同步面板状态引用，保持与硬编码路径一致的对外接口
             const QString dockId = dock->objectName();
             if (dockId == QStringLiteral("SceneDock"))
+            {
                 m_panelState.leftDock = dock;
+            }
             else if (dockId == QStringLiteral("PropertiesDock"))
+            {
                 m_panelState.rightDock = dock;
+            }
 
             if (auto* tree = qobject_cast<SceneTreeDockWidget*>(dock->widget()))
+            {
                 m_panelState.sceneTreeDock = tree;
+            }
             if (auto* props = qobject_cast<PropertiesPanelWidget*>(dock->widget()))
+            {
                 m_panelState.propertiesDock = props;
+            }
         }
     }
 
@@ -225,9 +236,13 @@ QDockWidget* WorkbenchLayoutManager::registerDockWidget(const QString& title, QW
 
     // 仅更新面板状态引用，方便后续统一刷新与清理
     if (auto* tree = qobject_cast<SceneTreeDockWidget*>(widget))
+    {
         m_panelState.sceneTreeDock = tree;
+    }
     if (auto* props = qobject_cast<PropertiesPanelWidget*>(widget))
+    {
         m_panelState.propertiesDock = props;
+    }
 
     return dock;
 }
@@ -263,7 +278,9 @@ void WorkbenchLayoutManager::clearLayoutContent()
         for (auto* act : actions)
         {
             if (act)
+            {
                 act->disconnect();
+            }
         }
         mb->clear();
     }
@@ -295,10 +312,14 @@ void WorkbenchLayoutManager::clearLayoutContent()
         SY_INFO("[clearLayoutContent] Step A: releasing GL resources");
         // 2D 视口：释放 RenderWidget (QOpenGLWidget) 的 GL 资源
         if (auto* vp2d = qobject_cast<RenderViewport2D*>(oldCentral))
+        {
             vp2d->releaseGLResources();
+        }
         // 3D 视口：关闭渲染器持有的 GL 资源
         else if (auto* vp3d = qobject_cast<Viewport3D*>(oldCentral))
+        {
             vp3d->releaseGLResources();
+        }
 
         SY_INFO("[clearLayoutContent] Step B: setCentralWidget(nullptr)");
         m_parent->setCentralWidget(nullptr);
@@ -323,7 +344,9 @@ void WorkbenchLayoutManager::saveLayoutSnapshot(const QString& workbenchId)
 {
     // 布局快照只保存窗口外观，不保存业务状态；业务状态由状态中心负责
     if (workbenchId.isEmpty())
+    {
         return;
+    }
 
     // 优先使用数据库持久化，失败时回退到 QSettings
     if (m_persistenceService && m_persistenceService->isOpen() && m_persistenceService->workspaceSnapshots())
@@ -350,7 +373,9 @@ void WorkbenchLayoutManager::restoreLayoutSnapshot(const QString& workbenchId)
     // 布局恢复只还原窗口外观，不在这里恢复业务状态，避免状态源不统一
     // 注意：不恢复窗口几何尺寸（geometry），保持当前窗口位置和大小不变
     if (workbenchId.isEmpty())
+    {
         return;
+    }
 
     // 优先从数据库加载
     QByteArray state;
@@ -374,7 +399,9 @@ void WorkbenchLayoutManager::restoreLayoutSnapshot(const QString& workbenchId)
     }
 
     if (!state.isEmpty())
+    {
         m_parent->restoreState(state);
+    }
 
     // restoreState() 会覆盖 dock widget 的标题，需要重新设置为当前工作台的标题
     restoreDockWidgetTitles();
@@ -386,16 +413,22 @@ void WorkbenchLayoutManager::restoreDockWidgetTitles()
     {
         const auto title = dock->property("_workbench_dock_title").toString();
         if (!title.isEmpty())
+        {
             dock->setWindowTitle(title);
+        }
     }
 }
 
 void WorkbenchLayoutManager::setSkeletonDocksVisible(bool visible)
 {
     if (m_panelState.leftDock)
+    {
         m_panelState.leftDock->setVisible(visible);
+    }
     if (m_panelState.rightDock)
+    {
         m_panelState.rightDock->setVisible(visible);
+    }
 
     // 注意：posLabel/selLabel/msgLabel 已移除 —— 这些由 StatusBarBase 子类管理
     // 工作台状态栏 widget 的显示/隐藏由 WorkbenchWindow::setSkeletonDocksVisible 控制
@@ -407,7 +440,9 @@ void WorkbenchLayoutManager::updateBusyIndicator(bool busy)
 {
     // 繁忙指示器只表达忙闲状态，不承载命令细节或工作台切换细节
     if (!m_panelState.statusBar)
+    {
         return;
+    }
 
     if (busy)
     {

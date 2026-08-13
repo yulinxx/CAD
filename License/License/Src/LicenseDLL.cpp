@@ -8,7 +8,7 @@
 #include <string>
 
 #define LICENSE_STRINGIFY_IMPL(x) #x
-#define LICENSE_STRINGIFY(x) LICENSE_STRINGIFY_IMPL(x)
+#define LICENSE_STRINGIFY(x)      LICENSE_STRINGIFY_IMPL(x)
 
 struct LicenseContext
 {
@@ -76,20 +76,20 @@ namespace
     {
         switch (flavor)
         {
-            case LICENSE_GUARD_STARTUP:
-                return LicenseGuard::Flavor_Startup;
-            case LICENSE_GUARD_SAVE:
-                return LicenseGuard::Flavor_Save;
-            case LICENSE_GUARD_EXPORT:
-                return LicenseGuard::Flavor_Export;
-            case LICENSE_GUARD_RENDER:
-                return LicenseGuard::Flavor_Render;
-            case LICENSE_GUARD_GENERIC:
-            default:
-                return LicenseGuard::Flavor_Generic;
+        case LICENSE_GUARD_STARTUP:
+            return LicenseGuard::Flavor_Startup;
+        case LICENSE_GUARD_SAVE:
+            return LicenseGuard::Flavor_Save;
+        case LICENSE_GUARD_EXPORT:
+            return LicenseGuard::Flavor_Export;
+        case LICENSE_GUARD_RENDER:
+            return LicenseGuard::Flavor_Render;
+        case LICENSE_GUARD_GENERIC:
+        default:
+            return LicenseGuard::Flavor_Generic;
         }
     }
-}
+}  // namespace
 
 extern "C"
 {
@@ -100,10 +100,8 @@ extern "C"
 
     const char* License_GetVersionString(void)
     {
-        static const char kVersionString[] =
-            LICENSE_STRINGIFY(LICENSE_VERSION_MAJOR) "."
-            LICENSE_STRINGIFY(LICENSE_VERSION_MINOR) "."
-            LICENSE_STRINGIFY(LICENSE_VERSION_PATCH);
+        static const char kVersionString[] = LICENSE_STRINGIFY(LICENSE_VERSION_MAJOR) "." LICENSE_STRINGIFY(
+            LICENSE_VERSION_MINOR) "." LICENSE_STRINGIFY(LICENSE_VERSION_PATCH);
         return kVersionString;
     }
 

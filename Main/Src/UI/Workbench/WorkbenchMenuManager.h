@@ -25,7 +25,7 @@ struct UiConfigData;
 struct MenuDispatcher;
 #endif
 
-using WorkbenchFactory = std::function<UiWorkbench* (const QString& workbenchId)>;
+using WorkbenchFactory = std::function<UiWorkbench*(const QString& workbenchId)>;
 
 class WorkbenchMenuManager : public QObject
 {
@@ -53,8 +53,12 @@ public:
     /// 算法执行 / 仅展示模式下，全局启用或禁用全部菜单交互（含子菜单项）。
     /// 例如算法后台运行时调用 setAllMenusEnabled(false) 使整栏置灰仅展示，完成后传 true 恢复。
     void setAllMenusEnabled(bool enabled);
+
     /// 所属主窗口（供命令分发器转发工作台切换等窗口级动作）
-    WorkbenchWindow* workbenchWindow() const { return m_window; }
+    WorkbenchWindow* workbenchWindow() const
+    {
+        return m_window;
+    }
 #ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
     /// 通过菜单配置重建菜单（JSON 驱动）
     void rebuildMenusFromConfig();
@@ -88,22 +92,27 @@ public:
     {
         return m_menuState.fileMenu;
     }
+
     QMenu* recentFilesMenu() const
     {
         return m_menuState.recentFilesMenu;
     }
+
     QMenu* importMenu() const
     {
         return m_menuState.importMenu;
     }
+
     QMenu* exportMenu() const
     {
         return m_menuState.exportMenu;
     }
+
     QAction* workbench2DAction() const
     {
         return m_menuState.workbench2DAction;
     }
+
     QAction* workbench3DAction() const
     {
         return m_menuState.workbench3DAction;
@@ -123,12 +132,15 @@ private:
     enum MenuActionOption : int
     {
         MenuActionOption_None = 0,
-        MenuActionOption_Checkable = 1 << 0,   // 可勾选（视口开关、单位、主题等）
-        MenuActionOption_Theme = 1 << 1,       // 主题切换：commandId 即主题 ID，直接触发 triggerTheme
+        MenuActionOption_Checkable = 1 << 0,  // 可勾选（视口开关、单位、主题等）
+        MenuActionOption_Theme = 1 << 1,      // 主题切换：commandId 即主题 ID，直接触发 triggerTheme
     };
 
-    QAction* addMenuAction(QMenu* menu, const QString& text, const QString& commandId,
-        const QString& fallbackIcon = QString(), int options = MenuActionOption_None);
+    QAction* addMenuAction(QMenu* menu,
+        const QString& text,
+        const QString& commandId,
+        const QString& fallbackIcon = QString(),
+        int options = MenuActionOption_None);
 #ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
     void bindConfiguredMenuState();
     void refreshConfiguredMenuState();

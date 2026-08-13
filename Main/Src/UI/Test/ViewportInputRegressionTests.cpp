@@ -31,7 +31,7 @@
 #include <chrono>
 #include <thread>
 
- // 记录一帧，并保证两次时钟读取间隔非零（避免高精度时钟落在同一 tick 导致 avg==0 的抖动失败）
+// 记录一帧，并保证两次时钟读取间隔非零（避免高精度时钟落在同一 tick 导致 avg==0 的抖动失败）
 static void recordOneFrame(FrameTimer& timer)
 {
     timer.beginFrame();
@@ -672,19 +672,23 @@ TEST(FrameTimerRegressionTest, MultipleFrames_AverageIsStable)
     FrameTimer timer;
 
     for (int i = 0; i < 50; ++i)
+    {
         recordOneFrame(timer);
+    }
 
     double avg1 = timer.avgFrameMs();
     EXPECT_GT(avg1, 0.0);
 
     for (int i = 0; i < 50; ++i)
+    {
         recordOneFrame(timer);
+    }
 
     double avg2 = timer.avgFrameMs();
     EXPECT_GT(avg2, 0.0);
 
     // 平均帧时应在合理范围内（不强制具体值，因为取决于系统性能）
-    EXPECT_LT(avg2, 1000.0); // 应小于 1 秒
+    EXPECT_LT(avg2, 1000.0);  // 应小于 1 秒
 }
 
 TEST(FrameTimerRegressionTest, ResetAfterUse_ClearsAll)
@@ -841,7 +845,9 @@ TEST(ViewportSelectorRegressionTest, StatusCallback_IsInvoked)
     ViewportSelector selector(&scene, &selSvc, &camera, nullptr);
 
     bool called = false;
-    selector.setStatusCallback([&called](const QString& msg) { called = true; });
+    selector.setStatusCallback([&called](const QString& msg) {
+        called = true;
+    });
 
     selector.handleClick(QPointF(50, 50));
     EXPECT_TRUE(called);
@@ -863,7 +869,9 @@ TEST(ViewportSelectorRegressionTest, SelectionCallback_IsInvokedOnSelect)
     ViewportSelector selector(&scene, &selSvc, &camera, nullptr);
 
     bool called = false;
-    selector.setSelectionCallback([&called](const QString& src, const QString& text) { called = true; });
+    selector.setSelectionCallback([&called](const QString& src, const QString& text) {
+        called = true;
+    });
 
     selector.handleClick(QPointF(30, 30));
     // 点击在图元附近时应触发选择回调
@@ -996,7 +1004,9 @@ TEST(ToolSelectorInteractionTest, SelectionCallback_AfterToolDeactivation)
     ViewportSelector selector(&scene, &selSvc, &camera, nullptr);
 
     bool selectCalled = false;
-    selector.setSelectionCallback([&selectCalled](const QString& src, const QString& text) { selectCalled = true; });
+    selector.setSelectionCallback([&selectCalled](const QString& src, const QString& text) {
+        selectCalled = true;
+    });
 
     // 点击图元附近应触发选择
     selector.handleClick(QPointF(30, 30));
@@ -1012,7 +1022,9 @@ TEST(ToolSelectorInteractionTest, StatusCallback_AfterSelection)
     ViewportSelector selector(&scene, &selSvc, &camera, nullptr);
 
     QString lastStatus;
-    selector.setStatusCallback([&lastStatus](const QString& msg) { lastStatus = msg; });
+    selector.setStatusCallback([&lastStatus](const QString& msg) {
+        lastStatus = msg;
+    });
 
     selector.handleClick(QPointF(50, 50));
     EXPECT_FALSE(lastStatus.isEmpty());
