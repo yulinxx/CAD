@@ -17,6 +17,7 @@ class SceneTreeDockWidget;
 class PropertiesPanelWidget;
 class SceneEditService;
 class SceneEditService3D;
+class LayerManager;
 
 namespace Eg
 {
@@ -55,6 +56,9 @@ public:
 
     /// 设置场景编辑服务（用于将导入的图元通过事务写入文档，支持 Undo）
     void setEditService(SceneEditService* editService);
+
+    /// 设置图层管理器（用于导入后还原源文件图层结构，如 DXF 图层）
+    void setLayerManager(LayerManager* layerManager);
 
     /// 设置忙状态回调（替代旧的 UiStateCenter 直接依赖）
     void setBusyStateCallback(std::function<void(bool)> callback);
@@ -143,14 +147,21 @@ private:
     ImportResult phaseParse(const ImportContext& context, Fio::VecSyEntityPtr& outEntities);
 
     /// 3：构建文档（将图元添加到场景）
-    ImportResult phaseBuildDocument(
-        const ImportContext& context, Fio::VecSyEntityPtr& entities, const ImportOptions& options);
+    ImportResult phaseBuildDocument(const ImportContext& context,
+        Fio::VecSyEntityPtr& entities,
+        const ImportOptions& options,
+        const ImportResult& parseResult);
 
     /// 4：刷新显示（工作台、视口、树、属性面板）
     void phaseRefreshDisplay(const ImportResult& result, const ImportOptions& options);
 
     /// 5：回写状态（状态栏、最近文件、文档记录）
     void phaseWriteBackState(const ImportContext& context, const ImportResult& result);
+
+    /// 还原源文件图层结构（DXF 等支持图层的格式）
+    /// 按源图层表在 LayerManager 中创建/匹配图层，并把图元分配到对应图层
+    /// @return 成功创建的图层数量（仅计算新建图层）
+    int restoreImportedLayers(const ImportContext& context, const ImportResult& parseResult);
 
 private:
     /// 更新进度
@@ -170,6 +181,8 @@ private:
     SceneEditService3D* m_sceneEditService3D{ nullptr };
     /// 场景编辑服务（非拥有指针，用于事务化添加图元）
     SceneEditService* m_editService{ nullptr };
+    /// 图层管理器（非拥有指针，用于导入后还原图层结构）
+    LayerManager* m_layerManager{ nullptr };
     /// 忙状态回调（替代 UiStateCenter 直接调用）
     std::function<void(bool)> m_busyStateCallback;
     /// 状态栏提示回调（替代 UiStateCenter 直接调用）

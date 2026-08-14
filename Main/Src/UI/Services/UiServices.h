@@ -21,6 +21,7 @@ class ImportService;
 class ExportService;
 class RecentFileService;
 class SettingsService;
+class ViewportActionHub;
 
 /**
  * @struct UiServices
@@ -84,6 +85,9 @@ struct UiServices
 
     /// 共享 SettingsService singleton（app-level 共享，非每工作台私有）
     SettingsService* settingsService{ nullptr };
+
+    /// 视口动作中枢（视图缩放/平移/重置 → 当前活动视口）
+    ViewportActionHub* viewportActionHub{ nullptr };
 
     /// 最近文件回调：当文件被打开时调用，参数为文件完整路径
     /// 由 WorkbenchWindow 注入，用于刷新最近文件菜单

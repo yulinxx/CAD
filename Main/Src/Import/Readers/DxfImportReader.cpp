@@ -1,5 +1,9 @@
 #include "DxfImportReader.h"
 
+#include <cstdint>
+#include <unordered_map>
+#include <vector>
+
 #include <QFileInfo>
 
 #include "FileIO/FileIOManager.h"
@@ -34,7 +38,9 @@ ImportResult DxfImportReader::read(const ImportContext& context, Fio::VecSyEntit
 
         if (irOk && ir.entityCount > 0)
         {
-            auto converted = FioEntityConverter::convertAll(ir);
+            // 转换图元的同时收集「图元 → 源图层 sourceId」映射，供构建文档阶段还原图层结构
+            std::unordered_map<int64_t, uint32_t> entityLayerMap;
+            auto converted = FioEntityConverter::convertAll(ir, &entityLayerMap);
             if (!converted.empty())
             {
                 outEntities.clear();
@@ -44,13 +50,21 @@ ImportResult DxfImportReader::read(const ImportContext& context, Fio::VecSyEntit
                     outEntities.emplace_back(std::move(e));
                 }
 
-                SY_INFOF(
-                    "[DxfImportReader] IR path succeeded: entities=%zu, layers=%u", outEntities.size(), ir.layerCount);
+                // 提取源文件图层表（名称/颜色/可见性），随导入结果带回
+                std::vector<Fio::IrLayerInfo> importedLayers = FioEntityConverter::extractLayers(ir);
 
-                return ImportResult::ok(QStringLiteral("DXF import successful"),
+                SY_INFOF("[DxfImportReader] IR path succeeded: entities=%zu, layers=%u, mapped=%zu",
+                    outEntities.size(),
+                    importedLayers.size(),
+                    entityLayerMap.size());
+
+                ImportResult result = ImportResult::ok(QStringLiteral("DXF import successful"),
                     static_cast<int>(outEntities.size()),
-                    static_cast<int>(ir.layerCount),
+                    static_cast<int>(importedLayers.size()),
                     warns);
+                result.importedLayers = std::move(importedLayers);
+                result.entityLayerMap = std::move(entityLayerMap);
+                return result;
             }
         }
         SY_WARNF("[DxfImportReader] IR path unavailable, falling back to legacy: %s",
@@ -102,7 +116,10 @@ ImportResult DxfImportReader::read(const ImportContext& context, Fio::VecSyEntit
     }
     Fio::FileIOManager::freeEntityArray(raw);
 
-    SY_INFOF("[DxfImportReader] read END: success, entities=%zu, layers=%zu", count, layerCount);
+    // 回退路径不携带图层表信息，图层结构无法还原（图元将归入当前图层）
+    SY_INFOF("[DxfImportReader] read END: success (legacy fallback, layers not restored), entities=%zu, layers=%zu",
+        count,
+        layerCount);
 
     return ImportResult::ok(
         QStringLiteral("DXF import successful"), static_cast<int>(count), static_cast<int>(layerCount), warns);

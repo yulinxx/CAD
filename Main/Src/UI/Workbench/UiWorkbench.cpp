@@ -16,6 +16,7 @@
 #include "SceneDocument2D.h"
 #include "UiServices.h"
 #include "UiStateCenter.h"
+#include "UI/Services/ViewportActionHub.h"
 #include "Engine2D/Edit/IUndoRedoManager.h"
 #include "UiSceneTreeDock.h"
 #include "UiPropertiesPanel.h"
@@ -338,6 +339,18 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
         vp->setActiveTool(QStringLiteral("SelectTool"));
     }
 
+    // 视口动作中枢：注入当前视口，供菜单 Zoom 子菜单与右键菜单 View_* 操作统一分发
+    if (m_services.viewportActionHub)
+    {
+        m_services.viewportActionHub->setViewport(m_viewport);
+        window.setViewportZoomHandler([hub = m_services.viewportActionHub](const QString& action) {
+            if (hub)
+            {
+                hub->handle(action);
+            }
+        });
+    }
+
     createToolbars(window);
     createLayersDock(window);
 
@@ -491,7 +504,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // 接通「工具栏 → OperationBus → 视口」：把工具栏展示的 Tool_* 操作注册到操作总线，
     // 点击按钮后经总线转发表驱动的 LambdaOperation 激活视口对应工具。
     // 必须在视口（m_viewport）创建完成后再注册，故放在这里而非组合根。
-    DrawToolSwitchRegistry(m_services.operationBus, m_viewport).registerAll();
+    DrawToolSwitchRegistry(m_services.operationBus, &m_viewport).registerAll();
 
     // 双向状态同步：视口切换工具后高亮对应按钮；启动时初始化为当前活动工具（SelectTool）。
     QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged, drawWidget, &DrawToolBarWidget::updateActiveTool);
@@ -565,6 +578,12 @@ void Workbench2D::deactivate()
 
     // 清理命令动作中枢（unique_ptr 管理生命周期，reset 释放所有权）
     m_commandHub.reset();
+
+    // 视口动作中枢：断开当前视口，避免切换工作台后悬空指针
+    if (m_services.viewportActionHub)
+    {
+        m_services.viewportActionHub->clearViewport();
+    }
 
     // 工具栏指针会随窗口清理而失效（clearWorkbenchContent 会 delete QToolBar）
     m_topToolBar = nullptr;

@@ -1,7 +1,13 @@
 #pragma once
 
+#include <cstdint>
+#include <unordered_map>
+#include <vector>
+
 #include <QString>
 #include <QStringList>
+
+#include "FileIO/FioTypes.h"
 
 /// 导入错误类型：区分不同的失败原因，便于上层展示和处理
 enum class ImportErrorType
@@ -35,6 +41,12 @@ struct ImportResult
     int layerCount{ 0 };
     /// 导入后使用的工作台 ID
     QString usedWorkbenchId;
+
+    /// 源文件图层表（DXF 等支持图层的格式解析结果，供构建文档阶段重建图层）
+    std::vector<Fio::IrLayerInfo> importedLayers;
+    /// 图元图层归属映射：转换后图元的 EntityId(int64) → 源图层 sourceId
+    /// 与 importedLayers 配合，在构建文档阶段将图元还原到对应图层
+    std::unordered_map<int64_t, uint32_t> entityLayerMap;
 
     /// 创建成功结果
     static ImportResult ok(

@@ -12,6 +12,7 @@
 #include "UI2D/Operation/OperationBus.h"
 
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/EntityClipboard.h"
 #include "Engine2D/Edit/UndoRedoManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Edit/LayerEditService.h"
@@ -36,6 +37,10 @@ class PendingOperationRegistry;
 
 class SelectionService;
 class ISelectionService;
+class AlgorithmApplicationService;
+class AlgorithmRunner;
+class ViewportActionHub;
+class UnitManager;
 
 /**
  * @class ApplicationCompositionRoot
@@ -156,6 +161,24 @@ public:
         return m_sceneEditService.get();
     }
 
+    /// 获取 2D 图元剪贴板（复制/粘贴）
+    Eg::EntityClipboard* clipboard()
+    {
+        return m_clipboard.get();
+    }
+
+    /// 获取视口动作中枢（视图缩放/平移/重置）
+    ViewportActionHub* viewportActionHub()
+    {
+        return m_viewportActionHub.get();
+    }
+
+    /// 获取单位管理器（显示单位 / 算法对话框单位换算）
+    UnitManager* unitManager()
+    {
+        return m_unitManager.get();
+    }
+
     /// 获取选择服务（阶段1收口：由组合根统一创建并经 UiServices 注入）
     ISelectionService* selectionService();
 
@@ -171,6 +194,8 @@ private:
     void setupDirtyStateSync();
     // 注册各模块操作到 OperationBus
     void registerAllOperations();
+    // 惰性创建 2D 算法服务与执行器
+    AlgorithmRunner* algorithmRunner();
 
     /// UI Shell 宿主
     std::unique_ptr<UiShellHost> m_shellHost;
@@ -201,6 +226,21 @@ private:
 
     /// 场景编辑服务（新系统）
     std::unique_ptr<SceneEditService> m_sceneEditService;
+
+    /// 2D 图元剪贴板（复制/粘贴）
+    std::unique_ptr<Eg::EntityClipboard> m_clipboard;
+
+    /// 2D 算法应用服务（Fill/Nesting/Offset/Array/Boolean 任务编排）
+    std::unique_ptr<AlgorithmApplicationService> m_algorithmService;
+
+    /// 2D 算法执行器（OperationId::Algo_* → AlgorithmTaskId 路由）
+    std::unique_ptr<AlgorithmRunner> m_algorithmRunner;
+
+    /// 视口动作中枢（视图缩放/平移/重置）
+    std::unique_ptr<ViewportActionHub> m_viewportActionHub;
+
+    /// 单位管理器（显示单位 / 算法对话框单位换算）
+    std::unique_ptr<UnitManager> m_unitManager;
 
     /// 选择服务（阶段1收口：绑定 SceneManager，由组合根统一创建）
     std::unique_ptr<SelectionService> m_selectionService;

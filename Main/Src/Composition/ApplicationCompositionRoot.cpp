@@ -4,7 +4,6 @@
 #include "PendingOperationRegistry.h"
 #include "DocumentPersistenceHelper.h"
 
-#include "Operation/EditOperations.h"
 #include "UI2D/Operation/OperationRegistry.h"
 
 #include "UI/Services/UiLayoutService.h"
@@ -36,6 +35,12 @@
 
 #include "UI/Services/SelectionService.h"
 #include "UI/Services/ISelectionService.h"
+#include "UI/Services/ViewportActionHub.h"
+
+#include "UI/Algorithm/AlgorithmApplicationService.h"
+#include "UI2D/Operation/AlgorithmRunner.h"
+#include "Algorithm/AlgorithmTaskRegistration2D.h"
+#include "Manager/UnitManager/UnitManager.h"
 
 #include "Import/ImportService.h"
 #include "Import/ImportDispatcher.h"
@@ -82,6 +87,9 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     , m_sceneManager3D(std::make_unique<Eg::SceneManager3D>())
     , m_undoRedoManager(std::make_unique<UndoRedoManager>(m_sceneManager.get()))
     , m_sceneEditService(std::make_unique<SceneEditService>(m_sceneManager.get(), m_undoRedoManager.get()))
+    , m_clipboard(std::make_unique<Eg::EntityClipboard>())
+    , m_viewportActionHub(std::make_unique<ViewportActionHub>())
+    , m_unitManager(std::make_unique<UnitManager>())
     , m_selectionService(std::make_unique<SelectionService>(m_sceneManager.get()))
     , m_document2D(std::make_unique<SceneDocument2D>(m_sceneEditService.get()))
     , m_layerManager(std::make_unique<LayerManager>(m_sceneManager.get()))
@@ -121,6 +129,7 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
     uiServices.operationBus = m_operationBus.get();
     uiServices.document2D = m_document2D.get();
     uiServices.selectionService = m_selectionService.get();
+    uiServices.viewportActionHub = m_viewportActionHub.get();
     uiServices.layerManager = m_layerManager.get();
     uiServices.layerManagerBridge = m_layerManagerBridge.get();
     uiServices.layerEditService = m_layerEditService.get();
@@ -168,6 +177,8 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_importService->setSceneManager(m_sceneManager.get());
     m_importService->setSceneManager3D(m_sceneManager3D.get());
     m_importService->setEditService(m_sceneEditService.get());
+    // 注入图层管理器：DXF 等导入后按源图层表还原图层结构
+    m_importService->setLayerManager(m_layerManager.get());
     m_importService->setBusyStateCallback([this](bool busy) {
         if (m_stateCenter)
         {
@@ -295,17 +306,16 @@ void ApplicationCompositionRoot::registerAllOperations()
 
     SY_INFO("[ApplicationCompositionRoot] registering module operations on OperationBus");
 
-    // 旧 UI2D 框架的编辑操作（优先注册，first-wins 优先于 CoreOperationRegistry）
-    {
-        auto& registry = m_operationBus->registry();
-        OperationEdit::registerAll(registry);
-        OperationAlgo::registerAll(registry);
-    }
-
-    // 核心操作（撤销/重做/删除/圆角/倒角/帮助 + 编辑操作）
+    // 核心操作（撤销/重做/删除/圆角/倒角/选择/帮助 + 编辑操作 + 算法操作 + 视图操作）
     CoreOperationRegistry coreOps(m_operationBus.get(),
         m_sceneEditService.get(),
         m_undoRedoManager.get(),
+        m_clipboard.get(),
+        algorithmRunner(),
+        m_viewportActionHub.get(),
+        m_stateCenter.get(),
+        m_layerEditService.get(),
+        m_unitManager.get(),
         m_shellHost ? m_shellHost->mainWindow() : nullptr);
 
     coreOps.registerAll();
@@ -329,6 +339,21 @@ void ApplicationCompositionRoot::registerAllOperations()
     // 占位操作（视图缩放等）由 PendingOperationRegistry 统一管理
     PendingOperationRegistry pendingOps(m_operationBus.get());
     pendingOps.registerAll();
+}
+
+AlgorithmRunner* ApplicationCompositionRoot::algorithmRunner()
+{
+    if (!m_algorithmRunner)
+    {
+        m_algorithmService = std::make_unique<AlgorithmApplicationService>(nullptr);
+        AlgorithmTaskRegistration2D::registerAll(*m_algorithmService);
+        m_algorithmRunner = std::make_unique<AlgorithmRunner>(m_algorithmService.get(),
+            m_sceneManager.get(),
+            m_sceneEditService.get(),
+            m_unitManager.get(),
+            m_shellHost ? m_shellHost->mainWindow() : nullptr);
+    }
+    return m_algorithmRunner.get();
 }
 
 UiShellHost* ApplicationCompositionRoot::shellHost()

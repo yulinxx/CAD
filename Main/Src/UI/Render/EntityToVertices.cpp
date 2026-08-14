@@ -46,13 +46,21 @@ namespace
     // 按实体 ID 缓存离散化结果，避免非几何变更时重复离散化
     static std::unordered_map<uint64_t, CachedVertexData> s_vertexCache;
 
-    // 计算实体几何参数哈希（基于控制点 + 类型 + 闭合标志）
+    // 计算实体几何参数哈希（基于控制点 + 包围盒 + 类型 + 闭合标志）
     // 仅依赖 SyEntity 基类契约接口，不依赖具体派生类型
     uint64_t computeGeometryHash(const Eg::SyEntity* entity)
     {
         uint64_t hash = static_cast<uint64_t>(entity->eType);
         hash ^= static_cast<uint64_t>(entity->bClosed) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
 
+        // 将单个 double 的位模式混入哈希（C++17 兼容写法）
+        auto mix = [&hash](double v) {
+            uint64_t bits = 0;
+            std::memcpy(&bits, &v, sizeof(double));
+            hash ^= bits + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        };
+
+        // 控制点：Line/Polygon 完整；曲线类（Circle/Arc/Ellipse/Bezier/NURBS）仅返回 basePoint。
         const size_t cpCount = entity->getControlPointCount();
         if (cpCount > 0 && cpCount < 256)
         {
@@ -60,13 +68,21 @@ namespace
             const size_t written = entity->getControlPoints(pts.data(), cpCount);
             for (size_t i = 0; i < written; ++i)
             {
-                // 将 double 的位模式直接混入哈希（C++17 兼容写法）
-                uint64_t bitsX = 0, bitsY = 0;
-                std::memcpy(&bitsX, &pts[i].x(), sizeof(double));
-                std::memcpy(&bitsY, &pts[i].y(), sizeof(double));
-                hash ^= bitsX + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-                hash ^= bitsY + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+                mix(pts[i].x());
+                mix(pts[i].y());
             }
+        }
+
+        // 曲线类控制点接口不完整（半径/角度/控制点未覆盖），仅靠控制点哈希会导致
+        // 修改半径/角度/控制点后命中陈旧缓存、曲线仍按旧几何显示。追加包围盒角点作为
+        // 几何指纹兜底（包围盒由实际几何计算，可覆盖上述参数变化）。
+        const Ut::BBox2d bbox = entity->getBbox();
+        if (bbox.isValid())
+        {
+            mix(bbox.minPt.x());
+            mix(bbox.minPt.y());
+            mix(bbox.maxPt.x());
+            mix(bbox.maxPt.y());
         }
         return hash;
     }

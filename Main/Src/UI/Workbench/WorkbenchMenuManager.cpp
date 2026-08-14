@@ -1273,18 +1273,15 @@ void WorkbenchMenuManager::bindMenuCommands()
 
 void WorkbenchMenuManager::clearGlobalShortcuts()
 {
-    if (m_undoAction)
+    for (QAction* action : m_editShortcuts)
     {
-        m_window->removeAction(m_undoAction);
-        delete m_undoAction;
-        m_undoAction = nullptr;
+        if (action)
+        {
+            m_window->removeAction(action);
+            delete action;
+        }
     }
-    if (m_redoAction)
-    {
-        m_window->removeAction(m_redoAction);
-        delete m_redoAction;
-        m_redoAction = nullptr;
-    }
+    m_editShortcuts.clear();
 }
 
 void WorkbenchMenuManager::bindShortcuts()
@@ -1292,19 +1289,21 @@ void WorkbenchMenuManager::bindShortcuts()
     // 先清理旧动作，防止重复叠加
     clearGlobalShortcuts();
 
-    m_undoAction = new QAction(m_window->tr("Undo"), m_window);
-    m_undoAction->setShortcut(QKeySequence::Undo);
-    connect(m_undoAction, &QAction::triggered, this, [this]() {
+    QAction* undoAction = new QAction(m_window->tr("Undo"), m_window);
+    undoAction->setShortcut(QKeySequence::Undo);
+    connect(undoAction, &QAction::triggered, this, [this]() {
         dispatchCommandSafely(QStringLiteral("edit.undo"));
     });
-    m_window->addAction(m_undoAction);
+    m_window->addAction(undoAction);
+    m_editShortcuts.push_back(undoAction);
 
-    m_redoAction = new QAction(m_window->tr("Redo"), m_window);
-    m_redoAction->setShortcut(QKeySequence::Redo);
-    connect(m_redoAction, &QAction::triggered, this, [this]() {
+    QAction* redoAction = new QAction(m_window->tr("Redo"), m_window);
+    redoAction->setShortcut(QKeySequence::Redo);
+    connect(redoAction, &QAction::triggered, this, [this]() {
         dispatchCommandSafely(QStringLiteral("edit.redo"));
     });
-    m_window->addAction(m_redoAction);
+    m_window->addAction(redoAction);
+    m_editShortcuts.push_back(redoAction);
 }
 
 void WorkbenchMenuManager::refreshWorkbenchMenuChecks(const QString& workbenchId)

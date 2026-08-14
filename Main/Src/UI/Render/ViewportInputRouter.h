@@ -114,6 +114,7 @@ private:
     // ==================== 鼠标事件分发 ====================
 
     bool dispatchMousePressToInput(const QPointF& worldPos, QMouseEvent* event);
+    bool dispatchRightButtonPressToInput(const QPointF& worldPos, QMouseEvent* event);
     bool dispatchMouseMoveToInput(const QPointF& worldPos, QMouseEvent* event);
     bool dispatchMouseReleaseToInput(const QPointF& worldPos, QMouseEvent* event);
     bool dispatchToActiveTool(

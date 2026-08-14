@@ -262,6 +262,13 @@ std::unique_ptr<Eg::SyEntity> FioEntityConverter::convertEntity(const Fio::Entit
 
 std::vector<std::unique_ptr<Eg::SyEntity>> FioEntityConverter::convertAll(const Fio::FioParseResult& parseData)
 {
+    // 兼容旧调用：不输出图层映射
+    return convertAll(parseData, nullptr);
+}
+
+std::vector<std::unique_ptr<Eg::SyEntity>> FioEntityConverter::convertAll(
+    const Fio::FioParseResult& parseData, std::unordered_map<int64_t, uint32_t>* outEntityLayerMap)
+{
     std::vector<std::unique_ptr<Eg::SyEntity>> result;
     result.reserve(parseData.entityCount);
 
@@ -277,8 +284,23 @@ std::vector<std::unique_ptr<Eg::SyEntity>> FioEntityConverter::convertAll(const 
             entity->setVisible(parseData.entities[i].visible);
             entity->setLocked(parseData.entities[i].locked);
             // 注意：SyEntity 体系无 lineWidth 成员，线宽由渲染层控制
+
+            // 记录图元 → 源图层 sourceId 映射（供导入阶段还原图层结构）
+            const uint32_t layerSourceId = parseData.entities[i].layerSourceId;
+            if (outEntityLayerMap && layerSourceId != 0)
+            {
+                (*outEntityLayerMap)[static_cast<int64_t>(entity->id)] = layerSourceId;
+            }
+
             result.push_back(std::move(entity));
         }
+    }
+
+    if (outEntityLayerMap)
+    {
+        SY_INFOF("[FioEntityConverter] convertAll: %zu entities, %zu with layer assignment",
+            result.size(),
+            outEntityLayerMap->size());
     }
 
     // SY_INFOF("[FioEntityConverter] Converted %zu entities successfully", result.size());

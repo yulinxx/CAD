@@ -164,9 +164,11 @@ def read_mdstring(buf: bytes, rva: int) -> str:
     如果 rva 为 0 表示该字段未设置，返回空字符串。
     解码失败时回退到 latin-1 以避免抛出异常。
     """
-    if rva == 0:
+    if rva == 0 or rva + 4 > len(buf):
         return ""
     length = struct.unpack_from("<I", buf, rva)[0]      # 字符数量
+    if length == 0 or rva + 4 + length * 2 > len(buf):
+        return ""
     raw = buf[rva + 4:rva + 4 + length * 2]             # 每个字符 2 字节
     try:
         return raw.decode("utf-16-le", errors="replace")
@@ -393,7 +395,7 @@ def read_module_list(buf: bytes, loc: Tuple[int, int]) -> List[ModuleEntry]:
 
         # 从 module_name_rva 读取完整路径（旧版 Breakpad / Linux dump 常用）
         name_rva = struct.unpack_from("<I", buf, b + 20)[0]
-        name_from_rva = read_mdstring(buf, name_rva)
+        name_from_rva = read_mdstring(buf, name_rva) if name_rva + 4 <= len(buf) else ""
 
         # 从 cv_record 读取短名称（新版 Crashpad / macOS 常用）
         cv_size = struct.unpack_from("<I", buf, b + 76)[0]
@@ -1112,8 +1114,7 @@ def show_backtrace(crashed_reg: Optional[RegisterSet], crash_tid: int,
     else:
         print(f"  {Colors.DIM}(--raw 模式，跳过深层帧解析){Colors.RESET}")
 
-    print(f"\n  {Colors.DIM}[提示] 如需完整符号化回溯，请构建 Breakpad 的 `minidump_stackwalk`
-          f" 并使用 --dump-stackwalk 指定路径。{Colors.RESET}")
+    print(f"\n  {Colors.DIM}[提示] 如需完整符号化回溯，请构建 Breakpad 的 `minidump_stackwalk` 并使用 --dump-stackwalk 指定路径。{Colors.RESET}")
     return 0
 
 

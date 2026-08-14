@@ -186,9 +186,8 @@ private:
     UiWorkbench* m_workbench{ nullptr };
     WorkbenchFactory m_workbenchFactory;
     std::function<void(const QString&)> m_viewportZoomHandler;
-    // 全局 Undo/Redo 动作（窗口级，需在切换工作台时显式清理）
-    QAction* m_undoAction{ nullptr };
-    QAction* m_redoAction{ nullptr };
+    // 全局编辑快捷键动作（窗口级，需在切换工作台时显式清理）
+    std::vector<QAction*> m_editShortcuts;
 #ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
     std::unique_ptr<UiConfigurationManager> m_menuConfigManager;
     std::unique_ptr<UiLayoutBuilder> m_menuLayoutBuilder;

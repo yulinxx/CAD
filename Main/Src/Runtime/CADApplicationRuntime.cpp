@@ -12,6 +12,8 @@
 #include "Common/CrashHandlerBootstrap.h"
 #include "License/LicenseDialog.h"
 #include "License/LicenseDLL.h"
+#include "Composition/ApplicationCompositionRoot.h"
+#include "UI/Settings/SettingsService.h"
 
 // 构造函数：初始化QApplication并设置应用基本信息
 CADApplicationRuntime::CADApplicationRuntime(int argc, char* argv[], const AppPaths& appPaths)
@@ -123,6 +125,14 @@ int CADApplicationRuntime::run()
                  "composition root");
         return -2;
     }
+
+    // 退出时自动保存 common 设置（字体/主题/语言）到 SQLite 数据库
+    QObject::connect(m_app.get(), &QCoreApplication::aboutToQuit, []() {
+        if (auto* svc = ApplicationCompositionRoot::getSettingsService())
+        {
+            svc->saveCurrentCommonSettings();
+        }
+    });
 
     const int exitCode = m_app->exec();
     SY_INFOF("[CADApplicationRuntime] Application exited with code %d", exitCode);

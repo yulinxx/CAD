@@ -199,9 +199,11 @@ void SceneRefreshCoordinator::onSceneChanged()
 
 void SceneRefreshCoordinator::onSelectionChanged()
 {
-    // P5: 观察者注册收敛 — 发射信号供视口同步工具状态，再触发纯视觉重绘
+    // P5: 观察者注册收敛 — 发射信号供视口同步工具状态
     emit selectionChanged();
-    requestRepaint();
+    // 选择变化需重建场景几何：选中图元的原始实线不再提交（由虚线轮廓覆盖层替代），
+    // 取消选中的图元需恢复实线，因此必须走全量刷新而非纯视觉重绘。
+    requestFullRefresh();
 }
 
 void SceneRefreshCoordinator::applyRepaintRefresh()
@@ -240,6 +242,20 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             continue;
         }
 
+        auto uid = static_cast<uint64_t>(id);
+
+        // 选中图元不渲染原始实体（由虚线轮廓覆盖层表示），若此前已在 GPU 上则移除。
+        // 与 gatherGeometry 全量路径保持同一规则，避免拖动变换时实线被重新提交。
+        if (entity->selected())
+        {
+            if (m_renderedEntityIds.count(uid))
+            {
+                m_renderWidget->removeRenderEntity(uid);
+                m_renderedEntityIds.erase(uid);
+            }
+            continue;
+        }
+
         std::vector<render::VertexP3C3> vertices;
         render::PrimitiveType primType;
         if (!entityToVertices(entity, vertices, primType))
@@ -249,10 +265,9 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             continue;
         }
 
-        auto uid = static_cast<uint64_t>(id);
         if (m_renderedEntityIds.count(uid))
         {
-            m_renderWidget->modifyRenderEntity(uid, vertices.data(), static_cast<uint32_t>(vertices.size()));
+            m_renderWidget->modifyRenderEntity(uid, vertices.data(), static_cast<uint32_t>(vertices.size()), primType);
         }
         else
         {
@@ -290,7 +305,9 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     auto allEntities = sm->getAllEntities();
     for (auto* e : allEntities)
     {
-        if (e && e->visible() && (!e->layer() || e->layer()->isVisible()))
+        // 选中图元不纳入已渲染账本（其原始实体几何由 gatherGeometry 跳过），
+        // 取消选中后才会被增量路径重新提交。
+        if (e && e->visible() && !e->selected() && (!e->layer() || e->layer()->isVisible()))
         {
             m_renderedEntityIds.insert(static_cast<uint64_t>(e->id));
         }

@@ -7,13 +7,31 @@
 class OperationBus;
 class SceneEditService;
 class IUndoRedoManager;
+class AlgorithmRunner;
+class ViewportActionHub;
+class UiStateCenter;
+class LayerEditService;
+class UnitManager;
 class QWidget;
+
+namespace Eg
+{
+    class EntityClipboard;
+}
 
 class CoreOperationRegistry
 {
 public:
-    CoreOperationRegistry(
-        OperationBus* bus, SceneEditService* editService, IUndoRedoManager* undoManager, QWidget* parentWidget);
+    CoreOperationRegistry(OperationBus* bus,
+        SceneEditService* editService,
+        IUndoRedoManager* undoManager,
+        Eg::EntityClipboard* clipboard,
+        AlgorithmRunner* algorithmRunner,
+        ViewportActionHub* viewportActionHub,
+        UiStateCenter* stateCenter,
+        LayerEditService* layerEditService,
+        UnitManager* unitManager,
+        QWidget* parentWidget);
 
 public:
     void registerAll();
@@ -21,10 +39,18 @@ public:
 private:
     void registerHelpOperations();
     void registerEditOperations();
+    void registerAlgorithmOperations();
+    void registerViewOperations();
 
 private:
     OperationBus* m_bus;
     SceneEditService* m_editService;
     IUndoRedoManager* m_undoManager;
+    Eg::EntityClipboard* m_clipboard;
+    AlgorithmRunner* m_algorithmRunner;
+    ViewportActionHub* m_viewportActionHub;
+    UiStateCenter* m_stateCenter;
+    LayerEditService* m_layerEditService;
+    UnitManager* m_unitManager;
     QWidget* m_parentWidget;
 };

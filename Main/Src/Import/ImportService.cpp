@@ -2,6 +2,9 @@
 #include "ImportDispatcher.h"
 #include "ImportResult.h"
 
+#include <cstdint>
+#include <unordered_map>
+
 #include <QCoreApplication>
 #include <QMetaObject>
 #include <thread>
@@ -9,9 +12,12 @@
 #include "Log/SyLogger.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
+#include "Engine2D/Interaction/LayerManager.h"
 #include "Engine3D/SceneManager3D.h"
 #include "Engine3D/SyEntity/SyMeshEntity.h"
 #include "UI3D/Edit/SceneEditService3D.h"
+
+#include "Color/Color.hpp"
 
 #include <QFileInfo>
 
@@ -111,6 +117,12 @@ void ImportService::setSceneEditService3D(SceneEditService3D* sceneEditService3D
 void ImportService::setEditService(SceneEditService* editService)
 {
     m_editService = editService;
+}
+
+void ImportService::setLayerManager(LayerManager* layerManager)
+{
+    m_layerManager = layerManager;
+    SY_INFOF("[ImportService] setLayerManager: %p", m_layerManager);
 }
 
 void ImportService::setBusyStateCallback(std::function<void(bool)> cb)
@@ -226,13 +238,15 @@ ImportResult ImportService::importWithContext(const ImportContext& context, cons
 
     // ===== 2：解析文件 =====
     SY_INFO("[ImportService] Phase 2: Parse file");
-    result = phaseParse(mutableCtx, importedEntities);
-    if (!result.success)
+    ImportResult parseResult = phaseParse(mutableCtx, importedEntities);
+    if (!parseResult.success)
     {
-        SY_ERRORF("[ImportService] Phase 2 failed: %s", result.message.toUtf8().constData());
-        return fail(result);
+        SY_ERRORF("[ImportService] Phase 2 failed: %s", parseResult.message.toUtf8().constData());
+        return fail(parseResult);
     }
-    SY_INFOF("[ImportService] Phase 2 completed: entities=%zu", importedEntities.size());
+    SY_INFOF("[ImportService] Phase 2 completed: entities=%zu, layers=%zu",
+        importedEntities.size(),
+        parseResult.importedLayers.size());
 
     if (isCanceled(mutableCtx))
     {
@@ -241,7 +255,7 @@ ImportResult ImportService::importWithContext(const ImportContext& context, cons
 
     // ===== 3：构建文档 =====
     SY_INFO("[ImportService] Phase 3: Build document");
-    result = phaseBuildDocument(mutableCtx, importedEntities, options);
+    result = phaseBuildDocument(mutableCtx, importedEntities, options, parseResult);
     if (!result.success)
     {
         SY_ERRORF("[ImportService] Phase 3 failed: %s", result.message.toUtf8().constData());
@@ -326,28 +340,30 @@ void ImportService::importAsync(
 
         // Phase 2: 解析文件
         SY_INFO("[ImportService] Async Phase 2: Parse file");
-        result = self->phaseParse(mutableCtx, *importedEntities);
-        if (!result.success)
+        ImportResult parseResult = self->phaseParse(mutableCtx, *importedEntities);
+        if (!parseResult.success)
         {
-            SY_ERRORF("[ImportService] Async Phase 2 failed: %s", result.message.toUtf8().constData());
+            SY_ERRORF("[ImportService] Async Phase 2 failed: %s", parseResult.message.toUtf8().constData());
             if (onComplete)
             {
-                onComplete(result);
+                onComplete(parseResult);
             }
             return;
         }
 
-        SY_INFOF("[ImportService] Async parse completed: entities=%zu", importedEntities->size());
+        SY_INFOF("[ImportService] Async parse completed: entities=%zu, layers=%zu",
+            importedEntities->size(),
+            parseResult.importedLayers.size());
 
         // Phase 3-5 必须在主线程执行（UI 操作）
         auto entities = importedEntities;
         QMetaObject::invokeMethod(
             qApp,
-            [self, mutableCtx, entities, options, onComplete, sourcePath]() mutable {
+            [self, mutableCtx, entities, parseResult, options, onComplete, sourcePath]() mutable {
                 ImportContext mainCtx = mutableCtx;
 
                 SY_INFO("[ImportService] Async Phase 3: Build document (main thread)");
-                ImportResult result = self->phaseBuildDocument(mainCtx, *entities, options);
+                ImportResult result = self->phaseBuildDocument(mainCtx, *entities, options, parseResult);
                 if (!result.success)
                 {
                     SY_ERRORF("[ImportService] Async Phase 3 failed: %s", result.message.toUtf8().constData());
@@ -461,7 +477,7 @@ ImportResult ImportService::phaseParse(const ImportContext& context, Fio::VecSyE
 
 // ===== 3：构建文档 =====
 ImportResult ImportService::phaseBuildDocument(
-    const ImportContext& context, Fio::VecSyEntityPtr& entities, const ImportOptions& options)
+    const ImportContext& context, Fio::VecSyEntityPtr& entities, const ImportOptions& options, const ImportResult& parseResult)
 {
     updateProgress(ImportPhase::BuildDocument, 0.0f);
     emit importPhaseChanged(ImportPhase::BuildDocument);
@@ -591,6 +607,17 @@ ImportResult ImportService::phaseBuildDocument(
         return ImportResult::fail(QStringLiteral("No scene manager available"), ImportErrorType::Unknown);
     }
 
+    // 还原源文件图层结构（DXF 等支持图层的格式）：
+    // 图元在 SceneEditService::addEntities 中默认分配到当前图层，这里再按源图层表重新归属
+    if (!hasMeshEntities)
+    {
+        const int createdLayers = restoreImportedLayers(context, parseResult);
+        if (createdLayers > 0)
+        {
+            SY_INFOF("[ImportService] Restored %d layer(s) from source document", createdLayers);
+        }
+    }
+
     SY_INFOF("[ImportService] Document built: %d entities", entityCount);
     updateProgress(ImportPhase::BuildDocument, 1.0f);
 
@@ -686,6 +713,80 @@ void ImportService::phaseWriteBackState(const ImportContext& context, const Impo
 
     SY_INFO("[ImportService] State written back");
     updateProgress(ImportPhase::WriteBackState, 1.0f);
+}
+
+int ImportService::restoreImportedLayers(const ImportContext& context, const ImportResult& parseResult)
+{
+    if (!m_layerManager || parseResult.importedLayers.empty())
+    {
+        return 0;
+    }
+    if (!context.preserveLayers)
+    {
+        SY_INFO("[ImportService] restoreImportedLayers: preserveLayers=false, skipping layer restore");
+        return 0;
+    }
+
+    // 源图层 sourceId → 运行时 LayerManager 图层 ID
+    std::unordered_map<uint32_t, int> sourceToLayerId;
+    int createdCount = 0;
+
+    for (const auto& src : parseResult.importedLayers)
+    {
+        int layerId = m_layerManager->findLayerByName(src.name);
+        if (layerId < 0)
+        {
+            // 图层不存在则新建，并应用源图层的颜色/可见性/锁定属性
+            layerId = m_layerManager->createLayer(src.name);
+            ++createdCount;
+
+            const uint8_t r = static_cast<uint8_t>((src.color >> 16) & 0xFF);
+            const uint8_t g = static_cast<uint8_t>((src.color >> 8) & 0xFF);
+            const uint8_t b = static_cast<uint8_t>(src.color & 0xFF);
+            m_layerManager->setLayerColor(layerId, Ut::Color::fromRGB255(r, g, b));
+            m_layerManager->setLayerVisible(layerId, src.visible);
+            m_layerManager->setLayerLocked(layerId, src.locked);
+
+            SY_INFOF("[ImportService] Restored source layer '%s' -> id %d (color=#%02X%02X%02X, visible=%d)",
+                src.name,
+                layerId,
+                r,
+                g,
+                b,
+                src.visible ? 1 : 0);
+        }
+        else
+        {
+            SY_INFOF("[ImportService] Source layer '%s' already exists as id %d, reusing", src.name, layerId);
+        }
+        sourceToLayerId[src.sourceId] = layerId;
+    }
+
+    // 将图元归属到对应图层：EntityId → 源图层 sourceId → 运行时图层 ID
+    std::unordered_map<int64_t, int> entityToLayerId;
+    entityToLayerId.reserve(parseResult.entityLayerMap.size());
+    for (const auto& [entityId, sourceId] : parseResult.entityLayerMap)
+    {
+        auto it = sourceToLayerId.find(sourceId);
+        if (it != sourceToLayerId.end())
+        {
+            entityToLayerId[entityId] = it->second;
+        }
+        else
+        {
+            SY_WARNF("[ImportService] Entity %lld references unknown source layer %u, keeping current layer",
+                static_cast<long long>(entityId),
+                sourceId);
+        }
+    }
+
+    if (!entityToLayerId.empty())
+    {
+        m_layerManager->applyEntityLayerMap(entityToLayerId);
+        SY_INFOF("[ImportService] Assigned %zu entities to restored layers", entityToLayerId.size());
+    }
+
+    return createdCount;
 }
 
 void ImportService::updateProgress(ImportPhase phase, float progress)

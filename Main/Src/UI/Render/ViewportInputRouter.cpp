@@ -419,6 +419,12 @@ bool ViewportInputRouter::dispatchToSelectorRelease(const QPointF& worldPos, QMo
 
 bool ViewportInputRouter::dispatchMousePressToInput(const QPointF& worldPos, QMouseEvent* event)
 {
+    // 右键：取消当前图元（绘制态）或退出工具（空闲态），与 ESC 语义一致
+    if (event->button() == Qt::RightButton)
+    {
+        return dispatchRightButtonPressToInput(worldPos, event);
+    }
+
     if (event->button() != Qt::LeftButton || m_panModeEnabled)
     {
         return false;
@@ -438,6 +444,55 @@ bool ViewportInputRouter::dispatchMousePressToInput(const QPointF& worldPos, QMo
     }
 
     return dispatchToSelectorPress(worldPos, event);
+}
+
+// 右键分发：绘制态交给活动工具取消当前图元；空闲态退出工具并切回选择工具（与 ESC 一致）。
+// 文档约定（绘图交互 §4.4/§5.5）：右键 = Esc；双击/空格/Enter = 确认；Backspace = 回退。
+bool ViewportInputRouter::dispatchRightButtonPressToInput(const QPointF& worldPos, QMouseEvent* event)
+{
+    if (m_panModeEnabled)
+    {
+        return false;
+    }
+
+    // 交互分发器有活跃命令时，右键视为取消该命令
+    if (m_interactionDispatcher && m_interactionDispatcher->hasActiveCommand() &&
+        m_interactionDispatcher->dispatchEvent(
+            { InteractionEventType::MouseDown, static_cast<int>(worldPos.x()), static_cast<int>(worldPos.y()), -1 }))
+    {
+        event->accept();
+        return true;
+    }
+
+    if (m_toolManager)
+    {
+        auto* tool = m_toolManager->getActiveTool();
+        if (tool)
+        {
+            // 绘制态：BaseTool::onMousePress 处理右键取消当前图元，返回 true 表示已消费
+            if (tool->onMousePress(worldPos, event))
+            {
+                event->accept();
+                return true;
+            }
+
+            // 空闲态：与 ESC 一致，退出当前绘图工具并切回选择工具
+            const QString activeTool = m_toolManager->getActiveToolName();
+            if (!activeTool.isEmpty() && activeTool != QStringLiteral("SelectTool"))
+            {
+                m_toolManager->cancelCurrentTool();
+                if (m_operationBus)
+                {
+                    m_operationBus->run(OperationId::Tool_Select, {}, OperationSource::ContextMenu);
+                }
+                event->accept();
+                return true;
+            }
+        }
+    }
+
+    // SelectTool 空闲态右键：不消费，保留给右键菜单/后续处理
+    return false;
 }
 
 bool ViewportInputRouter::dispatchMouseMoveToInput(const QPointF& worldPos, QMouseEvent* event)

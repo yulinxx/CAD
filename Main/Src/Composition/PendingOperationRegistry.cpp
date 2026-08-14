@@ -7,13 +7,9 @@
 
 #include <cstddef>
 
-// 注册尚未接入的算法/编辑/视图操作
-// 占位策略：注册 LambdaOperation 打印警告，避免菜单/工具栏点击时静默无响应
-//
-// 分层管理原则：
-// - Algorithm 类：接入 AlgorithmApplicationService 后移除
-// - Edit 类：接入 GeometryEditService 后移除
-// - View 类：接入 ViewController 后移除
+// 占位操作注册器 — 为尚未接入的操作注册占位 LambdaOperation（打印 WARN，避免菜单/工具栏点击时静默无响应）。
+// 2026-08-14 起：编辑/算法/视图操作已全部接入（CoreOperationRegistry / AlgorithmRunner / ViewportActionHub），
+// 当前已无占位操作；本注册器保留空实现，后续新增未接入操作时在此追加占位数组即可。
 PendingOperationRegistry::PendingOperationRegistry(OperationBus* bus)
     : m_bus(bus)
 {
@@ -28,48 +24,6 @@ void PendingOperationRegistry::registerAll()
 
     auto& reg = m_bus->registry();
     int totalRegistered = 0;
-
-    // ---- 算法操作占位（待接入 AlgorithmApplicationService）----
-    const OperationId algoOps[] = {
-        OperationId::Algo_Fill,
-        OperationId::Algo_Nesting,
-        OperationId::Algo_Offset,
-        OperationId::Algo_Array,
-        OperationId::Algo_BooleanUnion,
-        OperationId::Algo_BooleanIntersection,
-        OperationId::Algo_BooleanDifference,
-        OperationId::Algo_BooleanXor,
-        OperationId::Algo_ReliefEngravingFromImage,
-    };
-
-    // ---- 编辑操作占位（待接入 GeometryEditService）----
-    const OperationId editOps[] = {
-        OperationId::Edit_Trim,
-        OperationId::Edit_Extend,
-        OperationId::Edit_Align,
-        OperationId::Edit_Cut,
-        OperationId::Edit_Paste,
-        OperationId::Edit_MirrorH,
-        OperationId::Edit_MirrorV,
-    };
-
-    // ---- 视图操作占位（待接入 ViewController）----
-    const OperationId viewOps[] = {
-        OperationId::View_ZoomFit,
-        OperationId::View_ZoomIn,
-        OperationId::View_ZoomOut,
-        OperationId::View_ZoomSelection,
-        OperationId::View_Pan,
-        OperationId::View_Reset,
-        OperationId::View_GridVisible,
-        OperationId::View_SnapEnabled,
-        OperationId::View_OrthoMode,
-        OperationId::View_AngleSnap,
-        OperationId::View_LayerManager,
-        OperationId::View_NewLayer,
-        OperationId::View_DeleteLayer,
-        OperationId::View_SetDisplayUnit,
-    };
 
     auto registerPlaceholders = [&reg, &totalRegistered](const OperationId* ops, size_t count, const char* category) {
         int registered = 0;
@@ -90,9 +44,6 @@ void PendingOperationRegistry::registerAll()
         }
     };
 
-    registerPlaceholders(algoOps, std::size(algoOps), "Algorithm");
-    registerPlaceholders(editOps, std::size(editOps), "Edit");
-    registerPlaceholders(viewOps, std::size(viewOps), "View");
-
+    // 当前无待占位操作；后续新增未接入操作时在此追加数组并调用 registerPlaceholders
     SY_INFOF("[Composition] Total %d placeholder operations registered across all categories", totalRegistered);
 }

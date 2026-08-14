@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 #include "FileIO/FioTypes.h"
@@ -45,6 +47,13 @@ public:
     /// @param parseData 解析结果（中立 IR）
     /// @return 领域图元对象列表
     static std::vector<std::unique_ptr<Eg::SyEntity>> convertAll(const Fio::FioParseResult& parseData);
+
+    /// 将 FioParseResult 中的所有图元批量转换为 SyEntity 列表，并输出图层归属映射
+    /// @param parseData 解析结果（中立 IR）
+    /// @param outEntityLayerMap 可选输出：转换后图元 EntityId(int64) → 源图层 sourceId（仅 layerSourceId != 0 的图元）
+    /// @return 领域图元对象列表
+    static std::vector<std::unique_ptr<Eg::SyEntity>> convertAll(
+        const Fio::FioParseResult& parseData, std::unordered_map<int64_t, uint32_t>* outEntityLayerMap);
 
     /// 将 FioParseResult 中的图层信息提取为独立列表
     /// @param parseData 解析结果

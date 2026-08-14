@@ -30,6 +30,11 @@ class WorkbenchActionManager;
 class WorkbenchStateManager;
 class SceneTreeDockWidget;
 class PropertiesPanelWidget;
+class FileDropHandler;
+class QDragEnterEvent;
+class QDragMoveEvent;
+class QDragLeaveEvent;
+class QDropEvent;
 
 /// 工作台切换工厂：按 ID 返回对应的工作台实例
 using WorkbenchFactory = std::function<UiWorkbench*(const QString& workbenchId)>;
@@ -62,6 +67,14 @@ protected:
     void changeEvent(QEvent* event) override;
     /// 窗口关闭事件处理（拦截未保存更改）
     void closeEvent(QCloseEvent* event) override;
+    /// 文件拖放进入事件（对接 FileDropHandler → ImportService）
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    /// 文件拖放移动事件
+    void dragMoveEvent(QDragMoveEvent* event) override;
+    /// 文件拖放离开事件
+    void dragLeaveEvent(QDragLeaveEvent* event) override;
+    /// 文件拖放释放事件（对接 FileDropHandler → ImportService）
+    void dropEvent(QDropEvent* event) override;
 
 public:
     /// 设置状态中心
@@ -267,6 +280,8 @@ private:
     WorkbenchFactory m_workbenchFactory;
     /// 菜单管理器
     WorkbenchMenuManager* m_menuManager{ nullptr };
+    /// 文件拖放处理器（对接 ImportService，2D/3D 工作台共用）
+    std::unique_ptr<FileDropHandler> m_fileDropHandler;
     /// 布局管理器：集中管理工具栏、停靠面板、状态栏骨架与布局快照
     std::unique_ptr<WorkbenchLayoutManager> m_layoutManager;
     /// 操作管理器：管理快捷键、命令权限检查、错误上报、性能记录

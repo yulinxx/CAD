@@ -3,6 +3,7 @@
 #include "WorkbenchLayoutManager.h"
 #include "WorkbenchActionManager.h"
 #include "WorkbenchStateManager.h"
+#include "FileDropHandler.h"
 
 /**
  * @file WorkbenchWindow.cpp
@@ -127,13 +128,20 @@
 
 #include <QCloseEvent>
 #include <QMessageBox>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDragLeaveEvent>
+#include <QDropEvent>
 
 WorkbenchWindow::WorkbenchWindow(QWidget* parent)
     : QMainWindow(parent)
+    , m_fileDropHandler(std::make_unique<FileDropHandler>(this))
 {
     SY_DEBUG("[WorkbenchWindow] Creating main window");
     setWindowTitle(QString::fromStdString(MainApp::appName()));
     resize(1440, 900);
+    // 启用文件拖放，2D/3D 工作台共用统一 FileDropHandler
+    setAcceptDrops(true);
 
     if (const auto* screen = QGuiApplication::primaryScreen())
     {
@@ -262,6 +270,12 @@ void WorkbenchWindow::configureServices(const UiServices& services)
     m_uiServices = services;
     m_stateCenter = services.stateCenter;
     m_themeService = services.themeService;
+
+    // 注入导入服务到文件拖放处理器（2D/3D 工作台共用统一导入入口）
+    if (m_fileDropHandler)
+    {
+        m_fileDropHandler->setImportService(services.importService);
+    }
 
     if (m_actionManager)
     {
@@ -533,6 +547,43 @@ void WorkbenchWindow::closeEvent(QCloseEvent* event)
         }
     }
     event->accept();
+}
+
+void WorkbenchWindow::dragEnterEvent(QDragEnterEvent* event)
+{
+    if (m_fileDropHandler && m_fileDropHandler->handleDragEnter(event))
+    {
+        return;
+    }
+    event->ignore();
+}
+
+void WorkbenchWindow::dragMoveEvent(QDragMoveEvent* event)
+{
+    if (m_fileDropHandler && m_fileDropHandler->handleDragMove(event))
+    {
+        return;
+    }
+    event->ignore();
+}
+
+void WorkbenchWindow::dragLeaveEvent(QDragLeaveEvent* event)
+{
+    if (m_fileDropHandler)
+    {
+        m_fileDropHandler->handleDragLeave(event);
+        return;
+    }
+    event->accept();
+}
+
+void WorkbenchWindow::dropEvent(QDropEvent* event)
+{
+    if (m_fileDropHandler && m_fileDropHandler->handleDrop(event))
+    {
+        return;
+    }
+    event->ignore();
 }
 
 void WorkbenchWindow::applyTheme(const QString& styleSheet)

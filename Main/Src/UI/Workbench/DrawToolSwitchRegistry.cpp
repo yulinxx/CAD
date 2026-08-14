@@ -10,19 +10,19 @@
 
 #include <memory>
 
-DrawToolSwitchRegistry::DrawToolSwitchRegistry(OperationBus* bus, RenderViewport2D* viewport)
+DrawToolSwitchRegistry::DrawToolSwitchRegistry(OperationBus* bus, RenderViewport2D** viewportPtr)
     : m_bus(bus)
-    , m_viewport(viewport)
+    , m_viewportPtr(viewportPtr)
 {
 }
 
 void DrawToolSwitchRegistry::registerAll()
 {
-    if (!m_bus || !m_viewport)
+    if (!m_bus || !m_viewportPtr || !*m_viewportPtr)
     {
         SY_WARNF("[DrawToolSwitchRegistry] skip registration: bus=%s viewport=%s",
             m_bus ? "ok" : "null",
-            m_viewport ? "ok" : "null");
+            (m_viewportPtr && *m_viewportPtr) ? "ok" : "null");
         return;
     }
 
@@ -45,12 +45,14 @@ void DrawToolSwitchRegistry::registerAll()
         const QString toolName = QString::fromUtf8(entry.toolName);
 
         // LambdaOperation 是框架推荐的依赖注入方式（见 OperationBus.cpp 头注释）：
-        // 直接捕获视口，不依赖已废弃的 OperationContext。
+        // 捕获指向 m_viewport 的间接引用，而非视口裸指针本身。
+        // OperationRegistry 跳过重复注册，因此首次注册的 lambda 会贯穿整个应用生命周期；
+        // 间接引用确保工作台切换后 lambda 始终访问当前视口（或安全跳过 null）。
         registry.registerOperation(
-            std::make_unique<LambdaOperation>(entry.operationId, [viewport = m_viewport, toolName]() {
-                if (viewport)
+            std::make_unique<LambdaOperation>(entry.operationId, [vpPtr = m_viewportPtr, toolName]() {
+                if (vpPtr && *vpPtr)
                 {
-                    viewport->setActiveTool(toolName);
+                    (*vpPtr)->setActiveTool(toolName);
                 }
             }));
 
