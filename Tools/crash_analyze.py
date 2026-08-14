@@ -160,20 +160,24 @@ class RegisterSet:
 def read_mdstring(buf: bytes, rva: int) -> str:
     """从 dump 文件中读取一个 MINIDUMP_STRING 结构。
     
-    格式：前 4 字节为小端序 u32 表示字符数（不是字节数），后面紧跟 UTF-16LE 编码的字符。
+    格式：前 4 字节为小端序 u32 表示字节数（含 UTF-16LE 编码），后面紧跟字符数据。
     如果 rva 为 0 表示该字段未设置，返回空字符串。
-    解码失败时回退到 latin-1 以避免抛出异常。
     """
     if rva == 0 or rva + 4 > len(buf):
         return ""
-    length = struct.unpack_from("<I", buf, rva)[0]      # 字符数量
-    if length == 0 or rva + 4 + length * 2 > len(buf):
+    length = struct.unpack_from("<I", buf, rva)[0]      # 字节数
+    if length == 0 or length > 4096 or rva + 4 + length > len(buf):
         return ""
-    raw = buf[rva + 4:rva + 4 + length * 2]             # 每个字符 2 字节
+    raw = buf[rva + 4:rva + 4 + length]
     try:
-        return raw.decode("utf-16-le", errors="replace")
+        s = raw.decode("utf-16-le", errors="replace")
     except Exception:
-        return raw.decode("latin-1", errors="replace")
+        s = raw.decode("latin-1", errors="replace")
+    # 在第一个 null 字符处截断
+    npos = s.find("\x00")
+    if npos >= 0:
+        s = s[:npos]
+    return s.strip()
 
 
 def parse_minidump(path: str):
@@ -326,6 +330,23 @@ def cv_record_name(buf: bytes, cv_rva: int, cv_size: int) -> str:
     return ""
 
 
+def cv_record_name_raw(data: bytes) -> str:
+    """从内联 CodeView 数据中提取模块名称（Breakpad 格式）。
+    
+    数据格式：RSDS/NB07/NB10 签名(4) + GUID(16) + age(4) + 0 结尾 ASCII 名称。
+    """
+    if len(data) < 24:
+        return ""
+    sig = data[:4]
+    if sig in (b"RSDS", b"NB07", b"NB10"):
+        name = data[24:].split(b"\x00", 1)[0]
+        try:
+            return name.decode("utf-8", errors="replace")
+        except Exception:
+            return ""
+    return ""
+
+
 def _is_plausible_base(v: int) -> bool:
     """判断一个地址是否像是合法的模块加载基址。
     
@@ -341,11 +362,11 @@ def _is_plausible_base(v: int) -> bool:
 def read_module_list(buf: bytes, loc: Tuple[int, int]) -> List[ModuleEntry]:
     """读取 MODULE_LIST Stream（类型 4），提取所有已加载模块。
     
-    关键难点：不同平台 / 不同版本的 Breakpad 生成的 MDRawModule 记录长度（stride）
-    可能不同（108、112、120、160、216 等）。因此采用自适应探测：
-      1. 尝试多个候选 stride
+    关键难点：不同平台 / 不同版本的 Breakpad/Crashpad 生成的 MDRawModule 记录长度（stride）
+    可能不同（56=Microsoft, 100=Breakpad, 108 等）。因此采用自适应探测：
+      1. 尝试多个候选 header 大小（4 或 8 字节）和 stride
       2. 检查每个记录的起始 8 字节（base address）是否合法
-      3. 选择能验证全部记录且得分最高的 stride
+      3. 选择能验证全部记录且得分最高的组合
     
     字段布局（在选定 stride 内的固定偏移）：
       +0   base_of_image(u64)
@@ -353,35 +374,36 @@ def read_module_list(buf: bytes, loc: Tuple[int, int]) -> List[ModuleEntry]:
       +12  checksum(u32)
       +16  time_date_stamp(u32)
       +20  module_name_rva(u32)   -> MINIDUMP_STRING（完整路径）
-      +76  cv_record.data_size(u32)
-      +80  cv_record.rva(u32)     -> CodeView 记录（通常含短名称）
+      +24  cv_record(u32*2 或 52字节内联) -> CodeView 记录（通常含短名称）
     """
     size, rva = loc
     count = struct.unpack_from("<I", buf, rva)[0]
     if count == 0:
         return []
 
-    # 自适应 stride 探测
-    best_stride, best_score = 108, -1
-    for stride in (108, 112, 116, 120, 128, 160, 200, 216, 224):
-        score = 0
-        checked = 0
-        for i in range(count):
-            b = rva + 8 + i * stride
-            if b + 16 > len(buf):
-                break
-            checked += 1
-            base = struct.unpack_from("<Q", buf, b)[0]
-            if base == 0 or _is_plausible_base(base):
-                score += 1
-            else:
-                break
-        # 只有验证了所有记录且至少有一个合法 base 的 stride 才会被采纳
-        if checked == count and score >= best_score and score > 0:
-            best_stride, best_score = stride, score
+    # 自适应 stride 探测（同时尝试 hdr=4 和 hdr=8，覆盖有无对齐填充的情况）
+    best_stride, best_score, best_hdr = -1, -1, 4
+    for hdr in (4, 8):
+        for stride in (56, 100, 108, 112, 116, 120, 128, 136, 144, 160, 200, 216, 224):
+            score = 0
+            checked = 0
+            for i in range(count):
+                b = rva + hdr + i * stride
+                if b + 16 > len(buf):
+                    break
+                checked += 1
+                base = struct.unpack_from("<Q", buf, b)[0]
+                if base == 0 or _is_plausible_base(base):
+                    score += 1
+                else:
+                    break
+            if checked == count and score > best_score:
+                best_stride, best_score, best_hdr = stride, score, hdr
+    if best_stride < 0:
+        return []
 
     mods: List[ModuleEntry] = []
-    hdr = 8  # number_of_modules(u32) + 4 字节对齐填充
+    hdr = best_hdr
     for i in range(count):
         b = rva + hdr + i * best_stride
         # 修复：使用 best_stride 做边界检查，而非硬编码 108
@@ -398,9 +420,22 @@ def read_module_list(buf: bytes, loc: Tuple[int, int]) -> List[ModuleEntry]:
         name_from_rva = read_mdstring(buf, name_rva) if name_rva + 4 <= len(buf) else ""
 
         # 从 cv_record 读取短名称（新版 Crashpad / macOS 常用）
-        cv_size = struct.unpack_from("<I", buf, b + 76)[0]
-        cv_rva = struct.unpack_from("<I", buf, b + 80)[0]
-        name_from_cv = cv_record_name(buf, cv_rva, cv_size)
+        # cv_record 在 module_name_rva(+20, 4字节) 之后，偏移 +24
+        # 对于 Microsoft 格式 (stride=56)：cv_record 是 MINIDUMP_LOCATION_DATA (data_size+rva)
+        # 对于 Breakpad 格式 (stride>=100)：cv_record 是内联 CodeView 数据 (RSDS等)
+        name_from_cv = ""
+        if best_stride >= 56:
+            cv_sig = struct.unpack_from("<I", buf, b + 24)[0]
+            if cv_sig == 0x53445352 or cv_sig == 0x3037424e or cv_sig == 0x3031424e:
+                # Breakpad 格式：内联 CodeView 数据 (RSDS/NB07/NB10)
+                cv_data = buf[b + 24:b + 24 + min(52, best_stride - 24)]
+                name_from_cv = cv_record_name_raw(cv_data)
+            else:
+                # Microsoft 格式：MINIDUMP_LOCATION_DATA -> 跟随 rva
+                cv_size = struct.unpack_from("<I", buf, b + 24)[0]
+                cv_rva = struct.unpack_from("<I", buf, b + 28)[0]
+                if cv_size and cv_rva and cv_rva + cv_size <= len(buf):
+                    name_from_cv = cv_record_name(buf, cv_rva, cv_size)
 
         # 名称优先级：cv_record 短名 > module_name_rva 的 basename > 十六进制占位符
         if name_from_cv:
@@ -897,14 +932,21 @@ def dump_modules(mods: List[ModuleEntry]) -> None:
     print(f"  {'基址':<18} {'大小':<10} {'时间戳':<12} {'名称'}")
     print(f"  {'-'*18} {'-'*10} {'-'*12} {'-'*40}")
     for m in mods:
-        # 将 PE/ELF 时间戳转换为人类可读的日期
         ts_str = time.strftime("%Y-%m-%d", time.gmtime(m.timestamp)) if m.timestamp else "-"
         name_disp = m.name if len(m.name) <= 40 else m.name[:37] + "..."
-        print(f"  0x{m.base:016x} {m.size:<10} {ts_str:<12} {name_disp}")
-        # 如果完整路径与短名称不同，额外显示一行路径（灰色）
+        line = f"  0x{m.base:016x} {m.size:<10} {ts_str:<12} {name_disp}"
+        try:
+            print(line)
+        except UnicodeEncodeError:
+            print(line.encode("ascii", errors="replace").decode("ascii"))
         if m.path and m.path != m.name and len(m.path) > len(m.name):
             path_disp = m.path if len(m.path) <= 58 else "..." + m.path[-55:]
-            print(f"  {'':18} {'':10} {'':12} {Colors.DIM}{path_disp}{Colors.RESET}")
+            line2 = f"  {'':18} {'':10} {'':12} {Colors.DIM}{path_disp}{Colors.RESET}"
+            try:
+                print(line2)
+            except UnicodeEncodeError:
+                safe = path_disp.encode("ascii", errors="replace").decode("ascii")
+                print(f"  {'':18} {'':10} {'':12} {safe}")
 
 
 def dump_stack_memory(buf: bytes, directory: dict, t: ThreadEntry,
