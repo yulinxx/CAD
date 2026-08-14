@@ -59,6 +59,17 @@
       ]
     },
     {
+      "id": "algorithm",
+      "label": "Algorithm",
+      "items": [
+        { "type": "action", "id": "algo.fill", "label": "Fill", "command": "algo.fill", "workbenches": ["2D"] },
+        { "type": "action", "id": "algo.nesting", "label": "Nesting", "command": "algo.nesting", "workbenches": ["2D"] },
+        { "type": "action", "id": "algo.array", "label": "Array", "command": "algo.array", "workbenches": ["2D"] },
+        { "type": "action", "id": "algo.offset", "label": "Offset...", "command": "algo.offset", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "algo.relief_engraving", "label": "Relief Engraving", "command": "algo.relief_engraving", "workbenches": ["2D", "3D"] }
+      ]
+    },
+    {
       "id": "view",
       "label": "View",
       "items": [
@@ -98,11 +109,6 @@
       "id": "tools",
       "label": "Tools",
       "items": [
-        { "type": "submenu", "id": "tools.algorithm", "label": "Algorithm", "workbenches": ["2D"], "items": [
-          { "type": "action", "id": "algo.fill", "label": "Fill", "command": "algo.fill", "workbenches": ["2D"] },
-          { "type": "action", "id": "algo.nesting", "label": "Nesting", "command": "algo.nesting", "workbenches": ["2D"] },
-          { "type": "action", "id": "algo.relief_engraving", "label": "Relief Engraving", "command": "algo.relief_engraving", "workbenches": ["2D", "3D"] }
-        ] },
         { "type": "submenu", "id": "tools.model", "label": "Model", "workbenches": ["3D"], "items": [
           { "type": "action", "id": "algo.nesting_from_mesh", "label": "Nesting from Mesh", "command": "algo.nesting_from_mesh", "workbenches": ["3D"] },
           { "type": "action", "id": "process.generate_relief_toolpath", "label": "Generate Relief Toolpath", "command": "process.generate_relief_toolpath", "workbenches": ["3D"] },

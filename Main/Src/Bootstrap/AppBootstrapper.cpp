@@ -145,6 +145,8 @@ void AppBootstrapper::bootstrap()
 
     m_services.sceneEditService = m_compositionRoot->sceneEditService();
 
+    m_services.unitManager = m_compositionRoot->unitManager();
+
     const auto startWorkbenchId = m_startWorkbenchId.isEmpty() ? QStringLiteral("2D") : m_startWorkbenchId;
     // SY_INFOF("[AppBootstrapper] Bootstrapping workbench: %s", startWorkbenchId.toUtf8().constData());
 

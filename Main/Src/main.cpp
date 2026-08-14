@@ -6,23 +6,21 @@ int runCADApplication(int argc, char** argv);
 
 int main(int argc, char** argv)
 {
-    // macOS: QOpenGLWidget must share its framebuffer texture with Qt's
-    // internal compositing context. If the widget sets a format that differs
-    // from the global default (e.g. 4.1 CoreProfile), Qt emits
-    // "Could not create NSOpenGLContext with shared context, falling back to
-    // unshared context" and the widget renders black.
-    // Setting the SAME format as the global default makes the contexts shareable.
+    // 全应用统一采用现代 OpenGL（CoreProfile），不使用固定管线：
+    // - Windows：OpenGL 4.6 CoreProfile（最高版本）
+    // - macOS：OpenGL 4.1 CoreProfile（macOS 支持的最高版本）
+    // 所有渲染（2D Renderx、3D 视图）均使用 shader + VBO/VAO 编程。
     //
-    // Windows: RenderWidget3D 仍使用固定管线（glBegin/glMatrixMode/glFrustum 等），
-    // 在 CoreProfile 下这些函数会被禁用导致 3D 网格与模型不显示。
-    // 因此 Windows 采用 CompatibilityProfile 兼容现代 shader 与固定管线。
+    // macOS 要求 QOpenGLWidget 与全局默认格式一致，否则 NSOpenGLContext
+    // 无法共享 framebuffer，widget 会渲染黑屏/错位。故各 widget 不再单独
+    // 覆盖格式，统一沿用此处全局默认。
     QSurfaceFormat format;
 #ifdef Q_OS_MACOS
     format.setVersion(4, 1);
     format.setProfile(QSurfaceFormat::CoreProfile);
 #else
     format.setVersion(4, 6);
-    format.setProfile(QSurfaceFormat::CompatibilityProfile);
+    format.setProfile(QSurfaceFormat::CoreProfile);
 #endif
     format.setDepthBufferSize(24);
     format.setStencilBufferSize(8);

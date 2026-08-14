@@ -130,6 +130,7 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
     uiServices.document2D = m_document2D.get();
     uiServices.selectionService = m_selectionService.get();
     uiServices.viewportActionHub = m_viewportActionHub.get();
+    uiServices.unitManager = m_unitManager.get();
     uiServices.layerManager = m_layerManager.get();
     uiServices.layerManagerBridge = m_layerManagerBridge.get();
     uiServices.layerEditService = m_layerEditService.get();

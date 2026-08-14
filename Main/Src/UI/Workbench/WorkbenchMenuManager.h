@@ -172,7 +172,6 @@ private:
         QAction* workbench2DAction{ nullptr };
         QAction* workbench3DAction{ nullptr };
         QMenu* themeMenu{ nullptr };
-        QActionGroup* unitActionGroup{ nullptr };
     } m_menuState;
 
     WorkbenchWindow* m_window;

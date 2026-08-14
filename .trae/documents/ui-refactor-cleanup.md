@@ -17,9 +17,9 @@
 ### 1.1 删除 `BaseTool::switchToSelectTool()`
 
 **修改文件:**
-- [BaseTool.h](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/Ui/DrawTools/BaseTool.h) 删除 230-234 行整个 `switchToSelectTool()` 方法
-- [DialogTool.cpp:19](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/Ui/DrawTools/DialogTool.cpp#L19) `switchToSelectTool()` → `switchTool("SelectTool")`
-- [DialogTool.h](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/Ui/DrawTools/DialogTool.h) 第 16、24 行注释中 `switchToSelectTool` 字样同步更新为 `switchTool("SelectTool")`
+- [BaseTool.h](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/UI/DrawTools/BaseTool.h) 删除 230-234 行整个 `switchToSelectTool()` 方法
+- [DialogTool.cpp:19](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/UI/DrawTools/DialogTool.cpp#L19) `switchToSelectTool()` → `switchTool("SelectTool")`
+- [DialogTool.h](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/UI/DrawTools/DialogTool.h) 第 16、24 行注释中 `switchToSelectTool` 字样同步更新为 `switchTool("SelectTool")`
 - [BaseToolTests.cpp:40](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Test/BaseToolTests.cpp#L40) `using BaseTool::switchToSelectTool;` → `using BaseTool::switchTool;`
 - [BaseToolTests.cpp:495](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Test/BaseToolTests.cpp#L495) `tool.switchToSelectTool();` → `tool.switchTool("SelectTool");`
 - [ToolManagerTests.cpp:23](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Test/ToolManagerTests.cpp#L23) `using BaseTool::switchToSelectTool;` → `using BaseTool::switchTool;`
@@ -30,10 +30,10 @@
 ### 1.2 删除冗余工厂文件
 
 **删除文件:**
-- [ToolFactories.h](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/Ui/DrawTools/ToolFactories.h) (156 行,7 个工厂类,零调用方)
-- [IToolFactory.h](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/Ui/DrawTools/IToolFactory.h) (基类,唯一引用方是 ToolFactories.h)
+- [ToolFactories.h](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/UI/DrawTools/ToolFactories.h) (156 行,7 个工厂类,零调用方)
+- [IToolFactory.h](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/UI/DrawTools/IToolFactory.h) (基类,唯一引用方是 ToolFactories.h)
 
-**前置确认:** [ToolInitializer.cpp:72-103](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/Ui/ViewWidget/ToolInitializer.cpp#L72-L103) 已通过 `tm.registerTool<ConcreteTool>("Name")` 模板注册全部 17 个工具。CMakeLists 用 GLOB_RECURSE 自动收集,无显式引用。
+**前置确认:** [ToolInitializer.cpp:72-103](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/UI/ViewWidget/ToolInitializer.cpp#L72-L103) 已通过 `tm.registerTool<ConcreteTool>("Name")` 模板注册全部 17 个工具。CMakeLists 用 GLOB_RECURSE 自动收集,无显式引用。
 
 **误报排除:** `ViewInputDispatcher.cpp` 中的 `switchToSelectToolIfNeeded` 是匿名命名空间本地函数,与 `BaseTool::switchToSelectTool()` 无关,不改动。
 
@@ -48,7 +48,7 @@
 
 ### 当前 Bug
 
-[BaseTool.cpp:152-189](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/Ui/DrawTools/BaseTool.cpp#L152-L189):
+[BaseTool.cpp:152-189](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/UI/DrawTools/BaseTool.cpp#L152-L189):
 
 ```cpp
 const bool stepBackKey =
@@ -64,7 +64,7 @@ if (stepBackKey && isDrawing()) {
 
 ### 修正
 
-**修改 [BaseTool.cpp:154-156](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/Ui/DrawTools/BaseTool.cpp#L154-L156):**
+**修改 [BaseTool.cpp:154-156](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/UI/DrawTools/BaseTool.cpp#L154-L156):**
 
 ```cpp
 const bool stepBackKey = event->key() == Qt::Key_Backspace;
@@ -72,7 +72,7 @@ const bool stepBackKey = event->key() == Qt::Key_Backspace;
 
 移除 `Qt::Key_Z + ControlModifier` 分支。`isAutoRepeat()` / `canStepBack()` / `stepBack()` 逻辑保留(仅 Backspace 走)。Ctrl+Z 在绘图态返回 false → 经 `ShortcutManager`/`CommandActionHub` 命中 `Edit_Undo` → `UndoRedoManager::undo()`。
 
-**修改 [BaseTool.h:45](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/Ui/DrawTools/BaseTool.h#L45) 注释:**
+**修改 [BaseTool.h:45](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/UI/DrawTools/BaseTool.h#L45) 注释:**
 
 ```
 绘制中 Backspace:回退一步(stepBack,仅当前图元,不入主 Undo 栈)
@@ -118,14 +118,14 @@ public:
 
 5 个共有方法签名已精确核对一致。`setSelectionInfo` 签名不同(2D: `int,double,double`;3D: `int,QString,int`)不进接口,各自保留具体方法。`StatusBar3D::setEntityCount` 为 3D 独有,不进接口。
 
-**2. 修改 [StatusBar.h](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/Ui/StatusBar/StatusBar.h) (2D):**
+**2. 修改 [StatusBar.h](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/UI/StatusBar/StatusBar.h) (2D):**
 
 - `#include "UI/IStatusBar.h"`
 - `class StatusBar : public QWidget, public IStatusBar`
 - 5 个方法加 `override`(`setPositionText`/`setMessageText`/`setInfoText`/`clearAll`/`retranslateUi`)
 - `setSelectionInfo` 保留具体方法
 
-**3. 修改 [StatusBar3D.h](file:///c:/Users/xx/Documents/Cpp/CAD/UI/3D/Src/Ui/StatusBar/StatusBar3D.h) (3D):**
+**3. 修改 [StatusBar3D.h](file:///c:/Users/xx/Documents/Cpp/CAD/UI/3D/Src/UI/StatusBar/StatusBar3D.h) (3D):**
 
 - `#include "UI/IStatusBar.h"`
 - `class StatusBar3D : public QWidget, public IStatusBar`
@@ -142,7 +142,7 @@ class IStatusBar;  // 前向声明
 virtual IStatusBar* customStatusBar() const = 0;
 ```
 
-**5. 修改 [MainWindow.h](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/Ui/MainWindow/MainWindow.h) (2D):**
+**5. 修改 [MainWindow.h](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/UI/MainWindow/MainWindow.h) (2D):**
 
 `StatusBar* customStatusBar() const;` → `StatusBar* customStatusBar() const override;`
 

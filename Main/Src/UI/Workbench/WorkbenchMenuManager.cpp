@@ -2,6 +2,8 @@
 #include "WorkbenchWindow.h"
 
 #include "Log/SyLogger.h"
+#include "Manager/UnitManager/UnitManager.h"
+#include "Manager/UnitManager/UnitSelectionMenu.h"
 #include "UI2D/Operation/CommandCatalog.h"
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
@@ -443,18 +445,16 @@ void WorkbenchMenuManager::buildMenus()
 void WorkbenchMenuManager::buildLegacyMenus()
 {
     // 旧路径保留：用于未启用配置驱动时的兼容构建。
-    // 顶层菜单统一为 File / Edit / View / Tools / Help，
-    // Draw / Modify / Algorithm 收敛为子菜单，与配置驱动的 schema 保持一致（2D/3D 同一结构）。
+    // 顶层菜单统一为 File / Edit / Draw / Algorithm / View / Tools / Help，
+    // Draw / Algorithm 提升为独立顶层菜单（不再收敛在 Tools 下），
+    // Modify 由 refreshEditMenuForWorkbench 建立到 Edit 下，与配置驱动的 schema 保持一致（2D/3D 同一结构）。
     m_menuState.fileMenu = m_window->menuBar()->addMenu(m_window->tr("File"));
     m_menuState.editMenu = m_window->menuBar()->addMenu(m_window->tr("Edit"));
+    m_menuState.drawMenu = m_window->menuBar()->addMenu(m_window->tr("Draw"));
+    m_menuState.algorithmMenu = m_window->menuBar()->addMenu(m_window->tr("Algorithm"));
     m_menuState.viewMenu = m_window->menuBar()->addMenu(m_window->tr("View"));
     m_menuState.toolsMenu = m_window->menuBar()->addMenu(m_window->tr("Tools"));
     m_menuState.helpMenu = m_window->menuBar()->addMenu(m_window->tr("Help"));
-
-    // Draw / Algorithm 作为 Tools 的子菜单；Modify 由 refreshEditMenuForWorkbench 建立到 Edit 下。
-    m_menuState.drawMenu = m_menuState.toolsMenu->addMenu(m_window->tr("Draw"));
-    m_menuState.algorithmMenu = m_menuState.toolsMenu->addMenu(m_window->tr("Algorithm"));
-    m_menuState.toolsMenu->addSeparator();
 
     buildFileMenu();
     buildViewMenu();
@@ -747,29 +747,18 @@ void WorkbenchMenuManager::buildViewMenu()
 
     m_menuState.unitMenu = m_menuState.viewMenu->addMenu(m_window->tr("Unit"));
     m_menuState.unitMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/View/unit.svg")));
-    m_menuState.unitActionGroup = new QActionGroup(m_window);
-    m_menuState.unitActionGroup->setExclusive(true);
 
-    const struct
+    // 复用共享的单位选择菜单构建器（与状态栏 Position 弹出菜单同源），
+    // 可选单位、显示文本、命令 ID 均在 UnitSelectionMenu 中唯一维护
+    UnitManager::Unit currentUnit = UnitManager::Unit::Millimeter;
+    if (m_uiServices && m_uiServices->unitManager)
     {
-        const char* text;
-        const char* cmdId;
-        bool checked;
-    } units[] = { { "mm", "view.unit_mm", true }, { "cm", "view.unit_cm", false }, { "inch", "view.unit_inch", false } };
-
-    for (const auto& u : units)
-    {
-        auto* act = m_menuState.unitMenu->addAction(m_window->tr(u.text));
-        act->setCheckable(true);
-        act->setChecked(u.checked);
-        m_menuState.unitActionGroup->addAction(act);
-        QString cmdId = QString::fromLatin1(u.cmdId);
-        setCmdId(act, cmdId);
-        connect(act, &QAction::triggered, this, [this, cmdId, u]() {
-            logMenuTrigger(QString::fromUtf8(u.text), cmdId);
-            dispatchCommandSafely(cmdId);
-        });
+        currentUnit = m_uiServices->unitManager->displayUnit();
     }
+    UnitSelectionMenu::populate(m_menuState.unitMenu, currentUnit, [this](const QString& cmdId) {
+        logMenuTrigger(UnitSelectionMenu::textForCommandId(cmdId), cmdId);
+        dispatchCommandSafely(cmdId);
+    });
 
     m_menuState.viewMenu->addSeparator();
 
@@ -1005,8 +994,8 @@ void WorkbenchMenuManager::refreshEditMenuForWorkbench(const QString& workbenchI
 
     m_menuState.pathOpsMenu = m_menuState.editMenu->addMenu(m_window->tr("Path Operations"));
     m_menuState.pathOpsMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/Actions/offset.svg")));
-    addMenuAction(m_menuState.pathOpsMenu, m_window->tr("Offset"), QStringLiteral("edit.offset"));
-    addMenuAction(m_menuState.pathOpsMenu, m_window->tr("Boolean Union"), QStringLiteral("edit.boolean_union"));
+    addMenuAction(
+        m_menuState.pathOpsMenu, m_window->tr("Boolean Union"), QStringLiteral("edit.boolean_union"));
     addMenuAction(
         m_menuState.pathOpsMenu, m_window->tr("Boolean Intersection"), QStringLiteral("edit.boolean_intersection"));
     addMenuAction(
@@ -1094,6 +1083,10 @@ void WorkbenchMenuManager::refreshAlgorithmMenuForWorkbench(const QString& workb
         QStringLiteral("algo.array"),
         QStringLiteral(":/ui/common/Icons/Actions/algo_array.svg"));
     addMenuAction(m_menuState.algorithmMenu,
+        m_window->tr("Offset..."),
+        QStringLiteral("algo.offset"),
+        QStringLiteral(":/ui/common/Icons/Actions/offset.svg"));
+    addMenuAction(m_menuState.algorithmMenu,
         m_window->tr("Bitmap Relief Engraving..."),
         QStringLiteral("algo.relief_engraving"),
         QStringLiteral(":/ui/common/Icons/Actions/algo_relief.svg"));
@@ -1125,6 +1118,10 @@ void WorkbenchMenuManager::buildHelpMenu()
     m_menuState.helpMenu->addSeparator();
 
     auto* settingsAction = m_menuState.helpMenu->addAction(m_window->tr("Settings..."));
+    // macOS 上 Qt 会按文本启发（Settings/Preferences/Options → PreferencesRole）把该动作
+    // 自动搬进应用菜单，导致 Help 菜单里看不到“设置”。显式 NoRole 让它在各平台都固定在 Help 下，
+    // 其它平台不受影响（NoRole 是 Qt 默认之外的显式声明，仅抑制 macOS 的自动搬迁）。
+    settingsAction->setMenuRole(QAction::NoRole);
     setCmdId(settingsAction, QStringLiteral("help.settings"));
     IconHelper::setThemedIcon(settingsAction, QStringLiteral(":/ui/common/Icons/Help/settings.svg"));
     connect(settingsAction, &QAction::triggered, this, [this]() {

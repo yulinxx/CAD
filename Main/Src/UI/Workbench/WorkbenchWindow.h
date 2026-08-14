@@ -21,6 +21,7 @@ class QStatusBar;
 class QToolBar;
 class OperationBus;
 class StatusBarBase;
+class UnitManager;
 class UiStateCenter;
 class UiThemeService;
 class UiWorkbench;
@@ -118,8 +119,8 @@ public:
     /// @param handler 缩放操作处理函数，参数为 "zoom_in"/"zoom_out"/"zoom_fit"/"zoom_selection"/"reset"
     void setViewportZoomHandler(std::function<void(const QString&)> handler);
     /// 更新状态栏鼠标坐标显示
-    /// @param x 世界坐标 X
-    /// @param y 世界坐标 Y
+    /// @param x 世界坐标 X（毫米）
+    /// @param y 世界坐标 Y（毫米）
     void updatePositionLabel(double x, double y);
 
     // ==================== 最近文件菜单 ====================
@@ -204,6 +205,8 @@ public:
     }
 
 private:
+    /// 更新状态栏鼠标坐标显示（按当前显示单位换算）
+    void refreshPositionLabel();
     /// 创建窗口初始占位内容，作为工作台首次挂接前的安全兜底
     QWidget* createInitialCentralWidget();
     /// 创建工具栏基础骨架，便于后续拆出更多工具栏分组
@@ -268,6 +271,13 @@ private:
     OperationBus* m_operationBus{ nullptr };
     /// UI 服务集合
     UiServices m_uiServices;
+    /// 单位管理器（非拥有指针，来自 UiServices）
+    UnitManager* m_unitManager{ nullptr };
+    /// 最近一次鼠标世界坐标（毫米，基单位）
+    double m_lastMouseX{ 0.0 };
+    double m_lastMouseY{ 0.0 };
+    /// 是否已有有效的鼠标坐标
+    bool m_hasMousePosition{ false };
     /// 当前工作台
     UiWorkbench* m_workbench{ nullptr };
     /// 主题切换回调

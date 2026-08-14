@@ -68,6 +68,20 @@
       ]
     },
     {
+      "id": "algorithm",
+      "label": "Algorithm",
+      "visible": true,
+      "workbenches": ["2D"],
+      "visibilityScope": "2D",
+      "items": [
+        { "type": "action", "id": "algo.fill", "label": "Fill", "command": "algo.fill", "workbenches": ["2D"], "visibilityScope": "2D" },
+        { "type": "action", "id": "algo.nesting", "label": "Nesting", "command": "algo.nesting", "workbenches": ["2D"], "visibilityScope": "2D" },
+        { "type": "action", "id": "algo.array", "label": "Array", "command": "algo.array", "workbenches": ["2D"], "visibilityScope": "2D" },
+        { "type": "action", "id": "algo.offset", "label": "Offset...", "command": "algo.offset", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"], "visibilityScope": "2D" },
+        { "type": "action", "id": "algo.relief_engraving", "label": "Relief Engraving", "command": "algo.relief_engraving", "workbenches": ["2D", "3D"], "visibilityScope": "shared" }
+      ]
+    },
+    {
       "id": "view",
       "label": "View",
       "visible": true,
@@ -134,11 +148,6 @@
       "visible": true,
       "workbenches": ["2D", "3D"],
       "items": [
-        { "type": "submenu", "id": "tools.algorithm", "label": "Algorithm", "workbenches": ["2D"], "visibilityScope": "2D", "items": [
-          { "type": "action", "id": "algo.fill", "label": "Fill", "command": "algo.fill", "workbenches": ["2D"], "visibilityScope": "2D" },
-          { "type": "action", "id": "algo.nesting", "label": "Nesting", "command": "algo.nesting", "workbenches": ["2D"], "visibilityScope": "2D" },
-          { "type": "action", "id": "algo.relief_engraving", "label": "Relief Engraving", "command": "algo.relief_engraving", "workbenches": ["2D", "3D"], "visibilityScope": "shared" }
-        ] },
         { "type": "submenu", "id": "tools.theme", "label": "Theme", "workbenches": ["2D", "3D"], "visibilityScope": "shared", "items": [
           { "type": "action", "id": "theme.system", "label": "System", "command": "theme.system", "workbenches": ["2D", "3D"], "visibilityScope": "shared" },
           { "type": "action", "id": "theme.light", "label": "Light", "command": "theme.light", "workbenches": ["2D", "3D"], "visibilityScope": "shared" },
