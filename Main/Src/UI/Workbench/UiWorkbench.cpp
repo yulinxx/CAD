@@ -357,7 +357,7 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
     // 启动时从数据库加载并应用已保存的 2D 专属设置（画布/网格/标尺）
     if (m_settingsCoordinator && m_viewport)
     {
-        m_settingsCoordinator->loadAndApplySettings(m_viewport->renderWidget(), nullptr, nullptr);
+        m_settingsCoordinator->loadAndApplySettings(m_viewport->renderWidget(), nullptr, m_services.unitManager);
     }
 
     // 创建 2D 状态栏 widget 并挂载到窗口
@@ -365,6 +365,9 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
     if (!m_statusBar2D)
     {
         m_statusBar2D = new StatusBar(&window);
+        // Position 标签弹出单位选择 → 复用与视图菜单完全相同的命令分发路径
+        m_statusBar2D->setUnitManager(m_services.unitManager);
+        connect(m_statusBar2D, &StatusBar::sigUnitCommandRequested, this, &Workbench2D::dispatchCommand);
         SY_INFO("[Workbench2D] StatusBar created");
     }
     window.mountStatusBar(m_statusBar2D);
@@ -377,9 +380,9 @@ bool Workbench2D::showSettingsDialog(QWidget* /*parent*/)
         return false;
     }
 
-    // 2D 无 GridSnapManager/UnitManager 实例，传递 nullptr（coordinator 已做空指针保护）
+    // 2D 无 GridSnapManager 实例，传递 nullptr（coordinator 已做空指针保护）
     RenderWidget* widget = m_viewport->renderWidget();
-    return m_settingsCoordinator->showSettingsDialog(widget, nullptr, nullptr);
+    return m_settingsCoordinator->showSettingsDialog(widget, nullptr, m_services.unitManager);
 }
 
 QWidget* Workbench2D::createCentralViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties)

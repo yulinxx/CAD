@@ -17,7 +17,7 @@
 
 ### 现状
 
-- `ToolContext::addEntity` 签名 `std::function<void(Eg::SyEntity*)>` ([ToolContext.h:37](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/Ui/DrawTools/ToolContext.h#L37))
+- `ToolContext::addEntity` 签名 `std::function<void(Eg::SyEntity*)>` ([ToolContext.h:37](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/UI/DrawTools/ToolContext.h#L37))
 - Tool 栈上构造 `SyEntity` 传给 `addEntityFromPointer` → 双重 clone（`SceneEditService.cpp:117` + `SceneUndoCommands.cpp:238`）
 - `SceneEditService::addEntities(std::vector<std::unique_ptr<Eg::SyEntity>>, QString)` ([SceneEditService.h:55](file:///c:/Users/xx/Documents/Cpp/CAD/Engine/2D/Include/Engine2D/Edit/SceneEditService.h#L55)) 和 `applyChangeSet(SceneChangeSet&&, QString)` ([SceneEditService.h:59-60](file:///c:/Users/xx/Documents/Cpp/CAD/Engine/2D/Include/Engine2D/Edit/SceneEditService.h#L59-L60)) 都已经支持 unique_ptr
 - `SceneChangeSet::toAdd` 是 `std::vector<std::unique_ptr<Eg::SyEntity>>`（[SceneChangeSet.h:16-39](file:///c:/Users/xx/Documents/Cpp/CAD/Engine/2D/Include/Engine2D/Core/SceneChangeSet.h#L16-L39)）
@@ -46,7 +46,7 @@ void submitEntity(std::unique_ptr<Eg::SyEntity> e, QString desc = QStringLiteral
 void submitChanges(Eg::SceneChangeSet&& set, QString desc);
 ```
 
-**`ToolManager::initializeTools` 注入新 lambda**（[ToolManager.cpp:20-33](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/Ui/DrawTools/ToolManager.cpp#L20-L33)）：
+**`ToolManager::initializeTools` 注入新 lambda**（[ToolManager.cpp:20-33](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/UI/DrawTools/ToolManager.cpp#L20-L33)）：
 ```cpp
 if (sceneEditService) {
     enrichedCtx.submitChanges = [edit = sceneEditService](Eg::SceneChangeSet&& s, QString desc) {
@@ -62,7 +62,7 @@ if (sceneEditService) {
 
 **改 16 个 Tool 的提交点**（机械替换，模式相同）：
 
-代表改动 `LineTool::completeLine` ([LineTool.cpp:106-117](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/Ui/DrawTools/LineTool.cpp#L106-L117))：
+代表改动 `LineTool::completeLine` ([LineTool.cpp:106-117](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/UI/DrawTools/LineTool.cpp#L106-L117))：
 ```cpp
 // 旧
 Eg::SyLine line;
@@ -87,9 +87,9 @@ submitEntity(std::move(line));  // ownership 直接进入 SceneChangeSet
 
 ### 关键文件
 
-- 修改 `UI/2D/Src/Ui/DrawTools/ToolContext.h`（加 2 字段）
-- 修改 `UI/2D/Src/Ui/DrawTools/BaseTool.h` / `BaseTool.cpp`（加 2 方法 + 改 `initialize` 接收新字段）
-- 修改 `UI/2D/Src/Ui/DrawTools/ToolManager.cpp:20-33`（注入新 lambda）
+- 修改 `UI/2D/Src/UI/DrawTools/ToolContext.h`（加 2 字段）
+- 修改 `UI/2D/Src/UI/DrawTools/BaseTool.h` / `BaseTool.cpp`（加 2 方法 + 改 `initialize` 接收新字段）
+- 修改 `UI/2D/Src/UI/DrawTools/ToolManager.cpp:20-33`（注入新 lambda）
 - 修改 16 个 Tool 的 `*Tool.cpp` 完成方法
 - ✅ 注释 `SceneEditService::addEntityFromPointer` 标 `@deprecated`
 
@@ -140,7 +140,7 @@ namespace Render2D
 - 只保留非模板 `void setSceneEnvGeometry(const Render::SceneEnvGeometry& geo)`（line 210）
 - 删除头文件对 `RenderTypes.h` 的依赖（已移到 `SceneConverter2D.cpp`）
 
-**`ViewRenderCoordinator` 改动**（[ViewRenderCoordinator.h:25](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/Ui/ViewWidget/ViewRenderCoordinator.h#L25)）：
+**`ViewRenderCoordinator` 改动**（[ViewRenderCoordinator.h:25](file:///c:/Users/xx/Documents/Cpp/CAD/UI/2D/Src/UI/ViewWidget/ViewRenderCoordinator.h#L25)）：
 - 删除 line 4-5 的 2 个 `../../../../../` 相对 include
 - `setSceneEnvGeometry(const Eg::SceneEnvGeometry&)` 实现改为：
   ```cpp
@@ -163,9 +163,9 @@ namespace Render2D
 - 新建 `Render/Common/Src/SceneConverter2D.cpp`
 - 修改 `Render/2D/Include/Render2D/RenderWidget.h:209-263`（删 template）
 - 修改 `Render/2D/Src/RenderWidget.cpp`（如果 inline 函数搬到 cpp）
-- 修改 `UI/2D/Src/Ui/ViewWidget/ViewRenderCoordinator.h:4-5`（删相对 include）
-- 修改 `UI/2D/Src/Ui/ViewWidget/ViewRenderCoordinator.cpp:20-25`（改实现）
-- 修改 `UI/2D/Src/Ui/DrawTools/BaseTool.cpp:4`（删相对 include）
+- 修改 `UI/2D/Src/UI/ViewWidget/ViewRenderCoordinator.h:4-5`（删相对 include）
+- 修改 `UI/2D/Src/UI/ViewWidget/ViewRenderCoordinator.cpp:20-25`（改实现）
+- 修改 `UI/2D/Src/UI/DrawTools/BaseTool.cpp:4`（删相对 include）
 - 修改 `Render/Common/CMakeLists.txt`（加 Engine 依赖）
 
 ### 验证
@@ -221,8 +221,8 @@ target_include_directories(${LIB_NAME}
 **Step 3.3：删所有跨模块相对 include**
 
 确认 grep：`grep -rn "include \"\\.\\./" UI Engine Render`（限定相对路径深度 ≥ 3 级）。已知位置：
-- `UI/2D/Src/Ui/ViewWidget/ViewRenderCoordinator.h:4-5`（重构 2 已覆盖）
-- `UI/2D/Src/Ui/DrawTools/BaseTool.cpp:4`（重构 2 已覆盖）
+- `UI/2D/Src/UI/ViewWidget/ViewRenderCoordinator.h:4-5`（重构 2 已覆盖）
+- `UI/2D/Src/UI/DrawTools/BaseTool.cpp:4`（重构 2 已覆盖）
 
 替换为：
 - `"../../../../Render/Common/Include/Render/RenderTypes.h"` → `"Render/RenderTypes.h"`
@@ -297,8 +297,8 @@ public:
 
 - 新建 `UI/Common/Include/UI/AppHost/{IAppHost,AppHostBase,MainWindowBase,ServiceLocatorBase,DocumentManagerBase}.h`
 - 新建 `UI/Common/Src/AppHost/{MainWindowBase,ServiceLocatorBase,DocumentManagerBase}.cpp`
-- 修改 `UI/2D/Src/Ui/MainWindow/MainWindow2D.h/.cpp` — 继承 MainWindowBase
-- 修改 `UI/3D/Src/Ui/MainWindow/MainWindow3D.h/.cpp` — 继承 MainWindowBase
+- 修改 `UI/2D/Src/UI/MainWindow/MainWindow2D.h/.cpp` — 继承 MainWindowBase
+- 修改 `UI/3D/Src/UI/MainWindow/MainWindow3D.h/.cpp` — 继承 MainWindowBase
 - 修改 `UI/2D/Src/Service/ServiceLocator2D.h/.cpp` — 继承 ServiceLocatorBase
 - 修改 `UI/3D/Src/Service/ServiceLocator3D.h/.cpp` — 继承 ServiceLocatorBase
 - 修改 `UI/2D/Src/Service/DocumentManager2D.h/.cpp` — 继承 DocumentManagerBase
@@ -316,7 +316,7 @@ public:
 - 启动 3D 入口（`MainApp/MainApp3D.exe`），所有菜单/工具栏正常
 - 创建新文档 / 打开 / 关闭 / 切文档 路径都正常
 - `grep -c "void.*::save" UI/2D/Src/UI/MainWindow/ UI/3D/Src/UI/MainWindow/` 应有重复的方法被收编到 base
-- `wc -l UI/2D/Src/Ui/MainWindow/MainWindow2D.cpp UI/3D/Src/Ui/MainWindow/MainWindow3D.cpp` 总行数应减少 30%+
+- `wc -l UI/2D/Src/UI/MainWindow/MainWindow2D.cpp UI/3D/Src/UI/MainWindow/MainWindow3D.cpp` 总行数应减少 30%+
 
 ---
 

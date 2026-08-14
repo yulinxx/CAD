@@ -5,6 +5,8 @@
 #include "WorkbenchStateManager.h"
 #include "FileDropHandler.h"
 
+#include "Manager/UnitManager/UnitManager.h"
+
 /**
  * @file WorkbenchWindow.cpp
  * @brief 工作台主窗口 — UI 框架的顶层容器
@@ -270,6 +272,17 @@ void WorkbenchWindow::configureServices(const UiServices& services)
     m_uiServices = services;
     m_stateCenter = services.stateCenter;
     m_themeService = services.themeService;
+
+    // 单位管理器：状态栏坐标按当前显示单位换算，切换单位时实时刷新
+    if (m_unitManager && m_unitManager != services.unitManager)
+    {
+        disconnect(m_unitManager, &UnitManager::sigDisplayUnitChanged, this, &WorkbenchWindow::refreshPositionLabel);
+    }
+    m_unitManager = services.unitManager;
+    if (m_unitManager)
+    {
+        connect(m_unitManager, &UnitManager::sigDisplayUnitChanged, this, &WorkbenchWindow::refreshPositionLabel);
+    }
 
     // 注入导入服务到文件拖放处理器（2D/3D 工作台共用统一导入入口）
     if (m_fileDropHandler)
@@ -613,9 +626,30 @@ void WorkbenchWindow::setViewportZoomHandler(std::function<void(const QString&)>
 
 void WorkbenchWindow::updatePositionLabel(double x, double y)
 {
-    if (m_activeStatusBar)
+    m_lastMouseX = x;
+    m_lastMouseY = y;
+    m_hasMousePosition = true;
+    refreshPositionLabel();
+}
+
+void WorkbenchWindow::refreshPositionLabel()
+{
+    if (!m_activeStatusBar || !m_hasMousePosition)
     {
-        m_activeStatusBar->setPositionText(tr("Position: (%1, %2) mm").arg(x, 0, 'f', 2).arg(y, 0, 'f', 2));
+        return;
+    }
+
+    if (m_unitManager)
+    {
+        const UnitManager::Unit unit = m_unitManager->displayUnit();
+        const double dx = m_unitManager->fromBaseUnit(m_lastMouseX, unit);
+        const double dy = m_unitManager->fromBaseUnit(m_lastMouseY, unit);
+        m_activeStatusBar->setPositionText(
+            tr("Position: (%1, %2) %3").arg(dx, 0, 'f', 2).arg(dy, 0, 'f', 2).arg(UnitManager::unitSymbol(unit)));
+    }
+    else
+    {
+        m_activeStatusBar->setPositionText(tr("Position: (%1, %2) mm").arg(m_lastMouseX, 0, 'f', 2).arg(m_lastMouseY, 0, 'f', 2));
     }
 }
 

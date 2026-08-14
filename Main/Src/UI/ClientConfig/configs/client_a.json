@@ -7,14 +7,20 @@
   "extends": "base",
   "menus": [
     {
+      "id": "algorithm",
+      "label": "Algorithm",
+      "visible": true,
+      "workbenches": ["2D"],
+      "items": [
+        { "type": "action", "id": "tool.measure", "label": "Measure", "command": "2d.measure", "icon": ":/ui/common/Icons/Actions/measure.svg", "workbenches": ["2D"] }
+      ]
+    },
+    {
       "id": "tools",
       "label": "Tools",
       "visible": true,
       "workbenches": ["2D"],
       "items": [
-        { "type": "submenu", "id": "tools.algorithm", "label": "Algorithm", "workbenches": ["2D"], "items": [
-          { "type": "action", "id": "tool.measure", "label": "Measure", "command": "2d.measure", "icon": ":/ui/common/Icons/Actions/measure.svg", "workbenches": ["2D"] }
-        ] },
         { "type": "submenu", "id": "tools.theme", "label": "Theme", "workbenches": ["2D", "3D"], "items": [
           { "type": "action", "id": "theme.system", "label": "System", "command": "theme.system", "workbenches": ["2D", "3D"] },
           { "type": "action", "id": "theme.light", "label": "Light", "command": "theme.light", "workbenches": ["2D", "3D"] },

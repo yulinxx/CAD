@@ -180,8 +180,6 @@ $RECYCLE.BIN/
 
 # ---- 项目特定目录 ----
 SVGnest/
-Doc/
-docs/
 Archive/
 RenderEngine/
 scripts/

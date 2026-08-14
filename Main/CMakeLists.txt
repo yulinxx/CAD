@@ -133,6 +133,15 @@ file(READ "${SRC_ROOT}/Common/VersionInfo.h.in" _version_info_content)
 string(CONFIGURE "${_version_info_content}" _version_info_configured @ONLY)
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/VersionInfo.h" "${_version_info_configured}")
 
+# macOS: 生成 Info.plist。NSHighResolutionCapable 必须为 YES：非 bundle 的裸可执行文件
+# 没有 Info.plist，macOS 会以 1x（低分辨率）合成窗口，而 Qt6 按 Retina(dpr=2) 渲染，
+# 导致 GL 内容错位缩放并残留在视图角落（重复台面/网格、不均匀网格线）。
+if(APPLE)
+    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in" _info_plist_content)
+    string(CONFIGURE "${_info_plist_content}" _info_plist_configured @ONLY)
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/Info.plist" "${_info_plist_configured}")
+endif()
+
 add_executable(${app_name}
     ${MAIN_APP_SOURCES}
     ${MAIN_APP_HEADERS}
@@ -154,9 +163,33 @@ set_target_properties(${app_name} PROPERTIES
     AUTORCC ON
     WIN32_EXECUTABLE ON
     CXX_VISIBILITY_PRESET default
+    MACOSX_BUNDLE TRUE
+    MACOSX_BUNDLE_BUNDLE_NAME "${app_name}"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "com.sanyi.${app_name}"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0.0"
+    MACOSX_BUNDLE_BUNDLE_VERSION "1.0.0"
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_BINARY_DIR}/Info.plist"
 )
 
 target_compile_features(${app_name} PRIVATE cxx_std_17)
+
+# Renderx 运行时资源：着色器与默认字体必须位于应用可执行文件目录
+# （applicationDirPath()）。Renderx 自身只复制到其 dylib 输出目录，
+# macOS bundle 化后应用二进制位于 Contents/MacOS，需额外复制一份。
+if(SANYI_RENDERX_DIR AND EXISTS "${SANYI_RENDERX_DIR}/src/shader")
+    file(GLOB _renderx_shader_files
+        "${SANYI_RENDERX_DIR}/src/shader/*.vert"
+        "${SANYI_RENDERX_DIR}/src/shader/*.frag"
+        "${SANYI_RENDERX_DIR}/src/shader/*.comp")
+    file(GLOB _renderx_font_files "${SANYI_RENDERX_DIR}/src/res/*.ttf")
+    add_custom_command(TARGET ${app_name} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${app_name}>"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${_renderx_shader_files} "$<TARGET_FILE_DIR:${app_name}>/"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${_renderx_font_files} "$<TARGET_FILE_DIR:${app_name}>/"
+        COMMENT "Copying Renderx shaders and fonts to app directory"
+        VERBATIM
+    )
+endif()
 
 target_include_directories(${app_name}
     PRIVATE

@@ -22,6 +22,7 @@ class ExportService;
 class RecentFileService;
 class SettingsService;
 class ViewportActionHub;
+class UnitManager;
 
 /**
  * @struct UiServices
@@ -88,6 +89,9 @@ struct UiServices
 
     /// 视口动作中枢（视图缩放/平移/重置 → 当前活动视口）
     ViewportActionHub* viewportActionHub{ nullptr };
+
+    /// 单位管理器（显示单位 / 算法对话框单位换算）
+    UnitManager* unitManager{ nullptr };
 
     /// 最近文件回调：当文件被打开时调用，参数为文件完整路径
     /// 由 WorkbenchWindow 注入，用于刷新最近文件菜单

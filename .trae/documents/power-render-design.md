@@ -143,6 +143,10 @@ public:
 - 间接绘制：每帧构造 `DrawCmd[]` → `glNamedBufferSubData(INDIRECT)` → `glMultiDrawArraysIndirect`
 - 文字/Mesh 独立 VBO + Program
 - 7 个 prim type 共用一个 Program，按 `glLineWidth` / `glPointSize` 状态切换
+- **跨平台注意事项（从 Renderx 修复中吸取的教训）**：
+  - `glLineWidth` 须钳制到 `GL_LINE_WIDTH_RANGE` 范围；macOS CoreProfile 下该范围为 `[1, 1]`
+  - 不应启用 `GL_LINE_SMOOTH`；与 MSAA 叠加会导致特定缩放级别下线段片段被覆盖率丢弃
+  - 细分阶段应以 double 精度减去相机中心后再转 float（camera-relative），避免大坐标精度丢失
 
 ### 9. TextAtlas（`text/text_atlas.cpp`）— port from Renderx，**修复 stub**
 - 2048×2048 RGBA8 纹理
@@ -235,6 +239,9 @@ cmake --build . --config Release
 |---|---|
 | GLEW 找不到 | `find_package(GLEW QUIET)` 找不到则 `PR_NO_GLEW` 用 wglGetProcAddress 退化 |
 | OpenGL 4.6 不可用（macOS 4.1） | IPowerBackend 抽象，Vulkan/Metal 后续；2D path 最低 3.3 |
+| macOS 线宽钳制为 1px | macOS CoreProfile 下 `GL_LINE_WIDTH_RANGE=[1,1]`；粗线需 geometry shader 或 triangle strip 模拟 |
+| GL_LINE_SMOOTH + MSAA 冲突 | 不启用 `GL_LINE_SMOOTH`，MSAA 已提供足够抗锯齿（Renderx 已验证） |
+| 大坐标精度丢失 | 细分阶段 double 精度减去相机中心后再转 float（Renderx 已实现） |
 | QuadTree 重建慢 | V1 接受全量重建；V2 增量（dirty bbox 复用） |
 | stb_truetype 单 TU 膨胀 | `#define STB_TRUETYPE_IMPLEMENTATION` 仅在 `stb_truetype_impl.cpp` |
 | PowerWorld 组件多 | text/mesh 用 `unique_ptr` 默认 nullptr，2D 场景不强制使用 |
