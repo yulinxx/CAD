@@ -141,9 +141,11 @@ namespace
     class IncrementalVertexSink : public Eg::ISceneGeometrySink
     {
     public:
-        IncrementalVertexSink(std::vector<render::VertexP3C3>& outVertices, render::PrimitiveType& outType)
+        IncrementalVertexSink(std::vector<render::VertexP3C3>& outVertices, render::PrimitiveType& outType,
+            const double* cameraCenter = nullptr)
             : m_vertices(outVertices)
             , m_outType(outType)
+            , m_cameraCenter(cameraCenter)
         {
         }
 
@@ -318,8 +320,16 @@ namespace
         void addVertex(double x, double y, const float rgba[4])
         {
             render::VertexP3C3 v;
-            v.px = static_cast<float>(x);
-            v.py = static_cast<float>(y);
+            if (m_cameraCenter)
+            {
+                v.px = static_cast<float>(x - m_cameraCenter[0]) + static_cast<float>(m_cameraCenter[0]);
+                v.py = static_cast<float>(y - m_cameraCenter[1]) + static_cast<float>(m_cameraCenter[1]);
+            }
+            else
+            {
+                v.px = static_cast<float>(x);
+                v.py = static_cast<float>(y);
+            }
             v.pz = 0.0f;
             v.cr = rgba[0];
             v.cg = rgba[1];
@@ -329,6 +339,7 @@ namespace
 
         std::vector<render::VertexP3C3>& m_vertices;
         render::PrimitiveType& m_outType;
+        const double* m_cameraCenter;
         bool m_emitted = false;
         bool m_sawText = false;
     };
@@ -356,7 +367,8 @@ void clearEntityVertexCache()
  * 此函数处于渲染数据准备层，不涉及 OpenGL 调用。
  */
 bool entityToVertices(
-    const Eg::SyEntity* entity, std::vector<render::VertexP3C3>& outVertices, render::PrimitiveType& outType)
+    const Eg::SyEntity* entity, std::vector<render::VertexP3C3>& outVertices, render::PrimitiveType& outType,
+    const double* cameraCenter)
 {
     if (!entity)
     {
@@ -378,7 +390,7 @@ bool entityToVertices(
     }
 
     // 通过 Engine 侧统一边界分解图元，本地 sink 离散化
-    IncrementalVertexSink sink(outVertices, outType);
+    IncrementalVertexSink sink(outVertices, outType, cameraCenter);
     if (!Eg::emitEntityGeometry(*entity, sink))
     {
         return false;

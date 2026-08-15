@@ -160,6 +160,9 @@ public:
     /// 将 RenderWidget 本地坐标转换为世界坐标（物理像素 → 相机反算）
     QPointF widgetToWorld(QPoint widgetLocalPos) const;
 
+    /// 粘贴锚点：鼠标在视口内则取鼠标世界坐标，否则取视口中心世界坐标
+    QPointF pasteAnchorWorld() const;
+
 signals:
     void sceneChanged();
     // P1: 视口不直接持有编辑服务，通过信号通知上层
@@ -167,6 +170,8 @@ signals:
     void nudgeRequested(double dx, double dy);
     // 活动工具切换成功时发出，供工具栏等上层同步按钮高亮状态
     void activeToolChanged(const QString& toolName);
+    // 场景选择状态变化（含绘制后自动选中、点选/框选、撤销等所有路径），供上层刷新命令可用性
+    void selectionChanged();
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
@@ -236,6 +241,10 @@ private:
     std::function<void(const QString&)> m_commandStageCallback;
     // 鼠标位置回调，参数为世界坐标 (x, y)
     std::function<void(double, double)> m_positionCallback;
+
+    // 最近一次鼠标世界坐标（用于粘贴锚点等；hasCursor 表示是否已捕获过鼠标位置）
+    QPointF m_lastCursorWorldPos{ 0.0, 0.0 };
+    bool m_hasCursorPos{ false };
 
     // 刷新协调器（四级刷新策略 + 增量渲染管线）
     std::unique_ptr<SceneRefreshCoordinator> m_refreshCoordinator;
