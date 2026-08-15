@@ -251,6 +251,10 @@ private:
     void createToolbars(WorkbenchWindow& window);
     /// 创建并注册 2D 图层面板
     SceneTreeDockWidget* createLayersDock(WorkbenchWindow& window) const;
+    /// 将当前选中图元生成为属性模型并推送到属性面板（面板不存在则安全忽略）
+    /// 通过 EntityPropertyModel2D（算法层）+ PropertyModel（数据层）解耦，
+    /// 本方法仅作为组合根把"数据/算法"绑定到"UI"，面板可随时替换/移除。
+    void refreshPropertiesPanel();
 
 private:
     /// 命令动作中枢：管理所有 QAction 的创建、绑定、刷新
@@ -266,6 +270,9 @@ private:
 
     /// 2D 设置协调器（共享 SettingsService  singleton）
     std::unique_ptr<SettingsUiCoordinator2D> m_settingsCoordinator;
+
+    /// 当前挂载的 2D 工作台窗口（组合根绑定点，用于向属性面板推送模型）
+    WorkbenchWindow* m_workbenchWindow{ nullptr };
 };
 
 #if BUILD_UI3D

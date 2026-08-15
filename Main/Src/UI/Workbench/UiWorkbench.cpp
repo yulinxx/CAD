@@ -36,6 +36,8 @@
 #include "UI/RightToolBar/RightToolBar.h"
 #include "UI/TopToolBar/TopToolBar.h"
 #include "UI/Dlg/LayerManagerDialog.h"
+#include "UI2D/Service/EntityPropertyModel2D.h"
+#include "UI2D/Service/EntityPropertyEditSession2D.h"
 
 #include "Engine2D/Edit/LayerEditService.h"
 #include "Engine2D/Edit/SceneEditService.h"
@@ -352,6 +354,8 @@ bool Workbench2D::initialize(const UiServices& services)
 
 void Workbench2D::attachToWindow(WorkbenchWindow& window)
 {
+    m_workbenchWindow = &window;
+
     auto* viewport = createCentralViewport(window, nullptr);
     if (!viewport)
     {
@@ -368,6 +372,16 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
         vp->initializeTools();
         setupImportCallbacks(vp, window);
         vp->setActiveTool(QStringLiteral("SelectTool"));
+    }
+
+    // 属性被编辑后（已入撤销栈）延迟重建模型，避免在内联编辑器提交过程中重入
+    if (auto* props = window.propertiesDock())
+    {
+        QObject::connect(props, &PropertiesPanelWidget::sigPropertyEdited, this, [this]() {
+            QTimer::singleShot(0, this, [this]() {
+                refreshPropertiesPanel();
+            });
+        });
     }
 
     // 视口动作中枢：注入当前视口，供菜单 Zoom 子菜单与右键菜单 View_* 操作统一分发
@@ -473,6 +487,11 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
             }
         });
 
+        // 选择变化 → 同步刷新属性面板（仅当面板存在时生效，UI 可定制/移除）
+        QObject::connect(vp, &RenderViewport2D::selectionChanged, this, [this]() {
+            refreshPropertiesPanel();
+        });
+
         // 鼠标移动时实时更新状态栏位置标签
         vp->setPositionCallback([stateCenter = m_services.stateCenter, &window](double x, double y) {
             QVariantMap meta = stateCenter->metadata();
@@ -508,12 +527,8 @@ void Workbench2D::setupImportCallbacks(RenderViewport2D* vp, WorkbenchWindow& wi
     });
 
     // 属性面板刷新（导入后更新属性显示）
-    m_services.importService->setPropertyRefreshCallback([&window]() {
-        auto* props = window.propertiesDock();
-        if (props)
-        {
-            props->refresh();
-        }
+    m_services.importService->setPropertyRefreshCallback([this]() {
+        refreshPropertiesPanel();
     });
 }
 
@@ -730,6 +745,9 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         QObject::connect(m_services.operationBus, &OperationBus::undoStateChanged, this, [this]() {
             m_commandHub->refreshActionStates(m_commandHub->captureSnapshot(m_commandHub->mainWindow()));
         });
+        QObject::connect(m_services.operationBus, &OperationBus::undoStateChanged, this, [this]() {
+            refreshPropertiesPanel();
+        });
         // 剪贴板操作（Copy/Cut）后立即刷新 Paste 按钮启用状态
         QObject::connect(m_services.operationBus, &OperationBus::operationCompleted, this, [this](OperationId id, bool success) {
             if (success && (id == OperationId::Edit_Copy || id == OperationId::Edit_Cut))
@@ -746,6 +764,44 @@ SceneTreeDockWidget* Workbench2D::createLayersDock(WorkbenchWindow& window) cons
     sceneDock->setObjectName(QStringLiteral("SceneTreeDock"));
     window.registerDockWidget(QObject::tr("2D Layers"), sceneDock, Qt::LeftDockWidgetArea);
     return sceneDock;
+}
+
+void Workbench2D::refreshPropertiesPanel()
+{
+    // 属性面板是可选的 UI：配置驱动时可能不存在，因此先探测再绑定。
+    if (!m_workbenchWindow)
+    {
+        return;
+    }
+    auto* props = m_workbenchWindow->propertiesDock();
+    if (!props)
+    {
+        return;
+    }
+
+    // 读取当前选中图元 id（数据来源：引擎场景）
+    std::vector<Eg::EntityId> entityIds;
+    if (m_services.sceneEditService)
+    {
+        if (auto* scene = m_services.sceneEditService->sceneManager())
+        {
+            for (Eg::SyEntity* e : scene->getSelectedEntities())
+            {
+                if (e)
+                {
+                    entityIds.push_back(e->id);
+                }
+            }
+        }
+    }
+
+    // 创建编辑会话（算法层）：持有图元 id，负责按需解析实体、应用修改并集成撤销。
+    auto session = std::make_shared<EntityPropertyEditSession2D>(m_services.sceneEditService, std::move(entityIds));
+
+    // 数据/算法产物推送给 UI 层：模型用于展示，会话作为编辑目标。
+    // 面板仅消费 PropertyModel / IPropertyEditTarget，不感知算法与引擎细节。
+    props->setEditTarget(session);
+    props->setPropertyModel(session->buildModel());
 }
 
 void Workbench2D::activate()
