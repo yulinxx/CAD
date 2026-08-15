@@ -26,6 +26,7 @@
 class QMouseEvent;
 class QWheelEvent;
 class QKeyEvent;
+class QInputMethodEvent;
 class QContextMenuEvent;
 class RenderWidget;
 class Camera2D;
@@ -83,6 +84,14 @@ public:
     void handleWheel(QWheelEvent* event);
     void handleKeyPress(QKeyEvent* event);
     void handleContextMenu(QContextMenuEvent* event);
+
+    // ==================== 输入法（IME） ====================
+
+    /// 输入法事件转发给活动工具（返回是否被消费）
+    bool handleInputMethodEvent(QInputMethodEvent* event);
+
+    /// 输入法光标屏幕矩形（由活动工具的光标世界矩形经相机换算）
+    QRectF inputMethodCursorRect() const;
 
     // ==================== 交互状态 ====================
 

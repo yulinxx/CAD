@@ -25,7 +25,10 @@
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QKeyEvent>
+#include <QInputMethodEvent>
 #include <QContextMenuEvent>
+#include <QVariant>
+#include <QRectF>
 #include <cmath>
 #include "Log/SyLogger.h"
 
@@ -43,6 +46,65 @@ ViewportInputRouter::~ViewportInputRouter() = default;
 void ViewportInputRouter::setRenderWidget(RenderWidget* widget)
 {
     m_renderWidget = widget;
+
+    // 注入输入法查询处理器：RenderWidget 的 inputMethodQuery 委托至此
+    // 覆盖 Windows/IM、macOS/NSTextInputClient、Linux/IBus-Fcitx 需要的全部查询
+    if (widget)
+    {
+        widget->setInputMethodQueryHandler([this](Qt::InputMethodQuery query) -> QVariant {
+            switch (query)
+            {
+            case Qt::ImEnabled:
+                return true;
+            case Qt::ImCursorRectangle:
+                return inputMethodCursorRect();
+            case Qt::ImFont:
+                if (m_toolManager && m_toolManager->getActiveTool())
+                {
+                    const QFont f = m_toolManager->getActiveTool()->inputMethodFont();
+                    if (!f.family().isEmpty())
+                    {
+                        return f;
+                    }
+                }
+                return QVariant();
+            case Qt::ImSurroundingText:
+                if (m_toolManager && m_toolManager->getActiveTool())
+                {
+                    return m_toolManager->getActiveTool()->inputMethodSurroundingText();
+                }
+                return QVariant();
+            case Qt::ImCursorPosition:
+                if (m_toolManager && m_toolManager->getActiveTool())
+                {
+                    const int pos = m_toolManager->getActiveTool()->inputMethodCursorPos();
+                    if (pos >= 0)
+                    {
+                        return pos;
+                    }
+                }
+                return QVariant();
+            case Qt::ImAnchorPosition:
+                if (m_toolManager && m_toolManager->getActiveTool())
+                {
+                    const int pos = m_toolManager->getActiveTool()->inputMethodAnchorPos();
+                    if (pos >= 0)
+                    {
+                        return pos;
+                    }
+                }
+                return QVariant();
+            default:
+                return QVariant();
+            }
+        });
+
+        // 注入输入法事件处理器：中文组字/上屏事件从 RenderWidget 转发至活动工具。
+        // 这是 IME 生效的关键链路（不覆写 inputMethodEvent 则事件被 Qt 丢弃）。
+        widget->setInputMethodEventHandler([this](QInputMethodEvent* event) -> bool {
+            return handleInputMethodEvent(event);
+        });
+    }
 }
 
 void ViewportInputRouter::setCamera(Camera2D* camera)
@@ -147,6 +209,12 @@ bool ViewportInputRouter::eventFilter(QObject* obj, QEvent* event)
         auto* ke = static_cast<QKeyEvent*>(event);
         handleKeyPress(ke);
         return true;
+    }
+    case QEvent::InputMethod:
+    {
+        auto* ime = static_cast<QInputMethodEvent*>(event);
+        // 输入法事件：活动工具消费则拦截，否则忽略交由系统默认（无效果）
+        return handleInputMethodEvent(ime);
     }
     case QEvent::ContextMenu:
     {
@@ -303,6 +371,68 @@ void ViewportInputRouter::handleKeyPress(QKeyEvent* event)
     }
 
     event->ignore();
+}
+
+// ==================== 输入法（IME） ====================
+
+bool ViewportInputRouter::handleInputMethodEvent(QInputMethodEvent* event)
+{
+    if (!m_toolManager)
+    {
+        return false;
+    }
+    auto* tool = m_toolManager->getActiveTool();
+    if (!tool)
+    {
+        return false;
+    }
+    const bool consumed = tool->onInputMethodEvent(event);
+    if (consumed)
+    {
+        SY_DEBUG("[ViewportInputRouter] IME event consumed by active tool");
+    }
+    return consumed;
+}
+
+QRectF ViewportInputRouter::inputMethodCursorRect() const
+{
+    if (!m_toolManager)
+    {
+        return QRectF();
+    }
+    auto* tool = m_toolManager->getActiveTool();
+    if (!tool)
+    {
+        return QRectF();
+    }
+    const QRectF worldRect = tool->caretWorldRect();
+    if (worldRect.isEmpty() || !m_camera || !m_renderWidget)
+    {
+        return QRectF();
+    }
+
+    const float vpW = physicalViewportSize().width();
+    const float vpH = physicalViewportSize().height();
+    if (vpW <= 0 || vpH <= 0)
+    {
+        return QRectF();
+    }
+
+    // 世界坐标 → NDC（相机视图矩阵）→ 逻辑像素（Widget 本地坐标）
+    const Render::Mat3f vm = m_camera->viewMatrix(vpW, vpH);
+    const float lw = static_cast<float>(m_renderWidget->width());
+    const float lh = static_cast<float>(m_renderWidget->height());
+    const auto toScreen = [&vm, lw, lh](const QPointF& w) -> QPointF {
+        const float ndcX = vm.at(0, 0) * static_cast<float>(w.x()) + vm.at(0, 1) * static_cast<float>(w.y()) +
+            vm.at(0, 2);
+        const float ndcY = vm.at(1, 0) * static_cast<float>(w.x()) + vm.at(1, 1) * static_cast<float>(w.y()) +
+            vm.at(1, 2);
+        return QPointF((ndcX * 0.5f + 0.5f) * lw, (1.0f - (ndcY * 0.5f + 0.5f)) * lh);
+    };
+
+    const QPointF tl = toScreen(worldRect.topLeft());
+    const QPointF br = toScreen(worldRect.bottomRight());
+    return QRectF(tl, br).normalized();
 }
 
 void ViewportInputRouter::handleContextMenu(QContextMenuEvent* event)
