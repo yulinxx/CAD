@@ -294,10 +294,6 @@ void RenderWidget3DAdapter::selectNodeById(const QString& nodeId)
         m_selectedPathNames.append(QString::fromUtf8(entityName));
     }
 
-    SY_INFOF("[RenderWidget3DAdapter] Selected node by ID: %s, path: %s",
-        qPrintable(nodeId),
-        qPrintable(m_selectedPathNames.join("/")));
-
     if (m_selectionCallback)
     {
         m_selectionCallback(nodeId);

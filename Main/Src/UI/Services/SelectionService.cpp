@@ -72,8 +72,6 @@ void SelectionService::select(const char* id)
         return;
     }
 
-    SY_DEBUGF("[SelectionService] Select entity: id=%s", id);
-
     auto eid = Eg::parseEntityId(std::string(id));
     if (!eid)
     {
@@ -140,7 +138,6 @@ void SelectionService::clear()
 {
     if (m_sceneManager)
     {
-        SY_DEBUG("[SelectionService] Clear selection");
         m_sceneManager->clearSelection();
     }
 }
@@ -194,8 +191,6 @@ void SelectionService::setSelectedEntityIds(const QVector<QString>& ids)
     {
         return;
     }
-
-    SY_DEBUGF("[SelectionService] Set selected entities: count=%d", ids.size());
     std::vector<Eg::IEntity*> entities;
     entities.reserve(ids.size());
     for (const QString& id : ids)
