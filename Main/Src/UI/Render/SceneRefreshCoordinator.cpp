@@ -179,16 +179,27 @@ void SceneRefreshCoordinator::onSceneChanged()
 {
     if (m_sceneManager)
     {
-        for (auto id : m_sceneManager->dirtyEntities())
+        const auto dirtyIds = m_sceneManager->dirtyEntities();
+        const auto deletedIds = m_sceneManager->deletedEntityIds();
+        SY_WARNF("[RefreshDiag] onSceneChanged: dirty=%zu deleted=%zu",
+                 dirtyIds.size(), deletedIds.size());
+        for (auto id : dirtyIds)
         {
             m_pendingDirtyIds.insert(id);
         }
-        for (auto id : m_sceneManager->deletedEntityIds())
+        for (auto id : deletedIds)
         {
             m_pendingDeletedIds.insert(id);
         }
     }
+    else
+    {
+        SY_WARNF("[RefreshDiag] onSceneChanged: m_sceneManager is NULL (observer not registered)");
+    }
     scheduleSceneUpdate();
+    SY_TRACEF("[SceneRefreshCoordinator] onSceneChanged: dirty=%zu, deleted=%zu",
+              m_pendingDirtyIds.size(),
+              m_pendingDeletedIds.size());
 }
 
 void SceneRefreshCoordinator::onSelectionChanged()
@@ -274,6 +285,16 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             m_renderWidget->addRenderEntity(uid, vertices.data(), static_cast<uint32_t>(vertices.size()), primType);
             m_renderedEntityIds.insert(uid);
         }
+    }
+
+    // 诊断：统计本轮增量提交结果，确认图元是否进入渲染层
+    {
+        const uint32_t totalEntities = m_renderWidget->entityRenderCount();
+        SY_WARNF("[RefreshDiag] applyLightRefresh done: pending=%zu addedBook=%zu renderWorldEnt=%u fallback=%d",
+            m_pendingDirtyIds.size(),
+            m_renderedEntityIds.size(),
+            totalEntities,
+            m_pendingFullRefreshFallback ? 1 : 0);
     }
 
     // 位图层协调：以场景为真源，增量处理新增/修改/删除/图层显隐
