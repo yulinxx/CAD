@@ -50,7 +50,6 @@ void LayerPersistenceBridge::detach()
 /// 图层新增时同步写入数据库
 void LayerPersistenceBridge::onLayerAdded(int nLayerId, const char* name)
 {
-    SY_INFOF("[LayerPersistenceBridge] Layer added: id=%d, name=%s", nLayerId, name);
     syncLayerToDb(nLayerId);
 }
 
@@ -72,7 +71,6 @@ void LayerPersistenceBridge::onLayerRemoved(int nLayerId)
 /// 图层属性变更时同步更新数据库
 void LayerPersistenceBridge::onLayerChanged(int nLayerId)
 {
-    SY_DEBUGF("[LayerPersistenceBridge] Layer changed: id=%d", nLayerId);
     syncLayerToDb(nLayerId);
 }
 
@@ -82,7 +80,6 @@ void LayerPersistenceBridge::onCurrentLayerChanged(int /*nLayerId*/) {}
 /// 图层可见性变更时只写 visible 字段
 void LayerPersistenceBridge::onLayerVisibilityChanged(int nLayerId, bool bVisible)
 {
-    SY_DEBUGF("[LayerPersistenceBridge] Layer visibility changed: id=%d, visible=%d", nLayerId, bVisible);
     if (m_layerRepository)
     {
         if (!m_layerRepository->updateVisibility(m_documentId, nLayerId, bVisible))

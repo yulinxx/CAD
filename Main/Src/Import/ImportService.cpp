@@ -746,18 +746,10 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
             m_layerManager->setLayerColor(layerId, Ut::Color::fromRGB255(r, g, b));
             m_layerManager->setLayerVisible(layerId, src.visible);
             m_layerManager->setLayerLocked(layerId, src.locked);
-
-            SY_INFOF("[ImportService] Restored source layer '%s' -> id %d (color=#%02X%02X%02X, visible=%d)",
-                src.name,
-                layerId,
-                r,
-                g,
-                b,
-                src.visible ? 1 : 0);
         }
         else
         {
-            SY_INFOF("[ImportService] Source layer '%s' already exists as id %d, reusing", src.name, layerId);
+            // 源图层已存在，复用现有图层 ID
         }
         sourceToLayerId[src.sourceId] = layerId;
     }
@@ -786,6 +778,7 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
         SY_INFOF("[ImportService] Assigned %zu entities to restored layers", entityToLayerId.size());
     }
 
+    SY_INFOF("[ImportService] Restored %d/%zu source layer(s)", createdCount, parseResult.importedLayers.size());
     return createdCount;
 }
 

@@ -63,10 +63,8 @@ bool LayerRepository::save(const LayerRecord& record)
             return false;
         }
 
-        SY_DEBUGF("[LayerRepository] Updated layer: doc=%s, layer=%d", record.documentId.c_str(), record.layerId);
         return true;
     }
-
     // 新记录：插入
     auto values = recordToRow(record);
     if (!m_database.insertOrReplace("layers", values))

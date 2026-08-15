@@ -181,8 +181,6 @@ void SceneRefreshCoordinator::onSceneChanged()
     {
         const auto dirtyIds = m_sceneManager->dirtyEntities();
         const auto deletedIds = m_sceneManager->deletedEntityIds();
-        SY_WARNF("[RefreshDiag] onSceneChanged: dirty=%zu deleted=%zu",
-                 dirtyIds.size(), deletedIds.size());
         for (auto id : dirtyIds)
         {
             m_pendingDirtyIds.insert(id);
@@ -192,14 +190,7 @@ void SceneRefreshCoordinator::onSceneChanged()
             m_pendingDeletedIds.insert(id);
         }
     }
-    else
-    {
-        SY_WARNF("[RefreshDiag] onSceneChanged: m_sceneManager is NULL (observer not registered)");
-    }
     scheduleSceneUpdate();
-    SY_TRACEF("[SceneRefreshCoordinator] onSceneChanged: dirty=%zu, deleted=%zu",
-              m_pendingDirtyIds.size(),
-              m_pendingDeletedIds.size());
 }
 
 void SceneRefreshCoordinator::onSelectionChanged()
