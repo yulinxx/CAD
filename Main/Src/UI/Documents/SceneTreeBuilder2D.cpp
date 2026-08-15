@@ -6,14 +6,12 @@
 #include "Engine2D/SyEntity/SyGroup.h"
 #include "Engine/SyEntity/SyEntity.h"
 #include "Engine/SyEntity/EType.h"
-#include "Engine/EntityIdUtils.h"
 
 #include <QObject>
-#include <functional>
 
 namespace
 {
-    void collectGroupedEntityIds(const Eg::SyGroup* group, QSet<QString>& out)
+    void visitGroupMembers(const Eg::SyGroup* group, QSet<qint64>& out)
     {
         if (!group)
         {
@@ -21,21 +19,21 @@ namespace
         }
         for (const auto* sub : group->subGroups())
         {
-            collectGroupedEntityIds(sub, out);
+            visitGroupMembers(sub, out);
         }
         for (const auto* e : group->entities())
         {
             if (e)
             {
-                out.insert(QString::number(e->id));
+                out.insert(static_cast<qint64>(e->id));
             }
         }
     }
 }  // namespace
 
-QString SceneTreeBuilder2D::typeName(int eType)
+QString SceneTreeBuilder2D::typeName(Eg::EType eType)
 {
-    switch (static_cast<Eg::EType>(eType))
+    switch (eType)
     {
     case Eg::EType::POINT:
         return QObject::tr("Point");
@@ -77,122 +75,114 @@ QString SceneTreeBuilder2D::typeName(int eType)
     }
 }
 
-SceneTreeNode2D SceneTreeBuilder2D::buildEntityNode(Eg::SceneManager* scene, LayerManager* layers, const Eg::SyEntity* entity)
+SceneTreeTopology2D SceneTreeBuilder2D::buildTopology(Eg::SceneManager* scene)
 {
-    SceneTreeNode2D node;
-    if (!entity)
-    {
-        return node;
-    }
-
-    node.id = QString::number(entity->id);
-    node.typeName = typeName(static_cast<int>(entity->eType));
-    node.displayName = entity->name() && *entity->name() ? QString::fromUtf8(entity->name()) : node.typeName;
-    node.selected = entity->selected();
-    node.visible = entity->visible();
-    node.locked = entity->locked();
-    node.isGroup = false;
-
-    if (layers && scene)
-    {
-        const int layerId = layers->getEntityLayer(entity);
-        node.layerName = QString::fromStdString(layers->layerName(layerId));
-    }
-    Q_UNUSED(scene);
-    return node;
-}
-
-SceneTreeNode2D SceneTreeBuilder2D::buildGroupNode(Eg::SceneManager* scene, LayerManager* layers, Eg::SyGroup* group)
-{
-    SceneTreeNode2D node;
-    if (!group)
-    {
-        return node;
-    }
-
-    node.id = QString::number(group->id);
-    node.typeName = QObject::tr("Group");
-    const QString groupName = group->name() ? QString::fromUtf8(group->name()) : QString();
-    node.displayName = groupName.isEmpty() ? node.typeName : groupName;
-    node.isGroup = true;
-    node.visible = true;
-
-    bool anySelected = false;
-    for (const auto* sub : group->subGroups())
-    {
-        SceneTreeNode2D child = buildGroupNode(scene, layers, const_cast<Eg::SyGroup*>(sub));
-        anySelected = anySelected || child.selected;
-        node.children.append(child);
-    }
-    for (const auto* e : group->entities())
-    {
-        SceneTreeNode2D child = buildEntityNode(scene, layers, e);
-        anySelected = anySelected || child.selected;
-        node.children.append(child);
-    }
-    node.selected = anySelected;
-    return node;
-}
-
-SceneTreeModel2D SceneTreeBuilder2D::build(Eg::SceneManager* scene, LayerManager* layers)
-{
-    SceneTreeModel2D model;
+    SceneTreeTopology2D topo;
     if (!scene)
     {
-        return model;
+        return topo;
     }
 
-    // 收集所有已入群组的图元 ID，避免顶层重复列出
-    QSet<QString> groupedIds;
-    for (const auto* group : scene->groupManager().getTopLevelGroups())
-    {
-        collectGroupedEntityIds(group, groupedIds);
-    }
-
-    // 顶层群组节点
+    // 收集所有已入群组的图元 ID，避免在顶层重复列出
+    QSet<qint64> groupedIds;
     for (auto* group : scene->groupManager().getTopLevelGroups())
     {
-        SceneTreeNode2D node = buildGroupNode(scene, layers, group);
-        if (node.selected)
-        {
-            ++model.selectedCount;
-        }
-        model.nodes.append(node);
+        visitGroupMembers(group, groupedIds);
     }
 
-    // 未入群组的图元作为顶层节点
+    topo.topLevel.reserve(static_cast<int>(groupedIds.size()) + static_cast<int>(scene->groupManager().getTopLevelGroups().size()));
+
+    // 顶层群组
+    for (auto* group : scene->groupManager().getTopLevelGroups())
+    {
+        if (group)
+        {
+            topo.topLevel.push_back({ static_cast<qint64>(group->id), true });
+        }
+    }
+
+    // 未入群组的图元作为顶层行
     for (const auto& e : scene->getAllEntities())
     {
-        if (!e)
+        if (!e || groupedIds.contains(static_cast<qint64>(e->id)))
         {
             continue;
         }
-        if (groupedIds.contains(QString::number(e->id)))
-        {
-            continue;
-        }
-        SceneTreeNode2D node = buildEntityNode(scene, layers, e);
-        if (node.selected)
-        {
-            ++model.selectedCount;
-        }
-        model.nodes.append(node);
+        topo.topLevel.push_back({ static_cast<qint64>(e->id), false });
     }
 
-    // 统计节点总数（含子节点）
-    std::function<void(const SceneTreeNode2D&)> count = [&](const SceneTreeNode2D& n) {
-        ++model.totalCount;
-        for (const auto& c : n.children)
-        {
-            count(c);
-        }
-    };
-    for (const auto& n : model.nodes)
+    return topo;
+}
+
+QVector<SceneTreeRow2D> SceneTreeBuilder2D::groupMembers(Eg::SceneManager* scene, qint64 groupId)
+{
+    QVector<SceneTreeRow2D> out;
+    if (!scene)
     {
-        count(n);
+        return out;
     }
 
-    return model;
+    auto* group = scene->groupManager().findGroup(static_cast<Eg::EntityId>(groupId));
+    if (!group)
+    {
+        return out;
+    }
+
+    for (auto* sub : group->subGroups())
+    {
+        if (sub)
+        {
+            out.push_back({ static_cast<qint64>(sub->id), true });
+        }
+    }
+    for (auto* e : group->entities())
+    {
+        if (e)
+        {
+            out.push_back({ static_cast<qint64>(e->id), false });
+        }
+    }
+    return out;
+}
+
+SceneTreeRowMeta2D SceneTreeBuilder2D::rowMeta(Eg::SceneManager* scene, LayerManager* layers, const SceneTreeRow2D& row)
+{
+    SceneTreeRowMeta2D meta;
+    if (!scene)
+    {
+        return meta;
+    }
+
+    if (row.isGroup)
+    {
+        meta.typeName = typeName(Eg::EType::GROUP);
+        meta.displayName = meta.typeName;
+        meta.visible = true;
+        if (auto* group = scene->groupManager().findGroup(static_cast<Eg::EntityId>(row.id)))
+        {
+            if (group->name() && *group->name())
+            {
+                meta.displayName = QString::fromUtf8(group->name());
+            }
+        }
+        return meta;
+    }
+
+    auto* entity = scene->findEntityById(static_cast<Eg::EntityId>(row.id));
+    if (!entity)
+    {
+        return meta;
+    }
+    meta.typeName = typeName(entity->eType);
+    meta.displayName = (entity->name() && *entity->name()) ? QString::fromUtf8(entity->name()) : meta.typeName;
+    meta.visible = entity->visible();
+    meta.locked = entity->locked();
+    meta.selected = entity->selected();
+    if (layers)
+    {
+        meta.layerName = QString::fromStdString(layers->layerName(layers->getEntityLayer(entity)));
+    }
+    return meta;
 }
 
 QSet<QString> SceneTreeBuilder2D::selectedIds(Eg::SceneManager* scene)
@@ -206,7 +196,7 @@ QSet<QString> SceneTreeBuilder2D::selectedIds(Eg::SceneManager* scene)
     {
         if (e)
         {
-            ids.insert(QString::number(e->id));
+            ids.insert(QString::number(static_cast<qint64>(e->id)));
         }
     }
     return ids;

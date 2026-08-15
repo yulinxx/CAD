@@ -262,6 +262,12 @@ private:
     void toggleEntityVisibility(const QString& id, bool visible);
     /// 重命名图元（直接写引擎并刷新）
     void renameEntity(const QString& id, const QString& newName);
+    /// 从场景树批量删除实体（走编辑服务，可撤销）
+    void deleteSceneTreeSelection(const QStringList& ids);
+    /// 从场景树批量设置可见性
+    void setSceneTreeVisibility(const QStringList& ids, bool visible);
+    /// 从场景树批量设置锁定
+    void setSceneTreeLock(const QStringList& ids, bool locked);
     /// 将当前选中图元生成为属性模型并推送到属性面板（面板不存在则安全忽略）
     /// 通过 EntityPropertyModel2D（算法层）+ PropertyModel（数据层）解耦，
     /// 本方法仅作为组合根把"数据/算法"绑定到"UI"，面板可随时替换/移除。

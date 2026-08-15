@@ -774,6 +774,9 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
     connect(panel, &SceneTreePanel2D::selectionChanged, this, &Workbench2D::applySceneTreeSelection);
     connect(panel, &SceneTreePanel2D::visibilityToggled, this, &Workbench2D::toggleEntityVisibility);
     connect(panel, &SceneTreePanel2D::renameRequested, this, &Workbench2D::renameEntity);
+    connect(panel, &SceneTreePanel2D::deleteRequested, this, &Workbench2D::deleteSceneTreeSelection);
+    connect(panel, &SceneTreePanel2D::batchVisibilityRequested, this, &Workbench2D::setSceneTreeVisibility);
+    connect(panel, &SceneTreePanel2D::batchLockRequested, this, &Workbench2D::setSceneTreeLock);
 
     // 引擎/场景（业务）→ 面板（UI）：变化后刷新展示与选中高亮
     if (m_viewport)
@@ -803,7 +806,16 @@ void Workbench2D::refreshSceneTree()
         return;
     }
     Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
-    m_scenePanel2D->setModel(SceneTreeBuilder2D::build(scene, m_services.layerManager));
+    // 拓扑：O(N) 一次生成紧凑索引；群组成员与元数据均懒加载
+    const SceneTreeTopology2D topology = SceneTreeBuilder2D::buildTopology(scene);
+    m_scenePanel2D->setTopology(
+        topology,
+        [scene, layers = m_services.layerManager](qint64 id, bool isGroup) {
+            return SceneTreeBuilder2D::rowMeta(scene, layers, SceneTreeRow2D{ id, isGroup });
+        },
+        [scene](qint64 groupId) {
+            return SceneTreeBuilder2D::groupMembers(scene, groupId);
+        });
 }
 
 void Workbench2D::syncSceneTreeSelection()
@@ -878,6 +890,86 @@ void Workbench2D::renameEntity(const QString& id, const QString& newName)
     {
         const QByteArray utf8 = newName.toUtf8();
         entity->setName(utf8.constData());
+        scene->notifySceneChanged();
+    }
+}
+
+void Workbench2D::deleteSceneTreeSelection(const QStringList& ids)
+{
+    if (ids.isEmpty() || !m_services.sceneEditService)
+    {
+        return;
+    }
+    std::vector<Eg::EntityId> eids;
+    eids.reserve(ids.size());
+    for (const QString& id : ids)
+    {
+        const auto eid = Eg::parseEntityId(id.toStdString());
+        if (eid)
+        {
+            eids.push_back(*eid);
+        }
+    }
+    if (eids.empty())
+    {
+        return;
+    }
+    m_services.sceneEditService->deleteEntities(eids, "Delete from Scene Tree");
+    // 删除后刷新树与选择（deleteEntities 为可撤销路径）
+    refreshSceneTree();
+    syncSceneTreeSelection();
+}
+
+void Workbench2D::setSceneTreeVisibility(const QStringList& ids, bool visible)
+{
+    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
+    if (!scene || ids.isEmpty())
+    {
+        return;
+    }
+    bool changed = false;
+    for (const QString& id : ids)
+    {
+        const auto eid = Eg::parseEntityId(id.toStdString());
+        if (!eid)
+        {
+            continue;
+        }
+        if (auto* entity = scene->findEntityById(*eid))
+        {
+            entity->setVisible(visible);
+            changed = true;
+        }
+    }
+    if (changed)
+    {
+        scene->notifySceneChanged();
+    }
+}
+
+void Workbench2D::setSceneTreeLock(const QStringList& ids, bool locked)
+{
+    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
+    if (!scene || ids.isEmpty())
+    {
+        return;
+    }
+    bool changed = false;
+    for (const QString& id : ids)
+    {
+        const auto eid = Eg::parseEntityId(id.toStdString());
+        if (!eid)
+        {
+            continue;
+        }
+        if (auto* entity = scene->findEntityById(*eid))
+        {
+            entity->setLocked(locked);
+            changed = true;
+        }
+    }
+    if (changed)
+    {
         scene->notifySceneChanged();
     }
 }

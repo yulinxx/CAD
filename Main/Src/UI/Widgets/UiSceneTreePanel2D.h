@@ -2,16 +2,19 @@
 
 /**
  * @file UiSceneTreePanel2D.h
- * @brief 2D 场景树面板（UI 层，纯 Qt Widgets）
+ * @brief 2D 场景树面板（UI 层，纯 Qt Widgets，面向百万级图元）
  *
- * 本控件只消费 SceneTreeModel2D（纯数据），并发出选择/可见性/重命名请求
- * 信号，完全不感知引擎与算法细节：
- *   - 数据层：SceneTreeModel2D
- *   - 算法层：SceneTreeBuilder2D（把引擎场景转成数据模型）
- *   - UI 层：本类
+ * 本控件使用 **QTreeView + 自写 QAbstractItemModel**，模型实现
+ * `canFetchMore/fetchMore`：群组展开时才懒加载其成员，绝不 `expandAll`，
+ * 因此上百万图元也不会为每个图元生成控件节点（视图按可见区虚拟化渲染）。
  *
- * 因此本面板可以随时被替换/移除/定制（例如换成自定义树、列表或第三方
- * 控件），只要继续消费同一数据模型并发出相同信号即可，不影响业务逻辑。
+ * 解耦设计（与属性面板同一范式）：
+ *   - 数据层：SceneTreeTopology2D / SceneTreeRow2D / SceneTreeRowMeta2D
+ *   - 算法层：SceneTreeBuilder2D（通过注入的 MetaProvider / ChildrenProvider）
+ *   - UI 层：本类，只消费数据 + 回调，不感知引擎细节
+ *
+ * 本面板可随时被替换/移除/定制（换成列表、第三方树等），只要继续消费同一
+ * 数据与回调并发出相同信号即可，不影响业务逻辑。
  */
 
 #include <QSet>
@@ -19,57 +22,65 @@
 #include <QStringList>
 #include <QWidget>
 
-struct SceneTreeModel2D;
+#include <functional>
 
-class QTreeWidget;
-class QTreeWidgetItem;
+struct SceneTreeTopology2D;
+struct SceneTreeRow2D;
+struct SceneTreeRowMeta2D;
+
+class QMenu;
+class QTreeView;
+class SceneTreeTableModel2D;
 
 class SceneTreePanel2D final : public QWidget
 {
     Q_OBJECT
 
 public:
-    enum Column
-    {
-        ColName = 0,  // 名称（可双击重命名）
-        ColType,      // 类型
-        ColLayer,     // 图层
-        ColVisible,   // 可见性（复选框）
-        ColumnCount
-    };
+    /// 行元数据提供者（UI 不感知引擎，由控制器注入算法层）
+    using MetaProvider = std::function<SceneTreeRowMeta2D(qint64 id, bool isGroup)>;
+    /// 群组成员懒加载提供者（群组展开时调用）
+    using ChildrenProvider = std::function<QVector<SceneTreeRow2D>(qint64 groupId)>;
 
     explicit SceneTreePanel2D(QWidget* parent = nullptr);
+    ~SceneTreePanel2D() override;
 
-    /// 全量重建树（展示数据模型）
-    void setModel(const SceneTreeModel2D& model);
-    /// 仅更新选中高亮（不重建，避免折叠/展开状态丢失）
+    /// 设置拓扑 + 元数据/成员提供者（会 reset 模型，但不展开任何节点）
+    void setTopology(const SceneTreeTopology2D& topology, MetaProvider metaProvider, ChildrenProvider childrenProvider);
+
+    /// 仅更新选中高亮（不重建拓扑）
     void setSelectedIds(const QSet<QString>& ids);
-    /// 当前选中的节点 ID 列表
+
+    /// 当前选中的实体节点 ID 列表（不含群组）
     QStringList selectedIds() const;
 
 signals:
     /// 用户在树中改变选择（ids 为选中的引擎图元 ID）
     void selectionChanged(const QStringList& ids);
-    /// 双击激活节点
+    /// 双击/回车激活节点
     void itemActivated(const QString& id);
     /// 可见性切换请求
     void visibilityToggled(const QString& id, bool visible);
     /// 重命名请求
     void renameRequested(const QString& id, const QString& newName);
+    /// 批量删除请求（ids 为选中的实体 id）
+    void deleteRequested(const QStringList& ids);
+    /// 批量显示/隐藏请求
+    void batchVisibilityRequested(const QStringList& ids, bool visible);
+    /// 批量锁定/解锁请求
+    void batchLockRequested(const QStringList& ids, bool locked);
 
 private:
-    void rebuildTree(const SceneTreeModel2D& model);
-    void addNodeItem(QTreeWidgetItem* parent, const struct SceneTreeNode2D& node);
-    QTreeWidgetItem* findItemById(const QString& id) const;
-    void collectSelectedIds(QStringList& ids) const;
-
-private slots:
-    void onItemChanged(QTreeWidgetItem* item, int column);
-    void onSelectionChanged();
-    void onItemActivated(QTreeWidgetItem* item, int column);
+    void onModelSelectionChanged();
+    /// 右键上下文菜单：对当前多选实体执行显示/隐藏/锁定/删除等批量操作
+    void showContextMenu(const QPoint& pos);
+    /// 全选顶层行（用 QItemSelection 区间，O(1)，不逐行枚举）
+    void selectAllRows();
 
 private:
-    QTreeWidget* m_tree{ nullptr };
-    /// 程序化更新期间的抑制标志，避免 itemChanged 信号被误当作用户操作
-    bool m_updating{ false };
+    QTreeView* m_view{ nullptr };
+    QMenu* m_contextMenu{ nullptr };
+    SceneTreeTableModel2D* m_model{ nullptr };
+    /// 程序化同步选中期间置位，抑制 selectionChanged 信号回环
+    bool m_syncing{ false };
 };
