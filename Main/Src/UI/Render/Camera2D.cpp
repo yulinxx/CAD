@@ -167,28 +167,6 @@ void Camera2D::zoomToFit(float vpW, float vpH, float sceneW, float sceneH)
     zoomX = zoom;
     zoomY = zoom;
     panOffset = QPointF(0, 0);
-
-    // 计算生成的视图边界，用于验证
-    float finalScaleX = 2.0f * zoom / vpW;
-    float finalScaleY = 2.0f * zoom / vpH;
-    float wMinX = -1.0f / finalScaleX;
-    float wMaxX = 1.0f / finalScaleX;
-    float wMinY = -1.0f / finalScaleY;
-    float wMaxY = 1.0f / finalScaleY;
-
-    SY_INFOF("Camera2D::zoomToFit: vp=(%.0f,%.0f), scene=(%.2f,%.2f), zoom=%.6f, scaleX=%.8f, scaleY=%.8f, "
-             "initialViewBounds=[%.2f,%.2f]-[%.2f,%.2f]",
-        vpW,
-        vpH,
-        sceneW,
-        sceneH,
-        zoom,
-        finalScaleX,
-        finalScaleY,
-        wMinX,
-        wMinY,
-        wMaxX,
-        wMaxY);
 }
 
 void Camera2D::zoomToBBox(float vpW, float vpH, float minX, float minY, float maxX, float maxY)
@@ -214,19 +192,6 @@ void Camera2D::zoomToBBox(float vpW, float vpH, float minX, float minY, float ma
     // 先缩放到边界框尺寸，再平移使中心点对齐
     zoomToFit(vpW, vpH, sceneW, sceneH);
     pan(-centerX, -centerY);
-
-    SY_INFOF(
-        "Camera2D::zoomToBBox: bbox=[%.2f,%.2f]-[%.2f,%.2f], center=(%.2f,%.2f), zoom=(%.6f,%.6f), pan=(%.2f,%.2f)",
-        minX,
-        minY,
-        maxX,
-        maxY,
-        centerX,
-        centerY,
-        zoomX,
-        zoomY,
-        panOffset.x(),
-        panOffset.y());
 }
 
 void Camera2D::zoomAtCenter(float factor, float vpW, float vpH)
@@ -240,15 +205,6 @@ void Camera2D::zoomAtCenter(float factor, float vpW, float vpH)
     QPoint centerScreen(static_cast<int>(vpW * 0.5f), static_cast<int>(vpH * 0.5f));
     QPointF anchorWorld = screenToWorld(centerScreen, vpW, vpH);
     zoomIn(factor, anchorWorld, vpW, vpH);
-
-    SY_TRACEF("Camera2D::zoomAtCenter: factor=%.3f, vp=(%.0f,%.0f), anchor=(%.2f,%.2f), zoom=(%.6f,%.6f)",
-        factor,
-        vpW,
-        vpH,
-        anchorWorld.x(),
-        anchorWorld.y(),
-        zoomX,
-        zoomY);
 }
 
 void Camera2D::setViewExtent(float vpW, float vpH, float centerX, float centerY, float halfW, float halfH)
@@ -274,19 +230,6 @@ void Camera2D::setViewExtent(float vpW, float vpH, float centerX, float centerY,
     zoomX = zoom;
     zoomY = zoom;
     panOffset = QPointF(-centerX, -centerY);
-
-    SY_TRACEF("Camera2D::setViewExtent: vpW=%.0f, vpH=%.0f, center=(%.2f,%.2f), half=(%.2f,%.2f), zoom=(%.6f,%.6f), "
-              "pan=(%.2f,%.2f)",
-        vpW,
-        vpH,
-        centerX,
-        centerY,
-        halfW,
-        halfH,
-        zoomX,
-        zoomY,
-        panOffset.x(),
-        panOffset.y());
 }
 
 void Camera2D::resetToDefault(float vpW, float vpH)
@@ -305,12 +248,4 @@ void Camera2D::resetToDefault(float vpW, float vpH)
     {
         reset();
     }
-
-    SY_INFOF("Camera2D::resetToDefault: vp=(%.0f,%.0f), zoom=(%.6f,%.6f), pan=(%.2f,%.2f)",
-        vpW,
-        vpH,
-        zoomX,
-        zoomY,
-        panOffset.x(),
-        panOffset.y());
 }

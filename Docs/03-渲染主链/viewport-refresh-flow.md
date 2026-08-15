@@ -409,38 +409,48 @@ RefreshCallback()
 场景变化（图元增删改）
     │
     ▼
-SceneDocument2D::notifyChange()
+SceneDocument2D::notifyChange() / SceneNotifier::notifySceneChanged()
     │
     ▼
-sigSceneChanged() 信号
+SceneRefreshCoordinator::onSceneChanged()   // 收集脏/删除图元 ID
     │
     ▼
-RenderViewport2D::updateSceneRender()
+scheduleSceneUpdate()（16ms 节流 QTimer）
     │
     ▼
-RenderWidget::submitSceneFromDataSource(dataSource)
+SceneRefreshCoordinator::updateSceneRender()
     │
-    ├─→ renderBeginScene(m_device)
-    │       // 清除所有旧图元（RenderWorld::clearAllEntities）
-    │
-    ├─→ SceneGeometrySinkAdapter sink(m_device)
-    │
-    ├─→ dataSource->gatherGeometry(sink)
-    │       // 遍历场景图元，推送几何原语到渲染层
-    │
-    ├─→ renderEndScene(m_device)
-    │
-    └─→ QOpenGLWidget::update()   // 触发 paintGL
+    ├─→ RefreshLevel::Repaint      → 仅 renderWidget->update()（纯视觉重绘）
+    ├─→ RefreshLevel::LightUpdate  → applyLightRefresh()（增量提交脏图元）
+    └─→ RefreshLevel::FullRefresh  → applyFullRefresh()
+            │
+            └─→ RenderWidget::submitSceneFromDataSource(dataSource)
+                    ├─→ renderBeginScene(m_device)
+                    │       // 清除所有旧图元（RenderWorld::clearAllEntities）
+                    ├─→ SceneGeometrySinkAdapter sink(m_device)
+                    ├─→ dataSource->gatherGeometry(sink)
+                    │       // 遍历场景图元，推送几何原语到渲染层
+                    ├─→ renderEndScene(m_device)
+                    └─→ QOpenGLWidget::update()   // 触发 paintGL
     │
     ▼
 paintGL() → renderFrame()
     │
-    ├─→ world2D.update()           // 脏图元顶点 → GPU 顶点池
-    ├─→ world2D.queryVisible()     // 四叉树视锥剔除
-    ├─→ batchQueue.submit()        // 按 PrimitiveType 排序
-    ├─→ batchQueue.render()        // 间接绘制
-    ├─→ overlayQueue.render()      // 叠加层（仅脏时上传 GPU）
-    └─→ meshManager.render()       // 仅在有 3D 实例时
+    ├─→ 数据准备（Pass 外）：
+    │       ├─→ syncWorldToPersistentManager() + executeCulling()（GPU 剔除）
+    │       ├─→ readBackGpuVisibility()（可见性回读）
+    │       └─→ batchQueue.submit()（按 PrimitiveType 排序组装批次）
+    │
+    ├─→ RenderGraph Pass 编排：
+    │       ├─→ Pass 0 FrameSetup（清屏、混合、重置命令编码器）
+    │       ├─→ Pass 1 SceneEnv（网格背景）
+    │       ├─→ Pass 2 Bitmap（位图）
+    │       ├─→ Pass 3 World2DCollect（world2D 命令 → CommandEncoder）
+    │       ├─→ Pass 4 OverlayCollect（overlay 命令 → CommandEncoder）
+    │       ├─→ Pass 5 CommandExecute（统一排序执行，经 PSM 绑定管线）
+    │       └─→ Pass 6 Text（文本）
+    │
+    └─→ renderGraph.execute() → endFrame() → present()
     │
     ▼
 屏幕呈现
@@ -452,7 +462,7 @@ paintGL() → renderFrame()
 相机变化（缩放/平移）
     │
     ▼
-RenderViewport2D 更新视图矩阵
+RenderViewport2D 更新视图矩阵 + 相机中心
     │
     ▼
 QOpenGLWidget::update()   // 触发 paintGL
@@ -460,21 +470,28 @@ QOpenGLWidget::update()   // 触发 paintGL
     ▼
 renderFrame()  // 仅重绘，不重建图元数据
     │
-    ├─→ world2D.queryVisible()  // 重新计算可见性
+    ├─→ computeViewBounds() + executeCulling()（按新视口重新剔除）
     ├─→ batchQueue.submit()     // 按新视口重新组装批次
-    └─→ batchQueue.render()
+    └─→ RenderGraph Pass 编排 + execute（见 10.1）
     │
     ▼
 屏幕呈现
 ```
 
+> 相机相对渲染：`tessellatePolyline` 等细分函数在 double 精度下先减相机中心再转 float，
+> 着色器每帧再减 `uCameraCenter`（两层配合，坐标量级达 10^6 时仍保持像素级精度）。
+> 详见 `Renderx/README.md`「相机相对渲染」一节。
+
 ### 10.3 实际刷新优化
 
 | 优化策略 | 实现位置 | 说明 |
 |----------|----------|------|
+| **分级刷新** | `SceneRefreshCoordinator`（Repaint/LightUpdate/FullRefresh） | 16ms 节流合并短时间多次变更 |
 | **图元清除** | `renderBeginScene` → `world2D.clearAllEntities()` | 每次数据源提交流前清除旧图元，避免累积 |
-| **增量更新** | `RenderWorld::update()` | 仅更新 `m_dirtyList` 中的脏图元顶点 |
-| **四叉树剔除** | `RenderWorld::queryVisible()` | 仅绘制视口内可见图元 |
+| **增量更新** | `RenderWorld::update()` / `applyLightRefresh()` | 仅更新 `m_dirtyList` 中的脏图元顶点 |
+| **GPU 剔除** | `PersistentEntityManager::executeCulling()` | Compute Shader AABB-视锥剔除，回退 CPU 四叉树 |
+| **四叉树剔除** | `RenderWorld::queryVisible()` | 仅绘制视口内可见图元（GPU 剔除失效时兜底） |
 | **批次缓存** | `BatchQueue::submit()` | 仅在可见图元变化时重建批次 |
 | **叠加层缓存** | `OverlayQueue::render()` | 仅当 `m_dirty=true` 时重建合并缓冲区和上传 GPU |
+| **管线缓存** | `PipelineStateManager` | 按状态键缓存复用管线，`execute()` 开头重置 PSM 状态 |
 | **3D 跳过** | `renderFrame()` | 仅当 `meshManager.getInstanceCount() > 0` 时渲染 3D |

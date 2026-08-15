@@ -33,6 +33,7 @@
 #include "Log/SyLogger.h"
 #include "UiWorkbench.h"
 #include "WorkbenchWindow.h"
+#include "RenderViewport2D.h"
 
 #include <QObject>
 #include <QWidget>
@@ -524,14 +525,24 @@ void CoreOperationRegistry::registerEditOperations()
         editService->deleteSelected("Cut");
     }));
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Paste, [editService, clipboard] {
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Paste,
+        [editService, clipboard, viewportHub = m_viewportActionHub] {
         if (!editService || !clipboard || !clipboard->hasContent())
         {
             return;
         }
         auto* scene = editService->sceneManager();
 
+        // 粘贴位置：鼠标在视口内取鼠标世界坐标，否则取视口中心
         Ut::Vec2d pastePos(0, 0);
+        if (viewportHub)
+        {
+            if (auto* vp = viewportHub->viewport())
+            {
+                const QPointF world = vp->pasteAnchorWorld();
+                pastePos = Ut::Vec2d(world.x(), world.y());
+            }
+        }
         auto pasted = clipboard->paste(pastePos);
         if (pasted.empty())
         {

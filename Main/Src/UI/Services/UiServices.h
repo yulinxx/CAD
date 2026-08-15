@@ -24,6 +24,11 @@ class SettingsService;
 class ViewportActionHub;
 class UnitManager;
 
+namespace Eg
+{
+    class EntityClipboard;
+}
+
 /**
  * @struct UiServices
  * @brief UI 服务集合
@@ -92,6 +97,9 @@ struct UiServices
 
     /// 单位管理器（显示单位 / 算法对话框单位换算）
     UnitManager* unitManager{ nullptr };
+
+    /// 图元剪贴板（Copy/Cut/Paste 的图元副本缓存）
+    Eg::EntityClipboard* clipboard{ nullptr };
 
     /// 最近文件回调：当文件被打开时调用，参数为文件完整路径
     /// 由 WorkbenchWindow 注入，用于刷新最近文件菜单

@@ -136,6 +136,7 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
     uiServices.layerEditService = m_layerEditService.get();
     uiServices.persistenceService = persistenceService();
     uiServices.recentFileService = m_recentFileService.get();
+    uiServices.clipboard = m_clipboard.get();
 
     // LayerManagerBridge 注册为 LayerManager 观察者
     m_layerManager->addObserver(m_layerManagerBridge.get());

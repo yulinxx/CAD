@@ -17,6 +17,7 @@
 #include "UiServices.h"
 #include "UiStateCenter.h"
 #include "UI/Services/ViewportActionHub.h"
+#include "UI/Services/ISelectionService.h"
 #include "Engine2D/Edit/IUndoRedoManager.h"
 #include "UiSceneTreeDock.h"
 #include "UiPropertiesPanel.h"
@@ -39,6 +40,11 @@
 #include "Engine2D/Edit/LayerEditService.h"
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Interaction/LayerManager.h"
+#include "Engine2D/Core/SceneManager.h"
+#include "Engine/EntityIdUtils.h"
+#include "Engine/SyEntity/SyEntity.h"
+#include <string>
+#include <vector>
 #include "UI2D/Operation/CommandCatalog.h"
 #include "UI2D/Operation/OperationId.h"
 #include "UI2D/Operation/OperationBus.h"
@@ -132,6 +138,31 @@ namespace
         return label;
     }
 }  // namespace
+
+namespace
+{
+    /// ISelectionService::visitSelectedIds 的计数 visitor（POD 安全）
+    void countSelectedIds(const char* /*id*/, void* context)
+    {
+        if (context)
+        {
+            ++*static_cast<int*>(context);
+        }
+    }
+
+    /// ISelectionService::visitSelectedIds 的收集 visitor（POD 安全，收集图元 ID）
+    void collectSelectedIds(const char* id, void* context)
+    {
+        auto* ids = static_cast<std::vector<Eg::EntityId>*>(context);
+        if (id)
+        {
+            if (auto eid = Eg::parseEntityId(std::string(id)))
+            {
+                ids->push_back(*eid);
+            }
+        }
+    }
+}
 
 WorkbenchStateSnapshot UiWorkbench::currentSnapshot() const
 {
@@ -427,8 +458,19 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
             stateCenter->setStatusPrompt(text);
         });
 
-        vp->setSelectionCallback([stateCenter = m_services.stateCenter](const QString& selText, const QString& selType) {
-            stateCenter->setSelectionContext(selType, selText);
+        vp->setSelectionCallback([this](const QString& selText, const QString& selType) {
+            if (m_services.stateCenter)
+            {
+                m_services.stateCenter->setSelectionContext(selType, selText);
+            }
+        });
+
+        // 任何选择变化（点选/框选/绘制后自动选中/撤销等）→ 刷新顶部工具栏动作启用状态
+        QObject::connect(vp, &RenderViewport2D::selectionChanged, this, [this]() {
+            if (m_commandHub)
+            {
+                m_commandHub->refreshActionStates(m_commandHub->captureSnapshot(m_commandHub->mainWindow()));
+            }
         });
 
         // 鼠标移动时实时更新状态栏位置标签
@@ -516,6 +558,115 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // CommandActionHub：管理所有 QAction 的创建与绑定
     m_commandHub = std::make_unique<CommandActionHub>();
     m_commandHub->setMainWindow(&window);
+    // 注入选择计数提供器：Hub 不依赖 ISelectionService，保持界面层与服务层解耦
+    m_commandHub->setSelectionCountProvider([selectionService = m_services.selectionService]() -> int {
+        if (!selectionService)
+        {
+            return 0;
+        }
+        int count = 0;
+        selectionService->visitSelectedIds(&countSelectedIds, &count);
+        return count;
+    });
+    // 注入「选中项位于锁定图层」提供器：Delete/Copy/Mirror/Align 等 RequiresUnlocked* 动作据此禁用
+    m_commandHub->setSelectionLockedProvider(
+        [selectionService = m_services.selectionService,
+            layerManager = m_services.layerManager,
+            sceneEditService = m_services.sceneEditService]() -> bool {
+            if (!selectionService || !layerManager || !sceneEditService)
+            {
+                return false;
+            }
+            Eg::SceneManager* scene = sceneEditService->sceneManager();
+            if (!scene)
+            {
+                return false;
+            }
+            struct LockedCtx
+            {
+                Eg::SceneManager* scene;
+                LayerManager* layers;
+                bool locked{ false };
+            };
+            LockedCtx ctx{ scene, layerManager, false };
+            selectionService->visitSelectedIds(
+                [](const char* id, void* v) {
+                    auto* c = static_cast<LockedCtx*>(v);
+                    if (c->locked)
+                    {
+                        return;
+                    }
+                    auto eid = Eg::parseEntityId(std::string(id));
+                    if (!eid)
+                    {
+                        return;
+                    }
+                    if (Eg::SyEntity* entity = c->scene->findEntityById(*eid))
+                    {
+                        if (c->layers->isLayerLocked(c->layers->getEntityLayer(entity)))
+                        {
+                            c->locked = true;
+                        }
+                    }
+                },
+                &ctx);
+            return ctx.locked;
+        });
+    // 注入分组切换状态提供器：Group/Ungroup 顶部按钮实时可用
+    m_commandHub->setGroupToggleProvider(
+        [selectionService = m_services.selectionService,
+            layerManager = m_services.layerManager,
+            sceneEditService = m_services.sceneEditService]() -> GroupToggleState {
+            GroupToggleState state;
+            if (!selectionService || !layerManager || !sceneEditService)
+            {
+                return state;
+            }
+            Eg::SceneManager* scene = sceneEditService->sceneManager();
+            if (!scene)
+            {
+                return state;
+            }
+            const auto selected = scene->getSelectedEntities();
+            if (selected.empty())
+            {
+                return state;
+            }
+            bool onLockedLayer = false;
+            bool hasGroup = false;
+            for (Eg::SyEntity* e : selected)
+            {
+                if (!e)
+                {
+                    continue;
+                }
+                if (layerManager->isLayerLocked(layerManager->getEntityLayer(e)))
+                {
+                    onLockedLayer = true;
+                }
+                if (e->group())
+                {
+                    hasGroup = true;
+                }
+            }
+            state.on = hasGroup;
+            state.enabled = !onLockedLayer;
+            return state;
+        });
+    // 注入撤销/重做状态提供器（OperationBus context 在生产路径不填充 undoManager）
+    m_commandHub->setUndoRedoProvider([undoManager = m_services.undoManager]() -> UndoRedoState {
+        UndoRedoState state;
+        if (undoManager)
+        {
+            state.canUndo = undoManager->canUndo();
+            state.canRedo = undoManager->canRedo();
+        }
+        return state;
+    });
+    // 注入剪贴板内容提供器（Paste 按钮启用状态，实时反映剪贴板是否已复制图元）
+    m_commandHub->setClipboardProvider([clipboard = m_services.clipboard]() -> bool {
+        return clipboard && clipboard->hasContent();
+    });
     m_commandHub->rebuildAllActions();
 
     // 顶部工具栏（编辑命令）
@@ -532,6 +683,60 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     if (m_services.layerManager)
     {
         m_rightToolBar->setLayerManager(m_services.layerManager, m_services.layerManagerBridge);
+    }
+
+    // 单击色块 → 若已选中图元则将其移动到该图层（可撤销），并设为当前图层
+    QObject::connect(m_rightToolBar, &RightToolBar::sigLayerSelected, this, [this](int layerId) {
+        // 有选中图元时，把选中图元分配到点击的图层（LayerEditService 带 Undo）
+        if (m_services.selectionService && m_services.layerEditService)
+        {
+            std::vector<Eg::EntityId> selectedIds;
+            m_services.selectionService->visitSelectedIds(&collectSelectedIds, &selectedIds);
+            if (!selectedIds.empty())
+            {
+                m_services.layerEditService->assignEntitiesToLayer(selectedIds, layerId, "Move selected to layer");
+            }
+        }
+        if (m_services.layerManager)
+        {
+            m_services.layerManager->setCurrentLayer(layerId);
+        }
+        // 图层变更后刷新动作状态（撤销/重做可用性、锁定图层禁用态等）
+        if (m_commandHub)
+        {
+            m_commandHub->refreshActionStates(m_commandHub->captureSnapshot(m_commandHub->mainWindow()));
+        }
+    });
+
+    // 双击色块 → 打开图层管理对话框（其中设置当前图层会通过 sigCurrentLayerChanged 同步回右侧色块）
+    QObject::connect(m_rightToolBar, &RightToolBar::sigLayerDoubleClicked, this, [this](int /*layerId*/) {
+        if (m_services.layerEditService)
+        {
+            LayerManagerDialog::showDialog(m_services.layerEditService, m_commandHub ? m_commandHub->mainWindow() : nullptr);
+        }
+    });
+
+    // 图层锁定/属性变更 → 实时刷新顶部按钮启用状态（如锁定图层后 Delete/Mirror/Align/Group 变不可用）
+    if (m_services.layerManagerBridge && m_commandHub)
+    {
+        QObject::connect(m_services.layerManagerBridge, &QtLayerManagerBridge::sigLayerChanged, this, [this](int) {
+            m_commandHub->refreshActionStates(m_commandHub->captureSnapshot(m_commandHub->mainWindow()));
+        });
+    }
+
+    // 撤销/重做栈状态变化 → 刷新 Undo/Redo 按钮（含本工作台通过 LayerEditService 直接入栈的图层操作）
+    if (m_services.operationBus && m_commandHub)
+    {
+        QObject::connect(m_services.operationBus, &OperationBus::undoStateChanged, this, [this]() {
+            m_commandHub->refreshActionStates(m_commandHub->captureSnapshot(m_commandHub->mainWindow()));
+        });
+        // 剪贴板操作（Copy/Cut）后立即刷新 Paste 按钮启用状态
+        QObject::connect(m_services.operationBus, &OperationBus::operationCompleted, this, [this](OperationId id, bool success) {
+            if (success && (id == OperationId::Edit_Copy || id == OperationId::Edit_Cut))
+            {
+                m_commandHub->refreshActionStates(m_commandHub->captureSnapshot(m_commandHub->mainWindow()));
+            }
+        });
     }
 }
 
@@ -556,13 +761,10 @@ void Workbench2D::activate()
         SY_INFOF("[Workbench2D] Restored tool: %s", qPrintable(snapshot.activeToolId));
     }
 
-    // 激活时刷新一次动作状态（撤销/重做可用性）
-    if (m_commandHub && m_services.undoManager)
+    // 激活时刷新一次动作状态（撤销/重做可用性 + 选中项驱动的启用态）
+    if (m_commandHub)
     {
-        CommandUiSnapshot snap;
-        snap.canUndo = m_services.undoManager->canUndo();
-        snap.canRedo = m_services.undoManager->canRedo();
-        m_commandHub->refreshActionStates(snap);
+        m_commandHub->refreshActionStates(m_commandHub->captureSnapshot(m_commandHub->mainWindow()));
     }
 }
 

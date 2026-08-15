@@ -316,63 +316,60 @@ public:
 | **增量更新** | 配合 RenderWorld 增量更新机制，支持高效的场景渲染 |
 | **跨语言边界** | 通过 C API 封装，支持不同语言编写的渲染后端 |
 
-### 11.7 渲染流程（2026-07-16 更新）
+### 11.7 渲染流程（2026-08-15 更新）
 
 #### 场景数据提交流程
 
 ```
-RenderViewport2D::updateSceneRender()
-    │
-    ▼
-RenderWidget::submitSceneFromDataSource(dataSource)
-    │
-    ├─→ renderBeginScene(m_device)
-    │       // 清除所有旧图元（RenderWorld::clearAllEntities），
-    │       // 避免新数据源场景与旧图元累积冲突
-    │
-    ├─→ SceneGeometrySinkAdapter sink(m_device)
-    │
-    ├─→ dataSource->gatherGeometry(sink)
-    │       │
-    │       └─→ SceneManager::gatherGeometry()
-    │               │
-    │               ├─→ sink.emitPolyline(...)  → renderEmitPolyline → world2D.addEntity()
-    │               ├─→ sink.emitCircle(...)    → renderEmitCircle    → tessellateCircle → addEntity()
-    │               ├─→ sink.emitArc(...)       → renderEmitArc       → tessellateArc → addEntity()
-    │               └─→ sink.emitEllipse(...)   → renderEmitEllipse   → tessellateEllipse → addEntity()
-    │
-    ├─→ renderEndScene(m_device)
-    │
-    └─→ QOpenGLWidget::update()   // 触发 paintGL
+场景变化 → SceneRefreshCoordinator（16ms 节流，分级刷新）
+    ├─→ RefreshLevel::Repaint      → 仅 renderWidget->update()（纯视觉重绘）
+    ├─→ RefreshLevel::LightUpdate  → applyLightRefresh()（增量提交脏图元）
+    └─→ RefreshLevel::FullRefresh  → applyFullRefresh()
+            │
+            └─→ RenderWidget::submitSceneFromDataSource(dataSource)
+                    ├─→ renderBeginScene(m_device)
+                    │       // 清除所有旧图元（RenderWorld::clearAllEntities），
+                    │       // 避免新数据源场景与旧图元累积冲突
+                    ├─→ SceneGeometrySinkAdapter sink(m_device)
+                    ├─→ dataSource->gatherGeometry(sink)
+                    │       │
+                    │       └─→ SceneManager::gatherGeometry()
+                    │               │
+                    │               ├─→ sink.emitPolyline(...)  → renderEmitPolyline → world2D.addEntity()
+                    │               ├─→ sink.emitCircle(...)    → renderEmitCircle    → tessellateCircle → addEntity()
+                    │               ├─→ sink.emitArc(...)       → renderEmitArc       → tessellateArc → addEntity()
+                    │               └─→ sink.emitEllipse(...)   → renderEmitEllipse   → tessellateEllipse → addEntity()
+                    ├─→ renderEndScene(m_device)
+                    └─→ QOpenGLWidget::update()   // 触发 paintGL
 ```
 
 #### 每帧渲染流程
 
 ```
 paintGL() → renderFrame()
-    │
     ├─→ rhi->beginFrame()
-    ├─→ rhi->clear()
     │
-    ├─→ world2D.update()
-    │       // 将脏图元顶点数据复制到 GPU 顶点池（O(1) 直接指针访问）
+    ├─→ 数据准备（Pass 外）：
+    │       ├─→ syncWorldToPersistentManager() + executeCulling()（GPU 剔除）
+    │       ├─→ readBackGpuVisibility()（可见性回读，失效时回退 CPU 四叉树）
+    │       └─→ batchQueue.submit()（按 PrimitiveType 排序组装批次）
     │
-    ├─→ world2D.queryVisible()
-    │       // 四叉树视锥剔除，输出可见图元索引列表
+    ├─→ RenderGraph Pass 编排（renderGraph.execute）：
+    │       ├─→ Pass 0 FrameSetup（清屏、混合、重置命令编码器）
+    │       ├─→ Pass 1 SceneEnv（网格背景）
+    │       ├─→ Pass 2 Bitmap（位图）
+    │       ├─→ Pass 3 World2DCollect（world2D 命令 → CommandEncoder）
+    │       ├─→ Pass 4 OverlayCollect（overlay 命令 → CommandEncoder）
+    │       ├─→ Pass 5 CommandExecute（统一排序执行，经 PSM 绑定管线）
+    │       └─→ Pass 6 Text（文本，条件启用）
     │
-    ├─→ sceneEnv.render()          // 场景环境（网格背景等）
-    │
-    ├─→ batchQueue.submit()        // 按 PrimitiveType 排序组装批次
-    ├─→ batchQueue.render()        // 间接绘制批次
-    │
-    ├─→ overlayQueue.render()      // 叠加层（选择框、控制点、预览等）
-    │       // 仅当 m_dirty=true 时重建合并顶点缓冲区并上传 GPU
-    │
-    ├─→ meshManager.render()       // 仅在有 3D 实例时渲染
-    │
-    ├─→ rhi->endFrame()
-    └─→ rhi->present()
+    └─→ rhi->endFrame() / present()
 ```
+
+> 说明：早期版本（2026-07-16）记录的"world2D.update → queryVisible → sceneEnv.render →
+> batchQueue.submit/render → overlayQueue.render → meshManager.render"线性流程已被
+> RenderGraph 显式 Pass 编排 + GPU 剔除取代，详情见 `渲染管线.md` Phase 4 与
+> `viewport-refresh-flow.md` §10。
 
 #### 着色器映射机制
 

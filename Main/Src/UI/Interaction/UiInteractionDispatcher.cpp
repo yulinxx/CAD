@@ -224,12 +224,6 @@ bool DefaultInteractionDispatcher::dispatchEvent(const InteractionEvent& event)
     }
 
     m_stateCenter->setInteractionState(kind, event.x, event.y, event.key);
-    SY_DEBUGF("[InteractionDispatcher] Event dispatched: kind=%s x=%d y=%d key=%d consumed=%d",
-        kind.toUtf8().constData(),
-        event.x,
-        event.y,
-        event.key,
-        consumed ? 1 : 0);
     return consumed;
 }
 

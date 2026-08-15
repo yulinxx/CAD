@@ -250,3 +250,99 @@ F9 临时转储（`glGetBooleanv`）显示按键时刻 `DEPTH_TEST=0, BLEND=1`�
 导入 OBJ、MakeBox/MakeSphere、旋转视角确认无空洞、选中高亮线框完整。
 
 ---
+
+## 10. 2D 线条渲染：线宽钳制 + GL_LINE_SMOOTH 移除（2026-08-15 修复）
+
+> 涉及 `Renderx/src/rhi/rhi_gl.cpp`，属于 2D Renderx 路径（RenderWidget/网格线/六边形等所有线图元）。
+
+### 10.1 症状
+
+- macOS：所有 2D 线条（网格、多边形）线宽全部退化为 1px，无法显示更宽线条。
+- 缩放视图后部分线条消失（缩放过程中间隔性缺线）。
+
+### 10.2 根因一：线宽无钳制（仅 macOS）
+
+macOS CoreProfile 下 `GL_LINE_WIDTH_RANGE` 通常为 **[1, 1]**（OpenGL 规范限制，
+core profile 下所有线宽都钳到 1px）。原实现 `setLineWidth()` 直接 `glLineWidth(w)`
+不查范围，驱动按规范钳制后实际线宽恒为 1，导致"线宽设置无效、全部退化"。
+
+### 10.3 根因二：GL_LINE_SMOOTH 与 MSAA 叠加（macOS + Windows 均可能）
+
+原实现全局 `glEnable(GL_LINE_SMOOTH)`。该基于覆盖率的抗锯齿算法与 4x MSAA 叠加时，
+会在特定缩放级别丢弃低于覆盖阈值的线段片段 → 缩放后线条消失/间隔缺线。
+
+### 10.4 修复
+
+```cpp
+// rhi_gl.cpp
+// 1. 不再全局启用 GL_LINE_SMOOTH（依赖 MSAA 提供多重采样抗锯齿）
+g->Enable(GL_MULTISAMPLE);
+
+// 2. 初始化时查询 GPU 线宽范围
+float range[2] = { 1.0f, 1.0f };
+g->GetFloatv(GL_LINE_WIDTH_RANGE, range);
+m_minLineWidth = range[0] > 0.0f ? range[0] : 1.0f;
+m_maxLineWidth = range[1] >= m_minLineWidth ? range[1] : m_minLineWidth;
+
+// 3. setLineWidth() 时钳制到 [m_minLineWidth, m_maxLineWidth]
+```
+
+### 10.5 跨平台说明
+
+- macOS：`GL_LINE_WIDTH_RANGE=[1,1]` → 钳制后所有线宽仍为 1px（系统限制，无法突破）。
+- Windows CompatibilityProfile：可能支持更宽线宽，钳制后按驱动实际范围生效。
+- 移除 `GL_LINE_SMOOTH` 后，抗锯齿完全依赖 MSAA；若在非 MSAA 环境需要线抗锯齿，
+  应配合 `glHint(GL_LINE_SMOOTH_HINT, GL_NICEST)` 且仅在非 MSAA 时启用。
+
+---
+
+## 11. 2D 六边形/多边形缺边问题（2026-08-15 修复，跨平台）
+
+> 详细记录见 `Docs/03-渲染主链/渲染管线.md` 的「六边形渲染缺陷修复记录（2026-08-14/15）」。
+
+### 11.1 症状
+
+1. 初次绘制六边形，预览图不对；之后绘制预览为绿色且形状正确。
+2. 画完六边形后选中 → 取消选择 → 缩放视图，六边形只显示三边（间隔缺边）。
+3. 选中时六边形有虚线轮廓，取消选择后虚线轮廓消失。
+
+### 11.2 根因与修复摘要
+
+| 问题 | 根因 | 修复 |
+|------|------|------|
+| 初次预览不对 | `PolygonTool::onMousePress` 在半径为 0 时调 `updatePreview()` | 预览延迟到 `onMouseMove` 按实际半径更新 |
+| 取消选择后只显示三边 | PSM 缓存管线与 GPU 实际状态不同步（SceneEnv 直接 `bindPipeline` 绕过 PSM，CommandEncoder 复用 PSM 缓存时跳过绑定） | `PipelineStateManager::resetCurrentPipeline()` + `CommandEncoder::execute()` 开头调用 |
+| 增量刷新精度丢失 | `applyLightRefresh()` 未传 `cameraCenter`，`IncrementalVertexSink` 直接 `double→float` 截断 | 传入 `RenderWidget::cameraCenter()`，与全量路径一致 |
+| 拓扑硬编码 | `RenderWidget::setSceneCommands()` 硬编码 `LineList`，6 顶点只画 3 边 | 按 `RenderCommand.primitiveType` 映射拓扑 |
+
+### 11.3 影响范围
+
+- `UI/2D/.../PolygonTool.cpp`、`UI/2D/.../RenderWidget.cpp`
+- `Main/Src/UI/Render/SceneRefreshCoordinator.cpp`
+- `Renderx/src/core/pipeline_state_manager.h/.cpp`、`Renderx/src/core/command_encoder.cpp`
+
+macOS 与 Windows 均受影响，非平台特有。
+
+---
+
+## 12. 鼠标移动干扰选中虚线动画（2026-08-15 修复，跨平台）
+
+> 详细记录见 `Docs/03-渲染主链/虚线.md` 的「13.7 鼠标移动干扰虚线动画」。
+
+### 12.1 症状
+
+选中图元显示流水虚线后，鼠标在图元（虚线轮廓）上移动时，虚线流动动画被干扰/加速（相位频繁跳变）。
+
+### 12.2 根因与修复摘要
+
+| 问题 | 根因 | 修复 |
+|------|------|------|
+| hover 变化触发轮廓重建 | `SelectionGizmo::onMouseMove()` hover 变化时调用完整 `repaint()`，重新走 `setSelectionOutlines()` | 新增 `repaintHandles()`，hover 变化仅重绘手柄，不重建轮廓 |
+| 相位反复归零 | `RenderWidget::setSelectionOutlines()` 每次调用都归零 `m_selectionDashOffsetPx` | 新增 `selectionOutlinesEqual()` 内容比较，路径未变时保留相位、不重复离散 |
+
+### 12.3 影响范围
+
+- `UI/2D/.../SelectionGizmo.{h,cpp}`
+- `UI/2D/.../RenderWidget.cpp`
+
+macOS 与 Windows 均受影响，非平台特有。

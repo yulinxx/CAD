@@ -28,6 +28,7 @@
 #include <QWheelEvent>
 #include <QKeyEvent>
 #include <QContextMenuEvent>
+#include <QCursor>
 
 #include "Log/SyLogger.h"
 #include <QTimer>
@@ -425,7 +426,6 @@ bool RenderViewport2D::setActiveTool(const QString& toolName)
         {
             setCursor(Qt::CrossCursor);
         }
-        SY_INFOF("[RenderViewport2D] active tool=%s", qPrintable(toolName));
         // 通知上层（如绘图工具栏）同步活动工具状态
         emit activeToolChanged(toolName);
     }
@@ -647,6 +647,8 @@ void RenderViewport2D::selectEntityById(const QString& entityId)
 void RenderViewport2D::syncSelectionDetails()
 {
     syncSelectionToolState();
+    // 通知上层：选择状态已变化（覆盖绘制后自动选中、点选/框选、撤销等所有路径）
+    emit selectionChanged();
 }
 
 void RenderViewport2D::clearSelection()
@@ -721,6 +723,10 @@ void RenderViewport2D::mouseMoveEvent(QMouseEvent* event)
     if (m_inputRouter)
     {
         m_inputRouter->handleMouseMove(event);
+        // 记录最近鼠标世界坐标，供粘贴等操作作为锚点（即使之后鼠标移出视口）
+        const QPointF world = m_inputRouter->widgetToWorld(event->position());
+        m_lastCursorWorldPos = world;
+        m_hasCursorPos = true;
     }
 }
 
@@ -777,6 +783,21 @@ QPointF RenderViewport2D::widgetToWorld(QPoint widgetLocalPos) const
 {
     // P5 收口: 委托给 ViewportInputRouter，消除与 ViewportInputRouter 的重复实现
     return m_inputRouter ? m_inputRouter->widgetToWorld(widgetLocalPos) : QPointF();
+}
+
+QPointF RenderViewport2D::pasteAnchorWorld() const
+{
+    // 优先使用最近记录的鼠标世界坐标（鼠标在视口内移动过），保证粘贴跟随鼠标；
+    // 否则回退到当前光标位置（若在视口内），最后回退到视口中心。
+    if (m_hasCursorPos)
+    {
+        return m_lastCursorWorldPos;
+    }
+
+    const QPoint cursorLocal = mapFromGlobal(QCursor::pos());
+    const QRect viewRect = rect();
+    const QPoint anchorPx = viewRect.contains(cursorLocal) ? cursorLocal : viewRect.center();
+    return widgetToWorld(anchorPx);
 }
 
 void RenderViewport2D::updateViewMatrix()

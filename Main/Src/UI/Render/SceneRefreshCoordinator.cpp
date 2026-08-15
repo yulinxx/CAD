@@ -137,7 +137,6 @@ void SceneRefreshCoordinator::requestRepaint()
     {
         m_renderWidget->update();
     }
-    SY_TRACE("[SceneRefreshCoordinator] requestRepaint: 纯视觉刷新");
 }
 
 void SceneRefreshCoordinator::scheduleFullRefresh()
@@ -164,7 +163,6 @@ void SceneRefreshCoordinator::requestLightRefresh()
     {
         m_sceneUpdateTimer->start();
     }
-    SY_TRACE("[SceneRefreshCoordinator] requestLightRefresh: 增量刷新");
 }
 
 void SceneRefreshCoordinator::requestFullRefresh()
@@ -172,7 +170,6 @@ void SceneRefreshCoordinator::requestFullRefresh()
     // 全量刷新：重建所有渲染数据
     m_refreshLevel = RefreshLevel::FullRefresh;
     scheduleFullRefresh();
-    SY_INFO("[SceneRefreshCoordinator] requestFullRefresh: FullRefresh");
 }
 
 // 场景变更通知入口
@@ -192,9 +189,6 @@ void SceneRefreshCoordinator::onSceneChanged()
         }
     }
     scheduleSceneUpdate();
-    SY_TRACEF("[SceneRefreshCoordinator] onSceneChanged: dirty=%zu, deleted=%zu",
-        m_pendingDirtyIds.size(),
-        m_pendingDeletedIds.size());
 }
 
 void SceneRefreshCoordinator::onSelectionChanged()
@@ -258,7 +252,9 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
 
         std::vector<render::VertexP3C3> vertices;
         render::PrimitiveType primType;
-        if (!entityToVertices(entity, vertices, primType))
+        const QPointF cam = m_renderWidget->cameraCenter();
+        const double cameraCenter[2] = { cam.x(), cam.y() };
+        if (!entityToVertices(entity, vertices, primType, cameraCenter))
         {
             // 该图元无法走增量路径（如文本），标记需要回退到全量刷新
             m_pendingFullRefreshFallback = true;
@@ -267,10 +263,14 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
 
         if (m_renderedEntityIds.count(uid))
         {
+            // SY_DEBUGF("[SceneRefreshCoordinator] modifyEntity id=%llu eType=%d primType=%d verts=%zu",
+            //     uid, static_cast<int>(entity->eType), static_cast<int>(primType), vertices.size());
             m_renderWidget->modifyRenderEntity(uid, vertices.data(), static_cast<uint32_t>(vertices.size()), primType);
         }
         else
         {
+            // SY_DEBUGF("[SceneRefreshCoordinator] addEntity id=%llu eType=%d primType=%d verts=%zu",
+            //     uid, static_cast<int>(entity->eType), static_cast<int>(primType), vertices.size());
             m_renderWidget->addRenderEntity(uid, vertices.data(), static_cast<uint32_t>(vertices.size()), primType);
             m_renderedEntityIds.insert(uid);
         }

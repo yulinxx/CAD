@@ -25,13 +25,15 @@ namespace Eg
  * 曲线类图元（Bezier/Bezier2/Nurbs/Circle/Arc/Ellipse）支持离散化缓存：
  * 当实体仅因颜色/选择/图层变更而标记为脏时，直接复用缓存的顶点数据。
  *
- * @param entity      引擎图元指针（非空）
- * @param outVertices 输出顶点数组
- * @param outType     输出图元类型（LineStrip/LineLoop/PointList）
+ * @param entity       引擎图元指针（非空）
+ * @param outVertices  输出顶点数组
+ * @param outType      输出图元类型（LineStrip/LineLoop/PointList）
+ * @param cameraCenter 相机中心（世界坐标），用于精度优化（nullptr 时退化为直接转换）
  * @return true 转换成功，false 表示该类型不支持增量路径（如文本）
  */
 bool entityToVertices(
-    const Eg::SyEntity* entity, std::vector<render::VertexP3C3>& outVertices, render::PrimitiveType& outType);
+    const Eg::SyEntity* entity, std::vector<render::VertexP3C3>& outVertices, render::PrimitiveType& outType,
+    const double* cameraCenter = nullptr);
 
 /**
  * @brief 清空曲线离散化缓存
