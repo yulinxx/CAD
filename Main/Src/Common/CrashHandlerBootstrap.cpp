@@ -18,14 +18,23 @@ namespace
 
     int onCrashCallback(const char* dumpPath, int succeeded, void* /*userData*/)
     {
+        std::fprintf(stderr,
+            "\n"
+            "==========================================================================\n"
+            "  *** SanYiCAD CRASH ***  The application has crashed!\n"
+            "==========================================================================\n");
         if (succeeded && dumpPath && dumpPath[0] != '\0')
         {
-            std::fprintf(stderr, "[CrashHandler] minidump saved: %s\n", dumpPath);
+            std::fprintf(stderr, "  [CrashHandler] minidump saved: %s\n", dumpPath);
         }
         else
         {
-            std::fprintf(stderr, "[CrashHandler] failed to write minidump\n");
+            std::fprintf(stderr, "  [CrashHandler] failed to write minidump\n");
         }
+        std::fprintf(stderr,
+            "==========================================================================\n"
+            "  Please report the above info and the .dmp file to technical support.\n"
+            "==========================================================================\n\n");
         return succeeded;
     }
 
@@ -107,7 +116,9 @@ void CrashHandlerBootstrap::logPendingDumps()
         return;
     }
 
-    SY_WARNF("[CrashHandler] found %d previous crash dump(s) in: %s", count, g_dumpPath.c_str());
+    SY_CRITICAL("==========================================================================");
+    SY_CRITICAL("  *** SanYiCAD CRASH REPORT ***  A previous crash was detected");
+    SY_CRITICALF("[CrashHandler] found %d previous crash dump(s) in: %s", count, g_dumpPath.c_str());
 
     for (int i = 0; i < count; ++i)
     {
@@ -115,11 +126,14 @@ void CrashHandlerBootstrap::logPendingDumps()
         if (CrashHandler_GetDumpFilePath(i, dumpPath, sizeof(dumpPath)) == CRASHHANDLER_OK)
         {
             const QFileInfo info(QString::fromUtf8(dumpPath));
-            SY_WARNF("[CrashHandler] dump[%d]: %s (size=%lld bytes, modified=%s)",
+            SY_CRITICALF("[CrashHandler] dump[%d]: %s (size=%lld bytes, modified=%s)",
                 i,
                 dumpPath,
                 static_cast<long long>(info.size()),
                 info.lastModified().toString(Qt::ISODate).toUtf8().constData());
         }
     }
+
+    SY_CRITICAL("  Please report the above info and the .dmp file to technical support.");
+    SY_CRITICAL("==========================================================================");
 }
