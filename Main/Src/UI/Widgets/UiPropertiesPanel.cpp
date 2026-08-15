@@ -93,6 +93,23 @@ namespace
             layout->addLayout(indexRow);
             m_coord = new PointCoordEditor(this);
             layout->addWidget(m_coord);
+
+            // 切换索引时，通过坐标提供器重新加载该索引对应的坐标
+            connect(m_index,
+                QOverload<int>::of(&QComboBox::currentIndexChanged),
+                this,
+                [this](int idx) {
+                    if (m_provider && idx >= 0)
+                    {
+                        m_coord->setPoint(m_provider(idx));
+                    }
+                });
+        }
+
+        /// 设置"按索引取坐标"的提供器（由代理注入，读取当前值）
+        void setPointProvider(std::function<QPointF(int)> provider)
+        {
+            m_provider = std::move(provider);
         }
 
         void setup(int count, int current, const QString& label)
@@ -125,6 +142,7 @@ namespace
     private:
         QComboBox* m_index{ nullptr };
         PointCoordEditor* m_coord{ nullptr };
+        std::function<QPointF(int)> m_provider;
     };
 
     // 颜色编辑器：按钮弹出选色对话框
@@ -171,6 +189,18 @@ namespace
         QColor m_color{ Qt::white };
     };
 }  // namespace
+
+// ---- 值列的内联编辑代理 ----
+// 属性名列（第 0 列）只读，禁止原地编辑字段名
+class ReadOnlyFieldDelegate : public QStyledItemDelegate
+{
+public:
+    using QStyledItemDelegate::QStyledItemDelegate;
+    QWidget* createEditor(QWidget*, const QStyleOptionViewItem&, const QModelIndex&) const override
+    {
+        return nullptr;  // 取消编辑
+    }
+};
 
 // ---- 值列的内联编辑代理 ----
 class PropertyItemDelegate : public QStyledItemDelegate
@@ -258,6 +288,9 @@ public:
             const int current = data.value(QStringLiteral("currentIndex"), 0).toInt();
             const QString label = data.value(QStringLiteral("label"), tr("Point")).toString();
             pl->setup(count, current, label);
+            // 注入坐标提供器：切换索引时实时加载该节点坐标（多段线/控制点按索引查询）
+            pl->setPointProvider(
+                [target = this->m_target, item](int idx) -> QPointF { return target ? target->pointAt(item, idx) : QPointF(); });
             QPointF p = m_target ? m_target->pointAt(item, current) : QPointF();
             pl->setPoint(p);
             return;
@@ -394,6 +427,8 @@ PropertiesPanelWidget::PropertiesPanelWidget(QWidget* parent)
         emit sigPropertyEdited();
     });
     m_tree->setItemDelegateForColumn(1, m_delegate);
+    // 属性名列只读，避免误改字段名
+    m_tree->setItemDelegateForColumn(0, new ReadOnlyFieldDelegate(this));
 }
 
 void PropertiesPanelWidget::setEditTarget(std::shared_ptr<IPropertyEditTarget> target)
@@ -507,8 +542,9 @@ void PropertiesPanelWidget::renderPropertyModel()
             child->setToolTip(0, item.tooltip);
             child->setToolTip(1, item.tooltip);
         }
-        // 保存 PropertyItem 供内联编辑器读取
+        // 保存 PropertyItem 供内联编辑器读取（两列都保存，代理按当前编辑列读取）
         child->setData(0, PropertyItemRole, QVariant::fromValue(item));
+        child->setData(1, PropertyItemRole, QVariant::fromValue(item));
 
         // 仅可编辑项且存在编辑目标时允许双击编辑
         if (item.editable && editable)
