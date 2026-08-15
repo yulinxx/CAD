@@ -1281,7 +1281,9 @@ void CoreOperationRegistry::registerAlgorithmOperations()
     };
 
     registerAlgoOp(OperationId::Algo_Fill);
+#ifdef ENABLE_NESTING
     registerAlgoOp(OperationId::Algo_Nesting);
+#endif
     registerAlgoOp(OperationId::Algo_Offset);
     registerAlgoOp(OperationId::Algo_Array);
     registerAlgoOp(OperationId::Algo_BooleanUnion);

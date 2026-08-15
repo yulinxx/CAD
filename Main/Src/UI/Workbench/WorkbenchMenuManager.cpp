@@ -1074,10 +1074,12 @@ void WorkbenchMenuManager::refreshAlgorithmMenuForWorkbench(const QString& workb
         m_window->tr("Fill..."),
         QStringLiteral("algo.fill"),
         QStringLiteral(":/ui/common/Icons/Actions/algo_fill.svg"));
+#ifdef ENABLE_NESTING
     addMenuAction(m_menuState.algorithmMenu,
         m_window->tr("Nesting..."),
         QStringLiteral("algo.nesting"),
         QStringLiteral(":/ui/common/Icons/Actions/algo_nesting.svg"));
+#endif
     addMenuAction(m_menuState.algorithmMenu,
         m_window->tr("Array..."),
         QStringLiteral("algo.array"),

@@ -946,43 +946,68 @@ def check_consistency(repos: List[Dict]):
 
 
 
-def get_default_branch(repo_path: str) -> str:
-    """自动检测仓库的默认分支（main / master / 其他）"""
-    # 先尝试获取当前分支
+def get_default_branch(repo_path: str, remotes: List[str] = None) -> Tuple[str, Optional[str]]:
+    """自动检测默认分支。返回 (分支名, 推荐远程名)；检测不到时远程名为 None。
+    优先级：
+    1. 遍历所有远程的 HEAD symbolic-ref（子模块多远程场景，不再只看 origin）
+    2. 本地分支：main 优先于 master
+    3. 各远程的 main/master：main 优先，远程按传入顺序
+    4. 回退到当前分支（非 HEAD 游离态）
+    """
     _, branch, _ = run_cmd(["git", "rev-parse", "--abbrev-ref", "HEAD"], repo_path)
     current = branch.strip()
 
-    # 尝试获取远程默认分支
-    _, out, _ = run_cmd(["git", "symbolic-ref", "refs/remotes/origin/HEAD"], repo_path)
-    if out.strip() and "refs/remotes/origin/" in out:
-        return out.strip().split("/")[-1]
+    remote_list = remotes or []
+    if not remote_list:
+        _, ro, _ = run_cmd(["git", "remote"], repo_path)
+        remote_list = [r.strip() for r in ro.strip().splitlines() if r.strip()]
 
-    # 检查本地分支
+    # 1. 各远程的 HEAD symbolic-ref（最权威）
+    for remote in remote_list:
+        _, out, _ = run_cmd(["git", "symbolic-ref", f"refs/remotes/{remote}/HEAD"], repo_path)
+        if out.strip() and f"refs/remotes/{remote}/" in out:
+            return out.strip().split("/")[-1], remote
+
+    # 2. 本地分支（main 优先）
     _, out, _ = run_cmd(["git", "branch", "--list", "main", "master"], repo_path)
     branches = [b.strip().lstrip("* ") for b in out.strip().splitlines() if b.strip()]
     if "main" in branches:
-        return "main"
+        return "main", None
     if "master" in branches:
-        return "master"
+        return "master", None
 
-    # 检查远程分支
+    # 3. 远程分支（遍历所有远程，main 优先）
     _, out, _ = run_cmd(["git", "branch", "-r"], repo_path)
-    remote_branches = [b.strip() for b in out.strip().splitlines() if b.strip()]
-    for candidate in ["origin/main", "origin/master"]:
-        if candidate in remote_branches:
-            return candidate.split("/")[-1]
+    remote_branches = set()
+    for line in out.strip().splitlines():
+        s = line.strip()
+        if "->" in s:
+            s = s.split("->", 1)[0].strip()
+        if s:
+            remote_branches.add(s)
 
-    return current if current != "HEAD" else "main"
+    for remote in remote_list:
+        if f"{remote}/main" in remote_branches:
+            return "main", remote
+    for remote in remote_list:
+        if f"{remote}/master" in remote_branches:
+            return "master", remote
+
+    # 4. 回退
+    return (current if current != "HEAD" else "main"), None
 
 
 def checkout_latest(repos: List[Dict]):
     """
     将所有仓库切换到最前端（默认分支最新提交）
     流程: 保存当前变更(stash) → 切默认分支 → 拉取最新
+    多远程歧义时自动用 git checkout --track <remote>/<branch> 消除
     """
     print(c("\n🎯 切换到最前端模式", Colors.BOLD + Colors.OKGREEN))
-    print("  流程: 检测默认分支 → 切换 → 拉取最新")
-    print("  如果工作区有未提交变更，会先自动 stash\n")
+    print("  流程: 检测默认分支(main优先) → 切换 → 拉取最新")
+    print("  如果工作区有未提交变更，会先自动 stash")
+    print(c("  分支名匹配多个远程时，自动用 --track <remote>/<branch> 消除歧义\n",
+            Colors.DIM))
 
     auto_stash = input("  有未提交变更时自动 stash? (y/n, 默认y): ").strip().lower() != "n"
     auto_pull = input("  切换后自动拉取最新? (y/n, 默认y): ").strip().lower() != "n"
@@ -994,11 +1019,12 @@ def checkout_latest(repos: List[Dict]):
     results = []
     for repo in repos:
         print(c(f"\n  ── {repo['name']} ──", Colors.OKCYAN))
-        result = {"name": repo["name"], "steps": []}
+        result = {"name": repo["name"], "steps": [], "status": "ok"}
 
-        # 1. 检测默认分支
-        default_branch = get_default_branch(repo["path"])
-        print(f"    默认分支: {c(default_branch, Colors.OKBLUE)}")
+        # 1. 检测默认分支（传入 remotes 以支持多远程）
+        default_branch, preferred_remote = get_default_branch(repo["path"], repo["remotes"])
+        print(f"    默认分支: {c(default_branch, Colors.OKBLUE)}"
+              + (f"  (推荐远程: {preferred_remote})" if preferred_remote else ""))
 
         # 2. 检查是否有未提交变更
         _, diff_out, _ = run_cmd(["git", "status", "--porcelain"], repo["path"])
@@ -1016,59 +1042,117 @@ def checkout_latest(repos: List[Dict]):
                 else:
                     print(c(f"❌ {err}", Colors.FAIL))
                     result["steps"].append(("stash", False))
+                    result["status"] = "failed"
                     results.append(result)
                     continue
             else:
                 print(c("    ⚠️ 有未提交变更，跳过 (未启用自动stash)", Colors.WARNING))
                 result["steps"].append(("stash", None))
+                result["status"] = "skipped_dirty"
                 results.append(result)
                 continue
 
-        # 3. 切换分支
+        # 3. 切换分支（歧义失败时带 --track 用推荐远程重试）
         print(f"    切换到 {default_branch}...", end=" ")
         cmd = ["git", "checkout", default_branch]
         show_cmd(cmd)
         rc, _, err = run_cmd(cmd, repo["path"])
         if rc == 0:
             print(c("✅", Colors.OKGREEN))
-            result["steps"].append(("checkout", True))
+            result["steps"].append((f"checkout {default_branch}", True))
         else:
-            print(c(f"❌ {err}", Colors.FAIL))
-            result["steps"].append(("checkout", False))
-            results.append(result)
-            continue
+            ambiguous = err and ("matched multiple" in err or "ambiguous" in err)
+            if ambiguous and preferred_remote:
+                print(c("⚠️ 分支名多义，重试...", Colors.WARNING))
+                track_cmd = ["git", "checkout", "--track", f"{preferred_remote}/{default_branch}"]
+                show_cmd(track_cmd)
+                print(f"    用 {preferred_remote}/{default_branch} 重试...", end=" ")
+                rc2, _, err2 = run_cmd(track_cmd, repo["path"])
+                if rc2 == 0:
+                    print(c("✅", Colors.OKGREEN))
+                    result["steps"].append((f"checkout --track {preferred_remote}/{default_branch}", True))
+                else:
+                    print(c(f"❌ {err2}", Colors.FAIL))
+                    result["steps"].append((f"checkout {default_branch}", False))
+                    result["status"] = "failed"
+                    results.append(result)
+                    continue
+            else:
+                print(c(f"❌ {err}", Colors.FAIL))
+                if ambiguous and not preferred_remote:
+                    print(c("      💡 多个远程有同名分支且无法判定默认，建议用 [14] 远程管理确认后重试",
+                            Colors.WARNING))
+                result["steps"].append((f"checkout {default_branch}", False))
+                result["status"] = "failed"
+                results.append(result)
+                continue
 
-        # 4. 拉取最新
+        # 4. 拉取最新（切分支后工作区已干净，直接拉；遇本地变更冲突走 stash 救援）
         if auto_pull:
+            pull_any_failed = False
             for remote in repo["remotes"]:
                 print(f"    从 {remote} 拉取 {default_branch}...", end=" ")
                 cmd = ["git", "pull", remote, default_branch]
                 show_cmd(cmd)
                 rc, out, err = run_cmd(cmd, repo["path"])
                 if rc == 0:
-                    print(c("✅", Colors.OKGREEN))
-                    result["steps"].append((f"pull({remote})", True))
+                    if "Already up to date" in out or "已经是最新" in out or "Already up-to-date" in out:
+                        print(c("✅ 最新", Colors.OKGREEN))
+                        result["steps"].append((f"pull({remote})", "uptodate"))
+                    else:
+                        print(c("✅ 更新", Colors.OKGREEN))
+                        result["steps"].append((f"pull({remote})", "updated"))
+                elif err and "local changes" in err.lower():
+                    print(c("⚠️ 本地变更冲突，自动 stash→pull→pop", Colors.WARNING))
+                    ok, steps = try_pull_with_stash(repo, remote, default_branch, pop=True)
+                    for step, sok, serr in steps:
+                        print(c(f"    {'✅' if sok else '❌'} {step}" + (f": {serr}" if not sok else ""),
+                                Colors.OKGREEN if sok else Colors.FAIL))
+                    result["steps"].append((f"pull({remote})", ok))
+                    if not ok:
+                        pull_any_failed = True
                 else:
                     print(c("❌", Colors.FAIL))
                     if err:
                         print(c(f"      {err}", Colors.FAIL))
                     result["steps"].append((f"pull({remote})", False))
+                    pull_any_failed = True
+            if pull_any_failed:
+                result["status"] = "pull_failed"
 
         results.append(result)
 
-    # 汇总
-    print(c("\n" + "═" * 50, Colors.HEADER))
+    # 详细汇总（四类：成功 / 切分支成功但拉取失败 / 切换失败 / 跳过）
+    print(c("\n" + "═" * 60, Colors.HEADER))
     print(c("  切换到最前端结果汇总", Colors.HEADER + Colors.BOLD))
-    print(c("═" * 50, Colors.HEADER))
-    for r in results:
-        print(f"\n  {r['name']}:")
-        for step, ok in r["steps"]:
-            if ok is True:
-                print(f"    ✅ {step}")
-            elif ok is False:
-                print(f"    ❌ {step}")
-            else:
-                print(f"    ⏭️  {step} (跳过)")
+    print(c("═" * 60, Colors.HEADER))
+
+    ok = [r["name"] for r in results if r["status"] == "ok"]
+    pull_failed = [r["name"] for r in results if r["status"] == "pull_failed"]
+    failed = [r["name"] for r in results if r["status"] == "failed"]
+    skipped = [r["name"] for r in results if r["status"] == "skipped_dirty"]
+
+    if ok:
+        print(c(f"\n  ✅ 成功 ({len(ok)} 个):", Colors.OKGREEN))
+        for n in ok:
+            print(f"    - {n}")
+    if pull_failed:
+        print(c(f"\n  ⚠️ 切分支成功，但拉取部分失败 ({len(pull_failed)} 个):", Colors.WARNING))
+        for n in pull_failed:
+            print(f"    - {n}")
+    if failed:
+        print(c(f"\n  ❌ 切换失败 ({len(failed)} 个):", Colors.FAIL))
+        for n in failed:
+            print(f"    - {n}")
+        print(c("  💡 常见原因: 分支名多义 / 本地有冲突修改 / 远程无此分支", Colors.WARNING))
+    if skipped:
+        print(c(f"\n  ⏭️  跳过(有未提交变更且未启用自动stash) ({len(skipped)} 个):", Colors.DIM))
+        for n in skipped:
+            print(f"    - {n}")
+
+    total = len(results)
+    print(c(f"\n  共 {total} 个仓库 | 成功 {len(ok)} | 拉取失败 {len(pull_failed)} | "
+            f"切换失败 {len(failed)} | 跳过 {len(skipped)}", Colors.BOLD))
 
 
 def git_submodule_update(repos: List[Dict]):
@@ -1199,9 +1283,10 @@ def print_batch_stats(results: List[Dict]):
 
 
 def batch_pull(repos: List[Dict]):
-    """批量拉取所有远程"""
+    """批量拉取所有远程，三态分类(有更新/已是最新/失败) + 冲突感知"""
     print(c("📥 批量拉取模式", Colors.BOLD + Colors.OKGREEN))
     print("  将自动从所有远程拉取当前分支")
+    print(c("  命令格式: git pull <remote> <branch>", Colors.DIM))
     print("  遇本地变更冲突时: [1] stash→pull→pop  [2] stash→pull(不pop)  [3] 跳过  [0] 退出  [回车/空格=1]")
     choice = input("  >>> ").strip()
 
@@ -1217,22 +1302,31 @@ def batch_pull(repos: List[Dict]):
 
     results = []
     for repo in repos:
-        print(c(f"  ── {repo['name']} ──", Colors.OKCYAN))
+        print(c(f"\n  ── {repo['name']} ──", Colors.OKCYAN))
         branch = repo["current_branch"]
-        result = {"name": repo["name"], "steps": []}
+        result = {"name": repo["name"], "steps": [], "status": "skip"}
 
         if not repo["remotes"]:
             print(c("    无远程仓库，跳过", Colors.DIM))
+            result["status"] = "no_remote"
+            results.append(result)
             continue
 
+        any_failed = False
+        any_updated = False
         for remote in repo["remotes"]:
             cmd = ["git", "pull", remote, branch]
             show_cmd(cmd)
             print(f"    → {remote}/{branch}...", end=" ")
             rc, out, err = run_cmd(cmd, repo["path"])
             if rc == 0:
-                print(c("✅", Colors.OKGREEN))
-                result["steps"].append((f"{remote}/{branch}", True))
+                if "Already up to date" in out or "已经是最新" in out or "Already up-to-date" in out:
+                    print(c("✅ 已是最新", Colors.OKGREEN))
+                    result["steps"].append((f"{remote}/{branch}", "uptodate"))
+                else:
+                    print(c("✅ 有更新", Colors.OKGREEN))
+                    result["steps"].append((f"{remote}/{branch}", "updated"))
+                    any_updated = True
             elif err and "local changes" in err.lower() and strategy != "skip":
                 do_pop = (strategy == "pop")
                 label = " → pop" if do_pop else " (不pop)"
@@ -1243,26 +1337,71 @@ def batch_pull(repos: List[Dict]):
                         print(c(f"    ✅ {step}", Colors.OKGREEN))
                     else:
                         print(c(f"    ❌ {step}: {serr}", Colors.FAIL))
-                    result["steps"].append((f"{remote}/{branch}·{step}", sok))
                 if not do_pop and ok:
                     print(c("    💡 本地改动仍在 stash 中 (git stash list 可查看/恢复)", Colors.DIM))
                 print(c(f"    结果: {'✅ 成功' if ok else '❌ 失败'}", Colors.OKGREEN if ok else Colors.FAIL))
+                result["steps"].append((f"{remote}/{branch}", "updated" if ok else "failed"))
+                if ok:
+                    any_updated = True
+                else:
+                    any_failed = True
             else:
-                print(c("❌", Colors.FAIL))
+                print(c("❌ 失败", Colors.FAIL))
                 if err and "unmerged files" in err.lower():
                     print(c("      ⚠️ 存在未解决的冲突，请先解决 (git status) 或还原该仓库。", Colors.WARNING))
                 elif err:
                     print(c(f"      {err}", Colors.FAIL))
-                result["steps"].append((f"{remote}/{branch}", False))
+                result["steps"].append((f"{remote}/{branch}", "failed"))
+                any_failed = True
+
+        # 仓库级状态：失败优先，其次有更新，最后全是最新的
+        if any_failed:
+            result["status"] = "failed"
+        elif any_updated:
+            result["status"] = "updated"
+        else:
+            result["status"] = "uptodate"
         results.append(result)
 
-    print_batch_stats(results)
+    # 分类汇总
+    print(c("\n" + "═" * 60, Colors.HEADER))
+    print(c("  批量拉取结果汇总", Colors.HEADER + Colors.BOLD))
+    print(c("═" * 60, Colors.HEADER))
+
+    updated = [r["name"] for r in results if r["status"] == "updated"]
+    uptodate = [r["name"] for r in results if r["status"] == "uptodate"]
+    failed = [r["name"] for r in results if r["status"] == "failed"]
+    no_remote = [r["name"] for r in results if r["status"] == "no_remote"]
+
+    if updated:
+        print(c(f"\n  ✅ 有更新 ({len(updated)} 个):", Colors.OKGREEN))
+        for n in updated:
+            print(f"    - {n}")
+    if uptodate:
+        print(c(f"\n  ⏭️  已是最新，无需拉取 ({len(uptodate)} 个):", Colors.DIM))
+        for n in uptodate:
+            print(f"    - {n}")
+    if failed:
+        print(c(f"\n  ❌ 拉取失败 ({len(failed)} 个):", Colors.FAIL))
+        for n in failed:
+            print(f"    - {n}")
+        print(c("  💡 通常因本地有未提交变更或未解决冲突，建议先 commit/stash 或用 [9] Stash 管理",
+                Colors.WARNING))
+    if no_remote:
+        print(c(f"\n  ⚪ 无远程仓库 ({len(no_remote)} 个):", Colors.DIM))
+        for n in no_remote:
+            print(f"    - {n}")
+
+    total = len(results)
+    print(c(f"\n  共 {total} 个仓库 | 更新 {len(updated)} | 最新 {len(uptodate)} | "
+            f"失败 {len(failed)} | 无远程 {len(no_remote)}", Colors.BOLD))
 
 
 def batch_push(repos: List[Dict]):
-    """批量推送到所有远程"""
+    """批量推送到所有远程，三态分类(已推送/已是最新/失败)"""
     print(c("🚀 批量推送模式", Colors.BOLD + Colors.OKGREEN))
     print("  将自动推送到所有远程的当前分支")
+    print(c("  命令格式: git push [--force] <remote> <branch>", Colors.DIM))
 
     force = input("  强制推送? (y/n, 默认n): ").strip().lower() == "y"
 
@@ -1272,14 +1411,19 @@ def batch_push(repos: List[Dict]):
 
     results = []
     for repo in repos:
-        print(c(f"  ── {repo['name']} ──", Colors.OKCYAN))
+        print(c(f"\n  ── {repo['name']} ──", Colors.OKCYAN))
         branch = repo["current_branch"]
-        result = {"name": repo["name"], "steps": []}
+        result = {"name": repo["name"], "steps": [], "status": "skip"}
 
         if not repo["remotes"]:
             print(c("    无远程仓库，跳过", Colors.DIM))
+            result["status"] = "no_remote"
+            results.append(result)
             continue
 
+        any_failed = False
+        any_pushed = False
+        any_uptodate = False
         for remote in repo["remotes"]:
             cmd = ["git", "push"]
             if force:
@@ -1289,16 +1433,59 @@ def batch_push(repos: List[Dict]):
             print(f"    → {remote}/{branch}...", end=" ")
             rc, out, err = run_cmd(cmd, repo["path"])
             if rc == 0:
-                print(c("✅", Colors.OKGREEN))
-                result["steps"].append((f"{remote}/{branch}", True))
+                if "Everything up-to-date" in (err or "") or "Everything up-to-date" in (out or ""):
+                    print(c("✅ 已是最新", Colors.OKGREEN))
+                    result["steps"].append((f"{remote}/{branch}", "uptodate"))
+                    any_uptodate = True
+                else:
+                    print(c("✅ 已推送", Colors.OKGREEN))
+                    result["steps"].append((f"{remote}/{branch}", "pushed"))
+                    any_pushed = True
             else:
-                print(c("❌", Colors.FAIL))
+                print(c("❌ 失败", Colors.FAIL))
                 if err:
                     print(c(f"      {err}", Colors.FAIL))
-                result["steps"].append((f"{remote}/{branch}", False))
+                result["steps"].append((f"{remote}/{branch}", "failed"))
+                any_failed = True
+
+        if any_failed:
+            result["status"] = "failed"
+        elif any_pushed:
+            result["status"] = "pushed"
+        else:
+            result["status"] = "uptodate"
         results.append(result)
 
-    print_batch_stats(results)
+    # 分类汇总
+    print(c("\n" + "═" * 60, Colors.HEADER))
+    print(c("  批量推送结果汇总", Colors.HEADER + Colors.BOLD))
+    print(c("═" * 60, Colors.HEADER))
+
+    pushed = [r["name"] for r in results if r["status"] == "pushed"]
+    uptodate = [r["name"] for r in results if r["status"] == "uptodate"]
+    failed = [r["name"] for r in results if r["status"] == "failed"]
+    no_remote = [r["name"] for r in results if r["status"] == "no_remote"]
+
+    if pushed:
+        print(c(f"\n  ✅ 已推送 ({len(pushed)} 个):", Colors.OKGREEN))
+        for n in pushed:
+            print(f"    - {n}")
+    if uptodate:
+        print(c(f"\n  ⏭️  已是最新，无需推送 ({len(uptodate)} 个):", Colors.DIM))
+        for n in uptodate:
+            print(f"    - {n}")
+    if failed:
+        print(c(f"\n  ❌ 推送失败 ({len(failed)} 个):", Colors.FAIL))
+        for n in failed:
+            print(f"    - {n}")
+    if no_remote:
+        print(c(f"\n  ⚪ 无远程仓库 ({len(no_remote)} 个):", Colors.DIM))
+        for n in no_remote:
+            print(f"    - {n}")
+
+    total = len(results)
+    print(c(f"\n  共 {total} 个仓库 | 推送 {len(pushed)} | 最新 {len(uptodate)} | "
+            f"失败 {len(failed)} | 无远程 {len(no_remote)}", Colors.BOLD))
 
 
 def main():

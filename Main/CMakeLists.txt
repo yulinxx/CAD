@@ -244,6 +244,11 @@ if(SANYI_ENABLE_CONFIG_DRIVEN_UI)
     target_compile_definitions(${app_name} PRIVATE SANYI_ENABLE_CONFIG_DRIVEN_UI=1)
 endif()
 
+# 可选模块宏传播：保证 EXE 中与各 UI DLL 中 #ifdef 分支一致
+if(BUILD_NESTING)
+    target_compile_definitions(${app_name} PRIVATE ENABLE_NESTING)
+endif()
+
 if(BUILD_UI3D)
     target_link_libraries(${app_name} PRIVATE UI3D Engine3D)
     target_compile_definitions(${app_name} PRIVATE BUILD_UI3D=1)
@@ -617,6 +622,10 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
         if(BUILD_GEOMODELCORE)
             target_compile_definitions(MainTests PRIVATE ENABLE_GEOMODELCORE)
         endif()
+    endif()
+
+    if(BUILD_NESTING)
+        target_compile_definitions(MainTests PRIVATE ENABLE_NESTING)
     endif()
 
     # 客户化 UI 配置（测试目标同样需要访问资源）

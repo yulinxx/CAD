@@ -114,7 +114,11 @@ if(GTest_FOUND)
     option(BUILD_LOG_TESTS "Build Log unit tests" ${BUILD_ALL_TESTS})
     option(BUILD_ENGINE2D_TESTS "Build Engine2D unit tests" ${BUILD_ALL_TESTS})
     option(BUILD_ENGINE3D_TESTS "Build Engine3D unit tests" ${BUILD_ALL_TESTS})
-    option(BUILD_NESTING_TESTS "Build Nesting unit tests" ${BUILD_ALL_TESTS})
+    if(BUILD_NESTING)
+        option(BUILD_NESTING_TESTS "Build Nesting unit tests" ${BUILD_ALL_TESTS})
+    else()
+        option(BUILD_NESTING_TESTS "Build Nesting unit tests" OFF)
+    endif()
     option(BUILD_GEOMODELCORE_TESTS "Build GeoModelCore unit tests" ${BUILD_ALL_TESTS})
     option(BUILD_FILEIO_TESTS "Build FileIO unit tests" ${BUILD_ALL_TESTS})
     option(BUILD_LICENSE_TESTS "Build License unit tests" ON)
@@ -182,6 +186,15 @@ else()
     message(STATUS "  Engraving: DISABLED")
 endif()
 
+# 6. 功能模块（须在 UI 之前：UICommon/UI2D 在 configure 时要求 Nesting 目标存在）
+add_subdirectory(FileIO/FileIO)
+if(BUILD_NESTING)
+    add_subdirectory(Nesting/Nesting)
+    message(STATUS "  Nesting: ENABLED")
+else()
+    message(STATUS "  Nesting: DISABLED")
+endif()
+
 # 5. UI 层 - 用户界面
 add_subdirectory(UI/Common)
 add_subdirectory(UI/2D)
@@ -190,10 +203,6 @@ if(BUILD_UI3D)
 else()
     message(STATUS "  UI3D: DISABLED")
 endif()
-
-# 6. 功能模块
-add_subdirectory(FileIO/FileIO)
-add_subdirectory(Nesting/Nesting)
 
 message(STATUS "----------------------------------------")
 if(BUILD_HARDWARE)
@@ -264,8 +273,11 @@ set(SANYI_PROJECT_LIBS
     # EngineCommon Engine2D
     # RenderCommon Render2D
     UICommon UI2D
-    FileIO Nesting
+    FileIO
 )
+if(BUILD_NESTING)
+    list(APPEND SANYI_PROJECT_LIBS Nesting)
+endif()
 
 if(BUILD_UI3D)
     list(APPEND SANYI_PROJECT_LIBS Engine3D UI3D)
