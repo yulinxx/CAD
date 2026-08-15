@@ -6,12 +6,16 @@
 #include <QAbstractItemModel>
 #include <QColorDialog>
 #include <QComboBox>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QDoubleSpinBox>
+#include <QFormLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMap>
+#include <QMessageBox>
 #include <QModelIndex>
 #include <QPushButton>
 #include <QStyledItemDelegate>
@@ -188,6 +192,115 @@ namespace
         QPushButton* m_button{ nullptr };
         QColor m_color{ Qt::white };
     };
+
+    // 是否属于"复合编辑"类型：需要多控件/较多空间，改用弹窗编辑，避免内联编辑器被压缩到行高内不可见
+    bool isComplexEditType(PropertyEditType type)
+    {
+        return type == PropertyEditType::Point2d || type == PropertyEditType::PointList
+            || type == PropertyEditType::Color;
+    }
+
+    // 复合属性（点/点列表/颜色）编辑弹窗：提供充足空间，保证控件完整显示
+    class PropertyEditDialog : public QDialog
+    {
+    public:
+        PropertyEditDialog(const PropertyItem& item, std::shared_ptr<IPropertyEditTarget> target, QWidget* parent = nullptr)
+            : QDialog(parent)
+            , m_item(item)
+            , m_target(std::move(target))
+        {
+            setWindowTitle(tr("Edit %1").arg(m_item.name));
+            setMinimumWidth(360);
+
+            auto* layout = new QVBoxLayout(this);
+            layout->setContentsMargins(12, 12, 12, 12);
+            layout->setSpacing(12);
+
+            auto* form = new QFormLayout();
+            form->setLabelAlignment(Qt::AlignRight);
+
+            switch (m_item.editType)
+            {
+            case PropertyEditType::Point2d:
+            {
+                m_point = new PointCoordEditor(this);
+                m_point->setPoint(m_target ? m_target->pointAt(m_item, 0) : QPointF());
+                form->addRow(tr("Coordinates:"), m_point);
+                break;
+            }
+            case PropertyEditType::PointList:
+            {
+                m_list = new PointListEditor(this);
+                const QVariantMap data = m_item.editData.toMap();
+                const int count = data.value(QStringLiteral("count"), 0).toInt();
+                const int current = data.value(QStringLiteral("currentIndex"), 0).toInt();
+                const QString label = data.value(QStringLiteral("label"), tr("Point")).toString();
+                m_list->setup(count, current, label);
+                m_list->setPointProvider(
+                    [target = this->m_target, item = this->m_item](int idx) -> QPointF {
+                        return target ? target->pointAt(item, idx) : QPointF();
+                    });
+                m_list->setPoint(m_target ? m_target->pointAt(m_item, current) : QPointF());
+                form->addRow(tr("Vertices:"), m_list);
+                break;
+            }
+            case PropertyEditType::Color:
+            {
+                m_color = new ColorEditor(this);
+                QColor c(m_item.value);
+                m_color->setColor(c.isValid() ? c : QColor(Qt::white));
+                form->addRow(tr("Color:"), m_color);
+                break;
+            }
+            default:
+                break;
+            }
+            layout->addLayout(form);
+
+            auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+            connect(buttons, &QDialogButtonBox::accepted, this, [this]() {
+                if (commit())
+                {
+                    accept();
+                }
+                else
+                {
+                    QMessageBox::warning(this, tr("Edit"), tr("Invalid value, change was not applied."));
+                }
+            });
+            connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+            layout->addWidget(buttons);
+        }
+
+        /// 应用修改（成功返回 true）
+        bool commit()
+        {
+            if (!m_target)
+            {
+                return false;
+            }
+            if (m_point)
+            {
+                return m_target->editPointAt(m_item, 0, m_point->point());
+            }
+            if (m_list)
+            {
+                return m_target->editPointAt(m_item, m_list->index(), m_list->point());
+            }
+            if (m_color)
+            {
+                return m_target->editValue(m_item, m_color->color().name(QColor::HexArgb));
+            }
+            return false;
+        }
+
+    private:
+        PropertyItem m_item;
+        std::shared_ptr<IPropertyEditTarget> m_target;
+        PointCoordEditor* m_point{ nullptr };
+        PointListEditor* m_list{ nullptr };
+        ColorEditor* m_color{ nullptr };
+    };
 }  // namespace
 
 // ---- 值列的内联编辑代理 ----
@@ -234,10 +347,6 @@ public:
             auto* edit = new QLineEdit(parent);
             return edit;
         }
-        case PropertyEditType::Point2d:
-            return new PointCoordEditor(parent);
-        case PropertyEditType::PointList:
-            return new PointListEditor(parent);
         case PropertyEditType::ComboBox:
         {
             auto* combo = new QComboBox(parent);
@@ -250,10 +359,12 @@ public:
             combo->addItems({ tr("No"), tr("Yes") });
             return combo;
         }
+        case PropertyEditType::Point2d:
+        case PropertyEditType::PointList:
         case PropertyEditType::Color:
-            return new ColorEditor(parent);
         default:
-            return new QLineEdit(parent);
+            // 复合类型改由 PropertyEditDialog 弹窗编辑（createEditor 返回 nullptr 表示不进入内联编辑）
+            return nullptr;
         }
     }
 
@@ -271,35 +382,6 @@ public:
         {
             int idx = combo->findText(item.value);
             combo->setCurrentIndex(qMax(0, idx));
-            return;
-        }
-
-        if (auto* pt = dynamic_cast<PointCoordEditor*>(editor))
-        {
-            QPointF p = m_target ? m_target->pointAt(item, 0) : QPointF();
-            pt->setPoint(p);
-            return;
-        }
-
-        if (auto* pl = dynamic_cast<PointListEditor*>(editor))
-        {
-            const QVariantMap data = item.editData.toMap();
-            const int count = data.value(QStringLiteral("count"), 0).toInt();
-            const int current = data.value(QStringLiteral("currentIndex"), 0).toInt();
-            const QString label = data.value(QStringLiteral("label"), tr("Point")).toString();
-            pl->setup(count, current, label);
-            // 注入坐标提供器：切换索引时实时加载该节点坐标（多段线/控制点按索引查询）
-            pl->setPointProvider(
-                [target = this->m_target, item](int idx) -> QPointF { return target ? target->pointAt(item, idx) : QPointF(); });
-            QPointF p = m_target ? m_target->pointAt(item, current) : QPointF();
-            pl->setPoint(p);
-            return;
-        }
-
-        if (auto* ce = dynamic_cast<ColorEditor*>(editor))
-        {
-            QColor c(item.value);
-            ce->setColor(c.isValid() ? c : QColor(Qt::white));
             return;
         }
     }
@@ -368,26 +450,6 @@ public:
                 displayValue = combo->currentText();
             }
         }
-        else if (auto* pt = dynamic_cast<PointCoordEditor*>(editor))
-        {
-            applied = m_target->editPointAt(item, 0, pt->point());
-            if (applied)
-            {
-                displayValue = QStringLiteral("(%1, %2)").arg(pt->point().x(), 0, 'f', 3).arg(pt->point().y(), 0, 'f', 3);
-            }
-        }
-        else if (auto* pl = dynamic_cast<PointListEditor*>(editor))
-        {
-            applied = m_target->editPointAt(item, pl->index(), pl->point());
-        }
-        else if (auto* ce = dynamic_cast<ColorEditor*>(editor))
-        {
-            applied = m_target->editValue(item, ce->color().name(QColor::HexArgb));
-            if (applied)
-            {
-                displayValue = ce->color().name(QColor::HexArgb);
-            }
-        }
 
         // 写回展示值（近似）；随后由绑定层根据提交回调重建模型，保证派生字段刷新
         if (applied)
@@ -416,7 +478,10 @@ PropertiesPanelWidget::PropertiesPanelWidget(QWidget* parent)
     m_tree->setHeaderLabels({ tr("Field"), tr("Value") });
     m_tree->setColumnCount(2);
     m_tree->setSelectionBehavior(QAbstractItemView::SelectRows);
-    m_tree->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::EditKeyPressed);
+    // 行高适当放大，保证内联编辑框/下拉框完整显示
+    m_tree->setStyleSheet(QStringLiteral("QTreeWidget::item { min-height: 26px; }"));
+    // 编辑统一在 itemDoubleClicked 中手动处理：标量内联、复合类型弹窗
+    m_tree->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_tree->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
     m_tree->header()->setSectionResizeMode(1, QHeaderView::Stretch);
     layout->addWidget(m_tree);
@@ -429,6 +494,32 @@ PropertiesPanelWidget::PropertiesPanelWidget(QWidget* parent)
     m_tree->setItemDelegateForColumn(1, m_delegate);
     // 属性名列只读，避免误改字段名
     m_tree->setItemDelegateForColumn(0, new ReadOnlyFieldDelegate(this));
+
+    // 双击编辑：标量内联编辑，复合属性（点/点列表/颜色）弹窗编辑，保证控件完整可见
+    connect(m_tree, &QTreeWidget::itemDoubleClicked, this, [this](QTreeWidgetItem* item, int column) {
+        if (column != 1 || !item)
+        {
+            return;
+        }
+        const PropertyItem pi = item->data(1, PropertyItemRole).value<PropertyItem>();
+        if (!pi.editable || !m_editTarget)
+        {
+            return;
+        }
+
+        if (isComplexEditType(pi.editType))
+        {
+            PropertyEditDialog dlg(pi, m_editTarget, this);
+            if (dlg.exec() == QDialog::Accepted)
+            {
+                emit sigPropertyEdited();
+            }
+        }
+        else
+        {
+            m_tree->editItem(item, 1);
+        }
+    });
 }
 
 void PropertiesPanelWidget::setEditTarget(std::shared_ptr<IPropertyEditTarget> target)
