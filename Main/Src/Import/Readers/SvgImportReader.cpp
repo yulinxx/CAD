@@ -1,5 +1,7 @@
 #include "SvgImportReader.h"
 
+#include <unordered_map>
+
 #include "FileIO/FileIOManager.h"
 #include "Import/FioEntityConverter.h"
 #include "Log/SyLogger.h"
@@ -38,7 +40,9 @@ ImportResult SvgImportReader::read(const ImportContext& context, Fio::VecSyEntit
         return ImportResult::fail(msg, errorType, QStringList{});
     }
 
-    auto converted = FioEntityConverter::convertAll(ir);
+    // 转换图元的同时收集「图元 → 源图层 sourceId」映射，供构建文档阶段还原图层结构
+    std::unordered_map<int64_t, uint32_t> entityLayerMap;
+    auto converted = FioEntityConverter::convertAll(ir, &entityLayerMap);
     outEntities.clear();
     outEntities.reserve(converted.size());
     for (auto& e : converted)
@@ -46,10 +50,19 @@ ImportResult SvgImportReader::read(const ImportContext& context, Fio::VecSyEntit
         outEntities.emplace_back(std::move(e));
     }
 
-    SY_INFOF("[SvgImportReader] read END: success, entities=%zu", outEntities.size());
+    // 提取源文件图层表（名称/颜色/可见性），随导入结果带回
+    std::vector<Fio::IrLayerInfo> importedLayers = FioEntityConverter::extractLayers(ir);
 
-    return ImportResult::ok(QStringLiteral("SVG import successful"),
+    SY_INFOF("[SvgImportReader] read END: success, entities=%zu, layers=%zu, mapped=%zu",
+        outEntities.size(),
+        importedLayers.size(),
+        entityLayerMap.size());
+
+    ImportResult result = ImportResult::ok(QStringLiteral("SVG import successful"),
         static_cast<int>(outEntities.size()),
-        static_cast<int>(ir.layerCount),
+        static_cast<int>(importedLayers.size()),
         QStringList{});
+    result.importedLayers = std::move(importedLayers);
+    result.entityLayerMap = std::move(entityLayerMap);
+    return result;
 }
