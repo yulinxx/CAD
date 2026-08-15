@@ -115,6 +115,17 @@ public:
     QPointF widgetToWorld(QPointF widgetLocalPos) const;
     QSizeF physicalViewportSize() const;
 
+    /// 最近一次鼠标在视口内的世界坐标（供粘贴等操作作为锚点）
+    QPointF lastCursorWorldPos() const
+    {
+        return m_lastCursorWorldPos;
+    }
+
+    bool hasCursorPos() const
+    {
+        return m_hasCursorPos;
+    }
+
 private:
     // ==================== 坐标转换辅助 ====================
 
@@ -161,6 +172,9 @@ private:
     bool m_panning{ false };
     bool m_panModeEnabled{ false };
     QPoint m_lastMousePos;
+    // 最近一次鼠标世界坐标（粘贴锚点）
+    QPointF m_lastCursorWorldPos{ 0.0, 0.0 };
+    bool m_hasCursorPos{ false };
 
     // 回调
     std::function<void(double, double)> m_positionCallback;

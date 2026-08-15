@@ -264,6 +264,10 @@ void ViewportInputRouter::handleMouseMove(QMouseEvent* event)
         return;
     }
 
+    // 记录最近鼠标世界坐标，供粘贴等操作作为锚点（即使之后鼠标移出视口）
+    m_lastCursorWorldPos = worldPos;
+    m_hasCursorPos = true;
+
     if (m_positionCallback)
     {
         m_positionCallback(worldPos.x(), worldPos.y());

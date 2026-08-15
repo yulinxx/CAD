@@ -242,10 +242,6 @@ private:
     // 鼠标位置回调，参数为世界坐标 (x, y)
     std::function<void(double, double)> m_positionCallback;
 
-    // 最近一次鼠标世界坐标（用于粘贴锚点等；hasCursor 表示是否已捕获过鼠标位置）
-    QPointF m_lastCursorWorldPos{ 0.0, 0.0 };
-    bool m_hasCursorPos{ false };
-
     // 刷新协调器（四级刷新策略 + 增量渲染管线）
     std::unique_ptr<SceneRefreshCoordinator> m_refreshCoordinator;
 

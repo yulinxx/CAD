@@ -543,6 +543,11 @@ void CoreOperationRegistry::registerEditOperations()
                 pastePos = Ut::Vec2d(world.x(), world.y());
             }
         }
+        // 兜底：无有效锚点时使用默认设计台面中心 (600,400)，避免粘贴到原点角落
+        if (pastePos.x() == 0.0 && pastePos.y() == 0.0)
+        {
+            pastePos = Ut::Vec2d(600.0, 400.0);
+        }
         auto pasted = clipboard->paste(pastePos);
         if (pasted.empty())
         {
