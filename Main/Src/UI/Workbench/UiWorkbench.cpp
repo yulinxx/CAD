@@ -2,6 +2,7 @@
 
 #include <QAction>
 #include <QActionGroup>
+#include <QDockWidget>
 #include <QShortcut>
 #include <QSizePolicy>
 #include <QTextEdit>
@@ -1654,7 +1655,13 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
     // 3D 工作台隐藏骨架 dock，因此这里总是创建自己的 SceneTreePanel3D）。
     auto* created = new SceneTreePanel3D(&window);
     created->setObjectName(QStringLiteral("SceneTreeDock3D"));
-    window.registerDockWidget(QObject::tr("Scene"), created, Qt::LeftDockWidgetArea);
+    auto* sceneDock = window.registerDockWidget(QObject::tr("Scene"), created, Qt::LeftDockWidgetArea);
+    // 限制 Scene 面板宽度，避免把 3D 视图挤得过窄
+    if (sceneDock)
+    {
+        sceneDock->setMinimumWidth(170);
+        sceneDock->setMaximumWidth(280);
+    }
     m_scenePanel3D = created;
 
     if (!m_scenePanel3D)
