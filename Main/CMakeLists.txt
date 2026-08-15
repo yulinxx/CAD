@@ -71,6 +71,8 @@ set(MAIN_APP_SOURCES
     ${SRC_ROOT}/UI/Adapters/TransformDialogAdapter.cpp
     ${SRC_ROOT}/UI/Documents/SceneBuilder3D.cpp
     ${SRC_ROOT}/UI/Documents/SceneDocument2D.cpp
+    ${SRC_ROOT}/UI/Documents/SceneTreeBuilder2D.cpp
+    ${SRC_ROOT}/UI/Documents/SceneTreeBuilder3D.cpp
     ${SRC_ROOT}/UI/Entities/UiEntities.cpp
     ${SRC_ROOT}/UI/Entities/UiGeometryAlgorithms.cpp
     ${SRC_ROOT}/UI/Interaction/UiInteractionDispatcher.cpp
@@ -104,6 +106,8 @@ set(MAIN_APP_SOURCES
     ${SRC_ROOT}/UI/Widgets/DrawToolBarWidget.cpp
     ${SRC_ROOT}/UI/Widgets/UiPropertiesPanel.cpp
     ${SRC_ROOT}/UI/Widgets/UiSceneTreeDock.cpp
+    ${SRC_ROOT}/UI/Widgets/UiSceneTreePanel2D.cpp
+    ${SRC_ROOT}/UI/Widgets/UiSceneTreePanel3D.cpp
     ${SRC_ROOT}/UI/Widgets/ViewportSelector.cpp
 )
 
@@ -496,36 +500,40 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
         ${SRC_ROOT}/UI/ClientConfig/UiLayoutBuilder.cpp
         ${SRC_ROOT}/UI/ClientConfig/UiPanelRegistry.cpp
         ${SRC_ROOT}/UI/Documents/SceneDocument2D.cpp
-        ${SRC_ROOT}/UI/Entities/UiEntities.cpp
-        ${SRC_ROOT}/UI/Entities/UiGeometryAlgorithms.cpp
-        ${SRC_ROOT}/UI/Interaction/UiInteractionDispatcher.cpp
-        ${SRC_ROOT}/UI/Render/Camera2D.cpp
-        ${SRC_ROOT}/UI/Render/EntityToVertices.cpp
-        ${SRC_ROOT}/UI/Render/RenderViewport2D.cpp
-        ${SRC_ROOT}/UI/Render/Renderer3DFactory.cpp
-        ${SRC_ROOT}/UI/Render/SceneRefreshCoordinator.cpp
-        ${SRC_ROOT}/UI/Render/ViewportInputRouter.cpp
-        ${SRC_ROOT}/UI/Services/FileDialogService.cpp
-        ${SRC_ROOT}/UI/Services/HelpDialogService.cpp
-        ${SRC_ROOT}/UI/Services/RecentFileService.cpp
-        ${SRC_ROOT}/UI/Services/SelectionService.cpp
-        ${SRC_ROOT}/UI/Services/UiLayoutService.cpp
-        ${SRC_ROOT}/UI/Services/UiShellHost.cpp
-        ${SRC_ROOT}/UI/Services/UiStateCenter.cpp
-        ${SRC_ROOT}/UI/Services/UiThemeService.cpp
-        ${SRC_ROOT}/UI/Services/ViewportActionHub.cpp
-        ${SRC_ROOT}/UI/Workbench/UiWorkbench.cpp
-        ${SRC_ROOT}/UI/Workbench/DrawToolSwitchRegistry.cpp
-        ${SRC_ROOT}/UI/Workbench/FileDropHandler.cpp
-        ${SRC_ROOT}/UI/Workbench/WorkbenchActionManager.cpp
-        ${SRC_ROOT}/UI/Workbench/WorkbenchLayoutManager.cpp
-        ${SRC_ROOT}/UI/Workbench/WorkbenchMenuManager.cpp
-        ${SRC_ROOT}/UI/Workbench/WorkbenchStateManager.cpp
-        ${SRC_ROOT}/UI/Workbench/WorkbenchWindow.cpp
-        ${SRC_ROOT}/UI/Widgets/DrawToolBarWidget.cpp
-        ${SRC_ROOT}/UI/Widgets/UiPropertiesPanel.cpp
-        ${SRC_ROOT}/UI/Widgets/UiSceneTreeDock.cpp
-        ${SRC_ROOT}/UI/Widgets/ViewportSelector.cpp
+    ${SRC_ROOT}/UI/Documents/SceneTreeBuilder2D.cpp
+    ${SRC_ROOT}/UI/Documents/SceneTreeBuilder3D.cpp
+    ${SRC_ROOT}/UI/Entities/UiEntities.cpp
+    ${SRC_ROOT}/UI/Entities/UiGeometryAlgorithms.cpp
+    ${SRC_ROOT}/UI/Interaction/UiInteractionDispatcher.cpp
+    ${SRC_ROOT}/UI/Render/Camera2D.cpp
+    ${SRC_ROOT}/UI/Render/EntityToVertices.cpp
+    ${SRC_ROOT}/UI/Render/RenderViewport2D.cpp
+    ${SRC_ROOT}/UI/Render/Renderer3DFactory.cpp
+    ${SRC_ROOT}/UI/Render/SceneRefreshCoordinator.cpp
+    ${SRC_ROOT}/UI/Render/ViewportInputRouter.cpp
+    ${SRC_ROOT}/UI/Services/FileDialogService.cpp
+    ${SRC_ROOT}/UI/Services/HelpDialogService.cpp
+    ${SRC_ROOT}/UI/Services/RecentFileService.cpp
+    ${SRC_ROOT}/UI/Services/SelectionService.cpp
+    ${SRC_ROOT}/UI/Services/UiLayoutService.cpp
+    ${SRC_ROOT}/UI/Services/UiShellHost.cpp
+    ${SRC_ROOT}/UI/Services/UiStateCenter.cpp
+    ${SRC_ROOT}/UI/Services/UiThemeService.cpp
+    ${SRC_ROOT}/UI/Services/ViewportActionHub.cpp
+    ${SRC_ROOT}/UI/Workbench/UiWorkbench.cpp
+    ${SRC_ROOT}/UI/Workbench/DrawToolSwitchRegistry.cpp
+    ${SRC_ROOT}/UI/Workbench/FileDropHandler.cpp
+    ${SRC_ROOT}/UI/Workbench/WorkbenchActionManager.cpp
+    ${SRC_ROOT}/UI/Workbench/WorkbenchLayoutManager.cpp
+    ${SRC_ROOT}/UI/Workbench/WorkbenchMenuManager.cpp
+    ${SRC_ROOT}/UI/Workbench/WorkbenchStateManager.cpp
+    ${SRC_ROOT}/UI/Workbench/WorkbenchWindow.cpp
+    ${SRC_ROOT}/UI/Widgets/DrawToolBarWidget.cpp
+    ${SRC_ROOT}/UI/Widgets/UiPropertiesPanel.cpp
+    ${SRC_ROOT}/UI/Widgets/UiSceneTreeDock.cpp
+    ${SRC_ROOT}/UI/Widgets/UiSceneTreePanel2D.cpp
+    ${SRC_ROOT}/UI/Widgets/UiSceneTreePanel3D.cpp
+    ${SRC_ROOT}/UI/Widgets/ViewportSelector.cpp
     )
 
     if(BUILD_UI3D)

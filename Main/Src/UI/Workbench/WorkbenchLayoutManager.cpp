@@ -1,6 +1,6 @@
 #include "WorkbenchLayoutManager.h"
 #include "WorkbenchMenuManager.h"
-#include "UiSceneTreeDock.h"
+#include "UiSceneTreePanel2D.h"
 #include "UiPropertiesPanel.h"
 #include "Persistence/PersistenceService.h"
 #include "Persistence/Repositories/WorkspaceSnapshotRepository.h"
@@ -89,7 +89,7 @@ void WorkbenchLayoutManager::buildDockAreas()
 #endif
 
     // 场景树面板
-    m_panelState.sceneTreeDock = new SceneTreeDockWidget(m_parent);
+    m_panelState.sceneTreeDock = new SceneTreePanel2D(m_parent);
     m_panelState.leftDock = new QDockWidget(m_parent->tr("Scene"), m_parent);  // 场景
     m_panelState.leftDock->setObjectName(QStringLiteral("SceneDock"));
     m_panelState.leftDock->setWidget(m_panelState.sceneTreeDock);
@@ -118,7 +118,7 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
 
         // 注册内置面板工厂：与 JSON 中的 widgetType 对应
         m_panelRegistry->registerPanel(QStringLiteral("SceneTreePanel"), [](QWidget* parent) {
-            return static_cast<QWidget*>(new SceneTreeDockWidget(parent));
+            return static_cast<QWidget*>(new SceneTreePanel2D(parent));
         });
         m_panelRegistry->registerPanel(QStringLiteral("PropertiesPanel"), [](QWidget* parent) {
             return static_cast<QWidget*>(new PropertiesPanelWidget(parent));
@@ -173,7 +173,7 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
                 m_panelState.rightDock = dock;
             }
 
-            if (auto* tree = qobject_cast<SceneTreeDockWidget*>(dock->widget()))
+            if (auto* tree = qobject_cast<SceneTreePanel2D*>(dock->widget()))
             {
                 m_panelState.sceneTreeDock = tree;
             }
@@ -235,7 +235,7 @@ QDockWidget* WorkbenchLayoutManager::registerDockWidget(const QString& title, QW
     dock->setProperty("_workbench_dock_title", title);
 
     // 仅更新面板状态引用，方便后续统一刷新与清理
-    if (auto* tree = qobject_cast<SceneTreeDockWidget*>(widget))
+    if (auto* tree = qobject_cast<SceneTreePanel2D*>(widget))
     {
         m_panelState.sceneTreeDock = tree;
     }

@@ -107,7 +107,7 @@ option(SANYI_ENABLE_CONFIG_DRIVEN_UI "Enable config-driven UI layout" OFF)  # ON
 在 `WorkbenchLayoutManager::buildDockAreasFromConfig()` 注册内置面板工厂：
 
 ```cpp
-registry->registerPanel("SceneTreePanel", [](QWidget* p){ return new SceneTreeDockWidget(p); });
+registry->registerPanel("SceneTreePanel", [](QWidget* p){ return new SceneTreePanel2D(p); });
 registry->registerPanel("PropertiesPanel", [](QWidget* p){ return new PropertiesPanelWidget(p); });
 ```
 
@@ -117,6 +117,13 @@ registry->registerPanel("PropertiesPanel", [](QWidget* p){ return new Properties
 3. 在 JSON 的 `docks[].widgetType` 写 `"MyPanel"`。
 
 > 注意：`UiLayoutBuilder::buildDocks` 遇到 **未注册** `widgetType` 会降级为占位 `QWidget` 并 `SY_WARNF` 告警 —— 不会崩溃。
+
+**场景树面板（数据/算法/UI 分离，UI 可定制/可缺失）**：
+- 2D 场景树：`SceneTreeBuilder2D`（算法层，读 Engine2D 场景）→ `SceneTreeModel2D`（数据层）→ `SceneTreePanel2D`（UI，由 `WorkbenchLayoutManager` 经面板注册表创建）。
+- 3D 场景树：`SceneTreeBuilder3D`（算法层，读 `SceneManager3D`）→ `SceneTreeModel3D`（数据层）→ `SceneTreePanel3D`（UI，由 `Workbench3D::setupSceneTree3D` 直接创建并注册 dock）。
+- 两套面板只消费各自纯数据模型并发出选择/可见性/重命名信号，业务逻辑不感知 UI；面板可替换/移除/定制，不影响算法层与数据层。
+- 3D 树刷新时机：导入时 `SceneManager3D::markDataChanged()` 触发 `SceneMonitor3D::sceneChanged` → `Workbench3D::refreshSceneTree3D`；另在 `ImportService::importFinished` 显式兜底一次。
+- 算法层单测：`Main/Src/UI/Test/SceneTreeBuilder3DTests.cpp`（空场景/节点填充/名称回退/选中计数/`selectedIds`）。
 
 ### 3.4 图标
 

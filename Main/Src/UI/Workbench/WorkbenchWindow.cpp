@@ -122,7 +122,7 @@
 #include "UiStateCenter.h"
 #include "UiThemeService.h"
 #include "UiWorkbench.h"
-#include "UiSceneTreeDock.h"
+#include "UiSceneTreePanel2D.h"
 #include "UiPropertiesPanel.h"
 #include "Engine2D/Edit/LayerEditService.h"
 #include "Engine2D/Interaction/LayerManager.h"
@@ -393,7 +393,7 @@ QWidget* WorkbenchWindow::createInitialCentralWidget()
     return m_layoutManager->createInitialCentralWidget();
 }
 
-SceneTreeDockWidget* WorkbenchWindow::sceneTreeDock() const
+SceneTreePanel2D* WorkbenchWindow::sceneTreeDock() const
 {
     return m_layoutManager->panelState().sceneTreeDock;
 }

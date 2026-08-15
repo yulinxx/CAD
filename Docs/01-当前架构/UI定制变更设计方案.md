@@ -944,7 +944,6 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
     auto* panelRegistry = configManager->panelRegistry();
 
     // 2. 创建工作台专属的面板
-    auto* sceneDock = createLayersDock(window);
     auto* drawToolBar = new DrawToolBarWidget(&window);
     auto* properties = new PropertiesPanelWidget(&window);
     auto* commandPanel = createPanelWidget(QObject::tr("Command panel"), &window);

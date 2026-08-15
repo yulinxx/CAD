@@ -23,7 +23,7 @@
 #include "UI/TopToolBar/TopToolBar.h"
 #include "UI/StatusBar/StatusBar.h"
 #include "UI/StatusBar/StatusBar3D.h"
-#include "UI/Widgets/UiSceneTreeDock.h"
+#include "UI/Widgets/UiSceneTreePanel2D.h"
 #include "UI/Widgets/UiPropertiesPanel.h"
 #include "Render3D/RenderWidget3D.h"
 #include "ClientConfig/UiClientConfigBase.h"
@@ -340,7 +340,7 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
     {
         m_menuPanelRegistry = std::make_unique<UiPanelRegistry>();
         m_menuPanelRegistry->registerPanel(QStringLiteral("SceneTreePanel"), [](QWidget* parent) {
-            return static_cast<QWidget*>(new SceneTreeDockWidget(parent));
+            return static_cast<QWidget*>(new SceneTreePanel2D(parent));
         });
         m_menuPanelRegistry->registerPanel(QStringLiteral("PropertiesPanel"), [](QWidget* parent) {
             return static_cast<QWidget*>(new PropertiesPanelWidget(parent));

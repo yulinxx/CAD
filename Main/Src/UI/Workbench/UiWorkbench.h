@@ -11,11 +11,12 @@ class QWidget;
 class QToolBar;
 class WorkbenchWindow;
 class PropertiesPanelWidget;
-class SceneTreeDockWidget;
 class RenderViewport2D;
 class StatusBar;
 class SettingsService;
 class SettingsUiCoordinator2D;
+class SceneTreePanel2D;
+class SceneTreePanel3D;
 struct UiStateSnapshot;
 
 // 3D 类型前向声明（避免头文件膨胀，实际 include 下沉到 .cpp）
@@ -249,8 +250,18 @@ private:
     void setupImportCallbacks(RenderViewport2D* vp, WorkbenchWindow& window);
     /// 创建左侧绘图工具栏 + 顶部编辑工具栏 + 右侧颜色/图层工具栏
     void createToolbars(WorkbenchWindow& window);
-    /// 创建并注册 2D 图层面板
-    SceneTreeDockWidget* createLayersDock(WorkbenchWindow& window) const;
+    /// 绑定并填充 2D 场景树面板（数据经算法层由引擎场景生成，UI 可定制/可缺失）
+    void setupSceneTree(WorkbenchWindow& window);
+    /// 重建场景树模型并推送到面板（结构性变化：导入/撤销/增删）
+    void refreshSceneTree();
+    /// 仅同步面板选中高亮（选择变化，避免重建树导致折叠丢失）
+    void syncSceneTreeSelection();
+    /// 将面板选择同步到引擎选择
+    void applySceneTreeSelection(const QStringList& ids);
+    /// 切换图元可见性（直接写引擎并刷新）
+    void toggleEntityVisibility(const QString& id, bool visible);
+    /// 重命名图元（直接写引擎并刷新）
+    void renameEntity(const QString& id, const QString& newName);
     /// 将当前选中图元生成为属性模型并推送到属性面板（面板不存在则安全忽略）
     /// 通过 EntityPropertyModel2D（算法层）+ PropertyModel（数据层）解耦，
     /// 本方法仅作为组合根把"数据/算法"绑定到"UI"，面板可随时替换/移除。
@@ -265,6 +276,8 @@ private:
     class RightToolBar* m_rightToolBar{ nullptr };
     /// 2D 渲染视口 — Qt 父对象管理生命周期（工作台切换时用于恢复工具状态）
     class RenderViewport2D* m_viewport{ nullptr };
+    /// 2D 场景树面板（可选 UI，配置驱动时可能不存在）
+    class SceneTreePanel2D* m_scenePanel2D{ nullptr };
     /// 2D 状态栏 widget — 由 StatusBar 基类管理，通过 mountStatusBar 挂载到 WorkbenchWindow
     StatusBar* m_statusBar2D{ nullptr };
 
@@ -332,6 +345,20 @@ private:
     void bind3DDeleteKeySignal();
     void setup3DDeleteShortcuts(WorkbenchWindow& window);
 
+    // ---- 3D 场景树（数据/算法/UI 分离，UI 可定制/可缺失） ----
+    /// 绑定并填充 3D 场景树面板（数据经算法层由引擎场景生成）
+    void setupSceneTree3D(WorkbenchWindow& window);
+    /// 重建场景树模型并推送到面板（结构性变化：导入/撤销/增删）
+    void refreshSceneTree3D();
+    /// 仅同步面板选中高亮（选择变化，避免重建树导致折叠丢失）
+    void syncSceneTreeSelection3D();
+    /// 将面板选择同步到引擎选择
+    void applySceneTreeSelection3D(const QStringList& ids);
+    /// 切换图元可见性（直接写引擎并刷新）
+    void toggleEntityVisibility3D(const QString& id, bool visible);
+    /// 重命名图元（直接写引擎并刷新）
+    void renameEntity3D(const QString& id, const QString& newName);
+
 private:
     // PIMPL + 自定义删除器：避免 MOC 编译时需要 ServiceOwner 完整定义
     std::unique_ptr<ServiceOwner, ServiceOwnerDeleter> m_serviceOwner;
@@ -342,6 +369,9 @@ private:
 
     /// 3D 状态栏 widget — 由 StatusBar3D 基类管理，通过 mountStatusBar 挂载到 WorkbenchWindow
     StatusBar3D* m_statusBar3D{ nullptr };
+
+    /// 3D 场景树面板（可选 UI，配置驱动时可能不存在）
+    class SceneTreePanel3D* m_scenePanel3D{ nullptr };
 
     Eg::SceneManager3D* m_sceneManager3D{ nullptr };
 

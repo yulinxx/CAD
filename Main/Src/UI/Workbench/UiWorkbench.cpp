@@ -19,7 +19,10 @@
 #include "UI/Services/ViewportActionHub.h"
 #include "UI/Services/ISelectionService.h"
 #include "Engine2D/Edit/IUndoRedoManager.h"
-#include "UiSceneTreeDock.h"
+#include "UiSceneTreePanel2D.h"
+#include "SceneTreeModel2D.h"
+#include "SceneTreeBuilder2D.h"
+#include "Engine2D/Core/SceneManager.h"
 #include "UiPropertiesPanel.h"
 #include "RenderViewport2D.h"
 #include "DrawToolBarWidget.h"
@@ -397,7 +400,7 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
     }
 
     createToolbars(window);
-    createLayersDock(window);
+    setupSceneTree(window);
 
     // 启动时从数据库加载并应用已保存的 2D 专属设置（画布/网格/标尺）
     if (m_settingsCoordinator && m_viewport)
@@ -518,12 +521,8 @@ void Workbench2D::setupImportCallbacks(RenderViewport2D* vp, WorkbenchWindow& wi
     });
 
     // 场景树刷新（导入后重建树结构）
-    m_services.importService->setTreeRebuildCallback([&window]() {
-        auto* dock = window.sceneTreeDock();
-        if (dock)
-        {
-            dock->refresh();
-        }
+    m_services.importService->setTreeRebuildCallback([this]() {
+        refreshSceneTree();
     });
 
     // 属性面板刷新（导入后更新属性显示）
@@ -758,12 +757,129 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     }
 }
 
-SceneTreeDockWidget* Workbench2D::createLayersDock(WorkbenchWindow& window) const
+void Workbench2D::setupSceneTree(WorkbenchWindow& window)
 {
-    auto* sceneDock = new SceneTreeDockWidget(&window);
-    sceneDock->setObjectName(QStringLiteral("SceneTreeDock"));
-    window.registerDockWidget(QObject::tr("2D Layers"), sceneDock, Qt::LeftDockWidgetArea);
-    return sceneDock;
+    // 场景树面板是可选的 UI：配置驱动时可能不存在，因此先探测再绑定。
+    auto* panel = window.sceneTreeDock();
+    if (!panel)
+    {
+        // 骨架未提供时安全创建并注册（UI 可定制/可缺失）
+        panel = new SceneTreePanel2D(&window);
+        panel->setObjectName(QStringLiteral("SceneTreeDock"));
+        window.registerDockWidget(QObject::tr("Scene"), panel, Qt::LeftDockWidgetArea);
+    }
+    m_scenePanel2D = panel;
+
+    // 面板（UI）→ 引擎（业务）：用户操作通过算法层写回引擎
+    connect(panel, &SceneTreePanel2D::selectionChanged, this, &Workbench2D::applySceneTreeSelection);
+    connect(panel, &SceneTreePanel2D::visibilityToggled, this, &Workbench2D::toggleEntityVisibility);
+    connect(panel, &SceneTreePanel2D::renameRequested, this, &Workbench2D::renameEntity);
+
+    // 引擎/场景（业务）→ 面板（UI）：变化后刷新展示与选中高亮
+    if (m_viewport)
+    {
+        connect(m_viewport, &RenderViewport2D::selectionChanged, this, &Workbench2D::syncSceneTreeSelection);
+    }
+    if (m_services.operationBus)
+    {
+        connect(m_services.operationBus, &OperationBus::undoStateChanged, this, &Workbench2D::refreshSceneTree);
+        connect(m_services.operationBus, &OperationBus::operationCompleted, this,
+            [this](OperationId, bool success) {
+                if (success)
+                {
+                    refreshSceneTree();
+                }
+            });
+    }
+
+    // 初始填充
+    refreshSceneTree();
+}
+
+void Workbench2D::refreshSceneTree()
+{
+    if (!m_scenePanel2D)
+    {
+        return;
+    }
+    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
+    m_scenePanel2D->setModel(SceneTreeBuilder2D::build(scene, m_services.layerManager));
+}
+
+void Workbench2D::syncSceneTreeSelection()
+{
+    if (!m_scenePanel2D)
+    {
+        return;
+    }
+    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
+    m_scenePanel2D->setSelectedIds(SceneTreeBuilder2D::selectedIds(scene));
+}
+
+void Workbench2D::applySceneTreeSelection(const QStringList& ids)
+{
+    if (!m_services.selectionService)
+    {
+        return;
+    }
+    if (ids.isEmpty())
+    {
+        m_services.selectionService->clear();
+        return;
+    }
+
+    std::vector<std::string> storage;
+    storage.reserve(ids.size());
+    for (const QString& id : ids)
+    {
+        storage.push_back(id.toStdString());
+    }
+    std::vector<const char*> cids;
+    cids.reserve(storage.size());
+    for (const std::string& str : storage)
+    {
+        cids.push_back(str.c_str());
+    }
+    m_services.selectionService->selectMultiple(cids.data(), cids.size());
+}
+
+void Workbench2D::toggleEntityVisibility(const QString& id, bool visible)
+{
+    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
+    if (!scene)
+    {
+        return;
+    }
+    const auto eid = Eg::parseEntityId(id.toStdString());
+    if (!eid)
+    {
+        return;
+    }
+    if (auto* entity = scene->findEntityById(*eid))
+    {
+        entity->setVisible(visible);
+        scene->notifySceneChanged();
+    }
+}
+
+void Workbench2D::renameEntity(const QString& id, const QString& newName)
+{
+    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
+    if (!scene || newName.isEmpty())
+    {
+        return;
+    }
+    const auto eid = Eg::parseEntityId(id.toStdString());
+    if (!eid)
+    {
+        return;
+    }
+    if (auto* entity = scene->findEntityById(*eid))
+    {
+        const QByteArray utf8 = newName.toUtf8();
+        entity->setName(utf8.constData());
+        scene->notifySceneChanged();
+    }
 }
 
 void Workbench2D::refreshPropertiesPanel()
@@ -851,6 +967,8 @@ void Workbench2D::deactivate()
     m_rightToolBar = nullptr;
     // 视口指针随窗口清理而失效
     m_viewport = nullptr;
+    // 场景树面板指针随窗口清理而失效
+    m_scenePanel2D = nullptr;
 }
 
 void Workbench2D::shutdown()
@@ -919,8 +1037,13 @@ QString Workbench2D::formatSelectionText(const UiStateSnapshot& state) const
     #include "UI/MenuManager/ViewMenu3D.h"
     #include "UI/MenuManager/HelpMenu3D.h"
     #include "Engine3D/SceneManager3D.h"
+    #include "Engine3D/Selection/SelectionManager3D.h"
     #include "Renderer3DFactory.h"
     #include "Log/SyLogger.h"
+
+    #include "SceneTreeBuilder3D.h"
+    #include "UiSceneTreePanel3D.h"
+    #include "Engine/EntityIdUtils.h"
 
 QString Workbench3D::id() const
 {
@@ -1014,6 +1137,7 @@ void Workbench3D::build3DWorkbenchUi(WorkbenchWindow& window)
 
     create3DServices();
     setup3DViewportAndSignals(window);
+    setupSceneTree3D(window);
     setup3DMenuAndShortcuts(window);
 }
 
@@ -1430,6 +1554,134 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     SY_INFO("[Workbench3D] 3D workbench UI build completed");
 }
 
+// ==================== 3D 场景树（数据/算法/UI 分离） ====================
+
+void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
+{
+    // 3D 场景树面板是可选的 UI：独立创建并注册（骨架的 SceneTreePanel2D 属 2D，
+    // 3D 工作台隐藏骨架 dock，因此这里总是创建自己的 SceneTreePanel3D）。
+    auto* created = new SceneTreePanel3D(&window);
+    created->setObjectName(QStringLiteral("SceneTreeDock3D"));
+    window.registerDockWidget(QObject::tr("Scene"), created, Qt::LeftDockWidgetArea);
+    m_scenePanel3D = created;
+
+    if (!m_scenePanel3D)
+    {
+        return;
+    }
+
+    // 面板（UI）→ 引擎（业务）：用户操作通过引擎/算法层写回
+    connect(m_scenePanel3D, &SceneTreePanel3D::selectionChanged, this, &Workbench3D::applySceneTreeSelection3D);
+    connect(m_scenePanel3D, &SceneTreePanel3D::visibilityToggled, this, &Workbench3D::toggleEntityVisibility3D);
+    connect(m_scenePanel3D, &SceneTreePanel3D::renameRequested, this, &Workbench3D::renameEntity3D);
+
+    // 引擎/场景（业务）→ 面板（UI）：变化后刷新展示与选中高亮
+    if (m_services3D.renderWidget)
+    {
+        connect(m_services3D.renderWidget, &RenderWidget3D::sigSelectionChanged, this,
+            [this](const Eg::SyMeshEntity** /*entities*/, int /*count*/) {
+                syncSceneTreeSelection3D();
+            });
+    }
+    if (m_services3D.sceneMonitor)
+    {
+        connect(m_services3D.sceneMonitor, &SceneMonitor3D::sceneChanged, this, &Workbench3D::refreshSceneTree3D);
+    }
+
+    // 3D 导入完成后显式刷新一次树（导入会触发 markDataChanged → SceneMonitor ，
+    // 此处 importFinished 作为兜底与显式接入点，二者叠加安全）
+    if (m_services.importService)
+    {
+        connect(m_services.importService, &ImportService::importFinished, this, &Workbench3D::refreshSceneTree3D);
+    }
+
+    // 初始填充
+    refreshSceneTree3D();
+}
+
+void Workbench3D::refreshSceneTree3D()
+{
+    if (!m_scenePanel3D)
+    {
+        return;
+    }
+    m_scenePanel3D->setModel(SceneTreeBuilder3D::build(m_sceneManager3D));
+}
+
+void Workbench3D::syncSceneTreeSelection3D()
+{
+    if (!m_scenePanel3D)
+    {
+        return;
+    }
+    m_scenePanel3D->setSelectedIds(SceneTreeBuilder3D::selectedIds(m_sceneManager3D));
+}
+
+void Workbench3D::applySceneTreeSelection3D(const QStringList& ids)
+{
+    if (!m_sceneManager3D || !m_services3D.renderWidget)
+    {
+        return;
+    }
+    auto& sel = m_services3D.renderWidget->selectionManager();
+    sel.clearSelection();
+
+    for (const QString& id : ids)
+    {
+        const auto eid = Eg::parseEntityId(id.toStdString());
+        if (!eid)
+        {
+            continue;
+        }
+        if (auto* mesh = m_sceneManager3D->findMeshById(*eid))
+        {
+            sel.addSelect(mesh);
+        }
+    }
+
+    m_services3D.renderWidget->markSceneDirty();
+    syncSceneTreeSelection3D();
+}
+
+void Workbench3D::toggleEntityVisibility3D(const QString& id, bool visible)
+{
+    if (!m_sceneManager3D)
+    {
+        return;
+    }
+    const auto eid = Eg::parseEntityId(id.toStdString());
+    if (!eid)
+    {
+        return;
+    }
+    if (auto* mesh = m_sceneManager3D->findMeshById(*eid))
+    {
+        mesh->setVisible(visible);
+        m_sceneManager3D->markDataChanged();
+        refreshSceneTree3D();
+    }
+}
+
+void Workbench3D::renameEntity3D(const QString& id, const QString& newName)
+{
+    if (!m_sceneManager3D || newName.isEmpty())
+    {
+        return;
+    }
+    const auto eid = Eg::parseEntityId(id.toStdString());
+    if (!eid)
+    {
+        return;
+    }
+    if (auto* mesh = m_sceneManager3D->findMeshById(*eid))
+    {
+        const QByteArray utf8 = newName.toUtf8();
+        mesh->setName(utf8.constData());
+        m_sceneManager3D->markDataChanged();
+        refreshSceneTree3D();
+    }
+}
+
 void Workbench3D::onMenuAction(int actionId, const QVariantMap& params)
 {
     Q_UNUSED(params);
@@ -1517,6 +1769,9 @@ void Workbench3D::deactivate()
         m_services3D.sceneEditService->bindRenderWidget(nullptr);
         m_services3D.renderWidget = nullptr;
     }
+
+    // 场景树面板随窗口销毁，清空引用避免悬空
+    m_scenePanel3D = nullptr;
 
     // 2) 先销毁 3D 菜单与主窗口包装对象。
     //    这两个对象会持有大量 QAction / signal-slot / UI 状态引用，必须先于服务释放。

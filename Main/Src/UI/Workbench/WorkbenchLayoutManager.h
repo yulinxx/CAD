@@ -18,7 +18,7 @@ class QToolBar;
 class QWidget;
 class WorkbenchMenuManager;
 class PersistenceService;
-class SceneTreeDockWidget;
+class SceneTreePanel2D;
 class PropertiesPanelWidget;
 #ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
 class UiConfigurationManager;
@@ -41,7 +41,7 @@ struct PanelState
     /// 状态栏中的繁忙标签（框架级，始终存在）
     QLabel* busyLabel{ nullptr };
     /// 场景树停靠面板
-    SceneTreeDockWidget* sceneTreeDock{ nullptr };
+    SceneTreePanel2D* sceneTreeDock{ nullptr };
     /// 属性面板
     PropertiesPanelWidget* propertiesDock{ nullptr };
 };

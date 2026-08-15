@@ -449,7 +449,11 @@ Main/Src/UI/
 │   └── RenderWidget3DAdapter.h/cpp    # 3D 渲染控件适配器
 ├── Documents/         # 文档类
 │   ├── EntityDocument2D.h/cpp         # 2D 图元文档
-│   └── SceneDocument3D.h/cpp          # 3D 场景文档
+│   ├── SceneDocument3D.h/cpp          # 3D 场景文档
+│   ├── SceneTreeModel2D.h             # 2D 场景树数据模型（纯数据）
+│   ├── SceneTreeBuilder2D.h/cpp       # 2D 场景树构建器（算法层）
+│   ├── SceneTreeModel3D.h             # 3D 场景树数据模型（纯数据）
+│   └── SceneTreeBuilder3D.h/cpp       # 3D 场景树构建器（算法层）
 ├── Entities/          # 图元类
 │   ├── UiEntity.h                     # 图元基类
 │   ├── ITransformable.h               # 可变换接口
@@ -475,7 +479,8 @@ Main/Src/UI/
 │   └── UiSelectionTools.h/cpp         # 选择工具
 ├── Widgets/           # UI 控件
 │   ├── Viewport3D.h/cpp               # 3D 视口
-│   ├── SceneTreeDockWidget.h/cpp      # 场景树停靠控件
+│   ├── UiSceneTreePanel2D.h/cpp       # 2D 场景树控件（数据/算法/UI 分离）
+│   ├── UiSceneTreePanel3D.h/cpp       # 3D 场景树控件（数据/算法/UI 分离）
 │   ├── PropertiesPanelWidget.h/cpp    # 属性面板控件
 │   └── WorkbenchWindow.h/cpp          # 工作台窗口
 ├── Workbench/         # 工作台类
