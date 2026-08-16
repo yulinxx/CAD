@@ -9,6 +9,7 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
+#include <QEvent>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -520,6 +521,15 @@ PropertiesPanelWidget::PropertiesPanelWidget(QWidget* parent)
             m_tree->editItem(item, 1);
         }
     });
+}
+
+void PropertiesPanelWidget::changeEvent(QEvent* event)
+{
+    if (event->type() == QEvent::LanguageChange && m_tree)
+    {
+        m_tree->setHeaderLabels({ tr("Field"), tr("Value") });
+    }
+    QWidget::changeEvent(event);
 }
 
 void PropertiesPanelWidget::setEditTarget(std::shared_ptr<IPropertyEditTarget> target)
