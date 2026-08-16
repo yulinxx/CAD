@@ -54,6 +54,12 @@ QString FileDialogService::importFilterForFormat(Fio::FileFormat fmt)
         return QObject::tr("OBJ Files (*.obj);;All Files (*.*)");
     case Fio::FileFormat::STL:
         return QObject::tr("STL Files (*.stl);;All Files (*.*)");
+    case Fio::FileFormat::AI:
+        // Adobe Illustrator：AI 8+ 为 PDF 基，AI 7- 为 PostScript 基，两者都经 pdftocairo/Ghostscript 转 SVG 解析
+        return QObject::tr("Adobe Illustrator (*.ai);;All Files (*.*)");
+    case Fio::FileFormat::UG:
+        // Unigraphics / NX：支持 IGES(.igs/.iges) 中性交换格式（.prt 为 NX 原生私有格式，不直接支持）
+        return QObject::tr("IGES Files (*.igs *.iges);;All Files (*.*)");
     default:
         return QObject::tr("All Files (*.*)");
     }

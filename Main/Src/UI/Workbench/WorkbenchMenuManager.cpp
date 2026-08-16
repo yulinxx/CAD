@@ -553,12 +553,16 @@ void WorkbenchMenuManager::refreshFileMenuForWorkbench(const QString& workbenchI
     const QStringList importFormats = { tr("DXF (*.dxf)"),
         tr("PLT (*.plt, *.hpgl)"),
         tr("SVG (*.svg)"),
-        tr("PDF (*.pdf)") };
+        tr("PDF (*.pdf)"),
+        tr("Adobe Illustrator (*.ai)"),
+        tr("Unigraphics IGES (*.igs, *.iges)") };
 
     const QStringList importCmdIds = { QStringLiteral("file.import_dxf"),
         QStringLiteral("file.import_plt"),
         QStringLiteral("file.import_svg"),
-        QStringLiteral("file.import_pdf") };
+        QStringLiteral("file.import_pdf"),
+        QStringLiteral("file.import_ai"),
+        QStringLiteral("file.import_ug") };
 
     for (int i = 0; i < importFormats.size(); ++i)
     {
@@ -876,6 +880,7 @@ void WorkbenchMenuManager::refreshEditMenuForWorkbench(const QString& workbenchI
     addMenuAction(m_menuState.editMenu, tr("Copy"), QStringLiteral("edit.copy"));
     addMenuAction(m_menuState.editMenu, tr("Paste"), QStringLiteral("edit.paste"));
     addMenuAction(m_menuState.editMenu, tr("Paste as Text"), QStringLiteral("edit.paste_text"));
+    addMenuAction(m_menuState.editMenu, tr("Paste as Image"), QStringLiteral("edit.paste_image"));
     m_menuState.editMenu->addSeparator();
 
     addMenuAction(m_menuState.editMenu, tr("Delete"), QStringLiteral("edit.delete"));

@@ -57,6 +57,8 @@ set(MAIN_APP_SOURCES
     ${SRC_ROOT}/Import/Readers/StepImportReader.cpp
     ${SRC_ROOT}/Import/Readers/StlImportReader.cpp
     ${SRC_ROOT}/Import/Readers/SvgImportReader.cpp
+    ${SRC_ROOT}/Import/Readers/AiImportReader.cpp
+    ${SRC_ROOT}/Import/Readers/UgImportReader.cpp
     ${SRC_ROOT}/License/LicenseDialog.cpp
     ${SRC_ROOT}/Persistence/DatabaseBootstrapper.cpp
     ${SRC_ROOT}/Persistence/LayerPersistenceBridge.cpp
@@ -485,7 +487,9 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
         ${SRC_ROOT}/Import/Readers/PltImportReader.cpp
         ${SRC_ROOT}/Import/Readers/StepImportReader.cpp
         ${SRC_ROOT}/Import/Readers/StlImportReader.cpp
-        ${SRC_ROOT}/Import/Readers/SvgImportReader.cpp
+    ${SRC_ROOT}/Import/Readers/SvgImportReader.cpp
+    ${SRC_ROOT}/Import/Readers/AiImportReader.cpp
+    ${SRC_ROOT}/Import/Readers/UgImportReader.cpp
         ${SRC_ROOT}/Persistence/DatabaseBootstrapper.cpp
         ${SRC_ROOT}/Persistence/LayerPersistenceBridge.cpp
         ${SRC_ROOT}/Persistence/PersistenceService.cpp

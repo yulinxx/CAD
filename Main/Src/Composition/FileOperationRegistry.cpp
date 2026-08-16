@@ -36,12 +36,14 @@ namespace
         Fio::FileFormat format;
     };
 
-    constexpr std::array<FormatMappingEntry, 5> kImportFormatMap = { {
+    constexpr std::array<FormatMappingEntry, 7> kImportFormatMap = { {
         { OperationId::File_ImportDXF, Fio::FileFormat::DXF },
         { OperationId::File_ImportSVG, Fio::FileFormat::SVG },
         { OperationId::File_ImportPLT, Fio::FileFormat::PLT },
         { OperationId::File_ImportStep, Fio::FileFormat::STEP },
         { OperationId::File_ImportPDF, Fio::FileFormat::PDF },
+        { OperationId::File_ImportAI, Fio::FileFormat::AI },
+        { OperationId::File_ImportUG, Fio::FileFormat::UG },
     } };
 
     constexpr std::array<FormatMappingEntry, 5> kExportFormatMap = { {
@@ -53,8 +55,10 @@ namespace
     } };
 
     // P5 收口: 统一按格式映射批量注册操作，消除 registerImportOps/registerExportOps 的重复循环
+    // 模板化以兼容不同数量的格式映射（导入 7 种 / 导出 5 种）
+    template <std::size_t N>
     void registerFromFormatMap(OperationRegistry& reg,
-        const std::array<FormatMappingEntry, 5>& map,
+        const std::array<FormatMappingEntry, N>& map,
         std::function<void(Fio::FileFormat)> handler)
     {
         for (const auto& entry : map)
