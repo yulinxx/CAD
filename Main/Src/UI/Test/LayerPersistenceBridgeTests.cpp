@@ -45,6 +45,8 @@ protected:
                 color           TEXT    DEFAULT '#000000',
                 visible         INTEGER DEFAULT 1,
                 locked          INTEGER DEFAULT 0,
+                fill            INTEGER DEFAULT 0,
+                fill_color      TEXT    DEFAULT '',
                 order_index     INTEGER DEFAULT 0,
                 updated_at      TEXT    DEFAULT (datetime('now'))
             )
@@ -380,6 +382,8 @@ TEST(LayerPersistenceBridgeNullTest, NullLayerManager_AttachIsSafe)
                            "color TEXT DEFAULT '#000000',"
                            "visible INTEGER DEFAULT 1,"
                            "locked INTEGER DEFAULT 0,"
+                           "fill INTEGER DEFAULT 0,"
+                           "fill_color TEXT DEFAULT '',"
                            "order_index INTEGER DEFAULT 0,"
                            "updated_at TEXT DEFAULT (datetime('now')))"));
 

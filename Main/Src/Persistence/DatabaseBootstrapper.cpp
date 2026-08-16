@@ -6,7 +6,11 @@
 #include <sstream>
 
 // 当前 Schema 版本号（每次修改表结构时递增）
-static constexpr int kSchemaVersion = 2;
+// v1: 初始表结构
+// v2: 新增 documents 表
+// v3: layers 表新增 fill 列（填充图层标志，色块填充）
+// v4: layers 表新增 fill_color 列（填充色，色块填充）
+static constexpr int kSchemaVersion = 4;
 
 DatabaseBootstrapper::DatabaseBootstrapper(Eg::Database& database)
     : m_database(database)
@@ -172,6 +176,8 @@ bool DatabaseBootstrapper::createBusinessTables()
             color           TEXT    DEFAULT '#000000',
             visible         INTEGER DEFAULT 1,
             locked          INTEGER DEFAULT 0,
+            fill            INTEGER DEFAULT 0,
+            fill_color      TEXT    DEFAULT '',
             order_index     INTEGER DEFAULT 0,
             updated_at      TEXT    DEFAULT (datetime('now'))
         )
@@ -261,6 +267,35 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
                 return false;
             }
             SY_INFO("[DatabaseBootstrapper] Migration v1->v2: created documents table");
+        }
+        else if (v == 2)
+        {
+            // v2 -> v3: layers 表新增 fill 列（填充图层标志）
+            // 注意：CREATE TABLE IF NOT EXISTS 不会为已存在的表补列，必须 ALTER TABLE
+            std::string sqlFill = R"(
+                ALTER TABLE layers ADD COLUMN fill INTEGER DEFAULT 0
+            )";
+            if (!m_database.execute(sqlFill))
+            {
+                m_lastError = "Migration v2->v3 failed: " + m_database.lastError();
+                SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+                return false;
+            }
+            SY_INFO("[DatabaseBootstrapper] Migration v2->v3: added layers.fill column");
+        }
+        else if (v == 3)
+        {
+            // v3 -> v4: layers 表新增 fill_color 列（填充色）
+            std::string sqlFillColor = R"(
+                ALTER TABLE layers ADD COLUMN fill_color TEXT DEFAULT ''
+            )";
+            if (!m_database.execute(sqlFillColor))
+            {
+                m_lastError = "Migration v3->v4 failed: " + m_database.lastError();
+                SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+                return false;
+            }
+            SY_INFO("[DatabaseBootstrapper] Migration v3->v4: added layers.fill_color column");
         }
         // 后续版本迁移在此追加 else if 分支
     }

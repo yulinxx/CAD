@@ -38,6 +38,9 @@ public:
     bool rename(const std::string& documentId, int layerId, const std::string& newName);
     bool updateVisibility(const std::string& documentId, int layerId, bool visible);
     bool updateLocked(const std::string& documentId, int layerId, bool locked);
+
+    /// 字段级更新：填充图层标志
+    bool updateFill(const std::string& documentId, int layerId, bool fill);
     bool updateColor(const std::string& documentId, int layerId, const std::string& color);
 
     /// 批量更新图层顺序（在一个事务中完成）

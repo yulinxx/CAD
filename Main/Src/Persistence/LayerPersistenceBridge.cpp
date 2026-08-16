@@ -128,6 +128,8 @@ void LayerPersistenceBridge::syncLayerToDb(int nLayerId)
     Ut::Color layerClr = m_layerManager->layerColor(nLayerId);
     bool visible = m_layerManager->isLayerVisible(nLayerId);
     bool locked = m_layerManager->isLayerLocked(nLayerId);
+    bool fill = m_layerManager->isLayerFill(nLayerId);
+    Ut::Color fillClr = m_layerManager->layerFillColor(nLayerId);
 
     // 计算实际排序序号
     int orderIndex = nLayerId;
@@ -149,6 +151,8 @@ void LayerPersistenceBridge::syncLayerToDb(int nLayerId)
     record.color = layerClr.toHexRGB();
     record.visible = visible;
     record.locked = locked;
+    record.fill = fill;
+    record.fillColor = fillClr.toHexRGB();
     record.orderIndex = orderIndex;
     record.updatedAt = QDateTime::currentDateTime().toString(Qt::ISODate).toStdString();
 

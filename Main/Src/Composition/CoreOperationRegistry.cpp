@@ -1384,6 +1384,7 @@ void CoreOperationRegistry::registerAlgorithmOperations()
     };
 
     registerAlgoOp(OperationId::Algo_Fill);
+    registerAlgoOp(OperationId::Algo_FillColor);
 #ifdef ENABLE_NESTING
     registerAlgoOp(OperationId::Algo_Nesting);
 #endif

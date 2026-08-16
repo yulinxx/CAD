@@ -63,6 +63,7 @@
       "label": "Algorithm",
       "items": [
         { "type": "action", "id": "algo.fill", "label": "Fill", "command": "algo.fill", "workbenches": ["2D"] },
+        { "type": "action", "id": "algo.fillColor", "label": "Color Fill", "command": "algo.fillColor", "workbenches": ["2D"] },
         { "type": "action", "id": "algo.nesting", "label": "Nesting", "command": "algo.nesting", "workbenches": ["2D"] },
         { "type": "action", "id": "algo.array", "label": "Array", "command": "algo.array", "workbenches": ["2D"] },
         { "type": "action", "id": "algo.offset", "label": "Offset...", "command": "algo.offset", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"] },

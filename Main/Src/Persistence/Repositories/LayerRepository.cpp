@@ -46,6 +46,8 @@ bool LayerRepository::save(const LayerRecord& record)
         values["color"] = record.color;
         values["visible"] = record.visible ? "1" : "0";
         values["locked"] = record.locked ? "1" : "0";
+        values["fill"] = record.fill ? "1" : "0";
+        values["fill_color"] = record.fillColor;
         values["order_index"] = std::to_string(record.orderIndex);
         if (!record.updatedAt.empty())
         {
@@ -165,6 +167,23 @@ bool LayerRepository::updateLocked(const std::string& documentId, int layerId, b
     return true;
 }
 
+bool LayerRepository::updateFill(const std::string& documentId, int layerId, bool fill)
+{
+    // 按文档 + 图层 ID 更新填充图层标志
+    std::map<std::string, std::string> values;
+    values["fill"] = fill ? "1" : "0";
+    std::map<std::string, std::string> whereParams;
+    whereParams["document_id"] = documentId;
+    whereParams["layer_id"] = std::to_string(layerId);
+    if (!m_database.update("layers", values, "document_id = :document_id AND layer_id = :layer_id", whereParams))
+    {
+        m_lastError = "Failed to update layer fill: " + m_database.lastError();
+        SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
+        return false;
+    }
+    return true;
+}
+
 bool LayerRepository::updateColor(const std::string& documentId, int layerId, const std::string& color)
 {
     // 按文档 + 图层 ID 更新颜色
@@ -256,6 +275,16 @@ LayerRecord LayerRepository::rowToRecord(const std::map<std::string, std::string
     {
         rec.locked = (it->second == "1");
     }
+    it = row.find("fill");
+    if (it != row.end())
+    {
+        rec.fill = (it->second == "1");
+    }
+    it = row.find("fill_color");
+    if (it != row.end())
+    {
+        rec.fillColor = it->second;
+    }
     it = row.find("order_index");
     if (it != row.end())
     {
@@ -282,6 +311,8 @@ std::map<std::string, std::string> LayerRepository::recordToRow(const LayerRecor
     row["color"] = rec.color;
     row["visible"] = rec.visible ? "1" : "0";
     row["locked"] = rec.locked ? "1" : "0";
+    row["fill"] = rec.fill ? "1" : "0";
+    row["fill_color"] = rec.fillColor;
     row["order_index"] = std::to_string(rec.orderIndex);
     row["updated_at"] = rec.updatedAt;
     return row;

@@ -1026,6 +1026,10 @@ void WorkbenchMenuManager::refreshAlgorithmMenuForWorkbench(const QString& workb
         tr("Fill..."),
         QStringLiteral("algo.fill"),
         QStringLiteral(":/ui/common/Icons/Actions/algo_fill.svg"));
+    addMenuAction(m_menuState.algorithmMenu,
+        tr("Color Fill"),
+        QStringLiteral("algo.fillColor"),
+        QStringLiteral(":/ui/common/Icons/Actions/algo_fill_color.svg"));
 #ifdef ENABLE_NESTING
     addMenuAction(m_menuState.algorithmMenu,
         tr("Nesting..."),
