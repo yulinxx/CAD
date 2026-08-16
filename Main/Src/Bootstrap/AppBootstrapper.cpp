@@ -143,6 +143,8 @@ void AppBootstrapper::bootstrap()
     // 阶段1收口：选择服务由组合根统一创建，不再直接暴露 SceneManager
     m_services.selectionService = m_compositionRoot->selectionService();
 
+    m_services.clipboard = m_compositionRoot->clipboard();
+
     m_services.sceneEditService = m_compositionRoot->sceneEditService();
 
     m_services.unitManager = m_compositionRoot->unitManager();
