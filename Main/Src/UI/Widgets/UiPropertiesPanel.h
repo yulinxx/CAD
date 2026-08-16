@@ -29,8 +29,6 @@ public:
 
     struct PropertiesData
     {
-        QString stateText;
-        QString selectionText;
         QString objectTitle;
         QStringList objectLines;
         WorkbenchMode mode{ WorkbenchMode::Unknown };
@@ -42,8 +40,6 @@ public:
 public:
     void setPropertiesData(const PropertiesData& data);
     void setWorkbenchMode(WorkbenchMode mode);
-    void setStateText(const QString& text);
-    void setSelectionText(const QString& text);
     void setObjectDetails(const QString& title, const QStringList& lines);
     void refresh();
 

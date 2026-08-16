@@ -93,8 +93,8 @@ void WorkbenchLayoutManager::buildDockAreas()
     m_panelState.leftDock = new QDockWidget(m_parent->tr("Scene"), m_parent);  // 场景
     m_panelState.leftDock->setObjectName(QStringLiteral("SceneDock"));
     m_panelState.leftDock->setWidget(m_panelState.sceneTreeDock);
-    m_panelState.leftDock->setMinimumWidth(180);
-    m_panelState.leftDock->setMaximumWidth(400);
+    m_panelState.leftDock->setMinimumWidth(170);
+    m_panelState.leftDock->setMaximumWidth(280);
     m_parent->addDockWidget(Qt::LeftDockWidgetArea, m_panelState.leftDock);
 
     // 属性面板
@@ -103,8 +103,12 @@ void WorkbenchLayoutManager::buildDockAreas()
     m_panelState.rightDock->setObjectName(QStringLiteral("PropertiesDock"));
     m_panelState.rightDock->setWidget(m_panelState.propertiesDock);
     m_panelState.rightDock->setMinimumWidth(200);
-    m_panelState.rightDock->setMaximumWidth(450);
+    m_panelState.rightDock->setMaximumWidth(340);
     m_parent->addDockWidget(Qt::RightDockWidgetArea, m_panelState.rightDock);
+
+    // 设置初始面板宽度，避免两侧面板默认过宽挤压中间的视图
+    m_parent->resizeDocks({ m_panelState.leftDock, m_panelState.rightDock }, { 200, 300 },
+                          Qt::Horizontal);
 }
 
 #ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
@@ -200,16 +204,6 @@ void WorkbenchLayoutManager::buildStatusBar()
     // 工作台级内容（坐标/选择/消息）由 StatusBarBase 子类管理，
     // 通过 WorkbenchWindow::mountStatusBar/unmountStatusBar 在工作台切换时挂载/卸载
     m_panelState.statusBar = m_parent->statusBar();
-
-    // 工作台状态标签（右侧固定）— 显示 WB/Doc/Cmd/Layer/View/Dirty 等全局信息
-    m_panelState.workbenchLabel = new QLabel(m_parent);
-    m_panelState.workbenchLabel->setMinimumWidth(300);
-    m_panelState.statusBar->addPermanentWidget(m_panelState.workbenchLabel, 1);
-
-    // 繁忙标签 — 显示 Busy/Idle 状态
-    m_panelState.busyLabel = new QLabel(m_parent);
-    m_panelState.busyLabel->setMinimumWidth(60);
-    m_panelState.statusBar->addPermanentWidget(m_panelState.busyLabel);
 }
 
 QWidget* WorkbenchLayoutManager::createInitialCentralWidget()

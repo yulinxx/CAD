@@ -166,11 +166,6 @@ public:
     /// @param centralWidget 当前中央视口 widget
     virtual void releaseCentralWidgetGLResources(QWidget* centralWidget) const;
 
-    /// 格式化选择信息文本（用于属性面板显示）
-    /// @param state 当前 UI 状态快照
-    /// @return 格式化后的选择文本
-    virtual QString formatSelectionText(const UiStateSnapshot& state) const;
-
     /// 是否需要显示骨架停靠面板（SceneDock / PropertiesDock）
     /// 2D 工作台返回 true（默认），3D 工作台返回 false
     virtual bool requiresSkeletonDocks() const;
@@ -237,7 +232,6 @@ public:
 
     // 框架层委托接口
     void releaseCentralWidgetGLResources(QWidget* centralWidget) const override;
-    QString formatSelectionText(const UiStateSnapshot& state) const override;
 
     bool showSettingsDialog(QWidget* parent) override;
 
@@ -322,7 +316,6 @@ public:
 
     // 框架层委托接口
     void releaseCentralWidgetGLResources(QWidget* centralWidget) const override;
-    QString formatSelectionText(const UiStateSnapshot& state) const override;
     bool requiresSkeletonDocks() const override;
     bool managesOwnMenus() const override;
 

@@ -225,17 +225,6 @@ void UiWorkbench::releaseCentralWidgetGLResources(QWidget* /*centralWidget*/) co
     // 默认不释放任何资源，子类按需重写
 }
 
-QString UiWorkbench::formatSelectionText(const UiStateSnapshot& state) const
-{
-    // 默认格式：通用格式，子类按需重写（如 2D/3D 专用格式）
-    return QObject::tr("Sel=%1 | SelSrc=%2 | CmdSrc=%3 | SelType=%4 | CmdType=%5")
-        .arg(state.currentSelectionText)
-        .arg(state.currentSelectionSource)
-        .arg(state.currentCommandOwner)
-        .arg(state.currentSelectionType)
-        .arg(state.currentCommandType);
-}
-
 bool UiWorkbench::requiresSkeletonDocks() const
 {
     return true;
@@ -1078,15 +1067,6 @@ void Workbench2D::releaseCentralWidgetGLResources(QWidget* centralWidget) const
     }
 }
 
-QString Workbench2D::formatSelectionText(const UiStateSnapshot& state) const
-{
-    return QObject::tr("2D Sel=%1 | SelType=%2 | CmdSrc=%3 | CmdType=%4")
-        .arg(state.currentSelectionText)
-        .arg(state.currentSelectionType)
-        .arg(state.currentCommandOwner)
-        .arg(state.currentCommandType);
-}
-
 #if BUILD_UI3D
 // Workbench3D 实现
 // 统一工作台初始化模板
@@ -1904,15 +1884,6 @@ void Workbench3D::releaseCentralWidgetGLResources(QWidget* centralWidget) const
     {
         vp->releaseGLResources();
     }
-}
-
-QString Workbench3D::formatSelectionText(const UiStateSnapshot& state) const
-{
-    return QObject::tr("3D Sel=%1 | NodeType=%2 | CmdSrc=%3 | CmdType=%4")
-        .arg(state.currentSelectionText)
-        .arg(state.currentSelectionType)
-        .arg(state.currentCommandOwner)
-        .arg(state.currentCommandType);
 }
 
 bool Workbench3D::requiresSkeletonDocks() const

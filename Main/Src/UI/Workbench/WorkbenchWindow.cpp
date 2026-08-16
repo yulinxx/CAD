@@ -144,6 +144,9 @@ WorkbenchWindow::WorkbenchWindow(QWidget* parent)
     resize(1440, 900);
     // 启用文件拖放，2D/3D 工作台共用统一 FileDropHandler
     setAcceptDrops(true);
+    // Windows 下 QOpenGLWidget 是原生子窗口，拖放事件可能不冒泡到本窗口，
+    // 额外安装应用级事件过滤器兜底，确保拖放任何位置都能触发导入
+    // m_fileDropHandler->installAppEventFilter();
 
     if (const auto* screen = QGuiApplication::primaryScreen())
     {
@@ -803,7 +806,6 @@ void WorkbenchWindow::clearWorkbenchContent()
     clearAllShortcuts();
 
     // 2: 卸载工作台状态栏 widget（由 StatusBarBase 子类管理，不在此处 delete）
-    // 框架级标签（workbenchLabel/busyLabel）保留在 QStatusBar 中，不随工作台切换销毁
     unmountStatusBar();
 
     // 3: 清理繁忙进度条（布局管理器只负责创建，框架在此显式回收）

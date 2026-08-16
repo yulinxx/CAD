@@ -541,17 +541,7 @@ void PropertiesPanelWidget::setWorkbenchMode(WorkbenchMode mode)
     refresh();
 }
 
-void PropertiesPanelWidget::setStateText(const QString& text)
-{
-    m_data.stateText = text;
-    refresh();
-}
 
-void PropertiesPanelWidget::setSelectionText(const QString& text)
-{
-    m_data.selectionText = text;
-    refresh();
-}
 
 void PropertiesPanelWidget::setObjectDetails(const QString& title, const QStringList& lines)
 {
@@ -653,8 +643,7 @@ void PropertiesPanelWidget::renderPropertyModel()
 
 void PropertiesPanelWidget::renderInfoText()
 {
-    new QTreeWidgetItem(m_tree, { tr("State"), m_data.stateText });
-    new QTreeWidgetItem(m_tree, { tr("Selection"), m_data.selectionText });
+
     new QTreeWidgetItem(m_tree, { tr("Object"), m_data.objectTitle });
 
     if (!m_data.documentType.isEmpty())

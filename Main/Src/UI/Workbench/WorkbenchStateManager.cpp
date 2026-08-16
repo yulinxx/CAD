@@ -144,69 +144,17 @@ void WorkbenchStateManager::syncWorkbenchSelectionFromStateCenter()
 
 void WorkbenchStateManager::refreshStatusText()
 {
-    // 这里只刷新全局状态展示，不在此处拼接工作台业务流程
+    // 只刷新繁忙指示器，不再拼接全局状态汇总文字（WB/Doc/Cmd/Layer/View/Dirty 等）
+    bool busy = false;
     if (m_stateCenter)
     {
-        syncWindowStateFromStateCenter();
-        const auto state = m_stateCenter->snapshot();
-        const auto& panel = m_layoutManager->panelState();
-
-        if (panel.workbenchLabel)
-        {
-            // 从状态提示（三级回退）读取统一状态提示
-            QString statusPrompt = state.statusPrompt;
-            if (statusPrompt.isEmpty())
-            {
-                statusPrompt = state.metadata.value(QStringLiteral("statusPrompt")).toString();
-            }
-            if (statusPrompt.isEmpty())
-            {
-                statusPrompt = m_parent->tr("Ready");
-            }
-
-            // 提取文件名用于状态栏展示，完整路径放在 tooltip 中
-            QString docDisplay = state.currentDocumentId;
-            QString docTooltip;
-            if (!docDisplay.isEmpty() && docDisplay != QStringLiteral("none"))
-            {
-                QFileInfo fi(docDisplay);
-                docTooltip = docDisplay;
-                docDisplay = fi.fileName();
-            }
-
-            panel.workbenchLabel->setText(
-                m_parent->tr("WB:%1 | Doc:%2 | Cmd:%3(%4) | Layer:%5 | View:%6 | Dirty:%7 | %8")
-                    .arg(state.currentWorkbenchId)
-                    .arg(docDisplay)
-                    .arg(state.currentCommandId)
-                    .arg(state.currentCommandPhase)
-                    .arg(state.currentLayerId)
-                    .arg(state.currentViewMode)
-                    .arg(state.dirty ? m_parent->tr("Y") : m_parent->tr("N"))
-                    .arg(statusPrompt));
-            panel.workbenchLabel->setToolTip(docTooltip);
-        }
-
-        if (panel.busyLabel)
-        {
-            panel.busyLabel->setText(state.busy ? m_parent->tr("Busy") : m_parent->tr("Idle"));
-        }
-
-        // 这里仍然只做展示，不把状态写回状态中心，避免循环同步
-        m_layoutManager->updateBusyIndicator(state.busy);
-        return;
+        busy = m_stateCenter->snapshot().busy;
     }
-
-    const auto& panel = m_layoutManager->panelState();
-    if (panel.workbenchLabel)
+    else
     {
-        panel.workbenchLabel->setText(m_parent->tr("Workbench: %1").arg(m_windowState.workbenchId));
+        busy = m_windowState.busy;
     }
-    if (panel.busyLabel)
-    {
-        panel.busyLabel->setText(m_windowState.busy ? m_parent->tr("Busy") : m_parent->tr("Idle"));
-    }
-    m_layoutManager->updateBusyIndicator(m_windowState.busy);
+    m_layoutManager->updateBusyIndicator(busy);
 }
 
 void WorkbenchStateManager::refreshFromState()
@@ -245,7 +193,7 @@ void WorkbenchStateManager::refreshFromState()
         }
         else if (selectionText.contains(QStringLiteral("entities selected")))
         {
-            QRegularExpression re(QStringLiteral("(\\d+)"));
+            QRegularExpression re(QStringLiteral("(\\d+)\\s*entities\\s+selected"));
             auto match = re.match(selectionText);
             if (match.hasMatch())
             {
@@ -271,49 +219,6 @@ void WorkbenchStateManager::refreshFromState()
         m_menuManager->refreshWorkbenchMenuChecks(state.currentWorkbenchId);
         m_menuManager->refreshThemeMenuChecks(state.currentThemeId);
         m_menuManager->refreshGridSnapMenuChecks();
-    }
-    // 属性面板使用状态中心快照作为输入，不在这里额外拼接窗口本地状态
-    if (panel.propertiesDock && m_stateCenter)
-    {
-        const auto state = m_stateCenter->snapshot();
-        // 属性面板同样以状态中心为准，避免单独维护一套展示状态
-        QString statusPrompt = state.statusPrompt;
-        if (statusPrompt.isEmpty())
-        {
-            statusPrompt = state.metadata.value(QStringLiteral("statusPrompt")).toString();
-        }
-        if (statusPrompt.isEmpty())
-        {
-            statusPrompt = m_parent->tr("Ready");
-        }
-        panel.propertiesDock->setStateText(
-            m_parent->tr("WB=%1 | View=%2 | Cmd=%3(%4) | Dirty=%5 | Layer=%6 | Doc=%7 | Busy=%8 | %9")
-                .arg(state.currentWorkbenchId)
-                .arg(state.currentViewMode)
-                .arg(state.currentCommandId)
-                .arg(state.currentCommandPhase)
-                .arg(state.dirty ? m_parent->tr("Y") : m_parent->tr("N"))
-                .arg(state.currentLayerId)
-                .arg(state.currentDocumentId)
-                .arg(state.busy ? m_parent->tr("Y") : m_parent->tr("N"))
-                .arg(statusPrompt));
-
-        // 选择文本格式化委托给当前工作台（2D/3D 各自定义格式）
-        QString selectionText;
-        if (auto* wb = m_parent->currentWorkbench())
-        {
-            selectionText = wb->formatSelectionText(state);
-        }
-        else
-        {
-            selectionText = m_parent->tr("Sel=%1 | SelSrc=%2 | CmdSrc=%3 | SelType=%4 | CmdType=%5")
-                                .arg(state.currentSelectionText)
-                                .arg(state.currentSelectionSource)
-                                .arg(state.currentCommandOwner)
-                                .arg(state.currentSelectionType)
-                                .arg(state.currentCommandType);
-        }
-        panel.propertiesDock->setSelectionText(selectionText);
     }
 }
 

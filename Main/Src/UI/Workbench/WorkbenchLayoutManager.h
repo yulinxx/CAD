@@ -36,10 +36,6 @@ struct PanelState
     QDockWidget* leftDock{ nullptr };
     /// 右侧停靠面板
     QDockWidget* rightDock{ nullptr };
-    /// 状态栏中的工作台标签（框架级，始终存在）
-    QLabel* workbenchLabel{ nullptr };
-    /// 状态栏中的繁忙标签（框架级，始终存在）
-    QLabel* busyLabel{ nullptr };
     /// 场景树停靠面板
     SceneTreePanel2D* sceneTreeDock{ nullptr };
     /// 属性面板
