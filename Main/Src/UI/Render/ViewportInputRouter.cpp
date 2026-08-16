@@ -352,14 +352,65 @@ void ViewportInputRouter::handleWheel(QWheelEvent* event)
     float vpW = static_cast<float>(physSize.width());
     float vpH = static_cast<float>(physSize.height());
 
-    float factor = (event->angleDelta().y() > 0) ? 1.1f : 0.9f;
-    m_camera->zoomIn(factor, worldPos, vpW, vpH);
+    const QPoint angleDelta = event->angleDelta();
+    const QPointF pixelDelta = event->pixelDelta();
+
+    // 触控板捏合时 Ctrl+滚轮的增量通常很小，改用固定缩放因子避免单步过猛
+    const float factor = (angleDelta.y() > 0) ? 1.1f : 0.9f;
+
+    switch (classifyWheel(angleDelta, pixelDelta, event->modifiers()))
+    {
+    case WheelGestureType::Zoom:
+        // 触控板捏合缩放 / 普通鼠标滚轮缩放（锚定光标位置）
+        m_camera->zoomIn(factor, worldPos, vpW, vpH);
+        break;
+    case WheelGestureType::Pan:
+        // 触控板双指拖动 → 平移视图（方向与既有鼠标平移一致）
+        m_camera->pan(static_cast<float>(pixelDelta.x()) / m_camera->zoomX,
+            -static_cast<float>(pixelDelta.y()) / m_camera->zoomY);
+        break;
+    case WheelGestureType::HorizontalPan:
+    {
+        // Shift+滚轮/双指 → 水平平移
+        const double scrollValue = (angleDelta.y() != 0)
+            ? static_cast<double>(angleDelta.y())
+            : (pixelDelta.isNull() ? static_cast<double>(angleDelta.x())
+                                   : static_cast<double>(pixelDelta.y()));
+        m_camera->pan(static_cast<float>(scrollValue) / m_camera->zoomX, 0.0f);
+        break;
+    }
+    }
+
     // 相机参数已变，通知视口提交新矩阵并重绘
     if (m_cameraChangedCallback)
     {
         m_cameraChangedCallback();
     }
     event->accept();
+}
+
+// 跨平台滚轮/触控板手势分类：
+//  - Ctrl+滚轮 = 触控板捏合缩放（Qt 在 Windows/macOS/Linux 统一翻译为 Ctrl+Wheel）
+//  - Shift+滚轮 = 水平平移
+//  - 像素增量非空（触控板双指拖动） = 平移
+//  - 否则（普通鼠标滚轮） = 缩放
+ViewportInputRouter::WheelGestureType ViewportInputRouter::classifyWheel(
+    const QPoint& angleDelta, const QPointF& pixelDelta, Qt::KeyboardModifiers modifiers)
+{
+    Q_UNUSED(angleDelta);
+    if (modifiers.testFlag(Qt::ControlModifier))
+    {
+        return WheelGestureType::Zoom;
+    }
+    if (modifiers.testFlag(Qt::ShiftModifier))
+    {
+        return WheelGestureType::HorizontalPan;
+    }
+    if (!pixelDelta.isNull())
+    {
+        return WheelGestureType::Pan;
+    }
+    return WheelGestureType::Zoom;
 }
 
 void ViewportInputRouter::handleKeyPress(QKeyEvent* event)

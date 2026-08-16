@@ -1150,6 +1150,44 @@ TEST(RenderViewport2DRegressionTest, InputRouter_WheelNullRenderWidget)
     SUCCEED();
 }
 
+// ==================== 滚轮/触控板手势分类测试（跨平台） ====================
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyPinchAsZoom)
+{
+    // 触控板捏合 → Ctrl+滚轮 → 缩放
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 120), QPointF(), Qt::ControlModifier),
+        ViewportInputRouter::WheelGestureType::Zoom);
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, -120), QPointF(), Qt::ControlModifier),
+        ViewportInputRouter::WheelGestureType::Zoom);
+}
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyTrackpadDragAsPan)
+{
+    // 触控板双指拖动 → 像素增量非空且无修饰键 → 平移
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 0), QPointF(30.0, 12.0), Qt::NoModifier),
+        ViewportInputRouter::WheelGestureType::Pan);
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 0), QPointF(-30.0, -12.0), Qt::NoModifier),
+        ViewportInputRouter::WheelGestureType::Pan);
+}
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyMouseWheelAsZoom)
+{
+    // 普通鼠标滚轮：仅角度增量、无像素增量、无修饰键 → 缩放（保持既有行为）
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 120), QPointF(), Qt::NoModifier),
+        ViewportInputRouter::WheelGestureType::Zoom);
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, -120), QPointF(), Qt::NoModifier),
+        ViewportInputRouter::WheelGestureType::Zoom);
+}
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyShiftScrollAsHorizontalPan)
+{
+    // Shift+滚轮/双指 → 水平平移
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 120), QPointF(), Qt::ShiftModifier),
+        ViewportInputRouter::WheelGestureType::HorizontalPan);
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 0), QPointF(0.0, 40.0), Qt::ShiftModifier),
+        ViewportInputRouter::WheelGestureType::HorizontalPan);
+}
+
 // ==================== 上下文菜单测试 ====================
 
 TEST(RenderViewport2DRegressionTest, InputRouter_ContextMenuNullDispatcher)

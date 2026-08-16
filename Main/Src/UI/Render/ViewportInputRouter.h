@@ -95,6 +95,21 @@ public:
 
     // ==================== 交互状态 ====================
 
+    // 滚轮/触控板手势分类结果：Zoom(缩放)、Pan(平移)、HorizontalPan(水平平移)
+    enum class WheelGestureType
+    {
+        Zoom,
+        Pan,
+        HorizontalPan,
+    };
+
+    /// 跨平台滚轮/触控板手势分类（纯函数，便于单测）：
+    ///  - Ctrl+滚轮  = 触控板捏合缩放（Qt 在 Windows/macOS/Linux 上统一翻译为 Ctrl+Wheel）
+    ///  - Shift+滚轮 = 水平平移
+    ///  - 带像素增量(触控板双指拖动) = 平移
+    ///  - 无像素增量(普通鼠标滚轮)  = 缩放
+    static WheelGestureType classifyWheel(const QPoint& angleDelta, const QPointF& pixelDelta, Qt::KeyboardModifiers modifiers);
+
     bool isPanning() const
     {
         return m_panning;
