@@ -14,8 +14,10 @@ struct Camera2D
     float zoomY = 1.0f;
     QPointF panOffset;
 
-    static constexpr float MIN_ZOOM = 0.001f;
-    static constexpr float MAX_ZOOM = 10000.0f;
+    // 缩放范围：0.01 允许缩小到默认视图的 1/100（足够总览整个场景），
+    // 500 允许放大到默认视图的 500 倍。超出此范围会退化渲染矩阵，易触发崩溃。
+    static constexpr float MIN_ZOOM = 0.01f;
+    static constexpr float MAX_ZOOM = 500.0f;
 
     // ---- 基础变换 ----
 
