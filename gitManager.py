@@ -71,6 +71,50 @@ def is_exit_key(choice: str) -> bool:
     return choice.strip().lower() in ("0", "q", "quit", "exit", "e", "x", "退出", "取消")
 
 
+def prompt(text: str, default: str = None, allow_exit: bool = True,
+           exit_hint: str = None, to_lower: bool = False) -> Optional[str]:
+    """统一的输入提示。默认提示可退出，输入 0/q/取消 等退出键返回 None。
+
+    Args:
+        text:      提示文本（例如 "  统一提交信息"）
+        default:   回车时的默认值（None 表示无默认，空字符串则代表默认空文本）
+        allow_exit: 是否允许用退出键取消当前操作（默认 True）
+        exit_hint: 自定义退出提示文本（默认 "[0/q=取消]"）
+        to_lower:  非 None 时结果转小写（便于 y/n 判断）
+    """
+    suffix = ""
+    if allow_exit:
+        hint = exit_hint if exit_hint is not None else "0/q=取消"
+        if default is not None:
+            suffix = f" (回车={default!r}, {hint})"
+        else:
+            suffix = f" ({hint})"
+    elif default is not None:
+        suffix = f" (回车={default!r})"
+
+    value = input(text + suffix + ": ").strip()
+    if allow_exit and is_exit_key(value):
+        print(c("  → 已取消", Colors.DIM))
+        return None
+    if not value and default is not None:
+        value = default
+    if to_lower and value is not None:
+        value = value.lower()
+    return value
+
+
+def confirm(text: str, default_yes: bool = True, allow_exit: bool = False) -> Optional[bool]:
+    """统一的 y/n 确认。默认提示含 0/q 退出（allow_exit=True 时）。
+    返回 True=是、False=否、None=用户选择退出（仅 allow_exit 时会出现）。"""
+    default_label = "y" if default_yes else "n"
+    exit_label = " 0/q=取消" if allow_exit else ""
+    full = f"{text} (y/n, 默认{default_label}{exit_label})"
+    v = prompt(full, default=default_label, allow_exit=allow_exit, to_lower=True)
+    if v is None:
+        return None
+    return v in ("y", "yes", "是")
+
+
 def autostash_msg(action: str) -> str:
     """生成自动 stash 的带时间戳备注，例如 autostash before pull 2026-08-14 14:30:00"""
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -1006,14 +1050,23 @@ def checkout_latest(repos: List[Dict]):
     print(c("\n🎯 切换到最前端模式", Colors.BOLD + Colors.OKGREEN))
     print("  流程: 检测默认分支(main优先) → 切换 → 拉取最新")
     print("  如果工作区有未提交变更，会先自动 stash")
-    print(c("  分支名匹配多个远程时，自动用 --track <remote>/<branch> 消除歧义\n",
+    print(c("  分支名匹配多个远程时，自动用 --track <remote>/<branch> 消除歧义",
             Colors.DIM))
+    print(c("  任意参数录入阶段输入 0/q 都可取消当前操作\n", Colors.DIM))
 
-    auto_stash = input("  有未提交变更时自动 stash? (y/n, 默认y): ").strip().lower() != "n"
-    auto_pull = input("  切换后自动拉取最新? (y/n, 默认y): ").strip().lower() != "n"
+    # 是否自动 stash
+    auto_stash = confirm("  有未提交变更时自动 stash", default_yes=True, allow_exit=True)
+    if auto_stash is None:
+        return
 
-    if is_exit_key(input("  [回车/空格=开始执行, 0/q=退出]: ").strip()):
-        print(c("  → 已退出", Colors.DIM))
+    # 是否自动拉取
+    auto_pull = confirm("  切换后自动拉取最新", default_yes=True, allow_exit=True)
+    if auto_pull is None:
+        return
+
+    ok = confirm("  开始执行", default_yes=True, allow_exit=True)
+    if ok is None or not ok:
+        print(c("  → 已取消", Colors.DIM))
         return
 
     results = []
@@ -1189,15 +1242,21 @@ def quick_sync(repos: List[Dict]):
     print(c("⚡ 快速同步模式", Colors.BOLD + Colors.OKGREEN))
     print("  流程: 暂存 → 提交 → 拉取 → 推送")
     print("  所有仓库将自动处理，无需逐个确认")
+    print(c("  任意参数录入阶段输入 0/q 都可取消当前操作\n", Colors.DIM))
 
-    msg = input("  统一提交信息 (回车使用默认): ").strip()
-    if not msg:
-        msg = "update: batch sync"
+    # 提交信息：回车用默认；输入 0/q → 退出
+    msg = prompt("  统一提交信息", default="update: batch sync")
+    if msg is None:
+        return
 
-    force = input("  是否强制推送? (y/n, 默认n): ").strip().lower() == "y"
+    # 是否强制推送
+    force = confirm("  是否强制推送", default_yes=False, allow_exit=True)
+    if force is None:
+        return
 
-    if is_exit_key(input("  [回车/空格=开始执行, 0/q=退出]: ").strip()):
-        print(c("  → 已退出", Colors.DIM))
+    ok = confirm("  开始执行", default_yes=True, allow_exit=True)
+    if ok is None or not ok:
+        print(c("  → 已取消", Colors.DIM))
         return
 
     results = []
@@ -1402,11 +1461,15 @@ def batch_push(repos: List[Dict]):
     print(c("🚀 批量推送模式", Colors.BOLD + Colors.OKGREEN))
     print("  将自动推送到所有远程的当前分支")
     print(c("  命令格式: git push [--force] <remote> <branch>", Colors.DIM))
+    print(c("  任意参数录入阶段输入 0/q 都可取消当前操作\n", Colors.DIM))
 
-    force = input("  强制推送? (y/n, 默认n): ").strip().lower() == "y"
+    force = confirm("  强制推送", default_yes=False, allow_exit=True)
+    if force is None:
+        return
 
-    if is_exit_key(input("  [回车/空格=开始执行, 0/q=退出]: ").strip()):
-        print(c("  → 已退出", Colors.DIM))
+    ok = confirm("  开始执行", default_yes=True, allow_exit=True)
+    if ok is None or not ok:
+        print(c("  → 已取消", Colors.DIM))
         return
 
     results = []
@@ -1622,8 +1685,9 @@ def main_loop(repos, root_path, args):
                 rc, _, err = run_cmd(cmd, repo["path"])
                 print(c("  ✅ 全部暂存" if rc == 0 else f"  ❌ {err}", Colors.OKGREEN if rc == 0 else Colors.FAIL))
         elif choice == "25":
-            msg = input("统一提交信息 (回车使用默认): ").strip() or "update: batch commit"
-            git_commit(selected, batch_msg=msg)
+            msg = prompt("统一提交信息", default="update: batch commit")
+            if msg is not None:
+                git_commit(selected, batch_msg=msg)
         elif choice == "26":
             checkout_latest(selected)
         elif choice == "27":
