@@ -107,11 +107,13 @@ public:
     };
 
     /// 跨平台滚轮/触控板手势分类（纯函数，便于单测）：
-    ///  - Ctrl+滚轮  = 触控板捏合缩放（Qt 在 Windows/macOS/Linux 上统一翻译为 Ctrl+Wheel）
-    ///  - Shift+滚轮 = 水平平移
-    ///  - 带像素增量(触控板双指拖动) = 平移
-    ///  - 无像素增量(普通鼠标滚轮)  = 缩放
-    static WheelGestureType classifyWheel(const QPoint& angleDelta, const QPointF& pixelDelta, Qt::KeyboardModifiers modifiers);
+    ///  - 无滚动阶段(普通鼠标滚轮, macOS 上鼠标滚轮也带像素增量) = 缩放，不改变鼠标既有操作
+    ///  - 触控板(带滚动阶段 ScrollBegin/Update/Momentum/End)：
+    ///    * Ctrl = 捏合缩放
+    ///    * Shift = 水平平移
+    ///    * 其余 = 平移（双指拖动）
+    static WheelGestureType classifyWheel(
+        const QPoint& angleDelta, const QPointF& pixelDelta, Qt::KeyboardModifiers modifiers, Qt::ScrollPhase phase);
 
     bool isPanning() const
     {

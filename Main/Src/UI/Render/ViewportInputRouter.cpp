@@ -377,16 +377,26 @@ void ViewportInputRouter::handleWheel(QWheelEvent* event)
 
     const QPoint angleDelta = event->angleDelta();
     const QPointF pixelDelta = event->pixelDelta();
+    const Qt::ScrollPhase phase = event->phase();
 
-    // 触控板捏合时 Ctrl+滚轮的增量通常很小，改用固定缩放因子避免单步过猛
-    const float factor = (angleDelta.y() > 0) ? 1.1f : 0.9f;
-
-    switch (classifyWheel(angleDelta, pixelDelta, event->modifiers()))
+    switch (classifyWheel(angleDelta, pixelDelta, event->modifiers(), phase))
     {
     case WheelGestureType::Zoom:
-        // 触控板捏合缩放 / 普通鼠标滚轮缩放（锚定光标位置）
+    {
+        // 触控板捏合（Ctrl+滚动阶段事件）：按增量比例缩放，平滑连续；
+        // 普通鼠标滚轮（含 Ctrl/Shift 修饰）：保持既有"每格 10%"缩放不变。
+        float factor;
+        if (phase != Qt::NoScrollPhase && event->modifiers().testFlag(Qt::ControlModifier))
+        {
+            factor = 1.0f + static_cast<float>(angleDelta.y()) / 1200.0f;
+        }
+        else
+        {
+            factor = (angleDelta.y() > 0) ? 1.1f : 0.9f;
+        }
         m_camera->zoomIn(factor, worldPos, vpW, vpH);
         break;
+    }
     case WheelGestureType::Pan:
         // 触控板双指拖动 → 平移视图（方向与既有鼠标平移一致）
         m_camera->pan(static_cast<float>(pixelDelta.x()) / m_camera->zoomX,
@@ -394,7 +404,7 @@ void ViewportInputRouter::handleWheel(QWheelEvent* event)
         break;
     case WheelGestureType::HorizontalPan:
     {
-        // Shift+滚轮/双指 → 水平平移
+        // 触控板 Shift+双指 → 水平平移
         const double scrollValue = (angleDelta.y() != 0)
             ? static_cast<double>(angleDelta.y())
             : (pixelDelta.isNull() ? static_cast<double>(angleDelta.x())
@@ -413,21 +423,23 @@ void ViewportInputRouter::handleWheel(QWheelEvent* event)
 }
 
 // 跨平台滚轮/触控板手势分类：
-//  - 无像素增量（普通鼠标滚轮）→ 一律缩放，不改变既有鼠标操作（无论是否带 Ctrl/Shift）
-//  - 触控板（有像素增量）：
-//      * Ctrl+滚轮 = 捏合缩放
-//      * Shift+滚轮 = 水平平移
+//  - 无滚动阶段（普通鼠标滚轮，macOS 上鼠标滚轮也带像素增量）→ 一律缩放，
+//    不改变既有鼠标操作（无论是否带 Ctrl/Shift）
+//  - 触控板（带滚动阶段 ScrollBegin/ScrollUpdate/ScrollMomentum/ScrollEnd）：
+//      * Ctrl = 捏合缩放
+//      * Shift = 水平平移
 //      * 其余 = 平移（双指拖动）
 ViewportInputRouter::WheelGestureType ViewportInputRouter::classifyWheel(
-    const QPoint& angleDelta, const QPointF& pixelDelta, Qt::KeyboardModifiers modifiers)
+    const QPoint& angleDelta, const QPointF& pixelDelta, Qt::KeyboardModifiers modifiers, Qt::ScrollPhase phase)
 {
     Q_UNUSED(angleDelta);
+    Q_UNUSED(pixelDelta);
     // 鼠标滚轮：保持原有"滚轮=缩放"语义，不因修饰键改变
-    if (pixelDelta.isNull())
+    if (phase == Qt::NoScrollPhase)
     {
         return WheelGestureType::Zoom;
     }
-    // 以下仅针对触控板（有像素增量）
+    // 以下仅针对触控板（带滚动阶段）
     if (modifiers.testFlag(Qt::ControlModifier))
     {
         return WheelGestureType::Zoom;
@@ -446,14 +458,16 @@ void ViewportInputRouter::handleNativeGesture(QNativeGestureEvent* event)
         return;
     }
 
-    // 触控板捏合缩放：value() 为相对缩放因子（>1 放大，<1 缩小）
+    // macOS 触控板捏合：Qt 将 NSEvent.magnification 作为原始增量传入 value()
+    // （张开 ≈ +0.05，捏拢 ≈ -0.05），转换为缩放因子：factor = 1 + value
     if (event->gestureType() != Qt::ZoomNativeGesture)
     {
         return;
     }
 
-    const double scale = event->value();
-    if (scale <= 0.0 || std::isnan(scale))
+    const double magnification = event->value();
+    const double factor = 1.0 + magnification;
+    if (!std::isfinite(factor) || factor < 0.3 || factor > 3.0)
     {
         return;
     }
@@ -468,7 +482,7 @@ void ViewportInputRouter::handleNativeGesture(QNativeGestureEvent* event)
     float vpW = static_cast<float>(physSize.width());
     float vpH = static_cast<float>(physSize.height());
 
-    m_camera->zoomIn(static_cast<float>(scale), worldPos, vpW, vpH);
+    m_camera->zoomIn(static_cast<float>(factor), worldPos, vpW, vpH);
 
     if (m_cameraChangedCallback)
     {
