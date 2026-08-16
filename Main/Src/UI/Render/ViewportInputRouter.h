@@ -83,6 +83,7 @@ public:
     void handleMouseDoubleClick(QMouseEvent* event);
     void handleWheel(QWheelEvent* event);
     void handleKeyPress(QKeyEvent* event);
+    void handleKeyRelease(QKeyEvent* event);
     void handleContextMenu(QContextMenuEvent* event);
 
     // ==================== 输入法（IME） ====================
@@ -123,6 +124,12 @@ public:
     void setPanModeEnabled(bool enabled)
     {
         m_panModeEnabled = enabled;
+    }
+
+    /// 空格是否正处于"临时平移"按下状态
+    bool isSpaceHeld() const
+    {
+        return m_spaceHeld;
     }
 
     // ==================== 坐标转换（P5 收口: RenderViewport2D 也委托至此，消除重复） ====================
@@ -187,6 +194,9 @@ private:
     bool m_panning{ false };
     bool m_panModeEnabled{ false };
     QPoint m_lastMousePos;
+    // 空格临时平移（按住空格 + 单指/左键拖动 = 平移，空格单独按下释放 = 原有确认/重置语义）
+    bool m_spaceHeld{ false };
+    bool m_spacePanned{ false };
     // 最近一次鼠标世界坐标（粘贴锚点）
     QPointF m_lastCursorWorldPos{ 0.0, 0.0 };
     bool m_hasCursorPos{ false };

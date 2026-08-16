@@ -1003,6 +1003,40 @@ TEST(RenderViewport2DRegressionTest, InputRouter_PanModeToggle)
     EXPECT_FALSE(router.isPanModeEnabled());
 }
 
+// ==================== 空格临时平移（跨平台触控板/鼠标导航） ====================
+
+TEST(RenderViewport2DRegressionTest, InputRouter_SpaceKeyEntersTemporaryPanState)
+{
+    ViewportInputRouter router;
+    // 空格按下 → 进入临时平移态
+    QKeyEvent press(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+    router.handleKeyPress(&press);
+    EXPECT_TRUE(router.isSpaceHeld());
+
+    // 空格释放（未发生平移）→ 退出临时平移态，且不崩溃
+    QKeyEvent release(QEvent::KeyRelease, Qt::Key_Space, Qt::NoModifier);
+    router.handleKeyRelease(&release);
+    EXPECT_FALSE(router.isSpaceHeld());
+    SUCCEED();
+}
+
+TEST(RenderViewport2DRegressionTest, InputRouter_SpaceAutoRepeatDoesNotToggle)
+{
+    ViewportInputRouter router;
+    QKeyEvent press(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+    router.handleKeyPress(&press);
+    EXPECT_TRUE(router.isSpaceHeld());
+
+    // 长按空格自动重复不应改变状态
+    QKeyEvent repeat(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier, 0, 0, 0, QString(), /*autorep=*/true, 1);
+    router.handleKeyPress(&repeat);
+    EXPECT_TRUE(router.isSpaceHeld());
+
+    QKeyEvent release(QEvent::KeyRelease, Qt::Key_Space, Qt::NoModifier);
+    router.handleKeyRelease(&release);
+    EXPECT_FALSE(router.isSpaceHeld());
+}
+
 // ==================== ViewportInputRouter 回调注入测试 ====================
 
 TEST(RenderViewport2DRegressionTest, InputRouter_PositionCallback)

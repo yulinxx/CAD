@@ -210,6 +210,12 @@ bool ViewportInputRouter::eventFilter(QObject* obj, QEvent* event)
         handleKeyPress(ke);
         return true;
     }
+    case QEvent::KeyRelease:
+    {
+        auto* ke = static_cast<QKeyEvent*>(event);
+        handleKeyRelease(ke);
+        return true;
+    }
     case QEvent::InputMethod:
     {
         auto* ime = static_cast<QInputMethodEvent*>(event);
@@ -420,12 +426,51 @@ void ViewportInputRouter::handleKeyPress(QKeyEvent* event)
         return;
     }
 
+    // 空格按下：进入"临时平移"态，但不立即确认——空格语义（绘图工具确认/SelectTool 重置视图）
+    // 延迟到空格释放时触发；若期间发生了空格+左键拖动平移，则释放时不触发（视为导航）。
+    if (event->key() == Qt::Key_Space)
+    {
+        if (event->isAutoRepeat())
+        {
+            event->accept();
+            return;
+        }
+        m_spaceHeld = true;
+        m_spacePanned = false;
+        event->accept();
+        return;
+    }
+
     if (handleKeyPressDispatch(event))
     {
         return;
     }
 
     event->ignore();
+}
+
+void ViewportInputRouter::handleKeyRelease(QKeyEvent* event)
+{
+    if (!event || event->key() != Qt::Key_Space)
+    {
+        return;
+    }
+
+    m_spaceHeld = false;
+
+    // 空格单独按下并释放（未用于平移）→ 触发原有确认/重置语义；
+    // 用一次合成的空格按下事件走既有分发管线。
+    if (!m_spacePanned)
+    {
+        QKeyEvent spacePress(QEvent::KeyPress, Qt::Key_Space, event->modifiers());
+        if (handleKeyPressDispatch(&spacePress))
+        {
+            event->accept();
+            return;
+        }
+    }
+
+    event->accept();
 }
 
 // ==================== 输入法（IME） ====================
@@ -730,6 +775,15 @@ bool ViewportInputRouter::handlePanMousePress(const QPoint& physWidgetPos, QMous
     if (event->button() == Qt::LeftButton && m_panModeEnabled)
     {
         m_panning = true;
+        m_lastMousePos = physWidgetPos;
+        event->accept();
+        return true;
+    }
+    // 按住空格 + 左键/单指拖动 = 临时平移（保持"空格=确认"在单独释放时语义不变）
+    if (event->button() == Qt::LeftButton && m_spaceHeld)
+    {
+        m_panning = true;
+        m_spacePanned = true;
         m_lastMousePos = physWidgetPos;
         event->accept();
         return true;
