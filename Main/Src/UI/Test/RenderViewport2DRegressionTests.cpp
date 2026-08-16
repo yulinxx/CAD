@@ -24,10 +24,13 @@
 #include <QKeyEvent>
 #include <QContextMenuEvent>
 #include <QWidget>
+#include <QNativeGestureEvent>
+#include <QPointingDevice>
 
 #include "UI/Render/SceneRefreshCoordinator.h"
 #include "UI/Render/Camera2D.h"
 #include "UI/Render/ViewportInputRouter.h"
+#include "RenderWidget.h"
 #include "UI/Widgets/ViewportSelector.h"
 #include "UI/Services/ISelectionService.h"
 #include "Engine2D/Core/SceneManager.h"
@@ -1035,6 +1038,94 @@ TEST(RenderViewport2DRegressionTest, InputRouter_SpaceAutoRepeatDoesNotToggle)
     QKeyEvent release(QEvent::KeyRelease, Qt::Key_Space, Qt::NoModifier);
     router.handleKeyRelease(&release);
     EXPECT_FALSE(router.isSpaceHeld());
+}
+
+// ==================== 视口滚轮/触控板实际行为测试（真实 RenderWidget + Camera2D） ====================
+
+namespace
+{
+    // 构造一个带固定尺寸 RenderWidget 与 Camera2D 的路由，供滚轮/手势行为测试使用
+    struct WheelRig
+    {
+        WheelRig()
+        {
+            widget.resize(800, 600);
+            router.setRenderWidget(&widget);
+            router.setCamera(&camera);
+        }
+        RenderWidget widget;
+        Camera2D camera;
+        ViewportInputRouter router;
+    };
+}
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_TrackpadDragPansCamera)
+{
+    WheelRig rig;
+    // 触控板双指拖动：仅像素增量、无修饰键 → 平移相机
+    QWheelEvent ev(QPointF(600, 400), QPointF(600, 400), QPoint(30, 12), QPoint(0, 0),
+        Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+    rig.router.handleWheel(&ev);
+
+    EXPECT_NEAR(rig.camera.panOffset.x(), 30.0, 1e-4);
+    EXPECT_NEAR(rig.camera.panOffset.y(), -12.0, 1e-4);
+    // 平移不应改变缩放
+    EXPECT_NEAR(rig.camera.zoomX, 1.0, 1e-4);
+}
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_MouseWheelZoomsCamera)
+{
+    WheelRig rig;
+    // 普通鼠标滚轮：仅角度增量、无像素增量 → 缩放
+    QWheelEvent ev(QPointF(600, 400), QPointF(600, 400), QPoint(), QPoint(0, 120),
+        Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+    rig.router.handleWheel(&ev);
+
+    EXPECT_NEAR(rig.camera.zoomX, 1.1, 1e-4);
+    EXPECT_NEAR(rig.camera.zoomY, 1.1, 1e-4);
+}
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_PinchCtrlWheelZoomsCamera)
+{
+    WheelRig rig;
+    // 触控板捏合（Ctrl+滚轮）→ 缩放
+    QWheelEvent ev(QPointF(600, 400), QPointF(600, 400), QPoint(), QPoint(0, 120),
+        Qt::NoButton, Qt::ControlModifier, Qt::NoScrollPhase, false);
+    rig.router.handleWheel(&ev);
+    EXPECT_NEAR(rig.camera.zoomX, 1.1, 1e-4);
+}
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_MacPinchNativeGestureZoomsCamera)
+{
+    WheelRig rig;
+    // macOS 触控板捏合以 NativeGesture 送达 → 按缩放因子放大
+    auto* dev = QPointingDevice::primaryPointingDevice();
+    QNativeGestureEvent ev(Qt::ZoomNativeGesture, dev, 2, QPointF(600, 400), QPointF(600, 400),
+        QPointF(600, 400), 1.2, QPointF());
+    rig.router.handleNativeGesture(&ev);
+    EXPECT_NEAR(rig.camera.zoomX, 1.2, 1e-4);
+}
+
+TEST(RenderViewport2DRegressionTest, SpaceKey_FingerMovePansCamera)
+{
+    WheelRig rig;
+    // 按住空格 + 单指移动（无按键的 MouseMove）→ 平移相机
+    QKeyEvent space(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+    rig.router.handleKeyPress(&space);
+    EXPECT_TRUE(rig.router.isSpaceHeld());
+
+    // 第一次移动：建立锚点（delta 0）
+    QMouseEvent move1(QEvent::MouseMove, QPointF(600, 400), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+    rig.router.handleMouseMove(&move1);
+    EXPECT_TRUE(rig.router.isPanning());
+
+    // 第二次移动：产生平移（physWidgetPos 按 DPR 缩放）
+    QMouseEvent move2(QEvent::MouseMove, QPointF(620, 410), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+    rig.router.handleMouseMove(&move2);
+
+    const double dpr = rig.widget.devicePixelRatio();
+    EXPECT_NEAR(rig.camera.panOffset.x(), 20.0 * dpr, 1e-3);
+    EXPECT_NEAR(rig.camera.panOffset.y(), -10.0 * dpr, 1e-3);
 }
 
 // ==================== ViewportInputRouter 回调注入测试 ====================

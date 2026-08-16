@@ -27,6 +27,7 @@
 #include <QKeyEvent>
 #include <QInputMethodEvent>
 #include <QContextMenuEvent>
+#include <QNativeGestureEvent>
 #include <QVariant>
 #include <QRectF>
 #include <cmath>
@@ -204,6 +205,13 @@ bool ViewportInputRouter::eventFilter(QObject* obj, QEvent* event)
         handleWheel(we);
         return true;
     }
+    case QEvent::NativeGesture:
+    {
+        // macOS 触控板捏合以 NativeGesture 形式送达（非 Ctrl+Wheel），跨平台统一在此转缩放。
+        auto* ge = static_cast<QNativeGestureEvent*>(event);
+        handleNativeGesture(ge);
+        return true;
+    }
     case QEvent::KeyPress:
     {
         auto* ke = static_cast<QKeyEvent*>(event);
@@ -277,6 +285,15 @@ void ViewportInputRouter::handleMouseMove(QMouseEvent* event)
     if (m_positionCallback)
     {
         m_positionCallback(worldPos.x(), worldPos.y());
+    }
+
+    // 空格按住时：任意鼠标/触控板单指移动即进入临时平移（无需按下按键）。
+    // 触控板单指移动是纯移动事件（无按键），与 AutoCAD "按住空格拖动" 手感一致。
+    if (m_spaceHeld && !m_panning)
+    {
+        m_panning = true;
+        m_spacePanned = true;
+        m_lastMousePos = physWidgetPos;
     }
 
     if (handlePanMouseMove(physWidgetPos, event))
@@ -417,6 +434,44 @@ ViewportInputRouter::WheelGestureType ViewportInputRouter::classifyWheel(
         return WheelGestureType::Pan;
     }
     return WheelGestureType::Zoom;
+}
+
+void ViewportInputRouter::handleNativeGesture(QNativeGestureEvent* event)
+{
+    if (!m_renderWidget || !m_camera || !event)
+    {
+        return;
+    }
+
+    // 触控板捏合缩放：value() 为相对缩放因子（>1 放大，<1 缩小）
+    if (event->gestureType() != Qt::ZoomNativeGesture)
+    {
+        return;
+    }
+
+    const double scale = event->value();
+    if (scale <= 0.0 || std::isnan(scale))
+    {
+        return;
+    }
+
+    QPointF worldPos = widgetToWorld(event->position());
+    if (worldPos.isNull())
+    {
+        return;
+    }
+
+    QSizeF physSize = physicalViewportSize();
+    float vpW = static_cast<float>(physSize.width());
+    float vpH = static_cast<float>(physSize.height());
+
+    m_camera->zoomIn(static_cast<float>(scale), worldPos, vpW, vpH);
+
+    if (m_cameraChangedCallback)
+    {
+        m_cameraChangedCallback();
+    }
+    event->accept();
 }
 
 void ViewportInputRouter::handleKeyPress(QKeyEvent* event)

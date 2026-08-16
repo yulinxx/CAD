@@ -25,6 +25,7 @@
 
 class QMouseEvent;
 class QWheelEvent;
+class QNativeGestureEvent;
 class QKeyEvent;
 class QInputMethodEvent;
 class QContextMenuEvent;
@@ -82,6 +83,7 @@ public:
     void handleMouseRelease(QMouseEvent* event);
     void handleMouseDoubleClick(QMouseEvent* event);
     void handleWheel(QWheelEvent* event);
+    void handleNativeGesture(QNativeGestureEvent* event);
     void handleKeyPress(QKeyEvent* event);
     void handleKeyRelease(QKeyEvent* event);
     void handleContextMenu(QContextMenuEvent* event);
