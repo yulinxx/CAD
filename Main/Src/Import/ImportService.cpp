@@ -505,7 +505,7 @@ ImportResult ImportService::phaseBuildDocument(
 
     if (entities.empty())
     {
-        SY_WARN("[ImportService] All entities were invalid — nothing to import");
+        SY_WARN("[ImportService] All entities were invalid, nothing to import");
         return ImportResult::fail(QStringLiteral("No valid entities to import"), ImportErrorType::ParseFailed);
     }
 

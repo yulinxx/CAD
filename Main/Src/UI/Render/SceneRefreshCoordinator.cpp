@@ -100,7 +100,7 @@ void SceneRefreshCoordinator::setPerfMonitorEnabled(bool enabled)
     if (enabled && !m_frameTimer)
     {
         m_frameTimer = std::make_unique<FrameTimer>();
-        SY_INFO("[SceneRefreshCoordinator] 帧性能监控已启用");
+        SY_INFO("[SceneRefreshCoordinator] Frame performance monitoring enabled");
     }
     else if (!enabled && m_frameTimer)
     {
@@ -109,7 +109,7 @@ void SceneRefreshCoordinator::setPerfMonitorEnabled(bool enabled)
             m_frameTimer->report();
         }
         m_frameTimer.reset();
-        SY_INFO("[SceneRefreshCoordinator] 帧性能监控已禁用");
+        SY_INFO("[SceneRefreshCoordinator] Frame performance monitoring disabled");
     }
 }
 
@@ -276,16 +276,6 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             m_renderWidget->addRenderEntity(uid, vertices.data(), static_cast<uint32_t>(vertices.size()), primType);
             m_renderedEntityIds.insert(uid);
         }
-    }
-
-    // 诊断：统计本轮增量提交结果，确认图元是否进入渲染层
-    {
-        const uint32_t totalEntities = m_renderWidget->entityRenderCount();
-        SY_WARNF("[RefreshDiag] applyLightRefresh done: pending=%zu addedBook=%zu renderWorldEnt=%u fallback=%d",
-            m_pendingDirtyIds.size(),
-            m_renderedEntityIds.size(),
-            totalEntities,
-            m_pendingFullRefreshFallback ? 1 : 0);
     }
 
     // 位图层协调：以场景为真源，增量处理新增/修改/删除/图层显隐
