@@ -55,6 +55,7 @@
 #include "Engine/SyEntity/SyEntity.h"
 #include <string>
 #include <vector>
+#include <functional>
 #include "UI2D/Operation/CommandCatalog.h"
 #include "UI2D/Operation/OperationId.h"
 #include "UI2D/Operation/OperationBus.h"
@@ -243,6 +244,30 @@ bool UiWorkbench::showSettingsDialog(QWidget* /*parent*/)
 {
     return false;
 }
+
+// 场景树场景观察者：捕获绕过操作总线的直接编辑（如视口 Delete 键删除），
+// 只关心场景变化，由 Workbench2D 依据图元数量变化判断是否需要重建树。
+class SceneTreeSceneObserver2D final : public Eg::SceneNotifier::IObserver
+{
+public:
+    using Callback = std::function<void()>;
+
+    explicit SceneTreeSceneObserver2D(Callback cb)
+        : m_cb(std::move(cb))
+    {
+    }
+
+    void onSceneChanged() override
+    {
+        if (m_cb)
+        {
+            m_cb();
+        }
+    }
+
+private:
+    Callback m_cb;
+};
 
 // ============================================================
 // Workbench2D 实现
@@ -876,8 +901,49 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
             });
     }
 
+    // 引擎场景变更兜底：任何直接修改（如视口 Delete 键删除、导入清空等）
+    // 都会经 SceneNotifier 通知这里；依据图元数量变化判断是否结构变更，
+    // 防抖后重建树，避免 Scene 列表残留。
+    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
+    if (scene)
+    {
+        m_lastSceneEntityCount = scene->getEntityCount();
+        if (!m_sceneTreeRefreshTimer)
+        {
+            m_sceneTreeRefreshTimer = new QTimer(this);
+            m_sceneTreeRefreshTimer->setSingleShot(true);
+            m_sceneTreeRefreshTimer->setInterval(150);
+            connect(m_sceneTreeRefreshTimer, &QTimer::timeout, this, &Workbench2D::refreshSceneTree);
+        }
+        if (!m_sceneTreeObserver)
+        {
+            m_sceneTreeObserver = std::make_unique<SceneTreeSceneObserver2D>([this]() {
+                onSceneTreeSceneChanged();
+            });
+        }
+        scene->addObserver(m_sceneTreeObserver.get());
+    }
+
     // 初始填充
     refreshSceneTree();
+}
+
+void Workbench2D::onSceneTreeSceneChanged()
+{
+    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
+    if (!scene)
+    {
+        return;
+    }
+    const std::size_t count = scene->getEntityCount();
+    if (count != m_lastSceneEntityCount)
+    {
+        m_lastSceneEntityCount = count;
+        if (m_sceneTreeRefreshTimer)
+        {
+            m_sceneTreeRefreshTimer->start();
+        }
+    }
 }
 
 void Workbench2D::refreshSceneTree()
@@ -1142,6 +1208,22 @@ void Workbench2D::deactivate()
     m_textFontToolBarWidget = nullptr;
     // 视口指针随窗口清理而失效
     m_viewport = nullptr;
+    // 注销场景变更观察者并停用防抖定时器，避免切换工作台后悬空
+    if (m_sceneTreeObserver && m_services.sceneEditService)
+    {
+        if (auto* scene = m_services.sceneEditService->sceneManager())
+        {
+            scene->removeObserver(m_sceneTreeObserver.get());
+        }
+    }
+    m_sceneTreeObserver.reset();
+    if (m_sceneTreeRefreshTimer)
+    {
+        m_sceneTreeRefreshTimer->stop();
+        m_sceneTreeRefreshTimer->deleteLater();
+        m_sceneTreeRefreshTimer = nullptr;
+    }
+    m_lastSceneEntityCount = 0;
     // 场景树面板指针随窗口清理而失效
     m_scenePanel2D = nullptr;
 }
