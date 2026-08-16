@@ -30,6 +30,7 @@
 #include "DrawToolSwitchRegistry.h"
 #include "WorkbenchWindow.h"
 #include "WorkbenchMenuManager.h"
+#include "RenderWidget.h"
 
 #include "UI2D/Operation/CommandActionHub.h"
 #include "UI2D/Operation/OperationBus.h"
@@ -639,6 +640,25 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
             &RenderViewport2D::activeToolChanged,
             menuMgr,
             &WorkbenchMenuManager::syncDrawMenuToTool);
+    }
+
+    // View → Grid & Snap 菜单的真正生效点：把 stateCenter 元数据映射到网格显隐。
+    // 菜单/操作只翻转 metadata(gridVisible)，此处作为唯一消费者同步到视口网格渲染。
+    if (m_services.stateCenter && m_viewport)
+    {
+        const auto applyGridVisibleFromMetadata = [stateCenter = m_services.stateCenter, vp = m_viewport]() {
+            if (auto* renderWidget = vp->renderWidget())
+            {
+                if (auto* env = renderWidget->sceneEnvironment())
+                {
+                    const bool visible = stateCenter->metadata().value(QStringLiteral("gridVisible")).toBool();
+                    env->setGridVisible(visible);
+                    env->notifyChanged();
+                }
+            }
+        };
+        QObject::connect(m_services.stateCenter, &UiStateCenter::metadataChanged, this, applyGridVisibleFromMetadata);
+        applyGridVisibleFromMetadata();
     }
 
     // CommandActionHub：管理所有 QAction 的创建与绑定
