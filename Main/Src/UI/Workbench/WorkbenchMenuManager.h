@@ -163,7 +163,6 @@ private:
         QMenu* mirrorMenu{ nullptr };
         QMenu* alignMenu{ nullptr };
         QMenu* pathOpsMenu{ nullptr };
-        QMenu* layerMenu{ nullptr };
         QMenu* unitMenu{ nullptr };
         QMenu* gridSnapMenu{ nullptr };
         QMenu* zoomMenu{ nullptr };

@@ -24,7 +24,6 @@
 #include "UI/Services/UiStateCenter.h"
 #include "UI/Dlg/LayerManagerDialog.h"
 #include "Engine2D/Edit/LayerEditService.h"
-#include "Engine2D/Interaction/LayerManager.h"
 #include "Manager/UnitManager/UnitManager.h"
 #include "Ut/BBox2d.h"
 #include "Ut/GeomMath.h"
@@ -1371,28 +1370,6 @@ void CoreOperationRegistry::registerViewOperations()
             if (layerEditService)
             {
                 LayerManagerDialog::showDialog(layerEditService, parentWidget);
-            }
-        }));
-
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::View_NewLayer, [layerEditService] {
-            if (layerEditService)
-            {
-                layerEditService->createLayer();
-            }
-        }));
-
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::View_DeleteLayer, [layerEditService] {
-            if (!layerEditService)
-            {
-                return;
-            }
-            LayerManager* layerManager = layerEditService->layerManager();
-            const int currentId = layerManager ? layerManager->currentLayerId() : -1;
-            if (currentId >= 0)
-            {
-                layerEditService->deleteLayer(currentId);
             }
         }));
 

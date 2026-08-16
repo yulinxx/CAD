@@ -17,8 +17,6 @@
 #include "UI/ThemeManager.h"
 #include "UI/IconHelper.h"
 #include "UI/Dlg/LayerManagerDialog.h"
-#include "Engine2D/Interaction/LayerManager.h"
-#include "Engine2D/Edit/LayerEditService.h"
 #include "UI/RightToolBar/RightToolBar.h"
 #include "UI/TopToolBar/TopToolBar.h"
 #include "UI/StatusBar/StatusBar.h"
@@ -35,8 +33,6 @@
 
 #include <QAction>
 #include <QActionGroup>
-#include <QInputDialog>
-#include <QLineEdit>
 #include <QMenuBar>
 #include <QSet>
 #include <QSignalBlocker>
@@ -627,9 +623,7 @@ void WorkbenchMenuManager::buildViewMenu()
 
     m_menuState.viewMenu->addSeparator();
 
-    m_menuState.layerMenu = m_menuState.viewMenu->addMenu(tr("Layer"));
-    m_menuState.layerMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/View/layers.svg")));
-    auto* layerMgr = m_menuState.layerMenu->addAction(tr("Layer Manager..."));
+    auto* layerMgr = m_menuState.viewMenu->addAction(tr("Layer Manager..."));
     IconHelper::setThemedIcon(layerMgr, QStringLiteral(":/ui/common/Icons/View/layers.svg"));
     QObject::connect(layerMgr, &QAction::triggered, this, [this]() {
         logMenuTrigger(tr("Layer Manager..."), QStringLiteral("view.layer_manager"));
@@ -641,106 +635,6 @@ void WorkbenchMenuManager::buildViewMenu()
                 LayerManagerDialog::showDialog(m_uiServices->layerEditService, w);
             }
         }
-    });
-    m_menuState.layerMenu->addSeparator();
-    auto* newLayer = m_menuState.layerMenu->addAction(tr("New Layer"));
-    IconHelper::setThemedIcon(newLayer, QStringLiteral(":/ui/common/Icons/View/layer_new.svg"));
-    QObject::connect(newLayer, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("New Layer"), QStringLiteral("view.layer_new"));
-        if (!m_uiServices || !m_uiServices->layerEditService)
-        {
-            return;
-        }
-        int id = m_uiServices->layerEditService->createLayer();
-        if (id >= 0)
-        {
-            SY_INFOF("[WorkbenchMenuManager] New layer created, id=%d", id);
-        }
-        else
-        {
-            SY_ERRORF("[WorkbenchMenuManager] Failed to create layer, id=%d", id);
-        }
-    });
-    auto* delLayer = m_menuState.layerMenu->addAction(tr("Delete Layer"));
-    IconHelper::setThemedIcon(delLayer, QStringLiteral(":/ui/common/Icons/View/layer_delete.svg"));
-    QObject::connect(delLayer, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Delete Layer"), QStringLiteral("view.layer_delete"));
-        if (!m_uiServices || !m_uiServices->layerEditService || !m_uiServices->layerManager)
-        {
-            return;
-        }
-        int currentId = m_uiServices->layerManager->currentLayerId();
-        if (currentId < 0)
-        {
-            return;
-        }
-        m_uiServices->layerEditService->deleteLayer(currentId);
-    });
-
-    m_menuState.layerMenu->addSeparator();
-    auto* layerCtxMenu = new QMenu(tr("More Layer Operations"), m_window);
-    layerCtxMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/View/layers.svg")));
-    m_menuState.layerMenu->addMenu(layerCtxMenu);
-    auto* renameLayer = layerCtxMenu->addAction(tr("Rename Layer"));
-    IconHelper::setThemedIcon(renameLayer, QStringLiteral(":/ui/common/Icons/View/layer_rename.svg"));
-    QObject::connect(renameLayer, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Rename Layer"), QStringLiteral("view.layer_rename"));
-        if (!m_uiServices || !m_uiServices->layerEditService || !m_uiServices->layerManager)
-        {
-            return;
-        }
-        int currentId = m_uiServices->layerManager->currentLayerId();
-        if (currentId < 0)
-        {
-            return;
-        }
-        auto* w = qobject_cast<WorkbenchWindow*>(m_window);
-        if (!w)
-        {
-            return;
-        }
-        bool ok = false;
-        QString newName = QInputDialog::getText(
-            w, tr("Rename Layer"), tr("New name:"), QLineEdit::Normal, QString(), &ok);
-        if (ok && !newName.isEmpty())
-        {
-            m_uiServices->layerEditService->renameLayer(currentId, newName.toStdString());
-            SY_INFOF("[WorkbenchMenuManager] Layer renamed: id=%d", currentId);
-        }
-    });
-
-    auto* toggleLock = layerCtxMenu->addAction(tr("Toggle Lock"));
-    IconHelper::setThemedIcon(toggleLock, QStringLiteral(":/ui/common/Icons/View/layer_lock.svg"));
-    QObject::connect(toggleLock, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Toggle Lock"), QStringLiteral("view.layer_toggle_lock"));
-        if (!m_uiServices || !m_uiServices->layerManager)
-        {
-            return;
-        }
-        int currentId = m_uiServices->layerManager->currentLayerId();
-        if (currentId < 0)
-        {
-            return;
-        }
-        bool locked = m_uiServices->layerManager->isLayerLocked(currentId);
-        m_uiServices->layerManager->setLayerLocked(currentId, !locked);
-    });
-
-    auto* toggleVisible = layerCtxMenu->addAction(tr("Toggle Visibility"));
-    IconHelper::setThemedIcon(toggleVisible, QStringLiteral(":/ui/common/Icons/View/layer_visible.svg"));
-    QObject::connect(toggleVisible, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Toggle Visibility"), QStringLiteral("view.layer_toggle_visible"));
-        if (!m_uiServices || !m_uiServices->layerManager)
-        {
-            return;
-        }
-        int currentId = m_uiServices->layerManager->currentLayerId();
-        if (currentId < 0)
-        {
-            return;
-        }
-        bool visible = m_uiServices->layerManager->isLayerVisible(currentId);
-        m_uiServices->layerManager->setLayerVisible(currentId, !visible);
     });
 
     m_menuState.viewMenu->addSeparator();
