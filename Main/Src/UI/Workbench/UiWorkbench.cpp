@@ -437,10 +437,11 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
     createToolbars(window);
     setupSceneTree(window);
 
-    // 启动时从数据库加载并应用已保存的 2D 专属设置（画布/网格/标尺）
+    // 启动时从数据库加载并应用已保存的 2D 专属设置（画布/网格/标尺/捕捉）
     if (m_settingsCoordinator && m_viewport)
     {
-        m_settingsCoordinator->loadAndApplySettings(m_viewport->renderWidget(), nullptr, m_services.unitManager);
+        m_settingsCoordinator->loadAndApplySettings(
+            m_viewport->renderWidget(), m_viewport->gridSnapManager(), m_services.unitManager);
     }
 
     // 创建 2D 状态栏 widget 并挂载到窗口
@@ -463,9 +464,9 @@ bool Workbench2D::showSettingsDialog(QWidget* /*parent*/)
         return false;
     }
 
-    // 2D 无 GridSnapManager 实例，传递 nullptr（coordinator 已做空指针保护）
+    // 2D 捕捉设置由视口持有的 GridSnapManager 驱动（coordinator 已做空指针保护）
     RenderWidget* widget = m_viewport->renderWidget();
-    return m_settingsCoordinator->showSettingsDialog(widget, nullptr, m_services.unitManager);
+    return m_settingsCoordinator->showSettingsDialog(widget, m_viewport->gridSnapManager(), m_services.unitManager);
 }
 
 QWidget* Workbench2D::createCentralViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties)

@@ -62,6 +62,10 @@ RenderViewport2D::RenderViewport2D(QWidget* parent)
     // 输入路由器（P5 大文件收口：从 RenderViewport2D 中抽取事件分发逻辑）
     m_inputRouter = std::make_unique<ViewportInputRouter>(this);
     wireInputRouter();
+
+    // 网格+对象捕捉管理器：引擎层纯计算门面，场景接入见 setDocument()
+    m_gridSnapManager = std::make_unique<GridSnapManager>();
+    m_inputRouter->setSnapPositionCallback([this](const QPointF& p) { return applySnap(p); });
 }
 
 RenderViewport2D::~RenderViewport2D()
@@ -155,6 +159,28 @@ void RenderViewport2D::initRenderWidget()
 Eg::SceneManager* RenderViewport2D::sceneManager() const
 {
     return m_sceneManager;
+}
+
+// 对世界坐标应用吸附（图元/网格/起点），并刷新捕捉指示器。
+// 捕捉由引擎层 GridSnapManager::snap() 完成（内部 SnapEngine 纯计算，无 UI 依赖）。
+QPointF RenderViewport2D::applySnap(const QPointF& worldPos) const
+{
+    if (!m_gridSnapManager)
+    {
+        return worldPos;
+    }
+
+    const Ut::Vec2d src(worldPos.x(), worldPos.y());
+    const Ut::Vec2d snapped = m_gridSnapManager->snap(src);
+
+    const bool didSnap = (snapped.x() != src.x()) || (snapped.y() != src.y());
+    if (m_renderCoordinator)
+    {
+        m_renderCoordinator->setSnapIndicator(
+            QPointF(snapped.x(), snapped.y()), didSnap);
+    }
+
+    return QPointF(snapped.x(), snapped.y());
 }
 
 // ==================== 外部接口实现 ====================
@@ -268,6 +294,23 @@ void RenderViewport2D::setDocument(SceneDocument2D* document)
         m_inputRouter->setDocument(m_document);
     }
 
+    // 捕捉管理器接入场景：对象捕捉从 SceneManager 提取候选图元。
+    // 优先使用场景空间索引按捕捉半径做区域查询，无索引时 SnapEngine 自动回退全量遍历。
+    if (m_gridSnapManager)
+    {
+        m_gridSnapManager->setSceneManager(m_sceneManager);
+        if (m_sceneManager)
+        {
+            m_gridSnapManager->setSpatialQueryCallback([scene = m_sceneManager](const Ut::BBox2d& box) {
+                return scene->queryByBox(box, /*containedOnly=*/false);
+            });
+        }
+        else
+        {
+            m_gridSnapManager->setSpatialQueryCallback(nullptr);
+        }
+    }
+
     // 初始刷新 - 新文档需要全量 gather，不能用增量路径
     if (m_refreshCoordinator)
     {
@@ -320,13 +363,14 @@ void RenderViewport2D::initializeTools()
 
     m_toolManager = std::make_unique<ToolManager>();
 
-    // 创建渲染协调器
-    auto* coordinator = new Ui2D::ViewRenderCoordinator();
-    coordinator->setRenderWidget(m_renderWidget);
+    // 创建渲染协调器（唯一持有，用于覆盖层/捕捉指示器）
+    m_renderCoordinator = std::make_unique<Ui2D::ViewRenderCoordinator>();
+    m_renderCoordinator->setRenderWidget(m_renderWidget);
+    auto* coordinator = m_renderCoordinator.get();
 
     // 注册所有工具。
     // 额外注入场景编辑服务（Gizmo 变换 Undo）、图层管理器（锁定图层过滤）、
-    // 重置视图回调（空格键）等选择工具所需的依赖。
+    // 重置视图回调（空格键）、网格+对象捕捉管理器等选择工具所需的依赖。
     ToolInitializer::registerAllTools(
         *m_toolManager, m_sceneManager, m_renderWidget, coordinator,
         [this](const QString& msg) {
@@ -335,7 +379,8 @@ void RenderViewport2D::initializeTools()
         /*sceneEdit=*/m_document ? m_document->editService() : nullptr,
         /*layerManager=*/m_layerManager,
         /*onResetView=*/[this]() { zoomToFit(); },
-        /*onEntityDoubleClick=*/nullptr);
+        /*onEntityDoubleClick=*/nullptr,
+        /*gridSnapManager=*/m_gridSnapManager.get());
 
     // P1: 通过信号通知上层提交图元，视口不直接持有编辑服务
     m_toolManager->setEntityCallbackForAllTools([this](Eg::SyEntity* e) {
@@ -374,7 +419,8 @@ void RenderViewport2D::initializeTools()
                 return false;
             }
 
-            const QPointF worldPos(interaction.x, interaction.y);
+            // 统一应用吸附（与输入路由器同一入口），保证命令/交互分发路径也可捕捉
+            const QPointF worldPos = applySnap(QPointF(interaction.x, interaction.y));
             switch (interaction.type)
             {
             case InteractionEventType::MouseDown:

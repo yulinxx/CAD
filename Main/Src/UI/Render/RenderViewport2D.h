@@ -21,6 +21,7 @@
 #include "ViewportSelector.h"
 
 #include "UI/IViewportHost.h"  // P1: 2D/3D 公共视口宿主接口
+#include "Engine2D/Interaction/GridSnapManager.h"  // 网格+对象捕捉管理器（本视口持有）
 
 class RenderWidget;
 class SceneDocument2D;
@@ -33,6 +34,11 @@ class SceneRefreshCoordinator;
 class ViewportInputRouter;
 class LayerManager;
 struct ToolContext;
+
+namespace Ui2D
+{
+    class ViewRenderCoordinator;
+}
 
 class QMouseEvent;
 class QWheelEvent;
@@ -121,6 +127,12 @@ public:
     /// 注入图层管理器，供选择工具过滤锁定图层
     void setLayerManager(LayerManager* manager);
 
+    /// 获取内部捕捉管理器（网格+对象捕捉）。用于向设置对话框/输入路由暴露捕捉能力。
+    GridSnapManager* gridSnapManager() const
+    {
+        return m_gridSnapManager.get();
+    }
+
     /// 在 native window 销毁前显式释放 OpenGL 资源，避免析构时访问无效句柄崩溃
     void releaseGLResources();
 
@@ -202,6 +214,9 @@ private:
     // 获取物理像素视口尺寸（与 GPU 渲染一致）
     QSizeF physicalViewportSize() const;
 
+    // 捕捉辅助：对世界坐标应用吸附（图元/网格/起点），并刷新捕捉指示器
+    QPointF applySnap(const QPointF& worldPos) const;
+
     // 辅助
     void updateStatus(const QString& text);
     void syncStatusMode(const QString& text);
@@ -249,4 +264,10 @@ private:
 
     // 输入路由器（P5 大文件收口：从 RenderViewport2D 中抽取事件分发逻辑）
     std::unique_ptr<ViewportInputRouter> m_inputRouter;
+
+    // 网格+对象捕捉管理器（引擎层纯计算门面，非 UI 拥有，便于移植复用）
+    std::unique_ptr<GridSnapManager> m_gridSnapManager;
+
+    // 渲染协调器（覆盖层/捕捉指示器桥接；由 initializeTools 创建）
+    std::unique_ptr<Ui2D::ViewRenderCoordinator> m_renderCoordinator;
 };

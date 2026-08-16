@@ -161,6 +161,11 @@ void ViewportInputRouter::setStatusCallback(std::function<void(const QString&)> 
     m_statusCallback = std::move(callback);
 }
 
+void ViewportInputRouter::setSnapPositionCallback(std::function<QPointF(const QPointF&)> callback)
+{
+    m_snapPositionCallback = std::move(callback);
+}
+
 void ViewportInputRouter::setCameraChangedCallback(std::function<void()> callback)
 {
     m_navigation.setCameraChangedCallback(std::move(callback));
@@ -352,7 +357,7 @@ void ViewportInputRouter::handleMouseDoubleClick(QMouseEvent* event)
     {
         if (m_toolManager && m_toolManager->getActiveTool())
         {
-            m_toolManager->getActiveTool()->onMouseDoubleClick(worldPos, event);
+            m_toolManager->getActiveTool()->onMouseDoubleClick(applySnap(worldPos), event);
             event->accept();
             return;
         }
@@ -573,9 +578,19 @@ bool ViewportInputRouter::dispatchToActiveTool(
         return false;
     }
 
-    (tool->*handler)(worldPos, event);
+    (tool->*handler)(applySnap(worldPos), event);
     event->accept();
     return true;
+}
+
+// 对世界坐标统一应用吸附（图元/网格/起点）。无回调或未命中时返回原坐标。
+QPointF ViewportInputRouter::applySnap(const QPointF& worldPos) const
+{
+    if (!m_snapPositionCallback)
+    {
+        return worldPos;
+    }
+    return m_snapPositionCallback(worldPos);
 }
 
 bool ViewportInputRouter::dispatchToSelectorPress(const QPointF& worldPos, QMouseEvent* event)

@@ -74,6 +74,10 @@ public:
     // 相机变化回调 — 缩放/平移后通知视口更新视图矩阵并重绘（转发到共享导航控制器）
     void setCameraChangedCallback(std::function<void()> callback);
 
+    // 捕捉回调 — 在把世界坐标分发给活动工具前统一应用（图元/网格/起点吸附）。
+    // 通过函数注入而非直接依赖 GridSnapManager，保持输入路由低耦合、便于移植与测试。
+    void setSnapPositionCallback(std::function<QPointF(const QPointF&)> callback);
+
     // ==================== 事件过滤器（转发 RenderWidget 事件到视口） ====================
 
     bool eventFilter(QObject* obj, QEvent* event) override;
@@ -159,6 +163,11 @@ private:
 
     bool mouseEventToWorld(QMouseEvent* event, QPointF& worldPos, QPoint& widgetPos, QPoint& physWidgetPos) const;
 
+    // ==================== 捕捉辅助 ====================
+
+    /// 对世界坐标统一应用吸附（图元/网格/起点）。无回调或未命中时返回原坐标。
+    QPointF applySnap(const QPointF& worldPos) const;
+
     // ==================== 鼠标事件分发 ====================
 
     bool dispatchMousePressToInput(const QPointF& worldPos, QMouseEvent* event);
@@ -210,6 +219,8 @@ private:
     // 回调
     std::function<void(double, double)> m_positionCallback;
     std::function<void(const QString&)> m_statusCallback;
+    // 捕捉回调：分发到活动工具前对世界坐标应用吸附（图元/网格/起点）
+    std::function<QPointF(const QPointF&)> m_snapPositionCallback;
 
     // 共享导航控制器：手势→相机的单一实现（本路由与独立预览窗口共用）
     ViewportNavigation2D m_navigation;
