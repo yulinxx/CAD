@@ -130,6 +130,7 @@ void AppBootstrapper::bootstrap()
     m_services.undoManager = m_compositionRoot->undoRedoManager();
 
     m_services.operationBus = m_compositionRoot->operationBus();
+    m_services.viewportActionHub = m_compositionRoot->viewportActionHub();
     m_services.layerManager = m_compositionRoot->layerManager();
     m_services.layerManagerBridge = m_compositionRoot->layerManagerBridge();
     m_services.layerEditService = m_compositionRoot->layerEditService();
