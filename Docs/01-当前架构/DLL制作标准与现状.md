@@ -544,7 +544,7 @@ TopoShape::TopoShape(const TopoShape& other)
 | | `Hardware` | SHARED | `HARDWARE_API` | 无 | ⭐ |
 | | `Network` | SHARED | `NETWORK_API` | 无 | ⭐ |
 | | `Vision` | SHARED | `VISION_API` / `VISION_C_API` | 有（`VisionDLL.h`） | ⭐⭐⭐ |
-| | `Engraving` | SHARED | `ENGRAVING_API` | 有（`EngravingCAPI.h`） | ⭐⭐⭐ |
+| | `Engraving` | SHARED | `ENGRAVING_API` | 有（`EngravingCAPI.h`，类型安全句柄） | ⭐⭐⭐ |
 | | `GeoModelCore` | SHARED | `GEOMODEL_API` | 有（`GeoModelDLL.h`） | ⭐⭐ |
 | **Python** | `PythonHost` | SHARED | `PYTHONHOST_API` | 无 | ⭐ |
 | | `SanYiPyBindCore` | MODULE (.pyd) | pybind11 处理 | 无（直接绑定 C++） | ⭐ |
@@ -570,7 +570,7 @@ TopoShape::TopoShape(const TopoShape& other)
 | **Nesting** | `NestingDLL.h` | `typedef void* NestingJobHandle` | `enum NestingResultCode` | 有（`Nesting_GetVersion`） | ✅ 已完成 |
 | **Vision** | `VisionDLL.h` | `typedef void* VisionImageHandle` | `enum VisionResultCode` | 有（`Vision_GetVersion`） | ✅ 已完成 |
 | **GeoModelCore** | `GeoModelDLL.h` | `typedef void* GeoModelHandle` | `enum GeoModelResultCode` | 有（`GeoModel_GetVersion`） | ✅ 已完成 |
-| **Engraving** | `EngravingCAPI.h` | `void*` 句柄 | `int` 返回码 | 有（`Engraving_GetVersion`） | ✅ 已完成 |
+| **Engraving** | `EngravingCAPI.h` | `struct EngravingVolumeImpl*`（类型安全） | `enum EngravingResultCode` | 有（`Engraving_GetVersion`） | ✅ 已完成（2026-08-16 收口） |
 | **License** | `LicenseDLL.h` | `struct LicenseContext*`（类型安全） | `enum LicenseResult` | 有（`License_GetVersion`） | ✅ 已完成 |
 | **CrashHandler** | `CrashHandlerDLL.h` | 无句柄（全局单例） | `enum CrashHandlerResult` | 有（`CrashHandler_GetVersion`） | ✅ 已完成 |
 | **RenderNext** | `CAPI.h` | `struct RNWorldImpl*`（类型安全） | 无（void 函数） | 有（`rnGetVersionString`） | ✅ 已完成 |
@@ -665,7 +665,7 @@ TopoShape::TopoShape(const TopoShape& other)
 | `Nesting/NestingDLL.h` | 进度回调参数含 `const char*` 但未指定编码；版本查询已补齐 | ✅ **已修复** | 已在注释中注明 UTF-8；`Nesting_GetVersion` 已补齐 |
 | `Nesting/NestingDLL.h` | ~~句柄为 `void*`~~ → 已改为 `struct NestingJobImpl*` | ✅ **已修复** | 类型安全不透明句柄；`NestingAPI.cpp` 内部 cast 改 `reinterpret_cast`；`Engine2D/NestingEngine.cpp` 调用方 `ProgressBridge::job` 改 `NestingJobHandle` |
 | `Vision/VisionDLL.h` | 句柄为 `void*`，非类型安全；版本查询已补齐 | ✅ **已修复** | 建议改为类型安全句柄；`Vision_GetVersion` 已补齐 |
-| `Engraving/EngravingCAPI.h` | 句柄为 `void*`，非类型安全；版本查询已补齐 | ✅ **已修复** | 建议改为类型安全句柄；`Engraving_GetVersion` 已补齐 |
+| `Engraving/EngravingCAPI.h` | 句柄为 `void*`，非类型安全 | ✅ **已修复（2026-08-16）** | 已重写为类型安全句柄 `struct EngravingVolumeImpl*`；POD 结构 + `structSize` ABI 校验 + `EngravingResultCode` 错误码 + 日志回调 + thread_local 错误信息，覆盖版本/参数/包围盒/切片/轮廓/加工器句柄/一键生成/内存释放全流程 |
 | `Engraving/LaserStrategy.h` | `getName()` 返回 `std::string` + `adjustParams` 含 `const std::string&` 纯虚 | ✅ **已修复** | `getName()` 改为 `const char*`；`adjustParams` 改为 `const char*` |
 | `Engraving/EngravingImageAPI.h` | `generate2d5ToolpathFromImageFile` 含 `const std::string&` | ✅ **已修复** | 改为 `const char*` |
 | `UI/2D/CMakeLists.txt` | `Src/` 目录为 PUBLIC include | ✅ **已修复** | `Src/` 已改为 PRIVATE |
