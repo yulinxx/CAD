@@ -413,14 +413,21 @@ void ViewportInputRouter::handleWheel(QWheelEvent* event)
 }
 
 // 跨平台滚轮/触控板手势分类：
-//  - Ctrl+滚轮 = 触控板捏合缩放（Qt 在 Windows/macOS/Linux 统一翻译为 Ctrl+Wheel）
-//  - Shift+滚轮 = 水平平移
-//  - 像素增量非空（触控板双指拖动） = 平移
-//  - 否则（普通鼠标滚轮） = 缩放
+//  - 无像素增量（普通鼠标滚轮）→ 一律缩放，不改变既有鼠标操作（无论是否带 Ctrl/Shift）
+//  - 触控板（有像素增量）：
+//      * Ctrl+滚轮 = 捏合缩放
+//      * Shift+滚轮 = 水平平移
+//      * 其余 = 平移（双指拖动）
 ViewportInputRouter::WheelGestureType ViewportInputRouter::classifyWheel(
     const QPoint& angleDelta, const QPointF& pixelDelta, Qt::KeyboardModifiers modifiers)
 {
     Q_UNUSED(angleDelta);
+    // 鼠标滚轮：保持原有"滚轮=缩放"语义，不因修饰键改变
+    if (pixelDelta.isNull())
+    {
+        return WheelGestureType::Zoom;
+    }
+    // 以下仅针对触控板（有像素增量）
     if (modifiers.testFlag(Qt::ControlModifier))
     {
         return WheelGestureType::Zoom;
@@ -429,11 +436,7 @@ ViewportInputRouter::WheelGestureType ViewportInputRouter::classifyWheel(
     {
         return WheelGestureType::HorizontalPan;
     }
-    if (!pixelDelta.isNull())
-    {
-        return WheelGestureType::Pan;
-    }
-    return WheelGestureType::Zoom;
+    return WheelGestureType::Pan;
 }
 
 void ViewportInputRouter::handleNativeGesture(QNativeGestureEvent* event)

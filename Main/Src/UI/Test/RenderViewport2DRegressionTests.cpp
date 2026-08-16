@@ -1085,6 +1085,20 @@ TEST(RenderViewport2DRegressionTest, WheelGesture_MouseWheelZoomsCamera)
     EXPECT_NEAR(rig.camera.zoomY, 1.1, 1e-4);
 }
 
+TEST(RenderViewport2DRegressionTest, WheelGesture_MouseWheelShiftStillZooms)
+{
+    WheelRig rig;
+    // 鼠标滚轮带 Shift：应保持缩放（锚定缩放会合法地移动 panOffset），不改为平移
+    QWheelEvent ev(QPointF(600, 400), QPointF(600, 400), QPoint(), QPoint(0, 120),
+        Qt::NoButton, Qt::ShiftModifier, Qt::NoScrollPhase, false);
+    rig.router.handleWheel(&ev);
+
+    EXPECT_NEAR(rig.camera.zoomX, 1.1, 1e-4);
+    EXPECT_NEAR(rig.camera.zoomY, 1.1, 1e-4);
+    // 若误判为水平平移，panOffset.x 会明显偏离
+    EXPECT_LT(rig.camera.panOffset.x(), 100.0);
+}
+
 TEST(RenderViewport2DRegressionTest, WheelGesture_PinchCtrlWheelZoomsCamera)
 {
     WheelRig rig;
@@ -1297,17 +1311,26 @@ TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyTrackpadDragAsPan)
 
 TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyMouseWheelAsZoom)
 {
-    // 普通鼠标滚轮：仅角度增量、无像素增量、无修饰键 → 缩放（保持既有行为）
+    // 普通鼠标滚轮：仅角度增量、无像素增量 → 缩放（保持既有行为）
     EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 120), QPointF(), Qt::NoModifier),
         ViewportInputRouter::WheelGestureType::Zoom);
     EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, -120), QPointF(), Qt::NoModifier),
         ViewportInputRouter::WheelGestureType::Zoom);
 }
 
-TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyShiftScrollAsHorizontalPan)
+TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyMouseWheelModifiersStillZoom)
 {
-    // Shift+滚轮/双指 → 水平平移
+    // 鼠标滚轮带 Ctrl/Shift 修饰键 → 仍缩放（不改变鼠标既有操作）
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 120), QPointF(), Qt::ControlModifier),
+        ViewportInputRouter::WheelGestureType::Zoom);
     EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 120), QPointF(), Qt::ShiftModifier),
+        ViewportInputRouter::WheelGestureType::Zoom);
+}
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyTrackpadShiftScrollAsHorizontalPan)
+{
+    // 触控板 Shift+双指（有像素增量）→ 水平平移
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 120), QPointF(0.0, 40.0), Qt::ShiftModifier),
         ViewportInputRouter::WheelGestureType::HorizontalPan);
     EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 0), QPointF(0.0, 40.0), Qt::ShiftModifier),
         ViewportInputRouter::WheelGestureType::HorizontalPan);
