@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file ImportExportRegressionTests.cpp
  * @brief 导入导出链回归测试 — 覆盖 ImportService/ExportService/FioEntityConverter 完整链路
  *
@@ -33,6 +33,7 @@
 #include <fstream>
 #include <filesystem>
 #include <atomic>
+#include <unordered_map>
 
 // ==================== ImportService 基础流程测试 ====================
 
@@ -1670,3 +1671,44 @@ TEST(ImportExportRegressionTest, IrPipeline_ConvertAll_PassesExtensionBlob)
     EXPECT_DOUBLE_EQ(poly->vertices()[0].x(), 1.0);
     EXPECT_DOUBLE_EQ(poly->vertices()[2].y(), 6.0);
 }
+
+// 回归：DXF 图层 sourceId 必须 1-based。
+// 旧实现 sourceId 从 0 开始，与 EntityInfo.layerSourceId 的「0=无图层」哨兵冲突，
+// 导致首个图层（DXF 默认图层 "0"）上的图元被 convertAll 过滤掉 → 导入后场景不显示图层颜色。
+TEST(ImportExportRegressionTest, IrPipeline_RealDxf_FirstLayerSourceIdIsOneBased)
+{
+    // 最小 DXF：TABLES 中定义图层 "0"（红色），ENTITIES 中一条 LINE 位于该图层。
+    std::string dxf = "0\nSECTION\n2\nTABLES\n"
+                      "0\nTABLE\n2\nLAYER\n70\n1\n"
+                      "0\nLAYER\n2\n0\n70\n0\n62\n1\n6\nCONTINUOUS\n"
+                      "0\nENDTAB\n0\nENDSEC\n"
+                      "0\nSECTION\n2\nENTITIES\n"
+                      "0\nLINE\n8\n0\n10\n0.0\n20\n0.0\n30\n0.0\n11\n100.0\n21\n50.0\n31\n0.0\n"
+                      "0\nENDSEC\n0\nEOF\n";
+
+    std::string path = writeTempFile("dxf", dxf);
+    Fio::FileIOManager fileIO;
+    Fio::FioParseResult ir;
+    char errBuf[1024] = { 0 };
+    bool ok = fileIO.importToIR(path.c_str(), Fio::FileFormat::DXF, &ir, errBuf, sizeof(errBuf));
+    std::filesystem::remove(path);
+
+    ASSERT_TRUE(ok) << errBuf;
+    ASSERT_GE(ir.layerCount, 1u);
+
+    // 图层表与图元引用必须使用一致的 1-based sourceId
+    const auto* layer0 = &ir.layers[0];
+    EXPECT_NE(layer0->sourceId, 0u);
+
+    // convertAll 必须把该图层上的图元写入 entityLayerMap（而不是因 sourceId==0 被丢弃）
+    std::unordered_map<int64_t, uint32_t> entityLayerMap;
+    auto entities = FioEntityConverter::convertAll(ir, &entityLayerMap);
+    ASSERT_EQ(entities.size(), 1u);
+    ASSERT_EQ(entityLayerMap.size(), 1u);
+
+    const auto it = entityLayerMap.find(entities[0]->id);
+    ASSERT_NE(it, entityLayerMap.end());
+    EXPECT_EQ(it->second, layer0->sourceId);
+}
+
+

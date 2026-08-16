@@ -283,6 +283,17 @@ std::vector<std::unique_ptr<Eg::SyEntity>> FioEntityConverter::convertAll(
             // 设置公共属性（SyEntity 基类提供的 setter）
             entity->setVisible(parseData.entities[i].visible);
             entity->setLocked(parseData.entities[i].locked);
+
+            // 应用解析出的实体颜色（0xAARRGGBB；0 表示未指定，回退到图层/黑色）。
+            // 以覆盖色形式设置，优先级高于图层颜色，确保导入后保留原文件颜色。
+            const uint32_t col = parseData.entities[i].color;
+            if (col != 0)
+            {
+                const uint8_t r = static_cast<uint8_t>((col >> 16) & 0xFF);
+                const uint8_t g = static_cast<uint8_t>((col >> 8) & 0xFF);
+                const uint8_t b = static_cast<uint8_t>(col & 0xFF);
+                entity->setOverrideColor(Ut::Color::fromRGB255(r, g, b));
+            }
             // 注意：SyEntity 体系无 lineWidth 成员，线宽由渲染层控制
 
             // 记录图元 → 源图层 sourceId 映射（供导入阶段还原图层结构）
