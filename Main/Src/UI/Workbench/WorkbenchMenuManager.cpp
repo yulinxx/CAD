@@ -839,6 +839,7 @@ void WorkbenchMenuManager::refreshEditMenuForWorkbench(const QString& workbenchI
     addMenuAction(m_menuState.editMenu, tr("Cut"), QStringLiteral("edit.cut"));
     addMenuAction(m_menuState.editMenu, tr("Copy"), QStringLiteral("edit.copy"));
     addMenuAction(m_menuState.editMenu, tr("Paste"), QStringLiteral("edit.paste"));
+    addMenuAction(m_menuState.editMenu, tr("Paste as Text"), QStringLiteral("edit.paste_text"));
     m_menuState.editMenu->addSeparator();
 
     addMenuAction(m_menuState.editMenu, tr("Delete"), QStringLiteral("edit.delete"));

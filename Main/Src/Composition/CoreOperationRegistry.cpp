@@ -19,6 +19,8 @@
 #include "UI/Adapters/TransformDialogAdapter.h"
 #include "UI/TransformParameters.h"
 #include "UI2D/Operation/AlgorithmRunner.h"
+#include "Option/TextPasteService.h"
+#include "Option/TextInputSettingsStore.h"
 #include "Operation/ReliefEngravingOperation2D.h"
 #include "UI/Services/ViewportActionHub.h"
 #include "UI/Services/UiStateCenter.h"
@@ -524,62 +526,108 @@ void CoreOperationRegistry::registerEditOperations()
         editService->deleteSelected("Cut");
     }));
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Paste,
-        [editService, clipboard, viewportHub = m_viewportActionHub] {
-        if (!editService || !clipboard || !clipboard->hasContent())
-        {
-            return;
-        }
-        auto* scene = editService->sceneManager();
-
-        // 粘贴位置：鼠标在视口内取鼠标世界坐标，否则取视口中心
-        Ut::Vec2d pastePos(0, 0);
+    // 粘贴锚点：鼠标在视口内取鼠标世界坐标，否则取视口中心；
+    // 无有效锚点时回退默认设计台面中心 (600,400)
+    auto pasteAnchor = [viewportHub = m_viewportActionHub]() -> Ut::Vec2d {
+        Ut::Vec2d anchor(0, 0);
         if (viewportHub)
         {
             if (auto* vp = viewportHub->viewport())
             {
                 const QPointF world = vp->pasteAnchorWorld();
-                pastePos = Ut::Vec2d(world.x(), world.y());
+                anchor = Ut::Vec2d(world.x(), world.y());
             }
         }
-        // 兜底：无有效锚点时使用默认设计台面中心 (600,400)，避免粘贴到原点角落
-        if (pastePos.x() == 0.0 && pastePos.y() == 0.0)
+        if (anchor.x() == 0.0 && anchor.y() == 0.0)
         {
-            pastePos = Ut::Vec2d(600.0, 400.0);
+            anchor = Ut::Vec2d(600.0, 400.0);
         }
-        auto pasted = clipboard->paste(pastePos);
-        if (pasted.empty())
+        return anchor;
+    };
+
+    // 将剪贴板纯文本按最近字体设置转矢量并居中粘贴（成功则选中新文字）
+    auto pasteText = [editService, pasteAnchor](bool selectResult) {
+        if (!editService)
         {
             return;
         }
-
-        std::vector<Eg::EntityId> pastedIds;
-        pastedIds.reserve(pasted.size());
-        for (const auto& e : pasted)
+        auto* scene = editService->sceneManager();
+        const Ut::Vec2d anchor = pasteAnchor();
+        QString err;
+        Eg::SyGroup* group = TextPasteService::pasteClipboardText(scene, anchor, err);
+        if (!group)
         {
-            if (e)
+            if (!err.isEmpty())
             {
-                pastedIds.push_back(e->id);
+                SY_WARNF("[PasteText] %s", err.toStdString().c_str());
+            }
+            return;
+        }
+        if (selectResult)
+        {
+            scene->clearSelection();
+            std::vector<Eg::SyEntity*> leaves = group->flatten();
+            if (!leaves.empty())
+            {
+                scene->selectEntities(leaves);
             }
         }
+    };
 
-        scene->clearSelection();
-        editService->addEntities(std::move(pasted), "Paste");
-
-        Eg::VecSyEntityPtr pastedEntities;
-        pastedEntities.reserve(pastedIds.size());
-        for (Eg::EntityId id : pastedIds)
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Paste,
+        [editService, clipboard, pasteAnchor, pasteText] {
+        if (!editService)
         {
-            if (auto* ent = scene->findEntityById(id))
+            return;
+        }
+        auto* scene = editService->sceneManager();
+
+        // 图元剪贴板有内容 → 粘贴图元；否则若系统剪贴板有纯文本 → 粘贴为矢量文字
+        if (clipboard && clipboard->hasContent())
+        {
+            const Ut::Vec2d pastePos = pasteAnchor();
+            auto pasted = clipboard->paste(pastePos);
+            if (pasted.empty())
             {
-                pastedEntities.push_back(ent);
+                return;
             }
+
+            std::vector<Eg::EntityId> pastedIds;
+            pastedIds.reserve(pasted.size());
+            for (const auto& e : pasted)
+            {
+                if (e)
+                {
+                    pastedIds.push_back(e->id);
+                }
+            }
+
+            scene->clearSelection();
+            editService->addEntities(std::move(pasted), "Paste");
+
+            Eg::VecSyEntityPtr pastedEntities;
+            pastedEntities.reserve(pastedIds.size());
+            for (Eg::EntityId id : pastedIds)
+            {
+                if (auto* ent = scene->findEntityById(id))
+                {
+                    pastedEntities.push_back(ent);
+                }
+            }
+            if (!pastedEntities.empty())
+            {
+                scene->selectEntities(pastedEntities);
+            }
+            return;
         }
-        if (!pastedEntities.empty())
-        {
-            scene->selectEntities(pastedEntities);
-        }
+
+        // 回退：外部复制的文字 → 矢量文字
+        pasteText(true);
     }));
+
+    // 显式"粘贴为文字"：无论图元剪贴板是否有内容，都把系统剪贴板纯文本转为矢量
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_PasteText,
+        [pasteText] { pasteText(true); }));
 
     reg.registerOperation(
         std::make_unique<ParamLambdaOperation>(OperationId::Edit_Duplicate, [editService, parentWidget](const QVariantMap& params) {
