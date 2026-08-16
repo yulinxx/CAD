@@ -181,32 +181,6 @@ void WorkbenchStateManager::refreshFromState()
         }
         m_activeStatusBar->setMessageText(prompt);
     }
-    if (m_activeStatusBar && m_stateCenter)
-    {
-        const auto state = m_stateCenter->snapshot();
-        const QString selectionText = state.currentSelectionText.trimmed();
-        int selectedCount = 0;
-
-        if (selectionText.isEmpty() || selectionText == QStringLiteral("none"))
-        {
-            selectedCount = 0;
-        }
-        else if (selectionText.contains(QStringLiteral("entities selected")))
-        {
-            QRegularExpression re(QStringLiteral("(\\d+)\\s*entities\\s+selected"));
-            auto match = re.match(selectionText);
-            if (match.hasMatch())
-            {
-                selectedCount = match.captured(1).toInt();
-            }
-        }
-        else
-        {
-            selectedCount = 1;
-        }
-
-        m_activeStatusBar->setSelectionInfo(selectedCount, m_parent->tr("Selected: %1").arg(selectedCount));
-    }
 
     const auto& panel = m_layoutManager->panelState();
 

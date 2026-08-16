@@ -482,6 +482,9 @@ void WorkbenchWindow::unmountStatusBar()
         m_layoutManager->panelState().statusBar->removeWidget(m_activeStatusBar);
     }
 
+    // 卸载时清空旧状态栏内容，避免切换 2D/3D 后残留上一次的显示
+    m_activeStatusBar->clearAll();
+
     // 不在这里 delete —— StatusBarBase 的生命周期由创建它的 Workbench 负责
     // Workbench2D/Workbench3D 在析构时会清理自己创建的 StatusBar
     m_activeStatusBar = nullptr;

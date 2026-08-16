@@ -485,6 +485,22 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
             refreshPropertiesPanel();
         });
 
+        // 选择变化 → 把真实选中数量推给状态栏选择指示器（StatusBarBase 容器内的独立指示器）
+        QObject::connect(vp, &RenderViewport2D::selectionChanged, this, [this]() {
+            if (m_statusBar2D)
+            {
+                int n = 0;
+                if (m_services.sceneEditService)
+                {
+                    if (auto* scene = m_services.sceneEditService->sceneManager())
+                    {
+                        n = static_cast<int>(scene->getSelectedEntities().size());
+                    }
+                }
+                m_statusBar2D->setSelectionInfo(n, tr("Selected: %1").arg(n));
+            }
+        });
+
         // 鼠标移动时实时更新状态栏位置标签
         vp->setPositionCallback([stateCenter = m_services.stateCenter, &window](double x, double y) {
             QVariantMap meta = stateCenter->metadata();
