@@ -125,8 +125,10 @@
 #include "UiSceneTreePanel2D.h"
 #include "UiPropertiesPanel.h"
 #include "Engine2D/Edit/LayerEditService.h"
+#include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Interaction/LayerManager.h"
 #include "UI/Dlg/LayerManagerDialog.h"
+#include "UI/Interaction/UiInteractionGate.h"
 
 #include <QCloseEvent>
 #include <QMessageBox>
@@ -147,6 +149,10 @@ WorkbenchWindow::WorkbenchWindow(QWidget* parent)
     // Windows 下 QOpenGLWidget 是原生子窗口，拖放事件可能不冒泡到本窗口，
     // 额外安装应用级事件过滤器兜底，确保拖放任何位置都能触发导入
     // m_fileDropHandler->installAppEventFilter();
+
+    // 注册主界面根部件到总开关（UiInteractionGate），
+    // 供长时算法/批量操作在运行期间整体禁用/恢复主界面
+    UiInteractionGate::instance().setRootWidget(this);
 
     if (const auto* screen = QGuiApplication::primaryScreen())
     {
@@ -291,6 +297,11 @@ void WorkbenchWindow::configureServices(const UiServices& services)
     if (m_fileDropHandler)
     {
         m_fileDropHandler->setImportService(services.importService);
+        // 图片/位图拖放导入需要访问 2D 场景管理器
+        if (services.sceneEditService)
+        {
+            m_fileDropHandler->setSceneManager(services.sceneEditService->sceneManager());
+        }
     }
 
     if (m_actionManager)
