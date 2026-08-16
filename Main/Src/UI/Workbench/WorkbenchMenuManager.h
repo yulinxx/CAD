@@ -44,6 +44,8 @@ public:
     void setWorkbench(UiWorkbench* workbench);
     void setWorkbenchFactory(WorkbenchFactory factory);
     void setViewportZoomHandler(std::function<void(const QString&)> handler);
+    /// 设置 TestView 菜单回调（打开独立预览渲染窗口）
+    void setTestViewHandler(std::function<void()> handler);
 
     void buildMenus();
     void buildThemeMenu();
@@ -187,6 +189,7 @@ private:
     UiWorkbench* m_workbench{ nullptr };
     WorkbenchFactory m_workbenchFactory;
     std::function<void(const QString&)> m_viewportZoomHandler;
+    std::function<void()> m_testViewHandler;
     // Draw 菜单绘图工具动作组（互斥单选，与左侧工具栏选中态联动）
     QActionGroup* m_drawToolActionGroup{ nullptr };
     // 全局编辑快捷键动作（窗口级，需在切换工作台时显式清理）

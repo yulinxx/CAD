@@ -644,6 +644,14 @@ void WorkbenchWindow::setViewportZoomHandler(std::function<void(const QString&)>
     }
 }
 
+void WorkbenchWindow::setTestViewHandler(std::function<void()> handler)
+{
+    if (m_menuManager)
+    {
+        m_menuManager->setTestViewHandler(std::move(handler));
+    }
+}
+
 void WorkbenchWindow::updatePositionLabel(double x, double y)
 {
     m_lastMouseX = x;

@@ -293,6 +293,11 @@ void WorkbenchMenuManager::setViewportZoomHandler(std::function<void(const QStri
     m_viewportZoomHandler = std::move(handler);
 }
 
+void WorkbenchMenuManager::setTestViewHandler(std::function<void()> handler)
+{
+    m_testViewHandler = std::move(handler);
+}
+
 void WorkbenchMenuManager::rebuildAllMenus()
 {
     // 先清理旧的全局快捷键动作，防止 2D 的 Undo/Redo 泄漏到 3D 模式
@@ -638,6 +643,17 @@ void WorkbenchMenuManager::buildViewMenu()
             {
                 LayerManagerDialog::showDialog(m_uiServices->layerEditService, w);
             }
+        }
+    });
+
+    m_menuState.viewMenu->addSeparator();
+
+    auto* testView = m_menuState.viewMenu->addAction(tr("TestView"));
+    QObject::connect(testView, &QAction::triggered, this, [this]() {
+        logMenuTrigger(tr("TestView"), QStringLiteral("view.testview"));
+        if (m_testViewHandler)
+        {
+            m_testViewHandler();
         }
     });
 

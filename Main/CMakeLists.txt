@@ -111,6 +111,7 @@ set(MAIN_APP_SOURCES
     ${SRC_ROOT}/UI/Widgets/UiSceneTreePanel2D.cpp
     ${SRC_ROOT}/UI/Widgets/UiSceneTreePanel3D.cpp
     ${SRC_ROOT}/UI/Widgets/ViewportSelector.cpp
+    ${SRC_ROOT}/UI/TestView/TestViewWindow.cpp
 )
 
 if(BUILD_UI3D)
@@ -538,6 +539,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
     ${SRC_ROOT}/UI/Widgets/UiSceneTreePanel2D.cpp
     ${SRC_ROOT}/UI/Widgets/UiSceneTreePanel3D.cpp
     ${SRC_ROOT}/UI/Widgets/ViewportSelector.cpp
+    ${SRC_ROOT}/UI/TestView/TestViewWindow.cpp
     )
 
     if(BUILD_UI3D)

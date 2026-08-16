@@ -26,6 +26,7 @@
 #include "Engine2D/Core/SceneManager.h"
 #include "UiPropertiesPanel.h"
 #include "RenderViewport2D.h"
+#include "UI/TestView/TestViewWindow.h"
 #include "FileDropHandler.h"
 
 #include <optional>
@@ -478,11 +479,26 @@ QWidget* Workbench2D::createCentralViewport(WorkbenchWindow& window, PropertiesP
 void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& window)
 {
     Q_UNUSED(window);
-
     vp->setSelectionService(m_services.selectionService);
     vp->setInteractionDispatcher(m_services.interactionDispatcher);
     vp->setOperationBus(m_services.operationBus);
     vp->setLayerManager(m_services.layerManager);
+
+    // TestView：打开独立“仅显示”预览窗口，展示当前 2D 场景全部图元
+    window.setTestViewHandler([this, &window]() {
+        if (!m_services.sceneEditService)
+        {
+            return;
+        }
+        auto* scene = m_services.sceneEditService->sceneManager();
+        if (!scene)
+        {
+            return;
+        }
+        auto* w = new TestViewWindow(scene, &window);
+        w->setAttribute(Qt::WA_DeleteOnClose);
+        w->show();
+    });
 
     // P1: 视口通过信号通知上层，不直接持有编辑服务
     if (m_services.sceneEditService)
