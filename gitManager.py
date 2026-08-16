@@ -71,6 +71,18 @@ def is_exit_key(choice: str) -> bool:
     return choice.strip().lower() in ("0", "q", "quit", "exit", "e", "x", "退出", "取消")
 
 
+def per_repo_choice() -> str:
+    """逐仓库处理前的选择：返回 'run' | 'skip' | 'all' | 'menu'"""
+    choice = input("  [回车/空格=处理  a=全部处理  0=跳过  m=返回主菜单] >>> ").strip()
+    if choice.lower() == "m":
+        return "menu"
+    if choice.lower() == "a":
+        return "all"
+    if is_exit_key(choice):
+        return "skip"
+    return "run"
+
+
 def autostash_msg(action: str) -> str:
     """生成自动 stash 的带时间戳备注，例如 autostash before pull 2026-08-14 14:30:00"""
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -349,9 +361,21 @@ def try_pull_with_stash(repo: Dict, remote: str, branch: str, pop: bool = True) 
 
 
 def git_pull(repos: List[Dict]):
-    """拉取：支持多远程，批量自动处理"""
+    """拉取：支持多远程，逐个确认"""
+    process_all = False
     for repo in repos:
         print(c(f"📥 {repo['name']}", Colors.BOLD + Colors.OKGREEN))
+
+        if not process_all:
+            act = per_repo_choice()
+            if act == "menu":
+                print(c("  → 已返回主菜单", Colors.DIM))
+                return
+            if act == "all":
+                process_all = True
+            elif act == "skip":
+                print(c("  → 已跳过此仓库", Colors.DIM))
+                continue
 
         remotes = select_remotes(repo, "选择要拉取的远程")
         if not remotes:
@@ -402,8 +426,20 @@ def git_pull(repos: List[Dict]):
 
 
 def git_fetch(repos: List[Dict]):
+    process_all = False
     for repo in repos:
         print(c(f"🌐 {repo['name']}", Colors.BOLD + Colors.OKGREEN))
+
+        if not process_all:
+            act = per_repo_choice()
+            if act == "menu":
+                print(c("  → 已返回主菜单", Colors.DIM))
+                return
+            if act == "all":
+                process_all = True
+            elif act == "skip":
+                print(c("  → 已跳过此仓库", Colors.DIM))
+                continue
 
         remotes = select_remotes(repo, "选择要获取的远程")
         if not remotes:
@@ -437,8 +473,12 @@ def git_add(repos: List[Dict]):
         if len(out.strip().splitlines()) > 15:
             print(c(f"  ... 还有 {len(out.strip().splitlines()) - 15} 个文件", Colors.DIM))
 
-        print("  [1] 全部暂存(add -A)  [2] 交互式暂存(-p)  [3] 指定文件  [0] 退出  [回车/空格=1]")
+        print("  [1] 全部暂存(add -A)  [2] 交互式暂存(-p)  [3] 指定文件  [0] 跳过  [m] 返回主菜单  [回车/空格=1]")
         choice = input("  >>> ").strip()
+
+        if choice.lower() == "m":
+            print(c("  → 已返回主菜单", Colors.DIM))
+            return
 
         if not choice or choice == "1":
             cmd = ["git", "add", "-A"]
@@ -449,7 +489,7 @@ def git_add(repos: List[Dict]):
             else:
                 print(c(f"  ❌ 失败: {err}", Colors.FAIL))
         elif is_exit_key(choice):
-            print(c("  → 已退出", Colors.DIM))
+            print(c("  → 已跳过此仓库", Colors.DIM))
             continue
         elif choice == "2":
             print(c("  进入交互式暂存模式 (按提示操作，q退出)...", Colors.WARNING))
@@ -479,11 +519,15 @@ def git_commit(repos: List[Dict], batch_msg: str = None):
             msg = batch_msg
             print(f"  使用提交信息: {c(msg, Colors.OKBLUE)}")
         else:
-            print("  [1] 输入提交信息  [2] 默认信息  [3] amend  [0] 退出  [回车/空格=2]")
+            print("  [1] 输入提交信息  [2] 默认信息  [3] amend  [0] 跳过  [m] 返回主菜单  [回车/空格=2]")
             choice = input("  >>> ").strip()
 
+            if choice.lower() == "m":
+                print(c("  → 已返回主菜单", Colors.DIM))
+                return
+
             if is_exit_key(choice):
-                print(c("  → 已退出", Colors.DIM))
+                print(c("  → 已跳过此仓库", Colors.DIM))
                 continue
 
             if not choice or choice == "2":
@@ -514,8 +558,20 @@ def git_commit(repos: List[Dict], batch_msg: str = None):
 
 
 def git_push(repos: List[Dict], force: bool = False):
+    process_all = False
     for repo in repos:
         print(c(f"🚀 {repo['name']}", Colors.BOLD + Colors.OKGREEN))
+
+        if not process_all:
+            act = per_repo_choice()
+            if act == "menu":
+                print(c("  → 已返回主菜单", Colors.DIM))
+                return
+            if act == "all":
+                process_all = True
+            elif act == "skip":
+                print(c("  → 已跳过此仓库", Colors.DIM))
+                continue
 
         remotes = select_remotes(repo, "选择要推送的远程")
         if not remotes:
@@ -541,17 +597,70 @@ def git_push(repos: List[Dict], force: bool = False):
 
 
 def git_branch(repos: List[Dict]):
+    print(c(f"🌿 分支管理 (共 {len(repos)} 个仓库)", Colors.BOLD + Colors.OKCYAN))
+    print("  [1] 批量新建分支  [2] 批量切换分支  [3] 批量删除分支  [4] 批量合并分支  [5] 逐仓库处理  [0] 退出  [回车/空格=0]")
+    choice = input("  >>> ").strip()
+
+    if not choice or is_exit_key(choice):
+        print(c("  → 已退出", Colors.DIM))
+        return
+
+    if choice in ("1", "2", "3", "4"):
+        name = input("  分支名: ").strip()
+        if not name:
+            print(c("  → 未输入分支名", Colors.DIM))
+            return
+
+        op_name = {"1": "新建", "2": "切换", "3": "删除", "4": "合并"}[choice]
+        force = False
+        if choice == "3":
+            force = input("  未合并分支强制删除? (y/n, 默认n): ").strip().lower() == "y"
+
+        if input(f"  确认对 {len(repos)} 个仓库执行「{op_name}分支 {name}」? (y/n): ").strip().lower() != "y":
+            print(c("  → 已取消", Colors.DIM))
+            return
+
+        results = []
+        for repo in repos:
+            print(c(f"  ── {repo['name']} ──", Colors.OKCYAN))
+            if choice == "1":
+                cmd = ["git", "checkout", "-b", name]
+            elif choice == "2":
+                cmd = ["git", "checkout", name]
+            elif choice == "3":
+                cmd = ["git", "branch", "-d", name]
+                if force:
+                    cmd = ["git", "branch", "-D", name]
+            else:
+                cmd = ["git", "merge", name]
+            show_cmd(cmd)
+            rc, out, err = run_cmd(cmd, repo["path"])
+            if rc == 0:
+                print(c("  ✅ 成功", Colors.OKGREEN))
+                results.append({"name": repo["name"], "steps": [(f"{op_name} {name}", True)]})
+            else:
+                print(c(f"  ❌ {err}", Colors.FAIL))
+                results.append({"name": repo["name"], "steps": [(f"{op_name} {name}", False)]})
+        print_batch_stats(results)
+        return
+
+    # 逐仓库处理：可跳过 / 返回主菜单
     for repo in repos:
         print(c(f"🌿 {repo['name']}", Colors.BOLD + Colors.OKCYAN))
+        show_cmd(["git", "branch", "-a"])
         rc, out, _ = run_cmd(["git", "branch", "-a"], repo["path"])
         if out:
             print(out)
 
-        print("  [1] 新建分支  [2] 切换分支  [3] 删除分支  [4] 合并分支  [0] 退出  [回车/空格=0]")
+        print("  [1] 新建分支  [2] 切换分支  [3] 删除分支  [4] 合并分支  [0] 跳过此仓库  [m] 返回主菜单  [回车/空格=跳过]")
         choice = input("  >>> ").strip()
 
+        if choice.lower() == "m":
+            print(c("  → 已返回主菜单", Colors.DIM))
+            return
+
         if not choice or is_exit_key(choice):
-            print(c("  → 已退出", Colors.DIM))
+            print(c("  → 已跳过此仓库", Colors.DIM))
             continue
 
         if choice == "1":
@@ -611,7 +720,7 @@ def git_stash(repos: List[Dict]):
         else:
             print(c("  暂无 stash", Colors.DIM))
 
-        print("  [1] 保存stash  [2] 弹出最新  [3] 查看内容  [4] 清空本仓库  [5] 清空所有仓库  [0] 退出  [m] 返回主菜单  [回车/空格=1]")
+        print("  [1] 保存stash  [2] 弹出最新  [3] 查看内容  [4] 清空本仓库  [5] 清空所有仓库  [0] 跳过  [m] 返回主菜单  [回车/空格=1]")
         choice = input("  >>> ").strip()
 
         if choice.lower() == "m":
@@ -619,7 +728,7 @@ def git_stash(repos: List[Dict]):
             return
 
         if is_exit_key(choice):
-            print(c("  → 已退出", Colors.DIM))
+            print(c("  → 已跳过此仓库", Colors.DIM))
             continue
 
         if not choice or choice == "1":
@@ -686,11 +795,15 @@ def git_reset(repos: List[Dict]):
     for repo in repos:
         print(c(f"↩️  {repo['name']}", Colors.BOLD + Colors.WARNING))
         print(c("  ⚠️ 重置可能丢失变更！", Colors.WARNING))
-        print("  [1] 软重置(保留工作区)  [2] 混合重置(取消暂存)  [3] 硬重置(丢弃变更)  [0] 退出  [回车/空格=0]")
+        print("  [1] 软重置(保留工作区)  [2] 混合重置(取消暂存)  [3] 硬重置(丢弃变更)  [0] 跳过  [m] 返回主菜单  [回车/空格=0]")
         choice = input("  >>> ").strip()
 
+        if choice.lower() == "m":
+            print(c("  → 已返回主菜单", Colors.DIM))
+            return
+
         if not choice or is_exit_key(choice):
-            print(c("  → 已退出", Colors.DIM))
+            print(c("  → 已跳过此仓库", Colors.DIM))
             continue
 
         if choice == "1":
@@ -734,11 +847,15 @@ def git_remote_manage(repos: List[Dict]):
         else:
             print(c("  暂无远程", Colors.DIM))
 
-        print("  [1] 添加远程  [2] 删除远程  [3] 修改URL  [4] 重命名  [0] 退出  [回车/空格=0]")
+        print("  [1] 添加远程  [2] 删除远程  [3] 修改URL  [4] 重命名  [0] 跳过  [m] 返回主菜单  [回车/空格=0]")
         choice = input("  >>> ").strip()
 
+        if choice.lower() == "m":
+            print(c("  → 已返回主菜单", Colors.DIM))
+            return
+
         if not choice or is_exit_key(choice):
-            print(c("  → 已退出", Colors.DIM))
+            print(c("  → 已跳过此仓库", Colors.DIM))
             continue
 
         if choice == "1":
@@ -807,11 +924,15 @@ def git_discard_files(repos: List[Dict]):
         for i, (st, f) in enumerate(tracked, 1):
             print(f"    [{i:2d}] {c(st, Colors.WARNING)} {f}")
 
-        print("  [1] 丢弃全部已跟踪文件变更  [2] 指定文件  [0] 退出  [回车/空格=0]")
+        print("  [1] 丢弃全部已跟踪文件变更  [2] 指定文件  [0] 跳过  [m] 返回主菜单  [回车/空格=0]")
         choice = input("  >>> ").strip()
 
+        if choice.lower() == "m":
+            print(c("  → 已返回主菜单", Colors.DIM))
+            return
+
         if not choice or is_exit_key(choice):
-            print(c("  → 已退出", Colors.DIM))
+            print(c("  → 已跳过此仓库", Colors.DIM))
             continue
 
         target_files = []
@@ -1159,11 +1280,15 @@ def git_submodule_update(repos: List[Dict]):
     main_repos = [r for r in repos if not r["is_submodule"] or r["rel_path"] == "."]
     for repo in main_repos:
         print(c(f"🔄 {repo['name']}", Colors.BOLD + Colors.OKGREEN))
-        print("  [1] 初始化并更新  [2] 仅更新  [3] 递归更新  [0] 退出  [回车/空格=1]")
+        print("  [1] 初始化并更新  [2] 仅更新  [3] 递归更新  [0] 跳过  [m] 返回主菜单  [回车/空格=1]")
         choice = input("  >>> ").strip()
 
+        if choice.lower() == "m":
+            print(c("  → 已返回主菜单", Colors.DIM))
+            return
+
         if is_exit_key(choice):
-            print(c("  → 已退出", Colors.DIM))
+            print(c("  → 已跳过此仓库", Colors.DIM))
             continue
         if not choice:
             choice = "1"
@@ -1534,7 +1659,7 @@ def main_loop(repos, root_path, args):
   [4]  📦 暂存文件 (add)            → git add -A
   [5]  💾 提交变更 (commit)         → git commit -m "msg"
   [6]  🚀 推送代码 (push)           → git push <remote> <branch>
-  [7]  🌿 分支管理 (branch)         → git branch / checkout / merge
+  [7]  🌿 分支管理 (branch)         → git branch / checkout / merge (可批量)
   [8]  📜 查看日志 (log)            → git log --oneline -15
   [9]  📂 Stash管理                 → git stash push/pop/list/clear
   [10] ↩️  重置操作 (reset)          → git reset --soft/mixed/hard
