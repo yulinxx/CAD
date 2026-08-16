@@ -21,6 +21,8 @@
 #include <QUrl>
 #include <QWidget>
 
+#include <vector>
+
 namespace
 {
     // 位图/图片扩展名（与 FileOperationRegistry::doImportImage 一致），
@@ -33,6 +35,29 @@ namespace
                                           QStringLiteral("tif"),    QStringLiteral("gif"),
                                           QStringLiteral("webp") };
         return exts;
+    }
+
+    // 将图片文件解码为 RGBA8888 QImage。
+    // 优先 QImage（覆盖 png/bmp/jpg/gif/ico/svg 等）；失败时回退到
+    // Fio::loadImageToRgba（libwebp 解 webp、libtiff 解 tiff、stb_image 解 tga 等），
+    // 确保拖拽支持全部声明格式。
+    bool loadRgbaImage(const QString& filePath, QImage& outRgba)
+    {
+        QImage image(filePath);
+        if (!image.isNull())
+        {
+            outRgba = image.convertToFormat(QImage::Format_RGBA8888);
+            return true;
+        }
+
+        std::vector<unsigned char> bytes;
+        int w = 0, h = 0;
+        if (!Fio::loadImageToRgba(filePath.toUtf8().constData(), bytes, w, h) || w <= 0 || h <= 0)
+        {
+            return false;
+        }
+        outRgba = QImage(bytes.data(), w, h, w * 4, QImage::Format_RGBA8888).copy();
+        return !outRgba.isNull();
     }
 }  // namespace
 
@@ -51,6 +76,67 @@ void FileDropHandler::setSceneManager(Eg::SceneManager* sceneManager)
     m_sceneManager = sceneManager;
 }
 
+void FileDropHandler::installAppEventFilter()
+{
+    if (m_appFilterInstalled)
+    {
+        return;
+    }
+    if (QCoreApplication* app = QApplication::instance())
+    {
+        app->installEventFilter(this);
+        m_appFilterInstalled = true;
+        SY_INFO("[FileDropHandler] App-level event filter installed for drag-drop");
+    }
+}
+
+bool FileDropHandler::eventFilter(QObject* watched, QEvent* event)
+{
+    // 应用级过滤器兜底：在 QOpenGLWidget 原生子窗口（macOS/Windows）上，
+    // 拖放事件不冒泡到 WorkbenchWindow，这里统一拦截处理。
+    if (!m_importService)
+    {
+        return QObject::eventFilter(watched, event);
+    }
+
+    switch (event->type())
+    {
+    case QEvent::DragEnter:
+    {
+        if (handleDragEnter(static_cast<QDragEnterEvent*>(event)))
+        {
+            return true;  // 已接受，不再下发给目标控件
+        }
+        return false;
+    }
+    case QEvent::DragMove:
+    {
+        if (handleDragMove(static_cast<QDragMoveEvent*>(event)))
+        {
+            return true;
+        }
+        return false;
+    }
+    case QEvent::DragLeave:
+    {
+        handleDragLeave(static_cast<QDragLeaveEvent*>(event));
+        return false;  // DragLeave 不消费，交回目标控件
+    }
+    case QEvent::Drop:
+    {
+        if (handleDrop(static_cast<QDropEvent*>(event)))
+        {
+            return true;  // 已导入，消费事件避免二次处理
+        }
+        return false;
+    }
+    default:
+        break;
+    }
+
+    return QObject::eventFilter(watched, event);
+}
+
 // void FileDropHandler::installAppEventFilter()
 // {
 //     if (m_appFilterInstalled)
@@ -63,42 +149,6 @@ void FileDropHandler::setSceneManager(Eg::SceneManager* sceneManager)
 //         m_appFilterInstalled = true;
 //         SY_INFO("[FileDropHandler] App-level event filter installed for drag-drop");
 //     }
-// }
-
-// bool FileDropHandler::eventFilter(QObject* watched, QEvent* event)
-// {
-//     if (!m_importService)
-//     {
-//         return QObject::eventFilter(watched, event);
-//     }
-
-//     switch (event->type())
-//     {
-//     case QEvent::DragEnter:
-//     {
-//         handleDragEnter(static_cast<QDragEnterEvent*>(event));
-//         return event->isAccepted();
-//     }
-//     case QEvent::DragMove:
-//     {
-//         handleDragMove(static_cast<QDragMoveEvent*>(event));
-//         return event->isAccepted();
-//     }
-//     case QEvent::DragLeave:
-//     {
-//         handleDragLeave(static_cast<QDragLeaveEvent*>(event));
-//         return true;
-//     }
-//     case QEvent::Drop:
-//     {
-//         handleDrop(static_cast<QDropEvent*>(event));
-//         return true;
-//     }
-//     default:
-//         break;
-//     }
-
-//     return QObject::eventFilter(watched, event);
 // }
 
 QStringList FileDropHandler::supportedExtensions() const
@@ -252,13 +302,11 @@ bool FileDropHandler::importImage(const QString& filePath)
         return false;
     }
 
-    QImage image(filePath);
-    if (image.isNull())
+    QImage rgba;
+    if (!loadRgbaImage(filePath, rgba))
     {
         return false;
     }
-
-    QImage rgba = image.convertToFormat(QImage::Format_RGBA8888);
 
     const Fio::ImageInfo info = Fio::readImageInfo(filePath.toUtf8().constData());
     const float worldW = Fio::pixelsToUnit(rgba.width(), info.dpiX, Fio::UnitType::Millimeter);

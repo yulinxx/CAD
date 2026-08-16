@@ -88,6 +88,9 @@ public:
     void syncGridSnapMenuState();
     void refreshGridSnapMenuChecks();
 
+    /// 根据当前激活的绘图工具同步 Draw 菜单勾选态（与左侧工具栏联动）
+    void syncDrawMenuToTool(const QString& toolName);
+
     QMenu* fileMenu() const
     {
         return m_menuState.fileMenu;
@@ -184,6 +187,8 @@ private:
     UiWorkbench* m_workbench{ nullptr };
     WorkbenchFactory m_workbenchFactory;
     std::function<void(const QString&)> m_viewportZoomHandler;
+    // Draw 菜单绘图工具动作组（互斥单选，与左侧工具栏选中态联动）
+    QActionGroup* m_drawToolActionGroup{ nullptr };
     // 全局编辑快捷键动作（窗口级，需在切换工作台时显式清理）
     std::vector<QAction*> m_editShortcuts;
 #ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI

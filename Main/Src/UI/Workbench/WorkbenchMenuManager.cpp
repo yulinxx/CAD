@@ -793,7 +793,43 @@ void WorkbenchMenuManager::refreshDrawMenuForWorkbench(const QString& workbenchI
         const QString iconRes = cmdEntry.iconResource ? QString::fromUtf8(cmdEntry.iconResource) : QString();
         // 绘图工具命令使用 toolName 作为 commandId，由 Workbench2D::dispatchCommand
         // 兜底按 operationForToolName 解析，与左侧工具栏/右键菜单为同一条分发路径。
-        addMenuAction(m_menuState.drawMenu, tr(cmdEntry.text), QString::fromUtf8(cmdEntry.toolName), iconRes);
+        QAction* toolAction = addMenuAction(
+            m_menuState.drawMenu, tr(cmdEntry.text), QString::fromUtf8(cmdEntry.toolName), iconRes);
+        // 绘图工具菜单项设为可勾选（互斥单选），与左侧工具栏选中态联动：
+        // 视口 activeToolChanged → syncDrawMenuToTool 更新勾选，反之点击菜单走同一条 Tool_* 分发。
+        if (toolAction)
+        {
+            toolAction->setCheckable(true);
+            QActionGroup* group = m_drawToolActionGroup;
+            if (!group)
+            {
+                group = new QActionGroup(this);
+                group->setExclusive(true);
+                m_drawToolActionGroup = group;
+            }
+            group->addAction(toolAction);
+        }
+    }
+}
+
+void WorkbenchMenuManager::syncDrawMenuToTool(const QString& toolName)
+{
+    if (!m_menuState.drawMenu)
+    {
+        return;
+    }
+    for (QAction* action : m_menuState.drawMenu->actions())
+    {
+        if (!action || !action->isCheckable() || action->isSeparator())
+        {
+            continue;
+        }
+        const QString cmdId = action->property("commandId").toString();
+        const bool active = !toolName.isEmpty() && cmdId == toolName;
+        if (active != action->isChecked())
+        {
+            action->setChecked(active);
+        }
     }
 }
 

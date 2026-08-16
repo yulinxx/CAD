@@ -146,9 +146,12 @@ WorkbenchWindow::WorkbenchWindow(QWidget* parent)
     resize(1440, 900);
     // 启用文件拖放，2D/3D 工作台共用统一 FileDropHandler
     setAcceptDrops(true);
-    // Windows 下 QOpenGLWidget 是原生子窗口，拖放事件可能不冒泡到本窗口，
-    // 额外安装应用级事件过滤器兜底，确保拖放任何位置都能触发导入
-    // m_fileDropHandler->installAppEventFilter();
+    // QOpenGLWidget 在 macOS/Windows 是原生子窗口，拖放事件可能不冒泡到本窗口。
+    // 额外安装应用级事件过滤器兜底，确保拖放视口/子窗口任意位置都能触发导入。
+    if (m_fileDropHandler)
+    {
+        m_fileDropHandler->installAppEventFilter();
+    }
 
     // 注册主界面根部件到总开关（UiInteractionGate），
     // 供长时算法/批量操作在运行期间整体禁用/恢复主界面

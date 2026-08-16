@@ -29,6 +29,7 @@
 #include "DrawToolBarWidget.h"
 #include "DrawToolSwitchRegistry.h"
 #include "WorkbenchWindow.h"
+#include "WorkbenchMenuManager.h"
 
 #include "UI2D/Operation/CommandActionHub.h"
 #include "UI2D/Operation/OperationBus.h"
@@ -324,7 +325,17 @@ void Workbench2D::dispatchCommand(const QString& commandId)
     const OperationId operation = CommandCatalog::operationForCommandId(commandId);
     if (operation == OperationId::None)
     {
-        SY_WARNF("[Workbench2D] Unknown command: %s", qPrintable(commandId));
+        // 绘图工具菜单项以 toolName（如 "LineTool"）作为命令 ID 分发，
+        // 与左侧工具栏 DrawToolBarWidget 保持一致：用 operationForToolName 解析到已注册的 Tool_* 操作，
+        // 经 OperationBus 激活视口对应工具，从而与工具栏形成同一条分发/联动路径。
+        const OperationId toolOperation = CommandCatalog::operationForToolName(commandId);
+        if (toolOperation == OperationId::None)
+        {
+            SY_WARNF("[Workbench2D] Unknown command: %s", qPrintable(commandId));
+            return;
+        }
+        SY_INFOF("[Workbench2D] Dispatch tool command='%s'", qPrintable(commandId));
+        m_services.operationBus->run(toolOperation, {}, OperationSource::Menu);
         return;
     }
 
@@ -620,6 +631,15 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // 双向状态同步：视口切换工具后高亮对应按钮；启动时初始化为当前活动工具（SelectTool）。
     QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged, drawWidget, &DrawToolBarWidget::updateActiveTool);
     drawWidget->updateActiveTool(m_viewport->activeToolName());
+
+    // Draw 菜单与左侧工具栏联动：视口切换工具 → 同步菜单勾选态
+    if (auto* menuMgr = window.menuManager())
+    {
+        QObject::connect(m_viewport,
+            &RenderViewport2D::activeToolChanged,
+            menuMgr,
+            &WorkbenchMenuManager::syncDrawMenuToTool);
+    }
 
     // CommandActionHub：管理所有 QAction 的创建与绑定
     m_commandHub = std::make_unique<CommandActionHub>();

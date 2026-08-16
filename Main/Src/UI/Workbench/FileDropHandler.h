@@ -34,9 +34,9 @@ public:
     /// 注入 2D 场景管理器（非拥有指针，用于导入位图/图片文件）
     void setSceneManager(Eg::SceneManager* sceneManager);
 
-    // /// 在 QApplication 上安装应用级事件过滤器，兜底处理
-    // /// Windows 下 QOpenGLWidget 原生子窗口不向上冒泡拖放事件的情况
-    // void installAppEventFilter();
+    /// 在 QApplication 上安装应用级事件过滤器，兜底处理
+    /// Windows/macOS 下 QOpenGLWidget 原生子窗口不向上冒泡拖放事件的情况
+    void installAppEventFilter();
 
     // 处理 QDragEnterEvent — 仅在拖入受支持扩展名的文件时 accept
     bool handleDragEnter(QDragEnterEvent* event);
@@ -61,12 +61,12 @@ signals:
     void sigDropFinished(int successCount, int failedCount);
 
 protected:
-    /// 应用级事件过滤器：拦截拖放事件（Windows 原生子窗口兜底）
-    // bool eventFilter(QObject* watched, QEvent* event) override;
+    /// 应用级事件过滤器：拦截拖放事件（Windows/macOS 原生子窗口兜底）
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
     ImportService* m_importService{ nullptr };
     Eg::SceneManager* m_sceneManager{ nullptr };
     /// 是否已安装应用级事件过滤器
-    // bool m_appFilterInstalled{ false };
+    bool m_appFilterInstalled{ false };
 };

@@ -128,6 +128,7 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
     uiServices.interactionDispatcher = interactionDispatcher();
     uiServices.operationBus = m_operationBus.get();
     uiServices.document2D = m_document2D.get();
+    uiServices.sceneEditService = m_sceneEditService.get();
     uiServices.selectionService = m_selectionService.get();
     uiServices.viewportActionHub = m_viewportActionHub.get();
     uiServices.unitManager = m_unitManager.get();

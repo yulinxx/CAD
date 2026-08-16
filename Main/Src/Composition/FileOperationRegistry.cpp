@@ -25,6 +25,7 @@
 #include <QImage>
 #include <QVariantMap>
 #include <array>
+#include <vector>
 
 namespace
 {
@@ -230,15 +231,27 @@ void FileOperationRegistry::doImportImage(const QString& filePath)
             }
         }
 
+        QImage rgba;
         QImage image(path);
-        if (image.isNull())
+        if (!image.isNull())
         {
-            QMessageBox::warning(
-                m_parentWidget, QObject::tr("Import Image"), QObject::tr("Failed to load image: %1").arg(path));
-            return;
+            rgba = image.convertToFormat(QImage::Format_RGBA8888);
+        }
+        else
+        {
+            // QImage 无法解码（如缺少 Qt imageformats 插件）时回退：
+            // libwebp 解 webp、libtiff 解 tiff、stb_image 解 tga 等，保证菜单导入支持全部声明格式。
+            std::vector<unsigned char> bytes;
+            int w = 0, h = 0;
+            if (!Fio::loadImageToRgba(path.toUtf8().constData(), bytes, w, h) || w <= 0 || h <= 0)
+            {
+                QMessageBox::warning(
+                    m_parentWidget, QObject::tr("Import Image"), QObject::tr("Failed to load image: %1").arg(path));
+                return;
+            }
+            rgba = QImage(bytes.data(), w, h, w * 4, QImage::Format_RGBA8888).copy();
         }
 
-        QImage rgba = image.convertToFormat(QImage::Format_RGBA8888);
         Fio::ImageInfo info = Fio::readImageInfo(path.toUtf8().constData());
         const float worldW = Fio::pixelsToUnit(rgba.width(), info.dpiX, Fio::UnitType::Millimeter);
         const float worldH = Fio::pixelsToUnit(rgba.height(), info.dpiY, Fio::UnitType::Millimeter);
