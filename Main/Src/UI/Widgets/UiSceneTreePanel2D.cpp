@@ -373,11 +373,12 @@ SceneTreePanel2D::SceneTreePanel2D(QWidget* parent)
     m_view->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_view->setAllColumnsShowFocus(true);
     m_view->setUniformRowHeights(true);
+    // 所有列 Interactive：允许用户拖拽表头调整各列宽度
     m_view->header()->setStretchLastSection(false);
-    m_view->header()->setSectionResizeMode(SceneTreeTableModel2D::ColName, QHeaderView::Stretch);
-    m_view->header()->setSectionResizeMode(SceneTreeTableModel2D::ColType, QHeaderView::ResizeToContents);
-    m_view->header()->setSectionResizeMode(SceneTreeTableModel2D::ColLayer, QHeaderView::ResizeToContents);
-    m_view->header()->setSectionResizeMode(SceneTreeTableModel2D::ColVisible, QHeaderView::ResizeToContents);
+    m_view->header()->setSectionResizeMode(SceneTreeTableModel2D::ColName, QHeaderView::Interactive);
+    m_view->header()->setSectionResizeMode(SceneTreeTableModel2D::ColType, QHeaderView::Interactive);
+    m_view->header()->setSectionResizeMode(SceneTreeTableModel2D::ColLayer, QHeaderView::Interactive);
+    m_view->header()->setSectionResizeMode(SceneTreeTableModel2D::ColVisible, QHeaderView::Interactive);
     // 绝不 expandAll；群组仅在用户点击展开箭头时通过 canFetchMore/fetchMore 懒加载
     m_view->setExpandsOnDoubleClick(true);
     layout->addWidget(m_view);

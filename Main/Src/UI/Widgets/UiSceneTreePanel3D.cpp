@@ -23,10 +23,11 @@ SceneTreePanel3D::SceneTreePanel3D(QWidget* parent)
 
     m_tree = new QTreeWidget(this);
     m_tree->setHeaderLabels({ tr("Name"), tr("Type"), tr("Info") });
+    // 所有列 Interactive：允许用户拖拽表头调整各列宽度
     m_tree->header()->setStretchLastSection(false);
-    m_tree->header()->setSectionResizeMode(SceneTreePanel3D::ColName, QHeaderView::Stretch);
-    m_tree->header()->setSectionResizeMode(SceneTreePanel3D::ColType, QHeaderView::ResizeToContents);
-    m_tree->header()->setSectionResizeMode(SceneTreePanel3D::ColInfo, QHeaderView::ResizeToContents);
+    m_tree->header()->setSectionResizeMode(SceneTreePanel3D::ColName, QHeaderView::Interactive);
+    m_tree->header()->setSectionResizeMode(SceneTreePanel3D::ColType, QHeaderView::Interactive);
+    m_tree->header()->setSectionResizeMode(SceneTreePanel3D::ColInfo, QHeaderView::Interactive);
     m_tree->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_tree->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::EditKeyPressed);
     layout->addWidget(m_tree);
