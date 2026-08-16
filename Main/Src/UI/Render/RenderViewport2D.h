@@ -159,6 +159,8 @@ public:
     QPointF mapToScene(const QPoint& screenPos) const;
     /// 将 RenderWidget 本地坐标转换为世界坐标（物理像素 → 相机反算）
     QPointF widgetToWorld(QPoint widgetLocalPos) const;
+    /// 将全局屏幕坐标转换为世界坐标（用于拖放等跨控件定位）
+    QPointF mapGlobalToScene(const QPoint& globalPos) const;
 
     /// 粘贴锚点：鼠标在视口内则取鼠标世界坐标，否则取视口中心世界坐标
     QPointF pasteAnchorWorld() const;

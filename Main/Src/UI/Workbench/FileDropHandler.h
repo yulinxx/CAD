@@ -1,7 +1,11 @@
 #pragma once
 
 #include <QObject>
+#include <QPointF>
 #include <QStringList>
+
+#include <functional>
+#include <optional>
 
 class ImportService;
 class QDragEnterEvent;
@@ -38,6 +42,10 @@ public:
     /// Windows/macOS 下 QOpenGLWidget 原生子窗口不向上冒泡拖放事件的情况
     void installAppEventFilter();
 
+    /// 设置屏幕全局坐标 → 世界坐标转换回调（用于把导入位置放到鼠标松开处）。
+    /// 入参为全局屏幕坐标（物理像素无关），返回世界坐标；无法转换时返回 std::nullopt。
+    void setScreenToWorldConverter(std::function<std::optional<QPointF>(const QPoint&)> converter);
+
     // 处理 QDragEnterEvent — 仅在拖入受支持扩展名的文件时 accept
     bool handleDragEnter(QDragEnterEvent* event);
     // 处理 QDragMoveEvent
@@ -51,8 +59,8 @@ public:
     QStringList supportedExtensions() const;
 
 private:
-    /// 通过 QImage 导入位图/图片文件到当前场景
-    bool importImage(const QString& filePath);
+    /// 通过 QImage 导入位图/图片文件到当前场景，图片中心放在 anchorWorld 处
+    bool importImage(const QString& filePath, const QPointF& anchorWorld = QPointF(0, 0));
 
 signals:
     /// 单个文件导入完成（导入前后各发一次，导入前 success=false）
@@ -67,6 +75,8 @@ protected:
 private:
     ImportService* m_importService{ nullptr };
     Eg::SceneManager* m_sceneManager{ nullptr };
+    /// 屏幕全局坐标 → 世界坐标转换器（由上层注入）
+    std::function<std::optional<QPointF>(const QPoint&)> m_screenToWorld;
     /// 是否已安装应用级事件过滤器
     bool m_appFilterInstalled{ false };
 };

@@ -63,6 +63,12 @@ public:
     explicit WorkbenchWindow(QWidget* parent = nullptr);
     ~WorkbenchWindow() override;
 
+    /// 文件拖放处理器（供上层注入坐标转换等回调）
+    class FileDropHandler* fileDropHandler() const
+    {
+        return m_fileDropHandler.get();
+    }
+
 protected:
     /// 语言切换事件处理
     void changeEvent(QEvent* event) override;

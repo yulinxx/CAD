@@ -26,6 +26,9 @@
 #include "Engine2D/Core/SceneManager.h"
 #include "UiPropertiesPanel.h"
 #include "RenderViewport2D.h"
+#include "FileDropHandler.h"
+
+#include <optional>
 #include "DrawToolBarWidget.h"
 #include "DrawToolSwitchRegistry.h"
 #include "WorkbenchWindow.h"
@@ -558,6 +561,18 @@ void Workbench2D::setupImportCallbacks(RenderViewport2D* vp, WorkbenchWindow& wi
     if (!m_services.importService)
     {
         return;
+    }
+
+    // 拖放导入时，把图片/位图放到鼠标松开的全局坐标处（世界坐标）
+    if (auto* fdh = window.fileDropHandler())
+    {
+        fdh->setScreenToWorldConverter([vp](const QPoint& globalPos) -> std::optional<QPointF> {
+            if (!vp)
+            {
+                return std::nullopt;
+            }
+            return vp->mapGlobalToScene(globalPos);
+        });
     }
 
     // 导入后自动 zoomToFit

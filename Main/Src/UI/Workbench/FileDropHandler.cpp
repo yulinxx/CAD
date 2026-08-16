@@ -10,6 +10,7 @@
 #include "FileIO/ImageUtils.h"
 
 #include <QApplication>
+#include <QCursor>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
 #include <QDragLeaveEvent>
@@ -74,6 +75,11 @@ void FileDropHandler::setImportService(ImportService* service)
 void FileDropHandler::setSceneManager(Eg::SceneManager* sceneManager)
 {
     m_sceneManager = sceneManager;
+}
+
+void FileDropHandler::setScreenToWorldConverter(std::function<std::optional<QPointF>(const QPoint&)> converter)
+{
+    m_screenToWorld = std::move(converter);
 }
 
 void FileDropHandler::installAppEventFilter()
@@ -220,6 +226,16 @@ bool FileDropHandler::handleDrop(QDropEvent* event)
     int successCount = 0;
     int failedCount = 0;
 
+    // 图片导入锚点：鼠标松开处（全局屏幕坐标 → 世界坐标）。转换失败时回退到原点。
+    QPointF anchorWorld(0, 0);
+    if (m_screenToWorld)
+    {
+        if (auto w = m_screenToWorld(QCursor::pos()))
+        {
+            anchorWorld = *w;
+        }
+    }
+
     for (const QUrl& url : urls)
     {
         if (!url.isLocalFile())
@@ -248,7 +264,7 @@ bool FileDropHandler::handleDrop(QDropEvent* event)
                 continue;
             }
 
-            const bool ok = importImage(filePath);
+            const bool ok = importImage(filePath, anchorWorld);
             if (ok)
             {
                 ++successCount;
@@ -295,7 +311,7 @@ bool FileDropHandler::handleDrop(QDropEvent* event)
     return successCount > 0;
 }
 
-bool FileDropHandler::importImage(const QString& filePath)
+bool FileDropHandler::importImage(const QString& filePath, const QPointF& anchorWorld)
 {
     if (filePath.isEmpty())
     {
@@ -318,13 +334,16 @@ bool FileDropHandler::importImage(const QString& filePath)
     imgEntity->ePixelFormat = Eg::SyPixelFormat::RGBA32;
     imgEntity->setPixelData(rgba.constBits(), static_cast<size_t>(rgba.sizeInBytes()));
 
+    // 图片以中心点为世界锚点，锚点即鼠标松开处的世界坐标
     const double halfW = worldW / 2.0;
     const double halfH = worldH / 2.0;
-    imgEntity->basePoint = Ut::Vec2d(0, 0);
-    imgEntity->topLeft = Ut::Vec2d(-halfW, halfH);
-    imgEntity->topRight = Ut::Vec2d(halfW, halfH);
-    imgEntity->bottomLeft = Ut::Vec2d(-halfW, -halfH);
-    imgEntity->bottomRight = Ut::Vec2d(halfW, -halfH);
+    const double cx = anchorWorld.x();
+    const double cy = anchorWorld.y();
+    imgEntity->basePoint = Ut::Vec2d(cx, cy);
+    imgEntity->topLeft = Ut::Vec2d(cx - halfW, cy + halfH);
+    imgEntity->topRight = Ut::Vec2d(cx + halfW, cy + halfH);
+    imgEntity->bottomLeft = Ut::Vec2d(cx - halfW, cy - halfH);
+    imgEntity->bottomRight = Ut::Vec2d(cx + halfW, cy - halfH);
 
     m_sceneManager->addEntity(imgEntity);
     return true;
