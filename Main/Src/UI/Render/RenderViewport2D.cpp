@@ -672,6 +672,17 @@ QPointF RenderViewport2D::mapToScene(const QPoint& screenPos) const
     return widgetToWorld(widgetPos);
 }
 
+QPointF RenderViewport2D::mapGlobalToScene(const QPoint& globalPos) const
+{
+    if (!m_renderWidget)
+    {
+        return QPointF();
+    }
+    // 全局屏幕坐标 → RenderWidget 本地坐标（设备无关像素），再反算世界坐标
+    const QPoint local = m_renderWidget->mapFromGlobal(globalPos);
+    return widgetToWorld(local);
+}
+
 // ==================== 事件处理（委托给 ViewportInputRouter） ====================
 
 void RenderViewport2D::showEvent(QShowEvent* event)

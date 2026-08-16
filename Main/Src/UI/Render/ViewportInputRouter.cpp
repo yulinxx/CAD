@@ -7,6 +7,7 @@
 #include "ViewportInputRouter.h"
 #include "RenderWidget.h"
 #include "Camera2D.h"
+#include "ViewportNavigation2D.h"
 #include "SceneRefreshCoordinator.h"
 #include "ViewportSelector.h"
 #include "ISelectionService.h"
@@ -27,6 +28,7 @@
 #include <QKeyEvent>
 #include <QInputMethodEvent>
 #include <QContextMenuEvent>
+#include <QNativeGestureEvent>
 #include <QVariant>
 #include <QRectF>
 #include <cmath>
@@ -46,6 +48,7 @@ ViewportInputRouter::~ViewportInputRouter() = default;
 void ViewportInputRouter::setRenderWidget(RenderWidget* widget)
 {
     m_renderWidget = widget;
+    m_navigation.setRenderWidget(widget);
 
     // 注入输入法查询处理器：RenderWidget 的 inputMethodQuery 委托至此
     // 覆盖 Windows/IM、macOS/NSTextInputClient、Linux/IBus-Fcitx 需要的全部查询
@@ -110,6 +113,7 @@ void ViewportInputRouter::setRenderWidget(RenderWidget* widget)
 void ViewportInputRouter::setCamera(Camera2D* camera)
 {
     m_camera = camera;
+    m_navigation.setCamera(camera);
 }
 
 void ViewportInputRouter::setToolManager(ToolManager* tm)
@@ -159,7 +163,7 @@ void ViewportInputRouter::setStatusCallback(std::function<void(const QString&)> 
 
 void ViewportInputRouter::setCameraChangedCallback(std::function<void()> callback)
 {
-    m_cameraChangedCallback = std::move(callback);
+    m_navigation.setCameraChangedCallback(std::move(callback));
 }
 
 // ==================== 事件过滤器 ====================
@@ -204,10 +208,23 @@ bool ViewportInputRouter::eventFilter(QObject* obj, QEvent* event)
         handleWheel(we);
         return true;
     }
+    case QEvent::NativeGesture:
+    {
+        // macOS 触控板捏合以 NativeGesture 形式送达（非 Ctrl+Wheel），跨平台统一在此转缩放。
+        auto* ge = static_cast<QNativeGestureEvent*>(event);
+        handleNativeGesture(ge);
+        return true;
+    }
     case QEvent::KeyPress:
     {
         auto* ke = static_cast<QKeyEvent*>(event);
         handleKeyPress(ke);
+        return true;
+    }
+    case QEvent::KeyRelease:
+    {
+        auto* ke = static_cast<QKeyEvent*>(event);
+        handleKeyRelease(ke);
         return true;
     }
     case QEvent::InputMethod:
@@ -271,6 +288,15 @@ void ViewportInputRouter::handleMouseMove(QMouseEvent* event)
     if (m_positionCallback)
     {
         m_positionCallback(worldPos.x(), worldPos.y());
+    }
+
+    // 空格按住时：任意鼠标/触控板单指移动即进入临时平移（无需按下按键）。
+    // 触控板单指移动是纯移动事件（无按键），与 AutoCAD "按住空格拖动" 手感一致。
+    if (m_spaceHeld && !m_panning)
+    {
+        m_panning = true;
+        m_spacePanned = true;
+        m_navigation.beginPan(physWidgetPos);
     }
 
     if (handlePanMouseMove(physWidgetPos, event))
@@ -342,23 +368,34 @@ void ViewportInputRouter::handleWheel(QWheelEvent* event)
         return;
     }
 
-    QPointF worldPos = widgetToWorld(event->position());
-    if (worldPos.isNull())
+    // 共享导航控制器统一处理滚轮/触控板手势 → 相机变化
+    m_navigation.handleWheel(event);
+    event->accept();
+}
+
+// 跨平台滚轮/触控板手势分类：
+//  - 无滚动阶段（普通鼠标滚轮，macOS 上鼠标滚轮也带像素增量）→ 一律缩放，
+//    不改变既有鼠标操作（无论是否带 Ctrl/Shift）
+//  - 触控板（带滚动阶段 ScrollBegin/ScrollUpdate/ScrollMomentum/ScrollEnd）：
+//      * Ctrl = 捏合缩放
+//      * Shift = 水平平移
+//      * 其余 = 平移（双指拖动）
+ViewportInputRouter::WheelGestureType ViewportInputRouter::classifyWheel(
+    const QPoint& angleDelta, const QPointF& pixelDelta, Qt::KeyboardModifiers modifiers, Qt::ScrollPhase phase)
+{
+    // 转发到共享导航控制器的唯一实现（枚举值一一对应）
+    return static_cast<WheelGestureType>(ViewportNavigation2D::classifyWheel(angleDelta, pixelDelta, modifiers, phase));
+}
+
+void ViewportInputRouter::handleNativeGesture(QNativeGestureEvent* event)
+{
+    if (!m_renderWidget || !m_camera || !event)
     {
         return;
     }
 
-    QSizeF physSize = physicalViewportSize();
-    float vpW = static_cast<float>(physSize.width());
-    float vpH = static_cast<float>(physSize.height());
-
-    float factor = (event->angleDelta().y() > 0) ? 1.1f : 0.9f;
-    m_camera->zoomIn(factor, worldPos, vpW, vpH);
-    // 相机参数已变，通知视口提交新矩阵并重绘
-    if (m_cameraChangedCallback)
-    {
-        m_cameraChangedCallback();
-    }
+    // 共享导航控制器统一处理 macOS 触控板捏合缩放
+    m_navigation.handleNativeGesture(event);
     event->accept();
 }
 
@@ -369,12 +406,51 @@ void ViewportInputRouter::handleKeyPress(QKeyEvent* event)
         return;
     }
 
+    // 空格按下：进入"临时平移"态，但不立即确认——空格语义（绘图工具确认/SelectTool 重置视图）
+    // 延迟到空格释放时触发；若期间发生了空格+左键拖动平移，则释放时不触发（视为导航）。
+    if (event->key() == Qt::Key_Space)
+    {
+        if (event->isAutoRepeat())
+        {
+            event->accept();
+            return;
+        }
+        m_spaceHeld = true;
+        m_spacePanned = false;
+        event->accept();
+        return;
+    }
+
     if (handleKeyPressDispatch(event))
     {
         return;
     }
 
     event->ignore();
+}
+
+void ViewportInputRouter::handleKeyRelease(QKeyEvent* event)
+{
+    if (!event || event->key() != Qt::Key_Space)
+    {
+        return;
+    }
+
+    m_spaceHeld = false;
+
+    // 空格单独按下并释放（未用于平移）→ 触发原有确认/重置语义；
+    // 用一次合成的空格按下事件走既有分发管线。
+    if (!m_spacePanned)
+    {
+        QKeyEvent spacePress(QEvent::KeyPress, Qt::Key_Space, event->modifiers());
+        if (handleKeyPressDispatch(&spacePress))
+        {
+            event->accept();
+            return;
+        }
+    }
+
+    event->accept();
 }
 
 // ==================== 输入法（IME） ====================
@@ -454,12 +530,7 @@ void ViewportInputRouter::handleContextMenu(QContextMenuEvent* event)
 
 QSizeF ViewportInputRouter::physicalViewportSize() const
 {
-    if (!m_renderWidget)
-    {
-        return QSizeF(0, 0);
-    }
-    const float dpr = static_cast<float>(m_renderWidget->devicePixelRatio());
-    return QSizeF(m_renderWidget->width() * dpr, m_renderWidget->height() * dpr);
+    return m_navigation.physicalViewportSize();
 }
 
 QPointF ViewportInputRouter::widgetToWorld(QPointF widgetLocalPos) const
@@ -468,18 +539,7 @@ QPointF ViewportInputRouter::widgetToWorld(QPointF widgetLocalPos) const
     {
         return QPointF();
     }
-
-    QSizeF physSize = physicalViewportSize();
-    float vpW = static_cast<float>(physSize.width());
-    float vpH = static_cast<float>(physSize.height());
-    if (vpW <= 0 || vpH <= 0)
-    {
-        return QPointF();
-    }
-
-    const float dpr = static_cast<float>(m_renderWidget->devicePixelRatio());
-    QPoint physPos(static_cast<int>(widgetLocalPos.x() * dpr), static_cast<int>(widgetLocalPos.y() * dpr));
-    return m_camera->screenToWorld(physPos, vpW, vpH);
+    return m_navigation.widgetToWorld(widgetLocalPos);
 }
 
 bool ViewportInputRouter::mouseEventToWorld(
@@ -493,16 +553,7 @@ bool ViewportInputRouter::mouseEventToWorld(
     widgetPos = event->pos();
     const float dpr = static_cast<float>(m_renderWidget->devicePixelRatio());
     physWidgetPos = QPoint(static_cast<int>(widgetPos.x() * dpr), static_cast<int>(widgetPos.y() * dpr));
-
-    QSizeF physSize = physicalViewportSize();
-    float vpW = static_cast<float>(physSize.width());
-    float vpH = static_cast<float>(physSize.height());
-    if (vpW <= 0 || vpH <= 0)
-    {
-        return false;
-    }
-
-    worldPos = m_camera->screenToWorld(physWidgetPos, vpW, vpH);
+    worldPos = m_navigation.physicalToWorld(physWidgetPos);
     return !worldPos.isNull();
 }
 
@@ -669,17 +720,18 @@ bool ViewportInputRouter::dispatchMouseReleaseToInput(const QPointF& worldPos, Q
 
 bool ViewportInputRouter::handlePanMousePress(const QPoint& physWidgetPos, QMouseEvent* event)
 {
-    if (event->button() == Qt::MiddleButton)
+    const bool middle = event->button() == Qt::MiddleButton;
+    const bool panMode = event->button() == Qt::LeftButton && m_panModeEnabled;
+    // 按住空格 + 左键/单指拖动 = 临时平移（保持"空格=确认"在单独释放时语义不变）
+    const bool spacePan = event->button() == Qt::LeftButton && m_spaceHeld;
+    if (middle || panMode || spacePan)
     {
         m_panning = true;
-        m_lastMousePos = physWidgetPos;
-        event->accept();
-        return true;
-    }
-    if (event->button() == Qt::LeftButton && m_panModeEnabled)
-    {
-        m_panning = true;
-        m_lastMousePos = physWidgetPos;
+        if (spacePan)
+        {
+            m_spacePanned = true;
+        }
+        m_navigation.beginPan(physWidgetPos);
         event->accept();
         return true;
     }
@@ -693,15 +745,8 @@ bool ViewportInputRouter::handlePanMouseMove(const QPoint& physWidgetPos, QMouse
         return false;
     }
 
-    QPoint delta = physWidgetPos - m_lastMousePos;
-    m_lastMousePos = physWidgetPos;
-    float worldDx = static_cast<float>(delta.x()) / m_camera->zoomX;
-    float worldDy = -static_cast<float>(delta.y()) / m_camera->zoomY;
-    m_camera->pan(worldDx, worldDy);
-    if (m_cameraChangedCallback)
-    {
-        m_cameraChangedCallback();
-    }
+    // 共享导航控制器统一换算并触发相机变化回调
+    m_navigation.updatePan(physWidgetPos);
     event->accept();
     return true;
 }
@@ -711,6 +756,7 @@ bool ViewportInputRouter::handlePanMouseRelease(QMouseEvent* event)
     if (event->button() == Qt::MiddleButton || (event->button() == Qt::LeftButton && m_panning))
     {
         m_panning = false;
+        m_navigation.endPan();
         event->accept();
         return true;
     }

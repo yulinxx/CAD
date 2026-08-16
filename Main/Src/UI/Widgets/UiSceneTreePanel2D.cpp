@@ -373,11 +373,12 @@ SceneTreePanel2D::SceneTreePanel2D(QWidget* parent)
     m_view->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_view->setAllColumnsShowFocus(true);
     m_view->setUniformRowHeights(true);
+    // 所有列 Interactive：允许用户拖拽表头调整各列宽度
     m_view->header()->setStretchLastSection(false);
-    m_view->header()->setSectionResizeMode(SceneTreeTableModel2D::ColName, QHeaderView::Stretch);
-    m_view->header()->setSectionResizeMode(SceneTreeTableModel2D::ColType, QHeaderView::ResizeToContents);
-    m_view->header()->setSectionResizeMode(SceneTreeTableModel2D::ColLayer, QHeaderView::ResizeToContents);
-    m_view->header()->setSectionResizeMode(SceneTreeTableModel2D::ColVisible, QHeaderView::ResizeToContents);
+    m_view->header()->setSectionResizeMode(SceneTreeTableModel2D::ColName, QHeaderView::Interactive);
+    m_view->header()->setSectionResizeMode(SceneTreeTableModel2D::ColType, QHeaderView::Interactive);
+    m_view->header()->setSectionResizeMode(SceneTreeTableModel2D::ColLayer, QHeaderView::Interactive);
+    m_view->header()->setSectionResizeMode(SceneTreeTableModel2D::ColVisible, QHeaderView::Interactive);
     // 绝不 expandAll；群组仅在用户点击展开箭头时通过 canFetchMore/fetchMore 懒加载
     m_view->setExpandsOnDoubleClick(true);
     layout->addWidget(m_view);
@@ -462,13 +463,32 @@ void SceneTreePanel2D::setSelectedIds(const QSet<QString>& ids)
 
     m_syncing = true;
     m_view->selectionModel()->clearSelection();
+    QModelIndex firstIndex;
     for (qint64 id : idSet)
     {
         const QModelIndex idx = m_model->indexForId(id);
-        if (idx.isValid())
+        if (!idx.isValid())
         {
-            m_view->selectionModel()->select(idx, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+            continue;
         }
+        m_view->selectionModel()->select(idx, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        if (!firstIndex.isValid())
+        {
+            firstIndex = idx;
+        }
+    }
+
+    // 定位到第一个选中项：展开其祖先并滚动到可见（若选中项位于未加载的群组内，
+    // 无法定位，保持现状，仅对已物化的行生效）
+    if (firstIndex.isValid())
+    {
+        QModelIndex parent = firstIndex.parent();
+        while (parent.isValid())
+        {
+            m_view->expand(parent);
+            parent = parent.parent();
+        }
+        m_view->scrollTo(firstIndex, QAbstractItemView::EnsureVisible);
     }
     m_syncing = false;
 }

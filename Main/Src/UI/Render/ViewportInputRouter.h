@@ -23,8 +23,11 @@
 #include <QPoint>
 #include <functional>
 
+#include "ViewportNavigation2D.h"
+
 class QMouseEvent;
 class QWheelEvent;
+class QNativeGestureEvent;
 class QKeyEvent;
 class QInputMethodEvent;
 class QContextMenuEvent;
@@ -68,7 +71,7 @@ public:
 
     void setPositionCallback(std::function<void(double, double)> callback);
     void setStatusCallback(std::function<void(const QString&)> callback);
-    // 相机变化回调 — 缩放/平移后通知视口更新视图矩阵并重绘
+    // 相机变化回调 — 缩放/平移后通知视口更新视图矩阵并重绘（转发到共享导航控制器）
     void setCameraChangedCallback(std::function<void()> callback);
 
     // ==================== 事件过滤器（转发 RenderWidget 事件到视口） ====================
@@ -82,7 +85,9 @@ public:
     void handleMouseRelease(QMouseEvent* event);
     void handleMouseDoubleClick(QMouseEvent* event);
     void handleWheel(QWheelEvent* event);
+    void handleNativeGesture(QNativeGestureEvent* event);
     void handleKeyPress(QKeyEvent* event);
+    void handleKeyRelease(QKeyEvent* event);
     void handleContextMenu(QContextMenuEvent* event);
 
     // ==================== 输入法（IME） ====================
@@ -94,6 +99,23 @@ public:
     QRectF inputMethodCursorRect() const;
 
     // ==================== 交互状态 ====================
+
+    // 滚轮/触控板手势分类结果：Zoom(缩放)、Pan(平移)、HorizontalPan(水平平移)
+    enum class WheelGestureType
+    {
+        Zoom,
+        Pan,
+        HorizontalPan,
+    };
+
+    /// 跨平台滚轮/触控板手势分类（纯函数，便于单测）：
+    ///  - 无滚动阶段(普通鼠标滚轮, macOS 上鼠标滚轮也带像素增量) = 缩放，不改变鼠标既有操作
+    ///  - 触控板(带滚动阶段 ScrollBegin/Update/Momentum/End)：
+    ///    * Ctrl = 捏合缩放
+    ///    * Shift = 水平平移
+    ///    * 其余 = 平移（双指拖动）
+    static WheelGestureType classifyWheel(
+        const QPoint& angleDelta, const QPointF& pixelDelta, Qt::KeyboardModifiers modifiers, Qt::ScrollPhase phase);
 
     bool isPanning() const
     {
@@ -108,6 +130,12 @@ public:
     void setPanModeEnabled(bool enabled)
     {
         m_panModeEnabled = enabled;
+    }
+
+    /// 空格是否正处于"临时平移"按下状态
+    bool isSpaceHeld() const
+    {
+        return m_spaceHeld;
     }
 
     // ==================== 坐标转换（P5 收口: RenderViewport2D 也委托至此，消除重复） ====================
@@ -172,6 +200,9 @@ private:
     bool m_panning{ false };
     bool m_panModeEnabled{ false };
     QPoint m_lastMousePos;
+    // 空格临时平移（按住空格 + 单指/左键拖动 = 平移，空格单独按下释放 = 原有确认/重置语义）
+    bool m_spaceHeld{ false };
+    bool m_spacePanned{ false };
     // 最近一次鼠标世界坐标（粘贴锚点）
     QPointF m_lastCursorWorldPos{ 0.0, 0.0 };
     bool m_hasCursorPos{ false };
@@ -179,5 +210,7 @@ private:
     // 回调
     std::function<void(double, double)> m_positionCallback;
     std::function<void(const QString&)> m_statusCallback;
-    std::function<void()> m_cameraChangedCallback;
+
+    // 共享导航控制器：手势→相机的单一实现（本路由与独立预览窗口共用）
+    ViewportNavigation2D m_navigation;
 };

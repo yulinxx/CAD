@@ -55,6 +55,9 @@ signals:
     /// 某属性被成功编辑（已入撤销栈）。由绑定层监听并触发模型重建。
     void sigPropertyEdited();
 
+protected:
+    void changeEvent(QEvent* event) override;
+
 private:
     void syncText();
     void renderPropertyModel();

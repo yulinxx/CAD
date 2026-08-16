@@ -13,6 +13,8 @@
 #include "UI/LanguageManager.h"
 #include "UI/FontManager.h"
 #include "Persistence/PersistenceService.h"
+#include "Persistence/Repositories/SettingsRepository.h"
+#include "UI/Settings/SettingsKeysCommon.h"
 
 #include "render/render_types.h"
 
@@ -93,6 +95,23 @@ void AppInitializer::initialize()
     if (persistenceService->initialize(dbPath.toStdString()))
     {
         SY_INFOF("[AppInitializer] Database initialized: %s", dbPath.toUtf8().constData());
+
+        // 读取并应用用户保存的日志设置
+        auto* settingsRepo = persistenceService->settings();
+        if (settingsRepo)
+        {
+            // 读取 log_enabled (默认 true)
+            std::string logEnabledStr = settingsRepo->loadValue("common", "log_enabled", "true");
+            bool logEnabled = (logEnabledStr == "true" || logEnabledStr == "1");
+            SyLogger::GetInstance().SetEnabled(logEnabled);
+
+            // 读取 log_level (默认 Debug = 1)
+            std::string logLevelStr = settingsRepo->loadValue("common", "log_level", "1");
+            int logLevelInt = std::stoi(logLevelStr);
+            SyLogger::GetInstance().SetLevel(static_cast<SyLogLevel>(logLevelInt));
+
+            SY_INFOF("[AppInitializer] Log settings applied: enabled=%d, level=%d", logEnabled, logLevelInt);
+        }
     }
     else
     {

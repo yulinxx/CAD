@@ -63,6 +63,12 @@ public:
     explicit WorkbenchWindow(QWidget* parent = nullptr);
     ~WorkbenchWindow() override;
 
+    /// 文件拖放处理器（供上层注入坐标转换等回调）
+    class FileDropHandler* fileDropHandler() const
+    {
+        return m_fileDropHandler.get();
+    }
+
 protected:
     /// 语言切换事件处理
     void changeEvent(QEvent* event) override;
@@ -118,6 +124,8 @@ public:
     /// 由工作台在创建视口后注入，将菜单缩放操作转发到视口
     /// @param handler 缩放操作处理函数，参数为 "zoom_in"/"zoom_out"/"zoom_fit"/"zoom_selection"/"reset"
     void setViewportZoomHandler(std::function<void(const QString&)> handler);
+    /// 设置 TestView 菜单回调（打开独立预览渲染窗口）
+    void setTestViewHandler(std::function<void()> handler);
     /// 更新状态栏鼠标坐标显示
     /// @param x 世界坐标 X（毫米）
     /// @param y 世界坐标 Y（毫米）

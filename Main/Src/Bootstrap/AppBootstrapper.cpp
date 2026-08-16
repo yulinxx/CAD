@@ -130,6 +130,7 @@ void AppBootstrapper::bootstrap()
     m_services.undoManager = m_compositionRoot->undoRedoManager();
 
     m_services.operationBus = m_compositionRoot->operationBus();
+    m_services.viewportActionHub = m_compositionRoot->viewportActionHub();
     m_services.layerManager = m_compositionRoot->layerManager();
     m_services.layerManagerBridge = m_compositionRoot->layerManagerBridge();
     m_services.layerEditService = m_compositionRoot->layerEditService();
@@ -142,6 +143,8 @@ void AppBootstrapper::bootstrap()
 
     // 阶段1收口：选择服务由组合根统一创建，不再直接暴露 SceneManager
     m_services.selectionService = m_compositionRoot->selectionService();
+
+    m_services.clipboard = m_compositionRoot->clipboard();
 
     m_services.sceneEditService = m_compositionRoot->sceneEditService();
 

@@ -29,6 +29,17 @@ void Camera2D::computeViewMatrix(float outMat[9], float vpW, float vpH) const
         return;
     }
 
+    // 防御：缩放值损坏（NaN/Inf/≤0）时返回单位矩阵，避免把退化矩阵交给渲染层
+    if (!std::isfinite(zoomX) || !std::isfinite(zoomY) || zoomX <= 0.0f || zoomY <= 0.0f)
+    {
+        for (int i = 0; i < 9; ++i)
+        {
+            outMat[i] = (i == 0 || i == 4 || i == 8) ? 1.0f : 0.0f;
+        }
+        SY_ERRORF("Camera2D::computeViewMatrix: invalid zoom (%.9g, %.9g), returning identity", zoomX, zoomY);
+        return;
+    }
+
     const float scaleX = 2.0f * zoomX / vpW;
     const float scaleY = 2.0f * zoomY / vpH;
     const float tx = scaleX * panOffset.x();
@@ -99,6 +110,19 @@ QPointF Camera2D::screenToWorld(const QPoint& screenPos, float vpW, float vpH) c
 
 void Camera2D::zoomIn(float factor, const QPointF& anchorWorld, float vpW, float vpH)
 {
+    // 防御：非法/非有限缩放因子一律忽略，避免把 zoom 打成 NaN/Inf 后持续崩溃
+    if (!std::isfinite(factor) || factor <= 0.0f)
+    {
+        return;
+    }
+    if (!std::isfinite(zoomX) || !std::isfinite(zoomY) || zoomX <= 0.0f || zoomY <= 0.0f)
+    {
+        // 相机状态已损坏，重置到安全默认值后再缩放
+        zoomX = 1.0f;
+        zoomY = 1.0f;
+        panOffset = QPointF(0, 0);
+    }
+
     float newZoomX = zoomX * factor;
     float newZoomY = zoomY * factor;
     if (newZoomX > MAX_ZOOM)
@@ -118,12 +142,18 @@ void Camera2D::zoomIn(float factor, const QPointF& anchorWorld, float vpW, float
         newZoomY = MIN_ZOOM;
     }
 
-    float ratio = newZoomX / zoomX;
-    panOffset.setX(panOffset.x() / ratio + anchorWorld.x() * (1.0f / ratio - 1.0f));
-    panOffset.setY(panOffset.y() / ratio + anchorWorld.y() * (1.0f / ratio - 1.0f));
+    if (std::isfinite(newZoomX) && std::isfinite(newZoomY))
+    {
+        const float ratio = newZoomX / zoomX;
+        if (std::isfinite(ratio) && ratio > 0.0f)
+        {
+            panOffset.setX(panOffset.x() / ratio + anchorWorld.x() * (1.0f / ratio - 1.0f));
+            panOffset.setY(panOffset.y() / ratio + anchorWorld.y() * (1.0f / ratio - 1.0f));
+        }
 
-    zoomX = newZoomX;
-    zoomY = newZoomY;
+        zoomX = newZoomX;
+        zoomY = newZoomY;
+    }
 }
 
 void Camera2D::zoomOut(float factor, const QPointF& anchorWorld, float vpW, float vpH)

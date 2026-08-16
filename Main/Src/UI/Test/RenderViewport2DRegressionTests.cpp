@@ -24,10 +24,13 @@
 #include <QKeyEvent>
 #include <QContextMenuEvent>
 #include <QWidget>
+#include <QNativeGestureEvent>
+#include <QPointingDevice>
 
 #include "UI/Render/SceneRefreshCoordinator.h"
 #include "UI/Render/Camera2D.h"
 #include "UI/Render/ViewportInputRouter.h"
+#include "RenderWidget.h"
 #include "UI/Widgets/ViewportSelector.h"
 #include "UI/Services/ISelectionService.h"
 #include "Engine2D/Core/SceneManager.h"
@@ -1003,6 +1006,155 @@ TEST(RenderViewport2DRegressionTest, InputRouter_PanModeToggle)
     EXPECT_FALSE(router.isPanModeEnabled());
 }
 
+// ==================== 空格临时平移（跨平台触控板/鼠标导航） ====================
+
+TEST(RenderViewport2DRegressionTest, InputRouter_SpaceKeyEntersTemporaryPanState)
+{
+    ViewportInputRouter router;
+    // 空格按下 → 进入临时平移态
+    QKeyEvent press(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+    router.handleKeyPress(&press);
+    EXPECT_TRUE(router.isSpaceHeld());
+
+    // 空格释放（未发生平移）→ 退出临时平移态，且不崩溃
+    QKeyEvent release(QEvent::KeyRelease, Qt::Key_Space, Qt::NoModifier);
+    router.handleKeyRelease(&release);
+    EXPECT_FALSE(router.isSpaceHeld());
+    SUCCEED();
+}
+
+TEST(RenderViewport2DRegressionTest, InputRouter_SpaceAutoRepeatDoesNotToggle)
+{
+    ViewportInputRouter router;
+    QKeyEvent press(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+    router.handleKeyPress(&press);
+    EXPECT_TRUE(router.isSpaceHeld());
+
+    // 长按空格自动重复不应改变状态
+    QKeyEvent repeat(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier, 0, 0, 0, QString(), /*autorep=*/true, 1);
+    router.handleKeyPress(&repeat);
+    EXPECT_TRUE(router.isSpaceHeld());
+
+    QKeyEvent release(QEvent::KeyRelease, Qt::Key_Space, Qt::NoModifier);
+    router.handleKeyRelease(&release);
+    EXPECT_FALSE(router.isSpaceHeld());
+}
+
+// ==================== 视口滚轮/触控板实际行为测试（真实 RenderWidget + Camera2D） ====================
+
+namespace
+{
+    // 构造一个带固定尺寸 RenderWidget 与 Camera2D 的路由，供滚轮/手势行为测试使用
+    struct WheelRig
+    {
+        WheelRig()
+        {
+            widget.resize(800, 600);
+            router.setRenderWidget(&widget);
+            router.setCamera(&camera);
+        }
+        RenderWidget widget;
+        Camera2D camera;
+        ViewportInputRouter router;
+    };
+}
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_TrackpadDragPansCamera)
+{
+    WheelRig rig;
+    // 触控板双指拖动：带滚动阶段、无修饰键 → 平移相机
+    QWheelEvent ev(QPointF(600, 400), QPointF(600, 400), QPoint(30, 12), QPoint(0, 0),
+        Qt::NoButton, Qt::NoModifier, Qt::ScrollUpdate, false);
+    rig.router.handleWheel(&ev);
+
+    EXPECT_NEAR(rig.camera.panOffset.x(), 30.0, 1e-4);
+    EXPECT_NEAR(rig.camera.panOffset.y(), -12.0, 1e-4);
+    // 平移不应改变缩放
+    EXPECT_NEAR(rig.camera.zoomX, 1.0, 1e-4);
+}
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_MouseWheelZoomsCamera)
+{
+    WheelRig rig;
+    // 普通鼠标滚轮（macOS 上鼠标滚轮也带像素增量，但无滚动阶段）→ 缩放
+    QWheelEvent ev(QPointF(600, 400), QPointF(600, 400), QPoint(30, 12), QPoint(0, 120),
+        Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+    rig.router.handleWheel(&ev);
+
+    EXPECT_NEAR(rig.camera.zoomX, 1.1, 1e-4);
+    EXPECT_NEAR(rig.camera.zoomY, 1.1, 1e-4);
+    // 缩放而非平移：panOffset 不出现滚轮量级的偏移
+    EXPECT_LT(rig.camera.panOffset.x(), 20.0);
+}
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_MouseWheelShiftStillZooms)
+{
+    WheelRig rig;
+    // 鼠标滚轮带 Shift：应保持缩放（锚定缩放会合法地移动 panOffset），不改为平移
+    QWheelEvent ev(QPointF(600, 400), QPointF(600, 400), QPoint(), QPoint(0, 120),
+        Qt::NoButton, Qt::ShiftModifier, Qt::NoScrollPhase, false);
+    rig.router.handleWheel(&ev);
+
+    EXPECT_NEAR(rig.camera.zoomX, 1.1, 1e-4);
+    EXPECT_NEAR(rig.camera.zoomY, 1.1, 1e-4);
+    // 若误判为水平平移，panOffset.x 会明显偏离
+    EXPECT_LT(rig.camera.panOffset.x(), 100.0);
+}
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_PinchCtrlWheelZoomsCamera)
+{
+    WheelRig rig;
+    // 触控板捏合（Windows/Linux: Ctrl+带滚动阶段滚轮）→ 缩放
+    QWheelEvent ev(QPointF(600, 400), QPointF(600, 400), QPoint(), QPoint(0, 120),
+        Qt::NoButton, Qt::ControlModifier, Qt::ScrollUpdate, false);
+    rig.router.handleWheel(&ev);
+    EXPECT_NEAR(rig.camera.zoomX, 1.1, 1e-4);
+}
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_MacPinchSpreadZoomsIn)
+{
+    WheelRig rig;
+    // macOS 捏合张开：value() 为原始增量(+0.2) → factor=1.2 放大
+    auto* dev = QPointingDevice::primaryPointingDevice();
+    QNativeGestureEvent ev(Qt::ZoomNativeGesture, dev, 2, QPointF(600, 400), QPointF(600, 400),
+        QPointF(600, 400), 0.2, QPointF());
+    rig.router.handleNativeGesture(&ev);
+    EXPECT_NEAR(rig.camera.zoomX, 1.2, 1e-4);
+}
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_MacPinchInwardZoomsOut)
+{
+    WheelRig rig;
+    // macOS 捏合收拢：value() 为原始增量(-0.2) → factor=0.8 缩小
+    auto* dev = QPointingDevice::primaryPointingDevice();
+    QNativeGestureEvent ev(Qt::ZoomNativeGesture, dev, 2, QPointF(600, 400), QPointF(600, 400),
+        QPointF(600, 400), -0.2, QPointF());
+    rig.router.handleNativeGesture(&ev);
+    EXPECT_NEAR(rig.camera.zoomX, 0.8, 1e-4);
+}
+
+TEST(RenderViewport2DRegressionTest, SpaceKey_FingerMovePansCamera)
+{
+    WheelRig rig;
+    // 按住空格 + 单指移动（无按键的 MouseMove）→ 平移相机
+    QKeyEvent space(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+    rig.router.handleKeyPress(&space);
+    EXPECT_TRUE(rig.router.isSpaceHeld());
+
+    // 第一次移动：建立锚点（delta 0）
+    QMouseEvent move1(QEvent::MouseMove, QPointF(600, 400), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+    rig.router.handleMouseMove(&move1);
+    EXPECT_TRUE(rig.router.isPanning());
+
+    // 第二次移动：产生平移（physWidgetPos 按 DPR 缩放）
+    QMouseEvent move2(QEvent::MouseMove, QPointF(620, 410), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+    rig.router.handleMouseMove(&move2);
+
+    const double dpr = rig.widget.devicePixelRatio();
+    EXPECT_NEAR(rig.camera.panOffset.x(), 20.0 * dpr, 1e-3);
+    EXPECT_NEAR(rig.camera.panOffset.y(), -10.0 * dpr, 1e-3);
+}
+
 // ==================== ViewportInputRouter 回调注入测试 ====================
 
 TEST(RenderViewport2DRegressionTest, InputRouter_PositionCallback)
@@ -1148,6 +1300,56 @@ TEST(RenderViewport2DRegressionTest, InputRouter_WheelNullRenderWidget)
     // 无 RenderWidget 时不崩溃
     router.handleWheel(&wheelEvent);
     SUCCEED();
+}
+
+// ==================== 滚轮/触控板手势分类测试（跨平台） ====================
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyPinchAsZoom)
+{
+    // 触控板捏合 → Ctrl+滚动阶段滚轮 → 缩放
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 120), QPointF(0, 40), Qt::ControlModifier, Qt::ScrollUpdate),
+        ViewportInputRouter::WheelGestureType::Zoom);
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, -120), QPointF(0, -40), Qt::ControlModifier, Qt::ScrollUpdate),
+        ViewportInputRouter::WheelGestureType::Zoom);
+}
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyTrackpadDragAsPan)
+{
+    // 触控板双指拖动 → 带滚动阶段且无修饰键 → 平移
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 0), QPointF(30.0, 12.0), Qt::NoModifier, Qt::ScrollUpdate),
+        ViewportInputRouter::WheelGestureType::Pan);
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 0), QPointF(-30.0, -12.0), Qt::NoModifier, Qt::ScrollMomentum),
+        ViewportInputRouter::WheelGestureType::Pan);
+}
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyMouseWheelAsZoom)
+{
+    // 普通鼠标滚轮：无滚动阶段 → 缩放（保持既有行为）
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 120), QPointF(), Qt::NoModifier, Qt::NoScrollPhase),
+        ViewportInputRouter::WheelGestureType::Zoom);
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, -120), QPointF(), Qt::NoModifier, Qt::NoScrollPhase),
+        ViewportInputRouter::WheelGestureType::Zoom);
+    // macOS 上鼠标滚轮也带像素增量，但无滚动阶段 → 仍缩放
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 120), QPointF(30, 12), Qt::NoModifier, Qt::NoScrollPhase),
+        ViewportInputRouter::WheelGestureType::Zoom);
+}
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyMouseWheelModifiersStillZoom)
+{
+    // 鼠标滚轮带 Ctrl/Shift 修饰键 → 仍缩放（不改变鼠标既有操作）
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 120), QPointF(), Qt::ControlModifier, Qt::NoScrollPhase),
+        ViewportInputRouter::WheelGestureType::Zoom);
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 120), QPointF(), Qt::ShiftModifier, Qt::NoScrollPhase),
+        ViewportInputRouter::WheelGestureType::Zoom);
+}
+
+TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyTrackpadShiftScrollAsHorizontalPan)
+{
+    // 触控板 Shift+双指（带滚动阶段）→ 水平平移
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 120), QPointF(0.0, 40.0), Qt::ShiftModifier, Qt::ScrollUpdate),
+        ViewportInputRouter::WheelGestureType::HorizontalPan);
+    EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 0), QPointF(0.0, 40.0), Qt::ShiftModifier, Qt::ScrollUpdate),
+        ViewportInputRouter::WheelGestureType::HorizontalPan);
 }
 
 // ==================== 上下文菜单测试 ====================

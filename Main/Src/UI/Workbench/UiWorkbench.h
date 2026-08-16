@@ -17,6 +17,7 @@ class SettingsService;
 class SettingsUiCoordinator2D;
 class SceneTreePanel2D;
 class SceneTreePanel3D;
+class SceneTreeSceneObserver2D;
 struct UiStateSnapshot;
 
 // 3D 类型前向声明（避免头文件膨胀，实际 include 下沉到 .cpp）
@@ -213,6 +214,14 @@ protected:
  *
  * 提供 2D 绘图功能，包括线条绘制、测量、选择等操作。
  */
+
+/// 2D 左右面板（Draw Tools / Layers）的承载样式
+enum class PanelHostStyle
+{
+    Toolbar,  ///< 固定工具栏（QToolBar 停靠在左右两侧）
+    Dock      ///< Dock 停靠面板（QDockWidget，默认）
+};
+
 class Workbench2D final : public UiWorkbench
 {
 public:
@@ -235,6 +244,12 @@ public:
 
     bool showSettingsDialog(QWidget* parent) override;
 
+public:
+    /// 设置左右面板（Draw Tools / Layers）的承载样式（默认 Dock）
+    void setPanelHostStyle(PanelHostStyle style);
+    /// 当前左右面板承载样式
+    PanelHostStyle panelHostStyle() const { return m_panelHostStyle; }
+
 private:
     /// 创建中央视口
     QWidget* createCentralViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties);
@@ -248,6 +263,8 @@ private:
     void setupSceneTree(WorkbenchWindow& window);
     /// 重建场景树模型并推送到面板（结构性变化：导入/撤销/增删）
     void refreshSceneTree();
+    /// 引擎场景变更兜底：图元数量变化即视为结构变更，防抖后重建树，避免残留
+    void onSceneTreeSceneChanged();
     /// 仅同步面板选中高亮（选择变化，避免重建树导致折叠丢失）
     void syncSceneTreeSelection();
     /// 将面板选择同步到引擎选择
@@ -272,12 +289,23 @@ private:
     std::unique_ptr<class CommandActionHub> m_commandHub;
     /// 顶部工具栏（编辑命令）— Qt 父对象管理生命周期
     class TopToolBar* m_topToolBar{ nullptr };
+    /// 文字编辑字体工具栏（双击文字进入编辑时显示）— Qt 父对象管理生命周期
+    class QToolBar* m_textFontToolBar{ nullptr };
+    class TextFontToolBar* m_textFontToolBarWidget{ nullptr };
     /// 右侧工具栏（颜色/图层）— Qt 父对象管理生命周期
     class RightToolBar* m_rightToolBar{ nullptr };
+    /// 左右面板承载样式（Draw Tools / Layers）
+    PanelHostStyle m_panelHostStyle{ PanelHostStyle::Toolbar };
     /// 2D 渲染视口 — Qt 父对象管理生命周期（工作台切换时用于恢复工具状态）
     class RenderViewport2D* m_viewport{ nullptr };
     /// 2D 场景树面板（可选 UI，配置驱动时可能不存在）
     class SceneTreePanel2D* m_scenePanel2D{ nullptr };
+    /// 场景变更观察者（捕获绕过操作总线的直接编辑，如视口 Delete 键）
+    std::unique_ptr<SceneTreeSceneObserver2D> m_sceneTreeObserver;
+    /// 场景树重建防抖定时器（合并批量增删，避免每步 O(N) 重建）
+    class QTimer* m_sceneTreeRefreshTimer{ nullptr };
+    /// 上次记录的图元数量（判断是否发生结构变更）
+    std::size_t m_lastSceneEntityCount{ 0 };
     /// 2D 状态栏 widget — 由 StatusBar 基类管理，通过 mountStatusBar 挂载到 WorkbenchWindow
     StatusBar* m_statusBar2D{ nullptr };
 

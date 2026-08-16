@@ -26,9 +26,15 @@
 #include "Engine2D/Core/SceneManager.h"
 #include "UiPropertiesPanel.h"
 #include "RenderViewport2D.h"
+#include "UI/TestView/TestViewWindow.h"
+#include "FileDropHandler.h"
+
+#include <optional>
 #include "DrawToolBarWidget.h"
 #include "DrawToolSwitchRegistry.h"
 #include "WorkbenchWindow.h"
+#include "WorkbenchMenuManager.h"
+#include "RenderWidget.h"
 
 #include "UI2D/Operation/CommandActionHub.h"
 #include "UI2D/Operation/OperationBus.h"
@@ -39,6 +45,10 @@
 
 #include "UI/RightToolBar/RightToolBar.h"
 #include "UI/TopToolBar/TopToolBar.h"
+#include "UI/TopToolBar/TextFontToolBar.h"
+#include "UI/DrawTools/TextEditTool.h"
+#include "UI/DrawTools/ToolManager.h"
+#include "UI/UiMetrics.h"
 #include "UI/Dlg/LayerManagerDialog.h"
 #include "UI2D/Service/EntityPropertyModel2D.h"
 #include "UI2D/Service/EntityPropertyEditSession2D.h"
@@ -51,6 +61,7 @@
 #include "Engine/SyEntity/SyEntity.h"
 #include <string>
 #include <vector>
+#include <functional>
 #include "UI2D/Operation/CommandCatalog.h"
 #include "UI2D/Operation/OperationId.h"
 #include "UI2D/Operation/OperationBus.h"
@@ -240,6 +251,30 @@ bool UiWorkbench::showSettingsDialog(QWidget* /*parent*/)
     return false;
 }
 
+// 场景树场景观察者：捕获绕过操作总线的直接编辑（如视口 Delete 键删除），
+// 只关心场景变化，由 Workbench2D 依据图元数量变化判断是否需要重建树。
+class SceneTreeSceneObserver2D final : public Eg::SceneNotifier::IObserver
+{
+public:
+    using Callback = std::function<void()>;
+
+    explicit SceneTreeSceneObserver2D(Callback cb)
+        : m_cb(std::move(cb))
+    {
+    }
+
+    void onSceneChanged() override
+    {
+        if (m_cb)
+        {
+            m_cb();
+        }
+    }
+
+private:
+    Callback m_cb;
+};
+
 // ============================================================
 // Workbench2D 实现
 QString Workbench2D::id() const
@@ -295,7 +330,17 @@ void Workbench2D::dispatchCommand(const QString& commandId)
     const OperationId operation = CommandCatalog::operationForCommandId(commandId);
     if (operation == OperationId::None)
     {
-        SY_WARNF("[Workbench2D] Unknown command: %s", qPrintable(commandId));
+        // 绘图工具菜单项以 toolName（如 "LineTool"）作为命令 ID 分发，
+        // 与左侧工具栏 DrawToolBarWidget 保持一致：用 operationForToolName 解析到已注册的 Tool_* 操作，
+        // 经 OperationBus 激活视口对应工具，从而与工具栏形成同一条分发/联动路径。
+        const OperationId toolOperation = CommandCatalog::operationForToolName(commandId);
+        if (toolOperation == OperationId::None)
+        {
+            SY_WARNF("[Workbench2D] Unknown command: %s", qPrintable(commandId));
+            return;
+        }
+        SY_INFOF("[Workbench2D] Dispatch tool command='%s'", qPrintable(commandId));
+        m_services.operationBus->run(toolOperation, {}, OperationSource::Menu);
         return;
     }
 
@@ -434,11 +479,26 @@ QWidget* Workbench2D::createCentralViewport(WorkbenchWindow& window, PropertiesP
 void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& window)
 {
     Q_UNUSED(window);
-
     vp->setSelectionService(m_services.selectionService);
     vp->setInteractionDispatcher(m_services.interactionDispatcher);
     vp->setOperationBus(m_services.operationBus);
     vp->setLayerManager(m_services.layerManager);
+
+    // TestView：打开独立“仅显示”预览窗口，展示当前 2D 场景全部图元
+    window.setTestViewHandler([this, &window]() {
+        if (!m_services.sceneEditService)
+        {
+            return;
+        }
+        auto* scene = m_services.sceneEditService->sceneManager();
+        if (!scene)
+        {
+            return;
+        }
+        auto* w = new TestViewWindow(scene, &window);
+        w->setAttribute(Qt::WA_DeleteOnClose);
+        w->show();
+    });
 
     // P1: 视口通过信号通知上层，不直接持有编辑服务
     if (m_services.sceneEditService)
@@ -519,6 +579,18 @@ void Workbench2D::setupImportCallbacks(RenderViewport2D* vp, WorkbenchWindow& wi
         return;
     }
 
+    // 拖放导入时，把图片/位图放到鼠标松开的全局坐标处（世界坐标）
+    if (auto* fdh = window.fileDropHandler())
+    {
+        fdh->setScreenToWorldConverter([vp](const QPoint& globalPos) -> std::optional<QPointF> {
+            if (!vp)
+            {
+                return std::nullopt;
+            }
+            return vp->mapGlobalToScene(globalPos);
+        });
+    }
+
     // 导入后自动 zoomToFit
     m_services.importService->setViewportFitCallback([vp]() {
         QTimer::singleShot(0, vp, [vp]() {
@@ -537,15 +609,19 @@ void Workbench2D::setupImportCallbacks(RenderViewport2D* vp, WorkbenchWindow& wi
     });
 }
 
+void Workbench2D::setPanelHostStyle(PanelHostStyle style)
+{
+    if (m_panelHostStyle == style)
+    {
+        return;
+    }
+    m_panelHostStyle = style;
+}
+
 void Workbench2D::createToolbars(WorkbenchWindow& window)
 {
-    // 左侧绘图工具栏
-    auto* leftToolBar = new QToolBar(QObject::tr("Draw Tools"), &window);
-    leftToolBar->setObjectName(QStringLiteral("DrawToolBar"));
-    leftToolBar->setMovable(false);
-    window.addToolBar(Qt::LeftToolBarArea, leftToolBar);
-
-    auto* drawWidget = new DrawToolBarWidget(leftToolBar);
+    // 绘图工具内容控件（承载样式无关：无论 Dock 还是 Toolbar 复用同一内容）
+    auto* drawWidget = new DrawToolBarWidget(&window);
     drawWidget->setOperationBus(m_services.operationBus);
 
     // 从 CommandCatalog 构建工具定义列表
@@ -564,7 +640,20 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         }
     }
     drawWidget->setToolDefinitions(drawTools);
-    leftToolBar->addWidget(drawWidget);
+
+    // 依据承载样式创建左侧面板（Draw Tools）
+    if (m_panelHostStyle == PanelHostStyle::Dock)
+    {
+        window.registerDockWidget(QObject::tr("Draw Tools"), drawWidget, Qt::LeftDockWidgetArea);
+    }
+    else
+    {
+        auto* leftToolBar = new QToolBar(QObject::tr("Draw Tools"), &window);
+        leftToolBar->setObjectName(QStringLiteral("DrawToolBar"));
+        leftToolBar->setMovable(false);
+        window.addToolBar(Qt::LeftToolBarArea, leftToolBar);
+        leftToolBar->addWidget(drawWidget);
+    }
 
     // 接通「工具栏 → OperationBus → 视口」：把工具栏展示的 Tool_* 操作注册到操作总线，
     // 点击按钮后经总线转发表驱动的 LambdaOperation 激活视口对应工具。
@@ -574,6 +663,34 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // 双向状态同步：视口切换工具后高亮对应按钮；启动时初始化为当前活动工具（SelectTool）。
     QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged, drawWidget, &DrawToolBarWidget::updateActiveTool);
     drawWidget->updateActiveTool(m_viewport->activeToolName());
+
+    // Draw 菜单与左侧工具栏联动：视口切换工具 → 同步菜单勾选态
+    if (auto* menuMgr = window.menuManager())
+    {
+        QObject::connect(m_viewport,
+            &RenderViewport2D::activeToolChanged,
+            menuMgr,
+            &WorkbenchMenuManager::syncDrawMenuToTool);
+    }
+
+    // View → Grid & Snap 菜单的真正生效点：把 stateCenter 元数据映射到网格显隐。
+    // 菜单/操作只翻转 metadata(gridVisible)，此处作为唯一消费者同步到视口网格渲染。
+    if (m_services.stateCenter && m_viewport)
+    {
+        const auto applyGridVisibleFromMetadata = [stateCenter = m_services.stateCenter, vp = m_viewport]() {
+            if (auto* renderWidget = vp->renderWidget())
+            {
+                if (auto* env = renderWidget->sceneEnvironment())
+                {
+                    const bool visible = stateCenter->metadata().value(QStringLiteral("gridVisible")).toBool();
+                    env->setGridVisible(visible);
+                    env->notifyChanged();
+                }
+            }
+        };
+        QObject::connect(m_services.stateCenter, &UiStateCenter::metadataChanged, this, applyGridVisibleFromMetadata);
+        applyGridVisibleFromMetadata();
+    }
 
     // CommandActionHub：管理所有 QAction 的创建与绑定
     m_commandHub = std::make_unique<CommandActionHub>();
@@ -695,10 +812,52 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     m_topToolBar->installHubActions(m_commandHub.get());
     window.addToolBar(Qt::TopToolBarArea, m_topToolBar);
 
-    // 右侧工具栏（颜色/图层）
+    // 文字编辑字体工具栏（双击文字进入编辑会话时显示字体族/字号/粗斜下划线）
+    m_textFontToolBar = new QToolBar(QObject::tr("Text Font"), &window);
+    m_textFontToolBar->setObjectName(QStringLiteral("TextFontToolBar"));
+    m_textFontToolBar->setMovable(false);
+    m_textFontToolBar->setIconSize(QSize(UiMetrics::toolbarIconSizeSmall(), UiMetrics::toolbarIconSizeSmall()));
+    m_textFontToolBarWidget = new TextFontToolBar(m_textFontToolBar);
+    m_textFontToolBar->addWidget(m_textFontToolBarWidget);
+    window.addToolBar(Qt::TopToolBarArea, m_textFontToolBar);
+    m_textFontToolBar->setVisible(false);
+
+    auto bindTextFontToolBar = [this](const QString& toolName) {
+        if (toolName == QStringLiteral("TextEditTool"))
+        {
+            if (m_viewport)
+            {
+                if (ToolManager* tm = m_viewport->toolManager())
+                {
+                    if (auto* tool = dynamic_cast<TextEditTool*>(tm->getTool(QStringLiteral("TextEditTool"))))
+                    {
+                        m_textFontToolBarWidget->bindTool(tool);
+                        m_textFontToolBar->setVisible(true);
+                        return;
+                    }
+                }
+            }
+        }
+        m_textFontToolBarWidget->bindTool(nullptr);
+        m_textFontToolBar->setVisible(false);
+    };
+    QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged, this, bindTextFontToolBar);
+    if (m_viewport)
+    {
+        bindTextFontToolBar(m_viewport->activeToolName());
+    }
+
+    // 右侧图层面板（颜色/图层），依据承载样式创建
     m_rightToolBar = new RightToolBar(&window);
     m_rightToolBar->setObjectName(QStringLiteral("RightToolBar"));
-    window.addToolBar(Qt::RightToolBarArea, m_rightToolBar);
+    if (m_panelHostStyle == PanelHostStyle::Dock)
+    {
+        window.registerDockWidget(QObject::tr("Layers"), m_rightToolBar, Qt::RightDockWidgetArea);
+    }
+    else
+    {
+        window.addToolBar(Qt::RightToolBarArea, m_rightToolBar);
+    }
 
     if (m_services.layerManager)
     {
@@ -760,7 +919,19 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
                 m_commandHub->refreshActionStates(m_commandHub->captureSnapshot(m_commandHub->mainWindow()));
             }
         });
+        // 撤销/重做会恢复/移除/重建图元（场景拓扑变化），增量刷新可能遗漏，
+        // 强制全量重建视口，确保回退结果实时可见
+        QObject::connect(m_services.operationBus, &OperationBus::operationCompleted, this, [this](OperationId id, bool success) {
+            if (success && (id == OperationId::Edit_Undo || id == OperationId::Edit_Redo))
+            {
+                if (m_viewport)
+                {
+                    m_viewport->requestFullRefresh();
+                }
+            }
+        });
     }
+
 }
 
 void Workbench2D::setupSceneTree(WorkbenchWindow& window)
@@ -801,8 +972,49 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
             });
     }
 
+    // 引擎场景变更兜底：任何直接修改（如视口 Delete 键删除、导入清空等）
+    // 都会经 SceneNotifier 通知这里；依据图元数量变化判断是否结构变更，
+    // 防抖后重建树，避免 Scene 列表残留。
+    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
+    if (scene)
+    {
+        m_lastSceneEntityCount = scene->getEntityCount();
+        if (!m_sceneTreeRefreshTimer)
+        {
+            m_sceneTreeRefreshTimer = new QTimer(this);
+            m_sceneTreeRefreshTimer->setSingleShot(true);
+            m_sceneTreeRefreshTimer->setInterval(150);
+            connect(m_sceneTreeRefreshTimer, &QTimer::timeout, this, &Workbench2D::refreshSceneTree);
+        }
+        if (!m_sceneTreeObserver)
+        {
+            m_sceneTreeObserver = std::make_unique<SceneTreeSceneObserver2D>([this]() {
+                onSceneTreeSceneChanged();
+            });
+        }
+        scene->addObserver(m_sceneTreeObserver.get());
+    }
+
     // 初始填充
     refreshSceneTree();
+}
+
+void Workbench2D::onSceneTreeSceneChanged()
+{
+    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
+    if (!scene)
+    {
+        return;
+    }
+    const std::size_t count = scene->getEntityCount();
+    if (count != m_lastSceneEntityCount)
+    {
+        m_lastSceneEntityCount = count;
+        if (m_sceneTreeRefreshTimer)
+        {
+            m_sceneTreeRefreshTimer->start();
+        }
+    }
 }
 
 void Workbench2D::refreshSceneTree()
@@ -1063,8 +1275,26 @@ void Workbench2D::deactivate()
     // 工具栏指针会随窗口清理而失效（clearWorkbenchContent 会 delete QToolBar）
     m_topToolBar = nullptr;
     m_rightToolBar = nullptr;
+    m_textFontToolBar = nullptr;
+    m_textFontToolBarWidget = nullptr;
     // 视口指针随窗口清理而失效
     m_viewport = nullptr;
+    // 注销场景变更观察者并停用防抖定时器，避免切换工作台后悬空
+    if (m_sceneTreeObserver && m_services.sceneEditService)
+    {
+        if (auto* scene = m_services.sceneEditService->sceneManager())
+        {
+            scene->removeObserver(m_sceneTreeObserver.get());
+        }
+    }
+    m_sceneTreeObserver.reset();
+    if (m_sceneTreeRefreshTimer)
+    {
+        m_sceneTreeRefreshTimer->stop();
+        m_sceneTreeRefreshTimer->deleteLater();
+        m_sceneTreeRefreshTimer = nullptr;
+    }
+    m_lastSceneEntityCount = 0;
     // 场景树面板指针随窗口清理而失效
     m_scenePanel2D = nullptr;
 }

@@ -51,6 +51,8 @@
 #include "Import/Readers/ObjImportReader.h"
 #include "Import/Readers/StlImportReader.h"
 #include "Import/Readers/PltImportReader.h"
+#include "Import/Readers/AiImportReader.h"
+#include "Import/Readers/UgImportReader.h"
 
 #include "Export/ExportService.h"
 #include "Export/ExportDispatcher.h"
@@ -128,6 +130,7 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
     uiServices.interactionDispatcher = interactionDispatcher();
     uiServices.operationBus = m_operationBus.get();
     uiServices.document2D = m_document2D.get();
+    uiServices.sceneEditService = m_sceneEditService.get();
     uiServices.selectionService = m_selectionService.get();
     uiServices.viewportActionHub = m_viewportActionHub.get();
     uiServices.unitManager = m_unitManager.get();
@@ -173,6 +176,9 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_importDispatcher->registerReader(std::make_unique<ObjImportReader>());
     m_importDispatcher->registerReader(std::make_unique<StlImportReader>());
     m_importDispatcher->registerReader(std::make_unique<PltImportReader>());
+    // 新增导入格式：Adobe Illustrator (AI) 与 Unigraphics/NX (UG, 经 IGES)
+    m_importDispatcher->registerReader(std::make_unique<AiImportReader>());
+    m_importDispatcher->registerReader(std::make_unique<UgImportReader>());
 
     // 配置导入服务
     m_importService->setDispatcher(m_importDispatcher.get());

@@ -25,6 +25,7 @@
 #include <QImage>
 #include <QVariantMap>
 #include <array>
+#include <vector>
 
 namespace
 {
@@ -35,12 +36,14 @@ namespace
         Fio::FileFormat format;
     };
 
-    constexpr std::array<FormatMappingEntry, 5> kImportFormatMap = { {
+    constexpr std::array<FormatMappingEntry, 7> kImportFormatMap = { {
         { OperationId::File_ImportDXF, Fio::FileFormat::DXF },
         { OperationId::File_ImportSVG, Fio::FileFormat::SVG },
         { OperationId::File_ImportPLT, Fio::FileFormat::PLT },
         { OperationId::File_ImportStep, Fio::FileFormat::STEP },
         { OperationId::File_ImportPDF, Fio::FileFormat::PDF },
+        { OperationId::File_ImportAI, Fio::FileFormat::AI },
+        { OperationId::File_ImportUG, Fio::FileFormat::UG },
     } };
 
     constexpr std::array<FormatMappingEntry, 5> kExportFormatMap = { {
@@ -52,8 +55,10 @@ namespace
     } };
 
     // P5 收口: 统一按格式映射批量注册操作，消除 registerImportOps/registerExportOps 的重复循环
+    // 模板化以兼容不同数量的格式映射（导入 7 种 / 导出 5 种）
+    template <std::size_t N>
     void registerFromFormatMap(OperationRegistry& reg,
-        const std::array<FormatMappingEntry, 5>& map,
+        const std::array<FormatMappingEntry, N>& map,
         std::function<void(Fio::FileFormat)> handler)
     {
         for (const auto& entry : map)
@@ -230,15 +235,27 @@ void FileOperationRegistry::doImportImage(const QString& filePath)
             }
         }
 
+        QImage rgba;
         QImage image(path);
-        if (image.isNull())
+        if (!image.isNull())
         {
-            QMessageBox::warning(
-                m_parentWidget, QObject::tr("Import Image"), QObject::tr("Failed to load image: %1").arg(path));
-            return;
+            rgba = image.convertToFormat(QImage::Format_RGBA8888);
+        }
+        else
+        {
+            // QImage 无法解码（如缺少 Qt imageformats 插件）时回退：
+            // libwebp 解 webp、libtiff 解 tiff、stb_image 解 tga 等，保证菜单导入支持全部声明格式。
+            std::vector<unsigned char> bytes;
+            int w = 0, h = 0;
+            if (!Fio::loadImageToRgba(path.toUtf8().constData(), bytes, w, h) || w <= 0 || h <= 0)
+            {
+                QMessageBox::warning(
+                    m_parentWidget, QObject::tr("Import Image"), QObject::tr("Failed to load image: %1").arg(path));
+                return;
+            }
+            rgba = QImage(bytes.data(), w, h, w * 4, QImage::Format_RGBA8888).copy();
         }
 
-        QImage rgba = image.convertToFormat(QImage::Format_RGBA8888);
         Fio::ImageInfo info = Fio::readImageInfo(path.toUtf8().constData());
         const float worldW = Fio::pixelsToUnit(rgba.width(), info.dpiX, Fio::UnitType::Millimeter);
         const float worldH = Fio::pixelsToUnit(rgba.height(), info.dpiY, Fio::UnitType::Millimeter);
