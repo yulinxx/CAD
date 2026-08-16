@@ -5,10 +5,8 @@
 #include "RenderWidget.h"
 
 #include "Engine2D/Core/SceneManager.h"
-#include "Engine2D/SyEntity/SyLine.h"
-#include "Engine2D/SyEntity/SyCircle.h"
-#include "Engine2D/SyEntity/SyArc.h"
-#include "Engine2D/SyEntity/SyPolygon.h"
+#include "Engine2D/Geometry/Geo2DQuery.h"
+#include "Engine2D/Geo/GeometryContext.h"
 #include "Engine/SyEntity/SyEntity.h"
 #include "Engine/EntityIdUtils.h"
 
@@ -18,28 +16,6 @@
 namespace
 {
     constexpr double kHitTolerancePx = 8.0;
-
-    double distPointToSegment(const QPointF& p, const QPointF& a, const QPointF& b)
-    {
-        double abx = b.x() - a.x();
-        double aby = b.y() - a.y();
-        double apx = p.x() - a.x();
-        double apy = p.y() - a.y();
-
-        double lenSq = abx * abx + aby * aby;
-        if (lenSq < 1e-12)
-        {
-            return std::hypot(apx, apy);
-        }
-
-        double t = (apx * abx + apy * aby) / lenSq;
-        t = std::max(0.0, std::min(1.0, t));
-
-        double closestX = a.x() + t * abx;
-        double closestY = a.y() + t * aby;
-
-        return std::hypot(p.x() - closestX, p.y() - closestY);
-    }
 }  // namespace
 
 ViewportSelector::ViewportSelector(Eg::SceneManager* sceneManager,
@@ -129,6 +105,9 @@ size_t ViewportSelector::endBoxSelect(const QPointF& worldPos)
 
     std::vector<std::string> hitIds;
 
+    // 框选判定收口到引擎图元 BBox：统一处理所有图元类型，避免在 UI 层逐类型判断
+    Ut::BBox2d box(Ut::Vec2d(minX, minY), Ut::Vec2d(maxX, maxY));
+
     for (const auto* entity : m_sceneManager->getAllEntities())
     {
         if (!entity)
@@ -136,42 +115,8 @@ size_t ViewportSelector::endBoxSelect(const QPointF& worldPos)
             continue;
         }
 
-        bool inside = false;
-
-        if (entity->eType == Eg::EType::LINE)
-        {
-            auto* line = static_cast<const Eg::SyLine*>(entity);
-            for (const auto& pt : line->pointRef())
-            {
-                if (pt.x() >= minX && pt.x() <= maxX && pt.y() >= minY && pt.y() <= maxY)
-                {
-                    inside = true;
-                    break;
-                }
-            }
-        }
-        else if (entity->eType == Eg::EType::CIRCLE || entity->eType == Eg::EType::ARC)
-        {
-            const auto& c = entity->basePoint;
-            if (c.x() >= minX && c.x() <= maxX && c.y() >= minY && c.y() <= maxY)
-            {
-                inside = true;
-            }
-        }
-        else if (entity->eType == Eg::EType::POLYGON)
-        {
-            auto* polygon = static_cast<const Eg::SyPolygon*>(entity);
-            for (const auto& v : polygon->vertices())
-            {
-                if (v.x() >= minX && v.x() <= maxX && v.y() >= minY && v.y() <= maxY)
-                {
-                    inside = true;
-                    break;
-                }
-            }
-        }
-
-        if (inside)
+        Ut::BBox2d bbox = entity->getBbox();
+        if (bbox.isValid() && box.intersects(bbox))
         {
             hitIds.push_back(std::to_string(entity->id));
         }
@@ -329,10 +274,12 @@ void ViewportSelector::performHitTest(const QPointF& worldPos)
         return;
     }
 
-    double tol = kHitTolerancePx / m_camera->zoomX;
+    // 拾取容差：屏幕像素换算到世界坐标半径
+    Eg::GeometryContext ctx;
+    ctx.dPick = kHitTolerancePx / m_camera->zoomX;
 
     std::string hitId;
-    double minDist = tol;
+    double minDist = ctx.dPick;
 
     for (const auto* entity : m_sceneManager->getAllEntities())
     {
@@ -341,45 +288,8 @@ void ViewportSelector::performHitTest(const QPointF& worldPos)
             continue;
         }
 
-        double dist = std::numeric_limits<double>::max();
-
-        if (entity->eType == Eg::EType::LINE)
-        {
-            auto* line = static_cast<const Eg::SyLine*>(entity);
-            if (line->pointRef().size() >= 2)
-            {
-                for (size_t i = 1; i < line->pointRef().size(); ++i)
-                {
-                    const auto& p0 = line->pointRef()[i - 1];
-                    const auto& p1 = line->pointRef()[i];
-                    double d = distPointToSegment(worldPos, QPointF(p0.x(), p0.y()), QPointF(p1.x(), p1.y()));
-                    if (d < dist)
-                    {
-                        dist = d;
-                    }
-                }
-            }
-        }
-        else if (entity->eType == Eg::EType::CIRCLE)
-        {
-            auto* circle = static_cast<const Eg::SyCircle*>(entity);
-            const auto& c = entity->basePoint;
-            double d = std::abs(std::hypot(worldPos.x() - c.x(), worldPos.y() - c.y()) - circle->dRadius);
-            if (d < dist)
-            {
-                dist = d;
-            }
-        }
-        else if (entity->eType == Eg::EType::ARC)
-        {
-            auto* arc = static_cast<const Eg::SyArc*>(entity);
-            const auto& c = entity->basePoint;
-            double d = std::abs(std::hypot(worldPos.x() - c.x(), worldPos.y() - c.y()) - arc->dRadius);
-            if (d < dist)
-            {
-                dist = d;
-            }
-        }
+        // 命中判定收口到引擎 Geo2DQuery：统一处理线段/折线/圆/弧/椭圆/贝塞尔/样条/复合线
+        const double dist = Eg::Geo2DQuery::distanceToPoint(entity, Ut::Vec2d(worldPos.x(), worldPos.y()), ctx);
 
         if (dist < minDist)
         {
