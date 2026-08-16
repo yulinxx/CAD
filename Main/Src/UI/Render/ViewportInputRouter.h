@@ -23,6 +23,8 @@
 #include <QPoint>
 #include <functional>
 
+#include "ViewportNavigation2D.h"
+
 class QMouseEvent;
 class QWheelEvent;
 class QNativeGestureEvent;
@@ -69,7 +71,7 @@ public:
 
     void setPositionCallback(std::function<void(double, double)> callback);
     void setStatusCallback(std::function<void(const QString&)> callback);
-    // 相机变化回调 — 缩放/平移后通知视口更新视图矩阵并重绘
+    // 相机变化回调 — 缩放/平移后通知视口更新视图矩阵并重绘（转发到共享导航控制器）
     void setCameraChangedCallback(std::function<void()> callback);
 
     // ==================== 事件过滤器（转发 RenderWidget 事件到视口） ====================
@@ -208,5 +210,7 @@ private:
     // 回调
     std::function<void(double, double)> m_positionCallback;
     std::function<void(const QString&)> m_statusCallback;
-    std::function<void()> m_cameraChangedCallback;
+
+    // 共享导航控制器：手势→相机的单一实现（本路由与独立预览窗口共用）
+    ViewportNavigation2D m_navigation;
 };

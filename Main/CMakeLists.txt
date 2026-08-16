@@ -84,6 +84,7 @@ set(MAIN_APP_SOURCES
     ${SRC_ROOT}/UI/Render/Renderer3DFactory.cpp
     ${SRC_ROOT}/UI/Render/SceneRefreshCoordinator.cpp
     ${SRC_ROOT}/UI/Render/ViewportInputRouter.cpp
+    ${SRC_ROOT}/UI/Render/ViewportNavigation2D.cpp
     ${SRC_ROOT}/UI/Services/FileDialogService.cpp
     ${SRC_ROOT}/UI/Services/HelpDialogService.cpp
     ${SRC_ROOT}/UI/Services/RecentFileService.cpp
@@ -516,6 +517,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
     ${SRC_ROOT}/UI/Render/Renderer3DFactory.cpp
     ${SRC_ROOT}/UI/Render/SceneRefreshCoordinator.cpp
     ${SRC_ROOT}/UI/Render/ViewportInputRouter.cpp
+    ${SRC_ROOT}/UI/Render/ViewportNavigation2D.cpp
     ${SRC_ROOT}/UI/Services/FileDialogService.cpp
     ${SRC_ROOT}/UI/Services/HelpDialogService.cpp
     ${SRC_ROOT}/UI/Services/RecentFileService.cpp
