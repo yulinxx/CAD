@@ -18,6 +18,8 @@
 #include "Repositories/LayerRepository.h"
 #include "Persistence/Models/LayerRecord.h"
 #include "Engine2D/Interaction/LayerManager.h"
+#include "Engine2D/Edit/LayerEditService.h"
+#include "Engine2D/Edit/UndoRedoManager.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine/Persistence/Database.h"
 
@@ -512,4 +514,121 @@ TEST_F(LayerPersistenceBridgeTest, CreateManyLayers_Stress)
 
     auto layers = m_layerRepository->loadByDocument("doc_stress");
     EXPECT_EQ(layers.size(), static_cast<size_t>(kLayerCount));
+}
+
+// ==================== 图层数量上限 / 按色去重 / 图元计数 ====================
+// 需求：反复导入不同 DXF 时图层不断累积。为防异常，LayerManager 限定图层数量上限；
+// 导入侧按「名称 → 颜色」去重复用图层。此处直接验证 LayerManager 的行为。
+
+TEST_F(LayerPersistenceBridgeTest, CreateLayer_RespectsMaxCount)
+{
+    // 默认已有 8 个默认图层；从当前数量创建直至达到上限
+    const int baseCount = m_layerManager->layerCount();
+    ASSERT_LE(baseCount, LayerManager::kMaxLayerCount);
+
+    std::vector<int> ids;
+    for (int i = 0; i < LayerManager::kMaxLayerCount - baseCount; ++i)
+    {
+        const int id = m_layerManager->createLayer("Cap_" + std::to_string(i));
+        EXPECT_GT(id, 0) << "layer creation should succeed below the cap";
+        if (id > 0)
+        {
+            ids.push_back(id);
+        }
+    }
+
+    // 达到上限后 createLayer 必须返回 -1（拒绝创建），layerCount 不再增长
+    EXPECT_EQ(m_layerManager->layerCount(), LayerManager::kMaxLayerCount);
+    EXPECT_EQ(m_layerManager->maxLayerCount(), LayerManager::kMaxLayerCount);
+    EXPECT_LT(m_layerManager->createLayer("OverflowLayer"), 0);
+    EXPECT_EQ(m_layerManager->layerCount(), LayerManager::kMaxLayerCount);
+}
+
+TEST_F(LayerPersistenceBridgeTest, FindLayerByColor_DedupSharedLayer)
+{
+    // 相同颜色应能查找到同一图层（供导入按色去重复用）
+    const Ut::Color color = Ut::Color::fromRGB255(12, 34, 56);
+    int firstId = m_layerManager->createLayer("ColorA");
+    ASSERT_GT(firstId, 0);
+    m_layerManager->setLayerColor(firstId, color);
+
+    // 新图层同名不同色：按颜色去重应返回已有图层而非新建
+    int secondId = m_layerManager->createLayer("ColorB");
+    ASSERT_GT(secondId, 0);
+    m_layerManager->setLayerColor(secondId, color);
+
+    EXPECT_EQ(m_layerManager->findLayerByColor(color), firstId);
+}
+
+TEST_F(LayerPersistenceBridgeTest, GetLayerEntityCounts_SinglePass)
+{
+    // 计数与逐层 getLayerEntities().size() 一致（O(N) 单趟统计）
+    const auto allIds = m_layerManager->getAllLayerIds();
+    ASSERT_FALSE(allIds.empty());
+    const int layerId = allIds[0];
+
+    const auto counts = m_layerManager->getLayerEntityCounts();
+
+    // 空场景：counts 不包含该图层（或计数值为 0），与 getLayerEntities().size() 一致
+    auto it = counts.find(layerId);
+    const int counted = (it != counts.end()) ? it->second : 0;
+    EXPECT_EQ(counted, static_cast<int>(m_layerManager->getLayerEntities(layerId).size()));
+
+    // 空场景时所有图层计数均为 0
+    for (int id : allIds)
+    {
+        EXPECT_EQ(m_layerManager->getLayerEntities(id).size(), 0u);
+    }
+}
+
+// ==================== LayerEditService::deleteLayers 批量删除 ====================
+
+TEST(LayerEditServiceDeleteLayersTest, BatchDelete_MultipleLayers_OneUndoEntry)
+{
+    Eg::SceneManager scene;
+    LayerManager layerMgr(&scene);
+    UndoRedoManager undoMgr(&scene);
+    LayerEditService service(&layerMgr, &undoMgr, &scene);
+
+    int a = layerMgr.createLayer("BatchA");
+    int b = layerMgr.createLayer("BatchB");
+    int c = layerMgr.createLayer("BatchC");
+    ASSERT_GT(a, 0);
+    ASSERT_GT(b, 0);
+    ASSERT_GT(c, 0);
+
+    const int deleted = service.deleteLayers({ a, b, c });
+    EXPECT_EQ(deleted, 3);
+    EXPECT_EQ(layerMgr.findLayerByName("BatchA"), -1);
+    EXPECT_EQ(layerMgr.findLayerByName("BatchB"), -1);
+    EXPECT_EQ(layerMgr.findLayerByName("BatchC"), -1);
+
+    // 单一撤销条目：一次 undo 恢复全部三个图层
+    undoMgr.undo();
+    EXPECT_GT(layerMgr.findLayerByName("BatchA"), 0);
+    EXPECT_GT(layerMgr.findLayerByName("BatchB"), 0);
+    EXPECT_GT(layerMgr.findLayerByName("BatchC"), 0);
+}
+
+TEST(LayerEditServiceDeleteLayersTest, BatchDelete_SkipsLockedAndDefault)
+{
+    Eg::SceneManager scene;
+    LayerManager layerMgr(&scene);
+    UndoRedoManager undoMgr(&scene);
+    LayerEditService service(&layerMgr, &undoMgr, &scene);
+
+    int locked = layerMgr.createLayer("LockedLayer");
+    int free = layerMgr.createLayer("FreeLayer");
+    ASSERT_GT(locked, 0);
+    ASSERT_GT(free, 0);
+    layerMgr.setLayerLocked(locked, true);
+
+    // 锁定图层与默认图层 0 会被跳过，仅删除 free
+    const int deleted = service.deleteLayers({ locked, free, 0 });
+    EXPECT_EQ(deleted, 1);
+    EXPECT_GT(layerMgr.findLayerByName("LockedLayer"), 0);
+    EXPECT_EQ(layerMgr.findLayerByName("FreeLayer"), -1);
+
+    undoMgr.undo();
+    EXPECT_GT(layerMgr.findLayerByName("FreeLayer"), 0);
 }

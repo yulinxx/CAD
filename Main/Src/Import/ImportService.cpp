@@ -733,23 +733,40 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
 
     for (const auto& src : parseResult.importedLayers)
     {
+        const uint8_t r = static_cast<uint8_t>((src.color >> 16) & 0xFF);
+        const uint8_t g = static_cast<uint8_t>((src.color >> 8) & 0xFF);
+        const uint8_t b = static_cast<uint8_t>(src.color & 0xFF);
+        const Ut::Color color = Ut::Color::fromRGB255(r, g, b);
+
+        // 1) 优先按名称复用已有图层（同名不同色的源图层也共用同一运行时图层，避免反复导入时图层无限累积）
         int layerId = m_layerManager->findLayerByName(src.name);
         if (layerId < 0)
         {
-            // 图层不存在则新建，并应用源图层的颜色/可见性/锁定属性
-            layerId = m_layerManager->createLayer(src.name);
-            ++createdCount;
-
-            const uint8_t r = static_cast<uint8_t>((src.color >> 16) & 0xFF);
-            const uint8_t g = static_cast<uint8_t>((src.color >> 8) & 0xFF);
-            const uint8_t b = static_cast<uint8_t>(src.color & 0xFF);
-            m_layerManager->setLayerColor(layerId, Ut::Color::fromRGB255(r, g, b));
-            m_layerManager->setLayerVisible(layerId, src.visible);
-            m_layerManager->setLayerLocked(layerId, src.locked);
+            // 2) 名称不匹配时按颜色去重：同一颜色的源图层共用同一运行时图层
+            layerId = m_layerManager->findLayerByColor(color);
         }
-        else
+        if (layerId < 0)
         {
-            // 源图层已存在，复用现有图层 ID
+            // 3) 名称与颜色都不匹配才新建图层，并应用源图层的可见性/锁定属性
+            layerId = m_layerManager->createLayer(src.name);
+            if (layerId >= 0)
+            {
+                ++createdCount;
+                m_layerManager->setLayerColor(layerId, color);
+                m_layerManager->setLayerVisible(layerId, src.visible);
+                m_layerManager->setLayerLocked(layerId, src.locked);
+            }
+            else
+            {
+                // 图层数量已达上限：回退到默认图层，避免无限累积导致异常
+                SY_WARNF("[ImportService] Layer count limit reached, falling back to default layer for '%s'",
+                    src.name);
+                layerId = m_layerManager->findLayerByName("Layer 0");
+                if (layerId < 0)
+                {
+                    layerId = 0;
+                }
+            }
         }
         sourceToLayerId[src.sourceId] = layerId;
     }

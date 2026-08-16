@@ -59,12 +59,14 @@ SceneTreeModel3D SceneTreeBuilder3D::build(Eg::SceneManager3D* scene)
         {
             continue;
         }
+
         const bool isSelected = selected.contains(QString::number(mesh->id));
         SceneTreeNode3D node = buildMeshNode(mesh, isSelected);
         if (node.selected)
         {
             ++model.selectedCount;
         }
+
         model.nodes.append(node);
         ++model.totalCount;
     }

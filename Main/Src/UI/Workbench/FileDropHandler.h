@@ -26,6 +26,10 @@ public:
     /// 注入导入服务（非拥有指针）
     void setImportService(ImportService* service);
 
+    // /// 在 QApplication 上安装应用级事件过滤器，兜底处理
+    // /// Windows 下 QOpenGLWidget 原生子窗口不向上冒泡拖放事件的情况
+    // void installAppEventFilter();
+
     // 处理 QDragEnterEvent — 仅在拖入受支持扩展名的文件时 accept
     bool handleDragEnter(QDragEnterEvent* event);
     // 处理 QDragMoveEvent
@@ -44,6 +48,12 @@ signals:
     /// 一批文件拖放导入结束
     void sigDropFinished(int successCount, int failedCount);
 
+protected:
+    /// 应用级事件过滤器：拦截拖放事件（Windows 原生子窗口兜底）
+    // bool eventFilter(QObject* watched, QEvent* event) override;
+
 private:
     ImportService* m_importService{ nullptr };
+    /// 是否已安装应用级事件过滤器
+    // bool m_appFilterInstalled{ false };
 };

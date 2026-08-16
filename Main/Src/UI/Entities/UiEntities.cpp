@@ -128,6 +128,7 @@ void SelectionSet::remove(const std::string& nodeId)
     {
         return;
     }
+
     std::vector<Eg::EntityId> selIds;
     m_scene->forEachSelectedEntityId(
         [](Eg::EntityId id, void* ctx) -> bool {
@@ -136,7 +137,9 @@ void SelectionSet::remove(const std::string& nodeId)
             return true;
         },
         &selIds);
+
     m_scene->clearSelection();
+
     for (auto id : selIds)
     {
         if (id != *eid)

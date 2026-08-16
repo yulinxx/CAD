@@ -5,13 +5,16 @@
 #include "Import/ImportResult.h"
 #include "Log/SyLogger.h"
 
+#include <QApplication>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
 #include <QDragLeaveEvent>
 #include <QDropEvent>
+#include <QEvent>
 #include <QFileInfo>
 #include <QMimeData>
 #include <QUrl>
+#include <QWidget>
 
 FileDropHandler::FileDropHandler(QObject* parent)
     : QObject(parent)
@@ -22,6 +25,56 @@ void FileDropHandler::setImportService(ImportService* service)
 {
     m_importService = service;
 }
+
+// void FileDropHandler::installAppEventFilter()
+// {
+//     if (m_appFilterInstalled)
+//     {
+//         return;
+//     }
+//     if (QCoreApplication* app = QApplication::instance())
+//     {
+//         app->installEventFilter(this);
+//         m_appFilterInstalled = true;
+//         SY_INFO("[FileDropHandler] App-level event filter installed for drag-drop");
+//     }
+// }
+
+// bool FileDropHandler::eventFilter(QObject* watched, QEvent* event)
+// {
+//     if (!m_importService)
+//     {
+//         return QObject::eventFilter(watched, event);
+//     }
+
+//     switch (event->type())
+//     {
+//     case QEvent::DragEnter:
+//     {
+//         handleDragEnter(static_cast<QDragEnterEvent*>(event));
+//         return event->isAccepted();
+//     }
+//     case QEvent::DragMove:
+//     {
+//         handleDragMove(static_cast<QDragMoveEvent*>(event));
+//         return event->isAccepted();
+//     }
+//     case QEvent::DragLeave:
+//     {
+//         handleDragLeave(static_cast<QDragLeaveEvent*>(event));
+//         return true;
+//     }
+//     case QEvent::Drop:
+//     {
+//         handleDrop(static_cast<QDropEvent*>(event));
+//         return true;
+//     }
+//     default:
+//         break;
+//     }
+
+//     return QObject::eventFilter(watched, event);
+// }
 
 QStringList FileDropHandler::supportedExtensions() const
 {

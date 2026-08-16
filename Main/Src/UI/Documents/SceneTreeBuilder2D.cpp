@@ -90,7 +90,8 @@ SceneTreeTopology2D SceneTreeBuilder2D::buildTopology(Eg::SceneManager* scene)
         visitGroupMembers(group, groupedIds);
     }
 
-    topo.topLevel.reserve(static_cast<int>(groupedIds.size()) + static_cast<int>(scene->groupManager().getTopLevelGroups().size()));
+    topo.topLevel.reserve(
+        static_cast<int>(groupedIds.size()) + static_cast<int>(scene->groupManager().getTopLevelGroups().size()));
 
     // 顶层群组
     for (auto* group : scene->groupManager().getTopLevelGroups())
@@ -135,6 +136,7 @@ QVector<SceneTreeRow2D> SceneTreeBuilder2D::groupMembers(Eg::SceneManager* scene
             out.push_back({ static_cast<qint64>(sub->id), true });
         }
     }
+
     for (auto* e : group->entities())
     {
         if (e)
@@ -178,10 +180,10 @@ SceneTreeRowMeta2D SceneTreeBuilder2D::rowMeta(Eg::SceneManager* scene, LayerMan
     meta.visible = entity->visible();
     meta.locked = entity->locked();
     meta.selected = entity->selected();
+
     if (layers)
-    {
         meta.layerName = QString::fromStdString(layers->layerName(layers->getEntityLayer(entity)));
-    }
+
     return meta;
 }
 
@@ -192,6 +194,7 @@ QSet<QString> SceneTreeBuilder2D::selectedIds(Eg::SceneManager* scene)
     {
         return ids;
     }
+
     for (const auto* e : scene->getSelectedEntities())
     {
         if (e)
