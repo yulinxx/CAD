@@ -213,6 +213,14 @@ protected:
  *
  * 提供 2D 绘图功能，包括线条绘制、测量、选择等操作。
  */
+
+/// 2D 左右面板（Draw Tools / Layers）的承载样式
+enum class PanelHostStyle
+{
+    Toolbar,  ///< 固定工具栏（QToolBar 停靠在左右两侧）
+    Dock      ///< Dock 停靠面板（QDockWidget，默认）
+};
+
 class Workbench2D final : public UiWorkbench
 {
 public:
@@ -234,6 +242,12 @@ public:
     void releaseCentralWidgetGLResources(QWidget* centralWidget) const override;
 
     bool showSettingsDialog(QWidget* parent) override;
+
+public:
+    /// 设置左右面板（Draw Tools / Layers）的承载样式（默认 Dock）
+    void setPanelHostStyle(PanelHostStyle style);
+    /// 当前左右面板承载样式
+    PanelHostStyle panelHostStyle() const { return m_panelHostStyle; }
 
 private:
     /// 创建中央视口
@@ -272,8 +286,13 @@ private:
     std::unique_ptr<class CommandActionHub> m_commandHub;
     /// 顶部工具栏（编辑命令）— Qt 父对象管理生命周期
     class TopToolBar* m_topToolBar{ nullptr };
+    /// 文字编辑字体工具栏（双击文字进入编辑时显示）— Qt 父对象管理生命周期
+    class QToolBar* m_textFontToolBar{ nullptr };
+    class TextFontToolBar* m_textFontToolBarWidget{ nullptr };
     /// 右侧工具栏（颜色/图层）— Qt 父对象管理生命周期
     class RightToolBar* m_rightToolBar{ nullptr };
+    /// 左右面板承载样式（Draw Tools / Layers）
+    PanelHostStyle m_panelHostStyle{ PanelHostStyle::Toolbar };
     /// 2D 渲染视口 — Qt 父对象管理生命周期（工作台切换时用于恢复工具状态）
     class RenderViewport2D* m_viewport{ nullptr };
     /// 2D 场景树面板（可选 UI，配置驱动时可能不存在）

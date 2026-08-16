@@ -39,6 +39,10 @@
 
 #include "UI/RightToolBar/RightToolBar.h"
 #include "UI/TopToolBar/TopToolBar.h"
+#include "UI/TopToolBar/TextFontToolBar.h"
+#include "UI/DrawTools/TextEditTool.h"
+#include "UI/DrawTools/ToolManager.h"
+#include "UI/UiMetrics.h"
 #include "UI/Dlg/LayerManagerDialog.h"
 #include "UI2D/Service/EntityPropertyModel2D.h"
 #include "UI2D/Service/EntityPropertyEditSession2D.h"
@@ -537,15 +541,19 @@ void Workbench2D::setupImportCallbacks(RenderViewport2D* vp, WorkbenchWindow& wi
     });
 }
 
+void Workbench2D::setPanelHostStyle(PanelHostStyle style)
+{
+    if (m_panelHostStyle == style)
+    {
+        return;
+    }
+    m_panelHostStyle = style;
+}
+
 void Workbench2D::createToolbars(WorkbenchWindow& window)
 {
-    // 左侧绘图工具栏
-    auto* leftToolBar = new QToolBar(QObject::tr("Draw Tools"), &window);
-    leftToolBar->setObjectName(QStringLiteral("DrawToolBar"));
-    leftToolBar->setMovable(false);
-    window.addToolBar(Qt::LeftToolBarArea, leftToolBar);
-
-    auto* drawWidget = new DrawToolBarWidget(leftToolBar);
+    // 绘图工具内容控件（承载样式无关：无论 Dock 还是 Toolbar 复用同一内容）
+    auto* drawWidget = new DrawToolBarWidget(&window);
     drawWidget->setOperationBus(m_services.operationBus);
 
     // 从 CommandCatalog 构建工具定义列表
@@ -564,7 +572,20 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         }
     }
     drawWidget->setToolDefinitions(drawTools);
-    leftToolBar->addWidget(drawWidget);
+
+    // 依据承载样式创建左侧面板（Draw Tools）
+    if (m_panelHostStyle == PanelHostStyle::Dock)
+    {
+        window.registerDockWidget(QObject::tr("Draw Tools"), drawWidget, Qt::LeftDockWidgetArea);
+    }
+    else
+    {
+        auto* leftToolBar = new QToolBar(QObject::tr("Draw Tools"), &window);
+        leftToolBar->setObjectName(QStringLiteral("DrawToolBar"));
+        leftToolBar->setMovable(false);
+        window.addToolBar(Qt::LeftToolBarArea, leftToolBar);
+        leftToolBar->addWidget(drawWidget);
+    }
 
     // 接通「工具栏 → OperationBus → 视口」：把工具栏展示的 Tool_* 操作注册到操作总线，
     // 点击按钮后经总线转发表驱动的 LambdaOperation 激活视口对应工具。
@@ -695,10 +716,52 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     m_topToolBar->installHubActions(m_commandHub.get());
     window.addToolBar(Qt::TopToolBarArea, m_topToolBar);
 
-    // 右侧工具栏（颜色/图层）
+    // 文字编辑字体工具栏（双击文字进入编辑会话时显示字体族/字号/粗斜下划线）
+    m_textFontToolBar = new QToolBar(QObject::tr("Text Font"), &window);
+    m_textFontToolBar->setObjectName(QStringLiteral("TextFontToolBar"));
+    m_textFontToolBar->setMovable(false);
+    m_textFontToolBar->setIconSize(QSize(UiMetrics::toolbarIconSizeSmall(), UiMetrics::toolbarIconSizeSmall()));
+    m_textFontToolBarWidget = new TextFontToolBar(m_textFontToolBar);
+    m_textFontToolBar->addWidget(m_textFontToolBarWidget);
+    window.addToolBar(Qt::TopToolBarArea, m_textFontToolBar);
+    m_textFontToolBar->setVisible(false);
+
+    auto bindTextFontToolBar = [this](const QString& toolName) {
+        if (toolName == QStringLiteral("TextEditTool"))
+        {
+            if (m_viewport)
+            {
+                if (ToolManager* tm = m_viewport->toolManager())
+                {
+                    if (auto* tool = dynamic_cast<TextEditTool*>(tm->getTool(QStringLiteral("TextEditTool"))))
+                    {
+                        m_textFontToolBarWidget->bindTool(tool);
+                        m_textFontToolBar->setVisible(true);
+                        return;
+                    }
+                }
+            }
+        }
+        m_textFontToolBarWidget->bindTool(nullptr);
+        m_textFontToolBar->setVisible(false);
+    };
+    QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged, this, bindTextFontToolBar);
+    if (m_viewport)
+    {
+        bindTextFontToolBar(m_viewport->activeToolName());
+    }
+
+    // 右侧图层面板（颜色/图层），依据承载样式创建
     m_rightToolBar = new RightToolBar(&window);
     m_rightToolBar->setObjectName(QStringLiteral("RightToolBar"));
-    window.addToolBar(Qt::RightToolBarArea, m_rightToolBar);
+    if (m_panelHostStyle == PanelHostStyle::Dock)
+    {
+        window.registerDockWidget(QObject::tr("Layers"), m_rightToolBar, Qt::RightDockWidgetArea);
+    }
+    else
+    {
+        window.addToolBar(Qt::RightToolBarArea, m_rightToolBar);
+    }
 
     if (m_services.layerManager)
     {
@@ -760,7 +823,19 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
                 m_commandHub->refreshActionStates(m_commandHub->captureSnapshot(m_commandHub->mainWindow()));
             }
         });
+        // 撤销/重做会恢复/移除/重建图元（场景拓扑变化），增量刷新可能遗漏，
+        // 强制全量重建视口，确保回退结果实时可见
+        QObject::connect(m_services.operationBus, &OperationBus::operationCompleted, this, [this](OperationId id, bool success) {
+            if (success && (id == OperationId::Edit_Undo || id == OperationId::Edit_Redo))
+            {
+                if (m_viewport)
+                {
+                    m_viewport->requestFullRefresh();
+                }
+            }
+        });
     }
+
 }
 
 void Workbench2D::setupSceneTree(WorkbenchWindow& window)
@@ -1063,6 +1138,8 @@ void Workbench2D::deactivate()
     // 工具栏指针会随窗口清理而失效（clearWorkbenchContent 会 delete QToolBar）
     m_topToolBar = nullptr;
     m_rightToolBar = nullptr;
+    m_textFontToolBar = nullptr;
+    m_textFontToolBarWidget = nullptr;
     // 视口指针随窗口清理而失效
     m_viewport = nullptr;
     // 场景树面板指针随窗口清理而失效
