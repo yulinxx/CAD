@@ -93,8 +93,6 @@ void WorkbenchLayoutManager::buildDockAreas()
     m_panelState.leftDock = new QDockWidget(m_parent->tr("Scene"), m_parent);  // 场景
     m_panelState.leftDock->setObjectName(QStringLiteral("SceneDock"));
     m_panelState.leftDock->setWidget(m_panelState.sceneTreeDock);
-    m_panelState.leftDock->setMinimumWidth(170);
-    m_panelState.leftDock->setMaximumWidth(280);
     m_parent->addDockWidget(Qt::LeftDockWidgetArea, m_panelState.leftDock);
 
     // 属性面板
@@ -102,12 +100,11 @@ void WorkbenchLayoutManager::buildDockAreas()
     m_panelState.rightDock = new QDockWidget(m_parent->tr("Properties"), m_parent);  // 属性
     m_panelState.rightDock->setObjectName(QStringLiteral("PropertiesDock"));
     m_panelState.rightDock->setWidget(m_panelState.propertiesDock);
-    m_panelState.rightDock->setMinimumWidth(200);
-    m_panelState.rightDock->setMaximumWidth(340);
     m_parent->addDockWidget(Qt::RightDockWidgetArea, m_panelState.rightDock);
 
-    // 设置初始面板宽度，避免两侧面板默认过宽挤压中间的视图
-    m_parent->resizeDocks({ m_panelState.leftDock, m_panelState.rightDock }, { 200, 300 },
+    // 仅设置初始面板宽度（默认窄一点，不挤压中间的视图），
+    // 不限制最大宽度，用户可手动拖拽加宽；放到顶部/底部 Dock 时也能自适应拉宽
+    m_parent->resizeDocks({ m_panelState.leftDock, m_panelState.rightDock }, { 180, 280 },
                           Qt::Horizontal);
 }
 

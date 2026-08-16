@@ -1652,11 +1652,10 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
     auto* created = new SceneTreePanel3D(&window);
     created->setObjectName(QStringLiteral("SceneTreeDock3D"));
     auto* sceneDock = window.registerDockWidget(QObject::tr("Scene"), created, Qt::LeftDockWidgetArea);
-    // 限制 Scene 面板宽度，避免把 3D 视图挤得过窄
+    // 仅设置初始宽度（窄一点，不挤压 3D 视图），不限制最大宽度，用户可手动拖宽
     if (sceneDock)
     {
-        sceneDock->setMinimumWidth(170);
-        sceneDock->setMaximumWidth(280);
+        window.resizeDocks({ sceneDock }, { 220 }, Qt::Horizontal);
     }
     m_scenePanel3D = created;
 
