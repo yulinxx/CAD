@@ -38,6 +38,7 @@ set(MAIN_APP_SOURCES
     ${SRC_ROOT}/Export/ExportService.cpp
     ${SRC_ROOT}/Export/Writers/BmpExportWriter.cpp
     ${SRC_ROOT}/Export/Writers/DxfExportWriter.cpp
+    ${SRC_ROOT}/Export/Writers/NativeExportWriter.cpp
     ${SRC_ROOT}/Export/Writers/ObjExportWriter.cpp
     ${SRC_ROOT}/Export/Writers/PdfExportWriter.cpp
     ${SRC_ROOT}/Export/Writers/PngExportWriter.cpp
@@ -471,6 +472,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
         ${SRC_ROOT}/Export/ExportService.cpp
         ${SRC_ROOT}/Export/Writers/BmpExportWriter.cpp
         ${SRC_ROOT}/Export/Writers/DxfExportWriter.cpp
+        ${SRC_ROOT}/Export/Writers/NativeExportWriter.cpp
         ${SRC_ROOT}/Export/Writers/ObjExportWriter.cpp
         ${SRC_ROOT}/Export/Writers/PdfExportWriter.cpp
         ${SRC_ROOT}/Export/Writers/PngExportWriter.cpp

@@ -63,6 +63,7 @@
 #include "Export/Writers/PngExportWriter.h"
 #include "Export/Writers/ObjExportWriter.h"
 #include "Export/Writers/StepExportWriter.h"
+#include "Export/Writers/NativeExportWriter.h"
 
 #include <QWidget>
 
@@ -213,6 +214,7 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_exportDispatcher->registerWriter(std::make_unique<PngExportWriter>());
     m_exportDispatcher->registerWriter(std::make_unique<ObjExportWriter>());
     m_exportDispatcher->registerWriter(std::make_unique<StepExportWriter>());
+    m_exportDispatcher->registerWriter(std::make_unique<NativeExportWriter>());
 
     // 配置导出服务
     m_exportService->setDispatcher(m_exportDispatcher.get());
