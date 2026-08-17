@@ -1142,12 +1142,12 @@ TEST(RenderViewport2DRegressionTest, SpaceKey_FingerMovePansCamera)
     EXPECT_TRUE(rig.router.isSpaceHeld());
 
     // 第一次移动：建立锚点（delta 0）
-    QMouseEvent move1(QEvent::MouseMove, QPointF(600, 400), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+    QMouseEvent move1(QEvent::MouseMove, QPointF(600, 400), QPointF(600, 400), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
     rig.router.handleMouseMove(&move1);
     EXPECT_TRUE(rig.router.isPanning());
 
     // 第二次移动：产生平移（physWidgetPos 按 DPR 缩放）
-    QMouseEvent move2(QEvent::MouseMove, QPointF(620, 410), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+    QMouseEvent move2(QEvent::MouseMove, QPointF(620, 410), QPointF(620, 410), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
     rig.router.handleMouseMove(&move2);
 
     const double dpr = rig.widget.devicePixelRatio();

@@ -87,6 +87,11 @@ if(MSVC)
     add_compile_options("/utf-8")
 endif()
 
+# macOS: 抑制 -Wnonportable-include-path（大小写不敏感文件系统上大小写匹配的误报）
+if(APPLE)
+    add_compile_options(-Wno-nonportable-include-path)
+endif()
+
 # 统一输出目录
 set(_SANYI_BIN_DIR "${CMAKE_BINARY_DIR}/bin_Qt${QT_VERSION_MAJOR}")
 set(_SANYI_LIB_DIR "${CMAKE_BINARY_DIR}/lib_Qt${QT_VERSION_MAJOR}")
