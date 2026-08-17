@@ -135,12 +135,12 @@ size_t ViewportSelector::endBoxSelect(const QPointF& worldPos)
         m_selectionService->selectMultiple(idPtrs.data(), idPtrs.size());
         if (m_statusCallback)
         {
-            m_statusCallback(QStringLiteral("2D 已选中 %1 个图元").arg(static_cast<int>(hitIds.size())));
+            m_statusCallback(QStringLiteral("2D: %1 entity(ies) selected").arg(static_cast<int>(hitIds.size())));
         }
         if (m_selectionCallback)
         {
             m_selectionCallback(QStringLiteral("2D-Select"),
-                QStringLiteral("2D 已选中 %1 个图元").arg(static_cast<int>(hitIds.size())));
+                QStringLiteral("2D: %1 entity(ies) selected").arg(static_cast<int>(hitIds.size())));
         }
     }
     else

@@ -545,7 +545,7 @@ void RenderViewport2D::zoomToSelection()
     auto bboxOpt = m_selector->selectionBBox();
     if (!bboxOpt)
     {
-        updateStatus(tr("未选中图元"));
+        updateStatus(tr("No entities selected"));
         return;
     }
 
