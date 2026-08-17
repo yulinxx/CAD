@@ -1,0 +1,5 @@
+if(EXISTS "C:/Users/xx/Documents/Cpp/CAD/License/License/LicenseTests/LicenseTests[1]_tests.cmake")
+  include("C:/Users/xx/Documents/Cpp/CAD/License/License/LicenseTests/LicenseTests[1]_tests.cmake")
+else()
+  add_test(LicenseTests_NOT_BUILT LicenseTests_NOT_BUILT)
+endif()

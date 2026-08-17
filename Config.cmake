@@ -9,12 +9,13 @@
 # 加载用户本地配置（可选）
 # --------------------------------------------------------------------
 # [A1 修复] 支持 Config.local.cmake 覆盖默认路径，实现"公共配置入库 + 私有配置不入库"
-# 注意：使用绝对路径，因为子模块（如 Renderx）会通过 ../Config.cmake 直接 include 此文件。
-if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/Config.local.cmake")
-    include("${CMAKE_CURRENT_LIST_DIR}/Config.local.cmake")
-    message(STATUS "[Config] Loaded local configuration from Config.local.cmake")
-elseif(EXISTS "${CMAKE_SOURCE_DIR}/Config.local.cmake")
-    include("${CMAKE_SOURCE_DIR}/Config.local.cmake")
+# --------------------------------------------------------------------
+# 注意：Config.local.cmake 已被 .gitignore 排除，不会提交到版本控制。
+# 用户本地配置（vcpkg/Qt 路径等）请编辑 Config.local.cmake。
+# 未找到时使用 Config.cmake 中的默认值。
+set(_SANYI_CONFIG_LOCAL "${CMAKE_CURRENT_LIST_DIR}/Config.local.cmake")
+if(EXISTS "${_SANYI_CONFIG_LOCAL}")
+    include("${_SANYI_CONFIG_LOCAL}")
     message(STATUS "[Config] Loaded local configuration from Config.local.cmake")
 endif()
 

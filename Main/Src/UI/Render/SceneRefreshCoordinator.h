@@ -95,6 +95,7 @@ private:
         None,         // 无待办
         Repaint,      // 仅重绘
         LightUpdate,  // 增量提交脏/删除图元
+        Selection,    // [E5] 选择态变化：仅修改被选/取消选中图元的样式（增量）
         FullRefresh   // 全量 gather + submit
     };
 

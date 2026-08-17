@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  build-and-test-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure
+        run: |
+          cmake -B build -G "Visual Studio 17 2022" -A x64 \
+            -DBUILD_UI_TESTS=ON \
+            -DBUILD_UI_COMMON_TESTS=ON \
+            -DBUILD_UI2D_TESTS=ON \
+            -DBUILD_UI3D_TESTS=ON \
+            -DBUILD_HARDWARE=OFF \
+            -DBUILD_VISION=OFF \
+            -DSANYI_PYBIND_CORE=OFF
+
+      - name: Build
+        run: |
+          cmake --build build --config Debug --parallel \
+            --target UICommon UI2D UI3D SanYiCAD \
+            UICommonCommandKernelTests UI3DCommandCatalogTests UI2DCoreTests UI3DStorageTests
+
+      - name: Test
+        run: ctest --test-dir build -C Debug --output-on-failure --parallel

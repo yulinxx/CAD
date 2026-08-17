@@ -843,126 +843,126 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
 
     // 注册 Default 上下文（通用编辑命令）
     m_contextManager->registerContext(ToolBarContext::Default, {
-        .context = ToolBarContext::Default,
-        .title = tr("Edit"),
-        .sections = {
+        ToolBarContext::Default,
+        tr("Edit"),
+        {
             { "", {
-                { .actionId = "Edit_Undo", .displayName = tr("Undo"), .iconResource = ":/ui/common/Icons/Actions/undo.svg" },
-                { .actionId = "Edit_Redo", .displayName = tr("Redo"), .iconResource = ":/ui/common/Icons/Actions/redo.svg" },
+                { "Edit_Undo", tr("Undo"), ":/ui/common/Icons/Actions/undo.svg" },
+                { "Edit_Redo", tr("Redo"), ":/ui/common/Icons/Actions/redo.svg" },
             }},
             { "", {
-                { .actionId = "Edit_MirrorHorizontal", .displayName = tr("Mirror H"), .iconResource = ":/ui/common/Icons/Actions/mirror_h.svg" },
-                { .actionId = "Edit_MirrorVertical", .displayName = tr("Mirror V"), .iconResource = ":/ui/common/Icons/Actions/mirror_v.svg" },
+                { "Edit_MirrorHorizontal", tr("Mirror H"), ":/ui/common/Icons/Actions/mirror_h.svg" },
+                { "Edit_MirrorVertical", tr("Mirror V"), ":/ui/common/Icons/Actions/mirror_v.svg" },
             }},
             { "", {
-                { .actionId = "Edit_AlignLeft", .displayName = tr("Align Left"), .iconResource = ":/ui/common/Icons/Actions/align_left.svg" },
-                { .actionId = "Edit_AlignRight", .displayName = tr("Align Right"), .iconResource = ":/ui/common/Icons/Actions/align_right.svg" },
-                { .actionId = "Edit_AlignCenterH", .displayName = tr("Align Center H"), .iconResource = ":/ui/common/Icons/Actions/align_center_h.svg" },
-                { .actionId = "Edit_AlignTop", .displayName = tr("Align Top"), .iconResource = ":/ui/common/Icons/Actions/align_top.svg" },
-                { .actionId = "Edit_AlignBottom", .displayName = tr("Align Bottom"), .iconResource = ":/ui/common/Icons/Actions/align_bottom.svg" },
-                { .actionId = "Edit_AlignCenterV", .displayName = tr("Align Center V"), .iconResource = ":/ui/common/Icons/Actions/align_center_v.svg" },
+                { "Edit_AlignLeft", tr("Align Left"), ":/ui/common/Icons/Actions/align_left.svg" },
+                { "Edit_AlignRight", tr("Align Right"), ":/ui/common/Icons/Actions/align_right.svg" },
+                { "Edit_AlignCenterH", tr("Align Center H"), ":/ui/common/Icons/Actions/align_center_h.svg" },
+                { "Edit_AlignTop", tr("Align Top"), ":/ui/common/Icons/Actions/align_top.svg" },
+                { "Edit_AlignBottom", tr("Align Bottom"), ":/ui/common/Icons/Actions/align_bottom.svg" },
+                { "Edit_AlignCenterV", tr("Align Center V"), ":/ui/common/Icons/Actions/align_center_v.svg" },
             }},
             { "", {
-                { .actionId = "Edit_SelectAll", .displayName = tr("Select All"), .iconResource = ":/ui/common/Icons/Actions/select_all.svg" },
-                { .actionId = "Edit_InvertSelection", .displayName = tr("Invert Selection"), .iconResource = ":/ui/common/Icons/Actions/invert_selection.svg" },
-                { .actionId = "Edit_Deselect", .displayName = tr("Deselect"), .iconResource = ":/ui/common/Icons/Actions/deselect.svg" },
+                { "Edit_SelectAll", tr("Select All"), ":/ui/common/Icons/Actions/select_all.svg" },
+                { "Edit_InvertSelection", tr("Invert Selection"), ":/ui/common/Icons/Actions/invert_selection.svg" },
+                { "Edit_Deselect", tr("Deselect"), ":/ui/common/Icons/Actions/deselect.svg" },
             }},
             { "", {
-                { .actionId = "Edit_Copy", .displayName = tr("Copy"), .iconResource = ":/ui/common/Icons/Actions/copy.svg" },
-                { .actionId = "Edit_Paste", .displayName = tr("Paste"), .iconResource = ":/ui/common/Icons/Actions/paste.svg" },
-                { .actionId = "Edit_Delete", .displayName = tr("Delete"), .iconResource = ":/ui/common/Icons/Actions/delete.svg" },
+                { "Edit_Copy", tr("Copy"), ":/ui/common/Icons/Actions/copy.svg" },
+                { "Edit_Paste", tr("Paste"), ":/ui/common/Icons/Actions/paste.svg" },
+                { "Edit_Delete", tr("Delete"), ":/ui/common/Icons/Actions/delete.svg" },
             }},
             { "", {
-                { .actionId = "Edit_Group", .displayName = tr("Group"), .iconResource = ":/ui/common/Icons/Actions/group.svg", .checkable = true },
+                { "Edit_Group", tr("Group"), ":/ui/common/Icons/Actions/group.svg", true },
             }},
         },
     });
 
     // 注册 TextEditing 上下文（文字编辑工具栏）
     m_contextManager->registerContext(ToolBarContext::TextEditing, {
-        .context = ToolBarContext::TextEditing,
-        .title = tr("Text Format"),
-        .sections = {
+        ToolBarContext::TextEditing,
+        tr("Text Format"),
+        {
             { "", {
-                { .actionId = "Text_FontFamily", .displayName = tr("Font"), .iconResource = ":/ui/common/Icons/Tools/text.svg" },
-                { .actionId = "Text_FontSize", .displayName = tr("Size"), .iconResource = ":/ui/common/Icons/Tools/text.svg" },
-                { .actionId = "Text_Bold", .displayName = tr("Bold"), .iconResource = ":/ui/common/Icons/Tools/text.svg", .checkable = true },
-                { .actionId = "Text_Italic", .displayName = tr("Italic"), .iconResource = ":/ui/common/Icons/Tools/text.svg", .checkable = true },
-                { .actionId = "Text_Underline", .displayName = tr("Underline"), .iconResource = ":/ui/common/Icons/Tools/text.svg", .checkable = true },
+                { "Text_FontFamily", tr("Font"), ":/ui/common/Icons/Tools/text.svg" },
+                { "Text_FontSize", tr("Size"), ":/ui/common/Icons/Tools/text.svg" },
+                { "Text_Bold", tr("Bold"), ":/ui/common/Icons/Tools/text.svg", true },
+                { "Text_Italic", tr("Italic"), ":/ui/common/Icons/Tools/text.svg", true },
+                { "Text_Underline", tr("Underline"), ":/ui/common/Icons/Tools/text.svg", true },
             }},
         },
     });
 
     // 注册 QRCodeEditing 上下文（二维码编辑工具栏）
     m_contextManager->registerContext(ToolBarContext::QREditing, {
-        .context = ToolBarContext::QREditing,
-        .title = tr("QR Code"),
-        .sections = {
+        ToolBarContext::QREditing,
+        tr("QR Code"),
+        {
             { tr("Content"), {
-                { .actionId = "QR_Content", .displayName = tr("Content") },
-                { .actionId = "QR_ErrorCorrection", .displayName = tr("Error Correction") },
+                { "QR_Content", tr("Content") },
+                { "QR_ErrorCorrection", tr("Error Correction") },
             }},
             { tr("Appearance"), {
-                { .actionId = "QR_Size", .displayName = tr("Size") },
-                { .actionId = "QR_Foreground", .displayName = tr("Foreground") },
-                { .actionId = "QR_Background", .displayName = tr("Background") },
+                { "QR_Size", tr("Size") },
+                { "QR_Foreground", tr("Foreground") },
+                { "QR_Background", tr("Background") },
             }},
             { tr("Advanced"), {
-                { .actionId = "QR_Logo", .displayName = tr("Logo") },
+                { "QR_Logo", tr("Logo") },
             }},
         },
     });
 
     // 注册 BitmapEditing 上下文（位图编辑工具栏）
     m_contextManager->registerContext(ToolBarContext::BitmapEditing, {
-        .context = ToolBarContext::BitmapEditing,
-        .title = tr("Bitmap"),
-        .sections = {
+        ToolBarContext::BitmapEditing,
+        tr("Bitmap"),
+        {
             { tr("Adjust"), {
-                { .actionId = "Bitmap_Crop", .displayName = tr("Crop") },
-                { .actionId = "Bitmap_Rotate", .displayName = tr("Rotate") },
-                { .actionId = "Bitmap_Brightness", .displayName = tr("Brightness") },
-                { .actionId = "Bitmap_Contrast", .displayName = tr("Contrast") },
+                { "Bitmap_Crop", tr("Crop") },
+                { "Bitmap_Rotate", tr("Rotate") },
+                { "Bitmap_Brightness", tr("Brightness") },
+                { "Bitmap_Contrast", tr("Contrast") },
             }},
             { tr("Filter"), {
-                { .actionId = "Bitmap_Filter", .displayName = tr("Filter") },
+                { "Bitmap_Filter", tr("Filter") },
             }},
         },
     });
 
     // 注册 VectorEditing 上下文（矢量编辑工具栏）
     m_contextManager->registerContext(ToolBarContext::VectorEditing, {
-        .context = ToolBarContext::VectorEditing,
-        .title = tr("Vector"),
-        .sections = {
+        ToolBarContext::VectorEditing,
+        tr("Vector"),
+        {
             { tr("Path"), {
-                { .actionId = "Vector_NodeEdit", .displayName = tr("Node Edit") },
-                { .actionId = "Vector_Simplify", .displayName = tr("Simplify") },
-                { .actionId = "Vector_Boolean", .displayName = tr("Boolean") },
+                { "Vector_NodeEdit", tr("Node Edit") },
+                { "Vector_Simplify", tr("Simplify") },
+                { "Vector_Boolean", tr("Boolean") },
             }},
             { tr("Style"), {
-                { .actionId = "Vector_Stroke", .displayName = tr("Stroke") },
-                { .actionId = "Vector_Fill", .displayName = tr("Fill") },
+                { "Vector_Stroke", tr("Stroke") },
+                { "Vector_Fill", tr("Fill") },
             }},
         },
     });
 
     // 注册 ImageEditing 上下文（图片编辑工具栏）
     m_contextManager->registerContext(ToolBarContext::ImageEditing, {
-        .context = ToolBarContext::ImageEditing,
-        .title = tr("Image"),
-        .sections = {
+        ToolBarContext::ImageEditing,
+        tr("Image"),
+        {
             { tr("Transform"), {
-                { .actionId = "Image_Crop", .displayName = tr("Crop") },
-                { .actionId = "Image_Rotate", .displayName = tr("Rotate") },
-                { .actionId = "Image_Flip", .displayName = tr("Flip") },
+                { "Image_Crop", tr("Crop") },
+                { "Image_Rotate", tr("Rotate") },
+                { "Image_Flip", tr("Flip") },
             }},
             { tr("Adjust"), {
-                { .actionId = "Image_Brightness", .displayName = tr("Brightness") },
-                { .actionId = "Image_Contrast", .displayName = tr("Contrast") },
+                { "Image_Brightness", tr("Brightness") },
+                { "Image_Contrast", tr("Contrast") },
             }},
             { tr("Filter"), {
-                { .actionId = "Image_Filter", .displayName = tr("Filter") },
+                { "Image_Filter", tr("Filter") },
             }},
         },
     });

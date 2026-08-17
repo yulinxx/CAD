@@ -197,9 +197,16 @@ void SceneRefreshCoordinator::onSelectionChanged()
 {
     // P5: 观察者注册收敛 — 发射信号供视口同步工具状态
     emit selectionChanged();
-    // 选择变化需重建场景几何：选中图元的原始实线不再提交（由虚线轮廓覆盖层替代），
-    // 取消选中的图元需恢复实线，因此必须走全量刷新而非纯视觉重绘。
-    requestFullRefresh();
+
+    // [E5-P1 修复] 选择变化走增量渲染，而非全量重建。
+    // 旧代码调用 requestFullRefresh() 导致每次单击/悬停都触发整场 gather+tessellate+submit。
+    // 现在使用 Selection 级别：仅修改被选/取消选中图元的样式（虚线轮廓 vs 实线），
+    // 通过 modifyRenderEntity 实现高亮，避免重 tessellation。
+    if (m_refreshLevel < RefreshLevel::Selection)
+    {
+        m_refreshLevel = RefreshLevel::Selection;
+    }
+    scheduleSceneUpdate();
 }
 
 void SceneRefreshCoordinator::applyRepaintRefresh()
@@ -435,6 +442,41 @@ void SceneRefreshCoordinator::updateSceneRender()
     if (level == RefreshLevel::LightUpdate)
     {
         applyLightRefresh(sm);
+    }
+
+    // [E5-P1 修复] Selection 级别：选择态变化走增量路径。
+    // 选择高亮通过 modifyRenderEntity 修改样式（虚线轮廓 vs 实线），
+    // 而非全量 gather+tessellate+submit。对于大批量选择变化，降级到 LightUpdate。
+    if (level == RefreshLevel::Selection)
+    {
+        // 选择变化量小时走增量修改，量大时降级到 LightUpdate
+        if (m_pendingDirtyIds.size() > 100)
+        {
+            applyLightRefresh(sm);
+        }
+        else
+        {
+            // 小批量选择变化：仅修改受影响图元的渲染样式
+            for (auto id : m_pendingDirtyIds)
+            {
+                auto uid = static_cast<uint64_t>(id);
+                if (m_renderedEntityIds.count(uid))
+                {
+                    auto* entity = sm->findEntityById(id);
+                    if (entity)
+                    {
+                        std::vector<render::VertexP3C3> vertices;
+                        render::PrimitiveType primType;
+                        const QPointF cam = m_renderWidget->cameraCenter();
+                        const double cameraCenter[2] = { cam.x(), cam.y() };
+                        if (entityToVertices(entity, vertices, primType, cameraCenter))
+                        {
+                            m_renderWidget->modifyRenderEntity(uid, vertices.data(), static_cast<uint32_t>(vertices.size()), primType);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // 仅显式 FullRefresh 级别走此分支，避免与 LightUpdate 的内部回退重复执行

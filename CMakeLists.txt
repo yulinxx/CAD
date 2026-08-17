@@ -54,19 +54,23 @@ message(STATUS "  VCPKG_DIR: ${VCPKG_DIR}")
 
 # [A3 修复] 不再在 configure 阶段执行 git submodule update。
 # 子模块更新应在 configure 之前由用户手动执行（见 README 前置步骤）。
-# configure 时仅校验各子模块目录是否存在，缺失则报错提示。
+# configure 时仅校验各子模块的 CMakeLists.txt 是否存在，缺失则报错提示。
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
     message(STATUS "  Git: Checking submodule presence...")
     set(_SANYI_SUBMODULE_DIRS
-        "Engine" "Renderx" "UI" "FileIO" "Utility" "Log"
-        "License" "CrashHandler" "Hardware" "Network" "Vision"
-        "Engraving" "Nesting" "GeoModelCore" "PythonHost" "PyBindCore"
+        "Engine/Common" "Engine/2D" "Engine/3D" "Engine/Persistence"
+        "Renderx" "UI/Common" "UI/2D" "UI/3D"
+        "FileIO/FileIO" "Utility/Utility" "Log/Log"
+        "License/License" "CrashHandler/CrashHandler"
+        "Hardware/Hardware" "Network/Network" "Vision/Vision"
+        "Engraving/Engraving" "Nesting/Nesting" "GeoModelCore/GeoModelCore"
+        "PythonHost" "PyBindCore/PyBindCore"
     )
     foreach(_submod IN LISTS _SANYI_SUBMODULE_DIRS)
-        if(NOT IS_DIRECTORY "${PROJECT_SOURCE_DIR}/${_submod}")
+        if(NOT EXISTS "${PROJECT_SOURCE_DIR}/${_submod}/CMakeLists.txt")
             message(FATAL_ERROR
-                "  Submodule '${_submod}' is missing (directory not found).\n"
+                "  Submodule '${_submod}' is missing (no CMakeLists.txt found).\n"
                 "  Please run before configuring:\n"
                 "    cd ${PROJECT_SOURCE_DIR}\n"
                 "    git submodule update --init --recursive"

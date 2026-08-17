@@ -1,0 +1,49 @@
+name: Engraving MeshSlicer Tests
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+
+jobs:
+  mesh-slicer-tests:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git $env:RUNNER_TEMP/vcpkg
+          & "$env:RUNNER_TEMP/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
+          echo "VCPKG_ROOT=$env:RUNNER_TEMP/vcpkg" >> $env:GITHUB_ENV
+          echo "VCPKG_DEFAULT_TRIPLET=x64-windows" >> $env:GITHUB_ENV
+
+      - name: Install dependencies
+        run: |
+          & "$env:VCPKG_ROOT/vcpkg.exe" install opencv4 gtest --triplet x64-windows
+
+      - name: Configure
+        run: |
+          cmake -B build-ci -S Engraving/ci `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DCMAKE_BUILD_TYPE=Release `
+            -A x64
+
+      - name: Build tests
+        run: cmake --build build-ci --config Release --target EngravingMeshSlicerTests
+
+      - name: Run tests
+        run: |
+          $exe = Get-ChildItem -Path build-ci -Recurse -Filter EngravingMeshSlicerTests.exe | Select-Object -First 1
+          if (-not $exe) { throw "EngravingMeshSlicerTests.exe not found" }
+          & $exe.FullName
+
+      - name: CTest
+        run: ctest --test-dir build-ci -C Release --output-on-failure

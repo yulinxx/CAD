@@ -93,6 +93,7 @@ extern "C"
 
     // [B2-P0 修复] License_SetCheckEnabled 已从公开导出表移除。
     // 许可开关应通过编译期宏 SANYI_ENABLE_LICENSE 控制，而非运行时公开 API。
+    // 内部测试仍可通过 LicenseInternal::SetCheckEnabled() 调用。
 #ifdef LICENSE_TEST_HOOKS
     LICENSE_C_API LICENSE_API void License_SetCheckEnabled(int enabled);
 #endif
@@ -115,6 +116,7 @@ extern "C"
 
     // [B2-P0 修复] License_GuardMarkValid 已从公开导出表移除。
     // 此函数允许任意进程将散射态标记为有效，完全击穿 Guard 防 patch 设计。
+    // 内部测试仍可通过 LicenseInternal 命名空间调用。
 #ifdef LICENSE_TEST_HOOKS
     LICENSE_C_API LICENSE_API int License_GuardMarkValid(void);
 #endif
