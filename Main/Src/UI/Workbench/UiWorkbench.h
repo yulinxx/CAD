@@ -230,6 +230,7 @@ public:
     Workbench2D();
     ~Workbench2D() override;
 
+public:
     QString id() const override;
     QString displayName() const override;
     bool isCommandRegistered(const QString& commandId) const override;

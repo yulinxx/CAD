@@ -822,6 +822,11 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     });
     m_commandHub->rebuildAllActions();
 
+    // 顶部工具栏（编辑命令）— 必须先创建，再由 ContextManager 填充 actions
+    m_topToolBar = new TopToolBar(&window);
+    m_topToolBar->setObjectName(QStringLiteral("TopToolBar"));
+    window.addToolBar(Qt::TopToolBarArea, m_topToolBar);
+
     // 文字编辑字体工具栏（双击文字进入编辑会话时显示字体族/字号/粗斜下划线）
     // 必须先创建，再注册到 ContextManager
     m_textFontToolBar = new QToolBar(QObject::tr("Text Font"), &window);

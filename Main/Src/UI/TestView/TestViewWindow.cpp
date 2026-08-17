@@ -5,11 +5,15 @@
 #include "UI/Render/ViewportNavigation2D.h"
 
 #include "Engine/Scene/SceneRenderContract.h"
+#include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/SyEntity/SyImage.h"
+#include "Engine/SyEntity/SyEntity.h"
+#include "Engine/SyEntity/EType.h"
+#include "Engine/Layer/SyLayer.h"
 
 #include <QMouseEvent>
 #include <QNativeGestureEvent>
 #include <QWheelEvent>
-#include <QTimer>
 
 /**
  * @brief 仅显示用渲染控件
@@ -39,26 +43,9 @@ public:
         m_navigation.setCameraChangedCallback([this]() { applyView(); });
     }
 
-    void setScene(Eg::ISceneDataSource* scene)
+    void setScene(Eg::SceneManager* scene)
     {
         m_scene = scene;
-    }
-
-    /// OpenGL 初始化完成后加载场景并适配视图（未就绪则延迟重试）
-    void finishInit()
-    {
-        if (!m_scene)
-        {
-            return;
-        }
-        if (!isInitialized())
-        {
-            QTimer::singleShot(16, this, [this]() { finishInit(); });
-            return;
-        }
-
-        submitSceneFromDataSource(m_scene);
-        fitScene();
     }
 
     void fitScene()
@@ -92,6 +79,22 @@ public:
     }
 
 protected:
+    void paintGL() override
+    {
+        // 首次绘制时（GL 上下文必然 current）再一次性提交场景与位图并适配视图，
+        // 避免在 paint 事件之外以非 current 上下文做 GPU 上传导致打开即崩溃。
+        if (!m_sceneSubmitted && m_scene && isInitialized())
+        {
+            m_sceneSubmitted = true;
+            submitSceneFromDataSource(m_scene);
+            // submitSceneFromDataSource 内部 renderBeginScene 会清空 GPU 位图，
+            // 需在此重传所有可见位图纹理（与主视口 reconcileBitmaps 对齐）
+            uploadBitmaps();
+            fitScene();
+        }
+        RenderWidget::paintGL();
+    }
+
     void wheelEvent(QWheelEvent* event) override
     {
         // 共享导航控制器统一处理滚轮/触控板手势
@@ -128,6 +131,32 @@ protected:
     }
 
 private:
+    /// 上传场景中所有可见位图（SyImage）的纹理，使占位符显示为实际图像
+    void uploadBitmaps()
+    {
+        if (!m_scene)
+        {
+            return;
+        }
+        for (auto* e : m_scene->getAllEntities())
+        {
+            if (!e || e->eType != Eg::EType::IMAGE || !e->visible())
+            {
+                continue;
+            }
+            if (e->layer() && !e->layer()->isVisible())
+            {
+                continue;
+            }
+            const auto* image = static_cast<const Eg::SyImage*>(e);
+            if (!image->pixelData() || image->nWidth <= 0 || image->nHeight <= 0)
+            {
+                continue;
+            }
+            setBitmapImage(static_cast<uint64_t>(e->id), image);
+        }
+    }
+
     float physicalWidth() const
     {
         return static_cast<float>(width() * devicePixelRatio());
@@ -149,13 +178,14 @@ private:
         setViewMatrix(m_camera.viewMatrix(physicalWidth(), physicalHeight()));
     }
 
-    Eg::ISceneDataSource* m_scene{ nullptr };
+    Eg::SceneManager* m_scene{ nullptr };
     Camera2D m_camera;
     ViewportNavigation2D m_navigation;
     bool m_panning{ false };
+    bool m_sceneSubmitted{ false };
 };
 
-TestViewWindow::TestViewWindow(Eg::ISceneDataSource* scene, QWidget* parent)
+TestViewWindow::TestViewWindow(Eg::SceneManager* scene, QWidget* parent)
     : QMainWindow(parent)
 {
     setWindowTitle(tr("Test View"));
@@ -164,9 +194,7 @@ TestViewWindow::TestViewWindow(Eg::ISceneDataSource* scene, QWidget* parent)
     m_renderWidget = new TestViewRenderWidget(this);
     m_renderWidget->setScene(scene);
     setCentralWidget(m_renderWidget);
-
-    // 等控件显示并完成 OpenGL 初始化后再提交场景几何（内部自带未就绪重试）
-    QTimer::singleShot(0, m_renderWidget, &TestViewRenderWidget::finishInit);
 }
 
 TestViewWindow::~TestViewWindow() = default;
+
