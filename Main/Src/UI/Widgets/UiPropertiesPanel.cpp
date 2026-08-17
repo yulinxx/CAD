@@ -19,6 +19,7 @@
 #include <QMessageBox>
 #include <QModelIndex>
 #include <QPushButton>
+#include <QSpinBox>
 #include <QStyledItemDelegate>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
@@ -81,7 +82,11 @@ namespace
         QDoubleSpinBox* m_y{ nullptr };
     };
 
-    // 点列表编辑器：索引下拉 + 坐标
+    // 点列表编辑器：索引选择 + 坐标
+    // 索引使用 QSpinBox（而非把 N 个索引全部塞进 QComboBox）：
+    //   - O(1) 内存，顶点再多也不物化索引
+    //   - 支持键盘直接跳转到任意索引（如输入 5000）
+    // 坐标本身不预取，通过 pointProvider 按需加载（懒加载）
     class PointListEditor : public QWidget
     {
     public:
@@ -90,48 +95,49 @@ namespace
         {
             auto* layout = new QVBoxLayout(this);
             layout->setContentsMargins(2, 2, 2, 2);
-            layout->setSpacing(2);
+            layout->setSpacing(4);
             auto* indexRow = new QHBoxLayout();
             indexRow->addWidget(new QLabel(QStringLiteral("Index:"), this));
-            m_index = new QComboBox(this);
+            m_index = new QSpinBox(this);
+            m_index->setRange(0, 0);
+            m_index->setMinimumWidth(90);
             indexRow->addWidget(m_index, 1);
+            m_countLabel = new QLabel(this);
+            indexRow->addWidget(m_countLabel);
             layout->addLayout(indexRow);
             m_coord = new PointCoordEditor(this);
             layout->addWidget(m_coord);
 
-            // 切换索引时，通过坐标提供器重新加载该索引对应的坐标
-            connect(m_index,
-                QOverload<int>::of(&QComboBox::currentIndexChanged),
-                this,
-                [this](int idx) {
-                    if (m_provider && idx >= 0)
-                    {
-                        m_coord->setPoint(m_provider(idx));
-                    }
-                });
+            // 切换索引时，通过坐标提供器按需加载该索引对应的坐标
+            connect(m_index, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int idx) {
+                if (m_provider)
+                {
+                    m_coord->setPoint(m_provider(idx));
+                }
+            });
         }
 
-        /// 设置"按索引取坐标"的提供器（由代理注入，读取当前值）
+        /// 设置"按索引取坐标"的提供器（由代理注入，按需读取，懒加载）
         void setPointProvider(std::function<QPointF(int)> provider)
         {
             m_provider = std::move(provider);
         }
 
+        /// 配置索引范围（count 可为任意大，不物化）
         void setup(int count, int current, const QString& label)
         {
+            Q_UNUSED(label);
+            const int last = qMax(0, count - 1);
             m_index->blockSignals(true);
-            m_index->clear();
-            for (int i = 0; i < count; ++i)
-            {
-                m_index->addItem(QStringLiteral("%1 %2").arg(label).arg(i));
-            }
-            m_index->setCurrentIndex(qBound(0, current, count - 1));
+            m_index->setRange(0, last);
+            m_index->setValue(qBound(0, current, last));
             m_index->blockSignals(false);
+            m_countLabel->setText(QStringLiteral("/ %1").arg(count));
         }
 
         int index() const
         {
-            return m_index->currentIndex();
+            return m_index->value();
         }
 
         void setPoint(const QPointF& p)
@@ -145,7 +151,8 @@ namespace
         }
 
     private:
-        QComboBox* m_index{ nullptr };
+        QSpinBox* m_index{ nullptr };
+        QLabel* m_countLabel{ nullptr };
         PointCoordEditor* m_coord{ nullptr };
         std::function<QPointF(int)> m_provider;
     };
