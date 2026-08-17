@@ -305,6 +305,11 @@ void WorkbenchWindow::configureServices(const UiServices& services)
         {
             m_fileDropHandler->setSceneManager(services.sceneEditService->sceneManager());
         }
+        // 注入图层管理器，用于将拖放的位图分配到位图图层
+        if (services.layerManager)
+        {
+            m_fileDropHandler->setLayerManager(services.layerManager);
+        }
     }
 
     if (m_actionManager)

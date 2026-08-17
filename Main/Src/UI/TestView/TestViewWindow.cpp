@@ -6,13 +6,17 @@
 
 #include "Engine/Scene/SceneRenderContract.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/SceneNotifier.h"
 #include "Engine2D/SyEntity/SyImage.h"
 #include "Engine/SyEntity/SyEntity.h"
 #include "Engine/SyEntity/EType.h"
 #include "Engine/Layer/SyLayer.h"
 
+#include <QCheckBox>
+#include <QEvent>
 #include <QMouseEvent>
 #include <QNativeGestureEvent>
+#include <QVBoxLayout>
 #include <QWheelEvent>
 
 /**
@@ -21,12 +25,16 @@
  * 继承 RenderWidget 并关闭场景环境(幅面/网格/标尺)，只负责把场景图元画出来。
  * 导航复用共享的 ViewportNavigation2D（与主视口同源）：滚轮缩放、触控板双指
  * 平移/捏合缩放、左/中键拖拽平移；不实现任何选择/编辑逻辑。
+ *
+ * liveSync = true 时订阅场景变化，在变更后重提图元/位图实现实时同步；
+ * liveSync = false 时为打开时的静态快照。
  */
 class TestViewRenderWidget : public RenderWidget
 {
 public:
-    explicit TestViewRenderWidget(QWidget* parent = nullptr)
+    explicit TestViewRenderWidget(bool liveSync, QWidget* parent = nullptr)
         : RenderWidget(parent)
+        , m_liveSync(liveSync)
     {
         // 仅显示图元：关闭工作台(幅面)、网格、标尺等场景环境，
         // 使 computeGeometry 返回空，渲染时完全跳过这些背景元素。
@@ -43,9 +51,44 @@ public:
         m_navigation.setCameraChangedCallback([this]() { applyView(); });
     }
 
+    ~TestViewRenderWidget() override
+    {
+        detachObserver();
+    }
+
     void setScene(Eg::SceneManager* scene)
     {
+        // 场景即将替换：先解绑旧观察者再绑新
+        detachObserver();
         m_scene = scene;
+        if (m_liveSync)
+        {
+            attachObserver();
+        }
+    }
+
+    void setLiveSync(bool on)
+    {
+        if (on == m_liveSync)
+        {
+            return;
+        }
+        m_liveSync = on;
+        if (on)
+        {
+            attachObserver();
+        }
+        else
+        {
+            detachObserver();
+        }
+        // 开/关即时生效：关闭后回归快照（冻结当前渲染），打开后立刻追上最新
+        markDirtyAndRefresh();
+    }
+
+    bool liveSync() const
+    {
+        return m_liveSync;
     }
 
     void fitScene()
@@ -81,16 +124,26 @@ public:
 protected:
     void paintGL() override
     {
-        // 首次绘制时（GL 上下文必然 current）再一次性提交场景与位图并适配视图，
-        // 避免在 paint 事件之外以非 current 上下文做 GPU 上传导致打开即崩溃。
-        if (!m_sceneSubmitted && m_scene && isInitialized())
+        // 在 GL 上下文 current 的第一帧（及每次 dirty）时提交场景与位图，
+        // 避免在 paint 之外以非 current 上下文做 GPU 上传导致崩溃。
+        if (m_scene && isInitialized())
         {
-            m_sceneSubmitted = true;
-            submitSceneFromDataSource(m_scene);
-            // submitSceneFromDataSource 内部 renderBeginScene 会清空 GPU 位图，
-            // 需在此重传所有可见位图纹理（与主视口 reconcileBitmaps 对齐）
-            uploadBitmaps();
-            fitScene();
+            const bool firstTime = !m_sceneSubmitted;
+            if (firstTime && m_liveSync)
+            {
+                attachObserver();
+            }
+            if (firstTime || (m_liveSync && m_sceneDirty))
+            {
+                submitSceneFromDataSource(m_scene);
+                uploadBitmaps();
+                if (firstTime)
+                {
+                    fitScene();
+                }
+                m_sceneSubmitted = true;
+                m_sceneDirty = false;
+            }
         }
         RenderWidget::paintGL();
     }
@@ -131,6 +184,42 @@ protected:
     }
 
 private:
+    void onSceneChanged()
+    {
+        if (!m_liveSync)
+        {
+            return;
+        }
+        markDirtyAndRefresh();
+    }
+
+    void markDirtyAndRefresh()
+    {
+        if (isInitialized())
+        {
+            m_sceneDirty = true;
+            update();
+        }
+    }
+
+    void attachObserver()
+    {
+        if (m_scene && !m_observerAttached)
+        {
+            m_scene->addObserver(&m_observer);
+            m_observerAttached = true;
+        }
+    }
+
+    void detachObserver()
+    {
+        if (m_scene && m_observerAttached)
+        {
+            m_scene->removeObserver(&m_observer);
+            m_observerAttached = false;
+        }
+    }
+
     /// 上传场景中所有可见位图（SyImage）的纹理，使占位符显示为实际图像
     void uploadBitmaps()
     {
@@ -178,23 +267,75 @@ private:
         setViewMatrix(m_camera.viewMatrix(physicalWidth(), physicalHeight()));
     }
 
+    /// 场景变更观察者，转发到宿主控件
+    class TestViewSceneObserver : public Eg::SceneNotifier::IObserver
+    {
+    public:
+        explicit TestViewSceneObserver(TestViewRenderWidget* self)
+            : m_self(self)
+        {
+        }
+        void onSceneChanged() override
+        {
+            if (m_self)
+            {
+                m_self->onSceneChanged();
+            }
+        }
+
+        void onEntityAdded(Eg::SyEntity* /*entity*/) override
+        {
+            if (m_self)
+            {
+                m_self->onSceneChanged();
+            }
+        }
+
+        void onEntityRemoved(size_t /*index*/) override
+        {
+            if (m_self)
+            {
+                m_self->onSceneChanged();
+            }
+        }
+
+    private:
+        TestViewRenderWidget* m_self;
+    };
+
     Eg::SceneManager* m_scene{ nullptr };
     Camera2D m_camera;
     ViewportNavigation2D m_navigation;
-    bool m_panning{ false };
+    TestViewSceneObserver m_observer{ this };
+    bool m_observerAttached{ false };
+    bool m_liveSync{ false };
     bool m_sceneSubmitted{ false };
+    bool m_sceneDirty{ false };
+    bool m_panning{ false };
 };
 
-TestViewWindow::TestViewWindow(Eg::SceneManager* scene, QWidget* parent)
+TestViewWindow::TestViewWindow(Eg::SceneManager* scene, bool liveSync, QWidget* parent)
     : QMainWindow(parent)
 {
-    setWindowTitle(tr("Test View"));
+    setWindowTitle(liveSync ? tr("Test View (Live)") : tr("Test View"));
     resize(900, 640);
 
-    m_renderWidget = new TestViewRenderWidget(this);
+    auto* container = new QWidget(this);
+    auto* layout = new QVBoxLayout(container);
+    layout->setContentsMargins(2, 2, 2, 2);
+
+    auto* syncBox = new QCheckBox(tr("Sync with scene (live)"), container);
+    syncBox->setToolTip(tr("实时同步场景变化（关闭时保持当前快照）"));
+    syncBox->setChecked(liveSync);
+    layout->addWidget(syncBox);
+
+    m_renderWidget = new TestViewRenderWidget(liveSync, this);
     m_renderWidget->setScene(scene);
-    setCentralWidget(m_renderWidget);
+    layout->addWidget(m_renderWidget);
+
+    setCentralWidget(container);
+
+    connect(syncBox, &QCheckBox::toggled, m_renderWidget, &TestViewRenderWidget::setLiveSync);
 }
 
 TestViewWindow::~TestViewWindow() = default;
-

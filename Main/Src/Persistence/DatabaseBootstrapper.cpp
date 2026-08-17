@@ -180,6 +180,7 @@ bool DatabaseBootstrapper::createBusinessTables()
             locked          INTEGER DEFAULT 0,
             fill            INTEGER DEFAULT 0,
             fill_color      TEXT    DEFAULT '',
+            layer_type      INTEGER DEFAULT 0,
             order_index     INTEGER DEFAULT 0,
             updated_at      TEXT    DEFAULT (datetime('now'))
         )
@@ -286,6 +287,17 @@ bool DatabaseBootstrapper::ensureLayerColumns()
             return false;
         }
         SY_INFO("[DatabaseBootstrapper] Added missing layers.fill_color column");
+    }
+
+    if (!hasColumn("layer_type"))
+    {
+        if (!m_database.execute("ALTER TABLE layers ADD COLUMN layer_type INTEGER DEFAULT 0"))
+        {
+            m_lastError = "Failed to add layers.layer_type column: " + m_database.lastError();
+            SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+            return false;
+        }
+        SY_INFO("[DatabaseBootstrapper] Added missing layers.layer_type column");
     }
 
     return true;

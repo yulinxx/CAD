@@ -159,6 +159,9 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
     // LayerManager 注入 SceneEditService，添加图元时自动分配图层
     m_sceneEditService->setLayerManager(m_layerManager.get());
 
+    // 填充几何更新协调器（单例）：图元移动/变换后增量重算色块填充（跟随位置）
+    Eg::FillGeometryUpdater::instance().initialize(m_sceneManager.get(), m_layerManager.get(), m_sceneEditService.get());
+
     // 配置 ShellHost 核心依赖
     m_shellHost->setStateCenter(m_stateCenter.get());
     m_shellHost->setThemeService(m_themeService.get());
@@ -335,6 +338,7 @@ void ApplicationCompositionRoot::registerAllOperations()
     FileOperationConfig fileConfig;
     fileConfig.bus = m_operationBus.get();
     fileConfig.sceneManager = m_sceneManager.get();
+    fileConfig.layerManager = m_layerManager.get();
     fileConfig.importService = m_importService.get();
     fileConfig.exportService = m_exportService.get();
     fileConfig.recentFiles = m_recentFileService.get();

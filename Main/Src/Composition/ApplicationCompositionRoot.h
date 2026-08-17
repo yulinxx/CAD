@@ -17,6 +17,7 @@
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Edit/LayerEditService.h"
 #include "Engine2D/Interaction/LayerManager.h"
+#include "Engine2D/Algorithm/FillGeometryUpdater.h"
 #include "UI2D/Edit/QtLayerManagerBridge.h"
 #include "Engine3D/SceneManager3D.h"
 

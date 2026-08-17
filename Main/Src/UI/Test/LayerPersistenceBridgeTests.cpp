@@ -47,6 +47,7 @@ protected:
                 locked          INTEGER DEFAULT 0,
                 fill            INTEGER DEFAULT 0,
                 fill_color      TEXT    DEFAULT '',
+                layer_type      INTEGER DEFAULT 0,
                 order_index     INTEGER DEFAULT 0,
                 updated_at      TEXT    DEFAULT (datetime('now'))
             )
@@ -384,6 +385,7 @@ TEST(LayerPersistenceBridgeNullTest, NullLayerManager_AttachIsSafe)
                            "locked INTEGER DEFAULT 0,"
                            "fill INTEGER DEFAULT 0,"
                            "fill_color TEXT DEFAULT '',"
+                           "layer_type INTEGER DEFAULT 0,"
                            "order_index INTEGER DEFAULT 0,"
                            "updated_at TEXT DEFAULT (datetime('now')))"));
 

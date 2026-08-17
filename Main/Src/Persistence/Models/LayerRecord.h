@@ -19,6 +19,7 @@ struct LayerRecord
     bool locked{ false };    // 是否锁定
     bool fill{ false };      // 是否填充图层（色块填充）
     std::string fillColor;   // 填充色（hex 格式，如 "#FF0000"；色块填充使用）
+    int layerType{ 0 };      // 图层类型（0=矢量 VECTOR，1=位图 BITMAP）
     int orderIndex{ 0 };     // 图层排序序号
     std::string updatedAt;   // 最近更新时间（ISO 8601 格式）
 };

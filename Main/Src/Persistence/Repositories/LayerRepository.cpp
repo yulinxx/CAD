@@ -48,6 +48,7 @@ bool LayerRepository::save(const LayerRecord& record)
         values["locked"] = record.locked ? "1" : "0";
         values["fill"] = record.fill ? "1" : "0";
         values["fill_color"] = record.fillColor;
+        values["layer_type"] = std::to_string(record.layerType);
         values["order_index"] = std::to_string(record.orderIndex);
         if (!record.updatedAt.empty())
         {
@@ -201,6 +202,23 @@ bool LayerRepository::updateColor(const std::string& documentId, int layerId, co
     return true;
 }
 
+bool LayerRepository::updateLayerType(const std::string& documentId, int layerId, int layerType)
+{
+    // 按文档 + 图层 ID 更新图层类型
+    std::map<std::string, std::string> values;
+    values["layer_type"] = std::to_string(layerType);
+    std::map<std::string, std::string> whereParams;
+    whereParams["document_id"] = documentId;
+    whereParams["layer_id"] = std::to_string(layerId);
+    if (!m_database.update("layers", values, "document_id = :document_id AND layer_id = :layer_id", whereParams))
+    {
+        m_lastError = "Failed to update layer type: " + m_database.lastError();
+        SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
+        return false;
+    }
+    return true;
+}
+
 bool LayerRepository::batchUpdateOrder(
     const std::string& documentId, const std::vector<std::pair<int, int>>& layerIdAndOrders)
 {
@@ -285,6 +303,11 @@ LayerRecord LayerRepository::rowToRecord(const std::map<std::string, std::string
     {
         rec.fillColor = it->second;
     }
+    it = row.find("layer_type");
+    if (it != row.end())
+    {
+        rec.layerType = std::stoi(it->second);
+    }
     it = row.find("order_index");
     if (it != row.end())
     {
@@ -313,6 +336,7 @@ std::map<std::string, std::string> LayerRepository::recordToRow(const LayerRecor
     row["locked"] = rec.locked ? "1" : "0";
     row["fill"] = rec.fill ? "1" : "0";
     row["fill_color"] = rec.fillColor;
+    row["layer_type"] = std::to_string(rec.layerType);
     row["order_index"] = std::to_string(rec.orderIndex);
     row["updated_at"] = rec.updatedAt;
     return row;

@@ -8,6 +8,7 @@
 #include "UI/Services/UiStateCenter.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/SyEntity/SyImage.h"
+#include "Engine2D/Interaction/LayerManager.h"
 #include "UI/Services/FileDialogService.h"
 #include "UI/Services/RecentFileService.h"
 #include "UI/Services/HelpDialogService.h"
@@ -73,6 +74,7 @@ namespace
 FileOperationRegistry::FileOperationRegistry(const FileOperationConfig& config)
     : m_bus(config.bus)
     , m_sceneManager(config.sceneManager)
+    , m_layerManager(config.layerManager)
     , m_importService(config.importService)
     , m_exportService(config.exportService)
     , m_recentFiles(config.recentFiles)
@@ -274,7 +276,29 @@ void FileOperationRegistry::doImportImage(const QString& filePath)
         imgEntity->bottomLeft = Ut::Vec2d(-halfW, -halfH);
         imgEntity->bottomRight = Ut::Vec2d(halfW, -halfH);
 
-        m_sceneManager->addEntity(imgEntity);
+        // 保存 ID，克隆后插入场景并保留 ID，以便后续查找
+        const Eg::EntityId originalId = imgEntity->id;
+        auto snap = std::unique_ptr<Eg::SyEntity>(imgEntity->clone());
+        snap->id = originalId;
+        m_sceneManager->insertEntityPreserveId(std::move(snap));
+
+        // 分配到位图图层
+        if (m_layerManager && m_sceneManager)
+        {
+            Eg::SyEntity* added = m_sceneManager->findSyEntityById(originalId);
+            if (added)
+            {
+                int bitmapLayerId = m_layerManager->findOrCreateLayerByType(Eg::LayerType::BITMAP);
+                if (bitmapLayerId >= 0)
+                {
+                    m_layerManager->assignEntityToLayer(added, bitmapLayerId);
+                    m_layerManager->setCurrentLayer(bitmapLayerId);
+                }
+            }
+        }
+
+        delete imgEntity;
+
         SY_INFOF("[FileOperation] Imported image: %s (%dx%d)", path.toUtf8().constData(), rgba.width(), rgba.height());
     });
 }

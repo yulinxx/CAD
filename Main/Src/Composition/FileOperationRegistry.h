@@ -10,6 +10,7 @@
 
 class OperationBus;
 class UiStateCenter;
+class LayerManager;
 class LayerPersistenceBridge;
 class PersistenceService;
 class ImportService;
@@ -34,6 +35,7 @@ struct FileOperationConfig
 {
     OperationBus* bus = nullptr;
     Eg::SceneManager* sceneManager = nullptr;
+    LayerManager* layerManager = nullptr;
     ImportService* importService = nullptr;
     ExportService* exportService = nullptr;
     RecentFileService* recentFiles = nullptr;
@@ -99,6 +101,7 @@ private:
 
     OperationBus* m_bus;
     Eg::SceneManager* m_sceneManager;
+    LayerManager* m_layerManager;
     ImportService* m_importService;
     ExportService* m_exportService;
     RecentFileService* m_recentFiles;

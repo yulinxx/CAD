@@ -3,6 +3,7 @@
 #include "Repositories/LayerRepository.h"
 #include "Engine2D/Interaction/LayerManager.h"
 #include "Engine/EngineAPI.h"
+#include "Engine/Layer/SyLayer.h"
 #include "Log/SyLogger.h"
 
 #include <QDateTime>
@@ -130,6 +131,7 @@ void LayerPersistenceBridge::syncLayerToDb(int nLayerId)
     bool locked = m_layerManager->isLayerLocked(nLayerId);
     bool fill = m_layerManager->isLayerFill(nLayerId);
     Ut::Color fillClr = m_layerManager->layerFillColor(nLayerId);
+    Eg::LayerType type = m_layerManager->layerType(nLayerId);
 
     // 计算实际排序序号
     int orderIndex = nLayerId;
@@ -153,6 +155,7 @@ void LayerPersistenceBridge::syncLayerToDb(int nLayerId)
     record.locked = locked;
     record.fill = fill;
     record.fillColor = fillClr.toHexRGB();
+    record.layerType = static_cast<int>(type);
     record.orderIndex = orderIndex;
     record.updatedAt = QDateTime::currentDateTime().toString(Qt::ISODate).toStdString();
 

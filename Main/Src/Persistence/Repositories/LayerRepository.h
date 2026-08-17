@@ -43,6 +43,9 @@ public:
     bool updateFill(const std::string& documentId, int layerId, bool fill);
     bool updateColor(const std::string& documentId, int layerId, const std::string& color);
 
+    /// 字段级更新：图层类型（0=矢量，1=位图）
+    bool updateLayerType(const std::string& documentId, int layerId, int layerType);
+
     /// 批量更新图层顺序（在一个事务中完成）
     bool batchUpdateOrder(const std::string& documentId, const std::vector<std::pair<int, int>>& layerIdAndOrders);
 
