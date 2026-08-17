@@ -44,6 +44,7 @@
 #include "UI2D/Edit/QtLayerManagerBridge.h"
 
 #include "UI/RightToolBar/RightToolBar.h"
+#include "UI/Services/ToolBarContextManager.h"
 #include "UI/TopToolBar/TopToolBar.h"
 #include "UI/TopToolBar/TextFontToolBar.h"
 #include "UI/DrawTools/TextEditTool.h"
@@ -807,46 +808,86 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     });
     m_commandHub->rebuildAllActions();
 
-    // 顶部工具栏（编辑命令）
-    m_topToolBar = new TopToolBar(&window);
-    m_topToolBar->setObjectName(QStringLiteral("TopToolBar"));
-    m_topToolBar->installHubActions(m_commandHub.get());
-    window.addToolBar(Qt::TopToolBarArea, m_topToolBar);
+    // 初始化工具栏上下文管理器
+    m_contextManager = std::make_unique<ToolBarContextManager>();
 
-    // 文字编辑字体工具栏（双击文字进入编辑会话时显示字体族/字号/粗斜下划线）
-    m_textFontToolBar = new QToolBar(QObject::tr("Text Font"), &window);
-    m_textFontToolBar->setObjectName(QStringLiteral("TextFontToolBar"));
-    m_textFontToolBar->setMovable(false);
-    m_textFontToolBar->setIconSize(QSize(UiMetrics::toolbarIconSizeSmall(), UiMetrics::toolbarIconSizeSmall()));
-    m_textFontToolBarWidget = new TextFontToolBar(m_textFontToolBar);
-    m_textFontToolBar->addWidget(m_textFontToolBarWidget);
-    window.addToolBar(Qt::TopToolBarArea, m_textFontToolBar);
-    m_textFontToolBar->setVisible(false);
+    // 注册 Default 上下文（通用编辑命令）
+    m_contextManager->registerContext(ToolBarContext::Default, {
+        .context = ToolBarContext::Default,
+        .title = tr("Edit"),
+        .sections = {
+            { "", {
+                { .actionId = "Edit_Undo", .displayName = tr("Undo") },
+                { .actionId = "Edit_Redo", .displayName = tr("Redo") },
+            }},
+            { "", {
+                { .actionId = "Edit_MirrorHorizontal", .displayName = tr("Mirror H") },
+                { .actionId = "Edit_MirrorVertical", .displayName = tr("Mirror V") },
+            }},
+            { "", {
+                { .actionId = "Edit_AlignLeft", .displayName = tr("Align Left") },
+                { .actionId = "Edit_AlignRight", .displayName = tr("Align Right") },
+                { .actionId = "Edit_AlignCenterH", .displayName = tr("Align Center H") },
+                { .actionId = "Edit_AlignTop", .displayName = tr("Align Top") },
+                { .actionId = "Edit_AlignBottom", .displayName = tr("Align Bottom") },
+                { .actionId = "Edit_AlignCenterV", .displayName = tr("Align Center V") },
+            }},
+            { "", {
+                { .actionId = "Edit_SelectAll", .displayName = tr("Select All") },
+                { .actionId = "Edit_InvertSelection", .displayName = tr("Invert Selection") },
+                { .actionId = "Edit_Deselect", .displayName = tr("Deselect") },
+            }},
+            { "", {
+                { .actionId = "Edit_Copy", .displayName = tr("Copy") },
+                { .actionId = "Edit_Paste", .displayName = tr("Paste") },
+                { .actionId = "Edit_Delete", .displayName = tr("Delete") },
+            }},
+            { "", {
+                { .actionId = "Edit_Group", .displayName = tr("Group"), .checkable = true },
+            }},
+        },
+    });
 
-    auto bindTextFontToolBar = [this](const QString& toolName) {
-        if (toolName == QStringLiteral("TextEditTool"))
-        {
-            if (m_viewport)
-            {
-                if (ToolManager* tm = m_viewport->toolManager())
-                {
-                    if (auto* tool = dynamic_cast<TextEditTool*>(tm->getTool(QStringLiteral("TextEditTool"))))
-                    {
-                        m_textFontToolBarWidget->bindTool(tool);
-                        m_textFontToolBar->setVisible(true);
-                        return;
-                    }
-                }
-            }
+    // 注册 TextEditing 上下文（文字编辑工具栏）
+    m_contextManager->registerContext(ToolBarContext::TextEditing, {
+        .context = ToolBarContext::TextEditing,
+        .title = tr("Text Format"),
+        .sections = {
+            { "", {
+                { .actionId = "Text_FontFamily", .displayName = tr("Font") },
+                { .actionId = "Text_FontSize", .displayName = tr("Size") },
+                { .actionId = "Text_Bold", .displayName = tr("Bold"), .checkable = true },
+                { .actionId = "Text_Italic", .displayName = tr("Italic"), .checkable = true },
+                { .actionId = "Text_Underline", .displayName = tr("Underline"), .checkable = true },
+            }},
+        },
+    });
+
+    // 注册自定义文字编辑工具栏
+    m_contextManager->registerCustomToolBar(ToolBarContext::TextEditing, m_textFontToolBarWidget, false);
+
+    // 绑定 TopToolBar 动作设置/清空回调
+    m_contextManager->setTopToolBarActionSetter([this](const QList<ToolBarAction>& actions) {
+        if (m_topToolBar) {
+            m_topToolBar->setActions(actions);
         }
-        m_textFontToolBarWidget->bindTool(nullptr);
-        m_textFontToolBar->setVisible(false);
-    };
-    QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged, this, bindTextFontToolBar);
-    if (m_viewport)
-    {
-        bindTextFontToolBar(m_viewport->activeToolName());
-    }
+    });
+    m_contextManager->setTopToolBarClearer([this]() {
+        if (m_topToolBar) {
+            m_topToolBar->clearActions();
+        }
+    });
+
+    // 监听上下文切换，同步显隐自定义工具栏
+    connect(m_contextManager.get(), &ToolBarContextManager::customToolBarVisibilityChanged,
+        this, [this](ToolBarContext ctx, bool visible) {
+            if (ctx == ToolBarContext::TextEditing && m_textFontToolBar) {
+                m_textFontToolBar->setVisible(visible);
+            }
+        });
+
+    // 默认进入 Default 上下文
+    m_contextManager->setCurrentContext(ToolBarContext::Default);
 
     // 右侧图层面板（颜色/图层），依据承载样式创建
     m_rightToolBar = new RightToolBar(&window);
