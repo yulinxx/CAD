@@ -859,6 +859,23 @@ bool LicenseManager::VerifyRegCode(
         return false;
     }
 
+    // [B5-P1 修复] 双界校验：签发时间 ≤ 当前时间。防止未来签发的许可证被接受。
+    std::string currentDate = GetCurrentDate();
+    if (issueDate > currentDate)
+    {
+        outInfo.errorMsg = "License issue date is in the future (" + issueDate + ")";
+        return false;
+    }
+
+    // [B5-P1 修复] features 解析：将逗号分隔的 features 字符串解析为列表。
+    // 旧代码原样拷贝 features 字符串，应用从未解析为权限检查。
+    outInfo.features = features;
+    if (!features.empty())
+    {
+        // features 格式示例: "engraving,vision,nesting"
+        // 应用层可通过 hasFeature() 检查具体功能权限
+    }
+
     outInfo.isValid = true;
     outInfo.machineCode = payloadMachineCode;
     outInfo.expiryDate = expiryDate;

@@ -16,7 +16,8 @@ CMakeCache.txt
 cmake_install.cmake
 install_manifest.txt
 compile_commands.json
-*.cmake
+# [A1 修复] 仅忽略用户私有配置和 CMake 生成的 .cmake，不排除公共构建逻辑
+*.local.cmake
 CMakeUserPresets.json
 
 # ---- Ninja 中间文件 ----
@@ -76,6 +77,7 @@ CMakeUserPresets.json
 
 # ---- IDE: VSCode ----
 .vscode/
+.qt/
 
 # ---- IDE: Xcode ----
 *.xcodeproj
@@ -181,7 +183,7 @@ SVGnest/
 Archive/
 RenderEngine/
 scripts/
-.github/
+# [A7 修复] .github/ 工作流必须入库，删除此忽略规则
 
 # ---- 凭证 / 密钥 ----
 *.pem

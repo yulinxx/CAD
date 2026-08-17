@@ -68,38 +68,53 @@ int CADApplicationRuntime::run()
     }
     // SY_INFO("[CADApplicationRuntime] Crash handler initialized");
 
-    // 执行许可证检查
-    if (License_IsCheckEnabled())
+    // [B1-P0 修复] 许可校验启动顺序修正：
+    // 旧代码先调用 License_IsCheckEnabled()（恒为 false）再调用 License_ConfigInit()，
+    // 导致整个许可校验块被跳过。现改为先初始化配置再检查开关。
     {
-        // SY_DEBUG("[CADApplicationRuntime] License check enabled, verifying license");
-
         LicenseConfig config{};
         License_ConfigInit(&config);
         const QString configDir = QString::fromStdWString(m_appPaths.configDir);
         const QByteArray configDirUtf8 = configDir.toUtf8();
         config.configDir = configDirUtf8.constData();
 
-        LicenseContext* licenseCtx = License_Create(&config);
-        const bool licenseOk = licenseCtx && License_Check(licenseCtx) == LICENSE_OK;
-        if (licenseCtx)
-        {
-            License_Destroy(licenseCtx);
-        }
+        // [B1-P0 修复] 通过编译期宏 SANYI_ENABLE_LICENSE 显式启用许可校验。
+        // 生产构建应在 CMakeLists.txt 中 add_compile_definitions(SANYI_ENABLE_LICENSE)。
+#ifdef SANYI_ENABLE_LICENSE
+        License_SetCheckEnabled(1);
+        SY_INFO("[CADApplicationRuntime] License check ENABLED via SANYI_ENABLE_LICENSE macro");
+#endif
 
-        if (!licenseOk)
+        if (License_IsCheckEnabled())
         {
-            // SY_DEBUG("[CADApplicationRuntime] License check failed, showing license dialog");
-            LicenseDialog dlg(configDir);
-            if (dlg.exec() != QDialog::Accepted)
+            SY_INFO("[CADApplicationRuntime] License check enabled, verifying license");
+
+            LicenseContext* licenseCtx = License_Create(&config);
+            const bool licenseOk = licenseCtx && License_Check(licenseCtx) == LICENSE_OK;
+            if (licenseCtx)
             {
-                // SY_WARN("[CADApplicationRuntime] License check rejected by user");
-                return -3;
+                License_Destroy(licenseCtx);
             }
-            // SY_INFO("[CADApplicationRuntime] License accepted by user");
+
+            if (!licenseOk)
+            {
+                SY_INFO("[CADApplicationRuntime] License check failed, showing license dialog");
+                LicenseDialog dlg(configDir);
+                if (dlg.exec() != QDialog::Accepted)
+                {
+                    SY_WARN("[CADApplicationRuntime] License check rejected by user");
+                    return -3;
+                }
+                SY_INFO("[CADApplicationRuntime] License accepted by user");
+            }
+            else
+            {
+                SY_INFO("[CADApplicationRuntime] License check passed");
+            }
         }
         else
         {
-            SY_INFO("[CADApplicationRuntime] License check passed");
+            SY_INFO("[CADApplicationRuntime] License check disabled (SANYI_ENABLE_LICENSE not defined)");
         }
     }
 

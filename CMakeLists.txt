@@ -52,24 +52,30 @@ message(STATUS "")
 message(STATUS "  Project: ${PROJECT_NAME}")
 message(STATUS "  VCPKG_DIR: ${VCPKG_DIR}")
 
+# [A3 修复] 不再在 configure 阶段执行 git submodule update。
+# 子模块更新应在 configure 之前由用户手动执行（见 README 前置步骤）。
+# configure 时仅校验各子模块目录是否存在，缺失则报错提示。
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
-    message(STATUS "  Git: Updating submodules...")
-    execute_process(
-        COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        RESULT_VARIABLE GIT_SUBMOD_RESULT
+    message(STATUS "  Git: Checking submodule presence...")
+    set(_SANYI_SUBMODULE_DIRS
+        "Engine" "Renderx" "UI" "FileIO" "Utility" "Log"
+        "License" "CrashHandler" "Hardware" "Network" "Vision"
+        "Engraving" "Nesting" "GeoModelCore" "PythonHost" "PyBindCore"
     )
-    if(NOT GIT_SUBMOD_RESULT EQUAL "0")
-        message(WARNING "  Git: Failed to update submodules!")
-        message(WARNING "  Please run manually:")
-        message(WARNING "    cd ${CMAKE_CURRENT_SOURCE_DIR}")
-        message(WARNING "    git submodule update --init --recursive")
-    else()
-        message(STATUS "  Git: Submodules updated successfully")
-    endif()
+    foreach(_submod IN LISTS _SANYI_SUBMODULE_DIRS)
+        if(NOT IS_DIRECTORY "${PROJECT_SOURCE_DIR}/${_submod}")
+            message(FATAL_ERROR
+                "  Submodule '${_submod}' is missing (directory not found).\n"
+                "  Please run before configuring:\n"
+                "    cd ${PROJECT_SOURCE_DIR}\n"
+                "    git submodule update --init --recursive"
+            )
+        endif()
+    endforeach()
+    message(STATUS "  Git: All submodules present")
 else()
-    message(STATUS "  Git: Not found or not a git repository")
+    message(STATUS "  Git: Not found or not a git repository, skipping submodule check")
 endif()
 
 # 统一 C++ 标准

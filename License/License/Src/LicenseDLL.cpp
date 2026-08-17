@@ -122,10 +122,14 @@ extern "C"
         return LicenseInternal::IsCheckEnabled() ? 1 : 0;
     }
 
+    // [B2-P0 修复] License_SetCheckEnabled 已从公开导出表移除。
+    // 保留实现仅供内部测试使用（通过 #ifdef LICENSE_TEST_HOOKS 守卫）。
+#ifdef LICENSE_TEST_HOOKS
     void License_SetCheckEnabled(int enabled)
     {
         LicenseInternal::SetCheckEnabled(enabled != 0);
     }
+#endif
 
     LicenseContext* License_Create(const LicenseConfig* config)
     {
@@ -369,11 +373,15 @@ extern "C"
         }
     }
 
+    // [B2-P0 修复] License_GuardMarkValid 已从公开导出表移除。
+    // 此函数允许任意进程绕过 Guard 防 patch 设计，仅在测试构建中可用。
+#ifdef LICENSE_TEST_HOOKS
     int License_GuardMarkValid(void)
     {
         LicenseGuard::MarkValid();
         return LICENSE_OK;
     }
+#endif
 
     int License_GuardMarkInvalid(void)
     {

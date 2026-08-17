@@ -5,7 +5,15 @@
 
 namespace
 {
+    // [B1-P0 修复] 通过编译期宏控制默认值：
+    // - SANYI_ENABLE_LICENSE=ON  → 默认启用许可校验（生产环境）
+    // - 未定义或 OFF            → 默认禁用（开发/测试环境）
+    // 用户仍可在运行时通过 SetCheckEnabled() 动态切换。
+#ifdef SANYI_ENABLE_LICENSE
+    std::atomic<bool> g_checkEnabled{ true };
+#else
     std::atomic<bool> g_checkEnabled{ false };
+#endif
 }
 
 namespace LicenseInternal

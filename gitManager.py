@@ -765,6 +765,8 @@ def git_remote_url(repos: List[Dict]):
                 print(f"    {remote}: {url}")
         else:
             print(c("    (无远程)", Colors.DIM))
+        
+        print("─────────────────")
 
 
 def git_remote_manage(repos: List[Dict]):
@@ -1596,22 +1598,25 @@ def main_loop(repos, root_path, args):
   [3]  🌐 获取远程 (fetch)          → git fetch <remote>
   [4]  📦 暂存文件 (add)            → git add -A
   [5]  💾 提交变更 (commit)         → git commit -m "msg"
+
   [6]  🚀 推送代码 (push)           → git push <remote> <branch>
   [7]  🌿 分支管理 (branch)         → git branch / checkout / merge
   [8]  📜 查看日志 (log)            → git log --oneline -15
   [9]  📂 Stash管理                 → git stash push/pop/list/clear
   [10] ↩️  重置操作 (reset)          → git reset --soft/mixed/hard
-  [11] 🔗 查看所有远程URL           → git remote -v
+
+  [11] 🔗 查看所有远程URL            → git remote -v
   [12] 🔄 子模块更新                → git submodule update
-  [13] 🗑️  丢弃文件变更 (discard)   → git checkout -- <file>
+  [13] 🗑️ 丢弃文件变更 (discard)    → git checkout -- <file>
   [14] 🔧 远程仓库管理              → git remote add/remove/set-url/rename
   ──────────────────────────────────────────────────
-  [21] ⚡ 快速同步                 → git add -A + commit + pull + push
+  [21] ⚡ 快速同步                  → git add -A + commit + pull + push
   [22] 📥 批量拉取 (所有远程)       → git pull 全远程 (冲突自动stash/pop)
   [23] 🚀 批量推送 (所有远程)       → git push 全远程
   [24] 📦 批量暂存 (所有仓库)       → git add -A
   [25] 💾 批量提交 (所有仓库)       → git commit -m "msg"
-  [26] 🎯 切换到最前端              → git checkout <默认分支> + pull
+
+  [26] 🎯 切换至最前端              → git checkout <默认分支> + pull
   [27] 🔍 跨仓库一致性检查          → 分支/远程/同步状态对比
   ──────────────────────────────────────────────────
   [99] 📝 重新扫描仓库

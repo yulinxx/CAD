@@ -33,6 +33,27 @@ file(GLOB_RECURSE LIB_HEADERS CONFIGURE_DEPENDS
 list(FILTER LIB_SOURCES EXCLUDE REGEX "${SANYI_SOURCE_EXCLUDE_REGEX}")
 list(FILTER LIB_HEADERS EXCLUDE REGEX "${SANYI_HEADER_EXCLUDE_REGEX}")
 
+# [B3-P0 修复] KeygenTool 和 LicenseKeygenDLL 包含私钥生成逻辑，
+# 不应编译进发货 DLL。将其提取为独立静态库，供测试和可选的 KeygenTool 工具使用。
+set(_KEYGEN_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/Src/KeygenTool.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Src/LicenseKeygenDLL.cpp"
+)
+list(FILTER LIB_SOURCES EXCLUDE REGEX ".*/KeygenTool\\.cpp$")
+list(FILTER LIB_SOURCES EXCLUDE REGEX ".*/LicenseKeygenDLL\\.cpp$")
+
+# 创建 LicenseKeygen 静态库（仅供内部测试和 KeygenTool 使用）
+add_library(LicenseKeygen STATIC ${_KEYGEN_SOURCES})
+target_include_directories(LicenseKeygen PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/Include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Src"
+)
+target_compile_definitions(LicenseKeygen PRIVATE LICENSE_EXPORTS)
+if(WIN32)
+    target_compile_options(LicenseKeygen PRIVATE /utf-8)
+endif()
+set_property(TARGET LicenseKeygen PROPERTY FOLDER "Core")
+
 # --- 第三方依赖 ---
 find_package(OpenSSL REQUIRED)
 

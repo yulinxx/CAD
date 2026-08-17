@@ -15,6 +15,7 @@ target_include_directories(LicenseTests PRIVATE
 
 target_link_libraries(LicenseTests PRIVATE
     License
+    LicenseKeygen
     GTest::gtest
     GTest::gtest_main
 )

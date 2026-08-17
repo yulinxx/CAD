@@ -580,7 +580,23 @@ void WorkbenchWindow::closeEvent(QCloseEvent* event)
         {
             if (m_uiServices.operationBus)
             {
-                m_uiServices.operationBus->run(OperationId::File_Save, {});
+                // [E8-P1 修复] 同步等待保存完成，而非 fire-and-forget。
+                // 旧代码直接 accept() 导致保存未完成窗口即关闭，数据静默丢失。
+                OperationResult saveResult = m_uiServices.operationBus->run(OperationId::File_Save, {});
+                if (!saveResult.success)
+                {
+                    // 保存失败：弹对话框让用户选择重试/放弃
+                    auto retryResult = QMessageBox::warning(this,
+                        tr("Save Failed"),
+                        tr("Failed to save: %1\nDo you want to retry?").arg(saveResult.message),
+                        QMessageBox::Retry | QMessageBox::Discard);
+                    if (retryResult == QMessageBox::Retry)
+                    {
+                        event->ignore();
+                        return;  // 用户选择重试，不关闭
+                    }
+                    // 用户选择放弃，继续关闭
+                }
             }
         }
     }
