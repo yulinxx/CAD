@@ -52,6 +52,7 @@
 #include "Import/Readers/StlImportReader.h"
 #include "Import/Readers/PltImportReader.h"
 #include "Import/Readers/AiImportReader.h"
+#include "Import/Readers/NativeImportReader.h"
 #include "Import/Readers/UgImportReader.h"
 
 #include "Export/ExportService.h"
@@ -182,6 +183,7 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_importDispatcher->registerReader(std::make_unique<PltImportReader>());
     // 新增导入格式：Adobe Illustrator (AI) 与 Unigraphics/NX (UG, 经 IGES)
     m_importDispatcher->registerReader(std::make_unique<AiImportReader>());
+    m_importDispatcher->registerReader(std::make_unique<NativeImportReader>());
     m_importDispatcher->registerReader(std::make_unique<UgImportReader>());
 
     // 配置导入服务
