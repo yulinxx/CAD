@@ -24,7 +24,7 @@ CADApplicationRuntime::CADApplicationRuntime(int argc, char* argv[], const AppPa
     m_app->setApplicationVersion(QString::fromStdString(MainApp::appVersion()));
     m_app->setOrganizationName(QString::fromStdString(MainApp::organizationName()));
     m_app->setOrganizationDomain(QString::fromStdString(MainApp::organizationDomain()));
-    m_app->setWindowIcon(QIcon(":/ui/common/Icons/qt-logo.png"));
+    m_app->setWindowIcon(QIcon(":/ui/common/Icons/Help/theme.svg"));
 
     // 设置当前工作目录到应用根目录
     if (!m_appPaths.appRootPath.empty())
