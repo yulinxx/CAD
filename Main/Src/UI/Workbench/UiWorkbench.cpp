@@ -847,33 +847,33 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         .title = tr("Edit"),
         .sections = {
             { "", {
-                { .actionId = "Edit_Undo", .displayName = tr("Undo") },
-                { .actionId = "Edit_Redo", .displayName = tr("Redo") },
+                { .actionId = "Edit_Undo", .displayName = tr("Undo"), .iconResource = ":/ui/common/Icons/Actions/undo.svg" },
+                { .actionId = "Edit_Redo", .displayName = tr("Redo"), .iconResource = ":/ui/common/Icons/Actions/redo.svg" },
             }},
             { "", {
-                { .actionId = "Edit_MirrorHorizontal", .displayName = tr("Mirror H") },
-                { .actionId = "Edit_MirrorVertical", .displayName = tr("Mirror V") },
+                { .actionId = "Edit_MirrorHorizontal", .displayName = tr("Mirror H"), .iconResource = ":/ui/common/Icons/Actions/mirror_h.svg" },
+                { .actionId = "Edit_MirrorVertical", .displayName = tr("Mirror V"), .iconResource = ":/ui/common/Icons/Actions/mirror_v.svg" },
             }},
             { "", {
-                { .actionId = "Edit_AlignLeft", .displayName = tr("Align Left") },
-                { .actionId = "Edit_AlignRight", .displayName = tr("Align Right") },
-                { .actionId = "Edit_AlignCenterH", .displayName = tr("Align Center H") },
-                { .actionId = "Edit_AlignTop", .displayName = tr("Align Top") },
-                { .actionId = "Edit_AlignBottom", .displayName = tr("Align Bottom") },
-                { .actionId = "Edit_AlignCenterV", .displayName = tr("Align Center V") },
+                { .actionId = "Edit_AlignLeft", .displayName = tr("Align Left"), .iconResource = ":/ui/common/Icons/Actions/align_left.svg" },
+                { .actionId = "Edit_AlignRight", .displayName = tr("Align Right"), .iconResource = ":/ui/common/Icons/Actions/align_right.svg" },
+                { .actionId = "Edit_AlignCenterH", .displayName = tr("Align Center H"), .iconResource = ":/ui/common/Icons/Actions/align_center_h.svg" },
+                { .actionId = "Edit_AlignTop", .displayName = tr("Align Top"), .iconResource = ":/ui/common/Icons/Actions/align_top.svg" },
+                { .actionId = "Edit_AlignBottom", .displayName = tr("Align Bottom"), .iconResource = ":/ui/common/Icons/Actions/align_bottom.svg" },
+                { .actionId = "Edit_AlignCenterV", .displayName = tr("Align Center V"), .iconResource = ":/ui/common/Icons/Actions/align_center_v.svg" },
             }},
             { "", {
-                { .actionId = "Edit_SelectAll", .displayName = tr("Select All") },
-                { .actionId = "Edit_InvertSelection", .displayName = tr("Invert Selection") },
-                { .actionId = "Edit_Deselect", .displayName = tr("Deselect") },
+                { .actionId = "Edit_SelectAll", .displayName = tr("Select All"), .iconResource = ":/ui/common/Icons/Actions/select_all.svg" },
+                { .actionId = "Edit_InvertSelection", .displayName = tr("Invert Selection"), .iconResource = ":/ui/common/Icons/Actions/invert_selection.svg" },
+                { .actionId = "Edit_Deselect", .displayName = tr("Deselect"), .iconResource = ":/ui/common/Icons/Actions/deselect.svg" },
             }},
             { "", {
-                { .actionId = "Edit_Copy", .displayName = tr("Copy") },
-                { .actionId = "Edit_Paste", .displayName = tr("Paste") },
-                { .actionId = "Edit_Delete", .displayName = tr("Delete") },
+                { .actionId = "Edit_Copy", .displayName = tr("Copy"), .iconResource = ":/ui/common/Icons/Actions/copy.svg" },
+                { .actionId = "Edit_Paste", .displayName = tr("Paste"), .iconResource = ":/ui/common/Icons/Actions/paste.svg" },
+                { .actionId = "Edit_Delete", .displayName = tr("Delete"), .iconResource = ":/ui/common/Icons/Actions/delete.svg" },
             }},
             { "", {
-                { .actionId = "Edit_Group", .displayName = tr("Group"), .checkable = true },
+                { .actionId = "Edit_Group", .displayName = tr("Group"), .checkable = true, .iconResource = ":/ui/common/Icons/Actions/group.svg" },
             }},
         },
     });
@@ -884,11 +884,11 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         .title = tr("Text Format"),
         .sections = {
             { "", {
-                { .actionId = "Text_FontFamily", .displayName = tr("Font") },
-                { .actionId = "Text_FontSize", .displayName = tr("Size") },
-                { .actionId = "Text_Bold", .displayName = tr("Bold"), .checkable = true },
-                { .actionId = "Text_Italic", .displayName = tr("Italic"), .checkable = true },
-                { .actionId = "Text_Underline", .displayName = tr("Underline"), .checkable = true },
+                { .actionId = "Text_FontFamily", .displayName = tr("Font"), .iconResource = ":/ui/common/Icons/Tools/text.svg" },
+                { .actionId = "Text_FontSize", .displayName = tr("Size"), .iconResource = ":/ui/common/Icons/Tools/text.svg" },
+                { .actionId = "Text_Bold", .displayName = tr("Bold"), .checkable = true, .iconResource = ":/ui/common/Icons/Tools/text.svg" },
+                { .actionId = "Text_Italic", .displayName = tr("Italic"), .checkable = true, .iconResource = ":/ui/common/Icons/Tools/text.svg" },
+                { .actionId = "Text_Underline", .displayName = tr("Underline"), .checkable = true, .iconResource = ":/ui/common/Icons/Tools/text.svg" },
             }},
         },
     });
