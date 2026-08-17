@@ -1,8 +1,11 @@
 find_package(GTest REQUIRED)
+find_package(OpenSSL REQUIRED)
 include(GoogleTest)
 
 add_executable(LicenseTests
     LicenseTests.cpp
+    "${CMAKE_CURRENT_SOURCE_DIR}/../License/Src/KeygenTool.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../License/Src/LicenseKeygenDLL.cpp"
 )
 
 target_compile_features(LicenseTests PRIVATE cxx_std_17)
@@ -15,6 +18,8 @@ target_include_directories(LicenseTests PRIVATE
 
 target_link_libraries(LicenseTests PRIVATE
     License
+    OpenSSL::SSL
+    OpenSSL::Crypto
     GTest::gtest
     GTest::gtest_main
 )
