@@ -8,6 +8,7 @@
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/SyEntity/SyImage.h"
 #include "Engine2D/Interaction/LayerManager.h"
+#include "Engine/EntityIdGenerator.h"
 #include "FileIO/ImageUtils.h"
 
 #include <QApplication>
@@ -351,16 +352,16 @@ bool FileDropHandler::importImage(const QString& filePath, const QPointF& anchor
     imgEntity->bottomLeft = Ut::Vec2d(cx - halfW, cy - halfH);
     imgEntity->bottomRight = Ut::Vec2d(cx + halfW, cy - halfH);
 
-    // 保存 ID，克隆后插入场景并保留 ID，以便后续查找
-    const Eg::EntityId originalId = imgEntity->id;
+    // 显式获取持久 ID，避免 insertEntityPreserveId 替换临时 ID 导致查找失败
+    const Eg::EntityId persistentId = Eg::EntityIdGenerator::instance().getNextPersistentId();
     auto snap = std::unique_ptr<Eg::SyEntity>(imgEntity->clone());
-    snap->id = originalId;
+    snap->id = persistentId;
     m_sceneManager->insertEntityPreserveId(std::move(snap));
 
     // 分配到位图图层
     if (m_layerManager && m_sceneManager)
     {
-        Eg::SyEntity* added = m_sceneManager->findSyEntityById(originalId);
+        Eg::SyEntity* added = m_sceneManager->findSyEntityById(persistentId);
         if (added)
         {
             int bitmapLayerId = m_layerManager->findOrCreateLayerByType(Eg::LayerType::BITMAP);
