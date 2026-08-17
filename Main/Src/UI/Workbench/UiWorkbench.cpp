@@ -498,7 +498,7 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         {
             return;
         }
-        auto* w = new TestViewWindow(scene, &window);
+        auto* w = new TestViewWindow(scene, true, &window);
         w->setAttribute(Qt::WA_DeleteOnClose);
         w->show();
     });
