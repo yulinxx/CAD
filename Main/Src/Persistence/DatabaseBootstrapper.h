@@ -38,6 +38,9 @@ private:
     /// 创建所有业务数据表
     bool createBusinessTables();
 
+    /// 确保 layers 表包含 fill / fill_color 列（幂等，兼容旧格式已存在的表）
+    bool ensureLayerColumns();
+
     /// 执行从当前版本到目标版本的迁移
     bool runMigrations(int currentVersion, int targetVersion);
 

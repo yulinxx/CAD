@@ -4,6 +4,8 @@
 #include "Log/SyLogger.h"
 
 #include <sstream>
+#include <map>
+#include <vector>
 
 // 当前 Schema 版本号（每次修改表结构时递增）
 // v1: 初始表结构
@@ -190,6 +192,13 @@ bool DatabaseBootstrapper::createBusinessTables()
         return false;
     }
 
+    // 兼容已存在的旧格式 layers 表：CREATE TABLE IF NOT EXISTS 不会为其补列，
+    // 确保 fill / fill_color 列存在，否则持久化时会出现 "no such column" 错误。
+    if (!ensureLayerColumns())
+    {
+        return false;
+    }
+
     // 文档元数据表（v2 新增）
     std::string sqlDocuments = R"(
         CREATE TABLE IF NOT EXISTS documents (
@@ -231,6 +240,52 @@ bool DatabaseBootstrapper::createBusinessTables()
         m_lastError = "Failed to create settings table: " + m_database.lastError();
         SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
         return false;
+    }
+
+    return true;
+}
+
+bool DatabaseBootstrapper::ensureLayerColumns()
+{
+    std::vector<std::map<std::string, std::string>> cols =
+        m_database.query("PRAGMA table_info(layers)");
+    if (cols.empty())
+    {
+        // 表不存在时由调用方负责建表，这里视为无需补列
+        return true;
+    }
+
+    auto hasColumn = [&cols](const std::string& name) {
+        for (const auto& row : cols)
+        {
+            if (row.at("name") == name)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    if (!hasColumn("fill"))
+    {
+        if (!m_database.execute("ALTER TABLE layers ADD COLUMN fill INTEGER DEFAULT 0"))
+        {
+            m_lastError = "Failed to add layers.fill column: " + m_database.lastError();
+            SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+            return false;
+        }
+        SY_INFO("[DatabaseBootstrapper] Added missing layers.fill column");
+    }
+
+    if (!hasColumn("fill_color"))
+    {
+        if (!m_database.execute("ALTER TABLE layers ADD COLUMN fill_color TEXT DEFAULT ''"))
+        {
+            m_lastError = "Failed to add layers.fill_color column: " + m_database.lastError();
+            SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+            return false;
+        }
+        SY_INFO("[DatabaseBootstrapper] Added missing layers.fill_color column");
     }
 
     return true;
