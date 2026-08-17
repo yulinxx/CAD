@@ -16,6 +16,7 @@ class ExportDispatcher;
 namespace Eg
 {
     class SceneManager;
+    class SceneManager3D;
 }
 
 /// 导出服务：导出操作的总入口，协调数据收集、格式写入和状态回写
@@ -30,8 +31,11 @@ public:
     /// 设置导出分发器
     void setDispatcher(ExportDispatcher* dispatcher);
 
-    /// 设置场景管理器（用于收集场景中的图元数据）
+    /// 设置场景管理器（用于收集 2D 图元数据）
     void setSceneManager(Eg::SceneManager* sceneManager);
+
+    /// 设置 3D 场景管理器（用于收集 3D 网格图元）
+    void setSceneManager3D(Eg::SceneManager3D* sceneManager3D);
 
     /// 设置忙状态回调（替代旧的 UiStateCenter 直接依赖）
     void setBusyStateCallback(std::function<void(bool)> callback);
@@ -73,8 +77,10 @@ private:
 
     /// 导出分发器（非拥有指针）
     ExportDispatcher* m_dispatcher{ nullptr };
-    /// 场景管理器（非拥有指针）
+    /// 2D 场景管理器（非拥有指针）
     Eg::SceneManager* m_sceneManager{ nullptr };
+    /// 3D 场景管理器（非拥有指针）
+    Eg::SceneManager3D* m_sceneManager3D{ nullptr };
     /// 忙状态回调（替代 UiStateCenter 直接调用）
     std::function<void(bool)> m_busyStateCallback;
     /// 状态栏提示回调（替代 UiStateCenter 直接调用）

@@ -219,6 +219,7 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     // 配置导出服务
     m_exportService->setDispatcher(m_exportDispatcher.get());
     m_exportService->setSceneManager(m_sceneManager.get());
+    m_exportService->setSceneManager3D(m_sceneManager3D.get());
     m_exportService->setBusyStateCallback([this](bool busy) {
         if (m_stateCenter)
         {

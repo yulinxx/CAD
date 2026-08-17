@@ -3,6 +3,7 @@
 
 #include "Log/SyLogger.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine3D/SceneManager3D.h"
 
 ExportService::ExportService(QObject* parent)
     : QObject(parent)
@@ -19,6 +20,11 @@ void ExportService::setDispatcher(ExportDispatcher* dispatcher)
 void ExportService::setSceneManager(Eg::SceneManager* sceneManager)
 {
     m_sceneManager = sceneManager;
+}
+
+void ExportService::setSceneManager3D(Eg::SceneManager3D* sceneManager3D)
+{
+    m_sceneManager3D = sceneManager3D;
 }
 
 void ExportService::setBusyStateCallback(std::function<void(bool)> callback)
@@ -128,6 +134,8 @@ QStringList ExportService::supportedExtensions() const
 Fio::VecSyEntityPtr ExportService::collectAllEntities() const
 {
     Fio::VecSyEntityPtr entities;
+
+    // 收集 2D 图元
     if (m_sceneManager)
     {
         auto allEntities = m_sceneManager->getAllEntities();
@@ -137,7 +145,37 @@ Fio::VecSyEntityPtr ExportService::collectAllEntities() const
             // ABI: clone 在 Engine2D 分配，/MD 共享堆下跨 DLL delete 安全
             entities.push_back(std::unique_ptr<Eg::SyEntity>(e->clone()));
         }
+        SY_INFOF("[ExportService] Collected %d 2D entities", (int)entities.size());
     }
+
+    // 收集 3D 网格图元
+    if (m_sceneManager3D)
+    {
+        // 使用 C 风格回调收集 3D 图元（SceneManager3D 接口约束）
+        struct CollectCtx
+        {
+            Fio::VecSyEntityPtr* entities;
+            size_t count;
+        };
+
+        CollectCtx ctx = { &entities, 0 };
+
+        m_sceneManager3D->forEachEntity(
+            [](Eg::SyMeshEntity* entity, void* userData) {
+                if (entity)
+                {
+                    auto* ctx = static_cast<CollectCtx*>(userData);
+                    // SyMeshEntity 继承 SyEntity，clone() 返回 SyEntity*
+                    // 包装为 unique_ptr<SyEntity> 保持多态正确释放
+                    ctx->entities->push_back(std::unique_ptr<Eg::SyEntity>(entity->clone()));
+                    ++ctx->count;
+                }
+            },
+            &ctx);
+
+        SY_INFOF("[ExportService] Collected %d 3D mesh entities", (int)ctx.count);
+    }
+
     return entities;
 }
 
