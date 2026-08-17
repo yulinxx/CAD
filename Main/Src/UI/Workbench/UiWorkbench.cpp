@@ -44,7 +44,7 @@
 #include "UI2D/Edit/QtLayerManagerBridge.h"
 
 #include "UI/RightToolBar/RightToolBar.h"
-#include "UI/Services/ToolBarContextManager.h"
+#include "UI/Service/ToolBarContextManager.h"
 #include "UI/TopToolBar/TopToolBar.h"
 #include "UI/TopToolBar/TextFontToolBar.h"
 #include "UI/DrawTools/TextEditTool.h"
@@ -53,6 +53,7 @@
 #include "UI/Dlg/LayerManagerDialog.h"
 #include "UI2D/Service/EntityPropertyModel2D.h"
 #include "UI2D/Service/EntityPropertyEditSession2D.h"
+#include "UI2D/Service/SceneMonitor.h"
 
 #include "Engine2D/Edit/LayerEditService.h"
 #include "Engine2D/Edit/SceneEditService.h"
@@ -516,6 +517,19 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
             vp, &RenderViewport2D::nudgeRequested, [service = m_services.sceneEditService](double dx, double dy) {
                 service->nudgeSelected(dx, dy, "Move endpoint");
             });
+
+        // 场景变更监控：捕获拖拽/交互式修改等非操作总线路径的场景变更 → 刷新属性面板
+        // 拖拽完成后 commitInteractive → notifySceneChanged → SceneMonitor::sceneChanged → 刷新面板
+        if (auto* scene = m_services.sceneEditService->sceneManager())
+        {
+            m_sceneMonitor = new SceneMonitor(this);
+            m_sceneMonitor->watch(scene);
+            QObject::connect(m_sceneMonitor, &SceneMonitor::sceneChanged, this, [this]() {
+                QTimer::singleShot(0, this, [this]() {
+                    refreshPropertiesPanel();
+                });
+            });
+        }
     }
 
     vp->setDocument(m_services.document2D);
@@ -808,6 +822,17 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     });
     m_commandHub->rebuildAllActions();
 
+    // 文字编辑字体工具栏（双击文字进入编辑会话时显示字体族/字号/粗斜下划线）
+    // 必须先创建，再注册到 ContextManager
+    m_textFontToolBar = new QToolBar(QObject::tr("Text Font"), &window);
+    m_textFontToolBar->setObjectName(QStringLiteral("TextFontToolBar"));
+    m_textFontToolBar->setMovable(false);
+    m_textFontToolBar->setIconSize(QSize(UiMetrics::toolbarIconSizeSmall(), UiMetrics::toolbarIconSizeSmall()));
+    m_textFontToolBarWidget = new TextFontToolBar(m_textFontToolBar);
+    m_textFontToolBar->addWidget(m_textFontToolBarWidget);
+    window.addToolBar(Qt::TopToolBarArea, m_textFontToolBar);
+    m_textFontToolBar->setVisible(false);
+
     // 初始化工具栏上下文管理器
     m_contextManager = std::make_unique<ToolBarContextManager>();
 
@@ -863,6 +888,80 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         },
     });
 
+    // 注册 QRCodeEditing 上下文（二维码编辑工具栏）
+    m_contextManager->registerContext(ToolBarContext::QREditing, {
+        .context = ToolBarContext::QREditing,
+        .title = tr("QR Code"),
+        .sections = {
+            { tr("Content"), {
+                { .actionId = "QR_Content", .displayName = tr("Content") },
+                { .actionId = "QR_ErrorCorrection", .displayName = tr("Error Correction") },
+            }},
+            { tr("Appearance"), {
+                { .actionId = "QR_Size", .displayName = tr("Size") },
+                { .actionId = "QR_Foreground", .displayName = tr("Foreground") },
+                { .actionId = "QR_Background", .displayName = tr("Background") },
+            }},
+            { tr("Advanced"), {
+                { .actionId = "QR_Logo", .displayName = tr("Logo") },
+            }},
+        },
+    });
+
+    // 注册 BitmapEditing 上下文（位图编辑工具栏）
+    m_contextManager->registerContext(ToolBarContext::BitmapEditing, {
+        .context = ToolBarContext::BitmapEditing,
+        .title = tr("Bitmap"),
+        .sections = {
+            { tr("Adjust"), {
+                { .actionId = "Bitmap_Crop", .displayName = tr("Crop") },
+                { .actionId = "Bitmap_Rotate", .displayName = tr("Rotate") },
+                { .actionId = "Bitmap_Brightness", .displayName = tr("Brightness") },
+                { .actionId = "Bitmap_Contrast", .displayName = tr("Contrast") },
+            }},
+            { tr("Filter"), {
+                { .actionId = "Bitmap_Filter", .displayName = tr("Filter") },
+            }},
+        },
+    });
+
+    // 注册 VectorEditing 上下文（矢量编辑工具栏）
+    m_contextManager->registerContext(ToolBarContext::VectorEditing, {
+        .context = ToolBarContext::VectorEditing,
+        .title = tr("Vector"),
+        .sections = {
+            { tr("Path"), {
+                { .actionId = "Vector_NodeEdit", .displayName = tr("Node Edit") },
+                { .actionId = "Vector_Simplify", .displayName = tr("Simplify") },
+                { .actionId = "Vector_Boolean", .displayName = tr("Boolean") },
+            }},
+            { tr("Style"), {
+                { .actionId = "Vector_Stroke", .displayName = tr("Stroke") },
+                { .actionId = "Vector_Fill", .displayName = tr("Fill") },
+            }},
+        },
+    });
+
+    // 注册 ImageEditing 上下文（图片编辑工具栏）
+    m_contextManager->registerContext(ToolBarContext::ImageEditing, {
+        .context = ToolBarContext::ImageEditing,
+        .title = tr("Image"),
+        .sections = {
+            { tr("Transform"), {
+                { .actionId = "Image_Crop", .displayName = tr("Crop") },
+                { .actionId = "Image_Rotate", .displayName = tr("Rotate") },
+                { .actionId = "Image_Flip", .displayName = tr("Flip") },
+            }},
+            { tr("Adjust"), {
+                { .actionId = "Image_Brightness", .displayName = tr("Brightness") },
+                { .actionId = "Image_Contrast", .displayName = tr("Contrast") },
+            }},
+            { tr("Filter"), {
+                { .actionId = "Image_Filter", .displayName = tr("Filter") },
+            }},
+        },
+    });
+
     // 注册自定义文字编辑工具栏
     m_contextManager->registerCustomToolBar(ToolBarContext::TextEditing, m_textFontToolBarWidget, false);
 
@@ -888,6 +987,17 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
 
     // 默认进入 Default 上下文
     m_contextManager->setCurrentContext(ToolBarContext::Default);
+
+    // 根据选中图元类型自动切换上下文（监听视口选择变化）
+    if (m_viewport) {
+        connect(m_viewport, &RenderViewport2D::selectionChanged, this, [this]() {
+            if (!m_contextManager) return;
+            const ToolBarContext newCtx = determineContextFromSelection();
+            if (m_contextManager->currentContext() != newCtx) {
+                m_contextManager->setCurrentContext(newCtx);
+            }
+        });
+    }
 
     // 右侧图层面板（颜色/图层），依据承载样式创建
     m_rightToolBar = new RightToolBar(&window);
@@ -973,7 +1083,99 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
             }
         });
     }
+}
 
+ToolBarContext Workbench2D::determineContextFromSelection() const
+{
+    if (!m_services.selectionService) {
+        return ToolBarContext::Default;
+    }
+
+    // 获取选中的图元 ID 列表
+    std::vector<Eg::EntityId> selectedIds;
+    m_services.selectionService->visitSelectedIds(
+        [](const char* id, void* ctx) {
+            auto& vec = *static_cast<std::vector<Eg::EntityId>*>(ctx);
+            if (auto eid = Eg::parseEntityId(std::string(id))) {
+                vec.push_back(*eid);
+            }
+        },
+        &selectedIds);
+
+    if (selectedIds.empty()) {
+        return ToolBarContext::Default;
+    }
+
+    // 获取场景管理器
+    auto* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
+    if (!scene) {
+        return ToolBarContext::Default;
+    }
+
+    // 统计各类型图元数量
+    int textCount = 0;
+    int qrCount = 0;
+    int bitmapCount = 0;
+    int vectorCount = 0;
+    int imageCount = 0;
+    int otherCount = 0;
+
+    for (Eg::EntityId id : selectedIds) {
+        if (auto* entity = scene->findEntityById(id)) {
+            switch (entity->eType) {
+                case Eg::EType::TEXT:
+                    textCount++;
+                    break;
+                case Eg::EType::QR_CODE:
+                    qrCount++;
+                    break;
+                case Eg::EType::IMAGE:
+                    bitmapCount++;
+                    break;
+                case Eg::EType::LINE:
+                case Eg::EType::ARC:
+                case Eg::EType::CIRCLE:
+                case Eg::EType::ELLIPSE:
+                case Eg::EType::SMARTLINE:
+                case Eg::EType::POLYGON:
+                case Eg::EType::SPLINE:
+                case Eg::EType::BEZIER:
+                case Eg::EType::BEZIER2:
+                    vectorCount++;
+                    break;
+                default:
+                    otherCount++;
+                    break;
+            }
+        }
+    }
+
+    // 优先级：专用编辑模式 > 通用模式
+    // 单一类型优先
+    if (textCount > 0 && qrCount == 0 && bitmapCount == 0 && vectorCount == 0 && imageCount == 0) {
+        return ToolBarContext::TextEditing;
+    }
+    if (qrCount > 0 && textCount == 0 && bitmapCount == 0 && vectorCount == 0 && imageCount == 0) {
+        return ToolBarContext::QREditing;
+    }
+    if (bitmapCount > 0 && textCount == 0 && qrCount == 0 && vectorCount == 0 && imageCount == 0) {
+        return ToolBarContext::BitmapEditing;
+    }
+    if (vectorCount > 0 && textCount == 0 && qrCount == 0 && bitmapCount == 0 && imageCount == 0) {
+        return ToolBarContext::VectorEditing;
+    }
+    if (imageCount > 0 && textCount == 0 && qrCount == 0 && bitmapCount == 0 && vectorCount == 0) {
+        return ToolBarContext::ImageEditing;
+    }
+
+    // 混合类型：优先返回最专用的上下文
+    if (textCount > 0) return ToolBarContext::TextEditing;
+    if (qrCount > 0) return ToolBarContext::QREditing;
+    if (bitmapCount > 0) return ToolBarContext::BitmapEditing;
+    if (vectorCount > 0) return ToolBarContext::VectorEditing;
+    if (imageCount > 0) return ToolBarContext::ImageEditing;
+
+    return ToolBarContext::Default;
 }
 
 void Workbench2D::setupSceneTree(WorkbenchWindow& window)

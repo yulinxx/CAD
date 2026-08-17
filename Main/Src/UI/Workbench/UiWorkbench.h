@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "UiServices.h"
+#include "UI/Service/ToolBarContextManager.h"
 
 class QWidget;
 class QToolBar;
@@ -18,6 +19,7 @@ class SettingsUiCoordinator2D;
 class SceneTreePanel2D;
 class SceneTreePanel3D;
 class SceneTreeSceneObserver2D;
+class SceneMonitor;
 struct UiStateSnapshot;
 
 // 3D 类型前向声明（避免头文件膨胀，实际 include 下沉到 .cpp）
@@ -302,6 +304,8 @@ private:
     class SceneTreePanel2D* m_scenePanel2D{ nullptr };
     /// 场景变更观察者（捕获绕过操作总线的直接编辑，如视口 Delete 键）
     std::unique_ptr<SceneTreeSceneObserver2D> m_sceneTreeObserver;
+    /// 场景变更监控（IObserver → Qt 信号桥接：捕获拖拽/交互式修改等非操作总线路径的场景变更）
+    SceneMonitor* m_sceneMonitor{ nullptr };
     /// 场景树重建防抖定时器（合并批量增删，避免每步 O(N) 重建）
     class QTimer* m_sceneTreeRefreshTimer{ nullptr };
     /// 上次记录的图元数量（判断是否发生结构变更）
@@ -311,6 +315,12 @@ private:
 
     /// 2D 设置协调器（共享 SettingsService  singleton）
     std::unique_ptr<SettingsUiCoordinator2D> m_settingsCoordinator;
+
+    /// 工具栏上下文管理器：管理不同编辑模式下的工具栏配置与切换
+    std::unique_ptr<ToolBarContextManager> m_contextManager;
+
+    /// 根据当前选中图元类型确定应切换到的工具栏上下文
+    ToolBarContext determineContextFromSelection() const;
 
     /// 当前挂载的 2D 工作台窗口（组合根绑定点，用于向属性面板推送模型）
     WorkbenchWindow* m_workbenchWindow{ nullptr };
