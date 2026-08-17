@@ -873,7 +873,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
                 { .actionId = "Edit_Delete", .displayName = tr("Delete"), .iconResource = ":/ui/common/Icons/Actions/delete.svg" },
             }},
             { "", {
-                { .actionId = "Edit_Group", .displayName = tr("Group"), .checkable = true, .iconResource = ":/ui/common/Icons/Actions/group.svg" },
+                { .actionId = "Edit_Group", .displayName = tr("Group"), .iconResource = ":/ui/common/Icons/Actions/group.svg", .checkable = true },
             }},
         },
     });
@@ -886,9 +886,9 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
             { "", {
                 { .actionId = "Text_FontFamily", .displayName = tr("Font"), .iconResource = ":/ui/common/Icons/Tools/text.svg" },
                 { .actionId = "Text_FontSize", .displayName = tr("Size"), .iconResource = ":/ui/common/Icons/Tools/text.svg" },
-                { .actionId = "Text_Bold", .displayName = tr("Bold"), .checkable = true, .iconResource = ":/ui/common/Icons/Tools/text.svg" },
-                { .actionId = "Text_Italic", .displayName = tr("Italic"), .checkable = true, .iconResource = ":/ui/common/Icons/Tools/text.svg" },
-                { .actionId = "Text_Underline", .displayName = tr("Underline"), .checkable = true, .iconResource = ":/ui/common/Icons/Tools/text.svg" },
+                { .actionId = "Text_Bold", .displayName = tr("Bold"), .iconResource = ":/ui/common/Icons/Tools/text.svg", .checkable = true },
+                { .actionId = "Text_Italic", .displayName = tr("Italic"), .iconResource = ":/ui/common/Icons/Tools/text.svg", .checkable = true },
+                { .actionId = "Text_Underline", .displayName = tr("Underline"), .iconResource = ":/ui/common/Icons/Tools/text.svg", .checkable = true },
             }},
         },
     });
