@@ -28,6 +28,8 @@ SceneTreePanel3D::SceneTreePanel3D(QWidget* parent)
     m_tree->header()->setSectionResizeMode(SceneTreePanel3D::ColName, QHeaderView::Interactive);
     m_tree->header()->setSectionResizeMode(SceneTreePanel3D::ColType, QHeaderView::Interactive);
     m_tree->header()->setSectionResizeMode(SceneTreePanel3D::ColInfo, QHeaderView::Interactive);
+    // 初始按内容调整列宽，避免过宽占据视图空间
+    m_tree->header()->resizeSections(QHeaderView::ResizeToContents);
     m_tree->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_tree->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::EditKeyPressed);
     layout->addWidget(m_tree);

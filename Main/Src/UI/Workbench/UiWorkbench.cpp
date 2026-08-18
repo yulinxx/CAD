@@ -181,7 +181,7 @@ namespace
             }
         }
     }
-}
+}  // namespace
 
 WorkbenchStateSnapshot UiWorkbench::currentSnapshot() const
 {
@@ -683,10 +683,8 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // Draw 菜单与左侧工具栏联动：视口切换工具 → 同步菜单勾选态
     if (auto* menuMgr = window.menuManager())
     {
-        QObject::connect(m_viewport,
-            &RenderViewport2D::activeToolChanged,
-            menuMgr,
-            &WorkbenchMenuManager::syncDrawMenuToTool);
+        QObject::connect(
+            m_viewport, &RenderViewport2D::activeToolChanged, menuMgr, &WorkbenchMenuManager::syncDrawMenuToTool);
     }
 
     // View → Grid & Snap 菜单的真正生效点：把 stateCenter 元数据映射到网格显隐。
@@ -704,7 +702,8 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
                 }
             }
         };
-        m_gridVisibilityMetadataConn = QObject::connect(m_services.stateCenter, &UiStateCenter::metadataChanged, this, applyGridVisibleFromMetadata);
+        m_gridVisibilityMetadataConn = QObject::connect(
+            m_services.stateCenter, &UiStateCenter::metadataChanged, this, applyGridVisibleFromMetadata);
         applyGridVisibleFromMetadata();
     }
 
@@ -722,90 +721,88 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         return count;
     });
     // 注入「选中项位于锁定图层」提供器：Delete/Copy/Mirror/Align 等 RequiresUnlocked* 动作据此禁用
-    m_commandHub->setSelectionLockedProvider(
-        [selectionService = m_services.selectionService,
-            layerManager = m_services.layerManager,
-            sceneEditService = m_services.sceneEditService]() -> bool {
-            if (!selectionService || !layerManager || !sceneEditService)
-            {
-                return false;
-            }
-            Eg::SceneManager* scene = sceneEditService->sceneManager();
-            if (!scene)
-            {
-                return false;
-            }
-            struct LockedCtx
-            {
-                Eg::SceneManager* scene;
-                LayerManager* layers;
-                bool locked{ false };
-            };
-            LockedCtx ctx{ scene, layerManager, false };
-            selectionService->visitSelectedIds(
-                [](const char* id, void* v) {
-                    auto* c = static_cast<LockedCtx*>(v);
-                    if (c->locked)
+    m_commandHub->setSelectionLockedProvider([selectionService = m_services.selectionService,
+                                                 layerManager = m_services.layerManager,
+                                                 sceneEditService = m_services.sceneEditService]() -> bool {
+        if (!selectionService || !layerManager || !sceneEditService)
+        {
+            return false;
+        }
+        Eg::SceneManager* scene = sceneEditService->sceneManager();
+        if (!scene)
+        {
+            return false;
+        }
+        struct LockedCtx
+        {
+            Eg::SceneManager* scene;
+            LayerManager* layers;
+            bool locked{ false };
+        };
+        LockedCtx ctx{ scene, layerManager, false };
+        selectionService->visitSelectedIds(
+            [](const char* id, void* v) {
+                auto* c = static_cast<LockedCtx*>(v);
+                if (c->locked)
+                {
+                    return;
+                }
+                auto eid = Eg::parseEntityId(std::string(id));
+                if (!eid)
+                {
+                    return;
+                }
+                if (Eg::SyEntity* entity = c->scene->findEntityById(*eid))
+                {
+                    if (c->layers->isLayerLocked(c->layers->getEntityLayer(entity)))
                     {
-                        return;
+                        c->locked = true;
                     }
-                    auto eid = Eg::parseEntityId(std::string(id));
-                    if (!eid)
-                    {
-                        return;
-                    }
-                    if (Eg::SyEntity* entity = c->scene->findEntityById(*eid))
-                    {
-                        if (c->layers->isLayerLocked(c->layers->getEntityLayer(entity)))
-                        {
-                            c->locked = true;
-                        }
-                    }
-                },
-                &ctx);
-            return ctx.locked;
-        });
+                }
+            },
+            &ctx);
+        return ctx.locked;
+    });
     // 注入分组切换状态提供器：Group/Ungroup 顶部按钮实时可用
-    m_commandHub->setGroupToggleProvider(
-        [selectionService = m_services.selectionService,
-            layerManager = m_services.layerManager,
-            sceneEditService = m_services.sceneEditService]() -> GroupToggleState {
-            GroupToggleState state;
-            if (!selectionService || !layerManager || !sceneEditService)
-            {
-                return state;
-            }
-            Eg::SceneManager* scene = sceneEditService->sceneManager();
-            if (!scene)
-            {
-                return state;
-            }
-            const auto selected = scene->getSelectedEntities();
-            if (selected.empty())
-            {
-                return state;
-            }
-            bool onLockedLayer = false;
-            bool hasGroup = false;
-            for (Eg::SyEntity* e : selected)
-            {
-                if (!e)
-                {
-                    continue;
-                }
-                if (layerManager->isLayerLocked(layerManager->getEntityLayer(e)))
-                {
-                    onLockedLayer = true;
-                }
-                if (e->group())
-                {
-                    hasGroup = true;
-                }
-            }
-            state.on = hasGroup;
-            state.enabled = !onLockedLayer;
+    m_commandHub->setGroupToggleProvider([selectionService = m_services.selectionService,
+                                             layerManager = m_services.layerManager,
+                                             sceneEditService = m_services.sceneEditService]() -> GroupToggleState {
+        GroupToggleState state;
+        if (!selectionService || !layerManager || !sceneEditService)
+        {
             return state;
-        });
+        }
+        Eg::SceneManager* scene = sceneEditService->sceneManager();
+        if (!scene)
+        {
+            return state;
+        }
+        const auto selected = scene->getSelectedEntities();
+        if (selected.empty())
+        {
+            return state;
+        }
+        bool onLockedLayer = false;
+        bool hasGroup = false;
+        for (Eg::SyEntity* e : selected)
+        {
+            if (!e)
+            {
+                continue;
+            }
+            if (layerManager->isLayerLocked(layerManager->getEntityLayer(e)))
+            {
+                onLockedLayer = true;
+            }
+            if (e->group())
+            {
+                hasGroup = true;
+            }
+        }
+        state.on = hasGroup;
+        state.enabled = !onLockedLayer;
+        return state;
+    });
     // 注入撤销/重做状态提供器（OperationBus context 在生产路径不填充 undoManager）
     m_commandHub->setUndoRedoProvider([undoManager = m_services.undoManager]() -> UndoRedoState {
         UndoRedoState state;
@@ -842,150 +839,178 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     m_contextManager = std::make_unique<ToolBarContextManager>();
 
     // 注册 Default 上下文（通用编辑命令）
-    m_contextManager->registerContext(ToolBarContext::Default, {
-        ToolBarContext::Default,
-        tr("Edit"),
+    m_contextManager->registerContext(ToolBarContext::Default,
         {
-            { "", {
-                { "Edit_Undo", tr("Undo"), ":/ui/common/Icons/Actions/undo.svg" },
-                { "Edit_Redo", tr("Redo"), ":/ui/common/Icons/Actions/redo.svg" },
-            }},
-            { "", {
-                { "Edit_MirrorHorizontal", tr("Mirror H"), ":/ui/common/Icons/Actions/mirror_h.svg" },
-                { "Edit_MirrorVertical", tr("Mirror V"), ":/ui/common/Icons/Actions/mirror_v.svg" },
-            }},
-            { "", {
-                { "Edit_AlignLeft", tr("Align Left"), ":/ui/common/Icons/Actions/align_left.svg" },
-                { "Edit_AlignRight", tr("Align Right"), ":/ui/common/Icons/Actions/align_right.svg" },
-                { "Edit_AlignCenterH", tr("Align Center H"), ":/ui/common/Icons/Actions/align_center_h.svg" },
-                { "Edit_AlignTop", tr("Align Top"), ":/ui/common/Icons/Actions/align_top.svg" },
-                { "Edit_AlignBottom", tr("Align Bottom"), ":/ui/common/Icons/Actions/align_bottom.svg" },
-                { "Edit_AlignCenterV", tr("Align Center V"), ":/ui/common/Icons/Actions/align_center_v.svg" },
-            }},
-            { "", {
-                { "Edit_SelectAll", tr("Select All"), ":/ui/common/Icons/Actions/select_all.svg" },
-                { "Edit_InvertSelection", tr("Invert Selection"), ":/ui/common/Icons/Actions/invert_selection.svg" },
-                { "Edit_Deselect", tr("Deselect"), ":/ui/common/Icons/Actions/deselect.svg" },
-            }},
-            { "", {
-                { "Edit_Copy", tr("Copy"), ":/ui/common/Icons/Actions/copy.svg" },
-                { "Edit_Paste", tr("Paste"), ":/ui/common/Icons/Actions/paste.svg" },
-                { "Edit_Delete", tr("Delete"), ":/ui/common/Icons/Actions/delete.svg" },
-            }},
-            { "", {
-                { "Edit_Group", tr("Group"), ":/ui/common/Icons/Actions/group.svg", true },
-            }},
-        },
-    });
+            ToolBarContext::Default,
+            tr("Edit"),
+            {
+                { "",
+                    {
+                        { "Edit_Undo", tr("Undo"), ":/ui/common/Icons/Actions/undo.svg" },
+                        { "Edit_Redo", tr("Redo"), ":/ui/common/Icons/Actions/redo.svg" },
+                    } },
+                { "",
+                    {
+                        { "Edit_MirrorHorizontal", tr("Mirror H"), ":/ui/common/Icons/Actions/mirror_h.svg" },
+                        { "Edit_MirrorVertical", tr("Mirror V"), ":/ui/common/Icons/Actions/mirror_v.svg" },
+                    } },
+                { "",
+                    {
+                        { "Edit_AlignLeft", tr("Align Left"), ":/ui/common/Icons/Actions/align_left.svg" },
+                        { "Edit_AlignRight", tr("Align Right"), ":/ui/common/Icons/Actions/align_right.svg" },
+                        { "Edit_AlignCenterH", tr("Align Center H"), ":/ui/common/Icons/Actions/align_center_h.svg" },
+                        { "Edit_AlignTop", tr("Align Top"), ":/ui/common/Icons/Actions/align_top.svg" },
+                        { "Edit_AlignBottom", tr("Align Bottom"), ":/ui/common/Icons/Actions/align_bottom.svg" },
+                        { "Edit_AlignCenterV", tr("Align Center V"), ":/ui/common/Icons/Actions/align_center_v.svg" },
+                    } },
+                { "",
+                    {
+                        { "Edit_SelectAll", tr("Select All"), ":/ui/common/Icons/Actions/select_all.svg" },
+                        { "Edit_InvertSelection", tr("Invert Selection"), ":/ui/common/Icons/Actions/invert_selection.svg" },
+                        { "Edit_Deselect", tr("Deselect"), ":/ui/common/Icons/Actions/deselect.svg" },
+                    } },
+                { "",
+                    {
+                        { "Edit_Copy", tr("Copy"), ":/ui/common/Icons/Actions/copy.svg" },
+                        { "Edit_Paste", tr("Paste"), ":/ui/common/Icons/Actions/paste.svg" },
+                        { "Edit_Delete", tr("Delete"), ":/ui/common/Icons/Actions/delete.svg" },
+                    } },
+                { "",
+                    {
+                        { "Edit_Group", tr("Group"), ":/ui/common/Icons/Actions/group.svg", true },
+                    } },
+            },
+        });
 
     // 注册 TextEditing 上下文（文字编辑工具栏）
-    m_contextManager->registerContext(ToolBarContext::TextEditing, {
-        ToolBarContext::TextEditing,
-        tr("Text Format"),
+    m_contextManager->registerContext(ToolBarContext::TextEditing,
         {
-            { "", {
-                { "Text_FontFamily", tr("Font"), ":/ui/common/Icons/Tools/text.svg" },
-                { "Text_FontSize", tr("Size"), ":/ui/common/Icons/Tools/text.svg" },
-                { "Text_Bold", tr("Bold"), ":/ui/common/Icons/Tools/text.svg", true },
-                { "Text_Italic", tr("Italic"), ":/ui/common/Icons/Tools/text.svg", true },
-                { "Text_Underline", tr("Underline"), ":/ui/common/Icons/Tools/text.svg", true },
-            }},
-        },
-    });
+            ToolBarContext::TextEditing,
+            tr("Text Format"),
+            {
+                { "",
+                    {
+                        { "Text_FontFamily", tr("Font"), ":/ui/common/Icons/Tools/text.svg" },
+                        { "Text_FontSize", tr("Size"), ":/ui/common/Icons/Tools/text.svg" },
+                        { "Text_Bold", tr("Bold"), ":/ui/common/Icons/Tools/text.svg", true },
+                        { "Text_Italic", tr("Italic"), ":/ui/common/Icons/Tools/text.svg", true },
+                        { "Text_Underline", tr("Underline"), ":/ui/common/Icons/Tools/text.svg", true },
+                    } },
+            },
+        });
 
     // 注册 QRCodeEditing 上下文（二维码编辑工具栏）
-    m_contextManager->registerContext(ToolBarContext::QREditing, {
-        ToolBarContext::QREditing,
-        tr("QR Code"),
+    m_contextManager->registerContext(ToolBarContext::QREditing,
         {
-            { tr("Content"), {
-                { "QR_Content", tr("Content") },
-                { "QR_ErrorCorrection", tr("Error Correction") },
-            }},
-            { tr("Appearance"), {
-                { "QR_Size", tr("Size") },
-                { "QR_Foreground", tr("Foreground") },
-                { "QR_Background", tr("Background") },
-            }},
-            { tr("Advanced"), {
-                { "QR_Logo", tr("Logo") },
-            }},
-        },
-    });
+            ToolBarContext::QREditing,
+            tr("QR Code"),
+            {
+                { tr("Content"),
+                    {
+                        { "QR_Content", tr("Content") },
+                        { "QR_ErrorCorrection", tr("Error Correction") },
+                    } },
+                { tr("Appearance"),
+                    {
+                        { "QR_Size", tr("Size") },
+                        { "QR_Foreground", tr("Foreground") },
+                        { "QR_Background", tr("Background") },
+                    } },
+                { tr("Advanced"),
+                    {
+                        { "QR_Logo", tr("Logo") },
+                    } },
+            },
+        });
 
     // 注册 BitmapEditing 上下文（位图编辑工具栏）
-    m_contextManager->registerContext(ToolBarContext::BitmapEditing, {
-        ToolBarContext::BitmapEditing,
-        tr("Bitmap"),
+    m_contextManager->registerContext(ToolBarContext::BitmapEditing,
         {
-            { tr("Adjust"), {
-                { "Bitmap_Crop", tr("Crop") },
-                { "Bitmap_Rotate", tr("Rotate") },
-                { "Bitmap_Brightness", tr("Brightness") },
-                { "Bitmap_Contrast", tr("Contrast") },
-            }},
-            { tr("Filter"), {
-                { "Bitmap_Filter", tr("Filter") },
-            }},
-        },
-    });
+            ToolBarContext::BitmapEditing,
+            tr("Bitmap"),
+            {
+                { tr("Adjust"),
+                    {
+                        { "Bitmap_Crop", tr("Crop") },
+                        { "Bitmap_Rotate", tr("Rotate") },
+                        { "Bitmap_Brightness", tr("Brightness") },
+                        { "Bitmap_Contrast", tr("Contrast") },
+                    } },
+                { tr("Filter"),
+                    {
+                        { "Bitmap_Filter", tr("Filter") },
+                    } },
+            },
+        });
 
     // 注册 VectorEditing 上下文（矢量编辑工具栏）
-    m_contextManager->registerContext(ToolBarContext::VectorEditing, {
-        ToolBarContext::VectorEditing,
-        tr("Vector"),
+    m_contextManager->registerContext(ToolBarContext::VectorEditing,
         {
-            { tr("Path"), {
-                { "Vector_NodeEdit", tr("Node Edit") },
-                { "Vector_Simplify", tr("Simplify") },
-                { "Vector_Boolean", tr("Boolean") },
-            }},
-            { tr("Style"), {
-                { "Vector_Stroke", tr("Stroke") },
-                { "Vector_Fill", tr("Fill") },
-            }},
-        },
-    });
+            ToolBarContext::VectorEditing,
+            tr("Vector"),
+            {
+                { tr("Path"),
+                    {
+                        { "Vector_NodeEdit", tr("Node Edit") },
+                        { "Vector_Simplify", tr("Simplify") },
+                        { "Vector_Boolean", tr("Boolean") },
+                    } },
+                { tr("Style"),
+                    {
+                        { "Vector_Stroke", tr("Stroke") },
+                        { "Vector_Fill", tr("Fill") },
+                    } },
+            },
+        });
 
     // 注册 ImageEditing 上下文（图片编辑工具栏）
-    m_contextManager->registerContext(ToolBarContext::ImageEditing, {
-        ToolBarContext::ImageEditing,
-        tr("Image"),
+    m_contextManager->registerContext(ToolBarContext::ImageEditing,
         {
-            { tr("Transform"), {
-                { "Image_Crop", tr("Crop") },
-                { "Image_Rotate", tr("Rotate") },
-                { "Image_Flip", tr("Flip") },
-            }},
-            { tr("Adjust"), {
-                { "Image_Brightness", tr("Brightness") },
-                { "Image_Contrast", tr("Contrast") },
-            }},
-            { tr("Filter"), {
-                { "Image_Filter", tr("Filter") },
-            }},
-        },
-    });
+            ToolBarContext::ImageEditing,
+            tr("Image"),
+            {
+                { tr("Transform"),
+                    {
+                        { "Image_Crop", tr("Crop") },
+                        { "Image_Rotate", tr("Rotate") },
+                        { "Image_Flip", tr("Flip") },
+                    } },
+                { tr("Adjust"),
+                    {
+                        { "Image_Brightness", tr("Brightness") },
+                        { "Image_Contrast", tr("Contrast") },
+                    } },
+                { tr("Filter"),
+                    {
+                        { "Image_Filter", tr("Filter") },
+                    } },
+            },
+        });
 
     // 注册自定义文字编辑工具栏
     m_contextManager->registerCustomToolBar(ToolBarContext::TextEditing, m_textFontToolBarWidget, false);
 
     // 绑定 TopToolBar 动作设置/清空回调
     m_contextManager->setTopToolBarActionSetter([this](const QList<ToolBarAction>& actions) {
-        if (m_topToolBar) {
+        if (m_topToolBar)
+        {
             m_topToolBar->setActions(actions);
         }
     });
     m_contextManager->setTopToolBarClearer([this]() {
-        if (m_topToolBar) {
+        if (m_topToolBar)
+        {
             m_topToolBar->clearActions();
         }
     });
 
     // 监听上下文切换，同步显隐自定义工具栏
-    connect(m_contextManager.get(), &ToolBarContextManager::customToolBarVisibilityChanged,
-        this, [this](ToolBarContext ctx, bool visible) {
-            if (ctx == ToolBarContext::TextEditing && m_textFontToolBar) {
+    connect(m_contextManager.get(),
+        &ToolBarContextManager::customToolBarVisibilityChanged,
+        this,
+        [this](ToolBarContext ctx, bool visible) {
+            if (ctx == ToolBarContext::TextEditing && m_textFontToolBar)
+            {
                 m_textFontToolBar->setVisible(visible);
             }
         });
@@ -994,11 +1019,14 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     m_contextManager->setCurrentContext(ToolBarContext::Default);
 
     // 根据选中图元类型自动切换上下文（监听视口选择变化）
-    if (m_viewport) {
+    if (m_viewport)
+    {
         connect(m_viewport, &RenderViewport2D::selectionChanged, this, [this]() {
-            if (!m_contextManager) return;
+            if (!m_contextManager)
+                return;
             const ToolBarContext newCtx = determineContextFromSelection();
-            if (m_contextManager->currentContext() != newCtx) {
+            if (m_contextManager->currentContext() != newCtx)
+            {
                 m_contextManager->setCurrentContext(newCtx);
             }
         });
@@ -1048,7 +1076,8 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     QObject::connect(m_rightToolBar, &RightToolBar::sigLayerDoubleClicked, this, [this](int /*layerId*/) {
         if (m_services.layerEditService)
         {
-            LayerManagerDialog::showDialog(m_services.layerEditService, m_commandHub ? m_commandHub->mainWindow() : nullptr);
+            LayerManagerDialog::showDialog(
+                m_services.layerEditService, m_commandHub ? m_commandHub->mainWindow() : nullptr);
         }
     });
 
@@ -1070,29 +1099,32 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
             refreshPropertiesPanel();
         });
         // 剪贴板操作（Copy/Cut）后立即刷新 Paste 按钮启用状态
-        QObject::connect(m_services.operationBus, &OperationBus::operationCompleted, this, [this](OperationId id, bool success) {
-            if (success && (id == OperationId::Edit_Copy || id == OperationId::Edit_Cut))
-            {
-                m_commandHub->refreshActionStates(m_commandHub->captureSnapshot(m_commandHub->mainWindow()));
-            }
-        });
+        QObject::connect(
+            m_services.operationBus, &OperationBus::operationCompleted, this, [this](OperationId id, bool success) {
+                if (success && (id == OperationId::Edit_Copy || id == OperationId::Edit_Cut))
+                {
+                    m_commandHub->refreshActionStates(m_commandHub->captureSnapshot(m_commandHub->mainWindow()));
+                }
+            });
         // 撤销/重做会恢复/移除/重建图元（场景拓扑变化），增量刷新可能遗漏，
         // 强制全量重建视口，确保回退结果实时可见
-        QObject::connect(m_services.operationBus, &OperationBus::operationCompleted, this, [this](OperationId id, bool success) {
-            if (success && (id == OperationId::Edit_Undo || id == OperationId::Edit_Redo))
-            {
-                if (m_viewport)
+        QObject::connect(
+            m_services.operationBus, &OperationBus::operationCompleted, this, [this](OperationId id, bool success) {
+                if (success && (id == OperationId::Edit_Undo || id == OperationId::Edit_Redo))
                 {
-                    m_viewport->requestFullRefresh();
+                    if (m_viewport)
+                    {
+                        m_viewport->requestFullRefresh();
+                    }
                 }
-            }
-        });
+            });
     }
 }
 
 ToolBarContext Workbench2D::determineContextFromSelection() const
 {
-    if (!m_services.selectionService) {
+    if (!m_services.selectionService)
+    {
         return ToolBarContext::Default;
     }
 
@@ -1101,19 +1133,22 @@ ToolBarContext Workbench2D::determineContextFromSelection() const
     m_services.selectionService->visitSelectedIds(
         [](const char* id, void* ctx) {
             auto& vec = *static_cast<std::vector<Eg::EntityId>*>(ctx);
-            if (auto eid = Eg::parseEntityId(std::string(id))) {
+            if (auto eid = Eg::parseEntityId(std::string(id)))
+            {
                 vec.push_back(*eid);
             }
         },
         &selectedIds);
 
-    if (selectedIds.empty()) {
+    if (selectedIds.empty())
+    {
         return ToolBarContext::Default;
     }
 
     // 获取场景管理器
     auto* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
-    if (!scene) {
+    if (!scene)
+    {
         return ToolBarContext::Default;
     }
 
@@ -1125,60 +1160,73 @@ ToolBarContext Workbench2D::determineContextFromSelection() const
     int imageCount = 0;
     int otherCount = 0;
 
-    for (Eg::EntityId id : selectedIds) {
-        if (auto* entity = scene->findEntityById(id)) {
-            switch (entity->eType) {
-                case Eg::EType::TEXT:
-                    textCount++;
-                    break;
-                case Eg::EType::QR_CODE:
-                    qrCount++;
-                    break;
-                case Eg::EType::IMAGE:
-                    bitmapCount++;
-                    break;
-                case Eg::EType::LINE:
-                case Eg::EType::ARC:
-                case Eg::EType::CIRCLE:
-                case Eg::EType::ELLIPSE:
-                case Eg::EType::SMARTLINE:
-                case Eg::EType::POLYGON:
-                case Eg::EType::SPLINE:
-                case Eg::EType::BEZIER:
-                case Eg::EType::BEZIER2:
-                    vectorCount++;
-                    break;
-                default:
-                    otherCount++;
-                    break;
+    for (Eg::EntityId id : selectedIds)
+    {
+        if (auto* entity = scene->findEntityById(id))
+        {
+            switch (entity->eType)
+            {
+            case Eg::EType::TEXT:
+                textCount++;
+                break;
+            case Eg::EType::QR_CODE:
+                qrCount++;
+                break;
+            case Eg::EType::IMAGE:
+                bitmapCount++;
+                break;
+            case Eg::EType::LINE:
+            case Eg::EType::ARC:
+            case Eg::EType::CIRCLE:
+            case Eg::EType::ELLIPSE:
+            case Eg::EType::SMARTLINE:
+            case Eg::EType::POLYGON:
+            case Eg::EType::SPLINE:
+            case Eg::EType::BEZIER:
+            case Eg::EType::BEZIER2:
+                vectorCount++;
+                break;
+            default:
+                otherCount++;
+                break;
             }
         }
     }
 
     // 优先级：专用编辑模式 > 通用模式
     // 单一类型优先
-    if (textCount > 0 && qrCount == 0 && bitmapCount == 0 && vectorCount == 0 && imageCount == 0) {
+    if (textCount > 0 && qrCount == 0 && bitmapCount == 0 && vectorCount == 0 && imageCount == 0)
+    {
         return ToolBarContext::TextEditing;
     }
-    if (qrCount > 0 && textCount == 0 && bitmapCount == 0 && vectorCount == 0 && imageCount == 0) {
+    if (qrCount > 0 && textCount == 0 && bitmapCount == 0 && vectorCount == 0 && imageCount == 0)
+    {
         return ToolBarContext::QREditing;
     }
-    if (bitmapCount > 0 && textCount == 0 && qrCount == 0 && vectorCount == 0 && imageCount == 0) {
+    if (bitmapCount > 0 && textCount == 0 && qrCount == 0 && vectorCount == 0 && imageCount == 0)
+    {
         return ToolBarContext::BitmapEditing;
     }
-    if (vectorCount > 0 && textCount == 0 && qrCount == 0 && bitmapCount == 0 && imageCount == 0) {
+    if (vectorCount > 0 && textCount == 0 && qrCount == 0 && bitmapCount == 0 && imageCount == 0)
+    {
         return ToolBarContext::VectorEditing;
     }
-    if (imageCount > 0 && textCount == 0 && qrCount == 0 && bitmapCount == 0 && vectorCount == 0) {
+    if (imageCount > 0 && textCount == 0 && qrCount == 0 && bitmapCount == 0 && vectorCount == 0)
+    {
         return ToolBarContext::ImageEditing;
     }
 
     // 混合类型：优先返回最专用的上下文
-    if (textCount > 0) return ToolBarContext::TextEditing;
-    if (qrCount > 0) return ToolBarContext::QREditing;
-    if (bitmapCount > 0) return ToolBarContext::BitmapEditing;
-    if (vectorCount > 0) return ToolBarContext::VectorEditing;
-    if (imageCount > 0) return ToolBarContext::ImageEditing;
+    if (textCount > 0)
+        return ToolBarContext::TextEditing;
+    if (qrCount > 0)
+        return ToolBarContext::QREditing;
+    if (bitmapCount > 0)
+        return ToolBarContext::BitmapEditing;
+    if (vectorCount > 0)
+        return ToolBarContext::VectorEditing;
+    if (imageCount > 0)
+        return ToolBarContext::ImageEditing;
 
     return ToolBarContext::Default;
 }
@@ -1190,9 +1238,16 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
     if (!panel)
     {
         // 骨架未提供时安全创建并注册（UI 可定制/可缺失）
+        // 关键：新创建的停靠面板必须使用与骨架一致的 objectName（"SceneDock"），
+        // 否则在 3D→2D 切换后恢复布局快照时按 objectName 匹配失败，
+        // Qt 可能把左侧停靠区宽度错误地应用到中央视图，导致 2D 视图被挤压消失。
         panel = new SceneTreePanel2D(&window);
         panel->setObjectName(QStringLiteral("SceneTreeDock"));
-        window.registerDockWidget(QObject::tr("Scene"), panel, Qt::LeftDockWidgetArea);
+        auto* dock = window.registerDockWidget(QObject::tr("Scene"), panel, Qt::LeftDockWidgetArea);
+        if (dock)
+        {
+            dock->setObjectName(QStringLiteral("SceneDock"));
+        }
     }
     m_scenePanel2D = panel;
 
@@ -1212,13 +1267,12 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
     if (m_services.operationBus)
     {
         connect(m_services.operationBus, &OperationBus::undoStateChanged, this, &Workbench2D::refreshSceneTree);
-        connect(m_services.operationBus, &OperationBus::operationCompleted, this,
-            [this](OperationId, bool success) {
-                if (success)
-                {
-                    refreshSceneTree();
-                }
-            });
+        connect(m_services.operationBus, &OperationBus::operationCompleted, this, [this](OperationId, bool success) {
+            if (success)
+            {
+                refreshSceneTree();
+            }
+        });
     }
 
     // 引擎场景变更兜底：任何直接修改（如视口 Delete 键删除、导入清空等）
@@ -2135,12 +2189,18 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
 {
     // 3D 场景树面板是可选的 UI：独立创建并注册（骨架的 SceneTreePanel2D 属 2D，
     // 3D 工作台隐藏骨架 dock，因此这里总是创建自己的 SceneTreePanel3D）。
+    // 使用稳定的 objectName（与 2D 的 "SceneDock" 区分），避免布局快照按 objectName
+    // 恢复时误匹配；同时限制宽度，防止左侧面板过宽挤压 3D 视图。
     auto* created = new SceneTreePanel3D(&window);
     created->setObjectName(QStringLiteral("SceneTreeDock3D"));
     auto* sceneDock = window.registerDockWidget(QObject::tr("Scene"), created, Qt::LeftDockWidgetArea);
-    // 仅设置初始宽度（窄一点，不挤压 3D 视图），不限制最大宽度，用户可手动拖宽
+
+    // 限制 Scene 面板宽度：最小 180、最大 300，初始 220，避免过宽挤压 3D 视图
     if (sceneDock)
     {
+        sceneDock->setObjectName(QStringLiteral("SceneTreeDock3D"));
+        sceneDock->setMinimumWidth(180);
+        sceneDock->setMaximumWidth(300);
         window.resizeDocks({ sceneDock }, { 220 }, Qt::Horizontal);
     }
     m_scenePanel3D = created;
@@ -2158,7 +2218,9 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
     // 引擎/场景（业务）→ 面板（UI）：变化后刷新展示与选中高亮
     if (m_services3D.renderWidget)
     {
-        connect(m_services3D.renderWidget, &RenderWidget3D::sigSelectionChanged, this,
+        connect(m_services3D.renderWidget,
+            &RenderWidget3D::sigSelectionChanged,
+            this,
             [this](const Eg::SyMeshEntity** /*entities*/, int /*count*/) {
                 syncSceneTreeSelection3D();
             });
