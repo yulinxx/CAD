@@ -32,42 +32,33 @@
 
 ## 2. 接口定义
 
-### 2.1 IRenderBackend 接口
+### 2.1 Renderx C API（当前生产边界）
+
+当前生产路径不再以 `IRenderBackend` 作为主线描述，而是以 `Renderx` 的 C ABI 为边界：
 
 ```cpp
-class IRenderBackend
-{
-public:
-    virtual ~IRenderBackend() = default;
-    
-    /// 初始化后端
-    virtual void initialize(const RenderContext& ctx) = 0;
-    
-    /// 关闭后端
-    virtual void shutdown() = 0;
-    
-    /// 渲染一帧
-    virtual void render(const RenderFrame& frame) = 0;
-    
-    /// 调整视口尺寸
-    virtual void resize(const Size2D& size) = 0;
-    
-    /// 获取后端能力
-    virtual const BackendCapabilities& getCapabilities() const = 0;
-};
+RenderDevice* renderCreateDevice(const DeviceDesc* desc);
+void renderDestroyDevice(RenderDevice* dev);
+void renderResize(RenderDevice* dev, uint32_t width, uint32_t height);
+void renderSubmitGeometry(RenderDevice* dev, const GeometryPrimitive* primitive);
+void renderFrame(RenderDevice* dev);
 ```
 
-### 2.2 RenderContext
+### 2.2 渲染设备状态（历史语境）
 
 ```cpp
-struct RenderContext
+struct RenderStats
 {
-    Size2D viewportSize;
-    float devicePixelRatio;
-    bool vsyncEnabled;
-    std::string backendName;
+    uint32_t entityCount;
+    uint32_t visibleCount;
+    uint32_t drawCallCount;
+    uint32_t triangleCount;
+    uint32_t lineCount;
+    uint32_t pointCount;
+    uint64_t gpuMemoryBytes;
 };
 ```
+> 说明：这里保留历史抽象，仅用于解释旧文档中的状态命名；当前生产边界以 `RenderDevice*` 和 `render/render.h` 为准。
 
 ### 2.3 RenderFrame
 
@@ -193,32 +184,33 @@ IRenderBackend::render()
 ### 5.1 OpenGL 后端
 
 **特点**：
-- 使用 QOpenGLContext 管理上下文
-- 使用 QOpenGLFunctions 调用 OpenGL API
-- 支持 OpenGL 3.3+
+- 由 `Renderx` 内部的 RHI 层管理上下文
+- 直接面向平台 OpenGL API
+- 支持 2D / 3D 统一渲染
 
 **关键文件**：
-- `Main/Src/RenderCore/MinimalOpenGLBackend.h/cpp`
+- `Renderx/src/rhi/rhi_gl.cpp`
 
-### 5.2 软件后端
+### 5.2 Null / 回退后端
 
 **特点**：
-- 使用 QPainter 进行 CPU 渲染
-- 支持离屏渲染
-- 作为硬件渲染的回退方案
+- 作为无图形环境或测试环境的回退实现
+- 用于保持设备创建链路可用
+- 不承担业务渲染语义
 
 **关键文件**：
-- `Main/Src/RenderCore/SoftwareRenderer.h/cpp`
+- `Renderx/src/rhi/rhi_null.cpp`
 
-### 5.3 默认后端
+### 5.3 设备创建策略
 
 **特点**：
-- 自动选择最佳后端
-- 优先使用 OpenGL 后端
-- 失败时回退到软件后端
+- 由 `renderCreateDevice()` 统一创建渲染设备
+- 后端选择由 `Renderx` 内部完成
+- 失败时回退到可用的最小实现
 
 **关键文件**：
-- `Main/Src/RenderCore/DefaultRenderBackend.h/cpp`
+- `Renderx/src/c_api/render_c_api_device.cpp`
+- `Renderx/src/c_api/render_runtime.cpp`
 
 ---
 
@@ -336,7 +328,7 @@ public:
 ```
 ┌─────────────────┐     ISceneDataSource     ┌─────────────────┐
 │   数据层         │ ───────────────────────► │   适配层         │
-│ (Engine2D)      │                          │ (RenderCompat)   │
+│ (Engine2D)      │                          │ (UI2D)           │
 │ SceneManager    │                          │ SceneGeometry    │
 └─────────────────┘                          │ SinkAdapter      │
                                              └────────┬────────┘

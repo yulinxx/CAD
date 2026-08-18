@@ -1,15 +1,11 @@
 #pragma once
 
+#include "SqliteRepositoryBase.h"
 #include "Persistence/Models/WorkspaceSnapshotRecord.h"
 
 #include <map>
 #include <vector>
 #include <string>
-
-namespace Eg
-{
-    class Database;
-}
 
 /**
  * @brief 工作台布局快照仓储 — 封装 workspace_snapshots 表的 CRUD 操作
@@ -17,7 +13,7 @@ namespace Eg
  * 每个工作台类型（2D/3D）保存一份布局快照。
  * WorkbenchWindow 在切换工作台时调用 save/load。
  */
-class WorkspaceSnapshotRepository
+class WorkspaceSnapshotRepository : public SqliteRepositoryBase
 {
 public:
     explicit WorkspaceSnapshotRepository(Eg::Database& database);
@@ -33,12 +29,7 @@ public:
     /// 删除指定工作台的布局快照
     bool remove(const std::string& workbenchId);
 
-    const std::string& lastError() const;
-
 private:
     WorkspaceSnapshotRecord rowToRecord(const std::map<std::string, std::string>& row) const;
     std::map<std::string, std::string> recordToRow(const WorkspaceSnapshotRecord& rec) const;
-
-    Eg::Database& m_database;
-    std::string m_lastError;
 };

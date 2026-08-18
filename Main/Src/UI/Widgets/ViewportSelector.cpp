@@ -110,7 +110,7 @@ size_t ViewportSelector::endBoxSelect(const QPointF& worldPos)
     Ut::BBox2d box(Ut::Vec2d(minX, minY), Ut::Vec2d(maxX, maxY));
 
     const auto candidates = m_sceneManager->queryByBox(box, /*containedOnly=*/false);
-    for (SyEntity* entity : candidates)
+    for (Eg::SyEntity* entity : candidates)
     {
         if (entity)
         {
@@ -281,7 +281,7 @@ void ViewportSelector::performHitTest(const QPointF& worldPos)
     // 避免对全场图元逐个 distanceToPoint（O(N) 全量扫描）。
     const Ut::Vec2d pt(worldPos.x(), worldPos.y());
     const auto candidates = m_sceneManager->queryByPoint(pt, ctx.dPick);
-    for (SyEntity* entity : candidates)
+    for (Eg::SyEntity* entity : candidates)
     {
         if (!entity)
         {

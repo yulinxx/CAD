@@ -1,7 +1,7 @@
 #include "ExportDispatcher.h"
 
 #include "Log/SyLogger.h"
-#include <QFileInfo>
+#include "FileIO/FormatRegistry.h"
 
 void ExportDispatcher::registerWriter(std::unique_ptr<IExportWriter> writer)
 {
@@ -54,50 +54,7 @@ ExportResult ExportDispatcher::dispatch(const ExportContext& context, const Fio:
 
 Fio::FileFormat ExportDispatcher::detectFormat(const QString& filePath)
 {
-    QString ext = QFileInfo(filePath).suffix().toLower();
-
-    if (ext == QStringLiteral("dxf"))
-    {
-        return Fio::FileFormat::DXF;
-    }
-    if (ext == QStringLiteral("svg"))
-    {
-        return Fio::FileFormat::SVG;
-    }
-    if (ext == QStringLiteral("pdf"))
-    {
-        return Fio::FileFormat::PDF;
-    }
-    if (ext == QStringLiteral("plt"))
-    {
-        return Fio::FileFormat::PLT;
-    }
-    if (ext == QStringLiteral("bmp"))
-    {
-        return Fio::FileFormat::BMP;
-    }
-    if (ext == QStringLiteral("png"))
-    {
-        return Fio::FileFormat::PNG;
-    }
-    if (ext == QStringLiteral("stp") || ext == QStringLiteral("step"))
-    {
-        return Fio::FileFormat::STEP;
-    }
-    if (ext == QStringLiteral("obj"))
-    {
-        return Fio::FileFormat::Unknown;  // OBJ 暂未在 ExportDispatcher 中注册
-    }
-    if (ext == QStringLiteral("sy"))
-    {
-        return Fio::FileFormat::Native;
-    }
-    if (ext == QStringLiteral("syx"))
-    {
-        return Fio::FileFormat::Native3D;
-    }
-
-    return Fio::FileFormat::Unknown;
+    return Fio::FormatRegistry::instance().detectFormat(filePath.toUtf8().constData());
 }
 
 QStringList ExportDispatcher::supportedExtensions() const

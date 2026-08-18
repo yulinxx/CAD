@@ -34,7 +34,6 @@ class FileDialogService;
 class RecentFileService;
 class HelpDialogService;
 class FileOperationRegistry;
-class PendingOperationRegistry;
 
 class SelectionService;
 class ISelectionService;
@@ -136,6 +135,12 @@ public:
     RecentFileService* recentFileService()
     {
         return m_recentFileService.get();
+    }
+
+    /// 获取组装后的 UI 服务集合
+    const UiServices& uiServices() const
+    {
+        return m_uiServices;
     }
 
     /// 获取帮助弹窗服务
@@ -278,6 +283,9 @@ private:
 
     /// 最近文件服务
     std::unique_ptr<RecentFileService> m_recentFileService;
+
+    /// 组装后的 UI 服务集合
+    UiServices m_uiServices;
 
     /// 帮助弹窗服务
     std::unique_ptr<HelpDialogService> m_helpDialogService;

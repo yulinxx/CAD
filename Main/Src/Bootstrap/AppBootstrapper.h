@@ -57,6 +57,5 @@ private:
     std::string m_version;
     std::unique_ptr<ApplicationCompositionRoot> m_compositionRoot;
     std::unique_ptr<UiWorkbench> m_workbench;
-    UiServices m_services;
     QString m_startWorkbenchId{ QStringLiteral("2D") };
 };

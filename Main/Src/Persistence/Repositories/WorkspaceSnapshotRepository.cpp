@@ -4,7 +4,7 @@
 #include "Log/SyLogger.h"
 
 WorkspaceSnapshotRepository::WorkspaceSnapshotRepository(Eg::Database& database)
-    : m_database(database)
+    : SqliteRepositoryBase(database)
 {
 }
 
@@ -29,9 +29,7 @@ bool WorkspaceSnapshotRepository::save(const WorkspaceSnapshotRecord& record)
 
     if (!m_database.insertOrReplace("workspace_snapshots", values))
     {
-        m_lastError = "Failed to save workspace snapshot: " + m_database.lastError();
-        SY_ERRORF("[WorkspaceSnapshotRepository] %s", m_lastError.c_str());
-        return false;
+        return fail("WorkspaceSnapshotRepository", "Failed to save workspace snapshot");
     }
 
     return true;
@@ -44,17 +42,10 @@ bool WorkspaceSnapshotRepository::remove(const std::string& workbenchId)
 
     if (!m_database.deleteRows("workspace_snapshots", "workbench_id = :workbench_id", whereParams))
     {
-        m_lastError = "Failed to remove workspace snapshot: " + m_database.lastError();
-        SY_ERRORF("[WorkspaceSnapshotRepository] %s", m_lastError.c_str());
-        return false;
+        return fail("WorkspaceSnapshotRepository", "Failed to remove workspace snapshot");
     }
 
     return true;
-}
-
-const std::string& WorkspaceSnapshotRepository::lastError() const
-{
-    return m_lastError;
 }
 
 WorkspaceSnapshotRecord WorkspaceSnapshotRepository::rowToRecord(const std::map<std::string, std::string>& row) const

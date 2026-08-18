@@ -70,20 +70,18 @@ TEST(FrameworkLifecycleTest, StableChecklist_IsDocumented)
     SUCCEED();
 }
 
-TEST(FrameworkLifecycleTest, WorkbenchStateSnapshot_DefaultValuesAreStable)
+TEST(FrameworkLifecycleTest, UiStateSnapshot_DefaultsAreStable)
 {
-    // 工作台快照对象必须具备稳定默认值，避免未初始化字段在切换/退出时传播脏状态。
-    WorkbenchStateSnapshot snapshot;
+    // 快照对象必须具备稳定默认值，避免未初始化字段在切换/退出时传播脏状态。
+    UiStateSnapshot snapshot;
 
-    EXPECT_TRUE(snapshot.viewMode.isEmpty());
-    EXPECT_TRUE(snapshot.layerId.isEmpty());
-    EXPECT_TRUE(snapshot.documentId.isEmpty());
-    EXPECT_TRUE(snapshot.selectionSource.isEmpty());
-    EXPECT_TRUE(snapshot.selectionText.isEmpty());
-    EXPECT_TRUE(snapshot.selectionType.isEmpty());
-    EXPECT_TRUE(snapshot.viewportType.isEmpty());
-    EXPECT_TRUE(snapshot.viewportStatus.isEmpty());
+    EXPECT_TRUE(snapshot.currentSelectionText.isEmpty());
+    EXPECT_TRUE(snapshot.activeToolId.isEmpty());
+    EXPECT_TRUE(snapshot.inputFocusWidget.isEmpty());
+    EXPECT_FALSE(snapshot.busy);
     EXPECT_FALSE(snapshot.dirty);
+    EXPECT_EQ(snapshot.currentSelectionSource, QStringLiteral("none"));
+    EXPECT_EQ(snapshot.currentSelectionType, QStringLiteral("none"));
 }
 
 TEST(FrameworkLifecycleTest, SimpleRenderer3D_LifecycleIsIdempotent)
@@ -125,36 +123,46 @@ TEST(FrameworkLifecycleTest, SimpleRenderer3D_ResetViewDoesNotBreakMode)
 
 // ==================== P0 回归测试 (2026-07-29) ====================
 
-TEST(FrameworkRegressionTest, WorkbenchStateSnapshot_AllFieldsHaveDefaults)
+TEST(FrameworkRegressionTest, UiStateSnapshot_AllFieldsHaveDefaults)
 {
-    // 验证工作台快照所有字段（包括新增的 activeToolId / inputFocusWidget）都有稳定默认值
-    WorkbenchStateSnapshot snapshot;
+    // 验证合并后状态快照所有字段（含命令/交互/工具字段）都有稳定默认值
+    UiStateSnapshot snapshot;
 
-    EXPECT_TRUE(snapshot.viewMode.isEmpty());
-    EXPECT_TRUE(snapshot.layerId.isEmpty());
-    EXPECT_TRUE(snapshot.documentId.isEmpty());
-    EXPECT_TRUE(snapshot.selectionSource.isEmpty());
-    EXPECT_TRUE(snapshot.selectionText.isEmpty());
-    EXPECT_TRUE(snapshot.selectionType.isEmpty());
-    EXPECT_TRUE(snapshot.viewportType.isEmpty());
-    EXPECT_TRUE(snapshot.viewportStatus.isEmpty());
-    EXPECT_TRUE(snapshot.activeToolId.isEmpty());      // P0: 工具状态恢复
-    EXPECT_TRUE(snapshot.inputFocusWidget.isEmpty());  // P0: 焦点状态恢复
+    EXPECT_TRUE(snapshot.currentSelectionText.isEmpty());
+    EXPECT_TRUE(snapshot.activeToolId.isEmpty());
+    EXPECT_TRUE(snapshot.inputFocusWidget.isEmpty());
+    EXPECT_EQ(snapshot.currentSelectionSource, QStringLiteral("none"));
+    EXPECT_EQ(snapshot.currentSelectionType, QStringLiteral("none"));
+    EXPECT_EQ(snapshot.currentWorkbenchId, QStringLiteral("default"));
+    EXPECT_EQ(snapshot.currentThemeId, QStringLiteral("system"));
+    EXPECT_EQ(snapshot.currentViewMode, QStringLiteral("none"));
+    EXPECT_EQ(snapshot.currentLayerId, QStringLiteral("default"));
+    EXPECT_EQ(snapshot.currentDocumentId, QStringLiteral("none"));
+    EXPECT_EQ(snapshot.currentCommandId, QStringLiteral("idle"));
+    EXPECT_EQ(snapshot.refreshState, QStringLiteral("idle"));
+    EXPECT_EQ(snapshot.progress, -1);
+    EXPECT_FALSE(snapshot.busy);
     EXPECT_FALSE(snapshot.dirty);
 }
 
-TEST(FrameworkRegressionTest, WorkbenchStateSnapshot_RoundTrip)
+TEST(FrameworkRegressionTest, UiStateSnapshot_RoundTrip)
 {
     // 验证快照读写闭环：写入 → 读取 → 值一致
-    WorkbenchStateSnapshot snapshot;
+    UiStateSnapshot snapshot;
     snapshot.activeToolId = QStringLiteral("SelectTool");
     snapshot.inputFocusWidget = QStringLiteral("viewport");
-    snapshot.viewMode = QStringLiteral("3D");
+    snapshot.currentViewMode = QStringLiteral("3D");
+    snapshot.currentLayerId = QStringLiteral("layer0");
+    snapshot.currentDocumentId = QStringLiteral("doc_001");
+    snapshot.currentSelectionText = QStringLiteral("Line");
     snapshot.dirty = true;
 
     EXPECT_EQ(snapshot.activeToolId, QStringLiteral("SelectTool"));
     EXPECT_EQ(snapshot.inputFocusWidget, QStringLiteral("viewport"));
-    EXPECT_EQ(snapshot.viewMode, QStringLiteral("3D"));
+    EXPECT_EQ(snapshot.currentViewMode, QStringLiteral("3D"));
+    EXPECT_EQ(snapshot.currentLayerId, QStringLiteral("layer0"));
+    EXPECT_EQ(snapshot.currentDocumentId, QStringLiteral("doc_001"));
+    EXPECT_EQ(snapshot.currentSelectionText, QStringLiteral("Line"));
     EXPECT_TRUE(snapshot.dirty);
 }
 
@@ -386,106 +394,109 @@ TEST(FrameworkRegressionTest, SerializationRoundtrip_EntityProperties)
 
 TEST(FrameworkRegressionTest, ViewportSwitch_WorkbenchSnapshotPreservesState)
 {
-    // 验证工作台快照在视口切换时正确保存和恢复状态
-    WorkbenchStateSnapshot snapshot2D;
-    snapshot2D.viewMode = QStringLiteral("2D");
-    snapshot2D.viewportType = QStringLiteral("2D_Viewport");
-    snapshot2D.viewportStatus = QStringLiteral("zoom=1.5;pan=100,200");
-    snapshot2D.documentId = QStringLiteral("doc_001");
-    snapshot2D.selectionSource = QStringLiteral("viewport");
-    snapshot2D.selectionType = QStringLiteral("Line");
+    // 验证合并后状态快照在视口切换时正确保存和恢复状态
+    UiStateSnapshot snapshot2D;
+    snapshot2D.currentViewMode = QStringLiteral("2D");
+    snapshot2D.metadata.insert(QStringLiteral("viewportType"), QStringLiteral("2D_Viewport"));
+    snapshot2D.metadata.insert(QStringLiteral("viewportStatus"), QStringLiteral("zoom=1.5;pan=100,200"));
+    snapshot2D.currentDocumentId = QStringLiteral("doc_001");
+    snapshot2D.currentSelectionSource = QStringLiteral("viewport");
+    snapshot2D.currentSelectionType = QStringLiteral("Line");
     snapshot2D.activeToolId = QStringLiteral("DrawLineTool");
     snapshot2D.dirty = false;
 
     // 保存 2D 快照（模拟 2D -> 3D 切换）
-    WorkbenchStateSnapshot saved2D = snapshot2D;
+    UiStateSnapshot saved2D = snapshot2D;
 
     // 切换到 3D 视口
-    WorkbenchStateSnapshot snapshot3D;
-    snapshot3D.viewMode = QStringLiteral("3D");
-    snapshot3D.viewportType = QStringLiteral("3D_Viewport");
-    snapshot3D.viewportStatus = QStringLiteral("zoom=2.0;pan=50,50;orbit=30,45");
+    UiStateSnapshot snapshot3D;
+    snapshot3D.currentViewMode = QStringLiteral("3D");
+    snapshot3D.metadata.insert(QStringLiteral("viewportType"), QStringLiteral("3D_Viewport"));
+    snapshot3D.metadata.insert(QStringLiteral("viewportStatus"), QStringLiteral("zoom=2.0;pan=50,50;orbit=30,45"));
     snapshot3D.activeToolId = QStringLiteral("OrbitTool");
-    snapshot3D.documentId = QStringLiteral("doc_001");  // 活动文档应保持不变
+    snapshot3D.currentDocumentId = QStringLiteral("doc_001");  // 活动文档应保持不变
 
-    // 验证 3D 和 2D 状态不同
-    EXPECT_NE(saved2D.viewMode, snapshot3D.viewMode);
-    EXPECT_NE(saved2D.viewportType, snapshot3D.viewportType);
+    // 验证 3D 和 2D 状态不同（视口状态经 metadata 承载，与生产一致）
+    EXPECT_NE(saved2D.currentViewMode, snapshot3D.currentViewMode);
+    EXPECT_NE(saved2D.metadata.value(QStringLiteral("viewportType")),
+        snapshot3D.metadata.value(QStringLiteral("viewportType")));
     // 活动文档在切换时保持不变
-    EXPECT_EQ(saved2D.documentId, snapshot3D.documentId);
+    EXPECT_EQ(saved2D.currentDocumentId, snapshot3D.currentDocumentId);
 
     // 保存 3D 快照（模拟 3D -> 2D 切换）
-    WorkbenchStateSnapshot saved3D = snapshot3D;
+    UiStateSnapshot saved3D = snapshot3D;
 
     // 恢复 2D 状态
-    WorkbenchStateSnapshot restored2D = saved2D;
+    UiStateSnapshot restored2D = saved2D;
 
     // 验证恢复到 2D 状态
-    EXPECT_EQ(restored2D.viewMode, QStringLiteral("2D"));
-    EXPECT_EQ(restored2D.viewportType, QStringLiteral("2D_Viewport"));
-    EXPECT_EQ(restored2D.viewportStatus, QStringLiteral("zoom=1.5;pan=100,200"));
-    EXPECT_EQ(restored2D.documentId, QStringLiteral("doc_001"));
+    EXPECT_EQ(restored2D.currentViewMode, QStringLiteral("2D"));
+    EXPECT_EQ(restored2D.metadata.value(QStringLiteral("viewportType")), QStringLiteral("2D_Viewport"));
+    EXPECT_EQ(restored2D.metadata.value(QStringLiteral("viewportStatus")), QStringLiteral("zoom=1.5;pan=100,200"));
+    EXPECT_EQ(restored2D.currentDocumentId, QStringLiteral("doc_001"));
     EXPECT_EQ(restored2D.activeToolId, QStringLiteral("DrawLineTool"));
     EXPECT_FALSE(restored2D.dirty);
 
     // 3D 快照也应保持独立
-    EXPECT_EQ(saved3D.viewMode, QStringLiteral("3D"));
+    EXPECT_EQ(saved3D.currentViewMode, QStringLiteral("3D"));
     EXPECT_EQ(saved3D.activeToolId, QStringLiteral("OrbitTool"));
 }
 
 TEST(FrameworkRegressionTest, ViewportSwitch_SelectionStateRecoverable)
 {
     // 验证选择状态在视口切换后可以恢复
-    WorkbenchStateSnapshot snapshot;
-    snapshot.selectionSource = QStringLiteral("viewport");
-    snapshot.selectionText = QStringLiteral("Line (id=42)");
-    snapshot.selectionType = QStringLiteral("Line");
-    snapshot.documentId = QStringLiteral("doc_001");
+    UiStateSnapshot snapshot;
+    snapshot.currentSelectionSource = QStringLiteral("viewport");
+    snapshot.currentSelectionText = QStringLiteral("Line (id=42)");
+    snapshot.currentSelectionType = QStringLiteral("Line");
+    snapshot.currentDocumentId = QStringLiteral("doc_001");
 
     // 保存 2D 选择状态
-    WorkbenchStateSnapshot saved2D = snapshot;
+    UiStateSnapshot saved2D = snapshot;
 
     // 切换到 3D，清除选择状态
-    snapshot.selectionSource.clear();
-    snapshot.selectionText.clear();
-    snapshot.selectionType.clear();
-    snapshot.viewMode = QStringLiteral("3D");
+    snapshot.currentSelectionSource.clear();
+    snapshot.currentSelectionText.clear();
+    snapshot.currentSelectionType.clear();
+    snapshot.currentViewMode = QStringLiteral("3D");
 
-    EXPECT_TRUE(snapshot.selectionSource.isEmpty());
-    EXPECT_TRUE(snapshot.selectionText.isEmpty());
-    EXPECT_TRUE(snapshot.selectionType.isEmpty());
+    EXPECT_TRUE(snapshot.currentSelectionSource.isEmpty());
+    EXPECT_TRUE(snapshot.currentSelectionText.isEmpty());
+    EXPECT_TRUE(snapshot.currentSelectionType.isEmpty());
 
     // 恢复 2D，选择状态应恢复
-    WorkbenchStateSnapshot restored = saved2D;
-    EXPECT_EQ(restored.selectionSource, QStringLiteral("viewport"));
-    EXPECT_EQ(restored.selectionText, QStringLiteral("Line (id=42)"));
-    EXPECT_EQ(restored.selectionType, QStringLiteral("Line"));
+    UiStateSnapshot restored = saved2D;
+    EXPECT_EQ(restored.currentSelectionSource, QStringLiteral("viewport"));
+    EXPECT_EQ(restored.currentSelectionText, QStringLiteral("Line (id=42)"));
+    EXPECT_EQ(restored.currentSelectionType, QStringLiteral("Line"));
 }
 
 TEST(FrameworkRegressionTest, ViewportSwitch_ViewportStatePerViewport)
 {
-    // 验证每个视口的视口状态（缩放、平移）独立保存
-    WorkbenchStateSnapshot snapshot2D;
-    snapshot2D.viewMode = QStringLiteral("2D");
-    snapshot2D.viewportType = QStringLiteral("2D_Viewport");
-    snapshot2D.viewportStatus = QStringLiteral("zoom=1.0;pan=0,0");
+    // 验证每个视口的视口状态（缩放、平移）独立保存（经 metadata 承载）
+    UiStateSnapshot snapshot2D;
+    snapshot2D.currentViewMode = QStringLiteral("2D");
+    snapshot2D.metadata.insert(QStringLiteral("viewportType"), QStringLiteral("2D_Viewport"));
+    snapshot2D.metadata.insert(QStringLiteral("viewportStatus"), QStringLiteral("zoom=1.0;pan=0,0"));
 
-    WorkbenchStateSnapshot snapshot3D;
-    snapshot3D.viewMode = QStringLiteral("3D");
-    snapshot3D.viewportType = QStringLiteral("3D_Viewport");
-    snapshot3D.viewportStatus = QStringLiteral("zoom=2.5;pan=100,50;orbit=45,30");
+    UiStateSnapshot snapshot3D;
+    snapshot3D.currentViewMode = QStringLiteral("3D");
+    snapshot3D.metadata.insert(QStringLiteral("viewportType"), QStringLiteral("3D_Viewport"));
+    snapshot3D.metadata.insert(QStringLiteral("viewportStatus"), QStringLiteral("zoom=2.5;pan=100,50;orbit=45,30"));
 
     // 验证两个视口快照的视口状态独立
-    EXPECT_NE(snapshot2D.viewportStatus, snapshot3D.viewportStatus);
-    EXPECT_NE(snapshot2D.viewportType, snapshot3D.viewportType);
+    EXPECT_NE(snapshot2D.metadata.value(QStringLiteral("viewportStatus")),
+        snapshot3D.metadata.value(QStringLiteral("viewportStatus")));
+    EXPECT_NE(snapshot2D.metadata.value(QStringLiteral("viewportType")),
+        snapshot3D.metadata.value(QStringLiteral("viewportType")));
 
     // 修改 2D 视口状态不应影响 3D 快照
-    WorkbenchStateSnapshot saved3D = snapshot3D;
-    snapshot2D.viewportStatus = QStringLiteral("zoom=1.5;pan=200,100");
+    UiStateSnapshot saved3D = snapshot3D;
+    snapshot2D.metadata.insert(QStringLiteral("viewportStatus"), QStringLiteral("zoom=1.5;pan=200,100"));
 
     // 3D 快照保持不变
-    EXPECT_EQ(saved3D.viewportStatus, QStringLiteral("zoom=2.5;pan=100,50;orbit=45,30"));
-    EXPECT_EQ(snapshot3D.viewportStatus, saved3D.viewportStatus);
+    EXPECT_EQ(saved3D.metadata.value(QStringLiteral("viewportStatus")), QStringLiteral("zoom=2.5;pan=100,50;orbit=45,30"));
+    EXPECT_EQ(snapshot3D.metadata.value(QStringLiteral("viewportStatus")), saved3D.metadata.value(QStringLiteral("viewportStatus")));
 }
 
 // ==================== 渲染快照一致性测试 (2026-07-30) ====================

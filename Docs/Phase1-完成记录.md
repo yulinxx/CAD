@@ -149,7 +149,7 @@ class OperationBus : public QObject,
 | **操作结果** | `OperationResult` | `OperationResult3D` | ✅ 共享 `OperationResultBase` |
 | **操作总线** | `OperationBus` | `OperationBus3D` | ✅ 共享 `OperationBusBase` |
 | **选择系统** | `SelectionSet` | `SelectionSet` | ✅ 统一类型 |
-| **渲染管线** | `RenderCoreRenderer` + `Render2D` | `RenderCoreRenderer` + `Render3D` | ✅ 共享核心抽象 |
+| **渲染管线** | `RenderCoreRenderer` + `Render2D` | `RenderCoreRenderer` + `Render3D` | ✅ 共享核心抽象（历史记录；当前生产路径已收口为 `Renderx` / `SanYiRender`） |
 
 > 说明：这张表描述的是阶段1当时的统一程度。后续代码继续演进后，UI 主线与渲染路径又进一步收口，当前主线状态请以 `Docs/框架现状与修理计划.md` 为准。
 
@@ -215,7 +215,7 @@ class OperationBus : public QObject,
 | 后端工厂 | `RenderBackendFactory` | `RenderBackendFactory` | ✅ 完全统一 |
 | 渲染帧 | `RenderFrame` | `RenderFrame` | ✅ 完全统一 |
 
-**差距说明**：渲染流程基本统一，但 2D 和 3D 的具体渲染器实现（`Render2D` vs `Render3D`）仍为独立模块。
+**差距说明**：这段描述保留的是阶段1历史语境；当前生产路径已不再使用 `Render2D` / `Render3D` 作为独立渲染模块，而是统一收口到 `Renderx` / `SanYiRender`。
 
 #### 术语定义（100%）
 

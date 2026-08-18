@@ -4,6 +4,7 @@
 #include <QWidget>
 
 #include "FileIO/FileFormat.h"
+#include "FileIO/FormatRegistry.h"
 #include "Log/SyLogger.h"
 
 // ==================== 对话框调用 ====================
@@ -38,50 +39,16 @@ QString FileDialogService::allSupportedFilter()
 
 QString FileDialogService::importFilterForFormat(Fio::FileFormat fmt)
 {
-    switch (fmt)
-    {
-    case Fio::FileFormat::DXF:
-        return QObject::tr("DXF Files (*.dxf);;All Files (*.*)");
-    case Fio::FileFormat::SVG:
-        return QObject::tr("SVG Files (*.svg);;All Files (*.*)");
-    case Fio::FileFormat::PLT:
-        return QObject::tr("PLT Files (*.plt *.hpgl);;All Files (*.*)");
-    case Fio::FileFormat::STEP:
-        return QObject::tr("STEP Files (*.stp *.step);;All Files (*.*)");
-    case Fio::FileFormat::PDF:
-        return QObject::tr("PDF Files (*.pdf);;All Files (*.*)");
-    case Fio::FileFormat::OBJ:
-        return QObject::tr("OBJ Files (*.obj);;All Files (*.*)");
-    case Fio::FileFormat::STL:
-        return QObject::tr("STL Files (*.stl);;All Files (*.*)");
-    case Fio::FileFormat::AI:
-        // Adobe Illustrator：AI 8+ 为 PDF 基，AI 7- 为 PostScript 基，两者都经 pdftocairo/Ghostscript 转 SVG 解析
-        return QObject::tr("Adobe Illustrator (*.ai);;All Files (*.*)");
-    case Fio::FileFormat::UG:
-        // Unigraphics / NX：支持 IGES(.igs/.iges) 中性交换格式（.prt 为 NX 原生私有格式，不直接支持）
-        return QObject::tr("IGES Files (*.igs *.iges);;All Files (*.*)");
-    default:
-        return QObject::tr("All Files (*.*)");
-    }
+    // 过滤器字符串统一来自 FormatRegistry（P1-11 收敛后的唯一入口）
+    const char* filter = Fio::FormatRegistry::instance().importFilter(fmt);
+    return filter ? QString::fromUtf8(filter) : QObject::tr("All Files (*.*)");
 }
 
 QString FileDialogService::exportFilterForFormat(Fio::FileFormat fmt)
 {
-    switch (fmt)
-    {
-    case Fio::FileFormat::DXF:
-        return QObject::tr("DXF Files (*.dxf);;All Files (*.*)");
-    case Fio::FileFormat::SVG:
-        return QObject::tr("SVG Files (*.svg);;All Files (*.*)");
-    case Fio::FileFormat::PLT:
-        return QObject::tr("PLT Files (*.plt);;All Files (*.*)");
-    case Fio::FileFormat::BMP:
-        return QObject::tr("BMP Files (*.bmp);;All Files (*.*)");
-    case Fio::FileFormat::PNG:
-        return QObject::tr("PNG Files (*.png);;All Files (*.*)");
-    default:
-        return QObject::tr("All Files (*.*)");
-    }
+    // 过滤器字符串统一来自 FormatRegistry（P1-11 收敛后的唯一入口）
+    const char* filter = Fio::FormatRegistry::instance().exportFilter(fmt);
+    return filter ? QString::fromUtf8(filter) : QObject::tr("All Files (*.*)");
 }
 
 QString FileDialogService::openFileFilter()

@@ -123,32 +123,8 @@ void AppBootstrapper::bootstrap()
         return;
     }
 
-    m_services.stateCenter = m_compositionRoot->stateCenter();
-    m_services.themeService = m_compositionRoot->themeService();
-    m_services.layoutService = m_compositionRoot->layoutService();
-    m_services.interactionDispatcher = m_compositionRoot->interactionDispatcher();
-    m_services.undoManager = m_compositionRoot->undoRedoManager();
-
-    m_services.operationBus = m_compositionRoot->operationBus();
-    m_services.viewportActionHub = m_compositionRoot->viewportActionHub();
-    m_services.layerManager = m_compositionRoot->layerManager();
-    m_services.layerManagerBridge = m_compositionRoot->layerManagerBridge();
-    m_services.layerEditService = m_compositionRoot->layerEditService();
-    m_services.persistenceService = m_compositionRoot->persistenceService();
-
-    m_services.layerPersistenceBridge = m_compositionRoot->layerPersistenceBridge();
-    m_services.document2D = m_compositionRoot->document2D();
-    m_services.importService = m_compositionRoot->importService();
-    m_services.exportService = m_compositionRoot->exportService();
-
-    // 阶段1收口：选择服务由组合根统一创建，不再直接暴露 SceneManager
-    m_services.selectionService = m_compositionRoot->selectionService();
-
-    m_services.clipboard = m_compositionRoot->clipboard();
-
-    m_services.sceneEditService = m_compositionRoot->sceneEditService();
-
-    m_services.unitManager = m_compositionRoot->unitManager();
+    // 使用组合根已组装的完整 UI 服务集合（含 recentFileService 等）
+    const UiServices& uiServices = m_compositionRoot->uiServices();
 
     const auto startWorkbenchId = m_startWorkbenchId.isEmpty() ? QStringLiteral("2D") : m_startWorkbenchId;
     // SY_INFOF("[AppBootstrapper] Bootstrapping workbench: %s", startWorkbenchId.toUtf8().constData());
@@ -167,7 +143,7 @@ void AppBootstrapper::bootstrap()
 #endif
         m_workbench = std::make_unique<Workbench2D>();
 
-    if (!m_workbench->initialize(m_services))
+    if (!m_workbench->initialize(uiServices))
     {
         SY_ERRORF(
             "[AppBootstrapper] error code=bootstrap.workbench_init_failed message=Workbench '%s' initialization failed",
@@ -179,7 +155,7 @@ void AppBootstrapper::bootstrap()
 
     auto* shell = m_compositionRoot->shellHost();
     shell->setFrameworkServices(buildFrameworkServices(m_compositionRoot.get()));
-    shell->setUiServices(m_services);
+    shell->setUiServices(uiServices);
     shell->setWorkbench(m_workbench.get());
     shell->initializeAndShow();
 

@@ -1238,7 +1238,7 @@ void CoreOperationRegistry::registerEditOperations()
     }));
 
     // ---- 贝塞尔拆分/合并 ----
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_BezierToggle, [editService] {
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_BezierToggle, [this, editService] {
         if (!editService)
         {
             return;

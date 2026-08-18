@@ -426,6 +426,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
         PRIVATE
             Utility
             CrashHandler
+            License
             EngineCommon
             Engine2D
             EnginePersistence

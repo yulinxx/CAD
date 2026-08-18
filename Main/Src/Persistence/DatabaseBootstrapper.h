@@ -41,6 +41,21 @@ private:
     /// 确保 layers 表包含 fill / fill_color 列（幂等，兼容旧格式已存在的表）
     bool ensureLayerColumns();
 
+    /// 创建 documents 表（幂等；初始建表与 v1->v2 迁移共用同一 DDL）
+    bool createDocumentsTable();
+
+    /// 幂等新增 layers 列：PRAGMA 检查缺失后 ALTER TABLE ADD COLUMN
+    bool ensureLayerColumn(const std::string& column, const std::string& definition);
+
+    /// 确保 layers.fill 列存在（初始建表与 v2->v3 迁移共用）
+    bool ensureLayerFillColumn();
+
+    /// 确保 layers.fill_color 列存在（初始建表与 v3->v4 迁移共用）
+    bool ensureLayerFillColorColumn();
+
+    /// 确保 layers.layer_type 列存在（补齐历史库里缺失的图层类型列）
+    bool ensureLayerTypeColumn();
+
     /// 执行从当前版本到目标版本的迁移
     bool runMigrations(int currentVersion, int targetVersion);
 

@@ -1,15 +1,11 @@
 #pragma once
 
+#include "SqliteRepositoryBase.h"
 #include "Persistence/Models/RecentFileRecord.h"
 
 #include <map>
 #include <vector>
 #include <string>
-
-namespace Eg
-{
-    class Database;
-}
 
 /**
  * @brief 最近文件仓储 — 封装 recent_files 表的 CRUD 操作
@@ -17,7 +13,7 @@ namespace Eg
  * 不直接暴露 SQL，所有操作通过 Database 的通用接口完成。
  * WorkbenchWindow 通过 PersistenceService 访问此仓储。
  */
-class RecentFileRepository
+class RecentFileRepository : public SqliteRepositoryBase
 {
 public:
     explicit RecentFileRepository(Eg::Database& database);
@@ -34,13 +30,7 @@ public:
     /// 移除指定路径的最近文件记录
     bool remove(const std::string& filePath);
 
-    /// 最近一次操作的错误信息
-    const std::string& lastError() const;
-
 private:
     RecentFileRecord rowToRecord(const std::map<std::string, std::string>& row) const;
     std::map<std::string, std::string> recordToRow(const RecentFileRecord& rec) const;
-
-    Eg::Database& m_database;
-    std::string m_lastError;
 };

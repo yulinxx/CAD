@@ -201,25 +201,8 @@ bool DatabaseBootstrapper::createBusinessTables()
     }
 
     // 文档元数据表（v2 新增）
-    std::string sqlDocuments = R"(
-        CREATE TABLE IF NOT EXISTS documents (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            file_path       TEXT    NOT NULL,
-            title           TEXT    NOT NULL DEFAULT '',
-            format          TEXT    DEFAULT '',
-            entity_count    INTEGER DEFAULT 0,
-            file_size       TEXT    DEFAULT '',
-            last_opened_at  TEXT    DEFAULT (datetime('now')),
-            last_saved_at   TEXT    DEFAULT (datetime('now')),
-            created_at      TEXT    DEFAULT (datetime('now')),
-            UNIQUE(file_path)
-        )
-    )";
-
-    if (!m_database.execute(sqlDocuments))
+    if (!createDocumentsTable())
     {
-        m_lastError = "Failed to create documents table: " + m_database.lastError();
-        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
         return false;
     }
 
@@ -248,59 +231,87 @@ bool DatabaseBootstrapper::createBusinessTables()
 
 bool DatabaseBootstrapper::ensureLayerColumns()
 {
-    std::vector<std::map<std::string, std::string>> cols =
-        m_database.query("PRAGMA table_info(layers)");
-    if (cols.empty())
+    // 表不存在时由调用方负责建表，这里无需补列
+    if (m_database.query("PRAGMA table_info(layers)").empty())
     {
-        // 表不存在时由调用方负责建表，这里视为无需补列
         return true;
     }
 
-    auto hasColumn = [&cols](const std::string& name) {
-        for (const auto& row : cols)
-        {
-            if (row.at("name") == name)
-            {
-                return true;
-            }
-        }
+    if (!ensureLayerFillColumn() || !ensureLayerFillColorColumn() || !ensureLayerTypeColumn())
+    {
         return false;
-    };
-
-    if (!hasColumn("fill"))
-    {
-        if (!m_database.execute("ALTER TABLE layers ADD COLUMN fill INTEGER DEFAULT 0"))
-        {
-            m_lastError = "Failed to add layers.fill column: " + m_database.lastError();
-            SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
-            return false;
-        }
-        SY_INFO("[DatabaseBootstrapper] Added missing layers.fill column");
-    }
-
-    if (!hasColumn("fill_color"))
-    {
-        if (!m_database.execute("ALTER TABLE layers ADD COLUMN fill_color TEXT DEFAULT ''"))
-        {
-            m_lastError = "Failed to add layers.fill_color column: " + m_database.lastError();
-            SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
-            return false;
-        }
-        SY_INFO("[DatabaseBootstrapper] Added missing layers.fill_color column");
-    }
-
-    if (!hasColumn("layer_type"))
-    {
-        if (!m_database.execute("ALTER TABLE layers ADD COLUMN layer_type INTEGER DEFAULT 0"))
-        {
-            m_lastError = "Failed to add layers.layer_type column: " + m_database.lastError();
-            SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
-            return false;
-        }
-        SY_INFO("[DatabaseBootstrapper] Added missing layers.layer_type column");
     }
 
     return true;
+}
+
+bool DatabaseBootstrapper::createDocumentsTable()
+{
+    std::string sqlDocuments = R"(
+        CREATE TABLE IF NOT EXISTS documents (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_path       TEXT    NOT NULL,
+            title           TEXT    NOT NULL DEFAULT '',
+            format          TEXT    DEFAULT '',
+            entity_count    INTEGER DEFAULT 0,
+            file_size       TEXT    DEFAULT '',
+            last_opened_at  TEXT    DEFAULT (datetime('now')),
+            last_saved_at   TEXT    DEFAULT (datetime('now')),
+            created_at      TEXT    DEFAULT (datetime('now')),
+            UNIQUE(file_path)
+        )
+    )";
+
+    if (!m_database.execute(sqlDocuments))
+    {
+        m_lastError = "Failed to create documents table: " + m_database.lastError();
+        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        return false;
+    }
+    return true;
+}
+
+bool DatabaseBootstrapper::ensureLayerColumn(const std::string& column, const std::string& definition)
+{
+    bool exists = false;
+    for (const auto& row : m_database.query("PRAGMA table_info(layers)"))
+    {
+        if (row.at("name") == column)
+        {
+            exists = true;
+            break;
+        }
+    }
+
+    if (exists)
+    {
+        return true;
+    }
+
+    std::string sql = "ALTER TABLE layers ADD COLUMN " + column + " " + definition;
+    if (!m_database.execute(sql))
+    {
+        m_lastError = "Failed to add layers." + column + " column: " + m_database.lastError();
+        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        return false;
+    }
+    SY_INFOF("[DatabaseBootstrapper] Added missing layers.%s column", column.c_str());
+    return true;
+}
+
+bool DatabaseBootstrapper::ensureLayerFillColumn()
+{
+    return ensureLayerColumn("fill", "INTEGER DEFAULT 0");
+}
+
+bool DatabaseBootstrapper::ensureLayerFillColorColumn()
+{
+    return ensureLayerColumn("fill_color", "TEXT DEFAULT ''");
+}
+
+bool DatabaseBootstrapper::ensureLayerTypeColumn()
+{
+    return ensureLayerColumn("layer_type", "INTEGER DEFAULT 0");
 }
 
 bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
@@ -313,21 +324,7 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
         if (v == 1)
         {
             // v1 -> v2: 新增 documents 表，用于存储文档元数据
-            std::string sqlDocuments = R"(
-                CREATE TABLE IF NOT EXISTS documents (
-                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                    file_path       TEXT    NOT NULL,
-                    title           TEXT    NOT NULL DEFAULT '',
-                    format          TEXT    DEFAULT '',
-                    entity_count    INTEGER DEFAULT 0,
-                    file_size       TEXT    DEFAULT '',
-                    last_opened_at  TEXT    DEFAULT (datetime('now')),
-                    last_saved_at   TEXT    DEFAULT (datetime('now')),
-                    created_at      TEXT    DEFAULT (datetime('now')),
-                    UNIQUE(file_path)
-                )
-            )";
-            if (!m_database.execute(sqlDocuments))
+            if (!createDocumentsTable())
             {
                 m_lastError = "Migration v1->v2 failed: " + m_database.lastError();
                 SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
@@ -338,11 +335,7 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
         else if (v == 2)
         {
             // v2 -> v3: layers 表新增 fill 列（填充图层标志）
-            // 注意：CREATE TABLE IF NOT EXISTS 不会为已存在的表补列，必须 ALTER TABLE
-            std::string sqlFill = R"(
-                ALTER TABLE layers ADD COLUMN fill INTEGER DEFAULT 0
-            )";
-            if (!m_database.execute(sqlFill))
+            if (!ensureLayerFillColumn())
             {
                 m_lastError = "Migration v2->v3 failed: " + m_database.lastError();
                 SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
@@ -353,10 +346,7 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
         else if (v == 3)
         {
             // v3 -> v4: layers 表新增 fill_color 列（填充色）
-            std::string sqlFillColor = R"(
-                ALTER TABLE layers ADD COLUMN fill_color TEXT DEFAULT ''
-            )";
-            if (!m_database.execute(sqlFillColor))
+            if (!ensureLayerFillColorColumn())
             {
                 m_lastError = "Migration v3->v4 failed: " + m_database.lastError();
                 SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());

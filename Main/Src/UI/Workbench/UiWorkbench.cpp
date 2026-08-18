@@ -183,18 +183,18 @@ namespace
     }
 }  // namespace
 
-WorkbenchStateSnapshot UiWorkbench::currentSnapshot() const
+UiStateSnapshot UiWorkbench::currentSnapshot() const
 {
-    WorkbenchStateSnapshot snapshot = m_savedState;
+    UiStateSnapshot snapshot = m_savedState;
     if (m_services.stateCenter)
     {
         auto snap = m_services.stateCenter->snapshot();
-        snapshot.viewMode = snap.currentViewMode;
-        snapshot.layerId = snap.currentLayerId;
-        snapshot.documentId = snap.currentDocumentId;
-        snapshot.selectionSource = snap.currentSelectionSource;
-        snapshot.selectionText = snap.currentSelectionText;
-        snapshot.selectionType = snap.currentSelectionType;
+        snapshot.currentViewMode = snap.currentViewMode;
+        snapshot.currentLayerId = snap.currentLayerId;
+        snapshot.currentDocumentId = snap.currentDocumentId;
+        snapshot.currentSelectionSource = snap.currentSelectionSource;
+        snapshot.currentSelectionText = snap.currentSelectionText;
+        snapshot.currentSelectionType = snap.currentSelectionType;
         snapshot.dirty = snap.dirty;
         // 工具/输入状态（工作台切换时恢复）
         snapshot.activeToolId = snap.activeToolId;
@@ -203,13 +203,13 @@ WorkbenchStateSnapshot UiWorkbench::currentSnapshot() const
     return snapshot;
 }
 
-void UiWorkbench::restoreFromSnapshot(const WorkbenchStateSnapshot& snapshot)
+void UiWorkbench::restoreFromSnapshot(const UiStateSnapshot& snapshot)
 {
     if (m_services.stateCenter)
     {
-        m_services.stateCenter->setCurrentViewMode(snapshot.viewMode);
-        m_services.stateCenter->setCurrentLayerId(snapshot.layerId);
-        m_services.stateCenter->setCurrentDocumentId(snapshot.documentId);
+        m_services.stateCenter->setCurrentViewMode(snapshot.currentViewMode);
+        m_services.stateCenter->setCurrentLayerId(snapshot.currentLayerId);
+        m_services.stateCenter->setCurrentDocumentId(snapshot.currentDocumentId);
         // 工具/输入状态恢复（仅写入状态中心，子类 activate() 负责应用到视口）
         m_services.stateCenter->setActiveToolId(snapshot.activeToolId);
         m_services.stateCenter->setInputFocusWidget(snapshot.inputFocusWidget);
@@ -376,8 +376,8 @@ bool Workbench2D::initialize(const UiServices& services)
     // 阶段1收口：SelectionService 已由组合根创建并经 UiServices.selectionService 注入，
     // 工作台不再直接触碰底层 SceneManager
 
-    m_initialState = WorkbenchStateSnapshot{};
-    m_savedState = WorkbenchStateSnapshot{};
+    m_initialState = UiStateSnapshot{};
+    m_savedState = UiStateSnapshot{};
 
     // 使用应用共享 SettingsService singleton（2D/3D 逻辑一致）
     m_settingsCoordinator = std::make_unique<SettingsUiCoordinator2D>(ApplicationCompositionRoot::getSettingsService());
@@ -1536,7 +1536,7 @@ void Workbench2D::refreshPropertiesPanel()
 void Workbench2D::activate()
 {
     // 从状态快照恢复（首次激活使用 m_initialState，后续使用 m_savedState）
-    const auto& snapshot = m_savedState.viewMode.isEmpty() ? m_initialState : m_savedState;
+    const auto& snapshot = m_savedState.currentViewMode.isEmpty() ? m_initialState : m_savedState;
     restoreFromSnapshot(snapshot);
 
     // 恢复工具状态：将快照中的工具 ID 应用到视口
@@ -1737,8 +1737,8 @@ bool Workbench3D::initialize(const UiServices& services)
         return false;
     }
 
-    m_savedState = WorkbenchStateSnapshot{};
-    m_initialState = WorkbenchStateSnapshot{};
+    m_savedState = UiStateSnapshot{};
+    m_initialState = UiStateSnapshot{};
     return true;
 }
 
@@ -2356,7 +2356,7 @@ void Workbench3D::attachToWindow(WorkbenchWindow& window)
 void Workbench3D::activate()
 {
     // 从状态快照恢复（与 2D 保持一致）
-    const auto& snapshot = m_savedState.viewMode.isEmpty() ? m_initialState : m_savedState;
+    const auto& snapshot = m_savedState.currentViewMode.isEmpty() ? m_initialState : m_savedState;
     restoreFromSnapshot(snapshot);
 
     if (m_services.stateCenter)

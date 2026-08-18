@@ -121,8 +121,8 @@ void WorkbenchStateManager::syncWindowStateFromStateCenter()
 
     const auto state = m_stateCenter->snapshot();
     // 以状态中心为准同步窗口层状态，避免窗口本地状态与全局状态漂移
-    m_windowState.workbenchId = state.currentWorkbenchId;
-    m_windowState.themeId = state.currentThemeId;
+    m_windowState.currentWorkbenchId = state.currentWorkbenchId;
+    m_windowState.currentThemeId = state.currentThemeId;
     m_windowState.busy = state.busy;
 }
 
@@ -135,9 +135,9 @@ void WorkbenchStateManager::syncWorkbenchSelectionFromStateCenter()
 
     const auto state = m_stateCenter->snapshot();
     // 选择上下文单独同步，避免刷新状态栏时把选择语义和窗口语义混在一起
-    m_windowState.selectionText = state.currentSelectionText;
-    m_windowState.selectionSource = state.currentSelectionSource;
-    m_windowState.selectionType = state.currentSelectionType;
+    m_windowState.currentSelectionText = state.currentSelectionText;
+    m_windowState.currentSelectionSource = state.currentSelectionSource;
+    m_windowState.currentSelectionType = state.currentSelectionType;
 }
 
 // ==================== UI 刷新 ====================
@@ -236,7 +236,7 @@ void WorkbenchStateManager::updateWindowTitle()
     }
 
     m_parent->setWindowTitle(
-        QStringLiteral("%1 - %2").arg(QString::fromStdString(MainApp::appName()), m_windowState.workbenchId));
+        QStringLiteral("%1 - %2").arg(QString::fromStdString(MainApp::appName()), m_windowState.currentWorkbenchId));
 }
 
 // ==================== 工作台切换状态收尾 ====================
@@ -259,11 +259,11 @@ void WorkbenchStateManager::resetWorkbenchLocalMirror()
 {
     // 本地镜像只做清空，不向状态中心写额外语义
     m_windowState.busy = false;
-    m_windowState.workbenchId = QStringLiteral("default");
-    m_windowState.themeId = QStringLiteral("system");
-    m_windowState.selectionText.clear();
-    m_windowState.selectionSource.clear();
-    m_windowState.selectionType.clear();
+    m_windowState.currentWorkbenchId = QStringLiteral("default");
+    m_windowState.currentThemeId = QStringLiteral("system");
+    m_windowState.currentSelectionText.clear();
+    m_windowState.currentSelectionSource.clear();
+    m_windowState.currentSelectionType.clear();
 }
 
 void WorkbenchStateManager::clearSelectionState()

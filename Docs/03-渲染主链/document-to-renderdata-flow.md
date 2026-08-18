@@ -98,7 +98,7 @@ viewport 不负责：
 
 ### Step 3
 
-`SceneEditServiceAdapter` 或 `ViewWidget` 进行中间同步：
+`RenderViewport2D` 或 `ViewRenderCoordinator` 进行中间同步：
 - 同步 selection
 - 更新 render data
 
@@ -114,17 +114,17 @@ viewport 触发重绘并显示结果。
 
 ## 5. 推荐职责拆分
 
-### 5.1 `SceneEditServiceAdapter`
+### 5.1 `SceneEditService` + `SceneRefreshCoordinator`
 
 负责在提交、取消、预览时推动文档状态变化，并触发刷新回调。
 
-### 5.2 `GpuSceneRenderer2D`
+### 5.2 `SceneGeometrySinkAdapter`（UI2D 适配层）
 
-负责 Main → Render2D 格式翻译，生成可绘制的渲染帧。
+负责将 `ISceneGeometrySink` 接口调用转换为 Renderx C API 调用，推送几何原语到 `SanYiRender.dll`。
 
-### 5.3 `Render2DSink`
+### 5.3 `RenderWidget`（UI2D 模块）
 
-负责将渲染帧投递到 GPU RenderWidget。
+负责承载 OpenGL 上下文与 Renderx 设备，接收刷新请求并触发 `paintGL → renderFrame`。
 
 ### 5.4 `ViewWidget`（UI/2D 模块）
 
@@ -266,7 +266,7 @@ public:
 ```
 ┌─────────────────┐     ISceneDataSource     ┌─────────────────┐
 │   数据层         │ ───────────────────────► │   适配层         │
-│ (Engine2D)      │                          │ (RenderCompat)   │
+│ (Engine2D)      │                          │ (UI2D)           │
 │ SceneManager    │                          │ SceneGeometry    │
 └─────────────────┘                          │ SinkAdapter      │
                                              └────────┬────────┘
@@ -284,8 +284,8 @@ public:
 | 层级 | 组件 | 职责 | 关键文件 |
 |------|------|------|----------|
 | **数据层** | `SceneManager` | 继承 `ISceneDataSource`，遍历图元并推送几何原语 | `Engine2D/Core/SceneManager.h/cpp` |
-| **适配层** | `SceneGeometrySinkAdapter` | 实现 `ISceneGeometrySink`，将接口调用转换为 C API 调用 | `RenderCompat/SceneGeometrySinkAdapter.h/cpp` |
-| **渲染层** | `SanYiRender.dll` | 提供几何原语推送的 C API，实现原语细分和渲染 | `Renderx/c_api/render_c_api.cpp` |
+| **适配层** | `SceneGeometrySinkAdapter` | 实现 `ISceneGeometrySink`，将接口调用转换为 C API 调用 | `UI/2D/Include/Render/SceneGeometrySinkAdapter.h` + `UI/2D/Src/UI/ViewWidget/SceneGeometrySinkAdapter.cpp` |
+| **渲染层** | `SanYiRender.dll` | 提供几何原语推送的 C API，实现原语细分和渲染 | `Renderx/src/c_api/render_c_api_device.cpp` + `render_c_api_entity.cpp` + `render_c_api_frame.cpp` + `render_c_api_overlay.cpp` |
 
 ### 11.5 支持的图元类型
 
@@ -335,10 +335,10 @@ public:
                     │       │
                     │       └─→ SceneManager::gatherGeometry()
                     │               │
-                    │               ├─→ sink.emitPolyline(...)  → renderEmitPolyline → world2D.addEntity()
-                    │               ├─→ sink.emitCircle(...)    → renderEmitCircle    → tessellateCircle → addEntity()
-                    │               ├─→ sink.emitArc(...)       → renderEmitArc       → tessellateArc → addEntity()
-                    │               └─→ sink.emitEllipse(...)   → renderEmitEllipse   → tessellateEllipse → addEntity()
+                    │               ├─→ sink.emitPolyline(...)  → renderSubmitGeometry(Polyline) → world2D.addEntity()
+                    │               ├─→ sink.emitCircle(...)    → renderSubmitGeometry(Circle)   → tessellateCircle → addEntity()
+                    │               ├─→ sink.emitArc(...)       → renderSubmitGeometry(Arc)      → tessellateArc → addEntity()
+                    │               └─→ sink.emitEllipse(...)   → renderSubmitGeometry(Ellipse)  → tessellateEllipse → addEntity()
                     ├─→ renderEndScene(m_device)
                     └─→ QOpenGLWidget::update()   // 触发 paintGL
 ```
@@ -444,31 +444,7 @@ static const std::unordered_map<std::string, const char*> shaderMap = {
 
 ```text
 Main/Src/UI/
-├── Adapters/          # 适配器类
-│   ├── SceneEditServiceAdapter.h/cpp   # 文档编辑服务适配器
-│   └── RenderWidget3DAdapter.h/cpp    # 3D 渲染控件适配器
-├── Documents/         # 文档类
-│   ├── EntityDocument2D.h/cpp         # 2D 图元文档
-│   ├── SceneDocument3D.h/cpp          # 3D 场景文档
-│   ├── SceneTreeModel2D.h             # 2D 场景树数据模型（纯数据）
-│   ├── SceneTreeBuilder2D.h/cpp       # 2D 场景树构建器（算法层）
-│   ├── SceneTreeModel3D.h             # 3D 场景树数据模型（纯数据）
-│   └── SceneTreeBuilder3D.h/cpp       # 3D 场景树构建器（算法层）
-├── Entities/          # 图元类
-│   ├── UiEntity.h                     # 图元基类
-│   ├── ITransformable.h               # 可变换接口
-│   ├── LineEntity2D.h/cpp             # 2D 线图元
-│   ├── PolylineEntity2D.h/cpp         # 2D 多段线图元
-│   ├── CircleEntity2D.h/cpp           # 2D 圆图元
-│   ├── ArcEntity2D.h/cpp              # 2D 圆弧图元
-│   ├── SceneNode.h/cpp                # 3D 场景节点
-│   ├── SelectionSet.h/cpp             # 选择集
-│   └── CameraController3D.h/cpp       # 3D 相机控制器
-├── Render/            # 渲染相关
-│   ├── SimpleRenderer3D.h/cpp         # 3D 软件渲染器
-│   ├── GpuSceneRenderer2D.h/cpp       # 2D GPU 场景渲染桥接器
-│   ├── IRenderDataSink.h              # 渲染数据接收器接口
-│   └── Render2DSink.h/cpp             # 2D 渲染 sink
+├── Render/            # 渲染相关（见 13.1 Render 子目录）
 ├── Services/          # 服务类
 │   ├── UiServices.h                   # UI 服务集合
 │   ├── UiFrameworkServices.h          # 框架服务集合
@@ -488,7 +464,7 @@ Main/Src/UI/
 │   ├── Workbench2D.h/cpp              # 2D 工作台
 │   └── Workbench3D.h/cpp              # 3D 工作台
 ├── UiViewWidgets.h    # 视图控件聚合头（保持向后兼容）
-└── UiCommandDispatcher.h # 命令分发器
+└── 由 OperationBus / Workbench 统一分发命令
 ```
 
 ### 13.2 UI/2D 模块工具目录
@@ -534,10 +510,10 @@ UI/2D/Src/Ui/DrawTools/
 
 | 文件 | 职责 | 渲染链角色 |
 |------|------|-----------|
-| `SceneEditServiceAdapter` | 文档编辑事务管理 | 文档层 → render data 层 |
-| `GpuSceneRenderer2D` | Main → Render2D 格式翻译 | render data 层 → GPU renderer |
-| `Render2DSink` | GPU 渲染帧投递 | GPU renderer → viewport 层 |
-| `SceneCompiler` | 场景编译 | 文档层 → render data 层 |
+| `SceneEditService` | 文档编辑事务管理 | 文档层 → render data 层 |
+| `RenderViewport2D` | 2D 视口宿主与刷新协调 | viewport 层 |
+| `RenderWidget` / `SceneGeometrySinkAdapter` | UI2D 适配层，几何推送与 C API 转换 | render data 层 → GPU renderer |
+| `SceneManager` | 场景遍历与几何导出 | 文档层 → render data 层 |
 | `ViewWidget` (UI/2D) | 工具管理 + 事件分发 + 渲染协调 | viewport 层 |
 | `ToolManager` (UI/2D) | 工具注册与切换 | 无（输入分发） |
 | `OperationBus` (UI/2D) | 操作分发总线 | 无（命令调度） |

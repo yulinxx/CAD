@@ -5,6 +5,7 @@
 
 #include "Services/UiFrameworkServices.h"
 #include "Services/UiServices.h"
+#include "Services/UiStateCenter.h"
 
 class QMainWindow;
 class UiStateCenter;
@@ -13,24 +14,6 @@ class StatusBarBase;
 class WorkbenchMenuManager;
 class WorkbenchLayoutManager;
 class WorkbenchWindow;
-
-/// 窗口状态：只保存与窗口语义直接相关的高层状态
-/// 从 WorkbenchWindow::WindowState 提升为独立类型
-struct WindowState
-{
-    /// 当前工作台 ID
-    QString workbenchId{ QStringLiteral("default") };
-    /// 当前主题 ID
-    QString themeId{ QStringLiteral("system") };
-    /// 当前是否处于繁忙状态
-    bool busy{ false };
-    /// 当前选择文本
-    QString selectionText;
-    /// 当前选择来源
-    QString selectionSource;
-    /// 当前选择类型
-    QString selectionType;
-};
 
 /// 工作台状态管理器：统一管理状态中心同步、窗口状态镜像、状态栏刷新
 /// 从 WorkbenchWindow 中拆分，遵循单一职责原则
@@ -93,13 +76,13 @@ public:
     /// 统一写入工作台切换上下文
     void setWorkbenchSwitchContext(const QString& workbenchId, const QString& switchContextText);
 
-    // ==================== 数据访问 ====================
-    WindowState& windowState()
+    /// 窗口本地状态镜像（与状态中心同构，统一使用 UiStateSnapshot）
+    UiStateSnapshot& windowState()
     {
         return m_windowState;
     }
 
-    const WindowState& windowState() const
+    const UiStateSnapshot& windowState() const
     {
         return m_windowState;
     }
@@ -144,7 +127,7 @@ private:
     UiServices m_uiServices;
 
     /// 窗口状态镜像
-    WindowState m_windowState;
+    UiStateSnapshot m_windowState;
     /// 当前挂载的工作台状态栏 widget（由 WorkbenchWindow 在 mount/unmount 时同步）
     StatusBarBase* m_activeStatusBar{ nullptr };
 };

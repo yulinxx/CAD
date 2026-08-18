@@ -4,7 +4,7 @@
 #include "Log/SyLogger.h"
 
 DocumentRepository::DocumentRepository(Eg::Database& database)
-    : m_database(database)
+    : SqliteRepositoryBase(database)
 {
 }
 
@@ -72,9 +72,7 @@ bool DocumentRepository::save(const DocumentRecord& record)
 {
     if (record.filePath.empty())
     {
-        m_lastError = "save: empty filePath";
-        SY_ERRORF("[DocumentRepository] %s", m_lastError.c_str());
-        return false;
+        return setError("DocumentRepository", "save: empty filePath");
     }
 
     // 先检查是否已存在同路径的记录，若存在则更新而非插入
@@ -118,9 +116,7 @@ bool DocumentRepository::save(const DocumentRecord& record)
 
         if (!m_database.update("documents", values, whereClause, whereParams))
         {
-            m_lastError = "Failed to update document metadata: " + m_database.lastError();
-            SY_ERRORF("[DocumentRepository] %s", m_lastError.c_str());
-            return false;
+            return fail("DocumentRepository", "Failed to update document metadata");
         }
 
         SY_DEBUGF("[DocumentRepository] Updated document: %s", record.filePath.c_str());
@@ -131,9 +127,7 @@ bool DocumentRepository::save(const DocumentRecord& record)
     auto values = recordToRow(record);
     if (!m_database.insertOrReplace("documents", values))
     {
-        m_lastError = "Failed to save document metadata: " + m_database.lastError();
-        SY_ERRORF("[DocumentRepository] %s", m_lastError.c_str());
-        return false;
+        return fail("DocumentRepository", "Failed to save document metadata");
     }
 
     SY_DEBUGF("[DocumentRepository] Inserted document: %s", record.filePath.c_str());
@@ -154,9 +148,7 @@ bool DocumentRepository::remove(const std::string& filePath)
 
     if (!m_database.deleteRows("documents", "file_path = :file_path", whereParams))
     {
-        m_lastError = "Failed to remove document: " + m_database.lastError();
-        SY_ERRORF("[DocumentRepository] %s", m_lastError.c_str());
-        return false;
+        return fail("DocumentRepository", "Failed to remove document");
     }
 
     int deleted = m_database.changes();
@@ -170,11 +162,6 @@ bool DocumentRepository::remove(const std::string& filePath)
     }
 
     return true;
-}
-
-const std::string& DocumentRepository::lastError() const
-{
-    return m_lastError;
 }
 
 DocumentRecord DocumentRepository::rowToRecord(const std::map<std::string, std::string>& row) const

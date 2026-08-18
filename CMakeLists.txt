@@ -289,6 +289,7 @@ set(SANYI_PROJECT_LIBS
     # RenderCommon Render2D
     UICommon UI2D
     FileIO
+    EnginePersistence
 )
 if(BUILD_NESTING)
     list(APPEND SANYI_PROJECT_LIBS Nesting)

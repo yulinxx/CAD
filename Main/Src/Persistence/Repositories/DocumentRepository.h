@@ -1,15 +1,11 @@
 #pragma once
 
+#include "SqliteRepositoryBase.h"
 #include "Persistence/Models/DocumentRecord.h"
 
 #include <map>
 #include <vector>
 #include <string>
-
-namespace Eg
-{
-    class Database;
-}
 
 /**
  * @brief 文档元数据仓储 — 封装 documents 表的 CRUD 操作
@@ -18,7 +14,7 @@ namespace Eg
  * 文件打开/保存时调用 save() 更新文档元数据，文件关闭时调用 remove()。
  * WorkbenchWindow 通过 PersistenceService 访问此仓储。
  */
-class DocumentRepository
+class DocumentRepository : public SqliteRepositoryBase
 {
 public:
     explicit DocumentRepository(Eg::Database& database);
@@ -35,13 +31,7 @@ public:
     /// 根据文件路径删除文档元数据
     bool remove(const std::string& filePath);
 
-    /// 最近一次操作的错误信息
-    const std::string& lastError() const;
-
 private:
     DocumentRecord rowToRecord(const std::map<std::string, std::string>& row) const;
     std::map<std::string, std::string> recordToRow(const DocumentRecord& rec) const;
-
-    Eg::Database& m_database;
-    std::string m_lastError;
 };

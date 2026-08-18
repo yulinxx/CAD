@@ -1,15 +1,11 @@
 #pragma once
 
+#include "SqliteRepositoryBase.h"
 #include "Persistence/Models/LayerRecord.h"
 
 #include <map>
 #include <vector>
 #include <string>
-
-namespace Eg
-{
-    class Database;
-}
 
 /**
  * @brief 图层仓储 — 封装 layers 表的 CRUD 操作
@@ -17,7 +13,7 @@ namespace Eg
  * 按文档ID隔离图层数据，支持批量读写。
  * UiWorkbench 通过 PersistenceService 访问此仓储。
  */
-class LayerRepository
+class LayerRepository : public SqliteRepositoryBase
 {
 public:
     explicit LayerRepository(Eg::Database& database);
@@ -49,12 +45,7 @@ public:
     /// 批量更新图层顺序（在一个事务中完成）
     bool batchUpdateOrder(const std::string& documentId, const std::vector<std::pair<int, int>>& layerIdAndOrders);
 
-    const std::string& lastError() const;
-
 private:
     LayerRecord rowToRecord(const std::map<std::string, std::string>& row) const;
     std::map<std::string, std::string> recordToRow(const LayerRecord& rec) const;
-
-    Eg::Database& m_database;
-    std::string m_lastError;
 };

@@ -4,7 +4,7 @@
 #include "Log/SyLogger.h"
 
 LayerRepository::LayerRepository(Eg::Database& database)
-    : m_database(database)
+    : SqliteRepositoryBase(database)
 {
 }
 
@@ -61,9 +61,7 @@ bool LayerRepository::save(const LayerRecord& record)
 
         if (!m_database.update("layers", values, "document_id = :document_id AND layer_id = :layer_id", whereParams))
         {
-            m_lastError = "Failed to update layer: " + m_database.lastError();
-            SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
-            return false;
+            return fail("LayerRepository", "Failed to update layer");
         }
 
         return true;
@@ -72,9 +70,7 @@ bool LayerRepository::save(const LayerRecord& record)
     auto values = recordToRow(record);
     if (!m_database.insertOrReplace("layers", values))
     {
-        m_lastError = "Failed to save layer: " + m_database.lastError();
-        SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
-        return false;
+        return fail("LayerRepository", "Failed to save layer");
     }
 
     SY_DEBUGF("[LayerRepository] Inserted layer: doc=%s, layer=%d", record.documentId.c_str(), record.layerId);
@@ -89,9 +85,7 @@ bool LayerRepository::remove(const std::string& documentId, int layerId)
 
     if (!m_database.deleteRows("layers", "document_id = :document_id AND layer_id = :layer_id", whereParams))
     {
-        m_lastError = "Failed to remove layer: " + m_database.lastError();
-        SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
-        return false;
+        return fail("LayerRepository", "Failed to remove layer");
     }
 
     return true;
@@ -127,9 +121,7 @@ bool LayerRepository::rename(const std::string& documentId, int layerId, const s
     whereParams["layer_id"] = std::to_string(layerId);
     if (!m_database.update("layers", values, "document_id = :document_id AND layer_id = :layer_id", whereParams))
     {
-        m_lastError = "Failed to rename layer: " + m_database.lastError();
-        SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
-        return false;
+        return fail("LayerRepository", "Failed to rename layer");
     }
     return true;
 }
@@ -144,9 +136,7 @@ bool LayerRepository::updateVisibility(const std::string& documentId, int layerI
     whereParams["layer_id"] = std::to_string(layerId);
     if (!m_database.update("layers", values, "document_id = :document_id AND layer_id = :layer_id", whereParams))
     {
-        m_lastError = "Failed to update layer visibility: " + m_database.lastError();
-        SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
-        return false;
+        return fail("LayerRepository", "Failed to update layer visibility");
     }
     return true;
 }
@@ -161,9 +151,7 @@ bool LayerRepository::updateLocked(const std::string& documentId, int layerId, b
     whereParams["layer_id"] = std::to_string(layerId);
     if (!m_database.update("layers", values, "document_id = :document_id AND layer_id = :layer_id", whereParams))
     {
-        m_lastError = "Failed to update layer lock: " + m_database.lastError();
-        SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
-        return false;
+        return fail("LayerRepository", "Failed to update layer lock");
     }
     return true;
 }
@@ -178,9 +166,7 @@ bool LayerRepository::updateFill(const std::string& documentId, int layerId, boo
     whereParams["layer_id"] = std::to_string(layerId);
     if (!m_database.update("layers", values, "document_id = :document_id AND layer_id = :layer_id", whereParams))
     {
-        m_lastError = "Failed to update layer fill: " + m_database.lastError();
-        SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
-        return false;
+        return fail("LayerRepository", "Failed to update layer fill");
     }
     return true;
 }
@@ -195,9 +181,7 @@ bool LayerRepository::updateColor(const std::string& documentId, int layerId, co
     whereParams["layer_id"] = std::to_string(layerId);
     if (!m_database.update("layers", values, "document_id = :document_id AND layer_id = :layer_id", whereParams))
     {
-        m_lastError = "Failed to update layer color: " + m_database.lastError();
-        SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
-        return false;
+        return fail("LayerRepository", "Failed to update layer color");
     }
     return true;
 }
@@ -212,9 +196,7 @@ bool LayerRepository::updateLayerType(const std::string& documentId, int layerId
     whereParams["layer_id"] = std::to_string(layerId);
     if (!m_database.update("layers", values, "document_id = :document_id AND layer_id = :layer_id", whereParams))
     {
-        m_lastError = "Failed to update layer type: " + m_database.lastError();
-        SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
-        return false;
+        return fail("LayerRepository", "Failed to update layer type");
     }
     return true;
 }
@@ -233,26 +215,18 @@ bool LayerRepository::batchUpdateOrder(
         whereParams["layer_id"] = std::to_string(layerId);
         if (!m_database.update("layers", values, "document_id = :document_id AND layer_id = :layer_id", whereParams))
         {
-            m_lastError = "Failed to update order for layer " + std::to_string(layerId) + ": " + m_database.lastError();
-            SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
-            return false;
+            return fail("LayerRepository",
+                "Failed to update order for layer " + std::to_string(layerId));
         }
     }
 
     if (!txn.commit())
     {
-        m_lastError = "Failed to commit batch order update: " + m_database.lastError();
-        SY_ERRORF("[LayerRepository] %s", m_lastError.c_str());
-        return false;
+        return fail("LayerRepository", "Failed to commit batch order update");
     }
 
     SY_DEBUGF("[LayerRepository] Batch updated order for %zu layers", layerIdAndOrders.size());
     return true;
-}
-
-const std::string& LayerRepository::lastError() const
-{
-    return m_lastError;
 }
 
 LayerRecord LayerRepository::rowToRecord(const std::map<std::string, std::string>& row) const

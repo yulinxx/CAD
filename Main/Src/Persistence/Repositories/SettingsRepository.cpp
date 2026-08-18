@@ -4,7 +4,7 @@
 #include "Log/SyLogger.h"
 
 SettingsRepository::SettingsRepository(Eg::Database& database)
-    : m_database(database)
+    : SqliteRepositoryBase(database)
 {
 }
 
@@ -31,9 +31,7 @@ bool SettingsRepository::saveValue(
 
     if (!m_database.insertOrReplace("settings", values))
     {
-        m_lastError = "Failed to save setting: " + m_database.lastError();
-        SY_ERRORF("[SettingsRepository] %s", m_lastError.c_str());
-        return false;
+        return fail("SettingsRepository", "Failed to save setting");
     }
 
     return true;
@@ -47,9 +45,7 @@ bool SettingsRepository::removeValue(const std::string& groupName, const std::st
 
     if (!m_database.deleteRows("settings", "group_name = :group_name AND key = :key", whereParams))
     {
-        m_lastError = "Failed to remove setting: " + m_database.lastError();
-        SY_ERRORF("[SettingsRepository] %s", m_lastError.c_str());
-        return false;
+        return fail("SettingsRepository", "Failed to remove setting");
     }
 
     return true;
@@ -69,11 +65,6 @@ std::vector<SettingRecord> SettingsRepository::loadGroup(const std::string& grou
     }
 
     return result;
-}
-
-const std::string& SettingsRepository::lastError() const
-{
-    return m_lastError;
 }
 
 SettingRecord SettingsRepository::rowToRecord(const std::map<std::string, std::string>& row) const

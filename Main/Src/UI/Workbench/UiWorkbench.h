@@ -7,6 +7,7 @@
 
 #include "UiServices.h"
 #include "UI/Service/ToolBarContextManager.h"
+#include "Services/UiStateCenter.h"
 
 class QWidget;
 class QToolBar;
@@ -59,46 +60,6 @@ class BRepModelService3D;
  *
  * 定义了 UI 工作台接口及其实现类，包括 2D 和 3D 工作台。
  */
-
-// ============================================================
-/**
- * @struct WorkbenchStateSnapshot
- * @brief 工作台状态快照
- *
- * 用于工作台切换时保存和恢复状态，避免切换后丢失当前选择、视图模式等信息。
- * 每个工作台在 deactivate() 时保存状态，在 activate() 时恢复状态。
- *
- * 状态字段覆盖：
- *   - 文档/视图：documentId, viewMode, viewportType, viewportStatus
- *   - 图层/选择：layerId, selectionSource, selectionText, selectionType
- *   - 工具/输入：activeToolId, inputFocusWidget
- *   - 脏状态：dirty
- */
-struct WorkbenchStateSnapshot
-{
-    /// 视图模式
-    QString viewMode;
-    /// 图层 ID
-    QString layerId;
-    /// 文档 ID
-    QString documentId;
-    /// 选择来源
-    QString selectionSource;
-    /// 选择文本
-    QString selectionText;
-    /// 选择类型
-    QString selectionType;
-    /// 视口类型
-    QString viewportType;
-    /// 视口状态
-    QString viewportStatus;
-    /// 当前激活工具 ID（切换后恢复工具状态）
-    QString activeToolId;
-    /// 当前输入焦点控件名称（切换后恢复焦点）
-    QString inputFocusWidget;
-    /// 是否有未保存更改
-    bool dirty{ false };
-};
 
 // ============================================================
 /**
@@ -192,19 +153,19 @@ protected:
     /// 获取当前状态快照
     /// 从状态中心读取当前状态，若无状态中心则使用初始化时的缓存状态
     /// @return 当前状态快照
-    virtual WorkbenchStateSnapshot currentSnapshot() const;
+    virtual UiStateSnapshot currentSnapshot() const;
 
     /// 恢复状态快照
     /// @param snapshot 要恢复的状态快照
-    virtual void restoreFromSnapshot(const WorkbenchStateSnapshot& snapshot);
+    virtual void restoreFromSnapshot(const UiStateSnapshot& snapshot);
 
 protected:
     /// UI 服务副本（避免持有外部临时引用）
     UiServices m_services;
     /// 初始化时缓存的状态，供首次激活使用
-    WorkbenchStateSnapshot m_initialState;
+    UiStateSnapshot m_initialState;
     /// 上次停用前保存的状态快照，供下次激活时恢复
-    WorkbenchStateSnapshot m_savedState;
+    UiStateSnapshot m_savedState;
     /// 共享 SettingsService singleton（app-level 共享，非每工作台私有）
     SettingsService* m_settingsService{ nullptr };
 };

@@ -1,5 +1,6 @@
 #include "ImportDispatcher.h"
 #include "Log/SyLogger.h"
+#include "FileIO/FormatRegistry.h"
 
 #include <QFileInfo>
 
@@ -65,66 +66,7 @@ ImportResult ImportDispatcher::dispatch(const ImportContext& context, Fio::VecSy
 
 Fio::FileFormat ImportDispatcher::detectFormat(const QString& filePath)
 {
-    QString ext = QFileInfo(filePath).suffix().toLower();
-
-    if (ext == QStringLiteral("dxf"))
-    {
-        return Fio::FileFormat::DXF;
-    }
-    if (ext == QStringLiteral("svg"))
-    {
-        return Fio::FileFormat::SVG;
-    }
-    if (ext == QStringLiteral("pdf"))
-    {
-        return Fio::FileFormat::PDF;
-    }
-    if (ext == QStringLiteral("plt") || ext == QStringLiteral("hpgl"))
-    {
-        return Fio::FileFormat::PLT;
-    }
-
-    if (ext == QStringLiteral("stp") || ext == QStringLiteral("step"))
-    {
-        return Fio::FileFormat::STEP;
-    }
-
-    if (ext == QStringLiteral("ai"))
-    {
-        return Fio::FileFormat::AI;
-    }
-
-    if (ext == QStringLiteral("prt") || ext == QStringLiteral("igs") || ext == QStringLiteral("iges"))
-    {
-        return Fio::FileFormat::UG;
-    }
-
-    if (ext == QStringLiteral("sy"))
-    {
-        return Fio::FileFormat::Native;
-    }
-    if (ext == QStringLiteral("syx"))
-    {
-        return Fio::FileFormat::Native3D;
-    }
-    if (ext == QStringLiteral("obj"))
-    {
-        return Fio::FileFormat::OBJ;
-    }
-    if (ext == QStringLiteral("stl"))
-    {
-        return Fio::FileFormat::STL;
-    }
-    if (ext == QStringLiteral("bmp"))
-    {
-        return Fio::FileFormat::BMP;
-    }
-    if (ext == QStringLiteral("png"))
-    {
-        return Fio::FileFormat::PNG;
-    }
-
-    return Fio::FileFormat::Unknown;
+    return Fio::FormatRegistry::instance().detectFormat(filePath.toUtf8().constData());
 }
 
 QStringList ImportDispatcher::supportedExtensions() const

@@ -17,7 +17,7 @@
 
 - `Main` 只负责宿主与视图装配，不直接绑定具体渲染后端
 - `UI3D` 作为 3D 工作台框架主层，负责菜单、工具栏、状态栏、命令总线、快捷键
-- `RenderCompat` 作为旧 OpenGL 渲染兼容层
+- `RenderWidget3D`（现位于 UI3D）作为旧 OpenGL 渲染兼容层
 - `IRenderer3D` 作为唯一渲染抽象接口
 - `IRenderer3D` 的创建必须有唯一来源，禁止在视图宿主中分散创建
 - `SimpleRenderer3D` 仅保留为验证链或临时默认实现，不作为最终框架主链
@@ -54,11 +54,11 @@
 
 ---
 
-### 2. UI/RenderCompat 层
+### 2. UI3D 渲染控件层（原 UI/RenderCompat）
 
 当前核心文件：
 
-- `UI/RenderCompat/Src/RenderWidget3D.cpp`
+- `UI/3D/Src/Render/RenderWidget3D.cpp`
 - `Main/Src/UI/RenderWidget3DAdapter.h`
 - `Main/Src/UI/RenderWidget3DAdapter.cpp`
 
@@ -368,8 +368,8 @@ flowchart TD
     viewport3d --> irenderer
 
     irenderer --> simpleRenderer[SimpleRenderer3D]
-    irenderer --> renderCompat[RenderWidget3DAdapter]
-    renderCompat --> renderWidget3d[RenderWidget3D]
+    irenderer --> adapter3d[RenderWidget3DAdapter]
+    adapter3d --> renderWidget3d[RenderWidget3D]
 
     ui3dRoot --> mainWindow3d[MainWindow3D]
     mainWindow3d --> operationBus3d[OperationBus3D]
@@ -410,7 +410,7 @@ flowchart TD
 
 ---
 
-### `RenderCompat`
+### `RenderWidget3DAdapter`
 负责：
 
 - 保留旧 OpenGL widget
@@ -851,9 +851,9 @@ Workbench3D::build3DWorkbenchUi()
 
 ---
 
-## UI/RenderCompat 层
+## UI3D 渲染控件层（原 UI/RenderCompat）
 
-### `UI/RenderCompat/Src/RenderWidget3D.cpp`
+### `UI/3D/Src/Render/RenderWidget3D.cpp`
 修改内容：
 
 - 保持 OpenGL widget 的旧实现
@@ -1008,7 +1008,7 @@ Workbench3D::build3DWorkbenchUi()
 - 框架归属还没有完全统一
 - 最合理的方向是：
 
-**`UI3D` 主框架 + `RenderCompat` 兼容链 + `Main` 宿主化接入**
+**`UI3D` 主框架 + `RenderWidget3D` 兼容链 + `Main` 宿主化接入**
 
 ---
 
@@ -1122,7 +1122,7 @@ Workbench3D::build3DWorkbenchUi()
 - [ ] 明确这是兼容层
 - [ ] 明确只做桥接，不做业务编排
 
-### `UI/RenderCompat/Src/RenderWidget3D.cpp`
+### `UI/3D/Src/Render/RenderWidget3D.cpp`
 - [ ] 保留旧 OpenGL 渲染实现
 - [ ] 不新增业务逻辑
 - [ ] 不作为默认主入口

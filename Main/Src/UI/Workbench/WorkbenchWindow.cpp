@@ -394,7 +394,7 @@ void WorkbenchWindow::initializeWorkbenchShell()
     setCentralWidget(createInitialCentralWidget());
     updateWindowTitle();
     refreshStatusText();
-    QString initialWorkbenchId = m_stateManager ? m_stateManager->windowState().workbenchId : QStringLiteral("default");
+    QString initialWorkbenchId = m_stateManager ? m_stateManager->windowState().currentWorkbenchId : QStringLiteral("default");
     if (m_stateCenter)
     {
         initialWorkbenchId = m_stateCenter->currentWorkbenchId();
@@ -1022,7 +1022,7 @@ void WorkbenchWindow::refreshThemeMenuChecks(const QString& themeId)
 {
     if (m_stateManager)
     {
-        m_stateManager->windowState().themeId = themeId;
+        m_stateManager->windowState().currentThemeId = themeId;
     }
     updateWindowTitle();
     if (m_menuManager)
@@ -1059,7 +1059,7 @@ void WorkbenchWindow::triggerTheme(const QString& themeId)
         // 主题状态变化后同步本地状态，避免窗口与状态中心短时间不一致
         if (m_stateManager)
         {
-            m_stateManager->windowState().themeId = themeId;
+            m_stateManager->windowState().currentThemeId = themeId;
         }
     }
     updateWindowTitle();
@@ -1157,7 +1157,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     }
 
     const QString currentWorkbenchId =
-        m_stateManager ? m_stateManager->windowState().workbenchId : QStringLiteral("default");
+        m_stateManager ? m_stateManager->windowState().currentWorkbenchId : QStringLiteral("default");
     if (workbenchId.compare(currentWorkbenchId, Qt::CaseInsensitive) == 0)
     {
         SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: same workbench %s, skipping", workbenchId.toUtf8().constData());
@@ -1174,7 +1174,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     m_switchingWorkbench = true;
 
     const auto previousWorkbenchId =
-        m_stateManager ? m_stateManager->windowState().workbenchId : QStringLiteral("default");
+        m_stateManager ? m_stateManager->windowState().currentWorkbenchId : QStringLiteral("default");
     const auto switchContextText = workbenchSwitchText(workbenchId);
 
     SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: switching from %s to %s",
@@ -1257,7 +1257,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     if (m_stateManager)
     {
         m_stateManager->windowState().busy = false;
-        m_stateManager->windowState().workbenchId = workbenchId;
+        m_stateManager->windowState().currentWorkbenchId = workbenchId;
     }
     SY_DEBUGF("[WorkbenchWindow] workbench state committed: id=%s busy=0", workbenchId.toUtf8().constData());
 

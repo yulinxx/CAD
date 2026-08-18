@@ -6,7 +6,7 @@
 #include <sstream>
 
 RecentFileRepository::RecentFileRepository(Eg::Database& database)
-    : m_database(database)
+    : SqliteRepositoryBase(database)
 {
 }
 
@@ -31,9 +31,7 @@ bool RecentFileRepository::saveAll(const std::vector<RecentFileRecord>& records)
     // 清空现有数据
     if (!m_database.execute("DELETE FROM recent_files"))
     {
-        m_lastError = "Failed to clear recent_files: " + m_database.lastError();
-        SY_ERRORF("[RecentFileRepository] %s", m_lastError.c_str());
-        return false;
+        return fail("RecentFileRepository", "Failed to clear recent_files");
     }
 
     // 批量插入
@@ -42,9 +40,7 @@ bool RecentFileRepository::saveAll(const std::vector<RecentFileRecord>& records)
         auto values = recordToRow(rec);
         if (!m_database.insert("recent_files", values))
         {
-            m_lastError = "Failed to insert recent file: " + m_database.lastError();
-            SY_ERRORF("[RecentFileRepository] %s", m_lastError.c_str());
-            return false;
+            return fail("RecentFileRepository", "Failed to insert recent file");
         }
     }
 
@@ -58,9 +54,7 @@ bool RecentFileRepository::append(const RecentFileRecord& record)
     // 使用 INSERT OR REPLACE 处理重复路径（UNIQUE(file_path) 约束保证去重）
     if (!m_database.insertOrReplace("recent_files", values))
     {
-        m_lastError = "Failed to append recent file: " + m_database.lastError();
-        SY_ERRORF("[RecentFileRepository] %s", m_lastError.c_str());
-        return false;
+        return fail("RecentFileRepository", "Failed to append recent file");
     }
 
     // 控制列表上限，删除超出上限的最旧记录
@@ -85,17 +79,10 @@ bool RecentFileRepository::remove(const std::string& filePath)
 
     if (!m_database.deleteRows("recent_files", "file_path = :file_path", whereParams))
     {
-        m_lastError = "Failed to remove recent file: " + m_database.lastError();
-        SY_ERRORF("[RecentFileRepository] %s", m_lastError.c_str());
-        return false;
+        return fail("RecentFileRepository", "Failed to remove recent file");
     }
 
     return true;
-}
-
-const std::string& RecentFileRepository::lastError() const
-{
-    return m_lastError;
 }
 
 RecentFileRecord RecentFileRepository::rowToRecord(const std::map<std::string, std::string>& row) const

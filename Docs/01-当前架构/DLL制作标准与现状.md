@@ -517,28 +517,23 @@ TopoShape::TopoShape(const TopoShape& other)
 
 ### 1. 当前工程的真实模块全景
 
-当前工程（SanYiCAD v1.0.0）共有 **27 个共享库**、**2 个静态库**、**1 个可执行文件**、**1 个 Python 模块**：
+当前工程（SanYiCAD v1.0.0）共有 **19 个共享库**、**1 个可执行文件**、**1 个 Python 模块**：
 
 | 层级 | 实际 CMake 目标 | 类型 | 导出宏 | C ABI Facade | 导出严格度 |
 |---|---|---|---|---|---|
-| **Core** | `CadCore` | SHARED | `CAD_CORE_API` | 有（`CoreAPI.h`） | ⭐⭐ |
-| | `Utility` | SHARED | `UTILITY_API` | 无 | ⭐ |
+| **Core** | `Utility` | SHARED | `UTILITY_API` | 无 | ⭐ |
 | | `Log` | SHARED | `LOG_API` | 有（`SyLoggerDLL.h`） | ⭐⭐⭐ |
 | | `CrashHandler` | SHARED | `CRASHHANDLER_API` | 有（`CrashHandlerDLL.h`） | ⭐⭐⭐ |
 | | `License` | SHARED | `LICENSE_API` | 有（`LicenseDLL.h`） | ⭐⭐⭐ |
 | **Engine** | `EngineCommon` | SHARED | `ENGINE_API` | 部分（仅版本查询） | ⭐ |
 | | `Engine2D` | SHARED | `ENGINE2D_API` | 无 | ⭐ |
 | | `Engine3D` | SHARED | `ENGINE3D_API` | 无 | ⭐ |
-| | `EnginePersistence` | **STATIC** | 无（静态库，不导出） | 无 | 内部 |
-| **Render** | `RenderCommon` | SHARED | `RENDER_API` | 无 | ⭐ |
-| | `Render2D` | SHARED | `RENDER_API` | 无 | ⭐ |
-| | `Render3D` | SHARED | `RENDER_API` | 无 | ⭐ |
-| | `RenderNext` | SHARED | `RN_API` | 有（`CAPI.h`） | ⭐⭐⭐ |
+| | `EnginePersistence` | SHARED | `ENGINEPERSISTENCE_EXPORTS` | 无 | 内部 |
+| **Render** | `SanYiRender`（Renderx） | SHARED | `RENDER_API` | 有（`render/render.h`） | ⭐⭐⭐ |
 
 | **UI** | `UICommon` | SHARED | `UICOMMON_API` | 无 | ⭐ |
 | | `UI2D` | SHARED | `UI2D_API` | 无 | ⭐ |
 | | `UI3D` | SHARED | `UI3D_API` | 无 | ⭐ |
-| | `UiRenderCore` | **STATIC** | 无导出 | 无 | 内部 |
 | **功能模块** | `FileIO` | SHARED | `FILEIO_API` | 有（`FileIOExport.h`） | ⭐⭐⭐ |
 | | `Nesting` | SHARED | `NESTING_API` / `NESTING_C_API` | 有（`NestingDLL.h`） | ⭐⭐⭐ |
 | | `Hardware` | SHARED | `HARDWARE_API` | 无 | ⭐ |
@@ -563,7 +558,6 @@ TopoShape::TopoShape(const TopoShape& other)
 
 | 模块 | C API 文件 | 句柄风格 | 错误码 | 版本查询 | 状态 |
 |---|---|---|---|---|---|
-| **CadCore** | `CoreAPI.h` | 无句柄 | `int` 返回码 | 有（`CadCoreVersion`） | ✅ 已完成 |
 | **Log** | `SyLoggerDLL.h` | 无句柄（全局单例） | 无 | 有（`SyLog_GetVersion`） | ✅ 已完成 |
 | **Engine** | `EngineAPI.h` | 无 | `int` | 有（`SanYiEngineVersion`） | ✅ 部分完成 |
 | **FileIO** | `FileIOExport.h` | `struct FioManagerImpl*`（类型安全） | `FioResult`（含 `char[512]`） | 有（`fio_version`） | ✅ 已完成 |
@@ -573,7 +567,7 @@ TopoShape::TopoShape(const TopoShape& other)
 | **Engraving** | `EngravingCAPI.h` | `struct EngravingVolumeImpl*`（类型安全） | `enum EngravingResultCode` | 有（`Engraving_GetVersion`） | ✅ 已完成（2026-08-16 收口） |
 | **License** | `LicenseDLL.h` | `struct LicenseContext*`（类型安全） | `enum LicenseResult` | 有（`License_GetVersion`） | ✅ 已完成 |
 | **CrashHandler** | `CrashHandlerDLL.h` | 无句柄（全局单例） | `enum CrashHandlerResult` | 有（`CrashHandler_GetVersion`） | ✅ 已完成 |
-| **RenderNext** | `CAPI.h` | `struct RNWorldImpl*`（类型安全） | 无（void 函数） | 有（`rnGetVersionString`） | ✅ 已完成 |
+| **SanYiRender** | `render/render.h` | `RenderDevice*`（类型安全不透明结构体指针） | 无（void 函数） | 无 | ✅ 已完成 |
 
 **句柄风格说明**：
 - ✅ **类型安全不透明指针**：`struct XxxImpl*` — 推荐，编译期类型检查
@@ -584,8 +578,7 @@ TopoShape::TopoShape(const TopoShape& other)
 | 实际模块 | 建议形态 | 当前状态 | 导出严格度 |
 |---|---|---|---|
 | `SanYiCAD.exe` | **维持可执行文件** | 应用入口 + 装配 + 窗口启动 | 不适用 |
-| `CadCore.dll` | **C++ DLL + C ABI facade** | 已有 C API（版本查询），需扩展 | ⭐⭐ |
-| `RenderNext.dll` | **保持 C ABI facade** | 纯 C API，版本查询已完成 | ⭐⭐⭐ |
+| `SanYiRender.dll` | **保持 C ABI facade** | 纯 C API（`render/render.h`），统一 2D/3D 渲染入口 | ⭐⭐⭐ |
 | `Nesting.dll` | **保持 C ABI facade** | 完整 C API，需统一句柄风格 + 版本查询 | ⭐⭐⭐ |
 | `Vision.dll` | **保持 C ABI facade** | 完整 C API，需统一句柄风格 + 版本查询 | ⭐⭐⭐ |
 | `GeoModelCore.dll` | **保持 C ABI facade** | 已有 C API，需移除警告压制 + 版本查询 | ⭐⭐ |
@@ -595,7 +588,6 @@ TopoShape::TopoShape(const TopoShape& other)
 | `License.dll` | **保持 C ABI facade** | 完整 C API，版本查询已完成 | ⭐⭐⭐ |
 | `FileIO.dll` | **C++ DLL + C ABI facade** | C API 已完成，需补充异常捕获 | ⭐⭐⭐ |
 | `Engine*.dll` | **维持内部 C++ DLL** | 内部高效协作，不对外承诺 ABI | ⭐ |
-| `Render*.dll` (旧) | **维持内部 C++ DLL** | 与 UI 紧密绑定（Qt） | ⭐ |
 | `UI*.dll` | **维持内部 C++ DLL** | Qt 界面层，不建议对外暴露 | ⭐ |
 | `PythonHost.dll` | **维持内部 C++ DLL** | Python 集成框架 | ⭐ |
 | `PyBindCore.pyd` | **考虑增加 C facade 层** | 当前直接绑定 C++，有 ABI 风险 | ⭐ |
@@ -617,14 +609,14 @@ TopoShape::TopoShape(const TopoShape& other)
 
 ### 5. 现有 C API 的不一致问题（需统一）
 
-| 差异点 | Nesting | Vision | GeoModelCore | Engraving | RenderNext | 建议统一方向 |
+| 差异点 | Nesting | Vision | GeoModelCore | Engraving | SanYiRender | 建议统一方向 |
 |---|---|---|---|---|---|---|---|
-| 句柄风格 | `void*` | `void*` | `void*` | `void*` | `struct Xxx*` | **统一为不透明结构体指针** |
+| 句柄风格 | `void*` | `void*` | `void*` | `void*` | `RenderDevice*`（类型安全） | **统一为不透明结构体指针** |
 | 错误码 | `enum NestingResultCode` | `enum VisionResultCode` | `enum GeoModelResultCode` | `int` | 无 | **统一为 `SanyiResult`** |
-| 导出宏 | `NESTING_C_API + NESTING_API` | `VISION_C_API` 含 extern "C" | `GEOMODEL_API` 纯 | `ENGRAVING_API` 纯 | `RN_API` 纯 | **统一为单体宏** |
+| 导出宏 | `NESTING_C_API + NESTING_API` | `VISION_C_API` 含 extern "C" | `GEOMODEL_API` 纯 | `ENGRAVING_API` 纯 | `RENDER_API` 纯 | **统一为单体宏** |
 | extern "C" 位置 | 头文件包裹 | 宏内自带 | 头文件包裹 | 头文件包裹 | 头文件包裹 | 统一为**头文件包裹** |
-| 版本查询 | 有 | 有 | 有 | 有 | 有 | **每个 facade 增加** |
-| 入参校验 | 有 | 有 | 有 | 有 | 无 | **所有导出函数前置校验** |
+| 版本查询 | 有 | 有 | 有 | 有 | 无 | **每个 facade 增加** |
+| 入参校验 | 有 | 有 | 有 | 有 | 有 | **所有导出函数前置校验** |
 | 结构体大小校验 | 无 | 无 | 无 | 无 | 无 | **关键结构体增加 static_assert** |
 
 ### 7. 当前工程存在问题的 ABI 边界
@@ -672,7 +664,7 @@ TopoShape::TopoShape(const TopoShape& other)
 | `UI/3D/CMakeLists.txt` | `Src/` 目录为 PUBLIC include | ✅ **已修复** | `Src/` 已改为 PRIVATE |
 | `FileIO/FileIOManager.h` | 导出类含 `std::unique_ptr`、`std::function`、`std::vector`、`std::string` | ✅ **已修复** | C1 收口（2026-07-31）：回调改 C 函数指针+`void* ctx`；`importFile/exportFile` 改 `const char*`+裸指针数组+`errorBuffer`；新增 `deleteEntities/freeEntityArray`；头文件不再依赖 IFileParser/IFileWriter/STL |
 | `FileIO/FileIOExport.h` | ~~C API 入口未包 `try/catch(...)`~~ | ✅ **已删除** | C API 层（FileIOExport.h/.cpp）已整体删除，异常安全问题随之消除 |
-| `Render/Common` | ~~依赖 Qt 类型~~ → 已移除 `#include <QPointF>` | ✅ **已修复** | `RenderTypes.h` 中 QPointF 未被任何类型使用，已移除；补齐 ABI 注解（内部 C++ ABI 层，文件已标记 DEPRECATED 迁移中） |
+| `Render/Common`（旧，已删除） | ~~依赖 Qt 类型~~ → 已移除 `#include <QPointF>` | ✅ **已修复（历史）** | 原 `RenderTypes.h` 中 QPointF 已移除；`Render/Common` 等旧渲染库已整体删除，渲染统一由 `Renderx/SanYiRender` 承担 |
 | `UI/Common/LaserToolpathBridge.h` | `executeLaserToolpath` 用 `const std::vector<LaserToolpathPoint>&` 入参 | ✅ **已修复** | 改为 `const LaserToolpathPoint*, int count`（2026-07-31 P0 修复） |
 
 ### 8. FileIO.dll 导出特点（已落地）
@@ -884,8 +876,7 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 | `ENGINE_API` | `EngineAPI.h` | `ENGINE_EXPORTS` | 无 |
 | `ENGINE2D_API` | `EngineAPI.h` | `ENGINE2D_EXPORTS` | 无 |
 | `ENGINE3D_API` | `EngineAPI.h` | `ENGINE3D_EXPORTS` | 无 |
-| `RENDER_API` | `RenderAPI.h`（两处） | `RENDER_EXPORTS` | 无 |
-| `RN_API` | `CAPI.h`（RenderNext） | `RENDER_NEXT_BUILD` | 无 |
+| `RENDER_API` | `render/render.h`（Renderx） | `RENDER_EXPORTS` | 无 |
 | `UICOMMON_API` | `UICommonAPI.h` | `UICOMMON_EXPORTS` | 无 |
 | `UI2D_API` | `UI2DAPI.h` | `UI2D_EXPORTS` | 无 |
 | `UI3D_API` | `UI3DAPI.h` | `UI3D_EXPORTS` | 无 |
@@ -1359,10 +1350,9 @@ ModuleName/
 | `GeoModelCore` | `Include/GeoModelCore/` | ✅ 好 |
 | `Vision` | `Include/Vision/` | ✅ 好 |
 | `Engraving` | `Include/Engraving/` | ✅ 好 |
-| `RenderNext` | `include/sanyi_render/` | ✅ 好（小写） |
+| `Renderx` | `include/render/` | ✅ 好（小写） |
 | `CrashHandler` | `Include/CrashHandler/` | ✅ 好 |
 | `Main/Src/RenderCore/` | 头文件混在 `Src/` | ❌ 需抽到 `Main/Include/UiRenderCore/` |
-| `Render/Common`、`Render/2D`、`Render/3D` | 待检查 | ⚠️ 标注 DEPRECATED 迁移中 |
 
 ### 3. 规则
 
@@ -1873,7 +1863,7 @@ ModuleName/
 | Network | 已完成/内部可接受 | 仅需保留内部 ABI 标注 |
 | Nesting | 已完成 | 句柄化已完成 |
 | PyBindCore | 已完成 | facade 路线已完成 |
-| Render/Common Qt | 已完成 | 已完成必要收口 |
+| Render/Common Qt（旧，已删除） | 已完成 | 已完成必要收口；旧渲染库已删除，统一为 Renderx/SanYiRender |
 | Vision | 内部可接受 | 沙箱模块，不承诺跨 DLL ABI |
 
 ### 7. 代码级复核清单（✅ 已完成）
@@ -2693,7 +2683,7 @@ struct SerializeResult {
 | `License` | 典型跨语言调用边界 | 维持 / 强化 C ABI |
 | `CrashHandler` | 崩溃回调、日志收集跨语言风险高 | 维持 / 强化 C ABI |
 | `Network` | 如果作为服务边界或外部通信层 | 推荐提供 C ABI |
-| `RenderNext` | 作为对外 facade 或兼容层 | 保持纯 C ABI |
+| `RenderNext`→`SanYiRender` | 作为对外 facade 或兼容层 | 保持纯 C ABI |
 | `Nesting` / `Vision`（若对外发布） | 若要给脚本或外部插件调用 | 需要 C ABI 包装层 |
 
 #### 2.2 可以只导出 C++ 的模块
@@ -2726,7 +2716,7 @@ struct SerializeResult {
 | `License` | 尽快做成稳定 C ABI | 通常跨语言、跨工具、跨版本更敏感，不适合长期停留在 C++ 导出 |
 | `CrashHandler` | 尽早 C ABI 化 | 崩溃处理是系统边界，不适合复杂 C++ ABI |
 | `Network` | 如果只是内部模块，可先 C++ 导出；如果要给外部客户端 / 插件 / 服务使用，最终还是要 C ABI | 根据实际使用范围决定收口节奏 |
-| `RenderNext` | 尽量保持 C ABI | 本身就适合作为稳定 facade，是最适合长期对外的层 |
+| `SanYiRender` | 尽量保持 C ABI | 本身就适合作为稳定 facade，是最适合长期对外的层 |
 | `Nesting` | 如果近期只作为内部模块，先 C++ 导出可以；但如果未来要开放给脚本 / 外部插件，就提前规划 facade | 先快后稳的典型候选 |
 | `Vision` | 如果近期只作为内部模块，先 C++ 导出可以；但如果未来要开放给脚本 / 外部插件，就提前规划 facade | OpenCV 相关类型复杂，建议尽早明确边界 |
 
@@ -2767,7 +2757,7 @@ struct SerializeResult {
 
 | 优先级 | 模块 | 迁移建议 |
 |---|---|---|
-| P0 | `License`、`CrashHandler`、`RenderNext` | 优先收口，直接以稳定 facade 为目标 |
+| P0 | `License`、`CrashHandler`、`SanYiRender` | 优先收口，直接以稳定 facade 为目标 |
 | P1 | `FileIO`、`UICommon` | 先 C++ 导出过渡，再按阶段收口 |
 | P2 | `Network` | 按实际外部使用范围决定，内部可先 C++ 导出 |
 | P3 | `Nesting`、`Vision` | 近期可先 C++ 导出，但应预留 facade 入口 |
@@ -3041,7 +3031,7 @@ virtual size_t defaultRootName(char* buffer, size_t bufferSize) const = 0;
 | 4 | 每个导出函数参数校验与异常屏蔽 | ⚠️ 部分完成 | CrashHandler/License 已完整；其余 C facade 建议逐步补齐 `try/catch(...)` + 前置校验 |
 | 5 | 结构体带 `static_assert` 大小校验 | ❌ 未做 | 关键导出结构体建议增加 |
 | 6 | 依赖检查纳入发布流程（`dumpbin /dependents` / `ldd`） | ❌ 未做 | 建议纳入 CI |
-| 7 | `Render/Common`、`Render/2D`、`Render/3D` 目录组织 | ⚠️ 标注 DEPRECATED 迁移中 | 与 `RenderNext` 并存，待统一 |
+| 7 | `Render/` 旧 submodule 目录已废弃 | ⚠️ 已在 SanYiPaths.cmake 注释移除 | 渲染由 `Renderx/SanYiRender` 统一承担；旧 submodule 目录为空，不再构建 |
 | 8 | 统一入口迁移后遗留：各模块 CMakeLists 仍保留 `LIB_SOURCES` 局部计数变量 | ✅ 已清理 | 迁移至 `sanyi_add_shared_library()` 时一并精简，见「十九、2」 |
 | 9 | `Main/Src/UI/Workbench/WorkbenchMenuManager.cpp` 引用的 `IUiCommandDispatcher` 未定义（用户工作区进行中的重构） | ⚠️ 用户侧未完成 | 与 DLL 迁移无关，SanYiCAD.exe 编译受其阻塞 |
 | 10 | MSVC `/m` 并行构建偶发 `error C2065` 误报（关联错位到无关行） | ⚠️ 已知 | Renderx `overlay_queue.cpp(515,59)` 曾误报 `rangeKind`，串行重编通过；遇此类错误先单线程复验 |

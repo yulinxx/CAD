@@ -27,7 +27,7 @@ SanYiCAD/
 │   │   ├── Composition/        # 组合根（手动 DI 容器）
 │   │   ├── Common/             # 初始化、路径管理
 │   │   ├── License/            # 许可管理
-│   │   ├── RenderCore/         # 统一渲染抽象层
+│   │   ├── Render/             # 2D/3D 渲染适配层
 │   │   └── UI/                 # 应用层 UI 实现
 │   │       └── ClientConfig/   # 客户配置目录（新增）
 │   │           ├── UiConfigLoader.h          # 配置加载器（解析 JSON → 数据模型）
@@ -47,7 +47,7 @@ SanYiCAD/
 │   └── resources/
 ├── UI/                         # [Git Submodule] UI 组件库
 ├── Engine/                     # [Git Submodule] 引擎核心
-├── Render/                     # [Git Submodule] 渲染层
+├── Renderx/                    # [Git Submodule] 渲染层（SanYiRender.dll）
 ├── Utility/                    # [Git Submodule] 基础工具库
 ├── Log/                        # [Git Submodule] 日志
 ├── CrashHandler/               # [Git Submodule] 崩溃捕获
@@ -122,9 +122,9 @@ main()
 │  - SceneDocument3D (3D scene tree)                          │
 │  - Algorithm (boolean ops, offsets, etc.)                   │
 ├─────────────────────────────────────────────────────────────┤
-│  Render Layer (Render/)                                     │
-│  - RenderCommon, Render2D, Render3D                         │
-│  - IRenderer3D, rendering pipeline                          │
+│  Render Layer (Renderx / SanYiRender.dll)                   │
+│  - 纯 C ABI 渲染入口、2D/3D 统一渲染管线                      │
+│  - 仅依赖系统图形库，内部负责 OpenGL/Vulkan/Metal RHI、着色器、批次管理 │
 ├─────────────────────────────────────────────────────────────┤
 │  Infrastructure (Utility, Log, CrashHandler)                │
 │  - Containers, math, logging, crash reporting               │
