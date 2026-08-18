@@ -105,18 +105,14 @@ size_t ViewportSelector::endBoxSelect(const QPointF& worldPos)
 
     std::vector<std::string> hitIds;
 
-    // 框选判定收口到引擎图元 BBox：统一处理所有图元类型，避免在 UI 层逐类型判断
+    // 框选判定收口到空间索引查询：用 queryByBox 替代全量遍历 getAllEntities()，
+    // 候选图元的包围盒已缓存（SceneManager::queryByBox 复用索引缓存），不再逐图元重算。
     Ut::BBox2d box(Ut::Vec2d(minX, minY), Ut::Vec2d(maxX, maxY));
 
-    for (const auto* entity : m_sceneManager->getAllEntities())
+    const auto candidates = m_sceneManager->queryByBox(box, /*containedOnly=*/false);
+    for (SyEntity* entity : candidates)
     {
-        if (!entity)
-        {
-            continue;
-        }
-
-        Ut::BBox2d bbox = entity->getBbox();
-        if (bbox.isValid() && box.intersects(bbox))
+        if (entity)
         {
             hitIds.push_back(std::to_string(entity->id));
         }
@@ -281,7 +277,11 @@ void ViewportSelector::performHitTest(const QPointF& worldPos)
     std::string hitId;
     double minDist = ctx.dPick;
 
-    for (const auto* entity : m_sceneManager->getAllEntities())
+    // 先经空间索引 queryByPoint 缩小候选范围，再对候选做精确距离判定，
+    // 避免对全场图元逐个 distanceToPoint（O(N) 全量扫描）。
+    const Ut::Vec2d pt(worldPos.x(), worldPos.y());
+    const auto candidates = m_sceneManager->queryByPoint(pt, ctx.dPick);
+    for (SyEntity* entity : candidates)
     {
         if (!entity)
         {
@@ -289,7 +289,7 @@ void ViewportSelector::performHitTest(const QPointF& worldPos)
         }
 
         // 命中判定收口到引擎 Geo2DQuery：统一处理线段/折线/圆/弧/椭圆/贝塞尔/样条/复合线
-        const double dist = Eg::Geo2DQuery::distanceToPoint(entity, Ut::Vec2d(worldPos.x(), worldPos.y()), ctx);
+        const double dist = Eg::Geo2DQuery::distanceToPoint(entity, pt, ctx);
 
         if (dist < minDist)
         {
