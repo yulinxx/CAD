@@ -704,7 +704,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
                 }
             }
         };
-        QObject::connect(m_services.stateCenter, &UiStateCenter::metadataChanged, this, applyGridVisibleFromMetadata);
+        m_gridVisibilityMetadataConn = QObject::connect(m_services.stateCenter, &UiStateCenter::metadataChanged, this, applyGridVisibleFromMetadata);
         applyGridVisibleFromMetadata();
     }
 
@@ -1502,6 +1502,13 @@ void Workbench2D::activate()
 void Workbench2D::deactivate()
 {
     m_savedState = currentSnapshot();
+
+    // 断开 metadataChanged 连接，防止切换工作台后悬空视口指针回调
+    if (m_gridVisibilityMetadataConn)
+    {
+        QObject::disconnect(m_gridVisibilityMetadataConn);
+        m_gridVisibilityMetadataConn = {};
+    }
 
     // 清除 ImportService 中持有的视口回调，防止切换后悬空指针
     // ImportService 生命周期长于工作台，不清理会导致 use-after-free

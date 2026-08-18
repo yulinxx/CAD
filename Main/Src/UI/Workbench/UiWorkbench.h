@@ -320,6 +320,9 @@ private:
     /// 工具栏上下文管理器：管理不同编辑模式下的工具栏配置与切换
     std::unique_ptr<ToolBarContextManager> m_contextManager;
 
+    /// 网格显隐 metadata 连接（切换工作台时需断开，防止悬空视口指针回调）
+    QMetaObject::Connection m_gridVisibilityMetadataConn;
+
     /// 根据当前选中图元类型确定应切换到的工具栏上下文
     ToolBarContext determineContextFromSelection() const;
 
