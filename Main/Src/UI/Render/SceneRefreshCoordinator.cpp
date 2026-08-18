@@ -436,47 +436,21 @@ void SceneRefreshCoordinator::updateSceneRender()
         return;
     }
 
-    // LightUpdate 增量刷新：applyLightRefresh 内部遇不可增量图元（如文本）
-    // 会通过 m_pendingFullRefreshFallback 自动回退到 applyFullRefresh，
-    // 因此此处无需对 LightUpdate 再做全量处理
-    if (level == RefreshLevel::LightUpdate)
+    // LightUpdate / Selection 增量刷新：
+    // 删除图元（m_pendingDeletedIds）必须被处理，否则会从渲染世界中被永久遗漏
+    // （典型症状：删除后视图不更新）。Selection 级别的样式变更同样由 applyLightRefresh
+    // 覆盖——其内部已对脏图元调用 modifyRenderEntity，并对选中图元执行移除（改由虚线轮廓覆盖层表示）。
+    // 因此无论 LightUpdate 还是 Selection，只要有增量待办就走 applyLightRefresh。
+    // 注意：onSelectionChanged 会先把 m_refreshLevel 提升为 Selection(3)，若紧随其后发生场景删除
+    // （onSceneChanged），scheduleSceneUpdate 不会将其降级回 LightUpdate(2)，因此这里必须显式包含
+    // Selection 级别，否则待删除图元会在 Selection 分支中被跳过。
+    const bool needApplyLight =
+        (level == RefreshLevel::LightUpdate) ||
+        (level == RefreshLevel::Selection) ||
+        !m_pendingDeletedIds.empty();
+    if (needApplyLight)
     {
         applyLightRefresh(sm);
-    }
-
-    // [E5-P1 修复] Selection 级别：选择态变化走增量路径。
-    // 选择高亮通过 modifyRenderEntity 修改样式（虚线轮廓 vs 实线），
-    // 而非全量 gather+tessellate+submit。对于大批量选择变化，降级到 LightUpdate。
-    if (level == RefreshLevel::Selection)
-    {
-        // 选择变化量小时走增量修改，量大时降级到 LightUpdate
-        if (m_pendingDirtyIds.size() > 100)
-        {
-            applyLightRefresh(sm);
-        }
-        else
-        {
-            // 小批量选择变化：仅修改受影响图元的渲染样式
-            for (auto id : m_pendingDirtyIds)
-            {
-                auto uid = static_cast<uint64_t>(id);
-                if (m_renderedEntityIds.count(uid))
-                {
-                    auto* entity = sm->findEntityById(id);
-                    if (entity)
-                    {
-                        std::vector<render::VertexP3C3> vertices;
-                        render::PrimitiveType primType;
-                        const QPointF cam = m_renderWidget->cameraCenter();
-                        const double cameraCenter[2] = { cam.x(), cam.y() };
-                        if (entityToVertices(entity, vertices, primType, cameraCenter))
-                        {
-                            m_renderWidget->modifyRenderEntity(uid, vertices.data(), static_cast<uint32_t>(vertices.size()), primType);
-                        }
-                    }
-                }
-            }
-        }
     }
 
     // 仅显式 FullRefresh 级别走此分支，避免与 LightUpdate 的内部回退重复执行

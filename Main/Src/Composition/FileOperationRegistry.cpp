@@ -360,6 +360,19 @@ void FileOperationRegistry::registerFileOpenOps()
     reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::File_Open, [this] {
         QString filePath = FileDialogService::getOpenFileName(
             m_parentWidget, QObject::tr("Open File"), FileDialogService::openFileFilter());
+        if (filePath.isEmpty())
+        {
+            return;
+        }
+        // 2D 的“打开”仅允许自定义 2D 文档（.sy），其它格式走“导入”
+        if (!filePath.toLower().endsWith(QStringLiteral(".sy")))
+        {
+            QMessageBox::warning(m_parentWidget,
+                QObject::tr("Open Error"),
+                QObject::tr("Only SanYi 2D files (*.sy) can be opened here.\n"
+                            "Use File ▸ Import for other formats."));
+            return;
+        }
         doOpenFile(filePath);
     }));
 
