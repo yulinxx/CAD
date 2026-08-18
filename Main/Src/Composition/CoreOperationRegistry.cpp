@@ -1246,9 +1246,9 @@ void CoreOperationRegistry::registerEditOperations()
         auto* scene = editService->sceneManager();
         const OperationId target =
             canMergeSelectedBeziers(scene) ? OperationId::Edit_MergeBezier : OperationId::Edit_SplitBezier;
-        if (OperationBus* bus = OperationBus::instance())
+        if (m_bus)
         {
-            bus->run(target);
+            m_bus->run(target);
         }
     }));
 
