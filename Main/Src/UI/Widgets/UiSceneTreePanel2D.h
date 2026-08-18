@@ -72,6 +72,8 @@ signals:
 
 private:
     void onModelSelectionChanged();
+    /// 语言切换时刷新缓存的上下文菜单文本（菜单仅在构造时构建一次）
+    void retranslateMenu();
     /// 右键上下文菜单：对当前多选实体执行显示/隐藏/锁定/删除等批量操作
     void showContextMenu(const QPoint& pos);
     /// 全选顶层行（用 QItemSelection 区间，O(1)，不逐行枚举）

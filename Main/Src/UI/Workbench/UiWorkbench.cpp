@@ -6,6 +6,9 @@
 #include <QShortcut>
 #include <QSizePolicy>
 #include <QTextEdit>
+#include <QPlainTextEdit>
+#include <QLineEdit>
+#include <QApplication>
 #include <QToolBar>
 #include <QWidget>
 #include <QEvent>
@@ -533,6 +536,62 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
     }
 
     vp->setDocument(m_services.document2D);
+
+    // 全局快捷键：Delete/Backspace 删除选中、Ctrl+A 全选、Esc 取消选择。
+    // 采用窗口级 QShortcut（不依赖渲染控件焦点）：macOS 下 QOpenGLWidget 不会自动获焦，
+    // 且选择可能来自场景树面板而非画布，全局快捷键可保证无论焦点在画布还是场景树都能生效。
+    // 处于文本编辑（行编辑/多行文本）时不拦截，避免破坏正常输入。
+    const auto editingText = []() -> bool {
+        QWidget* fw = QApplication::focusWidget();
+        return fw && (qobject_cast<QLineEdit*>(fw) || qobject_cast<QTextEdit*>(fw) ||
+                       qobject_cast<QPlainTextEdit*>(fw));
+    };
+    const auto deleteSelectedShapes = [this, editingText]() {
+        if (editingText())
+        {
+            return;
+        }
+        if (m_services.sceneEditService)
+        {
+            m_services.sceneEditService->deleteSelected("Delete");
+        }
+        if (m_services.selectionService)
+        {
+            m_services.selectionService->clear();
+        }
+        if (m_viewport)
+        {
+            m_viewport->requestFullRefresh();
+        }
+    };
+    const auto clearSelectionShapes = [this, editingText]() {
+        if (editingText())
+        {
+            return;
+        }
+        if (m_services.selectionService)
+        {
+            m_services.selectionService->clear();
+        }
+        if (m_viewport)
+        {
+            m_viewport->requestFullRefresh();
+        }
+    };
+
+    auto* deleteSc = new QShortcut(QKeySequence(Qt::Key_Delete), &window);
+    QObject::connect(deleteSc, &QShortcut::activated, this, deleteSelectedShapes);
+    auto* backspaceSc = new QShortcut(QKeySequence(Qt::Key_Backspace), &window);
+    QObject::connect(backspaceSc, &QShortcut::activated, this, deleteSelectedShapes);
+    auto* selectAllSc = new QShortcut(QKeySequence::SelectAll, &window);
+    QObject::connect(selectAllSc, &QShortcut::activated, this, [this, editingText]() {
+        if (!editingText() && m_services.operationBus)
+        {
+            m_services.operationBus->run(OperationId::Edit_SelectAll, {}, OperationSource::Shortcut);
+        }
+    });
+    auto* escSc = new QShortcut(QKeySequence(Qt::Key_Escape), &window);
+    QObject::connect(escSc, &QShortcut::activated, this, clearSelectionShapes);
 
     // 状态回调：将视口状态写入状态中心
     if (m_services.stateCenter)

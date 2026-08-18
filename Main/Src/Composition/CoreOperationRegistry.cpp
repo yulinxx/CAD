@@ -1006,14 +1006,23 @@ void CoreOperationRegistry::registerEditOperations()
 
         if (hasGroup)
         {
-            scene->ungroupSelected();
+            editService->ungroupSelectedEntities();
         }
         else
         {
             auto selected = scene->getSelectedEntities();
             if (selected.size() >= 2)
             {
-                scene->createGroup(selected, "Group");
+                std::vector<Eg::EntityId> ids;
+                ids.reserve(selected.size());
+                for (Eg::SyEntity* e : selected)
+                {
+                    if (e)
+                    {
+                        ids.push_back(e->id);
+                    }
+                }
+                editService->groupEntities(ids, "Group");
             }
         }
     }));
@@ -1021,7 +1030,7 @@ void CoreOperationRegistry::registerEditOperations()
     reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Ungroup, [editService] {
         if (editService)
         {
-            editService->sceneManager()->ungroupSelected();
+            editService->ungroupSelectedEntities();
         }
     }));
 

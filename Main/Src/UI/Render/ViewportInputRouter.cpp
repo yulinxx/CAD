@@ -31,6 +31,7 @@
 #include <QNativeGestureEvent>
 #include <QVariant>
 #include <QRectF>
+#include <QApplication>
 #include <cmath>
 #include "Log/SyLogger.h"
 
@@ -195,6 +196,17 @@ bool ViewportInputRouter::eventFilter(QObject* obj, QEvent* event)
             break;
         case QEvent::MouseButtonPress:
             handleMousePress(static_cast<QMouseEvent*>(event));
+            // 鼠标按下时把键盘焦点交给渲染控件：QOpenGLWidget 不会自动获得键盘焦点，
+            // 否则 Delete/Esc/Ctrl+A 等按键事件无法送达，导致选择图形后无法用删除键删除。
+            // 若焦点已位于渲染控件内部的文本编辑浮层等子控件，则不夺取，避免打断输入。
+            if (m_renderWidget)
+            {
+                QWidget* fw = QApplication::focusWidget();
+                if (fw == nullptr || !m_renderWidget->isAncestorOf(fw))
+                {
+                    m_renderWidget->setFocus(Qt::MouseFocusReason);
+                }
+            }
             break;
         case QEvent::MouseMove:
             handleMouseMove(static_cast<QMouseEvent*>(event));

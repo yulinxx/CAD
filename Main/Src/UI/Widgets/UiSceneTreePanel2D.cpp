@@ -1,6 +1,7 @@
 #include "UiSceneTreePanel2D.h"
 
 #include "SceneTreeModel2D.h"
+#include "UI/LanguageManager.h"
 
 #include <QAbstractItemModel>
 #include <QAction>
@@ -432,6 +433,53 @@ SceneTreePanel2D::SceneTreePanel2D(QWidget* parent)
             m_syncing = false;
         }
     });
+
+    // 上下文菜单只在构造时构建一次，需监听语言切换以刷新其缓存的文本
+    if (auto* lm = LanguageManager::instance())
+    {
+        connect(lm, &LanguageManager::languageChanged, this, &SceneTreePanel2D::retranslateMenu);
+    }
+    retranslateMenu();
+}
+
+void SceneTreePanel2D::retranslateMenu()
+{
+    if (!m_contextMenu)
+    {
+        return;
+    }
+    for (QAction* act : m_contextMenu->actions())
+    {
+        const QString on = act->objectName();
+        if (on == QStringLiteral("ctxShow"))
+        {
+            act->setText(tr("Show"));
+        }
+        else if (on == QStringLiteral("ctxHide"))
+        {
+            act->setText(tr("Hide"));
+        }
+        else if (on == QStringLiteral("ctxLock"))
+        {
+            act->setText(tr("Lock"));
+        }
+        else if (on == QStringLiteral("ctxUnlock"))
+        {
+            act->setText(tr("Unlock"));
+        }
+        else if (on == QStringLiteral("ctxDelete"))
+        {
+            act->setText(tr("Delete"));
+        }
+        else if (on == QStringLiteral("ctxSelectAll"))
+        {
+            act->setText(tr("Select All"));
+        }
+        else if (on == QStringLiteral("ctxClear"))
+        {
+            act->setText(tr("Clear Selection"));
+        }
+    }
 }
 
 SceneTreePanel2D::~SceneTreePanel2D() = default;
