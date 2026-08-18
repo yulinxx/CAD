@@ -583,7 +583,7 @@ ImportResult ImportService::phaseBuildDocument(
             m_editService,
             static_cast<int>(entities.size()));
         m_editService->addEntities(
-            std::move(entities), "Import " + context.sourcePath.toStdString(), CommitMode::Direct);
+            std::move(entities), "Import " + context.sourcePath.toStdString());
         SY_INFO("[ImportService] addEntities completed successfully");
     }
     else if (m_sceneManager)
