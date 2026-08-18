@@ -70,7 +70,12 @@
 
 // 应用组合根组件，负责创建和组装所有核心服务
 // 作为依赖注入的中心点，管理UI层和命令系统的生命周期
-ApplicationCompositionRoot::~ApplicationCompositionRoot() = default;
+ApplicationCompositionRoot::~ApplicationCompositionRoot()
+{
+    // 进程退出时，FillGeometryUpdater（Meyers 单例）的析构晚于本组合根，
+    // 若不在 SceneEditService 仍存活时解绑，其析构会访问已销毁对象导致崩溃。
+    Eg::FillGeometryUpdater::instance().detach();
+}
 
 ISelectionService* ApplicationCompositionRoot::selectionService()
 {
