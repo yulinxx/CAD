@@ -86,7 +86,8 @@ QString FileDialogService::exportFilterForFormat(Fio::FileFormat fmt)
 
 QString FileDialogService::openFileFilter()
 {
-    return allSupportedFilter();
+    // 2D 的“打开”只允许自定义 2D 文档（.sy），其它格式走“导入”
+    return QObject::tr("SanYi 2D File (*.sy);;All Files (*.*)");
 }
 
 QString FileDialogService::saveFileFilter()
