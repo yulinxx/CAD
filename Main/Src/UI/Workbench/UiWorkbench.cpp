@@ -2141,7 +2141,7 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
     // 仅设置初始宽度（窄一点，不挤压 3D 视图），不限制最大宽度，用户可手动拖宽
     if (sceneDock)
     {
-        window.resizeDocks({ sceneDock }, { 220 }, Qt::Horizontal);
+        window.resizeDocks({ sceneDock }, { 180 }, Qt::Horizontal);
     }
     m_scenePanel3D = created;
 
