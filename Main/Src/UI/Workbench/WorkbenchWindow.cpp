@@ -1203,6 +1203,16 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: clearing workbench content");
     clearWorkbenchContent();
 
+    // 切换时同步清理一些容易残留的 UI 语义，避免 2D/3D 视觉状态串线
+    if (m_stateCenter)
+    {
+        QVariantMap meta = m_stateCenter->metadata();
+        meta.remove(QStringLiteral("rightPanelSource"));
+        meta.remove(QStringLiteral("drawToolSource"));
+        meta.remove(QStringLiteral("activeToolId"));
+        m_stateCenter->setMetadata(meta);
+    }
+
     // 5: 设置新工作台上下文（在 attach 之前，确保新工作台能看到正确的状态）
     setWorkbenchSwitchContext(workbenchId, switchContextText);
 

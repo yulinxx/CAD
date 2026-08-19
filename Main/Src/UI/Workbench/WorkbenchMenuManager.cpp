@@ -525,6 +525,50 @@ void WorkbenchMenuManager::buildFileMenu()
     QObject::connect(exitAction, &QAction::triggered, m_window, &QWidget::close);
 }
 
+void WorkbenchMenuManager::refreshImportMenuForWorkbench(const QString& workbenchId)
+{
+    if (!m_menuState.fileMenu)
+    {
+        return;
+    }
+
+    if (m_menuState.importMenu)
+    {
+        m_menuState.fileMenu->removeAction(m_menuState.importMenu->menuAction());
+        delete m_menuState.importMenu;
+        m_menuState.importMenu = nullptr;
+    }
+
+    m_menuState.importMenu = m_menuState.fileMenu->addMenu(tr("Import"));
+    m_menuState.importMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/File/import.svg")));
+
+    const QStringList supported = Workbench2D::buildSupportedImportFormats(workbenchId);
+    for (const QString& commandId : supported)
+    {
+        QString label;
+        if (commandId == QStringLiteral("file.import_dxf")) label = tr("DXF formats...");
+        else if (commandId == QStringLiteral("file.import_plt")) label = tr("PLT / HPGL formats...");
+        else if (commandId == QStringLiteral("file.import_svg")) label = tr("SVG formats...");
+        else if (commandId == QStringLiteral("file.import_pdf")) label = tr("PDF formats...");
+        else if (commandId == QStringLiteral("file.import_ai")) label = tr("AI formats...");
+        else if (commandId == QStringLiteral("file.import_ug")) label = tr("UG / IGES formats...");
+        else if (commandId == QStringLiteral("file.import_image")) label = tr("Image formats...");
+        else if (commandId == QStringLiteral("file.import_step")) label = tr("STEP formats...");
+        else if (commandId == QStringLiteral("file.import_model")) label = tr("All Supported...");
+        else if (commandId == QStringLiteral("file.import_obj")) label = tr("OBJ formats...");
+        else if (commandId == QStringLiteral("file.import_stl")) label = tr("STL formats...");
+        else if (commandId == QStringLiteral("file.open_step")) label = tr("Open STEP...");
+        else label = commandId;
+
+        addMenuAction(m_menuState.importMenu, label, commandId);
+    }
+
+    if (m_menuState.importMenu->actions().isEmpty())
+    {
+        addMenuAction(m_menuState.importMenu, tr("All Supported..."), QStringLiteral("file.import_model"));
+    }
+}
+
 void WorkbenchMenuManager::refreshFileMenuForWorkbench(const QString& workbenchId)
 {
     if (!m_menuState.fileMenu)
@@ -553,30 +597,7 @@ void WorkbenchMenuManager::refreshFileMenuForWorkbench(const QString& workbenchI
         return;
     }
 
-    m_menuState.importMenu = m_menuState.fileMenu->addMenu(tr("Import"));
-    m_menuState.importMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/File/import.svg")));
-
-    const QStringList importFormats = { tr("DXF (*.dxf)"),
-        tr("PLT (*.plt, *.hpgl)"),
-        tr("SVG (*.svg)"),
-        tr("PDF (*.pdf)"),
-        tr("Adobe Illustrator (*.ai)"),
-        tr("Unigraphics IGES (*.igs, *.iges)") };
-
-    const QStringList importCmdIds = { QStringLiteral("file.import_dxf"),
-        QStringLiteral("file.import_plt"),
-        QStringLiteral("file.import_svg"),
-        QStringLiteral("file.import_pdf"),
-        QStringLiteral("file.import_ai"),
-        QStringLiteral("file.import_ug") };
-
-    for (int i = 0; i < importFormats.size(); ++i)
-    {
-        addMenuAction(m_menuState.importMenu, importFormats[i], importCmdIds[i]);
-    }
-
-    m_menuState.importMenu->addSeparator();
-    addMenuAction(m_menuState.importMenu, tr("Image..."), QStringLiteral("file.import_image"));
+    refreshImportMenuForWorkbench(workbenchId);
 
     m_menuState.exportMenu = m_menuState.fileMenu->addMenu(tr("Export"));
     m_menuState.exportMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/File/export.svg")));

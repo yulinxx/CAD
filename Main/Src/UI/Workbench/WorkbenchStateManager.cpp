@@ -264,6 +264,8 @@ void WorkbenchStateManager::resetWorkbenchLocalMirror()
     m_windowState.currentSelectionText.clear();
     m_windowState.currentSelectionSource.clear();
     m_windowState.currentSelectionType.clear();
+    m_windowState.currentCommandId.clear();
+    m_windowState.currentCommandPhase.clear();
 }
 
 void WorkbenchStateManager::clearSelectionState()
@@ -339,6 +341,9 @@ void WorkbenchStateManager::resetWorkbenchTransientState()
         meta.insert(QStringLiteral("selectionText"), QString());
         meta.insert(QStringLiteral("selectionType"), QStringLiteral("none"));
         meta.insert(QStringLiteral("viewportStatus"), QStringLiteral("Idle"));
+        meta.insert(QStringLiteral("rightPanelSource"), QStringLiteral("none"));
+        meta.insert(QStringLiteral("drawToolSource"), QStringLiteral("none"));
+        meta.insert(QStringLiteral("activeToolId"), QString());
         m_stateCenter->setMetadata(meta);
         clearSelectionState();
         // 保留 dirty 标记：切换工作台不应清除"未保存"状态

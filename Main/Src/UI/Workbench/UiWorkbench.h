@@ -2,12 +2,14 @@
 
 #include <QString>
 #include <QObject>
+#include <QVector>
 
 #include <memory>
 
 #include "UiServices.h"
 #include "UI/Service/ToolBarContextManager.h"
 #include "Services/UiStateCenter.h"
+#include "DrawToolBarWidget.h"
 
 class QWidget;
 class QToolBar;
@@ -223,6 +225,10 @@ private:
     void setupImportCallbacks(RenderViewport2D* vp, WorkbenchWindow& window);
     /// 创建左侧绘图工具栏 + 顶部编辑工具栏 + 右侧颜色/图层工具栏
     void createToolbars(WorkbenchWindow& window);
+    /// 从命令目录构建菜单/左侧绘图栏共用的 UI 元数据视图
+    static QVector<DrawToolEntry> buildDrawToolEntries();
+    /// 从命令目录汇总可支持的导入格式入口（2D/3D 共用视图）
+    static QStringList buildSupportedImportFormats(const QString& workbenchId);
     /// 绑定并填充 2D 场景树面板（数据经算法层由引擎场景生成，UI 可定制/可缺失）
     void setupSceneTree(WorkbenchWindow& window);
     /// 重建场景树模型并推送到面板（结构性变化：导入/撤销/增删）

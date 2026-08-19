@@ -702,28 +702,91 @@ void Workbench2D::setPanelHostStyle(PanelHostStyle style)
     m_panelHostStyle = style;
 }
 
+namespace
+{
+QVector<DrawToolEntry> buildDrawToolEntriesFromCatalog()
+{
+    QVector<DrawToolEntry> drawTools;
+    for (const auto& entry : CommandCatalog::commands())
+    {
+        if (!hasSurface(entry.surfaces, CommandSurface2D::LeftToolbar))
+        {
+            continue;
+        }
+        DrawToolEntry tool;
+        tool.commandId = QString::fromUtf8(entry.toolName ? entry.toolName : "");
+        tool.displayName = QString::fromUtf8(entry.text ? entry.text : "");
+        tool.tooltip = QString::fromUtf8(entry.text ? entry.text : "");
+        tool.shortcut = QString::fromUtf8(entry.shortcutId ? entry.shortcutId : "");
+        tool.iconResource = QString::fromUtf8(entry.iconResource ? entry.iconResource : "");
+        drawTools.append(tool);
+    }
+    return drawTools;
+}
+
+QStringList buildSupportedImportFormatsFromCatalog(const QString& workbenchId)
+{
+    struct SupportedImportDef
+    {
+        const char* commandId;
+        const char* workbenches;
+    };
+
+    static const SupportedImportDef kSupportedImports[] = {
+        { "file.import_dxf", "2D" },
+        { "file.import_plt", "2D" },
+        { "file.import_svg", "2D" },
+        { "file.import_pdf", "2D" },
+        { "file.import_ai", "2D" },
+        { "file.import_ug", "2D" },
+        { "file.import_image", "2D" },
+        { "file.import_step", "2D,3D" },
+        { "file.import_model", "3D" },
+        { "file.import_obj", "3D" },
+        { "file.import_stl", "3D" },
+        { "file.open_step", "3D" },
+    };
+
+    QStringList formats;
+    const bool want3D = workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0;
+    for (const auto& item : kSupportedImports)
+    {
+        const QString wbList = QString::fromUtf8(item.workbenches);
+        const bool item3D = wbList.contains(QStringLiteral("3D"), Qt::CaseInsensitive);
+        const bool item2D = wbList.contains(QStringLiteral("2D"), Qt::CaseInsensitive);
+        if ((want3D && !item3D) || (!want3D && !item2D))
+        {
+            continue;
+        }
+        const QString cmdId = QString::fromUtf8(item.commandId);
+        if (!formats.contains(cmdId))
+        {
+            formats.append(cmdId);
+        }
+    }
+    return formats;
+}
+}  // namespace
+
+QVector<DrawToolEntry> Workbench2D::buildDrawToolEntries()
+{
+    return buildDrawToolEntriesFromCatalog();
+}
+
+QStringList Workbench2D::buildSupportedImportFormats(const QString& workbenchId)
+{
+    return buildSupportedImportFormatsFromCatalog(workbenchId);
+}
+
+
 void Workbench2D::createToolbars(WorkbenchWindow& window)
 {
     // 绘图工具内容控件（承载样式无关：无论 Dock 还是 Toolbar 复用同一内容）
     auto* drawWidget = new DrawToolBarWidget(&window);
     drawWidget->setOperationBus(m_services.operationBus);
 
-    // 从 CommandCatalog 构建工具定义列表
-    QVector<DrawToolEntry> drawTools;
-    for (const auto& entry : CommandCatalog::commands())
-    {
-        if (hasSurface(entry.surfaces, CommandSurface2D::LeftToolbar))
-        {
-            DrawToolEntry tool;
-            tool.commandId = QString::fromUtf8(entry.toolName ? entry.toolName : "");
-            tool.displayName = QString::fromUtf8(entry.text ? entry.text : "");
-            tool.tooltip = QString::fromUtf8(entry.text ? entry.text : "");
-            tool.shortcut = QString::fromUtf8(entry.shortcutId ? entry.shortcutId : "");
-            tool.iconResource = QString::fromUtf8(entry.iconResource ? entry.iconResource : "");
-            drawTools.append(tool);
-        }
-    }
-    drawWidget->setToolDefinitions(drawTools);
+    // 从同一份元数据构建工具定义列表，作为菜单/左侧工具栏/右侧联动状态的同一来源
+    drawWidget->setToolDefinitions(buildDrawToolEntries());
 
     // 依据承载样式创建左侧面板（Draw Tools）
     if (m_panelHostStyle == PanelHostStyle::Dock)
@@ -1106,6 +1169,7 @@ m_contextManager->setCurrentContext(ToolBarContext::Default);
     // 右侧图层面板（颜色/图层），依据承载样式创建
     m_rightToolBar = new RightToolBar(&window);
     m_rightToolBar->setObjectName(QStringLiteral("RightToolBar"));
+    m_rightToolBar->setProperty("uiSource", QStringLiteral("CommandCatalog + LayerManager"));
     if (m_panelHostStyle == PanelHostStyle::Dock)
     {
         window.registerDockWidget(QObject::tr("Layers"), m_rightToolBar, Qt::RightDockWidgetArea);
@@ -1118,6 +1182,13 @@ m_contextManager->setCurrentContext(ToolBarContext::Default);
     if (m_services.layerManager)
     {
         m_rightToolBar->setLayerManager(m_services.layerManager, m_services.layerManagerBridge);
+    }
+
+    if (m_services.stateCenter)
+    {
+        QVariantMap meta = m_services.stateCenter->metadata();
+        meta.insert(QStringLiteral("rightPanelSource"), QStringLiteral("LayerManager"));
+        m_services.stateCenter->setMetadata(meta);
     }
 
     // 单击色块 → 若已选中图元则将其移动到该图层（可撤销），并设为当前图层

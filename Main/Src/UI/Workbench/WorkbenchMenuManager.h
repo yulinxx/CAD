@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 #include <QObject>
+#include <QStringList>
 
 class QAction;
 class QActionGroup;
@@ -77,6 +78,8 @@ public:
 
     void refreshFileMenuForWorkbench(const QString& workbenchId);
     void refreshDrawMenuForWorkbench(const QString& workbenchId);
+    /// 从命令目录汇总导入支持格式的菜单项，供 File → Import 统一展示
+    void refreshImportMenuForWorkbench(const QString& workbenchId);
     void refreshEditMenuForWorkbench(const QString& workbenchId);
     void refreshModifyMenuForWorkbench(const QString& workbenchId);
     void refreshAlgorithmMenuForWorkbench(const QString& workbenchId);
