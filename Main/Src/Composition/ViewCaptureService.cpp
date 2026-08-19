@@ -118,7 +118,7 @@ namespace Ui
         // 执行离屏捕获
         std::vector<uint8_t> buf(targetSize.width() * targetSize.height() * 4);
         uint32_t rowPitch = 0;
-        bool ok = renderCaptureFrame(dev, targetSize.width(), targetSize.height(), buf.data(), &rowPitch);
+        int ok = renderReadPixels(dev, 0, 0, targetSize.width(), targetSize.height(), buf.data(), &rowPitch);
 
         // 恢复原视图矩阵（内部会自动同步 cameraCenter）
         if (req.framing != FramingKind::UseCurrent)
@@ -126,7 +126,7 @@ namespace Ui
             renderSetView2D(dev, savedView.data, widget->width(), widget->height());
         }
 
-        if (!ok)
+        if (ok != 1)
         {
             return QImage();
         }
