@@ -68,6 +68,8 @@ public:
     /// 由 JSON 配置驱动构建停靠区域
     /// @return 是否成功应用配置（失败时调用方回退到硬编码骨架）
     bool buildDockAreasFromConfig();
+    /// 载入客户配置并初始化配置相关缓存（工具栏/Dock 共用）
+    bool ensureConfigLoaded();
 #endif
     /// 初始化状态栏骨架
     void initializeStatusBarSkeleton();
@@ -147,5 +149,7 @@ private:
     std::unique_ptr<UiConfigurationManager> m_configManager;
     /// 面板工厂注册表（Dock 配置化）
     std::unique_ptr<UiPanelRegistry> m_panelRegistry;
+    /// 配置驱动布局是否已经构建，避免工具栏/Dock 重复加载
+    bool m_configDrivenLayoutBuilt{ false };
 #endif
 };

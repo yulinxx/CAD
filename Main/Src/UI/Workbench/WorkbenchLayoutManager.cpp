@@ -60,14 +60,46 @@ WorkbenchLayoutManager::~WorkbenchLayoutManager() = default;
 
 void WorkbenchLayoutManager::initializeToolBarSkeleton()
 {
-    // 工具栏骨架只创建承载容器，不在初始化绑定具体动作
+    // 骨架阶段只做容器准备，真正内容由统一入口填充。
     buildToolBars();
 }
 
 void WorkbenchLayoutManager::buildToolBars()
 {
-    // 工具栏骨架只创建承载容器，不在初始化绑定具体动作
+#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
+    if (!ensureConfigLoaded())
+    {
+        return;
+    }
+
+    if (m_configDrivenLayoutBuilt)
+    {
+        return;
+    }
+
+    const UiConfigData* config = m_configManager->configData();
+    if (!config)
+    {
+        return;
+    }
+
+    NullDispatcher dispatcher;
+    UiLayoutBuilder builder(m_parent, &dispatcher, m_panelRegistry.get());
+    builder.buildToolBars(config->toolBars);
+    for (QToolBar* tb : builder.builtToolBars())
+    {
+        if (tb)
+        {
+            m_registeredToolBars.push_back(tb);
+        }
+    }
+    m_configDrivenLayoutBuilt = true;
+    return;
+#endif
+
+    // 保留空壳接口：真实内容由配置驱动模式统一生成。
 }
+
 
 void WorkbenchLayoutManager::initializeDockAreaSkeleton()
 {
@@ -109,27 +141,38 @@ void WorkbenchLayoutManager::buildDockAreas()
 }
 
 #ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
-bool WorkbenchLayoutManager::buildDockAreasFromConfig()
+bool WorkbenchLayoutManager::ensureConfigLoaded()
 {
-    // 懒加载配置管理器与面板注册表
-    if (!m_configManager)
+    if (m_configManager && m_panelRegistry)
     {
-        m_configManager = std::make_unique<UiConfigurationManager>();
-        m_panelRegistry = std::make_unique<UiPanelRegistry>();
-
-        // 注册内置面板工厂：与 JSON 中的 widgetType 对应
-        m_panelRegistry->registerPanel(QStringLiteral("SceneTreePanel"), [](QWidget* parent) {
-            return static_cast<QWidget*>(new SceneTreePanel2D(parent));
-        });
-        m_panelRegistry->registerPanel(QStringLiteral("PropertiesPanel"), [](QWidget* parent) {
-            return static_cast<QWidget*>(new PropertiesPanelWidget(parent));
-        });
+        return true;
     }
+
+    m_configManager = std::make_unique<UiConfigurationManager>();
+    m_panelRegistry = std::make_unique<UiPanelRegistry>();
+
+    // 注册内置面板工厂：与 JSON 中的 widgetType 对应
+    m_panelRegistry->registerPanel(QStringLiteral("SceneTreePanel"), [](QWidget* parent) {
+        return static_cast<QWidget*>(new SceneTreePanel2D(parent));
+    });
+    m_panelRegistry->registerPanel(QStringLiteral("PropertiesPanel"), [](QWidget* parent) {
+        return static_cast<QWidget*>(new PropertiesPanelWidget(parent));
+    });
 
     const QString resourcePath = clientConfigResourcePath();
     if (!m_configManager->applyConfiguration(resourcePath, ConfigFallbackPolicy::Strict))
     {
         SY_ERRORF("[WorkbenchLayoutManager] Failed to load client config: %s", qPrintable(resourcePath));
+        return false;
+    }
+
+    return m_configManager->configData() != nullptr;
+}
+
+bool WorkbenchLayoutManager::buildDockAreasFromConfig()
+{
+    if (!ensureConfigLoaded())
+    {
         return false;
     }
 

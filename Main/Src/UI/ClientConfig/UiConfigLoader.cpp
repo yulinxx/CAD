@@ -147,8 +147,12 @@ std::optional<UiConfigData> UiConfigLoader::loadWithInheritance(const QString& p
         return std::nullopt;
     }
 
-    // 处理 extends 继承：父配置在前，子配置覆盖/追加
-    const QString extends = root.value(QStringLiteral("extends")).toString();
+    // 处理 extends / inherits 继承：父配置在前，子配置覆盖/追加
+    QString extends = root.value(QStringLiteral("extends")).toString();
+    if (extends.isEmpty())
+    {
+        extends = root.value(QStringLiteral("inherits")).toString();
+    }
     if (!extends.isEmpty())
     {
         // 根据当前路径推导父配置的完整路径

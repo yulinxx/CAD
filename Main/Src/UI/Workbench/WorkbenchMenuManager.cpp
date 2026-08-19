@@ -37,6 +37,7 @@
 #include <QFileInfo>
 #include <QKeySequence>
 #include <QStringList>
+#include <algorithm>
 #include <functional>
 
 namespace
@@ -118,6 +119,26 @@ namespace
     QString currentWorkbenchId(const UiStateCenter* stateCenter)
     {
         return stateCenter ? stateCenter->currentWorkbenchId() : QStringLiteral("2D");
+    }
+
+    QMenu* findTopLevelMenu(WorkbenchWindow* window, const QString& title)
+    {
+        if (!window || !window->menuBar())
+        {
+            return nullptr;
+        }
+
+        for (QAction* action : window->menuBar()->actions())
+        {
+            if (QMenu* menu = action ? action->menu() : nullptr)
+            {
+                if (menu->title().compare(title, Qt::CaseInsensitive) == 0)
+                {
+                    return menu;
+                }
+            }
+        }
+        return nullptr;
     }
 
     bool commandEnabledForWorkbench(const QStringList& workbenches, const QString& workbenchId)
@@ -310,6 +331,8 @@ void WorkbenchMenuManager::rebuildAllMenus()
     rebuildMenusFromConfig();
     bindConfiguredMenuState();
     bindMenuCommands();
+
+    
 }
 
 void WorkbenchMenuManager::rebuildMenusFromConfig()
@@ -336,12 +359,11 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
         : QStringLiteral("san_yi");
     const QString resourcePath = QStringLiteral(":/configs/%1.json").arg(clientId);
 
-    // 这里使用配置管理器统一加载客户配置；失败则回退到 san_yi.json
+    // 这里使用配置管理器统一加载客户配置；失败则回退到 legacy 菜单路径。
     const bool loaded = m_menuConfigManager->applyConfiguration(resourcePath, ConfigFallbackPolicy::Fallback);
     const UiConfigData* config = m_menuConfigManager->configData();
     if (!loaded || !config)
     {
-        // 回退到旧路径（buildLegacyMenus 作为最后的静态回退）
         SY_WARNF("[WorkbenchMenuManager] Config menu build failed, fallback to legacy menu path. resource=%s",
             qPrintable(resourcePath));
         buildLegacyMenus();
@@ -361,8 +383,6 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
 
     // 菜单/工具栏由同一个配置对象生成；菜单项会根据 workbenches 字段与当前工作台命令目录双重过滤。
     const QString wbId = currentWorkbenchId(m_stateCenter);
-    // 菜单完整性策略：JSON 声明即展示（配合 workbenches / visibilityScope 过滤）。
-    // 未注册的命令由 UiLayoutBuilder::bindAction 置灰，而不是整体隐藏，保证 2D/3D 结构一致。
     const auto commandAvailable = [this](const QString& commandId) {
         if (commandId.isEmpty())
         {
@@ -379,8 +399,7 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
         filterMenusForWorkbench(config->menus, wbId, commandAvailable, m_workbench ? m_workbench->id() : QString());
 
     // 职责划分：WorkbenchMenuManager 只负责菜单与快捷键；
-    // 工具栏 / Dock 由 WorkbenchLayoutManager（buildToolBars / buildDockAreasFromConfig）统一构建，
-    // 避免同一份配置被两处重复消费导致清理与快照的数据竞争。
+    // 工具栏 / Dock 由 WorkbenchLayoutManager（buildToolBars / buildDockAreasFromConfig）统一构建。
     std::vector<ShortcutDef> filteredShortcuts;
     filteredShortcuts.reserve(config->shortcuts.size());
     for (const auto& shortcut : config->shortcuts)
@@ -423,13 +442,21 @@ void WorkbenchMenuManager::buildLegacyMenus()
     // 顶层菜单统一为 File / Edit / Draw / Algorithm / View / Tools / Help，
     // Draw / Algorithm 提升为独立顶层菜单（不再收敛在 Tools 下），
     // Modify 由 refreshEditMenuForWorkbench 建立到 Edit 下，与配置驱动的 schema 保持一致（2D/3D 同一结构）。
-    m_menuState.fileMenu = m_window->menuBar()->addMenu(tr("File"));
-    m_menuState.editMenu = m_window->menuBar()->addMenu(tr("Edit"));
-    m_menuState.drawMenu = m_window->menuBar()->addMenu(tr("Draw"));
-    m_menuState.algorithmMenu = m_window->menuBar()->addMenu(tr("Algorithm"));
-    m_menuState.viewMenu = m_window->menuBar()->addMenu(tr("View"));
-    m_menuState.toolsMenu = m_window->menuBar()->addMenu(tr("Tools"));
-    m_menuState.helpMenu = m_window->menuBar()->addMenu(tr("Help"));
+    m_menuState.fileMenu = findTopLevelMenu(m_window, tr("File"));
+    m_menuState.editMenu = findTopLevelMenu(m_window, tr("Edit"));
+    m_menuState.drawMenu = findTopLevelMenu(m_window, tr("Draw"));
+    m_menuState.algorithmMenu = findTopLevelMenu(m_window, tr("Algorithm"));
+    m_menuState.viewMenu = findTopLevelMenu(m_window, tr("View"));
+    m_menuState.toolsMenu = findTopLevelMenu(m_window, tr("Tools"));
+    m_menuState.helpMenu = findTopLevelMenu(m_window, tr("Help"));
+
+    if (!m_menuState.fileMenu) m_menuState.fileMenu = m_window->menuBar()->addMenu(tr("File"));
+    if (!m_menuState.editMenu) m_menuState.editMenu = m_window->menuBar()->addMenu(tr("Edit"));
+    if (!m_menuState.drawMenu) m_menuState.drawMenu = m_window->menuBar()->addMenu(tr("Draw"));
+    if (!m_menuState.algorithmMenu) m_menuState.algorithmMenu = m_window->menuBar()->addMenu(tr("Algorithm"));
+    if (!m_menuState.viewMenu) m_menuState.viewMenu = m_window->menuBar()->addMenu(tr("View"));
+    if (!m_menuState.toolsMenu) m_menuState.toolsMenu = m_window->menuBar()->addMenu(tr("Tools"));
+    if (!m_menuState.helpMenu) m_menuState.helpMenu = m_window->menuBar()->addMenu(tr("Help"));
 
     buildFileMenu();
     buildViewMenu();
@@ -1586,6 +1613,7 @@ void WorkbenchMenuManager::refreshConfiguredMenuState()
     refreshMenu(m_menuState.editMenu);
     refreshMenu(m_menuState.algorithmMenu);
     refreshMenu(m_menuState.helpMenu);
+    refreshMenu(m_menuState.drawMenu);
 }
 
 void WorkbenchMenuManager::syncGridSnapMenuState()
