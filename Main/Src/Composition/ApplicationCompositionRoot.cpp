@@ -116,6 +116,7 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     // 装配顺序：UI 服务 → 导入导出 → 对话框 → 脏状态 → 操作注册
     UiServices uiServices = assembleUiServices();
     setupImportExportServices(uiServices);
+    m_uiServices = uiServices;
     m_shellHost->setUiServices(uiServices);
     setupDialogServices();
     setupDirtyStateSync();
