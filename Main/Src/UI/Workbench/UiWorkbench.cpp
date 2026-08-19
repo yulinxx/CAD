@@ -476,7 +476,6 @@ bool Workbench2D::showSettingsDialog(QWidget* /*parent*/)
 
 QWidget* Workbench2D::createCentralViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties)
 {
-    Q_UNUSED(window);
     Q_UNUSED(properties);
     auto* viewport = new RenderViewport2D();
     return viewport;
