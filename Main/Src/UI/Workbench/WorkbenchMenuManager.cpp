@@ -525,6 +525,33 @@ void WorkbenchMenuManager::buildFileMenu()
     QObject::connect(exitAction, &QAction::triggered, m_window, &QWidget::close);
 }
 
+namespace
+{
+struct ImportMenuItemSpec
+{
+    const char* commandId;
+    const char* label2D;
+    const char* label3D;
+};
+
+const ImportMenuItemSpec k2DImportItems[] = {
+    { "file.import_dxf", QT_TR_NOOP("DXF..."), nullptr },
+    { "file.import_plt", QT_TR_NOOP("PLT / HPGL..."), nullptr },
+    { "file.import_svg", QT_TR_NOOP("SVG..."), nullptr },
+    { "file.import_pdf", QT_TR_NOOP("PDF..."), nullptr },
+    { "file.import_ai", QT_TR_NOOP("AI..."), nullptr },
+    { "file.import_ug", QT_TR_NOOP("UG / IGES..."), nullptr },
+    { "file.import_image", QT_TR_NOOP("Image..."), nullptr },
+};
+
+const ImportMenuItemSpec k3DImportItems[] = {
+    { "file.import_model", nullptr, QT_TR_NOOP("Model...") },
+    { "file.import_obj", nullptr, QT_TR_NOOP("OBJ...") },
+    { "file.import_stl", nullptr, QT_TR_NOOP("STL...") },
+    { "file.open_step", nullptr, QT_TR_NOOP("Open STEP...") },
+};
+}
+
 void WorkbenchMenuManager::refreshImportMenuForWorkbench(const QString& workbenchId)
 {
     if (!m_menuState.fileMenu)
@@ -542,30 +569,46 @@ void WorkbenchMenuManager::refreshImportMenuForWorkbench(const QString& workbenc
     m_menuState.importMenu = m_menuState.fileMenu->addMenu(tr("Import"));
     m_menuState.importMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/File/import.svg")));
 
-    const QStringList supported = Workbench2D::buildSupportedImportFormats(workbenchId);
-    for (const QString& commandId : supported)
-    {
-        QString label;
-        if (commandId == QStringLiteral("file.import_dxf")) label = tr("DXF formats...");
-        else if (commandId == QStringLiteral("file.import_plt")) label = tr("PLT / HPGL formats...");
-        else if (commandId == QStringLiteral("file.import_svg")) label = tr("SVG formats...");
-        else if (commandId == QStringLiteral("file.import_pdf")) label = tr("PDF formats...");
-        else if (commandId == QStringLiteral("file.import_ai")) label = tr("AI formats...");
-        else if (commandId == QStringLiteral("file.import_ug")) label = tr("UG / IGES formats...");
-        else if (commandId == QStringLiteral("file.import_image")) label = tr("Image formats...");
-        else if (commandId == QStringLiteral("file.import_step")) label = tr("STEP formats...");
-        else if (commandId == QStringLiteral("file.import_model")) label = tr("All Supported...");
-        else if (commandId == QStringLiteral("file.import_obj")) label = tr("OBJ formats...");
-        else if (commandId == QStringLiteral("file.import_stl")) label = tr("STL formats...");
-        else if (commandId == QStringLiteral("file.open_step")) label = tr("Open STEP...");
-        else label = commandId;
+    const bool is3D = workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0;
+    const QString allSupportedLabel = tr("All Supported Formats...");
+    const QString allSupportedCommand = is3D ? QStringLiteral("file.import_model") : QStringLiteral("file.open");
+    addMenuAction(m_menuState.importMenu, allSupportedLabel, allSupportedCommand);
+    m_menuState.importMenu->addSeparator();
 
-        addMenuAction(m_menuState.importMenu, label, commandId);
+    auto addImportMenuItem = [this, is3D](QMenu* parent, const ImportMenuItemSpec& spec) {
+        if (!parent)
+        {
+            return;
+        }
+        const char* label = is3D ? spec.label3D : spec.label2D;
+        if (!label)
+        {
+            return;
+        }
+        addMenuAction(parent, tr(label), QString::fromUtf8(spec.commandId));
+    };
+
+    auto* commonMenu = m_menuState.importMenu->addMenu(tr("Common Formats..."));
+    if (commonMenu)
+    {
+        addMenuAction(commonMenu, tr("STEP..."), QStringLiteral("file.import_step"));
+    }
+
+    auto* drawingMenu = m_menuState.importMenu->addMenu(tr("2D / Drawing Formats..."));
+    for (const auto& spec : k2DImportItems)
+    {
+        addImportMenuItem(drawingMenu, spec);
+    }
+
+    auto* modelMenu = m_menuState.importMenu->addMenu(tr("3D Model Formats..."));
+    for (const auto& spec : k3DImportItems)
+    {
+        addImportMenuItem(modelMenu, spec);
     }
 
     if (m_menuState.importMenu->actions().isEmpty())
     {
-        addMenuAction(m_menuState.importMenu, tr("All Supported..."), QStringLiteral("file.import_model"));
+        addMenuAction(m_menuState.importMenu, tr("All Supported Formats..."), allSupportedCommand);
     }
 }
 
@@ -587,14 +630,6 @@ void WorkbenchMenuManager::refreshFileMenuForWorkbench(const QString& workbenchI
         m_menuState.fileMenu->removeAction(m_menuState.exportMenu->menuAction());
         delete m_menuState.exportMenu;
         m_menuState.exportMenu = nullptr;
-    }
-
-    // legacy 旧路径下 3D 菜单由 Workbench3D / MenuManager3D 自理（managesOwnMenus=true），
-    // 本函数只服务 2D；3D 相关目录过滤（CommandCatalog3D）已随死分支删除，见架构文档。
-    if (workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0)
-    {
-        SY_DEBUGF("[WorkbenchMenuManager] refreshFileMenuForWorkbench skip 3D (managed by MenuManager3D)");
-        return;
     }
 
     refreshImportMenuForWorkbench(workbenchId);

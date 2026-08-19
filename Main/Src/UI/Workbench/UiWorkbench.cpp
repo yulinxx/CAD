@@ -726,35 +726,34 @@ QVector<DrawToolEntry> buildDrawToolEntriesFromCatalog()
 
 QStringList buildSupportedImportFormatsFromCatalog(const QString& workbenchId)
 {
+    QStringList formats;
+    const bool want3D = workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0;
+
     struct SupportedImportDef
     {
         const char* commandId;
-        const char* workbenches;
+        bool in2D;
+        bool in3D;
     };
 
     static const SupportedImportDef kSupportedImports[] = {
-        { "file.import_dxf", "2D" },
-        { "file.import_plt", "2D" },
-        { "file.import_svg", "2D" },
-        { "file.import_pdf", "2D" },
-        { "file.import_ai", "2D" },
-        { "file.import_ug", "2D" },
-        { "file.import_image", "2D" },
-        { "file.import_step", "2D,3D" },
-        { "file.import_model", "3D" },
-        { "file.import_obj", "3D" },
-        { "file.import_stl", "3D" },
-        { "file.open_step", "3D" },
+        { "file.import_dxf", true, false },
+        { "file.import_plt", true, false },
+        { "file.import_svg", true, false },
+        { "file.import_pdf", true, false },
+        { "file.import_ai", true, false },
+        { "file.import_ug", true, false },
+        { "file.import_image", true, false },
+        { "file.import_step", true, true },
+        { "file.import_model", false, true },
+        { "file.import_obj", false, true },
+        { "file.import_stl", false, true },
+        { "file.open_step", false, true },
     };
 
-    QStringList formats;
-    const bool want3D = workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0;
     for (const auto& item : kSupportedImports)
     {
-        const QString wbList = QString::fromUtf8(item.workbenches);
-        const bool item3D = wbList.contains(QStringLiteral("3D"), Qt::CaseInsensitive);
-        const bool item2D = wbList.contains(QStringLiteral("2D"), Qt::CaseInsensitive);
-        if ((want3D && !item3D) || (!want3D && !item2D))
+        if ((want3D && !item.in3D) || (!want3D && !item.in2D))
         {
             continue;
         }
