@@ -33,9 +33,10 @@
 #include "Ut/Mat.h"
 #include "Ut/Vec.h"
 #include "Log/SyLogger.h"
-#include "UiWorkbench.h"
-#include "WorkbenchWindow.h"
-#include "RenderViewport2D.h"
+#include "UI/Service/ViewCaptureService.h"
+#include "UI/Workbench/WorkbenchWindow.h"
+#include "UI/Workbench/UiWorkbench.h"
+#include "UI/Render/RenderViewport2D.h"
 
 #include <QObject>
 #include <QWidget>
@@ -301,7 +302,8 @@ CoreOperationRegistry::CoreOperationRegistry(OperationBus* bus,
     UiStateCenter* stateCenter,
     LayerEditService* layerEditService,
     UnitManager* unitManager,
-    QWidget* parentWidget)
+    QWidget* parentWidget,
+    Ui::ViewCaptureService* captureService)
     : m_bus(bus)
     , m_editService(editService)
     , m_undoManager(undoManager)
@@ -312,6 +314,7 @@ CoreOperationRegistry::CoreOperationRegistry(OperationBus* bus,
     , m_layerEditService(layerEditService)
     , m_unitManager(unitManager)
     , m_parentWidget(parentWidget)
+    , m_captureService(captureService)
 {
 }
 
@@ -586,7 +589,8 @@ void CoreOperationRegistry::registerEditOperations()
         auto* scene = editService->sceneManager();
         const Ut::Vec2d anchor = pasteAnchor();
         QString err;
-        Eg::SyEntity* image = ImagePasteService::pasteClipboardImage(scene, anchor, err);
+        // 经 SceneEditService 添加，支持撤销/重做
+        Eg::SyEntity* image = ImagePasteService::pasteClipboardImage(scene, anchor, err, nullptr, editService);
         if (!image)
         {
             if (!err.isEmpty())
@@ -1481,5 +1485,33 @@ void CoreOperationRegistry::registerViewOperations()
             const int unit = params.value(
                 QStringLiteral("unit"), static_cast<int>(UnitManager::Unit::Millimeter)).toInt();
             unitManager->setDisplayUnit(static_cast<UnitManager::Unit>(unit));
+        }));
+
+    // ---- 截图（F12） ----
+    reg.registerOperation(std::make_unique<LambdaOperation>(
+        OperationId::View_Capture, [captureService = m_captureService, hub] {
+            if (!captureService || !hub)
+            {
+                return;
+            }
+            if (auto* vp = hub->viewport())
+            {
+                if (auto* widget = vp->renderWidget())
+                {
+                    Ui::CaptureRequest req;
+                    req.scope = Ui::CaptureScope::CurrentView;
+                    req.framing = Ui::FramingKind::UseCurrent;
+                    req.autoSave = true;
+                    QImage img = captureService->capture2D(widget, req);
+                    if (!img.isNull())
+                    {
+                        QString path = captureService->saveImage(img, req, false);
+                        if (!path.isEmpty())
+                        {
+                            SY_INFOF("[View_Capture] Saved to %s", path.toStdString().c_str());
+                        }
+                    }
+                }
+            }
         }));
 }

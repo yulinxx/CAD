@@ -36,6 +36,7 @@
 #include "UI/Services/SelectionService.h"
 #include "UI/Services/ISelectionService.h"
 #include "UI/Services/ViewportActionHub.h"
+#include "UI/Service/ViewCaptureService.h"
 
 #include "UI/Algorithm/AlgorithmApplicationService.h"
 #include "UI2D/Operation/AlgorithmRunner.h"
@@ -99,6 +100,7 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     , m_clipboard(std::make_unique<Eg::EntityClipboard>())
     , m_viewportActionHub(std::make_unique<ViewportActionHub>())
     , m_unitManager(std::make_unique<UnitManager>())
+    , m_captureService(std::make_unique<Ui::ViewCaptureService>())
     , m_selectionService(std::make_unique<SelectionService>(m_sceneManager.get()))
     , m_document2D(std::make_unique<SceneDocument2D>(m_sceneEditService.get()))
     , m_layerManager(std::make_unique<LayerManager>(m_sceneManager.get()))
@@ -337,7 +339,8 @@ void ApplicationCompositionRoot::registerAllOperations()
         m_stateCenter.get(),
         m_layerEditService.get(),
         m_unitManager.get(),
-        m_shellHost ? m_shellHost->mainWindow() : nullptr);
+        m_shellHost ? m_shellHost->mainWindow() : nullptr,
+        m_captureService.get());
 
     coreOps.registerAll();
 

@@ -4,20 +4,23 @@
  */
 #pragma once
 
+#include "UI/Service/ViewCaptureService.h"
+
 class OperationBus;
 class SceneEditService;
 class IUndoRedoManager;
+
+namespace Eg
+{
+    class EntityClipboard;
+}
+
 class AlgorithmRunner;
 class ViewportActionHub;
 class UiStateCenter;
 class LayerEditService;
 class UnitManager;
 class QWidget;
-
-namespace Eg
-{
-    class EntityClipboard;
-}
 
 class CoreOperationRegistry
 {
@@ -31,7 +34,8 @@ public:
         UiStateCenter* stateCenter,
         LayerEditService* layerEditService,
         UnitManager* unitManager,
-        QWidget* parentWidget);
+        QWidget* parentWidget,
+        Ui::ViewCaptureService* captureService = nullptr);
 
 public:
     void registerAll();
@@ -52,5 +56,6 @@ private:
     UiStateCenter* m_stateCenter;
     LayerEditService* m_layerEditService;
     UnitManager* m_unitManager;
-    QWidget* m_parentWidget;
+    QWidget* m_parentWidget{ nullptr };
+    Ui::ViewCaptureService* m_captureService = nullptr;
 };

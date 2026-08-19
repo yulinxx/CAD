@@ -593,6 +593,16 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
     auto* escSc = new QShortcut(QKeySequence(Qt::Key_Escape), &window);
     QObject::connect(escSc, &QShortcut::activated, this, clearSelectionShapes);
 
+    // F12 截图
+    auto* captureSc = new QShortcut(QKeySequence(Qt::Key_F12), &window);
+    QObject::connect(captureSc, &QShortcut::activated, this, [this, editingText]() {
+        if (editingText() || !m_services.operationBus)
+        {
+            return;
+        }
+        m_services.operationBus->run(OperationId::View_Capture, {}, OperationSource::Shortcut);
+    });
+
     // 状态回调：将视口状态写入状态中心
     if (m_services.stateCenter)
     {

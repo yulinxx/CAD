@@ -42,6 +42,11 @@ class AlgorithmRunner;
 class ViewportActionHub;
 class UnitManager;
 
+namespace Ui
+{
+    class ViewCaptureService;
+}
+
 /**
  * @class ApplicationCompositionRoot
  * @brief 应用程序组合根类
@@ -247,6 +252,9 @@ private:
 
     /// 单位管理器（显示单位 / 算法对话框单位换算）
     std::unique_ptr<UnitManager> m_unitManager;
+
+    /// 截图服务（F12 截图 / 固定视角全场景）
+    std::unique_ptr<Ui::ViewCaptureService> m_captureService;
 
     /// 选择服务（阶段1收口：绑定 SceneManager，由组合根统一创建）
     std::unique_ptr<SelectionService> m_selectionService;

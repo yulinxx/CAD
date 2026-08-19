@@ -1,5 +1,6 @@
 #include "CADApplicationRuntime.h"
 
+#include <QApplication>
 #include <QFileInfo>
 
 #include <cstdio>
@@ -91,6 +92,10 @@ int runCADApplication(int argc, char** argv)
         return cliResult;
     }
 
+    // QApplication 必须在 buildAppPaths() 之前创建，否则 AppPathManager 在解析路径时
+    // 调用 QCoreApplication::applicationDirPath() 会因 QApplication 尚未存在而告警。
+    auto app = std::make_unique<QApplication>(argc, argv);
+
     auto appPaths = MainApp::buildAppPaths(MainApp::appName());
     if (appPaths.appRootPath.empty())
     {
@@ -116,7 +121,7 @@ int runCADApplication(int argc, char** argv)
         return -1;
     }
 
-    CADApplicationRuntime runtime(argc, argv, appPaths);
+    CADApplicationRuntime runtime(std::move(app), appPaths);
     runtime.setStartWorkbenchId(QStringLiteral("2D"));
     return runtime.run();
 }

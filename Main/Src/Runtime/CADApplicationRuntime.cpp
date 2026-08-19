@@ -15,9 +15,9 @@
 #include "Composition/ApplicationCompositionRoot.h"
 #include "UI/Settings/SettingsService.h"
 
-// 构造函数：初始化QApplication并设置应用基本信息
-CADApplicationRuntime::CADApplicationRuntime(int argc, char* argv[], const AppPaths& appPaths)
-    : m_app(std::make_unique<QApplication>(argc, argv))
+// 构造函数：接收已创建的 QApplication（须由调用方在 buildAppPaths 之前创建），并设置应用基本信息
+CADApplicationRuntime::CADApplicationRuntime(std::unique_ptr<QApplication> app, const AppPaths& appPaths)
+    : m_app(std::move(app))
     , m_appPaths(appPaths)
 {
     m_app->setApplicationName(QString::fromStdString(MainApp::appName()));
