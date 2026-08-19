@@ -1,30 +1,10 @@
 #pragma once
 
-#include "../IExportWriter.h"
+#include "ExportWriterBase.h"
 
 /// SVG 格式导出写入器
-class SvgExportWriter : public IExportWriter
+class SvgExportWriter : public ExportWriterBase
 {
 public:
-    Fio::FileFormat format() const override
-    {
-        return Fio::FileFormat::SVG;
-    }
-
-    QStringList supportedExtensions() const override
-    {
-        return { QStringLiteral("svg") };
-    }
-
-    QString formatName() const override
-    {
-        return QStringLiteral("SVG");
-    }
-
-    QString defaultExtension() const override
-    {
-        return QStringLiteral("svg");
-    }
-
-    ExportResult write(const ExportContext& context, const Fio::VecSyEntityPtr& entities) override;
+    SvgExportWriter();
 };

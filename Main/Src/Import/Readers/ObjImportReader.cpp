@@ -3,6 +3,11 @@
 #include "Engine3D/Loader/ObjLoader.h"
 #include "Log/SyLogger.h"
 
+ObjImportReader::ObjImportReader()
+    : ImportReaderBase(Fio::FileFormat::OBJ, { QStringLiteral("obj") }, QStringLiteral("OBJ"))
+{
+}
+
 /**
  * @brief OBJ 文件导入实现
  * 使用 Eg::ObjLoader 加载网格，包装为 SyMeshEntity 后通过基类指针返回。

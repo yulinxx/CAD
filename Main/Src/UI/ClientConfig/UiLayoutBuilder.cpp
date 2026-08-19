@@ -1,6 +1,7 @@
 #include "UiLayoutBuilder.h"
 #include "UiPanelRegistry.h"
 
+#include "UI2D/Operation/CommandCatalog.h"
 #include "Log/SyLogger.h"
 
 #include <QAction>
@@ -57,6 +58,24 @@ namespace
         }
         return id;
     }
+
+    QString resolveIconFromCatalog(const QString& commandId)
+    {
+        if (commandId.isEmpty())
+        {
+            return QString();
+        }
+        const OperationId opId = CommandCatalog::operationForCommandId(commandId);
+        if (opId != OperationId::None)
+        {
+            const CommandEntry2D* entry = CommandCatalog::findByOperation(opId);
+            if (entry && entry->iconResource)
+            {
+                return QString::fromUtf8(entry->iconResource);
+            }
+        }
+        return QString();
+    }
 }  // namespace
 
 UiLayoutBuilder::UiLayoutBuilder(QMainWindow* window, IUiCommandDispatcher* dispatcher, UiPanelRegistry* panelRegistry)
@@ -92,9 +111,14 @@ void UiLayoutBuilder::bindAction(QAction* action,
     {
         action->setText(text);
     }
-    if (!iconResource.isEmpty())
+    QString resolvedIcon = iconResource;
+    if (resolvedIcon.isEmpty())
     {
-        action->setIcon(QIcon(iconResource));
+        resolvedIcon = resolveIconFromCatalog(commandId);
+    }
+    if (!resolvedIcon.isEmpty())
+    {
+        action->setIcon(QIcon(resolvedIcon));
     }
     if (!workbenchId.isEmpty())
     {

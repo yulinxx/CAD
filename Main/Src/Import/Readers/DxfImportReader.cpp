@@ -1,126 +1,28 @@
 #include "DxfImportReader.h"
 
-#include <cstdint>
-#include <unordered_map>
-#include <vector>
-
-#include <QFileInfo>
-
-#include "FileIO/FileIOManager.h"
-#include "Import/FioEntityConverter.h"
 #include "Log/SyLogger.h"
-#include "Engine/SyEntity/SyEntity.h"
+
+DxfImportReader::DxfImportReader()
+    : ImportReaderBase(Fio::FileFormat::DXF, { QStringLiteral("dxf") }, QStringLiteral("DXF"))
+{
+}
 
 ImportResult DxfImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
 {
     SY_INFOF("[DxfImportReader] read START: path=%s", context.sourcePath.toUtf8().constData());
 
-    Fio::FileIOManager fileIO;
-    SY_INFO("[DxfImportReader] Creating FileIOManager");
-
-    std::string pathStr = context.sourcePath.toUtf8().toStdString();
-    SY_INFOF("[DxfImportReader] Calling fileIO.importFile: path=%s, format=%d",
-        pathStr.c_str(),
-        static_cast<int>(Fio::FileFormat::DXF));
-
-    QStringList warns;
-    Fio::FileIOManager::WarningCallback warningCb = [](const char* warning, void* ctx) {
-        static_cast<QStringList*>(ctx)->append(QString::fromUtf8(warning));
-    };
-
-    // ===== 主链路：中立 IR 导入（parseToIR → FioEntityConverter） =====
+    // 主链路：中立 IR 导入（parseToIR → FioEntityConverter）
     // FileIO 不再直接实例化 Engine 对象，IR 为跨 DLL 安全的 POD；
     // 若 IR 路径失败（如解析器未实现 IR 或文件不支持），自动回退旧路径。
+    ImportResult result;
+    QString errMsg;
+    if (tryImportViaIR(context, Fio::FileFormat::DXF, outEntities, true, &result, &errMsg))
     {
-        Fio::FioParseResult ir;
-        char irErrBuf[1024] = { 0 };
-        bool irOk = fileIO.importToIR(pathStr.c_str(), Fio::FileFormat::DXF, &ir, irErrBuf, sizeof(irErrBuf));
-
-        if (irOk && ir.entityCount > 0)
-        {
-            // 转换图元的同时收集「图元 → 源图层 sourceId」映射，供构建文档阶段还原图层结构
-            std::unordered_map<int64_t, uint32_t> entityLayerMap;
-            auto converted = FioEntityConverter::convertAll(ir, &entityLayerMap);
-            if (!converted.empty())
-            {
-                outEntities.clear();
-                outEntities.reserve(converted.size());
-                for (auto& e : converted)
-                {
-                    outEntities.emplace_back(std::move(e));
-                }
-
-                // 提取源文件图层表（名称/颜色/可见性），随导入结果带回
-                std::vector<Fio::IrLayerInfo> importedLayers = FioEntityConverter::extractLayers(ir);
-
-                SY_INFOF("[DxfImportReader] IR path succeeded: entities=%zu, layers=%u, mapped=%zu",
-                    outEntities.size(),
-                    importedLayers.size(),
-                    entityLayerMap.size());
-
-                ImportResult result = ImportResult::ok(QStringLiteral("DXF import successful"),
-                    static_cast<int>(outEntities.size()),
-                    static_cast<int>(importedLayers.size()),
-                    warns);
-                result.importedLayers = std::move(importedLayers);
-                result.entityLayerMap = std::move(entityLayerMap);
-                return result;
-            }
-        }
-        SY_WARNF("[DxfImportReader] IR path unavailable, falling back to legacy: %s",
-            irErrBuf[0] ? irErrBuf : "no entities");
+        return result;
     }
+    SY_WARNF("[DxfImportReader] IR path unavailable, falling back to legacy: %s",
+        errMsg.isEmpty() ? "no entities" : errMsg.toUtf8().constData());
 
-    // ===== 回退路径：旧版直接实例化 Engine 对象 =====
-    Eg::SyEntity** raw = nullptr;
-    size_t count = 0;
-    size_t layerCount = 0;
-    char errBuf[1024] = { 0 };
-
-    bool ok = fileIO.importFile(
-        pathStr.c_str(), Fio::FileFormat::DXF, &raw, &count, errBuf, sizeof(errBuf), warningCb, &warns, &layerCount);
-
-    SY_INFOF("[DxfImportReader] fileIO.importFile returned: success=%d, entities=%zu", ok ? 1 : 0, count);
-
-    if (!ok)
-    {
-        QString msg = QString::fromUtf8(errBuf);
-        SY_ERRORF("[DxfImportReader] Failed: %s", msg.toUtf8().constData());
-
-        ImportErrorType errorType = ImportErrorType::ParseFailed;
-        if (msg.contains(QStringLiteral("file not found"), Qt::CaseInsensitive) ||
-            msg.contains(QStringLiteral("cannot open"), Qt::CaseInsensitive))
-        {
-            errorType = ImportErrorType::FileNotFound;
-        }
-        else if (msg.contains(QStringLiteral("unit"), Qt::CaseInsensitive) ||
-            msg.contains(QStringLiteral("scale"), Qt::CaseInsensitive))
-        {
-            errorType = ImportErrorType::UnitIncompatible;
-        }
-        else if (msg.contains(QStringLiteral("coordinate"), Qt::CaseInsensitive) ||
-            msg.contains(QStringLiteral("axis"), Qt::CaseInsensitive))
-        {
-            errorType = ImportErrorType::CoordinateSystemIncompatible;
-        }
-
-        SY_INFO("[DxfImportReader] read END: fail");
-        return ImportResult::fail(msg, errorType, warns);
-    }
-
-    outEntities.clear();
-    outEntities.reserve(count);
-    for (size_t i = 0; i < count; ++i)
-    {
-        outEntities.emplace_back(raw[i]);
-    }
-    Fio::FileIOManager::freeEntityArray(raw);
-
-    // 回退路径不携带图层表信息，图层结构无法还原（图元将归入当前图层）
-    SY_INFOF("[DxfImportReader] read END: success (legacy fallback, layers not restored), entities=%zu, layers=%zu",
-        count,
-        layerCount);
-
-    return ImportResult::ok(
-        QStringLiteral("DXF import successful"), static_cast<int>(count), static_cast<int>(layerCount), warns);
+    // 回退路径：旧版 importFile（不携带图层表信息，图层结构无法还原，图元将归入当前图层）
+    return readViaLegacy(context, Fio::FileFormat::DXF, outEntities);
 }

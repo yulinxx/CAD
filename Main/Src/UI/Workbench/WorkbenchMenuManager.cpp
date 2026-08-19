@@ -25,11 +25,9 @@
 #include "UI/Widgets/UiPropertiesPanel.h"
 #include "Render3D/RenderWidget3D.h"
 #include "ClientConfig/UiClientConfigBase.h"
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
-    #include "ClientConfig/UiConfigurationManager.h"
-    #include "ClientConfig/UiLayoutBuilder.h"
-    #include "ClientConfig/UiPanelRegistry.h"
-#endif
+#include "ClientConfig/UiConfigurationManager.h"
+#include "ClientConfig/UiLayoutBuilder.h"
+#include "ClientConfig/UiPanelRegistry.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -117,12 +115,10 @@ namespace
         }
     }
 
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
     QString currentWorkbenchId(const UiStateCenter* stateCenter)
     {
         return stateCenter ? stateCenter->currentWorkbenchId() : QStringLiteral("2D");
     }
-#endif
 
     bool commandEnabledForWorkbench(const QStringList& workbenches, const QString& workbenchId)
     {
@@ -300,7 +296,7 @@ void WorkbenchMenuManager::setTestViewHandler(std::function<void()> handler)
 
 void WorkbenchMenuManager::rebuildAllMenus()
 {
-    // 先清理旧的全局快捷键动作，防止 2D 的 Undo/Redo 泄漏到 3D 模式
+    // Clear old menus and shortcuts
     clearGlobalShortcuts();
     if (auto* mb = m_window->menuBar())
     {
@@ -308,27 +304,14 @@ void WorkbenchMenuManager::rebuildAllMenus()
     }
     m_menuState = {};
 
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
-    // 配置驱动菜单优先：如果可用，则直接由 JSON 菜单树生成。
-    // 这样 2D / 3D 菜单就共享同一套 schema、图标、工作台可见性和日志行为。
+    // Always use config-driven menus as primary path.
+    // The legacy hardcoded path (buildLegacyMenus) is deprecated and kept
+    // only as a static fallback when config loading fails.
     rebuildMenusFromConfig();
     bindConfiguredMenuState();
-#else
-    buildMenus();
-#endif
-
     bindMenuCommands();
-    // 全局 Undo/Redo 快捷键仅旧路径需要（配置驱动模式的快捷键由 JSON 统一生成）
-#ifndef SANYI_ENABLE_CONFIG_DRIVEN_UI
-    QString wbId = m_stateCenter ? m_stateCenter->currentWorkbenchId() : QStringLiteral("2D");
-    if (wbId.compare(QStringLiteral("2D"), Qt::CaseInsensitive) == 0)
-    {
-        bindShortcuts();
-    }
-#endif
 }
 
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
 void WorkbenchMenuManager::rebuildMenusFromConfig()
 {
     // 配置驱动菜单的原则：同一份 UiConfigData 同时驱动菜单、工具栏、Dock、快捷键。
@@ -358,7 +341,7 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
     const UiConfigData* config = m_menuConfigManager->configData();
     if (!loaded || !config)
     {
-        // 直接回退到旧路径（不能调用 buildMenus()，否则配置模式下会与本站形成递归）
+        // 回退到旧路径（buildLegacyMenus 作为最后的静态回退）
         SY_WARNF("[WorkbenchMenuManager] Config menu build failed, fallback to legacy menu path. resource=%s",
             qPrintable(resourcePath));
         buildLegacyMenus();
@@ -417,7 +400,6 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
         filteredMenus.size(),
         filteredShortcuts.size());
 }
-#endif
 
 void WorkbenchMenuManager::createBaseMenus()
 {
@@ -426,21 +408,13 @@ void WorkbenchMenuManager::createBaseMenus()
 
 void WorkbenchMenuManager::initializeMenuSkeleton()
 {
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
     rebuildMenusFromConfig();
-#else
-    buildMenus();
-#endif
 }
 
 void WorkbenchMenuManager::buildMenus()
 {
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
     rebuildMenusFromConfig();
     bindConfiguredMenuState();
-#else
-    buildLegacyMenus();
-#endif
 }
 
 void WorkbenchMenuManager::buildLegacyMenus()
@@ -1481,7 +1455,6 @@ std::vector<MenuDef> WorkbenchMenuManager::filterMenusForWorkbench(const std::ve
     return filteredMenus;
 }
 
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
 void WorkbenchMenuManager::bindConfiguredMenuState()
 {
     if (!m_stateCenter)
@@ -1528,7 +1501,8 @@ void WorkbenchMenuManager::refreshConfiguredMenuState()
         action->setChecked(checked);
     };
 
-    auto refreshMenu = [&](QMenu* menu) {
+    // 遍历菜单栏中的所有菜单（适配 config-driven 和 legacy 路径）
+    std::function<void(QMenu*)> refreshMenu = [&](QMenu* menu) {
         if (!menu)
         {
             return;
@@ -1537,6 +1511,12 @@ void WorkbenchMenuManager::refreshConfiguredMenuState()
         {
             if (!action)
             {
+                continue;
+            }
+            // 递归处理子菜单
+            if (QMenu* subMenu = action->menu())
+            {
+                refreshMenu(subMenu);
                 continue;
             }
             const QString cmdId = action->property("commandId").toString();
@@ -1588,13 +1568,25 @@ void WorkbenchMenuManager::refreshConfiguredMenuState()
         }
     };
 
+    // config-driven 菜单在 QMenuBar 中；legacy 菜单在 m_menuState 中
+    QMenuBar* menuBar = m_window ? m_window->menuBar() : nullptr;
+    if (menuBar)
+    {
+        for (QAction* act : menuBar->actions())
+        {
+            if (QMenu* menu = act->menu())
+            {
+                refreshMenu(menu);
+            }
+        }
+    }
+    // 回退到 legacy 菜单指针
     refreshMenu(m_menuState.viewMenu);
     refreshMenu(m_menuState.fileMenu);
     refreshMenu(m_menuState.editMenu);
     refreshMenu(m_menuState.algorithmMenu);
     refreshMenu(m_menuState.helpMenu);
 }
-#endif
 
 void WorkbenchMenuManager::syncGridSnapMenuState()
 {

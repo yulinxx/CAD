@@ -1,39 +1,9 @@
 #include "StepExportWriter.h"
 
-#include <vector>
-
-#include "FileIO/FileIOManager.h"
-#include "Log/SyLogger.h"
-
-ExportResult StepExportWriter::write(const ExportContext& context, const Fio::VecSyEntityPtr& entities)
+StepExportWriter::StepExportWriter()
+    : ExportWriterBase(Fio::FileFormat::STEP,
+          { QStringLiteral("stp"), QStringLiteral("step") },
+          QStringLiteral("STEP"),
+          QStringLiteral("step"))
 {
-    Fio::FileIOManager fileIO;
-
-    std::vector<const Eg::SyEntity*> raw;
-    raw.reserve(entities.size());
-    for (const auto& entity : entities)
-    {
-        raw.push_back(entity.get());
-    }
-
-    char errBuf[1024] = { 0 };
-    bool ok = fileIO.exportFile(context.targetPath.toUtf8().toStdString().c_str(),
-        Fio::FileFormat::STEP,
-        raw.data(),
-        raw.size(),
-        errBuf,
-        sizeof(errBuf));
-
-    if (!ok)
-    {
-        QString msg = QString::fromUtf8(errBuf);
-        SY_ERRORF("[StepExportWriter] Failed: %s", msg.toUtf8().constData());
-        return ExportResult::fail(msg);
-    }
-
-    SY_INFOF("[StepExportWriter] Exported %d entities to STEP: %s",
-        (int)entities.size(),
-        context.targetPath.toUtf8().constData());
-
-    return ExportResult::ok(QStringLiteral("STEP export successful"), static_cast<int>(entities.size()));
 }

@@ -32,7 +32,6 @@
 
 #include "Log/SyLogger.h"
 #include <QTimer>
-#include "Log/SyLogger.h"
 
 // ==================== RenderViewport2D 实现 ====================
 
@@ -42,6 +41,7 @@ RenderViewport2D::RenderViewport2D(QWidget* parent)
     setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
     setAutoFillBackground(false);
+    setMinimumSize(640, 480);
 
     initRenderWidget();
 

@@ -1,25 +1,11 @@
 #pragma once
 
-#include "../IImportReader.h"
+#include "ImportReaderBase.h"
 
 /// STEP 格式导入读取器
-class StepImportReader : public IImportReader
+class StepImportReader : public ImportReaderBase
 {
 public:
-    Fio::FileFormat format() const override
-    {
-        return Fio::FileFormat::STEP;
-    }
-
-    QStringList supportedExtensions() const override
-    {
-        return { QStringLiteral("stp"), QStringLiteral("step") };
-    }
-
-    QString formatName() const override
-    {
-        return QStringLiteral("STEP");
-    }
-
+    StepImportReader();
     ImportResult read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities) override;
 };

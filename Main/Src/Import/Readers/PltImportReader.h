@@ -1,25 +1,11 @@
 #pragma once
 
-#include "../IImportReader.h"
+#include "ImportReaderBase.h"
 
 /// PLT (HPGL) 格式导入读取器
-class PltImportReader : public IImportReader
+class PltImportReader : public ImportReaderBase
 {
 public:
-    Fio::FileFormat format() const override
-    {
-        return Fio::FileFormat::PLT;
-    }
-
-    QStringList supportedExtensions() const override
-    {
-        return { QStringLiteral("plt"), QStringLiteral("hpgl") };
-    }
-
-    QString formatName() const override
-    {
-        return QStringLiteral("PLT");
-    }
-
+    PltImportReader();
     ImportResult read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities) override;
 };

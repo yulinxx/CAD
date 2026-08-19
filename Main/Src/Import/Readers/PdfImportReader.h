@@ -1,25 +1,11 @@
 #pragma once
 
-#include "../IImportReader.h"
+#include "ImportReaderBase.h"
 
 /// PDF 格式导入读取器
-class PdfImportReader : public IImportReader
+class PdfImportReader : public ImportReaderBase
 {
 public:
-    Fio::FileFormat format() const override
-    {
-        return Fio::FileFormat::PDF;
-    }
-
-    QStringList supportedExtensions() const override
-    {
-        return { QStringLiteral("pdf") };
-    }
-
-    QString formatName() const override
-    {
-        return QStringLiteral("PDF");
-    }
-
+    PdfImportReader();
     ImportResult read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities) override;
 };

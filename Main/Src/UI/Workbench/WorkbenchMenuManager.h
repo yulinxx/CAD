@@ -16,14 +16,12 @@ class WorkbenchWindow;
 struct UiFrameworkServices;
 struct UiServices;
 struct MenuDef;
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
 class IUiCommandDispatcher;
 class UiConfigurationManager;
 class UiPanelRegistry;
 class UiLayoutBuilder;
 struct UiConfigData;
 struct MenuDispatcher;
-#endif
 
 using WorkbenchFactory = std::function<UiWorkbench*(const QString& workbenchId)>;
 
@@ -61,10 +59,8 @@ public:
     {
         return m_window;
     }
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
     /// 通过菜单配置重建菜单（JSON 驱动）
     void rebuildMenusFromConfig();
-#endif
     /// 根据工作台和命令可用性过滤配置菜单，便于测试与复用
     static std::vector<MenuDef> filterMenusForWorkbench(const std::vector<MenuDef>& menus,
         const QString& workbenchId,
@@ -146,10 +142,11 @@ private:
         const QString& commandId,
         const QString& fallbackIcon = QString(),
         int options = MenuActionOption_None);
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
+
+    /// 绑定配置菜单状态到状态中心（checkable 状态同步）
     void bindConfiguredMenuState();
+    /// 刷新配置菜单状态
     void refreshConfiguredMenuState();
-#endif
 
     struct MenuState
     {
@@ -194,7 +191,6 @@ private:
     QActionGroup* m_drawToolActionGroup{ nullptr };
     // 全局编辑快捷键动作（窗口级，需在切换工作台时显式清理）
     std::vector<QAction*> m_editShortcuts;
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
     std::unique_ptr<UiConfigurationManager> m_menuConfigManager;
     std::unique_ptr<UiLayoutBuilder> m_menuLayoutBuilder;
     std::unique_ptr<UiPanelRegistry> m_menuPanelRegistry;
@@ -202,5 +198,4 @@ private:
     std::unique_ptr<MenuDispatcher> m_dispatcher;
     // 防止每次 rebuildAllMenus 重复连接状态中心信号
     bool m_configStateBound{ false };
-#endif
 };

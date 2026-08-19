@@ -2,22 +2,17 @@
 
 #include <QFileInfo>
 
-#include "FileIO/FileIOManager.h"
 #include "Log/SyLogger.h"
-#include "Engine/SyEntity/SyEntity.h"
+
+NativeImportReader::NativeImportReader()
+    : ImportReaderBase(
+        Fio::FileFormat::Native, { QStringLiteral("sy"), QStringLiteral("syx") }, QStringLiteral("SanYi Native"))
+{
+}
 
 ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
 {
     SY_INFOF("[NativeImportReader] read START: path=%s", context.sourcePath.toUtf8().constData());
-
-    Fio::FileIOManager fileIO;
-
-    std::string pathStr = context.sourcePath.toUtf8().toStdString();
-
-    QStringList warns;
-    Fio::FileIOManager::WarningCallback warningCb = [](const char* warning, void* ctx) {
-        static_cast<QStringList*>(ctx)->append(QString::fromUtf8(warning));
-    };
 
     // 检测是否为 3D 格式 (.syx)
     QFileInfo fi(context.sourcePath);
@@ -28,51 +23,23 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEn
         is3D ? "3D (.syx)" : "2D (.sy)",
         static_cast<int>(format));
 
-    // 使用 FileIOManager 导入本地格式
-    Eg::SyEntity** raw = nullptr;
-    size_t count = 0;
-    size_t layerCount = 0;
-    char errBuf[1024] = { 0 };
-
-    bool ok = fileIO.importFile(
-        pathStr.c_str(), format, &raw, &count, errBuf, sizeof(errBuf),
-        warningCb, &warns, &layerCount);
-
-    if (!ok)
+    // 主链路：中立 IR 导入（parseToIR → FioEntityConverter）
+    ImportResult result;
+    QString errMsg;
+    if (tryImportViaIR(context, format, outEntities, false, &result, &errMsg))
     {
-        QString msg = QString::fromUtf8(errBuf);
-        SY_ERRORF("[NativeImportReader] Failed: %s", msg.toUtf8().constData());
-
-        ImportErrorType errorType = ImportErrorType::ParseFailed;
-        if (msg.contains(QStringLiteral("file not found"), Qt::CaseInsensitive) ||
-            msg.contains(QStringLiteral("cannot open"), Qt::CaseInsensitive))
-        {
-            errorType = ImportErrorType::FileNotFound;
-        }
-        else if (msg.contains(QStringLiteral("unit"), Qt::CaseInsensitive) ||
-            msg.contains(QStringLiteral("scale"), Qt::CaseInsensitive))
-        {
-            errorType = ImportErrorType::UnitIncompatible;
-        }
-
-        return ImportResult::fail(msg, errorType, warns);
+        return result;
     }
+    SY_WARNF("[NativeImportReader] IR path unavailable, falling back to legacy: %s",
+        errMsg.isEmpty() ? "no entities" : errMsg.toUtf8().constData());
 
-    outEntities.clear();
-    outEntities.reserve(count);
-    for (size_t i = 0; i < count; ++i)
-    {
-        outEntities.emplace_back(raw[i]);
-    }
-    Fio::FileIOManager::freeEntityArray(raw);
+    // 回退路径：旧版 importFile
+    return readViaLegacy(context, format, outEntities);
+}
 
-    SY_INFOF("[NativeImportReader] read END: success=%d, entities=%zu, layers=%zu",
-        ok ? 1 : 0, count, layerCount);
-
-    QString formatDesc = is3D ? QStringLiteral("SanYi 3D Native") : QStringLiteral("SanYi 2D Native");
-    return ImportResult::ok(
-        formatDesc + QStringLiteral(" import successful"),
-        static_cast<int>(count),
-        static_cast<int>(layerCount),
-        warns);
+QString NativeImportReader::successMessage(Fio::FileFormat format) const
+{
+    return format == Fio::FileFormat::Native3D
+        ? QStringLiteral("SanYi 3D Native import successful")
+        : QStringLiteral("SanYi 2D Native import successful");
 }

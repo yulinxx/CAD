@@ -1,25 +1,11 @@
 #pragma once
 
-#include "../IImportReader.h"
+#include "ImportReaderBase.h"
 
 /// SVG 格式导入读取器
-class SvgImportReader : public IImportReader
+class SvgImportReader : public ImportReaderBase
 {
 public:
-    Fio::FileFormat format() const override
-    {
-        return Fio::FileFormat::SVG;
-    }
-
-    QStringList supportedExtensions() const override
-    {
-        return { QStringLiteral("svg"), QStringLiteral("svgz") };
-    }
-
-    QString formatName() const override
-    {
-        return QStringLiteral("SVG");
-    }
-
+    SvgImportReader();
     ImportResult read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities) override;
 };

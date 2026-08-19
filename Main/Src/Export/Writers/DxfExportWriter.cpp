@@ -1,37 +1,6 @@
 #include "DxfExportWriter.h"
 
-#include "FileIO/FileIOManager.h"
-#include "Log/SyLogger.h"
-
-ExportResult DxfExportWriter::write(const ExportContext& context, const Fio::VecSyEntityPtr& entities)
+DxfExportWriter::DxfExportWriter()
+    : ExportWriterBase(Fio::FileFormat::DXF, { QStringLiteral("dxf") }, QStringLiteral("DXF"), QStringLiteral("dxf"))
 {
-    Fio::FileIOManager fileIO;
-
-    std::vector<const Eg::SyEntity*> raw;
-    raw.reserve(entities.size());
-    for (const auto& entity : entities)
-    {
-        raw.push_back(entity.get());
-    }
-
-    char errBuf[1024] = { 0 };
-    bool ok = fileIO.exportFile(context.targetPath.toUtf8().toStdString().c_str(),
-        Fio::FileFormat::DXF,
-        raw.data(),
-        raw.size(),
-        errBuf,
-        sizeof(errBuf));
-
-    if (!ok)
-    {
-        QString msg = QString::fromUtf8(errBuf);
-        SY_ERRORF("[DxfExportWriter] Failed: %s", msg.toUtf8().constData());
-        return ExportResult::fail(msg);
-    }
-
-    SY_INFOF("[DxfExportWriter] Exported %d entities to DXF: %s",
-        (int)entities.size(),
-        context.targetPath.toUtf8().constData());
-
-    return ExportResult::ok(QStringLiteral("DXF export successful"), static_cast<int>(entities.size()));
 }
