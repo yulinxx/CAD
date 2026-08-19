@@ -360,6 +360,9 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
     endif()
 
         set(MAIN_TEST_DEP_SOURCES ${MAIN_APP_SOURCES})
+        # 测试目标必须使用 gtest_main 作为入口，而不能复用应用本身的 main.cpp
+        # （否则 gtest 发现阶段会真正启动 GUI 应用并卡死，导致构建超时失败）。
+        list(FILTER MAIN_TEST_DEP_SOURCES EXCLUDE REGEX ".*/main\\.cpp$")
 
     # P2 测试扩展: 添加 protobuf 生成的源文件以支持 SyEntitySerializer 测试
     # 生成目录由 FileIO target 通过 INTERFACE_SANYI_PROTO_GEN_DIR 属性暴露，位于构建树中

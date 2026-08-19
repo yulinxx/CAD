@@ -593,6 +593,16 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
     auto* escSc = new QShortcut(QKeySequence(Qt::Key_Escape), &window);
     QObject::connect(escSc, &QShortcut::activated, this, clearSelectionShapes);
 
+    // F12 截图
+    auto* captureSc = new QShortcut(QKeySequence(Qt::Key_F12), &window);
+    QObject::connect(captureSc, &QShortcut::activated, this, [this, editingText]() {
+        if (editingText() || !m_services.operationBus)
+        {
+            return;
+        }
+        m_services.operationBus->run(OperationId::View_Capture, {}, OperationSource::Shortcut);
+    });
+
     // 状态回调：将视口状态写入状态中心
     if (m_services.stateCenter)
     {
@@ -1075,20 +1085,23 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         });
 
     // 默认进入 Default 上下文
-    m_contextManager->setCurrentContext(ToolBarContext::Default);
+m_contextManager->setCurrentContext(ToolBarContext::Default);
 
     // 根据选中图元类型自动切换上下文（监听视口选择变化）
     if (m_viewport)
     {
         connect(m_viewport, &RenderViewport2D::selectionChanged, this, [this]() {
-            if (!m_contextManager)
-                return;
+            if (!m_contextManager) return;
             const ToolBarContext newCtx = determineContextFromSelection();
             if (m_contextManager->currentContext() != newCtx)
             {
                 m_contextManager->setCurrentContext(newCtx);
             }
         });
+    }
+    else
+    {
+        SY_INFOF("[Workbench2D] m_viewport is null when setting up selectionChanged connection!");
     }
 
     // 右侧图层面板（颜色/图层），依据承载样式创建
