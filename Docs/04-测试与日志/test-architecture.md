@@ -24,6 +24,10 @@
 - 可重复
 
 **关键文件**：
+- `Renderx/Test/RenderTypesTests.cpp`
+- `Utility/Utility/Test/VecTests.cpp`、`BBox2dTests.cpp`、`GeomMathTests.cpp`
+- `Engine/2D/Test/Geo2DPrimitivesTests.cpp`、`Geo2DConstructAlgorithmsTests.cpp`
+- `Engine/3D/Test/Geo3DPrimitivesExtendedTests.cpp`
 - `UI/2D/Test/BaseToolTests.cpp`
 - `UI/2D/Test/TransformParametersTests.cpp`
 - `UI/Common/Test/CommandKernelTests.cpp`
@@ -33,19 +37,23 @@
 **定义**：测试多个组件协作的行为
 
 **范围**：
-- 命令生命周期测试（CommandLifecycleTests）
-- 渲染管线测试（RenderPipelineTest）
+- 命令生命周期测试（CommandConcurrentTests / UndoRedoTests）
+- 渲染链路测试（RenderViewport2DRegressionTests / ViewportRefreshRegressionTests）
 - 视口刷新测试
 - 选择同步测试
 
 **特点**：
 - 验证组件间交互
 - 覆盖完整流程
-- 执行时间中等（< 100ms / 测试）
+- 执行时间中等
 
 **关键文件**：
-- `Main/Tests/RenderPipelineTest.cpp`
+- `Main/Src/UI/Test/RenderViewport2DRegressionTests.cpp`
+- `Main/Src/UI/Test/ViewportRefreshRegressionTests.cpp`
+- `Main/Src/UI/Test/ViewportInputRegressionTests.cpp`
+- `Main/Src/UI/Test/Scene3DRegressionTests.cpp`
 - `UI/2D/Test/ToolsInteropTests.cpp`
+- `UI/3D/Test/OperationBus3DTests.cpp`
 
 ### 1.3 回归测试
 
@@ -133,23 +141,86 @@ TEST_F(BaseToolTest, LineTool_Creation)
 ### 3.1 测试项目结构
 
 ```
-Main/Tests/
-├── RenderCoreTests.cpp       # 渲染核心测试
-├── RenderPipelineTest.cpp    # 渲染管线测试
-├── CommandLifecycleTests.cpp # 命令生命周期测试
+Main/Src/UI/Test/
+├── FrameworkLifecycleTests.cpp      # 框架生命周期
+├── RenderViewport2DRegressionTests.cpp # 2D 视口回归
+├── ViewportRefreshRegressionTests.cpp  # 视口刷新回归
+├── ViewportInputRegressionTests.cpp    # 视口输入回归
+├── Scene3DRegressionTests.cpp       # 3D 场景回归
+├── RenderWidget3DAdapterTests.cpp   # 3D 适配层测试
+├── SimpleRenderer3DTests.cpp        # 验证渲染器测试
+├── UndoRedoRegressionTests.cpp      # 撤销重做回归
+├── UndoRedoExtendedRegressionTests.cpp
+├── SceneNotifierTests.cpp           # 场景通知测试
+├── SelectionServiceTests.cpp        # 选择服务测试
+├── SyEntitySerializerTests.cpp      # 图元序列化
+├── FioEntityConverterTests.cpp      # IR 转换测试
+├── ImportExportRegressionTests.cpp  # 导入导出回归
+├── LayerPersistenceBridgeTests.cpp  # 图层持久化桥接
+├── ClientConfigTests.cpp            # 客户配置测试
+├── SceneTreeBuilder3DTests.cpp      # 3D 场景树构建
+└── ToolSelectionSyncRegressionTests.cpp
 
 UI/2D/Test/
 ├── TestMain.cpp              # 测试入口
 ├── BaseToolTests.cpp         # 基础工具测试
 ├── ToolManagerTests.cpp      # 工具管理器测试
 ├── TransformParametersTests.cpp # 变换参数测试
-└── ToolsInteropTests.cpp     # 工具交互测试
+├── ToolsInteropTests.cpp     # 工具交互测试
+├── TextEditToolFlowTests.cpp # 文本编辑工具流
+├── TextEditServiceTests.cpp  # 文本编辑服务
+├── ToolShortcutTests.cpp     # 工具快捷键
+├── ParameterFactoryTests.cpp # 参数工厂
+├── ComplexToolsTests.cpp     # 复杂工具
+└── ComplexToolsTestImpl.cpp
 
 UI/Common/Test/
-└── CommandKernelTests.cpp    # 命令内核测试
+├── CommandKernelTests.cpp    # 命令内核测试
+├── CommandConcurrentTests.cpp # 命令并发测试
+├── UndoRedoTests.cpp         # 撤销重做测试
+└── SettingsTableTests.cpp    # 设置表测试
 
 UI/3D/Test/
-└── OperationId3DMappingTest.cpp # 3D操作ID映射测试
+├── CommandCatalog3DTests.cpp # 3D 命令目录测试
+├── OperationBus3DTests.cpp   # 3D 操作总线测试
+├── ToolManager3DTests.cpp    # 3D 工具管理器测试
+├── Lighting3DTests.cpp       # 光照测试
+└── SceneDocumentIO3DTest.cpp # 3D 场景文档 IO
+
+Renderx/Test/
+├── RenderTypesTests.cpp      # 渲染类型测试
+├── BatchQueueTests.cpp       # 批次队列测试
+├── MeshManagerTests.cpp      # 网格管理测试
+├── ArenaTests.cpp            # Arena 分配器测试
+├── SlotMapTests.cpp          # SlotMap 测试
+├── NullBackendTests.cpp      # Null 后端测试
+└── TransientBufferPoolTests.cpp # 暂存缓冲池测试
+
+Engine/2D/Test/
+├── Geo2D*Tests.cpp          # 2D 几何算法
+├── GeometryComputationTests.cpp
+├── SceneManagerTests.cpp    # 场景管理测试
+├── SelectionSemanticsTests.cpp
+├── TessellatorTests.cpp     # 细分器测试
+├── PathOptimizerTests.cpp   # 路径优化测试
+└── RegressionTests.cpp      # 2D 回归
+
+Engine/3D/Test/
+├── Geo3D*Tests.cpp          # 3D 几何算法
+├── GeometryContext3DTests.cpp
+└── TransformerTests.cpp
+
+FileIO/FileIO/Test/
+├── FileImportTests.cpp
+├── SySerializerTests.cpp
+├── FioTypesTests.cpp
+├── FileIOUtilityTests.cpp
+└── FileIORegressionTests.cpp
+
+Utility/Utility/Test/
+├── VecTests.cpp
+├── BBox2dTests.cpp
+└── GeomMathTests.cpp
 ```
 
 ### 3.2 测试命名规范
@@ -162,21 +233,7 @@ UI/3D/Test/
 
 ### 3.3 Mock/Stub 组织
 
-```
-UI/2D/Test/Stub/
-├── Engine2D/                 # Engine2D 模拟
-│   ├── Core/
-│   │   └── SceneManager.h
-│   ├── SyEntity/
-│   │   ├── SyLine.h
-│   │   ├── SyCircle.h
-│   │   └── SyArc.h
-│   └── Edit/
-│       └── SceneEditService.h
-└── Ui/
-    └── ViewWidget/
-        └── ViewRenderCoordinator.h
-```
+当前主要使用 GTest 的 gmock 进行 mock，mock 定义与测试用例同文件（如 `FrameworkLifecycleTests.cpp` 中的 MockSceneManager），不单独维护 Stub 目录。
 
 ---
 
@@ -186,8 +243,8 @@ UI/2D/Test/Stub/
 
 | 模块 | 目标覆盖率 | 当前覆盖率 |
 |------|-----------|-----------|
-| 核心渲染类型 | 90% | 85% |
-| 渲染管线 | 80% | 75% |
+| Renderx 核心类型 | 90% | 85% |
+| 2D 几何算法 | 80% | 75% |
 | UI2D 工具 | 80% | 70% |
 | 命令系统 | 85% | 80% |
 
@@ -280,8 +337,6 @@ struct TestGeometry
 
 ---
 
-## 7. 变更记录
+## 7. 同步说明
 
-| 日期 | 版本 | 变更内容 | 作者 |
-|------|------|----------|------|
-| 2026-07-10 | 1.0.0 | 初版：基于当前测试结构编写 | 架构组 |
+本文的测试文件列表应与当前工作树保持一致。新增 / 删除测试文件时同步更新「3.1 测试项目结构」。

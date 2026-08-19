@@ -44,7 +44,7 @@
 
 | 字段 | 说明 | 示例 |
 |------|------|------|
-| **模块名** | 日志来源模块 | `OperationBus`, `SceneCompiler`, `ToolManager` |
+| **模块名** | 日志来源模块 | `OperationBus`, `SceneRefreshCoordinator`, `ToolManager` |
 | **事件** | 事件类型 | `execute`, `compile`, `render`, `select` |
 | **操作ID** | 操作标识 | `Tool_Line`, `Edit_Delete`, `View_ZoomFit` |
 | **来源** | 触发来源 | `Menu`, `Toolbar`, `Shortcut`, `Gizmo` |
@@ -53,18 +53,17 @@
 ### 2.3 格式示例
 
 ```cpp
-// 命令执行
-SY_INFO("[%s] %s op=%s source=%s result=%s", 
-    busTag(), eventName, operationIdToString(id), 
-    operationSourceToString(source), result.message);
+// 命令执行（OperationBus）
+SY_INFO("[OperationBus] execute op=%s source=%s result=%s",
+    operationIdToString(id), operationSourceToString(source), result.message);
 
-// 场景编译
-SY_INFO("[SceneCompiler] compile sceneType=%s entities=%d batches=%d",
-    sceneType.c_str(), entityCount, batchCount);
+// 场景提交（SceneRefreshCoordinator）
+SY_INFO("[SceneRefreshCoordinator] submit level=%d entities=%d",
+    refreshLevel, entityCount);
 
-// 渲染帧
-SY_DEBUG("[RenderCoreRenderer] render frame=%d batches=%d time=%dms",
-    frameNumber, batchCount, renderTime);
+// 视口刷新（RenderViewport2D）
+SY_DEBUG("[RenderViewport2D] frame=%d entities=%d time=%dms",
+    frameNumber, entityCount, renderTime);
 
 // 错误处理
 SY_ERROR("[OperationBus] execute failed op=%s error=%s",
@@ -75,58 +74,63 @@ SY_ERROR("[OperationBus] execute failed op=%s error=%s",
 
 ## 3. 日志分类
 
-### 3.1 按模块分类
+### 3.1 按模块分类（与当前代码日志标签一致）
 
-| 模块 | 日志标签 | 主要内容 | 状态 |
-|------|----------|----------|------|
-| **CADApplicationRuntime** | `[CADApplicationRuntime]` | 应用启动、初始化、关闭 | ✅ |
-| **AppBootstrapper** | `[AppBootstrapper]` | 组合根初始化、工作台创建、启动序列 | ✅ |
-| **IInteractionDispatcher** | `[InteractionDispatcher]` | 命令执行、提交、取消、撤销、重做 | ✅ |
-| **CreateCommands** | `[CreateCommands]` | 绘制命令激活、提交、取消（线、圆、弧、多段线、多边形） | ✅ |
-| **TransformCommands** | `[TransformCommands]` | 变换命令激活、提交、取消（移动、旋转、复制、删除、镜像） | ✅ |
-| **SelectCommands** | `[SelectCommands]` | 选择命令激活、提交、取消 | ✅ |
-| **SceneDocument2D** | `[SceneDocument2D]` | 文档操作（创建、删除、清空） | ✅ |
-| **WorkbenchWindow** | `[WorkbenchWindow]` | 主窗口创建、工作台切换、菜单构建 | ✅ |
-| **OperationBus** | `[OperationBus]` | 命令执行、结果、状态变化 | ✅ |
-| **SceneCompiler** | `[SceneCompiler]` | 编译过程、图元统计、批次信息 | ✅ |
-| **ToolManager** | `[ToolManager]` | 工具切换、激活/失活、状态变化 | ✅ |
-| **RenderCoreRenderer** | `[RenderCoreRenderer]` | 渲染调度、帧统计、错误处理 | ✅ |
-| **SelectionSet** | `[SelectionSet]` | 选择变化、选中图元、高亮更新 | ✅ |
-| **ViewWidget** | `[ViewWidget]` | 事件处理、相机变化、视图操作 | ✅ |
-| **ToolManager3D** | `[ToolManager3D]` | 3D 工具注册、激活、切换、事件分发 | ✅ |
-| **SelectionTool3D** | `[SelectionTool3D]` | 3D 选择模式、拾取结果、框选操作 | ✅ |
-| **TransformTool3D** | `[TransformTool3D]` | 3D 变换模式切换、操作开始/结束 | ✅ |
-| **NavigationTool3D** | `[NavigationTool3D]` | 3D 导航操作、相机状态变化 | ✅ |
+| 模块 | 日志标签 | 主要内容 |
+|------|----------|----------|
+| **CADApplicationRuntime** | `[CADApplicationRuntime]` | 应用启动、初始化、关闭 |
+| **AppBootstrapper** | `[AppBootstrapper]` | 组合根初始化、工作台创建、启动序列 |
+| **ApplicationCompositionRoot** | `[ApplicationCompositionRoot]` | 服务组装、操作注册 |
+| **InteractionDispatcher** | `[InteractionDispatcher]` | 命令执行、提交、取消、撤销、重做 |
+| **SceneDocument2D** | `[SceneDocument2D]` | 文档操作（创建、删除、清空） |
+| **WorkbenchWindow** | `[WorkbenchWindow]` | 主窗口创建、工作台切换、菜单构建 |
+| **Workbench2D / Workbench3D** | `[Workbench2D]` / `[Workbench3D]` | 工作台装配与 3D 视图链路 |
+| **OperationBus** | `[OperationBus]` | 命令执行、结果、状态变化 |
+| **ToolManager** | `[ToolManager]` | 工具切换、激活/失活、状态变化 |
+| **RenderViewport2D** | `[RenderViewport2D]` | 2D 视口宿主、相机、刷新 |
+| **SceneRefreshCoordinator** | `[SceneRefreshCoordinator]` | 刷新调度、增量/全量提交 |
+| **RenderWidget3D / RenderWidget3DAdapter** | `[RenderWidget3D]` / `[RenderWidget3DAdapter]` | 3D 渲染控件与适配层 |
+| **Viewport3D / Renderer3DFactory** | `[Viewport3D]` / `[Renderer3DFactory]` | 3D 视口宿主与渲染器创建 |
+| **ExportService / ImportService** | `[ExportService]` / `[ImportService]` | 导入导出主链路 |
+| **ImportDispatcher / ExportDispatcher** | `[ImportDispatcher]` / `[ExportDispatcher]` | 格式路由与分发 |
+| **FileManager** | `[FileManager]` | 文件管理、格式识别 |
+| **SceneEditService3D** | `[SceneEditService3D]` | 3D 编辑事务 |
+| **UiShellHost** | `[UiShellHost]` | Shell 宿主、工作台切换 |
+| **UiWorkbench** | `[UiWorkbench]` | 工作台生命周期 |
+| **SettingsService** | `[SettingsService]` | 设置存取 |
+| **SelectionService** | `[SelectionService]` | 选择状态 |
+| **ToolManager3D 相关** | `[OperationBus3D]` / `[CommandRegistry3D]` / `[ServiceLocator3D]` | 3D 操作总线、命令注册、服务定位 |
 
-### 3.2 日志覆盖范围（2026-07-11 更新）
+### 3.2 日志覆盖范围
 
 #### 启动流程
 - ✅ `CADApplicationRuntime`：应用启动、初始化、关闭
 - ✅ `AppBootstrapper`：组合根初始化、工作台创建、启动序列
 
 #### 命令生命周期
-- ✅ `IInteractionDispatcher`：命令执行、提交、取消、撤销、重做
-- ✅ `CreateCommands`：DrawLine、Circle、Arc、Polyline、Polygon 命令激活/提交/取消
-- ✅ `TransformCommands`：Move、Rotate、Copy、Delete、Mirror 命令激活/提交/取消
-- ✅ `SelectCommands`：Select 命令激活/提交/取消
+- ✅ `InteractionDispatcher` / `OperationBus`：命令执行、提交、取消、撤销、重做
+- ✅ `OperationRegistry` / `PendingOp`：操作注册与占位操作
+- ✅ `CommandActionHub`：工具激活快速路径
 
 #### 文档操作
 - ✅ `SceneDocument2D`：图元创建、删除、清空
+- ✅ `SceneEditService3D`：3D 编辑事务
 
-#### 工作台与UI
+#### 工作台与 UI
 - ✅ `WorkbenchWindow`：主窗口创建、工作台切换、菜单构建
+- ✅ `UiShellHost`：Shell 与工作台切换
+- ✅ `Workbench2D` / `Workbench3D`：工作台装配
 
 #### 渲染管线
-- ✅ `RenderCoreRenderer`：编译开始/完成、渲染状态、错误处理
-- ✅ `SceneCompiler`：编译过程、图元统计、批次信息
-- ✅ `SceneTraverser`：场景遍历、图元访问
+- ✅ `RenderViewport2D`：视口刷新、相机变化
+- ✅ `SceneRefreshCoordinator`：增量 / 全量刷新调度
+- ✅ `RenderWidget3D` / `RenderWidget3DAdapter`：3D 控件与适配
+- ✅ `Viewport3D` / `Renderer3DFactory`：3D 视口与渲染器工厂
 
 #### 工具系统
 - ✅ `ToolManager`（UI/2D）：工具切换、激活/失活、状态变化
-- ✅ `ToolManager3D`：3D 工具注册、激活、切换、事件分发
-- ✅ `SelectionTool3D`：3D 选择模式、拾取结果、框选操作
-- ✅ `TransformTool3D`：3D 变换模式切换、操作开始/结束
-- ✅ `NavigationTool3D`：3D 导航操作、相机状态变化
+- ✅ `TextEditTool` / `TextInputTool` / `SelectTool`：具体工具行为
+- ✅ `OperationBus3D` / `CommandRegistry3D`：3D 操作与命令注册
 
 ### 3.2 按流程分类
 
@@ -232,7 +236,7 @@ SyLogger::setFile("app.log");
    grep "ERROR" app.log
 
 2. 根据模块筛选
-   grep "\[SceneCompiler\]" app.log
+   grep "\[OperationBus\]" app.log
 
 3. 根据操作 ID 筛选
    grep "op=Tool_Line" app.log
@@ -274,10 +278,10 @@ SyLogger::setFile("app.log");
 
 ---
 
-## 8. 变更记录
+## 8. 日志标签与代码同步说明
 
-| 日期 | 版本 | 变更内容 | 作者 |
-|------|------|----------|------|
-| 2026-07-11 | 1.2.0 | 补充完整日志覆盖范围：渲染管线、3D工具系统、SelectionSet、ViewWidget | 开发组 |
-| 2026-07-11 | 1.1.0 | 全生命周期日志落地：启动流程、命令生命周期、文档操作、工作台切换 | 开发组 |
-| 2026-07-10 | 1.0.0 | 初版：基于当前日志实现编写 | 架构组 |
+本文的模块标签表以当前代码中的实际 `SY_*` 日志前缀为准。规则：
+
+1. 新增模块日志时使用 `[ModuleName]` 统一前缀。
+2. 删除或重命名模块时同步更新本节。
+3. 已删除组件（`SceneCompiler`、`RenderCoreRenderer`、`SceneTraverser`、`CreateCommands`/`TransformCommands`/`SelectCommands` 等）不再出现在本节。

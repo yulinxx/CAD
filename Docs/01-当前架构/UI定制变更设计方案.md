@@ -1,4 +1,4 @@
-# UI 定制变更设计方案
+# 用户界面定制变更设计方案
 
 ## 1. 项目概况
 
@@ -141,7 +141,7 @@ main()
 | **Observer Pattern** | 状态变更通知（Qt Signals） | `UiStateCenter` |
 | **Strategy Pattern** | 主题、布局策略可替换 | `UiThemeService`、`UiLayoutService` |
 | **Workbench Pattern** | 工作台模式（类似 Eclipse RCP） | `UiWorkbench` → `Workbench2D` / `Workbench3D` |
-| **Adapter Pattern** | 桥接引擎与 UI | `SceneEditServiceAdapter`、`ViewWidgetAdapter` 等 |
+| **Adapter Pattern** | 桥接引擎与 UI | `SceneGeometrySinkAdapter`、`DocumentExportAdapter` 等 |
 
 ### 3.4 当前 UI 组件注册方式
 
@@ -828,7 +828,7 @@ qt_add_resources(${app_name} "CONFIGS"
 实际上，使用 `qt_add_resources` 或 `qt_add_qml_module`（Qt 6.5+）更简洁，可以直接在 CMake 中嵌入资源：
 
 ```cmake
-# Qt 6.5+ 推荐写法
+# 六点五及以上推荐写法
 qt_add_resources(${app_name} "APP_CONFIG"
     PREFIX "/configs"
     FILES
