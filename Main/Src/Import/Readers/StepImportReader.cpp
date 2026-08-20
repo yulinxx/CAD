@@ -3,9 +3,7 @@
 #include "Log/SyLogger.h"
 
 StepImportReader::StepImportReader()
-    : ImportReaderBase(Fio::FileFormat::STEP,
-          { QStringLiteral("stp"), QStringLiteral("step") },
-          QStringLiteral("STEP"))
+    : ImportReaderBase(Fio::FileFormat::STEP, { QStringLiteral("stp"), QStringLiteral("step") }, QStringLiteral("STEP"))
 {
 }
 

@@ -183,11 +183,26 @@ void UiLayoutBuilder::buildMenus(const std::vector<MenuDef>& menus)
             buildMenuItem(qMenu, item);
         }
 
-        SY_INFOF("[UiLayoutBuilder] Menu built id='%s' workbench='%s' items=%d",
+        int enabledCount = 0;
+        for (QAction* act : qMenu->actions())
+        {
+            if (act && act->isEnabled())
+            {
+                ++enabledCount;
+            }
+        }
+        SY_INFOF("[UiLayoutBuilder] Menu built id='%s' label='%s' workbench='%s' items=%d enabled=%d/%d",
             qPrintable(menu.id),
+            qPrintable(actionLabel(menu.label, menu.id)),
             qPrintable(menu.workbenches.join(QStringLiteral(","))),
+            static_cast<int>(menu.items.size()),
+            enabledCount,
             qMenu->actions().size());
     }
+
+    SY_INFOF("[UiLayoutBuilder] All menus built: total=%d topLevelMenus=%d",
+        static_cast<int>(menus.size()),
+        m_window->menuBar() ? m_window->menuBar()->actions().size() : 0);
 }
 
 void UiLayoutBuilder::buildMenuItem(QMenu* parent, const std::variant<MenuActionDef, SubMenuDef, MenuItemType>& item)
@@ -304,7 +319,15 @@ void UiLayoutBuilder::buildToolBars(const std::vector<ToolBarDef>& toolBars)
             }
             bindAction(action, actionDef.commandId, actionDef.label, actionDef.iconName, tb.workbenchId);
         }
+
+        SY_INFOF("[UiLayoutBuilder] ToolBar built id='%s' title='%s' position='%s' items=%d",
+            qPrintable(tb.id),
+            qPrintable(actionLabel(tb.title, tb.id)),
+            qPrintable(tb.workbenchId),
+            toolBar->actions().size());
     }
+
+    SY_INFOF("[UiLayoutBuilder] All toolbars built: total=%d", static_cast<int>(toolBars.size()));
 }
 
 void UiLayoutBuilder::buildDocks(const std::vector<DockDef>& docks)
@@ -336,7 +359,20 @@ void UiLayoutBuilder::buildDocks(const std::vector<DockDef>& docks)
         dockWidget->setProperty("widgetType", dock.widgetType);
         m_window->addDockWidget(toDockArea(dock.position), dockWidget);
         m_builtDocks.push_back(dockWidget);
+
+        const char* dockPos = dock.position == DockPosition::Left     ? "left"
+            : dock.position == DockPosition::Top                      ? "top"
+            : dock.position == DockPosition::Bottom                   ? "bottom"
+                                                                      : "right";
+        SY_INFOF("[UiLayoutBuilder] Dock built id='%s' title='%s' widget='%s' position='%s' visible=%d",
+            qPrintable(dock.id),
+            qPrintable(actionLabel(dock.title, dock.id)),
+            qPrintable(dock.widgetType),
+            dockPos,
+            dock.visible ? 1 : 0);
     }
+
+    SY_INFOF("[UiLayoutBuilder] All docks built: total=%d", static_cast<int>(docks.size()));
 }
 
 void UiLayoutBuilder::buildShortcuts(const std::vector<ShortcutDef>& shortcuts)

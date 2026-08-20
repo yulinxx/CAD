@@ -476,8 +476,10 @@ ImportResult ImportService::phaseParse(const ImportContext& context, Fio::VecSyE
 }
 
 // ===== 3：构建文档 =====
-ImportResult ImportService::phaseBuildDocument(
-    const ImportContext& context, Fio::VecSyEntityPtr& entities, const ImportOptions& options, const ImportResult& parseResult)
+ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
+    Fio::VecSyEntityPtr& entities,
+    const ImportOptions& options,
+    const ImportResult& parseResult)
 {
     updateProgress(ImportPhase::BuildDocument, 0.0f);
     emit importPhaseChanged(ImportPhase::BuildDocument);
@@ -582,8 +584,7 @@ ImportResult ImportService::phaseBuildDocument(
         SY_INFOF("[ImportService] Calling addEntities: editService=%p, entities=%d",
             m_editService,
             static_cast<int>(entities.size()));
-        m_editService->addEntities(
-            std::move(entities), "Import " + context.sourcePath.toStdString());
+        m_editService->addEntities(std::move(entities), "Import " + context.sourcePath.toStdString());
         SY_INFO("[ImportService] addEntities completed successfully");
     }
     else if (m_sceneManager)
@@ -759,8 +760,7 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
             else
             {
                 // 图层数量已达上限：回退到默认图层，避免无限累积导致异常
-                SY_WARNF("[ImportService] Layer count limit reached, falling back to default layer for '%s'",
-                    src.name);
+                SY_WARNF("[ImportService] Layer count limit reached, falling back to default layer for '%s'", src.name);
                 layerId = m_layerManager->findLayerByName("Layer 0");
                 if (layerId < 0)
                 {

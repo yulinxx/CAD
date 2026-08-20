@@ -215,8 +215,7 @@ bool LayerRepository::batchUpdateOrder(
         whereParams["layer_id"] = std::to_string(layerId);
         if (!m_database.update("layers", values, "document_id = :document_id AND layer_id = :layer_id", whereParams))
         {
-            return fail("LayerRepository",
-                "Failed to update order for layer " + std::to_string(layerId));
+            return fail("LayerRepository", "Failed to update order for layer " + std::to_string(layerId));
         }
     }
 

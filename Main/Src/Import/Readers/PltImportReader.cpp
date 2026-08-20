@@ -3,9 +3,7 @@
 #include "Log/SyLogger.h"
 
 PltImportReader::PltImportReader()
-    : ImportReaderBase(Fio::FileFormat::PLT,
-          { QStringLiteral("plt"), QStringLiteral("hpgl") },
-          QStringLiteral("PLT"))
+    : ImportReaderBase(Fio::FileFormat::PLT, { QStringLiteral("plt"), QStringLiteral("hpgl") }, QStringLiteral("PLT"))
 {
 }
 

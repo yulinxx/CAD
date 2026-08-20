@@ -100,8 +100,7 @@ void ViewportNavigation2D::handleWheel(QWheelEvent* event)
         // 触控板 Shift+双指 → 水平平移
         const double scrollValue = (angleDelta.y() != 0)
             ? static_cast<double>(angleDelta.y())
-            : (pixelDelta.isNull() ? static_cast<double>(angleDelta.x())
-                                   : static_cast<double>(pixelDelta.y()));
+            : (pixelDelta.isNull() ? static_cast<double>(angleDelta.x()) : static_cast<double>(pixelDelta.y()));
         m_camera->pan(static_cast<float>(scrollValue) / m_camera->zoomX, 0.0f);
         break;
     }

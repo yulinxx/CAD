@@ -141,7 +141,8 @@ namespace
     class IncrementalVertexSink : public Eg::ISceneGeometrySink
     {
     public:
-        IncrementalVertexSink(std::vector<render::VertexP3C3>& outVertices, render::PrimitiveType& outType,
+        IncrementalVertexSink(std::vector<render::VertexP3C3>& outVertices,
+            render::PrimitiveType& outType,
             const double* cameraCenter = nullptr)
             : m_vertices(outVertices)
             , m_outType(outType)
@@ -366,8 +367,9 @@ void clearEntityVertexCache()
  *   → scheduleSceneUpdate → updateSceneRender → applyLightRefresh → 此函数
  * 此函数处于渲染数据准备层，不涉及 OpenGL 调用。
  */
-bool entityToVertices(
-    const Eg::SyEntity* entity, std::vector<render::VertexP3C3>& outVertices, render::PrimitiveType& outType,
+bool entityToVertices(const Eg::SyEntity* entity,
+    std::vector<render::VertexP3C3>& outVertices,
+    render::PrimitiveType& outType,
     const double* cameraCenter)
 {
     if (!entity)

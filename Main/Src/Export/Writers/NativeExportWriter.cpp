@@ -4,10 +4,8 @@
 #include "Engine3D/SyEntity/SyMeshEntity.h"
 
 NativeExportWriter::NativeExportWriter()
-    : ExportWriterBase(Fio::FileFormat::Native,
-          { QStringLiteral("sy") },
-          QStringLiteral("SanYi Native"),
-          QStringLiteral("sy"))
+    : ExportWriterBase(
+          Fio::FileFormat::Native, { QStringLiteral("sy") }, QStringLiteral("SanYi Native"), QStringLiteral("sy"))
 {
 }
 

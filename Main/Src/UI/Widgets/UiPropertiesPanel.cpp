@@ -175,8 +175,7 @@ namespace
         void setColor(const QColor& c)
         {
             m_color = c;
-            m_button->setStyleSheet(
-                QStringLiteral("background-color: %1; color: %2;")
+            m_button->setStyleSheet(QStringLiteral("background-color: %1; color: %2;")
                     .arg(c.name(QColor::HexRgb))
                     .arg(c.lightnessF() > 0.5 ? QStringLiteral("black") : QStringLiteral("white")));
             m_button->setText(c.name(QColor::HexArgb).toUpper());
@@ -204,15 +203,16 @@ namespace
     // 是否属于"复合编辑"类型：需要多控件/较多空间，改用弹窗编辑，避免内联编辑器被压缩到行高内不可见
     bool isComplexEditType(PropertyEditType type)
     {
-        return type == PropertyEditType::Point2d || type == PropertyEditType::PointList
-            || type == PropertyEditType::Color;
+        return type == PropertyEditType::Point2d || type == PropertyEditType::PointList ||
+            type == PropertyEditType::Color;
     }
 
     // 复合属性（点/点列表/颜色）编辑弹窗：提供充足空间，保证控件完整显示
     class PropertyEditDialog : public QDialog
     {
     public:
-        PropertyEditDialog(const PropertyItem& item, std::shared_ptr<IPropertyEditTarget> target, QWidget* parent = nullptr)
+        PropertyEditDialog(
+            const PropertyItem& item, std::shared_ptr<IPropertyEditTarget> target, QWidget* parent = nullptr)
             : QDialog(parent)
             , m_item(item)
             , m_target(std::move(target))
@@ -244,10 +244,9 @@ namespace
                 const int current = data.value(QStringLiteral("currentIndex"), 0).toInt();
                 const QString label = data.value(QStringLiteral("label"), tr("Point")).toString();
                 m_list->setup(count, current, label);
-                m_list->setPointProvider(
-                    [target = this->m_target, item = this->m_item](int idx) -> QPointF {
-                        return target ? target->pointAt(item, idx) : QPointF();
-                    });
+                m_list->setPointProvider([target = this->m_target, item = this->m_item](int idx) -> QPointF {
+                    return target ? target->pointAt(item, idx) : QPointF();
+                });
                 m_list->setPoint(m_target ? m_target->pointAt(m_item, current) : QPointF());
                 form->addRow(tr("Vertices:"), m_list);
                 break;
@@ -317,6 +316,7 @@ class ReadOnlyFieldDelegate : public QStyledItemDelegate
 {
 public:
     using QStyledItemDelegate::QStyledItemDelegate;
+
     QWidget* createEditor(QWidget*, const QStyleOptionViewItem&, const QModelIndex&) const override
     {
         return nullptr;  // 取消编辑
@@ -558,8 +558,6 @@ void PropertiesPanelWidget::setWorkbenchMode(WorkbenchMode mode)
     refresh();
 }
 
-
-
 void PropertiesPanelWidget::setObjectDetails(const QString& title, const QStringList& lines)
 {
     m_data.objectTitle = title;
@@ -660,7 +658,6 @@ void PropertiesPanelWidget::renderPropertyModel()
 
 void PropertiesPanelWidget::renderInfoText()
 {
-
     new QTreeWidgetItem(m_tree, { tr("Object"), m_data.objectTitle });
 
     if (!m_data.documentType.isEmpty())

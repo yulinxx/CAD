@@ -180,9 +180,22 @@ struct MenuDispatcher final : public IUiCommandDispatcher
         return commandId == QLatin1String("view.switch_to_2d") || commandId == QLatin1String("view.switch_to_3d");
     }
 
+    // 主题切换命令（theme.*）：与工作台切换同理，直接在分发器层面放行。
+    static bool isThemeCommand(const QString& commandId)
+    {
+        return commandId.startsWith(QLatin1String("theme."));
+    }
+
+    // 语言切换命令（language.*）：同上。语言由 LanguageManager 统一管理，
+    // 不注册在 2D/3D 命令目录中，需要分发器识别才可点击。
+    static bool isLanguageCommand(const QString& commandId)
+    {
+        return commandId.startsWith(QLatin1String("language."));
+    }
+
     bool isCommandRegistered(const QString& commandId) const override
     {
-        if (isWorkbenchSwitchCommand(commandId))
+        if (isWorkbenchSwitchCommand(commandId) || isThemeCommand(commandId) || isLanguageCommand(commandId))
         {
             return true;
         }
@@ -201,6 +214,32 @@ struct MenuDispatcher final : public IUiCommandDispatcher
                 qPrintable(commandId),
                 qPrintable(target));
             self->workbenchWindow()->triggerWorkbench(target);
+            return;
+        }
+        // 主题切换：与 legacy 路径一致，直接走主窗口主题切换。
+        if (isThemeCommand(commandId) && self && self->workbenchWindow())
+        {
+            SY_INFOF("[WorkbenchMenuManager] dispatch theme command='%s'", qPrintable(commandId));
+            self->workbenchWindow()->triggerTheme(commandId);
+            return;
+        }
+        // 语言切换：language.<code> → AppLanguage；兼容历史 "language.tw" → 中文。
+        if (isLanguageCommand(commandId))
+        {
+            QString code = commandId.mid(QStringLiteral("language.").size());
+            AppLanguage lang = AppLanguage::English;
+            if (code.compare(QLatin1String("tw"), Qt::CaseInsensitive) == 0)
+            {
+                lang = AppLanguage::Chinese;
+            }
+            else if (const auto parsed = LanguageManager::fromCode(code); parsed.has_value())
+            {
+                lang = *parsed;
+            }
+            SY_INFOF("[WorkbenchMenuManager] dispatch language command='%s' -> AppLanguage(%d)",
+                qPrintable(commandId),
+                static_cast<int>(lang));
+            LM->setLanguage(lang);
             return;
         }
         if (!workbench)
@@ -385,6 +424,13 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
         if (commandId.isEmpty())
         {
             return false;
+        }
+        // 工作台切换 / 主题 / 语言属于窗口级动作命令（由 MenuDispatcher 直接处理），
+        // 不注册在 2D/3D 命令目录中，过滤时必须放行，否则对应菜单项会被移除。
+        if (MenuDispatcher::isWorkbenchSwitchCommand(commandId) || MenuDispatcher::isThemeCommand(commandId) ||
+            MenuDispatcher::isLanguageCommand(commandId))
+        {
+            return true;
         }
         if (!m_workbench)
         {

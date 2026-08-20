@@ -495,8 +495,10 @@ TEST(FrameworkRegressionTest, ViewportSwitch_ViewportStatePerViewport)
     snapshot2D.metadata.insert(QStringLiteral("viewportStatus"), QStringLiteral("zoom=1.5;pan=200,100"));
 
     // 3D 快照保持不变
-    EXPECT_EQ(saved3D.metadata.value(QStringLiteral("viewportStatus")), QStringLiteral("zoom=2.5;pan=100,50;orbit=45,30"));
-    EXPECT_EQ(snapshot3D.metadata.value(QStringLiteral("viewportStatus")), saved3D.metadata.value(QStringLiteral("viewportStatus")));
+    EXPECT_EQ(
+        saved3D.metadata.value(QStringLiteral("viewportStatus")), QStringLiteral("zoom=2.5;pan=100,50;orbit=45,30"));
+    EXPECT_EQ(snapshot3D.metadata.value(QStringLiteral("viewportStatus")),
+        saved3D.metadata.value(QStringLiteral("viewportStatus")));
 }
 
 // ==================== 渲染快照一致性测试 (2026-07-30) ====================

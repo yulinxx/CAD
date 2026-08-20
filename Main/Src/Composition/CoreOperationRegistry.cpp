@@ -265,9 +265,8 @@ namespace
         return cubicCount == 2 || quadCount == 2;
     }
 
-    void collectBezierCandidates(Eg::SceneManager* scene,
-        std::vector<Eg::SyEntity*>& outCubic,
-        std::vector<Eg::SyEntity*>& outQuad)
+    void collectBezierCandidates(
+        Eg::SceneManager* scene, std::vector<Eg::SyEntity*>& outCubic, std::vector<Eg::SyEntity*>& outQuad)
     {
         if (!scene)
         {
@@ -371,8 +370,8 @@ void CoreOperationRegistry::registerAll()
         }
     }));
 
-    reg.registerOperation(std::make_unique<ParamLambdaOperation>(
-        OperationId::Edit_Nudge, [editService](const QVariantMap& params) {
+    reg.registerOperation(
+        std::make_unique<ParamLambdaOperation>(OperationId::Edit_Nudge, [editService](const QVariantMap& params) {
             if (!editService)
             {
                 return;
@@ -609,72 +608,74 @@ void CoreOperationRegistry::registerEditOperations()
         }
     };
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Paste,
-        [editService, clipboard, pasteAnchor, pasteText, pasteImage] {
-        if (!editService)
-        {
-            return;
-        }
-        auto* scene = editService->sceneManager();
-
-        // 图元剪贴板有内容 → 粘贴图元；否则系统剪贴板有纯文本 → 粘贴为矢量文字；
-        // 再否则系统剪贴板有位图 → 粘贴为图片
-        if (clipboard && clipboard->hasContent())
-        {
-            const Ut::Vec2d pastePos = pasteAnchor();
-            auto pasted = clipboard->paste(pastePos);
-            if (pasted.empty())
+    reg.registerOperation(std::make_unique<LambdaOperation>(
+        OperationId::Edit_Paste, [editService, clipboard, pasteAnchor, pasteText, pasteImage] {
+            if (!editService)
             {
                 return;
             }
+            auto* scene = editService->sceneManager();
 
-            std::vector<Eg::EntityId> pastedIds;
-            pastedIds.reserve(pasted.size());
-            for (const auto& e : pasted)
+            // 图元剪贴板有内容 → 粘贴图元；否则系统剪贴板有纯文本 → 粘贴为矢量文字；
+            // 再否则系统剪贴板有位图 → 粘贴为图片
+            if (clipboard && clipboard->hasContent())
             {
-                if (e)
+                const Ut::Vec2d pastePos = pasteAnchor();
+                auto pasted = clipboard->paste(pastePos);
+                if (pasted.empty())
                 {
-                    pastedIds.push_back(e->id);
+                    return;
                 }
-            }
 
-            scene->clearSelection();
-            editService->addEntities(std::move(pasted), "Paste");
-
-            Eg::VecSyEntityPtr pastedEntities;
-            pastedEntities.reserve(pastedIds.size());
-            for (Eg::EntityId id : pastedIds)
-            {
-                if (auto* ent = scene->findEntityById(id))
+                std::vector<Eg::EntityId> pastedIds;
+                pastedIds.reserve(pasted.size());
+                for (const auto& e : pasted)
                 {
-                    pastedEntities.push_back(ent);
+                    if (e)
+                    {
+                        pastedIds.push_back(e->id);
+                    }
                 }
-            }
-            if (!pastedEntities.empty())
-            {
-                scene->selectEntities(pastedEntities);
-            }
-            return;
-        }
 
-        // 回退：外部复制的文字 → 矢量文字；无文字则外部复制的位图 → 图片
-        if (pasteText(true))
-        {
-            return;
-        }
+                scene->clearSelection();
+                editService->addEntities(std::move(pasted), "Paste");
+
+                Eg::VecSyEntityPtr pastedEntities;
+                pastedEntities.reserve(pastedIds.size());
+                for (Eg::EntityId id : pastedIds)
+                {
+                    if (auto* ent = scene->findEntityById(id))
+                    {
+                        pastedEntities.push_back(ent);
+                    }
+                }
+                if (!pastedEntities.empty())
+                {
+                    scene->selectEntities(pastedEntities);
+                }
+                return;
+            }
+
+            // 回退：外部复制的文字 → 矢量文字；无文字则外部复制的位图 → 图片
+            if (pasteText(true))
+            {
+                return;
+            }
+            pasteImage(true);
+        }));
+
+    // 显式"粘贴为文字"：无论图元剪贴板是否有内容，都把系统剪贴板纯文本转为矢量
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_PasteText, [pasteText] {
+        pasteText(true);
+    }));
+
+    // 显式"粘贴为图片"：无论图元剪贴板是否有内容，都把系统剪贴板位图粘贴为图片
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_PasteImage, [pasteImage] {
         pasteImage(true);
     }));
 
-    // 显式"粘贴为文字"：无论图元剪贴板是否有内容，都把系统剪贴板纯文本转为矢量
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_PasteText,
-        [pasteText] { pasteText(true); }));
-
-    // 显式"粘贴为图片"：无论图元剪贴板是否有内容，都把系统剪贴板位图粘贴为图片
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_PasteImage,
-        [pasteImage] { pasteImage(true); }));
-
-    reg.registerOperation(
-        std::make_unique<ParamLambdaOperation>(OperationId::Edit_Duplicate, [editService, parentWidget](const QVariantMap& params) {
+    reg.registerOperation(std::make_unique<ParamLambdaOperation>(
+        OperationId::Edit_Duplicate, [editService, parentWidget](const QVariantMap& params) {
             if (!editService)
             {
                 return;
@@ -743,8 +744,8 @@ void CoreOperationRegistry::registerEditOperations()
         }));
 
     // ---- 变换 ----
-    reg.registerOperation(
-        std::make_unique<ParamLambdaOperation>(OperationId::Edit_Move, [editService, parentWidget](const QVariantMap& params) {
+    reg.registerOperation(std::make_unique<ParamLambdaOperation>(
+        OperationId::Edit_Move, [editService, parentWidget](const QVariantMap& params) {
             if (!editService)
             {
                 return;
@@ -783,8 +784,8 @@ void CoreOperationRegistry::registerEditOperations()
                 false);
         }));
 
-    reg.registerOperation(
-        std::make_unique<ParamLambdaOperation>(OperationId::Edit_Rotate, [editService, parentWidget](const QVariantMap& params) {
+    reg.registerOperation(std::make_unique<ParamLambdaOperation>(
+        OperationId::Edit_Rotate, [editService, parentWidget](const QVariantMap& params) {
             if (!editService)
             {
                 return;
@@ -847,8 +848,8 @@ void CoreOperationRegistry::registerEditOperations()
                 false);
         }));
 
-    reg.registerOperation(
-        std::make_unique<ParamLambdaOperation>(OperationId::Edit_Mirror, [editService, parentWidget](const QVariantMap& params) {
+    reg.registerOperation(std::make_unique<ParamLambdaOperation>(
+        OperationId::Edit_Mirror, [editService, parentWidget](const QVariantMap& params) {
             if (!editService)
             {
                 return;
@@ -1047,9 +1048,9 @@ void CoreOperationRegistry::registerEditOperations()
             }
             auto* scene = editService->sceneManager();
 
-            TransformParameters tp = TransformParameters::createTrim(
-                params.value(QStringLiteral("targetId"), 0).toULongLong(),
-                params.value(QStringLiteral("boundaryId"), 0).toULongLong());
+            TransformParameters tp =
+                TransformParameters::createTrim(params.value(QStringLiteral("targetId"), 0).toULongLong(),
+                    params.value(QStringLiteral("boundaryId"), 0).toULongLong());
 
             Eg::SyEntity* target = nullptr;
             Eg::SyEntity* boundary = nullptr;
@@ -1070,8 +1071,10 @@ void CoreOperationRegistry::registerEditOperations()
                 return;
             }
 
-            const double d1 = (hitX - targetSeg.x1) * (hitX - targetSeg.x1) + (hitY - targetSeg.y1) * (hitY - targetSeg.y1);
-            const double d2 = (hitX - targetSeg.x2) * (hitX - targetSeg.x2) + (hitY - targetSeg.y2) * (hitY - targetSeg.y2);
+            const double d1 =
+                (hitX - targetSeg.x1) * (hitX - targetSeg.x1) + (hitY - targetSeg.y1) * (hitY - targetSeg.y1);
+            const double d2 =
+                (hitX - targetSeg.x2) * (hitX - targetSeg.x2) + (hitY - targetSeg.y2) * (hitY - targetSeg.y2);
             const double newX1 = (d1 <= d2) ? hitX : targetSeg.x1;
             const double newY1 = (d1 <= d2) ? hitY : targetSeg.y1;
             const double newX2 = (d1 <= d2) ? targetSeg.x2 : hitX;
@@ -1103,9 +1106,9 @@ void CoreOperationRegistry::registerEditOperations()
                 return;
             }
 
-            TransformParameters tp = TransformParameters::createExtend(
-                params.value(QStringLiteral("targetId"), 0).toULongLong(),
-                params.value(QStringLiteral("boundaryId"), 0).toULongLong());
+            TransformParameters tp =
+                TransformParameters::createExtend(params.value(QStringLiteral("targetId"), 0).toULongLong(),
+                    params.value(QStringLiteral("boundaryId"), 0).toULongLong());
 
             Eg::SyEntity* target = nullptr;
             Eg::SyEntity* boundary = nullptr;
@@ -1409,8 +1412,8 @@ void CoreOperationRegistry::registerAlgorithmOperations()
     registerAlgoOp(OperationId::Algo_BooleanXor);
 
     // ---- 位图浮雕 ----
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::Algo_ReliefEngravingFromImage, [parentWidget = m_parentWidget] {
+    reg.registerOperation(
+        std::make_unique<LambdaOperation>(OperationId::Algo_ReliefEngravingFromImage, [parentWidget = m_parentWidget] {
             ReliefEngravingOperation2D::run(parentWidget);
         }));
 }
@@ -1457,18 +1460,22 @@ void CoreOperationRegistry::registerViewOperations()
         stateCenter->setMetadata(meta);
     };
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::View_GridVisible, [toggleMetadata] { toggleMetadata("gridVisible"); }));
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::View_SnapEnabled, [toggleMetadata] { toggleMetadata("snapEnabled"); }));
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::View_OrthoMode, [toggleMetadata] { toggleMetadata("orthoMode"); }));
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::View_AngleSnap, [toggleMetadata] { toggleMetadata("angleSnap"); }));
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::View_GridVisible, [toggleMetadata] {
+        toggleMetadata("gridVisible");
+    }));
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::View_SnapEnabled, [toggleMetadata] {
+        toggleMetadata("snapEnabled");
+    }));
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::View_OrthoMode, [toggleMetadata] {
+        toggleMetadata("orthoMode");
+    }));
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::View_AngleSnap, [toggleMetadata] {
+        toggleMetadata("angleSnap");
+    }));
 
     // ---- 图层 ----
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::View_LayerManager, [layerEditService, parentWidget] {
+    reg.registerOperation(
+        std::make_unique<LambdaOperation>(OperationId::View_LayerManager, [layerEditService, parentWidget] {
             if (layerEditService)
             {
                 LayerManagerDialog::showDialog(layerEditService, parentWidget);
@@ -1476,20 +1483,20 @@ void CoreOperationRegistry::registerViewOperations()
         }));
 
     // ---- 显示单位 ----
-    reg.registerOperation(
-        std::make_unique<ParamLambdaOperation>(OperationId::View_SetDisplayUnit, [unitManager](const QVariantMap& params) {
+    reg.registerOperation(std::make_unique<ParamLambdaOperation>(
+        OperationId::View_SetDisplayUnit, [unitManager](const QVariantMap& params) {
             if (!unitManager)
             {
                 return;
             }
-            const int unit = params.value(
-                QStringLiteral("unit"), static_cast<int>(UnitManager::Unit::Millimeter)).toInt();
+            const int unit =
+                params.value(QStringLiteral("unit"), static_cast<int>(UnitManager::Unit::Millimeter)).toInt();
             unitManager->setDisplayUnit(static_cast<UnitManager::Unit>(unit));
         }));
 
     // ---- 截图（F12） ----
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::View_Capture, [captureService = m_captureService, hub] {
+    reg.registerOperation(
+        std::make_unique<LambdaOperation>(OperationId::View_Capture, [captureService = m_captureService, hub] {
             if (!captureService || !hub)
             {
                 return;

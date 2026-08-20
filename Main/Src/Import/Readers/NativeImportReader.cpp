@@ -6,7 +6,7 @@
 
 NativeImportReader::NativeImportReader()
     : ImportReaderBase(
-        Fio::FileFormat::Native, { QStringLiteral("sy"), QStringLiteral("syx") }, QStringLiteral("SanYi Native"))
+          Fio::FileFormat::Native, { QStringLiteral("sy"), QStringLiteral("syx") }, QStringLiteral("SanYi Native"))
 {
 }
 
@@ -39,7 +39,6 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEn
 
 QString NativeImportReader::successMessage(Fio::FileFormat format) const
 {
-    return format == Fio::FileFormat::Native3D
-        ? QStringLiteral("SanYi 3D Native import successful")
-        : QStringLiteral("SanYi 2D Native import successful");
+    return format == Fio::FileFormat::Native3D ? QStringLiteral("SanYi 3D Native import successful")
+                                               : QStringLiteral("SanYi 2D Native import successful");
 }

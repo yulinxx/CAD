@@ -32,11 +32,15 @@ namespace
     // 这些格式走 QImage 导入路径，不经过 ImportService 的矢量读取器。
     const QStringList& imageExtensions()
     {
-        static const QStringList exts = { QStringLiteral("jpg"),    QStringLiteral("jpeg"),
-                                          QStringLiteral("png"),    QStringLiteral("bmp"),
-                                          QStringLiteral("tga"),    QStringLiteral("tiff"),
-                                          QStringLiteral("tif"),    QStringLiteral("gif"),
-                                          QStringLiteral("webp") };
+        static const QStringList exts = { QStringLiteral("jpg"),
+            QStringLiteral("jpeg"),
+            QStringLiteral("png"),
+            QStringLiteral("bmp"),
+            QStringLiteral("tga"),
+            QStringLiteral("tiff"),
+            QStringLiteral("tif"),
+            QStringLiteral("gif"),
+            QStringLiteral("webp") };
         return exts;
     }
 

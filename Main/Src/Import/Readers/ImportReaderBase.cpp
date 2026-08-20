@@ -69,11 +69,11 @@ void ImportReaderBase::decorateError(QString& /*msg*/, const ImportContext& /*co
 }
 
 bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
-                                      Fio::FileFormat format,
-                                      Fio::VecSyEntityPtr& outEntities,
-                                      bool collectLayers,
-                                      ImportResult* result,
-                                      QString* errMsg) const
+    Fio::FileFormat format,
+    Fio::VecSyEntityPtr& outEntities,
+    bool collectLayers,
+    ImportResult* result,
+    QString* errMsg) const
 {
     Fio::FileIOManager fileIO;
     std::string pathStr = context.sourcePath.toUtf8().toStdString();
@@ -107,10 +107,7 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
     }
 
     ImportResult res = ImportResult::ok(
-        successMessage(format),
-        static_cast<int>(outEntities.size()),
-        static_cast<int>(ir.layerCount),
-        QStringList{});
+        successMessage(format), static_cast<int>(outEntities.size()), static_cast<int>(ir.layerCount), QStringList{});
 
     if (collectLayers)
     {
@@ -126,10 +123,8 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
     return true;
 }
 
-ImportResult ImportReaderBase::readViaIR(const ImportContext& context,
-                                         Fio::FileFormat format,
-                                         Fio::VecSyEntityPtr& outEntities,
-                                         bool collectLayers) const
+ImportResult ImportReaderBase::readViaIR(
+    const ImportContext& context, Fio::FileFormat format, Fio::VecSyEntityPtr& outEntities, bool collectLayers) const
 {
     ImportResult result;
     QString errMsg;
@@ -147,9 +142,8 @@ ImportResult ImportReaderBase::readViaIR(const ImportContext& context,
     return ImportResult::fail(errMsg, classifyError(errMsg), QStringList{});
 }
 
-ImportResult ImportReaderBase::readViaLegacy(const ImportContext& context,
-                                             Fio::FileFormat format,
-                                             Fio::VecSyEntityPtr& outEntities) const
+ImportResult ImportReaderBase::readViaLegacy(
+    const ImportContext& context, Fio::FileFormat format, Fio::VecSyEntityPtr& outEntities) const
 {
     Fio::FileIOManager fileIO;
     std::string pathStr = context.sourcePath.toUtf8().toStdString();
@@ -183,10 +177,7 @@ ImportResult ImportReaderBase::readViaLegacy(const ImportContext& context,
     }
     Fio::FileIOManager::freeEntityArray(raw);
 
-    SY_INFOF("[%s] read END: success, entities=%zu, layers=%zu",
-        m_formatName.toUtf8().constData(),
-        count,
-        layerCount);
+    SY_INFOF("[%s] read END: success, entities=%zu, layers=%zu", m_formatName.toUtf8().constData(), count, layerCount);
 
     return ImportResult::ok(successMessage(format), static_cast<int>(count), static_cast<int>(layerCount), warns);
 }

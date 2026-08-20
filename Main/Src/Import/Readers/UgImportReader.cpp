@@ -3,9 +3,8 @@
 #include "Log/SyLogger.h"
 
 UgImportReader::UgImportReader()
-    : ImportReaderBase(Fio::FileFormat::UG,
-          { QStringLiteral("igs"), QStringLiteral("iges") },
-          QStringLiteral("Unigraphics (IGES)"))
+    : ImportReaderBase(
+          Fio::FileFormat::UG, { QStringLiteral("igs"), QStringLiteral("iges") }, QStringLiteral("Unigraphics (IGES)"))
 {
 }
 
@@ -24,9 +23,8 @@ void UgImportReader::decorateError(QString& msg, const ImportContext& context) c
     // 文件是 NX 原生 .prt 时给出更明确的说明
     if (context.sourcePath.endsWith(QStringLiteral(".prt"), Qt::CaseInsensitive))
     {
-        msg = QStringLiteral(
-            "NX native .prt is a private binary format not directly supported.\n"
-            "Please export the model as IGES (.igs/.iges) from Siemens NX and import that file.");
+        msg = QStringLiteral("NX native .prt is a private binary format not directly supported.\n"
+                             "Please export the model as IGES (.igs/.iges) from Siemens NX and import that file.");
     }
 }
 

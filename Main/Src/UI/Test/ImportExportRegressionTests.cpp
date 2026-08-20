@@ -1710,5 +1710,3 @@ TEST(ImportExportRegressionTest, IrPipeline_RealDxf_FirstLayerSourceIdIsOneBased
     ASSERT_NE(it, entityLayerMap.end());
     EXPECT_EQ(it->second, layer0->sourceId);
 }
-
-

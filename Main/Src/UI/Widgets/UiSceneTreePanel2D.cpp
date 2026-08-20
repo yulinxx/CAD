@@ -384,11 +384,15 @@ SceneTreePanel2D::SceneTreePanel2D(QWidget* parent)
     m_view->setExpandsOnDoubleClick(true);
     layout->addWidget(m_view);
 
-    connect(m_model, &SceneTreeTableModel2D::sigVisibilityToggled, this,
-        [this](qint64 id, bool visible) { emit visibilityToggled(QString::number(id), visible); });
-    connect(m_model, &SceneTreeTableModel2D::sigRenameRequested, this,
-        [this](qint64 id, const QString& newName) { emit renameRequested(QString::number(id), newName); });
-    connect(m_view->selectionModel(), &QItemSelectionModel::selectionChanged, this,
+    connect(m_model, &SceneTreeTableModel2D::sigVisibilityToggled, this, [this](qint64 id, bool visible) {
+        emit visibilityToggled(QString::number(id), visible);
+    });
+    connect(m_model, &SceneTreeTableModel2D::sigRenameRequested, this, [this](qint64 id, const QString& newName) {
+        emit renameRequested(QString::number(id), newName);
+    });
+    connect(m_view->selectionModel(),
+        &QItemSelectionModel::selectionChanged,
+        this,
         &SceneTreePanel2D::onModelSelectionChanged);
     connect(m_view, &QTreeView::activated, this, [this](const QModelIndex& index) {
         if (index.isValid())
@@ -419,11 +423,21 @@ SceneTreePanel2D::SceneTreePanel2D(QWidget* parent)
     auto* actClear = m_contextMenu->addAction(tr("Clear Selection"));
     actClear->setObjectName(QStringLiteral("ctxClear"));
 
-    connect(actShow, &QAction::triggered, this, [this]() { emit batchVisibilityRequested(selectedIds(), true); });
-    connect(actHide, &QAction::triggered, this, [this]() { emit batchVisibilityRequested(selectedIds(), false); });
-    connect(actLock, &QAction::triggered, this, [this]() { emit batchLockRequested(selectedIds(), true); });
-    connect(actUnlock, &QAction::triggered, this, [this]() { emit batchLockRequested(selectedIds(), false); });
-    connect(actDelete, &QAction::triggered, this, [this]() { emit deleteRequested(selectedIds()); });
+    connect(actShow, &QAction::triggered, this, [this]() {
+        emit batchVisibilityRequested(selectedIds(), true);
+    });
+    connect(actHide, &QAction::triggered, this, [this]() {
+        emit batchVisibilityRequested(selectedIds(), false);
+    });
+    connect(actLock, &QAction::triggered, this, [this]() {
+        emit batchLockRequested(selectedIds(), true);
+    });
+    connect(actUnlock, &QAction::triggered, this, [this]() {
+        emit batchLockRequested(selectedIds(), false);
+    });
+    connect(actDelete, &QAction::triggered, this, [this]() {
+        emit deleteRequested(selectedIds());
+    });
     connect(actSelectAll, &QAction::triggered, this, &SceneTreePanel2D::selectAllRows);
     connect(actClear, &QAction::triggered, this, [this]() {
         if (m_view && m_view->selectionModel())
@@ -484,9 +498,8 @@ void SceneTreePanel2D::retranslateMenu()
 
 SceneTreePanel2D::~SceneTreePanel2D() = default;
 
-void SceneTreePanel2D::setTopology(const SceneTreeTopology2D& topology,
-    MetaProvider metaProvider,
-    ChildrenProvider childrenProvider)
+void SceneTreePanel2D::setTopology(
+    const SceneTreeTopology2D& topology, MetaProvider metaProvider, ChildrenProvider childrenProvider)
 {
     m_model->setTopology(topology, std::move(metaProvider), std::move(childrenProvider));
 }
@@ -614,6 +627,7 @@ void SceneTreePanel2D::selectAllRows()
         return;
     }
     m_syncing = true;
-    m_view->selectionModel()->select(QItemSelection(first, last), QItemSelectionModel::Select | QItemSelectionModel::Rows);
+    m_view->selectionModel()->select(
+        QItemSelection(first, last), QItemSelectionModel::Select | QItemSelectionModel::Rows);
     m_syncing = false;
 }

@@ -21,29 +21,22 @@
         ] },
         { "type": "separator" },
         { "type": "submenu", "id": "file.import", "label": "Import", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D", "3D"], "items": [
-          { "type": "action", "id": "file.import_dxf", "label": "DXF", "command": "file.import_dxf", "workbenches": ["2D"] },
-          { "type": "action", "id": "file.import_plt", "label": "PLT", "command": "file.import_plt", "workbenches": ["2D"] },
-          { "type": "action", "id": "file.import_svg", "label": "SVG", "command": "file.import_svg", "workbenches": ["2D"] },
-          { "type": "action", "id": "file.import_pdf", "label": "PDF", "command": "file.import_pdf", "workbenches": ["2D"] },
-          { "type": "action", "id": "file.import_ai", "label": "AI", "command": "file.import_ai", "workbenches": ["2D"] },
-          { "type": "action", "id": "file.import_step", "label": "STEP", "command": "file.import_step", "workbenches": ["2D", "3D"] },
-          { "type": "action", "id": "file.import_ug", "label": "UG", "command": "file.import_ug", "workbenches": ["2D"] },
-          { "type": "action", "id": "file.import_image", "label": "Image", "command": "file.import_image", "workbenches": ["2D"] },
-          { "type": "action", "id": "file.import_model", "label": "Model", "command": "file.import_model", "workbenches": ["3D"] },
-          { "type": "action", "id": "file.import_obj", "label": "OBJ", "command": "file.import_obj", "workbenches": ["3D"] },
-          { "type": "action", "id": "file.import_stl", "label": "STL", "command": "file.import_stl", "workbenches": ["3D"] },
-          { "type": "action", "id": "file.open_step", "label": "Open STEP", "command": "file.open_step", "workbenches": ["3D"] }
+          { "type": "action", "id": "file.import_all", "label": "All Supported...", "command": "file.open", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D"] },
+          { "type": "action", "id": "file.import_all_3d", "label": "All Supported...", "command": "file.import_model", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["3D"] },
+          { "type": "action", "id": "file.import_drawing", "label": "2D / Drawing Formats...", "command": "file.import_step", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "file.import_model3d", "label": "3D Model Formats...", "command": "file.import_obj", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "file.import_image", "label": "Image Formats...", "command": "file.import_image", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D", "3D"] }
         ] },
         { "type": "submenu", "id": "file.export", "label": "Export", "icon": ":/ui/common/Icons/File/export.svg", "workbenches": ["2D", "3D"], "items": [
-          { "type": "action", "id": "file.export_dxf", "label": "DXF", "command": "file.export_dxf", "workbenches": ["2D"] },
-          { "type": "action", "id": "file.export_svg", "label": "SVG", "command": "file.export_svg", "workbenches": ["2D"] },
-          { "type": "action", "id": "file.export_plt", "label": "PLT", "command": "file.export_plt", "workbenches": ["2D"] },
-          { "type": "action", "id": "file.export_bmp", "label": "BMP", "command": "file.export_bmp", "workbenches": ["2D"] },
-          { "type": "action", "id": "file.export_png", "label": "PNG", "command": "file.export_png", "workbenches": ["2D", "3D"] },
-          { "type": "action", "id": "file.export_obj", "label": "OBJ", "command": "file.export_obj", "workbenches": ["3D"] },
-          { "type": "action", "id": "file.export_stl", "label": "STL", "command": "file.export_stl", "workbenches": ["3D"] },
-          { "type": "action", "id": "file.export_step", "label": "STEP", "command": "file.export_step", "workbenches": ["3D"] },
-          { "type": "action", "id": "file.export_pdf", "label": "PDF", "command": "file.export_pdf", "workbenches": ["3D"] }
+          { "type": "action", "id": "file.export_dxf", "label": "DXF", "command": "file.export_dxf", "icon": ":/ui/common/Icons/File/export.svg", "workbenches": ["2D"] },
+          { "type": "action", "id": "file.export_svg", "label": "SVG", "command": "file.export_svg", "icon": ":/ui/common/Icons/File/export.svg", "workbenches": ["2D"] },
+          { "type": "action", "id": "file.export_plt", "label": "PLT", "command": "file.export_plt", "icon": ":/ui/common/Icons/File/export.svg", "workbenches": ["2D"] },
+          { "type": "action", "id": "file.export_bmp", "label": "BMP", "command": "file.export_bmp", "icon": ":/ui/common/Icons/File/export.svg", "workbenches": ["2D"] },
+          { "type": "action", "id": "file.export_obj", "label": "OBJ", "command": "file.export_obj", "icon": ":/ui/common/Icons/File/export.svg", "workbenches": ["3D"] },
+          { "type": "action", "id": "file.export_stl", "label": "STL", "command": "file.export_stl", "icon": ":/ui/common/Icons/File/export.svg", "workbenches": ["3D"] },
+          { "type": "action", "id": "file.export_step", "label": "STEP", "command": "file.export_step", "icon": ":/ui/common/Icons/File/export.svg", "workbenches": ["3D"] },
+          { "type": "action", "id": "file.export_pdf", "label": "PDF", "command": "file.export_pdf", "icon": ":/ui/common/Icons/File/export.svg", "workbenches": ["3D"] },
+          { "type": "action", "id": "file.export_png", "label": "PNG", "command": "file.export_png", "icon": ":/ui/common/Icons/File/export.svg", "workbenches": ["2D", "3D"] }
         ] },
         { "type": "separator" },
         { "type": "action", "id": "file.exit", "label": "Exit", "command": "file.exit", "icon": ":/ui/common/Icons/File/exit.svg", "shortcut": "Ctrl+Q", "workbenches": ["2D", "3D"] }
@@ -71,13 +64,13 @@
         { "type": "action", "id": "edit.delete", "label": "Delete", "command": "edit.delete", "icon": ":/ui/common/Icons/Actions/delete.svg", "shortcut": "Delete", "workbenches": ["2D", "3D"] },
         { "type": "separator" },
         { "type": "submenu", "id": "edit.transform", "label": "Transform", "icon": ":/ui/common/Icons/Actions/move.svg", "workbenches": ["2D", "3D"], "items": [
-          { "type": "action", "id": "edit.move", "label": "Move", "command": "edit.move", "icon": ":/ui/common/Icons/Actions/move.svg", "workbenches": ["2D"] },
+          { "type": "action", "id": "edit.move", "label": "Move", "command": "edit.move", "icon": ":/ui/common/Icons/Actions/move.svg", "workbenches": ["2D", "3D"] },
           { "type": "action", "id": "edit.rotate_90cw", "label": "Rotate 90 CW", "command": "edit.rotate_90cw", "icon": ":/ui/common/Icons/Actions/rotate.svg", "workbenches": ["2D"] },
           { "type": "action", "id": "edit.rotate_90ccw", "label": "Rotate 90 CCW", "command": "edit.rotate_90ccw", "icon": ":/ui/common/Icons/Actions/rotate.svg", "workbenches": ["2D"] },
           { "type": "action", "id": "edit.rotate_180", "label": "Rotate 180", "command": "edit.rotate_180", "icon": ":/ui/common/Icons/Actions/rotate.svg", "workbenches": ["2D"] },
           { "type": "action", "id": "edit.mirror_horizontal", "label": "Mirror Horizontal", "command": "edit.mirror_horizontal", "icon": ":/ui/common/Icons/Actions/mirror_h.svg", "workbenches": ["2D"] },
           { "type": "action", "id": "edit.mirror_vertical", "label": "Mirror Vertical", "command": "edit.mirror_vertical", "icon": ":/ui/common/Icons/Actions/mirror_v.svg", "workbenches": ["2D"] },
-          { "type": "action", "id": "edit.scale", "label": "Scale", "command": "edit.scale", "icon": ":/ui/common/Icons/View3D/scale.svg", "workbenches": ["2D"] },
+          { "type": "action", "id": "edit.scale", "label": "Scale", "command": "edit.scale", "icon": ":/ui/common/Icons/View3D/scale.svg", "workbenches": ["2D", "3D"] },
           { "type": "action", "id": "edit.transform_translate", "label": "Translate", "command": "edit.transform_translate", "icon": ":/ui/common/Icons/Actions/move.svg", "workbenches": ["3D"] },
           { "type": "action", "id": "edit.transform_rotate", "label": "Rotate", "command": "edit.transform_rotate", "icon": ":/ui/common/Icons/Actions/rotate.svg", "workbenches": ["3D"] },
           { "type": "action", "id": "edit.transform_scale", "label": "Scale", "command": "edit.transform_scale", "icon": ":/ui/common/Icons/View3D/scale.svg", "workbenches": ["3D"] },
@@ -113,36 +106,6 @@
         { "type": "separator" },
         { "type": "action", "id": "edit.array", "label": "Array...", "command": "edit.array", "icon": ":/ui/common/Icons/Actions/array.svg", "workbenches": ["2D"] },
         { "type": "action", "id": "edit.test", "label": "Test", "command": "edit.test", "icon": ":/ui/common/Icons/Actions/test.svg", "workbenches": ["2D"] }
-      ]
-    },
-    {
-      "id": "draw",
-      "label": "Draw",
-      "visible": true,
-      "workbenches": ["2D"],
-      "items": [
-        { "type": "action", "id": "tool.select", "label": "Select", "command": "tool.select", "icon": ":/ui/common/Icons/Tools/select.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "tool.point", "label": "Point", "command": "tool.point", "icon": ":/ui/common/Icons/Tools/point.svg", "workbenches": ["2D"] },
-        { "type": "separator" },
-        { "type": "action", "id": "tool.line", "label": "Line", "command": "tool.line", "icon": ":/ui/common/Icons/Tools/line.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "tool.polyline", "label": "Polyline", "command": "tool.polyline", "icon": ":/ui/common/Icons/Tools/polyline.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "tool.polygon", "label": "Polygon", "command": "tool.polygon", "icon": ":/ui/common/Icons/Tools/polygon.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "tool.smartline", "label": "Smart Line", "command": "tool.smartline", "icon": ":/ui/common/Icons/Tools/smartline.svg", "workbenches": ["2D"] },
-        { "type": "separator" },
-        { "type": "action", "id": "tool.circle", "label": "Circle", "command": "tool.circle", "icon": ":/ui/common/Icons/Tools/circle.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "tool.arc", "label": "Arc", "command": "tool.arc", "icon": ":/ui/common/Icons/Tools/arc.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "tool.ellipse", "label": "Ellipse", "command": "tool.ellipse", "icon": ":/ui/common/Icons/Tools/ellipse.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "tool.rectangle", "label": "Rectangle", "command": "tool.rectangle", "icon": ":/ui/common/Icons/Tools/rectangle.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "tool.triangle", "label": "Triangle", "command": "tool.triangle", "icon": ":/ui/common/Icons/Tools/triangle.svg", "workbenches": ["2D"] },
-        { "type": "separator" },
-        { "type": "action", "id": "tool.bezier2", "label": "Quadratic Bezier", "command": "tool.bezier2", "icon": ":/ui/common/Icons/Tools/bezier2.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "tool.bezier", "label": "Cubic Bezier", "command": "tool.bezier", "icon": ":/ui/common/Icons/Tools/bezier.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "tool.spline", "label": "Spline", "command": "tool.spline", "icon": ":/ui/common/Icons/Tools/spline.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "tool.nurbs", "label": "Nurbs", "command": "tool.nurbs", "icon": ":/ui/common/Icons/Tools/nurbs.svg", "workbenches": ["2D"] },
-        { "type": "separator" },
-        { "type": "action", "id": "tool.text", "label": "Text", "command": "tool.text", "icon": ":/ui/common/Icons/Tools/text.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "tool.bitmap", "label": "Bitmap", "command": "tool.bitmap", "icon": ":/ui/common/Icons/Tools/bitmap.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "tool.qrcode", "label": "QR Code", "command": "tool.qrcode", "icon": ":/ui/common/Icons/Tools/qrcode.svg", "workbenches": ["2D"] }
       ]
     },
     {
@@ -201,6 +164,36 @@
         ] },
         { "type": "action", "id": "view.switch_to_2d", "label": "Switch to 2D", "command": "view.switch_to_2d", "icon": ":/ui/common/Icons/View3D/switch_to_2d.svg", "workbenches": ["3D"] },
         { "type": "action", "id": "view.switch_to_3d", "label": "Switch to 3D", "command": "view.switch_to_3d", "icon": ":/ui/common/Icons/View/switch_to_3d.svg", "workbenches": ["2D"] }
+      ]
+    },
+    {
+      "id": "draw",
+      "label": "Draw",
+      "visible": true,
+      "workbenches": ["2D"],
+      "items": [
+        { "type": "action", "id": "tool.select", "label": "Select", "command": "tool.select", "icon": ":/ui/common/Icons/Tools/select.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "tool.point", "label": "Point", "command": "tool.point", "icon": ":/ui/common/Icons/Tools/point.svg", "workbenches": ["2D"] },
+        { "type": "separator" },
+        { "type": "action", "id": "tool.line", "label": "Line", "command": "tool.line", "icon": ":/ui/common/Icons/Tools/line.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "tool.polyline", "label": "Polyline", "command": "tool.polyline", "icon": ":/ui/common/Icons/Tools/polyline.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "tool.polygon", "label": "Polygon", "command": "tool.polygon", "icon": ":/ui/common/Icons/Tools/polygon.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "tool.smartline", "label": "Smart Line", "command": "tool.smartline", "icon": ":/ui/common/Icons/Tools/smartline.svg", "workbenches": ["2D"] },
+        { "type": "separator" },
+        { "type": "action", "id": "tool.circle", "label": "Circle", "command": "tool.circle", "icon": ":/ui/common/Icons/Tools/circle.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "tool.arc", "label": "Arc", "command": "tool.arc", "icon": ":/ui/common/Icons/Tools/arc.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "tool.ellipse", "label": "Ellipse", "command": "tool.ellipse", "icon": ":/ui/common/Icons/Tools/ellipse.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "tool.rectangle", "label": "Rectangle", "command": "tool.rectangle", "icon": ":/ui/common/Icons/Tools/rectangle.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "tool.triangle", "label": "Triangle", "command": "tool.triangle", "icon": ":/ui/common/Icons/Tools/triangle.svg", "workbenches": ["2D"] },
+        { "type": "separator" },
+        { "type": "action", "id": "tool.bezier2", "label": "Quadratic Bezier", "command": "tool.bezier2", "icon": ":/ui/common/Icons/Tools/bezier2.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "tool.bezier", "label": "Cubic Bezier", "command": "tool.bezier", "icon": ":/ui/common/Icons/Tools/bezier.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "tool.spline", "label": "Spline", "command": "tool.spline", "icon": ":/ui/common/Icons/Tools/spline.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "tool.nurbs", "label": "Nurbs", "command": "tool.nurbs", "icon": ":/ui/common/Icons/Tools/nurbs.svg", "workbenches": ["2D"] },
+        { "type": "separator" },
+        { "type": "action", "id": "tool.text", "label": "Text", "command": "tool.text", "icon": ":/ui/common/Icons/Tools/text.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "tool.bitmap", "label": "Bitmap", "command": "tool.bitmap", "icon": ":/ui/common/Icons/Tools/bitmap.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "tool.qrcode", "label": "QR Code", "command": "tool.qrcode", "icon": ":/ui/common/Icons/Tools/qrcode.svg", "workbenches": ["2D"] }
       ]
     },
     {
@@ -280,7 +273,19 @@
         { "type": "submenu", "id": "help.language", "label": "Language", "icon": ":/ui/common/Icons/Help/language.svg", "workbenches": ["2D", "3D"], "items": [
           { "type": "action", "id": "language.en", "label": "English", "command": "language.en", "checkable": true, "workbenches": ["2D", "3D"] },
           { "type": "action", "id": "language.zh", "label": "简体中文", "command": "language.zh", "checkable": true, "workbenches": ["2D", "3D"] },
-          { "type": "action", "id": "language.tw", "label": "繁體中文", "command": "language.tw", "checkable": true, "workbenches": ["2D", "3D"] }
+          { "type": "action", "id": "language.tw", "label": "繁體中文", "command": "language.tw", "checkable": true, "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "language.ja", "label": "日本語", "command": "language.ja", "checkable": true, "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "language.ko", "label": "한국어", "command": "language.ko", "checkable": true, "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "language.fr", "label": "Français", "command": "language.fr", "checkable": true, "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "language.de", "label": "Deutsch", "command": "language.de", "checkable": true, "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "language.es", "label": "Español", "command": "language.es", "checkable": true, "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "language.pt", "label": "Português", "command": "language.pt", "checkable": true, "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "language.ru", "label": "Русский", "command": "language.ru", "checkable": true, "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "language.ar", "label": "العربية", "command": "language.ar", "checkable": true, "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "language.it", "label": "Italiano", "command": "language.it", "checkable": true, "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "language.hi", "label": "हिन्दी", "command": "language.hi", "checkable": true, "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "language.tr", "label": "Türkçe", "command": "language.tr", "checkable": true, "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "language.vi", "label": "Tiếng Việt", "command": "language.vi", "checkable": true, "workbenches": ["2D", "3D"] }
         ] },
         { "type": "separator" },
         { "type": "action", "id": "help.about", "label": "About", "command": "help.about", "icon": ":/ui/common/Icons/Help/about.svg", "workbenches": ["2D", "3D"] }

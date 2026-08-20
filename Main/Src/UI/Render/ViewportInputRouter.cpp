@@ -520,10 +520,10 @@ QRectF ViewportInputRouter::inputMethodCursorRect() const
     const float lw = static_cast<float>(m_renderWidget->width());
     const float lh = static_cast<float>(m_renderWidget->height());
     const auto toScreen = [&vm, lw, lh](const QPointF& w) -> QPointF {
-        const float ndcX = vm.at(0, 0) * static_cast<float>(w.x()) + vm.at(0, 1) * static_cast<float>(w.y()) +
-            vm.at(0, 2);
-        const float ndcY = vm.at(1, 0) * static_cast<float>(w.x()) + vm.at(1, 1) * static_cast<float>(w.y()) +
-            vm.at(1, 2);
+        const float ndcX =
+            vm.at(0, 0) * static_cast<float>(w.x()) + vm.at(0, 1) * static_cast<float>(w.y()) + vm.at(0, 2);
+        const float ndcY =
+            vm.at(1, 0) * static_cast<float>(w.x()) + vm.at(1, 1) * static_cast<float>(w.y()) + vm.at(1, 2);
         return QPointF((ndcX * 0.5f + 0.5f) * lw, (1.0f - (ndcY * 0.5f + 0.5f)) * lh);
     };
 

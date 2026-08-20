@@ -100,7 +100,6 @@ void WorkbenchLayoutManager::buildToolBars()
     // 保留空壳接口：真实内容由配置驱动模式统一生成。
 }
 
-
 void WorkbenchLayoutManager::initializeDockAreaSkeleton()
 {
     // 停靠区骨架先只创建左右容器，不在这里挂接具体工作台面板
@@ -136,8 +135,7 @@ void WorkbenchLayoutManager::buildDockAreas()
 
     // 仅设置初始面板宽度（默认窄一点，不挤压中间的视图），
     // 不限制最大宽度，用户可手动拖拽加宽；放到顶部/底部 Dock 时也能自适应拉宽
-    m_parent->resizeDocks({ m_panelState.leftDock, m_panelState.rightDock }, { 180, 280 },
-                          Qt::Horizontal);
+    m_parent->resizeDocks({ m_panelState.leftDock, m_panelState.rightDock }, { 180, 280 }, Qt::Horizontal);
 }
 
 #ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI

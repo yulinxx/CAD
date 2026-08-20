@@ -394,7 +394,8 @@ void WorkbenchWindow::initializeWorkbenchShell()
     setCentralWidget(createInitialCentralWidget());
     updateWindowTitle();
     refreshStatusText();
-    QString initialWorkbenchId = m_stateManager ? m_stateManager->windowState().currentWorkbenchId : QStringLiteral("default");
+    QString initialWorkbenchId =
+        m_stateManager ? m_stateManager->windowState().currentWorkbenchId : QStringLiteral("default");
     if (m_stateCenter)
     {
         initialWorkbenchId = m_stateCenter->currentWorkbenchId();
@@ -698,7 +699,8 @@ void WorkbenchWindow::refreshPositionLabel()
     }
     else
     {
-        m_activeStatusBar->setPositionText(tr("Position: (%1, %2) mm").arg(m_lastMouseX, 0, 'f', 2).arg(m_lastMouseY, 0, 'f', 2));
+        m_activeStatusBar->setPositionText(
+            tr("Position: (%1, %2) mm").arg(m_lastMouseX, 0, 'f', 2).arg(m_lastMouseY, 0, 'f', 2));
     }
 }
 

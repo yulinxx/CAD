@@ -7,10 +7,8 @@
 #include "Log/SyLogger.h"
 #include "Engine/SyEntity/SyEntity.h"
 
-ExportWriterBase::ExportWriterBase(Fio::FileFormat format,
-                                   QStringList extensions,
-                                   QString formatName,
-                                   QString defaultExtension)
+ExportWriterBase::ExportWriterBase(
+    Fio::FileFormat format, QStringList extensions, QString formatName, QString defaultExtension)
     : m_format(format)
     , m_extensions(std::move(extensions))
     , m_formatName(std::move(formatName))
@@ -62,12 +60,8 @@ ExportResult ExportWriterBase::write(const ExportContext& context, const Fio::Ve
     const Fio::FileFormat fmt = resolveFormat(entities);
 
     char errBuf[1024] = { 0 };
-    bool ok = fileIO.exportFile(context.targetPath.toUtf8().toStdString().c_str(),
-        fmt,
-        raw.data(),
-        raw.size(),
-        errBuf,
-        sizeof(errBuf));
+    bool ok = fileIO.exportFile(
+        context.targetPath.toUtf8().toStdString().c_str(), fmt, raw.data(), raw.size(), errBuf, sizeof(errBuf));
 
     if (!ok)
     {

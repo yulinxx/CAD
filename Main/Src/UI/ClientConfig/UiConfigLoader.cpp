@@ -147,11 +147,21 @@ std::optional<UiConfigData> UiConfigLoader::loadWithInheritance(const QString& p
         return std::nullopt;
     }
 
-    // 处理 extends / inherits 继承：父配置在前，子配置覆盖/追加
+    // 处理 extends / inherits 继承：父配置在前，子配置覆盖/追加。
+    // 兼容两种写法：顶层键（"extends": "base"）或 meta 内键（"meta": { "inherits": "base" }）。
+    const QJsonObject meta = root.value(QStringLiteral("meta")).toObject();
     QString extends = root.value(QStringLiteral("extends")).toString();
     if (extends.isEmpty())
     {
+        extends = meta.value(QStringLiteral("extends")).toString();
+    }
+    if (extends.isEmpty())
+    {
         extends = root.value(QStringLiteral("inherits")).toString();
+    }
+    if (extends.isEmpty())
+    {
+        extends = meta.value(QStringLiteral("inherits")).toString();
     }
     if (!extends.isEmpty())
     {
@@ -162,6 +172,13 @@ std::optional<UiConfigData> UiConfigLoader::loadWithInheritance(const QString& p
             const int slash = path.lastIndexOf(QChar('/'));
             const QString dir = slash >= 0 ? path.left(slash + 1) : QStringLiteral(":/configs/");
             parentPath = dir + extends;
+        }
+
+        // 父配置省略扩展名时补齐 .json（如 "inherits/extends: base" → ":/configs/base.json"），
+        // 避免父配置资源加载失败导致整个配置回落为空
+        if (!parentPath.endsWith(QStringLiteral(".json"), Qt::CaseInsensitive))
+        {
+            parentPath += QStringLiteral(".json");
         }
 
         auto parent = loadWithInheritance(parentPath);

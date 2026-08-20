@@ -48,7 +48,9 @@ public:
         // 复用共享导航控制器：手势 → 相机变化的唯一实现，与主视口保持一致
         m_navigation.setRenderWidget(this);
         m_navigation.setCamera(&m_camera);
-        m_navigation.setCameraChangedCallback([this]() { applyView(); });
+        m_navigation.setCameraChangedCallback([this]() {
+            applyView();
+        });
     }
 
     ~TestViewRenderWidget() override
@@ -275,6 +277,7 @@ private:
             : m_self(self)
         {
         }
+
         void onSceneChanged() override
         {
             if (m_self)

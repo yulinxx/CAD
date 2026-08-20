@@ -65,7 +65,9 @@ RenderViewport2D::RenderViewport2D(QWidget* parent)
 
     // 网格+对象捕捉管理器：引擎层纯计算门面，场景接入见 setDocument()
     m_gridSnapManager = std::make_unique<GridSnapManager>();
-    m_inputRouter->setSnapPositionCallback([this](const QPointF& p) { return applySnap(p); });
+    m_inputRouter->setSnapPositionCallback([this](const QPointF& p) {
+        return applySnap(p);
+    });
 }
 
 RenderViewport2D::~RenderViewport2D()
@@ -176,8 +178,7 @@ QPointF RenderViewport2D::applySnap(const QPointF& worldPos) const
     const bool didSnap = (snapped.x() != src.x()) || (snapped.y() != src.y());
     if (m_renderCoordinator)
     {
-        m_renderCoordinator->setSnapIndicator(
-            QPointF(snapped.x(), snapped.y()), didSnap);
+        m_renderCoordinator->setSnapIndicator(QPointF(snapped.x(), snapped.y()), didSnap);
     }
 
     return QPointF(snapped.x(), snapped.y());
@@ -372,13 +373,19 @@ void RenderViewport2D::initializeTools()
     // 额外注入场景编辑服务（Gizmo 变换 Undo）、图层管理器（锁定图层过滤）、
     // 重置视图回调（空格键）、网格+对象捕捉管理器等选择工具所需的依赖。
     ToolInitializer::registerAllTools(
-        *m_toolManager, m_sceneManager, m_renderWidget, coordinator,
+        *m_toolManager,
+        m_sceneManager,
+        m_renderWidget,
+        coordinator,
         [this](const QString& msg) {
             updateStatus(msg);
         },
         /*sceneEdit=*/m_document ? m_document->editService() : nullptr,
         /*layerManager=*/m_layerManager,
-        /*onResetView=*/[this]() { zoomToFit(); },
+        /*onResetView=*/
+        [this]() {
+            zoomToFit();
+        },
         /*onEntityDoubleClick=*/nullptr,
         /*gridSnapManager=*/m_gridSnapManager.get());
 

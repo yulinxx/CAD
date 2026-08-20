@@ -58,7 +58,7 @@ namespace
 
     // P5 收口: 统一按格式映射批量注册操作，消除 registerImportOps/registerExportOps 的重复循环
     // 模板化以兼容不同数量的格式映射（导入 7 种 / 导出 5 种）
-    template <std::size_t N>
+    template<std::size_t N>
     void registerFromFormatMap(OperationRegistry& reg,
         const std::array<FormatMappingEntry, N>& map,
         std::function<void(Fio::FileFormat)> handler)
