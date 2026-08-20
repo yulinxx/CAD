@@ -93,13 +93,12 @@ static std::string GetMachineGuid()
 static std::string GetMachineGuid()
 {
     // macOS 12.0+ 使用 kIOMainPortDefault 替代已废弃的 kIOMasterPortDefault
-#if defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 120000
+    #if defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 120000
     mach_port_t mainPort = kIOMainPortDefault;
-#else
+    #else
     mach_port_t mainPort = kIOMasterPortDefault;
-#endif
-    io_registry_entry_t ioPort =
-        IOServiceGetMatchingService(mainPort, IOServiceMatching("IOPlatformExpertDevice"));
+    #endif
+    io_registry_entry_t ioPort = IOServiceGetMatchingService(mainPort, IOServiceMatching("IOPlatformExpertDevice"));
     if (ioPort == IO_OBJECT_NULL)
     {
         return {};

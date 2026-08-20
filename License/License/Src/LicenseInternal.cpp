@@ -14,7 +14,7 @@ namespace
 #else
     std::atomic<bool> g_checkEnabled{ false };
 #endif
-}
+}  // namespace
 
 namespace LicenseInternal
 {
