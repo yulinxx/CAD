@@ -445,9 +445,7 @@ void SceneRefreshCoordinator::updateSceneRender()
     // （onSceneChanged），scheduleSceneUpdate 不会将其降级回 LightUpdate(2)，因此这里必须显式包含
     // Selection 级别，否则待删除图元会在 Selection 分支中被跳过。
     const bool needApplyLight =
-        (level == RefreshLevel::LightUpdate) ||
-        (level == RefreshLevel::Selection) ||
-        !m_pendingDeletedIds.empty();
+        (level == RefreshLevel::LightUpdate) || (level == RefreshLevel::Selection) || !m_pendingDeletedIds.empty();
     if (needApplyLight)
     {
         applyLightRefresh(sm);

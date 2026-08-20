@@ -542,8 +542,7 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
     // 处于文本编辑（行编辑/多行文本）时不拦截，避免破坏正常输入。
     const auto editingText = []() -> bool {
         QWidget* fw = QApplication::focusWidget();
-        return fw && (qobject_cast<QLineEdit*>(fw) || qobject_cast<QTextEdit*>(fw) ||
-                       qobject_cast<QPlainTextEdit*>(fw));
+        return fw && (qobject_cast<QLineEdit*>(fw) || qobject_cast<QTextEdit*>(fw) || qobject_cast<QPlainTextEdit*>(fw));
     };
     const auto deleteSelectedShapes = [this, editingText]() {
         if (editingText())
@@ -704,67 +703,67 @@ void Workbench2D::setPanelHostStyle(PanelHostStyle style)
 
 namespace
 {
-QVector<DrawToolEntry> buildDrawToolEntriesFromCatalog()
-{
-    QVector<DrawToolEntry> drawTools;
-    for (const auto& entry : CommandCatalog::commands())
+    QVector<DrawToolEntry> buildDrawToolEntriesFromCatalog()
     {
-        if (!hasSurface(entry.surfaces, CommandSurface2D::LeftToolbar))
+        QVector<DrawToolEntry> drawTools;
+        for (const auto& entry : CommandCatalog::commands())
         {
-            continue;
+            if (!hasSurface(entry.surfaces, CommandSurface2D::LeftToolbar))
+            {
+                continue;
+            }
+            DrawToolEntry tool;
+            tool.commandId = QString::fromUtf8(entry.toolName ? entry.toolName : "");
+            tool.displayName = QString::fromUtf8(entry.text ? entry.text : "");
+            tool.tooltip = QString::fromUtf8(entry.text ? entry.text : "");
+            tool.shortcut = QString::fromUtf8(entry.shortcutId ? entry.shortcutId : "");
+            tool.iconResource = QString::fromUtf8(entry.iconResource ? entry.iconResource : "");
+            drawTools.append(tool);
         }
-        DrawToolEntry tool;
-        tool.commandId = QString::fromUtf8(entry.toolName ? entry.toolName : "");
-        tool.displayName = QString::fromUtf8(entry.text ? entry.text : "");
-        tool.tooltip = QString::fromUtf8(entry.text ? entry.text : "");
-        tool.shortcut = QString::fromUtf8(entry.shortcutId ? entry.shortcutId : "");
-        tool.iconResource = QString::fromUtf8(entry.iconResource ? entry.iconResource : "");
-        drawTools.append(tool);
+        return drawTools;
     }
-    return drawTools;
-}
 
-QStringList buildSupportedImportFormatsFromCatalog(const QString& workbenchId)
-{
-    QStringList formats;
-    const bool want3D = workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0;
-
-    struct SupportedImportDef
+    QStringList buildSupportedImportFormatsFromCatalog(const QString& workbenchId)
     {
-        const char* commandId;
-        bool in2D;
-        bool in3D;
-    };
+        QStringList formats;
+        const bool want3D = workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0;
 
-    static const SupportedImportDef kSupportedImports[] = {
-        { "file.import_dxf", true, false },
-        { "file.import_plt", true, false },
-        { "file.import_svg", true, false },
-        { "file.import_pdf", true, false },
-        { "file.import_ai", true, false },
-        { "file.import_ug", true, false },
-        { "file.import_image", true, false },
-        { "file.import_step", true, true },
-        { "file.import_model", false, true },
-        { "file.import_obj", false, true },
-        { "file.import_stl", false, true },
-        { "file.open_step", false, true },
-    };
+        struct SupportedImportDef
+        {
+            const char* commandId;
+            bool in2D;
+            bool in3D;
+        };
 
-    for (const auto& item : kSupportedImports)
-    {
-        if ((want3D && !item.in3D) || (!want3D && !item.in2D))
+        static const SupportedImportDef kSupportedImports[] = {
+            { "file.import_dxf", true, false },
+            { "file.import_plt", true, false },
+            { "file.import_svg", true, false },
+            { "file.import_pdf", true, false },
+            { "file.import_ai", true, false },
+            { "file.import_ug", true, false },
+            { "file.import_image", true, false },
+            { "file.import_step", true, true },
+            { "file.import_model", false, true },
+            { "file.import_obj", false, true },
+            { "file.import_stl", false, true },
+            { "file.open_step", false, true },
+        };
+
+        for (const auto& item : kSupportedImports)
         {
-            continue;
+            if ((want3D && !item.in3D) || (!want3D && !item.in2D))
+            {
+                continue;
+            }
+            const QString cmdId = QString::fromUtf8(item.commandId);
+            if (!formats.contains(cmdId))
+            {
+                formats.append(cmdId);
+            }
         }
-        const QString cmdId = QString::fromUtf8(item.commandId);
-        if (!formats.contains(cmdId))
-        {
-            formats.append(cmdId);
-        }
+        return formats;
     }
-    return formats;
-}
 }  // namespace
 
 QVector<DrawToolEntry> Workbench2D::buildDrawToolEntries()
@@ -776,7 +775,6 @@ QStringList Workbench2D::buildSupportedImportFormats(const QString& workbenchId)
 {
     return buildSupportedImportFormatsFromCatalog(workbenchId);
 }
-
 
 void Workbench2D::createToolbars(WorkbenchWindow& window)
 {
@@ -1146,13 +1144,14 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         });
 
     // 默认进入 Default 上下文
-m_contextManager->setCurrentContext(ToolBarContext::Default);
+    m_contextManager->setCurrentContext(ToolBarContext::Default);
 
     // 根据选中图元类型自动切换上下文（监听视口选择变化）
     if (m_viewport)
     {
         connect(m_viewport, &RenderViewport2D::selectionChanged, this, [this]() {
-            if (!m_contextManager) return;
+            if (!m_contextManager)
+                return;
             const ToolBarContext newCtx = determineContextFromSelection();
             if (m_contextManager->currentContext() != newCtx)
             {

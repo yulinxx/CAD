@@ -57,11 +57,11 @@ namespace Ui
         }
         else
         {
-            path = QFileDialog::getSaveFileName(
-                nullptr,
+            path = QFileDialog::getSaveFileName(nullptr,
                 QCoreApplication::translate("ViewCaptureService", "Save Screenshot"),
                 QDir(screenshotsDir()).filePath(generateFileName(is3D)),
                 QCoreApplication::translate("ViewCaptureService", "PNG Image (*.png);;All Files (*)"));
+
             if (path.isEmpty())
             {
                 return QString();
@@ -134,7 +134,7 @@ namespace Ui
         // 转 QImage（GL 左下角原点 -> QImage 左上角原点，需翻转）
         QImage img(buf.data(), targetSize.width(), targetSize.height(), rowPitch, QImage::Format_RGBA8888);
         QImage flipped = img.mirrored(false, true);  // 垂直翻转
-        return flipped.copy();  // 确保数据拥有权
+        return flipped.copy();                       // 确保数据拥有权
     }
 
     QImage ViewCaptureService::capture3D(RenderWidget3D* widget, const CaptureRequest& req)
@@ -181,4 +181,4 @@ namespace Ui
 
         return QImage();
     }
-}
+}  // namespace Ui

@@ -331,8 +331,6 @@ void WorkbenchMenuManager::rebuildAllMenus()
     rebuildMenusFromConfig();
     bindConfiguredMenuState();
     bindMenuCommands();
-
-    
 }
 
 void WorkbenchMenuManager::rebuildMenusFromConfig()
@@ -450,13 +448,20 @@ void WorkbenchMenuManager::buildLegacyMenus()
     m_menuState.toolsMenu = findTopLevelMenu(m_window, tr("Tools"));
     m_menuState.helpMenu = findTopLevelMenu(m_window, tr("Help"));
 
-    if (!m_menuState.fileMenu) m_menuState.fileMenu = m_window->menuBar()->addMenu(tr("File"));
-    if (!m_menuState.editMenu) m_menuState.editMenu = m_window->menuBar()->addMenu(tr("Edit"));
-    if (!m_menuState.drawMenu) m_menuState.drawMenu = m_window->menuBar()->addMenu(tr("Draw"));
-    if (!m_menuState.algorithmMenu) m_menuState.algorithmMenu = m_window->menuBar()->addMenu(tr("Algorithm"));
-    if (!m_menuState.viewMenu) m_menuState.viewMenu = m_window->menuBar()->addMenu(tr("View"));
-    if (!m_menuState.toolsMenu) m_menuState.toolsMenu = m_window->menuBar()->addMenu(tr("Tools"));
-    if (!m_menuState.helpMenu) m_menuState.helpMenu = m_window->menuBar()->addMenu(tr("Help"));
+    if (!m_menuState.fileMenu)
+        m_menuState.fileMenu = m_window->menuBar()->addMenu(tr("File"));
+    if (!m_menuState.editMenu)
+        m_menuState.editMenu = m_window->menuBar()->addMenu(tr("Edit"));
+    if (!m_menuState.drawMenu)
+        m_menuState.drawMenu = m_window->menuBar()->addMenu(tr("Draw"));
+    if (!m_menuState.algorithmMenu)
+        m_menuState.algorithmMenu = m_window->menuBar()->addMenu(tr("Algorithm"));
+    if (!m_menuState.viewMenu)
+        m_menuState.viewMenu = m_window->menuBar()->addMenu(tr("View"));
+    if (!m_menuState.toolsMenu)
+        m_menuState.toolsMenu = m_window->menuBar()->addMenu(tr("Tools"));
+    if (!m_menuState.helpMenu)
+        m_menuState.helpMenu = m_window->menuBar()->addMenu(tr("Help"));
 
     buildFileMenu();
     buildViewMenu();
@@ -511,12 +516,13 @@ void WorkbenchMenuManager::buildFileMenu()
     });
     m_menuState.fileMenu->addSeparator();
 
-    refreshFileMenuForWorkbench(m_stateCenter ? m_stateCenter->currentWorkbenchId() : QStringLiteral("2D"));
-
-    m_menuState.fileMenu->addSeparator();
     m_menuState.recentFilesMenu = m_menuState.fileMenu->addMenu(tr("Recent Files"));
     m_menuState.recentFilesMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/File/recent.svg")));
     m_window->populateRecentFilesMenu();
+
+    m_menuState.fileMenu->addSeparator();
+
+    refreshFileMenuForWorkbench(m_stateCenter ? m_stateCenter->currentWorkbenchId() : QStringLiteral("2D"));
 
     m_menuState.fileMenu->addSeparator();
     auto* exitAction = m_menuState.fileMenu->addAction(tr("Exit"));
@@ -527,29 +533,83 @@ void WorkbenchMenuManager::buildFileMenu()
 
 namespace
 {
-struct ImportMenuItemSpec
+    struct MenuFormatItemSpec
+    {
+        const char* commandId;
+        const char* label2D;
+        const char* label3D;
+    };
+
+    // Import 菜单：扁平 4 项，与菜单架构文档 5.3 / 6.3 一致。
+    // 2D / 3D 共用同一组入口，差异只体现在 label2D / label3D。
+    const MenuFormatItemSpec kImportItems[] = {
+        { "file.import_model", QT_TR_NOOP("All Supported..."), QT_TR_NOOP("All Supported...") },
+        { "file.import_step", QT_TR_NOOP("2D / Drawing Formats..."), QT_TR_NOOP("2D / Drawing Formats...") },
+        { "file.import_obj", QT_TR_NOOP("3D Model Formats..."), QT_TR_NOOP("3D Model Formats...") },
+        { "file.import_image", QT_TR_NOOP("Image Formats..."), QT_TR_NOOP("Image Formats...") },
+    };
+
+    // Export 菜单：扁平项，2D / 3D 各自可见的格式不同。
+    const MenuFormatItemSpec k2DExportItems[] = {
+        { "file.export_dxf", QT_TR_NOOP("DXF"), nullptr },
+        { "file.export_svg", QT_TR_NOOP("SVG"), nullptr },
+        { "file.export_plt", QT_TR_NOOP("PLT"), nullptr },
+        { "file.export_bmp", QT_TR_NOOP("BMP"), nullptr },
+        { "file.export_png", QT_TR_NOOP("PNG"), QT_TR_NOOP("PNG") },
+    };
+
+    const MenuFormatItemSpec k3DExportItems[] = {
+        { "file.export_obj", nullptr, QT_TR_NOOP("OBJ") },
+        { "file.export_stl", nullptr, QT_TR_NOOP("STL") },
+        { "file.export_step", nullptr, QT_TR_NOOP("STEP") },
+        { "file.export_pdf", nullptr, QT_TR_NOOP("PDF") },
+        { "file.export_png", nullptr, QT_TR_NOOP("PNG") },
+    };
+}  // namespace
+
+void WorkbenchMenuManager::refreshExportMenuForWorkbench(const QString& workbenchId)
 {
-    const char* commandId;
-    const char* label2D;
-    const char* label3D;
-};
+    if (!m_menuState.fileMenu)
+    {
+        return;
+    }
 
-const ImportMenuItemSpec k2DImportItems[] = {
-    { "file.import_dxf", QT_TR_NOOP("DXF..."), nullptr },
-    { "file.import_plt", QT_TR_NOOP("PLT / HPGL..."), nullptr },
-    { "file.import_svg", QT_TR_NOOP("SVG..."), nullptr },
-    { "file.import_pdf", QT_TR_NOOP("PDF..."), nullptr },
-    { "file.import_ai", QT_TR_NOOP("AI..."), nullptr },
-    { "file.import_ug", QT_TR_NOOP("UG / IGES..."), nullptr },
-    { "file.import_image", QT_TR_NOOP("Image..."), nullptr },
-};
+    if (m_menuState.exportMenu)
+    {
+        m_menuState.fileMenu->removeAction(m_menuState.exportMenu->menuAction());
+        delete m_menuState.exportMenu;
+        m_menuState.exportMenu = nullptr;
+    }
 
-const ImportMenuItemSpec k3DImportItems[] = {
-    { "file.import_model", nullptr, QT_TR_NOOP("Model...") },
-    { "file.import_obj", nullptr, QT_TR_NOOP("OBJ...") },
-    { "file.import_stl", nullptr, QT_TR_NOOP("STL...") },
-    { "file.open_step", nullptr, QT_TR_NOOP("Open STEP...") },
-};
+    m_menuState.exportMenu = m_menuState.fileMenu->addMenu(tr("Export"));
+    m_menuState.exportMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/File/export.svg")));
+
+    const bool is3D = workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0;
+    auto addMenuItems = [this, is3D](QMenu* parent, const MenuFormatItemSpec* items, size_t count) {
+        if (!parent)
+        {
+            return;
+        }
+        for (size_t i = 0; i < count; ++i)
+        {
+            const auto& spec = items[i];
+            const char* label = is3D ? spec.label3D : spec.label2D;
+            if (!label)
+            {
+                continue;
+            }
+            addMenuAction(parent, tr(label), QString::fromUtf8(spec.commandId));
+        }
+    };
+
+    if (is3D)
+    {
+        addMenuItems(m_menuState.exportMenu, k3DExportItems, std::size(k3DExportItems));
+    }
+    else
+    {
+        addMenuItems(m_menuState.exportMenu, k2DExportItems, std::size(k2DExportItems));
+    }
 }
 
 void WorkbenchMenuManager::refreshImportMenuForWorkbench(const QString& workbenchId)
@@ -569,46 +629,11 @@ void WorkbenchMenuManager::refreshImportMenuForWorkbench(const QString& workbenc
     m_menuState.importMenu = m_menuState.fileMenu->addMenu(tr("Import"));
     m_menuState.importMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/File/import.svg")));
 
-    const bool is3D = workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0;
-    const QString allSupportedLabel = tr("All Supported Formats...");
-    const QString allSupportedCommand = is3D ? QStringLiteral("file.import_model") : QStringLiteral("file.open");
-    addMenuAction(m_menuState.importMenu, allSupportedLabel, allSupportedCommand);
-    m_menuState.importMenu->addSeparator();
-
-    auto addImportMenuItem = [this, is3D](QMenu* parent, const ImportMenuItemSpec& spec) {
-        if (!parent)
-        {
-            return;
-        }
-        const char* label = is3D ? spec.label3D : spec.label2D;
-        if (!label)
-        {
-            return;
-        }
-        addMenuAction(parent, tr(label), QString::fromUtf8(spec.commandId));
-    };
-
-    auto* commonMenu = m_menuState.importMenu->addMenu(tr("Common Formats..."));
-    if (commonMenu)
+    // 导入菜单为扁平 4 项，2D / 3D 共用同一组入口，与菜单架构文档一致。
+    for (const auto& spec : kImportItems)
     {
-        addMenuAction(commonMenu, tr("STEP..."), QStringLiteral("file.import_step"));
-    }
-
-    auto* drawingMenu = m_menuState.importMenu->addMenu(tr("2D / Drawing Formats..."));
-    for (const auto& spec : k2DImportItems)
-    {
-        addImportMenuItem(drawingMenu, spec);
-    }
-
-    auto* modelMenu = m_menuState.importMenu->addMenu(tr("3D Model Formats..."));
-    for (const auto& spec : k3DImportItems)
-    {
-        addImportMenuItem(modelMenu, spec);
-    }
-
-    if (m_menuState.importMenu->actions().isEmpty())
-    {
-        addMenuAction(m_menuState.importMenu, tr("All Supported Formats..."), allSupportedCommand);
+        const char* label = spec.label2D;  // 2D / 3D 文案一致
+        addMenuAction(m_menuState.importMenu, tr(label), QString::fromUtf8(spec.commandId));
     }
 }
 
@@ -633,24 +658,7 @@ void WorkbenchMenuManager::refreshFileMenuForWorkbench(const QString& workbenchI
     }
 
     refreshImportMenuForWorkbench(workbenchId);
-
-    m_menuState.exportMenu = m_menuState.fileMenu->addMenu(tr("Export"));
-    m_menuState.exportMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/File/export.svg")));
-
-    const QStringList exportFormats = { tr("DXF (*.dxf)"),
-        tr("SVG (*.svg)"),
-        tr("PLT (*.plt)"),
-        tr("BMP (*.bmp)"),
-        tr("PNG (*.png)") };
-    const QStringList exportCmdIds = { QStringLiteral("file.export_dxf"),
-        QStringLiteral("file.export_svg"),
-        QStringLiteral("file.export_plt"),
-        QStringLiteral("file.export_bmp"),
-        QStringLiteral("file.export_png") };
-    for (int i = 0; i < exportFormats.size(); ++i)
-    {
-        addMenuAction(m_menuState.exportMenu, exportFormats[i], exportCmdIds[i]);
-    }
+    refreshExportMenuForWorkbench(workbenchId);
 }
 
 void WorkbenchMenuManager::buildViewMenu()
@@ -662,122 +670,7 @@ void WorkbenchMenuManager::buildViewMenu()
 
     m_menuState.viewMenu->addSeparator();
 
-    QString currentWorkbenchId = m_stateCenter ? m_stateCenter->currentWorkbenchId() : QStringLiteral("2D");
-
-    if (currentWorkbenchId == QStringLiteral("2D"))
-    {
-        m_menuState.workbench3DAction = m_menuState.viewMenu->addAction(tr("Switch to 3D"));
-        m_menuState.workbench3DAction->setCheckable(true);
-        IconHelper::setThemedIcon(
-            m_menuState.workbench3DAction, QStringLiteral(":/ui/common/Icons/View/switch_to_3d.svg"));
-        QObject::connect(m_menuState.workbench3DAction, &QAction::triggered, this, [this]() {
-            logMenuTrigger(tr("Switch to 3D"), QStringLiteral("view.switch_to_3d"));
-            m_window->triggerWorkbench(QStringLiteral("3D"));
-        });
-    }
-    else if (currentWorkbenchId == QStringLiteral("3D"))
-    {
-        m_menuState.workbench2DAction = m_menuState.viewMenu->addAction(tr("Switch to 2D"));
-        m_menuState.workbench2DAction->setCheckable(true);
-        IconHelper::setThemedIcon(
-            m_menuState.workbench2DAction, QStringLiteral(":/ui/common/Icons/View3D/switch_to_2d.svg"));
-        QObject::connect(m_menuState.workbench2DAction, &QAction::triggered, this, [this]() {
-            logMenuTrigger(tr("Switch to 2D"), QStringLiteral("view.switch_to_2d"));
-            m_window->triggerWorkbench(QStringLiteral("2D"));
-        });
-    }
-
-    m_menuState.viewMenu->addSeparator();
-
-    auto* layerMgr = m_menuState.viewMenu->addAction(tr("Layer Manager..."));
-    IconHelper::setThemedIcon(layerMgr, QStringLiteral(":/ui/common/Icons/View/layers.svg"));
-    QObject::connect(layerMgr, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Layer Manager..."), QStringLiteral("view.layer_manager"));
-        if (m_uiServices && m_uiServices->layerEditService)
-        {
-            auto* w = qobject_cast<WorkbenchWindow*>(m_window);
-            if (w)
-            {
-                LayerManagerDialog::showDialog(m_uiServices->layerEditService, w);
-            }
-        }
-    });
-
-    m_menuState.viewMenu->addSeparator();
-
-    auto* testView = m_menuState.viewMenu->addAction(tr("TestView"));
-    QObject::connect(testView, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("TestView"), QStringLiteral("view.testview"));
-        if (m_testViewHandler)
-        {
-            m_testViewHandler();
-        }
-    });
-
-    m_menuState.viewMenu->addSeparator();
-
-    m_menuState.unitMenu = m_menuState.viewMenu->addMenu(tr("Unit"));
-    m_menuState.unitMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/View/unit.svg")));
-
-    // 复用共享的单位选择菜单构建器（与状态栏 Position 弹出菜单同源），
-    // 可选单位、显示文本、命令 ID 均在 UnitSelectionMenu 中唯一维护
-    UnitManager::Unit currentUnit = UnitManager::Unit::Millimeter;
-    if (m_uiServices && m_uiServices->unitManager)
-    {
-        currentUnit = m_uiServices->unitManager->displayUnit();
-    }
-    UnitSelectionMenu::populate(m_menuState.unitMenu, currentUnit, [this](const QString& cmdId) {
-        logMenuTrigger(UnitSelectionMenu::textForCommandId(cmdId), cmdId);
-        dispatchCommandSafely(cmdId);
-    });
-
-    m_menuState.viewMenu->addSeparator();
-
-    m_menuState.gridSnapMenu = m_menuState.viewMenu->addMenu(tr("Grid && Snap"));
-    m_menuState.gridSnapMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/View/snap.svg")));
-    auto* showGrid = m_menuState.gridSnapMenu->addAction(tr("Show Grid"));
-    showGrid->setCheckable(true);
-    IconHelper::setThemedIcon(showGrid, QStringLiteral(":/ui/common/Icons/View3D/grid.svg"));
-    QObject::connect(showGrid, &QAction::toggled, this, [this](bool checked) {
-        logMenuTrigger(tr("Show Grid"), QStringLiteral("view.grid_visible"));
-        if (m_stateCenter)
-        {
-            m_stateCenter->setMetadata({ { QStringLiteral("gridVisible"), checked } });
-        }
-    });
-    auto* snapEnabled = m_menuState.gridSnapMenu->addAction(tr("Snap Enabled"));
-    snapEnabled->setCheckable(true);
-    IconHelper::setThemedIcon(snapEnabled, QStringLiteral(":/ui/common/Icons/View/snap.svg"));
-    QObject::connect(snapEnabled, &QAction::toggled, this, [this](bool checked) {
-        logMenuTrigger(tr("Snap Enabled"), QStringLiteral("view.snap_enabled"));
-        if (m_stateCenter)
-        {
-            m_stateCenter->setMetadata({ { QStringLiteral("snapEnabled"), checked } });
-        }
-    });
-    auto* orthoMode = m_menuState.gridSnapMenu->addAction(tr("Ortho Mode"));
-    orthoMode->setCheckable(true);
-    IconHelper::setThemedIcon(orthoMode, QStringLiteral(":/ui/common/Icons/View/ortho.svg"));
-    QObject::connect(orthoMode, &QAction::toggled, this, [this](bool checked) {
-        logMenuTrigger(tr("Ortho Mode"), QStringLiteral("view.ortho_mode"));
-        if (m_stateCenter)
-        {
-            m_stateCenter->setMetadata({ { QStringLiteral("orthoMode"), checked } });
-        }
-    });
-    auto* angleSnap = m_menuState.gridSnapMenu->addAction(tr("Angle Snap"));
-    angleSnap->setCheckable(true);
-    IconHelper::setThemedIcon(angleSnap, QStringLiteral(":/ui/common/Icons/View/angle_snap.svg"));
-    QObject::connect(angleSnap, &QAction::toggled, this, [this](bool checked) {
-        logMenuTrigger(tr("Angle Snap"), QStringLiteral("view.angle_snap"));
-        if (m_stateCenter)
-        {
-            m_stateCenter->setMetadata({ { QStringLiteral("angleSnap"), checked } });
-        }
-    });
-
-    m_menuState.viewMenu->addSeparator();
-
+    // Zoom 子菜单
     m_menuState.zoomMenu = m_menuState.viewMenu->addMenu(tr("Zoom"));
     m_menuState.zoomMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/View/zoom_in.svg")));
     auto* zoomIn = m_menuState.zoomMenu->addAction(tr("Zoom In"));
@@ -832,6 +725,133 @@ void WorkbenchMenuManager::buildViewMenu()
             m_viewportZoomHandler(QStringLiteral("reset"));
         }
     });
+
+    // Pan
+    auto* panAction = m_menuState.viewMenu->addAction(tr("Pan"));
+    panAction->setShortcut(QStringLiteral("M"));
+    QObject::connect(panAction, &QAction::triggered, this, [this]() {
+        logMenuTrigger(tr("Pan"), QStringLiteral("view.pan"));
+        if (m_viewportZoomHandler)
+        {
+            m_viewportZoomHandler(QStringLiteral("pan"));
+        }
+    });
+
+    m_menuState.viewMenu->addSeparator();
+
+    // Unit 子菜单
+    m_menuState.unitMenu = m_menuState.viewMenu->addMenu(tr("Unit"));
+    m_menuState.unitMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/View/unit.svg")));
+    UnitManager::Unit currentUnit = UnitManager::Unit::Millimeter;
+    if (m_uiServices && m_uiServices->unitManager)
+    {
+        currentUnit = m_uiServices->unitManager->displayUnit();
+    }
+    UnitSelectionMenu::populate(m_menuState.unitMenu, currentUnit, [this](const QString& cmdId) {
+        logMenuTrigger(UnitSelectionMenu::textForCommandId(cmdId), cmdId);
+        dispatchCommandSafely(cmdId);
+    });
+
+    m_menuState.viewMenu->addSeparator();
+
+    // Grid && Snap 子菜单
+    m_menuState.gridSnapMenu = m_menuState.viewMenu->addMenu(tr("Grid && Snap"));
+    m_menuState.gridSnapMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/View/snap.svg")));
+    auto* showGrid = m_menuState.gridSnapMenu->addAction(tr("Show Grid"));
+    showGrid->setCheckable(true);
+    IconHelper::setThemedIcon(showGrid, QStringLiteral(":/ui/common/Icons/View3D/grid.svg"));
+    QObject::connect(showGrid, &QAction::toggled, this, [this](bool checked) {
+        logMenuTrigger(tr("Show Grid"), QStringLiteral("view.grid_visible"));
+        if (m_stateCenter)
+        {
+            m_stateCenter->setMetadata({ { QStringLiteral("gridVisible"), checked } });
+        }
+    });
+    auto* snapEnabled = m_menuState.gridSnapMenu->addAction(tr("Snap Enabled"));
+    snapEnabled->setCheckable(true);
+    IconHelper::setThemedIcon(snapEnabled, QStringLiteral(":/ui/common/Icons/View/snap.svg"));
+    QObject::connect(snapEnabled, &QAction::toggled, this, [this](bool checked) {
+        logMenuTrigger(tr("Snap Enabled"), QStringLiteral("view.snap_enabled"));
+        if (m_stateCenter)
+        {
+            m_stateCenter->setMetadata({ { QStringLiteral("snapEnabled"), checked } });
+        }
+    });
+    auto* orthoMode = m_menuState.gridSnapMenu->addAction(tr("Ortho Mode"));
+    orthoMode->setCheckable(true);
+    IconHelper::setThemedIcon(orthoMode, QStringLiteral(":/ui/common/Icons/View/ortho.svg"));
+    QObject::connect(orthoMode, &QAction::toggled, this, [this](bool checked) {
+        logMenuTrigger(tr("Ortho Mode"), QStringLiteral("view.ortho_mode"));
+        if (m_stateCenter)
+        {
+            m_stateCenter->setMetadata({ { QStringLiteral("orthoMode"), checked } });
+        }
+    });
+    auto* angleSnap = m_menuState.gridSnapMenu->addAction(tr("Angle Snap"));
+    angleSnap->setCheckable(true);
+    IconHelper::setThemedIcon(angleSnap, QStringLiteral(":/ui/common/Icons/View/angle_snap.svg"));
+    QObject::connect(angleSnap, &QAction::toggled, this, [this](bool checked) {
+        logMenuTrigger(tr("Angle Snap"), QStringLiteral("view.angle_snap"));
+        if (m_stateCenter)
+        {
+            m_stateCenter->setMetadata({ { QStringLiteral("angleSnap"), checked } });
+        }
+    });
+
+    m_menuState.viewMenu->addSeparator();
+
+    // Layer Manager
+    auto* layerMgr = m_menuState.viewMenu->addAction(tr("Layer Manager..."));
+    IconHelper::setThemedIcon(layerMgr, QStringLiteral(":/ui/common/Icons/View/layers.svg"));
+    QObject::connect(layerMgr, &QAction::triggered, this, [this]() {
+        logMenuTrigger(tr("Layer Manager..."), QStringLiteral("view.layer_manager"));
+        if (m_uiServices && m_uiServices->layerEditService)
+        {
+            auto* w = qobject_cast<WorkbenchWindow*>(m_window);
+            if (w)
+            {
+                LayerManagerDialog::showDialog(m_uiServices->layerEditService, w);
+            }
+        }
+    });
+
+    m_menuState.viewMenu->addSeparator();
+
+    // Switch to 2D/3D
+    QString currentWorkbenchId = m_stateCenter ? m_stateCenter->currentWorkbenchId() : QStringLiteral("2D");
+    if (currentWorkbenchId == QStringLiteral("2D"))
+    {
+        m_menuState.workbench3DAction = m_menuState.viewMenu->addAction(tr("Switch to 3D"));
+        m_menuState.workbench3DAction->setCheckable(true);
+        IconHelper::setThemedIcon(
+            m_menuState.workbench3DAction, QStringLiteral(":/ui/common/Icons/View/switch_to_3d.svg"));
+        QObject::connect(m_menuState.workbench3DAction, &QAction::triggered, this, [this]() {
+            logMenuTrigger(tr("Switch to 3D"), QStringLiteral("view.switch_to_3d"));
+            m_window->triggerWorkbench(QStringLiteral("3D"));
+        });
+    }
+    else if (currentWorkbenchId == QStringLiteral("3D"))
+    {
+        m_menuState.workbench2DAction = m_menuState.viewMenu->addAction(tr("Switch to 2D"));
+        m_menuState.workbench2DAction->setCheckable(true);
+        IconHelper::setThemedIcon(
+            m_menuState.workbench2DAction, QStringLiteral(":/ui/common/Icons/View3D/switch_to_2d.svg"));
+        QObject::connect(m_menuState.workbench2DAction, &QAction::triggered, this, [this]() {
+            logMenuTrigger(tr("Switch to 2D"), QStringLiteral("view.switch_to_2d"));
+            m_window->triggerWorkbench(QStringLiteral("2D"));
+        });
+    }
+
+    m_menuState.viewMenu->addSeparator();
+
+    auto* testView = m_menuState.viewMenu->addAction(tr("TestView"));
+    QObject::connect(testView, &QAction::triggered, this, [this]() {
+        logMenuTrigger(tr("TestView"), QStringLiteral("view.testview"));
+        if (m_testViewHandler)
+        {
+            m_testViewHandler();
+        }
+    });
 }
 
 void WorkbenchMenuManager::refreshDrawMenuForWorkbench(const QString& workbenchId)
@@ -870,8 +890,8 @@ void WorkbenchMenuManager::refreshDrawMenuForWorkbench(const QString& workbenchI
         const QString iconRes = cmdEntry.iconResource ? QString::fromUtf8(cmdEntry.iconResource) : QString();
         // 绘图工具命令使用 toolName 作为 commandId，由 Workbench2D::dispatchCommand
         // 兜底按 operationForToolName 解析，与左侧工具栏/右键菜单为同一条分发路径。
-        QAction* toolAction = addMenuAction(
-            m_menuState.drawMenu, tr(cmdEntry.text), QString::fromUtf8(cmdEntry.toolName), iconRes);
+        QAction* toolAction =
+            addMenuAction(m_menuState.drawMenu, tr(cmdEntry.text), QString::fromUtf8(cmdEntry.toolName), iconRes);
         // 绘图工具菜单项设为可勾选（互斥单选），与左侧工具栏选中态联动：
         // 视口 activeToolChanged → syncDrawMenuToTool 更新勾选，反之点击菜单走同一条 Tool_* 分发。
         if (toolAction)
@@ -959,31 +979,28 @@ void WorkbenchMenuManager::refreshEditMenuForWorkbench(const QString& workbenchI
     addMenuAction(m_menuState.editMenu, tr("Delete"), QStringLiteral("edit.delete"));
     m_menuState.editMenu->addSeparator();
 
-    // Modify（几何变换）菜单收敛到 Edit 下，作为子菜单（2D：交互式修改工具；3D：配置模式走 JSON edit.transform）
-    m_menuState.modifyMenu = m_menuState.editMenu->addMenu(tr("Modify"));
+    // Transform 子菜单：Move / Rotate 90 CW / Rotate 90 CCW / Rotate 180 / Mirror Horizontal / Mirror Vertical / Scale
+    m_menuState.modifyMenu = m_menuState.editMenu->addMenu(tr("Transform"));
     m_menuState.modifyMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/Actions/move.svg")));
-    refreshModifyMenuForWorkbench(workbenchId);
-    m_menuState.editMenu->addSeparator();
-
-    m_menuState.rotateMenu = m_menuState.editMenu->addMenu(tr("Rotate"));
-    m_menuState.rotateMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/Actions/rotate.svg")));
-    addMenuAction(m_menuState.rotateMenu,
+    addMenuAction(m_menuState.modifyMenu, tr("Move"), QStringLiteral("edit.move"));
+    addMenuAction(m_menuState.modifyMenu,
         tr("Rotate 90 CW"),
         QStringLiteral("edit.rotate_90cw"),
         QStringLiteral(":/ui/common/Icons/Actions/rotate.svg"));
-    addMenuAction(m_menuState.rotateMenu,
+    addMenuAction(m_menuState.modifyMenu,
         tr("Rotate 90 CCW"),
         QStringLiteral("edit.rotate_90ccw"),
         QStringLiteral(":/ui/common/Icons/Actions/rotate.svg"));
-    addMenuAction(m_menuState.rotateMenu,
+    addMenuAction(m_menuState.modifyMenu,
         tr("Rotate 180"),
         QStringLiteral("edit.rotate_180"),
         QStringLiteral(":/ui/common/Icons/Actions/rotate.svg"));
-
-    m_menuState.mirrorMenu = m_menuState.editMenu->addMenu(tr("Mirror"));
-    m_menuState.mirrorMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/Actions/mirror_h.svg")));
-    addMenuAction(m_menuState.mirrorMenu, tr("Mirror Horizontal"), QStringLiteral("edit.mirror_horizontal"));
-    addMenuAction(m_menuState.mirrorMenu, tr("Mirror Vertical"), QStringLiteral("edit.mirror_vertical"));
+    addMenuAction(m_menuState.modifyMenu, tr("Mirror Horizontal"), QStringLiteral("edit.mirror_horizontal"));
+    addMenuAction(m_menuState.modifyMenu, tr("Mirror Vertical"), QStringLiteral("edit.mirror_vertical"));
+    addMenuAction(m_menuState.modifyMenu,
+        tr("Scale"),
+        QStringLiteral("edit.scale"),
+        QStringLiteral(":/ui/common/Icons/View3D/scale.svg"));
 
     m_menuState.alignMenu = m_menuState.editMenu->addMenu(tr("Align"));
     m_menuState.alignMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/Actions/align_left.svg")));
@@ -1003,12 +1020,9 @@ void WorkbenchMenuManager::refreshEditMenuForWorkbench(const QString& workbenchI
 
     m_menuState.pathOpsMenu = m_menuState.editMenu->addMenu(tr("Path Operations"));
     m_menuState.pathOpsMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/Actions/offset.svg")));
-    addMenuAction(
-        m_menuState.pathOpsMenu, tr("Boolean Union"), QStringLiteral("edit.boolean_union"));
-    addMenuAction(
-        m_menuState.pathOpsMenu, tr("Boolean Intersection"), QStringLiteral("edit.boolean_intersection"));
-    addMenuAction(
-        m_menuState.pathOpsMenu, tr("Boolean Difference"), QStringLiteral("edit.boolean_difference"));
+    addMenuAction(m_menuState.pathOpsMenu, tr("Boolean Union"), QStringLiteral("edit.boolean_union"));
+    addMenuAction(m_menuState.pathOpsMenu, tr("Boolean Intersection"), QStringLiteral("edit.boolean_intersection"));
+    addMenuAction(m_menuState.pathOpsMenu, tr("Boolean Difference"), QStringLiteral("edit.boolean_difference"));
     addMenuAction(m_menuState.pathOpsMenu, tr("Boolean Xor"), QStringLiteral("edit.boolean_xor"));
 }
 
@@ -1730,18 +1744,15 @@ void WorkbenchMenuManager::refreshGridSnapMenuChecks()
         {
             checked = metadata.value(QStringLiteral("gridVisible")).toBool();
         }
-        else if (text.contains(tr("Snap"), Qt::CaseInsensitive) &&
-            metadata.contains(QStringLiteral("snapEnabled")))
+        else if (text.contains(tr("Snap"), Qt::CaseInsensitive) && metadata.contains(QStringLiteral("snapEnabled")))
         {
             checked = metadata.value(QStringLiteral("snapEnabled")).toBool();
         }
-        else if (text.contains(tr("Ortho"), Qt::CaseInsensitive) &&
-            metadata.contains(QStringLiteral("orthoMode")))
+        else if (text.contains(tr("Ortho"), Qt::CaseInsensitive) && metadata.contains(QStringLiteral("orthoMode")))
         {
             checked = metadata.value(QStringLiteral("orthoMode")).toBool();
         }
-        else if (text.contains(tr("Angle"), Qt::CaseInsensitive) &&
-            metadata.contains(QStringLiteral("angleSnap")))
+        else if (text.contains(tr("Angle"), Qt::CaseInsensitive) && metadata.contains(QStringLiteral("angleSnap")))
         {
             checked = metadata.value(QStringLiteral("angleSnap")).toBool();
         }
