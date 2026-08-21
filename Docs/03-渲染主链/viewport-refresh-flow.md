@@ -20,7 +20,7 @@ Document / Scene
 → SceneRefreshCoordinator
 → RenderViewport2D
 → RenderWidget
-→ Renderx / SanYiRender
+→ Renderx / RenderX
 → screen
 ```
 
@@ -30,7 +30,7 @@ Document / Scene
 - `SceneRefreshCoordinator` 负责刷新节流、增量与全量刷新协调
 - `RenderViewport2D` 负责 2D 宿主、输入和刷新触发
 - `RenderWidget` 负责 OpenGL 宿主和渲染设备连接
-- `Renderx` / `SanYiRender` 负责最终渲染执行
+- `Renderx` / `RenderX` 负责最终渲染执行
 
 ---
 

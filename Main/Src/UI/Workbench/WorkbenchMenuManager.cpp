@@ -31,11 +31,13 @@
 
 #include <QAction>
 #include <QActionGroup>
-#include <QMenuBar>
-#include <QSet>
-#include <QSignalBlocker>
+#include <QApplication>
 #include <QFileInfo>
 #include <QKeySequence>
+#include <QMenuBar>
+#include <QMessageBox>
+#include <QSet>
+#include <QSignalBlocker>
 #include <QStringList>
 #include <algorithm>
 #include <functional>
@@ -221,6 +223,15 @@ struct MenuDispatcher final : public IUiCommandDispatcher
         {
             SY_INFOF("[WorkbenchMenuManager] dispatch theme command='%s'", qPrintable(commandId));
             self->workbenchWindow()->triggerTheme(commandId);
+            return;
+        }
+        // 关于对话框：help.about 是窗口级动作，不应进入命令目录。
+        if (commandId == QLatin1String("help.about") && self && self->workbenchWindow())
+        {
+            SY_INFOF("[WorkbenchMenuManager] dispatch about command='%s'", qPrintable(commandId));
+            QMessageBox::about(self->workbenchWindow(),
+                QObject::tr("About"),
+                QObject::tr("SanYiCAD\nVersion: %1").arg(qApp ? qApp->applicationVersion() : QString()));
             return;
         }
         // 语言切换：language.<code> → AppLanguage；兼容历史 "language.tw" → 中文。
@@ -423,20 +434,31 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
     const auto commandAvailable = [this](const QString& commandId) {
         if (commandId.isEmpty())
         {
+            SY_DEBUG("[WorkbenchMenuManager] commandAvailable: empty commandId filtered");
             return false;
         }
         // 工作台切换 / 主题 / 语言属于窗口级动作命令（由 MenuDispatcher 直接处理），
         // 不注册在 2D/3D 命令目录中，过滤时必须放行，否则对应菜单项会被移除。
         if (MenuDispatcher::isWorkbenchSwitchCommand(commandId) || MenuDispatcher::isThemeCommand(commandId) ||
-            MenuDispatcher::isLanguageCommand(commandId))
+            MenuDispatcher::isLanguageCommand(commandId) || commandId == QLatin1String("help.about") ||
+            commandId.startsWith(QStringLiteral("language."), Qt::CaseInsensitive))
         {
+            SY_DEBUGF("[WorkbenchMenuManager] commandAvailable: allow window command '%s'", qPrintable(commandId));
             return true;
         }
         if (!m_workbench)
         {
+            SY_DEBUGF("[WorkbenchMenuManager] commandAvailable: no workbench, allow '%s'", qPrintable(commandId));
             return true;
         }
-        return m_workbench->isCommandRegistered(commandId);
+        const bool registered = m_workbench->isCommandRegistered(commandId);
+        if (!registered)
+        {
+            SY_DEBUGF("[WorkbenchMenuManager] commandAvailable: unregistered '%s' in workbench '%s'",
+                qPrintable(commandId),
+                qPrintable(m_workbench->id()));
+        }
+        return registered;
     };
 
     std::vector<MenuDef> filteredMenus =
@@ -1455,6 +1477,8 @@ bool WorkbenchMenuManager::isMenuGroupAllowedForWorkbench(const QString& command
 
     return commandId.startsWith(QStringLiteral("view."), Qt::CaseInsensitive) ||
         commandId.startsWith(QStringLiteral("edit."), Qt::CaseInsensitive) ||
+        commandId.startsWith(QStringLiteral("tool."), Qt::CaseInsensitive) ||
+        commandId.startsWith(QStringLiteral("language."), Qt::CaseInsensitive) ||
         commandId.startsWith(QStringLiteral("model."), Qt::CaseInsensitive) ||
         commandId.startsWith(QStringLiteral("process."), Qt::CaseInsensitive) ||
         commandId.startsWith(QStringLiteral("algo."), Qt::CaseInsensitive) ||

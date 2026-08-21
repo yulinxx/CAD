@@ -10,7 +10,7 @@ add_executable(LicenseTests
 
 target_compile_features(LicenseTests PRIVATE cxx_std_17)
 
-target_compile_definitions(LicenseTests PRIVATE LICENSE_TEST_HOOKS)
+target_compile_definitions(LicenseTests PRIVATE LICENSE_TEST_HOOKS LICENSE_KEYGEN_EXPORTS)
 
 target_include_directories(LicenseTests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/../License/Include"

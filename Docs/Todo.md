@@ -6,7 +6,7 @@
 
 当前实现：
 
-- `Renderx` 提供纯 POD 描述符 `SceneEnvGeometryDesc` / `EnvLayerDesc`（`Renderx/include/render/render_types.h`），零 Engine 依赖。
+- `Renderx` 提供纯 POD 描述符 `SceneEnvGeometryDesc` / `EnvLayerDesc`（`Renderx/include/render/RenderTypes.h`），零 Engine 依赖。
 - C API 提供 `renderSetSceneEnvDirect` 直通入口（`Renderx/src/c_api/`）。
 - UI 侧 `RenderWidget::submitSceneEnvGeometry(const Eg::SceneEnvGeometry&)` 由 `Renderx` 内部完成逐顶点转换，不再拆散为平行数组。
 - `UI/2D` 两处调用点（`submitSceneFromDataSource` / `submitDefaultSceneEnv`）已统一走直通提交。

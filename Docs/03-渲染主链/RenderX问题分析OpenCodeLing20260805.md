@@ -6,7 +6,12 @@
 
 ## 1. 当前结论
 
-RenderX 当前已经具备统一渲染运行时的形态，当前生产目标名为 `SanYiRender`，源码位于 `Renderx/`。
+RenderX 当前已经具备统一渲染运行时的形态，当前生产目标名为 `RenderX`，源码位于 `Renderx/`。
+
+**增量渲染能力**：
+- **PEM (PersistentEntityManager)**: 通过 `dirtyFlags` 标记变化的图元，`uploadChanges()` 仅增量上传脏图元到 GPU SSBO。当脏图元超过半数时自动退化为全量上传，避免多次小批量开销。
+- **RenderWorld**: 通过 `dirty` 标记和 `m_dirtyList` 跟踪变化的图元，`getDirtyVertexRanges()` 返回需要上传的顶点区间，`clearDirtyFlags()` 在 BatchQueue 完成上传后清除。支持四叉树自适应重建阈值。
+- **GPU 读回双缓冲**: `PersistentEntityManager::readBackGpuVisibility()` 现使用双缓冲机制，通过 fence 同步消除 CPU-GPU 同步瓶颈，不再阻塞 CPU。
 
 ---
 
@@ -47,7 +52,7 @@ SceneDocument3D / SceneManager3D
 
 ## 4. 当前约束
 
-1. 生产路径统一为 `Renderx` / `SanYiRender`。
+1. 生产路径统一为 `Renderx` / `RenderX`。
 2. UI 不直接依赖渲染内部实现。
 3. C ABI 不暴露不稳定容器布局。
 4. 继续清理旧命名和旧历史路径。

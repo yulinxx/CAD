@@ -50,7 +50,7 @@ SanYiCAD/
 ├── Utility/                  # 通用工具库（字符串、文件、加密）
 ├── PyBindCore/               # Python 绑定
 ├── PythonHost/               # Python 宿主（脚本扩展）
-├── SanYiRender/              # 独立渲染 DLL（纯 POD 契约）
+├── RenderX/              # 独立渲染 DLL（纯 POD 契约）
 ├── Tools/
 │   ├── KeygenTool/           # 离线注册码生成工具
 │   └── encrypt_string.py     # 字符串加密工具
@@ -90,7 +90,7 @@ SanYiCAD/
 | **Render3D** | 3D 渲染器（基于 OpenGL） | OpenGL | RenderCommon, Engine3D |
 | **Render/Core** | 底层渲染核心（GPU 缓冲区、着色器程序） | OpenGL | RenderCommon |
 | **UiRenderCore** | UI 层渲染抽象（场景编译、后端桥接、软件渲染） | Qt | Engine2D, Engine3D, UICommon |
-| **SanYiRender** | 独立渲染 DLL（纯 POD 契约，无 Engine 依赖） | C API | 无 |
+| **RenderX** | 独立渲染 DLL（纯 POD 契约，无 Engine 依赖） | C API | 无 |
 
 ### UI 层（用户界面）
 

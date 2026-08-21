@@ -21,6 +21,11 @@ project(SanYiCAD
     LANGUAGES CXX
 )
 
+# MSVC 运行库设置：动态链接 CRT (/MD 发布, /MDd 调试)
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL" CACHE STRING "MSVC runtime library" FORCE)
+endif()
+
 set(SANYI_ROOT "${PROJECT_SOURCE_DIR}" CACHE INTERNAL "SanYi CAD project root")
 include("${SANYI_ROOT}/CMake/SanYiPaths.cmake")
 include("${SANYI_ROOT}/CMake/Utils.cmake")
@@ -40,6 +45,9 @@ find_package(Vulkan QUIET)
 if(Vulkan_FOUND)
     message(STATUS "  Vulkan: FOUND (${Vulkan_INCLUDE_DIRS})")
     add_compile_definitions(SANYI_VULKAN_ENABLED)
+    add_compile_definitions(RENDERX_HAS_VULKAN)
+    # 让所有目标（含 RenderX 的 rhiVulkan.cpp）都能找到 <vulkan/vulkan.h>
+    include_directories(${Vulkan_INCLUDE_DIRS})
 else()
     message(STATUS "  Vulkan: NOT found (optional, Vulkan backend will be unavailable)")
 endif()
@@ -300,7 +308,7 @@ if(BUILD_UI3D)
 endif()
 
 if(BUILD_RENDERX)
-    list(APPEND SANYI_PROJECT_LIBS SanYiRender)
+    list(APPEND SANYI_PROJECT_LIBS RenderX)
 endif()
 
 if(BUILD_HARDWARE)

@@ -11,7 +11,7 @@
  */
 #pragma once
 
-#include <render/render_types.h>
+#include "render/RenderTypes.h"
 #include <vector>
 
 namespace Eg
@@ -32,7 +32,7 @@ namespace Eg
  * @return true 转换成功，false 表示该类型不支持增量路径（如文本）
  */
 bool entityToVertices(
-    const Eg::SyEntity* entity, std::vector<render::VertexP3C3>& outVertices, render::PrimitiveType& outType,
+    const Eg::SyEntity* entity, std::vector<Render::VertexP3C3>& outVertices, Render::PrimitiveType& outType,
     const double* cameraCenter = nullptr);
 
 /**

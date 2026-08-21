@@ -75,14 +75,15 @@ namespace Ui
         return path;
     }
 
-    QImage ViewCaptureService::capture2D(RenderWidget* widget, const CaptureRequest& req)
+    QImage ViewCaptureService::capture2D(void* widget, const CaptureRequest& req)
     {
-        if (!widget || !widget->isInitialized())
+        auto* w = static_cast<RenderWidget*>(widget);
+        if (!w || !w->isInitialized())
         {
             return QImage();
         }
 
-        render::RenderDevice* dev = widget->renderDevice();
+        Render::RenderDevice* dev = w->renderDevice();
         if (!dev)
         {
             return QImage();
@@ -92,11 +93,11 @@ namespace Ui
         QSize targetSize = req.resolution;
         if (targetSize.isEmpty())
         {
-            targetSize = widget->size() * widget->devicePixelRatioF();
+            targetSize = w->size() * w->devicePixelRatioF();
         }
 
         // 根据 framing 准备 view matrix
-        Render::Mat3f savedView = widget->viewMatrix();
+        Render::Mat3f savedView = w->viewMatrix();
         Render::Mat3f targetView = savedView;
 
         if (req.framing == FramingKind::FitAll)
@@ -123,7 +124,7 @@ namespace Ui
         // 恢复原视图矩阵（内部会自动同步 cameraCenter）
         if (req.framing != FramingKind::UseCurrent)
         {
-            renderSetView2D(dev, savedView.data, widget->width(), widget->height());
+            renderSetView2D(dev, savedView.data, w->width(), w->height());
         }
 
         if (ok != 1)
@@ -137,9 +138,10 @@ namespace Ui
         return flipped.copy();                       // 确保数据拥有权
     }
 
-    QImage ViewCaptureService::capture3D(RenderWidget3D* widget, const CaptureRequest& req)
+    QImage ViewCaptureService::capture3D(void* widget, const CaptureRequest& req)
     {
-        if (!widget)
+        auto* w3d = static_cast<RenderWidget3D*>(widget);
+        if (!w3d)
         {
             return QImage();
         }
@@ -147,32 +149,32 @@ namespace Ui
         QSize targetSize = req.resolution;
         if (targetSize.isEmpty())
         {
-            targetSize = widget->size() * widget->devicePixelRatioF();
+            targetSize = w3d->size() * w3d->devicePixelRatioF();
         }
 
         // 根据 framing 选择相机
         if (req.framing == FramingKind::UseCurrent)
         {
             // 当前视图：使用 widget 当前相机
-            QMatrix4x4 view = widget->viewMatrix();
-            QMatrix4x4 proj = widget->projectionMatrix();
-            return widget->captureOffscreen(targetSize.width(), targetSize.height(), view, proj);
+            QMatrix4x4 view = w3d->viewMatrix();
+            QMatrix4x4 proj = w3d->projectionMatrix();
+            return w3d->captureOffscreen(targetSize.width(), targetSize.height(), view, proj);
         }
         else if (req.framing == FramingKind::PresetCamera3D || req.framing == FramingKind::FitAll)
         {
             // 计算场景包围盒
-            if (widget->sceneManager())
+            if (w3d->sceneManager())
             {
-                Ut::BBox3f sceneBBox = widget->sceneManager()->sceneBBox3D();
+                Ut::BBox3f sceneBBox = w3d->sceneManager()->sceneBBox3D();
                 if (sceneBBox.isValid())
                 {
-                    return widget->captureIsometricOffscreen(targetSize.width(), targetSize.height(), sceneBBox);
+                    return w3d->captureIsometricOffscreen(targetSize.width(), targetSize.height(), sceneBBox);
                 }
             }
             // 无场景或 bbox 无效，回退当前相机
-            QMatrix4x4 view = widget->viewMatrix();
-            QMatrix4x4 proj = widget->projectionMatrix();
-            return widget->captureOffscreen(targetSize.width(), targetSize.height(), view, proj);
+            QMatrix4x4 view = w3d->viewMatrix();
+            QMatrix4x4 proj = w3d->projectionMatrix();
+            return w3d->captureOffscreen(targetSize.width(), targetSize.height(), view, proj);
         }
         else if (req.framing == FramingKind::CustomBox)
         {

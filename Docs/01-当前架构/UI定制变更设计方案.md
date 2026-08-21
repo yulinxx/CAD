@@ -38,7 +38,7 @@ SanYiCAD/
 │   │           ├── UiPanelRegistry.h         # 面板工厂注册表
 │   │           ├── UiPanelRegistry.cpp
 │   │           ├── configs/                  # JSON 配置文件目录
-│   │           │   ├── san_yi.json           # 默认客户配置（三益标准版）
+│   │           │   ├── san_yi.json           # 默认客户配置（三义标准版）
 │   │           │   ├── client_a.json         # 客户 A 配置
 │   │           │   ├── client_b.json         # 客户 B 配置
 │   │           │   └── ...                   # 其他客户 JSON 配置
@@ -47,7 +47,7 @@ SanYiCAD/
 │   └── resources/
 ├── UI/                         # [Git Submodule] UI 组件库
 ├── Engine/                     # [Git Submodule] 引擎核心
-├── Renderx/                    # [Git Submodule] 渲染层（SanYiRender.dll）
+├── Renderx/                    # [Git Submodule] 渲染层（RenderX.dll）
 ├── Utility/                    # [Git Submodule] 基础工具库
 ├── Log/                        # [Git Submodule] 日志
 ├── CrashHandler/               # [Git Submodule] 崩溃捕获
@@ -122,7 +122,7 @@ main()
 │  - SceneDocument3D (3D scene tree)                          │
 │  - Algorithm (boolean ops, offsets, etc.)                   │
 ├─────────────────────────────────────────────────────────────┤
-│  Render Layer (Renderx / SanYiRender.dll)                   │
+│  Render Layer (Renderx / RenderX.dll)                   │
 │  - 纯 C ABI 渲染入口、2D/3D 统一渲染管线                      │
 │  - 仅依赖系统图形库，内部负责 OpenGL/Vulkan/Metal RHI、着色器、批次管理 │
 ├─────────────────────────────────────────────────────────────┤
@@ -572,7 +572,7 @@ private:
 {
   "meta": {
     "clientId": "san_yi",
-    "clientName": "三益标准版本",
+    "clientName": "三义标准版本",
     "version": "1.0"
   },
   "menus": [
@@ -767,7 +767,7 @@ CMake 在配置阶段根据 `SANYI_CLIENT_ID` **生成**对应的 `.qrc` 文件�
 # 客户配置选项
 set(SANYI_CLIENT_ID "san_yi" CACHE STRING "Target client ID")
 set_property(CACHE SANYI_CLIENT_ID PROPERTY STRINGS
-    "san_yi"      # 三益标准版本
+    "san_yi"      # 三义标准版本
     "client_a"    # 客户 A
     "client_b"    # 客户 B
     # ...
@@ -839,7 +839,7 @@ qt_add_resources(${app_name} "APP_CONFIG"
 ### 8.6 编译命令
 
 ```bash
-# 默认编译（三益标准版本）
+# 默认编译（三义标准版本）
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 
@@ -1000,7 +1000,7 @@ void UiConfigurationManager::registerCustomPanels(const UiConfigData& config)
 
 ```json
 {
-  "meta": { "clientId": "san_yi", "clientName": "三益标准版" },
+  "meta": { "clientId": "san_yi", "clientName": "三义标准版" },
   "menus": [ /* 文件、编辑、绘图、图元操作、视图、工具 */ ],
   "toolbars": [ /* 主工具栏(顶部)、视图工具栏(顶部) */ ],
   "docks": [ /* 图层(左)、属性(右)、命令(底) */ ]
@@ -1390,7 +1390,7 @@ set(TRANSLATABLE_SOURCES
 ### 17.4 编译方式
 
 ```bash
-# 默认编译（三益标准版本）
+# 默认编译（三义标准版本）
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 

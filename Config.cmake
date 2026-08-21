@@ -37,6 +37,11 @@ endif()
 # --------------------------------------------------------------------
 set(QT_VERSION_MAJOR 6)
 
+# MSVC 运行库设置：动态链接 CRT (/MD 发布, /MDd 调试)
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL" CACHE STRING "MSVC runtime library" FORCE)
+endif()
+
 # --------------------------------------------------------------------
 # Qt 路径配置（默认值，可通过 Config.local.cmake 或 -DQt_INSTALL_DIR= 覆盖）
 # --------------------------------------------------------------------

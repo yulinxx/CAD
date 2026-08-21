@@ -25,7 +25,7 @@
 - 网格背景线粗细/间距不均匀。
 
 ### 根因（RHI GL 后端非 DSA 路径忽略 per-layer 顶点偏移）
-`Renderx/src/rhi/rhi_gl.cpp` 的 `GLDevice::bindVertexBuffer()`：
+`Renderx/src/rhi/rhigl.cpp` 的 `GLDevice::bindVertexBuffer()`：
 
 - DSA 路径（`glVertexArrayVertexBuffer`，OpenGL 4.3+）：偏移作为参数传给驱动，**正确**。
 - 非 DSA fallback 路径（macOS 4.1 没有该函数）：`configureVertexAttribs()` 里的
@@ -45,7 +45,7 @@ Windows/Linux 走 DSA 路径（4.6 支持），所以只在 Mac 出现。
 （P3C3/P3C4/P3N3/P3T2/P3T2C4/P2T2C4）的 fallback 分支都已处理。
 
 ```cpp
-// rhi_gl.cpp
+// rhigl.cpp
 void GLDevice::configureVertexAttribs(GLFuncs* g, PrimitiveTopology, VertexFormat fmt, uint64_t baseOffset);
 // fallback: (void*)(uintptr_t)(baseOffset + 12) 等
 // bindVertexBuffer 调用点传入 offset
@@ -151,7 +151,7 @@ Qt 无法创建共享 NSOpenGLContext，渲染内容错位/残留（左上角重
 - **shader/字体复制**：POST_BUILD 复制到 `$<TARGET_FILE_DIR>`，Windows/Linux 上与 dylib 同目录，冗余但无害。
 - **平台分支**：`#ifdef Q_OS_MACOS / #else`（#else 同时覆盖 Windows 与 Linux）。
 - **GL 调用**：全部为 3.3 core 子集 + Qt 抽象（QOpenGLShaderProgram/VBO/VAO），三平台一致。
-- **无平台特有依赖**：无 GLUT/GLEW/GLAD/GLU；`uintptr_t` 在 rhi_gl.cpp 中原本已使用（MSVC 兼容）。
+- **无平台特有依赖**：无 GLUT/GLEW/GLAD/GLU；`uintptr_t` 在 rhigl.cpp 中原本已使用（MSVC 兼容）。
 
 ⚠️ 本机只能编译 macOS。Windows/Linux 需要在对应平台各跑一次完整构建 + 运行确认。
 重点回归项：2D 台面/网格显示、3D 视图、2D↔3D 工作台切换。
@@ -253,7 +253,7 @@ F9 临时转储（`glGetBooleanv`）显示按键时刻 `DEPTH_TEST=0, BLEND=1`�
 
 ## 10. 2D 线条渲染：线宽钳制 + GL_LINE_SMOOTH 移除（2026-08-15 修复）
 
-> 涉及 `Renderx/src/rhi/rhi_gl.cpp`，属于 2D Renderx 路径（RenderWidget/网格线/六边形等所有线图元）。
+> 涉及 `Renderx/src/rhi/rhigl.cpp`，属于 2D Renderx 路径（RenderWidget/网格线/六边形等所有线图元）。
 
 ### 10.1 症状
 
@@ -274,7 +274,7 @@ core profile 下所有线宽都钳到 1px）。原实现 `setLineWidth()` 直接
 ### 10.4 修复
 
 ```cpp
-// rhi_gl.cpp
+// rhigl.cpp
 // 1. 不再全局启用 GL_LINE_SMOOTH（依赖 MSAA 提供多重采样抗锯齿）
 g->Enable(GL_MULTISAMPLE);
 

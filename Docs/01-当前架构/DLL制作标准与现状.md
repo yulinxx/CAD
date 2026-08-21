@@ -10,7 +10,7 @@
 2. 跨 DLL 的 public 接口避免直接暴露 STL、Qt 类型和模板实现细节。
 3. 内部 C++ DLL 可以使用 STL，但不把 STL 作为跨边界契约。
 4. 所有导出模块都要明确导出宏、头文件边界和最小公共 API。
-5. 渲染相关的对外入口以 `Renderx` / `SanYiRender` 为准，不再沿用旧的 `RenderCommon` / `Render2D` / `Render3D` / `RenderNext` 口径。
+5. 渲染相关的对外入口以 `Renderx` / `RenderX` 为准，不再沿用旧的 `RenderCommon` / `Render2D` / `Render3D` / `RenderNext` 口径。
 
 ---
 
@@ -27,7 +27,7 @@
 | `Engine3D` | 3D 几何与场景核心 | 内部 C++ DLL |
 | `EnginePersistence` | 文档持久化 | 内部 C++ DLL |
 | `FileIO` | 导入导出 | 内部 C++ DLL |
-| `Renderx` / `SanYiRender` | 统一渲染入口 | C ABI |
+| `Renderx` / `RenderX` | 统一渲染入口 | C ABI |
 | `UICommon` | UI 公共能力 | 内部 C++ DLL |
 | `UI2D` | 2D 视图与交互 | 内部 C++ DLL |
 | `UI3D` | 3D 视图与交互 | 内部 C++ DLL |
@@ -52,7 +52,7 @@
 
 ### 3.3 渲染模块
 
-- 生产渲染目标名为 `SanYiRender`。
+- 生产渲染目标名为 `RenderX`。
 - 代码目录位于 `Renderx/`。
 - 对外头文件以 `Renderx/include/render/render.h` 为准。
 - 当前主接口围绕 `RenderDevice*`、`renderCreateDevice()`、`renderSubmitGeometry()`、`renderFrame()` 展开。
@@ -64,7 +64,7 @@
 1. 继续补齐各 facade 的版本查询。
 2. 继续统一错误码风格。
 3. 继续压缩跨 DLL 的 public STL 用法。
-4. 继续把渲染相关的旧命名统一替换为 `Renderx` / `SanYiRender`。
+4. 继续把渲染相关的旧命名统一替换为 `Renderx` / `RenderX`。
 5. 继续保持 UI 与引擎、渲染的职责分离。
 
 ---

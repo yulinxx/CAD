@@ -9,7 +9,7 @@
 3. **CMake include 传播** — 上游 PUBLIC，下游 0 重复定义
 4. **2D/3D 收编（MainWindow/ServiceLocator/DocumentManager）** — 验证命令总线 base 复用后，把上层重复的窗口/服务/文档基类抽出来
 
-不动：`SceneEditService3D` / `UndoCommands3D` / `TransformEditBridge3D`（3D 独有功能，2D 无对应物），4 套并行的渲染系统（`Renderx` / `Render/NextGen` / `SanYiRender`），`BaseTool` 6 个旧 setter（重构 1 完成后可删但保留 1 个 release）。
+不动：`SceneEditService3D` / `UndoCommands3D` / `TransformEditBridge3D`（3D 独有功能，2D 无对应物），4 套并行的渲染系统（`Renderx` / `Render/NextGen` / `RenderX`），`BaseTool` 6 个旧 setter（重构 1 完成后可删但保留 1 个 release）。
 
 ---
 
@@ -367,7 +367,7 @@ MainApp/MainApp3D.exe
 
 ## 关键不动的部分
 
-- `Renderx/` `Render/NextGen/` `SanYiRender/` — 渲染层收敛是单独 PR
+- `Renderx/` `Render/NextGen/` `RenderX/` — 渲染层收敛是单独 PR
 - `RenderWorld` / `RenderWidgetEx` 切到主链路 — 单独 PR（涉及性能优化）
 - `BaseTool` 6 个旧 setter — 重构 1 完成后保留 1 release 再删
 - `addEntityFromPointer` 公开方法 — 保留 1 release 再删

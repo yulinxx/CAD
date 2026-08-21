@@ -142,7 +142,7 @@ target_link_libraries(${app_name}
         EngineCommon
         Engine2D
         EnginePersistence
-        SanYiRender
+        RenderX
         UICommon
         UI2D
         Log
@@ -436,7 +436,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             UICommon
             UI2D
             Log
-            SanYiRender
+            RenderX
             FileIO
             protobuf::libprotobuf-lite
             ${QT_LIBRARIES}

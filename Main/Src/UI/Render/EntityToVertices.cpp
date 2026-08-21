@@ -6,11 +6,11 @@
  * 改为消费 Engine 侧统一边界 emitEntityGeometry 输出的几何原语契约
  * （ISceneGeometrySink），由本地 IncrementalVertexSink 完成离散化。
  * 离散化公式与全量路径（render_c_api_frame.cpp 的 tessellate*）保持一致，
- * 统一参数来自 render/tess_params.h。
+ * 统一参数来自 render/TessParams.h。
  */
 #include "EntityToVertices.h"
 
-#include <render/tess_params.h>
+#include "render/TessParams.h"
 
 #include "Engine2D/Geometry/EntityGeometryEmitter.h"
 #include "Engine/SyEntity/SyEntity.h"
@@ -22,7 +22,7 @@
 
 namespace
 {
-    // 离散化参数统一由 render::tess 定义（见 render/tess_params.h），
+    // 离散化参数统一由 Render::tess 定义（见 render/TessParams.h），
     // 保证全量路径与增量路径结果一致
 
     // 颜色转换：Ut::Color → float[4]
@@ -39,8 +39,8 @@ namespace
     struct CachedVertexData
     {
         uint64_t geometryHash = 0;
-        std::vector<render::VertexP3C3> vertices;
-        render::PrimitiveType primType = render::PrimitiveType::LineStrip;
+        std::vector<Render::VertexP3C3> vertices;
+        Render::PrimitiveType primType = Render::PrimitiveType::LineStrip;
     };
 
     // 按实体 ID 缓存离散化结果，避免非几何变更时重复离散化
@@ -91,8 +91,8 @@ namespace
     bool tryCacheHit(uint64_t entityId,
         uint64_t geomHash,
         const Ut::Color& color,
-        std::vector<render::VertexP3C3>& outVertices,
-        render::PrimitiveType& outType)
+        std::vector<Render::VertexP3C3>& outVertices,
+        Render::PrimitiveType& outType)
     {
         auto it = s_vertexCache.find(entityId);
         if (it == s_vertexCache.end() || it->second.geometryHash != geomHash)
@@ -117,8 +117,8 @@ namespace
     // 存入缓存
     void storeCache(uint64_t entityId,
         uint64_t geomHash,
-        const std::vector<render::VertexP3C3>& vertices,
-        render::PrimitiveType primType)
+        const std::vector<Render::VertexP3C3>& vertices,
+        Render::PrimitiveType primType)
     {
         auto& entry = s_vertexCache[entityId];
         entry.geometryHash = geomHash;
@@ -136,13 +136,13 @@ namespace
     // ==================== 增量路径几何接收器 ====================
     // 消费 emitEntityGeometry 输出的原语，离散化为 VertexP3C3 顶点数组。
     // 离散化公式必须与全量路径 render_c_api_frame.cpp 的 tessellate* 保持严格一致
-    // （参数统一来自 render/tess_params.h），确保两条路径渲染结果一致。
+    // （参数统一来自 render/TessParams.h），确保两条路径渲染结果一致。
 
     class IncrementalVertexSink : public Eg::ISceneGeometrySink
     {
     public:
-        IncrementalVertexSink(std::vector<render::VertexP3C3>& outVertices,
-            render::PrimitiveType& outType,
+        IncrementalVertexSink(std::vector<Render::VertexP3C3>& outVertices,
+            Render::PrimitiveType& outType,
             const double* cameraCenter = nullptr)
             : m_vertices(outVertices)
             , m_outType(outType)
@@ -168,7 +168,7 @@ namespace
             {
                 return;
             }
-            m_outType = bClosed ? render::PrimitiveType::LineLoop : render::PrimitiveType::LineStrip;
+            m_outType = bClosed ? Render::PrimitiveType::LineLoop : Render::PrimitiveType::LineStrip;
             float rgba[4];
             colorToRGBA(color, rgba);
             for (size_t i = 0; i < count; ++i)
@@ -180,7 +180,7 @@ namespace
 
         void emitPoint(const Ut::Vec2d& position, const Ut::Color& color) override
         {
-            m_outType = render::PrimitiveType::PointList;
+            m_outType = Render::PrimitiveType::PointList;
             float rgba[4];
             colorToRGBA(color, rgba);
             addVertex(position.x(), position.y(), rgba);
@@ -193,13 +193,13 @@ namespace
             {
                 return;
             }
-            m_outType = render::PrimitiveType::LineLoop;
+            m_outType = Render::PrimitiveType::LineLoop;
             float rgba[4];
             colorToRGBA(color, rgba);
-            const int segments = render::tess::kCircleSegments;
+            const int segments = Render::tess::kCircleSegments;
             for (int i = 0; i < segments; ++i)
             {
-                double angle = (2.0 * render::tess::kPi * i) / segments;
+                double angle = (2.0 * Render::tess::kPi * i) / segments;
                 addVertex(center.x() + radius * std::cos(angle), center.y() + radius * std::sin(angle), rgba);
             }
             m_emitted = true;
@@ -212,17 +212,17 @@ namespace
             {
                 return;
             }
-            m_outType = render::PrimitiveType::LineStrip;
+            m_outType = Render::PrimitiveType::LineStrip;
             float rgba[4];
             colorToRGBA(color, rgba);
             double start = startAngle;
             double end = endAngle;
             if (end < start)
             {
-                end += 2.0 * render::tess::kPi;
+                end += 2.0 * Render::tess::kPi;
             }
             const double angleRange = end - start;
-            const int segments = render::tess::arcSegments(angleRange);
+            const int segments = Render::tess::arcSegments(angleRange);
             for (int i = 0; i <= segments; ++i)
             {
                 double t = static_cast<double>(i) / segments;
@@ -252,15 +252,15 @@ namespace
             if (bFullEllipse || (start == 0.0 && end == 0.0))
             {
                 start = 0.0;
-                end = 2.0 * render::tess::kPi;
+                end = 2.0 * Render::tess::kPi;
             }
             if (end < start)
             {
-                end += 2.0 * render::tess::kPi;
+                end += 2.0 * Render::tess::kPi;
             }
             const double angleRange = end - start;
-            m_outType = bFullEllipse ? render::PrimitiveType::LineLoop : render::PrimitiveType::LineStrip;
-            const int segments = render::tess::ellipseSegments(angleRange);
+            m_outType = bFullEllipse ? Render::PrimitiveType::LineLoop : Render::PrimitiveType::LineStrip;
+            const int segments = Render::tess::ellipseSegments(angleRange);
             const double cosR = std::cos(rotation);
             const double sinR = std::sin(rotation);
             for (int i = 0; i <= segments; ++i)
@@ -296,7 +296,7 @@ namespace
             const Ut::Vec2d& bottomRight,
             const Ut::Color& color) override
         {
-            m_outType = render::PrimitiveType::LineStrip;
+            m_outType = Render::PrimitiveType::LineStrip;
             float rgba[4];
             colorToRGBA(color, rgba);
             // 5个顶点：TL → TR → BR → BL → TL（闭合线框）
@@ -320,7 +320,7 @@ namespace
     private:
         void addVertex(double x, double y, const float rgba[4])
         {
-            render::VertexP3C3 v;
+            Render::VertexP3C3 v;
             if (m_cameraCenter)
             {
                 v.px = static_cast<float>(x - m_cameraCenter[0]) + static_cast<float>(m_cameraCenter[0]);
@@ -338,8 +338,8 @@ namespace
             m_vertices.push_back(v);
         }
 
-        std::vector<render::VertexP3C3>& m_vertices;
-        render::PrimitiveType& m_outType;
+        std::vector<Render::VertexP3C3>& m_vertices;
+        Render::PrimitiveType& m_outType;
         const double* m_cameraCenter;
         bool m_emitted = false;
         bool m_sawText = false;
@@ -368,8 +368,8 @@ void clearEntityVertexCache()
  * 此函数处于渲染数据准备层，不涉及 OpenGL 调用。
  */
 bool entityToVertices(const Eg::SyEntity* entity,
-    std::vector<render::VertexP3C3>& outVertices,
-    render::PrimitiveType& outType,
+    std::vector<Render::VertexP3C3>& outVertices,
+    Render::PrimitiveType& outType,
     const double* cameraCenter)
 {
     if (!entity)

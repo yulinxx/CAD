@@ -11,7 +11,7 @@ set(SANYI_ENGINE_COMMON_DIR "${SANYI_ROOT}/Engine/Common")
 set(SANYI_ENGINE_2D_DIR     "${SANYI_ROOT}/Engine/2D")
 set(SANYI_ENGINE_3D_DIR     "${SANYI_ROOT}/Engine/3D")
 set(SANYI_ENGINE_PERSISTENCE_DIR "${SANYI_ROOT}/Engine/Persistence")
-# 以下 Render 路径已废弃，由 Renderx/SanYiRender 统一替代
+# 以下 Render 路径已废弃，由 Renderx/RenderX 统一替代
 # set(SANYI_RENDER_COMMON_DIR "${SANYI_ROOT}/Render/Common")
 # set(SANYI_RENDER_2D_DIR     "${SANYI_ROOT}/Render/2D")
 # set(SANYI_RENDER_3D_DIR     "${SANYI_ROOT}/Render/3D")

@@ -54,6 +54,18 @@ namespace
     {
         if (!label.isEmpty())
         {
+            // 优先从 WorkbenchMenuManager 上下文翻译（已包含 File/Edit/View/Draw/Help 等顶层菜单文案），
+            // 回退到 UiLayoutBuilder。这样 JSON 菜单标签能复用 legacy 路径的翻译条目。
+            QString translated = QCoreApplication::translate("WorkbenchMenuManager", label.toUtf8().constData());
+            if (translated != label)
+            {
+                return translated;
+            }
+            translated = QCoreApplication::translate("MainWindow", label.toUtf8().constData());
+            if (translated != label)
+            {
+                return translated;
+            }
             return QCoreApplication::translate("UiLayoutBuilder", label.toUtf8().constData());
         }
         return id;
@@ -165,6 +177,7 @@ void UiLayoutBuilder::buildMenus(const std::vector<MenuDef>& menus)
     {
         if (menu.id.isEmpty() || !menu.visible)
         {
+            SY_DEBUGF("[UiLayoutBuilder] Skip menu id='%s' visible=%d", qPrintable(menu.id), menu.visible ? 1 : 0);
             continue;
         }
         QMenu* qMenu = menuBar->addMenu(actionLabel(menu.label, menu.id));
@@ -217,6 +230,7 @@ void UiLayoutBuilder::buildMenuItem(QMenu* parent, const std::variant<MenuAction
         if (std::get<MenuItemType>(item) == MenuItemType::Separator)
         {
             parent->addSeparator();
+            SY_DEBUGF("[UiLayoutBuilder] Added separator to menu '%s'", qPrintable(parent->title()));
         }
         return;
     }
@@ -226,6 +240,7 @@ void UiLayoutBuilder::buildMenuItem(QMenu* parent, const std::variant<MenuAction
         const SubMenuDef& sub = std::get<SubMenuDef>(item);
         if (!sub.visible)
         {
+            SY_DEBUGF("[UiLayoutBuilder] Skip submenu id='%s' visible=0", qPrintable(sub.id));
             return;
         }
         QMenu* subMenu = parent->addMenu(actionLabel(sub.label, sub.id));
@@ -251,6 +266,9 @@ void UiLayoutBuilder::buildMenuItem(QMenu* parent, const std::variant<MenuAction
     const MenuActionDef& actionDef = std::get<MenuActionDef>(item);
     if (!actionDef.visible)
     {
+        SY_DEBUGF("[UiLayoutBuilder] Skip action id='%s' visible=0 command='%s'",
+            qPrintable(actionDef.id),
+            qPrintable(actionDef.commandId));
         return;
     }
     QAction* action = parent->addAction(actionLabel(actionDef.label, actionDef.id));

@@ -6,7 +6,7 @@
 
 ## 1. 当前边界
 
-当前生产渲染边界以 `Renderx` / `SanYiRender` 为准。
+当前生产渲染边界以 `Renderx` / `RenderX` 为准。
 
 ### 1.1 对外入口
 

@@ -259,8 +259,8 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             continue;
         }
 
-        std::vector<render::VertexP3C3> vertices;
-        render::PrimitiveType primType;
+        std::vector<Render::VertexP3C3> vertices;
+        Render::PrimitiveType primType;
         const QPointF cam = m_renderWidget->cameraCenter();
         const double cameraCenter[2] = { cam.x(), cam.y() };
         if (!entityToVertices(entity, vertices, primType, cameraCenter))

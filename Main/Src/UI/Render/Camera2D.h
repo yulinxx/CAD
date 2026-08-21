@@ -2,7 +2,7 @@
 
 #include <QPointF>
 
-#include "Render/RenderTypes.h"
+#include "render/RenderTypes.h"
 
 /// 2D 正交相机 — 封装缩放、平移、视图矩阵计算
 ///

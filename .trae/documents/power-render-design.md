@@ -2,14 +2,14 @@
 
 > **文档状态（2026-08-02）**：设计方案，不是当前生产实现清单。
 >
-> 当前代码已使用 `Renderx` 相关路径，但本文对 `Render/NextGen`、`SanYiRender`、`RenderEngine` 等模块的比较和目标架构，不能直接解释当前运行时调用链。后续若决定采用 PowerRender，应另行记录迁移范围、兼容期和验收标准。
+> 当前代码已使用 `Renderx` 相关路径，但本文对 `Render/NextGen`、`RenderX`、`RenderEngine` 等模块的比较和目标架构，不能直接解释当前运行时调用链。后续若决定采用 PowerRender，应另行记录迁移范围、兼容期和验收标准。
 
 ## Context（背景）
 
 工程内同时存在 4 套并行渲染模块：
 
 - `Render/NextGen/` — POD 契约 + C-API 干净，但只有单 GL46 VBO + 间接绘制，无空间索引/文字/Mesh
-- `SanYiRender/` — VertexArena + 间接绘制，但无 QuadTree、无 Mesh 共享、无文字
+- `RenderX/` — VertexArena + 间接绘制，但无 QuadTree、无 Mesh 共享、无文字
 - `Renderx/` — SlotMap + QuadTree + TextAtlas + MeshManager 全部具备，但 RHI 抽象厚、与业务耦合重
 - `RenderEngine/` — Device/World/View 三层最清晰，但 QuadTree 简单、无间接绘制、无 Mesh/Text
 
@@ -37,7 +37,7 @@ C:\Users\xx\Documents\Cpp\CAD\PowerRender\
 │   ├── core\
 │   │   ├── slot_map.h               # port from Renderx
 │   │   ├── arena.h                  # port from Renderx（小对象池）
-│   │   ├── vertex_arena.h           # port from SanYiRender
+│   │   ├── vertex_arena.h           # port from RenderX
 │   │   ├── vertex_arena.cpp
 │   │   ├── quad_tree.h              # port from RenderEngine
 │   │   ├── quad_tree.cpp
@@ -96,7 +96,7 @@ PRView   ── 相机 + 视口，绑 1 个 World + 1 个 Device；多 View 可�
 - 内部 `m_dense / m_dense_keys / m_sparse / m_freeList`
 - `swap-with-last` 删除，`dense_data()` 暴露给遍历
 
-### 4. VertexArena（`core/vertex_arena.h`）— 直接 port from SanYiRender
+### 4. VertexArena（`core/vertex_arena.h`）— 直接 port from RenderX
 - bump + freelist，按 vertex 数分配稳定 VBO offset
 - 改 vertex count → 旧 slot 进 freelist，分配新 offset
 - `reserveHighWater` 指数扩容
@@ -137,7 +137,7 @@ public:
 - 2D/3D 相机矩阵、视口、背景色
 - `render()` = `world.buildSnapshot` → `backend.flush(snap)` → `backend.draw`
 
-### 8. GL46Backend（`backend/gl46_backend.cpp`）— port from Render/NextGen + SanYiRender
+### 8. GL46Backend（`backend/gl46_backend.cpp`）— port from Render/NextGen + RenderX
 - 单一大型 VBO（初始 1M 顶点）+ 持久映射（`glMapNamedBufferRange` + `MAP_PERSISTENT`）
 - 增量上传：`glBufferSubData(offset, size, data)`，仅上传脏 entity
 - 间接绘制：每帧构造 `DrawCmd[]` → `glNamedBufferSubData(INDIRECT)` → `glMultiDrawArraysIndirect`
@@ -167,7 +167,7 @@ public:
 | 复用来源 | 文件 | 行数 |
 |---|---|---:|
 | SlotMap | [Renderx/src/core/slot_map.h](file:///C:/Users/xx/Documents/Cpp/CAD/Renderx/src/core/slot_map.h) | 153 |
-| VertexArena | [SanYiRender/src/internal/vertex_arena.h](file:///C:/Users/xx/Documents/Cpp/CAD/SanYiRender/src/internal/vertex_arena.h) | 110 |
+| VertexArena | [RenderX/src/internal/vertex_arena.h](file:///C:/Users/xx/Documents/Cpp/CAD/RenderX/src/internal/vertex_arena.h) | 110 |
 | QuadTree | [RenderEngine/src/core/quad_tree.h](file:///C:/Users/xx/Documents/Cpp/CAD/RenderEngine/src/core/quad_tree.h) | 166 |
 | TextAtlas 头 | [Renderx/src/core/text_atlas.h](file:///C:/Users/xx/Documents/Cpp/CAD/Renderx/src/core/text_atlas.h) | 69 |
 | TextAtlas 实 | [Renderx/src/core/text_atlas.cpp](file:///C:/Users/xx/Documents/Cpp/CAD/Renderx/src/core/text_atlas.cpp) | 209 |
@@ -178,9 +178,9 @@ public:
 | POD 契约 | [Render/NextGen/Include/RenderNext/Types.h](file:///C:/Users/xx/Documents/Cpp/CAD/Render/NextGen/Include/RenderNext/Types.h) | 192 |
 | C-API 风格 | [Render/NextGen/Include/RenderNext/CAPI.h](file:///C:/Users/xx/Documents/Cpp/CAD/Render/NextGen/Include/RenderNext/CAPI.h) | 220 |
 | Buffer 封装 | [Render/NextGen/Src/GL46/Buffer.h](file:///C:/Users/xx/Documents/Cpp/CAD/Render/NextGen/Src/GL46/Buffer.h) | 142 |
-| C-API 调度样例 | [SanYiRender/src/c_api.cpp](file:///C:/Users/xx/Documents/Cpp/CAD/SanYiRender/src/c_api.cpp) | — |
+| C-API 调度样例 | [RenderX/src/c_api.cpp](file:///C:/Users/xx/Documents/Cpp/CAD/RenderX/src/c_api.cpp) | — |
 | C++ RHI 类型 | [RenderEngine/src/rhi/rhi_types.h](file:///C:/Users/xx/Documents/Cpp/CAD/RenderEngine/src/rhi/rhi_types.h) | 84 |
-| 独立 CMake 样例 | [SanYiRender/CMakeLists.txt](file:///C:/Users/xx/Documents/Cpp/CAD/SanYiRender/CMakeLists.txt) | 105 |
+| 独立 CMake 样例 | [RenderX/CMakeLists.txt](file:///C:/Users/xx/Documents/Cpp/CAD/RenderX/CMakeLists.txt) | 105 |
 
 ## 实施步骤
 

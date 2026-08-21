@@ -74,7 +74,7 @@ User Input
 → SceneChanged
 → RenderViewport2D
 → RenderWidget
-→ Renderx / SanYiRender
+→ Renderx / RenderX
 → Screen
 ```
 

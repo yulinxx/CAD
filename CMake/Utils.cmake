@@ -76,6 +76,8 @@ endfunction()
 
 function(sanyi_add_debug_symbols target)
     if(MSVC)
+        # MSVC: 仅设置调试符号选项，不尝试在configure时复制PDB文件
+        # PDB文件在build时间生成，configure时引用会失败
         target_compile_options(${target} PRIVATE
             $<$<CONFIG:Release>:/Zi>
             $<$<CONFIG:RelWithDebInfo>:/Zi>
@@ -86,15 +88,7 @@ function(sanyi_add_debug_symbols target)
             $<$<CONFIG:Release>:/OPT:ICF>
             $<$<CONFIG:RelWithDebInfo>:/DEBUG>
         )
-
-        set(_pdb_output_dir "$<TARGET_FILE_DIR:${target}>/symbols")
-        add_custom_command(TARGET ${target} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory "${_pdb_output_dir}"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "$<TARGET_PDB_FILE:${target}>"
-                "${_pdb_output_dir}/"
-            COMMENT "Copying debug symbols for ${target} to symbols directory"
-        )
+        message(STATUS "MSVC debug symbols enabled for ${target} (PDB copy deferred to build time)")
     elseif(APPLE)
         target_compile_options(${target} PRIVATE -g)
         add_custom_command(TARGET ${target} POST_BUILD
@@ -284,6 +278,15 @@ function(sanyi_add_shared_library target)
     # 未显式指定版本分量时留空，避免 SOVERSION 展开为空值导致参数奇偶错位
     if(SANYI_SHLIB_VERSION_MAJOR)
         list(APPEND _target_properties SOVERSION "${SANYI_SHLIB_VERSION_MAJOR}")
+    endif()
+
+    # MSVC 运行库：统一动态链接 CRT（/MD 发布, /MDd 调试）。
+    # 注意：不能在 configure 阶段依赖父作用域 CMAKE_MSVC_RUNTIME_LIBRARY，
+    # 子目录内的 project() 会重置该变量导致 RuntimeLibrary 为空，
+    # 从而出现 LNK2001: unresolved external symbol _DllMainCRTStartup。
+    # 这里按目标显式设置 MSVC_RUNTIME_LIBRARY 属性，确保所有模块一致。
+    if(MSVC)
+        list(APPEND _target_properties MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
     endif()
 
     if(SANYI_SHLIB_AUTOMOC)

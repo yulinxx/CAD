@@ -16,7 +16,7 @@
 #include "Persistence/Repositories/SettingsRepository.h"
 #include "UI/Settings/SettingsKeysCommon.h"
 
-#include "render/render_types.h"
+#include "render/RenderTypes.h"
 
 #include <QApplication>
 #include <QCoreApplication>
@@ -57,7 +57,7 @@ void AppInitializer::initialize()
     SyLogger::GetInstance().Initialize(MainApp::appName().c_str(), SyLogLevel::Debug, true, true);
 
     SY_INFOF("Starting %s v%s", MainApp::appName().c_str(), MainApp::appVersion().c_str());
-    SY_INFOF("[Render] Active render backend: %s", render::backendName(render::BackendType::OpenGL));
+    SY_INFOF("[Render] Active render backend: %s", Render::backendName(Render::BackendType::OpenGL));
 
     CrashHandlerBootstrap::logPendingDumps();
 

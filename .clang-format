@@ -129,7 +129,7 @@ BraceWrapping:
 NamespaceIndentation: All       # 命名空间内的内容额外缩进
 CompactNamespaces: false        # 禁止合并嵌套命名空间 (namespace a::b {)
 FixNamespaceComments: true      # 在命名空间结束处自动补全注释，便于长文件定位
-                                # (如 namespace render 的结尾 // namespace render)
+                                # (如 namespace Render 的结尾 // namespace Render)
 
 
 # ============================================================
