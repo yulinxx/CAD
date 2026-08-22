@@ -47,6 +47,71 @@
 
 namespace
 {
+    /**
+     * @brief 场景变异 Lambda 操作 — 重写 mutatesScene() 返回 true
+     *
+     * 用于镜像、对齐、分组等直接修改场景的操作，确保 OperationBus 能正确
+     * 识别场景变异并触发相应的刷新流程。
+     */
+    class SceneMutatingLambdaOperation : public LambdaOperation
+    {
+    public:
+        using Fn = std::function<void()>;
+        using CanExecFn = std::function<bool()>;
+
+        SceneMutatingLambdaOperation(
+            OperationId id,
+            Fn fn,
+            CanExecFn canExec =
+                [] {
+                    return true;
+                })
+            : LambdaOperation(id, std::move(fn), std::move(canExec))
+        {
+        }
+
+        bool mutatesScene() const override
+        {
+            return true;
+        }
+
+        bool isUndoable() const override
+        {
+            return true;
+        }
+    };
+
+    /**
+     * @brief 带参数的场景变异 Lambda 操作
+     */
+    class ParamSceneMutatingLambdaOperation : public ParamLambdaOperation
+    {
+    public:
+        using ParamFn = std::function<void(const QVariantMap&)>;
+        using CanExecFn = std::function<bool()>;
+
+        ParamSceneMutatingLambdaOperation(
+            OperationId id,
+            ParamFn fn,
+            CanExecFn canExec =
+                [] {
+                    return true;
+                })
+            : ParamLambdaOperation(id, std::move(fn), std::move(canExec))
+        {
+        }
+
+        bool mutatesScene() const override
+        {
+            return true;
+        }
+
+        bool isUndoable() const override
+        {
+            return true;
+        }
+    };
+
     std::vector<Eg::EntityId> collectIds(const Eg::VecSyEntityPtr& selected)
     {
         std::vector<Eg::EntityId> ids;
