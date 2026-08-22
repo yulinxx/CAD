@@ -4,7 +4,6 @@
 #include "WorkbenchWindow.h"
 #include "UiWorkbench.h"
 #include "UiStateCenter.h"
-#include "UiThemeService.h"
 #include "UiPropertiesPanel.h"
 #include "Services/UiServices.h"
 #include "Services/UiFrameworkServices.h"
@@ -39,13 +38,6 @@ void WorkbenchStateManager::setUiStateCenter(UiStateCenter* stateCenter)
     bindStateSignals();
 }
 
-void WorkbenchStateManager::setThemeService(UiThemeService* themeService)
-{
-    // 主题服务入口只替换引用，不在这里主动触发主题加载或界面刷新
-    m_themeService = themeService;
-    m_uiServices.themeService = themeService;
-}
-
 void WorkbenchStateManager::setFrameworkServices(const UiFrameworkServices& services)
 {
     // 框架级能力统一从这里注入，后续错误、权限、性能都必须走同一条框架路径
@@ -62,13 +54,11 @@ void WorkbenchStateManager::configureServices(const UiServices& services)
     unbindStateSignals();
     m_uiServices = services;
     m_stateCenter = services.stateCenter;
-    m_themeService = services.themeService;
 
     if (m_menuManager)
     {
         m_menuManager->setOperationBus(services.operationBus);
         m_menuManager->setStateCenter(services.stateCenter);
-        m_menuManager->setThemeService(services.themeService);
         m_menuManager->setUiServices(&m_uiServices);
         m_menuManager->rebuildAllMenus();
     }

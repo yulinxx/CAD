@@ -744,7 +744,7 @@ void CoreOperationRegistry::registerEditOperations()
         }));
 
     // ---- 变换 ----
-    reg.registerOperation(std::make_unique<ParamLambdaOperation>(
+    reg.registerOperation(std::make_unique<ParamSceneMutatingLambdaOperation>(
         OperationId::Edit_Move, [editService, parentWidget](const QVariantMap& params) {
             if (!editService)
             {
@@ -784,7 +784,7 @@ void CoreOperationRegistry::registerEditOperations()
                 false);
         }));
 
-    reg.registerOperation(std::make_unique<ParamLambdaOperation>(
+    reg.registerOperation(std::make_unique<ParamSceneMutatingLambdaOperation>(
         OperationId::Edit_Rotate, [editService, parentWidget](const QVariantMap& params) {
             if (!editService)
             {
@@ -848,7 +848,7 @@ void CoreOperationRegistry::registerEditOperations()
                 false);
         }));
 
-    reg.registerOperation(std::make_unique<ParamLambdaOperation>(
+    reg.registerOperation(std::make_unique<ParamSceneMutatingLambdaOperation>(
         OperationId::Edit_Mirror, [editService, parentWidget](const QVariantMap& params) {
             if (!editService)
             {
@@ -920,7 +920,7 @@ void CoreOperationRegistry::registerEditOperations()
                 false);
         }));
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_MirrorH, [editService] {
+    reg.registerOperation(std::make_unique<SceneMutatingLambdaOperation>(OperationId::Edit_MirrorH, [editService] {
         if (!editService)
         {
             return;
@@ -933,18 +933,19 @@ void CoreOperationRegistry::registerEditOperations()
         }
         const auto ids = collectIds(selected);
         double minX, minY, maxX, maxY;
-        const double axisX = calcCombinedBounds(selected, minX, minY, maxX, maxY) ? (minX + maxX) * 0.5 : 0.0;
+        const double centerX = calcCombinedBounds(selected, minX, minY, maxX, maxY) ? (minX + maxX) * 0.5 : 0.0;
         editService->transformEntities(
             ids,
             [&]() {
                 EntityTransform transform(scene);
-                transform.mirrorByIds(ids, 0, axisX, 0.0);
+                // axis=1: 垂直轴镜像（左右翻转），dAxisX=中心X坐标
+                transform.mirrorByIds(ids, 1, centerX, 0.0);
             },
             "Mirror Horizontal",
             false);
     }));
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_MirrorV, [editService] {
+    reg.registerOperation(std::make_unique<SceneMutatingLambdaOperation>(OperationId::Edit_MirrorV, [editService] {
         if (!editService)
         {
             return;
@@ -957,19 +958,20 @@ void CoreOperationRegistry::registerEditOperations()
         }
         const auto ids = collectIds(selected);
         double minX, minY, maxX, maxY;
-        const double axisY = calcCombinedBounds(selected, minX, minY, maxX, maxY) ? (minY + maxY) * 0.5 : 0.0;
+        const double centerY = calcCombinedBounds(selected, minX, minY, maxX, maxY) ? (minY + maxY) * 0.5 : 0.0;
         editService->transformEntities(
             ids,
             [&]() {
                 EntityTransform transform(scene);
-                transform.mirrorByIds(ids, 1, 0.0, axisY);
+                // axis=0: 水平轴镜像（上下翻转），dAxisY=中心Y坐标
+                transform.mirrorByIds(ids, 0, 0.0, centerY);
             },
             "Mirror Vertical",
             false);
     }));
 
     reg.registerOperation(
-        std::make_unique<ParamLambdaOperation>(OperationId::Edit_Align, [editService](const QVariantMap& params) {
+        std::make_unique<ParamSceneMutatingLambdaOperation>(OperationId::Edit_Align, [editService](const QVariantMap& params) {
             if (!editService)
             {
                 return;
@@ -993,7 +995,7 @@ void CoreOperationRegistry::registerEditOperations()
         }));
 
     // ---- 群组 ----
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_GroupToggle, [editService] {
+    reg.registerOperation(std::make_unique<SceneMutatingLambdaOperation>(OperationId::Edit_GroupToggle, [editService] {
         if (!editService)
         {
             return;
@@ -1032,7 +1034,7 @@ void CoreOperationRegistry::registerEditOperations()
         }
     }));
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Ungroup, [editService] {
+    reg.registerOperation(std::make_unique<SceneMutatingLambdaOperation>(OperationId::Edit_Ungroup, [editService] {
         if (editService)
         {
             editService->ungroupSelectedEntities();
@@ -1041,7 +1043,7 @@ void CoreOperationRegistry::registerEditOperations()
 
     // ---- 修剪 / 延伸 ----
     reg.registerOperation(
-        std::make_unique<ParamLambdaOperation>(OperationId::Edit_Trim, [editService](const QVariantMap& params) {
+        std::make_unique<ParamSceneMutatingLambdaOperation>(OperationId::Edit_Trim, [editService](const QVariantMap& params) {
             if (!editService)
             {
                 return;
@@ -1100,7 +1102,7 @@ void CoreOperationRegistry::registerEditOperations()
         }));
 
     reg.registerOperation(
-        std::make_unique<ParamLambdaOperation>(OperationId::Edit_Extend, [editService](const QVariantMap& params) {
+        std::make_unique<ParamSceneMutatingLambdaOperation>(OperationId::Edit_Extend, [editService](const QVariantMap& params) {
             if (!editService)
             {
                 return;

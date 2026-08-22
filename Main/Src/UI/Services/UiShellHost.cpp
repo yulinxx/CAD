@@ -2,7 +2,6 @@
 
 #include "Log/SyLogger.h"
 #include "UiStateCenter.h"
-#include "UiThemeService.h"
 #include "UiWorkbench.h"
 #include "WorkbenchWindow.h"
 #include "UI2D/Operation/OperationBus.h"
@@ -25,15 +24,6 @@ void UiShellHost::setStateCenter(UiStateCenter* stateCenter)
     // 宿主只转发状态中心引用，不在这里做额外初始化
     m_stateCenter = stateCenter;
     m_mainWindow->setUiStateCenter(stateCenter);
-}
-
-/// 设置主题服务并传递给主窗口
-/// @param themeService 主题服务
-void UiShellHost::setThemeService(UiThemeService* themeService)
-{
-    // 宿主只转发主题服务引用，不在这里提前加载主题
-    m_themeService = themeService;
-    m_mainWindow->setThemeService(themeService);
 }
 
 /// 设置操作总线
@@ -91,14 +81,6 @@ void UiShellHost::initializeAndShow()
 
     m_workbench->attachToWindow(*m_mainWindow);
     m_workbench->activate();
-
-    m_mainWindow->setThemeChangeCallback([this](const QString& themeId) {
-        if (m_themeService)
-        {
-            m_themeService->loadThemeFromId(themeId);
-            m_mainWindow->applyTheme(m_themeService->styleSheet());
-        }
-    });
 
     m_mainWindow->setWorkbenchFactory([this](const QString& id) -> UiWorkbench* {
         return resolveWorkbench(id);

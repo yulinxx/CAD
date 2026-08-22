@@ -117,6 +117,8 @@ void DrawToolBarWidget::createToolButtons()
         button->setCheckable(true);
         // 互斥选中（单选组语义）：点击已选中的按钮不会取消选中，保证始终有一个工具处于高亮
         button->setAutoExclusive(true);
+        // 关闭 autoRaise：让 QSS :hover / :pressed 样式正常渲染（autoRaise=true 时 Qt 原生绘制会覆盖样式表）
+        button->setAutoRaise(false);
         // 不抢占焦点：让 Esc 等快捷键始终由视口（ViewportInputRouter）处理
         button->setFocusPolicy(Qt::NoFocus);
         button->setIconSize(QSize(iconSize, iconSize));

@@ -120,7 +120,7 @@
 #include "UI2D/Operation/OperationId.h"
 #include "UI2D/Operation/CommandCatalog.h"
 #include "UiStateCenter.h"
-#include "UiThemeService.h"
+#include "UI/ThemeManager.h"
 #include "UiWorkbench.h"
 #include "UiSceneTreePanel2D.h"
 #include "UiPropertiesPanel.h"
@@ -227,19 +227,6 @@ void WorkbenchWindow::setUiStateCenter(UiStateCenter* stateCenter)
     }
 }
 
-/// 设置主题服务
-/// @param themeService 主题服务
-void WorkbenchWindow::setThemeService(UiThemeService* themeService)
-{
-    // 主题服务入口只替换引用，不在这里主动触发主题加载或界面刷新
-    m_themeService = themeService;
-    m_uiServices.themeService = themeService;
-    if (m_stateManager)
-    {
-        m_stateManager->setThemeService(themeService);
-    }
-}
-
 /// 设置操作总线
 /// @param bus 操作总线
 void WorkbenchWindow::setOperationBus(OperationBus* bus)
@@ -283,7 +270,6 @@ void WorkbenchWindow::configureServices(const UiServices& services)
 {
     m_uiServices = services;
     m_stateCenter = services.stateCenter;
-    m_themeService = services.themeService;
 
     // 单位管理器：状态栏坐标按当前显示单位换算，切换单位时实时刷新
     if (m_unitManager && m_unitManager != services.unitManager)
@@ -320,7 +306,6 @@ void WorkbenchWindow::configureServices(const UiServices& services)
     if (m_stateManager)
     {
         m_stateManager->setUiStateCenter(services.stateCenter);
-        m_stateManager->setThemeService(services.themeService);
     }
 
     if (m_layoutManager)
@@ -332,7 +317,6 @@ void WorkbenchWindow::configureServices(const UiServices& services)
     {
         m_menuManager->setOperationBus(services.operationBus);
         m_menuManager->setStateCenter(services.stateCenter);
-        m_menuManager->setThemeService(services.themeService);
         m_menuManager->setUiServices(&m_uiServices);
         m_menuManager->setWorkbench(m_workbench);
         if (m_workbench)
@@ -650,21 +634,6 @@ void WorkbenchWindow::dropEvent(QDropEvent* event)
         return;
     }
     event->ignore();
-}
-
-void WorkbenchWindow::applyTheme(const QString& styleSheet)
-{
-    setStyleSheet(styleSheet);
-}
-
-/// 设置主题切换回调
-/// @param callback 主题切换回调函数
-void WorkbenchWindow::setThemeChangeCallback(std::function<void(const QString&)> callback)
-{
-    // 主题回调只作为外部扩展点，不在这里绑定额外业务行为
-    // 回调一旦注入，就应被视为主题链的唯一扩展入口之一
-    // 这里不触发立即执行，避免回调设置产生副作用
-    m_themeChangeCallback = std::move(callback);
 }
 
 /// 设置视口缩放操作回调
@@ -1045,26 +1014,26 @@ void WorkbenchWindow::refreshThemeMenuChecks(const QString& themeId)
 }
 
 /// 触发主题切换
-/// @param themeId 主题 ID
+/// @param themeId 主题 ID（如 "theme.dark"、"theme.light"、"theme.system"）
 void WorkbenchWindow::triggerTheme(const QString& themeId)
 {
-    // 主题切换只负责调度，不在这里扩展额外 UI 行为，避免主题逻辑和工作台逻辑互相污染
-    if (m_themeChangeCallback)
-    {
-        m_themeChangeCallback(themeId);
-    }
+    // 解析命令 ID（"theme.dark" → AppTheme::Dark）并委托 ThemeManager 应用
+    const QString name = themeId.mid(QStringLiteral("theme.").size()).toLower();
+    AppTheme appTheme = AppTheme::Light;
+    if (name == QStringLiteral("dark"))
+        appTheme = AppTheme::Dark;
+    else if (name == QStringLiteral("blue"))
+        appTheme = AppTheme::Blue;
+    else if (name == QStringLiteral("slate"))
+        appTheme = AppTheme::Slate;
+    else if (name == QStringLiteral("highcontrast"))
+        appTheme = AppTheme::HighContrast;
+    else if (name == QStringLiteral("system"))
+        appTheme = AppTheme::System;
+    else if (name == QStringLiteral("default"))
+        appTheme = AppTheme::Default;
 
-    if (m_themeService && m_themeService->loadThemeFromId(themeId))
-    {
-        applyTheme(m_themeService->styleSheet());
-    }
-    else
-    {
-        // 主题加载失败时只做错误上报，不在这里尝试额外回退逻辑，避免主题链复杂化
-        reportFrameworkError(QStringLiteral("theme.load_failed"),
-            QStringLiteral("Failed to load theme %1").arg(themeId),
-            QStringLiteral("WorkbenchWindow::triggerTheme"));
-    }
+    TM->setTheme(appTheme);
 
     if (m_stateCenter)
     {

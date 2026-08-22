@@ -7,13 +7,13 @@
 #include "UI/Services/UiLayoutService.h"
 #include "UI/Services/UiShellHost.h"
 #include "UI/Services/UiStateCenter.h"
-#include "UI/Services/UiThemeService.h"
 #include "UI/Documents/SceneDocument2D.h"
 #include "UI2D/Operation/OperationBus.h"
 
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Core/EntityClipboard.h"
 #include "Engine2D/Edit/UndoRedoManager.h"
+#include "Engine2D/Edit/IUndoRedoManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Edit/LayerEditService.h"
 #include "Engine2D/Interaction/LayerManager.h"
@@ -69,9 +69,6 @@ public:
 
     /// 获取状态中心
     UiStateCenter* stateCenter();
-
-    /// 获取主题服务
-    UiThemeService* themeService();
 
     /// 获取布局服务
     UiLayoutService* layoutService();
@@ -214,9 +211,6 @@ private:
     /// UI 状态中心
     std::unique_ptr<UiStateCenter> m_stateCenter;
 
-    /// 主题服务
-    std::unique_ptr<UiThemeService> m_themeService;
-
     /// 布局服务
     std::unique_ptr<UiLayoutService> m_layoutService;
 
@@ -234,6 +228,9 @@ private:
 
     /// 撤销重做管理器（新系统）
     std::unique_ptr<UndoRedoManager> m_undoRedoManager;
+
+    /// UndoRedoManager → OperationBus 桥接观察者
+    std::unique_ptr<IUndoRedoObserver> m_undoRedoObserver;
 
     /// 场景编辑服务（新系统）
     std::unique_ptr<SceneEditService> m_sceneEditService;

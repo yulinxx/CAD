@@ -23,7 +23,6 @@ class OperationBus;
 class StatusBarBase;
 class UnitManager;
 class UiStateCenter;
-class UiThemeService;
 class UiWorkbench;
 class WorkbenchMenuManager;
 class WorkbenchLayoutManager;
@@ -87,9 +86,6 @@ public:
     /// 设置状态中心
     /// @param stateCenter UI 状态中心
     void setUiStateCenter(UiStateCenter* stateCenter);
-    /// 设置主题服务
-    /// @param themeService 主题服务
-    void setThemeService(UiThemeService* themeService);
     /// 设置操作总线
     /// @param bus 操作总线
     void setOperationBus(OperationBus* bus);
@@ -114,12 +110,6 @@ public:
     /// 设置工作台切换工厂
     /// @param factory 工作台工厂回调
     void setWorkbenchFactory(WorkbenchFactory factory);
-    /// 应用样式表
-    /// @param styleSheet 样式表内容
-    void applyTheme(const QString& styleSheet);
-    /// 设置主题切换回调
-    /// @param callback 主题切换回调函数
-    void setThemeChangeCallback(std::function<void(const QString&)> callback);
     /// 设置视口缩放操作回调（Zoom In/Out/Fit/Selection/Reset）
     /// 由工作台在创建视口后注入，将菜单缩放操作转发到视口
     /// @param handler 缩放操作处理函数，参数为 "zoom_in"/"zoom_out"/"zoom_fit"/"zoom_selection"/"reset"
@@ -273,8 +263,6 @@ private:
 private:
     /// UI 状态中心
     UiStateCenter* m_stateCenter{ nullptr };
-    /// 主题服务
-    UiThemeService* m_themeService{ nullptr };
     /// 操作总线
     OperationBus* m_operationBus{ nullptr };
     /// UI 服务集合
@@ -289,7 +277,6 @@ private:
     /// 当前工作台
     UiWorkbench* m_workbench{ nullptr };
     /// 主题切换回调
-    std::function<void(const QString&)> m_themeChangeCallback;
     /// 当前挂载的工作台状态栏 widget（由 StatusBarBase 子类管理位置/选择/消息显示）
     /// 工作台切换时通过 mountStatusBar/unmountStatusBar 替换
     StatusBarBase* m_activeStatusBar{ nullptr };

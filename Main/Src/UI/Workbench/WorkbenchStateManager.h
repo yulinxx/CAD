@@ -9,7 +9,6 @@
 
 class QMainWindow;
 class UiStateCenter;
-class UiThemeService;
 class StatusBarBase;
 class WorkbenchMenuManager;
 class WorkbenchLayoutManager;
@@ -33,8 +32,6 @@ public:
 
     /// 设置状态中心
     void setUiStateCenter(UiStateCenter* stateCenter);
-    /// 设置主题服务
-    void setThemeService(UiThemeService* themeService);
     /// 设置框架级服务
     void setFrameworkServices(const UiFrameworkServices& services);
     /// 设置当前挂载的工作台状态栏 widget（由 WorkbenchWindow 在 mount/unmount 时同步）
@@ -92,11 +89,6 @@ public:
         return m_stateCenter;
     }
 
-    UiThemeService* themeService() const
-    {
-        return m_themeService;
-    }
-
     /// 获取框架级服务引用
     const UiFrameworkServices& frameworkServices() const
     {
@@ -119,8 +111,6 @@ private:
 
     /// UI 状态中心
     UiStateCenter* m_stateCenter{ nullptr };
-    /// 主题服务
-    UiThemeService* m_themeService{ nullptr };
     /// 框架级服务桥接
     UiFrameworkServices m_frameworkServices;
     /// UI 服务集合

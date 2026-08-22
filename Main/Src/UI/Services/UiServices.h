@@ -8,7 +8,6 @@
 class IInteractionDispatcher;
 class UiLayoutService;
 class UiStateCenter;
-class UiThemeService;
 class ISelectionService;
 class IUndoRedoManager;
 class OperationBus;
@@ -40,9 +39,6 @@ struct UiServices
 {
     /// UI 状态中心
     UiStateCenter* stateCenter{ nullptr };
-
-    /// 主题服务
-    UiThemeService* themeService{ nullptr };
 
     /// 布局服务
     UiLayoutService* layoutService{ nullptr };

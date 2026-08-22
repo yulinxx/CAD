@@ -701,6 +701,7 @@ void RenderViewport2D::syncSelectionDetails()
 {
     syncSelectionToolState();
     // 通知上层：选择状态已变化（覆盖绘制后自动选中、点选/框选、撤销等所有路径）
+    SY_INFOF("[RenderViewport2D] syncSelectionDetails -> emitting selectionChanged");
     emit selectionChanged();
 }
 

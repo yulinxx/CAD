@@ -8,7 +8,6 @@
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
 #include "UiStateCenter.h"
-#include "UiThemeService.h"
 #include "UiWorkbench.h"
 #include "UiServices.h"
 #include "UiFrameworkServices.h"
@@ -255,11 +254,6 @@ void WorkbenchMenuManager::setOperationBus(OperationBus* bus)
 void WorkbenchMenuManager::setStateCenter(UiStateCenter* stateCenter)
 {
     m_stateCenter = stateCenter;
-}
-
-void WorkbenchMenuManager::setThemeService(UiThemeService* themeService)
-{
-    m_themeService = themeService;
 }
 
 void WorkbenchMenuManager::setFrameworkServices(const UiFrameworkServices* services)

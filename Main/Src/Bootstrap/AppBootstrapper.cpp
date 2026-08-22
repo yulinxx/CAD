@@ -89,12 +89,6 @@ bool AppBootstrapper::initialize()
                  "missing state center");
         return false;
     }
-    if (!m_compositionRoot->themeService())
-    {
-        SY_ERROR("[AppBootstrapper] error code=bootstrap.root_missing_service message=ApplicationCompositionRoot "
-                 "missing theme service");
-        return false;
-    }
     if (!m_compositionRoot->layoutService())
     {
         SY_ERROR("[AppBootstrapper] error code=bootstrap.root_missing_service message=ApplicationCompositionRoot "

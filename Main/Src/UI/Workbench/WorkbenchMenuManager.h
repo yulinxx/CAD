@@ -11,7 +11,6 @@ class QActionGroup;
 class QMenu;
 class OperationBus;
 class UiStateCenter;
-class UiThemeService;
 class UiWorkbench;
 class WorkbenchWindow;
 struct UiFrameworkServices;
@@ -37,7 +36,6 @@ public:
 
     void setOperationBus(OperationBus* bus);
     void setStateCenter(UiStateCenter* stateCenter);
-    void setThemeService(UiThemeService* themeService);
     void setFrameworkServices(const UiFrameworkServices* services);
     void setUiServices(const UiServices* services);
     void setWorkbench(UiWorkbench* workbench);
@@ -184,7 +182,6 @@ private:
     QMetaObject::Connection m_themeChangedConn;
     OperationBus* m_operationBus{ nullptr };
     UiStateCenter* m_stateCenter{ nullptr };
-    UiThemeService* m_themeService{ nullptr };
     const UiFrameworkServices* m_frameworkServices{ nullptr };
     const UiServices* m_uiServices{ nullptr };
     UiWorkbench* m_workbench{ nullptr };

@@ -11,12 +11,35 @@
 #include "UI/Services/UiShellHost.h"
 #include "UI/Workbench/WorkbenchWindow.h"
 #include "UI/Services/UiStateCenter.h"
-#include "UI/Services/UiThemeService.h"
 #include "UI/Services/HelpDialogService.h"
 
 #include "UI2D/Edit/QtLayerManagerBridge.h"
 
 #include "Common/AppInitializer.h"
+
+// UndoRedoManager → OperationBus 桥接观察者
+// 当 SceneEditService 等绕过 OperationBus::run() 直接推入 undo 命令时，
+// 通过此观察者确保 OperationBus 发出 undoStateChanged 信号。
+class UndoRedoObserverBridge : public IUndoRedoObserver
+{
+public:
+    explicit UndoRedoObserverBridge(OperationBus* bus)
+        : m_bus(bus)
+    {
+    }
+    void onUndoStateChanged() override
+    {
+        if (m_bus)
+        {
+            emit m_bus->undoStateChanged();
+        }
+    }
+    void onCanUndoChanged(bool) override {}
+    void onCanRedoChanged(bool) override {}
+
+private:
+    OperationBus* m_bus{ nullptr };
+};
 
 #include "Persistence/LayerPersistenceBridge.h"
 #include "Persistence/PersistenceService.h"
@@ -88,7 +111,6 @@ ISelectionService* ApplicationCompositionRoot::selectionService()
 // 装配顺序：UI 基础服务 → 导入导出 → 对话框服务 → 脏状态同步 → 操作注册
 ApplicationCompositionRoot::ApplicationCompositionRoot()
     : m_stateCenter(std::make_unique<UiStateCenter>())
-    , m_themeService(std::make_unique<DefaultUiThemeService>())
     , m_layoutService(std::make_unique<DefaultUiLayoutService>())
     , m_interactionDispatcher(std::make_unique<DefaultInteractionDispatcher>())
     , m_shellHost(std::make_unique<UiShellHost>())
@@ -122,6 +144,12 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     setupDirtyStateSync();
     registerAllOperations();
 
+    // 桥接 UndoRedoManager 观察者 → OperationBus::undoStateChanged
+    // 当 SceneEditService 等绕过 OperationBus::run() 直接推入 undo 命令时，
+    // 通过此观察者确保 OperationBus 发出信号，使 TopToolBar 等刷新按钮状态。
+    m_undoRedoObserver = std::make_unique<UndoRedoObserverBridge>(m_operationBus.get());
+    m_undoRedoManager->addObserver(m_undoRedoObserver.get());
+
     SY_INFO("[ApplicationCompositionRoot] initialized with module-based operation registration");
 }
 
@@ -135,7 +163,6 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
     // 组装 UI 服务集合
     UiServices uiServices;
     uiServices.stateCenter = m_stateCenter.get();
-    uiServices.themeService = m_themeService.get();
     uiServices.layoutService = m_layoutService.get();
     uiServices.interactionDispatcher = interactionDispatcher();
     uiServices.operationBus = m_operationBus.get();
@@ -173,7 +200,6 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
 
     // 配置 ShellHost 核心依赖
     m_shellHost->setStateCenter(m_stateCenter.get());
-    m_shellHost->setThemeService(m_themeService.get());
     m_shellHost->setOperationBus(m_operationBus.get());
 
     return uiServices;
@@ -390,11 +416,6 @@ UiShellHost* ApplicationCompositionRoot::shellHost()
 UiStateCenter* ApplicationCompositionRoot::stateCenter()
 {
     return m_stateCenter.get();
-}
-
-UiThemeService* ApplicationCompositionRoot::themeService()
-{
-    return m_themeService.get();
 }
 
 UiLayoutService* ApplicationCompositionRoot::layoutService()

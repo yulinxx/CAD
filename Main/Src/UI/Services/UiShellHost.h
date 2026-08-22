@@ -7,7 +7,6 @@
 
 class OperationBus;
 class UiStateCenter;
-class UiThemeService;
 class UiWorkbench;
 class WorkbenchWindow;
 
@@ -30,11 +29,6 @@ public:
     /// @param stateCenter UI 状态中心
     /// 仅转发引用，不做额外初始化
     void setStateCenter(UiStateCenter* stateCenter);
-
-    /// 设置主题服务
-    /// @param themeService 主题服务
-    /// 仅转发引用，不提前加载主题
-    void setThemeService(UiThemeService* themeService);
 
     /// 设置操作总线
     /// @param bus 操作总线
@@ -76,8 +70,6 @@ private:
     std::unique_ptr<WorkbenchWindow> m_mainWindow;
     /// UI 状态中心引用
     UiStateCenter* m_stateCenter{ nullptr };
-    /// 主题服务引用
-    UiThemeService* m_themeService{ nullptr };
     /// 操作总线
     OperationBus* m_operationBus{ nullptr };
     /// UI 服务集合
