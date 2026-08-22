@@ -4,7 +4,7 @@
 
 | 项目 | 内容 |
 |------|------|
-| 项目名 | SanYiCAD（三益CAD） |
+| 项目名 | SanYiCAD（三义CAD） |
 | 语言 | C++17 |
 | 框架 | Qt 6（Widgets, OpenGLWidgets, Core, Gui） |
 | 构建系统 | CMake 4.3+ |
@@ -2098,3 +2098,210 @@ configs/ 目录纳入 git，JSON 配置变更走正常 Code Review 流程。
   - 为 arrays 使用标准缩进（2 空格）
   - CI 中加 JSON 格式化检查（clang-format 对 JSON 的支持，或使用 prettier）
 ```
+
+---
+
+## 25. 多客户定制演进方案（数十客户规模）
+
+> 当客户数量从个位数增长到数十个时，单纯依赖"每客户一份 JSON + 手工维护"会迅速失控。
+> 本章给出面向数十客户规模的演进方案，核心目标是：**让新增/修改一个客户的定制成本趋近于零，且不破坏其他客户**。
+
+### 25.1 规模化的核心矛盾
+
+| 矛盾 | 单客户定制 | 数十客户定制 |
+|------|-----------|-------------|
+| 配置数量 | 1 份 | 数十份，且存在大量相似片段 |
+| 变更传播 | 直接改配置 | 一处基础改动需同步到所有客户 |
+| 验证成本 | 手工验证 | 无法手工逐一验证 |
+| 代码分支 | 无 | 极易产生"客户专属 ifdef 地狱" |
+| 交付节奏 | 单一版本 | 多客户并行交付、各自发版 |
+
+演进方案围绕四条主线展开：**配置继承与合并、自动化校验、客户专属代码隔离、工具链支撑**。
+
+### 25.2 配置继承与合并（消灭重复）
+
+#### 25.2.1 三层配置模型
+
+```
+configs/
+├── base.json              # 基础配置（全客户共享的菜单/工具栏/面板骨架）
+├── <clientId>.json        # 客户差异配置（仅写与 base 不同的部分）
+└── local.override.json    # 本地调试覆盖（不入库，.gitignore）
+```
+
+- `base.json` 承载 80% 的公共结构（File/Edit/View/Help 等标准菜单）。
+- 客户配置只声明差异：`extends: "base"` + 覆盖/新增/删除节点。
+- 加载顺序：`base → 客户配置 → local.override`，后者覆盖前者。
+
+#### 25.2.2 合并操作符
+
+在现有继承机制（第 18.1 节）基础上，为数组节点补充显式操作符，避免"整数组替换"带来的脆弱性：
+
+| 操作符 | 含义 | 示例 |
+|--------|------|------|
+| `replace` | 整体替换（默认） | `{ "op": "replace", "id": "file.import" }` |
+| `merge` | 按 `id` 合并子项 | `{ "op": "merge", "id": "file.import", "items": [...] }` |
+| `insertBefore` / `insertAfter` | 在指定项前后插入 | `{ "op": "insertAfter", "ref": "file.import_all", "items": [...] }` |
+| `remove` | 删除指定项 | `{ "op": "remove", "id": "file.import_pdf" }` |
+| `rename` | 改标签/图标 | `{ "op": "rename", "id": "file.import_all", "label": "Import All..." }` |
+
+> 设计原则：**客户配置永远不复制整棵菜单树**，只描述"与 base 的差异"。
+> 这样 base 新增一个公共菜单项时，所有客户自动获得，无需逐客户同步。
+
+### 25.3 配置校验自动化（把错误挡在编译前）
+
+#### 25.3.1 三层校验
+
+```
+第 1 层：JSON 语法校验        —— 所有客户配置可被标准 JSON 解析器解析
+第 2 层：Schema 校验          —— 字段类型/必填/枚举合法（复用第 7.2 节 JSON Schema）
+第 3 层：语义校验             —— 命令 ID 已注册、引用节点存在、无循环继承
+```
+
+#### 25.3.2 命令 ID 注册检查（关键）
+
+菜单/工具栏引用的每个 `command` 必须能在命令目录中找到，否则该项在运行时被禁用（第 20.5 节兜底）。
+CI 中执行静态检查：
+
+```
+# 伪代码：validate_configs.py
+for cfg in all_client_configs:
+    merged = merge(base, cfg)                    # 合并继承
+    for node in walk(merged):                    # 遍历所有节点
+        if node.command:
+            assert command_registry.contains(node.command), \
+                f"{cfg}: unknown command {node.command}"
+        if node.type == "submenu":
+            assert node.id in known_submenu_ids
+```
+
+#### 25.3.3 回归快照测试
+
+- 为每个客户生成"合并后完整配置"的规范化快照（`snapshots/<clientId>.json`）。
+- CI 中对比快照：任何基础配置变更导致某客户菜单结构变化时，diff 明确可见，由人工确认是否符合预期。
+- 快照同时作为**配置预览工具**的输入，无需启动完整应用即可审查菜单结构。
+
+### 25.4 客户专属代码隔离（避免 ifdef 地狱）
+
+#### 25.4.1 目录规范
+
+```
+Main/Src/UI/ClientConfig/
+├── configs/                     # JSON 配置（数据驱动，优先）
+├── custom/                      # 客户专属 C++ 代码（仅当 JSON 无法表达时）
+│   ├── san_yi/                  # 三义标准版专属逻辑
+│   ├── client_a/                # 客户 A 专属逻辑
+│   └── ...
+└── common/                      # 所有客户共享的扩展点实现
+```
+
+#### 25.4.2 何时需要 C++ 定制
+
+JSON 只能表达"结构"，无法表达"行为"。以下场景必须走 C++：
+
+| 场景 | 示例 | 落点 |
+|------|------|------|
+| 专属业务逻辑 | 客户 A 的排样算法入口 | `custom/client_a/` |
+| 专属面板 | 客户 B 的工艺参数面板 | 面板工厂注册（第 10.3 节） |
+| 专属命令 | 客户 C 的私有导入器 | 命令目录追加 + OperationBus 注册 |
+| 专属许可 | 功能开关差异 | 第 22 章许可机制 |
+
+#### 25.4.3 编译期选择（而非散落 ifdef）
+
+- 根 CMake 通过 `SANYI_CLIENT_ID` 选择客户（第 8.3 节）。
+- 客户专属源文件**按目录整体加入编译**，禁止在共享代码中写 `#ifdef SANYI_CLIENT_A` 散落分支。
+- 若确有共享代码需要感知客户差异，收敛到**一个接口**（如 `IClientExtension`），客户通过工厂返回实现：
+
+```cpp
+// common/IClientExtension.h —— 所有客户必须实现的扩展点
+class IClientExtension
+{
+public:
+    virtual ~IClientExtension() = default;
+    virtual QString clientId() const = 0;
+    virtual void registerCommands(OperationBus& bus) = 0;      // 追加专属命令
+    virtual void registerPanels(UiPanelRegistry& registry) = 0; // 追加专属面板
+    virtual QStringList extraImportFormats() const = 0;         // 追加导入格式
+};
+```
+
+- `custom/<clientId>/ClientExtension.cpp` 实现该接口，由组合根按 `SANYI_CLIENT_ID` 装配。
+- 这样**新增客户 = 新增一个目录 + 一份 JSON + 一个扩展实现**，共享代码零改动。
+
+### 25.5 版本管理工具链
+
+#### 25.5.1 配置版本控制
+
+- `configs/` 与 `custom/` 纳入 git，变更走 Code Review。
+- 配置与代码**同仓库同版本**：客户定制随主版本一起发布，避免配置漂移。
+- 为配置引入 `schemaVersion` 字段，升级配置格式时提供迁移脚本。
+
+#### 25.5.2 CI/CD 客户矩阵构建
+
+```
+# 伪代码：CI 构建矩阵
+matrix:
+  client: [san_yi, client_a, client_b, ...]   # 全部客户
+  config: [Debug, Release]
+
+build(client):
+  cmake -DSANYI_CLIENT_ID=$client ...
+  build
+  run validate_configs.py                     # 配置校验
+  run snapshot_diff.py                        # 快照回归
+  run unit_tests --client=$client             # 客户专属测试
+  package SanYiCAD_${client}_${version}.zip
+```
+
+- 每个客户独立构建产物，互不影响。
+- 新增客户只需在矩阵中加一行，无需改构建脚本逻辑。
+
+#### 25.5.3 发布与回滚
+
+- 产物命名带客户 ID 与版本号，可追溯。
+- 配置变更支持"按客户灰度"：先给试点客户发新版，验证后再全量。
+
+### 25.6 定制效率工具
+
+#### 25.6.1 配置生成器（脚手架）
+
+```
+# 伪代码：new_client.py
+new_client.py --id client_d --extends base --menus file,edit,view
+```
+
+自动生成：
+- `configs/client_d.json`（继承 base 的骨架）
+- `custom/client_d/` 目录与 `ClientExtension.cpp` 模板
+- CI 矩阵条目、快照占位、单元测试骨架
+
+#### 25.6.2 配置预览工具（离线审查）
+
+- 独立小工具：加载 `base + 客户配置` → 渲染菜单树文本/树形图。
+- 开发者在**不编译、不运行完整应用**的情况下审查菜单结构是否正确。
+- 输出与运行时 `UiLayoutBuilder` 一致，保证"所见即所得"。
+
+#### 25.6.3 配置热更新（可选，后期）
+
+- 若客户要求不改代码即可调整菜单，可将配置从"编译期嵌入"升级为"运行时加载"（配置文件随安装包分发）。
+- 代价：需要处理配置校验、版本兼容、安全（配置篡改）等问题。
+- 建议：**先做编译期嵌入 + 工具链**，确认收益后再评估运行时加载。
+
+### 25.7 演进路线图
+
+| 阶段 | 目标 | 关键动作 |
+|------|------|---------|
+| 阶段一（当前） | 单客户可用 | 编译期嵌入 JSON + 面板工厂 + 命令目录 |
+| 阶段二 | 3-5 客户 | 配置继承与合并操作符 + 配置校验脚本 + 快照测试 |
+| 阶段三 | 10+ 客户 | `custom/<clientId>` 隔离 + `IClientExtension` + CI 矩阵 |
+| 阶段四 | 数十客户 | 配置生成器 + 预览工具 + 按客户灰度发布 |
+
+### 25.8 结论
+
+现有框架（JSON 配置驱动 + 命令目录 + 面板工厂 + OperationBus）**已经具备支撑数十客户定制的基础能力**：
+- 菜单/工具栏/面板结构差异 → JSON 配置解决；
+- 命令/面板/格式等行为差异 → `custom/<clientId>` + `IClientExtension` 解决；
+- 验证与交付 → 配置校验自动化 + CI 客户矩阵解决。
+
+需要补强的是**工程化配套**（校验、快照、脚手架、预览工具），而非推翻现有架构。
+按第 25.7 节路线图分阶段推进，即可在客户规模增长时保持定制成本线性、可控。

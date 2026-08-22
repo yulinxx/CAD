@@ -4,15 +4,17 @@
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
 #include "UI2D/Operation/IOperation.h"
+
 #include "UI/FileOperationUtils.h"
 #include "UI/Services/UiStateCenter.h"
+#include "UI/Services/FileDialogService.h"
+#include "UI/Services/RecentFileService.h"
+#include "UI/Services/HelpDialogService.h"
+
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/SyEntity/SyImage.h"
 #include "Engine2D/Interaction/LayerManager.h"
 #include "Engine/EntityIdGenerator.h"
-#include "UI/Services/FileDialogService.h"
-#include "UI/Services/RecentFileService.h"
-#include "UI/Services/HelpDialogService.h"
 #include "Import/ImportService.h"
 #include "Export/ExportService.h"
 #include "Persistence/PersistenceService.h"
@@ -31,7 +33,7 @@
 
 namespace
 {
-    // 统一格式映射表：OperationId → FileFormat，替代旧的 switch 分支
+    // 统一格式映射表：OperationId → FileFormat
     struct FormatMappingEntry
     {
         OperationId opId;
@@ -427,6 +429,17 @@ void FileOperationRegistry::registerImportOps()
         std::make_unique<ParamLambdaOperation>(OperationId::File_ImportImage, [this](const QVariantMap& params) {
             doImportImage(params.value(QStringLiteral("filePath")).toString());
         }));
+
+    // “All Supported...”：弹出所有支持格式的对话框，按扩展名自动路由到对应导入器
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::File_ImportAll, [this] {
+        QString filePath = FileDialogService::getOpenFileName(
+            m_parentWidget, QObject::tr("Import File"), FileDialogService::allSupportedFilter());
+        if (filePath.isEmpty())
+        {
+            return;
+        }
+        doOpenFile(filePath);
+    }));
 }
 
 void FileOperationRegistry::registerExportOps()

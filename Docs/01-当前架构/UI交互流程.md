@@ -372,3 +372,128 @@ flowchart TD
 | 3D 状态栏 | `UI/3D`（StatusBar3D） |
 | 属性面板（UI/算法/数据三层） | `Main/Src/UI/Widgets/UiPropertiesPanel`、`UI2D/Service/EntityPropertyModel2D`、`UI/Dlg/PropertyModel.h` |
 | 面板注册表 | `Main/Src/UI/ClientConfig/UiPanelRegistry.cpp` |
+
+---
+
+## 10. 菜单定制加载与交互流程
+
+> 本章聚焦"菜单可定制"这一能力：客户配置如何变成菜单、2D/3D 如何只显示各自格式、
+> 定制菜单点击后如何执行，以及新增一个客户定制的完整流程。
+
+### 10.1 定制菜单加载链路（配置 → 数据模型 → Qt 菜单）
+
+```mermaid
+flowchart TD
+    Json["configs/&lt;clientId&gt;.json<br/>（继承 base.json）"] --> Load["UiConfigLoader::load()<br/>JSON → UiClientConfigBase 数据模型"]
+    Load --> Validate["配置校验<br/>语法 / Schema / 命令 ID 注册检查"]
+    Validate -- "失败" --> Fallback["回退默认配置（san_yi）<br/>并记录警告"]
+    Validate -- "成功" --> Manager["UiConfigurationManager::applyConfiguration()<br/>持有当前生效配置"]
+    Manager --> Workbench["WorkbenchMenuManager::rebuildMenusFromConfig()"]
+    Workbench --> Filter["filterMenusForWorkbench()<br/>按 workbenches 字段过滤 2D/3D"]
+    Filter --> Builder["UiLayoutBuilder::buildMenus()<br/>数据模型 → QMenu/QAction 树"]
+    Builder --> Bind["bindAction()<br/>文本/图标/快捷键/commandId"]
+    Bind --> Check{"命令已注册？"}
+    Check -- "是" --> Enable["启用 + 连接 triggered"]
+    Check -- "否" --> Disable["禁用态保留（命令可用后自动点亮）"]
+```
+
+**数据模型核心字段**（`UiClientConfigBase`）
+
+| 字段 | 含义 | 示例 |
+|------|------|------|
+| `type` | 节点类型 | `menu` / `submenu` / `action` / `separator` |
+| `id` | 节点唯一 ID | `file.import_dxf` |
+| `label` | 显示文本 | `DXF...` |
+| `command` | 绑定的命令 ID | `file.import_dxf` |
+| `icon` | 图标资源路径 | `:/ui/common/Icons/File/import.svg` |
+| `workbenches` | 可见工作台 | `["2D"]` / `["2D","3D"]` |
+| `items` | 子节点（submenu） | `[...]` |
+
+### 10.2 工作台过滤与格式隔离（2D/3D 各自格式）
+
+菜单树中每个节点都带 `workbenches` 字段，`filterMenusForWorkbench()` 在构建时按当前工作台裁剪：
+
+```
+2D 工作台可见：  workbenches 含 "2D" 的节点
+3D 工作台可见：  workbenches 含 "3D" 的节点
+```
+
+**File ▸ Import / Export 的格式隔离规则**（本次定制落地）：
+
+| 菜单项 | 2D 工作台 | 3D 工作台 |
+|--------|-----------|-----------|
+| Open | 仅 `.sy` | 仅 `.sy3d` / `.syx` |
+| Import ▸ All Supported... | 2D 全部支持格式集合 | 3D 全部支持格式集合 |
+| Import ▸ 具体格式 | DXF / PLT / SVG / PDF / AI / UG / Image / STEP | OBJ / STL / STEP |
+| Export ▸ 具体格式 | DXF / SVG / PLT / BMP / PNG | OBJ / STL / STEP |
+
+> 原则：**Open 只打开本工作台保存的文档格式；Import/Export 只暴露本工作台支持的格式**。
+> "All Supported..." 只是各格式项的集合入口，按扩展名自动路由到对应导入器。
+
+### 10.3 定制菜单的交互执行链
+
+定制菜单项点击后与标准菜单完全同源，走统一命令分发链（第 7 节）：
+
+```mermaid
+flowchart LR
+    Click["点击定制菜单项"] --> Trigger["QAction::triggered"]
+    Trigger --> Dispatch["MenuDispatcher::dispatch(commandId)"]
+    Dispatch --> WB["workbench->dispatchCommand(commandId)"]
+    WB --> Catalog["CommandCatalog / CommandCatalog3D<br/>commandId → OperationId"]
+    Catalog --> Bus["OperationBus::run(OperationId)"]
+    Bus --> Handler["对应 Operation 处理器<br/>（FileOperationRegistry / FileOperations3D 等）"]
+    Handler --> Dialog["QFileDialog 按格式过滤"]
+    Handler --> Import["按扩展名路由到导入器<br/>（DXF→DxfImporter / OBJ→ObjLoader ...）"]
+    Import --> Scene["SceneManager 落库 + 撤销栈 + 渲染刷新"]
+```
+
+**定制项新增时的三处对接**（缺一不可，否则菜单禁用或点击无效）：
+
+| 对接点 | 文件 | 作用 |
+|--------|------|------|
+| ① 命令 ID → OperationId | `CommandCatalog.cpp`（2D）/ `CommandCatalog3D.cpp`（3D） | 菜单 commandId 可解析 |
+| ② OperationId 枚举 | `UI/Common/Include/UI/Command/OperationId.h` | 统一操作 ID |
+| ③ Operation 处理器 | `FileOperationRegistry.cpp`（2D）/ `FileOperations3D.cpp`（3D） | 真正执行业务 |
+
+### 10.4 新增一个客户定制的完整流程
+
+以"给客户 X 的 2D File 菜单去掉 PDF 导入、增加专属格式"为例：
+
+```
+第 1 步：创建 configs/client_x.json
+        { "extends": "base",
+          "menus": [ { "op": "remove", "id": "file.import_pdf" },
+                     { "op": "insertAfter", "ref": "file.import_svg",
+                       "items": [ { "type": "action", "id": "file.import_fbx",
+                                    "label": "FBX...", "command": "file.import_fbx",
+                                    "workbenches": ["2D"] } ] } ] }
+
+第 2 步：若 FBX 是全新格式 → 三处对接
+        ① CommandCatalog.cpp 加 { "file.import_fbx", OperationId::File_ImportFBX }
+        ② OperationId.h 加 File_ImportFBX
+        ③ FileOperationRegistry.cpp 注册 File_ImportFBX 处理器
+
+第 3 步：CMake 选择客户
+        cmake -DSANYI_CLIENT_ID=client_x ...
+
+第 4 步：CI 校验
+        validate_configs.py（命令 ID 检查）+ 快照回归
+```
+
+**定制生效路径**：`client_x.json → UiConfigLoader → UiConfigurationManager → rebuildMenusFromConfig → UiLayoutBuilder → 菜单呈现`。
+共享代码零改动，新增格式只需补三处对接点。
+
+### 10.5 定制相关文件速查
+
+| 关注点 | 文件 |
+|---|---|
+| 配置加载（JSON → 数据模型） | `Main/Src/UI/ClientConfig/UiConfigLoader.cpp` |
+| 配置管理与回退 | `Main/Src/UI/ClientConfig/UiConfigurationManager.cpp` |
+| 布局构建（模型 → Qt 菜单） | `Main/Src/UI/ClientConfig/UiLayoutBuilder.cpp` |
+| 面板工厂注册 | `Main/Src/UI/ClientConfig/UiPanelRegistry.cpp` |
+| 客户配置 JSON | `Main/Src/UI/ClientConfig/configs/{base,san_yi,client_a}.json` |
+| 2D 文件操作处理器 | `Main/Src/Composition/FileOperationRegistry.cpp` |
+| 3D 文件操作处理器 | `UI/3D/Src/Operation/FileOperations3D.cpp` |
+| 2D 命令目录 | `UI/2D/Src/Operation/CommandCatalog.cpp` |
+| 3D 命令目录 | `UI/3D/Src/Operation/CommandCatalog3D.cpp` |
+| 统一操作 ID | `UI/Common/Include/UI/Command/OperationId.h` |

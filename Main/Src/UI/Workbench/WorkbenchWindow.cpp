@@ -350,6 +350,12 @@ void WorkbenchWindow::setWorkbench(UiWorkbench* workbench)
     if (m_menuManager)
     {
         m_menuManager->setWorkbench(workbench);
+        // 构造函数中因无工作台跳过了菜单构建，注入工作台后必须重建，
+        // 否则命令目录为空导致全部动作被禁用。
+        if (workbench && !workbench->managesOwnMenus())
+        {
+            m_menuManager->rebuildAllMenus();
+        }
     }
 }
 
@@ -383,7 +389,12 @@ void WorkbenchWindow::initializeWorkbenchShell()
 {
     if (m_menuManager)
     {
-        m_menuManager->buildMenus();
+        // 无工作台时先不构建菜单：命令目录为空会导致全部动作被禁用并刷屏 Unknown command id，
+        // 待 setWorkbench 注入工作台后由 rebuildAllMenus 统一构建。
+        if (m_workbench)
+        {
+            m_menuManager->buildMenus();
+        }
         m_menuManager->buildThemeMenu();
         m_menuManager->bindShortcuts();
     }

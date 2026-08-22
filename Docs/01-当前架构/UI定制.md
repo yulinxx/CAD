@@ -451,7 +451,112 @@ QAction::triggered
 
 ---
 
-## 8. 回归检查清单
+## 8. 数十个客户的多客户定制管理
+
+> 目标：在 **数十个客户、每个客户菜单/工具栏/面板各不相同** 的场景下，让定制开发可控、可维护、可回归。
+> 核心思想：**一份公共基线 + 每客户一份差异配置 + 统一命令目录**，尽量“只改 JSON，不改 C++”。
+
+### 8.1 配置分层模型（基线 + 差异）
+
+所有客户共享一份 `base.json`（公共基线），每个客户只维护自己的差异文件：
+
+```
+Main/Src/UI/ClientConfig/configs/
+├── base.json              公共基线（菜单/工具栏/Dock/快捷键的默认结构）
+├── san_yi.json            extends base  三义标准版（默认）
+├── client_a.json          extends base  客户 A（覆盖差异项）
+├── client_b.json          extends base  客户 B
+├── ...                    （数十个客户，每个一个 JSON）
+└── client_zz.json         extends client_a  支持客户再继承
+```
+
+继承规则（`UiConfigLoader::loadWithInheritance` + `mergeConfig`）：
+- 同 `id` 的菜单/工具栏 → **替换**；
+- 新 `id` → **追加**；
+- 未出现在子配置中的字段 → **继承自父**。
+
+> 效果：新增客户 = 新建 1 个 JSON + CMake 加 1 行，**不触碰任何 C++ 源文件**。
+
+### 8.2 命令目录统一（所有客户共享同一套 commandId）
+
+- 2D / 3D 命令目录（`CommandCatalog.cpp` / `CommandCatalog3D.cpp`）是**唯一命令事实来源**，所有客户共用。
+- 客户配置只决定「怎么展示」（顺序 / 分组 / 文案 / 图标 / 显隐），不决定「有什么功能」。
+- 客户要新增专属功能时，才需要扩展命令目录 + OperationBus（见 8.4）。
+
+### 8.3 客户专属功能的三级扩展
+
+| 级别 | 适用场景 | 改动位置 | 是否改 C++ |
+|------|---------|---------|-----------|
+| L1 配置级 | 菜单增删 / 排序 / 显隐 / 文案 / 图标 / 快捷键 | 客户 JSON | 否 |
+| L2 命令级 | 新增客户专属命令（复用现有业务能力） | `CommandCatalog` + `OperationBus` 注册 | 是（少量） |
+| L3 面板级 | 客户自定义面板 / 工具栏组 / 高级命令 | `UiPanelRegistry::registerPanel()` + 客户 JSON | 是（少量） |
+
+> 约定：L2 / L3 的 C++ 代码必须放在**客户专属目录**（如 `Main/Src/UI/ClientConfig/custom/<clientId>/`），
+> 用 CMake 按 `SANYI_CLIENT_ID` 条件编译，避免把客户逻辑混进公共代码。
+
+### 8.4 代码组织建议（数十客户规模）
+
+```
+Main/Src/UI/ClientConfig/
+├── configs/                    # 所有客户 JSON（纯数据，非 C++ 人员可维护）
+│   ├── base.json
+│   ├── san_yi.json
+│   └── client_*.json
+├── custom/                     # 客户专属 C++（按客户分目录，条件编译）
+│   ├── client_a/
+│   │   ├── ClientAPanels.cpp
+│   │   └── ClientACommands.cpp
+│   └── client_b/
+└── UiConfigLoader.h/.cpp       # 公共：JSON 解析 + 继承合并（所有客户共享）
+```
+
+CMake 侧（`Main/CMakeLists.txt`）：
+
+```cmake
+set(SANYI_CLIENT_ID "san_yi" CACHE STRING "Target UI client ID")
+# 只把当前客户的 custom 目录加入编译
+if(SANYI_CLIENT_ID STREQUAL "client_a")
+    target_sources(MyApp PRIVATE custom/client_a/ClientAPanels.cpp)
+endif()
+```
+
+### 8.5 版本管理与发布
+
+- **配置校验**：为 JSON 写单元测试（加载 → 解析 → 字段完整性 → 命令 ID 是否在 CommandCatalog 中注册），
+  未注册命令的菜单项在运行期自动禁用并 `SY_WARNF`，避免“菜单点了没反应”。
+- **回归策略**：`SANYI_ENABLE_CONFIG_DRIVEN_UI=OFF` 时基线功能不变；
+  `ON` 时每个客户配置都能正常加载；`ClientConfigTests` 全量通过。
+- **发布矩阵**：每个客户一个构建产物（`SANYI_CLIENT_ID` 不同），CI 按客户矩阵并行构建 + 冒烟测试。
+- **配置变更评审**：客户 JSON 的 `meta.version` 递增，diff 走代码评审，避免客户配置漂移。
+
+### 8.6 现有框架适配性评估
+
+**结论：现有框架（JSON 配置驱动 + 命令目录 + 工作台过滤 + 面板工厂）基本适合多客户定制，**
+**但要做到“数十客户、纯配置化、低成本”，还需要补齐以下几点：**
+
+| 现状 | 评估 | 建议 |
+|------|------|------|
+| JSON 配置驱动 + extends 继承 | ✅ 核心机制已具备 | 保持，强化配置校验测试 |
+| 命令目录统一（2D/3D） | ✅ 已具备 | 保持 |
+| 工作台过滤 | ✅ 已具备 | 保持 |
+| 面板工厂注册 | ✅ 已具备 | 保持 |
+| 客户专属 C++ 目录 | ❌ 尚无约定 | 新增 `custom/<clientId>/` 目录 + CMake 条件编译 |
+| 配置校验测试 | ⚠️ 部分 | 补充“命令 ID 注册检查”单测 |
+| 客户配置版本管理 | ⚠️ 无 | 增加 `meta.version` + 变更评审 |
+| 3D 导出命令注册 | ❌ 缺失 | 补齐 CommandCatalog3D + FileOperations3D（见《菜单架构.md》12.2） |
+| 2D “All Supported” 语义 | ⚠️ 现映射 file.open（仅 .sy） | 建议新增 `File_ImportAll` 操作，真正聚合全部 2D 格式 |
+
+### 8.7 让定制更便捷的落地清单
+
+1. 建立 `configs/` 客户 JSON 模板（含注释字段说明），新客户复制模板改差异。
+2. 建立 `custom/<clientId>/` 客户 C++ 目录约定，禁止在公共代码里写客户分支。
+3. 提供“配置预览”工具（可选）：加载客户 JSON 后截图对比，减少人工回归。
+4. 把「新增客户」做成脚本化流程：`new_client.sh <id>` 生成 JSON + CMake 行 + 单测骨架。
+5. 所有客户共享同一套命令目录，客户差异只体现在配置层 —— 这是多客户可维护的关键。
+
+---
+
+## 9. 回归检查清单
 
 - [ ] `SANYI_ENABLE_CONFIG_DRIVEN_UI=OFF` 时基线功能不变；
 - [ ] `SANYI_ENABLE_CONFIG_DRIVEN_UI=ON` 时 `:/configs/san_yi.json` 能正常加载；

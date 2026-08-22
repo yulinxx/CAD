@@ -56,14 +56,6 @@ namespace
         return action;
     }
 
-    // 统一的菜单点击日志，2D 菜单均遵循该格式，便于按 command 检索。
-    // 注意：不能用 qPrintable（Windows 下走 toLocal8Bit 产生 GBK 字节），
-    // 中文菜单文本（如语言名）会写入 GBK 导致日志乱码；统一用 UTF-8 输出。
-    void logMenuTrigger(const QString& text, const QString& commandId)
-    {
-        SY_INFOF("[Menu] trigger text='%s' command='%s'", text.toUtf8().constData(), commandId.toUtf8().constData());
-    }
-
     // 清空菜单全部动作，并连带删除子菜单对象。
     // 相比 qDeleteAll(menu->actions())，直接删除子菜单 QAction 不会销毁其 QMenu，
     // 会造成孤儿子菜单在多次局部刷新间累积（泄漏）；这里显式 delete 子菜单，一并回收。
@@ -159,13 +151,6 @@ namespace
         return false;
     }
 
-    void logFilteredCommand(const QString& commandId, const QString& workbenchId, const char* reason)
-    {
-        SY_DEBUGF("[WorkbenchMenuManager] Filtered command='%s' workbench='%s' reason=%s",
-            qPrintable(commandId),
-            qPrintable(workbenchId),
-            reason);
-    }
 }  // namespace
 
 // 配置驱动菜单的命令分发器：文件作用域定义，便于 WorkbenchMenuManager 以成员方式持有，
@@ -212,23 +197,18 @@ struct MenuDispatcher final : public IUiCommandDispatcher
         {
             const QString target =
                 commandId == QLatin1String("view.switch_to_3d") ? QStringLiteral("3D") : QStringLiteral("2D");
-            SY_INFOF("[WorkbenchMenuManager] dispatch workbench-switch command='%s' target='%s'",
-                qPrintable(commandId),
-                qPrintable(target));
             self->workbenchWindow()->triggerWorkbench(target);
             return;
         }
         // 主题切换：与 legacy 路径一致，直接走主窗口主题切换。
         if (isThemeCommand(commandId) && self && self->workbenchWindow())
         {
-            SY_INFOF("[WorkbenchMenuManager] dispatch theme command='%s'", qPrintable(commandId));
             self->workbenchWindow()->triggerTheme(commandId);
             return;
         }
         // 关于对话框：help.about 是窗口级动作，不应进入命令目录。
         if (commandId == QLatin1String("help.about") && self && self->workbenchWindow())
         {
-            SY_INFOF("[WorkbenchMenuManager] dispatch about command='%s'", qPrintable(commandId));
             QMessageBox::about(self->workbenchWindow(),
                 QObject::tr("About"),
                 QObject::tr("SanYiCAD\nVersion: %1").arg(qApp ? qApp->applicationVersion() : QString()));
@@ -247,9 +227,6 @@ struct MenuDispatcher final : public IUiCommandDispatcher
             {
                 lang = *parsed;
             }
-            SY_INFOF("[WorkbenchMenuManager] dispatch language command='%s' -> AppLanguage(%d)",
-                qPrintable(commandId),
-                static_cast<int>(lang));
             LM->setLanguage(lang);
             return;
         }
@@ -258,7 +235,6 @@ struct MenuDispatcher final : public IUiCommandDispatcher
             SY_WARNF("[WorkbenchMenuManager] No active workbench for command='%s'", qPrintable(commandId));
             return;
         }
-        SY_INFOF("[Menu] dispatch workbench='%s' command='%s'", qPrintable(workbench->id()), qPrintable(commandId));
         workbench->dispatchCommand(commandId);
     }
 };
@@ -330,8 +306,7 @@ QAction* WorkbenchMenuManager::addMenuAction(
     // 主题切换类菜单项：commandId 即主题 ID，不进入命令总线
     if (options & MenuActionOption_Theme)
     {
-        connect(action, &QAction::triggered, this, [this, text, commandId]() {
-            logMenuTrigger(text, commandId);
+        connect(action, &QAction::triggered, this, [this, commandId]() {
             m_window->triggerTheme(commandId);
         });
         return action;
@@ -343,8 +318,7 @@ QAction* WorkbenchMenuManager::addMenuAction(
     // 统一分发：全部走 dispatchCommandSafely（优先当前工作台 dispatchCommand，无工作台时回退 OperationBus）。
     // 2D 绘图工具（toolName 类型 commandId）也由 Workbench2D::dispatchCommand 兜底调用 operationForToolName，
     // 与左侧工具栏/右键菜单保持同一条命令路径，不再在菜单层单独直连 OperationBus。
-    connect(action, &QAction::triggered, this, [this, text, commandId]() {
-        logMenuTrigger(text, commandId);
+    connect(action, &QAction::triggered, this, [this, commandId]() {
         dispatchCommandSafely(commandId);
     });
     return action;
@@ -434,7 +408,6 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
     const auto commandAvailable = [this](const QString& commandId) {
         if (commandId.isEmpty())
         {
-            SY_DEBUG("[WorkbenchMenuManager] commandAvailable: empty commandId filtered");
             return false;
         }
         // 工作台切换 / 主题 / 语言属于窗口级动作命令（由 MenuDispatcher 直接处理），
@@ -443,21 +416,13 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
             MenuDispatcher::isLanguageCommand(commandId) || commandId == QLatin1String("help.about") ||
             commandId.startsWith(QStringLiteral("language."), Qt::CaseInsensitive))
         {
-            SY_DEBUGF("[WorkbenchMenuManager] commandAvailable: allow window command '%s'", qPrintable(commandId));
             return true;
         }
         if (!m_workbench)
         {
-            SY_DEBUGF("[WorkbenchMenuManager] commandAvailable: no workbench, allow '%s'", qPrintable(commandId));
             return true;
         }
         const bool registered = m_workbench->isCommandRegistered(commandId);
-        if (!registered)
-        {
-            SY_DEBUGF("[WorkbenchMenuManager] commandAvailable: unregistered '%s' in workbench '%s'",
-                qPrintable(commandId),
-                qPrintable(m_workbench->id()));
-        }
         return registered;
     };
 
@@ -557,11 +522,9 @@ void WorkbenchMenuManager::buildFileMenu()
     IconHelper::setThemedIcon(newAction, QStringLiteral(":/ui/common/Icons/File/new.svg"));
     IconHelper::setThemedIcon(openAction, QStringLiteral(":/ui/common/Icons/File/open.svg"));
     connect(newAction, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("New"), QStringLiteral("file.new"));
         dispatchCommandSafely(QStringLiteral("file.new"));
     });
     connect(openAction, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Open..."), QStringLiteral("file.open"));
         dispatchCommandSafely(QStringLiteral("file.open"));
     });
     m_menuState.fileMenu->addSeparator();
@@ -575,11 +538,9 @@ void WorkbenchMenuManager::buildFileMenu()
     IconHelper::setThemedIcon(saveAction, QStringLiteral(":/ui/common/Icons/File/save.svg"));
     IconHelper::setThemedIcon(saveAsAction, QStringLiteral(":/ui/common/Icons/File/save_as.svg"));
     connect(saveAction, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Save"), QStringLiteral("file.save"));
         dispatchCommandSafely(QStringLiteral("file.save"));
     });
     connect(saveAsAction, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Save As..."), QStringLiteral("file.save_as"));
         dispatchCommandSafely(QStringLiteral("file.save_as"));
     });
     m_menuState.fileMenu->addSeparator();
@@ -745,7 +706,6 @@ void WorkbenchMenuManager::buildViewMenu()
     zoomIn->setShortcut(QKeySequence::ZoomIn);
     IconHelper::setThemedIcon(zoomIn, QStringLiteral(":/ui/common/Icons/View/zoom_in.svg"));
     QObject::connect(zoomIn, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Zoom In"), QStringLiteral("view.zoom_in"));
         if (m_viewportZoomHandler)
         {
             m_viewportZoomHandler(QStringLiteral("zoom_in"));
@@ -755,7 +715,6 @@ void WorkbenchMenuManager::buildViewMenu()
     zoomOut->setShortcut(QKeySequence::ZoomOut);
     IconHelper::setThemedIcon(zoomOut, QStringLiteral(":/ui/common/Icons/View/zoom_out.svg"));
     QObject::connect(zoomOut, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Zoom Out"), QStringLiteral("view.zoom_out"));
         if (m_viewportZoomHandler)
         {
             m_viewportZoomHandler(QStringLiteral("zoom_out"));
@@ -766,7 +725,6 @@ void WorkbenchMenuManager::buildViewMenu()
     zoomFit->setShortcut(QStringLiteral("Ctrl+F"));
     IconHelper::setThemedIcon(zoomFit, QStringLiteral(":/ui/common/Icons/View3D/fit.svg"));
     QObject::connect(zoomFit, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Zoom to Fit"), QStringLiteral("view.zoom_fit"));
         if (m_viewportZoomHandler)
         {
             m_viewportZoomHandler(QStringLiteral("zoom_fit"));
@@ -776,7 +734,6 @@ void WorkbenchMenuManager::buildViewMenu()
     zoomSel->setShortcut(QStringLiteral("Ctrl+Shift+F"));
     IconHelper::setThemedIcon(zoomSel, QStringLiteral(":/ui/common/Icons/View/zoom_selection.svg"));
     QObject::connect(zoomSel, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Zoom to Selection"), QStringLiteral("view.zoom_selection"));
         if (m_viewportZoomHandler)
         {
             m_viewportZoomHandler(QStringLiteral("zoom_selection"));
@@ -787,7 +744,6 @@ void WorkbenchMenuManager::buildViewMenu()
     resetView->setShortcut(QStringLiteral("Ctrl+0"));
     IconHelper::setThemedIcon(resetView, QStringLiteral(":/ui/common/Icons/View3D/reset.svg"));
     QObject::connect(resetView, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Reset View"), QStringLiteral("view.reset"));
         if (m_viewportZoomHandler)
         {
             m_viewportZoomHandler(QStringLiteral("reset"));
@@ -798,7 +754,6 @@ void WorkbenchMenuManager::buildViewMenu()
     auto* panAction = m_menuState.viewMenu->addAction(tr("Pan"));
     panAction->setShortcut(QStringLiteral("M"));
     QObject::connect(panAction, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Pan"), QStringLiteral("view.pan"));
         if (m_viewportZoomHandler)
         {
             m_viewportZoomHandler(QStringLiteral("pan"));
@@ -816,7 +771,6 @@ void WorkbenchMenuManager::buildViewMenu()
         currentUnit = m_uiServices->unitManager->displayUnit();
     }
     UnitSelectionMenu::populate(m_menuState.unitMenu, currentUnit, [this](const QString& cmdId) {
-        logMenuTrigger(UnitSelectionMenu::textForCommandId(cmdId), cmdId);
         dispatchCommandSafely(cmdId);
     });
 
@@ -829,7 +783,6 @@ void WorkbenchMenuManager::buildViewMenu()
     showGrid->setCheckable(true);
     IconHelper::setThemedIcon(showGrid, QStringLiteral(":/ui/common/Icons/View3D/grid.svg"));
     QObject::connect(showGrid, &QAction::toggled, this, [this](bool checked) {
-        logMenuTrigger(tr("Show Grid"), QStringLiteral("view.grid_visible"));
         if (m_stateCenter)
         {
             m_stateCenter->setMetadata({ { QStringLiteral("gridVisible"), checked } });
@@ -839,7 +792,6 @@ void WorkbenchMenuManager::buildViewMenu()
     snapEnabled->setCheckable(true);
     IconHelper::setThemedIcon(snapEnabled, QStringLiteral(":/ui/common/Icons/View/snap.svg"));
     QObject::connect(snapEnabled, &QAction::toggled, this, [this](bool checked) {
-        logMenuTrigger(tr("Snap Enabled"), QStringLiteral("view.snap_enabled"));
         if (m_stateCenter)
         {
             m_stateCenter->setMetadata({ { QStringLiteral("snapEnabled"), checked } });
@@ -849,7 +801,6 @@ void WorkbenchMenuManager::buildViewMenu()
     orthoMode->setCheckable(true);
     IconHelper::setThemedIcon(orthoMode, QStringLiteral(":/ui/common/Icons/View/ortho.svg"));
     QObject::connect(orthoMode, &QAction::toggled, this, [this](bool checked) {
-        logMenuTrigger(tr("Ortho Mode"), QStringLiteral("view.ortho_mode"));
         if (m_stateCenter)
         {
             m_stateCenter->setMetadata({ { QStringLiteral("orthoMode"), checked } });
@@ -859,7 +810,6 @@ void WorkbenchMenuManager::buildViewMenu()
     angleSnap->setCheckable(true);
     IconHelper::setThemedIcon(angleSnap, QStringLiteral(":/ui/common/Icons/View/angle_snap.svg"));
     QObject::connect(angleSnap, &QAction::toggled, this, [this](bool checked) {
-        logMenuTrigger(tr("Angle Snap"), QStringLiteral("view.angle_snap"));
         if (m_stateCenter)
         {
             m_stateCenter->setMetadata({ { QStringLiteral("angleSnap"), checked } });
@@ -872,7 +822,6 @@ void WorkbenchMenuManager::buildViewMenu()
     auto* layerMgr = m_menuState.viewMenu->addAction(tr("Layer Manager..."));
     IconHelper::setThemedIcon(layerMgr, QStringLiteral(":/ui/common/Icons/View/layers.svg"));
     QObject::connect(layerMgr, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Layer Manager..."), QStringLiteral("view.layer_manager"));
         if (m_uiServices && m_uiServices->layerEditService)
         {
             auto* w = qobject_cast<WorkbenchWindow*>(m_window);
@@ -894,7 +843,6 @@ void WorkbenchMenuManager::buildViewMenu()
         IconHelper::setThemedIcon(
             m_menuState.workbench3DAction, QStringLiteral(":/ui/common/Icons/View/switch_to_3d.svg"));
         QObject::connect(m_menuState.workbench3DAction, &QAction::triggered, this, [this]() {
-            logMenuTrigger(tr("Switch to 3D"), QStringLiteral("view.switch_to_3d"));
             m_window->triggerWorkbench(QStringLiteral("3D"));
         });
     }
@@ -905,7 +853,6 @@ void WorkbenchMenuManager::buildViewMenu()
         IconHelper::setThemedIcon(
             m_menuState.workbench2DAction, QStringLiteral(":/ui/common/Icons/View3D/switch_to_2d.svg"));
         QObject::connect(m_menuState.workbench2DAction, &QAction::triggered, this, [this]() {
-            logMenuTrigger(tr("Switch to 2D"), QStringLiteral("view.switch_to_2d"));
             m_window->triggerWorkbench(QStringLiteral("2D"));
         });
     }
@@ -914,7 +861,6 @@ void WorkbenchMenuManager::buildViewMenu()
 
     auto* testView = m_menuState.viewMenu->addAction(tr("TestView"));
     QObject::connect(testView, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("TestView"), QStringLiteral("view.testview"));
         if (m_testViewHandler)
         {
             m_testViewHandler();
@@ -933,7 +879,6 @@ void WorkbenchMenuManager::refreshDrawMenuForWorkbench(const QString& workbenchI
     // 旧有的 CommandCatalog3D "model." 前缀过滤分支属死代码，已删除。
     if (workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0)
     {
-        SY_DEBUGF("[WorkbenchMenuManager] refreshDrawMenuForWorkbench skip 3D (managed by MenuManager3D)");
         return;
     }
 
@@ -1008,7 +953,6 @@ void WorkbenchMenuManager::refreshEditMenuForWorkbench(const QString& workbenchI
     // 旧路径下 Edit 菜单仅服务 2D（3D 由 MenuManager3D 自理，见架构文档）。
     if (workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0)
     {
-        SY_DEBUGF("[WorkbenchMenuManager] refreshEditMenuForWorkbench skip 3D (managed by MenuManager3D)");
         return;
     }
 
@@ -1023,11 +967,9 @@ void WorkbenchMenuManager::refreshEditMenuForWorkbench(const QString& workbenchI
     applyMenuIcon(undoAction, QStringLiteral("edit.undo"));
     applyMenuIcon(redoAction, QStringLiteral("edit.redo"));
     connect(undoAction, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Undo"), QStringLiteral("edit.undo"));
         dispatchCommandSafely(QStringLiteral("edit.undo"));
     });
     connect(redoAction, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Redo"), QStringLiteral("edit.redo"));
         dispatchCommandSafely(QStringLiteral("edit.redo"));
     });
     m_menuState.editMenu->addSeparator();
@@ -1104,7 +1046,6 @@ void WorkbenchMenuManager::refreshModifyMenuForWorkbench(const QString& workbenc
     // 旧路径下 Modify 仅服务 2D（3D 变换工具在配置模式走 JSON edit.transform，旧 3D 分支删除）。
     if (workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0)
     {
-        SY_DEBUGF("[WorkbenchMenuManager] refreshModifyMenuForWorkbench skip 3D (managed by MenuManager3D)");
         return;
     }
 
@@ -1155,7 +1096,6 @@ void WorkbenchMenuManager::refreshAlgorithmMenuForWorkbench(const QString& workb
     // 旧路径下 Algorithm 仅服务 2D（3D algo./process. 命令在配置模式走 JSON tools.model，旧 3D 分支删除）。
     if (workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0)
     {
-        SY_DEBUGF("[WorkbenchMenuManager] refreshAlgorithmMenuForWorkbench skip 3D (managed by MenuManager3D)");
         return;
     }
 
@@ -1196,7 +1136,6 @@ void WorkbenchMenuManager::buildHelpMenu()
     setCmdId(docsAction, QStringLiteral("help.docs"));
     IconHelper::setThemedIcon(docsAction, QStringLiteral(":/ui/common/Icons/Help/docs.svg"));
     connect(docsAction, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Documentation"), QStringLiteral("help.docs"));
         dispatchCommandSafely(QStringLiteral("help.docs"));
     });
 
@@ -1205,7 +1144,6 @@ void WorkbenchMenuManager::buildHelpMenu()
     setCmdId(shortcutAction, QStringLiteral("help.shortcuts"));
     IconHelper::setThemedIcon(shortcutAction, QStringLiteral(":/ui/common/Icons/Help/shortcuts.svg"));
     connect(shortcutAction, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Keyboard Shortcuts"), QStringLiteral("help.shortcuts"));
         dispatchCommandSafely(QStringLiteral("help.shortcuts"));
     });
     m_menuState.helpMenu->addSeparator();
@@ -1218,7 +1156,6 @@ void WorkbenchMenuManager::buildHelpMenu()
     setCmdId(settingsAction, QStringLiteral("help.settings"));
     IconHelper::setThemedIcon(settingsAction, QStringLiteral(":/ui/common/Icons/Help/settings.svg"));
     connect(settingsAction, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("Settings..."), QStringLiteral("help.settings"));
         dispatchCommandSafely(QStringLiteral("help.settings"));
     });
     m_menuState.helpMenu->addSeparator();
@@ -1236,7 +1173,6 @@ void WorkbenchMenuManager::buildHelpMenu()
         act->setChecked(lang == currentLang);
         langGroup->addAction(act);
         connect(act, &QAction::triggered, this, [lang]() {
-            logMenuTrigger(LM->languageName(lang), QStringLiteral("help.language"));
             LM->setLanguage(lang);
         });
     }
@@ -1278,7 +1214,6 @@ void WorkbenchMenuManager::buildHelpMenu()
         act->setChecked(theme == currentTheme);
         themeGroup->addAction(act);
         connect(act, &QAction::triggered, this, [theme]() {
-            logMenuTrigger(TM->themeName(theme), QStringLiteral("help.theme"));
             TM->setTheme(theme);
         });
     }
@@ -1313,7 +1248,6 @@ void WorkbenchMenuManager::buildHelpMenu()
     setCmdId(aboutAction, QStringLiteral("help.about"));
     IconHelper::setThemedIcon(aboutAction, QStringLiteral(":/ui/common/Icons/Help/about.svg"));
     connect(aboutAction, &QAction::triggered, this, [this]() {
-        logMenuTrigger(tr("About"), QStringLiteral("help.about"));
         dispatchCommandSafely(QStringLiteral("help.about"));
     });
 }
@@ -1514,22 +1448,18 @@ std::vector<MenuDef> WorkbenchMenuManager::filterMenusForWorkbench(const std::ve
                                                                                  MenuActionDef& outAction) -> bool {
         if (!action.visible || !commandEnabledForWorkbench(action.workbenches, workbenchId))
         {
-            logFilteredCommand(action.commandId, workbenchId, "workbench-filter");
             return false;
         }
         if (!visibilityAllowed(action.visibilityScope))
         {
-            logFilteredCommand(action.commandId, workbenchId, "visibility-scope");
             return false;
         }
         if (!commandVisibleByMenuGroup(action.commandId))
         {
-            logFilteredCommand(action.commandId, workbenchId, "group-filter");
             return false;
         }
         if (!commandAvailable(action.commandId))
         {
-            logFilteredCommand(action.commandId, workbenchId, "command-unavailable");
             return false;
         }
         outAction = action;
@@ -1540,12 +1470,10 @@ std::vector<MenuDef> WorkbenchMenuManager::filterMenusForWorkbench(const std::ve
                                                                             SubMenuDef& outSub) -> bool {
         if (!sub.visible || !commandEnabledForWorkbench(sub.workbenches, workbenchId))
         {
-            logFilteredCommand(sub.id, workbenchId, "submenu-workbench-filter");
             return false;
         }
         if (!visibilityAllowed(sub.visibilityScope))
         {
-            logFilteredCommand(sub.id, workbenchId, "submenu-visibility-scope");
             return false;
         }
         outSub = sub;
@@ -1586,7 +1514,6 @@ std::vector<MenuDef> WorkbenchMenuManager::filterMenusForWorkbench(const std::ve
         }
         if (!visibilityAllowed(menu.visibilityScope))
         {
-            logFilteredCommand(menu.id, workbenchId, "menu-visibility-scope");
             continue;
         }
         MenuDef menuCopy = menu;

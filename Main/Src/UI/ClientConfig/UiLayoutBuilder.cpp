@@ -230,7 +230,6 @@ void UiLayoutBuilder::buildMenuItem(QMenu* parent, const std::variant<MenuAction
         if (std::get<MenuItemType>(item) == MenuItemType::Separator)
         {
             parent->addSeparator();
-            SY_DEBUGF("[UiLayoutBuilder] Added separator to menu '%s'", qPrintable(parent->title()));
         }
         return;
     }

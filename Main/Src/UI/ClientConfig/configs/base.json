@@ -21,11 +21,19 @@
         ] },
         { "type": "separator" },
         { "type": "submenu", "id": "file.import", "label": "Import", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D", "3D"], "items": [
-          { "type": "action", "id": "file.import_all", "label": "All Supported...", "command": "file.open", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D"] },
+          { "type": "action", "id": "file.import_all", "label": "All Supported...", "command": "file.import_all", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D"] },
           { "type": "action", "id": "file.import_all_3d", "label": "All Supported...", "command": "file.import_model", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["3D"] },
-          { "type": "action", "id": "file.import_drawing", "label": "2D / Drawing Formats...", "command": "file.import_step", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D", "3D"] },
-          { "type": "action", "id": "file.import_model3d", "label": "3D Model Formats...", "command": "file.import_obj", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D", "3D"] },
-          { "type": "action", "id": "file.import_image", "label": "Image Formats...", "command": "file.import_image", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D", "3D"] }
+          { "type": "separator", "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "file.import_dxf", "label": "DXF...", "command": "file.import_dxf", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D"] },
+          { "type": "action", "id": "file.import_plt", "label": "PLT...", "command": "file.import_plt", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D"] },
+          { "type": "action", "id": "file.import_svg", "label": "SVG...", "command": "file.import_svg", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D"] },
+          { "type": "action", "id": "file.import_pdf", "label": "PDF...", "command": "file.import_pdf", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D"] },
+          { "type": "action", "id": "file.import_ai", "label": "AI...", "command": "file.import_ai", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D"] },
+          { "type": "action", "id": "file.import_ug", "label": "UG...", "command": "file.import_ug", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D"] },
+          { "type": "action", "id": "file.import_image", "label": "Image...", "command": "file.import_image", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D"] },
+          { "type": "action", "id": "file.import_step", "label": "STEP...", "command": "file.import_step", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "file.import_obj", "label": "OBJ...", "command": "file.import_obj", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["3D"] },
+          { "type": "action", "id": "file.import_stl", "label": "STL...", "command": "file.import_stl", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["3D"] }
         ] },
         { "type": "submenu", "id": "file.export", "label": "Export", "icon": ":/ui/common/Icons/File/export.svg", "workbenches": ["2D", "3D"], "items": [
           { "type": "action", "id": "file.export_dxf", "label": "DXF", "command": "file.export_dxf", "icon": ":/ui/common/Icons/File/export.svg", "workbenches": ["2D"] },
@@ -35,8 +43,7 @@
           { "type": "action", "id": "file.export_obj", "label": "OBJ", "command": "file.export_obj", "icon": ":/ui/common/Icons/File/export.svg", "workbenches": ["3D"] },
           { "type": "action", "id": "file.export_stl", "label": "STL", "command": "file.export_stl", "icon": ":/ui/common/Icons/File/export.svg", "workbenches": ["3D"] },
           { "type": "action", "id": "file.export_step", "label": "STEP", "command": "file.export_step", "icon": ":/ui/common/Icons/File/export.svg", "workbenches": ["3D"] },
-          { "type": "action", "id": "file.export_pdf", "label": "PDF", "command": "file.export_pdf", "icon": ":/ui/common/Icons/File/export.svg", "workbenches": ["3D"] },
-          { "type": "action", "id": "file.export_png", "label": "PNG", "command": "file.export_png", "icon": ":/ui/common/Icons/File/export.svg", "workbenches": ["2D", "3D"] }
+          { "type": "action", "id": "file.export_png", "label": "PNG", "command": "file.export_png", "icon": ":/ui/common/Icons/File/export.svg", "workbenches": ["2D"] }
         ] },
         { "type": "separator" },
         { "type": "action", "id": "file.exit", "label": "Exit", "command": "file.exit", "icon": ":/ui/common/Icons/File/exit.svg", "shortcut": "Ctrl+Q", "workbenches": ["2D", "3D"] }
