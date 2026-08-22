@@ -53,6 +53,7 @@
 #include "UI/DrawTools/TextEditTool.h"
 #include "UI/DrawTools/ToolManager.h"
 #include "UI/UiMetrics.h"
+#include "UI/ThemeManager.h"
 #include "UI/Dlg/LayerManagerDialog.h"
 #include "UI2D/Service/EntityPropertyModel2D.h"
 #include "UI2D/Service/EntityPropertyEditSession2D.h"
@@ -156,7 +157,8 @@ namespace
     {
         auto* label = new QLabel(text, parent);
         label->setAlignment(Qt::AlignCenter);
-        label->setStyleSheet(QStringLiteral("background:#f0f0f0;border:1px solid #ccc;padding:20px;"));
+        label->setStyleSheet(QStringLiteral("background:%1;border:1px solid %2;padding:20px;")
+                                 .arg(TM->colors().iconBg, TM->colors().borderNormal));
         return label;
     }
 }  // namespace

@@ -187,7 +187,7 @@ UI/Common/Resources/Icons/
 3. `:/ui/common/Icons/<相对路径>` — 默认集。
 
 覆盖集**只放需要差异化的图标**，其余自动继承默认集。皮肤 → 覆盖集映射由 `ThemeManager::iconFlavorFor()` 决定：
-`Dark/Slate → dark`，`Light/Blue → light`，`HighContrast → highcontrast`。
+`Dark/Slate → dark`，`Light/Blue/Default → light`，`HighContrast → highcontrast`，`System → 根据当前系统外观动态选择`。
 
 #### 3.4.4 用户定制图标
 
@@ -207,7 +207,43 @@ IconHelper::setUserIconDirectory("C:/myIcons");   // 传空串清除定制
 4. `ThemeManager::loadStylesheet()` 加对应 QSS 路径（`Styles/<theme>.qss`）；
 5. 仅个别图标需要差异化时，再新增 `<flavor>/` 覆盖集并注册进 qrc。
 
-#### 3.4.6 刷新与缓存
+#### 3.4.6 系统主题跟随（System 模式）
+
+`AppTheme::System` 是一个特殊的主题模式，它不加载独立的 QSS 文件，而是根据操作系统的深色/浅色模式设置，自动切换到 `Light` 或 `Dark` 主题。
+
+**核心组件：`SystemThemeDetector`**（`UI/Common/Include/UI/SystemThemeDetector.h`）
+
+- 单例模式，通过 `STD` 宏访问
+- 跨平台检测：macOS（NSAppearance）、Windows（注册表）、Linux（GTK 主题）
+- 信号驱动：系统主题变化时发射 `systemThemeChanged(bool isDark)`
+- 低耦合：仅负责检测，不直接操作 UI 样式
+
+**工作流程：**
+
+```
+系统外观变化
+  → SystemThemeDetector 检测到变化
+     → 发射 systemThemeChanged(isDark) 信号
+        → ThemeManager 接收信号（构造函数中连接）
+           → 若当前为 System 模式：
+              → 解析为 Light 或 Dark
+              → 应用对应的 QSS + Palette + 图标
+              → 发射 themeChanged(System) 信号
+```
+
+**各平台检测策略：**
+
+| 平台 | 检测方法 | 变化监听 |
+|------|---------|---------|
+| macOS | `[NSApp effectiveAppearance]` + `bestMatchFromAppearancesWithNames:` | `NSDistributedNotificationCenter` 监听 `AppleInterfaceThemeChangedNotification` |
+| Windows | 注册表 `HKCU\...\Personalize\AppsUseLightTheme` | `QAbstractNativeEventFilter` 监听 `WM_SETTINGCHANGE` |
+| Linux | 读取 GTK 主题名称（gsettings / settings.ini） | `QTimer` 每 5 秒轮询 |
+
+**日志输出：**
+
+所有检测和变化事件均通过 `SY_INFO`/`SY_DEBUG` 记录，格式为 `[SystemThemeDetector] ...`，便于问题排查。
+
+#### 3.4.7 刷新与缓存
 
 - 主题切换：`ThemeManager::setTheme` → `IconHelper::refreshAllThemedIcons()` 全量重刷（遍历所有带 `kThemedIconPathProperty` 属性的 action/button）。
 - 渲染缓存：按「解析路径 + 令牌色 + 尺寸 + DPR」缓存 `QPixmap`，切换主题 / DPI 后自动失效。
@@ -448,6 +484,8 @@ QAction::triggered
 - **JSON 修改后不生效**：资源通过 AUTORCC 编译进二进制，改 JSON 后需 **重新 CMake+编译**（不能单纯刷新运行）。
 - **布局快照还原覆盖标题**：`UiLayoutBuilder` 构建 Dock 会设置 `objectName`（如 `SceneDock`/`PropertiesDock`）；`restoreLayoutSnapshot()` 依赖 `_workbench_dock_title` 属性恢复标题，config-driven 路径已在 `buildDockAreasFromConfig()` 中通过 `setProperty` 兜底。
 - **3D 菜单**：3D 命令来自 `CommandCatalog3D`，菜单构建受 `BUILD_UI3D` 宏保护，与上一节约定一致。
+- **System 主题不跟随系统切换**：检查日志中是否有 `[SystemThemeDetector]` 输出；macOS 需确保应用有辅助功能权限；Windows 需确保注册表路径正确；Linux 需确保 `gsettings` 命令可用。
+- **深色模式下文字看不清**：检查该控件是否使用了硬编码颜色（如 `#f0f0f0`、`color: red`），应替换为 `TM->colors()` 中的语义色。
 
 ---
 
@@ -562,4 +600,8 @@ endif()
 - [ ] `SANYI_ENABLE_CONFIG_DRIVEN_UI=ON` 时 `:/configs/san_yi.json` 能正常加载；
 - [ ] Dock 能从 JSON 构建，`m_panelState.sceneTreeDock/propertiesDock/leftDock/rightDock` 仍被正确填充（供 `WorkbenchWindow::sceneTreeDock()`/`setSkeletonDocksVisible()` 使用）；
 - [ ] `ClientConfigTests` 全部通过；
-- [ ] 全量 `MainTests` 回归无新增失败。
+- [ ] 全量 `MainTests` 回归无新增失败；
+- [ ] **System 主题**：设置中选择 "System (Follow OS)" 后，切换系统深色/浅色模式时应用自动跟随切换；
+- [ ] **System 主题**：日志中可看到 `[SystemThemeDetector]` 和 `[ThemeManager]` 的主题切换记录；
+- [ ] **硬编码样式修复**：LicenseDialog、UiWorkbench、FillDialog 在深色模式下文字可读、背景协调；
+- [ ] **跨平台**：macOS / Windows / Linux 各平台 System 主题检测正常工作。

@@ -1,6 +1,7 @@
 #include "LicenseDialog.h"
 
 #include "License/LicenseDLL.h"
+#include "UI/ThemeManager.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -77,7 +78,8 @@ void LicenseDialog::SetupUi()
     m_machineCodeLabel = new QLabel(m_machineCode);
     m_machineCodeLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     m_machineCodeLabel->setStyleSheet(
-        QStringLiteral("font-family: monospace; padding: 4px; background: #f0f0f0; border: 1px solid #ccc;"));
+        QStringLiteral("font-family: monospace; padding: 4px; background: %1; border: 1px solid %2;")
+            .arg(TM->colors().iconBg, TM->colors().borderNormal));
     machineCodeLayout->addWidget(mcLabel);
     machineCodeLayout->addWidget(m_machineCodeLabel, 1);
     mainLayout->addLayout(machineCodeLayout);
@@ -92,7 +94,7 @@ void LicenseDialog::SetupUi()
 
     m_statusLabel = new QLabel();
     m_statusLabel->setWordWrap(true);
-    m_statusLabel->setStyleSheet(QStringLiteral("color: red;"));
+    m_statusLabel->setStyleSheet(QStringLiteral("color: %1;").arg(TM->colors().error));
     mainLayout->addWidget(m_statusLabel);
 
     auto* btnLayout = new QHBoxLayout();
@@ -129,7 +131,7 @@ void LicenseDialog::OnActivateClicked()
     }
 
     m_activateBtn->setEnabled(false);
-    m_statusLabel->setStyleSheet(QStringLiteral("color: gray;"));
+    m_statusLabel->setStyleSheet(QStringLiteral("color: %1;").arg(TM->colors().textMuted));
     m_statusLabel->setText(tr("Verifying..."));
 
     QApplication::processEvents();
@@ -137,7 +139,7 @@ void LicenseDialog::OnActivateClicked()
     LicenseContextHolder holder(m_configDir);
     if (!holder.get())
     {
-        m_statusLabel->setStyleSheet(QStringLiteral("color: red;"));
+    m_statusLabel->setStyleSheet(QStringLiteral("color: %1;").arg(TM->colors().error));
         m_statusLabel->setText(tr("Failed to initialize license module."));
         m_activateBtn->setEnabled(true);
         return;
@@ -168,7 +170,7 @@ void LicenseDialog::OnActivateClicked()
     info.structSize = sizeof(LicenseInfo);
     License_GetInfo(holder.get(), &info);
 
-    m_statusLabel->setStyleSheet(QStringLiteral("color: red;"));
+    m_statusLabel->setStyleSheet(QStringLiteral("color: %1;").arg(TM->colors().error));
     if (info.errorMessage[0] != '\0')
     {
         m_statusLabel->setText(QString::fromUtf8(info.errorMessage));
