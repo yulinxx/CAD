@@ -202,6 +202,33 @@ void SceneRefreshCoordinator::onSelectionChanged()
     // 旧代码调用 requestFullRefresh() 导致每次单击/悬停都触发整场 gather+tessellate+submit。
     // 现在使用 Selection 级别：仅修改被选/取消选中图元的样式（虚线轮廓 vs 实线），
     // 通过 modifyRenderEntity 实现高亮，避免重 tessellation。
+    //
+    // [关键修复] SyEntity::setSelected 仅翻转标志、不会把图元标记为场景 dirty，
+    // 因此“取消选中”不会进入 m_pendingDirtyIds。而 applyLightRefresh 对选中图元执行
+    // removeRenderEntity 并把它从 m_renderedEntityIds 抹除；若之后取消选中却没有任何
+    // 脏标记驱动重新提交，该图元主体几何将永远留在渲染器之外（表现：选择后取消选择，
+    // 图元消失；再次选中又因覆盖层而“出现”）。
+    // 解决办法：把“当前选中集合”与“上一帧选中集合”的差集（即本次发生选中态翻转的图元）
+    // 加入待处理脏集合，确保增量路径对它们重新评估——选中的被移除（改由虚线覆盖层表示），
+    // 取消选中的被重新提交回主几何。
+    if (m_sceneManager)
+    {
+        std::unordered_set<uint64_t> currentSelected;
+        for (Eg::SyEntity* e : m_sceneManager->getSelectedEntities())
+        {
+            currentSelected.insert(static_cast<uint64_t>(e->id));
+        }
+        for (uint64_t id : currentSelected)
+        {
+            m_pendingDirtyIds.insert(id);
+        }
+        for (uint64_t id : m_lastSelectedIds)
+        {
+            m_pendingDirtyIds.insert(id);
+        }
+        m_lastSelectedIds = std::move(currentSelected);
+    }
+
     if (m_refreshLevel < RefreshLevel::Selection)
     {
         m_refreshLevel = RefreshLevel::Selection;

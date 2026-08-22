@@ -123,6 +123,10 @@ private:
     // 已提交到渲染系统的实体 ID 集合（区分新增 vs 修改）
     std::unordered_set<uint64_t> m_renderedEntityIds;
 
+    // 上一帧已同步的选中集合：用于在选择变更时计算“发生选中态翻转”的图元，
+    // 将其加入待处理脏集合，驱动增量路径正确增删（见 onSelectionChanged）。
+    std::unordered_set<uint64_t> m_lastSelectedIds;
+
     // 当前已同步到位图渲染层的 SyImage 实体 ID 集合（多图支持，本地账本）
     std::unordered_set<uint64_t> m_bitmapImageIds;
 
