@@ -5,6 +5,7 @@
 #include "DocumentPersistenceHelper.h"
 
 #include "UI2D/Operation/OperationRegistry.h"
+#include "UI2D/Operation/OperationRouting.h"
 
 #include "UI/Services/UiLayoutService.h"
 #include "UI/Services/UiServices.h"
@@ -351,8 +352,8 @@ void ApplicationCompositionRoot::setupDirtyStateSync()
 
 void ApplicationCompositionRoot::registerAllOperations()
 {
-    // OperationBus 设为活动实例
-    OperationBus::setActiveInstance(m_operationBus.get());
+    // OperationRouting 注入 OperationBus（替代全局单例）
+    OperationRouting::setOperationBus(m_operationBus.get());
 
     SY_INFO("[ApplicationCompositionRoot] registering module operations on OperationBus");
 

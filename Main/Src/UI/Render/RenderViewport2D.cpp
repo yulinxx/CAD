@@ -387,7 +387,8 @@ void RenderViewport2D::initializeTools()
             zoomToFit();
         },
         /*onEntityDoubleClick=*/nullptr,
-        /*gridSnapManager=*/m_gridSnapManager.get());
+        /*gridSnapManager=*/m_gridSnapManager.get(),
+        /*operationBus=*/m_operationBus);
 
     // P1: 通过信号通知上层提交图元，视口不直接持有编辑服务
     m_toolManager->setEntityCallbackForAllTools([this](Eg::SyEntity* e) {

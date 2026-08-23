@@ -840,6 +840,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // CommandActionHub：管理所有 QAction 的创建与绑定
     m_commandHub = std::make_unique<CommandActionHub>();
     m_commandHub->setMainWindow(&window);
+    m_commandHub->setOperationBus(m_services.operationBus);
     // 注入选择计数提供器：Hub 不依赖 ISelectionService，保持界面层与服务层解耦
     m_commandHub->setSelectionCountProvider([selectionService = m_services.selectionService]() -> int {
         if (!selectionService)

@@ -86,7 +86,22 @@ public:
     void removeEntity(const char* id) override;
     void clear() override;
 
+    // ---- SceneDocumentBase 元数据覆盖 ----
+
+    const char* documentName() const override;
+    void setDocumentName(const char* name) override;
+
+    const char* filePath() const override;
+    void setFilePath(const char* path) override;
+
+    bool isModified() const override;
+    void setModified(bool modified) override;
+
 private:
     Eg::SceneManager* m_scene{ nullptr };
     SceneEditService* m_editService{ nullptr };
+
+    std::string m_documentName;
+    std::string m_filePath;
+    bool m_isModified{ false };
 };
