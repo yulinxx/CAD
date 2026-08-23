@@ -4,11 +4,9 @@
 #include <functional>
 #include <memory>
 
-#include "UiServices.h"
 #include "UiFrameworkServices.h"
 
 class UiStateCenter;
-class UiLayoutService;
 class QMouseEvent;
 class QKeyEvent;
 
@@ -95,12 +93,6 @@ public:
     /// 设置状态中心
     virtual void setStateCenter(UiStateCenter* stateCenter) = 0;
 
-    /// 设置 UI 服务集合
-    virtual void setUiServices(const UiServices& services) = 0;
-
-    /// 设置布局服务
-    virtual void setLayoutService(UiLayoutService* layoutService) = 0;
-
     /// 设置框架级服务桥接
     virtual void setFrameworkServices(const UiFrameworkServices& services) = 0;
 
@@ -128,8 +120,6 @@ public:
     void setEventHandler(InteractionEventHandler handler) override;
     bool dispatchEvent(const InteractionEvent& event) override;
     void setStateCenter(UiStateCenter* stateCenter) override;
-    void setUiServices(const UiServices& services) override;
-    void setLayoutService(UiLayoutService* layoutService) override;
     void setFrameworkServices(const UiFrameworkServices& services) override;
     void setToolChangedCallback(std::function<void(const QString&)> callback) override;
     void setCommandType(const QString& commandType) override;
@@ -140,8 +130,6 @@ private:
 
 private:
     UiStateCenter* m_stateCenter{ nullptr };
-    UiLayoutService* m_layoutService{ nullptr };
-    UiServices m_uiServices;
     UiFrameworkServices m_frameworkServices;
     QString m_activeCommandId;
     QString m_commandType;

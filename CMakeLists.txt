@@ -293,8 +293,6 @@ install(TARGETS SanYiCAD
 # Install all project shared libraries
 set(SANYI_PROJECT_LIBS
     Utility Log CrashHandler License
-    # EngineCommon Engine2D
-    # RenderCommon Render2D
     UICommon UI2D
     FileIO
     EnginePersistence

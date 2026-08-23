@@ -1,7 +1,6 @@
 #include "UiInteractionDispatcher.h"
 
 #include "UiStateCenter.h"
-#include "UiServices.h"
 #include "UiFrameworkServices.h"
 #include "Log/SyLogger.h"
 
@@ -230,16 +229,6 @@ bool DefaultInteractionDispatcher::dispatchEvent(const InteractionEvent& event)
 void DefaultInteractionDispatcher::setStateCenter(UiStateCenter* stateCenter)
 {
     m_stateCenter = stateCenter;
-}
-
-void DefaultInteractionDispatcher::setUiServices(const UiServices& services)
-{
-    m_uiServices = services;
-}
-
-void DefaultInteractionDispatcher::setLayoutService(UiLayoutService* layoutService)
-{
-    m_layoutService = layoutService;
 }
 
 void DefaultInteractionDispatcher::setFrameworkServices(const UiFrameworkServices& services)

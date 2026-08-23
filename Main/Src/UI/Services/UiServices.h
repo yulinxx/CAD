@@ -3,7 +3,7 @@
 #include <functional>
 #include <memory>
 
-#include "UiFrameworkServices.h"
+#include "IUiServices.h"
 
 class IInteractionDispatcher;
 class UiLayoutService;
@@ -30,12 +30,19 @@ namespace Eg
 
 /**
  * @struct UiServices
- * @brief UI 服务集合
+ * @brief UI 服务集合（具体类型聚合，实现 IUiServices 接口）
  *
- * 聚合了 UI 层所需的所有服务，包括状态中心、主题服务、
- * 布局服务、命令分发器和撤销栈。通过组合模式统一管理服务依赖。
+ * 聚合了 UI 层所需的所有服务。当前暴露 17 个具体类型指针，
+ * 违反"UI 只保留入口、交互和状态同步"原则。
+ *
+ * 【已知问题】消费者直接依赖具体实现类，无法独立测试或替换实现。
+ * 其中 ISelectionService、IUndoRedoManager、IInteractionDispatcher
+ * 已有抽象接口，其余服务待逐步定义接口后迁移。
+ *
+ * 【迁移方向】仅依赖抽象服务的消费者应改为依赖 IUiServices；
+ * 需要具体服务的消费者应通过独立参数注入。
  */
-struct UiServices
+struct UiServices : public IUiServices
 {
     /// UI 状态中心
     UiStateCenter* stateCenter{ nullptr };
@@ -101,11 +108,9 @@ struct UiServices
     /// 由 WorkbenchWindow 注入，用于刷新最近文件菜单
     std::function<void(const QString&)> recentFileOpenedCallback;
 
-    /// 将框架级桥接信息写入到服务集合中
-    /// @param frameworkServices 框架级服务
-    /// @return 当前服务集合引用
-    UiServices& withFrameworkServices(const UiFrameworkServices& /*frameworkServices*/)
-    {
-        return *this;
-    }
+    // ---- IUiServices 接口实现 ----
+
+    ISelectionService* getSelectionService() const override { return selectionService; }
+    IUndoRedoManager* getUndoManager() const override { return undoManager; }
+    IInteractionDispatcher* getInteractionDispatcher() const override { return interactionDispatcher; }
 };
