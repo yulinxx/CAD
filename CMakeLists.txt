@@ -110,9 +110,9 @@ if(APPLE)
     add_compile_options(-Wno-nonportable-include-path)
 endif()
 
-# 统一输出目录
-set(_SANYI_BIN_DIR "${CMAKE_BINARY_DIR}/bin_Qt${QT_VERSION_MAJOR}")
-set(_SANYI_LIB_DIR "${CMAKE_BINARY_DIR}/lib_Qt${QT_VERSION_MAJOR}")
+# 统一输出目录（缓存变量，跨 project() 作用域可见）
+set(_SANYI_BIN_DIR "${CMAKE_BINARY_DIR}/bin_Qt${QT_VERSION_MAJOR}" CACHE INTERNAL "SanYi runtime output dir")
+set(_SANYI_LIB_DIR "${CMAKE_BINARY_DIR}/lib_Qt${QT_VERSION_MAJOR}" CACHE INTERNAL "SanYi library output dir")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${_SANYI_BIN_DIR}")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${_SANYI_BIN_DIR}")

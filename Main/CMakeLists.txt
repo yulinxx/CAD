@@ -159,6 +159,7 @@ endif()
 # 可选模块宏传播：保证 EXE 中与各 UI DLL 中 #ifdef 分支一致
 if(BUILD_NESTING)
     target_compile_definitions(${app_name} PRIVATE ENABLE_NESTING)
+    target_link_libraries(${app_name} PRIVATE Nesting)
 endif()
 
 if(BUILD_UI3D)
@@ -168,6 +169,7 @@ if(BUILD_UI3D)
     # 含 #ifdef ENABLE_GEOMODELCORE 条件数据成员，EXE 必须与 DLL 的 sizeof 一致
     if(BUILD_GEOMODELCORE)
         target_compile_definitions(${app_name} PRIVATE ENABLE_GEOMODELCORE)
+        target_link_libraries(${app_name} PRIVATE GeoModelCore)
     endif()
 endif()
 
@@ -450,11 +452,13 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
         target_compile_definitions(MainTests PRIVATE BUILD_UI3D=1)
         if(BUILD_GEOMODELCORE)
             target_compile_definitions(MainTests PRIVATE ENABLE_GEOMODELCORE)
+            target_link_libraries(MainTests PRIVATE GeoModelCore)
         endif()
     endif()
 
     if(BUILD_NESTING)
         target_compile_definitions(MainTests PRIVATE ENABLE_NESTING)
+        target_link_libraries(MainTests PRIVATE Nesting)
     endif()
 
     # 客户化 UI 配置（测试目标同样需要访问资源）
