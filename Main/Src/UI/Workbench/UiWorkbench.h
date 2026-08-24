@@ -257,6 +257,8 @@ private:
 private:
     /// 命令动作中枢：管理所有 QAction 的创建、绑定、刷新
     std::unique_ptr<class CommandActionHub> m_commandHub;
+    /// 视口右键菜单请求：基于命令中枢构建并弹出右键菜单，实现选择/锁定的实时联动
+    void onViewportContextMenu(QContextMenuEvent* event);
     /// 顶部工具栏（编辑命令）— Qt 父对象管理生命周期
     class TopToolBar* m_topToolBar{ nullptr };
     /// 文字编辑字体工具栏（双击文字进入编辑时显示）— Qt 父对象管理生命周期

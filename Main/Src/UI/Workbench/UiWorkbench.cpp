@@ -2,6 +2,7 @@
 
 #include <QAction>
 #include <QActionGroup>
+#include <QMenu>
 #include <QDockWidget>
 #include <QShortcut>
 #include <QSizePolicy>
@@ -165,15 +166,6 @@ namespace
 
 namespace
 {
-    /// ISelectionService::visitSelectedIds 的计数 visitor（POD 安全）
-    void countSelectedIds(const char* /*id*/, void* context)
-    {
-        if (context)
-        {
-            ++*static_cast<int*>(context);
-        }
-    }
-
     /// ISelectionService::visitSelectedIds 的收集 visitor（POD 安全，收集图元 ID）
     void collectSelectedIds(const char* id, void* context)
     {
@@ -841,98 +833,95 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     m_commandHub = std::make_unique<CommandActionHub>();
     m_commandHub->setMainWindow(&window);
     m_commandHub->setOperationBus(m_services.operationBus);
-    // 注入选择计数提供器：Hub 不依赖 ISelectionService，保持界面层与服务层解耦
-    m_commandHub->setSelectionCountProvider([selectionService = m_services.selectionService]() -> int {
-        if (!selectionService)
-        {
-            return 0;
-        }
-        int count = 0;
-        selectionService->visitSelectedIds(&countSelectedIds, &count);
-        return count;
-    });
-    // 注入「选中项位于锁定图层」提供器：Delete/Copy/Mirror/Align 等 RequiresUnlocked* 动作据此禁用
-    m_commandHub->setSelectionLockedProvider([selectionService = m_services.selectionService,
-                                                 layerManager = m_services.layerManager,
-                                                 sceneEditService = m_services.sceneEditService]() -> bool {
+    // 单一数据源：一次遍历选中的图元集合，统一算出 count / 锁定(图层+实体) / 可编辑 /
+    // 类型直方图 / 分组 / 贝塞尔，注入给命令中枢。替代原先 count / lock / group 三处各自遍历、
+    // 且分别走 ISelectionService 与 SceneManager 两个数据源的分裂实现，从根上消除规则漂移。
+    m_commandHub->setSelectionContextProvider([selectionService = m_services.selectionService,
+                                               layerManager = m_services.layerManager,
+                                               sceneEditService = m_services.sceneEditService]() -> SelectionContext {
+        SelectionContext result;
         if (!selectionService || !layerManager || !sceneEditService)
         {
-            return false;
+            return result;
         }
         Eg::SceneManager* scene = sceneEditService->sceneManager();
         if (!scene)
         {
-            return false;
+            return result;
         }
-        struct LockedCtx
+        struct Ctx
         {
             Eg::SceneManager* scene;
             LayerManager* layers;
-            bool locked{ false };
+            SelectionContext* out;
         };
-        LockedCtx ctx{ scene, layerManager, false };
+        Ctx ctx{ scene, layerManager, &result };
         selectionService->visitSelectedIds(
             [](const char* id, void* v) {
-                auto* c = static_cast<LockedCtx*>(v);
-                if (c->locked)
-                {
-                    return;
-                }
+                auto* c = static_cast<Ctx*>(v);
                 auto eid = Eg::parseEntityId(std::string(id));
                 if (!eid)
                 {
                     return;
                 }
-                if (Eg::SyEntity* entity = c->scene->findEntityById(*eid))
+                Eg::SyEntity* e = c->scene->findEntityById(*eid);
+                if (!e)
                 {
-                    if (c->layers->isLayerLocked(c->layers->getEntityLayer(entity)))
-                    {
-                        c->locked = true;
-                    }
+                    return;
+                }
+                c->out->selectionCount++;
+                const bool layerLocked = c->layers->isLayerLocked(c->layers->getEntityLayer(e));
+                const bool entityLocked = e->locked();
+                if (layerLocked)
+                {
+                    c->out->anyLockedLayer = true;
+                }
+                if (entityLocked)
+                {
+                    c->out->anyLockedEntity = true;
+                }
+                if (!layerLocked && !entityLocked)
+                {
+                    c->out->anyEditable = true;
+                }
+                switch (e->eType)
+                {
+                case Eg::EType::TEXT:
+                    c->out->typeMask |= static_cast<uint32_t>(SelectionTypeBit::Text);
+                    break;
+                case Eg::EType::QR_CODE:
+                    c->out->typeMask |= static_cast<uint32_t>(SelectionTypeBit::Qr);
+                    break;
+                case Eg::EType::IMAGE:
+                    c->out->typeMask |= static_cast<uint32_t>(SelectionTypeBit::Bitmap);
+                    break;
+                case Eg::EType::LINE:
+                case Eg::EType::ARC:
+                case Eg::EType::CIRCLE:
+                case Eg::EType::ELLIPSE:
+                case Eg::EType::SMARTLINE:
+                case Eg::EType::POLYGON:
+                case Eg::EType::SPLINE:
+                case Eg::EType::BEZIER:
+                case Eg::EType::BEZIER2:
+                    c->out->typeMask |= static_cast<uint32_t>(SelectionTypeBit::Vector);
+                    break;
+                default:
+                    c->out->typeMask |= static_cast<uint32_t>(SelectionTypeBit::Other);
+                    break;
+                }
+                if (e->group())
+                {
+                    c->out->groupOn = true;
                 }
             },
             &ctx);
-        return ctx.locked;
-    });
-    // 注入分组切换状态提供器：Group/Ungroup 顶部按钮实时可用
-    m_commandHub->setGroupToggleProvider([selectionService = m_services.selectionService,
-                                             layerManager = m_services.layerManager,
-                                             sceneEditService = m_services.sceneEditService]() -> GroupToggleState {
-        GroupToggleState state;
-        if (!selectionService || !layerManager || !sceneEditService)
-        {
-            return state;
-        }
-        Eg::SceneManager* scene = sceneEditService->sceneManager();
-        if (!scene)
-        {
-            return state;
-        }
-        const auto selected = scene->getSelectedEntities();
-        if (selected.empty())
-        {
-            return state;
-        }
-        bool onLockedLayer = false;
-        bool hasGroup = false;
-        for (Eg::SyEntity* e : selected)
-        {
-            if (!e)
-            {
-                continue;
-            }
-            if (layerManager->isLayerLocked(layerManager->getEntityLayer(e)))
-            {
-                onLockedLayer = true;
-            }
-            if (e->group())
-            {
-                hasGroup = true;
-            }
-        }
-        state.on = hasGroup;
-        state.enabled = !onLockedLayer;
-        return state;
+        result.hasSelection = result.selectionCount > 0;
+        // 分组按钮：选中含分组则显示 Ungroup；命中任意锁定图层则不可用
+        result.groupEnabled = !result.anyLockedLayer;
+        // 贝塞尔切换按钮：当前无独立语义，保持禁用（与重构前未赋值行为一致）
+        result.bezierEnabled = false;
+        return result;
     });
     // 注入撤销/重做状态提供器（OperationBus context 在生产路径不填充 undoManager）
     m_commandHub->setUndoRedoProvider([undoManager = m_services.undoManager]() -> UndoRedoState {
@@ -1162,6 +1151,8 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
                 m_contextManager->setCurrentContext(newCtx);
             }
         });
+        // 右键菜单请求：交给命令中枢统一构建并弹出（含选择/锁定实时联动）
+        connect(m_viewport, &RenderViewport2D::contextMenuRequested, this, &Workbench2D::onViewportContextMenu);
     }
     else
     {
@@ -1267,110 +1258,41 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
 
 ToolBarContext Workbench2D::determineContextFromSelection() const
 {
-    if (!m_services.selectionService)
+    // 直接复用命令中枢最近一次选择上下文快照中的类型直方图（typeMask），
+    // 不再二次遍历场景——刷新顺序保证 currentSnapshot() 反映本次选择变化，
+    // 与工具栏/菜单/右键菜单共用同一份类型事实，避免上下文漂移。
+    const uint32_t mask = m_commandHub->currentSnapshot().typeMask;
+
+    const bool text = (mask & static_cast<uint32_t>(SelectionTypeBit::Text)) != 0;
+    const bool qr = (mask & static_cast<uint32_t>(SelectionTypeBit::Qr)) != 0;
+    const bool bitmap = (mask & static_cast<uint32_t>(SelectionTypeBit::Bitmap)) != 0;
+    const bool vector = (mask & static_cast<uint32_t>(SelectionTypeBit::Vector)) != 0;
+    const bool other = (mask & static_cast<uint32_t>(SelectionTypeBit::Other)) != 0;
+
+    if (!text && !qr && !bitmap && !vector && !other)
     {
         return ToolBarContext::Default;
     }
 
-    // 获取选中的图元 ID 列表
-    std::vector<Eg::EntityId> selectedIds;
-    m_services.selectionService->visitSelectedIds(
-        [](const char* id, void* ctx) {
-            auto& vec = *static_cast<std::vector<Eg::EntityId>*>(ctx);
-            if (auto eid = Eg::parseEntityId(std::string(id)))
-            {
-                vec.push_back(*eid);
-            }
-        },
-        &selectedIds);
-
-    if (selectedIds.empty())
-    {
-        return ToolBarContext::Default;
-    }
-
-    // 获取场景管理器
-    auto* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
-    if (!scene)
-    {
-        return ToolBarContext::Default;
-    }
-
-    // 统计各类型图元数量
-    int textCount = 0;
-    int qrCount = 0;
-    int bitmapCount = 0;
-    int vectorCount = 0;
-    int imageCount = 0;
-    int otherCount = 0;
-
-    for (Eg::EntityId id : selectedIds)
-    {
-        if (auto* entity = scene->findEntityById(id))
-        {
-            switch (entity->eType)
-            {
-            case Eg::EType::TEXT:
-                textCount++;
-                break;
-            case Eg::EType::QR_CODE:
-                qrCount++;
-                break;
-            case Eg::EType::IMAGE:
-                bitmapCount++;
-                break;
-            case Eg::EType::LINE:
-            case Eg::EType::ARC:
-            case Eg::EType::CIRCLE:
-            case Eg::EType::ELLIPSE:
-            case Eg::EType::SMARTLINE:
-            case Eg::EType::POLYGON:
-            case Eg::EType::SPLINE:
-            case Eg::EType::BEZIER:
-            case Eg::EType::BEZIER2:
-                vectorCount++;
-                break;
-            default:
-                otherCount++;
-                break;
-            }
-        }
-    }
-
-    // 优先级：专用编辑模式 > 通用模式
-    // 单一类型优先
-    if (textCount > 0 && qrCount == 0 && bitmapCount == 0 && vectorCount == 0 && imageCount == 0)
-    {
+    // 优先级：专用编辑模式 > 通用模式。混合类型时优先返回最专用的上下文。
+    if (text && !qr && !bitmap && !vector)
         return ToolBarContext::TextEditing;
-    }
-    if (qrCount > 0 && textCount == 0 && bitmapCount == 0 && vectorCount == 0 && imageCount == 0)
-    {
+    if (qr && !text && !bitmap && !vector)
         return ToolBarContext::QREditing;
-    }
-    if (bitmapCount > 0 && textCount == 0 && qrCount == 0 && vectorCount == 0 && imageCount == 0)
-    {
+    if (bitmap && !text && !qr && !vector)
         return ToolBarContext::BitmapEditing;
-    }
-    if (vectorCount > 0 && textCount == 0 && qrCount == 0 && bitmapCount == 0 && imageCount == 0)
-    {
+    if (vector && !text && !qr && !bitmap)
         return ToolBarContext::VectorEditing;
-    }
-    if (imageCount > 0 && textCount == 0 && qrCount == 0 && bitmapCount == 0 && vectorCount == 0)
-    {
-        return ToolBarContext::ImageEditing;
-    }
 
-    // 混合类型：优先返回最专用的上下文
-    if (textCount > 0)
+    // 混合：优先最专用
+    if (text)
         return ToolBarContext::TextEditing;
-    if (qrCount > 0)
+    if (qr)
         return ToolBarContext::QREditing;
-    if (bitmapCount > 0)
+    if (bitmap)
         return ToolBarContext::BitmapEditing;
-    if (vectorCount > 0)
+    if (vector)
         return ToolBarContext::VectorEditing;
-    if (imageCount > 0)
-        return ToolBarContext::ImageEditing;
 
     return ToolBarContext::Default;
 }
@@ -1639,6 +1561,24 @@ void Workbench2D::setSceneTreeLock(const QStringList& ids, bool locked)
     }
 }
 
+void Workbench2D::onViewportContextMenu(QContextMenuEvent* event)
+{
+    if (!event || !m_commandHub || !m_services.layerManager)
+    {
+        return;
+    }
+    QMenu menu;
+    // 基于命令中枢实时快照构建菜单（count / 锁定 / 类型 来自与工具栏相同的单一事实来源），
+    // 避免右键菜单再走一套独立的选择数据源导致显隐/灰显规则漂移。
+    const CommandUiSnapshot snapshot = m_commandHub->captureSnapshot(m_commandHub->mainWindow());
+    m_commandHub->populateContextMenu(&menu, snapshot, m_services.layerManager);
+    if (menu.isEmpty())
+    {
+        return;
+    }
+    menu.exec(event->globalPos());
+}
+
 void Workbench2D::refreshPropertiesPanel()
 {
     // 属性面板是可选的 UI：配置驱动时可能不存在，因此先探测再绑定。
@@ -1675,6 +1615,9 @@ void Workbench2D::refreshPropertiesPanel()
     // 面板仅消费 PropertyModel / IPropertyEditTarget，不感知算法与引擎细节。
     props->setEditTarget(session);
     props->setPropertyModel(session->buildModel());
+    // 同步锁定态：属性面板双击编辑与工具栏/右键菜单的禁用规则实时一致
+    // （来自命令中枢最近一次选择上下文快照，单一事件总线驱动）
+    props->setLockState(m_commandHub->currentSnapshot().anyLocked());
 }
 
 void Workbench2D::activate()

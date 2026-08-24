@@ -543,6 +543,12 @@ void ViewportInputRouter::handleContextMenu(QContextMenuEvent* event)
     event->ignore();
 }
 
+bool ViewportInputRouter::hasActiveCommand() const
+{
+    // 视口右键前判断是否处于绘制/编辑命令中：处于命令则取消当前命令而不弹菜单
+    return m_interactionDispatcher && m_interactionDispatcher->hasActiveCommand();
+}
+
 // ==================== 坐标转换 ====================
 
 QSizeF ViewportInputRouter::physicalViewportSize() const

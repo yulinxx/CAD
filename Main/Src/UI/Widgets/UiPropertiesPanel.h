@@ -51,6 +51,10 @@ public:
     /// 面板仅通过 IPropertyEditTarget 接口提交编辑，不感知引擎/撤销细节。
     void setEditTarget(std::shared_ptr<IPropertyEditTarget> target);
 
+    /// 设置选中项锁定态（来自命令中枢的选择上下文快照）。锁定态下禁用双击编辑，
+    /// 使属性面板与工具栏/菜单/右键菜单的锁定规则实时一致（单一事件总线驱动）。
+    void setLockState(bool locked);
+
 signals:
     /// 某属性被成功编辑（已入撤销栈）。由绑定层监听并触发模型重建。
     void sigPropertyEdited();
@@ -70,4 +74,6 @@ private:
     bool m_hasModel{ false };
     std::shared_ptr<IPropertyEditTarget> m_editTarget;
     class PropertyItemDelegate* m_delegate{ nullptr };
+    /// 选中项是否处于锁定（图层锁或实体锁），禁用双击内联/弹窗编辑
+    bool m_locked{ false };
 };

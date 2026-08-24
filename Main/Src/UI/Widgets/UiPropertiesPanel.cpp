@@ -510,7 +510,8 @@ PropertiesPanelWidget::PropertiesPanelWidget(QWidget* parent)
             return;
         }
         const PropertyItem pi = item->data(1, PropertyItemRole).value<PropertyItem>();
-        if (!pi.editable || !m_editTarget)
+        // 锁定态（图层锁或实体锁）下禁止编辑：与工具栏/右键菜单的禁用规则保持一致
+        if (!pi.editable || !m_editTarget || m_locked)
         {
             return;
         }
@@ -544,6 +545,16 @@ void PropertiesPanelWidget::setEditTarget(std::shared_ptr<IPropertyEditTarget> t
     m_editTarget = std::move(target);
     m_delegate->setEditTarget(m_editTarget);
     refresh();
+}
+
+void PropertiesPanelWidget::setLockState(bool locked)
+{
+    // 锁定态变化即重绘：树项恢复只读，避免用户通过双击绕过命令枢纽的禁用规则
+    if (m_locked != locked)
+    {
+        m_locked = locked;
+        refresh();
+    }
 }
 
 void PropertiesPanelWidget::setPropertiesData(const PropertiesData& data)

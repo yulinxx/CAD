@@ -186,6 +186,8 @@ signals:
     void activeToolChanged(const QString& toolName);
     // 场景选择状态变化（含绘制后自动选中、点选/框选、撤销等所有路径），供上层刷新命令可用性
     void selectionChanged();
+    // 右键菜单请求：由 UI 层（Workbench）构建并弹出菜单，使右键联动统一走命令中枢
+    void contextMenuRequested(QContextMenuEvent* event);
 
 protected:
     void resizeEvent(QResizeEvent* event) override;

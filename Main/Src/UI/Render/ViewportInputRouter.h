@@ -94,6 +94,9 @@ public:
     void handleKeyRelease(QKeyEvent* event);
     void handleContextMenu(QContextMenuEvent* event);
 
+    /// 是否存在正在进行的编辑/绘制命令（视口右键时用于决定是否取消当前命令而非弹菜单）
+    bool hasActiveCommand() const;
+
     // ==================== 输入法（IME） ====================
 
     /// 输入法事件转发给活动工具（返回是否被消费）
