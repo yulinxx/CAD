@@ -1997,6 +1997,10 @@ void Workbench3D::bind3DRenderSignals(ServiceOwner& own)
     bind3DSelectionSignal();
     bind3DDeleteKeySignal();
 
+    // 右键菜单请求：交给命令中枢基于统一快照构建并弹出（与 2D 视口一致）
+    connect(m_services3D.renderWidget, &RenderWidget3D::sigContextMenuRequested,
+        this, &Workbench3D::on3DContextMenuRequested);
+
     if (auto* viewport = qobject_cast<Viewport3D*>(m_mainWindow3D ? m_mainWindow3D->centralWidget() : nullptr))
     {
         viewport->setInputHandler([this](QEvent* event) {
@@ -2121,6 +2125,37 @@ void Workbench3D::setup3DDeleteShortcuts(WorkbenchWindow& window)
         }
     });
     window.registerShortcut(m_backspaceShortcut);
+}
+
+void Workbench3D::on3DContextMenuRequested(const QPoint& globalPos)
+{
+    auto* renderWidget = m_services3D.renderWidget;
+    if (!renderWidget || !m_serviceOwner || !m_serviceOwner->commandActionHub)
+    {
+        return;
+    }
+    QMenu menu;
+    // 基于命令中枢实时快照构建菜单（count / 锁定 来自与 3D 工具栏相同的单一事实来源），
+    // 避免右键菜单再走一套独立的选择数据源导致显隐/灰显规则漂移（与 2D 一致）。
+    CommandUiSnapshot3D snapshot;
+    const auto& selected = renderWidget->selectionManager().getSelectedEntities();
+    snapshot.hasSelection = !selected.empty();
+    snapshot.selectionCount = static_cast<int>(selected.size());
+    // 统一锁定判定：任一选中实体被锁定则视为有锁（与 2D 语义一致）
+    for (const Eg::SyMeshEntity* e : selected)
+    {
+        if (e && e->locked())
+        {
+            snapshot.anyLockedEntity = true;
+            break;
+        }
+    }
+    m_serviceOwner->commandActionHub->populateContextMenu(&menu, snapshot);
+    if (menu.isEmpty())
+    {
+        return;
+    }
+    menu.exec(globalPos);
 }
 
 /// 步骤三：创建 CommandActionHub3D、注册命令、初始化菜单管理器和快捷键

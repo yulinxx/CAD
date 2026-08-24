@@ -354,6 +354,8 @@ private:
     void bind3DSelectionSignal();
     void bind3DDeleteKeySignal();
     void setup3DDeleteShortcuts(WorkbenchWindow& window);
+    /// 3D 视口右键菜单请求：基于命令中枢快照构建并弹出（与 2D 统一的单一事实来源）
+    void on3DContextMenuRequested(const QPoint& globalPos);
 
     // ---- 3D 场景树（数据/算法/UI 分离，UI 可定制/可缺失） ----
     /// 绑定并填充 3D 场景树面板（数据经算法层由引擎场景生成）
