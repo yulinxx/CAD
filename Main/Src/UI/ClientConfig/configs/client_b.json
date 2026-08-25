@@ -23,18 +23,7 @@
       ]
     }
   ],
-  "toolbars": [
-    {
-      "id": "RightToolBar",
-      "title": "Right Tools",
-      "position": "right",
-      "workbench": "2D",
-      "items": [
-        { "type": "action", "id": "tool.qrcode", "label": "QR Code", "command": "tool.qrcode", "icon": ":/ui/common/Icons/Tools/qrcode.svg" },
-        { "type": "action", "id": "algo.nesting", "label": "Nesting", "command": "algo.nesting", "icon": ":/ui/common/Icons/Actions/algo_nesting.svg", "feature": "nesting" }
-      ]
-    }
-  ],
+  "toolbars": [],
   "statusBar": {
     "visible": true,
     "sizeGripEnabled": true,

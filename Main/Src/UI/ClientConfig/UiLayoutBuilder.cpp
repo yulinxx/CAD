@@ -167,13 +167,22 @@ void UiLayoutBuilder::bindAction(QAction* action,
 
     if (m_dispatcher && m_dispatcher->isCommandRegistered(commandId))
     {
-        QObject::connect(action, &QAction::triggered, [this, action, commandId](bool) {
+        // 绝对不能捕获 this：构建器普遍是栈上/临时对象（WorkbenchLayoutManager 建工具栏、
+        // UiContextMenuService 建右键菜单都是局部变量），而 QAction 的存活期远长于它。
+        // 捕获 this 会在构建器析构后留下悬垂指针，点按钮时崩在 m_dispatcher->dispatch()。
+        // 只捕获分发器指针本身：菜单/工具栏用的是长生命周期分发器（WorkbenchMenuManager
+        // 的成员、WorkbenchLayoutManager 注入的），右键菜单用的栈上分发器由"菜单必须在
+        // 同一作用域内 exec + delete"的约定保证有效。
+        // 接收者显式传 action：连接随 action 一同销毁，不留悬挂连接。
+        IUiCommandDispatcher* dispatcher = m_dispatcher;
+        QObject::connect(action, &QAction::triggered, action, [dispatcher, action, commandId](bool) {
             SY_INFOF("[Menu] trigger text='%s' command='%s'",
                 action->text().toUtf8().constData(),
                 commandId.toUtf8().constData());
-            m_dispatcher->dispatch(commandId);
+            dispatcher->dispatch(commandId);
         });
     }
+
     else
     {
         // 命令未注册 → 按钮禁用 + 提示
@@ -469,10 +478,13 @@ void UiLayoutBuilder::buildShortcuts(const std::vector<ShortcutDef>& shortcuts)
 
         auto* shortcut = new QShortcut(QKeySequence(sc.keySequence), m_window);
         shortcut->setContext(Qt::ApplicationShortcut);
-        QObject::connect(shortcut, &QShortcut::activated, [this, commandId = sc.commandId]() {
+        // 与 bindAction 同理：QShortcut 挂在窗口上、活得比构建器长，只能捕获分发器指针
+        IUiCommandDispatcher* dispatcher = m_dispatcher;
+        QObject::connect(shortcut, &QShortcut::activated, shortcut, [dispatcher, commandId = sc.commandId]() {
             SY_INFOF("[Menu] shortcut command='%s'", qPrintable(commandId));
-            m_dispatcher->dispatch(commandId);
+            dispatcher->dispatch(commandId);
         });
+
     }
 }
 

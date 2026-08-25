@@ -5,18 +5,7 @@
     "version": "2.0",
     "inherits": "base"
   },
-  "toolbars": [
-    {
-      "id": "TopToolBar",
-      "title": "Top Tools",
-      "position": "top",
-      "workbench": "global",
-      "items": [
-        { "type": "action", "id": "edit.undo", "label": "Undo", "command": "edit.undo", "icon": ":/ui/common/Icons/Actions/undo.svg", "shortcut": "Ctrl+Z" },
-        { "type": "action", "id": "edit.redo", "label": "Redo", "command": "edit.redo", "icon": ":/ui/common/Icons/Actions/redo.svg", "shortcut": "Ctrl+Y" }
-      ]
-    }
-  ],
+  "toolbars": [],
   "docks": [
     { "id": "SceneDock", "title": "Scene", "position": "left", "widgetType": "SceneTreePanel", "visible": true }
   ],

@@ -45,6 +45,9 @@ class UnitManager;
 /// 硬件装配层。前向声明即可：DeviceHost 的头文件刻意不含任何 Hardware 类型，
 /// 但组合根也没必要为此多包含一层。
 class DeviceHost;
+class ProcessingJobService;
+class LaserOperationRegistry;
+
 
 namespace Ui
 {
@@ -197,6 +200,10 @@ public:
     /// 获取硬件装配层。始终非空；未启动硬件时其 isRunning() 为 false。
     DeviceHost* deviceHost();
 
+    /// 获取加工作业服务。始终非空；设备未启动时所有加工请求都会被明确拒绝。
+    ProcessingJobService* processingJobService();
+
+
     /**
      * @brief 读取机器档案并启动硬件。
      * @param configDir  应用配置目录（用于定位 machine.json）
@@ -322,4 +329,11 @@ private:
 
     /// 硬件装配层（设备 + IO 点位 + 安全策略 + tick 驱动）
     std::unique_ptr<DeviceHost> m_deviceHost;
+
+    /// 加工作业服务（编译 → loadPlan → startPlan → 进度）
+    std::unique_ptr<ProcessingJobService> m_processingJobService;
+
+    /// 加工操作注册表（捕获 DeviceHost / ProcessingJobService，必须活得比 OperationBus 长）
+    std::unique_ptr<LaserOperationRegistry> m_laserOperationRegistry;
 };
+

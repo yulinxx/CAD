@@ -190,6 +190,16 @@ void SceneRefreshCoordinator::onSceneChanged()
             m_pendingDeletedIds.insert(id);
         }
     }
+
+    // 选中图元的本体不进主几何（改由流水虚线轮廓覆盖层表示），而轮廓只在"选择集变化"时
+    // 由 SelectTool 重建。于是当选中图元的几何被改动（对齐/镜像/缩放/移动）时，选择集没变、
+    // 轮廓也就不会重建，画面里的虚线会停在变换前的位置。这里补一次通知，让视口按当前场景
+    // 重新离散轮廓；消费端 syncSelectionFromScene 是从场景全量重读的，重复调用无副作用。
+    if (!m_lastSelectedIds.empty())
+    {
+        emit selectionChanged();
+    }
+
     scheduleSceneUpdate();
 }
 

@@ -37,6 +37,20 @@
 
 #include "MachineProfile.h"
 
+#ifdef ENABLE_HARDWARE
+// 只前向声明，不包含 Hardware 头：本文件在 BUILD_HARDWARE=OFF 时同样要能编译，
+// 而前向声明足够让上层（加工作业服务）拿到带类型的接口指针。
+namespace Hw
+{
+    class IDevice;
+    class IMotionCard;
+    class IGalvoCard;
+    class ILaserSource;
+    class IIoModule;
+}
+#endif
+
+
 class DeviceHost : public QObject
 {
     Q_OBJECT
@@ -77,6 +91,43 @@ public:
 
     /// 最近一次评估中被违反的条件描述列表。
     QStringList safetyViolations() const;
+
+    /**
+     * @brief 手动推进一拍：推进模拟时钟 → 轮询 IO → 评估安全 → 按需发信号。
+     * @param elapsedMs 距上一拍的时长（毫秒）；<=0 时不推进模拟时钟，但仍会轮询与评估
+     *
+     * 公开而不是只有私有的定时器槽：单元测试里没有事件循环，QTimer 不会响，
+     * 而模拟设备的时间完全靠宿主推进。测试需要
+     * 「tick(50) → 断言状态」这条确定性路径，而不是 sleep 之后碰运气。
+     * 生产路径仍由 tick 定时器调用，两者走的是同一段代码。
+     */
+    void tick(qint64 elapsedMs);
+
+
+#ifdef ENABLE_HARDWARE
+    /**
+     * @name 已装配设备的接口出口
+     *
+     * 只在编入硬件支持时存在。返回的指针**归本类所有**，调用方不得 destroy，
+     * 也不得跨 stop() 缓存 —— stop() 之后一律失效（返回 nullptr）。
+     *
+     * 之所以把接口指针暴露出来而不是在 DeviceHost 上再包一层加工 API：
+     * 加工作业（loadPlan/startPlan/进度轮询）是一整套有状态的流程，
+     * 塞进装配层会让本类同时负责「装配」和「作业调度」两件事。
+     * 作业调度交给 ProcessingJobService，本类只回答「零件在哪」。
+     *
+     * 设备不具备某项能力时对应函数返回 nullptr，调用方必须判空 ——
+     * 振镜一体机没有 IMotionCard，运动卡机型没有 IGalvoCard，这是常态而非异常。
+     */
+    ///@{
+    Hw::IDevice* device() const;
+    Hw::IMotionCard* motionCard() const;
+    Hw::IGalvoCard* galvoCard() const;
+    Hw::ILaserSource* laserSource() const;
+    Hw::IIoModule* ioModule() const;
+    ///@}
+#endif
+
 
 public slots:
     /**

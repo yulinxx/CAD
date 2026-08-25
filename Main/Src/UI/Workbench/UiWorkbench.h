@@ -31,7 +31,7 @@ struct CommandUiSnapshot;
     #include <QShortcut>
     #include "UI3D/Service/ServicePack3D.h"    // 值成员需要完整定义
     #include "UI/MainWindow/MainWindow3D.h"    // unique_ptr 成员，MOC 需要完整类型
-    #include "UI/MenuManager/MenuManager3D.h"  // unique_ptr 成员，MOC 需要完整类型
+
 
 namespace Eg
 {
@@ -179,7 +179,11 @@ protected:
     UiStateSnapshot m_savedState;
     /// 共享 SettingsService singleton（app-level 共享，非每工作台私有）
     SettingsService* m_settingsService{ nullptr };
+    /// 当前挂载的工作台窗口（组合根绑定点：属性面板推送、菜单管理器访问）
+    /// 由各子类在 attachToWindow 中赋值；2D/3D 都需要，故提到基类
+    WorkbenchWindow* m_workbenchWindow{ nullptr };
 };
+
 
 // ============================================================
 /**
@@ -316,12 +320,16 @@ private:
     /// 网格显隐 metadata 连接（切换工作台时需断开，防止悬空视口指针回调）
     QMetaObject::Connection m_gridVisibilityMetadataConn;
 
-    /// 根据当前选中图元类型确定应切换到的工具栏上下文
-    ToolBarContext determineContextFromSelection() const;
-
-    /// 当前挂载的 2D 工作台窗口（组合根绑定点，用于向属性面板推送模型）
-    WorkbenchWindow* m_workbenchWindow{ nullptr };
+    /**
+     * @brief 由选择上下文快照推导应切换到的工具栏上下文。
+     *
+     * 入参而不是内部再去问 Hub：扇出链上所有消费者必须看同一份快照，
+     * 否则又回到「依赖 Hub 缓存是否已更新」的顺序耦合。
+     */
+    ToolBarContext determineContextFromSelection(const CommandUiSnapshot& snapshot) const;
 };
+
+
 
 #if BUILD_UI3D
 // ============================================================
@@ -353,6 +361,9 @@ public:
     void releaseCentralWidgetGLResources(QWidget* centralWidget) const override;
     bool requiresSkeletonDocks() const override;
     bool managesOwnMenus() const override;
+    /// 重新抓取 3D 快照并驱动全部命令 UI（中枢托管动作 + 配置化菜单栏）
+    void refreshCommandUiState() override;
+
 
     // 3D 工作台接管设置对话框，避免 CoreOperationRegistry 兜底弹出冗余提示
     bool showSettingsDialog(QWidget* parent) override;
@@ -371,7 +382,6 @@ private:
     void create3DServices();
     void setup3DViewportAndSignals(WorkbenchWindow& window);
     void setup3DMenuAndShortcuts(WorkbenchWindow& window);
-    void onMenuAction(int actionId, const QVariantMap& params);
     void create3DViewport(WorkbenchWindow& window);
     void bind3DRenderSignals(ServiceOwner& own);
     void bind3DCursorSignal();
@@ -406,7 +416,7 @@ private:
     ServicePack3D m_services3D{};
 
     std::unique_ptr<class MainWindow3D> m_mainWindow3D;
-    std::unique_ptr<class MenuManager3D> m_menuManager3D;
+
 
     /// 3D 状态栏 widget — 由 StatusBar3D 基类管理，通过 mountStatusBar 挂载到 WorkbenchWindow
     StatusBar3D* m_statusBar3D{ nullptr };

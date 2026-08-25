@@ -47,6 +47,14 @@ public:
     /// @param filler 填充回调；同 id 重复注册会覆盖
     void registerDynamicSection(const QString& sectionId, UiContextMenuSectionFiller filler);
 
+    /// 注销动态段提供者
+    /// 本服务是进程级单例，而 filler 闭包普遍捕获工作台裸指针。工作台
+    /// deactivate() 时必须注销，否则闭包会跨工作台存活：另一侧的 JSON 只要声明
+    /// 同名 dynamicSections，右键就会打进已失效的工作台对象。
+    /// @param sectionId 与注册时一致；未注册时静默返回
+    void unregisterDynamicSection(const QString& sectionId);
+
+
     /// 按配置构建右键菜单
     /// @param config 当前客户配置（通常取自 WorkbenchLayoutManager::configManager()）
     /// @param contextMenuId 菜单 ID，例如 "canvas.2d"

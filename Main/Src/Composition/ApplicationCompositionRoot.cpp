@@ -2,7 +2,9 @@
 #include "FileOperationRegistry.h"
 #include "CoreOperationRegistry.h"
 #include "PendingOperationRegistry.h"
+#include "LaserOperationRegistry.h"
 #include "DocumentPersistenceHelper.h"
+
 
 #include "UI2D/Operation/OperationRegistry.h"
 #include "UI2D/Operation/OperationRouting.h"
@@ -18,6 +20,8 @@
 
 #include "../Hardware/DeviceHost.h"
 #include "../Hardware/MachineProfile.h"
+#include "../Hardware/ProcessingJobService.h"
+
 
 #include "Common/AppInitializer.h"
 
@@ -95,18 +99,24 @@ private:
 #include "Export/Writers/StepExportWriter.h"
 #include "Export/Writers/NativeExportWriter.h"
 
+#include <QMessageBox>
 #include <QWidget>
 
 // 应用组合根组件，负责创建和组装所有核心服务
 // 作为依赖注入的中心点，管理UI层和命令系统的生命周期
 ApplicationCompositionRoot::~ApplicationCompositionRoot()
 {
+    // 加工服务先销毁：它的析构会把还在跑的作业 abort 掉，
+    // 而 abort 需要设备还活着。反过来先停设备，作业就无处可停了。
+    m_processingJobService.reset();
+
     // 硬件必须最先停：定时器停掉、设备 close（关光 + 输出置安全态）之后，
     // 其他服务才可以安全销毁。反过来的话，tick 里可能访问到已销毁的对象。
     if (m_deviceHost)
     {
         m_deviceHost->stop();
     }
+
 
     // 进程退出时，FillGeometryUpdater（Meyers 单例）的析构晚于本组合根，
     // 若不在 SceneEditService 仍存活时解绑，其析构会访问已销毁对象导致崩溃。
@@ -118,14 +128,16 @@ DeviceHost* ApplicationCompositionRoot::deviceHost()
     return m_deviceHost.get();
 }
 
+ProcessingJobService* ApplicationCompositionRoot::processingJobService()
+{
+    return m_processingJobService.get();
+}
+
+
 bool ApplicationCompositionRoot::startHardware(const QString& configDir, QString& warningOut)
 {
-    if (!m_deviceHost)
-    {
-        m_deviceHost = std::make_unique<DeviceHost>();
-    }
-
     QString loadWarning;
+
     const MachineProfile profile = MachineProfileLoader::loadOrFallback(configDir, loadWarning);
 
     QString startError;
@@ -183,7 +195,17 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     m_shellHost->setUiServices(uiServices);
     setupDialogServices();
     setupDirtyStateSync();
+
+    // 硬件宿主与加工服务必须在 registerAllOperations() **之前**创建。
+    // 硬件真正启动（startHardware）发生在应用启动流程的后段，
+    // 但注册进 OperationBus 的 lambda 捕获的是这两个对象的指针 ——
+    // 对象要先存在，指针才稳定。启动前它们只是「设备未就绪」状态，
+    // 加工命令会明确报「设备未启动」，而不是空指针。
+    m_deviceHost = std::make_unique<DeviceHost>();
+    m_processingJobService = std::make_unique<ProcessingJobService>(m_deviceHost.get());
+
     registerAllOperations();
+
 
     // 桥接 UndoRedoManager 观察者 → OperationBus::undoStateChanged
     // 当 SceneEditService 等绕过 OperationBus::run() 直接推入 undo 命令时，
@@ -429,10 +451,28 @@ void ApplicationCompositionRoot::registerAllOperations()
     m_fileOperationRegistry = std::make_unique<FileOperationRegistry>(fileConfig);
     m_fileOperationRegistry->registerAll();
 
+    // 加工操作（开始/暂停/停止/急停）
+    LaserOperationConfig laserConfig;
+    laserConfig.bus = m_operationBus.get();
+    laserConfig.deviceHost = m_deviceHost.get();
+    laserConfig.jobService = m_processingJobService.get();
+    laserConfig.sceneManager = m_sceneManager.get();
+    laserConfig.layerManager = m_layerManager.get();
+    laserConfig.errorReporter = [this](const QString& message) {
+        // 加工失败必须让操作员看见：只写日志的话，
+        // 现场表现是「按了开始加工什么都没发生」
+        QMessageBox::warning(m_shellHost ? m_shellHost->mainWindow() : nullptr,
+            QObject::tr("Processing"), message);
+    };
+
+    m_laserOperationRegistry = std::make_unique<LaserOperationRegistry>(laserConfig);
+    m_laserOperationRegistry->registerAll();
+
     // 占位操作（视图缩放等）由 PendingOperationRegistry 统一管理
     PendingOperationRegistry pendingOps(m_operationBus.get());
     pendingOps.registerAll();
 }
+
 
 AlgorithmRunner* ApplicationCompositionRoot::algorithmRunner()
 {

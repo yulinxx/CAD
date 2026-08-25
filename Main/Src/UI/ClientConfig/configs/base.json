@@ -11,13 +11,14 @@
       "visible": true,
       "workbenches": ["2D", "3D"],
       "items": [
-        { "type": "action", "id": "file.new", "label": "New", "command": "file.new", "icon": ":/ui/common/Icons/File/new.svg", "shortcut": "Ctrl+N", "workbenches": ["2D", "3D"] },
+        { "type": "action", "id": "file.new", "label": "New", "command": "file.new", "icon": ":/ui/common/Icons/File/new.svg", "shortcut": "Ctrl+N", "workbenches": ["2D"] },
+        { "type": "action", "id": "file.new_3d", "label": "New", "command": "file.new_scene", "icon": ":/ui/common/Icons/File/new.svg", "shortcut": "Ctrl+N", "workbenches": ["3D"] },
         { "type": "action", "id": "file.open", "label": "Open...", "command": "file.open", "icon": ":/ui/common/Icons/File/open.svg", "shortcut": "Ctrl+O", "workbenches": ["2D", "3D"] },
         { "type": "action", "id": "file.save", "label": "Save", "command": "file.save", "icon": ":/ui/common/Icons/File/save.svg", "shortcut": "Ctrl+S", "workbenches": ["2D", "3D"] },
         { "type": "action", "id": "file.save_as", "label": "Save As...", "command": "file.save_as", "icon": ":/ui/common/Icons/File/save_as.svg", "shortcut": "Ctrl+Shift+S", "workbenches": ["2D", "3D"] },
         { "type": "separator" },
         { "type": "submenu", "id": "file.recent", "label": "Recent Files", "icon": ":/ui/common/Icons/File/recent.svg", "workbenches": ["2D", "3D"], "items": [
-          { "type": "action", "id": "file.open_recent", "label": "Open Recent", "command": "file.open_recent", "workbenches": ["2D", "3D"] }
+          { "type": "action", "id": "file.open_recent", "label": "Open Recent", "command": "file.open_recent", "workbenches": ["2D"] }
         ] },
         { "type": "separator" },
         { "type": "submenu", "id": "file.import", "label": "Import", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D", "3D"], "items": [
@@ -60,24 +61,25 @@
         { "type": "separator" },
         { "type": "action", "id": "edit.select_all", "label": "Select All", "command": "edit.select_all", "icon": ":/ui/common/Icons/Actions/select_all.svg", "workbenches": ["2D", "3D"] },
         { "type": "action", "id": "edit.invert_selection", "label": "Invert Selection", "command": "edit.invert_selection", "icon": ":/ui/common/Icons/Actions/invert.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "edit.deselect", "label": "Clear Selection", "command": "edit.deselect", "icon": ":/ui/common/Icons/Actions/clear.svg", "workbenches": ["2D", "3D"] },
+        { "type": "action", "id": "edit.deselect", "label": "Clear Selection", "command": "edit.deselect", "icon": ":/ui/common/Icons/Actions/clear.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "edit.deselect_3d", "label": "Clear Selection", "command": "edit.clear_selection", "icon": ":/ui/common/Icons/Actions/clear.svg", "workbenches": ["3D"] },
         { "type": "separator" },
-        { "type": "action", "id": "edit.cut", "label": "Cut", "command": "edit.cut", "icon": ":/ui/common/Icons/Actions/cut.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "edit.copy", "label": "Copy", "command": "edit.copy", "icon": ":/ui/common/Icons/Actions/copy.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "edit.paste", "label": "Paste", "command": "edit.paste", "icon": ":/ui/common/Icons/Actions/paste.svg", "workbenches": ["2D", "3D"] },
+        { "type": "action", "id": "edit.cut", "label": "Cut", "command": "edit.cut", "icon": ":/ui/common/Icons/Actions/cut.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "edit.copy", "label": "Copy", "command": "edit.copy", "icon": ":/ui/common/Icons/Actions/copy.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "edit.paste", "label": "Paste", "command": "edit.paste", "icon": ":/ui/common/Icons/Actions/paste.svg", "workbenches": ["2D"] },
         { "type": "action", "id": "edit.paste_text", "label": "Paste as Text", "command": "edit.paste_text", "icon": ":/ui/common/Icons/Actions/paste.svg", "workbenches": ["2D"] },
         { "type": "action", "id": "edit.paste_image", "label": "Paste as Image", "command": "edit.paste_image", "icon": ":/ui/common/Icons/Actions/paste.svg", "workbenches": ["2D"] },
         { "type": "separator" },
         { "type": "action", "id": "edit.delete", "label": "Delete", "command": "edit.delete", "icon": ":/ui/common/Icons/Actions/delete.svg", "shortcut": "Delete", "workbenches": ["2D", "3D"] },
         { "type": "separator" },
         { "type": "submenu", "id": "edit.transform", "label": "Transform", "icon": ":/ui/common/Icons/Actions/move.svg", "workbenches": ["2D", "3D"], "items": [
-          { "type": "action", "id": "edit.move", "label": "Move", "command": "edit.move", "icon": ":/ui/common/Icons/Actions/move.svg", "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "edit.move", "label": "Move", "command": "edit.move", "icon": ":/ui/common/Icons/Actions/move.svg", "workbenches": ["2D"] },
           { "type": "action", "id": "edit.rotate_90cw", "label": "Rotate 90 CW", "command": "edit.rotate_90cw", "icon": ":/ui/common/Icons/Actions/rotate.svg", "workbenches": ["2D"] },
           { "type": "action", "id": "edit.rotate_90ccw", "label": "Rotate 90 CCW", "command": "edit.rotate_90ccw", "icon": ":/ui/common/Icons/Actions/rotate.svg", "workbenches": ["2D"] },
           { "type": "action", "id": "edit.rotate_180", "label": "Rotate 180", "command": "edit.rotate_180", "icon": ":/ui/common/Icons/Actions/rotate.svg", "workbenches": ["2D"] },
           { "type": "action", "id": "edit.mirror_horizontal", "label": "Mirror Horizontal", "command": "edit.mirror_horizontal", "icon": ":/ui/common/Icons/Actions/mirror_h.svg", "workbenches": ["2D"] },
           { "type": "action", "id": "edit.mirror_vertical", "label": "Mirror Vertical", "command": "edit.mirror_vertical", "icon": ":/ui/common/Icons/Actions/mirror_v.svg", "workbenches": ["2D"] },
-          { "type": "action", "id": "edit.scale", "label": "Scale", "command": "edit.scale", "icon": ":/ui/common/Icons/View3D/scale.svg", "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "edit.scale", "label": "Scale", "command": "edit.scale", "icon": ":/ui/common/Icons/View3D/scale.svg", "workbenches": ["2D"] },
           { "type": "action", "id": "edit.transform_translate", "label": "Translate", "command": "edit.transform_translate", "icon": ":/ui/common/Icons/Actions/move.svg", "workbenches": ["3D"] },
           { "type": "action", "id": "edit.transform_rotate", "label": "Rotate", "command": "edit.transform_rotate", "icon": ":/ui/common/Icons/Actions/rotate.svg", "workbenches": ["3D"] },
           { "type": "action", "id": "edit.transform_scale", "label": "Scale", "command": "edit.transform_scale", "icon": ":/ui/common/Icons/View3D/scale.svg", "workbenches": ["3D"] },
@@ -92,9 +94,7 @@
           { "type": "action", "id": "edit.align_center_v", "label": "Center Vertically", "command": "edit.align_center_v", "icon": ":/ui/common/Icons/Actions/align_center_v.svg", "workbenches": ["2D"] }
         ] },
         { "type": "action", "id": "edit.group", "label": "Group", "command": "edit.group", "icon": ":/ui/common/Icons/Actions/group.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "edit.group_3d", "label": "Group", "command": "edit.group", "icon": ":/ui/common/Icons/Actions/group.svg", "workbenches": ["3D"] },
         { "type": "action", "id": "edit.ungroup", "label": "Ungroup", "command": "edit.ungroup", "icon": ":/ui/common/Icons/Actions/ungroup.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "edit.ungroup_3d", "label": "Ungroup", "command": "edit.ungroup", "icon": ":/ui/common/Icons/Actions/ungroup.svg", "workbenches": ["3D"] },
         { "type": "separator" },
         { "type": "submenu", "id": "edit.path_operations", "label": "Path Operations", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"], "items": [
           { "type": "action", "id": "edit.offset", "label": "Offset...", "command": "edit.offset", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"] },
@@ -102,17 +102,7 @@
           { "type": "action", "id": "edit.boolean_intersection", "label": "Intersection", "command": "edit.boolean_intersection", "icon": ":/ui/common/Icons/Actions/boolean_intersection.svg", "workbenches": ["2D"] },
           { "type": "action", "id": "edit.boolean_difference", "label": "Difference", "command": "edit.boolean_difference", "icon": ":/ui/common/Icons/Actions/boolean_difference.svg", "workbenches": ["2D"] },
           { "type": "action", "id": "edit.boolean_xor", "label": "Xor", "command": "edit.boolean_xor", "icon": ":/ui/common/Icons/Actions/boolean_xor.svg", "workbenches": ["2D"] }
-        ] },
-        { "type": "separator" },
-        { "type": "submenu", "id": "edit.layer", "label": "Layer", "icon": ":/ui/common/Icons/View/layers.svg", "workbenches": ["2D"], "items": [
-          { "type": "action", "id": "edit.set_current_layer", "label": "Set Current Layer", "command": "edit.set_current_layer", "workbenches": ["2D"] },
-          { "type": "action", "id": "edit.move_to_layer", "label": "Move to Layer", "command": "edit.move_to_layer", "workbenches": ["2D"] },
-          { "type": "action", "id": "edit.get_bbox", "label": "Get Bounding Box", "command": "edit.get_bbox", "workbenches": ["2D"] },
-          { "type": "action", "id": "edit.random_generate", "label": "Random Generate", "command": "edit.random_generate", "workbenches": ["2D"] }
-        ] },
-        { "type": "separator" },
-        { "type": "action", "id": "edit.array", "label": "Array...", "command": "edit.array", "icon": ":/ui/common/Icons/Actions/array.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "edit.test", "label": "Test", "command": "edit.test", "icon": ":/ui/common/Icons/Actions/test.svg", "workbenches": ["2D"] }
+        ] }
       ]
     },
     {
@@ -122,10 +112,10 @@
       "workbenches": ["2D", "3D"],
       "items": [
         { "type": "submenu", "id": "view.zoom", "label": "Zoom", "icon": ":/ui/common/Icons/View/zoom_in.svg", "workbenches": ["2D", "3D"], "items": [
-          { "type": "action", "id": "view.zoom_in", "label": "Zoom In", "command": "view.zoom_in", "icon": ":/ui/common/Icons/View/zoom_in.svg", "shortcut": "Ctrl++", "workbenches": ["2D", "3D"] },
-          { "type": "action", "id": "view.zoom_out", "label": "Zoom Out", "command": "view.zoom_out", "icon": ":/ui/common/Icons/View/zoom_out.svg", "shortcut": "Ctrl+-", "workbenches": ["2D", "3D"] },
-          { "type": "action", "id": "view.zoom_fit", "label": "Zoom to Fit", "command": "view.zoom_fit", "icon": ":/ui/common/Icons/View3D/fit.svg", "shortcut": "Ctrl+F", "workbenches": ["2D", "3D"] },
-          { "type": "action", "id": "view.zoom_selection", "label": "Zoom to Selection", "command": "view.zoom_selection", "icon": ":/ui/common/Icons/View/zoom_selection.svg", "shortcut": "Ctrl+Shift+F", "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "view.zoom_in", "label": "Zoom In", "command": "view.zoom_in", "icon": ":/ui/common/Icons/View/zoom_in.svg", "shortcut": "Ctrl++", "workbenches": ["2D"] },
+          { "type": "action", "id": "view.zoom_out", "label": "Zoom Out", "command": "view.zoom_out", "icon": ":/ui/common/Icons/View/zoom_out.svg", "shortcut": "Ctrl+-", "workbenches": ["2D"] },
+          { "type": "action", "id": "view.zoom_fit", "label": "Zoom to Fit", "command": "view.zoom_fit", "icon": ":/ui/common/Icons/View3D/fit.svg", "shortcut": "Ctrl+F", "workbenches": ["2D"] },
+          { "type": "action", "id": "view.zoom_selection", "label": "Zoom to Selection", "command": "view.zoom_selection", "icon": ":/ui/common/Icons/View/zoom_selection.svg", "shortcut": "Ctrl+Shift+F", "workbenches": ["2D"] },
           { "type": "action", "id": "view.reset", "label": "Reset View", "command": "view.reset", "icon": ":/ui/common/Icons/View3D/reset.svg", "shortcut": "Ctrl+0", "workbenches": ["2D", "3D"] }
         ] },
         { "type": "action", "id": "view.pan", "label": "Pan", "command": "view.pan", "icon": ":/ui/common/Icons/View/pan.svg", "workbenches": ["2D"] },
@@ -143,10 +133,6 @@
         ] },
         { "type": "separator" },
         { "type": "action", "id": "view.layer_manager", "label": "Layer Manager...", "command": "view.layer_manager", "icon": ":/ui/common/Icons/View/layers.svg", "workbenches": ["2D"] },
-        { "type": "submenu", "id": "view.layer", "label": "Layer", "icon": ":/ui/common/Icons/View/layers.svg", "workbenches": ["2D"], "items": [
-          { "type": "action", "id": "view.new_layer", "label": "New Layer", "command": "view.new_layer", "icon": ":/ui/common/Icons/View/layer_new.svg", "workbenches": ["2D"] },
-          { "type": "action", "id": "view.delete_layer", "label": "Delete Layer", "command": "view.delete_layer", "icon": ":/ui/common/Icons/View/layer_delete.svg", "workbenches": ["2D"] }
-        ] },
         { "type": "separator" },
         { "type": "submenu", "id": "view.camera", "label": "Camera", "icon": ":/ui/common/Icons/View3D/camera.svg", "workbenches": ["3D"], "items": [
           { "type": "action", "id": "view.fit_all", "label": "Fit All", "command": "view.fit_all", "icon": ":/ui/common/Icons/View3D/fit.svg", "workbenches": ["3D"] },
@@ -163,9 +149,6 @@
         { "type": "submenu", "id": "view.display", "label": "Display", "icon": ":/ui/common/Icons/View3D/wireframe.svg", "workbenches": ["3D"], "items": [
           { "type": "action", "id": "view.wireframe", "label": "Wireframe", "command": "view.wireframe", "icon": ":/ui/common/Icons/View3D/wireframe.svg", "checkable": true, "workbenches": ["3D"] },
           { "type": "action", "id": "view.grid", "label": "Show Grid", "command": "view.grid", "icon": ":/ui/common/Icons/View3D/grid.svg", "checkable": true, "workbenches": ["3D"] },
-          { "type": "action", "id": "view.snap_enabled", "label": "Snap Enabled", "command": "view.snap_enabled", "icon": ":/ui/common/Icons/View/snap.svg", "checkable": true, "workbenches": ["3D"] },
-          { "type": "action", "id": "view.ortho_mode", "label": "Ortho Mode", "command": "view.ortho_mode", "icon": ":/ui/common/Icons/View/ortho.svg", "checkable": true, "workbenches": ["3D"] },
-          { "type": "action", "id": "view.angle_snap", "label": "Angle Snap", "command": "view.angle_snap", "icon": ":/ui/common/Icons/View/angle_snap.svg", "checkable": true, "workbenches": ["3D"] },
           { "type": "action", "id": "view.bbox", "label": "Show Bounding Box", "command": "view.bbox", "icon": ":/ui/common/Icons/View3D/bbox.svg", "checkable": true, "workbenches": ["3D"] },
           { "type": "action", "id": "view.floor", "label": "Show Floor", "command": "view.floor", "icon": ":/ui/common/Icons/View3D/floor.svg", "checkable": true, "workbenches": ["3D"] }
         ] },
@@ -226,37 +209,11 @@
       "visible": true,
       "workbenches": ["2D", "3D"],
       "items": [
-        { "type": "action", "id": "laser.connect", "label": "Connect", "command": "laser.connect", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "laser.disconnect", "label": "Disconnect", "command": "laser.disconnect", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "laser.home", "label": "Home", "command": "laser.home", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "laser.test_fire", "label": "Test Fire", "command": "laser.test_fire", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "laser.start_process", "label": "Start Process", "command": "laser.start_process", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "laser.pause_process", "label": "Pause Process", "command": "laser.pause_process", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "laser.stop_process", "label": "Stop Process", "command": "laser.stop_process", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "laser.material_db", "label": "Material Database", "command": "laser.material_db", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "laser.process_params", "label": "Process Parameters", "command": "laser.process_params", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "laser.emergency_stop", "label": "Emergency Stop", "command": "laser.emergency_stop", "icon": ":/ui/common/Icons/Actions/laser_emergency.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "laser.reset_safety", "label": "Reset Safety", "command": "laser.reset_safety", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "laser.self_check", "label": "Self Check", "command": "laser.self_check", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D", "3D"] }
-      ]
-    },
-    {
-      "id": "vision",
-      "label": "Vision",
-      "visible": true,
-      "workbenches": ["2D", "3D"],
-      "items": [
-        { "type": "action", "id": "vision.test_shape_detect", "label": "Test Shape Detect", "command": "vision.test_shape_detect", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "vision.test_barcode", "label": "Test Barcode", "command": "vision.test_barcode", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "vision.test_perspective", "label": "Test Perspective", "command": "vision.test_perspective", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "vision.test_enhance", "label": "Test Enhance", "command": "vision.test_enhance", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "vision.test_denoise", "label": "Test Denoise", "command": "vision.test_denoise", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "vision.test_sharpen", "label": "Test Sharpen", "command": "vision.test_sharpen", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "vision.test_video_capture", "label": "Test Video Capture", "command": "vision.test_video_capture", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "vision.test_camera_calibration", "label": "Test Camera Calibration", "command": "vision.test_camera_calibration", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "vision.test_image_stitch", "label": "Test Image Stitch", "command": "vision.test_image_stitch", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "vision.test_feature_match", "label": "Test Feature Match", "command": "vision.test_feature_match", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "vision.test_face_recognition", "label": "Test Face Recognition", "command": "vision.test_face_recognition", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["2D", "3D"] }
+        { "type": "action", "id": "laser.start_process", "label": "Start Process", "command": "laser.start_process", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "laser.pause_process", "label": "Pause Process", "command": "laser.pause_process", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "laser.stop_process", "label": "Stop Process", "command": "laser.stop_process", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D"] },
+        { "type": "separator" },
+        { "type": "action", "id": "laser.emergency_stop", "label": "Emergency Stop", "command": "laser.emergency_stop", "icon": ":/ui/common/Icons/Actions/laser_emergency.svg", "workbenches": ["2D"] }
       ]
     },
     {
@@ -299,52 +256,7 @@
       ]
     }
   ],
-  "toolbars": [
-    {
-      "id": "DrawToolBar",
-      "title": "Draw Tools",
-      "position": "left",
-      "workbench": "2D",
-      "items": [
-        { "type": "action", "id": "tool.select", "label": "Select", "command": "tool.select", "icon": ":/ui/common/Icons/Tools/select.svg" },
-        { "type": "action", "id": "tool.point", "label": "Point", "command": "tool.point", "icon": ":/ui/common/Icons/Tools/point.svg" },
-        { "type": "action", "id": "tool.line", "label": "Line", "command": "tool.line", "icon": ":/ui/common/Icons/Tools/line.svg" },
-        { "type": "action", "id": "tool.polyline", "label": "Polyline", "command": "tool.polyline", "icon": ":/ui/common/Icons/Tools/polyline.svg" },
-        { "type": "action", "id": "tool.rectangle", "label": "Rectangle", "command": "tool.rectangle", "icon": ":/ui/common/Icons/Tools/rectangle.svg" },
-        { "type": "action", "id": "tool.circle", "label": "Circle", "command": "tool.circle", "icon": ":/ui/common/Icons/Tools/circle.svg" },
-        { "type": "action", "id": "tool.arc", "label": "Arc", "command": "tool.arc", "icon": ":/ui/common/Icons/Tools/arc.svg" },
-        { "type": "action", "id": "tool.ellipse", "label": "Ellipse", "command": "tool.ellipse", "icon": ":/ui/common/Icons/Tools/ellipse.svg" },
-        { "type": "action", "id": "tool.text", "label": "Text", "command": "tool.text", "icon": ":/ui/common/Icons/Tools/text.svg" }
-      ]
-    },
-    {
-      "id": "TopToolBar",
-      "title": "Top Tools",
-      "position": "top",
-      "workbench": "global",
-      "items": [
-        { "type": "action", "id": "edit.undo", "label": "Undo", "command": "edit.undo", "icon": ":/ui/common/Icons/Actions/undo.svg", "shortcut": "Ctrl+Z" },
-        { "type": "action", "id": "edit.redo", "label": "Redo", "command": "edit.redo", "icon": ":/ui/common/Icons/Actions/redo.svg", "shortcut": "Ctrl+Y" },
-        { "type": "separator" },
-        { "type": "action", "id": "edit.cut", "label": "Cut", "command": "edit.cut", "icon": ":/ui/common/Icons/Actions/cut.svg" },
-        { "type": "action", "id": "edit.copy", "label": "Copy", "command": "edit.copy", "icon": ":/ui/common/Icons/Actions/copy.svg" },
-        { "type": "action", "id": "edit.paste", "label": "Paste", "command": "edit.paste", "icon": ":/ui/common/Icons/Actions/paste.svg" },
-        { "type": "action", "id": "edit.delete", "label": "Delete", "command": "edit.delete", "icon": ":/ui/common/Icons/Actions/delete.svg" }
-      ]
-    },
-    {
-      "id": "RightToolBar",
-      "title": "Right Tools",
-      "position": "right",
-      "workbench": "2D",
-      "items": [
-        { "type": "action", "id": "tool.qrcode", "label": "QR Code", "command": "tool.qrcode", "icon": ":/ui/common/Icons/Tools/qrcode.svg" },
-        { "type": "action", "id": "tool.bitmap", "label": "Bitmap", "command": "tool.bitmap", "icon": ":/ui/common/Icons/Tools/bitmap.svg" },
-        { "type": "action", "id": "algo.fill", "label": "Fill", "command": "algo.fill", "icon": ":/ui/common/Icons/Actions/algo_fill.svg" },
-        { "type": "action", "id": "algo.nesting", "label": "Nesting", "command": "algo.nesting", "icon": ":/ui/common/Icons/Actions/algo_nesting.svg" }
-      ]
-    }
-  ],
+  "toolbars": [],
   "docks": [
     { "id": "SceneDock", "title": "Scene", "position": "left", "widgetType": "SceneTreePanel", "visible": true },
     { "id": "PropertiesDock", "title": "Properties", "position": "right", "widgetType": "PropertiesPanel", "visible": true }

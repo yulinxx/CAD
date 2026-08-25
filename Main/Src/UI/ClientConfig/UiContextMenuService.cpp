@@ -66,6 +66,14 @@ void UiContextMenuService::registerDynamicSection(const QString& sectionId, UiCo
         qPrintable(sectionId));
 }
 
+void UiContextMenuService::unregisterDynamicSection(const QString& sectionId)
+{
+    if (m_sections.remove(sectionId) > 0)
+    {
+        SY_INFOF("[UiContextMenuService] Dynamic section unregistered: '%s'", qPrintable(sectionId));
+    }
+}
+
 bool UiContextMenuService::hasConfigFor(const UiConfigData* config, const QString& contextMenuId)
 {
     return findContextMenu(config, contextMenuId) != nullptr;

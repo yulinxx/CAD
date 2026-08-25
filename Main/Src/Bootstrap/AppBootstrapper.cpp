@@ -118,8 +118,11 @@ bool AppBootstrapper::initialize()
         {
             if (!hardwareWarning.isEmpty())
             {
-                SY_WARNF("[AppBootstrapper] Hardware started with warning: %s",
-                    hardwareWarning.toUtf8().constData());
+                // 这里不再把 hardwareWarning 原文打进日志：那是给界面看的中文文案，
+                // 落到控制台/现场日志文件里就是 mojibake。具体原因由 Hardware 侧
+                // 用英文各自记过一遍，这里只标记「带告警启动」。
+                SY_WARN("[AppBootstrapper] hardware started with a warning "
+                        "(see the [MachineProfile]/[DeviceHost] entries above for details)");
             }
         }
         else

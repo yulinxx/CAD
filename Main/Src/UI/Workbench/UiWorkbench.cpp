@@ -98,7 +98,6 @@
     #include "UI/StatusBar/StatusBar3D.h"
     #include "UI/Settings/SettingsService.h"
     #include "UI/MainWindow/MainWindow3D.h"
-    #include "UI/MenuManager/MenuManager3D.h"
     #include "UI/Algorithm/AlgorithmApplicationService.h"
 
     #include "Engine3D/SceneManager3D.h"
@@ -1157,10 +1156,14 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         m_services.stateCenter->setMetadata(meta);
     }
 
-    // 单击色块 → 若已选中图元则将其移动到该图层（可撤销），并设为当前图层
+    // 单击色块 → 若已选中未锁定图元则将其移动到该图层（可撤销），并设为当前图层
     QObject::connect(m_rightToolBar, &RightToolBar::sigLayerSelected, this, [this](int layerId) {
-        // 有选中图元时，把选中图元分配到点击的图层（LayerEditService 带 Undo）
-        if (m_services.selectionService && m_services.layerEditService)
+        // 「移动选中图元到图层」等价于 edit.move_to_layer，规则是 RequiresUnlockedSelection。
+        // 右侧色块是 QPushButton 而非 QAction，无法靠 enableRule 灰显，
+        // 因此在这里按同一份快照做前置判定 —— 否则点色块可以绕过锁定改动被锁图元。
+        // 注意：「设为当前图层」不受锁定影响，必须始终执行，故只 gate 前半段。
+        const bool selectionLocked = m_commandHub && m_commandHub->currentSnapshot().anyLocked();
+        if (!selectionLocked && m_services.selectionService && m_services.layerEditService)
         {
             std::vector<Eg::EntityId> selectedIds;
             m_services.selectionService->visitSelectedIds(&collectSelectedIds, &selectedIds);
@@ -1176,6 +1179,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         // 图层变更后刷新动作状态（撤销/重做可用性、锁定图层禁用态等）
         refreshCommandUiState();
     });
+
 
     // 双击色块 → 打开图层管理对话框（其中设置当前图层会通过 sigCurrentLayerChanged 同步回右侧色块）
     QObject::connect(m_rightToolBar, &RightToolBar::sigLayerDoubleClicked, this, [this](int /*layerId*/) {
@@ -1214,12 +1218,14 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     }
 }
 
-ToolBarContext Workbench2D::determineContextFromSelection() const
+ToolBarContext Workbench2D::determineContextFromSelection(const CommandUiSnapshot& snapshot) const
 {
-    // 直接复用命令中枢最近一次选择上下文快照中的类型直方图（typeMask），
-    // 不再二次遍历场景——刷新顺序保证 currentSnapshot() 反映本次选择变化，
-    // 与工具栏/菜单/右键菜单共用同一份类型事实，避免上下文漂移。
-    const uint32_t mask = m_commandHub->currentSnapshot().typeMask;
+    // 类型事实只有一处来源：命令中枢算好的 typeMask。
+    // 用入参而不是 m_commandHub->currentSnapshot()：这样本函数是纯函数，
+    // 不读任何成员状态，也就不会因为「Hub 缓存有没有更新」而算出
+    // 与工具栏 / 菜单 / 右键菜单不一致的上下文，顺带也不用判空 Hub。
+    const uint32_t mask = snapshot.typeMask;
+
 
     const bool text = (mask & static_cast<uint32_t>(SelectionTypeBit::Text)) != 0;
     const bool qr = (mask & static_cast<uint32_t>(SelectionTypeBit::Qr)) != 0;
@@ -1534,12 +1540,20 @@ void Workbench2D::onViewportContextMenu(QContextMenuEvent* event)
     // 图层等运行时内容通过 dynamicSections 插入，见下方注册的 "layer.actions"。
     if (QMenu* configured = buildConfiguredContextMenu(QStringLiteral("canvas.2d"), snapshot.hasSelection))
     {
+        // 配置化菜单的 QAction 是每次弹出新建的临时对象，不在中枢的动作表里，
+        // refreshActionStates / WorkbenchMenuManager::refreshCommandStates 都触达不到。
+        // 弹出前按同一份快照与同一份目录规则应用启用态，否则右键里的
+        // Cut / Copy / Delete / Paste 会在空选或选中锁定图元时仍是亮态，
+        // 与同名工具栏按钮的灰显状态直接矛盾。
+        CommandActionHub::applySnapshotToMenu(configured, snapshot);
+
         // 生命周期：dispatcher 是栈对象，必须保证菜单在本作用域内销毁完毕，
         // 不能用 deleteLater（事件循环稍后执行时 dispatcher 已失效）。
         configured->exec(event->globalPos());
         delete configured;
         return;
     }
+
 
     QMenu menu;
     m_commandHub->populateContextMenu(&menu, snapshot, m_services.layerManager);
@@ -1607,6 +1621,10 @@ void Workbench2D::refreshCommandUiState()
 
 void Workbench2D::applySelectionContext(const CommandUiSnapshot& snapshot)
 {
+    // 选择上下文的**唯一扇出点**：入参这份快照就是全部事实来源。
+    // 新增需要随选择/锁定联动的组件时，在这里加一次推送，组件自身只渲染、不判定；
+    // 反过来，这里任何一处再去问场景或问 Hub 缓存，都会把「规则漂移」放回来。
+
     // 属性面板：重建属性模型并同步锁定态（面板可缺失，内部已探测）
     refreshPropertiesPanel();
 
@@ -1617,9 +1635,19 @@ void Workbench2D::applySelectionContext(const CommandUiSnapshot& snapshot)
         m_statusBar2D->setSelectionInfo(n, tr("Selected: %1").arg(n));
     }
 
-    // 场景树右键菜单的启用态由面板在弹出时（SceneTreePanel2D::showContextMenu）
-    // 按自身 selectionModel 现场推导，不需要从这里推送快照——推送反而会因
-    // 「快照刷新 → 菜单弹出」之间的选择变化而过期。
+    // 场景树右键菜单：与视口右键菜单共用同一份 hasSelection / anyLocked 判定，消除规则漂移
+    if (m_scenePanel2D)
+    {
+        const bool lockStateChanged =
+            m_scenePanel2D->setCommandState(snapshot.hasSelection, snapshot.anyLocked());
+        // 树行的锁图标由 SceneTreeBuilder2D 在重建时绘制，而图元级 setLocked 不改变图元数量，
+        // onSceneTreeSceneChanged 的计数守卫会把它挡掉 —— 不补这一下，锁图标会滞后到下一次增删。
+        // 只在锁定态真的翻转时排一次去抖重建，避免每次选择变化都做 O(N) 重建。
+        if (lockStateChanged && m_sceneTreeRefreshTimer)
+        {
+            m_sceneTreeRefreshTimer->start();
+        }
+    }
 
     // 菜单栏：菜单项是独立于命令中枢创建的 QAction（config-driven 与 legacy 两条构建路径），
     // 中枢的 refreshActionStates 触达不到，故在此按同一份快照统一刷新启用态。
@@ -1631,17 +1659,17 @@ void Workbench2D::applySelectionContext(const CommandUiSnapshot& snapshot)
         }
     }
 
-
-    // 顶部工具栏上下文：按快照 typeMask 切换（Text/QR/Bitmap/Vector/Default）
+    // 顶部工具栏上下文：按同一份快照的 typeMask 切换（Text/QR/Bitmap/Vector/Default）
     if (m_contextManager)
     {
-        const ToolBarContext newCtx = determineContextFromSelection();
+        const ToolBarContext newCtx = determineContextFromSelection(snapshot);
         if (m_contextManager->currentContext() != newCtx)
         {
             m_contextManager->setCurrentContext(newCtx);
         }
     }
 }
+
 
 void Workbench2D::refreshPropertiesPanel()
 {
@@ -1681,8 +1709,14 @@ void Workbench2D::refreshPropertiesPanel()
     props->setPropertyModel(session->buildModel());
     // 同步锁定态：属性面板双击编辑与工具栏/右键菜单的禁用规则实时一致
     // （来自命令中枢最近一次选择上下文快照，单一事件总线驱动）
-    props->setLockState(m_commandHub->currentSnapshot().anyLocked());
+    // m_commandHub 在 deactivate() 里被 reset，而本函数可能由已投递的 QTimer::singleShot
+    // 回调（属性面板编辑 → sigPropertyEdited）在切换过程中被派发到，必须判空。
+    if (m_commandHub)
+    {
+        props->setLockState(m_commandHub->currentSnapshot().anyLocked());
+    }
 }
+
 
 void Workbench2D::activate()
 {
@@ -1712,7 +1746,29 @@ void Workbench2D::deactivate()
         m_gridVisibilityMetadataConn = {};
     }
 
+    // 断开长命对象到本工作台的所有连接。
+    // operationBus / layerManagerBridge 跨工作台存活，而 Workbench2D 实例被 UiShellHost
+    // 缓存复用、切换时不销毁 —— Qt 不会自动断开，attachToWindow 每次又重新 connect 一遍。
+    // 不断的后果不是崩溃而是叠加：N 次 2D↔3D 往返后，一次 2D 操作会触发 N 份场景树重建
+    // 与 N 份命令状态刷新。这些连接全部在 attach 期建立（含 UiStateBridge2D::install），
+    // 因此按"发送者 + 接收者"整体断开是安全的，下次 attach 会重新装。
+    if (m_services.operationBus)
+    {
+        QObject::disconnect(m_services.operationBus, nullptr, this, nullptr);
+    }
+    if (m_services.layerManagerBridge)
+    {
+        QObject::disconnect(m_services.layerManagerBridge, nullptr, this, nullptr);
+    }
+
+    // 注销右键菜单动态段：UiContextMenuService 是进程级单例，"layer.actions" 的闭包
+    // 捕获了本工作台的 this。不注销的话闭包会一直活着，另一侧工作台的 JSON 只要
+    // 声明同名 dynamicSections，右键就会打进已失效的 2D 工作台。
+    UiContextMenuService::instance().unregisterDynamicSection(QStringLiteral("layer.actions"));
+
+
     // 清除 ImportService 中持有的视口回调，防止切换后悬空指针
+
     // ImportService 生命周期长于工作台，不清理会导致 use-after-free
     if (m_services.importService)
     {
@@ -1755,7 +1811,25 @@ void Workbench2D::deactivate()
     m_lastSceneEntityCount = 0;
     // 场景树面板指针随窗口清理而失效
     m_scenePanel2D = nullptr;
+
+    // 场景监视器每次 attachToWindow 都会 new 一个（setupViewportServices），
+    // 若不在此销毁，往返切换 N 次后会有 N 个监视器同时 watch 同一场景，
+    // 一次场景变化触发 N 次 refreshCommandUiState（幂等但白做功，且随使用时长线性增长）。
+    if (m_sceneMonitor)
+    {
+        m_sceneMonitor->deleteLater();
+        m_sceneMonitor = nullptr;
+    }
+
+    // 工具栏上下文管理器持有的 setter/clearer lambda 捕获了已置空的 m_topToolBar；
+    // 同时上下文本身（如 TextEditing）不该跨工作台保留，否则回到 2D 时
+    // 工具栏会在旧上下文里重建。
+    if (m_contextManager)
+    {
+        m_contextManager->setCurrentContext(ToolBarContext::Default);
+    }
 }
+
 
 void Workbench2D::shutdown()
 {
@@ -1808,11 +1882,6 @@ void Workbench2D::releaseCentralWidgetGLResources(QWidget* centralWidget) const
     #include "UI/LeftToolBar/LeftToolBar3D.h"
     #include "UI/RightToolBar/RightToolBar3D.h"
 
-    #include "UI/MenuManager/MenuManager3D.h"
-    #include "UI/MenuManager/FileMenu3D.h"
-    #include "UI/MenuManager/EditMenu3D.h"
-    #include "UI/MenuManager/ViewMenu3D.h"
-    #include "UI/MenuManager/HelpMenu3D.h"
     #include "Engine3D/SceneManager3D.h"
     #include "Engine3D/Selection/SelectionManager3D.h"
     #include "Renderer3DFactory.h"
@@ -1907,7 +1976,7 @@ Workbench3D::~Workbench3D()
 // 内部拆分三个步骤：
 //   create3DServices()             — 创建所有 3D 服务并组装 ServicePack3D
 //   setup3DViewportAndSignals()    — 创建 MainWindow3D / Viewport3D / Renderer 并绑定信号
-//   setup3DMenuAndShortcuts()      — 创建 CommandActionHub3D / MenuManager3D / 快捷键
+//   setup3DMenuAndShortcuts()      — 创建 CommandActionHub3D / 工具栏 / 状态栏 / 快捷键
 void Workbench3D::build3DWorkbenchUi(WorkbenchWindow& window)
 {
     window.setSkeletonDocksVisible(false);
@@ -2335,6 +2404,28 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
         rt->show();
     }
 
+    // 配置化菜单栏的 QAction 不在中枢的 m_actions 里，refreshFromSnapshot 触达不到。
+    // 订阅中枢广播，用同一份 3D 快照 + CommandCatalog3D 规则外挂刷新菜单栏，
+    // 与 2D 侧 selectionContextChanged → refreshCommandStates 对等。
+    if (own.commandActionHub)
+    {
+        connect(own.commandActionHub.get(),
+
+            &CommandActionHub3D::commandUiSnapshotRefreshed,
+            this,
+            [this](const CommandUiSnapshot3D& snapshot) {
+                if (!m_workbenchWindow)
+                {
+                    return;
+                }
+                if (WorkbenchMenuManager* menus = m_workbenchWindow->menuManager())
+                {
+                    menus->refreshCommandStates3D(snapshot);
+                }
+            });
+    }
+
+
     // 6. 状态栏：创建独立的 StatusBar3D 并挂载到 WorkbenchWindow
     //    Workbench3D 拥有 StatusBar3D 的完整生命周期，不再从 MainWindow3D reparent
     //    MainWindow3D 保留自己的 StatusBar3D 供内部使用（如导航提示）
@@ -2521,33 +2612,22 @@ void Workbench3D::renameEntity3D(const QString& id, const QString& newName)
     }
 }
 
-void Workbench3D::onMenuAction(int actionId, const QVariantMap& params)
-{
-    Q_UNUSED(params);
-
-    const auto menuId = UI3D::fromCommonMenuId(actionId);
-
-    if (!m_services3D.operationBus)
-    {
-        return;
-    }
-
-    const auto operationId = CommandCatalog3D::operationForMenu(menuId);
-    if (operationId != OperationId3D::None)
-    {
-        m_services3D.operationBus->run(operationId);
-    }
-    else
-    {
-        SY_WARNF("[Workbench3D] No operation found for menu action id: %d", actionId);
-    }
-}
-
-// 3 — 附加到窗口，触发 UI 构建
 void Workbench3D::attachToWindow(WorkbenchWindow& window)
 {
+    m_workbenchWindow = &window;
     build3DWorkbenchUi(window);
 }
+
+void Workbench3D::refreshCommandUiState()
+{
+    // MainWindow3D 组装 3D 快照并推给中枢；中枢刷完托管动作后广播
+    // commandUiSnapshotRefreshed，由 attachToWindow 里挂的订阅刷新配置化菜单栏。
+    if (m_mainWindow3D)
+    {
+        m_mainWindow3D->refreshCommandUiState();
+    }
+}
+
 
 // 4 — 激活工作台，应用初始状态
 void Workbench3D::activate()
@@ -2605,19 +2685,20 @@ void Workbench3D::deactivate()
     if (m_services3D.renderWidget)
     {
         disconnect(m_services3D.renderWidget, nullptr, nullptr, nullptr);
-        m_services3D.sceneEditService->bindRenderWidget(nullptr);
+        // sceneEditService 与 renderWidget 是两个独立指针，不能靠外层判空推断它非空
+        if (m_services3D.sceneEditService)
+        {
+            m_services3D.sceneEditService->bindRenderWidget(nullptr);
+        }
         m_services3D.renderWidget = nullptr;
     }
+
 
     // 场景树面板随窗口销毁，清空引用避免悬空
     m_scenePanel3D = nullptr;
 
-    // 2) 先销毁 3D 菜单与主窗口包装对象。
-    //    这两个对象会持有大量 QAction / signal-slot / UI 状态引用，必须先于服务释放。
-    SY_INFO("[Workbench3D] Destroying MenuManager3D...");
-    m_menuManager3D.reset();
-    SY_INFO("[Workbench3D] MenuManager3D destroyed");
-
+    // 2) 先销毁 3D 主窗口包装对象。
+    //    它会持有大量 QAction / signal-slot / UI 状态引用，必须先于服务释放。
     SY_INFO("[Workbench3D] Destroying MainWindow3D...");
     m_mainWindow3D.reset();
     SY_INFO("[Workbench3D] MainWindow3D destroyed");

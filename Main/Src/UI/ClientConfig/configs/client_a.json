@@ -15,9 +15,6 @@
           { "type": "action", "id": "algo.fill", "label": "Fill", "command": "algo.fill", "icon": ":/ui/common/Icons/Actions/algo_fill.svg", "workbenches": ["2D"] },
           { "type": "action", "id": "algo.relief_engraving", "label": "Relief Engraving", "command": "algo.relief_engraving", "icon": ":/ui/common/Icons/Actions/algo_relief.svg", "workbenches": ["2D", "3D"] }
         ] },
-        { "type": "submenu", "id": "tools.measure", "label": "Measure", "icon": ":/ui/common/Icons/Actions/measure.svg", "workbenches": ["2D"], "items": [
-          { "type": "action", "id": "tool.measure", "label": "Measure", "command": "tool.measure", "icon": ":/ui/common/Icons/Actions/measure.svg", "workbenches": ["2D"] }
-        ] },
         { "type": "submenu", "id": "tools.theme", "label": "Theme", "icon": ":/ui/common/Icons/Help/theme.svg", "workbenches": ["2D", "3D"], "items": [
           { "type": "action", "id": "theme.light", "label": "Light", "command": "theme.light", "checkable": true, "workbenches": ["2D", "3D"] },
           { "type": "action", "id": "theme.dark", "label": "Dark", "command": "theme.dark", "checkable": true, "workbenches": ["2D", "3D"] }
@@ -25,19 +22,7 @@
       ]
     }
   ],
-  "toolbars": [
-    {
-      "id": "DrawToolBar",
-      "title": "Draw Tools",
-      "position": "left",
-      "workbench": "2D",
-      "items": [
-        { "type": "action", "id": "tool.select", "label": "Select", "command": "tool.select", "icon": ":/ui/common/Icons/Tools/select.svg" },
-        { "type": "action", "id": "tool.line", "label": "Line", "command": "tool.line", "icon": ":/ui/common/Icons/Tools/line.svg" },
-        { "type": "action", "id": "tool.rectangle", "label": "Rectangle", "command": "tool.rectangle", "icon": ":/ui/common/Icons/Tools/rectangle.svg" }
-      ]
-    }
-  ],
+  "toolbars": [],
   "shortcuts": [
     { "command": "edit.undo", "keys": "Ctrl+Z" },
     { "command": "edit.redo", "keys": "Ctrl+Y" },

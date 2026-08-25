@@ -54,8 +54,10 @@ namespace
         EXPECT_FALSE(p.safetyConditions.isEmpty());
     }
 
-    /// 急停点位不允许去抖：去抖是滤机械抖动的，安全信号不接受任何延迟。
-    TEST(MachineProfileTest, FallbackEmergencyStopPointHasNoDebounce)
+    /// 急停点位：不允许去抖（去抖是滤机械抖动的，安全信号不接受任何延迟），
+    /// 且极性必须是 activeLow —— 常闭接法下「高=正常、低=被按下」。
+    /// 极性写反会让模拟机一上电就判定「急停被按下」而永远无法开工。
+    TEST(MachineProfileTest, FallbackEmergencyStopPointPolarityAndDebounce)
     {
         const MachineProfile p = MachineProfileLoader::builtinSimulatedProfile();
 
@@ -66,10 +68,12 @@ namespace
             {
                 found = true;
                 EXPECT_EQ(0, pt.debounceMs);
+                EXPECT_TRUE(pt.activeLow);
             }
         }
         EXPECT_TRUE(found);
     }
+
 
     /// 找不到档案时回退，并且必须给出可展示的警告文案（不能静默把模拟当真机）。
     TEST(MachineProfileTest, MissingProfileFallsBackWithWarning)
@@ -273,7 +277,33 @@ namespace
         EXPECT_FALSE(host.canStartProcessing());
     }
 
+    /// 兜底档案装配起来之后必须**允许开工**。
+    /// 「开发机能完整跑通上层」是这份档案存在的唯一意义；
+    /// 若某个点位极性写反，这里会立刻抓到，而不是等到有人问「为什么开始加工是灰的」。
+    TEST(DeviceHostTest, BuiltinSimulatedProfileAllowsProcessingAfterDebounce)
+    {
+        DeviceHost host;
+        QString error;
+        ASSERT_TRUE(host.start(MachineProfileLoader::builtinSimulatedProfile(), error))
+            << error.toStdString();
+
+        // 第一拍之前裁决是 fail-safe 的 Blocked，必须先让安全评估跑一次
+        EXPECT_FALSE(host.canStartProcessing());
+
+        // 安全门点位 debounceMs = 20，IoPointMap::poll 要求电平稳定满该时长才采信：
+        // 第一拍（t=20）只登记 pending，第二拍（t=40）才认。
+        // 这里刻意分两步断言，正是为了把「一拍不够」这条时序事实钉在测试里 ——
+        // 否则日后有人把它并成一拍，失败原因会被误读成极性配错。
+        host.tick(20);
+        EXPECT_FALSE(host.canStartProcessing());
+        host.tick(20);
+        EXPECT_TRUE(host.canStartProcessing()) << host.safetyViolations().join(';').toStdString();
+
+        host.stop();
+    }
+
     /// 重复 start 必须被拒绝：静默重入会泄漏第一台设备且让 tick 驱动错乱。
+
     TEST(DeviceHostTest, SecondStartIsRejected)
     {
         const MachineProfile profile = MachineProfileLoader::builtinSimulatedProfile();

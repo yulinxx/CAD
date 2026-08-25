@@ -54,6 +54,14 @@ public:
     /// 当前选中的实体节点 ID 列表（不含群组）
     QStringList selectedIds() const;
 
+    /// 由命令中枢快照推入的启用判定输入（面板不自行遍历选择集，避免与工具栏/右键菜单规则漂移）
+    /// @param hasSelection 是否有选中项
+    /// @param anyLocked 选中项中是否存在锁定（实体锁或图层锁）
+    /// @return 锁定态是否发生变化 —— 树行的锁图标由 SceneTreeBuilder2D 在重建时绘制，
+    ///         调用方据此决定是否排一次树重建，避免锁图标滞后
+    bool setCommandState(bool hasSelection, bool anyLocked);
+
+
 signals:
     /// 用户在树中改变选择（ids 为选中的引擎图元 ID）
     void selectionChanged(const QStringList& ids);
@@ -85,4 +93,7 @@ private:
     SceneTreeTableModel2D* m_model{ nullptr };
     /// 程序化同步选中期间置位，抑制 selectionChanged 信号回环
     bool m_syncing{ false };
+    /// 命令启用判定输入（由 Workbench2D 从命令中枢快照推入）
+    bool m_hasSelection{ false };
+    bool m_anyLocked{ false };
 };

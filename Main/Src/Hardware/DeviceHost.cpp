@@ -211,6 +211,10 @@ struct DeviceHost::Impl
     QElapsedTimer clock;
     qint64 lastTickMs = 0;
 
+    /// 累加的时间基准（毫秒），供 IO 去抖与安全评估使用
+    qint64 nowMs = 0;
+
+
     MachineProfile profile;
     QString displayName;
 
@@ -439,7 +443,10 @@ void DeviceHost::stop()
     m_impl->lastFirstViolation.clear();
     m_impl->violations.clear();
     m_impl->lastDeviceState = -1;
+    m_impl->nowMs = 0;
+    m_impl->lastTickMs = 0;
 }
+
 
 bool DeviceHost::isRunning() const
 {
@@ -471,6 +478,31 @@ QStringList DeviceHost::safetyViolations() const
     return m_impl->violations;
 }
 
+Hw::IDevice* DeviceHost::device() const
+{
+    return m_impl->device;
+}
+
+Hw::IMotionCard* DeviceHost::motionCard() const
+{
+    return m_impl->motion;
+}
+
+Hw::IGalvoCard* DeviceHost::galvoCard() const
+{
+    return m_impl->galvo;
+}
+
+Hw::ILaserSource* DeviceHost::laserSource() const
+{
+    return m_impl->laser;
+}
+
+Hw::IIoModule* DeviceHost::ioModule() const
+{
+    return m_impl->io;
+}
+
 void DeviceHost::requestEmergencyStop()
 {
     if (!m_impl->device)
@@ -488,24 +520,39 @@ void DeviceHost::requestEmergencyStop()
 
 void DeviceHost::onTick()
 {
+    const qint64 now = m_impl->clock.elapsed();
+    const qint64 dt = now - m_impl->lastTickMs;
+    m_impl->lastTickMs = now;
+    tick(dt);
+}
+
+void DeviceHost::tick(qint64 elapsedMs)
+{
     if (!m_impl->device)
     {
         return;
     }
 
-    const qint64 now = m_impl->clock.elapsed();
-    const qint64 dt = now - m_impl->lastTickMs;
-    m_impl->lastTickMs = now;
-
-    // 模拟设备靠宿主推进时间；真机这里是 nullptr，自然跳过
-    if (m_impl->simClock && dt > 0)
+    if (elapsedMs > 0)
     {
-        m_impl->simClock->advance(dt);
+        // 时间基准用累加值而不是 QElapsedTimer：
+        // 手动推进（测试、无事件循环的宿主）与定时器驱动必须落在同一条时间轴上，
+        // 否则去抖窗口在两种驱动下的行为不同
+        m_impl->nowMs += elapsedMs;
+
+        // 模拟设备靠宿主推进时间；真机这里是 nullptr，自然跳过
+        if (m_impl->simClock)
+        {
+            m_impl->simClock->advance(elapsedMs);
+        }
     }
+
+    const qint64 now = m_impl->nowMs;
 
     // 顺序不能颠倒：evaluate 读的是上一次 poll 的结果
     m_impl->pointMap.poll(now);
     const Hw::SafetyVerdict verdict = m_impl->monitor.evaluate(now);
+
 
     const int32_t count = m_impl->monitor.violationCount();
     QStringList violations;
@@ -603,6 +650,12 @@ void DeviceHost::requestEmergencyStop()
 }
 
 void DeviceHost::onTick() {}
+
+void DeviceHost::tick(qint64 elapsedMs)
+{
+    Q_UNUSED(elapsedMs);
+}
+
 
 void DeviceHost::onDeviceEventQueued(int eventType, int channel, double value, const QString& message)
 {

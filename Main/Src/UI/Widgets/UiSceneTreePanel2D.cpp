@@ -586,13 +586,29 @@ void SceneTreePanel2D::onModelSelectionChanged()
     emit selectionChanged(selectedIds());
 }
 
+bool SceneTreePanel2D::setCommandState(bool hasSelection, bool anyLocked)
+{
+    const bool lockChanged = (m_anyLocked != anyLocked);
+    m_hasSelection = hasSelection;
+    m_anyLocked = anyLocked;
+    return lockChanged;
+}
+
+
 void SceneTreePanel2D::showContextMenu(const QPoint& pos)
 {
     if (!m_contextMenu || !m_view)
     {
         return;
     }
-    const bool hasSelection = !selectedIds().isEmpty();
+
+    // 启用判定的输入来自命令中枢快照（setCommandState 推入），与顶部工具栏/视口右键菜单
+    // 共用同一份 hasSelection / anyLocked 事实，避免"锁定图元在场景树仍可删除"的规则漂移。
+    // 语义对齐 CommandEnable2D：
+    //   Delete/Show/Hide → RequiresUnlockedSelection（锁定即禁用）
+    //   Lock/Unlock      → RequiresSelection（Unlock 必须在锁定时仍可用，否则无法解锁）
+    //   SelectAll/Clear  → Always
+    const bool unlockedSelection = m_hasSelection && !m_anyLocked;
     for (QAction* action : m_contextMenu->actions())
     {
         const QString name = action->objectName();
@@ -600,9 +616,13 @@ void SceneTreePanel2D::showContextMenu(const QPoint& pos)
         {
             action->setEnabled(true);
         }
+        else if (name == QStringLiteral("ctxLock") || name == QStringLiteral("ctxUnlock"))
+        {
+            action->setEnabled(m_hasSelection);
+        }
         else
         {
-            action->setEnabled(hasSelection);
+            action->setEnabled(unlockedSelection);
         }
     }
     m_contextMenu->exec(m_view->viewport()->mapToGlobal(pos));

@@ -692,22 +692,16 @@ void CoreOperationRegistry::registerEditOperations()
                     return;
                 }
 
-                std::vector<Eg::EntityId> pastedIds;
-                pastedIds.reserve(pasted.size());
-                for (const auto& e : pasted)
-                {
-                    if (e)
-                    {
-                        pastedIds.push_back(e->id);
-                    }
-                }
-
                 scene->clearSelection();
-                editService->addEntities(std::move(pasted), "Paste");
+                // 必须用 addEntities 的返回值：剪贴板克隆的 id 已清零，真正的 id 是入场时分配的。
+                // 早先这里沿用入参 id 去 findEntityById，命中的是**原图元**而不是副本 ——
+                // 于是副本没被选中、原件被选中，副本又因为渲染侧的"选中不提交主几何"规则
+                // 和轮廓覆盖层只画选择集，两头落空、彻底不可见。
+                const std::vector<Eg::EntityId> insertedIds = editService->addEntities(std::move(pasted), "Paste");
 
                 Eg::VecSyEntityPtr pastedEntities;
-                pastedEntities.reserve(pastedIds.size());
-                for (Eg::EntityId id : pastedIds)
+                pastedEntities.reserve(insertedIds.size());
+                for (Eg::EntityId id : insertedIds)
                 {
                     if (auto* ent = scene->findEntityById(id))
                     {

@@ -205,12 +205,12 @@ namespace MachineProfileLoader
         estop.name = QStringLiteral("safety.estop");
         estop.label = QStringLiteral("急停");
         estop.channel = 0;
-        // 急停按常闭（NC）接法：正常时回路通、电平为高；按下时断开、电平为低。
-        // 而本点位的语义电平 active 表示「急停被按下」（见下面 triggerOnActive=true），
-        // 因此必须 activeLow=true，把物理低电平映射成语义 active。
-        // 曾经这里写 false，于是模拟设备的默认高电平被直接读成「急停已按下」，
-        // 应用从第一个安全轮询周期起就恒处于急停态：canStartProcessing 永远为假，
-        // 且 SafetyMonitor 每 20ms 重新执行一遍急停动作，把日志刷满。
+
+        // 急停按常闭接法：**高电平 = 正常，低电平 = 被按下**，
+        // 所以「active（被按下）」对应低电平，activeLow 必须为 true。
+        // 写成 false 的后果是模拟机一上电就被判成「急停被按下」而永远无法开工 ——
+        // 而「开发机能跑模拟」恰恰是兜底档案存在的唯一意义。
+        // 这个极性必须与 SimulatedDevice 里 DI0 的约定一致（高=正常）。
         estop.activeLow = true;
         estop.debounceMs = 0;  // 安全信号不去抖
         profile.ioPoints.append(estop);
@@ -219,11 +219,13 @@ namespace MachineProfileLoader
         door.name = QStringLiteral("safety.door_closed");
         door.label = QStringLiteral("安全门");
         door.channel = 1;
-        // 安全门点位的语义 active 是「门已关」，常闭接法下正常（门关）即高电平，
-        // 与物理电平同相，故 activeLow=false。
+
+        // 门磁同样常闭（高=门已关），但这里点位的语义就是「active = 门已关」，
+        // 因此极性不翻转；「没关才是违规」由下面的 triggerOnActive=false 表达。
         door.activeLow = false;
         door.debounceMs = 20;
         profile.ioPoints.append(door);
+
 
         MachineSafetyConditionConfig estopCond;
         estopCond.pointName = estop.name;
@@ -253,7 +255,12 @@ namespace MachineProfileLoader
                 "未找到机器档案（%1 或 %2），已进入模拟设备模式：当前不会驱动任何真实硬件。")
                              .arg(QString::fromLatin1(kProfileEnvKey))
                              .arg(QDir(configDir).filePath(QString::fromLatin1(kProfileFileName)));
-            SY_WARNF("[MachineProfile] %s", warningOut.toUtf8().constData());
+            // 日志走英文：warningOut 是给界面看的中文提示，而日志会流向控制台与
+            // 现场日志文件，那里的编码不受我们控制，中文常出现 mojibake。
+            SY_WARNF("[MachineProfile] no machine profile found (env %s or file %s), "
+                     "falling back to simulated device mode: no real hardware will be driven",
+                kProfileEnvKey,
+                QDir(configDir).filePath(QString::fromLatin1(kProfileFileName)).toUtf8().constData());
             return builtinSimulatedProfile();
         }
 
