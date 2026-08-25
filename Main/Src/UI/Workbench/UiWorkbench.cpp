@@ -1617,11 +1617,9 @@ void Workbench2D::applySelectionContext(const CommandUiSnapshot& snapshot)
         m_statusBar2D->setSelectionInfo(n, tr("Selected: %1").arg(n));
     }
 
-    // 场景树右键菜单：与视口右键菜单共用同一份 hasSelection / anyLocked 判定，消除规则漂移
-    if (m_scenePanel2D)
-    {
-        m_scenePanel2D->setCommandState(snapshot.hasSelection, snapshot.anyLocked());
-    }
+    // 场景树右键菜单的启用态由面板在弹出时（SceneTreePanel2D::showContextMenu）
+    // 按自身 selectionModel 现场推导，不需要从这里推送快照——推送反而会因
+    // 「快照刷新 → 菜单弹出」之间的选择变化而过期。
 
     // 菜单栏：菜单项是独立于命令中枢创建的 QAction（config-driven 与 legacy 两条构建路径），
     // 中枢的 refreshActionStates 触达不到，故在此按同一份快照统一刷新启用态。

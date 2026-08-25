@@ -16,7 +16,8 @@
 #include "Persistence/Repositories/SettingsRepository.h"
 #include "UI/Settings/SettingsKeysCommon.h"
 
-#include "render/RenderTypes.h"
+// 渲染 DLL 的唯一公共头。这里只用它做后端名字符串化。
+#include "render/renderx.h"
 
 #include <QApplication>
 #include <QCoreApplication>
@@ -57,7 +58,8 @@ void AppInitializer::initialize()
     SyLogger::GetInstance().Initialize(MainApp::appName().c_str(), SyLogLevel::Debug, true, true);
 
     SY_INFOF("Starting %s v%s", MainApp::appName().c_str(), MainApp::appVersion().c_str());
-    SY_INFOF("[Render] Active render backend: %s", Render::backendName(Render::BackendType::OpenGL));
+    SY_INFOF("[Render] Active render backend: %s",
+             Render::RT::rxBackendName(Render::RT::Backend::OpenGL));
 
     CrashHandlerBootstrap::logPendingDumps();
 

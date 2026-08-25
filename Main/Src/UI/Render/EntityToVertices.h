@@ -11,7 +11,9 @@
  */
 #pragma once
 
-#include "render/RenderTypes.h"
+// 大写 Render/：应用层词汇表（顶点布局 / PrimitiveType / tess 参数），
+// 由 UI/Common/Include 提供，与渲染 DLL 的公共头无关。
+#include "Render/RenderTypes.h"
 #include <vector>
 
 namespace Eg

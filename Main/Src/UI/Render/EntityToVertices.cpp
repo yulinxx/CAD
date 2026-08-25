@@ -6,11 +6,9 @@
  * 改为消费 Engine 侧统一边界 emitEntityGeometry 输出的几何原语契约
  * （ISceneGeometrySink），由本地 IncrementalVertexSink 完成离散化。
  * 离散化公式与全量路径（render_c_api_frame.cpp 的 tessellate*）保持一致，
- * 统一参数来自 render/TessParams.h。
+ * 统一参数来自 Render::tess（UI/Common/Include/Render/RenderTypes.h）。
  */
 #include "EntityToVertices.h"
-
-#include "render/TessParams.h"
 
 #include "Engine2D/Geometry/EntityGeometryEmitter.h"
 #include "Engine/SyEntity/SyEntity.h"
@@ -22,7 +20,7 @@
 
 namespace
 {
-    // 离散化参数统一由 Render::tess 定义（见 render/TessParams.h），
+    // 离散化参数统一由 Render::tess 定义（UI/Common/Include/Render/RenderTypes.h），
     // 保证全量路径与增量路径结果一致
 
     // 颜色转换：Ut::Color → float[4]

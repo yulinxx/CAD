@@ -4,7 +4,7 @@
 #include <cmath>
 
 #include "Log/SyLogger.h"
-#include "render/RenderTypes.h"
+#include "Render/RenderTypes.h"
 
 namespace
 {

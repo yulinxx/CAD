@@ -2,7 +2,10 @@
 
 #include <QPointF>
 
-#include "render/RenderTypes.h"
+// 注意大写 Render/：这是应用层词汇表（UI/Common/Include/Render/RenderTypes.h），
+// 不是已删除的渲染 DLL 头。此前拼作 render/ 只在 macOS 大小写不敏感的
+// 文件系统上侥幸通过，Linux 上直接找不到文件。
+#include "Render/RenderTypes.h"
 
 /// 2D 正交相机 — 封装缩放、平移、视图矩阵计算
 ///

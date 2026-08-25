@@ -5,7 +5,6 @@
 #include "Engine3D/SceneManager3D.h"
 #include "Engine3D/SyEntity/SyMeshEntity.h"
 #include "Ut/BBox3.h"
-#include "render/render.h"
 
 #include <QApplication>
 #include <QDateTime>
@@ -83,59 +82,31 @@ namespace Ui
             return QImage();
         }
 
-        Render::RenderDevice* dev = w->renderDevice();
-        if (!dev)
+        // 读回必须发生在 EndFrame 之前，所以整个「渲染一帧 + 读像素」序列都在
+        // 控件内部完成（RenderWidget::captureFrameRGBA）。此前这里持有
+        // Render::RenderDevice* 自己调 renderReadPixels，是宿主唯一一处
+        // 直接握着渲染设备句柄的地方，也是渲染 DLL 无法独立替换的原因之一。
+        std::vector<uint8_t> rgba;
+        uint32_t width = 0;
+        uint32_t height = 0;
+        if (!w->captureFrameRGBA(rgba, width, height) || width == 0 || height == 0)
         {
             return QImage();
         }
 
-        // 计算目标分辨率
-        QSize targetSize = req.resolution;
-        if (targetSize.isEmpty())
+        // DLL 保证输出为 RGBA8、左上原点、逐行紧凑，因此这里既不翻转也不换序。
+        const QImage img(rgba.data(), static_cast<int>(width), static_cast<int>(height),
+            static_cast<qsizetype>(width) * 4, QImage::Format_RGBA8888);
+        QImage result = img.copy();  // 脱离 rgba 的生命周期
+
+        // 指定分辨率时按后备缓冲结果缩放。真正的「任意分辨率离屏重渲染」需要
+        // 渲染到纹理的 Surface，DLL 侧尚未提供，缩放是当前唯一诚实的做法。
+        const QSize targetSize = req.resolution;
+        if (!targetSize.isEmpty() && targetSize != result.size())
         {
-            targetSize = w->size() * w->devicePixelRatioF();
+            result = result.scaled(targetSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
         }
-
-        // 根据 framing 准备 view matrix
-        Render::Mat3f savedView = w->viewMatrix();
-        Render::Mat3f targetView = savedView;
-
-        if (req.framing == FramingKind::FitAll)
-        {
-            // TODO: 计算全场景包围盒并生成 fit 矩阵
-            // 需要场景管理器提供所有图元的 bbox
-        }
-        else if (req.framing == FramingKind::CustomBox)
-        {
-            // TODO: 用户自定义范围计算映射矩阵
-        }
-
-        // 应用目标视图矩阵（内部会自动同步 cameraCenter）
-        if (req.framing != FramingKind::UseCurrent)
-        {
-            renderSetView2D(dev, targetView.data, targetSize.width(), targetSize.height());
-        }
-
-        // 执行离屏捕获
-        std::vector<uint8_t> buf(targetSize.width() * targetSize.height() * 4);
-        uint32_t rowPitch = 0;
-        int ok = renderReadPixels(dev, 0, 0, targetSize.width(), targetSize.height(), buf.data(), &rowPitch);
-
-        // 恢复原视图矩阵（内部会自动同步 cameraCenter）
-        if (req.framing != FramingKind::UseCurrent)
-        {
-            renderSetView2D(dev, savedView.data, w->width(), w->height());
-        }
-
-        if (ok != 1)
-        {
-            return QImage();
-        }
-
-        // 转 QImage（GL 左下角原点 -> QImage 左上角原点，需翻转）
-        QImage img(buf.data(), targetSize.width(), targetSize.height(), rowPitch, QImage::Format_RGBA8888);
-        QImage flipped = img.mirrored(false, true);  // 垂直翻转
-        return flipped.copy();                       // 确保数据拥有权
+        return result;
     }
 
     QImage ViewCaptureService::capture3D(void* widget, const CaptureRequest& req)
