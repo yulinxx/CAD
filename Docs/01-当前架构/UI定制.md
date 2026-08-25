@@ -7,8 +7,18 @@
 
 - UI 边界 ≈ **配置 + 注册表 + 构建器**，不负责业务语义。
 - 业务语义入口唯一：`OperationBus::run(OperationId)`。
-- 菜单/工具栏的 **动态刷新**（工作台切换）仍由 C++ `WorkbenchMenuManager` 维护；
-  **静态骨架**（停靠面板布局）通过 JSON 配置化 —— 这是当前阶段的定制入口。
+- **配置驱动是唯一的 UI 构建路径**。菜单 / 工具栏 / 停靠面板 / 状态栏 / 右键菜单
+  全部由客户 JSON 生成，硬编码回退分支已删除。
+
+> **2026-08-25 起的重要变更（P0 收口）**
+>
+> 1. **客户 ID 改为运行时解析**：编译期宏 `SANYI_CLIENT_ID` 已废除。
+>    客户 ID 由 `UiClientContext` 在运行时解析，**一份二进制可服务多个客户**。
+> 2. **`SANYI_ENABLE_CONFIG_DRIVEN_UI` 已废弃**：配置驱动是唯一路径，
+>    `WorkbenchLayoutManager` 中的 `#ifdef` 与硬编码 Dock 骨架已删除。
+>    不要再新增该宏的分支。
+> 3. **状态栏、右键菜单、3D 菜单纳入同一套 JSON**：`MenuManager3D` 硬编码路径已移除。
+> 4. **License feature gating 已接线**：JSON 中的 `feature` 字段现在真正生效。
 
 ---
 
@@ -17,11 +27,15 @@
 ### 1.1 可以定制的
 | 维度 | 机制 | 示例 |
 |------|------|------|
-| 客户版本选择 | CMake 变量 `SANYI_CLIENT_ID` | `san_yi` / `client_a` / `client_b` |
-| 布局开关 | CMake 选项 `SANYI_ENABLE_CONFIG_DRIVEN_UI` | ON=JSON 驱动 Dock；OFF=硬编码骨架 |
+| 客户版本选择 | **运行时** `UiClientContext`（环境变量 / QSettings） | `san_yi` / `client_a` / `client_b` |
+| 顶层菜单 / 子菜单 | `configs/<client>.json` → `menus[]` | 增删/排序/改名/换图标 |
+| 工具栏 | `configs/<client>.json` → `toolbars[]` | 顶/左/右/底工具栏及其按钮 |
 | 停靠面板骨架 | `configs/<client>.json` → `docks[]` | 增删/换位 Scene/Properties |
-| 面板实现 | `UiPanelRegistry::registerPanel()` 工厂 | 注册自定义属性面板 |
-| 菜单/工具栏 | 仍在 C++，动态刷新 | `WorkbenchMenuManager` |
+| 状态栏槽位 | `configs/<client>.json` → `statusBar.items[]` | 客户标识 / 授权状态 / 自定义指示器 |
+| 右键菜单 | `configs/<client>.json` → `contextMenus[]` | 2D/3D 画布右键项及动态段插入位置 |
+| 快捷键 | `configs/<client>.json` → `shortcuts[]` | 覆盖默认键位 |
+| 面板 / 状态栏槽位实现 | `UiPanelRegistry::registerPanel()` 工厂 | 注册自定义属性面板、自定义指示器 |
+| **功能授权分级** | JSON `feature` 字段 + 注册码 `features` | 未授权项不出现 |
 | 图标资源 | `IconHelper` + 多主题覆盖集 `:/ui/common/Icons/*` | qrc 追加 / 皮肤覆盖集 / `setUserIconDirectory()` |
 | 回退策略 | `ConfigFallbackPolicy` | Strict / Fallback / Silent |
 
@@ -38,19 +52,27 @@
 
 ```
 Main/Src/UI/ClientConfig/
-├── UiClientConfigBase.h      数据结构（MenuDef / ToolBarDef / DockDef / ShortcutDef / UiConfigData）
+├── UiClientContext.h/.cpp    客户 ID 运行时唯一事实源（解析 + 缓存 + 资源路径回退）
+├── UiClientConfigBase.h      数据结构（MenuDef / ToolBarDef / DockDef / ShortcutDef /
+│                             StatusBarDef / StatusBarSlotDef / ContextMenuDef / UiConfigData）
 ├── UiConfigLoader.h/.cpp     JSON 解析 + extends 继承合并
-├── UiConfigurationManager.h/.cpp  加载器 + 面板注册表持有者 + 回退
-├── UiLayoutBuilder.h/.cpp    数据→Qt 控件构建器（Menu/ToolBar/Dock/Shortcut）
-├── UiPanelRegistry.h/.cpp    面板工厂注册表
+├── UiConfigurationManager.h/.cpp  加载器 + 回退；shared() 为进程级唯一配置源
+├── UiLayoutBuilder.h/.cpp    数据→Qt 控件构建器（Menu/ToolBar/Dock/Shortcut/StatusBar/ContextMenu）
+├── UiPanelRegistry.h/.cpp    面板与状态栏槽位工厂注册表
+├── UiBuiltinPanels.h/.cpp    内置面板/槽位工厂的唯一注册入口
+├── UiContextMenuService.h/.cpp  配置驱动右键菜单 + 动态段提供者注册
+├── UiFeatureGate.h/.cpp      功能授权闸门（License features → UI feature 字段）
 └── configs/
     ├── configs.qrc           Qt 资源：:/configs/*.json
-    ├── san_yi.json           标准版布局
     ├── base.json             公共基线（其它客户继承）
-    └── client_a.json         示例：extends base，新增左侧 dock
+    ├── san_yi.json           标准版布局
+    ├── client_a.json         示例：extends base，精简菜单/工具栏
+    └── client_b.json         示例：extends base，授权分级 + 状态栏/右键菜单定制
 ```
 
-> 菜单/工具栏的动态构建仍在 `Main/Src/UI/Workbench/WorkbenchMenuManager.cpp` 与 `UI/2D`、`UI/3D` 的 `CommandCatalog` 下。
+> 消费方：`WorkbenchMenuManager`（菜单+快捷键）、`WorkbenchLayoutManager`（工具栏+Dock+状态栏）、
+> `Workbench2D/3D::buildConfiguredContextMenu`（右键菜单）。三者都从
+> `UiConfigurationManager::shared()` 取同一份 `UiConfigData`。
 
 ---
 
@@ -58,18 +80,35 @@ Main/Src/UI/ClientConfig/
 
 ### 3.1 选择/新建一个客户版本
 
-在 `Main/CMakeLists.txt` 之上，编译期决定资源路径：
+**客户 ID 在运行时解析，不需要重新编译。** 解析优先级由高到低
+（`UiClientContext::resolveClientId`）：
 
-```cmake
-set(SANYI_CLIENT_ID "san_yi" CACHE STRING "Target UI client ID")   # ← 改这里
-option(SANYI_ENABLE_CONFIG_DRIVEN_UI "Enable config-driven UI layout" OFF)  # ON 才走 JSON Dock
+| 优先级 | 来源 | 用途 |
+|--------|------|------|
+| 1 | `UiClientContext::setClientIdOverride()` | 命令行 `--client=xxx`、单元测试 |
+| 2 | 环境变量 `SANYI_CLIENT_ID` | CI、现场临时切换排查 |
+| 3 | `QSettings` 键 `Client/Id` | 安装包部署时写入客户标识 |
+| 4 | 内置默认 `san_yi` | 兜底 |
+
+```powershell
+# 现场切换客户，无需重新编译
+$env:SANYI_CLIENT_ID = "client_b"; .\SanYiCAD.exe
 ```
 
-- `SANYI_CLIENT_ID` 用于拼资源路径 `:/configs/<client>.json`。
-- `SANYI_ENABLE_CONFIG_DRIVEN_UI=ON` 才会调用 `WorkbenchLayoutManager::buildDockAreasFromConfig()`。
-- 默认 OFF，保证基线构建行为不变；生产客户化时打开。
+CMake 侧只剩一个 `SANYI_DEFAULT_CLIENT_ID`，**仅用于安装包写入默认设置**，
+不再作为编译期宏影响代码分支：
 
-> **换客户不改代码，只改 `SANYI_CLIENT_ID` 然后重新CMake+编译。**
+```cmake
+set(SANYI_DEFAULT_CLIENT_ID "san_yi" CACHE STRING "Default UI client ID written to installer settings")
+```
+
+配置资源不存在时（客户 ID 拼错 / 配置未随包发布），
+`UiClientContext::configResourcePath()` 会打 WARN 并回退到 `san_yi.json` ——
+因为已无硬编码回退路径，加载失败会直接导致空窗口。
+
+> **换客户不改代码、不重编译，只改环境变量或安装包设置。**
+> 启动日志中 `[UiClientContext] Active client id='xxx' (source: yyy)` 是排查
+> 「客户配置为什么没生效」的第一现场。
 
 ### 3.2 编写/修改 JSON 布局
 
@@ -90,9 +129,13 @@ option(SANYI_ENABLE_CONFIG_DRIVEN_UI "Enable config-driven UI layout" OFF)  # ON
 可用字段（详见 `UiClientConfigBase.h`）：
 
 - `docks[].{id,title,position∈{left|right|top|bottom},widgetType,visible}`
-- `menus[].{id,label,items:[action|separator|submenu]}`
-- `toolBars[].{id,title,position∈{top|left|right|bottom},workbenchId,items}`
-- `shortcuts[].{commandId,keySequence}`
+- `menus[].{id,label,visible,workbenches[],items:[action|separator|submenu]}`
+- `toolbars[].{id,title,position∈{top|left|right|bottom},workbench,feature,items[]}`
+  （注意 JSON 键是小写 `toolbars`、`workbench`）
+- `shortcuts[].{command,keys}`
+- `statusBar.{visible,sizeGripEnabled,items[]}` — 见 §3.11
+- `contextMenus[].{id,workbench,feature,items[],dynamicSections[]}` — 见 §3.12
+- `feature` — 可挂在菜单项 / 工具栏 / 状态栏槽位 / 右键菜单上的授权门槛，见 §3.13
 - `themeStyle` — 主题标识或 QSS 路径
 
 **继承规则**（`UiConfigLoader::loadWithInheritance` + `mergeConfig`）：
@@ -104,17 +147,29 @@ option(SANYI_ENABLE_CONFIG_DRIVEN_UI "Enable config-driven UI layout" OFF)  # ON
 
 ### 3.3 注册/替换面板
 
-在 `WorkbenchLayoutManager::buildDockAreasFromConfig()` 注册内置面板工厂：
+内置面板与状态栏槽位的工厂**只在一个地方注册** ——
+`UiBuiltinPanels.cpp` 的 `registerBuiltinUiPanels(UiPanelRegistry&)`：
 
 ```cpp
-registry->registerPanel("SceneTreePanel", [](QWidget* p){ return new SceneTreePanel2D(p); });
-registry->registerPanel("PropertiesPanel", [](QWidget* p){ return new PropertiesPanelWidget(p); });
+// Main/Src/UI/ClientConfig/UiBuiltinPanels.cpp
+void registerBuiltinUiPanels(UiPanelRegistry& registry) {
+    registry.registerPanel("SceneTreePanel",   [](QWidget* p){ return new SceneTreePanel2D(p); });
+    registry.registerPanel("PropertiesPanel",  [](QWidget* p){ return new PropertiesPanelWidget(p); });
+    registry.registerPanel("ClientIndicator",  ...);   // 状态栏槽位
+    registry.registerPanel("LicenseIndicator", ...);
+    registry.registerPanel("Spacer",           ...);
+    registry.registerPanel("MessageLabel",     ...);
+}
 ```
+
+> **历史坑**：此前 `WorkbenchMenuManager` 与 `WorkbenchLayoutManager` 各自维护一份注册表，
+> 导致两边注册的 `widgetType` 集合会漂移。现已统一到本函数，**新增槽位/面板只改这一处**。
 
 定制面板：
 1. 编写 `MyCustomPanel : public QWidget`；
-2. `registerPanel("MyPanel", [](QWidget* p){ return new MyCustomPanel(p); });`；
-3. 在 JSON 的 `docks[].widgetType` 写 `"MyPanel"`。
+2. 在 `registerBuiltinUiPanels()`（或客户专属注册函数）里
+   `registry.registerPanel("MyPanel", [](QWidget* p){ return new MyCustomPanel(p); });`；
+3. 在 JSON 的 `docks[].widgetType`（或 `statusBar.items[].widgetType`）写 `"MyPanel"`。
 
 > 注意：`UiLayoutBuilder::buildDocks` 遇到 **未注册** `widgetType` 会降级为占位 `QWidget` 并 `SY_WARNF` 告警 —— 不会崩溃。
 
@@ -415,30 +470,173 @@ IconHelper::setUserIconDirectory("C:/myIcons");   // 传空串清除定制
 - `SceneManager` / `SceneEditService` 内部逻辑
 - 渲染契约
 
+### 3.11 状态栏配置（`statusBar`）
+
+状态栏不再硬编码，由 JSON 描述槽位序列，`WorkbenchLayoutManager::buildStatusBar()`
+调用 `UiLayoutBuilder::buildStatusBar()` 生成。
+
+```json
+"statusBar": {
+  "visible": true,
+  "sizeGripEnabled": true,
+  "items": [
+    { "id": "statusSpacer",     "widgetType": "Spacer",           "align": "left", "stretch": 1 },
+    { "id": "clientIndicator",  "widgetType": "ClientIndicator",  "align": "permanent" },
+    { "id": "licenseIndicator", "widgetType": "LicenseIndicator", "align": "permanent" }
+  ]
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `id` | 槽位标识，用于日志与继承覆盖 |
+| `widgetType` | 必须已在 `registerBuiltinUiPanels()` 注册（见 §3.3） |
+| `align` | `left`（默认）→ `QStatusBar::addWidget`；`permanent` / `right` → `addPermanentWidget` |
+| `stretch` | 拉伸因子，做占位弹簧时配 `Spacer` + `stretch: 1` |
+| `minimumWidth` | 最小宽度，避免文本抖动 |
+| `feature` | 授权门槛，见 §3.13 |
+| `workbenches` | 仅在指定工作台显示（如 `["2D"]`） |
+| `visible` | false 时不创建 |
+
+> **`align` 的实际差别**：`addWidget` 放的控件会被 `showMessage()` 的临时消息**覆盖**，
+> `addPermanentWidget` 不会。客户标识 / 授权状态这类常驻指示器必须用 `permanent`。
+>
+> **继承语义**：`statusBar` 是**整段替换**（只要子配置写了 `statusBar` 就完全覆盖父配置，
+> 不做逐槽位合并）。`StatusBarDef::declared` 用来区分「没写」和「写了空的」。
+
+> 实现注解：`StatusBarDef` 的成员叫 `items` 而**不是** `slots` ——
+> Qt 把 `slots` 定义成了空宏，用作结构体成员名会编译失败。
+
+### 3.12 右键菜单配置（`contextMenus`）与动态段
+
+```json
+"contextMenus": [
+  {
+    "id": "canvas.2d",
+    "workbench": "2D",
+    "items": [
+      { "type": "action", "id": "edit.cut",  "label": "Cut",  "command": "edit.cut" },
+      { "type": "separator" },
+      { "type": "action", "id": "view.layer_manager", "label": "Layer Manager", "command": "view.layer_manager" }
+    ],
+    "dynamicSections": ["layer.actions"]
+  }
+]
+```
+
+调用路径：
+
+```
+右键事件（Workbench2D::onViewportContextMenu / Workbench3D::on3DContextMenuRequested）
+  → buildConfiguredContextMenu("canvas.2d" | "canvas.3d", ...)
+      → UiContextMenuService::buildMenu(config, id, dispatcher, parent)
+          ├─ 按 items[] 生成静态项（走 UiLayoutBuilder::buildContextMenu）
+          └─ 按 dynamicSections[] 顺序追加动态段
+  → menu->exec(globalPos)  →  delete menu
+```
+
+**`dynamicSections` 解决什么问题**：右键菜单里有一部分内容取决于运行期数据
+（例如「设为当前图层」/「移动到图层…」子菜单要枚举 `LayerManager::getAllLayerIds()`），
+无法用静态 JSON 描述。做法是在 JSON 里**只声明插入位点的 id**，
+C++ 侧注册一个填充器：
+
+```cpp
+UiContextMenuService::instance().registerDynamicSection(
+    QStringLiteral("layer.actions"),
+    [this](QMenu* menu) {
+        CommandActionHub::populateLayerContextSection(menu, layerManager, hasSelection);
+    });
+```
+
+动态段按 `dynamicSections` 数组顺序、**追加在静态项之后**。
+未注册的 section id 会被跳过并告警，不会崩。
+
+> **生命周期陷阱**：`buildConfiguredContextMenu` 里的 `IUiCommandDispatcher`
+> 适配器是**栈对象**，因此弹出后必须在同一作用域内 `delete menu`，
+> **不能用 `deleteLater()`** —— 否则 dispatcher 已析构而菜单还在。
+
+> 尚未迁移的右键入口：`UiSceneTreePanel2D` 的场景树右键仍是硬编码。
+> 需要定制时按同样的 `contextMenus` + `dynamicSections` 模式迁移。
+
+### 3.13 功能授权分级（`feature`）
+
+`feature` 把「注册码买了什么」和「界面显示什么」连起来，
+链路为：注册码 `features` 字段 → `UiFeatureGate` → JSON `feature` 字段。
+
+写入侧（`CADApplicationRuntime.cpp`）：
+
+```
+License_GetInfo() 成功
+  → UiFeatureGate::instance().loadFromLicenseString(info.features)   // 逗号/分号/空白分隔
+授权校验被关闭，或 License_GetInfo 失败
+  → UiFeatureGate::instance().setUnrestricted(true)                  // 不做限制
+```
+
+读取侧（`UiLayoutBuilder`）：菜单项 / 整条工具栏 / 单个工具栏按钮 /
+状态栏槽位 / 整个右键菜单，共 5 处会先问 `UiFeatureGate::isAllowed(feature)`。
+
+```json
+{ "type": "action", "id": "algo.nesting", "command": "algo.nesting", "feature": "nesting" }
+```
+
+语义约定：
+
+- `feature` 为空 → 永远允许（绝大多数基础功能不写这个字段）。
+- 未授权项**根本不创建**，而不是创建后置灰 ——
+  客户不应该看见自己没买的功能入口。
+- `features` 里写 `*` 或 `all` → 不受限。
+- 匹配大小写不敏感。
+
+> 示例见 `configs/client_b.json`（`nesting` / `relief3d` / `vision` 三级授权）。
+
 ---
 
 ## 4. 运行期与回退
 
+配置驱动是唯一路径，**没有硬编码骨架兜底**，因此回退全部发生在「取哪份 JSON」这一层：
+
 ```
-SANYI_ENABLE_CONFIG_DRIVEN_UI=ON
-  → buildDockAreas() → buildDockAreasFromConfig()
-        ├─ UiConfigurationManager::applyConfiguration(:/configs/<client>.json, Strict)
-        │     ├─ 成功 → UiLayoutBuilder::buildDocks(docks)
-        │     └─ 失败 → 回退到 hard-coded SceneDock/PropertiesDock
-        └─ registerPanel 注册 SceneTreePanel / PropertiesPanel 工厂
+UiClientContext::clientId()                       // 覆盖 > 环境变量 > QSettings > san_yi
+  → UiClientContext::configResourcePath()
+        ├─ :/configs/<client>.json 存在 → 用它
+        └─ 不存在 → SY_WARN + 回退 :/configs/san_yi.json
+  → UiConfigurationManager::shared()              // 进程级唯一，ConfigFallbackPolicy::Fallback
+        ├─ 解析成功 → UiConfigData
+        └─ 解析失败 → 再回退 :/configs/san_yi.json
+  → 三个消费方共用同一份 UiConfigData：
+        ├─ WorkbenchMenuManager      菜单 + 快捷键
+        ├─ WorkbenchLayoutManager    工具栏 + Dock + 状态栏
+        └─ Workbench2D/3D            右键菜单
+  → Dock 构建彻底失败 → SY_ERROR，错误码 ui.dock_config_build_failed
 ```
 
-- 回退策略 `ConfigFallbackPolicy::Strict`：失败就返回 false → 执行硬编码骨架（当前代码默认）。
-- `Fallback`：失败时自动用 `:/configs/san_yi.json`。
-- `Silent`：失败则空配置。
+`ConfigFallbackPolicy`：
 
-> 开发调试时建议用 `Strict` 快速发现 JSON 错误；生产发布用 `Fallback` 提升健壮性。
+- `Strict` — 失败即失败（**开发调试用**，能第一时间暴露 JSON 错误）；
+- `Fallback` — 失败时用 `:/configs/san_yi.json`（**当前 `shared()` 采用**）；
+- `Silent` — 失败则空配置。
+
+> 关键日志（排查「客户配置为什么没生效」按这个顺序看）：
+> 1. `[UiClientContext] Active client id='xxx' (source: yyy)`
+> 2. `[UiClientContext]` 资源缺失告警
+> 3. `UiConfigLoader::lastError()` 对应的解析错误
+> 4. `ui.dock_config_build_failed`
+
+> **不要再新增 `#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI` 分支。**
+> 该宏留在 CMake 里仅为兼容旧脚本，代码里已无引用。
+> 历史教训：这个宏曾长期默认 OFF，而 ON 分支里的 `NullDispatcher`
+> 定义在 `buildDockAreasFromConfig()` 内部却被 `buildToolBars()` 引用 ——
+> 也就是说**开启后根本编译不过**，这正是「配置驱动代码写了却从没跑过」的根因。
 
 ---
 
 ## 5. 动态菜单与命令绑定（边界约定）
 
-菜单的 **动态部分** 由 `WorkbenchMenuManager` 在工作台切换时重建（`refreshXxxMenuForWorkbench()` 系列，2026-08-11 起**仅服务 2D**，对 3D 工作台早退，3D 菜单由 `MenuManager3D` 自理）：
+菜单的 **动态部分** 由 `WorkbenchMenuManager` 在工作台切换时重建
+（`refreshXxxMenuForWorkbench()` 系列）。2D / 3D 菜单现在走**同一套** JSON +
+命令目录路径，`MenuManager3D` 及其 5 个 Menu 子类的硬编码构建路径已移除，
+`Workbench3D::managesOwnMenus()` 恒返回 `false`。
+
 
 ```
 QAction::triggered
@@ -462,30 +660,50 @@ QAction::triggered
 ## 6. 流程速查（给后续开发人员）
 
 ### 6.1 目标：“客户 A 的右侧 panel 改成自定义面板”
-```bash
-1. 写 configs/client_a.json：docks[].widgetType = "MyPanel"
-2. Main/CMakeLists.txt: SANYI_CLIENT_ID=client_a, SANYI_ENABLE_CONFIG_DRIVEN_UI=ON
-3. WorkbenchLayoutManager::buildDockAreasFromConfig() 注册 registerPanel("MyPanel", ...)
-4. cmake --build ... --config Debug
+```
+1. UiBuiltinPanels.cpp 里 registry.registerPanel("MyPanel", ...)
+2. 写 configs/client_a.json：docks[].widgetType = "MyPanel"
+3. configs.qrc 加入 client_a.json（新客户才需要）
+4. cmake -S . -B build && cmake --build build --config Debug   ← 新增 .cpp 必须先 reconfigure
+5. 运行：$env:SANYI_CLIENT_ID = "client_a"; .\SanYiCAD.exe      ← 不改 CMake、不改客户宏
 ```
 
 ### 6.2 目标：“新增一个菜单命令”
 ```
-1. CommandCatalog.cpp 加 CommandEntry2D (kMenuOnly) + 命令字符串
+1. CommandCatalog.cpp 加 CommandEntry2D（surfaces 位掩码决定它出现在哪些面）
 2. OperationBus 注册 OperationId 实现
-3. （可选）WorkbenchMenuManager 动态刷菜单里加 action —— 多数命令已自动从 catalog 生成
+3. 在客户 JSON 的 menus[]/toolbars[]/contextMenus[] 里引用该 command
+```
+
+### 6.3 目标：“某个功能只卖给买了授权的客户”
+```
+1. 注册码 features 字段里加 "nesting"
+2. JSON 对应项加 "feature": "nesting"
+3. 未授权时该项不会被创建（不是置灰）
 ```
 
 ---
 
 ## 7. 常见问题
 
-- **QAction 没反应 / 不显示图标**：检查 `SANYI_ENABLE_CONFIG_DRIVEN_UI` 是否开、JSON `widgetType` 是否 `registerPanel` 注册过、图标路径是否以 `:/ui/common/`。
+- **QAction 没反应 / 不显示图标**：检查 JSON 的 `command` 是否在 `CommandCatalog` 注册过、
+  `widgetType` 是否在 `registerBuiltinUiPanels()` 注册过、图标路径是否以 `:/ui/common/` 开头。
+- **某个菜单项/按钮整个消失了**：先看它有没有 `feature` 字段 —— 未授权项是**不创建**的。
+  确认 `UiFeatureGate::licensedFeatures()` 里有没有对应条目。
+- **换了 `SANYI_CLIENT_ID` 环境变量但界面没变**：看启动日志
+  `[UiClientContext] Active client id=...`。若 source 不是 `env`，说明有更高优先级的
+  override 生效；若 id 对但界面没变，检查该 JSON 是否已加入 `configs.qrc`。
 - **JSON 修改后不生效**：资源通过 AUTORCC 编译进二进制，改 JSON 后需 **重新 CMake+编译**（不能单纯刷新运行）。
-- **布局快照还原覆盖标题**：`UiLayoutBuilder` 构建 Dock 会设置 `objectName`（如 `SceneDock`/`PropertiesDock`）；`restoreLayoutSnapshot()` 依赖 `_workbench_dock_title` 属性恢复标题，config-driven 路径已在 `buildDockAreasFromConfig()` 中通过 `setProperty` 兜底。
+- **新增了 .cpp 但没被编译**：本仓库用 `file(GLOB_RECURSE ... CONFIGURE_DEPENDS)`，
+  实测新增源文件后必须显式 `cmake -S . -B build` 重新配置，否则 `--build` 会“成功”但不编译新文件。
+- **布局快照还原覆盖标题**：`UiLayoutBuilder` 构建 Dock 会设置 `objectName`（如 `SceneDock`/`PropertiesDock`）；`restoreLayoutSnapshot()` 依赖 `_workbench_dock_title` 属性恢复标题，构建时已通过 `setProperty` 兜底。
+- **状态栏指示器被临时消息盖掉**：`align` 写成了 `left`，改成 `permanent`。
+- **右键菜单里的动态段没出现**：`dynamicSections` 声明的 id 与
+  `registerDynamicSection()` 注册的 id 不一致（区分大小写）。
 - **3D 菜单**：3D 命令来自 `CommandCatalog3D`，菜单构建受 `BUILD_UI3D` 宏保护，与上一节约定一致。
 - **System 主题不跟随系统切换**：检查日志中是否有 `[SystemThemeDetector]` 输出；macOS 需确保应用有辅助功能权限；Windows 需确保注册表路径正确；Linux 需确保 `gsettings` 命令可用。
 - **深色模式下文字看不清**：检查该控件是否使用了硬编码颜色（如 `#f0f0f0`、`color: red`），应替换为 `TM->colors()` 中的语义色。
+
 
 ---
 
@@ -529,8 +747,10 @@ Main/Src/UI/ClientConfig/configs/
 | L2 命令级 | 新增客户专属命令（复用现有业务能力） | `CommandCatalog` + `OperationBus` 注册 | 是（少量） |
 | L3 面板级 | 客户自定义面板 / 工具栏组 / 高级命令 | `UiPanelRegistry::registerPanel()` + 客户 JSON | 是（少量） |
 
-> 约定：L2 / L3 的 C++ 代码必须放在**客户专属目录**（如 `Main/Src/UI/ClientConfig/custom/<clientId>/`），
-> 用 CMake 按 `SANYI_CLIENT_ID` 条件编译，避免把客户逻辑混进公共代码。
+> 约定：L2 / L3 的 C++ 代码必须放在**客户专属目录**（如 `Main/Src/UI/ClientConfig/custom/<clientId>/`）。
+> **注意：客户 ID 已运行时化，不要再按客户条件编译。** 客户专属代码应全部编进同一份二进制，
+> 在注册阶段按 `UiClientContext::instance().clientId()` 判断是否注册自己的面板/命令，
+> 或直接用 `feature` 授权字段控制可见性 —— 这样才能保持「一份二进制服务全部客户」。
 
 ### 8.4 代码组织建议（数十客户规模）
 
@@ -540,68 +760,85 @@ Main/Src/UI/ClientConfig/
 │   ├── base.json
 │   ├── san_yi.json
 │   └── client_*.json
-├── custom/                     # 客户专属 C++（按客户分目录，条件编译）
+├── custom/                     # 客户专属 C++（按客户分目录，全部参与编译）
 │   ├── client_a/
 │   │   ├── ClientAPanels.cpp
 │   │   └── ClientACommands.cpp
 │   └── client_b/
+├── UiBuiltinPanels.h/.cpp      # 公共：内置面板/槽位工厂唯一注册入口
 └── UiConfigLoader.h/.cpp       # 公共：JSON 解析 + 继承合并（所有客户共享）
 ```
 
-CMake 侧（`Main/CMakeLists.txt`）：
+客户专属面板的注册方式（**运行时判断，不用条件编译**）：
 
-```cmake
-set(SANYI_CLIENT_ID "san_yi" CACHE STRING "Target UI client ID")
-# 只把当前客户的 custom 目录加入编译
-if(SANYI_CLIENT_ID STREQUAL "client_a")
-    target_sources(MyApp PRIVATE custom/client_a/ClientAPanels.cpp)
-endif()
+```cpp
+// UiBuiltinPanels.cpp 末尾，或客户自己的注册函数
+const QString clientId = UiClientContext::instance().clientId();
+if (clientId == QLatin1String("client_a")) {
+    registerClientAPanels(registry);   // 只影响注册表内容，不影响构建产物
+}
 ```
+
 
 ### 8.5 版本管理与发布
 
 - **配置校验**：为 JSON 写单元测试（加载 → 解析 → 字段完整性 → 命令 ID 是否在 CommandCatalog 中注册），
   未注册命令的菜单项在运行期自动禁用并 `SY_WARNF`，避免“菜单点了没反应”。
-- **回归策略**：`SANYI_ENABLE_CONFIG_DRIVEN_UI=OFF` 时基线功能不变；
-  `ON` 时每个客户配置都能正常加载；`ClientConfigTests` 全量通过。
-- **发布矩阵**：每个客户一个构建产物（`SANYI_CLIENT_ID` 不同），CI 按客户矩阵并行构建 + 冒烟测试。
+- **回归策略**：每个客户配置都能正常加载；`ClientConfigTests` 全量通过。
+- **发布矩阵**：**一份构建产物服务全部客户**。客户差异由运行期 `SANYI_CLIENT_ID`
+  环境变量 / `QSettings Client/Id` 决定，安装包写入默认值即可。
+  CI 只需构建一次，然后对每个客户 ID 起一次进程做冒烟测试。
 - **配置变更评审**：客户 JSON 的 `meta.version` 递增，diff 走代码评审，避免客户配置漂移。
 
 ### 8.6 现有框架适配性评估
 
-**结论：现有框架（JSON 配置驱动 + 命令目录 + 工作台过滤 + 面板工厂）基本适合多客户定制，**
-**但要做到“数十客户、纯配置化、低成本”，还需要补齐以下几点：**
+**结论：配置驱动 + 命令目录 + 工作台过滤 + 面板工厂 + 运行时客户 ID + 授权闸门，**
+**已能支撑「数十客户、纯配置化」的定制模式。剩余待补项如下：**
 
 | 现状 | 评估 | 建议 |
 |------|------|------|
-| JSON 配置驱动 + extends 继承 | ✅ 核心机制已具备 | 保持，强化配置校验测试 |
+| JSON 配置驱动 + extends 继承 | ✅ 唯一路径，硬编码分支已删 | 保持，强化配置校验测试 |
+| 客户 ID 运行时解析 | ✅ 已具备（`UiClientContext`） | 保持；不要再引入客户维度的条件编译 |
 | 命令目录统一（2D/3D） | ✅ 已具备 | 保持 |
 | 工作台过滤 | ✅ 已具备 | 保持 |
-| 面板工厂注册 | ✅ 已具备 | 保持 |
-| 客户专属 C++ 目录 | ❌ 尚无约定 | 新增 `custom/<clientId>/` 目录 + CMake 条件编译 |
-| 配置校验测试 | ⚠️ 部分 | 补充“命令 ID 注册检查”单测 |
-| 客户配置版本管理 | ⚠️ 无 | 增加 `meta.version` + 变更评审 |
+| 面板/槽位工厂注册 | ✅ 已收口到 `registerBuiltinUiPanels()` | 保持 |
+| 状态栏配置化 | ✅ 已具备（`statusBar.items[]`） | 保持 |
+| 右键菜单配置化 + 动态段 | ✅ 画布右键已迁移 | 场景树右键（`UiSceneTreePanel2D`）待迁移 |
+| License → UI 授权闸门 | ✅ 已接线（`UiFeatureGate`） | 补 `feature` 命名规范与授权矩阵文档 |
+| 客户专属 C++ 目录 | ❌ 尚无实体 | 新增 `custom/<clientId>/` 目录 + 运行期注册约定 |
+| 配置校验测试 | ⚠️ 部分 | 补“命令 ID 注册检查”“feature 拼写检查”单测 |
+| 客户配置版本管理 | ⚠️ 无迁移机制 | `meta.version` + 变更评审；后续补配置迁移 |
 | 3D 导出命令注册 | ❌ 缺失 | 补齐 CommandCatalog3D + FileOperations3D（见《菜单架构.md》12.2） |
-| 2D “All Supported” 语义 | ⚠️ 现映射 file.open（仅 .sy） | 建议新增 `File_ImportAll` 操作，真正聚合全部 2D 格式 |
+| 硬件接口抽象 | ❌ 缺失（P1） | 见《Docs/05-硬件与设备/》规划 |
+
 
 ### 8.7 让定制更便捷的落地清单
 
 1. 建立 `configs/` 客户 JSON 模板（含注释字段说明），新客户复制模板改差异。
-2. 建立 `custom/<clientId>/` 客户 C++ 目录约定，禁止在公共代码里写客户分支。
+2. 建立 `custom/<clientId>/` 客户 C++ 目录约定 + 运行期注册，禁止在公共代码里写客户分支。
 3. 提供“配置预览”工具（可选）：加载客户 JSON 后截图对比，减少人工回归。
-4. 把「新增客户」做成脚本化流程：`new_client.sh <id>` 生成 JSON + CMake 行 + 单测骨架。
-5. 所有客户共享同一套命令目录，客户差异只体现在配置层 —— 这是多客户可维护的关键。
+4. 把「新增客户」做成脚本化流程：`new_client.ps1 <id>` 生成 JSON + qrc 条目 + 单测骨架。
+5. 所有客户共享同一套命令目录与同一份二进制，客户差异只体现在配置层与授权层 ——
+   这是多客户可维护的关键。
 
 ---
 
 ## 9. 回归检查清单
 
-- [ ] `SANYI_ENABLE_CONFIG_DRIVEN_UI=OFF` 时基线功能不变；
-- [ ] `SANYI_ENABLE_CONFIG_DRIVEN_UI=ON` 时 `:/configs/san_yi.json` 能正常加载；
+- [ ] `:/configs/san_yi.json` / `client_a.json` / `client_b.json` 均能正常加载；
+- [ ] `SANYI_CLIENT_ID` 指向**不存在**的客户时，回退到 `san_yi.json` 且日志有 WARN，界面不空白；
+- [ ] 启动日志中 `[UiClientContext] Active client id=...` 与预期客户一致；
 - [ ] Dock 能从 JSON 构建，`m_panelState.sceneTreeDock/propertiesDock/leftDock/rightDock` 仍被正确填充（供 `WorkbenchWindow::sceneTreeDock()`/`setSkeletonDocksVisible()` 使用）；
+- [ ] 状态栏槽位按 JSON 生成，`permanent` 槽位不被 `showMessage()` 覆盖；
+- [ ] 切换工作台后状态栏槽位被正确清理重建，无残留、无重复；
+- [ ] 2D / 3D 画布右键菜单来自 `contextMenus`，图层动态段正常出现且能执行；
+- [ ] 未授权 `feature` 对应的菜单/工具栏/状态栏/右键项**不出现**；授权后出现；
+- [ ] 授权校验关闭时 `UiFeatureGate` 为 unrestricted，全部功能可见；
+- [ ] 语言切换（`retranslateUi`）后菜单重建正常，无重复菜单栏；
 - [ ] `ClientConfigTests` 全部通过；
 - [ ] 全量 `MainTests` 回归无新增失败；
 - [ ] **System 主题**：设置中选择 "System (Follow OS)" 后，切换系统深色/浅色模式时应用自动跟随切换；
 - [ ] **System 主题**：日志中可看到 `[SystemThemeDetector]` 和 `[ThemeManager]` 的主题切换记录；
 - [ ] **硬编码样式修复**：LicenseDialog、UiWorkbench、FillDialog 在深色模式下文字可读、背景协调；
 - [ ] **跨平台**：macOS / Windows / Linux 各平台 System 主题检测正常工作。
+

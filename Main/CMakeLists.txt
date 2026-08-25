@@ -162,6 +162,18 @@ if(BUILD_NESTING)
     target_link_libraries(${app_name} PRIVATE Nesting)
 endif()
 
+# 硬件抽象层：DeviceHost / MachineProfile 需要直接使用 Hw:: 接口装配设备。
+# 与 UI2D 用同一个 ENABLE_HARDWARE 宏名，保证两侧 #ifdef 分支一致。
+if(BUILD_HARDWARE)
+    target_compile_definitions(${app_name} PRIVATE ENABLE_HARDWARE)
+    target_include_directories(${app_name}
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include"
+    )
+    target_link_libraries(${app_name} PRIVATE Hardware)
+endif()
+
+
 if(BUILD_UI3D)
     target_link_libraries(${app_name} PRIVATE UI3D Engine3D)
     target_compile_definitions(${app_name} PRIVATE BUILD_UI3D=1)
@@ -460,6 +472,18 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
         target_compile_definitions(MainTests PRIVATE ENABLE_NESTING)
         target_link_libraries(MainTests PRIVATE Nesting)
     endif()
+
+    # 硬件抽象层：必须与应用目标用同一套宏，否则 DeviceHost.cpp 在两个目标里
+    # 编出来的是不同实现（一个真装配、一个空壳），测试就测不到真实行为。
+    if(BUILD_HARDWARE)
+        target_compile_definitions(MainTests PRIVATE ENABLE_HARDWARE)
+        target_include_directories(MainTests
+            PRIVATE
+                "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include"
+        )
+        target_link_libraries(MainTests PRIVATE Hardware)
+    endif()
+
 
     # 客户化 UI 配置（测试目标同样需要访问资源）
     # 客户 ID 在运行时解析，测试可通过 UiClientContext::setClientIdOverride() 指定

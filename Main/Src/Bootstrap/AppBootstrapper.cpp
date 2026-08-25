@@ -9,6 +9,9 @@
 #include "UI/Workbench/WorkbenchWindow.h"
 #include "UI/Services/UiFrameworkServices.h"
 
+#include "../Hardware/DeviceHost.h"
+
+
 namespace
 {
     // 构建框架服务集合，将应用根组件的服务注入到UI框架层
@@ -103,8 +106,32 @@ bool AppBootstrapper::initialize()
     }
 
     SY_INFO("[AppBootstrapper] ApplicationCompositionRoot initialized successfully");
+
+    // 硬件装配：读机器档案 → 创建设备 → open → 挂 IO 点位与安全条件 → 启动 tick。
+    // 刻意放在 UI 起来之前：安全联锁必须在用户能点「开始加工」之前就已经在评估，
+    // 而不是等界面加载完才开始判断。
+    // 也刻意不因失败而返回 false —— 没有机器同样要能画图、改工艺参数。
+    {
+        QString hardwareWarning;
+        const QString configDir = QString::fromStdWString(m_paths.configDir);
+        if (m_compositionRoot->startHardware(configDir, hardwareWarning))
+        {
+            if (!hardwareWarning.isEmpty())
+            {
+                SY_WARNF("[AppBootstrapper] Hardware started with warning: %s",
+                    hardwareWarning.toUtf8().constData());
+            }
+        }
+        else
+        {
+            SY_ERRORF("[AppBootstrapper] error code=bootstrap.hardware_start_failed message=%s",
+                hardwareWarning.toUtf8().constData());
+        }
+    }
+
     return true;
 }
+
 
 // 执行应用引导序列，组装UI服务并启动工作台
 void AppBootstrapper::bootstrap()
@@ -163,11 +190,18 @@ void AppBootstrapper::shutdown()
 
     if (m_compositionRoot)
     {
+        // 先停硬件：关光、停运动、输出置安全态。
+        // 「窗口已经关了但激光还在出光」是绝不能出现的状态。
+        if (auto* host = m_compositionRoot->deviceHost())
+        {
+            host->stop();
+        }
         if (auto* shell = m_compositionRoot->shellHost())
         {
             shell->shutdown();
         }
     }
+
 
     m_workbench.reset();
 

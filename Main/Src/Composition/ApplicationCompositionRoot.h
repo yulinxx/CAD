@@ -42,6 +42,10 @@ class AlgorithmRunner;
 class ViewportActionHub;
 class UnitManager;
 
+/// 硬件装配层。前向声明即可：DeviceHost 的头文件刻意不含任何 Hardware 类型，
+/// 但组合根也没必要为此多包含一层。
+class DeviceHost;
+
 namespace Ui
 {
     class ViewCaptureService;
@@ -190,6 +194,21 @@ public:
     /// 获取选择服务（阶段1收口：由组合根统一创建并经 UiServices 注入）
     ISelectionService* selectionService();
 
+    /// 获取硬件装配层。始终非空；未启动硬件时其 isRunning() 为 false。
+    DeviceHost* deviceHost();
+
+    /**
+     * @brief 读取机器档案并启动硬件。
+     * @param configDir  应用配置目录（用于定位 machine.json）
+     * @param warningOut 需要提示用户的说明（如「已进入模拟设备模式」或启动失败原因）
+     * @return 设备成功启动返回 true
+     *
+     * 失败**不应阻止应用启动**：没有机器也要能画图、能改工艺参数。
+     * 但失败必须可见 —— warningOut 里的文案设计成可以直接显示在状态栏/提示条上。
+     */
+    bool startHardware(const QString& configDir, QString& warningOut);
+
+
 private:
     // ---- 构造函数拆分（P5 结构性优化）----
     // 组装 UI 服务集合（RecentFileService + 图层桥接 + ShellHost 配置）
@@ -300,4 +319,7 @@ private:
 
     /// 文件操作注册表
     std::unique_ptr<FileOperationRegistry> m_fileOperationRegistry;
+
+    /// 硬件装配层（设备 + IO 点位 + 安全策略 + tick 驱动）
+    std::unique_ptr<DeviceHost> m_deviceHost;
 };

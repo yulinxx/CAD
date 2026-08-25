@@ -16,7 +16,11 @@
 
 #include "UI2D/Edit/QtLayerManagerBridge.h"
 
+#include "../Hardware/DeviceHost.h"
+#include "../Hardware/MachineProfile.h"
+
 #include "Common/AppInitializer.h"
+
 
 // UndoRedoManager → OperationBus 桥接观察者
 // 当 SceneEditService 等绕过 OperationBus::run() 直接推入 undo 命令时，
@@ -97,10 +101,46 @@ private:
 // 作为依赖注入的中心点，管理UI层和命令系统的生命周期
 ApplicationCompositionRoot::~ApplicationCompositionRoot()
 {
+    // 硬件必须最先停：定时器停掉、设备 close（关光 + 输出置安全态）之后，
+    // 其他服务才可以安全销毁。反过来的话，tick 里可能访问到已销毁的对象。
+    if (m_deviceHost)
+    {
+        m_deviceHost->stop();
+    }
+
     // 进程退出时，FillGeometryUpdater（Meyers 单例）的析构晚于本组合根，
     // 若不在 SceneEditService 仍存活时解绑，其析构会访问已销毁对象导致崩溃。
     Eg::FillGeometryUpdater::instance().detach();
 }
+
+DeviceHost* ApplicationCompositionRoot::deviceHost()
+{
+    return m_deviceHost.get();
+}
+
+bool ApplicationCompositionRoot::startHardware(const QString& configDir, QString& warningOut)
+{
+    if (!m_deviceHost)
+    {
+        m_deviceHost = std::make_unique<DeviceHost>();
+    }
+
+    QString loadWarning;
+    const MachineProfile profile = MachineProfileLoader::loadOrFallback(configDir, loadWarning);
+
+    QString startError;
+    if (!m_deviceHost->start(profile, startError))
+    {
+        warningOut = startError;
+        return false;
+    }
+
+    // 档案层的提示（例如「没有档案，已用模拟设备」）要继续往上传：
+    // 设备确实起来了，但用户必须知道起来的是模拟设备而不是真机
+    warningOut = loadWarning;
+    return true;
+}
+
 
 ISelectionService* ApplicationCompositionRoot::selectionService()
 {
