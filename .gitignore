@@ -87,6 +87,7 @@ CMakeUserPresets.json
 DerivedData/
 xcuserdata/
 *.swiftpm/
+.*/
 
 # ---- IDE: CLion / JetBrains ----
 .idea/
@@ -192,3 +193,4 @@ scripts/
 *.pfx
 .env
 .env.local
+.comate/plugins/软件开发团队/agents/qa-engineer.md
