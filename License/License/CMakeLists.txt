@@ -87,3 +87,12 @@ if(BUILD_LICENSE_TESTS)
 else()
     message(STATUS "  Tests: DISABLED")
 endif()
+
+message(STATUS "----------------------------------------")
+
+sanyi_export_imported_target(${LIB_NAME}
+    LIB_NAME "${LIB_NAME}"
+    PUBLIC_INCLUDE_DIRS
+        "${CMAKE_CURRENT_SOURCE_DIR}/Include"
+    INTERFACE_LINK_LIBRARIES
+)
