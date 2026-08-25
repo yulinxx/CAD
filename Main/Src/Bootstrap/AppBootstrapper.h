@@ -44,6 +44,8 @@ public:
 public:
     bool initialize();
     void bootstrap();
+
+    /// 关闭应用。幂等：显式调用与析构各会走一次，重复调用直接返回。
     void shutdown();
 
     ApplicationCompositionRoot* compositionRoot();
@@ -58,4 +60,9 @@ private:
     std::unique_ptr<ApplicationCompositionRoot> m_compositionRoot;
     std::unique_ptr<UiWorkbench> m_workbench;
     QString m_startWorkbenchId{ QStringLiteral("2D") };
+
+    /// shutdown 是否已执行过。关闭路径有两条（应用运行时的显式调用与本类析构），
+    /// 没有这个标记就会重复停设备、重复关 shell，日志里出现多轮
+    /// 「Starting shutdown / Shutdown complete」，真正那一次反而分不出来。
+    bool m_shutdownDone{ false };
 };

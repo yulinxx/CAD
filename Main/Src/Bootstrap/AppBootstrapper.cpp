@@ -183,9 +183,15 @@ void AppBootstrapper::bootstrap()
     SY_INFO("[AppBootstrapper] UI shell initialized and shown");
 }
 
-// 关闭应用，按顺序清理UI壳和工作台资源
+// 关闭应用，按顺序清理UI壳和工作台资源。幂等。
 void AppBootstrapper::shutdown()
 {
+    if (m_shutdownDone)
+    {
+        return;
+    }
+    m_shutdownDone = true;
+
     SY_INFO("[AppBootstrapper] Starting shutdown");
 
     if (m_compositionRoot)

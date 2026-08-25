@@ -205,7 +205,13 @@ namespace MachineProfileLoader
         estop.name = QStringLiteral("safety.estop");
         estop.label = QStringLiteral("急停");
         estop.channel = 0;
-        estop.activeLow = false;
+        // 急停按常闭（NC）接法：正常时回路通、电平为高；按下时断开、电平为低。
+        // 而本点位的语义电平 active 表示「急停被按下」（见下面 triggerOnActive=true），
+        // 因此必须 activeLow=true，把物理低电平映射成语义 active。
+        // 曾经这里写 false，于是模拟设备的默认高电平被直接读成「急停已按下」，
+        // 应用从第一个安全轮询周期起就恒处于急停态：canStartProcessing 永远为假，
+        // 且 SafetyMonitor 每 20ms 重新执行一遍急停动作，把日志刷满。
+        estop.activeLow = true;
         estop.debounceMs = 0;  // 安全信号不去抖
         profile.ioPoints.append(estop);
 
@@ -213,6 +219,8 @@ namespace MachineProfileLoader
         door.name = QStringLiteral("safety.door_closed");
         door.label = QStringLiteral("安全门");
         door.channel = 1;
+        // 安全门点位的语义 active 是「门已关」，常闭接法下正常（门关）即高电平，
+        // 与物理电平同相，故 activeLow=false。
         door.activeLow = false;
         door.debounceMs = 20;
         profile.ioPoints.append(door);

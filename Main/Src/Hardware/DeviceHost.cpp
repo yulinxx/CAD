@@ -418,6 +418,15 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
 
 void DeviceHost::stop()
 {
+    // 幂等：stop() 有多条调用路径（应用关闭流程、切换档案、析构），
+    // 且 AppBootstrapper 的显式 shutdown 与其析构都会走到这里。
+    // 没有 device 也没有定时器时直接返回，避免同一次关闭刷出多轮
+    // 「Stopping / Detached / clearPoints」日志，掩盖真正的一次停机。
+    if (!m_impl->device && !m_impl->timer.isActive())
+    {
+        return;
+    }
+
     m_impl->timer.stop();
     if (m_impl->device)
     {
@@ -470,9 +479,10 @@ void DeviceHost::requestEmergencyStop()
         return;
     }
     SY_ERRORF("[DeviceHost] Emergency stop requested by application");
-    // 走同一条执行器路径，保证「界面按的急停」与「安全条件触发的急停」
-    // 落到设备上的动作序列完全一致
-    m_impl->actuator.onEmergencyStop();
+    // 只走 triggerSoftwareEmergency：它内部已经立即调用同一个执行器
+    // （见 SafetyMonitor::triggerSoftwareEmergency 的注释）并置上闭锁。
+    // 这里再直接调一次 actuator.onEmergencyStop()，一次按下就会关光/停机两遍，
+    // 日志也翻倍。
     m_impl->monitor.triggerSoftwareEmergency("Emergency stop requested by application");
 }
 
