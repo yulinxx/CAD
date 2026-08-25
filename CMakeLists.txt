@@ -154,6 +154,14 @@ if(GTest_FOUND)
     else()
         option(BUILD_ENGRAVING_TESTS "Build Engraving unit tests" OFF)
     endif()
+    # 硬件抽象层（设备 HAL / IO 点位 / 安全策略）的测试。
+    # 默认 ON：这些测试全部跑在 SimulatedDevice 上，不需要任何真实硬件，
+    # 而 HAL 的回归价值恰恰在于「改了适配器不要破坏契约」。
+    if(BUILD_HARDWARE)
+        option(BUILD_HARDWARE_TESTS "Build Hardware unit tests" ON)
+    else()
+        option(BUILD_HARDWARE_TESTS "Build Hardware unit tests" OFF)
+    endif()
     
     enable_testing()
 else()
@@ -167,6 +175,7 @@ else()
     set(BUILD_FILEIO_TESTS OFF CACHE BOOL "Build FileIO unit tests" FORCE)
     set(BUILD_LICENSE_TESTS OFF CACHE BOOL "Build License unit tests" FORCE)
     set(BUILD_ENGRAVING_TESTS OFF CACHE BOOL "Build Engraving unit tests" FORCE)
+    set(BUILD_HARDWARE_TESTS OFF CACHE BOOL "Build Hardware unit tests" FORCE)
 endif()
 
 message(STATUS "")
