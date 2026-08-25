@@ -88,8 +88,13 @@ sequenceDiagram
 
 **关键点**
 1. 菜单「顺序 / 分组 / 文案」全部来自 JSON 配置，代码不重建菜单树。
-2. `SANYI_ENABLE_CONFIG_DRIVEN_UI=ON` 才走 Dock 配置路径；OFF 走硬编码骨架（默认）。
-3. `SANYI_CLIENT_ID` 决定加载哪个客户配置（`san_yi` / `client_a` / …），换客户只改编译变量。
+2. 配置驱动是**唯一**路径：菜单 / 工具栏 / Dock / 状态栏 / 右键菜单全部由 JSON 生成，
+   硬编码 Dock 骨架与 `SANYI_ENABLE_CONFIG_DRIVEN_UI` 宏已删除。
+3. 客户 ID 由 `UiClientContext` **运行时**解析
+   （override > `SANYI_CLIENT_ID` 环境变量 > `QSettings Client/Id` > `san_yi`），
+   换客户不需要重新编译，一份二进制服务全部客户。
+4. JSON 里带 `feature` 的项会先过 `UiFeatureGate`（注册码 `features` 授权），
+   未授权项**不创建**。
 
 ---
 
@@ -101,8 +106,8 @@ sequenceDiagram
 flowchart TD
     Start["应用启动 / 工作台切换"] --> Build["WorkbenchMenuManager::buildMenus()"]
     Build --> Rebuild["rebuildMenusFromConfig()"]
-    Rebuild --> Resolve["确定 clientId<br/>（SANYI_CLIENT_ID，缺省 san_yi）"]
-    Resolve --> Apply["UiConfigurationManager::applyConfiguration()<br/>加载 :/configs/&lt;clientId&gt;.json"]
+    Rebuild --> Resolve["确定 clientId<br/>（UiClientContext 运行时解析，缺省 san_yi）"]
+    Resolve --> Apply["UiConfigurationManager::shared()<br/>加载 :/configs/&lt;clientId&gt;.json"]
     Apply --> Inherit{"配置声明 extends ?"}
     Inherit -- "是（如 san_yi → base）" --> Parent["递归先加载父配置 base.json"]
     Parent --> Merge["按 id 合并：子覆盖父同名，新 id 追加"]
@@ -119,8 +124,10 @@ flowchart TD
 ```
 
 **关键点**
-- 若 `SANYI_ENABLE_CONFIG_DRIVEN_UI == OFF` 或 JSON 加载失败 → `buildLegacyMenus()` 作为回退（已标记 deprecated）。
+- 配置驱动是唯一路径。只有连 `san_yi.json` 都加载失败时才会退到
+  `buildLegacyMenus()`（已标记 deprecated 的静态兜底），正常运行不会走到。
 - 命令未注册的菜单项仍保留在菜单上（禁用态），避免结构与文档漂移。
+- 带 `feature` 且未授权的项**不创建**（与「禁用态」不同）。
 - 顶层菜单顺序固定：`File → Edit → View → Draw → Algorithm → Laser → Vision → Help`。
 
 ### 2.2 菜单点击逻辑（用户点击 → 执行）
@@ -156,8 +163,11 @@ flowchart TD
     Top --> Bind["UiLayoutBuilder 从 CommandCatalog<br/>填充 action（与菜单同源）"]
     Left --> Bind
     Right --> Bind
-    Bind --> Sync["工具栏按钮状态<br/>随 工具状态 / 文档状态 / 选择集 同步"]
+    Bind --> Install["UiStateBridge2D::install()<br/>attachToWindow 末尾集中挂载触发源"]
+    Install --> Sync["工具栏按钮启用态<br/>随 选择集 + 锁定态（图层锁/图元锁）<br/>+ 剪贴板 + 撤销栈 + 工具状态 同步"]
 ```
+
+按钮启用态不是各处自行判断，而是单点驱动：五路状态变化 → `Workbench2D::refreshCommandUiState()` → 命令 UI 快照 → `Cmd::evaluateEnableRule()`。完整链路见 `命令与状态流.md` 6.3。
 
 ### 3.2 顶部 / 右侧工具栏点击（命令型，一步到位）
 
@@ -170,6 +180,17 @@ flowchart LR
 ```
 
 > 顶部工具栏按钮「只做一件事」：触发一个命令；不直连几何内核、不直改文档、不直操渲染（见 `顶部工具栏架构定义.md`）。
+
+按钮**构建期**还有一段解析链（与上面的触发期链路区分）：
+
+```mermaid
+flowchart LR
+    Ctx["ToolBarContext 注册的 actionId<br/>如 edit.align_left"] --> Resolve["CommandCatalog::menuIdForCommandId()"]
+    Resolve --> Hub["TopToolBar::resolveHubAction()<br/>取 Hub 托管的同一个 QAction"]
+    Resolve -.解析落空.-> Fallback["createUnmanagedAction()<br/>占位项禁用 / 其余打告警"]
+```
+
+复用 Hub 的 QAction 是启用态联动的前提。一旦走到 `createUnmanagedAction()`，该按钮的 `enabled` 就固定为配置里的静态值，不再随选择/锁定变化 —— 这正是 6 个对齐按钮曾长期失效的机制。
 
 ### 3.3 左侧工具栏点击（绘图工具型，进入交互式流程）
 
@@ -473,10 +494,13 @@ flowchart LR
         ② OperationId.h 加 File_ImportFBX
         ③ FileOperationRegistry.cpp 注册 File_ImportFBX 处理器
 
-第 3 步：CMake 选择客户
-        cmake -DSANYI_CLIENT_ID=client_x ...
+第 3 步：把 client_x.json 加入 configs.qrc（新客户才需要）
+        然后 cmake -S . -B build && cmake --build build --config Debug
 
-第 4 步：CI 校验
+第 4 步：运行时切到该客户（不需要重新编译换客户）
+        $env:SANYI_CLIENT_ID = "client_x"; .\SanYiCAD.exe
+
+第 5 步：CI 校验
         validate_configs.py（命令 ID 检查）+ 快照回归
 ```
 

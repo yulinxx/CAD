@@ -31,7 +31,9 @@
 | `UICommon` | UI 公共能力 | 内部 C++ DLL |
 | `UI2D` | 2D 视图与交互 | 内部 C++ DLL |
 | `UI3D` | 3D 视图与交互 | 内部 C++ DLL |
-| `Nesting`、`Hardware`、`Network`、`Vision`、`Engraving`、`GeoModelCore`、`PythonHost` | 扩展模块 | 按各自模块边界控制 |
+| `Nesting` | 套料/排样 | C ABI（v2，`structSize` 前向兼容，见 [`套料算法.md`](../06-算法专题/套料算法.md) §8） |
+| `Hardware`、`Network`、`Vision`、`Engraving`、`GeoModelCore`、`PythonHost` | 扩展模块 | 按各自模块边界控制 |
+
 
 ---
 
