@@ -209,6 +209,10 @@ endif()
 
 if(MSVC)
     target_compile_options(${app_name} PRIVATE /utf-8 /FS)
+    # dbghelp：崩溃回调中符号化调用栈（CrashHandlerBootstrap.cpp）。
+    # 现场机器普遍没有 WinDbg/cdb，只留 .dmp 等于没有线索，
+    # 因此崩溃时直接把带函数名与行号的调用栈打到 stderr。
+    target_link_libraries(${app_name} PRIVATE dbghelp)
 endif()
 
 set(TRANSLATIONS_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Common/Translations")
@@ -458,6 +462,14 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             GTest::gtest_main
             GTest::gmock
     )
+
+    if(WIN32)
+        # MainTests 编译了全部 MAIN_APP_SOURCES，其中 CrashHandlerBootstrap.cpp 的
+        # printSymbolizedBacktrace 依赖 dbghelp。主程序在上面已单独链接，测试目标必须同步，
+        # 否则出现 LNK2019 __imp_SymInitialize。
+        target_link_libraries(MainTests PRIVATE dbghelp)
+    endif()
+
 
     if(BUILD_UI3D)
         target_link_libraries(MainTests PRIVATE Engine3D UI3D)

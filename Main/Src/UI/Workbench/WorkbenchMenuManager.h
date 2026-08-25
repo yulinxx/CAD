@@ -24,6 +24,11 @@ struct UiConfigData;
 struct MenuDispatcher;
 /// 命令 UI 状态快照（选择/锁定/剪贴板/撤销栈），定义在 UI2D 命令中枢
 struct CommandUiSnapshot;
+#if BUILD_UI3D
+/// 3D 命令 UI 状态快照，定义在 UI3D 命令中枢
+struct CommandUiSnapshot3D;
+#endif
+
 
 
 using WorkbenchFactory = std::function<UiWorkbench*(const QString& workbenchId)>;
@@ -49,6 +54,14 @@ public:
 
     void buildMenus();
     void buildThemeMenu();
+
+    /// 窗口级命令判定：这类命令刻意不进命令目录、不进命令总线，
+    /// 由 MenuDispatcher 直接短路到主窗口（工作台切换 / 主题 / 语言）。
+    ///
+    /// 公开在此是为了单点声明：契约测试要靠它区分「真的漏接线」与「刻意走窗口级路径」，
+    /// 否则测试里得再抄一份前缀名单，就成了第二处真相来源。
+    static bool isWindowLevelCommand(const QString& commandId);
+
     void bindMenuCommands();
     void bindShortcuts();
     void rebuildAllMenus();
@@ -68,6 +81,13 @@ public:
     ///   - 规则为 Always（恒可用，无需干预，也避免覆盖 setAllMenusEnabled 之类的全局置灰）
     void refreshCommandStates(const CommandUiSnapshot& snapshot);
 
+#if BUILD_UI3D
+    /// 3D 版本：规则来自 CommandCatalog3D（commandId → OperationId3D → 条目 → enableRule）。
+    /// 与 2D 共用 forEachCommandAction 遍历，但绝不共用目录 —— 2D 规则不得作用于 3D 菜单项。
+    void refreshCommandStates3D(const CommandUiSnapshot3D& snapshot);
+#endif
+
+
 
 
     /// 所属主窗口（供命令分发器转发工作台切换等窗口级动作）
@@ -77,6 +97,13 @@ public:
     }
     /// 通过菜单配置重建菜单（JSON 驱动）
     void rebuildMenusFromConfig();
+
+    /// 菜单/工具栏/右键菜单共用的命令分发器（本类持有生命周期）。
+    ///
+    /// 工具栏由 WorkbenchLayoutManager 构建，但绝不能自带一个空分发器 ——
+    /// 那会让工具栏按钮全部永久禁用。此处按需创建并同步当前工作台后返回。
+    IUiCommandDispatcher* commandDispatcher();
+
     /// 根据工作台和命令可用性过滤配置菜单，便于测试与复用
     static std::vector<MenuDef> filterMenusForWorkbench(const std::vector<MenuDef>& menus,
         const QString& workbenchId,

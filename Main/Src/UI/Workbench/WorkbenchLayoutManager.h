@@ -19,6 +19,7 @@ class SceneTreePanel2D;
 class PropertiesPanelWidget;
 class UiConfigurationManager;
 class UiPanelRegistry;
+class IUiCommandDispatcher;
 
 /// 面板状态：集中管理状态栏、工具栏与停靠面板指针
 /// 从 WorkbenchWindow::PanelState 提升为独立类型，供 WorkbenchLayoutManager 使用
@@ -51,9 +52,16 @@ public:
 
     // ==================== 骨架初始化 ====================
 
+    /// 设置工具栏动作使用的命令分发器（不持有生命周期）。
+    ///
+    /// 必须与菜单栏共用同一个分发器（WorkbenchMenuManager::commandDispatcher()），
+    /// 否则工具栏按下去无人响应；且必须在 buildToolBars() 之前注入 —— UiLayoutBuilder
+    /// 在构建期就按 isCommandRegistered() 一次性决定「连信号」还是「永久禁用」。
+    void setCommandDispatcher(IUiCommandDispatcher* dispatcher);
     /// 初始化工具栏骨架
     void initializeToolBarSkeleton();
     /// 构建工具栏（配置驱动，唯一路径）
+    /// 未注入命令分发器时不构建，等 setCommandDispatcher() 之后再调用一次
     void buildToolBars();
     /// 初始化停靠区骨架
     void initializeDockAreaSkeleton();
@@ -160,6 +168,8 @@ private:
     UiConfigurationManager* m_configManager{ nullptr };
     /// 面板工厂注册表（Dock 与状态栏槽位共用）
     std::unique_ptr<UiPanelRegistry> m_panelRegistry;
+    /// 工具栏动作的命令分发器：由 WorkbenchWindow 注入菜单侧的同一个实例，本类不拥有
+    IUiCommandDispatcher* m_commandDispatcher{ nullptr };
     /// 配置驱动布局是否已经构建，避免工具栏/Dock 重复加载
     bool m_configDrivenLayoutBuilt{ false };
     /// 当前工作台 ID，用于状态栏槽位的工作台过滤；空表示不过滤

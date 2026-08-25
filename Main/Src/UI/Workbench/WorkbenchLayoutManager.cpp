@@ -19,6 +19,7 @@
 #include <QDateTime>
 #include <QDockWidget>
 #include <QLabel>
+#include <QMenu>
 #include <QMenuBar>
 #include <QProgressBar>
 #include <QSettings>
@@ -29,11 +30,17 @@
 
 namespace
 {
-    /// 布局构建用的空命令分发器。
-    /// 工具栏/Dock 的构建只需要容器与控件，命令绑定由 WorkbenchMenuManager 侧的
-    /// MenuDispatcher 负责，因此这里给出一个不注册任何命令的实现。
+    /// Dock 构建用的空命令分发器。
+    /// Dock 只需要容器与面板控件，不含命令动作，因此给出一个不注册任何命令的实现。
     ///
-    /// 注意：必须放在文件作用域。历史实现把它定义在 buildDockAreasFromConfig() 内部，
+    /// 注意：工具栏**不能**用它。工具栏里全是命令动作，而 UiLayoutBuilder::bindAction
+    /// 在构建期就按 isCommandRegistered() 一次性决定「连 triggered 信号」还是
+    /// 「setEnabled(false) + commandUnavailable=true 永久禁用」。用空分发器构建工具栏，
+    /// 结果就是所有按钮永久变灰、启动日志刷屏 Unknown command id ——
+    /// 而且没有任何后续流程会回来重连（buildToolBars 有 m_configDrivenLayoutBuilt 幂等守卫，
+    /// refreshCommandStates 也只遍历菜单栏、并且会主动跳过 commandUnavailable 项）。
+    ///
+    /// 另外必须放在文件作用域。历史实现把它定义在 buildDockAreasFromConfig() 内部，
     /// 却在 buildToolBars() 里引用，导致配置驱动路径一旦启用就无法编译——
     /// 这也是该路径长期"写好但从未跑通"的直接原因。
     struct NullDispatcher final : public IUiCommandDispatcher
@@ -57,6 +64,11 @@ WorkbenchLayoutManager::~WorkbenchLayoutManager() = default;
 
 // ==================== 骨架初始化 ====================
 
+void WorkbenchLayoutManager::setCommandDispatcher(IUiCommandDispatcher* dispatcher)
+{
+    m_commandDispatcher = dispatcher;
+}
+
 void WorkbenchLayoutManager::initializeToolBarSkeleton()
 {
     // 骨架阶段只做容器准备，真正内容由统一入口填充。
@@ -79,6 +91,16 @@ void WorkbenchLayoutManager::buildToolBars()
         return;
     }
 
+    // 分发器尚未注入 → 推迟构建。
+    // 主窗口构造期（initializeToolBarSkeleton）还没有工作台，命令目录无从查询；
+    // 此时若硬着头皮构建，每个动作都会被判定为"命令未注册"而永久禁用。
+    // WorkbenchWindow::setWorkbench 注入分发器后会再调一次本函数。
+    if (!m_commandDispatcher)
+    {
+        SY_DEBUG("[WorkbenchLayoutManager] Toolbar build deferred: command dispatcher not injected yet");
+        return;
+    }
+
     const UiConfigData* config = m_configManager->configData();
     if (!config)
     {
@@ -86,9 +108,9 @@ void WorkbenchLayoutManager::buildToolBars()
         return;
     }
 
-    NullDispatcher dispatcher;
-    UiLayoutBuilder builder(m_parent, &dispatcher, m_panelRegistry.get());
+    UiLayoutBuilder builder(m_parent, m_commandDispatcher, m_panelRegistry.get());
     builder.buildToolBars(config->toolBars);
+
     for (QToolBar* tb : builder.builtToolBars())
     {
         if (tb)
@@ -336,14 +358,30 @@ void WorkbenchLayoutManager::clearLayoutContent()
     if (auto* mb = m_parent->menuBar())
     {
         const auto actions = mb->actions();
+        // QMenuBar::clear() 只摘掉顶层 QAction，菜单本体（QMenu 及其整棵子树）依然
+        // 作为 QMainWindow 的子对象存活。每切一次工作台就再堆一棵完整菜单树，
+        // 快捷键与 objectName 也会撞车。因此先记下各顶层 menu()，clear 后统一销毁。
+        QList<QMenu*> staleMenus;
         for (auto* act : actions)
         {
             if (act)
             {
+                if (QMenu* sub = act->menu())
+                {
+                    staleMenus.append(sub);
+                }
                 act->disconnect();
             }
         }
         mb->clear();
+        for (QMenu* sub : staleMenus)
+        {
+            // 本函数可能由菜单项自身的 triggered 回调触发（语言切换、工作台切换），
+            // 此时 QMenu 还在调用栈上，只能延后删除；同时脱离父对象，避免 findChild
+            // 在删除生效前捞到僵尸菜单。
+            sub->setParent(nullptr);
+            sub->deleteLater();
+        }
     }
 
     // 3: 清理所有停靠面板
@@ -356,6 +394,12 @@ void WorkbenchLayoutManager::clearLayoutContent()
 
     m_panelState.sceneTreeDock = nullptr;
     m_panelState.propertiesDock = nullptr;
+    // 骨架 Dock 指针必须一起置空：SceneDock / PropertiesDock 就在 m_registeredDocks 里，
+    // 上面的 delete 已经销毁了它们指向的对象。漏掉这两行的后果不是"少置一个空"，而是
+    // setSkeletonDocksVisible() 里的判空守卫失效（指针非空、对象已死）—— 切一次工作台就是一次 UAF。
+    m_panelState.leftDock = nullptr;
+    m_panelState.rightDock = nullptr;
+
 
     // 3.1: 清理配置驱动的状态栏槽位。
     // 容器（QStatusBar）保留，只回收槽位控件，否则工作台反复切换会堆积重复标签。

@@ -6,6 +6,10 @@
 #include "Manager/UnitManager/UnitSelectionMenu.h"
 #include "UI2D/Operation/CommandActionHub.h"
 #include "UI2D/Operation/CommandCatalog.h"
+#if BUILD_UI3D
+    #include "UI3D/Operation/CommandActionHub3D.h"
+#endif
+
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
 
@@ -38,6 +42,7 @@
 #include <QApplication>
 #include <QFileInfo>
 #include <QKeySequence>
+#include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QSet>
@@ -186,12 +191,13 @@ struct MenuDispatcher final : public IUiCommandDispatcher
 
     bool isCommandRegistered(const QString& commandId) const override
     {
-        if (isWorkbenchSwitchCommand(commandId) || isThemeCommand(commandId) || isLanguageCommand(commandId))
+        if (WorkbenchMenuManager::isWindowLevelCommand(commandId))
         {
             return true;
         }
         return workbench && workbench->isCommandRegistered(commandId);
     }
+
 
     void dispatch(const QString& commandId) override
     {
@@ -344,7 +350,23 @@ void WorkbenchMenuManager::rebuildAllMenus()
     clearGlobalShortcuts();
     if (auto* mb = m_window->menuBar())
     {
+        // 同 WorkbenchLayoutManager::clearLayoutContent：clear() 不销毁 QMenu 本体，
+        // 必须显式回收，否则每次重建（切工作台/切语言/重载客户配置）都泄漏一棵菜单树。
+        QList<QMenu*> staleMenus;
+        for (QAction* act : mb->actions())
+        {
+            if (act && act->menu())
+            {
+                staleMenus.append(act->menu());
+            }
+        }
         mb->clear();
+        for (QMenu* sub : staleMenus)
+        {
+            // 重建常由菜单项自身的 triggered 触发，QMenu 仍在调用栈上 —— 延后删除。
+            sub->setParent(nullptr);
+            sub->deleteLater();
+        }
     }
     m_menuState = {};
 
@@ -364,6 +386,27 @@ void WorkbenchMenuManager::rebuildAllMenus()
     }
 }
 
+
+bool WorkbenchMenuManager::isWindowLevelCommand(const QString& commandId)
+{
+    // 唯一真相：MenuDispatcher 短路处理的命令集合。改这里即同时改变
+    // 「按钮是否可点」（isCommandRegistered）与「契约测试是否放行」两处行为。
+    return MenuDispatcher::isWorkbenchSwitchCommand(commandId) || MenuDispatcher::isThemeCommand(commandId)
+        || MenuDispatcher::isLanguageCommand(commandId);
+}
+
+IUiCommandDispatcher* WorkbenchMenuManager::commandDispatcher()
+{
+    if (!m_dispatcher)
+    {
+        m_dispatcher = std::make_unique<MenuDispatcher>();
+        m_dispatcher->self = this;
+    }
+    // 每次取用都同步工作台：菜单/工具栏的构建时机早于 setWorkbench 的场景是常态，
+    // 而 isCommandRegistered() 要靠当前工作台的命令目录才能给出正确答案。
+    m_dispatcher->workbench = m_workbench;
+    return m_dispatcher.get();
+}
 
 void WorkbenchMenuManager::rebuildMenusFromConfig()
 {
@@ -395,13 +438,8 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
 
     // 命令分发器随 WorkbenchMenuManager 生命周期持有（成员 m_dispatcher）：
     // UiLayoutBuilder 会把该指针存入 QAction 触发回调并长期解引用，必须保证指针在菜单存在期间有效。
-    if (!m_dispatcher)
-    {
-        m_dispatcher = std::make_unique<MenuDispatcher>();
-        m_dispatcher->self = this;
-    }
-    m_dispatcher->workbench = m_workbench;
-    m_menuLayoutBuilder = std::make_unique<UiLayoutBuilder>(m_window, m_dispatcher.get(), m_menuPanelRegistry.get());
+    m_menuLayoutBuilder = std::make_unique<UiLayoutBuilder>(m_window, commandDispatcher(), m_menuPanelRegistry.get());
+
     m_menuLayoutBuilder->clearBuiltLayout();
 
     // 菜单/工具栏由同一个配置对象生成；菜单项会根据 workbenches 字段与当前工作台命令目录双重过滤。
@@ -1314,8 +1352,12 @@ void WorkbenchMenuManager::bindShortcuts()
     // 先清理旧动作，防止重复叠加
     clearGlobalShortcuts();
 
+    // 这两个动作不进任何菜单（纯窗口级快捷键），但同样打上 commandId：
+    // refreshCommandStates 会把 m_editShortcuts 一并遍历，使 Ctrl+Z / Ctrl+Y
+    // 在无撤销/重做历史时真正禁用，而不是触发后到操作层空转。
     QAction* undoAction = new QAction(tr("Undo"), m_window);
     undoAction->setShortcut(QKeySequence::Undo);
+    setCmdId(undoAction, QStringLiteral("edit.undo"));
     connect(undoAction, &QAction::triggered, this, [this]() {
         dispatchCommandSafely(QStringLiteral("edit.undo"));
     });
@@ -1324,12 +1366,20 @@ void WorkbenchMenuManager::bindShortcuts()
 
     QAction* redoAction = new QAction(tr("Redo"), m_window);
     redoAction->setShortcut(QKeySequence::Redo);
+    setCmdId(redoAction, QStringLiteral("edit.redo"));
     connect(redoAction, &QAction::triggered, this, [this]() {
         dispatchCommandSafely(QStringLiteral("edit.redo"));
     });
     m_window->addAction(redoAction);
     m_editShortcuts.push_back(redoAction);
+
+    // 新建的 QAction 默认 enabled=true，需立即按当前快照校正一次
+    if (m_workbench)
+    {
+        m_workbench->refreshCommandUiState();
+    }
 }
+
 
 void WorkbenchMenuManager::refreshWorkbenchMenuChecks(const QString& workbenchId)
 {
@@ -1630,37 +1680,44 @@ void WorkbenchMenuManager::forEachCommandAction(
     walk(m_menuState.algorithmMenu);
     walk(m_menuState.helpMenu);
     walk(m_menuState.drawMenu);
+
+    // 窗口级快捷键动作（Undo / Redo）不挂在任何菜单上，只能从成员容器取；
+    // 它们同样带 commandId，因此走同一个 visitor，启用态与菜单项保持一致。
+    for (QAction* action : m_editShortcuts)
+    {
+        if (!action)
+        {
+            continue;
+        }
+        const QString cmdId = action->property("commandId").toString();
+        if (cmdId.isEmpty())
+        {
+            continue;
+        }
+        visitor(action, cmdId);
+    }
 }
+
 
 void WorkbenchMenuManager::refreshCommandStates(const CommandUiSnapshot& snapshot)
 {
-    forEachCommandAction([&snapshot](QAction* action, const QString& cmdId) {
-        // 构建期已判定"命令未注册"的项永久禁用，不参与快照驱动
-        if (action->property("commandUnavailable").toBool())
-        {
-            return;
-        }
-
-        const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(cmdId);
-        if (menuId == static_cast<UI::MenuActionId>(0))
-        {
-            return;
-        }
-        const CommandEntry2D* entry = CommandCatalog::findByMenuId(menuId);
-        if (!entry)
-        {
-            return;
-        }
-
-        const auto rule = static_cast<CommandEnableRule>(static_cast<uint8_t>(entry->enableRule));
-        if (rule == CommandEnableRule::Always)
-        {
-            // 恒可用命令不写 enabled：避免与 setAllMenusEnabled 之类的全局置灰互相打架
-            return;
-        }
-        Cmd::setActionEnabled(action, Cmd::evaluateEnableRule(rule, snapshot));
+    // 规则求值与"跳过哪些项"的判定统一由命令中枢的静态应用器负责，
+    // 与配置化右键菜单共用同一份实现，本类只负责"遍历到哪些 action"。
+    forEachCommandAction([&snapshot](QAction* action, const QString& /*cmdId*/) {
+        CommandActionHub::applySnapshotToAction(action, snapshot);
     });
 }
+
+#if BUILD_UI3D
+void WorkbenchMenuManager::refreshCommandStates3D(const CommandUiSnapshot3D& snapshot)
+{
+    forEachCommandAction([&snapshot](QAction* action, const QString& /*cmdId*/) {
+        CommandActionHub3D::applySnapshotToAction(action, snapshot);
+    });
+}
+#endif
+
+
 
 void WorkbenchMenuManager::refreshConfiguredMenuState()
 {

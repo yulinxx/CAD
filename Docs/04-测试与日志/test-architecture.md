@@ -52,6 +52,7 @@
 - `Main/Src/UI/Test/ViewportRefreshRegressionTests.cpp`
 - `Main/Src/UI/Test/ViewportInputRegressionTests.cpp`
 - `Main/Src/UI/Test/Scene3DRegressionTests.cpp`
+- `Main/Src/UI/Test/CommandUiWiringTests.cpp`（顶部工具栏 actionId 与命令目录的接线一致性）
 - `UI/2D/Test/ToolsInteropTests.cpp`
 - `UI/3D/Test/OperationBus3DTests.cpp`
 
@@ -157,8 +158,9 @@ Main/Src/UI/Test/
 ├── FioEntityConverterTests.cpp      # IR 转换测试
 ├── ImportExportRegressionTests.cpp  # 导入导出回归
 ├── LayerPersistenceBridgeTests.cpp  # 图层持久化桥接
-├── ClientConfigTests.cpp            # 客户配置测试
+├── ClientConfigTests.cpp            # 客户配置测试（含工具栏命令绑定回归：无分发器时推迟构建 / 空分发器会永久禁用全部按钮 / 菜单与工具栏共用同一分发器实例）
 ├── SceneTreeBuilder3DTests.cpp      # 3D 场景树构建
+├── CommandUiWiringTests.cpp         # 命令 UI 接线回归（18 例：actionId 解析 / 启用规则 / 菜单栏 / 外部 QAction 树应用 / 2D-3D 切换防串台，后 5 例 BUILD_UI3D 条件编译）
 └── ToolSelectionSyncRegressionTests.cpp
 
 UI/2D/Test/
@@ -175,7 +177,7 @@ UI/2D/Test/
 └── ComplexToolsTestImpl.cpp
 
 UI/Common/Test/
-├── CommandKernelTests.cpp    # 命令内核测试
+├── CommandKernelTests.cpp    # 命令内核测试（含启用规则组合：多选 / 多选+未锁定）
 ├── CommandConcurrentTests.cpp # 命令并发测试
 ├── UndoRedoTests.cpp         # 撤销重做测试
 └── SettingsTableTests.cpp    # 设置表测试
@@ -247,6 +249,13 @@ Utility/Utility/Test/
 | 2D 几何算法 | 80% | 75% |
 | UI2D 工具 | 80% | 70% |
 | 命令系统 | 85% | 80% |
+
+命令系统内的「命令 UI 启用态」子层由两处覆盖：启用规则求值在 `UI/Common/Test/CommandKernelTests.cpp`（含多选、多选+未锁定组合），UI 接线一致性在 `Main/Src/UI/Test/CommandUiWiringTests.cpp` —— 前 8 例是数据契约（工具栏 actionId 全部可解析、菜单栏 Edit 命令规则符合预期且不为 `Always`、Menu surface 已声明），中间 5 例是 2D 行为验证：直接构造带 `property("commandId")` 的 QMenu 跑 `CommandActionHub::applySnapshotToMenu()`，断言空选禁用编辑命令、剪贴板只放行 Paste、对齐需两个未锁定、`commandUnavailable` 项保持禁用、无关动作不被误改。
+
+最后 5 例（`Switch_*` / `Switch3D_*`，`#if BUILD_UI3D`）覆盖 2D↔3D 切换：3D 侧 `CommandActionHub3D::applySnapshotToMenu()` 的选择/锁定门禁，以及「防串台」数据契约 —— 2D 独有 id 在 3D 目录解析为 `OperationId3D::None`、3D 独有 id 在 2D 目录解析为 `0`、跨侧快照对预置 `false` 的动作不产生改动、两侧同名命令（undo/redo/delete）的 `enableRule` 取值一致。
+
+切换缺陷里的 P0（`WorkbenchMenuManager::m_workbench` 未随切换同步）没有单测覆盖：它需要完整 `WorkbenchWindow` + 两个真实工作台，属集成层，当前靠手工冒烟验证（3D 下点菜单项确认走 3D 操作总线、3D 独有项可见可用）。
+
 
 ### 4.2 测试执行策略
 

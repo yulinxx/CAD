@@ -17,7 +17,10 @@
 #include "UI/ClientConfig/UiLayoutBuilder.h"
 #include "UI/ClientConfig/UiPanelRegistry.h"
 #include "UI/Services/UiStateCenter.h"
+#include "UI/Workbench/WorkbenchLayoutManager.h"
 #include "UI/Workbench/WorkbenchMenuManager.h"
+
+#include <QAction>
 
 #include <QMainWindow>
 #include <QDockWidget>
@@ -350,6 +353,30 @@ TEST(ClientConfigLayoutBuilderTest, UnknownCommandDisablesAction)
     EXPECT_FALSE(action->toolTip().isEmpty());
     delete action;
 }
+
+TEST(ClientConfigLayoutBuilderTest, ActionStillDispatchesAfterBuilderDestroyed)
+{
+    // 回归：触发回调曾捕获 this（构建器）。构建器在多处是栈上局部变量
+    // （WorkbenchLayoutManager 建工具栏、UiContextMenuService 建右键菜单），
+    // 而 QAction 挂在窗口上活得更久 —— 点按钮时解引用已析构的构建器，
+    // 表现为 m_dispatcher 是野指针的 0xC0000005 崩溃。
+    // 现在只捕获分发器指针，构建器析构后动作仍必须能正常派发。
+    FakeDispatcher dispatcher;
+    dispatcher.registered.insert(QStringLiteral("cmd.known"));
+
+    QMainWindow window;
+    QAction* action = new QAction(&window);
+    {
+        UiLayoutBuilder builder(&window, &dispatcher, nullptr);
+        builder.bindAction(action, QStringLiteral("cmd.known"));
+    }
+
+    action->trigger();
+    ASSERT_EQ(dispatcher.dispatched.size(), 1u);
+    EXPECT_EQ(dispatcher.dispatched[0], QStringLiteral("cmd.known"));
+    delete action;
+}
+
 
 TEST(ClientConfigLayoutBuilderTest, CheckableActionRespectsInitialState)
 {
@@ -690,3 +717,183 @@ TEST(ClientConfigLoaderTest, WorkbenchSwitchDoesNotLeakMenuEntries)
     EXPECT_EQ(std::get<MenuActionDef>(filtered3D[1].items[0]).commandId, QStringLiteral("view.wireframe"));
     EXPECT_EQ(std::get<MenuActionDef>(filtered2D[0].items[0]).commandId, QStringLiteral("file.open"));
 }
+
+// ==================== 工具栏命令绑定（回归） ====================
+
+namespace
+{
+    /// 造一条含两个按钮的工具栏配置：一个命令已注册、一个未注册。
+    ToolBarDef makeTwoActionToolBar()
+    {
+        ToolBarDef tb;
+        tb.id = QStringLiteral("TestToolBar");
+        tb.title = QStringLiteral("Test Tools");
+        tb.position = ToolBarPosition::Top;
+        tb.workbenchId = QStringLiteral("2D");
+
+        ToolBarActionDef known;
+        known.id = QStringLiteral("cmd.known");
+        known.label = QStringLiteral("Known");
+        known.commandId = QStringLiteral("cmd.known");
+
+        ToolBarActionDef missing;
+        missing.id = QStringLiteral("cmd.missing");
+        missing.label = QStringLiteral("Missing");
+        missing.commandId = QStringLiteral("cmd.missing");
+
+        tb.items.push_back(known);
+        tb.items.push_back(missing);
+        return tb;
+    }
+
+    /// 从工具栏里按 objectName 取动作（buildToolBars 会把 def.id 写进 objectName）
+    QAction* toolBarAction(QToolBar* toolBar, const QString& objectName)
+    {
+        if (!toolBar)
+        {
+            return nullptr;
+        }
+        for (QAction* action : toolBar->actions())
+        {
+            if (action && action->objectName() == objectName)
+            {
+                return action;
+            }
+        }
+        return nullptr;
+    }
+}  // namespace
+
+TEST(ClientConfigLayoutBuilderTest, ToolBarActionsBindThroughDispatcher)
+{
+    FakeDispatcher dispatcher;
+    dispatcher.registered.insert(QStringLiteral("cmd.known"));
+
+    QMainWindow window;
+    UiLayoutBuilder builder(&window, &dispatcher, nullptr);
+    builder.buildToolBars({ makeTwoActionToolBar() });
+
+    ASSERT_EQ(builder.builtToolBars().size(), 1u);
+    QToolBar* toolBar = builder.builtToolBars().front();
+    ASSERT_NE(toolBar, nullptr);
+
+    QAction* known = toolBarAction(toolBar, QStringLiteral("cmd.known"));
+    ASSERT_NE(known, nullptr);
+    EXPECT_TRUE(known->isEnabled());
+    // 命令可用时不得打「构建期永久不可用」标记，否则快照刷新会跳过它
+    EXPECT_FALSE(known->property("commandUnavailable").toBool());
+    known->trigger();
+    ASSERT_EQ(dispatcher.dispatched.size(), 1u);
+    EXPECT_EQ(dispatcher.dispatched[0], QStringLiteral("cmd.known"));
+
+    QAction* missing = toolBarAction(toolBar, QStringLiteral("cmd.missing"));
+    ASSERT_NE(missing, nullptr);
+    EXPECT_FALSE(missing->isEnabled());
+    EXPECT_TRUE(missing->property("commandUnavailable").toBool());
+    missing->trigger();
+    EXPECT_EQ(dispatcher.dispatched.size(), 1u);
+}
+
+TEST(ClientConfigLayoutBuilderTest, ToolBarBuiltWithBlindDispatcherDisablesEveryAction)
+{
+    // 回归：工具栏曾用一个 isCommandRegistered() 恒 false 的空分发器构建
+    // （WorkbenchLayoutManager 里的 NullDispatcher），于是每个按钮在构建期就被
+    // 永久禁用 + 打上 commandUnavailable，并刷屏「Unknown command id」；
+    // 之后没有任何流程会回来重连（buildToolBars 幂等守卫 + 快照刷新跳过该标记）。
+    // 本测试把那个失败模式固定下来：一旦有人再把空分发器接到工具栏上，
+    // 行为就是这样，谁都别指望它能自愈。
+    FakeDispatcher blind;  // registered 为空 → 任何命令都判定为未注册
+
+    QMainWindow window;
+    UiLayoutBuilder builder(&window, &blind, nullptr);
+    builder.buildToolBars({ makeTwoActionToolBar() });
+
+    ASSERT_EQ(builder.builtToolBars().size(), 1u);
+    QToolBar* toolBar = builder.builtToolBars().front();
+    ASSERT_NE(toolBar, nullptr);
+
+    for (const QString& id : { QStringLiteral("cmd.known"), QStringLiteral("cmd.missing") })
+    {
+        QAction* action = toolBarAction(toolBar, id);
+        ASSERT_NE(action, nullptr) << id.toStdString();
+        EXPECT_FALSE(action->isEnabled()) << id.toStdString();
+        EXPECT_TRUE(action->property("commandUnavailable").toBool()) << id.toStdString();
+        action->trigger();
+    }
+    EXPECT_TRUE(blind.dispatched.isEmpty());
+}
+
+TEST(WorkbenchLayoutManagerTest, ToolBarBuildDeferredUntilDispatcherInjected)
+{
+    // 主窗口构造期还没有工作台，命令目录无从查询。此时若构建工具栏，
+    // 每个按钮都会被判成「命令未注册」而永久禁用（见上一个测试）。
+    // 因此 buildToolBars() 必须在没有分发器时推迟，等 setCommandDispatcher() 之后再建。
+    const QString path = writeTempConfig(QStringLiteral("toolbar_defer.json"), QStringLiteral(R"({
+            "meta": { "clientId": "toolbar_defer", "clientName": "ToolBarDefer", "version": "1.0" },
+            "toolbars": [
+              {
+                "id": "DeferToolBar", "title": "Defer Tools", "position": "top", "workbench": "2D",
+                "items": [
+                  { "type": "action", "id": "cmd.known", "label": "Known", "command": "cmd.known" }
+                ]
+              }
+            ]
+        })"));
+
+    auto& shared = UiConfigurationManager::shared();
+    ASSERT_TRUE(shared.applyConfiguration(path, ConfigFallbackPolicy::Strict));
+    ASSERT_NE(shared.configData(), nullptr);
+    ASSERT_EQ(shared.configData()->toolBars.size(), 1u);
+
+    {
+        QMainWindow window;
+        WorkbenchLayoutManager layout(&window, nullptr);
+
+        // 未注入分发器：一条工具栏都不该建出来
+        layout.buildToolBars();
+        EXPECT_TRUE(layout.registeredToolBars().empty());
+
+        FakeDispatcher dispatcher;
+        dispatcher.registered.insert(QStringLiteral("cmd.known"));
+        layout.setCommandDispatcher(&dispatcher);
+        layout.buildToolBars();
+
+        ASSERT_EQ(layout.registeredToolBars().size(), 1u);
+        QToolBar* toolBar = layout.registeredToolBars().front();
+        ASSERT_NE(toolBar, nullptr);
+        EXPECT_EQ(toolBar->objectName(), QStringLiteral("DeferToolBar"));
+
+        QAction* known = toolBarAction(toolBar, QStringLiteral("cmd.known"));
+        ASSERT_NE(known, nullptr);
+        EXPECT_TRUE(known->isEnabled());
+        known->trigger();
+        ASSERT_EQ(dispatcher.dispatched.size(), 1u);
+        EXPECT_EQ(dispatcher.dispatched[0], QStringLiteral("cmd.known"));
+
+        // 幂等：再调一次不得重复建
+        layout.buildToolBars();
+        EXPECT_EQ(layout.registeredToolBars().size(), 1u);
+    }
+
+    // 共享配置是进程级单例，用完必须还原，否则污染后续用例
+    shared.reset();
+}
+
+TEST(WorkbenchMenuManagerTest, CommandDispatcherIsSharedAndStable)
+{
+    // 工具栏与菜单必须共用同一个分发器实例：
+    // UiLayoutBuilder 把该指针存进 QAction 的触发回调并长期解引用，
+    // 每次取用都新建一个会让先前建好的菜单项持有野指针。
+    WorkbenchMenuManager manager(nullptr);
+
+    IUiCommandDispatcher* first = manager.commandDispatcher();
+    ASSERT_NE(first, nullptr);
+    EXPECT_EQ(manager.commandDispatcher(), first);
+
+    // 无工作台时仍放行窗口级命令（主题/语言/工作台切换），否则这些菜单项会被误禁
+    EXPECT_TRUE(first->isCommandRegistered(QStringLiteral("theme.dark")));
+    EXPECT_TRUE(first->isCommandRegistered(QStringLiteral("view.switch_to_3d")));
+    // 工作台命令目录不可用时，业务命令一律判为未注册
+    EXPECT_FALSE(first->isCommandRegistered(QStringLiteral("tool.select")));
+}
+

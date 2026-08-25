@@ -258,6 +258,25 @@ SyLogger::setFile("app.log");
 | **tail** | 实时查看 |
 | **logcat** | Android 日志 |
 
+### 6.3 崩溃排查：日志尾部不可信，看调用栈
+
+日志走 spdlog **async_logger** + `flush_on(warn)`（`Log/Log/Src/SyLogger.cpp`）。
+硬崩溃时队列里尚未落盘的记录会**直接丢失**，因此：
+
+> **"日志最后一行"不等于崩溃位置。** 最后一行之后通常还有若干条已产生但未写出的记录。
+
+请按这个顺序取证：
+
+1. **看 stderr 的符号化调用栈。** 崩溃回调（`Main/Src/Common/CrashHandlerBootstrap.cpp`）
+   会用 dbghelp 打出 `模块!函数 + 偏移 (文件:行号)` 的调用栈，前几帧是崩溃处理器自身的噪声，往下看。
+   现场机器没有 WinDbg/cdb 也能直接读到栈，不必依赖 `.dmp`。
+2. **看 GL 驱动日志。** Renderx 已接入 KHR_debug 且开启 `GL_DEBUG_OUTPUT_SYNCHRONOUS`，
+   回调在**产生问题的那一次 GL 调用内部**触发，日志形如
+   `[gl][driver] HIGH type=0x824C id=1281: ...`。非法 GL 用法会自己报出位置，不要靠猜。
+3. **再看业务日志。** 用它确认崩溃前的最后一个已完成动作，而不是用它定位崩溃点。
+
+判断"进程是否还活着"永远比读日志尾部可靠。
+
 ---
 
 ## 7. 边界检查清单

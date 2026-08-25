@@ -97,6 +97,7 @@
 #include <QCoreApplication>
 #include <QDockWidget>
 #include <QLabel>
+#include <QMenu>
 #include <QGuiApplication>
 #include <QInputDialog>
 #include <QProgressBar>
@@ -332,6 +333,14 @@ void WorkbenchWindow::setWorkbench(UiWorkbench* workbench)
         if (workbench && !workbench->managesOwnMenus())
         {
             m_menuManager->rebuildAllMenus();
+        }
+        // 工具栏同理：构造期没有工作台，命令目录查不到任何命令，
+        // 此时构建会把每个按钮永久禁用（commandUnavailable）并刷屏 Unknown command id。
+        // 因此工具栏的构建推迟到这里，并与菜单共用同一个命令分发器。
+        if (m_layoutManager)
+        {
+            m_layoutManager->setCommandDispatcher(m_menuManager->commandDispatcher());
+            m_layoutManager->buildToolBars();
         }
     }
 }
@@ -1202,6 +1211,30 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
             m_workbench = target;
         }
     }
+
+    // 6b: 菜单管理器必须跟着换工作台。
+    // 它用 m_workbench 做三件事：MenuDispatcher 的派发目标、commandAvailable 的
+    // isCommandRegistered 判定、filterMenusForWorkbench 的 workbenchKind。
+    // 漏掉这一步会导致 3D 下点共有菜单项（edit.undo / file.save）派发到 2D 操作总线，
+    // 且 3D 专属菜单项被 2D 目录判为未注册而消失。
+    if (m_menuManager)
+    {
+        m_menuManager->setWorkbench(m_workbench);
+    }
+
+    // 6c: 重建骨架停靠面板。
+    // clearWorkbenchContent() 已经 delete 了全部 Dock（含 SceneDock / PropertiesDock），
+    // 而 buildDockAreas() 原先只在启动时调一次。结果是：leftDock / rightDock 变悬垂指针；
+    // 属性面板在 2D→3D→2D 之后永久消失（场景树因为 setupSceneTree 里有"dock 为空就自建"的
+    // 兜底而侥幸存活）。
+    // 注：工具栏没有对等的重建调用 —— 切换工作台后 buildToolBars() 不会再跑。这不是缺陷，
+    // 因为工具栏的唯一归属已收归 C++ 目录驱动路径（Workbench2D::createToolbars），四份
+    // 客户端 JSON 的 "toolbars" 一律为空数组；配置驱动那条只剩兜底能力，无内容可重建。
+    // 必须放在 attachToWindow 之前：工作台是往既有 Dock 里注册面板的。
+    buildDockAreas();
+
+
+
 
     // 7: 附加新工作台到窗口（注册面板、工具栏、中央控件）
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: attaching workbench to window");
