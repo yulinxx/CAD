@@ -9,14 +9,13 @@
 #include "Render/UiViewport3D.h"
 #include "Log/SyLogger.h"
 
-#include <QDateTime>
-#include <QDockWidget>
-#include <QLabel>
-#include <QMenuBar>
-#include <QProgressBar>
-#include <QSettings>
-#include <QStatusBar>
-#include <QToolBar>
+#include "ClientConfig/UiBuiltinPanels.h"
+#include "ClientConfig/UiClientContext.h"
+#include "ClientConfig/UiConfigLoader.h"
+#include "ClientConfig/UiConfigurationManager.h"
+#include "ClientConfig/UiLayoutBuilder.h"
+#include "ClientConfig/UiPanelRegistry.h"
+
 #include <QDateTime>
 #include <QDockWidget>
 #include <QLabel>
@@ -28,25 +27,25 @@
 #include <QWidget>
 #include <QPointer>
 
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
-    #include "ClientConfig/UiConfigLoader.h"
-    #include "ClientConfig/UiConfigurationManager.h"
-    #include "ClientConfig/UiLayoutBuilder.h"
-    #include "ClientConfig/UiPanelRegistry.h"
-
 namespace
 {
-    /// 客户配置资源路径（编译期由 SANYI_CLIENT_ID 决定）
-    QString clientConfigResourcePath()
+    /// 布局构建用的空命令分发器。
+    /// 工具栏/Dock 的构建只需要容器与控件，命令绑定由 WorkbenchMenuManager 侧的
+    /// MenuDispatcher 负责，因此这里给出一个不注册任何命令的实现。
+    ///
+    /// 注意：必须放在文件作用域。历史实现把它定义在 buildDockAreasFromConfig() 内部，
+    /// 却在 buildToolBars() 里引用，导致配置驱动路径一旦启用就无法编译——
+    /// 这也是该路径长期"写好但从未跑通"的直接原因。
+    struct NullDispatcher final : public IUiCommandDispatcher
     {
-    #ifndef SANYI_CLIENT_ID
-        return QStringLiteral(":/configs/san_yi.json");
-    #else
-        return QStringLiteral(":/configs/%1.json").arg(QString::fromUtf8(SANYI_CLIENT_ID));
-    #endif
-    }
+        bool isCommandRegistered(const QString&) const override
+        {
+            return false;
+        }
+
+        void dispatch(const QString&) override {}
+    };
 }  // namespace
-#endif
 
 WorkbenchLayoutManager::WorkbenchLayoutManager(QMainWindow* parent, WorkbenchMenuManager* menuManager)
     : m_parent(parent)
@@ -66,9 +65,12 @@ void WorkbenchLayoutManager::initializeToolBarSkeleton()
 
 void WorkbenchLayoutManager::buildToolBars()
 {
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
+    // 配置驱动是唯一路径：不再保留硬编码回退分支。
+    // 保留两条路径的代价是硬编码分支会持续接收新功能，而配置分支永远追不上，
+    // 最终两边行为分叉——这是 P0-1 要消除的核心风险。
     if (!ensureConfigLoaded())
     {
+        SY_ERROR("[WorkbenchLayoutManager] Toolbar build aborted: client config unavailable");
         return;
     }
 
@@ -80,6 +82,7 @@ void WorkbenchLayoutManager::buildToolBars()
     const UiConfigData* config = m_configManager->configData();
     if (!config)
     {
+        SY_ERROR("[WorkbenchLayoutManager] Toolbar build aborted: config data is null");
         return;
     }
 
@@ -94,10 +97,7 @@ void WorkbenchLayoutManager::buildToolBars()
         }
     }
     m_configDrivenLayoutBuilt = true;
-    return;
-#endif
-
-    // 保留空壳接口：真实内容由配置驱动模式统一生成。
+    SY_INFOF("[WorkbenchLayoutManager] Tool bars built from client config: count=%zu", m_registeredToolBars.size());
 }
 
 void WorkbenchLayoutManager::initializeDockAreaSkeleton()
@@ -108,63 +108,45 @@ void WorkbenchLayoutManager::initializeDockAreaSkeleton()
 
 void WorkbenchLayoutManager::buildDockAreas()
 {
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
-    // 配置驱动优先：成功则由 JSON 构建骨架停靠面板
+    // 配置驱动是唯一路径。加载失败时 UiClientContext::configResourcePath()
+    // 已经把资源回退到默认客户配置，因此这里失败意味着连默认配置也不可用，
+    // 属于打包缺失级别的问题，必须以 ERROR 暴露而不是静默降级。
     if (buildDockAreasFromConfig())
     {
-        SY_INFO("[WorkbenchLayoutManager] Dock areas built from client config");
+        SY_INFOF("[WorkbenchLayoutManager] Dock areas built from client config: count=%zu", m_registeredDocks.size());
         return;
     }
-    SY_WARNF("[WorkbenchLayoutManager] Config-driven dock build failed, "
-             "falling back to hardcoded skeleton");
-#endif
 
-    // 场景树面板
-    m_panelState.sceneTreeDock = new SceneTreePanel2D(m_parent);
-    m_panelState.leftDock = new QDockWidget(m_parent->tr("Scene"), m_parent);  // 场景
-    m_panelState.leftDock->setObjectName(QStringLiteral("SceneDock"));
-    m_panelState.leftDock->setWidget(m_panelState.sceneTreeDock);
-    m_parent->addDockWidget(Qt::LeftDockWidgetArea, m_panelState.leftDock);
-
-    // 属性面板
-    m_panelState.propertiesDock = new PropertiesPanelWidget(m_parent);
-    m_panelState.rightDock = new QDockWidget(m_parent->tr("Properties"), m_parent);  // 属性
-    m_panelState.rightDock->setObjectName(QStringLiteral("PropertiesDock"));
-    m_panelState.rightDock->setWidget(m_panelState.propertiesDock);
-    m_parent->addDockWidget(Qt::RightDockWidgetArea, m_panelState.rightDock);
-
-    // 仅设置初始面板宽度（默认窄一点，不挤压中间的视图），
-    // 不限制最大宽度，用户可手动拖拽加宽；放到顶部/底部 Dock 时也能自适应拉宽
-    m_parent->resizeDocks({ m_panelState.leftDock, m_panelState.rightDock }, { 180, 280 }, Qt::Horizontal);
+    SY_ERROR("[WorkbenchLayoutManager] error code=ui.dock_config_build_failed message=Failed to build dock areas from "
+             "client config; check that configs.qrc is packaged and the client JSON declares 'docks'");
 }
 
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
 bool WorkbenchLayoutManager::ensureConfigLoaded()
 {
     if (m_configManager && m_panelRegistry)
     {
-        return true;
+        return m_configManager->configData() != nullptr;
     }
 
-    m_configManager = std::make_unique<UiConfigurationManager>();
+    // 客户配置取自进程级共享实例（P0-1）：与 WorkbenchMenuManager、右键菜单服务
+    // 消费同一份 UiConfigData，客户 ID 由 UiClientContext 在运行时统一解析。
+    // 本类只借用指针，不拥有生命周期。
+    m_configManager = &UiConfigurationManager::shared();
+
     m_panelRegistry = std::make_unique<UiPanelRegistry>();
+    // 内置面板/状态栏槽位工厂集中注册，避免与菜单侧注册表内容漂移
+    registerBuiltinUiPanels(*m_panelRegistry);
 
-    // 注册内置面板工厂：与 JSON 中的 widgetType 对应
-    m_panelRegistry->registerPanel(QStringLiteral("SceneTreePanel"), [](QWidget* parent) {
-        return static_cast<QWidget*>(new SceneTreePanel2D(parent));
-    });
-    m_panelRegistry->registerPanel(QStringLiteral("PropertiesPanel"), [](QWidget* parent) {
-        return static_cast<QWidget*>(new PropertiesPanelWidget(parent));
-    });
-
-    const QString resourcePath = clientConfigResourcePath();
-    if (!m_configManager->applyConfiguration(resourcePath, ConfigFallbackPolicy::Strict))
+    if (!m_configManager->configData())
     {
-        SY_ERRORF("[WorkbenchLayoutManager] Failed to load client config: %s", qPrintable(resourcePath));
+        SY_ERRORF("[WorkbenchLayoutManager] Shared client config unavailable (client='%s')",
+            qPrintable(UiClientContext::instance().clientId()));
         return false;
     }
 
-    return m_configManager->configData() != nullptr;
+    SY_INFOF("[WorkbenchLayoutManager] Client config ready: client='%s'",
+        qPrintable(UiClientContext::instance().clientId()));
+    return true;
 }
 
 bool WorkbenchLayoutManager::buildDockAreasFromConfig()
@@ -181,22 +163,12 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
     }
 
     // 数据驱动构建 Dock（命令分发器此处不参与，仅为构造签名提供空实现）
-    struct NullDispatcher : public IUiCommandDispatcher
-    {
-        bool isCommandRegistered(const QString&) const override
-        {
-            return false;
-        }
-
-        void dispatch(const QString&) override {}
-    };
-
     NullDispatcher dispatcher;
     UiLayoutBuilder builder(m_parent, &dispatcher, m_panelRegistry.get());
     builder.buildDocks(config->docks);
 
-    // 将构建出的 Dock widget 挂入布局管理器注册表，与硬编码路径行为一致
-    // 便于统一清理（clearLayoutContent）与布局快照（restoreLayoutSnapshot）
+    // 将构建出的 Dock widget 挂入布局管理器注册表，统一清理（clearLayoutContent）
+    // 与布局快照（restoreLayoutSnapshot）
     for (QWidget* dockWidget : builder.builtDocks())
     {
         if (auto* dock = qobject_cast<QDockWidget*>(dockWidget))
@@ -204,7 +176,7 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
             dock->setProperty("_workbench_dock_title", dock->windowTitle());
             m_registeredDocks.push_back(dock);
 
-            // 同步面板状态引用，保持与硬编码路径一致的对外接口
+            // 同步面板状态引用，保持对外接口稳定（setSkeletonDocksVisible 等依赖它）
             const QString dockId = dock->objectName();
             if (dockId == QStringLiteral("SceneDock"))
             {
@@ -226,9 +198,20 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
         }
     }
 
+    // 初始面板宽度：默认窄一些，不挤压中间视图；不限制最大宽度，用户可手动拖宽。
+    // 仅在两个骨架 Dock 都存在时执行，配置里删掉其中一个也不会崩。
+    if (m_panelState.leftDock && m_panelState.rightDock)
+    {
+        m_parent->resizeDocks({ m_panelState.leftDock, m_panelState.rightDock }, { 180, 280 }, Qt::Horizontal);
+    }
+
     return !m_registeredDocks.empty();
 }
-#endif
+
+void WorkbenchLayoutManager::setActiveWorkbenchId(const QString& workbenchId)
+{
+    m_activeWorkbenchId = workbenchId;
+}
 
 void WorkbenchLayoutManager::initializeStatusBarSkeleton()
 {
@@ -238,10 +221,56 @@ void WorkbenchLayoutManager::initializeStatusBarSkeleton()
 
 void WorkbenchLayoutManager::buildStatusBar()
 {
-    // 构建框架级状态栏标签（始终存在，不随工作台切换而销毁）
-    // 工作台级内容（坐标/选择/消息）由 StatusBarBase 子类管理，
-    // 通过 WorkbenchWindow::mountStatusBar/unmountStatusBar 在工作台切换时挂载/卸载
+    // 框架级状态栏：容器始终存在，不随工作台切换而销毁。
+    // 槽位内容（客户标识、授权状态等跨工作台恒定信息）由客户 JSON 的 statusBar 节声明；
+    // 工作台级内容（坐标/选择/消息）仍由 StatusBarBase 子类通过
+    // WorkbenchWindow::mountStatusBar / unmountStatusBar 挂载，两者互不干扰。
     m_panelState.statusBar = m_parent->statusBar();
+
+    if (!ensureConfigLoaded())
+    {
+        SY_WARN("[WorkbenchLayoutManager] Status bar slots skipped: client config unavailable");
+        return;
+    }
+
+    const UiConfigData* config = m_configManager->configData();
+    if (!config)
+    {
+        return;
+    }
+
+    // 重建前先回收上一轮槽位，避免工作台反复切换时状态栏堆积重复控件
+    clearStatusBarSlots();
+
+    NullDispatcher dispatcher;
+    UiLayoutBuilder builder(m_parent, &dispatcher, m_panelRegistry.get());
+    builder.buildStatusBar(config->statusBar, m_activeWorkbenchId);
+    for (QWidget* slot : builder.builtStatusBarSlots())
+    {
+        if (slot)
+        {
+            m_statusBarSlots.emplace_back(slot);
+        }
+    }
+}
+
+void WorkbenchLayoutManager::clearStatusBarSlots()
+{
+    QStatusBar* bar = m_panelState.statusBar;
+    for (auto& slot : m_statusBarSlots)
+    {
+        if (!slot)
+        {
+            continue;
+        }
+        if (bar)
+        {
+            // removeWidget 只是取消托管，控件仍需显式销毁
+            bar->removeWidget(slot);
+        }
+        slot->deleteLater();
+    }
+    m_statusBarSlots.clear();
 }
 
 QWidget* WorkbenchLayoutManager::createInitialCentralWidget()
@@ -327,6 +356,14 @@ void WorkbenchLayoutManager::clearLayoutContent()
 
     m_panelState.sceneTreeDock = nullptr;
     m_panelState.propertiesDock = nullptr;
+
+    // 3.1: 清理配置驱动的状态栏槽位。
+    // 容器（QStatusBar）保留，只回收槽位控件，否则工作台反复切换会堆积重复标签。
+    clearStatusBarSlots();
+
+    // 工具栏/Dock 已全部销毁，下一次 buildToolBars 必须重新构建
+    m_configDrivenLayoutBuilt = false;
+
 
     // 4: 清理中央控件 — 先释放 GL 资源，再 setCentralWidget(nullptr)
     // 关键流程：releaseGLResources() → setCentralWidget(nullptr) → hide() → deleteLater()

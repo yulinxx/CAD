@@ -191,20 +191,13 @@ void WorkbenchWindow::retranslateUi()
 {
     setWindowTitle(QString::fromStdString(MainApp::appName()));
 
-    // 语言切换时重建菜单文案。由工作台自行管理菜单（legacy 模式下 3D 使用 MenuManager3D）时，
-    // 不能交给 WorkbenchMenuManager 重建，否则会用 2D 菜单覆盖 3D 菜单栏。
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
-    // 配置驱动模式下菜单统一由 WorkbenchMenuManager 生成，始终需要重建以刷新文案。
+    // 语言切换时重建菜单文案。
+    // 配置驱动是唯一路径（P0-1），菜单统一由 WorkbenchMenuManager 从客户 JSON 生成，
+    // 因此语言切换后始终需要重建以刷新文案；不再区分「工作台自管菜单」的 legacy 分支。
     if (m_menuManager)
     {
         m_menuManager->rebuildAllMenus();
     }
-#else
-    if (m_menuManager && (!m_workbench || !m_workbench->managesOwnMenus()))
-    {
-        m_menuManager->rebuildAllMenus();
-    }
-#endif
 
     refreshStatusText();
     SY_DEBUG("[WorkbenchWindow] retranslateUi completed");

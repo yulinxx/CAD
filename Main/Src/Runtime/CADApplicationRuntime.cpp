@@ -13,6 +13,7 @@
 #include "License/LicenseDialog.h"
 #include "License/LicenseDLL.h"
 #include "Composition/ApplicationCompositionRoot.h"
+#include "UI/ClientConfig/UiFeatureGate.h"
 #include "UI/Settings/SettingsService.h"
 
 // 构造函数：接收已创建的 QApplication（须由调用方在 buildAppPaths 之前创建），并设置应用基本信息
@@ -91,6 +92,30 @@ int CADApplicationRuntime::run()
 
             LicenseContext* licenseCtx = License_Create(&config);
             const bool licenseOk = licenseCtx && License_Check(licenseCtx) == LICENSE_OK;
+
+            // [P0-3] 功能授权闸门接线：把注册码里的 features 读入 UiFeatureGate，
+            // 供菜单/工具栏/状态栏/右键菜单按 feature 字段决定是否创建入口。
+            // 在此之前 features 字段虽然被签发、被解析，但从未被任何 UI 消费，
+            // License 实际退化成了「能不能启动」的二元开关。
+            if (licenseOk && licenseCtx)
+            {
+                LicenseInfo info{};
+                info.structSize = sizeof(LicenseInfo);
+                if (License_GetInfo(licenseCtx, &info) == LICENSE_OK)
+                {
+                    UiFeatureGate::instance().loadFromLicenseString(QString::fromUtf8(info.features));
+                    SY_INFOF("[CADApplicationRuntime] License features applied: customer='%s' expiry='%s'",
+                        info.customerName,
+                        info.expiryDate);
+                }
+                else
+                {
+                    // 取不到授权明细时保守放行，避免因读取失败把客户已购功能全部锁死
+                    SY_WARN("[CADApplicationRuntime] License_GetInfo failed, feature gate stays unrestricted");
+                    UiFeatureGate::instance().setUnrestricted(true);
+                }
+            }
+
             if (licenseCtx)
             {
                 License_Destroy(licenseCtx);
@@ -106,6 +131,22 @@ int CADApplicationRuntime::run()
                     return -3;
                 }
                 SY_INFO("[CADApplicationRuntime] License accepted by user");
+
+                // 用户刚激活成功，重新读取授权集：此时 features 才是最终生效的那份
+                LicenseContext* activatedCtx = License_Create(&config);
+                if (activatedCtx)
+                {
+                    LicenseInfo info{};
+                    info.structSize = sizeof(LicenseInfo);
+                    if (License_Check(activatedCtx) == LICENSE_OK &&
+                        License_GetInfo(activatedCtx, &info) == LICENSE_OK)
+                    {
+                        UiFeatureGate::instance().loadFromLicenseString(QString::fromUtf8(info.features));
+                        SY_INFOF("[CADApplicationRuntime] License features applied after activation: customer='%s'",
+                            info.customerName);
+                    }
+                    License_Destroy(activatedCtx);
+                }
             }
             else
             {
@@ -114,7 +155,11 @@ int CADApplicationRuntime::run()
         }
         else
         {
-            SY_INFO("[CADApplicationRuntime] License check disabled (SANYI_ENABLE_LICENSE not defined)");
+            // 许可校验未启用（开发构建）：授权闸门保持无限制，否则所有带 feature
+            // 标记的菜单项都会消失，开发时无法验证功能。
+            UiFeatureGate::instance().setUnrestricted(true);
+            SY_INFO("[CADApplicationRuntime] License check disabled (SANYI_ENABLE_LICENSE not defined), "
+                    "feature gate unrestricted");
         }
     }
 

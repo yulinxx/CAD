@@ -24,6 +24,7 @@ class SceneTreePanel3D;
 class SceneTreeSceneObserver2D;
 class SceneMonitor;
 struct UiStateSnapshot;
+struct CommandUiSnapshot;
 
 // 3D 类型前向声明（避免头文件膨胀，实际 include 下沉到 .cpp）
 #if BUILD_UI3D
@@ -132,6 +133,14 @@ public:
     /// @param centralWidget 当前中央视口 widget
     virtual void releaseCentralWidgetGLResources(QWidget* centralWidget) const;
 
+    /// 重新抓取命令 UI 快照并刷新所有命令面（工具栏 / 菜单栏 / 右键菜单 / 场景树）。
+    /// 框架层在重建菜单后调用，使新建的 QAction 立即得到正确启用态；
+    /// 未接入命令中枢的工作台保持空实现。
+    virtual void refreshCommandUiState()
+    {
+    }
+
+
     /// 是否需要显示骨架停靠面板（SceneDock / PropertiesDock）
     /// 2D 工作台返回 true（默认），3D 工作台返回 false
     virtual bool requiresSkeletonDocks() const;
@@ -216,6 +225,12 @@ public:
     /// 当前左右面板承载样式
     PanelHostStyle panelHostStyle() const { return m_panelHostStyle; }
 
+    /// 重新抓取选择上下文快照并驱动全部命令 UI（工具栏/菜单栏/右键菜单/面板/状态栏）
+    /// 唯一刷新入口，由 UiStateBridge2D 在各触发源上统一调用，
+    /// 框架层重建菜单后也会经基类虚接口回调到这里。
+    void refreshCommandUiState() override;
+
+
 private:
     /// 创建中央视口
     QWidget* createCentralViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties);
@@ -253,12 +268,21 @@ private:
     /// 通过 EntityPropertyModel2D（算法层）+ PropertyModel（数据层）解耦，
     /// 本方法仅作为组合根把"数据/算法"绑定到"UI"，面板可随时替换/移除。
     void refreshPropertiesPanel();
+    /// 消费命令中枢广播的选择上下文快照，扇出到属性面板/状态栏/场景树/工具栏上下文
+    /// （单一事件总线：所有 UI 联动共用同一份快照，避免各自二次遍历导致规则漂移）
+    void applySelectionContext(const CommandUiSnapshot& snapshot);
 
 private:
     /// 命令动作中枢：管理所有 QAction 的创建、绑定、刷新
     std::unique_ptr<class CommandActionHub> m_commandHub;
     /// 视口右键菜单请求：基于命令中枢构建并弹出右键菜单，实现选择/锁定的实时联动
     void onViewportContextMenu(QContextMenuEvent* event);
+    /// 按客户配置构建 2D 右键菜单（P0-2b）
+    /// @param contextMenuId JSON contextMenus 节中的菜单 ID，例如 "canvas.2d"
+    /// @param hasSelection 当前是否有选中实体（决定图层动态段是否含「移动到图层…」）
+    /// @return 配置菜单；未配置或无可用条目时返回 nullptr，调用方回退到内建路径。
+    ///         返回的菜单归调用方所有，且必须在同一作用域内 delete（命令分发器是栈对象）。
+    QMenu* buildConfiguredContextMenu(const QString& contextMenuId, bool hasSelection);
     /// 顶部工具栏（编辑命令）— Qt 父对象管理生命周期
     class TopToolBar* m_topToolBar{ nullptr };
     /// 文字编辑字体工具栏（双击文字进入编辑时显示）— Qt 父对象管理生命周期
@@ -356,6 +380,11 @@ private:
     void setup3DDeleteShortcuts(WorkbenchWindow& window);
     /// 3D 视口右键菜单请求：基于命令中枢快照构建并弹出（与 2D 统一的单一事实来源）
     void on3DContextMenuRequested(const QPoint& globalPos);
+    /// 按客户配置构建 3D 右键菜单（P0-2b）
+    /// @param contextMenuId JSON contextMenus 节中的菜单 ID，例如 "canvas.3d"
+    /// @return 配置菜单；未配置时返回 nullptr，调用方回退到内建路径。
+    ///         返回的菜单归调用方所有，且必须在同一作用域内 delete（命令分发器是栈对象）。
+    QMenu* buildConfiguredContextMenu(const QString& contextMenuId);
 
     // ---- 3D 场景树（数据/算法/UI 分离，UI 可定制/可缺失） ----
     /// 绑定并填充 3D 场景树面板（数据经算法层由引擎场景生成）

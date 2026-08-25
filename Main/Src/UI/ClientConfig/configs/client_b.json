@@ -1,0 +1,69 @@
+{
+  "meta": {
+    "clientId": "client_b",
+    "clientName": "客户B（授权分级示例）",
+    "version": "1.0",
+    "extends": "base"
+  },
+  "_comment": [
+    "本配置是「授权分级 + 状态栏/右键菜单定制」的示例客户，用于验证 P0 的三条链路：",
+    "1) feature 字段与 License features 联动：nesting / vision 未授权时下面这些入口不会出现；",
+    "2) statusBar 整节接管：客户可自由增删框架级槽位；",
+    "3) contextMenus 整项覆盖：同 id 覆盖 base 的右键菜单定义。"
+  ],
+  "menus": [
+    {
+      "id": "algorithm",
+      "label": "Algorithm",
+      "workbenches": ["2D", "3D"],
+      "items": [
+        { "type": "action", "id": "algo.fill", "label": "Fill", "command": "algo.fill", "icon": ":/ui/common/Icons/Actions/algo_fill.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "algo.nesting", "label": "Nesting", "command": "algo.nesting", "icon": ":/ui/common/Icons/Actions/algo_nesting.svg", "workbenches": ["2D"], "feature": "nesting" },
+        { "type": "action", "id": "algo.relief_engraving", "label": "Relief Engraving", "command": "algo.relief_engraving", "icon": ":/ui/common/Icons/Actions/algo_relief.svg", "workbenches": ["2D", "3D"], "feature": "relief3d" }
+      ]
+    }
+  ],
+  "toolbars": [
+    {
+      "id": "RightToolBar",
+      "title": "Right Tools",
+      "position": "right",
+      "workbench": "2D",
+      "items": [
+        { "type": "action", "id": "tool.qrcode", "label": "QR Code", "command": "tool.qrcode", "icon": ":/ui/common/Icons/Tools/qrcode.svg" },
+        { "type": "action", "id": "algo.nesting", "label": "Nesting", "command": "algo.nesting", "icon": ":/ui/common/Icons/Actions/algo_nesting.svg", "feature": "nesting" }
+      ]
+    }
+  ],
+  "statusBar": {
+    "visible": true,
+    "sizeGripEnabled": true,
+    "items": [
+      { "id": "statusSpacer", "widgetType": "Spacer", "align": "left", "stretch": 1 },
+      { "id": "visionIndicator", "widgetType": "MessageLabel", "align": "permanent", "minimumWidth": 120, "feature": "vision" },
+      { "id": "clientIndicator", "widgetType": "ClientIndicator", "align": "permanent" },
+      { "id": "licenseIndicator", "widgetType": "LicenseIndicator", "align": "permanent" }
+    ]
+  },
+  "contextMenus": [
+    {
+      "id": "canvas.2d",
+      "workbench": "2D",
+      "items": [
+        { "type": "action", "id": "edit.copy", "label": "Copy", "command": "edit.copy", "icon": ":/ui/common/Icons/Actions/copy.svg" },
+        { "type": "action", "id": "edit.paste", "label": "Paste", "command": "edit.paste", "icon": ":/ui/common/Icons/Actions/paste.svg" },
+        { "type": "action", "id": "edit.delete", "label": "Delete", "command": "edit.delete", "icon": ":/ui/common/Icons/Actions/delete.svg" },
+        { "type": "separator" },
+        { "type": "action", "id": "algo.nesting", "label": "Nesting", "command": "algo.nesting", "feature": "nesting" },
+        { "type": "separator" },
+        { "type": "action", "id": "view.zoom_fit", "label": "Zoom Fit", "command": "view.zoom_fit" }
+      ],
+      "dynamicSections": ["layer.actions"]
+    }
+  ],
+  "shortcuts": [
+    { "command": "edit.undo", "keys": "Ctrl+Z" },
+    { "command": "edit.redo", "keys": "Ctrl+Y" },
+    { "command": "edit.delete", "keys": "Delete" }
+  ]
+}

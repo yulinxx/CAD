@@ -30,6 +30,17 @@ public:
     UiConfigurationManager();
     ~UiConfigurationManager();
 
+    /// 进程级共享实例：客户 UI 配置的唯一事实源（P0-1）
+    ///
+    /// 历史实现里 WorkbenchMenuManager 与 WorkbenchLayoutManager 各自 new 了一个
+    /// UiConfigurationManager 并**分别**加载配置，两份副本一旦解析出不同客户
+    /// （菜单读环境变量、布局读编译期宏）就会出现「菜单和布局来自不同客户」。
+    /// 现在所有消费方都从这里取配置：首次访问时按 UiClientContext 解析出的
+    /// 资源路径加载，之后复用。
+    ///
+    /// @return 共享实例；配置加载失败时 configData() 为 nullptr，调用方需自行判空
+    static UiConfigurationManager& shared();
+
     /// 加载并应用客户 UI 配置
     /// @param resourcePath 配置路径（Qt 资源或文件）
     /// @param fallback 失败时的回退策略

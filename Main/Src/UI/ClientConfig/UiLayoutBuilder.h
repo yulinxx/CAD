@@ -16,6 +16,7 @@
 class QAction;
 class QMainWindow;
 class QMenu;
+class QStatusBar;
 class QToolBar;
 class QWidget;
 class UiPanelRegistry;
@@ -44,6 +45,20 @@ public:
     void buildToolBars(const std::vector<ToolBarDef>& toolBars);
     void buildDocks(const std::vector<DockDef>& docks);
     void buildShortcuts(const std::vector<ShortcutDef>& shortcuts);
+
+    /// 构建状态栏槽位（P0-2a）
+    /// 槽位控件由 UiPanelRegistry 按 widgetType 创建，与 Dock 使用同一套面板工厂。
+    /// @param statusBar 状态栏配置
+    /// @param workbenchId 当前工作台 ID，用于按 workbenches 字段过滤槽位
+    void buildStatusBar(const StatusBarDef& statusBar, const QString& workbenchId);
+
+    /// 按配置构建一个右键菜单（P0-2b）
+    /// 调用方负责 popup 与生命周期（通常用 QMenu::exec 后 deleteLater）。
+    /// @param def 右键菜单配置
+    /// @param parent 菜单父对象
+    /// @return 构建好的菜单；无可用条目时返回 nullptr（调用方据此决定不弹出）
+    QMenu* buildContextMenu(const ContextMenuDef& def, QWidget* parent);
+
     void clearBuiltLayout();
 
     /// 本次构建创建的 Dock widget（供上层注册到布局管理器，统一清理）
@@ -56,6 +71,12 @@ public:
     const std::vector<QToolBar*>& builtToolBars() const
     {
         return m_builtToolBars;
+    }
+
+    /// 本次构建挂入状态栏的槽位控件（供上层统一清理）
+    const std::vector<QWidget*>& builtStatusBarSlots() const
+    {
+        return m_builtStatusBarSlots;
     }
 
     /// 将动作绑定到命令；命令未注册时禁用动作并给出提示
@@ -76,4 +97,5 @@ private:
     UiPanelRegistry* m_panelRegistry;
     std::vector<QWidget*> m_builtDocks;
     std::vector<QToolBar*> m_builtToolBars;
+    std::vector<QWidget*> m_builtStatusBarSlots;
 };

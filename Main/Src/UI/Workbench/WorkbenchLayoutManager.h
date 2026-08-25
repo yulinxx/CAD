@@ -1,14 +1,11 @@
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include <QMainWindow>
 #include <QPointer>
 #include <QProgressBar>
-
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
-    #include <memory>
-#endif
 
 class QDockWidget;
 class QLabel;
@@ -20,10 +17,8 @@ class WorkbenchMenuManager;
 class PersistenceService;
 class SceneTreePanel2D;
 class PropertiesPanelWidget;
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
 class UiConfigurationManager;
 class UiPanelRegistry;
-#endif
 
 /// 面板状态：集中管理状态栏、工具栏与停靠面板指针
 /// 从 WorkbenchWindow::PanelState 提升为独立类型，供 WorkbenchLayoutManager 使用
@@ -58,23 +53,26 @@ public:
 
     /// 初始化工具栏骨架
     void initializeToolBarSkeleton();
-    /// 构建工具栏
+    /// 构建工具栏（配置驱动，唯一路径）
     void buildToolBars();
     /// 初始化停靠区骨架
     void initializeDockAreaSkeleton();
-    /// 构建停靠区域
+    /// 构建停靠区域（配置驱动，唯一路径）
     void buildDockAreas();
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
     /// 由 JSON 配置驱动构建停靠区域
-    /// @return 是否成功应用配置（失败时调用方回退到硬编码骨架）
+    /// @return 是否成功应用配置
     bool buildDockAreasFromConfig();
-    /// 载入客户配置并初始化配置相关缓存（工具栏/Dock 共用）
+    /// 载入客户配置并初始化配置相关缓存（菜单/工具栏/Dock/状态栏共用）
     bool ensureConfigLoaded();
-#endif
     /// 初始化状态栏骨架
     void initializeStatusBarSkeleton();
-    /// 构建状态栏
+    /// 构建状态栏（配置驱动：槽位由 JSON statusBar 节声明）
     void buildStatusBar();
+    /// 设置当前工作台 ID（用于按 workbenches 字段过滤状态栏槽位）
+    /// 需在 buildStatusBar 之前调用；为空时不做工作台过滤（全部槽位可见）
+    void setActiveWorkbenchId(const QString& workbenchId);
+    /// 回收由配置构建的状态栏槽位控件
+    void clearStatusBarSlots();
     /// 创建初始占位中央控件
     QWidget* createInitialCentralWidget();
 
@@ -135,6 +133,18 @@ public:
         return m_busyProgressBar;
     }
 
+    /// 已加载的客户配置管理器（供右键菜单等按需读取同一份配置）
+    UiConfigurationManager* configManager() const
+    {
+        return m_configManager;
+    }
+
+    /// 面板工厂注册表（Dock 与状态栏槽位共用）
+    UiPanelRegistry* panelRegistry() const
+    {
+        return m_panelRegistry.get();
+    }
+
 private:
     QMainWindow* m_parent;
     WorkbenchMenuManager* m_menuManager;
@@ -143,13 +153,15 @@ private:
     PanelState m_panelState;
     std::vector<QDockWidget*> m_registeredDocks;
     std::vector<QToolBar*> m_registeredToolBars;
+    /// 由配置构建并挂入状态栏的框架级槽位控件（工作台切换时统一回收）
+    std::vector<QPointer<QWidget>> m_statusBarSlots;
     QPointer<QProgressBar> m_busyProgressBar;
-#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
-    /// 客户化 UI 配置管理器（Dock 骨架配置化）
-    std::unique_ptr<UiConfigurationManager> m_configManager;
-    /// 面板工厂注册表（Dock 配置化）
+    /// 客户化 UI 配置管理器：指向 UiConfigurationManager::shared()，本类不拥有其生命周期
+    UiConfigurationManager* m_configManager{ nullptr };
+    /// 面板工厂注册表（Dock 与状态栏槽位共用）
     std::unique_ptr<UiPanelRegistry> m_panelRegistry;
     /// 配置驱动布局是否已经构建，避免工具栏/Dock 重复加载
     bool m_configDrivenLayoutBuilt{ false };
-#endif
+    /// 当前工作台 ID，用于状态栏槽位的工作台过滤；空表示不过滤
+    QString m_activeWorkbenchId;
 };

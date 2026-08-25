@@ -48,6 +48,12 @@ private:
     std::optional<ToolBarActionDef> parseToolBarAction(const QJsonObject& obj);
     std::optional<DockDef> parseDock(const QJsonObject& obj);
     std::optional<ShortcutDef> parseShortcut(const QJsonObject& obj);
+    /// 解析状态栏节（"statusBar"）
+    StatusBarDef parseStatusBar(const QJsonObject& obj);
+    /// 解析单个状态栏槽位
+    std::optional<StatusBarSlotDef> parseStatusBarSlot(const QJsonObject& obj);
+    /// 解析右键菜单节（"contextMenus"）中的单项
+    std::optional<ContextMenuDef> parseContextMenu(const QJsonObject& obj);
 
     /// 菜单可见性判断（按工作台）
     static bool isVisibleForWorkbench(const QStringList& workbenches, const QString& workbenchId);

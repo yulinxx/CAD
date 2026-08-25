@@ -364,5 +364,46 @@
     { "command": "view.zoom_out", "keys": "Ctrl+-" },
     { "command": "help.shortcuts", "keys": "F1" },
     { "command": "help.settings", "keys": "Ctrl+," }
+  ],
+  "statusBar": {
+    "visible": true,
+    "sizeGripEnabled": true,
+    "items": [
+      { "id": "statusSpacer", "widgetType": "Spacer", "align": "left", "stretch": 1 },
+      { "id": "clientIndicator", "widgetType": "ClientIndicator", "align": "permanent" },
+      { "id": "licenseIndicator", "widgetType": "LicenseIndicator", "align": "permanent" }
+    ]
+  },
+  "contextMenus": [
+    {
+      "id": "canvas.2d",
+      "workbench": "2D",
+      "items": [
+        { "type": "action", "id": "edit.cut", "label": "Cut", "command": "edit.cut", "icon": ":/ui/common/Icons/Actions/cut.svg" },
+        { "type": "action", "id": "edit.copy", "label": "Copy", "command": "edit.copy", "icon": ":/ui/common/Icons/Actions/copy.svg" },
+        { "type": "action", "id": "edit.paste", "label": "Paste", "command": "edit.paste", "icon": ":/ui/common/Icons/Actions/paste.svg" },
+        { "type": "action", "id": "edit.delete", "label": "Delete", "command": "edit.delete", "icon": ":/ui/common/Icons/Actions/delete.svg" },
+        { "type": "separator" },
+        { "type": "action", "id": "edit.select_all", "label": "Select All", "command": "edit.select_all" },
+        { "type": "separator" },
+        { "type": "action", "id": "view.zoom_in", "label": "Zoom In", "command": "view.zoom_in" },
+        { "type": "action", "id": "view.zoom_out", "label": "Zoom Out", "command": "view.zoom_out" },
+        { "type": "action", "id": "view.zoom_fit", "label": "Zoom Fit", "command": "view.zoom_fit" },
+        { "type": "action", "id": "view.reset", "label": "Reset View", "command": "view.reset" },
+        { "type": "separator" },
+        { "type": "action", "id": "view.layer_manager", "label": "Layer Manager", "command": "view.layer_manager" }
+      ],
+      "dynamicSections": ["layer.actions"]
+    },
+    {
+      "id": "canvas.3d",
+      "workbench": "3D",
+      "items": [
+        { "type": "action", "id": "edit.delete", "label": "Delete", "command": "edit.delete", "icon": ":/ui/common/Icons/Actions/delete.svg" },
+        { "type": "separator" },
+        { "type": "action", "id": "view.fit_all", "label": "Fit All", "command": "view.fit_all" },
+        { "type": "action", "id": "view.reset", "label": "Reset View", "command": "view.reset" }
+      ]
+    }
   ]
 }

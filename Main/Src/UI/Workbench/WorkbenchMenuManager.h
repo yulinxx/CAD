@@ -22,6 +22,9 @@ class UiPanelRegistry;
 class UiLayoutBuilder;
 struct UiConfigData;
 struct MenuDispatcher;
+/// 命令 UI 状态快照（选择/锁定/剪贴板/撤销栈），定义在 UI2D 命令中枢
+struct CommandUiSnapshot;
+
 
 using WorkbenchFactory = std::function<UiWorkbench*(const QString& workbenchId)>;
 
@@ -52,6 +55,20 @@ public:
     /// 算法执行 / 仅展示模式下，全局启用或禁用全部菜单交互（含子菜单项）。
     /// 例如算法后台运行时调用 setAllMenusEnabled(false) 使整栏置灰仅展示，完成后传 true 恢复。
     void setAllMenusEnabled(bool enabled);
+
+    /// 按命令 UI 快照刷新菜单项启用态。
+    ///
+    /// 菜单项的启用规则不在本类里维护 —— 一律按 property("commandId") 经
+    /// CommandCatalog::menuIdForCommandId() 反查目录条目，取条目上声明的 enableRule，
+    /// 再交给 Cmd::evaluateEnableRule 求值。这样菜单栏、顶部工具栏、右键菜单
+    /// 共用同一份规则与同一份快照，不会出现"工具栏灰了菜单还能点"的漂移。
+    ///
+    /// 两类项会被跳过：
+    ///   - property("commandUnavailable") 为真（命令未注册，构建期已永久禁用）
+    ///   - 规则为 Always（恒可用，无需干预，也避免覆盖 setAllMenusEnabled 之类的全局置灰）
+    void refreshCommandStates(const CommandUiSnapshot& snapshot);
+
+
 
     /// 所属主窗口（供命令分发器转发工作台切换等窗口级动作）
     WorkbenchWindow* workbenchWindow() const
@@ -150,6 +167,11 @@ private:
     /// 刷新配置菜单状态
     void refreshConfiguredMenuState();
 
+    /// 遍历菜单栏（config-driven）与 legacy 菜单指针下所有带 commandId 的叶子动作。
+    /// checked 同步与 enabled 同步共用这一份遍历，避免两处各写一遍递归导致覆盖范围漂移。
+    void forEachCommandAction(const std::function<void(QAction*, const QString&)>& visitor) const;
+
+
     struct MenuState
     {
         QMenu* fileMenu{ nullptr };
@@ -192,7 +214,8 @@ private:
     QActionGroup* m_drawToolActionGroup{ nullptr };
     // 全局编辑快捷键动作（窗口级，需在切换工作台时显式清理）
     std::vector<QAction*> m_editShortcuts;
-    std::unique_ptr<UiConfigurationManager> m_menuConfigManager;
+    // 客户 UI 配置不再由本类持有：统一取自 UiConfigurationManager::shared()，
+    // 保证菜单 / 工具栏 / Dock / 状态栏 / 右键菜单消费同一份配置（P0-1）
     std::unique_ptr<UiLayoutBuilder> m_menuLayoutBuilder;
     std::unique_ptr<UiPanelRegistry> m_menuPanelRegistry;
     // 配置菜单命令分发器：生命周期随本对象，菜单项触发回调期间必须长期有效

@@ -151,10 +151,10 @@ target_link_libraries(${app_name}
 )
 
 # 客户化 UI 配置
-target_compile_definitions(${app_name} PRIVATE SANYI_CLIENT_ID="${SANYI_CLIENT_ID}")
-if(SANYI_ENABLE_CONFIG_DRIVEN_UI)
-    target_compile_definitions(${app_name} PRIVATE SANYI_ENABLE_CONFIG_DRIVEN_UI=1)
-endif()
+# 注意（P0-1）：SANYI_CLIENT_ID 已不再作为编译期宏注入。
+# 客户 ID 现由 UiClientContext 在运行时解析（环境变量 / QSettings / 默认值），
+# 同一份二进制可服务多个客户。这里只把默认客户 ID 传给安装包脚本使用。
+target_compile_definitions(${app_name} PRIVATE SANYI_DEFAULT_CLIENT_ID="${SANYI_DEFAULT_CLIENT_ID}")
 
 # 可选模块宏传播：保证 EXE 中与各 UI DLL 中 #ifdef 分支一致
 if(BUILD_NESTING)
@@ -462,10 +462,8 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
     endif()
 
     # 客户化 UI 配置（测试目标同样需要访问资源）
-    target_compile_definitions(MainTests PRIVATE SANYI_CLIENT_ID="${SANYI_CLIENT_ID}")
-    if(SANYI_ENABLE_CONFIG_DRIVEN_UI)
-        target_compile_definitions(MainTests PRIVATE SANYI_ENABLE_CONFIG_DRIVEN_UI=1)
-    endif()
+    # 客户 ID 在运行时解析，测试可通过 UiClientContext::setClientIdOverride() 指定
+    target_compile_definitions(MainTests PRIVATE SANYI_DEFAULT_CLIENT_ID="${SANYI_DEFAULT_CLIENT_ID}")
 
     set_target_properties(MainTests PROPERTIES
         AUTOMOC ON

@@ -4,9 +4,11 @@
 #include "Log/SyLogger.h"
 #include "Manager/UnitManager/UnitManager.h"
 #include "Manager/UnitManager/UnitSelectionMenu.h"
+#include "UI2D/Operation/CommandActionHub.h"
 #include "UI2D/Operation/CommandCatalog.h"
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
+
 #include "UiStateCenter.h"
 #include "UiWorkbench.h"
 #include "UiServices.h"
@@ -23,8 +25,11 @@
 #include "UI/Widgets/UiSceneTreePanel2D.h"
 #include "UI/Widgets/UiPropertiesPanel.h"
 #include "Render3D/RenderWidget3D.h"
+#include "ClientConfig/UiBuiltinPanels.h"
 #include "ClientConfig/UiClientConfigBase.h"
+#include "ClientConfig/UiClientContext.h"
 #include "ClientConfig/UiConfigurationManager.h"
+#include "ClientConfig/UiFeatureGate.h"
 #include "ClientConfig/UiLayoutBuilder.h"
 #include "ClientConfig/UiPanelRegistry.h"
 
@@ -349,39 +354,41 @@ void WorkbenchMenuManager::rebuildAllMenus()
     rebuildMenusFromConfig();
     bindConfiguredMenuState();
     bindMenuCommands();
+
+    // 菜单重建产出的是全新 QAction，enabled 默认为 true。
+    // 必须请工作台重推一次命令 UI 快照，否则「无选中却能点删除/对齐」会在每次
+    // 工作台切换、语言切换、客户配置重载后复现。
+    if (m_workbench)
+    {
+        m_workbench->refreshCommandUiState();
+    }
 }
+
 
 void WorkbenchMenuManager::rebuildMenusFromConfig()
 {
-    // 配置驱动菜单的原则：同一份 UiConfigData 同时驱动菜单、工具栏、Dock、快捷键。
+    // 配置驱动菜单的原则：同一份 UiConfigData 同时驱动菜单、工具栏、Dock、状态栏、右键菜单。
     // 菜单部分由 UiLayoutBuilder 负责生成，WorkbenchMenuManager 负责接入工作台上下文与回退策略。
-    if (!m_menuConfigManager)
-    {
-        m_menuConfigManager = std::make_unique<UiConfigurationManager>();
-    }
     if (!m_menuPanelRegistry)
     {
         m_menuPanelRegistry = std::make_unique<UiPanelRegistry>();
-        m_menuPanelRegistry->registerPanel(QStringLiteral("SceneTreePanel"), [](QWidget* parent) {
-            return static_cast<QWidget*>(new SceneTreePanel2D(parent));
-        });
-        m_menuPanelRegistry->registerPanel(QStringLiteral("PropertiesPanel"), [](QWidget* parent) {
-            return static_cast<QWidget*>(new PropertiesPanelWidget(parent));
-        });
+        // 内置面板/状态栏槽位工厂集中注册，与 WorkbenchLayoutManager 使用同一份实现，
+        // 避免两个注册表内容漂移（P0-1）
+        registerBuiltinUiPanels(*m_menuPanelRegistry);
     }
 
-    const QString clientId = qEnvironmentVariableIsSet("SANYI_CLIENT_ID")
-        ? QString::fromUtf8(qgetenv("SANYI_CLIENT_ID"))
-        : QStringLiteral("san_yi");
-    const QString resourcePath = QStringLiteral(":/configs/%1.json").arg(clientId);
-
-    // 这里使用配置管理器统一加载客户配置；失败则回退到 legacy 菜单路径。
-    const bool loaded = m_menuConfigManager->applyConfiguration(resourcePath, ConfigFallbackPolicy::Fallback);
-    const UiConfigData* config = m_menuConfigManager->configData();
-    if (!loaded || !config)
+    // 客户配置取自进程级共享实例（P0-1）：菜单、工具栏、Dock、状态栏、右键菜单
+    // 全部消费同一份 UiConfigData，客户 ID 由 UiClientContext 在运行时统一解析。
+    // 历史实现这里自己 new 了一个 UiConfigurationManager 并读环境变量，
+    // 而布局侧另 new 一个并读编译期宏，两者可能解析出不同客户。
+    UiConfigurationManager& configManager = UiConfigurationManager::shared();
+    const QString clientId = UiClientContext::instance().clientId();
+    const UiConfigData* config = configManager.configData();
+    if (!config)
     {
-        SY_WARNF("[WorkbenchMenuManager] Config menu build failed, fallback to legacy menu path. resource=%s",
-            qPrintable(resourcePath));
+        SY_WARNF("[WorkbenchMenuManager] Shared client config unavailable (client='%s'), "
+                 "fallback to legacy menu path",
+            qPrintable(clientId));
         buildLegacyMenus();
         return;
     }
@@ -1571,6 +1578,90 @@ void WorkbenchMenuManager::bindConfiguredMenuState()
     refreshConfiguredMenuState();
 }
 
+void WorkbenchMenuManager::forEachCommandAction(
+    const std::function<void(QAction*, const QString&)>& visitor) const
+{
+    if (!visitor)
+    {
+        return;
+    }
+
+    std::function<void(QMenu*)> walk = [&](QMenu* menu) {
+        if (!menu)
+        {
+            return;
+        }
+        for (QAction* action : menu->actions())
+        {
+            if (!action)
+            {
+                continue;
+            }
+            // 子菜单标题项自身不携带 commandId，递归进去处理叶子项
+            if (QMenu* subMenu = action->menu())
+            {
+                walk(subMenu);
+                continue;
+            }
+            const QString cmdId = action->property("commandId").toString();
+            if (cmdId.isEmpty())
+            {
+                continue;
+            }
+            visitor(action, cmdId);
+        }
+    };
+
+    // config-driven 菜单挂在 QMenuBar 上；legacy 回退路径的菜单只有 m_menuState 指针能拿到
+    QMenuBar* menuBar = m_window ? m_window->menuBar() : nullptr;
+    if (menuBar)
+    {
+        for (QAction* act : menuBar->actions())
+        {
+            if (QMenu* menu = act->menu())
+            {
+                walk(menu);
+            }
+        }
+    }
+    walk(m_menuState.viewMenu);
+    walk(m_menuState.fileMenu);
+    walk(m_menuState.editMenu);
+    walk(m_menuState.algorithmMenu);
+    walk(m_menuState.helpMenu);
+    walk(m_menuState.drawMenu);
+}
+
+void WorkbenchMenuManager::refreshCommandStates(const CommandUiSnapshot& snapshot)
+{
+    forEachCommandAction([&snapshot](QAction* action, const QString& cmdId) {
+        // 构建期已判定"命令未注册"的项永久禁用，不参与快照驱动
+        if (action->property("commandUnavailable").toBool())
+        {
+            return;
+        }
+
+        const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(cmdId);
+        if (menuId == static_cast<UI::MenuActionId>(0))
+        {
+            return;
+        }
+        const CommandEntry2D* entry = CommandCatalog::findByMenuId(menuId);
+        if (!entry)
+        {
+            return;
+        }
+
+        const auto rule = static_cast<CommandEnableRule>(static_cast<uint8_t>(entry->enableRule));
+        if (rule == CommandEnableRule::Always)
+        {
+            // 恒可用命令不写 enabled：避免与 setAllMenusEnabled 之类的全局置灰互相打架
+            return;
+        }
+        Cmd::setActionEnabled(action, Cmd::evaluateEnableRule(rule, snapshot));
+    });
+}
+
 void WorkbenchMenuManager::refreshConfiguredMenuState()
 {
     if (!m_stateCenter)
@@ -1589,93 +1680,50 @@ void WorkbenchMenuManager::refreshConfiguredMenuState()
         action->setChecked(checked);
     };
 
-    // 遍历菜单栏中的所有菜单（适配 config-driven 和 legacy 路径）
-    std::function<void(QMenu*)> refreshMenu = [&](QMenu* menu) {
-        if (!menu)
+    forEachCommandAction([&](QAction* action, const QString& cmdId) {
+        if (cmdId == QStringLiteral("view.grid") || cmdId == QStringLiteral("view.grid_visible"))
         {
-            return;
+            applyChecked(action, state.metadata.value(QStringLiteral("gridVisible")).toBool());
         }
-        for (QAction* action : menu->actions())
+        else if (cmdId == QStringLiteral("view.snap") || cmdId == QStringLiteral("view.snap_enabled"))
         {
-            if (!action)
-            {
-                continue;
-            }
-            // 递归处理子菜单
-            if (QMenu* subMenu = action->menu())
-            {
-                refreshMenu(subMenu);
-                continue;
-            }
-            const QString cmdId = action->property("commandId").toString();
-            if (cmdId.isEmpty())
-            {
-                continue;
-            }
-
-            if (cmdId == QStringLiteral("view.grid") || cmdId == QStringLiteral("view.grid_visible"))
-            {
-                applyChecked(action, state.metadata.value(QStringLiteral("gridVisible")).toBool());
-            }
-            else if (cmdId == QStringLiteral("view.snap") || cmdId == QStringLiteral("view.snap_enabled"))
-            {
-                applyChecked(action, state.metadata.value(QStringLiteral("snapEnabled")).toBool());
-            }
-            else if (cmdId == QStringLiteral("view.ortho") || cmdId == QStringLiteral("view.ortho_mode"))
-            {
-                applyChecked(action, state.metadata.value(QStringLiteral("orthoMode")).toBool());
-            }
-            else if (cmdId == QStringLiteral("view.angle_snap"))
-            {
-                applyChecked(action, state.metadata.value(QStringLiteral("angleSnap")).toBool());
-            }
-            else if (cmdId == QStringLiteral("view.wireframe"))
-            {
-                applyChecked(action, state.metadata.value(QStringLiteral("wireframe")).toBool());
-            }
-            else if (cmdId == QStringLiteral("view.bbox"))
-            {
-                applyChecked(action, state.metadata.value(QStringLiteral("bbox")).toBool());
-            }
-            else if (cmdId == QStringLiteral("view.floor"))
-            {
-                applyChecked(action, state.metadata.value(QStringLiteral("floor")).toBool());
-            }
-            else if (cmdId == QStringLiteral("view.unit_mm"))
-            {
-                applyChecked(action, wbId.compare(QStringLiteral("2D"), Qt::CaseInsensitive) == 0);
-            }
-            else if (cmdId == QStringLiteral("view.unit_cm"))
-            {
-                applyChecked(action, false);
-            }
-            else if (cmdId == QStringLiteral("view.unit_inch"))
-            {
-                applyChecked(action, false);
-            }
+            applyChecked(action, state.metadata.value(QStringLiteral("snapEnabled")).toBool());
         }
-    };
-
-    // config-driven 菜单在 QMenuBar 中；legacy 菜单在 m_menuState 中
-    QMenuBar* menuBar = m_window ? m_window->menuBar() : nullptr;
-    if (menuBar)
-    {
-        for (QAction* act : menuBar->actions())
+        else if (cmdId == QStringLiteral("view.ortho") || cmdId == QStringLiteral("view.ortho_mode"))
         {
-            if (QMenu* menu = act->menu())
-            {
-                refreshMenu(menu);
-            }
+            applyChecked(action, state.metadata.value(QStringLiteral("orthoMode")).toBool());
         }
-    }
-    // 回退到 legacy 菜单指针
-    refreshMenu(m_menuState.viewMenu);
-    refreshMenu(m_menuState.fileMenu);
-    refreshMenu(m_menuState.editMenu);
-    refreshMenu(m_menuState.algorithmMenu);
-    refreshMenu(m_menuState.helpMenu);
-    refreshMenu(m_menuState.drawMenu);
+        else if (cmdId == QStringLiteral("view.angle_snap"))
+        {
+            applyChecked(action, state.metadata.value(QStringLiteral("angleSnap")).toBool());
+        }
+        else if (cmdId == QStringLiteral("view.wireframe"))
+        {
+            applyChecked(action, state.metadata.value(QStringLiteral("wireframe")).toBool());
+        }
+        else if (cmdId == QStringLiteral("view.bbox"))
+        {
+            applyChecked(action, state.metadata.value(QStringLiteral("bbox")).toBool());
+        }
+        else if (cmdId == QStringLiteral("view.floor"))
+        {
+            applyChecked(action, state.metadata.value(QStringLiteral("floor")).toBool());
+        }
+        else if (cmdId == QStringLiteral("view.unit_mm"))
+        {
+            applyChecked(action, wbId.compare(QStringLiteral("2D"), Qt::CaseInsensitive) == 0);
+        }
+        else if (cmdId == QStringLiteral("view.unit_cm"))
+        {
+            applyChecked(action, false);
+        }
+        else if (cmdId == QStringLiteral("view.unit_inch"))
+        {
+            applyChecked(action, false);
+        }
+    });
 }
+
 
 void WorkbenchMenuManager::syncGridSnapMenuState()
 {

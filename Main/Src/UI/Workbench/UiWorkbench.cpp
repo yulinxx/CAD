@@ -38,6 +38,12 @@
 #include "DrawToolSwitchRegistry.h"
 #include "WorkbenchWindow.h"
 #include "WorkbenchMenuManager.h"
+// 配置驱动右键菜单（P0-2b）：右键项与顶部菜单共享同一份客户配置与命令路径
+#include "ClientConfig/UiClientConfigBase.h"
+#include "ClientConfig/UiConfigurationManager.h"
+#include "ClientConfig/UiContextMenuService.h"
+#include "ClientConfig/UiLayoutBuilder.h"
+#include "UiStateBridge2D.h"
 #include "RenderWidget.h"
 
 #include "UI2D/Operation/CommandActionHub.h"
@@ -454,6 +460,11 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
         SY_INFO("[Workbench2D] StatusBar created");
     }
     window.mountStatusBar(m_statusBar2D);
+
+    // 命令 UI 刷新触发源集中挂载（选择/图层锁/场景变化含图元锁/撤销栈/操作完成）。
+    // 放在最后：此时视口、工具栏、场景树、状态栏均已就绪，install 内的首次刷新可覆盖全部 UI。
+    UiStateBridge2D::install(
+        this, m_viewport, m_services.operationBus, m_services.layerManagerBridge, m_sceneMonitor);
 }
 
 bool Workbench2D::showSettingsDialog(QWidget* /*parent*/)
@@ -514,17 +525,12 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
                 service->nudgeSelected(dx, dy, "Move endpoint");
             });
 
-        // 场景变更监控：捕获拖拽/交互式修改等非操作总线路径的场景变更 → 刷新属性面板
-        // 拖拽完成后 commitInteractive → notifySceneChanged → SceneMonitor::sceneChanged → 刷新面板
+        // 场景变更监控：捕获拖拽/交互式修改、图元锁定/可见性等非操作总线路径的场景变更。
+        // 订阅由 UiStateBridge2D::install 统一挂载（见 attachToWindow 末尾）。
         if (auto* scene = m_services.sceneEditService->sceneManager())
         {
             m_sceneMonitor = new SceneMonitor(this);
             m_sceneMonitor->watch(scene);
-            QObject::connect(m_sceneMonitor, &SceneMonitor::sceneChanged, this, [this]() {
-                QTimer::singleShot(0, this, [this]() {
-                    refreshPropertiesPanel();
-                });
-            });
         }
     }
 
@@ -609,34 +615,8 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
             }
         });
 
-        // 任何选择变化（点选/框选/绘制后自动选中/撤销等）→ 刷新顶部工具栏动作启用状态
-        QObject::connect(vp, &RenderViewport2D::selectionChanged, this, [this]() {
-            if (m_commandHub)
-            {
-                m_commandHub->refreshActionStates(m_commandHub->captureSnapshot(m_commandHub->mainWindow()));
-            }
-        });
-
-        // 选择变化 → 同步刷新属性面板（仅当面板存在时生效，UI 可定制/移除）
-        QObject::connect(vp, &RenderViewport2D::selectionChanged, this, [this]() {
-            refreshPropertiesPanel();
-        });
-
-        // 选择变化 → 把真实选中数量推给状态栏选择指示器（StatusBarBase 容器内的独立指示器）
-        QObject::connect(vp, &RenderViewport2D::selectionChanged, this, [this]() {
-            if (m_statusBar2D)
-            {
-                int n = 0;
-                if (m_services.sceneEditService)
-                {
-                    if (auto* scene = m_services.sceneEditService->sceneManager())
-                    {
-                        n = static_cast<int>(scene->getSelectedEntities().size());
-                    }
-                }
-                m_statusBar2D->setSelectionInfo(n, tr("Selected: %1").arg(n));
-            }
-        });
+        // 选择变化 → 刷新命令 UI（工具栏/右键菜单/面板/状态栏）的连线统一由
+        // UiStateBridge2D::install 挂载，此处不再逐个 connect，避免触发源散落漏接。
 
         // 鼠标移动时实时更新状态栏位置标签
         vp->setPositionCallback([stateCenter = m_services.stateCenter, &window](double x, double y) {
@@ -917,8 +897,9 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
             },
             &ctx);
         result.hasSelection = result.selectionCount > 0;
-        // 分组按钮：选中含分组则显示 Ungroup；命中任意锁定图层则不可用
-        result.groupEnabled = !result.anyLockedLayer;
+        // 分组按钮：选中含分组则显示 Ungroup；命中任意锁定（图层锁或实体锁）则不可用，
+        // 与 RequiresUnlockedSelection 的双锁语义保持一致。
+        result.groupEnabled = !(result.anyLockedLayer || result.anyLockedEntity);
         // 贝塞尔切换按钮：当前无独立语义，保持禁用（与重构前未赋值行为一致）
         result.bezierEnabled = false;
         return result;
@@ -967,38 +948,38 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
             {
                 { "",
                     {
-                        { "Edit_Undo", tr("Undo"), ":/ui/common/Icons/Actions/undo.svg" },
-                        { "Edit_Redo", tr("Redo"), ":/ui/common/Icons/Actions/redo.svg" },
+                        { "edit.undo", tr("Undo"), ":/ui/common/Icons/Actions/undo.svg" },
+                        { "edit.redo", tr("Redo"), ":/ui/common/Icons/Actions/redo.svg" },
                     } },
                 { "",
                     {
-                        { "Edit_MirrorHorizontal", tr("Mirror H"), ":/ui/common/Icons/Actions/mirror_h.svg" },
-                        { "Edit_MirrorVertical", tr("Mirror V"), ":/ui/common/Icons/Actions/mirror_v.svg" },
+                        { "edit.mirror_horizontal", tr("Mirror H"), ":/ui/common/Icons/Actions/mirror_h.svg" },
+                        { "edit.mirror_vertical", tr("Mirror V"), ":/ui/common/Icons/Actions/mirror_v.svg" },
                     } },
                 { "",
                     {
-                        { "Edit_AlignLeft", tr("Align Left"), ":/ui/common/Icons/Actions/align_left.svg" },
-                        { "Edit_AlignRight", tr("Align Right"), ":/ui/common/Icons/Actions/align_right.svg" },
-                        { "Edit_AlignCenterH", tr("Align Center H"), ":/ui/common/Icons/Actions/align_center_h.svg" },
-                        { "Edit_AlignTop", tr("Align Top"), ":/ui/common/Icons/Actions/align_top.svg" },
-                        { "Edit_AlignBottom", tr("Align Bottom"), ":/ui/common/Icons/Actions/align_bottom.svg" },
-                        { "Edit_AlignCenterV", tr("Align Center V"), ":/ui/common/Icons/Actions/align_center_v.svg" },
+                        { "edit.align_left", tr("Align Left"), ":/ui/common/Icons/Actions/align_left.svg" },
+                        { "edit.align_right", tr("Align Right"), ":/ui/common/Icons/Actions/align_right.svg" },
+                        { "edit.align_center_h", tr("Align Center H"), ":/ui/common/Icons/Actions/align_center_h.svg" },
+                        { "edit.align_top", tr("Align Top"), ":/ui/common/Icons/Actions/align_top.svg" },
+                        { "edit.align_bottom", tr("Align Bottom"), ":/ui/common/Icons/Actions/align_bottom.svg" },
+                        { "edit.align_center_v", tr("Align Center V"), ":/ui/common/Icons/Actions/align_center_v.svg" },
                     } },
                 { "",
                     {
-                        { "Edit_SelectAll", tr("Select All"), ":/ui/common/Icons/Actions/select_all.svg" },
-                        { "Edit_InvertSelection", tr("Invert Selection"), ":/ui/common/Icons/Actions/invert_selection.svg" },
-                        { "Edit_Deselect", tr("Deselect"), ":/ui/common/Icons/Actions/deselect.svg" },
+                        { "edit.select_all", tr("Select All"), ":/ui/common/Icons/Actions/select_all.svg" },
+                        { "edit.invert_selection", tr("Invert Selection"), ":/ui/common/Icons/Actions/invert_selection.svg" },
+                        { "edit.deselect", tr("Deselect"), ":/ui/common/Icons/Actions/deselect.svg" },
                     } },
                 { "",
                     {
-                        { "Edit_Copy", tr("Copy"), ":/ui/common/Icons/Actions/copy.svg" },
-                        { "Edit_Paste", tr("Paste"), ":/ui/common/Icons/Actions/paste.svg" },
-                        { "Edit_Delete", tr("Delete"), ":/ui/common/Icons/Actions/delete.svg" },
+                        { "edit.copy", tr("Copy"), ":/ui/common/Icons/Actions/copy.svg" },
+                        { "edit.paste", tr("Paste"), ":/ui/common/Icons/Actions/paste.svg" },
+                        { "edit.delete", tr("Delete"), ":/ui/common/Icons/Actions/delete.svg" },
                     } },
                 { "",
                     {
-                        { "Edit_Group", tr("Group"), ":/ui/common/Icons/Actions/group.svg", true },
+                        { "edit.group", tr("Group"), ":/ui/common/Icons/Actions/group.svg", true },
                     } },
             },
         });
@@ -1139,18 +1120,10 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // 默认进入 Default 上下文
     m_contextManager->setCurrentContext(ToolBarContext::Default);
 
-    // 根据选中图元类型自动切换上下文（监听视口选择变化）
+    // 根据选中图元类型自动切换上下文：由 applySelectionContext 消费快照 typeMask 完成，
+    // 不再单独监听 selectionChanged（避免与快照刷新产生顺序竞争）。
     if (m_viewport)
     {
-        connect(m_viewport, &RenderViewport2D::selectionChanged, this, [this]() {
-            if (!m_contextManager)
-                return;
-            const ToolBarContext newCtx = determineContextFromSelection();
-            if (m_contextManager->currentContext() != newCtx)
-            {
-                m_contextManager->setCurrentContext(newCtx);
-            }
-        });
         // 右键菜单请求：交给命令中枢统一构建并弹出（含选择/锁定实时联动）
         connect(m_viewport, &RenderViewport2D::contextMenuRequested, this, &Workbench2D::onViewportContextMenu);
     }
@@ -1201,10 +1174,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
             m_services.layerManager->setCurrentLayer(layerId);
         }
         // 图层变更后刷新动作状态（撤销/重做可用性、锁定图层禁用态等）
-        if (m_commandHub)
-        {
-            m_commandHub->refreshActionStates(m_commandHub->captureSnapshot(m_commandHub->mainWindow()));
-        }
+        refreshCommandUiState();
     });
 
     // 双击色块 → 打开图层管理对话框（其中设置当前图层会通过 sigCurrentLayerChanged 同步回右侧色块）
@@ -1216,33 +1186,10 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         }
     });
 
-    // 图层锁定/属性变更 → 实时刷新顶部按钮启用状态（如锁定图层后 Delete/Mirror/Align/Group 变不可用）
-    if (m_services.layerManagerBridge && m_commandHub)
+    // 撤销/重做会恢复/移除/重建图元（场景拓扑变化），增量刷新可能遗漏，
+    // 强制全量重建视口，确保回退结果实时可见
+    if (m_services.operationBus)
     {
-        QObject::connect(m_services.layerManagerBridge, &QtLayerManagerBridge::sigLayerChanged, this, [this](int) {
-            m_commandHub->refreshActionStates(m_commandHub->captureSnapshot(m_commandHub->mainWindow()));
-        });
-    }
-
-    // 撤销/重做栈状态变化 → 刷新 Undo/Redo 按钮（含本工作台通过 LayerEditService 直接入栈的图层操作）
-    if (m_services.operationBus && m_commandHub)
-    {
-        QObject::connect(m_services.operationBus, &OperationBus::undoStateChanged, this, [this]() {
-            m_commandHub->refreshActionStates(m_commandHub->captureSnapshot(m_commandHub->mainWindow()));
-        });
-        QObject::connect(m_services.operationBus, &OperationBus::undoStateChanged, this, [this]() {
-            refreshPropertiesPanel();
-        });
-        // 剪贴板操作（Copy/Cut）后立即刷新 Paste 按钮启用状态
-        QObject::connect(
-            m_services.operationBus, &OperationBus::operationCompleted, this, [this](OperationId id, bool success) {
-                if (success && (id == OperationId::Edit_Copy || id == OperationId::Edit_Cut))
-                {
-                    m_commandHub->refreshActionStates(m_commandHub->captureSnapshot(m_commandHub->mainWindow()));
-                }
-            });
-        // 撤销/重做会恢复/移除/重建图元（场景拓扑变化），增量刷新可能遗漏，
-        // 强制全量重建视口，确保回退结果实时可见
         QObject::connect(
             m_services.operationBus, &OperationBus::operationCompleted, this, [this](OperationId id, bool success) {
                 if (success && (id == OperationId::Edit_Undo || id == OperationId::Edit_Redo))
@@ -1252,6 +1199,17 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
                         m_viewport->requestFullRefresh();
                     }
                 }
+            });
+    }
+
+    // 命令中枢广播的选择上下文快照 → 扇出到属性面板/状态栏/场景树/工具栏上下文（单一事件总线）
+    if (m_commandHub)
+    {
+        QObject::connect(m_commandHub.get(),
+            &CommandActionHub::selectionContextChanged,
+            this,
+            [this](const CommandUiSnapshot& snapshot) {
+                applySelectionContext(snapshot);
             });
     }
 }
@@ -1567,16 +1525,124 @@ void Workbench2D::onViewportContextMenu(QContextMenuEvent* event)
     {
         return;
     }
-    QMenu menu;
+
     // 基于命令中枢实时快照构建菜单（count / 锁定 / 类型 来自与工具栏相同的单一事实来源），
     // 避免右键菜单再走一套独立的选择数据源导致显隐/灰显规则漂移。
     const CommandUiSnapshot snapshot = m_commandHub->captureSnapshot(m_commandHub->mainWindow());
+
+    // 配置驱动优先（P0-2b）：客户 JSON 声明了 contextMenus["canvas.2d"] 时由配置接管。
+    // 图层等运行时内容通过 dynamicSections 插入，见下方注册的 "layer.actions"。
+    if (QMenu* configured = buildConfiguredContextMenu(QStringLiteral("canvas.2d"), snapshot.hasSelection))
+    {
+        // 生命周期：dispatcher 是栈对象，必须保证菜单在本作用域内销毁完毕，
+        // 不能用 deleteLater（事件循环稍后执行时 dispatcher 已失效）。
+        configured->exec(event->globalPos());
+        delete configured;
+        return;
+    }
+
+    QMenu menu;
     m_commandHub->populateContextMenu(&menu, snapshot, m_services.layerManager);
     if (menu.isEmpty())
     {
         return;
     }
     menu.exec(event->globalPos());
+}
+
+QMenu* Workbench2D::buildConfiguredContextMenu(const QString& contextMenuId, bool hasSelection)
+{
+    const UiConfigData* config = UiConfigurationManager::shared().configData();
+    if (!UiContextMenuService::hasConfigFor(config, contextMenuId))
+    {
+        return nullptr;
+    }
+
+    // 命令分发器适配：直接复用工作台自身的命令路径，
+    // 与顶部菜单 / 工具栏 / 快捷键走同一条 dispatchCommand。
+    struct WorkbenchDispatcher final : public IUiCommandDispatcher
+    {
+        Workbench2D* wb = nullptr;
+
+        bool isCommandRegistered(const QString& commandId) const override
+        {
+            return wb && wb->isCommandRegistered(commandId);
+        }
+
+        void dispatch(const QString& commandId) override
+        {
+            if (wb)
+            {
+                wb->dispatchCommand(commandId);
+            }
+        }
+    };
+
+    WorkbenchDispatcher dispatcher;
+    dispatcher.wb = this;
+
+    // 图层动态段：每次弹出都重新注册，闭包捕获当前选中状态与图层管理器
+    UiContextMenuService::instance().registerDynamicSection(QStringLiteral("layer.actions"),
+        [this, hasSelection](QMenu* menu) {
+            if (m_commandHub && m_services.layerManager)
+            {
+                m_commandHub->populateLayerContextSection(menu, m_services.layerManager, hasSelection);
+            }
+        });
+
+    return UiContextMenuService::instance().buildMenu(config, contextMenuId, &dispatcher, m_commandHub->mainWindow());
+}
+
+void Workbench2D::refreshCommandUiState()
+{
+    if (!m_commandHub)
+    {
+        return;
+    }
+
+    // 一次抓取，多处消费：refreshActionStates 内部会广播 selectionContextChanged，
+    // 由 applySelectionContext 扇出到属性面板/状态栏/场景树/工具栏上下文。
+    m_commandHub->refreshActionStates(m_commandHub->captureSnapshot(m_commandHub->mainWindow()));
+}
+
+void Workbench2D::applySelectionContext(const CommandUiSnapshot& snapshot)
+{
+    // 属性面板：重建属性模型并同步锁定态（面板可缺失，内部已探测）
+    refreshPropertiesPanel();
+
+    // 状态栏选择指示器：直接用快照里的 selectionCount，不再二次遍历场景
+    if (m_statusBar2D)
+    {
+        const int n = snapshot.selectionCount;
+        m_statusBar2D->setSelectionInfo(n, tr("Selected: %1").arg(n));
+    }
+
+    // 场景树右键菜单：与视口右键菜单共用同一份 hasSelection / anyLocked 判定，消除规则漂移
+    if (m_scenePanel2D)
+    {
+        m_scenePanel2D->setCommandState(snapshot.hasSelection, snapshot.anyLocked());
+    }
+
+    // 菜单栏：菜单项是独立于命令中枢创建的 QAction（config-driven 与 legacy 两条构建路径），
+    // 中枢的 refreshActionStates 触达不到，故在此按同一份快照统一刷新启用态。
+    if (m_workbenchWindow)
+    {
+        if (WorkbenchMenuManager* menus = m_workbenchWindow->menuManager())
+        {
+            menus->refreshCommandStates(snapshot);
+        }
+    }
+
+
+    // 顶部工具栏上下文：按快照 typeMask 切换（Text/QR/Bitmap/Vector/Default）
+    if (m_contextManager)
+    {
+        const ToolBarContext newCtx = determineContextFromSelection();
+        if (m_contextManager->currentContext() != newCtx)
+        {
+            m_contextManager->setCurrentContext(newCtx);
+        }
+    }
 }
 
 void Workbench2D::refreshPropertiesPanel()
@@ -1634,10 +1700,7 @@ void Workbench2D::activate()
     }
 
     // 激活时刷新一次动作状态（撤销/重做可用性 + 选中项驱动的启用态）
-    if (m_commandHub)
-    {
-        m_commandHub->refreshActionStates(m_commandHub->captureSnapshot(m_commandHub->mainWindow()));
-    }
+    refreshCommandUiState();
 }
 
 void Workbench2D::deactivate()
@@ -2150,12 +2213,54 @@ void Workbench3D::on3DContextMenuRequested(const QPoint& globalPos)
             break;
         }
     }
+    // 配置驱动优先（P0-2b）：客户 JSON 声明了 contextMenus["canvas.3d"] 时由配置接管
+    if (QMenu* configured = buildConfiguredContextMenu(QStringLiteral("canvas.3d")))
+    {
+        // dispatcher 是栈对象，菜单必须在本作用域内销毁，不能 deleteLater
+        configured->exec(globalPos);
+        delete configured;
+        return;
+    }
+
     m_serviceOwner->commandActionHub->populateContextMenu(&menu, snapshot);
     if (menu.isEmpty())
     {
         return;
     }
     menu.exec(globalPos);
+}
+
+QMenu* Workbench3D::buildConfiguredContextMenu(const QString& contextMenuId)
+{
+    const UiConfigData* config = UiConfigurationManager::shared().configData();
+    if (!UiContextMenuService::hasConfigFor(config, contextMenuId))
+    {
+        return nullptr;
+    }
+
+    // 与 2D 同构的分发器适配：右键项走 Workbench3D::dispatchCommand，
+    // 与 3D 顶部菜单 / 工具栏共用同一条命令路径。
+    struct Workbench3DDispatcher final : public IUiCommandDispatcher
+    {
+        Workbench3D* wb = nullptr;
+
+        bool isCommandRegistered(const QString& commandId) const override
+        {
+            return wb && wb->isCommandRegistered(commandId);
+        }
+
+        void dispatch(const QString& commandId) override
+        {
+            if (wb)
+            {
+                wb->dispatchCommand(commandId);
+            }
+        }
+    };
+
+    Workbench3DDispatcher dispatcher;
+    dispatcher.wb = this;
+    return UiContextMenuService::instance().buildMenu(config, contextMenuId, &dispatcher, m_services3D.renderWidget);
 }
 
 /// 步骤三：创建 CommandActionHub3D、注册命令、初始化菜单管理器和快捷键
@@ -2191,43 +2296,15 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     own.commandActionHub->rebuildAll(own.shortcutManager.get());
     SY_INFO("[Workbench3D] CommandActionHub3D rebuilt with all actions");
 
-    // 2. 创建菜单骨架到 WorkbenchWindow 菜单栏
-    #ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
-    // 配置驱动模式下，WorkbenchMenuManager 负责统一创建 2D / 3D 菜单。
-    // MenuManager3D 仍保留为 3D 专用 ActionHub/菜单适配器，不再直接清空并创建窗口菜单。
-    SY_INFO("[Workbench3D] Config-driven menu mode: using WorkbenchMenuManager");
-    #else
-    m_menuManager3D = std::make_unique<MenuManager3D>(mainWindow3D);
-    m_menuManager3D->createMenus(window.menuBar());
-    #endif
+    // 2. 菜单：统一由 WorkbenchMenuManager 从客户 JSON 生成（P0-2c）
+    //
+    // 3D 菜单历史上由 MenuManager3D（5 个硬编码 Menu 子类）自行清空并创建窗口菜单栏，
+    // 与 2D 的配置驱动路径完全并行，客户想改 3D 菜单只能改 C++。
+    // 现在 2D / 3D 走同一条 JSON 链路：菜单项在客户配置里按 workbenches: ["3D"] 声明，
+    // 命令 ID 经 Workbench3D::dispatchCommand 落到 OperationBus3D。
+    // MenuManager3D 及其 bindXxxMenu / connectMenuSignals 已随硬编码路径一并移除。
+    SY_INFO("[Workbench3D] Menus are built by WorkbenchMenuManager from client config");
 
-    #ifndef SANYI_ENABLE_CONFIG_DRIVEN_UI
-    // 3. 绑定菜单 Action（在 rebuildAll 之后，action() 才有有效指针）
-    if (auto* fm = qobject_cast<FileMenu3D*>(m_menuManager3D->fileMenu()))
-    {
-        own.commandActionHub->bindFileMenu(fm);
-    }
-    if (auto* em = m_menuManager3D->editMenu())
-    {
-        own.commandActionHub->bindEditMenu(em);
-    }
-    if (auto* vm = m_menuManager3D->viewMenu())
-    {
-        own.commandActionHub->bindViewMenu(vm);
-    }
-        #ifdef ENABLE_GEOMODELCORE
-    if (auto* sm = m_menuManager3D->solidMenu())
-    {
-        own.commandActionHub->bindSolidMenu(sm);
-    }
-        #endif
-
-    // 4. 连接非 hub 菜单信号（hub action 已由 wireAction 直接连接 OperationBus）
-    m_menuManager3D->connectMenuSignals();
-    SY_INFO("[Workbench3D] MenuManager3D initialized on WorkbenchWindow menubar");
-
-    connect(m_menuManager3D.get(), &MenuManager3D::sigMenuAction, this, &Workbench3D::onMenuAction);
-    #endif
 
     // 5. 转移并绑定工具栏。
     // 菜单由统一配置路径生成，3D CommandActionHub 继续负责高频工具栏动作。
@@ -2578,13 +2655,9 @@ bool Workbench3D::requiresSkeletonDocks() const
 
 bool Workbench3D::managesOwnMenus() const
 {
-    // 配置驱动模式下由 WorkbenchMenuManager 统一构建 2D/3D 菜单（见 setup3DMenuAndShortcuts），
-    // 3D 不再自行管理窗口菜单栏；仅旧路径（MenuManager3D）由本工作台自理。
-    #ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI
+    // 菜单统一由 WorkbenchMenuManager 从客户 JSON 构建（P0-2c），
+    // 3D 工作台不再自行管理窗口菜单栏。硬编码的 MenuManager3D 路径已移除。
     return false;
-    #else
-    return true;
-    #endif
 }
 
 bool Workbench3D::showSettingsDialog(QWidget* /*parent*/)

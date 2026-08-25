@@ -3,5 +3,6 @@
         <file alias="san_yi.json">configs/san_yi.json</file>
         <file alias="base.json">configs/base.json</file>
         <file alias="client_a.json">configs/client_a.json</file>
+        <file alias="client_b.json">configs/client_b.json</file>
     </qresource>
 </RCC>

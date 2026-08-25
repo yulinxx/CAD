@@ -30,15 +30,19 @@ set(SANYI_ROOT "${PROJECT_SOURCE_DIR}" CACHE INTERNAL "SanYi CAD project root")
 include("${SANYI_ROOT}/CMake/SanYiPaths.cmake")
 include("${SANYI_ROOT}/CMake/Utils.cmake")
 
-# 客户化 UI 配置选项：选择目标客户版本（编译期嵌入对应的 JSON 配置）
-set(SANYI_CLIENT_ID "san_yi" CACHE STRING "Target UI client ID")
-set_property(CACHE SANYI_CLIENT_ID PROPERTY STRINGS
+# 客户化 UI 配置：默认客户 ID 仅用于打包时写入安装包默认设置，
+# **不再**作为编译期宏注入代码。运行时客户 ID 由 UiClientContext 解析，
+# 优先级：命令行覆盖 > 环境变量 SANYI_CLIENT_ID > QSettings Client/Id > san_yi。
+# 这样一份二进制即可服务多个客户，无需为每个客户单独出包。
+set(SANYI_DEFAULT_CLIENT_ID "san_yi" CACHE STRING "Default UI client ID written to installer settings")
+set_property(CACHE SANYI_DEFAULT_CLIENT_ID PROPERTY STRINGS
     "san_yi"
     "client_a"
     "client_b"
 )
-# 客户 UI 配置驱动开关：默认关闭，启用后由 JSON 配置驱动 UI 构建
-option(SANYI_ENABLE_CONFIG_DRIVEN_UI "Enable config-driven UI layout" OFF)
+# 配置驱动 UI 已成为唯一构建路径（硬编码回退分支已删除），此开关仅保留兼容占位。
+# 注意：不要再新增 #ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI 分支。
+option(SANYI_ENABLE_CONFIG_DRIVEN_UI "Deprecated: config-driven UI is now the only path" ON)
 
 # 可选: 启用 Vulkan 支持 (从 vcpkg 获取)
 find_package(Vulkan QUIET)
