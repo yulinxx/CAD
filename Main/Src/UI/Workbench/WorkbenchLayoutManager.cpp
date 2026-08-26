@@ -201,7 +201,8 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
     // 仅在两个骨架 Dock 都存在时执行，配置里删掉其中一个也不会崩。
     if (m_panelState.leftDock && m_panelState.rightDock)
     {
-        m_parent->resizeDocks({ m_panelState.leftDock, m_panelState.rightDock }, { 180, 280 }, Qt::Horizontal);
+        m_parent->resizeDocks({ m_panelState.leftDock.data(), m_panelState.rightDock.data() },
+            { 180, 280 }, Qt::Horizontal);
     }
 
     return !m_registeredDocks.empty();
@@ -353,8 +354,8 @@ void WorkbenchLayoutManager::clearLayoutContent(const UiWorkbench* oldWorkbench)
     }
     m_registeredDocks.clear();
 
-    m_panelState.sceneTreeDock = nullptr;
-    m_panelState.propertiesDock = nullptr;
+    // 不需要手工置空 m_panelState 里的 Dock 指针：它们是 QPointer，
+    // 上面的 delete 已经让它们自动变成 null（见 PanelState 的注释）。
 
     // 3.1: 清理配置驱动的状态栏槽位。
     // 容器（QStatusBar）保留，只回收槽位控件，否则工作台反复切换会堆积重复标签。

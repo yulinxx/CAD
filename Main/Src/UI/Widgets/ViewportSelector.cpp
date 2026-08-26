@@ -13,9 +13,16 @@
 #include <cmath>
 #include <limits>
 
+#include <QColor>
+
 namespace
 {
     constexpr double kHitTolerancePx = 8.0;
+
+    // 框选橡皮筋：半透明填充 + 实色描边。
+    // 走 selectionRect 通道（填充+描边），不是 selectionBox（只描边的选中集包围盒）。
+    const QColor kBoxSelectFill(204, 102, 0, 48);
+    const QColor kBoxSelectBorder(204, 102, 0, 200);
 }  // namespace
 
 ViewportSelector::ViewportSelector(Eg::SceneManager* sceneManager,
@@ -53,7 +60,7 @@ void ViewportSelector::beginBoxSelect(const QPointF& worldPos)
     }
 
     Render::BBox2d bbox(worldPos.x(), worldPos.y(), worldPos.x(), worldPos.y());
-    m_renderWidget->setSelectionBox(&bbox, QColor(204, 102, 0, 200));
+    m_renderWidget->setSelectionRect(&bbox, kBoxSelectFill, kBoxSelectBorder);
 }
 
 void ViewportSelector::updateBoxSelect(const QPointF& worldPos)
@@ -66,7 +73,7 @@ void ViewportSelector::updateBoxSelect(const QPointF& worldPos)
     }
 
     Render::BBox2d bbox(m_boxSelectStart.x(), m_boxSelectStart.y(), worldPos.x(), worldPos.y());
-    m_renderWidget->setSelectionBox(&bbox, QColor(204, 102, 0, 200));
+    m_renderWidget->setSelectionRect(&bbox, kBoxSelectFill, kBoxSelectBorder);
 }
 
 size_t ViewportSelector::endBoxSelect(const QPointF& worldPos)
@@ -75,7 +82,7 @@ size_t ViewportSelector::endBoxSelect(const QPointF& worldPos)
 
     if (m_renderWidget)
     {
-        m_renderWidget->setSelectionBox(nullptr, QColor());
+        m_renderWidget->setSelectionRect(nullptr, QColor(), QColor());
     }
 
     if (!m_camera || !m_sceneManager || !m_selectionService)
