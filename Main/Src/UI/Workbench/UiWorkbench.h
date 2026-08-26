@@ -2,6 +2,7 @@
 
 #include <QString>
 #include <QObject>
+#include <QPointer>
 #include <QVector>
 
 #include <memory>
@@ -304,8 +305,14 @@ private:
     class QTimer* m_sceneTreeRefreshTimer{ nullptr };
     /// 上次记录的图元数量（判断是否发生结构变更）
     std::size_t m_lastSceneEntityCount{ 0 };
-    /// 2D 状态栏 widget — 由 StatusBar 基类管理，通过 mountStatusBar 挂载到 WorkbenchWindow
-    StatusBar* m_statusBar2D{ nullptr };
+    /// 2D 状态栏 widget。
+    /// 所有权在 Qt 父子关系：创建时挂在 WorkbenchWindow 上，mountStatusBar 里
+    /// QStatusBar::addWidget 会把它再 reparent 到 QStatusBar。QStatusBar 跨工作台
+    /// 切换一直存在，所以这个对象在 unmountStatusBar 之后仍然活着，下次 attach
+    /// 直接复用。用 QPointer 而不是裸指针：一旦哪天它被 Qt 或别处销毁，
+    /// `if (!m_statusBar2D) new ...` 这条复用判断会自动走到重建分支，而不是拿着
+    /// 悬空指针去 mount。
+    QPointer<StatusBar> m_statusBar2D;
 
     /// 2D 设置协调器（共享 SettingsService  singleton）
     std::unique_ptr<SettingsUiCoordinator2D> m_settingsCoordinator;
@@ -408,8 +415,10 @@ private:
     std::unique_ptr<class MainWindow3D> m_mainWindow3D;
     std::unique_ptr<class MenuManager3D> m_menuManager3D;
 
-    /// 3D 状态栏 widget — 由 StatusBar3D 基类管理，通过 mountStatusBar 挂载到 WorkbenchWindow
-    StatusBar3D* m_statusBar3D{ nullptr };
+    /// 3D 状态栏 widget。所有权与复用规则同 m_statusBar2D（见那里的注释）。
+    /// deactivate() 里刻意**不**清空它：清空等于每次切回 3D 都新建一个，
+    /// 而旧的仍挂在 QStatusBar 上没人删。
+    QPointer<StatusBar3D> m_statusBar3D;
 
     /// 3D 场景树面板（可选 UI，配置驱动时可能不存在）
     class SceneTreePanel3D* m_scenePanel3D{ nullptr };

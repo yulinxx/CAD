@@ -493,8 +493,12 @@ void WorkbenchWindow::unmountStatusBar()
     // 卸载时清空旧状态栏内容，避免切换 2D/3D 后残留上一次的显示
     m_activeStatusBar->clearAll();
 
-    // 不在这里 delete —— StatusBarBase 的生命周期由创建它的 Workbench 负责
-    // Workbench2D/Workbench3D 在析构时会清理自己创建的 StatusBar
+    // 不在这里 delete：状态栏 widget 的所有权在 Qt 父子关系里。
+    // QStatusBar::addWidget 已把它 reparent 到 QStatusBar，而 QStatusBar 跨工作台
+    // 切换一直存在，所以卸载后对象仍然活着，下次 attach 由工作台复用同一个实例。
+    // （曾经这里写「由创建它的 Workbench 在析构时清理」，但 ~Workbench2D 是
+    // = default、~Workbench3D 也没碰它——那句描述的契约并不存在。真正的回收者
+    // 是 QStatusBar 的析构。）
     m_activeStatusBar = nullptr;
     if (m_stateManager)
     {
