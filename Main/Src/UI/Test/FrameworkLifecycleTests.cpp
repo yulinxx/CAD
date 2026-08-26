@@ -18,7 +18,6 @@
  * - 验证 WorkbenchStateSnapshot 完整字段闭环
  * - 验证 ISceneDataSource 统一渲染数据源契约
  * - 验证 SceneGeometryCollector 包围盒收集
- * - 验证 SimpleRenderer3D 通过 ISceneDataSource 渲染
  *
  * 第四部分：回归测试扩展 (2026-07-30)
  * - 场景序列化往返测试 (Syx 序列化/反序列化)
@@ -29,7 +28,6 @@
 
 #include <gtest/gtest.h>
 
-#include "UI/Render/SimpleRenderer3D.h"
 #include "UI/Workbench/UiWorkbench.h"
 #include "Engine/Scene/SceneGeometryCollector.h"
 #include "Engine/Scene/SceneRenderContract.h"
@@ -82,43 +80,6 @@ TEST(FrameworkLifecycleTest, UiStateSnapshot_DefaultsAreStable)
     EXPECT_FALSE(snapshot.dirty);
     EXPECT_EQ(snapshot.currentSelectionSource, QStringLiteral("none"));
     EXPECT_EQ(snapshot.currentSelectionType, QStringLiteral("none"));
-}
-
-TEST(FrameworkLifecycleTest, SimpleRenderer3D_LifecycleIsIdempotent)
-{
-    // 渲染器生命周期应支持重复关闭，不应因二次 shutdown 产生异常状态。
-    SimpleRenderer3D renderer;
-
-    EXPECT_FALSE(renderer.isReady());
-    EXPECT_FALSE(renderer.isRenderLoopRunning());
-
-    EXPECT_TRUE(renderer.initialize());
-    EXPECT_TRUE(renderer.isReady());
-
-    renderer.setRenderLoopEnabled(true);
-    EXPECT_TRUE(renderer.isRenderLoopRunning());
-
-    renderer.shutdown();
-    EXPECT_FALSE(renderer.isReady());
-    EXPECT_FALSE(renderer.isRenderLoopRunning());
-
-    // 关闭后再次调用 shutdown 应保持幂等。
-    renderer.shutdown();
-    EXPECT_FALSE(renderer.isReady());
-    EXPECT_FALSE(renderer.isRenderLoopRunning());
-}
-
-TEST(FrameworkLifecycleTest, SimpleRenderer3D_ResetViewDoesNotBreakMode)
-{
-    // resetView 只能重置视图，不应该破坏当前交互模式的可用性。
-    SimpleRenderer3D renderer;
-    ASSERT_TRUE(renderer.initialize());
-
-    renderer.setOrbitMode(true);
-    renderer.resetView();
-
-    EXPECT_TRUE(renderer.isOrbitMode());
-    renderer.shutdown();
 }
 
 // ==================== P0 回归测试 (2026-07-29) ====================

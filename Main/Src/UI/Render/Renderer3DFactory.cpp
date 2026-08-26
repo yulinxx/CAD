@@ -1,6 +1,5 @@
 #include "Renderer3DFactory.h"
 
-#include "SimpleRenderer3D.h"
 #include "RenderWidget3DAdapter.h"
 #include "Log/SyLogger.h"
 
@@ -8,10 +7,6 @@ std::unique_ptr<IRenderer3D> Renderer3DFactory::create(RendererType type)
 {
     switch (type)
     {
-    case RendererType::Simple:
-        SY_INFO("[Renderer3DFactory] Creating SimpleRenderer3D (validation chain)");
-        return std::make_unique<SimpleRenderer3D>();
-
     case RendererType::Compatible:
         SY_INFO("[Renderer3DFactory] Creating RenderWidget3DAdapter (compatible chain)");
         return std::make_unique<RenderWidget3DAdapter>();
@@ -31,10 +26,6 @@ std::unique_ptr<IRenderer3D> Renderer3DFactory::createDefault()
 
 Renderer3DFactory::RendererType Renderer3DFactory::fromString(const std::string& name)
 {
-    if (name == "simple" || name == "Simple")
-    {
-        return RendererType::Simple;
-    }
     if (name == "compatible" || name == "Compatible")
     {
         return RendererType::Compatible;
@@ -52,8 +43,6 @@ std::string Renderer3DFactory::toString(RendererType type)
 {
     switch (type)
     {
-    case RendererType::Simple:
-        return "Simple";
     case RendererType::Compatible:
         return "Compatible";
     case RendererType::None:

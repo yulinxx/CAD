@@ -110,7 +110,6 @@
 
     #include "UI3D/Service/SceneMonitor3D.h"
     #include "UI3D/Shortcut/ShortcutManager3D.h"
-    #include "UI3D/Navigation/NavigationConfig3D.h"
     #include "UI3D/Service/SceneDocument3D.h"
     #include "UI3D/Service/CameraController3D.h"
     #include "UI3D/Settings/SettingsUiCoordinator3D.h"
@@ -130,7 +129,6 @@ struct Workbench3D::ServiceOwner
     std::unique_ptr<SceneEditService3D> sceneEditService;
     std::unique_ptr<SceneMonitor3D> sceneMonitor;
     std::unique_ptr<ShortcutManager3D> shortcutManager;
-    std::unique_ptr<NavigationConfig3D> navigationConfig;
     std::unique_ptr<SceneDocument3D> sceneDocument;
 
     std::unique_ptr<SceneDocument3DAdapter> sceneDocumentAdapter;
@@ -475,7 +473,13 @@ bool Workbench2D::showSettingsDialog(QWidget* /*parent*/)
 
     // 2D 捕捉设置由视口持有的 GridSnapManager 驱动（coordinator 已做空指针保护）
     RenderWidget* widget = m_viewport->renderWidget();
-    return m_settingsCoordinator->showSettingsDialog(widget, m_viewport->gridSnapManager(), m_services.unitManager);
+    // 快捷键页的数据来自配置驱动菜单的台账（菜单管理器持有），2D/3D 同一份实现
+    IShortcutSettingsModel* shortcutModel =
+        m_workbenchWindow && m_workbenchWindow->menuManager()
+        ? m_workbenchWindow->menuManager()->shortcutSettingsModel()
+        : nullptr;
+    return m_settingsCoordinator->showSettingsDialog(
+        widget, m_viewport->gridSnapManager(), m_services.unitManager, shortcutModel);
 }
 
 QWidget* Workbench2D::createCentralViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties)
@@ -1884,7 +1888,6 @@ void Workbench2D::releaseCentralWidgetGLResources(QWidget* centralWidget) const
     #include "UI3D/Edit/SceneEditService3D.h"
     #include "UI3D/Service/SceneMonitor3D.h"
     #include "UI3D/Shortcut/ShortcutManager3D.h"
-    #include "UI3D/Navigation/NavigationConfig3D.h"
     #include "UI3D/Service/SceneDocument3D.h"
     #include "UI3D/Service/CameraController3D.h"
     #include "UI3D/Settings/SettingsUiCoordinator3D.h"
@@ -2021,7 +2024,6 @@ void Workbench3D::create3DServices()
         std::make_unique<SceneEditService3D>(m_sceneManager3D, own.undoRedoManager.get(), own.documentManager.get());
     own.sceneMonitor = std::make_unique<SceneMonitor3D>(nullptr);
     own.shortcutManager = std::make_unique<ShortcutManager3D>(nullptr);
-    own.navigationConfig = std::make_unique<NavigationConfig3D>();
     own.sceneDocument = std::make_unique<SceneDocument3D>(m_sceneManager3D);
     own.sceneDocumentAdapter = std::make_unique<SceneDocument3DAdapter>();
     auto sceneManagerAlias = std::shared_ptr<Eg::SceneManager3D>(m_sceneManager3D, [](Eg::SceneManager3D*) {});
@@ -2030,7 +2032,7 @@ void Workbench3D::create3DServices()
     own.algorithmService = std::make_unique<AlgorithmApplicationService>(nullptr);
     own.settingsService = ApplicationCompositionRoot::getSettingsService();
     own.settingsService->init();
-    own.settingsCoordinator = std::make_unique<SettingsUiCoordinator3D>(own.settingsService, own.navigationConfig.get());
+    own.settingsCoordinator = std::make_unique<SettingsUiCoordinator3D>(own.settingsService);
 
     #ifdef ENABLE_GEOMODELCORE
     own.brepModelService = std::make_unique<BRepModelService3D>();
@@ -2054,7 +2056,6 @@ void Workbench3D::create3DServices()
     m_services3D.sceneEditService = own.sceneEditService.get();
     m_services3D.sceneMonitor = own.sceneMonitor.get();
     m_services3D.shortcutManager = own.shortcutManager.get();
-    m_services3D.navigationConfig = own.navigationConfig.get();
     m_services3D.sceneDocument = own.sceneDocument.get();
     m_services3D.cameraController = own.cameraController.get();
     m_services3D.algorithmService = own.algorithmService.get();
@@ -2145,33 +2146,12 @@ void Workbench3D::bind3DRenderSignals(ServiceOwner& own)
 
     bind3DCursorSignal();
     bind3DSelectionSignal();
-    bind3DDeleteKeySignal();
 
     // 右键菜单请求：交给命令中枢基于统一快照构建并弹出（与 2D 视口一致）
     connect(m_services3D.renderWidget, &RenderWidget3D::sigContextMenuRequested,
         this, &Workbench3D::on3DContextMenuRequested);
-
-    if (auto* viewport = qobject_cast<Viewport3D*>(m_mainWindow3D ? m_mainWindow3D->centralWidget() : nullptr))
-    {
-        viewport->setInputHandler([this](QEvent* event) {
-            if (!event || !m_services3D.operationBus)
-            {
-                return false;
-            }
-
-            if (event->type() == QEvent::KeyPress)
-            {
-                auto* keyEvent = static_cast<QKeyEvent*>(event);
-                if (keyEvent->key() == Qt::Key_Delete || keyEvent->key() == Qt::Key_Backspace)
-                {
-                    m_services3D.operationBus->run(OperationId3D::Edit_Delete);
-                    return true;
-                }
-            }
-            return false;
-        });
-    }
 }
+
 
 /// 绑定光标世界坐标信号
 void Workbench3D::bind3DCursorSignal()
@@ -2233,47 +2213,41 @@ void Workbench3D::bind3DSelectionSignal()
         });
 }
 
-/// 绑定 Delete/Backspace 键盘按键信号
-void Workbench3D::bind3DDeleteKeySignal()
-{
-    auto* renderWidget = m_services3D.renderWidget;
-    connect(renderWidget, &RenderWidget3D::sigKeyPressed, this, [this](int key, Qt::KeyboardModifiers) {
-        if (key == Qt::Key_Delete || key == Qt::Key_Backspace)
-        {
-            if (m_services3D.operationBus)
-            {
-                SY_INFO("[Workbench3D] Delete key pressed (renderWidget signal), running Edit_Delete operation");
-                m_services3D.operationBus->run(OperationId3D::Edit_Delete);
-            }
-        }
-    });
-}
-
 /// 创建全局删除快捷键
 void Workbench3D::setup3DDeleteShortcuts(WorkbenchWindow& window)
 {
-    // 全局 Delete 快捷键（渲染 widget 无焦点时也生效）
-    m_deleteShortcut = new QShortcut(QKeySequence(Qt::Key_Delete), &window);
-    m_deleteShortcut->setContext(Qt::ApplicationShortcut);
-    connect(m_deleteShortcut, &QShortcut::activated, this, [this]() {
+    // Delete/Backspace 在 3D 侧只保留这一条通路（窗口级 QShortcut）。
+    // 此前还并存 RenderWidget3D::sigKeyPressed 与 Viewport3D::setInputHandler 两条，
+    // 三者都跑 Edit_Delete：ApplicationShortcut 会在按键送达 widget 前就消费掉事件，
+    // 所以那两条平时是死代码，一旦快捷键被禁用/判 ambiguous 就变成一次按键删两次。
+    //
+    // 与 2D 同一套护栏：焦点在文本控件里时不拦截，否则在参数面板里按退格会删图元。
+    const auto editingText = []() -> bool {
+        QWidget* fw = QApplication::focusWidget();
+        return fw && (qobject_cast<QLineEdit*>(fw) || qobject_cast<QTextEdit*>(fw) || qobject_cast<QPlainTextEdit*>(fw));
+    };
+    const auto deleteSelected3D = [this, editingText]() {
+        if (editingText())
+        {
+            return;
+        }
         if (m_services3D.operationBus)
         {
             SY_INFO("[Workbench3D] Delete shortcut activated, running Edit_Delete operation");
             m_services3D.operationBus->run(OperationId3D::Edit_Delete);
         }
-    });
+    };
+
+    // 全局 Delete 快捷键（渲染 widget 无焦点时也生效）
+    m_deleteShortcut = new QShortcut(QKeySequence(Qt::Key_Delete), &window);
+    m_deleteShortcut->setContext(Qt::ApplicationShortcut);
+    connect(m_deleteShortcut, &QShortcut::activated, this, deleteSelected3D);
     window.registerShortcut(m_deleteShortcut);
 
     // 全局 Backspace 快捷键
     m_backspaceShortcut = new QShortcut(QKeySequence(Qt::Key_Backspace), &window);
     m_backspaceShortcut->setContext(Qt::ApplicationShortcut);
-    connect(m_backspaceShortcut, &QShortcut::activated, this, [this]() {
-        if (m_services3D.operationBus)
-        {
-            SY_INFO("[Workbench3D] Backspace shortcut activated, running Edit_Delete operation");
-            m_services3D.operationBus->run(OperationId3D::Edit_Delete);
-        }
-    });
+    connect(m_backspaceShortcut, &QShortcut::activated, this, deleteSelected3D);
     window.registerShortcut(m_backspaceShortcut);
 }
 
@@ -2766,7 +2740,28 @@ bool Workbench3D::showSettingsDialog(QWidget* /*parent*/)
         SY_WARN("[Workbench3D] showSettingsDialog: MainWindow3D is null");
         return false;
     }
-    m_mainWindow3D->showSettingsDialog();
+
+    auto& own = *m_serviceOwner;
+    if (!own.settingsCoordinator)
+    {
+        SY_WARN("[Workbench3D] showSettingsDialog: settings coordinator is null");
+        return false;
+    }
+
+    // 直接在此调协调器，而不是转给 MainWindow3D::showSettingsDialog：快捷键页的模型来自
+    // 框架层台账（配置驱动菜单建出的 QAction/QShortcut），UI3D 库看不到那一层。
+    IShortcutSettingsModel* shortcutModel =
+        m_workbenchWindow && m_workbenchWindow->menuManager()
+        ? m_workbenchWindow->menuManager()->shortcutSettingsModel()
+        : nullptr;
+
+    const bool changed = own.settingsCoordinator->showSettingsDialog(
+        m_mainWindow3D->renderWidget(), own.shortcutManager.get(), shortcutModel);
+    if (changed)
+    {
+        m_mainWindow3D->applyShortcutBindings();
+        m_mainWindow3D->setStatusMessage(QObject::tr("Settings applied and saved"));
+    }
     return true;
 }
 #endif

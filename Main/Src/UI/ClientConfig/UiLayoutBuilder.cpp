@@ -1,6 +1,7 @@
 #include "UiLayoutBuilder.h"
 #include "UiFeatureGate.h"
 #include "UiPanelRegistry.h"
+#include "UiShortcutRegistry.h"
 
 #include "UI2D/Operation/CommandCatalog.h"
 #include "Log/SyLogger.h"
@@ -9,6 +10,7 @@
 #include <QCoreApplication>
 #include <QDockWidget>
 #include <QIcon>
+#include <QKeySequence>
 #include <QMainWindow>
 #include <QMenu>
 #include <QMenuBar>
@@ -57,6 +59,29 @@ namespace
             }
         }
         return false;
+    }
+
+    /// 按稳定的 action id 显式声明 macOS 菜单角色。
+    /// QAction 默认是 TextHeuristicRole：Qt 按**文本**（Exit/Quit/About/Settings/Preferences/
+    /// Options）猜测角色，命中就把该动作搬进 macOS 应用菜单。文本一旦被翻译成"退出"/"关于"
+    /// 启发即失效，于是同一台 Mac 上切个语言菜单结构就变，这种不一致比平台差异更难排查。
+    /// 这里按 id 显式声明，与文本、语言彻底解耦；其余项一律 NoRole，禁止 Qt 擅自搬迁。
+    /// 非 macOS 平台 Qt 忽略 menuRole，设置本身无副作用。
+    QAction::MenuRole menuRoleForActionId(const QString& actionId)
+    {
+        if (actionId == QLatin1String("file.exit"))
+        {
+            return QAction::QuitRole;
+        }
+        if (actionId == QLatin1String("help.about"))
+        {
+            return QAction::AboutRole;
+        }
+        if (actionId == QLatin1String("help.settings"))
+        {
+            return QAction::PreferencesRole;
+        }
+        return QAction::NoRole;
     }
 
 
@@ -142,6 +167,7 @@ void UiLayoutBuilder::clearBuiltLayout()
     m_builtDocks.clear();
     m_builtToolBars.clear();
     m_builtStatusBarSlots.clear();
+    m_menuShortcutKeys.clear();
     // Dock / 工具栏 / 状态栏槽位的销毁由上层（WorkbenchLayoutManager）负责，
     // 这里只丢引用；快捷键没有别的持有者，必须本类销毁。
     releaseBuiltShortcuts();
@@ -182,6 +208,11 @@ void UiLayoutBuilder::bindAction(QAction* action,
     }
     action->setProperty("commandId", commandId);
 
+    // objectName 由 buildMenuItem 在调用本函数前写入 action id（工具栏/右键菜单可能为空）。
+    // menuRole 对非菜单动作无效，统一设置不会有副作用。
+    action->setMenuRole(menuRoleForActionId(action->objectName()));
+
+
     if (m_dispatcher && m_dispatcher->isCommandRegistered(commandId))
     {
         // 捕获 dispatcher 而不是 this：本 builder 每次 rebuildMenusFromConfig 都被整体
@@ -215,6 +246,8 @@ void UiLayoutBuilder::bindAction(QAction* action,
 
 void UiLayoutBuilder::buildMenus(const std::vector<MenuDef>& menus)
 {
+    // 每轮重建都从空集开始：菜单按当前工作台重新过滤，上一轮占用的键序列不能带进来。
+    m_menuShortcutKeys.clear();
     if (!m_window)
     {
         return;
@@ -343,12 +376,29 @@ void UiLayoutBuilder::buildMenuItem(QMenu* parent, const std::variant<MenuAction
     action->setObjectName(actionDef.id);
     action->setCheckable(actionDef.checkable);
     action->setChecked(actionDef.checked);
-    if (!actionDef.shortcut.isEmpty())
+    // 配置里写的键是默认值；用户覆盖（如果有）在此叠加，台账没挂上时就等于配置值。
+    const QKeySequence configuredKey =
+        actionDef.shortcut.isEmpty() ? QKeySequence() : QKeySequence(actionDef.shortcut);
+    const QKeySequence keySequence = m_shortcutRegistry
+        ? m_shortcutRegistry->effectiveKey(actionDef.commandId, configuredKey)
+        : configuredKey;
+    if (!keySequence.isEmpty())
     {
-        action->setShortcut(QKeySequence(actionDef.shortcut));
+        action->setShortcut(keySequence);
+        // 菜单项快捷键即全局快捷键（单一来源）：默认的 WindowShortcut 只在菜单所属窗口激活时生效，
+        // 浮动出去的 Dock 是独立顶层窗口，按键就不响应了。历史上这个作用域由配置 shortcuts 节
+        // 另建的 ApplicationShortcut QShortcut 兜住，那批重复定义已移除，作用域必须在此补齐。
+        action->setShortcutContext(Qt::ApplicationShortcut);
+        m_menuShortcutKeys.insert(keySequence.toString());
     }
     bindAction(
         action, actionDef.commandId, actionDef.label, actionDef.iconName, actionDef.workbenches.join(QStringLiteral(",")));
+
+    if (m_shortcutRegistry)
+    {
+        // 没配快捷键的动作也登记：设置页要能给它分配一个。
+        m_shortcutRegistry->recordAction(action, actionDef.commandId, actionDef.id, actionDef.label, configuredKey);
+    }
 }
 
 void UiLayoutBuilder::buildToolBars(const std::vector<ToolBarDef>& toolBars)
@@ -491,13 +541,29 @@ void UiLayoutBuilder::buildShortcuts(const std::vector<ShortcutDef>& shortcuts)
             continue;
         }
 
+        // 单一来源守卫：菜单项已经声明过这个键序列，就不再另建 QShortcut。
+        // 两者并存时同一按键有两个接收者，Qt 判 ambiguous 后两边都不触发——
+        // 表现为「配置里明明写了快捷键，按下去没反应」。JSON 里的重复定义已清理，
+        // 这里再拦一道，防止后续配置改动重新引入。
+        // 依赖 buildShortcuts 在 buildMenus 之后调用（见 WorkbenchMenuManager::rebuildMenusFromConfig）。
+        const QKeySequence configuredKey(sc.keySequence);
+        const QKeySequence keySequence =
+            m_shortcutRegistry ? m_shortcutRegistry->effectiveKey(sc.commandId, configuredKey) : configuredKey;
+        if (!keySequence.isEmpty() && m_menuShortcutKeys.contains(keySequence.toString()))
+        {
+            SY_WARNF("[UiLayoutBuilder] Skip duplicated shortcut '%s' for command '%s' — already bound by a menu item",
+                qPrintable(keySequence.toString()),
+                qPrintable(sc.commandId));
+            continue;
+        }
+
         // QShortcut 由本 builder 拥有：它 parent 到窗口，但**不能**靠窗口回收——
         // 每次 rebuildMenusFromConfig 都会按当前工作台的命令目录重新过滤一遍
         // shortcuts，上一批必须先消失。否则：
         //  - 两个工作台都有的键（Ctrl+Z 等）会累积同键 QShortcut，Qt 判 ambiguous
         //    后两个都不触发，表现为「切一次工作台快捷键就失效」；
         //  - 只有 2D 有的键（Ctrl+N / Ctrl+F 等）在 3D 下仍由上一批响应。
-        auto* shortcut = new QShortcut(QKeySequence(sc.keySequence), m_window);
+        auto* shortcut = new QShortcut(keySequence, m_window);
         shortcut->setContext(Qt::ApplicationShortcut);
         // 同 bindAction：捕获 dispatcher 而不是 this，本 builder 会被整体替换
         QObject::connect(shortcut, &QShortcut::activated,
@@ -506,6 +572,10 @@ void UiLayoutBuilder::buildShortcuts(const std::vector<ShortcutDef>& shortcuts)
                 dispatcher->dispatch(commandId);
             });
         m_builtShortcuts.push_back(shortcut);
+        if (m_shortcutRegistry)
+        {
+            m_shortcutRegistry->recordShortcut(shortcut, sc.commandId, configuredKey);
+        }
     }
 }
 

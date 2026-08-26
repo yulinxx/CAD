@@ -149,7 +149,6 @@ Main/Src/UI/Test/
 ├── ViewportInputRegressionTests.cpp    # 视口输入回归
 ├── Scene3DRegressionTests.cpp       # 3D 场景回归
 ├── RenderWidget3DAdapterTests.cpp   # 3D 适配层测试
-├── SimpleRenderer3DTests.cpp        # 验证渲染器测试
 ├── UndoRedoRegressionTests.cpp      # 撤销重做回归
 ├── UndoRedoExtendedRegressionTests.cpp
 ├── SceneNotifierTests.cpp           # 场景通知测试

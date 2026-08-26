@@ -44,7 +44,6 @@ class UndoRedoManager3D;
 class SceneEditService3D;
 class SceneMonitor3D;
 class ShortcutManager3D;
-class NavigationConfig3D;
 class SceneDocument3D;
 class CameraController3D;
 class SettingsUiCoordinator3D;
@@ -393,7 +392,6 @@ private:
     void bind3DRenderSignals(ServiceOwner& own);
     void bind3DCursorSignal();
     void bind3DSelectionSignal();
-    void bind3DDeleteKeySignal();
     void setup3DDeleteShortcuts(WorkbenchWindow& window);
     /// 3D 视口右键菜单请求：基于命令中枢快照构建并弹出（与 2D 统一的单一事实来源）
     void on3DContextMenuRequested(const QPoint& globalPos);

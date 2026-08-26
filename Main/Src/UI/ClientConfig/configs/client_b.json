@@ -19,7 +19,9 @@
       "items": [
         { "type": "action", "id": "algo.fill", "label": "Fill", "command": "algo.fill", "icon": ":/ui/common/Icons/Actions/algo_fill.svg", "workbenches": ["2D"] },
         { "type": "action", "id": "algo.nesting", "label": "Nesting", "command": "algo.nesting", "icon": ":/ui/common/Icons/Actions/algo_nesting.svg", "workbenches": ["2D"], "feature": "nesting" },
-        { "type": "action", "id": "algo.relief_engraving", "label": "Relief Engraving", "command": "algo.relief_engraving", "icon": ":/ui/common/Icons/Actions/algo_relief.svg", "workbenches": ["2D", "3D"], "feature": "relief3d" }
+        { "type": "action", "id": "algo.relief_engraving", "label": "Bitmap Relief Engraving...", "command": "algo.relief_engraving", "icon": ":/ui/common/Icons/Actions/algo_relief.svg", "workbenches": ["2D"], "feature": "relief3d" },
+        { "type": "action", "id": "algo.relief_engraving_mesh", "label": "Mesh Relief Engraving...", "command": "algo.relief_engraving_mesh", "icon": ":/ui/common/Icons/Actions/algo_relief.svg", "workbenches": ["3D"], "feature": "relief3d" }
+
       ]
     }
   ],
@@ -51,8 +53,5 @@
     }
   ],
   "shortcuts": [
-    { "command": "edit.undo", "keys": "Ctrl+Z" },
-    { "command": "edit.redo", "keys": "Ctrl+Y" },
-    { "command": "edit.delete", "keys": "Delete" }
   ]
 }

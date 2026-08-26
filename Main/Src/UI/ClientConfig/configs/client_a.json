@@ -13,7 +13,8 @@
       "items": [
         { "type": "submenu", "id": "tools.algorithm", "label": "Algorithm", "icon": ":/ui/common/Icons/Actions/algo_fill.svg", "workbenches": ["2D", "3D"], "items": [
           { "type": "action", "id": "algo.fill", "label": "Fill", "command": "algo.fill", "icon": ":/ui/common/Icons/Actions/algo_fill.svg", "workbenches": ["2D"] },
-          { "type": "action", "id": "algo.relief_engraving", "label": "Relief Engraving", "command": "algo.relief_engraving", "icon": ":/ui/common/Icons/Actions/algo_relief.svg", "workbenches": ["2D", "3D"] }
+          { "type": "action", "id": "algo.relief_engraving", "label": "Bitmap Relief Engraving...", "command": "algo.relief_engraving", "icon": ":/ui/common/Icons/Actions/algo_relief.svg", "workbenches": ["2D"] },
+          { "type": "action", "id": "algo.relief_engraving_mesh", "label": "Mesh Relief Engraving...", "command": "algo.relief_engraving_mesh", "icon": ":/ui/common/Icons/Actions/algo_relief.svg", "workbenches": ["3D"] }
         ] },
         { "type": "submenu", "id": "tools.theme", "label": "Theme", "icon": ":/ui/common/Icons/Help/theme.svg", "workbenches": ["2D", "3D"], "items": [
           { "type": "action", "id": "theme.light", "label": "Light", "command": "theme.light", "checkable": true, "workbenches": ["2D", "3D"] },
@@ -24,9 +25,6 @@
   ],
   "toolbars": [],
   "shortcuts": [
-    { "command": "edit.undo", "keys": "Ctrl+Z" },
-    { "command": "edit.redo", "keys": "Ctrl+Y" },
-    { "command": "edit.delete", "keys": "Delete" },
     { "command": "tool.select", "keys": "Esc" }
   ]
 }

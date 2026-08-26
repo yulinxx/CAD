@@ -4,6 +4,7 @@
 #include "Log/SyLogger.h"
 #include "Manager/UnitManager/UnitManager.h"
 #include "Manager/UnitManager/UnitSelectionMenu.h"
+#include "Platform/MacMenuCleanup.h"
 #include "UI2D/Operation/CommandActionHub.h"
 #include "UI2D/Operation/CommandCatalog.h"
 #if BUILD_UI3D
@@ -36,6 +37,7 @@
 #include "ClientConfig/UiFeatureGate.h"
 #include "ClientConfig/UiLayoutBuilder.h"
 #include "ClientConfig/UiPanelRegistry.h"
+#include "ClientConfig/UiShortcutRegistry.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -48,6 +50,7 @@
 #include <QSet>
 #include <QSignalBlocker>
 #include <QStringList>
+#include <QTimer>
 #include <algorithm>
 #include <functional>
 
@@ -384,6 +387,12 @@ void WorkbenchMenuManager::rebuildAllMenus()
     {
         m_workbench->refreshCommandUiState();
     }
+
+    // macOS 原生菜单栏收尾：移除系统注入到 Edit 菜单的「表情与符号 / 开始听写」。
+    // 必须排到事件循环下一轮——Qt 是延迟把 QMenuBar 同步到 NSMenu 的，同步调用会扫到空菜单。
+    // 也必须每次重建都做：上面刚把整棵菜单树销毁重建，NSMenu 是全新的，启动时清一次不够。
+    // 非 macOS 平台该函数是头文件里的内联空实现，无需在调用点做条件编译。
+    QTimer::singleShot(0, m_window, [] { cleanupMacEditMenuSystemItems(); });
 }
 
 
@@ -407,6 +416,12 @@ IUiCommandDispatcher* WorkbenchMenuManager::commandDispatcher()
     m_dispatcher->workbench = m_workbench;
     return m_dispatcher.get();
 }
+
+IShortcutSettingsModel* WorkbenchMenuManager::shortcutSettingsModel() const
+{
+    return m_shortcutSettingsModel.get();
+}
+
 
 void WorkbenchMenuManager::rebuildMenusFromConfig()
 {
@@ -444,6 +459,17 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
 
     // 菜单/工具栏由同一个配置对象生成；菜单项会根据 workbenches 字段与当前工作台命令目录双重过滤。
     const QString wbId = currentWorkbenchId(m_stateCenter);
+
+    // 快捷键台账按工作台分作用域：用户覆盖在构建期叠加到配置默认值上，
+    // 同时把这一轮建出的 QAction/QShortcut 登记进去，供设置页的快捷键页直接编辑。
+    if (!m_shortcutRegistry)
+    {
+        m_shortcutRegistry = std::make_unique<UiShortcutRegistry>();
+        m_shortcutSettingsModel = std::make_unique<UiShortcutSettingsModel>(m_shortcutRegistry.get());
+    }
+    m_shortcutRegistry->beginBuild(wbId);
+    m_menuLayoutBuilder->setShortcutRegistry(m_shortcutRegistry.get());
+
     const auto commandAvailable = [this](const QString& commandId) {
         if (commandId.isEmpty())
         {
@@ -1188,10 +1214,11 @@ void WorkbenchMenuManager::buildHelpMenu()
     m_menuState.helpMenu->addSeparator();
 
     auto* settingsAction = m_menuState.helpMenu->addAction(tr("Settings..."));
-    // macOS 上 Qt 会按文本启发（Settings/Preferences/Options → PreferencesRole）把该动作
-    // 自动搬进应用菜单，导致 Help 菜单里看不到“设置”。显式 NoRole 让它在各平台都固定在 Help 下，
-    // 其它平台不受影响（NoRole 是 Qt 默认之外的显式声明，仅抑制 macOS 的自动搬迁）。
-    settingsAction->setMenuRole(QAction::NoRole);
+    // 与配置驱动路径（UiLayoutBuilder 的 menuRoleForActionId）保持同一结论：显式声明角色，
+    // 不依赖 Qt 的 TextHeuristicRole 按文本猜——文本一被翻译成“设置”启发就失效，
+    // 同一台 Mac 上切个语言菜单结构就变。PreferencesRole 让它稳定落在 macOS 应用菜单里，
+    // 其它平台 Qt 忽略 menuRole，仍留在 Help 下。
+    settingsAction->setMenuRole(QAction::PreferencesRole);
     setCmdId(settingsAction, QStringLiteral("help.settings"));
     IconHelper::setThemedIcon(settingsAction, QStringLiteral(":/ui/common/Icons/Help/settings.svg"));
     connect(settingsAction, &QAction::triggered, this, [this]() {

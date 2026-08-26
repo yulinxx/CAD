@@ -11,6 +11,7 @@
 
 #include "UiClientConfigBase.h"
 
+#include <QSet>
 #include <vector>
 
 class QAction;
@@ -21,6 +22,7 @@ class QStatusBar;
 class QToolBar;
 class QWidget;
 class UiPanelRegistry;
+class UiShortcutRegistry;
 
 /// 命令分发器抽象接口
 /// 适配现有 CommandCatalog + OperationBus 体系，同时允许单元测试注入假实现
@@ -66,6 +68,15 @@ public:
 
     void clearBuiltLayout();
 
+    /// 挂入快捷键台账（可为空）。挂上后：配置里的键会先叠加用户覆盖再生效，
+    /// 且每个菜单动作/全局快捷键都登记进台账，供设置页的快捷键页编辑。
+    /// 必须在 buildMenus/buildShortcuts 之前设置。
+    void setShortcutRegistry(UiShortcutRegistry* registry)
+    {
+        m_shortcutRegistry = registry;
+    }
+
+
     /// 本次构建创建的 Dock widget（供上层注册到布局管理器，统一清理）
     const std::vector<QWidget*>& builtDocks() const
     {
@@ -101,9 +112,14 @@ private:
     QMainWindow* m_window;
     IUiCommandDispatcher* m_dispatcher;
     UiPanelRegistry* m_panelRegistry;
+    /// 快捷键台账（非拥有；由 WorkbenchMenuManager 持有，寿命长于本 builder）
+    UiShortcutRegistry* m_shortcutRegistry{ nullptr };
     std::vector<QWidget*> m_builtDocks;
     std::vector<QToolBar*> m_builtToolBars;
     std::vector<QWidget*> m_builtStatusBarSlots;
     /// 本次构建创建的全局快捷键，由本类拥有并销毁
     std::vector<QShortcut*> m_builtShortcuts;
+    /// 本次构建中已被菜单项占用的键序列（QKeySequence::toString() 归一化后的文本）。
+    /// buildShortcuts 靠它跳过重复定义，见 buildShortcuts 的注释。
+    QSet<QString> m_menuShortcutKeys;
 };

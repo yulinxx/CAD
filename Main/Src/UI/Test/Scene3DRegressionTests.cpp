@@ -1,29 +1,23 @@
 /**
  * @file Scene3DRegressionTests.cpp
- * @brief 3D 侧最小闭环回归测试 — 覆盖 SceneManager3D / SimpleRenderer3D / RenderWidget3DAdapter
+ * @brief 3D 侧最小闭环回归测试 — 覆盖 SceneManager3D / RenderWidget3DAdapter
  *
  * 测试范围：
  *  - SceneManager3D 生命周期与实体管理
  *  - 3D 场景实体添加/删除/选中
- *  - SimpleRenderer3D 与场景联动
  *  - RenderWidget3DAdapter 回调链路
  *  - 3D 相机模式切换
- *
- * 新增测试 (2026-07-30)
  */
 
 #include <gtest/gtest.h>
 
-#include "UI/Render/SimpleRenderer3D.h"
 #include "UI/Render/RenderWidget3DAdapter.h"
-#include "UI/IRenderSurface.h"
 #include "Engine3D/SceneManager3D.h"
 #include "Engine3D/SyEntity/SyMeshEntity.h"
 
 #include <memory>
 #include <QGuiApplication>
-#include <QImage>
-#include <QPainter>
+
 
 // ==================== SceneManager3D 基础测试 ====================
 
@@ -178,79 +172,6 @@ TEST(Scene3DRegressionTest, SceneManager3D_DeleteSelected)
     EXPECT_EQ(selCount, 0u);
 }
 
-// ==================== SimpleRenderer3D 集成冒烟测试 ====================
-// 仅保留与场景/接口对接有关的最小覆盖，具体渲染器行为归 `SimpleRenderer3DTests.cpp` 负责。
-
-TEST(Scene3DRegressionTest, SimpleRenderer3D_RenderWithoutScene)
-{
-    // MainTests 为 gtest 控制台程序，无 QApplication。QPainter::drawText 在无 QGuiApplication
-    // 时字体引擎未初始化会崩溃（0xC0000409）；与 SimpleRenderer3DTests.cpp 的 Render 测试约定一致：
-    // 无 GUI 上下文时跳过实际渲染，仅保留可安全执行的冒烟部分。
-    if (!qGuiApp)
-    {
-        GTEST_SKIP() << "Render test requires Qt GUI context";
-    }
-
-    SimpleRenderer3D renderer;
-    renderer.initialize();
-
-    QImage image(400, 300, QImage::Format_ARGB32);
-    image.fill(Qt::white);
-    QPainter painter(&image);
-
-    renderer.render(painter, 400, 300);
-    // 无场景时渲染不应崩溃
-    SUCCEED();
-
-    renderer.shutdown();
-}
-
-TEST(Scene3DRegressionTest, SimpleRenderer3D_ResizePreservesState)
-{
-    SimpleRenderer3D renderer;
-    renderer.initialize();
-
-    renderer.resize(800, 600);
-    EXPECT_TRUE(renderer.isReady());
-
-    renderer.resize(1024, 768);
-    EXPECT_TRUE(renderer.isReady());
-
-    renderer.shutdown();
-}
-
-TEST(Scene3DRegressionTest, SimpleRenderer3D_ResetView)
-{
-    SimpleRenderer3D renderer;
-    renderer.initialize();
-    renderer.resetView();
-    EXPECT_TRUE(renderer.isReady());
-    renderer.shutdown();
-}
-
-TEST(Scene3DRegressionTest, SimpleRenderer3D_SelectNodeById)
-{
-    SimpleRenderer3D renderer;
-    renderer.initialize();
-
-    renderer.selectNodeById("test_node");
-    // 选择不存在的节点不应崩溃
-    SUCCEED();
-
-    renderer.shutdown();
-}
-
-TEST(Scene3DRegressionTest, SimpleRenderer3D_SelectedNodeId_InitiallyEmpty)
-{
-    SimpleRenderer3D renderer;
-    renderer.initialize();
-
-    EXPECT_TRUE(renderer.selectedNodeId().isEmpty());
-    EXPECT_TRUE(renderer.selectedPathNames().isEmpty());
-
-    renderer.shutdown();
-}
-
 // ==================== RenderWidget3DAdapter 回调测试 ====================
 
 TEST(Scene3DRegressionTest, RenderWidget3DAdapter_DefaultConstruction)
@@ -359,20 +280,4 @@ TEST(Scene3DRegressionTest, RenderWidget3DAdapter_SelectNodeById)
     EXPECT_TRUE(adapter.selectedNodeId().isEmpty());
 
     adapter.shutdown();
-}
-
-// ==================== IRenderSurface 接口一致性测试 ====================
-
-TEST(Scene3DRegressionTest, SimpleRenderer3D_ImplementsIRenderSurface)
-{
-    SimpleRenderer3D renderer;
-    // 验证 SimpleRenderer3D 实现了 IRenderSurface 接口
-    UI::IRenderSurface* surface = dynamic_cast<UI::IRenderSurface*>(&renderer);
-    EXPECT_NE(surface, nullptr);
-}
-
-TEST(Scene3DRegressionTest, SimpleRenderer3D_IsNotOpenGL)
-{
-    SimpleRenderer3D renderer;
-    EXPECT_FALSE(renderer.isOpenGL());  // SimpleRenderer3D 是软件渲染
 }

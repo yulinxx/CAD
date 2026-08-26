@@ -10,11 +10,5 @@
     { "id": "SceneDock", "title": "Scene", "position": "left", "widgetType": "SceneTreePanel", "visible": true }
   ],
   "shortcuts": [
-    { "command": "edit.undo", "keys": "Ctrl+Z" },
-    { "command": "edit.redo", "keys": "Ctrl+Y" },
-    { "command": "edit.delete", "keys": "Delete" },
-    { "command": "file.new", "keys": "Ctrl+N" },
-    { "command": "file.open", "keys": "Ctrl+O" },
-    { "command": "file.save", "keys": "Ctrl+S" }
   ]
 }

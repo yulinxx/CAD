@@ -27,6 +27,15 @@ file(GLOB_RECURSE MAIN_APP_SOURCES CONFIGURE_DEPENDS
 # 排除测试目录下的文件（这些由测试目标独立编译，不属于应用可执行文件）
 list(FILTER MAIN_APP_SOURCES EXCLUDE REGEX ".*/UI/Test/.*\.cpp$")
 
+# macOS 平台专用 Objective-C++ 文件：上面的 glob 只收 .cpp，.mm 必须显式加入。
+# 追加进 MAIN_APP_SOURCES（而非 add_executable 后 target_sources）是为了让
+# MainTests 一并获得——它复用 MAIN_APP_SOURCES，否则 macOS 下测试目标会缺符号。
+if(APPLE)
+    list(APPEND MAIN_APP_SOURCES
+        "${SRC_ROOT}/Platform/MacMenuCleanup.mm"
+    )
+endif()
+
 set(MAIN_APP_HEADERS
     ${SRC_ROOT}/Common/VersionInfo.h.in
 )
@@ -371,7 +380,6 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
     )
 
     if(NOT BUILD_UI3D)
-        list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*SimpleRenderer3DTests\\.cpp$")
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*RenderWidget3DAdapterTests\\.cpp$")
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*Scene3DRegressionTests\\.cpp$")
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*FrameworkLifecycleTests\\.cpp$")

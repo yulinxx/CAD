@@ -13,11 +13,14 @@
         { "id": "edit.transform_translate", "display": "Translate",         "shortcut": "T",            "configurable": true },
         { "id": "edit.transform_rotate", "display": "Rotate",               "shortcut": "R",            "configurable": true },
         { "id": "edit.transform_scale",  "display": "Scale",                "shortcut": "S",            "configurable": true },
-        { "id": "algo.relief_engraving", "display": "3D Relief Engraving",  "shortcut": "Ctrl+Shift+E", "configurable": true },
+        { "id": "algo.relief_engraving_mesh", "display": "3D Relief Engraving", "shortcut": "Ctrl+Shift+E", "configurable": true },
         { "id": "process.generate_relief_toolpath", "display": "Generate Relief Toolpath", "shortcut": "Ctrl+Shift+G", "configurable": true },
         { "id": "process.export_relief_toolpath", "display": "Export Relief Toolpath", "shortcut": "",   "configurable": true },
-        { "id": "process.send_relief_to_laser",    "display": "Send Relief to Laser",   "shortcut": "Ctrl+Shift+L", "configurable": true }
+        { "id": "view.zoom_in",         "display": "Zoom In",              "shortcut": "Ctrl++",       "configurable": true },
+        { "id": "view.zoom_out",        "display": "Zoom Out",             "shortcut": "Ctrl+-",       "configurable": true }
     ],
+
+
     "views": [
         { "id": "view.switch_to_2d",      "display": "Switch to 2D",         "shortcut": "Ctrl+Shift+2", "configurable": true },
         { "id": "view.reset",           "display": "Reset View",           "shortcut": "Ctrl+R",       "configurable": true },

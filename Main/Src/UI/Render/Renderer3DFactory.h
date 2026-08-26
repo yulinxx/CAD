@@ -4,12 +4,18 @@
 #include <memory>
 #include <string>
 
+/**
+ * @brief 3D 渲染器工厂
+ *
+ * 目前只有一条真实链路：Compatible（RenderWidget3DAdapter → RenderWidget3D，OpenGL）。
+ * 曾经存在的 Simple（软件渲染 SimpleRenderer3D）链路已删除 —— 它在产品运行时没有触发点，
+ * 只有测试在用，且自带一套与 RenderWidget3D 冲突的相机键位约定。
+ */
 class Renderer3DFactory
 {
 public:
     enum class RendererType
     {
-        Simple,
         Compatible,
         None
     };

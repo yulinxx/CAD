@@ -5,12 +5,14 @@
  * 通过 Objective-C++ 直接操作 NSMenu，移除 macOS 自动注入
  * 到 Edit 菜单的系统菜单项（表情与符号、开始听写等），
  * 保留原生顶部菜单栏体验。
+ *
+ * 本文件只在 APPLE 平台参与编译（见 Main/CMakeLists.txt 的 if(APPLE) 分支），
+ * 非 macOS 平台由头文件提供内联空实现，这里不需要再做平台条件编译。
  */
 #include "Platform/MacMenuCleanup.h"
 
-#ifdef Q_OS_MACOS
-
 #import <Cocoa/Cocoa.h>
+
 
 /// 判断 NSMenuItem 是否为 macOS 系统注入项
 static BOOL isSystemInjectedItem(NSMenuItem* item)
@@ -112,11 +114,3 @@ void cleanupMacEditMenuSystemItems()
     }
 }
 
-#else  // 非 macOS 平台 — 空实现
-
-void cleanupMacEditMenuSystemItems()
-{
-    // 非 macOS 平台无操作
-}
-
-#endif

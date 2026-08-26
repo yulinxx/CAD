@@ -20,6 +20,8 @@ class IUiCommandDispatcher;
 class UiConfigurationManager;
 class UiPanelRegistry;
 class UiLayoutBuilder;
+class UiShortcutRegistry;
+class IShortcutSettingsModel;
 struct UiConfigData;
 struct MenuDispatcher;
 /// 命令 UI 状态快照（选择/锁定/剪贴板/撤销栈），定义在 UI2D 命令中枢
@@ -103,6 +105,13 @@ public:
     /// 工具栏由 WorkbenchLayoutManager 构建，但绝不能自带一个空分发器 ——
     /// 那会让工具栏按钮全部永久禁用。此处按需创建并同步当前工作台后返回。
     IUiCommandDispatcher* commandDispatcher();
+
+    /// 快捷键设置页模型（本类持有生命周期，可能为空——配置驱动菜单未成功构建时）。
+    ///
+    /// 2D/3D 设置对话框共用它：能改的就是配置驱动菜单实际绑定的那批 QAction/QShortcut，
+    /// 这也是当前唯一真正生效的快捷键链路。
+    IShortcutSettingsModel* shortcutSettingsModel() const;
+
 
     /// 根据工作台和命令可用性过滤配置菜单，便于测试与复用
     ///
@@ -249,6 +258,11 @@ private:
     // 保证菜单 / 工具栏 / Dock / 状态栏 / 右键菜单消费同一份配置（P0-1）
     std::unique_ptr<UiLayoutBuilder> m_menuLayoutBuilder;
     std::unique_ptr<UiPanelRegistry> m_menuPanelRegistry;
+    // 快捷键台账：寿命必须长于 m_menuLayoutBuilder（后者每次重建都整体替换），
+    // 设置页里的快捷键模型直接指向它。
+    std::unique_ptr<UiShortcutRegistry> m_shortcutRegistry;
+    // 快捷键设置页模型：包装台账，随本对象存活，供 2D/3D 设置对话框复用
+    std::unique_ptr<IShortcutSettingsModel> m_shortcutSettingsModel;
     // 配置菜单命令分发器：生命周期随本对象，菜单项触发回调期间必须长期有效
     std::unique_ptr<MenuDispatcher> m_dispatcher;
     // 防止每次 rebuildAllMenus 重复连接状态中心信号
