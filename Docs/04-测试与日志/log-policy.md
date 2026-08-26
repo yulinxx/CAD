@@ -95,6 +95,7 @@ SY_ERROR("[OperationBus] execute failed op=%s error=%s",
 | **ImportDispatcher / ExportDispatcher** | `[ImportDispatcher]` / `[ExportDispatcher]` | 格式路由与分发 |
 | **导入读取器（基类统一）** | `[ImportReader:<格式名>]` | IR 解析耗时、图元/图层/群组统计、转换丢弃差额 |
 | **FileIO DLL 入口** | `[FileIO]` | `importToIR` / `importFile` 的成败与统计 |
+| **FileIO IR 投影层** | `[IrProjector]` | 解析结果 → IR 的守恒口径（`N parsed -> M entities`）与降级分类计数 |
 | **FileIO 解析器** | `[DxfParser]` / `[SvgParser]` / `[PltParser]` / `[StepParser]` / `[UgParser]` / `[ObjParser]` / `[StlParser]` / `[NativeParser]` / `[PdfBasedParser:<格式名>]` | 单格式解析细节 |
 | **FileIO 解析器工厂** | `[FileParserFactory]` / `[IFileParser]` | 解析器创建失败、格式未接入 IR |
 | **FileManager** | `[FileManager]` | 文件管理、格式识别 |
@@ -271,6 +272,7 @@ SyLogger::setFile("app.log");
 [ImportDispatcher]       格式路由：命中哪个读取器、读取器耗时与结果
 [ImportReader:DXF]       IR 解析统计、转换层丢弃差额、旧路径回退
 [FileIO]                 DLL 入口：parser 是否存在、异常、零实体
+[IrProjector]            投影层：解析结果 → IR 的守恒口径与降级分类计数
 [DxfParser] 等           单格式解析细节：块展开、越界、上限截断
 ```
 
@@ -278,8 +280,18 @@ SyLogger::setFile("app.log");
 
 - **提示导入成功但画布是空的**：先看 `[ImportService] Entity split`（网格与非网格各多少），
   再看 `Entity validation dropped`（有多少图元没通过合法性校验）。
-- **图元比源文件少**：看 `[ImportReader:*] Converter dropped N of M IR entity(ies)`——
-  转换层不认识的类型会在这里被丢掉。
+- **图元比源文件少**：分两段查，**先看内层**。
+  `[IrProjector] Projected <格式>: N parsed -> M entities` 是解析结果进 IR 的守恒口径，
+  `parsed != entities` 说明图元在投影层就没了；紧跟的
+  `[IrProjector] Degraded while projecting ...` 给出分类计数
+  （`unknownType` 是整条丢弃，`blobOverflow`/`smartLineSkipped` 是退化成空壳图元），
+  再往下一条 `First unknown geometry type: raw=.. (..), sourceId=..` 给首个样本，
+  拿 `sourceId` 可以回原文件定位。
+  外层 `[ImportReader:*] Converter dropped N of M IR entity(ies)` 里的 **M 是 IR 的
+  `entityCount`**，也就是已经扣过投影层损耗了，所以只看这一行会漏掉一半原因。
+- **导入后图元全挤在默认图层上**：看 `[IrProjector] Degraded ...` 的
+  `missingLayerRef` / `missingGroupRef` —— 源文件引用了不存在的图层/群组，
+  投影层落到「未分配 / 无群组」哨兵。
 - **图层/群组没还原**：看 `[ImportService] Layer restore` / `Group restore` 两行的
   `created` 与 `entity mapping` 数；若打的是 `skipped`，行尾会写明原因
   （`LayerManager not set` / `preserveLayers=false` / `no 2D entity imported`）。
@@ -289,6 +301,11 @@ SyLogger::setFile("app.log");
 
 约定：每个 parser 的收尾日志文案统一为 `parseToIR END`，
 所以 `grep "parseToIR END"` 能一次性捞出所有格式的解析统计。
+
+`[IrProjector]` 的降级一律**按类别聚合计数 + 首个样本**，不逐条打：畸形文件里这类问题
+每个图元都会触发一次，几万条同样的 WARN 会把日志冲爆。同理每个类别只往 `warnings` 塞
+一条，所以 `FioParseResult::warningCount` 是**类别数**而不是受影响的图元数。
+分类含义见 `FileIO/README.md` §6.3。
 
 ### 6.4 崩溃排查：日志尾部不可信，看调用栈
 
