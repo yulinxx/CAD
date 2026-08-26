@@ -278,7 +278,11 @@ private:
     UiWorkbench* m_workbench{ nullptr };
     /// 主题切换回调
     /// 当前挂载的工作台状态栏 widget（由 StatusBarBase 子类管理位置/选择/消息显示）
-    /// 工作台切换时通过 mountStatusBar/unmountStatusBar 替换
+    /// 工作台切换时通过 mountStatusBar/unmountStatusBar 替换。
+    /// 这里保持裸指针：StatusBarBase 在本头文件里只有前向声明（QPointer 需要完整
+    /// 类型），且该指针只由 mount/unmount 这一对函数写，作用域自洽。
+    /// 真正需要跨切换存活的复用指针在工作台侧（Workbench2D/3D 的 m_statusBar2D/3D），
+    /// 那两个已改成 QPointer。
     StatusBarBase* m_activeStatusBar{ nullptr };
 
     /// 工作台切换工厂

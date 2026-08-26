@@ -19,23 +19,28 @@ class SceneTreePanel2D;
 class PropertiesPanelWidget;
 class UiConfigurationManager;
 class UiPanelRegistry;
-class IUiCommandDispatcher;
+class UiWorkbench;
 
 /// 面板状态：集中管理状态栏、工具栏与停靠面板指针
 /// 从 WorkbenchWindow::PanelState 提升为独立类型，供 WorkbenchLayoutManager 使用
 /// 注意：posLabel/selLabel/msgLabel 已移除 —— 这些由 StatusBarBase 子类管理
+///
+/// 一律用 QPointer 而非裸指针：这些 widget 的所有权在 QMainWindow（父子关系），
+/// 而 clearLayoutContent 在工作台切换时会**同步 delete** 全部 Dock。用裸指针时
+/// leftDock/rightDock 会变成悬空指针，随后 setSkeletonDocksVisible 一调用就崩
+/// （2D→3D 切换时 Workbench3D::build3DWorkbenchUi 的第一句就是它）。
 struct PanelState
 {
     /// 状态栏（QMainWindow 内置）
-    QStatusBar* statusBar{ nullptr };
+    QPointer<QStatusBar> statusBar;
     /// 左侧停靠面板
-    QDockWidget* leftDock{ nullptr };
+    QPointer<QDockWidget> leftDock;
     /// 右侧停靠面板
-    QDockWidget* rightDock{ nullptr };
+    QPointer<QDockWidget> rightDock;
     /// 场景树停靠面板
-    SceneTreePanel2D* sceneTreeDock{ nullptr };
+    QPointer<SceneTreePanel2D> sceneTreeDock;
     /// 属性面板
-    PropertiesPanelWidget* propertiesDock{ nullptr };
+    QPointer<PropertiesPanelWidget> propertiesDock;
 };
 
 /// 工作台布局管理器：管理工具栏/Dock/状态栏的创建、注册、清理、布局快照
@@ -92,7 +97,10 @@ public:
     QToolBar* registerToolBar(const QString& title);
     /// 清空工作台内容（移除所有注册的面板和工具栏）
     /// 使用 deleteLater() 延迟删除，避免 QOpenGLWidget 析构时崩溃
-    void clearLayoutContent();
+    /// @param oldWorkbench 被替换掉的工作台。中央视口的 GL 资源释放委托给它的
+    ///        releaseCentralWidgetGLResources —— 布局管理器不认识 2D/3D 视口的具体类型。
+    ///        为空时跳过释放并告警（正常切换流程一定非空）。
+    void clearLayoutContent(const UiWorkbench* oldWorkbench);
 
     // ==================== 布局快照 ====================
 

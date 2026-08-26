@@ -123,11 +123,28 @@ UiLayoutBuilder::UiLayoutBuilder(QMainWindow* window, IUiCommandDispatcher* disp
 {
 }
 
+UiLayoutBuilder::~UiLayoutBuilder()
+{
+    releaseBuiltShortcuts();
+}
+
+void UiLayoutBuilder::releaseBuiltShortcuts()
+{
+    for (QShortcut* shortcut : m_builtShortcuts)
+    {
+        delete shortcut;
+    }
+    m_builtShortcuts.clear();
+}
+
 void UiLayoutBuilder::clearBuiltLayout()
 {
     m_builtDocks.clear();
     m_builtToolBars.clear();
     m_builtStatusBarSlots.clear();
+    // Dock / 工具栏 / 状态栏槽位的销毁由上层（WorkbenchLayoutManager）负责，
+    // 这里只丢引用；快捷键没有别的持有者，必须本类销毁。
+    releaseBuiltShortcuts();
 }
 
 void UiLayoutBuilder::bindAction(QAction* action, const QString& commandId)
@@ -167,20 +184,18 @@ void UiLayoutBuilder::bindAction(QAction* action,
 
     if (m_dispatcher && m_dispatcher->isCommandRegistered(commandId))
     {
-        // 绝对不能捕获 this：构建器普遍是栈上/临时对象（WorkbenchLayoutManager 建工具栏、
-        // UiContextMenuService 建右键菜单都是局部变量），而 QAction 的存活期远长于它。
-        // 捕获 this 会在构建器析构后留下悬垂指针，点按钮时崩在 m_dispatcher->dispatch()。
-        // 只捕获分发器指针本身：菜单/工具栏用的是长生命周期分发器（WorkbenchMenuManager
-        // 的成员、WorkbenchLayoutManager 注入的），右键菜单用的栈上分发器由"菜单必须在
-        // 同一作用域内 exec + delete"的约定保证有效。
-        // 接收者显式传 action：连接随 action 一同销毁，不留悬挂连接。
-        IUiCommandDispatcher* dispatcher = m_dispatcher;
-        QObject::connect(action, &QAction::triggered, action, [dispatcher, action, commandId](bool) {
-            SY_INFOF("[Menu] trigger text='%s' command='%s'",
-                action->text().toUtf8().constData(),
-                commandId.toUtf8().constData());
-            dispatcher->dispatch(commandId);
-        });
+        // 捕获 dispatcher 而不是 this：本 builder 每次 rebuildMenusFromConfig 都被整体
+        // 替换（WorkbenchMenuManager::m_menuLayoutBuilder 是 unique_ptr），而它建出来的
+        // QAction 挂在 menubar 子树上、活得更久。捕获 this 的话，切一次工作台之后
+        // 触发这些 action 就会解引用已析构的 builder。
+        // dispatcher 由 WorkbenchMenuManager 持有且只创建一次，寿命足够。
+        QObject::connect(action, &QAction::triggered,
+            [dispatcher = m_dispatcher, action, commandId](bool) {
+                SY_INFOF("[Menu] trigger text='%s' command='%s'",
+                    action->text().toUtf8().constData(),
+                    commandId.toUtf8().constData());
+                dispatcher->dispatch(commandId);
+            });
     }
 
     else
@@ -476,15 +491,21 @@ void UiLayoutBuilder::buildShortcuts(const std::vector<ShortcutDef>& shortcuts)
             continue;
         }
 
+        // QShortcut 由本 builder 拥有：它 parent 到窗口，但**不能**靠窗口回收——
+        // 每次 rebuildMenusFromConfig 都会按当前工作台的命令目录重新过滤一遍
+        // shortcuts，上一批必须先消失。否则：
+        //  - 两个工作台都有的键（Ctrl+Z 等）会累积同键 QShortcut，Qt 判 ambiguous
+        //    后两个都不触发，表现为「切一次工作台快捷键就失效」；
+        //  - 只有 2D 有的键（Ctrl+N / Ctrl+F 等）在 3D 下仍由上一批响应。
         auto* shortcut = new QShortcut(QKeySequence(sc.keySequence), m_window);
         shortcut->setContext(Qt::ApplicationShortcut);
-        // 与 bindAction 同理：QShortcut 挂在窗口上、活得比构建器长，只能捕获分发器指针
-        IUiCommandDispatcher* dispatcher = m_dispatcher;
-        QObject::connect(shortcut, &QShortcut::activated, shortcut, [dispatcher, commandId = sc.commandId]() {
-            SY_INFOF("[Menu] shortcut command='%s'", qPrintable(commandId));
-            dispatcher->dispatch(commandId);
-        });
-
+        // 同 bindAction：捕获 dispatcher 而不是 this，本 builder 会被整体替换
+        QObject::connect(shortcut, &QShortcut::activated,
+            [dispatcher = m_dispatcher, commandId = sc.commandId]() {
+                SY_INFOF("[Menu] shortcut command='%s'", qPrintable(commandId));
+                dispatcher->dispatch(commandId);
+            });
+        m_builtShortcuts.push_back(shortcut);
     }
 }
 

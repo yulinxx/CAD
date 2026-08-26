@@ -16,6 +16,7 @@
 class QAction;
 class QMainWindow;
 class QMenu;
+class QShortcut;
 class QStatusBar;
 class QToolBar;
 class QWidget;
@@ -40,6 +41,10 @@ class UiLayoutBuilder
 {
 public:
     UiLayoutBuilder(QMainWindow* window, IUiCommandDispatcher* dispatcher, UiPanelRegistry* panelRegistry);
+
+    /// 销毁本次构建创建的 QShortcut（见 buildShortcuts 的注释）。
+    /// Dock / 工具栏 / 状态栏槽位不在此销毁：那些由上层布局管理器统一回收。
+    ~UiLayoutBuilder();
 
     void buildMenus(const std::vector<MenuDef>& menus);
     void buildToolBars(const std::vector<ToolBarDef>& toolBars);
@@ -91,6 +96,7 @@ public:
 
 private:
     void buildMenuItem(QMenu* parent, const std::variant<MenuActionDef, SubMenuDef, MenuItemType>& item);
+    void releaseBuiltShortcuts();
 
     QMainWindow* m_window;
     IUiCommandDispatcher* m_dispatcher;
@@ -98,4 +104,6 @@ private:
     std::vector<QWidget*> m_builtDocks;
     std::vector<QToolBar*> m_builtToolBars;
     std::vector<QWidget*> m_builtStatusBarSlots;
+    /// 本次构建创建的全局快捷键，由本类拥有并销毁
+    std::vector<QShortcut*> m_builtShortcuts;
 };
