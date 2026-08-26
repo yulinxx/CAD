@@ -23,17 +23,9 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEn
         is3D ? "3D (.syx)" : "2D (.sy)",
         static_cast<int>(format));
 
-    // 主链路：中立 IR 导入（parseToIR → FioEntityConverter）
-    ImportResult result;
-    QString errMsg;
-    if (tryImportViaIR(context, format, outEntities, false, &result, &errMsg))
-    {
-        return result;
-    }
-    SY_WARNF("[NativeImportReader] IR path unavailable, falling back to legacy: %s",
-        errMsg.isEmpty() ? "no entities" : errMsg.toUtf8().constData());
-
-    // 回退路径：旧版 importFile
+    // 原生格式不走中立 IR：NativeParser 没有实现 parseToIR（protobuf 文档直接反序列化成
+    // Engine 图元，没有中间的 IR 表达），先尝试 IR 只会白跑一次并留下误导性的失败日志。
+    // 后续计划是把 .sy / .syx 整体迁到 Engine/Persistence，届时这个读取器会一并撤掉。
     return readViaLegacy(context, format, outEntities);
 }
 

@@ -192,11 +192,20 @@ ImportResult ImportService::importWithContext(const ImportContext& context, cons
     if (!m_dispatcher)
     {
         QString msg = QStringLiteral("ImportDispatcher not set");
-        SY_ERRORF("[ImportService] %s", msg.toUtf8().constData());
-        return ImportResult::fail(msg, ImportErrorType::Unknown);
+        SY_ERRORF("[ImportService] importWithContext aborted: %s", msg.toUtf8().constData());
+        // 此处 guard 尚未构造（忙状态未置位），但完成信号必须发出，
+        // 否则监听 importFinished 的调用方会一直等不到结束通知
+        const ImportResult r = ImportResult::fail(msg, ImportErrorType::Unknown);
+        emit importFinished(r);
+        return r;
     }
 
-    SY_INFOF("[ImportService] sceneManager=%p, editService=%p", m_sceneManager, m_editService);
+    // 落地目标一次性打全：mesh 走 3D 通道、其余走 2D 通道，缺哪个 sink 直接看这行
+    SY_INFOF("[ImportService] Sinks: sceneManager=%p, editService=%p, sceneManager3D=%p, editService3D=%p",
+        static_cast<void*>(m_sceneManager),
+        static_cast<void*>(m_editService),
+        static_cast<void*>(m_sceneManager3D),
+        static_cast<void*>(m_sceneEditService3D));
 
     // RAII 守卫：自动管理忙状态和最终状态提示
     ScopedImportGuard guard(this, context.sourcePath);
@@ -298,7 +307,7 @@ void ImportService::importAsync(
     if (!m_dispatcher)
     {
         QString msg = QStringLiteral("ImportDispatcher not set");
-        SY_ERRORF("[ImportService] %s", msg.toUtf8().constData());
+        SY_ERRORF("[ImportService] importAsync aborted: %s", msg.toUtf8().constData());
         if (onComplete)
         {
             onComplete(ImportResult::fail(msg, ImportErrorType::Unknown));
@@ -306,73 +315,118 @@ void ImportService::importAsync(
         return;
     }
 
-    // 获取 shared_ptr 用于跨线程安全传递
-    // 使用 std::shared_ptr<ImportService> 需要 enable_shared_from_this
-    // 这里使用简单的裸指针 + 标志位，调用方需确保 ImportService 在回调前存活
+    // 忙状态与开始通知都在调用线程（主线程）发出：
+    // 这些回调最终会动 UI，放到后台线程里发是跨线程访问
+    if (m_busyStateCallback)
+    {
+        m_busyStateCallback(true);
+    }
+    if (m_statusPromptCallback)
+    {
+        m_statusPromptCallback(QStringLiteral("Importing: %1").arg(context.sourcePath));
+    }
+    emit importStarted(context.sourcePath);
 
+    // 裸指针 + detach 线程：调用方必须保证 ImportService 存活到回调结束
     auto* self = this;
-    auto sourcePath = context.sourcePath;
 
-    // 启动后台线程执行 Phase 1-2
-    std::thread([self, context, options, onComplete, sourcePath]() {
+    // 统一收尾：清忙状态 + 最终提示 + 完成信号 + 回调，保证每条退出路径都恰好走一次，
+    // 且始终在主线程执行（后台线程失败时也会经此回到主线程）
+    auto finishOnMainThread = [self, onComplete](const ImportResult& r) {
+        QMetaObject::invokeMethod(
+            qApp,
+            [self, onComplete, r]() {
+                if (self->m_busyStateCallback)
+                {
+                    self->m_busyStateCallback(false);
+                }
+                if (self->m_statusPromptCallback)
+                {
+                    self->m_statusPromptCallback(r.success
+                            ? QStringLiteral("Import completed: %1 entities").arg(r.entityCount)
+                            : QStringLiteral("Import failed: %1").arg(r.message));
+                }
+                emit self->importFinished(r);
+                if (onComplete)
+                {
+                    onComplete(r);
+                }
+                SY_INFOF("[ImportService] importAsync END: success=%d, entities=%d, message=%s",
+                    r.success ? 1 : 0,
+                    r.entityCount,
+                    r.message.toUtf8().constData());
+            },
+            Qt::QueuedConnection);
+    };
+
+    // 启动后台线程执行 Phase 1-2（纯解析，不碰 UI 与场景）
+    std::thread([self, context, options, finishOnMainThread]() {
         ImportContext mutableCtx = context;
         auto importedEntities = std::make_shared<Fio::VecSyEntityPtr>();
 
-        emit self->importStarted(sourcePath);
-
-        if (self->m_statusPromptCallback)
-        {
-            self->m_statusPromptCallback(QStringLiteral("Importing: %1").arg(sourcePath));
-        }
-
-        // Phase 1: 识别格式
+        // ===== 异步 1：识别文件格式 =====
         SY_INFO("[ImportService] Async Phase 1: Detect format");
         ImportResult result = self->phaseDetectFormat(mutableCtx);
         if (!result.success)
         {
             SY_ERRORF("[ImportService] Async Phase 1 failed: %s", result.message.toUtf8().constData());
-            if (onComplete)
-            {
-                onComplete(result);
-            }
+            finishOnMainThread(result);
+            return;
+        }
+        SY_INFOF("[ImportService] Async Phase 1 completed: format=%d", static_cast<int>(mutableCtx.format));
+
+        if (self->isCanceled(mutableCtx))
+        {
+            SY_WARN("[ImportService] Async import canceled after Phase 1");
+            finishOnMainThread(ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
             return;
         }
 
-        // Phase 2: 解析文件
+        // ===== 异步 2：解析文件 =====
         SY_INFO("[ImportService] Async Phase 2: Parse file");
         ImportResult parseResult = self->phaseParse(mutableCtx, *importedEntities);
         if (!parseResult.success)
         {
             SY_ERRORF("[ImportService] Async Phase 2 failed: %s", parseResult.message.toUtf8().constData());
-            if (onComplete)
-            {
-                onComplete(parseResult);
-            }
+            finishOnMainThread(parseResult);
+            return;
+        }
+        SY_INFOF("[ImportService] Async Phase 2 completed: entities=%zu, layers=%zu, groups=%zu",
+            importedEntities->size(),
+            parseResult.importedLayers.size(),
+            parseResult.importedGroups.size());
+
+        if (self->isCanceled(mutableCtx))
+        {
+            SY_WARN("[ImportService] Async import canceled after Phase 2");
+            finishOnMainThread(ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
             return;
         }
 
-        SY_INFOF("[ImportService] Async parse completed: entities=%zu, layers=%zu",
-            importedEntities->size(),
-            parseResult.importedLayers.size());
-
-        // Phase 3-5 必须在主线程执行（UI 操作）
+        // Phase 3-5 必须回主线程：要动场景、视口与状态栏
         auto entities = importedEntities;
         QMetaObject::invokeMethod(
             qApp,
-            [self, mutableCtx, entities, parseResult, options, onComplete, sourcePath]() mutable {
+            [self, mutableCtx, entities, parseResult, options, finishOnMainThread]() mutable {
                 ImportContext mainCtx = mutableCtx;
+
+                if (self->isCanceled(mainCtx))
+                {
+                    SY_WARN("[ImportService] Async import canceled before Phase 3");
+                    finishOnMainThread(
+                        ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
+                    return;
+                }
 
                 SY_INFO("[ImportService] Async Phase 3: Build document (main thread)");
                 ImportResult result = self->phaseBuildDocument(mainCtx, *entities, options, parseResult);
                 if (!result.success)
                 {
                     SY_ERRORF("[ImportService] Async Phase 3 failed: %s", result.message.toUtf8().constData());
-                    if (onComplete)
-                    {
-                        onComplete(result);
-                    }
+                    finishOnMainThread(result);
                     return;
                 }
+                SY_INFOF("[ImportService] Async Phase 3 completed: entityCount=%d", result.entityCount);
 
                 SY_INFO("[ImportService] Async Phase 4: Refresh display");
                 self->phaseRefreshDisplay(result, options);
@@ -380,14 +434,7 @@ void ImportService::importAsync(
                 SY_INFO("[ImportService] Async Phase 5: Write back state");
                 self->phaseWriteBackState(mainCtx, result);
 
-                if (onComplete)
-                {
-                    onComplete(result);
-                }
-
-                emit self->importFinished(result);
-
-                SY_INFOF("[ImportService] importAsync END: success=%d", result.success ? 1 : 0);
+                finishOnMainThread(result);
             },
             Qt::QueuedConnection);
     }).detach();
@@ -491,144 +538,186 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     // 图元合法性过滤：拒绝坏数据进入 SceneManager / RenderWorld
     Fio::VecSyEntityPtr validEntities;
     validEntities.reserve(entities.size());
-    for (auto& entity : entities)
+    int nullCount = 0;
+    int invalidCount = 0;
+    for (size_t i = 0; i < entities.size(); ++i)
     {
-        if (entity && entity->isValid())
+        auto& entity = entities[i];
+        if (!entity)
         {
-            validEntities.push_back(std::move(entity));
+            ++nullCount;
+            SY_WARNF("[ImportService] Skipping null entity at index %zu", i);
+            continue;
         }
-        else
+        if (!entity->isValid())
         {
-            SY_WARNF("[ImportService] Skipping invalid entity");
+            ++invalidCount;
+            // 打出类型码：定位是哪一类图元在解析层被造坏
+            SY_WARNF("[ImportService] Skipping invalid entity at index %zu, eType=%d",
+                i,
+                static_cast<int>(entity->eType));
+            continue;
         }
+        validEntities.push_back(std::move(entity));
     }
 
     entities = std::move(validEntities);
 
+    if (nullCount > 0 || invalidCount > 0)
+    {
+        SY_WARNF("[ImportService] Entity validation dropped %d null + %d invalid, %zu remaining",
+            nullCount,
+            invalidCount,
+            entities.size());
+    }
+
     if (entities.empty())
     {
-        SY_WARN("[ImportService] All entities were invalid, nothing to import");
+        SY_ERRORF("[ImportService] All %d parsed entity(ies) were rejected by validation, nothing to import",
+            nullCount + invalidCount);
         return ImportResult::fail(QStringLiteral("No valid entities to import"), ImportErrorType::ParseFailed);
     }
 
-    int entityCount = static_cast<int>(entities.size());
 
     // 如果作为新文档导入，先清空场景
     if (options.importAsNewDocument && m_sceneManager)
     {
-        SY_INFO("[ImportService] Clearing scene before import");
+        SY_INFO("[ImportService] Clearing 2D scene before import");
         m_sceneManager->clearScene();
     }
 
-    // 判断是否为 3D 网格图元
-    bool hasMeshEntities = false;
-    for (const auto& entity : entities)
+    // ===== 3.1 按图元类型分拣：网格进 3D 场景，其余进 2D 场景 =====
+    // 混合文件（例如同一个 OBJ 里既有网格又有线框标注）两侧都必须落地。
+    std::vector<std::unique_ptr<Eg::SyMeshEntity>> meshEntities;
+    Fio::VecSyEntityPtr flatEntities;
+    for (auto& entity : entities)
     {
-        if (entity && entity->eType == Eg::EType::MESH)
+        if (!entity)
         {
-            hasMeshEntities = true;
-            break;
+            continue;
+        }
+        if (entity->eType == Eg::EType::MESH)
+        {
+            meshEntities.push_back(std::unique_ptr<Eg::SyMeshEntity>(static_cast<Eg::SyMeshEntity*>(entity.release())));
+        }
+        else
+        {
+            flatEntities.push_back(std::move(entity));
         }
     }
+    entities.clear();
 
-    // 将导入的图元添加到场景（通过 SceneEditService 确保 Undo/图层分配/ID 冲突处理）
-    if (hasMeshEntities && m_sceneManager3D)
+    // 没有 3D 场景可落地时，网格退回 2D 通道（沿用既有行为），但必须留痕便于排查
+    if (!meshEntities.empty() && !m_sceneManager3D)
     {
-        // 3D 网格图元添加到 3D 场景管理器
-        SY_INFOF(
-            "[ImportService] Adding mesh entities to SceneManager3D: %d entities", static_cast<int>(entities.size()));
+        SY_WARNF("[ImportService] SceneManager3D not set, %zu mesh entity(ies) fall back to the 2D scene",
+            meshEntities.size());
+        for (auto& mesh : meshEntities)
+        {
+            flatEntities.push_back(std::unique_ptr<Eg::SyEntity>(mesh.release()));
+        }
+        meshEntities.clear();
+    }
 
+    const bool hasMeshEntities = !meshEntities.empty();
+    SY_INFOF("[ImportService] Entity split: %zu mesh -> 3D scene, %zu flat -> 2D scene",
+        meshEntities.size(),
+        flatEntities.size());
+
+    // ===== 3.2 网格图元落地到 3D 场景 =====
+    int meshAdded = 0;
+    if (hasMeshEntities)
+    {
         if (options.importAsNewDocument)
         {
+            SY_INFO("[ImportService] Clearing 3D scene before import");
             m_sceneManager3D->clearScene();
         }
 
-        // 收集所有网格图元
-        std::vector<std::unique_ptr<Eg::SyMeshEntity>> meshEntities;
-        std::vector<std::unique_ptr<Eg::SyEntity>> remainingEntities;
-        for (auto& entity : entities)
+        meshAdded = static_cast<int>(meshEntities.size());
+        if (m_sceneEditService3D)
         {
-            if (entity && entity->eType == Eg::EType::MESH)
-            {
-                meshEntities.push_back(
-                    std::unique_ptr<Eg::SyMeshEntity>(static_cast<Eg::SyMeshEntity*>(entity.release())));
-            }
-            else
-            {
-                remainingEntities.push_back(std::move(entity));
-            }
-        }
-        entities = std::move(remainingEntities);
-
-        // 如果有 SceneEditService3D，通过它添加以支持 Undo
-        if (m_sceneEditService3D && !meshEntities.empty())
-        {
-            SY_INFOF("[ImportService] Using SceneEditService3D for undoable import: %zu entities", meshEntities.size());
+            SY_INFOF("[ImportService] Adding %d mesh entity(ies) via SceneEditService3D (undoable)", meshAdded);
             m_sceneEditService3D->addEntities(std::move(meshEntities), "Import 3D mesh");
         }
         else
         {
-            // 回退：直接添加到 SceneManager3D（无 Undo 支持）
+            // 回退：直写 SceneManager3D，无 Undo 支持
+            SY_WARNF("[ImportService] SceneEditService3D not set, adding %d mesh entity(ies) without undo support",
+                meshAdded);
             for (auto& mesh : meshEntities)
             {
-                auto* meshPtr = mesh.release();
-                m_sceneManager3D->addEntity(meshPtr);
+                m_sceneManager3D->addEntity(mesh.release());
             }
         }
 
         m_sceneManager3D->markDataChanged();
-        SY_INFO("[ImportService] Mesh entities added to SceneManager3D successfully");
+        SY_INFOF("[ImportService] %d mesh entity(ies) added to SceneManager3D", meshAdded);
     }
-    else if (m_editService)
+
+    // ===== 3.3 其余图元落地到 2D 场景 =====
+    int flatAdded = 0;
+    if (!flatEntities.empty())
     {
-        SY_INFOF("[ImportService] Calling addEntities: editService=%p, entities=%d",
-            m_editService,
-            static_cast<int>(entities.size()));
-        m_editService->addEntities(std::move(entities), "Import " + context.sourcePath.toStdString());
-        SY_INFO("[ImportService] addEntities completed successfully");
-    }
-    else if (m_sceneManager)
-    {
-        // 回退：无 SceneEditService 时直写 SceneManager（无 Undo）
-        SY_INFOF("[ImportService] Direct adding to sceneManager=%p, entities=%d",
-            m_sceneManager,
-            static_cast<int>(entities.size()));
-        for (auto& entity : entities)
+        flatAdded = static_cast<int>(flatEntities.size());
+        if (m_editService)
         {
-            if (entity)
+            SY_INFOF("[ImportService] Adding %d entity(ies) via SceneEditService (undoable)", flatAdded);
+            m_editService->addEntities(std::move(flatEntities), "Import " + context.sourcePath.toStdString());
+        }
+        else if (m_sceneManager)
+        {
+            // 回退：无 SceneEditService 时直写 SceneManager，无 Undo 支持
+            SY_WARNF("[ImportService] SceneEditService not set, adding %d entity(ies) without undo support", flatAdded);
+            for (auto& entity : flatEntities)
             {
-                m_sceneManager->addEntity(entity.release());
+                if (entity)
+                {
+                    m_sceneManager->addEntity(entity.release());
+                }
             }
         }
-        SY_INFO("[ImportService] Direct add completed");
+        else
+        {
+            SY_ERRORF("[ImportService] No 2D scene available, %d entity(ies) cannot be imported", flatAdded);
+            return ImportResult::fail(QStringLiteral("No scene manager available"), ImportErrorType::Unknown);
+        }
+        SY_INFOF("[ImportService] %d entity(ies) added to the 2D scene", flatAdded);
     }
-    else
+
+    const int entityCount = meshAdded + flatAdded;
+    if (entityCount == 0)
     {
-        SY_ERROR("[ImportService] Neither SceneEditService nor SceneManager available");
+        SY_ERROR("[ImportService] No entity landed in any scene");
         return ImportResult::fail(QStringLiteral("No scene manager available"), ImportErrorType::Unknown);
     }
 
-    // 还原源文件图层结构（DXF 等支持图层的格式）：
-    // 图元在 SceneEditService::addEntities 中默认分配到当前图层，这里再按源图层表重新归属
-    if (!hasMeshEntities)
+    // ===== 3.4 还原源文件的图层与群组结构 =====
+    // 只对 2D 通道有意义：3D 网格不参与图层体系与 SyGroup 树。
+    // 时序约束：必须在图元进入场景、拿到运行时 EntityId 之后，才能按映射表反查归属。
+    if (flatAdded > 0)
     {
         const int createdLayers = restoreImportedLayers(context, parseResult);
-        if (createdLayers > 0)
-        {
-            SY_INFOF("[ImportService] Restored %d layer(s) from source document", createdLayers);
-        }
+        SY_INFOF("[ImportService] Layer restore: %d created from %zu source layer(s), %zu entity mapping(s)",
+            createdLayers,
+            parseResult.importedLayers.size(),
+            parseResult.entityLayerMap.size());
 
-        // 还原源文件群组结构（DXF 块引用 / SVG 的 g 元素 / OBJ 的 o-g-usemtl）：
-        // 图元此时已进入场景并拿到运行时 EntityId，才能按 entityGroupMap 反查并挂进群组
         const int createdGroups = restoreImportedGroups(parseResult);
-        if (createdGroups > 0)
-        {
-            SY_INFOF("[ImportService] Restored %d group(s) from source document", createdGroups);
-        }
-
+        SY_INFOF("[ImportService] Group restore: %d created from %zu source group(s), %zu entity mapping(s)",
+            createdGroups,
+            parseResult.importedGroups.size(),
+            parseResult.entityGroupMap.size());
+    }
+    else if (!parseResult.importedLayers.empty() || !parseResult.importedGroups.empty())
+    {
+        SY_WARNF("[ImportService] Skipping layer/group restore: no 2D entity imported (%zu layer(s), %zu group(s) "
+                 "carried by IR are dropped)",
+            parseResult.importedLayers.size(),
+            parseResult.importedGroups.size());
     }
 
-    SY_INFOF("[ImportService] Document built: %d entities", entityCount);
+    SY_INFOF("[ImportService] Document built: %d entities (%d mesh + %d flat)", entityCount, meshAdded, flatAdded);
     updateProgress(ImportPhase::BuildDocument, 1.0f);
 
     // 根据图元类型设置目标工作台 ID
@@ -643,23 +732,39 @@ void ImportService::phaseRefreshDisplay(const ImportResult& result, const Import
     updateProgress(ImportPhase::RefreshDisplay, 0.0f);
     emit importPhaseChanged(ImportPhase::RefreshDisplay);
 
-    SY_INFO("[ImportService] Phase 4: Refreshing display");
+    SY_INFOF("[ImportService] Phase 4: Refreshing display, workbench='%s', autoFit=%d, autoSwitch=%d",
+        result.usedWorkbenchId.toUtf8().constData(),
+        options.autoFit ? 1 : 0,
+        options.autoSwitchWorkbench ? 1 : 0);
 
     // 工作台切换
-    if (options.autoSwitchWorkbench && m_workbenchSwitchCallback)
+    if (options.autoSwitchWorkbench)
     {
-        QString targetId = result.usedWorkbenchId;
-        if (targetId.isEmpty())
+        const QString targetId =
+            result.usedWorkbenchId.isEmpty() ? QStringLiteral("2D") : result.usedWorkbenchId;
+        if (m_workbenchSwitchCallback)
         {
-            targetId = QStringLiteral("2D");
+            SY_INFOF("[ImportService] Switching workbench to '%s'", targetId.toUtf8().constData());
+            m_workbenchSwitchCallback(targetId);
         }
-        m_workbenchSwitchCallback(targetId);
+        else
+        {
+            SY_WARNF("[ImportService] Workbench switch to '%s' skipped: no callback registered",
+                targetId.toUtf8().constData());
+        }
     }
 
     // 视口适配
-    if (options.autoFit && m_viewportFitCallback)
+    if (options.autoFit)
     {
-        m_viewportFitCallback();
+        if (m_viewportFitCallback)
+        {
+            m_viewportFitCallback();
+        }
+        else
+        {
+            SY_WARN("[ImportService] Viewport fit skipped: no callback registered");
+        }
     }
 
     // 树结构刷新
@@ -667,14 +772,22 @@ void ImportService::phaseRefreshDisplay(const ImportResult& result, const Import
     {
         m_treeRebuildCallback();
     }
+    else
+    {
+        SY_WARN("[ImportService] Scene tree rebuild skipped: no callback registered");
+    }
 
     // 属性面板刷新
     if (m_propertyRefreshCallback)
     {
         m_propertyRefreshCallback();
     }
+    else
+    {
+        SY_WARN("[ImportService] Property panel refresh skipped: no callback registered");
+    }
 
-    SY_INFO("[ImportService] Display refreshed");
+    SY_INFO("[ImportService] Phase 4: Display refreshed");
     updateProgress(ImportPhase::RefreshDisplay, 1.0f);
 }
 
@@ -695,6 +808,10 @@ void ImportService::phaseWriteBackState(const ImportContext& context, const Impo
     {
         m_currentDocumentPathCallback(context.sourcePath);
     }
+    else
+    {
+        SY_WARN("[ImportService] Current document path not updated: no callback registered");
+    }
 
     // 添加到最近文件（优先使用 context 中的回调）
     if (context.recentFileAddCallback)
@@ -705,11 +822,19 @@ void ImportService::phaseWriteBackState(const ImportContext& context, const Impo
     {
         m_recentFileAddCallback(context.sourcePath);
     }
+    else
+    {
+        SY_WARN("[ImportService] Recent file list not updated: no callback registered");
+    }
 
     // 文档持久化（使用成员变量回调，全局配置）
     if (m_documentPersistenceCallback)
     {
         m_documentPersistenceCallback(context.sourcePath, result.entityCount);
+    }
+    else
+    {
+        SY_WARN("[ImportService] Document persistence skipped: no callback registered");
     }
 
     // 更新状态栏（使用成员变量回调，全局配置）
@@ -721,19 +846,27 @@ void ImportService::phaseWriteBackState(const ImportContext& context, const Impo
         m_statusBarUpdateCallback(statusMsg);
     }
 
-    SY_INFO("[ImportService] State written back");
+    SY_INFO("[ImportService] Phase 5: State written back");
     updateProgress(ImportPhase::WriteBackState, 1.0f);
 }
 
 int ImportService::restoreImportedLayers(const ImportContext& context, const ImportResult& parseResult)
 {
-    if (!m_layerManager || parseResult.importedLayers.empty())
+    if (parseResult.importedLayers.empty())
     {
+        // 该格式本身不带图层信息（OBJ / STL / PLT 等），无需还原
+        return 0;
+    }
+    if (!m_layerManager)
+    {
+        SY_WARNF("[ImportService] Layer restore skipped: LayerManager not set, %zu source layer(s) dropped",
+            parseResult.importedLayers.size());
         return 0;
     }
     if (!context.preserveLayers)
     {
-        SY_INFO("[ImportService] restoreImportedLayers: preserveLayers=false, skipping layer restore");
+        SY_INFOF("[ImportService] Layer restore skipped: preserveLayers=false, %zu source layer(s) ignored",
+            parseResult.importedLayers.size());
         return 0;
     }
 
@@ -810,8 +943,15 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
 
 int ImportService::restoreImportedGroups(const ImportResult& parseResult)
 {
-    if (!m_sceneManager || parseResult.importedGroups.empty())
+    if (parseResult.importedGroups.empty())
     {
+        // 该格式本身不带群组信息，或解析层未产出群组表
+        return 0;
+    }
+    if (!m_sceneManager)
+    {
+        SY_WARNF("[ImportService] Group restore skipped: SceneManager not set, %zu source group(s) dropped",
+            parseResult.importedGroups.size());
         return 0;
     }
 
@@ -904,6 +1044,9 @@ int ImportService::restoreImportedGroups(const ImportResult& parseResult)
 
 void ImportService::updateProgress(ImportPhase phase, float progress)
 {
+    // 阶段号只落 Debug 级：Info 级里已有每个 phase 的 START/END，这里避免重复噪音，
+    // 但排查"卡在哪个阶段"时把日志级别降到 Debug 就能看到进度推进
+    SY_DEBUGF("[ImportService] Progress: phase=%d, value=%.2f", static_cast<int>(phase), progress);
     emit importProgress(progress);
 }
 

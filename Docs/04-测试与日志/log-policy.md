@@ -93,6 +93,10 @@ SY_ERROR("[OperationBus] execute failed op=%s error=%s",
 | **Viewport3D / Renderer3DFactory** | `[Viewport3D]` / `[Renderer3DFactory]` | 3D 视口宿主与渲染器创建 |
 | **ExportService / ImportService** | `[ExportService]` / `[ImportService]` | 导入导出主链路 |
 | **ImportDispatcher / ExportDispatcher** | `[ImportDispatcher]` / `[ExportDispatcher]` | 格式路由与分发 |
+| **导入读取器（基类统一）** | `[ImportReader:<格式名>]` | IR 解析耗时、图元/图层/群组统计、转换丢弃差额 |
+| **FileIO DLL 入口** | `[FileIO]` | `importToIR` / `importFile` 的成败与统计 |
+| **FileIO 解析器** | `[DxfParser]` / `[SvgParser]` / `[PltParser]` / `[StepParser]` / `[UgParser]` / `[ObjParser]` / `[StlParser]` / `[NativeParser]` / `[PdfBasedParser:<格式名>]` | 单格式解析细节 |
+| **FileIO 解析器工厂** | `[FileParserFactory]` / `[IFileParser]` | 解析器创建失败、格式未接入 IR |
 | **FileManager** | `[FileManager]` | 文件管理、格式识别 |
 | **SceneEditService3D** | `[SceneEditService3D]` | 3D 编辑事务 |
 | **UiShellHost** | `[UiShellHost]` | Shell 宿主、工作台切换 |
@@ -258,7 +262,35 @@ SyLogger::setFile("app.log");
 | **tail** | 实时查看 |
 | **logcat** | Android 日志 |
 
-### 6.3 崩溃排查：日志尾部不可信，看调用栈
+### 6.3 导入一个文件失败/结果不对时怎么查
+
+导入链路跨了三层（Main → FileIO DLL → 具体 parser），日志按层分前缀，从外到内逐层收敛：
+
+```
+[ImportService]          五阶段主流程：格式识别 → 解析 → 构建文档 → 刷新显示 → 回写状态
+[ImportDispatcher]       格式路由：命中哪个读取器、读取器耗时与结果
+[ImportReader:DXF]       IR 解析统计、转换层丢弃差额、旧路径回退
+[FileIO]                 DLL 入口：parser 是否存在、异常、零实体
+[DxfParser] 等           单格式解析细节：块展开、越界、上限截断
+```
+
+按现象定位：
+
+- **提示导入成功但画布是空的**：先看 `[ImportService] Entity split`（网格与非网格各多少），
+  再看 `Entity validation dropped`（有多少图元没通过合法性校验）。
+- **图元比源文件少**：看 `[ImportReader:*] Converter dropped N of M IR entity(ies)`——
+  转换层不认识的类型会在这里被丢掉。
+- **图层/群组没还原**：看 `[ImportService] Layer restore` / `Group restore` 两行的
+  `created` 与 `entity mapping` 数；若打的是 `skipped`，行尾会写明原因
+  （`LayerManager not set` / `preserveLayers=false` / `no 2D entity imported`）。
+- **导入很慢**：`[ImportDispatcher] Reader '<格式>' succeeded: ... N ms` 是读取器总耗时，
+  `[ImportReader:*] IR parsed in N ms` 是纯解析耗时，两者之差是转换层开销。
+- **卡住不动**：把级别降到 DEBUG，看 `[ImportService] Progress: phase=..` 停在哪个阶段。
+
+约定：每个 parser 的收尾日志文案统一为 `parseToIR END`，
+所以 `grep "parseToIR END"` 能一次性捞出所有格式的解析统计。
+
+### 6.4 崩溃排查：日志尾部不可信，看调用栈
 
 日志走 spdlog **async_logger** + `flush_on(warn)`（`Log/Log/Src/SyLogger.cpp`）。
 硬崩溃时队列里尚未落盘的记录会**直接丢失**，因此：
