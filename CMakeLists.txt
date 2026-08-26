@@ -162,6 +162,13 @@ if(GTest_FOUND)
     else()
         option(BUILD_HARDWARE_TESTS "Build Hardware unit tests" OFF)
     endif()
+    # 视觉模块测试。默认 ON：全部跑在 SimulatedCamera / FileReplayCamera 上，
+    # 不需要真实相机，而视觉的回归价值恰恰在于「改了算子不要破坏契约与精度」。
+    if(BUILD_VISION)
+        option(BUILD_VISION_TESTS "Build Vision unit tests" ON)
+    else()
+        option(BUILD_VISION_TESTS "Build Vision unit tests" OFF)
+    endif()
     
     enable_testing()
 else()
@@ -176,6 +183,7 @@ else()
     set(BUILD_LICENSE_TESTS OFF CACHE BOOL "Build License unit tests" FORCE)
     set(BUILD_ENGRAVING_TESTS OFF CACHE BOOL "Build Engraving unit tests" FORCE)
     set(BUILD_HARDWARE_TESTS OFF CACHE BOOL "Build Hardware unit tests" FORCE)
+    set(BUILD_VISION_TESTS OFF CACHE BOOL "Build Vision unit tests" FORCE)
 endif()
 
 message(STATUS "")
