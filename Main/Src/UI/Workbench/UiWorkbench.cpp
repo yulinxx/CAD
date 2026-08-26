@@ -577,10 +577,16 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         }
     };
 
+    // 这几个全局快捷键必须走 window.registerShortcut 登记，否则工作台切换时
+    // clearAllShortcuts 删不到它们（它只回收登记过的）：切到 3D 后 2D 的 Delete
+    // 仍然活着，一边在 3D 界面里删 2D 场景的图元，一边和 3D 注册的 Delete 同键冲突，
+    // Qt 判 ambiguous 后两个都不触发。3D 侧（setup3DDeleteShortcuts）一直是这么做的。
     auto* deleteSc = new QShortcut(QKeySequence(Qt::Key_Delete), &window);
     QObject::connect(deleteSc, &QShortcut::activated, this, deleteSelectedShapes);
+    window.registerShortcut(deleteSc);
     auto* backspaceSc = new QShortcut(QKeySequence(Qt::Key_Backspace), &window);
     QObject::connect(backspaceSc, &QShortcut::activated, this, deleteSelectedShapes);
+    window.registerShortcut(backspaceSc);
     auto* selectAllSc = new QShortcut(QKeySequence::SelectAll, &window);
     QObject::connect(selectAllSc, &QShortcut::activated, this, [this, editingText]() {
         if (!editingText() && m_services.operationBus)
@@ -588,8 +594,10 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
             m_services.operationBus->run(OperationId::Edit_SelectAll, {}, OperationSource::Shortcut);
         }
     });
+    window.registerShortcut(selectAllSc);
     auto* escSc = new QShortcut(QKeySequence(Qt::Key_Escape), &window);
     QObject::connect(escSc, &QShortcut::activated, this, clearSelectionShapes);
+    window.registerShortcut(escSc);
 
     // F12 截图
     auto* captureSc = new QShortcut(QKeySequence(Qt::Key_F12), &window);
@@ -600,6 +608,7 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         }
         m_services.operationBus->run(OperationId::View_Capture, {}, OperationSource::Shortcut);
     });
+    window.registerShortcut(captureSc);
 
     // 状态回调：将视口状态写入状态中心
     if (m_services.stateCenter)
@@ -1719,6 +1728,17 @@ void Workbench2D::deactivate()
         m_services.importService->setViewportFitCallback(nullptr);
         m_services.importService->setTreeRebuildCallback(nullptr);
         m_services.importService->setPropertyRefreshCallback(nullptr);
+    }
+
+    // 同理：FileDropHandler 由 WorkbenchWindow 持有（跨切换永生），它的
+    // 屏幕→世界换算回调按值捕获了 RenderViewport2D*。装的是 application 级事件
+    // 过滤器，所以切到 3D 之后往窗口拖一张图片同样会走进来 → 解引用已析构的视口。
+    if (m_workbenchWindow)
+    {
+        if (auto* fdh = m_workbenchWindow->fileDropHandler())
+        {
+            fdh->setScreenToWorldConverter(nullptr);
+        }
     }
 
     // 清理命令动作中枢（unique_ptr 管理生命周期，reset 释放所有权）
