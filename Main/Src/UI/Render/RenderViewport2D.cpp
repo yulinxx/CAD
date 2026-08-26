@@ -88,25 +88,26 @@ void RenderViewport2D::releaseGLResources()
         return;
     }
 
-    // 先停止刷新协调器，避免释放期间还有刷新请求命中已失效的 widget
+    // 1) 先停外部刷新来源，避免释放期间还有刷新请求命中已失效的 Runtime。
+    //    控件内部的动画定时器由 RenderWidget::releaseGLResources 自己停——
+    //    谁拥有重绘来源，谁负责关掉它。
     if (m_refreshCoordinator)
     {
         m_refreshCoordinator->stop();
     }
 
-    // 先从布局中移除子 RenderWidget（QOpenGLWidget），
-    // 阻止 Qt 在 makeCurrent() 之后继续向它派发布局/绘制事件。
-    if (auto* layout = this->layout())
-    {
-        layout->removeWidget(m_renderWidget);
-    }
-
-    // 再释放 GL 资源（内部会判断可见性，避免在无效 surface 上 makeCurrent）
+    // 2) 释放 GL 资源。上下文的当前性由 RenderWidget 自己保证（只有它知道自己的
+    //    QOpenGLContext），这里不包 makeCurrent。
     m_renderWidget->releaseGLResources();
 
-    // 最后把子 widget 从父控件脱离，防止后续 setCentralWidget(nullptr) → hide()
-    // 时 Qt 再次访问已释放的 QOpenGLWidget
-    m_renderWidget->setParent(nullptr);
+    // 释放后 m_session 已失效，RenderWidget::renderFrame 会在入口直接返回，
+    // 因此后续 setCentralWidget(nullptr) → hide() 触发的绘制事件都是空操作。
+    //
+    // 这里刻意**不**做 layout()->removeWidget() + setParent(nullptr)：
+    // 那是为了规避「hide() 期间访问失效 native handle」而加的手法，但那次崩溃的
+    // 真因是 GL 删除没有当前上下文（已在 RenderWidget 内修正）。把子控件摘成
+    // 孤立顶层反而有两个副作用：本视口析构时不再级联删除它（每次工作台切换泄漏
+    // 一个 RenderWidget），且这个孤立控件仍会继续收到定时器与绘制事件。
 }
 
 void RenderViewport2D::wireInputRouter()

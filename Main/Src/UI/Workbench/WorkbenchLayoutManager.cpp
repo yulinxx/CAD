@@ -5,8 +5,7 @@
 #include "Persistence/PersistenceService.h"
 #include "Persistence/Repositories/WorkspaceSnapshotRepository.h"
 #include "Persistence/Models/WorkspaceSnapshotRecord.h"
-#include "Render/RenderViewport2D.h"
-#include "Render/UiViewport3D.h"
+#include "UiWorkbench.h"
 #include "Log/SyLogger.h"
 
 #include "ClientConfig/UiBuiltinPanels.h"
@@ -317,7 +316,7 @@ QToolBar* WorkbenchLayoutManager::registerToolBar(const QString& title)
     return toolBar;
 }
 
-void WorkbenchLayoutManager::clearLayoutContent()
+void WorkbenchLayoutManager::clearLayoutContent(const UiWorkbench* oldWorkbench)
 {
     // 1: 清理所有工具栏（包括通过 addToolBar 直接添加而未注册的工具栏，如3D左侧工具栏）
     // 先收集所有工具栏指针，避免遍历过程中容器被修改
@@ -375,19 +374,22 @@ void WorkbenchLayoutManager::clearLayoutContent()
     //
     // 因此必须先在有效的 native window 上下文中释放 GL 资源，
     // 再销毁 native window。
+    //
+    // 「怎么释放」交给旧工作台的 releaseCentralWidgetGLResources：
+    // 布局管理器是框架层，不该认识 RenderViewport2D / Viewport3D 这些具体类型。
+    // 这个虚接口一直存在（UiWorkbench.h），只是此前被这里的 qobject_cast 绕过，
+    // 三份实现全是死代码。
     auto* oldCentral = m_parent->centralWidget();
     if (oldCentral)
     {
         SY_INFO("[clearLayoutContent] Step A: releasing GL resources");
-        // 2D 视口：释放 RenderWidget (QOpenGLWidget) 的 GL 资源
-        if (auto* vp2d = qobject_cast<RenderViewport2D*>(oldCentral))
+        if (oldWorkbench)
         {
-            vp2d->releaseGLResources();
+            oldWorkbench->releaseCentralWidgetGLResources(oldCentral);
         }
-        // 3D 视口：关闭渲染器持有的 GL 资源
-        else if (auto* vp3d = qobject_cast<Viewport3D*>(oldCentral))
+        else
         {
-            vp3d->releaseGLResources();
+            SY_WARN("[clearLayoutContent] 旧工作台为空，跳过中央视口 GL 释放");
         }
 
         SY_INFO("[clearLayoutContent] Step B: setCentralWidget(nullptr)");

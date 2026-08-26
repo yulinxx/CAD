@@ -840,7 +840,10 @@ void WorkbenchWindow::clearWorkbenchContent()
     }
 
     // 4: 委托布局管理器清理工具栏/菜单栏/停靠面板/中央控件并重建占位控件
-    m_layoutManager->clearLayoutContent();
+    // 传入当前（即将被替换的）工作台：中央视口的 GL 释放是 2D/3D 差异化逻辑，
+    // 由工作台自己的 releaseCentralWidgetGLResources 承担。
+    // triggerWorkbench 在第 6 步才把 m_workbench 指向新工作台，所以此刻它仍是旧的。
+    m_layoutManager->clearLayoutContent(m_workbench);
 
     // 5: 强制处理所有排队的 DeferredDelete 事件
     // 旧中央控件（如 RenderViewport2D）内部包含 QOpenGLWidget，

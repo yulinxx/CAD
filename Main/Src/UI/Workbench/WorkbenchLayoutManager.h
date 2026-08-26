@@ -19,6 +19,7 @@ class SceneTreePanel2D;
 class PropertiesPanelWidget;
 class UiConfigurationManager;
 class UiPanelRegistry;
+class UiWorkbench;
 
 /// 面板状态：集中管理状态栏、工具栏与停靠面板指针
 /// 从 WorkbenchWindow::PanelState 提升为独立类型，供 WorkbenchLayoutManager 使用
@@ -84,7 +85,10 @@ public:
     QToolBar* registerToolBar(const QString& title);
     /// 清空工作台内容（移除所有注册的面板和工具栏）
     /// 使用 deleteLater() 延迟删除，避免 QOpenGLWidget 析构时崩溃
-    void clearLayoutContent();
+    /// @param oldWorkbench 被替换掉的工作台。中央视口的 GL 资源释放委托给它的
+    ///        releaseCentralWidgetGLResources —— 布局管理器不认识 2D/3D 视口的具体类型。
+    ///        为空时跳过释放并告警（正常切换流程一定非空）。
+    void clearLayoutContent(const UiWorkbench* oldWorkbench);
 
     // ==================== 布局快照 ====================
 
