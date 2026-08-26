@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file FioEntityConverterTests.cpp
  * @brief FioEntityConverter 回归测试 — 中立 IR → Engine SyEntity 转换
  *
@@ -15,7 +15,7 @@
 #include <gtest/gtest.h>
 #include <cstring>
 
-#include "FioEntityConverter.h"
+#include "Engine3D/Import/FioEntityConverter.h"
 #include "FileIO/FioTypes.h"
 
 // Engine2D 实体类型
@@ -44,7 +44,7 @@ TEST(FioEntityConverterTest, ConvertLineEntity)
     info.line.x2 = 100.0;
     info.line.y2 = 200.0;
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::LINE);
 
@@ -66,7 +66,7 @@ TEST(FioEntityConverterTest, ConvertCircleEntity)
     info.circle.cy = 60.0;
     info.circle.r = 25.0;
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::CIRCLE);
 
@@ -88,7 +88,7 @@ TEST(FioEntityConverterTest, ConvertArcEntity)
     info.arc.sa = 0.0;
     info.arc.ea = 1.5708;
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::ARC);
 
@@ -114,7 +114,7 @@ TEST(FioEntityConverterTest, ConvertEllipseEntity)
     info.ellipse.sa = 0.0;
     info.ellipse.ea = 6.2832;
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::ELLIPSE);
 
@@ -135,7 +135,7 @@ TEST(FioEntityConverterTest, ConvertPointEntity)
     info.line.x1 = 42.0;  // 点坐标复用 line.x1/y1
     info.line.y1 = 99.0;
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::POINT);
 
@@ -159,7 +159,7 @@ TEST(FioEntityConverterTest, ConvertBezierEntity)
     info.bezier.ex = 150.0;
     info.bezier.ey = 0.0;
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::BEZIER);
 
@@ -186,7 +186,7 @@ TEST(FioEntityConverterTest, ConvertBezier2Entity)
     info.bezier2.ex = 100.0;
     info.bezier2.ey = 0.0;
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::BEZIER2);
 
@@ -210,7 +210,7 @@ TEST(FioEntityConverterTest, ConvertTextEntity)
     info.text.h = 12.0;
     info.text.a = 0.5;
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::TEXT);
 
@@ -234,7 +234,7 @@ TEST(FioEntityConverterTest, ConvertBarCodeEntity)
     info.barWidth = 50.0;
     info.barHeight = 30.0;
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::BAR_CODE);
 
@@ -257,7 +257,7 @@ TEST(FioEntityConverterTest, ConvertQRCodeEntity)
     info.text.y = 5.0;
     info.moduleSize = 10.0;
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::QR_CODE);
 
@@ -285,7 +285,7 @@ TEST(FioEntityConverterTest, ConvertPolygonWithExtensionData)
     info.extensionDataOffset = 0;
     info.extensionDataSize = sizeof(vertices);
 
-    auto entity = FioEntityConverter::convertEntity(info, blob);
+    auto entity = Eg::FioEntityConverter::convertEntity(info, blob);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::POLYGON);
 
@@ -316,7 +316,7 @@ TEST(FioEntityConverterTest, ConvertPolylineWithExtensionData)
     info.extensionDataOffset = 0;
     info.extensionDataSize = sizeof(vertices);
 
-    auto entity = FioEntityConverter::convertEntity(info, blob);
+    auto entity = Eg::FioEntityConverter::convertEntity(info, blob);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::POLYGON);
 
@@ -363,7 +363,7 @@ TEST(FioEntityConverterTest, ConvertNurbsWithExtensionData)
     info.extensionDataOffset = 0;
     info.extensionDataSize = sizeof(extData);
 
-    auto entity = FioEntityConverter::convertEntity(info, blob);
+    auto entity = Eg::FioEntityConverter::convertEntity(info, blob);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::SPLINE);
 
@@ -397,7 +397,7 @@ TEST(FioEntityConverterTest, ConvertImageWithExtensionData)
     info.extensionDataOffset = 0;
     info.extensionDataSize = sizeof(pixelData);
 
-    auto entity = FioEntityConverter::convertEntity(info, blob);
+    auto entity = Eg::FioEntityConverter::convertEntity(info, blob);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::IMAGE);
 
@@ -415,7 +415,7 @@ TEST(FioEntityConverterTest, ConvertUnknownTypeReturnsNull)
     Fio::EntityInfo info;
     info.type = Fio::EntityType::Unknown;
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     EXPECT_EQ(entity, nullptr);
 }
 
@@ -446,7 +446,7 @@ TEST(FioEntityConverterTest, ConvertAllBatch)
     parseData.entityCount = 3;
     std::strncpy(parseData.sourceFormat, "DXF", sizeof(parseData.sourceFormat));
 
-    auto result = FioEntityConverter::convertAll(parseData);
+    auto result = Eg::FioEntityConverter::convertAll(parseData);
     EXPECT_EQ(result.size(), 2u);  // 未知类型被跳过
     EXPECT_EQ(result[0]->eType, Eg::EType::LINE);
     EXPECT_EQ(result[1]->eType, Eg::EType::CIRCLE);
@@ -460,7 +460,7 @@ TEST(FioEntityConverterTest, ConvertAllEmptyInput)
     parseData.entities = nullptr;
     parseData.entityCount = 0;
 
-    auto result = FioEntityConverter::convertAll(parseData);
+    auto result = Eg::FioEntityConverter::convertAll(parseData);
     EXPECT_TRUE(result.empty());
 }
 
@@ -485,7 +485,7 @@ TEST(FioEntityConverterTest, ExtractLayers)
     parseData.layers = layers;
     parseData.layerCount = 2;
 
-    auto result = FioEntityConverter::extractLayers(parseData);
+    auto result = Eg::FioEntityConverter::extractLayers(parseData);
     ASSERT_EQ(result.size(), 2u);
     EXPECT_EQ(result[0].sourceId, 1u);
     EXPECT_EQ(std::string(result[0].name), "Layer1");
@@ -507,7 +507,7 @@ TEST(FioEntityConverterTest, ExtractLayersEmptyInput)
     parseData.layers = nullptr;
     parseData.layerCount = 0;
 
-    auto result = FioEntityConverter::extractLayers(parseData);
+    auto result = Eg::FioEntityConverter::extractLayers(parseData);
     EXPECT_TRUE(result.empty());
 }
 
@@ -521,7 +521,7 @@ TEST(FioEntityConverterTest, ConvertPolygonWithEmptyExtensionData)
     info.extensionDataOffset = 0;
     info.extensionDataSize = 0;
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::POLYGON);
 

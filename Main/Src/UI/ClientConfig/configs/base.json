@@ -160,7 +160,7 @@
       "id": "draw",
       "label": "Draw",
       "visible": true,
-      "workbenches": ["2D"],
+      "workbenches": ["2D", "3D"],
       "items": [
         { "type": "action", "id": "tool.select", "label": "Select", "command": "tool.select", "icon": ":/ui/common/Icons/Tools/select.svg", "workbenches": ["2D"] },
         { "type": "action", "id": "tool.point", "label": "Point", "command": "tool.point", "icon": ":/ui/common/Icons/Tools/point.svg", "workbenches": ["2D"] },
@@ -183,7 +183,21 @@
         { "type": "separator" },
         { "type": "action", "id": "tool.text", "label": "Text", "command": "tool.text", "icon": ":/ui/common/Icons/Tools/text.svg", "workbenches": ["2D"] },
         { "type": "action", "id": "tool.bitmap", "label": "Bitmap", "command": "tool.bitmap", "icon": ":/ui/common/Icons/Tools/bitmap.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "tool.qrcode", "label": "QR Code", "command": "tool.qrcode", "icon": ":/ui/common/Icons/Tools/qrcode.svg", "workbenches": ["2D"] }
+        { "type": "action", "id": "tool.qrcode", "label": "QR Code", "command": "tool.qrcode", "icon": ":/ui/common/Icons/Tools/qrcode.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "model.make_box", "label": "Box", "command": "model.make_box", "icon": ":/ui/common/Icons/Model3D/primitive_box.svg", "workbenches": ["3D"] },
+        { "type": "action", "id": "model.make_sphere", "label": "Sphere", "command": "model.make_sphere", "icon": ":/ui/common/Icons/Model3D/primitive_sphere.svg", "workbenches": ["3D"] },
+        { "type": "action", "id": "model.make_cylinder", "label": "Cylinder", "command": "model.make_cylinder", "icon": ":/ui/common/Icons/Model3D/primitive_cylinder.svg", "workbenches": ["3D"] },
+        { "type": "separator", "workbenches": ["3D"] },
+        { "type": "submenu", "id": "model.boolean", "label": "Boolean", "icon": ":/ui/common/Icons/Actions/boolean_union.svg", "workbenches": ["3D"], "items": [
+          { "type": "action", "id": "model.boolean_fuse", "label": "Fuse", "command": "model.boolean_fuse", "icon": ":/ui/common/Icons/Actions/boolean_union.svg", "workbenches": ["3D"] },
+          { "type": "action", "id": "model.boolean_cut", "label": "Cut", "command": "model.boolean_cut", "icon": ":/ui/common/Icons/Actions/boolean_difference.svg", "workbenches": ["3D"] }
+        ] },
+        { "type": "submenu", "id": "model.split", "label": "Split", "icon": ":/ui/common/Icons/Actions/cut.svg", "workbenches": ["3D"], "items": [
+          { "type": "action", "id": "model.split_half_x", "label": "Half by X", "command": "model.split_half_x", "icon": ":/ui/common/Icons/Actions/cut.svg", "workbenches": ["3D"] },
+          { "type": "action", "id": "model.split_half_y", "label": "Half by Y", "command": "model.split_half_y", "icon": ":/ui/common/Icons/Actions/cut.svg", "workbenches": ["3D"] },
+          { "type": "action", "id": "model.split_half_z", "label": "Half by Z", "command": "model.split_half_z", "icon": ":/ui/common/Icons/Actions/cut.svg", "workbenches": ["3D"] },
+          { "type": "action", "id": "model.split_by_pick_plane", "label": "By Picked Plane", "command": "model.split_by_pick_plane", "icon": ":/ui/common/Icons/Actions/cut.svg", "workbenches": ["3D"] }
+        ] }
       ]
     },
     {
@@ -209,11 +223,42 @@
       "visible": true,
       "workbenches": ["2D", "3D"],
       "items": [
-        { "type": "action", "id": "laser.start_process", "label": "Start Process", "command": "laser.start_process", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "laser.pause_process", "label": "Pause Process", "command": "laser.pause_process", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "laser.stop_process", "label": "Stop Process", "command": "laser.stop_process", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "laser.connect", "label": "Connect", "command": "laser.connect", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["3D"] },
+        { "type": "action", "id": "laser.disconnect", "label": "Disconnect", "command": "laser.disconnect", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["3D"] },
+        { "type": "action", "id": "laser.home", "label": "Home", "command": "laser.home", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["3D"] },
+        { "type": "action", "id": "laser.test_fire", "label": "Test Fire", "command": "laser.test_fire", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["3D"] },
         { "type": "separator" },
-        { "type": "action", "id": "laser.emergency_stop", "label": "Emergency Stop", "command": "laser.emergency_stop", "icon": ":/ui/common/Icons/Actions/laser_emergency.svg", "workbenches": ["2D"] }
+        { "type": "action", "id": "laser.start_process", "label": "Start Process", "command": "laser.start_process", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D", "3D"] },
+        { "type": "action", "id": "laser.pause_process", "label": "Pause Process", "command": "laser.pause_process", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D", "3D"] },
+        { "type": "action", "id": "laser.stop_process", "label": "Stop Process", "command": "laser.stop_process", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D", "3D"] },
+        { "type": "separator" },
+        { "type": "action", "id": "laser.material_db", "label": "Material Database", "command": "laser.material_db", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["3D"] },
+        { "type": "action", "id": "laser.process_params", "label": "Process Parameters", "command": "laser.process_params", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["3D"] },
+        { "type": "separator" },
+        { "type": "action", "id": "laser.emergency_stop", "label": "Emergency Stop", "command": "laser.emergency_stop", "icon": ":/ui/common/Icons/Actions/laser_emergency.svg", "workbenches": ["2D", "3D"] },
+        { "type": "action", "id": "laser.reset_safety", "label": "Reset Safety", "command": "laser.reset_safety", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["3D"] },
+        { "type": "action", "id": "laser.self_check", "label": "Self Check", "command": "laser.self_check", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["3D"] }
+      ]
+    },
+    {
+      "id": "vision",
+      "label": "Vision",
+      "visible": true,
+      "workbenches": ["2D", "3D"],
+      "items": [
+        { "type": "action", "id": "vision.test_shape_detect", "label": "Shape Detect", "command": "vision.test_shape_detect", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["3D"] },
+        { "type": "action", "id": "vision.test_barcode", "label": "Barcode", "command": "vision.test_barcode", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["3D"] },
+        { "type": "action", "id": "vision.test_perspective", "label": "Perspective", "command": "vision.test_perspective", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["3D"] },
+        { "type": "separator" },
+        { "type": "action", "id": "vision.test_enhance", "label": "Enhance", "command": "vision.test_enhance", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["3D"] },
+        { "type": "action", "id": "vision.test_denoise", "label": "Denoise", "command": "vision.test_denoise", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["3D"] },
+        { "type": "action", "id": "vision.test_sharpen", "label": "Sharpen", "command": "vision.test_sharpen", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["3D"] },
+        { "type": "separator" },
+        { "type": "action", "id": "vision.test_video_capture", "label": "Video Capture", "command": "vision.test_video_capture", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["3D"] },
+        { "type": "action", "id": "vision.test_camera_calibration", "label": "Camera Calibration", "command": "vision.test_camera_calibration", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["3D"] },
+        { "type": "action", "id": "vision.test_image_stitch", "label": "Image Stitch", "command": "vision.test_image_stitch", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["3D"] },
+        { "type": "action", "id": "vision.test_feature_match", "label": "Feature Match", "command": "vision.test_feature_match", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["3D"] },
+        { "type": "action", "id": "vision.test_face_recognition", "label": "Face Recognition", "command": "vision.test_face_recognition", "icon": ":/ui/common/Icons/Actions/vision.svg", "workbenches": ["3D"] }
       ]
     },
     {

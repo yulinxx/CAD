@@ -105,13 +105,17 @@ public:
     IUiCommandDispatcher* commandDispatcher();
 
     /// 根据工作台和命令可用性过滤配置菜单，便于测试与复用
+    ///
+    /// 过滤依据只有三条：菜单项的 workbenches 字段、visibilityScope、以及命令是否在
+    /// 当前工作台命令目录注册。不再按命令 ID 前缀做额外白名单 —— 否则新增行业模块
+    /// （laser / vision 等）在 3D 下会被静默吞掉，而 JSON 配置无法自救。
+    /// 过滤后会归一化分隔符（去掉首尾与连续的空分隔线）。
     static std::vector<MenuDef> filterMenusForWorkbench(const std::vector<MenuDef>& menus,
+
         const QString& workbenchId,
         const std::function<bool(const QString&)>& commandAvailable,
         const QString& workbenchKind = QString());
 
-    /// 让帮助/主题等固定菜单保持在可预期的工作台中，避免配置误入
-    static bool isMenuGroupAllowedForWorkbench(const QString& commandId, const QString& workbenchKind);
     /// 清理全局快捷键动作（Undo/Redo），切换工作台时调用
     void clearGlobalShortcuts();
     void createBaseMenus();

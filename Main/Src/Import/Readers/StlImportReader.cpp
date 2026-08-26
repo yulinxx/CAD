@@ -1,6 +1,5 @@
 #include "StlImportReader.h"
 
-#include "Engine3D/Loader/StlLoader.h"
 #include "Log/SyLogger.h"
 
 StlImportReader::StlImportReader()
@@ -8,38 +7,15 @@ StlImportReader::StlImportReader()
 {
 }
 
+/**
+ * @brief STL 文件导入实现
+ * 统一走中立 IR 链路：FileIO 的 StlParser → parseToIR → Eg::FioEntityConverter。
+ * StlParser 负责 ASCII / 二进制识别、三角形数量上限与法线兜底，本层不再重复实现。
+ */
 ImportResult StlImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
 {
     SY_INFOF("[StlImportReader] read START: path=%s", context.sourcePath.toUtf8().constData());
 
-    // 主链路：中立 IR 导入（parseToIR → FioEntityConverter）
-    ImportResult result;
-    QString errMsg;
-    if (tryImportViaIR(context, Fio::FileFormat::STL, outEntities, false, &result, &errMsg))
-    {
-        return result;
-    }
-    SY_WARNF("[StlImportReader] IR path unavailable, falling back to legacy: %s",
-        errMsg.isEmpty() ? "no entities" : errMsg.toUtf8().constData());
-
-    // 回退路径：旧版直接 StlLoader
-    std::string error;
-    auto mesh = Eg::StlLoader::load(context.sourcePath.toUtf8().toStdString(), error);
-
-    if (!mesh)
-    {
-        QString msg = QString::fromStdString(error);
-        SY_ERRORF("[StlImportReader] Failed to load STL file: %s (path=%s)",
-            msg.toUtf8().constData(),
-            context.sourcePath.toUtf8().constData());
-        return ImportResult::fail(msg, ImportErrorType::ParseFailed);
-    }
-
-    SY_INFOF("[StlImportReader] STL loaded successfully (legacy): %s, triangles=%zu, verts=%zu",
-        mesh->name(),
-        mesh->triangleCount(),
-        mesh->vertices.size());
-
-    outEntities.push_back(std::move(mesh));
-    return ImportResult::ok(QStringLiteral("STL import successful: 1 mesh entity"), 1);
+    // StlParser 仅实现 IR 路径，无旧路径回退；STL 无图层概念，故不收集图层表
+    return readViaIR(context, Fio::FileFormat::STL, outEntities, false);
 }

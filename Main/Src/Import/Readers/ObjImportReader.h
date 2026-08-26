@@ -4,8 +4,8 @@
 
 /**
  * @brief OBJ 格式导入读取器
- * 使用 Engine3D::ObjLoader 加载 OBJ 网格数据，
- * 转换为 SyMeshEntity（通过 SyEntity 基类指针）返回。
+ * 走 FileIO 的 ObjParser + 中立 IR，由 Eg::FioEntityConverter 转成 SyMeshEntity，
+ * 通过 SyEntity 基类指针返回。
  */
 class ObjImportReader : public ImportReaderBase
 {

@@ -163,6 +163,12 @@ private:
     /// @return 成功创建的图层数量（仅计算新建图层）
     int restoreImportedLayers(const ImportContext& context, const ImportResult& parseResult);
 
+    /// 还原源文件群组结构（DXF 块引用 / SVG 的 g 元素 / OBJ 的 o-g-usemtl 等）
+    /// 按 IR 群组表在 SceneManager::groupManager() 中新建群组，重建父子层级，并把图元挂到所属群组
+    /// @return 成功创建的群组数量
+    int restoreImportedGroups(const ImportResult& parseResult);
+
+
 private:
     /// 更新进度
     void updateProgress(ImportPhase phase, float progress);

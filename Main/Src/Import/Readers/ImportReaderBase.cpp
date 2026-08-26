@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "FileIO/FileIOManager.h"
-#include "Import/FioEntityConverter.h"
+#include "Engine3D/Import/FioEntityConverter.h"
 #include "Log/SyLogger.h"
 #include "Engine/SyEntity/SyEntity.h"
 
@@ -96,9 +96,13 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
         return false;
     }
 
-    // 转换图元的同时收集「图元 → 源图层 sourceId」映射，供构建文档阶段还原图层结构
+    // 转换图元的同时收集「图元 → 源图层 / 源群组 sourceId」映射，供构建文档阶段还原结构。
+    // 群组映射无条件收集：群组不像图层那样只有部分格式支持，DXF 块引用、OBJ 的 o/g/usemtl
+    // 都会产出群组，且收集成本只是一个哈希表。
     std::unordered_map<int64_t, uint32_t> entityLayerMap;
-    auto converted = FioEntityConverter::convertAll(ir, collectLayers ? &entityLayerMap : nullptr);
+    std::unordered_map<int64_t, uint64_t> entityGroupMap;
+    auto converted =
+        Eg::FioEntityConverter::convertAll(ir, collectLayers ? &entityLayerMap : nullptr, &entityGroupMap);
     outEntities.clear();
     outEntities.reserve(converted.size());
     for (auto& e : converted)
@@ -112,9 +116,21 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
     if (collectLayers)
     {
         // 提取源文件图层表（名称/颜色/可见性），随导入结果带回
-        res.importedLayers = FioEntityConverter::extractLayers(ir);
+        res.importedLayers = Eg::FioEntityConverter::extractLayers(ir);
         res.entityLayerMap = std::move(entityLayerMap);
     }
+
+    if (ir.groupCount > 0)
+    {
+        // 提取源文件群组表（名称 + 父子关系），随导入结果带回，供 ImportService 重建 SyGroup
+        res.importedGroups = Eg::FioEntityConverter::extractGroups(ir);
+        res.entityGroupMap = std::move(entityGroupMap);
+        SY_INFOF("[%s] IR carried %u group(s), %zu entity-group assignment(s)",
+            m_formatName.toUtf8().constData(),
+            ir.groupCount,
+            res.entityGroupMap.size());
+    }
+
 
     if (result)
     {

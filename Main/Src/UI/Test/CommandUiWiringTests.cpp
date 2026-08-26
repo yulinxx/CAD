@@ -587,7 +587,17 @@ namespace
             QStringLiteral("file.open_step"),
             QStringLiteral("file.save_brep_step"),
             QStringLiteral("file.save_brep_step_as"),
+            QStringLiteral("model.make_box"),
+            QStringLiteral("model.make_sphere"),
+            QStringLiteral("model.make_cylinder"),
+            QStringLiteral("model.boolean_fuse"),
+            QStringLiteral("model.boolean_cut"),
+            QStringLiteral("model.split_half_x"),
+            QStringLiteral("model.split_half_y"),
+            QStringLiteral("model.split_half_z"),
+            QStringLiteral("model.split_by_pick_plane"),
         };
+
         return kGeoModelOnly.contains(commandId);
 #else
         Q_UNUSED(commandId);

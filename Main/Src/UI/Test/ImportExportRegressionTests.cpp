@@ -16,7 +16,7 @@
 
 #include "ImportService.h"
 #include "ExportService.h"
-#include "FioEntityConverter.h"
+#include "Engine3D/Import/FioEntityConverter.h"
 #include "SyEntitySerializer.h"
 #include "FileIO/FioTypes.h"
 #include "FileIO/FileIOManager.h"
@@ -306,7 +306,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_MetadataTransfer)
     entity.locked = false;
     entity.lineWidth = 2.0;
 
-    auto result = FioEntityConverter::convertEntity(entity);
+    auto result = Eg::FioEntityConverter::convertEntity(entity);
     ASSERT_NE(result, nullptr);
     EXPECT_EQ(result->eType, Eg::EType::LINE);
 
@@ -325,7 +325,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_NameTransfer)
     info.circle.r = 5.0;
     std::strncpy(info.name, "MyCircle", sizeof(info.name));
 
-    auto result = FioEntityConverter::convertEntity(info);
+    auto result = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(result, nullptr);
     // convertEntity 创建时调用 setName，名称直接转移
     EXPECT_STREQ(result->name(), "MyCircle");
@@ -343,7 +343,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_VisibleTransfer)
     info.visible = false;
     info.locked = true;
 
-    auto result = FioEntityConverter::convertEntity(info);
+    auto result = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(result, nullptr);
     // convertEntity 不设置 visible/locked（由 convertAll 批量设置，默认值）
     EXPECT_TRUE(result->visible());
@@ -361,7 +361,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_LayerSourceIdTransfer)
     info.line.y2 = 10.0;
     info.layerSourceId = 42;
 
-    auto result = FioEntityConverter::convertEntity(info);
+    auto result = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(result, nullptr);
     // 图层 ID 仅用于引用追踪，不直接存储到实体
     EXPECT_EQ(result->eType, Eg::EType::LINE);
@@ -399,7 +399,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_MixedTypeBatch)
     parseData.entityCount = 4;
     std::strncpy(parseData.sourceFormat, "DXF", sizeof(parseData.sourceFormat));
 
-    auto result = FioEntityConverter::convertAll(parseData);
+    auto result = Eg::FioEntityConverter::convertAll(parseData);
     ASSERT_EQ(result.size(), 4u);
 
     EXPECT_EQ(result[0]->eType, Eg::EType::LINE);
@@ -427,7 +427,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_SkipUnknownInBatch)
     parseData.entities = entities;
     parseData.entityCount = 3;
 
-    auto result = FioEntityConverter::convertAll(parseData);
+    auto result = Eg::FioEntityConverter::convertAll(parseData);
     EXPECT_EQ(result.size(), 2u);
 }
 
@@ -451,7 +451,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_ExtractLayersWithEmptyName)
     parseData.layers = layers;
     parseData.layerCount = 2;
 
-    auto result = FioEntityConverter::extractLayers(parseData);
+    auto result = Eg::FioEntityConverter::extractLayers(parseData);
     ASSERT_EQ(result.size(), 2u);
     EXPECT_EQ(std::string(result[0].name), "Layer_1");
     EXPECT_EQ(std::string(result[1].name), "");
@@ -472,7 +472,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_SourceFormatPreserved)
     parseData.entityCount = 1;
     std::strncpy(parseData.sourceFormat, "SVG", sizeof(parseData.sourceFormat));
 
-    auto result = FioEntityConverter::convertAll(parseData);
+    auto result = Eg::FioEntityConverter::convertAll(parseData);
     ASSERT_EQ(result.size(), 1u);
     EXPECT_EQ(result[0]->eType, Eg::EType::LINE);
 }
@@ -491,7 +491,7 @@ TEST(ImportExportRegressionTest, Chain_EntityCountAfterImport)
     info.line.x2 = 10.0;
     info.line.y2 = 10.0;
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
@@ -527,7 +527,7 @@ TEST(ImportExportRegressionTest, Chain_ExportCollectMatchesImport)
     parseData.entities = infos;
     parseData.entityCount = 3;
 
-    auto entities = FioEntityConverter::convertAll(parseData);
+    auto entities = Eg::FioEntityConverter::convertAll(parseData);
     ASSERT_EQ(entities.size(), 3u);
 
     std::vector<std::unique_ptr<Eg::SyEntity>> moveVec;
@@ -607,7 +607,7 @@ TEST(ImportExportRegressionTest, LayerChain_ExtractAndVerify)
     parseData.layers = layers;
     parseData.layerCount = 3;
 
-    auto result = FioEntityConverter::extractLayers(parseData);
+    auto result = Eg::FioEntityConverter::extractLayers(parseData);
     ASSERT_EQ(result.size(), 3u);
 
     // 验证图层属性完整性
@@ -699,7 +699,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_ConvertNullEntityInfo)
     parseData.entities = nullptr;
     parseData.entityCount = 0;
 
-    auto result = FioEntityConverter::convertAll(parseData);
+    auto result = Eg::FioEntityConverter::convertAll(parseData);
     EXPECT_TRUE(result.empty());
 }
 
@@ -715,7 +715,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_ConvertLineEntity)
     info.line.x2 = 100.0;
     info.line.y2 = 200.0;
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::LINE);
     EXPECT_STREQ(entity->name(), "TestLine");
@@ -730,7 +730,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_ConvertCircleEntity)
     info.circle.cy = 50.0;
     info.circle.r = 25.0;
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::CIRCLE);
     EXPECT_STREQ(entity->name(), "TestCircle");
@@ -747,7 +747,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_ConvertArcEntity)
     info.arc.sa = 0.0;
     info.arc.ea = 1.5708;
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::ARC);
     EXPECT_STREQ(entity->name(), "TestArc");
@@ -766,7 +766,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_ConvertPolygonEntity)
     blob.data = reinterpret_cast<uint8_t*>(const_cast<double*>(verts));
     blob.size = sizeof(verts);
 
-    auto entity = FioEntityConverter::convertEntity(info, blob);
+    auto entity = Eg::FioEntityConverter::convertEntity(info, blob);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::POLYGON);
     EXPECT_STREQ(entity->name(), "TestPolygon");
@@ -777,7 +777,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_UnknownTypeReturnsNull)
     Fio::EntityInfo info;
     info.type = Fio::EntityType::Unknown;
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     EXPECT_EQ(entity, nullptr);
 }
 
@@ -787,7 +787,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_ConvertAllEmpty)
     parseData.entities = nullptr;
     parseData.entityCount = 0;
 
-    auto result = FioEntityConverter::convertAll(parseData);
+    auto result = Eg::FioEntityConverter::convertAll(parseData);
     EXPECT_TRUE(result.empty());
 }
 
@@ -797,7 +797,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_ExtractLayersEmpty)
     parseData.layers = nullptr;
     parseData.layerCount = 0;
 
-    auto layers = FioEntityConverter::extractLayers(parseData);
+    auto layers = Eg::FioEntityConverter::extractLayers(parseData);
     EXPECT_TRUE(layers.empty());
 }
 
@@ -812,7 +812,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_EntityInfoWithLayerId)
     info.line.y2 = 10.0;
     info.layerSourceId = 42;
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::LINE);
     EXPECT_STREQ(entity->name(), "LayeredLine");
@@ -949,7 +949,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_EntityCountAfterBatch)
     parseData.entities = infos;
     parseData.entityCount = 3;
 
-    auto entities = FioEntityConverter::convertAll(parseData);
+    auto entities = Eg::FioEntityConverter::convertAll(parseData);
     EXPECT_EQ(entities.size(), 3u);
 
     // 验证类型正确
@@ -963,7 +963,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_EntityCountEmptyInput)
     Fio::FioParseResult emptyData;
     emptyData.entityCount = 0;
 
-    auto entities = FioEntityConverter::convertAll(emptyData);
+    auto entities = Eg::FioEntityConverter::convertAll(emptyData);
     EXPECT_EQ(entities.size(), 0u);
 }
 
@@ -990,11 +990,11 @@ TEST(ImportExportRegressionTest, FioEntityConverter_LayerNameTransfer)
     parseData.layers = layers;
     parseData.layerCount = 2;
 
-    auto entities = FioEntityConverter::convertAll(parseData);
+    auto entities = Eg::FioEntityConverter::convertAll(parseData);
     ASSERT_EQ(entities.size(), 1u);
     EXPECT_STREQ(entities[0]->name(), "TestLine");
 
-    auto extractedLayers = FioEntityConverter::extractLayers(parseData);
+    auto extractedLayers = Eg::FioEntityConverter::extractLayers(parseData);
     EXPECT_EQ(extractedLayers.size(), 2u);
     EXPECT_STREQ(extractedLayers[0].name, "LayerA");
     EXPECT_STREQ(extractedLayers[1].name, "LayerB");
@@ -1121,7 +1121,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_AllSupportedTypes)
     parseData.entities = infos;
     parseData.entityCount = 6;
 
-    auto result = FioEntityConverter::convertAll(parseData);
+    auto result = Eg::FioEntityConverter::convertAll(parseData);
     // 已知类型至少应转换成功（Unknown 类型会被跳过）
     EXPECT_GE(result.size(), 4u);
     // 验证类型分布
@@ -1168,7 +1168,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_MaxLayerCount)
     }
     parseData.layers = layers.data();
 
-    auto result = FioEntityConverter::extractLayers(parseData);
+    auto result = Eg::FioEntityConverter::extractLayers(parseData);
     EXPECT_EQ(result.size(), 100u);
 }
 
@@ -1182,7 +1182,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_EmptyEntityName)
     info.line.y2 = 10.0;
     info.name[0] = '\0';  // 空名称
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::LINE);
     EXPECT_STREQ(entity->name(), "");
@@ -1197,7 +1197,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_LongEntityName)
     info.circle.r = 5.0;
     std::strncpy(info.name, "VeryLongEntityNameThatExceedsTypicalLimits", sizeof(info.name) - 1);
 
-    auto entity = FioEntityConverter::convertEntity(info);
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::CIRCLE);
     // 名称应被截断或完整保留
@@ -1272,7 +1272,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_ConvertAllWithNullEntity)
     info.type = Fio::EntityType::Unknown;
     parseData.entities = &info;
 
-    auto result = FioEntityConverter::convertAll(parseData);
+    auto result = Eg::FioEntityConverter::convertAll(parseData);
     EXPECT_TRUE(result.empty());
 }
 
@@ -1282,7 +1282,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_ConvertAllWithZeroCount)
     parseData.entityCount = 0;
     parseData.entities = nullptr;
 
-    auto result = FioEntityConverter::convertAll(parseData);
+    auto result = Eg::FioEntityConverter::convertAll(parseData);
     EXPECT_TRUE(result.empty());
 }
 
@@ -1292,7 +1292,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_ExtractLayersWithNullData)
     parseData.layerCount = 0;
     parseData.layers = nullptr;
 
-    auto layers = FioEntityConverter::extractLayers(parseData);
+    auto layers = Eg::FioEntityConverter::extractLayers(parseData);
     EXPECT_TRUE(layers.empty());
 }
 
@@ -1338,7 +1338,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_BatchConsistency_AllFormats)
     parseData.entities = infos;
     parseData.entityCount = 6;
 
-    auto result = FioEntityConverter::convertAll(parseData);
+    auto result = Eg::FioEntityConverter::convertAll(parseData);
     // 不崩溃，返回合理数量的实体
     EXPECT_GE(result.size(), 4u);
 }
@@ -1364,7 +1364,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_EntityNamePreservedInBatch)
     parseData.entities = infos;
     parseData.entityCount = 2;
 
-    auto result = FioEntityConverter::convertAll(parseData);
+    auto result = Eg::FioEntityConverter::convertAll(parseData);
     ASSERT_GE(result.size(), 2u);
     EXPECT_STREQ(result[0]->name(), "NamedLine");
     EXPECT_STREQ(result[1]->name(), "NamedCircle");
@@ -1391,7 +1391,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_LayerIdPreservedInBatch)
     parseData.entities = infos;
     parseData.entityCount = 2;
 
-    auto result = FioEntityConverter::convertAll(parseData);
+    auto result = Eg::FioEntityConverter::convertAll(parseData);
     ASSERT_GE(result.size(), 2u);
     // layerSourceId 仅在 EntityInfo 层面使用，转换后实体类型正确即可
     EXPECT_EQ(result[0]->eType, Eg::EType::LINE);
@@ -1526,7 +1526,7 @@ TEST(ImportExportRegressionTest, ImportService_CanImportVariousExtensionsEmpty)
 }
 
 // ==================== IR 主链路回归测试 ====================
-// 覆盖：FileIOManager::importToIR → FioEntityConverter::convertAll 端到端管线，
+// 覆盖：FileIOManager::importToIR → Eg::FioEntityConverter::convertAll 端到端管线，
 // 验证真实 DXF 文件通过中立 IR 路径导入后图元完整。
 
 namespace
@@ -1567,7 +1567,7 @@ TEST(ImportExportRegressionTest, IrPipeline_RealDxf_ParseAndConvert)
     ASSERT_TRUE(ok) << errBuf;
     ASSERT_EQ(ir.entityCount, 2u);
 
-    auto entities = FioEntityConverter::convertAll(ir);
+    auto entities = Eg::FioEntityConverter::convertAll(ir);
     ASSERT_EQ(entities.size(), 2u);
 
     EXPECT_EQ(entities[0]->eType, Eg::EType::LINE);
@@ -1595,7 +1595,7 @@ TEST(ImportExportRegressionTest, IrPipeline_RealDxf_LwPolylineKeepsVertices)
     ASSERT_TRUE(ok) << errBuf;
     ASSERT_EQ(ir.entityCount, 1u);
 
-    auto entities = FioEntityConverter::convertAll(ir);
+    auto entities = Eg::FioEntityConverter::convertAll(ir);
     ASSERT_EQ(entities.size(), 1u);
     ASSERT_EQ(entities[0]->eType, Eg::EType::POLYGON);
 
@@ -1632,7 +1632,7 @@ TEST(ImportExportRegressionTest, IrPipeline_RealDxf_SplineKeepsControlPoints)
     ASSERT_TRUE(ok) << errBuf;
     ASSERT_EQ(ir.entityCount, 1u);
 
-    auto entities = FioEntityConverter::convertAll(ir);
+    auto entities = Eg::FioEntityConverter::convertAll(ir);
     ASSERT_EQ(entities.size(), 1u);
     ASSERT_EQ(entities[0]->eType, Eg::EType::SPLINE);
 
@@ -1663,7 +1663,7 @@ TEST(ImportExportRegressionTest, IrPipeline_ConvertAll_PassesExtensionBlob)
     parseData.extensionBlob.data = reinterpret_cast<uint8_t*>(pts);
     parseData.extensionBlob.size = sizeof(pts);
 
-    auto entities = FioEntityConverter::convertAll(parseData);
+    auto entities = Eg::FioEntityConverter::convertAll(parseData);
     ASSERT_EQ(entities.size(), 1u);
 
     auto* poly = static_cast<Eg::SyPolygon*>(entities[0].get());
@@ -1702,7 +1702,7 @@ TEST(ImportExportRegressionTest, IrPipeline_RealDxf_FirstLayerSourceIdIsOneBased
 
     // convertAll 必须把该图层上的图元写入 entityLayerMap（而不是因 sourceId==0 被丢弃）
     std::unordered_map<int64_t, uint32_t> entityLayerMap;
-    auto entities = FioEntityConverter::convertAll(ir, &entityLayerMap);
+    auto entities = Eg::FioEntityConverter::convertAll(ir, &entityLayerMap);
     ASSERT_EQ(entities.size(), 1u);
     ASSERT_EQ(entityLayerMap.size(), 1u);
 

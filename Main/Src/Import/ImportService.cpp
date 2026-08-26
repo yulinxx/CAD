@@ -617,6 +617,15 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
         {
             SY_INFOF("[ImportService] Restored %d layer(s) from source document", createdLayers);
         }
+
+        // 还原源文件群组结构（DXF 块引用 / SVG 的 g 元素 / OBJ 的 o-g-usemtl）：
+        // 图元此时已进入场景并拿到运行时 EntityId，才能按 entityGroupMap 反查并挂进群组
+        const int createdGroups = restoreImportedGroups(parseResult);
+        if (createdGroups > 0)
+        {
+            SY_INFOF("[ImportService] Restored %d group(s) from source document", createdGroups);
+        }
+
     }
 
     SY_INFOF("[ImportService] Document built: %d entities", entityCount);
@@ -798,6 +807,100 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
     SY_INFOF("[ImportService] Restored %d/%zu source layer(s)", createdCount, parseResult.importedLayers.size());
     return createdCount;
 }
+
+int ImportService::restoreImportedGroups(const ImportResult& parseResult)
+{
+    if (!m_sceneManager || parseResult.importedGroups.empty())
+    {
+        return 0;
+    }
+
+    // 群组 id 不复用 IR 的 sourceId：IR 的 sourceId 是 1-based 密集编号，与运行时 EntityId
+    // 空间会撞车，所以这里统一用 createGroup 分配新 id，再靠 sourceId → SyGroup* 映射表衔接。
+    Eg::GroupManager& groupManager = m_sceneManager->groupManager();
+
+    std::unordered_map<uint64_t, Eg::SyGroup*> sourceToGroup;
+    sourceToGroup.reserve(parseResult.importedGroups.size());
+
+    // 第一遍：只建群组，不接父子。先全建出来可以免除对拓扑排序的依赖。
+    int createdCount = 0;
+    for (const auto& src : parseResult.importedGroups)
+    {
+        Eg::SyGroup* group = groupManager.createGroup(src.name);
+        if (!group)
+        {
+            SY_WARNF("[ImportService] Failed to create group for source group %llu ('%s')",
+                static_cast<unsigned long long>(src.sourceId),
+                src.name);
+            continue;
+        }
+        sourceToGroup[src.sourceId] = group;
+        ++createdCount;
+    }
+
+    // 第二遍：重建父子层级。IR 侧已做过环检测，这里再用 wouldCreateCycle 兜底，
+    // 保证即使上游契约被破坏也不会把场景挂成环导致 flatten 无限递归。
+    for (const auto& src : parseResult.importedGroups)
+    {
+        if (src.parentSourceId == 0)
+        {
+            continue;
+        }
+        auto childIt = sourceToGroup.find(src.sourceId);
+        auto parentIt = sourceToGroup.find(src.parentSourceId);
+        if (childIt == sourceToGroup.end() || parentIt == sourceToGroup.end())
+        {
+            SY_WARNF("[ImportService] Group %llu references missing parent %llu, keeping it top-level",
+                static_cast<unsigned long long>(src.sourceId),
+                static_cast<unsigned long long>(src.parentSourceId));
+            continue;
+        }
+        if (parentIt->second->wouldCreateCycle(childIt->second))
+        {
+            SY_WARNF("[ImportService] Group %llu would create a cycle under parent %llu, keeping it top-level",
+                static_cast<unsigned long long>(src.sourceId),
+                static_cast<unsigned long long>(src.parentSourceId));
+            continue;
+        }
+        parentIt->second->addSubGroup(childIt->second);
+    }
+
+    // 第三遍：把图元挂到所属群组。EntityId → 源群组 sourceId → 运行时 SyGroup*
+    size_t assignedCount = 0;
+    size_t missingEntities = 0;
+    for (const auto& [entityId, sourceId] : parseResult.entityGroupMap)
+    {
+        auto groupIt = sourceToGroup.find(sourceId);
+        if (groupIt == sourceToGroup.end())
+        {
+            SY_WARNF("[ImportService] Entity %lld references unknown source group %llu, leaving it ungrouped",
+                static_cast<long long>(entityId),
+                static_cast<unsigned long long>(sourceId));
+            continue;
+        }
+
+        Eg::SyEntity* entity = m_sceneManager->findEntityById(entityId);
+        if (!entity)
+        {
+            // 图元可能因为几何非法在加入场景前就被丢弃，这属于正常损耗，只统计不逐条告警
+            ++missingEntities;
+            continue;
+        }
+        groupIt->second->addEntity(entity);
+        ++assignedCount;
+    }
+
+    if (missingEntities > 0)
+    {
+        SY_WARNF("[ImportService] %zu group member(s) not found in scene, skipped", missingEntities);
+    }
+    SY_INFOF("[ImportService] Restored %d/%zu source group(s), %zu member assignment(s)",
+        createdCount,
+        parseResult.importedGroups.size(),
+        assignedCount);
+    return createdCount;
+}
+
 
 void ImportService::updateProgress(ImportPhase phase, float progress)
 {

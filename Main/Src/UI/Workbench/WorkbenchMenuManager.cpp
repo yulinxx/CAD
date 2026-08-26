@@ -1449,35 +1449,39 @@ void WorkbenchMenuManager::refreshThemeMenuChecks(const QString& themeId)
     }
 }
 
-bool WorkbenchMenuManager::isMenuGroupAllowedForWorkbench(const QString& commandId, const QString& workbenchKind)
-{
-    if (commandId.isEmpty())
-    {
-        return true;
-    }
-    if (workbenchKind.compare(QStringLiteral("3D"), Qt::CaseInsensitive) != 0)
-    {
-        return true;
-    }
-
-    return commandId.startsWith(QStringLiteral("view."), Qt::CaseInsensitive) ||
-        commandId.startsWith(QStringLiteral("edit."), Qt::CaseInsensitive) ||
-        commandId.startsWith(QStringLiteral("tool."), Qt::CaseInsensitive) ||
-        commandId.startsWith(QStringLiteral("language."), Qt::CaseInsensitive) ||
-        commandId.startsWith(QStringLiteral("model."), Qt::CaseInsensitive) ||
-        commandId.startsWith(QStringLiteral("process."), Qt::CaseInsensitive) ||
-        commandId.startsWith(QStringLiteral("algo."), Qt::CaseInsensitive) ||
-        commandId.startsWith(QStringLiteral("file."), Qt::CaseInsensitive) ||
-        commandId.startsWith(QStringLiteral("help."), Qt::CaseInsensitive) ||
-        commandId.startsWith(QStringLiteral("theme."), Qt::CaseInsensitive);
-}
-
 std::vector<MenuDef> WorkbenchMenuManager::filterMenusForWorkbench(const std::vector<MenuDef>& menus,
     const QString& workbenchId,
     const std::function<bool(const QString&)>& commandAvailable,
     const QString& workbenchKind)
 {
+    // 分隔符归一化：JSON 里的分隔符是按“全部菜单项都在”排版的，
+    // 过滤掉不属于当前工作台的动作后会留下开头/结尾/连续的空分隔线，
+    // 这会让 3D 菜单看起来像一堆断裂的空行。这里在数据层收敛，构建层无需关心。
+    const auto normalizeSeparators = [](std::vector<std::variant<MenuActionDef, SubMenuDef, MenuItemType>>& items) {
+        const auto isSeparator = [](const std::variant<MenuActionDef, SubMenuDef, MenuItemType>& item) {
+            return std::holds_alternative<MenuItemType>(item) &&
+                std::get<MenuItemType>(item) == MenuItemType::Separator;
+        };
+        std::vector<std::variant<MenuActionDef, SubMenuDef, MenuItemType>> normalized;
+
+        normalized.reserve(items.size());
+        for (const auto& item : items)
+        {
+            if (isSeparator(item) && (normalized.empty() || isSeparator(normalized.back())))
+            {
+                continue;
+            }
+            normalized.push_back(item);
+        }
+        while (!normalized.empty() && isSeparator(normalized.back()))
+        {
+            normalized.pop_back();
+        }
+        items.swap(normalized);
+    };
+
     const auto visibilityAllowed = [&](const QString& scope) {
+
         if (scope.isEmpty())
         {
             return true;
@@ -1491,10 +1495,6 @@ std::vector<MenuDef> WorkbenchMenuManager::filterMenusForWorkbench(const std::ve
             scope.compare(QStringLiteral("shared"), Qt::CaseInsensitive) == 0;
     };
 
-    const auto commandVisibleByMenuGroup = [&](const QString& commandId) {
-        return isMenuGroupAllowedForWorkbench(commandId, workbenchKind);
-    };
-
     std::function<bool(const MenuActionDef&, MenuActionDef&)> filterAction = [&](const MenuActionDef& action,
                                                                                  MenuActionDef& outAction) -> bool {
         if (!action.visible || !commandEnabledForWorkbench(action.workbenches, workbenchId))
@@ -1505,14 +1505,11 @@ std::vector<MenuDef> WorkbenchMenuManager::filterMenusForWorkbench(const std::ve
         {
             return false;
         }
-        if (!commandVisibleByMenuGroup(action.commandId))
-        {
-            return false;
-        }
         if (!commandAvailable(action.commandId))
         {
             return false;
         }
+
         outAction = action;
         return true;
     };
@@ -1552,8 +1549,10 @@ std::vector<MenuDef> WorkbenchMenuManager::filterMenusForWorkbench(const std::ve
                 outSub.items.push_back(subItem);
             }
         }
+        normalizeSeparators(outSub.items);
         return !outSub.items.empty();
     };
+
 
     std::vector<MenuDef> filteredMenus;
     filteredMenus.reserve(menus.size());
@@ -1592,7 +1591,9 @@ std::vector<MenuDef> WorkbenchMenuManager::filterMenusForWorkbench(const std::ve
                 menuCopy.items.push_back(item);
             }
         }
+        normalizeSeparators(menuCopy.items);
         if (!menuCopy.items.empty())
+
         {
             filteredMenus.push_back(menuCopy);
         }

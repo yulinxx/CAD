@@ -1,6 +1,5 @@
 #include "ObjImportReader.h"
 
-#include "Engine3D/Loader/ObjLoader.h"
 #include "Log/SyLogger.h"
 
 ObjImportReader::ObjImportReader()
@@ -10,30 +9,14 @@ ObjImportReader::ObjImportReader()
 
 /**
  * @brief OBJ 文件导入实现
- * 使用 Eg::ObjLoader 加载网格，包装为 SyMeshEntity 后通过基类指针返回。
- * 日志关键位置：加载错误 / 成功
+ * 统一走中立 IR 链路：FileIO 的 ObjParser → parseToIR → Eg::FioEntityConverter，
+ * 与 2D 格式（DXF / SVG / PLT）保持同一条路径。OBJ 的 o / g / usemtl 分段
+ * 由 ObjParser 拆成多个 Mesh3D 实体并带出群组信息，因此这里不再合并为单一网格。
  */
 ImportResult ObjImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
 {
-    std::string error;
-    auto mesh = Eg::ObjLoader::load(context.sourcePath.toUtf8().toStdString(), error);
+    SY_INFOF("[ObjImportReader] read START: path=%s", context.sourcePath.toUtf8().constData());
 
-    if (!mesh)
-    {
-        QString msg = QString::fromStdString(error);
-        SY_ERRORF("[ObjImportReader] Failed to load OBJ file: %s (path=%s)",
-            msg.toUtf8().constData(),
-            context.sourcePath.toUtf8().constData());
-        return ImportResult::fail(msg, ImportErrorType::ParseFailed);
-    }
-
-    SY_INFOF("[ObjImportReader] OBJ loaded successfully: %s, triangles=%zu, verts=%zu",
-        mesh->name(),
-        mesh->triangleCount(),
-        mesh->vertices.size());
-
-    // 通过基类指针存入输出列表（IImportReader 接口使用 SyEntity 基类）
-    outEntities.push_back(std::move(mesh));
-
-    return ImportResult::ok(QStringLiteral("OBJ import successful: 1 mesh entity"), 1);
+    // ObjParser 仅实现 IR 路径，无旧路径回退；OBJ 无图层概念，故不收集图层表
+    return readViaIR(context, Fio::FileFormat::OBJ, outEntities, false);
 }

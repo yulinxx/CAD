@@ -48,6 +48,14 @@ struct ImportResult
     /// 与 importedLayers 配合，在构建文档阶段将图元还原到对应图层
     std::unordered_map<int64_t, uint32_t> entityLayerMap;
 
+    /// 源文件群组表（DXF 块引用 / SVG <g> / OBJ 的 o-g-usemtl 分段），
+    /// 父子关系由 IrGroupInfo::parentSourceId 表达，0 表示顶层
+    std::vector<Fio::IrGroupInfo> importedGroups;
+    /// 图元群组归属映射：转换后图元的 EntityId(int64) → 源群组 sourceId
+    /// 与 importedGroups 配合，在构建文档阶段重建 SyGroup 树
+    std::unordered_map<int64_t, uint64_t> entityGroupMap;
+
+
     /// 创建成功结果
     static ImportResult ok(
         const QString& msg = QString(), int entities = 0, int layers = 0, const QStringList& warns = {})

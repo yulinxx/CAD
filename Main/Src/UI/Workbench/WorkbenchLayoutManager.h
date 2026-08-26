@@ -13,6 +13,7 @@ class QShortcut;
 class QStatusBar;
 class QToolBar;
 class QWidget;
+class IUiCommandDispatcher;
 class WorkbenchMenuManager;
 class PersistenceService;
 class SceneTreePanel2D;

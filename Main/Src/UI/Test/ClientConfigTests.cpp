@@ -494,7 +494,7 @@ TEST(ClientConfigLoaderTest, WorkbenchFilterKeepsOnlyMatchingEntries)
     ASSERT_EQ(config->menus[0].items.size(), 2u);
 }
 
-TEST(ClientConfigLoaderTest, ThreeDMenuFilterDropsUnknownGroups)
+TEST(ClientConfigLoaderTest, ThreeDMenuFilterDropsUnregisteredCommands)
 {
     auto commandAvailable = [](const QString& commandId) {
         return commandId == QStringLiteral("view.front") || commandId == QStringLiteral("model.make_box");
@@ -540,7 +540,97 @@ TEST(ClientConfigLoaderTest, ThreeDMenuFilterDropsUnknownGroups)
     EXPECT_EQ(std::get<MenuActionDef>(filtered[0].items[0]).commandId, QStringLiteral("view.front"));
 }
 
+/// 行业模块（laser / vision）在 3D 下必须能进菜单：
+/// 判定只看 workbenches 字段与命令注册情况，不再按命令 ID 前缀做白名单。
+TEST(ClientConfigLoaderTest, ThreeDMenuKeepsIndustryGroupsWhenCommandRegistered)
+{
+    auto commandAvailable = [](const QString& commandId) {
+        return commandId == QStringLiteral("laser.connect") ||
+            commandId == QStringLiteral("vision.test_shape_detect");
+    };
+
+    MenuDef laserMenu;
+    laserMenu.id = QStringLiteral("laser");
+    laserMenu.label = QStringLiteral("Laser");
+    laserMenu.workbenches = { QStringLiteral("2D"), QStringLiteral("3D") };
+
+    MenuActionDef laserConnect;
+    laserConnect.id = QStringLiteral("laser.connect");
+    laserConnect.label = QStringLiteral("Connect");
+    laserConnect.commandId = QStringLiteral("laser.connect");
+    laserConnect.workbenches = { QStringLiteral("2D"), QStringLiteral("3D") };
+    laserMenu.items.push_back(laserConnect);
+
+
+    MenuDef visionMenu;
+    visionMenu.id = QStringLiteral("vision");
+    visionMenu.label = QStringLiteral("Vision");
+    visionMenu.workbenches = { QStringLiteral("2D"), QStringLiteral("3D") };
+
+    MenuActionDef shapeDetect;
+    shapeDetect.id = QStringLiteral("vision.test_shape_detect");
+    shapeDetect.label = QStringLiteral("Shape Detect");
+    shapeDetect.commandId = QStringLiteral("vision.test_shape_detect");
+    shapeDetect.workbenches = { QStringLiteral("2D"), QStringLiteral("3D") };
+    visionMenu.items.push_back(shapeDetect);
+
+    const auto filtered3D = WorkbenchMenuManager::filterMenusForWorkbench(
+        { laserMenu, visionMenu }, QStringLiteral("3D"), commandAvailable, QStringLiteral("3D"));
+
+    ASSERT_EQ(filtered3D.size(), 2u);
+    EXPECT_EQ(filtered3D[0].id, QStringLiteral("laser"));
+    EXPECT_EQ(filtered3D[1].id, QStringLiteral("vision"));
+}
+
+/// 过滤掉不属于当前工作台的动作后，遗留的首尾/连续分隔符必须收敛，
+/// 否则 3D 菜单会出现开头就是分隔线、或成片空分隔线的排版。
+TEST(ClientConfigLoaderTest, FilterCollapsesDanglingSeparators)
+{
+    auto commandAvailable = [](const QString&) { return true; };
+
+    MenuDef drawMenu;
+    drawMenu.id = QStringLiteral("draw");
+    drawMenu.label = QStringLiteral("Draw");
+    drawMenu.workbenches = { QStringLiteral("2D"), QStringLiteral("3D") };
+
+    MenuActionDef only2D;
+    only2D.id = QStringLiteral("tool.line");
+    only2D.label = QStringLiteral("Line");
+    only2D.commandId = QStringLiteral("tool.line");
+    only2D.workbenches = { QStringLiteral("2D") };
+
+    MenuActionDef only3D;
+    only3D.id = QStringLiteral("model.make_box");
+    only3D.label = QStringLiteral("Box");
+    only3D.commandId = QStringLiteral("model.make_box");
+    only3D.workbenches = { QStringLiteral("3D") };
+
+    // 排版为：分隔符 / 2D 项 / 分隔符 / 分隔符 / 3D 项 / 分隔符
+    drawMenu.items.push_back(MenuItemType::Separator);
+    drawMenu.items.push_back(only2D);
+    drawMenu.items.push_back(MenuItemType::Separator);
+    drawMenu.items.push_back(MenuItemType::Separator);
+    drawMenu.items.push_back(only3D);
+    drawMenu.items.push_back(MenuItemType::Separator);
+
+    const auto filtered3D = WorkbenchMenuManager::filterMenusForWorkbench(
+        { drawMenu }, QStringLiteral("3D"), commandAvailable, QStringLiteral("3D"));
+
+    ASSERT_EQ(filtered3D.size(), 1u);
+    ASSERT_EQ(filtered3D[0].items.size(), 1u);
+    ASSERT_TRUE(std::holds_alternative<MenuActionDef>(filtered3D[0].items[0]));
+    EXPECT_EQ(std::get<MenuActionDef>(filtered3D[0].items[0]).commandId, QStringLiteral("model.make_box"));
+
+    const auto filtered2D = WorkbenchMenuManager::filterMenusForWorkbench(
+        { drawMenu }, QStringLiteral("2D"), commandAvailable, QStringLiteral("2D"));
+
+    ASSERT_EQ(filtered2D.size(), 1u);
+    ASSERT_EQ(filtered2D[0].items.size(), 1u);
+    EXPECT_EQ(std::get<MenuActionDef>(filtered2D[0].items[0]).commandId, QStringLiteral("tool.line"));
+}
+
 TEST(ClientConfigLoaderTest, HelpMenuKeepsOnlyApprovedSharedEntries)
+
 {
     auto commandAvailable = [](const QString& commandId) {
         return commandId == QStringLiteral("help.about") || commandId == QStringLiteral("help.settings") ||
