@@ -332,9 +332,9 @@ void Workbench2D::dispatchCommand(const QString& commandId)
     const OperationId operation = CommandCatalog::operationForCommandId(commandId);
     if (operation == OperationId::None)
     {
-        // 绘图工具菜单项以 toolName（如 "LineTool"）作为命令 ID 分发，
-        // 与左侧工具栏 DrawToolBarWidget 保持一致：用 operationForToolName 解析到已注册的 Tool_* 操作，
-        // 经 OperationBus 激活视口对应工具，从而与工具栏形成同一条分发/联动路径。
+        // 绘图工具菜单项以 toolName（如 "LineTool"）作为命令 ID 分发时的兜底：
+        // 用 operationForToolName 解析到已注册的 Tool_* 操作，经 OperationBus 激活视口对应工具，
+        // 与左侧工具栏（命令中枢的工具 QAction）落到同一条分发/联动路径。
         const OperationId toolOperation = CommandCatalog::operationForToolName(commandId);
         if (toolOperation == OperationId::None)
         {
@@ -674,25 +674,32 @@ void Workbench2D::setPanelHostStyle(PanelHostStyle style)
 
 namespace
 {
-    QVector<DrawToolEntry> buildDrawToolEntriesFromCatalog()
+    /// 取出左侧绘图工具栏要展示的中枢 QAction，顺序即命令目录顺序
+    ///
+    /// 目录是唯一事实来源：surfaces 决定"上不上左侧栏"，中枢决定"动作长什么样、点了干什么"。
+    /// 展示层（DrawToolBarWidget）只按这个顺序摆按钮。
+    QVector<QAction*> buildLeftToolbarActions(CommandActionHub& hub)
     {
-        QVector<DrawToolEntry> drawTools;
+        QVector<QAction*> actions;
         for (const auto& entry : CommandCatalog::commands())
         {
-            if (!hasSurface(entry.surfaces, CommandSurface2D::LeftToolbar))
+            if (!hasSurface(entry.surfaces, CommandSurface2D::LeftToolbar) || !entry.toolName)
             {
                 continue;
             }
-            DrawToolEntry tool;
-            tool.commandId = QString::fromUtf8(entry.toolName ? entry.toolName : "");
-            tool.displayName = QString::fromUtf8(entry.text ? entry.text : "");
-            tool.tooltip = QString::fromUtf8(entry.text ? entry.text : "");
-            tool.shortcut = QString::fromUtf8(entry.shortcutId ? entry.shortcutId : "");
-            tool.iconResource = QString::fromUtf8(entry.iconResource ? entry.iconResource : "");
-            drawTools.append(tool);
+            const QString toolName = QString::fromUtf8(entry.toolName);
+            if (QAction* action = hub.toolAction(toolName))
+            {
+                actions.append(action);
+            }
+            else
+            {
+                SY_WARNF("[Workbench2D] left toolbar entry has no hub action: %s", qPrintable(toolName));
+            }
         }
-        return drawTools;
+        return actions;
     }
+
 
     QStringList buildSupportedImportFormatsFromCatalog(const QString& workbenchId)
     {
@@ -737,9 +744,9 @@ namespace
     }
 }  // namespace
 
-QVector<DrawToolEntry> Workbench2D::buildDrawToolEntries()
+QVector<QAction*> Workbench2D::buildDrawToolActions()
 {
-    return buildDrawToolEntriesFromCatalog();
+    return m_commandHub ? buildLeftToolbarActions(*m_commandHub) : QVector<QAction*>{};
 }
 
 QStringList Workbench2D::buildSupportedImportFormats(const QString& workbenchId)
@@ -749,39 +756,10 @@ QStringList Workbench2D::buildSupportedImportFormats(const QString& workbenchId)
 
 void Workbench2D::createToolbars(WorkbenchWindow& window)
 {
-    // 绘图工具内容控件（承载样式无关：无论 Dock 还是 Toolbar 复用同一内容）
-    auto* drawWidget = new DrawToolBarWidget(&window);
-    drawWidget->setOperationBus(m_services.operationBus);
-
-    // 从同一份元数据构建工具定义列表，作为菜单/左侧工具栏/右侧联动状态的同一来源
-    drawWidget->setToolDefinitions(buildDrawToolEntries());
-
-    // 依据承载样式创建左侧面板（Draw Tools）
-    if (m_panelHostStyle == PanelHostStyle::Dock)
-    {
-        window.registerDockWidget(QObject::tr("Draw Tools"), drawWidget, Qt::LeftDockWidgetArea);
-    }
-    else
-    {
-        auto* leftToolBar = new QToolBar(QObject::tr("Draw Tools"), &window);
-        leftToolBar->setObjectName(QStringLiteral("DrawToolBar"));
-        leftToolBar->setMovable(false);
-        window.addToolBar(Qt::LeftToolBarArea, leftToolBar);
-        leftToolBar->addWidget(drawWidget);
-    }
-
-    // 接通「工具栏 → OperationBus → 视口」：把工具栏展示的 Tool_* 操作注册到操作总线，
-    // 点击按钮后经总线转发表驱动的 LambdaOperation 激活视口对应工具。
+    // 接通「UI 入口 → OperationBus → 视口」：把绘图工具的 Tool_* 操作注册到操作总线，
+    // 触发后经总线转发表驱动的 LambdaOperation 激活视口对应工具。
     // 必须在视口（m_viewport）创建完成后再注册，故放在这里而非组合根。
     DrawToolSwitchRegistry(m_services.operationBus, &m_viewport).registerAll();
-
-    // 双向状态同步：视口切换工具后高亮对应按钮；启动时初始化为当前活动工具（SelectTool）。
-    QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged, drawWidget, &DrawToolBarWidget::updateActiveTool);
-    drawWidget->updateActiveTool(m_viewport->activeToolName());
-
-    // Draw 菜单不再单独同步勾选态：配置驱动菜单里的绘图项与左侧工具栏共用
-    // 命令中枢托管的 QAction，选中态由中枢按快照统一刷新。
-
 
     // View → Grid & Snap 菜单的真正生效点：把 stateCenter 元数据映射到网格显隐。
     // 菜单/操作只翻转 metadata(gridVisible)，此处作为唯一消费者同步到视口网格渲染。
@@ -802,6 +780,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
             m_services.stateCenter, &UiStateCenter::metadataChanged, this, applyGridVisibleFromMetadata);
         applyGridVisibleFromMetadata();
     }
+
 
     // CommandActionHub：管理所有 QAction 的创建与绑定
     m_commandHub = std::make_unique<CommandActionHub>();
@@ -913,6 +892,38 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         return clipboard && clipboard->hasContent();
     });
     m_commandHub->rebuildAllActions();
+
+    // 左侧绘图工具面板：必须在中枢建好动作之后创建 —— 面板只是中枢 QAction 的展示壳，
+    // 早于 rebuildAllActions 创建就一个按钮都拿不到。
+    auto* drawWidget = new DrawToolBarWidget(&window);
+    const QVector<QAction*> drawToolActions = buildDrawToolActions();
+    drawWidget->setToolActions(drawToolActions);
+    SY_INFOF("[Workbench2D] Draw tool panel built: tools=%d host=%s",
+        static_cast<int>(drawToolActions.size()),
+        m_panelHostStyle == PanelHostStyle::Dock ? "Dock" : "ToolBar");
+
+
+    // 依据承载样式创建左侧面板（Draw Tools）
+    if (m_panelHostStyle == PanelHostStyle::Dock)
+    {
+        window.registerDockWidget(QObject::tr("Draw Tools"), drawWidget, Qt::LeftDockWidgetArea);
+    }
+    else
+    {
+        auto* leftToolBar = new QToolBar(QObject::tr("Draw Tools"), &window);
+        leftToolBar->setObjectName(QStringLiteral("DrawToolBar"));
+        leftToolBar->setMovable(false);
+        window.addToolBar(Qt::LeftToolBarArea, leftToolBar);
+        leftToolBar->addWidget(drawWidget);
+    }
+
+    // 视口 → UI 的勾选态回写（Esc 回到 SelectTool、工具用完自动返回等）。
+    // 勾选态由中枢的 QActionGroup 单点维护，展示层不再各自记 activeTool。
+    // 配置驱动的 Draw 菜单项是不可勾选的普通动作，不参与高亮，只共用同一条派发链。
+    QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged,
+        m_commandHub.get(), &CommandActionHub::setActiveToolAction);
+    m_commandHub->setActiveToolAction(m_viewport->activeToolName());
+
 
     // 顶部工具栏（编辑命令）— 必须先创建，再由 ContextManager 填充 actions
     m_topToolBar = new TopToolBar(&window);

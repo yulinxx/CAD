@@ -10,8 +10,8 @@
 #include "UiServices.h"
 #include "UI/Service/ToolBarContextManager.h"
 #include "Services/UiStateCenter.h"
-#include "DrawToolBarWidget.h"
 
+class QAction;
 class QWidget;
 class QToolBar;
 class WorkbenchWindow;
@@ -244,8 +244,8 @@ private:
     void setupImportCallbacks(RenderViewport2D* vp, WorkbenchWindow& window);
     /// 创建左侧绘图工具栏 + 顶部编辑工具栏 + 右侧颜色/图层工具栏
     void createToolbars(WorkbenchWindow& window);
-    /// 从命令目录构建菜单/左侧绘图栏共用的 UI 元数据视图
-    static QVector<DrawToolEntry> buildDrawToolEntries();
+    /// 取出左侧绘图工具栏要展示的中枢 QAction（顺序即命令目录顺序）
+    QVector<QAction*> buildDrawToolActions();
     /// 从命令目录汇总可支持的导入格式入口（2D/3D 共用视图）
     static QStringList buildSupportedImportFormats(const QString& workbenchId);
     /// 绑定并填充 2D 场景树面板（数据经算法层由引擎场景生成，UI 可定制/可缺失）

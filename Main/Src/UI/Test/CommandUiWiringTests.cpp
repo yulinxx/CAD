@@ -19,7 +19,9 @@
 #include "UI/Menu/MenuActionId.h"
 #include "UI/ClientConfig/UiClientConfigBase.h"
 #include "UI/ClientConfig/UiConfigLoader.h"
+#include "UI/Widgets/DrawToolBarWidget.h"
 #include "UI/Workbench/WorkbenchMenuManager.h"
+
 
 #if BUILD_UI3D
 #include "UI3D/Operation/CommandActionHub3D.h"
@@ -28,10 +30,13 @@
 
 
 #include <QAction>
+#include <QMainWindow>
 #include <QMenu>
 #include <QString>
 #include <QStringList>
+#include <QToolButton>
 #include <QVector>
+
 
 
 
@@ -683,6 +688,140 @@ TEST(CommandConfigContractTest, EveryConfiguredCommandIdResolvesInItsWorkbenchCa
         << "以下配置项的 commandId 无法解析，按钮会永久点不动（共 " << violations.size() << " 条）:\n"
         << violations.join(QLatin1Char('\n')).toStdString();
 }
+
+// ============================================================
+// 左侧绘图工具栏 ↔ 命令中枢
+//
+// 背景（回归防护）：左侧栏此前自建 QToolButton、自己解析 toolName → OperationId、
+// 自己记 activeTool，等于绘图工具有两套并存的派发与状态方案。现在它只是中枢 QAction
+// 的展示壳，以下测试锁定这条唯一路径。
+
+namespace
+{
+    /// 与 Workbench2D::buildDrawToolActions 一致的取值口径：目录顺序 + LeftToolbar 面。
+    QVector<const CommandEntry2D*> leftToolbarEntries()
+    {
+        QVector<const CommandEntry2D*> entries;
+        for (const CommandEntry2D& entry : CommandCatalog::commands())
+        {
+            if (hasSurface(entry.surfaces, CommandSurface2D::LeftToolbar) && entry.toolName)
+            {
+                entries.append(&entry);
+            }
+        }
+        return entries;
+    }
+
+    QVector<QAction*> leftToolbarActions(const CommandActionHub& hub)
+    {
+        QVector<QAction*> actions;
+        for (const CommandEntry2D* entry : leftToolbarEntries())
+        {
+            actions.append(hub.toolAction(QString::fromUtf8(entry->toolName)));
+        }
+        return actions;
+    }
+}  // namespace
+
+TEST(DrawToolBarWidgetTest, ButtonsAreShellsOfHubToolActions)
+{
+    QMainWindow window;
+    CommandActionHub hub;
+    hub.setMainWindow(&window);
+    hub.rebuildToolActions();
+
+    const QVector<QAction*> actions = leftToolbarActions(hub);
+    ASSERT_FALSE(actions.isEmpty());
+    for (QAction* action : actions)
+    {
+        ASSERT_NE(action, nullptr) << "目录声明了 LeftToolbar 面，中枢却没建出对应动作";
+    }
+
+    DrawToolBarWidget widget;
+    widget.setToolActions(actions);
+
+    const QList<QToolButton*> buttons = widget.findChildren<QToolButton*>();
+    ASSERT_EQ(buttons.size(), actions.size());
+    for (int i = 0; i < buttons.size(); ++i)
+    {
+        // 按钮不持有自己的状态：图标/文案/勾选/启用全部来自 defaultAction
+        EXPECT_EQ(buttons[i]->defaultAction(), actions[i]);
+    }
+}
+
+TEST(DrawToolBarWidgetTest, ButtonClickTriggersHubActionAndReportsLeftToolbarSource)
+{
+    QMainWindow window;
+    CommandActionHub hub;
+    hub.setMainWindow(&window);
+    hub.rebuildToolActions();
+
+    QAction* lineAction = hub.toolAction(QStringLiteral("LineTool"));
+    ASSERT_NE(lineAction, nullptr);
+
+    DrawToolBarWidget widget;
+    widget.setToolActions({ lineAction });
+
+    const QList<QToolButton*> buttons = widget.findChildren<QToolButton*>();
+    ASSERT_EQ(buttons.size(), 1);
+
+    int triggered = 0;
+    QObject::connect(lineAction, &QAction::triggered, [&triggered]() { ++triggered; });
+    buttons[0]->click();
+
+    EXPECT_EQ(triggered, 1) << "点击按钮必须触发中枢 QAction，而不是走展示层自己的派发";
+    // 来源判定不能依赖宿主 objectName：按钮的关联对象是按钮本身，
+    // 靠名字匹配会落到 Shortcut，日志与"按来源分流"的行为都会错。
+    EXPECT_EQ(hub.detectOperationSource(lineAction), OperationSource::LeftToolbar);
+}
+
+TEST(DrawToolBarWidgetTest, ActiveToolActionStaysExclusive)
+{
+    QMainWindow window;
+    CommandActionHub hub;
+    hub.setMainWindow(&window);
+    hub.rebuildToolActions();
+
+    const auto checkedCount = [&hub]() {
+        int count = 0;
+        for (QAction* action : leftToolbarActions(hub))
+        {
+            if (action && action->isChecked())
+            {
+                ++count;
+            }
+        }
+        return count;
+    };
+
+    hub.setActiveToolAction(QStringLiteral("LineTool"));
+    EXPECT_EQ(checkedCount(), 1);
+    EXPECT_TRUE(hub.toolAction(QStringLiteral("LineTool"))->isChecked());
+
+    // 视口侧再切一次（Esc 回到选择工具的场景）：上一个必须自动落下
+    hub.setActiveToolAction(QStringLiteral("SelectTool"));
+    EXPECT_EQ(checkedCount(), 1);
+    EXPECT_TRUE(hub.toolAction(QStringLiteral("SelectTool"))->isChecked());
+    EXPECT_FALSE(hub.toolAction(QStringLiteral("LineTool"))->isChecked());
+}
+
+TEST(DrawToolBarWidgetTest, ToolActionsCarryCatalogCommandId)
+{
+    QMainWindow window;
+    CommandActionHub hub;
+    hub.setMainWindow(&window);
+    hub.rebuildToolActions();
+
+    for (const CommandEntry2D* entry : leftToolbarEntries())
+    {
+        QAction* action = hub.toolAction(QString::fromUtf8(entry->toolName));
+        ASSERT_NE(action, nullptr) << entry->toolName;
+        ASSERT_NE(entry->shortcutId, nullptr) << entry->toolName;
+        // commandId 是跨入口的统一标识：快照刷新、日志、配置契约测试都靠它认人
+        EXPECT_EQ(action->property("commandId").toString(), QString::fromUtf8(entry->shortcutId));
+    }
+}
+
 
 
 

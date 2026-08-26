@@ -26,7 +26,7 @@ flowchart TB
         Attach["Workbench2D::attachToWindow()"]
         Menu["WorkbenchMenuManager<br/>buildMenus() 菜单栏"]
         Top["TopToolBar 顶部工具栏"]
-        Left["LeftToolBar 左侧绘图栏"]
+        Left["DrawToolBarWidget 左侧绘图栏<br/>（中枢工具 QAction 的展示壳）"]
         Right["RightToolBar 右侧栏"]
         Status["mountStatusBar(StatusBar)"]
         Docks["buildDockAreasFromConfig()<br/>场景树 Dock + 属性面板 Dock"]
@@ -163,16 +163,25 @@ flowchart LR
 ```mermaid
 flowchart TD
     Attach["工作台 attachToWindow()"] --> Top["创建 TopToolBar<br/>视图/文件/模式/加工快捷"]
-    Attach --> Left["创建 LeftToolBar<br/>选择 + 几何创建 + 辅助绘图"]
+    Attach --> Hub["配置 CommandActionHub<br/>rebuildAllActions() 建好全部 QAction"]
     Attach --> Right["创建 RightToolBar<br/>上下文辅助入口"]
     Top --> Bind["UiLayoutBuilder 从 CommandCatalog<br/>填充 action（与菜单同源）"]
-    Left --> Bind
+    Hub --> Left["创建 DrawToolBarWidget（左侧绘图面板）<br/>setToolActions(中枢的工具 QAction)"]
     Right --> Bind
-    Bind --> Install["UiStateBridge2D::install()<br/>attachToWindow 末尾集中挂载触发源"]
+    Left --> Install["UiStateBridge2D::install()<br/>attachToWindow 末尾集中挂载触发源"]
+    Bind --> Install
     Install --> Sync["工具栏按钮启用态<br/>随 选择集 + 锁定态（图层锁/图元锁）<br/>+ 剪贴板 + 撤销栈 + 工具状态 同步"]
 ```
 
 按钮启用态不是各处自行判断，而是单点驱动：五路状态变化 → `Workbench2D::refreshCommandUiState()` → 命令 UI 快照 → `Cmd::evaluateEnableRule()`。完整链路见 `命令与状态流.md` 6.3。
+
+> 左侧绘图面板不走 JSON 布局，而是 C++ 面板 + 中枢 QAction：`Workbench2D::buildDrawToolActions()`
+> 按命令目录顺序 + `CommandSurface2D::LeftToolbar` 过滤取 `CommandActionHub::toolAction()`，
+> 交给 `DrawToolBarWidget::setToolActions()`。**必须在 `rebuildAllActions()` 之后创建** ——
+> 面板只是中枢 QAction 的壳，早于它创建就一个按钮都拿不到。面板挂在左侧 `QToolBar`
+> （objectName `DrawToolBar`）或 Dock 上，由 `PanelHostStyle` 决定，启动时打
+> `[Workbench2D] Draw tool panel built: tools=18 host=ToolBar`。
+
 
 ### 3.2 顶部 / 右侧工具栏点击（命令型，一步到位）
 
@@ -200,10 +209,13 @@ flowchart LR
 ### 3.3 左侧工具栏点击（绘图工具型，进入交互式流程）
 
 > 左侧绘图按钮走 **ToolManager + ITool** 路径（区别于普通命令），会激活工具并接管视口鼠标输入。
+> 按钮本身只是中枢 QAction 的壳（`QToolButton::setDefaultAction`），点击即 trigger 该 QAction，
+> 与菜单 / 右键菜单共用同一条派发链。
 
 ```mermaid
 flowchart TD
-    Click["点击 LeftToolBar 绘图按钮"] --> Run["OperationBus::run(Tool_XXX)"]
+    Click["点击左侧绘图按钮<br/>（QToolButton，defaultAction = 中枢工具 QAction）"] --> Trig["QAction::triggered<br/>source = LeftToolbar（读按钮的 operationSource 属性）"]
+    Trig --> Run["OperationBus::run(Tool_XXX, {}, source)"]
     Run --> Lambda["LambdaOperation<br/>(registerPendingToolOperations 注册)"]
     Lambda --> SetTool["ToolManager::setActiveTool(toolName)"]
     SetTool --> Viewport["视口进入工具捕获模式"]
@@ -214,7 +226,13 @@ flowchart TD
     Emit --> Scene["SceneManager 落库 + 渲染刷新"]
     Scene --> State["ToolContext / 命令阶段流转"]
     State --> Idle["完成 → 回到 Idle<br/>（或保持工具继续画）"]
+    Idle -.活动工具变化.-> Back["RenderViewport2D::activeToolChanged<br/>→ CommandActionHub::setActiveToolAction()<br/>→ QActionGroup 单点维护勾选高亮"]
 ```
+
+> 勾选高亮的坑：`setActiveToolAction()` 内**不能**用 `QSignalBlocker`。`QActionGroup` 的互斥依赖
+> `QAction::changed`，屏蔽信号会让上一个按钮保持高亮，出现两个按钮同时亮；`setChecked()` 本身
+> 不发 `triggered`，不会回环派发。
+
 
 **鼠标事件优先级**（`RenderViewport2D::mousePressEvent`）：
 1. 中键 → 平移

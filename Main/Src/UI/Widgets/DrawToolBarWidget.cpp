@@ -1,16 +1,12 @@
 #include "DrawToolBarWidget.h"
 
+#include <QAction>
 #include <QToolButton>
 #include <QVBoxLayout>
-#include <QIcon>
 #include <QSize>
 
-#include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
-#include "UI2D/Operation/CommandCatalog.h"
-#include "UI/IconHelper.h"
 #include "UI/UiMetrics.h"
-#include "Log/SyLogger.h"
 
 DrawToolBarWidget::DrawToolBarWidget(QWidget* parent)
     : QWidget(parent)
@@ -18,81 +14,23 @@ DrawToolBarWidget::DrawToolBarWidget(QWidget* parent)
     setObjectName(QStringLiteral("DrawToolBarWidget"));
     setMinimumWidth(48);
     setMaximumWidth(56);
-
-    m_activeToolId.clear();
 }
 
 DrawToolBarWidget::~DrawToolBarWidget() {}
 
-void DrawToolBarWidget::setToolDefinitions(const QVector<DrawToolEntry>& tools)
+void DrawToolBarWidget::setToolActions(const QVector<QAction*>& actions)
 {
-    m_toolDefinitions = tools;
-    createToolButtons();
+    m_toolActions = actions;
+    rebuildButtons();
 }
 
-void DrawToolBarWidget::setOperationBus(OperationBus* bus)
+void DrawToolBarWidget::rebuildButtons()
 {
-    m_operationBus = bus;
-}
-
-void DrawToolBarWidget::updateActiveTool(const QString& toolId)
-{
-    m_activeToolId = toolId;
-    setButtonChecked(toolId, true);
-}
-
-QString DrawToolBarWidget::currentActiveTool() const
-{
-    return m_activeToolId;
-}
-
-void DrawToolBarWidget::onToolButtonClicked()
-{
-    auto* button = qobject_cast<QToolButton*>(sender());
-    if (!button)
+    // 清除旧按钮，重建布局。按钮只是 QAction 的展示壳，QAction 归中枢所有，此处不销毁它们。
+    if (QLayout* old = layout())
     {
-        return;
-    }
-
-    QString toolId = button->property("toolId").toString();
-    if (toolId.isEmpty())
-    {
-        return;
-    }
-
-    // 按钮存的是 CommandCatalog 的 toolName（如 "LineTool"），
-    // 因此必须用 operationForToolName 解析，而不是 operationForCommandId（后者只认识 "2d.draw_line" 这类命令键）。
-    const OperationId opId = CommandCatalog::operationForToolName(toolId);
-    if (opId == OperationId::None)
-    {
-        SY_WARNF("[DrawToolBarWidget] no operation for tool: %s", qPrintable(toolId));
-        return;
-    }
-
-    // 始终保持点击的工具为选中态（配合 setAutoExclusive，重复点击也不会取消高亮）
-    const bool alreadyActive = (toolId == m_activeToolId);
-    m_activeToolId = toolId;
-    setButtonChecked(toolId, true);
-    if (alreadyActive)
-    {
-        return;
-    }
-
-    // 统一走 OperationBus：UI 入口 → 操作总线 → 已注册的 Tool_* 操作 → 视口激活对应工具
-    SY_INFOF("[DrawToolBarWidget] activate tool=%s op=%s", qPrintable(toolId), Cmd::operationIdToString(opId));
-    if (m_operationBus)
-    {
-        m_operationBus->run(opId, {}, OperationSource::DrawTool);
-    }
-}
-
-void DrawToolBarWidget::createToolButtons()
-{
-    // 清除旧按钮，重建布局
-    if (layout())
-    {
-        QLayoutItem* item;
-        while ((item = layout()->takeAt(0)) != nullptr)
+        QLayoutItem* item = nullptr;
+        while ((item = old->takeAt(0)) != nullptr)
         {
             if (item->widget())
             {
@@ -100,65 +38,40 @@ void DrawToolBarWidget::createToolButtons()
             }
             delete item;
         }
-        delete layout();
+        delete old;
     }
-    m_toolButtons.clear();
 
     const int iconSize = UiMetrics::toolbarIconSizeLarge();
 
-    auto* layout = new QVBoxLayout(this);
-    layout->setSpacing(4);
-    layout->setContentsMargins(4, 4, 4, 4);
+    auto* box = new QVBoxLayout(this);
+    box->setSpacing(4);
+    box->setContentsMargins(4, 4, 4, 4);
 
-    // 使用外部注入的工具定义，保证与 CommandCatalog 命令 ID 一致
-    for (const auto& tool : m_toolDefinitions)
+    for (QAction* action : m_toolActions)
     {
+        if (!action)
+        {
+            continue;
+        }
+
         auto* button = new QToolButton(this);
-        button->setCheckable(true);
-        // 互斥选中（单选组语义）：点击已选中的按钮不会取消选中，保证始终有一个工具处于高亮
-        button->setAutoExclusive(true);
         // 关闭 autoRaise：让 QSS :hover / :pressed 样式正常渲染（autoRaise=true 时 Qt 原生绘制会覆盖样式表）
         button->setAutoRaise(false);
         // 不抢占焦点：让 Esc 等快捷键始终由视口（ViewportInputRouter）处理
         button->setFocusPolicy(Qt::NoFocus);
         button->setIconSize(QSize(iconSize, iconSize));
+        // 无图标时回退为文字按钮，保证功能可见
+        button->setToolButtonStyle(action->icon().isNull() ? Qt::ToolButtonTextOnly : Qt::ToolButtonIconOnly);
+        // 派发来源标记：中枢的 detectOperationSource 读取本属性判定 LeftToolbar，
+        // 不依赖宿主（QToolBar / QDockWidget）的 objectName，换承载方式也不会误判。
+        button->setProperty("operationSource", static_cast<int>(OperationSource::LeftToolbar));
+        // setDefaultAction 后按钮的图标/文案/提示/可勾选/勾选态/启用态全部跟随 QAction，
+        // 点击即 trigger 该 QAction —— 与菜单、右键菜单共用同一条派发链。
+        // 互斥由中枢的 QActionGroup 保证，无需 setAutoExclusive。
+        button->setDefaultAction(action);
 
-        QString tooltip = tool.tooltip;
-        if (!tool.shortcut.isEmpty())
-        {
-            tooltip = QStringLiteral("%1 (%2)").arg(tool.tooltip, tool.shortcut);
-        }
-
-        if (tool.iconResource.isEmpty())
-        {
-            // 无图标时回退为文字按钮，保证功能可见
-            button->setToolButtonStyle(Qt::ToolButtonTextOnly);
-            button->setText(tool.displayName);
-        }
-        else
-        {
-            // 图标按钮，悬停时以文字提示（tooltip）说明用途
-            button->setToolButtonStyle(Qt::ToolButtonIconOnly);
-            IconHelper::setThemedIcon(button, tool.iconResource);
-            tooltip = tool.displayName + (tooltip.isEmpty() ? QString() : QStringLiteral("\n") + tooltip);
-        }
-        button->setToolTip(tooltip);
-        button->setProperty("toolId", tool.commandId);
-        button->setProperty("shortcut", tool.shortcut);
-
-        connect(button, &QToolButton::clicked, this, &DrawToolBarWidget::onToolButtonClicked);
-
-        layout->addWidget(button);
-        m_toolButtons[tool.commandId] = button;
+        box->addWidget(button);
     }
 
-    layout->addStretch();
-}
-
-void DrawToolBarWidget::setButtonChecked(const QString& toolId, bool checked)
-{
-    for (auto it = m_toolButtons.begin(); it != m_toolButtons.end(); ++it)
-    {
-        it.value()->setChecked(it.key() == toolId && checked);
-    }
+    box->addStretch();
 }

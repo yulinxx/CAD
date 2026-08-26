@@ -173,6 +173,16 @@ void registerBuiltinUiPanels(UiPanelRegistry& registry) {
 
 > 注意：`UiLayoutBuilder::buildDocks` 遇到 **未注册** `widgetType` 会降级为占位 `QWidget` 并 `SY_WARNF` 告警 —— 不会崩溃。
 
+**左侧绘图面板不在这套注册表里**：`DrawToolBarWidget` 由 `Workbench2D::createToolbars()` 直接创建，
+挂在左侧 `QToolBar`（objectName `DrawToolBar`）或左侧 Dock 上，按 `PanelHostStyle` 决定。
+它是纯展示层：唯一 API `setToolActions(QVector<QAction*>)`，按钮用
+`QToolButton::setDefaultAction()` 挂 `CommandActionHub` 托管的工具 QAction，
+图标/文案/勾选态/启用态全部由 QAction 承载。因此**替换这个面板不需要接 `OperationBus`**，
+只要照样消费中枢给的 QAction；反过来，任何自建按钮 + 自己 `run()` 的写法都会绕开统一派发链。
+两条构建期约束：面板必须在 `CommandActionHub::rebuildAllActions()` 之后创建（否则取不到任何动作），
+承载控件要写 `property("operationSource")` 声明来源（中枢按此判定，见《命令与状态流.md》4.2）。
+
+
 **场景树面板（数据/算法/UI 分离，UI 可定制/可缺失）**：
 - 2D 场景树：`SceneTreeBuilder2D`（算法层，读 Engine2D 场景）→ `SceneTreeModel2D`（数据层）→ `SceneTreePanel2D`（UI，由 `WorkbenchLayoutManager` 经面板注册表创建）。
 - 3D 场景树：`SceneTreeBuilder3D`（算法层，读 `SceneManager3D`）→ `SceneTreeModel3D`（数据层）→ `SceneTreePanel3D`（UI，由 `Workbench3D::setupSceneTree3D` 直接创建并注册 dock）。

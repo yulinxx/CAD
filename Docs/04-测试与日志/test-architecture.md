@@ -52,7 +52,7 @@
 - `Main/Src/UI/Test/ViewportRefreshRegressionTests.cpp`
 - `Main/Src/UI/Test/ViewportInputRegressionTests.cpp`
 - `Main/Src/UI/Test/Scene3DRegressionTests.cpp`
-- `Main/Src/UI/Test/CommandUiWiringTests.cpp`（顶部工具栏 actionId 与命令目录的接线一致性）
+- `Main/Src/UI/Test/CommandUiWiringTests.cpp`（顶部工具栏 actionId 与命令目录的接线一致性；左侧绘图面板与中枢工具动作的接线）
 - `UI/2D/Test/ToolsInteropTests.cpp`
 - `UI/3D/Test/OperationBus3DTests.cpp`
 
@@ -159,7 +159,7 @@ Main/Src/UI/Test/
 ├── LayerPersistenceBridgeTests.cpp  # 图层持久化桥接
 ├── ClientConfigTests.cpp            # 客户配置测试（含工具栏命令绑定回归：无分发器时推迟构建 / 空分发器会永久禁用全部按钮 / 菜单与工具栏共用同一分发器实例）
 ├── SceneTreeBuilder3DTests.cpp      # 3D 场景树构建
-├── CommandUiWiringTests.cpp         # 命令 UI 接线回归（18 例：actionId 解析 / 启用规则 / 菜单栏 / 外部 QAction 树应用 / 2D-3D 切换防串台，后 5 例 BUILD_UI3D 条件编译）
+├── CommandUiWiringTests.cpp         # 命令 UI 接线回归（23 例：actionId 解析 / 启用规则 / 菜单栏 / 外部 QAction 树应用 / 2D-3D 切换防串台（5 例 BUILD_UI3D 条件编译）/ 配置命令契约 / 左侧绘图面板与中枢工具动作 4 例）
 └── ToolSelectionSyncRegressionTests.cpp
 
 UI/2D/Test/
@@ -254,6 +254,13 @@ Utility/Utility/Test/
 最后 5 例（`Switch_*` / `Switch3D_*`，`#if BUILD_UI3D`）覆盖 2D↔3D 切换：3D 侧 `CommandActionHub3D::applySnapshotToMenu()` 的选择/锁定门禁，以及「防串台」数据契约 —— 2D 独有 id 在 3D 目录解析为 `OperationId3D::None`、3D 独有 id 在 2D 目录解析为 `0`、跨侧快照对预置 `false` 的动作不产生改动、两侧同名命令（undo/redo/delete）的 `enableRule` 取值一致。
 
 切换缺陷里的 P0（`WorkbenchMenuManager::m_workbench` 未随切换同步）没有单测覆盖：它需要完整 `WorkbenchWindow` + 两个真实工作台，属集成层，当前靠手工冒烟验证（3D 下点菜单项确认走 3D 操作总线、3D 独有项可见可用）。
+
+同文件末尾的 `DrawToolBarWidgetTest`（4 例，2026-08-26 新增）锁定左侧绘图面板与命令中枢的接线：
+按钮数量与顺序等于目录里 `LeftToolbar` 面的工具且每个按钮的 `defaultAction` 就是中枢那个 QAction、
+点击按钮必须触发中枢 QAction 且 `detectOperationSource()` 报 `LeftToolbar`、
+连续 `setActiveToolAction()` 后始终恰好一个 checked（`QActionGroup` 互斥不被破坏）、
+每个工具动作的 `commandId` 属性等于目录 `shortcutId`。
+
 
 
 ### 4.2 测试执行策略
