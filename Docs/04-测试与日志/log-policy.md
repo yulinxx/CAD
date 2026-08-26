@@ -314,14 +314,23 @@ SyLogger::setFile("app.log");
 
 > **"日志最后一行"不等于崩溃位置。** 最后一行之后通常还有若干条已产生但未写出的记录。
 
-请按这个顺序取证：
+**已缓解（2026-08-26）**：新增 `SyLogger::Flush()`，崩溃回调
+（`Main/Src/Common/CrashHandlerBootstrap.cpp`）**第一件事**就是调它，把队列冲出去。
+该函数**刻意不加锁** —— 崩溃时其他线程可能正持着 logger 的互斥量且永远不会再释放
+（比如崩在临界区里），加锁等于把崩溃现场变成死锁；`spdlog::logger::flush()` 自身线程安全，
+最坏情况是与并发写入交错，远好过丢掉整段日志。
 
-1. **看 stderr 的符号化调用栈。** 崩溃回调（`Main/Src/Common/CrashHandlerBootstrap.cpp`）
+所以现在日志尾部**可信度提高了，但仍不是权威**：flush 之后崩溃处理器本身还会继续产生日志，
+且 flush 只覆盖到"崩溃回调进入的那一刻"。取证顺序不变：
+
+1. **看 stderr 的符号化调用栈。** 崩溃回调
    会用 dbghelp 打出 `模块!函数 + 偏移 (文件:行号)` 的调用栈，前几帧是崩溃处理器自身的噪声，往下看。
    现场机器没有 WinDbg/cdb 也能直接读到栈，不必依赖 `.dmp`。
 2. **看 GL 驱动日志。** Renderx 已接入 KHR_debug 且开启 `GL_DEBUG_OUTPUT_SYNCHRONOUS`，
    回调在**产生问题的那一次 GL 调用内部**触发，日志形如
    `[gl][driver] HIGH type=0x824C id=1281: ...`。非法 GL 用法会自己报出位置，不要靠猜。
+   注意 `GL_DEBUG_TYPE_OTHER`（驱动闲聊，如 "driver allocated storage for renderbuffer"）
+   已降级到 debug —— warning 级别必须条条值得看，否则真正的问题会被冲掉。
 3. **再看业务日志。** 用它确认崩溃前的最后一个已完成动作，而不是用它定位崩溃点。
 
 判断"进程是否还活着"永远比读日志尾部可靠。

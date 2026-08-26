@@ -177,14 +177,10 @@ void WorkbenchStateManager::refreshFromState()
     // 注意：posLabel/selLabel/msgLabel 已移除 —— 这些由 StatusBarBase 子类管理，
     // 状态栏消息与选择信息在上方通过 m_activeStatusBar 接口统一更新
 
-    if (m_menuManager)
-    {
-        const auto state = m_stateCenter->snapshot();
-        m_menuManager->refreshWorkbenchMenuChecks(state.currentWorkbenchId);
-        m_menuManager->refreshThemeMenuChecks(state.currentThemeId);
-        m_menuManager->refreshGridSnapMenuChecks();
-    }
+    // 菜单勾选态不在这里推：配置驱动菜单已连到状态中心的 stateChanged / metadataChanged，
+    // 由 WorkbenchMenuManager::refreshConfiguredMenuState 单点同步。
 }
+
 
 void WorkbenchStateManager::updateWindowTitle()
 {

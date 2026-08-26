@@ -291,8 +291,13 @@ m_maxLineWidth = range[1] >= m_minLineWidth ? range[1] : m_minLineWidth;
 
 - macOS：`GL_LINE_WIDTH_RANGE=[1,1]` → 钳制后所有线宽仍为 1px（系统限制，无法突破）。
 - Windows CompatibilityProfile：可能支持更宽线宽，钳制后按驱动实际范围生效。
+- Windows **前向兼容** Core 上下文（Qt 请求 GL≥3.0 且未设 `QSurfaceFormat::DeprecatedFunctions`
+  时就是这种）：宽线已被移除，`glLineWidth` 只接受 1.0，但 `GL_ALIASED_LINE_WIDTH_RANGE`
+  仍会谎报 `[1,10]` —— 按 range 钳制这道防御在这里**无效**。Renderx 侧改为查
+  `GL_CONTEXT_FLAGS` 得到事实，详见《03-渲染主链/新渲染架构.md》§22.1。
 - 移除 `GL_LINE_SMOOTH` 后，抗锯齿完全依赖 MSAA；若在非 MSAA 环境需要线抗锯齿，
   应配合 `glHint(GL_LINE_SMOOTH_HINT, GL_NICEST)` 且仅在非 MSAA 时启用。
+
 
 ---
 

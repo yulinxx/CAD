@@ -102,6 +102,11 @@ namespace
 
     int onCrashCallback(const char* dumpPath, int succeeded, void* /*userData*/)
     {
+        // 第一件事：把异步日志队列强制落盘。
+        // 日志走 spdlog async_logger + flush_on(warn)，崩溃时队列里尚未写出的记录会随
+        // 进程一起消失，于是"日志最后一行"根本不是崩溃位置 —— 排查会被这条假线索反复带偏。
+        SyLogger::GetInstance().Flush();
+
         std::fprintf(stderr,
             "\n"
             "==========================================================================\n"

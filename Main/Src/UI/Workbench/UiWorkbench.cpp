@@ -30,8 +30,8 @@
 #include "Engine2D/Core/SceneManager.h"
 #include "UiPropertiesPanel.h"
 #include "RenderViewport2D.h"
-#include "UI/TestView/TestViewWindow.h"
 #include "FileDropHandler.h"
+
 
 #include <optional>
 #include "DrawToolBarWidget.h"
@@ -497,23 +497,8 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
     vp->setOperationBus(m_services.operationBus);
     vp->setLayerManager(m_services.layerManager);
 
-    // TestView：打开独立“仅显示”预览窗口，展示当前 2D 场景全部图元
-    window.setTestViewHandler([this, &window]() {
-        if (!m_services.sceneEditService)
-        {
-            return;
-        }
-        auto* scene = m_services.sceneEditService->sceneManager();
-        if (!scene)
-        {
-            return;
-        }
-        auto* w = new TestViewWindow(scene, true, &window);
-        w->setAttribute(Qt::WA_DeleteOnClose);
-        w->show();
-    });
-
     // P1: 视口通过信号通知上层，不直接持有编辑服务
+
     if (m_services.sceneEditService)
     {
         QObject::connect(
@@ -794,12 +779,9 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged, drawWidget, &DrawToolBarWidget::updateActiveTool);
     drawWidget->updateActiveTool(m_viewport->activeToolName());
 
-    // Draw 菜单与左侧工具栏联动：视口切换工具 → 同步菜单勾选态
-    if (auto* menuMgr = window.menuManager())
-    {
-        QObject::connect(
-            m_viewport, &RenderViewport2D::activeToolChanged, menuMgr, &WorkbenchMenuManager::syncDrawMenuToTool);
-    }
+    // Draw 菜单不再单独同步勾选态：配置驱动菜单里的绘图项与左侧工具栏共用
+    // 命令中枢托管的 QAction，选中态由中枢按快照统一刷新。
+
 
     // View → Grid & Snap 菜单的真正生效点：把 stateCenter 元数据映射到网格显隐。
     // 菜单/操作只翻转 metadata(gridVisible)，此处作为唯一消费者同步到视口网格渲染。

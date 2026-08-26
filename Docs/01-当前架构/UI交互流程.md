@@ -124,11 +124,12 @@ flowchart TD
 ```
 
 **关键点**
-- 配置驱动是唯一路径。只有连 `san_yi.json` 都加载失败时才会退到
-  `buildLegacyMenus()`（已标记 deprecated 的静态兜底），正常运行不会走到。
+- 配置驱动是唯一路径。连 `san_yi.json` 都加载失败时只打一条 `SY_ERRORF`
+  并**不建任何菜单**；原来的 `buildLegacyMenus()` 静态兜底已于 2026-08-26 删除。
 - 命令未注册的菜单项仍保留在菜单上（禁用态），避免结构与文档漂移。
 - 带 `feature` 且未授权的项**不创建**（与「禁用态」不同）。
 - 顶层菜单顺序固定：`File → Edit → View → Draw → Algorithm → Laser → Vision → Help`。
+
 
 ### 2.2 菜单点击逻辑（用户点击 → 执行）
 
@@ -137,15 +138,19 @@ flowchart LR
     Click["用户点击菜单项"] --> Trigger["QAction::triggered"]
     Trigger --> Log["记录日志<br/>[Menu] trigger text=... command=..."]
     Trigger --> Dispatch["MenuDispatcher::dispatch(commandId)"]
-    Dispatch --> Switch{"view.switch_to_2d / view.switch_to_3d ?"}
-    Switch -- "是" --> WB["triggerWorkbench(目标工作台)<br/>触发工作台切换（见第 6 节）"]
+    Dispatch --> Switch{"窗口级命令？<br/>view.switch_to_* / theme.* / language.* / help.about"}
+    Switch -- "是" --> WB["主窗口直接处理<br/>（见第 6 节工作台切换）"]
     Switch -- "否" --> HasWB{"存在当前工作台 ?"}
     HasWB -- "是" --> WB2["workbench->dispatchCommand(commandId)"]
-    HasWB -- "否" --> Bus["回退 OperationBus<br/>按 commandId 解析 OperationId"]
+    HasWB -- "否" --> Warn["SY_WARNF 告警，命令不执行"]
     WB2 --> Catalog["2D: CommandCatalog / 3D: CommandCatalog3D<br/>commandId → OperationId"]
-    Bus --> Catalog
-    Catalog --> Run["OperationBus::run(OperationId)<br/>执行对应 Operation"]
+    Catalog --> Enrich["OperationRouting::enrichParams<br/>补 angle / mode / unit 等参数"]
+    Enrich --> Run["OperationBus::run(OperationId, params, source)"]
 ```
+
+> 「无工作台时退回 `OperationBus::run(opId)`」的旁路已随 `dispatchCommandSafely`
+> 一起删除：它绕过 `enrichParams`，会丢掉旋转 angle / 对齐 mode / 单位 unit。
+
 
 ---
 

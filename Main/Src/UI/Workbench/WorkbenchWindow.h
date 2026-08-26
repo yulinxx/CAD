@@ -114,9 +114,8 @@ public:
     /// 由工作台在创建视口后注入，将菜单缩放操作转发到视口
     /// @param handler 缩放操作处理函数，参数为 "zoom_in"/"zoom_out"/"zoom_fit"/"zoom_selection"/"reset"
     void setViewportZoomHandler(std::function<void(const QString&)> handler);
-    /// 设置 TestView 菜单回调（打开独立预览渲染窗口）
-    void setTestViewHandler(std::function<void()> handler);
     /// 更新状态栏鼠标坐标显示
+
     /// @param x 世界坐标 X（毫米）
     /// @param y 世界坐标 Y（毫米）
     void updatePositionLabel(double x, double y);
@@ -130,8 +129,7 @@ public:
     QStringList loadRecentFiles() const;
     /// 将最近文件列表保存到设置
     void saveRecentFiles(const QStringList& files) const;
-    /// 填充最近文件子菜单
-    void populateRecentFilesMenu();
+
 
     /// 注册停靠面板
     /// @param title 面板标题
@@ -192,9 +190,10 @@ public:
     /// 触发主题切换
     /// @param themeId 主题 ID
     void triggerTheme(const QString& themeId);
-    /// 刷新主题菜单选中状态
+    /// 记录当前主题并刷新窗口标题（菜单勾选态由配置驱动菜单自行同步）
     /// @param themeId 当前主题 ID
     void refreshThemeMenuChecks(const QString& themeId);
+
 
     /// 菜单管理器
     WorkbenchMenuManager* menuManager() const

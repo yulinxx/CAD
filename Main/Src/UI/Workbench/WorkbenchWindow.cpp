@@ -381,7 +381,6 @@ void WorkbenchWindow::initializeWorkbenchShell()
         {
             m_menuManager->buildMenus();
         }
-        m_menuManager->buildThemeMenu();
         m_menuManager->bindShortcuts();
     }
     initializeToolBarSkeleton();
@@ -391,22 +390,9 @@ void WorkbenchWindow::initializeWorkbenchShell()
     setCentralWidget(createInitialCentralWidget());
     updateWindowTitle();
     refreshStatusText();
-    QString initialWorkbenchId =
-        m_stateManager ? m_stateManager->windowState().currentWorkbenchId : QStringLiteral("default");
-    if (m_stateCenter)
-    {
-        initialWorkbenchId = m_stateCenter->currentWorkbenchId();
-    }
-    if (initialWorkbenchId.isEmpty() || initialWorkbenchId == QStringLiteral("default"))
-    {
-        initialWorkbenchId = QStringLiteral("2D");
-    }
-    if (m_menuManager)
-    {
-        m_menuManager->refreshWorkbenchMenuChecks(initialWorkbenchId);
-    }
-    updateWindowTitle();
 }
+
+
 
 QWidget* WorkbenchWindow::createInitialCentralWidget()
 {
@@ -652,15 +638,8 @@ void WorkbenchWindow::setViewportZoomHandler(std::function<void(const QString&)>
     }
 }
 
-void WorkbenchWindow::setTestViewHandler(std::function<void()> handler)
-{
-    if (m_menuManager)
-    {
-        m_menuManager->setTestViewHandler(std::move(handler));
-    }
-}
-
 void WorkbenchWindow::updatePositionLabel(double x, double y)
+
 {
     m_lastMouseX = x;
     m_lastMouseY = y;
@@ -725,8 +704,8 @@ void WorkbenchWindow::addRecentFile(const QString& filePath)
         files.removeLast();
     }
     saveRecentFiles(files);
-    populateRecentFilesMenu();
 }
+
 
 /// 从设置中加载最近文件列表（数据库优先，QSettings 兜底）
 QStringList WorkbenchWindow::loadRecentFiles() const
@@ -760,57 +739,8 @@ void WorkbenchWindow::saveRecentFiles(const QStringList& files) const
     settings.setValue(QStringLiteral("RecentFiles"), files);
 }
 
-/// 填充最近文件子菜单
-void WorkbenchWindow::populateRecentFilesMenu()
-{
-    QMenu* recentMenu = m_menuManager ? m_menuManager->recentFilesMenu() : nullptr;
-    if (!recentMenu)
-    {
-        return;
-    }
-
-    qDeleteAll(recentMenu->actions());
-
-    QStringList files = loadRecentFiles();
-
-    if (files.isEmpty())
-    {
-        auto* empty = recentMenu->addAction(tr("(No recent files)"));
-        empty->setEnabled(false);
-        return;
-    }
-
-    // 添加最近文件菜单项
-    int index = 1;
-    for (const QString& filePath : files)
-    {
-        QFileInfo fileInfo(filePath);
-        QString displayText = QStringLiteral("%1. %2").arg(index).arg(fileInfo.fileName());
-
-        auto* action = recentMenu->addAction(displayText);
-        action->setData(filePath);
-
-        // 点击时打开文件（通过 OperationBus 直接传入路径）
-        QObject::connect(action, &QAction::triggered, this, [this, filePath]() {
-            auto* bus = m_uiServices.operationBus;
-            if (bus && bus->registry().has(OperationId::File_OpenRecent))
-            {
-                QVariantMap params;
-                params[QStringLiteral("filePath")] = filePath;
-                bus->run(OperationId::File_OpenRecent, params);
-            }
-            else if (m_operationBus)
-            {
-                // 兜底：走文件打开对话框（用户手动选取）
-                m_operationBus->run(CommandCatalog::operationForCommandId(QStringLiteral("file.open")));
-            }
-        });
-
-        ++index;
-    }
-}
-
 /// 注册停靠面板
+
 /// @param title 面板标题
 /// @param widget 面板内容部件
 /// @param area 停靠区域
@@ -949,14 +879,9 @@ void WorkbenchWindow::syncWorkbenchStateFromStateCenter()
     }
 
     const auto start = std::chrono::steady_clock::now();
-    const auto state = m_stateCenter->snapshot();
-    if (m_menuManager)
-    {
-        m_menuManager->refreshWorkbenchMenuChecks(state.currentWorkbenchId);
-        m_menuManager->refreshThemeMenuChecks(state.currentThemeId);
-    }
     updateWindowTitle();
     recordPerformance(QStringLiteral("WorkbenchWindow::syncWorkbenchStateFromStateCenter"),
+
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 }
 
@@ -1007,7 +932,8 @@ void WorkbenchWindow::updateBusyIndicator(bool busy)
     m_layoutManager->updateBusyIndicator(busy);
 }
 
-/// 刷新主题菜单选中状态
+/// 记录当前主题并刷新窗口标题
+/// 主题菜单的勾选态由配置驱动菜单按状态中心快照自行同步（refreshConfiguredMenuState）
 /// @param themeId 当前主题 ID
 void WorkbenchWindow::refreshThemeMenuChecks(const QString& themeId)
 {
@@ -1016,11 +942,8 @@ void WorkbenchWindow::refreshThemeMenuChecks(const QString& themeId)
         m_stateManager->windowState().currentThemeId = themeId;
     }
     updateWindowTitle();
-    if (m_menuManager)
-    {
-        m_menuManager->refreshThemeMenuChecks(themeId);
-    }
 }
+
 
 /// 触发主题切换
 /// @param themeId 主题 ID（如 "theme.dark"、"theme.light"、"theme.system"）
@@ -1129,17 +1052,10 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
             m_stateCenter->setCurrentViewMode(QStringLiteral("none"));
             m_stateCenter->setSelectionContext(QStringLiteral("Workbench-Switch"), QStringLiteral("Ready"));
         }
-        const bool is3DNoWb = workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0;
-        if (!is3DNoWb && m_menuManager)
-        {
-            m_menuManager->refreshWorkbenchMenuChecks(workbenchId);
-            m_menuManager->refreshEditMenuForWorkbench(workbenchId);
-            m_menuManager->refreshDrawMenuForWorkbench(workbenchId);
-            m_menuManager->refreshModifyMenuForWorkbench(workbenchId);
-            m_menuManager->refreshAlgorithmMenuForWorkbench(workbenchId);
-            m_menuManager->refreshFileMenuForWorkbench(workbenchId);
-        }
+        // 菜单不需要在这里刷新：配置驱动菜单会随状态中心的 currentWorkbenchChanged
+        // 自行重建与同步（rebuildAllMenus / refreshConfiguredMenuState）。
         refreshFromState();
+
         refreshStatusText();
         updateWindowTitle();
         recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.noWorkbench"),
@@ -1152,11 +1068,8 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     if (workbenchId.compare(currentWorkbenchId, Qt::CaseInsensitive) == 0)
     {
         SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: same workbench %s, skipping", workbenchId.toUtf8().constData());
-        if (m_menuManager)
-        {
-            m_menuManager->refreshWorkbenchMenuChecks(workbenchId);
-        }
         recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.sameWorkbench"),
+
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
         return;
     }

@@ -32,6 +32,20 @@ Document / Scene
 - `RenderWidget` 负责 OpenGL 宿主和渲染设备连接
 - `Renderx` / `RenderX` 负责最终渲染执行
 
+### 2.3 帧外上传必须自己 makeCurrent（2026-08-26 已修）
+
+`SceneRefreshCoordinator` 是在**定时器回调**里调 `RenderWidget::submitSceneFromDataSource`
+与 `addRenderEntity` 的 —— 不在 `paintGL` 内，因此没有当前 GL 上下文；而这两个入口会一路
+走到 `rxGeometryAlloc / Write / Flush`，发出 `glGenBuffers / glBufferData / glBufferSubData`。
+
+无当前上下文时这些调用在 Windows 上通常直接返回：**既不报错也不上传**。数据要等下一帧
+帧内 flush 才偶然补上，症状就是"改完场景要动一下鼠标才刷新"。
+
+现在这两个入口按需 `makeCurrent` / `doneCurrent`，且已在帧内时不重复切换。
+约定：**任何会发 GL 调用的入口自己确认上下文当前性，不把这个前提外推给调用方**
+（释放路径的同一条结论见《新渲染架构.md》§21.1，上传路径见 §22.2）。
+
+
 ---
 
 ## 3. 当前建议

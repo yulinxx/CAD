@@ -632,19 +632,30 @@ UiClientContext::clientId()                       // 覆盖 > 环境变量 > QSe
 
 ## 5. 动态菜单与命令绑定（边界约定）
 
-菜单的 **动态部分** 由 `WorkbenchMenuManager` 在工作台切换时重建
-（`refreshXxxMenuForWorkbench()` 系列）。2D / 3D 菜单现在走**同一套** JSON +
-命令目录路径，`MenuManager3D` 及其 5 个 Menu 子类的硬编码构建路径已移除，
-`Workbench3D::managesOwnMenus()` 恒返回 `false`。
+菜单在工作台切换时由 `WorkbenchMenuManager::rebuildAllMenus()` → `rebuildMenusFromConfig()`
+**整体重建**，勾选态由状态中心信号经 `bindConfiguredMenuState()` → `refreshConfiguredMenuState()`
+单点同步。2D / 3D 菜单走**同一套** JSON + 命令目录路径，`MenuManager3D` 及其 5 个 Menu 子类的
+硬编码构建路径已移除，`Workbench3D::managesOwnMenus()` 恒返回 `false`。
+
+> 历史实现里那一批 `refresh*MenuForWorkbench()` / `syncDrawMenuToTool()` /
+> `refreshThemeMenuChecks()` 等函数已于 2026-08-26 随 legacy 菜单链删除 ——
+> 它们全部依赖 `m_menuState`，而 JSON 驱动路径从不写这个成员，在默认构建下 100% 空转。
 
 
 ```
 QAction::triggered
-  → lambda(commandId)
+  → UiLayoutBuilder::bindAction 绑定的 lambda
       → logMenuTrigger(text, commandId)                // 统一菜单触发日志
-      → dispatchCommandSafely(commandId)               // 内部按 CommandCatalog::operationForCommandId 路由
-      → OperationBus::run(OperationId)                 // 执行
+      → MenuDispatcher::dispatch(commandId)            // 窗口级命令在此短路
+      → UiWorkbench::dispatchCommand(commandId)        // 按命令目录解析 OperationId
+      → OperationRouting（enrichParams 参数富化）
+      → OperationBus::run(OperationId, params, source) // 执行
 ```
+
+这是唯一一条分发链。`dispatchCommandSafely()` 已删除，也不再存在
+「无工作台时直接 `OperationBus::run(opId)`」的旁路 —— 那条旁路绕过 `enrichParams`，
+会丢掉旋转 angle / 对齐 mode / 单位 unit。
+
 
 命令字符串命名规范（统一小写下划线）：`file.*`、`edit.*`、`view.*`、`tool.*`、`2d.*`、`algo.*`、`help.*`。
 

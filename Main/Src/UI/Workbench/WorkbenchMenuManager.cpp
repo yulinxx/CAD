@@ -51,103 +51,19 @@
 #include <QSignalBlocker>
 #include <QStringList>
 #include <QTimer>
+#include <QToolBar>
 #include <algorithm>
 #include <functional>
 
 namespace
 {
-    inline QAction* setCmdId(QAction* action, const QString& cmdId)
-    {
-        if (action)
-        {
-            action->setData(cmdId);
-            // 统一命令标识存储：与 UiLayoutBuilder 写入的 property("commandId") 约定一致，
-            // 使 bindConfiguredMenuState / 测试 / 日志统一按同一 property 读取，避免新旧路径失配。
-            action->setProperty("commandId", cmdId);
-        }
-        return action;
-    }
-
-    // 清空菜单全部动作，并连带删除子菜单对象。
-    // 相比 qDeleteAll(menu->actions())，直接删除子菜单 QAction 不会销毁其 QMenu，
-    // 会造成孤儿子菜单在多次局部刷新间累积（泄漏）；这里显式 delete 子菜单，一并回收。
-    void clearMenuActions(QMenu* menu)
-    {
-        if (!menu)
-        {
-            return;
-        }
-        const auto actions = menu->actions();
-        for (QAction* act : actions)
-        {
-            if (!act)
-            {
-                continue;
-            }
-            if (QMenu* sub = act->menu())
-            {
-                delete sub;  // 子菜单析构会连带删除其 menuAction，不可再 delete act
-            }
-            else
-            {
-                delete act;
-            }
-        }
-    }
-
-    // 为 2D 传统菜单项解析图标：优先取 CommandCatalog 中注册的资源，否则使用显式回退路径。
-    void applyMenuIcon(QAction* action, const QString& commandId, const char* fallbackResource = nullptr)
-    {
-        if (!action)
-        {
-            return;
-        }
-        QString res;
-        if (!commandId.isEmpty())
-        {
-            const CommandEntry2D* entry =
-                CommandCatalog::findByOperation(CommandCatalog::operationForCommandId(commandId));
-            if (entry && entry->iconResource)
-            {
-                res = QString::fromUtf8(entry->iconResource);
-            }
-        }
-        if (res.isEmpty() && fallbackResource)
-        {
-            res = QString::fromUtf8(fallbackResource);
-        }
-        if (!res.isEmpty())
-        {
-            IconHelper::setThemedIcon(action, res);
-        }
-    }
-
     QString currentWorkbenchId(const UiStateCenter* stateCenter)
     {
         return stateCenter ? stateCenter->currentWorkbenchId() : QStringLiteral("2D");
     }
 
-    QMenu* findTopLevelMenu(WorkbenchWindow* window, const QString& title)
-    {
-        if (!window || !window->menuBar())
-        {
-            return nullptr;
-        }
-
-        for (QAction* action : window->menuBar()->actions())
-        {
-            if (QMenu* menu = action ? action->menu() : nullptr)
-            {
-                if (menu->title().compare(title, Qt::CaseInsensitive) == 0)
-                {
-                    return menu;
-                }
-            }
-        }
-        return nullptr;
-    }
-
     bool commandEnabledForWorkbench(const QStringList& workbenches, const QString& workbenchId)
+
     {
         if (workbenches.isEmpty())
         {
@@ -204,8 +120,8 @@ struct MenuDispatcher final : public IUiCommandDispatcher
 
     void dispatch(const QString& commandId) override
     {
-        // 工作台切换统一由主窗口 triggerWorkbench 处理（含防重复切换保护），
-        // 与 legacy 路径 View 菜单的 Switch 动作行为保持一致。
+        // 工作台切换统一由主窗口 triggerWorkbench 处理（含防重复切换保护）。
+
         if (isWorkbenchSwitchCommand(commandId) && self && self->workbenchWindow())
         {
             const QString target =
@@ -213,7 +129,8 @@ struct MenuDispatcher final : public IUiCommandDispatcher
             self->workbenchWindow()->triggerWorkbench(target);
             return;
         }
-        // 主题切换：与 legacy 路径一致，直接走主窗口主题切换。
+        // 主题切换：直接走主窗口主题切换，不进命令总线。
+
         if (isThemeCommand(commandId) && self && self->workbenchWindow())
         {
             self->workbenchWindow()->triggerTheme(commandId);
@@ -285,67 +202,11 @@ void WorkbenchMenuManager::setWorkbench(UiWorkbench* workbench)
     m_workbench = workbench;
 }
 
-void WorkbenchMenuManager::dispatchCommandSafely(const QString& commandId)
-{
-    if (m_workbench)
-    {
-        m_workbench->dispatchCommand(commandId);
-        return;
-    }
-    if (m_operationBus)
-    {
-        const OperationId opId = CommandCatalog::operationForCommandId(commandId);
-        if (opId != OperationId::None)
-        {
-            m_operationBus->run(opId);
-        }
-    }
-}
-
-QAction* WorkbenchMenuManager::addMenuAction(
-    QMenu* menu, const QString& text, const QString& commandId, const QString& fallbackIcon, int options)
-{
-    QAction* action = menu->addAction(text);
-    if (options & MenuActionOption_Checkable)
-    {
-        action->setCheckable(true);
-    }
-
-    // 主题切换类菜单项：commandId 即主题 ID，不进入命令总线
-    if (options & MenuActionOption_Theme)
-    {
-        connect(action, &QAction::triggered, this, [this, commandId]() {
-            m_window->triggerTheme(commandId);
-        });
-        return action;
-    }
-
-    setCmdId(action, commandId);
-    applyMenuIcon(action, commandId, fallbackIcon.isEmpty() ? nullptr : fallbackIcon.toUtf8().constData());
-
-    // 统一分发：全部走 dispatchCommandSafely（优先当前工作台 dispatchCommand，无工作台时回退 OperationBus）。
-    // 2D 绘图工具（toolName 类型 commandId）也由 Workbench2D::dispatchCommand 兜底调用 operationForToolName，
-    // 与左侧工具栏/右键菜单保持同一条命令路径，不再在菜单层单独直连 OperationBus。
-    connect(action, &QAction::triggered, this, [this, commandId]() {
-        dispatchCommandSafely(commandId);
-    });
-    return action;
-}
-
-void WorkbenchMenuManager::setWorkbenchFactory(WorkbenchFactory factory)
-{
-    m_workbenchFactory = std::move(factory);
-}
-
 void WorkbenchMenuManager::setViewportZoomHandler(std::function<void(const QString&)> handler)
 {
     m_viewportZoomHandler = std::move(handler);
 }
 
-void WorkbenchMenuManager::setTestViewHandler(std::function<void()> handler)
-{
-    m_testViewHandler = std::move(handler);
-}
 
 void WorkbenchMenuManager::rebuildAllMenus()
 {
@@ -371,14 +232,10 @@ void WorkbenchMenuManager::rebuildAllMenus()
             sub->deleteLater();
         }
     }
-    m_menuState = {};
-
-    // Always use config-driven menus as primary path.
-    // The legacy hardcoded path (buildLegacyMenus) is deprecated and kept
-    // only as a static fallback when config loading fails.
+    // 菜单只有一条构建路径：JSON 配置驱动。
     rebuildMenusFromConfig();
     bindConfiguredMenuState();
-    bindMenuCommands();
+
 
     // 菜单重建产出的是全新 QAction，enabled 默认为 true。
     // 必须请工作台重推一次命令 UI 快照，否则「无选中却能点删除/对齐」会在每次
@@ -444,12 +301,13 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
     const UiConfigData* config = configManager.configData();
     if (!config)
     {
-        SY_WARNF("[WorkbenchMenuManager] Shared client config unavailable (client='%s'), "
-                 "fallback to legacy menu path",
+        // 配置缺失时不再退回硬编码菜单：legacy 那条链已删除。
+        // 菜单一栏都建不出来是装配级故障，必须显性报错，而不是悄悄换一套结构。
+        SY_ERRORF("[WorkbenchMenuManager] Shared client config unavailable (client='%s'), menus not built",
             qPrintable(clientId));
-        buildLegacyMenus();
         return;
     }
+
 
     // 命令分发器随 WorkbenchMenuManager 生命周期持有（成员 m_dispatcher）：
     // UiLayoutBuilder 会把该指针存入 QAction 触发回调并长期解引用，必须保证指针在菜单存在期间有效。
@@ -516,852 +374,15 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
         filteredShortcuts.size());
 }
 
-void WorkbenchMenuManager::createBaseMenus()
-{
-    initializeMenuSkeleton();
-}
-
-void WorkbenchMenuManager::initializeMenuSkeleton()
-{
-    rebuildMenusFromConfig();
-}
-
 void WorkbenchMenuManager::buildMenus()
+
 {
     rebuildMenusFromConfig();
     bindConfiguredMenuState();
 }
 
-void WorkbenchMenuManager::buildLegacyMenus()
-{
-    // 旧路径保留：用于未启用配置驱动时的兼容构建。
-    // 顶层菜单统一为 File / Edit / Draw / Algorithm / View / Tools / Help，
-    // Draw / Algorithm 提升为独立顶层菜单（不再收敛在 Tools 下），
-    // Modify 由 refreshEditMenuForWorkbench 建立到 Edit 下，与配置驱动的 schema 保持一致（2D/3D 同一结构）。
-    m_menuState.fileMenu = findTopLevelMenu(m_window, tr("File"));
-    m_menuState.editMenu = findTopLevelMenu(m_window, tr("Edit"));
-    m_menuState.drawMenu = findTopLevelMenu(m_window, tr("Draw"));
-    m_menuState.algorithmMenu = findTopLevelMenu(m_window, tr("Algorithm"));
-    m_menuState.viewMenu = findTopLevelMenu(m_window, tr("View"));
-    m_menuState.toolsMenu = findTopLevelMenu(m_window, tr("Tools"));
-    m_menuState.helpMenu = findTopLevelMenu(m_window, tr("Help"));
-
-    if (!m_menuState.fileMenu)
-        m_menuState.fileMenu = m_window->menuBar()->addMenu(tr("File"));
-    if (!m_menuState.editMenu)
-        m_menuState.editMenu = m_window->menuBar()->addMenu(tr("Edit"));
-    if (!m_menuState.drawMenu)
-        m_menuState.drawMenu = m_window->menuBar()->addMenu(tr("Draw"));
-    if (!m_menuState.algorithmMenu)
-        m_menuState.algorithmMenu = m_window->menuBar()->addMenu(tr("Algorithm"));
-    if (!m_menuState.viewMenu)
-        m_menuState.viewMenu = m_window->menuBar()->addMenu(tr("View"));
-    if (!m_menuState.toolsMenu)
-        m_menuState.toolsMenu = m_window->menuBar()->addMenu(tr("Tools"));
-    if (!m_menuState.helpMenu)
-        m_menuState.helpMenu = m_window->menuBar()->addMenu(tr("Help"));
-
-    buildFileMenu();
-    buildViewMenu();
-    buildHelpMenu();
-    QString initialWorkbenchId = m_stateCenter ? m_stateCenter->currentWorkbenchId() : QStringLiteral("2D");
-    // Modify 子菜单由 refreshEditMenuForWorkbench 一并建立，避免重复刷新
-    refreshEditMenuForWorkbench(initialWorkbenchId);
-    refreshDrawMenuForWorkbench(initialWorkbenchId);
-    refreshAlgorithmMenuForWorkbench(initialWorkbenchId);
-}
-
-void WorkbenchMenuManager::buildFileMenu()
-{
-    if (!m_menuState.fileMenu)
-    {
-        return;
-    }
-
-    auto* newAction = m_menuState.fileMenu->addAction(tr("New"));
-    newAction->setShortcut(QKeySequence::New);
-    auto* openAction = m_menuState.fileMenu->addAction(tr("Open..."));
-    openAction->setShortcut(QKeySequence::Open);
-    setCmdId(newAction, QStringLiteral("file.new"));
-    setCmdId(openAction, QStringLiteral("file.open"));
-    IconHelper::setThemedIcon(newAction, QStringLiteral(":/ui/common/Icons/File/new.svg"));
-    IconHelper::setThemedIcon(openAction, QStringLiteral(":/ui/common/Icons/File/open.svg"));
-    connect(newAction, &QAction::triggered, this, [this]() {
-        dispatchCommandSafely(QStringLiteral("file.new"));
-    });
-    connect(openAction, &QAction::triggered, this, [this]() {
-        dispatchCommandSafely(QStringLiteral("file.open"));
-    });
-    m_menuState.fileMenu->addSeparator();
-
-    auto* saveAction = m_menuState.fileMenu->addAction(tr("Save"));
-    saveAction->setShortcut(QKeySequence::Save);
-    auto* saveAsAction = m_menuState.fileMenu->addAction(tr("Save As..."));
-    saveAsAction->setShortcut(QKeySequence::SaveAs);
-    setCmdId(saveAction, QStringLiteral("file.save"));
-    setCmdId(saveAsAction, QStringLiteral("file.save_as"));
-    IconHelper::setThemedIcon(saveAction, QStringLiteral(":/ui/common/Icons/File/save.svg"));
-    IconHelper::setThemedIcon(saveAsAction, QStringLiteral(":/ui/common/Icons/File/save_as.svg"));
-    connect(saveAction, &QAction::triggered, this, [this]() {
-        dispatchCommandSafely(QStringLiteral("file.save"));
-    });
-    connect(saveAsAction, &QAction::triggered, this, [this]() {
-        dispatchCommandSafely(QStringLiteral("file.save_as"));
-    });
-    m_menuState.fileMenu->addSeparator();
-
-    m_menuState.recentFilesMenu = m_menuState.fileMenu->addMenu(tr("Recent Files"));
-    m_menuState.recentFilesMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/File/recent.svg")));
-    m_window->populateRecentFilesMenu();
-
-    m_menuState.fileMenu->addSeparator();
-
-    refreshFileMenuForWorkbench(m_stateCenter ? m_stateCenter->currentWorkbenchId() : QStringLiteral("2D"));
-
-    m_menuState.fileMenu->addSeparator();
-    auto* exitAction = m_menuState.fileMenu->addAction(tr("Exit"));
-    exitAction->setShortcut(QKeySequence::Quit);
-    IconHelper::setThemedIcon(exitAction, QStringLiteral(":/ui/common/Icons/File/exit.svg"));
-    QObject::connect(exitAction, &QAction::triggered, m_window, &QWidget::close);
-}
-
-namespace
-{
-    struct MenuFormatItemSpec
-    {
-        const char* commandId;
-        const char* label2D;
-        const char* label3D;
-    };
-
-    // Import 菜单：扁平 4 项，与菜单架构文档 5.3 / 6.3 一致。
-    // 2D / 3D 共用同一组入口，差异只体现在 label2D / label3D。
-    const MenuFormatItemSpec kImportItems[] = {
-        { "file.import_model", QT_TR_NOOP("All Supported..."), QT_TR_NOOP("All Supported...") },
-        { "file.import_step", QT_TR_NOOP("2D / Drawing Formats..."), QT_TR_NOOP("2D / Drawing Formats...") },
-        { "file.import_obj", QT_TR_NOOP("3D Model Formats..."), QT_TR_NOOP("3D Model Formats...") },
-        { "file.import_image", QT_TR_NOOP("Image Formats..."), QT_TR_NOOP("Image Formats...") },
-    };
-
-    // Export 菜单：扁平项，2D / 3D 各自可见的格式不同。
-    const MenuFormatItemSpec k2DExportItems[] = {
-        { "file.export_dxf", QT_TR_NOOP("DXF"), nullptr },
-        { "file.export_svg", QT_TR_NOOP("SVG"), nullptr },
-        { "file.export_plt", QT_TR_NOOP("PLT"), nullptr },
-        { "file.export_bmp", QT_TR_NOOP("BMP"), nullptr },
-        { "file.export_png", QT_TR_NOOP("PNG"), QT_TR_NOOP("PNG") },
-    };
-
-    const MenuFormatItemSpec k3DExportItems[] = {
-        { "file.export_obj", nullptr, QT_TR_NOOP("OBJ") },
-        { "file.export_stl", nullptr, QT_TR_NOOP("STL") },
-        { "file.export_step", nullptr, QT_TR_NOOP("STEP") },
-        { "file.export_pdf", nullptr, QT_TR_NOOP("PDF") },
-        { "file.export_png", nullptr, QT_TR_NOOP("PNG") },
-    };
-}  // namespace
-
-void WorkbenchMenuManager::refreshExportMenuForWorkbench(const QString& workbenchId)
-{
-    if (!m_menuState.fileMenu)
-    {
-        return;
-    }
-
-    if (m_menuState.exportMenu)
-    {
-        m_menuState.fileMenu->removeAction(m_menuState.exportMenu->menuAction());
-        delete m_menuState.exportMenu;
-        m_menuState.exportMenu = nullptr;
-    }
-
-    m_menuState.exportMenu = m_menuState.fileMenu->addMenu(tr("Export"));
-    m_menuState.exportMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/File/export.svg")));
-
-    const bool is3D = workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0;
-    auto addMenuItems = [this, is3D](QMenu* parent, const MenuFormatItemSpec* items, size_t count) {
-        if (!parent)
-        {
-            return;
-        }
-        for (size_t i = 0; i < count; ++i)
-        {
-            const auto& spec = items[i];
-            const char* label = is3D ? spec.label3D : spec.label2D;
-            if (!label)
-            {
-                continue;
-            }
-            addMenuAction(parent, tr(label), QString::fromUtf8(spec.commandId));
-        }
-    };
-
-    if (is3D)
-    {
-        addMenuItems(m_menuState.exportMenu, k3DExportItems, std::size(k3DExportItems));
-    }
-    else
-    {
-        addMenuItems(m_menuState.exportMenu, k2DExportItems, std::size(k2DExportItems));
-    }
-}
-
-void WorkbenchMenuManager::refreshImportMenuForWorkbench(const QString& workbenchId)
-{
-    if (!m_menuState.fileMenu)
-    {
-        return;
-    }
-
-    if (m_menuState.importMenu)
-    {
-        m_menuState.fileMenu->removeAction(m_menuState.importMenu->menuAction());
-        delete m_menuState.importMenu;
-        m_menuState.importMenu = nullptr;
-    }
-
-    m_menuState.importMenu = m_menuState.fileMenu->addMenu(tr("Import"));
-    m_menuState.importMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/File/import.svg")));
-
-    // 导入菜单为扁平 4 项，2D / 3D 共用同一组入口，与菜单架构文档一致。
-    for (const auto& spec : kImportItems)
-    {
-        const char* label = spec.label2D;  // 2D / 3D 文案一致
-        addMenuAction(m_menuState.importMenu, tr(label), QString::fromUtf8(spec.commandId));
-    }
-}
-
-void WorkbenchMenuManager::refreshFileMenuForWorkbench(const QString& workbenchId)
-{
-    if (!m_menuState.fileMenu)
-    {
-        return;
-    }
-
-    if (m_menuState.importMenu)
-    {
-        m_menuState.fileMenu->removeAction(m_menuState.importMenu->menuAction());
-        delete m_menuState.importMenu;
-        m_menuState.importMenu = nullptr;
-    }
-    if (m_menuState.exportMenu)
-    {
-        m_menuState.fileMenu->removeAction(m_menuState.exportMenu->menuAction());
-        delete m_menuState.exportMenu;
-        m_menuState.exportMenu = nullptr;
-    }
-
-    refreshImportMenuForWorkbench(workbenchId);
-    refreshExportMenuForWorkbench(workbenchId);
-}
-
-void WorkbenchMenuManager::buildViewMenu()
-{
-    if (!m_menuState.viewMenu)
-    {
-        return;
-    }
-
-    m_menuState.viewMenu->addSeparator();
-
-    // Zoom 子菜单
-    m_menuState.zoomMenu = m_menuState.viewMenu->addMenu(tr("Zoom"));
-    m_menuState.zoomMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/View/zoom_in.svg")));
-    auto* zoomIn = m_menuState.zoomMenu->addAction(tr("Zoom In"));
-    zoomIn->setShortcut(QKeySequence::ZoomIn);
-    IconHelper::setThemedIcon(zoomIn, QStringLiteral(":/ui/common/Icons/View/zoom_in.svg"));
-    QObject::connect(zoomIn, &QAction::triggered, this, [this]() {
-        if (m_viewportZoomHandler)
-        {
-            m_viewportZoomHandler(QStringLiteral("zoom_in"));
-        }
-    });
-    auto* zoomOut = m_menuState.zoomMenu->addAction(tr("Zoom Out"));
-    zoomOut->setShortcut(QKeySequence::ZoomOut);
-    IconHelper::setThemedIcon(zoomOut, QStringLiteral(":/ui/common/Icons/View/zoom_out.svg"));
-    QObject::connect(zoomOut, &QAction::triggered, this, [this]() {
-        if (m_viewportZoomHandler)
-        {
-            m_viewportZoomHandler(QStringLiteral("zoom_out"));
-        }
-    });
-    m_menuState.zoomMenu->addSeparator();
-    auto* zoomFit = m_menuState.zoomMenu->addAction(tr("Zoom to Fit"));
-    zoomFit->setShortcut(QStringLiteral("Ctrl+F"));
-    IconHelper::setThemedIcon(zoomFit, QStringLiteral(":/ui/common/Icons/View3D/fit.svg"));
-    QObject::connect(zoomFit, &QAction::triggered, this, [this]() {
-        if (m_viewportZoomHandler)
-        {
-            m_viewportZoomHandler(QStringLiteral("zoom_fit"));
-        }
-    });
-    auto* zoomSel = m_menuState.zoomMenu->addAction(tr("Zoom to Selection"));
-    zoomSel->setShortcut(QStringLiteral("Ctrl+Shift+F"));
-    IconHelper::setThemedIcon(zoomSel, QStringLiteral(":/ui/common/Icons/View/zoom_selection.svg"));
-    QObject::connect(zoomSel, &QAction::triggered, this, [this]() {
-        if (m_viewportZoomHandler)
-        {
-            m_viewportZoomHandler(QStringLiteral("zoom_selection"));
-        }
-    });
-    m_menuState.zoomMenu->addSeparator();
-    auto* resetView = m_menuState.zoomMenu->addAction(tr("Reset View"));
-    resetView->setShortcut(QStringLiteral("Ctrl+0"));
-    IconHelper::setThemedIcon(resetView, QStringLiteral(":/ui/common/Icons/View3D/reset.svg"));
-    QObject::connect(resetView, &QAction::triggered, this, [this]() {
-        if (m_viewportZoomHandler)
-        {
-            m_viewportZoomHandler(QStringLiteral("reset"));
-        }
-    });
-
-    // Pan
-    auto* panAction = m_menuState.viewMenu->addAction(tr("Pan"));
-    panAction->setShortcut(QStringLiteral("M"));
-    QObject::connect(panAction, &QAction::triggered, this, [this]() {
-        if (m_viewportZoomHandler)
-        {
-            m_viewportZoomHandler(QStringLiteral("pan"));
-        }
-    });
-
-    m_menuState.viewMenu->addSeparator();
-
-    // Unit 子菜单
-    m_menuState.unitMenu = m_menuState.viewMenu->addMenu(tr("Unit"));
-    m_menuState.unitMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/View/unit.svg")));
-    UnitManager::Unit currentUnit = UnitManager::Unit::Millimeter;
-    if (m_uiServices && m_uiServices->unitManager)
-    {
-        currentUnit = m_uiServices->unitManager->displayUnit();
-    }
-    UnitSelectionMenu::populate(m_menuState.unitMenu, currentUnit, [this](const QString& cmdId) {
-        dispatchCommandSafely(cmdId);
-    });
-
-    m_menuState.viewMenu->addSeparator();
-
-    // Grid && Snap 子菜单
-    m_menuState.gridSnapMenu = m_menuState.viewMenu->addMenu(tr("Grid && Snap"));
-    m_menuState.gridSnapMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/View/snap.svg")));
-    auto* showGrid = m_menuState.gridSnapMenu->addAction(tr("Show Grid"));
-    showGrid->setCheckable(true);
-    IconHelper::setThemedIcon(showGrid, QStringLiteral(":/ui/common/Icons/View3D/grid.svg"));
-    QObject::connect(showGrid, &QAction::toggled, this, [this](bool checked) {
-        if (m_stateCenter)
-        {
-            m_stateCenter->setMetadata({ { QStringLiteral("gridVisible"), checked } });
-        }
-    });
-    auto* snapEnabled = m_menuState.gridSnapMenu->addAction(tr("Snap Enabled"));
-    snapEnabled->setCheckable(true);
-    IconHelper::setThemedIcon(snapEnabled, QStringLiteral(":/ui/common/Icons/View/snap.svg"));
-    QObject::connect(snapEnabled, &QAction::toggled, this, [this](bool checked) {
-        if (m_stateCenter)
-        {
-            m_stateCenter->setMetadata({ { QStringLiteral("snapEnabled"), checked } });
-        }
-    });
-    auto* orthoMode = m_menuState.gridSnapMenu->addAction(tr("Ortho Mode"));
-    orthoMode->setCheckable(true);
-    IconHelper::setThemedIcon(orthoMode, QStringLiteral(":/ui/common/Icons/View/ortho.svg"));
-    QObject::connect(orthoMode, &QAction::toggled, this, [this](bool checked) {
-        if (m_stateCenter)
-        {
-            m_stateCenter->setMetadata({ { QStringLiteral("orthoMode"), checked } });
-        }
-    });
-    auto* angleSnap = m_menuState.gridSnapMenu->addAction(tr("Angle Snap"));
-    angleSnap->setCheckable(true);
-    IconHelper::setThemedIcon(angleSnap, QStringLiteral(":/ui/common/Icons/View/angle_snap.svg"));
-    QObject::connect(angleSnap, &QAction::toggled, this, [this](bool checked) {
-        if (m_stateCenter)
-        {
-            m_stateCenter->setMetadata({ { QStringLiteral("angleSnap"), checked } });
-        }
-    });
-
-    m_menuState.viewMenu->addSeparator();
-
-    // Layer Manager
-    auto* layerMgr = m_menuState.viewMenu->addAction(tr("Layer Manager..."));
-    IconHelper::setThemedIcon(layerMgr, QStringLiteral(":/ui/common/Icons/View/layers.svg"));
-    QObject::connect(layerMgr, &QAction::triggered, this, [this]() {
-        if (m_uiServices && m_uiServices->layerEditService)
-        {
-            auto* w = qobject_cast<WorkbenchWindow*>(m_window);
-            if (w)
-            {
-                LayerManagerDialog::showDialog(m_uiServices->layerEditService, w);
-            }
-        }
-    });
-
-    m_menuState.viewMenu->addSeparator();
-
-    // Switch to 2D/3D
-    QString currentWorkbenchId = m_stateCenter ? m_stateCenter->currentWorkbenchId() : QStringLiteral("2D");
-    if (currentWorkbenchId == QStringLiteral("2D"))
-    {
-        m_menuState.workbench3DAction = m_menuState.viewMenu->addAction(tr("Switch to 3D"));
-        m_menuState.workbench3DAction->setCheckable(true);
-        IconHelper::setThemedIcon(
-            m_menuState.workbench3DAction, QStringLiteral(":/ui/common/Icons/View/switch_to_3d.svg"));
-        QObject::connect(m_menuState.workbench3DAction, &QAction::triggered, this, [this]() {
-            m_window->triggerWorkbench(QStringLiteral("3D"));
-        });
-    }
-    else if (currentWorkbenchId == QStringLiteral("3D"))
-    {
-        m_menuState.workbench2DAction = m_menuState.viewMenu->addAction(tr("Switch to 2D"));
-        m_menuState.workbench2DAction->setCheckable(true);
-        IconHelper::setThemedIcon(
-            m_menuState.workbench2DAction, QStringLiteral(":/ui/common/Icons/View3D/switch_to_2d.svg"));
-        QObject::connect(m_menuState.workbench2DAction, &QAction::triggered, this, [this]() {
-            m_window->triggerWorkbench(QStringLiteral("2D"));
-        });
-    }
-
-    m_menuState.viewMenu->addSeparator();
-
-    auto* testView = m_menuState.viewMenu->addAction(tr("TestView"));
-    QObject::connect(testView, &QAction::triggered, this, [this]() {
-        if (m_testViewHandler)
-        {
-            m_testViewHandler();
-        }
-    });
-}
-
-void WorkbenchMenuManager::refreshDrawMenuForWorkbench(const QString& workbenchId)
-{
-    if (!m_menuState.drawMenu)
-    {
-        return;
-    }
-
-    // 旧路径下 Draw 菜单仅服务 2D（3D 由 MenuManager3D 自理，见架构文档），
-    // 旧有的 CommandCatalog3D "model." 前缀过滤分支属死代码，已删除。
-    if (workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0)
-    {
-        return;
-    }
-
-    clearMenuActions(m_menuState.drawMenu);
-
-    bool firstSeparatorAdded = false;
-    for (const CommandEntry2D& cmdEntry : CommandCatalog::commands())
-    {
-        if (!cmdEntry.toolName)
-        {
-            continue;
-        }
-        if (!hasSurface(cmdEntry.surfaces, CommandSurface2D::Menu))
-        {
-            continue;
-        }
-        if (!firstSeparatorAdded && cmdEntry.menuId != UI::MenuActionId::Draw_Select)
-        {
-            m_menuState.drawMenu->addSeparator();
-            firstSeparatorAdded = true;
-        }
-        const QString iconRes = cmdEntry.iconResource ? QString::fromUtf8(cmdEntry.iconResource) : QString();
-        // 绘图工具命令使用 toolName 作为 commandId，由 Workbench2D::dispatchCommand
-        // 兜底按 operationForToolName 解析，与左侧工具栏/右键菜单为同一条分发路径。
-        QAction* toolAction =
-            addMenuAction(m_menuState.drawMenu, tr(cmdEntry.text), QString::fromUtf8(cmdEntry.toolName), iconRes);
-        // 绘图工具菜单项设为可勾选（互斥单选），与左侧工具栏选中态联动：
-        // 视口 activeToolChanged → syncDrawMenuToTool 更新勾选，反之点击菜单走同一条 Tool_* 分发。
-        if (toolAction)
-        {
-            toolAction->setCheckable(true);
-            QActionGroup* group = m_drawToolActionGroup;
-            if (!group)
-            {
-                group = new QActionGroup(this);
-                group->setExclusive(true);
-                m_drawToolActionGroup = group;
-            }
-            group->addAction(toolAction);
-        }
-    }
-}
-
-void WorkbenchMenuManager::syncDrawMenuToTool(const QString& toolName)
-{
-    if (!m_menuState.drawMenu)
-    {
-        return;
-    }
-    for (QAction* action : m_menuState.drawMenu->actions())
-    {
-        if (!action || !action->isCheckable() || action->isSeparator())
-        {
-            continue;
-        }
-        const QString cmdId = action->property("commandId").toString();
-        const bool active = !toolName.isEmpty() && cmdId == toolName;
-        if (active != action->isChecked())
-        {
-            action->setChecked(active);
-        }
-    }
-}
-
-void WorkbenchMenuManager::refreshEditMenuForWorkbench(const QString& workbenchId)
-{
-    if (!m_menuState.editMenu)
-    {
-        return;
-    }
-
-    // 旧路径下 Edit 菜单仅服务 2D（3D 由 MenuManager3D 自理，见架构文档）。
-    if (workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0)
-    {
-        return;
-    }
-
-    // clearMenuActions 会连带删除 Modify/Rotate/Mirror/Align/Path Operations 等子菜单对象，
-    // 避免只删 menuAction 造成孤儿子菜单累积（原 qDeleteAll 的泄漏点）。
-    clearMenuActions(m_menuState.editMenu);
-
-    auto* undoAction = m_menuState.editMenu->addAction(tr("Undo"));
-    undoAction->setShortcut(QKeySequence::Undo);
-    auto* redoAction = m_menuState.editMenu->addAction(tr("Redo"));
-    redoAction->setShortcut(QKeySequence::Redo);
-    applyMenuIcon(undoAction, QStringLiteral("edit.undo"));
-    applyMenuIcon(redoAction, QStringLiteral("edit.redo"));
-    connect(undoAction, &QAction::triggered, this, [this]() {
-        dispatchCommandSafely(QStringLiteral("edit.undo"));
-    });
-    connect(redoAction, &QAction::triggered, this, [this]() {
-        dispatchCommandSafely(QStringLiteral("edit.redo"));
-    });
-    m_menuState.editMenu->addSeparator();
-
-    addMenuAction(m_menuState.editMenu, tr("Select All"), QStringLiteral("edit.select_all"));
-    addMenuAction(m_menuState.editMenu, tr("Invert Selection"), QStringLiteral("edit.invert_selection"));
-    addMenuAction(m_menuState.editMenu, tr("Deselect"), QStringLiteral("edit.deselect"));
-    m_menuState.editMenu->addSeparator();
-
-    addMenuAction(m_menuState.editMenu, tr("Cut"), QStringLiteral("edit.cut"));
-    addMenuAction(m_menuState.editMenu, tr("Copy"), QStringLiteral("edit.copy"));
-    addMenuAction(m_menuState.editMenu, tr("Paste"), QStringLiteral("edit.paste"));
-    addMenuAction(m_menuState.editMenu, tr("Paste as Text"), QStringLiteral("edit.paste_text"));
-    addMenuAction(m_menuState.editMenu, tr("Paste as Image"), QStringLiteral("edit.paste_image"));
-    m_menuState.editMenu->addSeparator();
-
-    addMenuAction(m_menuState.editMenu, tr("Delete"), QStringLiteral("edit.delete"));
-    m_menuState.editMenu->addSeparator();
-
-    // Transform 子菜单：Move / Rotate 90 CW / Rotate 90 CCW / Rotate 180 / Mirror Horizontal / Mirror Vertical / Scale
-    m_menuState.modifyMenu = m_menuState.editMenu->addMenu(tr("Transform"));
-    m_menuState.modifyMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/Actions/move.svg")));
-    addMenuAction(m_menuState.modifyMenu, tr("Move"), QStringLiteral("edit.move"));
-    addMenuAction(m_menuState.modifyMenu,
-        tr("Rotate 90 CW"),
-        QStringLiteral("edit.rotate_90cw"),
-        QStringLiteral(":/ui/common/Icons/Actions/rotate.svg"));
-    addMenuAction(m_menuState.modifyMenu,
-        tr("Rotate 90 CCW"),
-        QStringLiteral("edit.rotate_90ccw"),
-        QStringLiteral(":/ui/common/Icons/Actions/rotate.svg"));
-    addMenuAction(m_menuState.modifyMenu,
-        tr("Rotate 180"),
-        QStringLiteral("edit.rotate_180"),
-        QStringLiteral(":/ui/common/Icons/Actions/rotate.svg"));
-    addMenuAction(m_menuState.modifyMenu, tr("Mirror Horizontal"), QStringLiteral("edit.mirror_horizontal"));
-    addMenuAction(m_menuState.modifyMenu, tr("Mirror Vertical"), QStringLiteral("edit.mirror_vertical"));
-    addMenuAction(m_menuState.modifyMenu,
-        tr("Scale"),
-        QStringLiteral("edit.scale"),
-        QStringLiteral(":/ui/common/Icons/View3D/scale.svg"));
-
-    m_menuState.alignMenu = m_menuState.editMenu->addMenu(tr("Align"));
-    m_menuState.alignMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/Actions/align_left.svg")));
-    addMenuAction(m_menuState.alignMenu, tr("Align Left"), QStringLiteral("edit.align_left"));
-    addMenuAction(m_menuState.alignMenu, tr("Align Right"), QStringLiteral("edit.align_right"));
-    addMenuAction(m_menuState.alignMenu, tr("Align Center H"), QStringLiteral("edit.align_center_h"));
-    addMenuAction(m_menuState.alignMenu, tr("Align Top"), QStringLiteral("edit.align_top"));
-    addMenuAction(m_menuState.alignMenu, tr("Align Bottom"), QStringLiteral("edit.align_bottom"));
-    addMenuAction(m_menuState.alignMenu, tr("Align Center V"), QStringLiteral("edit.align_center_v"));
-    m_menuState.editMenu->addSeparator();
-
-    addMenuAction(
-        m_menuState.editMenu, tr("Group"), QStringLiteral("edit.group"), QString(), MenuActionOption_Checkable);
-    addMenuAction(m_menuState.editMenu, tr("Ungroup"), QStringLiteral("edit.ungroup"));
-
-    m_menuState.editMenu->addSeparator();
-
-    m_menuState.pathOpsMenu = m_menuState.editMenu->addMenu(tr("Path Operations"));
-    m_menuState.pathOpsMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/Actions/offset.svg")));
-    addMenuAction(m_menuState.pathOpsMenu, tr("Boolean Union"), QStringLiteral("edit.boolean_union"));
-    addMenuAction(m_menuState.pathOpsMenu, tr("Boolean Intersection"), QStringLiteral("edit.boolean_intersection"));
-    addMenuAction(m_menuState.pathOpsMenu, tr("Boolean Difference"), QStringLiteral("edit.boolean_difference"));
-    addMenuAction(m_menuState.pathOpsMenu, tr("Boolean Xor"), QStringLiteral("edit.boolean_xor"));
-}
-
-void WorkbenchMenuManager::refreshModifyMenuForWorkbench(const QString& workbenchId)
-{
-    if (!m_menuState.modifyMenu)
-    {
-        return;
-    }
-
-    // 旧路径下 Modify 仅服务 2D（3D 变换工具在配置模式走 JSON edit.transform，旧 3D 分支删除）。
-    if (workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0)
-    {
-        return;
-    }
-
-    clearMenuActions(m_menuState.modifyMenu);
-
-    addMenuAction(m_menuState.modifyMenu, tr("Move"), QStringLiteral("2d.move"));
-    addMenuAction(m_menuState.modifyMenu,
-        tr("Rotate"),
-        QStringLiteral("2d.rotate"),
-        QStringLiteral(":/ui/common/Icons/Actions/rotate.svg"));
-    addMenuAction(m_menuState.modifyMenu,
-        tr("Scale"),
-        QStringLiteral("2d.scale"),
-        QStringLiteral(":/ui/common/Icons/View3D/scale.svg"));
-    addMenuAction(m_menuState.modifyMenu, tr("Copy"), QStringLiteral("2d.copy"));
-    addMenuAction(m_menuState.modifyMenu,
-        tr("Mirror"),
-        QStringLiteral("2d.mirror"),
-        QStringLiteral(":/ui/common/Icons/Actions/mirror_h.svg"));
-    m_menuState.modifyMenu->addSeparator();
-    addMenuAction(m_menuState.modifyMenu,
-        tr("Trim"),
-        QStringLiteral("2d.trim"),
-        QStringLiteral(":/ui/common/Icons/Actions/trim.svg"));
-    addMenuAction(m_menuState.modifyMenu,
-        tr("Extend"),
-        QStringLiteral("2d.extend"),
-        QStringLiteral(":/ui/common/Icons/Actions/extend.svg"));
-    addMenuAction(m_menuState.modifyMenu,
-        tr("Fillet"),
-        QStringLiteral("2d.fillet"),
-        QStringLiteral(":/ui/common/Icons/Actions/fillet.svg"));
-    addMenuAction(m_menuState.modifyMenu,
-        tr("Chamfer"),
-        QStringLiteral("2d.chamfer"),
-        QStringLiteral(":/ui/common/Icons/Actions/chamfer.svg"));
-    m_menuState.modifyMenu->addSeparator();
-    addMenuAction(m_menuState.modifyMenu, tr("Delete"), QStringLiteral("2d.delete"));
-}
-
-void WorkbenchMenuManager::refreshAlgorithmMenuForWorkbench(const QString& workbenchId)
-{
-    if (!m_menuState.algorithmMenu)
-    {
-        return;
-    }
-
-    // 旧路径下 Algorithm 仅服务 2D（3D algo./process. 命令在配置模式走 JSON tools.model，旧 3D 分支删除）。
-    if (workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0)
-    {
-        return;
-    }
-
-    clearMenuActions(m_menuState.algorithmMenu);
-
-    addMenuAction(m_menuState.algorithmMenu,
-        tr("Fill..."),
-        QStringLiteral("algo.fill"),
-        QStringLiteral(":/ui/common/Icons/Actions/algo_fill.svg"));
-#ifdef ENABLE_NESTING
-    addMenuAction(m_menuState.algorithmMenu,
-        tr("Nesting..."),
-        QStringLiteral("algo.nesting"),
-        QStringLiteral(":/ui/common/Icons/Actions/algo_nesting.svg"));
-#endif
-    addMenuAction(m_menuState.algorithmMenu,
-        tr("Array..."),
-        QStringLiteral("algo.array"),
-        QStringLiteral(":/ui/common/Icons/Actions/algo_array.svg"));
-    addMenuAction(m_menuState.algorithmMenu,
-        tr("Offset..."),
-        QStringLiteral("algo.offset"),
-        QStringLiteral(":/ui/common/Icons/Actions/offset.svg"));
-    addMenuAction(m_menuState.algorithmMenu,
-        tr("Bitmap Relief Engraving..."),
-        QStringLiteral("algo.relief_engraving"),
-        QStringLiteral(":/ui/common/Icons/Actions/algo_relief.svg"));
-}
-
-void WorkbenchMenuManager::buildHelpMenu()
-{
-    if (!m_menuState.helpMenu)
-    {
-        return;
-    }
-
-    auto* docsAction = m_menuState.helpMenu->addAction(tr("Documentation"));
-    setCmdId(docsAction, QStringLiteral("help.docs"));
-    IconHelper::setThemedIcon(docsAction, QStringLiteral(":/ui/common/Icons/Help/docs.svg"));
-    connect(docsAction, &QAction::triggered, this, [this]() {
-        dispatchCommandSafely(QStringLiteral("help.docs"));
-    });
-
-    auto* shortcutAction = m_menuState.helpMenu->addAction(tr("Keyboard Shortcuts"));
-    shortcutAction->setShortcut(Qt::Key_F1);
-    setCmdId(shortcutAction, QStringLiteral("help.shortcuts"));
-    IconHelper::setThemedIcon(shortcutAction, QStringLiteral(":/ui/common/Icons/Help/shortcuts.svg"));
-    connect(shortcutAction, &QAction::triggered, this, [this]() {
-        dispatchCommandSafely(QStringLiteral("help.shortcuts"));
-    });
-    m_menuState.helpMenu->addSeparator();
-
-    auto* settingsAction = m_menuState.helpMenu->addAction(tr("Settings..."));
-    // 与配置驱动路径（UiLayoutBuilder 的 menuRoleForActionId）保持同一结论：显式声明角色，
-    // 不依赖 Qt 的 TextHeuristicRole 按文本猜——文本一被翻译成“设置”启发就失效，
-    // 同一台 Mac 上切个语言菜单结构就变。PreferencesRole 让它稳定落在 macOS 应用菜单里，
-    // 其它平台 Qt 忽略 menuRole，仍留在 Help 下。
-    settingsAction->setMenuRole(QAction::PreferencesRole);
-    setCmdId(settingsAction, QStringLiteral("help.settings"));
-    IconHelper::setThemedIcon(settingsAction, QStringLiteral(":/ui/common/Icons/Help/settings.svg"));
-    connect(settingsAction, &QAction::triggered, this, [this]() {
-        dispatchCommandSafely(QStringLiteral("help.settings"));
-    });
-    m_menuState.helpMenu->addSeparator();
-
-    m_menuState.languageMenu = m_menuState.helpMenu->addMenu(tr("Language"));
-    m_menuState.languageMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/Help/language.svg")));
-    auto* langGroup = new QActionGroup(m_window);
-    langGroup->setExclusive(true);
-    const auto langs = LM->supportedLanguages();
-    const auto currentLang = LM->currentLanguage();
-    for (const auto& lang : langs)
-    {
-        auto* act = m_menuState.languageMenu->addAction(LM->languageName(lang));
-        act->setCheckable(true);
-        act->setChecked(lang == currentLang);
-        langGroup->addAction(act);
-        connect(act, &QAction::triggered, this, [lang]() {
-            LM->setLanguage(lang);
-        });
-    }
-    if (m_languageChangedConn)
-    {
-        disconnect(m_languageChangedConn);
-    }
-    m_languageChangedConn = connect(LM, &LanguageManager::languageChanged, this, [this](AppLanguage newLang) {
-        if (!m_menuState.languageMenu)
-        {
-            return;
-        }
-        for (QAction* act : m_menuState.languageMenu->actions())
-        {
-            if (!act->isCheckable())
-            {
-                continue;
-            }
-            const auto langs = LM->supportedLanguages();
-            int idx = m_menuState.languageMenu->actions().indexOf(act);
-            if (idx >= 0 && idx < langs.size())
-            {
-                QSignalBlocker blocker(act);
-                act->setChecked(langs[idx] == newLang);
-            }
-        }
-    });
-
-    m_menuState.helpThemeMenu = m_menuState.helpMenu->addMenu(tr("Theme"));
-    m_menuState.helpThemeMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/Help/theme.svg")));
-    auto* themeGroup = new QActionGroup(m_window);
-    themeGroup->setExclusive(true);
-    const auto themes = TM->supportedThemes();
-    const auto currentTheme = TM->currentTheme();
-    for (const auto& theme : themes)
-    {
-        auto* act = m_menuState.helpThemeMenu->addAction(TM->themeName(theme));
-        act->setCheckable(true);
-        act->setChecked(theme == currentTheme);
-        themeGroup->addAction(act);
-        connect(act, &QAction::triggered, this, [theme]() {
-            TM->setTheme(theme);
-        });
-    }
-    if (m_themeChangedConn)
-    {
-        disconnect(m_themeChangedConn);
-    }
-    m_themeChangedConn = connect(TM, &ThemeManager::themeChanged, this, [this](AppTheme newTheme) {
-        if (!m_menuState.helpThemeMenu)
-        {
-            return;
-        }
-        for (QAction* act : m_menuState.helpThemeMenu->actions())
-        {
-            if (!act->isCheckable())
-            {
-                continue;
-            }
-            const auto themes = TM->supportedThemes();
-            int idx = m_menuState.helpThemeMenu->actions().indexOf(act);
-            if (idx >= 0 && idx < themes.size())
-            {
-                QSignalBlocker blocker(act);
-                act->setChecked(themes[idx] == newTheme);
-            }
-        }
-    });
-
-    m_menuState.helpMenu->addSeparator();
-
-    auto* aboutAction = m_menuState.helpMenu->addAction(tr("About"));
-    setCmdId(aboutAction, QStringLiteral("help.about"));
-    IconHelper::setThemedIcon(aboutAction, QStringLiteral(":/ui/common/Icons/Help/about.svg"));
-    connect(aboutAction, &QAction::triggered, this, [this]() {
-        dispatchCommandSafely(QStringLiteral("help.about"));
-    });
-}
-
-void WorkbenchMenuManager::initializeThemeMenuSkeleton()
-{
-    buildThemeMenu();
-}
-
-void WorkbenchMenuManager::buildThemeMenu()
-{
-    // 主题菜单保留为独立逻辑，后续也可并入菜单配置 schema。
-    // 配置驱动模式下 Themes 菜单由 JSON（tools.theme）生成，这里为空兜底。
-    if (!m_menuState.toolsMenu)
-    {
-        return;
-    }
-    m_menuState.themeMenu = m_menuState.toolsMenu->addMenu(tr("Theme"));
-    m_menuState.themeMenu->setIcon(IconHelper::themedIcon(QStringLiteral(":/ui/common/Icons/Help/theme.svg")));
-
-    addMenuAction(m_menuState.themeMenu,
-        tr("System"),
-        QStringLiteral("system"),
-        QString(),
-        MenuActionOption_Theme | MenuActionOption_Checkable);
-    addMenuAction(m_menuState.themeMenu,
-        tr("Light"),
-        QStringLiteral("light"),
-        QString(),
-        MenuActionOption_Theme | MenuActionOption_Checkable);
-    addMenuAction(m_menuState.themeMenu,
-        tr("Dark"),
-        QStringLiteral("dark"),
-        QString(),
-        MenuActionOption_Theme | MenuActionOption_Checkable);
-    addMenuAction(m_menuState.themeMenu,
-        tr("Blue"),
-        QStringLiteral("blue"),
-        QString(),
-        MenuActionOption_Theme | MenuActionOption_Checkable);
-}
-
-void WorkbenchMenuManager::bindMenuCommands()
-{
-    SY_INFO("[WorkbenchMenuManager] bindMenuCommands: menu actions are now directly connected to OperationBus");
-}
-
 void WorkbenchMenuManager::clearGlobalShortcuts()
+
 {
     for (QAction* action : m_editShortcuts)
     {
@@ -1379,28 +400,24 @@ void WorkbenchMenuManager::bindShortcuts()
     // 先清理旧动作，防止重复叠加
     clearGlobalShortcuts();
 
-    // 这两个动作不进任何菜单（纯窗口级快捷键），但同样打上 commandId：
-    // refreshCommandStates 会把 m_editShortcuts 一并遍历，使 Ctrl+Z / Ctrl+Y
-    // 在无撤销/重做历史时真正禁用，而不是触发后到操作层空转。
-    QAction* undoAction = new QAction(tr("Undo"), m_window);
-    undoAction->setShortcut(QKeySequence::Undo);
-    setCmdId(undoAction, QStringLiteral("edit.undo"));
-    connect(undoAction, &QAction::triggered, this, [this]() {
-        dispatchCommandSafely(QStringLiteral("edit.undo"));
-    });
-    m_window->addAction(undoAction);
-    m_editShortcuts.push_back(undoAction);
+    // 这里**不再**自建 Undo / Redo 的窗口级 QAction。
+    //
+    // 快捷键只保留一条注册路径：客户 JSON。Edit 菜单项自带 "shortcut": "Ctrl+Z" /
+    // "Ctrl+Y"（configs/base.json），UiLayoutBuilder::buildMenuItem 会把它设到菜单
+    // QAction 上；shortcuts[] 节里的重复定义也已清理，并且 buildShortcuts 还有一道
+    // "菜单已声明过该键序列就不再建 QShortcut" 的守卫。
+    //
+    // 此前这里额外建的窗口级 QAction 用的是 QKeySequence::Undo / Redo，在 Windows 上
+    // 正是 Ctrl+Z / Ctrl+Y —— 与菜单项同键、同为窗口范围，Qt 判定 ambiguous 后两个
+    // 接收者都不触发，表现为"按 Ctrl+Z 有时没反应"，且只在特定焦点链下出现。
+    //
+    // 启用态并未因此丢失：菜单 QAction 带 commandId，本来就在 forEachCommandAction
+    // 的遍历范围内，撤销栈为空时会被快照刷新灰掉，比窗口级动作的覆盖面更完整。
+    //
+    // clearGlobalShortcuts 与 m_editShortcuts 保留：工作台切换时仍需清理上一批
+    // 由其他路径注册的窗口级动作（当前为空是正常状态）。
 
-    QAction* redoAction = new QAction(tr("Redo"), m_window);
-    redoAction->setShortcut(QKeySequence::Redo);
-    setCmdId(redoAction, QStringLiteral("edit.redo"));
-    connect(redoAction, &QAction::triggered, this, [this]() {
-        dispatchCommandSafely(QStringLiteral("edit.redo"));
-    });
-    m_window->addAction(redoAction);
-    m_editShortcuts.push_back(redoAction);
-
-    // 新建的 QAction 默认 enabled=true，需立即按当前快照校正一次
+    // 菜单/工具栏的启用态需按当前快照校正一次（重建菜单后新动作默认 enabled=true）
     if (m_workbench)
     {
         m_workbench->refreshCommandUiState();
@@ -1408,75 +425,9 @@ void WorkbenchMenuManager::bindShortcuts()
 }
 
 
-void WorkbenchMenuManager::refreshWorkbenchMenuChecks(const QString& workbenchId)
-{
-    const bool is2D = workbenchId.compare(QStringLiteral("2D"), Qt::CaseInsensitive) == 0;
-    const bool is3D = workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0;
-
-    if (is2D)
-    {
-        if (m_menuState.workbench3DAction)
-        {
-            m_menuState.workbench3DAction->deleteLater();
-            m_menuState.workbench3DAction = nullptr;
-        }
-        if (m_menuState.workbench2DAction)
-        {
-            m_menuState.workbench2DAction->deleteLater();
-            m_menuState.workbench2DAction = nullptr;
-        }
-        if (!m_menuState.workbench3DAction && m_menuState.viewMenu)
-        {
-            m_menuState.workbench3DAction = new QAction(tr("Switch to 3D"), this);
-            m_menuState.workbench3DAction->setCheckable(true);
-            m_menuState.viewMenu->insertAction(m_menuState.viewMenu->actions().first(), m_menuState.workbench3DAction);
-            QObject::connect(m_menuState.workbench3DAction, &QAction::triggered, this, [this]() {
-                m_window->triggerWorkbench(QStringLiteral("3D"));
-            });
-        }
-    }
-    else if (is3D)
-    {
-        if (m_menuState.workbench2DAction)
-        {
-            m_menuState.workbench2DAction->deleteLater();
-            m_menuState.workbench2DAction = nullptr;
-        }
-        if (m_menuState.workbench3DAction)
-        {
-            m_menuState.workbench3DAction->deleteLater();
-            m_menuState.workbench3DAction = nullptr;
-        }
-        if (!m_menuState.workbench2DAction && m_menuState.viewMenu)
-        {
-            m_menuState.workbench2DAction = new QAction(tr("Switch to 2D"), this);
-            m_menuState.workbench2DAction->setCheckable(true);
-            m_menuState.viewMenu->insertAction(m_menuState.viewMenu->actions().first(), m_menuState.workbench2DAction);
-            QObject::connect(m_menuState.workbench2DAction, &QAction::triggered, this, [this]() {
-                m_window->triggerWorkbench(QStringLiteral("2D"));
-            });
-        }
-    }
-}
-
-void WorkbenchMenuManager::refreshThemeMenuChecks(const QString& themeId)
-{
-    if (!m_menuState.themeMenu)
-    {
-        return;
-    }
-
-    for (QAction* action : m_menuState.themeMenu->actions())
-    {
-        if (!action->isCheckable())
-        {
-            continue;
-        }
-        action->setChecked(action->text().compare(themeId, Qt::CaseInsensitive) == 0);
-    }
-}
 
 std::vector<MenuDef> WorkbenchMenuManager::filterMenusForWorkbench(const std::vector<MenuDef>& menus,
+
     const QString& workbenchId,
     const std::function<bool(const QString&)>& commandAvailable,
     const QString& workbenchKind)
@@ -1664,6 +615,19 @@ void WorkbenchMenuManager::forEachCommandAction(
         return;
     }
 
+    // 同一个 QAction 可能既在菜单里又在工具栏上（中枢托管的 action 就是这样），
+    // 去重后再交给 visitor：启用态求值本身是幂等的，但重复访问会让日志和
+    // 后续可能加入的"只允许写一次"类断言失效。
+    QSet<QAction*> visited;
+    auto visitOnce = [&](QAction* action, const QString& cmdId) {
+        if (!action || visited.contains(action))
+        {
+            return;
+        }
+        visited.insert(action);
+        visitor(action, cmdId);
+    };
+
     std::function<void(QMenu*)> walk = [&](QMenu* menu) {
         if (!menu)
         {
@@ -1686,11 +650,12 @@ void WorkbenchMenuManager::forEachCommandAction(
             {
                 continue;
             }
-            visitor(action, cmdId);
+            visitOnce(action, cmdId);
         }
     };
 
-    // config-driven 菜单挂在 QMenuBar 上；legacy 回退路径的菜单只有 m_menuState 指针能拿到
+
+    // 菜单一律挂在 QMenuBar 上（JSON 配置驱动构建），遍历菜单栏即可覆盖全部菜单项
     QMenuBar* menuBar = m_window ? m_window->menuBar() : nullptr;
     if (menuBar)
     {
@@ -1702,12 +667,37 @@ void WorkbenchMenuManager::forEachCommandAction(
             }
         }
     }
-    walk(m_menuState.viewMenu);
-    walk(m_menuState.fileMenu);
-    walk(m_menuState.editMenu);
-    walk(m_menuState.algorithmMenu);
-    walk(m_menuState.helpMenu);
-    walk(m_menuState.drawMenu);
+
+
+    // 工具栏也必须遍历。工具栏动作与菜单项来自同一份命令目录、同一份启用规则，
+    // 只是挂载位置不同；此前这里只走菜单栏，导致"菜单灰了工具栏还能点"的漂移，
+    // 是启用态最容易出现分叉的地方。
+    // 注意：配置驱动工具栏由 WorkbenchLayoutManager 建在主窗口上，
+    // 因此只能按 findChildren 取，不能依赖成员指针。
+
+    if (m_window)
+    {
+        for (QToolBar* toolBar : m_window->findChildren<QToolBar*>())
+        {
+            if (!toolBar)
+            {
+                continue;
+            }
+            for (QAction* action : toolBar->actions())
+            {
+                if (!action)
+                {
+                    continue;
+                }
+                const QString cmdId = action->property("commandId").toString();
+                if (cmdId.isEmpty())
+                {
+                    continue;
+                }
+                visitOnce(action, cmdId);
+            }
+        }
+    }
 
     // 窗口级快捷键动作（Undo / Redo）不挂在任何菜单上，只能从成员容器取；
     // 它们同样带 commandId，因此走同一个 visitor，启用态与菜单项保持一致。
@@ -1722,7 +712,7 @@ void WorkbenchMenuManager::forEachCommandAction(
         {
             continue;
         }
-        visitor(action, cmdId);
+        visitOnce(action, cmdId);
     }
 }
 
@@ -1807,81 +797,4 @@ void WorkbenchMenuManager::refreshConfiguredMenuState()
             applyChecked(action, false);
         }
     });
-}
-
-
-void WorkbenchMenuManager::syncGridSnapMenuState()
-{
-    if (!m_stateCenter || !m_menuState.gridSnapMenu)
-    {
-        return;
-    }
-
-    for (QAction* act : m_menuState.gridSnapMenu->actions())
-    {
-        if (!act->isCheckable() || act->isSeparator())
-        {
-            continue;
-        }
-
-        const QString text = act->text();
-        const bool checked = act->isChecked();
-        if (text.contains(tr("Grid"), Qt::CaseInsensitive))
-        {
-            m_stateCenter->setMetadata({ { QStringLiteral("gridVisible"), checked } });
-        }
-        else if (text.contains(tr("Snap"), Qt::CaseInsensitive))
-        {
-            m_stateCenter->setMetadata({ { QStringLiteral("snapEnabled"), checked } });
-        }
-        else if (text.contains(tr("Ortho"), Qt::CaseInsensitive))
-        {
-            m_stateCenter->setMetadata({ { QStringLiteral("orthoMode"), checked } });
-        }
-        else if (text.contains(tr("Angle"), Qt::CaseInsensitive))
-        {
-            m_stateCenter->setMetadata({ { QStringLiteral("angleSnap"), checked } });
-        }
-    }
-}
-
-void WorkbenchMenuManager::refreshGridSnapMenuChecks()
-{
-    if (!m_stateCenter || !m_menuState.gridSnapMenu)
-    {
-        return;
-    }
-
-    const auto& metadata = m_stateCenter->snapshot().metadata;
-
-    for (QAction* act : m_menuState.gridSnapMenu->actions())
-    {
-        if (!act->isCheckable() || act->isSeparator())
-        {
-            continue;
-        }
-
-        const QString text = act->text();
-        bool checked = act->isChecked();
-
-        if (text.contains(tr("Grid"), Qt::CaseInsensitive) && metadata.contains(QStringLiteral("gridVisible")))
-        {
-            checked = metadata.value(QStringLiteral("gridVisible")).toBool();
-        }
-        else if (text.contains(tr("Snap"), Qt::CaseInsensitive) && metadata.contains(QStringLiteral("snapEnabled")))
-        {
-            checked = metadata.value(QStringLiteral("snapEnabled")).toBool();
-        }
-        else if (text.contains(tr("Ortho"), Qt::CaseInsensitive) && metadata.contains(QStringLiteral("orthoMode")))
-        {
-            checked = metadata.value(QStringLiteral("orthoMode")).toBool();
-        }
-        else if (text.contains(tr("Angle"), Qt::CaseInsensitive) && metadata.contains(QStringLiteral("angleSnap")))
-        {
-            checked = metadata.value(QStringLiteral("angleSnap")).toBool();
-        }
-
-        QSignalBlocker blocker(act);
-        act->setChecked(checked);
-    }
 }
