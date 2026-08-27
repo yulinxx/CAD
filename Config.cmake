@@ -73,7 +73,8 @@ option(BUILD_HARDWARE "Build Hardware module (laser control, material database)"
 option(BUILD_ENGRAVING "Build Engraving module (3D laser engraving)" ${SANYI_DEFAULT_OPTIONAL})
 option(BUILD_GEOMODELCORE "Build GeoModelCore module (OpenCASCADE-based geometry modeling)" ${SANYI_DEFAULT_CORE})
 option(BUILD_UI3D "Build UI3D module (3D user interface)" ${SANYI_DEFAULT_OPTIONAL})
-option(BUILD_NESTING "Build Nesting module (2D/3D nesting/arrangement algorithm)" ${SANYI_DEFAULT_OPTIONAL})
+option(BUILD_NESTING "Build Nesting module (2D/3D nesting/arrangement algorithm)" ${SANYI_DEFAULT_OPTIONAL} )
+# option(BUILD_NESTING "Build Nesting module (2D/3D nesting/arrangement algorithm)" OFF)
 
 # ====================================================================
 # 自动配置区域（以下内容自动配置，无需手动修改）

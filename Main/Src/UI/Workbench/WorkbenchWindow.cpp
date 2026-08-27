@@ -752,8 +752,8 @@ void WorkbenchWindow::clearWorkbenchContent()
 {
     const auto start = std::chrono::steady_clock::now();
     SY_DEBUGF("[WorkbenchWindow] clearing workbench content: toolbars=%d docks=%d shortcuts=%d",
-        m_layoutManager->registeredToolBars().size(),
-        m_layoutManager->registeredDocks().size(),
+        static_cast<int>(m_layoutManager->registeredToolBars().size()),
+        static_cast<int>(m_layoutManager->registeredDocks().size()),
         m_actionManager ? m_actionManager->shortcutCount() : 0);
 
     // 1: 清理所有注册的全局快捷键（Qt::ApplicationShortcut 不会随父窗口销毁）
