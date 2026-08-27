@@ -95,7 +95,36 @@ void SceneRefreshCoordinator::stop()
     }
 }
 
+void SceneRefreshCoordinator::markEntityDirty(uint64_t entityId)
+{
+    // 只补精度，不动级别：级别由 request* / onSceneChanged 决定
+    m_pendingDirtyIds.insert(static_cast<Eg::EntityId>(entityId));
+}
+
+void SceneRefreshCoordinator::markEntityDeleted(uint64_t entityId)
+{
+    const auto id = static_cast<Eg::EntityId>(entityId);
+    m_pendingDirtyIds.erase(id);
+    m_pendingDeletedIds.insert(id);
+}
+
+UI::SceneRefreshLevel SceneRefreshCoordinator::pendingLevel() const
+{
+    return m_refreshLevel;
+}
+
+void SceneRefreshCoordinator::flushPendingRefresh()
+{
+    // 跳过节流立刻派发：定时器仍要停掉，否则待办已清空还会空跑一次
+    if (m_sceneUpdateTimer)
+    {
+        m_sceneUpdateTimer->stop();
+    }
+    updateSceneRender();
+}
+
 void SceneRefreshCoordinator::setPerfMonitorEnabled(bool enabled)
+
 {
     if (enabled && !m_frameTimer)
     {

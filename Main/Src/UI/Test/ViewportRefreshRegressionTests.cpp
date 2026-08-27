@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file ViewportRefreshRegressionTests.cpp
  * @brief 视口刷新回归测试 — 覆盖刷新策略、脏标记、性能监控
  *
@@ -678,6 +678,25 @@ TEST(ViewportRefreshRegressionTest, Coordinator_RepaintDoesNotTriggerFullRefresh
     coordinator.requestRepaint();
     coordinator.stop();
     SUCCEED();
+}
+
+// 公共契约（UI::ISceneRefreshScheduler）在 2D 侧的语义：级别单调升级、不可降级
+TEST(ViewportRefreshRegressionTest, Coordinator_PendingLevelNeverDowngrades)
+{
+    Eg::SceneManager scene;
+    SceneRefreshCoordinator coordinator;
+    coordinator.setSceneManager(&scene);
+
+    EXPECT_EQ(coordinator.pendingLevel(), UI::SceneRefreshLevel::None);
+
+    coordinator.requestFullRefresh();
+    EXPECT_EQ(coordinator.pendingLevel(), UI::SceneRefreshLevel::FullRefresh);
+
+    coordinator.requestLightRefresh();
+    coordinator.requestRepaint();
+    EXPECT_EQ(coordinator.pendingLevel(), UI::SceneRefreshLevel::FullRefresh);
+
+    coordinator.stop();
 }
 
 TEST(ViewportRefreshRegressionTest, Coordinator_LightRefreshThenRepaintNoDowngrade)

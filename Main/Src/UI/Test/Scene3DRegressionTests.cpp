@@ -12,7 +12,9 @@
 #include <gtest/gtest.h>
 
 #include "UI/Render/RenderWidget3DAdapter.h"
+#include "UI3D/Render3D/SceneRefreshCoordinator3D.h"
 #include "Engine3D/SceneManager3D.h"
+
 #include "Engine3D/SyEntity/SyMeshEntity.h"
 
 #include <memory>
@@ -281,3 +283,59 @@ TEST(Scene3DRegressionTest, RenderWidget3DAdapter_SelectNodeById)
 
     adapter.shutdown();
 }
+
+// ==================== 3D 刷新调度器（公共契约实现） ====================
+// 不绑定视口即可测：未绑定时只记账不重绘，正好用来验证级别与脏 ID 的状态机。
+
+TEST(SceneRefreshCoordinator3DTest, DefaultLevelIsNone)
+{
+    UI3D::SceneRefreshCoordinator3D scheduler;
+    EXPECT_EQ(scheduler.pendingLevel(), UI::SceneRefreshLevel::None);
+    EXPECT_EQ(scheduler.pendingDirtyCount(), 0u);
+}
+
+TEST(SceneRefreshCoordinator3DTest, LevelNeverDowngrades)
+{
+    UI3D::SceneRefreshCoordinator3D scheduler;
+    scheduler.requestFullRefresh();
+    EXPECT_EQ(scheduler.pendingLevel(), UI::SceneRefreshLevel::FullRefresh);
+
+    // 更低级别的请求不能把已排定的全量刷新降下来
+    scheduler.requestLightRefresh();
+    scheduler.requestRepaint();
+    EXPECT_EQ(scheduler.pendingLevel(), UI::SceneRefreshLevel::FullRefresh);
+}
+
+TEST(SceneRefreshCoordinator3DTest, MarkDirtyDoesNotChangeLevel)
+{
+    UI3D::SceneRefreshCoordinator3D scheduler;
+    scheduler.markEntityDirty(7);
+    EXPECT_EQ(scheduler.pendingLevel(), UI::SceneRefreshLevel::None);
+    EXPECT_EQ(scheduler.pendingDirtyCount(), 1u);
+}
+
+TEST(SceneRefreshCoordinator3DTest, MarkDeletedRemovesFromDirtySet)
+{
+    UI3D::SceneRefreshCoordinator3D scheduler;
+    scheduler.markEntityDirty(7);
+    scheduler.markEntityDeleted(7);
+    EXPECT_EQ(scheduler.pendingDirtyCount(), 0u);
+    EXPECT_EQ(scheduler.pendingDeletedCount(), 1u);
+}
+
+TEST(SceneRefreshCoordinator3DTest, StopClearsPendingWork)
+{
+    UI3D::SceneRefreshCoordinator3D scheduler;
+    scheduler.markEntityDirty(1);
+    scheduler.requestFullRefresh();
+
+    scheduler.stop();
+    EXPECT_EQ(scheduler.pendingLevel(), UI::SceneRefreshLevel::None);
+    EXPECT_EQ(scheduler.pendingDirtyCount(), 0u);
+
+    // stop 之后的请求一律忽略：视口已经不在了，攒着也没人消费
+    scheduler.requestFullRefresh();
+    EXPECT_EQ(scheduler.pendingLevel(), UI::SceneRefreshLevel::None);
+}
+
+
