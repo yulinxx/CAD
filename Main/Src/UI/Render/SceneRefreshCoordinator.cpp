@@ -12,6 +12,7 @@
 #include "Engine/SyEntity/SyEntity.h"
 #include "Engine/Layer/SyLayer.h"
 #include "Engine2D/SyEntity/SyImage.h"
+#include "Engine2D/SyEntity/SyText.h"
 #include "Engine/SyEntity/EType.h"
 
 #include "Log/SyLogger.h"
@@ -311,6 +312,14 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             continue;
         }
 
+        // 文本（SyText）同理：字形四边形由 reconcileTexts 一路处理。
+        // 这一跳是「文本不再拖累几何增量刷新」的关键：以前文本只要变脏就把
+        // 整帧升级成全量刷新，10 万条几何跟着一起重传。
+        if (entity->eType == Eg::EType::TEXT)
+        {
+            continue;
+        }
+
         auto uid = static_cast<uint64_t>(id);
 
         // 选中图元不渲染原始实体（由虚线轮廓覆盖层表示），若此前已在 GPU 上则移除。
@@ -331,8 +340,12 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         const double cameraCenter[2] = { cam.x(), cam.y() };
         if (!entityToVertices(entity, vertices, primType, cameraCenter))
         {
-            // 该图元无法走增量路径（如文本），标记需要回退到全量刷新
-            m_pendingFullRefreshFallback = true;
+            // 走到这里意味着 Engine 侧分解出了本地 sink 不认识的原语。
+            // 文本/位图已各有专用通道并在上面跳过，因此这里只能是新增图元
+            // 类型时漏配了离散化分支——跳过该实体并留一条日志，比悄悄升级成
+            // 全量刷新更容易定位（全量刷新会让问题表现为「偶发卡顿」）。
+            SY_WARNF("[SceneRefreshCoordinator] 实体 %llu (eType=%d) 无法增量转换为顶点，已跳过",
+                static_cast<unsigned long long>(uid), static_cast<int>(entity->eType));
             continue;
         }
 
@@ -354,13 +367,8 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     // 位图层协调：以场景为真源，增量处理新增/修改/删除/图层显隐
     reconcileBitmaps(sm, /*fullReconcile=*/false);
 
-    // 遍历完成后，若存在不可增量图元（如文本），自动升级为全量刷新
-    // 全量刷新会重建所有渲染数据，覆盖前面的增量更新，确保文本显示正确
-    if (m_pendingFullRefreshFallback)
-    {
-        applyFullRefresh(sm);
-        m_pendingFullRefreshFallback = false;
-    }
+    // 世界文字层协调：同上。文本自己一路后，增量刷新不再因文本升级为全量。
+    reconcileTexts(sm, /*fullReconcile=*/false);
 
     m_renderWidget->update();
 }
@@ -391,6 +399,9 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     // 位图层全量协调：submitSceneFromDataSource 内部 renderBeginScene 已清空 GPU 位图，
     // 这里以场景为真源整体重建，保证与场景生命周期完全一致
     reconcileBitmaps(sm, /*fullReconcile=*/true);
+
+    // 世界文字层全量协调：同上
+    reconcileTexts(sm, /*fullReconcile=*/true);
 }
 
 void SceneRefreshCoordinator::reconcileBitmaps(Eg::SceneManager* sm, bool fullReconcile)
@@ -464,6 +475,79 @@ void SceneRefreshCoordinator::reconcileBitmaps(Eg::SceneManager* sm, bool fullRe
 
         m_renderWidget->setBitmapImage(id, image);
         m_bitmapImageIds.insert(id);
+    }
+}
+
+void SceneRefreshCoordinator::reconcileTexts(Eg::SceneManager* sm, bool fullReconcile)
+{
+    if (!m_renderWidget || !sm)
+    {
+        return;
+    }
+
+    if (fullReconcile)
+    {
+        // 全量重建：重置本地账本与渲染侧账本后整体重传
+        m_renderWidget->clearWorldTexts();
+        m_worldTextIds.clear();
+    }
+
+    // 期望集合：场景中所有可见 SyText（可见 = 实体可见 && 图层可见）
+    std::unordered_set<uint64_t> desired;
+    for (auto* e : sm->getAllEntities())
+    {
+        if (!e || e->eType != Eg::EType::TEXT || !e->visible())
+        {
+            continue;
+        }
+        if (e->layer() && !e->layer()->isVisible())
+        {
+            continue;
+        }
+        desired.insert(static_cast<uint64_t>(e->id));
+    }
+
+    // 移除：本地账本中存在但场景已不期望（删除 / 隐藏 / 图层隐藏）
+    for (auto it = m_worldTextIds.begin(); it != m_worldTextIds.end();)
+    {
+        if (!desired.count(*it))
+        {
+            m_renderWidget->removeWorldText(*it);
+            it = m_worldTextIds.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
+    // 新增/更新：期望但尚未登记 → 登记；已登记但本轮 dirty（内容/位置/字高变化）→ 重登记
+    for (auto id : desired)
+    {
+        const bool isNew = m_worldTextIds.count(id) == 0;
+        const bool isDirty = m_pendingDirtyIds.count(static_cast<Eg::EntityId>(id)) > 0;
+        if (!isNew && !isDirty)
+        {
+            continue;
+        }
+
+        auto* e = sm->findEntityById(static_cast<Eg::EntityId>(id));
+        if (!e)
+        {
+            continue;
+        }
+
+        // 空串或非正字高画不出任何东西，不纳入账本（移除残留）
+        const auto* text = static_cast<const Eg::SyText*>(e);
+        if (text->text()[0] == '\0' || text->dHeight <= 0.0)
+        {
+            m_renderWidget->removeWorldText(id);
+            m_worldTextIds.erase(id);
+            continue;
+        }
+
+        m_renderWidget->setWorldText(id, text);
+        m_worldTextIds.insert(id);
     }
 }
 

@@ -114,9 +114,6 @@ private:
 
     RefreshLevel m_refreshLevel{ RefreshLevel::None };
 
-    // 增量刷新回退标志：脏图元无法转换为顶点（如文本）时置位，触发全量刷新
-    bool m_pendingFullRefreshFallback{ false };
-
     // 脏标记集合（增量渲染）
     std::unordered_set<Eg::EntityId> m_pendingDirtyIds;
     std::unordered_set<Eg::EntityId> m_pendingDeletedIds;
@@ -136,6 +133,14 @@ private:
     //   fullReconcile=true：先清空位图层（renderBeginScene 已清 GPU 位图），整体重传
     //   fullReconcile=false：仅按 dirty/新增增量上传，并移除场景中已不存在的位图
     void reconcileBitmaps(Eg::SceneManager* sm, bool fullReconcile);
+
+    // 当前已同步到世界文字层的 SyText 实体 ID 集合（本地账本）
+    std::unordered_set<uint64_t> m_worldTextIds;
+
+    // 世界文字层协调：与 reconcileBitmaps 同一形状、同一真源规则。
+    // 文本没有可复用的顶点块（字形四边形要随字体图集重排），因此不走
+    // entityToVertices 那条增量顶点路径，而是自己一路。
+    void reconcileTexts(Eg::SceneManager* sm, bool fullReconcile);
 
     // 帧耗时追踪器（性能监控基础设施）
     std::unique_ptr<FrameTimer> m_frameTimer;
