@@ -310,6 +310,25 @@ Utility/Utility/Test/
 | **已知失败** | 已识别的旧架构遗留问题 | 标记并计划修复 |
 | **环境失败** | 测试环境问题 | 修复环境 |
 
+#### 4.3.1 无 QApplication 导致的"挂死"（2026-08-27 定位）
+
+构造 `QWidget` 前必须存在 `QApplication`，否则 Qt 直接 `qFatal`，Debug 版走
+`__debugbreak()` —— 进程停在断点上，既不退出也不打印 gtest 汇总，表现为：
+
+- 测试进程挂死，`ctest` 只报超时，看不出是哪个用例；
+- 退出码 `0x80000003`（STATUS_BREAKPOINT）；
+- 挂死进程一直占着 Qt 与项目 DLL，后续构建报 `LNK1168: 无法打开 xxx.dll 进行写入`。
+
+排查顺序：先 `Get-Process | Where Path -like "*build*"` 找残留测试进程，
+再看该 exe 的 stderr 是否有 `Must construct a QApplication before a QWidget`。
+
+约定：任何会构造 QWidget（含派生自 QWidget 的 Stub）的测试目标都必须建
+`QApplication` —— `UI/2D/Test/TestMain.cpp` 在自定义 main 里建，
+`MainTests` 用 `::testing::Environment` 在首个用例前建。
+平台插件沿用默认 `windows`（`sanyi_deploy_qt_dlls` 只部署它，
+强制 `QT_QPA_PLATFORM=offscreen` 会因插件缺失直接起不来）。
+
+
 ---
 
 ## 5. 测试辅助工具
