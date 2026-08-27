@@ -1,0 +1,38 @@
+#pragma once
+
+/**
+ * @file BuildConfig.h（由 CMake 从 BuildConfig.h.in 生成，勿手改）
+ * @brief 编译期开关在运行期的如实镜像
+ *
+ * 为什么需要这份文件：
+ *   BUILD_VISION / BUILD_ENGRAVING 这类开关只以 ENABLE_VISION / ENABLE_ENGRAVING
+ *   的形式加在 UI2D / UI3D 目标上，主程序（EXE）的编译单元里根本看不到它们。
+ *   于是「某个功能到底有没有编进这份构建」在 EXE 里无法回答 —— 配置 JSON 里写了、
+ *   License 也放行了，但模块没编译，最终表现是点了没反应且一条日志都没有。
+ *   启动自检（UiConfigSelfCheck）需要交叉核对 CMake / JSON / License 三侧，
+ *   本头就是「CMake 侧」的唯一事实来源。
+ *
+ * 约定：只放开关真值，不放任何判断逻辑。谁需要语义，自己在上层写。
+ */
+
+namespace BuildConfig
+{
+    /// 3D 工作台（UI3D + Engine3D）
+    constexpr bool kUi3D = @_bc_BUILD_UI3D@;
+    /// 排样算法模块
+    constexpr bool kNesting = @_bc_BUILD_NESTING@;
+    /// 硬件抽象层（HAL / 设备适配）
+    constexpr bool kHardware = @_bc_BUILD_HARDWARE@;
+    /// 视觉模块
+    constexpr bool kVision = @_bc_BUILD_VISION@;
+    /// 浮雕雕刻模块
+    constexpr bool kEngraving = @_bc_BUILD_ENGRAVING@;
+    /// 几何内核（3D 布尔/曲面）
+    constexpr bool kGeoModelCore = @_bc_BUILD_GEOMODELCORE@;
+    /// Renderx 渲染后端
+    constexpr bool kRenderx = @_bc_BUILD_RENDERX@;
+    /// Python 宿主集成
+    constexpr bool kPythonHost = @_bc_SANYI_PYTHON_HOST@;
+    /// 许可校验（未开启时授权闸门为无限制模式）
+    constexpr bool kLicense = @_bc_SANYI_ENABLE_LICENSE@;
+}

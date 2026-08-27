@@ -110,11 +110,8 @@ public:
     /// 设置工作台切换工厂
     /// @param factory 工作台工厂回调
     void setWorkbenchFactory(WorkbenchFactory factory);
-    /// 设置视口缩放操作回调（Zoom In/Out/Fit/Selection/Reset）
-    /// 由工作台在创建视口后注入，将菜单缩放操作转发到视口
-    /// @param handler 缩放操作处理函数，参数为 "zoom_in"/"zoom_out"/"zoom_fit"/"zoom_selection"/"reset"
-    void setViewportZoomHandler(std::function<void(const QString&)> handler);
     /// 更新状态栏鼠标坐标显示
+
 
     /// @param x 世界坐标 X（毫米）
     /// @param y 世界坐标 Y（毫米）

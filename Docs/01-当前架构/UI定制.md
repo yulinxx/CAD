@@ -855,6 +855,9 @@ if (clientId == QLatin1String("client_a")) {
 - [ ] 2D / 3D 画布右键菜单来自 `contextMenus`，图层动态段正常出现且能执行；
 - [ ] 未授权 `feature` 对应的菜单/工具栏/状态栏/右键项**不出现**；授权后出现；
 - [ ] 授权校验关闭时 `UiFeatureGate` 为 unrestricted，全部功能可见；
+- [ ] 启动日志中 `[ConfigSelfCheck]` 汇总行的 `unresolved` 与 `licensedNotCompiled` 均为 0（见 §10）；
+- [ ] 新增授权 `feature` 后已同步 `UiConfigSelfCheck::isFeatureCompiledIn()` 的对应表（见 §10.3）；
+- [ ] `configs/` 下新增 JSON 后已登记进 `configs.qrc`（漏登记时 CMake 配置阶段会 `FATAL_ERROR`，见 §10.4）；
 - [ ] 语言切换（`retranslateUi`）后菜单重建正常，无重复菜单栏；
 - [ ] `ClientConfigTests` 全部通过；
 - [ ] 全量 `MainTests` 回归无新增失败；
@@ -862,4 +865,107 @@ if (clientId == QLatin1String("client_a")) {
 - [ ] **System 主题**：日志中可看到 `[SystemThemeDetector]` 和 `[ThemeManager]` 的主题切换记录；
 - [ ] **硬编码样式修复**：LicenseDialog、UiWorkbench、FillDialog 在深色模式下文字可读、背景协调；
 - [ ] **跨平台**：macOS / Windows / Linux 各平台 System 主题检测正常工作。
+
+---
+
+## 10. 配置可信性：启动自检、`BuildConfig.h` 与 qrc 护栏
+
+定制链路上有三份互不相干的事实来源：**CMake 开关**（模块有没有编进这份构建）、
+**JSON 配置**（界面上摆了什么）、**License 授权**（客户买了什么）。三者各自都
+「看起来正常」，但两两不一致时全部是静默失效，没有任何报错：
+
+| 不一致 | 现场表现 |
+|--------|----------|
+| JSON 写了命令，命令目录里没有 | `UiLayoutBuilder::bindAction` 不接 lambda，按钮照常显示但**永久点不动** |
+| JSON 标了 feature、License 放行，但模块没编译 | 点了没反应，且**一条日志都没有**（等于卖了一个不存在的功能） |
+| JSON 声明了 3D 工作台，构建没开 `BUILD_UI3D` | 菜单项凭空消失，看不出是配置写错还是构建裁掉了 |
+
+这三类问题历史上都靠人工翻 JSON 才发现。现在由启动自检一次性报出来。
+
+### 10.1 `BuildConfig.h`：把编译期开关变成运行期可读的真值
+
+`Main/Src/Common/BuildConfig.h.in` → CMake 生成 `BuildConfig.h`，把开关落成
+`constexpr bool`：`kUi3D` / `kNesting` / `kHardware` / `kVision` / `kEngraving` /
+`kGeoModelCore` / `kRenderx` / `kPythonHost` / `kLicense`。
+
+**为什么必须有这份文件**：`BUILD_VISION` / `BUILD_ENGRAVING` 这类开关只以
+`ENABLE_VISION` / `ENABLE_ENGRAVING` 的形式加在 UI2D / UI3D 目标上，主程序（EXE）
+的编译单元里根本看不到它们。于是「某个功能到底有没有编进这份构建」在 EXE 里无法
+回答 —— 配置写了、许可放行了、模块没编译，最终表现是点了没反应且零日志。
+这份头就是「CMake 侧」在运行期的唯一事实来源。
+
+约定：**只放开关真值，不放任何判断逻辑**。需要语义的自己在上层写。
+
+生成方式沿用仓库既有的 CMake 4.3 兼容写法（`Main/CMakeLists.txt`，紧随
+`VersionInfo.h` 之后）：`file(READ)` + `string(CONFIGURE ... @ONLY)` + `file(WRITE)`，
+不用 `configure_file`。
+
+### 10.2 五类报告与「只报告不阻断」
+
+入口是 `UiConfigSelfCheck::runAndLogForCurrentClient()`
+（`Main/Src/UI/ClientConfig/UiConfigSelfCheck.{h,cpp}`），报告结构
+`UiConfigSelfCheckReport` 分五类：
+
+| 字段 | 含义 | 日志级别 |
+|------|------|----------|
+| `unresolvedCommands` | JSON 里的 commandId 在所属工作台的命令目录里解析不出（按钮永久点不动） | ERROR |
+| `gatedOutByBuild` | 目录里没有，但原因是模块没编译（`kGeoModelCore` 关闭时的 STEP / 布尔 / `model.*` 一批） | INFO |
+| `licensedButNotCompiled` | JSON 引用 + License 放行 + 模块没编译 | ERROR |
+| `compiledButNotLicensed` | 模块已编译但 License 未放行（正常的授权限制） | INFO |
+| `workbenchNotCompiled` | JSON 声明了 3D 工作台但 `BUILD_UI3D` 关闭 | WARN |
+
+`gatedOutByBuild` 与 `unresolvedCommands` **刻意分开报告**：JSON 是编译无关的、
+始终声明这些项，关掉几何内核时它们从目录里消失属于预期裁剪。混在一起的话，每次
+裁剪构建都会刷出一堆假告警，真正的接线漏洞就被埋掉了。
+
+`licensedButNotCompiled` 是五类里最严重的一类 —— 它等于「卖出去了但功能不存在」。
+
+**自检只报告、不阻止启动**：生产现场宁可少个按钮也要能开机。但结论一定写进日志，
+出问题时第一时间能定位到是三侧里哪一侧配错了。汇总行形如：
+
+```
+[ConfigSelfCheck] client='san_yi' commands=N features=M unresolved=0 gatedOut=0 \
+    licensedNotCompiled=0 compiledNotLicensed=0 workbenchGaps=0
+```
+
+逐条明细也会打印 —— 每一条本身就是「去改哪一行 JSON / 开哪个构建开关」的答案，
+只给个计数等于没说；正常构建条数应为 0，不存在刷屏风险。
+
+### 10.3 feature ↔ 构建开关的对应表必须手工维护
+
+`featureId` 是「卖点」命名（License 侧口径），构建开关是「模块」命名，两者不同名，
+`UiConfigSelfCheck::isFeatureCompiledIn()` 里那张表就是唯一的对应关系：
+
+| featureId | 构建开关 |
+|-----------|----------|
+| `nesting` | `BuildConfig::kNesting` |
+| `vision` | `BuildConfig::kVision` |
+| `relief3d` | `BuildConfig::kEngraving` |
+| `hardware` | `BuildConfig::kHardware` |
+| `3d` | `BuildConfig::kUi3D` |
+
+**新增授权功能时必须同步这张表**，否则自检对它完全无感（表里查不到就跳过，
+不报错也不告警）。守卫是 `UiConfigSelfCheckTest.EveryFeatureUsedInConfigsHasABuildSwitchMapping`：
+JSON 里用到的 feature 必须都登记了映射。纯授权控制项（没有对应模块的 feature）
+本来就无从核对，不在此列。
+
+窗口级命令（工作台切换 / 主题 / 语言）刻意不进命令目录，由 `MenuDispatcher` 短路，
+判定直接复用 `WorkbenchMenuManager::isWindowLevelCommand`，不在自检里另立一份
+前缀名单 —— 两份名单必然会漂移。
+
+### 10.4 调用时机与 qrc 陈旧护栏
+
+调用点在 `Main/Src/Runtime/CADApplicationRuntime.cpp`，位于
+`m_bootstrapper->bootstrap()` 与组合根校验**之后**。必须在 bootstrap 之后：
+客户配置是首次访问 `UiConfigurationManager::shared()` 时才加载的，而那发生在
+菜单 / 工作台构建期间；放在前面自检只会看到「没有配置」。
+
+自检复用的是 `UiConfigurationManager::shared()` 里那份**实际生效的配置**，不重新
+加载一遍 —— 重新加载会得到另一份副本，反而可能掩盖装配顺序问题。
+
+`Main/CMakeLists.txt` 另有一条**构建期**护栏：glob `UI/ClientConfig/configs/*.json`
+与 `configs.qrc` 的内容比对，磁盘上存在但没登记进资源的直接 `FATAL_ERROR`。
+理由：漏登记时打包后运行期取不到那份配置，只会静默回退到默认客户，既不报错也看不出
+少了什么。反方向（qrc 登记了已删除的文件）rcc 自己会报错，不需要额外护栏。
+
 

@@ -202,10 +202,6 @@ void WorkbenchMenuManager::setWorkbench(UiWorkbench* workbench)
     m_workbench = workbench;
 }
 
-void WorkbenchMenuManager::setViewportZoomHandler(std::function<void(const QString&)> handler)
-{
-    m_viewportZoomHandler = std::move(handler);
-}
 
 
 void WorkbenchMenuManager::rebuildAllMenus()

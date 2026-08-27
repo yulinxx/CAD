@@ -52,7 +52,7 @@
 - `Main/Src/UI/Test/ViewportRefreshRegressionTests.cpp`
 - `Main/Src/UI/Test/ViewportInputRegressionTests.cpp`
 - `Main/Src/UI/Test/Scene3DRegressionTests.cpp`
-- `Main/Src/UI/Test/CommandUiWiringTests.cpp`（顶部工具栏 actionId 与命令目录的接线一致性；左侧绘图面板与中枢工具动作的接线）
+- `Main/Src/UI/Test/CommandUiWiringTests.cpp`（顶部工具栏 actionId 与命令目录的接线一致性；左侧绘图面板与中枢工具动作的接线；客户配置里全部 commandId 的可解析性与配置可信性自检）
 - `UI/2D/Test/ToolsInteropTests.cpp`
 - `UI/3D/Test/OperationBus3DTests.cpp`
 
@@ -159,7 +159,7 @@ Main/Src/UI/Test/
 ├── LayerPersistenceBridgeTests.cpp  # 图层持久化桥接
 ├── ClientConfigTests.cpp            # 客户配置测试（含工具栏命令绑定回归：无分发器时推迟构建 / 空分发器会永久禁用全部按钮 / 菜单与工具栏共用同一分发器实例）
 ├── SceneTreeBuilder3DTests.cpp      # 3D 场景树构建
-├── CommandUiWiringTests.cpp         # 命令 UI 接线回归（23 例：actionId 解析 / 启用规则 / 菜单栏 / 外部 QAction 树应用 / 2D-3D 切换防串台（5 例 BUILD_UI3D 条件编译）/ 配置命令契约 / 左侧绘图面板与中枢工具动作 4 例）
+├── CommandUiWiringTests.cpp         # 命令 UI 接线回归（26 例：actionId 解析 / 启用规则 / 菜单栏 / 外部 QAction 树应用 / 2D-3D 切换防串台（5 例 BUILD_UI3D 条件编译）/ 配置命令契约 / 配置可信性自检 3 例 / 左侧绘图面板与中枢工具动作 4 例）
 └── ToolSelectionSyncRegressionTests.cpp
 
 UI/2D/Test/
@@ -260,6 +260,28 @@ Utility/Utility/Test/
 点击按钮必须触发中枢 QAction 且 `detectOperationSource()` 报 `LeftToolbar`、
 连续 `setActiveToolAction()` 后始终恰好一个 checked（`QActionGroup` 互斥不被破坏）、
 每个工具动作的 `commandId` 属性等于目录 `shortcutId`。
+
+同文件里的 `UiConfigSelfCheckTest`（3 例）覆盖配置可信性启动自检
+（`Main/Src/UI/ClientConfig/UiConfigSelfCheck.{h,cpp}`，交叉核对 CMake 开关 / JSON 配置 / License 授权）：
+
+- `UnknownCommandIdIsReportedAsUnresolved`：手工构造一份只含一个不存在 commandId 的配置，
+  断言它进 `unresolvedCommands`、`hasBlockingIssue()` 为真，且报告字符串里**带定位路径**
+  （`menus/edit/edit.does_not_exist`）。只报命令名的话还得人工翻 JSON 找它在哪，
+  报告就失去了大半价值，所以路径本身也是被断言的契约。
+- `ShippedConfigsPassTheSelfCheck`：对随包发布的 4 份配置（`base` / `san_yi` /
+  `client_a` / `client_b`）跑自检，`unresolvedCommands` 与 `licensedButNotCompiled`
+  都必须为空。后者是最严重的一类 —— 授权放行却没编译进来等于卖了不存在的功能。
+- `EveryFeatureUsedInConfigsHasABuildSwitchMapping`：配置里用到的每个 `feature` 都必须在
+  `UiConfigSelfCheck::isFeatureCompiledIn()` 的对应表里登记。没登记的 feature 自检对它
+  完全无感（查不到就跳过，不报错也不告警），这条守卫就是防止新增授权功能时漏改那张表。
+
+去重说明：`CommandUiWiringTests.cpp` 原先自带一份配置遍历实现
+（`collectMenuCommands` / `workbenchScope` / `collectAllCommandRefs` / `ConfigCommandRef`），
+现已删除，改为 `using ConfigCommandRef = UiConfigCommandRef;` + 调用
+`UiConfigSelfCheck::collectCommandRefs`。启动自检与配置契约测试必须用**同一份遍历**，
+否则会长出「测试过了但运行期自检漏报」这种最难查的偏差 —— 两边各写一份时，
+任何一侧漏了工具栏或快捷键节都察觉不到。
+
 
 
 

@@ -890,7 +890,9 @@ namespace
 
         // 直接发出裁决变化信号：这里验证的是「宿主 → 作业服务」这条接线，
         // 而不是 SafetyMonitor 自身的判定逻辑（后者由 HardwareTests 覆盖）
-        emit m_host->safetyVerdictChanged(false, QStringLiteral("安全门被打开"));
+        emit m_host->safetyVerdictChanged(
+            false, QStringLiteral("安全门被打开"), QStringLiteral("safety.door_closed"));
+
 
         EXPECT_TRUE(m_job->isPaused());
         EXPECT_FALSE(m_job->isRunning());

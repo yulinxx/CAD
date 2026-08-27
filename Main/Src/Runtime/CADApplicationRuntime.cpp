@@ -13,7 +13,9 @@
 #include "License/LicenseDialog.h"
 #include "License/LicenseDLL.h"
 #include "Composition/ApplicationCompositionRoot.h"
+#include "UI/ClientConfig/UiConfigSelfCheck.h"
 #include "UI/ClientConfig/UiFeatureGate.h"
+
 #include "UI/Settings/SettingsService.h"
 
 // 构造函数：接收已创建的 QApplication（须由调用方在 buildAppPaths 之前创建），并设置应用基本信息
@@ -187,7 +189,13 @@ int CADApplicationRuntime::run()
         return -2;
     }
 
+    // 配置可信性自检：CMake 开关 / JSON 配置 / License 授权 三侧交叉核对。
+    // 必须放在 bootstrap() 之后 —— 客户配置是首次访问 UiConfigurationManager::shared()
+    // 时才加载的，而那发生在菜单/工作台构建期间。
+    UiConfigSelfCheck::runAndLogForCurrentClient();
+
     // 退出时自动保存 common 设置（字体/主题/语言）到 SQLite 数据库
+
     QObject::connect(m_app.get(), &QCoreApplication::aboutToQuit, []() {
         if (auto* svc = ApplicationCompositionRoot::getSettingsService())
         {

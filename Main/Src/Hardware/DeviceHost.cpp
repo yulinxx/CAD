@@ -163,10 +163,12 @@ struct DeviceHost::Impl
 
         void onSafetyStateChanged(const Hw::SafetyVerdict& verdict) override
         {
-            // 只记日志：信号的发出统一由 onTick 做（那里能保证在主线程）
-            SY_WARNF("[DeviceHost] Safety state -> %s (violations=%d, first='%s')",
-                Hw::safetyStateName(verdict.state), verdict.violationCount, verdict.firstViolation);
+            // 只记日志：信号的发出统一由 onTick 做（那里能保证在主线程）。
+            // 打点位名而不是 firstViolation —— 后者是给界面看的本地化文案。
+            SY_WARNF("[DeviceHost] Safety state -> %s (violations=%d, first=%s)",
+                Hw::safetyStateName(verdict.state), verdict.violationCount, verdict.firstViolationPoint);
         }
+
     };
 
     /**
@@ -574,8 +576,10 @@ void DeviceHost::tick(qint64 elapsedMs)
         m_impl->lastCanStart = verdict.canStartProcessing;
         m_impl->lastFirstViolation = firstViolation;
         // 只在变化时发：20ms 一次的信号会把界面刷爆，也让日志无法阅读
-        emit safetyVerdictChanged(verdict.canStartProcessing, firstViolation);
+        emit safetyVerdictChanged(verdict.canStartProcessing, firstViolation,
+            QString::fromUtf8(verdict.firstViolationPoint));
     }
+
 
     const int state = static_cast<int>(m_impl->device->state());
     if (state != m_impl->lastDeviceState)

@@ -445,8 +445,10 @@ void ProcessingJobService::pollProgress()
 }
 
 void ProcessingJobService::onSafetyVerdictChanged(bool canStartProcessing,
-    const QString& firstViolation)
+    const QString& firstViolation,
+    const QString& firstViolationPoint)
 {
+    Q_UNUSED(firstViolation);
     if (canStartProcessing || !m_impl->active)
     {
         return;
@@ -460,11 +462,12 @@ void ProcessingJobService::onSafetyVerdictChanged(bool canStartProcessing,
     {
         return;
     }
-    SY_ERRORF("[ProcessingJob] Safety violated during job '%s' ('%s'), pausing",
-        m_impl->jobId.toUtf8().constData(), firstViolation.toUtf8().constData());
+    SY_ERRORF("[ProcessingJob] Safety violated during job '%s' (point=%s), pausing",
+        m_impl->jobId.toUtf8().constData(), firstViolationPoint.toUtf8().constData());
     runner.pause();
     pollProgress();
 }
+
 
 #else  // !ENABLE_HARDWARE
 
@@ -546,10 +549,13 @@ QString ProcessingJobService::planStateName() const { return QStringLiteral("Idl
 void ProcessingJobService::pollProgress() {}
 
 void ProcessingJobService::onSafetyVerdictChanged(bool canStartProcessing,
-    const QString& firstViolation)
+    const QString& firstViolation,
+    const QString& firstViolationPoint)
 {
     Q_UNUSED(canStartProcessing);
     Q_UNUSED(firstViolation);
+    Q_UNUSED(firstViolationPoint);
 }
+
 
 #endif  // ENABLE_HARDWARE

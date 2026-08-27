@@ -54,6 +54,51 @@ file(READ "${SRC_ROOT}/Common/VersionInfo.h.in" _version_info_content)
 string(CONFIGURE "${_version_info_content}" _version_info_configured @ONLY)
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/VersionInfo.h" "${_version_info_configured}")
 
+# ---------------------------------------------------------------------------
+# 编译期开关的运行期镜像（BuildConfig.h）
+#
+# BUILD_VISION / BUILD_ENGRAVING 只以 ENABLE_* 宏加在 UI2D / UI3D 目标上，EXE 看不见，
+# 于是「这个功能有没有编进来」在运行期无法回答 —— 配置写了、许可放行了、模块没编译，
+# 表现就是点了没反应且无日志。启动自检要靠这份镜像做 CMake/JSON/License 三侧交叉核对。
+# ---------------------------------------------------------------------------
+foreach(_bc_opt
+        BUILD_UI3D BUILD_NESTING BUILD_HARDWARE BUILD_VISION BUILD_ENGRAVING
+        BUILD_GEOMODELCORE BUILD_RENDERX SANYI_PYTHON_HOST SANYI_ENABLE_LICENSE)
+    if(${_bc_opt})
+        set(_bc_${_bc_opt} "true")
+    else()
+        set(_bc_${_bc_opt} "false")
+    endif()
+endforeach()
+file(READ "${SRC_ROOT}/Common/BuildConfig.h.in" _build_config_content)
+string(CONFIGURE "${_build_config_content}" _build_config_configured @ONLY)
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/BuildConfig.h" "${_build_config_configured}")
+
+# ---------------------------------------------------------------------------
+# qrc 陈旧护栏
+#
+# configs/ 下新增了客户 JSON 但忘了登记进 configs.qrc 时，构建出的二进制里根本
+# 没有这份配置：运行期只会静默回退到 san_yi，既不报错也看不出少了什么。
+# 反方向（qrc 里登记了已删除的文件）rcc 自己会报错，不需要额外护栏。
+# ---------------------------------------------------------------------------
+file(GLOB _client_config_json RELATIVE "${SRC_ROOT}/UI/ClientConfig"
+     "${SRC_ROOT}/UI/ClientConfig/configs/*.json")
+file(READ "${SRC_ROOT}/UI/ClientConfig/configs.qrc" _configs_qrc_content)
+set(_configs_qrc_missing "")
+foreach(_cfg ${_client_config_json})
+    string(FIND "${_configs_qrc_content}" "${_cfg}" _cfg_pos)
+    if(_cfg_pos EQUAL -1)
+        list(APPEND _configs_qrc_missing "${_cfg}")
+    endif()
+endforeach()
+if(_configs_qrc_missing)
+    message(FATAL_ERROR
+        "[Main] configs.qrc 已陈旧：以下客户配置存在于磁盘但未登记进资源，"
+        "打包后运行期取不到、会静默回退到默认客户：\n  ${_configs_qrc_missing}\n"
+        "请在 ${SRC_ROOT}/UI/ClientConfig/configs.qrc 里补上对应 <file alias=...> 条目。")
+endif()
+
+
 # macOS: 生成 Info.plist。NSHighResolutionCapable 必须为 YES：非 bundle 的裸可执行文件
 # 没有 Info.plist，macOS 会以 1x（低分辨率）合成窗口，而 Qt6 按 Retina(dpr=2) 渲染，
 # 导致 GL 内容错位缩放并残留在视图角落（重复台面/网格、不均匀网格线）。

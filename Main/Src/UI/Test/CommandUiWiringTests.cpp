@@ -19,7 +19,9 @@
 #include "UI/Menu/MenuActionId.h"
 #include "UI/ClientConfig/UiClientConfigBase.h"
 #include "UI/ClientConfig/UiConfigLoader.h"
+#include "UI/ClientConfig/UiConfigSelfCheck.h"
 #include "UI/Widgets/DrawToolBarWidget.h"
+
 #include "UI/Workbench/WorkbenchMenuManager.h"
 
 
@@ -477,93 +479,18 @@ TEST(CommandUiWiringTest, Switch_SharedCommandIdsCarrySameRuleInBothCatalogs)
 namespace
 {
     /// 一条待校验的配置引用：命令 id + 定位路径 + 生效工作台
-    struct ConfigCommandRef
-    {
-        QString commandId;
-        QString path;             // 形如 "menus/edit/edit.transform/edit.move"，失败时用于定位
-        QStringList workbenches;  // 空 = JSON 未声明，按"两侧都得能解析"要求
-    };
+    ///
+    /// 结构与遍历都取自产品代码（UiConfigSelfCheck）：启动自检与本测试必须用同一份
+    /// 遍历，否则"测试过了但运行期自检漏报"这种偏差会重新长出来。
+    using ConfigCommandRef = UiConfigCommandRef;
 
-    using MenuItemVariant = std::variant<MenuActionDef, SubMenuDef, MenuItemType>;
-
-    /// 递归收集菜单/子菜单/右键菜单里的命令项。
-    /// workbenches 缺省时继承上层（JSON 里子项普遍不重复声明）。
-    void collectMenuCommands(const std::vector<MenuItemVariant>& items,
-        const QString& parentPath,
-        const QStringList& inheritedWorkbenches,
-        QVector<ConfigCommandRef>& out)
-    {
-        for (const MenuItemVariant& item : items)
-        {
-            if (const auto* action = std::get_if<MenuActionDef>(&item))
-            {
-                ConfigCommandRef ref;
-                ref.commandId = action->commandId;
-                ref.path = parentPath + QLatin1Char('/') + action->id;
-                ref.workbenches = action->workbenches.isEmpty() ? inheritedWorkbenches : action->workbenches;
-                out.append(ref);
-            }
-            else if (const auto* sub = std::get_if<SubMenuDef>(&item))
-            {
-                const QStringList scope = sub->workbenches.isEmpty() ? inheritedWorkbenches : sub->workbenches;
-                collectMenuCommands(sub->items, parentPath + QLatin1Char('/') + sub->id, scope, out);
-            }
-            // MenuItemType（分隔符）不携带命令，跳过
-        }
-    }
-
-    /// 把 workbenchId 单值（"2D" / "3D" / "global"）折算成 workbenches 列表
-    QStringList workbenchScope(const QString& workbenchId)
-    {
-        if (workbenchId.compare(QLatin1String("global"), Qt::CaseInsensitive) == 0 || workbenchId.isEmpty())
-        {
-            return {};
-        }
-        return { workbenchId };
-    }
 
     /// 收集一份配置里全部命令引用（菜单 + 工具栏 + 右键菜单 + 快捷键）
     QVector<ConfigCommandRef> collectAllCommandRefs(const UiConfigData& config)
     {
-        QVector<ConfigCommandRef> refs;
-
-        for (const MenuDef& menu : config.menus)
-        {
-            collectMenuCommands(menu.items, QStringLiteral("menus/") + menu.id, menu.workbenches, refs);
-        }
-
-        for (const ToolBarDef& toolBar : config.toolBars)
-        {
-            const QStringList scope = workbenchScope(toolBar.workbenchId);
-            for (const auto& item : toolBar.items)
-            {
-                if (const auto* action = std::get_if<ToolBarActionDef>(&item))
-                {
-                    refs.append({ action->commandId,
-                        QStringLiteral("toolBars/") + toolBar.id + QLatin1Char('/') + action->id,
-                        scope });
-                }
-            }
-        }
-
-        for (const ContextMenuDef& menu : config.contextMenus)
-        {
-            collectMenuCommands(menu.items,
-                QStringLiteral("contextMenus/") + menu.id,
-                workbenchScope(menu.workbenchId),
-                refs);
-        }
-
-        for (const ShortcutDef& shortcut : config.shortcuts)
-        {
-            // 快捷键节没有工作台字段：只要求"至少一侧能解析"，用空 scope 表达
-            refs.append({ shortcut.commandId,
-                QStringLiteral("shortcuts/") + shortcut.keySequence,
-                QStringList() });
-        }
-
-        return refs;
+        return UiConfigSelfCheck::collectCommandRefs(config);
     }
+
 
     bool resolvableIn2D(const QString& commandId)
     {
@@ -688,6 +615,79 @@ TEST(CommandConfigContractTest, EveryConfiguredCommandIdResolvesInItsWorkbenchCa
         << "以下配置项的 commandId 无法解析，按钮会永久点不动（共 " << violations.size() << " 条）:\n"
         << violations.join(QLatin1Char('\n')).toStdString();
 }
+
+// ============================================================
+// 配置可信性自检（CMake 开关 / JSON / License 三侧交叉）
+
+TEST(UiConfigSelfCheckTest, UnknownCommandIdIsReportedAsUnresolved)
+{
+    UiConfigData config;
+    MenuDef menu;
+    menu.id = QStringLiteral("edit");
+    menu.workbenches = { QStringLiteral("2D") };
+
+    MenuActionDef bogus;
+    bogus.id = QStringLiteral("edit.does_not_exist");
+    bogus.commandId = QStringLiteral("edit.does_not_exist");
+    menu.items.push_back(bogus);
+    config.menus.push_back(menu);
+
+    const UiConfigSelfCheckReport report = UiConfigSelfCheck::run(config);
+
+    EXPECT_EQ(report.checkedCommandCount, 1);
+    ASSERT_EQ(report.unresolvedCommands.size(), 1);
+    // 报告必须带上定位路径：只报命令名的话还得人工翻 JSON 找它在哪
+    EXPECT_TRUE(report.unresolvedCommands[0].contains(QStringLiteral("menus/edit/edit.does_not_exist")))
+        << report.unresolvedCommands[0].toStdString();
+    EXPECT_TRUE(report.hasBlockingIssue());
+}
+
+TEST(UiConfigSelfCheckTest, ShippedConfigsPassTheSelfCheck)
+{
+    for (const QString& path : allClientConfigPaths())
+    {
+        UiConfigLoader loader(path);
+        auto config = loader.load();
+        ASSERT_TRUE(config.has_value()) << path.toStdString();
+
+        const UiConfigSelfCheckReport report = UiConfigSelfCheck::run(*config);
+        EXPECT_TRUE(report.unresolvedCommands.isEmpty())
+            << path.toStdString() << ":\n"
+            << report.unresolvedCommands.join(QLatin1Char('\n')).toStdString();
+        // 授权放行却没编译进来的功能是最严重的一类：等于"卖了不存在的功能"
+        EXPECT_TRUE(report.licensedButNotCompiled.isEmpty())
+            << path.toStdString() << ":\n"
+            << report.licensedButNotCompiled.join(QLatin1Char('\n')).toStdString();
+    }
+}
+
+TEST(UiConfigSelfCheckTest, EveryFeatureUsedInConfigsHasABuildSwitchMapping)
+{
+    QStringList unmapped;
+    for (const QString& path : allClientConfigPaths())
+    {
+        UiConfigLoader loader(path);
+        auto config = loader.load();
+        ASSERT_TRUE(config.has_value()) << path.toStdString();
+
+        for (const UiConfigFeatureRef& ref : UiConfigSelfCheck::collectFeatureRefs(*config))
+        {
+            bool known = false;
+            UiConfigSelfCheck::isFeatureCompiledIn(ref.featureId, known);
+            if (!known)
+            {
+                unmapped << QStringLiteral("%1 @ %2 (%3)").arg(ref.featureId, ref.path, path);
+            }
+        }
+    }
+
+    // 没有映射的 feature 自检对它完全无感：授权放行但模块没编译时不会有任何提示。
+    // 新增授权功能时必须同步 UiConfigSelfCheck::isFeatureCompiledIn 里的对应表。
+    EXPECT_TRUE(unmapped.isEmpty())
+        << "以下 feature 在 JSON 里被引用，但没有登记编译开关映射：\n"
+        << unmapped.join(QLatin1Char('\n')).toStdString();
+}
+
 
 // ============================================================
 // 左侧绘图工具栏 ↔ 命令中枢

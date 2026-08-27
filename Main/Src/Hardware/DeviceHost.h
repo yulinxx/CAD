@@ -147,7 +147,11 @@ signals:
     void deviceEventReceived(int eventType, int channel, double value, const QString& message);
 
     /// 安全裁决发生变化时发出（只在变化时发，不是每个 tick 都发）。
-    void safetyVerdictChanged(bool canStartProcessing, const QString& firstViolation);
+    /// firstViolation 是给界面看的本地化文案，firstViolationPoint 是机器可读的点位 id
+    /// （日志/遥测只能用后者，否则排查关键字会随部署语言变化）。
+    void safetyVerdictChanged(
+        bool canStartProcessing, const QString& firstViolation, const QString& firstViolationPoint);
+
 
     /// 设备连接状态变化（Hw::DeviceState 的整数值 + 可读名）。
     void deviceStateChanged(int state, const QString& stateName);

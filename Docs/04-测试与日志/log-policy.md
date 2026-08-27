@@ -173,6 +173,7 @@ SY_ERROR("[OperationBus] execute failed op=%s error=%s",
 | **未格式化** | 难以 grep 和分析 |
 | **无意义信息** | "entering function" 等无价值内容 |
 | **硬编码字符串** | 应使用统一的字符串转换函数 |
+| **本地化 / 用户可见文案** | 排查关键字会随部署语言变化，详见 §4.4 |
 
 ### 4.3 性能考虑
 
@@ -182,6 +183,62 @@ SY_ERROR("[OperationBus] execute failed op=%s error=%s",
 | **频率限制** | 高频操作（如鼠标移动）只记录关键事件 |
 | **日志轮转** | 自动轮转，保留最近 7 天 |
 | **异步写入** | 日志写入不阻塞主线程 |
+
+### 4.4 日志里禁止出现本地化文案，只打机器可读 id
+
+日志文本一律英文（项目既有约定）。这条约定还有一个更强的推论：**凡是会被本地化、
+或本来就是给用户看的文案，都不得进日志；日志只能打机器可读的稳定 id。**
+
+原因有两条，都不是风格问题：
+
+1. 本地化文案会随部署语言变化。中文部署里 `first='安全门未关闭'`，英文部署里同一条
+   记录会变成另一串字符，于是同一个故障在不同现场无法用同一套关键字检索，
+   `grep` / 日志聚合 / 告警规则全部失效。
+2. 界面文案是可以随时改的（措辞调整、翻译返工）。一旦日志依赖它，改一句提示语
+   就悄悄废掉了一条排查手段，而且没有任何编译期信号。
+
+做法：凡是「同一件事既要给人看又要给机器看」的地方，就在数据结构里放两个字段，
+一个进界面，一个进日志，并在注释里写明分工，避免后来人图省事直接打那个好看的。
+
+**范例：安全裁决（`Hw::SafetyVerdict`）**
+
+| 字段 | 内容 | 去处 |
+|------|------|------|
+| `firstViolation` | 条件的 `description`，给用户看的本地化文案（中文部署里就是中文） | 只进界面（状态栏单行提示、告警弹窗） |
+| `firstViolationPoint` | 逻辑点位 id，恒为 ASCII，如 `safety.door_closed` | 只进日志与遥测 |
+
+对应的日志形态：
+
+```cpp
+// Hardware/Hardware/Src/Device/SafetyMonitor.cpp
+SY_ERRORF("[Hw::SafetyMonitor] State -> %s, actions=0x%02X, violations=%d, first=%s",
+    safetyStateName(v.state), v.actions, v.violationCount, v.firstViolationPoint);
+// 后续违反项同样只打点位名
+SY_ERRORF("[Hw::SafetyMonitor]   also: %s", m_impl->violationPoints[i].data());
+```
+
+```cpp
+// Main/Src/Hardware/DeviceHost.cpp
+SY_WARNF("[DeviceHost] Safety state -> %s (violations=%d, first=%s)",
+    Hw::safetyStateName(verdict.state), verdict.violationCount, verdict.firstViolationPoint);
+
+// Main/Src/Hardware/ProcessingJobService.cpp
+SY_ERRORF("[ProcessingJob] Safety violated during job '%s' (point=%s), pausing",
+    m_impl->jobId.toUtf8().constData(), firstViolationPoint.toUtf8().constData());
+```
+
+不是所有违反都对应一个真实 IO 点位，这类情况填**稳定的合成 id**，不留空：
+
+| 场景 | 合成 id |
+|------|---------|
+| 尚未做过任何一次 `evaluate`（构造后的初值） | `safety.not_evaluated` |
+| IO 点位表缺失（设备未挂载） | `io.point_map` |
+| 软件急停 | `safety.software_estop` |
+
+留空会让 `first=` 变成空串，等于把「没有原因」和「原因是软件急停」两种情况打成同一行。
+
+同类约定的其他落点：操作 ID 用 `Cmd::operationIdToString()`，安全等级用
+`Hw::safetyStateName()` —— 都是「枚举 → 固定 ASCII 名」，不要在日志里拼界面文本。
 
 ---
 

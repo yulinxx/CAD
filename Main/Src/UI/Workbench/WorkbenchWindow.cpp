@@ -628,17 +628,8 @@ void WorkbenchWindow::dropEvent(QDropEvent* event)
     event->ignore();
 }
 
-/// 设置视口缩放操作回调
-/// @param handler 缩放操作处理函数
-void WorkbenchWindow::setViewportZoomHandler(std::function<void(const QString&)> handler)
-{
-    if (m_menuManager)
-    {
-        m_menuManager->setViewportZoomHandler(std::move(handler));
-    }
-}
-
 void WorkbenchWindow::updatePositionLabel(double x, double y)
+
 
 {
     m_lastMouseX = x;

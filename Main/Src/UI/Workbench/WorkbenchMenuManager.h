@@ -47,7 +47,7 @@ public:
     void setFrameworkServices(const UiFrameworkServices* services);
     void setUiServices(const UiServices* services);
     void setWorkbench(UiWorkbench* workbench);
-    void setViewportZoomHandler(std::function<void(const QString&)> handler);
+
 
     void buildMenus();
 
@@ -137,8 +137,8 @@ private:
     const UiFrameworkServices* m_frameworkServices{ nullptr };
     const UiServices* m_uiServices{ nullptr };
     UiWorkbench* m_workbench{ nullptr };
-    std::function<void(const QString&)> m_viewportZoomHandler;
     // 全局编辑快捷键动作（窗口级，需在切换工作台时显式清理）
+
     std::vector<QAction*> m_editShortcuts;
 
     // 客户 UI 配置不再由本类持有：统一取自 UiConfigurationManager::shared()，

@@ -424,17 +424,13 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
         });
     }
 
-    // 视口动作中枢：注入当前视口，供菜单 Zoom 子菜单与右键菜单 View_* 操作统一分发
+    // 视口动作中枢：注入当前视口，供菜单 Zoom 子菜单与右键菜单 View_* 操作统一分发。
+    // 分发不经过窗口层回调 —— View_* 命令在 CoreOperationRegistry 里直接消费本中枢。
     if (m_services.viewportActionHub)
     {
         m_services.viewportActionHub->setViewport(m_viewport);
-        window.setViewportZoomHandler([hub = m_services.viewportActionHub](const QString& action) {
-            if (hub)
-            {
-                hub->handle(action);
-            }
-        });
     }
+
 
     createToolbars(window);
     setupSceneTree(window);

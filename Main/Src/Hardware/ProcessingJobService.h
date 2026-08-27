@@ -142,7 +142,10 @@ signals:
 
 private slots:
     /// 安全裁决变为「不允许开工」时，正在跑的作业必须立刻暂停。
-    void onSafetyVerdictChanged(bool canStartProcessing, const QString& firstViolation);
+    /// firstViolationPoint 是机器可读的点位 id，日志只用它（firstViolation 是本地化文案）。
+    void onSafetyVerdictChanged(
+        bool canStartProcessing, const QString& firstViolation, const QString& firstViolationPoint);
+
 
 private:
     struct Impl;

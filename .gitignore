@@ -3,8 +3,10 @@
 # ============================================================
 
 # ---- 构建输出目录 ----
+# 只忽略目录：Windows 下 core.ignorecase 生效时，无斜杠的 build* 会连
+# BuildConfig.h.in 这类源文件一起吞掉，新增源文件被静默漏提交。
 build/
-build*
+build*/
 build-*/
 build_*/
 out/
