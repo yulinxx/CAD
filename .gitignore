@@ -188,6 +188,10 @@ RenderEngine/
 scripts/
 # [A7 修复] .github/ 工作流必须入库，删除此忽略规则
 
+# ---- 测试运行产生的落地文件 ----
+# Tesseract/Leptonica 在 CWD 写的二值化调试图，跑 OCR 相关测试就会出现
+thresholds_new.pnm
+
 # ---- 凭证 / 密钥 ----
 *.pem
 *.key
