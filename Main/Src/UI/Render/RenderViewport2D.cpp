@@ -632,33 +632,6 @@ QString RenderViewport2D::selectedEntityId() const
     return m_selector ? m_selector->selectedEntityId() : QString();
 }
 
-void RenderViewport2D::deleteSelectedEntity()
-{
-    if (!m_document)
-    {
-        return;
-    }
-    auto selectedId = selectedEntityId();
-    if (selectedId.isEmpty())
-    {
-        return;
-    }
-
-    // 删除直接走文档的 SceneEditService（P5 下沉），场景变更自动触发 SceneNotifier → 增量刷新。
-    // 旧 OperationBus 的 OperationContext 在生产路径不绑定场景，经它执行 Edit_Delete 只会被拒绝并刷告警。
-    if (m_document->editService())
-    {
-        m_document->editService()->deleteSelected("Delete");
-    }
-
-    // 清除选择（SceneNotifier 已通过 onSceneChanged 触发增量刷新，无需显式 requestFullRefresh）
-    if (m_selector)
-    {
-        m_selector->clearSelection();
-    }
-    updateStatus(tr("2D entity deleted"));
-}
-
 void RenderViewport2D::nudgeSelectedEndpoint(const QPointF& delta)
 {
     if (!m_document)

@@ -10,6 +10,7 @@
 #include "UiServices.h"
 #include "UI/Service/ToolBarContextManager.h"
 #include "Services/UiStateCenter.h"
+#include "ClientConfig/UiLayoutBuilder.h"    // IUiCommandDispatcher：工作台直接实现该接口
 
 class QAction;
 class QWidget;
@@ -74,7 +75,7 @@ class BRepModelService3D;
  *
  * 基类提供状态快照的通用实现，子类只需在 attachToWindow 中填充 m_initialState。
  */
-class UiWorkbench : public QObject
+class UiWorkbench : public QObject, public IUiCommandDispatcher
 {
     Q_OBJECT
 
@@ -92,11 +93,25 @@ public:
 
     /// 判断当前工作台是否提供命令
     /// 菜单构建器通过该接口复用 2D / 3D 各自的命令目录。
-    virtual bool isCommandRegistered(const QString& commandId) const;
+    /// 同时实现 IUiCommandDispatcher::isCommandRegistered。
+    bool isCommandRegistered(const QString& commandId) const override;
 
     /// 从当前工作台命令目录分发命令
     /// 菜单层只传递 commandId，不直接依赖具体 OperationBus 类型。
     virtual void dispatchCommand(const QString& commandId);
+
+    /// IUiCommandDispatcher 入口，等价于 dispatchCommand。
+    ///
+    /// 工作台自身就是分发器 —— 不要再为右键菜单／布局构建器另建适配器对象：
+    /// UiLayoutBuilder 会把 dispatcher 裸指针捕进 QAction 的 triggered 闭包，
+    /// 闭包的寿命跟随 QMenu，比任何局部适配器都长。历史上
+    /// buildConfiguredContextMenu 在栈上建适配器再传地址，函数返回即失效，
+    /// 点右键菜单项时 dispatch 打在已回收的栈帧上（3D 删除必崩）。
+    void dispatch(const QString& commandId) override
+    {
+        dispatchCommand(commandId);
+    }
+
 
     /// 获取工作台的命令显示名和图标等元数据
     virtual QString commandText(const QString& commandId) const;

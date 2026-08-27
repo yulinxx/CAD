@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file RenderViewport2D.h
  * @brief 基于 Renderx 的 2D 渲染视口 — 替换旧的 QGraphicsView 视口
  *
@@ -160,8 +160,9 @@ public:
     void setMeasureMode(bool enabled);
 
     // 选择/编辑操作（P5 已下沉：选择管理 → ViewportSelector，编辑 → SceneEditService）
+    // 注：deleteSelectedEntity() 已删除（2026-08-27）—— 它零调用方，且是第四套删除实现
+    //（只删单个 selectedEntityId，语义与其它三处都不同）。删除统一走 OperationBus 的 Edit_Delete。
     QString selectedEntityId() const;
-    void deleteSelectedEntity();
     void nudgeSelectedEndpoint(const QPointF& delta);
     void selectEntityById(const QString& entityId);
     void syncSelectionDetails();

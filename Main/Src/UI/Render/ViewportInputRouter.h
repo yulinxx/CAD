@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file ViewportInputRouter.h
  * @brief 2D 视口输入路由 — 从 RenderViewport2D 中抽取的事件分发逻辑
  *
@@ -193,7 +193,6 @@ private:
     bool handleKeyPressDispatch(QKeyEvent* event);
     bool handleInteractionDispatcherKeyPress(QKeyEvent* event);
     bool handleToolKeyPress(QKeyEvent* event);
-    bool handleDeleteKeyPress(QKeyEvent* event);
     bool handleEscapeKeyPress(QKeyEvent* event);
 
     // ==================== 内部状态 ====================

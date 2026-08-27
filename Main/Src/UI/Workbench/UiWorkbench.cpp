@@ -533,17 +533,20 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         {
             return;
         }
-        if (m_services.sceneEditService)
+        // 统一经 OperationBus 跑 Edit_Delete，与菜单 / 工具栏 / 右键完全同一条路径
+        //（handler 见 CoreOperationRegistry::registerAll 的 Edit_Delete，落到
+        // SceneEditService::deleteSelected）。3D 侧 setup3DDeleteShortcuts 也是这么做的。
+        //
+        // 曾经这里直连 sceneEditService 并额外做 selectionService->clear() +
+        // requestFullRefresh()，两样都不需要且有害：
+        //   - 选择表：SceneManager::extractEntitiesById 内部已 m_selection.remove()，
+        //     额外 clear 会在删除被锁定拒绝时把用户的选择一起清掉；
+        //   - 全量刷新：删除会 notifySceneChanged()，视口按增量路径重建即可，
+        //     菜单删除一直没有全刷也从没出现残影。
+        if (m_services.operationBus)
         {
-            m_services.sceneEditService->deleteSelected("Delete");
-        }
-        if (m_services.selectionService)
-        {
-            m_services.selectionService->clear();
-        }
-        if (m_viewport)
-        {
-            m_viewport->requestFullRefresh();
+            SY_INFO("[Workbench2D] Delete shortcut activated, running Edit_Delete operation");
+            m_services.operationBus->run(OperationId::Edit_Delete, {}, OperationSource::Shortcut);
         }
     };
     const auto clearSelectionShapes = [this, editingText]() {
@@ -565,10 +568,17 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
     // clearAllShortcuts 删不到它们（它只回收登记过的）：切到 3D 后 2D 的 Delete
     // 仍然活着，一边在 3D 界面里删 2D 场景的图元，一边和 3D 注册的 Delete 同键冲突，
     // Qt 判 ambiguous 后两个都不触发。3D 侧（setup3DDeleteShortcuts）一直是这么做的。
+    //
+    // Delete / Backspace 必须设 Qt::ApplicationShortcut，与 3D 侧一致：
+    // 这样按键在送达视口 widget 之前就被快捷键系统消费掉，画布内的工具/输入路由
+    // 不会再拿到同一次按键 —— 「一次按键删两次」在结构上就不可能发生，而不是靠
+    // 各条路径自己的选中集判定去互相躲。
     auto* deleteSc = new QShortcut(QKeySequence(Qt::Key_Delete), &window);
+    deleteSc->setContext(Qt::ApplicationShortcut);
     QObject::connect(deleteSc, &QShortcut::activated, this, deleteSelectedShapes);
     window.registerShortcut(deleteSc);
     auto* backspaceSc = new QShortcut(QKeySequence(Qt::Key_Backspace), &window);
+    backspaceSc->setContext(Qt::ApplicationShortcut);
     QObject::connect(backspaceSc, &QShortcut::activated, this, deleteSelectedShapes);
     window.registerShortcut(backspaceSc);
     auto* selectAllSc = new QShortcut(QKeySequence::SelectAll, &window);
@@ -762,18 +772,40 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     if (m_services.stateCenter && m_viewport)
     {
         const auto applyGridVisibleFromMetadata = [stateCenter = m_services.stateCenter, vp = m_viewport]() {
+            // 键不存在时**不能**当 false 用：QVariant().toBool() 也是 false，而 gridVisible
+            // 只由 View → Grid 菜单写入。历史实现在键缺失时照样推 false，于是任何一次
+            // metadataChanged（选择变化、捕捉开关、状态提示…）都会把网格强行关掉——
+            // 表现就是「设置里点了确定，网格整个不见了」。
+            const QVariant value = stateCenter->metadata().value(QStringLiteral("gridVisible"));
+            if (!value.isValid())
+            {
+                return;
+            }
             if (auto* renderWidget = vp->renderWidget())
             {
                 if (auto* env = renderWidget->sceneEnvironment())
                 {
-                    const bool visible = stateCenter->metadata().value(QStringLiteral("gridVisible")).toBool();
-                    env->setGridVisible(visible);
+                    env->setGridVisible(value.toBool());
                     env->notifyChanged();
                 }
             }
         };
         m_gridVisibilityMetadataConn = QObject::connect(
             m_services.stateCenter, &UiStateCenter::metadataChanged, this, applyGridVisibleFromMetadata);
+
+        // 用场景当前（已由设置应用过）的可见性给元数据播种，之后菜单勾选态与画布才一致。
+        if (auto* renderWidget = m_viewport->renderWidget())
+        {
+            if (auto* env = renderWidget->sceneEnvironment())
+            {
+                QVariantMap meta = m_services.stateCenter->metadata();
+                if (!meta.value(QStringLiteral("gridVisible")).isValid())
+                {
+                    meta.insert(QStringLiteral("gridVisible"), env->settings().grid.visible);
+                    m_services.stateCenter->setMetadata(meta);
+                }
+            }
+        }
         applyGridVisibleFromMetadata();
     }
 
@@ -1549,8 +1581,10 @@ void Workbench2D::onViewportContextMenu(QContextMenuEvent* event)
         // 与同名工具栏按钮的灰显状态直接矛盾。
         CommandActionHub::applySnapshotToMenu(configured, snapshot);
 
-        // 生命周期：dispatcher 是栈对象，必须保证菜单在本作用域内销毁完毕，
-        // 不能用 deleteLater（事件循环稍后执行时 dispatcher 已失效）。
+        // 生命周期：菜单在本作用域内建、本作用域内销毁。
+        // 注：曾经这里写「因为 dispatcher 是栈对象所以不能 deleteLater」，那个前提本身是错的 ——
+        // dispatcher 早在 buildConfiguredContextMenu 返回时就没了。现在分发器是工作台本体，
+        // 菜单何时销毁都安全，仍就地 delete 只是为了不把临时 QAction 留给事件循环。
         configured->exec(event->globalPos());
         delete configured;
         return;
@@ -1574,29 +1608,6 @@ QMenu* Workbench2D::buildConfiguredContextMenu(const QString& contextMenuId, boo
         return nullptr;
     }
 
-    // 命令分发器适配：直接复用工作台自身的命令路径，
-    // 与顶部菜单 / 工具栏 / 快捷键走同一条 dispatchCommand。
-    struct WorkbenchDispatcher final : public IUiCommandDispatcher
-    {
-        Workbench2D* wb = nullptr;
-
-        bool isCommandRegistered(const QString& commandId) const override
-        {
-            return wb && wb->isCommandRegistered(commandId);
-        }
-
-        void dispatch(const QString& commandId) override
-        {
-            if (wb)
-            {
-                wb->dispatchCommand(commandId);
-            }
-        }
-    };
-
-    WorkbenchDispatcher dispatcher;
-    dispatcher.wb = this;
-
     // 图层动态段：每次弹出都重新注册，闭包捕获当前选中状态与图层管理器
     UiContextMenuService::instance().registerDynamicSection(QStringLiteral("layer.actions"),
         [this, hasSelection](QMenu* menu) {
@@ -1606,8 +1617,12 @@ QMenu* Workbench2D::buildConfiguredContextMenu(const QString& contextMenuId, boo
             }
         });
 
-    return UiContextMenuService::instance().buildMenu(config, contextMenuId, &dispatcher, m_commandHub->mainWindow());
+    // 分发器直接用工作台自身（UiWorkbench 实现 IUiCommandDispatcher）：
+    // UiLayoutBuilder 把 dispatcher 裸指针捕进 QAction 的 triggered 闭包，闭包活到菜单析构，
+    // 而菜单在调用方 exec()，此处再建局部适配器就是悬垂指针。
+    return UiContextMenuService::instance().buildMenu(config, contextMenuId, this, m_commandHub->mainWindow());
 }
+
 
 void Workbench2D::refreshCommandUiState()
 {
@@ -2266,7 +2281,12 @@ void Workbench3D::on3DContextMenuRequested(const QPoint& globalPos)
     // 配置驱动优先（P0-2b）：客户 JSON 声明了 contextMenus["canvas.3d"] 时由配置接管
     if (QMenu* configured = buildConfiguredContextMenu(QStringLiteral("canvas.3d")))
     {
-        // dispatcher 是栈对象，菜单必须在本作用域内销毁，不能 deleteLater
+        // 与 2D 同构：配置化菜单的 QAction 是每次弹出新建的临时对象，中枢的
+        // refreshActionStates / WorkbenchMenuManager::refreshCommandStates3D 都触达不到，
+        // 弹出前必须按同一份快照套一次启用态，否则空选时右键的 Delete 仍是亮态。
+        CommandActionHub3D::applySnapshotToMenu(configured, snapshot);
+
+        // 生命周期同 2D：就地 exec、就地 delete。
         configured->exec(globalPos);
         delete configured;
         return;
@@ -2288,30 +2308,14 @@ QMenu* Workbench3D::buildConfiguredContextMenu(const QString& contextMenuId)
         return nullptr;
     }
 
-    // 与 2D 同构的分发器适配：右键项走 Workbench3D::dispatchCommand，
-    // 与 3D 顶部菜单 / 工具栏共用同一条命令路径。
-    struct Workbench3DDispatcher final : public IUiCommandDispatcher
-    {
-        Workbench3D* wb = nullptr;
-
-        bool isCommandRegistered(const QString& commandId) const override
-        {
-            return wb && wb->isCommandRegistered(commandId);
-        }
-
-        void dispatch(const QString& commandId) override
-        {
-            if (wb)
-            {
-                wb->dispatchCommand(commandId);
-            }
-        }
-    };
-
-    Workbench3DDispatcher dispatcher;
-    dispatcher.wb = this;
-    return UiContextMenuService::instance().buildMenu(config, contextMenuId, &dispatcher, m_services3D.renderWidget);
+    // 分发器直接用工作台自身（UiWorkbench 实现 IUiCommandDispatcher），
+    // 右键项与 3D 顶部菜单 / 工具栏共用同一条 dispatchCommand 路径。
+    // 不要在这里建局部适配器：UiLayoutBuilder 会把 dispatcher 裸指针捕进 QAction 的
+    // triggered 闭包，而菜单是在调用方 exec() 的 —— 本函数返回后栈帧即失效，
+    // 点「删除」时 dispatch 会打在已被 exec() 调用链覆写的栈内存上（必崩）。
+    return UiContextMenuService::instance().buildMenu(config, contextMenuId, this, m_services3D.renderWidget);
 }
+
 
 /// 步骤三：创建 CommandActionHub3D、注册命令、初始化菜单管理器和快捷键
 void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)

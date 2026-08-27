@@ -850,33 +850,6 @@ bool ViewportInputRouter::handleToolKeyPress(QKeyEvent* event)
     return false;
 }
 
-bool ViewportInputRouter::handleDeleteKeyPress(QKeyEvent* event)
-{
-    if (event->key() != Qt::Key_Delete)
-    {
-        return false;
-    }
-
-    // 删除选中图元：直接走文档的 SceneEditService（P5 下沉）。
-    // 旧 OperationBus 的 OperationContext 在生产路径不绑定场景，
-    // 经它执行 Edit_Delete 只会被拒绝并刷告警，且必须先删除再清空选择。
-    if (m_document && m_document->editService())
-    {
-        m_document->editService()->deleteSelected("Delete");
-    }
-    if (m_selectionService)
-    {
-        m_selectionService->clear();
-    }
-    // 删除后全量刷新：重建渲染数据，确保已删除图元从 GPU 端清除
-    if (m_refreshCoordinator)
-    {
-        m_refreshCoordinator->requestFullRefresh();
-    }
-    event->accept();
-    return true;
-}
-
 bool ViewportInputRouter::handleKeyPressDispatch(QKeyEvent* event)
 {
     if (handleInteractionDispatcherKeyPress(event))
@@ -889,10 +862,11 @@ bool ViewportInputRouter::handleKeyPressDispatch(QKeyEvent* event)
         return true;
     }
 
-    if (handleDeleteKeyPress(event))
-    {
-        return true;
-    }
+    // 注：这里原先还有一次 handleDeleteKeyPress(event)，已删除（2026-08-27）。
+    // Delete / Backspace 统一由工作台的窗口级 QShortcut（Qt::ApplicationShortcut）
+    // 经 OperationBus 跑 Edit_Delete，按键在送达视口 widget 之前就被消费，本分支恒不成立。
+    // 与 3D 侧同一套约定（见 Workbench3D::setup3DDeleteShortcuts 的注释）：
+    // 删除只允许有一条通路，多留一条就等于多一套选中集/锁定判定和一次重复删除的隐患。
 
     return handleEscapeKeyPress(event);
 }
