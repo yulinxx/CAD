@@ -505,6 +505,21 @@ ToolManager* RenderViewport2D::toolManager() const
     return m_toolManager.get();
 }
 
+bool RenderViewport2D::handleEscapeRequest()
+{
+    return m_inputRouter ? m_inputRouter->handleEscapeRequest() : false;
+}
+
+bool RenderViewport2D::handleStepBackRequest()
+{
+    return m_inputRouter ? m_inputRouter->handleStepBackRequest() : false;
+}
+
+bool RenderViewport2D::handleTextDeleteRequest(bool forward)
+{
+    return m_inputRouter ? m_inputRouter->handleTextDeleteRequest(forward) : false;
+}
+
 void RenderViewport2D::resetView()
 {
     // 相机重置到默认台面范围，视口只负责传视口尺寸和提交矩阵

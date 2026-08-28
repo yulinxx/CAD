@@ -303,6 +303,26 @@ namespace
             m_emitted = true;
         }
 
+        void emitTriangles(const Ut::Vec2d* points, size_t count, const Ut::Color& color) override
+        {
+            if (!points || count < 3)
+            {
+                return;
+            }
+            // 色块填充（SyFillRegion）：顶点流每 3 个构成一个三角形，实心绘制。
+            // 不足 3 的尾巴丢弃而不是补齐——补齐会画出数据里并不存在的三角形。
+            // 与全量路径 RenderSceneBuilder::emitTriangles 保持同一约定。
+            const size_t usable = count - (count % 3);
+            m_outType = Render::PrimitiveType::TriangleList;
+            float rgba[4];
+            colorToRGBA(color, rgba);
+            for (size_t i = 0; i < usable; ++i)
+            {
+                addVertex(points[i].x(), points[i].y(), rgba);
+            }
+            m_emitted = true;
+        }
+
         void emitTriangleSoup(const Ut::Vec3f* /*vertices*/,
             size_t /*vertexCount*/,
             const Ut::Vec3f* /*normals*/,

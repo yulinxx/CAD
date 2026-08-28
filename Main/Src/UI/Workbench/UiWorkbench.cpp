@@ -530,8 +530,28 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         QWidget* fw = QApplication::focusWidget();
         return fw && (qobject_cast<QLineEdit*>(fw) || qobject_cast<QTextEdit*>(fw) || qobject_cast<QPlainTextEdit*>(fw));
     };
-    const auto deleteSelectedShapes = [this, editingText]() {
+    const auto deleteSelectedShapes = [this, editingText](bool forward) {
         if (editingText())
+        {
+            return;
+        }
+        // 画布上正在编辑文字：⌫ / ⌦ 属于字符级删除，不能落到「删除选中图元」。
+        // editingText() 只认 QLineEdit / QTextEdit 这类 Qt 控件，TextEditTool 的
+        // 光标在视口里（焦点控件是 QOpenGLWidget），它拦不住 —— 必须问视口。
+        //   forward=false（⌫）→ 删选区或光标前一个字符
+        //   forward=true （⌦）→ 删选区或光标后一个字符
+        if (m_viewport && m_viewport->handleTextDeleteRequest(forward))
+        {
+            return;
+        }
+        // 绘制中的 Delete / Backspace 先归绘图工具：撤销上一个已确定的落点。
+        // 样条 / NURBS / 多段线这类要点多次的图元，点错一个不该整条重画；
+        // 这也不是主 Undo 栈 —— 只退当前正在构造的图元的输入点，已提交图元不动。
+        //
+        // 这一跳与 ESC 那跳同理且更硬：Delete / Backspace 是 Qt::ApplicationShortcut，
+        // 按键在送达视口 widget 之前就被快捷键系统消费，BaseTool::onKeyPress 里的
+        // 回退分支在绘图态根本走不到。
+        if (m_viewport && m_viewport->handleStepBackRequest())
         {
             return;
         }
@@ -556,6 +576,18 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         {
             return;
         }
+        // ESC 是分级语义，第一优先级在视口：
+        //   绘制中 → 丢弃当前图元、留在绘图工具；绘图工具空闲 → 退回选择工具。
+        // 视口消费掉就到此为止，不要顺手再清一次选择 —— 否则「画到一半按 ESC」
+        // 会连用户之前的选中集一起清掉。
+        //
+        // 这一跳是必需的而不是冗余：ESC 走的是窗口级 QShortcut，Qt 的快捷键在
+        // 键事件送达聚焦控件**之前**就消费掉了，视口的 ViewportInputRouter 根本
+        // 拿不到 KeyPress（Delete / Backspace 的注释里描述的是同一机制）。
+        if (m_viewport && m_viewport->handleEscapeRequest())
+        {
+            return;
+        }
         if (m_services.selectionService)
         {
             m_services.selectionService->clear();
@@ -575,13 +607,28 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
     // 这样按键在送达视口 widget 之前就被快捷键系统消费掉，画布内的工具/输入路由
     // 不会再拿到同一次按键 —— 「一次按键删两次」在结构上就不可能发生，而不是靠
     // 各条路径自己的选中集判定去互相躲。
+    //
+    // 两个键都删选中图元（macOS 上 ⌫ 发 Key_Backspace，Key_Delete 要按 Fn+⌫；
+    // 只绑 Key_Delete 等于让 Mac 用户没法用最顺手的那个键）。区别只在文本编辑态：
+    // forward=false 删光标前，forward=true 删光标后，判定见 deleteSelectedShapes。
+    //
+    // ⚠️ 单一所有者：这两条不能与菜单项声明的键序列重复。base.json 里
+    // `edit.delete` 曾带 "shortcut": "Delete"，与下面的 Key_Delete 撞成两个
+    // ApplicationShortcut 接收者，Qt 判 ambiguous 后两边都不触发 —— 表现就是
+    // 「按删除键没反应」。UiLayoutBuilder::buildShortcuts 的 m_menuShortcutKeys
+    // 守卫只拦配置里的 shortcuts 节，拦不到这里裸建的 QShortcut，所以该键序列
+    // 必须从菜单配置里摘掉（菜单项仍由 CommandActionHub 提供，只是不带快捷键）。
     auto* deleteSc = new QShortcut(QKeySequence(Qt::Key_Delete), &window);
     deleteSc->setContext(Qt::ApplicationShortcut);
-    QObject::connect(deleteSc, &QShortcut::activated, this, deleteSelectedShapes);
+    QObject::connect(deleteSc, &QShortcut::activated, this, [deleteSelectedShapes]() {
+        deleteSelectedShapes(/*forward=*/true);
+    });
     window.registerShortcut(deleteSc);
     auto* backspaceSc = new QShortcut(QKeySequence(Qt::Key_Backspace), &window);
     backspaceSc->setContext(Qt::ApplicationShortcut);
-    QObject::connect(backspaceSc, &QShortcut::activated, this, deleteSelectedShapes);
+    QObject::connect(backspaceSc, &QShortcut::activated, this, [deleteSelectedShapes]() {
+        deleteSelectedShapes(/*forward=*/false);
+    });
     window.registerShortcut(backspaceSc);
     auto* selectAllSc = new QShortcut(QKeySequence::SelectAll, &window);
     QObject::connect(selectAllSc, &QShortcut::activated, this, [this, editingText]() {

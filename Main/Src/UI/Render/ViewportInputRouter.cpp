@@ -385,6 +385,25 @@ void ViewportInputRouter::handleWheel(QWheelEvent* event)
         return;
     }
 
+    // 先给活动工具：参数类工具用 Ctrl+滚轮 调自己的绘图参数（多边形边数、
+    // NURBS 权重…），工具自己判断修饰键，消费了就不再走导航。
+    //
+    // 不能反过来（先导航后工具）：classifyWheel 对「无滚动阶段」的鼠标滚轮
+    // 一律判缩放且不看修饰键，所以只要导航先手，Ctrl+滚轮 永远变成缩放，
+    // 工具的 onWheel 一次都不会被调到 —— 「Ctrl+滚轮 改边数」就是这么失效的。
+    if (m_toolManager)
+    {
+        if (auto* tool = m_toolManager->getActiveTool())
+        {
+            const QPointF worldPos = widgetToWorld(event->position());
+            if (tool->onWheel(worldPos, event))
+            {
+                event->accept();
+                return;
+            }
+        }
+    }
+
     // 共享导航控制器统一处理滚轮/触控板手势 → 相机变化
     m_navigation.handleWheel(event);
     event->accept();
@@ -423,8 +442,12 @@ void ViewportInputRouter::handleKeyPress(QKeyEvent* event)
         return;
     }
 
-    // 空格按下：进入"临时平移"态，但不立即确认——空格语义（绘图工具确认/SelectTool 重置视图）
-    // 延迟到空格释放时触发；若期间发生了空格+左键拖动平移，则释放时不触发（视为导航）。
+    // 空格：绘图态 = 确认，空闲态 = 导航（按住拖动临时平移 / 单独按释放重置视图）。
+    //
+    // 绘制中必须立即派发给工具，不能进「临时平移」态：mouseMove 里
+    //「空格按住 + 任意移动」就会置 m_spacePanned=true（触控板单指移动也算），
+    // 手放在鼠标上按空格几乎必然产生一次移动事件，于是释放时的确认被判成导航
+    // 而丢掉 —— 表现就是「绘制中按空格没反应」。
     if (event->key() == Qt::Key_Space)
     {
         if (event->isAutoRepeat())
@@ -432,6 +455,19 @@ void ViewportInputRouter::handleKeyPress(QKeyEvent* event)
             event->accept();
             return;
         }
+
+        const bool drawing = m_toolManager && m_toolManager->getActiveTool()
+            && m_toolManager->getActiveTool()->isDrawingActive();
+        if (drawing)
+        {
+            if (handleKeyPressDispatch(event))
+            {
+                return;
+            }
+            event->accept();
+            return;
+        }
+
         m_spaceHeld = true;
         m_spacePanned = false;
         event->accept();
@@ -453,11 +489,15 @@ void ViewportInputRouter::handleKeyRelease(QKeyEvent* event)
         return;
     }
 
+    const bool wasHeld = m_spaceHeld;
     m_spaceHeld = false;
 
     // 空格单独按下并释放（未用于平移）→ 触发原有确认/重置语义；
     // 用一次合成的空格按下事件走既有分发管线。
-    if (!m_spacePanned)
+    //
+    // wasHeld 是必要条件：绘图态的空格已在 keyPress 里直接派发给工具了
+    //（那条路不置 m_spaceHeld），这里若再合成一次就是**确认两次**。
+    if (wasHeld && !m_spacePanned)
     {
         QKeyEvent spacePress(QEvent::KeyPress, Qt::Key_Space, event->modifiers());
         if (handleKeyPressDispatch(&spacePress))
@@ -867,6 +907,9 @@ bool ViewportInputRouter::handleKeyPressDispatch(QKeyEvent* event)
     // 经 OperationBus 跑 Edit_Delete，按键在送达视口 widget 之前就被消费，本分支恒不成立。
     // 与 3D 侧同一套约定（见 Workbench3D::setup3DDeleteShortcuts 的注释）：
     // 删除只允许有一条通路，多留一条就等于多一套选中集/锁定判定和一次重复删除的隐患。
+    //
+    // 绘图态「Delete = 回退上一个落点」也因此不能指望这条键盘路：那条语义由
+    // handleStepBackRequest() 提供，同样由工作台的快捷键回调优先问一次视口。
 
     return handleEscapeKeyPress(event);
 }
@@ -878,25 +921,83 @@ bool ViewportInputRouter::handleEscapeKeyPress(QKeyEvent* event)
         return false;
     }
 
-    // 仅当左侧绘图工具栏的工具（非选择工具）处于激活状态时处理：
-    // 丢弃当前工具未完成的草图，并切回选择工具。
-    const QString activeTool = m_toolManager ? m_toolManager->getActiveToolName() : QString();
-    if (activeTool.isEmpty() || activeTool == QStringLiteral("SelectTool"))
+    if (!handleEscapeRequest())
     {
         return false;
     }
 
-    if (m_toolManager)
-    {
-        m_toolManager->cancelCurrentTool();
-    }
-
-    // 走 OperationBus：UI 入口 → Tool_Select → 视口激活选择工具 → activeToolChanged → 工具栏高亮同步
-    if (m_operationBus)
-    {
-        m_operationBus->run(OperationId::Tool_Select, {}, OperationSource::Keyboard);
-    }
-
     event->accept();
     return true;
+}
+
+bool ViewportInputRouter::handleEscapeRequest()
+{
+    if (!m_toolManager)
+    {
+        return false;
+    }
+
+    ITool* tool = m_toolManager->getActiveTool();
+    const QString activeTool = m_toolManager->getActiveToolName();
+
+    // 一级：绘制中 —— 只丢弃当前正在构造的图元，**留在当前绘图工具**，
+    // 用户可以接着画下一个，不必回工具栏重新点一次。
+    if (tool && tool->isDrawingActive())
+    {
+        tool->cancel();
+        return true;
+    }
+
+    // 二级：绘图工具空闲 —— 退回选择工具。
+    // 走 OperationBus：UI 入口 → Tool_Select → 视口激活选择工具
+    // → activeToolChanged → 工具栏高亮同步（不要在这里直接 setActiveTool，
+    // 否则左侧按钮的勾选态没人回写）。
+    if (!activeTool.isEmpty() && activeTool != QStringLiteral("SelectTool"))
+    {
+        if (m_operationBus)
+        {
+            m_operationBus->run(OperationId::Tool_Select, {}, OperationSource::Keyboard);
+        }
+        return true;
+    }
+
+    // 三级：已在选择工具 —— 本层不消费，交给上层清空选择。
+    return false;
+}
+
+bool ViewportInputRouter::handleStepBackRequest()
+{
+    if (!m_toolManager)
+    {
+        return false;
+    }
+
+    ITool* tool = m_toolManager->getActiveTool();
+    if (!tool || !tool->isDrawingActive())
+    {
+        return false;
+    }
+
+    // 绘制中的 Delete / Backspace 是「撤销上一个落点」，不是「删除选中图元」，
+    // 也不是主 Undo 栈：样条 / NURBS / 多段线这类多次输入的图元，点错一个点
+    // 不该被迫整条重画，更不该把之前提交的图元退掉。
+    return tool->stepBackDrawing();
+}
+
+bool ViewportInputRouter::handleTextDeleteRequest(bool forward)
+{
+    if (!m_toolManager)
+    {
+        return false;
+    }
+
+    ITool* tool = m_toolManager->getActiveTool();
+    if (!tool)
+    {
+        return false;
+    }
+
+    // 编辑态判据由工具自己给（TextEditTool::deleteTextAtCursor 内部查 m_editing），
+    // 路由层不认识具体工具类型 —— 与 isDrawingActive / stepBackDrawing 同一套约定。
+    return tool->deleteTextAtCursor(forward);
 }

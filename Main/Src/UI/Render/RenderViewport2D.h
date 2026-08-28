@@ -116,6 +116,33 @@ public:
     /// 获取工具管理器
     ToolManager* toolManager() const;
 
+    /**
+     * @brief ESC 请求入口（供工作台的窗口级快捷键调用）
+     *
+     * 返回 true 表示视口已消费（绘制中丢弃图元 / 绘图工具退回选择工具）；
+     * 返回 false 表示视口不管，由上层清空选择。实现在 ViewportInputRouter，
+     * 这里只转发 —— ESC 的分级语义只有一份。
+     */
+    bool handleEscapeRequest();
+
+    /**
+     * @brief Delete / Backspace 请求入口（供工作台的应用级快捷键调用）
+     *
+     * 返回 true 表示绘制中已回退一个落点，上层**不要**再删除选中图元。
+     * 实现在 ViewportInputRouter，这里只转发。
+     */
+    bool handleStepBackRequest();
+
+    /**
+     * @brief 文本编辑态的 ⌫ / ⌦：删选区，或删光标前／后一个字符
+     *
+     * @param forward false = ⌫（删光标前）；true = ⌦（删光标后）
+     * @return true 表示已消费，上层**不要**再删除选中图元。
+     * 实现在 ViewportInputRouter，这里只转发。
+     */
+    bool handleTextDeleteRequest(bool forward);
+
+
     SceneDocument2D* document() const
     {
         return m_document;

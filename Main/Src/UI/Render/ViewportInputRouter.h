@@ -94,6 +94,46 @@ public:
     void handleKeyRelease(QKeyEvent* event);
     void handleContextMenu(QContextMenuEvent* event);
 
+    /**
+     * @brief ESC 的唯一语义实现（分级）
+     *
+     * 一级：活动工具正在绘制 → 丢弃当前图元，**留在该工具**；
+     * 二级：绘图工具空闲 → 经 OperationBus 退回选择工具；
+     * 三级：已在选择工具 → 返回 false，由上层清空选择。
+     *
+     * 必须对外可见：ESC 实际是工作台的窗口级 QShortcut（macOS 下 QOpenGLWidget
+     * 不自动获焦，键事件到不了视口，快捷键会先把 ESC 吃掉），因此「快捷键」与
+     * 「键盘路由」两条来路共用这一份实现，不允许各写一套。
+     */
+    bool handleEscapeRequest();
+
+    /**
+     * @brief Delete / Backspace 的第一优先级：绘制中回退一个已确定的落点
+     *
+     * 返回 true 表示已被绘图工具消费，上层**不要**再删除选中图元。
+     *
+     * 必须对外可见的理由与 handleEscapeRequest 相同，且更硬：Delete / Backspace 是
+     * 工作台的 Qt::ApplicationShortcut，按键在送达视口 widget 之前就被快捷键系统吃掉，
+     * `BaseTool::onKeyPress` 里的回退分支在绘图态从来没被走到过。
+     *
+     * 与主 Undo 栈无关：只回退当前正在构造的图元的输入点，已提交图元不受影响。
+     */
+    bool handleStepBackRequest();
+
+    /**
+     * @brief 文本编辑态的 ⌫ / ⌦：删选区，或删光标前／后一个字符
+     *
+     * @param forward false = ⌫（删光标前）；true = ⌦（删光标后）
+     * @return true 表示已消费，上层**不要**再删除选中图元
+     *
+     * 成因与 handleStepBackRequest 完全相同：Delete / Backspace 是应用级快捷键，
+     * 按键在送达视口 widget 之前就被吃掉，`TextEditTool::onKeyPress` 的
+     * Key_Backspace / Key_Delete 分支从来没被走到过 —— 不补这一跳，在画布上
+     * 编辑文字时按 ⌫ 会把整个文字群组删掉，而不是删一个字符。
+     */
+    bool handleTextDeleteRequest(bool forward);
+
+
     /// 是否存在正在进行的编辑/绘制命令（视口右键时用于决定是否取消当前命令而非弹菜单）
     bool hasActiveCommand() const;
 
