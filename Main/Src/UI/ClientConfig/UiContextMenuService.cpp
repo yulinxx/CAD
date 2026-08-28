@@ -52,7 +52,7 @@ UiContextMenuService& UiContextMenuService::instance()
     return service;
 }
 
-void UiContextMenuService::registerDynamicSection(const QString& sectionId, UiContextMenuSectionFiller filler)
+void UiContextMenuService::registerDynamicSection(const QString& sectionId, UiMenuSectionFiller filler)
 {
     if (sectionId.isEmpty() || !filler)
     {
@@ -73,6 +73,38 @@ void UiContextMenuService::unregisterDynamicSection(const QString& sectionId)
         SY_INFOF("[UiContextMenuService] Dynamic section unregistered: '%s'", qPrintable(sectionId));
     }
 }
+
+int UiContextMenuService::fillDynamicSections(QMenu* menu, const QStringList& sectionIds, const QString& ownerId)
+{
+    if (!menu)
+    {
+        return 0;
+    }
+
+    int added = 0;
+    // 顺序严格按 JSON 中 dynamicSections 的声明顺序
+    for (const QString& sectionId : sectionIds)
+    {
+        auto it = m_sections.constFind(sectionId);
+        if (it == m_sections.cend())
+        {
+            SY_WARNF("[UiContextMenuService] Menu id='%s' references unregistered dynamic section '%s'",
+                qPrintable(ownerId),
+                qPrintable(sectionId));
+            continue;
+        }
+        const int before = menu->actions().size();
+        (*it)(menu);
+        const int delta = menu->actions().size() - before;
+        added += delta;
+        SY_DEBUGF("[UiContextMenuService] Dynamic section '%s' added %d item(s) to '%s'",
+            qPrintable(sectionId),
+            delta,
+            qPrintable(ownerId));
+    }
+    return added;
+}
+
 
 bool UiContextMenuService::hasConfigFor(const UiConfigData* config, const QString& contextMenuId)
 {
@@ -110,24 +142,9 @@ QMenu* UiContextMenuService::buildMenu(const UiConfigData* config,
         menu->setObjectName(def->id);
     }
 
-    // 追加动态段：顺序严格按 JSON 中 dynamicSections 的声明顺序
-    for (const QString& sectionId : def->dynamicSections)
-    {
-        auto it = m_sections.constFind(sectionId);
-        if (it == m_sections.cend())
-        {
-            SY_WARNF("[UiContextMenuService] Context menu id='%s' references unregistered dynamic section '%s'",
-                qPrintable(def->id),
-                qPrintable(sectionId));
-            continue;
-        }
-        const int before = menu->actions().size();
-        (*it)(menu);
-        SY_DEBUGF("[UiContextMenuService] Dynamic section '%s' added %d item(s) to '%s'",
-            qPrintable(sectionId),
-            static_cast<int>(menu->actions().size() - before),
-            qPrintable(def->id));
-    }
+    // 追加动态段：与主菜单子菜单共用 fillDynamicSections，不在此另写一份追加逻辑
+    fillDynamicSections(menu, def->dynamicSections, def->id);
+
 
     if (!hasRealAction(menu))
     {

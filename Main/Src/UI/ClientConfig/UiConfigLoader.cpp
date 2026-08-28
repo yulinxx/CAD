@@ -473,6 +473,8 @@ std::optional<SubMenuDef> UiConfigLoader::parseSubMenu(const QJsonObject& obj)
     sub.visible = obj.value(QStringLiteral("visible")).toBool(true);
     sub.workbenches = obj.value(QStringLiteral("workbenches")).toVariant().toStringList();
     sub.visibilityScope = normalizeVisibilityScope(parseVisibilityScope(obj), sub.workbenches);
+    // 与 contextMenus 用同一个键名解析同一套机制，见 SubMenuDef::dynamicSections
+    sub.dynamicSections = obj.value(QStringLiteral("dynamicSections")).toVariant().toStringList();
     if (sub.id.isEmpty())
     {
         return std::nullopt;

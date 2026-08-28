@@ -18,6 +18,7 @@
 #include "UiWorkbench.h"
 #include "UiServices.h"
 #include "UiFrameworkServices.h"
+#include "UI/Services/IRecentFileService.h"
 #include "UI/ClientConfig/UiLayoutBuilder.h"
 #include "UI/LanguageManager.h"
 #include "UI/ThemeManager.h"
@@ -34,6 +35,7 @@
 #include "ClientConfig/UiClientConfigBase.h"
 #include "ClientConfig/UiClientContext.h"
 #include "ClientConfig/UiConfigurationManager.h"
+#include "ClientConfig/UiContextMenuService.h"
 #include "ClientConfig/UiFeatureGate.h"
 #include "ClientConfig/UiLayoutBuilder.h"
 #include "ClientConfig/UiPanelRegistry.h"
@@ -52,6 +54,7 @@
 #include <QStringList>
 #include <QTimer>
 #include <QToolBar>
+#include <QVariantMap>
 #include <algorithm>
 #include <functional>
 
@@ -118,7 +121,7 @@ struct MenuDispatcher final : public IUiCommandDispatcher
     }
 
 
-    void dispatch(const QString& commandId) override
+    void dispatch(const QString& commandId, const QVariantMap& params) override
     {
         // 工作台切换统一由主窗口 triggerWorkbench 处理（含防重复切换保护）。
 
@@ -165,7 +168,7 @@ struct MenuDispatcher final : public IUiCommandDispatcher
             SY_WARNF("[WorkbenchMenuManager] No active workbench for command='%s'", qPrintable(commandId));
             return;
         }
-        workbench->dispatchCommand(commandId);
+        workbench->dispatchCommand(commandId, params);
     }
 };
 
@@ -276,6 +279,69 @@ IShortcutSettingsModel* WorkbenchMenuManager::shortcutSettingsModel() const
 }
 
 
+void WorkbenchMenuManager::registerRecentFilesSection()
+{
+    // 菜单里最多列多少条最近文件。
+    // 服务的 QSettings 兜底路径自己截到 10 条，但数据库路径（RecentFileRepository::loadAll）
+    // 不截断，所以菜单侧必须自己卡一次，否则库里攒了几百条会撑出一个滚动到屏幕外的菜单。
+    constexpr int kMaxRecentMenuItems = 10;
+
+    UiContextMenuService::instance().registerDynamicSection(
+        QStringLiteral("file.recent"), [this](QMenu* menu) {
+            if (!menu)
+            {
+                return;
+            }
+
+            IRecentFileService* recentFiles = m_uiServices ? m_uiServices->recentFileService : nullptr;
+            const QStringList files = recentFiles ? recentFiles->loadRecentFiles() : QStringList{};
+
+            // 服务缺失与列表为空给同一种反馈：一个禁用占位项。
+            // 不能一条都不加 —— 空子菜单在 Qt 里点开是个空白小方块，看起来像菜单坏了。
+            if (files.isEmpty())
+            {
+                QAction* placeholder = menu->addAction(tr("No Recent Files"));
+                placeholder->setEnabled(false);
+                return;
+            }
+
+            IUiCommandDispatcher* dispatcher = commandDispatcher();
+            int index = 0;
+            for (const QString& filePath : files)
+            {
+                if (index >= kMaxRecentMenuItems)
+                {
+                    break;
+                }
+                ++index;
+
+                // 只显示文件名，完整路径进 tooltip/statusTip：最近文件路径动辄很长，
+                // 直接当菜单文本会把 File 菜单撑到半屏宽。
+                QAction* action = menu->addAction(
+                    QStringLiteral("&%1  %2").arg(index).arg(QFileInfo(filePath).fileName()));
+                action->setToolTip(filePath);
+                action->setStatusTip(filePath);
+                // 刻意不设 property("commandId")：启用态刷新会按 commandId 去当前工作台
+                // 命令目录反查规则，而 file.open_recent 只在 2D 目录里；3D 下会变成每次
+                // 刷新都告警一遍。这批条目本身恒可用（目录里 File_OpenRecent 也是 Always），
+                // 无需纳入启用态联动。
+
+                // 路径经 dispatch 的 QVariantMap 透传：file.open_recent → OperationId::File_OpenRecent
+                // 是 ParamLambdaOperation，读的正是 params["filePath"]。
+                // 接收者用 action 而不是 this：菜单重填会删掉这批 action，连接随之断开。
+                QObject::connect(action, &QAction::triggered, action, [dispatcher, filePath]() {
+                    if (!dispatcher)
+                    {
+                        SY_WARN("[WorkbenchMenuManager] Recent file triggered without dispatcher");
+                        return;
+                    }
+                    dispatcher->dispatch(QStringLiteral("file.open_recent"),
+                        QVariantMap{ { QStringLiteral("filePath"), filePath } });
+                });
+            }
+        });
+}
+
 void WorkbenchMenuManager::rebuildMenusFromConfig()
 {
     // 配置驱动菜单的原则：同一份 UiConfigData 同时驱动菜单、工具栏、Dock、状态栏、右键菜单。
@@ -308,6 +374,10 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
     // 命令分发器随 WorkbenchMenuManager 生命周期持有（成员 m_dispatcher）：
     // UiLayoutBuilder 会把该指针存入 QAction 触发回调并长期解引用，必须保证指针在菜单存在期间有效。
     m_menuLayoutBuilder = std::make_unique<UiLayoutBuilder>(m_window, commandDispatcher(), m_menuPanelRegistry.get());
+
+    // 注册 File ▸ Recent Files 动态段，必须在建菜单之前 ——
+    // UiLayoutBuilder 建到该子菜单时会立刻填一次。
+    registerRecentFilesSection();
 
     m_menuLayoutBuilder->clearBuiltLayout();
 
@@ -524,7 +594,10 @@ std::vector<MenuDef> WorkbenchMenuManager::filterMenusForWorkbench(const std::ve
             }
         }
         normalizeSeparators(outSub.items);
-        return !outSub.items.empty();
+        // 声明了 dynamicSections 的子菜单不能因为"静态条目为空"被裁掉 ——
+        // 这类子菜单的条目本来就在运行时才生成（File ▸ Recent Files 是纯动态的，
+        // 静态条目一个都没有）。裁掉的话 UiLayoutBuilder 根本看不到它，动态段永远填不进去。
+        return !outSub.items.empty() || !outSub.dynamicSections.isEmpty();
     };
 
 

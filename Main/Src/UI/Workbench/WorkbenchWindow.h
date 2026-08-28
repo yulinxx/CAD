@@ -117,17 +117,6 @@ public:
     /// @param y 世界坐标 Y（毫米）
     void updatePositionLabel(double x, double y);
 
-    // ==================== 最近文件菜单 ====================
-
-    /// 将文件路径添加到最近文件列表
-    /// @param filePath 文件完整路径
-    void addRecentFile(const QString& filePath);
-    /// 从设置中加载最近文件列表
-    QStringList loadRecentFiles() const;
-    /// 将最近文件列表保存到设置
-    void saveRecentFiles(const QStringList& files) const;
-
-
     /// 注册停靠面板
     /// @param title 面板标题
     /// @param widget 面板内容部件

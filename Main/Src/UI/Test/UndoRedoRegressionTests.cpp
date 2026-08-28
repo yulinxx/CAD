@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file UndoRedoRegressionTests.cpp
  * @brief 撤销/重做回归测试 — 覆盖命令栈、事务、批量操作、快照、保存点
  *
@@ -740,6 +740,111 @@ TEST(UndoRedoRegressionTest, EntitySnapshots_MergeTwoCommands)
     // 合并后一次 undo 回到 V1
     undoMgr.undo();
     EXPECT_STREQ(scene.findSyEntityById(lineId)->name(), "V1");
+}
+
+// 一次完整的鼠标拖拽（按下 → 拖动 → 松开）必须是一条独立的撤销记录：
+// 连续拖两次要能分两次撤回，不能被并成一条。
+// 历史缺陷：SceneEditService::pushExecutedSnapshotCommand 里的
+// if (allowMerge && ...) {} 是空语句，allowMerge 被忽略，所有路径都走了会合并的分支。
+TEST(UndoRedoRegressionTest, EntitySnapshots_NonMergeableKeepsSeparateRecords)
+{
+    Eg::SceneManager scene;
+    UndoRedoManager undoMgr(&scene);
+
+    auto line = std::make_unique<Eg::SyLine>();
+    line->setName("V1");
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    Eg::EntityId lineId = line->id;
+
+    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    vec.push_back(std::move(line));
+    scene.addEntities(std::move(vec));
+
+    Eg::EntityId snapId[1] = { lineId };
+
+    // 第一次拖拽：V1 → V2，mergeable = false
+    Eg::SyEntity* beforeSnap1[1] = { nullptr };
+    size_t beforeCount1 = Eg::captureEntitySnapshots(&scene, snapId, 1, beforeSnap1, 1);
+    scene.findSyEntityById(lineId)->setName("V2");
+    Eg::SyEntity* afterSnap1[1] = { nullptr };
+    size_t afterCount1 = Eg::captureEntitySnapshots(&scene, snapId, 1, afterSnap1, 1);
+
+    auto* drag1 = Eg::createEntitySnapshotsCommand(
+        &scene, beforeSnap1, beforeCount1, afterSnap1, afterCount1, "Transform", false);
+    drag1->execute();
+    undoMgr.pushExecutedCommand(drag1);
+
+    // 第二次拖拽：V2 → V3，同一批图元、同一 description，同样 mergeable = false
+    Eg::SyEntity* beforeSnap2[1] = { nullptr };
+    size_t beforeCount2 = Eg::captureEntitySnapshots(&scene, snapId, 1, beforeSnap2, 1);
+    scene.findSyEntityById(lineId)->setName("V3");
+    Eg::SyEntity* afterSnap2[1] = { nullptr };
+    size_t afterCount2 = Eg::captureEntitySnapshots(&scene, snapId, 1, afterSnap2, 1);
+
+    auto* drag2 = Eg::createEntitySnapshotsCommand(
+        &scene, beforeSnap2, beforeCount2, afterSnap2, afterCount2, "Transform", false);
+    drag2->execute();
+    undoMgr.pushExecutedCommand(drag2);
+
+    EXPECT_STREQ(scene.findSyEntityById(lineId)->name(), "V3");
+
+    // 两条独立记录：第一次撤销只回到 V2，第二次才回到 V1
+    undoMgr.undo();
+    EXPECT_STREQ(scene.findSyEntityById(lineId)->name(), "V2");
+    EXPECT_TRUE(undoMgr.canUndo());
+
+    undoMgr.undo();
+    EXPECT_STREQ(scene.findSyEntityById(lineId)->name(), "V1");
+    EXPECT_FALSE(undoMgr.canUndo());
+}
+
+// 合并判定必须对称：先来一条可合并的（方向键 nudge），再来一条不可合并的（鼠标拖拽），
+// 拖拽不能被吞进 nudge 那条记录里。
+// UndoRedoManager 问的是栈顶（this），只判 this->m_mergeable 会漏掉这种组合。
+TEST(UndoRedoRegressionTest, EntitySnapshots_MergeIsSymmetric)
+{
+    Eg::SceneManager scene;
+    UndoRedoManager undoMgr(&scene);
+
+    auto line = std::make_unique<Eg::SyLine>();
+    line->setName("V1");
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    Eg::EntityId lineId = line->id;
+
+    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    vec.push_back(std::move(line));
+    scene.addEntities(std::move(vec));
+
+    Eg::EntityId snapId[1] = { lineId };
+
+    // nudge：mergeable = true
+    Eg::SyEntity* beforeSnap1[1] = { nullptr };
+    size_t beforeCount1 = Eg::captureEntitySnapshots(&scene, snapId, 1, beforeSnap1, 1);
+    scene.findSyEntityById(lineId)->setName("V2");
+    Eg::SyEntity* afterSnap1[1] = { nullptr };
+    size_t afterCount1 = Eg::captureEntitySnapshots(&scene, snapId, 1, afterSnap1, 1);
+
+    auto* nudge = Eg::createEntitySnapshotsCommand(
+        &scene, beforeSnap1, beforeCount1, afterSnap1, afterCount1, "Transform", true);
+    nudge->execute();
+    undoMgr.pushExecutedCommand(nudge);
+
+    // 拖拽：mergeable = false，description 相同
+    Eg::SyEntity* beforeSnap2[1] = { nullptr };
+    size_t beforeCount2 = Eg::captureEntitySnapshots(&scene, snapId, 1, beforeSnap2, 1);
+    scene.findSyEntityById(lineId)->setName("V3");
+    Eg::SyEntity* afterSnap2[1] = { nullptr };
+    size_t afterCount2 = Eg::captureEntitySnapshots(&scene, snapId, 1, afterSnap2, 1);
+
+    auto* drag = Eg::createEntitySnapshotsCommand(
+        &scene, beforeSnap2, beforeCount2, afterSnap2, afterCount2, "Transform", false);
+    drag->execute();
+    undoMgr.pushExecutedCommand(drag);
+
+    // 没被合并：撤销一次只回到 V2
+    undoMgr.undo();
+    EXPECT_STREQ(scene.findSyEntityById(lineId)->name(), "V2");
+    EXPECT_TRUE(undoMgr.canUndo());
 }
 
 // ==================== 图元属性变更测试 ====================

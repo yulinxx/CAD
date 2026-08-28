@@ -240,6 +240,11 @@ private:
     // 相机
     Camera2D m_camera;
 
+    /// 上次重建选中轮廓时所用的 pixelToWorld 比例（0 = 尚未记录）。
+    /// 轮廓离散密度是像素基准的（见 SelectionOutlineBuilder），缩放跨过一定倍数后
+    /// 必须重建：否则放大看虚线会显棱角，缩小则白白背着过密的顶点。
+    float m_outlineScaleAtBuild{ 0.0f };
+
     // 文档和服务
     SceneDocument2D* m_document{ nullptr };
     Eg::SceneManager* m_sceneManager{ nullptr };

@@ -140,12 +140,6 @@ public:
         return m_fileDialogService.get();
     }
 
-    /// 获取最近文件服务
-    RecentFileService* recentFileService()
-    {
-        return m_recentFileService.get();
-    }
-
     /// 获取组装后的 UI 服务集合
     const UiServices& uiServices() const
     {

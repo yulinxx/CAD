@@ -223,7 +223,7 @@ bool UiWorkbench::isCommandRegistered(const QString& /*commandId*/) const
     return false;
 }
 
-void UiWorkbench::dispatchCommand(const QString& /*commandId*/)
+void UiWorkbench::dispatchCommand(const QString& /*commandId*/, const QVariantMap& /*params*/)
 {
     SY_WARN("[UiWorkbench] Command dispatch requested without a workbench adapter");
 }
@@ -308,7 +308,7 @@ bool Workbench2D::isCommandRegistered(const QString& commandId) const
     return CommandCatalog::operationForCommandId(commandId) != OperationId::None;
 }
 
-void Workbench2D::dispatchCommand(const QString& commandId)
+void Workbench2D::dispatchCommand(const QString& commandId, const QVariantMap& params)
 {
     if (!m_services.operationBus)
     {
@@ -324,7 +324,7 @@ void Workbench2D::dispatchCommand(const QString& commandId)
         SY_INFOF("[Workbench2D] Dispatch command='%s' menuId=%d source=Menu",
             qPrintable(commandId),
             static_cast<int>(menuId));
-        OperationRouting::dispatch(menuId);
+        OperationRouting::dispatch(menuId, OperationSource::Menu, params);
         return;
     }
 
@@ -342,12 +342,12 @@ void Workbench2D::dispatchCommand(const QString& commandId)
             return;
         }
         SY_INFOF("[Workbench2D] Dispatch tool command='%s'", qPrintable(commandId));
-        m_services.operationBus->run(toolOperation, {}, OperationSource::Menu);
+        m_services.operationBus->run(toolOperation, params, OperationSource::Menu);
         return;
     }
 
     SY_INFOF("[Workbench2D] Dispatch command='%s'", qPrintable(commandId));
-    m_services.operationBus->run(operation, {}, OperationSource::Menu);
+    m_services.operationBus->run(operation, params, OperationSource::Menu);
 }
 
 QString Workbench2D::commandText(const QString& commandId) const
@@ -449,7 +449,10 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
         m_statusBar2D = new StatusBar(&window);
         // Position 标签弹出单位选择 → 复用与视图菜单完全相同的命令分发路径
         m_statusBar2D->setUnitManager(m_services.unitManager);
-        connect(m_statusBar2D, &StatusBar::sigUnitCommandRequested, this, &Workbench2D::dispatchCommand);
+        // dispatchCommand 现在带 params，信号只给 commandId，这里用 lambda 补空参数
+        connect(m_statusBar2D, &StatusBar::sigUnitCommandRequested, this, [this](const QString& commandId) {
+            dispatchCommand(commandId, QVariantMap{});
+        });
         SY_INFO("[Workbench2D] StatusBar created");
     }
     window.mountStatusBar(m_statusBar2D);
@@ -1933,7 +1936,7 @@ bool Workbench3D::isCommandRegistered(const QString& commandId) const
     return CommandCatalog3D::operationForCommandId(commandId) != OperationId3D::None;
 }
 
-void Workbench3D::dispatchCommand(const QString& commandId)
+void Workbench3D::dispatchCommand(const QString& commandId, const QVariantMap& params)
 {
     if (!m_services3D.operationBus)
     {
@@ -1949,7 +1952,12 @@ void Workbench3D::dispatchCommand(const QString& commandId)
     }
 
     SY_INFOF("[Workbench3D] Dispatch command='%s'", qPrintable(commandId));
-    m_services3D.operationBus->run(operation);
+    // 走完整 Request：便捷入口 run(id, source) 不带 params，会把调用方参数丢掉
+    OperationRequest3D req;
+    req.id = operation;
+    req.source = OperationSource3D::Menu;
+    req.params = params;
+    m_services3D.operationBus->run(req);
 }
 
 QString Workbench3D::commandText(const QString& commandId) const

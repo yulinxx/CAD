@@ -51,6 +51,13 @@ struct SubMenuDef
     bool checkable = false;
     bool checked = false;
     std::vector<std::variant<MenuActionDef, SubMenuDef, MenuItemType>> items;
+    /// 动态段提供者 ID 列表，按顺序追加到静态条目之后。
+    /// 与 ContextMenuDef::dynamicSections 是同一套机制、同一个注册表
+    /// （UiContextMenuService 的段注册表），JSON 里的键名也相同 —— 不要另造概念。
+    /// 典型用途是「File ▸ Recent Files」：条目按运行时最近文件列表生成。
+    /// 注意主菜单只在工作台重建时构建一次，所以声明了本字段的子菜单会在
+    /// aboutToShow 时重填（见 UiLayoutBuilder::buildMenuItem）。
+    QStringList dynamicSections;
 };
 
 /// 顶层菜单定义

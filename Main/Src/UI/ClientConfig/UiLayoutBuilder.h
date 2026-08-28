@@ -12,6 +12,7 @@
 #include "UiClientConfigBase.h"
 
 #include <QSet>
+#include <QVariantMap>
 #include <vector>
 
 class QAction;
@@ -34,8 +35,16 @@ public:
     /// 命令是否已注册
     virtual bool isCommandRegistered(const QString& commandId) const = 0;
 
-    /// 分发命令
-    virtual void dispatch(const QString& commandId) = 0;
+    /// 分发命令（唯一入口）
+    /// @param params 调用方给出的参数（如最近文件项的 path），实现负责透传到操作总线；
+    ///        实现里的 enrichParams 只能补齐缺失项，不得整体覆盖。
+    virtual void dispatch(const QString& commandId, const QVariantMap& params) = 0;
+
+    /// 无参分发的便捷写法。非虚，只是转调上面那一条通路，不构成第二个入口。
+    void dispatch(const QString& commandId)
+    {
+        dispatch(commandId, QVariantMap{});
+    }
 };
 
 /// 数据驱动的布局构建器

@@ -49,7 +49,7 @@ namespace
             return false;
         }
 
-        void dispatch(const QString&) override {}
+        void dispatch(const QString&, const QVariantMap&) override {}
     };
 }  // namespace
 

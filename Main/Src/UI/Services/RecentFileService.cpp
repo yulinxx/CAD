@@ -13,16 +13,6 @@ RecentFileService::RecentFileService(PersistenceService* persistence)
 {
 }
 
-void RecentFileService::setPersistenceService(PersistenceService* persistence)
-{
-    m_persistence = persistence;
-}
-
-PersistenceService* RecentFileService::persistenceService() const
-{
-    return m_persistence;
-}
-
 void RecentFileService::addRecentFile(const QString& filePath)
 {
     if (filePath.isEmpty())

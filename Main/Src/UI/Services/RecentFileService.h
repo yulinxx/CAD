@@ -1,36 +1,30 @@
 #pragma once
 
-#include <QString>
-#include <QStringList>
+#include "UI/Services/IRecentFileService.h"
 
 class PersistenceService;
 
 /**
  * @class RecentFileService
- * @brief 最近文件管理服务 —— 封装 QSettings + 数据库双写的最近文件操作
+ * @brief IRecentFileService 的唯一实现 —— QSettings + 数据库双写
  *
- * 将"最近文件"的读写逻辑从 WorkbenchWindow 和 ApplicationCompositionRoot 中剥离，
- * 提供统一的 add/load/save 接口。内部优先使用数据库持久化，QSettings 作为兜底。
+ * 全仓最近文件读写只走这一条路。曾经并存的三套（WorkbenchWindow 自带一份、
+ * UI2D ConfigManager 写 "Files/RecentFiles"、UI2D FileManager 纯内存）已删除。
+ * 内部优先使用数据库持久化，QSettings 作为兜底。
  */
-class RecentFileService
+class RecentFileService : public IRecentFileService
 {
 public:
     explicit RecentFileService(PersistenceService* persistence = nullptr);
 
-    /// 设置持久化服务（运行时可更新）
-    void setPersistenceService(PersistenceService* persistence);
-
-    /// 获取持久化服务
-    PersistenceService* persistenceService() const;
-
     /// 追加一个最近文件（自动去重、截断、双写）
-    void addRecentFile(const QString& filePath);
+    void addRecentFile(const QString& filePath) override;
 
     /// 加载最近文件列表（数据库优先，QSettings 兜底）
-    QStringList loadRecentFiles() const;
+    QStringList loadRecentFiles() const override;
 
     /// 保存最近文件列表（QSettings 兜底写入）
-    void saveRecentFiles(const QStringList& files) const;
+    void saveRecentFiles(const QStringList& files) const override;
 
 private:
     /// 最大最近文件数量

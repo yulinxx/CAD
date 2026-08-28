@@ -89,9 +89,7 @@
 #include "Log/SyLogger.h"
 #include "UI/StatusBarBase.h"
 #include <QAction>
-#include <QDateTime>
 #include <QEvent>
-#include <QFileInfo>
 #include <functional>
 
 #include <QCoreApplication>
@@ -103,7 +101,6 @@
 #include <QProgressBar>
 #include <QRegularExpression>
 #include <QScreen>
-#include <QSettings>
 #include <QStatusBar>
 #include <QToolBar>
 #include <QWidget>
@@ -114,8 +111,6 @@
 #include "UiLayoutService.h"
 #include "Persistence/PersistenceService.h"
 #include "Persistence/Repositories/WorkspaceSnapshotRepository.h"
-#include "Persistence/Repositories/RecentFileRepository.h"
-#include "Persistence/Models/RecentFileRecord.h"
 #include "Persistence/Models/WorkspaceSnapshotRecord.h"
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
@@ -660,77 +655,13 @@ void WorkbenchWindow::refreshPositionLabel()
     }
 }
 
-// ==================== 最近文件菜单实现 ====================
-
-/// 将文件路径添加到最近文件列表
-/// @param filePath 文件完整路径
-void WorkbenchWindow::addRecentFile(const QString& filePath)
-{
-    if (filePath.isEmpty())
-    {
-        return;
-    }
-
-    // 优先使用数据库持久化，失败时回退到 QSettings
-    auto* ps = m_uiServices.persistenceService;
-    if (ps && ps->isOpen() && ps->recentFiles())
-    {
-        QFileInfo fileInfo(filePath);
-        RecentFileRecord rec;
-        rec.filePath = filePath.toStdString();
-        rec.title = fileInfo.fileName().toStdString();
-        rec.format = fileInfo.suffix().toUpper().toStdString();
-        // 获取当前时间戳
-        rec.lastOpenedTime = QDateTime::currentDateTime().toString(Qt::ISODate).toStdString();
-        ps->recentFiles()->append(rec);
-    }
-
-    // 同时维护 QSettings 作为兜底（与数据库双写，确保降级可用）
-    QStringList files = loadRecentFiles();
-    files.removeAll(filePath);
-    files.prepend(filePath);
-    constexpr int kMaxRecentFiles = 10;
-    while (files.size() > kMaxRecentFiles)
-    {
-        files.removeLast();
-    }
-    saveRecentFiles(files);
-}
-
-
-/// 从设置中加载最近文件列表（数据库优先，QSettings 兜底）
-QStringList WorkbenchWindow::loadRecentFiles() const
-{
-    auto* ps = m_uiServices.persistenceService;
-    if (ps && ps->isOpen() && ps->recentFiles())
-    {
-        auto records = ps->recentFiles()->loadAll();
-        if (!records.empty())
-        {
-            QStringList result;
-            for (const auto& rec : records)
-            {
-                result.append(QString::fromStdString(rec.filePath));
-            }
-            return result;
-        }
-    }
-
-    // 兜底：从 QSettings 读取
-    QSettings settings;
-    return settings.value(QStringLiteral("RecentFiles"), QStringList()).toStringList();
-}
-
-/// 将最近文件列表保存到设置（数据库优先，QSettings 兜底）
-void WorkbenchWindow::saveRecentFiles(const QStringList& files) const
-{
-    // 数据库端：由 addRecentFile 逐条写入，此处不做批量覆盖
-    // QSettings 兜底：保留旧版兼容性
-    QSettings settings;
-    settings.setValue(QStringLiteral("RecentFiles"), files);
-}
+// 最近文件读写已收口到 RecentFileService（Main/Src/UI/Services/RecentFileService.h）。
+// 这里原本有一份逐字节相同的 addRecentFile/loadRecentFiles/saveRecentFiles，
+// 无任何外部调用者，且与 RecentFileService 写同一个 QSettings 键 "RecentFiles"，
+// 属于第二套并行实现，已删除。需要读写最近文件请走 m_uiServices.recentFileService。
 
 /// 注册停靠面板
+
 
 /// @param title 面板标题
 /// @param widget 面板内容部件

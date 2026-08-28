@@ -428,6 +428,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*RenderWidget3DAdapterTests\\.cpp$")
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*Scene3DRegressionTests\\.cpp$")
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*FrameworkLifecycleTests\\.cpp$")
+        list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*TransformGizmo3DHitTests\\.cpp$")
     endif()
 
         set(MAIN_TEST_DEP_SOURCES ${MAIN_APP_SOURCES})
