@@ -885,7 +885,24 @@ void RenderViewport2D::applyCameraToWidget()
     {
         m_renderWidget->markSceneEnvDirty();
     }
+
+    // 选中轮廓的离散密度按像素给定，缩放跨过一定倍数后必须重建。
+    // 只按倍数判定、不是每次相机变化都重建：平移与微小缩放不改变屏幕上的边长量级，
+    // 而重建要把整个选中集重新离散一遍 —— 选中上万个图元时那是逐帧都做不起的。
+    const float scale = m_renderWidget->pixelToWorldScale();
+    if (scale > 0.0f)
+    {
+        constexpr float kRebuildRatio = 1.5f;
+        const bool crossed = m_outlineScaleAtBuild <= 0.0f || scale > m_outlineScaleAtBuild * kRebuildRatio ||
+                             scale * kRebuildRatio < m_outlineScaleAtBuild;
+        if (crossed)
+        {
+            m_outlineScaleAtBuild = scale;
+            syncSelectionToolState();
+        }
+    }
 }
+
 
 // ==================== 刷新策略委托（→ SceneRefreshCoordinator） ====================
 

@@ -8,7 +8,7 @@
 #include "UI/FileOperationUtils.h"
 #include "UI/Services/UiStateCenter.h"
 #include "UI/Services/FileDialogService.h"
-#include "UI/Services/RecentFileService.h"
+#include "UI/Services/IRecentFileService.h"
 #include "UI/Services/HelpDialogService.h"
 
 #include "Engine2D/Core/SceneManager.h"

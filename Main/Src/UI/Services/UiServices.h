@@ -18,7 +18,7 @@ class PersistenceService;
 class LayerPersistenceBridge;
 class ImportService;
 class ExportService;
-class RecentFileService;
+class IRecentFileService;
 class SettingsService;
 class ViewportActionHub;
 class UnitManager;
@@ -89,8 +89,8 @@ struct UiServices : public IUiServices
     /// 场景编辑服务（带Undo的图元操作入口，阶段1收口：不再暴露底层 SceneManager）
     class SceneEditService* sceneEditService{ nullptr };
 
-    /// 最近文件服务（统一管理最近文件列表的读写）
-    RecentFileService* recentFileService{ nullptr };
+    /// 最近文件服务（全仓唯一的最近文件读写入口，实现为 Main 的 RecentFileService）
+    IRecentFileService* recentFileService{ nullptr };
 
     /// 共享 SettingsService singleton（app-level 共享，非每工作台私有）
     SettingsService* settingsService{ nullptr };
@@ -103,10 +103,6 @@ struct UiServices : public IUiServices
 
     /// 图元剪贴板（Copy/Cut/Paste 的图元副本缓存）
     Eg::EntityClipboard* clipboard{ nullptr };
-
-    /// 最近文件回调：当文件被打开时调用，参数为文件完整路径
-    /// 由 WorkbenchWindow 注入，用于刷新最近文件菜单
-    std::function<void(const QString&)> recentFileOpenedCallback;
 
     // ---- IUiServices 接口实现 ----
 

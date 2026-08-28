@@ -2,7 +2,7 @@
 
 /**
  * @file UiContextMenuService.h
- * @brief 配置驱动的右键菜单服务（P0-2b）
+ * @brief 配置驱动的右键菜单服务（P0-2b）+ 全仓唯一的菜单动态段注册表
  *
  * 背景：
  *   右键菜单历史上完全由 C++ 硬编码组装（CommandActionHub::populateContextMenu /
@@ -12,10 +12,15 @@
  * 设计：
  *   静态部分 —— 由客户 JSON 的 contextMenus 节声明，走 UiLayoutBuilder 构建，
  *               与顶部菜单共享命令绑定、图标解析、授权门控行为。
- *   动态部分 —— 右键菜单里有内容天生无法静态描述（典型是「设为当前图层 /
- *               移动到图层…」，需要按运行时图层列表生成）。这类内容由 C++ 侧
- *               注册「动态段提供者」，JSON 只用 dynamicSections 声明插入哪些段、
- *               按什么顺序。这样既保住了配置化，也不必把运行时数据塞进 JSON。
+ *   动态部分 —— 菜单里有内容天生无法静态描述（右键的「设为当前图层 / 移动到图层…」
+ *               需要按运行时图层列表生成；File ▸ Recent Files 需要按最近文件列表生成）。
+ *               这类内容由 C++ 侧注册「动态段提供者」，JSON 只用 dynamicSections
+ *               声明插入哪些段、按什么顺序。这样既保住了配置化，也不必把运行时数据塞进 JSON。
+ *
+ * 段注册表是全仓唯一的一份，两个菜单表面共用：
+ *   - 右键菜单：本类 buildMenu() 里追加（ContextMenuDef::dynamicSections）
+ *   - 主菜单子菜单：UiLayoutBuilder 里追加（SubMenuDef::dynamicSections）
+ *   两边都调用 fillDynamicSections()，不要各写一份追加逻辑。
  *
  * 使用约定：
  *   1. 启动时调用 registerDynamicSection() 注册动态段。
@@ -26,6 +31,7 @@
 
 #include <QMap>
 #include <QString>
+#include <QStringList>
 #include <functional>
 
 class QMenu;
@@ -34,18 +40,20 @@ class IUiCommandDispatcher;
 struct UiConfigData;
 
 /// 动态段填充回调：向已构建的菜单追加运行时生成的条目
-using UiContextMenuSectionFiller = std::function<void(QMenu* menu)>;
+/// 右键菜单与主菜单子菜单共用此类型，故不叫 ContextMenu*
+using UiMenuSectionFiller = std::function<void(QMenu* menu)>;
 
-/// 配置驱动的右键菜单服务（进程级单例）
+/// 配置驱动的右键菜单服务 + 菜单动态段注册表（进程级单例）
 class UiContextMenuService
 {
 public:
     static UiContextMenuService& instance();
 
     /// 注册动态段提供者
-    /// @param sectionId 与 JSON contextMenus[].dynamicSections 中的字符串对应
+    /// @param sectionId 与 JSON 里 dynamicSections 中的字符串对应
+    ///        （contextMenus[].dynamicSections 或 menus[].items[].dynamicSections）
     /// @param filler 填充回调；同 id 重复注册会覆盖
-    void registerDynamicSection(const QString& sectionId, UiContextMenuSectionFiller filler);
+    void registerDynamicSection(const QString& sectionId, UiMenuSectionFiller filler);
 
     /// 注销动态段提供者
     /// 本服务是进程级单例，而 filler 闭包普遍捕获工作台裸指针。工作台
@@ -54,6 +62,13 @@ public:
     /// @param sectionId 与注册时一致；未注册时静默返回
     void unregisterDynamicSection(const QString& sectionId);
 
+    /// 按声明顺序把动态段追加到 menu 末尾
+    ///
+    /// 右键菜单与主菜单子菜单共用这一份追加逻辑：未注册的段只告警并跳过，
+    /// 不中断其余段，避免一个客户配置写错就整块菜单消失。
+    /// @param ownerId 仅用于日志定位（右键菜单 id 或子菜单 id）
+    /// @return 实际追加的条目数
+    int fillDynamicSections(QMenu* menu, const QStringList& sectionIds, const QString& ownerId);
 
     /// 按配置构建右键菜单
     /// @param config 当前客户配置（通常取自 WorkbenchLayoutManager::configManager()）
@@ -75,5 +90,5 @@ public:
 private:
     UiContextMenuService() = default;
 
-    QMap<QString, UiContextMenuSectionFiller> m_sections;
+    QMap<QString, UiMenuSectionFiller> m_sections;
 };

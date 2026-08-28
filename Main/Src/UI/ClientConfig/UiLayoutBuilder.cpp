@@ -1,4 +1,5 @@
 #include "UiLayoutBuilder.h"
+#include "UiContextMenuService.h"
 #include "UiFeatureGate.h"
 #include "UiPanelRegistry.h"
 #include "UiShortcutRegistry.h"
@@ -347,6 +348,38 @@ void UiLayoutBuilder::buildMenuItem(QMenu* parent, const std::variant<MenuAction
         for (const auto& subItem : sub.items)
         {
             buildMenuItem(subMenu, subItem);
+        }
+
+        // 声明了 dynamicSections 的子菜单：条目按运行时数据生成（如 File ▸ Recent Files）。
+        //
+        // 这里必须挂 aboutToShow —— 主菜单只在工作台重建时构建一次，而最近文件之类的
+        // 运行时数据随时在变；右键菜单不需要这一步，因为每次右键都整块重建。
+        // 重填只丢弃静态条目之后的部分，静态条目及其命令绑定/快捷键台账保持不变。
+        //
+        // 约定：filler 必须新建归本菜单所有的 QAction。共享 QAction（如命令中枢托管的
+        // 那批）不能进动态段，否则重填会把别人还在用的对象删掉 —— 下面按 parent 判定，
+        // 非本菜单所有的只摘不删。
+        if (!sub.dynamicSections.isEmpty())
+        {
+            const int staticCount = subMenu->actions().size();
+            const QStringList sectionIds = sub.dynamicSections;
+            const QString ownerId = sub.id;
+            auto refill = [subMenu, staticCount, sectionIds, ownerId]() {
+                const QList<QAction*> actions = subMenu->actions();
+                for (int i = actions.size() - 1; i >= staticCount; --i)
+                {
+                    QAction* stale = actions.at(i);
+                    subMenu->removeAction(stale);
+                    if (stale->parent() == subMenu)
+                    {
+                        stale->deleteLater();
+                    }
+                }
+                UiContextMenuService::instance().fillDynamicSections(subMenu, sectionIds, ownerId);
+            };
+            // 先填一次：不打开菜单也能通过 actions() 看到内容，契约测试与启用态刷新都依赖这一点
+            refill();
+            QObject::connect(subMenu, &QMenu::aboutToShow, subMenu, refill);
         }
         return;
     }

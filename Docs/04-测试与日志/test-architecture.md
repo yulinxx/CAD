@@ -171,14 +171,15 @@ UI/2D/Test/
 ├── TextEditToolFlowTests.cpp # 文本编辑工具流
 ├── TextEditServiceTests.cpp  # 文本编辑服务
 ├── ToolShortcutTests.cpp     # 工具快捷键
-├── ParameterFactoryTests.cpp # 参数工厂
 ├── ComplexToolsTests.cpp     # 复杂工具
 └── ComplexToolsTestImpl.cpp
+
 
 UI/Common/Test/
 ├── CommandKernelTests.cpp    # 命令内核测试（含启用规则组合：多选 / 多选+未锁定）
 ├── CommandConcurrentTests.cpp # 命令并发测试
 ├── UndoRedoTests.cpp         # 撤销重做测试
+├── OperationRoutingBaseTests.cpp # 菜单路由模板：调用方 params 透传与 enrich 语义
 └── SettingsTableTests.cpp    # 设置表测试
 
 UI/3D/Test/
@@ -327,6 +328,26 @@ Utility/Utility/Test/
 `MainTests` 用 `::testing::Environment` 在首个用例前建。
 平台插件沿用默认 `windows`（`sanyi_deploy_qt_dlls` 只部署它，
 强制 `QT_QPA_PLATFORM=offscreen` 会因插件缺失直接起不来）。
+
+#### 4.3.2 缺 DLL 被误判成"超时"（2026-08-27 定位）
+
+`UI3DStorageTests` 长期被记为"超时挂死"，实测**不是挂死**：真实退出码是
+`0xC0000135`（STATUS_DLL_NOT_FOUND），进程在 `main` 之前就没了，
+stdout/stderr 一个字都没有。根因是该目标是全仓唯一链接 `Qt::Test` 的 3D 测试，
+而 CMake 里漏了 `sanyi_deploy_qt_dlls(UI3DStorageTests)`，输出目录没有 `Qt6Testd.dll`。
+补上部署后 12/12 全过。
+
+两条排查纪律：
+
+- **别用「杀进程 + 读重定向文件」判断有没有输出。** 被 `Kill()` 掉的进程，
+  stdout 缓冲区里的内容全部丢失，看起来就像"零输出的挂死"。
+  先拿 `-Wait` 跑一次读退出码，再决定要不要设超时。
+- **退出码要按十六进制看。** `0xC0000135` 缺 DLL、`0xC0000005` 访问违例、
+  `0x80000003` 断点（见 4.3.1），三者的排查方向完全不同。
+  PowerShell 里 `$p.ExitCode` 在配合 `-PassThru` + `WaitForExit(ms)` 时可能拿到空值，
+  用 `-Wait` 或先调无参 `WaitForExit()`。
+- QtTest 目标可以用它自带的 `-o 文件,txt` 直接落盘，绕开重定向不可靠的问题。
+
 
 
 ---

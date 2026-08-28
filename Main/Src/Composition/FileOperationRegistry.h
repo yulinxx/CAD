@@ -15,7 +15,7 @@ class LayerPersistenceBridge;
 class PersistenceService;
 class ImportService;
 class ExportService;
-class RecentFileService;
+class IRecentFileService;
 class HelpDialogService;
 
 namespace Eg
@@ -38,7 +38,7 @@ struct FileOperationConfig
     LayerManager* layerManager = nullptr;
     ImportService* importService = nullptr;
     ExportService* exportService = nullptr;
-    RecentFileService* recentFiles = nullptr;
+    IRecentFileService* recentFiles = nullptr;
     HelpDialogService* helpDialog = nullptr;
     UiStateCenter* stateCenter = nullptr;
     LayerPersistenceBridge* layerPersistence = nullptr;
@@ -104,7 +104,7 @@ private:
     LayerManager* m_layerManager;
     ImportService* m_importService;
     ExportService* m_exportService;
-    RecentFileService* m_recentFiles;
+    IRecentFileService* m_recentFiles;
     HelpDialogService* m_helpDialog;
     UiStateCenter* m_stateCenter;
     LayerPersistenceBridge* m_layerPersistence;

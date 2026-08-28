@@ -221,10 +221,11 @@ void SceneRefreshCoordinator::onSceneChanged()
         }
     }
 
-    // 选中图元的本体不进主几何（改由流水虚线轮廓覆盖层表示），而轮廓只在"选择集变化"时
-    // 由 SelectTool 重建。于是当选中图元的几何被改动（对齐/镜像/缩放/移动）时，选择集没变、
-    // 轮廓也就不会重建，画面里的虚线会停在变换前的位置。这里补一次通知，让视口按当前场景
-    // 重新离散轮廓；消费端 syncSelectionFromScene 是从场景全量重读的，重复调用无副作用。
+    // 流水虚线轮廓覆盖层只在"选择集变化"时由 SelectTool 重建。于是当选中图元的几何被改动
+    // （对齐/镜像/缩放/移动）时，选择集没变、轮廓也就不会重建，画面里的虚线会停在变换前的
+    // 位置。这里补一次通知，让视口按当前场景重新离散轮廓；消费端 syncSelectionFromScene
+    // 是从场景全量重读的，重复调用无副作用。
+
     if (!m_lastSelectedIds.empty())
     {
         emit selectionChanged();
@@ -240,17 +241,12 @@ void SceneRefreshCoordinator::onSelectionChanged()
 
     // [E5-P1 修复] 选择变化走增量渲染，而非全量重建。
     // 旧代码调用 requestFullRefresh() 导致每次单击/悬停都触发整场 gather+tessellate+submit。
-    // 现在使用 Selection 级别：仅修改被选/取消选中图元的样式（虚线轮廓 vs 实线），
-    // 通过 modifyRenderEntity 实现高亮，避免重 tessellation。
     //
-    // [关键修复] SyEntity::setSelected 仅翻转标志、不会把图元标记为场景 dirty，
-    // 因此“取消选中”不会进入 m_pendingDirtyIds。而 applyLightRefresh 对选中图元执行
-    // removeRenderEntity 并把它从 m_renderedEntityIds 抹除；若之后取消选中却没有任何
-    // 脏标记驱动重新提交，该图元主体几何将永远留在渲染器之外（表现：选择后取消选择，
-    // 图元消失；再次选中又因覆盖层而“出现”）。
-    // 解决办法：把“当前选中集合”与“上一帧选中集合”的差集（即本次发生选中态翻转的图元）
-    // 加入待处理脏集合，确保增量路径对它们重新评估——选中的被移除（改由虚线覆盖层表示），
-    // 取消选中的被重新提交回主几何。
+    // 选中态不再改变主几何：图元本体始终以原色实线提交，选中反馈只由流水虚线轮廓覆盖层
+    // 叠加表达（覆盖层由 SelectTool 在 selectionChanged 时重建）。因此这里无需把选中态
+    // 翻转的图元加入脏集合——它们的顶点没有任何变化，重提交只是白做一遍离散化。
+    // 仍要维护 m_lastSelectedIds：onSceneChanged 靠它判断"当前有选中"，从而在几何被变换时
+    // 补发一次 selectionChanged 让轮廓跟着更新。
     if (m_sceneManager)
     {
         std::unordered_set<uint64_t> currentSelected;
@@ -258,16 +254,9 @@ void SceneRefreshCoordinator::onSelectionChanged()
         {
             currentSelected.insert(static_cast<uint64_t>(e->id));
         }
-        for (uint64_t id : currentSelected)
-        {
-            m_pendingDirtyIds.insert(id);
-        }
-        for (uint64_t id : m_lastSelectedIds)
-        {
-            m_pendingDirtyIds.insert(id);
-        }
         m_lastSelectedIds = std::move(currentSelected);
     }
+
 
     if (m_refreshLevel < RefreshLevel::Selection)
     {
@@ -291,7 +280,26 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         return;
     }
 
+    // 整批只切一次 GL 上下文、只请求一次重绘。addRenderEntity 单次调用自带一对
+    // makeCurrent/doneCurrent 与一次 update()，而一次批量编辑（拖动/对齐上万个
+    // 图元）会把它们全部压进脏集合，逐个做上下文切换是秒级开销。
+    // 用 RAII 收口，保证中途 return 或抛异常也不会把批量状态漏在开启态。
+    struct BatchGuard
+    {
+        RenderWidget* w;
+        explicit BatchGuard(RenderWidget* widget)
+            : w(widget)
+        {
+            w->beginBatchUpload();
+        }
+        ~BatchGuard()
+        {
+            w->endBatchUpload();
+        }
+    } batchGuard(m_renderWidget);
+
     for (auto id : m_pendingDeletedIds)
+
     {
         auto uid = static_cast<uint64_t>(id);
         m_renderWidget->removeRenderEntity(uid);
@@ -322,17 +330,10 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
 
         auto uid = static_cast<uint64_t>(id);
 
-        // 选中图元不渲染原始实体（由虚线轮廓覆盖层表示），若此前已在 GPU 上则移除。
-        // 与 gatherGeometry 全量路径保持同一规则，避免拖动变换时实线被重新提交。
-        if (entity->selected())
-        {
-            if (m_renderedEntityIds.count(uid))
-            {
-                m_renderWidget->removeRenderEntity(uid);
-                m_renderedEntityIds.erase(uid);
-            }
-            continue;
-        }
+        // 选中图元照常提交原始实体几何：选中反馈只由虚线轮廓覆盖层叠加表达，
+        // 图元本身保持原色实线不变。历史实现在这里把选中图元从 GPU 上移除，
+        // 于是一选中图形就"消失"只剩一圈虚线，原图看不出来了；而全量路径
+        // （SceneManager::gatherGeometry）本来就不跳过，两条路径规则也是矛盾的。
 
         std::vector<Render::VertexP3C3> vertices;
         Render::PrimitiveType primType;
@@ -388,9 +389,10 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     auto allEntities = sm->getAllEntities();
     for (auto* e : allEntities)
     {
-        // 选中图元不纳入已渲染账本（其原始实体几何由 gatherGeometry 跳过），
-        // 取消选中后才会被增量路径重新提交。
-        if (e && e->visible() && !e->selected() && (!e->layer() || e->layer()->isVisible()))
+        // 账本必须与 gatherGeometry 的提交规则一致：它不按 selected() 跳过，
+        // 因此选中图元同样已在 GPU 上，账本里也要记上。否则下一轮增量会把已存在的
+        // 图元当作新图元 addRenderEntity，造成重复提交。
+        if (e && e->visible() && (!e->layer() || e->layer()->isVisible()))
         {
             m_renderedEntityIds.insert(static_cast<uint64_t>(e->id));
         }

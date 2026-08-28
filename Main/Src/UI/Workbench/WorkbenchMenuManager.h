@@ -121,6 +121,13 @@ public:
     void clearGlobalShortcuts();
 
 private:
+    /// 注册 File ▸ Recent Files 动态段（段 id "file.recent"）
+    ///
+    /// 落点在本类而不是 Workbench2D/3D：最近文件是窗口级、2D/3D 共用的内容，
+    /// 放进工作台就会有两份闭包、两处注销。本类与主窗口同寿，闭包不会指向已失效对象，
+    /// 因此也不需要像右键菜单的 "layer.actions" 那样在 deactivate() 里注销。
+    void registerRecentFilesSection();
+
     /// 绑定配置菜单状态到状态中心（checkable 状态同步）
     void bindConfiguredMenuState();
     /// 刷新配置菜单状态

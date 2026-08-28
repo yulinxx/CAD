@@ -14,6 +14,7 @@
 #include "UI/ClientConfig/UiClientConfigBase.h"
 #include "UI/ClientConfig/UiConfigLoader.h"
 #include "UI/ClientConfig/UiConfigurationManager.h"
+#include "UI/ClientConfig/UiContextMenuService.h"
 #include "UI/ClientConfig/UiLayoutBuilder.h"
 #include "UI/ClientConfig/UiPanelRegistry.h"
 #include "UI/Services/UiStateCenter.h"
@@ -25,6 +26,7 @@
 #include <QMainWindow>
 #include <QDockWidget>
 #include <QFile>
+#include <QMenu>
 #include <QMenuBar>
 #include <QSet>
 #include <QTemporaryDir>
@@ -73,10 +75,11 @@ namespace
         return path;
     }
 
-    // 测试用命令分发器：记录分发到的命令，支持注册表查询
+    // 测试用命令分发器：记录分发到的命令与参数，支持注册表查询
     struct FakeDispatcher : public IUiCommandDispatcher
     {
         QStringList dispatched;
+        QList<QVariantMap> dispatchedParams;
         QSet<QString> registered;
 
         bool isCommandRegistered(const QString& commandId) const override
@@ -84,9 +87,10 @@ namespace
             return registered.contains(commandId);
         }
 
-        void dispatch(const QString& commandId) override
+        void dispatch(const QString& commandId, const QVariantMap& params) override
         {
             dispatched.push_back(commandId);
+            dispatchedParams.push_back(params);
         }
     };
 }  // namespace
@@ -986,4 +990,155 @@ TEST(WorkbenchMenuManagerTest, CommandDispatcherIsSharedAndStable)
     // 工作台命令目录不可用时，业务命令一律判为未注册
     EXPECT_FALSE(first->isCommandRegistered(QStringLiteral("tool.select")));
 }
+
+// ==================== 主菜单动态段（File ▸ Recent Files） ====================
+
+TEST(ClientConfigLoaderTest, ParsesSubMenuDynamicSections)
+{
+    const QString path = writeTempConfig(QStringLiteral("dynamic_submenu.json"), QStringLiteral(R"({
+            "meta": { "clientId": "test", "clientName": "Test", "version": "1.0" },
+            "menus": [ { "id": "file", "label": "File", "items": [
+                { "type": "submenu", "id": "file.recent", "label": "Recent Files",
+                  "dynamicSections": ["file.recent"], "items": [] }
+            ]}]
+        })"));
+
+    UiConfigLoader loader(path);
+    auto config = loader.load();
+    ASSERT_TRUE(config.has_value()) << loader.lastError().toStdString();
+    ASSERT_EQ(config->menus.size(), 1u);
+    ASSERT_EQ(config->menus[0].items.size(), 1u);
+    ASSERT_TRUE(std::holds_alternative<SubMenuDef>(config->menus[0].items[0]));
+
+    const SubMenuDef& sub = std::get<SubMenuDef>(config->menus[0].items[0]);
+    EXPECT_TRUE(sub.items.empty());
+    ASSERT_EQ(sub.dynamicSections.size(), 1);
+    EXPECT_EQ(sub.dynamicSections[0], QStringLiteral("file.recent"));
+}
+
+TEST(ClientConfigLoaderTest, FilterKeepsSubMenuWithOnlyDynamicSections)
+{
+    // 纯动态子菜单（静态条目为空）不能被"空子菜单"规则裁掉，
+    // 否则 UiLayoutBuilder 看不到它，动态段永远没机会填。
+    MenuDef menu;
+    menu.id = QStringLiteral("file");
+    menu.workbenches = QStringList{ QStringLiteral("2D") };
+
+    SubMenuDef dynamicOnly;
+    dynamicOnly.id = QStringLiteral("file.recent");
+    dynamicOnly.workbenches = QStringList{ QStringLiteral("2D") };
+    dynamicOnly.dynamicSections = QStringList{ QStringLiteral("file.recent") };
+    menu.items.push_back(dynamicOnly);
+
+    // 对照组：既没有静态条目也没有动态段，仍然该被裁掉
+    SubMenuDef trulyEmpty;
+    trulyEmpty.id = QStringLiteral("file.empty");
+    trulyEmpty.workbenches = QStringList{ QStringLiteral("2D") };
+    menu.items.push_back(trulyEmpty);
+
+    const auto filtered = WorkbenchMenuManager::filterMenusForWorkbench(
+        { menu }, QStringLiteral("2D"), [](const QString&) { return true; });
+
+    ASSERT_EQ(filtered.size(), 1u);
+    ASSERT_EQ(filtered[0].items.size(), 1u);
+    ASSERT_TRUE(std::holds_alternative<SubMenuDef>(filtered[0].items[0]));
+    EXPECT_EQ(std::get<SubMenuDef>(filtered[0].items[0]).id, QStringLiteral("file.recent"));
+}
+
+TEST(ClientConfigLayoutBuilderTest, SubMenuDynamicSectionFilledAtBuildAndRefilledOnAboutToShow)
+{
+    UiContextMenuService::instance().resetForTest();
+
+    // 段内容随外部数据变化，模拟最近文件列表
+    QStringList data{ QStringLiteral("a.sy") };
+    UiContextMenuService::instance().registerDynamicSection(
+        QStringLiteral("test.section"), [&data](QMenu* menu) {
+            for (const QString& item : data)
+            {
+                menu->addAction(item);
+            }
+        });
+
+    MenuDef menu;
+    menu.id = QStringLiteral("file");
+    menu.label = QStringLiteral("File");
+
+    SubMenuDef sub;
+    sub.id = QStringLiteral("file.recent");
+    sub.label = QStringLiteral("Recent Files");
+    sub.dynamicSections = QStringList{ QStringLiteral("test.section") };
+    menu.items.push_back(sub);
+
+    FakeDispatcher dispatcher;
+    QMainWindow window;
+    UiLayoutBuilder builder(&window, &dispatcher, nullptr);
+    builder.buildMenus({ menu });
+
+    QMenu* built = window.findChild<QMenu*>(QStringLiteral("file.recent"));
+    ASSERT_NE(built, nullptr);
+    // 建菜单时就填了一次，不必等用户点开
+    ASSERT_EQ(built->actions().size(), 1);
+    EXPECT_EQ(built->actions().at(0)->text(), QStringLiteral("a.sy"));
+
+    // 数据变了但菜单没重建：aboutToShow 必须重填，且不得叠加旧条目
+    data = QStringList{ QStringLiteral("b.sy"), QStringLiteral("c.sy") };
+    emit built->aboutToShow();
+    ASSERT_EQ(built->actions().size(), 2);
+    EXPECT_EQ(built->actions().at(0)->text(), QStringLiteral("b.sy"));
+    EXPECT_EQ(built->actions().at(1)->text(), QStringLiteral("c.sy"));
+
+    UiContextMenuService::instance().resetForTest();
+}
+
+TEST(ClientConfigLayoutBuilderTest, SubMenuStaticItemsSurviveDynamicRefill)
+{
+    UiContextMenuService::instance().resetForTest();
+
+    int fillCount = 0;
+    UiContextMenuService::instance().registerDynamicSection(
+        QStringLiteral("test.section"), [&fillCount](QMenu* menu) {
+            ++fillCount;
+            menu->addAction(QStringLiteral("dynamic"));
+        });
+
+    MenuDef menu;
+    menu.id = QStringLiteral("file");
+
+    MenuActionDef staticAction;
+    staticAction.id = QStringLiteral("file.clear");
+    staticAction.label = QStringLiteral("Clear");
+    staticAction.commandId = QStringLiteral("cmd.known");
+
+    SubMenuDef sub;
+    sub.id = QStringLiteral("file.recent");
+    sub.items.push_back(staticAction);
+    sub.dynamicSections = QStringList{ QStringLiteral("test.section") };
+    menu.items.push_back(sub);
+
+    FakeDispatcher dispatcher;
+    dispatcher.registered.insert(QStringLiteral("cmd.known"));
+    QMainWindow window;
+    UiLayoutBuilder builder(&window, &dispatcher, nullptr);
+    builder.buildMenus({ menu });
+
+    QMenu* built = window.findChild<QMenu*>(QStringLiteral("file.recent"));
+    ASSERT_NE(built, nullptr);
+    ASSERT_EQ(built->actions().size(), 2);
+    EXPECT_EQ(built->actions().at(0)->text(), QStringLiteral("Clear"));
+
+    emit built->aboutToShow();
+    // 静态条目仍在原位且只有一份，动态部分被替换而非追加
+    ASSERT_EQ(built->actions().size(), 2);
+    EXPECT_EQ(built->actions().at(0)->text(), QStringLiteral("Clear"));
+    EXPECT_EQ(built->actions().at(1)->text(), QStringLiteral("dynamic"));
+    EXPECT_EQ(fillCount, 2);
+
+    // 静态项的命令绑定不能被重填破坏
+    built->actions().at(0)->trigger();
+    ASSERT_EQ(dispatcher.dispatched.size(), 1u);
+    EXPECT_EQ(dispatcher.dispatched[0], QStringLiteral("cmd.known"));
+
+    UiContextMenuService::instance().resetForTest();
+}
+
 

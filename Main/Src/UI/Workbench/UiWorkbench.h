@@ -97,8 +97,9 @@ public:
     bool isCommandRegistered(const QString& commandId) const override;
 
     /// 从当前工作台命令目录分发命令
-    /// 菜单层只传递 commandId，不直接依赖具体 OperationBus 类型。
-    virtual void dispatchCommand(const QString& commandId);
+    /// 菜单层只传递 commandId 与参数，不直接依赖具体 OperationBus 类型。
+    /// @param params 调用方参数（如动态最近文件项的 path），透传到操作总线
+    virtual void dispatchCommand(const QString& commandId, const QVariantMap& params);
 
     /// IUiCommandDispatcher 入口，等价于 dispatchCommand。
     ///
@@ -107,10 +108,13 @@ public:
     /// 闭包的寿命跟随 QMenu，比任何局部适配器都长。历史上
     /// buildConfiguredContextMenu 在栈上建适配器再传地址，函数返回即失效，
     /// 点右键菜单项时 dispatch 打在已回收的栈帧上（3D 删除必崩）。
-    void dispatch(const QString& commandId) override
+    void dispatch(const QString& commandId, const QVariantMap& params) override
     {
-        dispatchCommand(commandId);
+        dispatchCommand(commandId, params);
     }
+
+    /// 派生类里声明了两参数 dispatch 会隐藏基类的无参便捷重载，显式引入
+    using IUiCommandDispatcher::dispatch;
 
 
     /// 获取工作台的命令显示名和图标等元数据
@@ -225,7 +229,7 @@ public:
     QString id() const override;
     QString displayName() const override;
     bool isCommandRegistered(const QString& commandId) const override;
-    void dispatchCommand(const QString& commandId) override;
+    void dispatchCommand(const QString& commandId, const QVariantMap& params) override;
     QString commandText(const QString& commandId) const override;
     bool initialize(const UiServices& services) override;
     void attachToWindow(WorkbenchWindow& window) override;
@@ -374,7 +378,7 @@ public:
     QString id() const override;
     QString displayName() const override;
     bool isCommandRegistered(const QString& commandId) const override;
-    void dispatchCommand(const QString& commandId) override;
+    void dispatchCommand(const QString& commandId, const QVariantMap& params) override;
     QString commandText(const QString& commandId) const override;
     bool initialize(const UiServices& services) override;
     void attachToWindow(WorkbenchWindow& window) override;
