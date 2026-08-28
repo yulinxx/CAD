@@ -109,6 +109,48 @@ if(MSVC)
     add_compile_options("/utf-8")
 endif()
 
+# ---------------------------------------------------------------------------
+# MSVC 静态分析：补上 printf 格式串校验（默认关闭，CI 专用）
+#
+# SY_*F 宏（Log/Log/Include/Log/SyLogger.h:194-199）是 C 可变参数，格式串靠标注校验：
+#   GCC/Clang —— __attribute__((format(printf,...)))，-Wformat 默认开启即生效；
+#   MSVC      —— SAL 的 _Printf_format_string_，**只在 /analyze 下才被检查**。
+# 于是「%d 打 qsizetype」这类错误在 Mac/Linux 报警告，在 Windows 一声不响，
+# 直到 32 位目标上变成读错栈、后续实参全部错位。本开关把两边拉平。
+#
+# 为什么不是 /analyze:only —— 它跳过代码生成，不产出 .obj，链接必然失败；
+# 要用它得另建构建目录并容忍链接错误，靠翻日志判定结果。/analyze 是
+# 「分析 + 正常编译」，能直接复用现有 target 列表，代价是编译变慢（约 2~3x），
+# 所以只在独立的 CI 作业里开，本地与发布构建不受影响。
+#
+# /analyze:external- + /external:* 把 Qt/vcpkg 头排除在分析之外，否则三方头的
+# 噪声会把自己代码的告警彻底埋掉。
+#
+# 只把格式串相关的分析告警提为错误（其余 /analyze 告警保持告警，避免一次性引入
+# 大量非本议题的失败）：
+#   C6271 多余实参        C6272 应为浮点   C6273 应为整型   C6274 应为字符
+#   C6284 传了对象而非字符串              C6328 类型/宽度不匹配（本次 macOS 报的那类）
+#   C6340 有无符号不匹配
+# ---------------------------------------------------------------------------
+option(SANYI_MSVC_ANALYZE "Enable MSVC /analyze (SAL printf format-string checking); CI only" OFF)
+
+if(MSVC AND SANYI_MSVC_ANALYZE)
+    if(MSVC_VERSION LESS 1929)
+        message(FATAL_ERROR
+            "[Analyze] SANYI_MSVC_ANALYZE requires VS2019 16.10+ (MSVC_VERSION >= 1929) "
+            "for /analyze:external-; current MSVC_VERSION=${MSVC_VERSION}")
+    endif()
+
+    add_compile_options(
+        /analyze
+        /analyze:external-
+        /external:anglebrackets
+        /external:W0
+        /we6271 /we6272 /we6273 /we6274 /we6284 /we6328 /we6340
+    )
+    message(STATUS "  MSVC /analyze: ON (format-string diagnostics promoted to errors)")
+endif()
+
 # macOS: 抑制 -Wnonportable-include-path（大小写不敏感文件系统上大小写匹配的误报）
 if(APPLE)
     add_compile_options(-Wno-nonportable-include-path)

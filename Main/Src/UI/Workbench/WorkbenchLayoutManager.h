@@ -144,12 +144,6 @@ public:
         return m_registeredToolBars;
     }
 
-    /// 获取繁忙进度条指针（供 WorkbenchWindow 清理时使用）
-    QProgressBar* busyProgressBar() const
-    {
-        return m_busyProgressBar;
-    }
-
     /// 已加载的客户配置管理器（供右键菜单等按需读取同一份配置）
     UiConfigurationManager* configManager() const
     {

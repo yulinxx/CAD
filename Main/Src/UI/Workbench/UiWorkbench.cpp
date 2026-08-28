@@ -459,7 +459,9 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
 
     // 命令 UI 刷新触发源集中挂载（选择/图层锁/场景变化含图元锁/撤销栈/操作完成）。
     // 放在最后：此时视口、工具栏、场景树、状态栏均已就绪，install 内的首次刷新可覆盖全部 UI。
-    UiStateBridge2D::install(
+    // 返回的句柄必须留到 deactivate 销毁：bus / layerBridge 跨工作台长寿，
+    // 连线两端都不死时 Qt 不会自动回收，往返切换 N 次就会刷 N 次。
+    m_uiStateConnections = UiStateBridge2D::install(
         this, m_viewport, m_services.operationBus, m_services.layerManagerBridge, m_sceneMonitor);
 }
 
@@ -1850,6 +1852,15 @@ void Workbench2D::deactivate()
     {
         m_sceneMonitor->deleteLater();
         m_sceneMonitor = nullptr;
+    }
+
+    // 命令 UI 连线的生命周期句柄。上面销毁监视器只断得掉 sceneChanged 那一路；
+    // bus / layerBridge 是 UiServices 的成员，跨工作台长寿，接收方本对象同样长寿，
+    // 两端都不死的连线 Qt 永远不会自动回收——必须显式销毁句柄整批断开。
+    if (m_uiStateConnections)
+    {
+        m_uiStateConnections->deleteLater();
+        m_uiStateConnections = nullptr;
     }
 
     // 工具栏上下文管理器持有的 setter/clearer lambda 捕获了已置空的 m_topToolBar；

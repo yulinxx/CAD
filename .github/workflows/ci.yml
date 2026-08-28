@@ -36,3 +36,38 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build -C Debug --output-on-failure --parallel
+
+  # /analyze 补上 MSVC 侧缺失的 printf 格式串校验（SAL 标注只在 /analyze 下生效，
+  # 详见根 CMakeLists.txt 里 SANYI_MSVC_ANALYZE 的注释）。
+  # 单独成一个作业而不是并进上面：/analyze 会让编译慢 2~3 倍，不该拖慢主构建与测试。
+  #
+  # TODO: 首次跑绿之后把 continue-on-error 去掉，让它成为阻塞门禁。
+  # 在此之前这个作业只负责暴露存量问题——Windows 侧从来没做过这项检查，
+  # 直接设成阻塞很可能一上来就红，把无关的 PR 全拦下。
+  static-analysis-windows:
+    runs-on: windows-latest
+    continue-on-error: true
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure (analyze)
+        run: |
+          cmake -B build-analyze -G "Visual Studio 17 2022" -A x64 \
+            -DSANYI_MSVC_ANALYZE=ON \
+            -DBUILD_UI_TESTS=OFF \
+            -DBUILD_UI_COMMON_TESTS=OFF \
+            -DBUILD_UI2D_TESTS=OFF \
+            -DBUILD_UI3D_TESTS=OFF \
+            -DBUILD_HARDWARE=ON \
+            -DBUILD_VISION=OFF \
+            -DSANYI_PYBIND_CORE=OFF
+
+      - name: Analyze
+        run: |
+          cmake --build build-analyze --config Debug --parallel \
+            --target UICommon UI2D UI3D SanYiCAD

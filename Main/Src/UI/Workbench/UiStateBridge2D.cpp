@@ -23,7 +23,7 @@ void UiStateBridge2D::refreshAll(Workbench2D* workbench)
     }
 }
 
-void UiStateBridge2D::install(Workbench2D* workbench,
+QObject* UiStateBridge2D::install(Workbench2D* workbench,
     RenderViewport2D* viewport,
     OperationBus* bus,
     QtLayerManagerBridge* layerBridge,
@@ -31,13 +31,19 @@ void UiStateBridge2D::install(Workbench2D* workbench,
 {
     if (!workbench)
     {
-        return;
+        return nullptr;
     }
+
+    // 本次安装的生命周期句柄：所有连线都以它为 context object，销毁它即整批断开。
+    // 不能用 workbench 自己当 context —— 它跨工作台长寿，而 bus / layerBridge 同样长寿，
+    // 两端都不死的连线永远不会被 Qt 自动回收（见头文件「连线的寿命」）。
+    auto* guard = new QObject(workbench);
+    guard->setObjectName(QStringLiteral("UiStateBridge2DConnections"));
 
     // 选择变化（点选/框选/绘制后自动选中/撤销等所有路径）
     if (viewport)
     {
-        QObject::connect(viewport, &RenderViewport2D::selectionChanged, workbench, [workbench]() {
+        QObject::connect(viewport, &RenderViewport2D::selectionChanged, guard, [workbench]() {
             refreshAll(workbench);
         });
     }
@@ -45,7 +51,7 @@ void UiStateBridge2D::install(Workbench2D* workbench,
     // 图层锁定/属性变更（锁定图层后其中图元的 Delete/Mirror/Align/Group 应变灰）
     if (layerBridge)
     {
-        QObject::connect(layerBridge, &QtLayerManagerBridge::sigLayerChanged, workbench, [workbench](int) {
+        QObject::connect(layerBridge, &QtLayerManagerBridge::sigLayerChanged, guard, [workbench](int) {
             refreshAll(workbench);
         });
     }
@@ -53,13 +59,13 @@ void UiStateBridge2D::install(Workbench2D* workbench,
     if (bus)
     {
         // 撤销/重做栈变化（含经 LayerEditService 直接入栈的图层操作）
-        QObject::connect(bus, &OperationBus::undoStateChanged, workbench, [workbench]() {
+        QObject::connect(bus, &OperationBus::undoStateChanged, guard, [workbench]() {
             refreshAll(workbench);
         });
 
         // 任意操作成功完成后刷新一次：替代原先仅监听 Edit_Copy / Edit_Cut 的硬编码白名单，
         // 新增写剪贴板或改变选择的操作无需再回来改这里。
-        QObject::connect(bus, &OperationBus::operationCompleted, workbench, [workbench](OperationId, bool success) {
+        QObject::connect(bus, &OperationBus::operationCompleted, guard, [workbench](OperationId, bool success) {
             if (success)
             {
                 refreshAll(workbench);
@@ -73,7 +79,7 @@ void UiStateBridge2D::install(Workbench2D* workbench,
     // 延后到事件循环下一轮，确保引擎侧批量变更已全部落地。
     if (sceneMonitor)
     {
-        QObject::connect(sceneMonitor, &SceneMonitor::sceneChanged, workbench, [workbench]() {
+        QObject::connect(sceneMonitor, &SceneMonitor::sceneChanged, guard, [workbench]() {
             QTimer::singleShot(0, workbench, [workbench]() {
                 refreshAll(workbench);
             });
@@ -81,4 +87,5 @@ void UiStateBridge2D::install(Workbench2D* workbench,
     }
 
     refreshAll(workbench);
+    return guard;
 }

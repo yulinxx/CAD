@@ -78,6 +78,6 @@ void registerBuiltinUiPanels(UiPanelRegistry& registry)
     });
 
     SY_INFOF("[UiBuiltinPanels] Registered %d builtin panel/slot factories: %s",
-        registry.registeredPanelIds().size(),
+        static_cast<int>(registry.registeredPanelIds().size()),
         qPrintable(registry.registeredPanelIds().join(QLatin1Char(','))));
 }

@@ -153,11 +153,6 @@ namespace
             return m_emitted;
         }
 
-        bool sawText() const
-        {
-            return m_sawText;
-        }
-
         void setCurrentEntityId(uint64_t /*id*/) override {}
 
         void emitPolyline(const Ut::Vec2d* points, size_t count, bool bClosed, const Ut::Color& color) override
@@ -274,7 +269,9 @@ namespace
 
         void emitText(const Ut::Vec2d& /*position*/, const char* /*text*/, const Ut::Color& /*color*/) override
         {
-            m_sawText = true;
+            // 文本不产顶点：世界文本走 RenderWidget::setWorldText →
+            // WorldTextQuadBuilder 独立通道，由 SceneRefreshCoordinator::reconcileTexts
+            // 驱动，且 TEXT 实体在增量循环里已被跳过，正常不会走到这里。
         }
 
         void emitTextEx(const Ut::Vec2d& /*position*/,
@@ -285,7 +282,7 @@ namespace
             int /*hAlign*/,
             int /*vAlign*/) override
         {
-            m_sawText = true;
+            // 同 emitText
         }
 
         void emitImagePlaceholder(const Ut::Vec2d& topLeft,
@@ -340,7 +337,6 @@ namespace
         Render::PrimitiveType& m_outType;
         const double* m_cameraCenter;
         bool m_emitted = false;
-        bool m_sawText = false;
     };
 }  // namespace
 
@@ -355,7 +351,8 @@ void clearEntityVertexCache()
  *
  * 由 Engine 侧 emitEntityGeometry 完成图元分解（UI 不再识别具体派生类型），
  * 本地 IncrementalVertexSink 将原语离散化为顶点。支持类型与全量路径一致；
- * 文本（emitText/emitTextEx）不支持增量路径，返回 false 由调用方走全量刷新。
+ * 文本（SyText）与位图（SyImage）不产顶点，它们各有独立的渲染通道，调用方
+ * 在遍历脏实体时就已跳过这两类，不会走到这里。
  *
  * 曲线类图元（Bezier/Bezier2/Nurbs/Circle/Arc/Ellipse）支持离散化缓存：
  * 当实体仅因颜色/选择/图层变更而标记为脏时，直接复用缓存的顶点数据，
@@ -392,11 +389,6 @@ bool entityToVertices(const Eg::SyEntity* entity,
     // 通过 Engine 侧统一边界分解图元，本地 sink 离散化
     IncrementalVertexSink sink(outVertices, outType, cameraCenter);
     if (!Eg::emitEntityGeometry(*entity, sink))
-    {
-        return false;
-    }
-    // 文本等复杂类型无法走增量路径（全量刷新已由渲染器处理文本渲染）
-    if (sink.sawText())
     {
         return false;
     }

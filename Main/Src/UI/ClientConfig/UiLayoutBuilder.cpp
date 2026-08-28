@@ -300,12 +300,12 @@ void UiLayoutBuilder::buildMenus(const std::vector<MenuDef>& menus)
             qPrintable(menu.workbenches.join(QStringLiteral(","))),
             static_cast<int>(menu.items.size()),
             enabledCount,
-            qMenu->actions().size());
+            static_cast<int>(qMenu->actions().size()));
     }
 
     SY_INFOF("[UiLayoutBuilder] All menus built: total=%d topLevelMenus=%d",
         static_cast<int>(menus.size()),
-        m_window->menuBar() ? m_window->menuBar()->actions().size() : 0);
+        m_window->menuBar() ? static_cast<int>(m_window->menuBar()->actions().size()) : 0);
 }
 
 void UiLayoutBuilder::buildMenuItem(QMenu* parent, const std::variant<MenuActionDef, SubMenuDef, MenuItemType>& item)
@@ -505,7 +505,7 @@ void UiLayoutBuilder::buildToolBars(const std::vector<ToolBarDef>& toolBars)
             qPrintable(tb.id),
             qPrintable(actionLabel(tb.title, tb.id)),
             qPrintable(tb.workbenchId),
-            toolBar->actions().size());
+            static_cast<int>(toolBar->actions().size()));
     }
 
     SY_INFOF("[UiLayoutBuilder] All toolbars built: total=%d", static_cast<int>(toolBars.size()));

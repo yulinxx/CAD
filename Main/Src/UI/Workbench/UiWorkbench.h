@@ -323,6 +323,10 @@ private:
     std::unique_ptr<SceneTreeSceneObserver2D> m_sceneTreeObserver;
     /// 场景变更监控（IObserver → Qt 信号桥接：捕获拖拽/交互式修改等非操作总线路径的场景变更）
     SceneMonitor* m_sceneMonitor{ nullptr };
+    /// 命令 UI 刷新连线的生命周期句柄（UiStateBridge2D::install 返回）。
+    /// 用 QPointer 是因为它 parent 在本对象上，shutdown 路径可能先被父级批量回收；
+    /// deactivate 里销毁它即整批断开连线，见 UiStateBridge2D.h「连线的寿命」。
+    QPointer<QObject> m_uiStateConnections;
     /// 场景树重建防抖定时器（合并批量增删，避免每步 O(N) 重建）
     class QTimer* m_sceneTreeRefreshTimer{ nullptr };
     /// 上次记录的图元数量（判断是否发生结构变更）

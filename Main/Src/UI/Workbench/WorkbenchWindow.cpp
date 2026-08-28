@@ -683,8 +683,8 @@ void WorkbenchWindow::clearWorkbenchContent()
 {
     const auto start = std::chrono::steady_clock::now();
     SY_DEBUGF("[WorkbenchWindow] clearing workbench content: toolbars=%d docks=%d shortcuts=%d",
-        m_layoutManager->registeredToolBars().size(),
-        m_layoutManager->registeredDocks().size(),
+        static_cast<int>(m_layoutManager->registeredToolBars().size()),
+        static_cast<int>(m_layoutManager->registeredDocks().size()),
         m_actionManager ? m_actionManager->shortcutCount() : 0);
 
     // 1: 清理所有注册的全局快捷键（Qt::ApplicationShortcut 不会随父窗口销毁）
@@ -694,15 +694,13 @@ void WorkbenchWindow::clearWorkbenchContent()
     // 2: 卸载工作台状态栏 widget（由 StatusBarBase 子类管理，不在此处 delete）
     unmountStatusBar();
 
-    // 3: 清理繁忙进度条（布局管理器只负责创建，框架在此显式回收）
-    if (auto* sb = statusBar())
-    {
-        if (auto* progress = m_layoutManager->busyProgressBar())
-        {
-            sb->removeWidget(progress);
-            progress->deleteLater();
-        }
-    }
+    // 3: 清理繁忙进度条。
+    // 回收责任归创建方（布局管理器）单点持有：updateBusyIndicator(false) 内部
+    // removeWidget + deleteLater + 清 QPointer 三件一起做。此前框架在这里自己
+    // removeWidget + deleteLater 却不清 QPointer，靠下面第 5 步的 sendPostedEvents
+    // 才让指针归零——一旦那一步被挪走或改成异步，下次 updateBusyIndicator(true)
+    // 会看到非空的僵尸指针并直接 return，忙碌指示器就永久不再出现。
+    m_layoutManager->updateBusyIndicator(false);
 
     // 4: 委托布局管理器清理工具栏/菜单栏/停靠面板/中央控件并重建占位控件
     // 传入当前（即将被替换的）工作台：中央视口的 GL 释放是 2D/3D 差异化逻辑，
@@ -1075,6 +1073,15 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     // 必须放在 attachToWindow 之前：工作台是往既有 Dock 里注册面板的。
     buildDockAreas();
 
+    // 6d: 重建配置驱动的状态栏槽位。
+    // 与 6c 同构的漏洞：clearLayoutContent() 的 3.1 步 clearStatusBarSlots() 已把
+    // 客户 JSON 声明的槽位（客户标识、授权状态等跨工作台恒定信息）删掉，而唯一的
+    // 重建入口 buildStatusBar() 只挂在启动路径（initializeWorkbenchShell）上。
+    // 结果是第一次工作台切换后这些槽位永久消失，且没有任何报错。
+    // buildStatusBar 内部先 clearStatusBarSlots 再重建，重入安全。
+    // 同样必须放在 attachToWindow 之前：工作台的 mountStatusBar 要往这个容器里挂。
+    m_layoutManager->buildStatusBar();
+
 
 
 
@@ -1102,8 +1109,8 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     {
         m_menuManager->rebuildAllMenus();
     }
-    // 状态栏 widget 由各 Workbench 在 attachToWindow 中创建并通过 mountStatusBar 挂载，
-    // 此处不再需要手动 buildStatusBar() 重建
+    // 工作台级状态栏 widget（坐标/选择/消息）由各 Workbench 在 attachToWindow 中
+    // 创建并通过 mountStatusBar 挂载；配置驱动的框架级槽位已在第 6d 步重建。
     // 新工作台自行决定是否需要骨架停靠面板
     setSkeletonDocksVisible(m_workbench->requiresSkeletonDocks());
     refreshFromState();
