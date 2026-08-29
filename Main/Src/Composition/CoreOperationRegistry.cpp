@@ -392,15 +392,28 @@ void CoreOperationRegistry::registerAll()
     auto& reg = m_bus->registry();
     auto* editService = m_editService;
     auto* undoManager = m_undoManager;
+    auto* hub = m_viewportActionHub;
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Undo, [undoManager] {
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Undo, [undoManager, hub] {
+        // 文字编辑会话内的 ⌘Z 被工具吃掉且不做事：整个会话在全局栈上只是**一条**
+        // ReplaceTextGroupCommand，会话中直落全局栈退掉的是"进入编辑之前"的那个操作
+        // —— 用户看到的是「文字还在改，画布上别的东西却变了」。提交退出后按一次
+        // 整段回退本次编辑。与 ⌫ / Esc 的分级同一套约定（判据在工具手里）。
+        if (hub && hub->viewport() && hub->viewport()->handleTextUndoRequest(false))
+        {
+            return;
+        }
         if (undoManager && undoManager->canUndo())
         {
             undoManager->undo();
         }
     }));
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Redo, [undoManager] {
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Redo, [undoManager, hub] {
+        if (hub && hub->viewport() && hub->viewport()->handleTextUndoRequest(true))
+        {
+            return;
+        }
         if (undoManager && undoManager->canRedo())
         {
             undoManager->redo();

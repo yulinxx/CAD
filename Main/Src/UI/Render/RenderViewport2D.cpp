@@ -389,7 +389,18 @@ void RenderViewport2D::initializeTools()
         },
         /*onEntityDoubleClick=*/nullptr,
         /*gridSnapManager=*/m_gridSnapManager.get(),
-        /*operationBus=*/m_operationBus);
+        /*operationBus=*/m_operationBus,
+        /*panViewByPixels=*/
+        [this](double dxPx, double dyPx) {
+            // 工具侧按**逻辑**像素表达平移意图，相机吃的是物理像素：DPR 换算在这里做一次，
+            // 免得每个工具各自去查 devicePixelRatio。
+            if (!m_inputRouter || !m_renderWidget)
+            {
+                return;
+            }
+            const double dpr = static_cast<double>(m_renderWidget->devicePixelRatio());
+            m_inputRouter->panViewByPhysicalPixels(dxPx * dpr, dyPx * dpr);
+        });
 
     // P1: 通过信号通知上层提交图元，视口不直接持有编辑服务
     m_toolManager->setEntityCallbackForAllTools([this](Eg::SyEntity* e) {
@@ -518,6 +529,11 @@ bool RenderViewport2D::handleStepBackRequest()
 bool RenderViewport2D::handleTextDeleteRequest(bool forward)
 {
     return m_inputRouter ? m_inputRouter->handleTextDeleteRequest(forward) : false;
+}
+
+bool RenderViewport2D::handleTextUndoRequest(bool redo)
+{
+    return m_inputRouter ? m_inputRouter->handleTextUndoRequest(redo) : false;
 }
 
 void RenderViewport2D::resetView()

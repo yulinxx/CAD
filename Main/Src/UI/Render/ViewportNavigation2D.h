@@ -54,6 +54,12 @@ public:
     void beginPan(const QPoint& physWidgetPos);
     void updatePan(const QPoint& physWidgetPos);
     void endPan();
+
+    /// 按物理像素增量平移视图，不需要处于拖拽平移会话中。
+    /// 供「拖选到视口外自动平移」这类程序化平移使用：走 beginPan/updatePan 会
+    /// 覆盖 m_lastMousePos，把用户真实拖拽的锚点冲掉。
+    void panByPixels(double dxPhys, double dyPhys);
+
     bool isPanning() const
     {
         return m_panning;
