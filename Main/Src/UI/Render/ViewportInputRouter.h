@@ -34,7 +34,6 @@ class QContextMenuEvent;
 class RenderWidget;
 class Camera2D;
 class ToolManager;
-class ViewportSelector;
 class IInteractionDispatcher;
 class ISelectionService;
 class OperationBus;
@@ -60,7 +59,6 @@ public:
     void setRenderWidget(RenderWidget* widget);
     void setCamera(Camera2D* camera);
     void setToolManager(ToolManager* tm);
-    void setSelector(ViewportSelector* selector);
     void setInteractionDispatcher(IInteractionDispatcher* dispatcher);
     void setSelectionService(ISelectionService* service);
     void setOperationBus(OperationBus* bus);
@@ -238,8 +236,6 @@ private:
     bool dispatchMouseReleaseToInput(const QPointF& worldPos, QMouseEvent* event);
     bool dispatchToActiveTool(
         const QPointF& worldPos, QMouseEvent* event, bool (ITool::*handler)(const QPointF&, QMouseEvent*));
-    bool dispatchToSelectorPress(const QPointF& worldPos, QMouseEvent* event);
-    bool dispatchToSelectorRelease(const QPointF& worldPos, QMouseEvent* event);
 
     // ==================== 平移处理 ====================
 
@@ -259,7 +255,6 @@ private:
     RenderWidget* m_renderWidget{ nullptr };
     Camera2D* m_camera{ nullptr };
     ToolManager* m_toolManager{ nullptr };
-    ViewportSelector* m_selector{ nullptr };
     IInteractionDispatcher* m_interactionDispatcher{ nullptr };
     ISelectionService* m_selectionService{ nullptr };
     OperationBus* m_operationBus{ nullptr };

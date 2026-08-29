@@ -1,54 +1,32 @@
 #pragma once
 
-#include <QPointF>
-#include <QString>
-#include <QColor>
-#include <functional>
-#include <string>
-#include <vector>
 #include <optional>
 
 #include "BBox/BBox2d.hpp"
 
-struct Camera2D;
 class ISelectionService;
-class RenderWidget;
 
 namespace Eg
 {
     class SceneManager;
 }
 
+// 选中集的几何查询器。
+//
+// 职责边界：本类**不参与输入分发**。点选 / 框选 / 命中判定全部由 SelectTool
+// 经 ViewportInputRouter::dispatchToActiveTool 处理（SelectTool 常驻激活，
+// 见 ToolManager::setActiveTool("SelectTool")），所以视口层不需要第二套拾取实现。
+// 这里只保留一件事：把 ISelectionService 里的 ID 集合翻译成世界坐标包围盒，
+// 供 zoom_selection（Ctrl+Shift+F）之类的视图操作使用。
+//
+// 选择的读写请直接用 ISelectionService / Eg::SceneManager，不要在这里加转发。
 class ViewportSelector
 {
 public:
-    ViewportSelector(Eg::SceneManager* sceneManager,
-        ISelectionService* selectionService,
-        const Camera2D* camera,
-        RenderWidget* renderWidget);
+    ViewportSelector(Eg::SceneManager* sceneManager, ISelectionService* selectionService);
 
-    bool handleClick(const QPointF& worldPos);
-
-    bool isBoxSelecting() const
-    {
-        return m_boxSelecting;
-    }
-
-    void beginBoxSelect(const QPointF& worldPos);
-    void updateBoxSelect(const QPointF& worldPos);
-    size_t endBoxSelect(const QPointF& worldPos);
-
-    // ---- 选择查询/管理（P5 从 RenderViewport2D 下沉） ----
-
-    // 获取第一个选中图元的 ID
-    QString selectedEntityId() const;
-    // 按 ID 选中图元（先清空再选中）
-    void selectEntityById(const QString& entityId);
-    // 清空选择
-    void clearSelection();
-
-    // 计算选中图元的合并 BBox（P5 从 RenderViewport2D 下沉）
-    // 返回 nullopt 表示无选中或 BBox 无效
+    // 计算选中图元的合并 BBox
+    // 返回 nullopt 表示无选中、依赖未注入或所有选中项 BBox 均无效
     std::optional<Ut::BBox2d> selectionBBox() const;
 
     void setSceneManager(Eg::SceneManager* sm)
@@ -61,28 +39,7 @@ public:
         m_selectionService = svc;
     }
 
-    void setStatusCallback(std::function<void(const QString&)> callback)
-    {
-        m_statusCallback = std::move(callback);
-    }
-
-    void setSelectionCallback(std::function<void(const QString&, const QString&)> callback)
-    {
-        m_selectionCallback = std::move(callback);
-    }
-
 private:
-    void performHitTest(const QPointF& worldPos);
-
     Eg::SceneManager* m_sceneManager;
     ISelectionService* m_selectionService;
-    const Camera2D* m_camera;
-    RenderWidget* m_renderWidget;
-
-    bool m_boxSelecting{ false };
-    QPointF m_boxSelectStart;
-    QPointF m_boxSelectEnd;
-
-    std::function<void(const QString&)> m_statusCallback;
-    std::function<void(const QString&, const QString&)> m_selectionCallback;
 };

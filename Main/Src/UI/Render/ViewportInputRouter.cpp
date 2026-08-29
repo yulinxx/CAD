@@ -9,7 +9,6 @@
 #include "Camera2D.h"
 #include "ViewportNavigation2D.h"
 #include "SceneRefreshCoordinator.h"
-#include "ViewportSelector.h"
 #include "ISelectionService.h"
 #include "UiInteractionDispatcher.h"
 #include "SceneDocument2D.h"
@@ -120,11 +119,6 @@ void ViewportInputRouter::setCamera(Camera2D* camera)
 void ViewportInputRouter::setToolManager(ToolManager* tm)
 {
     m_toolManager = tm;
-}
-
-void ViewportInputRouter::setSelector(ViewportSelector* selector)
-{
-    m_selector = selector;
 }
 
 void ViewportInputRouter::setInteractionDispatcher(IInteractionDispatcher* dispatcher)
@@ -655,30 +649,6 @@ QPointF ViewportInputRouter::applySnap(const QPointF& worldPos) const
     return m_snapPositionCallback(worldPos);
 }
 
-bool ViewportInputRouter::dispatchToSelectorPress(const QPointF& worldPos, QMouseEvent* event)
-{
-    if (!m_selector)
-    {
-        return false;
-    }
-
-    m_selector->beginBoxSelect(worldPos);
-    event->accept();
-    return true;
-}
-
-bool ViewportInputRouter::dispatchToSelectorRelease(const QPointF& worldPos, QMouseEvent* event)
-{
-    if (!m_selector)
-    {
-        return false;
-    }
-
-    m_selector->handleClick(worldPos);
-    event->accept();
-    return true;
-}
-
 bool ViewportInputRouter::dispatchMousePressToInput(const QPointF& worldPos, QMouseEvent* event)
 {
     // 右键：取消当前图元（绘制态）或退出工具（空闲态），与 ESC 语义一致
@@ -705,7 +675,9 @@ bool ViewportInputRouter::dispatchMousePressToInput(const QPointF& worldPos, QMo
         return true;
     }
 
-    return dispatchToSelectorPress(worldPos, event);
+    // 没有兜底分支：SelectTool 常驻激活，dispatchToActiveTool 一定消费左键按下，
+    // 点选/框选全部在工具层完成，视口层不再做第二套拾取。
+    return false;
 }
 
 // 右键分发：绘制态交给活动工具取消当前图元；空闲态退出工具并切回选择工具（与 ESC 一致）。
@@ -790,7 +762,8 @@ bool ViewportInputRouter::dispatchMouseReleaseToInput(const QPointF& worldPos, Q
         return true;
     }
 
-    return dispatchToSelectorRelease(worldPos, event);
+    // 同 dispatchMousePressToInput：释放也没有视口层兜底，全部由活动工具消费。
+    return false;
 }
 
 // ==================== 平移处理 ====================

@@ -509,10 +509,6 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
                     service->addEntityFromPointer(e, "Draw");
                 }
             });
-        QObject::connect(
-            vp, &RenderViewport2D::nudgeRequested, [service = m_services.sceneEditService](double dx, double dy) {
-                service->nudgeSelected(dx, dy, "Move endpoint");
-            });
 
         // 场景变更监控：捕获拖拽/交互式修改、图元锁定/可见性等非操作总线路径的场景变更。
         // 订阅由 UiStateBridge2D::install 统一挂载（见 attachToWindow 末尾）。
@@ -661,13 +657,6 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
     {
         vp->setStatusCallback([stateCenter = m_services.stateCenter](const QString& text) {
             stateCenter->setStatusPrompt(text);
-        });
-
-        vp->setSelectionCallback([this](const QString& selText, const QString& selType) {
-            if (m_services.stateCenter)
-            {
-                m_services.stateCenter->setSelectionContext(selType, selText);
-            }
         });
 
         // 选择变化 → 刷新命令 UI（工具栏/右键菜单/面板/状态栏）的连线统一由

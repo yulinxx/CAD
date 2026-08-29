@@ -99,7 +99,6 @@ public:
     }
 
     void setStatusCallback(std::function<void(const QString&)> callback);
-    void setSelectionCallback(std::function<void(const QString&, const QString&)> callback);
     void setCommandStageCallback(std::function<void(const QString&)> callback);
     // 设置鼠标位置回调，用于在状态栏显示当前光标坐标
     void setPositionCallback(std::function<void(double, double)> callback);
@@ -195,14 +194,11 @@ public:
     void setDrawingEnabled(bool enabled);
     void setMeasureMode(bool enabled);
 
-    // 选择/编辑操作（P5 已下沉：选择管理 → ViewportSelector，编辑 → SceneEditService）
-    // 注：deleteSelectedEntity() 已删除（2026-08-27）—— 它零调用方，且是第四套删除实现
-    //（只删单个 selectedEntityId，语义与其它三处都不同）。删除统一走 OperationBus 的 Edit_Delete。
-    QString selectedEntityId() const;
-    void nudgeSelectedEndpoint(const QPointF& delta);
-    void selectEntityById(const QString& entityId);
+    // 选择状态广播（选择的读写在 SelectTool / ISelectionService，视口只负责通知上层）
+    // 注：selectedEntityId / selectEntityById / clearSelection / nudgeSelectedEndpoint
+    // 已删除（2026-08-30）—— 全部零调用方，且各自都是第二套实现：选择走 SelectTool +
+    // ISelectionService，删除走 OperationBus 的 Edit_Delete，微调走 Edit_Nudge。
     void syncSelectionDetails();
-    void clearSelection();
 
     // 坐标转换
     QPointF mapToScene(const QPoint& screenPos) const;
@@ -218,7 +214,6 @@ signals:
     void sceneChanged();
     // P1: 视口不直接持有编辑服务，通过信号通知上层
     void entitySubmitRequested(Eg::SyEntity* entity);
-    void nudgeRequested(double dx, double dy);
     // 活动工具切换成功时发出，供工具栏等上层同步按钮高亮状态
     void activeToolChanged(const QString& toolName);
     // 场景选择状态变化（含绘制后自动选中、点选/框选、撤销等所有路径），供上层刷新命令可用性
@@ -260,7 +255,6 @@ private:
     void updateStatus(const QString& text);
     void syncStatusMode(const QString& text);
     void syncCommandStage(const QString& text);
-    void syncSelectionCallback(const QString& source, const QString& text);
     void syncSelectionToolState();
 
     Eg::SceneManager* sceneManager() const;
@@ -293,12 +287,11 @@ private:
     // 工具系统
     std::unique_ptr<ToolManager> m_toolManager;
 
-    // 选择控制器
+    // 选中集包围盒查询器（只服务 zoom_selection 等视图操作）
     std::unique_ptr<ViewportSelector> m_selector;
 
     // 回调
     std::function<void(const QString&)> m_statusCallback;
-    std::function<void(const QString&, const QString&)> m_selectionCallback;
     std::function<void(const QString&)> m_commandStageCallback;
     // 鼠标位置回调，参数为世界坐标 (x, y)
     std::function<void(double, double)> m_positionCallback;

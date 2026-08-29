@@ -57,7 +57,8 @@ RenderViewport2D::RenderViewport2D(QWidget* parent)
     // 初始相机状态：台面中心 (600,400)，可见范围 (0,0)~(1200,800)
     m_camera.panOffset = QPointF(-600.0f, -400.0f);
 
-    m_selector = std::make_unique<ViewportSelector>(nullptr, nullptr, &m_camera, m_renderWidget);
+    // 选中集包围盒查询器（zoom_selection 等视图操作用；场景/选择服务在 setDocument/setSelectionService 注入）
+    m_selector = std::make_unique<ViewportSelector>(nullptr, nullptr);
 
     // 输入路由器（P5 大文件收口：从 RenderViewport2D 中抽取事件分发逻辑）
     m_inputRouter = std::make_unique<ViewportInputRouter>(this);
@@ -121,7 +122,6 @@ void RenderViewport2D::wireInputRouter()
     m_inputRouter->setCamera(&m_camera);
     m_inputRouter->setDocument(m_document);
     m_inputRouter->setRefreshCoordinator(m_refreshCoordinator.get());
-    m_inputRouter->setSelector(m_selector.get());
     syncInputRouterCallbacks();
 }
 
@@ -190,22 +190,9 @@ QPointF RenderViewport2D::applySnap(const QPointF& worldPos) const
 void RenderViewport2D::setStatusCallback(std::function<void(const QString&)> callback)
 {
     m_statusCallback = std::move(callback);
-    if (m_selector)
-    {
-        m_selector->setStatusCallback(m_statusCallback);
-    }
     if (m_inputRouter)
     {
         syncInputRouterCallbacks();
-    }
-}
-
-void RenderViewport2D::setSelectionCallback(std::function<void(const QString&, const QString&)> callback)
-{
-    m_selectionCallback = std::move(callback);
-    if (m_selector)
-    {
-        m_selector->setSelectionCallback(m_selectionCallback);
     }
 }
 
@@ -236,14 +223,6 @@ void RenderViewport2D::syncCommandStage(const QString& text)
     if (m_commandStageCallback)
     {
         m_commandStageCallback(text);
-    }
-}
-
-void RenderViewport2D::syncSelectionCallback(const QString& source, const QString& text)
-{
-    if (m_selectionCallback)
-    {
-        m_selectionCallback(source, text);
     }
 }
 
@@ -655,53 +634,7 @@ void RenderViewport2D::setMeasureMode(bool enabled)
     syncStatusMode(enabled ? tr("2D measure mode") : tr("2D select mode"));
 }
 
-// ==================== 选择/编辑操作（P5 下沉到 ViewportSelector / SceneEditService） ====================
-
-QString RenderViewport2D::selectedEntityId() const
-{
-    // 委托给 ViewportSelector
-    return m_selector ? m_selector->selectedEntityId() : QString();
-}
-
-void RenderViewport2D::nudgeSelectedEndpoint(const QPointF& delta)
-{
-    if (!m_document)
-    {
-        return;
-    }
-    auto selectedId = selectedEntityId();
-    if (selectedId.isEmpty())
-    {
-        return;
-    }
-
-    // P1: 通过信号通知上层执行 nudge，视口不直接持有编辑服务
-    emit nudgeRequested(delta.x(), delta.y());
-
-    syncSelectionDetails();
-    updateStatus(tr("2D endpoint moved"));
-    // 图元修改后增量刷新：onSceneChanged 已收集脏 ID，LightUpdate 足够
-    if (m_refreshCoordinator)
-    {
-        m_refreshCoordinator->requestLightRefresh();
-    }
-}
-
-void RenderViewport2D::selectEntityById(const QString& entityId)
-{
-    if (!m_document)
-    {
-        return;
-    }
-    // 选择管理委托给 ViewportSelector
-    if (m_selector)
-    {
-        m_selector->selectEntityById(entityId);
-    }
-    syncSelectionDetails();
-    syncStatusMode(tr("2D entity selected"));
-    requestRepaint();
-}
+// ==================== 选择状态广播 ====================
 
 void RenderViewport2D::syncSelectionDetails()
 {
@@ -709,16 +642,6 @@ void RenderViewport2D::syncSelectionDetails()
     // 通知上层：选择状态已变化（覆盖绘制后自动选中、点选/框选、撤销等所有路径）
     SY_INFOF("[RenderViewport2D] syncSelectionDetails -> emitting selectionChanged");
     emit selectionChanged();
-}
-
-void RenderViewport2D::clearSelection()
-{
-    // 委托给 ViewportSelector
-    if (m_selector)
-    {
-        m_selector->clearSelection();
-    }
-    requestRepaint();
 }
 
 QPointF RenderViewport2D::mapToScene(const QPoint& screenPos) const

@@ -926,13 +926,6 @@ TEST(RenderViewport2DRegressionTest, InputRouter_SetToolManager)
     SUCCEED();
 }
 
-TEST(RenderViewport2DRegressionTest, InputRouter_SetSelector)
-{
-    ViewportInputRouter router;
-    router.setSelector(nullptr);
-    SUCCEED();
-}
-
 TEST(RenderViewport2DRegressionTest, InputRouter_SetInteractionDispatcher)
 {
     ViewportInputRouter router;
@@ -979,7 +972,6 @@ TEST(RenderViewport2DRegressionTest, InputRouter_FullDependencyInjection)
     router.setRefreshCoordinator(&coordinator);
     router.setRenderWidget(nullptr);
     router.setToolManager(nullptr);
-    router.setSelector(nullptr);
     router.setInteractionDispatcher(nullptr);
     router.setSelectionService(nullptr);
     router.setOperationBus(nullptr);
@@ -1566,7 +1558,9 @@ TEST(RenderViewport2DRegressionTest, Camera2D_ZoomToBBoxMatchesZoomToFitPlusPan)
     EXPECT_NEAR(camera1.panOffset.y(), camera2.panOffset.y(), 1e-4f);
 }
 
-// ==================== ViewportSelector 选择管理方法测试（P5 视口瘦身） ====================
+// ==================== ViewportSelector::selectionBBox 测试 ====================
+// ViewportSelector 只剩这一件事：把选中 ID 集合翻译成世界坐标包围盒（zoom_selection 用）。
+// 点选/框选归 SelectTool，选择读写归 ISelectionService，此处不再覆盖。
 
 namespace
 {
@@ -1654,139 +1648,65 @@ namespace
     };
 }  // namespace
 
-TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectedEntityIdEmpty)
+TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectionBBoxNullDeps)
 {
     StubSelectionService svc;
-    Camera2D camera;
-    ViewportSelector selector(nullptr, &svc, &camera, nullptr);
 
-    // 无选择时返回空字符串
-    EXPECT_TRUE(selector.selectedEntityId().isEmpty());
+    // 场景/选择服务缺一不可，缺任一返回 nullopt 而不是崩溃
+    EXPECT_FALSE(ViewportSelector(nullptr, &svc).selectionBBox().has_value());
+
+    Eg::SceneManager scene;
+    EXPECT_FALSE(ViewportSelector(&scene, nullptr).selectionBBox().has_value());
 }
 
-TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectedEntityIdReturnsFirst)
+TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectionBBoxEmptySelection)
 {
+    Eg::SceneManager scene;
     StubSelectionService svc;
-    svc.selectedIds = { "42", "99" };
-    Camera2D camera;
-    ViewportSelector selector(nullptr, &svc, &camera, nullptr);
+    ViewportSelector selector(&scene, &svc);
 
-    // 返回第一个选中 ID
-    EXPECT_EQ(selector.selectedEntityId(), QStringLiteral("42"));
+    // 无选中项 → nullopt
+    EXPECT_FALSE(selector.selectionBBox().has_value());
 }
 
-TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectEntityById)
+TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectionBBoxMergesSelected)
 {
+    Eg::SceneManager scene;
+
+    auto line1 = std::make_unique<Eg::SyLine>();
+    line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    Eg::EntityId id1 = line1->id;
+
+    auto line2 = std::make_unique<Eg::SyLine>();
+    line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 40) });
+    Eg::EntityId id2 = line2->id;
+
+    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    entities.push_back(std::move(line1));
+    entities.push_back(std::move(line2));
+    scene.addEntities(std::move(entities));
+
     StubSelectionService svc;
-    svc.selectedIds = { "1", "2" };
-    Camera2D camera;
-    ViewportSelector selector(nullptr, &svc, &camera, nullptr);
+    svc.selectedIds = { std::to_string(id1), std::to_string(id2) };
 
-    // 选中 ID "100"：先清空再选中
-    selector.selectEntityById(QStringLiteral("100"));
+    ViewportSelector selector(&scene, &svc);
+    auto bbox = selector.selectionBBox();
+    ASSERT_TRUE(bbox.has_value());
 
-    EXPECT_EQ(svc.selectedIds.size(), 1u);
-    EXPECT_EQ(svc.selectedIds[0], "100");
+    // 两条线段的包围盒并集：(0,0)~(30,40)
+    EXPECT_NEAR(bbox->minPt.x(), 0.0, 1e-6);
+    EXPECT_NEAR(bbox->minPt.y(), 0.0, 1e-6);
+    EXPECT_NEAR(bbox->maxPt.x(), 30.0, 1e-6);
+    EXPECT_NEAR(bbox->maxPt.y(), 40.0, 1e-6);
 }
 
-TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectEntityByIdFiresCallbacks)
+TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectionBBoxIgnoresUnknownId)
 {
+    Eg::SceneManager scene;
     StubSelectionService svc;
-    Camera2D camera;
-    ViewportSelector selector(nullptr, &svc, &camera, nullptr);
+    // 选择服务里残留的陈旧 ID（图元已删）不应产生包围盒
+    svc.selectedIds = { "999999" };
 
-    QString lastStatus;
-    QString lastCallbackSource;
-    QString lastCallbackText;
-    selector.setStatusCallback([&](const QString& s) {
-        lastStatus = s;
-    });
-    selector.setSelectionCallback([&](const QString& src, const QString& t) {
-        lastCallbackSource = src;
-        lastCallbackText = t;
-    });
-
-    selector.selectEntityById(QStringLiteral("55"));
-
-    // 验证回调被触发
-    EXPECT_FALSE(lastStatus.isEmpty());
-    EXPECT_EQ(lastCallbackSource, QStringLiteral("2D-Select"));
-    EXPECT_TRUE(lastCallbackText.contains(QStringLiteral("55")));
-}
-
-TEST(RenderViewport2DRegressionTest, ViewportSelector_ClearSelection)
-{
-    StubSelectionService svc;
-    svc.selectedIds = { "1", "2", "3" };
-    Camera2D camera;
-    ViewportSelector selector(nullptr, &svc, &camera, nullptr);
-
-    selector.clearSelection();
-
-    EXPECT_TRUE(svc.selectedIds.empty());
-}
-
-TEST(RenderViewport2DRegressionTest, ViewportSelector_ClearSelectionFiresCallback)
-{
-    StubSelectionService svc;
-    svc.selectedIds = { "1" };
-    Camera2D camera;
-    ViewportSelector selector(nullptr, &svc, &camera, nullptr);
-
-    QString lastStatus;
-    selector.setStatusCallback([&](const QString& s) {
-        lastStatus = s;
-    });
-
-    selector.clearSelection();
-
-    EXPECT_FALSE(lastStatus.isEmpty());
-}
-
-TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectEntityByIdNullService)
-{
-    Camera2D camera;
-    ViewportSelector selector(nullptr, nullptr, &camera, nullptr);
-
-    // 无选择服务时不应崩溃
-    selector.selectEntityById(QStringLiteral("1"));
-    SUCCEED();
-}
-
-TEST(RenderViewport2DRegressionTest, ViewportSelector_ClearSelectionNullService)
-{
-    Camera2D camera;
-    ViewportSelector selector(nullptr, nullptr, &camera, nullptr);
-
-    // 无选择服务时不应崩溃
-    selector.clearSelection();
-    SUCCEED();
-}
-
-TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectedEntityIdNullService)
-{
-    Camera2D camera;
-    ViewportSelector selector(nullptr, nullptr, &camera, nullptr);
-
-    // 无选择服务时返回空字符串
-    EXPECT_TRUE(selector.selectedEntityId().isEmpty());
-}
-
-TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectClearSelectSequence)
-{
-    StubSelectionService svc;
-    Camera2D camera;
-    ViewportSelector selector(nullptr, &svc, &camera, nullptr);
-
-    // 选中 1 → 清空 → 选中 2
-    selector.selectEntityById(QStringLiteral("1"));
-    EXPECT_EQ(svc.selectedIds.size(), 1u);
-    EXPECT_EQ(svc.selectedIds[0], "1");
-
-    selector.clearSelection();
-    EXPECT_TRUE(svc.selectedIds.empty());
-
-    selector.selectEntityById(QStringLiteral("2"));
-    EXPECT_EQ(svc.selectedIds.size(), 1u);
-    EXPECT_EQ(svc.selectedIds[0], "2");
+    ViewportSelector selector(&scene, &svc);
+    EXPECT_FALSE(selector.selectionBBox().has_value());
 }

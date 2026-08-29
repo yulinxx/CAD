@@ -17,7 +17,6 @@
 
 #include "UI/Render/SceneRefreshCoordinator.h"
 #include "UI/Render/Camera2D.h"
-#include "UI/Widgets/ViewportSelector.h"
 #include "UI/Services/ISelectionService.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/SyEntity/SyLine.h"
@@ -769,115 +768,6 @@ TEST(RefreshIntegrationTest, Coordinator_StopAfterSceneChange)
     SUCCEED();
 }
 
-// ==================== 视口选择器基础测试 ====================
-
-TEST(ViewportSelectorRegressionTest, Construction_DoesNotCrash)
-{
-    Eg::SceneManager scene;
-    MockSelectionService selSvc;
-    Camera2D camera;
-
-    ViewportSelector selector(&scene, &selSvc, &camera, nullptr);
-    SUCCEED();
-}
-
-TEST(ViewportSelectorRegressionTest, InitialState_NotBoxSelecting)
-{
-    Eg::SceneManager scene;
-    MockSelectionService selSvc;
-    Camera2D camera;
-
-    ViewportSelector selector(&scene, &selSvc, &camera, nullptr);
-    EXPECT_FALSE(selector.isBoxSelecting());
-}
-
-TEST(ViewportSelectorRegressionTest, BoxSelect_Lifecycle)
-{
-    Eg::SceneManager scene;
-    MockSelectionService selSvc;
-    Camera2D camera;
-
-    ViewportSelector selector(&scene, &selSvc, &camera, nullptr);
-
-    EXPECT_FALSE(selector.isBoxSelecting());
-
-    selector.beginBoxSelect(QPointF(0, 0));
-    EXPECT_TRUE(selector.isBoxSelecting());
-
-    selector.updateBoxSelect(QPointF(100, 100));
-    EXPECT_TRUE(selector.isBoxSelecting());
-
-    size_t count = selector.endBoxSelect(QPointF(100, 100));
-    EXPECT_FALSE(selector.isBoxSelecting());
-    // 空场景框选计数应为 0
-    EXPECT_EQ(count, 0u);
-}
-
-TEST(ViewportSelectorRegressionTest, BoxSelect_WithEntities)
-{
-    Eg::SceneManager scene;
-    MockSelectionService selSvc;
-    Camera2D camera;
-
-    auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(10, 10), Ut::Vec2d(50, 50) });
-
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
-    entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
-
-    ViewportSelector selector(&scene, &selSvc, &camera, nullptr);
-
-    // 框选包含图元的区域
-    selector.beginBoxSelect(QPointF(0, 0));
-    size_t count = selector.endBoxSelect(QPointF(100, 100));
-    EXPECT_FALSE(selector.isBoxSelecting());
-    // 框选应选中至少一个图元
-    EXPECT_GE(count, 0u);
-}
-
-TEST(ViewportSelectorRegressionTest, StatusCallback_IsInvoked)
-{
-    Eg::SceneManager scene;
-    MockSelectionService selSvc;
-    Camera2D camera;
-
-    ViewportSelector selector(&scene, &selSvc, &camera, nullptr);
-
-    bool called = false;
-    selector.setStatusCallback([&called](const QString& msg) {
-        called = true;
-    });
-
-    selector.handleClick(QPointF(50, 50));
-    EXPECT_TRUE(called);
-}
-
-TEST(ViewportSelectorRegressionTest, SelectionCallback_IsInvokedOnSelect)
-{
-    Eg::SceneManager scene;
-    MockSelectionService selSvc;
-    Camera2D camera;
-
-    auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(10, 10), Ut::Vec2d(50, 50) });
-
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
-    entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
-
-    ViewportSelector selector(&scene, &selSvc, &camera, nullptr);
-
-    bool called = false;
-    selector.setSelectionCallback([&called](const QString& src, const QString& text) {
-        called = true;
-    });
-
-    selector.handleClick(QPointF(30, 30));
-    // 点击在图元附近时应触发选择回调
-    EXPECT_TRUE(called);
-}
-
 // ==================== 键盘路由三级优先级链测试 ====================
 // 键盘事件路由优先级（从 handleKeyPress 实现）：
 // 1. InteractionDispatcher (Escape/Enter) — 优先级最高
@@ -944,90 +834,23 @@ TEST(KeyRoutingRegressionTest, PriorityChain_EnterConfirmsTool)
 // 鼠标事件分发优先级（从 dispatchMousePressToInput 实现）：
 // 1. 中键/平移模式 — 最高优先级（handlePanMousePress）
 // 2. InteractionDispatcher (hasActiveCommand) — 第二优先级
-// 3. ActiveTool (onMousePress/onMouseMove/onMouseRelease) — 第三优先级
-// 4. ViewportSelector (beginBoxSelect/handleClick) — 最低优先级
+// 3. ActiveTool (onMousePress/onMouseMove/onMouseRelease) — 最低优先级，也是唯一兜底
+//    （SelectTool 常驻激活，点选/框选都在工具层，视口层没有第二套拾取）
 
 TEST(MouseDispatchRegressionTest, PriorityChain_PanBlocksTool)
 {
-    // 中键按下时，平移优先于工具和选择器
+    // 中键按下时，平移优先于工具
     SceneRefreshCoordinator coordinator;
     coordinator.stop();
     SUCCEED();
 }
 
-TEST(MouseDispatchRegressionTest, PriorityChain_ToolBlocksSelector)
+TEST(MouseDispatchRegressionTest, PriorityChain_ToolIsFallback)
 {
-    // 有活动工具时，左键事件优先发给工具，不经过选择器
+    // 无交互命令时，左键事件最终由活动工具处理
     SceneRefreshCoordinator coordinator;
     coordinator.stop();
     SUCCEED();
-}
-
-TEST(MouseDispatchRegressionTest, PriorityChain_SelectorIsFallback)
-{
-    // 无活动工具时，左键事件最终由选择器处理
-    SceneRefreshCoordinator coordinator;
-    coordinator.stop();
-    SUCCEED();
-}
-
-// ==================== 工具状态与选择器交互测试 ====================
-
-TEST(ToolSelectorInteractionTest, ActiveTool_PreventsBoxSelect)
-{
-    Eg::SceneManager scene;
-    MockSelectionService selSvc;
-    Camera2D camera;
-
-    ViewportSelector selector(&scene, &selSvc, &camera, nullptr);
-
-    // 无活动工具时，框选正常
-    selector.beginBoxSelect(QPointF(0, 0));
-    EXPECT_TRUE(selector.isBoxSelecting());
-    selector.endBoxSelect(QPointF(100, 100));
-    EXPECT_FALSE(selector.isBoxSelecting());
-}
-
-TEST(ToolSelectorInteractionTest, SelectionCallback_AfterToolDeactivation)
-{
-    Eg::SceneManager scene;
-    MockSelectionService selSvc;
-    Camera2D camera;
-
-    auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(10, 10), Ut::Vec2d(50, 50) });
-
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
-    entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
-
-    ViewportSelector selector(&scene, &selSvc, &camera, nullptr);
-
-    bool selectCalled = false;
-    selector.setSelectionCallback([&selectCalled](const QString& src, const QString& text) {
-        selectCalled = true;
-    });
-
-    // 点击图元附近应触发选择
-    selector.handleClick(QPointF(30, 30));
-    EXPECT_TRUE(selectCalled);
-}
-
-TEST(ToolSelectorInteractionTest, StatusCallback_AfterSelection)
-{
-    Eg::SceneManager scene;
-    MockSelectionService selSvc;
-    Camera2D camera;
-
-    ViewportSelector selector(&scene, &selSvc, &camera, nullptr);
-
-    QString lastStatus;
-    selector.setStatusCallback([&lastStatus](const QString& msg) {
-        lastStatus = msg;
-    });
-
-    selector.handleClick(QPointF(50, 50));
-    EXPECT_FALSE(lastStatus.isEmpty());
 }
 
 // ==================== showEvent 初始刷新逻辑测试 ====================
@@ -1107,100 +930,6 @@ TEST(SetDocumentRegressionTest, AddObserver_ReceiveSceneChange)
     coordinator.onSceneChanged();
     EXPECT_FALSE(scene.dirtyEntities().empty());
     coordinator.stop();
-}
-
-// ==================== 视口选择器扩展测试 ====================
-
-TEST(ViewportSelectorExtendedTest, DoubleBeginBoxSelect_Resets)
-{
-    Eg::SceneManager scene;
-    MockSelectionService selSvc;
-    Camera2D camera;
-
-    ViewportSelector selector(&scene, &selSvc, &camera, nullptr);
-
-    selector.beginBoxSelect(QPointF(0, 0));
-    EXPECT_TRUE(selector.isBoxSelecting());
-
-    // 第二次 beginBoxSelect 重置状态
-    selector.beginBoxSelect(QPointF(50, 50));
-    EXPECT_TRUE(selector.isBoxSelecting());
-
-    selector.endBoxSelect(QPointF(100, 100));
-    EXPECT_FALSE(selector.isBoxSelecting());
-}
-
-TEST(ViewportSelectorExtendedTest, EndBoxSelect_WithoutBegin)
-{
-    Eg::SceneManager scene;
-    MockSelectionService selSvc;
-    Camera2D camera;
-
-    ViewportSelector selector(&scene, &selSvc, &camera, nullptr);
-
-    // 未开始框选时调用 endBoxSelect 不应崩溃
-    size_t count = selector.endBoxSelect(QPointF(100, 100));
-    EXPECT_EQ(count, 0u);
-    EXPECT_FALSE(selector.isBoxSelecting());
-}
-
-TEST(ViewportSelectorExtendedTest, UpdateBoxSelect_WithoutBegin)
-{
-    Eg::SceneManager scene;
-    MockSelectionService selSvc;
-    Camera2D camera;
-
-    ViewportSelector selector(&scene, &selSvc, &camera, nullptr);
-
-    // 未开始框选时调用 updateBoxSelect 不应崩溃
-    selector.updateBoxSelect(QPointF(100, 100));
-    EXPECT_FALSE(selector.isBoxSelecting());
-}
-
-TEST(ViewportSelectorExtendedTest, NullSceneManager_IsSafe)
-{
-    MockSelectionService selSvc;
-    Camera2D camera;
-
-    ViewportSelector selector(nullptr, &selSvc, &camera, nullptr);
-
-    selector.beginBoxSelect(QPointF(0, 0));
-    size_t count = selector.endBoxSelect(QPointF(100, 100));
-    EXPECT_EQ(count, 0u);
-}
-
-TEST(ViewportSelectorExtendedTest, NullSelectionService_IsSafe)
-{
-    Eg::SceneManager scene;
-    Camera2D camera;
-
-    ViewportSelector selector(&scene, nullptr, &camera, nullptr);
-
-    selector.beginBoxSelect(QPointF(0, 0));
-    size_t count = selector.endBoxSelect(QPointF(100, 100));
-    EXPECT_EQ(count, 0u);
-}
-
-TEST(ViewportSelectorExtendedTest, InverseBoxSelect_Behavior)
-{
-    Eg::SceneManager scene;
-    MockSelectionService selSvc;
-    Camera2D camera;
-
-    auto line = std::make_unique<Eg::SyLine>();
-    line->setPointVector({ Ut::Vec2d(10, 10), Ut::Vec2d(50, 50) });
-
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
-    entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
-
-    ViewportSelector selector(&scene, &selSvc, &camera, nullptr);
-
-    // 正向框选
-    selector.beginBoxSelect(QPointF(0, 0));
-    size_t count = selector.endBoxSelect(QPointF(100, 100));
-    EXPECT_GE(count, 0u);
-    EXPECT_FALSE(selector.isBoxSelecting());
 }
 
 // ==================== 刷新级别转换规则测试 ====================
