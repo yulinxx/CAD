@@ -172,7 +172,8 @@ UI/2D/Test/
 ├── TextEditServiceTests.cpp  # 文本编辑服务
 ├── ToolShortcutTests.cpp     # 工具快捷键
 ├── ComplexToolsTests.cpp     # 复杂工具
-└── ComplexToolsTestImpl.cpp
+├── ComplexToolsTestImpl.cpp
+└── PinnedMarkerGeometryTests.cpp # 屏幕定尺寸标记几何（17 例：选择手柄 / 点标记的顶点数、尺寸不随缩放变化、sizePx 兜底、像素偏移、非有限锚点、多组合批）
 
 
 UI/Common/Test/
