@@ -64,12 +64,18 @@ int CADApplicationRuntime::run()
         MainApp::appVersion().c_str());
 
     // 初始化崩溃处理
-    // SY_DEBUG("[CADApplicationRuntime] Initializing crash handler");
-    if (!CrashHandlerBootstrap::initialize(MainApp::appName(), MainApp::appVersion()))
+    //
+    // SANYI_DISABLE_CRASH_HANDLER=1 时跳过：Breakpad 在 macOS 上抢的是 Mach 异常端口，
+    // 优先级高于 AddressSanitizer 的信号处理，装上它 ASan 就永远打不出 free 栈/use 栈，
+    // 只剩一个 minidump。排查内存问题（ASan / Valgrind）时必须让它让位。
+    if (qEnvironmentVariableIntValue("SANYI_DISABLE_CRASH_HANDLER") != 0)
+    {
+        SY_WARN("[CADApplicationRuntime] CrashHandler disabled by SANYI_DISABLE_CRASH_HANDLER");
+    }
+    else if (!CrashHandlerBootstrap::initialize(MainApp::appName(), MainApp::appVersion()))
     {
         SY_WARN("[CADApplicationRuntime] CrashHandler initialization failed, continuing without crash capture");
     }
-    // SY_INFO("[CADApplicationRuntime] Crash handler initialized");
 
     // [B1-P0 修复] 许可校验启动顺序修正：
     // 旧代码先调用 License_IsCheckEnabled()（恒为 false）再调用 License_ConfigInit()，
