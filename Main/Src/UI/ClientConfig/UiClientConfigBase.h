@@ -151,7 +151,6 @@ struct StatusBarSlotDef
     int stretch{ 0 };                                          // 伸缩因子（仅 Left 有效）
     int minimumWidth{ 0 };                                     // 最小宽度，0 表示不限制
     QString feature;                                           // 可选：需要的许可功能 ID
-    QStringList workbenches;                                   // 可见工作台；为空表示全部可见
     bool visible = true;
 };
 

@@ -505,7 +505,6 @@ IconHelper::setUserIconDirectory("C:/myIcons");   // 传空串清除定制
 | `stretch` | 拉伸因子，做占位弹簧时配 `Spacer` + `stretch: 1` |
 | `minimumWidth` | 最小宽度，避免文本抖动 |
 | `feature` | 授权门槛，见 §3.13 |
-| `workbenches` | 仅在指定工作台显示（如 `["2D"]`） |
 | `visible` | false 时不创建 |
 
 > **`align` 的实际差别**：`addWidget` 放的控件会被 `showMessage()` 的临时消息**覆盖**，

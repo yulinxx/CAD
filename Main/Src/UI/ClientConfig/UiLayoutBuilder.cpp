@@ -45,23 +45,6 @@ namespace
         return UiFeatureGate::instance().isAllowed(feature);
     }
 
-    /// 工作台可见性判断：列表为空表示全部工作台可见
-    bool visibleForWorkbench(const QStringList& workbenches, const QString& workbenchId)
-    {
-        if (workbenches.isEmpty() || workbenchId.isEmpty())
-        {
-            return true;
-        }
-        for (const QString& wb : workbenches)
-        {
-            if (wb.compare(workbenchId, Qt::CaseInsensitive) == 0)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
     /// 按稳定的 action id 显式声明 macOS 菜单角色。
     /// QAction 默认是 TextHeuristicRole：Qt 按**文本**（Exit/Quit/About/Settings/Preferences/
     /// Options）猜测角色，命中就把该动作搬进 macOS 应用菜单。文本一旦被翻译成"退出"/"关于"
@@ -612,7 +595,7 @@ void UiLayoutBuilder::buildShortcuts(const std::vector<ShortcutDef>& shortcuts)
     }
 }
 
-void UiLayoutBuilder::buildStatusBar(const StatusBarDef& statusBarDef, const QString& workbenchId)
+void UiLayoutBuilder::buildStatusBar(const StatusBarDef& statusBarDef)
 {
     if (!m_window)
     {
@@ -642,13 +625,6 @@ void UiLayoutBuilder::buildStatusBar(const StatusBarDef& statusBarDef, const QSt
         if (!slotDef.visible)
         {
             SY_DEBUGF("[UiLayoutBuilder] Skip status slot id='%s' visible=0", qPrintable(slotDef.id));
-            continue;
-        }
-        if (!visibleForWorkbench(slotDef.workbenches, workbenchId))
-        {
-            SY_DEBUGF("[UiLayoutBuilder] Skip status slot id='%s' — not for workbench '%s'",
-                qPrintable(slotDef.id),
-                qPrintable(workbenchId));
             continue;
         }
         // 授权门控（P0-3）：例如「视觉定位坐标显示」这类选装功能的状态栏指示器
@@ -696,10 +672,7 @@ void UiLayoutBuilder::buildStatusBar(const StatusBarDef& statusBarDef, const QSt
             slotDef.stretch);
     }
 
-    SY_INFOF("[UiLayoutBuilder] StatusBar built: workbench='%s' slots=%d/%d",
-        qPrintable(workbenchId),
-        built,
-        static_cast<int>(statusBarDef.items.size()));
+    SY_INFOF("[UiLayoutBuilder] StatusBar built: slots=%d/%d", built, static_cast<int>(statusBarDef.items.size()));
 }
 
 QMenu* UiLayoutBuilder::buildContextMenu(const ContextMenuDef& def, QWidget* parent)

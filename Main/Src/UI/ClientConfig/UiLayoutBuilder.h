@@ -65,8 +65,7 @@ public:
     /// 构建状态栏槽位（P0-2a）
     /// 槽位控件由 UiPanelRegistry 按 widgetType 创建，与 Dock 使用同一套面板工厂。
     /// @param statusBar 状态栏配置
-    /// @param workbenchId 当前工作台 ID，用于按 workbenches 字段过滤槽位
-    void buildStatusBar(const StatusBarDef& statusBar, const QString& workbenchId);
+    void buildStatusBar(const StatusBarDef& statusBar);
 
     /// 按配置构建一个右键菜单（P0-2b）
     /// 调用方负责 popup 与生命周期（通常用 QMenu::exec 后 deleteLater）。

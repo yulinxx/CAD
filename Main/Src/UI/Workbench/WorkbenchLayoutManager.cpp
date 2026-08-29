@@ -230,11 +230,6 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
     return !m_registeredDocks.empty();
 }
 
-void WorkbenchLayoutManager::setActiveWorkbenchId(const QString& workbenchId)
-{
-    m_activeWorkbenchId = workbenchId;
-}
-
 void WorkbenchLayoutManager::initializeStatusBarSkeleton()
 {
     // 状态栏骨架只承载全局状态展示，不提前填入业务语义
@@ -266,7 +261,7 @@ void WorkbenchLayoutManager::buildStatusBar()
 
     NullDispatcher dispatcher;
     UiLayoutBuilder builder(m_parent, &dispatcher, m_panelRegistry.get());
-    builder.buildStatusBar(config->statusBar, m_activeWorkbenchId);
+    builder.buildStatusBar(config->statusBar);
     for (QWidget* slot : builder.builtStatusBarSlots())
     {
         if (slot)

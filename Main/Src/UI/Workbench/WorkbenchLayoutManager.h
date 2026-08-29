@@ -82,9 +82,6 @@ public:
     void initializeStatusBarSkeleton();
     /// 构建状态栏（配置驱动：槽位由 JSON statusBar 节声明）
     void buildStatusBar();
-    /// 设置当前工作台 ID（用于按 workbenches 字段过滤状态栏槽位）
-    /// 需在 buildStatusBar 之前调用；为空时不做工作台过滤（全部槽位可见）
-    void setActiveWorkbenchId(const QString& workbenchId);
     /// 回收由配置构建的状态栏槽位控件
     void clearStatusBarSlots();
     /// 创建初始占位中央控件
@@ -175,6 +172,4 @@ private:
     IUiCommandDispatcher* m_commandDispatcher{ nullptr };
     /// 配置驱动布局是否已经构建，避免工具栏/Dock 重复加载
     bool m_configDrivenLayoutBuilt{ false };
-    /// 当前工作台 ID，用于状态栏槽位的工作台过滤；空表示不过滤
-    QString m_activeWorkbenchId;
 };

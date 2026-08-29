@@ -656,7 +656,6 @@ std::optional<StatusBarSlotDef> UiConfigLoader::parseStatusBarSlot(const QJsonOb
     slot.stretch = obj.value(QStringLiteral("stretch")).toInt(0);
     slot.minimumWidth = obj.value(QStringLiteral("minimumWidth")).toInt(0);
     slot.feature = obj.value(QStringLiteral("feature")).toString();
-    slot.workbenches = obj.value(QStringLiteral("workbenches")).toVariant().toStringList();
     slot.visible = obj.value(QStringLiteral("visible")).toBool(true);
 
     // widgetType 是槽位的唯一必填字段：没有它就无法从面板工厂取到控件
