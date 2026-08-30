@@ -96,6 +96,12 @@
         { "type": "separator" },
         { "type": "submenu", "id": "edit.path_operations", "label": "Path Operations", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"], "items": [
           { "type": "action", "id": "edit.offset", "label": "Offset...", "command": "edit.offset", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"] },
+          { "type": "separator" },
+          { "type": "action", "id": "edit.trim", "label": "Trim", "command": "edit.trim", "icon": ":/ui/common/Icons/Actions/trim.svg", "workbenches": ["2D"] },
+          { "type": "action", "id": "edit.extend", "label": "Extend", "command": "edit.extend", "icon": ":/ui/common/Icons/Actions/extend.svg", "workbenches": ["2D"] },
+          { "type": "action", "id": "edit.fillet", "label": "Fillet...", "command": "edit.fillet", "icon": ":/ui/common/Icons/Actions/fillet.svg", "workbenches": ["2D"] },
+          { "type": "action", "id": "edit.chamfer", "label": "Chamfer...", "command": "edit.chamfer", "icon": ":/ui/common/Icons/Actions/chamfer.svg", "workbenches": ["2D"] },
+          { "type": "separator" },
           { "type": "action", "id": "edit.boolean_union", "label": "Union", "command": "edit.boolean_union", "icon": ":/ui/common/Icons/Actions/boolean_union.svg", "workbenches": ["2D"] },
           { "type": "action", "id": "edit.boolean_intersection", "label": "Intersection", "command": "edit.boolean_intersection", "icon": ":/ui/common/Icons/Actions/boolean_intersection.svg", "workbenches": ["2D"] },
           { "type": "action", "id": "edit.boolean_difference", "label": "Difference", "command": "edit.boolean_difference", "icon": ":/ui/common/Icons/Actions/boolean_difference.svg", "workbenches": ["2D"] },
