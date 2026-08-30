@@ -158,6 +158,20 @@ void ViewportNavigation2D::endPan()
     m_panning = false;
 }
 
+void ViewportNavigation2D::panByPixels(double dxPhys, double dyPhys)
+{
+    if (!m_camera)
+    {
+        return;
+    }
+    // 与 updatePan 同一套换算：屏幕 y 向下、世界 y 向上，所以 dy 取负。
+    const float worldDx = static_cast<float>(dxPhys) / m_camera->zoomX;
+    const float worldDy = -static_cast<float>(dyPhys) / m_camera->zoomY;
+    m_camera->pan(worldDx, worldDy);
+
+    notifyCameraChanged();
+}
+
 QSizeF ViewportNavigation2D::physicalViewportSize() const
 {
     if (!m_renderWidget)

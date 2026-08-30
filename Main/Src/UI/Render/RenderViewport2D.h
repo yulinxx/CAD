@@ -142,6 +142,15 @@ public:
      */
     bool handleTextDeleteRequest(bool forward);
 
+    /**
+     * @brief 文本编辑态的 ⌘Z / ⇧⌘Z：在会话内的快照栈上撤销/重做
+     *
+     * @param redo false = 撤销；true = 重做
+     * @return true 表示已消费，上层**不要**再跑全局 Undo。
+     * 实现在 ViewportInputRouter，这里只转发。
+     */
+    bool handleTextUndoRequest(bool redo);
+
 
     SceneDocument2D* document() const
     {

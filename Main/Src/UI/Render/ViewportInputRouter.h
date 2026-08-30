@@ -133,6 +133,17 @@ public:
      */
     bool handleTextDeleteRequest(bool forward);
 
+    /**
+     * @brief 文本编辑态的 ⌘Z / ⇧⌘Z：在会话内的快照栈上撤销/重做
+     *
+     * @param redo false = 撤销；true = 重做
+     * @return true 表示已消费，调用方**不要**再跑全局 Undo
+     *
+     * 与 handleTextDeleteRequest 同因：⌘Z 归菜单/工作台的应用级快捷键，按键送不到视口。
+     * 一整个编辑会话在全局栈上只有一条 Undo，会话中直落全局栈会把上一个整体操作退掉。
+     */
+    bool handleTextUndoRequest(bool redo);
+
 
     /// 是否存在正在进行的编辑/绘制命令（视口右键时用于决定是否取消当前命令而非弹菜单）
     bool hasActiveCommand() const;
@@ -177,6 +188,14 @@ public:
     void setPanModeEnabled(bool enabled)
     {
         m_panModeEnabled = enabled;
+    }
+
+    /// 按物理像素程序化平移视图（文字拖选到视口外的自动平移走这条路）。
+    /// 刻意不动 m_panning：那个标志表示「用户正在拖拽平移」，自动平移不是拖拽会话，
+    /// 置上它会让随后的 MouseRelease 被当成平移收尾吃掉。
+    void panViewByPhysicalPixels(double dxPhys, double dyPhys)
+    {
+        m_navigation.panByPixels(dxPhys, dyPhys);
     }
 
     /// 空格是否正处于"临时平移"按下状态

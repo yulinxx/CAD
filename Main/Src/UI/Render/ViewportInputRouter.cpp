@@ -442,12 +442,16 @@ void ViewportInputRouter::handleKeyPress(QKeyEvent* event)
         return;
     }
 
-    // 空格：绘图态 = 确认，空闲态 = 导航（按住拖动临时平移 / 单独按释放重置视图）。
+    // 空格：绘图态 / 文字编辑态 = 交给工具，空闲态 = 导航（按住拖动临时平移 /
+    // 单独按释放重置视图）。
     //
     // 绘制中必须立即派发给工具，不能进「临时平移」态：mouseMove 里
     //「空格按住 + 任意移动」就会置 m_spacePanned=true（触控板单指移动也算），
     // 手放在鼠标上按空格几乎必然产生一次移动事件，于是释放时的确认被判成导航
     // 而丢掉 —— 表现就是「绘制中按空格没反应」。
+    //
+    // 文字编辑态同理，而且更严重：即使侥幸走到释放分支，那里合成的按下事件
+    // 不带 text()，TextEditTool 的可打印字符分支拿不到 " "，敲空格永远插不进去。
     if (event->key() == Qt::Key_Space)
     {
         if (event->isAutoRepeat())
@@ -456,9 +460,9 @@ void ViewportInputRouter::handleKeyPress(QKeyEvent* event)
             return;
         }
 
-        const bool drawing = m_toolManager && m_toolManager->getActiveTool()
-            && m_toolManager->getActiveTool()->isDrawingActive();
-        if (drawing)
+        ITool* active = m_toolManager ? m_toolManager->getActiveTool() : nullptr;
+        const bool toolOwnsSpace = active && (active->isDrawingActive() || active->isTextInputActive());
+        if (toolOwnsSpace)
         {
             if (handleKeyPressDispatch(event))
             {
@@ -1000,4 +1004,22 @@ bool ViewportInputRouter::handleTextDeleteRequest(bool forward)
     // 编辑态判据由工具自己给（TextEditTool::deleteTextAtCursor 内部查 m_editing），
     // 路由层不认识具体工具类型 —— 与 isDrawingActive / stepBackDrawing 同一套约定。
     return tool->deleteTextAtCursor(forward);
+}
+
+bool ViewportInputRouter::handleTextUndoRequest(bool redo)
+{
+    if (!m_toolManager)
+    {
+        return false;
+    }
+
+    ITool* tool = m_toolManager->getActiveTool();
+    if (!tool)
+    {
+        return false;
+    }
+
+    // 同上：编辑态判据在工具手里。返回 true 表示这次 ⌘Z 用在了文字会话内，
+    // 全局 Undo 不能再跑 —— 否则会把进入编辑之前的那条命令退掉。
+    return tool->undoTextEdit(redo);
 }
