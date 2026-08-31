@@ -278,10 +278,15 @@ ImportResult ImportReaderBase::readViaLegacy(
 
     for (const QString& warn : warns)
     {
-        SY_WARNF("[ImportReader:%s] Legacy parser warning: %s", tag.constData(), warn.toUtf8().constData());
+        // Warnings are already collected in the result; log summary only
     }
 
-    SY_INFOF("[ImportReader:%s] read END (legacy): success, entities=%zu, layers=%zu, warnings=%zu, %lld ms",
+    if (!warns.isEmpty())
+    {
+        SY_WARNF("[ImportReader:%s] Legacy parser produced %d warning(s)", tag.constData(), warns.size());
+    }
+
+    SY_INFOF("[ImportReader:%s] read END (legacy): success, entities=%zu, layers=%zu, %lld ms",
         tag.constData(),
         count,
         layerCount,

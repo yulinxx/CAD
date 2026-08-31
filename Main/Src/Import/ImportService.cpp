@@ -193,19 +193,10 @@ ImportResult ImportService::importWithContext(const ImportContext& context, cons
     {
         QString msg = QStringLiteral("ImportDispatcher not set");
         SY_ERRORF("[ImportService] importWithContext aborted: %s", msg.toUtf8().constData());
-        // 此处 guard 尚未构造（忙状态未置位），但完成信号必须发出，
-        // 否则监听 importFinished 的调用方会一直等不到结束通知
         const ImportResult r = ImportResult::fail(msg, ImportErrorType::Unknown);
         emit importFinished(r);
         return r;
     }
-
-    // 落地目标一次性打全：mesh 走 3D 通道、其余走 2D 通道，缺哪个 sink 直接看这行
-    SY_INFOF("[ImportService] Sinks: sceneManager=%p, editService=%p, sceneManager3D=%p, editService3D=%p",
-        static_cast<void*>(m_sceneManager),
-        static_cast<void*>(m_editService),
-        static_cast<void*>(m_sceneManager3D),
-        static_cast<void*>(m_sceneEditService3D));
 
     // RAII 守卫：自动管理忙状态和最终状态提示
     ScopedImportGuard guard(this, context.sourcePath);
@@ -231,14 +222,12 @@ ImportResult ImportService::importWithContext(const ImportContext& context, cons
     Fio::VecSyEntityPtr importedEntities;
 
     // ===== 1：识别文件格式 =====
-    SY_INFO("[ImportService] Phase 1: Detect format");
     ImportResult result = phaseDetectFormat(mutableCtx);
     if (!result.success)
     {
         SY_ERRORF("[ImportService] Phase 1 failed: %s", result.message.toUtf8().constData());
         return fail(result);
     }
-    SY_INFOF("[ImportService] Phase 1 completed: format=%d", static_cast<int>(mutableCtx.format));
 
     if (isCanceled(mutableCtx))
     {
@@ -246,16 +235,12 @@ ImportResult ImportService::importWithContext(const ImportContext& context, cons
     }
 
     // ===== 2：解析文件 =====
-    SY_INFO("[ImportService] Phase 2: Parse file");
     ImportResult parseResult = phaseParse(mutableCtx, importedEntities);
     if (!parseResult.success)
     {
         SY_ERRORF("[ImportService] Phase 2 failed: %s", parseResult.message.toUtf8().constData());
         return fail(parseResult);
     }
-    SY_INFOF("[ImportService] Phase 2 completed: entities=%zu, layers=%zu",
-        importedEntities.size(),
-        parseResult.importedLayers.size());
 
     if (isCanceled(mutableCtx))
     {
@@ -263,14 +248,12 @@ ImportResult ImportService::importWithContext(const ImportContext& context, cons
     }
 
     // ===== 3：构建文档 =====
-    SY_INFO("[ImportService] Phase 3: Build document");
     result = phaseBuildDocument(mutableCtx, importedEntities, options, parseResult);
     if (!result.success)
     {
         SY_ERRORF("[ImportService] Phase 3 failed: %s", result.message.toUtf8().constData());
         return fail(result);
     }
-    SY_INFOF("[ImportService] Phase 3 completed: entityCount=%d", result.entityCount);
 
     if (isCanceled(mutableCtx))
     {
@@ -278,14 +261,10 @@ ImportResult ImportService::importWithContext(const ImportContext& context, cons
     }
 
     // ===== 4：刷新显示 =====
-    SY_INFO("[ImportService] Phase 4: Refresh display");
     phaseRefreshDisplay(result, options);
-    SY_INFO("[ImportService] Phase 4 completed");
 
     // ===== 5：回写状态 =====
-    SY_INFO("[ImportService] Phase 5: Write back state");
     phaseWriteBackState(mutableCtx, result);
-    SY_INFO("[ImportService] Phase 5 completed");
 
     // RAII 守卫在析构时自动清除忙状态并写最终提示
     guard.setResult(result);
@@ -546,16 +525,11 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
         if (!entity)
         {
             ++nullCount;
-            SY_WARNF("[ImportService] Skipping null entity at index %zu", i);
             continue;
         }
         if (!entity->isValid())
         {
             ++invalidCount;
-            // 打出类型码：定位是哪一类图元在解析层被造坏
-            SY_WARNF("[ImportService] Skipping invalid entity at index %zu, eType=%d",
-                i,
-                static_cast<int>(entity->eType));
             continue;
         }
         validEntities.push_back(std::move(entity));

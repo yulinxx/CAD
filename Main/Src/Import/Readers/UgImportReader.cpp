@@ -30,7 +30,6 @@ void UgImportReader::decorateError(QString& msg, const ImportContext& context) c
 
 ImportResult UgImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
 {
-    SY_INFOF("[UgImportReader] read START: path=%s", context.sourcePath.toUtf8().constData());
 
     // 走 FileIO 的 UgParser（IGES 子集解析），将 IGES 图元转换为中立 IR
     return readViaIR(context, Fio::FileFormat::UG, outEntities, true);

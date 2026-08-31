@@ -12,7 +12,6 @@ NativeImportReader::NativeImportReader()
 
 ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
 {
-    SY_INFOF("[NativeImportReader] read START: path=%s", context.sourcePath.toUtf8().constData());
 
     // 检测是否为 3D 格式 (.syx)
     QFileInfo fi(context.sourcePath);

@@ -261,7 +261,6 @@ bool FileDropHandler::handleDrop(QDropEvent* event)
             continue;
         }
 
-        SY_INFOF("[FileDropHandler] Importing dropped file: %s", filePath.toUtf8().constData());
         emit sigFileImported(filePath, false);
 
         // 位图/图片文件走 QImage 导入路径（与 FileOperationRegistry::doImportImage 一致）
@@ -279,7 +278,6 @@ bool FileDropHandler::handleDrop(QDropEvent* event)
             if (ok)
             {
                 ++successCount;
-                SY_INFOF("[FileDropHandler] Image imported: %s", filePath.toUtf8().constData());
             }
             else
             {
@@ -306,7 +304,6 @@ bool FileDropHandler::handleDrop(QDropEvent* event)
         if (result.success)
         {
             ++successCount;
-            SY_INFOF("[FileDropHandler] Imported: %s", filePath.toUtf8().constData());
         }
         else
         {
@@ -318,6 +315,10 @@ bool FileDropHandler::handleDrop(QDropEvent* event)
     }
 
     event->acceptProposedAction();
+    if (successCount + failedCount > 1)
+    {
+        SY_INFOF("[FileDropHandler] Drop completed: %d succeeded, %d failed", successCount, failedCount);
+    }
     emit sigDropFinished(successCount, failedCount);
     return successCount > 0;
 }

@@ -53,15 +53,15 @@
 #include "UI2D/Operation/CommandCatalog.h"
 #include "UI2D/Edit/QtLayerManagerBridge.h"
 
-#include "UI/RightToolBar/RightToolBar.h"
+#include "UI2D/ToolBar/RightToolBar.h"
 #include "UI/Service/ToolBarContextManager.h"
-#include "UI/TopToolBar/TopToolBar.h"
-#include "UI/TopToolBar/TextFontToolBar.h"
+#include "UI2D/ToolBar/TopToolBar.h"
+#include "UI2D/ToolBar/TextFontToolBar.h"
 #include "UI/DrawTools/TextEditTool.h"
 #include "UI/DrawTools/ToolManager.h"
 #include "UI/UiMetrics.h"
 #include "UI/ThemeManager.h"
-#include "UI/Dlg/LayerManagerDialog.h"
+#include "UI2D/Dlg/LayerManagerDialog.h"
 #include "UI2D/Service/EntityPropertyModel2D.h"
 #include "UI2D/Service/EntityPropertyEditSession2D.h"
 #include "UI2D/Service/SceneMonitor.h"
@@ -83,7 +83,7 @@
 #include "Import/ImportService.h"
 #include "Color/Color.hpp"
 #include "Log/SyLogger.h"
-#include "UI/StatusBar/StatusBar.h"
+#include "UI2D/StatusBar/StatusBar.h"
 
 #include "UI/Settings/SettingsService.h"
 #include "UI2D/Settings/SettingsUiCoordinator2D.h"
@@ -321,7 +321,7 @@ void Workbench2D::dispatchCommand(const QString& commandId, const QVariantMap& p
     const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(commandId);
     if (menuId != static_cast<UI::MenuActionId>(0))
     {
-        SY_INFOF("[Workbench2D] Dispatch command='%s' menuId=%d source=Menu",
+        SY_DEBUGF("[Workbench2D] Dispatch command='%s' menuId=%d source=Menu",
             qPrintable(commandId),
             static_cast<int>(menuId));
         OperationRouting::dispatch(menuId, OperationSource::Menu, params);
@@ -341,12 +341,12 @@ void Workbench2D::dispatchCommand(const QString& commandId, const QVariantMap& p
             SY_WARNF("[Workbench2D] Unknown command: %s", qPrintable(commandId));
             return;
         }
-        SY_INFOF("[Workbench2D] Dispatch tool command='%s'", qPrintable(commandId));
+        SY_DEBUGF("[Workbench2D] Dispatch tool command='%s'", qPrintable(commandId));
         m_services.operationBus->run(toolOperation, params, OperationSource::Menu);
         return;
     }
 
-    SY_INFOF("[Workbench2D] Dispatch command='%s'", qPrintable(commandId));
+    SY_DEBUGF("[Workbench2D] Dispatch command='%s'", qPrintable(commandId));
     m_services.operationBus->run(operation, params, OperationSource::Menu);
 }
 
@@ -381,7 +381,6 @@ bool Workbench2D::initialize(const UiServices& services)
 
     // 使用应用共享 SettingsService singleton（2D/3D 逻辑一致）
     m_settingsCoordinator = std::make_unique<SettingsUiCoordinator2D>(ApplicationCompositionRoot::getSettingsService());
-    m_services.settingsService = ApplicationCompositionRoot::getSettingsService();
 
     // 注册 2D 专属设置表，确保保存时表已存在
     if (m_settingsCoordinator)

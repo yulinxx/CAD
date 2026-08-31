@@ -9,7 +9,6 @@ DxfImportReader::DxfImportReader()
 
 ImportResult DxfImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
 {
-    SY_INFOF("[DxfImportReader] read START: path=%s", context.sourcePath.toUtf8().constData());
 
     // 主链路：中立 IR 导入（parseToIR → FioEntityConverter）
     // FileIO 不再直接实例化 Engine 对象，IR 为跨 DLL 安全的 POD；
