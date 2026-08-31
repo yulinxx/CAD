@@ -18,6 +18,8 @@
 #include "UiWorkbench.h"
 #include "UiServices.h"
 #include "UiFrameworkServices.h"
+#include "Composition/ApplicationCompositionRoot.h"
+#include "UI/Settings/SettingsService.h"
 #include "UI/Services/IRecentFileService.h"
 #include "UI/ClientConfig/UiLayoutBuilder.h"
 #include "UI/LanguageManager.h"
@@ -147,20 +149,38 @@ struct MenuDispatcher final : public IUiCommandDispatcher
                 QObject::tr("SanYiCAD\nVersion: %1").arg(qApp ? qApp->applicationVersion() : QString()));
             return;
         }
-        // 语言切换：language.<code> → AppLanguage；兼容历史 "language.tw" → 中文。
+        // 语言切换：language.<code> → AppLanguage，落盘后由 SettingsService 应用。
         if (isLanguageCommand(commandId))
         {
             QString code = commandId.mid(QStringLiteral("language.").size());
             AppLanguage lang = AppLanguage::English;
-            if (code.compare(QLatin1String("tw"), Qt::CaseInsensitive) == 0)
-            {
-                lang = AppLanguage::Chinese;
-            }
-            else if (const auto parsed = LanguageManager::fromCode(code); parsed.has_value())
+            if (const auto parsed = LanguageManager::fromCode(code); parsed.has_value())
             {
                 lang = *parsed;
             }
-            LM->setLanguage(lang);
+            else
+            {
+                SY_WARNF("[MenuDispatcher] unknown language code '%s', ignore", qPrintable(code));
+                return;
+            }
+            // 必须落盘：只调 LM->setLanguage 的话语言只活在内存里，一旦有人再走
+            // applyCommonSettings（设置对话框确定、SettingsService 懒初始化）就会被
+            // 库里的 common/language 覆盖回去，表现为「切个工作台语言就丢了」。
+            // SettingsService::setLanguage 内部会写库并调 LM->setLanguage。
+            if (auto* settings = ApplicationCompositionRoot::getSettingsService(); settings && settings->isInitialized())
+            {
+                settings->setLanguage(lang);
+            }
+            else
+            {
+                LM->setLanguage(lang);
+            }
+            // 语言切换成功会经 LanguageChange → retranslateUi → rebuildAllMenus 回填勾选；
+            // 但 .qm 缺失时不发 LanguageChange，这里补一次，保证勾选态与实际语言一致。
+            if (self)
+            {
+                self->refreshConfiguredMenuState();
+            }
             return;
         }
         if (!workbench)
@@ -234,6 +254,11 @@ void WorkbenchMenuManager::rebuildAllMenus()
     // 菜单只有一条构建路径：JSON 配置驱动。
     rebuildMenusFromConfig();
     bindConfiguredMenuState();
+
+    // 重建产出的 QAction 一律是 checked=false（JSON 里没写 checked）。状态中心的信号只在
+    // 状态"变化"时才发，重建后不会补发，所以必须在这里主动回填一次勾选态，
+    // 否则语言/网格/吸附等勾选项在每次工作台切换、语言切换后都是空的。
+    refreshConfiguredMenuState();
 
 
     // 菜单重建产出的是全新 QAction，enabled 默认为 true。
@@ -864,6 +889,20 @@ void WorkbenchMenuManager::refreshConfiguredMenuState()
         else if (cmdId == QStringLiteral("view.unit_inch"))
         {
             applyChecked(action, false);
+        }
+        // 语言勾选态：菜单每次重建都是全新 QAction（checked 默认 false），
+        // 必须按 LanguageManager 的当前语言回填，否则 2D/3D 切换后勾选态全部消失。
+        else if (cmdId.startsWith(QStringLiteral("language.")))
+        {
+            const QString code = cmdId.mid(QStringLiteral("language.").size());
+            const auto lang = LanguageManager::fromCode(code);
+            applyChecked(action, lang.has_value() && *lang == LM->currentLanguage());
+        }
+        // 主题勾选态：来源是 ThemeManager 而不是状态中心，同样要在这里回填。
+        // 注意用 System/Default 时勾的是 System/Default 本身，不是它解析出来的实际皮肤。
+        else if (cmdId.startsWith(QStringLiteral("theme.")))
+        {
+            applyChecked(action, ThemeManager::menuIdFor(TM->currentTheme()) == cmdId.toLower());
         }
     });
 }

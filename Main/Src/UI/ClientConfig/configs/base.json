@@ -255,7 +255,6 @@
         { "type": "submenu", "id": "help.language", "label": "Language", "icon": ":/ui/common/Icons/Help/language.svg", "workbenches": ["2D", "3D"], "items": [
           { "type": "action", "id": "language.en", "label": "English", "command": "language.en", "checkable": true, "workbenches": ["2D", "3D"] },
           { "type": "action", "id": "language.zh", "label": "简体中文", "command": "language.zh", "checkable": true, "workbenches": ["2D", "3D"] },
-          { "type": "action", "id": "language.tw", "label": "繁體中文", "command": "language.tw", "checkable": true, "workbenches": ["2D", "3D"] },
           { "type": "action", "id": "language.ja", "label": "日本語", "command": "language.ja", "checkable": true, "workbenches": ["2D", "3D"] },
           { "type": "action", "id": "language.ko", "label": "한국어", "command": "language.ko", "checkable": true, "workbenches": ["2D", "3D"] },
           { "type": "action", "id": "language.fr", "label": "Français", "command": "language.fr", "checkable": true, "workbenches": ["2D", "3D"] },
