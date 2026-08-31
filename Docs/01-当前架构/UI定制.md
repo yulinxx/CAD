@@ -967,4 +967,67 @@ JSON 里用到的 feature 必须都登记了映射。纯授权控制项（没有
 理由：漏登记时打包后运行期取不到那份配置，只会静默回退到默认客户，既不报错也看不出
 少了什么。反方向（qrc 登记了已删除的文件）rcc 自己会报错，不需要额外护栏。
 
+---
+
+## 11. 皮肤链路的两个真实缺陷（2026-08-31）
+
+### 11.1 深色模式下停靠面板发黑
+
+**现象。** macOS 系统处于深色模式时，Scene / Properties 两个停靠面板整块是近黑
+（#171717），而主界面其余部分是浅色，视觉上完全割裂。
+
+**成因，两条叠加。**
+
+1. **整份样式表被丢弃。** `common.qss` 的 `QCheckBox, QRadioButton { spacing: 8px; }`
+   规则**缺一个右花括号**。QSS 是一次性解析的：`qApp->setStyleSheet(common + <theme>)`
+   拼接后只要有一处语法错误，Qt 打一行 `Could not parse application stylesheet`
+   然后**整份丢弃** —— 不是"跳过出错那条规则"。所以真正生效的只剩 QPalette。
+2. **QPalette 只写了 Active 组。** `ThemeManager::applyPaletteForTheme` 的所有
+   `setColor` 都落在默认（Active）组。窗口失焦或控件禁用时 Qt 取 Inactive / Disabled 组，
+   那两组没被覆盖，回落到 `style()->standardPalette()` —— 在 macOS 深色模式下就是黑底。
+   停靠面板恰恰是最容易处于 Inactive 状态的区域。
+
+另有一处独立缺口：QSS 的类型选择器**不匹配基类**。`QTreeWidget` 选择器对裸
+`QTreeView` 无效，而 Scene 面板正是 `QTreeView` + 自定义 model。五份主题 qss 与
+`common.qss` 的三处 item view 选择器都补上了 `QTreeView`。
+
+**为什么测试没抓住。** 没有任何测试断言样式表能被解析。`setStyleSheet` 不返回值、
+不抛异常，解析失败只体现在一行运行期日志里。
+
+**修法与教训。** 补花括号；`applyPaletteForTheme` 内的 set lambda 改为**写 Active 时
+自动同步写 Inactive / Disabled**（各分支末尾对 Disabled 的灰化文字覆盖仍在后面生效）。
+教训两条：改 qss 后必须看启动日志有没有 `Could not parse`；写 palette 一律三组齐全，
+只写 Active 等于把失焦和禁用两种状态交给平台默认值。
+
+### 11.2 取色对话框：原生面板不回写 `selectedColor()`
+
+**现象。** macOS 下 Layer Manager 的 Pick Color，选完颜色点确定，色块**仍然是黑的**。
+
+**成因。** `QColorDialog::getColor()` 在 macOS 上打开的是原生 NSColorPanel。
+当初始色为**纯黑**时，NSColorPanel 不会把用户的选择写回 `selectedColor()`，
+`getColor()` 于是原样返回黑色。这是平台桥接层的缺陷，不是样式问题 ——
+一开始怀疑的"`QPushButton` 在 macOS 上需要 border 才能应用 `background-color`"
+经像素级实测（`grab()` 取中心像素）证伪，新旧写法都正确渲染成目标色。
+
+**修法：一个统一入口，保留原生面板。** 新增 `UiDialogHelpers::pickColor(initial, parent, title)`：
+构造 `QColorDialog`（**不设** `DontUseNativeDialog`，跨平台都保留系统面板），
+连 `currentColorChanged` 自己记住最后一个有效色，`exec()` 通过后优先返回它，
+兜底才取 `selectedColor()`。
+
+全应用 6 个取色点（`LayerManagerDialog` 描边/填充、`UiPropertiesPanel`、
+`EntityPropertiesDialogBase`、`SettingsColorRowHelper`、`FillDialog`）一律改走它 ——
+`FillDialog` 原先靠 `DontUseNativeDialog` 绕过问题，现在也统一回原生面板。
+仓库内已无 `QColorDialog::getColor` 直接调用。
+
+**教训。** 同一个平台缺陷若允许每个调用点各自绕（一个加 flag、一个不加），
+就会出现"同一个软件里两种取色面板"。跨平台差异应当收敛到一个 helper 里处理一次。
+
+### 11.3 补充回归项（追加到 §9）
+
+- [ ] 启动日志中**没有** `Could not parse application stylesheet`；
+- [ ] 五套主题下 Scene（`QTreeView`）与 Properties（`QTreeWidget`）面板背景与主界面一致；
+- [ ] 主窗口失焦后停靠面板颜色不变（Inactive 组已覆盖）；
+- [ ] 深色模式下从**纯黑**初始色进入取色面板，选色确定后色块正确更新；
+- [ ] `Help ▸ Language` / `Theme` 当前项有勾选，切换工作台后勾选仍在，重启后保持。
+
 
