@@ -123,6 +123,57 @@ TEST(CommandUiWiringTest, DeleteRequiresUnlockedSelection)
     EXPECT_EQ(entry->enableRule, CommandEnable2D::RequiresUnlockedSelection);
 }
 
+TEST(CommandUiWiringTest, PathModifyCommandsResolveAndRequireTwoUnlocked)
+{
+    // 修剪/延伸/圆角/倒角都作用于「两个图元」：无参调用时由 CoreOperationRegistry
+    // 取当前选中的前两个，因此启用规则必须是「两个且均未锁定」，
+    // 否则单选时菜单可点但操作静默返回（用户看到的是"点了没反应"）。
+    const QStringList modifyIds = {
+        QStringLiteral("edit.trim"),
+        QStringLiteral("edit.extend"),
+        QStringLiteral("edit.fillet"),
+        QStringLiteral("edit.chamfer"),
+    };
+
+    for (const QString& commandId : modifyIds)
+    {
+        // edit.* 前缀才参与启用态刷新：2d.* 会被 menuIdForCommandId 短路成 0
+        const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(commandId);
+        EXPECT_NE(static_cast<int>(menuId), 0) << commandId.toStdString();
+
+        const CommandEntry2D* entry = CommandCatalog::findByMenuId(menuId);
+        ASSERT_NE(entry, nullptr) << commandId.toStdString();
+        EXPECT_EQ(entry->enableRule, CommandEnable2D::RequiresUnlockedMultiSelection)
+            << commandId.toStdString();
+        EXPECT_NE(CommandCatalog::operationForCommandId(commandId), OperationId::None)
+            << commandId.toStdString();
+    }
+}
+
+TEST(CommandUiWiringTest, LegacyTwoDPrefixAliasesForEditCommandsAreGone)
+{
+    // 同一功能不留两套命令 id：这批 2d.* 曾与 edit.* 同义（或是 trim/extend/fillet/chamfer
+    // 的旧名），已随目录条目改名一并删除。留着会绕过启用态刷新（2d. 前缀短路成 0）。
+    const QStringList retiredIds = {
+        QStringLiteral("2d.move"),
+        QStringLiteral("2d.copy"),
+        QStringLiteral("2d.rotate"),
+        QStringLiteral("2d.scale"),
+        QStringLiteral("2d.mirror"),
+        QStringLiteral("2d.delete"),
+        QStringLiteral("2d.trim"),
+        QStringLiteral("2d.extend"),
+        QStringLiteral("2d.fillet"),
+        QStringLiteral("2d.chamfer"),
+    };
+
+    for (const QString& commandId : retiredIds)
+    {
+        EXPECT_EQ(CommandCatalog::operationForCommandId(commandId), OperationId::None)
+            << commandId.toStdString();
+    }
+}
+
 TEST(CommandUiWiringTest, CatalogShortcutIdsResolveBackToOwnMenuId)
 {
     // 目录是 actionId 的唯一真值源：凡声明了 shortcutId 的条目，
@@ -326,7 +377,7 @@ TEST(CommandUiWiringTest, ApplySnapshotToMenu_LeavesUnrelatedActionsUntouched)
     // 无 commandId（分隔符替代项 / 纯 UI 项）与解析不到目录条目的 id 都应原样保留
     QAction* plain = menu.addAction(QStringLiteral("No command id"));
     QAction* unknown = addConfiguredAction(&menu, "totally.unknown.command");
-    QAction* directOp = addConfiguredAction(&menu, "2d.move");  // 2d.* 前缀由目录显式返回 0
+    QAction* directOp = addConfiguredAction(&menu, "2d.draw_line");  // 2d.* 前缀由目录显式返回 0
 
     CommandActionHub::applySnapshotToMenu(&menu, makeSnapshot(0, false, false));
 
