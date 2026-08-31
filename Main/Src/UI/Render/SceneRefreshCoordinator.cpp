@@ -61,11 +61,30 @@ SceneRefreshCoordinator::SceneRefreshCoordinator(QObject* parent)
 SceneRefreshCoordinator::~SceneRefreshCoordinator()
 {
     stop();
+    // 必须解绑：视口只是弱引用调度器，调度器先走的话它会留着一个悬空指针，
+    // 下一次覆盖层写入就会打到已析构对象上。
+    if (m_renderWidget)
+    {
+        m_renderWidget->setRefreshScheduler(nullptr);
+        m_renderWidget = nullptr;
+    }
 }
 
 void SceneRefreshCoordinator::setRenderWidget(RenderWidget* widget)
 {
+    // 解绑旧视口：否则它会继续把刷新意图打到一个已经不属于自己的调度器上
+    if (m_renderWidget && m_renderWidget != widget)
+    {
+        m_renderWidget->setRefreshScheduler(nullptr);
+    }
     m_renderWidget = widget;
+    // 反向注入：视口内部的覆盖层 / 位图 / 文字 / 视图矩阵这几类刷新
+    // 原来是裸调 update() 完全绕过调度器的，注入后统一经 requestRepaint() 汇入。
+    // 这是「所有 2D 刷新来源都能从 pendingLevel() 推理」的前提。
+    if (m_renderWidget)
+    {
+        m_renderWidget->setRefreshScheduler(this);
+    }
 }
 
 void SceneRefreshCoordinator::setSceneManager(Eg::SceneManager* sm)
