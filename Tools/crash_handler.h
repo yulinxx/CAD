@@ -100,16 +100,16 @@ inline LONG WINAPI ExceptionFilter(EXCEPTION_POINTERS* ep) {
     // 显示崩溃对话框
     wchar_t msg[MAX_PATH * 2];
     swprintf_s(msg,
-        L"程序崩溃了！\n\n"
-        L"异常代码: 0x%08X\n"
-        L"崩溃地址: 0x%p\n"
-        L"崩溃报告已保存:\n%s\n\n"
-        L"请将此文件发送给开发人员。",
+        L"Program crashed!\n\n"        // 程序崩溃了！
+        L"Exception code: 0x%08X\n"    // 异常代码
+        L"Crash address: 0x%p\n"       // 崩溃地址
+        L"Crash report saved:\n%s\n\n" // 崩溃报告已保存
+        L"Please send this file to the developers.",  // 请将此文件发送给开发人员
         ep->ExceptionRecord->ExceptionCode,
         ep->ExceptionRecord->ExceptionAddress,
         g_dumpPath.c_str());
     
-    MessageBoxW(NULL, msg, L"SanYiCAD - 崩溃", 
+    MessageBoxW(NULL, msg, L"SanYiCAD - Crash",  // SanYiCAD - 崩溃
         MB_OK | MB_ICONERROR | MB_TOPMOST);
     
     return EXCEPTION_EXECUTE_HANDLER;
