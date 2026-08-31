@@ -429,6 +429,8 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*Scene3DRegressionTests\\.cpp$")
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*FrameworkLifecycleTests\\.cpp$")
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*TransformGizmo3DHitTests\\.cpp$")
+        # 跨镜像 RTTI 守卫用 Engine3D 的图元做样本，没有 UI3D 时 Engine3D 不参与链接
+        list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*CrossImageRttiTests\\.cpp$")
     endif()
 
         set(MAIN_TEST_DEP_SOURCES ${MAIN_APP_SOURCES})
