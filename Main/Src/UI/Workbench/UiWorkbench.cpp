@@ -947,7 +947,20 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         return result;
     });
     // 注入撤销/重做状态提供器（OperationBus context 在生产路径不填充 undoManager）
+    //
+    // 这里必须在接线时就把漏注入喊出来：provider 的返回值会在
+    // CommandActionHub::captureSnapshot 里**覆盖** snapshot.canUndo / canRedo，
+    // 捕到 nullptr 就等于把两者钉死为 false，而 edit.undo / edit.redo 的
+    // RequiresUndo / RequiresRedo 判定随之永远不通过 —— 菜单和工具栏的撤销/重做
+    // 一直置灰，置灰的 QAction 连 Ctrl+Z / Ctrl+Y 都不触发。整条链路没有任何
+    // 报错，表现只是「撤销完全没反应」，极难往接线上查（2026-08-31 实际踩过：
+    // ApplicationCompositionRoot::assembleUiServices 漏了这一项）。
+    if (!m_services.undoManager)
+    {
+        SY_WARN("[Workbench2D] UiServices::undoManager is null, Undo/Redo actions will stay disabled");
+    }
     m_commandHub->setUndoRedoProvider([undoManager = m_services.undoManager]() -> UndoRedoState {
+
         UndoRedoState state;
         if (undoManager)
         {

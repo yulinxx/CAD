@@ -231,6 +231,15 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
     uiServices.operationBus = m_operationBus.get();
     uiServices.document2D = m_document2D.get();
     uiServices.sceneEditService = m_sceneEditService.get();
+    // 撤销/重做管理器必须填进 UiServices：Workbench2D::createToolbars 会把
+    // m_services.undoManager **按值捕进** setUndoRedoProvider 的闭包，而
+    // CommandActionHub::captureSnapshot 拿这个 provider 的结果**覆盖**
+    // snapshot.canUndo / canRedo。这里漏填时闭包捕到的是 nullptr，
+    // canUndo 恒为 false，edit.undo / edit.redo 的 RequiresUndo / RequiresRedo
+    // 判定永远不通过 —— 菜单和工具栏的撤销/重做一直置灰，而置灰的 QAction
+    // 连它的 Ctrl+Z / Ctrl+Y 都不会触发，表现就是「撤销完全没反应」。
+    uiServices.undoManager = m_undoRedoManager.get();
+
     uiServices.selectionService = m_selectionService.get();
     uiServices.viewportActionHub = m_viewportActionHub.get();
     uiServices.unitManager = m_unitManager.get();
