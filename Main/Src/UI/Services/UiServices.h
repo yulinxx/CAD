@@ -3,7 +3,7 @@
 #include <functional>
 #include <memory>
 
-#include "IUiServices.h"
+#include "IUIServices.h"
 
 class IInteractionDispatcher;
 class UiStateCenter;
@@ -26,7 +26,7 @@ namespace Eg
 
 /**
  * @struct UiServices
- * @brief UI 服务集合（具体类型聚合，实现 IUiServices 接口）
+ * @brief UI 服务集合（具体类型聚合，实现 IUIServices 接口）
  *
  * 聚合了 UI 层所需的服务。当前暴露 16 个指针，其中 4 个是抽象接口
  * （ISelectionService / IUndoRedoManager / IInteractionDispatcher /
@@ -40,11 +40,11 @@ namespace Eg
  *
  * 【已知问题】消费者直接依赖具体实现类，无法独立测试或替换实现。
  *
- * 【迁移方向】仅依赖抽象服务的消费者应改为依赖 IUiServices；
+ * 【迁移方向】仅依赖抽象服务的消费者应改为依赖 IUIServices；
  * 需要具体服务的消费者应通过独立参数注入。读取点集中在 UiWorkbench 与
  * WorkbenchWindow 两处，逐字段下沉为构造参数是可行的下一步。
  */
-struct UiServices : public IUiServices
+struct UiServices : public IUIServices
 {
     /// UI 状态中心
     UiStateCenter* stateCenter{ nullptr };
@@ -94,7 +94,7 @@ struct UiServices : public IUiServices
     /// 图元剪贴板（Copy/Cut/Paste 的图元副本缓存）
     Eg::EntityClipboard* clipboard{ nullptr };
 
-    // ---- IUiServices 接口实现 ----
+    // ---- IUIServices 接口实现 ----
 
     ISelectionService* getSelectionService() const override { return selectionService; }
     IUndoRedoManager* getUndoManager() const override { return undoManager; }

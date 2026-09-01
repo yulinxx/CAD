@@ -4,7 +4,7 @@
 #include <QPointer>
 
 #include "Services/UiFrameworkServices.h"
-#include "Services/UiServices.h"
+#include "Services/UIServices.h"
 #include "Services/UiStateCenter.h"
 
 class QMainWindow;

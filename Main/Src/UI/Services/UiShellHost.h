@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "UiFrameworkServices.h"
-#include "UiServices.h"
+#include "UIServices.h"
 
 class OperationBus;
 class UiStateCenter;

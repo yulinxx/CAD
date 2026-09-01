@@ -10,7 +10,7 @@
 #include "UI2D/Operation/OperationRouting.h"
 
 #include "UI/Services/UiLayoutService.h"
-#include "UI/Services/UiServices.h"
+#include "UI/Services/UIServices.h"
 #include "UI/Services/UiShellHost.h"
 #include "UI/Workbench/WorkbenchWindow.h"
 #include "UI/Services/UiStateCenter.h"

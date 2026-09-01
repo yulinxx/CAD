@@ -4,7 +4,6 @@
 #include <memory>
 
 #include <QAbstractItemModel>
-#include <QColorDialog>
 #include <QComboBox>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -26,6 +25,7 @@
 #include <QVBoxLayout>
 
 #include "UI/Dlg/IPropertyEditTarget.h"
+#include "UI/UiDialogHelpers.h"
 
 namespace
 {
@@ -189,7 +189,7 @@ namespace
     private:
         void chooseColor()
         {
-            QColor c = QColorDialog::getColor(m_color, this);
+            QColor c = UiDialog::pickColor(m_color, this);
             if (c.isValid())
             {
                 setColor(c);

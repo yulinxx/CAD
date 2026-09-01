@@ -5,7 +5,7 @@
 #include "UiWorkbench.h"
 #include "UiStateCenter.h"
 #include "UiPropertiesPanel.h"
-#include "Services/UiServices.h"
+#include "Services/UIServices.h"
 #include "Services/UiFrameworkServices.h"
 #include "Log/SyLogger.h"
 #include "UI/StatusBarBase.h"

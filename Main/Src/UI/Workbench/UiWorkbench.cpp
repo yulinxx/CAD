@@ -19,7 +19,7 @@
 
 #include "Composition/ApplicationCompositionRoot.h"
 #include "SceneDocument2D.h"
-#include "UiServices.h"
+#include "UIServices.h"
 #include "UiStateCenter.h"
 #include "UI/Services/ViewportActionHub.h"
 #include "UI/Services/ISelectionService.h"

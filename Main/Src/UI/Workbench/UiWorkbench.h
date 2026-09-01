@@ -7,7 +7,7 @@
 
 #include <memory>
 
-#include "UiServices.h"
+#include "UIServices.h"
 #include "UI/Service/ToolBarContextManager.h"
 #include "Services/UiStateCenter.h"
 #include "ClientConfig/UiLayoutBuilder.h"    // IUiCommandDispatcher：工作台直接实现该接口

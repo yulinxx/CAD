@@ -74,6 +74,13 @@ public:
     ///   - 规则为 Always（恒可用，无需干预）
     void refreshCommandStates(const CommandUiSnapshot& snapshot);
 
+    /// 回填菜单项勾选态（网格/吸附/正交/单位/主题/语言）。
+    ///
+    /// 状态中心的信号只在状态"变化"时发，菜单重建后不会补发；而 rebuildAllMenus 产出的
+    /// QAction 一律 checked=false。因此凡是「菜单被重建」或「勾选态的来源不在状态中心」
+    /// （主题走 ThemeManager、语言走 LanguageManager）的时机，都必须主动调这里回填一次。
+    void refreshConfiguredMenuState();
+
 
 #if BUILD_UI3D
     /// 3D 版本：规则来自 CommandCatalog3D（commandId → OperationId3D → 条目 → enableRule）。
@@ -130,8 +137,6 @@ private:
 
     /// 绑定配置菜单状态到状态中心（checkable 状态同步）
     void bindConfiguredMenuState();
-    /// 刷新配置菜单状态
-    void refreshConfiguredMenuState();
 
     /// 遍历菜单栏与工具栏上所有带 commandId 的叶子动作。
     /// checked 同步与 enabled 同步共用这一份遍历，避免两处各写一遍递归导致覆盖范围漂移。

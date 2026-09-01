@@ -109,6 +109,8 @@
 
 #include "VersionInfo.h"
 #include "UiLayoutService.h"
+#include "Composition/ApplicationCompositionRoot.h"
+#include "UI/Settings/SettingsService.h"
 #include "Persistence/PersistenceService.h"
 #include "Persistence/Repositories/WorkspaceSnapshotRepository.h"
 #include "Persistence/Models/WorkspaceSnapshotRecord.h"
@@ -862,6 +864,13 @@ void WorkbenchWindow::refreshThemeMenuChecks(const QString& themeId)
         m_stateManager->windowState().currentThemeId = themeId;
     }
     updateWindowTitle();
+
+    // 主题勾选态的来源是 ThemeManager，不经状态中心，所以状态中心不会发信号触发回填，
+    // 必须在这里主动刷一次，否则菜单里永远没有勾。
+    if (m_menuManager)
+    {
+        m_menuManager->refreshConfiguredMenuState();
+    }
 }
 
 
@@ -869,23 +878,21 @@ void WorkbenchWindow::refreshThemeMenuChecks(const QString& themeId)
 /// @param themeId 主题 ID（如 "theme.dark"、"theme.light"、"theme.system"）
 void WorkbenchWindow::triggerTheme(const QString& themeId)
 {
-    // 解析命令 ID（"theme.dark" → AppTheme::Dark）并委托 ThemeManager 应用
-    const QString name = themeId.mid(QStringLiteral("theme.").size()).toLower();
-    AppTheme appTheme = AppTheme::Light;
-    if (name == QStringLiteral("dark"))
-        appTheme = AppTheme::Dark;
-    else if (name == QStringLiteral("blue"))
-        appTheme = AppTheme::Blue;
-    else if (name == QStringLiteral("slate"))
-        appTheme = AppTheme::Slate;
-    else if (name == QStringLiteral("highcontrast"))
-        appTheme = AppTheme::HighContrast;
-    else if (name == QStringLiteral("system"))
-        appTheme = AppTheme::System;
-    else if (name == QStringLiteral("default"))
-        appTheme = AppTheme::Default;
+    // 解析命令 ID（"theme.dark" → AppTheme::Dark）；映射由 ThemeManager 统一提供，
+    // 菜单勾选态回填用的是同一份映射。
+    const AppTheme appTheme = ThemeManager::themeFromMenuId(themeId);
 
-    TM->setTheme(appTheme);
+    // 必须落盘：只调 TM->setTheme 的话主题只活在内存里，后续任何一次
+    // applyCommonSettings（设置对话框确定、SettingsService 懒初始化）都会用库里的
+    // common/theme 覆盖回去。SettingsService::setTheme 内部会写库并调 TM->setTheme。
+    if (auto* settings = ApplicationCompositionRoot::getSettingsService(); settings && settings->isInitialized())
+    {
+        settings->setTheme(appTheme);
+    }
+    else
+    {
+        TM->setTheme(appTheme);
+    }
 
     if (m_stateCenter)
     {

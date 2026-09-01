@@ -8,7 +8,7 @@
 #include <QPointer>
 
 #include "UiFrameworkServices.h"
-#include "UiServices.h"
+#include "UIServices.h"
 
 class QAction;
 class QActionGroup;

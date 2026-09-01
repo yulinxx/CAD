@@ -46,9 +46,6 @@ namespace
         s_logPathBuffer[copyLen] = '\0';
         return s_logPathBuffer;
     }
-
-    // 语言配置项在 QSettings 中的键名（与 ConfigManager 保持一致）
-    constexpr const char* kLanguageSettingKey = "General/Language";
 }  // namespace
 
 void AppInitializer::initialize()
@@ -67,17 +64,13 @@ void AppInitializer::initialize()
     const QString translationsDir = QCoreApplication::applicationDirPath() + QStringLiteral("/translations");
     languageManager->setTranslationsDir(translationsDir);
 
-    // 启动语言解析：
-    //   1) 若用户已显式保存语言设置项（QSettings 的 General/Language），则采用之；
-    //   2) 否则（首次使用）根据系统语言解析，匹配不到时由 LanguageManager 回退英文。
-    // 通过默认构造的 QSettings 读取，与运行时设置的 org/app 名保持一致，从而与
-    // ConfigManager 共用同一份配置存储，避免跨模块硬耦合。
-    const QString storedLanguageCode = QSettings().value(QString::fromLatin1(kLanguageSettingKey)).toString();
-    if (storedLanguageCode.isEmpty())
-    {
-        SY_INFO("[AppInitializer] No saved language setting (first launch), resolving from system language");
-    }
-    const AppLanguage language = LanguageManager::resolveStartupLanguage(storedLanguageCode);
+    // 启动语言只按系统语言解析（匹配不到由 LanguageManager 回退英文）。
+    //
+    // 这里刻意不再读 QSettings 的 "General/Language"：那个键全仓库没有任何写入方，
+    // 永远是空值，只会让人误以为存在第二套语言存储。语言的唯一持久化位置是
+    // SQLite 的 common/language，由 SettingsService::init() → applyCommonSettings()
+    // 在数据库就绪后覆盖这里的系统语言结果（见 SettingsPersistenceHelper）。
+    const AppLanguage language = LanguageManager::resolveStartupLanguage(QString());
     languageManager->setLanguage(language, translationsDir);
 
     FontConfig fontConfig;

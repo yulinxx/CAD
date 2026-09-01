@@ -1,7 +1,7 @@
 #pragma once
 
 /**
- * @file IUiServices.h
+ * @file IUIServices.h
  * @brief UI 服务窄接口 — 仅暴露已有抽象句柄
  *
  * 定义消费者应依赖的最小抽象集。当前暴露：
@@ -13,18 +13,18 @@
  * 应通过独立参数注入，而非依赖此接口。
  *
  * @section 设计依据
- * UiServices.h 聚合了 16 个服务指针，违反"UI 只保留入口、交互和状态同步"原则。
- * 本接口作为迁移第一步，让消费者逐步从 UiServices 依赖转向 IUiServices。
+ * UIServices.h 聚合了 16 个服务指针，违反"UI 只保留入口、交互和状态同步"原则。
+ * 本接口作为迁移第一步，让消费者逐步从 UIServices 依赖转向 IUIServices。
  */
 
 class ISelectionService;
 class IUndoRedoManager;
 class IInteractionDispatcher;
 
-class IUiServices
+class IUIServices
 {
 public:
-    virtual ~IUiServices() = default;
+    virtual ~IUIServices() = default;
 
     /// 选择服务（选择状态与文档事实分离）
     virtual ISelectionService* getSelectionService() const = 0;
