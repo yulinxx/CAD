@@ -360,6 +360,12 @@ namespace
     };
 }  // namespace
 
+// 供外部调用：图元删除时丢弃其缓存条目
+void eraseEntityVertexCache(uint64_t entityId)
+{
+    s_vertexCache.erase(entityId);
+}
+
 // 供外部调用：全量刷新时清空缓存
 void clearEntityVertexCache()
 {

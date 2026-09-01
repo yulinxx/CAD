@@ -6,7 +6,6 @@
 #include "IUiServices.h"
 
 class IInteractionDispatcher;
-class UiLayoutService;
 class UiStateCenter;
 class ISelectionService;
 class IUndoRedoManager;
@@ -15,11 +14,8 @@ class LayerManager;
 class QtLayerManagerBridge;
 class LayerEditService;
 class PersistenceService;
-class LayerPersistenceBridge;
 class ImportService;
-class ExportService;
 class IRecentFileService;
-class SettingsService;
 class ViewportActionHub;
 class UnitManager;
 
@@ -32,23 +28,26 @@ namespace Eg
  * @struct UiServices
  * @brief UI 服务集合（具体类型聚合，实现 IUiServices 接口）
  *
- * 聚合了 UI 层所需的所有服务。当前暴露 17 个具体类型指针，
- * 违反"UI 只保留入口、交互和状态同步"原则。
+ * 聚合了 UI 层所需的服务。当前暴露 16 个指针，其中 4 个是抽象接口
+ * （ISelectionService / IUndoRedoManager / IInteractionDispatcher /
+ * IRecentFileService），其余为具体类型，违反"UI 只保留入口、交互和状态同步"原则。
+ *
+ * 2026-08-31 已删除 4 个死字段：layoutService、layerPersistenceBridge、
+ * exportService、settingsService —— 它们只在装配处被赋值，全仓无读取点
+ * （settingsService 甚至只被 UiWorkbench 写入一次）。对象所有权都在
+ * ApplicationCompositionRoot 的 unique_ptr 上，真正需要它们的
+ * FileOperationRegistry 走 FileOperationConfig 单独注入，与本结构无关。
  *
  * 【已知问题】消费者直接依赖具体实现类，无法独立测试或替换实现。
- * 其中 ISelectionService、IUndoRedoManager、IInteractionDispatcher
- * 已有抽象接口，其余服务待逐步定义接口后迁移。
  *
  * 【迁移方向】仅依赖抽象服务的消费者应改为依赖 IUiServices；
- * 需要具体服务的消费者应通过独立参数注入。
+ * 需要具体服务的消费者应通过独立参数注入。读取点集中在 UiWorkbench 与
+ * WorkbenchWindow 两处，逐字段下沉为构造参数是可行的下一步。
  */
 struct UiServices : public IUiServices
 {
     /// UI 状态中心
     UiStateCenter* stateCenter{ nullptr };
-
-    /// 布局服务
-    UiLayoutService* layoutService{ nullptr };
 
     /// 交互式命令生命周期分发器
     IInteractionDispatcher* interactionDispatcher{ nullptr };
@@ -77,23 +76,14 @@ struct UiServices : public IUiServices
     /// 持久化服务（数据库仓储入口，UI 不直接拼 SQL）
     PersistenceService* persistenceService{ nullptr };
 
-    /// 图层持久化桥接器（将 LayerManager 运行态变更同步写入数据库）
-    LayerPersistenceBridge* layerPersistenceBridge{ nullptr };
-
     /// 导入服务（文件导入总入口）
     ImportService* importService{ nullptr };
-
-    /// 导出服务（文件导出总入口）
-    ExportService* exportService{ nullptr };
 
     /// 场景编辑服务（带Undo的图元操作入口，阶段1收口：不再暴露底层 SceneManager）
     class SceneEditService* sceneEditService{ nullptr };
 
     /// 最近文件服务（全仓唯一的最近文件读写入口，实现为 Main 的 RecentFileService）
     IRecentFileService* recentFileService{ nullptr };
-
-    /// 共享 SettingsService singleton（app-level 共享，非每工作台私有）
-    SettingsService* settingsService{ nullptr };
 
     /// 视口动作中枢（视图缩放/平移/重置 → 当前活动视口）
     ViewportActionHub* viewportActionHub{ nullptr };

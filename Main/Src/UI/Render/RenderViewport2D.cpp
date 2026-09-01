@@ -179,7 +179,7 @@ QPointF RenderViewport2D::applySnap(const QPointF& worldPos) const
     const bool didSnap = (snapped.x() != src.x()) || (snapped.y() != src.y());
     if (m_renderCoordinator)
     {
-        m_renderCoordinator->setSnapIndicator(QPointF(snapped.x(), snapped.y()), didSnap);
+        m_renderCoordinator->setSnapIndicator(snapped, didSnap);
     }
 
     return QPointF(snapped.x(), snapped.y());

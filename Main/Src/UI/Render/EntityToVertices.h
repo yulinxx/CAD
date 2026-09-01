@@ -38,6 +38,17 @@ bool entityToVertices(
     const double* cameraCenter = nullptr);
 
 /**
+ * @brief 丢弃单个图元的离散化缓存
+ *
+ * 图元删除时必须调用：缓存以实体 ID 为键，条目不会自行过期。
+ * 只依赖全量刷新时的 clearEntityVertexCache 不够——增量刷新路径下
+ * 删除的图元永远不会触发全清，缓存会随「新建—删除」循环无界增长。
+ *
+ * @param entityId 被删除图元的 ID
+ */
+void eraseEntityVertexCache(uint64_t entityId);
+
+/**
  * @brief 清空曲线离散化缓存
  *
  * 全量刷新或场景重建时调用，确保缓存不会持有已删除实体的旧数据。

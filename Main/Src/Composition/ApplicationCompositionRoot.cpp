@@ -226,7 +226,6 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
     // 组装 UI 服务集合
     UiServices uiServices;
     uiServices.stateCenter = m_stateCenter.get();
-    uiServices.layoutService = m_layoutService.get();
     uiServices.interactionDispatcher = interactionDispatcher();
     uiServices.operationBus = m_operationBus.get();
     uiServices.document2D = m_document2D.get();
@@ -260,7 +259,6 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
             std::make_unique<LayerPersistenceBridge>(m_layerManager.get(), persistenceService()->layers());
 
         m_layerPersistenceBridge->attach();
-        uiServices.layerPersistenceBridge = m_layerPersistenceBridge.get();
         SY_INFO("[ApplicationCompositionRoot] LayerPersistenceBridge attached");
     }
 
@@ -345,9 +343,9 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
         }
     });
 
-    // 注入到 UI 服务集合
+    // 注入到 UI 服务集合。导出服务不进 UiServices：唯一的消费者
+    // FileOperationRegistry 走 FileOperationConfig::exportService 单独注入。
     uiServices.importService = m_importService.get();
-    uiServices.exportService = m_exportService.get();
 
     // 导入进度 → 状态中心
     QObject::connect(m_importService.get(), &ImportService::importStarted, m_stateCenter.get(), [this](const QString&) {

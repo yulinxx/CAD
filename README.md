@@ -5,7 +5,7 @@
 - 2D/3D 图形编辑与渲染
 - 百万级图元场景
 - 跨平台（Windows / Linux / macOS）
-- 渲染后端可切换（OpenGL → Vulkan / DX12）
+- 渲染经独立 DLL（RenderX，C API + POD 契约）收口，当前后端为 OpenGL
 
 ---
 
@@ -18,24 +18,24 @@ SanYiCAD/
 │   │   ├── Runtime/          # CADApplicationRuntime（启动 + 许可校验）
 │   │   ├── Bootstrap/        # AppBootstrapper（组件初始化）
 │   │   ├── UI/               # 主窗口、工作台、命令系统
+│   │   │   ├── Render/       # 场景刷新协调、图元→顶点离散化
+│   │   │   ├── Services/     # UiServices 服务聚合
 │   │   │   └── Test/         # 测试目录（单元/集成/端到端测试）
 │   │   ├── Common/           # AppPathManager、AppInitializer
 │   │   ├── License/          # 许可证模块（离线注册码）
-│   │   ├── Composition/      # 依赖注入、命令注册
-│   │   └── RenderCore/       # UI 层渲染抽象（UiRenderCore）
+│   │   └── Composition/      # 依赖注入、命令注册
 │   └── CMakeLists.txt        # 主应用构建配置
 ├── Engine/                   # 图形引擎
 │   ├── Common/               # 通用几何算法、数学工具
 │   ├── 2D/                   # 2D 图元定义、布尔运算、CAM 路径生成
 │   └── 3D/                   # 3D 场景管理、网格操作
-├── Render/                   # 渲染层
-│   ├── Common/               # 渲染公共类型、着色器管理
-│   ├── 2D/                   # 2D 渲染实现（Qt Widgets + Shader）
-│   ├── 3D/                   # 3D 渲染实现（OpenGL + Gizmo）
-│   └── Core/                 # 底层渲染核心（GL46Backend、RenderBuffer）
-├── Renderx/                  # 新一代渲染框架（C API，独立开发中）
+├── Renderx/                  # 渲染 DLL（RenderX.dll，纯 C API + POD 契约）
+│   ├── include/render/       # 对外唯一公共头 renderx.h
+│   ├── src/rhi/              # RHI 抽象：目前实现 gl/ 与 null/ 两个后端
+│   ├── src/rt/               # Runtime / Session / 增量渲染 / 字形图集
+│   └── src/shader/           # 内嵌着色器（构建期打包进 DLL）
 ├── UI/                       # UI 组件库
-│   ├── Common/               # 通用 UI 组件、状态管理
+│   ├── Common/               # 通用 UI 组件、状态管理、命令内核
 │   ├── 2D/                   # 2D 工作台 UI、工具面板、属性面板
 │   └── 3D/                   # 3D 工作台 UI、场景树、设置对话框
 ├── FileIO/                   # 文件导入导出（DXF、PLT、SVG、STL 等）
@@ -50,12 +50,11 @@ SanYiCAD/
 ├── Utility/                  # 通用工具库（字符串、文件、加密）
 ├── PyBindCore/               # Python 绑定
 ├── PythonHost/               # Python 宿主（脚本扩展）
-├── RenderX/              # 独立渲染 DLL（纯 POD 契约）
 ├── Tools/
 │   ├── KeygenTool/           # 离线注册码生成工具
 │   └── encrypt_string.py     # 字符串加密工具
 ├── ThirdParty/               # 第三方库
-├── Doc/                      # 架构分析文档
+├── Docs/                     # 架构与专题文档
 ├── CMakeLists.txt            # 根构建配置
 ├── Config.cmake                # 用户配置（vcpkg/Qt 路径、编译开关）
 └── README.md                 # 项目说明（本文档）
@@ -85,12 +84,15 @@ SanYiCAD/
 
 | 模块 | 职责 | 技术栈 | 依赖 |
 |------|------|--------|------|
-| **RenderCommon** | 渲染公共类型（顶点、着色器、纹理） | OpenGL | EngineCommon |
-| **Render2D** | 2D 渲染器（基于 Qt Widgets） | Qt + Shader | RenderCommon, Engine2D |
-| **Render3D** | 3D 渲染器（基于 OpenGL） | OpenGL | RenderCommon, Engine3D |
-| **Render/Core** | 底层渲染核心（GPU 缓冲区、着色器程序） | OpenGL | RenderCommon |
-| **UiRenderCore** | UI 层渲染抽象（场景编译、后端桥接、软件渲染） | Qt | Engine2D, Engine3D, UICommon |
-| **RenderX** | 独立渲染 DLL（纯 POD 契约，无 Engine 依赖） | C API | 无 |
+| **RenderX** | 唯一渲染 DLL（纯 C API + POD 契约，无 Engine / Qt 依赖） | C API + OpenGL | 无 |
+
+> 后端现状：只有 **OpenGL** 与 **Null**（无头/单测）两个后端已实现。
+> `renderx.h` 的 `Backend` 枚举里保留了 `Metal`（Phase 7）与 `Vulkan`（Phase 8）取值，
+> 但 `isBackendAvailable` 对二者显式返回 false，`createDevice` 直接报错返回 nullptr，
+> **不做静默回退**。请勿把枚举取值当作可用后端。
+>
+> 已删除的旧模块：`RenderCommon` / `Render2D` / `Render3D` / `Render/Core` / `UiRenderCore`。
+> 它们的职责已分别落到 RenderX（GPU 侧）与 `Main/Src/UI/Render`（宿主侧场景刷新与离散化）。
 
 ### UI 层（用户界面）
 
@@ -145,11 +147,11 @@ SanYiCAD/
            │                             │                             │
            ▼                             ▼                             │
    ┌───────────────┐             ┌───────────────┐                     │
-   │   UICommon    │◄────────────│  UiRenderCore │                     │
-   │  通用 UI 组件 │             │ 渲染抽象层     │                     │
-   └───────┬───────┘             └───────┬───────┘                     │
-           │                             │                             │
-           ▼                             ▼                             │
+   │   UICommon    │◄────────────│    RenderX    │                     │
+   │  通用 UI 组件 │             │ 渲染 DLL(C API)│                     │
+   └───────┬───────┘             └───────────────┘                     │
+           │                                                           │
+           ▼                                                           │
    ┌───────────────┐             ┌───────────────┐                     │
    │   Engine2D    │             │   Engine3D    │                     │
    │ 2D 几何引擎   │             │ 3D 场景引擎   │                     │
@@ -162,29 +164,21 @@ SanYiCAD/
                    │  通用几何工具 │                                   │
                    └───────┬───────┘                                   │
                            │                                           │
-           ┌───────────────┼───────────────┐                           │
-           │               │               │                           │
-           ▼               ▼               ▼                           │
-   ┌───────────────┐ ┌───────────────┐ ┌───────────────┐             │
-   │    Render2D   │ │    Render3D   │ │   FileIO      │             │
-   │ 2D 渲染器     │ │ 3D 渲染器     │ │ 文件导入导出   │             │
-   └───────┬───────┘ └───────┬───────┘ └───────┬───────┘             │
-           │                 │                 │                       │
-           └────────┬────────┘                 │                       │
-                    ▼                          │                       │
-            ┌───────────────┐                  │                       │
-            │  RenderCommon │◄─────────────────┘                       │
-            │ 渲染公共类型   │                                          │
-            └───────┬───────┘                                          │
-                    │                                                  │
-           ┌────────┴────────┐                                         │
-           │                 │                                         │
-           ▼                 ▼                                         │
+                           ▼                                           │
+                   ┌───────────────┐                                   │
+                   │   FileIO      │                                   │
+                   │ 文件导入导出   │                                   │
+                   └───────┬───────┘                                   │
+                           │                                           │
+           ┌───────────────┴─────────────┐                             │
+           │                             │                             │
+           ▼                             ▼                             │
    ┌───────────────┐ ┌───────────────┐                                 │
    │    Nesting    │ │   Engraving   │                                 │
    │  排样算法     │ │  雕刻工艺     │                                 │
    └───────┬───────┘ └───────┬───────┘                                 │
            │                 │                                         │
+
            ▼                 ▼                                         │
    ┌───────────────┐ ┌───────────────┐                                 │
    │ GeoModelCore  │ │  PythonHost   │                                 │
@@ -406,36 +400,30 @@ void OnSave() {
 
 ## 渲染后端切换
 
-通过环境变量控制渲染后端：
-
-```bash
-# Windows
-set SAN_YI_RENDER_BACKEND=opengl    # 强制 OpenGL
-set SAN_YI_RENDER_BACKEND=software  # 强制软件渲染
-
-# Linux/macOS
-export SAN_YI_RENDER_BACKEND=opengl
-export SAN_YI_RENDER_BACKEND=software
-```
+后端由宿主在创建 RenderX 设备时显式指定（`DeviceDesc::backend`），
+没有环境变量开关，也没有静默回退——`Backend::Auto` 是唯一允许自动选择的取值。
 
 | 后端类型 | 说明 | 状态 |
 |----------|------|------|
-| OpenGL | 跨平台硬件加速 | 默认 |
-| Vulkan | 新一代图形 API | 预留 |
-| Metal | Apple 平台硬件加速 | 预留 |
-| Software | 纯 CPU 软件渲染 | 可用（fallback） |
+| OpenGL | 跨平台硬件加速，当前唯一的生产后端 | 已实现（默认） |
+| Null | 不产生任何 GPU 调用，用于单测与无头环境 | 已实现 |
+| Metal | Apple 平台硬件加速 | 未实现（Phase 7，枚举占位） |
+| Vulkan | 新一代图形 API | 未实现（Phase 8，枚举占位） |
+
+选择未实现的后端时，`rxRuntimeCreate` / `createDevice` 会通过 `logCallback`
+报明原因并返回 nullptr，不会退化成 Null 后端画出一片黑屏。
 
 ---
 
 ## 文档
 
-架构分析与设计文档位于 `Doc/` 目录：
+架构与专题文档位于 `Docs/` 目录，入口见 [文档总览](Docs/00-索引与总览/文档总览.md)：
 
-- [架构全方位分析与重新设计](Doc/Architecture_Analysis_And_Redesign.md)
-- [SanYi CAD 完整分析报告](Doc/SanYi_CAD_Complete_Analysis_Report.md)
-- [UI 交互框架设计文档](Doc/UI交互框架设计文档.md)
-- [渲染框架分析](Doc/Rendering_Framework_Analysis.md)
-- [架构设计文档](Docs/架构.md)
+- [架构文档地图](Docs/00-索引与总览/架构文档地图.md)
+- [新渲染架构](Docs/03-渲染主链/新渲染架构.md)
+- [渲染管线](Docs/03-渲染主链/渲染管线.md)
+- [GPU 渲染边界](Docs/03-渲染主链/gpu-renderer-boundary.md)
+- [3D 架构现状与约束](Docs/03-渲染主链/3D%20架构现状与约束.md)
 - [许可证模块文档](Main/Src/License/LicenseManager.md)
 
 ---
@@ -477,4 +465,4 @@ export SAN_YI_RENDER_BACKEND=software
 | UI 层 | ✅ 稳定 | 2D/3D 工作台功能完整 |
 | 功能模块 | ✅ 稳定 | FileIO/Nesting/Hardware/Engraving |
 | Python | ⚠️ 开发中 | PythonHost 基础框架完成 |
-| 渲染后端 | ⚠️ 开发中 | OpenGL 稳定，Vulkan/Metal 预留 |
+| 渲染后端 | ⚠️ 开发中 | 仅 OpenGL 与 Null 已实现；Vulkan/Metal 只是枚举占位，选中即报错 |

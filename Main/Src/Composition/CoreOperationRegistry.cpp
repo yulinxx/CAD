@@ -25,7 +25,7 @@
 #include "Operation/ReliefEngravingOperation2D.h"
 #include "UI/Services/ViewportActionHub.h"
 #include "UI/Services/UiStateCenter.h"
-#include "UI/Dlg/LayerManagerDialog.h"
+#include "UI2D/Dlg/LayerManagerDialog.h"
 #include "Engine2D/Edit/LayerEditService.h"
 #include "Manager/UnitManager/UnitManager.h"
 #include "Ut/BBox2d.h"

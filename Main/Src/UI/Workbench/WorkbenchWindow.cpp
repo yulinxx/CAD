@@ -123,7 +123,7 @@
 #include "Engine2D/Edit/LayerEditService.h"
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Interaction/LayerManager.h"
-#include "UI/Dlg/LayerManagerDialog.h"
+#include "UI2D/Dlg/LayerManagerDialog.h"
 #include "UI/Interaction/UiInteractionGate.h"
 
 #include <QCloseEvent>

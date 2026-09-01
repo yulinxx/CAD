@@ -59,6 +59,26 @@
 - 对外头文件以 `Renderx/include/render/render.h` 为准。
 - 当前主接口围绕 `RenderDevice*`、`renderCreateDevice()`、`renderSubmitGeometry()`、`renderFrame()` 展开。
 
+### 3.4 头文件与源文件的目录归位
+
+判定标准只有一条：**头文件是否属于该 DLL 对外契约**。是，就必须放进 `Include/`；否，就留在 `Src/`。
+
+- 导出的声明（带 `XXX_API` 导出宏、或被其他模块 `#include`）→ `Include/<模块名>/...`
+- 全部实现（`.cpp`）→ `Src/...`
+- 仅模块内部使用的头文件（内部 helper、私有实现细节）→ 与其 `.cpp` 同放 `Src/...`
+
+**子目录必须镜像一致**：`Include/` 与 `Src/` 的相对路径保持同名同层级，头文件挪走后不改变相对包含关系。
+
+```
+UI/2D/
+  Include/UI2D/ToolBar/RightToolBar.h   ← 导出头（含 UI2D_API）
+  Src/UI/ToolBar/RightToolBar.cpp       ← 实现
+```
+
+这样做的目的是**交付时能整目录打包**：对外只需给 `Include/` + `.lib` + `.dll`，不必从 `Src/` 的层层子目录里逐个挑头文件；同时 `Include/` 本身就是这个 DLL 的公共 API 清单，一眼可见边界。
+
+反例（当前 UI2D 的实际状态，属于待整理项）：`Src/UI/RightToolBar/RightToolBar.h` 带 `UI2D_API` 却留在 `Src/` 下，只在 `Include/UI2D/ToolBar/ToolBarBase.h` 放了个 `#include "UI/ToolBarBase/ToolBarBase.h"` 的转发头。转发头是权宜之计，不是目标形态——它让 `Include/` 无法独立交付，因为真正的声明还在 `Src/` 里。
+
 ---
 
 ## 4. 当前需要继续统一的点
@@ -68,6 +88,8 @@
 3. 继续压缩跨 DLL 的 public STL 用法。
 4. 继续把渲染相关的旧命名统一替换为 `Renderx` / `RenderX`。
 5. 继续保持 UI 与引擎、渲染的职责分离。
+6. 继续按 §3.4 归位导出头：把 `Src/` 下带导出宏的头文件迁入 `Include/`，并逐步撤掉转发头。UI2D 目前尚有 19 个此类头文件留在 `Src/`。
+7. 继续统一 `Include` / `Src` 的目录名大小写（多数模块用 `Include` / `Src`，`Renderx` 用 `include` / `src`）。
 
 ---
 
