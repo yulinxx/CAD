@@ -304,7 +304,18 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         auto uid = static_cast<uint64_t>(id);
         m_renderWidget->removeRenderEntity(uid);
         m_renderedEntityIds.erase(uid);
+        // 离散化缓存以实体 ID 为键，删除时必须一并丢弃：
+        // 增量刷新路径不走 clearEntityVertexCache，缓存否则只增不减。
+        eraseEntityVertexCache(uid);
     }
+
+    // 本轮脏集合里是否出现过位图 / 文字实体。下面用它决定要不要跑 reconcile*：
+    // 那两个函数各要做一次 sm->getAllEntities() 全场景扫描（返回值还是按值拷贝的
+    // 指针向量）再建一个 N 元素的 unordered_set。增量刷新每 16ms 一次，10 万图元
+    // 的图纸就是每帧两遍 O(N) —— 而绝大多数图纸里位图和文字的数量都是零。
+    // 标志在这个循环里顺手收集，不额外多做一次 findEntityById。
+    bool touchedImage = false;
+    bool touchedText = false;
 
     for (auto id : m_pendingDirtyIds)
     {
@@ -317,6 +328,7 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         // 位图（SyImage）不走折线/线框顶点路径，统一由 reconcileBitmaps 处理
         if (entity->eType == Eg::EType::IMAGE)
         {
+            touchedImage = true;
             continue;
         }
 
@@ -325,6 +337,7 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         // 整帧升级成全量刷新，10 万条几何跟着一起重传。
         if (entity->eType == Eg::EType::TEXT)
         {
+            touchedText = true;
             continue;
         }
 
@@ -365,11 +378,23 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         }
     }
 
-    // 位图层协调：以场景为真源，增量处理新增/修改/删除/图层显隐
-    reconcileBitmaps(sm, /*fullReconcile=*/false);
+    // 位图层协调：以场景为真源，增量处理新增/修改/删除/图层显隐。
+    //
+    // 两个短路条件是「或」而不是「与」，缺哪个都会漏画：
+    //   - touchedImage：本轮有位图变脏/新增，必须对账；
+    //   - 账本非空：图元或图层转为不可见**不会**进脏集合（LayerManager::setLayerVisible
+    //     只改标志位），只能靠这里的全量对账发现。账本非空时跳过就会留下残影。
+    // 两者都不成立时（账本空 && 本轮没碰位图）对账必然是空转，可以安全跳过。
+    if (touchedImage || !m_bitmapImageIds.empty())
+    {
+        reconcileBitmaps(sm, /*fullReconcile=*/false);
+    }
 
     // 世界文字层协调：同上。文本自己一路后，增量刷新不再因文本升级为全量。
-    reconcileTexts(sm, /*fullReconcile=*/false);
+    if (touchedText || !m_worldTextIds.empty())
+    {
+        reconcileTexts(sm, /*fullReconcile=*/false);
+    }
 
     m_renderWidget->update();
 }
@@ -588,25 +613,28 @@ void SceneRefreshCoordinator::updateSceneRender()
         return;
     }
 
-    // LightUpdate / Selection 增量刷新：
-    // 删除图元（m_pendingDeletedIds）必须被处理，否则会从渲染世界中被永久遗漏
-    // （典型症状：删除后视图不更新）。Selection 级别的样式变更同样由 applyLightRefresh
-    // 覆盖——其内部已对脏图元调用 modifyRenderEntity，并对选中图元执行移除（改由虚线轮廓覆盖层表示）。
-    // 因此无论 LightUpdate 还是 Selection，只要有增量待办就走 applyLightRefresh。
-    // 注意：onSelectionChanged 会先把 m_refreshLevel 提升为 Selection(3)，若紧随其后发生场景删除
-    // （onSceneChanged），scheduleSceneUpdate 不会将其降级回 LightUpdate(2)，因此这里必须显式包含
-    // Selection 级别，否则待删除图元会在 Selection 分支中被跳过。
-    const bool needApplyLight =
-        (level == RefreshLevel::LightUpdate) || (level == RefreshLevel::Selection) || !m_pendingDeletedIds.empty();
-    if (needApplyLight)
-    {
-        applyLightRefresh(sm);
-    }
-
-    // 仅显式 FullRefresh 级别走此分支，避免与 LightUpdate 的内部回退重复执行
+    // 全量优先，且两条路径互斥。
+    //
+    // 曾经这里是「先判 needApplyLight 跑增量，再判 level >= FullRefresh 跑全量」两个
+    // 独立的 if：当 level == FullRefresh 且有待删图元时两者同时命中，于是先逐个
+    // remove/upsert 一遍，紧接着 submitSceneFromDataSource 把成果整体丢弃。
+    // 全量重建以场景为真源，被删掉的图元本来就不会出现在重建结果里
+    // （reconcile* 的 fullReconcile 分支同样是清空后整体重传），不需要增量兜底。
     if (level >= RefreshLevel::FullRefresh)
     {
         applyFullRefresh(sm);
+    }
+    // LightUpdate / Selection 增量刷新：
+    // 删除图元（m_pendingDeletedIds）必须被处理，否则会从渲染世界中被永久遗漏
+    // （典型症状：删除后视图不更新）。Selection 级别的样式变更同样由 applyLightRefresh
+    // 覆盖——其内部已对脏图元调用 modifyRenderEntity。
+    // 注意：onSelectionChanged 会先把 m_refreshLevel 提升为 Selection(3)，若紧随其后发生场景删除
+    // （onSceneChanged），scheduleSceneUpdate 不会将其降级回 LightUpdate(2)，因此这里必须显式包含
+    // Selection 级别，否则待删除图元会在 Selection 分支中被跳过。
+    else if ((level == RefreshLevel::LightUpdate) || (level == RefreshLevel::Selection)
+        || !m_pendingDeletedIds.empty())
+    {
+        applyLightRefresh(sm);
     }
 
     sm->markClean();
