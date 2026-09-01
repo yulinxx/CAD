@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file ToolSelectionSyncRegressionTests.cpp
  * @brief 工具初始化链与选择同步回归测试 — 覆盖 ToolManager/SelectTool/选择状态同步
  *
@@ -22,7 +22,16 @@
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyCircle.h"
 #include "Engine2D/SyEntity/SyPolygon.h"
+#include "Engine2D/SyEntity/SyImage.h"
+#include "Engine2D/Edit/SceneEditService.h"
+#include "Engine2D/Edit/UndoRedoManager.h"
+#include "Engine2D/Geometry/Geo2DQuery.h"
+#include "Engine2D/Geo/GeometryContext.h"
+#include "UI/DrawTools/SelectionGizmo.h"
 #include "UI/Services/SelectionService.h"
+
+#include <QMouseEvent>
+#include <QPointF>
 
 #include <memory>
 #include <vector>
@@ -1211,4 +1220,225 @@ TEST(ToolSelectionSyncRegressionTest, NoDangling_DeleteMixedTypes)
     EXPECT_NE(scene.findSyEntityById(idLine), nullptr);
     EXPECT_NE(scene.findSyEntityById(idPoly), nullptr);
     EXPECT_EQ(scene.findSyEntityById(idCircle), nullptr);
+}
+
+// ==================== 本体拖动平移 + 变换撤销（Gizmo 全链路） ====================
+//
+// 这一组补的是集成缺口：原先只有 EntitySnapshotsCommand 的单元测试，
+// 「SelectionGizmo::onMousePress/Move/Release → InteractiveEditSession → 撤销栈」
+// 这一整条没有任何覆盖。wireGizmo() 里的 `if (m_sceneEdit)` 一旦因注入顺序变化
+// 落空，变换就静默失去撤销，而旧测试全部照绿。
+//
+// 平移的判据是 HandleKind::Body —— 名字里有 Handle，但它不是手柄：
+// 它表示"按在图元本体上"，由 hitsSelectedGeometry() → Geo2DQuery::hitTest 判定，
+// 缩放/旋转手柄在它之前就已判完并返回。所以「点在图元上按住左键拖」和
+// 「拖角点缩放」共用同一条 onMouseMove 路径，撤销登记也是同一套。
+
+namespace
+{
+    QMouseEvent makeMouseEvent(QEvent::Type type, const QPointF& pos, Qt::MouseButton button)
+    {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 4, 0)
+        return QMouseEvent(type, pos, pos, button, button, Qt::NoModifier);
+#else
+        return QMouseEvent(type, pos, button, button, Qt::NoModifier);
+#endif
+    }
+
+    /// 驱动一次完整的「按下 → 移动 → 松开」，坐标均为世界坐标。
+    /// 返回按下是否被 Gizmo 接住（false 表示没命中，走的是框选而不是变换）。
+    bool dragFromTo(SelectTool& tool, const QPointF& from, const QPointF& to)
+    {
+        QMouseEvent press = makeMouseEvent(QEvent::MouseButtonPress, from, Qt::LeftButton);
+        tool.onMousePress(from, &press);
+        const bool grabbed = tool.gizmo().isInteracting();
+
+        QMouseEvent move = makeMouseEvent(QEvent::MouseMove, to, Qt::NoButton);
+        tool.onMouseMove(to, &move);
+
+        QMouseEvent release = makeMouseEvent(QEvent::MouseButtonRelease, to, Qt::LeftButton);
+        tool.onMouseRelease(to, &release);
+        return grabbed;
+    }
+
+    /// 手柄命中容差 = pixelToWorld × handlePixelRadius()。
+    /// 测试里的图元有上百个世界单位，若沿用 1.0 的兜底比例，角点手柄的命中圈
+    /// 会盖住整个包围盒内部，本体命中永远竞争不过缩放手柄。
+    void initSelectToolForDrag(SelectTool& tool, Eg::SceneManager& scene, SceneEditService& edit)
+    {
+        ToolContext ctx;
+        ctx.sceneManager = &scene;
+        ctx.sceneEditService = &edit;
+        ctx.pixelToWorld = []() -> double { return 0.05; };
+        tool.initialize(ctx);
+    }
+}  // namespace
+
+TEST(GizmoBodyDragRegressionTest, DragLineBodyTranslatesEntity)
+{
+    Eg::SceneManager scene;
+    UndoRedoManager undoMgr(&scene);
+    SceneEditService edit(&scene, &undoMgr);
+
+    auto line = std::make_unique<Eg::SyLine>();
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    const Eg::EntityId lineId = line->id;
+
+    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    entities.push_back(std::move(line));
+    scene.addEntities(std::move(entities));
+
+    SelectTool tool;
+    initSelectToolForDrag(tool, scene, edit);
+    scene.selectEntity(scene.findSyEntityById(lineId));
+    tool.syncSelectionFromScene();
+    ASSERT_TRUE(tool.hasSelectedEntities());
+
+    // (50,50) 在线上，且离四个角点手柄都远
+    EXPECT_TRUE(dragFromTo(tool, QPointF(50, 50), QPointF(60, 70)));
+
+    const Ut::BBox2d bbox = scene.findSyEntityById(lineId)->computeBBox();
+    EXPECT_NEAR(bbox.minPt.x(), 10.0, 1e-9);
+    EXPECT_NEAR(bbox.minPt.y(), 20.0, 1e-9);
+    EXPECT_NEAR(bbox.maxPt.x(), 110.0, 1e-9);
+    EXPECT_NEAR(bbox.maxPt.y(), 120.0, 1e-9);
+}
+
+TEST(GizmoBodyDragRegressionTest, DragImageInteriorTranslatesEntity)
+{
+    Eg::SceneManager scene;
+    UndoRedoManager undoMgr(&scene);
+    SceneEditService edit(&scene, &undoMgr);
+
+    auto image = std::make_unique<Eg::SyImage>();
+    image->nWidth = 2;
+    image->nHeight = 2;
+    image->ePixelFormat = Eg::SyPixelFormat::RGBA32;
+    image->setPixelDataVector(std::vector<unsigned char>(2 * 2 * 4, 0xFF));
+    image->topLeft = Ut::Vec2d(0, 60);
+    image->topRight = Ut::Vec2d(100, 60);
+    image->bottomLeft = Ut::Vec2d(0, 0);
+    image->bottomRight = Ut::Vec2d(100, 0);
+    image->basePoint = Ut::Vec2d(50, 30);
+    const Eg::EntityId imageId = image->id;
+
+    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    entities.push_back(std::move(image));
+    scene.addEntities(std::move(entities));
+
+    SelectTool tool;
+    initSelectToolForDrag(tool, scene, edit);
+    scene.selectEntity(scene.findSyEntityById(imageId));
+    tool.syncSelectionFromScene();
+
+    // 逐环定位：实体在场景里 → 选中同步进工具 → 同步进 Gizmo → 引擎层几何命中
+    ASSERT_NE(scene.findSyEntityById(imageId), nullptr);
+    ASSERT_TRUE(tool.hasSelectedEntities());
+    ASSERT_EQ(tool.gizmo().selection().size(), 1u);
+    {
+        Eg::GeometryContext probe;
+        probe.dPick = 0.25;
+        probe.dModeling = 1e-6;
+        EXPECT_TRUE(Eg::Geo2DQuery::hitTest(scene.findSyEntityById(imageId), Ut::Vec2d(20, 45), probe));
+    }
+
+    // 位图内部任意一点都应命中本体：Geo2DPath 的 IMAGE 分支把四个角点作为闭合轮廓，
+    // locatePoint 才能判出 Inside。缺这个分支时会退化成按 value(t) 采样，
+    // 32 个采样点全落在 basePoint 上，"到轮廓的距离"变成"到中心的距离"，
+    // 于是只有缩放/旋转手柄可用，图片拖不动。
+    EXPECT_TRUE(dragFromTo(tool, QPointF(20, 45), QPointF(35, 55)));
+
+    const auto* moved = static_cast<const Eg::SyImage*>(scene.findSyEntityById(imageId));
+    ASSERT_NE(moved, nullptr);
+    EXPECT_NEAR(moved->bottomLeft.x(), 15.0, 1e-9);
+    EXPECT_NEAR(moved->bottomLeft.y(), 10.0, 1e-9);
+    EXPECT_NEAR(moved->topRight.x(), 115.0, 1e-9);
+    EXPECT_NEAR(moved->topRight.y(), 70.0, 1e-9);
+    // basePoint 必须跟着走，否则纹理贴图与几何错位
+    EXPECT_NEAR(moved->basePoint.x(), 65.0, 1e-9);
+    EXPECT_NEAR(moved->basePoint.y(), 40.0, 1e-9);
+}
+
+TEST(GizmoBodyDragRegressionTest, BodyDragIsUndoable)
+{
+    Eg::SceneManager scene;
+    UndoRedoManager undoMgr(&scene);
+    SceneEditService edit(&scene, &undoMgr);
+
+    auto image = std::make_unique<Eg::SyImage>();
+    image->nWidth = 1;
+    image->nHeight = 1;
+    image->ePixelFormat = Eg::SyPixelFormat::RGBA32;
+    image->setPixelDataVector(std::vector<unsigned char>(4, 0xFF));
+    image->topLeft = Ut::Vec2d(0, 60);
+    image->topRight = Ut::Vec2d(100, 60);
+    image->bottomLeft = Ut::Vec2d(0, 0);
+    image->bottomRight = Ut::Vec2d(100, 0);
+    image->basePoint = Ut::Vec2d(50, 30);
+    const Eg::EntityId imageId = image->id;
+
+    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    entities.push_back(std::move(image));
+    scene.addEntities(std::move(entities));
+
+    SelectTool tool;
+    initSelectToolForDrag(tool, scene, edit);
+    scene.selectEntity(scene.findSyEntityById(imageId));
+    tool.syncSelectionFromScene();
+
+    ASSERT_FALSE(undoMgr.canUndo());
+    ASSERT_TRUE(dragFromTo(tool, QPointF(50, 30), QPointF(70, 30)));
+
+    // 一次拖拽 = 一条记录（commitInteractive 传 allowMerge=false）
+    EXPECT_TRUE(undoMgr.canUndo());
+    EXPECT_EQ(undoMgr.undoCount(), 1u);
+
+    undoMgr.undo();
+
+    // 撤销走 applyEntitySnapshots，实体按 id 被整体替换，指针必须重新解析
+    const auto* restored = static_cast<const Eg::SyImage*>(scene.findSyEntityById(imageId));
+    ASSERT_NE(restored, nullptr);
+    EXPECT_NEAR(restored->bottomLeft.x(), 0.0, 1e-9);
+    EXPECT_NEAR(restored->topRight.x(), 100.0, 1e-9);
+    EXPECT_NEAR(restored->basePoint.x(), 50.0, 1e-9);
+    // 像素数据不能在快照往返中丢失
+    EXPECT_EQ(restored->pixelDataSize(), 4u);
+
+    ASSERT_TRUE(undoMgr.canRedo());
+    undoMgr.redo();
+    const auto* redone = static_cast<const Eg::SyImage*>(scene.findSyEntityById(imageId));
+    ASSERT_NE(redone, nullptr);
+    EXPECT_NEAR(redone->bottomLeft.x(), 20.0, 1e-9);
+}
+
+TEST(GizmoBodyDragRegressionTest, CornerHandleScaleIsUndoable)
+{
+    Eg::SceneManager scene;
+    UndoRedoManager undoMgr(&scene);
+    SceneEditService edit(&scene, &undoMgr);
+
+    auto line = std::make_unique<Eg::SyLine>();
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
+    const Eg::EntityId lineId = line->id;
+
+    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    entities.push_back(std::move(line));
+    scene.addEntities(std::move(entities));
+
+    SelectTool tool;
+    initSelectToolForDrag(tool, scene, edit);
+    scene.selectEntity(scene.findSyEntityById(lineId));
+    tool.syncSelectionFromScene();
+
+    // 精确压在包围盒右上角 → TopRight 缩放手柄
+    ASSERT_TRUE(dragFromTo(tool, QPointF(100, 100), QPointF(150, 150)));
+
+    const Ut::BBox2d scaled = scene.findSyEntityById(lineId)->computeBBox();
+    EXPECT_GT(scaled.width(), 100.0);
+    EXPECT_EQ(undoMgr.undoCount(), 1u);
+
+    undoMgr.undo();
+    const Ut::BBox2d back = scene.findSyEntityById(lineId)->computeBBox();
+    EXPECT_NEAR(back.width(), 100.0, 1e-9);
+    EXPECT_NEAR(back.height(), 100.0, 1e-9);
 }

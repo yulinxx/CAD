@@ -79,6 +79,31 @@ UI/2D/
 
 反例（当前 UI2D 的实际状态，属于待整理项）：`Src/UI/RightToolBar/RightToolBar.h` 带 `UI2D_API` 却留在 `Src/` 下，只在 `Include/UI2D/ToolBar/ToolBarBase.h` 放了个 `#include "UI/ToolBarBase/ToolBarBase.h"` 的转发头。转发头是权宜之计，不是目标形态——它让 `Include/` 无法独立交付，因为真正的声明还在 `Src/` 里。
 
+### 3.5 跨库判型：禁止 `dynamic_cast`，一律用 `eType`
+
+`SyEntity` 派生体的判型必须走 `entity->eType`（`EType` 枚举）+ `static_cast`，**不得**用
+`dynamic_cast`。
+
+原因是 RTTI 在多动态库进程里不可靠：`SyImage`、`SyFillRegion` 这类图元整体定义在头文件中，
+没有任何 out-of-line 的虚函数把 vtable / typeinfo 锚定进 `Engine2D`，于是每个包含该头的库
+都会各自生成一份弱符号 typeinfo；工程按 `-fvisibility=hidden` 编译，这些符号不导出，链接器
+无法合并。结果是「谁创建的对象」决定了 `dynamic_cast` 能不能成功——`Main`/`UI2D` 里 new 出来
+的 `SyImage`，传进 `Engine2D` 内部再 `dynamic_cast<const SyImage*>` 会返回 `nullptr`，
+而且**不报任何错**，只是静默走进 else 分支。
+
+已知踩过的坑（2026-08-30 修复）：`Geo2DQuery::isClosed()` 用 `dynamic_cast` 认位图，在真实
+进程里恒为 false，于是 `hitTest()` 跳过「点是否在图元内部」这一判据，`SelectionGizmo` 判不出
+`HandleKind::Body`，表现为「位图能缩放能旋转、就是拖不动」。同一进程里
+`Geo2DPath::isClosedContour()` 用的是 `eType` switch，一直是对的，两边结论长期不一致。
+
+这个缺陷还有一个恶性特征：**把相关代码单独链成一个小程序去测，`dynamic_cast` 是正确的**，
+测试全绿。要复现必须在多库进程里跑（`MainTests` 这种链全部 dylib 的目标）。
+
+`Engine/2D/Src/Algorithm/` 下的 `Geo2DSampling` / `Geo2DAnalysis` / `Geo2DEdit` 仍有上百处
+`dynamic_cast<const SyLine*>` 之类的写法。它们目前"能用"是因为 `SyLine`、`SyPolygon` 等有
+对应 `.cpp` 把虚函数锚定在 `Engine2D` 内，typeinfo 只有一份；这是巧合而不是保证——任何图元
+一旦改成纯头文件实现，就会立刻重现同一类静默失效。这批替换尚未进行。
+
 ---
 
 ## 4. 当前需要继续统一的点
@@ -90,6 +115,7 @@ UI/2D/
 5. 继续保持 UI 与引擎、渲染的职责分离。
 6. 继续按 §3.4 归位导出头：把 `Src/` 下带导出宏的头文件迁入 `Include/`，并逐步撤掉转发头。UI2D 目前尚有 19 个此类头文件留在 `Src/`。
 7. 继续统一 `Include` / `Src` 的目录名大小写（多数模块用 `Include` / `Src`，`Renderx` 用 `include` / `src`）。
+8. 继续把 `Engine/2D/Src/Algorithm/` 下残留的 `dynamic_cast` 判型替换为 `eType`（见 §3.5）。
 
 ---
 

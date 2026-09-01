@@ -1,0 +1,107 @@
+{
+  "meta": {
+    "clientId": "example_client",
+    "clientName": "示例客户定制版",
+    "version": "2.0",
+    "inherits": "san_yi",
+    "_note": "此文件展示如何通过配置定制 UI，基于 san_yi 扩展"
+  },
+
+  "_customizationExamples": {
+    "说明": "以下是各类型定制的配置示例，取消注释即可生效"
+  },
+
+  "_1_addCustomPanel": {
+    "_comment": "新增客户专属面板（需配合代码注册工厂）",
+    "_docks": [
+      {
+        "id": "ExampleDock",
+        "title": "示例面板",
+        "position": "right",
+        "widgetType": "ExamplePanel",
+        "visible": true,
+        "area": "right",
+        "allowedAreas": ["right", "bottom"]
+      }
+    ]
+  },
+
+  "_2_addCustomMenu": {
+    "_comment": "新增客户专属菜单",
+    "_menus": [
+      {
+        "id": "example",
+        "label": "示例",
+        "visible": true,
+        "workbenches": ["2D", "3D"],
+        "_items": [
+          {
+            "type": "action",
+            "id": "example.info",
+            "label": "显示信息",
+            "command": "example.info",
+            "icon": ":/ui/common/Icons/Help/about.svg",
+            "workbenches": ["2D", "3D"]
+          },
+          {
+            "type": "separator"
+          },
+          {
+            "type": "submenu",
+            "id": "example.settings",
+            "label": "客户设置",
+            "icon": ":/ui/common/Icons/Help/settings.svg",
+            "workbenches": ["2D", "3D"],
+            "_items": [
+              {
+                "type": "action",
+                "id": "example.settings.preferences",
+                "label": "偏好设置...",
+                "command": "example.settings.preferences"
+              },
+              {
+                "type": "action",
+                "id": "example.settings.advanced",
+                "label": "高级设置...",
+                "command": "example.settings.advanced"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+
+  "_3_customLayout": {
+    "_comment": "调整默认布局（隐藏/显示/重排面板）",
+    "_docks": [
+      {
+        "_note": "覆盖继承的面板配置",
+        "id": "PropertiesDock",
+        "visible": false
+      }
+    ]
+  },
+
+  "_4_customContextMenu": {
+    "_comment": "自定义右键菜单",
+    "_contextMenus": [
+      {
+        "id": "canvas.example",
+        "workbench": "2D",
+        "_items": [
+          { "type": "separator" },
+          { "type": "action", "id": "example.custom_action", "label": "客户自定义操作", "command": "example.custom_action" }
+        ],
+        "dynamicSections": ["layer.actions"]
+      }
+    ]
+  },
+
+  "_5_customShortcuts": {
+    "_comment": "添加快捷键（仅用于无菜单入口的命令）",
+    "_shortcuts": [
+      { "id": "shortcut.example.quick_action", "key": "F12" }
+    ]
+  }
+}
