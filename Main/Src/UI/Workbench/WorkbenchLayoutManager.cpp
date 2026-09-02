@@ -221,10 +221,11 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
 
     // 初始面板宽度：默认窄一些，不挤压中间视图；不限制最大宽度，用户可手动拖宽。
     // 仅在两个骨架 Dock 都存在时执行，配置里删掉其中一个也不会崩。
+    // 右侧面板 (PropertiesDock) 宽一些，因为属性行经常有较长的值（坐标、名称等）。
     if (m_panelState.leftDock && m_panelState.rightDock)
     {
         m_parent->resizeDocks({ m_panelState.leftDock.data(), m_panelState.rightDock.data() },
-            { 180, 280 }, Qt::Horizontal);
+            { 180, 320 }, Qt::Horizontal);
     }
 
     return !m_registeredDocks.empty();
