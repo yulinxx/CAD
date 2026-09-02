@@ -14,10 +14,10 @@
 
 #include <gtest/gtest.h>
 
-#include "UI/DrawTools/ToolManager.h"
-#include "UI/DrawTools/ToolContext.h"
-#include "UI/DrawTools/ITool.h"
-#include "UI/DrawTools/SelectTool.h"
+#include "UI2D/DrawTools/ToolManager.h"
+#include "UI2D/DrawTools/ToolContext.h"
+#include "UI2D/DrawTools/ITool.h"
+#include "UI2D/DrawTools/SelectTool.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyCircle.h"
@@ -27,7 +27,7 @@
 #include "Engine2D/Edit/UndoRedoManager.h"
 #include "Engine2D/Geometry/Geo2DQuery.h"
 #include "Engine2D/Geo/GeometryContext.h"
-#include "UI/DrawTools/SelectionGizmo.h"
+#include "UI2D/DrawTools/SelectionGizmo.h"
 #include "UI/Services/SelectionService.h"
 
 #include <QMouseEvent>

@@ -58,7 +58,7 @@
 #include "UI2D/ToolBar/TopToolBar.h"
 #include "UI2D/ToolBar/TextFontToolBar.h"
 #include "UI/DrawTools/TextEditTool.h"
-#include "UI/DrawTools/ToolManager.h"
+#include "UI2D/DrawTools/ToolManager.h"
 #include "UI/UiMetrics.h"
 #include "UI/ThemeManager.h"
 #include "UI2D/Dlg/LayerManagerDialog.h"

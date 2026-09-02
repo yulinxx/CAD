@@ -18,10 +18,10 @@
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
 
-#include "UI/DrawTools/ToolManager.h"
-#include "UI/DrawTools/SelectTool.h"
-#include "UI/ViewWidget/ToolInitializer.h"
-#include "UI/ViewWidget/ViewRenderCoordinator.h"
+#include "UI2D/DrawTools/ToolManager.h"
+#include "UI2D/DrawTools/SelectTool.h"
+#include "UI2D/ViewWidget/ToolInitializer.h"
+#include "UI2D/ViewWidget/ViewRenderCoordinator.h"
 
 #include <QVBoxLayout>
 #include <QMouseEvent>

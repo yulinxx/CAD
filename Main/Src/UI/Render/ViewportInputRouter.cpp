@@ -19,8 +19,8 @@
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
 
-#include "UI/DrawTools/ToolManager.h"
-#include "UI/DrawTools/ITool.h"
+#include "UI2D/DrawTools/ToolManager.h"
+#include "UI2D/DrawTools/ITool.h"
 
 #include <QMouseEvent>
 #include <QWheelEvent>

@@ -38,6 +38,7 @@ endif()
 
 set(MAIN_APP_HEADERS
     ${SRC_ROOT}/Common/VersionInfo.h.in
+    ${SRC_ROOT}/UI/ClientConfig/ExampleCustomPanel.h
 )
 
 file(GLOB_RECURSE MAIN_RESOURCES CONFIGURE_DEPENDS
@@ -458,6 +459,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
         ${MAIN_TEST_DEP_SOURCES}
         ${PROTO_GEN_SRC}
         ${BASE_TOOL_SRC}
+        ${SRC_ROOT}/UI/ClientConfig/ExampleCustomPanel.h
         ${SRC_ROOT}/UI/ClientConfig/configs.qrc
     )
 
