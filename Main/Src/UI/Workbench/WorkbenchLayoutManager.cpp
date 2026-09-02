@@ -225,7 +225,7 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
     if (m_panelState.leftDock && m_panelState.rightDock)
     {
         m_parent->resizeDocks({ m_panelState.leftDock.data(), m_panelState.rightDock.data() },
-            { 180, 320 }, Qt::Horizontal);
+            { 180, 380 }, Qt::Horizontal);
     }
 
     return !m_registeredDocks.empty();
