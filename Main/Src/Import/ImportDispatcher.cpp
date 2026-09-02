@@ -29,11 +29,6 @@ void ImportDispatcher::registerReader(std::unique_ptr<IImportReader> reader)
 
     m_formatMap[fmt] = reader.get();
     m_readers.push_back(std::move(reader));
-
-    SY_INFOF("[ImportDispatcher] Registered reader '%s' for format=%d, extensions=%s",
-        formatName.toUtf8().constData(),
-        static_cast<int>(fmt),
-        m_readers.back()->supportedExtensions().join(QLatin1Char(',')).toUtf8().constData());
 }
 
 ImportResult ImportDispatcher::dispatch(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)

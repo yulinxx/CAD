@@ -13,8 +13,6 @@ void ExportDispatcher::registerWriter(std::unique_ptr<IExportWriter> writer)
     Fio::FileFormat fmt = writer->format();
     m_formatMap[fmt] = writer.get();
     m_writers.push_back(std::move(writer));
-
-    SY_INFOF("[ExportDispatcher] Registered writer for format=%d", static_cast<int>(fmt));
 }
 
 ExportResult ExportDispatcher::dispatch(const ExportContext& context, const Fio::VecSyEntityPtr& entities)

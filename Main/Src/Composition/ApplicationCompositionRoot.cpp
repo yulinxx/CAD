@@ -289,6 +289,9 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_importDispatcher->registerReader(std::make_unique<AiImportReader>());
     m_importDispatcher->registerReader(std::make_unique<NativeImportReader>());
     m_importDispatcher->registerReader(std::make_unique<UgImportReader>());
+    SY_INFOF("[ImportDispatcher] Registered %zu reader(s): %s",
+        m_importDispatcher->supportedExtensions().size(),
+        m_importDispatcher->supportedExtensions().join(QLatin1String(", ")).toUtf8().constData());
 
     // 配置导入服务
     m_importService->setDispatcher(m_importDispatcher.get());
@@ -324,6 +327,9 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_exportDispatcher->registerWriter(std::make_unique<ObjExportWriter>());
     m_exportDispatcher->registerWriter(std::make_unique<StepExportWriter>());
     m_exportDispatcher->registerWriter(std::make_unique<NativeExportWriter>());
+    SY_INFOF("[ExportDispatcher] Registered %zu writer(s): %s",
+        m_exportDispatcher->supportedExtensions().size(),
+        m_exportDispatcher->supportedExtensions().join(QLatin1String(", ")).toUtf8().constData());
 
     // 配置导出服务
     m_exportService->setDispatcher(m_exportDispatcher.get());
