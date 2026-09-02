@@ -24,6 +24,8 @@ set(SANYI_UI_3D_DIR             "${SANYI_ROOT}/UI/3D")
 
 set(SANYI_NETWORK_DIR       "${SANYI_ROOT}/Network/Network")
 set(SANYI_NESTING_DIR       "${SANYI_ROOT}/Nesting/Nesting")
+set(SANYI_VISION_DIR        "${SANYI_ROOT}/Vision/Vision")
+set(SANYI_HARDWARE_DIR      "${SANYI_ROOT}/Hardware/Hardware")
 set(SANYI_PYTHONHOST_DIR    "${SANYI_ROOT}/PythonHost/PythonHost")
 set(SANYI_THIRDPARTY_DIR    "${SANYI_ROOT}/ThirdParty")
 
