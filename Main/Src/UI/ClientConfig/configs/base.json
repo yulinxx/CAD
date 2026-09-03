@@ -315,8 +315,7 @@
         { "type": "action", "id": "view.reset", "label": "Reset View", "command": "view.reset" },
         { "type": "separator" },
         { "type": "action", "id": "view.layer_manager", "label": "Layer Manager", "command": "view.layer_manager" }
-      ],
-      "dynamicSections": ["layer.actions"]
+      ]
     },
     {
       "id": "canvas.3d",

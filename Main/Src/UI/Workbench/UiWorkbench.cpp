@@ -1694,7 +1694,6 @@ void Workbench2D::onViewportContextMenu(QContextMenuEvent* event)
     const CommandUiSnapshot snapshot = m_commandHub->captureSnapshot(m_commandHub->mainWindow());
 
     // 配置驱动优先（P0-2b）：客户 JSON 声明了 contextMenus["canvas.2d"] 时由配置接管。
-    // 图层等运行时内容通过 dynamicSections 插入，见下方注册的 "layer.actions"。
     if (QMenu* configured = buildConfiguredContextMenu(QStringLiteral("canvas.2d"), snapshot.hasSelection))
     {
         // 配置化菜单的 QAction 是每次弹出新建的临时对象，不在中枢的动作表里，
@@ -1730,15 +1729,6 @@ QMenu* Workbench2D::buildConfiguredContextMenu(const QString& contextMenuId, boo
     {
         return nullptr;
     }
-
-    // 图层动态段：每次弹出都重新注册，闭包捕获当前选中状态与图层管理器
-    UiContextMenuService::instance().registerDynamicSection(QStringLiteral("layer.actions"),
-        [this, hasSelection](QMenu* menu) {
-            if (m_commandHub && m_services.layerManager)
-            {
-                m_commandHub->populateLayerContextSection(menu, m_services.layerManager, hasSelection);
-            }
-        });
 
     // 分发器直接用工作台自身（UiWorkbench 实现 IUiCommandDispatcher）：
     // UiLayoutBuilder 把 dispatcher 裸指针捕进 QAction 的 triggered 闭包，闭包活到菜单析构，
@@ -1900,11 +1890,6 @@ void Workbench2D::deactivate()
     {
         QObject::disconnect(m_services.layerManagerBridge, nullptr, this, nullptr);
     }
-
-    // 注销右键菜单动态段：UiContextMenuService 是进程级单例，"layer.actions" 的闭包
-    // 捕获了本工作台的 this。不注销的话闭包会一直活着，另一侧工作台的 JSON 只要
-    // 声明同名 dynamicSections，右键就会打进已失效的 2D 工作台。
-    UiContextMenuService::instance().unregisterDynamicSection(QStringLiteral("layer.actions"));
 
 
     // 清除 ImportService 中持有的视口回调，防止切换后悬空指针

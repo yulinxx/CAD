@@ -62,7 +62,6 @@ void UiContextMenuService::registerDynamicSection(const QString& sectionId, UiMe
     const bool replaced = m_sections.contains(sectionId);
     m_sections.insert(sectionId, std::move(filler));
 }
-}
 
 void UiContextMenuService::unregisterDynamicSection(const QString& sectionId)
 {
