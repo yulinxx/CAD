@@ -102,8 +102,6 @@ void AppInitializer::initialize()
             // 默认使用 Info 级别，让用户能看到关键信息
             SyLogger::GetInstance().SetLevel(SyLogLevel::Info);
             SY_INFO("[AppInitializer] Default log level set to Info (will be overridden by SettingsService if available)");
-
-            SY_INFOF("[AppInitializer] Log settings applied: enabled=%d, level=%d", logEnabled, logLevelInt);
         }
     }
     else
