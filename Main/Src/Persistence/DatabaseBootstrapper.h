@@ -12,6 +12,10 @@ namespace Eg
  *
  * 管理 Schema 版本，确保表结构与应用代码保持同步。
  * 在应用启动时由 AppInitializer 调用 ensureSchema()。
+ *
+ * 版本控制：
+ * - schema_version: 数据库表结构版本
+ * - app_version: 应用版本（用于判断是否需要清除旧数据）
  */
 class DatabaseBootstrapper
 {
@@ -27,6 +31,9 @@ public:
 
     /// 最新应用期望的 Schema 版本号
     static int latestSchemaVersion();
+
+    /// 获取数据库中记录的应用版本
+    std::string databaseAppVersion() const;
 
     /// 最近一次操作的错误信息
     const std::string& lastError() const;

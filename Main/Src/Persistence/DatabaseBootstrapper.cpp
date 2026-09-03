@@ -14,6 +14,11 @@
 // v4: layers 表新增 fill_color 列（填充色，色块填充）
 static constexpr int kSchemaVersion = 4;
 
+// 当前应用版本（用于判断数据库是否与当前版本兼容）
+// 格式: "major.minor.patch" 例如 "1.0.0"
+// 当应用版本变化时，可能需要清除旧数据或执行迁移
+static constexpr const char* kAppVersion = "1.0.0";
+
 DatabaseBootstrapper::DatabaseBootstrapper(Eg::Database& database)
     : m_database(database)
 {
@@ -26,6 +31,29 @@ bool DatabaseBootstrapper::ensureSchema()
         m_lastError = "Database is not open";
         SY_ERROR("[DatabaseBootstrapper] Database is not open");
         return false;
+    }
+
+    // 检查应用版本兼容性
+    std::string dbAppVersion = databaseAppVersion();
+    if (!dbAppVersion.empty() && dbAppVersion != kAppVersion)
+    {
+        SY_WARNF("[DatabaseBootstrapper] App version mismatch: db=%s current=%s - clearing incompatible data",
+            dbAppVersion.c_str(), kAppVersion);
+        // 版本不匹配时清除所有业务数据（保留 meta 表）
+        m_database.execute("DELETE FROM recent_files");
+        m_database.execute("DELETE FROM workspace_snapshots");
+        m_database.execute("DELETE FROM layers");
+        m_database.execute("DELETE FROM documents");
+        // 重置 schema 版本，强制重建
+        m_database.execute("DELETE FROM app_meta WHERE key = 'schema_version'");
+    }
+
+    // 记录当前应用版本
+    {
+        std::map<std::string, std::string> values;
+        values["key"] = "app_version";
+        values["value"] = kAppVersion;
+        m_database.insertOrReplace("app_meta", values);
     }
 
     int currentVersion = schemaVersion();
@@ -83,6 +111,17 @@ int DatabaseBootstrapper::schemaVersion() const
 int DatabaseBootstrapper::latestSchemaVersion()
 {
     return kSchemaVersion;
+}
+
+std::string DatabaseBootstrapper::databaseAppVersion() const
+{
+    if (!m_database.isOpen())
+    {
+        return {};
+    }
+
+    std::string version = m_database.get("app_meta", "value", "key = 'app_version'");
+    return version;
 }
 
 const std::string& DatabaseBootstrapper::lastError() const
