@@ -4,7 +4,7 @@
 #include "UiFeatureGate.h"
 #include "UiPanelRegistry.h"
 #include "UiPropertiesPanel.h"
-#include "UiSceneTreePanel2D.h"
+#include "UiSceneTreePanel.h"
 
 #include "Log/SyLogger.h"
 
@@ -29,7 +29,7 @@ void registerBuiltinUiPanels(UiPanelRegistry& registry)
     // ==================== Dock 面板 ====================
 
     registry.registerPanel(QStringLiteral("SceneTreePanel"), [](QWidget* parent) {
-        return static_cast<QWidget*>(new SceneTreePanel2D(parent));
+        return static_cast<QWidget*>(new SceneTreePanel(parent));
     });
     registry.registerPanel(QStringLiteral("PropertiesPanel"), [](QWidget* parent) {
         return static_cast<QWidget*>(new PropertiesPanelWidget(parent));
@@ -77,7 +77,7 @@ void registerBuiltinUiPanels(UiPanelRegistry& registry)
         return static_cast<QWidget*>(makeStatusLabel(parent, QString()));
     });
 
-    SY_INFOF("[UiBuiltinPanels] Registered %d builtin panel/slot factories: %s",
+    SY_DEBUGF("[UiBuiltinPanels] Registered %d builtin panel/slot factories: %s",
         static_cast<int>(registry.registeredPanelIds().size()),
         qPrintable(registry.registeredPanelIds().join(QLatin1Char(','))));
 }

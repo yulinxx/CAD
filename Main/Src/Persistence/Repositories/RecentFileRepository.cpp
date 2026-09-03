@@ -68,7 +68,6 @@ bool RecentFileRepository::append(const RecentFileRecord& record)
         SY_WARNF("[RecentFileRepository] Failed to trim excess records: %s", m_database.lastError().c_str());
     }
 
-    SY_DEBUGF("[RecentFileRepository] Appended recent file: %s", record.filePath.c_str());
     return true;
 }
 

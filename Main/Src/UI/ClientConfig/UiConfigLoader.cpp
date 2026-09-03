@@ -641,7 +641,7 @@ StatusBarDef UiConfigLoader::parseStatusBar(const QJsonObject& obj)
         }
     }
 
-    SY_INFOF("[UiConfigLoader] StatusBar parsed: visible=%d slots=%d",
+    SY_DEBUGF("[UiConfigLoader] StatusBar parsed: visible=%d slots=%d",
         bar.visible ? 1 : 0,
         static_cast<int>(bar.items.size()));
     return bar;
@@ -691,7 +691,7 @@ std::optional<ContextMenuDef> UiConfigLoader::parseContextMenu(const QJsonObject
         return std::nullopt;
     }
 
-    SY_INFOF("[UiConfigLoader] ContextMenu parsed id='%s' workbench='%s' items=%d",
+    SY_DEBUGF("[UiConfigLoader] ContextMenu parsed id='%s' workbench='%s' items=%d",
         qPrintable(cm.id),
         qPrintable(cm.workbenchId),
         static_cast<int>(cm.items.size()));

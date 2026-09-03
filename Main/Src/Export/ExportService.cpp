@@ -95,9 +95,7 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
         result.message =
             QStringLiteral("Exported %1 entities to: %2").arg(result.exportedEntityCount).arg(context.targetPath);
 
-        SY_INFOF("[ExportService] %s", result.message.toUtf8().constData());
-
-        // 导出完成后状态回写
+        // Export completed
         postExportRecord(result, context);
     }
     else
@@ -145,7 +143,6 @@ Fio::VecSyEntityPtr ExportService::collectAllEntities() const
             // ABI: clone 在 Engine2D 分配，/MD 共享堆下跨 DLL delete 安全
             entities.push_back(std::unique_ptr<Eg::SyEntity>(e->clone()));
         }
-        SY_INFOF("[ExportService] Collected %d 2D entities", (int)entities.size());
     }
 
     // 收集 3D 网格图元
@@ -172,8 +169,6 @@ Fio::VecSyEntityPtr ExportService::collectAllEntities() const
                 }
             },
             &ctx);
-
-        SY_INFOF("[ExportService] Collected %d 3D mesh entities", (int)ctx.count);
     }
 
     return entities;
@@ -181,8 +176,5 @@ Fio::VecSyEntityPtr ExportService::collectAllEntities() const
 
 void ExportService::postExportRecord(const ExportResult& result, const ExportContext& context)
 {
-    SY_INFOF("[ExportService] Export recorded: format=%d, entities=%d, path=%s",
-        static_cast<int>(context.format),
-        result.exportedEntityCount,
-        context.targetPath.toUtf8().constData());
+    // Recording export to history database
 }

@@ -16,7 +16,7 @@ class QWidget;
 class IUiCommandDispatcher;
 class WorkbenchMenuManager;
 class PersistenceService;
-class SceneTreePanel2D;
+class SceneTreePanel;
 class PropertiesPanelWidget;
 class UiConfigurationManager;
 class UiPanelRegistry;
@@ -39,7 +39,7 @@ struct PanelState
     /// 右侧停靠面板
     QPointer<QDockWidget> rightDock;
     /// 场景树停靠面板
-    QPointer<SceneTreePanel2D> sceneTreeDock;
+    QPointer<SceneTreePanel> sceneTreeDock;
     /// 属性面板
     QPointer<PropertiesPanelWidget> propertiesDock;
 };
@@ -113,6 +113,8 @@ public:
     void restoreDockWidgetTitles();
     /// 设置骨架面板可见性
     void setSkeletonDocksVisible(bool visible);
+    /// 设置场景树面板可见性（3D 模式下需要单独显示）
+    void setSceneDockVisible(bool visible);
 
     // ==================== 繁忙指示器 ====================
 

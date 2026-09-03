@@ -259,7 +259,7 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
             std::make_unique<LayerPersistenceBridge>(m_layerManager.get(), persistenceService()->layers());
 
         m_layerPersistenceBridge->attach();
-        SY_INFO("[ApplicationCompositionRoot] LayerPersistenceBridge attached");
+        SY_DEBUG("[ApplicationCompositionRoot] LayerPersistenceBridge attached");
     }
 
     // LayerManager 注入 SceneEditService，添加图元时自动分配图层
@@ -289,8 +289,8 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_importDispatcher->registerReader(std::make_unique<AiImportReader>());
     m_importDispatcher->registerReader(std::make_unique<NativeImportReader>());
     m_importDispatcher->registerReader(std::make_unique<UgImportReader>());
-    SY_INFOF("[ImportDispatcher] Registered %zu reader(s): %s",
-        m_importDispatcher->supportedExtensions().size(),
+    SY_INFOF("[ImportDispatcher] Registered %lld reader(s): %s",
+        static_cast<long long>(m_importDispatcher->supportedExtensions().size()),
         m_importDispatcher->supportedExtensions().join(QLatin1String(", ")).toUtf8().constData());
 
     // 配置导入服务
@@ -327,8 +327,8 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_exportDispatcher->registerWriter(std::make_unique<ObjExportWriter>());
     m_exportDispatcher->registerWriter(std::make_unique<StepExportWriter>());
     m_exportDispatcher->registerWriter(std::make_unique<NativeExportWriter>());
-    SY_INFOF("[ExportDispatcher] Registered %zu writer(s): %s",
-        m_exportDispatcher->supportedExtensions().size(),
+    SY_INFOF("[ExportDispatcher] Registered %lld writer(s): %s",
+        static_cast<long long>(m_exportDispatcher->supportedExtensions().size()),
         m_exportDispatcher->supportedExtensions().join(QLatin1String(", ")).toUtf8().constData());
 
     // 配置导出服务

@@ -21,11 +21,11 @@ void UiClientContext::setClientIdOverride(const QString& clientId)
     m_cachedClientId.clear();
     if (!m_override.isEmpty())
     {
-        SY_INFOF("[UiClientContext] Client id override set: '%s'", qPrintable(m_override));
+        SY_DEBUGF("[UiClientContext] Client id override set: '%s'", qPrintable(m_override));
     }
     else
     {
-        SY_INFO("[UiClientContext] Client id override cleared");
+        SY_DEBUG("[UiClientContext] Client id override cleared");
     }
 }
 
@@ -76,7 +76,7 @@ const QString& UiClientContext::clientId() const
 
     m_resolved = true;
     // 该日志是排查「客户配置为什么没生效」的第一现场，务必保留
-    SY_INFOF("[UiClientContext] Active client id='%s' (source: %s)",
+    SY_DEBUGF("[UiClientContext] Active client id='%s' (source: %s)",
         qPrintable(m_cachedClientId),
         qPrintable(source));
     return m_cachedClientId;

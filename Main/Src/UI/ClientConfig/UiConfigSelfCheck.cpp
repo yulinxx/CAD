@@ -371,10 +371,10 @@ void UiConfigSelfCheck::logReport(const UiConfigSelfCheckReport& report, const Q
         SY_WARNF("[ConfigSelfCheck] workbench declared in config but not compiled: %s",
             item.toUtf8().constData());
     }
-    for (const QString& item : report.gatedOutByBuild)
+    if (!report.gatedOutByBuild.isEmpty())
     {
-        SY_INFOF("[ConfigSelfCheck] command absent because its module was not compiled (expected trim): %s",
-            item.toUtf8().constData());
+        SY_DEBUGF("[ConfigSelfCheck] %d command(s) absent because module not compiled (expected trim)",
+            report.gatedOutByBuild.size());
     }
 
     for (const QString& item : report.compiledButNotLicensed)

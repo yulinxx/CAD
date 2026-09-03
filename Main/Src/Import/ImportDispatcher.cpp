@@ -47,9 +47,6 @@ ImportResult ImportDispatcher::dispatch(const ImportContext& context, Fio::VecSy
     if (fmt == Fio::FileFormat::Unknown)
     {
         fmt = detectFormat(context.sourcePath);
-        SY_INFOF("[ImportDispatcher] Format detected from path: suffix='%s' -> format=%d",
-            fi.suffix().toUtf8().constData(),
-            static_cast<int>(fmt));
     }
 
     if (fmt == Fio::FileFormat::Unknown)
@@ -74,26 +71,15 @@ ImportResult ImportDispatcher::dispatch(const ImportContext& context, Fio::VecSy
     ImportContext fullCtx = context;
     fullCtx.format = fmt;
 
-    SY_INFOF("[ImportDispatcher] Dispatching to reader '%s': format=%d, size=%lld bytes, path=%s",
-        reader->formatName().toUtf8().constData(),
-        static_cast<int>(fmt),
-        static_cast<long long>(fi.size()),
-        context.sourcePath.toUtf8().constData());
-
     const auto startTime = std::chrono::steady_clock::now();
     ImportResult result = reader->read(fullCtx, outEntities);
     const auto elapsedMs =
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - startTime).count();
 
-    // 读取器耗时单独记一条：这是排查"导入很慢"时唯一能区分解析层与落地层的地方
+    // Reader result
     if (result.success)
     {
-        SY_INFOF("[ImportDispatcher] Reader '%s' succeeded: %zu entity(ies), %zu layer(s), %zu group(s), %lld ms",
-            reader->formatName().toUtf8().constData(),
-            outEntities.size(),
-            result.importedLayers.size(),
-            result.importedGroups.size(),
-            static_cast<long long>(elapsedMs));
+        // Import succeeded
     }
     else
     {

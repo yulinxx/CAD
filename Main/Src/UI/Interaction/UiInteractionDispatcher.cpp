@@ -147,7 +147,7 @@ void DefaultInteractionDispatcher::begin(const QString& commandId)
         m_stateCenter->setBusy(true);
     }
 
-    SY_INFOF("[InteractionDispatcher] Begin command: id=%s type=%s",
+    SY_DEBUGF("[InteractionDispatcher] Begin command: id=%s type=%s",
         commandId.toUtf8().constData(),
         m_commandType.toUtf8().constData());
 
@@ -165,7 +165,7 @@ void DefaultInteractionDispatcher::submit()
         return;
     }
 
-    SY_INFOF("[InteractionDispatcher] Submit command: id=%s", m_activeCommandId.toUtf8().constData());
+    SY_DEBUGF("[InteractionDispatcher] Submit command: id=%s", m_activeCommandId.toUtf8().constData());
     syncCommandFinishState();
 }
 
@@ -177,7 +177,7 @@ void DefaultInteractionDispatcher::cancel()
         return;
     }
 
-    SY_INFOF("[InteractionDispatcher] Cancel command: id=%s", m_activeCommandId.toUtf8().constData());
+    SY_DEBUGF("[InteractionDispatcher] Cancel command: id=%s", m_activeCommandId.toUtf8().constData());
     syncCommandFinishState();
 }
 

@@ -142,6 +142,10 @@ void RenderViewport2D::syncInputRouterCallbacks()
             m_refreshCoordinator->requestRepaint();
         }
     });
+    // 回车键缩放到选中图元范围
+    m_inputRouter->setZoomToSelectionCallback([this]() {
+        zoomToSelection();
+    });
 }
 
 void RenderViewport2D::initRenderWidget()
@@ -564,7 +568,8 @@ void RenderViewport2D::zoomToSelection()
     auto bboxOpt = m_selector->selectionBBox();
     if (!bboxOpt)
     {
-        updateStatus(tr("No entities selected"));
+        // 没有选中图元时，重置视图（与空格键行为一致）
+        zoomToFit();
         return;
     }
 
@@ -640,7 +645,6 @@ void RenderViewport2D::syncSelectionDetails()
 {
     syncSelectionToolState();
     // 通知上层：选择状态已变化（覆盖绘制后自动选中、点选/框选、撤销等所有路径）
-    SY_INFOF("[RenderViewport2D] syncSelectionDetails -> emitting selectionChanged");
     emit selectionChanged();
 }
 

@@ -1,4 +1,4 @@
-﻿#include "DocumentExportAdapter.h"
+#include "DocumentExportAdapter.h"
 
 #include "Engine2D/Core/SceneManager.h"
 #include "Log/SyLogger.h"
@@ -24,7 +24,7 @@ Fio::VecSyEntityPtr DocumentExportAdapter::collect2D()
         entities.push_back(std::unique_ptr<Eg::SyEntity>(e->clone()));
     }
 
-    SY_INFOF("[DocumentExportAdapter] Collected %d entities from 2D scene", (int)entities.size());
+    SY_DEBUGF("[DocumentExportAdapter] Collected %d entities from 2D scene", (int)entities.size());
     return entities;
 }
 
@@ -50,6 +50,6 @@ Fio::VecSyEntityPtr DocumentExportAdapter::collectSelected()
         entities.push_back(std::unique_ptr<Eg::SyEntity>(e->clone()));
     }
 
-    SY_INFOF("[DocumentExportAdapter] Collected %d selected entities", (int)entities.size());
+    SY_DEBUGF("[DocumentExportAdapter] Collected %d selected entities", (int)entities.size());
     return entities;
 }

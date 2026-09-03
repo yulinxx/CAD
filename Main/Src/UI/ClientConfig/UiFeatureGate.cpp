@@ -44,12 +44,12 @@ void UiFeatureGate::setLicensedFeatures(const QStringList& features)
 
     if (m_unrestricted)
     {
-        SY_INFO("[UiFeatureGate] Wildcard license detected, all features unlocked");
+        SY_DEBUG("[UiFeatureGate] Wildcard license detected, all features unlocked");
         return;
     }
 
     // 该日志是排查「某菜单项为什么不出现」的关键线索，务必保留
-    SY_INFOF("[UiFeatureGate] Licensed features loaded (%d): %s",
+    SY_DEBUGF("[UiFeatureGate] Licensed features loaded (%d): %s",
         static_cast<int>(m_features.size()),
         qPrintable(licensedFeatures().join(QLatin1Char(','))));
 }
@@ -57,7 +57,7 @@ void UiFeatureGate::setLicensedFeatures(const QStringList& features)
 void UiFeatureGate::setUnrestricted(bool unrestricted)
 {
     m_unrestricted = unrestricted;
-    SY_INFOF("[UiFeatureGate] Unrestricted mode %s", unrestricted ? "ON" : "OFF");
+    SY_DEBUGF("[UiFeatureGate] Unrestricted mode %s", unrestricted ? "ON" : "OFF");
 }
 
 bool UiFeatureGate::isAllowed(const QString& featureId) const

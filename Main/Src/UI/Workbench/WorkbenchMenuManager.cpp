@@ -30,7 +30,7 @@
 #include "UI2D/ToolBar/TopToolBar.h"
 #include "UI2D/StatusBar/StatusBar.h"
 #include "UI/StatusBar/StatusBar3D.h"
-#include "UI/Widgets/UiSceneTreePanel2D.h"
+#include "UI/Widgets/UiSceneTreePanel.h"
 #include "UI/Widgets/UiPropertiesPanel.h"
 #include "Render3D/RenderWidget3D.h"
 #include "ClientConfig/UiBuiltinPanels.h"
@@ -458,11 +458,11 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
     m_menuLayoutBuilder->buildMenus(filteredMenus);
     m_menuLayoutBuilder->buildShortcuts(filteredShortcuts);
 
-    SY_INFOF("[WorkbenchMenuManager] Config-driven menus built: client='%s', workbench='%s', menus=%zu, shortcuts=%zu",
+    SY_DEBUGF("[WorkbenchMenuManager] Config-driven menus built: client='%s', workbench='%s', menus=%lld, shortcuts=%lld",
         qPrintable(clientId),
         qPrintable(wbId),
-        filteredMenus.size(),
-        filteredShortcuts.size());
+        static_cast<long long>(filteredMenus.size()),
+        static_cast<long long>(filteredShortcuts.size()));
 }
 
 void WorkbenchMenuManager::buildMenus()

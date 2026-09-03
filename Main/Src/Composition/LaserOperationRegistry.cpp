@@ -134,5 +134,5 @@ void LaserOperationRegistry::registerAll()
             return true;
         }));
 
-    SY_INFO("[LaserOperation] registered: StartProcess / PauseProcess / StopProcess / EmergencyStop");
+    SY_DEBUG("[LaserOperation] registered: StartProcess / PauseProcess / StopProcess / EmergencyStop");
 }

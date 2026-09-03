@@ -128,7 +128,7 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
         return false;
     }
 
-    SY_INFOF("[ImportReader:%s] IR parsed in %lld ms: entities=%u, layers=%u, groups=%u, warnings=%u, unit='%s', "
+    SY_DEBUGF("[ImportReader:%s] IR parsed in %lld ms: entities=%u, layers=%u, groups=%u, warnings=%u, unit='%s', "
              "sourceFormat='%s'",
         tag.constData(),
         static_cast<long long>(parseMs),
@@ -182,7 +182,7 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
     }
     else if (ir.layerCount > 0)
     {
-        SY_INFOF("[ImportReader:%s] IR carried %u layer(s) but layer collection is off for this format",
+        SY_DEBUGF("[ImportReader:%s] IR carried %u layer(s) but layer collection is off for this format",
             tag.constData(),
             ir.layerCount);
     }
@@ -192,7 +192,7 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
         // 提取源文件群组表（名称 + 父子关系），随导入结果带回，供 ImportService 重建 SyGroup
         res.importedGroups = Eg::FioEntityConverter::extractGroups(ir);
         res.entityGroupMap = std::move(entityGroupMap);
-        SY_INFOF("[ImportReader:%s] IR carried %u group(s), %zu entity-group assignment(s)",
+        SY_DEBUGF("[ImportReader:%s] IR carried %u group(s), %lld entity-group assignment(s)",
             tag.constData(),
             ir.groupCount,
             res.entityGroupMap.size());
@@ -214,7 +214,7 @@ ImportResult ImportReaderBase::readViaIR(
     QString errMsg;
     if (tryImportViaIR(context, format, outEntities, collectLayers, &result, &errMsg))
     {
-        SY_INFOF("[ImportReader:%s] read END: success, entities=%d, layers=%zu, layerMapped=%zu, groups=%zu",
+        SY_DEBUGF("[ImportReader:%s] read END: success, entities=%d, layers=%lld, layerMapped=%lld, groups=%lld",
             tag.constData(),
             result.entityCount,
             result.importedLayers.size(),
@@ -283,10 +283,12 @@ ImportResult ImportReaderBase::readViaLegacy(
 
     if (!warns.isEmpty())
     {
-        SY_WARNF("[ImportReader:%s] Legacy parser produced %d warning(s)", tag.constData(), warns.size());
+        SY_WARNF("[ImportReader:%s] Legacy parser produced %d warning(s)",
+            tag.constData(),
+            static_cast<int>(warns.size()));
     }
 
-    SY_INFOF("[ImportReader:%s] read END (legacy): success, entities=%zu, layers=%zu, %lld ms",
+    SY_DEBUGF("[ImportReader:%s] read END (legacy): success, entities=%lld, layers=%lld, warnings=%lld, %lld ms",
         tag.constData(),
         count,
         layerCount,

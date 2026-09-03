@@ -33,7 +33,7 @@ void LayerPersistenceBridge::attach()
     }
     m_layerManager->addObserver(this);
     m_attached = true;
-    SY_INFO("[LayerPersistenceBridge] Attached to LayerManager");
+    SY_DEBUG("[LayerPersistenceBridge] Attached to LayerManager");
 }
 
 /// 停止监听图层变更事件
@@ -45,7 +45,7 @@ void LayerPersistenceBridge::detach()
     }
     m_layerManager->removeObserver(this);
     m_attached = false;
-    SY_INFO("[LayerPersistenceBridge] Detached from LayerManager");
+    SY_DEBUG("[LayerPersistenceBridge] Detached from LayerManager");
 }
 
 /// 图层新增时同步写入数据库
@@ -57,7 +57,7 @@ void LayerPersistenceBridge::onLayerAdded(int nLayerId, const char* name)
 /// 图层删除时同步从数据库移除
 void LayerPersistenceBridge::onLayerRemoved(int nLayerId)
 {
-    SY_INFOF("[LayerPersistenceBridge] Layer removed: id=%d", nLayerId);
+    SY_DEBUGF("[LayerPersistenceBridge] Layer removed: id=%d", nLayerId);
     if (m_layerRepository)
     {
         if (!m_layerRepository->remove(m_documentId, nLayerId))
@@ -95,7 +95,7 @@ void LayerPersistenceBridge::onLayerVisibilityChanged(int nLayerId, bool bVisibl
 /// 图层顺序变更时批量写入所有图层顺序
 void LayerPersistenceBridge::onLayerOrderChanged()
 {
-    SY_INFO("[LayerPersistenceBridge] Layer order changed, batch updating all layers");
+    SY_DEBUG("[LayerPersistenceBridge] Layer order changed, batch updating all layers");
     if (!m_layerManager || !m_layerRepository)
     {
         return;

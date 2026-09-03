@@ -242,8 +242,8 @@ bool ProcessingJobService::startPlan(const Hw::MotionPlanView& view, const QStri
     m_impl->pollTimer.start();
 
 
-    SY_INFOF("[ProcessingJob] Started '%s' on %s: %zu command(s), bounds [%.3f %.3f]-[%.3f %.3f]",
-        m_impl->jobId.toUtf8().constData(), runner.kindName(), view.commandCount,
+    SY_DEBUGF("[ProcessingJob] Started '%s' on %s: %lld command(s), bounds [%.3f %.3f]-[%.3f %.3f]",
+        m_impl->jobId.toUtf8().constData(), runner.kindName(), static_cast<long long>(view.commandCount),
         view.header.boundsMinX, view.header.boundsMinY,
         view.header.boundsMaxX, view.header.boundsMaxY);
 
@@ -273,7 +273,7 @@ bool ProcessingJobService::pauseJob(QString& errorOut)
         SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
         return false;
     }
-    SY_INFOF("[ProcessingJob] Paused '%s'", m_impl->jobId.toUtf8().constData());
+    SY_DEBUGF("[ProcessingJob] Paused '%s'", m_impl->jobId.toUtf8().constData());
     // 不在这里改 lastState：状态一律以设备上报为准，
     // 本地先改会让「调用成功但设备没真正暂停」变成看不见的谎
     pollProgress();
@@ -311,7 +311,7 @@ bool ProcessingJobService::resumeJob(QString& errorOut)
         SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
         return false;
     }
-    SY_INFOF("[ProcessingJob] Resumed '%s'", m_impl->jobId.toUtf8().constData());
+    SY_DEBUGF("[ProcessingJob] Resumed '%s'", m_impl->jobId.toUtf8().constData());
     pollProgress();
     return true;
 }
@@ -420,7 +420,7 @@ void ProcessingJobService::pollProgress()
     case Hw::PlanState::Completed:
         m_impl->active = false;
         m_impl->pollTimer.stop();
-        SY_INFOF("[ProcessingJob] Finished '%s'", m_impl->jobId.toUtf8().constData());
+        SY_DEBUGF("[ProcessingJob] Finished '%s'", m_impl->jobId.toUtf8().constData());
         emit jobFinished(true, QStringLiteral("加工完成：%1").arg(m_impl->jobId));
         break;
 

@@ -206,7 +206,7 @@ void FileOperationRegistry::doImportByFormat(Fio::FileFormat fmt)
             return;
         }
 
-        SY_INFOF("[FileOperation] Importing via ImportService: format=%d, path=%s",
+        SY_DEBUGF("[FileOperation] Importing via ImportService: format=%d, path=%s",
             static_cast<int>(fmt),
             filePath.toUtf8().constData());
 
@@ -302,7 +302,7 @@ void FileOperationRegistry::doImportImage(const QString& filePath)
 
         delete imgEntity;
 
-        SY_INFOF("[FileOperation] Imported image: %s (%dx%d)", path.toUtf8().constData(), rgba.width(), rgba.height());
+        SY_DEBUGF("[FileOperation] Imported image: %s (%dx%d)", path.toUtf8().constData(), rgba.width(), rgba.height());
     });
 }
 

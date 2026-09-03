@@ -39,11 +39,11 @@ void PendingOperationRegistry::registerAll()
         }
         if (registered > 0)
         {
-            SY_INFOF("[Composition] Registered %d placeholder operations for %s", registered, category);
+            SY_DEBUGF("[Composition] Registered %d placeholder operations for %s", registered, category);
             totalRegistered += registered;
         }
     };
 
     // 当前无待占位操作；后续新增未接入操作时在此追加数组并调用 registerPlaceholders
-    SY_INFOF("[Composition] Total %d placeholder operations registered across all categories", totalRegistered);
+    SY_DEBUGF("[Composition] Total %d placeholder operations registered across all categories", totalRegistered);
 }

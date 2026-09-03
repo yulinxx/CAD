@@ -103,7 +103,7 @@ void FileDropHandler::installAppEventFilter()
     {
         app->installEventFilter(this);
         m_appFilterInstalled = true;
-        SY_INFO("[FileDropHandler] App-level event filter installed for drag-drop");
+        SY_DEBUG("[FileDropHandler] App-level event filter installed for drag-drop");
     }
 }
 
@@ -317,7 +317,7 @@ bool FileDropHandler::handleDrop(QDropEvent* event)
     event->acceptProposedAction();
     if (successCount + failedCount > 1)
     {
-        SY_INFOF("[FileDropHandler] Drop completed: %d succeeded, %d failed", successCount, failedCount);
+        SY_DEBUGF("[FileDropHandler] Drop completed: %d succeeded, %d failed", successCount, failedCount);
     }
     emit sigDropFinished(successCount, failedCount);
     return successCount > 0;

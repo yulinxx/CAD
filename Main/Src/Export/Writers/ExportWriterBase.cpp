@@ -70,10 +70,5 @@ ExportResult ExportWriterBase::write(const ExportContext& context, const Fio::Ve
         return ExportResult::fail(msg);
     }
 
-    SY_INFOF("[%s] Exported %d entities: %s",
-        m_formatName.toUtf8().constData(),
-        static_cast<int>(entities.size()),
-        context.targetPath.toUtf8().constData());
-
     return ExportResult::ok(successMessage(), static_cast<int>(entities.size()));
 }

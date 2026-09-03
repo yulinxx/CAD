@@ -21,6 +21,7 @@
 #include <QObject>
 #include <QPointF>
 #include <QPoint>
+#include <QElapsedTimer>
 #include <functional>
 
 #include "ViewportNavigation2D.h"
@@ -75,6 +76,9 @@ public:
     // 捕捉回调 — 在把世界坐标分发给活动工具前统一应用（图元/网格/起点吸附）。
     // 通过函数注入而非直接依赖 GridSnapManager，保持输入路由低耦合、便于移植与测试。
     void setSnapPositionCallback(std::function<QPointF(const QPointF&)> callback);
+
+    // 缩放到选中图元回调
+    void setZoomToSelectionCallback(std::function<void()> callback);
 
     // ==================== 事件过滤器（转发 RenderWidget 事件到视口） ====================
 
@@ -265,9 +269,13 @@ private:
     bool m_panning{ false };
     bool m_panModeEnabled{ false };
     QPoint m_lastMousePos;
-    // 空格临时平移（按住空格 + 单指/左键拖动 = 平移，空格单独按下释放 = 原有确认/重置语义）
+    // 空格临时平移（按住空格 + 单指/左键拖动 = 平移）
+    // 空格单独按下释放：单击 = 重置视图，双击（500ms内）= 缩放到选中图元范围
     bool m_spaceHeld{ false };
     bool m_spacePanned{ false };
+    // 双击空格（500ms内）缩放到选中图元
+    QElapsedTimer m_spaceTapTimer;
+    static constexpr int kDoubleSpaceInterval = 500;  // ms
     // 最近一次鼠标世界坐标（粘贴锚点）
     QPointF m_lastCursorWorldPos{ 0.0, 0.0 };
     bool m_hasCursorPos{ false };
@@ -277,6 +285,7 @@ private:
     std::function<void(const QString&)> m_statusCallback;
     // 捕捉回调：分发到活动工具前对世界坐标应用吸附（图元/网格/起点）
     std::function<QPointF(const QPointF&)> m_snapPositionCallback;
+    std::function<void()> m_zoomToSelectionCallback;
 
     // 共享导航控制器：手势→相机的单一实现（本路由与独立预览窗口共用）
     ViewportNavigation2D m_navigation;

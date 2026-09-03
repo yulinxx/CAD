@@ -18,7 +18,7 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEn
     bool is3D = (fi.suffix().toLower() == QStringLiteral("syx"));
     Fio::FileFormat format = is3D ? Fio::FileFormat::Native3D : Fio::FileFormat::Native;
 
-    SY_INFOF("[NativeImportReader] Importing native format: %s (format=%d)",
+    SY_DEBUGF("[NativeImportReader] Importing native format: %s (format=%d)",
         is3D ? "3D (.syx)" : "2D (.sy)",
         static_cast<int>(format));
 

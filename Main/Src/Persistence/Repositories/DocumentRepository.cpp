@@ -123,14 +123,13 @@ bool DocumentRepository::save(const DocumentRecord& record)
         return true;
     }
 
-    // 新记录：插入
+    // New record: insert
     auto values = recordToRow(record);
     if (!m_database.insertOrReplace("documents", values))
     {
         return fail("DocumentRepository", "Failed to save document metadata");
     }
 
-    SY_DEBUGF("[DocumentRepository] Inserted document: %s", record.filePath.c_str());
     return true;
 }
 

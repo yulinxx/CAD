@@ -31,6 +31,7 @@
 #include <QVariant>
 #include <QRectF>
 #include <QApplication>
+#include <QElapsedTimer>
 #include <cmath>
 #include "Log/SyLogger.h"
 
@@ -159,6 +160,11 @@ void ViewportInputRouter::setStatusCallback(std::function<void(const QString&)> 
 void ViewportInputRouter::setSnapPositionCallback(std::function<QPointF(const QPointF&)> callback)
 {
     m_snapPositionCallback = std::move(callback);
+}
+
+void ViewportInputRouter::setZoomToSelectionCallback(std::function<void()> callback)
+{
+    m_zoomToSelectionCallback = std::move(callback);
 }
 
 void ViewportInputRouter::setCameraChangedCallback(std::function<void()> callback)
@@ -437,7 +443,7 @@ void ViewportInputRouter::handleKeyPress(QKeyEvent* event)
     }
 
     // 空格：绘图态 / 文字编辑态 = 交给工具，空闲态 = 导航（按住拖动临时平移 /
-    // 单独按释放重置视图）。
+    // 单独按释放 = 单击重置视图，双击500ms内缩放到选中图元）。
     //
     // 绘制中必须立即派发给工具，不能进「临时平移」态：mouseMove 里
     //「空格按住 + 任意移动」就会置 m_spacePanned=true（触控板单指移动也算），
@@ -482,30 +488,56 @@ void ViewportInputRouter::handleKeyPress(QKeyEvent* event)
 
 void ViewportInputRouter::handleKeyRelease(QKeyEvent* event)
 {
-    if (!event || event->key() != Qt::Key_Space)
+    if (!event)
     {
         return;
     }
 
-    const bool wasHeld = m_spaceHeld;
-    m_spaceHeld = false;
-
-    // 空格单独按下并释放（未用于平移）→ 触发原有确认/重置语义；
-    // 用一次合成的空格按下事件走既有分发管线。
-    //
-    // wasHeld 是必要条件：绘图态的空格已在 keyPress 里直接派发给工具了
-    //（那条路不置 m_spaceHeld），这里若再合成一次就是**确认两次**。
-    if (wasHeld && !m_spacePanned)
+    // 处理空格键
+    if (event->key() == Qt::Key_Space)
     {
-        QKeyEvent spacePress(QEvent::KeyPress, Qt::Key_Space, event->modifiers());
-        if (handleKeyPressDispatch(&spacePress))
-        {
-            event->accept();
-            return;
-        }
-    }
+        const bool wasHeld = m_spaceHeld;
+        const bool wasSpacePanned = m_spacePanned;  // 记住移动状态
+        m_spaceHeld = false;
 
-    event->accept();
+        // 空格键释放时，强制结束临时平移状态
+        if (m_panning)
+        {
+            m_panning = false;
+            m_spacePanned = false;
+            m_navigation.endPan();
+        }
+
+        // 检查是否是双击空格（500ms内）缩放到选中图元
+        if (wasHeld && !wasSpacePanned)
+        {
+            // 双击空格检测
+            if (m_spaceTapTimer.isValid() && m_spaceTapTimer.elapsed() < kDoubleSpaceInterval)
+            {
+                // 双击空格 → 缩放到选中图元
+                if (m_zoomToSelectionCallback)
+                {
+                    m_zoomToSelectionCallback();
+                }
+                m_spaceTapTimer.invalidate();
+                event->accept();
+                return;
+            }
+            // 第一次单击空格 → 记录时间并触发重置视图
+            m_spaceTapTimer.start();
+
+            // 触发原有确认/重置语义
+            QKeyEvent spacePress(QEvent::KeyPress, Qt::Key_Space, event->modifiers());
+            if (handleKeyPressDispatch(&spacePress))
+            {
+                event->accept();
+                return;
+            }
+        }
+
+        event->accept();
+        return;
+    }
 }
 
 // ==================== 输入法（IME） ====================
@@ -772,7 +804,7 @@ bool ViewportInputRouter::handlePanMousePress(const QPoint& physWidgetPos, QMous
 {
     const bool middle = event->button() == Qt::MiddleButton;
     const bool panMode = event->button() == Qt::LeftButton && m_panModeEnabled;
-    // 按住空格 + 左键/单指拖动 = 临时平移（保持"空格=确认"在单独释放时语义不变）
+    // 按住空格 + 左键/单指拖动 = 临时平移
     const bool spacePan = event->button() == Qt::LeftButton && m_spaceHeld;
     if (middle || panMode || spacePan)
     {

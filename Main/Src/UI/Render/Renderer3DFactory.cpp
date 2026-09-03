@@ -8,19 +8,19 @@ std::unique_ptr<IRenderer3D> Renderer3DFactory::create(RendererType type)
     switch (type)
     {
     case RendererType::Compatible:
-        SY_INFO("[Renderer3DFactory] Creating RenderWidget3DAdapter (compatible chain)");
+        SY_DEBUG("[Renderer3DFactory] Creating RenderWidget3DAdapter (compatible chain)");
         return std::make_unique<RenderWidget3DAdapter>();
 
     case RendererType::None:
     default:
-        SY_INFO("[Renderer3DFactory] Creating null renderer");
+        SY_DEBUG("[Renderer3DFactory] Creating null renderer");
         return nullptr;
     }
 }
 
 std::unique_ptr<IRenderer3D> Renderer3DFactory::createDefault()
 {
-    SY_INFO("[Renderer3DFactory] Creating default renderer: Compatible chain");
+    SY_DEBUG("[Renderer3DFactory] Creating default renderer: Compatible chain");
     return create(RendererType::Compatible);
 }
 

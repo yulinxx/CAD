@@ -10,7 +10,7 @@
 SelectionService::SelectionService(Eg::SceneManager* sceneManager)
     : m_sceneManager(sceneManager)
 {
-    SY_INFO("[SelectionService] initialized");
+    SY_DEBUG("[SelectionService] initialized");
 }
 
 // ==================== POD 安全接口实现 ====================

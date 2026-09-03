@@ -54,7 +54,9 @@ void AppInitializer::initialize()
 
     SyLogger::GetInstance().Initialize(MainApp::appName().c_str(), SyLogLevel::Debug, true, true);
 
+    SY_INFO("==============================================================");
     SY_INFOF("Starting %s v%s", MainApp::appName().c_str(), MainApp::appVersion().c_str());
+    SY_INFO("==============================================================");
     SY_INFOF("[Render] Active render backend: %s",
              Render::RT::rxBackendName(Render::RT::Backend::OpenGL));
 

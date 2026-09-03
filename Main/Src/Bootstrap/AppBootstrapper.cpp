@@ -75,7 +75,7 @@ AppBootstrapper::~AppBootstrapper()
 // 初始化应用组合根组件，创建并验证所有必需的服务
 bool AppBootstrapper::initialize()
 {
-    SY_INFO("[AppBootstrapper] Initializing composition root");
+    SY_DEBUG("[AppBootstrapper] Initializing composition root");
 
     m_compositionRoot = std::make_unique<ApplicationCompositionRoot>();
 
@@ -105,7 +105,7 @@ bool AppBootstrapper::initialize()
         return false;
     }
 
-    SY_INFO("[AppBootstrapper] ApplicationCompositionRoot initialized successfully");
+    SY_DEBUG("[AppBootstrapper] ApplicationCompositionRoot initialized successfully");
 
     // 硬件装配：读机器档案 → 创建设备 → open → 挂 IO 点位与安全条件 → 启动 tick。
     // 刻意放在 UI 起来之前：安全联锁必须在用户能点「开始加工」之前就已经在评估，
@@ -139,7 +139,7 @@ bool AppBootstrapper::initialize()
 // 执行应用引导序列，组装UI服务并启动工作台
 void AppBootstrapper::bootstrap()
 {
-    SY_INFO("[AppBootstrapper] Starting bootstrap sequence");
+    SY_DEBUG("[AppBootstrapper] Starting bootstrap sequence");
 
     if (!m_compositionRoot)
     {
@@ -175,7 +175,7 @@ void AppBootstrapper::bootstrap()
 
         return;
     }
-    SY_INFOF("[AppBootstrapper] Workbench '%s' initialized successfully", startWorkbenchId.toUtf8().constData());
+    SY_DEBUGF("[AppBootstrapper] Workbench '%s' initialized successfully", startWorkbenchId.toUtf8().constData());
 
     auto* shell = m_compositionRoot->shellHost();
     shell->setFrameworkServices(buildFrameworkServices(m_compositionRoot.get()));
@@ -183,7 +183,7 @@ void AppBootstrapper::bootstrap()
     shell->setWorkbench(m_workbench.get());
     shell->initializeAndShow();
 
-    SY_INFO("[AppBootstrapper] UI shell initialized and shown");
+    SY_DEBUG("[AppBootstrapper] UI shell initialized and shown");
 }
 
 // 关闭应用，按顺序清理UI壳和工作台资源。幂等。
@@ -195,7 +195,7 @@ void AppBootstrapper::shutdown()
     }
     m_shutdownDone = true;
 
-    SY_INFO("[AppBootstrapper] Starting shutdown");
+    SY_DEBUG("[AppBootstrapper] Starting shutdown");
 
     if (m_compositionRoot)
     {
@@ -214,7 +214,7 @@ void AppBootstrapper::shutdown()
 
     m_workbench.reset();
 
-    SY_INFO("[AppBootstrapper] Shutdown complete");
+    SY_DEBUG("[AppBootstrapper] Shutdown complete");
 }
 
 // 获取启动工作台ID

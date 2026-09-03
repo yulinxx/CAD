@@ -33,11 +33,11 @@ bool UiConfigurationManager::applyConfiguration(const QString& resourcePath, Con
     if (config)
     {
         m_configData = std::make_unique<UiConfigData>(std::move(*config));
-        SY_INFOF("[UiConfigurationManager] Config loaded: %s (menus=%zu, toolbars=%zu, docks=%zu)",
+        SY_DEBUGF("[UiConfigurationManager] Config loaded: %s (menus=%lld, toolbars=%lld, docks=%lld)",
             qPrintable(resourcePath),
-            m_configData->menus.size(),
-            m_configData->toolBars.size(),
-            m_configData->docks.size());
+            static_cast<long long>(m_configData->menus.size()),
+            static_cast<long long>(m_configData->toolBars.size()),
+            static_cast<long long>(m_configData->docks.size()));
         return true;
     }
 

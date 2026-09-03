@@ -21,8 +21,7 @@ class RenderViewport2D;
 class StatusBar;
 class SettingsService;
 class SettingsUiCoordinator2D;
-class SceneTreePanel2D;
-class SceneTreePanel3D;
+class SceneTreePanel;
 class SceneTreeSceneObserver2D;
 class SceneMonitor;
 struct UiStateSnapshot;
@@ -317,8 +316,8 @@ private:
     PanelHostStyle m_panelHostStyle{ PanelHostStyle::Toolbar };
     /// 2D 渲染视口 — Qt 父对象管理生命周期（工作台切换时用于恢复工具状态）
     class RenderViewport2D* m_viewport{ nullptr };
-    /// 2D 场景树面板（可选 UI，配置驱动时可能不存在）
-    class SceneTreePanel2D* m_scenePanel2D{ nullptr };
+    /// 2D 场景树面板（统一面板，支持 2D 和 3D）
+    class SceneTreePanel* m_scenePanel2D{ nullptr };
     /// 场景变更观察者（捕获绕过操作总线的直接编辑，如视口 Delete 键）
     std::unique_ptr<SceneTreeSceneObserver2D> m_sceneTreeObserver;
     /// 场景变更监控（IObserver → Qt 信号桥接：捕获拖拽/交互式修改等非操作总线路径的场景变更）
@@ -437,6 +436,12 @@ private:
     void toggleEntityVisibility3D(const QString& id, bool visible);
     /// 重命名图元（直接写引擎并刷新）
     void renameEntity3D(const QString& id, const QString& newName);
+    /// 批量设置图元可见性
+    void setSceneTreeVisibility3D(const QStringList& ids, bool visible);
+    /// 批量设置图元锁定状态
+    void setSceneTreeLock3D(const QStringList& ids, bool locked);
+    /// 删除选中的图元
+    void deleteSceneTreeSelection3D(const QStringList& ids);
 
 private:
     // PIMPL + 自定义删除器：避免 MOC 编译时需要 ServiceOwner 完整定义
@@ -451,8 +456,8 @@ private:
     /// 而旧的仍挂在 QStatusBar 上没人删。
     QPointer<StatusBar3D> m_statusBar3D;
 
-    /// 3D 场景树面板（可选 UI，配置驱动时可能不存在）
-    class SceneTreePanel3D* m_scenePanel3D{ nullptr };
+    /// 3D 场景树面板（与 2D 共享统一面板）
+    class SceneTreePanel* m_scenePanel3D{ nullptr };
 
     Eg::SceneManager3D* m_sceneManager3D{ nullptr };
 

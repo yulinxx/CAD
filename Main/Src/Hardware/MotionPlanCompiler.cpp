@@ -397,10 +397,10 @@ namespace MotionPlanCompiler
         result.boundsMaxX = finalHeader.boundsMaxX;
         result.boundsMaxY = finalHeader.boundsMaxY;
 
-        SY_INFOF("[MotionPlanCompiler] '%s': %d layer(s), %d entity(ies), %zu command(s), "
+        SY_DEBUGF("[MotionPlanCompiler] '%s': %d layer(s), %d entity(ies), %lld command(s), "
                  "bounds [%.3f,%.3f]-[%.3f,%.3f], skipped=%d degraded=%d",
             spec.jobId.toUtf8().constData(), result.layerCount, result.entityCount,
-            result.commandCount, result.boundsMinX, result.boundsMinY,
+            static_cast<long long>(result.commandCount), result.boundsMinX, result.boundsMinY,
             result.boundsMaxX, result.boundsMaxY,
             result.skippedEntityCount, result.degradedEntityCount);
         return result;

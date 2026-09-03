@@ -1,6 +1,6 @@
 #include "WorkbenchLayoutManager.h"
 #include "WorkbenchMenuManager.h"
-#include "UiSceneTreePanel2D.h"
+#include "UiSceneTreePanel.h"
 #include "UiPropertiesPanel.h"
 #include "Persistence/PersistenceService.h"
 #include "Persistence/Repositories/WorkspaceSnapshotRepository.h"
@@ -118,7 +118,7 @@ void WorkbenchLayoutManager::buildToolBars()
         }
     }
     m_configDrivenLayoutBuilt = true;
-    SY_INFOF("[WorkbenchLayoutManager] Tool bars built from client config: count=%zu", m_registeredToolBars.size());
+    SY_DEBUGF("[WorkbenchLayoutManager] Tool bars built from client config: count=%lld", static_cast<long long>(m_registeredToolBars.size()));
 }
 
 void WorkbenchLayoutManager::initializeDockAreaSkeleton()
@@ -134,7 +134,7 @@ void WorkbenchLayoutManager::buildDockAreas()
     // 属于打包缺失级别的问题，必须以 ERROR 暴露而不是静默降级。
     if (buildDockAreasFromConfig())
     {
-        SY_INFOF("[WorkbenchLayoutManager] Dock areas built from client config: count=%zu", m_registeredDocks.size());
+        SY_DEBUGF("[WorkbenchLayoutManager] Dock areas built from client config: count=%lld", static_cast<long long>(m_registeredDocks.size()));
         return;
     }
 
@@ -165,7 +165,7 @@ bool WorkbenchLayoutManager::ensureConfigLoaded()
         return false;
     }
 
-    SY_INFOF("[WorkbenchLayoutManager] Client config ready: client='%s'",
+    SY_DEBUGF("[WorkbenchLayoutManager] Client config ready: client='%s'",
         qPrintable(UiClientContext::instance().clientId()));
     return true;
 }
@@ -208,7 +208,7 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
                 m_panelState.rightDock = dock;
             }
 
-            if (auto* tree = qobject_cast<SceneTreePanel2D*>(dock->widget()))
+            if (auto* tree = qobject_cast<SceneTreePanel*>(dock->widget()))
             {
                 m_panelState.sceneTreeDock = tree;
             }
@@ -304,7 +304,24 @@ QDockWidget* WorkbenchLayoutManager::registerDockWidget(const QString& title, QW
 {
     // 注册停靠面板只负责把面板挂到指定区域，不在这里注入业务行为
     auto* dock = new QDockWidget(title, m_parent);
-    dock->setObjectName(title);
+
+    // 设置 objectName 以便后续 setSkeletonDocksVisible / setSceneDockVisible 等方法能正确识别
+    // 根据 widget 类型推断 dock id
+    QString dockId;
+    if (qobject_cast<SceneTreePanel*>(widget))
+    {
+        dockId = QStringLiteral("SceneDock");
+    }
+    else if (qobject_cast<PropertiesPanelWidget*>(widget))
+    {
+        dockId = QStringLiteral("PropertiesDock");
+    }
+    else
+    {
+        dockId = title;
+    }
+    dock->setObjectName(dockId);
+
     dock->setWidget(widget);
     m_parent->addDockWidget(area, dock);
     m_registeredDocks.push_back(dock);
@@ -313,8 +330,18 @@ QDockWidget* WorkbenchLayoutManager::registerDockWidget(const QString& title, QW
     // restoreState() 会覆盖 dock 标题，需要在恢复后重新设置
     dock->setProperty("_workbench_dock_title", title);
 
+    // 同步面板状态引用，保持对外接口稳定（setSkeletonDocksVisible 等依赖它）
+    if (dockId == QStringLiteral("SceneDock"))
+    {
+        m_panelState.leftDock = dock;
+    }
+    else if (dockId == QStringLiteral("PropertiesDock"))
+    {
+        m_panelState.rightDock = dock;
+    }
+
     // 仅更新面板状态引用，方便后续统一刷新与清理
-    if (auto* tree = qobject_cast<SceneTreePanel2D*>(widget))
+    if (auto* tree = qobject_cast<SceneTreePanel*>(widget))
     {
         m_panelState.sceneTreeDock = tree;
     }
@@ -417,7 +444,7 @@ void WorkbenchLayoutManager::clearLayoutContent(const UiWorkbench* oldWorkbench)
     auto* oldCentral = m_parent->centralWidget();
     if (oldCentral)
     {
-        SY_INFO("[clearLayoutContent] Step A: releasing GL resources");
+        SY_DEBUG("[clearLayoutContent] Step A: releasing GL resources");
         if (oldWorkbench)
         {
             oldWorkbench->releaseCentralWidgetGLResources(oldCentral);
@@ -427,16 +454,16 @@ void WorkbenchLayoutManager::clearLayoutContent(const UiWorkbench* oldWorkbench)
             SY_WARN("[clearLayoutContent] 旧工作台为空，跳过中央视口 GL 释放");
         }
 
-        SY_INFO("[clearLayoutContent] Step B: setCentralWidget(nullptr)");
+        SY_DEBUG("[clearLayoutContent] Step B: setCentralWidget(nullptr)");
         m_parent->setCentralWidget(nullptr);
 
-        SY_INFO("[clearLayoutContent] Step C: hide + deleteLater");
+        SY_DEBUG("[clearLayoutContent] Step C: hide + deleteLater");
         oldCentral->hide();
         oldCentral->deleteLater();
     }
-    SY_INFO("[clearLayoutContent] Step D: creating placeholder");
+    SY_DEBUG("[clearLayoutContent] Step D: creating placeholder");
     m_parent->setCentralWidget(createInitialCentralWidget());
-    SY_INFO("[clearLayoutContent] Step E: done");
+    SY_DEBUG("[clearLayoutContent] Step E: done");
 }
 
 // ==================== 布局快照 ====================
@@ -463,7 +490,7 @@ void WorkbenchLayoutManager::saveLayoutSnapshot(const QString& workbenchId)
         rec.windowState = m_parent->saveState().toBase64().toStdString();
         rec.updatedAt = QDateTime::currentDateTime().toString(Qt::ISODate).toStdString();
         m_persistenceService->workspaceSnapshots()->save(rec);
-        SY_INFOF("[WorkbenchLayoutManager] Saved layout snapshot to database: %s", rec.workbenchId.c_str());
+        SY_DEBUGF("[WorkbenchLayoutManager] Saved layout snapshot to database: %s", rec.workbenchId.c_str());
     }
 
     // QSettings 兜底
@@ -491,7 +518,7 @@ void WorkbenchLayoutManager::restoreLayoutSnapshot(const QString& workbenchId)
         if (!rec.windowState.empty())
         {
             state = QByteArray::fromBase64(QByteArray::fromStdString(rec.windowState));
-            SY_INFOF("[WorkbenchLayoutManager] Loaded layout snapshot from database: %s", rec.workbenchId.c_str());
+            SY_DEBUGF("[WorkbenchLayoutManager] Loaded layout snapshot from database: %s", rec.workbenchId.c_str());
         }
     }
 
@@ -538,6 +565,32 @@ void WorkbenchLayoutManager::setSkeletonDocksVisible(bool visible)
 
     // 注意：posLabel/selLabel/msgLabel 已移除 —— 这些由 StatusBarBase 子类管理
     // 工作台状态栏 widget 的显示/隐藏由 WorkbenchWindow::setSkeletonDocksVisible 控制
+}
+
+void WorkbenchLayoutManager::setSceneDockVisible(bool visible)
+{
+    // 查找 SceneDock
+    QDockWidget* sceneDock = m_panelState.leftDock.data();
+    if (!sceneDock)
+    {
+        for (auto* dock : m_registeredDocks)
+        {
+            if (dock && dock->objectName() == QStringLiteral("SceneDock"))
+            {
+                sceneDock = dock;
+                m_panelState.leftDock = dock;
+                break;
+            }
+        }
+    }
+
+    if (sceneDock)
+    {
+        // 设置宽度限制（与 2D 模式一致）
+        sceneDock->setMinimumWidth(180);
+        sceneDock->setMaximumWidth(300);
+        sceneDock->setVisible(visible);
+    }
 }
 
 // ==================== 繁忙指示器 ====================

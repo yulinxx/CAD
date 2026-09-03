@@ -52,7 +52,7 @@ bool RenderWidget3DAdapter::ensureWidgetCreated()
     layout->setContentsMargins(0, 0, 0, 0);
     layout->addWidget(m_renderWidget.get());
     bindWidgetSignals();
-    SY_INFO("[RenderWidget3DAdapter] RenderWidget3D created as child widget");
+    SY_DEBUG("[RenderWidget3DAdapter] RenderWidget3D created as child widget");
     return true;
 }
 
@@ -195,7 +195,7 @@ void RenderWidget3DAdapter::setScene(SceneDocument3DAdapter* document)
     {
         m_sceneManager = sceneManager;
         m_renderWidget->setSceneManager(sceneManager);
-        SY_INFOF("[RenderWidget3DAdapter] SceneManager3D set: %p", sceneManager);
+        SY_DEBUGF("[RenderWidget3DAdapter] SceneManager3D set: %p", sceneManager);
         emitStatus(QObject::tr("Scene loaded"));
     }
 }
@@ -210,7 +210,7 @@ void RenderWidget3DAdapter::setCamera(CameraController3D* controller)
     // 将 CameraController3D 连接到 RenderWidget3D 的 Camera3D
     // 这样控制器就能真正操作相机，实现视图控制
     controller->setCamera(&m_renderWidget->camera());
-    SY_INFOF("[RenderWidget3DAdapter] CameraController3D connected to Camera3D at %p", &m_renderWidget->camera());
+    SY_DEBUGF("[RenderWidget3DAdapter] CameraController3D connected to Camera3D at %p", &m_renderWidget->camera());
 
     // 同步轨道模式
     setOrbitMode(controller->isOrbitMode());

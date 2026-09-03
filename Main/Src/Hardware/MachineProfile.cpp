@@ -203,7 +203,7 @@ namespace MachineProfileLoader
         // 否则上层的联锁逻辑到了真机才第一次被执行
         MachineIoPointConfig estop;
         estop.name = QStringLiteral("safety.estop");
-        estop.label = QStringLiteral("急停");
+        estop.label = QStringLiteral("Emergency Stop");  // 急停
         estop.channel = 0;
 
         // 急停按常闭接法：**高电平 = 正常，低电平 = 被按下**，
@@ -217,7 +217,7 @@ namespace MachineProfileLoader
 
         MachineIoPointConfig door;
         door.name = QStringLiteral("safety.door_closed");
-        door.label = QStringLiteral("安全门");
+        door.label = QStringLiteral("Safety Door");  // 安全门
         door.channel = 1;
 
         // 门磁同样常闭（高=门已关），但这里点位的语义就是「active = 门已关」，
@@ -229,7 +229,7 @@ namespace MachineProfileLoader
 
         MachineSafetyConditionConfig estopCond;
         estopCond.pointName = estop.name;
-        estopCond.description = QStringLiteral("急停被按下");
+        estopCond.description = QStringLiteral("Emergency stop pressed");  // 急停被按下
         estopCond.triggerOnActive = true;
         estopCond.severity = QStringLiteral("emergency");
         estopCond.actions << QStringLiteral("emergency");
@@ -237,7 +237,7 @@ namespace MachineProfileLoader
 
         MachineSafetyConditionConfig doorCond;
         doorCond.pointName = door.name;
-        doorCond.description = QStringLiteral("安全门未关闭");
+        doorCond.description = QStringLiteral("Safety door not closed");  // 安全门未关闭
         doorCond.triggerOnActive = false;  // active 表示「门已关」，未 active 才是违规
         doorCond.severity = QStringLiteral("blocked");
         doorCond.actions << QStringLiteral("block_start") << QStringLiteral("laser_off");

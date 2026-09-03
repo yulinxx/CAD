@@ -120,7 +120,7 @@
 #include "UiStateCenter.h"
 #include "UI/ThemeManager.h"
 #include "UiWorkbench.h"
-#include "UiSceneTreePanel2D.h"
+#include "UiSceneTreePanel.h"
 #include "UiPropertiesPanel.h"
 #include "Engine2D/Edit/LayerEditService.h"
 #include "Engine2D/Edit/SceneEditService.h"
@@ -396,7 +396,7 @@ QWidget* WorkbenchWindow::createInitialCentralWidget()
     return m_layoutManager->createInitialCentralWidget();
 }
 
-SceneTreePanel2D* WorkbenchWindow::sceneTreeDock() const
+SceneTreePanel* WorkbenchWindow::sceneTreeDock() const
 {
     return m_layoutManager->panelState().sceneTreeDock;
 }
@@ -1120,6 +1120,17 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     // 创建并通过 mountStatusBar 挂载；配置驱动的框架级槽位已在第 6d 步重建。
     // 新工作台自行决定是否需要骨架停靠面板
     setSkeletonDocksVisible(m_workbench->requiresSkeletonDocks());
+
+    // 3D 模式下 Scene 面板需要始终显示（即使 requiresSkeletonDocks() 为 false）
+    // 因为 SceneTreePanel 是工作台自己的面板，不是 skeleton 的面板
+    if (!m_workbench->requiresSkeletonDocks())
+    {
+        if (auto* layoutMgr = m_layoutManager.get())
+        {
+            layoutMgr->setSceneDockVisible(true);
+        }
+    }
+
     refreshFromState();
     refreshStatusText();
     updateWindowTitle();

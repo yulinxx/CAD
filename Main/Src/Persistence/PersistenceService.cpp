@@ -22,7 +22,7 @@ PersistenceService::~PersistenceService()
 
 bool PersistenceService::initialize(const std::string& dbPath)
 {
-    SY_INFOF("[PersistenceService] Initializing database at: %s", dbPath.c_str());
+    SY_DEBUGF("[PersistenceService] Initializing database at: %s", dbPath.c_str());
 
     if (!m_database->open(dbPath))
     {
@@ -47,7 +47,7 @@ bool PersistenceService::initialize(const std::string& dbPath)
     m_settings = std::make_unique<SettingsRepository>(*m_database);
     m_documents = std::make_unique<DocumentRepository>(*m_database);
 
-    SY_INFO("[PersistenceService] Initialized successfully");
+    SY_DEBUG("[PersistenceService] Initialized successfully");
     return true;
 }
 
@@ -55,7 +55,7 @@ void PersistenceService::shutdown()
 {
     if (m_database && m_database->isOpen())
     {
-        SY_INFO("[PersistenceService] Shutting down");
+        SY_DEBUG("[PersistenceService] Shutting down");
         m_recentFiles.reset();
         m_workspaceSnapshots.reset();
         m_layers.reset();

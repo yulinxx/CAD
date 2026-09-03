@@ -430,7 +430,27 @@ void CoreOperationRegistry::registerAll()
     reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_SelectAll, [editService] {
         if (editService && editService->sceneManager())
         {
-            editService->sceneManager()->selectAll();
+            auto* scene = editService->sceneManager();
+            // 收集所有可见实体（过滤隐藏的实体和隐藏图层的实体）
+            Eg::VecSyEntityPtr visibleEntities;
+            const auto allEntities = scene->getAllEntities();
+            for (auto* entity : allEntities)
+            {
+                if (entity && entity->visible())
+                {
+                    // 检查图层可见性
+                    if (auto* layer = entity->layer())
+                    {
+                        if (!layer->isVisible())
+                        {
+                            continue;
+                        }
+                    }
+                    visibleEntities.push_back(entity);
+                }
+            }
+            // 一次性选中所有可见实体（避免逐个调用 selectEntity 导致选择集被覆盖）
+            scene->selectEntities(visibleEntities);
         }
     }));
 
@@ -676,7 +696,7 @@ void CoreOperationRegistry::registerEditOperations()
             }
             return;
         }
-        SY_INFO("[PasteImage] Clipboard image pasted");
+        SY_DEBUG("[PasteImage] Clipboard image pasted");
         if (selectResult)
         {
             scene->clearSelection();
@@ -1278,7 +1298,7 @@ void CoreOperationRegistry::registerEditOperations()
             return;
         }
         const Ut::BBox2d bbox = entity->getBbox();
-        SY_INFOF("[GetBbox] entity=%llu bbox=(%.3f, %.3f)-(%.3f, %.3f)",
+        SY_DEBUGF("[GetBbox] entity=%llu bbox=(%.3f, %.3f)-(%.3f, %.3f)",
             static_cast<unsigned long long>(entity->id),
             bbox.minPt.x(),
             bbox.minPt.y(),
@@ -1589,7 +1609,7 @@ void CoreOperationRegistry::registerViewOperations()
                         QString path = captureService->saveImage(img, req, false);
                         if (!path.isEmpty())
                         {
-                            SY_INFOF("[View_Capture] Saved to %s", path.toStdString().c_str());
+                            SY_DEBUGF("[View_Capture] Saved to %s", path.toStdString().c_str());
                         }
                     }
                 }

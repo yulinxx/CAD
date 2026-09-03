@@ -481,7 +481,7 @@ bool SceneDocument2D::tryRemoveEntity(const QString& id)
         m_scene->deleteEntity(m_scene->findSyEntityById(eid));
     }
 
-    SY_INFOF("[SceneDocument2D] entity removed: id=%s via=%s",
+    SY_DEBUGF("[SceneDocument2D] entity removed: id=%s via=%s",
         qPrintable(id),
         m_editService ? "SceneEditService" : "SceneManager");
     m_isModified = true;
@@ -524,5 +524,5 @@ void SceneDocument2D::clear()
     const auto count = m_scene->getAllEntities().size();
     m_scene->clearScene();
     m_isModified = true;
-    SY_INFOF("[SceneDocument2D] document cleared: entities=%zu", count);
+    SY_DEBUGF("[SceneDocument2D] document cleared: entities=%lld", static_cast<long long>(count));
 }

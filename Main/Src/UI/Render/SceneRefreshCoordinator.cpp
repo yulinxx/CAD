@@ -149,7 +149,7 @@ void SceneRefreshCoordinator::setPerfMonitorEnabled(bool enabled)
     if (enabled && !m_frameTimer)
     {
         m_frameTimer = std::make_unique<FrameTimer>();
-        SY_INFO("[SceneRefreshCoordinator] Frame performance monitoring enabled");
+        SY_DEBUG("[SceneRefreshCoordinator] Frame performance monitoring enabled");
     }
     else if (!enabled && m_frameTimer)
     {
@@ -158,7 +158,7 @@ void SceneRefreshCoordinator::setPerfMonitorEnabled(bool enabled)
             m_frameTimer->report();
         }
         m_frameTimer.reset();
-        SY_INFO("[SceneRefreshCoordinator] Frame performance monitoring disabled");
+        SY_DEBUG("[SceneRefreshCoordinator] Frame performance monitoring disabled");
     }
 }
 
@@ -344,6 +344,22 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             continue;
         }
 
+        // 检查实体可见性：隐藏的实体应从渲染中移除，而不是更新几何
+        const bool entityVisible = entity->visible() && (!entity->layer() || entity->layer()->isVisible());
+        auto uid = static_cast<uint64_t>(id);
+
+        if (!entityVisible)
+        {
+            // 实体不可见：从渲染中移除（如果之前有渲染的话）
+            if (m_renderedEntityIds.count(uid))
+            {
+                m_renderWidget->removeRenderEntity(uid);
+                m_renderedEntityIds.erase(uid);
+                eraseEntityVertexCache(uid);
+            }
+            continue;
+        }
+
         // 位图（SyImage）不走折线/线框顶点路径，统一由 reconcileBitmaps 处理
         if (entity->eType == Eg::EType::IMAGE)
         {
@@ -359,8 +375,6 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             touchedText = true;
             continue;
         }
-
-        auto uid = static_cast<uint64_t>(id);
 
         // 选中图元照常提交原始实体几何：选中反馈只由虚线轮廓覆盖层叠加表达，
         // 图元本身保持原色实线不变。历史实现在这里把选中图元从 GPU 上移除，

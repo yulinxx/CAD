@@ -11,13 +11,13 @@
 
 QString FileDialogService::getOpenFileName(QWidget* parent, const QString& title, const QString& filter)
 {
-    SY_INFOF("[FileDialogService] getOpenFileName: title=%s, filter=%s",
+    SY_DEBUGF("[FileDialogService] getOpenFileName: title=%s, filter=%s",
         title.toUtf8().constData(),
         filter.toUtf8().constData());
 
     QString result = QFileDialog::getOpenFileName(parent, title, QString(), filter);
 
-    SY_INFOF("[FileDialogService] getOpenFileName returned: %s", result.toUtf8().constData());
+    SY_DEBUGF("[FileDialogService] getOpenFileName returned: %s", result.toUtf8().constData());
 
     return result;
 }

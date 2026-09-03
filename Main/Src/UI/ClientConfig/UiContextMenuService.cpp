@@ -61,7 +61,7 @@ void UiContextMenuService::registerDynamicSection(const QString& sectionId, UiMe
     }
     const bool replaced = m_sections.contains(sectionId);
     m_sections.insert(sectionId, std::move(filler));
-    SY_INFOF("[UiContextMenuService] Dynamic section %s: '%s'",
+    SY_DEBUGF("[UiContextMenuService] Dynamic section %s: '%s'",
         replaced ? "replaced" : "registered",
         qPrintable(sectionId));
 }
@@ -70,7 +70,7 @@ void UiContextMenuService::unregisterDynamicSection(const QString& sectionId)
 {
     if (m_sections.remove(sectionId) > 0)
     {
-        SY_INFOF("[UiContextMenuService] Dynamic section unregistered: '%s'", qPrintable(sectionId));
+        SY_DEBUGF("[UiContextMenuService] Dynamic section unregistered: '%s'", qPrintable(sectionId));
     }
 }
 
@@ -148,12 +148,12 @@ QMenu* UiContextMenuService::buildMenu(const UiConfigData* config,
 
     if (!hasRealAction(menu))
     {
-        SY_INFOF("[UiContextMenuService] Context menu id='%s' resolved to empty, not shown", qPrintable(def->id));
+        SY_DEBUGF("[UiContextMenuService] Context menu id='%s' resolved to empty, not shown", qPrintable(def->id));
         menu->deleteLater();
         return nullptr;
     }
 
-    SY_INFOF("[UiContextMenuService] Context menu built from config id='%s' actions=%d dynamicSections=%d",
+    SY_DEBUGF("[UiContextMenuService] Context menu built from config id='%s' actions=%d dynamicSections=%d",
         qPrintable(def->id),
         static_cast<int>(menu->actions().size()),
         static_cast<int>(def->dynamicSections.size()));

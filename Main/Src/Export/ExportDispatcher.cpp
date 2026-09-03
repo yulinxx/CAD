@@ -43,7 +43,7 @@ ExportResult ExportDispatcher::dispatch(const ExportContext& context, const Fio:
     ExportContext fullCtx = context;
     fullCtx.format = fmt;
 
-    SY_INFOF("[ExportDispatcher] Dispatching export: format=%d, path=%s",
+    SY_DEBUGF("[ExportDispatcher] Dispatching export: format=%d, path=%s",
         static_cast<int>(fmt),
         context.targetPath.toUtf8().constData());
 

@@ -339,7 +339,7 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
     m_impl->io = Hw::hwQuery<Hw::IIoModule>(device);
     m_impl->simClock = Hw::hwQuery<Hw::ISimulationClock>(device);
 
-    SY_INFOF("[DeviceHost] Opened '%s' (%s) caps: motion=%d galvo=%d laser=%d io=%d sim=%d",
+    SY_DEBUGF("[DeviceHost] Opened '%s' (%s) caps: motion=%d galvo=%d laser=%d io=%d sim=%d",
         idUtf8.constData(), m_impl->displayName.toUtf8().constData(),
         m_impl->motion ? 1 : 0, m_impl->galvo ? 1 : 0, m_impl->laser ? 1 : 0,
         m_impl->io ? 1 : 0, m_impl->simClock ? 1 : 0);
@@ -414,9 +414,9 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
     m_impl->lastTickMs = 0;
     m_impl->timer.start(profile.tickIntervalMs);
 
-    SY_INFOF("[DeviceHost] Started: tick=%dms, %lld IO point(s), %d safety condition(s)%s",
+    SY_DEBUGF("[DeviceHost] Started: tick=%dms, %lld IO point(s), %d safety condition(s)%s",
         profile.tickIntervalMs,
-        static_cast<long long>(profile.ioPoints.size()),
+        static_cast<long long>(m_impl->pointMap.pointCount()),
         m_impl->monitor.conditionCount(),
         profile.fromFallback ? " [SIMULATED FALLBACK]" : "");
     return true;
@@ -436,7 +436,7 @@ void DeviceHost::stop()
     m_impl->timer.stop();
     if (m_impl->device)
     {
-        SY_INFOF("[DeviceHost] Stopping '%s'", m_impl->profile.deviceId.toUtf8().constData());
+        SY_DEBUGF("[DeviceHost] Stopping '%s'", m_impl->profile.deviceId.toUtf8().constData());
     }
     m_impl->destroyDevice();
     m_impl->monitor.clearConditions();

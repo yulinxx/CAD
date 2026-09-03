@@ -28,7 +28,7 @@ class WorkbenchMenuManager;
 class WorkbenchLayoutManager;
 class WorkbenchActionManager;
 class WorkbenchStateManager;
-class SceneTreePanel2D;
+class SceneTreePanel;
 class PropertiesPanelWidget;
 class FileDropHandler;
 class QDragEnterEvent;
@@ -302,6 +302,12 @@ public:
     }
 
     // 面板访问器（供工作台设置回调使用）
-    SceneTreePanel2D* sceneTreeDock() const;
+    SceneTreePanel* sceneTreeDock() const;
     PropertiesPanelWidget* propertiesDock() const;
+
+    // 布局管理器访问器（供工作台设置场景面板可见性使用）
+    WorkbenchLayoutManager* layoutManager() const
+    {
+        return m_layoutManager.get();
+    }
 };

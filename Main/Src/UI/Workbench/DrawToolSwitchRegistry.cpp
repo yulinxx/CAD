@@ -59,5 +59,5 @@ void DrawToolSwitchRegistry::registerAll()
         ++registered;
     }
 
-    SY_INFOF("[DrawToolSwitchRegistry] registered %d draw tool switch operations", registered);
+    SY_DEBUGF("[DrawToolSwitchRegistry] registered %d draw tool switch operations", registered);
 }

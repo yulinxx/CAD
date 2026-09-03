@@ -33,7 +33,7 @@ bool DatabaseBootstrapper::ensureSchema()
     if (currentVersion == 0)
     {
         // 首次创建：建表
-        SY_INFO("[DatabaseBootstrapper] First run, creating schema v1");
+        SY_DEBUG("[DatabaseBootstrapper] First run, creating schema v1");
         if (!createMetaTable())
         {
             return false;
@@ -46,14 +46,14 @@ bool DatabaseBootstrapper::ensureSchema()
     else if (currentVersion < kSchemaVersion)
     {
         // 需要迁移
-        SY_INFOF("[DatabaseBootstrapper] Migrating schema from v%d to v%d", currentVersion, kSchemaVersion);
+        SY_DEBUGF("[DatabaseBootstrapper] Migrating schema from v%d to v%d", currentVersion, kSchemaVersion);
         if (!runMigrations(currentVersion, kSchemaVersion))
         {
             return false;
         }
     }
 
-    SY_INFOF("[DatabaseBootstrapper] Schema is up to date (v%d)", kSchemaVersion);
+    SY_DEBUGF("[DatabaseBootstrapper] Schema is up to date (v%d)", kSchemaVersion);
     return true;
 }
 
@@ -295,7 +295,7 @@ bool DatabaseBootstrapper::ensureLayerColumn(const std::string& column, const st
         SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
         return false;
     }
-    SY_INFOF("[DatabaseBootstrapper] Added missing layers.%s column", column.c_str());
+    SY_DEBUGF("[DatabaseBootstrapper] Added missing layers.%s column", column.c_str());
     return true;
 }
 
@@ -319,7 +319,7 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
     // 逐版本递增执行迁移，保证幂等性和可追溯性
     for (int v = currentVersion; v < targetVersion; ++v)
     {
-        SY_INFOF("[DatabaseBootstrapper] Running migration v%d -> v%d", v, v + 1);
+        SY_DEBUGF("[DatabaseBootstrapper] Running migration v%d -> v%d", v, v + 1);
 
         if (v == 1)
         {
@@ -330,7 +330,7 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
                 SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
                 return false;
             }
-            SY_INFO("[DatabaseBootstrapper] Migration v1->v2: created documents table");
+            SY_DEBUG("[DatabaseBootstrapper] Migration v1->v2: created documents table");
         }
         else if (v == 2)
         {
@@ -341,7 +341,7 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
                 SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
                 return false;
             }
-            SY_INFO("[DatabaseBootstrapper] Migration v2->v3: added layers.fill column");
+            SY_DEBUG("[DatabaseBootstrapper] Migration v2->v3: added layers.fill column");
         }
         else if (v == 3)
         {
@@ -352,7 +352,7 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
                 SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
                 return false;
             }
-            SY_INFO("[DatabaseBootstrapper] Migration v3->v4: added layers.fill_color column");
+            SY_DEBUG("[DatabaseBootstrapper] Migration v3->v4: added layers.fill_color column");
         }
         // 后续版本迁移在此追加 else if 分支
     }
@@ -370,6 +370,6 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
         return false;
     }
 
-    SY_INFOF("[DatabaseBootstrapper] Schema migrated to v%d", targetVersion);
+    SY_DEBUGF("[DatabaseBootstrapper] Schema migrated to v%d", targetVersion);
     return true;
 }
