@@ -2,6 +2,7 @@
 
 #include "Engine/Persistence/Database.h"
 #include "Log/SyLogger.h"
+#include "VersionInfo.h"
 
 #include <sstream>
 #include <map>
@@ -14,10 +15,7 @@
 // v4: layers 表新增 fill_color 列（填充色，色块填充）
 static constexpr int kSchemaVersion = 4;
 
-// 当前应用版本（用于判断数据库是否与当前版本兼容）
-// 格式: "major.minor.patch" 例如 "1.0.0"
-// 当应用版本变化时，可能需要清除旧数据或执行迁移
-static constexpr const char* kAppVersion = "1.0.0";
+// 应用版本使用 MainApp::appVersion() 全局定义
 
 DatabaseBootstrapper::DatabaseBootstrapper(Eg::Database& database)
     : m_database(database)
@@ -35,10 +33,10 @@ bool DatabaseBootstrapper::ensureSchema()
 
     // 检查应用版本兼容性
     std::string dbAppVersion = databaseAppVersion();
-    if (!dbAppVersion.empty() && dbAppVersion != kAppVersion)
+    if (!dbAppVersion.empty() && dbAppVersion != MainApp::appVersion().c_str())
     {
         SY_WARNF("[DatabaseBootstrapper] App version mismatch: db=%s current=%s - clearing incompatible data",
-            dbAppVersion.c_str(), kAppVersion);
+            dbAppVersion.c_str(), MainApp::appVersion().c_str());
         // 版本不匹配时清除所有业务数据（保留 meta 表）
         m_database.execute("DELETE FROM recent_files");
         m_database.execute("DELETE FROM workspace_snapshots");
@@ -52,7 +50,7 @@ bool DatabaseBootstrapper::ensureSchema()
     {
         std::map<std::string, std::string> values;
         values["key"] = "app_version";
-        values["value"] = kAppVersion;
+        values["value"] = MainApp::appVersion().c_str();
         m_database.insertOrReplace("app_meta", values);
     }
 
