@@ -97,17 +97,11 @@ void AppInitializer::initialize()
         auto* settingsRepo = persistenceService->settings();
         if (settingsRepo)
         {
-            // 读取 log_enabled (默认 true)
-            std::string logEnabledStr = settingsRepo->loadValue("settings", "log_enabled", "true");
-            bool logEnabled = (logEnabledStr == "true" || logEnabledStr == "1");
-            SyLogger::GetInstance().SetEnabled(logEnabled);
-
-            // 读取 log_level - 使用 settings 表，group_name="settings"
-            std::string logLevelStr = settingsRepo->loadValue("settings", "log_level", "1");
-            SY_INFOF("[AppInitializer] Raw log_level from DB: '%s' (table=settings)", logLevelStr.c_str());
-            int logLevelInt = std::stoi(logLevelStr);
-            SY_INFOF("[AppInitializer] Parsed log_level: %d (0=Trace,1=Debug,2=Info,3=Warn)", logLevelInt);
-            SyLogger::GetInstance().SetLevel(static_cast<SyLogLevel>(logLevelInt));
+            // 日志设置由 SettingsService 统一管理（在 UI 模块初始化时应用）
+            // 这里只设置默认值，确保启动时日志可用
+            // 默认使用 Info 级别，让用户能看到关键信息
+            SyLogger::GetInstance().SetLevel(SyLogLevel::Info);
+            SY_INFO("[AppInitializer] Default log level set to Info (will be overridden by SettingsService if available)");
 
             SY_INFOF("[AppInitializer] Log settings applied: enabled=%d, level=%d", logEnabled, logLevelInt);
         }
