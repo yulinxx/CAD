@@ -98,12 +98,12 @@ void AppInitializer::initialize()
         if (settingsRepo)
         {
             // 读取 log_enabled (默认 true)
-            std::string logEnabledStr = settingsRepo->loadValue("common", "log_enabled", "true");
+            std::string logEnabledStr = settingsRepo->loadValue("settings_common", "log_enabled", "true");
             bool logEnabled = (logEnabledStr == "true" || logEnabledStr == "1");
             SyLogger::GetInstance().SetEnabled(logEnabled);
 
             // 读取 log_level (默认 Debug = 1)
-            std::string logLevelStr = settingsRepo->loadValue("common", "log_level", "1");
+            std::string logLevelStr = settingsRepo->loadValue("settings_common", "log_level", "1");
             int logLevelInt = std::stoi(logLevelStr);
             SyLogger::GetInstance().SetLevel(static_cast<SyLogLevel>(logLevelInt));
 
