@@ -61,17 +61,12 @@ void UiContextMenuService::registerDynamicSection(const QString& sectionId, UiMe
     }
     const bool replaced = m_sections.contains(sectionId);
     m_sections.insert(sectionId, std::move(filler));
-    SY_DEBUGF("[UiContextMenuService] Dynamic section %s: '%s'",
-        replaced ? "replaced" : "registered",
-        qPrintable(sectionId));
+}
 }
 
 void UiContextMenuService::unregisterDynamicSection(const QString& sectionId)
 {
-    if (m_sections.remove(sectionId) > 0)
-    {
-        SY_DEBUGF("[UiContextMenuService] Dynamic section unregistered: '%s'", qPrintable(sectionId));
-    }
+    m_sections.remove(sectionId);
 }
 
 int UiContextMenuService::fillDynamicSections(QMenu* menu, const QStringList& sectionIds, const QString& ownerId)
@@ -97,10 +92,6 @@ int UiContextMenuService::fillDynamicSections(QMenu* menu, const QStringList& se
         (*it)(menu);
         const int delta = menu->actions().size() - before;
         added += delta;
-        SY_DEBUGF("[UiContextMenuService] Dynamic section '%s' added %d item(s) to '%s'",
-            qPrintable(sectionId),
-            delta,
-            qPrintable(ownerId));
     }
     return added;
 }

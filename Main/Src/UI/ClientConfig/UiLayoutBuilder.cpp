@@ -277,13 +277,6 @@ void UiLayoutBuilder::buildMenus(const std::vector<MenuDef>& menus)
                 ++enabledCount;
             }
         }
-        SY_DEBUGF("[UiLayoutBuilder] Menu built id='%s' label='%s' workbench='%s' items=%d enabled=%d/%d",
-            qPrintable(menu.id),
-            qPrintable(actionLabel(menu.label, menu.id)),
-            qPrintable(menu.workbenches.join(QStringLiteral(","))),
-            static_cast<int>(menu.items.size()),
-            enabledCount,
-            static_cast<int>(qMenu->actions().size()));
     }
 
     SY_DEBUGF("[UiLayoutBuilder] All menus built: total=%d topLevelMenus=%d",
