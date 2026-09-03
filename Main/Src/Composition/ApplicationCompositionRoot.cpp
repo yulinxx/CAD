@@ -289,7 +289,7 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_importDispatcher->registerReader(std::make_unique<AiImportReader>());
     m_importDispatcher->registerReader(std::make_unique<NativeImportReader>());
     m_importDispatcher->registerReader(std::make_unique<UgImportReader>());
-    SY_INFOF("[ImportDispatcher] Registered %lld reader(s): %s",
+    SY_DEBUGF("[ImportDispatcher] Registered %lld reader(s): %s",
         static_cast<long long>(m_importDispatcher->supportedExtensions().size()),
         m_importDispatcher->supportedExtensions().join(QLatin1String(", ")).toUtf8().constData());
 
@@ -327,7 +327,7 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_exportDispatcher->registerWriter(std::make_unique<ObjExportWriter>());
     m_exportDispatcher->registerWriter(std::make_unique<StepExportWriter>());
     m_exportDispatcher->registerWriter(std::make_unique<NativeExportWriter>());
-    SY_INFOF("[ExportDispatcher] Registered %lld writer(s): %s",
+    SY_DEBUGF("[ExportDispatcher] Registered %lld writer(s): %s",
         static_cast<long long>(m_exportDispatcher->supportedExtensions().size()),
         m_exportDispatcher->supportedExtensions().join(QLatin1String(", ")).toUtf8().constData());
 
@@ -430,7 +430,7 @@ void ApplicationCompositionRoot::registerAllOperations()
     // OperationRouting 注入 OperationBus（替代全局单例）
     OperationRouting::setOperationBus(m_operationBus.get());
 
-    SY_INFO("[ApplicationCompositionRoot] registering module operations on OperationBus");
+    SY_DEBUG("[ApplicationCompositionRoot] registering module operations on OperationBus");
 
     // 核心操作（撤销/重做/删除/圆角/倒角/选择/帮助 + 编辑操作 + 算法操作 + 视图操作）
     CoreOperationRegistry coreOps(m_operationBus.get(),
