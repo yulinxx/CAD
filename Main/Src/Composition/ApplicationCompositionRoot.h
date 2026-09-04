@@ -34,6 +34,7 @@ class FileDialogService;
 class RecentFileService;
 class HelpDialogService;
 class FileOperationRegistry;
+class PersistenceService;
 
 class SelectionService;
 class ISelectionService;

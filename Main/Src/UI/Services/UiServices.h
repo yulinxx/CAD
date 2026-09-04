@@ -13,6 +13,7 @@ class OperationBus;
 class LayerManager;
 class QtLayerManagerBridge;
 class LayerEditService;
+class PersistenceService;
 class ImportService;
 class IRecentFileService;
 class ViewportActionHub;
@@ -73,6 +74,7 @@ struct UiServices : public IUIServices
     LayerEditService* layerEditService{ nullptr };
 
     /// 持久化服务（数据库仓储入口，UI 不直接拼 SQL）
+    PersistenceService* persistenceService{ nullptr };
 
     /// 导入服务（文件导入总入口）
     ImportService* importService{ nullptr };
