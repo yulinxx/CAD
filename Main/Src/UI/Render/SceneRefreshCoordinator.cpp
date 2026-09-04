@@ -269,10 +269,9 @@ void SceneRefreshCoordinator::onSelectionChanged()
     if (m_sceneManager)
     {
         std::unordered_set<uint64_t> currentSelected;
-        for (Eg::SyEntity* e : m_sceneManager->getSelectedEntities())
-        {
+        m_sceneManager->forEachSelected([&currentSelected](Eg::SyEntity* e) {
             currentSelected.insert(static_cast<uint64_t>(e->id));
-        }
+        });
         m_lastSelectedIds = std::move(currentSelected);
     }
 
@@ -329,10 +328,8 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     }
 
     // 本轮脏集合里是否出现过位图 / 文字实体。下面用它决定要不要跑 reconcile*：
-    // 那两个函数各要做一次 sm->getAllEntities() 全场景扫描（返回值还是按值拷贝的
-    // 指针向量）再建一个 N 元素的 unordered_set。增量刷新每 16ms 一次，10 万图元
-    // 的图纸就是每帧两遍 O(N) —— 而绝大多数图纸里位图和文字的数量都是零。
-    // 标志在这个循环里顺手收集，不额外多做一次 findEntityById。
+    // reconcileBitmaps/reconcileTexts 现在使用 getEntitiesByType 按类型索引获取，
+    // 避免全场景扫描。标志在这个循环里顺手收集，不额外多做一次 findEntityById。
     bool touchedImage = false;
     bool touchedText = false;
 
@@ -444,9 +441,7 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
 
     m_renderWidget->submitSceneFromDataSource(sm);
     m_renderedEntityIds.clear();
-    auto allEntities = sm->getAllEntities();
-    for (auto* e : allEntities)
-    {
+    sm->forEachEntity([this](Eg::SyEntity* e) {
         // 账本必须与 gatherGeometry 的提交规则一致：它不按 selected() 跳过，
         // 因此选中图元同样已在 GPU 上，账本里也要记上。否则下一轮增量会把已存在的
         // 图元当作新图元 addRenderEntity，造成重复提交。
@@ -454,7 +449,7 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
         {
             m_renderedEntityIds.insert(static_cast<uint64_t>(e->id));
         }
-    }
+    });
 
     // 位图层全量协调：submitSceneFromDataSource 内部 renderBeginScene 已清空 GPU 位图，
     // 这里以场景为真源整体重建，保证与场景生命周期完全一致
@@ -480,9 +475,11 @@ void SceneRefreshCoordinator::reconcileBitmaps(Eg::SceneManager* sm, bool fullRe
 
     // 期望集合：场景中所有可见 SyImage（可见 = 实体可见 && 图层可见）
     std::unordered_set<uint64_t> desired;
-    for (auto* e : sm->getAllEntities())
+    // 使用类型索引避免全场景扫描
+    auto imageEntities = sm->getEntitiesByType(Eg::EType::IMAGE);
+    for (auto* e : imageEntities)
     {
-        if (!e || e->eType != Eg::EType::IMAGE || !e->visible())
+        if (!e || !e->visible())
         {
             continue;
         }
@@ -554,9 +551,11 @@ void SceneRefreshCoordinator::reconcileTexts(Eg::SceneManager* sm, bool fullReco
 
     // 期望集合：场景中所有可见 SyText（可见 = 实体可见 && 图层可见）
     std::unordered_set<uint64_t> desired;
-    for (auto* e : sm->getAllEntities())
+    // 使用类型索引避免全场景扫描
+    auto textEntities = sm->getEntitiesByType(Eg::EType::TEXT);
+    for (auto* e : textEntities)
     {
-        if (!e || e->eType != Eg::EType::TEXT || !e->visible())
+        if (!e || !e->visible())
         {
             continue;
         }
