@@ -373,8 +373,8 @@ void UiConfigSelfCheck::logReport(const UiConfigSelfCheckReport& report, const Q
     }
     if (!report.gatedOutByBuild.isEmpty())
     {
-        SY_DEBUGF("[ConfigSelfCheck] %d command(s) absent because module not compiled (expected trim)",
-            report.gatedOutByBuild.size());
+        SY_DEBUGF("[ConfigSelfCheck] %lld command(s) absent because module not compiled (expected trim)",
+            static_cast<long long>(report.gatedOutByBuild.size()));
     }
 
     for (const QString& item : report.compiledButNotLicensed)
