@@ -13,7 +13,6 @@ class OperationBus;
 class LayerManager;
 class QtLayerManagerBridge;
 class LayerEditService;
-class PersistenceService;
 class ImportService;
 class IRecentFileService;
 class ViewportActionHub;
@@ -28,7 +27,7 @@ namespace Eg
  * @struct UiServices
  * @brief UI 服务集合（具体类型聚合，实现 IUIServices 接口）
  *
- * 聚合了 UI 层所需的服务。当前暴露 16 个指针，其中 4 个是抽象接口
+ * 聚合了 UI 层所需的服务。当前暴露 15 个指针，其中 4 个是抽象接口
  * （ISelectionService / IUndoRedoManager / IInteractionDispatcher /
  * IRecentFileService），其余为具体类型，违反"UI 只保留入口、交互和状态同步"原则。
  *
@@ -74,7 +73,6 @@ struct UiServices : public IUIServices
     LayerEditService* layerEditService{ nullptr };
 
     /// 持久化服务（数据库仓储入口，UI 不直接拼 SQL）
-    PersistenceService* persistenceService{ nullptr };
 
     /// 导入服务（文件导入总入口）
     ImportService* importService{ nullptr };

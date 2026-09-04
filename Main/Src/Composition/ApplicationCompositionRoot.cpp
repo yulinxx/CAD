@@ -245,7 +245,6 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
     uiServices.layerManager = m_layerManager.get();
     uiServices.layerManagerBridge = m_layerManagerBridge.get();
     uiServices.layerEditService = m_layerEditService.get();
-    uiServices.persistenceService = persistenceService();
     uiServices.recentFileService = m_recentFileService.get();
     uiServices.clipboard = m_clipboard.get();
 
