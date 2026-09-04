@@ -1389,11 +1389,7 @@ void CoreOperationRegistry::registerEditOperations()
                 {
                     continue;
                 }
-                auto* bezier = dynamic_cast<Eg::SyBezier*>(e);
-                if (!bezier)
-                {
-                    continue;
-                }
+                auto* bezier = static_cast<Eg::SyBezier*>(e);
                 auto pair = Eg::BezierAlgorithms::splitBezier(bezier, dT);
                 changeSet.toRemove.push_back(e->id);
                 changeSet.toAdd.push_back(std::make_unique<Eg::SyBezier>(pair.first));
@@ -1421,32 +1417,26 @@ void CoreOperationRegistry::registerEditOperations()
         SceneChangeSet changeSet;
         if (vCubic.size() == 2)
         {
-            auto* b1 = dynamic_cast<Eg::SyBezier*>(vCubic[0]);
-            auto* b2 = dynamic_cast<Eg::SyBezier*>(vCubic[1]);
-            if (b1 && b2)
+            auto* b1 = static_cast<Eg::SyBezier*>(vCubic[0]);
+            auto* b2 = static_cast<Eg::SyBezier*>(vCubic[1]);
+            auto merged = Eg::BezierAlgorithms::mergeBeziers(b1, b2);
+            if (merged)
             {
-                auto merged = Eg::BezierAlgorithms::mergeBeziers(b1, b2);
-                if (merged)
-                {
-                    changeSet.toRemove.push_back(vCubic[0]->id);
-                    changeSet.toRemove.push_back(vCubic[1]->id);
-                    changeSet.toAdd.push_back(std::make_unique<Eg::SyBezier>(*merged));
-                }
+                changeSet.toRemove.push_back(vCubic[0]->id);
+                changeSet.toRemove.push_back(vCubic[1]->id);
+                changeSet.toAdd.push_back(std::make_unique<Eg::SyBezier>(*merged));
             }
         }
         else if (vQuad.size() == 2)
         {
-            auto* b1 = dynamic_cast<Eg::SyBezier2*>(vQuad[0]);
-            auto* b2 = dynamic_cast<Eg::SyBezier2*>(vQuad[1]);
-            if (b1 && b2)
+            auto* b1 = static_cast<Eg::SyBezier2*>(vQuad[0]);
+            auto* b2 = static_cast<Eg::SyBezier2*>(vQuad[1]);
+            auto merged = Eg::BezierAlgorithms::mergeBeziers(b1, b2);
+            if (merged)
             {
-                auto merged = Eg::BezierAlgorithms::mergeBeziers(b1, b2);
-                if (merged)
-                {
-                    changeSet.toRemove.push_back(vQuad[0]->id);
-                    changeSet.toRemove.push_back(vQuad[1]->id);
-                    changeSet.toAdd.push_back(std::make_unique<Eg::SyBezier2>(*merged));
-                }
+                changeSet.toRemove.push_back(vQuad[0]->id);
+                changeSet.toRemove.push_back(vQuad[1]->id);
+                changeSet.toAdd.push_back(std::make_unique<Eg::SyBezier2>(*merged));
             }
         }
 
