@@ -72,8 +72,8 @@ private:
 
 #include "UI/Algorithm/AlgorithmApplicationService.h"
 #include "UI2D/Operation/AlgorithmRunner.h"
-#include "Algorithm/AlgorithmTaskRegistration2D.h"
-#include "Manager/UnitManager/UnitManager.h"
+#include "UI2D/AlgorithmTaskRegistration2D.h"
+#include "UI2D/Manager/UnitManager.h"
 
 #include "Import/ImportService.h"
 #include "Import/ImportDispatcher.h"

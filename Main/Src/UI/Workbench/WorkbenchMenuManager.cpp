@@ -2,8 +2,8 @@
 #include "WorkbenchWindow.h"
 
 #include "Log/SyLogger.h"
-#include "Manager/UnitManager/UnitManager.h"
-#include "Manager/UnitManager/UnitSelectionMenu.h"
+#include "UI2D/Manager/UnitManager.h"
+#include "UI2D/Manager/UnitSelectionMenu.h"
 #include "Platform/MacMenuCleanup.h"
 #include "UI2D/Operation/CommandActionHub.h"
 #include "UI2D/Operation/CommandCatalog.h"

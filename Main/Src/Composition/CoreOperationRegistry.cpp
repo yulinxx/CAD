@@ -27,7 +27,7 @@
 #include "UI/Services/UiStateCenter.h"
 #include "UI2D/Dlg/LayerManagerDialog.h"
 #include "Engine2D/Edit/LayerEditService.h"
-#include "Manager/UnitManager/UnitManager.h"
+#include "UI2D/Manager/UnitManager.h"
 #include "Ut/BBox2d.h"
 #include "Ut/GeomMath.h"
 #include "Ut/Mat.h"
