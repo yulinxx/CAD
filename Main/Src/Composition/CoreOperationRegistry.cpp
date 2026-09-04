@@ -627,16 +627,28 @@ void CoreOperationRegistry::registerEditOperations()
         editService->deleteSelected("Cut");
     }));
 
-    // 粘贴锚点：鼠标在视口内取鼠标世界坐标，否则取视口中心；
-    // 无有效锚点时回退默认设计台面中心 (600,400)
+    // 粘贴锚点：如果鼠标在视图范围内则粘贴到鼠标位置，否则粘贴到视图中心
     auto pasteAnchor = [viewportHub = m_viewportActionHub]() -> Ut::Vec2d {
         Ut::Vec2d anchor(0, 0);
         if (viewportHub)
         {
             if (auto* vp = viewportHub->viewport())
             {
-                const QPointF world = vp->pasteAnchorWorld();
-                anchor = Ut::Vec2d(world.x(), world.y());
+                // 检查鼠标当前是否在视口内
+                const QPoint cursorLocal = vp->mapFromGlobal(QCursor::pos());
+                const QRect viewRect = vp->rect();
+                if (viewRect.contains(cursorLocal))
+                {
+                    // 鼠标在视图内，使用鼠标位置的世界坐标
+                    const QPointF world = vp->widgetToWorld(cursorLocal);
+                    anchor = Ut::Vec2d(world.x(), world.y());
+                }
+                else
+                {
+                    // 鼠标不在视图内，使用视图中心
+                    const QPointF centerWorld = vp->viewportCenterWorld();
+                    anchor = Ut::Vec2d(centerWorld.x(), centerWorld.y());
+                }
             }
         }
         if (anchor.x() == 0.0 && anchor.y() == 0.0)

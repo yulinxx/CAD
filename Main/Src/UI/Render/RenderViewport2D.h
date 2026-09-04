@@ -210,6 +210,9 @@ public:
     /// 粘贴锚点：鼠标在视口内则取鼠标世界坐标，否则取视口中心世界坐标
     QPointF pasteAnchorWorld() const;
 
+    /// 获取视口中心的世界坐标（用于粘贴图元到视图中心）
+    QPointF viewportCenterWorld() const;
+
 signals:
     void sceneChanged();
     // P1: 视口不直接持有编辑服务，通过信号通知上层

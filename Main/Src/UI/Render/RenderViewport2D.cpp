@@ -798,6 +798,13 @@ QPointF RenderViewport2D::pasteAnchorWorld() const
     return widgetToWorld(anchorPx);
 }
 
+QPointF RenderViewport2D::viewportCenterWorld() const
+{
+    const QRect viewRect = rect();
+    const QPoint centerPx = viewRect.center();
+    return widgetToWorld(centerPx);
+}
+
 void RenderViewport2D::updateViewMatrix()
 {
     applyCameraToWidget();
