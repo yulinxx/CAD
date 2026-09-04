@@ -1,18 +1,19 @@
 ﻿/**
  * @file SyEntitySerializerTests.cpp
- * @brief SyEntitySerializer 鍥炲綊娴嬭瘯 鈥?SyEntity 鈫?Protobuf 搴忓垪鍖栭棴鐜? *
- * 瑕嗙洊锛? *   - 鎵€鏈夊疄浣撶被鍨嬬殑 serializeEntity 鈫?deserializeEntity 闂幆
- *   - 閫氱敤灞炴€э紙id, basePoint, bClosed, bCCW锛夌殑搴忓垪鍖? *   - 鍥惧眰鍏宠仈鐨勫簭鍒楀寲
- *   - 澶嶆潅瀹炰綋绫诲瀷锛圢URBS, Image锛夌殑搴忓垪鍖? *
- * P2 娴嬭瘯瑕嗙洊鎵╁睍 (2026-07-30)
+ * @brief SyEntitySerializer 往返测试 — SyEntity ↔ Protobuf 序列化封装
+ * 覆盖：
+ *   - 所有实体类型的 serializeEntity ↔ deserializeEntity 闭环
+ *   - 通用属性（id, basePoint, bClosed, bCCW）的序列化
+ *   - 视图关联的序列化
+ *   - 复杂实体类型（NURBS, Image）的序列化
+ * P2 测试覆盖扩展 (2026-07-30)
  */
-
 #include <gtest/gtest.h>
 
 #include "SyEntitySerializer.h"
 #include "FileIO/SyDocument.h"
 
-// Engine2D 瀹炰綋绫诲瀷
+// Engine2D 实体类型
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyArc.h"
 #include "Engine2D/SyEntity/SyCircle.h"
@@ -31,7 +32,7 @@
 
 namespace
 {
-    /// 杈呭姪锛氬皢瀹炰綋搴忓垪鍖栧悗绔嬪嵆鍙嶅簭鍒楀寲锛岄獙璇侀棴鐜?
+    /// 辅助：将实体序列化后立即反序列化，验证往返
     template<typename T>
     std::pair<std::unique_ptr<Eg::SyEntity>, sanyi::proto::EntityData> roundTrip(const Eg::SyEntity& entity)
     {
@@ -151,11 +152,11 @@ TEST(SyEntitySerializerTest, PointRoundTrip)
     expectVec2dEqual(deserialized->basePoint, Ut::Vec2d(42.0, 99.0));
 }
 
-// ==================== 澶氳竟褰㈠簭鍒楀寲闂幆锛堟樉寮忛《鐐癸級 ====================
+// ==================== 多段线序列化循环（显式端点） ====================
 
 TEST(SyEntitySerializerTest, PolygonRoundTrip)
 {
-    // 浣跨敤 setVertices 璁剧疆鏄惧紡椤剁偣锛岄伩鍏嶄笌鍙傛暟鍖栧畾涔夌殑鍐茬獊
+    // 使用 setVertices 设置多边形顶点，避免与参数化定义的冲突
     Eg::SyPolygon original;
     original.id = 10;
     original.basePoint = Ut::Vec2d(0.0, 0.0);
@@ -177,7 +178,7 @@ TEST(SyEntitySerializerTest, PolygonRoundTrip)
     expectVec2dEqual(resultVerts[3], Ut::Vec2d(0.0, 10.0));
 }
 
-// ==================== 澶氳竟褰㈠簭鍒楀寲闂幆锛堝弬鏁板寲锛?====================
+// ==================== 多段线序列化循环（参数化） ====================
 
 TEST(SyEntitySerializerTest, ParametricPolygonRoundTrip)
 {
@@ -195,7 +196,7 @@ TEST(SyEntitySerializerTest, ParametricPolygonRoundTrip)
     auto* poly = static_cast<Eg::SyPolygon*>(deserialized.get());
     EXPECT_EQ(poly->nSides, 6);
     EXPECT_DOUBLE_EQ(poly->dCircumRadius, 30.0);
-    // 鍙傛暟鍖栧杈瑰舰椤剁偣鐢?computeVertices 璁＄畻锛岄獙璇侀《鐐规暟
+    // 参数化多边形顶点由 computeVertices 计算，验证顶点数
     const auto& resultVerts = poly->vertices();
     EXPECT_EQ(resultVerts.size(), 6u);
 }
@@ -441,11 +442,11 @@ TEST(SyEntitySerializerTest, LargeIdRoundTrip)
     EXPECT_EQ(deserialized->id, 0xFFFFFFFFFFFFFFFFULL);
 }
 
-// ==================== 娴偣绮惧害楠岃瘉 ====================
+// ==================== 顶点精度验证 ====================
 
 TEST(SyEntitySerializerTest, DoublePrecisionRoundTrip)
 {
-    // 楠岃瘉鍙岀簿搴︽诞鐐规暟鍦ㄥ簭鍒楀寲鍚庣簿搴︿笉涓㈠け
+    // 验证双精度浮点数在序列化后精度不丢失
     Eg::SyCircle original;
     original.id = 1;
     original.basePoint = Ut::Vec2d(1.23456789012345, -9.87654321098765);
