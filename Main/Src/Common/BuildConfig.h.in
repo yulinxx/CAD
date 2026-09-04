@@ -33,6 +33,8 @@ namespace BuildConfig
     constexpr bool kRenderx = @_bc_BUILD_RENDERX@;
     /// Python 宿主集成
     constexpr bool kPythonHost = @_bc_SANYI_PYTHON_HOST@;
+    /// Python 模块（与 kPythonHost 等价，用于统一命名）
+    constexpr bool kPython = @_bc_BUILD_PYTHON@;
     /// 许可校验（未开启时授权闸门为无限制模式）
     constexpr bool kLicense = @_bc_SANYI_ENABLE_LICENSE@;
 }

@@ -315,7 +315,13 @@ endif()
 message(STATUS "----------------------------------------")
 
 # 7. Python 集成
-option(SANYI_PYTHON_HOST "Enable PythonHost integration framework" ON)
+# SANYI_PYTHON_HOST 依赖于 BUILD_PYTHON 开关
+if(NOT BUILD_PYTHON)
+    set(SANYI_PYTHON_HOST_DEFAULT OFF)
+else()
+    set(SANYI_PYTHON_HOST_DEFAULT ON)
+endif()
+option(SANYI_PYTHON_HOST "Enable PythonHost integration framework" ${SANYI_PYTHON_HOST_DEFAULT})
 option(SANYI_PYTHON_EMBED "Enable in-process Python bridge (Phase 3)" OFF)
 set(SANYI_PYTHON_VERSION "3.11" CACHE STRING "Required Python version")
 

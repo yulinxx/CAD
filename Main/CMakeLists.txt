@@ -64,7 +64,7 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/VersionInfo.h" "${_version_info_configur
 # ---------------------------------------------------------------------------
 foreach(_bc_opt
         BUILD_UI3D BUILD_NESTING BUILD_HARDWARE BUILD_VISION BUILD_ENGRAVING
-        BUILD_GEOMODELCORE BUILD_RENDERX SANYI_PYTHON_HOST SANYI_ENABLE_LICENSE)
+        BUILD_GEOMODELCORE BUILD_RENDERX SANYI_PYTHON_HOST BUILD_PYTHON SANYI_ENABLE_LICENSE)
     if(${_bc_opt})
         set(_bc_${_bc_opt} "true")
     else()
