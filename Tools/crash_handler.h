@@ -46,23 +46,43 @@ inline std::wstring GetDumpPath() {
     return path;
 }
 
+// 定位 crash_reporter.py 所在目录：
+// 崩溃发生时 cwd 未必是安装目录（Explorer 直接启动、服务进程等场景），
+// 硬编码 L"." 会找不到脚本。改为可执行文件所在目录。
+inline std::wstring GetScriptDir() {
+    wchar_t buf[MAX_PATH];
+    const DWORD n = GetModuleFileNameW(NULL, buf, MAX_PATH);
+    if (n == 0 || n >= MAX_PATH) {
+        return L"."; // 失败时回退当前目录（原有行为）
+    }
+    std::wstring path(buf, n);
+    const size_t slash = path.find_last_of(L"\\/");
+    if (slash != std::wstring::npos) {
+        path.resize(slash);
+    }
+    return path;
+}
+
 // 调用 Python 脚本上传
 inline void UploadDump(const wchar_t* dumpPath) {
     if (g_serverUrl.empty()) return;
-    
+
+    const std::wstring scriptDir = GetScriptDir();
+
     // 构造命令: python crash_reporter.py <server> <dump>
     wchar_t cmd[MAX_PATH * 3];
     swprintf_s(cmd, 
         L"python.exe \"%s\\crash_reporter.py\" \"%s\" \"%s\"",
-        /* 需要传入脚本所在目录 */ L".",
+        scriptDir.c_str(),
         g_serverUrl.c_str(),
         dumpPath);
     
-    // 静默执行，等待完成
+    // 静默执行，等待完成；
+    // 子进程工作目录设为脚本所在目录，避免崩溃时 cwd 不在安装目录导致上传失败
     STARTUPINFOW si = { sizeof(si) };
     PROCESS_INFORMATION pi = {};
     CreateProcessW(NULL, cmd, NULL, NULL, FALSE, 
-        CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+        CREATE_NO_WINDOW, NULL, scriptDir.c_str(), &si, &pi);
     
     // 等待上传完成（最多60秒）
     WaitForSingleObject(pi.hProcess, 60000);

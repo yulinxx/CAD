@@ -60,9 +60,12 @@
 4. **macOS GL 4.6 GPU 剔除不可用**（✅ 已修复）— `culling.comp` 已从 `#version 460` 降为 `#version 430`（compute 最低版本，兼容 Win/Linux 4.6）；`createComputePipeline` 在不支持时给出平台提示。macOS 最高 GL 4.1 **无计算着色器**，后续接入 GPU 剔除时须先判 `Capabilities::computeShaders`，为 0 降级 CPU（`rxSessionQueryVisibility`/`DrawList::resolve`）。若未来需 460 专属特性，应提供 430/460 双变体按能力选择，勿再整体抬到 460。
 5. **Network 令牌明文存储** — `ConfigManager.cpp:21,63-93` 用 `QSettings(IniFormat)` 明文存 access/refresh token，建议系统 keychain（macOS Keychain / Windows DPAPI）或加密后落盘。
 6. **Hardware 密码学不达标** — `SafetyManager.cpp:245-246` 固定全局盐 `"sanyi_salt_v1"` + SHA-256（非 KDF）+ 非常量时间比较 + 默认凭据 `admin/admin123`。应改 bcrypt/scrypt/argon2、每用户独立盐、常量时间比较、强制首登改密并移除默认账号。
-7. **CI 仅覆盖 Windows 且 /analyze 为软门** — `.github/workflows/ci.yml`：加 macOS/Linux runner（构建路径已就绪但从未在 CI 验证）；去掉 `static-analysis-windows` 的 `continue-on-error: true`。
+7. **CI 仅覆盖 Windows 且 /analyze 为软门**（✅ 已完成）— `.github/workflows/ci.yml`：
+   - `static-analysis-windows` 去掉 `continue-on-error: true`（及过期 TODO 注释），改为阻塞门禁。
+   - 新增 `core-libs-macos-linux` 作业（macos-14/arm64-osx + ubuntu-22.04/x64-linux），对从未进过 CI 的跨平台核心库跑独立构建与测试：Nesting（int128 叉积、无 UI/Qt 依赖）+ GeoModelCore（OCCT 建模、网格 float 管线）。vcpkg 按键缓存（OCCT 纯源码编译约 30~40 分钟/首次）。全应用级 mac/Linux 构建（Qt+全套 vcpkg 依赖）过重，留待后续单独开作业。
+   - 注：新作业需在 GitHub 上首跑验证（本地无法执行 CI），ctest/-C 参数在 mac/Linux 单配置生成器下会被忽略、无害。
 8. **libdxfrw 在非 MSVC 上 `-Werror`**（✅ 已修复）— `ThirdParty/libdxfrw/CMakeLists.txt:15` 移除 `-Werror`（保留 `-Wall -Wextra -pedantic`），并注释说明如需严格告警应在 CI 里对该第三方固定版本基线单独开启，避免个别 GCC/Clang 警告掐断整个构建。
-9. **GeoModelCore 网格为 double + flat-normal** — `GmcMeshData`（`GmcTypes.h`）用 `vector<double>`（显存 2×）；`GmcMesh.cpp` 法线按三角形面算，无法平滑着色。建议换成 float 存储 + 顶点法线生成（P2 性能项，功能正确）。
+9. **GeoModelCore 网格为 double + flat-normal**（✅ 已修复）— `GmcMeshData`（`GmcTypes.h`）改 `std::vector<float>` 存储（显存减半）；`GmcMesh::tessellate` 改为两趟处理：按容差网格焊接顶点（`deflection×1e-3`），同一焊点内法向夹角 ≤60° 的三角面累加合并成平滑顶点法线、超阈值保留硬边（方盒棱边不糊）。`GmcBvh.cpp` 同步适配 float（`triBounds` 显式转 double）。桥接 `UI/3D GmcMeshBridge3D` 改读 float 直接构 `Ut::Vec3f`。新增回归测试 `GmcMeshTest.SmoothVertexNormalsKeepHardEdges`，54 用例全绿。
 
 ## P2（性能/健壮性/结构）
 

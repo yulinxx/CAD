@@ -40,13 +40,9 @@ jobs:
   # /analyze 补上 MSVC 侧缺失的 printf 格式串校验（SAL 标注只在 /analyze 下生效，
   # 详见根 CMakeLists.txt 里 SANYI_MSVC_ANALYZE 的注释）。
   # 单独成一个作业而不是并进上面：/analyze 会让编译慢 2~3 倍，不该拖慢主构建与测试。
-  #
-  # TODO: 首次跑绿之后把 continue-on-error 去掉，让它成为阻塞门禁。
-  # 在此之前这个作业只负责暴露存量问题——Windows 侧从来没做过这项检查，
-  # 直接设成阻塞很可能一上来就红，把无关的 PR 全拦下。
+  # 该作业现在是阻塞门禁（2025 起已跑绿，不再继续放行告警）。
   static-analysis-windows:
     runs-on: windows-latest
-    continue-on-error: true
     defaults:
       run:
         shell: bash
@@ -71,3 +67,75 @@ jobs:
         run: |
           cmake --build build-analyze --config Debug --parallel \
             --target UICommon UI2D UI3D SanYiCAD
+
+  # ---------------------------------------------------------------------------
+  # macOS / Linux 跨平台核心库验证（Nesting + GeoModelCore 独立构建）。
+  #
+  # 为什么只在这两个模块：Windows 主作业只 build UI 类目标，GeoModelCore（OCCT
+  # 建模）、Nesting（套料）从没进过任何平台的 CI，但恰好这两处正是本轮审查里
+  # 的跨平台风险点——Nesting 的 __int128 叉积（Geometry.cpp）与 GeoModelCore 的
+  # 网格 float 管线。两者均无 Qt/UI 依赖，独立入口（各自根 CMakeLists.txt）沿用
+  # 仓库统一的 Config.cmake + StandaloneInit.cmake，配 vcpkg 即可编译测试。
+  #
+  # 全应用（Qt + 全套 vcpkg 依赖）的 mac/Linux 构建目前太重，留待后续单独开作业。
+  # ---------------------------------------------------------------------------
+  core-libs-macos-linux:
+    name: core libs (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            triplet: arm64-osx
+          - os: ubuntu-22.04
+            triplet: x64-linux
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # vcpkg 按键缓存，随 vcpkg 上游滚动或手动 bump 键尾版本号自动失效，
+      # 避免三方库每次都源码重编（OCCT 纯源码构建约 30~40 分钟）
+      - name: Cache vcpkg
+        id: cache-vcpkg
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.workspace }}/vcpkg
+          key: vcpkg-${{ matrix.triplet }}-${{ runner.os }}-${{ runner.arch }}-v1
+
+      - name: Set up vcpkg
+        run: |
+          if [ ! -x "$GITHUB_WORKSPACE/vcpkg/vcpkg" ]; then
+            rm -rf "$GITHUB_WORKSPACE/vcpkg"
+            git clone --depth 1 https://github.com/microsoft/vcpkg.git "$GITHUB_WORKSPACE/vcpkg"
+            "$GITHUB_WORKSPACE/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+          echo "VCPKG_ROOT=$GITHUB_WORKSPACE/vcpkg" >> "$GITHUB_ENV"
+
+      # 两个模块共享的三方依赖一次装齐：OCCT（GeoModelCore）+ Clipper2/GTest（Nesting）
+      - name: Install dependencies
+        run: |
+          "$VCPKG_ROOT/vcpkg" install opencascade clipper2 gtest --triplet ${{ matrix.triplet }} --clean-after-build
+
+      - name: Configure & test Nesting
+        run: |
+          cmake -S Nesting -B build-nesting -DVCPKG_DIR="$VCPKG_ROOT" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_NESTING_EXAMPLES=OFF \
+            -DBUILD_NESTING_TESTS=ON \
+            -DNESTING_WITH_LOG=OFF
+          cmake --build build-nesting --parallel
+          ctest --test-dir build-nesting -C Release --output-on-failure --parallel
+
+      - name: Configure & test GeoModelCore
+        run: |
+          cmake -S GeoModelCore -B build-gmc -DVCPKG_DIR="$VCPKG_ROOT" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_GEOMODELCORE_EXAMPLE=OFF \
+            -DBUILD_GEOMODELCORE_TESTS=ON
+          cmake --build build-gmc --parallel
+          ctest --test-dir build-gmc -C Release --output-on-failure --parallel
