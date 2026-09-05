@@ -208,18 +208,16 @@ namespace
             m_outType = Render::PrimitiveType::LineStrip;
             float rgba[4];
             colorToRGBA(color, rgba);
-            double start = startAngle;
-            double end = endAngle;
-            if (end < start)
-            {
-                end += 2.0 * Render::tess::kPi;
-            }
-            const double angleRange = end - start;
-            const int segments = Render::tess::arcSegments(angleRange);
+
+            // 直接使用原始角度差，保留绘制方向
+            // 顺时针绘制时 endAngle < startAngle，angleRange 为负
+            // 逆时针绘制时 endAngle > startAngle，angleRange 为正
+            const double angleRange = endAngle - startAngle;
+            const int segments = Render::tess::arcSegments(std::abs(angleRange));
             for (int i = 0; i <= segments; ++i)
             {
                 double t = static_cast<double>(i) / segments;
-                double angle = start + t * angleRange;
+                double angle = startAngle + t * angleRange;
                 addVertex(center.x() + radius * std::cos(angle), center.y() + radius * std::sin(angle), rgba);
             }
             m_emitted = true;
