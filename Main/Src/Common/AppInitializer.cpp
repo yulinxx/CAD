@@ -26,6 +26,7 @@
 #include <QSettings>
 
 #include <cstring>
+#include <memory>
 
 namespace
 {
@@ -86,19 +87,15 @@ void AppInitializer::initialize()
     const QString dataDir = AppPathManager::dataDir();
     QDir().mkpath(dataDir);
     const QString dbPath = dataDir + QStringLiteral("/cad_database.sqlite");
-    auto* persistenceService = new PersistenceService();
+    auto persistenceService = std::make_shared<PersistenceService>();
 
     if (persistenceService->initialize(dbPath.toStdString()))
     {
         SY_INFOF("[AppInitializer] Database initialized: %s", dbPath.toUtf8().constData());
 
-        // 读取并应用用户保存的日志设置
         auto* settingsRepo = persistenceService->settings();
         if (settingsRepo)
         {
-            // 日志设置由 SettingsService 统一管理（在 UI 模块初始化时应用）
-            // 这里只设置默认值，确保启动时日志可用
-            // 默认使用 Info 级别，让用户能看到关键信息
             SyLogger::GetInstance().SetLevel(SyLogLevel::Info);
             SY_INFO("[AppInitializer] Default log level set to Info (will be overridden by SettingsService if available)");
         }
@@ -106,22 +103,19 @@ void AppInitializer::initialize()
     else
     {
         SY_ERRORF("[AppInitializer] Failed to initialize database: %s", persistenceService->lastError().c_str());
-        // 数据库初始化失败不阻塞启动，UI 层将回退到 QSettings
     }
 
-    // 将 PersistenceService 所有权转移给全局指针（供 CompositionRoot 获取）
     s_persistenceService = persistenceService;
 }
 
 void AppInitializer::shutdown()
 {
     SY_INFO("Application shutting down");
-    delete s_persistenceService;
-    s_persistenceService = nullptr;
+    s_persistenceService.reset();
     SyLogger::GetInstance().Shutdown();
 }
 
-PersistenceService* AppInitializer::persistenceService()
+std::shared_ptr<PersistenceService> AppInitializer::persistenceService()
 {
     return s_persistenceService;
 }

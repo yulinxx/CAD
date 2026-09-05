@@ -1,9 +1,19 @@
+#include <ctime>
 #include "ExportService.h"
 #include "ExportDispatcher.h"
 
 #include "Log/SyLogger.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine3D/SceneManager3D.h"
+#include "Persistence/PersistenceService.h"
+#include "Persistence/Models/DocumentRecord.h"
+#include "Persistence/Repositories/DocumentRepository.h"
+#include "FileIO/FileFormat.h"
+
+void ExportService::setPersistenceService(PersistenceService* service)
+{
+    m_persistenceService = service;
+}
 
 ExportService::ExportService(QObject* parent)
     : QObject(parent)
@@ -176,5 +186,36 @@ Fio::VecSyEntityPtr ExportService::collectAllEntities() const
 
 void ExportService::postExportRecord(const ExportResult& result, const ExportContext& context)
 {
-    // Recording export to history database
+    if (!result.success || !m_persistenceService || !m_persistenceService->isOpen())
+    {
+        return;
+    }
+    auto* repo = m_persistenceService->documents();
+    if (!repo)
+    {
+        return;
+    }
+
+    DocumentRecord record;
+    record.filePath = context.targetPath.toStdString();
+    record.title = context.sourceDocumentId.toStdString();
+    record.entityCount = static_cast<int>(result.exportedEntityCount);
+    record.format = [](Fio::FileFormat fmt) -> std::string {
+        switch (fmt) {
+            case Fio::FileFormat::DXF: return "DXF";
+            case Fio::FileFormat::SVG: return "SVG";
+            case Fio::FileFormat::STEP: return "STEP";
+            case Fio::FileFormat::OBJ: return "OBJ";
+            case Fio::FileFormat::STL: return "STL";
+            case Fio::FileFormat::PDF: return "PDF";
+            case Fio::FileFormat::Native: return "SY";
+            case Fio::FileFormat::Native3D: return "SYX";
+            default: return "Unknown";
+        }
+    }(context.format);
+    record.lastSavedAt = std::to_string(std::time(nullptr));
+
+    repo->save(record);
+    SY_DEBUGF("[ExportService] Export record saved: %s (%d entities)",
+        context.targetPath.toUtf8().constData(), result.exportedEntityCount);
 }

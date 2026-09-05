@@ -316,8 +316,8 @@ private:
     /// 帮助弹窗服务
     std::unique_ptr<HelpDialogService> m_helpDialogService;
 
-    /// 持久化服务（非拥有指针，由 AppInitializer 管理生命周期）
-    PersistenceService* m_persistenceService{ nullptr };
+    /// 持久化服务（共享指针，由 AppInitializer 管理生命周期）
+    std::shared_ptr<PersistenceService> m_persistenceService;
 
     /// 文件操作注册表
     std::unique_ptr<FileOperationRegistry> m_fileOperationRegistry;

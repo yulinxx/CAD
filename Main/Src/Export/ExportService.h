@@ -11,6 +11,8 @@
 #include "ExportResult.h"
 #include "FileIO/IFileParser.h"
 
+class PersistenceService;
+
 class ExportDispatcher;
 
 namespace Eg
@@ -36,6 +38,9 @@ public:
 
     /// 设置 3D 场景管理器（用于收集 3D 网格图元）
     void setSceneManager3D(Eg::SceneManager3D* sceneManager3D);
+
+    /// 设置持久化服务（用于导出记录回写）
+    void setPersistenceService(PersistenceService* service);
 
     /// 设置忙状态回调（替代旧的 UiStateCenter 直接依赖）
     void setBusyStateCallback(std::function<void(bool)> callback);
@@ -81,6 +86,8 @@ private:
     Eg::SceneManager* m_sceneManager{ nullptr };
     /// 3D 场景管理器（非拥有指针）
     Eg::SceneManager3D* m_sceneManager3D{ nullptr };
+    /// 持久化服务（非拥有指针，用于导出记录回写）
+    class PersistenceService* m_persistenceService{ nullptr };
     /// 忙状态回调（替代 UiStateCenter 直接调用）
     std::function<void(bool)> m_busyStateCallback;
     /// 状态栏提示回调（替代 UiStateCenter 直接调用）

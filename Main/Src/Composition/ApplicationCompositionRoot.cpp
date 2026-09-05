@@ -315,7 +315,7 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     });
 
     m_importService->setDocumentPersistenceCallback([this](const QString& filePath, int entityCount) {
-        DocumentPersistenceHelper::recordImport(m_persistenceService, filePath, entityCount);
+        DocumentPersistenceHelper::recordImport(m_persistenceService.get(), filePath, entityCount);
     });
 
     // 注册导出写入器
@@ -335,6 +335,7 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_exportService->setDispatcher(m_exportDispatcher.get());
     m_exportService->setSceneManager(m_sceneManager.get());
     m_exportService->setSceneManager3D(m_sceneManager3D.get());
+    m_exportService->setPersistenceService(persistenceService());
     m_exportService->setBusyStateCallback([this](bool busy) {
         if (m_stateCenter)
         {
@@ -554,13 +555,13 @@ LayerPersistenceBridge* ApplicationCompositionRoot::layerPersistenceBridge()
 
 PersistenceService* ApplicationCompositionRoot::persistenceService()
 {
-    // 从 AppInitializer 获取已初始化的持久化服务
+    // 从 AppInitializer 获取已初始化的持久化服务（shared_ptr 管理）
     if (!m_persistenceService)
     {
         m_persistenceService = AppInitializer::persistenceService();
     }
 
-    return m_persistenceService;
+    return m_persistenceService.get();
 }
 
 SettingsService* ApplicationCompositionRoot::getSettingsService()
