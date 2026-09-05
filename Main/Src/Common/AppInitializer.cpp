@@ -29,8 +29,7 @@
 
 namespace
 {
-    // 全局持久化服务指针（AppInitializer 创建，CompositionRoot 获取）
-    static PersistenceService* s_persistenceService = nullptr;
+    static std::shared_ptr<PersistenceService> s_persistenceService;
 
     // SyLogger 日志目录回调 thunk：C 函数指针 + void* ctx，
     // 返回静态缓冲（避免 std::function/std::string 跨 DLL 传递）

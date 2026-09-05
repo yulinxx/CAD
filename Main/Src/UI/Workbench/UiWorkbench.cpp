@@ -2815,6 +2815,20 @@ void Workbench3D::attachToWindow(WorkbenchWindow& window)
 {
     m_workbenchWindow = &window;
     build3DWorkbenchUi(window);
+
+    // 连接 MainWindow3D 的切换信号到 WorkbenchWindow 的工作台切换机制
+    if (m_mainWindow3D)
+    {
+        connect(m_mainWindow3D.get(), &MainWindow3D::sigSwitchTo2D,
+                &window, [&window]() {
+                    window.triggerWorkbench(QStringLiteral("2D"));
+                }, Qt::QueuedConnection);
+
+        connect(m_mainWindow3D.get(), &MainWindow3D::sigSwitchTo3D,
+                &window, [&window]() {
+                    window.triggerWorkbench(QStringLiteral("3D"));
+                }, Qt::QueuedConnection);
+    }
 }
 
 void Workbench3D::refreshCommandUiState()

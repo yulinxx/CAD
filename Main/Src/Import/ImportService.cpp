@@ -7,6 +7,7 @@
 
 #include <QCoreApplication>
 #include <QMetaObject>
+#include <QPointer>
 #include <thread>
 
 #include "Log/SyLogger.h"
@@ -299,26 +300,28 @@ void ImportService::importAsync(
     }
     emit importStarted(context.sourcePath);
 
-    // 裸指针 + detach 线程：调用方必须保证 ImportService 存活到回调结束
-    auto* self = this;
+    // 使用 QPointer 安全持有 this：若 ImportService 被销毁，
+    // QPointer 自动置空，后续所有路径安全返回，避免悬空指针访问
+    QPointer<ImportService> safeSelf = this;
 
     // 统一收尾：清忙状态 + 最终提示 + 完成信号 + 回调，保证每条退出路径都恰好走一次，
     // 且始终在主线程执行（后台线程失败时也会经此回到主线程）
-    auto finishOnMainThread = [self, onComplete](const ImportResult& r) {
+    auto finishOnMainThread = [safeSelf, onComplete](const ImportResult& r) {
         QMetaObject::invokeMethod(
             qApp,
-            [self, onComplete, r]() {
-                if (self->m_busyStateCallback)
+            [safeSelf, onComplete, r]() {
+                if (safeSelf.isNull()) return;
+                if (safeSelf->m_busyStateCallback)
                 {
-                    self->m_busyStateCallback(false);
+                    safeSelf->m_busyStateCallback(false);
                 }
-                if (self->m_statusPromptCallback)
+                if (safeSelf->m_statusPromptCallback)
                 {
-                    self->m_statusPromptCallback(r.success
+                    safeSelf->m_statusPromptCallback(r.success
                             ? QStringLiteral("Import completed: %1 entities").arg(r.entityCount)
                             : QStringLiteral("Import failed: %1").arg(r.message));
                 }
-                emit self->importFinished(r);
+                emit safeSelf->importFinished(r);
                 if (onComplete)
                 {
                     onComplete(r);
@@ -332,12 +335,13 @@ void ImportService::importAsync(
     };
 
     // 启动后台线程执行 Phase 1-2（纯解析，不碰 UI 与场景）
-    std::thread([self, context, options, finishOnMainThread]() {
+    std::thread([safeSelf, context, options, finishOnMainThread]() {
+        if (safeSelf.isNull()) return;
         ImportContext mutableCtx = context;
         auto importedEntities = std::make_shared<Fio::VecSyEntityPtr>();
 
         // ===== Async Phase 1: Detect format =====
-        ImportResult result = self->phaseDetectFormat(mutableCtx);
+        ImportResult result = safeSelf->phaseDetectFormat(mutableCtx);
         if (!result.success)
         {
             SY_ERRORF("[ImportService] Async Phase 1 failed: %s", result.message.toUtf8().constData());
@@ -345,7 +349,7 @@ void ImportService::importAsync(
             return;
         }
 
-        if (self->isCanceled(mutableCtx))
+        if (safeSelf->isCanceled(mutableCtx))
         {
             SY_WARN("[ImportService] Async import canceled after Phase 1");
             finishOnMainThread(ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
@@ -353,7 +357,7 @@ void ImportService::importAsync(
         }
 
         // ===== Async Phase 2: Parse file =====
-        ImportResult parseResult = self->phaseParse(mutableCtx, *importedEntities);
+        ImportResult parseResult = safeSelf->phaseParse(mutableCtx, *importedEntities);
         if (!parseResult.success)
         {
             SY_ERRORF("[ImportService] Async Phase 2 failed: %s", parseResult.message.toUtf8().constData());
@@ -361,7 +365,7 @@ void ImportService::importAsync(
             return;
         }
 
-        if (self->isCanceled(mutableCtx))
+        if (safeSelf->isCanceled(mutableCtx))
         {
             SY_WARN("[ImportService] Async import canceled after Phase 2");
             finishOnMainThread(ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
@@ -372,10 +376,11 @@ void ImportService::importAsync(
         auto entities = importedEntities;
         QMetaObject::invokeMethod(
             qApp,
-            [self, mutableCtx, entities, parseResult, options, finishOnMainThread]() mutable {
+            [safeSelf, mutableCtx, entities, parseResult, options, finishOnMainThread]() mutable {
+                if (safeSelf.isNull()) return;
                 ImportContext mainCtx = mutableCtx;
 
-                if (self->isCanceled(mainCtx))
+                if (safeSelf->isCanceled(mainCtx))
                 {
                     SY_WARN("[ImportService] Async import canceled before Phase 3");
                     finishOnMainThread(
@@ -384,7 +389,7 @@ void ImportService::importAsync(
                 }
 
                 // Build document on main thread
-                ImportResult result = self->phaseBuildDocument(mainCtx, *entities, options, parseResult);
+                ImportResult result = safeSelf->phaseBuildDocument(mainCtx, *entities, options, parseResult);
                 if (!result.success)
                 {
                     SY_ERRORF("[ImportService] Async Phase 3 failed: %s", result.message.toUtf8().constData());
@@ -392,8 +397,8 @@ void ImportService::importAsync(
                     return;
                 }
 
-                self->phaseRefreshDisplay(result, options);
-                self->phaseWriteBackState(mainCtx, result);
+                safeSelf->phaseRefreshDisplay(result, options);
+                safeSelf->phaseWriteBackState(mainCtx, result);
 
                 finishOnMainThread(result);
             },
