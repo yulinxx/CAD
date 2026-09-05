@@ -828,8 +828,8 @@ if (clientId == QLatin1String("client_a")) {
 | 客户专属 C++ 目录 | ❌ 尚无实体 | 新增 `custom/<clientId>/` 目录 + 运行期注册约定 |
 | 配置校验测试 | ⚠️ 部分 | 补“命令 ID 注册检查”“feature 拼写检查”单测 |
 | 客户配置版本管理 | ⚠️ 无迁移机制 | `meta.version` + 变更评审；后续补配置迁移 |
-| 3D 导出命令注册 | ❌ 缺失 | 补齐 CommandCatalog3D + FileOperations3D（见《菜单架构.md》12.2） |
-| 硬件接口抽象 | ❌ 缺失（P1） | 见《Docs/05-硬件与设备/》规划 |
+| 3D 导出命令注册 | ✅ 已实现（OBJ/STL/STEP） | 仅 PDF/PNG 导出缺失；STEP 依赖 `ENABLE_GEOMODELCORE` 需校验 |
+| 硬件接口抽象 | ✅ 已实现（六厂商适配器） | 仅缺真机实测；适配器代码就绪（雷赛/正运动/Aerotech/金橙子/SCANLAB/Ruida） |
 
 
 ### 8.7 让定制更便捷的落地清单
