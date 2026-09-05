@@ -74,7 +74,7 @@
     - 距离 ≤ tol → `Touch`（原为 `Intersect`；`intersects()` 对两者同为 true，边界语义无回归）。
     - 非 solid/非闭合对仍按原距离语义。`GmcIntersection.cpp`。
 11. **Nesting 叉积精度与注释不符**（✅ 已修复）— `Geometry.cpp:398-405` 注释声称 `__int128` 实为 `double` 叉积。现 `__SIZEOF_INT128__` 平台用真正的 `__int128` 求符号（单调链凸包只消费方向），无 int128 平台回退 double 并注明适用范围；新增 `Nesting` 独立构建测试验证（89 用例绿）。
-12. **`GmcBvh::intersectBroadphase` 交点不精确** — `GmcBvh.cpp:283-290` 命中点是两个三角形 AABB 中心的平均，非真实交点。当前仅用于“是否相交”粗判可接受；若被消费需改为真实三角形求交。
+12. **`GmcBvh::intersectBroadphase` 交点不精确**（✅ 已修复）— `GmcBvh.cpp:283-290` 命中点原为两个三角形 AABB 中心的平均。现改为 AABB 预筛 + **精确三角形求交**：两三角形所在平面交线 L，各自被对方平面切出的线段在 L 上的区间做重叠，命中点取重叠区间中点；共面场景退化为 2D 多边形裁剪（Sutherland-Hodgman），命中点取重叠区质心。`GmcMeshIntersectionResult::point` 不再近似。新增回归测试 `GmcIntersectionTest.ExactTriangleIntersection`、`...NoHitWhenAabbOverlaps`、`...CoplanarTriangleOverlap`，57 用例全绿。
 13. **`BRepBuilder` 棱柱仅取第一面**（✅ 已修复）— `BRepBuilder.cpp` 改为提取“顶面集”：面平面法向与拉伸方向一致（>0.999）的平面面片组成 compound 再 `BRepPrimAPI_MakePrism`，避免只取第一面漏掉轮廓；同时按面取向（REVERSED→取反）排除底面，且不再把侧壁一起扫出。无匹配面时退回旧的第一面行为。新增回归测试 `BRepBuilderTest.MakePrismMultiFaceBase`。
 14. **`TopoShape` 死 API**（✅ 已修复）— `countFaces/countEdges/countVertices/getFace/getEdge/getVertex/forEachFace/forEachEdge/forEachVertex` 已用 `TopExp_Explorer` 实现；`makeFillet`/`makeChamfer` 走 `BRepFilletAPI`，`offsetShape`/`thicken` 走 `BRepOffsetAPI`（`PerformByJoin`/`MakeThickSolidByJoin`），`section` 委托 `GmcBoolean::section`，`repair` 委托 `GmcShapeHealing::repair`。`TopoShape.cpp`。附带修复：测试文件与头文件 API 漂移（`makeFillet({..})`/`getAllFaces` 等旧调用改齐），53 用例全绿。
 15. **`PyBindCore::DocumentFacade::open` 是空桩**（待确认）— `DocumentFacade.cpp:50-53`（`save` 同为桩）。FileIO 已有完整 `Fio::SySerializer`/`SyDocument` 持久化栈，但 PyBindCore 目前未链接 FileIO，且缺 `SyDocument ↔ Eg::SceneManager` 实体转换桥。属功能开发而非缺陷修复，决定是否立项由产品拍板。
@@ -84,10 +84,10 @@
 
 ## P3（清理/体验）
 
-19. **`Tools/crash_handler.h` 脚本路径硬编码 `L"."`** — 依赖进程 CWD，改为取固定安装目录或 `argv[0]` 所在路径。
-20. **Network 原始指针单例无析构顺序** — `NetworkManager.cpp:14-17`。
-21. **UI 布局 builder 重复构建累积 QShortcut** — `UiLayoutBuilder` 已有去重守卫，仍建议重启时统一 `releaseBuiltShortcuts` 清理。
-22. **`GmcSplit::splitByPlane` 双次全布尔** — `GmcSplit.cpp` 负半空间对正半空间再做 common/cut，需反复切片的大模型建议保留 BSP/半边结构。
-23. **`GmcShapeHealing::removeDegeneratedEdges` 线性扫描** — `GmcShapeHealing.cpp:130-147` O(children × degen)，可用无序哈希提速。
+19. **`Tools/crash_handler.h` 脚本路径硬编码 `L"."`**（✅ 已修复）— `UploadDump` 改为 `GetScriptDir()`：取 `GetModuleFileNameW(NULL,…)` 解析可执行文件所在目录定位 `crash_reporter.py`（失败回退 cwd），并作为子进程工作目录传入 `CreateProcessW`，避免崩溃时 CWD 不在安装目录导致上传脚本找不到。
+20. **Network 原始指针单例无析构顺序**（✅ 已修复）— `NetworkManager` 对 WebSocketClient/ConfigManager/NetworkStatusMonitor/CacheManager 四个 Meyers 单例由裸指针改为 `QPointer<…>` 成员：单例若先于 NetworkManager 析构，指针自动置空，消除析构期垂悬访问。注：本机 Qt 缺 Qt6WebSockets 模块，Network 未能本地编译验证，待 CI（vcpkg Qt）覆盖。
+21. **UI 布局 builder 重复构建累积 QShortcut**（✅ 已评估，维持现状）— `UiLayoutBuilder::clearBuiltLayout()`→`releaseBuiltShortcuts()` 在每次 `rebuildMenusFromConfig` 前清掉上一批 QShortcut 并复位 `m_menuShortcutKeys` 去重键（`WorkbenchMenuManager.cpp:407` 先清后建），析构再兜底一次；键冲突还有「菜单已声明就不再另建」守卫。累积不成立，无需改码。
+22. **`GmcSplit::splitByPlane` 双次全布尔**（✅ 已加注释，维持双布尔实现）— 平面分割本就需两半结果，现每次是「整个 bbox 包围半空间实体」的两次全布尔（common+cut）。按 P3 定位只补注释说明代价与三条可选优化路径（BRepAlgoAPI_Splitter 一趟切、按 shape bbox 缩小半空间、逐面切缝），不做赢面不大的提前优化。
+23. **`GmcShapeHealing::removeDegeneratedEdges` 线性扫描**（✅ 已修复）— `GmcShapeHealing.cpp` 重建时对每个直接子节点线性比对退化边列表，现改用 `std::unordered_set<TopoDS_Shape>`（哈希= TShape 指针，相等= `IsEqual` 即 TShape+Location），O(n×m) → 平均 O(n)。新增匿名命名空间 `TopoShapePtrHash`/`TopoShapeEqual`。
 
 > 以上条目若已处理请把对应行标记 **✅ 已完成** 并附上变更说明。
