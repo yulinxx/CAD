@@ -245,13 +245,10 @@ namespace
                 start = 0.0;
                 end = 2.0 * Render::tess::kPi;
             }
-            if (end < start)
-            {
-                end += 2.0 * Render::tess::kPi;
-            }
+            // 使用原始角度差，保留绘制方向（顺时针/逆时针）
             const double angleRange = end - start;
             m_outType = bFullEllipse ? Render::PrimitiveType::LineLoop : Render::PrimitiveType::LineStrip;
-            const int segments = Render::tess::ellipseSegments(angleRange);
+            const int segments = Render::tess::ellipseSegments(std::abs(angleRange));
             const double cosR = std::cos(rotation);
             const double sinR = std::sin(rotation);
             for (int i = 0; i <= segments; ++i)
