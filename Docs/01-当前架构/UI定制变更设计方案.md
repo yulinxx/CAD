@@ -156,7 +156,7 @@ main()
 | **Observer Pattern** | 状态变更通知（Qt Signals） | `UiStateCenter` |
 | **Strategy Pattern** | 主题、布局策略可替换 | `UiThemeService`、`UiLayoutService` |
 | **Workbench Pattern** | 工作台模式（类似 Eclipse RCP） | `UiWorkbench` → `Workbench2D` / `Workbench3D` |
-| **Adapter Pattern** | 桥接引擎与 UI | `SceneGeometrySinkAdapter`、`DocumentExportAdapter` 等 |
+| **Adapter Pattern** | 桥接引擎与 UI | `RenderSceneBuilder`、`DocumentExportAdapter` 等 |
 
 ### 3.4 当前 UI 组件注册方式
 
