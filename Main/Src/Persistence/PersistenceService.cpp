@@ -1,5 +1,7 @@
 #include "PersistenceService.h"
 
+#include <thread>
+
 #include "DatabaseBootstrapper.h"
 #include "Repositories/RecentFileRepository.h"
 #include "Repositories/WorkspaceSnapshotRepository.h"
@@ -56,6 +58,9 @@ void PersistenceService::shutdown()
     if (m_database && m_database->isOpen())
     {
         SY_DEBUG("[PersistenceService] Shutting down");
+        // 先等待一小段时间，让其他线程有时间完成数据库操作
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
         m_recentFiles.reset();
         m_workspaceSnapshots.reset();
         m_layers.reset();
