@@ -103,7 +103,7 @@
  * ```cpp
  * {OperationId::CustomMyCommand, UI::MenuActionId::CustomMyCommand, "My Command",
  *  "shortcut.custom.my_command", ":/icons/my_command.svg",
- *  CommandSurface2D::Menu | CommandSurface2D::Toolbar | CommandSurface2D::ContextMenu,
+ *  CommandSurface2DValues::Menu | CommandSurface2DValues::Toolbar | CommandSurface2DValues::ContextMenu,
  *  CommandEnable2D::RequiresSelection, false}
  * ```
  *
