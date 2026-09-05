@@ -340,6 +340,7 @@ bool FileDropHandler::importImage(const QString& filePath, const QPointF& anchor
     const float worldW = Fio::pixelsToUnit(rgba.width(), info.dpiX, Fio::UnitType::Millimeter);
     const float worldH = Fio::pixelsToUnit(rgba.height(), info.dpiY, Fio::UnitType::Millimeter);
 
+    // 直接创建 SyImage 并设置属性
     auto* imgEntity = new Eg::SyImage();
     imgEntity->nWidth = rgba.width();
     imgEntity->nHeight = rgba.height();
@@ -359,8 +360,8 @@ bool FileDropHandler::importImage(const QString& filePath, const QPointF& anchor
 
     // 显式获取持久 ID，避免 insertEntityPreserveId 替换临时 ID 导致查找失败
     const Eg::EntityId persistentId = Eg::EntityIdGenerator::instance().getNextPersistentId();
-    auto snap = std::unique_ptr<Eg::SyEntity>(imgEntity->clone());
-    snap->id = persistentId;
+    imgEntity->id = persistentId;
+    auto snap = std::unique_ptr<Eg::SyEntity>(imgEntity);
     m_sceneManager->insertEntityPreserveId(std::move(snap));
 
     // 分配到位图图层
@@ -378,6 +379,5 @@ bool FileDropHandler::importImage(const QString& filePath, const QPointF& anchor
         }
     }
 
-    delete imgEntity;
     return true;
 }

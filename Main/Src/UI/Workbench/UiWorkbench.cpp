@@ -730,7 +730,7 @@ namespace
         QVector<QAction*> actions;
         for (const auto& entry : CommandCatalog::commands())
         {
-            if (!hasSurface(entry.surfaces, CommandSurface2D::LeftToolbar) || !entry.toolName)
+            if (!hasSurface(entry.surfaces, CommandSurface2DValues::LeftToolbar) || !entry.toolName)
             {
                 continue;
             }

@@ -87,7 +87,7 @@ TEST(CommandUiWiringTest, DefaultToolBarContextIdsAllHaveCatalogEntry)
         const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(commandId);
         const CommandEntry2D* entry = CommandCatalog::findByMenuId(menuId);
         ASSERT_NE(entry, nullptr) << "命令目录缺少条目: " << commandId.toStdString();
-        EXPECT_TRUE(hasSurface(entry->surfaces, CommandSurface2D::TopToolbar))
+        EXPECT_TRUE(hasSurface(entry->surfaces, CommandSurface2DValues::TopToolbar))
             << "命令未声明 TopToolbar 暴露面，工具栏会跳过它: " << commandId.toStdString();
     }
 }
@@ -270,7 +270,7 @@ TEST(CommandUiWiringTest, MenuBarEditCommandsDeclareMenuSurface)
         const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(commandId);
         const CommandEntry2D* entry = CommandCatalog::findByMenuId(menuId);
         ASSERT_NE(entry, nullptr) << commandId.toStdString();
-        EXPECT_TRUE(hasSurface(entry->surfaces, CommandSurface2D::Menu)) << commandId.toStdString();
+        EXPECT_TRUE(hasSurface(entry->surfaces, CommandSurface2DValues::Menu)) << commandId.toStdString();
     }
 }
 
@@ -755,7 +755,7 @@ namespace
         QVector<const CommandEntry2D*> entries;
         for (const CommandEntry2D& entry : CommandCatalog::commands())
         {
-            if (hasSurface(entry.surfaces, CommandSurface2D::LeftToolbar) && entry.toolName)
+            if (hasSurface(entry.surfaces, CommandSurface2DValues::LeftToolbar) && entry.toolName)
             {
                 entries.append(&entry);
             }

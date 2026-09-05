@@ -33,7 +33,7 @@ void DrawToolSwitchRegistry::registerAll()
     // 避免手工维护第二份 operationId → toolName 映射表。
     for (const CommandEntry2D& entry : CommandCatalog::commands())
     {
-        if (!hasSurface(entry.surfaces, CommandSurface2D::LeftToolbar))
+        if (!hasSurface(entry.surfaces, CommandSurface2DValues::LeftToolbar))
         {
             continue;
         }
