@@ -192,7 +192,7 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
         // 提取源文件群组表（名称 + 父子关系），随导入结果带回，供 ImportService 重建 SyGroup
         res.importedGroups = Eg::FioEntityConverter::extractGroups(ir);
         res.entityGroupMap = std::move(entityGroupMap);
-        SY_DEBUGF("[ImportReader:%s] IR carried %u group(s), %lld entity-group assignment(s)",
+        SY_DEBUGF("[ImportReader:%s] IR carried %u group(s), %zu entity-group assignment(s)",
             tag.constData(),
             ir.groupCount,
             res.entityGroupMap.size());
@@ -214,7 +214,7 @@ ImportResult ImportReaderBase::readViaIR(
     QString errMsg;
     if (tryImportViaIR(context, format, outEntities, collectLayers, &result, &errMsg))
     {
-        SY_DEBUGF("[ImportReader:%s] read END: success, entities=%d, layers=%lld, layerMapped=%lld, groups=%lld",
+        SY_DEBUGF("[ImportReader:%s] read END: success, entities=%d, layers=%zu, layerMapped=%zu, groups=%zu",
             tag.constData(),
             result.entityCount,
             result.importedLayers.size(),
@@ -288,7 +288,7 @@ ImportResult ImportReaderBase::readViaLegacy(
             static_cast<int>(warns.size()));
     }
 
-    SY_DEBUGF("[ImportReader:%s] read END (legacy): success, entities=%lld, layers=%lld, warnings=%lld, %lld ms",
+    SY_DEBUGF("[ImportReader:%s] read END (legacy): success, entities=%zu, layers=%zu, warnings=%zu, %lld ms",
         tag.constData(),
         count,
         layerCount,
