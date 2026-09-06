@@ -704,7 +704,7 @@ void ImportService::phaseRefreshDisplay(const ImportResult& result, const Import
         }
         else
         {
-            SY_DEBUGF("[ImportService] Workbench switch to '%s' skipped: no callback registered",
+            SY_TRACEF("[ImportService] Workbench switch to '%s' skipped: no callback registered",
                 targetId.toUtf8().constData());
         }
     }
@@ -718,7 +718,7 @@ void ImportService::phaseRefreshDisplay(const ImportResult& result, const Import
         }
         else
         {
-            SY_DEBUG("[ImportService] Viewport fit skipped: no callback registered");
+            SY_TRACE("[ImportService] Viewport fit skipped: no callback registered");
         }
     }
 
@@ -729,7 +729,7 @@ void ImportService::phaseRefreshDisplay(const ImportResult& result, const Import
     }
     else
     {
-        SY_DEBUG("[ImportService] Scene tree rebuild skipped: no callback registered");
+        SY_TRACE("[ImportService] Scene tree rebuild skipped: no callback registered");
     }
 
     // 属性面板刷新
@@ -739,7 +739,7 @@ void ImportService::phaseRefreshDisplay(const ImportResult& result, const Import
     }
     else
     {
-        SY_DEBUG("[ImportService] Property panel refresh skipped: no callback registered");
+        SY_TRACE("[ImportService] Property panel refresh skipped: no callback registered");
     }
 
     updateProgress(ImportPhase::RefreshDisplay, 1.0f);
@@ -788,7 +788,7 @@ void ImportService::phaseWriteBackState(const ImportContext& context, const Impo
     }
     else
     {
-        SY_DEBUG("[ImportService] Document persistence skipped: no callback registered");
+        SY_TRACE("[ImportService] Document persistence skipped: no callback registered");
     }
 
     // 更新状态栏（使用成员变量回调，全局配置）
@@ -826,6 +826,7 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
     // 源图层 sourceId → 运行时 LayerManager 图层 ID
     std::unordered_map<uint32_t, int> sourceToLayerId;
     int createdCount = 0;
+    int reusedCount = 0;
 
     for (const auto& src : parseResult.importedLayers)
     {
@@ -836,19 +837,15 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
 
         // 1) 优先按名称复用已有图层（同名不同色的源图层也共用同一运行时图层，避免反复导入时图层无限累积）
         int layerId = m_layerManager->findLayerByName(src.name);
-        SY_DEBUGF("[ImportService] Layer restore: source='%s' color=0x%08X, findByName=%d",
-            src.name, src.color, layerId);
         if (layerId < 0)
         {
             // 2) 名称不匹配时按颜色去重：同一颜色的源图层共用同一运行时图层
             layerId = m_layerManager->findLayerByColor(color);
-            SY_DEBUGF("[ImportService] Layer restore: source='%s' findByColor=%d", src.name, layerId);
         }
         if (layerId < 0)
         {
             // 3) 名称与颜色都不匹配才新建图层，并应用源图层的可见性/锁定属性
             layerId = m_layerManager->createLayer(src.name);
-            SY_DEBUGF("[ImportService] Layer restore: source='%s' created new layerId=%d", src.name, layerId);
             if (layerId >= 0)
             {
                 ++createdCount;
@@ -870,9 +867,8 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
         else
         {
             // 找到现有图层后，确保颜色与源图层匹配（避免找到颜色不同的现有图层）
-            // 直接设置颜色，这样复用图层时也能保证颜色正确
             m_layerManager->setLayerColor(layerId, color);
-            SY_DEBUGF("[ImportService] Layer restore: source='%s' reused existing layerId=%d (color set)", src.name, layerId);
+            ++reusedCount;
         }
         sourceToLayerId[src.sourceId] = layerId;
     }
@@ -895,9 +891,6 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
             // 获取实体的原始颜色（overrideColor就是原始颜色）
             // 注意：在清除overrideColor之前获取颜色
             const Ut::Color& entityColor = entity->getColor();
-            SY_DEBUGF("[ImportService] Entity %llu color: (%f,%f,%f)", 
-                static_cast<unsigned long long>(entity->id),
-                entityColor.r(), entityColor.g(), entityColor.b());
             uint8_t r = static_cast<uint8_t>(entityColor.r() * 255);
             uint8_t g = static_cast<uint8_t>(entityColor.g() * 255);
             uint8_t b = static_cast<uint8_t>(entityColor.b() * 255);
@@ -919,7 +912,8 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
         }
     }
 
-    SY_DEBUGF("[ImportService] Restored %d/%lld source layer(s)", createdCount, static_cast<long long>(parseResult.importedLayers.size()));
+    SY_DEBUGF("[ImportService] Layer restore: %zu total, %d created, %d reused",
+        parseResult.importedLayers.size(), createdCount, reusedCount);
     return createdCount;
 }
 
