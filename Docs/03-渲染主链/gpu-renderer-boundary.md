@@ -39,7 +39,7 @@ void renderFrame(RenderDevice* dev);
 
 ### 2.1 UI 适配层
 
-UI 层通过 `RenderWidget` 和 `SceneGeometrySinkAdapter` 连接渲染层。
+UI 层通过 `RenderWidget` 和 `RenderSceneBuilder` 连接渲染层。
 
 ### 2.2 渲染层
 
