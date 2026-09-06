@@ -188,6 +188,11 @@ if(GTest_FOUND)
     else()
         option(BUILD_NESTING_TESTS "Build Nesting unit tests" OFF)
     endif()
+    if(BUILD_CAM)
+        option(BUILD_CAM_TESTS "Build CAM unit tests" ${BUILD_ALL_TESTS})
+    else()
+        option(BUILD_CAM_TESTS "Build CAM unit tests" OFF)
+    endif()
     option(BUILD_GEOMODELCORE_TESTS "Build GeoModelCore unit tests" ${BUILD_ALL_TESTS})
     option(BUILD_FILEIO_TESTS "Build FileIO unit tests" ${BUILD_ALL_TESTS})
     option(BUILD_LICENSE_TESTS "Build License unit tests" ON)
@@ -281,6 +286,14 @@ else()
     message(STATUS "  Nesting: DISABLED")
 endif()
 
+# 6.5 CAM 模块 - 激光切割工艺路径生成
+if(BUILD_CAM)
+    add_subdirectory(CAM/CAM)
+    message(STATUS "  CAM: ENABLED")
+else()
+    message(STATUS "  CAM: DISABLED")
+endif()
+
 # 5. UI 层 - 用户界面
 add_subdirectory(UI/Common)
 add_subdirectory(UI/2D)
@@ -368,6 +381,10 @@ set(SANYI_PROJECT_LIBS
 )
 if(BUILD_NESTING)
     list(APPEND SANYI_PROJECT_LIBS Nesting)
+endif()
+
+if(BUILD_CAM)
+    list(APPEND SANYI_PROJECT_LIBS CAM)
 endif()
 
 if(BUILD_UI3D)
