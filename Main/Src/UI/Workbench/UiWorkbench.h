@@ -10,7 +10,7 @@
 #include "UIServices.h"
 #include "UI/Service/ToolBarContextManager.h"
 #include "Services/UiStateCenter.h"
-#include "ClientConfig/UiLayoutBuilder.h"    // IUiCommandDispatcher：工作台直接实现该接口
+#include "ClientConfig/UiLayoutBuilder.h"  // IUiCommandDispatcher：工作台直接实现该接口
 
 class QAction;
 class QWidget;
@@ -30,9 +30,8 @@ struct CommandUiSnapshot;
 // 3D 类型前向声明（避免头文件膨胀，实际 include 下沉到 .cpp）
 #if BUILD_UI3D
     #include <QShortcut>
-    #include "UI3D/Service/ServicePack3D.h"    // 值成员需要完整定义
-    #include "UI/MainWindow/MainWindow3D.h"    // unique_ptr 成员，MOC 需要完整类型
-
+    #include "UI3D/Service/ServicePack3D.h"  // 值成员需要完整定义
+    #include "UI/MainWindow/MainWindow3D.h"  // unique_ptr 成员，MOC 需要完整类型
 
 namespace Eg
 {
@@ -115,7 +114,6 @@ public:
     /// 派生类里声明了两参数 dispatch 会隐藏基类的无参便捷重载，显式引入
     using IUiCommandDispatcher::dispatch;
 
-
     /// 获取工作台的命令显示名和图标等元数据
     virtual QString commandText(const QString& commandId) const;
 
@@ -154,10 +152,7 @@ public:
     /// 重新抓取命令 UI 快照并刷新所有命令面（工具栏 / 菜单栏 / 右键菜单 / 场景树）。
     /// 框架层在重建菜单后调用，使新建的 QAction 立即得到正确启用态；
     /// 未接入命令中枢的工作台保持空实现。
-    virtual void refreshCommandUiState()
-    {
-    }
-
+    virtual void refreshCommandUiState() {}
 
     /// 是否需要显示骨架停靠面板（SceneDock / PropertiesDock）
     /// 2D 工作台返回 true（默认），3D 工作台返回 false
@@ -202,7 +197,6 @@ protected:
     WorkbenchWindow* m_workbenchWindow{ nullptr };
 };
 
-
 // ============================================================
 /**
  * @class Workbench2D
@@ -244,14 +238,17 @@ public:
 public:
     /// 设置左右面板（Draw Tools / Layers）的承载样式（默认 Dock）
     void setPanelHostStyle(PanelHostStyle style);
+
     /// 当前左右面板承载样式
-    PanelHostStyle panelHostStyle() const { return m_panelHostStyle; }
+    PanelHostStyle panelHostStyle() const
+    {
+        return m_panelHostStyle;
+    }
 
     /// 重新抓取选择上下文快照并驱动全部命令 UI（工具栏/菜单栏/右键菜单/面板/状态栏）
     /// 唯一刷新入口，由 UiStateBridge2D 在各触发源上统一调用，
     /// 框架层重建菜单后也会经基类虚接口回调到这里。
     void refreshCommandUiState() override;
-
 
 private:
     /// 创建中央视口
@@ -357,8 +354,6 @@ private:
     ToolBarContext determineContextFromSelection(const CommandUiSnapshot& snapshot) const;
 };
 
-
-
 #if BUILD_UI3D
 // ============================================================
 /**
@@ -391,7 +386,6 @@ public:
     bool managesOwnMenus() const override;
     /// 重新抓取 3D 快照并驱动全部命令 UI（中枢托管动作 + 配置化菜单栏）
     void refreshCommandUiState() override;
-
 
     // 3D 工作台接管设置对话框，避免 CoreOperationRegistry 兜底弹出冗余提示
     bool showSettingsDialog(QWidget* parent) override;
@@ -449,7 +443,6 @@ private:
     ServicePack3D m_services3D{};
 
     std::unique_ptr<class MainWindow3D> m_mainWindow3D;
-
 
     /// 3D 状态栏 widget。所有权与复用规则同 m_statusBar2D（见那里的注释）。
     /// deactivate() 里刻意**不**清空它：清空等于每次切回 3D 都新建一个，

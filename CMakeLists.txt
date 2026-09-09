@@ -240,7 +240,9 @@ message(STATUS "***************************************************************"
 add_subdirectory(Utility/Utility)
 
 # 1.5 CrashHandler 层 - 崩溃捕获（在日志之前，确保初始化阶段崩溃也能捕获）
-add_subdirectory(CrashHandler/CrashHandler)
+if(BUILD_CRASHHANDLER)
+    add_subdirectory(CrashHandler/CrashHandler)
+endif()
 
 # 1.6 License 层 - 软件注册与许可校验
 add_subdirectory(License/License)
@@ -374,7 +376,13 @@ install(TARGETS SanYiCAD
 
 # Install all project shared libraries
 set(SANYI_PROJECT_LIBS
-    Utility Log CrashHandler License
+    Utility Log License
+)
+if(BUILD_CRASHHANDLER)
+    list(APPEND SANYI_PROJECT_LIBS CrashHandler)
+endif()
+
+list(APPEND SANYI_PROJECT_LIBS
     UICommon UI2D
     FileIO
     EnginePersistence
