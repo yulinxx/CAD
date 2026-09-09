@@ -22,6 +22,7 @@
 #include "Engine3D/SceneManager3D.h"
 
 #include "FileIO/FileIOManager.h"
+#include "PendingOperationRegistry.h"
 
 class SettingsService;  // forward
 
@@ -34,6 +35,7 @@ class FileDialogService;
 class RecentFileService;
 class HelpDialogService;
 class FileOperationRegistry;
+class PendingOperationRegistry;
 class PersistenceService;
 
 class SelectionService;
@@ -48,6 +50,7 @@ class UnitManager;
 class DeviceHost;
 class ProcessingJobService;
 class LaserOperationRegistry;
+class ImportExportRegistry;
 
 
 namespace Ui
@@ -321,6 +324,9 @@ private:
 
     /// 文件操作注册表
     std::unique_ptr<FileOperationRegistry> m_fileOperationRegistry;
+
+    /// 占位操作注册表
+    std::unique_ptr<PendingOperationRegistry> m_pendingOperationRegistry;
 
     /// 硬件装配层（设备 + IO 点位 + 安全策略 + tick 驱动）
     std::unique_ptr<DeviceHost> m_deviceHost;

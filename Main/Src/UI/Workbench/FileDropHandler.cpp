@@ -370,11 +370,20 @@ bool FileDropHandler::importImage(const QString& filePath, const QPointF& anchor
         Eg::SyEntity* added = m_sceneManager->findSyEntityById(persistentId);
         if (added)
         {
-            int bitmapLayerId = m_layerManager->findOrCreateLayerByType(Eg::LayerType::BITMAP);
+            const int curId = m_layerManager->currentLayerId();
+            Eg::LayerType curType = m_layerManager->layerType(curId);
+            int bitmapLayerId;
+            if (curType == Eg::LayerType::BITMAP)
+            {
+                bitmapLayerId = curId;
+            }
+            else
+            {
+                bitmapLayerId = m_layerManager->findOrCreateLayerByType(Eg::LayerType::BITMAP);
+            }
             if (bitmapLayerId >= 0)
             {
                 m_layerManager->assignEntityToLayer(added, bitmapLayerId);
-                m_layerManager->setCurrentLayer(bitmapLayerId);
             }
         }
     }

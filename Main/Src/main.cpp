@@ -2,10 +2,19 @@
 
 #include <QSurfaceFormat>
 
+#ifdef Q_OS_MACOS
+#include <QApplication>
+#endif
+
 int runCADApplication(int argc, char** argv);
 
 int main(int argc, char** argv)
 {
+#ifdef Q_OS_MACOS
+    // macOS: 禁用 Input Method Kit 的 mach port 通信，避免 IMKCFRunLoopWakeUpReliable 崩溃
+    // 这是 Qt 在 macOS 上的已知问题，会导致 segfault
+    qputenv("QT_IM_MODULE", "plain");
+#endif
     // 全应用统一采用现代 OpenGL（CoreProfile），不使用固定管线：
     // - Windows：OpenGL 4.6 CoreProfile（最高版本）
     // - macOS：OpenGL 4.1 CoreProfile（macOS 支持的最高版本）

@@ -177,11 +177,12 @@ target_include_directories(${app_name}
         "${CMAKE_CURRENT_SOURCE_DIR}/../License/License/Include"
 )
 if(BUILD_CRASHHANDLER)
-    list(APPEND PROJECT_INCLUDE_DIRS
-        "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler/CrashHandler/Include"
+    target_include_directories(${app_name} PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler"
     )
 endif()
 
+# Build PROJECT_INCLUDE_DIRS list first
 list(APPEND PROJECT_INCLUDE_DIRS
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/2D/Include"
@@ -195,6 +196,14 @@ list(APPEND PROJECT_INCLUDE_DIRS
         "${CMAKE_CURRENT_SOURCE_DIR}/../Log/Log/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Include"
 )
+if(BUILD_CRASHHANDLER)
+    list(APPEND PROJECT_INCLUDE_DIRS
+        "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler"
+    )
+endif()
+
+# Apply PROJECT_INCLUDE_DIRS to the target (must be AFTER the list is populated)
+target_include_directories(${app_name} PRIVATE ${PROJECT_INCLUDE_DIRS})
 
 target_link_libraries(${app_name}
     PRIVATE
@@ -502,7 +511,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
 if(BUILD_CRASHHANDLER)
     target_include_directories(MainTests
         PRIVATE
-            "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler/CrashHandler/Include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler"
     )
 endif()
 
@@ -521,6 +530,9 @@ list(APPEND PROJECT_INCLUDE_DIRS
             "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Src"
             # protobuf 生成头文件目录由 FileIO target 的 PUBLIC_INCLUDE_DIRS 自动传播
     )
+
+# Apply PROJECT_INCLUDE_DIRS to MainTests
+target_include_directories(MainTests PRIVATE ${PROJECT_INCLUDE_DIRS})
 
     target_link_libraries(MainTests
         PRIVATE

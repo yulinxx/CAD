@@ -13,23 +13,16 @@ class LayerEditService;
 class UnitManager;
 class QWidget;
 
-namespace Eg
-{
-    class EntityClipboard;
-}
-
 /**
- * @class CoreOperationRegistry
- * @brief 核心操作注册器（外观类）
+ * @class EditOperationRegistry
+ * @brief 编辑操作注册器 — 复制/粘贴/变换/群组/修剪/延伸/贝塞尔等编辑操作
  *
- * 将注册职责委托给子注册器：EditOperationRegistry、ViewOperationRegistry、
- * AlgorithmOperationRegistry、HelpOperationRegistry。
- * 从 CoreOperationRegistry.cpp（1620行）拆分而来（2026-09-08）。
+ * 从 CoreOperationRegistry 拆分而来（2026-09-08），用于缩小单一注册器体积。
  */
-class CoreOperationRegistry
+class EditOperationRegistry
 {
 public:
-    CoreOperationRegistry(OperationBus* bus,
+    EditOperationRegistry(OperationBus* bus,
         SceneEditService* editService,
         IUndoRedoManager* undoManager,
         Eg::EntityClipboard* clipboard,
@@ -44,10 +37,14 @@ public:
     void registerAll();
 
 private:
-    void registerHelpOperations();
-    void registerEditOperations();
-    void registerAlgorithmOperations();
-    void registerViewOperations();
+    void registerClipboardOps();
+    void registerTransformOps();
+    void registerGroupOps();
+    void registerTrimExtendOps();
+    void registerBboxOps();
+    void registerDiscretizeOp();
+    void registerBezierOps();
+    void registerArrayOp();
 
     OperationBus* m_bus;
     SceneEditService* m_editService;
