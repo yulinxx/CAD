@@ -191,8 +191,20 @@ list(APPEND PROJECT_INCLUDE_DIRS
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Common/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Src"
+)
+if(BUILD_UI3D)
+    list(APPEND PROJECT_INCLUDE_DIRS
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Src"
+    )
+else()
+    # When UI3D is disabled, use stub headers
+    list(APPEND PROJECT_INCLUDE_DIRS
+        "${CMAKE_BINARY_DIR}/stubs"
+    )
+endif()
+
+list(APPEND PROJECT_INCLUDE_DIRS
         "${CMAKE_CURRENT_SOURCE_DIR}/../Log/Log/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Include"
 )

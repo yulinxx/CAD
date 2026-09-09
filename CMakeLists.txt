@@ -6,13 +6,11 @@ if(POLICY CMP0167)
     cmake_policy(SET CMP0167 NEW)
 endif()
 
-# 包含项配置文件
+# 包含全局配置文件 (定义所有编译环境选项)
 include(Config.cmake)
 
 # 集成VCPKG
 set(CMAKE_TOOLCHAIN_FILE "${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "Vcpkg toolchain file")
-# 禁用 vcpkg 自动部署 DLL
-# set(VCPKG_APPLOCAL_DEPS OFF CACHE BOOL "Disable automatic DLL deployment")
 
 # 项目基本信息
 project(SanYiCAD
@@ -21,93 +19,11 @@ project(SanYiCAD
     LANGUAGES CXX
 )
 
-# MSVC 运行库设置：动态链接 CRT (/MD 发布, /MDd 调试)
-if(MSVC)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL" CACHE STRING "MSVC runtime library" FORCE)
-endif()
-
 set(SANYI_ROOT "${PROJECT_SOURCE_DIR}" CACHE INTERNAL "SanYi CAD project root")
 include("${SANYI_ROOT}/CMake/SanYiPaths.cmake")
 include("${SANYI_ROOT}/CMake/Utils.cmake")
 
-# 客户化 UI 配置：默认客户 ID 仅用于打包时写入安装包默认设置，
-# **不再**作为编译期宏注入代码。运行时客户 ID 由 UiClientContext 解析，
-# 优先级：命令行覆盖 > 环境变量 SANYI_CLIENT_ID > QSettings Client/Id > san_yi。
-# 这样一份二进制即可服务多个客户，无需为每个客户单独出包。
-set(SANYI_DEFAULT_CLIENT_ID "san_yi" CACHE STRING "Default UI client ID written to installer settings")
-set_property(CACHE SANYI_DEFAULT_CLIENT_ID PROPERTY STRINGS
-    "san_yi"
-    "client_a"
-    "client_b"
-)
-# 配置驱动 UI 已成为唯一构建路径（硬编码回退分支已删除），此开关仅保留兼容占位。
-# 注意：不要再新增 #ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI 分支。
-option(SANYI_ENABLE_CONFIG_DRIVEN_UI "Deprecated: config-driven UI is now the only path" ON)
-
-# 可选: 启用 Vulkan 支持 (从 vcpkg 获取)
-find_package(Vulkan QUIET)
-if(Vulkan_FOUND)
-    message(STATUS "  Vulkan: FOUND (${Vulkan_INCLUDE_DIRS})")
-    add_compile_definitions(SANYI_VULKAN_ENABLED)
-    add_compile_definitions(RENDERX_HAS_VULKAN)
-    # 让所有目标（含 RenderX 的 rhiVulkan.cpp）都能找到 <vulkan/vulkan.h>
-    include_directories(${Vulkan_INCLUDE_DIRS})
-else()
-    message(STATUS "  Vulkan: NOT found (optional, Vulkan backend will be unavailable)")
-endif()
-
-message(STATUS "")
-message(STATUS "==========================================")
-message(STATUS "  SanYi CAD System Configuration")
-message(STATUS "==========================================")
-message(STATUS "")
-message(STATUS "  Project: ${PROJECT_NAME}")
-message(STATUS "  VCPKG_DIR: ${VCPKG_DIR}")
-
-# [A3 修复] 不再在 configure 阶段执行 git submodule update。
-# 子模块更新应在 configure 之前由用户手动执行（见 README 前置步骤）。
-# configure 时仅校验各子模块的 CMakeLists.txt 是否存在，缺失则报错提示。
-find_package(Git QUIET)
-if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
-    message(STATUS "  Git: Checking submodule presence...")
-    set(_SANYI_SUBMODULE_DIRS
-        "Engine/Common" "Engine/2D" "Engine/3D" "Engine/Persistence"
-        "Renderx" "UI/Common" "UI/2D" "UI/3D"
-        "FileIO/FileIO" "Utility/Utility" "Log/Log"
-        "License/License" "CrashHandler/CrashHandler"
-        "Hardware/Hardware" "Network/Network" "Vision/Vision"
-        "Engraving/Engraving" "Nesting/Nesting" "GeoModelCore/GeoModelCore"
-        "PythonHost" "PyBindCore/PyBindCore"
-    )
-    foreach(_submod IN LISTS _SANYI_SUBMODULE_DIRS)
-        if(NOT EXISTS "${PROJECT_SOURCE_DIR}/${_submod}/CMakeLists.txt")
-            message(FATAL_ERROR
-                "  Submodule '${_submod}' is missing (no CMakeLists.txt found).\n"
-                "  Please run before configuring:\n"
-                "    cd ${PROJECT_SOURCE_DIR}\n"
-                "    git submodule update --init --recursive"
-            )
-        endif()
-    endforeach()
-    message(STATUS "  Git: All submodules present")
-else()
-    message(STATUS "  Git: Not found or not a git repository, skipping submodule check")
-endif()
-
-# 统一 C++ 标准
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-# 符号可见性控制：默认隐藏，仅通过宏导出必要符号
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
-
-# 统一 MSVC 运行时库设置
-if(MSVC)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
-    add_compile_options("/utf-8")
-endif()
+# 注意: C++标准、编译器设置、输出目录等已在 Config.cmake 中配置
 
 # ---------------------------------------------------------------------------
 # MSVC 静态分析：补上 printf 格式串校验（默认关闭，CI 专用）
@@ -151,27 +67,8 @@ if(MSVC AND SANYI_MSVC_ANALYZE)
     message(STATUS "  MSVC /analyze: ON (format-string diagnostics promoted to errors)")
 endif()
 
-# macOS: 抑制 -Wnonportable-include-path（大小写不敏感文件系统上大小写匹配的误报）
-if(APPLE)
-    add_compile_options(-Wno-nonportable-include-path)
-endif()
-
 # 统一输出目录（缓存变量，跨 project() 作用域可见）
-set(_SANYI_BIN_DIR "${CMAKE_BINARY_DIR}/bin_Qt${QT_VERSION_MAJOR}" CACHE INTERNAL "SanYi runtime output dir")
-set(_SANYI_LIB_DIR "${CMAKE_BINARY_DIR}/lib_Qt${QT_VERSION_MAJOR}" CACHE INTERNAL "SanYi library output dir")
-
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${_SANYI_BIN_DIR}")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${_SANYI_BIN_DIR}")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${_SANYI_LIB_DIR}")
-
-foreach(cfg Debug Release RelWithDebInfo MinSizeRel)
-    string(TOUPPER "${cfg}" cfg_u)
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${cfg_u} "${_SANYI_BIN_DIR}/${cfg}")
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${cfg_u} "${_SANYI_BIN_DIR}/${cfg}")
-    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${cfg_u} "${_SANYI_LIB_DIR}/${cfg}")
-endforeach()
-
-set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+# 注意: 基础目录已在 Config.cmake 中配置，此处添加 Qt 版本后缀以保持兼容性
 
 find_package(GTest CONFIG QUIET)
 if(GTest_FOUND)
@@ -232,6 +129,24 @@ else()
     set(BUILD_HARDWARE_TESTS OFF CACHE BOOL "Build Hardware unit tests" FORCE)
     set(BUILD_VISION_TESTS OFF CACHE BOOL "Build Vision unit tests" FORCE)
 endif()
+
+# 输出目录配置 (带 Qt 版本后缀以保持兼容性)
+# 注意: 基础目录已在 Config.cmake 中配置
+set(_SANYI_BIN_DIR "${CMAKE_BINARY_DIR}/bin_Qt${QT_VERSION_MAJOR}" CACHE INTERNAL "SanYi runtime output dir")
+set(_SANYI_LIB_DIR "${CMAKE_BINARY_DIR}/lib_Qt${QT_VERSION_MAJOR}" CACHE INTERNAL "SanYi library output dir")
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${_SANYI_BIN_DIR}")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${_SANYI_BIN_DIR}")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${_SANYI_LIB_DIR}")
+
+foreach(cfg Debug Release RelWithDebInfo MinSizeRel)
+    string(TOUPPER "${cfg}" cfg_u)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${cfg_u} "${_SANYI_BIN_DIR}/${cfg}")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${cfg_u} "${_SANYI_BIN_DIR}/${cfg}")
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${cfg_u} "${_SANYI_LIB_DIR}/${cfg}")
+endforeach()
+
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 message(STATUS "")
 message(STATUS "***************************************************************")
