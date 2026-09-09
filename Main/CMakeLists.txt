@@ -174,8 +174,15 @@ target_include_directories(${app_name}
         "${UI_ROOT}/Widgets"
         "${UI_ROOT}/Workbench"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Utility/Utility/Include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler/CrashHandler/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../License/License/Include"
+)
+if(BUILD_CRASHHANDLER)
+    list(APPEND PROJECT_INCLUDE_DIRS
+        "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler/CrashHandler/Include"
+    )
+endif()
+
+list(APPEND PROJECT_INCLUDE_DIRS
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/2D/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/3D/Include"
@@ -192,8 +199,14 @@ target_include_directories(${app_name}
 target_link_libraries(${app_name}
     PRIVATE
         Utility
-        CrashHandler
         License
+)
+if(BUILD_CRASHHANDLER)
+    target_link_libraries(${app_name} PRIVATE CrashHandler)
+endif()
+
+target_link_libraries(${app_name}
+    PRIVATE
         EngineCommon
         Engine2D
         EnginePersistence
@@ -484,8 +497,16 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
             "${UI_ROOT}/Widgets"
             "${UI_ROOT}/Workbench"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Utility/Utility/Include"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler/CrashHandler/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../License/License/Include"
+)
+if(BUILD_CRASHHANDLER)
+    target_include_directories(MainTests
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler/CrashHandler/Include"
+    )
+endif()
+
+list(APPEND PROJECT_INCLUDE_DIRS
             "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/2D/Include"
             "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/3D/Include"
@@ -504,9 +525,15 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
     target_link_libraries(MainTests
         PRIVATE
             Utility
-            CrashHandler
             License
             EngineCommon
+)
+if(BUILD_CRASHHANDLER)
+    target_link_libraries(MainTests PRIVATE CrashHandler)
+endif()
+
+target_link_libraries(MainTests
+        PRIVATE
             Engine2D
             EnginePersistence
             UICommon

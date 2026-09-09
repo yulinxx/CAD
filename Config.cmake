@@ -1,83 +1,46 @@
 # ============================================================================
-# Config.cmake — 公共构建配置（入库）
+# Config.cmake — SanYi CAD 公共构建配置
 # ============================================================================
-# 此文件包含所有可入库的公共构建逻辑。
-# 用户本地私有配置请使用 Config.local.cmake（已被 .gitignore 排除）。
+# 本文件为公共配置，入库版本控制。
+# 用户私有配置请编辑同目录下的 Config.local.cmake（不在版本控制中）。
 # ============================================================================
 
-# --------------------------------------------------------------------
-# 加载用户本地配置（可选）
-# --------------------------------------------------------------------
-# [A1 修复] 支持 Config.local.cmake 覆盖默认路径，实现"公共配置入库 + 私有配置不入库"
-# --------------------------------------------------------------------
-# 注意：Config.local.cmake 已被 .gitignore 排除，不会提交到版本控制。
-# 用户本地配置（vcpkg/Qt 路径等）请编辑 Config.local.cmake。
-# 未找到时使用 Config.cmake 中的默认值。
-set(_SANYI_CONFIG_LOCAL "${CMAKE_CURRENT_LIST_DIR}/Config.local.cmake")
-if(EXISTS "${_SANYI_CONFIG_LOCAL}")
-    include("${_SANYI_CONFIG_LOCAL}")
-    message(STATUS "[Config] Loaded local configuration from Config.local.cmake")
-endif()
+# =============================================================================
+# 【用户配置区域】- 以下配置可被 Config.local.cmake 覆盖
+# =============================================================================
 
-# --------------------------------------------------------------------
-# vcpkg 配置（默认值，可通过 Config.local.cmake 或 -DVCPKG_DIR= 覆盖）
-# --------------------------------------------------------------------
-if(NOT VCPKG_DIR)
+# -----------------------------------------------------------------------------
+# [1] vcpkg 路径配置
+# -----------------------------------------------------------------------------
+if(NOT DEFINED VCPKG_DIR OR VCPKG_DIR STREQUAL "")
     if(WIN32)
-        set(VCPKG_DIR "$ENV{VCPKG_ROOT}" CACHE PATH "VCPKG installation directory")
-        if(NOT VCPKG_DIR OR NOT EXISTS "${VCPKG_DIR}")
-            set(VCPKG_DIR "C:/vcpkg/" CACHE PATH "VCPKG installation directory")
-        endif()
+        set(VCPKG_DIR "C:/Users/xx/vcpkg" CACHE PATH "vcpkg installation directory")
+        # set(VCPKG_DIR "C:/Users/xx/vcpkg" CACHE PATH "vcpkg installation directory")
     elseif(UNIX AND NOT APPLE)
-        set(VCPKG_DIR "$ENV{VCPKG_ROOT}" CACHE PATH "VCPKG installation directory")
-        if(NOT VCPKG_DIR OR NOT EXISTS "${VCPKG_DIR}")
-            set(VCPKG_DIR "/usr/local/vcpkg/" CACHE PATH "VCPKG installation directory")
-        endif()
+        set(VCPKG_DIR "/usr/local/vcpkg" CACHE PATH "vcpkg installation directory")
     elseif(APPLE)
-        set(VCPKG_DIR "$ENV{VCPKG_ROOT}" CACHE PATH "VCPKG installation directory")
-        if(NOT VCPKG_DIR OR NOT EXISTS "${VCPKG_DIR}")
-            set(VCPKG_DIR "/opt/vcpkg/" CACHE PATH "VCPKG installation directory")
-        endif()
+        set(VCPKG_DIR "/opt/vcpkg" CACHE PATH "vcpkg installation directory")
     endif()
 endif()
 
-# --------------------------------------------------------------------
-# Qt 版本配置（已固定 Qt6，不再支持 Qt5）
-# --------------------------------------------------------------------
-set(QT_VERSION_MAJOR 6)
-
-# MSVC 运行库设置：动态链接 CRT (/MD 发布, /MDd 调试)
-if(MSVC)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL" CACHE STRING "MSVC runtime library" FORCE)
-endif()
-
-# --------------------------------------------------------------------
-# Qt 路径配置（默认值，可通过 Config.local.cmake 或 -DQt_INSTALL_DIR= 覆盖）
-# --------------------------------------------------------------------
-if(NOT Qt_INSTALL_DIR)
+# -----------------------------------------------------------------------------
+# [2] Qt 路径配置
+# -----------------------------------------------------------------------------
+if(NOT DEFINED Qt_INSTALL_DIR OR Qt_INSTALL_DIR STREQUAL "")
     if(WIN32)
-        set(Qt_INSTALL_DIR "$ENV{QT_DIR}" CACHE PATH "Qt installation directory")
-        if(NOT Qt_INSTALL_DIR OR NOT EXISTS "${Qt_INSTALL_DIR}")
-            set(Qt_INSTALL_DIR "C:/Qt/6.11.1/msvc2022_64" CACHE PATH "Qt installation directory")
-        endif()
+        set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.11.2/msvc2022_64" CACHE PATH "Qt installation directory")
+        # set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.11.2/msvc2022_64" CACHE PATH "Qt installation directory")
     elseif(UNIX AND NOT APPLE)
-        set(Qt_INSTALL_DIR "$ENV{QT_DIR}" CACHE PATH "Qt installation directory")
-        if(NOT Qt_INSTALL_DIR OR NOT EXISTS "${Qt_INSTALL_DIR}")
-            set(Qt_INSTALL_DIR "/usr/local/Qt/6.11.1/gcc_64" CACHE PATH "Qt installation directory")
-        endif()
+        set(Qt_INSTALL_DIR "/usr/local/Qt/6.11.2/gcc_64" CACHE PATH "Qt installation directory")
     elseif(APPLE)
-        set(Qt_INSTALL_DIR "$ENV{QT_DIR}" CACHE PATH "Qt installation directory")
-        if(NOT Qt_INSTALL_DIR OR NOT EXISTS "${Qt_INSTALL_DIR}")
-            set(Qt_INSTALL_DIR "/Applications/Qt/6.11.1/macos" CACHE PATH "Qt installation directory")
-        endif()
+        set(Qt_INSTALL_DIR "/Applications/Qt/6.11.1/macos" CACHE PATH "Qt installation directory")
     endif()
 endif()
 
-# --------------------------------------------------------------------
-# 模块编译开关配置
-# --------------------------------------------------------------------
-# [A2 修复] 使用 option() 代替 set(... FORCE)，允许用户通过 -D<OPTION>=OFF 覆盖。
-# 默认值可通过 Config.local.cmake 中的 SANYI_DEFAULT_* 变量自定义。
+# -----------------------------------------------------------------------------
+# [3] 模块编译开关（可通过 -D<OPTION>=ON/OFF 覆盖）
+# -----------------------------------------------------------------------------
+# 默认值配置（可放在 Config.local.cmake 中覆盖）
 if(NOT DEFINED SANYI_DEFAULT_OPTIONAL)
     set(SANYI_DEFAULT_OPTIONAL ON)
 endif()
@@ -85,52 +48,68 @@ if(NOT DEFINED SANYI_DEFAULT_CORE)
     set(SANYI_DEFAULT_CORE OFF)
 endif()
 
-option(BUILD_VISION "Build Vision module (image processing, computer vision)" ${SANYI_DEFAULT_OPTIONAL})
-option(BUILD_NETWORK "Build Network module (HTTP, WebSocket, cloud sync)" OFF)
-option(BUILD_HARDWARE "Build Hardware module (laser control, material database)" ${SANYI_DEFAULT_OPTIONAL})
-option(BUILD_ENGRAVING "Build Engraving module (3D laser engraving)" ${SANYI_DEFAULT_OPTIONAL})
-option(BUILD_GEOMODELCORE "Build GeoModelCore module (OpenCASCADE-based geometry modeling)" ${SANYI_DEFAULT_CORE})
-option(BUILD_UI3D "Build UI3D module (3D user interface)" ${SANYI_DEFAULT_OPTIONAL})
-option(BUILD_NESTING "Build Nesting module (2D/3D nesting/arrangement algorithm)" ${SANYI_DEFAULT_OPTIONAL} )
-option(BUILD_CAM "Build CAM module (laser cutting toolpath generation)" ${SANYI_DEFAULT_OPTIONAL})
-option(BUILD_PYTHON "Build Python module (PythonHost integration framework)" OFF)
-# option(BUILD_NESTING "Build Nesting module (2D/3D nesting/arrangement algorithm)" OFF)
+# 核心模块（默认关闭）
+option(BUILD_GEOMODELCORE "GeoModelCore module (OpenCASCADE-based geometry modeling)" ${SANYI_DEFAULT_CORE})
 
-# ====================================================================
-# 自动配置区域（以下内容自动配置，无需手动修改）
-# ====================================================================
+# 可选模块（默认开启）
+option(BUILD_UI3D   "UI3D module (3D user interface)" ${SANYI_DEFAULT_OPTIONAL})
+option(BUILD_NESTING "Nesting module (2D/3D nesting algorithm)" ${SANYI_DEFAULT_OPTIONAL})
 
-# --------------------------------------------------------------------
-# Qt CMake 配置目录（自动从 Qt_INSTALL_DIR 派生）
-# --------------------------------------------------------------------
+# 扩展模块（默认关闭）
+option(BUILD_VISION        "Vision module (image processing/computer vision)" OFF)
+option(BUILD_NETWORK       "Network module (HTTP/WebSocket/cloud sync)" OFF)
+option(BUILD_HARDWARE      "Hardware module (laser control/material database)" OFF)
+option(BUILD_ENGRAVING     "Engraving module (3D laser engraving)" OFF)
+option(BUILD_CAM           "CAM module (laser cutting toolpath generation)" OFF)
+option(BUILD_PYTHON        "Python module (PythonHost integration framework)" OFF)
+option(BUILD_CRASHHANDLER  "CrashHandler module (crash capture and minidump generation)" OFF)
+
+# =============================================================================
+# 【自动配置区域】- 以下内容自动完成，无需手动修改
+# =============================================================================
+
+# 加载用户本地配置（覆盖上述默认值）
+set(_SANYI_CONFIG_LOCAL "${CMAKE_CURRENT_LIST_DIR}/Config.local.cmake")
+if(EXISTS "${_SANYI_CONFIG_LOCAL}")
+    include("${_SANYI_CONFIG_LOCAL}")
+    message(STATUS "[Config] Loaded local configuration from Config.local.cmake")
+endif()
+
+# 检查路径是否存在
+if(NOT EXISTS "${VCPKG_DIR}")
+    message(WARNING "VCPKG_DIR does not exist: ${VCPKG_DIR}")
+endif()
+if(NOT EXISTS "${Qt_INSTALL_DIR}")
+    message(WARNING "Qt_INSTALL_DIR does not exist: ${Qt_INSTALL_DIR}")
+endif()
+
+# Qt 版本固定
+set(QT_VERSION_MAJOR 6)
+
+# MSVC 运行时库：动态链接 CRT
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL" CACHE STRING "MSVC runtime library" FORCE)
+endif()
+
+# Qt CMake 配置
 set(Qt6_DIR "${Qt_INSTALL_DIR}/lib/cmake/Qt6" CACHE PATH "Qt CMake configuration directory")
-
-# --------------------------------------------------------------------
-# 设置 CMAKE_PREFIX_PATH
-# --------------------------------------------------------------------
 list(INSERT CMAKE_PREFIX_PATH 0 "${Qt_INSTALL_DIR}")
 
-# --------------------------------------------------------------------
-# 输出Qt配置信息用于调试
-# --------------------------------------------------------------------
+# 输出配置信息
 get_filename_component(QT_VERSION_FULL "${Qt_INSTALL_DIR}" PATH)
 get_filename_component(QT_VERSION_FULL "${QT_VERSION_FULL}" NAME)
-message(STATUS "[Qt]")
-message(STATUS "  Version: ${QT_VERSION_FULL}")
-message(STATUS "  Install Directory: ${Qt_INSTALL_DIR}")
-message(STATUS "  Config Directory: ${Qt6_DIR}")
-message(STATUS "  CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}")
+message(STATUS "")
+message(STATUS "=== SanYi CAD Configuration ===")
+message(STATUS "  Qt Version:    ${QT_VERSION_FULL}")
+message(STATUS "  Qt Directory:  ${Qt_INSTALL_DIR}")
+message(STATUS "  vcpkg Directory: ${VCPKG_DIR}")
+message(STATUS "  Build Modules: ${SANYI_DEFAULT_OPTIONAL}/Core=${SANYI_DEFAULT_CORE}")
+message(STATUS "")
 
-# --------------------------------------------------------------------
-# 自动配置 CMAKE_PREFIX_PATH 和 运行时环境
-# --------------------------------------------------------------------
-if(EXISTS "${Qt_INSTALL_DIR}")
-    if(WIN32)
-        set(_SANYI_QT_BIN "${Qt_INSTALL_DIR}/bin")
-        set(_SANYI_VCPKG_BIN "${VCPKG_DIR}/installed/x64-windows/bin")
-        set(ENV{PATH} "${_SANYI_QT_BIN};${_SANYI_VCPKG_BIN};$ENV{PATH}")
-        set(QT_PLUGIN_PATH "${Qt_INSTALL_DIR}/plugins" CACHE PATH "Qt plugins directory")
-        
-        # Qt6 的 MOC/RCC 由 Qt6::moc / Qt6::rcc 目标自动管理，无需手动指定路径
-    endif()
+# Windows 运行时环境配置
+if(WIN32 AND EXISTS "${Qt_INSTALL_DIR}")
+    set(_SANYI_QT_BIN "${Qt_INSTALL_DIR}/bin")
+    set(_SANYI_VCPKG_BIN "${VCPKG_DIR}/installed/x64-windows/bin")
+    set(ENV{PATH} "${_SANYI_QT_BIN};${_SANYI_VCPKG_BIN};$ENV{PATH}")
+    set(QT_PLUGIN_PATH "${Qt_INSTALL_DIR}/plugins" CACHE PATH "Qt plugins directory")
 endif()
