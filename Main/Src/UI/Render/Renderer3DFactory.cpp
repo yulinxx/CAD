@@ -1,6 +1,8 @@
 #include "Renderer3DFactory.h"
 
+#if BUILD_UI3D
 #include "RenderWidget3DAdapter.h"
+#endif
 #include "Log/SyLogger.h"
 
 std::unique_ptr<IRenderer3D> Renderer3DFactory::create(RendererType type)
@@ -8,8 +10,13 @@ std::unique_ptr<IRenderer3D> Renderer3DFactory::create(RendererType type)
     switch (type)
     {
     case RendererType::Compatible:
+#if BUILD_UI3D
         SY_DEBUG("[Renderer3DFactory] Creating RenderWidget3DAdapter (compatible chain)");
         return std::make_unique<RenderWidget3DAdapter>();
+#else
+        SY_DEBUG("[Renderer3DFactory] UI3D disabled, returning null renderer");
+        return nullptr;
+#endif
 
     case RendererType::None:
     default:

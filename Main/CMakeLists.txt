@@ -34,6 +34,11 @@ if(APPLE)
     list(APPEND MAIN_APP_SOURCES
         "${SRC_ROOT}/Platform/MacMenuCleanup.mm"
     )
+    # .mm 文件包含 Obj-C 头文件，不能与 C++ 文件混在同一个 Unity batch 中
+    set_source_files_properties(
+        "${CMAKE_CURRENT_SOURCE_DIR}/Src/Platform/MacMenuCleanup.mm"
+        PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON
+    )
 endif()
 
 set(MAIN_APP_HEADERS
@@ -198,10 +203,83 @@ if(BUILD_UI3D)
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Src"
     )
 else()
-    # When UI3D is disabled, use stub headers
-    list(APPEND PROJECT_INCLUDE_DIRS
-        "${CMAKE_BINARY_DIR}/stubs"
+    # When UI3D is disabled, generate stub headers so Main module compiles
+    set(_STUB_DIR "${CMAKE_BINARY_DIR}/stubs")
+    file(MAKE_DIRECTORY
+        "${_STUB_DIR}/UI3D/Algorithm"
+        "${_STUB_DIR}/UI3D/Edit"
+        "${_STUB_DIR}/UI3D/Manager"
+        "${_STUB_DIR}/UI3D/Operation"
+        "${_STUB_DIR}/UI3D/Render3D"
+        "${_STUB_DIR}/UI3D/Service"
+        "${_STUB_DIR}/UI3D/Settings"
+        "${_STUB_DIR}/UI3D/Shortcut"
+        "${_STUB_DIR}/Render3D"
+        "${_STUB_DIR}/UI/StatusBar"
+        "${_STUB_DIR}/UI/TopToolBar"
+        "${_STUB_DIR}/UI/MainWindow"
+        "${_STUB_DIR}/UI/Settings"
+        "${_STUB_DIR}/UI/Algorithm"
     )
+    # IRenderer3D - full interface required by Renderer3DFactory
+    file(WRITE "${_STUB_DIR}/Render3D/IRenderer3D.h"
+        "#pragma once\n"
+        "#include <QString>\n#include <QStringList>\n#include <QPainter>\n#include <functional>\n"
+        "class SceneDocument3DAdapter;\nclass CameraController3D;\n"
+        "class IRenderer3D {\npublic:\n"
+        "  virtual ~IRenderer3D() = default;\n"
+        "  using StatusCallback = std::function<void(const QString&)>;\n"
+        "  using SelectionCallback = std::function<void(const QString&)>;\n"
+        "  using PathCallback = std::function<void(const QStringList&)>;\n"
+        "  virtual bool initialize(void* = nullptr) = 0;\n  virtual void shutdown() = 0;\n"
+        "  virtual bool isReady() const = 0;\n  virtual void setRenderLoopEnabled(bool) = 0;\n"
+        "  virtual bool isRenderLoopRunning() const = 0;\n"
+        "  virtual void setScene(SceneDocument3DAdapter*) = 0;\n"
+        "  virtual void setCamera(CameraController3D*) = 0;\n"
+        "  virtual void render(QPainter&, int, int) = 0;\n  virtual void resize(int, int) = 0;\n"
+        "  virtual void resetView() = 0;\n  virtual void setOrbitMode(bool) = 0;\n"
+        "  virtual void setMeasureMode(bool) = 0;\n  virtual bool isOrbitMode() const = 0;\n"
+        "  virtual bool isOpenGL() const = 0;\n  virtual void selectNodeById(const QString&) = 0;\n"
+        "  virtual QString selectedNodeId() const = 0;\n"
+        "  virtual QStringList selectedPathNames() const = 0;\n"
+        "  virtual void setStatusCallback(StatusCallback) = 0;\n"
+        "  virtual void setSelectionCallback(SelectionCallback) = 0;\n"
+        "  virtual void setPathCallback(PathCallback) = 0;\n};\n"
+    )
+    file(WRITE "${_STUB_DIR}/Render3D/RenderWidget3D.h"
+        "#pragma once\nclass QOpenGLWidget;\nclass RenderWidget3D;\n")
+    file(COPY_FILE "${_STUB_DIR}/Render3D/IRenderer3D.h" "${_STUB_DIR}/UI3D/Render3D/IRenderer3D.h")
+    file(COPY_FILE "${_STUB_DIR}/Render3D/RenderWidget3D.h" "${_STUB_DIR}/UI3D/Render3D/RenderWidget3D.h")
+    file(WRITE "${_STUB_DIR}/UI3D/Edit/SceneEditService3D.h"
+        "#pragma once\n#include <vector>\n#include <memory>\n"
+        "class SyEntity;\nclass SceneEditService3D {public:virtual ~SceneEditService3D()=default;"
+        "void addEntities(std::vector<std::unique_ptr<SyEntity>>&&,const char*){}};\n")
+    file(WRITE "${_STUB_DIR}/UI3D/Edit/UndoRedoManager3D.h"
+        "#pragma once\nclass UndoRedoManager3D;\n")
+    file(WRITE "${_STUB_DIR}/UI/StatusBar/StatusBar3D.h"
+        "#pragma once\nclass StatusBar3D;\n")
+    file(WRITE "${_STUB_DIR}/UI/TopToolBar/TopToolBar3D.h"
+        "#pragma once\nclass TopToolBar3D;\n")
+    file(WRITE "${_STUB_DIR}/UI/MainWindow/MainWindow3D.h"
+        "#pragma once\nclass MainWindow3D;\n")
+    file(WRITE "${_STUB_DIR}/UI/Settings/SettingsService.h"
+        "#pragma once\nclass SettingsService;\n")
+    file(WRITE "${_STUB_DIR}/UI/Algorithm/AlgorithmApplicationService.h"
+        "#pragma once\nclass AlgorithmApplicationService;\n")
+    foreach(_stub_h Algorithm/AlgorithmTaskRegistration3D.h Manager/DocumentManager3D.h
+        Operation/AlgorithmRunner3D.h Operation/CommandActionHub3D.h
+        Operation/CommandCatalog3D.h Operation/CommandRegistry3D.h
+        Operation/OperationBus3D.h Render3D/Camera3D.h
+        Render3D/SceneRefreshCoordinator3D.h Render3D/TransformGizmo3D.h
+        Service/BRepModelService3D.h Service/CameraController3D.h
+        Service/SceneDocument3D.h Service/SceneMonitor3D.h
+        Service/ServiceLocator3D.h Service/ServicePack3D.h
+        Settings/SettingsUiCoordinator3D.h Shortcut/ShortcutManager3D.h)
+        string(REGEX REPLACE "^.*/" "" _stub_cls "${_stub_h}")
+        string(REGEX REPLACE "\\.h$" "" _stub_cls "${_stub_cls}")
+        file(WRITE "${_STUB_DIR}/UI3D/${_stub_h}" "#pragma once\nclass ${_stub_cls};\n")
+    endforeach()
+    list(APPEND PROJECT_INCLUDE_DIRS "${_STUB_DIR}")
 endif()
 
 list(APPEND PROJECT_INCLUDE_DIRS
@@ -264,7 +342,7 @@ endif()
 
 
 if(BUILD_UI3D)
-    target_link_libraries(${app_name} PRIVATE UI3D Engine3D)
+    target_link_libraries(${app_name} PRIVATE UI3D)
     target_compile_definitions(${app_name} PRIVATE BUILD_UI3D=1)
     # 显式传播 ENABLE_GEOMODELCORE：SceneEditService3D / ServicePack3D 等导出类
     # 含 #ifdef ENABLE_GEOMODELCORE 条件数据成员，EXE 必须与 DLL 的 sizeof 一致
@@ -273,6 +351,9 @@ if(BUILD_UI3D)
         target_link_libraries(${app_name} PRIVATE GeoModelCore)
     endif()
 endif()
+# Engine3D 始终链接：Main 模块的 ImportService / SceneDocument3DAdapter 等核心
+# 代码无条件依赖 Engine3D（SceneManager3D、SyMeshEntity），与 BUILD_UI3D 无关
+target_link_libraries(${app_name} PRIVATE Engine3D)
 
 if(SANYI_PYTHON_HOST)
     target_compile_definitions(${app_name} PRIVATE SANYI_PYTHON_HOST=1)

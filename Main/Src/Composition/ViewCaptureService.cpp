@@ -1,6 +1,8 @@
 #include "UI/Service/ViewCaptureService.h"
 #include "RenderWidget.h"
+#if BUILD_UI3D
 #include "UI3D/Render3D/RenderWidget3D.h"
+#endif
 #include "Engine2D/Environment/SceneEnvironment.h"
 #include "Engine3D/SceneManager3D.h"
 #include "Engine3D/SyEntity/SyMeshEntity.h"
@@ -111,6 +113,7 @@ namespace Ui
 
     QImage ViewCaptureService::capture3D(void* widget, const CaptureRequest& req)
     {
+#if BUILD_UI3D
         auto* w3d = static_cast<RenderWidget3D*>(widget);
         if (!w3d)
         {
@@ -151,7 +154,7 @@ namespace Ui
         {
             // 自定义 3D 范围：TODO
         }
-
+#endif
         return QImage();
     }
 }  // namespace Ui

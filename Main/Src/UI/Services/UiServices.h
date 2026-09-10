@@ -3,7 +3,7 @@
 #include <functional>
 #include <memory>
 
-#include "IUIServices.h"
+#include "IUiServices.h"
 
 class IInteractionDispatcher;
 class UiStateCenter;

@@ -7,7 +7,7 @@
 
 #include "../Composition/ApplicationCompositionRoot.h"
 #include "../Common/AppPathManager.h"
-#include "../UI/Services/UIServices.h"
+#include "../UI/Services/UiServices.h"
 
 class UiWorkbench;
 

@@ -1,3 +1,5 @@
+#if BUILD_UI3D
+
 #include "RenderWidget3DAdapter.h"
 
 #include <QCoreApplication>
@@ -334,3 +336,4 @@ RenderWidget3D* RenderWidget3DAdapter::widget() const
 {
     return m_renderWidget.get();
 }
+#endif // BUILD_UI3D

@@ -16,7 +16,7 @@
 
 #include "UiStateCenter.h"
 #include "UiWorkbench.h"
-#include "UIServices.h"
+#include "UiServices.h"
 #include "UiFrameworkServices.h"
 #include "Composition/ApplicationCompositionRoot.h"
 #include "UI/Settings/SettingsService.h"
@@ -32,7 +32,9 @@
 #include "UI/StatusBar/StatusBar3D.h"
 #include "UI/Widgets/UiSceneTreePanel.h"
 #include "UI/Widgets/UiPropertiesPanel.h"
+#if BUILD_UI3D
 #include "Render3D/RenderWidget3D.h"
+#endif
 #include "ClientConfig/UiBuiltinPanels.h"
 #include "ClientConfig/UiClientConfigBase.h"
 #include "ClientConfig/UiClientContext.h"

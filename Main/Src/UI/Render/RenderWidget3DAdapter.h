@@ -1,5 +1,7 @@
 #pragma once
 
+#if BUILD_UI3D
+
 #include "Render3D/IRenderer3D.h"
 #include <QString>
 #include <memory>
@@ -115,3 +117,5 @@ private:
     SelectionCallback m_selectionCallback;
     PathCallback m_pathCallback;
 };
+
+#endif // BUILD_UI3D

@@ -16,7 +16,11 @@
 #include "Engine2D/Interaction/LayerManager.h"
 #include "Engine3D/SceneManager3D.h"
 #include "Engine3D/SyEntity/SyMeshEntity.h"
+#if BUILD_UI3D
 #include "UI3D/Edit/SceneEditService3D.h"
+#else
+class SceneEditService3D;
+#endif
 
 #include "Color/Color.hpp"
 
@@ -593,12 +597,14 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
         }
 
         meshAdded = static_cast<int>(meshEntities.size());
+#if BUILD_UI3D
         if (m_sceneEditService3D)
         {
             SY_DEBUGF("[ImportService] Adding %d mesh entity(ies) via SceneEditService3D (undoable)", meshAdded);
             m_sceneEditService3D->addEntities(std::move(meshEntities), "Import 3D mesh");
         }
         else
+#endif
         {
             // 回退：直写 SceneManager3D，无 Undo 支持
             SY_DEBUGF("[ImportService] SceneEditService3D not set, adding %d mesh entity(ies) without undo support",
