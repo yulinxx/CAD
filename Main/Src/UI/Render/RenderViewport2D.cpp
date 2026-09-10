@@ -178,15 +178,15 @@ QPointF RenderViewport2D::applySnap(const QPointF& worldPos) const
     }
 
     const Ut::Vec2d src(worldPos.x(), worldPos.y());
-    const Ut::Vec2d snapped = m_gridSnapManager->snap(src);
+    const auto output = m_gridSnapManager->snap(src);
 
-    const bool didSnap = (snapped.x() != src.x()) || (snapped.y() != src.y());
+    const bool didSnap = (output.pos.x() != src.x()) || (output.pos.y() != src.y());
     if (m_renderCoordinator)
     {
-        m_renderCoordinator->setSnapIndicator(snapped, didSnap);
+        m_renderCoordinator->setSnapIndicator(output.pos, didSnap, output.snapType);
     }
 
-    return QPointF(snapped.x(), snapped.y());
+    return QPointF(output.pos.x(), output.pos.y());
 }
 
 // ==================== 外部接口实现 ====================
