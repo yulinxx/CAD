@@ -27,7 +27,8 @@
 # vcpkg 根目录
 if(NOT DEFINED VCPKG_DIR OR VCPKG_DIR STREQUAL "")
     if(WIN32)
-        set(VCPKG_DIR "C:/vcpkg/" CACHE PATH "VCPKG installation directory")
+        # set(VCPKG_DIR "C:/vcpkg/" CACHE PATH "VCPKG installation directory")
+        set(VCPKG_DIR "C:/Users/xx/vcpkg/" CACHE PATH "VCPKG installation directory")
     elseif(UNIX AND NOT APPLE)
         set(VCPKG_DIR "/usr/local/vcpkg/" CACHE PATH "VCPKG installation directory")
     elseif(APPLE)
@@ -38,7 +39,7 @@ endif()
 # Qt 安装目录
 if(NOT DEFINED Qt_INSTALL_DIR OR Qt_INSTALL_DIR STREQUAL "")
     if(WIN32)
-        set(Qt_INSTALL_DIR "C:/Qt/6.11.1/msvc2022_64" CACHE PATH "Qt installation directory")
+        set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.11.2/msvc2022_64" CACHE PATH "Qt installation directory")
     elseif(UNIX AND NOT APPLE)
         set(Qt_INSTALL_DIR "/usr/local/Qt/6.11.1/gcc_64" CACHE PATH "Qt installation directory")
     elseif(APPLE)
@@ -161,8 +162,8 @@ endif()
 # ===== 核心功能模块 =====
 # 建议保持默认开启状态
 option(BUILD_RENDERX "Build Renderx rendering engine (3D rendering core)" ON)
-option(BUILD_UI3D "Build UI3D module (3D user interface)" OFF)
-option(BUILD_NESTING "Build Nesting module (2D/3D nesting/arrangement algorithm)" OFF)
+option(BUILD_UI3D "Build UI3D module (3D user interface)" ON)
+option(BUILD_NESTING "Build Nesting module (2D/3D nesting/arrangement algorithm)" ON)
 option(BUILD_CAM "Build CAM module (laser cutting toolpath generation)" OFF)
 
 # ===== 可选功能模块 =====
@@ -172,8 +173,6 @@ option(BUILD_NETWORK "Build Network module (HTTP, WebSocket, cloud sync)" OFF)
 option(BUILD_HARDWARE "Build Hardware module (laser control, material database)" OFF)
 option(BUILD_ENGRAVING "Build Engraving module (3D laser engraving)" OFF)
 option(BUILD_GEOMODELCORE "Build GeoModelCore module (OpenCASCADE-based geometry modeling)" OFF)
-option(BUILD_UI3D "Build UI3D module (3D user interface)" OFF)
-option(BUILD_NESTING "Build Nesting module (2D/3D nesting/arrangement algorithm)" OFF)
 option(BUILD_CRASHHANDLER "Build CrashHandler module (crash capture and reporting)" ON)
 option(BUILD_PYTHON "Build Python module (PythonHost integration framework)" OFF)
 

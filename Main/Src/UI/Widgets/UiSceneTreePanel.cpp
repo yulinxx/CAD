@@ -447,12 +447,6 @@ SceneTreePanel::SceneTreePanel(QWidget* parent)
 
     m_view = new QTreeView(this);
     m_view->header()->setStretchLastSection(false);
-    m_view->header()->setSectionResizeMode(0, QHeaderView::Interactive);
-    m_view->header()->setSectionResizeMode(1, QHeaderView::Interactive);
-    m_view->header()->setSectionResizeMode(2, QHeaderView::Interactive);
-    m_view->setColumnWidth(0, 50);
-    m_view->setColumnWidth(1, 70);
-    m_view->setColumnWidth(2, 60);
     m_view->setAlternatingRowColors(true);
     m_view->setSortingEnabled(true);
     m_view->sortByColumn(1, Qt::AscendingOrder);
@@ -550,6 +544,13 @@ void SceneTreePanel::setMode2D(const SceneTreeTopology2D& topology, MetaProvider
     m_model = model;
     m_view->setModel(m_model);
 
+    m_view->header()->setSectionResizeMode(0, QHeaderView::Interactive);
+    m_view->header()->setSectionResizeMode(1, QHeaderView::Interactive);
+    m_view->header()->setSectionResizeMode(2, QHeaderView::Interactive);
+    m_view->setColumnWidth(0, 50);
+    m_view->setColumnWidth(1, 70);
+    m_view->setColumnWidth(2, 60);
+
     // 使用回调而非信号
     model->setVisibilityCallback([this](qint64 id, bool visible) {
         emit visibilityToggled(QString::number(id), visible);
@@ -571,6 +572,13 @@ void SceneTreePanel::setMode3D(const SceneTreeModel3D& model)
     model3d->setData(model);
     m_model = model3d;
     m_view->setModel(m_model);
+
+    m_view->header()->setSectionResizeMode(0, QHeaderView::Interactive);
+    m_view->header()->setSectionResizeMode(1, QHeaderView::Interactive);
+    m_view->header()->setSectionResizeMode(2, QHeaderView::Interactive);
+    m_view->setColumnWidth(0, 50);
+    m_view->setColumnWidth(1, 70);
+    m_view->setColumnWidth(2, 60);
 
     // 使用回调而非信号
     model3d->setVisibilityCallback([this](const QString& id, bool visible) {
