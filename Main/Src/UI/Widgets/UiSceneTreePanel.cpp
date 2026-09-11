@@ -606,6 +606,10 @@ void SceneTreePanel::setSelectedIds(const QSet<QString>& ids)
     }
 
     m_syncing = true;
+    
+    // 优化1: 阻止信号以减少触发次数，批量更新选择状态
+    m_view->blockSignals(true);
+    m_view->selectionModel()->blockSignals(true);
     m_view->selectionModel()->clearSelection();
 
     if (m_mode == Mode::Mode2D)
@@ -624,6 +628,8 @@ void SceneTreePanel::setSelectedIds(const QSet<QString>& ids)
                 }
             }
 
+            // 优化2: 批量选择 - 使用 QItemSelection 一次性选择多个项目
+            QItemSelection selection;
             QModelIndex firstIndex;
             for (qint64 id : idSet)
             {
@@ -632,12 +638,15 @@ void SceneTreePanel::setSelectedIds(const QSet<QString>& ids)
                 {
                     continue;
                 }
-                m_view->selectionModel()->select(idx, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+                selection.select(idx);
                 if (!firstIndex.isValid())
                 {
                     firstIndex = idx;
                 }
             }
+            
+            // 一次性应用选择
+            m_view->selectionModel()->select(selection, QItemSelectionModel::Select | QItemSelectionModel::Rows);
 
             if (firstIndex.isValid())
             {
@@ -656,6 +665,8 @@ void SceneTreePanel::setSelectedIds(const QSet<QString>& ids)
         auto* model3d = dynamic_cast<SceneTreeTableModel3D*>(m_model);
         if (model3d)
         {
+            // 3D模式也使用批量选择
+            QItemSelection selection;
             for (const QString& id : ids)
             {
                 // 遍历查找匹配的项
@@ -664,14 +675,18 @@ void SceneTreePanel::setSelectedIds(const QSet<QString>& ids)
                     const QModelIndex idx = m_model->index(row, 1, QModelIndex());
                     if (idx.data(kIdRole).toString() == id)
                     {
-                        m_view->selectionModel()->select(idx, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+                        selection.select(idx);
                         break;
                     }
                 }
             }
+            m_view->selectionModel()->select(selection, QItemSelectionModel::Select | QItemSelectionModel::Rows);
         }
     }
 
+    // 恢复信号
+    m_view->selectionModel()->blockSignals(false);
+    m_view->blockSignals(false);
     m_syncing = false;
 }
 
