@@ -199,7 +199,7 @@ QPointF RenderViewport2D::applySnap(const QPointF& worldPos) const
         if (m_renderCoordinator)
         {
             m_renderCoordinator->setSnapIndicator(
-                Ut::Vec2d(worldPos.x(), worldPos.y()), false, Eg::SnapEngine::Snap_None);
+                Ut::Vec2d(worldPos.x(), worldPos.y()), false, SnapEngine::Snap_None);
         }
         
         return worldPos;
