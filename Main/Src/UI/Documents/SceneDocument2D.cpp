@@ -334,7 +334,7 @@ QString SceneDocument2D::createSmartLine(const QVector<QPointF>& points)
     }
     else
     {
-        added = m_scene->addEntity(bezier.release());
+        added = m_scene->addEntity(smartLine.release());
     }
 
     QString id = added ? QString::number(added->id) : QString();
