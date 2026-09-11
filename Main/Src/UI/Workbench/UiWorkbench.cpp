@@ -855,7 +855,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     m_commandHub = std::make_unique<CommandActionHub>();
     m_commandHub->setMainWindow(&window);
     m_commandHub->setOperationBus(m_services.operationBus);
-    // 单一数据源：一次遍历选中的图元集合，统一算出 count / 锁定(图层+实体) / 可编辑 /
+    // 单一数据源：一次遍历选中的图元集合，统一算出 count / 锁定(图层+图元) / 可编辑 /
     // 类型直方图 / 分组 / 贝塞尔，注入给命令中枢。替代原先 count / lock / group 三处各自遍历、
     // 且分别走 ISelectionService 与 SceneManager 两个数据源的分裂实现，从根上消除规则漂移。
     m_commandHub->setSelectionContextProvider([selectionService = m_services.selectionService,
@@ -944,7 +944,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
             },
             &ctx);
         result.hasSelection = result.selectionCount > 0;
-        // 分组按钮：需有选中图元 且 未命中任意锁定（图层锁或实体锁）且 未隐藏，
+        // 分组按钮：需有选中图元 且 未命中任意锁定（图层锁或图元锁）且 未隐藏，
         // 与 RequiresUnlockedSelection 的双锁语义保持一致。
         result.groupEnabled = result.hasSelection && !(result.anyLockedLayer || result.anyLockedEntity || result.anyHidden);
         // 贝塞尔切换按钮：当前无独立语义，保持禁用（与重构前未赋值行为一致）
@@ -1627,26 +1627,41 @@ void Workbench2D::setSceneTreeVisibility(const QStringList& ids, bool visible)
         {
             entity->setVisible(visible);
             changed = true;
-            // 隐藏时记录需要取消选择的实体
+            // 隐藏时记录需要取消选择的图元
             if (!visible && entity->selected())
             {
                 idsToDeselect.append(id);
             }
         }
     }
-    // 隐藏实体时清除选择
+    // 隐藏图元时清除选择 - 优化：批量操作避免多次触发选择变化通知
     if (!idsToDeselect.isEmpty())
     {
-        for (const QString& id : idsToDeselect)
+        // 收集所有当前选中的图元
+        std::vector<Eg::SyEntity*> currentSelected;
+        scene->forEachSelected([&currentSelected](Eg::SyEntity* e) {
+            currentSelected.push_back(e);
+        });
+        
+        // 构建需要保留的图元列表（从当前选中中移除要隐藏的）
+        std::vector<Eg::SyEntity*> toKeep;
+        toKeep.reserve(currentSelected.size());
+        QSet<QString> idsToDeselectSet = idsToDeselect.toSet();
+        
+        for (Eg::SyEntity* e : currentSelected)
         {
-            const auto eid = Eg::parseEntityId(id.toStdString());
-            if (eid)
+            QString id = QString::number(static_cast<qint64>(e->id));
+            if (!idsToDeselectSet.contains(id))
             {
-                if (auto* entity = scene->findEntityById(*eid))
-                {
-                    scene->deselectEntity(entity);
-                }
+                toKeep.push_back(e);
             }
+        }
+        
+        // 批量操作：先清空选择，再批量选择保留的图元（只触发2次通知而非N次）
+        scene->clearSelection();
+        if (!toKeep.empty())
+        {
+            scene->selectEntities(toKeep);
         }
     }
     if (changed)
@@ -1830,7 +1845,7 @@ void Workbench2D::refreshPropertiesPanel()
         }
     }
 
-    // 创建编辑会话（算法层）：持有图元 id，负责按需解析实体、应用修改并集成撤销。
+    // 创建编辑会话（算法层）：持有图元 id，负责按需解析图元、应用修改并集成撤销。
     auto session = std::make_shared<EntityPropertyEditSession2D>(m_services.sceneEditService, std::move(entityIds));
 
     // 数据/算法产物推送给 UI 层：模型用于展示，会话作为编辑目标。
@@ -2390,7 +2405,7 @@ void Workbench3D::on3DContextMenuRequested(const QPoint& globalPos)
     const auto& selected = renderWidget->selectionManager().getSelectedEntities();
     snapshot.hasSelection = !selected.empty();
     snapshot.selectionCount = static_cast<int>(selected.size());
-    // 统一锁定判定：任一选中实体被锁定则视为有锁（与 2D 语义一致）
+    // 统一锁定判定：任一选中图元被锁定则视为有锁（与 2D 语义一致）
     for (const Eg::SyMeshEntity* e : selected)
     {
         if (e && e->locked())
@@ -2749,7 +2764,7 @@ void Workbench3D::setSceneTreeVisibility3D(const QStringList& ids, bool visible)
             changed = true;
         }
     }
-    // 隐藏实体时清除选择（3D 目前只支持清空全部选择）
+    // 隐藏图元时清除选择（3D 目前只支持清空全部选择）
     if (!visible && changed)
     {
         m_sceneManager3D->clearSelection();
