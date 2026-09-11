@@ -24,7 +24,7 @@ namespace
     constexpr int kNameRole = Qt::UserRole + 1;
     constexpr int kVisRole = Qt::UserRole + 2;
     constexpr int kIsGroupRole = Qt::UserRole + 3;
-}
+}  // namespace
 
 // ============================================================
 // 2D 模型：懒加载模型（从 UiSceneTreePanel2D.cpp 提取）
@@ -38,8 +38,9 @@ public:
     {
     }
 
-    void setTopology(const SceneTreeTopology2D& topology, SceneTreePanel::MetaProvider2D metaProvider,
-                     SceneTreePanel::ChildrenProvider2D childrenProvider)
+    void setTopology(const SceneTreeTopology2D& topology,
+        SceneTreePanel::MetaProvider2D metaProvider,
+        SceneTreePanel::ChildrenProvider2D childrenProvider)
     {
         beginResetModel();
         m_topLevel = topology.topLevel;
@@ -442,7 +443,8 @@ private:
 // ============================================================
 
 SceneTreePanel::SceneTreePanel(QWidget* parent)
-    : QWidget(parent), m_model(nullptr)
+    : QWidget(parent)
+    , m_model(nullptr)
 {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -457,8 +459,8 @@ SceneTreePanel::SceneTreePanel(QWidget* parent)
     m_view->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::EditKeyPressed);
     layout->addWidget(m_view);
 
-    connect(m_view->selectionModel(), &QItemSelectionModel::selectionChanged,
-            this, &SceneTreePanel::onModelSelectionChanged);
+    connect(
+        m_view->selectionModel(), &QItemSelectionModel::selectionChanged, this, &SceneTreePanel::onModelSelectionChanged);
     connect(m_view, &QTreeView::activated, this, [this](const QModelIndex& index) {
         if (index.isValid())
         {
@@ -532,7 +534,8 @@ SceneTreePanel::~SceneTreePanel()
     delete m_model;
 }
 
-void SceneTreePanel::setMode2D(const SceneTreeTopology2D& topology, MetaProvider2D metaProvider, ChildrenProvider2D childrenProvider)
+void SceneTreePanel::setMode2D(
+    const SceneTreeTopology2D& topology, MetaProvider2D metaProvider, ChildrenProvider2D childrenProvider)
 {
     m_mode = Mode::Mode2D;
     m_metaProvider2D = std::move(metaProvider);
@@ -546,8 +549,8 @@ void SceneTreePanel::setMode2D(const SceneTreeTopology2D& topology, MetaProvider
     model->setTopology(topology, m_metaProvider2D, m_childrenProvider2D);
     m_model = model;
     m_view->setModel(m_model);
-    connect(m_view->selectionModel(), &QItemSelectionModel::selectionChanged,
-            this, &SceneTreePanel::onModelSelectionChanged);
+    connect(
+        m_view->selectionModel(), &QItemSelectionModel::selectionChanged, this, &SceneTreePanel::onModelSelectionChanged);
 
     m_view->header()->setSectionResizeMode(0, QHeaderView::Interactive);
     m_view->header()->setSectionResizeMode(1, QHeaderView::Interactive);
@@ -577,8 +580,8 @@ void SceneTreePanel::setMode3D(const SceneTreeModel3D& model)
     model3d->setData(model);
     m_model = model3d;
     m_view->setModel(m_model);
-    connect(m_view->selectionModel(), &QItemSelectionModel::selectionChanged,
-            this, &SceneTreePanel::onModelSelectionChanged);
+    connect(
+        m_view->selectionModel(), &QItemSelectionModel::selectionChanged, this, &SceneTreePanel::onModelSelectionChanged);
 
     m_view->header()->setSectionResizeMode(0, QHeaderView::Interactive);
     m_view->header()->setSectionResizeMode(1, QHeaderView::Interactive);
@@ -606,7 +609,7 @@ void SceneTreePanel::setSelectedIds(const QSet<QString>& ids)
     }
 
     m_syncing = true;
-    
+
     // 优化1: 阻止信号以减少触发次数，批量更新选择状态
     m_view->blockSignals(true);
     m_view->selectionModel()->blockSignals(true);
@@ -638,13 +641,13 @@ void SceneTreePanel::setSelectedIds(const QSet<QString>& ids)
                 {
                     continue;
                 }
-                selection.select(idx);
+                selection.select(idx, idx);
                 if (!firstIndex.isValid())
                 {
                     firstIndex = idx;
                 }
             }
-            
+
             // 一次性应用选择
             m_view->selectionModel()->select(selection, QItemSelectionModel::Select | QItemSelectionModel::Rows);
 
@@ -675,7 +678,7 @@ void SceneTreePanel::setSelectedIds(const QSet<QString>& ids)
                     const QModelIndex idx = m_model->index(row, 1, QModelIndex());
                     if (idx.data(kIdRole).toString() == id)
                     {
-                        selection.select(idx);
+                        selection.select(idx, idx);
                         break;
                     }
                 }
