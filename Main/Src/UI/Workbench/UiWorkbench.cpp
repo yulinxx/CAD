@@ -944,9 +944,9 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
             },
             &ctx);
         result.hasSelection = result.selectionCount > 0;
-        // 分组按钮：选中含分组则显示 Ungroup；命中任意锁定（图层锁或实体锁）或隐藏则不可用，
+        // 分组按钮：需有选中图元 且 未命中任意锁定（图层锁或实体锁）且 未隐藏，
         // 与 RequiresUnlockedSelection 的双锁语义保持一致。
-        result.groupEnabled = !(result.anyLockedLayer || result.anyLockedEntity || result.anyHidden);
+        result.groupEnabled = result.hasSelection && !(result.anyLockedLayer || result.anyLockedEntity || result.anyHidden);
         // 贝塞尔切换按钮：当前无独立语义，保持禁用（与重构前未赋值行为一致）
         result.bezierEnabled = false;
         return result;
