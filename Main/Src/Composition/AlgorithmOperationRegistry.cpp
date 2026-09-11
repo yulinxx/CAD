@@ -3,6 +3,7 @@
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
 #include "UI2D/Operation/IOperation.h"
+#include "UI2D/Operation/AlgorithmRunner.h"
 
 #include "Operation/ReliefEngravingOperation2D.h"
 
@@ -21,11 +22,18 @@ void AlgorithmOperationRegistry::registerAll()
     QWidget* parentWidget = m_parentWidget;
     auto& reg = m_bus->registry();
 
-    const auto registerAlgoOp = [&reg](OperationId id) {
-        reg.registerOperation(std::make_unique<ParamLambdaOperation>(id, [id](const QVariantMap& params) {
-            // 由 AlgorithmRunner 统一调度，AlgorithmRunner 通过 OperationId 路由到具体算法任务
-            // 具体实现在 AlgorithmRunner::runForOperation 中
-        }));
+    AlgorithmRunner* runner = m_algorithmRunner;
+    const auto registerAlgoOp = [&reg, runner](OperationId id) {
+        reg.registerOperation(std::make_unique<ParamLambdaOperation>(id,
+            [id, runner](const QVariantMap& params) {
+                if (!runner)
+                    return;
+                OperationRequest req;
+                req.id = id;
+                req.params = params;
+                req.source = OperationSource::Menu;
+                runner->runForOperation(id, req);
+            }));
     };
 
     registerAlgoOp(OperationId::Algo_Fill);

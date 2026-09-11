@@ -344,7 +344,10 @@ public:
     void setData(const SceneTreeModel3D& model)
     {
         beginResetModel();
-        clear();
+        while (rowCount() > 0)
+        {
+            removeRow(0);
+        }
         m_nodeMap.clear();
 
         for (const auto& node : model.nodes)
@@ -543,6 +546,8 @@ void SceneTreePanel::setMode2D(const SceneTreeTopology2D& topology, MetaProvider
     model->setTopology(topology, m_metaProvider2D, m_childrenProvider2D);
     m_model = model;
     m_view->setModel(m_model);
+    connect(m_view->selectionModel(), &QItemSelectionModel::selectionChanged,
+            this, &SceneTreePanel::onModelSelectionChanged);
 
     m_view->header()->setSectionResizeMode(0, QHeaderView::Interactive);
     m_view->header()->setSectionResizeMode(1, QHeaderView::Interactive);
@@ -572,6 +577,8 @@ void SceneTreePanel::setMode3D(const SceneTreeModel3D& model)
     model3d->setData(model);
     m_model = model3d;
     m_view->setModel(m_model);
+    connect(m_view->selectionModel(), &QItemSelectionModel::selectionChanged,
+            this, &SceneTreePanel::onModelSelectionChanged);
 
     m_view->header()->setSectionResizeMode(0, QHeaderView::Interactive);
     m_view->header()->setSectionResizeMode(1, QHeaderView::Interactive);
