@@ -1,5 +1,6 @@
 #include "WorkbenchMenuManager.h"
 #include "WorkbenchWindow.h"
+#include "Common/BuildConfig.h"
 
 #include "Log/SyLogger.h"
 #include "UI2D/Manager/UnitManager.h"
@@ -119,6 +120,11 @@ struct MenuDispatcher final : public IUiCommandDispatcher
     {
         if (WorkbenchMenuManager::isWindowLevelCommand(commandId))
         {
+            // 3D 未编译时，禁用切换到 3D 的命令
+            if (commandId == QLatin1String("view.switch_to_3d") && !BuildConfig::kUi3D)
+            {
+                return false;
+            }
             return true;
         }
         return workbench && workbench->isCommandRegistered(commandId);
