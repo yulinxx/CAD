@@ -1646,12 +1646,12 @@ void Workbench2D::setSceneTreeVisibility(const QStringList& ids, bool visible)
         // 构建需要保留的图元列表（从当前选中中移除要隐藏的）
         std::vector<Eg::SyEntity*> toKeep;
         toKeep.reserve(currentSelected.size());
-        QSet<QString> idsToDeselectSet = QSet<QString>::fromList(idsToDeselect);
+        std::unordered_set<QString> idsToDeselectSet(idsToDeselect.begin(), idsToDeselect.end());
         
         for (Eg::SyEntity* e : currentSelected)
         {
             QString id = QString::number(static_cast<qint64>(e->id));
-            if (!idsToDeselectSet.contains(id))
+            if (!idsToDeselectSet.count(id))
             {
                 toKeep.push_back(e);
             }
