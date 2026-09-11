@@ -5,6 +5,9 @@
  * 输入路由委托给 ViewportInputRouter（P5 大文件收口）。
  */
 #include "RenderViewport2D.h"
+
+#include <chrono>
+
 #include "RenderWidget.h"
 #include "SceneRefreshCoordinator.h"
 #include "ViewportInputRouter.h"
@@ -170,6 +173,7 @@ Eg::SceneManager* RenderViewport2D::sceneManager() const
 
 // 对世界坐标应用吸附（图元/网格/起点），并刷新捕捉指示器。
 // 捕捉由引擎层 GridSnapManager::snap() 完成（内部 SnapEngine 纯计算，无 UI 依赖）。
+// 优化：快速移动时跳过捕捉计算，提升性能
 QPointF RenderViewport2D::applySnap(const QPointF& worldPos) const
 {
     if (!m_gridSnapManager)
@@ -177,8 +181,36 @@ QPointF RenderViewport2D::applySnap(const QPointF& worldPos) const
         return worldPos;
     }
 
+    // 性能优化：快速移动时跳过捕捉
+    // 计算与上次捕捉位置的欧氏距离
+    const double dx = worldPos.x() - m_lastSnapMousePos.x();
+    const double dy = worldPos.y() - m_lastSnapMousePos.y();
+    const double distSq = dx * dx + dy * dy;
+    
+    // 如果移动距离超过阈值，认为在快速移动，跳过捕捉
+    // 这可以大大减少鼠标快速移动时的性能开销
+    if (distSq > kFastMoveSnapThreshold * kFastMoveSnapThreshold)
+    {
+        // 更新位置记录，但不进行捕捉
+        m_lastSnapMousePos = worldPos;
+        m_lastSnapTime = std::chrono::steady_clock::now();
+        
+        // 隐藏捕捉指示器
+        if (m_renderCoordinator)
+        {
+            m_renderCoordinator->setSnapIndicator(
+                Ut::Vec2d(worldPos.x(), worldPos.y()), false, Eg::SnapEngine::Snap_None);
+        }
+        
+        return worldPos;
+    }
+
     const Ut::Vec2d src(worldPos.x(), worldPos.y());
     const auto output = m_gridSnapManager->snap(src);
+
+    // 更新捕捉位置记录
+    m_lastSnapMousePos = worldPos;
+    m_lastSnapTime = std::chrono::steady_clock::now();
 
     const bool didSnap = (output.pos.x() != src.x()) || (output.pos.y() != src.y());
     if (m_renderCoordinator)

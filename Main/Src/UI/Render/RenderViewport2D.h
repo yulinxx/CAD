@@ -310,4 +310,10 @@ private:
 
     // 渲染协调器（覆盖层/捕捉指示器桥接；由 initializeTools 创建）
     std::unique_ptr<Ui2D::ViewRenderCoordinator> m_renderCoordinator;
+
+    // 捕捉性能优化：追踪上次鼠标位置和时间，用于快速移动时跳过捕捉
+    mutable QPointF m_lastSnapMousePos;
+    mutable std::chrono::steady_clock::time_point m_lastSnapTime;
+    // 快速移动阈值（世界坐标单位），超过此距离认为在快速移动
+    static constexpr double kFastMoveSnapThreshold = 50.0;
 };
