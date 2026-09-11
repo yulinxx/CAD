@@ -1,6 +1,6 @@
 #include "WorkbenchMenuManager.h"
 #include "WorkbenchWindow.h"
-#include "Common/BuildConfig.h"
+#include "BuildConfig.h"
 
 #include "Log/SyLogger.h"
 #include "UI2D/Manager/UnitManager.h"
