@@ -41,10 +41,10 @@ namespace
         Render::PrimitiveType primType = Render::PrimitiveType::LineStrip;
     };
 
-    // 按实体 ID 缓存离散化结果，避免非几何变更时重复离散化
+    // 按图元 ID 缓存离散化结果，避免非几何变更时重复离散化
     static std::unordered_map<uint64_t, CachedVertexData> s_vertexCache;
 
-    // 计算实体几何参数哈希（基于控制点 + 包围盒 + 类型 + 闭合标志）
+    // 计算图元几何参数哈希（基于控制点 + 包围盒 + 类型 + 闭合标志）
     // 仅依赖 SyEntity 基类契约接口，不依赖具体派生类型
     uint64_t computeGeometryHash(const Eg::SyEntity* entity)
     {
@@ -266,7 +266,7 @@ namespace
         {
             // 文本不产顶点：世界文本走 RenderWidget::setWorldText →
             // WorldTextQuadBuilder 独立通道，由 SceneRefreshCoordinator::reconcileTexts
-            // 驱动，且 TEXT 实体在增量循环里已被跳过，正常不会走到这里。
+            // 驱动，且 TEXT 图元在增量循环里已被跳过，正常不会走到这里。
         }
 
         void emitTextEx(const Ut::Vec2d& /*position*/,
@@ -373,10 +373,10 @@ void clearEntityVertexCache()
  * 由 Engine 侧 emitEntityGeometry 完成图元分解（UI 不再识别具体派生类型），
  * 本地 IncrementalVertexSink 将原语离散化为顶点。支持类型与全量路径一致；
  * 文本（SyText）与位图（SyImage）不产顶点，它们各有独立的渲染通道，调用方
- * 在遍历脏实体时就已跳过这两类，不会走到这里。
+ * 在遍历脏图元时就已跳过这两类，不会走到这里。
  *
  * 曲线类图元（Bezier/Bezier2/Nurbs/Circle/Arc/Ellipse）支持离散化缓存：
- * 当实体仅因颜色/选择/图层变更而标记为脏时，直接复用缓存的顶点数据，
+ * 当图元仅因颜色/选择/图层变更而标记为脏时，直接复用缓存的顶点数据，
  * 跳过昂贵的离散化计算。
  *
  * 输入事件链路：SceneManager::onSceneChanged → RenderViewport2D::onSceneChanged

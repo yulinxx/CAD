@@ -393,7 +393,7 @@ TEST(SelectionServiceTest, Qt_EntityIdAt_WithEntity)
     entities.push_back(std::move(line));
     scene.addEntities(std::move(entities));
 
-    // 点查询在实体附近
+    // 点查询在图元附近
     auto id = svc.entityIdAt(QPointF(5, 5), 10.0);
     // 不崩溃，返回空或 ID
     SUCCEED();
@@ -413,7 +413,7 @@ TEST(SelectionServiceTest, Integration_AddEntityDoesNotSelect)
     entities.push_back(std::move(line));
     scene.addEntities(std::move(entities));
 
-    // 添加实体后不应自动选中
+    // 添加图元后不应自动选中
     auto ids = svc.selectedIdsQ();
     EXPECT_TRUE(ids.empty());
 }
@@ -435,7 +435,7 @@ TEST(SelectionServiceTest, Integration_DeleteEntityClearsSelection)
     svc.select(idStr.c_str());
     EXPECT_TRUE(svc.isSelected(idStr.c_str()));
 
-    // 删除选中实体后选择应被清除
+    // 删除选中图元后选择应被清除
     scene.deleteEntity(scene.findSyEntityById(lineId));
     EXPECT_FALSE(svc.isSelected(idStr.c_str()));
 }

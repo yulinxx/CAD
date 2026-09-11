@@ -328,7 +328,7 @@ SyLogger::setFile("app.log");
 [ImportService]          五阶段主流程：格式识别 → 解析 → 构建文档 → 刷新显示 → 回写状态
 [ImportDispatcher]       格式路由：命中哪个读取器、读取器耗时与结果
 [ImportReader:DXF]       IR 解析统计、转换层丢弃差额、旧路径回退
-[FileIO]                 DLL 入口：parser 是否存在、异常、零实体
+[FileIO]                 DLL 入口：parser 是否存在、异常、零图元
 [IrProjector]            投影层：解析结果 → IR 的守恒口径与降级分类计数
 [DxfParser] 等           单格式解析细节：块展开、越界、上限截断
 ```

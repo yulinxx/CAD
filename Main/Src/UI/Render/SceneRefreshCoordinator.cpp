@@ -322,12 +322,12 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         auto uid = static_cast<uint64_t>(id);
         m_renderWidget->removeRenderEntity(uid);
         m_renderedEntityIds.erase(uid);
-        // 离散化缓存以实体 ID 为键，删除时必须一并丢弃：
+        // 离散化缓存以图元 ID 为键，删除时必须一并丢弃：
         // 增量刷新路径不走 clearEntityVertexCache，缓存否则只增不减。
         eraseEntityVertexCache(uid);
     }
 
-    // 本轮脏集合里是否出现过位图 / 文字实体。下面用它决定要不要跑 reconcile*：
+    // 本轮脏集合里是否出现过位图 / 文字图元。下面用它决定要不要跑 reconcile*：
     // reconcileBitmaps/reconcileTexts 现在使用 getEntitiesByType 按类型索引获取，
     // 避免全场景扫描。标志在这个循环里顺手收集，不额外多做一次 findEntityById。
     bool touchedImage = false;
@@ -341,13 +341,13 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             continue;
         }
 
-        // 检查实体可见性：隐藏的实体应从渲染中移除，而不是更新几何
+        // 检查图元可见性：隐藏的图元应从渲染中移除，而不是更新几何
         const bool entityVisible = entity->visible() && (!entity->layer() || entity->layer()->isVisible());
         auto uid = static_cast<uint64_t>(id);
 
         if (!entityVisible)
         {
-            // 实体不可见：从渲染中移除（如果之前有渲染的话）
+            // 图元不可见：从渲染中移除（如果之前有渲染的话）
             if (m_renderedEntityIds.count(uid))
             {
                 m_renderWidget->removeRenderEntity(uid);
@@ -373,7 +373,7 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             continue;
         }
 
-        // 选中图元照常提交原始实体几何：选中反馈只由虚线轮廓覆盖层叠加表达，
+        // 选中图元照常提交原始图元几何：选中反馈只由虚线轮廓覆盖层叠加表达，
         // 图元本身保持原色实线不变。历史实现在这里把选中图元从 GPU 上移除，
         // 于是一选中图形就"消失"只剩一圈虚线，原图看不出来了；而全量路径
         // （SceneManager::gatherGeometry）本来就不跳过，两条路径规则也是矛盾的。
@@ -386,9 +386,9 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         {
             // 走到这里意味着 Engine 侧分解出了本地 sink 不认识的原语。
             // 文本/位图已各有专用通道并在上面跳过，因此这里只能是新增图元
-            // 类型时漏配了离散化分支——跳过该实体并留一条日志，比悄悄升级成
+            // 类型时漏配了离散化分支——跳过该图元并留一条日志，比悄悄升级成
             // 全量刷新更容易定位（全量刷新会让问题表现为「偶发卡顿」）。
-            SY_WARNF("[SceneRefreshCoordinator] 实体 %llu (eType=%d) 无法增量转换为顶点，已跳过",
+            SY_WARNF("[SceneRefreshCoordinator] 图元 %llu (eType=%d) 无法增量转换为顶点，已跳过",
                 static_cast<unsigned long long>(uid), static_cast<int>(entity->eType));
             continue;
         }
@@ -436,7 +436,7 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
         return;
     }
 
-    // 全量重建时清空曲线离散化缓存，避免持有已删除实体的旧数据
+    // 全量重建时清空曲线离散化缓存，避免持有已删除图元的旧数据
     clearEntityVertexCache();
 
     m_renderWidget->submitSceneFromDataSource(sm);
@@ -473,7 +473,7 @@ void SceneRefreshCoordinator::reconcileBitmaps(Eg::SceneManager* sm, bool fullRe
         m_bitmapImageIds.clear();
     }
 
-    // 期望集合：场景中所有可见 SyImage（可见 = 实体可见 && 图层可见）
+    // 期望集合：场景中所有可见 SyImage（可见 = 图元可见 && 图层可见）
     std::unordered_set<uint64_t> desired;
     // 使用类型索引避免全场景扫描
     auto imageEntities = sm->getEntitiesByType(Eg::EType::IMAGE);
@@ -549,7 +549,7 @@ void SceneRefreshCoordinator::reconcileTexts(Eg::SceneManager* sm, bool fullReco
         m_worldTextIds.clear();
     }
 
-    // 期望集合：场景中所有可见 SyText（可见 = 实体可见 && 图层可见）
+    // 期望集合：场景中所有可见 SyText（可见 = 图元可见 && 图层可见）
     std::unordered_set<uint64_t> desired;
     // 使用类型索引避免全场景扫描
     auto textEntities = sm->getEntitiesByType(Eg::EType::TEXT);

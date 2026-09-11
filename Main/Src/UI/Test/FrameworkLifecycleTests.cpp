@@ -204,7 +204,7 @@ TEST(FrameworkRegressionTest, ISceneDataSource_DefaultImplementations)
             *static_cast<bool*>(ctx) = true;
         },
         &visited);
-    EXPECT_FALSE(visited);  // 默认实现不遍历任何实体
+    EXPECT_FALSE(visited);  // 默认实现不遍历任何图元
 
     // ABI 收口：entityName 改为 buffer 模式，默认实现返回空字符串
     char nameBuf[64] = {};
@@ -682,7 +682,7 @@ TEST(FrameworkRegressionTest, UndoRedo_MultipleUndoRedoSequence)
     // 多次撤销/重做序列：创建 → 修改 → 删除 → undo ×3 → redo ×3
     Eg::SceneManager scene;
 
-    // 步骤1: 创建实体
+    // 步骤1: 创建图元
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     line->setName("Original");

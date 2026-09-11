@@ -92,7 +92,7 @@ void SelectionService::selectMultiple(const char* const* ids, size_t count)
         return;
     }
 
-    // 批量入口：收集实体后一次性批量选择（selectRange 整体替换选择集），
+    // 批量入口：收集图元后一次性批量选择（selectRange 整体替换选择集），
     // 而非循环调用 selectEntity（单选择替换语义，会导致只保留最后一个）。
     std::vector<Eg::IEntity*> entities;
     entities.reserve(count);

@@ -510,7 +510,7 @@ PropertiesPanelWidget::PropertiesPanelWidget(QWidget* parent)
             return;
         }
         const PropertyItem pi = item->data(1, PropertyItemRole).value<PropertyItem>();
-        // 锁定态（图层锁或实体锁）下禁止编辑：与工具栏/右键菜单的禁用规则保持一致
+        // 锁定态（图层锁或图元锁）下禁止编辑：与工具栏/右键菜单的禁用规则保持一致
         if (!pi.editable || !m_editTarget || m_locked)
         {
             return;

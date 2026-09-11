@@ -512,7 +512,7 @@ TEST(SelectionSyncRegressionTest, MockSelectionService_SelectMultipleClearsPrevi
 // 模拟键盘事件路由的三级优先级：
 // 1. InteractionDispatcher (Escape/Enter)
 // 2. ActiveTool (工具特定快捷键)
-// 3. Delete (删除选中实体)
+// 3. Delete (删除选中图元)
 
 TEST(KeyRoutingRegressionTest, DeleteKey_RemovesEntityFromScene)
 {
@@ -598,7 +598,7 @@ TEST(RefreshDirtyTrackingTest, AddEntityThenClean_DirtyResets)
     scene.markClean();
     EXPECT_TRUE(scene.dirtyEntities().empty());
 
-    // 再次添加实体后应有脏标记
+    // 再次添加图元后应有脏标记
     auto line2 = std::make_unique<Eg::SyLine>();
     line2->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(20, 20) });
     std::vector<std::unique_ptr<Eg::SyEntity>> entities2;
@@ -772,7 +772,7 @@ TEST(RefreshIntegrationTest, Coordinator_StopAfterSceneChange)
 // 键盘事件路由优先级（从 handleKeyPress 实现）：
 // 1. InteractionDispatcher (Escape/Enter) — 优先级最高
 // 2. ActiveTool (工具特定快捷键，如空格确认) — 第二优先级
-// 3. Delete (删除选中实体) — 最低优先级
+// 3. Delete (删除选中图元) — 最低优先级
 
 TEST(KeyRoutingRegressionTest, PriorityChain_DeleteKeyIsLowest)
 {
@@ -1046,7 +1046,7 @@ TEST(ViewportInputRegressionTest, SceneManager_DeleteOneKeepsOtherSelection)
     scene.selectEntity(e1);
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
-    // 删除选中实体后，选中计数清零
+    // 删除选中图元后，选中计数清零
     scene.deleteSelected();
     EXPECT_EQ(scene.getSelectedEntityCount(), 0u);
     EXPECT_EQ(scene.getEntityCount(), 1u);
@@ -1094,7 +1094,7 @@ TEST(ViewportInputRegressionTest, SceneManager_ClearSelection)
     EXPECT_EQ(scene.getSelectedEntityCount(), 0u);
 }
 
-// ==================== 多实体类型脏标记与刷新联动测试 ====================
+// ==================== 多图元类型脏标记与刷新联动测试 ====================
 
 TEST(ViewportInputRegressionTest, DirtyTracking_MultipleEntityTypes)
 {

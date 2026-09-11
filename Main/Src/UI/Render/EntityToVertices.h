@@ -25,7 +25,7 @@ namespace Eg
  * @brief 将单个引擎图元转换为 VertexP3C3 顶点数组
  *
  * 曲线类图元（Bezier/Bezier2/Nurbs/Circle/Arc/Ellipse）支持离散化缓存：
- * 当实体仅因颜色/选择/图层变更而标记为脏时，直接复用缓存的顶点数据。
+ * 当图元仅因颜色/选择/图层变更而标记为脏时，直接复用缓存的顶点数据。
  *
  * @param entity       引擎图元指针（非空）
  * @param outVertices  输出顶点数组
@@ -40,7 +40,7 @@ bool entityToVertices(
 /**
  * @brief 丢弃单个图元的离散化缓存
  *
- * 图元删除时必须调用：缓存以实体 ID 为键，条目不会自行过期。
+ * 图元删除时必须调用：缓存以图元 ID 为键，条目不会自行过期。
  * 只依赖全量刷新时的 clearEntityVertexCache 不够——增量刷新路径下
  * 删除的图元永远不会触发全清，缓存会随「新建—删除」循环无界增长。
  *
@@ -51,6 +51,6 @@ void eraseEntityVertexCache(uint64_t entityId);
 /**
  * @brief 清空曲线离散化缓存
  *
- * 全量刷新或场景重建时调用，确保缓存不会持有已删除实体的旧数据。
+ * 全量刷新或场景重建时调用，确保缓存不会持有已删除图元的旧数据。
  */
 void clearEntityVertexCache();

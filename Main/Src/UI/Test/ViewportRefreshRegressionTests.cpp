@@ -391,7 +391,7 @@ TEST(RefreshPathRegressionTest, RepaintPath_DoesNotNeedSceneManager)
 
 TEST(RefreshPathRegressionTest, LightUpdatePath_RequiresSceneManager)
 {
-    // LightUpdate 路径需要 SceneManager 来获取实体数据
+    // LightUpdate 路径需要 SceneManager 来获取图元数据
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
     coordinator.setSceneManager(&scene);
@@ -410,7 +410,7 @@ TEST(RefreshPathRegressionTest, LightUpdatePath_RequiresSceneManager)
 
 TEST(RefreshPathRegressionTest, FullRefreshPath_RequiresSceneManager)
 {
-    // FullRefresh 路径需要 SceneManager 来获取所有实体
+    // FullRefresh 路径需要 SceneManager 来获取所有图元
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
     coordinator.setSceneManager(&scene);
@@ -552,7 +552,7 @@ TEST(RefreshCleanupRegressionTest, PendingIds_ClearedAfterFullRefresh)
     SUCCEED();
 }
 
-// ==================== 大尺寸实体刷新测试 ====================
+// ==================== 大尺寸图元刷新测试 ====================
 
 TEST(RefreshStressRegressionTest, BulkEntities_SceneChanged)
 {
@@ -611,7 +611,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_OnSceneChangedWithDirtyEntities)
     entities.push_back(std::move(line));
     scene.addEntities(std::move(entities));
 
-    // 添加实体后应有脏标记
+    // 添加图元后应有脏标记
     EXPECT_FALSE(scene.dirtyEntities().empty());
 
     coordinator.onSceneChanged();

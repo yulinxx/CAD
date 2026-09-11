@@ -32,6 +32,6 @@ public:
     static QSet<QString> selectedIds(Eg::SceneManager3D* scene);
 
 private:
-    /// 将单个网格图元转为数据节点（selected 由场景选择列表提供，非实体标志位）
+    /// 将单个网格图元转为数据节点（selected 由场景选择列表提供，非图元标志位）
     static SceneTreeNode3D buildMeshNode(const struct Eg::SyMeshEntity* mesh, bool selected);
 };

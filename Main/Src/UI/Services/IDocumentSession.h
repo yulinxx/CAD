@@ -19,7 +19,7 @@ namespace Eg
     struct SyEntity;
 }
 
-/// 实体 ID 遍历回调：id 为 null-terminated C string，context 为调用方透传上下文
+/// 图元 ID 遍历回调：id 为 null-terminated C string，context 为调用方透传上下文
 typedef void (*DocEntityIdVisitor)(const char* id, void* context);
 
 class IDocumentSession

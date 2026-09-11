@@ -3,8 +3,8 @@
  * @brief 3D 侧最小闭环回归测试 — 覆盖 SceneManager3D / RenderWidget3DAdapter
  *
  * 测试范围：
- *  - SceneManager3D 生命周期与实体管理
- *  - 3D 场景实体添加/删除/选中
+ *  - SceneManager3D 生命周期与图元管理
+ *  - 3D 场景图元添加/删除/选中
  *  - RenderWidget3DAdapter 回调链路
  *  - 3D 相机模式切换
  */

@@ -301,7 +301,7 @@ flowchart TD
     Render --> Edit["用户双击值列内联编辑"]
     Edit --> Target["IPropertyEditTarget::editValue/editPointAt"]
     Target --> Snap["SceneEditService::captureSnapshots（修改前）"]
-    Snap --> Set["IPropertyProvider setter 修改实体"]
+    Snap --> Set["IPropertyProvider setter 修改图元"]
     Set --> Snap2["captureSnapshots（修改后）"]
     Snap2 --> Push["pushExecutedChange 入撤销栈"]
     Push --> Rebuild["sigPropertyEdited → 重建模型刷新面板"]

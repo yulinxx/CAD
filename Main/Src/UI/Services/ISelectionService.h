@@ -17,10 +17,10 @@
  * - 集合遍历使用回调模式（visitor + context），避免跨 DLL 内存分配/释放
  * - 内部实现可自由使用 STL，但不得暴露到虚函数签名中
  *
- * @section 实体访问说明 (v1.13 收口)
+ * @section 图元访问说明 (v1.13 收口)
  * 本接口仅暴露 const char* ID，不泄漏 Eg::SyEntity*。
  * 调用方需要直接读取图元几何数据时，应通过 visitSelectedIds 获取 ID，
- * 再用 Eg::SceneManager::findEntityById(id) 查询实体指针。
+ * 再用 Eg::SceneManager::findEntityById(id) 查询图元指针。
  * 这样 ISelectionService 成为纯 ID 接口，彻底消除引擎类型泄漏。
  */
 

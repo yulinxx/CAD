@@ -5,7 +5,7 @@
  * 测试范围：
  *  - ToolManager 构造/注册/初始化/工具切换
  *  - SelectTool 生命周期/选择同步/清除选择
- *  - 选择状态在增删实体后的同步
+ *  - 选择状态在增删图元后的同步
  *  - 工具回调链（entityCallback/switchToolCallback）
  *  - 删除后无悬空选中状态
  *
@@ -347,7 +347,7 @@ TEST(SelectToolRegressionTest, SyncSelectionFromScene_WithEntities)
     EXPECT_TRUE(tool.hasSelectedEntities());
 }
 
-// ==================== 选择状态在增删实体后的同步 ====================
+// ==================== 选择状态在增删图元后的同步 ====================
 
 TEST(SelectionSyncExtendedTest, AddEntity_SelectionStateUnchanged)
 {
@@ -364,7 +364,7 @@ TEST(SelectionSyncExtendedTest, AddEntity_SelectionStateUnchanged)
     scene.selectEntity(scene.findSyEntityById(id1));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
-    // 添加新实体不影响已有选中
+    // 添加新图元不影响已有选中
     auto line2 = std::make_unique<Eg::SyLine>();
     line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
     std::vector<std::unique_ptr<Eg::SyEntity>> entities2;
@@ -396,7 +396,7 @@ TEST(SelectionSyncExtendedTest, DeleteUnselectedEntity_SelectionUnchanged)
     scene.selectEntity(scene.findSyEntityById(id1));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
-    // 删除未选中的实体
+    // 删除未选中的图元
     scene.deleteEntity(scene.findSyEntityById(id2));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
     EXPECT_TRUE(scene.findSyEntityById(id1)->selected());
@@ -487,7 +487,7 @@ TEST(SelectionSyncExtendedTest, ClearSceneThenSelect_NoCrash)
     SUCCEED();
 }
 
-// ==================== 混合实体类型选择 ====================
+// ==================== 混合图元类型选择 ====================
 
 TEST(SelectionSyncExtendedTest, SelectMixedEntityTypes)
 {
@@ -565,7 +565,7 @@ TEST(SelectionSyncExtendedTest, DeleteSelectedViaDeleteEntity_ClearsSelection)
     scene.selectEntity(scene.findSyEntityById(lineId));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
-    // 通过 deleteEntity 删除选中实体，选中集应自动清除
+    // 通过 deleteEntity 删除选中图元，选中集应自动清除
     scene.deleteEntity(scene.findSyEntityById(lineId));
     EXPECT_EQ(scene.getSelectedEntityCount(), 0u);
     EXPECT_EQ(scene.findSyEntityById(lineId), nullptr);
@@ -589,7 +589,7 @@ TEST(SelectionSyncExtendedTest, DeleteAllSelected_OneByOne)
     scene.selectAll();
     EXPECT_EQ(scene.getSelectedEntityCount(), 4u);
 
-    // 逐个删除选中实体，每次删除后选中数应减少
+    // 逐个删除选中图元，每次删除后选中数应减少
     for (size_t i = 0; i < ids.size(); ++i)
     {
         auto* entity = scene.findSyEntityById(ids[i]);
@@ -647,7 +647,7 @@ TEST(SelectToolRegressionTest, SyncFromScene_AfterExternalDelete)
     tool.syncSelectionFromScene();
     EXPECT_TRUE(tool.hasSelectedEntities());
 
-    // 外部删除实体后，同步应清空选择
+    // 外部删除图元后，同步应清空选择
     scene.deleteEntity(scene.findSyEntityById(lineId));
     tool.syncSelectionFromScene();
     EXPECT_FALSE(tool.hasSelectedEntities());
@@ -978,7 +978,7 @@ TEST(SelectionSyncExtendedTest, AddEntityWhileSelected_SelectionUnchanged)
     scene.selectEntity(scene.findSyEntityById(id1));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
-    // 添加新实体不应影响已有选中
+    // 添加新图元不应影响已有选中
     auto line2 = std::make_unique<Eg::SyLine>();
     line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
     std::vector<std::unique_ptr<Eg::SyEntity>> entities2;
@@ -1036,7 +1036,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_AllToolsReceiveSwitchCallback)
 
 TEST(ToolSelectionSyncRegressionTest, ExternalModify_SyncAfterSceneDelete)
 {
-    // 场景管理器直接删除实体后，选择状态应同步
+    // 场景管理器直接删除图元后，选择状态应同步
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
@@ -1052,7 +1052,7 @@ TEST(ToolSelectionSyncRegressionTest, ExternalModify_SyncAfterSceneDelete)
     svc.select(idStr.c_str());
     EXPECT_TRUE(svc.isSelected(idStr.c_str()));
 
-    // 场景管理器直接删除实体
+    // 场景管理器直接删除图元
     scene.deleteEntity(scene.findSyEntityById(lineId));
     EXPECT_EQ(scene.getEntityCount(), 0u);
     // 选择应自动清除
@@ -1146,7 +1146,7 @@ TEST(ToolSelectionSyncRegressionTest, SelectTool_ConsistencyWithScene)
 
 TEST(ToolSelectionSyncRegressionTest, NoDangling_DeleteAllEntitiesOneByOne)
 {
-    // 逐个删除所有实体，验证无悬空选中
+    // 逐个删除所有图元，验证无悬空选中
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
@@ -1179,7 +1179,7 @@ TEST(ToolSelectionSyncRegressionTest, NoDangling_DeleteAllEntitiesOneByOne)
 
 TEST(ToolSelectionSyncRegressionTest, NoDangling_DeleteMixedTypes)
 {
-    // 删除混合类型实体，验证无悬空选中
+    // 删除混合类型图元，验证无悬空选中
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
@@ -1331,7 +1331,7 @@ TEST(GizmoBodyDragRegressionTest, DragImageInteriorTranslatesEntity)
     scene.selectEntity(scene.findSyEntityById(imageId));
     tool.syncSelectionFromScene();
 
-    // 逐环定位：实体在场景里 → 选中同步进工具 → 同步进 Gizmo → 引擎层几何命中
+    // 逐环定位：图元在场景里 → 选中同步进工具 → 同步进 Gizmo → 引擎层几何命中
     ASSERT_NE(scene.findSyEntityById(imageId), nullptr);
     ASSERT_TRUE(tool.hasSelectedEntities());
     ASSERT_EQ(tool.gizmo().selection().size(), 1u);
@@ -1395,7 +1395,7 @@ TEST(GizmoBodyDragRegressionTest, BodyDragIsUndoable)
 
     undoMgr.undo();
 
-    // 撤销走 applyEntitySnapshots，实体按 id 被整体替换，指针必须重新解析
+    // 撤销走 applyEntitySnapshots，图元按 id 被整体替换，指针必须重新解析
     const auto* restored = static_cast<const Eg::SyImage*>(scene.findSyEntityById(imageId));
     ASSERT_NE(restored, nullptr);
     EXPECT_NEAR(restored->bottomLeft.x(), 0.0, 1e-9);

@@ -3,7 +3,7 @@
  * @brief FioEntityConverter 回归测试 — 中立 IR → Engine SyEntity 转换
  *
  * 覆盖：
- *   - 所有实体类型的 convertEntity() 转换
+ *   - 所有图元类型的 convertEntity() 转换
  *   - 扩展数据（多边形、NURBS）的转换
  *   - convertAll() 批量转换
  *   - extractLayers() 图层提取
@@ -18,7 +18,7 @@
 #include "Engine3D/Import/FioEntityConverter.h"
 #include "FileIO/FioTypes.h"
 
-// Engine2D 实体类型
+// Engine2D 图元类型
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyArc.h"
 #include "Engine2D/SyEntity/SyCircle.h"

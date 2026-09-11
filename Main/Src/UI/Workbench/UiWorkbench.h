@@ -277,7 +277,7 @@ private:
     void toggleEntityVisibility(const QString& id, bool visible);
     /// 重命名图元（直接写引擎并刷新）
     void renameEntity(const QString& id, const QString& newName);
-    /// 从场景树批量删除实体（走编辑服务，可撤销）
+    /// 从场景树批量删除图元（走编辑服务，可撤销）
     void deleteSceneTreeSelection(const QStringList& ids);
     /// 从场景树批量设置可见性
     void setSceneTreeVisibility(const QStringList& ids, bool visible);
@@ -298,7 +298,7 @@ private:
     void onViewportContextMenu(QContextMenuEvent* event);
     /// 按客户配置构建 2D 右键菜单（P0-2b）
     /// @param contextMenuId JSON contextMenus 节中的菜单 ID，例如 "canvas.2d"
-    /// @param hasSelection 当前是否有选中实体（决定图层动态段是否含「移动到图层…」）
+    /// @param hasSelection 当前是否有选中图元（决定图层动态段是否含「移动到图层…」）
     /// @return 配置菜单；未配置或无可用条目时返回 nullptr，调用方回退到内建路径。
     ///         返回的菜单归调用方所有，且必须在同一作用域内 delete（命令分发器是栈对象）。
     QMenu* buildConfiguredContextMenu(const QString& contextMenuId, bool hasSelection);

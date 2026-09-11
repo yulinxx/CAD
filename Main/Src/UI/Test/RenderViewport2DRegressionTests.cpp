@@ -5,11 +5,11 @@
  * 测试范围：
  *  - SceneRefreshCoordinator 四级刷新策略完整生命周期
  *  - SceneManager 脏标记传播与刷新联动
- *  - 实体增删改后的刷新触发
+ *  - 图元增删改后的刷新触发
  *  - 选择变更后的重绘触发
  *  - 帧计时器性能监控
  *  - 刷新级别升级/降级规则
- *  - 大批量实体刷新压力
+ *  - 大批量图元刷新压力
  *
  * 注意：需要 QWidget 的测试（RenderViewport2D 事件分发）需要 QApplication 实例，
  * 当前版本以 SceneRefreshCoordinator / SceneManager 的组件级测试为主。
@@ -206,7 +206,7 @@ TEST(RenderViewport2DRegressionTest, DirtyFlag_AddEntityTriggersSceneChanged)
     scene.addEntities(std::move(entities));
 
     EXPECT_EQ(scene.getEntityCount(), 1u);
-    // 添加实体后场景管理器应有脏标记
+    // 添加图元后场景管理器应有脏标记
     // 注意：SceneManager 的实际脏标记行为取决于实现
 }
 
@@ -222,7 +222,7 @@ TEST(RenderViewport2DRegressionTest, DirtyFlag_ModifyEntityTriggersDirty)
     entities.push_back(std::move(line));
     scene.addEntities(std::move(entities));
 
-    // 修改实体属性
+    // 修改图元属性
     auto* entity = scene.findSyEntityById(lineId);
     ASSERT_NE(entity, nullptr);
     entity->setVisible(false);
@@ -262,7 +262,7 @@ TEST(RenderViewport2DRegressionTest, SelectionChange_TriggersRepaint)
     entities.push_back(std::move(line));
     scene.addEntities(std::move(entities));
 
-    // 选中实体
+    // 选中图元
     scene.selectEntity(scene.findSyEntityById(lineId));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
@@ -321,7 +321,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_SceneChangeRefreshesWithEntitie
     Eg::SceneManager scene;
     coordinator.setSceneManager(&scene);
 
-    // 添加实体
+    // 添加图元
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
 
@@ -341,7 +341,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_SceneChangeWithMultipleEntities
     Eg::SceneManager scene;
     coordinator.setSceneManager(&scene);
 
-    // 添加多个实体
+    // 添加多个图元
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     for (int i = 0; i < 5; ++i)
     {
@@ -363,7 +363,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_MixedTypeEntities)
     Eg::SceneManager scene;
     coordinator.setSceneManager(&scene);
 
-    // 添加混合类型实体
+    // 添加混合类型图元
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     {
         auto line = std::make_unique<Eg::SyLine>();
@@ -509,7 +509,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_PerfMonitorDoubleToggle)
     SUCCEED();
 }
 
-// ==================== 大批量实体刷新压力测试 ====================
+// ==================== 大批量图元刷新压力测试 ====================
 
 TEST(RenderViewport2DRegressionTest, Stress_LargeBatchEntityAdd)
 {
@@ -517,7 +517,7 @@ TEST(RenderViewport2DRegressionTest, Stress_LargeBatchEntityAdd)
     Eg::SceneManager scene;
     coordinator.setSceneManager(&scene);
 
-    // 大批量添加实体
+    // 大批量添加图元
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     for (int i = 0; i < 100; ++i)
     {
@@ -539,7 +539,7 @@ TEST(RenderViewport2DRegressionTest, Stress_RepeatedAddAndDelete)
     Eg::SceneManager scene;
     coordinator.setSceneManager(&scene);
 
-    // 反复添加和删除实体
+    // 反复添加和删除图元
     for (int round = 0; round < 5; ++round)
     {
         std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -644,7 +644,7 @@ TEST(RenderViewport2DRegressionTest, Camera2D_NegativeZoomToFit)
     SUCCEED();
 }
 
-// ==================== 实体属性变更后刷新测试 ====================
+// ==================== 图元属性变更后刷新测试 ====================
 
 TEST(RenderViewport2DRegressionTest, EntityPropertyChange_VisibilityToggle)
 {
@@ -792,7 +792,7 @@ TEST(RenderViewport2DRegressionTest, SelectionChain_MultipleSelectWithMixedTypes
     EXPECT_EQ(scene.getSelectedEntityCount(), 2u);
 }
 
-// ==================== 删除实体后无悬空选中测试 ====================
+// ==================== 删除图元后无悬空选中测试 ====================
 
 TEST(RenderViewport2DRegressionTest, NoDanglingSelection_DeleteAllSelected)
 {

@@ -880,8 +880,8 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
     }
 
     // 将图元归属到对应图层
-    // 逻辑：以实体的原始颜色为准，找到或创建对应颜色的图层，然后将实体关联到该图层
-    // 注意：对于SVG导入，实体有overrideColor表示原始颜色，我们需要根据这个颜色来关联图层
+    // 逻辑：以图元的原始颜色为准，找到或创建对应颜色的图层，然后将图元关联到该图层
+    // 注意：对于SVG导入，图元有overrideColor表示原始颜色，我们需要根据这个颜色来关联图层
     if (m_sceneManager && m_layerManager)
     {
         std::unordered_map<int64_t, int> entityToLayerId;
@@ -894,7 +894,7 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
                 continue;
             }
             
-            // 获取实体的原始颜色（overrideColor就是原始颜色）
+            // 获取图元的原始颜色（overrideColor就是原始颜色）
             // 注意：在清除overrideColor之前获取颜色
             const Ut::Color& entityColor = entity->getColor();
             uint8_t r = static_cast<uint8_t>(entityColor.r() * 255);

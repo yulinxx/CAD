@@ -56,7 +56,7 @@ public:
     /// 仅更新选中高亮（不重建拓扑）
     void setSelectedIds(const QSet<QString>& ids);
 
-    /// 当前选中的实体节点 ID 列表
+    /// 当前选中的图元节点 ID 列表
     QStringList selectedIds() const;
 
     /// 获取当前模式
@@ -74,7 +74,7 @@ signals:
     void visibilityToggled(const QString& id, bool visible);
     /// 重命名请求
     void renameRequested(const QString& id, const QString& newName);
-    /// 批量删除请求（ids 为选中的实体 id）
+    /// 批量删除请求（ids 为选中的图元 id）
     void deleteRequested(const QStringList& ids);
     /// 批量显示/隐藏请求
     void batchVisibilityRequested(const QStringList& ids, bool visible);

@@ -2,10 +2,10 @@
  * @file SyEntitySerializerTests.cpp
  * @brief SyEntitySerializer 往返测试 — SyEntity ↔ Protobuf 序列化封装
  * 覆盖：
- *   - 所有实体类型的 serializeEntity ↔ deserializeEntity 闭环
+ *   - 所有图元类型的 serializeEntity ↔ deserializeEntity 闭环
  *   - 通用属性（id, basePoint, bClosed, bCCW）的序列化
  *   - 视图关联的序列化
- *   - 复杂实体类型（NURBS, Image）的序列化
+ *   - 复杂图元类型（NURBS, Image）的序列化
  * P2 测试覆盖扩展 (2026-07-30)
  */
 #include <gtest/gtest.h>
@@ -13,7 +13,7 @@
 #include "SyEntitySerializer.h"
 #include "FileIO/SyDocument.h"
 
-// Engine2D 实体类型
+// Engine2D 图元类型
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyArc.h"
 #include "Engine2D/SyEntity/SyCircle.h"
@@ -32,7 +32,7 @@
 
 namespace
 {
-    /// 辅助：将实体序列化后立即反序列化，验证往返
+    /// 辅助：将图元序列化后立即反序列化，验证往返
     template<typename T>
     std::pair<std::unique_ptr<Eg::SyEntity>, sanyi::proto::EntityData> roundTrip(const Eg::SyEntity& entity)
     {

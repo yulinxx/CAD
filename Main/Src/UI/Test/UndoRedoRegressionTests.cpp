@@ -80,7 +80,7 @@ TEST(UndoRedoRegressionTest, DeleteEntityCommand_ExecuteAndUndo)
 
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
-    // 删除命令 — 使用场景中实际持有的实体指针
+    // 删除命令 — 使用场景中实际持有的图元指针
     auto* entityInScene = scene.findSyEntityById(entityId);
     ASSERT_NE(entityInScene, nullptr);
     auto cmd = std::make_unique<UndoRedoManager::DeleteEntityCommand>(&scene, entityInScene);
@@ -951,7 +951,7 @@ TEST(UndoRedoRegressionTest, PropertyChange_SelectionState)
     EXPECT_TRUE(rawLine->selected());
 }
 
-// ==================== 混合实体类型批量测试 ====================
+// ==================== 混合图元类型批量测试 ====================
 
 TEST(UndoRedoRegressionTest, Batch_MixedEntityTypes)
 {

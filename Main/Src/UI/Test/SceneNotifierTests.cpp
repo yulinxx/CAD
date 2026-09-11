@@ -6,7 +6,7 @@
  *  - 观察者注册与移除 (addObserver/removeObserver)
  *  - 场景变更通知 (notifySceneChanged)
  *  - 选择变更通知 (notifySelectionChanged)
- *  - 实体添加/移除通知 (notifyEntityAdded/notifyEntityRemoved)
+ *  - 图元添加/移除通知 (notifyEntityAdded/notifyEntityRemoved)
  *  - 批量更新与延迟通知 (beginBatch/endBatch/flushDeferred)
  *  - 边界条件：空指针、重复注册、嵌套批量
  *  - 通知顺序保证
@@ -225,7 +225,7 @@ TEST(SceneNotifierTest, NotifySelectionChanged_NoObservers)
 }
 
 // ============================================================================
-// 实体添加通知
+// 图元添加通知
 // ============================================================================
 
 TEST(SceneNotifierTest, NotifyEntityAdded_SingleObserver)
@@ -277,7 +277,7 @@ TEST(SceneNotifierTest, NotifyEntityAdded_MultipleEntities)
 }
 
 // ============================================================================
-// 实体移除通知
+// 图元移除通知
 // ============================================================================
 
 TEST(SceneNotifierTest, NotifyEntityRemoved_SingleObserver)

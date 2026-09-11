@@ -4,7 +4,7 @@
  *
  * 测试范围：
  *  - 删除后撤销恢复（图元属性完整性验证）
- *  - 绘图后撤销删除（实体 ID 一致性）
+ *  - 绘图后撤销删除（图元 ID 一致性）
  *  - 导入（批量）后撤销全部删除
  *  - 事务边界正确性（撤销后重做栈状态）
  *  - 选中状态在 undo/redo 后的恢复
@@ -162,7 +162,7 @@ TEST(UndoRedoExtendedRegressionTest, DrawUndo_EntityRemoved)
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    // 绘图（添加实体）
+    // 绘图（添加图元）
     auto cmd = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line));
     undoMgr.executeCommand(std::move(cmd).release());
     EXPECT_EQ(scene.getEntityCount(), 1u);
@@ -272,7 +272,7 @@ TEST(UndoRedoExtendedRegressionTest, SelectionState_MultipleSelectAfterUndo)
     scene.selectEntity(scene.findSyEntityById(id2));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
-    // 删除 id2: 选中实体被删除，选择计数归零
+    // 删除 id2: 选中图元被删除，选择计数归零
     auto* entity2 = scene.findSyEntityById(id2);
     ASSERT_NE(entity2, nullptr);
     auto cmd = std::make_unique<UndoRedoManager::DeleteEntityCommand>(&scene, entity2);
@@ -364,7 +364,7 @@ TEST(UndoRedoExtendedRegressionTest, BatchImport_MultiRoundUndoRedo)
 
 TEST(UndoRedoExtendedRegressionTest, DrawAfterUndo_EntityCountCorrect)
 {
-    // 验证：绘制 → 撤销 → 绘制 → 实体数正确
+    // 验证：绘制 → 撤销 → 绘制 → 图元数正确
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
@@ -615,7 +615,7 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_SelectionViaSceneManager)
 
 TEST(UndoRedoExtendedRegressionTest, UndoRedo_ImportEntitySelectionRestore)
 {
-    // 导入实体后撤销：验证选中状态恢复
+    // 导入图元后撤销：验证选中状态恢复
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
@@ -628,7 +628,7 @@ TEST(UndoRedoExtendedRegressionTest, UndoRedo_ImportEntitySelectionRestore)
     scene.addEntities(std::move(vec));
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
-    // 选中实体
+    // 选中图元
     scene.selectEntity(scene.findSyEntityById(lineId));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
@@ -672,7 +672,7 @@ TEST(UndoRedoExtendedRegressionTest, UndoRedo_TransactionBoundary_NestedBatch)
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
-    // 添加实体
+    // 添加图元
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;

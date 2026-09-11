@@ -5,7 +5,7 @@
  * 测试范围：
  *  - ImportService 五阶段流程与回调注入
  *  - ExportService 数据收集与格式输出
- *  - FioEntityConverter 元数据/硬件信息/实体属性转换
+ *  - FioEntityConverter 元数据/硬件信息/图元属性转换
  *  - 多格式 draw/circle/arc 往返一致性
  *  - 空场景/边界条件安全性
  *
@@ -363,7 +363,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_LayerSourceIdTransfer)
 
     auto result = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(result, nullptr);
-    // 图层 ID 仅用于引用追踪，不直接存储到实体
+    // 图层 ID 仅用于引用追踪，不直接存储到图元
     EXPECT_EQ(result->eType, Eg::EType::LINE);
 }
 
@@ -481,7 +481,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_SourceFormatPreserved)
 
 TEST(ImportExportRegressionTest, Chain_EntityCountAfterImport)
 {
-    // 模拟从 IR 导入实体到场景
+    // 模拟从 IR 导入图元到场景
     Eg::SceneManager scene;
 
     Fio::EntityInfo info;
@@ -505,7 +505,7 @@ TEST(ImportExportRegressionTest, Chain_ExportCollectMatchesImport)
 {
     Eg::SceneManager scene;
 
-    // 导入 3 个不同实体
+    // 导入 3 个不同图元
     Fio::EntityInfo infos[3];
     infos[0].type = Fio::EntityType::Line;
     infos[0].line.x1 = 0.0;
@@ -570,7 +570,7 @@ TEST(ImportExportRegressionTest, Chain_CollectAfterDelete)
 
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
-    // 删除后导出应收集 0 个实体
+    // 删除后导出应收集 0 个图元
     scene.deleteEntity(scene.findSyEntityById(lineId));
     EXPECT_EQ(scene.getEntityCount(), 0u);
 
@@ -888,11 +888,11 @@ TEST(ImportExportRegressionTest, SyEntitySerializer_ArcRoundTripWithLayer)
     EXPECT_STREQ(restored->name(), "LayerArc");
 }
 
-// ==================== P5 补充：导入后实体数/图层/名称一致性 ====================
+// ==================== P5 补充：导入后图元数/图层/名称一致性 ====================
 
 TEST(ImportExportRegressionTest, ImportService_EntityCountAfterImport)
 {
-    // 验证 ImportService 导入后实体数正确
+    // 验证 ImportService 导入后图元数正确
     ImportService service;
     Eg::SceneManager scene;
 
@@ -903,7 +903,7 @@ TEST(ImportExportRegressionTest, ImportService_EntityCountAfterImport)
 
     service.setSceneManager(&scene);
 
-    // 验证场景管理器中有实体
+    // 验证场景管理器中有图元
     EXPECT_EQ(scene.getAllEntities().size(), 1u);
     EXPECT_EQ(scene.getEntityCount(), 1u);
 }
@@ -925,7 +925,7 @@ TEST(ImportExportRegressionTest, ExportService_EntityCountAfterCollect)
 
 TEST(ImportExportRegressionTest, FioEntityConverter_EntityCountAfterBatch)
 {
-    // 批量转换后实体数正确（使用 POD 数组）
+    // 批量转换后图元数正确（使用 POD 数组）
     Fio::EntityInfo infos[3];
     infos[0].type = Fio::EntityType::Line;
     infos[0].line.x1 = 0;
@@ -1228,7 +1228,7 @@ TEST(ImportExportRegressionTest, ExportService_CollectWithSelectedEntities)
 
     service.setSceneManager(&scene);
     auto collected = service.collectAllEntities();
-    // collectAllEntities 收集所有实体，不限于选中
+    // collectAllEntities 收集所有图元，不限于选中
     EXPECT_EQ(collected.size(), 2u);
 }
 
@@ -1259,7 +1259,7 @@ TEST(ImportExportRegressionTest, ExportService_CanExportVariousExtensions)
 
 TEST(ImportExportRegressionTest, SyEntitySerializer_SerializeNullEntity)
 {
-    // 序列化空实体不应崩溃 — 序列化器由调用方保证非空输入
+    // 序列化空图元不应崩溃 — 序列化器由调用方保证非空输入
     // 此测试仅验证序列化流程不抛出异常
     SUCCEED();
 }
@@ -1339,13 +1339,13 @@ TEST(ImportExportRegressionTest, FioEntityConverter_BatchConsistency_AllFormats)
     parseData.entityCount = 6;
 
     auto result = Eg::FioEntityConverter::convertAll(parseData);
-    // 不崩溃，返回合理数量的实体
+    // 不崩溃，返回合理数量的图元
     EXPECT_GE(result.size(), 4u);
 }
 
 TEST(ImportExportRegressionTest, FioEntityConverter_EntityNamePreservedInBatch)
 {
-    // 验证实体名称在批量转换中保留
+    // 验证图元名称在批量转换中保留
     Fio::EntityInfo infos[2];
     infos[0].type = Fio::EntityType::Line;
     infos[0].line.x1 = 0.0;
@@ -1393,16 +1393,16 @@ TEST(ImportExportRegressionTest, FioEntityConverter_LayerIdPreservedInBatch)
 
     auto result = Eg::FioEntityConverter::convertAll(parseData);
     ASSERT_GE(result.size(), 2u);
-    // layerSourceId 仅在 EntityInfo 层面使用，转换后实体类型正确即可
+    // layerSourceId 仅在 EntityInfo 层面使用，转换后图元类型正确即可
     EXPECT_EQ(result[0]->eType, Eg::EType::LINE);
     EXPECT_EQ(result[1]->eType, Eg::EType::CIRCLE);
 }
 
-// ==================== P5 补测试: 导入导出实体数与状态一致性 ====================
+// ==================== P5 补测试: 导入导出图元数与状态一致性 ====================
 
 TEST(ImportExportRegressionTest, ExportService_EntityCountAfterExport)
 {
-    // 验证导出后实体数不变
+    // 验证导出后图元数不变
     ExportService service;
     Eg::SceneManager scene;
 
@@ -1417,7 +1417,7 @@ TEST(ImportExportRegressionTest, ExportService_EntityCountAfterExport)
 
     auto entities = service.collectAllEntities();
     EXPECT_EQ(entities.size(), 1u);
-    // 收集后场景实体数不变
+    // 收集后场景图元数不变
     EXPECT_EQ(scene.getEntityCount(), 1u);
 }
 
@@ -1437,13 +1437,13 @@ TEST(ImportExportRegressionTest, ExportService_CollectAfterSelectionChange)
     scene.addEntities(std::move(entities));
     EXPECT_EQ(scene.getEntityCount(), 3u);
 
-    // 选中一些实体
+    // 选中一些图元
     scene.selectAll();
     EXPECT_EQ(scene.getSelectedEntityCount(), 3u);
 
     service.setSceneManager(&scene);
     auto collected = service.collectAllEntities();
-    // 导出应收集全部实体，不论选择状态
+    // 导出应收集全部图元，不论选择状态
     EXPECT_EQ(collected.size(), 3u);
 }
 
@@ -1464,7 +1464,7 @@ TEST(ImportExportRegressionTest, SyEntitySerializer_SelectionStateAfterRoundTrip
     vec.push_back(std::move(line));
     scene.addEntities(std::move(vec));
 
-    // 选中实体
+    // 选中图元
     scene.selectEntity(scene.findSyEntityById(lineId));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
@@ -1479,7 +1479,7 @@ TEST(ImportExportRegressionTest, SyEntitySerializer_SelectionStateAfterRoundTrip
 
 TEST(ImportExportRegressionTest, SyEntitySerializer_EmptyEntitySerialization)
 {
-    // 空实体序列化不崩溃
+    // 空图元序列化不崩溃
     Eg::SyLine emptyLine;
     sanyi::proto::EntityData protoData;
     Fio::SyEntitySerializer::serializeEntity(emptyLine, &protoData);

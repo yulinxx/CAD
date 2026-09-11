@@ -74,6 +74,6 @@ private:
     bool m_hasModel{ false };
     std::shared_ptr<IPropertyEditTarget> m_editTarget;
     class PropertyItemDelegate* m_delegate{ nullptr };
-    /// 选中项是否处于锁定（图层锁或实体锁），禁用双击内联/弹窗编辑
+    /// 选中项是否处于锁定（图层锁或图元锁），禁用双击内联/弹窗编辑
     bool m_locked{ false };
 };

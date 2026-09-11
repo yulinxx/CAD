@@ -11,7 +11,7 @@ ObjImportReader::ObjImportReader()
  * @brief OBJ 文件导入实现
  * 统一走中立 IR 链路：FileIO 的 ObjParser → parseToIR → Eg::FioEntityConverter，
  * 与 2D 格式（DXF / SVG / PLT）保持同一条路径。OBJ 的 o / g / usemtl 分段
- * 由 ObjParser 拆成多个 Mesh3D 实体并带出群组信息，因此这里不再合并为单一网格。
+ * 由 ObjParser 拆成多个 Mesh3D 图元并带出群组信息，因此这里不再合并为单一网格。
  */
 ImportResult ObjImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
 {

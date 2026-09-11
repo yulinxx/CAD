@@ -46,7 +46,7 @@ SceneTreeModel3D SceneTreeBuilder3D::build(Eg::SceneManager3D* scene)
         return model;
     }
 
-    // 3D 场景选择状态统一存放在 SceneManager3D 的选择列表中（而非实体标志位），
+    // 3D 场景选择状态统一存放在 SceneManager3D 的选择列表中（而非图元标志位），
     // 这里一次性收集，供节点选中态与 selectedCount 复用，保证与 selectedIds() 一致。
     const QSet<QString> selected = selectedIds(scene);
 

@@ -44,7 +44,7 @@
 - `OperationBus` 注册的 `OperationId` 枚举与其实现
 - 渲染契约 `SceneRenderContract.h`
 
-> 约定：客户化只能从「**外观与编排**」的维度出发，不能绕开 `CommandCatalog → OperationBus` 去直改实体或渲染。
+> 约定：客户化只能从「**外观与编排**」的维度出发，不能绕开 `CommandCatalog → OperationBus` 去直改图元或渲染。
 
 ---
 
@@ -825,7 +825,7 @@ if (clientId == QLatin1String("client_a")) {
 | 状态栏配置化 | ✅ 已具备（`statusBar.items[]`） | 保持 |
 | 右键菜单配置化 + 动态段 | ✅ 画布右键已迁移 | 场景树右键（`UiSceneTreePanel2D`）待迁移 |
 | License → UI 授权闸门 | ✅ 已接线（`UiFeatureGate`） | 补 `feature` 命名规范与授权矩阵文档 |
-| 客户专属 C++ 目录 | ❌ 尚无实体 | 新增 `custom/<clientId>/` 目录 + 运行期注册约定 |
+| 客户专属 C++ 目录 | ❌ 尚无图元 | 新增 `custom/<clientId>/` 目录 + 运行期注册约定 |
 | 配置校验测试 | ⚠️ 部分 | 补“命令 ID 注册检查”“feature 拼写检查”单测 |
 | 客户配置版本管理 | ⚠️ 无迁移机制 | `meta.version` + 变更评审；后续补配置迁移 |
 | 3D 导出命令注册 | ✅ 已实现（OBJ/STL/STEP） | 仅 PDF/PNG 导出缺失；STEP 依赖 `ENABLE_GEOMODELCORE` 需校验 |

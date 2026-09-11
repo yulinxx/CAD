@@ -19,7 +19,7 @@ std::optional<Ut::BBox2d> ViewportSelector::selectionBBox() const
         return std::nullopt;
     }
 
-    // 通过 ID 遍历选中项，再用 SceneManager 查询实体指针合并 BBox
+    // 通过 ID 遍历选中项，再用 SceneManager 查询图元指针合并 BBox
     // 这样 ISelectionService 保持纯 ID 接口，不泄漏 SyEntity*
     struct BBoxContext
     {

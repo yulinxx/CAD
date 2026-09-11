@@ -9,7 +9,7 @@
  * 仓库里目前有四套互不相通的工艺参数：
  *   - `HardwareProfile`（Engine2D，按图层绑定）—— 但 `HardwareProfileManager`
  *     全仓库没有任何实例化点，且 `hardwareProfileId` 不写入 .sy 文档；
- *   - `Eg::ProcessParams`（SQLite 预设，与图层/实体无绑定）；
+ *   - `Eg::ProcessParams`（SQLite 预设，与图层/图元无绑定）；
  *   - `Eg::MaterialInfo` / `MaterialDatabase::MaterialInfo`（材料推荐值，两份）；
  *
  * 也就是说「按图层取工艺参数」这条链路当前是断的（详见

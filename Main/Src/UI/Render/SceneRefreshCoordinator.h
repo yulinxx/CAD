@@ -118,14 +118,14 @@ private:
     std::unordered_set<Eg::EntityId> m_pendingDirtyIds;
     std::unordered_set<Eg::EntityId> m_pendingDeletedIds;
 
-    // 已提交到渲染系统的实体 ID 集合（区分新增 vs 修改）
+    // 已提交到渲染系统的图元 ID 集合（区分新增 vs 修改）
     std::unordered_set<uint64_t> m_renderedEntityIds;
 
     // 上一帧已同步的选中集合：用于在选择变更时计算“发生选中态翻转”的图元，
     // 将其加入待处理脏集合，驱动增量路径正确增删（见 onSelectionChanged）。
     std::unordered_set<uint64_t> m_lastSelectedIds;
 
-    // 当前已同步到位图渲染层的 SyImage 实体 ID 集合（多图支持，本地账本）
+    // 当前已同步到位图渲染层的 SyImage 图元 ID 集合（多图支持，本地账本）
     std::unordered_set<uint64_t> m_bitmapImageIds;
 
     // 位图层协调（单源真值 = 场景中可见 SyImage 集合）：
@@ -134,7 +134,7 @@ private:
     //   fullReconcile=false：仅按 dirty/新增增量上传，并移除场景中已不存在的位图
     void reconcileBitmaps(Eg::SceneManager* sm, bool fullReconcile);
 
-    // 当前已同步到世界文字层的 SyText 实体 ID 集合（本地账本）
+    // 当前已同步到世界文字层的 SyText 图元 ID 集合（本地账本）
     std::unordered_set<uint64_t> m_worldTextIds;
 
     // 世界文字层协调：与 reconcileBitmaps 同一形状、同一真源规则。

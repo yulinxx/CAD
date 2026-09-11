@@ -89,7 +89,7 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
     const auto parseMs =
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - startTime).count();
 
-    // 解析失败与"解析成功但零实体"必须分开报：前者是文件/环境问题，后者多是内容为空或全部实体不受支持
+    // 解析失败与"解析成功但零图元"必须分开报：前者是文件/环境问题，后者多是内容为空或全部图元不受支持
     if (!ok)
     {
         SY_ERRORF("[ImportReader:%s] IR parse failed after %lld ms: %s",
@@ -153,7 +153,7 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
         outEntities.emplace_back(std::move(e));
     }
 
-    // 转换层会跳过自己不认识的实体类型；数量对不上时必须点明差额，否则表现为"导入少了东西"却无迹可查
+    // 转换层会跳过自己不认识的图元类型；数量对不上时必须点明差额，否则表现为"导入少了东西"却无迹可查
     if (outEntities.size() != static_cast<size_t>(ir.entityCount))
     {
         SY_WARNF("[ImportReader:%s] Converter dropped %zu of %u IR entity(ies): unsupported type or invalid geometry",

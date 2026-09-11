@@ -95,8 +95,7 @@ QString SceneDocument2D::createLine(const QPointF& start, const QPointF& end)
     }
     else
     {
-        m_scene->addEntity(line.release());
-        added = m_scene->getAllEntities().back();
+        added = m_scene->addEntity(line.release());
     }
 
     QString id = added ? QString::number(added->id) : QString();
@@ -132,8 +131,7 @@ QString SceneDocument2D::createPolyline(const QVector<QPointF>& points)
     }
     else
     {
-        m_scene->addEntity(line.release());
-        added = m_scene->getAllEntities().back();
+        added = m_scene->addEntity(line.release());
     }
 
     QString id = added ? QString::number(added->id) : QString();
@@ -157,8 +155,7 @@ QString SceneDocument2D::createCircle(const QPointF& center, double radius)
     }
     else
     {
-        m_scene->addEntity(circle.release());
-        added = m_scene->getAllEntities().back();
+        added = m_scene->addEntity(circle.release());
     }
 
     QString id = added ? QString::number(added->id) : QString();
@@ -184,8 +181,7 @@ QString SceneDocument2D::createArc(const QPointF& center, double radius, double 
     }
     else
     {
-        m_scene->addEntity(arc.release());
-        added = m_scene->getAllEntities().back();
+        added = m_scene->addEntity(arc.release());
     }
 
     QString id = added ? QString::number(added->id) : QString();
@@ -221,8 +217,7 @@ QString SceneDocument2D::createPolygon(const QVector<QPointF>& vertices)
     }
     else
     {
-        m_scene->addEntity(polygon.release());
-        added = m_scene->getAllEntities().back();
+        added = m_scene->addEntity(polygon.release());
     }
 
     QString id = added ? QString::number(added->id) : QString();
@@ -247,8 +242,7 @@ QString SceneDocument2D::createBezier2(const QPointF& start, const QPointF& cont
     }
     else
     {
-        m_scene->addEntity(bezier.release());
-        added = m_scene->getAllEntities().back();
+        added = m_scene->addEntity(bezier.release());
     }
 
     QString id = added ? QString::number(added->id) : QString();
@@ -275,8 +269,7 @@ QString SceneDocument2D::createBezier(
     }
     else
     {
-        m_scene->addEntity(bezier.release());
-        added = m_scene->getAllEntities().back();
+        added = m_scene->addEntity(bezier.release());
     }
 
     QString id = added ? QString::number(added->id) : QString();
@@ -309,8 +302,7 @@ QString SceneDocument2D::createNurbs(const QVector<QPointF>& controlPoints)
     }
     else
     {
-        m_scene->addEntity(nurbs.release());
-        added = m_scene->getAllEntities().back();
+        added = m_scene->addEntity(nurbs.release());
     }
 
     QString id = added ? QString::number(added->id) : QString();
@@ -342,8 +334,7 @@ QString SceneDocument2D::createSmartLine(const QVector<QPointF>& points)
     }
     else
     {
-        m_scene->addEntity(smartLine.release());
-        added = m_scene->getAllEntities().back();
+        added = m_scene->addEntity(bezier.release());
     }
 
     QString id = added ? QString::number(added->id) : QString();
@@ -373,8 +364,7 @@ QString SceneDocument2D::createText(const QPointF& position, const QString& text
     }
     else
     {
-        m_scene->addEntity(textEntity.release());
-        added = m_scene->getAllEntities().back();
+        added = m_scene->addEntity(textEntity.release());
     }
 
     QString id = added ? QString::number(added->id) : QString();
@@ -407,8 +397,7 @@ QString SceneDocument2D::createSpline(const QVector<QPointF>& points)
     }
     else
     {
-        m_scene->addEntity(nurbs.release());
-        added = m_scene->getAllEntities().back();
+        added = m_scene->addEntity(nurbs.release());
     }
 
     QString id = added ? QString::number(added->id) : QString();
