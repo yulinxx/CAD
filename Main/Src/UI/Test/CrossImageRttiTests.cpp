@@ -29,6 +29,7 @@
 #include <gtest/gtest.h>
 
 #include "Engine3D/Import/FioEntityConverter.h"
+#include "Engine2D/Import/Fio2DEntityConverter.h"
 #include "Engine3D/SyEntity/SyMeshEntity.h"
 #include "Engine/SyEntity/SyEntity.h"
 #include "FileIO/FioTypes.h"
@@ -36,6 +37,16 @@
 #include <cstring>
 #include <memory>
 #include <vector>
+
+// Engine3D 的转换器只构造 Mesh3D，2D 图元由 Engine2D 的工厂提供。
+// 应用里由 ApplicationCompositionRoot 在启动时注册；测试在此补一次。
+namespace
+{
+    const bool kFio2DFactoryRegistered = []() {
+        Eg::FioEntityConverter::set2DEntityFactory(&Eg::convertFio2DEntity);
+        return true;
+    }();
+}  // namespace
 
 namespace
 {

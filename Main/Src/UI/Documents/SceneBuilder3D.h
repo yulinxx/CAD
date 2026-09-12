@@ -6,7 +6,7 @@
 
 #include "UI/SceneBuilderBase.h"
 
-class SceneDocument3DAdapter;
+class SceneDocument3D;
 
 /**
  * @class SceneBuilder3D
@@ -19,7 +19,7 @@ class SceneBuilder3D : public UI::SceneBuilderBase
 {
 public:
     // 返回裸指针（调用方通过 SceneBuilderBase::destroyScene 释放）
-    static SceneDocument3DAdapter* createDefaultScene(QString& rootNodeId);
+    static SceneDocument3D* createDefaultScene(QString& rootNodeId);
     static QString defaultRootNodeName();
 
     // ---- SceneBuilderBase 接口 ----

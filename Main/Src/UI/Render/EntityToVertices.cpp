@@ -11,6 +11,7 @@
 #include "EntityToVertices.h"
 
 #include "Engine2D/Geometry/EntityGeometryEmitter.h"
+#include "Engine2D/Render/Tessellator.h"
 #include "Engine/SyEntity/SyEntity.h"
 #include "Engine/SyEntity/EType.h"
 
@@ -23,6 +24,11 @@ namespace
 {
     // 离散化参数统一由 Render::tess 定义（UI/Common/Include/Render/RenderTypes.h），
     // 保证全量路径与增量路径结果一致
+
+    // 曲线离散化复用缓冲：entityToVertices 会被 parallelForIndex 并行调用，
+    // thread_local 保证各线程互不干扰，同时预热后不再每次原语都堆分配。
+    // 曲线离散化公式统一在 Eg::Tessellator 的固定段数实现里，本文件不再自行重写。
+    thread_local Eg::Tessellator::FixedCurvePoints t_curvePoints;
 
     // 颜色转换：Ut::Color → float[4]
     inline void colorToRGBA(const Ut::Color& c, float out[4])
@@ -118,11 +124,13 @@ namespace
     }
 
     // 存入缓存
+    // 写入必须加独占锁：operator[] 在共享锁下执行会触发隐式插入，构成数据竞争
     void storeCache(uint64_t entityId,
         uint64_t geomHash,
         const std::vector<Render::VertexP3C3>& vertices,
         Render::PrimitiveType primType)
     {
+        std::unique_lock<std::shared_mutex> writeLock(s_cacheMutex);
         auto& entry = s_vertexCache[entityId];
         entry.geometryHash = geomHash;
         entry.vertices = vertices;
@@ -191,14 +199,18 @@ namespace
             {
                 return;
             }
-            m_outType = Render::PrimitiveType::LineLoop;
+            // 曲线离散化统一走 Eg::Tessellator 的固定段数实现，与全量路径同一份公式
+            Eg::Tessellator::tessellateCircleFixed(center, radius, t_curvePoints);
+            if (t_curvePoints.points.empty())
+            {
+                return;
+            }
+            m_outType = t_curvePoints.closed ? Render::PrimitiveType::LineLoop : Render::PrimitiveType::LineStrip;
             float rgba[4];
             colorToRGBA(color, rgba);
-            const int segments = Render::tess::kCircleSegments;
-            for (int i = 0; i < segments; ++i)
+            for (const Ut::Vec2d& p : t_curvePoints.points)
             {
-                double angle = (2.0 * Render::tess::kPi * i) / segments;
-                addVertex(center.x() + radius * std::cos(angle), center.y() + radius * std::sin(angle), rgba);
+                addVertex(p.x(), p.y(), rgba);
             }
             m_emitted = true;
         }
@@ -210,20 +222,18 @@ namespace
             {
                 return;
             }
+            // 直接使用原始角度差，保留绘制方向（顺时针为负、逆时针为正）
+            Eg::Tessellator::tessellateArcFixed(center, radius, startAngle, endAngle, t_curvePoints);
+            if (t_curvePoints.points.empty())
+            {
+                return;
+            }
             m_outType = Render::PrimitiveType::LineStrip;
             float rgba[4];
             colorToRGBA(color, rgba);
-
-            // 直接使用原始角度差，保留绘制方向
-            // 顺时针绘制时 endAngle < startAngle，angleRange 为负
-            // 逆时针绘制时 endAngle > startAngle，angleRange 为正
-            const double angleRange = endAngle - startAngle;
-            const int segments = Render::tess::arcSegments(std::abs(angleRange));
-            for (int i = 0; i <= segments; ++i)
+            for (const Ut::Vec2d& p : t_curvePoints.points)
             {
-                double t = static_cast<double>(i) / segments;
-                double angle = startAngle + t * angleRange;
-                addVertex(center.x() + radius * std::cos(angle), center.y() + radius * std::sin(angle), rgba);
+                addVertex(p.x(), p.y(), rgba);
             }
             m_emitted = true;
         }
@@ -241,28 +251,19 @@ namespace
             {
                 return;
             }
+            // 整椭圆取 segments 个点并闭合，弧段取 segments+1 个点且开口，由 Tessellator 内部判定
+            Eg::Tessellator::tessellateEllipseFixed(
+                center, radiusX, radiusY, rotation, startAngle, endAngle, bFullEllipse, t_curvePoints);
+            if (t_curvePoints.points.empty())
+            {
+                return;
+            }
+            m_outType = t_curvePoints.closed ? Render::PrimitiveType::LineLoop : Render::PrimitiveType::LineStrip;
             float rgba[4];
             colorToRGBA(color, rgba);
-            double start = startAngle;
-            double end = endAngle;
-            if (bFullEllipse || (start == 0.0 && end == 0.0))
+            for (const Ut::Vec2d& p : t_curvePoints.points)
             {
-                start = 0.0;
-                end = 2.0 * Render::tess::kPi;
-            }
-            // 使用原始角度差，保留绘制方向（顺时针/逆时针）
-            const double angleRange = end - start;
-            m_outType = bFullEllipse ? Render::PrimitiveType::LineLoop : Render::PrimitiveType::LineStrip;
-            const int segments = Render::tess::ellipseSegments(std::abs(angleRange));
-            const double cosR = std::cos(rotation);
-            const double sinR = std::sin(rotation);
-            for (int i = 0; i <= segments; ++i)
-            {
-                double t = static_cast<double>(i) / segments;
-                double angle = start + t * angleRange;
-                double lx = radiusX * std::cos(angle);
-                double ly = radiusY * std::sin(angle);
-                addVertex(center.x() + lx * cosR - ly * sinR, center.y() + lx * sinR + ly * cosR, rgba);
+                addVertex(p.x(), p.y(), rgba);
             }
             m_emitted = true;
         }
@@ -361,14 +362,18 @@ namespace
 }  // namespace
 
 // 供外部调用：图元删除时丢弃其缓存条目
+// erase 必须加独占锁，避免与并发读/写产生数据竞争
 void eraseEntityVertexCache(uint64_t entityId)
 {
+    std::unique_lock<std::shared_mutex> writeLock(s_cacheMutex);
     s_vertexCache.erase(entityId);
 }
 
 // 供外部调用：全量刷新时清空缓存
+// clear 必须加独占锁，避免与并发读/写产生数据竞争
 void clearEntityVertexCache()
 {
+    std::unique_lock<std::shared_mutex> writeLock(s_cacheMutex);
     s_vertexCache.clear();
 }
 

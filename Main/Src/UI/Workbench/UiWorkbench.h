@@ -49,7 +49,6 @@ class SettingsUiCoordinator3D;
 class CommandActionHub3D;
 class AlgorithmRunner3D;
 class AlgorithmApplicationService;
-class SceneDocument3DAdapter;
 class StatusBar3D;
     #ifdef ENABLE_GEOMODELCORE
 class BRepModelService3D;

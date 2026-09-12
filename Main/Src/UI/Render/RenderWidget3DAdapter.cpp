@@ -8,13 +8,12 @@
 #include <QPainter>
 #include <QVBoxLayout>
 
-#include "Render3D/RenderWidget3D.h"
+#include "UI3D/Render3D/RenderWidget3D.h"
 #include "Engine3D/SyEntity/SyMeshEntity.h"
 #include "Engine3D/SceneManager3D.h"
 #include "Engine3D/Selection/SelectionManager3D.h"
 #include "UI3D/Service/SceneDocument3D.h"
 #include "UI3D/Service/CameraController3D.h"
-#include "UiEntities.h"
 #include "Log/SyLogger.h"
 
 RenderWidget3DAdapter::RenderWidget3DAdapter() = default;
@@ -183,14 +182,14 @@ bool RenderWidget3DAdapter::isRenderLoopRunning() const
     return m_renderLoopEnabled && m_ready;
 }
 
-void RenderWidget3DAdapter::setScene(SceneDocument3DAdapter* document)
+void RenderWidget3DAdapter::setScene(SceneDocument3D* document)
 {
     if (!document || !m_renderWidget)
     {
         return;
     }
 
-    // 将 SceneDocument3DAdapter 中的 SceneManager3D 设置给 RenderWidget3D
+    // 将 SceneDocument3D 中的 SceneManager3D 设置给 RenderWidget3D
     auto engineScene = document->engineScene();
     auto* sceneManager = engineScene ? engineScene.get() : nullptr;
     if (sceneManager)
@@ -213,22 +212,6 @@ void RenderWidget3DAdapter::setCamera(CameraController3D* controller)
     // 这样控制器就能真正操作相机，实现视图控制
     controller->setCamera(&m_renderWidget->camera());
     SY_DEBUGF("[RenderWidget3DAdapter] CameraController3D connected to Camera3D at %p", &m_renderWidget->camera());
-
-    // 同步轨道模式
-    setOrbitMode(controller->isOrbitMode());
-}
-
-void RenderWidget3DAdapter::render(QPainter& painter, int width, int height)
-{
-    Q_UNUSED(painter);
-    Q_UNUSED(width);
-    Q_UNUSED(height);
-
-    // RenderWidget3D 自己在 paintGL 中绘制，这里只触发刷新。
-    if (m_renderWidget)
-    {
-        m_renderWidget->update();
-    }
 }
 
 void RenderWidget3DAdapter::resize(int width, int height)
@@ -245,22 +228,6 @@ void RenderWidget3DAdapter::resetView()
     {
         m_renderWidget->resetView();
     }
-}
-
-void RenderWidget3DAdapter::setOrbitMode(bool enabled)
-{
-    Q_UNUSED(enabled);
-    // 导航模式由内部 RenderWidget3D 自己管理，适配器只保留接口一致性。
-}
-
-void RenderWidget3DAdapter::setMeasureMode(bool enabled)
-{
-    Q_UNUSED(enabled);
-}
-
-bool RenderWidget3DAdapter::isOrbitMode() const
-{
-    return true;
 }
 
 void RenderWidget3DAdapter::selectNodeById(const QString& nodeId)

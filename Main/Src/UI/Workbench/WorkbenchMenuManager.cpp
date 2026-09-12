@@ -34,7 +34,7 @@
 #include "UI/Widgets/UiSceneTreePanel.h"
 #include "UI/Widgets/UiPropertiesPanel.h"
 #if BUILD_UI3D
-#include "Render3D/RenderWidget3D.h"
+#include "UI3D/Render3D/RenderWidget3D.h"
 #endif
 #include "ClientConfig/UiBuiltinPanels.h"
 #include "ClientConfig/UiClientConfigBase.h"

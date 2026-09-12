@@ -38,6 +38,8 @@ class FileOperationRegistry;
 class PendingOperationRegistry;
 class PersistenceService;
 
+class MachiningDataBridgeService;  // 3D → 2D 加工数据桥（数据模型 C）
+
 class SelectionService;
 class ISelectionService;
 class AlgorithmApplicationService;
@@ -168,6 +170,12 @@ public:
         return m_sceneManager.get();
     }
 
+    /// 获取 3D → 2D 加工数据桥（数据模型 C；切片提供者未注册时 isAvailable() 为 false）
+    MachiningDataBridgeService* machiningDataBridge()
+    {
+        return m_machiningDataBridge.get();
+    }
+
     /// 获取场景编辑服务
     SceneEditService* sceneEditService()
     {
@@ -249,6 +257,9 @@ private:
 
     /// 3D 场景管理器
     std::unique_ptr<Eg::SceneManager3D> m_sceneManager3D;
+
+    /// 3D → 2D 加工数据桥（数据模型 C）
+    std::unique_ptr<MachiningDataBridgeService> m_machiningDataBridge;
 
     /// 撤销重做管理器（新系统）
     std::unique_ptr<UndoRedoManager> m_undoRedoManager;

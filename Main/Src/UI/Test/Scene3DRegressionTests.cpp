@@ -238,41 +238,6 @@ TEST(Scene3DRegressionTest, RenderWidget3DAdapter_PathCallback)
     adapter.shutdown();
 }
 
-TEST(Scene3DRegressionTest, RenderWidget3DAdapter_IsOpenGL)
-{
-    RenderWidget3DAdapter adapter;
-    EXPECT_TRUE(adapter.isOpenGL());  // Adapter 使用 OpenGL 渲染
-}
-
-TEST(Scene3DRegressionTest, RenderWidget3DAdapter_OrbitMode)
-{
-    RenderWidget3DAdapter adapter;
-    adapter.initialize();
-
-    // 适配器为过渡层：导航模式由内部 RenderWidget3D 管理，isOrbitMode() 固定返回 true（接口一致性）
-    EXPECT_TRUE(adapter.isOrbitMode());
-
-    adapter.setOrbitMode(true);
-    EXPECT_TRUE(adapter.isOrbitMode());
-
-    adapter.setOrbitMode(false);
-    EXPECT_TRUE(adapter.isOrbitMode());
-
-    adapter.shutdown();
-}
-
-TEST(Scene3DRegressionTest, RenderWidget3DAdapter_MeasureMode)
-{
-    RenderWidget3DAdapter adapter;
-    adapter.initialize();
-
-    adapter.setMeasureMode(true);
-    adapter.setMeasureMode(false);
-
-    adapter.shutdown();
-    SUCCEED();
-}
-
 TEST(Scene3DRegressionTest, RenderWidget3DAdapter_SelectNodeById)
 {
     RenderWidget3DAdapter adapter;

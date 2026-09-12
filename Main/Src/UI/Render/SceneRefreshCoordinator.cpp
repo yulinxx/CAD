@@ -229,15 +229,27 @@ void SceneRefreshCoordinator::onSceneChanged()
 {
     if (m_sceneManager)
     {
-        const auto dirtyIds = m_sceneManager->dirtyEntities();
-        const auto deletedIds = m_sceneManager->deletedEntityIds();
-        for (auto id : dirtyIds)
+        Eg::SceneChangeSet changes;
+        if (m_sceneManager->readChanges(m_lastCursor, changes))
         {
-            m_pendingDirtyIds.insert(id);
+            for (const auto& change : changes.changes)
+            {
+                if (hasSceneChangeKind(change.kinds, Eg::SceneChangeKind::Removed))
+                {
+                    m_pendingDeletedIds.insert(change.entityId);
+                }
+                else
+                {
+                    m_pendingDirtyIds.insert(change.entityId);
+                }
+            }
+            m_lastCursor = changes.toRevision;
         }
-        for (auto id : deletedIds)
+        else
         {
-            m_pendingDeletedIds.insert(id);
+            m_refreshLevel = RefreshLevel::FullRefresh;
+            scheduleFullRefresh();
+            return;
         }
     }
 
@@ -732,7 +744,6 @@ void SceneRefreshCoordinator::updateSceneRender()
         applyLightRefresh(sm);
     }
 
-    sm->markClean();
     m_pendingDirtyIds.clear();
     m_pendingDeletedIds.clear();
 }

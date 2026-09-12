@@ -2,13 +2,13 @@
 
 #if BUILD_UI3D
 
-#include "Render3D/IRenderer3D.h"
+#include "UI3D/Render3D/IRenderer3D.h"
 #include <QString>
 #include <memory>
 #include <QWidget>
 
 class RenderWidget3D;
-class SceneDocument3DAdapter;
+class SceneDocument3D;
 class CameraController3D;
 
 namespace Eg
@@ -60,20 +60,10 @@ public:
     void setRenderLoopEnabled(bool enabled) override;
     bool isRenderLoopRunning() const override;
 
-    void setScene(SceneDocument3DAdapter* document) override;
+    void setScene(SceneDocument3D* document) override;
     void setCamera(CameraController3D* controller) override;
-    void render(QPainter& painter, int width, int height) override;
     void resize(int width, int height) override;
     void resetView() override;
-    void setOrbitMode(bool enabled) override;
-    void setMeasureMode(bool enabled) override;
-    bool isOrbitMode() const override;
-
-    /// 判断是否使用 OpenGL 渲染
-    bool isOpenGL() const override
-    {
-        return true;
-    }
 
     void selectNodeById(const QString& nodeId) override;
     QString selectedNodeId() const override;

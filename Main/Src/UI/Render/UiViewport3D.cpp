@@ -1,6 +1,6 @@
 #include "UiViewport3D.h"
 
-#include "Render3D/IRenderer3D.h"
+#include "UI3D/Render3D/IRenderer3D.h"
 
 #include <QContextMenuEvent>
 #include <QMouseEvent>
@@ -78,7 +78,7 @@ void Viewport3D::setStatusCallback(std::function<void(const QString&)> callback)
     }
 }
 
-void Viewport3D::setSceneDocument(SceneDocument3DAdapter* document)
+void Viewport3D::setSceneDocument(SceneDocument3D* document)
 {
     if (m_renderer)
     {
@@ -124,22 +124,6 @@ void Viewport3D::resetCamera()
     update();
 }
 
-void Viewport3D::setOrbitMode(bool enabled)
-{
-    if (m_renderer)
-    {
-        m_renderer->setOrbitMode(enabled);
-    }
-}
-
-void Viewport3D::setMeasureMode(bool enabled)
-{
-    if (m_renderer)
-    {
-        m_renderer->setMeasureMode(enabled);
-    }
-}
-
 QString Viewport3D::selectedNodeId() const
 {
     return m_renderer ? m_renderer->selectedNodeId() : QString();
@@ -157,11 +141,6 @@ void Viewport3D::selectNodeById(const QString& nodeId)
 QStringList Viewport3D::selectedPathNames() const
 {
     return m_renderer ? m_renderer->selectedPathNames() : QStringList();
-}
-
-bool Viewport3D::isUsingOpenGL() const
-{
-    return m_renderer && m_renderer->isOpenGL();
 }
 
 IRenderer3D* Viewport3D::renderer() const
@@ -221,21 +200,6 @@ void Viewport3D::wheelEvent(QWheelEvent* event)
 
     // RenderWidget3D 作为子控件直接接收滚轮事件，不需要在这里转发
     QWidget::wheelEvent(event);
-}
-
-void Viewport3D::paintEvent(QPaintEvent* event)
-{
-    Q_UNUSED(event);
-    if (isUsingOpenGL())
-    {
-        return;
-    }
-
-    QPainter painter(this);
-    if (m_renderer)
-    {
-        m_renderer->render(painter, width(), height());
-    }
 }
 
 void Viewport3D::contextMenuEvent(QContextMenuEvent* event)

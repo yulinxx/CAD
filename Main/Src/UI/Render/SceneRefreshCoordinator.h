@@ -24,6 +24,7 @@
 #include <unordered_set>
 
 #include "Engine/EntityIdGenerator.h"
+#include "Engine/Scene/SceneChangeSet.h"
 #include "Engine2D/Core/SceneNotifier.h"
 #include "UI/Render/ISceneRefreshScheduler.h"
 
@@ -120,6 +121,9 @@ private:
 
     // 已提交到渲染系统的图元 ID 集合（区分新增 vs 修改）
     std::unordered_set<uint64_t> m_renderedEntityIds;
+
+    // 变更流游标（用于 readChanges 增量消费）
+    Eg::ISceneChangeStream::Cursor m_lastCursor{ 0 };
 
     // 上一帧已同步的选中集合：用于在选择变更时计算“发生选中态翻转”的图元，
     // 将其加入待处理脏集合，驱动增量路径正确增删（见 onSelectionChanged）。

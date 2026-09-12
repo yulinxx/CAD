@@ -1,6 +1,10 @@
-﻿#include "UiSceneTreeDock.h"
+// 3D 场景树依赖 UI3D 的 SceneDocument3D/SceneNode，BUILD_UI3D 关闭时整体不参与编译
+// （与 RenderWidget3DAdapter.cpp 同一模式）
+#if BUILD_UI3D
 
-#include "UiEntities.h"
+#include "UiSceneTreeDock.h"
+
+#include "UI3D/Service/SceneDocument3D.h"
 #include "Engine3D/SyEntity/SyMeshEntity.h"
 
 #include <QTreeWidget>
@@ -37,7 +41,7 @@ SceneTreeDockWidget::SceneTreeDockWidget(QWidget* parent)
     });
 }
 
-void SceneTreeDockWidget::setSceneDocument(SceneDocument3DAdapter* document)
+void SceneTreeDockWidget::setSceneDocument(SceneDocument3D* document)
 {
     m_document = document;
     refresh();
@@ -213,3 +217,5 @@ QTreeWidgetItem* SceneTreeDockWidget::findItemByNodeId(const QString& nodeId) co
     }
     return nullptr;
 }
+
+#endif  // BUILD_UI3D

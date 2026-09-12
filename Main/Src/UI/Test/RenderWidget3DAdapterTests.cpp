@@ -18,7 +18,6 @@ TEST(RenderWidget3DAdapterTest, Construction)
     RenderWidget3DAdapter adapter;
     EXPECT_FALSE(adapter.isReady());
     EXPECT_FALSE(adapter.isRenderLoopRunning());
-    EXPECT_TRUE(adapter.isOpenGL());
 }
 
 TEST(RenderWidget3DAdapterTest, DestructorSafeWithoutInit)
@@ -37,12 +36,6 @@ TEST(RenderWidget3DAdapterTest, ShutdownWithoutInit)
 }
 
 // ==================== 状态查询测试 ====================
-
-TEST(RenderWidget3DAdapterTest, IsOpenGLReturnsTrue)
-{
-    RenderWidget3DAdapter adapter;
-    EXPECT_TRUE(adapter.isOpenGL());
-}
 
 TEST(RenderWidget3DAdapterTest, RenderLoopNotRunningWithoutInit)
 {
@@ -90,34 +83,6 @@ TEST(RenderWidget3DAdapterTest, Resize_WithoutInit)
     RenderWidget3DAdapter adapter;
     adapter.resize(800, 600);
     adapter.resize(1024, 768);
-    SUCCEED();
-}
-
-// ==================== 轨道/测量模式测试 ====================
-
-TEST(RenderWidget3DAdapterTest, OrbitMode_Default)
-{
-    RenderWidget3DAdapter adapter;
-    // 适配器 isOrbitMode 始终返回 true（由内部 RenderWidget3D 管理）
-    EXPECT_TRUE(adapter.isOrbitMode());
-}
-
-TEST(RenderWidget3DAdapterTest, SetOrbitMode)
-{
-    RenderWidget3DAdapter adapter;
-    // setOrbitMode 是空操作，接口保留兼容性
-    adapter.setOrbitMode(false);
-    EXPECT_TRUE(adapter.isOrbitMode());
-
-    adapter.setOrbitMode(true);
-    EXPECT_TRUE(adapter.isOrbitMode());
-}
-
-TEST(RenderWidget3DAdapterTest, SetMeasureMode_WithoutInit)
-{
-    RenderWidget3DAdapter adapter;
-    adapter.setMeasureMode(true);
-    adapter.setMeasureMode(false);
     SUCCEED();
 }
 
@@ -239,20 +204,4 @@ TEST(RenderWidget3DAdapterTest, Callbacks_ResetWithNull)
     adapter.setPathCallback(nullptr);
 
     SUCCEED();
-}
-
-// ==================== 视图模式组合测试 ====================
-
-TEST(RenderWidget3DAdapterTest, MeasureAndOrbitMode_Combination)
-{
-    RenderWidget3DAdapter adapter;
-
-    adapter.setMeasureMode(true);
-    EXPECT_TRUE(adapter.isOrbitMode());
-
-    adapter.setMeasureMode(false);
-    EXPECT_TRUE(adapter.isOrbitMode());
-
-    adapter.setOrbitMode(false);
-    EXPECT_TRUE(adapter.isOrbitMode());  // 始终返回 true
 }

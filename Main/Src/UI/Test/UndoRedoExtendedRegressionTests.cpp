@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file UndoRedoExtendedRegressionTests.cpp
  * @brief 撤销/重做扩展回归测试 — 覆盖删除/绘图/导入后 undo/redo 语义
  *
@@ -299,7 +299,6 @@ TEST(UndoRedoExtendedRegressionTest, DirtyState_AfterUndoRedo)
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
     scene.addEntities(std::move(vec));
-    scene.markClean();
 
     // 删除
     auto* entityInScene = scene.findSyEntityById(lineId);

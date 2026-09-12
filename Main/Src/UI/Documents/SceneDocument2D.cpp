@@ -98,16 +98,13 @@ QString SceneDocument2D::createLine(const QPointF& start, const QPointF& end)
         added = m_scene->addEntity(line.release());
     }
 
-    QString id = added ? QString::number(added->id) : QString();
-    if (added)
+    if (!added)
     {
-        m_isModified = true;
+        return {};
     }
-    if (added)
-    {
-        m_isModified = true;
-    }
-    return id;
+
+    m_isModified = true;
+    return QString::number(added->id);
 }
 
 QString SceneDocument2D::createPolyline(const QVector<QPointF>& points)

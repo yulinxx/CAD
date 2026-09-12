@@ -1,4 +1,5 @@
 #include "ApplicationCompositionRoot.h"
+#include "MachiningDataBridgeService.h"
 #include "FileOperationRegistry.h"
 #include "CoreOperationRegistry.h"
 #include "PendingOperationRegistry.h"
@@ -63,7 +64,9 @@ private:
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/UndoRedoManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
+#include "Engine2D/Import/Fio2DEntityConverter.h"
 #include "Engine2D/Interaction/LayerManager.h"
+#include "Engine3D/Import/FioEntityConverter.h"
 
 #include "UI/Services/SelectionService.h"
 #include "UI/Services/ISelectionService.h"
@@ -170,6 +173,8 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     , m_operationBus(std::make_unique<OperationBus>())
     , m_sceneManager(std::make_unique<Eg::SceneManager>())
     , m_sceneManager3D(std::make_unique<Eg::SceneManager3D>())
+    , m_machiningDataBridge(
+          std::make_unique<MachiningDataBridgeService>(m_sceneManager.get(), m_sceneManager3D.get()))
     , m_undoRedoManager(std::make_unique<UndoRedoManager>(m_sceneManager.get()))
     , m_sceneEditService(std::make_unique<SceneEditService>(m_sceneManager.get(), m_undoRedoManager.get()))
     , m_clipboard(std::make_unique<Eg::EntityClipboard>())
@@ -298,6 +303,12 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_importService->setSceneManager(m_sceneManager.get());
     m_importService->setSceneManager3D(m_sceneManager3D.get());
     m_importService->setEditService(m_sceneEditService.get());
+
+    // 注册 2D 图元工厂：Engine3D 的 FioEntityConverter 只构造 Mesh3D，
+    // 2D 图元（Line/Arc/Circle/... ）委托给 Engine2D。组合根同时能看到两侧，
+    // 这是打破 Engine3D → Engine2D 依赖的唯一注册点，必须在任何导入之前完成。
+    Eg::FioEntityConverter::set2DEntityFactory(&Eg::convertFio2DEntity);
+
     // 注入图层管理器：DXF 等导入后按源图层表还原图层结构
     m_importService->setLayerManager(m_layerManager.get());
     m_importService->setBusyStateCallback([this](bool busy) {

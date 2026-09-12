@@ -36,6 +36,22 @@
 #include <memory>
 #include <vector>
 
+namespace
+{
+    /// 取出某个图元的变更记录，不存在返回 nullptr
+    const Eg::SceneChange* findChange(const Eg::SceneChangeSet& set, Eg::EntityId id)
+    {
+        for (const Eg::SceneChange& change : set.changes)
+        {
+            if (change.entityId == id)
+            {
+                return &change;
+            }
+        }
+        return nullptr;
+    }
+}  // namespace
+
 // ==================== ToolManager 构造与生命周期 ====================
 
 TEST(ToolSelectionSyncRegressionTest, ToolManager_DefaultConstruction)
@@ -613,13 +629,20 @@ TEST(SelectionSyncExtendedTest, DeleteEntity_CheckDirtyAndDeleted)
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
     scene.addEntities(std::move(entities));
-    scene.markClean();
+
+    // 记下当前变更游标，只关心此后的变更
+    uint64_t cursor = 0;
+    Eg::SceneChangeSet changes;
+    ASSERT_TRUE(scene.readChanges(cursor, changes));
+    cursor = changes.toRevision;
 
     scene.deleteEntity(scene.findSyEntityById(lineId));
 
-    // 删除后应有 deletedEntityIds
-    const auto& deleted = scene.deletedEntityIds();
-    EXPECT_FALSE(deleted.empty());
+    // 删除后应有删除变更
+    ASSERT_TRUE(scene.readChanges(cursor, changes));
+    const Eg::SceneChange* change = findChange(changes, lineId);
+    ASSERT_NE(change, nullptr);
+    EXPECT_TRUE(Eg::hasSceneChangeKind(change->kinds, Eg::SceneChangeKind::Removed));
     // 删除后不应有悬空选中
     EXPECT_EQ(scene.getSelectedEntityCount(), 0u);
 }

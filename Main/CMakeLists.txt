@@ -283,7 +283,7 @@ if(BUILD_UI3D)
         target_link_libraries(${app_name} PRIVATE GeoModelCore)
     endif()
 endif()
-# Engine3D 始终链接：Main 模块的 ImportService / SceneDocument3DAdapter 等核心
+# Engine3D 始终链接：Main 模块的 ImportService / SceneBuilder3D 等核心
 # 代码无条件依赖 Engine3D（SceneManager3D、SyMeshEntity），与 BUILD_UI3D 无关
 target_link_libraries(${app_name} PRIVATE Engine3D)
 

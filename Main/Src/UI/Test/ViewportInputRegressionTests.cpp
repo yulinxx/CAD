@@ -30,6 +30,22 @@
 #include <chrono>
 #include <thread>
 
+namespace
+{
+    /// 取出某个图元的变更记录，不存在返回 nullptr
+    const Eg::SceneChange* findChange(const Eg::SceneChangeSet& set, Eg::EntityId id)
+    {
+        for (const Eg::SceneChange& change : set.changes)
+        {
+            if (change.entityId == id)
+            {
+                return &change;
+            }
+        }
+        return nullptr;
+    }
+}  // namespace
+
 // 记录一帧，并保证两次时钟读取间隔非零（避免高精度时钟落在同一 tick 导致 avg==0 的抖动失败）
 static void recordOneFrame(FrameTimer& timer)
 {
@@ -574,11 +590,16 @@ TEST(RefreshDirtyTrackingTest, AddEntity_MarksDirty)
     entities.push_back(std::move(line));
     scene.addEntities(std::move(entities));
 
-    const auto& dirty = scene.dirtyEntities();
-    EXPECT_FALSE(dirty.empty());
+    // 添加图元后应有变更记录
+    uint64_t cursor = 0;
+    Eg::SceneChangeSet changes;
+    ASSERT_TRUE(scene.readChanges(cursor, changes));
+    EXPECT_FALSE(changes.changes.empty());
 
-    scene.markClean();
-    EXPECT_TRUE(scene.dirtyEntities().empty());
+    // 推进变更游标后应读不到变更
+    cursor = changes.toRevision;
+    ASSERT_TRUE(scene.readChanges(cursor, changes));
+    EXPECT_TRUE(changes.changes.empty());
 }
 
 TEST(RefreshDirtyTrackingTest, AddEntityThenClean_DirtyResets)
@@ -592,19 +613,25 @@ TEST(RefreshDirtyTrackingTest, AddEntityThenClean_DirtyResets)
     entities.push_back(std::move(line));
     scene.addEntities(std::move(entities));
 
-    // addEntities 后应有脏标记
-    EXPECT_FALSE(scene.dirtyEntities().empty());
+    // addEntities 后应有变更记录
+    uint64_t cursor = 0;
+    Eg::SceneChangeSet changes;
+    ASSERT_TRUE(scene.readChanges(cursor, changes));
+    EXPECT_FALSE(changes.changes.empty());
 
-    scene.markClean();
-    EXPECT_TRUE(scene.dirtyEntities().empty());
+    // 推进变更游标后应读不到变更
+    cursor = changes.toRevision;
+    ASSERT_TRUE(scene.readChanges(cursor, changes));
+    EXPECT_TRUE(changes.changes.empty());
 
-    // 再次添加图元后应有脏标记
+    // 再次添加图元后应有变更记录
     auto line2 = std::make_unique<Eg::SyLine>();
     line2->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(20, 20) });
     std::vector<std::unique_ptr<Eg::SyEntity>> entities2;
     entities2.push_back(std::move(line2));
     scene.addEntities(std::move(entities2));
-    EXPECT_FALSE(scene.dirtyEntities().empty());
+    ASSERT_TRUE(scene.readChanges(cursor, changes));
+    EXPECT_FALSE(changes.changes.empty());
 }
 
 TEST(RefreshDirtyTrackingTest, DeleteEntity_AddsToDeletedIds)
@@ -618,11 +645,18 @@ TEST(RefreshDirtyTrackingTest, DeleteEntity_AddsToDeletedIds)
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
     scene.addEntities(std::move(entities));
-    scene.markClean();
+
+    // 记下当前变更游标，只关心此后的变更
+    uint64_t cursor = 0;
+    Eg::SceneChangeSet changes;
+    ASSERT_TRUE(scene.readChanges(cursor, changes));
+    cursor = changes.toRevision;
 
     scene.deleteEntity(scene.findSyEntityById(lineId));
-    const auto& deleted = scene.deletedEntityIds();
-    EXPECT_FALSE(deleted.empty());
+    ASSERT_TRUE(scene.readChanges(cursor, changes));
+    const Eg::SceneChange* change = findChange(changes, lineId);
+    ASSERT_NE(change, nullptr);
+    EXPECT_TRUE(Eg::hasSceneChangeKind(change->kinds, Eg::SceneChangeKind::Removed));
 }
 
 TEST(RefreshDirtyTrackingTest, MarkClean_ResetsAllDirty)
@@ -638,9 +672,16 @@ TEST(RefreshDirtyTrackingTest, MarkClean_ResetsAllDirty)
         scene.addEntities(std::move(entities));
     }
 
-    EXPECT_FALSE(scene.dirtyEntities().empty());
-    scene.markClean();
-    EXPECT_TRUE(scene.dirtyEntities().empty());
+    // 添加图元后应有变更记录
+    uint64_t cursor = 0;
+    Eg::SceneChangeSet changes;
+    ASSERT_TRUE(scene.readChanges(cursor, changes));
+    EXPECT_FALSE(changes.changes.empty());
+
+    // 推进变更游标后应读不到变更
+    cursor = changes.toRevision;
+    ASSERT_TRUE(scene.readChanges(cursor, changes));
+    EXPECT_TRUE(changes.changes.empty());
 }
 
 TEST(RefreshDirtyTrackingTest, BulkAddEntities_DirtyTracking)
@@ -657,11 +698,17 @@ TEST(RefreshDirtyTrackingTest, BulkAddEntities_DirtyTracking)
     scene.addEntities(std::move(entities));
 
     EXPECT_EQ(scene.getEntityCount(), 10u);
-    const auto& dirty = scene.dirtyEntities();
-    EXPECT_EQ(dirty.size(), 10u);
 
-    scene.markClean();
-    EXPECT_TRUE(scene.dirtyEntities().empty());
+    // 每个新增图元各有一条变更记录
+    uint64_t cursor = 0;
+    Eg::SceneChangeSet changes;
+    ASSERT_TRUE(scene.readChanges(cursor, changes));
+    EXPECT_EQ(changes.changes.size(), 10u);
+
+    // 推进变更游标后应读不到变更
+    cursor = changes.toRevision;
+    ASSERT_TRUE(scene.readChanges(cursor, changes));
+    EXPECT_TRUE(changes.changes.empty());
 }
 
 // ==================== 帧计时器扩展测试 ====================
@@ -733,7 +780,9 @@ TEST(RefreshIntegrationTest, Coordinator_ReceivesDirtyEntities)
     entities.push_back(std::move(line));
     scene.addEntities(std::move(entities));
 
-    EXPECT_FALSE(scene.dirtyEntities().empty());
+    Eg::SceneChangeSet changes;
+    ASSERT_TRUE(scene.readChanges(0, changes));
+    EXPECT_FALSE(changes.changes.empty());
 
     coordinator.onSceneChanged();
     coordinator.stop();
@@ -928,7 +977,10 @@ TEST(SetDocumentRegressionTest, AddObserver_ReceiveSceneChange)
     scene.addEntities(std::move(entities));
 
     coordinator.onSceneChanged();
-    EXPECT_FALSE(scene.dirtyEntities().empty());
+
+    Eg::SceneChangeSet changes;
+    ASSERT_TRUE(scene.readChanges(0, changes));
+    EXPECT_FALSE(changes.changes.empty());
     coordinator.stop();
 }
 
@@ -997,8 +1049,10 @@ TEST(ViewportInputRegressionTest, RefreshLevel_OnSceneChangedCollectsDirtyIds)
     coordinator.setSceneManager(&scene);
     coordinator.onSceneChanged();
 
-    // 场景变更后应有脏标记
-    EXPECT_FALSE(scene.dirtyEntities().empty());
+    // 场景变更后应有变更记录
+    Eg::SceneChangeSet changes;
+    ASSERT_TRUE(scene.readChanges(0, changes));
+    EXPECT_FALSE(changes.changes.empty());
     coordinator.stop();
 }
 
@@ -1116,7 +1170,9 @@ TEST(ViewportInputRegressionTest, DirtyTracking_MultipleEntityTypes)
     scene.addEntities(std::move(entities));
 
     EXPECT_EQ(scene.getEntityCount(), 3u);
-    EXPECT_FALSE(scene.dirtyEntities().empty());
+    Eg::SceneChangeSet changes;
+    ASSERT_TRUE(scene.readChanges(0, changes));
+    EXPECT_FALSE(changes.changes.empty());
 
     coordinator.onSceneChanged();
     coordinator.stop();
@@ -1136,10 +1192,16 @@ TEST(ViewportInputRegressionTest, DirtyTracking_ClearAfterRefresh)
     scene.addEntities(std::move(entities));
 
     coordinator.onSceneChanged();
-    EXPECT_FALSE(scene.dirtyEntities().empty());
 
-    // 清除脏标记
-    scene.markClean();
-    EXPECT_TRUE(scene.dirtyEntities().empty());
+    // 场景变更后应有变更记录
+    uint64_t cursor = 0;
+    Eg::SceneChangeSet changes;
+    ASSERT_TRUE(scene.readChanges(cursor, changes));
+    EXPECT_FALSE(changes.changes.empty());
+
+    // 推进变更游标后应读不到变更
+    cursor = changes.toRevision;
+    ASSERT_TRUE(scene.readChanges(cursor, changes));
+    EXPECT_TRUE(changes.changes.empty());
     coordinator.stop();
 }

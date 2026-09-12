@@ -16,7 +16,19 @@
 #include <cstring>
 
 #include "Engine3D/Import/FioEntityConverter.h"
+#include "Engine2D/Import/Fio2DEntityConverter.h"
 #include "FileIO/FioTypes.h"
+
+// Engine3D 的转换器只构造 Mesh3D，2D 图元由 Engine2D 的工厂提供。
+// 应用里由 ApplicationCompositionRoot 在启动时注册；测试在此补一次，
+// 否则 2D 图元会因未注册工厂而被丢弃。
+namespace
+{
+    const bool kFio2DFactoryRegistered = []() {
+        Eg::FioEntityConverter::set2DEntityFactory(&Eg::convertFio2DEntity);
+        return true;
+    }();
+}  // namespace
 
 // Engine2D 图元类型
 #include "Engine2D/SyEntity/SyLine.h"

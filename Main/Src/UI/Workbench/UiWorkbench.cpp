@@ -90,7 +90,6 @@
 #include "UI2D/Settings/SettingsUiCoordinator2D.h"
 
 #if BUILD_UI3D
-    #include "UiEntities.h"
     #include "UiViewport3D.h"
     #include "SceneBuilder3D.h"
 
@@ -132,7 +131,6 @@ struct Workbench3D::ServiceOwner
     std::unique_ptr<ShortcutManager3D> shortcutManager;
     std::unique_ptr<SceneDocument3D> sceneDocument;
 
-    std::unique_ptr<SceneDocument3DAdapter> sceneDocumentAdapter;
     std::unique_ptr<CameraController3D> cameraController;
     std::unique_ptr<AlgorithmApplicationService> algorithmService;
     std::unique_ptr<SettingsUiCoordinator3D> settingsCoordinator;
@@ -2058,7 +2056,7 @@ void Workbench2D::releaseCentralWidgetGLResources(QWidget* centralWidget) const
 
     #include "Engine3D/SceneManager3D.h"
     #include "Engine3D/Selection/SelectionManager3D.h"
-    #include "Renderer3DFactory.h"
+    #include "ViewportRendererFactory.h"
     #include "Log/SyLogger.h"
 
     #include "SceneTreeBuilder3D.h"
@@ -2180,10 +2178,8 @@ void Workbench3D::create3DServices()
         std::make_unique<SceneEditService3D>(m_sceneManager3D, own.undoRedoManager.get(), own.documentManager.get());
     own.sceneMonitor = std::make_unique<SceneMonitor3D>(nullptr);
     own.shortcutManager = std::make_unique<ShortcutManager3D>(nullptr);
+    // 3D 唯一文档入口：SceneDocument3D 自持引擎场景、UI 树与选择集
     own.sceneDocument = std::make_unique<SceneDocument3D>(m_sceneManager3D);
-    own.sceneDocumentAdapter = std::make_unique<SceneDocument3DAdapter>();
-    auto sceneManagerAlias = std::shared_ptr<Eg::SceneManager3D>(m_sceneManager3D, [](Eg::SceneManager3D*) {});
-    own.sceneDocumentAdapter->setEngineScene(sceneManagerAlias);
     own.cameraController = std::make_unique<CameraController3D>();
     own.algorithmService = std::make_unique<AlgorithmApplicationService>(nullptr);
     own.settingsService = ApplicationCompositionRoot::getSettingsService();
@@ -2262,13 +2258,13 @@ void Workbench3D::create3DViewport(WorkbenchWindow& window)
     window.setCentralWidget(viewport);
     SY_DEBUG("[Workbench3D] Viewport3D set as central widget");
 
-    SY_DEBUG("[Workbench3D] Creating renderer via Renderer3DFactory...");
-    auto renderer = Renderer3DFactory::createDefault();
+    SY_DEBUG("[Workbench3D] Creating renderer via ViewportRendererFactory...");
+    auto renderer = ViewportRendererFactory::createDefault();
     SY_DEBUG("[Workbench3D] Renderer created via factory");
 
     viewport->setRenderer(std::move(renderer));
-    viewport->setSceneDocument(m_serviceOwner->sceneDocumentAdapter.get());
-    SY_DEBUGF("[Workbench3D] SceneDocument3DAdapter set to Viewport3D: %p", m_serviceOwner->sceneDocumentAdapter.get());
+    viewport->setSceneDocument(m_serviceOwner->sceneDocument.get());
+    SY_DEBUGF("[Workbench3D] SceneDocument3D set to Viewport3D: %p", m_serviceOwner->sceneDocument.get());
 
     // 从适配器中取出内部 RenderWidget3D 指针，注册到 ServicePack3D
     // 这样新号绑定、SceneEditService3D、操作注册等都能访问到实际的渲染控件
