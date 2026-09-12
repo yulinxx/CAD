@@ -24,7 +24,7 @@
 - 可重复
 
 **关键文件**：
-- `Renderx/Test/RenderTypesTests.cpp`
+- `Renderx/Test/RhiCoreTests.cpp`、`SlotMapTests.cpp`、`ArenaTests.cpp`、`RxRuntimeTests.cpp`
 - `Utility/Utility/Test/VecTests.cpp`、`BBox2dTests.cpp`、`GeomMathTests.cpp`
 - `Engine/2D/Test/Geo2DPrimitivesTests.cpp`、`Geo2DConstructAlgorithmsTests.cpp`
 - `Engine/3D/Test/Geo3DPrimitivesExtendedTests.cpp`
@@ -157,6 +157,7 @@ Main/Src/UI/Test/
 ├── FioEntityConverterTests.cpp      # IR 转换测试
 ├── ImportExportRegressionTests.cpp  # 导入导出回归
 ├── LayerPersistenceBridgeTests.cpp  # 图层持久化桥接
+├── QtLayerManagerBridgeTests.cpp   # 图层 UI 刷新机制测试
 ├── ClientConfigTests.cpp            # 客户配置测试（含工具栏命令绑定回归：无分发器时推迟构建 / 空分发器会永久禁用全部按钮 / 菜单与工具栏共用同一分发器实例）
 ├── SceneTreeBuilder3DTests.cpp      # 3D 场景树构建
 ├── CommandUiWiringTests.cpp         # 命令 UI 接线回归（26 例：actionId 解析 / 启用规则 / 菜单栏 / 外部 QAction 树应用 / 2D-3D 切换防串台（5 例 BUILD_UI3D 条件编译）/ 配置命令契约 / 配置可信性自检 3 例 / 左侧绘图面板与中枢工具动作 4 例）
@@ -173,7 +174,9 @@ UI/2D/Test/
 ├── ToolShortcutTests.cpp     # 工具快捷键
 ├── ComplexToolsTests.cpp     # 复杂工具
 ├── ComplexToolsTestImpl.cpp
-└── PinnedMarkerGeometryTests.cpp # 屏幕定尺寸标记几何（17 例：选择手柄 / 点标记的顶点数、尺寸不随缩放变化、sizePx 兜底、像素偏移、非有限锚点、多组合批）
+├── PinnedMarkerGeometryTests.cpp # 屏幕定尺寸标记几何
+├── EntityEditPolicyTests.cpp # 图元编辑策略测试
+└── EntityEditorFactoryTests.cpp # 编辑器工厂测试
 
 
 UI/Common/Test/
@@ -191,21 +194,22 @@ UI/3D/Test/
 └── SceneDocumentIO3DTest.cpp # 3D 场景文档 IO
 
 Renderx/Test/
-├── RenderTypesTests.cpp      # 渲染类型测试
-├── BatchQueueTests.cpp       # 批次队列测试
-├── MeshManagerTests.cpp      # 网格管理测试
-├── ArenaTests.cpp            # Arena 分配器测试
-├── SlotMapTests.cpp          # SlotMap 测试
-├── NullBackendTests.cpp      # Null 后端测试
-└── TransientBufferPoolTests.cpp # 暂存缓冲池测试
+├── ArenaTests.cpp            # Arena 内存分配器测试
+├── RhiCoreTests.cpp         # RHI 核心测试
+├── RxRuntimeTests.cpp        # 运行时测试
+└── SlotMapTests.cpp         # SlotMap 数据结构测试
 
 Engine/2D/Test/
 ├── Geo2D*Tests.cpp          # 2D 几何算法
 ├── GeometryComputationTests.cpp
 ├── SceneManagerTests.cpp    # 场景管理测试
+├── SceneNotifierTests.cpp   # 场景通知器测试
 ├── SelectionSemanticsTests.cpp
+├── SpatialIndex2DTests.cpp # 空间索引测试
 ├── TessellatorTests.cpp     # 细分器测试
 ├── PathOptimizerTests.cpp   # 路径优化测试
+├── ArrayAlgorithmTests.cpp  # 阵列算法测试
+├── OffsetAlgorithmTests.cpp # 偏移算法测试
 └── RegressionTests.cpp      # 2D 回归
 
 Engine/3D/Test/
@@ -219,6 +223,11 @@ FileIO/FileIO/Test/
 ├── FioTypesTests.cpp
 ├── FileIOUtilityTests.cpp
 └── FileIORegressionTests.cpp
+
+PythonHost/PythonHost/Test/
+├── TaskRegistryTests.cpp    # 任务注册表测试
+├── RuntimeManagerTests.cpp  # 运行时管理器测试
+└── PythonHostTypesTests.cpp # 类型定义测试
 
 Utility/Utility/Test/
 ├── VecTests.cpp
@@ -418,3 +427,96 @@ struct TestGeometry
 ## 7. 同步说明
 
 本文的测试文件列表应与当前工作树保持一致。新增 / 删除测试文件时同步更新「3.1 测试项目结构」。
+
+## 8. 测试同步机制
+
+### 8.1 Bug 修复同步规则
+
+**原则**：每个 bug 修复必须附带回归测试用例
+
+| Bug 级别 | 要求 | 示例 |
+|----------|------|------|
+| P0 (崩溃/数据丢失) | **必须**添加回归测试 | 内存泄漏、空指针崩溃 |
+| P1 (功能错误) | **必须**添加回归测试 | 计算结果错误、UI 刷新失效 |
+| P2 (体验问题) | 建议添加回归测试 | 性能退化、边界条件 |
+| P3 (轻微问题) | 可选添加回归测试 | 拼写错误、注释问题 |
+
+### 8.2 同步检查清单
+
+在提交代码前，检查以下内容：
+
+```
+□ 测试覆盖检查：
+  □ 新功能是否有对应单元测试？
+  □ Bug 修复是否有回归测试？
+  □ 边界条件是否被测试覆盖？
+
+□ 文档同步检查：
+  □ 新增测试文件是否已记录在本文档？
+  □ 测试文件列表是否与实际目录一致？
+
+□ 代码审查检查：
+  □ 测试代码是否遵循命名规范？
+  □ 断言是否有意义（非 trivial pass/fail）？
+  □ 是否有资源泄漏（内存/文件句柄）？
+```
+
+### 8.3 CI/CD 测试集成
+
+```yaml
+# GitHub Actions 示例
+test:
+  runs-on: windows-latest
+  steps:
+    - name: Build and run tests
+      run: |
+        cmake --build build --target MainTests
+        ctest -C Release --output-on-failure
+
+    - name: Run specific test suites
+      run: |
+        ./build/bin/MainTests --gtest_filter=*RegressionTests
+        ./build/bin/MainTests --gtest_filter=*LayerManager*
+```
+
+### 8.4 测试覆盖率目标
+
+| 模块 | 最低覆盖率 | 目标覆盖率 |
+|------|-----------|-----------|
+| Utility | 80% | 90% |
+| Engine 2D 几何算法 | 50% | 80% |
+| Engine 3D | 30% | 60% |
+| UI 2D | 20% | 50% |
+| 命令系统 | 70% | 85% |
+| Nesting | 60% | 80% |
+
+### 8.5 新增模块测试模板
+
+当新增一个模块时，按以下结构添加测试：
+
+```
+NewModule/
+├── Test/
+│   ├── CMakeLists.txt
+│   ├── ModuleNameTests.cpp      # 核心功能测试
+│   ├── ModuleNameIntegrationTests.cpp  # 集成测试
+│   └── ModuleNameRegressionTests.cpp   # 回归测试
+```
+
+CMakeLists.txt 模板：
+```cmake
+find_package(GTest CONFIG REQUIRED)
+include(GoogleTest)
+
+file(GLOB TEST_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
+
+add_executable(NewModuleTests ${TEST_SOURCES})
+
+target_link_libraries(NewModuleTests PRIVATE
+    GTest::gtest
+    GTest::gtest_main
+    NewModule
+)
+
+gtest_discover_tests(NewModuleTests)
+```
