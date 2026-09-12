@@ -470,9 +470,6 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             }
         }
     }
-            m_renderedEntityIds.insert(uid);
-        }
-    }
 
     // 位图层协调：以场景为真源，增量处理新增/修改/删除/图层显隐。
     //
