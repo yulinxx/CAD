@@ -193,7 +193,7 @@ if(BUILD_CRASHHANDLER)
     )
 endif()
 
-# Build PROJECT_INCLUDE_DIRS list first
+# 先构建 PROJECT_INCLUDE_DIRS 列表
 list(APPEND PROJECT_INCLUDE_DIRS
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/2D/Include"
@@ -209,8 +209,8 @@ if(BUILD_UI3D)
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Src"
     )
 else()
-    # When UI3D is disabled, use pre-created stub headers so Main module compiles.
-    # Stubs live in Main/Src/Stubs/ — forward declarations only, no Engine3D/Qt dependencies.
+    # UI3D 禁用时，使用预创建的桩头文件使 Main 模块可编译。
+    # 桩文件位于 Main/Src/Stubs/ — 仅前向声明，无 Engine3D/Qt 依赖。
     list(APPEND PROJECT_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/Src/Stubs")
 endif()
 
@@ -224,7 +224,7 @@ if(BUILD_CRASHHANDLER)
     )
 endif()
 
-# Apply PROJECT_INCLUDE_DIRS to the target (must be AFTER the list is populated)
+# 将 PROJECT_INCLUDE_DIRS 应用到目标（必须在列表填充之后）
 target_include_directories(${app_name} PRIVATE ${PROJECT_INCLUDE_DIRS})
 
 target_link_libraries(${app_name}
@@ -556,7 +556,7 @@ list(APPEND PROJECT_INCLUDE_DIRS
             # protobuf 生成头文件目录由 FileIO target 的 PUBLIC_INCLUDE_DIRS 自动传播
     )
 
-# Apply PROJECT_INCLUDE_DIRS to MainTests
+# 将 PROJECT_INCLUDE_DIRS 应用到 MainTests
 target_include_directories(MainTests PRIVATE ${PROJECT_INCLUDE_DIRS})
 
     target_link_libraries(MainTests

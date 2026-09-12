@@ -459,8 +459,8 @@ SceneTreePanel::SceneTreePanel(QWidget* parent)
     m_view->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::EditKeyPressed);
     layout->addWidget(m_view);
 
-    connect(
-        m_view->selectionModel(), &QItemSelectionModel::selectionChanged, this, &SceneTreePanel::onModelSelectionChanged);
+    // 注意：QItemSelectionModel 的 connect 延迟到 setMode2D/setMode3D 中执行，
+    // 因为构造时 QTreeView 尚未 setModel()，selectionModel() 返回 nullptr。
     connect(m_view, &QTreeView::activated, this, [this](const QModelIndex& index) {
         if (index.isValid())
         {

@@ -281,15 +281,15 @@ endif()
 add_subdirectory(Main)
 
 # ============================================================================
-# Installation Rules
+# 安装规则
 # ============================================================================
-# Install main executable
+# 安装主可执行文件
 install(TARGETS SanYiCAD
     RUNTIME DESTINATION bin
     BUNDLE DESTINATION .
 )
 
-# Install all project shared libraries
+# 安装所有项目动态库
 set(SANYI_PROJECT_LIBS
     Utility Log License
 )
@@ -342,14 +342,14 @@ if(SANYI_PYTHON_HOST)
     list(APPEND SANYI_PROJECT_LIBS PythonHost)
 endif()
 
-# Install all project DLLs/SOs
+# 安装所有项目 DLL/SO 文件
 install(TARGETS ${SANYI_PROJECT_LIBS}
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION bin
     ARCHIVE DESTINATION lib
 )
 
-# Install PyBindCore module
+# 安装 PyBindCore 模块
 if(SANYI_PYBIND_CORE AND SANYI_PYTHON_HOST)
     install(TARGETS SanYiPyBindCore
         RUNTIME DESTINATION bin
@@ -357,9 +357,9 @@ if(SANYI_PYBIND_CORE AND SANYI_PYTHON_HOST)
     )
 endif()
 
-# Install third-party DLLs (from vcpkg) and Qt plugins
-# windeployqt already places everything in the output directory
-# We just need to copy all .dll, .pyd files from the output dir
+# 安装第三方 DLL（来自 vcpkg）和 Qt 插件
+# windeployqt 已将所有内容放置在输出目录中
+# 我们只需从输出目录复制所有 .dll、.pyd 文件
 if(WIN32)
     install(DIRECTORY "$<TARGET_FILE_DIR:SanYiCAD>/"
         DESTINATION bin
@@ -381,21 +381,21 @@ elseif(UNIX AND NOT APPLE)
     )
 endif()
 
-# Install translations
+# 安装翻译文件
 install(DIRECTORY "${CMAKE_BINARY_DIR}/translations"
     DESTINATION bin
     COMPONENT Translations
     OPTIONAL
 )
 
-# Install resources
+# 安装资源文件
 install(DIRECTORY "${CMAKE_BINARY_DIR}/resources"
     DESTINATION bin
     COMPONENT Resources
     OPTIONAL
 )
 
-# Install Python directory
+# 安装 Python 目录
 if(SANYI_PYTHON_HOST)
     install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/Python"
         DESTINATION bin
@@ -406,6 +406,6 @@ if(SANYI_PYTHON_HOST)
 endif()
 
 # ============================================================================
-# CPack Configuration
+# CPack 配置
 # ============================================================================
 include(CMake/Packaging.cmake)
