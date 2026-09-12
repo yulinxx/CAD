@@ -156,6 +156,8 @@ void EditOperationRegistry::registerAll()
             if (radius < 0.0)
             {
                 auto* scene = editService->sceneManager();
+                if (!scene)
+                    return;
                 auto selected = scene->getSelectedEntities();
                 if (selected.size() < 2)
                     return;
@@ -174,6 +176,8 @@ void EditOperationRegistry::registerAll()
             if (distance < 0.0)
             {
                 auto* scene = editService->sceneManager();
+                if (!scene)
+                    return;
                 auto selected = scene->getSelectedEntities();
                 if (selected.size() < 2)
                     return;
@@ -229,6 +233,8 @@ void EditOperationRegistry::registerClipboardOps()
         if (!editService)
             return false;
         auto* scene = editService->sceneManager();
+        if (!scene)
+            return false;
         const Ut::Vec2d anchor = pasteAnchor();
         QString err;
         Eg::SyGroup* group = TextPasteService::pasteClipboardText(scene, anchor, err);
@@ -252,6 +258,8 @@ void EditOperationRegistry::registerClipboardOps()
         if (!editService)
             return;
         auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
         const Ut::Vec2d anchor = pasteAnchor();
         QString err;
         Eg::SyEntity* image = ImagePasteService::pasteClipboardImage(scene, anchor, err, nullptr, editService);
@@ -276,6 +284,8 @@ void EditOperationRegistry::registerClipboardOps()
             if (!editService || !clipboard)
                 return;
             auto* scene = editService->sceneManager();
+            if (!scene)
+                return;
             auto selected = scene->getSelectedEntities();
             if (selected.empty())
                 return;
@@ -293,6 +303,8 @@ void EditOperationRegistry::registerClipboardOps()
         if (!editService || !clipboard)
             return;
         auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
         auto selected = scene->getSelectedEntities();
         if (selected.empty())
             return;
@@ -309,6 +321,8 @@ void EditOperationRegistry::registerClipboardOps()
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
+            if (!scene)
+                return;
             if (clipboard && clipboard->hasContent())
             {
                 const Ut::Vec2d pastePos = pasteAnchor();
@@ -346,6 +360,8 @@ void EditOperationRegistry::registerClipboardOps()
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
+            if (!scene)
+                return;
             auto selected = scene->getSelectedEntities();
             if (selected.empty())
                 return;
@@ -413,6 +429,8 @@ void EditOperationRegistry::registerTransformOps()
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
+            if (!scene)
+                return;
             auto selected = scene->getSelectedEntities();
             if (selected.empty())
                 return;
@@ -447,6 +465,8 @@ void EditOperationRegistry::registerTransformOps()
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
+            if (!scene)
+                return;
             auto selected = scene->getSelectedEntities();
             if (selected.empty())
                 return;
@@ -504,6 +524,8 @@ void EditOperationRegistry::registerTransformOps()
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
+            if (!scene)
+                return;
             auto selected = scene->getSelectedEntities();
             if (selected.empty())
                 return;
@@ -564,6 +586,8 @@ void EditOperationRegistry::registerTransformOps()
         if (!editService)
             return;
         auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
         auto selected = scene->getSelectedEntities();
         if (selected.empty())
             return;
@@ -584,6 +608,8 @@ void EditOperationRegistry::registerTransformOps()
         if (!editService)
             return;
         auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
         auto selected = scene->getSelectedEntities();
         if (selected.empty())
             return;
@@ -605,6 +631,8 @@ void EditOperationRegistry::registerTransformOps()
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
+            if (!scene)
+                return;
             auto selected = scene->getSelectedEntities();
             if (selected.empty())
                 return;
@@ -631,6 +659,8 @@ void EditOperationRegistry::registerGroupOps()
         if (!editService)
             return;
         auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
         bool hasGroup = false;
         for (Eg::SyEntity* e : scene->getSelectedEntities())
         {
@@ -676,6 +706,8 @@ void EditOperationRegistry::registerTrimExtendOps()
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
+            if (!scene)
+                return;
             TransformParameters tp = TransformParameters::createTrim(
                 params.value(QStringLiteral("targetId")).toULongLong(),
                 params.value(QStringLiteral("boundaryId")).toULongLong());
@@ -720,6 +752,8 @@ void EditOperationRegistry::registerTrimExtendOps()
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
+            if (!scene)
+                return;
             TransformParameters tp = TransformParameters::createExtend(
                 params.value(QStringLiteral("targetId")).toULongLong(),
                 params.value(QStringLiteral("boundaryId")).toULongLong());
@@ -792,6 +826,8 @@ void EditOperationRegistry::registerBboxOps()
         if (!editService)
             return;
         auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
         Eg::SyEntity* entity = scene->getSelectedEntity();
         if (!entity)
             return;
@@ -812,6 +848,8 @@ void EditOperationRegistry::registerDiscretizeOp()
         if (!editService)
             return;
         auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
         Eg::SyEntity* entity = scene->getSelectedEntity();
         if (!entity)
         {
@@ -848,6 +886,8 @@ void EditOperationRegistry::registerBezierOps()
         if (!editService)
             return;
         auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
         const OperationId target = OpRegistryHelpers::canMergeSelectedBeziers(scene) ? OperationId::Edit_MergeBezier : OperationId::Edit_SplitBezier;
         if (m_bus)
             m_bus->run(target);
@@ -858,6 +898,8 @@ void EditOperationRegistry::registerBezierOps()
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
+            if (!scene)
+                return;
             const double dT = params.value(QStringLiteral("t"), 0.5).toDouble();
             if (dT <= 0.0 || dT >= 1.0)
                 return;
@@ -886,6 +928,8 @@ void EditOperationRegistry::registerBezierOps()
         if (!editService)
             return;
         auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
         std::vector<Eg::SyEntity*> vCubic;
         std::vector<Eg::SyEntity*> vQuad;
         OpRegistryHelpers::collectBezierCandidates(scene, vCubic, vQuad);

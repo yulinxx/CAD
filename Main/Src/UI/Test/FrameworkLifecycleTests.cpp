@@ -82,7 +82,7 @@ TEST(FrameworkLifecycleTest, UiStateSnapshot_DefaultsAreStable)
     EXPECT_EQ(snapshot.currentSelectionType, QStringLiteral("none"));
 }
 
-// ==================== P0 回归测试 (2026-07-29) ====================
+// ==================== P0 回归测试 ====================
 
 TEST(FrameworkRegressionTest, UiStateSnapshot_AllFieldsHaveDefaults)
 {
@@ -241,7 +241,7 @@ TEST(FrameworkRegressionTest, ISceneGeometrySink_EmitBBoxDefaultIsNoop)
     SUCCEED();
 }
 
-// ==================== 场景序列化往返测试 (2026-07-30) ====================
+// ==================== 场景序列化往返测试 ====================
 
 TEST(FrameworkRegressionTest, SerializationRoundtrip_EntityCountAndTypes)
 {
@@ -351,7 +351,7 @@ TEST(FrameworkRegressionTest, SerializationRoundtrip_EntityProperties)
     EXPECT_TRUE(loadedPolygon->bClosed);
 }
 
-// ==================== 2D/3D 视口切换回归测试 (2026-07-30) ====================
+// ==================== 2D/3D 视口切换回归测试 ====================
 
 TEST(FrameworkRegressionTest, ViewportSwitch_WorkbenchSnapshotPreservesState)
 {
@@ -462,7 +462,7 @@ TEST(FrameworkRegressionTest, ViewportSwitch_ViewportStatePerViewport)
         saved3D.metadata.value(QStringLiteral("viewportStatus")));
 }
 
-// ==================== 渲染快照一致性测试 (2026-07-30) ====================
+// ==================== 渲染快照一致性测试 ====================
 
 TEST(FrameworkRegressionTest, SceneGeometryCollector_DeterministicOutput)
 {
@@ -606,7 +606,7 @@ TEST(FrameworkRegressionTest, SceneGeometryCollector_ConsistentAcrossMultipleCal
     EXPECT_EQ(collector.meshCount(), 0u);
 }
 
-// ==================== 撤销/重做回归测试 (2026-07-30) ====================
+// ==================== 撤销/重做回归测试 ====================
 
 TEST(FrameworkRegressionTest, UndoRedo_CreateUndoEntityRemoved)
 {

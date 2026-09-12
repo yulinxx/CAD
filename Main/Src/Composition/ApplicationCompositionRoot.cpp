@@ -259,7 +259,7 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
             std::make_unique<LayerPersistenceBridge>(m_layerManager.get(), persistenceService()->layers());
 
         m_layerPersistenceBridge->attach();
-        SY_DEBUG("[ApplicationCompositionRoot] LayerPersistenceBridge attached");
+        SY_INFO("[ApplicationCompositionRoot] LayerPersistenceBridge attached");
     }
 
     // LayerManager 注入 SceneEditService，添加图元时自动分配图层
@@ -431,7 +431,7 @@ void ApplicationCompositionRoot::registerAllOperations()
     // OperationRouting 注入 OperationBus（替代全局单例）
     OperationRouting::setOperationBus(m_operationBus.get());
 
-    SY_DEBUG("[ApplicationCompositionRoot] registering module operations on OperationBus");
+    SY_INFO("[ApplicationCompositionRoot] registering module operations on OperationBus");
 
     // 核心操作（撤销/重做/删除/圆角/倒角/选择/帮助 + 编辑操作 + 算法操作 + 视图操作）
     CoreOperationRegistry coreOps(m_operationBus.get(),

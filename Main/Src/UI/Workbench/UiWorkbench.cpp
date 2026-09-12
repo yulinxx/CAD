@@ -370,6 +370,7 @@ bool Workbench2D::initialize(const UiServices& services)
 {
     if (!services.stateCenter || !services.interactionDispatcher)
     {
+        SY_ERROR("[Workbench2D] initialize failed: stateCenter or interactionDispatcher is null");
         return false;
     }
     m_services = services;
@@ -399,6 +400,7 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
     auto* viewport = createCentralViewport(window, nullptr);
     if (!viewport)
     {
+        SY_ERROR("[Workbench2D] attachToWindow failed: createCentralViewport returned null");
         return;
     }
 
@@ -813,10 +815,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     if (m_services.stateCenter && m_viewport)
     {
         const auto applyGridVisibleFromMetadata = [stateCenter = m_services.stateCenter, vp = m_viewport]() {
-            // 键不存在时**不能**当 false 用：QVariant().toBool() 也是 false，而 gridVisible
-            // 只由 View → Grid 菜单写入。历史实现在键缺失时照样推 false，于是任何一次
-            // metadataChanged（选择变化、捕捉开关、状态提示…）都会把网格强行关掉——
-            // 表现就是「设置里点了确定，网格整个不见了」。
+            // gridVisible 只由 View → Grid 菜单写入，键不存在时不能当 false 用
             const QVariant value = stateCenter->metadata().value(QStringLiteral("gridVisible"));
             if (!value.isValid())
             {
@@ -856,8 +855,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     m_commandHub->setMainWindow(&window);
     m_commandHub->setOperationBus(m_services.operationBus);
     // 单一数据源：一次遍历选中的图元集合，统一算出 count / 锁定(图层+图元) / 可编辑 /
-    // 类型直方图 / 分组 / 贝塞尔，注入给命令中枢。替代原先 count / lock / group 三处各自遍历、
-    // 且分别走 ISelectionService 与 SceneManager 两个数据源的分裂实现，从根上消除规则漂移。
+    // 类型直方图 / 分组 / 贝塞尔，注入给命令中枢
     m_commandHub->setSelectionContextProvider([selectionService = m_services.selectionService,
                                                layerManager = m_services.layerManager,
                                                sceneEditService = m_services.sceneEditService]() -> SelectionContext {
@@ -2100,6 +2098,7 @@ bool Workbench3D::initialize(const UiServices& services)
 {
     if (!services.stateCenter || !services.interactionDispatcher)
     {
+        SY_ERROR("[Workbench3D] initialize failed: stateCenter or interactionDispatcher is null");
         return false;
     }
     m_services = services;

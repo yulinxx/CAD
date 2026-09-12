@@ -36,7 +36,7 @@ void Camera2D::computeViewMatrix(float outMat[9], float vpW, float vpH) const
         {
             outMat[i] = (i == 0 || i == 4 || i == 8) ? 1.0f : 0.0f;
         }
-        SY_ERRORF("Camera2D::computeViewMatrix: invalid zoom (%.9g, %.9g), returning identity", zoomX, zoomY);
+        SY_WARNF("Camera2D::computeViewMatrix: invalid zoom (%.9g, %.9g), returning identity", zoomX, zoomY);
         return;
     }
 

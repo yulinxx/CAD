@@ -565,8 +565,7 @@ void WorkbenchWindow::closeEvent(QCloseEvent* event)
         {
             if (m_uiServices.operationBus)
             {
-                // [E8-P1 修复] 同步等待保存完成，而非 fire-and-forget。
-                // 旧代码直接 accept() 导致保存未完成窗口即关闭，数据静默丢失。
+                // 同步等待保存完成，避免窗口关闭时数据未保存
                 OperationResult saveResult = m_uiServices.operationBus->run(OperationId::File_Save, {});
                 if (!saveResult.success)
                 {
@@ -953,7 +952,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     // 保护：防止重复切换（快速连续点击可能导致状态混乱）
     if (m_switchingWorkbench)
     {
-        SY_WARN("[WorkbenchWindow] triggerWorkbench: already switching, ignoring request");
+        SY_INFO("[WorkbenchWindow] triggerWorkbench: already switching, ignoring request");
         return;
     }
 
@@ -1071,9 +1070,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
 
     // 6c: 重建骨架停靠面板。
     // clearWorkbenchContent() 已经 delete 了全部 Dock（含 SceneDock / PropertiesDock），
-    // 而 buildDockAreas() 原先只在启动时调一次。结果是：leftDock / rightDock 变悬垂指针；
-    // 属性面板在 2D→3D→2D 之后永久消失（场景树因为 setupSceneTree 里有"dock 为空就自建"的
-    // 兜底而侥幸存活）。
+    // 切换工作台后需要重建。属性面板在 2D→3D→2D 之后需要重新创建。
     // 注：工具栏没有对等的重建调用 —— 切换工作台后 buildToolBars() 不会再跑。这不是缺陷，
     // 因为工具栏的唯一归属已收归 C++ 目录驱动路径（Workbench2D::createToolbars），四份
     // 客户端 JSON 的 "toolbars" 一律为空数组；配置驱动那条只剩兜底能力，无内容可重建。

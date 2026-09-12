@@ -911,10 +911,9 @@ bool ViewportInputRouter::handleKeyPressDispatch(QKeyEvent* event)
         return true;
     }
 
-    // 注：这里原先还有一次 handleDeleteKeyPress(event)，已删除（2026-08-27）。
     // Delete / Backspace 统一由工作台的窗口级 QShortcut（Qt::ApplicationShortcut）
-    // 经 OperationBus 跑 Edit_Delete，按键在送达视口 widget 之前就被消费，本分支恒不成立。
-    // 与 3D 侧同一套约定（见 Workbench3D::setup3DDeleteShortcuts 的注释）：
+    // 经 OperationBus 跑 Edit_Delete，按键在送达视口 widget 之前就被消费。
+    // 与 3D 侧同一套约定（见 Workbench3D::setup3DDeleteShortcuts）：
     // 删除只允许有一条通路，多留一条就等于多一套选中集/锁定判定和一次重复删除的隐患。
     //
     // 绘图态「Delete = 回退上一个落点」也因此不能指望这条键盘路：那条语义由

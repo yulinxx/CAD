@@ -8,7 +8,6 @@
 #include <cstddef>
 
 // 占位操作注册器 — 为尚未接入的操作注册占位 LambdaOperation（打印 WARN，避免菜单/工具栏点击时静默无响应）。
-// 2026-08-14 起：编辑/算法/视图操作已全部接入（CoreOperationRegistry / AlgorithmRunner / ViewportActionHub），
 // 当前已无占位操作；本注册器保留空实现，后续新增未接入操作时在此追加占位数组即可。
 PendingOperationRegistry::PendingOperationRegistry(OperationBus* bus)
     : m_bus(bus)

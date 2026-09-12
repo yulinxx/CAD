@@ -258,12 +258,9 @@ void SceneRefreshCoordinator::onSelectionChanged()
     // P5: 观察者注册收敛 — 发射信号供视口同步工具状态
     emit selectionChanged();
 
-    // [E5-P1 修复] 选择变化走增量渲染，而非全量重建。
-    // 旧代码调用 requestFullRefresh() 导致每次单击/悬停都触发整场 gather+tessellate+submit。
-    //
-    // 选中态不再改变主几何：图元本体始终以原色实线提交，选中反馈只由流水虚线轮廓覆盖层
-    // 叠加表达（覆盖层由 SelectTool 在 selectionChanged 时重建）。因此这里无需把选中态
-    // 翻转的图元加入脏集合——它们的顶点没有任何变化，重提交只是白做一遍离散化。
+    // 选择变化走增量渲染。选中态不改变主几何：图元本体始终以原色实线提交，
+    // 选中反馈只由流水虚线轮廓覆盖层叠加表达（覆盖层由 SelectTool 在 selectionChanged 时重建）。
+    // 因此这里无需把选中态翻转的图元加入脏集合——它们的顶点没有变化，重提交只是白做离散化。
     // 仍要维护 m_lastSelectedIds：onSceneChanged 靠它判断"当前有选中"，从而在几何被变换时
     // 补发一次 selectionChanged 让轮廓跟着更新。
     if (m_sceneManager)

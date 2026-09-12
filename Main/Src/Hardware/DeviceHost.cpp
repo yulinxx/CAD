@@ -271,6 +271,7 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
     if (m_impl->device)
     {
         errorOut = QStringLiteral("设备已经启动，请先 stop()");
+        SY_WARNF("[DeviceHost] start() refused: %s", errorOut.toUtf8().constData());
         return false;
     }
 

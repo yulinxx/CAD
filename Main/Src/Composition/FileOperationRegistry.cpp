@@ -127,6 +127,7 @@ bool FileOperationRegistry::doExport(const std::string& filePath)
 {
     if (!m_exportService)
     {
+        SY_ERROR("[FileOperation] doExport failed: exportService is null");
         return false;
     }
 
@@ -161,6 +162,9 @@ bool FileOperationRegistry::doOpenFile(const QString& filePath)
 {
     if (filePath.isEmpty() || !m_importService)
     {
+        SY_WARNF("[FileOperation] doOpenFile failed: filePath=%s importService=%s",
+            filePath.isEmpty() ? "(empty)" : filePath.toUtf8().constData(),
+            m_importService ? "ok" : "null");
         return false;
     }
 
@@ -465,6 +469,7 @@ void FileOperationRegistry::registerAll()
 {
     if (!m_bus || !m_sceneManager)
     {
+        SY_ERROR("[FileOperation] registerAll failed: bus or sceneManager is null");
         return;
     }
 

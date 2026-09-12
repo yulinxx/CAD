@@ -744,8 +744,7 @@ TEST(UndoRedoRegressionTest, EntitySnapshots_MergeTwoCommands)
 
 // 一次完整的鼠标拖拽（按下 → 拖动 → 松开）必须是一条独立的撤销记录：
 // 连续拖两次要能分两次撤回，不能被并成一条。
-// 历史缺陷：SceneEditService::pushExecutedSnapshotCommand 里的
-// if (allowMerge && ...) {} 是空语句，allowMerge 被忽略，所有路径都走了会合并的分支。
+// 确保 non-mergeable 属性的图元操作不会与其他操作合并
 TEST(UndoRedoRegressionTest, EntitySnapshots_NonMergeableKeepsSeparateRecords)
 {
     Eg::SceneManager scene;

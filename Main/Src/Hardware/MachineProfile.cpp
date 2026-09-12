@@ -154,7 +154,7 @@ namespace MachineProfileLoader
                 // 少一个点位会让依赖它的安全条件判定为 invalid，
                 // 而 violateWhenInvalid 默认为 true，最终表现为「无法开工」——
                 // 这条日志就是把「无法开工」和「配置写错」连起来的唯一线索
-                SY_ERRORF("[MachineProfile] Skipped invalid IO point: name='%s' channel=%d",
+                SY_WARNF("[MachineProfile] Skipped invalid IO point: name='%s' channel=%d",
                     p.name.toUtf8().constData(), p.channel);
                 continue;
             }
@@ -167,7 +167,7 @@ namespace MachineProfileLoader
             const MachineSafetyConditionConfig c = parseSafetyCondition(v.toObject());
             if (c.pointName.isEmpty())
             {
-                SY_ERRORF("[MachineProfile] Skipped safety condition without point name");
+                SY_WARNF("[MachineProfile] Skipped safety condition without point name");
                 continue;
             }
             profile.safetyConditions.append(c);
@@ -271,7 +271,7 @@ namespace MachineProfileLoader
             // 解析失败仍然回退，但把原因升级为 ERROR 并原样交给调用方展示：
             // 「配置写错了」和「这台机器没配硬件」是两件事，日志必须区分
             warningOut = QStringLiteral("%1；已临时进入模拟设备模式。").arg(error);
-            SY_ERRORF("[MachineProfile] %s", warningOut.toUtf8().constData());
+            SY_WARNF("[MachineProfile] %s", warningOut.toUtf8().constData());
             return builtinSimulatedProfile();
         }
 

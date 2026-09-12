@@ -355,7 +355,7 @@ void ImportService::importAsync(
 
         if (safeSelf->isCanceled(mutableCtx))
         {
-            SY_WARN("[ImportService] Async import canceled after Phase 1");
+            SY_INFO("[ImportService] Async import canceled after Phase 1");
             finishOnMainThread(ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
             return;
         }
@@ -371,7 +371,7 @@ void ImportService::importAsync(
 
         if (safeSelf->isCanceled(mutableCtx))
         {
-            SY_WARN("[ImportService] Async import canceled after Phase 2");
+            SY_INFO("[ImportService] Async import canceled after Phase 2");
             finishOnMainThread(ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
             return;
         }
@@ -386,7 +386,7 @@ void ImportService::importAsync(
 
                 if (safeSelf->isCanceled(mainCtx))
                 {
-                    SY_WARN("[ImportService] Async import canceled before Phase 3");
+                    SY_INFO("[ImportService] Async import canceled before Phase 3");
                     finishOnMainThread(
                         ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
                     return;
@@ -770,7 +770,7 @@ void ImportService::phaseWriteBackState(const ImportContext& context, const Impo
     }
     else
     {
-        SY_WARN("[ImportService] Current document path not updated: no callback registered");
+        SY_INFO("[ImportService] Current document path not updated: no callback registered");
     }
 
     // 添加到最近文件（优先使用 context 中的回调）
@@ -784,7 +784,7 @@ void ImportService::phaseWriteBackState(const ImportContext& context, const Impo
     }
     else
     {
-        SY_WARN("[ImportService] Recent file list not updated: no callback registered");
+        SY_INFO("[ImportService] Recent file list not updated: no callback registered");
     }
 
     // 文档持久化（使用成员变量回调，全局配置）

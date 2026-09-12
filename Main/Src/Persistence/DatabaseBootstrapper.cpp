@@ -102,6 +102,8 @@ int DatabaseBootstrapper::schemaVersion() const
     }
     catch (...)
     {
+        SY_WARNF("[DatabaseBootstrapper] schemaVersion: failed to parse version string '%s', treating as v0",
+            version.c_str());
         return 0;
     }
 }

@@ -115,6 +115,12 @@ namespace
             return emitPolyline(Eg::Geo2DPath::toPolyline(entity, ctx), out);
         }
 
+        if (segments.empty())
+        {
+            degraded = true;
+            return emitPolyline(Eg::Geo2DPath::toPolyline(entity, ctx), out);
+        }
+
         out.emitRapidTo(segments.front().ptStart.x(), segments.front().ptStart.y());
         for (const Eg::PathSegment& seg : segments)
         {

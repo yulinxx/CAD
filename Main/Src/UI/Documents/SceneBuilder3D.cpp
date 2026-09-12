@@ -30,9 +30,8 @@ QString SceneBuilder3D::defaultRootNodeName()
     return QObject::tr("Root");  // 根节点
 }
 
-// ABI 安全：返回裸指针而非 shared_ptr（2026-07-31 P0 修复）
-// 内部使用 raw new 创建 SceneDocument3DAdapter，调用方通过
-// SceneBuilderBase::destroyScene() 在 DLL 内释放
+// ABI 安全：返回裸指针，内部使用 raw new 创建 SceneDocument3DAdapter
+// 调用方通过 SceneBuilderBase::destroyScene() 在 DLL 内释放
 UI::SceneDocumentBase* SceneBuilder3D::createDefaultScene()
 {
     QString dummyId;
