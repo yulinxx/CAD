@@ -1,3 +1,6 @@
+# --------------------------------------------------------------------
+# 公司 / 产品信息（从 Config.cmake 读取，未定义时使用默认值）
+# --------------------------------------------------------------------
 if(NOT DEFINED SANYI_COMPANY_NAME)
     set(SANYI_COMPANY_NAME "SanYi Technology")
 endif()
@@ -109,7 +112,7 @@ function(sanyi_add_debug_symbols target)
 endfunction()
 
 function(sanyi_glob_sources OUT_VAR)
-    set(options)
+    set(options INCLUDE_MM)
     set(oneValueArgs BASE_DIR)
     set(multiValueArgs DIRS EXCLUDE_PATTERNS)
     cmake_parse_arguments(SANYI_GLOB "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
@@ -122,6 +125,10 @@ function(sanyi_glob_sources OUT_VAR)
     foreach(dir ${SANYI_GLOB_DIRS})
         file(GLOB _dir_files CONFIGURE_DEPENDS "${SANYI_GLOB_BASE_DIR}/${dir}/*.cpp")
         list(APPEND _sources ${_dir_files})
+        if(SANYI_GLOB_INCLUDE_MM)
+            file(GLOB _dir_mm_files CONFIGURE_DEPENDS "${SANYI_GLOB_BASE_DIR}/${dir}/*.mm")
+            list(APPEND _sources ${_dir_mm_files})
+        endif()
     endforeach()
 
     if(SANYI_GLOB_EXCLUDE_PATTERNS)

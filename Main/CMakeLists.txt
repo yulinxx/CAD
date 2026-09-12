@@ -20,25 +20,31 @@ endfunction()
 set(SRC_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/Src)
 set(UI_ROOT ${SRC_ROOT}/UI)
 
-# 自动收集所有源文件（新增 .cpp 文件无需修改此处）
+# 自动收集所有源文件（新增 .cpp/.mm 文件无需修改此处）
 file(GLOB_RECURSE MAIN_APP_SOURCES CONFIGURE_DEPENDS
     "${SRC_ROOT}/*.cpp"
+    "${SRC_ROOT}/*.mm"
 )
 # 排除测试目录下的文件（这些由测试目标独立编译，不属于应用可执行文件）
 list(FILTER MAIN_APP_SOURCES EXCLUDE REGEX ".*/UI/Test/.*\.cpp$")
 
-# macOS 平台专用 Objective-C++ 文件：上面的 glob 只收 .cpp，.mm 必须显式加入。
-# 追加进 MAIN_APP_SOURCES（而非 add_executable 后 target_sources）是为了让
-# MainTests 一并获得——它复用 MAIN_APP_SOURCES，否则 macOS 下测试目标会缺符号。
+# macOS 平台专用 Objective-C++ 文件：.mm 已被上面的 glob 自动收集。
+# 但需要排除非 macOS 平台的 .mm 文件
+if(NOT APPLE)
+    list(FILTER MAIN_APP_SOURCES EXCLUDE REGEX ".*\\.mm$")
+endif()
+
+# .mm 文件包含 Obj-C 头文件，不能与 C++ 文件混在同一个 Unity batch 中
 if(APPLE)
-    list(APPEND MAIN_APP_SOURCES
-        "${SRC_ROOT}/Platform/MacMenuCleanup.mm"
-    )
-    # .mm 文件包含 Obj-C 头文件，不能与 C++ 文件混在同一个 Unity batch 中
-    set_source_files_properties(
-        "${CMAKE_CURRENT_SOURCE_DIR}/Src/Platform/MacMenuCleanup.mm"
-        PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON
-    )
+    set(_mm_files "")
+    foreach(_f ${MAIN_APP_SOURCES})
+        if(_f MATCHES "\\.mm$")
+            list(APPEND _mm_files "${_f}")
+        endif()
+    endforeach()
+    if(_mm_files)
+        set_source_files_properties(${_mm_files} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+    endif()
 endif()
 
 set(MAIN_APP_HEADERS
@@ -203,83 +209,9 @@ if(BUILD_UI3D)
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Src"
     )
 else()
-    # When UI3D is disabled, generate stub headers so Main module compiles
-    set(_STUB_DIR "${CMAKE_BINARY_DIR}/stubs")
-    file(MAKE_DIRECTORY
-        "${_STUB_DIR}/UI3D/Algorithm"
-        "${_STUB_DIR}/UI3D/Edit"
-        "${_STUB_DIR}/UI3D/Manager"
-        "${_STUB_DIR}/UI3D/Operation"
-        "${_STUB_DIR}/UI3D/Render3D"
-        "${_STUB_DIR}/UI3D/Service"
-        "${_STUB_DIR}/UI3D/Settings"
-        "${_STUB_DIR}/UI3D/Shortcut"
-        "${_STUB_DIR}/Render3D"
-        "${_STUB_DIR}/UI/StatusBar"
-        "${_STUB_DIR}/UI/TopToolBar"
-        "${_STUB_DIR}/UI/MainWindow"
-        "${_STUB_DIR}/UI/Settings"
-        "${_STUB_DIR}/UI/Algorithm"
-    )
-    # IRenderer3D - full interface required by Renderer3DFactory
-    file(WRITE "${_STUB_DIR}/Render3D/IRenderer3D.h"
-        "#pragma once\n"
-        "#include <QString>\n#include <QStringList>\n#include <QPainter>\n#include <functional>\n"
-        "class SceneDocument3DAdapter;\nclass CameraController3D;\n"
-        "class IRenderer3D {\npublic:\n"
-        "  virtual ~IRenderer3D() = default;\n"
-        "  using StatusCallback = std::function<void(const QString&)>;\n"
-        "  using SelectionCallback = std::function<void(const QString&)>;\n"
-        "  using PathCallback = std::function<void(const QStringList&)>;\n"
-        "  virtual bool initialize(void* = nullptr) = 0;\n  virtual void shutdown() = 0;\n"
-        "  virtual bool isReady() const = 0;\n  virtual void setRenderLoopEnabled(bool) = 0;\n"
-        "  virtual bool isRenderLoopRunning() const = 0;\n"
-        "  virtual void setScene(SceneDocument3DAdapter*) = 0;\n"
-        "  virtual void setCamera(CameraController3D*) = 0;\n"
-        "  virtual void render(QPainter&, int, int) = 0;\n  virtual void resize(int, int) = 0;\n"
-        "  virtual void resetView() = 0;\n  virtual void setOrbitMode(bool) = 0;\n"
-        "  virtual void setMeasureMode(bool) = 0;\n  virtual bool isOrbitMode() const = 0;\n"
-        "  virtual bool isOpenGL() const = 0;\n  virtual void selectNodeById(const QString&) = 0;\n"
-        "  virtual QString selectedNodeId() const = 0;\n"
-        "  virtual QStringList selectedPathNames() const = 0;\n"
-        "  virtual void setStatusCallback(StatusCallback) = 0;\n"
-        "  virtual void setSelectionCallback(SelectionCallback) = 0;\n"
-        "  virtual void setPathCallback(PathCallback) = 0;\n};\n"
-    )
-    file(WRITE "${_STUB_DIR}/Render3D/RenderWidget3D.h"
-        "#pragma once\nclass QOpenGLWidget;\nclass RenderWidget3D;\n")
-    file(COPY_FILE "${_STUB_DIR}/Render3D/IRenderer3D.h" "${_STUB_DIR}/UI3D/Render3D/IRenderer3D.h")
-    file(COPY_FILE "${_STUB_DIR}/Render3D/RenderWidget3D.h" "${_STUB_DIR}/UI3D/Render3D/RenderWidget3D.h")
-    file(WRITE "${_STUB_DIR}/UI3D/Edit/SceneEditService3D.h"
-        "#pragma once\n#include <vector>\n#include <memory>\n"
-        "class SyEntity;\nclass SceneEditService3D {public:virtual ~SceneEditService3D()=default;"
-        "void addEntities(std::vector<std::unique_ptr<SyEntity>>&&,const char*){}};\n")
-    file(WRITE "${_STUB_DIR}/UI3D/Edit/UndoRedoManager3D.h"
-        "#pragma once\nclass UndoRedoManager3D;\n")
-    file(WRITE "${_STUB_DIR}/UI/StatusBar/StatusBar3D.h"
-        "#pragma once\nclass StatusBar3D;\n")
-    file(WRITE "${_STUB_DIR}/UI/TopToolBar/TopToolBar3D.h"
-        "#pragma once\nclass TopToolBar3D;\n")
-    file(WRITE "${_STUB_DIR}/UI/MainWindow/MainWindow3D.h"
-        "#pragma once\nclass MainWindow3D;\n")
-    file(WRITE "${_STUB_DIR}/UI/Settings/SettingsService.h"
-        "#pragma once\nclass SettingsService;\n")
-    file(WRITE "${_STUB_DIR}/UI/Algorithm/AlgorithmApplicationService.h"
-        "#pragma once\nclass AlgorithmApplicationService;\n")
-    foreach(_stub_h Algorithm/AlgorithmTaskRegistration3D.h Manager/DocumentManager3D.h
-        Operation/AlgorithmRunner3D.h Operation/CommandActionHub3D.h
-        Operation/CommandCatalog3D.h Operation/CommandRegistry3D.h
-        Operation/OperationBus3D.h Render3D/Camera3D.h
-        Render3D/SceneRefreshCoordinator3D.h Render3D/TransformGizmo3D.h
-        Service/BRepModelService3D.h Service/CameraController3D.h
-        Service/SceneDocument3D.h Service/SceneMonitor3D.h
-        Service/ServiceLocator3D.h Service/ServicePack3D.h
-        Settings/SettingsUiCoordinator3D.h Shortcut/ShortcutManager3D.h)
-        string(REGEX REPLACE "^.*/" "" _stub_cls "${_stub_h}")
-        string(REGEX REPLACE "\\.h$" "" _stub_cls "${_stub_cls}")
-        file(WRITE "${_STUB_DIR}/UI3D/${_stub_h}" "#pragma once\nclass ${_stub_cls};\n")
-    endforeach()
-    list(APPEND PROJECT_INCLUDE_DIRS "${_STUB_DIR}")
+    # When UI3D is disabled, use pre-created stub headers so Main module compiles.
+    # Stubs live in Main/Src/Stubs/ — forward declarations only, no Engine3D/Qt dependencies.
+    list(APPEND PROJECT_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/Src/Stubs")
 endif()
 
 list(APPEND PROJECT_INCLUDE_DIRS
