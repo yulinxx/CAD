@@ -83,11 +83,18 @@ if(BUILD_LICENSE_TESTS)
     enable_testing()
     find_package(GTest REQUIRED)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../Test" "${CMAKE_CURRENT_BINARY_DIR}/LicenseTests")
+endif()
+
+# --- 状态输出 ---
+message(STATUS "[${LIB_NAME}]")
+message(STATUS "  Version: ${PROJECT_VERSION}")
+message(STATUS "  Platform: ${CMAKE_SYSTEM_NAME}(${CMAKE_SYSTEM_PROCESSOR})")
+message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
+if(BUILD_LICENSE_TESTS)
     message(STATUS "  Tests: ENABLED")
 else()
     message(STATUS "  Tests: DISABLED")
 endif()
-
 message(STATUS "----------------------------------------")
 
 sanyi_export_imported_target(${LIB_NAME}
