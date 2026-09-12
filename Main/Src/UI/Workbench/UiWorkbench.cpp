@@ -1314,7 +1314,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         if (m_services.layerEditService)
         {
             LayerManagerDialog::showDialog(
-                m_services.layerEditService, m_commandHub ? m_commandHub->mainWindow() : nullptr);
+                m_services.layerEditService, m_commandHub ? m_commandHub->mainWindow() : nullptr, m_services.layerManagerBridge);
         }
     });
 
