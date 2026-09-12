@@ -29,6 +29,18 @@ namespace
             }
         }
     }
+
+    // 文字群组名承载编辑元数据（"Text|SY_TXT:v1:<base64>"），直接展示是乱码。
+    // 面板只显示友好名 "Text"；其余群组名照常展示。
+    QString friendlyGroupName(const char* rawName)
+    {
+        const QString name = QString::fromUtf8(rawName ? rawName : "");
+        if (name.startsWith(QStringLiteral("Text|")) || name.startsWith(QStringLiteral("SY_TXT:")))
+        {
+            return QObject::tr("Text");
+        }
+        return name;
+    }
 }  // namespace
 
 QString SceneTreeBuilder2D::typeName(Eg::EType eType)
@@ -164,7 +176,7 @@ SceneTreeRowMeta2D SceneTreeBuilder2D::rowMeta(Eg::SceneManager* scene, LayerMan
         {
             if (group->name() && *group->name())
             {
-                meta.displayName = QString::fromUtf8(group->name());
+                meta.displayName = friendlyGroupName(group->name());
             }
         }
         return meta;

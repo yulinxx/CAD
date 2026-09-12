@@ -250,6 +250,9 @@ public:
     /// 框架层重建菜单后也会经基类虚接口回调到这里。
     void refreshCommandUiState() override;
 
+    /// 重建场景树模型并推送到面板（结构性变化：导入/撤销/增删）
+    void refreshSceneTree();
+
 private:
     /// 创建中央视口
     QWidget* createCentralViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties);
@@ -265,8 +268,6 @@ private:
     static QStringList buildSupportedImportFormats(const QString& workbenchId);
     /// 绑定并填充 2D 场景树面板（数据经算法层由引擎场景生成，UI 可定制/可缺失）
     void setupSceneTree(WorkbenchWindow& window);
-    /// 重建场景树模型并推送到面板（结构性变化：导入/撤销/增删）
-    void refreshSceneTree();
     /// 引擎场景变更兜底：图元数量变化即视为结构变更，防抖后重建树，避免残留
     void onSceneTreeSceneChanged();
     /// 仅同步面板选中高亮（选择变化，避免重建树导致折叠丢失）

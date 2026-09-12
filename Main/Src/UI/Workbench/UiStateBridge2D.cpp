@@ -82,6 +82,8 @@ QObject* UiStateBridge2D::install(Workbench2D* workbench,
         QObject::connect(sceneMonitor, &SceneMonitor::sceneChanged, guard, [workbench]() {
             QTimer::singleShot(0, workbench, [workbench]() {
                 refreshAll(workbench);
+                // 场景变化时刷新场景树（可见性/锁定状态变化需要同步到树显示）
+                workbench->refreshSceneTree();
             });
         });
     }
