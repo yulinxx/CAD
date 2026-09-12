@@ -1560,8 +1560,7 @@ void Workbench2D::toggleEntityVisibility(const QString& id, bool visible)
 
 void Workbench2D::renameEntity(const QString& id, const QString& newName)
 {
-    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
-    if (!scene || newName.isEmpty())
+    if (newName.isEmpty() || !m_services.sceneEditService)
     {
         return;
     }
@@ -1570,12 +1569,25 @@ void Workbench2D::renameEntity(const QString& id, const QString& newName)
     {
         return;
     }
-    if (auto* entity = scene->findEntityById(*eid))
+    Eg::SceneManager* scene = m_services.sceneEditService->sceneManager();
+    if (!scene)
     {
-        const QByteArray utf8 = newName.toUtf8();
-        entity->setName(utf8.constData());
-        scene->notifySceneChanged();
+        return;
     }
+
+    // 走可撤销编辑路径：重命名作为独立撤销命令入栈（前后快照）。
+    // 若直接写引擎，重命名不会进入撤销栈，之后撤销任何较早的操作都会用
+    // 旧快照把名字覆盖回去（表现为"撤销后名字变回原来的"）。
+    const std::string name = newName.toStdString();
+    m_services.sceneEditService->mutateEntities(
+        { *eid },
+        [scene, entityId = *eid, name]() {
+            if (auto* entity = scene->findSyEntityById(entityId))
+            {
+                entity->setName(name.c_str());
+            }
+        },
+        "Rename");
 }
 
 void Workbench2D::deleteSceneTreeSelection(const QStringList& ids)
