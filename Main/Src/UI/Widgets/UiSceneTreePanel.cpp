@@ -135,6 +135,11 @@ public:
         {
             return meta.visible ? Qt::Checked : Qt::Unchecked;
         }
+        // 双击重命名时，编辑框以当前名称为初值（在原有名字基础上编辑）
+        if (role == Qt::EditRole && index.column() == 1)
+        {
+            return meta.displayName;
+        }
         if (role == kIdRole)
         {
             return QString::number(id);
@@ -176,6 +181,8 @@ public:
             {
                 m_visibilityCallback(id, value.toInt() == Qt::Checked);
             }
+            // 通知视图重绘该单元格，使复选框反映引擎最新可见性
+            emit dataChanged(index, index, { Qt::CheckStateRole });
             return true;
         }
         if (index.column() == 1 && role == Qt::EditRole)
@@ -184,6 +191,8 @@ public:
             {
                 m_renameCallback(id, value.toString());
             }
+            // 重命名后刷新显示名
+            emit dataChanged(index, index, { Qt::DisplayRole, Qt::EditRole });
             return true;
         }
         return false;
@@ -409,6 +418,8 @@ private:
         auto* nameItem = new QStandardItem(node.displayName);
         nameItem->setData(node.id, kIdRole);
         nameItem->setData(node.displayName, kNameRole);
+        // 双击重命名时编辑框以当前名称为初值
+        nameItem->setData(node.displayName, Qt::EditRole);
 
         auto* typeItem = new QStandardItem(node.typeName);
 

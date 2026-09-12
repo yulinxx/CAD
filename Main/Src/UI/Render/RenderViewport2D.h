@@ -40,6 +40,11 @@ namespace Ui2D
     class ViewRenderCoordinator;
 }
 
+namespace UI
+{
+    class CursorManager;
+}
+
 class QMouseEvent;
 class QWheelEvent;
 class QContextMenuEvent;
@@ -252,6 +257,9 @@ private:
     // 捕捉辅助：对世界坐标应用吸附（图元/网格/起点），并刷新捕捉指示器
     QPointF applySnap(const QPointF& worldPos) const;
 
+    // 根据「工具角色 / 平移状态 / 捕捉命中」合成并应用当前光标
+    void syncCursorRole() const;
+
     // 辅助
     void updateStatus(const QString& text);
     void syncStatusMode(const QString& text);
@@ -288,6 +296,9 @@ private:
     // 工具系统
     std::unique_ptr<ToolManager> m_toolManager;
 
+    // 光标管理：角色 → 光标解析（可替换主题），随皮肤刷新
+    std::unique_ptr<UI::CursorManager> m_cursorManager;
+
     // 选中集包围盒查询器（只服务 zoom_selection 等视图操作）
     std::unique_ptr<ViewportSelector> m_selector;
 
@@ -312,6 +323,9 @@ private:
     // 捕捉性能优化：追踪上次鼠标位置和时间，用于快速移动时跳过捕捉
     mutable QPointF m_lastSnapMousePos;
     mutable std::chrono::steady_clock::time_point m_lastSnapTime;
-    // 快速移动阈值（世界坐标单位），超过此距离认为在快速移动
-    static constexpr double kFastMoveSnapThreshold = 50.0;
+    // 快速移动阈值（像素单位），超过此屏幕距离认为在快速移动
+    static constexpr double kFastMoveSnapThresholdPx = 50.0;
+
+    // 捕捉命中时隐藏光标（避免挡住捕捉标记）；由 applySnap 更新
+    mutable bool m_snapCursorHidden{ false };
 };

@@ -237,7 +237,7 @@ void EditOperationRegistry::registerClipboardOps()
             return false;
         const Ut::Vec2d anchor = pasteAnchor();
         QString err;
-        Eg::SyGroup* group = TextPasteService::pasteClipboardText(scene, anchor, err);
+        Eg::SyGroup* group = TextPasteService::pasteClipboardText(scene, anchor, err, editService);
         if (!group)
         {
             if (!err.isEmpty())

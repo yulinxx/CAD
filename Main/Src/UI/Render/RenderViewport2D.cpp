@@ -26,6 +26,11 @@
 #include "UI2D/ViewWidget/ToolInitializer.h"
 #include "UI2D/ViewWidget/ViewRenderCoordinator.h"
 
+#include "UI2D/Dlg/EntityPropertiesDialog2D.h"
+
+#include "UI/CursorManager.h"
+#include "UI/CursorRole.h"
+
 #include <QVBoxLayout>
 #include <QMouseEvent>
 #include <QWheelEvent>
@@ -72,6 +77,10 @@ RenderViewport2D::RenderViewport2D(QWidget* parent)
     m_inputRouter->setSnapPositionCallback([this](const QPointF& p) {
         return applySnap(p);
     });
+
+    // 光标管理：目标必须是鼠标下的 RenderWidget（子控件），不是外层视口
+    m_cursorManager = std::make_unique<UI::CursorManager>();
+    m_cursorManager->setTargetWidget(m_renderWidget);
 }
 
 RenderViewport2D::~RenderViewport2D()
@@ -181,15 +190,28 @@ QPointF RenderViewport2D::applySnap(const QPointF& worldPos) const
         return worldPos;
     }
 
+    // 同步视图缩放：捕捉半径以像素声明，需换算为世界单位，保证屏幕捕捉范围恒定
+    double pixelToWorldScale = 1.0;
+    if (m_renderWidget)
+    {
+        const float s = m_renderWidget->pixelToWorldScale();
+        if (s > 0.0f)
+        {
+            pixelToWorldScale = static_cast<double>(s);
+        }
+    }
+    m_gridSnapManager->setPixelToWorldScale(pixelToWorldScale);
+
     // 性能优化：快速移动时跳过捕捉
-    // 计算与上次捕捉位置的欧氏距离
+    // 阈值同样以像素衡量，换算成世界单位后再比较，避免缩放时误判
     const double dx = worldPos.x() - m_lastSnapMousePos.x();
     const double dy = worldPos.y() - m_lastSnapMousePos.y();
     const double distSq = dx * dx + dy * dy;
+    const double thresholdWorld = kFastMoveSnapThresholdPx * pixelToWorldScale;
     
     // 如果移动距离超过阈值，认为在快速移动，跳过捕捉
     // 这可以大大减少鼠标快速移动时的性能开销
-    if (distSq > kFastMoveSnapThreshold * kFastMoveSnapThreshold)
+    if (distSq > thresholdWorld * thresholdWorld)
     {
         // 更新位置记录，但不进行捕捉
         m_lastSnapMousePos = worldPos;
@@ -201,7 +223,11 @@ QPointF RenderViewport2D::applySnap(const QPointF& worldPos) const
             m_renderCoordinator->setSnapIndicator(
                 Ut::Vec2d(worldPos.x(), worldPos.y()), false, SnapEngine::Snap_None);
         }
-        
+
+        // 未命中捕捉：恢复光标
+        m_snapCursorHidden = false;
+        syncCursorRole();
+
         return worldPos;
     }
 
@@ -218,7 +244,44 @@ QPointF RenderViewport2D::applySnap(const QPointF& worldPos) const
         m_renderCoordinator->setSnapIndicator(output.pos, didSnap, output.snapType);
     }
 
+    // 捕捉命中时隐藏光标，避免挡住捕捉标记；未命中恢复当前工具光标
+    m_snapCursorHidden = didSnap;
+    syncCursorRole();
+
     return QPointF(output.pos.x(), output.pos.y());
+}
+
+// 光标合成：平移态 > 工具角色；捕捉命中时整体隐藏
+void RenderViewport2D::syncCursorRole() const
+{
+    if (!m_cursorManager)
+    {
+        return;
+    }
+
+    UI::CursorRole role = UI::CursorRole::Default;
+    bool panning = false;
+    if (m_inputRouter && m_inputRouter->isPanning())
+    {
+        role = UI::CursorRole::Panning;
+        panning = true;
+    }
+    else if (m_inputRouter && m_inputRouter->isPanModeEnabled())
+    {
+        role = UI::CursorRole::Pan;
+        panning = true;
+    }
+    else if (m_toolManager)
+    {
+        if (const ITool* tool = m_toolManager->getActiveTool())
+        {
+            role = tool->cursorRole();
+        }
+    }
+
+    m_cursorManager->setRole(role);
+    // 平移时不隐藏（手型要可见）；其余情况捕捉命中即隐藏，避免挡住捕捉标记
+    m_cursorManager->setHidden(m_snapCursorHidden && !panning);
 }
 
 // ==================== 外部接口实现 ====================
@@ -402,7 +465,13 @@ void RenderViewport2D::initializeTools()
         [this]() {
             zoomToFit();
         },
-        /*onEntityDoubleClick=*/nullptr,
+        /*onEntityDoubleClick=*/
+        [this](Eg::SyEntity* entity) {
+            if (entity)
+            {
+                EntityPropertiesDialog2D::showDialog(this, entity);
+            }
+        },
         /*gridSnapManager=*/m_gridSnapManager.get(),
         /*operationBus=*/m_operationBus,
         /*panViewByPixels=*/
@@ -499,14 +568,8 @@ bool RenderViewport2D::setActiveTool(const QString& toolName)
     if (ok)
     {
         updateStatus(tr("2D tool: %1").arg(toolName));
-        if (toolName == "SelectTool")
-        {
-            unsetCursor();
-        }
-        else
-        {
-            setCursor(Qt::CrossCursor);
-        }
+        // 光标由工具角色驱动（选择/绘制/文字…），不在这里硬编码
+        syncCursorRole();
         // 通知上层（如绘图工具栏）同步活动工具状态
         emit activeToolChanged(toolName);
     }
@@ -652,6 +715,7 @@ void RenderViewport2D::setPanModeEnabled(bool enabled)
         m_inputRouter->setPanModeEnabled(enabled);
     }
     updateStatus(enabled ? tr("2D pan mode") : tr("2D select mode"));
+    syncCursorRole();
 }
 
 bool RenderViewport2D::isPanModeEnabled() const
@@ -737,7 +801,27 @@ void RenderViewport2D::resizeEvent(QResizeEvent* event)
 
 bool RenderViewport2D::eventFilter(QObject* obj, QEvent* event)
 {
-    return m_inputRouter->eventFilter(obj, event);
+    const bool handled = m_inputRouter->eventFilter(obj, event);
+
+    // 交互状态（平移中/工具拖拽）在事件派发中变化，派发后按最新状态刷新光标
+    if (obj == m_renderWidget)
+    {
+        switch (event->type())
+        {
+        case QEvent::Enter:
+        case QEvent::Leave:
+        case QEvent::MouseMove:
+        case QEvent::MouseButtonPress:
+        case QEvent::MouseButtonRelease:
+        case QEvent::Wheel:
+            syncCursorRole();
+            break;
+        default:
+            break;
+        }
+    }
+
+    return handled;
 }
 
 void RenderViewport2D::mousePressEvent(QMouseEvent* event)
