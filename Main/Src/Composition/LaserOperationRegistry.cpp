@@ -38,7 +38,7 @@ void LaserOperationRegistry::registerAll()
 {
     if (!m_config.bus)
     {
-        SY_ERRORF("[LaserOperation] No OperationBus, laser commands are not registered");
+        SY_WARNF("[LaserOperation] No OperationBus, laser commands are not registered");
         return;
     }
 
@@ -134,5 +134,5 @@ void LaserOperationRegistry::registerAll()
             return true;
         }));
 
-    SY_DEBUG("[LaserOperation] registered: StartProcess / PauseProcess / StopProcess / EmergencyStop");
+    SY_INFO("[LaserOperation] registered: StartProcess / PauseProcess / StopProcess / EmergencyStop");
 }

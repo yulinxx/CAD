@@ -17,6 +17,7 @@
 #include <cmath>
 #include <cstring>
 #include <unordered_map>
+#include <shared_mutex>
 
 namespace
 {
@@ -42,7 +43,9 @@ namespace
     };
 
     // 按图元 ID 缓存离散化结果，避免非几何变更时重复离散化
+    // 使用 shared_mutex 保护：读操作可以并发，写操作独占
     static std::unordered_map<uint64_t, CachedVertexData> s_vertexCache;
+    static std::shared_mutex s_cacheMutex;
 
     // 计算图元几何参数哈希（基于控制点 + 包围盒 + 类型 + 闭合标志）
     // 仅依赖 SyEntity 基类契约接口，不依赖具体派生类型
@@ -86,12 +89,14 @@ namespace
     }
 
     // 尝试从缓存命中：几何未变时仅更新颜色，跳过离散化
+    // 使用共享锁允许多线程并发读
     bool tryCacheHit(uint64_t entityId,
         uint64_t geomHash,
         const Ut::Color& color,
         std::vector<Render::VertexP3C3>& outVertices,
         Render::PrimitiveType& outType)
     {
+        std::shared_lock<std::shared_mutex> readLock(s_cacheMutex);
         auto it = s_vertexCache.find(entityId);
         if (it == s_vertexCache.end() || it->second.geometryHash != geomHash)
         {

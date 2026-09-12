@@ -39,9 +39,7 @@ namespace
     /// 而且没有任何后续流程会回来重连（buildToolBars 有 m_configDrivenLayoutBuilt 幂等守卫，
     /// refreshCommandStates 也只遍历菜单栏、并且会主动跳过 commandUnavailable 项）。
     ///
-    /// 另外必须放在文件作用域。历史实现把它定义在 buildDockAreasFromConfig() 内部，
-    /// 却在 buildToolBars() 里引用，导致配置驱动路径一旦启用就无法编译——
-    /// 这也是该路径长期"写好但从未跑通"的直接原因。
+    /// 必须放在文件作用域，供配置驱动路径使用
     struct NullDispatcher final : public IUiCommandDispatcher
     {
         bool isCommandRegistered(const QString&) const override
@@ -451,7 +449,7 @@ void WorkbenchLayoutManager::clearLayoutContent(const UiWorkbench* oldWorkbench)
         }
         else
         {
-            SY_WARN("[clearLayoutContent] 旧工作台为空，跳过中央视口 GL 释放");
+            SY_DEBUG("[clearLayoutContent] 旧工作台为空，跳过中央视口 GL 释放");
         }
 
         SY_DEBUG("[clearLayoutContent] Step B: setCentralWidget(nullptr)");

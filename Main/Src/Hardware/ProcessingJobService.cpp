@@ -258,12 +258,14 @@ bool ProcessingJobService::pauseJob(QString& errorOut)
     if (!m_impl->active)
     {
         errorOut = QStringLiteral("当前没有正在进行的加工作业");
+        SY_WARNF("[ProcessingJob] pauseJob refused: %s", errorOut.toUtf8().constData());
         return false;
     }
     const PlanRunner runner = PlanRunner::resolve(m_impl->host);
     if (!runner.valid())
     {
         errorOut = QStringLiteral("设备已断开");
+        SY_WARNF("[ProcessingJob] pauseJob refused: %s", errorOut.toUtf8().constData());
         return false;
     }
     const Hw::HwResult r = runner.pause();
@@ -285,6 +287,7 @@ bool ProcessingJobService::resumeJob(QString& errorOut)
     if (!m_impl->active)
     {
         errorOut = QStringLiteral("当前没有正在进行的加工作业");
+        SY_WARN("[ProcessingJob] resumeJob refused: no active job");
         return false;
     }
     // 恢复也是「开始出光」，安全门必须重新过一遍：
@@ -302,6 +305,7 @@ bool ProcessingJobService::resumeJob(QString& errorOut)
     if (!runner.valid())
     {
         errorOut = QStringLiteral("设备已断开");
+        SY_ERROR("[ProcessingJob] resumeJob failed: runner invalid (device disconnected)");
         return false;
     }
     const Hw::HwResult r = runner.resume();
@@ -321,6 +325,7 @@ bool ProcessingJobService::abortJob(QString& errorOut)
     if (!m_impl->active)
     {
         errorOut = QStringLiteral("当前没有正在进行的加工作业");
+        SY_WARN("[ProcessingJob] abortJob refused: no active job");
         return false;
     }
     const PlanRunner runner = PlanRunner::resolve(m_impl->host);
@@ -329,6 +334,7 @@ bool ProcessingJobService::abortJob(QString& errorOut)
         // 设备都没了，本地状态必须收干净，否则永远显示「加工中」
         m_impl->active = false;
         m_impl->pollTimer.stop();
+        SY_ERROR("[ProcessingJob] abortJob: device disappeared during active job, cleaning up local state");
         emit jobFinished(false, QStringLiteral("设备已断开，作业中止"));
         errorOut = QStringLiteral("设备已断开");
         return false;

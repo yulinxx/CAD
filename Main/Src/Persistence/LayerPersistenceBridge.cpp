@@ -33,7 +33,7 @@ void LayerPersistenceBridge::attach()
     }
     m_layerManager->addObserver(this);
     m_attached = true;
-    SY_DEBUG("[LayerPersistenceBridge] Attached to LayerManager");
+    SY_INFO("[LayerPersistenceBridge] Attached to LayerManager");
 }
 
 /// 停止监听图层变更事件
@@ -45,7 +45,7 @@ void LayerPersistenceBridge::detach()
     }
     m_layerManager->removeObserver(this);
     m_attached = false;
-    SY_DEBUG("[LayerPersistenceBridge] Detached from LayerManager");
+    SY_INFO("[LayerPersistenceBridge] Detached from LayerManager");
 }
 
 /// 图层新增时同步写入数据库

@@ -10,7 +10,7 @@ void ImportDispatcher::registerReader(std::unique_ptr<IImportReader> reader)
 {
     if (!reader)
     {
-        SY_ERROR("[ImportDispatcher] registerReader ignored: null reader");
+        SY_WARN("[ImportDispatcher] registerReader ignored: null reader");
         return;
     }
 

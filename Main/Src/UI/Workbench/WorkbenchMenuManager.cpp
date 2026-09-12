@@ -387,17 +387,14 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
         registerBuiltinUiPanels(*m_menuPanelRegistry);
     }
 
-    // 客户配置取自进程级共享实例（P0-1）：菜单、工具栏、Dock、状态栏、右键菜单
-    // 全部消费同一份 UiConfigData，客户 ID 由 UiClientContext 在运行时统一解析。
-    // 历史实现这里自己 new 了一个 UiConfigurationManager 并读环境变量，
-    // 而布局侧另 new 一个并读编译期宏，两者可能解析出不同客户。
+    // 客户配置取自进程级共享实例：菜单、工具栏、Dock、状态栏、右键菜单
+    // 全部消费同一份 UiConfigData，客户 ID 由 UiClientContext 在运行时统一解析
     UiConfigurationManager& configManager = UiConfigurationManager::shared();
     const QString clientId = UiClientContext::instance().clientId();
     const UiConfigData* config = configManager.configData();
     if (!config)
     {
-        // 配置缺失时不再退回硬编码菜单：legacy 那条链已删除。
-        // 菜单一栏都建不出来是装配级故障，必须显性报错，而不是悄悄换一套结构。
+        // 配置缺失时报错，菜单一栏都建不出来是装配级故障，必须显性报错
         SY_ERRORF("[WorkbenchMenuManager] Shared client config unavailable (client='%s'), menus not built",
             qPrintable(clientId));
         return;

@@ -70,16 +70,14 @@ int CADApplicationRuntime::run()
     // 只剩一个 minidump。排查内存问题（ASan / Valgrind）时必须让它让位。
     if (qEnvironmentVariableIntValue("SANYI_DISABLE_CRASH_HANDLER") != 0)
     {
-        SY_WARN("[CADApplicationRuntime] CrashHandler disabled by SANYI_DISABLE_CRASH_HANDLER");
+        SY_INFO("[CADApplicationRuntime] CrashHandler disabled by SANYI_DISABLE_CRASH_HANDLER");
     }
     else if (!CrashHandlerBootstrap::initialize(MainApp::appName(), MainApp::appVersion()))
     {
         SY_WARN("[CADApplicationRuntime] CrashHandler initialization failed, continuing without crash capture");
     }
 
-    // [B1-P0 修复] 许可校验启动顺序修正：
-    // 旧代码先调用 License_IsCheckEnabled()（恒为 false）再调用 License_ConfigInit()，
-    // 导致整个许可校验块被跳过。现改为先初始化配置再检查开关。
+    // 许可校验：先初始化配置，再检查开关是否启用
     {
         LicenseConfig config{};
         License_ConfigInit(&config);
@@ -87,8 +85,8 @@ int CADApplicationRuntime::run()
         const QByteArray configDirUtf8 = configDir.toUtf8();
         config.configDir = configDirUtf8.constData();
 
-        // [B1-P0 修复] 通过编译期宏 SANYI_ENABLE_LICENSE 显式启用许可校验。
-        // 生产构建应在 CMakeLists.txt 中 add_compile_definitions(SANYI_ENABLE_LICENSE)。
+        // 通过编译期宏 SANYI_ENABLE_LICENSE 显式启用许可校验
+        // 生产构建应在 CMakeLists.txt 中 add_compile_definitions(SANYI_ENABLE_LICENSE)
 #ifdef SANYI_ENABLE_LICENSE
         License_SetCheckEnabled(1);
         SY_INFO("[CADApplicationRuntime] License check ENABLED via SANYI_ENABLE_LICENSE macro");

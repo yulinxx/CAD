@@ -10,7 +10,7 @@
 SelectionService::SelectionService(Eg::SceneManager* sceneManager)
     : m_sceneManager(sceneManager)
 {
-    SY_DEBUG("[SelectionService] initialized");
+    SY_INFO("[SelectionService] initialized");
 }
 
 // ==================== POD 安全接口实现 ====================
@@ -19,6 +19,7 @@ void SelectionService::visitSelectedIds(SelectedIdVisitor visitor, void* context
 {
     if (!m_sceneManager || !visitor)
     {
+        SY_DEBUG("[SelectionService] visitSelectedIds: sceneManager or visitor is null");
         return;
     }
 
@@ -35,6 +36,7 @@ bool SelectionService::isSelected(const char* id) const
 {
     if (!m_sceneManager || !id)
     {
+        SY_DEBUG("[SelectionService] isSelected: sceneManager or id is null");
         return false;
     }
 
@@ -69,6 +71,7 @@ void SelectionService::select(const char* id)
 {
     if (!m_sceneManager || !id)
     {
+        SY_DEBUG("[SelectionService] select: sceneManager or id is null");
         return;
     }
 
@@ -89,6 +92,7 @@ void SelectionService::selectMultiple(const char* const* ids, size_t count)
 {
     if (!m_sceneManager || !ids || count == 0)
     {
+        SY_DEBUG("[SelectionService] selectMultiple: sceneManager, ids, or count is invalid");
         return;
     }
 

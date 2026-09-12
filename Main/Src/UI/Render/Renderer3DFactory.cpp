@@ -11,7 +11,7 @@ std::unique_ptr<IRenderer3D> Renderer3DFactory::create(RendererType type)
     {
     case RendererType::Compatible:
 #if BUILD_UI3D
-        SY_DEBUG("[Renderer3DFactory] Creating RenderWidget3DAdapter (compatible chain)");
+        SY_INFO("[Renderer3DFactory] Creating RenderWidget3DAdapter (compatible chain)");
         return std::make_unique<RenderWidget3DAdapter>();
 #else
         SY_DEBUG("[Renderer3DFactory] UI3D disabled, returning null renderer");
@@ -27,7 +27,7 @@ std::unique_ptr<IRenderer3D> Renderer3DFactory::create(RendererType type)
 
 std::unique_ptr<IRenderer3D> Renderer3DFactory::createDefault()
 {
-    SY_DEBUG("[Renderer3DFactory] Creating default renderer: Compatible chain");
+    SY_INFO("[Renderer3DFactory] Creating default renderer: Compatible chain");
     return create(RendererType::Compatible);
 }
 

@@ -136,11 +136,13 @@ void UiShellHost::switchWorkbench(UiWorkbench* workbench)
 {
     if (!workbench || !m_mainWindow)
     {
+        SY_WARN("[UiShellHost] switchWorkbench refused: workbench or mainWindow is null");
         return;
     }
 
     if (m_workbench == workbench)
     {
+        SY_DEBUG("[UiShellHost] switchWorkbench: same workbench, no-op");
         return;
     }
 

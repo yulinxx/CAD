@@ -524,8 +524,8 @@ TEST(CommandUiWiringTest, Switch_SharedCommandIdsCarrySameRuleInBothCatalogs)
 // 契约校验：客户 JSON 里出现的每个 commandId，都必须能在其所属工作台的命令目录里解析。
 //
 // 解析不出来的后果不是报错而是静默失效：UiLayoutBuilder::bindAction 不会接 lambda
-// （见 isCommandRegistered 门控），按钮/菜单项照常显示但永久点不动。历史上积累了
-// 几十个这样的死项，全靠人工翻 JSON 才发现。这里把它变成编译后必跑的断言。
+// （见 isCommandRegistered 门控），按钮/菜单项照常显示但永久点不动。
+// 这里把它变成编译后必跑的断言。
 // ─────────────────────────────────────────────────────────────────────────────
 namespace
 {

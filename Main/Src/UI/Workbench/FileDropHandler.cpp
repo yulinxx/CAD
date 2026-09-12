@@ -327,12 +327,14 @@ bool FileDropHandler::importImage(const QString& filePath, const QPointF& anchor
 {
     if (filePath.isEmpty())
     {
+        SY_WARN("[FileDropHandler] importImage: filePath is empty");
         return false;
     }
 
     QImage rgba;
     if (!loadRgbaImage(filePath, rgba))
     {
+        SY_WARNF("[FileDropHandler] importImage: failed to load image: %s", filePath.toUtf8().constData());
         return false;
     }
 

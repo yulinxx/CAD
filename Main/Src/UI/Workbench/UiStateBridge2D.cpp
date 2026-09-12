@@ -63,8 +63,8 @@ QObject* UiStateBridge2D::install(Workbench2D* workbench,
             refreshAll(workbench);
         });
 
-        // 任意操作成功完成后刷新一次：替代原先仅监听 Edit_Copy / Edit_Cut 的硬编码白名单，
-        // 新增写剪贴板或改变选择的操作无需再回来改这里。
+        // 任意操作成功完成后刷新一次：替代原来仅监听特定操作的白名单，
+        // 新增写剪贴板或改变选择的操作无需再回来改这里
         QObject::connect(bus, &OperationBus::operationCompleted, guard, [workbench](OperationId, bool success) {
             if (success)
             {

@@ -195,9 +195,7 @@ public:
     void setMeasureMode(bool enabled);
 
     // 选择状态广播（选择的读写在 SelectTool / ISelectionService，视口只负责通知上层）
-    // 注：selectedEntityId / selectEntityById / clearSelection / nudgeSelectedEndpoint
-    // 已删除（2026-08-30）—— 全部零调用方，且各自都是第二套实现：选择走 SelectTool +
-    // ISelectionService，删除走 OperationBus 的 Edit_Delete，微调走 Edit_Nudge。
+    // 选择走 SelectTool + ISelectionService，删除走 OperationBus 的 Edit_Delete，微调走 Edit_Nudge
     void syncSelectionDetails();
 
     // 坐标转换
