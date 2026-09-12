@@ -14,6 +14,7 @@
 #include "Engine2D/SyEntity/SyImage.h"
 #include "Engine2D/SyEntity/SyText.h"
 #include "Engine/SyEntity/EType.h"
+#include "Engine/Parallel/EngineParallel.h"
 
 #include "Log/SyLogger.h"
 #include "Log/SyPerfCounter.h"
@@ -330,6 +331,11 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     bool touchedImage = false;
     bool touchedText = false;
 
+    // 优化：收集需要处理的图元ID（可见的、非 IMAGE/TEXT 的）
+    // 用于后续的并行处理
+    std::vector<uint64_t> entityIdsToProcess;
+    entityIdsToProcess.reserve(m_pendingDirtyIds.size());
+
     for (auto id : m_pendingDirtyIds)
     {
         auto* entity = sm->findEntityById(id);
@@ -362,45 +368,108 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         }
 
         // 文本（SyText）同理：字形四边形由 reconcileTexts 一路处理。
-        // 这一跳是「文本不再拖累几何增量刷新」的关键：以前文本只要变脏就把
-        // 整帧升级成全量刷新，10 万条几何跟着一起重传。
         if (entity->eType == Eg::EType::TEXT)
         {
             touchedText = true;
             continue;
         }
 
-        // 选中图元照常提交原始图元几何：选中反馈只由虚线轮廓覆盖层叠加表达，
-        // 图元本身保持原色实线不变。历史实现在这里把选中图元从 GPU 上移除，
-        // 于是一选中图形就"消失"只剩一圈虚线，原图看不出来了；而全量路径
-        // （SceneManager::gatherGeometry）本来就不跳过，两条路径规则也是矛盾的。
+        // 收集需要处理的图元 ID
+        entityIdsToProcess.push_back(uid);
+    }
 
-        std::vector<Render::VertexP3C3> vertices;
-        Render::PrimitiveType primType;
-        const QPointF cam = m_renderWidget->cameraCenter();
-        const double cameraCenter[2] = { cam.x(), cam.y() };
-        if (!entityToVertices(entity, vertices, primType, cameraCenter))
-        {
-            // 走到这里意味着 Engine 侧分解出了本地 sink 不认识的原语。
-            // 文本/位图已各有专用通道并在上面跳过，因此这里只能是新增图元
-            // 类型时漏配了离散化分支——跳过该图元并留一条日志，比悄悄升级成
-            // 全量刷新更容易定位（全量刷新会让问题表现为「偶发卡顿」）。
-            SY_WARNF("[SceneRefreshCoordinator] 图元 %llu (eType=%d) 无法增量转换为顶点，已跳过",
-                static_cast<unsigned long long>(uid), static_cast<int>(entity->eType));
-            continue;
-        }
+    // 如果需要处理的图元数量大于阈值，使用并行处理
+    // 否则使用串行处理（减少线程调度开销）
+    constexpr size_t kParallelThreshold = 100;
+    const QPointF cam = m_renderWidget->cameraCenter();
+    const double cameraCenter[2] = { cam.x(), cam.y() };
 
-        if (m_renderedEntityIds.count(uid))
+    if (entityIdsToProcess.size() >= kParallelThreshold && Eg::EngineParallel::isEnabled())
+    {
+        // 并行处理：转换顶点
+        struct RenderJob
         {
-            // SY_DEBUGF("[SceneRefreshCoordinator] modifyEntity id=%llu eType=%d primType=%d verts=%zu",
-            //     uid, static_cast<int>(entity->eType), static_cast<int>(primType), vertices.size());
-            m_renderWidget->modifyRenderEntity(uid, vertices.data(), static_cast<uint32_t>(vertices.size()), primType);
+            uint64_t uid;
+            std::vector<Render::VertexP3C3> vertices;
+            Render::PrimitiveType primType;
+            bool valid = false;
+        };
+
+        const size_t count = entityIdsToProcess.size();
+        std::vector<RenderJob> jobs(count);
+
+        Eg::EngineParallel::parallelForIndex(count, [&](size_t index) {
+            auto id = entityIdsToProcess[index];
+            auto* entity = sm->findEntityById(id);
+            if (!entity)
+            {
+                return;
+            }
+
+            RenderJob& job = jobs[index];
+            job.uid = id;
+
+            if (entityToVertices(entity, job.vertices, job.primType, cameraCenter))
+            {
+                job.valid = true;
+            }
+        });
+
+        // 串行提交到 GPU（保证顺序）
+        for (size_t i = 0; i < count; ++i)
+        {
+            const auto& job = jobs[i];
+            if (!job.valid)
+            {
+                continue;
+            }
+
+            if (m_renderedEntityIds.count(job.uid))
+            {
+                m_renderWidget->modifyRenderEntity(job.uid, job.vertices.data(),
+                    static_cast<uint32_t>(job.vertices.size()), job.primType);
+            }
+            else
+            {
+                m_renderWidget->addRenderEntity(job.uid, job.vertices.data(),
+                    static_cast<uint32_t>(job.vertices.size()), job.primType);
+                m_renderedEntityIds.insert(job.uid);
+            }
         }
-        else
+    }
+    else
+    {
+        // 串行处理（小批量时更高效）
+        for (auto uid : entityIdsToProcess)
         {
-            // SY_DEBUGF("[SceneRefreshCoordinator] addEntity id=%llu eType=%d primType=%d verts=%zu",
-            //     uid, static_cast<int>(entity->eType), static_cast<int>(primType), vertices.size());
-            m_renderWidget->addRenderEntity(uid, vertices.data(), static_cast<uint32_t>(vertices.size()), primType);
+            auto* entity = sm->findEntityById(uid);
+            if (!entity)
+            {
+                continue;
+            }
+
+            std::vector<Render::VertexP3C3> vertices;
+            Render::PrimitiveType primType;
+            if (!entityToVertices(entity, vertices, primType, cameraCenter))
+            {
+                SY_WARNF("[SceneRefreshCoordinator] 图元 %llu (eType=%d) 无法增量转换为顶点，已跳过",
+                    static_cast<unsigned long long>(uid), static_cast<int>(entity->eType));
+                continue;
+            }
+
+            if (m_renderedEntityIds.count(uid))
+            {
+                m_renderWidget->modifyRenderEntity(uid, vertices.data(),
+                    static_cast<uint32_t>(vertices.size()), primType);
+            }
+            else
+            {
+                m_renderWidget->addRenderEntity(uid, vertices.data(),
+                    static_cast<uint32_t>(vertices.size()), primType);
+                m_renderedEntityIds.insert(uid);
+            }
+        }
+    }
             m_renderedEntityIds.insert(uid);
         }
     }
