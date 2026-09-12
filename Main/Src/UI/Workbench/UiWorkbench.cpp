@@ -1427,11 +1427,16 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
     }
     if (m_services.operationBus)
     {
-        connect(m_services.operationBus, &OperationBus::undoStateChanged, this, &Workbench2D::refreshSceneTree);
+        // 延迟到事件循环下一轮：撤销信号可能在场景树模型的 setData() 内同步发出
+        // （如重命名入撤销栈），此时重建模型会删掉正在回调的模型对象，
+        // 编辑器提交后视图持有悬空模型，表现为「重命名过一次后无法再双击编辑」。
+        connect(m_services.operationBus, &OperationBus::undoStateChanged, this, [this]() {
+            QTimer::singleShot(0, this, &Workbench2D::refreshSceneTree);
+        });
         connect(m_services.operationBus, &OperationBus::operationCompleted, this, [this](OperationId, bool success) {
             if (success)
             {
-                refreshSceneTree();
+                QTimer::singleShot(0, this, &Workbench2D::refreshSceneTree);
             }
         });
     }
