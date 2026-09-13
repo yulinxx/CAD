@@ -1007,7 +1007,7 @@ RenderUploadQueue
 OverlayScene
 ```
 
-— `RenderSessionHost` ✅ 已完成；`PersistentGeometryStore` / `RenderUploadQueue` / `OverlayScene` 待办。
+— `RenderSessionHost` ✅ 已完成；`PersistentGeometryStore` ✅ 已完成（`RenderBridge::PersistentGeometryStore`：几何仓 + 绘制列表 + 槽位台账，2D/3D 两个 builder 共用；2D 全量刷新改为按段位哈希差量更新，撤销/重做不再全场景重传）；`RenderUploadQueue` / `OverlayScene` 待办。
 
 5. 统一 2D/3D 的命令内核：
 

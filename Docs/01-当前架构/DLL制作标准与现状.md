@@ -28,7 +28,7 @@
 | `EnginePersistence` | 文档持久化 | 内部 C++ DLL |
 | `FileIO` | 导入导出 | 内部 C++ DLL |
 | `Renderx` / `RenderX` | 统一渲染入口 | C ABI |
-| `RenderBridge` | 宿主与渲染 DLL 的桥接（会话生命周期、宿主回调） | 内部 C++ DLL |
+| `RenderBridge` | 宿主与渲染 DLL 的桥接（会话生命周期、宿主回调、常驻几何仓与绘制列表） | 内部 C++ DLL |
 | `UICommon` | UI 公共能力 | 内部 C++ DLL |
 | `UI2D` | 2D 视图与交互 | 内部 C++ DLL |
 | `UI3D` | 3D 视图与交互 | 内部 C++ DLL |
