@@ -449,7 +449,8 @@ void WorkbenchLayoutManager::clearLayoutContent(const UiWorkbench* oldWorkbench)
         }
         else
         {
-            SY_DEBUG("[clearLayoutContent] 旧工作台为空，跳过中央视口 GL 释放");
+            // 旧工作台为空，跳过中央视口 GL 释放
+            SY_DEBUG("[clearLayoutContent] Old workbench is null, skip central viewport GL release");
         }
 
         SY_DEBUG("[clearLayoutContent] Step B: setCentralWidget(nullptr)");

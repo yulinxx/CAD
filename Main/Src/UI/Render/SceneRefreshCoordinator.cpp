@@ -476,9 +476,10 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
 
             std::vector<Render::VertexP3C3> vertices;
             Render::PrimitiveType primType;
+            // 图元无法增量转换为顶点，已跳过
             if (!entityToVertices(snapshot->entity(), vertices, primType, cameraCenter))
             {
-                SY_WARNF("[SceneRefreshCoordinator] 图元 %llu (eType=%d) 无法增量转换为顶点，已跳过",
+                SY_WARNF("[SceneRefreshCoordinator] Entity %llu (eType=%d) cannot be incrementally converted to vertices, skipped",
                     static_cast<unsigned long long>(uid), static_cast<int>(snapshot->type));
                 continue;
             }
