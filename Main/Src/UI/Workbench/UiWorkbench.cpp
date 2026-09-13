@@ -464,12 +464,12 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
 
 bool Workbench2D::showSettingsDialog(QWidget* /*parent*/)
 {
-    SY_DEBUG("[Workbench2D] showSettingsDialog: m_settingsCoordinator=%p m_viewport=%p",
+    SY_DEBUGF("[Workbench2D] showSettingsDialog: m_settingsCoordinator=%p m_viewport=%p",
         static_cast<void*>(m_settingsCoordinator.get()), static_cast<void*>(m_viewport));
 
     if (!m_settingsCoordinator || !m_viewport)
     {
-        SY_WARN("[Workbench2D] showSettingsDialog: failed - coordinator or viewport is null");
+        SY_WARNF("[Workbench2D] showSettingsDialog: failed - coordinator or viewport is null");
         return false;
     }
 
