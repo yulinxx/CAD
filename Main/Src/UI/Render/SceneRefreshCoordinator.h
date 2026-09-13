@@ -25,6 +25,7 @@
 
 #include "Engine/EntityIdGenerator.h"
 #include "Engine/Scene/SceneChangeSet.h"
+#include "Engine/Scene/RenderSnapshot.h"
 #include "Engine2D/Core/SceneNotifier.h"
 #include "UI/Render/ISceneRefreshScheduler.h"
 
@@ -124,6 +125,12 @@ private:
 
     // 变更流游标（用于 readChanges 增量消费）
     Eg::ISceneChangeStream::Cursor m_lastCursor{ 0 };
+
+    // 本轮待刷新的图元快照：在 UI 线程（onSceneChanged）按变更集 clone 出来，
+    // 增量刷新 —— 含并行离散化那条工作线程路径 —— 只读这份只读副本，
+    // 不再去碰场景里的活对象（SceneManager 的契约是只有主线程可以访问）。
+    // 按批次累积，刷完由 updateSceneRender 清空。
+    Eg::SceneSnapshot m_pendingSnapshot;
 
     // 上一帧已同步的选中集合：用于在选择变更时计算“发生选中态翻转”的图元，
     // 将其加入待处理脏集合，驱动增量路径正确增删（见 onSelectionChanged）。

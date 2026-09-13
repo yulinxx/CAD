@@ -232,6 +232,16 @@ void SceneRefreshCoordinator::onSceneChanged()
         Eg::SceneChangeSet changes;
         if (m_sceneManager->readChanges(m_lastCursor, changes))
         {
+            // 在这里（UI 线程）就把变更图元 clone 成只读快照：增量刷新可能在
+            // 工作线程里离散化，那时再去读活对象就会和用户的编辑并发。
+            if (!m_sceneManager->captureSnapshot(changes, m_pendingSnapshot))
+            {
+                // 快照拿不全就别走增量 —— 否则失败的那些图元会被当成「没变」而漏刷
+                m_refreshLevel = RefreshLevel::FullRefresh;
+                scheduleFullRefresh();
+                return;
+            }
+
             for (const auto& change : changes.changes)
             {
                 if (hasSceneChangeKind(change.kinds, Eg::SceneChangeKind::Removed))
@@ -350,17 +360,18 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
 
     for (auto id : m_pendingDirtyIds)
     {
-        auto* entity = sm->findEntityById(id);
-        if (!entity)
+        // 读快照而不是活对象：下面那条并行分支会在工作线程里离散化
+        const Eg::RenderEntitySnapshot* snapshot = m_pendingSnapshot.find(id);
+        if (snapshot == nullptr || snapshot->entity() == nullptr)
         {
             continue;
         }
 
-        // 检查图元可见性：隐藏的图元应从渲染中移除，而不是更新几何
-        const bool entityVisible = entity->visible() && (!entity->layer() || entity->layer()->isVisible());
         auto uid = static_cast<uint64_t>(id);
 
-        if (!entityVisible)
+        // 图元可见性 = 自身可见 且 所在图层可见。图层指针不随 clone 复制，
+        // 但这个判断仍在主线程上做，工作线程只负责顶点离散化。
+        if (!snapshot->effectiveVisible())
         {
             // 图元不可见：从渲染中移除（如果之前有渲染的话）
             if (m_renderedEntityIds.count(uid))
@@ -373,14 +384,14 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         }
 
         // 位图（SyImage）不走折线/线框顶点路径，统一由 reconcileBitmaps 处理
-        if (entity->eType == Eg::EType::IMAGE)
+        if (snapshot->type == Eg::EType::IMAGE)
         {
             touchedImage = true;
             continue;
         }
 
         // 文本（SyText）同理：字形四边形由 reconcileTexts 一路处理。
-        if (entity->eType == Eg::EType::TEXT)
+        if (snapshot->type == Eg::EType::TEXT)
         {
             touchedText = true;
             continue;
@@ -412,8 +423,10 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
 
         Eg::EngineParallel::parallelForIndex(count, [&](size_t index) {
             auto id = entityIdsToProcess[index];
-            auto* entity = sm->findEntityById(id);
-            if (!entity)
+            // 只读快照：副本是主线程 clone 好的，工作线程不再触碰场景数据
+            const Eg::RenderEntitySnapshot* snapshot =
+                m_pendingSnapshot.find(static_cast<Eg::EntityId>(id));
+            if (snapshot == nullptr || snapshot->entity() == nullptr)
             {
                 return;
             }
@@ -421,7 +434,7 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             RenderJob& job = jobs[index];
             job.uid = id;
 
-            if (entityToVertices(entity, job.vertices, job.primType, cameraCenter))
+            if (entityToVertices(snapshot->entity(), job.vertices, job.primType, cameraCenter))
             {
                 job.valid = true;
             }
@@ -454,18 +467,19 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         // 串行处理（小批量时更高效）
         for (auto uid : entityIdsToProcess)
         {
-            auto* entity = sm->findEntityById(uid);
-            if (!entity)
+            const Eg::RenderEntitySnapshot* snapshot =
+                m_pendingSnapshot.find(static_cast<Eg::EntityId>(uid));
+            if (snapshot == nullptr || snapshot->entity() == nullptr)
             {
                 continue;
             }
 
             std::vector<Render::VertexP3C3> vertices;
             Render::PrimitiveType primType;
-            if (!entityToVertices(entity, vertices, primType, cameraCenter))
+            if (!entityToVertices(snapshot->entity(), vertices, primType, cameraCenter))
             {
                 SY_WARNF("[SceneRefreshCoordinator] 图元 %llu (eType=%d) 无法增量转换为顶点，已跳过",
-                    static_cast<unsigned long long>(uid), static_cast<int>(entity->eType));
+                    static_cast<unsigned long long>(uid), static_cast<int>(snapshot->type));
                 continue;
             }
 
@@ -746,4 +760,7 @@ void SceneRefreshCoordinator::updateSceneRender()
 
     m_pendingDirtyIds.clear();
     m_pendingDeletedIds.clear();
+    // 本批快照已消费完：清掉条目，避免把整份 clone 副本一直挂在内存里。
+    // 修订号保留在游标上（m_lastCursor），下批快照从新修订号继续累积。
+    m_pendingSnapshot.reset(m_lastCursor);
 }
