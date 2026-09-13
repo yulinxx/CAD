@@ -12,13 +12,8 @@
 
 #include "Engine2D/Geometry/EntityGeometryEmitter.h"
 #include "Engine2D/Render/Tessellator.h"
-#include "Engine/SyEntity/SyEntity.h"
-#include "Engine/SyEntity/EType.h"
 
 #include <cmath>
-#include <cstring>
-#include <unordered_map>
-#include <shared_mutex>
 
 namespace
 {
@@ -37,111 +32,6 @@ namespace
         out[1] = c.g();
         out[2] = c.b();
         out[3] = c.a();
-    }
-
-    // ==================== 曲线离散化缓存 ====================
-
-    struct CachedVertexData
-    {
-        uint64_t geometryHash = 0;
-        std::vector<Render::VertexP3C3> vertices;
-        Render::PrimitiveType primType = Render::PrimitiveType::LineStrip;
-    };
-
-    // 按图元 ID 缓存离散化结果，避免非几何变更时重复离散化
-    // 使用 shared_mutex 保护：读操作可以并发，写操作独占
-    static std::unordered_map<uint64_t, CachedVertexData> s_vertexCache;
-    static std::shared_mutex s_cacheMutex;
-
-    // 计算图元几何参数哈希（基于控制点 + 包围盒 + 类型 + 闭合标志）
-    // 仅依赖 SyEntity 基类契约接口，不依赖具体派生类型
-    uint64_t computeGeometryHash(const Eg::SyEntity* entity)
-    {
-        uint64_t hash = static_cast<uint64_t>(entity->eType);
-        hash ^= static_cast<uint64_t>(entity->bClosed) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-
-        // 将单个 double 的位模式混入哈希（C++17 兼容写法）
-        auto mix = [&hash](double v) {
-            uint64_t bits = 0;
-            std::memcpy(&bits, &v, sizeof(double));
-            hash ^= bits + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-        };
-
-        // 控制点：Line/Polygon 完整；曲线类（Circle/Arc/Ellipse/Bezier/NURBS）仅返回 basePoint。
-        const size_t cpCount = entity->getControlPointCount();
-        if (cpCount > 0 && cpCount < 256)
-        {
-            std::vector<Ut::Vec2d> pts(cpCount);
-            const size_t written = entity->getControlPoints(pts.data(), cpCount);
-            for (size_t i = 0; i < written; ++i)
-            {
-                mix(pts[i].x());
-                mix(pts[i].y());
-            }
-        }
-
-        // 曲线类控制点接口不完整（半径/角度/控制点未覆盖），仅靠控制点哈希会导致
-        // 修改半径/角度/控制点后命中陈旧缓存、曲线仍按旧几何显示。追加包围盒角点作为
-        // 几何指纹兜底（包围盒由实际几何计算，可覆盖上述参数变化）。
-        const Ut::BBox2d bbox = entity->getBbox();
-        if (bbox.isValid())
-        {
-            mix(bbox.minPt.x());
-            mix(bbox.minPt.y());
-            mix(bbox.maxPt.x());
-            mix(bbox.maxPt.y());
-        }
-        return hash;
-    }
-
-    // 尝试从缓存命中：几何未变时仅更新颜色，跳过离散化
-    // 使用共享锁允许多线程并发读
-    bool tryCacheHit(uint64_t entityId,
-        uint64_t geomHash,
-        const Ut::Color& color,
-        std::vector<Render::VertexP3C3>& outVertices,
-        Render::PrimitiveType& outType)
-    {
-        std::shared_lock<std::shared_mutex> readLock(s_cacheMutex);
-        auto it = s_vertexCache.find(entityId);
-        if (it == s_vertexCache.end() || it->second.geometryHash != geomHash)
-        {
-            return false;
-        }
-
-        // 几何未变，拷贝缓存顶点并更新颜色
-        outVertices = it->second.vertices;
-        outType = it->second.primType;
-        float rgba[4];
-        colorToRGBA(color, rgba);
-        for (auto& v : outVertices)
-        {
-            v.cr = rgba[0];
-            v.cg = rgba[1];
-            v.cb = rgba[2];
-        }
-        return true;
-    }
-
-    // 存入缓存
-    // 写入必须加独占锁：operator[] 在共享锁下执行会触发隐式插入，构成数据竞争
-    void storeCache(uint64_t entityId,
-        uint64_t geomHash,
-        const std::vector<Render::VertexP3C3>& vertices,
-        Render::PrimitiveType primType)
-    {
-        std::unique_lock<std::shared_mutex> writeLock(s_cacheMutex);
-        auto& entry = s_vertexCache[entityId];
-        entry.geometryHash = geomHash;
-        entry.vertices = vertices;
-        entry.primType = primType;
-    }
-
-    // 判断图元类型是否值得缓存（曲线类离散化开销大）
-    bool isCacheableType(Eg::EType type)
-    {
-        return type == Eg::EType::BEZIER || type == Eg::EType::BEZIER2 || type == Eg::EType::NURBS ||
-            type == Eg::EType::CIRCLE || type == Eg::EType::ARC || type == Eg::EType::ELLIPSE;
     }
 
     // ==================== 增量路径几何接收器 ====================
@@ -361,22 +251,6 @@ namespace
     };
 }  // namespace
 
-// 供外部调用：图元删除时丢弃其缓存条目
-// erase 必须加独占锁，避免与并发读/写产生数据竞争
-void eraseEntityVertexCache(uint64_t entityId)
-{
-    std::unique_lock<std::shared_mutex> writeLock(s_cacheMutex);
-    s_vertexCache.erase(entityId);
-}
-
-// 供外部调用：全量刷新时清空缓存
-// clear 必须加独占锁，避免与并发读/写产生数据竞争
-void clearEntityVertexCache()
-{
-    std::unique_lock<std::shared_mutex> writeLock(s_cacheMutex);
-    s_vertexCache.clear();
-}
-
 /**
  * @brief 将单个引擎图元转换为 VertexP3C3 顶点数组
  *
@@ -385,9 +259,8 @@ void clearEntityVertexCache()
  * 文本（SyText）与位图（SyImage）不产顶点，它们各有独立的渲染通道，调用方
  * 在遍历脏图元时就已跳过这两类，不会走到这里。
  *
- * 曲线类图元（Bezier/Bezier2/Nurbs/Circle/Arc/Ellipse）支持离散化缓存：
- * 当图元仅因颜色/选择/图层变更而标记为脏时，直接复用缓存的顶点数据，
- * 跳过昂贵的离散化计算。
+ * 本函数无状态：不做任何跨调用缓存。判断「几何与上一轮是否相同、要不要重新上传」
+ * 归 `RenderSceneBuilder` 的段位账本，那一层才持有几何块，也就只有它需要台账。
  *
  * 输入事件链路：SceneManager::onSceneChanged → RenderViewport2D::onSceneChanged
  *   → scheduleSceneUpdate → updateSceneRender → applyLightRefresh → 此函数
@@ -403,34 +276,11 @@ bool entityToVertices(const Eg::SyEntity* entity,
         return false;
     }
 
-    const Ut::Color& color = entity->getColor();
-
-    // 缓存检查：曲线类图元先查缓存，命中则仅更新颜色
-    const uint64_t entityId = static_cast<uint64_t>(entity->id);
-    uint64_t geomHash = 0;
-    if (isCacheableType(entity->eType))
-    {
-        geomHash = computeGeometryHash(entity);
-        if (tryCacheHit(entityId, geomHash, color, outVertices, outType))
-        {
-            return true;
-        }
-    }
-
     // 通过 Engine 侧统一边界分解图元，本地 sink 离散化
     IncrementalVertexSink sink(outVertices, outType, cameraCenter);
     if (!Eg::emitEntityGeometry(*entity, sink))
     {
         return false;
     }
-    if (!sink.emitted())
-    {
-        return false;
-    }
-
-    if (isCacheableType(entity->eType))
-    {
-        storeCache(entityId, geomHash, outVertices, outType);
-    }
-    return true;
+    return sink.emitted();
 }

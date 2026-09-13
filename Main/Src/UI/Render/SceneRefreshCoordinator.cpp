@@ -342,9 +342,6 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         auto uid = static_cast<uint64_t>(id);
         m_renderWidget->removeRenderEntity(uid);
         m_renderedEntityIds.erase(uid);
-        // 离散化缓存以图元 ID 为键，删除时必须一并丢弃：
-        // 增量刷新路径不走 clearEntityVertexCache，缓存否则只增不减。
-        eraseEntityVertexCache(uid);
     }
 
     // 本轮脏集合里是否出现过位图 / 文字图元。下面用它决定要不要跑 reconcile*：
@@ -378,7 +375,6 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             {
                 m_renderWidget->removeRenderEntity(uid);
                 m_renderedEntityIds.erase(uid);
-                eraseEntityVertexCache(uid);
             }
             continue;
         }
@@ -526,9 +522,8 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
         return;
     }
 
-    // 全量重建时清空曲线离散化缓存，避免持有已删除图元的旧数据
-    clearEntityVertexCache();
-
+    // 全量重建：几何与台账都由 RenderSceneBuilder 的装配轮次自行对齐
+    // （本轮没出现的图元会被回收），这里不需要再做任何缓存失效
     m_renderWidget->submitSceneFromDataSource(sm);
     m_renderedEntityIds.clear();
     sm->forEachEntity([this](Eg::SyEntity* e) {
