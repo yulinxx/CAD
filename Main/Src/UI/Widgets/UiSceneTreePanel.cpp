@@ -42,6 +42,22 @@ public:
         SceneTreePanel::MetaProvider2D metaProvider,
         SceneTreePanel::ChildrenProvider2D childrenProvider)
     {
+        // 行集合完全没变时只更新元数据回调 + 发 dataChanged：
+        // 可见性/锁定/改名这类"只有行内容变了"的刷新不必 reset 模型 —— reset 会重建
+        // 顶层行索引（万级行是 O(N log N) 的 QMap 插入）并让视图丢掉展开状态与滚动位置。
+        // 约束：只在没有已展开的群组时走这条快径（m_groupChildren/m_childParent 都是空的），
+        // 否则群组成员可能已变、缓存会被落成陈旧行。
+        if (m_groupChildren.isEmpty() && m_childParent.isEmpty() && rowsEqual(topology.topLevel))
+        {
+            m_metaProvider = std::move(metaProvider);
+            m_childrenProvider = std::move(childrenProvider);
+            if (!m_topLevel.isEmpty())
+            {
+                emit dataChanged(index(0, 0), index(m_topLevel.size() - 1, columnCount(QModelIndex()) - 1));
+            }
+            return;
+        }
+
         beginResetModel();
         m_topLevel = topology.topLevel;
         m_topLevelRowById.clear();
@@ -300,6 +316,23 @@ public:
     }
 
 private:
+    /// 顶层行集合是否与当前一致（同 id、同分组标志、同顺序）
+    bool rowsEqual(const QVector<SceneTreeRow2D>& rows) const
+    {
+        if (rows.size() != m_topLevel.size())
+        {
+            return false;
+        }
+        for (int i = 0; i < rows.size(); ++i)
+        {
+            if (rows[i].id != m_topLevel[i].id || rows[i].isGroup != m_topLevel[i].isGroup)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     QModelIndex indexForGroup(qint64 gid) const
     {
         auto it = m_topLevelRowById.constFind(gid);
