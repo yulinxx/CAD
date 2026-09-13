@@ -175,6 +175,8 @@ add_subdirectory(Engine/Persistence)
 option(BUILD_RENDERX "Build Renderx rendering engine" ON)
 if(BUILD_RENDERX)
     add_subdirectory(Renderx)
+    # RenderBridge：宿主与渲染 DLL 之间的桥接层（会话生命周期、宿主回调）
+    add_subdirectory(RenderBridge)
 endif()
 
 # 4.6 GeoModelCore（须在 UI3D 之前，以便 UI3D 链接并继承头文件路径）
