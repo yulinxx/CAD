@@ -91,7 +91,7 @@ namespace MachineProfileLoader
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly))
         {
-            errorOut = QStringLiteral("无法打开机器档案：%1").arg(path);
+            errorOut = QStringLiteral("Failed to open machine profile: %1").arg(path);  // 无法打开机器档案
             return false;
         }
 
@@ -101,14 +101,14 @@ namespace MachineProfileLoader
 
         if (parseError.error != QJsonParseError::NoError)
         {
-            errorOut = QStringLiteral("机器档案 JSON 解析失败（偏移 %1）：%2")
+            errorOut = QStringLiteral("Machine profile JSON parse failed (offset %1): %2")
                            .arg(parseError.offset)
-                           .arg(parseError.errorString());
+                           .arg(parseError.errorString());  // 机器档案 JSON 解析失败
             return false;
         }
         if (!doc.isObject())
         {
-            errorOut = QStringLiteral("机器档案根节点必须是对象：%1").arg(path);
+            errorOut = QStringLiteral("Machine profile root must be object: %1").arg(path);  // 机器档案根节点必须是对象
             return false;
         }
 
@@ -118,7 +118,7 @@ namespace MachineProfileLoader
         profile.deviceId = root.value("deviceId").toString();
         if (profile.deviceId.isEmpty())
         {
-            errorOut = QStringLiteral("机器档案缺少 deviceId：%1").arg(path);
+            errorOut = QStringLiteral("Machine profile missing deviceId: %1").arg(path);  // 机器档案缺少 deviceId
             return false;
         }
 
@@ -270,7 +270,7 @@ namespace MachineProfileLoader
         {
             // 解析失败仍然回退，但把原因升级为 ERROR 并原样交给调用方展示：
             // 「配置写错了」和「这台机器没配硬件」是两件事，日志必须区分
-            warningOut = QStringLiteral("%1；已临时进入模拟设备模式。").arg(error);
+            warningOut = QStringLiteral("%1; temporarily using simulated device.").arg(error);  // 已临时进入模拟设备模式
             SY_WARNF("[MachineProfile] %s", warningOut.toUtf8().constData());
             return builtinSimulatedProfile();
         }

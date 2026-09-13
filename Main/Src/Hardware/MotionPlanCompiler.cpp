@@ -166,25 +166,25 @@ namespace MotionPlanCompiler
         ToolpathCompileResult result;
         out.clear();
 
-        if (!spec.defaultParams.valid())
+if (!spec.defaultParams.valid())
         {
-            result.error = QStringLiteral("默认工艺参数非法（功率 %1%%、速度 %2mm/s、遍数 %3）")
-                               .arg(spec.defaultParams.powerPercent)
-                               .arg(spec.defaultParams.speedMmPerSec)
-                               .arg(spec.defaultParams.passes);
+            result.error = QStringLiteral("Invalid default process params (power %1%%, speed %2mm/s, passes %3)")
+                           .arg(spec.defaultParams.powerPercent)
+                           .arg(spec.defaultParams.speedMmPerSec)
+                           .arg(spec.defaultParams.passes);  // 默认工艺参数非法
             return result;
         }
         for (auto it = spec.layerParams.constBegin(); it != spec.layerParams.constEnd(); ++it)
         {
             if (!it.value().valid())
             {
-                result.error = QStringLiteral("图层 %1 的工艺参数非法").arg(it.key());
+                result.error = QStringLiteral("Invalid process params for layer %1").arg(it.key());  // 图层工艺参数非法
                 return result;
             }
         }
         if (spec.chordToleranceMm <= 0.0)
         {
-            result.error = QStringLiteral("弦高容差必须为正数（当前 %1）").arg(spec.chordToleranceMm);
+            result.error = QStringLiteral("Chord tolerance must be positive (current %1)").arg(spec.chordToleranceMm);  // 弦高容差必须为正数
             return result;
         }
         // 上界不是「精度够用就行」的经验值，而是躲开 Engine2D 的一个实现陷阱：
@@ -192,17 +192,17 @@ namespace MotionPlanCompiler
         // 那里把 param（即这里的 dDiscretize）当成**采样点个数**用，且 <2 时回落到 32。
         // 于是 [0,2) 的任何容差都得到 32 点，而 5.0 会静默变成 5 点 —— 一个圆被切成五边形，
         // 却照样返回成功。宁可在入口拒绝，也不能把这种结果送去出光。
-        if (spec.chordToleranceMm > kMaxChordToleranceMm)
+if (spec.chordToleranceMm > kMaxChordToleranceMm)
         {
-            result.error = QStringLiteral("弦高容差 %1mm 过大（上限 %2mm）")
-                               .arg(spec.chordToleranceMm)
-                               .arg(kMaxChordToleranceMm);
+            result.error = QStringLiteral("Chord tolerance %1mm exceeds maximum %2mm")
+                           .arg(spec.chordToleranceMm)
+                           .arg(kMaxChordToleranceMm);  // 弦高容差过大
             return result;
         }
         if (spec.selectionOnly && spec.selectedEntityIds.isEmpty())
         {
             // 「只加工选中」但没选任何东西：绝不能退化成加工全图
-            result.error = QStringLiteral("已勾选「只加工选中图元」，但当前没有选中任何图元");
+            result.error = QStringLiteral("Selection-only mode enabled but no entities selected");  // 已勾选只加工选中图元但未选中任何图元
             return result;
         }
 

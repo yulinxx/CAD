@@ -270,7 +270,7 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
 {
     if (m_impl->device)
     {
-        errorOut = QStringLiteral("设备已经启动，请先 stop()");
+        errorOut = QStringLiteral("Device already started, call stop() first");  // 设备已经启动，请先 stop()
         SY_WARNF("[DeviceHost] start() refused: %s", errorOut.toUtf8().constData());
         return false;
     }
@@ -282,7 +282,7 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
     Hw::IDevice* device = Hw::DeviceRegistry::instance().create(idUtf8.constData());
     if (!device)
     {
-        errorOut = QStringLiteral("未知设备 ID：%1（可用 ID 见日志）").arg(profile.deviceId);
+        errorOut = QStringLiteral("Unknown device ID: %1 (see log for available IDs)").arg(profile.deviceId);  // 未知设备 ID
         SY_ERRORF("[DeviceHost] %s", errorOut.toUtf8().constData());
         return false;
     }
@@ -325,10 +325,10 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
     const Hw::HwResult opened = device->open(params);
     if (opened.failed())
     {
-        errorOut = QStringLiteral("打开设备 %1 失败：[%2] %3")
+        errorOut = QStringLiteral("Failed to open device %1: [%2] %3")
                        .arg(profile.deviceId)
                        .arg(QString::fromUtf8(Hw::hwErrorName(opened.error)))
-                       .arg(QString::fromUtf8(opened.message));
+                       .arg(QString::fromUtf8(opened.message));  // 打开设备失败
         SY_ERRORF("[DeviceHost] %s", errorOut.toUtf8().constData());
         m_impl->destroyDevice();
         return false;
@@ -346,20 +346,20 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
         m_impl->io ? 1 : 0, m_impl->simClock ? 1 : 0);
 
     // --- IO 点位 ---
-    if (!profile.ioPoints.isEmpty())
-    {
-        if (!m_impl->io)
+if (!profile.ioPoints.isEmpty())
         {
-            // 配了点位却没有 IO 能力：安全条件会全部判为 invalid，
-            // 而 violateWhenInvalid 默认 true，结果是永远无法开工。
-            // 与其让人对着「无法开工」发愣，不如在这里直接说清
-            errorOut = QStringLiteral("档案配置了 %1 个 IO 点位，但设备 %2 不提供 IO 能力")
-                           .arg(profile.ioPoints.size())
-                           .arg(profile.deviceId);
-            SY_ERRORF("[DeviceHost] %s", errorOut.toUtf8().constData());
-            m_impl->destroyDevice();
-            return false;
-        }
+            if (!m_impl->io)
+            {
+                // 配了点位却没有 IO 能力：安全条件会全部判为 invalid，
+                // 而 violateWhenInvalid 默认 true，结果是永远无法开工。
+                // 与其让人对着「无法开工」发愣，不如在这里直接说清
+                errorOut = QStringLiteral("Profile configured %1 IO points, but device %2 does not provide IO capability")
+                               .arg(profile.ioPoints.size())
+                               .arg(profile.deviceId);  // 档案配置了 IO 点位，但设备不提供 IO 能力
+                SY_ERRORF("[DeviceHost] %s", errorOut.toUtf8().constData());
+                m_impl->destroyDevice();
+                return false;
+            }
         m_impl->pointMap.attachModule(m_impl->io);
 
         for (const MachineIoPointConfig& pc : profile.ioPoints)
@@ -625,9 +625,9 @@ bool DeviceHost::isHardwareSupportCompiled()
 
 bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
 {
-    errorOut = QStringLiteral("本次构建未启用硬件模块（BUILD_HARDWARE=OFF），无法启动设备 %1")
+    errorOut = QStringLiteral("Hardware module not enabled (BUILD_HARDWARE=OFF), cannot start device %1")
                    .arg(profile.deviceId);
-    SY_WARNF("[DeviceHost] %s", errorOut.toUtf8().constData());
+    SY_WARNF("[DeviceHost] %s", errorOut.toUtf8().constData());  // 本次构建未启用硬件模块（BUILD_HARDWARE=OFF），无法启动设备
     return false;
 }
 
@@ -646,7 +646,7 @@ bool DeviceHost::canStartProcessing() const { return false; }
 
 QStringList DeviceHost::safetyViolations() const
 {
-    return QStringList{ QStringLiteral("未启用硬件模块") };
+    return QStringList{ QStringLiteral("Hardware module not enabled") };  // 未启用硬件模块
 }
 
 void DeviceHost::requestEmergencyStop()

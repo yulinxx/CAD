@@ -53,7 +53,7 @@ void LaserOperationRegistry::registerAll()
         [this, job] {
             if (!job || !m_config.sceneManager)
             {
-                reportError("StartProcess", QStringLiteral("加工服务未装配，无法开始加工"));
+                reportError("StartProcess", QStringLiteral("Processing service not configured, cannot start processing"));  // 加工服务未装配，无法开始加工
                 return;
             }
             QString error;
@@ -76,7 +76,7 @@ void LaserOperationRegistry::registerAll()
         [this, job] {
             if (!job)
             {
-                reportError("PauseProcess", QStringLiteral("加工服务未装配"));
+                reportError("PauseProcess", QStringLiteral("Processing service not configured"));  // 加工服务未装配
                 return;
             }
             QString error;
@@ -99,7 +99,7 @@ void LaserOperationRegistry::registerAll()
         [this, job] {
             if (!job)
             {
-                reportError("StopProcess", QStringLiteral("加工服务未装配"));
+                reportError("StopProcess", QStringLiteral("Processing service not configured"));  // 加工服务未装配
                 return;
             }
             QString error;
