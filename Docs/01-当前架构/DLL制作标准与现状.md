@@ -105,6 +105,35 @@ UI/2D/
 对应 `.cpp` 把虚函数锚定在 `Engine2D` 内，typeinfo 只有一份；这是巧合而不是保证——任何图元
 一旦改成纯头文件实现，就会立刻重现同一类静默失效。这批替换尚未进行。
 
+**当前统计**（2026-09-13 审计）：
+- `Geo2DEdit.cpp`: 45 处 `dynamic_cast`
+- `SceneManager.cpp`: 2 处 `dynamic_cast`
+- `UndoRedoManager.cpp` / `SceneUndoCommands.cpp`: 4 处（命令合并场景，非图元判型）
+
+**修复模式**：
+
+```cpp
+// ❌ 错误：跨 DLL dynamic_cast 不可靠
+if (auto* line = dynamic_cast<const SyLine*>(entity)) {
+    // ...
+}
+
+// ✅ 正确：使用 eType 枚举判型
+switch (entity->eType) {
+case EType::LINE: {
+    const auto* line = static_cast<const SyLine*>(entity);
+    // ...
+    break;
+}
+case EType::POLYGON: {
+    const auto* poly = static_cast<const SyPolygon*>(entity);
+    // ...
+    break;
+}
+// ...
+}
+```
+
 ---
 
 ## 4. 当前需要继续统一的点
