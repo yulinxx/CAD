@@ -1021,6 +1021,26 @@ OperationRegistry
 
 2D/3D 只注册不同的命令扩展。
 
+— ✅ 已完成（2026-09-13）。落地形态与本文设想的命名不同，因为内核**早就存在**：`UI/Common/Include/UI/Command/` 下已有一套共享内核（命名空间 `Cmd`），2D/3D 的 `OperationId` 本来就是同一个 `Cmd::OperationId` 枚举（`OperationId3D` 只是别名）。逐项对应：
+
+| 本文设想 | 实际落地 |
+|---|---|
+| `CommandId` | `Cmd::OperationId`（单一枚举，2D/3D 共用） |
+| `CommandDescriptor` | `CommandEntry2D` / `CommandEntry3D`，共同契约 `Cmd::CommandCatalogEntryBase` |
+| `CommandContext` | `OperationContext` / `OperationContext3D`（服务集合本质不同，靠模板参数保留） |
+| `CommandState` | `CommandUiSnapshotBase` + 两侧各自的扩展快照 |
+| `OperationRegistry` | `Cmd::OperationRegistryBase` |
+
+因此剩下要收的只有**漂移**，本次做的是启用规则：原先三套枚举并行（废弃的 `CommandEnableRule` + 2D 的 `CommandEnable2D` + 3D 的 `CommandEnable3D`），2D 那套还带两个私有值 100/101，3D 那套是隐式 `int`、位值一致性没有编译期保证。现在全部收敛到 `CmdCond` 位掩码，求值只剩 `Cmd::satisfy()` 一处，两侧 Hub 各删掉一条特判分支。
+
+注意：`CommandCatalogEntryBase` 是**刻意的 duck-typed 契约**（不继承）。因为两个目录都用位置聚合初始化逐字段列表，让 entry 继承基类会使其不再是聚合类型，两处目录表全部无法编译。这是取舍而不是遗漏。
+
+其余可继续收的点（未做，按收益排序）：
+- 两侧 `applySnapshotToAction/Menu` 与 `refreshCommandStates{,3D}` 仍是同构重复，内核已有 `Cmd::refreshActionsFromSnapshot` 但两者未走该模板。
+- 3D 缺 per-op `canExecute`（只判 `ctx.isValid()`），而 2D 在 `IOperation::canExecute` 里判 —— 同一条命令两边的可执行性语义不一致。
+- `undoable` 标记责任不一致：2D 由 bus 按 `isUndoable()` 代填，3D 由 handler 显式返回 `Cmd::OpFlagUndoable`。
+- `UI/Common/Include/UI/Command/CommandEnableRule.h` 这个文件名已名不副实（里面现在是 `CmdCond`），可考虑改名。
+
 6. 统一 Selection Model，避免 Engine、Document、UI、RenderWidget 各维护一份选择状态。
 
 ### P2：真正实现多后端

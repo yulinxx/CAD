@@ -173,7 +173,7 @@ flowchart TD
     Install --> Sync["工具栏按钮启用态<br/>随 选择集 + 锁定态（图层锁/图元锁）<br/>+ 剪贴板 + 撤销栈 + 工具状态 同步"]
 ```
 
-按钮启用态不是各处自行判断，而是单点驱动：五路状态变化 → `Workbench2D::refreshCommandUiState()` → 命令 UI 快照 → `Cmd::evaluateEnableRule()`。完整链路见 `命令与状态流.md` 6.3。
+按钮启用态不是各处自行判断，而是单点驱动：五路状态变化 → `Workbench2D::refreshCommandUiState()` → 命令 UI 快照 → `Cmd::satisfy()`。完整链路见 `命令与状态流.md` 6.3。
 
 > 左侧绘图面板不走 JSON 布局，而是 C++ 面板 + 中枢 QAction：`Workbench2D::buildDrawToolActions()`
 > 按命令目录顺序 + `CommandSurface2D::LeftToolbar` 过滤取 `CommandActionHub::toolAction()`，

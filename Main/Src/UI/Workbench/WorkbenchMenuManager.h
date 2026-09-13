@@ -66,7 +66,7 @@ public:
     ///
     /// 菜单项的启用规则不在本类里维护 —— 一律按 property("commandId") 经
     /// CommandCatalog::menuIdForCommandId() 反查目录条目，取条目上声明的 enableRule，
-    /// 再交给 Cmd::evaluateEnableRule 求值。这样菜单栏、顶部工具栏、右键菜单
+    /// 再交给 Cmd::satisfy 求值。这样菜单栏、顶部工具栏、右键菜单
     /// 共用同一份规则与同一份快照，不会出现"工具栏灰了菜单还能点"的漂移。
     ///
     /// 两类项会被跳过：

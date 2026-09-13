@@ -104,7 +104,7 @@
  * {OperationId::CustomMyCommand, UI::MenuActionId::CustomMyCommand, "My Command",
  *  "shortcut.custom.my_command", ":/icons/my_command.svg",
  *  CommandSurface2DValues::Menu | CommandSurface2DValues::Toolbar | CommandSurface2DValues::ContextMenu,
- *  CommandEnable2D::RequiresSelection, false}
+ *  Cmd::RequiresSelection, false}
  * ```
  *
  * 实现命令处理 (CommandActionHubActions.cpp):

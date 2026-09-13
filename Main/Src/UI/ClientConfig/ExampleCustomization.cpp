@@ -75,7 +75,7 @@ void registerExampleCustomizations()
  * {OperationId::ExampleInfo, UI::MenuActionId::ExampleInfo, "Show Info",
  *  "shortcut.example.info", ":/ui/common/Icons/Help/about.svg",
  *  CommandSurface2DValues::Menu | CommandSurface2DValues::Toolbar,
- *  CommandEnable2D::Always, false}
+ *  Cmd::Always, false}
  * ```
  */
 

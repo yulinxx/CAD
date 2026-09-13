@@ -109,7 +109,7 @@ TEST(CommandUiWiringTest, AlignCommandsRequireUnlockedMultiSelection)
         const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(commandId);
         const CommandEntry2D* entry = CommandCatalog::findByMenuId(menuId);
         ASSERT_NE(entry, nullptr) << commandId.toStdString();
-        EXPECT_EQ(entry->enableRule, CommandEnable2D::RequiresUnlockedMultiSelection)
+        EXPECT_EQ(entry->enableRule, Cmd::RequiresUnlockedMultiSelection)
             << commandId.toStdString();
     }
 }
@@ -120,7 +120,7 @@ TEST(CommandUiWiringTest, DeleteRequiresUnlockedSelection)
     const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(QStringLiteral("edit.delete"));
     const CommandEntry2D* entry = CommandCatalog::findByMenuId(menuId);
     ASSERT_NE(entry, nullptr);
-    EXPECT_EQ(entry->enableRule, CommandEnable2D::RequiresUnlockedSelection);
+    EXPECT_EQ(entry->enableRule, Cmd::RequiresUnlockedSelection);
 }
 
 TEST(CommandUiWiringTest, PathModifyCommandsResolveAndRequireTwoUnlocked)
@@ -143,7 +143,7 @@ TEST(CommandUiWiringTest, PathModifyCommandsResolveAndRequireTwoUnlocked)
 
         const CommandEntry2D* entry = CommandCatalog::findByMenuId(menuId);
         ASSERT_NE(entry, nullptr) << commandId.toStdString();
-        EXPECT_EQ(entry->enableRule, CommandEnable2D::RequiresUnlockedMultiSelection)
+        EXPECT_EQ(entry->enableRule, Cmd::RequiresUnlockedMultiSelection)
             << commandId.toStdString();
         EXPECT_NE(CommandCatalog::operationForCommandId(commandId), OperationId::None)
             << commandId.toStdString();
@@ -207,24 +207,24 @@ namespace
     struct MenuRuleExpectation
     {
         const char* commandId;
-        CommandEnable2D expectedRule;
+        CmdCond expectedRule;
     };
 
     QVector<MenuRuleExpectation> menuBarEditRuleExpectations()
     {
         return {
-            { "edit.undo", CommandEnable2D::RequiresUndo },
-            { "edit.redo", CommandEnable2D::RequiresRedo },
-            { "edit.cut", CommandEnable2D::RequiresUnlockedSelection },
-            { "edit.copy", CommandEnable2D::RequiresUnlockedSelection },
-            { "edit.paste", CommandEnable2D::RequiresClipboard },
-            { "edit.delete", CommandEnable2D::RequiresUnlockedSelection },
-            { "edit.align_left", CommandEnable2D::RequiresUnlockedMultiSelection },
-            { "edit.align_right", CommandEnable2D::RequiresUnlockedMultiSelection },
-            { "edit.align_center_h", CommandEnable2D::RequiresUnlockedMultiSelection },
-            { "edit.align_top", CommandEnable2D::RequiresUnlockedMultiSelection },
-            { "edit.align_bottom", CommandEnable2D::RequiresUnlockedMultiSelection },
-            { "edit.align_center_v", CommandEnable2D::RequiresUnlockedMultiSelection },
+            { "edit.undo", Cmd::RequiresUndo },
+            { "edit.redo", Cmd::RequiresRedo },
+            { "edit.cut", Cmd::RequiresUnlockedSelection },
+            { "edit.copy", Cmd::RequiresUnlockedSelection },
+            { "edit.paste", Cmd::RequiresClipboard },
+            { "edit.delete", Cmd::RequiresUnlockedSelection },
+            { "edit.align_left", Cmd::RequiresUnlockedMultiSelection },
+            { "edit.align_right", Cmd::RequiresUnlockedMultiSelection },
+            { "edit.align_center_h", Cmd::RequiresUnlockedMultiSelection },
+            { "edit.align_top", Cmd::RequiresUnlockedMultiSelection },
+            { "edit.align_bottom", Cmd::RequiresUnlockedMultiSelection },
+            { "edit.align_center_v", Cmd::RequiresUnlockedMultiSelection },
         };
     }
 }  // namespace
@@ -255,7 +255,7 @@ TEST(CommandUiWiringTest, MenuBarEditCommandRulesAreNotAlways)
         const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(commandId);
         const CommandEntry2D* entry = CommandCatalog::findByMenuId(menuId);
         ASSERT_NE(entry, nullptr) << commandId.toStdString();
-        EXPECT_NE(entry->enableRule, CommandEnable2D::Always)
+        EXPECT_NE(entry->enableRule, Cmd::Always)
             << "规则为 Always 会被菜单栏刷新跳过: " << commandId.toStdString();
     }
 }
