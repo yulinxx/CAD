@@ -19,7 +19,7 @@
  *    调用留在原处的情况（C2065/C3861）。
  *
  * 拆出来之后：本头只依赖 RenderTypes + ScreenConstantMetrics，两者都是纯头，
- * 测试目标无需链接 Renderx；`OverlaySceneBuilder.cpp` 只负责把产出的顶点
+ * 测试目标无需链接 Renderx；`OverlayScene.cpp` 只负责把产出的顶点
  * 交给瞬态环。顶点结构与 P3O2C4 的 stride 断言仍留在 `.cpp`（那里才认识
  * `rxVertexStride`），保证布局一旦漂移立刻编译失败。
  *
@@ -46,7 +46,7 @@ namespace Render
      * @brief P3O2C4 顶点：世界锚点 (x,y,z) + 像素偏移 (ox,oy) + RGBA
      *
      * 字段顺序即顶点缓冲的字节布局，不要重排；与 DLL 的 stride 断言在
-     * `OverlaySceneBuilder.cpp` 里。
+     * `OverlayScene.cpp` 里。
      */
     struct PinnedVertex
     {

@@ -23,7 +23,7 @@
  *
  * 单位默认是**物理像素**（与 `uViewport` = backingSize 同一坐标系，
  * 已含 devicePixelRatio），不是逻辑像素。唯一的例外是捕捉指示器
- * `kSnapIndicatorRadiusPx`：它是逻辑像素，由 OverlaySceneBuilder 乘 DPR 后再送渲染。
+ * `kSnapIndicatorRadiusPx`：它是逻辑像素，由 OverlayScene 乘 DPR 后再送渲染。
  *
  * ## 为什么在 RenderBridge 而不是 UI2D
  *
@@ -60,7 +60,7 @@ namespace Render
         constexpr float kDrawControlPointSizePx = 9.0f;
 
         /// 吸附指示器尺寸基准（**逻辑像素/点**）。各捕捉类型以它为半径基准缩放成不同形状；
-        /// 与其它「物理像素」常量不同，它在 OverlaySceneBuilder 里乘 devicePixelRatio
+        /// 与其它「物理像素」常量不同，它在 OverlayScene 里乘 devicePixelRatio
         /// 后才送入 WorldPinned，从而在 Retina / 非 Retina 上屏幕视觉尺寸一致。
         constexpr float kSnapIndicatorRadiusPx = 16.0f;
 

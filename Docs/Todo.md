@@ -1007,7 +1007,7 @@ RenderUploadQueue
 OverlayScene
 ```
 
-— `RenderSessionHost` ✅ 已完成；`PersistentGeometryStore` ✅ 已完成（`RenderBridge::PersistentGeometryStore`：几何仓 + 绘制列表 + 槽位台账，2D/3D 两个 builder 共用；2D 全量刷新改为按段位哈希差量更新，撤销/重做不再全场景重传）；`RenderUploadQueue` 部分完成（`RenderBridge::RenderUploadQueue` 已落地命令模型、线程边界与消费契约，**尚未接入视口** —— 队列的收益要等渲染线程独立才兑现，现在接入只是把同步上传拆成「入队 + 同线程立刻 drain」，因此留到 P2 与多后端/渲染线程一起收口）；`OverlayScene` 待办。
+— `RenderSessionHost` ✅ 已完成；`PersistentGeometryStore` ✅ 已完成（`RenderBridge::PersistentGeometryStore`：几何仓 + 绘制列表 + 槽位台账，2D/3D 两个 builder 共用；2D 全量刷新改为按段位哈希差量更新，撤销/重做不再全场景重传）；`RenderUploadQueue` 部分完成（`RenderBridge::RenderUploadQueue` 已落地命令模型、线程边界与消费契约，**尚未接入视口** —— 队列的收益要等渲染线程独立才兑现，现在接入只是把同步上传拆成「入队 + 同线程立刻 drain」，因此留到 P2 与多后端/渲染线程一起收口）；`OverlayScene` ✅ 已完成（`RenderBridge::OverlayScene`：覆盖层按 `OverlayLayerId` 拆成 9 个独立层，提交端（瞬态环分配 + DrawCommand）从 UI2D 移入 RenderBridge，见专题 24）。
 
 5. 统一 2D/3D 的命令内核：
 
@@ -3785,6 +3785,22 @@ Engine2D/Interaction/SnapEngine.h
 ---
 
 # 24. OverlayState 的字段过多，应拆成 Layer
+
+— ✅ 已完成（2026-09-13）：覆盖层已整体移入 `RenderBridge::OverlayScene`，并按要求拆成
+独立层。落点与本文设想的两处差异，都是落地时才看清的约束：
+
+- **层号顺序 = 提交顺序 = 叠放顺序**，写死在 `OverlayLayerId` 枚举里，不再靠一个共享的
+  自增 `seq`（那个 `seq` 会随调用顺序漂移）。枚举按原有提交次序排列，因此叠放不变。
+- 设成 `replaceLayer(id, shared_ptr<const OverlayLayer>)` 需要所有层共用一种载荷类型，
+  但这九层的载荷结构互不相同（包围盒 / 四边形列表 / 带弧长的轮廓路径 / 标记组 / 形状+颜色），
+  塞进一个通用 POD 只会变成一个 `void*` 袋子。因此改为**按层的强类型 setter**
+  （`setSelectionBox` / `setSelectionOutlines` / `setSelectionHandles` / …）+ 统一的
+  `clearLayer(id)` / `clear()`；「各工具只管理自己的图层」这一条由类型保证 ——
+  写哪层只影响哪层，不再需要「只清 update 实际携带的组」那条防御性注释来兜。
+
+另外，`OverlayState` 的 `snapType`（`Engine2D::SnapEngine::SnapFlag`）不再进入渲染侧：
+形状与颜色的映射留在 UI2D 的 `ViewRenderCoordinator`，`OverlayScene` 只收中性的
+`SnapMarkerShape` + `Render::Color`，渲染桥接层因此不依赖 Engine2D 的捕捉语义。
 
 ## 当前问题
 
@@ -6731,6 +6747,22 @@ Engine2D/Interaction/SnapEngine.h
 ---
 
 # 24. OverlayState 的字段过多，应拆成 Layer
+
+— ✅ 已完成（2026-09-13）：覆盖层已整体移入 `RenderBridge::OverlayScene`，并按要求拆成
+独立层。落点与本文设想的两处差异，都是落地时才看清的约束：
+
+- **层号顺序 = 提交顺序 = 叠放顺序**，写死在 `OverlayLayerId` 枚举里，不再靠一个共享的
+  自增 `seq`（那个 `seq` 会随调用顺序漂移）。枚举按原有提交次序排列，因此叠放不变。
+- 设成 `replaceLayer(id, shared_ptr<const OverlayLayer>)` 需要所有层共用一种载荷类型，
+  但这九层的载荷结构互不相同（包围盒 / 四边形列表 / 带弧长的轮廓路径 / 标记组 / 形状+颜色），
+  塞进一个通用 POD 只会变成一个 `void*` 袋子。因此改为**按层的强类型 setter**
+  （`setSelectionBox` / `setSelectionOutlines` / `setSelectionHandles` / …）+ 统一的
+  `clearLayer(id)` / `clear()`；「各工具只管理自己的图层」这一条由类型保证 ——
+  写哪层只影响哪层，不再需要「只清 update 实际携带的组」那条防御性注释来兜。
+
+另外，`OverlayState` 的 `snapType`（`Engine2D::SnapEngine::SnapFlag`）不再进入渲染侧：
+形状与颜色的映射留在 UI2D 的 `ViewRenderCoordinator`，`OverlayScene` 只收中性的
+`SnapMarkerShape` + `Render::Color`，渲染桥接层因此不依赖 Engine2D 的捕捉语义。
 
 ## 当前问题
 
