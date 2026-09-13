@@ -985,7 +985,7 @@ ManufacturingPreviewDocument
 
 ### P1：结构性重构
 
-1. 新建轻量 `RenderBridge` 模块。
+1. 新建轻量 `RenderBridge` 模块。 — ✅ 已完成 (`RenderBridge` 模块：`RenderSessionHost` 会话生命周期 + `HostCallbacks` 宿主回调，2D/3D 视口共用)
 2. 引入：
 
 ```text
@@ -995,7 +995,9 @@ RenderEntityProxy
 RenderSnapshot
 ```
 
-3. 将增量刷新从“按实体指针读取”改为“按变更快照读取”。
+— ✅ 已完成 `SceneChangeSet`(追加式修订日志) 与 `RenderSnapshot`(只读快照)；`DocumentRevision` 并入变更流修订号，`RenderEntityProxy` 由 `RenderEntitySnapshot` 承担。
+
+3. 将增量刷新从“按实体指针读取”改为“按变更快照读取”。 — ✅ 已完成（`SceneRefreshCoordinator` 的过滤循环、并行离散化、串行分支三处改读快照）
 4. 抽取公共：
 
 ```text
@@ -1004,6 +1006,8 @@ PersistentGeometryStore
 RenderUploadQueue
 OverlayScene
 ```
+
+— `RenderSessionHost` ✅ 已完成；`PersistentGeometryStore` / `RenderUploadQueue` / `OverlayScene` 待办。
 
 5. 统一 2D/3D 的命令内核：
 
