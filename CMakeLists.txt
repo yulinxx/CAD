@@ -159,11 +159,11 @@ if(BUILD_CRASHHANDLER)
     add_subdirectory(CrashHandler/CrashHandler)
 endif()
 
-# 1.6 License 层 - 软件注册与许可校验
-add_subdirectory(License/License)
-
-# 2. Log 层 - 日志库（Engine 层依赖）
+# 2. Log 层 - 日志库（Engine 层依赖，License 也依赖）
 add_subdirectory(Log/Log)
+
+# 1.6 License 层 - 软件注册与许可校验（依赖 Log）
+add_subdirectory(License/License)
 
 # 3. Engine 层 - 引擎核心
 add_subdirectory(Engine/Common)

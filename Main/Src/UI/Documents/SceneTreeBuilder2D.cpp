@@ -95,18 +95,20 @@ SceneTreeTopology2D SceneTreeBuilder2D::buildTopology(Eg::SceneManager* scene)
         return topo;
     }
 
+    // 顶层群组只查一次：旧实现对 getTopLevelGroups() 连查三次（每次都分配一个 vector）
+    const std::vector<Eg::SyGroup*> topLevelGroups = scene->groupManager().getTopLevelGroups();
+
     // 收集所有已入群组的图元 ID，避免在顶层重复列出
     QSet<qint64> groupedIds;
-    for (auto* group : scene->groupManager().getTopLevelGroups())
+    for (auto* group : topLevelGroups)
     {
         visitGroupMembers(group, groupedIds);
     }
 
-    topo.topLevel.reserve(
-        static_cast<int>(groupedIds.size()) + static_cast<int>(scene->groupManager().getTopLevelGroups().size()));
+    topo.topLevel.reserve(static_cast<int>(groupedIds.size()) + static_cast<int>(topLevelGroups.size()));
 
     // 顶层群组
-    for (auto* group : scene->groupManager().getTopLevelGroups())
+    for (auto* group : topLevelGroups)
     {
         if (group)
         {
@@ -114,15 +116,16 @@ SceneTreeTopology2D SceneTreeBuilder2D::buildTopology(Eg::SceneManager* scene)
         }
     }
 
-    // 未入群组的图元作为顶层行
-    for (const auto& e : scene->getAllEntities())
-    {
-        if (!e || groupedIds.contains(static_cast<qint64>(e->id)))
+    // 未入群组的图元作为顶层行。
+    // 直接遍历容器，不走 getAllEntities()：后者会先拷贝一份全部图元指针的 vector，
+    // 万级场景下这次拷贝比遍历本身还贵。
+    scene->forEachEntity([&topo, &groupedIds](Eg::SyEntity* entity) {
+        if (!entity || groupedIds.contains(static_cast<qint64>(entity->id)))
         {
-            continue;
+            return;
         }
-        topo.topLevel.push_back({ static_cast<qint64>(e->id), false });
-    }
+        topo.topLevel.push_back({ static_cast<qint64>(entity->id), false });
+    });
 
     return topo;
 }

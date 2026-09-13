@@ -202,7 +202,7 @@ int License_Check(LicenseContext* ctx)
 
         if (!manager->CheckLicense())
         {
-            SY_WARN("[LicenseDLL] License_Check: license verification failed: %s", manager->GetLicenseInfo().errorMsg.c_str());
+            SY_WARNF("[LicenseDLL] License_Check: license verification failed: %s", manager->GetLicenseInfo().errorMsg.c_str());
             setLastError(manager->GetLicenseInfo().errorMsg.c_str());
             return LICENSE_ERR_VERIFY_FAILED;
         }
@@ -245,7 +245,7 @@ int License_Activate(LicenseContext* ctx, const char* regCode)
 
         if (!manager->Activate(regCode))
         {
-            SY_WARN("[LicenseDLL] License_Activate: license activation failed: %s", manager->GetLicenseInfo().errorMsg.c_str());
+            SY_WARNF("[LicenseDLL] License_Activate: license activation failed: %s", manager->GetLicenseInfo().errorMsg.c_str());
             setLastError(manager->GetLicenseInfo().errorMsg.c_str());
             return LICENSE_ERR_VERIFY_FAILED;
         }
@@ -428,7 +428,7 @@ int License_GetInfo(LicenseContext* ctx, LicenseInfo* outInfo)
 
     int License_GuardCheck(LicenseGuardFlavor flavor)
     {
-        SY_DEBUG("[LicenseDLL] License_GuardCheck: checking license guard (flavor=%d)", static_cast<int>(flavor));
+        SY_DEBUGF("[LicenseDLL] License_GuardCheck: checking license guard (flavor=%d)", static_cast<int>(flavor));
         return LicenseGuard::Check(guardFlavorFromC(flavor)) ? LICENSE_OK : LICENSE_ERR_VERIFY_FAILED;
     }
 

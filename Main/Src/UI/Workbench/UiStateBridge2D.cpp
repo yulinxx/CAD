@@ -82,8 +82,10 @@ QObject* UiStateBridge2D::install(Workbench2D* workbench,
         QObject::connect(sceneMonitor, &SceneMonitor::sceneChanged, guard, [workbench]() {
             QTimer::singleShot(0, workbench, [workbench]() {
                 refreshAll(workbench);
-                // 场景变化时刷新场景树（可见性/锁定状态变化需要同步到树显示）
-                workbench->refreshSceneTree();
+                // 场景变化时刷新场景树（可见性/锁定状态变化需要同步到树显示）。
+                // 这里走「结构签名」判定：拖动图元这类只改几何的变更不会命中，
+                // 不会把万级场景的树在每次变更后重建一遍。
+                workbench->refreshSceneTreeIfNeeded();
             });
         });
     }

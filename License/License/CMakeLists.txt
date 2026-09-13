@@ -41,6 +41,9 @@ list(FILTER LIB_SOURCES EXCLUDE REGEX ".*/LicenseKeygenDLL\\.cpp$")
 # --- 第三方依赖 ---
 find_package(OpenSSL REQUIRED)
 
+# Log 依赖：通过导入的 Config 获取 Log::Log 别名目标
+include("${CMAKE_BINARY_DIR}/cmake/LogConfig.cmake")
+
 # 统一入口已无条件生成调试符号（version.rc / PDB-DWARF），
 # 该 option 仅为兼容旧构建参数保留，实际始终生效。
 option(SANYI_LICENSE_SYMBOLS "Generate debug symbols for License" ON)
@@ -63,6 +66,7 @@ sanyi_add_shared_library(${LIB_NAME}
         PRIVATE
             OpenSSL::SSL
             OpenSSL::Crypto
+            Log
 )
 
 if(WIN32)
