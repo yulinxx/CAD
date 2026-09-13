@@ -1035,8 +1035,8 @@ OperationRegistry
 
 注意：`CommandCatalogEntryBase` 是**刻意的 duck-typed 契约**（不继承）。因为两个目录都用位置聚合初始化逐字段列表，让 entry 继承基类会使其不再是聚合类型，两处目录表全部无法编译。这是取舍而不是遗漏。
 
-其余可继续收的点（未做，按收益排序）：
-- 两侧 `applySnapshotToAction/Menu` 与 `refreshCommandStates{,3D}` 仍是同构重复，内核已有 `Cmd::refreshActionsFromSnapshot` 但两者未走该模板。
+其余可继续收的点（按收益排序）：
+- ✅ 两侧 `applySnapshotToAction/Menu` 与批量刷新已收敛到内核：新增 `Cmd::applyDeclaredEnableState`（恒可用只跳过 + `satisfy`，策略一处）、`Cmd::applyToMenuTree`（菜单树遍历一处）、`Cmd::isCommandUnavailable`（前置守卫一处）。顺带修掉一处真实缺陷：批量入口 `refreshActionsFromSnapshot` 原先**无条件写 enabled**，会把 `Cmd::Always` 条目强制点亮、冲掉「全局置灰」与 3D 浮雕按钮的专属控制 —— 此前只是靠调用顺序恰好排在后面才没暴露。
 - 3D 缺 per-op `canExecute`（只判 `ctx.isValid()`），而 2D 在 `IOperation::canExecute` 里判 —— 同一条命令两边的可执行性语义不一致。
 - `undoable` 标记责任不一致：2D 由 bus 按 `isUndoable()` 代填，3D 由 handler 显式返回 `Cmd::OpFlagUndoable`。
 - `UI/Common/Include/UI/Command/CommandEnableRule.h` 这个文件名已名不副实（里面现在是 `CmdCond`），可考虑改名。
