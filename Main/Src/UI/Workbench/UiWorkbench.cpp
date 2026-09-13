@@ -375,6 +375,16 @@ bool Workbench2D::initialize(const UiServices& services)
     }
     m_services = services;
 
+    // 使用应用共享 SettingsService singleton，2D/3D 逻辑一致
+    m_settingsCoordinator = std::make_unique<SettingsUiCoordinator2D>(ApplicationCompositionRoot::getSettingsService());
+    m_services.settingsService = ApplicationCompositionRoot::getSettingsService();
+
+    // 注册 2D 专属设置项，确保设置页已存在
+    if (m_settingsCoordinator)
+    {
+        m_settingsCoordinator->init();
+    }
+
     SY_DEBUG("[Workbench2D] initialize: 2D workbench initialized successfully");
     return true;
 }
