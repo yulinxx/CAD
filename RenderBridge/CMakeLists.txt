@@ -45,6 +45,10 @@ sanyi_add_shared_library(${LIB_NAME}
         "${SANYI_RENDERX_DIR}/include"
         "${SANYI_UTILITY_DIR}/Include"
         "${SANYI_LOG_DIR}/Include"
+        # 覆盖层与屏幕定尺寸标记几何共用应用层绘制词汇（Render::Vec2f / Color / BBox2d）
+        "${SANYI_UI_COMMON_DIR}/Include"
+        # RenderTypes.h 里的离散化常量来自 EngineCommon（Eg::tess）
+        "${SANYI_ENGINE_COMMON_DIR}/Include"
     LINK_LIBRARIES
         PUBLIC
             Utility
@@ -59,6 +63,8 @@ sanyi_export_imported_target(${LIB_NAME}
     PUBLIC_INCLUDE_DIRS
         "${CMAKE_CURRENT_SOURCE_DIR}/Include"
         "${SANYI_RENDERX_DIR}/include"
+        "${SANYI_UI_COMMON_DIR}/Include"
+        "${SANYI_ENGINE_COMMON_DIR}/Include"
     INTERFACE_LINK_LIBRARIES
         Utility::Utility
         Log::Log
