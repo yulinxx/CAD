@@ -1777,6 +1777,13 @@ bool entityToVertices(
 
 # 4. EntityToVertices 的缓存存在数据竞争和生命周期问题
 
+— ✅ 已完成（2026-09-13）：缓存已整块删除，不是「加锁修一修」。`entityToVertices`
+退回纯函数，`eraseEntityVertexCache` / `clearEntityVertexCache` 两个外部失效 API 与
+`SceneRefreshCoordinator` 里的三处调用一并去掉。判断「几何与上一轮是否相同」现在只由
+`RenderSceneBuilder` 的段位哈希回答 —— 它属于持有几何块的那一层，自比对、不需要任何
+外部失效调用，因此本节列出的数据竞争与生命周期问题在结构上不再存在。下述原分析保留
+作为背景，其中「最低限度修复」已不再需要执行。
+
 ## 当前问题
 
 缓存是进程级静态对象：
@@ -4715,6 +4722,13 @@ bool entityToVertices(
 ---
 
 # 4. EntityToVertices 的缓存存在数据竞争和生命周期问题
+
+— ✅ 已完成（2026-09-13）：缓存已整块删除，不是「加锁修一修」。`entityToVertices`
+退回纯函数，`eraseEntityVertexCache` / `clearEntityVertexCache` 两个外部失效 API 与
+`SceneRefreshCoordinator` 里的三处调用一并去掉。判断「几何与上一轮是否相同」现在只由
+`RenderSceneBuilder` 的段位哈希回答 —— 它属于持有几何块的那一层，自比对、不需要任何
+外部失效调用，因此本节列出的数据竞争与生命周期问题在结构上不再存在。下述原分析保留
+作为背景，其中「最低限度修复」已不再需要执行。
 
 ## 当前问题
 
