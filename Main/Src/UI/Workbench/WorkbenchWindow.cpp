@@ -370,6 +370,8 @@ void WorkbenchWindow::unbindStateSignals()
 
 void WorkbenchWindow::initializeWorkbenchShell()
 {
+    SY_INFO("[WorkbenchWindow] initializeWorkbenchShell: starting workbench shell initialization");
+
     if (m_menuManager)
     {
         // 无工作台时先不构建菜单：命令目录为空会导致全部动作被禁用并刷屏 Unknown command id，

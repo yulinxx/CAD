@@ -5,6 +5,7 @@
 #include <QPointer>
 #include <QVector>
 
+#include <cstdint>
 #include <memory>
 
 #include "UiServices.h"
@@ -252,6 +253,11 @@ public:
     /// 重建场景树模型并推送到面板（结构性变化：导入/撤销/增删）
     void refreshSceneTree();
 
+    /// 只在「结构签名」变化时重建场景树（图元增删 / 群组拓扑）。
+    /// sceneChanged 会在拖动等高频路径上反复触发，全量重建在万级图元下每次都要
+    /// 几十毫秒，因此默认走这条；用户显式改可见性/锁定/重命名时仍调 refreshSceneTree()。
+    void refreshSceneTreeIfNeeded();
+
 private:
     /// 创建中央视口
     QWidget* createCentralViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties);
@@ -325,8 +331,11 @@ private:
     QPointer<QObject> m_uiStateConnections;
     /// 场景树重建防抖定时器（合并批量增删，避免每步 O(N) 重建）
     class QTimer* m_sceneTreeRefreshTimer{ nullptr };
-    /// 上次记录的图元数量（判断是否发生结构变更）
-    std::size_t m_lastSceneEntityCount{ 0 };
+    /// 场景树结构签名：图元增删（SceneManager::structureRevision）+ 群组拓扑
+    /// （GroupManager::topologyRevision）。三者都没变就不必重建树。
+    std::size_t m_lastSceneTreeEntityCount{ 0 };
+    uint64_t m_lastSceneTreeStructureRevision{ 0 };
+    uint64_t m_lastSceneTreeTopologyRevision{ 0 };
     /// 2D 状态栏 widget。
     /// 所有权在 Qt 父子关系：创建时挂在 WorkbenchWindow 上，mountStatusBar 里
     /// QStatusBar::addWidget 会把它再 reparent 到 QStatusBar。QStatusBar 跨工作台

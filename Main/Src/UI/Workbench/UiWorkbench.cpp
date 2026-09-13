@@ -366,6 +366,8 @@ QString Workbench2D::displayName() const
 
 bool Workbench2D::initialize(const UiServices& services)
 {
+    SY_INFO("[Workbench2D] initialize: starting 2D workbench initialization");
+
     if (!services.stateCenter || !services.interactionDispatcher)
     {
         SY_ERROR("[Workbench2D] initialize failed: stateCenter or interactionDispatcher is null");
@@ -373,21 +375,7 @@ bool Workbench2D::initialize(const UiServices& services)
     }
     m_services = services;
 
-    // 阶段1收口：SelectionService 已由组合根创建并经 UiServices.selectionService 注入，
-    // 工作台不再直接触碰底层 SceneManager
-
-    m_initialState = UiStateSnapshot{};
-    m_savedState = UiStateSnapshot{};
-
-    // 使用应用共享 SettingsService singleton（2D/3D 逻辑一致）
-    m_settingsCoordinator = std::make_unique<SettingsUiCoordinator2D>(ApplicationCompositionRoot::getSettingsService());
-
-    // 注册 2D 专属设置表，确保保存时表已存在
-    if (m_settingsCoordinator)
-    {
-        m_settingsCoordinator->init();
-    }
-
+    SY_DEBUG("[Workbench2D] initialize: 2D workbench initialized successfully");
     return true;
 }
 
@@ -1440,12 +1428,11 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
     }
 
     // 引擎场景变更兜底：任何直接修改（如视口 Delete 键删除、导入清空等）
-    // 都会经 SceneNotifier 通知这里；依据图元数量变化判断是否结构变更，
-    // 防抖后重建树，避免 Scene 列表残留。
+    // 都会经 SceneNotifier 通知这里；由结构签名（图元增删 + 群组拓扑）判断是否
+    // 需要重建，防抖后统一重建，避免 Scene 列表残留、也避免拖动时反复重建。
     Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
     if (scene)
     {
-        m_lastSceneEntityCount = scene->getEntityCount();
         if (!m_sceneTreeRefreshTimer)
         {
             m_sceneTreeRefreshTimer = new QTimer(this);
@@ -1468,20 +1455,9 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
 
 void Workbench2D::onSceneTreeSceneChanged()
 {
-    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
-    if (!scene)
-    {
-        return;
-    }
-    const std::size_t count = scene->getEntityCount();
-    if (count != m_lastSceneEntityCount)
-    {
-        m_lastSceneEntityCount = count;
-        if (m_sceneTreeRefreshTimer)
-        {
-            m_sceneTreeRefreshTimer->start();
-        }
-    }
+    // 结构签名没变（例如只是拖了几何）就不重建：原来这里按「图元数量」判断，
+    // 但群组拓扑变化不改数量，会让新建/解散的群组在树上残留。
+    refreshSceneTreeIfNeeded();
 }
 
 void Workbench2D::refreshSceneTree()
@@ -1501,6 +1477,57 @@ void Workbench2D::refreshSceneTree()
         [scene](qint64 groupId) {
             return SceneTreeBuilder2D::groupMembers(scene, groupId);
         });
+
+    // 记录本轮重建时的结构签名：之后的 sceneChanged 只要签名没变就不必再建
+    m_lastSceneTreeEntityCount = scene ? scene->getEntityCount() : 0;
+    m_lastSceneTreeStructureRevision = scene ? scene->structureRevision() : 0;
+    m_lastSceneTreeTopologyRevision = scene ? scene->groupManager().topologyRevision() : 0;
+
+    SY_INFOF("[Workbench2D] scene tree rebuilt: topLevel=%d entities=%zu structRev=%llu topoRev=%llu",
+        topology.topLevel.size(),
+        m_lastSceneTreeEntityCount,
+        static_cast<unsigned long long>(m_lastSceneTreeStructureRevision),
+        static_cast<unsigned long long>(m_lastSceneTreeTopologyRevision));
+}
+
+void Workbench2D::refreshSceneTreeIfNeeded()
+{
+    if (!m_scenePanel2D)
+    {
+        return;
+    }
+    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
+    if (!scene)
+    {
+        return;
+    }
+
+    // 结构签名：图元数量 + 增删修订 + 群组拓扑修订。拖动图元只推进几何修订，
+    // 不会命中这里，因此不会把万级场景的树反复重建。
+    const std::size_t count = scene->getEntityCount();
+    const uint64_t structureRev = scene->structureRevision();
+    const uint64_t topologyRev = scene->groupManager().topologyRevision();
+    if (count == m_lastSceneTreeEntityCount && structureRev == m_lastSceneTreeStructureRevision
+        && topologyRev == m_lastSceneTreeTopologyRevision)
+    {
+        return;
+    }
+
+    // 先记下已消费的签名再启表：否则连续 sceneChanged（拖动中）每次都会重启单次定时器，
+    // 重建被无限推迟；重建函数结束后会把签名再刷成最新值。
+    m_lastSceneTreeEntityCount = count;
+    m_lastSceneTreeStructureRevision = structureRev;
+    m_lastSceneTreeTopologyRevision = topologyRev;
+
+    if (m_sceneTreeRefreshTimer)
+    {
+        // 防抖：批量增删（导入/阵列）合并成一次重建
+        m_sceneTreeRefreshTimer->start();
+    }
+    else
+    {
+        refreshSceneTree();
+    }
 }
 
 void Workbench2D::syncSceneTreeSelection()
@@ -1558,6 +1585,10 @@ void Workbench2D::toggleEntityVisibility(const QString& id, bool visible)
     {
         entity->setVisible(visible);
         scene->notifySceneChanged();
+        // 可见性不进结构签名（不是增删/拓扑变化），且树行要显示新的显隐图标，
+        // 所以这里显式重建一次：这是用户点击行为，频率低，代价可接受。
+        SY_DEBUGF("[Workbench2D] toggleEntityVisibility: id=%lld visible=%d", static_cast<long long>(*eid), visible ? 1 : 0);
+        refreshSceneTree();
     }
 }
 
@@ -1591,6 +1622,11 @@ void Workbench2D::renameEntity(const QString& id, const QString& newName)
             }
         },
         "Rename");
+
+    // 改名不是结构变化（签名不动），但树行要显示新名字，这里显式重建一次。
+    // 撤销改名同样依赖它：undoStateChanged 走的是 refreshSceneTree()（无条件）。
+    SY_DEBUGF("[Workbench2D] renameEntity: id=%lld name=%s", static_cast<long long>(*eid), name.c_str());
+    refreshSceneTree();
 }
 
 void Workbench2D::deleteSceneTreeSelection(const QStringList& ids)
@@ -1680,6 +1716,9 @@ void Workbench2D::setSceneTreeVisibility(const QStringList& ids, bool visible)
     if (changed)
     {
         scene->notifySceneChanged();
+        // 同上：显隐不进结构签名，批量改完显式重建一次树（含取消选择的联动）
+        SY_DEBUGF("[Workbench2D] setSceneTreeVisibility: count=%d visible=%d", ids.size(), visible ? 1 : 0);
+        refreshSceneTree();
     }
 }
 
@@ -1707,6 +1746,9 @@ void Workbench2D::setSceneTreeLock(const QStringList& ids, bool locked)
     if (changed)
     {
         scene->notifySceneChanged();
+        // 锁定状态不进结构签名，显式重建一次树以刷新锁定图标
+        SY_DEBUGF("[Workbench2D] setSceneTreeLock: count=%d locked=%d", ids.size(), locked ? 1 : 0);
+        refreshSceneTree();
     }
 }
 
@@ -1972,7 +2014,9 @@ void Workbench2D::deactivate()
         m_sceneTreeRefreshTimer->deleteLater();
         m_sceneTreeRefreshTimer = nullptr;
     }
-    m_lastSceneEntityCount = 0;
+    m_lastSceneTreeEntityCount = 0;
+    m_lastSceneTreeStructureRevision = 0;
+    m_lastSceneTreeTopologyRevision = 0;
     // 场景树面板指针随窗口清理而失效
     m_scenePanel2D = nullptr;
 
@@ -2111,6 +2155,8 @@ QString Workbench3D::commandText(const QString& commandId) const
 // 1 — 初始化，存储服务引用
 bool Workbench3D::initialize(const UiServices& services)
 {
+    SY_INFO("[Workbench3D] initialize: starting 3D workbench initialization");
+
     if (!services.stateCenter || !services.interactionDispatcher)
     {
         SY_ERROR("[Workbench3D] initialize failed: stateCenter or interactionDispatcher is null");
@@ -2133,6 +2179,7 @@ bool Workbench3D::initialize(const UiServices& services)
 
     m_savedState = UiStateSnapshot{};
     m_initialState = UiStateSnapshot{};
+    SY_DEBUG("[Workbench3D] initialize: 3D workbench initialized successfully");
     return true;
 }
 

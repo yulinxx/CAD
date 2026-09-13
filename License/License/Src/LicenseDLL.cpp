@@ -2,6 +2,7 @@
 #include "LicenseGuard.h"
 #include "LicenseInternal.h"
 #include "LicenseManager.h"
+#include "Log/SyLogger.h"
 
 #include <cstring>
 #include <memory>
@@ -131,38 +132,43 @@ extern "C"
     }
 #endif
 
-    LicenseContext* License_Create(const LicenseConfig* config)
+LicenseContext* License_Create(const LicenseConfig* config)
+{
+    SY_INFO("[LicenseDLL] License_Create: creating license context");
+    try
     {
-        try
+        if (!config)
         {
-            if (!config)
-            {
-                setLastError("config is null");
-                return nullptr;
-            }
-
-            if (config->structSize != sizeof(LicenseConfig))
-            {
-                setLastError("LicenseConfig struct size mismatch");
-                return nullptr;
-            }
-
-            if (!config->configDir || config->configDir[0] == '\0')
-            {
-                setLastError("configDir is required");
-                return nullptr;
-            }
-
-            if (config->enableCheck >= 0)
-            {
-                LicenseInternal::SetCheckEnabled(config->enableCheck != 0);
-            }
-
-            auto* ctx = new LicenseContext();
-            ctx->manager = std::make_unique<LicenseManager>(config->configDir);
-            setLastError(nullptr);
-            return ctx;
+            SY_ERROR("[LicenseDLL] License_Create: config is null");
+            setLastError("config is null");
+            return nullptr;
         }
+
+        if (config->structSize != sizeof(LicenseConfig))
+        {
+            SY_ERROR("[LicenseDLL] License_Create: LicenseConfig struct size mismatch");
+            setLastError("LicenseConfig struct size mismatch");
+            return nullptr;
+        }
+
+        if (!config->configDir || config->configDir[0] == '\0')
+        {
+            SY_ERROR("[LicenseDLL] License_Create: configDir is required");
+            setLastError("configDir is required");
+            return nullptr;
+        }
+
+        if (config->enableCheck >= 0)
+        {
+            LicenseInternal::SetCheckEnabled(config->enableCheck != 0);
+        }
+
+        auto* ctx = new LicenseContext();
+        ctx->manager = std::make_unique<LicenseManager>(config->configDir);
+        setLastError(nullptr);
+        SY_INFO("[LicenseDLL] License_Create: license context created successfully");
+        return ctx;
+    }
         catch (const std::exception& ex)
         {
             setLastError(ex.what());
@@ -175,31 +181,36 @@ extern "C"
         }
     }
 
-    void License_Destroy(LicenseContext* ctx)
-    {
-        delete ctx;
-    }
+void License_Destroy(LicenseContext* ctx)
+{
+    SY_INFO("[LicenseDLL] License_Destroy: destroying license context");
+    delete ctx;
+}
 
-    int License_Check(LicenseContext* ctx)
+int License_Check(LicenseContext* ctx)
+{
+    SY_INFO("[LicenseDLL] License_Check: verifying license");
+    try
     {
-        try
+        LicenseManager* manager = getManager(ctx);
+        if (!manager)
         {
-            LicenseManager* manager = getManager(ctx);
-            if (!manager)
-            {
-                setLastError("LicenseContext is null");
-                return LICENSE_ERR_NULL_POINTER;
-            }
-
-            if (!manager->CheckLicense())
-            {
-                setLastError(manager->GetLicenseInfo().errorMsg.c_str());
-                return LICENSE_ERR_VERIFY_FAILED;
-            }
-
-            setLastError(nullptr);
-            return LICENSE_OK;
+            SY_ERROR("[LicenseDLL] License_Check: LicenseContext is null");
+            setLastError("LicenseContext is null");
+            return LICENSE_ERR_NULL_POINTER;
         }
+
+        if (!manager->CheckLicense())
+        {
+            SY_WARN("[LicenseDLL] License_Check: license verification failed: %s", manager->GetLicenseInfo().errorMsg.c_str());
+            setLastError(manager->GetLicenseInfo().errorMsg.c_str());
+            return LICENSE_ERR_VERIFY_FAILED;
+        }
+
+        SY_INFO("[LicenseDLL] License_Check: license verification passed");
+        setLastError(nullptr);
+        return LICENSE_OK;
+    }
         catch (const std::exception& ex)
         {
             setLastError(ex.what());
@@ -212,32 +223,37 @@ extern "C"
         }
     }
 
-    int License_Activate(LicenseContext* ctx, const char* regCode)
+int License_Activate(LicenseContext* ctx, const char* regCode)
+{
+    SY_INFO("[LicenseDLL] License_Activate: activating license");
+    try
     {
-        try
+        LicenseManager* manager = getManager(ctx);
+        if (!manager)
         {
-            LicenseManager* manager = getManager(ctx);
-            if (!manager)
-            {
-                setLastError("LicenseContext is null");
-                return LICENSE_ERR_NULL_POINTER;
-            }
-
-            if (!regCode || regCode[0] == '\0')
-            {
-                setLastError("regCode is required");
-                return LICENSE_ERR_INVALID_ARG;
-            }
-
-            if (!manager->Activate(regCode))
-            {
-                setLastError(manager->GetLicenseInfo().errorMsg.c_str());
-                return LICENSE_ERR_VERIFY_FAILED;
-            }
-
-            setLastError(nullptr);
-            return LICENSE_OK;
+            SY_ERROR("[LicenseDLL] License_Activate: LicenseContext is null");
+            setLastError("LicenseContext is null");
+            return LICENSE_ERR_NULL_POINTER;
         }
+
+        if (!regCode || regCode[0] == '\0')
+        {
+            SY_ERROR("[LicenseDLL] License_Activate: regCode is required");
+            setLastError("regCode is required");
+            return LICENSE_ERR_INVALID_ARG;
+        }
+
+        if (!manager->Activate(regCode))
+        {
+            SY_WARN("[LicenseDLL] License_Activate: license activation failed: %s", manager->GetLicenseInfo().errorMsg.c_str());
+            setLastError(manager->GetLicenseInfo().errorMsg.c_str());
+            return LICENSE_ERR_VERIFY_FAILED;
+        }
+
+        SY_INFO("[LicenseDLL] License_Activate: license activation succeeded");
+        setLastError(nullptr);
+        return LICENSE_OK;
+    }
         catch (const std::exception& ex)
         {
             setLastError(ex.what());
@@ -250,26 +266,30 @@ extern "C"
         }
     }
 
-    int License_ReValidate(LicenseContext* ctx)
+int License_ReValidate(LicenseContext* ctx)
+{
+    SY_INFO("[LicenseDLL] License_ReValidate: re-validating license");
+    try
     {
-        try
+        LicenseManager* manager = getManager(ctx);
+        if (!manager)
         {
-            LicenseManager* manager = getManager(ctx);
-            if (!manager)
-            {
-                setLastError("LicenseContext is null");
-                return LICENSE_ERR_NULL_POINTER;
-            }
-
-            if (!manager->ReValidate())
-            {
-                setLastError("License re-validation failed");
-                return LICENSE_ERR_VERIFY_FAILED;
-            }
-
-            setLastError(nullptr);
-            return LICENSE_OK;
+            SY_ERROR("[LicenseDLL] License_ReValidate: LicenseContext is null");
+            setLastError("LicenseContext is null");
+            return LICENSE_ERR_NULL_POINTER;
         }
+
+        if (!manager->ReValidate())
+        {
+            SY_WARN("[LicenseDLL] License_ReValidate: license re-validation failed");
+            setLastError("License re-validation failed");
+            return LICENSE_ERR_VERIFY_FAILED;
+        }
+
+        SY_INFO("[LicenseDLL] License_ReValidate: license re-validation passed");
+        setLastError(nullptr);
+        return LICENSE_OK;
+    }
         catch (const std::exception& ex)
         {
             setLastError(ex.what());
@@ -282,21 +302,24 @@ extern "C"
         }
     }
 
-    int License_Clear(LicenseContext* ctx)
+int License_Clear(LicenseContext* ctx)
+{
+    SY_INFO("[LicenseDLL] License_Clear: clearing license");
+    try
     {
-        try
+        LicenseManager* manager = getManager(ctx);
+        if (!manager)
         {
-            LicenseManager* manager = getManager(ctx);
-            if (!manager)
-            {
-                setLastError("LicenseContext is null");
-                return LICENSE_ERR_NULL_POINTER;
-            }
-
-            manager->ClearLicense();
-            setLastError(nullptr);
-            return LICENSE_OK;
+            SY_ERROR("[LicenseDLL] License_Clear: LicenseContext is null");
+            setLastError("LicenseContext is null");
+            return LICENSE_ERR_NULL_POINTER;
         }
+
+        manager->ClearLicense();
+        SY_INFO("[LicenseDLL] License_Clear: license cleared");
+        setLastError(nullptr);
+        return LICENSE_OK;
+    }
         catch (const std::exception& ex)
         {
             setLastError(ex.what());
@@ -309,19 +332,21 @@ extern "C"
         }
     }
 
-    int License_GetMachineCode(LicenseContext* ctx, char* buffer, size_t bufferSize)
+int License_GetMachineCode(LicenseContext* ctx, char* buffer, size_t bufferSize)
+{
+    SY_DEBUG("[LicenseDLL] License_GetMachineCode: getting machine code");
+    try
     {
-        try
+        LicenseManager* manager = getManager(ctx);
+        if (!manager)
         {
-            LicenseManager* manager = getManager(ctx);
-            if (!manager)
-            {
-                setLastError("LicenseContext is null");
-                return LICENSE_ERR_NULL_POINTER;
-            }
-
-            return copyStringToBuffer(manager->GetMachineCode(), buffer, bufferSize);
+            SY_ERROR("[LicenseDLL] License_GetMachineCode: LicenseContext is null");
+            setLastError("LicenseContext is null");
+            return LICENSE_ERR_NULL_POINTER;
         }
+
+        return copyStringToBuffer(manager->GetMachineCode(), buffer, bufferSize);
+    }
         catch (const std::exception& ex)
         {
             setLastError(ex.what());
@@ -334,33 +359,37 @@ extern "C"
         }
     }
 
-    int License_GetInfo(LicenseContext* ctx, LicenseInfo* outInfo)
+int License_GetInfo(LicenseContext* ctx, LicenseInfo* outInfo)
+{
+    SY_DEBUG("[LicenseDLL] License_GetInfo: getting license info");
+    try
     {
-        try
+        LicenseManager* manager = getManager(ctx);
+        if (!manager)
         {
-            LicenseManager* manager = getManager(ctx);
-            if (!manager)
-            {
-                setLastError("LicenseContext is null");
-                return LICENSE_ERR_NULL_POINTER;
-            }
-
-            if (!outInfo)
-            {
-                setLastError("outInfo is null");
-                return LICENSE_ERR_NULL_POINTER;
-            }
-
-            if (outInfo->structSize != 0 && outInfo->structSize != sizeof(LicenseInfo))
-            {
-                setLastError("LicenseInfo struct size mismatch");
-                return LICENSE_ERR_VERSION_MISMATCH;
-            }
-
-            fillLicenseInfo(outInfo, manager->GetLicenseInfo());
-            setLastError(nullptr);
-            return LICENSE_OK;
+            SY_ERROR("[LicenseDLL] License_GetInfo: LicenseContext is null");
+            setLastError("LicenseContext is null");
+            return LICENSE_ERR_NULL_POINTER;
         }
+
+        if (!outInfo)
+        {
+            SY_ERROR("[LicenseDLL] License_GetInfo: outInfo is null");
+            setLastError("outInfo is null");
+            return LICENSE_ERR_NULL_POINTER;
+        }
+
+        if (outInfo->structSize != 0 && outInfo->structSize != sizeof(LicenseInfo))
+        {
+            SY_ERROR("[LicenseDLL] License_GetInfo: LicenseInfo struct size mismatch");
+            setLastError("LicenseInfo struct size mismatch");
+            return LICENSE_ERR_VERSION_MISMATCH;
+        }
+
+        fillLicenseInfo(outInfo, manager->GetLicenseInfo());
+        setLastError(nullptr);
+        return LICENSE_OK;
+    }
         catch (const std::exception& ex)
         {
             setLastError(ex.what());
@@ -385,23 +414,27 @@ extern "C"
 
     int License_GuardMarkInvalid(void)
     {
+        SY_INFO("[LicenseDLL] License_GuardMarkInvalid: marking license as invalid");
         LicenseGuard::MarkInvalid();
         return LICENSE_OK;
     }
 
     int License_GuardRefresh(void)
     {
+        SY_INFO("[LicenseDLL] License_GuardRefresh: refreshing license guard");
         LicenseGuard::Refresh();
         return LICENSE_OK;
     }
 
     int License_GuardCheck(LicenseGuardFlavor flavor)
     {
+        SY_DEBUG("[LicenseDLL] License_GuardCheck: checking license guard (flavor=%d)", static_cast<int>(flavor));
         return LicenseGuard::Check(guardFlavorFromC(flavor)) ? LICENSE_OK : LICENSE_ERR_VERIFY_FAILED;
     }
 
     int License_GuardIsQuickValid(void)
     {
+        SY_DEBUG("[LicenseDLL] License_GuardIsQuickValid: quick license check");
         return LicenseGuard::IsQuickValid() ? 1 : 0;
     }
 

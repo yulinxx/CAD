@@ -72,6 +72,8 @@ void UiShellHost::setWorkbench(UiWorkbench* workbench)
 /// 5. 显示主窗口
 void UiShellHost::initializeAndShow()
 {
+    SY_INFO("[UiShellHost] initializeAndShow: starting UI shell initialization");
+
     if (!m_mainWindow || !m_workbench)
     {
         SY_ERROR("[UiShellHost] error code=shell.init_failed message=initializeAndShow called without main window or "
@@ -79,7 +81,9 @@ void UiShellHost::initializeAndShow()
         return;
     }
 
+    SY_DEBUG("[UiShellHost] attaching workbench to main window");
     m_workbench->attachToWindow(*m_mainWindow);
+    SY_DEBUG("[UiShellHost] activating workbench");
     m_workbench->activate();
 
     m_mainWindow->setWorkbenchFactory([this](const QString& id) -> UiWorkbench* {
