@@ -1007,7 +1007,7 @@ RenderUploadQueue
 OverlayScene
 ```
 
-— `RenderSessionHost` ✅ 已完成；`PersistentGeometryStore` ✅ 已完成（`RenderBridge::PersistentGeometryStore`：几何仓 + 绘制列表 + 槽位台账，2D/3D 两个 builder 共用；2D 全量刷新改为按段位哈希差量更新，撤销/重做不再全场景重传）；`RenderUploadQueue` / `OverlayScene` 待办。
+— `RenderSessionHost` ✅ 已完成；`PersistentGeometryStore` ✅ 已完成（`RenderBridge::PersistentGeometryStore`：几何仓 + 绘制列表 + 槽位台账，2D/3D 两个 builder 共用；2D 全量刷新改为按段位哈希差量更新，撤销/重做不再全场景重传）；`RenderUploadQueue` 部分完成（`RenderBridge::RenderUploadQueue` 已落地命令模型、线程边界与消费契约，**尚未接入视口** —— 队列的收益要等渲染线程独立才兑现，现在接入只是把同步上传拆成「入队 + 同线程立刻 drain」，因此留到 P2 与多后端/渲染线程一起收口）；`OverlayScene` 待办。
 
 5. 统一 2D/3D 的命令内核：
 
