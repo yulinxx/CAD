@@ -44,10 +44,12 @@ namespace
     public:
         IncrementalVertexSink(std::vector<Render::VertexP3C3>& outVertices,
             Render::PrimitiveType& outType,
-            const double* cameraCenter = nullptr)
+            const double* cameraCenter = nullptr,
+            double worldToScreenScale = 1.0)
             : m_vertices(outVertices)
             , m_outType(outType)
             , m_cameraCenter(cameraCenter)
+            , m_worldToScreenScale(worldToScreenScale)
         {
         }
 
@@ -89,8 +91,8 @@ namespace
             {
                 return;
             }
-            // 曲线离散化统一走 Eg::Tessellator 的固定段数实现，与全量路径同一份公式
-            Eg::Tessellator::tessellateCircleFixed(center, radius, t_curvePoints);
+            // 曲线离散化按屏幕缩放自适应段数，与全量路径（RenderSceneBuilder）同一份公式
+            Eg::Tessellator::tessellateCircleAdaptive(center, radius, m_worldToScreenScale, t_curvePoints);
             if (t_curvePoints.points.empty())
             {
                 return;
@@ -113,7 +115,8 @@ namespace
                 return;
             }
             // 直接使用原始角度差，保留绘制方向（顺时针为负、逆时针为正）
-            Eg::Tessellator::tessellateArcFixed(center, radius, startAngle, endAngle, t_curvePoints);
+            Eg::Tessellator::tessellateArcAdaptive(center, radius, startAngle, endAngle,
+                                                   m_worldToScreenScale, t_curvePoints);
             if (t_curvePoints.points.empty())
             {
                 return;
@@ -142,8 +145,9 @@ namespace
                 return;
             }
             // 整椭圆取 segments 个点并闭合，弧段取 segments+1 个点且开口，由 Tessellator 内部判定
-            Eg::Tessellator::tessellateEllipseFixed(
-                center, radiusX, radiusY, rotation, startAngle, endAngle, bFullEllipse, t_curvePoints);
+            Eg::Tessellator::tessellateEllipseAdaptive(
+                center, radiusX, radiusY, rotation, startAngle, endAngle, bFullEllipse,
+                m_worldToScreenScale, t_curvePoints);
             if (t_curvePoints.points.empty())
             {
                 return;
@@ -247,6 +251,7 @@ namespace
         std::vector<Render::VertexP3C3>& m_vertices;
         Render::PrimitiveType& m_outType;
         const double* m_cameraCenter;
+        double m_worldToScreenScale = 1.0;
         bool m_emitted = false;
     };
 }  // namespace
@@ -269,7 +274,8 @@ namespace
 bool entityToVertices(const Eg::SyEntity* entity,
     std::vector<Render::VertexP3C3>& outVertices,
     Render::PrimitiveType& outType,
-    const double* cameraCenter)
+    const double* cameraCenter,
+    double worldToScreenScale)
 {
     if (!entity)
     {
@@ -277,7 +283,7 @@ bool entityToVertices(const Eg::SyEntity* entity,
     }
 
     // 通过 Engine 侧统一边界分解图元，本地 sink 离散化
-    IncrementalVertexSink sink(outVertices, outType, cameraCenter);
+    IncrementalVertexSink sink(outVertices, outType, cameraCenter, worldToScreenScale);
     if (!Eg::emitEntityGeometry(*entity, sink))
     {
         return false;

@@ -52,8 +52,10 @@ namespace Eg
  * @param outVertices  输出顶点数组
  * @param outType      输出图元类型（LineStrip/LineLoop/PointList）
  * @param cameraCenter 相机中心（世界坐标），用于精度优化（nullptr 时退化为直接转换）
+ * @param worldToScreenScale 世界单位 → 屏幕像素的比例（正交相机下即 zoom），
+ *       曲线（圆/弧/椭圆）离散化按此自适应段数。默认 1.0 = 与 *Fixed 一致。
  * @return true 转换成功，false 表示该类型不支持增量路径（如文本）
  */
 bool entityToVertices(
     const Eg::SyEntity* entity, std::vector<Render::VertexP3C3>& outVertices, Render::PrimitiveType& outType,
-    const double* cameraCenter = nullptr);
+    const double* cameraCenter = nullptr, double worldToScreenScale = 1.0);

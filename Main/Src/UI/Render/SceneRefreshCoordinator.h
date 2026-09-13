@@ -22,6 +22,7 @@
 #include <QTimer>
 #include <memory>
 #include <unordered_set>
+#include <vector>
 
 #include "Engine/EntityIdGenerator.h"
 #include "Engine/Scene/SceneChangeSet.h"
@@ -65,6 +66,15 @@ public:
     /// 全量刷新 — 完整 gather + submit（导入、大批量修改、文档加载后）
     void requestFullRefresh() override;
 
+    /**
+     * @brief 曲线 LOD 分批重建 — zoom 跨阈值后逐批重建圆/弧/椭圆
+     *
+     * 与全量刷新的区别：只收集曲线类图元（CIRCLE/ARC/ELLIPSE），每帧重建一批
+     * （processCurveLodBatch），跨多帧完成，避免一次性重 tessellate 上万个曲线
+     * 造成单帧卡顿。折线/点/文本与缩放无关，不进队列。
+     */
+    void requestCurveLodRefresh();
+
     void markEntityDirty(uint64_t entityId) override;
     void markEntityDeleted(uint64_t entityId) override;
     UI::SceneRefreshLevel pendingLevel() const override;
@@ -107,6 +117,7 @@ private:
     void applyRepaintRefresh();
     void applyLightRefresh(Eg::SceneManager* sm);
     void applyFullRefresh(Eg::SceneManager* sm);
+    void processCurveLodBatch();
 
     RenderWidget* m_renderWidget{ nullptr };
     Eg::SceneManager* m_sceneManager{ nullptr };
@@ -131,6 +142,11 @@ private:
     // 不再去碰场景里的活对象（SceneManager 的契约是只有主线程可以访问）。
     // 按批次累积，刷完由 updateSceneRender 清空。
     Eg::SceneSnapshot m_pendingSnapshot;
+
+    // 曲线 LOD 分批重建队列：zoom 跨阈值时收集所有曲线图元 ID（requestCurveLodRefresh），
+    // 每帧由 processCurveLodBatch 重建一批。游标记录已处理到的位置。
+    std::vector<uint64_t> m_curveLodQueue;
+    size_t m_curveLodCursor = 0;
 
     // 上一帧已同步的选中集合：用于在选择变更时计算“发生选中态翻转”的图元，
     // 将其加入待处理脏集合，驱动增量路径正确增删（见 onSelectionChanged）。

@@ -222,6 +222,45 @@ void SceneRefreshCoordinator::requestFullRefresh()
     scheduleFullRefresh();
 }
 
+void SceneRefreshCoordinator::requestCurveLodRefresh()
+{
+    if (!m_sceneManager || !m_renderWidget)
+    {
+        return;
+    }
+
+    // 收集曲线类图元（圆/弧/椭圆）ID：只有它们的离散化段数随缩放变化。
+    m_curveLodQueue.clear();
+    m_curveLodCursor = 0;
+
+    const Eg::EType curveTypes[] = { Eg::EType::CIRCLE, Eg::EType::ARC, Eg::EType::ELLIPSE };
+    for (Eg::EType type : curveTypes)
+    {
+        const Eg::VecSyEntityPtr entities = m_sceneManager->getEntitiesByType(type);
+        for (const Eg::SyEntity* entity : entities)
+        {
+            if (entity)
+            {
+                m_curveLodQueue.push_back(static_cast<uint64_t>(entity->id));
+            }
+        }
+    }
+
+    if (!m_curveLodQueue.empty())
+    {
+        // 只启动定时器、不提升 RefreshLevel：曲线 LOD 是独立的后台分批任务，
+        // 由 updateSceneRender 在无场景级刷新时逐帧消费。
+        if (m_sceneUpdateTimer && !m_sceneUpdateTimer->isActive())
+        {
+            m_sceneUpdateTimer->start();
+        }
+        else if (!m_sceneUpdateTimer)
+        {
+            processCurveLodBatch();
+        }
+    }
+}
+
 // 场景变更通知入口
 // 通知链路：SceneNotifier::notifySceneChanged() → 此函数 → scheduleSceneUpdate() → updateSceneRender()
 // 收集脏/删除图元 ID，升级到 LightUpdate 级别
@@ -402,6 +441,10 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     constexpr size_t kParallelThreshold = 100;
     const QPointF cam = m_renderWidget->cameraCenter();
     const double cameraCenter[2] = { cam.x(), cam.y() };
+    // 世界单位 → 屏幕像素 = 1 / 每像素世界单位。曲线离散化按此自适应段数，
+    // 与全量路径 RenderSceneBuilder 的 setWorldToScreenScale 用同一个来源。
+    const float pixelToWorld = m_renderWidget->pixelToWorldScale();
+    const double worldToScreenScale = pixelToWorld > 0.0f ? 1.0 / static_cast<double>(pixelToWorld) : 1.0;
 
     if (entityIdsToProcess.size() >= kParallelThreshold && Eg::EngineParallel::isEnabled())
     {
@@ -430,7 +473,8 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             RenderJob& job = jobs[index];
             job.uid = id;
 
-            if (entityToVertices(snapshot->entity(), job.vertices, job.primType, cameraCenter))
+            if (entityToVertices(snapshot->entity(), job.vertices, job.primType, cameraCenter,
+                                 worldToScreenScale))
             {
                 job.valid = true;
             }
@@ -473,7 +517,8 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             std::vector<Render::VertexP3C3> vertices;
             Render::PrimitiveType primType;
             // 图元无法增量转换为顶点，已跳过
-            if (!entityToVertices(snapshot->entity(), vertices, primType, cameraCenter))
+            if (!entityToVertices(snapshot->entity(), vertices, primType, cameraCenter,
+                                  worldToScreenScale))
             {
                 SY_WARNF("[SceneRefreshCoordinator] Entity %llu (eType=%d) cannot be incrementally converted to vertices, skipped",
                     static_cast<unsigned long long>(uid), static_cast<int>(snapshot->type));
@@ -513,6 +558,81 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     }
 
     m_renderWidget->update();
+}
+
+void SceneRefreshCoordinator::processCurveLodBatch()
+{
+    if (!m_renderWidget || !m_sceneManager)
+    {
+        return;
+    }
+
+    if (m_curveLodCursor >= m_curveLodQueue.size())
+    {
+        m_curveLodQueue.clear();
+        m_curveLodCursor = 0;
+        return;
+    }
+
+    const QPointF cam = m_renderWidget->cameraCenter();
+    const double cameraCenter[2] = { cam.x(), cam.y() };
+    const float pixelToWorld = m_renderWidget->pixelToWorldScale();
+    const double worldToScreenScale = pixelToWorld > 0.0f ? 1.0 / static_cast<double>(pixelToWorld) : 1.0;
+
+    // 每帧预算：串行重建 2000 个曲线图元，亚毫秒级。zoom 期间场景不变，
+    // 直接在主线程读活对象（SceneManager 契约），无需 clone 快照。
+    constexpr size_t kBatchSize = 2000;
+    const size_t end = (std::min)(m_curveLodCursor + kBatchSize, m_curveLodQueue.size());
+
+    // 整批只切一次 GL 上下文、只请求一次重绘（与 applyLightRefresh 同策略）
+    m_renderWidget->beginBatchUpload();
+
+    for (size_t i = m_curveLodCursor; i < end; ++i)
+    {
+        const uint64_t uid = m_curveLodQueue[i];
+        Eg::SyEntity* entity = m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid));
+        if (!entity)
+        {
+            continue;
+        }
+
+        std::vector<Render::VertexP3C3> vertices;
+        Render::PrimitiveType primType;
+        if (!entityToVertices(entity, vertices, primType, cameraCenter, worldToScreenScale))
+        {
+            continue;
+        }
+
+        if (m_renderedEntityIds.count(uid))
+        {
+            m_renderWidget->modifyRenderEntity(uid, vertices.data(),
+                static_cast<uint32_t>(vertices.size()), primType);
+        }
+        else
+        {
+            m_renderWidget->addRenderEntity(uid, vertices.data(),
+                static_cast<uint32_t>(vertices.size()), primType);
+            m_renderedEntityIds.insert(uid);
+        }
+    }
+
+    m_renderWidget->endBatchUpload();
+
+    m_curveLodCursor = end;
+
+    if (m_curveLodCursor < m_curveLodQueue.size())
+    {
+        // 还有剩余，下一帧继续（不提升 RefreshLevel，仍是纯后台分批）
+        if (m_sceneUpdateTimer && !m_sceneUpdateTimer->isActive())
+        {
+            m_sceneUpdateTimer->start();
+        }
+    }
+    else
+    {
+        m_curveLodQueue.clear();
+        m_curveLodCursor = 0;
+    }
 }
 
 void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
@@ -698,7 +818,7 @@ void SceneRefreshCoordinator::reconcileTexts(Eg::SceneManager* sm, bool fullReco
 // 渲染刷新分发：按 RefreshLevel 级别选择刷新策略
 void SceneRefreshCoordinator::updateSceneRender()
 {
-    if (!m_renderWidget || m_refreshLevel == RefreshLevel::None)
+    if (!m_renderWidget || (m_refreshLevel == RefreshLevel::None && m_curveLodQueue.empty()))
     {
         return;
     }
@@ -715,14 +835,28 @@ void SceneRefreshCoordinator::updateSceneRender()
     // P5 收口: RAII 帧计时器，自动管理 beginFrame/endFrame，消除散落的手动调用
     ScopedFrameTimer scopedTimer(m_frameTimer.get());
 
-    RefreshLevel level = m_refreshLevel;
-    m_refreshLevel = RefreshLevel::None;
-
     auto* sm = m_sceneManager;
     if (!sm)
     {
         return;
     }
+
+    // 场景级刷新优先于曲线 LOD：全量/增量会以最新缩放重建，曲线队列的旧任务已过期
+    if (m_refreshLevel != RefreshLevel::None && !m_curveLodQueue.empty())
+    {
+        m_curveLodQueue.clear();
+        m_curveLodCursor = 0;
+    }
+
+    // 无场景级刷新时，处理曲线 LOD 分批重建（每帧一批，独立于 RefreshLevel）
+    if (m_refreshLevel == RefreshLevel::None && !m_curveLodQueue.empty())
+    {
+        processCurveLodBatch();
+        return;
+    }
+
+    RefreshLevel level = m_refreshLevel;
+    m_refreshLevel = RefreshLevel::None;
 
     if (level == RefreshLevel::Repaint)
     {

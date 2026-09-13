@@ -245,7 +245,8 @@ QPointF RenderViewport2D::applySnap(const QPointF& worldPos) const
     }
 
     // 捕捉命中时隐藏光标，避免挡住捕捉标记；未命中恢复当前工具光标
-    m_snapCursorHidden = didSnap;
+    // 只有捕捉到图元时才隐藏光标，捕捉到网格时不隐藏（网格捕捉是辅助性的，不需要隐藏光标）
+    m_snapCursorHidden = didSnap && (output.snapType != SnapEngine::Snap_Grid);
     syncCursorRole();
 
     return QPointF(output.pos.x(), output.pos.y());
@@ -568,7 +569,8 @@ bool RenderViewport2D::setActiveTool(const QString& toolName)
     if (ok)
     {
         updateStatus(tr("2D tool: %1").arg(toolName));
-        // 光标由工具角色驱动（选择/绘制/文字…），不在这里硬编码
+        // 切换工具时重置捕捉光标隐藏状态，避免之前捕捉命中导致光标无法恢复
+        m_snapCursorHidden = false;
         syncCursorRole();
         // 通知上层（如绘图工具栏）同步活动工具状态
         emit activeToolChanged(toolName);
@@ -714,6 +716,8 @@ void RenderViewport2D::setPanModeEnabled(bool enabled)
     {
         m_inputRouter->setPanModeEnabled(enabled);
     }
+    // 切换模式时重置捕捉光标隐藏状态，避免之前捕捉命中导致光标无法恢复
+    m_snapCursorHidden = false;
     updateStatus(enabled ? tr("2D pan mode") : tr("2D select mode"));
     syncCursorRole();
 }
@@ -965,6 +969,28 @@ void RenderViewport2D::applyCameraToWidget()
         {
             m_outlineScaleAtBuild = scale;
             syncSelectionToolState();
+        }
+    }
+
+    // 曲线 LOD：缩放（pixelToWorld 的倒数 = 世界单位→屏幕像素）跨过 2 倍时，
+    // 触发全量刷新让圆/弧/椭圆按新段数重新离散化。
+    // 段数 ∝ √zoom，zoom 跨 2 倍 → 段数跨 √2 ≈ 1.4 倍，弦高误差从 1px 涨到约 1.4px，
+    // 仍可接受；若用更小阈值会在 zoom 连续滚动时频繁全量遍历（百万图元下每帧做不起）。
+    if (scale > 0.0f)
+    {
+        constexpr float kCurveLodRatio = 2.0f;
+        const bool curveCrossed = m_curveLodScaleAtBuild <= 0.0f ||
+                                  scale > m_curveLodScaleAtBuild * kCurveLodRatio ||
+                                  scale * kCurveLodRatio < m_curveLodScaleAtBuild;
+        if (curveCrossed)
+        {
+            m_curveLodScaleAtBuild = scale;
+            if (m_refreshCoordinator)
+            {
+                // 分批重建曲线，而不是一次性全量刷新：只收集圆/弧/椭圆，
+                // 每帧重建一批（见 SceneRefreshCoordinator::requestCurveLodRefresh）。
+                m_refreshCoordinator->requestCurveLodRefresh();
+            }
         }
     }
 }
