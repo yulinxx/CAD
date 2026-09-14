@@ -252,6 +252,47 @@ namespace RenderBridge
             }
         }
 
+        /**
+         * @brief 预留几何仓容量：确保仓的底层缓冲 >= requiredBytes
+         *
+         * 如果当前容量不足，会触发一次临时分配+释放来驱动翻倍扩容，
+         * 避免后续批量写入时多次翻倍搬迁。已足够则不做任何操作。
+         *
+         * @return 实际容量（扩容后可能 > requiredBytes，因为翻倍策略）
+         */
+        uint64_t reserveCapacity(uint64_t requiredBytes)
+        {
+            if (!valid())
+            {
+                return 0;
+            }
+
+            Render::RT::GeometryStoreStats stats{};
+            if (Render::RT::rxGeometryStoreGetStats(m_runtime, m_store, &stats) != Render::RT::RxResult::Ok)
+            {
+                return 0;
+            }
+
+            if (stats.capacityBytes >= requiredBytes)
+            {
+                return stats.capacityBytes;
+            }
+
+            // 临时分配一块来驱动 grow()，然后立即释放
+            // grow() 内部按翻倍策略扩容，一次调用就能到位
+            Render::RT::GeometryBlock tmpBlock{};
+            const Render::RT::RxResult result =
+                Render::RT::rxGeometryAlloc(m_runtime, m_store, requiredBytes, &tmpBlock);
+            if (result == Render::RT::RxResult::Ok || result == Render::RT::RxResult::ErrorGeometryStoreGrown)
+            {
+                Render::RT::rxGeometryFree(m_runtime, m_store, tmpBlock.id);
+                // 重新取统计信息，确认扩容后的实际容量
+                rxGeometryStoreGetStats(m_runtime, m_store, &stats);
+            }
+
+            return stats.capacityBytes;
+        }
+
     private:
         Render::RT::RuntimeHandle m_runtime{ Render::RT::RuntimeHandle::Invalid };
         Render::RT::GeometryStoreHandle m_store{ Render::RT::GeometryStoreHandle::Invalid };
