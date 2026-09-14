@@ -197,6 +197,12 @@ void WorkbenchWindow::retranslateUi()
         m_menuManager->rebuildAllMenus();
     }
 
+    // 菜单整棵重建即可刷新；Dock 不能重建（会丢失内部面板状态），按保存的源标题原地重译。
+    if (m_layoutManager)
+    {
+        m_layoutManager->retranslateDockTitles();
+    }
+
     refreshStatusText();
     SY_DEBUG("[WorkbenchWindow] retranslateUi completed");
 }

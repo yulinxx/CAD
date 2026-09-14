@@ -551,6 +551,25 @@ void WorkbenchLayoutManager::restoreDockWidgetTitles()
     }
 }
 
+void WorkbenchLayoutManager::retranslateDockTitles()
+{
+    // 仅处理配置驱动的 Dock：构建时在 UiLayoutBuilder 保存了 JSON 英文源标题。
+    // 其余经 registerDockWidget() 注册的骨架/工作台 Dock 没有源标题属性，保持原样。
+    for (auto* dock : m_registeredDocks)
+    {
+        const QString source = dock->property("_workbench_dock_source_title").toString();
+        if (source.isEmpty())
+        {
+            continue;
+        }
+        const QString localized = UiLayoutBuilder::localizedLabel(source);
+        dock->setWindowTitle(localized);
+        // 布局快照恢复后靠 _workbench_dock_title 回填，必须同步成新译文，
+        // 否则 restoreState() 后标题会退回语言切换前的旧文案。
+        dock->setProperty("_workbench_dock_title", localized);
+    }
+}
+
 void WorkbenchLayoutManager::setSkeletonDocksVisible(bool visible)
 {
     if (m_panelState.leftDock)

@@ -648,6 +648,13 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     // 全量重建：几何与台账都由 RenderSceneBuilder 的装配轮次自行对齐
     // （本轮没出现的图元会被回收），这里不需要再做任何缓存失效
     m_renderWidget->submitSceneFromDataSource(sm);
+
+    // 游标必须对齐到当前修订号：全量重建走到这里通常是因为 readChanges 判定 cursor stale
+    // （变更日志被 prune 截断，旧游标落在 floor 之前）。若不更新游标，之后每次
+    // notifySceneChanged 都会再次 stale，70 万图元场景下退化成「每次编辑都全量重建」。
+    // 全量结果已反映当前场景状态，直接把游标锚定到最新修订号即可恢复后续增量链路。
+    m_lastCursor = sm->currentRevision();
+
     m_renderedEntityIds.clear();
     sm->forEachEntity([this](Eg::SyEntity* e) {
         // 账本必须与 gatherGeometry 的提交规则一致：它不按 selected() 跳过，

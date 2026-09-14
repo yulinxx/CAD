@@ -113,6 +113,12 @@ public:
         const QString& iconResource = QString(),
         const QString& workbenchId = QString());
 
+    /// 翻译 JSON 配置中的英文文案（菜单/右键菜单/工具栏/Dock 标题共用）。
+    /// 依次查询 WorkbenchMenuManager -> MainWindow -> UiLayoutBuilder 上下文，
+    /// 取第一个命中的译文；均无译文时返回 fallbackId（非空）或原文。
+    /// 语言切换后可直接用保存的英文源标题重新调用本方法刷新。
+    static QString localizedLabel(const QString& label, const QString& fallbackId = QString());
+
 private:
     void buildMenuItem(QMenu* parent, const std::variant<MenuActionDef, SubMenuDef, MenuItemType>& item);
     void releaseBuiltShortcuts();

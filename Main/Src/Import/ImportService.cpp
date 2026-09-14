@@ -3,6 +3,7 @@
 #include "ImportResult.h"
 
 #include <cstdint>
+#include <string>
 #include <unordered_map>
 
 #include <QCoreApplication>
@@ -834,92 +835,80 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
     int createdCount = 0;
     int reusedCount = 0;
 
+    // DXF 标准图层 "0" 直接对应内置默认图层（id 0），不按名再建一层
+    const bool isDxf = (context.format == Fio::FileFormat::DXF);
+
     for (const auto& src : parseResult.importedLayers)
     {
-        const uint8_t r = static_cast<uint8_t>((src.color >> 16) & 0xFF);
-        const uint8_t g = static_cast<uint8_t>((src.color >> 8) & 0xFF);
-        const uint8_t b = static_cast<uint8_t>(src.color & 0xFF);
-        const Ut::Color color = Ut::Color::fromRGB255(r, g, b);
+        const std::string srcName(src.name);
 
-        // 1) 优先按名称复用已有图层（同名不同色的源图层也共用同一运行时图层，避免反复导入时图层无限累积）
-        int layerId = m_layerManager->findLayerByName(src.name);
-        if (layerId < 0)
+        int layerId = (isDxf && srcName == "0") ? 0 : m_layerManager->findLayerByName(srcName);
+
+        if (layerId >= 0)
         {
-            // 2) 名称不匹配时按颜色去重：同一颜色的源图层共用同一运行时图层
-            layerId = m_layerManager->findLayerByColor(color);
+            // 同名图层视为同一个工艺层：保留用户已有的颜色/可见性/锁定设置，
+            // 不用源文件属性覆盖，避免重复导入污染既有图层
+            ++reusedCount;
         }
-        if (layerId < 0)
+        else
         {
-            // 3) 名称与颜色都不匹配才新建图层，并应用源图层的可见性/锁定属性
-            layerId = m_layerManager->createLayer(src.name);
+            // 严格按源图层名新建，并带上源图层的颜色/可见性/锁定。
+            // 刻意不再按颜色复用：内置 8 个默认图层恰好覆盖黑/红/绿/蓝等常见色，
+            // 按颜色去重会把源图层全部吸进默认图层，图层名永远建不出来。
+            layerId = m_layerManager->createLayer(srcName);
             if (layerId >= 0)
             {
                 ++createdCount;
-                m_layerManager->setLayerColor(layerId, color);
+                const uint8_t r = static_cast<uint8_t>((src.color >> 16) & 0xFF);
+                const uint8_t g = static_cast<uint8_t>((src.color >> 8) & 0xFF);
+                const uint8_t b = static_cast<uint8_t>(src.color & 0xFF);
+                m_layerManager->setLayerColor(layerId, Ut::Color::fromRGB255(r, g, b));
                 m_layerManager->setLayerVisible(layerId, src.visible);
                 m_layerManager->setLayerLocked(layerId, src.locked);
             }
             else
             {
-                // 图层数量已达上限：回退到默认图层，避免无限累积导致异常
-                SY_WARNF("[ImportService] Layer count limit reached, falling back to default layer for '%s'", src.name);
-                layerId = m_layerManager->findLayerByName("Layer 0");
-                if (layerId < 0)
-                {
-                    layerId = 0;
-                }
+                // 图层数量已达上限：回退到内置默认图层，图元不会因此丢失
+                SY_WARNF("[ImportService] Layer count limit reached, falling back to default layer for '%s'",
+                    srcName.c_str());
+                layerId = 0;
             }
-        }
-        else
-        {
-            // 找到现有图层后，确保颜色与源图层匹配（避免找到颜色不同的现有图层）
-            m_layerManager->setLayerColor(layerId, color);
-            ++reusedCount;
         }
         sourceToLayerId[src.sourceId] = layerId;
     }
 
-    // 将图元归属到对应图层
-    // 逻辑：以图元的原始颜色为准，找到或创建对应颜色的图层，然后将图元关联到该图层
-    // 注意：对于SVG导入，图元有overrideColor表示原始颜色，我们需要根据这个颜色来关联图层
-    if (m_sceneManager && m_layerManager)
+    // 图元归属只认解析层产出的 entityLayerMap（实体运行时 ID → 源图层 sourceId），
+    // 键全部来自本次导入，因此不会误改场景里已有的其他图元；映射缺失的实体留在默认层。
+    std::unordered_map<int64_t, int> runtimeLayerMap;
+    runtimeLayerMap.reserve(parseResult.entityLayerMap.size());
+    int unresolvedCount = 0;
+    for (const auto& [entityId, sourceLayerId] : parseResult.entityLayerMap)
     {
-        std::unordered_map<int64_t, int> entityToLayerId;
-        int assignedCount = 0;
-        
-        for (auto* entity : m_sceneManager->getAllEntities())
+        const auto it = sourceToLayerId.find(sourceLayerId);
+        if (it == sourceToLayerId.end())
         {
-            if (!entity)
-            {
-                continue;
-            }
-            
-            // 获取图元的原始颜色（overrideColor就是原始颜色）
-            // 注意：在清除overrideColor之前获取颜色
-            const Ut::Color& entityColor = entity->getColor();
-            uint8_t r = static_cast<uint8_t>(entityColor.r() * 255);
-            uint8_t g = static_cast<uint8_t>(entityColor.g() * 255);
-            uint8_t b = static_cast<uint8_t>(entityColor.b() * 255);
-            Ut::Color color = Ut::Color::fromRGB255(r, g, b);
-            
-            // 查找或创建对应颜色的图层
-            int layerId = m_layerManager->findOrCreateLayerByColor(color);
-            if (layerId >= 0)
-            {
-                entityToLayerId[entity->id] = layerId;
-                ++assignedCount;
-            }
+            ++unresolvedCount;
+            continue;
         }
-        
-        if (!entityToLayerId.empty())
-        {
-            m_layerManager->applyEntityLayerMap(entityToLayerId);
-            SY_DEBUGF("[ImportService] Assigned %d entities to color-based layers", assignedCount);
-        }
+        runtimeLayerMap[entityId] = it->second;
     }
 
-    SY_DEBUGF("[ImportService] Layer restore: %zu total, %d created, %d reused",
-        parseResult.importedLayers.size(), createdCount, reusedCount);
+    if (!runtimeLayerMap.empty())
+    {
+        m_layerManager->applyEntityLayerMap(runtimeLayerMap);
+    }
+
+    if (unresolvedCount > 0)
+    {
+        SY_WARNF("[ImportService] %d imported entit(y/ies) reference unknown source layer(s), left on default layer",
+            unresolvedCount);
+    }
+
+    SY_DEBUGF("[ImportService] Layer restore: %zu total, %d created, %d reused, %zu entity assignment(s)",
+        parseResult.importedLayers.size(),
+        createdCount,
+        reusedCount,
+        runtimeLayerMap.size());
     return createdCount;
 }
 

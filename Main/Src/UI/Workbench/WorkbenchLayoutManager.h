@@ -111,6 +111,8 @@ public:
     void restoreLayoutSnapshot(const QString& workbenchId);
     /// 重新设置 dock 标题
     void restoreDockWidgetTitles();
+    /// 语言切换后重新翻译 Dock 标题栏（依据构建期保存的 JSON 英文源标题）
+    void retranslateDockTitles();
     /// 设置骨架面板可见性
     void setSkeletonDocksVisible(bool visible);
     /// 设置场景树面板可见性（3D 模式下需要单独显示）
