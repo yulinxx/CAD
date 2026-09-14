@@ -1497,7 +1497,7 @@ void Workbench2D::refreshSceneTree()
     m_lastSceneTreeTopologyRevision = scene ? scene->groupManager().topologyRevision() : 0;
 
     SY_INFOF("[Workbench2D] scene tree rebuilt: topLevel=%d entities=%zu structRev=%llu topoRev=%llu",
-        topology.topLevel.size(),
+        static_cast<int>(topology.topLevel.size()),
         m_lastSceneTreeEntityCount,
         static_cast<unsigned long long>(m_lastSceneTreeStructureRevision),
         static_cast<unsigned long long>(m_lastSceneTreeTopologyRevision));
@@ -1730,7 +1730,7 @@ void Workbench2D::setSceneTreeVisibility(const QStringList& ids, bool visible)
     {
         scene->notifySceneChanged();
         // 同上：显隐不进结构签名，批量改完显式重建一次树（含取消选择的联动）
-        SY_DEBUGF("[Workbench2D] setSceneTreeVisibility: count=%d visible=%d", ids.size(), visible ? 1 : 0);
+        SY_DEBUGF("[Workbench2D] setSceneTreeVisibility: count=%d visible=%d", static_cast<int>(ids.size()), visible ? 1 : 0);
         refreshSceneTree();
     }
 }
@@ -1760,7 +1760,7 @@ void Workbench2D::setSceneTreeLock(const QStringList& ids, bool locked)
     {
         scene->notifySceneChanged();
         // 锁定状态不进结构签名，显式重建一次树以刷新锁定图标
-        SY_DEBUGF("[Workbench2D] setSceneTreeLock: count=%d locked=%d", ids.size(), locked ? 1 : 0);
+        SY_DEBUGF("[Workbench2D] setSceneTreeLock: count=%d locked=%d", static_cast<int>(ids.size()), locked ? 1 : 0);
         refreshSceneTree();
     }
 }

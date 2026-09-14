@@ -21,21 +21,96 @@
 
 #include "render/renderx.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
+
+// 物理内存查询只用于推荐几何仓上限，按平台各取最轻量的 API。
+#if defined(__APPLE__)
+#include <sys/sysctl.h>
+#elif defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#elif defined(__linux__)
+#include <sys/sysinfo.h>
+#endif
 
 namespace RenderBridge
 {
     class PersistentGeometryStore
     {
     public:
+        /// DLL 几何仓的硬顶：块偏移/长度都是 uint32，单仓不能超过 4GB-1。
+        /// 必须与 Renderx 内 rxIncremental.cpp 的 kAbsoluteMaxBytes 保持一致。
+        static constexpr uint64_t kStoreAbsoluteMaxBytes = 0xFFFFFFFFull;
+        /// 推荐上限的下限：小于此值普通图纸都可能装不下，没有工程意义。
+        static constexpr uint64_t kStoreFloorMaxBytes = 512ull * 1024 * 1024;
+
+        /**
+         * @brief 按本机物理内存推荐单仓增长上限
+         *
+         * 取物理内存的 1/4，再钳到 [512MB, 4GB)。4GB 是 uint32 块偏移的
+         * 硬顶，无法通过配置绕过。
+         *
+         * 为什么是 1/4：CpuToGpu 几何仓除 GPU 缓冲外（Apple Silicon 上与进程
+         * 共享物理页）还持有一份等大的 CPU 影子内存，稳态占用约为容量的 2 倍；
+         * 翻倍扩容的瞬间旧缓冲与旧影子都还在，峰值更高。取 1/4 可给文档模型、
+         * Qt 与系统留出余量。24GB 机器取到硬顶 4GB，可容纳约 90 万图元、
+         * 3GB 顶点量级的图纸；查询失败时保守回退到 512MB。
+         */
+        static uint64_t recommendedMaxBytes()
+        {
+            uint64_t physical = 0;
+#if defined(__APPLE__)
+            int mib[2] = { CTL_HW, HW_MEMSIZE };
+            std::size_t len = sizeof(physical);
+            if (::sysctl(mib, 2, &physical, &len, nullptr, 0) != 0)
+            {
+                physical = 0;
+            }
+#elif defined(_WIN32)
+            MEMORYSTATUSEX statex{};
+            statex.dwLength = sizeof(statex);
+            if (GlobalMemoryStatusEx(&statex))
+            {
+                physical = static_cast<uint64_t>(statex.ullTotalPhys);
+            }
+#elif defined(__linux__)
+            struct sysinfo info{};
+            if (::sysinfo(&info) == 0)
+            {
+                physical = static_cast<uint64_t>(info.totalram)
+                         * static_cast<uint64_t>(info.mem_unit);
+            }
+#endif
+            if (physical == 0)
+            {
+                return kStoreFloorMaxBytes;
+            }
+            uint64_t target = physical / 4;
+            if (target < kStoreFloorMaxBytes)
+            {
+                target = kStoreFloorMaxBytes;
+            }
+            if (target > kStoreAbsoluteMaxBytes)
+            {
+                target = kStoreAbsoluteMaxBytes;
+            }
+            return target;
+        }
+
         /// 创建参数：只暴露两个 builder 真正不同的部分
         struct Config
         {
             /// 几何仓初始容量（字节）。0 表示用 DLL 默认值
             uint64_t storeInitialBytes = 8ull * 1024 * 1024;
-            /// 几何仓增长上限（字节）。0 表示不限
-            uint64_t storeMaxBytes = 512ull * 1024 * 1024;
+            /// 几何仓增长上限（字节）。0 表示不限（DLL 仍会钳到 4GB 硬顶）
+            uint64_t storeMaxBytes = kStoreFloorMaxBytes;
             /// 分配粒度（字节），0 表示用 DLL 默认（256，已按 vec4 对齐）
             uint32_t storeGranularity = 0;
             /// DrawList 初始容量（条目数）
