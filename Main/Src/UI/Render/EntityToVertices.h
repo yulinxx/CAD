@@ -54,8 +54,12 @@ namespace Eg
  * @param cameraCenter 相机中心（世界坐标），用于精度优化（nullptr 时退化为直接转换）
  * @param worldToScreenScale 世界单位 → 屏幕像素的比例（正交相机下即 zoom），
  *       曲线（圆/弧/椭圆）离散化按此自适应段数。默认 1.0 = 与 *Fixed 一致。
+ * @param chordErrorPixels 曲线 LOD 的目标弦高误差（屏幕像素），取值越大段数越少。
+ *       默认取 Render::tess::kLodChordErrorPixels；调用方传视口的当前设置值，
+ *       保证增量路径与全量路径（RenderSceneBuilder）用同一份精度。
  * @return true 转换成功，false 表示该类型不支持增量路径（如文本）
  */
 bool entityToVertices(
     const Eg::SyEntity* entity, std::vector<Render::VertexP3C3>& outVertices, Render::PrimitiveType& outType,
-    const double* cameraCenter = nullptr, double worldToScreenScale = 1.0);
+    const double* cameraCenter = nullptr, double worldToScreenScale = 1.0,
+    double chordErrorPixels = Render::tess::kLodChordErrorPixels);

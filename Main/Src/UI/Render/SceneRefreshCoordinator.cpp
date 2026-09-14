@@ -445,6 +445,8 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     // 与全量路径 RenderSceneBuilder 的 setWorldToScreenScale 用同一个来源。
     const float pixelToWorld = m_renderWidget->pixelToWorldScale();
     const double worldToScreenScale = pixelToWorld > 0.0f ? 1.0 / static_cast<double>(pixelToWorld) : 1.0;
+    // 曲线 LOD 目标弦高误差（用户可在设置里调节），与全量路径取同一个来源
+    const double chordErrorPixels = m_renderWidget->lodChordErrorPixels();
 
     if (entityIdsToProcess.size() >= kParallelThreshold && Eg::EngineParallel::isEnabled())
     {
@@ -474,7 +476,7 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             job.uid = id;
 
             if (entityToVertices(snapshot->entity(), job.vertices, job.primType, cameraCenter,
-                                 worldToScreenScale))
+                                 worldToScreenScale, chordErrorPixels))
             {
                 job.valid = true;
             }
@@ -518,7 +520,7 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             Render::PrimitiveType primType;
             // 图元无法增量转换为顶点，已跳过
             if (!entityToVertices(snapshot->entity(), vertices, primType, cameraCenter,
-                                  worldToScreenScale))
+                                  worldToScreenScale, chordErrorPixels))
             {
                 SY_WARNF("[SceneRefreshCoordinator] Entity %llu (eType=%d) cannot be incrementally converted to vertices, skipped",
                     static_cast<unsigned long long>(uid), static_cast<int>(snapshot->type));
@@ -578,6 +580,7 @@ void SceneRefreshCoordinator::processCurveLodBatch()
     const double cameraCenter[2] = { cam.x(), cam.y() };
     const float pixelToWorld = m_renderWidget->pixelToWorldScale();
     const double worldToScreenScale = pixelToWorld > 0.0f ? 1.0 / static_cast<double>(pixelToWorld) : 1.0;
+    const double chordErrorPixels = m_renderWidget->lodChordErrorPixels();
 
     // 每帧预算：串行重建 2000 个曲线图元，亚毫秒级。zoom 期间场景不变，
     // 直接在主线程读活对象（SceneManager 契约），无需 clone 快照。
@@ -598,7 +601,7 @@ void SceneRefreshCoordinator::processCurveLodBatch()
 
         std::vector<Render::VertexP3C3> vertices;
         Render::PrimitiveType primType;
-        if (!entityToVertices(entity, vertices, primType, cameraCenter, worldToScreenScale))
+        if (!entityToVertices(entity, vertices, primType, cameraCenter, worldToScreenScale, chordErrorPixels))
         {
             continue;
         }
