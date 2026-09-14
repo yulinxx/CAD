@@ -26,6 +26,7 @@
 #include "UI/LanguageManager.h"
 #include "UI/ThemeManager.h"
 #include "UI/IconHelper.h"
+#include "UI/Dlg/AboutDialog.h"
 #include "UI2D/Dlg/LayerManagerDialog.h"
 #include "UI2D/ToolBar/RightToolBar.h"
 #include "UI2D/ToolBar/TopToolBar.h"
@@ -152,9 +153,7 @@ struct MenuDispatcher final : public IUiCommandDispatcher
         // 关于对话框：help.about 是窗口级动作，不应进入命令目录。
         if (commandId == QLatin1String("help.about") && self && self->workbenchWindow())
         {
-            QMessageBox::about(self->workbenchWindow(),
-                QObject::tr("About"),
-                QObject::tr("SanYiCAD\nVersion: %1").arg(qApp ? qApp->applicationVersion() : QString()));
+            AboutDialog::showDialog(AppMode::Mode2D, self->workbenchWindow());
             return;
         }
         // 语言切换：language.<code> → AppLanguage，落盘后由 SettingsService 应用。

@@ -1,26 +1,14 @@
 #include "UI/Services/HelpDialogService.h"
 
+#include "UI/Dlg/AboutDialog.h"
+
 #include <QInputDialog>
 #include <QMessageBox>
 #include <QWidget>
 
 void HelpDialogService::showAboutDialog(QWidget* parent)
 {
-    QMessageBox msgBox(parent);
-    msgBox.setWindowTitle(QObject::tr("About SanYi CAD"));
-    msgBox.setText(QObject::tr("<h3>SanYi CAD</h3>"
-                               "<p>Version 1.0.0</p>"
-                               "<p>Build: %1 %2</p>"
-                               "<p>Qt %3 (built with %4)</p>"
-                               "<p>C++17 &middot; MSVC</p>"
-                               "<br/>"
-                               "<p>Copyright &copy; 2026 SanYi Technology. All rights reserved.</p>")
-            .arg(QString::fromLatin1(__DATE__),
-                QString::fromLatin1(__TIME__),
-                QString::fromLatin1(qVersion()),
-                QString::fromLatin1(QT_VERSION_STR)));
-    msgBox.setIcon(QMessageBox::Information);
-    msgBox.exec();
+    AboutDialog::showDialog(AppMode::Mode2D, parent);
 }
 
 void HelpDialogService::showDocumentationDialog(QWidget* parent)

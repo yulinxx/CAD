@@ -85,25 +85,11 @@ namespace
         }
     }
 
+    // 实现已提升为 UiLayoutBuilder::localizedLabel() 静态方法，
+    // 供本文件构建菜单/Dock 与布局管理器在语言切换时复用同一条查询链。
     QString actionLabel(const QString& label, const QString& id)
     {
-        if (!label.isEmpty())
-        {
-            // 优先从 WorkbenchMenuManager 上下文翻译（已包含 File/Edit/View/Draw/Help 等顶层菜单文案），
-            // 回退到 UiLayoutBuilder。这样 JSON 菜单标签能复用 legacy 路径的翻译条目。
-            QString translated = QCoreApplication::translate("WorkbenchMenuManager", label.toUtf8().constData());
-            if (translated != label)
-            {
-                return translated;
-            }
-            translated = QCoreApplication::translate("MainWindow", label.toUtf8().constData());
-            if (translated != label)
-            {
-                return translated;
-            }
-            return QCoreApplication::translate("UiLayoutBuilder", label.toUtf8().constData());
-        }
-        return id;
+        return UiLayoutBuilder::localizedLabel(label, id);
     }
 
     QString resolveIconFromCatalog(const QString& commandId)
@@ -135,6 +121,38 @@ UiLayoutBuilder::UiLayoutBuilder(QMainWindow* window, IUiCommandDispatcher* disp
 UiLayoutBuilder::~UiLayoutBuilder()
 {
     releaseBuiltShortcuts();
+}
+
+QString UiLayoutBuilder::localizedLabel(const QString& label, const QString& fallbackId)
+{
+    if (label.isEmpty())
+    {
+        return fallbackId;
+    }
+
+    // 优先从 WorkbenchMenuManager 上下文翻译（集中声明于
+    // MenuLayoutTranslationStrings.cpp，覆盖全部 JSON 菜单/Dock 文案），
+    // 再回退 MainWindow（命令目录文案）与 UiLayoutBuilder，兼容历史条目。
+    // QByteArray 需持有到所有 translate 调用结束，否则 constData() 指针会悬垂
+    const QByteArray sourceUtf8 = label.toUtf8();
+    const char* source = sourceUtf8.constData();
+    QString translated = QCoreApplication::translate("WorkbenchMenuManager", source);
+    if (translated != label)
+    {
+        return translated;
+    }
+    translated = QCoreApplication::translate("MainWindow", source);
+    if (translated != label)
+    {
+        return translated;
+    }
+    translated = QCoreApplication::translate("UiLayoutBuilder", source);
+    if (translated != label)
+    {
+        return translated;
+    }
+    // 与原 actionLabel 行为一致：有英文源文案时始终返回源文案，不回退到 id
+    return label;
 }
 
 void UiLayoutBuilder::releaseBuiltShortcuts()
@@ -175,7 +193,9 @@ void UiLayoutBuilder::bindAction(QAction* action,
 
     if (!text.isEmpty())
     {
-        action->setText(text);
+        // 传入的 text 是 JSON 英文源文案，必须与创建 action 时一样走本地化；
+        // 直接 setText(text) 会把 buildMenuItem 已翻译好的文本覆盖回英文
+        action->setText(localizedLabel(text));
     }
     QString resolvedIcon = iconResource;
     if (resolvedIcon.isEmpty())
@@ -514,6 +534,9 @@ void UiLayoutBuilder::buildDocks(const std::vector<DockDef>& docks)
         dockWidget->setWidget(panel);
         dockWidget->setVisible(dock.visible);
         dockWidget->setProperty("widgetType", dock.widgetType);
+        // 保存 JSON 英文源标题，语言切换时布局管理器据此重新翻译，
+        // 不能只靠 windowTitle()——那时它已经是旧语言的译文了。
+        dockWidget->setProperty("_workbench_dock_source_title", dock.title);
         m_window->addDockWidget(toDockArea(dock.position), dockWidget);
         m_builtDocks.push_back(dockWidget);
 
