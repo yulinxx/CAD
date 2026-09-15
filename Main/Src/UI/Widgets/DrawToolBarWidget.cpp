@@ -24,6 +24,21 @@ void DrawToolBarWidget::setToolActions(const QVector<QAction*>& actions)
     rebuildButtons();
 }
 
+void DrawToolBarWidget::setPanModeToggleCallback(PanModeCallback callback)
+{
+    m_panModeToggleCallback = std::move(callback);
+}
+
+void DrawToolBarWidget::setIsPanModeCallback(IsPanModeCallback callback)
+{
+    m_isPanModeCallback = std::move(callback);
+}
+
+void DrawToolBarWidget::setCurrentToolName(const QString& toolName)
+{
+    m_currentToolName = toolName;
+}
+
 void DrawToolBarWidget::rebuildButtons()
 {
     // 清除旧按钮，重建布局。按钮只是 QAction 的展示壳，QAction 归中枢所有，此处不销毁它们。
@@ -65,10 +80,38 @@ void DrawToolBarWidget::rebuildButtons()
         // 派发来源标记：中枢的 detectOperationSource 读取本属性判定 LeftToolbar，
         // 不依赖宿主（QToolBar / QDockWidget）的 objectName，换承载方式也不会误判。
         button->setProperty("operationSource", static_cast<int>(OperationSource::LeftToolbar));
-        // setDefaultAction 后按钮的图标/文案/提示/可勾选/勾选态/启用态全部跟随 QAction，
-        // 点击即 trigger 该 QAction —— 与菜单、右键菜单共用同一条派发链。
-        // 互斥由中枢的 QActionGroup 保证，无需 setAutoExclusive。
-        button->setDefaultAction(action);
+
+        // 特殊处理：点击 Select 工具按钮时，在 Select 和 Pan 之间切换
+        QString toolName = action->data().toString();
+        if (toolName == QStringLiteral("SelectTool") && m_panModeToggleCallback && m_isPanModeCallback)
+        {
+            // 先用 QAction 正常触发，然后检查状态决定是否切换 Pan 模式
+            button->setDefaultAction(action);
+            // 覆盖 clicked 信号来处理 Select/Pan 切换
+            connect(button, &QToolButton::clicked, this, [this, action]() {
+                bool isPanMode = m_isPanModeCallback();
+                if (isPanMode)
+                {
+                    // 当前是 Pan 模式，点击 Select 按钮时保持 Select 工具（不做任何额外操作）
+                    // QAction 会被正常 trigger，切换到 Select 工具
+                    action->trigger();
+                }
+                else
+                {
+                    // 当前是 Select 工具或普通模式，点击 Select 按钮时切换到 Pan 模式
+                    // 不 trigger QAction，而是切换 Pan 模式
+                    m_panModeToggleCallback();
+                }
+            });
+        }
+        else
+        {
+            // 普通工具按钮正常处理
+            // setDefaultAction 后按钮的图标/文案/提示/可勾选/勾选态/启用态全部跟随 QAction，
+            // 点击即 trigger 该 QAction —— 与菜单、右键菜单共用同一条派发链。
+            // 互斥由中枢的 QActionGroup 保证，无需 setAutoExclusive。
+            button->setDefaultAction(action);
+        }
 
         box->addWidget(button);
     }
