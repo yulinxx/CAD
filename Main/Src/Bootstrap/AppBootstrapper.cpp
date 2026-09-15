@@ -56,7 +56,7 @@ AppPaths MainApp::buildAppPaths(const std::string& appName)
     return paths;
 }
 
-// 构造函数：初始化应用引导器，保存应用路径和版本信息
+// 初始化应用引导器，保存应用路径和版本信息
 AppBootstrapper::AppBootstrapper(const AppPaths& paths, const std::string& appName, const std::string& version)
     : m_paths(paths)
     , m_appName(appName)
@@ -65,7 +65,7 @@ AppBootstrapper::AppBootstrapper(const AppPaths& paths, const std::string& appNa
     // SY_INFOF("[AppBootstrapper] Created: name=%s, version=%s", appName.c_str(), version.c_str());
 }
 
-// 析构函数：确保在销毁前执行关闭流程
+// 确保在销毁前执行关闭流程
 AppBootstrapper::~AppBootstrapper()
 {
     shutdown();

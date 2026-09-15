@@ -207,18 +207,18 @@ public:
         }
 
         // 检查行列索引有效性，防止越界访问
-        if (index.row() < 0 || index.row() >= rowCount(index.parent()) ||
-            index.column() < 0 || index.column() >= columnCount(index.parent()))
+        if (index.row() < 0 || index.row() >= rowCount(index.parent()) || index.column() < 0 ||
+            index.column() >= columnCount(index.parent()))
         {
             return false;
         }
-        
+
         // 检查 internalId 是否有效（防止无效指针访问）
         if (index.internalId() == 0)
         {
             return false;
         }
-        
+
         const qint64 id = static_cast<qintptr>(index.internalId());
 
         if (index.column() == 0 && role == Qt::CheckStateRole)
@@ -448,8 +448,8 @@ public:
             return false;
         }
 
-        if (index.row() < 0 || index.row() >= rowCount(index.parent()) ||
-            index.column() < 0 || index.column() >= columnCount(index.parent()))
+        if (index.row() < 0 || index.row() >= rowCount(index.parent()) || index.column() < 0 ||
+            index.column() >= columnCount(index.parent()))
         {
             return false;
         }
@@ -634,7 +634,7 @@ SceneTreePanel::~SceneTreePanel()
     delete m_model;
 }
 
- void SceneTreePanel::setMode2D(
+void SceneTreePanel::setMode2D(
     const SceneTreeTopology2D& topology, MetaProvider2D metaProvider, ChildrenProvider2D childrenProvider)
 {
     m_mode = Mode::Mode2D;

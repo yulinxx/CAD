@@ -21,7 +21,7 @@
         { "type": "separator" },
         { "type": "submenu", "id": "file.import", "label": "Import", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D", "3D"], "items": [
           { "type": "action", "id": "file.import_all", "label": "All Supported...", "command": "file.import_all", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D"] },
-          { "type": "action", "id": "file.import_all_3d", "label": "All Supported...", "command": "file.import_model", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["3D"] },
+          { "type": "action", "id": "file.import_all_3d", "label": "All Supported...", "command": "file.import_model", "icon": ":/ui/common/Icons/File/import.svg", "shortcut": "Ctrl+Shift+O", "workbenches": ["3D"] },
           { "type": "separator", "workbenches": ["2D", "3D"] },
           { "type": "action", "id": "file.import_dxf", "label": "DXF...", "command": "file.import_dxf", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D"] },
           { "type": "action", "id": "file.import_plt", "label": "PLT...", "command": "file.import_plt", "icon": ":/ui/common/Icons/File/import.svg", "workbenches": ["2D"] },
@@ -58,7 +58,7 @@
         { "type": "action", "id": "edit.redo", "label": "Redo", "command": "edit.redo", "icon": ":/ui/common/Icons/Actions/redo.svg", "shortcut": "Ctrl+Y", "workbenches": ["2D", "3D"] },
         { "type": "separator" },
         { "type": "action", "id": "edit.select_all", "label": "Select All", "command": "edit.select_all", "icon": ":/ui/common/Icons/Actions/select_all.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "edit.invert_selection", "label": "Invert Selection", "command": "edit.invert_selection", "icon": ":/ui/common/Icons/Actions/invert.svg", "workbenches": ["2D", "3D"] },
+        { "type": "action", "id": "edit.invert_selection", "label": "Invert Selection", "command": "edit.invert_selection", "icon": ":/ui/common/Icons/Actions/invert.svg", "shortcut": "Ctrl+Shift+I", "workbenches": ["2D", "3D"] },
         { "type": "action", "id": "edit.deselect", "label": "Clear Selection", "command": "edit.deselect", "icon": ":/ui/common/Icons/Actions/clear.svg", "workbenches": ["2D"] },
         { "type": "action", "id": "edit.deselect_3d", "label": "Clear Selection", "command": "edit.clear_selection", "icon": ":/ui/common/Icons/Actions/clear.svg", "workbenches": ["3D"] },
         { "type": "separator" },
@@ -139,16 +139,16 @@
         { "type": "action", "id": "view.layer_manager", "label": "Layer Manager...", "command": "view.layer_manager", "icon": ":/ui/common/Icons/View/layers.svg", "workbenches": ["2D"] },
         { "type": "separator" },
         { "type": "submenu", "id": "view.camera", "label": "Camera", "icon": ":/ui/common/Icons/View3D/camera.svg", "workbenches": ["3D"], "items": [
-          { "type": "action", "id": "view.fit_all", "label": "Fit All", "command": "view.fit_all", "icon": ":/ui/common/Icons/View3D/fit.svg", "workbenches": ["3D"] },
-          { "type": "action", "id": "view.front", "label": "Front", "command": "view.front", "icon": ":/ui/common/Icons/View3D/view_front.svg", "workbenches": ["3D"] },
-          { "type": "action", "id": "view.back", "label": "Back", "command": "view.back", "icon": ":/ui/common/Icons/View3D/view_back.svg", "workbenches": ["3D"] },
-          { "type": "action", "id": "view.left", "label": "Left", "command": "view.left", "icon": ":/ui/common/Icons/View3D/view_left.svg", "workbenches": ["3D"] },
-          { "type": "action", "id": "view.right", "label": "Right", "command": "view.right", "icon": ":/ui/common/Icons/View3D/view_right.svg", "workbenches": ["3D"] },
-          { "type": "action", "id": "view.top", "label": "Top", "command": "view.top", "icon": ":/ui/common/Icons/View3D/view_top.svg", "workbenches": ["3D"] },
-          { "type": "action", "id": "view.bottom", "label": "Bottom", "command": "view.bottom", "icon": ":/ui/common/Icons/View3D/view_bottom.svg", "workbenches": ["3D"] },
-          { "type": "action", "id": "view.isometric", "label": "Isometric", "command": "view.isometric", "icon": ":/ui/common/Icons/View3D/view_isometric.svg", "workbenches": ["3D"] },
-          { "type": "action", "id": "view.dimetric", "label": "Dimetric", "command": "view.dimetric", "icon": ":/ui/common/Icons/View3D/view_dimetric.svg", "workbenches": ["3D"] },
-          { "type": "action", "id": "view.trimetric", "label": "Trimetric", "command": "view.trimetric", "icon": ":/ui/common/Icons/View3D/view_trimetric.svg", "workbenches": ["3D"] }
+          { "type": "action", "id": "view.fit_all", "label": "Fit All", "command": "view.fit_all", "icon": ":/ui/common/Icons/View3D/fit.svg", "shortcut": "Ctrl+F", "workbenches": ["3D"] },
+          { "type": "action", "id": "view.front", "label": "Front", "command": "view.front", "icon": ":/ui/common/Icons/View3D/view_front.svg", "shortcut": "Ctrl+1", "workbenches": ["3D"] },
+          { "type": "action", "id": "view.back", "label": "Back", "command": "view.back", "icon": ":/ui/common/Icons/View3D/view_back.svg", "shortcut": "Ctrl+2", "workbenches": ["3D"] },
+          { "type": "action", "id": "view.left", "label": "Left", "command": "view.left", "icon": ":/ui/common/Icons/View3D/view_left.svg", "shortcut": "Ctrl+3", "workbenches": ["3D"] },
+          { "type": "action", "id": "view.right", "label": "Right", "command": "view.right", "icon": ":/ui/common/Icons/View3D/view_right.svg", "shortcut": "Ctrl+4", "workbenches": ["3D"] },
+          { "type": "action", "id": "view.top", "label": "Top", "command": "view.top", "icon": ":/ui/common/Icons/View3D/view_top.svg", "shortcut": "Ctrl+5", "workbenches": ["3D"] },
+          { "type": "action", "id": "view.bottom", "label": "Bottom", "command": "view.bottom", "icon": ":/ui/common/Icons/View3D/view_bottom.svg", "shortcut": "Ctrl+6", "workbenches": ["3D"] },
+          { "type": "action", "id": "view.isometric", "label": "Isometric", "command": "view.isometric", "icon": ":/ui/common/Icons/View3D/view_isometric.svg", "shortcut": "Alt+I", "workbenches": ["3D"] },
+          { "type": "action", "id": "view.dimetric", "label": "Dimetric", "command": "view.dimetric", "icon": ":/ui/common/Icons/View3D/view_dimetric.svg", "shortcut": "Alt+D", "workbenches": ["3D"] },
+          { "type": "action", "id": "view.trimetric", "label": "Trimetric", "command": "view.trimetric", "icon": ":/ui/common/Icons/View3D/view_trimetric.svg", "shortcut": "Alt+T", "workbenches": ["3D"] }
         ] },
         { "type": "submenu", "id": "view.display", "label": "Display", "icon": ":/ui/common/Icons/View3D/wireframe.svg", "workbenches": ["3D"], "items": [
           { "type": "action", "id": "view.wireframe", "label": "Wireframe", "command": "view.wireframe", "icon": ":/ui/common/Icons/View3D/wireframe.svg", "checkable": true, "workbenches": ["3D"] },
@@ -156,7 +156,7 @@
           { "type": "action", "id": "view.bbox", "label": "Show Bounding Box", "command": "view.bbox", "icon": ":/ui/common/Icons/View3D/bbox.svg", "checkable": true, "workbenches": ["3D"] },
           { "type": "action", "id": "view.floor", "label": "Show Floor", "command": "view.floor", "icon": ":/ui/common/Icons/View3D/floor.svg", "checkable": true, "workbenches": ["3D"] }
         ] },
-        { "type": "action", "id": "view.switch_to_2d", "label": "Switch to 2D", "command": "view.switch_to_2d", "icon": ":/ui/common/Icons/View3D/switch_to_2d.svg", "workbenches": ["3D"] },
+        { "type": "action", "id": "view.switch_to_2d", "label": "Switch to 2D", "command": "view.switch_to_2d", "icon": ":/ui/common/Icons/View3D/switch_to_2d.svg", "shortcut": "Ctrl+Shift+2", "workbenches": ["3D"] },
         { "type": "action", "id": "view.switch_to_3d", "label": "Switch to 3D", "command": "view.switch_to_3d", "icon": ":/ui/common/Icons/View/switch_to_3d.svg", "workbenches": ["2D"] }
       ]
     },
@@ -193,8 +193,8 @@
         { "type": "action", "id": "model.make_cylinder", "label": "Cylinder", "command": "model.make_cylinder", "icon": ":/ui/common/Icons/Model3D/primitive_cylinder.svg", "workbenches": ["3D"] },
         { "type": "separator", "workbenches": ["3D"] },
         { "type": "submenu", "id": "model.boolean", "label": "Boolean", "icon": ":/ui/common/Icons/Actions/boolean_union.svg", "workbenches": ["3D"], "items": [
-          { "type": "action", "id": "model.boolean_fuse", "label": "Fuse", "command": "model.boolean_fuse", "icon": ":/ui/common/Icons/Actions/boolean_union.svg", "workbenches": ["3D"] },
-          { "type": "action", "id": "model.boolean_cut", "label": "Cut", "command": "model.boolean_cut", "icon": ":/ui/common/Icons/Actions/boolean_difference.svg", "workbenches": ["3D"] }
+          { "type": "action", "id": "model.boolean_fuse", "label": "Fuse", "command": "model.boolean_fuse", "icon": ":/ui/common/Icons/Actions/boolean_union.svg", "shortcut": "Ctrl+Shift+U", "workbenches": ["3D"] },
+          { "type": "action", "id": "model.boolean_cut", "label": "Cut", "command": "model.boolean_cut", "icon": ":/ui/common/Icons/Actions/boolean_difference.svg", "shortcut": "Ctrl+Shift+X", "workbenches": ["3D"] }
         ] },
         { "type": "submenu", "id": "model.split", "label": "Split", "icon": ":/ui/common/Icons/Actions/cut.svg", "workbenches": ["3D"], "items": [
           { "type": "action", "id": "model.split_half_x", "label": "Half by X", "command": "model.split_half_x", "icon": ":/ui/common/Icons/Actions/cut.svg", "workbenches": ["3D"] },
@@ -215,9 +215,9 @@
         { "type": "action", "id": "algo.array", "label": "Array", "command": "algo.array", "icon": ":/ui/common/Icons/Actions/algo_array.svg", "workbenches": ["2D"] },
         { "type": "action", "id": "algo.offset", "label": "Offset...", "command": "algo.offset", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"] },
         { "type": "action", "id": "algo.relief_engraving", "label": "Bitmap Relief Engraving...", "command": "algo.relief_engraving", "icon": ":/ui/common/Icons/Actions/algo_relief.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "algo.relief_engraving_mesh", "label": "Mesh Relief Engraving...", "command": "algo.relief_engraving_mesh", "icon": ":/ui/common/Icons/Actions/algo_relief.svg", "workbenches": ["3D"] },
+        { "type": "action", "id": "algo.relief_engraving_mesh", "label": "Mesh Relief Engraving...", "command": "algo.relief_engraving_mesh", "icon": ":/ui/common/Icons/Actions/algo_relief.svg", "shortcut": "Ctrl+Shift+E", "workbenches": ["3D"] },
         { "type": "action", "id": "algo.nesting_from_mesh", "label": "Nesting from Mesh", "command": "algo.nesting_from_mesh", "icon": ":/ui/common/Icons/Actions/group.svg", "workbenches": ["3D"] },
-        { "type": "action", "id": "process.generate_relief_toolpath", "label": "Generate Relief Toolpath", "command": "process.generate_relief_toolpath", "icon": ":/ui/common/Icons/Actions/cut.svg", "workbenches": ["3D"] },
+        { "type": "action", "id": "process.generate_relief_toolpath", "label": "Generate Relief Toolpath", "command": "process.generate_relief_toolpath", "icon": ":/ui/common/Icons/Actions/cut.svg", "shortcut": "Ctrl+Shift+G", "workbenches": ["3D"] },
         { "type": "action", "id": "process.export_relief_toolpath", "label": "Export Relief Toolpath", "command": "process.export_relief_toolpath", "icon": ":/ui/common/Icons/File/save_as.svg", "workbenches": ["3D"] }
       ]
     },
@@ -286,7 +286,13 @@
     "作用域与本节等价，同时还能在菜单上显示出来。",
     "本节只用于声明「没有菜单入口」的命令快捷键（例如工具切换键）。",
     "重复声明会让同一按键有两个接收者，Qt 判 ambiguous 后两边都不触发；",
-    "UiLayoutBuilder::buildShortcuts 会跳过重复项并打 WARN 日志。"
+    "UiLayoutBuilder::buildShortcuts 会跳过重复项并打 WARN 日志。",
+    "两条硬约束：",
+    "1) 不带修饰键的裸按键（Delete / Esc / 数字 / 单字母）不要写进配置——ApplicationShortcut",
+    "   会在按键送达聚焦控件之前消费掉事件，参数面板和设置对话框里的输入会被抢走",
+    "   （2D 侧 Delete/Backspace/Ctrl+A/Esc 因此由 Workbench2D 的窗口级 QShortcut 独占，",
+    "   见 UiWorkbench.cpp 的 setupShortcuts 注释）。",
+    "2) 3D 视口的 W/E/R/Q 变换模式键由 RenderWidget3D::keyPressEvent 独占，配置里不要重复声明。"
   ],
   "statusBar": {
     "visible": true,

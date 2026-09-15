@@ -343,22 +343,53 @@ void SceneRefreshCoordinator::onSelectionChanged()
     // P5: 观察者注册收敛 — 发射信号供视口同步工具状态
     emit selectionChanged();
 
-    // 选择变化走增量渲染。选中态不改变主几何：图元本体始终以原色实线提交，
-    // 选中反馈只由流水虚线轮廓覆盖层叠加表达（覆盖层由 SelectTool 在 selectionChanged 时重建）。
-    // 因此这里无需把选中态翻转的图元加入脏集合——它们的顶点没有变化，重提交只是白做离散化。
-    // 仍要维护 m_lastSelectedIds：onSceneChanged 靠它判断"当前有选中"，从而在几何被变换时
-    // 补发一次 selectionChanged 让轮廓跟着更新。
+    // 选择变化：默认选中态不改变主几何（图元本体始终以原色实线提交，选中反馈只由
+    // 流水虚线轮廓覆盖层叠加表达），因此无需把翻转的图元加入脏集合——它们的顶点没变。
+    // 仍要维护 m_lastSelectedIds：onSceneChanged 靠它判断"当前有选中"，几何被变换时补发。
+    //
+    // 例外："选中时隐藏原图"开启时，选中态会改变世界层内容（选中图元本体要从世界层移除、
+    // 取消选中的要恢复），因此选择集真正变化时需要一次全量重建。
+    bool selectionSetChanged = false;
     if (m_sceneManager)
     {
         std::unordered_set<uint64_t> currentSelected;
         m_sceneManager->forEachSelected([&currentSelected](Eg::SyEntity* e) {
             currentSelected.insert(static_cast<uint64_t>(e->id));
         });
+
+        // 对称差非空 = 选择集真的变了（有图元被选中或取消选中）
+        for (uint64_t id : currentSelected)
+        {
+            if (!m_lastSelectedIds.count(id))
+            {
+                selectionSetChanged = true;
+                break;
+            }
+        }
+        if (!selectionSetChanged)
+        {
+            for (uint64_t id : m_lastSelectedIds)
+            {
+                if (!currentSelected.count(id))
+                {
+                    selectionSetChanged = true;
+                    break;
+                }
+            }
+        }
+
         m_lastSelectedIds = std::move(currentSelected);
     }
 
-
-    if (m_refreshLevel < RefreshLevel::Selection)
+    if (m_renderWidget != nullptr && m_renderWidget->hideSelectedOriginal())
+    {
+        // 隐藏原图开启：选择集变化 → 全量重建世界层（选中本体增删）
+        if (selectionSetChanged)
+        {
+            m_refreshLevel = RefreshLevel::FullRefresh;
+        }
+    }
+    else if (m_refreshLevel < RefreshLevel::Selection)
     {
         m_refreshLevel = RefreshLevel::Selection;
     }
@@ -413,7 +444,7 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     bool touchedText = false;
 
     // 获取"选中时隐藏原图"设置
-    const bool hideSelected = false;
+    const bool hideSelected = m_renderWidget != nullptr && m_renderWidget->hideSelectedOriginal();
 
     // 如果启用隐藏选中实体，获取当前选中的实体ID集合
     std::unordered_set<uint64_t> selectedIds;
@@ -720,7 +751,7 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     m_renderedEntityIds.clear();
 
     // 获取"选中时隐藏原图"设置
-    const bool hideSelected = false;
+    const bool hideSelected = m_renderWidget != nullptr && m_renderWidget->hideSelectedOriginal();
 
     // 如果启用隐藏选中实体，获取当前选中的实体ID集合
     std::unordered_set<uint64_t> selectedIds;
@@ -753,6 +784,17 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
         }
     });
 
+    // "选中时隐藏原图"：上面的 submitSceneFromDataSource 已把全部图元（含选中）上传到 GPU，
+    // 这里把选中图元的本体从 GPU 移除，使画面只剩流水虚线轮廓。账本已在上面循环中排除它们，
+    // GPU 与账本因此保持一致。
+    if (hideSelected)
+    {
+        for (uint64_t uid : selectedIds)
+        {
+            m_renderWidget->removeRenderEntity(uid);
+        }
+    }
+
     // 位图层全量协调：submitSceneFromDataSource 内部 renderBeginScene 已清空 GPU 位图，
     // 这里以场景为真源整体重建，保证与场景生命周期完全一致
     reconcileBitmaps(sm, /*fullReconcile=*/true);
@@ -776,7 +818,7 @@ void SceneRefreshCoordinator::reconcileBitmaps(Eg::SceneManager* sm, bool fullRe
     }
 
     // 获取"选中时隐藏原图"设置
-    const bool hideSelected = false;
+    const bool hideSelected = m_renderWidget != nullptr && m_renderWidget->hideSelectedOriginal();
 
     // 如果启用隐藏选中实体，获取当前选中的实体ID集合
     std::unordered_set<uint64_t> selectedIds;
@@ -875,7 +917,7 @@ void SceneRefreshCoordinator::reconcileTexts(Eg::SceneManager* sm, bool fullReco
     }
 
     // 获取"选中时隐藏原图"设置
-    const bool hideSelected = false;
+    const bool hideSelected = m_renderWidget != nullptr && m_renderWidget->hideSelectedOriginal();
 
     // 如果启用隐藏选中实体，获取当前选中的实体ID集合
     std::unordered_set<uint64_t> selectedIds;

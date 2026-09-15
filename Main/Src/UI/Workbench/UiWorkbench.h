@@ -43,7 +43,6 @@ class DocumentManager3D;
 class UndoRedoManager3D;
 class SceneEditService3D;
 class SceneMonitor3D;
-class ShortcutManager3D;
 class SceneDocument3D;
 class CameraController3D;
 class SettingsUiCoordinator3D;

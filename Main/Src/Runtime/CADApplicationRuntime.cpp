@@ -18,7 +18,7 @@
 
 #include "UI/Settings/SettingsService.h"
 
-// 构造函数：接收已创建的 QApplication（须由调用方在 buildAppPaths 之前创建），并设置应用基本信息
+// 接收已创建的 QApplication（须由调用方在 buildAppPaths 之前创建），并设置应用基本信息
 CADApplicationRuntime::CADApplicationRuntime(std::unique_ptr<QApplication> app, const AppPaths& appPaths)
     : m_app(std::move(app))
     , m_appPaths(appPaths)
@@ -36,7 +36,7 @@ CADApplicationRuntime::CADApplicationRuntime(std::unique_ptr<QApplication> app, 
     }
 }
 
-// 析构函数：按顺序关闭引导器和应用初始化器
+// 按顺序关闭引导器和应用初始化器
 CADApplicationRuntime::~CADApplicationRuntime()
 {
     if (m_bootstrapper)

@@ -109,7 +109,6 @@
     #include "UI3D/Edit/SceneEditService3D.h"
 
     #include "UI3D/Service/SceneMonitor3D.h"
-    #include "UI3D/Shortcut/ShortcutManager3D.h"
     #include "UI3D/Service/SceneDocument3D.h"
     #include "UI3D/Service/CameraController3D.h"
     #include "UI3D/Settings/SettingsUiCoordinator3D.h"
@@ -128,7 +127,6 @@ struct Workbench3D::ServiceOwner
     std::unique_ptr<UndoRedoManager3D> undoRedoManager;
     std::unique_ptr<SceneEditService3D> sceneEditService;
     std::unique_ptr<SceneMonitor3D> sceneMonitor;
-    std::unique_ptr<ShortcutManager3D> shortcutManager;
     std::unique_ptr<SceneDocument3D> sceneDocument;
 
     std::unique_ptr<CameraController3D> cameraController;
@@ -2121,7 +2119,6 @@ void Workbench2D::releaseCentralWidgetGLResources(QWidget* centralWidget) const
     #include "UI3D/Edit/UndoRedoManager3D.h"
     #include "UI3D/Edit/SceneEditService3D.h"
     #include "UI3D/Service/SceneMonitor3D.h"
-    #include "UI3D/Shortcut/ShortcutManager3D.h"
     #include "UI3D/Service/SceneDocument3D.h"
     #include "UI3D/Service/CameraController3D.h"
     #include "UI3D/Settings/SettingsUiCoordinator3D.h"
@@ -2265,7 +2262,6 @@ void Workbench3D::create3DServices()
     own.sceneEditService =
         std::make_unique<SceneEditService3D>(m_sceneManager3D, own.undoRedoManager.get(), own.documentManager.get());
     own.sceneMonitor = std::make_unique<SceneMonitor3D>(nullptr);
-    own.shortcutManager = std::make_unique<ShortcutManager3D>(nullptr);
     // 3D 唯一文档入口：SceneDocument3D 自持引擎场景、UI 树与选择集
     own.sceneDocument = std::make_unique<SceneDocument3D>(m_sceneManager3D);
     own.cameraController = std::make_unique<CameraController3D>();
@@ -2295,7 +2291,6 @@ void Workbench3D::create3DServices()
     m_services3D.undoRedoManager = own.undoRedoManager.get();
     m_services3D.sceneEditService = own.sceneEditService.get();
     m_services3D.sceneMonitor = own.sceneMonitor.get();
-    m_services3D.shortcutManager = own.shortcutManager.get();
     m_services3D.sceneDocument = own.sceneDocument.get();
     m_services3D.cameraController = own.cameraController.get();
     m_services3D.algorithmService = own.algorithmService.get();
@@ -2578,12 +2573,28 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     }
 
     SY_DEBUG("[Workbench3D] Calling CommandRegistry3D::registerAll()...");
+    // Help ▸ Settings 与 2D 同路：由工作台层解析活动工作台后再叫 showSettingsDialog，
+    // 而不是让 UI3D 的 MainWindow3D 自己弹框 —— 快捷键页的数据源是框架层台账
+    // （配置驱动菜单建出的 QAction/QShortcut + 用户覆盖），UI3D 看不到那一层。
+    // 注册必须发生在 registerAll 之前：OperationRegistryBase 用 try_emplace，先到先得，
+    // 后注册的同名 Operation 会被忽略（HelpOperations3D 里已不再注册这一项）。
+    own.operationBus->registerOperation(std::make_unique<LambdaOperation3D>(
+        OperationId3D::Help_Settings, [windowPtr = &window](OperationContext3D&, const OperationRequest3D&) {
+            OperationResult3D result;
+            UiWorkbench* activeWb = windowPtr->currentWorkbench();
+            result.success = activeWb && activeWb->showSettingsDialog(windowPtr);
+            if (!result.success)
+            {
+                SY_WARNF("[Workbench3D] Help_Settings: no active workbench");
+            }
+            return result;
+        }));
     CommandRegistry3D::registerAll(mainWindow3D);
     SY_DEBUG("[Workbench3D] CommandRegistry3D::registerAll() completed");
 
     // 1. 先创建所有 Action（bindXxx 依赖 action() 返回有效指针）
     own.commandActionHub->setOperationBus(own.operationBus.get());
-    own.commandActionHub->rebuildAll(own.shortcutManager.get());
+    own.commandActionHub->rebuildAll();
     SY_DEBUG("[Workbench3D] CommandActionHub3D rebuilt with all actions");
 
     // 2. 菜单：统一由 WorkbenchMenuManager 从客户 JSON 生成（P0-2c）
@@ -3155,18 +3166,18 @@ bool Workbench3D::showSettingsDialog(QWidget* /*parent*/)
 
     // 直接在此调协调器，而不是转给 MainWindow3D::showSettingsDialog：快捷键页的模型来自
     // 框架层台账（配置驱动菜单建出的 QAction/QShortcut），UI3D 库看不到那一层。
+    // 与 2D 的 Workbench2D::showSettingsDialog 保持同构。
     IShortcutSettingsModel* shortcutModel =
         m_workbenchWindow && m_workbenchWindow->menuManager()
         ? m_workbenchWindow->menuManager()->shortcutSettingsModel()
         : nullptr;
 
-    const bool changed = own.settingsCoordinator->showSettingsDialog(
-        m_mainWindow3D->renderWidget(), own.shortcutManager.get(), shortcutModel);
-    if (changed)
+    if (!own.settingsCoordinator->showSettingsDialog(m_mainWindow3D->renderWidget(), shortcutModel))
     {
-        m_mainWindow3D->applyShortcutBindings();
-        m_mainWindow3D->setStatusMessage(QObject::tr("Settings applied and saved"));
+        return false;
     }
+
+    m_mainWindow3D->setStatusMessage(QObject::tr("Settings applied and saved"));
     return true;
 }
 #endif

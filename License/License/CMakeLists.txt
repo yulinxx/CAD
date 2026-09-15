@@ -41,10 +41,6 @@ list(FILTER LIB_SOURCES EXCLUDE REGEX ".*/LicenseKeygenDLL\\.cpp$")
 # --- 第三方依赖 ---
 find_package(OpenSSL REQUIRED)
 
-# 统一入口已无条件生成调试符号（version.rc / PDB-DWARF），
-# 该 option 仅为兼容旧构建参数保留，实际始终生效。
-option(SANYI_LICENSE_SYMBOLS "Generate debug symbols for License" ON)
-
 # --- 统一入口创建 DLL ---
 sanyi_add_shared_library(${LIB_NAME}
     FOLDER "${LIB_FOLDER}"
