@@ -8,6 +8,14 @@
 
 #include "UI2D/Operation/OperationId.h"
 #include "UI/UiMetrics.h"
+#include "UI/IconHelper.h"
+
+namespace
+{
+    // Select / Pan 按钮图标资源路径（Pan 复用已有 View 面板的平移手势图标）
+    const QString kSelectIconPath = QStringLiteral(":/ui/common/Icons/Tools/select.svg");
+    const QString kPanIconPath = QStringLiteral(":/ui/common/Icons/View/pan.svg");
+}  // namespace
 
 DrawToolBarWidget::DrawToolBarWidget(QWidget* parent)
     : QWidget(parent)
@@ -40,22 +48,13 @@ void DrawToolBarWidget::setCurrentToolName(const QString& toolName)
     m_currentToolName = toolName;
 }
 
-QIcon DrawToolBarWidget::selectIcon()
-{
-    return QIcon(":/ui/common/Icons/Tools/select.svg");
-}
-
-QIcon DrawToolBarWidget::panIcon()
-{
-    return QIcon(":/ui/common/Icons/Tools/pan.svg");
-}
-
 void DrawToolBarWidget::updateSelectButtonIcon()
 {
     if (m_selectButton)
     {
         bool isPanMode = m_isPanModeCallback ? m_isPanModeCallback() : false;
-        m_selectButton->setIcon(isPanMode ? panIcon() : selectIcon());
+        // 走皮肤着色并记录当前图标路径，主题切换时可被 refreshAllThemedIcons 一并刷新
+        IconHelper::setThemedIcon(m_selectButton, isPanMode ? kPanIconPath : kSelectIconPath);
         m_selectButton->setToolTip(isPanMode ? tr("Pan (Click to Select)") : tr("Select (Click to Pan)"));
     }
 }
@@ -102,35 +101,37 @@ void DrawToolBarWidget::rebuildButtons()
         // 不依赖宿主（QToolBar / QDockWidget）的 objectName，换承载方式也不会误判。
         button->setProperty("operationSource", static_cast<int>(OperationSource::LeftToolbar));
 
-        // 特殊处理：点击 Select 工具按钮时，在 Select 和 Pan 之间切换
-        QString toolName = action->data().toString();
+        // 特殊处理：Select 按钮在 Select 与 Pan 之间切换
+        // 靠 toolName 属性识别：action->data() 存的是 menuId(int)，不能当作工具名使用
+        const QString toolName = action->property("toolName").toString();
         if (toolName == QStringLiteral("SelectTool") && m_panModeToggleCallback && m_isPanModeCallback)
         {
             // 保存 Select 按钮指针
             m_selectButton = button;
 
-            // 设置正确的图标
-            bool isPanMode = m_isPanModeCallback();
-            button->setIcon(isPanMode ? panIcon() : selectIcon());
-            button->setToolTip(isPanMode ? tr("Pan (Click to Select)") : tr("Select (Click to Pan)"));
+            // 初始图标/提示按当前 Pan 状态设置
+            updateSelectButtonIcon();
 
             // 覆盖 clicked 信号来处理 Select/Pan 切换
             connect(button, &QToolButton::clicked, this, [this, action]() {
-                bool isPanMode = m_isPanModeCallback();
+                const bool isPanMode = m_isPanModeCallback ? m_isPanModeCallback() : false;
                 if (isPanMode)
                 {
-                    // 当前是 Pan 模式，点击 Select 按钮时切换到 Select 工具
+                    // 当前是 Pan：切回 Select（setActiveTool 会顺带关闭 Pan）
                     action->trigger();
-                    // 切换后更新图标
-                    QTimer::singleShot(0, this, &DrawToolBarWidget::updateSelectButtonIcon);
+                }
+                else if (action->isChecked())
+                {
+                    // 已是 Select：进入 Pan 模式
+                    m_panModeToggleCallback();
                 }
                 else
                 {
-                    // 当前是 Select 工具或普通模式，点击 Select 按钮时切换到 Pan 模式
-                    m_panModeToggleCallback();
-                    // 切换后更新图标
-                    QTimer::singleShot(0, this, &DrawToolBarWidget::updateSelectButtonIcon);
+                    // 其他工具激活时：先切到 Select，不进入 Pan
+                    action->trigger();
                 }
+                // 切换后更新图标
+                QTimer::singleShot(0, this, &DrawToolBarWidget::updateSelectButtonIcon);
             });
         }
         else

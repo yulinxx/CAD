@@ -51,11 +51,6 @@ public:
     /// 更新 Select 按钮图标（根据当前是 Select 还是 Pan 模式）
     void updateSelectButtonIcon();
 
-    /// 获取 Select 图标
-    static QIcon selectIcon();
-    /// 获取 Pan 图标
-    static QIcon panIcon();
-
 signals:
     /// 图标需要更新时发出
     void iconNeedsUpdate();

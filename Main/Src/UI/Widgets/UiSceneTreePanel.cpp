@@ -422,7 +422,7 @@ public:
     SceneTreeTableModel3D()
         : QStandardItemModel(0, 3)
     {
-        setHorizontalHeaderLabels({ QObject::tr("Vis"), QObject::tr("Name"), QObject::tr("Type") });
+        resetColumns();
     }
 
     void setData(const SceneTreeModel3D& model)
@@ -430,6 +430,10 @@ public:
         // 优化：使用 clear() 一次性清空模型，避免循环 removeRow(0) 触发多次更新事件
         clear();
         m_nodeMap.clear();
+        // clear() 把根节点换成了全新的 QStandardItem（columns==0），列结构与表头文字一并丢失：
+        // 3D 场景为空时不会再有行来补回列数，模型零列 → QTreeView 表头零节 →
+        // setMode3D 里的 setSectionResizeMode() 会命中 QHeaderView 的 Q_ASSERT(visual != -1)。
+        resetColumns();
 
         for (const auto& node : model.nodes)
         {
@@ -484,6 +488,13 @@ public:
     }
 
 private:
+    /// 设定列结构（列数 + 表头文字）。clear() 后必须重做一次，否则模型会退化成零列
+    void resetColumns()
+    {
+        setColumnCount(3);
+        setHorizontalHeaderLabels({ QObject::tr("Vis"), QObject::tr("Name"), QObject::tr("Type") });
+    }
+
     void addNode(QStandardItem* parent, const SceneTreeNode3D& node)
     {
         auto* visibleItem = new QStandardItem();
@@ -671,18 +682,9 @@ void SceneTreePanel::setMode3D(const SceneTreeModel3D& model)
     m_mode = Mode::Mode3D;
 
     // 先清除旧模型（可能是 2D 模式下的 SceneTreeTableModel2D）。
-    // 同样延迟销毁：3D 改名回调会同步走到这里，而 setData 在回调返回后还会调用
-    // QStandardItemModel::setData，立即 delete 会造成同一类访问已释放对象。
-    if (m_model)
-    {
-        m_model->deleteLater();
-        m_model = nullptr;
-    }
-
-    // 先清除旧模型（可能是 3D 模式下的 SceneTreeTableModel3D）
-    // 必须延迟销毁：本方法会在树行回调（勾选可见性 / 改名）中被同步调用，此时视图
-    // 正在派发该模型的事件，立即 delete 会让回调返回后的 setData 与 Qt 委托代码访问
-    // 已释放对象（勾选可见性即崩溃，崩在 emit dataChanged）。
+    // 必须延迟销毁：勾选可见性 / 改名会经回调同步走到这里，此时视图正在派发该模型的事件，
+    // 立即 delete 会让回调返回后的 setData（3D 侧还要再调一次 QStandardItemModel::setData）
+    // 与 Qt 委托代码访问已释放对象。
     if (m_model)
     {
         m_model->deleteLater();
