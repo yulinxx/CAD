@@ -976,10 +976,11 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // 左侧绘图工具面板：必须在中枢建好动作之后创建 —— 面板只是中枢 QAction 的展示壳，
     // 早于 rebuildAllActions 创建就一个按钮都拿不到。
     auto* drawWidget = new DrawToolBarWidget(&window);
-    const QVector<QAction*> drawToolActions = buildDrawToolActions();
-    drawWidget->setToolActions(drawToolActions);
 
-    // 设置 Select/Pan toggle 回调
+    // 设置 Select/Pan toggle 回调。必须在 setToolActions() 之前：setToolActions 内部会
+    // 立即 rebuildButtons()，而 Select 按钮的切换逻辑依赖这两个回调是否已就绪；
+    // 若晚于 setToolActions 设置，重建时回调为空，Select 按钮会退化为普通按钮，
+    // 点击只会 trigger 一次 SelectTool，永远进不了 Pan。
     drawWidget->setIsPanModeCallback([this]() {
         return m_viewport && m_viewport->isPanModeEnabled();
     });
@@ -991,6 +992,9 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         }
         return false;
     });
+
+    const QVector<QAction*> drawToolActions = buildDrawToolActions();
+    drawWidget->setToolActions(drawToolActions);
 
     // 监听 Pan 模式变化，更新 Select 按钮图标
     if (m_viewport)
