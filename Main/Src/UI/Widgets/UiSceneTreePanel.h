@@ -25,6 +25,7 @@ struct SceneTreeRow2D;
 struct SceneTreeRowMeta2D;
 struct SceneTreeModel3D;
 
+class QModelIndex;
 class QMenu;
 class QTreeView;
 class QAbstractItemModel;
@@ -81,16 +82,17 @@ signals:
     /// 批量锁定/解锁请求
     void batchLockRequested(const QStringList& ids, bool locked);
 
-private:
+ private:
     void onModelSelectionChanged();
     void retranslateMenu();
     void showContextMenu(const QPoint& pos);
     void selectAllRows();
 
-    void setModel2D(const SceneTreeTopology2D& topology, MetaProvider2D metaProvider, ChildrenProvider2D childrenProvider);
-    void setModel3D(const SceneTreeModel3D& model);
+    /// 保存/恢复展开状态
+    void collectExpandedIds(const QModelIndex& index, QStringList& outIds) const;
+    void expandId(const QString& id);
+    bool findAndExpandId(const QModelIndex& index, const QString& id);
 
-private:
     QTreeView* m_view{ nullptr };
     QMenu* m_contextMenu{ nullptr };
     QAbstractItemModel* m_model{ nullptr };

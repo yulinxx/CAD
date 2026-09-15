@@ -56,6 +56,16 @@ QObject* UiStateBridge2D::install(Workbench2D* workbench,
         });
     }
 
+    // 图层顺序 → 绘制次序（z-order）：换序只改 LayerManager 的图层顺序，图元本身没变，
+    // 因此增量刷新不会重算 sortKey。必须显式走一次全量装配，否则画面上的重叠关系
+    // 不会跟着图层顺序变（见 RenderSceneBuilder 的 sortKey 组装）。
+    if (layerBridge && viewport)
+    {
+        QObject::connect(layerBridge, &QtLayerManagerBridge::sigLayerOrderChanged, guard, [viewport]() {
+            viewport->requestFullRefresh();
+        });
+    }
+
     if (bus)
     {
         // 撤销/重做栈变化（含经 LayerEditService 直接入栈的图层操作）

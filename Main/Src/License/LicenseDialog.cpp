@@ -2,6 +2,8 @@
 
 #include "License/LicenseDLL.h"
 #include "UI/ThemeManager.h"
+#include "UI/Dlg/UiDialogLayoutHelper.h"
+#include "UI/Dlg/UiDialogLayoutMetrics.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -62,20 +64,21 @@ LicenseDialog::LicenseDialog(const QString& configDir, QWidget* parent)
 void LicenseDialog::SetupUi()
 {
     setWindowTitle(tr("Software Activation - SanYiCAD"));
-    setFixedSize(520, 300);
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
-    auto* mainLayout = new QVBoxLayout(this);
-    mainLayout->setSpacing(12);
-    mainLayout->setContentsMargins(24, 24, 24, 24);
+    // 使用辅助工具创建标准主布局
+    QVBoxLayout* mainLayout = UiDialogLayoutHelper::createMainLayout(this);
+    setLayout(mainLayout);
 
-    auto* titleLabel = new QLabel(tr("<h2>Activate License</h2>"));
+    auto* titleLabel = new QLabel(tr("<h2>Activate License</h2>"), this);
     titleLabel->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(titleLabel);
 
+    // 机器码行
     auto* machineCodeLayout = new QHBoxLayout();
-    auto* mcLabel = new QLabel(tr("Machine Code:"));
-    m_machineCodeLabel = new QLabel(m_machineCode);
+    machineCodeLayout->setSpacing(UiDialogLayout::FormSpacing);
+    auto* mcLabel = new QLabel(tr("Machine Code:"), this);
+    m_machineCodeLabel = new QLabel(m_machineCode, this);
     m_machineCodeLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     m_machineCodeLabel->setStyleSheet(
         QStringLiteral("font-family: monospace; padding: 4px; background: %1; border: 1px solid %2;")
@@ -84,41 +87,51 @@ void LicenseDialog::SetupUi()
     machineCodeLayout->addWidget(m_machineCodeLabel, 1);
     mainLayout->addLayout(machineCodeLayout);
 
+    // 注册码行
     auto* regLayout = new QHBoxLayout();
-    auto* regLabel = new QLabel(tr("Reg Code:"));
-    m_regCodeEdit = new QLineEdit();
+    regLayout->setSpacing(UiDialogLayout::FormSpacing);
+    auto* regLabel = new QLabel(tr("Reg Code:"), this);
+    m_regCodeEdit = new QLineEdit(this);
+    UiDialogLayoutHelper::setControlHeight(m_regCodeEdit);
     m_regCodeEdit->setPlaceholderText(tr("Paste your registration code here"));
     regLayout->addWidget(regLabel);
     regLayout->addWidget(m_regCodeEdit, 1);
     mainLayout->addLayout(regLayout);
 
-    m_statusLabel = new QLabel();
+    m_statusLabel = new QLabel(this);
     m_statusLabel->setWordWrap(true);
     m_statusLabel->setStyleSheet(QStringLiteral("color: %1;").arg(TM->colors().error));
     mainLayout->addWidget(m_statusLabel);
 
+    // 按钮行
     auto* btnLayout = new QHBoxLayout();
-    btnLayout->addStretch();
+    btnLayout->setSpacing(UiDialogLayout::ButtonSpacing);
 
-    m_activateBtn = new QPushButton(tr("Activate"));
+    m_activateBtn = new QPushButton(tr("Activate"), this);
+    UiDialogLayoutHelper::setupStandardButton(m_activateBtn, true);
     m_activateBtn->setDefault(true);
     connect(m_activateBtn, &QPushButton::clicked, this, &LicenseDialog::OnActivateClicked);
 
-    m_exitBtn = new QPushButton(tr("Exit"));
+    m_exitBtn = new QPushButton(tr("Exit"), this);
+    UiDialogLayoutHelper::setupSecondaryButton(m_exitBtn);
     connect(m_exitBtn, &QPushButton::clicked, this, &QDialog::reject);
 
+    btnLayout->addStretch();
     btnLayout->addWidget(m_activateBtn);
     btnLayout->addWidget(m_exitBtn);
-    mainLayout->addLayout(btnLayout);
 
     if (!m_machineCode.isEmpty())
     {
-        auto* copyBtn = new QPushButton(tr("Copy Machine Code"));
+        auto* copyBtn = new QPushButton(tr("Copy Machine Code"), this);
+        UiDialogLayoutHelper::setupSecondaryButton(copyBtn);
         connect(copyBtn, &QPushButton::clicked, this, [this]() {
             QApplication::clipboard()->setText(m_machineCode);
         });
+        // 插入到激活按钮之前
         btnLayout->insertWidget(1, copyBtn);
     }
+
+    mainLayout->addLayout(btnLayout);
 }
 
 void LicenseDialog::OnActivateClicked()

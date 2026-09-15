@@ -39,6 +39,7 @@ public:
     void releaseGLResources();
 
     void resetCamera();
+    void fitAll();
 
     QString selectedNodeId() const;
     void selectNodeById(const QString& nodeId);

@@ -124,6 +124,15 @@ void Viewport3D::resetCamera()
     update();
 }
 
+void Viewport3D::fitAll()
+{
+    if (m_renderer)
+    {
+        m_renderer->fitAll();
+    }
+    update();
+}
+
 QString Viewport3D::selectedNodeId() const
 {
     return m_renderer ? m_renderer->selectedNodeId() : QString();

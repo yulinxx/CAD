@@ -64,6 +64,7 @@ public:
     void setCamera(CameraController3D* controller) override;
     void resize(int width, int height) override;
     void resetView() override;
+    void fitAll() override;
 
     void selectNodeById(const QString& nodeId) override;
     QString selectedNodeId() const override;

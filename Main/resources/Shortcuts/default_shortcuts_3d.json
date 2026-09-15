@@ -2,6 +2,7 @@
     "actions": [
         { "id": "file.import_model",     "display": "Import Model",         "shortcut": "Ctrl+Shift+O", "configurable": true },
         { "id": "file.new_scene",        "display": "New Scene",            "shortcut": "Ctrl+N",       "configurable": true },
+        { "id": "file.open",             "display": "Open",                 "shortcut": "Ctrl+O",       "configurable": true },
         { "id": "file.save",            "display": "Save",                 "shortcut": "Ctrl+S",       "configurable": true },
         { "id": "file.save_as",          "display": "Save As",              "shortcut": "Ctrl+Shift+S", "configurable": true },
         { "id": "file.exit",            "display": "Exit",                 "shortcut": "Ctrl+Q",       "configurable": true },
@@ -13,6 +14,8 @@
         { "id": "edit.transform_translate", "display": "Translate",         "shortcut": "T",            "configurable": true },
         { "id": "edit.transform_rotate", "display": "Rotate",               "shortcut": "R",            "configurable": true },
         { "id": "edit.transform_scale",  "display": "Scale",                "shortcut": "S",            "configurable": true },
+        { "id": "edit.mirror",          "display": "Mirror",               "shortcut": "M",            "configurable": true },
+        { "id": "edit.invert_selection", "display": "Invert Selection",     "shortcut": "Ctrl+Shift+I", "configurable": true },
         { "id": "algo.relief_engraving_mesh", "display": "3D Relief Engraving", "shortcut": "Ctrl+Shift+E", "configurable": true },
         { "id": "process.generate_relief_toolpath", "display": "Generate Relief Toolpath", "shortcut": "Ctrl+Shift+G", "configurable": true },
         { "id": "process.export_relief_toolpath", "display": "Export Relief Toolpath", "shortcut": "",   "configurable": true },
@@ -20,6 +23,13 @@
         { "id": "view.zoom_out",        "display": "Zoom Out",             "shortcut": "Ctrl+-",       "configurable": true }
     ],
 
+    "models": [
+        { "id": "model.make_box",       "display": "Box",                  "shortcut": "Shift+B",      "configurable": true },
+        { "id": "model.make_sphere",    "display": "Sphere",               "shortcut": "Shift+S",      "configurable": true },
+        { "id": "model.make_cylinder",  "display": "Cylinder",             "shortcut": "Shift+C",      "configurable": true },
+        { "id": "model.boolean_fuse",   "display": "Fuse",                 "shortcut": "Ctrl+Shift+U", "configurable": true },
+        { "id": "model.boolean_cut",    "display": "Cut",                  "shortcut": "Ctrl+Shift+X", "configurable": true }
+    ],
 
     "views": [
         { "id": "view.switch_to_2d",      "display": "Switch to 2D",         "shortcut": "Ctrl+Shift+2", "configurable": true },
@@ -40,6 +50,7 @@
         { "id": "view.trimetric",       "display": "Trimetric View",       "shortcut": "Alt+T",        "configurable": true }
     ],
     "help": [
-        { "id": "help.shortcuts",       "display": "Keyboard Shortcuts",   "shortcut": "F1",           "configurable": false }
+        { "id": "help.shortcuts",       "display": "Keyboard Shortcuts",   "shortcut": "F1",           "configurable": false },
+        { "id": "help.settings",        "display": "Settings",             "shortcut": "Ctrl+,",       "configurable": true }
     ]
 }

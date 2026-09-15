@@ -230,6 +230,14 @@ void RenderWidget3DAdapter::resetView()
     }
 }
 
+void RenderWidget3DAdapter::fitAll()
+{
+    if (m_renderWidget)
+    {
+        m_renderWidget->fitAll();
+    }
+}
+
 void RenderWidget3DAdapter::selectNodeById(const QString& nodeId)
 {
     if (!m_renderWidget || !m_sceneManager)

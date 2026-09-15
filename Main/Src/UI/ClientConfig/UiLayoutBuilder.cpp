@@ -8,6 +8,7 @@
 #include "Log/SyLogger.h"
 
 #include <QAction>
+#include <QActionGroup>
 #include <QCoreApplication>
 #include <QDockWidget>
 #include <QIcon>
@@ -304,7 +305,7 @@ void UiLayoutBuilder::buildMenus(const std::vector<MenuDef>& menus)
         m_window->menuBar() ? static_cast<int>(m_window->menuBar()->actions().size()) : 0);
 }
 
-void UiLayoutBuilder::buildMenuItem(QMenu* parent, const std::variant<MenuActionDef, SubMenuDef, MenuItemType>& item)
+void UiLayoutBuilder::buildMenuItem(QMenu* parent, const std::variant<MenuActionDef, SubMenuDef, MenuItemType>& item, QActionGroup* exclusiveGroup)
 {
     if (!parent)
     {
@@ -341,10 +342,32 @@ void UiLayoutBuilder::buildMenuItem(QMenu* parent, const std::variant<MenuAction
         subMenu->setProperty("workbenchId", sub.workbenches.join(QStringLiteral(",")));
         subMenu->setProperty("checkable", sub.checkable);
         subMenu->setProperty("checked", sub.checked);
+
+        // 为互斥复选组（如主题、语言）创建 QActionGroup：同一子菜单下所有 checkable 叶子项自动互斥
+        QActionGroup* exclusiveGroup = nullptr;
+        bool hasCheckable = false;
         for (const auto& subItem : sub.items)
         {
-            buildMenuItem(subMenu, subItem);
+            if (std::holds_alternative<MenuActionDef>(subItem))
+            {
+                const MenuActionDef& actionDef = std::get<MenuActionDef>(subItem);
+                if (actionDef.checkable && actionDef.visible && m_dispatcher->isCommandRegistered(actionDef.commandId))
+                {
+                    hasCheckable = true;
+                    break;
+                }
+            }
         }
+        if (hasCheckable)
+        {
+            exclusiveGroup = new QActionGroup(subMenu);
+            exclusiveGroup->setExclusive(true);
+        }
+
+for (const auto& subItem : sub.items)
+            {
+                buildMenuItem(subMenu, subItem, exclusiveGroup);
+            }
 
         // 声明了 dynamicSections 的子菜单：条目按运行时数据生成（如 File ▸ Recent Files）。
         //
@@ -405,6 +428,12 @@ void UiLayoutBuilder::buildMenuItem(QMenu* parent, const std::variant<MenuAction
     action->setObjectName(actionDef.id);
     action->setCheckable(actionDef.checkable);
     action->setChecked(actionDef.checked);
+
+    // 加入互斥复选组（主题、语言等），由 Qt 自动处理单选逻辑
+    if (exclusiveGroup && actionDef.checkable)
+    {
+        exclusiveGroup->addAction(action);
+    }
     // 配置里写的键是默认值；用户覆盖（如果有）在此叠加，台账没挂上时就等于配置值。
     const QKeySequence configuredKey =
         actionDef.shortcut.isEmpty() ? QKeySequence() : QKeySequence(actionDef.shortcut);

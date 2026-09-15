@@ -2731,14 +2731,25 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
     }
     if (m_services3D.sceneMonitor)
     {
+        // SceneMonitor3D 触发场景所有变化（含可见性/锁定/几何），这些不一定推进 structureRevision，
+        // 故直接用无条件重建；批量操作（增删）走 structureRevision 防抖路径。
         connect(m_services3D.sceneMonitor, &SceneMonitor3D::sceneChanged, this, &Workbench3D::refreshSceneTree3D);
+    }
+
+    // 初始化防抖定时器
+    if (!m_sceneTree3DRefreshTimer)
+    {
+        m_sceneTree3DRefreshTimer = new QTimer(this);
+        m_sceneTree3DRefreshTimer->setSingleShot(true);
+        m_sceneTree3DRefreshTimer->setInterval(150);
+        connect(m_sceneTree3DRefreshTimer, &QTimer::timeout, this, &Workbench3D::refreshSceneTree3D);
     }
 
     // 3D 导入完成后显式刷新一次树（导入会触发 markDataChanged → SceneMonitor ，
     // 此处 importFinished 作为兜底与显式接入点，二者叠加安全）
     if (m_services.importService)
     {
-        connect(m_services.importService, &ImportService::importFinished, this, &Workbench3D::refreshSceneTree3D);
+        connect(m_services.importService, &ImportService::importFinished, this, &Workbench3D::refreshSceneTree3DIfNeeded);
     }
 
     // 初始填充
@@ -2752,6 +2763,39 @@ void Workbench3D::refreshSceneTree3D()
         return;
     }
     m_scenePanel3D->setMode3D(SceneTreeBuilder3D::build(m_sceneManager3D));
+    // 记录本轮重建时的结构签名：之后的 sceneChanged 只要签名没变就不必再建
+    m_lastSceneTree3DStructureRevision = m_sceneManager3D ? m_sceneManager3D->structureRevision() : 0;
+}
+
+void Workbench3D::refreshSceneTree3DIfNeeded()
+{
+    if (!m_scenePanel3D || !m_sceneManager3D)
+    {
+        return;
+    }
+
+    // 结构签名只认图元增删：可见性 / 锁定 / 几何变换都不推进它。
+    // 行集合不变时重建（build + 换模型 + 全表 dataChanged）纯属白做功，
+    // 而拖动、显隐切换、批量锁定这些高频操作都会触发 sceneChanged。
+    const uint64_t structureRev = m_sceneManager3D->structureRevision();
+    if (structureRev == m_lastSceneTree3DStructureRevision)
+    {
+        return;
+    }
+
+    // 先记下已消费的签名再启表：否则连续 sceneChanged 每次都会重启单次定时器，
+    // 重建被无限推迟；重建函数结束后会把签名再刷成最新值。
+    m_lastSceneTree3DStructureRevision = structureRev;
+
+    if (m_sceneTree3DRefreshTimer)
+    {
+        // 防抖：批量增删（导入/阵列/批量删除）合并成一次重建
+        m_sceneTree3DRefreshTimer->start();
+    }
+    else
+    {
+        refreshSceneTree3D();
+    }
 }
 
 void Workbench3D::syncSceneTreeSelection3D()
@@ -2772,8 +2816,11 @@ void Workbench3D::applySceneTreeSelection3D(const QStringList& ids)
         return;
     }
     auto& sel = m_services3D.renderWidget->selectionManager();
-    sel.clearSelection();
 
+    // 收集后一次提交：逐个 addSelect 会让每个图元触发一次属性面板/状态栏刷新，
+    // 场景树里多选（尤其全选）时会形成成片的无效刷新
+    std::vector<Eg::SyMeshEntity*> meshes;
+    meshes.reserve(static_cast<size_t>(ids.size()));
     for (const QString& id : ids)
     {
         const auto eid = Eg::parseEntityId(id.toStdString());
@@ -2783,9 +2830,11 @@ void Workbench3D::applySceneTreeSelection3D(const QStringList& ids)
         }
         if (auto* mesh = m_sceneManager3D->findMeshById(*eid))
         {
-            sel.addSelect(mesh);
+            meshes.push_back(mesh);
         }
     }
+    // additive=false：整体替换，等价于原来的 clearSelection + 逐个 addSelect
+    sel.selectMany(meshes, false);
 
     m_services3D.renderWidget->markSceneDirty();
     syncSceneTreeSelection3D();
@@ -2858,6 +2907,7 @@ void Workbench3D::setSceneTreeVisibility3D(const QStringList& ids, bool visible)
     if (changed)
     {
         m_sceneManager3D->markDataChanged();
+        // 可见性变更不推进 structureRevision，需显式重建以刷新树显示
         refreshSceneTree3D();
     }
 }
@@ -2885,6 +2935,7 @@ void Workbench3D::setSceneTreeLock3D(const QStringList& ids, bool locked)
     if (changed)
     {
         m_sceneManager3D->markDataChanged();
+        // 锁定状态不推进 structureRevision，需显式重建以刷新锁定图标
         refreshSceneTree3D();
     }
 }
@@ -2895,7 +2946,11 @@ void Workbench3D::deleteSceneTreeSelection3D(const QStringList& ids)
     {
         return;
     }
-    // 删除操作暂不支持批量，先实现单选删除逻辑
+
+    // 收集后一次批量删除：逐个 removeEntity 每个都是 O(场景规模) 的查找与尾部搬移，
+    // 而且每个都触发一次全场景选择同步 + 一次场景广播（M 个图元 → O(N·M) + M 次 UI 扇出）
+    std::vector<Eg::SyMeshEntity*> targets;
+    targets.reserve(static_cast<size_t>(ids.size()));
     for (const QString& id : ids)
     {
         const auto eid = Eg::parseEntityId(id.toStdString());
@@ -2905,11 +2960,18 @@ void Workbench3D::deleteSceneTreeSelection3D(const QStringList& ids)
         }
         if (auto* mesh = m_sceneManager3D->findMeshById(*eid))
         {
-            m_sceneManager3D->removeEntity(mesh);
+            targets.push_back(mesh);
         }
     }
+    if (targets.empty())
+    {
+        return;
+    }
+
+    m_sceneManager3D->deleteEntities(targets.data(), static_cast<int>(targets.size()));
     m_sceneManager3D->markDataChanged();
-    refreshSceneTree3D();
+    // 删除推进 structureRevision，走防抖重建即可
+    refreshSceneTree3DIfNeeded();
 }
 
 void Workbench3D::attachToWindow(WorkbenchWindow& window)
@@ -3009,6 +3071,15 @@ void Workbench3D::deactivate()
 
     // 场景树面板随窗口销毁，清空引用避免悬空
     m_scenePanel3D = nullptr;
+
+    // 清理 3D 场景树防抖定时器
+    if (m_sceneTree3DRefreshTimer)
+    {
+        m_sceneTree3DRefreshTimer->stop();
+        m_sceneTree3DRefreshTimer->deleteLater();
+        m_sceneTree3DRefreshTimer = nullptr;
+    }
+    m_lastSceneTree3DStructureRevision = 0;
 
     // 2) 先销毁 3D 主窗口包装对象。
     //    它会持有大量 QAction / signal-slot / UI 状态引用，必须先于服务释放。

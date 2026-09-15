@@ -2,9 +2,11 @@
 #include "ImportDispatcher.h"
 #include "ImportResult.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include <QCoreApplication>
 #include <QMetaObject>
@@ -12,6 +14,7 @@
 #include <thread>
 
 #include "Log/SyLogger.h"
+#include "Engine/EntityIdGenerator.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Interaction/LayerManager.h"
@@ -154,6 +157,11 @@ void ImportService::setTreeRebuildCallback(std::function<void()> cb)
 void ImportService::setPropertyRefreshCallback(std::function<void()> cb)
 {
     m_propertyRefreshCallback = std::move(cb);
+}
+
+void ImportService::setDisplayRefreshCallback(std::function<void()> cb)
+{
+    m_displayRefreshCallback = std::move(cb);
 }
 
 void ImportService::setWorkbenchSwitchCallback(std::function<void(const QString&)> cb)
@@ -622,13 +630,42 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
 
     // ===== 3.3 其余图元落地到 2D 场景 =====
     int flatAdded = 0;
+    // 转换期 ID → 入库后最终 ID 的修正表（见下方 addEntities 处的说明）
+    std::unordered_map<int64_t, int64_t> idRemap;
     if (!flatEntities.empty())
     {
         flatAdded = static_cast<int>(flatEntities.size());
         if (m_editService)
         {
             SY_DEBUGF("[ImportService] Adding %d entity(ies) via SceneEditService (undoable)", flatAdded);
-            m_editService->addEntities(std::move(flatEntities), "Import " + context.sourcePath.toStdString());
+
+            // 入库前记下当前 ID：addEntities 在「ID 为 0 / 临时 ID / 与场景已有图元冲突」时
+            // 会给图元换一个新持久 ID，而 parseResult 里的 entityLayerMap / entityGroupMap
+            // 是以转换期的 ID 为键的。不修正就会整批查不到图元，表现为「导入后全在默认图层」。
+            std::vector<Eg::EntityId> preInsertIds;
+            preInsertIds.reserve(flatEntities.size());
+            for (const auto& entity : flatEntities)
+            {
+                preInsertIds.push_back(entity ? entity->id : 0);
+            }
+
+            const std::vector<Eg::EntityId> finalIds =
+                m_editService->addEntities(std::move(flatEntities), "Import " + context.sourcePath.toStdString());
+
+            // 下标一一对应：addEntities 按入参顺序为每个非空图元返回最终 ID
+            const size_t mapped = std::min(preInsertIds.size(), finalIds.size());
+            for (size_t i = 0; i < mapped; ++i)
+            {
+                if (preInsertIds[i] != finalIds[i])
+                {
+                    idRemap[static_cast<int64_t>(preInsertIds[i])] = static_cast<int64_t>(finalIds[i]);
+                }
+            }
+            if (!idRemap.empty())
+            {
+                SY_DEBUGF("[ImportService] %zu entity id(s) were reassigned on insert, remapped for layer/group restore",
+                    idRemap.size());
+            }
         }
         else if (m_sceneManager)
         {
@@ -662,13 +699,13 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     // 时序约束：必须在图元进入场景、拿到运行时 EntityId 之后，才能按映射表反查归属。
     if (flatAdded > 0)
     {
-        const int createdLayers = restoreImportedLayers(context, parseResult);
+        const int createdLayers = restoreImportedLayers(context, parseResult, idRemap);
         SY_DEBUGF("[ImportService] Layer restore: %d created from %lld source layer(s), %lld entity mapping(s)",
             createdLayers,
             static_cast<long long>(parseResult.importedLayers.size()),
             static_cast<long long>(parseResult.entityLayerMap.size()));
 
-        const int createdGroups = restoreImportedGroups(parseResult);
+        const int createdGroups = restoreImportedGroups(parseResult, idRemap);
         SY_DEBUGF("[ImportService] Group restore: %d created from %lld source group(s), %lld entity mapping(s)",
             createdGroups,
             static_cast<long long>(parseResult.importedGroups.size()),
@@ -729,24 +766,33 @@ void ImportService::phaseRefreshDisplay(const ImportResult& result, const Import
         }
     }
 
-    // 树结构刷新
-    if (m_treeRebuildCallback)
+    // 统一显示刷新（优先使用批量回调，避免多次分离刷新）
+    if (m_displayRefreshCallback)
     {
-        m_treeRebuildCallback();
+        m_displayRefreshCallback();
     }
     else
     {
-        SY_TRACE("[ImportService] Scene tree rebuild skipped: no callback registered");
-    }
+        // 兼容旧回调：分别调用树刷新和属性刷新
+        // 树结构刷新
+        if (m_treeRebuildCallback)
+        {
+            m_treeRebuildCallback();
+        }
+        else
+        {
+            SY_TRACE("[ImportService] Scene tree rebuild skipped: no callback registered");
+        }
 
-    // 属性面板刷新
-    if (m_propertyRefreshCallback)
-    {
-        m_propertyRefreshCallback();
-    }
-    else
-    {
-        SY_TRACE("[ImportService] Property panel refresh skipped: no callback registered");
+        // 属性面板刷新
+        if (m_propertyRefreshCallback)
+        {
+            m_propertyRefreshCallback();
+        }
+        else
+        {
+            SY_TRACE("[ImportService] Property panel refresh skipped: no callback registered");
+        }
     }
 
     updateProgress(ImportPhase::RefreshDisplay, 1.0f);
@@ -810,7 +856,9 @@ void ImportService::phaseWriteBackState(const ImportContext& context, const Impo
     updateProgress(ImportPhase::WriteBackState, 1.0f);
 }
 
-int ImportService::restoreImportedLayers(const ImportContext& context, const ImportResult& parseResult)
+int ImportService::restoreImportedLayers(const ImportContext& context,
+    const ImportResult& parseResult,
+    const std::unordered_map<int64_t, int64_t>& idRemap)
 {
     if (parseResult.importedLayers.empty())
     {
@@ -835,6 +883,17 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
     int createdCount = 0;
     int reusedCount = 0;
 
+    // 逐个记住来源图层的落地结果，供下面按层输出日志（每层只输出一次）
+    struct ResolvedSourceLayer
+    {
+        std::string sourceName;
+        uint32_t sourceColor = 0;
+        int runtimeLayerId = 0;
+        const char* status = "reused";
+    };
+    std::vector<ResolvedSourceLayer> resolvedLayers;
+    resolvedLayers.reserve(parseResult.importedLayers.size());
+
     // DXF 标准图层 "0" 直接对应内置默认图层（id 0），不按名再建一层
     const bool isDxf = (context.format == Fio::FileFormat::DXF);
 
@@ -843,6 +902,7 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
         const std::string srcName(src.name);
 
         int layerId = (isDxf && srcName == "0") ? 0 : m_layerManager->findLayerByName(srcName);
+        const char* status = "reused";
 
         if (layerId >= 0)
         {
@@ -859,6 +919,7 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
             if (layerId >= 0)
             {
                 ++createdCount;
+                status = "created";
                 const uint8_t r = static_cast<uint8_t>((src.color >> 16) & 0xFF);
                 const uint8_t g = static_cast<uint8_t>((src.color >> 8) & 0xFF);
                 const uint8_t b = static_cast<uint8_t>(src.color & 0xFF);
@@ -872,9 +933,12 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
                 SY_WARNF("[ImportService] Layer count limit reached, falling back to default layer for '%s'",
                     srcName.c_str());
                 layerId = 0;
+                status = "fell back to default (layer limit)";
             }
         }
+
         sourceToLayerId[src.sourceId] = layerId;
+        resolvedLayers.push_back(ResolvedSourceLayer{ srcName, src.color, layerId, status });
     }
 
     // 图元归属只认解析层产出的 entityLayerMap（实体运行时 ID → 源图层 sourceId），
@@ -890,7 +954,9 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
             ++unresolvedCount;
             continue;
         }
-        runtimeLayerMap[entityId] = it->second;
+        // 入库时被换过 ID 的图元要按修正表换成最终 ID，否则这里查不到它
+        const auto remapIt = idRemap.find(entityId);
+        runtimeLayerMap[remapIt != idRemap.end() ? remapIt->second : entityId] = it->second;
     }
 
     if (!runtimeLayerMap.empty())
@@ -904,6 +970,32 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
             unresolvedCount);
     }
 
+    // 源文件带了图层就逐层记录一行、每层只记一次。
+    // 汇总数字看不出「某层是被新建、被复用、还是回退到了默认层」，也无法核对图层名与颜色，
+    // 多图层文件排查分层问题（DXF / SVG 等）时这组日志是第一手依据。
+    if (!resolvedLayers.empty())
+    {
+        // 每个运行时图层在**本次导入**中落了多少图元（不是场景里的总数，合并导入时才有区分）
+        std::unordered_map<int, int> importedCountByLayer;
+        for (const auto& entry : runtimeLayerMap)
+        {
+            ++importedCountByLayer[entry.second];
+        }
+
+        for (const auto& layer : resolvedLayers)
+        {
+            const auto countIt = importedCountByLayer.find(layer.runtimeLayerId);
+            SY_INFOF(
+                "[ImportService] Source layer '%s' #%06X -> runtime id=%d ('%s') %s, %d entity(ies) in this import",
+                layer.sourceName.c_str(),
+                static_cast<unsigned>(layer.sourceColor & 0x00FFFFFFu),
+                layer.runtimeLayerId,
+                m_layerManager->layerName(layer.runtimeLayerId).c_str(),
+                layer.status,
+                countIt != importedCountByLayer.end() ? countIt->second : 0);
+        }
+    }
+
     SY_DEBUGF("[ImportService] Layer restore: %zu total, %d created, %d reused, %zu entity assignment(s)",
         parseResult.importedLayers.size(),
         createdCount,
@@ -912,7 +1004,8 @@ int ImportService::restoreImportedLayers(const ImportContext& context, const Imp
     return createdCount;
 }
 
-int ImportService::restoreImportedGroups(const ImportResult& parseResult)
+int ImportService::restoreImportedGroups(const ImportResult& parseResult,
+    const std::unordered_map<int64_t, int64_t>& idRemap)
 {
     if (parseResult.importedGroups.empty())
     {
@@ -990,7 +1083,11 @@ int ImportService::restoreImportedGroups(const ImportResult& parseResult)
             continue;
         }
 
-        Eg::SyEntity* entity = m_sceneManager->findEntityById(entityId);
+        // 与图层归属同理：入库时被换过 ID 的图元要按修正表换成最终 ID
+        const auto remapIt = idRemap.find(entityId);
+        const int64_t runtimeEntityId = remapIt != idRemap.end() ? remapIt->second : entityId;
+
+        Eg::SyEntity* entity = m_sceneManager->findEntityById(runtimeEntityId);
         if (!entity)
         {
             // 图元可能因为几何非法在加入场景前就被丢弃，这属于正常损耗，只统计不逐条告警

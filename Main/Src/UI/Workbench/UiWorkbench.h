@@ -283,6 +283,8 @@ private:
     void toggleEntityVisibility(const QString& id, bool visible);
     /// 重命名图元（直接写引擎并刷新）
     void renameEntity(const QString& id, const QString& newName);
+    /// 延迟重建场景树（合并多次快速操作为一次重建，避免 setData 回调链中 delete this）
+    void scheduleTreeRefresh();
     /// 从场景树批量删除图元（走编辑服务，可撤销）
     void deleteSceneTreeSelection(const QStringList& ids);
     /// 从场景树批量设置可见性
@@ -331,6 +333,16 @@ private:
     QPointer<QObject> m_uiStateConnections;
     /// 场景树重建防抖定时器（合并批量增删，避免每步 O(N) 重建）
     class QTimer* m_sceneTreeRefreshTimer{ nullptr };
+    /// 场景树延迟重建标记（setData 回调链中 scheduleTreeRefresh 合并，避免 delete this）
+    bool m_treeRefreshPending{ false };
+    /// 命令 UI 状态刷新的节流冷却定时器 + 尾包标记。
+    /// 拖动这类「每个鼠标移动都改一次场景」的路径会高频打 refreshCommandUiState（唯一入口），
+    /// 每次都要重算全部命令/菜单的启用态并重建属性面板；这里用「首次立即 + 冷却窗口内合并 +
+    /// 窗口末尾补一次」把频率压到约 10Hz，最终态一定是最后一次变化的结果。
+    class QTimer* m_commandUiRefreshTimer{ nullptr };
+    bool m_commandUiRefreshPending{ false };
+    /// 真正执行一次命令 UI 状态刷新（refreshCommandUiState 直接调用，或经冷却定时器补尾包）
+    void applyCommandUiState();
     /// 场景树结构签名：图元增删（SceneManager::structureRevision）+ 群组拓扑
     /// （GroupManager::topologyRevision）。三者都没变就不必重建树。
     std::size_t m_lastSceneTreeEntityCount{ 0 };
@@ -431,6 +443,10 @@ private:
     void setupSceneTree3D(WorkbenchWindow& window);
     /// 重建场景树模型并推送到面板（结构性变化：导入/撤销/增删）
     void refreshSceneTree3D();
+
+    /// 只在结构签名变化时重建场景树（批量操作防抖）
+    void refreshSceneTree3DIfNeeded();
+
     /// 仅同步面板选中高亮（选择变化，避免重建树导致折叠丢失）
     void syncSceneTreeSelection3D();
     /// 将面板选择同步到引擎选择
@@ -465,6 +481,11 @@ private:
 
     QShortcut* m_deleteShortcut{ nullptr };
     QShortcut* m_backspaceShortcut{ nullptr };
+
+    /// 3D 场景树重建防抖定时器（合并批量增删，避免每步 O(N) 重建）
+    class QTimer* m_sceneTree3DRefreshTimer{ nullptr };
+    /// 3D 场景树结构签名：用于判定是否需要重建
+    uint64_t m_lastSceneTree3DStructureRevision{ 0 };
 };
 #endif
 

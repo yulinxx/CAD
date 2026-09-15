@@ -8,7 +8,7 @@
 #include <QCoreApplication>
 #include <QDialog>
 #include <QVBoxLayout>
-#include <QHBoxLayout>
+#include <QFormLayout>
 #include <QDoubleSpinBox>
 #include <QSpinBox>
 #include <QLabel>
@@ -116,6 +116,8 @@ QDialog* TransformDialogAdapter::createDialog()
     dialog->setMinimumWidth(300);
 
     auto layout = new QVBoxLayout(dialog);
+    layout->setSpacing(12);
+    layout->setContentsMargins(16, 16, 16, 16);
 
     // 根据变换类型添加输入控件
     switch (m_transformType)
@@ -181,27 +183,23 @@ QDialog* TransformDialogAdapter::createDialog()
 void TransformDialogAdapter::addMoveInputs(QVBoxLayout* layout)
 {
     auto group = new QGroupBox(trTransform("Move Parameters"));
-    auto groupLayout = new QVBoxLayout(group);
+    auto groupLayout = new QFormLayout(group);
+    groupLayout->setContentsMargins(12, 12, 12, 12);
+    groupLayout->setSpacing(10);
+    groupLayout->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    groupLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
 
-    // X 偏移
-    auto xLayout = new QHBoxLayout();
-    xLayout->addWidget(new QLabel("X:"));
     m_moveXSpinBox = new QDoubleSpinBox();
     m_moveXSpinBox->setRange(-10000, 10000);
     m_moveXSpinBox->setSingleStep(0.1);
     m_moveXSpinBox->setValue(0);
-    xLayout->addWidget(m_moveXSpinBox);
-    groupLayout->addLayout(xLayout);
+    groupLayout->addRow("X:", m_moveXSpinBox);
 
-    // Y 偏移
-    auto yLayout = new QHBoxLayout();
-    yLayout->addWidget(new QLabel("Y:"));
     m_moveYSpinBox = new QDoubleSpinBox();
     m_moveYSpinBox->setRange(-10000, 10000);
     m_moveYSpinBox->setSingleStep(0.1);
     m_moveYSpinBox->setValue(0);
-    yLayout->addWidget(m_moveYSpinBox);
-    groupLayout->addLayout(yLayout);
+    groupLayout->addRow("Y:", m_moveYSpinBox);
 
     layout->addWidget(group);
 }
@@ -209,36 +207,28 @@ void TransformDialogAdapter::addMoveInputs(QVBoxLayout* layout)
 void TransformDialogAdapter::addCopyInputs(QVBoxLayout* layout)
 {
     auto group = new QGroupBox(trTransform("Copy Parameters"));
-    auto groupLayout = new QVBoxLayout(group);
+    auto groupLayout = new QFormLayout(group);
+    groupLayout->setContentsMargins(12, 12, 12, 12);
+    groupLayout->setSpacing(10);
+    groupLayout->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    groupLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
 
-    // 复制数量
-    auto countLayout = new QHBoxLayout();
-    countLayout->addWidget(new QLabel(trTransform("Count:")));
     m_copyCountSpinBox = new QSpinBox();
     m_copyCountSpinBox->setRange(1, 100);
     m_copyCountSpinBox->setValue(1);
-    countLayout->addWidget(m_copyCountSpinBox);
-    groupLayout->addLayout(countLayout);
+    groupLayout->addRow(trTransform("Count:"), m_copyCountSpinBox);
 
-    // X 间距
-    auto spacingXLayout = new QHBoxLayout();
-    spacingXLayout->addWidget(new QLabel(trTransform("X Spacing:")));
     m_copySpacingXSpinBox = new QDoubleSpinBox();
     m_copySpacingXSpinBox->setRange(-10000, 10000);
     m_copySpacingXSpinBox->setSingleStep(0.1);
     m_copySpacingXSpinBox->setValue(0);
-    spacingXLayout->addWidget(m_copySpacingXSpinBox);
-    groupLayout->addLayout(spacingXLayout);
+    groupLayout->addRow(trTransform("X Spacing:"), m_copySpacingXSpinBox);
 
-    // Y 间距
-    auto spacingYLayout = new QHBoxLayout();
-    spacingYLayout->addWidget(new QLabel(trTransform("Y Spacing:")));
     m_copySpacingYSpinBox = new QDoubleSpinBox();
     m_copySpacingYSpinBox->setRange(-10000, 10000);
     m_copySpacingYSpinBox->setSingleStep(0.1);
     m_copySpacingYSpinBox->setValue(0);
-    spacingYLayout->addWidget(m_copySpacingYSpinBox);
-    groupLayout->addLayout(spacingYLayout);
+    groupLayout->addRow(trTransform("Y Spacing:"), m_copySpacingYSpinBox);
 
     layout->addWidget(group);
 }
@@ -246,38 +236,30 @@ void TransformDialogAdapter::addCopyInputs(QVBoxLayout* layout)
 void TransformDialogAdapter::addRotateInputs(QVBoxLayout* layout)
 {
     auto group = new QGroupBox(trTransform("Rotate Parameters"));
-    auto groupLayout = new QVBoxLayout(group);
+    auto groupLayout = new QFormLayout(group);
+    groupLayout->setContentsMargins(12, 12, 12, 12);
+    groupLayout->setSpacing(10);
+    groupLayout->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    groupLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
 
-    // 旋转角度
-    auto angleLayout = new QHBoxLayout();
-    angleLayout->addWidget(new QLabel(trTransform("Angle:")));
     m_rotateAngleSpinBox = new QDoubleSpinBox();
     m_rotateAngleSpinBox->setRange(-360, 360);
     m_rotateAngleSpinBox->setSingleStep(0.1);
     m_rotateAngleSpinBox->setValue(0);
     m_rotateAngleSpinBox->setSuffix("°");
-    angleLayout->addWidget(m_rotateAngleSpinBox);
-    groupLayout->addLayout(angleLayout);
+    groupLayout->addRow(trTransform("Angle:"), m_rotateAngleSpinBox);
 
-    // 旋转中心 X
-    auto centerXLayout = new QHBoxLayout();
-    centerXLayout->addWidget(new QLabel(trTransform("Center X:")));
     m_rotateCenterXSpinBox = new QDoubleSpinBox();
     m_rotateCenterXSpinBox->setRange(-10000, 10000);
     m_rotateCenterXSpinBox->setSingleStep(0.1);
     m_rotateCenterXSpinBox->setValue(0);
-    centerXLayout->addWidget(m_rotateCenterXSpinBox);
-    groupLayout->addLayout(centerXLayout);
+    groupLayout->addRow(trTransform("Center X:"), m_rotateCenterXSpinBox);
 
-    // 旋转中心 Y
-    auto centerYLayout = new QHBoxLayout();
-    centerYLayout->addWidget(new QLabel(trTransform("Center Y:")));
     m_rotateCenterYSpinBox = new QDoubleSpinBox();
     m_rotateCenterYSpinBox->setRange(-10000, 10000);
     m_rotateCenterYSpinBox->setSingleStep(0.1);
     m_rotateCenterYSpinBox->setValue(0);
-    centerYLayout->addWidget(m_rotateCenterYSpinBox);
-    groupLayout->addLayout(centerYLayout);
+    groupLayout->addRow(trTransform("Center Y:"), m_rotateCenterYSpinBox);
 
     layout->addWidget(group);
 }
@@ -286,6 +268,8 @@ void TransformDialogAdapter::addMirrorInputs(QVBoxLayout* layout, QDialog* dialo
 {
     auto group = new QGroupBox(trTransform("Mirror Parameters"));
     auto groupLayout = new QVBoxLayout(group);
+    groupLayout->setContentsMargins(12, 12, 12, 12);
+    groupLayout->setSpacing(10);
 
     // 镜像轴选择
     auto axisGroup = new QButtonGroup(group);
@@ -305,47 +289,35 @@ void TransformDialogAdapter::addMirrorInputs(QVBoxLayout* layout, QDialog* dialo
 
     // 自定义轴输入（默认隐藏）
     auto customGroup = new QGroupBox(trTransform("Custom Axis Parameters"));
-    auto customLayout = new QVBoxLayout(customGroup);
+    auto customForm = new QFormLayout(customGroup);
+    customForm->setContentsMargins(12, 12, 12, 12);
+    customForm->setSpacing(10);
+    customForm->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    customForm->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
 
-    // 起点 X
-    auto x1Layout = new QHBoxLayout();
-    x1Layout->addWidget(new QLabel(trTransform("Start X:")));
     m_mirrorLineX1SpinBox = new QDoubleSpinBox();
     m_mirrorLineX1SpinBox->setRange(-10000, 10000);
     m_mirrorLineX1SpinBox->setSingleStep(0.1);
     m_mirrorLineX1SpinBox->setValue(0);
-    x1Layout->addWidget(m_mirrorLineX1SpinBox);
-    customLayout->addLayout(x1Layout);
+    customForm->addRow(trTransform("Start X:"), m_mirrorLineX1SpinBox);
 
-    // 起点 Y
-    auto y1Layout = new QHBoxLayout();
-    y1Layout->addWidget(new QLabel(trTransform("Start Y:")));
     m_mirrorLineY1SpinBox = new QDoubleSpinBox();
     m_mirrorLineY1SpinBox->setRange(-10000, 10000);
     m_mirrorLineY1SpinBox->setSingleStep(0.1);
     m_mirrorLineY1SpinBox->setValue(0);
-    y1Layout->addWidget(m_mirrorLineY1SpinBox);
-    customLayout->addLayout(y1Layout);
+    customForm->addRow(trTransform("Start Y:"), m_mirrorLineY1SpinBox);
 
-    // 终点 X
-    auto x2Layout = new QHBoxLayout();
-    x2Layout->addWidget(new QLabel(trTransform("End X:")));
     m_mirrorLineX2SpinBox = new QDoubleSpinBox();
     m_mirrorLineX2SpinBox->setRange(-10000, 10000);
     m_mirrorLineX2SpinBox->setSingleStep(0.1);
     m_mirrorLineX2SpinBox->setValue(0);
-    x2Layout->addWidget(m_mirrorLineX2SpinBox);
-    customLayout->addLayout(x2Layout);
+    customForm->addRow(trTransform("End X:"), m_mirrorLineX2SpinBox);
 
-    // 终点 Y
-    auto y2Layout = new QHBoxLayout();
-    y2Layout->addWidget(new QLabel(trTransform("End Y:")));
     m_mirrorLineY2SpinBox = new QDoubleSpinBox();
     m_mirrorLineY2SpinBox->setRange(-10000, 10000);
     m_mirrorLineY2SpinBox->setSingleStep(0.1);
     m_mirrorLineY2SpinBox->setValue(0);
-    y2Layout->addWidget(m_mirrorLineY2SpinBox);
-    customLayout->addLayout(y2Layout);
+    customForm->addRow(trTransform("End Y:"), m_mirrorLineY2SpinBox);
 
     customGroup->setVisible(false);
     groupLayout->addWidget(customGroup);

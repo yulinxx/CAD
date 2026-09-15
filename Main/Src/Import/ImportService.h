@@ -87,6 +87,9 @@ public:
     /// 设置属性面板刷新回调（导入完成后刷新属性）
     void setPropertyRefreshCallback(std::function<void()> callback);
 
+    /// 设置统一显示刷新回调（导入完成后一次性刷新树、属性、视口等，避免多次回调）
+    void setDisplayRefreshCallback(std::function<void()> callback);
+
     /// 设置工作台切换回调（导入完成后切换工作台）
     /// @param callback 参数为目标工作台 ID
     void setWorkbenchSwitchCallback(std::function<void(const QString&)> callback);
@@ -160,13 +163,17 @@ private:
 
     /// 还原源文件图层结构（DXF 等支持图层的格式）
     /// 按源图层表在 LayerManager 中创建/匹配图层，并把图元分配到对应图层
+    /// @param idRemap 转换期 ID → 入库后最终 ID 的修正表（入库前 ID 被换过的图元才有条目）
     /// @return 成功创建的图层数量（仅计算新建图层）
-    int restoreImportedLayers(const ImportContext& context, const ImportResult& parseResult);
+    int restoreImportedLayers(const ImportContext& context,
+        const ImportResult& parseResult,
+        const std::unordered_map<int64_t, int64_t>& idRemap);
 
     /// 还原源文件群组结构（DXF 块引用 / SVG 的 g 元素 / OBJ 的 o-g-usemtl 等）
     /// 按 IR 群组表在 SceneManager::groupManager() 中新建群组，重建父子层级，并把图元挂到所属群组
+    /// @param idRemap 同 restoreImportedLayers
     /// @return 成功创建的群组数量
-    int restoreImportedGroups(const ImportResult& parseResult);
+    int restoreImportedGroups(const ImportResult& parseResult, const std::unordered_map<int64_t, int64_t>& idRemap);
 
 
 private:
@@ -200,6 +207,8 @@ private:
     std::function<void()> m_treeRebuildCallback;
     /// 属性面板刷新回调
     std::function<void()> m_propertyRefreshCallback;
+    /// 统一显示刷新回调（批量刷新树、属性、视口等）
+    std::function<void()> m_displayRefreshCallback;
     /// 工作台切换回调
     std::function<void(const QString&)> m_workbenchSwitchCallback;
     /// 状态栏更新回调

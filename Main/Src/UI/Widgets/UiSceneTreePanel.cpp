@@ -212,26 +212,43 @@ public:
         {
             return false;
         }
+        
+        // 检查 internalId 是否有效（防止无效指针访问）
+        if (index.internalId() == 0)
+        {
+            return false;
+        }
+        
         const qint64 id = static_cast<qintptr>(index.internalId());
 
         if (index.column() == 0 && role == Qt::CheckStateRole)
         {
+            // 先保存必要的值，因为回调可能导致模型被重置
+            const QModelIndex idx = index;
             if (m_visibilityCallback)
             {
                 m_visibilityCallback(id, value.toInt() == Qt::Checked);
             }
-            // 通知视图重绘该单元格，使复选框反映引擎最新可见性
-            emit dataChanged(index, index, { Qt::CheckStateRole });
+            // 检查索引是否仍然有效
+            if (idx.isValid())
+            {
+                emit dataChanged(idx, idx, { Qt::CheckStateRole });
+            }
             return true;
         }
         if (index.column() == 1 && role == Qt::EditRole)
         {
+            // 先保存必要的值，因为回调可能导致模型被重置
+            const QModelIndex idx = index;
             if (m_renameCallback)
             {
                 m_renameCallback(id, value.toString());
             }
-            // 重命名后刷新显示名
-            emit dataChanged(index, index, { Qt::DisplayRole, Qt::EditRole });
+            // 检查索引是否仍然有效
+            if (idx.isValid())
+            {
+                emit dataChanged(idx, idx, { Qt::DisplayRole, Qt::EditRole });
+            }
             return true;
         }
         return false;
@@ -664,7 +681,7 @@ void SceneTreePanel::setMode3D(const SceneTreeModel3D& model)
     m_view->header()->setSectionResizeMode(1, QHeaderView::Interactive);
     m_view->header()->setSectionResizeMode(2, QHeaderView::Interactive);
     m_view->setColumnWidth(0, 90);
-    m_view->setColumnWidth(1, 200);
+    m_view->setColumnWidth(1, 100);
     m_view->setColumnWidth(2, 80);
 
     // 首次加载时展开所有节点

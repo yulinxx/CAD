@@ -321,6 +321,16 @@ void WorkbenchWindow::configureServices(const UiServices& services)
             m_menuManager->rebuildAllMenus();
         }
     }
+
+    // 设置页切换皮肤后同步菜单勾选：SettingsService::themeChanged → UiStateCenter + 菜单刷新
+    if (auto* settings = ApplicationCompositionRoot::getSettingsService(); settings && m_stateCenter)
+    {
+        connect(settings, &SettingsService::themeChanged, this, [this](AppTheme theme) {
+            const QString themeId = ThemeManager::menuIdFor(theme);
+            m_stateCenter->setCurrentThemeId(themeId);
+            refreshThemeMenuChecks(themeId);
+        });
+    }
 }
 
 /// 设置当前工作台

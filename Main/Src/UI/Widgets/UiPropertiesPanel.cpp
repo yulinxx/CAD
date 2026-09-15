@@ -490,8 +490,10 @@ PropertiesPanelWidget::PropertiesPanelWidget(QWidget* parent)
     m_tree->setStyleSheet(QStringLiteral("QTreeWidget::item { min-height: 26px; }"));
     // 编辑统一在 itemDoubleClicked 中手动处理：标量内联、复合类型弹窗
     m_tree->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_tree->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-    m_tree->header()->setSectionResizeMode(1, QHeaderView::Stretch);
+    // Interactive 模式允许用户拖动调整列宽，stretchLastSection 使最后一列填满窗口
+    m_tree->header()->setStretchLastSection(true);
+    m_tree->header()->setSectionResizeMode(0, QHeaderView::Interactive);
+    m_tree->header()->setSectionResizeMode(1, QHeaderView::Interactive);
     layout->addWidget(m_tree);
 
     // 值列使用内联编辑代理；未设置编辑目标时不会进入编辑态

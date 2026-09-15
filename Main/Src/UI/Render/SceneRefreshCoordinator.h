@@ -104,6 +104,11 @@ signals:
     /// 选择变更信号（视口连接后用于同步工具状态）
     void selectionChanged();
 
+    /// 选中态的几何被改动（拖动/对齐/镜像/缩放等）—— 语义只有一句：轮廓要按当前场景重建。
+    /// 与 selectionChanged 分开：后者还挂着属性面板重建、菜单刷新、场景树选择同步等 UI 扇出，
+    /// 拖动过程中每个几何变更都发一次的话，UI 会跟着把同一份选择重做一遍（见 onSceneChanged）。
+    void selectionOutlineInvalidated();
+
 private slots:
     void updateSceneRender();
 

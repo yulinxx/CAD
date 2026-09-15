@@ -120,7 +120,7 @@ public:
     static QString localizedLabel(const QString& label, const QString& fallbackId = QString());
 
 private:
-    void buildMenuItem(QMenu* parent, const std::variant<MenuActionDef, SubMenuDef, MenuItemType>& item);
+    void buildMenuItem(QMenu* parent, const std::variant<MenuActionDef, SubMenuDef, MenuItemType>& item, QActionGroup* exclusiveGroup = nullptr);
     void releaseBuiltShortcuts();
 
     QMainWindow* m_window;

@@ -16,6 +16,7 @@
 #include "Engine/SyEntity/EType.h"
 #include "Engine/Parallel/EngineParallel.h"
 
+
 #include "Log/SyLogger.h"
 #include "Log/SyPerfCounter.h"
 
@@ -23,6 +24,26 @@ namespace
 {
     // 场景更新节流时间（毫秒）— 16ms 约等于 60fps，合并短时间内的多次场景变更
     constexpr int kSceneUpdateDelay = 16;
+
+    /// 取图元所属图层的绘制序号（0 = 最上层），供增量路径构造 z-order。
+    ///
+    /// 增量路径的图元快照是 clone，**不复制图层指针**，所以只能查活对象。
+    /// 只在主线程调用（SceneManager 的契约是只有主线程可以访问）；
+    /// 并行离散化那条路径必须提前在主线程把本值取好带进 job。
+    uint32_t layerIndexOfEntity(Eg::SceneManager* sm, Eg::EntityId id)
+    {
+        if (sm == nullptr)
+        {
+            return 0;
+        }
+        const Eg::SyEntity* entity = sm->findEntityById(id);
+        const Eg::SyLayer* layer = entity != nullptr ? entity->layer() : nullptr;
+        if (layer == nullptr || layer->getIndex() <= 0)
+        {
+            return 0;
+        }
+        return static_cast<uint32_t>(layer->getIndex());
+    }
 
     // P5 收口: RAII 帧计时器，自动管理 beginFrame/endFrame，消除 4 处重复的 null 检查 + 调用
     class ScopedFrameTimer
@@ -309,7 +330,9 @@ void SceneRefreshCoordinator::onSceneChanged()
 
     if (!m_lastSelectedIds.empty())
     {
-        emit selectionChanged();
+        // 只发"轮廓要重建"这一个意图：此处并非真的选择集变化，走公开的 selectionChanged
+        // 会连带触发属性面板重建与场景树的选择重设 —— 拖动中每次几何变更都做一遍，是卡顿主因。
+        emit selectionOutlineInvalidated();
     }
 
     scheduleSceneUpdate();
@@ -389,10 +412,32 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     bool touchedImage = false;
     bool touchedText = false;
 
+    // 获取"选中时隐藏原图"设置
+    const bool hideSelected = false;
+
+    // 如果启用隐藏选中实体，获取当前选中的实体ID集合
+    std::unordered_set<uint64_t> selectedIds;
+    if (hideSelected)
+    {
+        const auto selectedEntities = sm->getSelectedEntities();
+        for (const auto* e : selectedEntities)
+        {
+            if (e)
+            {
+                selectedIds.insert(static_cast<uint64_t>(e->id));
+            }
+        }
+    }
+
     // 优化：收集需要处理的图元ID（可见的、非 IMAGE/TEXT 的）
     // 用于后续的并行处理
     std::vector<uint64_t> entityIdsToProcess;
     entityIdsToProcess.reserve(m_pendingDirtyIds.size());
+
+    // 与 entityIdsToProcess 同下标的图层绘制序号。必须在这条主线程循环里取好：
+    // 下面那条并行分支在工作线程里离散化，工作线程不允许访问 SceneManager。
+    std::vector<uint32_t> entityLayerOrders;
+    entityLayerOrders.reserve(m_pendingDirtyIds.size());
 
     for (auto id : m_pendingDirtyIds)
     {
@@ -418,6 +463,18 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             continue;
         }
 
+        // 如果启用了"选中时隐藏原图"且实体被选中，则跳过渲染
+        if (hideSelected && selectedIds.count(uid))
+        {
+            // 从渲染中移除（如果之前有渲染的话）
+            if (m_renderedEntityIds.count(uid))
+            {
+                m_renderWidget->removeRenderEntity(uid);
+                m_renderedEntityIds.erase(uid);
+            }
+            continue;
+        }
+
         // 位图（SyImage）不走折线/线框顶点路径，统一由 reconcileBitmaps 处理
         if (snapshot->type == Eg::EType::IMAGE)
         {
@@ -432,8 +489,9 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             continue;
         }
 
-        // 收集需要处理的图元 ID
+        // 收集需要处理的图元 ID 与其图层绘制序号（两向量同下标）
         entityIdsToProcess.push_back(uid);
+        entityLayerOrders.push_back(layerIndexOfEntity(sm, static_cast<Eg::EntityId>(uid)));
     }
 
     // 如果需要处理的图元数量大于阈值，使用并行处理
@@ -456,6 +514,8 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             uint64_t uid;
             std::vector<Render::VertexP3C3> vertices;
             Render::PrimitiveType primType;
+            /// 图层绘制序号（0 = 最上层）。主线程已取好，工作线程只做搬运
+            uint32_t layerOrder = 0;
             bool valid = false;
         };
 
@@ -474,6 +534,7 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
 
             RenderJob& job = jobs[index];
             job.uid = id;
+            job.layerOrder = entityLayerOrders[index];
 
             if (entityToVertices(snapshot->entity(), job.vertices, job.primType, cameraCenter,
                                  worldToScreenScale, chordErrorPixels))
@@ -494,12 +555,12 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             if (m_renderedEntityIds.count(job.uid))
             {
                 m_renderWidget->modifyRenderEntity(job.uid, job.vertices.data(),
-                    static_cast<uint32_t>(job.vertices.size()), job.primType);
+                    static_cast<uint32_t>(job.vertices.size()), job.primType, job.layerOrder);
             }
             else
             {
                 m_renderWidget->addRenderEntity(job.uid, job.vertices.data(),
-                    static_cast<uint32_t>(job.vertices.size()), job.primType);
+                    static_cast<uint32_t>(job.vertices.size()), job.primType, job.layerOrder);
                 m_renderedEntityIds.insert(job.uid);
             }
         }
@@ -507,8 +568,9 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     else
     {
         // 串行处理（小批量时更高效）
-        for (auto uid : entityIdsToProcess)
+        for (size_t index = 0; index < entityIdsToProcess.size(); ++index)
         {
+            const uint64_t uid = entityIdsToProcess[index];
             const Eg::RenderEntitySnapshot* snapshot =
                 m_pendingSnapshot.find(static_cast<Eg::EntityId>(uid));
             if (snapshot == nullptr || snapshot->entity() == nullptr)
@@ -530,12 +592,12 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             if (m_renderedEntityIds.count(uid))
             {
                 m_renderWidget->modifyRenderEntity(uid, vertices.data(),
-                    static_cast<uint32_t>(vertices.size()), primType);
+                    static_cast<uint32_t>(vertices.size()), primType, entityLayerOrders[index]);
             }
             else
             {
                 m_renderWidget->addRenderEntity(uid, vertices.data(),
-                    static_cast<uint32_t>(vertices.size()), primType);
+                    static_cast<uint32_t>(vertices.size()), primType, entityLayerOrders[index]);
                 m_renderedEntityIds.insert(uid);
             }
         }
@@ -609,12 +671,12 @@ void SceneRefreshCoordinator::processCurveLodBatch()
         if (m_renderedEntityIds.count(uid))
         {
             m_renderWidget->modifyRenderEntity(uid, vertices.data(),
-                static_cast<uint32_t>(vertices.size()), primType);
+                static_cast<uint32_t>(vertices.size()), primType, layerIndexOfEntity(m_sceneManager, entity->id));
         }
         else
         {
             m_renderWidget->addRenderEntity(uid, vertices.data(),
-                static_cast<uint32_t>(vertices.size()), primType);
+                static_cast<uint32_t>(vertices.size()), primType, layerIndexOfEntity(m_sceneManager, entity->id));
             m_renderedEntityIds.insert(uid);
         }
     }
@@ -656,13 +718,38 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     m_lastCursor = sm->currentRevision();
 
     m_renderedEntityIds.clear();
-    sm->forEachEntity([this](Eg::SyEntity* e) {
+
+    // 获取"选中时隐藏原图"设置
+    const bool hideSelected = false;
+
+    // 如果启用隐藏选中实体，获取当前选中的实体ID集合
+    std::unordered_set<uint64_t> selectedIds;
+    if (hideSelected)
+    {
+        const auto selectedEntities = sm->getSelectedEntities();
+        for (const auto* e : selectedEntities)
+        {
+            if (e)
+            {
+                selectedIds.insert(static_cast<uint64_t>(e->id));
+            }
+        }
+    }
+
+    sm->forEachEntity([this, hideSelected, &selectedIds](Eg::SyEntity* e) {
         // 账本必须与 gatherGeometry 的提交规则一致：它不按 selected() 跳过，
         // 因此选中图元同样已在 GPU 上，账本里也要记上。否则下一轮增量会把已存在的
         // 图元当作新图元 addRenderEntity，造成重复提交。
+        // 但如果启用了"选中时隐藏原图"，则选中实体不应被渲染，账本也不应记录
         if (e && e->visible() && (!e->layer() || e->layer()->isVisible()))
         {
-            m_renderedEntityIds.insert(static_cast<uint64_t>(e->id));
+            auto uid = static_cast<uint64_t>(e->id);
+            if (hideSelected && selectedIds.count(uid))
+            {
+                // 选中且启用了隐藏，不记录到渲染账本（也不会被渲染）
+                return;
+            }
+            m_renderedEntityIds.insert(uid);
         }
     });
 
@@ -688,6 +775,23 @@ void SceneRefreshCoordinator::reconcileBitmaps(Eg::SceneManager* sm, bool fullRe
         m_bitmapImageIds.clear();
     }
 
+    // 获取"选中时隐藏原图"设置
+    const bool hideSelected = false;
+
+    // 如果启用隐藏选中实体，获取当前选中的实体ID集合
+    std::unordered_set<uint64_t> selectedIds;
+    if (hideSelected)
+    {
+        const auto selectedEntities = sm->getSelectedEntities();
+        for (const auto* e : selectedEntities)
+        {
+            if (e)
+            {
+                selectedIds.insert(static_cast<uint64_t>(e->id));
+            }
+        }
+    }
+
     // 期望集合：场景中所有可见 SyImage（可见 = 图元可见 && 图层可见）
     std::unordered_set<uint64_t> desired;
     // 使用类型索引避免全场景扫描
@@ -702,7 +806,13 @@ void SceneRefreshCoordinator::reconcileBitmaps(Eg::SceneManager* sm, bool fullRe
         {
             continue;
         }
-        desired.insert(static_cast<uint64_t>(e->id));
+        auto uid = static_cast<uint64_t>(e->id);
+        // 如果启用了"选中时隐藏原图"且实体被选中，跳过
+        if (hideSelected && selectedIds.count(uid))
+        {
+            continue;
+        }
+        desired.insert(uid);
     }
 
     // 移除：本地账本中存在但场景已不期望（删除 / 隐藏 / 图层隐藏）
@@ -764,6 +874,23 @@ void SceneRefreshCoordinator::reconcileTexts(Eg::SceneManager* sm, bool fullReco
         m_worldTextIds.clear();
     }
 
+    // 获取"选中时隐藏原图"设置
+    const bool hideSelected = false;
+
+    // 如果启用隐藏选中实体，获取当前选中的实体ID集合
+    std::unordered_set<uint64_t> selectedIds;
+    if (hideSelected)
+    {
+        const auto selectedEntities = sm->getSelectedEntities();
+        for (const auto* e : selectedEntities)
+        {
+            if (e)
+            {
+                selectedIds.insert(static_cast<uint64_t>(e->id));
+            }
+        }
+    }
+
     // 期望集合：场景中所有可见 SyText（可见 = 图元可见 && 图层可见）
     std::unordered_set<uint64_t> desired;
     // 使用类型索引避免全场景扫描
@@ -778,7 +905,13 @@ void SceneRefreshCoordinator::reconcileTexts(Eg::SceneManager* sm, bool fullReco
         {
             continue;
         }
-        desired.insert(static_cast<uint64_t>(e->id));
+        auto uid = static_cast<uint64_t>(e->id);
+        // 如果启用了"选中时隐藏原图"且实体被选中，跳过
+        if (hideSelected && selectedIds.count(uid))
+        {
+            continue;
+        }
+        desired.insert(uid);
     }
 
     // 移除：本地账本中存在但场景已不期望（删除 / 隐藏 / 图层隐藏）
