@@ -679,18 +679,42 @@ void SceneTreePanel::setMode3D(const SceneTreeModel3D& model)
         m_model = nullptr;
     }
 
+    // 先清除旧模型（可能是 3D 模式下的 SceneTreeTableModel3D）
+    // 必须延迟销毁：本方法会在树行回调（勾选可见性 / 改名）中被同步调用，此时视图
+    // 正在派发该模型的事件，立即 delete 会让回调返回后的 setData 与 Qt 委托代码访问
+    // 已释放对象（勾选可见性即崩溃，崩在 emit dataChanged）。
+    if (m_model)
+    {
+        m_model->deleteLater();
+        m_model = nullptr;
+    }
+
     auto* model3d = new SceneTreeTableModel3D();
     model3d->setData(model);
     m_model = model3d;
     m_view->setModel(m_model);
+
+    // 检查 selectionModel 是否有效
+    if (!m_view->selectionModel())
+    {
+        return;
+    }
+
     connect(
         m_view->selectionModel(), &QItemSelectionModel::selectionChanged, this, &SceneTreePanel::onModelSelectionChanged);
 
+    // 检查 header 是否有效
+    QHeaderView* header = m_view->header();
+    if (!header)
+    {
+        return;
+    }
+
     // 所有列都设置为 Interactive 模式，允许用户拖动调整列宽
-    m_view->header()->setStretchLastSection(false);
-    m_view->header()->setSectionResizeMode(0, QHeaderView::Interactive);
-    m_view->header()->setSectionResizeMode(1, QHeaderView::Interactive);
-    m_view->header()->setSectionResizeMode(2, QHeaderView::Interactive);
+    header->setStretchLastSection(false);
+    header->setSectionResizeMode(0, QHeaderView::Interactive);
+    header->setSectionResizeMode(1, QHeaderView::Interactive);
+    header->setSectionResizeMode(2, QHeaderView::Interactive);
     m_view->setColumnWidth(0, 90);
     m_view->setColumnWidth(1, 100);
     m_view->setColumnWidth(2, 80);
