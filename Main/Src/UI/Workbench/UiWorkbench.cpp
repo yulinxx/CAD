@@ -700,13 +700,9 @@ void Workbench2D::setupImportCallbacks(RenderViewport2D* vp, WorkbenchWindow& wi
         });
     });
 
-    // 场景树刷新（导入后重建树结构）
-    m_services.importService->setTreeRebuildCallback([this]() {
+    // 统一显示刷新（批量刷新场景树、属性面板，避免导入后多次分离刷新回调）
+    m_services.importService->setDisplayRefreshCallback([this]() {
         refreshSceneTree();
-    });
-
-    // 属性面板刷新（导入后更新属性显示）
-    m_services.importService->setPropertyRefreshCallback([this]() {
         refreshPropertiesPanel();
     });
 }
@@ -1453,10 +1449,17 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
             QTimer::singleShot(0, this, &Workbench2D::refreshSceneTree);
         });
         connect(m_services.operationBus, &OperationBus::operationCompleted, this, [this](OperationId, bool success) {
-            if (success)
+            if (!success)
             {
-                QTimer::singleShot(0, this, &Workbench2D::refreshSceneTree);
+                return;
             }
+            // 统一按结构签名（图元增删 + 群组拓扑修订）决定是否重建场景树：
+            // 选择类（全选/清除/反选）与纯几何类（移动/旋转/镜像/对齐/Nudge）操作
+            // 都不改树的行集合，重建（buildTopology + 换模型 + 全表 dataChanged）纯属
+            // 白做功；删除/粘贴/成组等结构变化签名不同，才会走防抖重建。
+            // 选中高亮由 syncSceneTreeSelection 单独维护，不依赖重建。
+            // 改名等「不入结构签名但要刷新行文本」的操作由上方 undoStateChanged 兜底。
+            QTimer::singleShot(0, this, &Workbench2D::refreshSceneTreeIfNeeded);
         });
     }
 
@@ -2003,6 +2006,7 @@ void Workbench2D::deactivate()
         m_services.importService->setViewportFitCallback(nullptr);
         m_services.importService->setTreeRebuildCallback(nullptr);
         m_services.importService->setPropertyRefreshCallback(nullptr);
+        m_services.importService->setDisplayRefreshCallback(nullptr);
     }
 
     // 同理：FileDropHandler 由 WorkbenchWindow 持有（跨切换永生），它的
@@ -2737,9 +2741,10 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
     }
     if (m_services3D.sceneMonitor)
     {
-        // SceneMonitor3D 触发场景所有变化（含可见性/锁定/几何），这些不一定推进 structureRevision，
-        // 故直接用无条件重建；批量操作（增删）走 structureRevision 防抖路径。
-        connect(m_services3D.sceneMonitor, &SceneMonitor3D::sceneChanged, this, &Workbench3D::refreshSceneTree3D);
+        // 场景监视器会在几何变换（拖动）等高频路径上反复触发，而这些不改变树行集合；
+        // 按结构签名（图元增删）判定即可跳过纯几何变更。可见性/锁定/改名由各自的
+        // 显式方法直接重建（它们不推进 structureRevision，见 setSceneTreeVisibility3D 等）。
+        connect(m_services3D.sceneMonitor, &SceneMonitor3D::sceneChanged, this, &Workbench3D::refreshSceneTree3DIfNeeded);
     }
 
     // 初始化防抖定时器
