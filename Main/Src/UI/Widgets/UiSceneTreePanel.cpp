@@ -630,9 +630,15 @@ SceneTreePanel::~SceneTreePanel()
     m_metaProvider2D = std::move(metaProvider);
     m_childrenProvider2D = std::move(childrenProvider);
 
-    // 先清除旧模型（可能是 3D 模式下的 SceneTreeTableModel3D）
-    delete m_model;
-    m_model = nullptr;
+    // 先清除旧模型（可能是 3D 模式下的 SceneTreeTableModel3D）。
+    // 必须延迟销毁：本方法会在树行回调（勾选可见性 / 改名）中被同步调用，此时视图
+    // 正在派发该模型的事件，立即 delete 会让回调返回后的 setData 与 Qt 委托代码访问
+    // 已释放对象（勾选可见性即崩溃，崩在 emit dataChanged）。
+    if (m_model)
+    {
+        m_model->deleteLater();
+        m_model = nullptr;
+    }
 
     auto* model = new SceneTreeTableModel2D(this);
     model->setTopology(topology, m_metaProvider2D, m_childrenProvider2D);
@@ -664,9 +670,14 @@ void SceneTreePanel::setMode3D(const SceneTreeModel3D& model)
 {
     m_mode = Mode::Mode3D;
 
-    // 先清除旧模型（可能是 2D 模式下的 SceneTreeTableModel2D）
-    delete m_model;
-    m_model = nullptr;
+    // 先清除旧模型（可能是 2D 模式下的 SceneTreeTableModel2D）。
+    // 同样延迟销毁：3D 改名回调会同步走到这里，而 setData 在回调返回后还会调用
+    // QStandardItemModel::setData，立即 delete 会造成同一类访问已释放对象。
+    if (m_model)
+    {
+        m_model->deleteLater();
+        m_model = nullptr;
+    }
 
     auto* model3d = new SceneTreeTableModel3D();
     model3d->setData(model);
