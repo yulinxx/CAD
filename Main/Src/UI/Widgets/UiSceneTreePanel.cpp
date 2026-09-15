@@ -82,12 +82,18 @@ public:
 
     QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override
     {
-        if (!hasIndex(row, column, parent))
+        // 首先检查 row 是否有效
+        if (row < 0)
         {
             return {};
         }
+        // 检查顶层索引时，row 不能超过 m_topLevel 的大小
         if (!parent.isValid())
         {
+            if (row >= m_topLevel.size())
+            {
+                return {};
+            }
             return createIndex(row, column, static_cast<quintptr>(m_topLevel[row].id));
         }
         const qint64 parentId = static_cast<qintptr>(parent.internalId());
@@ -137,6 +143,11 @@ public:
         {
             return {};
         }
+        // 检查行索引有效性，防止越界访问
+        if (index.row() < 0 || index.row() >= rowCount(index.parent()))
+        {
+            return {};
+        }
         const qint64 id = static_cast<qintptr>(index.internalId());
         const bool isGroup = m_isGroup.contains(id);
 
@@ -150,6 +161,11 @@ public:
         if (role == Qt::CheckStateRole && index.column() == 0)
         {
             return meta.visible ? Qt::Checked : Qt::Unchecked;
+        }
+        // 复选框左对齐（文本对齐）
+        if (role == Qt::TextAlignmentRole && index.column() == 0)
+        {
+            return QVariant(Qt::AlignLeft | Qt::AlignVCenter);
         }
         // 双击重命名时，编辑框以当前名称为初值（在原有名字基础上编辑）
         if (role == Qt::EditRole && index.column() == 1)
@@ -186,6 +202,13 @@ public:
     bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) override
     {
         if (!index.isValid())
+        {
+            return false;
+        }
+
+        // 检查行列索引有效性，防止越界访问
+        if (index.row() < 0 || index.row() >= rowCount(index.parent()) ||
+            index.column() < 0 || index.column() >= columnCount(index.parent()))
         {
             return false;
         }
@@ -382,22 +405,19 @@ public:
     SceneTreeTableModel3D()
         : QStandardItemModel(0, 3)
     {
+        setHorizontalHeaderLabels({ QObject::tr("Vis"), QObject::tr("Name"), QObject::tr("Type") });
     }
 
     void setData(const SceneTreeModel3D& model)
     {
-        beginResetModel();
-        while (rowCount() > 0)
-        {
-            removeRow(0);
-        }
+        // 优化：使用 clear() 一次性清空模型，避免循环 removeRow(0) 触发多次更新事件
+        clear();
         m_nodeMap.clear();
 
         for (const auto& node : model.nodes)
         {
             addNode(nullptr, node);
         }
-        endResetModel();
     }
 
     bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) override
@@ -407,15 +427,22 @@ public:
             return false;
         }
 
+        if (index.row() < 0 || index.row() >= rowCount(index.parent()) ||
+            index.column() < 0 || index.column() >= columnCount(index.parent()))
+        {
+            return false;
+        }
+
         if (index.column() == 0 && role == Qt::CheckStateRole)
         {
             const QString id = index.sibling(index.row(), 1).data(kIdRole).toString();
+            // 先更新本地复选框状态，再异步通知回调，避免重建整棵树导致闪烁/重排
+            bool ok = QStandardItemModel::setData(index, value, role);
             if (m_visibilityCallback)
             {
                 m_visibilityCallback(id, value.toInt() == Qt::Checked);
             }
-            // Call parent to actually update the check state
-            return QStandardItemModel::setData(index, value, role);
+            return ok;
         }
         if (index.column() == 1 && role == Qt::EditRole)
         {
@@ -445,6 +472,7 @@ private:
         auto* visibleItem = new QStandardItem();
         visibleItem->setCheckable(true);
         visibleItem->setCheckState(node.visible ? Qt::Checked : Qt::Unchecked);
+        visibleItem->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
         visibleItem->setData(node.id, kIdRole);
         visibleItem->setData(node.visible, kVisRole);
 
@@ -578,14 +606,14 @@ SceneTreePanel::~SceneTreePanel()
     delete m_model;
 }
 
-void SceneTreePanel::setMode2D(
+ void SceneTreePanel::setMode2D(
     const SceneTreeTopology2D& topology, MetaProvider2D metaProvider, ChildrenProvider2D childrenProvider)
 {
     m_mode = Mode::Mode2D;
     m_metaProvider2D = std::move(metaProvider);
     m_childrenProvider2D = std::move(childrenProvider);
 
-    // 先清除旧模型
+    // 先清除旧模型（可能是 3D 模式下的 SceneTreeTableModel3D）
     delete m_model;
     m_model = nullptr;
 
@@ -596,18 +624,21 @@ void SceneTreePanel::setMode2D(
     connect(
         m_view->selectionModel(), &QItemSelectionModel::selectionChanged, this, &SceneTreePanel::onModelSelectionChanged);
 
+    // 所有列都设置为 Interactive 模式，允许用户拖动调整列宽
+    m_view->header()->setStretchLastSection(false);
     m_view->header()->setSectionResizeMode(0, QHeaderView::Interactive);
     m_view->header()->setSectionResizeMode(1, QHeaderView::Interactive);
     m_view->header()->setSectionResizeMode(2, QHeaderView::Interactive);
-    m_view->setColumnWidth(0, 50);
-    m_view->setColumnWidth(1, 70);
-    m_view->setColumnWidth(2, 60);
+    // 设置合理的默认列宽，复选框列宽一些以便完整显示
+    m_view->setColumnWidth(0, 70);
+    m_view->setColumnWidth(1, 100);
+    m_view->setColumnWidth(2, 80);
 
     // 使用回调而非信号
     model->setVisibilityCallback([this](qint64 id, bool visible) {
         emit visibilityToggled(QString::number(id), visible);
     });
-    model->setRenameCallback([this](qint64 id, const QString& newName) {
+    static_cast<SceneTreeTableModel2D*>(m_model)->setRenameCallback([this](qint64 id, const QString& newName) {
         emit renameRequested(QString::number(id), newName);
     });
 }
@@ -616,7 +647,7 @@ void SceneTreePanel::setMode3D(const SceneTreeModel3D& model)
 {
     m_mode = Mode::Mode3D;
 
-    // 先清除旧模型
+    // 先清除旧模型（可能是 2D 模式下的 SceneTreeTableModel2D）
     delete m_model;
     m_model = nullptr;
 
@@ -627,12 +658,17 @@ void SceneTreePanel::setMode3D(const SceneTreeModel3D& model)
     connect(
         m_view->selectionModel(), &QItemSelectionModel::selectionChanged, this, &SceneTreePanel::onModelSelectionChanged);
 
+    // 所有列都设置为 Interactive 模式，允许用户拖动调整列宽
+    m_view->header()->setStretchLastSection(false);
     m_view->header()->setSectionResizeMode(0, QHeaderView::Interactive);
     m_view->header()->setSectionResizeMode(1, QHeaderView::Interactive);
     m_view->header()->setSectionResizeMode(2, QHeaderView::Interactive);
-    m_view->setColumnWidth(0, 50);
-    m_view->setColumnWidth(1, 70);
-    m_view->setColumnWidth(2, 60);
+    m_view->setColumnWidth(0, 90);
+    m_view->setColumnWidth(1, 200);
+    m_view->setColumnWidth(2, 80);
+
+    // 首次加载时展开所有节点
+    m_view->expandAll();
 
     // 使用回调而非信号
     model3d->setVisibilityCallback([this](const QString& id, bool visible) {
@@ -641,8 +677,53 @@ void SceneTreePanel::setMode3D(const SceneTreeModel3D& model)
     model3d->setRenameCallback([this](const QString& id, const QString& newName) {
         emit renameRequested(id, newName);
     });
+}
 
-    m_view->expandAll();
+void SceneTreePanel::collectExpandedIds(const QModelIndex& index, QStringList& outIds) const
+{
+    if (!index.isValid() || !m_model)
+    {
+        return;
+    }
+    const QString id = index.data(kIdRole).toString();
+    if (!id.isEmpty() && m_view->isExpanded(index))
+    {
+        outIds.append(id);
+    }
+    for (int r = 0; r < m_model->rowCount(index); ++r)
+    {
+        collectExpandedIds(m_model->index(r, 0, index), outIds);
+    }
+}
+
+void SceneTreePanel::expandId(const QString& id)
+{
+    if (!m_model || !m_view)
+    {
+        return;
+    }
+    findAndExpandId(m_model->index(0, 0), id);
+}
+
+bool SceneTreePanel::findAndExpandId(const QModelIndex& index, const QString& id)
+{
+    if (!index.isValid())
+    {
+        return false;
+    }
+    if (index.data(kIdRole).toString() == id)
+    {
+        m_view->setExpanded(index, true);
+        return true;
+    }
+    for (int r = 0; r < m_model->rowCount(index); ++r)
+    {
+        if (findAndExpandId(m_model->index(r, 0, index), id))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 void SceneTreePanel::setSelectedIds(const QSet<QString>& ids)
@@ -650,6 +731,44 @@ void SceneTreePanel::setSelectedIds(const QSet<QString>& ids)
     if (!m_view || !m_model || !m_view->selectionModel())
     {
         return;
+    }
+
+    // 2D 模式的 id 只需转数值一次：既用于下面「选择集未变」的短路，也用于批量选择。
+    QSet<qint64> idSet2D;
+    if (m_mode == Mode::Mode2D)
+    {
+        idSet2D.reserve(ids.size());
+        for (const QString& s : ids)
+        {
+            bool ok = false;
+            const qint64 v = s.toLongLong(&ok);
+            if (ok)
+            {
+                idSet2D.insert(v);
+            }
+        }
+
+        // 要选的就是当前这一批时直接返回：拖动 / 重复通知会以同一份选择高频打到这里，
+        // 而下面那次 clearSelection + select 走的是 QItemSelectionModel 的 range 插入合并，
+        // 选中项多时是超线性的，重做一遍纯属浪费，展开与滚动同样不必重做。
+        // 行的 internalId 就是图元 id，直接比对即可，避免走 data() 触发 metaProvider 的引擎查询。
+        const auto selectedRows = m_view->selectionModel()->selectedRows(1);
+        if (selectedRows.size() == idSet2D.size())
+        {
+            bool sameSelection = true;
+            for (const QModelIndex& idx : selectedRows)
+            {
+                if (!idSet2D.contains(static_cast<qint64>(idx.internalId())))
+                {
+                    sameSelection = false;
+                    break;
+                }
+            }
+            if (sameSelection)
+            {
+                return;
+            }
+        }
     }
 
     m_syncing = true;
@@ -664,21 +783,10 @@ void SceneTreePanel::setSelectedIds(const QSet<QString>& ids)
         auto* model2d = dynamic_cast<SceneTreeTableModel2D*>(m_model);
         if (model2d)
         {
-            QSet<qint64> idSet;
-            for (const QString& s : ids)
-            {
-                bool ok = false;
-                const qint64 v = s.toLongLong(&ok);
-                if (ok)
-                {
-                    idSet.insert(v);
-                }
-            }
-
             // 优化2: 批量选择 - 使用 QItemSelection 一次性选择多个项目
             QItemSelection selection;
             QModelIndex firstIndex;
-            for (qint64 id : idSet)
+            for (qint64 id : idSet2D)
             {
                 const QModelIndex idx = model2d->indexForId(id);
                 if (!idx.isValid())
@@ -730,6 +838,10 @@ void SceneTreePanel::setSelectedIds(const QSet<QString>& ids)
             m_view->selectionModel()->select(selection, QItemSelectionModel::Select | QItemSelectionModel::Rows);
         }
     }
+
+    // 上面屏蔽了 selectionModel 的信号，QTreeView 收不到选择变化、也就不会安排重绘；
+    // 这里显式刷一次视口，让高亮立刻跟手，而不是等下一次无关重绘才出现。
+    m_view->viewport()->update();
 
     // 恢复信号
     m_view->selectionModel()->blockSignals(false);
