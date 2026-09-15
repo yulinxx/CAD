@@ -62,6 +62,14 @@ RenderViewport2D::RenderViewport2D(QWidget* parent)
         syncSelectionDetails();
     });
 
+    // 选中态几何被改动（拖动/对齐/镜像/缩放）：只需要按当前场景重建轮廓与手柄，
+    // 不走 syncSelectionDetails —— 那条路还会再发视口的 selectionChanged，
+    // 把属性面板重建与场景树的选择重设一起带上，拖动时每步都做一遍。
+    QObject::connect(
+        m_refreshCoordinator.get(), &SceneRefreshCoordinator::selectionOutlineInvalidated, this, [this]() {
+            syncSelectionToolState();
+        });
+
     // 初始相机状态：台面中心 (600,400)，可见范围 (0,0)~(1200,800)
     m_camera.panOffset = QPointF(-600.0f, -400.0f);
 
@@ -563,6 +571,12 @@ bool RenderViewport2D::setActiveTool(const QString& toolName)
     if (!m_toolManager)
     {
         return false;
+    }
+
+    // 切换工具时关闭 Pan 模式（避免菜单 Pan 操作后点击其他工具仍是平移状态）
+    if (isPanModeEnabled())
+    {
+        setPanModeEnabled(false);
     }
 
     bool ok = m_toolManager->setActiveTool(toolName);
