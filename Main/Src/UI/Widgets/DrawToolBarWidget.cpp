@@ -4,6 +4,7 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QSize>
+#include <QTimer>
 
 #include "UI2D/Operation/OperationId.h"
 #include "UI/UiMetrics.h"
