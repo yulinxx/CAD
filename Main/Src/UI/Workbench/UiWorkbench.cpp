@@ -982,6 +982,20 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     auto* drawWidget = new DrawToolBarWidget(&window);
     const QVector<QAction*> drawToolActions = buildDrawToolActions();
     drawWidget->setToolActions(drawToolActions);
+
+    // 设置 Select/Pan toggle 回调
+    drawWidget->setIsPanModeCallback([this]() {
+        return m_viewport && m_viewport->isPanModeEnabled();
+    });
+    drawWidget->setPanModeToggleCallback([this]() {
+        if (m_viewport)
+        {
+            m_viewport->setPanModeEnabled(!m_viewport->isPanModeEnabled());
+            return true;
+        }
+        return false;
+    });
+
     SY_DEBUGF("[Workbench2D] Draw tool panel built: tools=%d host=%s",
         static_cast<int>(drawToolActions.size()),
         m_panelHostStyle == PanelHostStyle::Dock ? "Dock" : "ToolBar");
