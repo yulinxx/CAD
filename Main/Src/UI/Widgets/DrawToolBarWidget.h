@@ -3,6 +3,7 @@
 #include <QWidget>
 #include <QVector>
 #include <QString>
+#include <QIcon>
 #include <functional>
 
 class QAction;
@@ -47,6 +48,18 @@ public:
     /// 设置当前活动工具名称（用于 Select/Pan toggle 逻辑）
     void setCurrentToolName(const QString& toolName);
 
+    /// 更新 Select 按钮图标（根据当前是 Select 还是 Pan 模式）
+    void updateSelectButtonIcon();
+
+    /// 获取 Select 图标
+    static QIcon selectIcon();
+    /// 获取 Pan 图标
+    static QIcon panIcon();
+
+signals:
+    /// 图标需要更新时发出
+    void iconNeedsUpdate();
+
 private:
     void rebuildButtons();
 
@@ -57,4 +70,6 @@ private:
     PanModeCallback m_panModeToggleCallback;
     // 获取当前是否处于 Pan 模式的回调
     IsPanModeCallback m_isPanModeCallback;
+    // Select 按钮指针（用于更新图标）
+    QToolButton* m_selectButton = nullptr;
 };

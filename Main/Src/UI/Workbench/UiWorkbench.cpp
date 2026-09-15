@@ -996,6 +996,12 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         return false;
     });
 
+    // 监听 Pan 模式变化，更新 Select 按钮图标
+    if (m_viewport)
+    {
+        connect(m_viewport, &RenderViewport2D::panModeChanged, drawWidget, &DrawToolBarWidget::updateSelectButtonIcon);
+    }
+
     SY_DEBUGF("[Workbench2D] Draw tool panel built: tools=%d host=%s",
         static_cast<int>(drawToolActions.size()),
         m_panelHostStyle == PanelHostStyle::Dock ? "Dock" : "ToolBar");

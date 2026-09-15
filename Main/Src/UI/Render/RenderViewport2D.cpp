@@ -734,6 +734,8 @@ void RenderViewport2D::setPanModeEnabled(bool enabled)
     m_snapCursorHidden = false;
     updateStatus(enabled ? tr("2D pan mode") : tr("2D select mode"));
     syncCursorRole();
+    // 发出 Pan 模式变化信号，供工具栏更新图标
+    emit panModeChanged(enabled);
 }
 
 bool RenderViewport2D::isPanModeEnabled() const

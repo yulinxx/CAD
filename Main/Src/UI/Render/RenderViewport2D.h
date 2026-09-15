@@ -226,6 +226,8 @@ signals:
     void selectionChanged();
     // 右键菜单请求：由 UI 层（Workbench）构建并弹出菜单，使右键联动统一走命令中枢
     void contextMenuRequested(QContextMenuEvent* event);
+    // Pan 模式变化时发出，供工具栏更新图标
+    void panModeChanged(bool enabled);
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
