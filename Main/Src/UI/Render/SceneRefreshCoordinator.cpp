@@ -325,7 +325,8 @@ void SceneRefreshCoordinator::onSceneChanged()
 
     // 流水虚线轮廓覆盖层只在"选择集变化"时由 SelectTool 重建。于是当选中图元的几何被改动
     // （对齐/镜像/缩放/移动）时，选择集没变、轮廓也就不会重建，画面里的虚线会停在变换前的
-    // 位置。这里补一次通知，让视口按当前场景重新离散轮廓；消费端 syncSelectionFromScene
+    // 位置。这里补发一次轮廓失效通知（而非 selectionChanged：后者会让视口连带动属性面板
+    // 重建与场景树选择重设，拖动时每步都做一遍太重）；消费端 syncSelectionToolState
     // 是从场景全量重读的，重复调用无副作用。
 
     if (!m_lastSelectedIds.empty())
@@ -343,6 +344,7 @@ void SceneRefreshCoordinator::onSelectionChanged()
     // P5: 观察者注册收敛 — 发射信号供视口同步工具状态
     emit selectionChanged();
 
+<<<<<<< Updated upstream
     // 选择变化：默认选中态不改变主几何（图元本体始终以原色实线提交，选中反馈只由
     // 流水虚线轮廓覆盖层叠加表达），因此无需把翻转的图元加入脏集合——它们的顶点没变。
     // 仍要维护 m_lastSelectedIds：onSceneChanged 靠它判断"当前有选中"，几何被变换时补发。
@@ -350,6 +352,13 @@ void SceneRefreshCoordinator::onSelectionChanged()
     // 例外："选中时隐藏原图"开启时，选中态会改变世界层内容（选中图元本体要从世界层移除、
     // 取消选中的要恢复），因此选择集真正变化时需要一次全量重建。
     bool selectionSetChanged = false;
+=======
+    // 选择变化走增量渲染。选中态不改变主几何：图元本体始终以原色实线提交，
+    // 选中反馈只由流水虚线轮廓覆盖层叠加表达（覆盖层由 SelectTool 在 selectionChanged 时重建）。
+    // 因此这里无需把选中态翻转的图元加入脏集合——它们的顶点没有变化，重提交只是白做离散化。
+    // 仍要维护 m_lastSelectedIds：onSceneChanged 靠它判断"当前有选中"，从而在几何被变换时
+    // 补发一次 selectionOutlineInvalidated 让轮廓跟着更新。
+>>>>>>> Stashed changes
     if (m_sceneManager)
     {
         std::unordered_set<uint64_t> currentSelected;
@@ -652,7 +661,8 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         reconcileTexts(sm, /*fullReconcile=*/false);
     }
 
-    m_renderWidget->update();
+    // 位图/文字协调完成后不需要额外 update() ——
+    // BatchGuard 析构时 endBatchUpload() 已调用一次 QOpenGLWidget::update()。
 }
 
 void SceneRefreshCoordinator::processCurveLodBatch()

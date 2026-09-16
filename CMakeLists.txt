@@ -279,6 +279,13 @@ if(BUILD_KEYGEN_TOOL)
     message(STATUS "  KeygenTool: ENABLED")
 endif()
 
+# 7.6 Metal 原生视口原型（仅 Apple）——一次性可行性验证，不是产品代码。
+# 用来回答「Qt 宿主能否把 NSView 交给 Metal」，默认关闭。
+option(BUILD_METAL_VIEWPORT_PROTO "Build Metal native viewport prototype (Apple only)" OFF)
+if(BUILD_METAL_VIEWPORT_PROTO)
+    add_subdirectory(Tools/MetalViewportProto)
+endif()
+
 # 8. 应用入口
 add_subdirectory(Main)
 

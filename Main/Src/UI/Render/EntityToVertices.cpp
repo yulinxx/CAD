@@ -289,7 +289,7 @@ bool entityToVertices(const Eg::SyEntity* entity,
 
     // 通过 Engine 侧统一边界分解图元，本地 sink 离散化
     IncrementalVertexSink sink(outVertices, outType, cameraCenter, worldToScreenScale, chordErrorPixels);
-    if (!Eg::emitEntityGeometry(*entity, sink))
+    if (!Eg::emitEntityGeometry(*entity, sink, worldToScreenScale))
     {
         return false;
     }
