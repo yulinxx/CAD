@@ -104,7 +104,8 @@ Metal 的绑定模型比 GL 简单：`(set, binding)` 可以直接映射为 buff
 
 `GraphicsPipelineDesc` 到 `MTLRenderPipelineDescriptor` 的映射是直接的，但有两处必须显式处理：
 
-1. **`FillMode::Wireframe`**：Metal 没有多边形线框模式，`Capabilities::wireframeFill` 为 **false**。现有 `Mesh3DWire` 管线依赖 `fillMode = Wireframe`，在 Metal 上必须改为**三角化线框**（应用层或 RT 层生成 LineList），或在能力位为 false 时明确报错。这是必须在 M4 处理的已知缺口。
+1. **`FillMode::Wireframe`**：~~Metal 没有多边形线框模式，`Capabilities::wireframeFill` 为 **false**……这是必须在 M4 处理的已知缺口。~~
+   **【2026-09-16 更正：已实现，上述结论不成立】** macOS 的 Metal **支持**多边形线框，`Capabilities::wireframeFill` 现为 **true**。当初判断失误的原因是把「Metal 没有 `VK_POLYGON_MODE_LINE` 那样的**管线描述符属性**」读成了「Metal 不支持线框」——Metal 的对应物是**编码器状态** `MTLRenderCommandEncoder.triangleFillMode = MTLTriangleFillModeLines`，管线描述符里存不下，必须在 `bindPipeline` 时下发（`MetalCommandList::bindPipeline`），并且每个 render pass 新建编码器时要重新下发（`beginRenderPass` 清管线句柄）。**不需要**上层三角化线框，`Mesh3DWire` 与 `Highlight3D` 直接可用；回归用例 `RenderxMetalTests.Mesh3DWireFillDrawsEdgesInsteadOfSolidArea` 锁定该行为。
 2. **深度范围**：GL 裁剪空间 z ∈ [-1,1]，Metal 为 [0,1]。若宿主的投影矩阵按 GL 约定生成，Metal 上会出现深度错误。**这是最容易被忽略、且症状隐蔽的一条**（表现为远平面物体消失或 z-fighting）。处理方式见 §6。
 
 ### D5 命令录制与状态冗余消除
@@ -271,7 +272,7 @@ cmake --build build-mac --target RenderxTests --config Debug
 | 风险 | 影响 | 缓解 |
 |------|------|------|
 | **深度范围差异**（GL [-1,1] vs Metal [0,1]） | 3D 深度错误、远平面消失，症状隐蔽 | M4 显式验证；确认宿主投影矩阵约定，必要时在 Metal 侧做 z 重映射 |
-| **线框缺口**（Metal 无 polygon line） | `Mesh3DWire` 在 Mac 上无效 | `Capabilities::wireframeFill = false`，上层查能力后改走三角化线框 |
+| ~~**线框缺口**（Metal 无 polygon line）~~ **【2026-09-16 已消除】** | — | ~~`Capabilities::wireframeFill = false`，上层查能力后改走三角化线框~~ 实际 Metal 支持，改用编码器状态 `MTLTriangleFillModeLines`，见 §D4 第 1 条的更正说明 |
 | MSL 与 GLSL 双份维护 | 改一处漏一处，两侧渲染不一致 | 对比验证作为护栏；共享声明（pushConstant 块）两侧用测试锁定布局 |
 | 开发机无法验证 | 问题积压到 Mac 侧才暴露 | 分 M1-M4 交付，每阶段独立验收 |
 | ARC 与手动内存管理混用 | Metal 对象生命周期错误、崩溃 | `.mm` 统一开启 ARC，`id<MTL*>` 由 ARC 管理；C++ 侧只持有裸指针并在析构时置空 |
