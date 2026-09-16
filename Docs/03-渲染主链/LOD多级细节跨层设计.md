@@ -199,6 +199,16 @@ if (newLevel != builder.lodLevel()) {
 不该也不需关心「当前缩放级别下该用多少段」。这保持「数据层零渲染语义」的
 既有边界。
 
+### 4.3.1 SmartLine 细分输出 LineStrip 优化（2026-09-16）
+
+文件：`Engine/2D/Src/Render/Tessellator.cpp` (`tessellateSmartLine`)
+
+SVG 导入的复合曲线以 `SmartLine` 存储，每段原独立细分为 `GL_LINES`（成对顶点）。N 段产生 2N 个顶点，连接处顶点无复用。
+
+**优化**：`tessellateSmartLine()` 改为输出 `LineStrip`，首段保留起点，后续段跳过重复连接点。N 段仅产生 N+1 个顶点（原 2N），顶点数减少 ~50%，显存带宽减半。
+
+**收益**：复杂 SVG 渲染顶点大幅减少，GPU 提交负载降低。
+
 ***
 
 ## 5. 关键难点与对策
