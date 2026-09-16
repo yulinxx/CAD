@@ -242,6 +242,10 @@ target_link_libraries(${app_name}
         Engine2D
         EnginePersistence
         RenderX
+        # 应用退出时要显式销毁 Metal 的进程级共享 Runtime
+        # （AppBootstrapper::shutdown → RenderSessionHost::shutdownSharedRuntime）。
+        # 此前只是经由 UI2D/UI3D 传递进来，属「用了但没声明」。
+        RenderBridge
         UICommon
         UI2D
         Log

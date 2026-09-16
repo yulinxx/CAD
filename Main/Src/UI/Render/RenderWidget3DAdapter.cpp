@@ -150,6 +150,14 @@ void RenderWidget3DAdapter::shutdown()
         // 然后交给 Qt 事件循环安全删除。
         // 必须用 release() 放弃 unique_ptr 所有权，否则 reset() 会立即析构对象，
         // 与 deleteLater() 形成双重释放。
+        //
+        // 但**渲染资源必须先显式释放**：deleteLater() 的删除由事件循环处理，而应用
+        // 退出时事件循环已经结束（"Application exited with code 0" 之后才跑工作台
+        // shutdown），那个删除永远不会发生 —— 控件不析构，m_sessionHost 也就不会
+        // 释放 Surface/Session，Renderx 会在 Runtime 销毁时报
+        // "Runtime destroyed with N sessions still alive (host lifecycle error)"。
+        // 这一条是被实测抓出来的：从 3D 工作台直接退出应用时必现。
+        m_renderWidget->releaseRenderer();
         m_renderWidget->setParent(nullptr);
         m_renderWidget->deleteLater();
         m_renderWidget.release();

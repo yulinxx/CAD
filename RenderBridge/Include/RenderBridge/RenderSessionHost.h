@@ -23,6 +23,32 @@
  *
  * 不放进 UICommon：UICommon 的定位是「UI 通用件」，不应该为了这个再去
  * 公共依赖 RenderX；RenderBridge 才是宿主与渲染 DLL 之间的那一层。
+ *
+ * Metal 下的 Runtime 是**进程级共享**的：设备、内建管线预热、字形图集、
+ * GeometryStore、材质表与瞬态环都挂在 Runtime 上，而产品同一时刻只有一个
+ * 中央视口 —— 每个视口各建一套的代价是「每次 2D↔3D 切换都把这一整套重做
+ * 一遍」。因此 Metal 的 Runtime 由进程内一份持有者持有（实现见 .cpp 的
+ * SharedMetalRuntime），每个视口只建自己的 Surface 与 Session。
+ *
+ * 它的生命周期是**应用级**：首个视口建立，此后一直保留，直到应用退出
+ * （`shutdownSharedRuntime()`）**且最后一个视口已拆除**时才销毁。
+ *
+ * 为什么不是单纯的应用退出点销毁：实测发现 **Qt 的视口销毁是延迟的** —— 从 3D
+ * 工作台退出时 `Workbench3D::deactivate()` 已跑完（MainWindow3D 已析构、服务已
+ * 释放），但 `RenderWidget3D` 仍活着，其析构被 Qt 的对象树推到更晚。若此刻就销毁
+ * 共享 Runtime，Renderx 会明确报错
+ * `Runtime destroyed with N sessions still alive (host lifecycle error)`。
+ * 因此 `shutdownSharedRuntime()` 只**请求**销毁，真正的销毁落在最后一次
+ * `release()`（视口析构）之后——那里 Surface/Session 必然已经拆干净。
+ *
+ * 也不走纯引用计数：实测工作台切换是「先销毁旧视口、再创建新视口」，两者生命周期
+ * 不重叠，纯计数必然 1→0→1，等于每次切换都重建。
+ *
+ * GL 侧不做共享：GL 资源属于上下文，两个视口的 QOpenGLWidget 不保证共享
+ * 上下文，行为保持与之前完全一致。
+ *
+ * **代价**：瞬态环常驻整个应用会话（环总量 = transientBufferBytes × 2），
+ * 换来的是工作台切换不重建设备与内建管线。
  */
 
 #include "RenderBridge/RenderBridgeAPI.h"
@@ -36,6 +62,30 @@ namespace RenderBridge
     class RENDERBRIDGE_API RenderSessionHost
     {
     public:
+        /**
+         * Metal 共享 Runtime 的瞬态环预算（即 Config::transientBufferBytes 的
+         * 取值）。两个视口必须声明同一个值。
+         *
+         * 为什么必须同源：该参数是 **Runtime 级**的，共享后只有「首次建立」
+         * 那一次生效——后建者报一个更大的值也拿不到扩容，只会让
+         * SharedMetalRuntime 留一条 WARN。收口之前这里就是分叉的（2D 用默认
+         * 64MB、3D 用 128MB），一旦共享就会变成「谁先建谁说了算」。
+         *
+         * **为什么是 64MB（实测定的）**：单段容量 32MB。实测用
+         * `13451_Golden_Crown_v1_L2.obj`（348288 顶点、13.9MB 几何 blob）选中
+         * 5 个实体并三轴旋转（选中高亮与线框在拖拽时逐帧全量重传，是瞬态环的
+         * 主要负载），全程**未触发 75% 告警**，即单帧用量 < 24MB。
+         *
+         * 这个预算下仍然安全：`Session::endFrame` 在用量越过单段容量 75%
+         * （24MB）时报一条明确的 WARN，而真正超出 32MB 时 TransientRing 会为该次
+         * 分配另开缓冲（帧末释放）——不会画错，只是慢一点。也就是说「先用警告
+         * 提醒、再优雅降级」，不是一超就坏。真要吃到警告，把它抬回去即可。
+         *
+         * 取 64MB 而不是 128MB 的收益：环总量 = 预算 × 2，常驻显存因此从 256MB
+         * 降到 128MB——与收口前「2D 单开」的占用持平，切换零重建的收益不变。
+         */
+        static constexpr uint64_t kSharedRuntimeTransientBytes = 64ull * 1024 * 1024;
+
         /// 创建参数：只暴露两个视口真正不同的部分，其余走同一套默认
         struct Config
         {
@@ -88,9 +138,32 @@ namespace RenderBridge
         /// 把后端能力打一条日志；tag 是调用方前缀（两个视口前缀不同）
         void logCapabilities(const char* tag) const;
 
+        /**
+         * @brief 请求销毁进程级共享的 Metal Runtime（应用退出时调用一次）
+         *
+         * **只置标志，不一定当场销毁**：真正的销毁要等最后一个视口销毁（即最后一次
+         * `release()`）。原因是 Qt 的视口析构是延迟的——实测从 3D 工作台退出时，
+         * `Workbench3D::deactivate()` 已跑完但 `RenderWidget3D` 仍活着，若此刻就
+         * 销毁 Runtime，它的 Surface/Session 还在，Renderx 会报
+         * `Runtime destroyed with N sessions still alive (host lifecycle error)`。
+         *
+         * 调用时机：`AppBootstrapper::shutdown()` 里工作台释放之后。若调用时已经没有
+         * 活跃视口，则立即销毁。
+         *
+         * 幂等。GL 侧无共享 Runtime，调用它是空操作。
+         */
+        static void shutdownSharedRuntime();
+
     private:
         Render::RT::RuntimeHandle m_runtime{ Render::RT::RuntimeHandle::Invalid };
         Render::RT::SurfaceHandle m_surface{ Render::RT::SurfaceHandle::Invalid };
         Render::RT::SessionHandle m_session{ Render::RT::SessionHandle::Invalid };
+        /**
+         * 本实例的 Runtime 是否来自进程级共享持有者。
+         *
+         * 决定 shutdown() 是「还一份引用」还是「直接销毁」——写错会导致
+         * 共享 Runtime 被提前销毁（其它视口的 Surface 全部失效）或泄漏。
+         */
+        bool m_runtimeShared = false;
     };
 }  // namespace RenderBridge

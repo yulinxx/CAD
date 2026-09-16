@@ -3,6 +3,175 @@
 #include "RenderBridge/HostCallbacks.h"
 #include "Log/SyLogger.h"
 
+namespace
+{
+    /**
+     * @brief 进程级共享的 Metal Runtime
+     *
+     * **为什么要有它**：Runtime 是「一个 GPU 设备 + 全部共享资源」的粒度——
+     * 设备创建、内建管线预热（实测 22 条）、字形图集、GeometryStore、材质表、
+     * 管线缓存、瞬态环全挂在它上面。此前每个视口各建一套，于是每次 2D↔3D
+     * 工作台切换都要把这一整套重做一遍：实测同一 PID 内出现两次
+     * `Runtime ready`（一次 64MB、一次 128MB）与两次
+     * `Built-in pipelines ready 22/22`，而产品同一时刻只有一个中央视口，
+     * 这些工作纯属重复。
+     *
+     * **API 层本来就支持**：Renderx 按「1 个 Runtime + N 个 Surface」设计
+     * （`Runtime::createSurface` / `destroySurface`；README：「同一 Runtime 可
+     * 创建任意多个 Surface，共享全部 GPU 资源……这是多窗口的正确形态」），
+     * 多窗口共享也是库内已有的支持路径（`Runtime::sessionsInFrame` 专门处理
+     * 共享瞬态环的切段）。因此这一层只把「谁建、谁销毁」从「每个视口」
+     * 改成「进程内一份」，**不需要动任何 ABI**。
+     *
+     * **为什么只对 Metal 这样做**：GL 的资源属于上下文，两个视口的
+     * QOpenGLWidget 不保证共享上下文（surface 走 ForeignGlContext，只记录
+     * 当前帧缓冲），跨上下文复用同一个 Runtime 等于把「资源在这里创建、
+     * 在那边使用」引进来。GL 因此保持每视口一套，行为与之前完全一致。
+     *
+     * **生命周期是「应用级」，但销毁必须等视口拆完**：这一条被实测推着改了两次。
+     *
+     * 第一版用引用计数（最后一个视口销毁即销毁 Runtime），实测证伪：工作台切换是
+     * 「先销毁旧视口、再创建新视口」，两个生命周期不重叠，计数必然 1→0→1，
+     * 等于每次切换都重建。
+     *
+     * 第二版改成「应用退出时显式销毁」（AppBootstrapper::shutdown 里调
+     * shutdownSharedRuntime）。这版又被实测证伪：**Qt 的视口销毁是延迟的**——
+     * 从 3D 工作台退出时，`Workbench3D::deactivate()` 已经跑完（MainWindow3D
+     * 已析构、服务已释放），但 RenderWidget3D 仍活着，其析构被 Qt 的对象树
+     * 推到更晚。于是共享 Runtime 被提前销毁，Renderx 明确报错：
+     *
+     *   [E] Runtime destroyed with 1 sessions still alive (host lifecycle error)
+     *   [E] Runtime destroyed with 1 surfaces still alive (host lifecycle error)
+     *
+     * 现版把两者合起来：**请求与应用退出绑定，销毁与最后一个视口释放绑定**。
+     *   - `requestShutdown()`（应用退出时调用）只置标志；
+     *   - `release()`（视口析构时调用）在「已请求 + 计数归零」时才真正销毁。
+     * 这样销毁时机天然落在所有 Surface/Session 拆除之后，既不吃切换（那时没请求），
+     * 也不踩 Qt 的延迟销毁。
+     *
+     * 若视口直到进程退出都没被析构（异常路径），则**不销毁**：静态析构只记 WARN。
+     * 那种时刻渲染 DLL 可能已卸载，去调 rxRuntimeDestroy 的风险高于让 OS 回收。
+     *
+     * **代价（明确记录）**：瞬态环常驻整个应用会话。环总量 =
+     * transientBufferBytes × 2，当前 64MB 预算即常驻 128MB —— 与收口前
+     * 「2D 单开」的占用持平（那时 2D 的环是 64MB×2）。这是「切换零重建」换来的。
+     *
+     * **线程约定**：视口的创建与销毁、以及本持有者的请求都在 Qt 主线程，不加锁。
+     */
+    class SharedMetalRuntime
+    {
+    public:
+        static SharedMetalRuntime& instance()
+        {
+            static SharedMetalRuntime holder;
+            return holder;
+        }
+
+        ~SharedMetalRuntime()
+        {
+            if (Render::RT::rxValid(m_runtime))
+            {
+                // 走到这里说明应用退出了、但仍有视口没被析构（正常路径下
+                // 最后一个视口的 release() 已经把 runtime 销毁了）。此时渲染 DLL
+                // 可能已卸载，去调 rxRuntimeDestroy 的风险高于让 OS 回收，因此只报。
+                SY_WARNF("[SharedRuntime] 进程退出时 runtime 仍存活：有 %u 个视口未被析构，"
+                         "未销毁（交操作系统回收）", m_holders);
+            }
+        }
+
+        /// 取一份引用；首次调用负责按 desc 建立 Runtime
+        Render::RT::RuntimeHandle acquire(const Render::RT::RuntimeDesc& desc)
+        {
+            if (Render::RT::rxValid(m_runtime))
+            {
+                if (desc.transientBufferBytes != m_transientBytes)
+                {
+                    // 该参数是 Runtime 级、只有首次建立那一次生效。两个视口必须声明
+                    // 同一个值，否则「谁先建谁说了算」。这里留一条 WARN，
+                    // 免得将来两边又长出分叉（本次收口之前就是 64MB 与 128MB 分叉）
+                    // 而无人察觉。
+                    SY_WARNF("[SharedRuntime] transientBufferBytes 请求 %llu 与已建 %llu 不一致，"
+                             "沿用已建值（后建者拿不到扩容）",
+                        static_cast<unsigned long long>(desc.transientBufferBytes),
+                        static_cast<unsigned long long>(m_transientBytes));
+                }
+                m_holders += 1;
+                SY_INFOF("[SharedRuntime] 复用进程级 Metal runtime（当前持有点 %u 个）", m_holders);
+                return m_runtime;
+            }
+
+            m_runtime = Render::RT::rxRuntimeCreate(&desc);
+            if (!Render::RT::rxValid(m_runtime))
+            {
+                return Render::RT::RuntimeHandle::Invalid;
+            }
+            m_transientBytes = desc.transientBufferBytes;
+            m_holders = 1;
+            m_shutdownRequested = false;
+            SY_INFOF("[SharedRuntime] 建立进程级 Metal runtime"
+                     "（transient=%llu bytes；应用级生命周期，2D/3D 共用，不随视口重建）",
+                static_cast<unsigned long long>(m_transientBytes));
+            return m_runtime;
+        }
+
+        /// 视口析构：减持有计数；若应用已请求退出且这是最后一个视口，此刻才销毁
+        void release()
+        {
+            if (!Render::RT::rxValid(m_runtime))
+            {
+                return;
+            }
+            if (m_holders > 0)
+            {
+                m_holders -= 1;
+            }
+            if (m_shutdownRequested && m_holders == 0)
+            {
+                destroy("应用已请求退出，且最后一个视口已拆除");
+                return;
+            }
+            SY_INFOF("[SharedRuntime] 视口释放（当前持有点 %u 个；runtime 保留给下一个视口）",
+                m_holders);
+        }
+
+        /// 应用退出：只置标志。真正销毁交给最后一个视口的 release()（见类注释）
+        void requestShutdown()
+        {
+            if (!Render::RT::rxValid(m_runtime))
+            {
+                return;
+            }
+            m_shutdownRequested = true;
+            if (m_holders == 0)
+            {
+                destroy("应用已请求退出，且当前无视口");
+                return;
+            }
+            SY_INFOF("[SharedRuntime] 应用请求退出：仍有 %u 个视口未拆除，"
+                     "runtime 交给最后一次视口释放时销毁（Qt 的视口析构是延迟的）",
+                m_holders);
+        }
+
+    private:
+        void destroy(const char* reason)
+        {
+            m_shutdownRequested = false;
+            SY_INFOF("[SharedRuntime] 销毁进程级 Metal runtime（%s）", reason ? reason : "?");
+            Render::RT::rxRuntimeDestroy(m_runtime);
+            m_runtime = Render::RT::RuntimeHandle::Invalid;
+            m_transientBytes = 0;
+        }
+
+        Render::RT::RuntimeHandle m_runtime{ Render::RT::RuntimeHandle::Invalid };
+        /// 已建 Runtime 实际采用的瞬态环预算，用于对后续请求做一致性告警
+        uint64_t m_transientBytes = 0;
+        /// 当前持有点数量：只用于日志与「是否已拆完」的判断
+        uint32_t m_holders = 0;
+        /// 应用是否已请求退出（决定 release 到 0 时是销毁还是保留）
+        bool m_shutdownRequested = false;
+    };
+}  // namespace
+
 namespace RenderBridge
 {
     RenderSessionHost::~RenderSessionHost()
@@ -39,7 +208,17 @@ namespace RenderBridge
             // Metal 不解析 GL 符号：留空。
             rd.glGetProcAddress = reinterpret_cast<void*>(&Render::host::qtGlGetProcAddress);
         }
-        m_runtime = Render::RT::rxRuntimeCreate(&rd);
+        // Metal 的 Runtime 在进程内共享，GL 的每视口一套——理由见 SharedMetalRuntime 注释。
+        if (metal)
+        {
+            m_runtime = SharedMetalRuntime::instance().acquire(rd);
+            m_runtimeShared = true;
+        }
+        else
+        {
+            m_runtime = Render::RT::rxRuntimeCreate(&rd);
+            m_runtimeShared = false;
+        }
         if (!Render::RT::rxValid(m_runtime))
         {
             return false;
@@ -103,9 +282,25 @@ namespace RenderBridge
         }
         if (Render::RT::rxValid(m_runtime))
         {
-            Render::RT::rxRuntimeDestroy(m_runtime);
+            if (m_runtimeShared)
+            {
+                // 共享 Runtime 只减持有计数、不销毁：它活到应用退出（见 SharedMetalRuntime
+                // 注释——实测工作台切换是先销毁旧视口再建新视口，两个生命周期不重叠，
+                // 按引用计数必然 1→0→1，等于每次切换都重建）。
+                SharedMetalRuntime::instance().release();
+            }
+            else
+            {
+                Render::RT::rxRuntimeDestroy(m_runtime);
+            }
             m_runtime = Render::RT::RuntimeHandle::Invalid;
         }
+        m_runtimeShared = false;
+    }
+
+    void RenderSessionHost::shutdownSharedRuntime()
+    {
+        SharedMetalRuntime::instance().requestShutdown();
     }
 
     bool RenderSessionHost::isReady() const

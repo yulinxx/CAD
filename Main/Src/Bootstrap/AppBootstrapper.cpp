@@ -5,6 +5,8 @@
 
 #include "Log/SyLogger.h"
 
+#include "RenderBridge/RenderSessionHost.h"
+
 #include "UI/Workbench/UiWorkbench.h"
 #include "UI/Workbench/WorkbenchWindow.h"
 #include "UI/Services/UiFrameworkServices.h"
@@ -213,6 +215,14 @@ void AppBootstrapper::shutdown()
 
 
     m_workbench.reset();
+
+    // 请求销毁 Metal 的进程级共享 Runtime（设备 + 内建管线 + 字形图集 + 瞬态环）。
+    //
+    // 注意这里只是**请求**：真正的销毁等最后一个视口被析构时发生。实测从 3D 工作台
+    // 退出时 Qt 的视口销毁是延迟的（`Workbench3D::deactivate()` 已跑完，但
+    // RenderWidget3D 仍活着），此刻若直接销毁，它的 Surface/Session 还在，
+    // Renderx 会报 `Runtime destroyed with N sessions still alive`。
+    RenderBridge::RenderSessionHost::shutdownSharedRuntime();
 
     SY_DEBUG("[AppBootstrapper] Shutdown complete");
 }
