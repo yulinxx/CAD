@@ -339,13 +339,18 @@ endif()
 set(RESOURCES_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 set(RESOURCES_DST_DIR "$<TARGET_FILE_DIR:${app_name}>/resources")
 
-add_custom_command(TARGET ${app_name} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${RESOURCES_DST_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${RESOURCES_SRC_DIR}"
-        "${RESOURCES_DST_DIR}"
-    COMMENT "Copying resource files to ${RESOURCES_DST_DIR}"
-)
+# Only copy resources if the source directory exists
+if(EXISTS "${RESOURCES_SRC_DIR}")
+    add_custom_command(TARGET ${app_name} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${RESOURCES_DST_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${RESOURCES_SRC_DIR}"
+            "${RESOURCES_DST_DIR}"
+        COMMENT "Copying resource files to ${RESOURCES_DST_DIR}"
+    )
+else()
+    message(STATUS "Resources directory not found: ${RESOURCES_SRC_DIR}, skipping copy")
+endif()
 
 # ============ 部署第三方外部工具 (poppler / ghostscript) ============
 # 从 ThirdParty/<tool>/<platform>/<arch>/ 下的 bin/ 和 lib/ 复制到输出目录

@@ -290,6 +290,37 @@ endif()
 add_subdirectory(Main)
 
 # ============================================================================
+# 视口后端编译期开关
+# ============================================================================
+# 只决定「宿主视口用哪个后端」，不改变 Renderx：Metal 后端始终参与编译并与 GL
+# 并存（两个 runtime 可在同一进程里各建各的，视口切换时更是常态）。
+#
+# 关闭此开关 = 根本不编译 Metal 视口代码路径，退回到 OpenGL；这不是运行时回退
+# ——Metal 初始化失败属于错误，不做静默降级。
+option(SY_ENABLE_METAL_VIEWPORT "Use Metal-backed viewports on Apple platforms" ON)
+if(NOT APPLE)
+    # 非 Apple 平台没有 Metal 后端，强制关闭并覆盖缓存值，
+    # 免得被误设成 ON 后到处出现无法解析的后端分支。
+    set(SY_ENABLE_METAL_VIEWPORT OFF CACHE BOOL
+        "Use Metal-backed viewports on Apple platforms" FORCE)
+endif()
+if(SY_ENABLE_METAL_VIEWPORT)
+    message(STATUS "[SanYi] viewport backend: Metal")
+else()
+    message(STATUS "[SanYi] viewport backend: OpenGL")
+endif()
+
+# 编译定义的**唯一**出处：各目标不得自行判断 APPLE 或重复定义开关，
+# 否则两处取值不一致时会出现「一半 Metal 一半 GL」的静默错配。
+# 未开启时不定义任何宏，视口代码走未定义的 GL 分支。
+set(SY_VIEWPORT_BACKEND_TARGETS UI2D UI3D SanYiCAD)
+foreach(_sy_viewport_target IN LISTS SY_VIEWPORT_BACKEND_TARGETS)
+    if(TARGET ${_sy_viewport_target} AND SY_ENABLE_METAL_VIEWPORT)
+        target_compile_definitions(${_sy_viewport_target} PRIVATE SY_ENABLE_METAL_VIEWPORT=1)
+    endif()
+endforeach()
+
+# ============================================================================
 # 安装规则
 # ============================================================================
 # 安装主可执行文件
