@@ -5,10 +5,27 @@
 #include "UI2D/Operation/IOperation.h"
 
 #include "UI/Services/HelpDialogService.h"
+#include "UI/Shortcut/IShortcutSettingsModel.h"
 #include "UI/Workbench/WorkbenchWindow.h"
+#include "UI/Workbench/WorkbenchMenuManager.h"
 #include "UI/Workbench/UiWorkbench.h"
 
 #include <QWidget>
+
+namespace
+{
+    /// 当前活动工作台的快捷键台账模型。台账由配置驱动菜单在框架层建立
+    /// （QAction/QShortcut + 用户覆盖），2D/3D 共用同一份实现，只能从工作台窗口取。
+    IShortcutSettingsModel* activeShortcutModel(QWidget* parentWidget)
+    {
+        auto* window = qobject_cast<WorkbenchWindow*>(parentWidget);
+        if (!window || !window->menuManager())
+        {
+            return nullptr;
+        }
+        return window->menuManager()->shortcutSettingsModel();
+    }
+}  // namespace
 
 HelpOperationRegistry::HelpOperationRegistry(OperationBus* bus, QWidget* parentWidget)
     : m_bus(bus)
@@ -51,6 +68,7 @@ void HelpOperationRegistry::registerAll()
     }));
 
     reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Help_Shortcut, [parentWidget] {
-        HelpDialogService::showShortcutsDialog(parentWidget);
+        // 2D 与 3D 共用 HelpDialogService 的同一条实现，内容取当前工作台的台账
+        HelpDialogService::showShortcutsDialog(parentWidget, activeShortcutModel(parentWidget));
     }));
 }

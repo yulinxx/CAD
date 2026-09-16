@@ -22,6 +22,7 @@
 #include "UiServices.h"
 #include "UiStateCenter.h"
 #include "UI/Services/ViewportActionHub.h"
+#include "UI/Services/HelpDialogService.h"
 #include "UI/Services/ISelectionService.h"
 #include "Engine2D/Edit/IUndoRedoManager.h"
 #include "UiSceneTreePanel.h"
@@ -2573,11 +2574,12 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     }
 
     SY_DEBUG("[Workbench3D] Calling CommandRegistry3D::registerAll()...");
-    // Help ▸ Settings 与 2D 同路：由工作台层解析活动工作台后再叫 showSettingsDialog，
-    // 而不是让 UI3D 的 MainWindow3D 自己弹框 —— 快捷键页的数据源是框架层台账
-    // （配置驱动菜单建出的 QAction/QShortcut + 用户覆盖），UI3D 看不到那一层。
+    // Help_Settings / Help_Shortcut 由工作台层注册（需要框架层快捷键台账）
+    // 快捷键台账（配置驱动菜单建出的 QAction/QShortcut + 用户覆盖），而 UI3D 库看不到
+    // 那一层 —— Settings 需要台账模型注入，Shortcuts 需要台账渲染内容。因此统一由工作台层
+    // 注册，Settings 再解析活动工作台转发给 UiWorkbench::showSettingsDialog。
     // 注册必须发生在 registerAll 之前：OperationRegistryBase 用 try_emplace，先到先得，
-    // 后注册的同名 Operation 会被忽略（HelpOperations3D 里已不再注册这一项）。
+    // 后注册的同名 Operation 会被忽略（HelpOperations3D 里已不再注册这两项）。
     own.operationBus->registerOperation(std::make_unique<LambdaOperation3D>(
         OperationId3D::Help_Settings, [windowPtr = &window](OperationContext3D&, const OperationRequest3D&) {
             OperationResult3D result;
@@ -2587,6 +2589,19 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
             {
                 SY_WARNF("[Workbench3D] Help_Settings: no active workbench");
             }
+            return result;
+        }));
+    own.operationBus->registerOperation(std::make_unique<LambdaOperation3D>(
+        OperationId3D::Help_Shortcut, [windowPtr = &window](OperationContext3D&, const OperationRequest3D&) {
+            OperationResult3D result;
+            result.success = true;
+            IShortcutSettingsModel* shortcutModel =
+                windowPtr->menuManager() ? windowPtr->menuManager()->shortcutSettingsModel() : nullptr;
+            if (!shortcutModel)
+            {
+                SY_WARNF("[Workbench3D] Help_Shortcut: shortcut ledger unavailable");
+            }
+            HelpDialogService::showShortcutsDialog(windowPtr, shortcutModel);
             return result;
         }));
     CommandRegistry3D::registerAll(mainWindow3D);

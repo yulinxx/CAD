@@ -3,6 +3,7 @@
 #include <QString>
 
 class QWidget;
+class IShortcutSettingsModel;
 
 /**
  * @class HelpDialogService
@@ -14,14 +15,19 @@ class QWidget;
 class HelpDialogService
 {
 public:
-    /// 显示关于对话框
+    /// 显示关于对话框（无GL信息，适用于2D）
     static void showAboutDialog(QWidget* parent);
+
+    /// 显示关于对话框（带GL信息，适用于3D）
+    static void showAboutDialog(QWidget* parent, const QString& glVersion, const QString& glVendor,
+        const QString& glRenderer, const QString& glslVersion);
 
     /// 显示文档提示对话框
     static void showDocumentationDialog(QWidget* parent);
 
-    /// 显示键盘快捷键对话框
-    static void showShortcutsDialog(QWidget* parent);
+    /// 显示键盘快捷键对话框（2D/3D 共用，内容来自框架层快捷键台账）
+    /// @param model 当前工作台的快捷键台账模型，可为空（无活动工作台时给空态提示）
+    static void showShortcutsDialog(QWidget* parent, IShortcutSettingsModel* model);
 
     // ---- 通用错误/信息弹窗（供文件操作使用）----
 

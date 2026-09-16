@@ -1,6 +1,5 @@
 <RCC>
     <qresource prefix="/">
-        <file>resources/Shortcuts/default_shortcuts.json</file>
         <file>../UI/Common/Resources/Styles/common.qss</file>
         <file>../UI/Common/Resources/Styles/light.qss</file>
         <file>../UI/Common/Resources/Styles/dark.qss</file>
