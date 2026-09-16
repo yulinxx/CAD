@@ -477,6 +477,10 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
         "${UI_ROOT}/Test/*.cpp"
     )
 
+    # ViewportRefreshTestsMain.cpp 是下方 ViewportRefreshTests 目标的专用入口
+    # （自带 QApplication），进了 MainTests 会多出一个 main
+    list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*ViewportRefreshTestsMain\\.cpp$")
+
     if(NOT BUILD_UI3D)
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*RenderWidget3DAdapterTests\\.cpp$")
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*Scene3DRegressionTests\\.cpp$")
@@ -647,4 +651,56 @@ target_link_libraries(MainTests
 
     message(STATUS "[Main Tests]")
     message(STATUS "")
+endif()
+
+# ============================================================================
+# 视口刷新契约测试（独立目标，不受 BUILD_MAIN_TESTS 约束）
+# ============================================================================
+# 为什么必须单独开一个目标：Config.cmake 用**普通变量**统一 set(BUILD_MAIN_TESTS OFF)，
+# 普通变量会遮蔽本文件里同名的 option()（CMP0077 NEW），因此 -DBUILD_MAIN_TESTS=ON
+# 是无效的 —— 与 Renderx 的 BUILD_RENDERX_TESTS 属同一类约定。
+# 结果是 UI/Test 下的 ViewportRefreshRegressionTests 那 56 条刷新契约用例
+# **从不参与编译**，2D 的刷新语义（四级级别/脏标记/隐藏本体判据）一直没有回归网。
+#
+# 这里只编译该用例 + 它真正依赖的两个实现文件，不把整个 Main 应用拖进来。
+option(BUILD_VIEWPORT_REFRESH_TESTS "Build 2D viewport refresh contract tests" ON)
+if(BUILD_VIEWPORT_REFRESH_TESTS AND GTest_FOUND)
+    add_executable(ViewportRefreshTests
+        "${UI_ROOT}/Test/ViewportRefreshRegressionTests.cpp"
+        "${UI_ROOT}/Test/ViewportRefreshTestsMain.cpp"   # 自带 QApplication 的入口
+        "${UI_ROOT}/Render/SceneRefreshCoordinator.cpp"
+        "${UI_ROOT}/Render/EntityToVertices.cpp"
+    )
+    target_compile_features(ViewportRefreshTests PRIVATE cxx_std_17)
+    # SceneRefreshCoordinator 有 Q_OBJECT：moc 产物必须为这个目标单独生成一次
+    set_target_properties(ViewportRefreshTests PROPERTIES AUTOMOC ON)
+    target_include_directories(ViewportRefreshTests PRIVATE
+        "${SRC_ROOT}"                    # "UI/Render/SceneRefreshCoordinator.h"
+        "${UI_ROOT}/Render"              # "EntityToVertices.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Include"    # "RenderWidget.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Common/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/2D/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../Log/Log/Include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../Utility/Utility/Include"
+    )
+    target_link_libraries(ViewportRefreshTests PRIVATE
+        UI2D
+        Engine2D
+        EngineCommon
+        UICommon
+        Log
+        Utility
+        GTest::gtest
+        Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Gui Qt${QT_VERSION_MAJOR}::Widgets
+    )
+    if(MSVC)
+        target_compile_options(ViewportRefreshTests PRIVATE /utf-8 /FS)
+    endif()
+    sanyi_deploy_qt_dlls(ViewportRefreshTests)
+    gtest_discover_tests(ViewportRefreshTests
+        DISCOVERY_MODE PRE_TEST
+        WORKING_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+    )
+    set_property(TARGET ViewportRefreshTests PROPERTY FOLDER "Tests/Main")
 endif()

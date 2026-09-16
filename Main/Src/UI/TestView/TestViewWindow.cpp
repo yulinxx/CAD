@@ -124,10 +124,30 @@ public:
     }
 
 protected:
+    // 帧前准备（提交场景/位图）与后端无关，只有「帧钩子叫什么」随后端变：
+    // GL 是 paintGL，Metal 是 paintEvent（RenderWidget 的基类在 Metal 下是
+    // 普通 QWidget，没有 paintGL）。
+#ifdef SY_ENABLE_METAL_VIEWPORT
+    void paintEvent(QPaintEvent* event) override
+    {
+        prepareSceneBeforeFrame();
+        RenderWidget::paintEvent(event);
+    }
+#else
     void paintGL() override
     {
-        // 在 GL 上下文 current 的第一帧（及每次 dirty）时提交场景与位图，
-        // 避免在 paint 之外以非 current 上下文做 GPU 上传导致崩溃。
+        prepareSceneBeforeFrame();
+        RenderWidget::paintGL();
+    }
+#endif
+
+private:
+    /// 在帧内（首帧及每次 dirty）提交场景与位图。
+    /// 原实现在 GL 上下文 current 的第一帧提交以避免帧外上传崩溃；RenderWidget
+    /// 已把「帧外上传也要有可用上下文」这件事内化到后端助手里，因此时序保持不变
+    /// 只是保守选择，不再是被迫。
+    void prepareSceneBeforeFrame()
+    {
         if (m_scene && isInitialized())
         {
             const bool firstTime = !m_sceneSubmitted;
@@ -147,9 +167,9 @@ protected:
                 m_sceneDirty = false;
             }
         }
-        RenderWidget::paintGL();
     }
 
+protected:
     void wheelEvent(QWheelEvent* event) override
     {
         // 共享导航控制器统一处理滚轮/触控板手势

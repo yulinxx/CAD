@@ -222,6 +222,12 @@ void SceneRefreshCoordinator::scheduleFullRefresh()
     }
 }
 
+bool SceneRefreshCoordinator::hideSelectedEffective() const
+{
+    // 开关 + 「虚线此刻真的画得出来」二者必须同时成立，理由见头文件。
+    return m_renderWidget != nullptr && m_renderWidget->hideSelectedOriginalEffective();
+}
+
 void SceneRefreshCoordinator::requestLightRefresh()
 {
     // 增量刷新：通过定时器合并，收集脏 ID 后增量提交
@@ -381,13 +387,27 @@ void SceneRefreshCoordinator::onSelectionChanged()
         m_lastSelectedIds = std::move(currentSelected);
     }
 
-    if (m_renderWidget != nullptr && m_renderWidget->hideSelectedOriginal())
+    // 这里判的是「这次刷新要做到什么级别」，因此看的是**有效**隐藏状态
+    // （开关 && 虚线画得出来），而不是开关本身：
+    //
+    //   开关关着 / 开关开着但轮廓画不出来（选中集超预算）
+    //       → 本体根本没被摘，选择集变化不动世界层 → 廉价的 Selection 级就够；
+    //   开关开着且轮廓可画
+    //       → 选中本体必须从世界层摘掉，选择集变了就得全量重建；
+    //   有效状态本身翻转（上次摘了、这次不该摘；或反过来）
+    //       → 必须全量重建才能把上次摘掉的本体加回来。
+    //
+    // 加 m_lastHideSelectedEffective（上次刷新**实际**生效的隐藏状态）就是为了第三种：
+    // 只看当前值的话，「5 选（已摘本体）→ 3000 选（超预算，不该摘）」会被判成
+    // 「不需要重建」，那 5 个本体就永远回不来了。
+    //
+    // 反过来说，之前只看开关时，第三种情形每点选一次都要付一次 O(场景) 全量重建，
+    // 而画面其实毫无变化（本体本就没摘）——这是 70 万图元场景里可感知的白做。
+    const bool hideNow = m_renderWidget != nullptr && m_renderWidget->hideSelectedOriginalEffective();
+    if (selectionSetChanged && (hideNow || hideNow != m_lastHideSelectedEffective))
     {
-        // 隐藏原图开启：选择集变化 → 全量重建世界层（选中本体增删）
-        if (selectionSetChanged)
-        {
-            m_refreshLevel = RefreshLevel::FullRefresh;
-        }
+        // 选中本体的增删只能靠世界层全量重建
+        m_refreshLevel = RefreshLevel::FullRefresh;
     }
     else if (m_refreshLevel < RefreshLevel::Selection)
     {
@@ -443,8 +463,11 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     bool touchedImage = false;
     bool touchedText = false;
 
-    // 获取"选中时隐藏原图"设置
-    const bool hideSelected = m_renderWidget != nullptr && m_renderWidget->hideSelectedOriginal();
+    // 获取"选中时隐藏原图"的**有效**设置（开关 + 虚线画得出来），见 hideSelectedEffective()
+    const bool hideSelected = hideSelectedEffective();
+    // 记下本次实际生效的隐藏状态：onSelectionChanged 判断「这次选择集变化要不要全量重建」
+    // 时要用它识别「有效状态翻转」（见该处的注释）
+    m_lastHideSelectedEffective = hideSelected;
 
     // 如果启用隐藏选中实体，获取当前选中的实体ID集合
     std::unordered_set<uint64_t> selectedIds;
@@ -751,8 +774,11 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
 
     m_renderedEntityIds.clear();
 
-    // 获取"选中时隐藏原图"设置
-    const bool hideSelected = m_renderWidget != nullptr && m_renderWidget->hideSelectedOriginal();
+    // 获取"选中时隐藏原图"的**有效**设置（开关 + 虚线画得出来），见 hideSelectedEffective()
+    const bool hideSelected = hideSelectedEffective();
+    // 记下本次实际生效的隐藏状态：onSelectionChanged 判断「这次选择集变化要不要全量重建」
+    // 时要用它识别「有效状态翻转」（见该处的注释）
+    m_lastHideSelectedEffective = hideSelected;
 
     // 如果启用隐藏选中实体，获取当前选中的实体ID集合
     std::unordered_set<uint64_t> selectedIds;
@@ -818,8 +844,8 @@ void SceneRefreshCoordinator::reconcileBitmaps(Eg::SceneManager* sm, bool fullRe
         m_bitmapImageIds.clear();
     }
 
-    // 获取"选中时隐藏原图"设置
-    const bool hideSelected = m_renderWidget != nullptr && m_renderWidget->hideSelectedOriginal();
+    // 获取"选中时隐藏原图"的**有效**设置（开关 + 虚线画得出来），见 hideSelectedEffective()
+    const bool hideSelected = hideSelectedEffective();
 
     // 如果启用隐藏选中实体，获取当前选中的实体ID集合
     std::unordered_set<uint64_t> selectedIds;
@@ -917,8 +943,8 @@ void SceneRefreshCoordinator::reconcileTexts(Eg::SceneManager* sm, bool fullReco
         m_worldTextIds.clear();
     }
 
-    // 获取"选中时隐藏原图"设置
-    const bool hideSelected = m_renderWidget != nullptr && m_renderWidget->hideSelectedOriginal();
+    // 获取"选中时隐藏原图"的**有效**设置（开关 + 虚线画得出来），见 hideSelectedEffective()
+    const bool hideSelected = hideSelectedEffective();
 
     // 如果启用隐藏选中实体，获取当前选中的实体ID集合
     std::unordered_set<uint64_t> selectedIds;

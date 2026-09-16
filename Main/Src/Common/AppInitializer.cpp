@@ -57,8 +57,17 @@ void AppInitializer::initialize()
     SY_INFO("==============================================================");
     SY_INFOF("Starting %s v%s", MainApp::appName().c_str(), MainApp::appVersion().c_str());
     SY_INFO("==============================================================");
-    SY_INFOF("[Render] Active render backend: %s",
-             Render::RT::rxBackendName(Render::RT::Backend::OpenGL));
+    // 这里只能声明「本构建把视口编译成了哪个后端」——那是编译期事实，启动瞬间即可知。
+    // 真实生效的后端与设备名要等视口建 Surface 后由
+    // RenderSessionHost::logCapabilities 打印（只有那里拿得到 caps）。
+    // 曾经这里硬编码 Backend::OpenGL，在 Metal 构建下是一句失实日志。
+#ifdef SY_ENABLE_METAL_VIEWPORT
+    const Render::RT::Backend configuredBackend = Render::RT::Backend::Metal;
+#else
+    const Render::RT::Backend configuredBackend = Render::RT::Backend::OpenGL;
+#endif
+    SY_INFOF("[Render] Viewport backend (compile-time): %s",
+             Render::RT::rxBackendName(configuredBackend));
 
     CrashHandlerBootstrap::logPendingDumps();
 

@@ -177,7 +177,8 @@ void RenderViewport2D::initRenderWidget()
     m_renderWidget = new RenderWidget(this);
     m_renderWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     m_renderWidget->setMouseTracking(true);
-    // RenderWidget 是 QOpenGLWidget 原生窗口，鼠标事件不会冒泡到父控件，
+    // RenderWidget 是原生窗口（GL 分支是 QOpenGLWidget、Metal 分支是带
+    // WA_NativeWindow 的 QWidget），鼠标事件不会冒泡到父控件，
     // 通过事件过滤器将鼠标事件从 RenderWidget 转发到 RenderViewport2D 处理
     m_renderWidget->installEventFilter(this);
     layout->addWidget(m_renderWidget);

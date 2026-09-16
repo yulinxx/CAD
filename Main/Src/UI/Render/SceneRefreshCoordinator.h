@@ -124,6 +124,15 @@ private:
     void applyFullRefresh(Eg::SceneManager* sm);
     void processCurveLodBatch();
 
+    /**
+     * 「把选中图元本体从世界层摘除」的**有效**判据：设置开关开着 **且**
+     * 虚线轮廓此刻确实画得出来（RenderWidget::hideSelectedOriginalEffective）。
+     *
+     * 两者是同一份视觉的二选一替代，必须同时成立：虚线画不出来（选中集超轮廓预算）
+     * 时若还把本体摘掉，图上就什么都不剩了。
+     */
+    bool hideSelectedEffective() const;
+
     RenderWidget* m_renderWidget{ nullptr };
     Eg::SceneManager* m_sceneManager{ nullptr };
 
@@ -131,6 +140,16 @@ private:
     QTimer* m_sceneUpdateTimer{ nullptr };
 
     RefreshLevel m_refreshLevel{ RefreshLevel::None };
+
+    /*
+     * 上一次刷新**实际生效**的「隐藏选中本体」状态。
+     *
+     * 只在 applyLightRefresh / applyFullRefresh 这两条真正决定「本体在不在世界层」的
+     * 路径里更新。用途见 onSelectionChanged：选择集变化时不仅要看当前有效状态，
+     * 还要看它相对上次是否翻转了 —— 翻转意味着上次摘掉的本体必须（或不能）加回来，
+     * 那需要一次全量重建；没翻转就不必重建（选中集超预算时本体本就没摘）。
+     */
+    bool m_lastHideSelectedEffective{ false };
 
     // 脏标记集合（增量渲染）
     std::unordered_set<Eg::EntityId> m_pendingDirtyIds;

@@ -32,6 +32,25 @@
  *   MetalViewportProto                  # 并排打开 A/B 两个窗口，持续渲染
  *   MetalViewportProto --frames 120     # 各渲染 120 帧后退出
  *   MetalViewportProto --mode=a|b|both  # 只跑其中一条路径
+ *
+ * ## 结论（本原型已完成使命，结论已落地到产品）
+ *
+ * A 路径（QWidget + WA_NativeWindow）胜出，产品按它实现：
+ *   - 视口基类改为条件编译：GL 用 QOpenGLWidget，Metal 用 QWidget + WA_NativeWindow；
+ *   - MetalDevice 不再去改父视图的根 layer，而是**在传入的 NSView 上挂一个自建的
+ *     layer-hosting 子视图**（metalDevice.mm 的 RxxMetalHostView，按 NSWindowBelow
+ *     排序），从而绕开「替换 Qt 视图根 layer 非法」这条死路；
+ *   - 析构顺序改为「先栅栏等 GPU → 摘除子视图 → 释放托管纹理」，不再回访父视图。
+ *
+ * 保留本原型作为**冒烟工具**：它能在不启动产品的情况下独立验证
+ * 「NSView → CAMetalLayer → nextDrawable → 出帧 → resize 恢复」整条链。
+ *
+ * 构建与运行（默认不构建）：
+ *   cmake -S . -B build-proto -DBUILD_METAL_VIEWPORT_PROTO=ON
+ *   cmake --build build-proto --target MetalViewportProto -j8
+ *   DYLD_LIBRARY_PATH=<build-mac> build-proto/bin_Qt6/Debug/MetalViewportProto \
+ *       --mode=both --frames 204        # 退出码 0 = 全部视口每帧都出帧
+ *   MTL_DEBUG_LAYER=1 ... --mode=both --frames 204   # 叠加 Metal 校验层
  */
 
 #include "render/renderx.h"

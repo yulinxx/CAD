@@ -313,10 +313,16 @@ endif()
 # 编译定义的**唯一**出处：各目标不得自行判断 APPLE 或重复定义开关，
 # 否则两处取值不一致时会出现「一半 Metal 一半 GL」的静默错配。
 # 未开启时不定义任何宏，视口代码走未定义的 GL 分支。
-set(SY_VIEWPORT_BACKEND_TARGETS UI2D UI3D SanYiCAD)
+#
+# 必须是 PUBLIC：视口的公共头（RenderWidget.h / RenderWidget3D.h）里这个宏会
+# 改变**类定义本身**（基类不同），任何 include 这些头或继承这些类的目标
+# （SanYiCAD、MainTests…）都必须拿到同一个取值——否则同一份头在不同 TU 里
+# 被解析成不同的类，链接期以 ODR 冲突的形式爆炸。用 PUBLIC 让定义随
+# target_link_libraries 自动传播，而不是逐个目标手工补。
+set(SY_VIEWPORT_BACKEND_TARGETS UI2D UI3D)
 foreach(_sy_viewport_target IN LISTS SY_VIEWPORT_BACKEND_TARGETS)
     if(TARGET ${_sy_viewport_target} AND SY_ENABLE_METAL_VIEWPORT)
-        target_compile_definitions(${_sy_viewport_target} PRIVATE SY_ENABLE_METAL_VIEWPORT=1)
+        target_compile_definitions(${_sy_viewport_target} PUBLIC SY_ENABLE_METAL_VIEWPORT=1)
     endif()
 endforeach()
 
