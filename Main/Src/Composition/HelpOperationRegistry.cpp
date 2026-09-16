@@ -67,8 +67,10 @@ void HelpOperationRegistry::registerAll()
         HelpDialogService::showDocumentationDialog(parentWidget);
     }));
 
+#if 0
     reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Help_Shortcut, [parentWidget] {
         // 2D 与 3D 共用 HelpDialogService 的同一条实现，内容取当前工作台的台账
         HelpDialogService::showShortcutsDialog(parentWidget, activeShortcutModel(parentWidget));
     }));
+#endif
 }

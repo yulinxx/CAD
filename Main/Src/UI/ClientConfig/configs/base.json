@@ -242,7 +242,7 @@
       "workbenches": ["2D", "3D"],
       "items": [
         { "type": "action", "id": "help.docs", "label": "Documentation", "command": "help.docs", "icon": ":/ui/common/Icons/Help/docs.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "help.shortcuts", "label": "Keyboard Shortcuts", "command": "help.shortcuts", "icon": ":/ui/common/Icons/Help/shortcuts.svg", "shortcut": "F1", "workbenches": ["2D", "3D"] },
+        { "type": "action", "id": "help.shortcuts", "label": "Keyboard Shortcuts", "command": "help.shortcuts", "icon": ":/ui/common/Icons/Help/shortcuts.svg", "workbenches": ["2D", "3D"] },
         { "type": "separator" },
         { "type": "action", "id": "help.settings", "label": "Settings", "command": "help.settings", "icon": ":/ui/common/Icons/Help/settings.svg", "shortcut": "Ctrl+,", "workbenches": ["2D", "3D"] },
         { "type": "separator" },
@@ -270,7 +270,7 @@
           { "type": "action", "id": "language.vi", "label": "Tiếng Việt", "command": "language.vi", "checkable": true, "workbenches": ["2D", "3D"] }
         ] },
         { "type": "separator" },
-        { "type": "action", "id": "help.about", "label": "About", "command": "help.about", "icon": ":/ui/common/Icons/Help/about.svg", "workbenches": ["2D", "3D"] }
+        { "type": "action", "id": "help.about", "label": "About", "command": "help.about", "icon": ":/ui/common/Icons/Help/about.svg", "shortcut": "F1", "workbenches": ["2D", "3D"] }
       ]
     }
   ],
