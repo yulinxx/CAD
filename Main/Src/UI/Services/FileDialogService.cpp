@@ -31,10 +31,11 @@ QString FileDialogService::getSaveFileName(QWidget* parent, const QString& title
 
 QString FileDialogService::allSupportedFilter()
 {
-    return QObject::tr("All Supported Files (*.sy *.dxf *.plt *.stp *.step *.svg *.pdf *.ai *.obj *.stl);;"
+    return QObject::tr("All Supported Files (*.sy *.dxf *.plt *.stp *.step *.svg *.pdf *.ai *.obj *.stl *.png *.jpg *.jpeg *.bmp *.tga *.tiff *.gif *.webp);;"
                        "SanYi Files (*.sy);;DXF Files (*.dxf);;PLT Files (*.plt);;"
                        "STEP Files (*.stp *.step);;SVG Files (*.svg);;PDF Files (*.pdf);;"
-                       "AI Files (*.ai);;OBJ Files (*.obj);;STL Files (*.stl);;All Files (*.*)");
+                       "AI Files (*.ai);;OBJ Files (*.obj);;STL Files (*.stl);;"
+                       "Image Files (*.png *.jpg *.jpeg *.bmp *.tga *.tiff *.gif *.webp);;All Files (*.*)");
 }
 
 QString FileDialogService::importFilterForFormat(Fio::FileFormat fmt)
