@@ -201,6 +201,42 @@ Esc 取消则用 before 快照整体还原。拖动期间
   - 删除 ID 走 `removeRenderEntity` 增量移除；
 - 位图/文字有独立对账账本，纯矢量操作不触发它们的全量对账。
 
+### 5.1 overlay 变更请求的帧合并（2026-09-16）
+
+`ViewRenderCoordinator::requestRepaint()` 与 `SceneRefreshCoordinator3D::scheduleDispatch()`
+均改用 `QMetaObject::invokeMethod(..., Qt::QueuedConnection | Qt::UniqueConnection)`：
+
+- **QueuedConnection**：把 `update()` / `dispatch()` 调用推入事件循环，同帧内多次调用
+  不会立即执行，而是在下一帧事件循环开始时统一处理；
+- **UniqueConnection**：若同一对象同一槽函数已有待处理的 queued 调用，新调用会被静默丢弃，
+  保证同帧最多只触发一次 `update()` / `dispatch()`；
+- 效果：无论一帧内有多少处 overlay 变更或刷新请求，最终每帧只产生一次 `QOpenGLWidget::update()`
+  或一次 `SceneRefreshCoordinator3D::dispatch()`。
+
+此机制与 16ms 定时器互补：定时器管「何时刷新」，QueuedConnection 管「一帧内刷几次」。
+
+### 5.2 相机/鼠标拖拽期间的 update 节流（2026-09-16）
+
+- 2D `RenderWidget::setViewMatrix()`：相机拖拽时的 `QOpenGLWidget::update()` 改为
+  `QMetaObject::invokeMethod(this, "update", Qt::QueuedConnection | Qt::UniqueConnection)`；
+- 3D `RenderWidget3D::mouseMoveEvent()`：`m_transforming` / `m_rotating` / `m_panning` /
+  `m_boxSelecting` 各分支的 `update()` 全部改为 `QMetaObject::invokeMethod` 节流。
+
+### 5.3 MVP 矩阵预计算（2026-09-16）
+
+`RenderWidget3D::paintGL()` 中，原先每帧两次计算 `projectionMatrix() * viewMatrix()`：
+一次用于 `buildFrustum()` 构造视锥体，一次传给 shader 的 `uViewProjMatrix`。
+
+新增 `buildFrustum(RxFrustum&, const QMatrix4x4& combined)` 重载，接收预计算的合并矩阵；
+`paintGL()` 先算一次 `combined = projectionMatrix() * viewMatrix()`，然后同时用于
+`buildFrustum` 和 shader 上传，避免重复乘法。
+
+### 5.4 移除冗余 update（2026-09-16）
+
+`SceneRefreshCoordinator::applyLightRefresh()` 末尾的 `m_renderWidget->update()` 已移除：
+`BatchGuard` 析构时 `endBatchUpload()` 已调用 `update()`，重复调用被 QueuedConnection
+的 UniqueConnection 机制静默丢弃。
+
 ---
 
 ## 6. UI 侧：拖动期间的扇出切断与节流
@@ -286,3 +322,10 @@ pending 标志，超时补一次尾包。属性面板展示端点/半径等几�
   变换后只更新选中图元索引；框选、删除、新增、撤销重做各调用方全部改走批量接口，
   并修掉 `DeleteEntitiesCommand::redo` 的二次释放；`Workbench3D` 场景树重建改为按
   `structureRevision()` 门控。
+- ✅ 2026-09-16：overlay 与交互 update 的帧合并 —— `ViewRenderCoordinator::requestRepaint()`、
+  `SceneRefreshCoordinator3D::scheduleDispatch()` 改用
+  `QMetaObject::invokeMethod(..., Qt::QueuedConnection | Qt::UniqueConnection)` 合并同帧
+  多次调用为一次 `update()` / `dispatch()`；`RenderWidget::setViewMatrix()` 与
+  `RenderWidget3D::mouseMoveEvent()` 各分支的 `update()` 同理节流；
+  `buildFrustum` 新增重载接收预计算合并矩阵，避免每帧重复计算
+  `projectionMatrix() * viewMatrix()`；`applyLightRefresh` 移除冗余 `update()`。

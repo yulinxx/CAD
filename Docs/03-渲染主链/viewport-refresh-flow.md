@@ -54,10 +54,47 @@ Document / Scene
 2. 增量刷新与全量刷新分离。
 3. 视口只做显示和事件转发，不直接保存文档事实。
 4. 渲染层只负责绘制，不承担业务编排。
+5. 一帧内的多次 `update()` / `dispatch()` 调用通过 `QMetaObject::invokeMethod`
+   的 `QueuedConnection | UniqueConnection` 合并为一次，避免重复帧渲染。
 
 ---
 
-## 4. 当前需继续收口的点
+## 4. 帧合并机制（2026-09-16）
+
+### 4.1 问题
+
+`ViewRenderCoordinator::requestRepaint()` 和
+`SceneRefreshCoordinator3D::scheduleDispatch()` 可能被同一帧内多处代码
+同时调用（如多个 overlay 变更、多次场景通知）。若每次调用都直接触发
+`QOpenGLWidget::update()` 或 `dispatch()`，会导致同一帧多次渲染，
+浪费 GPU 带宽并拖慢交互帧率。
+
+### 4.2 方案
+
+均改用 `QMetaObject::invokeMethod(obj, slot, Qt::QueuedConnection | Qt::UniqueConnection)`：
+
+- `QueuedConnection`：将调用推入事件循环，延迟到下一帧才开始执行；
+- `UniqueConnection`：同一对象同一槽函数若有待处理的 queued 调用，新调用会被丢弃；
+- 保证每帧最多一次 `update()`（2D）或 `dispatch()`（3D）。
+
+### 4.3 覆盖范围
+
+| 位置 | 方法 | 节流方式 |
+|------|------|----------|
+| `ViewRenderCoordinator` | `requestRepaint()` | `invokeMethod(m_renderWidget, "update", ...)` |
+| `SceneRefreshCoordinator3D` | `scheduleDispatch()` | `invokeMethod(this, "dispatch", ...)` |
+| `RenderWidget::setViewMatrix()` | 相机拖拽 | `invokeMethod(this, "update", ...)` |
+| `RenderWidget3D::mouseMoveEvent()` | 变换/旋转/平移/框选 | `invokeMethod(this, "update", ...)` |
+
+### 4.4 与 16ms 定时器的关系
+
+- 16ms 定时器管「何时刷新」（批处理窗口）；
+- QueuedConnection 管「一帧内刷几次」（合并同帧重复调用）；
+- 两者互补：定时器到期后，QueuedConnection 保证只执行一次实际的渲染。
+
+---
+
+## 5. 当前需继续收口的点
 
 - 继续减少视口内部的协调逻辑
 - 继续统一 2D 和 3D 的刷新语义
