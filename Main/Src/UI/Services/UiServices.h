@@ -19,6 +19,11 @@ class IRecentFileService;
 class ViewportActionHub;
 class UnitManager;
 
+namespace Ui
+{
+    class ViewCaptureService;
+}
+
 namespace Eg
 {
     class EntityClipboard;
@@ -93,6 +98,12 @@ struct UiServices : public IUIServices
 
     /// 图元剪贴板（Copy/Cut/Paste 的图元副本缓存）
     Eg::EntityClipboard* clipboard{ nullptr };
+
+    /// 视图导出服务（「导出视图」命令；2D/3D 共用一个实例）
+    ///
+    /// 与 importService 同理放这里：消费者是工作台层（2D 的视图命令注册、
+    /// 3D 的导出视图操作），而它们拿不到 ApplicationCompositionRoot。
+    Ui::ViewCaptureService* captureService{ nullptr };
 
     // ---- IUIServices 接口实现 ----
 

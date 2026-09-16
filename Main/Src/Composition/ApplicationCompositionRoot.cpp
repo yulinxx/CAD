@@ -364,6 +364,9 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     // 注入到 UI 服务集合。导出服务不进 UiServices：唯一的消费者
     // FileOperationRegistry 走 FileOperationConfig::exportService 单独注入。
     uiServices.importService = m_importService.get();
+    // 视图导出服务：2D 与 3D 的「导出视图」命令都要用同一个实例，
+    // 保证两次导出的落盘目录与命名规则一致。
+    uiServices.captureService = m_captureService.get();
 
     // 导入进度 → 状态中心
     QObject::connect(m_importService.get(), &ImportService::importStarted, m_stateCenter.get(), [this](const QString&) {

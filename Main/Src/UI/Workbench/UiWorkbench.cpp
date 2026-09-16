@@ -24,6 +24,7 @@
 #include "UI/Services/ViewportActionHub.h"
 #include "UI/Services/HelpDialogService.h"
 #include "UI/Services/ISelectionService.h"
+#include "UI/Service/ViewCaptureService.h"
 #include "Engine2D/Edit/IUndoRedoManager.h"
 #include "UiSceneTreePanel.h"
 #include "SceneTreeModel2D.h"
@@ -2604,8 +2605,71 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
             HelpDialogService::showShortcutsDialog(windowPtr, shortcutModel);
             return result;
         }));
+
+    // 「导出视图」：3D 侧的 View_Capture。
+    //
+    // 与 2D 的 View_Capture 共用同一个 ViewCaptureService 实例（落盘目录与命名
+    // 规则因此完全一致），差别只在取 3D 视口并走 capture3D 的离屏读回——
+    // capture3D / RenderWidget3D::captureOffscreen 早已实现，此前**全仓没有任何
+    // 调用者**，等于 3D 视口截不了图（F12 在 3D 工作台下也不做任何事）。
+    //
+    // 注册放在工作台层的原因与上面两条一致：ViewCaptureService 由组合根持有，
+    // UI3D 库看不到它，因此不能像 View_Wireframe 那样在 ViewOperations3D 里注册。
+    own.operationBus->registerOperation(std::make_unique<LambdaOperation3D>(
+        OperationId3D::View_Capture,
+        [captureService = m_services.captureService](OperationContext3D& ctx,
+                                                     const OperationRequest3D&) {
+            OperationResult3D result;
+            if (!captureService || !ctx.renderWidget)
+            {
+                SY_WARNF("[Workbench3D] View_Capture: captureService=%s renderWidget=%s",
+                         captureService ? "ok" : "null", ctx.renderWidget ? "ok" : "null");
+                return result;
+            }
+
+            Ui::CaptureRequest req;
+            req.scope = Ui::CaptureScope::CurrentView;
+            req.framing = Ui::FramingKind::UseCurrent;
+            req.autoSave = true;
+
+            const QImage img = captureService->capture3D(ctx.renderWidget, req);
+            if (img.isNull())
+            {
+                SY_WARNF("[Workbench3D] View_Capture: capture3D 返回空图（离屏渲染失败）");
+                return result;
+            }
+            const QString path = captureService->saveImage(img, req, true);
+            if (path.isEmpty())
+            {
+                SY_WARNF("[Workbench3D] View_Capture: 截图保存失败");
+                return result;
+            }
+            SY_INFOF("[View_Capture] Saved to %s (3D %dx%d)", path.toStdString().c_str(),
+                     img.width(), img.height());
+            result.success = true;
+            return result;
+        }));
+
     CommandRegistry3D::registerAll(mainWindow3D);
     SY_DEBUG("[Workbench3D] CommandRegistry3D::registerAll() completed");
+
+    // F12 截图（与 2D 同一条快捷键；此前只有 2D 工作台注册过它）。
+    // 焦点在文本控件里时不拦截，理由与 setup3DDeleteShortcuts 的护栏相同。
+    auto* captureSc = new QShortcut(QKeySequence(Qt::Key_F12), &window);
+    connect(captureSc, &QShortcut::activated, this, [&own]() {
+        QWidget* focusWidget = QApplication::focusWidget();
+        if (focusWidget && (qobject_cast<QLineEdit*>(focusWidget) ||
+                            qobject_cast<QTextEdit*>(focusWidget) ||
+                            qobject_cast<QPlainTextEdit*>(focusWidget)))
+        {
+            return;
+        }
+        if (own.operationBus)
+        {
+            own.operationBus->run(OperationId3D::View_Capture);
+        }
+    });
+    window.registerShortcut(captureSc);
 
     // 1. 先创建所有 Action（bindXxx 依赖 action() 返回有效指针）
     own.commandActionHub->setOperationBus(own.operationBus.get());
