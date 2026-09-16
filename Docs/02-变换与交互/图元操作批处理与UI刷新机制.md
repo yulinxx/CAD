@@ -67,7 +67,12 @@ SVG 导入的复合曲线大多以 `SmartLine` 存储（一条 SVG 子路径 = �
 
 **优化**：
 - `EntitySpatialIndex::updateBulk(entities)` / `SpatialIndex2D::updateBulk()` / `SceneManager::updateEntityBoundsBulk()`：先收集所有旧包围盒一次性移除，再批量插入新包围盒，RTree 只做一次批量重建。
-- `EntityTransform::applyMatrixToIds()` 变换后收集实体列表，一次性调用 `updateEntityBoundsBulk()`。
+- `EntityTransform::applyMatrixToIds()` **只改几何**，不在图元循环里更新索引；整批结束后由
+  `SceneEditService::transformEntities()` 收集受影响图元并一次性调用 `updateEntityBoundsBulk()`。
+
+> 顺序上有个容易踩的坑：若让 `applyMatrixToIds()` 自己做一次批量更新，紧随其后的
+> `transformEntities()` 收尾会对同一批图元再更新一遍（而且收尾若仍用逐图元接口，
+> 第二遍恰好是最慢的那条路）。索引更新只能有**一处**，且应当在收尾处。
 
 **收益**：百图元批量移动/缩放时空间索引更新加速 5-10x。
 
@@ -83,8 +88,9 @@ SVG 导入的复合曲线大多以 `SmartLine` 存储（一条 SVG 子路径 = �
 3. `captureEntitySnapshots(after)` 拍变换后快照（重放用）；
 4. `notifyGeometryChanged()` 做移动联动（如填充色块跟随），before/after 按 id
    建 `unordered_map` 匹配，复杂度 O(N)（旧实现线性 `find_if` 为 O(N²)）；
-5. 对 ids 统一做一遍 `updateEntityBoundsNoNotify()`：更新空间索引 + 记录
-   `GeometryChanged` 变更，**不发通知**；
+5. 收集 ids 对应的图元，**一次** `updateEntityBoundsBulk()`：批量更新空间索引 +
+   记录 `GeometryChanged` 变更，**不发通知**（旧实现是逐图元
+   `updateEntityBoundsNoNotify()`，每个图元一次 remove+insert 并各自触发树重平衡）；
 6. `pushExecutedSnapshotCommand()` 入撤销栈，入栈完成后触发**唯一一次**
    `notifySceneChanged()`。
 
@@ -326,8 +332,11 @@ pending 标志，超时补一次尾包。属性面板展示端点/半径等几�
   `removeEntity`（每个都是 O(场景规模) 的查找与搬移 + 一次全场景选择同步与广播）；
 - ✅ 3D 选择变更走 `selectMany` 系列，禁止对命中集循环调用 `addSelect`；
 - ✅ 3D 批量变换后只对本批图元 `updateEntitiesBounds`，禁止全量 `rebuildSpatialIndex`；
-- [ ] 已知遗留（非本机制范围）：`SceneTreeTableModel2D::indexForId` 对群组成员仍为
-  线性扫描，超大群组选择可改为 id→QModelIndex 哈希。
+- ✅ 场景树按 id 定位行走哈希表：`SceneTreeTableModel2D::indexForId` 的群组成员
+  分支改为查 `m_childRowById`（与 `m_childParent` 同处维护），不再对全体已展开
+  群组做线性扫描；
+- ✅ 3D 撤销/重做走增量命令（`ReplaceEntitiesCommand3D`：移除 N + 新增 M），
+  禁止用「整场景 clone 两份 before/after」表达一次只动几个图元的操作。
 
 ---
 

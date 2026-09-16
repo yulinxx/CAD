@@ -217,6 +217,9 @@ namespace
             , m_item(item)
             , m_target(std::move(target))
         {
+            // 设置焦点策略，确保 Tab 键可以切换焦点（macOS 默认行为不同）
+            setFocusPolicy(Qt::StrongFocus);
+
             setWindowTitle(tr("Edit %1").arg(m_item.name));
             setMinimumWidth(360);
 

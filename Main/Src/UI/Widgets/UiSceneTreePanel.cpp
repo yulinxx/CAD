@@ -69,6 +69,7 @@ public:
         m_childrenProvider = std::move(childrenProvider);
         m_groupChildren.clear();
         m_childParent.clear();
+        m_childRowById.clear();
         m_isGroup.clear();
         for (const auto& row : m_topLevel)
         {
@@ -324,9 +325,12 @@ public:
         }
         auto children = m_childrenProvider ? m_childrenProvider(gid) : QVector<SceneTreeRow2D>{};
         m_groupChildren[gid] = children;
-        for (const auto& child : children)
+        for (int i = 0; i < children.size(); ++i)
         {
+            const SceneTreeRow2D& child = children[i];
             m_childParent[child.id] = gid;
+            // 行号与 m_childParent 同处维护：indexForId 靠它 O(1) 定位群组成员
+            m_childRowById[child.id] = i;
             if (child.isGroup)
             {
                 m_isGroup.insert(child.id);
@@ -341,18 +345,15 @@ public:
         {
             return createIndex(it.value(), 0, static_cast<quintptr>(id));
         }
-        for (auto it = m_groupChildren.constBegin(); it != m_groupChildren.constEnd(); ++it)
+
+        // 群组成员：直接查 id → 行号。旧实现是把所有**已展开群组**的成员逐个线性
+        // 扫一遍找 id，选中一个大群组时是 O(选中数 × 全体已加载成员数)。
+        auto rowIt = m_childRowById.constFind(id);
+        if (rowIt == m_childRowById.constEnd())
         {
-            const auto& children = it.value();
-            for (int i = 0; i < children.size(); ++i)
-            {
-                if (children[i].id == id)
-                {
-                    return createIndex(i, 0, static_cast<quintptr>(id));
-                }
-            }
+            return {};
         }
-        return {};
+        return createIndex(rowIt.value(), 0, static_cast<quintptr>(id));
     }
 
 private:
@@ -403,6 +404,9 @@ private:
     QMap<qint64, int> m_topLevelRowById;
     QMap<qint64, QVector<SceneTreeRow2D>> m_groupChildren;
     QMap<qint64, qint64> m_childParent;
+    /// 群组成员 id → 它在其父群组里的行号（与 m_childParent 同处维护）。
+    /// 供 indexForId 做 O(1) 定位，取代原先对所有已展开群组的线性扫描。
+    QMap<qint64, int> m_childRowById;
     QSet<qint64> m_isGroup;
     SceneTreePanel::MetaProvider2D m_metaProvider;
     SceneTreePanel::ChildrenProvider2D m_childrenProvider;

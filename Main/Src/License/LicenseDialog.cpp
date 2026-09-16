@@ -48,6 +48,8 @@ LicenseDialog::LicenseDialog(const QString& configDir, QWidget* parent)
     : QDialog(parent)
     , m_configDir(configDir)
 {
+    // 设置焦点策略，确保 Tab 键可以切换焦点（macOS 默认行为不同）
+    setFocusPolicy(Qt::StrongFocus);
     LicenseContextHolder holder(m_configDir);
     if (holder.get())
     {

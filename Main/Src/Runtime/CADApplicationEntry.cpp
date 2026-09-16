@@ -16,75 +16,31 @@
     #include <windows.h>
 #endif
 
-// 附加到父进程控制台（如 cmd/PowerShell），终端启动时 stdout/stderr/stdin 可正常收发
-// 仅当 stdout 无有效句柄（GUI 程序未继承标准流）时才附加，避免破坏管道/文件重定向
-// GUI 双击启动时无父控制台，AttachConsole 失败则保持原状，不影响图形界面
-static void attachParentConsoleIfAny()
+// 启用高 DPI 缩放（跨平台高分屏支持）
+// Qt 5.6+: AA_EnableHighDpiScaling, AA_UseHighDpiPixmaps
+// Qt 6+: 默认启用，但显式设置可确保兼容性
+static void setupHighDpiScaling()
 {
-#ifdef _WIN32
-    const HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (hOut != nullptr && hOut != INVALID_HANDLE_VALUE)
-    {
-        // stdout 已有句柄（控制台/管道/文件），CRT 会通过它输出，无需干预
-        return;
-    }
-    if (AttachConsole(ATTACH_PARENT_PROCESS))
-    {
-        FILE* out = nullptr;
-        (void)freopen_s(&out, "CONOUT$", "w", stdout);
-        FILE* err = nullptr;
-        (void)freopen_s(&err, "CONOUT$", "w", stderr);
-        FILE* in = nullptr;
-        (void)freopen_s(&in, "CONIN$", "r", stdin);
-    }
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+    QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
 #endif
 }
 
-// 输出多行详细版本信息到 stdout
-static void printVersionInfo()
+// macOS: 使用原生菜单栏
+static void setupNativeMenuBar()
 {
-    std::printf("%s %s\n", MainApp::appName().c_str(), MainApp::appVersion().c_str());
-    std::printf("Version: %d.%d.%d\n", MainApp::versionMajor(), MainApp::versionMinor(), MainApp::versionPatch());
-    std::printf("Organization: %s\n", MainApp::organizationName().c_str());
-    std::printf("Domain: %s\n", MainApp::organizationDomain().c_str());
-    std::fflush(stdout);
-}
-
-// 输出帮助信息到 stdout
-static void printHelpInfo()
-{
-    std::printf("Usage: %s [options] [file...]\n\n", MainApp::appName().c_str());
-    std::printf("Options:\n");
-    std::printf("  -v, --version     Show version information and exit\n");
-    std::printf("  -h, --help        Show this help and exit\n\n");
-    std::printf("Without options, the CAD GUI will start.\n");
-    std::fflush(stdout);
-}
-
-// 命令行标志解析：命中版本/帮助标志则输出并返回 0，否则返回 -1 继续正常启动
-static int handleCliFlags(int argc, char** argv)
-{
-    attachParentConsoleIfAny();
-
-    for (int i = 1; i < argc; ++i)
-    {
-        const std::string arg = argv[i] ? argv[i] : "";
-        if (arg == "--version" || arg == "-v")
-        {
-            printVersionInfo();
-            return 0;
-        }
-        if (arg == "--help" || arg == "-h")
-        {
-            printHelpInfo();
-            return 0;
-        }
-    }
-    return -1;
+#ifdef Q_OS_MACOS
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeMenuBar, false);
+#endif
 }
 
 int runCADApplication(int argc, char** argv)
 {
+    // 启用高 DPI 缩放（必须在 QApplication 创建前设置）
+    setupHighDpiScaling();
+    setupNativeMenuBar();
+    
     // 命令行标志优先处理：--version/-v、--help/-h 命中即退出，不启动 GUI
     const int cliResult = handleCliFlags(argc, argv);
     if (cliResult >= 0)
