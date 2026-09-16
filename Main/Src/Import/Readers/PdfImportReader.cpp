@@ -3,7 +3,7 @@
 #include "Log/SyLogger.h"
 
 PdfImportReader::PdfImportReader()
-    : ImportReaderBase(Fio::FileFormat::PDF, { QStringLiteral("pdf") }, QStringLiteral("PDF"))
+    : ImportReaderBase(Fio::FileFormat::PDF, { QStringLiteral("pdf") }, QStringLiteral("PDF"), ImportDimension::Dim2D)
 {
 }
 

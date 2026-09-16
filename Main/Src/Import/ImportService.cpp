@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <QCoreApplication>
+#include <QFileInfo>
 #include <QMetaObject>
 #include <QPointer>
 #include <thread>
@@ -427,6 +428,29 @@ bool ImportService::canImport(const QString& filePath) const
 QStringList ImportService::supportedExtensions() const
 {
     return m_dispatcher ? m_dispatcher->supportedExtensions() : QStringList();
+}
+
+QStringList ImportService::supportedExtensions(const QString& workbenchId) const
+{
+    if (!m_dispatcher)
+    {
+        return QStringList();
+    }
+
+    // 直接使用 ImportDispatcher 的按工作台过滤方法
+    // 每个读取器通过 dimension() 方法声明自己支持的维度（2D/3D/通用）
+    return m_dispatcher->supportedExtensions(workbenchId);
+}
+
+bool ImportService::canImport(const QString& filePath, const QString& workbenchId) const
+{
+    if (!m_dispatcher)
+    {
+        return false;
+    }
+
+    // 直接使用 ImportDispatcher 的按工作台过滤方法
+    return m_dispatcher->canImport(filePath, workbenchId);
 }
 
 // ===== 1：识别文件格式 =====

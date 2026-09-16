@@ -3,7 +3,7 @@
 #include "Log/SyLogger.h"
 
 AiImportReader::AiImportReader()
-    : ImportReaderBase(Fio::FileFormat::AI, { QStringLiteral("ai") }, QStringLiteral("Adobe Illustrator"))
+    : ImportReaderBase(Fio::FileFormat::AI, { QStringLiteral("ai") }, QStringLiteral("Adobe Illustrator"), ImportDimension::Dim2D)
 {
 }
 

@@ -6,11 +6,12 @@
 class ImportReaderBase : public IImportReader
 {
 public:
-    ImportReaderBase(Fio::FileFormat format, QStringList extensions, QString formatName);
+    ImportReaderBase(Fio::FileFormat format, QStringList extensions, QString formatName, ImportDimension dim);
     ~ImportReaderBase() override = default;
 
     Fio::FileFormat format() const override;
     QStringList supportedExtensions() const override;
+    ImportDimension dimension() const override;
     QString formatName() const override;
 
 protected:
@@ -51,4 +52,5 @@ private:
     Fio::FileFormat m_format;
     QStringList m_extensions;
     QString m_formatName;
+    ImportDimension m_dimension;
 };

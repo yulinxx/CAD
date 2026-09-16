@@ -12,10 +12,11 @@
 #include "Log/SyLogger.h"
 #include "Engine/SyEntity/SyEntity.h"
 
-ImportReaderBase::ImportReaderBase(Fio::FileFormat format, QStringList extensions, QString formatName)
+ImportReaderBase::ImportReaderBase(Fio::FileFormat format, QStringList extensions, QString formatName, ImportDimension dim)
     : m_format(format)
     , m_extensions(std::move(extensions))
     , m_formatName(std::move(formatName))
+    , m_dimension(dim)
 {
 }
 
@@ -27,6 +28,11 @@ Fio::FileFormat ImportReaderBase::format() const
 QStringList ImportReaderBase::supportedExtensions() const
 {
     return m_extensions;
+}
+
+ImportDimension ImportReaderBase::dimension() const
+{
+    return m_dimension;
 }
 
 QString ImportReaderBase::formatName() const

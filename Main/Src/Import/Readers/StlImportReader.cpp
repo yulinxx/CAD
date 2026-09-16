@@ -3,7 +3,7 @@
 #include "Log/SyLogger.h"
 
 StlImportReader::StlImportReader()
-    : ImportReaderBase(Fio::FileFormat::STL, { QStringLiteral("stl") }, QStringLiteral("STL"))
+    : ImportReaderBase(Fio::FileFormat::STL, { QStringLiteral("stl") }, QStringLiteral("STL"), ImportDimension::Dim3D)
 {
 }
 

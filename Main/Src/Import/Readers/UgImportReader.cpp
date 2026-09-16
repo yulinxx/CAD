@@ -4,7 +4,7 @@
 
 UgImportReader::UgImportReader()
     : ImportReaderBase(
-          Fio::FileFormat::UG, { QStringLiteral("igs"), QStringLiteral("iges") }, QStringLiteral("Unigraphics (IGES)"))
+          Fio::FileFormat::UG, { QStringLiteral("igs"), QStringLiteral("iges") }, QStringLiteral("Unigraphics (IGES)"), ImportDimension::Dim2D)
 {
 }
 

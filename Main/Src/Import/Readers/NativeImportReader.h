@@ -11,6 +11,9 @@ public:
 
     ImportResult read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities) override;
 
+    /// 重写 dimension()，因为 .sy 是 2D，.syx 是 3D，需要在读取时动态判断
+    ImportDimension dimension() const override;
+
 protected:
     /// 成功消息：区分 2D/3D 原生格式
     QString successMessage(Fio::FileFormat format) const override;

@@ -295,6 +295,25 @@ void WorkbenchWindow::configureServices(const UiServices& services)
         }
     }
 
+    // 监听工作台切换，更新 FileDropHandler 的工作台 ID 以过滤支持的扩展名
+    if (m_stateCenter && m_fileDropHandler)
+    {
+        // 初始化当前工作台 ID
+        const QString initialWorkbenchId = m_stateCenter->currentWorkbenchId();
+        if (!initialWorkbenchId.isEmpty())
+        {
+            m_fileDropHandler->setCurrentWorkbenchId(initialWorkbenchId);
+        }
+        // 连接信号以便在工作台切换时更新
+        connect(m_stateCenter, &UiStateCenter::currentWorkbenchChanged,
+            this, [this](const QString& workbenchId) {
+                if (m_fileDropHandler)
+                {
+                    m_fileDropHandler->setCurrentWorkbenchId(workbenchId);
+                }
+            });
+    }
+
     if (m_actionManager)
     {
         m_actionManager->setStateCenter(services.stateCenter);
@@ -1159,6 +1178,13 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         m_stateManager->windowState().busy = false;
         m_stateManager->windowState().currentWorkbenchId = workbenchId;
     }
+
+    // 更新 FileDropHandler 的工作台 ID，确保拖放过滤使用正确的扩展名
+    if (m_fileDropHandler)
+    {
+        m_fileDropHandler->setCurrentWorkbenchId(workbenchId);
+    }
+
     SY_DEBUGF("[WorkbenchWindow] workbench state committed: id=%s busy=0", workbenchId.toUtf8().constData());
 
     // 取消切换中标志，允许下次切换

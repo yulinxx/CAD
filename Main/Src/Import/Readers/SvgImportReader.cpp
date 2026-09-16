@@ -3,7 +3,7 @@
 #include "Log/SyLogger.h"
 
 SvgImportReader::SvgImportReader()
-    : ImportReaderBase(Fio::FileFormat::SVG, { QStringLiteral("svg"), QStringLiteral("svgz") }, QStringLiteral("SVG"))
+    : ImportReaderBase(Fio::FileFormat::SVG, { QStringLiteral("svg"), QStringLiteral("svgz") }, QStringLiteral("SVG"), ImportDimension::Dim2D)
 {
 }
 

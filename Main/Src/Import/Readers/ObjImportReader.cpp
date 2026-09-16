@@ -3,7 +3,7 @@
 #include "Log/SyLogger.h"
 
 ObjImportReader::ObjImportReader()
-    : ImportReaderBase(Fio::FileFormat::OBJ, { QStringLiteral("obj") }, QStringLiteral("OBJ"))
+    : ImportReaderBase(Fio::FileFormat::OBJ, { QStringLiteral("obj") }, QStringLiteral("OBJ"), ImportDimension::Dim3D)
 {
 }
 

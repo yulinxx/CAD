@@ -3,7 +3,7 @@
 #include "Log/SyLogger.h"
 
 DxfImportReader::DxfImportReader()
-    : ImportReaderBase(Fio::FileFormat::DXF, { QStringLiteral("dxf") }, QStringLiteral("DXF"))
+    : ImportReaderBase(Fio::FileFormat::DXF, { QStringLiteral("dxf") }, QStringLiteral("DXF"), ImportDimension::Dim2D)
 {
 }
 

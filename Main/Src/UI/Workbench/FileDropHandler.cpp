@@ -88,6 +88,11 @@ void FileDropHandler::setLayerManager(LayerManager* layerManager)
     m_layerManager = layerManager;
 }
 
+void FileDropHandler::setCurrentWorkbenchId(const QString& workbenchId)
+{
+    m_currentWorkbenchId = workbenchId;
+}
+
 void FileDropHandler::setScreenToWorldConverter(std::function<std::optional<QPointF>(const QPoint&)> converter)
 {
     m_screenToWorld = std::move(converter);
@@ -173,7 +178,15 @@ QStringList FileDropHandler::supportedExtensions() const
     QStringList exts = imageExtensions();
     if (m_importService)
     {
-        exts.append(m_importService->supportedExtensions());
+        if (!m_currentWorkbenchId.isEmpty())
+        {
+            // 根据当前工作台过滤扩展名
+            exts.append(m_importService->supportedExtensions(m_currentWorkbenchId));
+        }
+        else
+        {
+            exts.append(m_importService->supportedExtensions());
+        }
     }
     return exts;
 }

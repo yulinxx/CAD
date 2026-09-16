@@ -6,8 +6,16 @@
 
 NativeImportReader::NativeImportReader()
     : ImportReaderBase(
-          Fio::FileFormat::Native, { QStringLiteral("sy"), QStringLiteral("syx") }, QStringLiteral("SanYi Native"))
+          Fio::FileFormat::Native, { QStringLiteral("sy"), QStringLiteral("syx") }, QStringLiteral("SanYi Native"), ImportDimension::Both)
 {
+}
+
+ImportDimension NativeImportReader::dimension() const
+{
+    // NativeImportReader 同时支持 .sy (2D) 和 .syx (3D)
+    // 由于无法在构造时预知会读取哪个文件，这里返回 Both
+    // 实际过滤由调用方在读取时根据文件后缀判断
+    return ImportDimension::Both;
 }
 
 ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)

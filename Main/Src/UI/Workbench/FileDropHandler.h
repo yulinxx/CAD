@@ -42,6 +42,10 @@ public:
     /// 注入图层管理器（非拥有指针，用于将导入的位图分配到位图图层）
     void setLayerManager(LayerManager* layerManager);
 
+    /// 设置当前工作台 ID，用于过滤支持的扩展名
+    /// @param workbenchId 工作台 ID ("2D" 或 "3D")
+    void setCurrentWorkbenchId(const QString& workbenchId);
+
     /// 在 QApplication 上安装应用级事件过滤器，兜底处理
     /// Windows/macOS 下 QOpenGLWidget 原生子窗口不向上冒泡拖放事件的情况
     void installAppEventFilter();
@@ -80,6 +84,8 @@ private:
     ImportService* m_importService{ nullptr };
     Eg::SceneManager* m_sceneManager{ nullptr };
     LayerManager* m_layerManager{ nullptr };
+    /// 当前工作台 ID（用于过滤支持的扩展名）
+    QString m_currentWorkbenchId;
     /// 屏幕全局坐标 → 世界坐标转换器（由上层注入）
     std::function<std::optional<QPointF>(const QPoint&)> m_screenToWorld;
     /// 是否已安装应用级事件过滤器

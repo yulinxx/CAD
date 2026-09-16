@@ -108,10 +108,60 @@ QStringList ImportDispatcher::supportedExtensions() const
     return exts;
 }
 
+QStringList ImportDispatcher::supportedExtensions(const QString& workbenchId) const
+{
+    QStringList exts;
+
+    const bool is2DWorkbench = (workbenchId == QStringLiteral("2D"));
+    const bool is3DWorkbench = (workbenchId == QStringLiteral("3D"));
+
+    for (const auto& r : m_readers)
+    {
+        const ImportDimension dim = r->dimension();
+
+        // 判断该读取器是否与当前工作台兼容
+        bool compatible = false;
+        if (dim == ImportDimension::Both)
+        {
+            // 通用格式（如图片、Native 同时支持 2D/3D）总是兼容
+            compatible = true;
+        }
+        else if (is2DWorkbench && dim == ImportDimension::Dim2D)
+        {
+            compatible = true;
+        }
+        else if (is3DWorkbench && dim == ImportDimension::Dim3D)
+        {
+            compatible = true;
+        }
+
+        if (compatible)
+        {
+            exts.append(r->supportedExtensions());
+        }
+    }
+
+    return exts;
+}
+
 bool ImportDispatcher::canImport(const QString& filePath) const
 {
     Fio::FileFormat fmt = detectFormat(filePath);
     return findReader(fmt) != nullptr;
+}
+
+bool ImportDispatcher::canImport(const QString& filePath, const QString& workbenchId) const
+{
+    // 先检查是否可以被任何读取器导入
+    if (!canImport(filePath))
+    {
+        return false;
+    }
+
+    // 根据工作台过滤
+    const QStringList exts = supportedExtensions(workbenchId);
+    const QString ext = QFileInfo(filePath).suffix().toLower();
+    return exts.contains(ext);
 }
 
 IImportReader* ImportDispatcher::findReader(Fio::FileFormat format) const

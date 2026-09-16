@@ -132,6 +132,17 @@ public:
     /// 获取所有支持的导入扩展名列表
     QStringList supportedExtensions() const;
 
+    /// 获取指定工作台支持的导入扩展名列表
+    /// @param workbenchId 工作台 ID ("2D" 或 "3D")
+    /// @return 该工作台支持的扩展名列表
+    QStringList supportedExtensions(const QString& workbenchId) const;
+
+    /// 检查指定路径是否可在指定工作台导入
+    /// @param filePath 文件路径
+    /// @param workbenchId 工作台 ID ("2D" 或 "3D")
+    /// @return 是否可以导入
+    bool canImport(const QString& filePath, const QString& workbenchId) const;
+
 signals:
     /// 导入开始信号
     void importStarted(const QString& filePath);
