@@ -35,6 +35,17 @@ static void setupNativeMenuBar()
 #endif
 }
 
+// 命令行标志处理：--version/-v、--help/-h 命中即退出
+// 返回值：>=0 表示退出（返回值为 exit code），<0 表示继续启动 GUI
+static int handleCliFlags(int argc, char** argv)
+{
+    // TODO: 实现命令行参数处理 --version/-v、--help/-h
+    // 目前暂时跳过，直接启动 GUI
+    Q_UNUSED(argc);
+    Q_UNUSED(argv);
+    return -1;
+}
+
 int runCADApplication(int argc, char** argv)
 {
     // 启用高 DPI 缩放（必须在 QApplication 创建前设置）

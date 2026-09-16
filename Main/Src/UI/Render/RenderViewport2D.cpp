@@ -392,7 +392,9 @@ void RenderViewport2D::setDocument(SceneDocument2D* document)
         if (m_sceneManager)
         {
             m_gridSnapManager->setSpatialQueryCallback([scene = m_sceneManager](const Ut::BBox2d& box) {
-                return scene->queryByBox(box, /*containedOnly=*/false);
+                // 捕捉走 queryByBoxForSnap：拖动热路径上每帧都查，不能在这里补齐
+                // 被延后的空间索引（否则拖动期的 N 次索引操作会被拉回来）。
+                return scene->queryByBoxForSnap(box);
             });
         }
         else

@@ -96,8 +96,11 @@ SVG 导入的复合曲线大多以 `SmartLine` 存储（一条 SVG 子路径 = �
 
 要点：
 
-- `updateEntityBoundsNoNotify()` 与 `updateEntityBounds()` 的区别仅在于前者不广播，
-  调用方必须在批量结束后补一次 `notifySceneChanged()`；
+- `updateEntityBoundsNoNotify()` / `updateEntityBoundsBulk()` 与 `updateEntityBounds()`
+  的区别**不在广播**（三者都不广播，`recordChange` 也一样），而在于是否就地失效
+  场景包围盒缓存：`updateEntityBounds()` 会置 `m_sceneBBoxValid = false`，
+  前两者留给批量结束后的 `notifySceneChanged()` 统一处理。因此无论走哪条，
+  调用方都必须在批量结束后补一次 `notifySceneChanged()`；
 - 同一条命令无论选中多少图元，只有一次场景广播；方向键连按的 Nudge 命令在撤销栈上
   按 id 集合合并（`canMergeWith`），但每次仍只广播一次；
 - 重做时 `EntitySnapshotsCommand::redo()` 用 after 快照整批 `replaceEntitiesById`，

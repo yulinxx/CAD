@@ -349,7 +349,7 @@
           </p>
           <div class="callout">
             <div class="callout__label">最快的收益点</div>
-            <p><code>EntityTransform::findEntityById()</code> 当前对每次 ID 查找都做"全量图元指针拷贝 + 线性扫描"，而 <code>SceneManager::findEntityById()</code> 本身就是 O(1) 哈希查找——改为直接委托即可消除一整类 O(N·M) 热点，属于一行级修复（本报告已人工复核确认）。</p>
+            <p><code>EntityTransform::findEntityById()</code> 当前对每次 ID 查找都做"全量图元指针拷贝 + 线性扫描"，而 <code>SceneManager::findEntityById()</code> 本身就是 O(1) 哈希查找——改为直接委托即可消除一整类 O(N·M) 热点，属于一行级修复（本报告已人工复核确认）。<span class="why">——审查后已按此实现，见文末"审查后同步记录"。</span></p>
           </div>
         </section>
 
@@ -368,19 +368,19 @@
                   <td><span class="tag tag--high">高</span><br><code>Engine/2D/Src/Algorithm/EntityTransform.cpp:364-380</code> <span class="tag tag--verified">已复核</span></td>
                   <td><code>findEntityById()</code> 先 <code>getAllEntities()</code> 拷贝全部图元指针，再逐 ID 线性比较</td>
                   <td>单次查找 O(N) 且带全量 vector 拷贝</td>
-                  <td>直接委托 <code>m_sceneManager->findEntityById(id)</code>（容器内哈希索引，O(1)）</td>
+                  <td>【审查后已实现】直接委托 <code>m_sceneManager->findEntityById(id)</code>（容器内哈希索引，O(1)）</td>
                 </tr>
                 <tr>
                   <td><span class="tag tag--mid">中</span><br><code>EntityTransform.cpp:562-581</code></td>
                   <td><code>mirrorByIds()</code> 对 M 个 ID 各调一次上述线性查找</td>
                   <td>批量镜像 O(M·N)，百万图元下选 1000 个图元即 10 亿次比较</td>
-                  <td>一次性按 ID 集哈希批量取出，再统一变换</td>
+                  <td>【审查后已实现】一次性按 ID 集哈希批量取出，再统一变换（变换矩阵亦整批只构造一次）</td>
                 </tr>
                 <tr>
                   <td><span class="tag tag--high">高</span><br><code>EntityTransform.cpp:136, 382, 586, 638</code></td>
                   <td><code>mirrorAll / rotateAll</code> 等通过 <code>getAllEntities()</code> 返回全量指针副本</td>
                   <td>每次"全图变换"产生 8MB 级临时 vector（百万指针）</td>
-                  <td>改为回调式遍历或范围视图，避免物化副本</td>
+                  <td>【2026-09-16 已移除】这 6 个 <code>*All</code> 接口（<code>moveAll / rotateAll / scaleAll / shearAll / mirrorAll / mirrorAllByLine</code>）经核查无生产调用方——唯一调用方 <code>MoveProcessor</code> 自身零调用——已连同对应测试一并删除，"全图变换"这条路径不复存在，无需再改遍历方式</td>
                 </tr>
                 <tr>
                   <td><span class="tag tag--high">高</span><br><code>Engine/2D/Src/Core/EntityContainer.cpp:188-196</code> <span class="tag tag--verified">已复核</span></td>
@@ -622,10 +622,53 @@
             <p>所有复杂度类优化（P0/P1）落地前，建议先写一个可重复运行的基准：生成 100 万个混合图元 → 测量全选、框选、单删 1000 次、批量移动、undo/redo 的耗时与帧率。这组数据既是优化效果的验收依据，也是后续防止性能回退的回归基线。</p>
           </div>
         </section>
+
+        <section id="sync-log">
+          <h2>附录：审查后同步记录（2026-09-16）</h2>
+          <p>
+            本报告是 2026-09-12 的静态审查快照，正文条目保持原样；下表列出审查之后已处理的部分，
+            当前状态以代码与《图元操作批处理与 UI 刷新机制》为准。正文行号对应 2026-09-12 的版本，此后代码已多有改动。
+          </p>
+          <div class="table-wrap">
+            <table>
+              <caption>表 7：审查后已处理的条目</caption>
+              <thead>
+                <tr><th>审查条目</th><th>处理结果</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>表 1：<code>mirrorAll / rotateAll</code> 等"全图变换"产生全量指针副本</td>
+                  <td><strong>已移除</strong>：6 个 <code>*All</code> 接口经核查无生产调用方（唯一调用方 <code>MoveProcessor</code> 自身零调用），连同对应测试一并删除。</td>
+                </tr>
+                <tr>
+                  <td>表 1：<code>findEntityById()</code> 全量拷贝 + 逐 ID 线性比较（单次 O(N)）</td>
+                  <td><strong>已修复</strong>：改为直接委托 <code>SceneManager::findEntityById</code>（容器内哈希索引，O(1)）。<span class="why">——本条在审查后、本轮改动前即已修复。</span></td>
+                </tr>
+                <tr>
+                  <td>表 1：<code>mirrorByIds()</code> 对 M 个 ID 各做一次线性查找（O(M·N)）</td>
+                  <td><strong>已修复</strong>：批量接口一次按 ID 取出目标再统一变换，矩阵整批只构造一次。</td>
+                </tr>
+                <tr>
+                  <td>表 3：空间索引逐图元 <code>remove + insert</code>，每次触发树重平衡</td>
+                  <td><strong>已修复</strong>：批量变换收尾改为一次 <code>updateEntityBoundsBulk()</code>；并消除了"mutator 内更新一遍 + 收尾再更新一遍"的重复更新（第二遍恰是逐图元慢路径）。</td>
+                </tr>
+                <tr>
+                  <td>表 2：撤销链路用"全量快照"表达只动几个图元的操作</td>
+                  <td><strong>部分修复</strong>：3D 侧新增增量命令 <code>ReplaceEntitiesCommand3D</code>（移除 N + 新增 M），布尔/分割/建体不再整场景 clone 两份；2D 的 <code>EntitySnapshotsCommand</code> 仍为快照式，未动。</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            另有两项交互层扇出问题已同轮处理，它们不在本报告原条目的行号范围内：3D 每次场景通知同步触发整套 UI 刷新
+            （改为合并到事件循环下一轮，并去掉冗余的全场景选择重扫）；3D 拖拽预览逐帧在 CPU 重算并重传选中图元顶点
+            （改为复用常驻几何 + 模型矩阵提交，新增 <code>rxSessionSetModelMatrix</code>，ABI 5.3）。
+          </p>
+        </section>
       </main>
 
       <footer>
-        <p>审查说明：本报告基于 2026-09-12 工作区源码的静态审查，行号对应当前版本；标注"已复核"的条目由审查者逐行阅读原文确认，其余条目由模块化扫描定位、建议实施前对照代码二次确认。复杂度推断基于源码结构分析，未包含运行时剖析数据。</p>
+        <p>审查说明：本报告基于 2026-09-12 工作区源码的静态审查，正文行号对应 2026-09-12 的代码版本（此后代码已多有改动）；标注"已复核"的条目由审查者逐行阅读原文确认，其余条目由模块化扫描定位、建议实施前对照代码二次确认。复杂度推断基于源码结构分析，未包含运行时剖析数据。审查后已处理的条目见文末"审查后同步记录"（2026-09-16）。</p>
       </footer>
     </div>
   </article>
