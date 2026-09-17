@@ -259,12 +259,7 @@ target_link_libraries(${app_name}
 # 同一份二进制可服务多个客户。这里只把默认客户 ID 传给安装包脚本使用。
 target_compile_definitions(${app_name} PRIVATE SANYI_DEFAULT_CLIENT_ID="${SANYI_DEFAULT_CLIENT_ID}")
 
-# Qt 调试输出控制：非 Debug 配置下禁用 qDebug/qWarning 等调试日志
-# 使用生成器表达式 $<NOT:$<CONFIG:Debug>>:QT_NO_DEBUG_OUTPUT> 兼容多配置生成器
-# 当配置不是 Debug 时，展开为 -DQT_NO_DEBUG_OUTPUT
-target_compile_definitions(${app_name} PRIVATE
-    $<NOT:$<CONFIG:Debug>>:QT_NO_DEBUG_OUTPUT>
-)
+# Qt 调试输出控制已在 Config.cmake 中统一处理
 
 # 可选模块宏传播：保证 EXE 中与各 UI DLL 中 #ifdef 分支一致
 if(BUILD_NESTING)
