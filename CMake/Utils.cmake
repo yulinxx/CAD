@@ -264,9 +264,13 @@ function(sanyi_add_shared_library target)
     if(SANYI_SHLIB_EXPORT_MACRO)
         # CMake 标准做法：<target>_EXPORTS 用于 DLL 导出/导入
         # 例如 LIB_EXPORT_MACRO="UICORE_API" 产生 UICORE_EXPORTS
-        # CoreAPI.h 根据 UICORE_EXPORTS 判断是否导出
-        string(REPLACE "_API" "" _exports_target "${SANYI_SHLIB_EXPORT_MACRO}")
-        set(_exports_macro "${_exports_target}_EXPORTS")
+        # LIB_EXPORT_MACRO="LOG_EXPORTS" 直接使用 LOG_EXPORTS
+        if(SANYI_SHLIB_EXPORT_MACRO MATCHES "_API$")
+            string(REPLACE "_API" "" _exports_target "${SANYI_SHLIB_EXPORT_MACRO}")
+            set(_exports_macro "${_exports_target}_EXPORTS")
+        else()
+            set(_exports_macro "${SANYI_SHLIB_EXPORT_MACRO}")
+        endif()
         target_compile_definitions(${target} PRIVATE ${_exports_macro})
     endif()
     if(SANYI_SHLIB_COMPILE_DEFINITIONS)
