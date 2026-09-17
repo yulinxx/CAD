@@ -2841,6 +2841,10 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
                 syncSceneTreeSelection3D();
             });
     }
+    else
+    {
+        SY_ERROR("[Workbench3D] setupSceneTree3D: m_services3D.renderWidget is null!");
+    }
     if (m_services3D.sceneMonitor)
     {
         // 场景监视器会在几何变换（拖动）等高频路径上反复触发，而这些不改变树行集合；
@@ -2913,12 +2917,25 @@ void Workbench3D::refreshSceneTree3DIfNeeded()
 
 void Workbench3D::syncSceneTreeSelection3D()
 {
-    if (!m_scenePanel3D)
+    if (!m_scenePanel3D || !m_sceneManager3D || !m_services3D.renderWidget)
     {
         return;
     }
-    auto selected = SceneTreeBuilder3D::selectedIds(m_sceneManager3D);
-    SY_DEBUGF("[Workbench3D] syncSceneTreeSelection3D: selected count=%lld", static_cast<long long>(selected.size()));
+
+    // 从 SelectionManager3D 获取选中ID，而不是从 SceneManager3D
+    // 因为框选/点击选择直接操作的是 SelectionManager3D
+    auto& sel = m_services3D.renderWidget->selectionManager();
+    const auto& selectedEntities = sel.getSelectedEntities();
+
+    QSet<QString> selected;
+    for (const Eg::SyMeshEntity* entity : selectedEntities)
+    {
+        if (entity)
+        {
+            selected.insert(QString::number(entity->id));
+        }
+    }
+
     m_scenePanel3D->setSelectedIds(selected);
 }
 
