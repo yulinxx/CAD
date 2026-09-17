@@ -178,6 +178,11 @@ add_subdirectory(Engine/2D)
 add_subdirectory(Engine/3D)
 add_subdirectory(Engine/Persistence)
 
+# EngineAdapter - 算法适配层（接口隔离）
+if(BUILD_ENGINEADAPTER)
+    add_subdirectory(Engine/Adapter)
+endif()
+
 # 4. Render 层 - 渲染引擎（Renderx C API）
 option(BUILD_RENDERX "Build Renderx rendering engine" ON)
 if(BUILD_RENDERX)
@@ -221,8 +226,17 @@ else()
 endif()
 
 # 5. UI 层 - 用户界面
+# UICore - UI 抽象层（必须最先构建，其他 UI 模块依赖）
+if(BUILD_UICORE)
+    add_subdirectory(UI/Core)
+endif()
+
 add_subdirectory(UI/Common)
-add_subdirectory(UI/2D)
+
+if(BUILD_UI2D)
+    add_subdirectory(UI/2D)
+endif()
+
 if(BUILD_UI3D)
     add_subdirectory(UI/3D)
 else()
@@ -348,6 +362,14 @@ set(SANYI_PROJECT_LIBS
 )
 if(BUILD_CRASHHANDLER)
     list(APPEND SANYI_PROJECT_LIBS CrashHandler)
+endif()
+
+if(BUILD_UICORE)
+    list(APPEND SANYI_PROJECT_LIBS UICore)
+endif()
+
+if(BUILD_ENGINEADAPTER)
+    list(APPEND SANYI_PROJECT_LIBS EngineAdapter)
 endif()
 
 list(APPEND SANYI_PROJECT_LIBS
