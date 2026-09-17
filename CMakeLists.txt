@@ -19,6 +19,13 @@ project(SanYiCAD
     LANGUAGES CXX
 )
 
+# 启用 Unity Build（加快编译速度）
+option(SANYI_UNITY_BUILD "Enable unity build (faster compilation)" ON)
+if(SANYI_UNITY_BUILD)
+    set(CMAKE_UNITY_BUILD ON)
+    set(CMAKE_UNITY_BUILD_BATCH_SIZE 16)
+endif()
+
 set(SANYI_ROOT "${PROJECT_SOURCE_DIR}" CACHE INTERNAL "SanYi CAD project root")
 include("${SANYI_ROOT}/CMake/SanYiPaths.cmake")
 include("${SANYI_ROOT}/CMake/Utils.cmake")

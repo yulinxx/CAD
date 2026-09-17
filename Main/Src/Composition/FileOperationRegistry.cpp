@@ -23,7 +23,7 @@
 #include "FileIO/ImageUtils.h"
 #include "Log/SyLogger.h"
 
-#include <QFileInfo>
+#include <QSet>
 #include <QDateTime>
 #include <QMessageBox>
 #include <QImage>
@@ -33,6 +33,22 @@
 
 namespace
 {
+    // 图片扩展名集合（与 FileDropHandler::imageExtensions 一致）
+    // 注意：需与 Fio::FileFormat 枚举中的图片格式（BMP, PNG）保持同步
+    // 这些格式走 QImage 导入路径，不经过 ImportService
+    // 使用 QSet 实现 O(1) 查找
+    static const QSet<QString> kImageExtensions = {
+        QStringLiteral("jpg"),
+        QStringLiteral("jpeg"),
+        QStringLiteral("png"),
+        QStringLiteral("bmp"),
+        QStringLiteral("tga"),
+        QStringLiteral("tiff"),
+        QStringLiteral("tif"),
+        QStringLiteral("gif"),
+        QStringLiteral("webp"),
+    };
+
     // 统一格式映射表：OperationId → FileFormat
     struct FormatMappingEntry
     {
@@ -168,6 +184,14 @@ bool FileOperationRegistry::doOpenFile(const QString& filePath)
         return false;
     }
 
+    // 图片文件走专门的图片导入路径，不经过 ImportService（与拖放处理一致）
+    const QString ext = QFileInfo(filePath).suffix().toLower();
+    if (kImageExtensions.contains(ext))
+    {
+        doImportImage(filePath);
+        return true;
+    }
+
     ImportOptions opts;
     opts.importAsNewDocument = true;
     opts.autoFit = true;
@@ -245,10 +269,16 @@ void FileOperationRegistry::doImportImage(const QString& filePath)
         }
 
         QImage rgba;
+        int dpiX = 96;  // 默认 DPI
+        int dpiY = 96;
+
         QImage image(path);
         if (!image.isNull())
         {
             rgba = image.convertToFormat(QImage::Format_RGBA8888);
+            // 从 QImage 直接获取 DPI，避免额外读取文件
+            dpiX = image.logicalDpiX() > 0 ? image.logicalDpiX() : 96;
+            dpiY = image.logicalDpiY() > 0 ? image.logicalDpiY() : 96;
         }
         else
         {
@@ -263,13 +293,18 @@ void FileOperationRegistry::doImportImage(const QString& filePath)
                 return;
             }
             rgba = QImage(bytes.data(), w, h, w * 4, QImage::Format_RGBA8888).copy();
+
+            // 回退路径需要读取 DPI 信息
+            Fio::ImageInfo info = Fio::readImageInfo(path.toUtf8().constData());
+            dpiX = info.dpiX > 0 ? info.dpiX : 96;
+            dpiY = info.dpiY > 0 ? info.dpiY : 96;
         }
 
-        Fio::ImageInfo info = Fio::readImageInfo(path.toUtf8().constData());
-        const float worldW = Fio::pixelsToUnit(rgba.width(), info.dpiX, Fio::UnitType::Millimeter);
-        const float worldH = Fio::pixelsToUnit(rgba.height(), info.dpiY, Fio::UnitType::Millimeter);
+        const float worldW = Fio::pixelsToUnit(rgba.width(), dpiX, Fio::UnitType::Millimeter);
+        const float worldH = Fio::pixelsToUnit(rgba.height(), dpiY, Fio::UnitType::Millimeter);
 
-        auto* imgEntity = new Eg::SyImage();
+        // 直接用 unique_ptr 创建，避免 new + clone + delete 模式
+        auto imgEntity = std::make_unique<Eg::SyImage>();
         imgEntity->nWidth = rgba.width();
         imgEntity->nHeight = rgba.height();
         imgEntity->ePixelFormat = Eg::SyPixelFormat::RGBA32;
@@ -285,9 +320,8 @@ void FileOperationRegistry::doImportImage(const QString& filePath)
 
         // 显式获取持久 ID，避免 insertEntityPreserveId 替换临时 ID 导致查找失败
         const Eg::EntityId persistentId = Eg::EntityIdGenerator::instance().getNextPersistentId();
-        auto snap = std::unique_ptr<Eg::SyEntity>(imgEntity->clone());
-        snap->id = persistentId;
-        m_sceneManager->insertEntityPreserveId(std::move(snap));
+        imgEntity->id = persistentId;
+        m_sceneManager->insertEntityPreserveId(std::move(imgEntity));
 
         // 分配到位图图层
         if (m_layerManager && m_sceneManager)
@@ -312,8 +346,6 @@ void FileOperationRegistry::doImportImage(const QString& filePath)
                 }
             }
         }
-
-        delete imgEntity;
 
         SY_DEBUGF("[FileOperation] Imported image: %s (%dx%d)", path.toUtf8().constData(), rgba.width(), rgba.height());
     });
