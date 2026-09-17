@@ -73,6 +73,21 @@ function(sanyi_deploy_qt_dlls target)
             else()
                 message(WARNING "windeployqt not found at ${_qt_bin_dir}/windeployqt.exe")
             endif()
+
+            # 无头测试需要 offscreen 平台插件：windeployqt 默认只部署 qwindows，
+            # 而部分测试（如 CursorThemeTests）会设 QT_QPA_PLATFORM=offscreen；
+            # 缺插件时 Qt 直接 abort（退出码 3），表现为测试静默失败。
+            set(_qt_platforms_dir "${_qt_bin_dir}/../plugins/platforms")
+            if(EXISTS "${_qt_platforms_dir}")
+                add_custom_command(TARGET ${target} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E make_directory "${_output_dir}/platforms"
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "$<IF:$<CONFIG:Debug>,${_qt_platforms_dir}/qoffscreend.dll,${_qt_platforms_dir}/qoffscreen.dll>"
+                        "${_output_dir}/platforms/"
+                    COMMENT "Deploying Qt offscreen platform plugin for ${target}"
+                    VERBATIM
+                )
+            endif()
         endif()
     endif()
 endfunction()
