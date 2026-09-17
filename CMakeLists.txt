@@ -30,6 +30,12 @@ set(SANYI_ROOT "${PROJECT_SOURCE_DIR}" CACHE INTERNAL "SanYi CAD project root")
 include("${SANYI_ROOT}/CMake/SanYiPaths.cmake")
 include("${SANYI_ROOT}/CMake/Utils.cmake")
 
+# Qt 调试输出控制：非 Debug 构建下禁用 qDebug/qWarning 等调试日志
+# 定义 QT_NO_DEBUG_OUTPUT 后，Qt 的调试宏将变为空操作，不输出任何内容
+if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_definitions(QT_NO_DEBUG_OUTPUT)
+endif()
+
 # 注意: C++标准、编译器设置、输出目录等已在 Config.cmake 中配置
 
 # ---------------------------------------------------------------------------
