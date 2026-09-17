@@ -262,7 +262,10 @@ function(sanyi_add_shared_library target)
     target_compile_features(${target} PUBLIC cxx_std_17)
 
     if(SANYI_SHLIB_EXPORT_MACRO)
-        target_compile_definitions(${target} PRIVATE ${SANYI_SHLIB_EXPORT_MACRO})
+        # CMake 标准做法：<target>_EXPORTS 用于 DLL 导出/导入
+        # CoreAPI.h 会根据 UICORE_EXPORTS 判断是否导出
+        set(_exports_macro "${SANYI_SHLIB_EXPORT_MACRO}_EXPORTS")
+        target_compile_definitions(${target} PRIVATE ${_exports_macro})
     endif()
     if(SANYI_SHLIB_COMPILE_DEFINITIONS)
         target_compile_definitions(${target} PRIVATE ${SANYI_SHLIB_COMPILE_DEFINITIONS})
