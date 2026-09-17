@@ -188,8 +188,33 @@ set(SANYI_DEFAULT_UI_DIMENSION "2D" CACHE STRING "Default UI dimension: 2D|3D")
 # ===== 核心功能模块 =====
 # 建议保持默认开启状态
 option(BUILD_RENDERX "Build Renderx rendering engine (3D rendering core)" ON)
-option(BUILD_UI2D "Build UI2D module (2D user interface)" ON)
-option(BUILD_UI3D "Build UI3D module (3D user interface)" ON)
+option(BUILD_UI2D "Build UI2D module (2D user interface, always ON)" ON)
+
+# ---- UI 维度门控（唯一权威开关）----
+# 用法：cmake -DBUILD_UI_DIMENSION=2D
+#   BOTH（默认）：UI2D + UI3D 都构建（保持历史行为）
+#   2D          ：关闭 UI3D，只产出 2D 目标（Main 自动走 UI3D 桩头文件回退）
+#   3D          ：构建 UI3D，并把运行时默认视口设为 3D
+# 注意：UI2D 是全应用必需（Main 有数百处 UI2D 引用），任何取值都不会关闭它；
+#       因此 "3D" 表示"启用 3D 且默认 3D"，而非"仅 3D"。
+# BUILD_UI3D / SANYI_DEFAULT_UI_DIMENSION 均由本开关派生（FORCE 写回缓存，
+# 避免 2D→BOTH 切换时缓存粘滞）。
+set(BUILD_UI_DIMENSION "BOTH" CACHE STRING "UI build dimension gate: 2D|3D|BOTH")
+set_property(CACHE BUILD_UI_DIMENSION PROPERTY STRINGS 2D 3D BOTH)
+if(BUILD_UI_DIMENSION STREQUAL "2D")
+    set(BUILD_UI3D OFF CACHE BOOL "Build UI3D module (derived from BUILD_UI_DIMENSION)" FORCE)
+    set(SANYI_DEFAULT_UI_DIMENSION "2D" CACHE STRING "Default UI dimension (derived)" FORCE)
+elseif(BUILD_UI_DIMENSION STREQUAL "3D")
+    set(BUILD_UI3D ON CACHE BOOL "Build UI3D module (derived from BUILD_UI_DIMENSION)" FORCE)
+    set(SANYI_DEFAULT_UI_DIMENSION "3D" CACHE STRING "Default UI dimension (derived)" FORCE)
+elseif(BUILD_UI_DIMENSION STREQUAL "BOTH")
+    set(BUILD_UI3D ON CACHE BOOL "Build UI3D module (derived from BUILD_UI_DIMENSION)" FORCE)
+    set(SANYI_DEFAULT_UI_DIMENSION "2D" CACHE STRING "Default UI dimension (derived)" FORCE)
+else()
+    message(FATAL_ERROR
+        "[SanYi] BUILD_UI_DIMENSION 取值非法: '${BUILD_UI_DIMENSION}'（应为 2D|3D|BOTH）")
+endif()
+
 option(BUILD_NESTING "Build Nesting module (2D/3D nesting/arrangement algorithm)" ON)
 option(BUILD_CAM "Build CAM module (laser cutting toolpath generation)" OFF)
 

@@ -274,15 +274,43 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 
 ---
 
-### Phase 3 — 目录统一 + 维度门控（约 1 周）
+### Phase 3 — 目录统一 + 维度门控 ✅ 已完成（2026-09）
 
-1. **2D/3D 统一骨架**：`Adapter / Algorithm / Manager / Operation / Render / Service / Settings / UI`。
-   - 2D：`Action` → `Operation`。
-   - 3D：`Edit / Plugin / Relief / ...` 归位到统一骨架。
-   - **单独 PR，不与逻辑改动混合**（避免打断 `git blame` 与 Qt `AUTOMOC` 路径）。
-2. **根工程支持 `BUILD_UI_DIMENSION=2D|3D`** 门控（与 `UI/CMakeLists.txt` 行为一致）；`SANYI_DEFAULT_UI_DIMENSION` 只作运行时默认。
+**1. 2D/3D 目录骨架 — 实测已对齐，无需搬迁**
 
-**验收**：`cmake -DBUILD_UI_DIMENSION=2D` 只产出 2D 目标。
+实测两者共有骨架完全一致：
+
+```
+共有: Adapter, Algorithm, Manager, Operation, Service, Settings, UI
+仅2D: Action(空), Option(49 文件，域内专用)
+仅3D: Edit, Plugin, Relief, Render, Shortcut(空), Storage, Tool(域内专用)
+```
+
+- `Action`、`Shortcut` 为空目录（且未被 git 跟踪）→ 已删除。
+- 其余差异目录（`Option` / `Edit` / `Plugin` / `Relief` / `Storage` / `Tool`）是
+  **真实域内功能**，统一骨架里没有对应类目；强行搬迁属主观且会打断
+  **48 处** `#include "Option/..."` 等路径。**决定不搬迁**（避免为"整齐"付真实代价）。
+- `Render` 已在骨架内（3D 有 `Src/Render`）。
+
+**2. 根工程 `BUILD_UI_DIMENSION` 门控 — 已实现**
+
+`Config.cmake` 新增唯一权威开关 `BUILD_UI_DIMENSION`（`2D|3D|BOTH`，默认 `BOTH`），
+派生 `BUILD_UI3D` 与 `SANYI_DEFAULT_UI_DIMENSION`（`FORCE` 写回缓存，修复 2D→BOTH
+粘滞）。非法取值 `FATAL_ERROR`。
+
+| 取值 | UI2D | UI3D | 运行时默认 |
+|---|---|---|---|
+| `BOTH`（默认） | ON | ON | 2D |
+| `2D` | ON | **OFF** | 2D |
+| `3D` | ON | ON | 3D |
+
+> 约束：UI2D 全应用必需（Main 数百处引用、无桩回退），任何取值都不关闭；
+> 根 `CMakeLists.txt` 对 `BUILD_UI2D=OFF` 直接 `FATAL_ERROR`。
+
+**验收（已验证）**：
+- `cmake -DBUILD_UI_DIMENSION=2D` → `UI3D: DISABLED`，`SanYiCAD.slnx` 中 UI3D 引用 = **0**。
+- `BOTH` → UI3D 重新 ON（粘滞已修复）。
+- 非法值 → 配置期 `FATAL_ERROR`。
 
 ---
 
@@ -345,11 +373,12 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 Phase 0  审计 + 删除死抽象            ✅ 已完成（目录删除，构建通过）
 Phase 1  渲染后端收口（统一开关+删死抽象）✅ 已完成（不做运行时基类改造）
 Phase 2  UiEngineAccess 门面 + CI 方向校验   ✅ 已完成（依赖收口 + 校验通过）
-Phase 3  目录统一 + 维度门控                  ⏳ 待做（约 1 周）
+Phase 3  目录统一 + 维度门控                  ✅ 已完成（骨架本就对齐；BUILD_UI_DIMENSION 门控）
 ```
 
-> Phase 0/1 未改动业务逻辑，已消除"假解耦"（UI/Core、EngineAdapter、IRenderSurface、
-> 4 个死 CMake 宏）并统一后端开关。
-> Phase 2 已把 UI→Engine 依赖收口到 `UiEngineAccess` 单一门面，并由
-> `CMake/CheckDependencies.cmake` 在 configure 阶段强制方向（CI 门禁）。
-> Phase 3 是最后一项：2D/3D 目录统一 + 根工程维度门控。
+> 四个 Phase 全部完成。全程未改动业务逻辑语义：
+> - 消除了"假解耦"（UI/Core、EngineAdapter、IRenderSurface、4 个死 CMake 宏）；
+> - 后端开关统一为 `SANYI_DEFAULT_RENDER_BACKEND`；
+> - UI→Engine 依赖收口到 `UiEngineAccess` 门面，并由 `CheckDependencies.cmake`
+>   在 configure 阶段强制方向（CI 门禁）；
+> - 根工程新增 `BUILD_UI_DIMENSION=2D|3D|BOTH` 门控。

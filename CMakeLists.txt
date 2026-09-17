@@ -230,17 +230,21 @@ else()
 endif()
 
 # 5. UI 层 - 用户界面
-
+# UICommon 必需；UI2D 全应用必需（Main 有数百处 UI2D 引用且无桩回退）；
+# UI3D 可选，由 BUILD_UI3D / BUILD_UI_DIMENSION 控制。
 add_subdirectory(UI/Common)
 
-if(BUILD_UI2D)
-    add_subdirectory(UI/2D)
+if(NOT BUILD_UI2D)
+    message(FATAL_ERROR
+        "BUILD_UI2D=OFF 不受支持：Main 硬依赖 UI2D（无桩回退）。"
+        "如需仅 3D，请构建 UI 独立工程。")
 endif()
+add_subdirectory(UI/2D)
 
 if(BUILD_UI3D)
     add_subdirectory(UI/3D)
 else()
-    message(STATUS "  UI3D: DISABLED")
+    message(STATUS "  UI3D: DISABLED (BUILD_UI_DIMENSION=${BUILD_UI_DIMENSION})")
 endif()
 
 message(STATUS "----------------------------------------")
