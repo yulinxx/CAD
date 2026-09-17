@@ -390,3 +390,184 @@ endif()
 
     message(STATUS "[Export] ${_lib_name}Config.cmake -> ${_config_dir}")
 endfunction()
+
+# --------------------------------------------------------------------
+# 标准化模块声明宏 - 消除重复代码
+# --------------------------------------------------------------------
+function(sanyi_declare_module name)
+    set(options AUTOMOC AUTOUIC AUTORCC UNITY_BUILD)
+    set(oneValueArgs FOLDER DESCRIPTION EXPORT_MACRO VERSION_MAJOR VERSION_MINOR VERSION_PATCH)
+    set(multiValueArgs SOURCES HEADERS PUBLIC_INCLUDE_DIRS PRIVATE_INCLUDE_DIRS
+                       COMPILE_DEFINITIONS COMPILE_OPTIONS LINK_LIBRARIES QT_COMPONENTS
+                       PRIVATE_COMPILE_DEFINITIONS PRIVATE_COMPILE_OPTIONS PRIVATE_LINK_LIBRARIES)
+    cmake_parse_arguments(SANYI_DECL "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+    # 设置版本信息
+    if(SANYI_DECL_VERSION_MAJOR)
+        set(_version "${SANYI_DECL_VERSION_MAJOR}")
+        if(DEFINED SANYI_DECL_VERSION_MINOR)
+            set(_version "${_version}.${SANYI_DECL_VERSION_MINOR}")
+            if(DEFINED SANYI_DECL_VERSION_PATCH)
+                set(_version "${_version}.${SANYI_DECL_VERSION_PATCH}")
+            endif()
+        endif()
+        set(PROJECT_VERSION "${_version}")
+        set(PROJECT_VERSION_MAJOR "${SANYI_DECL_VERSION_MAJOR}")
+        set(PROJECT_VERSION_MINOR "${SANYI_DECL_VERSION_MINOR}")
+        set(PROJECT_VERSION_PATCH "${SANYI_DECL_VERSION_PATCH}")
+    endif()
+
+    # 添加库
+    add_library(${name} SHARED
+        ${SANYI_DECL_SOURCES}
+        ${SANYI_DECL_HEADERS}
+    )
+
+    # 目标属性
+    set(_target_properties
+        FOLDER "${SANYI_DECL_FOLDER}"
+        DEBUG_POSTFIX "_d"
+        VERSION "${PROJECT_VERSION}"
+    )
+    if(SANYI_DECL_VERSION_MAJOR)
+        list(APPEND _target_properties SOVERSION "${SANYI_DECL_VERSION_MAJOR}")
+    endif()
+
+    if(MSVC)
+        list(APPEND _target_properties MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+    endif()
+
+    if(SANYI_DECL_AUTOMOC)
+        list(APPEND _target_properties AUTOMOC ON)
+    endif()
+    if(SANYI_DECL_AUTOUIC)
+        list(APPEND _target_properties AUTOUIC ON)
+    endif()
+    if(SANYI_DECL_AUTORCC)
+        list(APPEND _target_properties AUTORCC ON)
+    endif()
+    if(SANYI_DECL_UNITY_BUILD)
+        list(APPEND _target_properties UNITY_BUILD ON)
+    endif()
+
+    set_target_properties(${name} PROPERTIES ${_target_properties})
+
+    # 包含目录
+    if(SANYI_DECL_PUBLIC_INCLUDE_DIRS)
+        target_include_directories(${name} PUBLIC ${SANYI_DECL_PUBLIC_INCLUDE_DIRS})
+    endif()
+    if(SANYI_DECL_PRIVATE_INCLUDE_DIRS)
+        target_include_directories(${name} PRIVATE ${SANYI_DECL_PRIVATE_INCLUDE_DIRS})
+    endif()
+
+    target_compile_features(${name} PUBLIC cxx_std_17)
+
+    if(SANYI_DECL_EXPORT_MACRO)
+        target_compile_definitions(${name} PRIVATE ${SANYI_DECL_EXPORT_MACRO})
+    endif()
+    if(SANYI_DECL_COMPILE_DEFINITIONS)
+        target_compile_definitions(${name} PRIVATE ${SANYI_DECL_COMPILE_DEFINITIONS})
+    endif()
+    if(SANYI_DECL_PRIVATE_COMPILE_DEFINITIONS)
+        target_compile_definitions(${name} PRIVATE ${SANYI_DECL_PRIVATE_COMPILE_DEFINITIONS})
+    endif()
+
+    if(MSVC)
+        target_compile_options(${name} PRIVATE /utf-8 /FS)
+    else()
+        target_compile_options(${name} PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    if(SANYI_DECL_COMPILE_OPTIONS)
+        target_compile_options(${name} PRIVATE ${SANYI_DECL_COMPILE_OPTIONS})
+    endif()
+    if(SANYI_DECL_PRIVATE_COMPILE_OPTIONS)
+        target_compile_options(${name} PRIVATE ${SANYI_DECL_PRIVATE_COMPILE_OPTIONS})
+    endif()
+
+    # Qt 组件
+    if(SANYI_DECL_QT_COMPONENTS)
+        sanyi_find_qt(${SANYI_DECL_QT_COMPONENTS})
+        target_link_libraries(${name} PUBLIC ${QT_LIBRARIES})
+    endif()
+
+    # 链接库
+    if(SANYI_DECL_LINK_LIBRARIES)
+        target_link_libraries(${name} ${SANYI_DECL_LINK_LIBRARIES})
+    endif()
+    if(SANYI_DECL_PRIVATE_LINK_LIBRARIES)
+        target_link_libraries(${name} PRIVATE ${SANYI_DECL_PRIVATE_LINK_LIBRARIES})
+    endif()
+
+    # 版本信息和调试符号
+    sanyi_add_version_info(${name} "${name}" "${SANYI_DECL_DESCRIPTION}")
+    sanyi_add_debug_symbols(${name})
+
+    # 状态输出
+    message(STATUS "[${name}]")
+    message(STATUS "  Version: ${PROJECT_VERSION}")
+    message(STATUS "  Platform: ${CMAKE_SYSTEM_NAME}(${CMAKE_SYSTEM_PROCESSOR})")
+    message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
+    message(STATUS "----------------------------------------")
+endfunction()
+
+# --------------------------------------------------------------------
+# 标准化模块导出宏
+# --------------------------------------------------------------------
+function(sanyi_export_module name)
+    set(options)
+    set(oneValueArgs LIB_NAME)
+    set(multiValueArgs PUBLIC_INCLUDE_DIRS INTERFACE_LINK_LIBRARIES)
+    cmake_parse_arguments(SANYI_EXP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+    if(NOT SANYI_EXP_LIB_NAME)
+        message(FATAL_ERROR "[sanyi_export_module] LIB_NAME required")
+    endif()
+
+    set(_config_dir "${CMAKE_BINARY_DIR}/cmake")
+    file(MAKE_DIRECTORY "${_config_dir}")
+
+    set(_lib_name "${SANYI_EXP_LIB_NAME}")
+    set(_target_name "${_lib_name}::${_lib_name}")
+
+    set(_includes "")
+    if(SANYI_EXP_PUBLIC_INCLUDE_DIRS)
+        foreach(inc IN LISTS SANYI_EXP_PUBLIC_INCLUDE_DIRS)
+            list(APPEND _includes "${inc}")
+        endforeach()
+    endif()
+
+    set(_deps "")
+    if(SANYI_EXP_INTERFACE_LINK_LIBRARIES)
+        foreach(dep IN LISTS SANYI_EXP_INTERFACE_LINK_LIBRARIES)
+            list(APPEND _deps "${dep}")
+        endforeach()
+    endif()
+
+    if(WIN32)
+        set(_implib_genex "\$<TARGET_FILE:${_lib_name}>")
+        set(_location_genex "\$<TARGET_FILE:${_lib_name}>")
+    elseif(APPLE)
+        set(_implib_genex "\$<TARGET_FILE:${_lib_name}>")
+        set(_location_genex "\$<TARGET_FILE:${_lib_name}>")
+    else()
+        set(_implib_genex "\$<TARGET_FILE:${_lib_name}>")
+        set(_location_genex "\$<TARGET_FILE:${_lib_name}>")
+    endif()
+
+    set(_config_content "# Generated by sanyi_export_module for ${_lib_name}
+# DO NOT EDIT
+
+if(NOT TARGET ${_target_name})
+    add_library(${_target_name} SHARED IMPORTED)
+    set_target_properties(${_target_name} PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES \"${_includes}\"
+        IMPORTED_IMPLIB \"${_implib_genex}\"
+        IMPORTED_LOCATION \"${_location_genex}\"
+        INTERFACE_LINK_LIBRARIES \"${_deps}\"
+    )
+endif()
+")
+    file(WRITE "${_config_dir}/${_lib_name}Config.cmake" "${_config_content}")
+
+    message(STATUS "[Export] ${_lib_name}Config.cmake -> ${_config_dir}")
+endfunction()
