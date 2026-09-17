@@ -34,7 +34,7 @@ if(NOT DEFINED VCPKG_DIR OR VCPKG_DIR STREQUAL "")
     elseif(UNIX AND NOT APPLE)
         set(VCPKG_DIR "/usr/local/vcpkg/" CACHE PATH "VCPKG installation directory")
     elseif(APPLE)
-        set(VCPKG_DIR "/opt/vcpkg" CACHE PATH "VCPKG installation directory")
+        set(VCPKG_DIR "/Users/ms/vcpkg" CACHE PATH "VCPKG installation directory")
     endif()
 endif()
 
@@ -170,7 +170,11 @@ endif()
 
 # ===== 渲染后端配置 =====
 set(SANYI_RENDER_BACKENDS "OPENGL;METAL;VULKAN" CACHE STRING "Available render backends")
-set(SANYI_DEFAULT_RENDER_BACKEND "OPENGL" CACHE STRING "Default render backend: OPENGL|METAL|VULKAN")
+if(APPLE)
+    set(SANYI_DEFAULT_RENDER_BACKEND "METAL" CACHE STRING "Default render backend: OPENGL|METAL|VULKAN")
+else()
+    set(SANYI_DEFAULT_RENDER_BACKEND "OPENGL" CACHE STRING "Default render backend: OPENGL|METAL|VULKAN")
+endif()
 
 # ===== UI 维度配置 =====
 set(SANYI_UI_DIMENSIONS "2D;3D" CACHE STRING "Available UI dimensions")
@@ -212,7 +216,7 @@ set(BUILD_MAIN_TESTS OFF)
 # 渲染后端选择逻辑
 if(SANYI_DEFAULT_RENDER_BACKEND STREQUAL "METAL")
     if(APPLE)
-        find_package(Metal REQUIRED)
+        # Metal 是 macOS 系统框架，不需要 find_package
         message(STATUS "[Render] Backend: Metal (Apple)")
     else()
         message(FATAL_ERROR "[Render] Metal backend only supported on macOS")
@@ -225,8 +229,13 @@ elseif(SANYI_DEFAULT_RENDER_BACKEND STREQUAL "VULKAN")
         message(FATAL_ERROR "[Render] Vulkan support disabled (SANYI_ENABLE_VULKAN=OFF)")
     endif()
 else()
-    find_package(OpenGL REQUIRED)
-    message(STATUS "[Render] Backend: OpenGL")
+    # OpenGL 在 macOS 上已被废弃，使用 Metal 作为默认后端
+    if(APPLE)
+        message(STATUS "[Render] Backend: Metal (fallback from OpenGL on macOS)")
+    else()
+        find_package(OpenGL REQUIRED)
+        message(STATUS "[Render] Backend: OpenGL")
+    endif()
 endif()
 
 # Vulkan 支持 (可选)

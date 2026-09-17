@@ -9,7 +9,7 @@ endif()
 # 包含全局配置文件 (定义所有编译环境选项)
 include(Config.cmake)
 
-# 集成VCPKG
+# 集成VCPKG (使用 Config.cmake 中配置的 VCPKG_DIR)
 set(CMAKE_TOOLCHAIN_FILE "${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "Vcpkg toolchain file")
 
 # 项目基本信息
