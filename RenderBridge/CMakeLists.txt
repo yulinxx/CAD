@@ -71,6 +71,10 @@ sanyi_export_imported_target(${LIB_NAME}
         RenderX::RenderX
 )
 
+message(STATUS "[${LIB_NAME}]")
+message(STATUS "  Version: ${PROJECT_VERSION}")
+message(STATUS "  Platform: ${CMAKE_SYSTEM_NAME}(${CMAKE_SYSTEM_PROCESSOR})")
+message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "----------------------------------------")
 
 # ============================================================================
@@ -86,6 +90,7 @@ message(STATUS "----------------------------------------")
 # 用独立 option 名（而不是复用 BUILD_*_TESTS）：Config.cmake 用普通变量统一
 # set(... OFF) 会遮蔽同名 option，这是仓库里既有的坑（见 Main 的 ViewportRefreshTests）。
 option(BUILD_RENDERBRIDGE_TESTS "Build RenderBridge host-side contract tests" ON)
+find_package(GTest CONFIG QUIET)
 if(BUILD_RENDERBRIDGE_TESTS AND GTest_FOUND)
     add_executable(RenderBridgeTests
         "${CMAKE_CURRENT_SOURCE_DIR}/Test/PersistentGeometryStoreTests.cpp"
