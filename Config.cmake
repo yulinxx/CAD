@@ -95,17 +95,22 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     # 统一警告级别
     add_compile_options(-Wall -Wextra -Wpedantic)
 
-    # 额外警告 (可根据需要调整)
+    # 额外警告抑制 (跨平台兼容)
     add_compile_options(
         -Wno-unused-parameter
         -Wno-unused-variable
+        -Wno-unused-private-field
+        -Wno-unused-lambda-capture
         -Wno-nullability-extension
+        -Wno-reorder
     )
 
     # macOS 特定
     if(APPLE)
         # 抑制大小写不敏感路径警告
         add_compile_options(-Wno-nonportable-include-path)
+        # 抑制 OpenGL 废弃警告（使用 Metal 作为后端）
+        add_compile_options(-Wno-deprecated-declarations)
     endif()
 
     message(STATUS "[Config] Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
