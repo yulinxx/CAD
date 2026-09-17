@@ -17,14 +17,9 @@
 #endif
 
 // 启用高 DPI 缩放（跨平台高分屏支持）
-// Qt 5.6+: AA_EnableHighDpiScaling, AA_UseHighDpiPixmaps
-// Qt 6+: 默认启用，但显式设置可确保兼容性
+// Qt 6+: 默认启用，无需手动设置
 static void setupHighDpiScaling()
 {
-#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
-    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-    QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
-#endif
 }
 
 // macOS: 使用原生菜单栏

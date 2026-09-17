@@ -317,7 +317,7 @@ QString SceneDocument2D::createSmartLine(const QVector<QPointF>& points)
         return {};
     }
     auto smartLine = std::make_unique<Eg::SySmartLine>();
-    for (int i = 0; i < points.size() - 1; ++i)
+    for (int i = 0; i < static_cast<int>(points.size()) - 1; ++i)
     {
         auto segment =
             std::make_unique<Eg::SyLine>(std::vector<Ut::Vec2d>{ toVec2d(points[i]), toVec2d(points[i + 1]) });

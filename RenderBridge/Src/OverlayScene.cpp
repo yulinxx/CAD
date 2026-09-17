@@ -12,16 +12,13 @@
 #include "RenderBridge/PinnedMarkerGeometry.h"
 #include "RenderBridge/ScreenConstantMetrics.h"
 
+#include "Ut/Def.h"
 #include "Log/SyLogger.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <utility>
-
-#ifndef M_PI
-    #define M_PI 3.14159265358979323846
-#endif
 
 namespace RT = Render::RT;
 

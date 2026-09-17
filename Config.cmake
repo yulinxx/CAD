@@ -24,22 +24,28 @@
 # --------------------------------------------------------------------
 # 以下路径可根据实际安装位置修改
 
-# vcpkg 根目录
+# vcpkg 根目录（自动检测，优先使用 VCPKG_DIR 环境变量）
 if(NOT DEFINED VCPKG_DIR OR VCPKG_DIR STREQUAL "")
-    if(WIN32)
-        # set(VCPKG_DIR "C:/vcpkg/" CACHE PATH "VCPKG installation directory")
-        set(VCPKG_DIR "C:/Users/xx/vcpkg/" CACHE PATH "VCPKG installation directory")
+    if(DEFINED ENV{VCPKG_DIR})
+        set(VCPKG_DIR "$ENV{VCPKG_DIR}" CACHE PATH "VCPKG installation directory")
+    elseif(WIN32)
+        set(VCPKG_DIR "C:/vcpkg/" CACHE PATH "VCPKG installation directory")
     elseif(UNIX AND NOT APPLE)
         set(VCPKG_DIR "/usr/local/vcpkg/" CACHE PATH "VCPKG installation directory")
     elseif(APPLE)
-        set(VCPKG_DIR "/Users/ms/vcpkg" CACHE PATH "VCPKG installation directory")
+        set(VCPKG_DIR "/opt/vcpkg" CACHE PATH "VCPKG installation directory")
     endif()
 endif()
 
-# Qt 安装目录
+# Qt 安装目录（优先使用 Qt6_DIR 或 Qt_INSTALL_DIR 环境变量）
 if(NOT DEFINED Qt_INSTALL_DIR OR Qt_INSTALL_DIR STREQUAL "")
-    if(WIN32)
-        set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.11.2/msvc2022_64" CACHE PATH "Qt installation directory")
+    if(DEFINED ENV{Qt_INSTALL_DIR})
+        set(Qt_INSTALL_DIR "$ENV{Qt_INSTALL_DIR}" CACHE PATH "Qt installation directory")
+    elseif(DEFINED Qt6_DIR)
+        get_filename_component(_qt6_root "${Qt6_DIR}" DIRECTORY)
+        get_filename_component(Qt_INSTALL_DIR "${_qt6_root}" DIRECTORY)
+    elseif(WIN32)
+        set(Qt_INSTALL_DIR "C:/Qt/6.11.2/msvc2022_64" CACHE PATH "Qt installation directory")
     elseif(UNIX AND NOT APPLE)
         set(Qt_INSTALL_DIR "/usr/local/Qt/6.11.1/gcc_64" CACHE PATH "Qt installation directory")
     elseif(APPLE)

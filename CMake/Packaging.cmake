@@ -170,5 +170,4 @@ set(CPACK_SOURCE_PACKAGE_FILE_NAME "sanyicad-${CPACK_PACKAGE_VERSION}-src")
 # ============================================================================
 # 包含 CPack（必须在所有 CPACK 变量设置之后）
 # ============================================================================
-# CMake 4.3 configure_file 兼容性问题：CPack 内部调用 configure_file 失败
-# include(CPack)
+include(CPack)
