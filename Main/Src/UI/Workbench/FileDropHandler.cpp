@@ -3,6 +3,7 @@
 #include "Import/ImportService.h"
 #include "Import/ImportOptions.h"
 #include "Import/ImportResult.h"
+#include "Import/ImportProgressRunner.h"
 #include "Log/SyLogger.h"
 
 #include "Engine2D/Core/SceneManager.h"
@@ -313,7 +314,12 @@ bool FileDropHandler::handleDrop(QDropEvent* event)
         opts.importAsNewDocument = false;
         opts.autoFit = true;
 
-        const ImportResult result = m_importService->importFile(filePath, opts);
+        // 带进度对话框的异步导入：解析在工作线程、落库回主线程，主界面不冻结。
+        // 多文件拖放时逐个导入，每个文件一个进度对话框（模态，期间主窗口不可交互）。
+        ImportContext context;
+        context.sourcePath = filePath;
+        const ImportResult result =
+            ImportProgressRunner::run(m_importService, context, opts, QApplication::activeWindow());
         if (result.success)
         {
             ++successCount;

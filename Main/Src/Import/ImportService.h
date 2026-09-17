@@ -167,7 +167,7 @@ private:
         const ImportResult& parseResult);
 
     /// 4：刷新显示（工作台、视口、树、属性面板）
-    void phaseRefreshDisplay(const ImportResult& result, const ImportOptions& options);
+    void phaseRefreshDisplay(const ImportContext& context, const ImportResult& result, const ImportOptions& options);
 
     /// 5：回写状态（状态栏、最近文件、文档记录）
     void phaseWriteBackState(const ImportContext& context, const ImportResult& result);
@@ -188,8 +188,9 @@ private:
 
 
 private:
-    /// 更新进度
-    void updateProgress(ImportPhase phase, float progress);
+    /// 更新进度：转发给 context.progressCallback（可跨线程安全消费，如进度对话框的 tracker），
+    /// 并发出 importProgress 信号。
+    void updateProgress(const ImportContext& context, ImportPhase phase, float progress);
 
     /// 检查是否已取消
     bool isCanceled(const ImportContext& context) const;
