@@ -112,6 +112,16 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 # --------------------------------------------------------------------
+# Qt 调试输出控制
+# --------------------------------------------------------------------
+# 非 Debug 构建下禁用 qDebug/qWarning 等调试日志
+# 定义 QT_NO_DEBUG_OUTPUT 后，Qt 的调试宏将变为空操作
+if(CMAKE_BUILD_TYPE AND (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel"))
+    add_compile_definitions(QT_NO_DEBUG_OUTPUT)
+    message(STATUS "[Qt] Debug output: DISABLED (Release build)")
+endif()
+
+# --------------------------------------------------------------------
 # C++ 标准配置
 # --------------------------------------------------------------------
 set(CMAKE_CXX_STANDARD 17)
