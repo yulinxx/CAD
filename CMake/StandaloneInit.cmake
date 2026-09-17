@@ -32,6 +32,18 @@ macro(sanyi_setup_compiler_options)
     else()
         add_compile_options(-Wall -Wextra -Wpedantic)
         add_compile_options(-Wno-conversion -Wno-float-conversion)
+        add_compile_options(
+            -Wno-unused-parameter
+            -Wno-unused-variable
+            -Wno-unused-private-field
+            -Wno-unused-lambda-capture
+            -Wno-nullability-extension
+            -Wno-reorder
+        )
+        if(APPLE)
+            add_compile_options(-Wno-nonportable-include-path)
+            add_compile_options(-Wno-deprecated-declarations)
+        endif()
     endif()
 endmacro()
 
