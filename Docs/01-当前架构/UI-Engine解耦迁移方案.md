@@ -247,21 +247,30 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 
 ---
 
-### Phase 2 — UI→Engine 依赖收口 + 方向强制（1–2 周）
+### Phase 2 — UI→Engine 依赖收口 + 方向强制 ✅ 已完成（2026-09）
 
-**不做接口**，只收口依赖面：
+**不做接口**，只收口依赖面。实际执行：
 
-1. 建 INTERFACE 目标 **`UiEngineAccess`**，只导出 UI 允许使用的 Engine 头 / 库。
-2. 所有 UI 模块改为 `target_link_libraries(... UiEngineAccess)`，**禁止**直接链 `Engine2D/3D/EngineCommon`。
-   - 365 处 `#include` **无需改动**；依赖从"散落各处"变为"一个可审计、可替换的收口点"。
-3. **CI 方向校验**（新增脚本 / CMake 检查）：
-   - `Engine*` 不得链 `UI*` / `Render*` / `Main`
+1. **`CMake/UiEngineAccess.cmake`** — INTERFACE 目标 `UiEngineAccess`，
+   `INTERFACE` 链接 `EngineCommon/Engine2D/Engine3D/EnginePersistence`。
+   在根与 `UI/CMakeLists.txt`（独立工程）里、Engine 目标之后定义。
+2. **UI 模块改链门面** — `UI/Common`、`UI/2D`、`UI/3D` 的
+   `target_link_libraries` 由 Engine 目标改为 `UiEngineAccess`，并删除各自重复的
+   Engine 包含路径（改为从门面传递）。
+   - 365 处 `#include "Engine*/..."` **未改动**；依赖从"散落各处"变为单一收口点。
+   - 对外导出的 imported target 仍用 `EngineCommon::EngineCommon` 等（门面是构建内的）。
+3. **`CMake/CheckDependencies.cmake`** — `sanyi_check_dependency_directions()`，
+   在根 `CMakeLists.txt` 所有目标创建后执行；违规 `FATAL_ERROR`：
+   - `Engine*` 不得链 `UI*` / `Render*` / `Main` / `UiEngineAccess`
    - `RenderX` / `RenderBridge` 不得链 `UI*` / `Main`
-   - `UI*` 不得直接链 `Engine2D/3D/EngineCommon`（只能经 `UiEngineAccess`）
+   - `UI*` 不得直接链 `EngineCommon/Engine2D/Engine3D/EnginePersistence`（只能经门面）
+4. **CI**：`.github/workflows/ci.yml` 的 Configure 步骤自动触发该检查，违规即失败。
 
-**验收**：
-- UI 模块直接链接 Engine 的目标数 = 0。
-- 任一方向违规，CI 直接失败。
+**验收（已验证）**：
+- 配置输出：`[UiEngineAccess] ... 已定义` + `[SanYi] 依赖方向校验: OK`。
+- 注入违规（给 `UICommon` 加 `Engine2D` 直链）→ configure 立即 `FATAL_ERROR`
+  （`CheckDependencies.cmake:67`）；移除后恢复通过。
+- Debug 全量构建通过，`SanYiCAD.exe` 生成。
 
 ---
 
@@ -335,10 +344,12 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 ```
 Phase 0  审计 + 删除死抽象            ✅ 已完成（目录删除，构建通过）
 Phase 1  渲染后端收口（统一开关+删死抽象）✅ 已完成（不做运行时基类改造）
-Phase 2  UiEngineAccess 门面 + CI 方向校验   ⏳ 待做（1-2 周）
+Phase 2  UiEngineAccess 门面 + CI 方向校验   ✅ 已完成（依赖收口 + 校验通过）
 Phase 3  目录统一 + 维度门控                  ⏳ 待做（约 1 周）
 ```
 
-> Phase 0/1 均未改动业务逻辑，风险最低，已消除"假解耦"（UI/Core、EngineAdapter、
-> IRenderSurface、4 个死 CMake 宏）并统一后端开关。
-> Phase 2 是下一个有实际收益的步骤：把 365 处 UI→Engine 直接 include 收口到单一门面目标。
+> Phase 0/1 未改动业务逻辑，已消除"假解耦"（UI/Core、EngineAdapter、IRenderSurface、
+> 4 个死 CMake 宏）并统一后端开关。
+> Phase 2 已把 UI→Engine 依赖收口到 `UiEngineAccess` 单一门面，并由
+> `CMake/CheckDependencies.cmake` 在 configure 阶段强制方向（CI 门禁）。
+> Phase 3 是最后一项：2D/3D 目录统一 + 根工程维度门控。

@@ -17,6 +17,10 @@ jobs:
         with:
           submodules: recursive
 
+      # 依赖方向校验在 configure 阶段自动执行（CMake/CheckDependencies.cmake）：
+      #   Engine* 不得依赖 UI*/Render*/Main；RenderX/RenderBridge 不得依赖 UI*/Main；
+      #   UI* 只能经 UiEngineAccess 门面访问 Engine*。
+      # 违规会让本步骤直接失败。
       - name: Configure
         run: |
           cmake -B build -G "Visual Studio 17 2022" -A x64 \

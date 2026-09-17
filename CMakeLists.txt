@@ -183,6 +183,10 @@ add_subdirectory(Engine/2D)
 add_subdirectory(Engine/3D)
 add_subdirectory(Engine/Persistence)
 
+# UI → Engine 唯一访问门面（必须在 Engine 目标之后、UI 模块之前定义）
+include("${SANYI_ROOT}/CMake/UiEngineAccess.cmake")
+sanyi_define_ui_engine_access()
+
 # 4. Render 层 - 渲染引擎（Renderx C API）
 option(BUILD_RENDERX "Build Renderx rendering engine" ON)
 if(BUILD_RENDERX)
@@ -360,6 +364,12 @@ foreach(_sy_viewport_target IN LISTS SY_VIEWPORT_BACKEND_TARGETS)
         target_compile_definitions(${_sy_viewport_target} PUBLIC SY_ENABLE_METAL_VIEWPORT=1)
     endif()
 endforeach()
+
+# ============================================================================
+# 依赖方向校验（CI 门禁）— 所有目标已创建后执行
+# ============================================================================
+include("${SANYI_ROOT}/CMake/CheckDependencies.cmake")
+sanyi_check_dependency_directions()
 
 # ============================================================================
 # 安装规则
