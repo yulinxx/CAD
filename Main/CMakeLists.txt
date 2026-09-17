@@ -20,11 +20,44 @@ endfunction()
 set(SRC_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/Src)
 set(UI_ROOT ${SRC_ROOT}/UI)
 
+# 项目根目录（用于相对路径缩写）
+set(PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
+
+# ============================================================================
+# 公共 Include 目录（主应用 + MainTests 共享）
+# ============================================================================
+set(SHARED_PROJECT_INCLUDE_DIRS
+    "${CMAKE_CURRENT_BINARY_DIR}"
+    "${SRC_ROOT}"
+    "${SRC_ROOT}/Common"
+    "${UI_ROOT}"
+    "${UI_ROOT}/Adapters"
+    "${UI_ROOT}/Interaction"
+    "${UI_ROOT}/Documents"
+    "${UI_ROOT}/Entities"
+    "${UI_ROOT}/Render"
+    "${UI_ROOT}/Services"
+    "${UI_ROOT}/Widgets"
+    "${UI_ROOT}/Workbench"
+    "${PROJECT_ROOT}/Utility/Utility/Include"
+    "${PROJECT_ROOT}/License/License/Include"
+    "${PROJECT_ROOT}/Engine/Common/Include"
+    "${PROJECT_ROOT}/Engine/2D/Include"
+    "${PROJECT_ROOT}/Engine/3D/Include"
+    "${PROJECT_ROOT}/Engine/Persistence/Include"
+    "${PROJECT_ROOT}/UI/Common/Include"
+    "${PROJECT_ROOT}/UI/2D/Include"
+    "${PROJECT_ROOT}/UI/2D/Src"
+    "${PROJECT_ROOT}/Log/Log/Include"
+    "${PROJECT_ROOT}/FileIO/FileIO/Include"
+)
+
 # 自动收集所有源文件（新增 .cpp/.mm 文件无需修改此处）
 file(GLOB_RECURSE MAIN_APP_SOURCES CONFIGURE_DEPENDS
     "${SRC_ROOT}/*.cpp"
     "${SRC_ROOT}/*.mm"
 )
+
 # 排除测试目录下的文件（这些由测试目标独立编译，不属于应用可执行文件）
 list(FILTER MAIN_APP_SOURCES EXCLUDE REGEX ".*/UI/Test/.*\.cpp$")
 
@@ -52,16 +85,19 @@ set(MAIN_APP_HEADERS
     ${SRC_ROOT}/UI/ClientConfig/ExampleCustomPanel.h
 )
 
-file(GLOB_RECURSE MAIN_RESOURCES CONFIGURE_DEPENDS
+file(GLOB_RECURSE MAIN  _RESOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.qrc"
 )
 
-set(app_name "SanYiCAD")
+set(APP_NAME "SanYiCAD")
 
 set(APP_ORGANIZATION_NAME "SanYi")
 set(APP_ORGANIZATION_DOMAIN "sanyi-cad.com")
 
-# CMake 4.3 configure_file 兼容性：改用 file(READ) + string(CONFIGURE) + file(WRITE)
+# 构建时间（用于版本信息显示）
+string(TIMESTAMP APP_BUILD_TIME "%Y-%m-%d %H:%M:%S" UTC)
+string(TIMESTAMP APP_BUILD_DATE "%Y-%m-%d" UTC)
+
 file(READ "${SRC_ROOT}/Common/VersionInfo.h.in" _version_info_content)
 string(CONFIGURE "${_version_info_content}" _version_info_configured @ONLY)
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/VersionInfo.h" "${_version_info_configured}")
@@ -82,6 +118,7 @@ foreach(_bc_opt
         set(_bc_${_bc_opt} "false")
     endif()
 endforeach()
+
 file(READ "${SRC_ROOT}/Common/BuildConfig.h.in" _build_config_content)
 string(CONFIGURE "${_build_config_content}" _build_config_configured @ONLY)
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/BuildConfig.h" "${_build_config_configured}")
@@ -120,7 +157,7 @@ if(APPLE)
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/Info.plist" "${_info_plist_configured}")
 endif()
 
-add_executable(${app_name}
+add_executable(${APP_NAME}
     ${MAIN_APP_SOURCES}
     ${MAIN_APP_HEADERS}
     ${MAIN_RESOURCES}
@@ -135,21 +172,21 @@ foreach(comp ${QT_COMPONENTS})
     list(APPEND QT_LIBRARIES Qt${QT_VERSION_MAJOR}::${comp})
 endforeach()
 
-set_target_properties(${app_name} PROPERTIES
+set_target_properties(${APP_NAME} PROPERTIES
     AUTOMOC ON
     AUTOUIC OFF
     AUTORCC ON
     WIN32_EXECUTABLE ON
     CXX_VISIBILITY_PRESET default
     MACOSX_BUNDLE TRUE
-    MACOSX_BUNDLE_BUNDLE_NAME "${app_name}"
-    MACOSX_BUNDLE_GUI_IDENTIFIER "com.sanyi.${app_name}"
+    MACOSX_BUNDLE_BUNDLE_NAME "${APP_NAME}"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "com.sanyi.${APP_NAME}"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0.0"
     MACOSX_BUNDLE_BUNDLE_VERSION "1.0.0"
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_BINARY_DIR}/Info.plist"
 )
 
-target_compile_features(${app_name} PRIVATE cxx_std_17)
+target_compile_features(${APP_NAME} PRIVATE cxx_std_17)
 
 # Renderx 运行时资源：着色器与默认字体必须位于应用可执行文件目录
 # （applicationDirPath()）。Renderx 自身只复制到其 dylib 输出目录，
@@ -160,83 +197,56 @@ if(SANYI_RENDERX_DIR AND EXISTS "${SANYI_RENDERX_DIR}/src/shader")
         "${SANYI_RENDERX_DIR}/src/shader/*.frag"
         "${SANYI_RENDERX_DIR}/src/shader/*.comp")
     file(GLOB _renderx_font_files CONFIGURE_DEPENDS "${SANYI_RENDERX_DIR}/src/res/*.ttf")
-    add_custom_command(TARGET ${app_name} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${app_name}>"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${_renderx_shader_files} "$<TARGET_FILE_DIR:${app_name}>/"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${_renderx_font_files} "$<TARGET_FILE_DIR:${app_name}>/"
+    add_custom_command(TARGET ${APP_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${APP_NAME}>"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${_renderx_shader_files} "$<TARGET_FILE_DIR:${APP_NAME}>/"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${_renderx_font_files} "$<TARGET_FILE_DIR:${APP_NAME}>/"
         COMMENT "Copying Renderx shaders and fonts to app directory"
         VERBATIM
     )
 endif()
 
-target_include_directories(${app_name}
+target_include_directories(${APP_NAME}
     PRIVATE
-        "${CMAKE_CURRENT_BINARY_DIR}"
-        "${SRC_ROOT}"
-        "${SRC_ROOT}/Common"
+        ${SHARED_PROJECT_INCLUDE_DIRS}
         "${SANYI_RENDERX_DIR}/include"
-        "${UI_ROOT}"
-        "${UI_ROOT}/Adapters"
-        "${UI_ROOT}/Interaction"
-        "${UI_ROOT}/Documents"
-        "${UI_ROOT}/Entities"
-        "${UI_ROOT}/Render"
-        "${UI_ROOT}/Services"
-        "${UI_ROOT}/Widgets"
-        "${UI_ROOT}/Workbench"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../Utility/Utility/Include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../License/License/Include"
 )
 if(BUILD_CRASHHANDLER)
-    target_include_directories(${app_name} PRIVATE
+    target_include_directories(${APP_NAME} PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler"
     )
 endif()
 
-# 先构建 PROJECT_INCLUDE_DIRS 列表
-list(APPEND PROJECT_INCLUDE_DIRS
-        "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/2D/Include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/3D/Include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Persistence/Include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Common/Include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Src"
-)
+# UI3D 条件分支：构建目录列表后再统一应用
+set(_app_project_include_dirs)
 if(BUILD_UI3D)
-    list(APPEND PROJECT_INCLUDE_DIRS
+    list(APPEND _app_project_include_dirs
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Src"
     )
 else()
     # UI3D 禁用时，使用预创建的桩头文件使 Main 模块可编译。
     # 桩文件位于 Main/Src/Stubs/ — 仅前向声明，无 Engine3D/Qt 依赖。
-    list(APPEND PROJECT_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/Src/Stubs")
+    list(APPEND _app_project_include_dirs "${CMAKE_CURRENT_SOURCE_DIR}/Src/Stubs")
 endif()
-
-list(APPEND PROJECT_INCLUDE_DIRS
-        "${CMAKE_CURRENT_SOURCE_DIR}/../Log/Log/Include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Include"
-)
 if(BUILD_CRASHHANDLER)
-    list(APPEND PROJECT_INCLUDE_DIRS
+    list(APPEND _app_project_include_dirs
         "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler"
     )
 endif()
 
-# 将 PROJECT_INCLUDE_DIRS 应用到目标（必须在列表填充之后）
-target_include_directories(${app_name} PRIVATE ${PROJECT_INCLUDE_DIRS})
+target_include_directories(${APP_NAME} PRIVATE ${_app_project_include_dirs})
 
-target_link_libraries(${app_name}
+target_link_libraries(${APP_NAME}
     PRIVATE
         Utility
         License
 )
 if(BUILD_CRASHHANDLER)
-    target_link_libraries(${app_name} PRIVATE CrashHandler)
+    target_link_libraries(${APP_NAME} PRIVATE CrashHandler)
 endif()
 
-target_link_libraries(${app_name}
+target_link_libraries(${APP_NAME}
     PRIVATE
         EngineCommon
         Engine2D
@@ -257,83 +267,83 @@ target_link_libraries(${app_name}
 # 注意（P0-1）：SANYI_CLIENT_ID 已不再作为编译期宏注入。
 # 客户 ID 现由 UiClientContext 在运行时解析（环境变量 / QSettings / 默认值），
 # 同一份二进制可服务多个客户。这里只把默认客户 ID 传给安装包脚本使用。
-target_compile_definitions(${app_name} PRIVATE SANYI_DEFAULT_CLIENT_ID="${SANYI_DEFAULT_CLIENT_ID}")
+target_compile_definitions(${APP_NAME} PRIVATE SANYI_DEFAULT_CLIENT_ID="${SANYI_DEFAULT_CLIENT_ID}")
 
 # Qt 调试输出控制已在 Config.cmake 中统一处理
 
 # 可选模块宏传播：保证 EXE 中与各 UI DLL 中 #ifdef 分支一致
 if(BUILD_NESTING)
-    target_compile_definitions(${app_name} PRIVATE ENABLE_NESTING)
-    target_link_libraries(${app_name} PRIVATE Nesting)
+    target_compile_definitions(${APP_NAME} PRIVATE ENABLE_NESTING)
+    target_link_libraries(${APP_NAME} PRIVATE Nesting)
 endif()
 
 # 硬件抽象层：DeviceHost / MachineProfile 需要直接使用 Hw:: 接口装配设备。
 # 与 UI2D 用同一个 ENABLE_HARDWARE 宏名，保证两侧 #ifdef 分支一致。
 if(BUILD_HARDWARE)
-    target_compile_definitions(${app_name} PRIVATE ENABLE_HARDWARE)
-    target_include_directories(${app_name}
+    target_compile_definitions(${APP_NAME} PRIVATE ENABLE_HARDWARE)
+    target_include_directories(${APP_NAME}
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include"
     )
-    target_link_libraries(${app_name} PRIVATE Hardware)
+    target_link_libraries(${APP_NAME} PRIVATE Hardware)
 endif()
 
 
 if(BUILD_UI3D)
-    target_link_libraries(${app_name} PRIVATE UI3D)
-    target_compile_definitions(${app_name} PRIVATE BUILD_UI3D=1)
+    target_link_libraries(${APP_NAME} PRIVATE UI3D)
+    target_compile_definitions(${APP_NAME} PRIVATE BUILD_UI3D=1)
     # 显式传播 ENABLE_GEOMODELCORE：SceneEditService3D / ServicePack3D 等导出类
     # 含 #ifdef ENABLE_GEOMODELCORE 条件数据成员，EXE 必须与 DLL 的 sizeof 一致
     if(BUILD_GEOMODELCORE)
-        target_compile_definitions(${app_name} PRIVATE ENABLE_GEOMODELCORE)
-        target_link_libraries(${app_name} PRIVATE GeoModelCore)
+        target_compile_definitions(${APP_NAME} PRIVATE ENABLE_GEOMODELCORE)
+        target_link_libraries(${APP_NAME} PRIVATE GeoModelCore)
     endif()
 endif()
 # Engine3D 始终链接：Main 模块的 ImportService / SceneBuilder3D 等核心
 # 代码无条件依赖 Engine3D（SceneManager3D、SyMeshEntity），与 BUILD_UI3D 无关
-target_link_libraries(${app_name} PRIVATE Engine3D)
+target_link_libraries(${APP_NAME} PRIVATE Engine3D)
 
 if(SANYI_PYTHON_HOST)
-    target_compile_definitions(${app_name} PRIVATE SANYI_PYTHON_HOST=1)
-    target_compile_definitions(${app_name} PRIVATE "CMAKE_SOURCE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/..\"")
-    target_include_directories(${app_name}
+    target_compile_definitions(${APP_NAME} PRIVATE SANYI_PYTHON_HOST=1)
+    target_compile_definitions(${APP_NAME} PRIVATE "CMAKE_SOURCE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/..\"")
+    target_include_directories(${APP_NAME}
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/../PythonHost/PythonHost/Include"
     )
-    target_link_libraries(${app_name} PRIVATE PythonHost)
-    add_dependencies(${app_name} PythonHost)
+    target_link_libraries(${APP_NAME} PRIVATE PythonHost)
+    add_dependencies(${APP_NAME} PythonHost)
 
-    add_custom_command(TARGET ${app_name} POST_BUILD
+    add_custom_command(TARGET ${APP_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_CURRENT_SOURCE_DIR}/../Python"
-            "$<TARGET_FILE_DIR:${app_name}>/Python"
+            "$<TARGET_FILE_DIR:${APP_NAME}>/Python"
         COMMENT "Deploying Python package to output directory"
     )
 endif()
 
 if(SANYI_PYBIND_CORE AND SANYI_PYTHON_HOST)
-    add_dependencies(${app_name} SanYiPyBindCore)
+    add_dependencies(${APP_NAME} SanYiPyBindCore)
 endif()
 
 if(MSVC)
-    target_compile_options(${app_name} PRIVATE /utf-8 /FS)
+    target_compile_options(${APP_NAME} PRIVATE /utf-8 /FS)
     # dbghelp：崩溃回调中符号化调用栈（CrashHandlerBootstrap.cpp）。
     # 现场机器普遍没有 WinDbg/cdb，只留 .dmp 等于没有线索，
     # 因此崩溃时直接把带函数名与行号的调用栈打到 stderr。
-    target_link_libraries(${app_name} PRIVATE dbghelp)
+    target_link_libraries(${APP_NAME} PRIVATE dbghelp)
 endif()
 
 set(TRANSLATIONS_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Common/Translations")
-set(TRANSLATIONS_DST_DIR "$<TARGET_FILE_DIR:${app_name}>/translations")
+set(TRANSLATIONS_DST_DIR "$<TARGET_FILE_DIR:${APP_NAME}>/translations")
 
 if(TARGET UICommon_translations)
-    add_dependencies(${app_name} UICommon_translations)
+    add_dependencies(${APP_NAME} UICommon_translations)
 endif()
 
 file(GLOB TRANSLATION_QM_FILES CONFIGURE_DEPENDS "${TRANSLATIONS_SRC_DIR}/*.qm")
 
 if(TRANSLATION_QM_FILES)
-    add_custom_command(TARGET ${app_name} POST_BUILD
+    add_custom_command(TARGET ${APP_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "${TRANSLATIONS_DST_DIR}"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             ${TRANSLATION_QM_FILES}
@@ -343,11 +353,11 @@ if(TRANSLATION_QM_FILES)
 endif()
 
 set(RESOURCES_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
-set(RESOURCES_DST_DIR "$<TARGET_FILE_DIR:${app_name}>/resources")
+set(RESOURCES_DST_DIR "$<TARGET_FILE_DIR:${APP_NAME}>/resources")
 
 # Only copy resources if the source directory exists
 if(EXISTS "${RESOURCES_SRC_DIR}")
-    add_custom_command(TARGET ${app_name} POST_BUILD
+    add_custom_command(TARGET ${APP_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "${RESOURCES_DST_DIR}"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${RESOURCES_SRC_DIR}"
@@ -413,19 +423,19 @@ foreach(_tool ${_deploy_tools})
         if(_tool_bin_file_count GREATER 0)
             # Windows: 直接复制到输出目录（dll + exe 在一起）
             if(WIN32)
-                add_custom_command(TARGET ${app_name} POST_BUILD
+                add_custom_command(TARGET ${APP_NAME} POST_BUILD
                     COMMAND ${CMAKE_COMMAND} -E copy_directory
                         "${_tool_bin_dir}"
-                        "$<TARGET_FILE_DIR:${app_name}>"
+                        "$<TARGET_FILE_DIR:${APP_NAME}>"
                     COMMENT "Deploying ${_tool} binaries to output directory"
                 )
             else()
                 # Linux/macOS: 复制 bin/ 到输出目录的 bin/ 子目录，保持结构
-                add_custom_command(TARGET ${app_name} POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${app_name}>/tools/${_tool}/bin"
+                add_custom_command(TARGET ${APP_NAME} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${APP_NAME}>/tools/${_tool}/bin"
                     COMMAND ${CMAKE_COMMAND} -E copy_directory
                         "${_tool_bin_dir}"
-                        "$<TARGET_FILE_DIR:${app_name}>/tools/${_tool}/bin"
+                        "$<TARGET_FILE_DIR:${APP_NAME}>/tools/${_tool}/bin"
                     COMMENT "Deploying ${_tool} bin/ to tools/${_tool}/bin"
                 )
             endif()
@@ -443,11 +453,11 @@ foreach(_tool ${_deploy_tools})
         file(GLOB _tool_lib_files CONFIGURE_DEPENDS "${_tool_lib_dir}/*.so*" "${_tool_lib_dir}/*.dylib")
         list(LENGTH _tool_lib_files _tool_lib_file_count)
         if(_tool_lib_file_count GREATER 0)
-            add_custom_command(TARGET ${app_name} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${app_name}>/tools/${_tool}/lib"
+            add_custom_command(TARGET ${APP_NAME} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${APP_NAME}>/tools/${_tool}/lib"
                 COMMAND ${CMAKE_COMMAND} -E copy_directory
                     "${_tool_lib_dir}"
-                    "$<TARGET_FILE_DIR:${app_name}>/tools/${_tool}/lib"
+                    "$<TARGET_FILE_DIR:${APP_NAME}>/tools/${_tool}/lib"
                 COMMENT "Deploying ${_tool} lib/ to tools/${_tool}/lib"
             )
             set(_tool_deployed TRUE)
@@ -460,17 +470,17 @@ foreach(_tool ${_deploy_tools})
     endif()
 endforeach()
 
-deploy_qt_libraries(${app_name} ${QT_VERSION_MAJOR})
+deploy_qt_libraries(${APP_NAME} ${QT_VERSION_MAJOR})
 
-sanyi_add_version_info(${app_name} "${app_name}" "SanYi CAD Application")
+sanyi_add_version_info(${APP_NAME} "${APP_NAME}" "SanYi CAD Application")
 
 option(SANYI_GENERATE_SYMBOLS "Generate debug symbols for crash analysis" ON)
 if(SANYI_GENERATE_SYMBOLS)
-    sanyi_add_debug_symbols(${app_name})
+    sanyi_add_debug_symbols(${APP_NAME})
 endif()
 
 message(STATUS "[Main]")
-message(STATUS "  Application: ${app_name}")
+message(STATUS "  Application: ${APP_NAME}")
 message(STATUS "  Version: ${PROJECT_VERSION}")
 message(STATUS "  Platform: ${CMAKE_SYSTEM_NAME}(${CMAKE_SYSTEM_PROCESSOR})")
 message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
@@ -529,25 +539,13 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
 
     target_include_directories(MainTests
         PRIVATE
-            "${CMAKE_CURRENT_BINARY_DIR}"
-            "${SRC_ROOT}"
-            "${SRC_ROOT}/Common"
+            ${SHARED_PROJECT_INCLUDE_DIRS}
             "${SRC_ROOT}/Persistence"
             "${SRC_ROOT}/Persistence/Repositories"
             "${SRC_ROOT}/Import"
             "${SRC_ROOT}/Export"
-            "${UI_ROOT}"
-            "${UI_ROOT}/Adapters"
-            "${UI_ROOT}/Interaction"
-            "${UI_ROOT}/Documents"
-            "${UI_ROOT}/Entities"
-            "${UI_ROOT}/Render"
-            "${UI_ROOT}/Services"
-            "${UI_ROOT}/Widgets"
-            "${UI_ROOT}/Workbench"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../Utility/Utility/Include"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../License/License/Include"
-)
+            "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Src"
+    )
 if(BUILD_CRASHHANDLER)
     target_include_directories(MainTests
         PRIVATE
@@ -555,24 +553,18 @@ if(BUILD_CRASHHANDLER)
     )
 endif()
 
-list(APPEND PROJECT_INCLUDE_DIRS
-            "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/2D/Include"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/3D/Include"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Persistence/Include"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Common/Include"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Include"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Src"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Include"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Src"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../Log/Log/Include"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Include"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Src"
-            # protobuf 生成头文件目录由 FileIO target 的 PUBLIC_INCLUDE_DIRS 自动传播
+# MainTests 专用补充目录（始终包含 UI3D）
+set(_test_project_include_dirs
+    "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Src"
+)
+if(BUILD_CRASHHANDLER)
+    list(APPEND _test_project_include_dirs
+        "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler"
     )
+endif()
 
-# 将 PROJECT_INCLUDE_DIRS 应用到 MainTests
-target_include_directories(MainTests PRIVATE ${PROJECT_INCLUDE_DIRS})
+target_include_directories(MainTests PRIVATE ${_test_project_include_dirs})
 
     target_link_libraries(MainTests
         PRIVATE

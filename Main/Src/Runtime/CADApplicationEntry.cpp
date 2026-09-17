@@ -34,10 +34,105 @@ static void setupNativeMenuBar()
 // 返回值：>=0 表示退出（返回值为 exit code），<0 表示继续启动 GUI
 static int handleCliFlags(int argc, char** argv)
 {
-    // TODO: 实现命令行参数处理 --version/-v、--help/-h
-    // 目前暂时跳过，直接启动 GUI
-    Q_UNUSED(argc);
-    Q_UNUSED(argv);
+    // 遍历命令行参数
+    for (int i = 1; i < argc; ++i)
+    {
+        const std::string arg = argv[i];
+
+        // --help / -h / -?
+        if (arg == "--help" || arg == "-h" || arg == "-?")
+        {
+            std::printf("Usage: %s [options] [file]\n", MainApp::appName().c_str());
+            std::printf("\n");
+            std::printf("Options:\n");
+            std::printf("  -v, --version           Show version information\n");
+            std::printf("  -h, --help              Show this help message\n");
+            std::printf("\n");
+            std::printf("File Options:\n");
+            std::printf("  [file]                 Open specified file on startup\n");
+            std::printf("\n");
+            std::printf("Report bugs to: https://xxxx.cad/issues\n");
+            return 0;
+        }
+
+        // --version / -v / --version-long
+        if (arg == "--version" || arg == "-v" || arg == "--version-long")
+        {
+            std::printf("%s %s\n", MainApp::appName().c_str(), MainApp::appVersion().c_str());
+            std::printf("Copyright (C) 2026 %s\n", MainApp::organizationName().c_str());
+            std::printf("License: Proprietary\n");
+            return 0;
+        }
+
+        // --version-full: 详细版本信息
+        if (arg == "--version-full")
+        {
+            std::printf("%s %d.%d.%d\n",
+                MainApp::appName().c_str(),
+                MainApp::versionMajor(),
+                MainApp::versionMinor(),
+                MainApp::versionPatch());
+            std::printf("\n");
+            std::printf("Organization: %s\n", MainApp::organizationName().c_str());
+            std::printf("Domain: %s\n", MainApp::organizationDomain().c_str());
+            std::printf("\n");
+            std::printf("This is proprietary software. All rights reserved.\n");
+            return 0;
+        }
+
+        // --version-all: 最详细版本信息（含构建信息）
+        if (arg == "--version-all")
+        {
+            std::printf("%s %d.%d.%d\n",
+                MainApp::appName().c_str(),
+                MainApp::versionMajor(),
+                MainApp::versionMinor(),
+                MainApp::versionPatch());
+            std::printf("\n");
+            std::printf("Application: %s\n", MainApp::appName().c_str());
+            std::printf("Version: %s\n", MainApp::appVersion().c_str());
+            std::printf("Organization: %s\n", MainApp::organizationName().c_str());
+            std::printf("Organization Domain: %s\n", MainApp::organizationDomain().c_str());
+            std::printf("\n");
+            std::printf("Build Information:\n");
+            std::printf("  Build Date: %s\n", MainApp::buildDate().c_str());
+            std::printf("  Build Time: %s (UTC)\n", MainApp::buildTime().c_str());
+            std::printf("  Build Type: %s\n", MainApp::buildType().c_str());
+            std::printf("\n");
+            std::printf("Copyright (C) 2026 %s. All rights reserved.\n",
+                MainApp::organizationName().c_str());
+            return 0;
+        }
+
+        // --authors: 显示作者/贡献者信息
+        if (arg == "--authors")
+        {
+            std::printf("%s\n", MainApp::appName().c_str());
+            std::printf("Copyright (C) 2026 %s\n", MainApp::organizationName().c_str());
+            std::printf("\n");
+            std::printf("Authors:\n");
+            std::printf("  SanYi Development Team <dev@sanyi-cad.com>\n");
+            return 0;
+        }
+
+        // --license: 显示许可证信息
+        if (arg == "--license")
+        {
+            std::printf("%s - License Information\n", MainApp::appName().c_str());
+            std::printf("\n");
+            std::printf("Copyright (C) 2026 %s\n", MainApp::organizationName().c_str());
+            std::printf("\n");
+            std::printf("This software is proprietary and confidential. Unauthorized copying,\n");
+            std::printf("distribution, or use of this software, via any medium, is strictly\n");
+            std::printf("prohibited and may result in severe civil and criminal penalties.\n");
+            std::printf("\n");
+            std::printf("This program is provided for authorized use only. By using this software,\n");
+            std::printf("you agree to the terms and conditions of the license agreement.\n");
+            return 0;
+        }
+    }
+
+    // 无命令行标志，继续启动 GUI
     return -1;
 }
 

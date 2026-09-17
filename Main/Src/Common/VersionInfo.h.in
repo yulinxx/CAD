@@ -11,14 +11,23 @@
 #define VERSION_MINOR @PROJECT_VERSION_MINOR@
 #define VERSION_PATCH @PROJECT_VERSION_PATCH@
 
+// 构建时间（由 CMake 注入）
+#define APP_BUILD_TIME "@APP_BUILD_TIME@"
+#define APP_BUILD_DATE "@APP_BUILD_DATE@"
+#define APP_BUILD_TYPE "@CMAKE_BUILD_TYPE@"
+
 namespace MainApp
 {
     inline const std::string appName() { return APP_NAME; }
     inline const std::string appVersion() { return APP_VERSION; }
     inline const std::string organizationName() { return APP_ORGANIZATION_NAME; }
     inline const std::string organizationDomain() { return APP_ORGANIZATION_DOMAIN; }
-    
+
     inline int versionMajor() { return VERSION_MAJOR; }
     inline int versionMinor() { return VERSION_MINOR; }
     inline int versionPatch() { return VERSION_PATCH; }
+
+    inline const std::string buildTime() { return APP_BUILD_TIME; }
+    inline const std::string buildDate() { return APP_BUILD_DATE; }
+    inline const std::string buildType() { return APP_BUILD_TYPE; }
 }
