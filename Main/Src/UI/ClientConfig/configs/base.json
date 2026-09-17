@@ -158,7 +158,7 @@
         ] },
         { "type": "action", "id": "view.switch_to_2d", "label": "Switch to 2D", "command": "view.switch_to_2d", "icon": ":/ui/common/Icons/View3D/switch_to_2d.svg", "shortcut": "Ctrl+Shift+2", "workbenches": ["3D"] },
         { "type": "action", "id": "view.switch_to_3d", "label": "Switch to 3D", "command": "view.switch_to_3d", "icon": ":/ui/common/Icons/View/switch_to_3d.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "view.capture", "label": "Capture View", "command": "view.capture", "workbenches": ["2D", "3D"] }
+        { "type": "action", "id": "view.capture", "label": "Capture View", "command": "view.capture", "icon": ":/ui/common/Icons/Actions/capture.svg", "workbenches": ["2D", "3D"] }
       ]
     },
     {
@@ -241,8 +241,7 @@
       "visible": true,
       "workbenches": ["2D", "3D"],
       "items": [
-        { "type": "action", "id": "help.docs", "label": "Documentation", "command": "help.docs", "icon": ":/ui/common/Icons/Help/docs.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "help.shortcuts", "label": "Keyboard Shortcuts", "command": "help.shortcuts", "icon": ":/ui/common/Icons/Help/shortcuts.svg", "workbenches": ["2D", "3D"] },
+        { "type": "action", "id": "help.docs", "label": "Documentation", "command": "help.docs", "icon": ":/ui/common/Icons/Help/docs.svg", "workbenches": ["2D", "3D"], "visible": false },
         { "type": "separator" },
         { "type": "action", "id": "help.settings", "label": "Settings", "command": "help.settings", "icon": ":/ui/common/Icons/Help/settings.svg", "shortcut": "Ctrl+,", "workbenches": ["2D", "3D"] },
         { "type": "separator" },
