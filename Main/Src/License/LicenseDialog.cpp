@@ -154,7 +154,7 @@ void LicenseDialog::OnActivateClicked()
     LicenseContextHolder holder(m_configDir);
     if (!holder.get())
     {
-    m_statusLabel->setStyleSheet(QStringLiteral("color: %1;").arg(TM->colors().error));
+        m_statusLabel->setStyleSheet(QStringLiteral("color: %1;").arg(TM->colors().error));
         m_statusLabel->setText(tr("Failed to initialize license module."));
         m_activateBtn->setEnabled(true);
         return;

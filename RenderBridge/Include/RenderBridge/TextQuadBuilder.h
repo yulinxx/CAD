@@ -76,8 +76,7 @@ namespace Render
          * @param view    世界 → NDC 矩阵，仅 coordMode 为 WorldPos_PixelSize 时使用
          * @param vpWidth/vpHeight 视口**物理像素**尺寸
          */
-        void addText(const Eg::TextItem& item, const Render::Mat3f& view, uint32_t vpWidth,
-            uint32_t vpHeight);
+        void addText(const Eg::TextItem& item, const Render::Mat3f& view, uint32_t vpWidth, uint32_t vpHeight);
 
         /**
          * @brief 把累积的顶点写入瞬态环，每个字号产出一笔 DrawCommand
@@ -85,8 +84,8 @@ namespace Render
          * 顺便把各字体图集的脏区上传（rxFontFlushAtlas）——必须在提交引用
          * 该图集的命令之前完成，否则本帧新出现的字符会采样到空白。
          */
-        void flush(Render::RT::SessionHandle session, uint8_t layer, uint16_t& seq,
-            std::vector<Render::RT::DrawCommand>& out);
+        void flush(
+            Render::RT::SessionHandle session, uint8_t layer, uint16_t& seq, std::vector<Render::RT::DrawCommand>& out);
 
     private:
         /// P2T2C4：位置（像素）+ UV + RGBA，32 字节
@@ -96,6 +95,7 @@ namespace Render
             float u, v;
             float r, g, b, a;
         };
+
         static_assert(sizeof(GVertex) == Render::RT::rxVertexStride(Render::RT::VertexFormat::P2T2C4),
             "GVertex 必须与 DLL 的 P2T2C4 步长一致");
 

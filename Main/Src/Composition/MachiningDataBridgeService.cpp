@@ -10,8 +10,7 @@
 
 #include <algorithm>
 
-MachiningDataBridgeService::MachiningDataBridgeService(
-    Eg::SceneManager* scene2D, Eg::SceneManager3D* scene3D)
+MachiningDataBridgeService::MachiningDataBridgeService(Eg::SceneManager* scene2D, Eg::SceneManager3D* scene3D)
     : m_scene2D(scene2D)
     , m_scene3D(scene3D)
 {
@@ -32,10 +31,8 @@ bool MachiningDataBridgeService::isAvailable() const
     return m_provider != nullptr && m_scene2D != nullptr;
 }
 
-bool MachiningDataBridgeService::sliceAndInject(Eg::EntityId meshId,
-    double layerHeight,
-    Eg::ISceneContext* target2D,
-    uint32_t* outLayerCount)
+bool MachiningDataBridgeService::sliceAndInject(
+    Eg::EntityId meshId, double layerHeight, Eg::ISceneContext* target2D, uint32_t* outLayerCount)
 {
     if (outLayerCount)
     {
@@ -63,8 +60,8 @@ bool MachiningDataBridgeService::sliceAndInject(Eg::EntityId meshId,
     // 来源网格校验：3D 场景可用时确认网格存在，避免对空 ID 做无用切片
     if (m_scene3D && !m_scene3D->findMeshById(meshId))
     {
-        SY_WARNF("[MachiningDataBridge] sliceAndInject: mesh %lld not found in 3D scene",
-            static_cast<long long>(meshId));
+        SY_WARNF(
+            "[MachiningDataBridge] sliceAndInject: mesh %lld not found in 3D scene", static_cast<long long>(meshId));
         return false;
     }
 

@@ -7,14 +7,14 @@
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
 #include "UI2D/Operation/IOperation.h"
+#include "UI2D/Dlg/LayerManagerDialog.h"
+#include "UI2D/Manager/UnitManager.h"
 
 #include "UI/Services/ViewportActionHub.h"
 #include "UI/Services/UiStateCenter.h"
-#include "UI2D/Dlg/LayerManagerDialog.h"
-#include "Engine2D/Edit/LayerEditService.h"
-#include "UI2D/Manager/UnitManager.h"
 #include "UI/Service/ViewCaptureService.h"
 #include "UI/Render/RenderViewport2D.h"
+#include "Engine2D/Edit/LayerEditService.h"
 
 ViewOperationRegistry::ViewOperationRegistry(OperationBus* bus,
     ViewportActionHub* viewportActionHub,
@@ -81,17 +81,17 @@ void ViewOperationRegistry::registerAll()
         toggleMetadata("angleSnap");
     }));
 
-    reg.registerOperation(
-        std::make_unique<LambdaOperation>(OperationId::View_LayerManager, [=] {
-            if (layerEditService)
-                LayerManagerDialog::showDialog(layerEditService, m_parentWidget);
-        }));
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::View_LayerManager, [=] {
+        if (layerEditService)
+            LayerManagerDialog::showDialog(layerEditService, m_parentWidget);
+    }));
 
     reg.registerOperation(std::make_unique<ParamLambdaOperation>(
         OperationId::View_SetDisplayUnit, [unitManager](const QVariantMap& params) {
             if (!unitManager)
                 return;
-            const int unit = params.value(QStringLiteral("unit"), static_cast<int>(UnitManager::Unit::Millimeter)).toInt();
+            const int unit =
+                params.value(QStringLiteral("unit"), static_cast<int>(UnitManager::Unit::Millimeter)).toInt();
             unitManager->setDisplayUnit(static_cast<UnitManager::Unit>(unit));
         }));
 

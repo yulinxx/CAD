@@ -53,7 +53,9 @@ void LaserOperationRegistry::registerAll()
         [this, job] {
             if (!job || !m_config.sceneManager)
             {
-                reportError("StartProcess", QStringLiteral("Processing service not configured, cannot start processing"));  // 加工服务未装配，无法开始加工
+                reportError("StartProcess",
+                    QStringLiteral(
+                        "Processing service not configured, cannot start processing"));  // 加工服务未装配，无法开始加工
                 return;
             }
             QString error;
@@ -66,8 +68,8 @@ void LaserOperationRegistry::registerAll()
             // canExec 决定菜单/工具栏的可用态：设备没起来、安全门没关、
             // 或者已经在加工时，「开始加工」必须是灰的 ——
             // 让操作员点了之后才看到报错，是最容易被投诉的交互
-            return job && host && host->isRunning() && host->canStartProcessing()
-                && !job->isRunning() && !job->isPaused();
+            return job && host && host->isRunning() && host->canStartProcessing() && !job->isRunning() &&
+                !job->isPaused();
         }));
 
     // --- 暂停 / 恢复（同一个命令来回切） ---

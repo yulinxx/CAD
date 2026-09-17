@@ -94,8 +94,8 @@ namespace
                 return;
             }
             // 曲线离散化按屏幕缩放自适应段数，与全量路径（RenderSceneBuilder）同一份公式
-            Eg::Tessellator::tessellateCircleAdaptive(center, radius, m_worldToScreenScale, t_curvePoints,
-                                                      m_chordErrorPixels);
+            Eg::Tessellator::tessellateCircleAdaptive(
+                center, radius, m_worldToScreenScale, t_curvePoints, m_chordErrorPixels);
             if (t_curvePoints.points.empty())
             {
                 return;
@@ -118,8 +118,8 @@ namespace
                 return;
             }
             // 直接使用原始角度差，保留绘制方向（顺时针为负、逆时针为正）
-            Eg::Tessellator::tessellateArcAdaptive(center, radius, startAngle, endAngle,
-                                                   m_worldToScreenScale, t_curvePoints, m_chordErrorPixels);
+            Eg::Tessellator::tessellateArcAdaptive(
+                center, radius, startAngle, endAngle, m_worldToScreenScale, t_curvePoints, m_chordErrorPixels);
             if (t_curvePoints.points.empty())
             {
                 return;
@@ -148,9 +148,16 @@ namespace
                 return;
             }
             // 整椭圆取 segments 个点并闭合，弧段取 segments+1 个点且开口，由 Tessellator 内部判定
-            Eg::Tessellator::tessellateEllipseAdaptive(
-                center, radiusX, radiusY, rotation, startAngle, endAngle, bFullEllipse,
-                m_worldToScreenScale, t_curvePoints, m_chordErrorPixels);
+            Eg::Tessellator::tessellateEllipseAdaptive(center,
+                radiusX,
+                radiusY,
+                rotation,
+                startAngle,
+                endAngle,
+                bFullEllipse,
+                m_worldToScreenScale,
+                t_curvePoints,
+                m_chordErrorPixels);
             if (t_curvePoints.points.empty())
             {
                 return;

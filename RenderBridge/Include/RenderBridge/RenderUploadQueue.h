@@ -123,7 +123,7 @@ namespace RenderBridge
          * 通常是持有几何仓与段位台账的 builder。这里刻意用模板而不是抽象接口：
          * 队列不需要知道消费者是谁，也不该为它定义一个只有一种实现的虚函数。
          */
-        template <typename Consumer>
+        template<typename Consumer>
         void flush(const Consumer& consumer)
         {
             std::vector<RenderUploadCommand> batch;

@@ -9,7 +9,6 @@ DxfImportReader::DxfImportReader()
 
 ImportResult DxfImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
 {
-
     // 主链路：中立 IR 导入（parseToIR → FioEntityConverter）
     // FileIO 不再直接实例化 Engine 对象，IR 为跨 DLL 安全的 POD；
     // 若 IR 路径失败（如解析器未实现 IR 或文件不支持），自动回退旧路径。

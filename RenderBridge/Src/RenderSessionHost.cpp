@@ -75,7 +75,8 @@ namespace
                 // 最后一个视口的 release() 已经把 runtime 销毁了）。此时渲染 DLL
                 // 可能已卸载，去调 rxRuntimeDestroy 的风险高于让 OS 回收，因此只报。
                 SY_WARNF("[SharedRuntime] 进程退出时 runtime 仍存活：有 %u 个视口未被析构，"
-                         "未销毁（交操作系统回收）", m_holders);
+                         "未销毁（交操作系统回收）",
+                    m_holders);
             }
         }
 
@@ -130,8 +131,7 @@ namespace
                 destroy("应用已请求退出，且最后一个视口已拆除");
                 return;
             }
-            SY_INFOF("[SharedRuntime] 视口释放（当前持有点 %u 个；runtime 保留给下一个视口）",
-                m_holders);
+            SY_INFOF("[SharedRuntime] 视口释放（当前持有点 %u 个；runtime 保留给下一个视口）", m_holders);
         }
 
         /// 应用退出：只置标志。真正销毁交给最后一个视口的 release()（见类注释）
@@ -305,8 +305,7 @@ namespace RenderBridge
 
     bool RenderSessionHost::isReady() const
     {
-        return Render::RT::rxValid(m_runtime) && Render::RT::rxValid(m_surface)
-            && Render::RT::rxValid(m_session);
+        return Render::RT::rxValid(m_runtime) && Render::RT::rxValid(m_surface) && Render::RT::rxValid(m_session);
     }
 
     void RenderSessionHost::logCapabilities(const char* tag) const
@@ -318,6 +317,8 @@ namespace RenderBridge
         }
         SY_INFOF("%s: backend=%s device=%s maxLineWidth=%.1f",
             tag ? tag : "RenderSessionHost",
-            Render::RT::rxBackendName(caps.backend), caps.deviceName, caps.maxLineWidth);
+            Render::RT::rxBackendName(caps.backend),
+            caps.deviceName,
+            caps.maxLineWidth);
     }
 }  // namespace RenderBridge

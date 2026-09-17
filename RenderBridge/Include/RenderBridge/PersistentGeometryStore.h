@@ -53,17 +53,17 @@
 
 // 物理内存查询只用于推荐几何仓上限，按平台各取最轻量的 API。
 #if defined(__APPLE__)
-#include <sys/sysctl.h>
+    #include <sys/sysctl.h>
 #elif defined(_WIN32)
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+    #include <windows.h>
 #elif defined(__linux__)
-#include <sys/sysinfo.h>
+    #include <sys/sysinfo.h>
 #endif
 
 namespace RenderBridge
@@ -111,8 +111,7 @@ namespace RenderBridge
             struct sysinfo info{};
             if (::sysinfo(&info) == 0)
             {
-                physical = static_cast<uint64_t>(info.totalram)
-                         * static_cast<uint64_t>(info.mem_unit);
+                physical = static_cast<uint64_t>(info.totalram) * static_cast<uint64_t>(info.mem_unit);
             }
 #endif
             if (physical == 0)
@@ -158,7 +157,11 @@ namespace RenderBridge
         };
 
         PersistentGeometryStore() = default;
-        ~PersistentGeometryStore() { shutdown(); }
+
+        ~PersistentGeometryStore()
+        {
+            shutdown();
+        }
 
         PersistentGeometryStore(const PersistentGeometryStore&) = delete;
         PersistentGeometryStore& operator=(const PersistentGeometryStore&) = delete;
@@ -186,8 +189,7 @@ namespace RenderBridge
             m_storeDesc = storeDesc;
             m_maxStores = config.maxStores == 0 ? 1u : config.maxStores;
 
-            const Render::RT::GeometryStoreHandle store =
-                Render::RT::rxGeometryStoreCreate(runtime, &storeDesc);
+            const Render::RT::GeometryStoreHandle store = Render::RT::rxGeometryStoreCreate(runtime, &storeDesc);
             if (!Render::RT::rxValid(store))
             {
                 // 几何仓创建失败
@@ -247,17 +249,33 @@ namespace RenderBridge
             m_nextSlot = 0;
         }
 
-        bool valid() const { return Render::RT::rxValid(m_runtime); }
-        Render::RT::RuntimeHandle runtime() const { return m_runtime; }
+        bool valid() const
+        {
+            return Render::RT::rxValid(m_runtime);
+        }
+
+        Render::RT::RuntimeHandle runtime() const
+        {
+            return m_runtime;
+        }
+
         /// 主仓（下标 0）。多仓下的「某个块在哪个仓」请用 `storeForBlock`；
         /// 这个访问器只用于拿主仓做诊断。
         Render::RT::GeometryStoreHandle store() const
         {
             return m_stores.empty() ? Render::RT::GeometryStoreHandle::Invalid : m_stores.front();
         }
+
         /// 当前仓数（1 表示未发生分片）
-        uint32_t storeCount() const { return static_cast<uint32_t>(m_stores.size()); }
-        Render::RT::DrawListHandle drawList() const { return m_drawList; }
+        uint32_t storeCount() const
+        {
+            return static_cast<uint32_t>(m_stores.size());
+        }
+
+        Render::RT::DrawListHandle drawList() const
+        {
+            return m_drawList;
+        }
 
         /// 块所在仓的句柄。查不到即默认主仓（见文件头的归属说明）
         Render::RT::GeometryStoreHandle storeForBlock(uint64_t blockId) const
@@ -271,8 +289,7 @@ namespace RenderBridge
                     index = found->second;
                 }
             }
-            return index < m_stores.size() ? m_stores[index]
-                                           : Render::RT::GeometryStoreHandle::Invalid;
+            return index < m_stores.size() ? m_stores[index] : Render::RT::GeometryStoreHandle::Invalid;
         }
 
         /**
@@ -287,8 +304,7 @@ namespace RenderBridge
             for (const Render::RT::GeometryStoreHandle store : m_stores)
             {
                 Render::RT::GeometryStoreStats one{};
-                if (Render::RT::rxGeometryStoreGetStats(m_runtime, store, &one)
-                    != Render::RT::RxResult::Ok)
+                if (Render::RT::rxGeometryStoreGetStats(m_runtime, store, &one) != Render::RT::RxResult::Ok)
                 {
                     continue;
                 }
@@ -322,7 +338,10 @@ namespace RenderBridge
         }
 
         /// 归还槽号。重复归还会在空闲栈里留下重复项，调用方须保证幂等自身成立
-        void releaseSlot(uint32_t slot) { m_freeSlots.push_back(slot); }
+        void releaseSlot(uint32_t slot)
+        {
+            m_freeSlots.push_back(slot);
+        }
 
         /// 摘掉某个槽位上的绘制命令，但保留槽号归属（例如临时隐藏某条命令）
         void removeCommand(uint32_t slot)
@@ -382,8 +401,7 @@ namespace RenderBridge
             }
 
             size_t index = m_stores.size() - 1;
-            Render::RT::RxResult result =
-                Render::RT::rxGeometryAlloc(m_runtime, m_stores[index], bytes, &out);
+            Render::RT::RxResult result = Render::RT::rxGeometryAlloc(m_runtime, m_stores[index], bytes, &out);
 
             if (result == Render::RT::RxResult::ErrorOutOfMemory)
             {
@@ -396,8 +414,7 @@ namespace RenderBridge
                 result = Render::RT::rxGeometryAlloc(m_runtime, m_stores[index], bytes, &out);
             }
 
-            if (result != Render::RT::RxResult::Ok
-                && result != Render::RT::RxResult::ErrorGeometryStoreGrown)
+            if (result != Render::RT::RxResult::Ok && result != Render::RT::RxResult::ErrorGeometryStoreGrown)
             {
                 return false;
             }
@@ -417,9 +434,8 @@ namespace RenderBridge
             {
                 return false;
             }
-            return Render::RT::rxGeometryWrite(m_runtime, storeForBlock(blockId), blockId,
-                                              byteOffset, sizeBytes, data)
-                == Render::RT::RxResult::Ok;
+            return Render::RT::rxGeometryWrite(m_runtime, storeForBlock(blockId), blockId, byteOffset, sizeBytes, data) ==
+                Render::RT::RxResult::Ok;
         }
 
         /// 释放一块。空闲表会与相邻空洞合并，避免碎片累积
@@ -495,10 +511,8 @@ namespace RenderBridge
             if (bytes > 0 && index < m_stores.size())
             {
                 Render::RT::GeometryBlock tmp{};
-                const Render::RT::RxResult result =
-                    Render::RT::rxGeometryAlloc(m_runtime, m_stores[index], bytes, &tmp);
-                if (result == Render::RT::RxResult::Ok
-                    || result == Render::RT::RxResult::ErrorGeometryStoreGrown)
+                const Render::RT::RxResult result = Render::RT::rxGeometryAlloc(m_runtime, m_stores[index], bytes, &tmp);
+                if (result == Render::RT::RxResult::Ok || result == Render::RT::RxResult::ErrorGeometryStoreGrown)
                 {
                     Render::RT::rxGeometryFree(m_runtime, m_stores[index], tmp.id);
                 }
@@ -518,8 +532,7 @@ namespace RenderBridge
                 return false;
             }
 
-            const Render::RT::GeometryStoreHandle store =
-                Render::RT::rxGeometryStoreCreate(m_runtime, &m_storeDesc);
+            const Render::RT::GeometryStoreHandle store = Render::RT::rxGeometryStoreCreate(m_runtime, &m_storeDesc);
             if (!Render::RT::rxValid(store))
             {
                 SY_ERRORF("[GeomStore] 第 %u 个仓创建失败（单仓上限 %llu bytes）",

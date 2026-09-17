@@ -144,8 +144,7 @@ int CADApplicationRuntime::run()
                 {
                     LicenseInfo info{};
                     info.structSize = sizeof(LicenseInfo);
-                    if (License_Check(activatedCtx) == LICENSE_OK &&
-                        License_GetInfo(activatedCtx, &info) == LICENSE_OK)
+                    if (License_Check(activatedCtx) == LICENSE_OK && License_GetInfo(activatedCtx, &info) == LICENSE_OK)
                     {
                         UiFeatureGate::instance().loadFromLicenseString(QString::fromUtf8(info.features));
                         SY_INFOF("[CADApplicationRuntime] License features applied after activation: customer='%s'",

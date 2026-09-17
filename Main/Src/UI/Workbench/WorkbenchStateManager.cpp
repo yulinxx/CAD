@@ -181,7 +181,6 @@ void WorkbenchStateManager::refreshFromState()
     // 由 WorkbenchMenuManager::refreshConfiguredMenuState 单点同步。
 }
 
-
 void WorkbenchStateManager::updateWindowTitle()
 {
     if (m_stateCenter)

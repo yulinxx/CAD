@@ -44,9 +44,9 @@ void registerBuiltinUiPanels(UiPanelRegistry& registry)
     // 「界面不对」往往是客户配置没生效，看一眼这里就能确认。
     registry.registerPanel(QStringLiteral("ClientIndicator"), [](QWidget* parent) {
         const QString clientId = UiClientContext::instance().clientId();
-        auto* label = makeStatusLabel(parent,
-            QCoreApplication::translate("UiStatusBar", "Client: %1").arg(clientId));
-        label->setToolTip(QCoreApplication::translate("UiStatusBar", "Active UI client configuration: %1").arg(clientId));
+        auto* label = makeStatusLabel(parent, QCoreApplication::translate("UiStatusBar", "Client: %1").arg(clientId));
+        label->setToolTip(
+            QCoreApplication::translate("UiStatusBar", "Active UI client configuration: %1").arg(clientId));
         return static_cast<QWidget*>(label);
     });
 
@@ -55,8 +55,7 @@ void registerBuiltinUiPanels(UiPanelRegistry& registry)
         const UiFeatureGate& gate = UiFeatureGate::instance();
         const QString text = gate.isUnrestricted()
             ? QCoreApplication::translate("UiStatusBar", "License: Full")
-            : QCoreApplication::translate("UiStatusBar", "License: %1 features")
-                  .arg(gate.licensedFeatures().size());
+            : QCoreApplication::translate("UiStatusBar", "License: %1 features").arg(gate.licensedFeatures().size());
         auto* label = makeStatusLabel(parent, text);
         if (!gate.isUnrestricted())
         {

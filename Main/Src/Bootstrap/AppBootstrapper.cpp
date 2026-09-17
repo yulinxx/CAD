@@ -13,7 +13,6 @@
 
 #include "../Hardware/DeviceHost.h"
 
-
 namespace
 {
     // 构建框架服务集合，将应用根组件的服务注入到UI框架层
@@ -137,7 +136,6 @@ bool AppBootstrapper::initialize()
     return true;
 }
 
-
 // 执行应用引导序列，组装UI服务并启动工作台
 void AppBootstrapper::bootstrap()
 {
@@ -212,7 +210,6 @@ void AppBootstrapper::shutdown()
             shell->shutdown();
         }
     }
-
 
     m_workbench.reset();
 

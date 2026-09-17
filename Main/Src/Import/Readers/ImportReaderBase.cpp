@@ -12,7 +12,8 @@
 #include "Log/SyLogger.h"
 #include "Engine/SyEntity/SyEntity.h"
 
-ImportReaderBase::ImportReaderBase(Fio::FileFormat format, QStringList extensions, QString formatName, ImportDimension dim)
+ImportReaderBase::ImportReaderBase(
+    Fio::FileFormat format, QStringList extensions, QString formatName, ImportDimension dim)
     : m_format(format)
     , m_extensions(std::move(extensions))
     , m_formatName(std::move(formatName))
@@ -97,6 +98,7 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
     {
         const std::function<void(ImportPhase, float)>* callback = nullptr;
     };
+
     ParseProgressBridge progressBridge{ &context.progressCallback };
     Fio::ParseProgressCallback progressCb = nullptr;
     if (context.progressCallback)
@@ -111,8 +113,7 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
     }
 
     const auto startTime = std::chrono::steady_clock::now();
-    const bool ok =
-        fileIO.importToIR(pathStr.c_str(), format, &ir, errBuf, sizeof(errBuf), progressCb, &progressBridge);
+    const bool ok = fileIO.importToIR(pathStr.c_str(), format, &ir, errBuf, sizeof(errBuf), progressCb, &progressBridge);
     const auto parseMs =
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - startTime).count();
 
@@ -156,7 +157,7 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
     }
 
     SY_DEBUGF("[ImportReader:%s] IR parsed in %lld ms: entities=%u, layers=%u, groups=%u, warnings=%u, unit='%s', "
-             "sourceFormat='%s'",
+              "sourceFormat='%s'",
         tag.constData(),
         static_cast<long long>(parseMs),
         ir.entityCount,
@@ -171,8 +172,7 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
     // 都会产出群组，且收集成本只是一个哈希表。
     std::unordered_map<int64_t, uint32_t> entityLayerMap;
     std::unordered_map<int64_t, uint64_t> entityGroupMap;
-    auto converted =
-        Eg::FioEntityConverter::convertAll(ir, collectLayers ? &entityLayerMap : nullptr, &entityGroupMap);
+    auto converted = Eg::FioEntityConverter::convertAll(ir, collectLayers ? &entityLayerMap : nullptr, &entityGroupMap);
     outEntities.clear();
     outEntities.reserve(converted.size());
     for (auto& e : converted)
@@ -197,8 +197,8 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
     if (ir.warningCount > 0)
     {
         res.addWarning(QStringLiteral("%1 parser reported %2 warning(s), see FileIO log for details")
-                           .arg(m_formatName)
-                           .arg(ir.warningCount));
+                .arg(m_formatName)
+                .arg(ir.warningCount));
     }
 
     if (collectLayers)
@@ -262,8 +262,8 @@ ImportResult ImportReaderBase::readViaLegacy(
     const ImportContext& context, Fio::FileFormat format, Fio::VecSyEntityPtr& outEntities) const
 {
     const QByteArray tag = m_formatName.toUtf8();
-    SY_WARNF("[ImportReader:%s] Falling back to the legacy import path (no IR, no layer/group restore)",
-        tag.constData());
+    SY_WARNF(
+        "[ImportReader:%s] Falling back to the legacy import path (no IR, no layer/group restore)", tag.constData());
 
     Fio::FileIOManager fileIO;
     std::string pathStr = context.sourcePath.toUtf8().toStdString();
@@ -310,9 +310,8 @@ ImportResult ImportReaderBase::readViaLegacy(
 
     if (!warns.isEmpty())
     {
-        SY_WARNF("[ImportReader:%s] Legacy parser produced %d warning(s)",
-            tag.constData(),
-            static_cast<int>(warns.size()));
+        SY_WARNF(
+            "[ImportReader:%s] Legacy parser produced %d warning(s)", tag.constData(), static_cast<int>(warns.size()));
     }
 
     SY_DEBUGF("[ImportReader:%s] read END (legacy): success, entities=%zu, layers=%zu, warnings=%zu, %lld ms",

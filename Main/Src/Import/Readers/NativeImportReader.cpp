@@ -5,8 +5,10 @@
 #include "Log/SyLogger.h"
 
 NativeImportReader::NativeImportReader()
-    : ImportReaderBase(
-          Fio::FileFormat::Native, { QStringLiteral("sy"), QStringLiteral("syx") }, QStringLiteral("SanYi Native"), ImportDimension::Both)
+    : ImportReaderBase(Fio::FileFormat::Native,
+          { QStringLiteral("sy"), QStringLiteral("syx") },
+          QStringLiteral("SanYi Native"),
+          ImportDimension::Both)
 {
 }
 
@@ -20,7 +22,6 @@ ImportDimension NativeImportReader::dimension() const
 
 ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
 {
-
     // 检测是否为 3D 格式 (.syx)
     QFileInfo fi(context.sourcePath);
     bool is3D = (fi.suffix().toLower() == QStringLiteral("syx"));

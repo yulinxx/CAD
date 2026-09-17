@@ -8,14 +8,14 @@
 
 #ifdef ENABLE_HARDWARE
 
-#include "Hardware/Device/DeviceRegistry.h"
-#include "Hardware/Device/IGalvoCard.h"
-#include "Hardware/Device/IIoModule.h"
-#include "Hardware/Device/ILaserSource.h"
-#include "Hardware/Device/IMotionCard.h"
-#include "Hardware/Device/IoPointMap.h"
-#include "Hardware/Device/ISimulationClock.h"
-#include "Hardware/Device/SafetyMonitor.h"
+    #include "Hardware/Device/DeviceRegistry.h"
+    #include "Hardware/Device/IGalvoCard.h"
+    #include "Hardware/Device/IIoModule.h"
+    #include "Hardware/Device/ILaserSource.h"
+    #include "Hardware/Device/IMotionCard.h"
+    #include "Hardware/Device/IoPointMap.h"
+    #include "Hardware/Device/ISimulationClock.h"
+    #include "Hardware/Device/SafetyMonitor.h"
 
 namespace
 {
@@ -37,8 +37,7 @@ namespace
         if (text.compare(QStringLiteral("blocked"), Qt::CaseInsensitive) != 0)
         {
             // 拼错的 severity 按最严处理：安全等级上「猜宽松」是不能接受的
-            SY_WARNF("[DeviceHost] Unknown safety severity '%s', treating as Emergency",
-                text.toUtf8().constData());
+            SY_WARNF("[DeviceHost] Unknown safety severity '%s', treating as Emergency", text.toUtf8().constData());
             return Hw::SafetyState::Emergency;
         }
         return Hw::SafetyState::Blocked;
@@ -83,7 +82,7 @@ namespace
         }
         return mask;
     }
-}
+}  // namespace
 
 /**
  * @brief 装配后的机器图元。
@@ -166,9 +165,10 @@ struct DeviceHost::Impl
             // 只记日志：信号的发出统一由 onTick 做（那里能保证在主线程）。
             // 打点位名而不是 firstViolation —— 后者是给界面看的本地化文案。
             SY_WARNF("[DeviceHost] Safety state -> %s (violations=%d, first=%s)",
-                Hw::safetyStateName(verdict.state), verdict.violationCount, verdict.firstViolationPoint);
+                Hw::safetyStateName(verdict.state),
+                verdict.violationCount,
+                verdict.firstViolationPoint);
         }
-
     };
 
     /**
@@ -189,7 +189,9 @@ struct DeviceHost::Impl
             }
             // QueuedConnection：把跨线程的 POD 事件安全搬到主线程。
             // 直接 emit 会让 UI 槽函数在适配器线程里跑。
-            QMetaObject::invokeMethod(host, "onDeviceEventQueued", Qt::QueuedConnection,
+            QMetaObject::invokeMethod(host,
+                "onDeviceEventQueued",
+                Qt::QueuedConnection,
                 Q_ARG(int, static_cast<int>(event.type)),
                 Q_ARG(int, event.channel),
                 Q_ARG(double, event.value),
@@ -215,7 +217,6 @@ struct DeviceHost::Impl
 
     /// 累加的时间基准（毫秒），供 IO 去抖与安全评估使用
     qint64 nowMs = 0;
-
 
     MachineProfile profile;
     QString displayName;
@@ -282,7 +283,8 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
     Hw::IDevice* device = Hw::DeviceRegistry::instance().create(idUtf8.constData());
     if (!device)
     {
-        errorOut = QStringLiteral("Unknown device ID: %1 (see log for available IDs)").arg(profile.deviceId);  // 未知设备 ID
+        errorOut =
+            QStringLiteral("Unknown device ID: %1 (see log for available IDs)").arg(profile.deviceId);  // 未知设备 ID
         SY_ERRORF("[DeviceHost] %s", errorOut.toUtf8().constData());
         return false;
     }
@@ -301,8 +303,7 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
     {
         // 现场排查接线时的模式：软件起来了但不碰硬件。
         // 这不是失败，但必须让日志说清楚，否则会被当成「设备连不上」
-        SY_WARNF("[DeviceHost] autoOpen=false, device '%s' created but NOT opened",
-            idUtf8.constData());
+        SY_WARNF("[DeviceHost] autoOpen=false, device '%s' created but NOT opened", idUtf8.constData());
         return true;
     }
 
@@ -314,7 +315,8 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
         if (params.count >= static_cast<int32_t>(Hw::kMaxParams))
         {
             SY_ERRORF("[DeviceHost] Too many open params (>%zu), '%s' and the rest are dropped",
-                Hw::kMaxParams, it.key().toUtf8().constData());
+                Hw::kMaxParams,
+                it.key().toUtf8().constData());
             break;
         }
         Hw::ParamValue& pv = params.items[params.count++];
@@ -341,25 +343,29 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
     m_impl->simClock = Hw::hwQuery<Hw::ISimulationClock>(device);
 
     SY_DEBUGF("[DeviceHost] Opened '%s' (%s) caps: motion=%d galvo=%d laser=%d io=%d sim=%d",
-        idUtf8.constData(), m_impl->displayName.toUtf8().constData(),
-        m_impl->motion ? 1 : 0, m_impl->galvo ? 1 : 0, m_impl->laser ? 1 : 0,
-        m_impl->io ? 1 : 0, m_impl->simClock ? 1 : 0);
+        idUtf8.constData(),
+        m_impl->displayName.toUtf8().constData(),
+        m_impl->motion ? 1 : 0,
+        m_impl->galvo ? 1 : 0,
+        m_impl->laser ? 1 : 0,
+        m_impl->io ? 1 : 0,
+        m_impl->simClock ? 1 : 0);
 
     // --- IO 点位 ---
-if (!profile.ioPoints.isEmpty())
+    if (!profile.ioPoints.isEmpty())
+    {
+        if (!m_impl->io)
         {
-            if (!m_impl->io)
-            {
-                // 配了点位却没有 IO 能力：安全条件会全部判为 invalid，
-                // 而 violateWhenInvalid 默认 true，结果是永远无法开工。
-                // 与其让人对着「无法开工」发愣，不如在这里直接说清
-                errorOut = QStringLiteral("Profile configured %1 IO points, but device %2 does not provide IO capability")
-                               .arg(profile.ioPoints.size())
-                               .arg(profile.deviceId);  // 档案配置了 IO 点位，但设备不提供 IO 能力
-                SY_ERRORF("[DeviceHost] %s", errorOut.toUtf8().constData());
-                m_impl->destroyDevice();
-                return false;
-            }
+            // 配了点位却没有 IO 能力：安全条件会全部判为 invalid，
+            // 而 violateWhenInvalid 默认 true，结果是永远无法开工。
+            // 与其让人对着「无法开工」发愣，不如在这里直接说清
+            errorOut = QStringLiteral("Profile configured %1 IO points, but device %2 does not provide IO capability")
+                           .arg(profile.ioPoints.size())
+                           .arg(profile.deviceId);  // 档案配置了 IO 点位，但设备不提供 IO 能力
+            SY_ERRORF("[DeviceHost] %s", errorOut.toUtf8().constData());
+            m_impl->destroyDevice();
+            return false;
+        }
         m_impl->pointMap.attachModule(m_impl->io);
 
         for (const MachineIoPointConfig& pc : profile.ioPoints)
@@ -377,8 +383,7 @@ if (!profile.ioPoints.isEmpty())
 
             if (!m_impl->pointMap.definePoint(def))
             {
-                SY_ERRORF("[DeviceHost] definePoint failed: '%s' ch=%d",
-                    pc.name.toUtf8().constData(), pc.channel);
+                SY_ERRORF("[DeviceHost] definePoint failed: '%s' ch=%d", pc.name.toUtf8().constData(), pc.channel);
             }
         }
     }
@@ -397,8 +402,7 @@ if (!profile.ioPoints.isEmpty())
 
         if (!m_impl->monitor.addCondition(cond))
         {
-            SY_ERRORF("[DeviceHost] addCondition failed for point '%s'",
-                cc.pointName.toUtf8().constData());
+            SY_ERRORF("[DeviceHost] addCondition failed for point '%s'", cc.pointName.toUtf8().constData());
         }
     }
 
@@ -449,7 +453,6 @@ void DeviceHost::stop()
     m_impl->nowMs = 0;
     m_impl->lastTickMs = 0;
 }
-
 
 bool DeviceHost::isRunning() const
 {
@@ -556,7 +559,6 @@ void DeviceHost::tick(qint64 elapsedMs)
     m_impl->pointMap.poll(now);
     const Hw::SafetyVerdict verdict = m_impl->monitor.evaluate(now);
 
-
     const int32_t count = m_impl->monitor.violationCount();
     QStringList violations;
     violations.reserve(count);
@@ -571,23 +573,20 @@ void DeviceHost::tick(qint64 elapsedMs)
     m_impl->violations = violations;
 
     const QString firstViolation = QString::fromUtf8(verdict.firstViolation);
-    if (verdict.canStartProcessing != m_impl->lastCanStart
-        || firstViolation != m_impl->lastFirstViolation)
+    if (verdict.canStartProcessing != m_impl->lastCanStart || firstViolation != m_impl->lastFirstViolation)
     {
         m_impl->lastCanStart = verdict.canStartProcessing;
         m_impl->lastFirstViolation = firstViolation;
         // 只在变化时发：20ms 一次的信号会把界面刷爆，也让日志无法阅读
-        emit safetyVerdictChanged(verdict.canStartProcessing, firstViolation,
-            QString::fromUtf8(verdict.firstViolationPoint));
+        emit safetyVerdictChanged(
+            verdict.canStartProcessing, firstViolation, QString::fromUtf8(verdict.firstViolationPoint));
     }
-
 
     const int state = static_cast<int>(m_impl->device->state());
     if (state != m_impl->lastDeviceState)
     {
         m_impl->lastDeviceState = state;
-        emit deviceStateChanged(
-            state, QString::fromUtf8(Hw::deviceStateName(m_impl->device->state())));
+        emit deviceStateChanged(state, QString::fromUtf8(Hw::deviceStateName(m_impl->device->state())));
     }
 }
 
@@ -625,24 +624,40 @@ bool DeviceHost::isHardwareSupportCompiled()
 
 bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
 {
-    errorOut = QStringLiteral("Hardware module not enabled (BUILD_HARDWARE=OFF), cannot start device %1")
-                   .arg(profile.deviceId);
-    SY_WARNF("[DeviceHost] %s", errorOut.toUtf8().constData());  // 本次构建未启用硬件模块（BUILD_HARDWARE=OFF），无法启动设备
+    errorOut =
+        QStringLiteral("Hardware module not enabled (BUILD_HARDWARE=OFF), cannot start device %1").arg(profile.deviceId);
+    SY_WARNF("[DeviceHost] %s",
+        errorOut.toUtf8().constData());  // 本次构建未启用硬件模块（BUILD_HARDWARE=OFF），无法启动设备
     return false;
 }
 
 void DeviceHost::stop() {}
 
-bool DeviceHost::isRunning() const { return false; }
+bool DeviceHost::isRunning() const
+{
+    return false;
+}
 
-QString DeviceHost::deviceId() const { return QString(); }
+QString DeviceHost::deviceId() const
+{
+    return QString();
+}
 
-QString DeviceHost::deviceDisplayName() const { return QString(); }
+QString DeviceHost::deviceDisplayName() const
+{
+    return QString();
+}
 
-bool DeviceHost::isSimulated() const { return false; }
+bool DeviceHost::isSimulated() const
+{
+    return false;
+}
 
 /// fail-safe：没有硬件支持就不允许开工，而不是「没有约束所以放行」。
-bool DeviceHost::canStartProcessing() const { return false; }
+bool DeviceHost::canStartProcessing() const
+{
+    return false;
+}
 
 QStringList DeviceHost::safetyViolations() const
 {
@@ -660,7 +675,6 @@ void DeviceHost::tick(qint64 elapsedMs)
 {
     Q_UNUSED(elapsedMs);
 }
-
 
 void DeviceHost::onDeviceEventQueued(int eventType, int channel, double value, const QString& message)
 {

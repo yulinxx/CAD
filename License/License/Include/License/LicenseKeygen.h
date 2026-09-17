@@ -19,7 +19,8 @@ extern "C"
 {
 #endif
 
-    LICENSE_C_API LICENSE_KEYGEN_API int LicenseKeygen_GenerateKeyPair(const char* privateKeyPath, const char* publicKeyPath);
+    LICENSE_C_API LICENSE_KEYGEN_API int LicenseKeygen_GenerateKeyPair(
+        const char* privateKeyPath, const char* publicKeyPath);
 
     LICENSE_C_API LICENSE_KEYGEN_API int LicenseKeygen_GenerateRegCode(const char* machineCode,
         const char* expiryDate,

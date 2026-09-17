@@ -16,7 +16,6 @@
 #include "Engine/SyEntity/EType.h"
 #include "Engine/Parallel/EngineParallel.h"
 
-
 #include "Log/SyLogger.h"
 #include "Log/SyPerfCounter.h"
 
@@ -438,11 +437,13 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     struct BatchGuard
     {
         RenderWidget* w;
+
         explicit BatchGuard(RenderWidget* widget)
             : w(widget)
         {
             w->beginBatchUpload();
         }
+
         ~BatchGuard()
         {
             w->endBatchUpload();
@@ -579,8 +580,7 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         Eg::EngineParallel::parallelForIndex(count, [&](size_t index) {
             auto id = entityIdsToProcess[index];
             // 只读快照：副本是主线程 clone 好的，工作线程不再触碰场景数据
-            const Eg::RenderEntitySnapshot* snapshot =
-                m_pendingSnapshot.find(static_cast<Eg::EntityId>(id));
+            const Eg::RenderEntitySnapshot* snapshot = m_pendingSnapshot.find(static_cast<Eg::EntityId>(id));
             if (snapshot == nullptr || snapshot->entity() == nullptr)
             {
                 return;
@@ -590,8 +590,8 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             job.uid = id;
             job.layerOrder = entityLayerOrders[index];
 
-            if (entityToVertices(snapshot->entity(), job.vertices, job.primType, cameraCenter,
-                                 worldToScreenScale, chordErrorPixels))
+            if (entityToVertices(
+                    snapshot->entity(), job.vertices, job.primType, cameraCenter, worldToScreenScale, chordErrorPixels))
             {
                 job.valid = true;
             }
@@ -608,13 +608,19 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
 
             if (m_renderedEntityIds.count(job.uid))
             {
-                m_renderWidget->modifyRenderEntity(job.uid, job.vertices.data(),
-                    static_cast<uint32_t>(job.vertices.size()), job.primType, job.layerOrder);
+                m_renderWidget->modifyRenderEntity(job.uid,
+                    job.vertices.data(),
+                    static_cast<uint32_t>(job.vertices.size()),
+                    job.primType,
+                    job.layerOrder);
             }
             else
             {
-                m_renderWidget->addRenderEntity(job.uid, job.vertices.data(),
-                    static_cast<uint32_t>(job.vertices.size()), job.primType, job.layerOrder);
+                m_renderWidget->addRenderEntity(job.uid,
+                    job.vertices.data(),
+                    static_cast<uint32_t>(job.vertices.size()),
+                    job.primType,
+                    job.layerOrder);
                 m_renderedEntityIds.insert(job.uid);
             }
         }
@@ -625,8 +631,7 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         for (size_t index = 0; index < entityIdsToProcess.size(); ++index)
         {
             const uint64_t uid = entityIdsToProcess[index];
-            const Eg::RenderEntitySnapshot* snapshot =
-                m_pendingSnapshot.find(static_cast<Eg::EntityId>(uid));
+            const Eg::RenderEntitySnapshot* snapshot = m_pendingSnapshot.find(static_cast<Eg::EntityId>(uid));
             if (snapshot == nullptr || snapshot->entity() == nullptr)
             {
                 continue;
@@ -635,23 +640,25 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             std::vector<Render::VertexP3C3> vertices;
             Render::PrimitiveType primType;
             // 图元无法增量转换为顶点，已跳过
-            if (!entityToVertices(snapshot->entity(), vertices, primType, cameraCenter,
-                                  worldToScreenScale, chordErrorPixels))
+            if (!entityToVertices(
+                    snapshot->entity(), vertices, primType, cameraCenter, worldToScreenScale, chordErrorPixels))
             {
-                SY_WARNF("[SceneRefreshCoordinator] Entity %llu (eType=%d) cannot be incrementally converted to vertices, skipped",
-                    static_cast<unsigned long long>(uid), static_cast<int>(snapshot->type));
+                SY_WARNF("[SceneRefreshCoordinator] Entity %llu (eType=%d) cannot be incrementally converted to "
+                         "vertices, skipped",
+                    static_cast<unsigned long long>(uid),
+                    static_cast<int>(snapshot->type));
                 continue;
             }
 
             if (m_renderedEntityIds.count(uid))
             {
-                m_renderWidget->modifyRenderEntity(uid, vertices.data(),
-                    static_cast<uint32_t>(vertices.size()), primType, entityLayerOrders[index]);
+                m_renderWidget->modifyRenderEntity(
+                    uid, vertices.data(), static_cast<uint32_t>(vertices.size()), primType, entityLayerOrders[index]);
             }
             else
             {
-                m_renderWidget->addRenderEntity(uid, vertices.data(),
-                    static_cast<uint32_t>(vertices.size()), primType, entityLayerOrders[index]);
+                m_renderWidget->addRenderEntity(
+                    uid, vertices.data(), static_cast<uint32_t>(vertices.size()), primType, entityLayerOrders[index]);
                 m_renderedEntityIds.insert(uid);
             }
         }
@@ -725,13 +732,19 @@ void SceneRefreshCoordinator::processCurveLodBatch()
 
         if (m_renderedEntityIds.count(uid))
         {
-            m_renderWidget->modifyRenderEntity(uid, vertices.data(),
-                static_cast<uint32_t>(vertices.size()), primType, layerIndexOfEntity(m_sceneManager, entity->id));
+            m_renderWidget->modifyRenderEntity(uid,
+                vertices.data(),
+                static_cast<uint32_t>(vertices.size()),
+                primType,
+                layerIndexOfEntity(m_sceneManager, entity->id));
         }
         else
         {
-            m_renderWidget->addRenderEntity(uid, vertices.data(),
-                static_cast<uint32_t>(vertices.size()), primType, layerIndexOfEntity(m_sceneManager, entity->id));
+            m_renderWidget->addRenderEntity(uid,
+                vertices.data(),
+                static_cast<uint32_t>(vertices.size()),
+                primType,
+                layerIndexOfEntity(m_sceneManager, entity->id));
             m_renderedEntityIds.insert(uid);
         }
     }
@@ -1094,8 +1107,7 @@ void SceneRefreshCoordinator::updateSceneRender()
     // 注意：onSelectionChanged 会先把 m_refreshLevel 提升为 Selection(3)，若紧随其后发生场景删除
     // （onSceneChanged），scheduleSceneUpdate 不会将其降级回 LightUpdate(2)，因此这里必须显式包含
     // Selection 级别，否则待删除图元会在 Selection 分支中被跳过。
-    else if ((level == RefreshLevel::LightUpdate) || (level == RefreshLevel::Selection)
-        || !m_pendingDeletedIds.empty())
+    else if ((level == RefreshLevel::LightUpdate) || (level == RefreshLevel::Selection) || !m_pendingDeletedIds.empty())
     {
         applyLightRefresh(sm);
     }

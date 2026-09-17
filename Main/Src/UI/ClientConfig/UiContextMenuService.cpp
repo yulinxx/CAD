@@ -20,9 +20,8 @@ namespace
         {
             return nullptr;
         }
-        auto it = std::find_if(config->contextMenus.cbegin(),
-            config->contextMenus.cend(),
-            [&id](const ContextMenuDef& def) {
+        auto it =
+            std::find_if(config->contextMenus.cbegin(), config->contextMenus.cend(), [&id](const ContextMenuDef& def) {
                 return def.id == id;
             });
         return it != config->contextMenus.cend() ? &(*it) : nullptr;
@@ -95,16 +94,13 @@ int UiContextMenuService::fillDynamicSections(QMenu* menu, const QStringList& se
     return added;
 }
 
-
 bool UiContextMenuService::hasConfigFor(const UiConfigData* config, const QString& contextMenuId)
 {
     return findContextMenu(config, contextMenuId) != nullptr;
 }
 
-QMenu* UiContextMenuService::buildMenu(const UiConfigData* config,
-    const QString& contextMenuId,
-    IUiCommandDispatcher* dispatcher,
-    QWidget* parent)
+QMenu* UiContextMenuService::buildMenu(
+    const UiConfigData* config, const QString& contextMenuId, IUiCommandDispatcher* dispatcher, QWidget* parent)
 {
     const ContextMenuDef* def = findContextMenu(config, contextMenuId);
     if (!def)
@@ -134,7 +130,6 @@ QMenu* UiContextMenuService::buildMenu(const UiConfigData* config,
 
     // 追加动态段：与主菜单子菜单共用 fillDynamicSections，不在此另写一份追加逻辑
     fillDynamicSections(menu, def->dynamicSections, def->id);
-
 
     if (!hasRealAction(menu))
     {

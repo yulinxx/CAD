@@ -14,7 +14,6 @@ StlImportReader::StlImportReader()
  */
 ImportResult StlImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
 {
-
     // StlParser 仅实现 IR 路径，无旧路径回退；STL 无图层概念，故不收集图层表
     return readViaIR(context, Fio::FileFormat::STL, outEntities, false);
 }

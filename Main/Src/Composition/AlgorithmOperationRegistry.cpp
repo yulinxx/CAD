@@ -7,7 +7,8 @@
 
 #include "Operation/ReliefEngravingOperation2D.h"
 
-AlgorithmOperationRegistry::AlgorithmOperationRegistry(OperationBus* bus, AlgorithmRunner* algorithmRunner, QWidget* parentWidget)
+AlgorithmOperationRegistry::AlgorithmOperationRegistry(
+    OperationBus* bus, AlgorithmRunner* algorithmRunner, QWidget* parentWidget)
     : m_bus(bus)
     , m_algorithmRunner(algorithmRunner)
     , m_parentWidget(parentWidget)
@@ -24,16 +25,15 @@ void AlgorithmOperationRegistry::registerAll()
 
     AlgorithmRunner* runner = m_algorithmRunner;
     const auto registerAlgoOp = [&reg, runner](OperationId id) {
-        reg.registerOperation(std::make_unique<ParamLambdaOperation>(id,
-            [id, runner](const QVariantMap& params) {
-                if (!runner)
-                    return;
-                OperationRequest req;
-                req.id = id;
-                req.params = params;
-                req.source = OperationSource::Menu;
-                runner->runForOperation(id, req);
-            }));
+        reg.registerOperation(std::make_unique<ParamLambdaOperation>(id, [id, runner](const QVariantMap& params) {
+            if (!runner)
+                return;
+            OperationRequest req;
+            req.id = id;
+            req.params = params;
+            req.source = OperationSource::Menu;
+            runner->runForOperation(id, req);
+        }));
     };
 
     registerAlgoOp(OperationId::Algo_Fill);

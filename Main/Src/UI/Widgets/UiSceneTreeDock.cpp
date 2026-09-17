@@ -2,14 +2,14 @@
 // （与 RenderWidget3DAdapter.cpp 同一模式）
 #if BUILD_UI3D
 
-#include "UiSceneTreeDock.h"
+    #include "UiSceneTreeDock.h"
 
-#include "UI3D/Service/SceneDocument3D.h"
-#include "Engine3D/SyEntity/SyMeshEntity.h"
+    #include "UI3D/Service/SceneDocument3D.h"
+    #include "Engine3D/SyEntity/SyMeshEntity.h"
 
-#include <QTreeWidget>
-#include <QTreeWidgetItem>
-#include <QVBoxLayout>
+    #include <QTreeWidget>
+    #include <QTreeWidgetItem>
+    #include <QVBoxLayout>
 
 SceneTreeDockWidget::SceneTreeDockWidget(QWidget* parent)
     : QWidget(parent)

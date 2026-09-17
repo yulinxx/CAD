@@ -19,12 +19,18 @@ namespace
     {
         switch (phase)
         {
-        case ImportPhase::DetectFormat:   return 0.00f;
-        case ImportPhase::Parse:          return 0.05f;
-        case ImportPhase::BuildDocument:  return 0.60f;
-        case ImportPhase::RefreshDisplay: return 0.95f;
-        case ImportPhase::WriteBackState: return 1.00f;
-        default:                          return 0.00f;
+        case ImportPhase::DetectFormat:
+            return 0.00f;
+        case ImportPhase::Parse:
+            return 0.05f;
+        case ImportPhase::BuildDocument:
+            return 0.60f;
+        case ImportPhase::RefreshDisplay:
+            return 0.95f;
+        case ImportPhase::WriteBackState:
+            return 1.00f;
+        default:
+            return 0.00f;
         }
     }
 
@@ -32,12 +38,18 @@ namespace
     {
         switch (phase)
         {
-        case ImportPhase::DetectFormat:   return 0.05f;
-        case ImportPhase::Parse:          return 0.55f;
-        case ImportPhase::BuildDocument:  return 0.35f;
-        case ImportPhase::RefreshDisplay: return 0.05f;
-        case ImportPhase::WriteBackState: return 0.00f;
-        default:                          return 0.00f;
+        case ImportPhase::DetectFormat:
+            return 0.05f;
+        case ImportPhase::Parse:
+            return 0.55f;
+        case ImportPhase::BuildDocument:
+            return 0.35f;
+        case ImportPhase::RefreshDisplay:
+            return 0.05f;
+        case ImportPhase::WriteBackState:
+            return 0.00f;
+        default:
+            return 0.00f;
         }
     }
 
@@ -45,12 +57,18 @@ namespace
     {
         switch (phase)
         {
-        case ImportPhase::DetectFormat:   return "识别文件格式";
-        case ImportPhase::Parse:          return "解析文件";
-        case ImportPhase::BuildDocument:  return "写入场景";
-        case ImportPhase::RefreshDisplay: return "刷新显示";
-        case ImportPhase::WriteBackState: return "收尾";
-        default:                          return "导入中";
+        case ImportPhase::DetectFormat:
+            return "识别文件格式";
+        case ImportPhase::Parse:
+            return "解析文件";
+        case ImportPhase::BuildDocument:
+            return "写入场景";
+        case ImportPhase::RefreshDisplay:
+            return "刷新显示";
+        case ImportPhase::WriteBackState:
+            return "收尾";
+        default:
+            return "导入中";
         }
     }
 }  // namespace
@@ -74,8 +92,8 @@ ImportResult ImportProgressRunner::run(
 
     // 对话框可能在导入结束前被强制关闭（连续两次取消），用 QPointer 兜底防止悬空
     QPointer<ProgressDialog> dialogPtr = dialog;
-    auto result =
-        std::make_shared<ImportResult>(ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
+    auto result = std::make_shared<ImportResult>(
+        ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
 
     // 落库阶段（BuildDocument 起）不可取消：图元已在事务中，无法中途回滚。
     // 该阶段回调固定跑在主线程，故可安全触碰对话框。
@@ -98,7 +116,9 @@ ImportResult ImportProgressRunner::run(
             }
         }
     };
-    context.cancelCallback = [tracker]() { return tracker->isCancelRequested(); };
+    context.cancelCallback = [tracker]() {
+        return tracker->isCancelRequested();
+    };
 
     dialog->startExternalTracking(true);
 

@@ -23,7 +23,7 @@
 #include "Engine3D/SceneManager3D.h"
 #include "Engine3D/SyEntity/SyMeshEntity.h"
 #if BUILD_UI3D
-#include "UI3D/Edit/SceneEditService3D.h"
+    #include "UI3D/Edit/SceneEditService3D.h"
 #else
 class SceneEditService3D;
 #endif
@@ -325,7 +325,8 @@ void ImportService::importAsync(
         QMetaObject::invokeMethod(
             qApp,
             [safeSelf, onComplete, r]() {
-                if (safeSelf.isNull()) return;
+                if (safeSelf.isNull())
+                    return;
                 if (safeSelf->m_busyStateCallback)
                 {
                     safeSelf->m_busyStateCallback(false);
@@ -351,7 +352,8 @@ void ImportService::importAsync(
 
     // 启动后台线程执行 Phase 1-2（纯解析，不碰 UI 与场景）
     std::thread([safeSelf, context, options, finishOnMainThread]() {
-        if (safeSelf.isNull()) return;
+        if (safeSelf.isNull())
+            return;
         ImportContext mutableCtx = context;
         auto importedEntities = std::make_shared<Fio::VecSyEntityPtr>();
 
@@ -392,14 +394,14 @@ void ImportService::importAsync(
         QMetaObject::invokeMethod(
             qApp,
             [safeSelf, mutableCtx, entities, parseResult, options, finishOnMainThread]() mutable {
-                if (safeSelf.isNull()) return;
+                if (safeSelf.isNull())
+                    return;
                 ImportContext mainCtx = mutableCtx;
 
                 if (safeSelf->isCanceled(mainCtx))
                 {
                     SY_INFO("[ImportService] Async import canceled before Phase 3");
-                    finishOnMainThread(
-                        ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
+                    finishOnMainThread(ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
                     return;
                 }
 
@@ -574,7 +576,6 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
         return ImportResult::fail(QStringLiteral("No valid entities to import"), ImportErrorType::ParseFailed);
     }
 
-
     // 如果作为新文档导入，先清空场景
     if (options.importAsNewDocument && m_sceneManager)
     {
@@ -703,7 +704,8 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
             }
             if (!idRemap.empty())
             {
-                SY_DEBUGF("[ImportService] %zu entity id(s) were reassigned on insert, remapped for layer/group restore",
+                SY_DEBUGF(
+                    "[ImportService] %zu entity id(s) were reassigned on insert, remapped for layer/group restore",
                     idRemap.size());
             }
         }
@@ -780,8 +782,7 @@ void ImportService::phaseRefreshDisplay(
     // 工作台切换
     if (options.autoSwitchWorkbench)
     {
-        const QString targetId =
-            result.usedWorkbenchId.isEmpty() ? QStringLiteral("2D") : result.usedWorkbenchId;
+        const QString targetId = result.usedWorkbenchId.isEmpty() ? QStringLiteral("2D") : result.usedWorkbenchId;
         if (m_workbenchSwitchCallback)
         {
             SY_DEBUGF("[ImportService] Switching workbench to '%s'", targetId.toUtf8().constData());
@@ -897,9 +898,8 @@ void ImportService::phaseWriteBackState(const ImportContext& context, const Impo
     updateProgress(context, ImportPhase::WriteBackState, 1.0f);
 }
 
-int ImportService::restoreImportedLayers(const ImportContext& context,
-    const ImportResult& parseResult,
-    const std::unordered_map<int64_t, int64_t>& idRemap)
+int ImportService::restoreImportedLayers(
+    const ImportContext& context, const ImportResult& parseResult, const std::unordered_map<int64_t, int64_t>& idRemap)
 {
     if (parseResult.importedLayers.empty())
     {
@@ -932,6 +932,7 @@ int ImportService::restoreImportedLayers(const ImportContext& context,
         int runtimeLayerId = 0;
         const char* status = "reused";
     };
+
     std::vector<ResolvedSourceLayer> resolvedLayers;
     resolvedLayers.reserve(parseResult.importedLayers.size());
 
@@ -1045,8 +1046,8 @@ int ImportService::restoreImportedLayers(const ImportContext& context,
     return createdCount;
 }
 
-int ImportService::restoreImportedGroups(const ImportResult& parseResult,
-    const std::unordered_map<int64_t, int64_t>& idRemap)
+int ImportService::restoreImportedGroups(
+    const ImportResult& parseResult, const std::unordered_map<int64_t, int64_t>& idRemap)
 {
     if (parseResult.importedGroups.empty())
     {
@@ -1149,7 +1150,6 @@ int ImportService::restoreImportedGroups(const ImportResult& parseResult,
         static_cast<long long>(assignedCount));
     return createdCount;
 }
-
 
 void ImportService::updateProgress(const ImportContext& context, ImportPhase phase, float progress)
 {

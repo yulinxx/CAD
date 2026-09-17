@@ -18,9 +18,7 @@
 
 // 启用高 DPI 缩放（跨平台高分屏支持）
 // Qt 6+: 默认启用，无需手动设置
-static void setupHighDpiScaling()
-{
-}
+static void setupHighDpiScaling() {}
 
 // macOS: 使用原生菜单栏
 static void setupNativeMenuBar()
@@ -99,8 +97,7 @@ static int handleCliFlags(int argc, char** argv)
             std::printf("  Build Time: %s (UTC)\n", MainApp::buildTime().c_str());
             std::printf("  Build Type: %s\n", MainApp::buildType().c_str());
             std::printf("\n");
-            std::printf("Copyright (C) 2026 %s. All rights reserved.\n",
-                MainApp::organizationName().c_str());
+            std::printf("Copyright (C) 2026 %s. All rights reserved.\n", MainApp::organizationName().c_str());
             return 0;
         }
 
@@ -141,7 +138,7 @@ int runCADApplication(int argc, char** argv)
     // 启用高 DPI 缩放（必须在 QApplication 创建前设置）
     setupHighDpiScaling();
     setupNativeMenuBar();
-    
+
     // 命令行标志优先处理：--version/-v、--help/-h 命中即退出，不启动 GUI
     const int cliResult = handleCliFlags(argc, argv);
     if (cliResult >= 0)

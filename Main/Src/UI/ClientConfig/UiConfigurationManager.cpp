@@ -25,7 +25,6 @@ UiConfigurationManager& UiConfigurationManager::shared()
     return manager;
 }
 
-
 bool UiConfigurationManager::applyConfiguration(const QString& resourcePath, ConfigFallbackPolicy fallback)
 {
     UiConfigLoader loader(resourcePath);

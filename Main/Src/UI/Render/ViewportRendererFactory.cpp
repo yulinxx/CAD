@@ -1,7 +1,7 @@
 #include "ViewportRendererFactory.h"
 
 #if BUILD_UI3D
-#include "RenderWidget3DAdapter.h"
+    #include "RenderWidget3DAdapter.h"
 #endif
 #include "Log/SyLogger.h"
 

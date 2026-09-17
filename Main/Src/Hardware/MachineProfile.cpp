@@ -55,14 +55,13 @@ namespace
         c.violateWhenInvalid = obj.value("violateWhenInvalid").toBool(true);
         return c;
     }
-}
+}  // namespace
 
 namespace MachineProfileLoader
 {
     QString resolvePath(const QString& configDir)
     {
-        const QString envPath =
-            QProcessEnvironment::systemEnvironment().value(QString::fromLatin1(kProfileEnvKey));
+        const QString envPath = QProcessEnvironment::systemEnvironment().value(QString::fromLatin1(kProfileEnvKey));
         if (!envPath.isEmpty())
         {
             if (QFileInfo::exists(envPath))
@@ -71,8 +70,7 @@ namespace MachineProfileLoader
             }
             // 显式指定了却不存在必须报出来：这几乎总是打错了路径，
             // 静默退回默认位置会让人以为环境变量生效了
-            SY_WARNF("[MachineProfile] %s points to a missing file: %s",
-                kProfileEnvKey, envPath.toUtf8().constData());
+            SY_WARNF("[MachineProfile] %s points to a missing file: %s", kProfileEnvKey, envPath.toUtf8().constData());
         }
 
         if (!configDir.isEmpty())
@@ -155,7 +153,8 @@ namespace MachineProfileLoader
                 // 而 violateWhenInvalid 默认为 true，最终表现为「无法开工」——
                 // 这条日志就是把「无法开工」和「配置写错」连起来的唯一线索
                 SY_WARNF("[MachineProfile] Skipped invalid IO point: name='%s' channel=%d",
-                    p.name.toUtf8().constData(), p.channel);
+                    p.name.toUtf8().constData(),
+                    p.channel);
                 continue;
             }
             profile.ioPoints.append(p);
@@ -176,8 +175,7 @@ namespace MachineProfileLoader
         profile.tickIntervalMs = root.value("tickIntervalMs").toInt(20);
         if (profile.tickIntervalMs < 1 || profile.tickIntervalMs > 1000)
         {
-            SY_WARNF("[MachineProfile] tickIntervalMs=%d out of range, using 20ms",
-                profile.tickIntervalMs);
+            SY_WARNF("[MachineProfile] tickIntervalMs=%d out of range, using 20ms", profile.tickIntervalMs);
             profile.tickIntervalMs = 20;
         }
         profile.autoOpen = root.value("autoOpen").toBool(true);
@@ -226,7 +224,6 @@ namespace MachineProfileLoader
         door.debounceMs = 20;
         profile.ioPoints.append(door);
 
-
         MachineSafetyConditionConfig estopCond;
         estopCond.pointName = estop.name;
         estopCond.description = QStringLiteral("Emergency stop pressed");  // 急停被按下
@@ -238,7 +235,7 @@ namespace MachineProfileLoader
         MachineSafetyConditionConfig doorCond;
         doorCond.pointName = door.name;
         doorCond.description = QStringLiteral("Safety door not closed");  // 安全门未关闭
-        doorCond.triggerOnActive = false;  // active 表示「门已关」，未 active 才是违规
+        doorCond.triggerOnActive = false;                                 // active 表示「门已关」，未 active 才是违规
         doorCond.severity = QStringLiteral("blocked");
         doorCond.actions << QStringLiteral("block_start") << QStringLiteral("laser_off");
         profile.safetyConditions.append(doorCond);
@@ -251,8 +248,7 @@ namespace MachineProfileLoader
         const QString path = resolvePath(configDir);
         if (path.isEmpty())
         {
-            warningOut = QStringLiteral(
-                "未找到机器档案（%1 或 %2），已进入模拟设备模式：当前不会驱动任何真实硬件。")
+            warningOut = QStringLiteral("未找到机器档案（%1 或 %2），已进入模拟设备模式：当前不会驱动任何真实硬件。")
                              .arg(QString::fromLatin1(kProfileEnvKey))
                              .arg(QDir(configDir).filePath(QString::fromLatin1(kProfileFileName)));
             // 日志走英文：warningOut 是给界面看的中文提示，而日志会流向控制台与
@@ -282,4 +278,4 @@ namespace MachineProfileLoader
             static_cast<long long>(profile.safetyConditions.size()));
         return profile;
     }
-}
+}  // namespace MachineProfileLoader

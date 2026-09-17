@@ -1,20 +1,20 @@
 #if BUILD_UI3D
 
-#include "RenderWidget3DAdapter.h"
+    #include "RenderWidget3DAdapter.h"
 
-#include <QCoreApplication>
-#include <QMouseEvent>
-#include <QWheelEvent>
-#include <QPainter>
-#include <QVBoxLayout>
+    #include <QCoreApplication>
+    #include <QMouseEvent>
+    #include <QWheelEvent>
+    #include <QPainter>
+    #include <QVBoxLayout>
 
-#include "UI3D/Render3D/RenderWidget3D.h"
-#include "Engine3D/SyEntity/SyMeshEntity.h"
-#include "Engine3D/SceneManager3D.h"
-#include "Engine3D/Selection/SelectionManager3D.h"
-#include "UI3D/Service/SceneDocument3D.h"
-#include "UI3D/Service/CameraController3D.h"
-#include "Log/SyLogger.h"
+    #include "UI3D/Render3D/RenderWidget3D.h"
+    #include "Engine3D/SyEntity/SyMeshEntity.h"
+    #include "Engine3D/SceneManager3D.h"
+    #include "Engine3D/Selection/SelectionManager3D.h"
+    #include "UI3D/Service/SceneDocument3D.h"
+    #include "UI3D/Service/CameraController3D.h"
+    #include "Log/SyLogger.h"
 
 RenderWidget3DAdapter::RenderWidget3DAdapter() = default;
 
@@ -319,4 +319,4 @@ RenderWidget3D* RenderWidget3DAdapter::widget() const
 {
     return m_renderWidget.get();
 }
-#endif // BUILD_UI3D
+#endif  // BUILD_UI3D

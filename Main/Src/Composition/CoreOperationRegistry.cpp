@@ -31,13 +31,21 @@ CoreOperationRegistry::CoreOperationRegistry(OperationBus* bus,
 
 void CoreOperationRegistry::registerAll()
 {
-    EditOperationRegistry editRegistry(m_bus, m_editService, m_undoManager, m_clipboard,
-        m_algorithmRunner, m_viewportActionHub, m_stateCenter,
-        m_layerEditService, m_unitManager, m_parentWidget, m_captureService);
+    EditOperationRegistry editRegistry(m_bus,
+        m_editService,
+        m_undoManager,
+        m_clipboard,
+        m_algorithmRunner,
+        m_viewportActionHub,
+        m_stateCenter,
+        m_layerEditService,
+        m_unitManager,
+        m_parentWidget,
+        m_captureService);
     editRegistry.registerAll();
 
-    ViewOperationRegistry viewRegistry(m_bus, m_viewportActionHub, m_stateCenter,
-        m_layerEditService, m_unitManager, m_captureService, m_parentWidget);
+    ViewOperationRegistry viewRegistry(
+        m_bus, m_viewportActionHub, m_stateCenter, m_layerEditService, m_unitManager, m_captureService, m_parentWidget);
     viewRegistry.registerAll();
 
     AlgorithmOperationRegistry algoRegistry(m_bus, m_algorithmRunner, m_parentWidget);
@@ -48,6 +56,9 @@ void CoreOperationRegistry::registerAll()
 }
 
 void CoreOperationRegistry::registerHelpOperations() {}
+
 void CoreOperationRegistry::registerEditOperations() {}
+
 void CoreOperationRegistry::registerAlgorithmOperations() {}
+
 void CoreOperationRegistry::registerViewOperations() {}

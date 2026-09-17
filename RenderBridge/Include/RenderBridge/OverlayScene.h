@@ -59,15 +59,15 @@ namespace RenderBridge
      */
     enum class OverlayLayerId : uint8_t
     {
-        SelectionBox = 0,      ///< 选中集总包围盒（只描边不填充）
-        SelectionHighlight,    ///< 文字选区高亮（半透明四边形，可多块）
-        SelectionRect,         ///< 框选预览矩形
-        SelectionOutlines,     ///< 流水虚线轮廓（像素基准，逐帧离散）
-        SelectionHandles,      ///< 缩放/变换手柄（屏幕定尺寸）
-        PointMarkers,          ///< 点标记：旋转手柄 / 编辑器控制点（屏幕定尺寸）
-        SnapIndicator,         ///< 捕捉指示器（屏幕定尺寸）
-        ToolPreview,           ///< 绘制预览折线
-        ControlLines,          ///< 辅助线（切线手柄、十字准星、文字光标条）
+        SelectionBox = 0,    ///< 选中集总包围盒（只描边不填充）
+        SelectionHighlight,  ///< 文字选区高亮（半透明四边形，可多块）
+        SelectionRect,       ///< 框选预览矩形
+        SelectionOutlines,   ///< 流水虚线轮廓（像素基准，逐帧离散）
+        SelectionHandles,    ///< 缩放/变换手柄（屏幕定尺寸）
+        PointMarkers,        ///< 点标记：旋转手柄 / 编辑器控制点（屏幕定尺寸）
+        SnapIndicator,       ///< 捕捉指示器（屏幕定尺寸）
+        ToolPreview,         ///< 绘制预览折线
+        ControlLines,        ///< 辅助线（切线手柄、十字准星、文字光标条）
         Count
     };
 
@@ -107,7 +107,10 @@ namespace RenderBridge
         std::vector<Render::Color> perMarkerFills;
         std::vector<Render::Color> perMarkerBorders;
 
-        bool empty() const { return anchors.empty(); }
+        bool empty() const
+        {
+            return anchors.empty();
+        }
     };
 
     /// 逐帧参数：像素↔世界的换算比例与流水虚线相位
@@ -145,12 +148,11 @@ namespace RenderBridge
          * 传空即清除本层。跨行选区在这里表达为「每行一块」，而不是一个跨行的并集
          * 大矩形 —— 并集会把两行之间未选中的部分一起涂上颜色。
          */
-        void setSelectionHighlight(const std::vector<Render::Vec2f>& quadCorners,
-            const Render::Color& fill, const Render::Color& border);
+        void setSelectionHighlight(
+            const std::vector<Render::Vec2f>& quadCorners, const Render::Color& fill, const Render::Color& border);
 
         /// 框选预览矩形（半透明填充 + 描边）。bbox 退化即清除本层
-        void setSelectionRect(const Render::BBox2d& rect, const Render::Color& fill,
-            const Render::Color& border);
+        void setSelectionRect(const Render::BBox2d& rect, const Render::Color& fill, const Render::Color& border);
 
         /// 流水虚线轮廓。传空即清除本层
         void setSelectionOutlines(std::vector<Render::SelectionOutlinePath> paths);
@@ -165,8 +167,8 @@ namespace RenderBridge
         void setPointMarkers(OverlayMarkerGroup group);
 
         /// 捕捉指示器。形状与颜色由调用方解析（它才认识捕捉类型）
-        void setSnapIndicator(const Render::Vec2f& worldPos, bool visible,
-            SnapMarkerShape shape, const Render::Color& color);
+        void setSnapIndicator(
+            const Render::Vec2f& worldPos, bool visible, SnapMarkerShape shape, const Render::Color& color);
 
         /// 绘制预览折线（世界坐标，相邻点连成线段）。传空即清除本层几何
         void setToolPreview(const std::vector<Render::Vec2f>& points);

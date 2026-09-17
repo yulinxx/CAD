@@ -70,8 +70,12 @@ namespace Render
      * @param sizePx    方块全宽（像素）；调用方负责夹下限，见 buildPinnedMarkers
      */
     inline void appendPinnedMarker(std::vector<PinnedVertex>& fillV,
-        std::vector<PinnedVertex>& borderV, const Vec2f& anchor, const Vec2f& offsetPx, float sizePx,
-        const Color& fill, const Color& border)
+        std::vector<PinnedVertex>& borderV,
+        const Vec2f& anchor,
+        const Vec2f& offsetPx,
+        float sizePx,
+        const Color& fill,
+        const Color& border)
     {
         if (!std::isfinite(anchor.x()) || !std::isfinite(anchor.y()))
             return;
@@ -130,8 +134,10 @@ namespace Render
      * sizePx 在这里统一夹到 `ScreenMetrics::kMinMarkerSizePx`——业务侧字段未初始化
      * （0 或负数）时兜底，而不是画出零面积几何。
      */
-    inline void buildPinnedMarkers(const PinnedMarkerGroup* groups, size_t groupCount,
-        std::vector<PinnedVertex>& fillV, std::vector<PinnedVertex>& borderV)
+    inline void buildPinnedMarkers(const PinnedMarkerGroup* groups,
+        size_t groupCount,
+        std::vector<PinnedVertex>& fillV,
+        std::vector<PinnedVertex>& borderV)
     {
         for (size_t g = 0; g < groupCount; ++g)
         {
@@ -141,18 +147,14 @@ namespace Render
             const float sizePx = std::max(grp.sizePx, ScreenMetrics::kMinMarkerSizePx);
             for (size_t i = 0; i < grp.anchors->size(); ++i)
             {
-                const Vec2f offsetPx = (grp.offsetsPx && i < grp.offsetsPx->size())
-                    ? (*grp.offsetsPx)[i]
-                    : Vec2f(0.0f, 0.0f);
+                const Vec2f offsetPx =
+                    (grp.offsetsPx && i < grp.offsetsPx->size()) ? (*grp.offsetsPx)[i] : Vec2f(0.0f, 0.0f);
                 // 使用每标记颜色（如果提供），否则使用统一颜色
-                const Color fill = (grp.perMarkerFills && i < grp.perMarkerFills->size())
-                    ? (*grp.perMarkerFills)[i]
-                    : grp.fill;
-                const Color border = (grp.perMarkerBorders && i < grp.perMarkerBorders->size())
-                    ? (*grp.perMarkerBorders)[i]
-                    : grp.border;
-                appendPinnedMarker(fillV, borderV, (*grp.anchors)[i], offsetPx, sizePx, fill,
-                    border);
+                const Color fill =
+                    (grp.perMarkerFills && i < grp.perMarkerFills->size()) ? (*grp.perMarkerFills)[i] : grp.fill;
+                const Color border =
+                    (grp.perMarkerBorders && i < grp.perMarkerBorders->size()) ? (*grp.perMarkerBorders)[i] : grp.border;
+                appendPinnedMarker(fillV, borderV, (*grp.anchors)[i], offsetPx, sizePx, fill, border);
             }
         }
     }

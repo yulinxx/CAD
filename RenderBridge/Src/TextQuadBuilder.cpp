@@ -28,8 +28,8 @@ namespace Render
         constexpr uint32_t kAtlasSide = 1024;
 
         /// 世界坐标 → 物理像素。view 是列主序的世界→NDC 矩阵（Ut::Mat3f）
-        void worldToPixel(const Render::Mat3f& view, float wx, float wy, uint32_t vpWidth,
-            uint32_t vpHeight, float& outX, float& outY)
+        void worldToPixel(
+            const Render::Mat3f& view, float wx, float wy, uint32_t vpWidth, uint32_t vpHeight, float& outX, float& outY)
         {
             // 列主序：data[col * 3 + row]，与 RenderWidget::mat3ToMat4 的取法一致
             const float ndcX = view.data[0] * wx + view.data[3] * wy + view.data[6];
@@ -45,8 +45,7 @@ namespace Render
         shutdown();
     }
 
-    bool TextQuadBuilder::initialize(Render::RT::RuntimeHandle runtime, const uint8_t* fontData,
-        size_t bytes)
+    bool TextQuadBuilder::initialize(Render::RT::RuntimeHandle runtime, const uint8_t* fontData, size_t bytes)
     {
         shutdown();
         if (!Render::RT::rxValid(runtime) || !fontData || bytes == 0)
@@ -108,7 +107,8 @@ namespace Render
                 m_warnedFontFailure = true;
                 // 字号 %d 的字体创建失败（错误码 %d），文字不会显示
                 SY_ERRORF("TextQuadBuilder: font creation failed for size %d (error %d), text will not be displayed",
-                    pixelHeight, static_cast<int>(result));
+                    pixelHeight,
+                    static_cast<int>(result));
             }
             // 仍然登记这一项：否则每帧每条文本都会重试一次创建。
             m_batches.push_back(Batch{ pixelHeight, Render::RT::FontHandle::Invalid, {} });
@@ -119,8 +119,8 @@ namespace Render
         return &m_batches.back();
     }
 
-    void TextQuadBuilder::addText(const Eg::TextItem& item, const Render::Mat3f& view,
-        uint32_t vpWidth, uint32_t vpHeight)
+    void TextQuadBuilder::addText(
+        const Eg::TextItem& item, const Render::Mat3f& view, uint32_t vpWidth, uint32_t vpHeight)
     {
         if (!valid() || item.text[0] == '\0' || item.fontSize <= 0 || vpWidth == 0 || vpHeight == 0)
         {
@@ -148,8 +148,7 @@ namespace Render
             uint32_t codepoint = 0;
             i += decodeUtf8(item.text + i, textLength - i, codepoint);
             Render::RT::GlyphInfo glyph{};
-            if (Render::RT::rxFontGlyph(m_runtime, batch->font, codepoint, &glyph)
-                != Render::RT::RxResult::Ok)
+            if (Render::RT::rxFontGlyph(m_runtime, batch->font, codepoint, &glyph) != Render::RT::RxResult::Ok)
             {
                 continue;
             }
@@ -216,8 +215,7 @@ namespace Render
             i += decodeUtf8(item.text + i, textLength - i, codepoint);
 
             Render::RT::GlyphInfo glyph{};
-            if (Render::RT::rxFontGlyph(m_runtime, batch->font, codepoint, &glyph)
-                != Render::RT::RxResult::Ok)
+            if (Render::RT::rxFontGlyph(m_runtime, batch->font, codepoint, &glyph) != Render::RT::RxResult::Ok)
             {
                 continue;
             }
@@ -247,8 +245,8 @@ namespace Render
         }
     }
 
-    void TextQuadBuilder::flush(Render::RT::SessionHandle session, uint8_t layer, uint16_t& seq,
-        std::vector<Render::RT::DrawCommand>& out)
+    void TextQuadBuilder::flush(
+        Render::RT::SessionHandle session, uint8_t layer, uint16_t& seq, std::vector<Render::RT::DrawCommand>& out)
     {
         if (!valid() || !Render::RT::rxValid(session))
         {

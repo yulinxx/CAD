@@ -37,7 +37,6 @@
 #include "RenderViewport2D.h"
 #include "FileDropHandler.h"
 
-
 #include <optional>
 #include "DrawToolBarWidget.h"
 #include "DrawToolSwitchRegistry.h"
@@ -164,7 +163,7 @@ namespace
         auto* label = new QLabel(text, parent);
         label->setAlignment(Qt::AlignCenter);
         label->setStyleSheet(QStringLiteral("background:%1;border:1px solid %2;padding:20px;")
-                                 .arg(TM->colors().iconBg, TM->colors().borderNormal));
+                .arg(TM->colors().iconBg, TM->colors().borderNormal));
         return label;
     }
 }  // namespace
@@ -431,7 +430,6 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
         m_services.viewportActionHub->setViewport(m_viewport);
     }
 
-
     createToolbars(window);
     setupSceneTree(window);
 
@@ -468,7 +466,8 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
 bool Workbench2D::showSettingsDialog(QWidget* /*parent*/)
 {
     SY_DEBUGF("[Workbench2D] showSettingsDialog: m_settingsCoordinator=%p m_viewport=%p",
-        static_cast<void*>(m_settingsCoordinator.get()), static_cast<void*>(m_viewport));
+        static_cast<void*>(m_settingsCoordinator.get()),
+        static_cast<void*>(m_viewport));
 
     if (!m_settingsCoordinator || !m_viewport)
     {
@@ -479,8 +478,7 @@ bool Workbench2D::showSettingsDialog(QWidget* /*parent*/)
     // 2D 捕捉设置由视口持有的 GridSnapManager 驱动（coordinator 已做空指针保护）
     RenderWidget* widget = m_viewport->renderWidget();
     // 快捷键页的数据来自配置驱动菜单的台账（菜单管理器持有），2D/3D 同一份实现
-    IShortcutSettingsModel* shortcutModel =
-        m_workbenchWindow && m_workbenchWindow->menuManager()
+    IShortcutSettingsModel* shortcutModel = m_workbenchWindow && m_workbenchWindow->menuManager()
         ? m_workbenchWindow->menuManager()->shortcutSettingsModel()
         : nullptr;
     return m_settingsCoordinator->showSettingsDialog(
@@ -559,7 +557,7 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
             return;
         }
         // 统一经 OperationBus 跑 Edit_Delete，与菜单 / 工具栏 / 右键完全同一条路径
-        //（handler 见 CoreOperationRegistry::registerAll 的 Edit_Delete，落到
+        // （handler 见 CoreOperationRegistry::registerAll 的 Edit_Delete，落到
         // SceneEditService::deleteSelected）。3D 侧 setup3DDeleteShortcuts 也是这么做的。
         //
         // 曾经这里直连 sceneEditService 并额外做 selectionService->clear() +
@@ -747,7 +745,6 @@ namespace
         return actions;
     }
 
-
     QStringList buildSupportedImportFormatsFromCatalog(const QString& workbenchId)
     {
         QStringList formats;
@@ -847,7 +844,6 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         applyGridVisibleFromMetadata();
     }
 
-
     // CommandActionHub：管理所有 QAction 的创建与绑定
     m_commandHub = std::make_unique<CommandActionHub>();
     m_commandHub->setMainWindow(&window);
@@ -855,8 +851,8 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // 单一数据源：一次遍历选中的图元集合，统一算出 count / 锁定(图层+图元) / 可编辑 /
     // 类型直方图 / 分组 / 贝塞尔，注入给命令中枢
     m_commandHub->setSelectionContextProvider([selectionService = m_services.selectionService,
-                                               layerManager = m_services.layerManager,
-                                               sceneEditService = m_services.sceneEditService]() -> SelectionContext {
+                                                  layerManager = m_services.layerManager,
+                                                  sceneEditService = m_services.sceneEditService]() -> SelectionContext {
         SelectionContext result;
         if (!selectionService || !layerManager || !sceneEditService)
         {
@@ -942,7 +938,8 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         result.hasSelection = result.selectionCount > 0;
         // 分组按钮：需有选中图元 且 未命中任意锁定（图层锁或图元锁）且 未隐藏，
         // 与 RequiresUnlockedSelection 的双锁语义保持一致。
-        result.groupEnabled = result.hasSelection && !(result.anyLockedLayer || result.anyLockedEntity || result.anyHidden);
+        result.groupEnabled =
+            result.hasSelection && !(result.anyLockedLayer || result.anyLockedEntity || result.anyHidden);
         // 贝塞尔切换按钮：当前无独立语义，保持禁用（与重构前未赋值行为一致）
         result.bezierEnabled = false;
         return result;
@@ -961,7 +958,6 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         SY_WARN("[Workbench2D] UiServices::undoManager is null, Undo/Redo actions will stay disabled");
     }
     m_commandHub->setUndoRedoProvider([undoManager = m_services.undoManager]() -> UndoRedoState {
-
         UndoRedoState state;
         if (undoManager)
         {
@@ -1009,7 +1005,6 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         static_cast<int>(drawToolActions.size()),
         m_panelHostStyle == PanelHostStyle::Dock ? "Dock" : "ToolBar");
 
-
     // 依据承载样式创建左侧面板（Draw Tools）
     if (m_panelHostStyle == PanelHostStyle::Dock)
     {
@@ -1027,49 +1022,52 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // 视口 → UI 的勾选态回写（Esc 回到 SelectTool、工具用完自动返回等）。
     // 勾选态由中枢的 QActionGroup 单点维护，展示层不再各自记 activeTool。
     // 配置驱动的 Draw 菜单项是不可勾选的普通动作，不参与高亮，只共用同一条派发链。
-    QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged,
-        m_commandHub.get(), &CommandActionHub::setActiveToolAction);
+    QObject::connect(
+        m_viewport, &RenderViewport2D::activeToolChanged, m_commandHub.get(), &CommandActionHub::setActiveToolAction);
     m_commandHub->setActiveToolAction(m_viewport->activeToolName());
 
     // 文字编辑工具栏绑定：工具切换到 TextEditTool 时，绑定到 TextFontToolBar
     // 以便在进入编辑时自动刷新字体面板信息
-    QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged,
-        this, [this](const QString& toolName) {
-            SY_DEBUGF("[Workbench2D] activeToolChanged: %s, m_textFontToolBarWidget=%p, m_viewport=%p",
-                qPrintable(toolName), reinterpret_cast<void*>(m_textFontToolBarWidget), reinterpret_cast<void*>(m_viewport));
-            if (toolName == QStringLiteral("TextEditTool") && m_textFontToolBarWidget && m_viewport)
+    QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged, this, [this](const QString& toolName) {
+        SY_DEBUGF("[Workbench2D] activeToolChanged: %s, m_textFontToolBarWidget=%p, m_viewport=%p",
+            qPrintable(toolName),
+            reinterpret_cast<void*>(m_textFontToolBarWidget),
+            reinterpret_cast<void*>(m_viewport));
+        if (toolName == QStringLiteral("TextEditTool") && m_textFontToolBarWidget && m_viewport)
+        {
+            auto* toolMgr = m_viewport->toolManager();
+            if (toolMgr)
             {
-                auto* toolMgr = m_viewport->toolManager();
-                if (toolMgr)
+                ITool* tool = toolMgr->getTool(QStringLiteral("TextEditTool"));
+                if (tool && tool->isTextEditTool())
                 {
-                    ITool* tool = toolMgr->getTool(QStringLiteral("TextEditTool"));
-                    if (tool && tool->isTextEditTool())
-                    {
-                        // safe to cast since isTextEditTool() returns true
-                        auto* textEditTool = static_cast<TextEditTool*>(tool);
-                        m_textFontToolBarWidget->bindTool(textEditTool);
-                        SY_DEBUGF("[Workbench2D] TextFontToolBar bound to TextEditTool");
+                    // safe to cast since isTextEditTool() returns true
+                    auto* textEditTool = static_cast<TextEditTool*>(tool);
+                    m_textFontToolBarWidget->bindTool(textEditTool);
+                    SY_DEBUGF("[Workbench2D] TextFontToolBar bound to TextEditTool");
 
-                        // 设置编辑状态变化回调，以便在进入/退出编辑时切换工具栏上下文
-                        textEditTool->setEditingStateChangedCallback([this](bool editing) {
-                            SY_DEBUGF("[Workbench2D] editingStateChanged: editing=%d, m_contextManager=%p", editing, reinterpret_cast<void*>(m_contextManager.get()));
-                            if (m_contextManager)
+                    // 设置编辑状态变化回调，以便在进入/退出编辑时切换工具栏上下文
+                    textEditTool->setEditingStateChangedCallback([this](bool editing) {
+                        SY_DEBUGF("[Workbench2D] editingStateChanged: editing=%d, m_contextManager=%p",
+                            editing,
+                            reinterpret_cast<void*>(m_contextManager.get()));
+                        if (m_contextManager)
+                        {
+                            // 进入编辑状态时切换到 TextEditing 上下文，显示字体面板
+                            // 退出编辑状态时切换回 Default 上下文
+                            const ToolBarContext targetCtx =
+                                editing ? ToolBarContext::TextEditing : ToolBarContext::Default;
+                            if (m_contextManager->currentContext() != targetCtx)
                             {
-                                // 进入编辑状态时切换到 TextEditing 上下文，显示字体面板
-                                // 退出编辑状态时切换回 Default 上下文
-                                const ToolBarContext targetCtx = editing ? ToolBarContext::TextEditing : ToolBarContext::Default;
-                                if (m_contextManager->currentContext() != targetCtx)
-                                {
-                                    m_contextManager->setCurrentContext(targetCtx);
-                                    SY_DEBUGF("[Workbench2D] Context switched to %d", static_cast<int>(targetCtx));
-                                }
+                                m_contextManager->setCurrentContext(targetCtx);
+                                SY_DEBUGF("[Workbench2D] Context switched to %d", static_cast<int>(targetCtx));
                             }
-                        });
-                    }
+                        }
+                    });
                 }
             }
-        });
-
+        }
+    });
 
     // 顶部工具栏（编辑命令）— 必须先创建，再由 ContextManager 填充 actions
     m_topToolBar = new TopToolBar(&window);
@@ -1139,9 +1137,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // 注意：不注册到 TopToolBar，因为字体/字号等控件已经在 TextFontToolBar 自定义工具栏中显示
     m_contextManager->registerContext(ToolBarContext::TextEditing,
         {
-            ToolBarContext::TextEditing,
-            tr("Text Format"),
-            {}  // 空 action 列表，控件通过 registerCustomToolBar 显示
+            ToolBarContext::TextEditing, tr("Text Format"), {}  // 空 action 列表，控件通过 registerCustomToolBar 显示
         });
 
     // 注册 QRCodeEditing 上下文（二维码编辑工具栏）
@@ -1330,13 +1326,13 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         }
     });
 
-
     // 双击色块 → 打开图层管理对话框（其中设置当前图层会通过 sigCurrentLayerChanged 同步回右侧色块）
     QObject::connect(m_rightToolBar, &RightToolBar::sigLayerDoubleClicked, this, [this](int /*layerId*/) {
         if (m_services.layerEditService)
         {
-            LayerManagerDialog::showDialog(
-                m_services.layerEditService, m_commandHub ? m_commandHub->mainWindow() : nullptr, m_services.layerManagerBridge);
+            LayerManagerDialog::showDialog(m_services.layerEditService,
+                m_commandHub ? m_commandHub->mainWindow() : nullptr,
+                m_services.layerManagerBridge);
         }
     });
 
@@ -1375,7 +1371,6 @@ ToolBarContext Workbench2D::determineContextFromSelection(const CommandUiSnapsho
     // 不读任何成员状态，也就不会因为「Hub 缓存有没有更新」而算出
     // 与工具栏 / 菜单 / 右键菜单不一致的上下文，顺带也不用判空 Hub。
     const uint32_t mask = snapshot.typeMask;
-
 
     const bool text = (mask & static_cast<uint32_t>(SelectionTypeBit::Text)) != 0;
     const bool qr = (mask & static_cast<uint32_t>(SelectionTypeBit::Qr)) != 0;
@@ -1550,8 +1545,8 @@ void Workbench2D::refreshSceneTreeIfNeeded()
     const std::size_t count = scene->getEntityCount();
     const uint64_t structureRev = scene->structureRevision();
     const uint64_t topologyRev = scene->groupManager().topologyRevision();
-    if (count == m_lastSceneTreeEntityCount && structureRev == m_lastSceneTreeStructureRevision
-        && topologyRev == m_lastSceneTreeTopologyRevision)
+    if (count == m_lastSceneTreeEntityCount && structureRev == m_lastSceneTreeStructureRevision &&
+        topologyRev == m_lastSceneTreeTopologyRevision)
     {
         return;
     }
@@ -1630,7 +1625,8 @@ void Workbench2D::toggleEntityVisibility(const QString& id, bool visible)
         scene->notifySceneChanged();
         // 可见性不进结构签名（不是增删/拓扑变化），且树行要显示新的显隐图标，
         // 所以这里显式重建一次：这是用户点击行为，频率低，代价可接受。
-        SY_DEBUGF("[Workbench2D] toggleEntityVisibility: id=%lld visible=%d", static_cast<long long>(*eid), visible ? 1 : 0);
+        SY_DEBUGF(
+            "[Workbench2D] toggleEntityVisibility: id=%lld visible=%d", static_cast<long long>(*eid), visible ? 1 : 0);
         refreshSceneTree();
     }
 }
@@ -1734,12 +1730,12 @@ void Workbench2D::setSceneTreeVisibility(const QStringList& ids, bool visible)
         scene->forEachSelected([&currentSelected](Eg::SyEntity* e) {
             currentSelected.push_back(e);
         });
-        
+
         // 构建需要保留的图元列表（从当前选中中移除要隐藏的）
         std::vector<Eg::SyEntity*> toKeep;
         toKeep.reserve(currentSelected.size());
         std::unordered_set<QString> idsToDeselectSet(idsToDeselect.begin(), idsToDeselect.end());
-        
+
         for (Eg::SyEntity* e : currentSelected)
         {
             QString id = QString::number(static_cast<qint64>(e->id));
@@ -1748,7 +1744,7 @@ void Workbench2D::setSceneTreeVisibility(const QStringList& ids, bool visible)
                 toKeep.push_back(e);
             }
         }
-        
+
         // 批量操作：先清空选择，再批量选择保留的图元（只触发2次通知而非N次）
         scene->clearSelection();
         if (!toKeep.empty())
@@ -1760,7 +1756,8 @@ void Workbench2D::setSceneTreeVisibility(const QStringList& ids, bool visible)
     {
         scene->notifySceneChanged();
         // 同上：显隐不进结构签名，批量改完显式重建一次树（含取消选择的联动）
-        SY_DEBUGF("[Workbench2D] setSceneTreeVisibility: count=%d visible=%d", static_cast<int>(ids.size()), visible ? 1 : 0);
+        SY_DEBUGF(
+            "[Workbench2D] setSceneTreeVisibility: count=%d visible=%d", static_cast<int>(ids.size()), visible ? 1 : 0);
         refreshSceneTree();
     }
 }
@@ -1825,7 +1822,6 @@ void Workbench2D::onViewportContextMenu(QContextMenuEvent* event)
         return;
     }
 
-
     QMenu menu;
     m_commandHub->populateContextMenu(&menu, snapshot, m_services.layerManager);
     if (menu.isEmpty())
@@ -1848,7 +1844,6 @@ QMenu* Workbench2D::buildConfiguredContextMenu(const QString& contextMenuId, boo
     // 而菜单在调用方 exec()，此处再建局部适配器就是悬垂指针。
     return UiContextMenuService::instance().buildMenu(config, contextMenuId, this, m_commandHub->mainWindow());
 }
-
 
 void Workbench2D::refreshCommandUiState()
 {
@@ -1881,8 +1876,7 @@ void Workbench2D::applySelectionContext(const CommandUiSnapshot& snapshot)
     // 场景树右键菜单：与视口右键菜单共用同一份 hasSelection / anyLocked 判定，消除规则漂移
     if (m_scenePanel2D)
     {
-        const bool lockStateChanged =
-            m_scenePanel2D->setCommandState(snapshot.hasSelection, snapshot.anyLocked());
+        const bool lockStateChanged = m_scenePanel2D->setCommandState(snapshot.hasSelection, snapshot.anyLocked());
         // 树行的锁图标由 SceneTreeBuilder2D 在重建时绘制，而图元级 setLocked 不改变图元数量，
         // onSceneTreeSceneChanged 的计数守卫会把它挡掉 —— 不补这一下，锁图标会滞后到下一次增删。
         // 只在锁定态真的翻转时排一次去抖重建，避免每次选择变化都做 O(N) 重建。
@@ -1912,7 +1906,6 @@ void Workbench2D::applySelectionContext(const CommandUiSnapshot& snapshot)
         }
     }
 }
-
 
 void Workbench2D::refreshPropertiesPanel()
 {
@@ -1960,7 +1953,6 @@ void Workbench2D::refreshPropertiesPanel()
     }
 }
 
-
 void Workbench2D::activate()
 {
     // 从状态快照恢复（首次激活使用 m_initialState，后续使用 m_savedState）
@@ -2003,7 +1995,6 @@ void Workbench2D::deactivate()
     {
         QObject::disconnect(m_services.layerManagerBridge, nullptr, this, nullptr);
     }
-
 
     // 清除 ImportService 中持有的视口回调，防止切换后悬空指针
 
@@ -2090,7 +2081,6 @@ void Workbench2D::deactivate()
         m_contextManager->setCurrentContext(ToolBarContext::Default);
     }
 }
-
 
 void Workbench2D::shutdown()
 {
@@ -2388,10 +2378,11 @@ void Workbench3D::bind3DRenderSignals(ServiceOwner& own)
     bind3DSelectionSignal();
 
     // 右键菜单请求：交给命令中枢基于统一快照构建并弹出（与 2D 视口一致）
-    connect(m_services3D.renderWidget, &RenderWidget3D::sigContextMenuRequested,
-        this, &Workbench3D::on3DContextMenuRequested);
+    connect(m_services3D.renderWidget,
+        &RenderWidget3D::sigContextMenuRequested,
+        this,
+        &Workbench3D::on3DContextMenuRequested);
 }
-
 
 /// 绑定光标世界坐标信号
 void Workbench3D::bind3DCursorSignal()
@@ -2552,7 +2543,6 @@ QMenu* Workbench3D::buildConfiguredContextMenu(const QString& contextMenuId)
     return UiContextMenuService::instance().buildMenu(config, contextMenuId, this, m_services3D.renderWidget);
 }
 
-
 /// 步骤三：创建 CommandActionHub3D、注册命令、初始化菜单管理器和快捷键
 void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
 {
@@ -2584,7 +2574,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     // 注册，Settings 再解析活动工作台转发给 UiWorkbench::showSettingsDialog。
     // 注册必须发生在 registerAll 之前：OperationRegistryBase 用 try_emplace，先到先得，
     // 后注册的同名 Operation 会被忽略（HelpOperations3D 里已不再注册这两项）。
-#if 0
+    #if 0
     own.operationBus->registerOperation(std::make_unique<LambdaOperation3D>(
         OperationId3D::Help_Settings, [windowPtr = &window](OperationContext3D&, const OperationRequest3D&) {
             OperationResult3D result;
@@ -2609,7 +2599,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
             HelpDialogService::showShortcutsDialog(windowPtr, shortcutModel);
             return result;
         }));
-#endif
+    #endif
 
     // 「导出视图」：3D 侧的 View_Capture。
     //
@@ -2620,15 +2610,14 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     //
     // 注册放在工作台层的原因与上面两条一致：ViewCaptureService 由组合根持有，
     // UI3D 库看不到它，因此不能像 View_Wireframe 那样在 ViewOperations3D 里注册。
-    own.operationBus->registerOperation(std::make_unique<LambdaOperation3D>(
-        OperationId3D::View_Capture,
-        [captureService = m_services.captureService](OperationContext3D& ctx,
-                                                     const OperationRequest3D&) {
+    own.operationBus->registerOperation(std::make_unique<LambdaOperation3D>(OperationId3D::View_Capture,
+        [captureService = m_services.captureService](OperationContext3D& ctx, const OperationRequest3D&) {
             OperationResult3D result;
             if (!captureService || !ctx.renderWidget)
             {
                 SY_WARNF("[Workbench3D] View_Capture: captureService=%s renderWidget=%s",
-                         captureService ? "ok" : "null", ctx.renderWidget ? "ok" : "null");
+                    captureService ? "ok" : "null",
+                    ctx.renderWidget ? "ok" : "null");
                 return result;
             }
 
@@ -2649,8 +2638,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
                 SY_WARNF("[Workbench3D] View_Capture: 截图保存失败");
                 return result;
             }
-            SY_INFOF("[View_Capture] Saved to %s (3D %dx%d)", path.toStdString().c_str(),
-                     img.width(), img.height());
+            SY_INFOF("[View_Capture] Saved to %s (3D %dx%d)", path.toStdString().c_str(), img.width(), img.height());
             // 保存成功后打开图片所在目录
             QString dir = QFileInfo(path).absolutePath();
             QDesktopServices::openUrl(QUrl::fromLocalFile(dir));
@@ -2666,9 +2654,9 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     auto* captureSc = new QShortcut(QKeySequence(Qt::Key_F12), &window);
     connect(captureSc, &QShortcut::activated, this, [&own]() {
         QWidget* focusWidget = QApplication::focusWidget();
-        if (focusWidget && (qobject_cast<QLineEdit*>(focusWidget) ||
-                            qobject_cast<QTextEdit*>(focusWidget) ||
-                            qobject_cast<QPlainTextEdit*>(focusWidget)))
+        if (focusWidget &&
+            (qobject_cast<QLineEdit*>(focusWidget) || qobject_cast<QTextEdit*>(focusWidget) ||
+                qobject_cast<QPlainTextEdit*>(focusWidget)))
         {
             return;
         }
@@ -2692,7 +2680,6 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     // 命令 ID 经 Workbench3D::dispatchCommand 落到 OperationBus3D。
     // MenuManager3D 及其 bindXxxMenu / connectMenuSignals 已随硬编码路径一并移除。
     SY_DEBUG("[Workbench3D] Menus are built by WorkbenchMenuManager from client config");
-
 
     // 5. 转移并绑定工具栏。
     // 菜单由统一配置路径生成，3D CommandActionHub 继续负责高频工具栏动作。
@@ -2745,7 +2732,6 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
                 }
             });
     }
-
 
     // 6. 状态栏：创建独立的 StatusBar3D 并挂载到 WorkbenchWindow
     //    Workbench3D 拥有 StatusBar3D 的完整生命周期，不再从 MainWindow3D reparent
@@ -2825,7 +2811,11 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
     // 面板（UI）→ 引擎（业务）：用户操作通过引擎/算法层写回
     connect(m_scenePanel3D, &SceneTreePanel::selectionChanged, this, &Workbench3D::applySceneTreeSelection3D);
     // 使用 QueuedConnection 避免在 itemChanged 处理中重建树导致崩溃
-    connect(m_scenePanel3D, &SceneTreePanel::visibilityToggled, this, &Workbench3D::toggleEntityVisibility3D, Qt::QueuedConnection);
+    connect(m_scenePanel3D,
+        &SceneTreePanel::visibilityToggled,
+        this,
+        &Workbench3D::toggleEntityVisibility3D,
+        Qt::QueuedConnection);
     connect(m_scenePanel3D, &SceneTreePanel::renameRequested, this, &Workbench3D::renameEntity3D);
     connect(m_scenePanel3D, &SceneTreePanel::batchVisibilityRequested, this, &Workbench3D::setSceneTreeVisibility3D);
     connect(m_scenePanel3D, &SceneTreePanel::batchLockRequested, this, &Workbench3D::setSceneTreeLock3D);
@@ -2850,7 +2840,8 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
         // 场景监视器会在几何变换（拖动）等高频路径上反复触发，而这些不改变树行集合；
         // 按结构签名（图元增删）判定即可跳过纯几何变更。可见性/锁定/改名由各自的
         // 显式方法直接重建（它们不推进 structureRevision，见 setSceneTreeVisibility3D 等）。
-        connect(m_services3D.sceneMonitor, &SceneMonitor3D::sceneChanged, this, &Workbench3D::refreshSceneTree3DIfNeeded);
+        connect(
+            m_services3D.sceneMonitor, &SceneMonitor3D::sceneChanged, this, &Workbench3D::refreshSceneTree3DIfNeeded);
     }
 
     // 初始化防抖定时器
@@ -2866,7 +2857,8 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
     // 此处 importFinished 作为兜底与显式接入点，二者叠加安全）
     if (m_services.importService)
     {
-        connect(m_services.importService, &ImportService::importFinished, this, &Workbench3D::refreshSceneTree3DIfNeeded);
+        connect(
+            m_services.importService, &ImportService::importFinished, this, &Workbench3D::refreshSceneTree3DIfNeeded);
     }
 
     // 初始填充
@@ -3112,15 +3104,23 @@ void Workbench3D::attachToWindow(WorkbenchWindow& window)
     // 连接 MainWindow3D 的切换信号到 WorkbenchWindow 的工作台切换机制
     if (m_mainWindow3D)
     {
-        connect(m_mainWindow3D.get(), &MainWindow3D::sigSwitchTo2D,
-                &window, [&window]() {
-                    window.triggerWorkbench(QStringLiteral("2D"));
-                }, Qt::QueuedConnection);
+        connect(
+            m_mainWindow3D.get(),
+            &MainWindow3D::sigSwitchTo2D,
+            &window,
+            [&window]() {
+                window.triggerWorkbench(QStringLiteral("2D"));
+            },
+            Qt::QueuedConnection);
 
-        connect(m_mainWindow3D.get(), &MainWindow3D::sigSwitchTo3D,
-                &window, [&window]() {
-                    window.triggerWorkbench(QStringLiteral("3D"));
-                }, Qt::QueuedConnection);
+        connect(
+            m_mainWindow3D.get(),
+            &MainWindow3D::sigSwitchTo3D,
+            &window,
+            [&window]() {
+                window.triggerWorkbench(QStringLiteral("3D"));
+            },
+            Qt::QueuedConnection);
     }
 }
 
@@ -3133,7 +3133,6 @@ void Workbench3D::refreshCommandUiState()
         m_mainWindow3D->refreshCommandUiState();
     }
 }
-
 
 // 4 — 激活工作台，应用初始状态
 void Workbench3D::activate()
@@ -3197,7 +3196,6 @@ void Workbench3D::deactivate()
         }
         m_services3D.renderWidget = nullptr;
     }
-
 
     // 场景树面板随窗口销毁，清空引用避免悬空
     m_scenePanel3D = nullptr;
@@ -3271,8 +3269,7 @@ bool Workbench3D::showSettingsDialog(QWidget* /*parent*/)
     // 直接在此调协调器，而不是转给 MainWindow3D::showSettingsDialog：快捷键页的模型来自
     // 框架层台账（配置驱动菜单建出的 QAction/QShortcut），UI3D 库看不到那一层。
     // 与 2D 的 Workbench2D::showSettingsDialog 保持同构。
-    IShortcutSettingsModel* shortcutModel =
-        m_workbenchWindow && m_workbenchWindow->menuManager()
+    IShortcutSettingsModel* shortcutModel = m_workbenchWindow && m_workbenchWindow->menuManager()
         ? m_workbenchWindow->menuManager()->shortcutSettingsModel()
         : nullptr;
 

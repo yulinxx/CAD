@@ -63,7 +63,6 @@ namespace
         return StatusBarSlotAlign::Left;
     }
 
-
     QString normalizeVisibilityScope(const QString& explicitScope, const QStringList& workbenches)
     {
         if (!explicitScope.trimmed().isEmpty())

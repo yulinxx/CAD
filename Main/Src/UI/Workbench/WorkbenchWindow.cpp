@@ -305,13 +305,12 @@ void WorkbenchWindow::configureServices(const UiServices& services)
             m_fileDropHandler->setCurrentWorkbenchId(initialWorkbenchId);
         }
         // 连接信号以便在工作台切换时更新
-        connect(m_stateCenter, &UiStateCenter::currentWorkbenchChanged,
-            this, [this](const QString& workbenchId) {
-                if (m_fileDropHandler)
-                {
-                    m_fileDropHandler->setCurrentWorkbenchId(workbenchId);
-                }
-            });
+        connect(m_stateCenter, &UiStateCenter::currentWorkbenchChanged, this, [this](const QString& workbenchId) {
+            if (m_fileDropHandler)
+            {
+                m_fileDropHandler->setCurrentWorkbenchId(workbenchId);
+            }
+        });
     }
 
     if (m_actionManager)
@@ -425,8 +424,6 @@ void WorkbenchWindow::initializeWorkbenchShell()
     updateWindowTitle();
     refreshStatusText();
 }
-
-
 
 QWidget* WorkbenchWindow::createInitialCentralWidget()
 {
@@ -663,7 +660,6 @@ void WorkbenchWindow::dropEvent(QDropEvent* event)
 
 void WorkbenchWindow::updatePositionLabel(double x, double y)
 
-
 {
     m_lastMouseX = x;
     m_lastMouseY = y;
@@ -699,7 +695,6 @@ void WorkbenchWindow::refreshPositionLabel()
 // 属于第二套并行实现，已删除。需要读写最近文件请走 m_uiServices.recentFileService。
 
 /// 注册停靠面板
-
 
 /// @param title 面板标题
 /// @param widget 面板内容部件
@@ -908,7 +903,6 @@ void WorkbenchWindow::refreshThemeMenuChecks(const QString& themeId)
         m_menuManager->refreshConfiguredMenuState();
     }
 }
-
 
 /// 触发主题切换
 /// @param themeId 主题 ID（如 "theme.dark"、"theme.light"、"theme.system"）
@@ -1122,9 +1116,6 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     // buildStatusBar 内部先 clearStatusBarSlots 再重建，重入安全。
     // 同样必须放在 attachToWindow 之前：工作台的 mountStatusBar 要往这个容器里挂。
     m_layoutManager->buildStatusBar();
-
-
-
 
     // 7: 附加新工作台到窗口（注册面板、工具栏、中央控件）
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: attaching workbench to window");

@@ -3,7 +3,8 @@
 #include "Log/SyLogger.h"
 
 AiImportReader::AiImportReader()
-    : ImportReaderBase(Fio::FileFormat::AI, { QStringLiteral("ai") }, QStringLiteral("Adobe Illustrator"), ImportDimension::Dim2D)
+    : ImportReaderBase(
+          Fio::FileFormat::AI, { QStringLiteral("ai") }, QStringLiteral("Adobe Illustrator"), ImportDimension::Dim2D)
 {
 }
 
@@ -30,7 +31,6 @@ void AiImportReader::decorateError(QString& msg, const ImportContext& /*context*
 
 ImportResult AiImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
 {
-
     // 走 FileIO 的 AiParser：内部将 PDF/PostScript 基 AI 转换为 SVG 后解析为中立 IR
     return readViaIR(context, Fio::FileFormat::AI, outEntities, true);
 }

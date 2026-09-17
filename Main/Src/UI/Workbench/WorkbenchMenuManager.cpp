@@ -35,7 +35,7 @@
 #include "UI/Widgets/UiSceneTreePanel.h"
 #include "UI/Widgets/UiPropertiesPanel.h"
 #if BUILD_UI3D
-#include "UI3D/Render3D/RenderWidget3D.h"
+    #include "UI3D/Render3D/RenderWidget3D.h"
 #endif
 #include "ClientConfig/UiBuiltinPanels.h"
 #include "ClientConfig/UiClientConfigBase.h"
@@ -87,7 +87,6 @@ namespace
         }
         return false;
     }
-
 }  // namespace
 
 // 配置驱动菜单的命令分发器：文件作用域定义，便于 WorkbenchMenuManager 以成员方式持有，
@@ -130,7 +129,6 @@ struct MenuDispatcher final : public IUiCommandDispatcher
         }
         return workbench && workbench->isCommandRegistered(commandId);
     }
-
 
     void dispatch(const QString& commandId, const QVariantMap& params) override
     {
@@ -232,8 +230,6 @@ void WorkbenchMenuManager::setWorkbench(UiWorkbench* workbench)
     m_workbench = workbench;
 }
 
-
-
 void WorkbenchMenuManager::rebuildAllMenus()
 {
     // Clear old menus and shortcuts
@@ -267,7 +263,6 @@ void WorkbenchMenuManager::rebuildAllMenus()
     // 否则语言/网格/吸附等勾选项在每次工作台切换、语言切换后都是空的。
     refreshConfiguredMenuState();
 
-
     // 菜单重建产出的是全新 QAction，enabled 默认为 true。
     // 必须请工作台重推一次命令 UI 快照，否则「无选中却能点删除/对齐」会在每次
     // 工作台切换、语言切换、客户配置重载后复现。
@@ -280,16 +275,17 @@ void WorkbenchMenuManager::rebuildAllMenus()
     // 必须排到事件循环下一轮——Qt 是延迟把 QMenuBar 同步到 NSMenu 的，同步调用会扫到空菜单。
     // 也必须每次重建都做：上面刚把整棵菜单树销毁重建，NSMenu 是全新的，启动时清一次不够。
     // 非 macOS 平台该函数是头文件里的内联空实现，无需在调用点做条件编译。
-    QTimer::singleShot(0, m_window, [] { cleanupMacEditMenuSystemItems(); });
+    QTimer::singleShot(0, m_window, [] {
+        cleanupMacEditMenuSystemItems();
+    });
 }
-
 
 bool WorkbenchMenuManager::isWindowLevelCommand(const QString& commandId)
 {
     // 唯一真相：MenuDispatcher 短路处理的命令集合。改这里即同时改变
     // 「按钮是否可点」（isCommandRegistered）与「契约测试是否放行」两处行为。
-    return MenuDispatcher::isWorkbenchSwitchCommand(commandId) || MenuDispatcher::isThemeCommand(commandId)
-        || MenuDispatcher::isLanguageCommand(commandId);
+    return MenuDispatcher::isWorkbenchSwitchCommand(commandId) || MenuDispatcher::isThemeCommand(commandId) ||
+        MenuDispatcher::isLanguageCommand(commandId);
 }
 
 IUiCommandDispatcher* WorkbenchMenuManager::commandDispatcher()
@@ -310,7 +306,6 @@ IShortcutSettingsModel* WorkbenchMenuManager::shortcutSettingsModel() const
     return m_shortcutSettingsModel.get();
 }
 
-
 void WorkbenchMenuManager::registerRecentFilesSection()
 {
     // 菜单里最多列多少条最近文件。
@@ -318,60 +313,58 @@ void WorkbenchMenuManager::registerRecentFilesSection()
     // 不截断，所以菜单侧必须自己卡一次，否则库里攒了几百条会撑出一个滚动到屏幕外的菜单。
     constexpr int kMaxRecentMenuItems = 10;
 
-    UiContextMenuService::instance().registerDynamicSection(
-        QStringLiteral("file.recent"), [this](QMenu* menu) {
-            if (!menu)
+    UiContextMenuService::instance().registerDynamicSection(QStringLiteral("file.recent"), [this](QMenu* menu) {
+        if (!menu)
+        {
+            return;
+        }
+
+        IRecentFileService* recentFiles = m_uiServices ? m_uiServices->recentFileService : nullptr;
+        const QStringList files = recentFiles ? recentFiles->loadRecentFiles() : QStringList{};
+
+        // 服务缺失与列表为空给同一种反馈：一个禁用占位项。
+        // 不能一条都不加 —— 空子菜单在 Qt 里点开是个空白小方块，看起来像菜单坏了。
+        if (files.isEmpty())
+        {
+            QAction* placeholder = menu->addAction(tr("No Recent Files"));
+            placeholder->setEnabled(false);
+            return;
+        }
+
+        IUiCommandDispatcher* dispatcher = commandDispatcher();
+        int index = 0;
+        for (const QString& filePath : files)
+        {
+            if (index >= kMaxRecentMenuItems)
             {
-                return;
+                break;
             }
+            ++index;
 
-            IRecentFileService* recentFiles = m_uiServices ? m_uiServices->recentFileService : nullptr;
-            const QStringList files = recentFiles ? recentFiles->loadRecentFiles() : QStringList{};
+            // 只显示文件名，完整路径进 tooltip/statusTip：最近文件路径动辄很长，
+            // 直接当菜单文本会把 File 菜单撑到半屏宽。
+            QAction* action = menu->addAction(QStringLiteral("&%1  %2").arg(index).arg(QFileInfo(filePath).fileName()));
+            action->setToolTip(filePath);
+            action->setStatusTip(filePath);
+            // 刻意不设 property("commandId")：启用态刷新会按 commandId 去当前工作台
+            // 命令目录反查规则，而 file.open_recent 只在 2D 目录里；3D 下会变成每次
+            // 刷新都告警一遍。这批条目本身恒可用（目录里 File_OpenRecent 也是 Always），
+            // 无需纳入启用态联动。
 
-            // 服务缺失与列表为空给同一种反馈：一个禁用占位项。
-            // 不能一条都不加 —— 空子菜单在 Qt 里点开是个空白小方块，看起来像菜单坏了。
-            if (files.isEmpty())
-            {
-                QAction* placeholder = menu->addAction(tr("No Recent Files"));
-                placeholder->setEnabled(false);
-                return;
-            }
-
-            IUiCommandDispatcher* dispatcher = commandDispatcher();
-            int index = 0;
-            for (const QString& filePath : files)
-            {
-                if (index >= kMaxRecentMenuItems)
+            // 路径经 dispatch 的 QVariantMap 透传：file.open_recent → OperationId::File_OpenRecent
+            // 是 ParamLambdaOperation，读的正是 params["filePath"]。
+            // 接收者用 action 而不是 this：菜单重填会删掉这批 action，连接随之断开。
+            QObject::connect(action, &QAction::triggered, action, [dispatcher, filePath]() {
+                if (!dispatcher)
                 {
-                    break;
+                    SY_WARN("[WorkbenchMenuManager] Recent file triggered without dispatcher");
+                    return;
                 }
-                ++index;
-
-                // 只显示文件名，完整路径进 tooltip/statusTip：最近文件路径动辄很长，
-                // 直接当菜单文本会把 File 菜单撑到半屏宽。
-                QAction* action = menu->addAction(
-                    QStringLiteral("&%1  %2").arg(index).arg(QFileInfo(filePath).fileName()));
-                action->setToolTip(filePath);
-                action->setStatusTip(filePath);
-                // 刻意不设 property("commandId")：启用态刷新会按 commandId 去当前工作台
-                // 命令目录反查规则，而 file.open_recent 只在 2D 目录里；3D 下会变成每次
-                // 刷新都告警一遍。这批条目本身恒可用（目录里 File_OpenRecent 也是 Always），
-                // 无需纳入启用态联动。
-
-                // 路径经 dispatch 的 QVariantMap 透传：file.open_recent → OperationId::File_OpenRecent
-                // 是 ParamLambdaOperation，读的正是 params["filePath"]。
-                // 接收者用 action 而不是 this：菜单重填会删掉这批 action，连接随之断开。
-                QObject::connect(action, &QAction::triggered, action, [dispatcher, filePath]() {
-                    if (!dispatcher)
-                    {
-                        SY_WARN("[WorkbenchMenuManager] Recent file triggered without dispatcher");
-                        return;
-                    }
-                    dispatcher->dispatch(QStringLiteral("file.open_recent"),
-                        QVariantMap{ { QStringLiteral("filePath"), filePath } });
-                });
-            }
-        });
+                dispatcher->dispatch(
+                    QStringLiteral("file.open_recent"), QVariantMap{ { QStringLiteral("filePath"), filePath } });
+            });
+        }
+    });
 }
 
 void WorkbenchMenuManager::rebuildMenusFromConfig()
@@ -398,7 +391,6 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
             qPrintable(clientId));
         return;
     }
-
 
     // 命令分发器随 WorkbenchMenuManager 生命周期持有（成员 m_dispatcher）：
     // UiLayoutBuilder 会把该指针存入 QAction 触发回调并长期解引用，必须保证指针在菜单存在期间有效。
@@ -513,8 +505,6 @@ void WorkbenchMenuManager::bindShortcuts()
     }
 }
 
-
-
 std::vector<MenuDef> WorkbenchMenuManager::filterMenusForWorkbench(const std::vector<MenuDef>& menus,
 
     const QString& workbenchId,
@@ -526,8 +516,7 @@ std::vector<MenuDef> WorkbenchMenuManager::filterMenusForWorkbench(const std::ve
     // 这会让 3D 菜单看起来像一堆断裂的空行。这里在数据层收敛，构建层无需关心。
     const auto normalizeSeparators = [](std::vector<std::variant<MenuActionDef, SubMenuDef, MenuItemType>>& items) {
         const auto isSeparator = [](const std::variant<MenuActionDef, SubMenuDef, MenuItemType>& item) {
-            return std::holds_alternative<MenuItemType>(item) &&
-                std::get<MenuItemType>(item) == MenuItemType::Separator;
+            return std::holds_alternative<MenuItemType>(item) && std::get<MenuItemType>(item) == MenuItemType::Separator;
         };
         std::vector<std::variant<MenuActionDef, SubMenuDef, MenuItemType>> normalized;
 
@@ -548,7 +537,6 @@ std::vector<MenuDef> WorkbenchMenuManager::filterMenusForWorkbench(const std::ve
     };
 
     const auto visibilityAllowed = [&](const QString& scope) {
-
         if (scope.isEmpty())
         {
             return true;
@@ -622,7 +610,6 @@ std::vector<MenuDef> WorkbenchMenuManager::filterMenusForWorkbench(const std::ve
         // 静态条目一个都没有）。裁掉的话 UiLayoutBuilder 根本看不到它，动态段永远填不进去。
         return !outSub.items.empty() || !outSub.dynamicSections.isEmpty();
     };
-
 
     std::vector<MenuDef> filteredMenus;
     filteredMenus.reserve(menus.size());
@@ -699,8 +686,7 @@ void WorkbenchMenuManager::bindConfiguredMenuState()
     refreshConfiguredMenuState();
 }
 
-void WorkbenchMenuManager::forEachCommandAction(
-    const std::function<void(QAction*, const QString&)>& visitor) const
+void WorkbenchMenuManager::forEachCommandAction(const std::function<void(QAction*, const QString&)>& visitor) const
 {
     if (!visitor)
     {
@@ -746,7 +732,6 @@ void WorkbenchMenuManager::forEachCommandAction(
         }
     };
 
-
     // 菜单一律挂在 QMenuBar 上（JSON 配置驱动构建），遍历菜单栏即可覆盖全部菜单项
     QMenuBar* menuBar = m_window ? m_window->menuBar() : nullptr;
     if (menuBar)
@@ -759,7 +744,6 @@ void WorkbenchMenuManager::forEachCommandAction(
             }
         }
     }
-
 
     // 工具栏也必须遍历。工具栏动作与菜单项来自同一份命令目录、同一份启用规则，
     // 只是挂载位置不同；此前这里只走菜单栏，导致"菜单灰了工具栏还能点"的漂移，
@@ -808,7 +792,6 @@ void WorkbenchMenuManager::forEachCommandAction(
     }
 }
 
-
 void WorkbenchMenuManager::refreshCommandStates(const CommandUiSnapshot& snapshot)
 {
     // 规则求值与"跳过哪些项"的判定统一由命令中枢的静态应用器负责，
@@ -826,8 +809,6 @@ void WorkbenchMenuManager::refreshCommandStates3D(const CommandUiSnapshot3D& sna
     });
 }
 #endif
-
-
 
 void WorkbenchMenuManager::refreshConfiguredMenuState()
 {

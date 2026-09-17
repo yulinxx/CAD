@@ -73,8 +73,7 @@ namespace
         bool writePattern(uint64_t blockId, uint8_t seed)
         {
             std::vector<uint8_t> payload(static_cast<size_t>(kBlockBytes), seed);
-            return m_store.writeBlock(blockId, 0, static_cast<uint32_t>(kBlockBytes),
-                                      payload.data());
+            return m_store.writeBlock(blockId, 0, static_cast<uint32_t>(kBlockBytes), payload.data());
         }
 
         Render::RT::RuntimeHandle m_runtime{ Render::RT::RuntimeHandle::Invalid };
@@ -108,8 +107,7 @@ namespace
             blocks.push_back(block);
         }
 
-        ASSERT_EQ(m_store.storeCount(), 2u)
-            << "主仓 4KB 上限用尽后必须开第二个仓，否则总容量卡在单仓上限";
+        ASSERT_EQ(m_store.storeCount(), 2u) << "主仓 4KB 上限用尽后必须开第二个仓，否则总容量卡在单仓上限";
 
         Render::RT::GeometryBlock sharded{};
         ASSERT_TRUE(m_store.allocBlock(kBlockBytes, sharded));
@@ -158,8 +156,7 @@ namespace
         // 释放分片块（在第二仓里）——它必须把该仓的 usedBytes 降下来
         m_store.freeBlock(sharded.id);
         const uint64_t usedAfter = m_store.totalStats().usedBytes;
-        EXPECT_LT(usedAfter, usedBefore)
-            << "释放分片块没有反映到聚合统计上，说明释放时路由到了错误的仓";
+        EXPECT_LT(usedAfter, usedBefore) << "释放分片块没有反映到聚合统计上，说明释放时路由到了错误的仓";
     }
 
     /// 统计是各仓之和：分片后总容量必须超过单仓上限

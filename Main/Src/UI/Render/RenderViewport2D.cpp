@@ -65,10 +65,9 @@ RenderViewport2D::RenderViewport2D(QWidget* parent)
     // 选中态几何被改动（拖动/对齐/镜像/缩放）：只需要按当前场景重建轮廓与手柄，
     // 不走 syncSelectionDetails —— 那条路还会再发视口的 selectionChanged，
     // 把属性面板重建与场景树的选择重设一起带上，拖动时每步都做一遍。
-    QObject::connect(
-        m_refreshCoordinator.get(), &SceneRefreshCoordinator::selectionOutlineInvalidated, this, [this]() {
-            syncSelectionToolState();
-        });
+    QObject::connect(m_refreshCoordinator.get(), &SceneRefreshCoordinator::selectionOutlineInvalidated, this, [this]() {
+        syncSelectionToolState();
+    });
 
     // 初始相机状态：台面中心 (600,400)，可见范围 (0,0)~(1200,800)
     m_camera.panOffset = QPointF(-600.0f, -400.0f);
@@ -217,7 +216,7 @@ QPointF RenderViewport2D::applySnap(const QPointF& worldPos) const
     const double dy = worldPos.y() - m_lastSnapMousePos.y();
     const double distSq = dx * dx + dy * dy;
     const double thresholdWorld = kFastMoveSnapThresholdPx * pixelToWorldScale;
-    
+
     // 如果移动距离超过阈值，认为在快速移动，跳过捕捉
     // 这可以大大减少鼠标快速移动时的性能开销
     if (distSq > thresholdWorld * thresholdWorld)
@@ -225,12 +224,11 @@ QPointF RenderViewport2D::applySnap(const QPointF& worldPos) const
         // 更新位置记录，但不进行捕捉
         m_lastSnapMousePos = worldPos;
         m_lastSnapTime = std::chrono::steady_clock::now();
-        
+
         // 隐藏捕捉指示器
         if (m_renderCoordinator)
         {
-            m_renderCoordinator->setSnapIndicator(
-                Ut::Vec2d(worldPos.x(), worldPos.y()), false, SnapEngine::Snap_None);
+            m_renderCoordinator->setSnapIndicator(Ut::Vec2d(worldPos.x(), worldPos.y()), false, SnapEngine::Snap_None);
         }
 
         // 未命中捕捉：恢复光标
@@ -983,7 +981,7 @@ void RenderViewport2D::applyCameraToWidget()
     {
         constexpr float kRebuildRatio = 1.5f;
         const bool crossed = m_outlineScaleAtBuild <= 0.0f || scale > m_outlineScaleAtBuild * kRebuildRatio ||
-                             scale * kRebuildRatio < m_outlineScaleAtBuild;
+            scale * kRebuildRatio < m_outlineScaleAtBuild;
         if (crossed)
         {
             m_outlineScaleAtBuild = scale;
@@ -998,9 +996,8 @@ void RenderViewport2D::applyCameraToWidget()
     if (scale > 0.0f)
     {
         constexpr float kCurveLodRatio = 2.0f;
-        const bool curveCrossed = m_curveLodScaleAtBuild <= 0.0f ||
-                                  scale > m_curveLodScaleAtBuild * kCurveLodRatio ||
-                                  scale * kCurveLodRatio < m_curveLodScaleAtBuild;
+        const bool curveCrossed = m_curveLodScaleAtBuild <= 0.0f || scale > m_curveLodScaleAtBuild * kCurveLodRatio ||
+            scale * kCurveLodRatio < m_curveLodScaleAtBuild;
         if (curveCrossed)
         {
             m_curveLodScaleAtBuild = scale;
@@ -1013,7 +1010,6 @@ void RenderViewport2D::applyCameraToWidget()
         }
     }
 }
-
 
 // ==================== 刷新策略委托（→ SceneRefreshCoordinator） ====================
 

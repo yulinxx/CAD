@@ -69,7 +69,6 @@ namespace
         return QAction::NoRole;
     }
 
-
     Qt::DockWidgetArea toDockArea(DockPosition position)
     {
         switch (position)
@@ -217,7 +216,6 @@ void UiLayoutBuilder::bindAction(QAction* action,
     // menuRole 对非菜单动作无效，统一设置不会有副作用。
     action->setMenuRole(menuRoleForActionId(action->objectName()));
 
-
     if (m_dispatcher && m_dispatcher->isCommandRegistered(commandId))
     {
         // 捕获 dispatcher 而不是 this：本 builder 每次 rebuildMenusFromConfig 都被整体
@@ -225,13 +223,12 @@ void UiLayoutBuilder::bindAction(QAction* action,
         // QAction 挂在 menubar 子树上、活得更久。捕获 this 的话，切一次工作台之后
         // 触发这些 action 就会解引用已析构的 builder。
         // dispatcher 由 WorkbenchMenuManager 持有且只创建一次，寿命足够。
-        QObject::connect(action, &QAction::triggered,
-            [dispatcher = m_dispatcher, action, commandId](bool) {
-                SY_DEBUGF("[Menu] trigger text='%s' command='%s'",
-                    action->text().toUtf8().constData(),
-                    commandId.toUtf8().constData());
-                dispatcher->dispatch(commandId);
-            });
+        QObject::connect(action, &QAction::triggered, [dispatcher = m_dispatcher, action, commandId](bool) {
+            SY_DEBUGF("[Menu] trigger text='%s' command='%s'",
+                action->text().toUtf8().constData(),
+                commandId.toUtf8().constData());
+            dispatcher->dispatch(commandId);
+        });
     }
 
     else
@@ -305,7 +302,8 @@ void UiLayoutBuilder::buildMenus(const std::vector<MenuDef>& menus)
         m_window->menuBar() ? static_cast<int>(m_window->menuBar()->actions().size()) : 0);
 }
 
-void UiLayoutBuilder::buildMenuItem(QMenu* parent, const std::variant<MenuActionDef, SubMenuDef, MenuItemType>& item, QActionGroup* exclusiveGroup)
+void UiLayoutBuilder::buildMenuItem(
+    QMenu* parent, const std::variant<MenuActionDef, SubMenuDef, MenuItemType>& item, QActionGroup* exclusiveGroup)
 {
     if (!parent)
     {
@@ -364,10 +362,10 @@ void UiLayoutBuilder::buildMenuItem(QMenu* parent, const std::variant<MenuAction
             exclusiveGroup->setExclusive(true);
         }
 
-for (const auto& subItem : sub.items)
-            {
-                buildMenuItem(subMenu, subItem, exclusiveGroup);
-            }
+        for (const auto& subItem : sub.items)
+        {
+            buildMenuItem(subMenu, subItem, exclusiveGroup);
+        }
 
         // 声明了 dynamicSections 的子菜单：条目按运行时数据生成（如 File ▸ Recent Files）。
         //
@@ -435,11 +433,9 @@ for (const auto& subItem : sub.items)
         exclusiveGroup->addAction(action);
     }
     // 配置里写的键是默认值；用户覆盖（如果有）在此叠加，台账没挂上时就等于配置值。
-    const QKeySequence configuredKey =
-        actionDef.shortcut.isEmpty() ? QKeySequence() : QKeySequence(actionDef.shortcut);
-    const QKeySequence keySequence = m_shortcutRegistry
-        ? m_shortcutRegistry->effectiveKey(actionDef.commandId, configuredKey)
-        : configuredKey;
+    const QKeySequence configuredKey = actionDef.shortcut.isEmpty() ? QKeySequence() : QKeySequence(actionDef.shortcut);
+    const QKeySequence keySequence =
+        m_shortcutRegistry ? m_shortcutRegistry->effectiveKey(actionDef.commandId, configuredKey) : configuredKey;
     if (!keySequence.isEmpty())
     {
         action->setShortcut(keySequence);
@@ -569,10 +565,10 @@ void UiLayoutBuilder::buildDocks(const std::vector<DockDef>& docks)
         m_window->addDockWidget(toDockArea(dock.position), dockWidget);
         m_builtDocks.push_back(dockWidget);
 
-        const char* dockPos = dock.position == DockPosition::Left     ? "left"
-            : dock.position == DockPosition::Top                      ? "top"
-            : dock.position == DockPosition::Bottom                   ? "bottom"
-                                                                      : "right";
+        const char* dockPos = dock.position == DockPosition::Left ? "left"
+            : dock.position == DockPosition::Top                  ? "top"
+            : dock.position == DockPosition::Bottom               ? "bottom"
+                                                                  : "right";
         SY_DEBUGF("[UiLayoutBuilder] Dock built id='%s' title='%s' widget='%s' position='%s' visible=%d",
             qPrintable(dock.id),
             qPrintable(actionLabel(dock.title, dock.id)),
@@ -627,11 +623,10 @@ void UiLayoutBuilder::buildShortcuts(const std::vector<ShortcutDef>& shortcuts)
         auto* shortcut = new QShortcut(keySequence, m_window);
         shortcut->setContext(Qt::ApplicationShortcut);
         // 同 bindAction：捕获 dispatcher 而不是 this，本 builder 会被整体替换
-        QObject::connect(shortcut, &QShortcut::activated,
-            [dispatcher = m_dispatcher, commandId = sc.commandId]() {
-                SY_DEBUGF("[Menu] shortcut command='%s'", qPrintable(commandId));
-                dispatcher->dispatch(commandId);
-            });
+        QObject::connect(shortcut, &QShortcut::activated, [dispatcher = m_dispatcher, commandId = sc.commandId]() {
+            SY_DEBUGF("[Menu] shortcut command='%s'", qPrintable(commandId));
+            dispatcher->dispatch(commandId);
+        });
         m_builtShortcuts.push_back(shortcut);
         if (m_shortcutRegistry)
         {

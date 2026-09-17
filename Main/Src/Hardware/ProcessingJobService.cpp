@@ -7,11 +7,11 @@
 
 #ifdef ENABLE_HARDWARE
 
-#include "Hardware/Device/IGalvoCard.h"
-#include "Hardware/Device/IMotionCard.h"
-#include "Hardware/Device/MotionPlan.h"
+    #include "Hardware/Device/IGalvoCard.h"
+    #include "Hardware/Device/IMotionCard.h"
+    #include "Hardware/Device/MotionPlan.h"
 
-#include "MotionPlanCompiler.h"
+    #include "MotionPlanCompiler.h"
 
 namespace
 {
@@ -47,19 +47,40 @@ namespace
             return r;
         }
 
-        bool valid() const { return motion != nullptr || galvo != nullptr; }
+        bool valid() const
+        {
+            return motion != nullptr || galvo != nullptr;
+        }
 
-        const char* kindName() const { return galvo ? "galvo" : "motion"; }
+        const char* kindName() const
+        {
+            return galvo ? "galvo" : "motion";
+        }
 
         Hw::HwResult load(const Hw::MotionPlanView& view) const
         {
             return galvo ? galvo->loadPlan(view) : motion->loadPlan(view);
         }
 
-        Hw::HwResult start() const { return galvo ? galvo->startMark() : motion->startPlan(); }
-        Hw::HwResult pause() const { return galvo ? galvo->pauseMark() : motion->pausePlan(); }
-        Hw::HwResult resume() const { return galvo ? galvo->resumeMark() : motion->resumePlan(); }
-        Hw::HwResult abort() const { return galvo ? galvo->abortMark() : motion->abortPlan(); }
+        Hw::HwResult start() const
+        {
+            return galvo ? galvo->startMark() : motion->startPlan();
+        }
+
+        Hw::HwResult pause() const
+        {
+            return galvo ? galvo->pauseMark() : motion->pausePlan();
+        }
+
+        Hw::HwResult resume() const
+        {
+            return galvo ? galvo->resumeMark() : motion->resumePlan();
+        }
+
+        Hw::HwResult abort() const
+        {
+            return galvo ? galvo->abortMark() : motion->abortPlan();
+        }
 
         Hw::PlanProgress progress() const
         {
@@ -75,7 +96,7 @@ namespace
             .arg(QString::fromUtf8(Hw::hwErrorName(result.error)))
             .arg(QString::fromUtf8(result.message));
     }
-}
+}  // namespace
 
 struct ProcessingJobService::Impl
 {
@@ -102,7 +123,6 @@ struct ProcessingJobService::Impl
     size_t lastIndex = 0;
     double lastFraction = 0.0;
 
-
     /// 开工前的统一门控。通过返回 true，否则 errorOut 已填好可展示原因。
     bool checkGate(QString& errorOut) const
     {
@@ -125,8 +145,8 @@ struct ProcessingJobService::Impl
         {
             const QStringList violations = host->safetyViolations();
             errorOut = violations.isEmpty()
-                           ? QStringLiteral("Safety conditions not met, processing prohibited")  // 安全条件不满足，禁止开始加工
-                           : QStringLiteral("Safety conditions not met, processing prohibited: %1").arg(violations.first());
+                ? QStringLiteral("Safety conditions not met, processing prohibited")  // 安全条件不满足，禁止开始加工
+                : QStringLiteral("Safety conditions not met, processing prohibited: %1").arg(violations.first());
             return false;
         }
         return true;
@@ -143,8 +163,7 @@ ProcessingJobService::ProcessingJobService(DeviceHost* host, QObject* parent)
 
     if (host)
     {
-        connect(host, &DeviceHost::safetyVerdictChanged,
-            this, &ProcessingJobService::onSafetyVerdictChanged);
+        connect(host, &DeviceHost::safetyVerdictChanged, this, &ProcessingJobService::onSafetyVerdictChanged);
     }
     else
     {
@@ -158,8 +177,7 @@ ProcessingJobService::~ProcessingJobService()
     {
         // 析构时还在加工：不能就这么走。设备侧的缓冲还在跑，
         // 进程退出后没人再收进度，机器会把整份计划走完 —— 无人看管的出光。
-        SY_WARNF("[ProcessingJob] Destroyed while job '%s' was active, aborting it",
-            m_impl->jobId.toUtf8().constData());
+        SY_WARNF("[ProcessingJob] Destroyed while job '%s' was active, aborting it", m_impl->jobId.toUtf8().constData());
         const PlanRunner runner = PlanRunner::resolve(m_impl->host);
         if (runner.valid())
         {
@@ -169,8 +187,8 @@ ProcessingJobService::~ProcessingJobService()
     m_impl->pollTimer.stop();
 }
 
-bool ProcessingJobService::startJob(const Eg::SceneManager& scene, const LayerManager* layers,
-    const ToolpathJobSpec& spec, QString& errorOut)
+bool ProcessingJobService::startJob(
+    const Eg::SceneManager& scene, const LayerManager* layers, const ToolpathJobSpec& spec, QString& errorOut)
 {
     // 先门控再编译：十万条指令的编译要几百毫秒，
     // 门没关就先编译等于让操作员盯着卡顿的界面等一条「门没关」的提示
@@ -191,8 +209,7 @@ bool ProcessingJobService::startJob(const Eg::SceneManager& scene, const LayerMa
     return startPlan(m_impl->builder.view(), spec.jobId, errorOut);
 }
 
-bool ProcessingJobService::startPlan(const Hw::MotionPlanView& view, const QString& jobId,
-    QString& errorOut)
+bool ProcessingJobService::startPlan(const Hw::MotionPlanView& view, const QString& jobId, QString& errorOut)
 {
     if (!m_impl->checkGate(errorOut))
     {
@@ -202,7 +219,8 @@ bool ProcessingJobService::startPlan(const Hw::MotionPlanView& view, const QStri
 
     if (!view.valid())
     {
-        errorOut = QStringLiteral("Processing plan is empty, no executable commands");  // 加工计划为空，没有任何可执行指令
+        errorOut =
+            QStringLiteral("Processing plan is empty, no executable commands");  // 加工计划为空，没有任何可执行指令
         SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
         return false;
     }
@@ -241,14 +259,17 @@ bool ProcessingJobService::startPlan(const Hw::MotionPlanView& view, const QStri
     m_impl->lastFraction = 0.0;
     m_impl->pollTimer.start();
 
-
     SY_DEBUGF("[ProcessingJob] Started '%s' on %s: %lld command(s), bounds [%.3f %.3f]-[%.3f %.3f]",
-        m_impl->jobId.toUtf8().constData(), runner.kindName(), static_cast<long long>(view.commandCount),
-        view.header.boundsMinX, view.header.boundsMinY,
-        view.header.boundsMaxX, view.header.boundsMaxY);
+        m_impl->jobId.toUtf8().constData(),
+        runner.kindName(),
+        static_cast<long long>(view.commandCount),
+        view.header.boundsMinX,
+        view.header.boundsMinY,
+        view.header.boundsMaxX,
+        view.header.boundsMaxY);
 
-    emit jobStateChanged(static_cast<int>(Hw::PlanState::Running),
-        QString::fromUtf8(Hw::planStateName(Hw::PlanState::Running)));
+    emit jobStateChanged(
+        static_cast<int>(Hw::PlanState::Running), QString::fromUtf8(Hw::planStateName(Hw::PlanState::Running)));
     emit jobStarted(m_impl->jobId, static_cast<int>(view.commandCount));
     return true;
 }
@@ -295,9 +316,8 @@ bool ProcessingJobService::resumeJob(QString& errorOut)
     if (!m_impl->host->canStartProcessing())
     {
         const QStringList violations = m_impl->host->safetyViolations();
-        errorOut = violations.isEmpty()
-                       ? QStringLiteral("安全条件不满足，禁止恢复加工")
-                       : QStringLiteral("安全条件不满足，禁止恢复加工：%1").arg(violations.first());
+        errorOut = violations.isEmpty() ? QStringLiteral("安全条件不满足，禁止恢复加工")
+                                        : QStringLiteral("安全条件不满足，禁止恢复加工：%1").arg(violations.first());
         SY_WARNF("[ProcessingJob] resumeJob refused: %s", errorOut.toUtf8().constData());
         return false;
     }
@@ -396,8 +416,7 @@ void ProcessingJobService::pollProgress()
     const PlanRunner runner = PlanRunner::resolve(m_impl->host);
     if (!runner.valid())
     {
-        SY_ERRORF("[ProcessingJob] Device disappeared while job '%s' was active",
-            m_impl->jobId.toUtf8().constData());
+        SY_ERRORF("[ProcessingJob] Device disappeared while job '%s' was active", m_impl->jobId.toUtf8().constData());
         m_impl->active = false;
         m_impl->pollTimer.stop();
         emit jobFinished(false, QStringLiteral("设备在加工过程中断开"));
@@ -409,16 +428,14 @@ void ProcessingJobService::pollProgress()
     if (p.state != m_impl->lastState)
     {
         m_impl->lastState = p.state;
-        emit jobStateChanged(static_cast<int>(p.state),
-            QString::fromUtf8(Hw::planStateName(p.state)));
+        emit jobStateChanged(static_cast<int>(p.state), QString::fromUtf8(Hw::planStateName(p.state)));
     }
 
     if (p.commandIndex != m_impl->lastIndex || p.fraction != m_impl->lastFraction)
     {
         m_impl->lastIndex = p.commandIndex;
         m_impl->lastFraction = p.fraction;
-        emit jobProgress(p.fraction, static_cast<int>(p.commandIndex),
-            static_cast<int>(p.commandCount));
+        emit jobProgress(p.fraction, static_cast<int>(p.commandIndex), static_cast<int>(p.commandCount));
     }
 
     switch (p.state)
@@ -439,10 +456,8 @@ void ProcessingJobService::pollProgress()
     case Hw::PlanState::Error:
         m_impl->active = false;
         m_impl->pollTimer.stop();
-        SY_ERRORF("[ProcessingJob] Job '%s' failed: %s",
-            m_impl->jobId.toUtf8().constData(), Hw::hwErrorName(p.error));
-        emit jobFinished(false, QStringLiteral("加工出错：[%1]")
-                                    .arg(QString::fromUtf8(Hw::hwErrorName(p.error))));
+        SY_ERRORF("[ProcessingJob] Job '%s' failed: %s", m_impl->jobId.toUtf8().constData(), Hw::hwErrorName(p.error));
+        emit jobFinished(false, QStringLiteral("加工出错：[%1]").arg(QString::fromUtf8(Hw::hwErrorName(p.error))));
         break;
 
     default:
@@ -450,9 +465,8 @@ void ProcessingJobService::pollProgress()
     }
 }
 
-void ProcessingJobService::onSafetyVerdictChanged(bool canStartProcessing,
-    const QString& firstViolation,
-    const QString& firstViolationPoint)
+void ProcessingJobService::onSafetyVerdictChanged(
+    bool canStartProcessing, const QString& firstViolation, const QString& firstViolationPoint)
 {
     Q_UNUSED(firstViolation);
     if (canStartProcessing || !m_impl->active)
@@ -469,11 +483,11 @@ void ProcessingJobService::onSafetyVerdictChanged(bool canStartProcessing,
         return;
     }
     SY_ERRORF("[ProcessingJob] Safety violated during job '%s' (point=%s), pausing",
-        m_impl->jobId.toUtf8().constData(), firstViolationPoint.toUtf8().constData());
+        m_impl->jobId.toUtf8().constData(),
+        firstViolationPoint.toUtf8().constData());
     runner.pause();
     pollProgress();
 }
-
 
 #else  // !ENABLE_HARDWARE
 
@@ -495,9 +509,10 @@ namespace
 {
     QString noHardwareReason()
     {
-        return QStringLiteral("Hardware module not enabled (BUILD_HARDWARE=OFF), cannot process");  // 本次构建未启用硬件模块（BUILD_HARDWARE=OFF），无法加工
+        return QStringLiteral(
+            "Hardware module not enabled (BUILD_HARDWARE=OFF), cannot process");  // 本次构建未启用硬件模块（BUILD_HARDWARE=OFF），无法加工
     }
-}
+}  // namespace
 
 ProcessingJobService::ProcessingJobService(DeviceHost* host, QObject* parent)
     : QObject(parent)
@@ -508,8 +523,8 @@ ProcessingJobService::ProcessingJobService(DeviceHost* host, QObject* parent)
 
 ProcessingJobService::~ProcessingJobService() = default;
 
-bool ProcessingJobService::startJob(const Eg::SceneManager& scene, const LayerManager* layers,
-    const ToolpathJobSpec& spec, QString& errorOut)
+bool ProcessingJobService::startJob(
+    const Eg::SceneManager& scene, const LayerManager* layers, const ToolpathJobSpec& spec, QString& errorOut)
 {
     Q_UNUSED(scene);
     Q_UNUSED(layers);
@@ -537,31 +552,50 @@ bool ProcessingJobService::abortJob(QString& errorOut)
     return false;
 }
 
-bool ProcessingJobService::isRunning() const { return false; }
+bool ProcessingJobService::isRunning() const
+{
+    return false;
+}
 
-bool ProcessingJobService::isPaused() const { return false; }
+bool ProcessingJobService::isPaused() const
+{
+    return false;
+}
 
-QString ProcessingJobService::currentJobId() const { return m_impl->jobId; }
+QString ProcessingJobService::currentJobId() const
+{
+    return m_impl->jobId;
+}
 
-ToolpathCompileResult ProcessingJobService::lastCompileResult() const { return m_impl->lastResult; }
+ToolpathCompileResult ProcessingJobService::lastCompileResult() const
+{
+    return m_impl->lastResult;
+}
 
-double ProcessingJobService::progressFraction() const { return 0.0; }
+double ProcessingJobService::progressFraction() const
+{
+    return 0.0;
+}
 
 /// 0 == Hw::PlanState::Idle，保持与硬件版一致的数值语义。
-int ProcessingJobService::planState() const { return 0; }
+int ProcessingJobService::planState() const
+{
+    return 0;
+}
 
-QString ProcessingJobService::planStateName() const { return QStringLiteral("Idle"); }
+QString ProcessingJobService::planStateName() const
+{
+    return QStringLiteral("Idle");
+}
 
 void ProcessingJobService::pollProgress() {}
 
-void ProcessingJobService::onSafetyVerdictChanged(bool canStartProcessing,
-    const QString& firstViolation,
-    const QString& firstViolationPoint)
+void ProcessingJobService::onSafetyVerdictChanged(
+    bool canStartProcessing, const QString& firstViolation, const QString& firstViolationPoint)
 {
     Q_UNUSED(canStartProcessing);
     Q_UNUSED(firstViolation);
     Q_UNUSED(firstViolationPoint);
 }
-
 
 #endif  // ENABLE_HARDWARE

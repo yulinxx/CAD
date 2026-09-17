@@ -33,8 +33,9 @@ namespace
     {
         float x, y, z, r, g, b, a;
     };
-    static_assert(sizeof(OVertex) == RT::rxVertexStride(RT::VertexFormat::P3C4),
-        "OVertex must match the DLL's P3C4 stride");
+
+    static_assert(
+        sizeof(OVertex) == RT::rxVertexStride(RT::VertexFormat::P3C4), "OVertex must match the DLL's P3C4 stride");
 
     inline OVertex vtx(float x, float y, float z, const Render::Color& c)
     {
@@ -44,8 +45,8 @@ namespace
     /// P3O2C4 顶点（世界锚点 + 像素偏移 + RGBA）定义在 PinnedMarkerGeometry.h，
     /// 与 DLL stride 的一致性在这里断言 —— 那个纯几何头不认识 rxVertexStride。
     using PVertex = Render::PinnedVertex;
-    static_assert(sizeof(PVertex) == RT::rxVertexStride(RT::VertexFormat::P3O2C4),
-        "PVertex must match the DLL's P3O2C4 stride");
+    static_assert(
+        sizeof(PVertex) == RT::rxVertexStride(RT::VertexFormat::P3O2C4), "PVertex must match the DLL's P3O2C4 stride");
 
     /**
      * @brief 把一批顶点写进瞬态环并追加一条 DrawCommand
@@ -53,9 +54,14 @@ namespace
      * 两个 emit 变体只在顶点格式与渲染空间上不同，其余（瞬态环分配、sortKey、
      * 字节偏移语义）完全一致，故用同一个模板生成，避免两份互相漂移的实现。
      */
-    template <typename V>
-    void emitAs(RT::SessionHandle session, std::vector<RT::DrawCommand>& out, const std::vector<V>& verts,
-        RT::PrimitiveTopology topo, RT::VertexFormat format, RT::RenderSpace space, uint16_t& seq)
+    template<typename V>
+    void emitAs(RT::SessionHandle session,
+        std::vector<RT::DrawCommand>& out,
+        const std::vector<V>& verts,
+        RT::PrimitiveTopology topo,
+        RT::VertexFormat format,
+        RT::RenderSpace space,
+        uint16_t& seq)
     {
         if (verts.empty())
             return;
@@ -83,14 +89,20 @@ namespace
         out.push_back(c);
     }
 
-    void emitWorld(RT::SessionHandle session, std::vector<RT::DrawCommand>& out,
-        const std::vector<OVertex>& verts, RT::PrimitiveTopology topo, uint16_t& seq)
+    void emitWorld(RT::SessionHandle session,
+        std::vector<RT::DrawCommand>& out,
+        const std::vector<OVertex>& verts,
+        RT::PrimitiveTopology topo,
+        uint16_t& seq)
     {
         emitAs(session, out, verts, topo, RT::VertexFormat::P3C4, RT::RenderSpace::World, seq);
     }
 
-    void emitPinned(RT::SessionHandle session, std::vector<RT::DrawCommand>& out,
-        const std::vector<PVertex>& verts, RT::PrimitiveTopology topo, uint16_t& seq)
+    void emitPinned(RT::SessionHandle session,
+        std::vector<RT::DrawCommand>& out,
+        const std::vector<PVertex>& verts,
+        RT::PrimitiveTopology topo,
+        uint16_t& seq)
     {
         emitAs(session, out, verts, topo, RT::VertexFormat::P3O2C4, RT::RenderSpace::WorldPinned, seq);
     }
@@ -137,8 +149,10 @@ namespace
 
     /// 把一组定尺寸标记合成两笔（全部填充一笔、全部边框一笔）。
     /// 顶点生成本身是纯几何，在 PinnedMarkerGeometry.h 里，可单测。
-    void emitPinnedMarkerGroup(RT::SessionHandle session, std::vector<RT::DrawCommand>& out,
-        const RenderBridge::OverlayMarkerGroup& group, uint16_t& seq)
+    void emitPinnedMarkerGroup(RT::SessionHandle session,
+        std::vector<RT::DrawCommand>& out,
+        const RenderBridge::OverlayMarkerGroup& group,
+        uint16_t& seq)
     {
         if (group.empty())
             return;
@@ -158,7 +172,7 @@ namespace
     }
 
     /**
-      * @brief 把一条带累积弧长的轮廓折线离散成「流水虚线」线段，**追加**到 outSegments
+     * @brief 把一条带累积弧长的轮廓折线离散成「流水虚线」线段，**追加**到 outSegments
      *
      * 单路径版 + 追加语义是刻意的：调用方要把整个选中集的虚线合成**一条**
      * DrawCommand。此前是「每条路径调一次多路径版 tessellate + 一次 emit」，
@@ -170,8 +184,11 @@ namespace
      * 图元后整个软件卡死」的主因。这里改成沿弧长单调推进的游标：dash 起点只会
      * 向前走，游标绝不回退。
      */
-    void appendSelectionDash(const Render::SelectionOutlinePath& path, float dashLength, float gapLength,
-        float offset, std::vector<Render::Vec2f>& outSegments)
+    void appendSelectionDash(const Render::SelectionOutlinePath& path,
+        float dashLength,
+        float gapLength,
+        float offset,
+        std::vector<Render::Vec2f>& outSegments)
     {
         constexpr size_t kMaxSegmentsPerPath = 16384;
 
@@ -259,8 +276,7 @@ namespace
     // 每个捕捉类型对应唯一形状；颜色由调用方决定。全部走 WorldPinned，
     // 偏移量单位是物理像素（乘过 DPR 后传入）。
 
-    void pinnedMarkerPoint(std::vector<PVertex>& v, const Render::Vec2f& p,
-        float radiusPx, const Render::Color& c)
+    void pinnedMarkerPoint(std::vector<PVertex>& v, const Render::Vec2f& p, float radiusPx, const Render::Color& c)
     {
         if (!std::isfinite(p.x()) || !std::isfinite(p.y()))
             return;
@@ -390,24 +406,49 @@ namespace
         v.push_back(Render::pinnedVertex(p, a.x(), a.y(), c));
     }
 
-    void emitSnapMarker(std::vector<PVertex>& v, const Render::Vec2f& p,
-        RenderBridge::SnapMarkerShape shape, const Render::Color& color, float scale)
+    void emitSnapMarker(std::vector<PVertex>& v,
+        const Render::Vec2f& p,
+        RenderBridge::SnapMarkerShape shape,
+        const Render::Color& color,
+        float scale)
     {
         if (!std::isfinite(p.x()) || !std::isfinite(p.y()))
             return;
         switch (shape)
         {
-        case RenderBridge::SnapMarkerShape::Square:     emitSquareMarker(v, p, color, scale); break;
-        case RenderBridge::SnapMarkerShape::Diamond:    emitDiamondMarker(v, p, color, scale); break;
-        case RenderBridge::SnapMarkerShape::Cross:      emitCrossMarker(v, p, color, scale); break;
-        case RenderBridge::SnapMarkerShape::X:          emitXMarker(v, p, color, scale); break;
-        case RenderBridge::SnapMarkerShape::Triangle:   emitTriangleMarker(v, p, color, scale); break;
-        case RenderBridge::SnapMarkerShape::Arc:        emitArcMarker(v, p, color, scale); break;
-        case RenderBridge::SnapMarkerShape::RightAngle: emitRightAngleMarker(v, p, color, scale); break;
-        case RenderBridge::SnapMarkerShape::Dot:        emitDotMarker(v, p, color, scale); break;
-        case RenderBridge::SnapMarkerShape::Star:       emitStarMarker(v, p, color, scale); break;
-        case RenderBridge::SnapMarkerShape::Hexagon:    emitHexagonMarker(v, p, color, scale); break;
-        case RenderBridge::SnapMarkerShape::Hourglass:  emitHourglassMarker(v, p, color, scale); break;
+        case RenderBridge::SnapMarkerShape::Square:
+            emitSquareMarker(v, p, color, scale);
+            break;
+        case RenderBridge::SnapMarkerShape::Diamond:
+            emitDiamondMarker(v, p, color, scale);
+            break;
+        case RenderBridge::SnapMarkerShape::Cross:
+            emitCrossMarker(v, p, color, scale);
+            break;
+        case RenderBridge::SnapMarkerShape::X:
+            emitXMarker(v, p, color, scale);
+            break;
+        case RenderBridge::SnapMarkerShape::Triangle:
+            emitTriangleMarker(v, p, color, scale);
+            break;
+        case RenderBridge::SnapMarkerShape::Arc:
+            emitArcMarker(v, p, color, scale);
+            break;
+        case RenderBridge::SnapMarkerShape::RightAngle:
+            emitRightAngleMarker(v, p, color, scale);
+            break;
+        case RenderBridge::SnapMarkerShape::Dot:
+            emitDotMarker(v, p, color, scale);
+            break;
+        case RenderBridge::SnapMarkerShape::Star:
+            emitStarMarker(v, p, color, scale);
+            break;
+        case RenderBridge::SnapMarkerShape::Hexagon:
+            emitHexagonMarker(v, p, color, scale);
+            break;
+        case RenderBridge::SnapMarkerShape::Hourglass:
+            emitHourglassMarker(v, p, color, scale);
+            break;
         case RenderBridge::SnapMarkerShape::Circle:
         default:
         {
@@ -441,8 +482,8 @@ namespace RenderBridge
         }
     }
 
-    void OverlayScene::setSelectionHighlight(const std::vector<Render::Vec2f>& quadCorners,
-        const Render::Color& fill, const Render::Color& border)
+    void OverlayScene::setSelectionHighlight(
+        const std::vector<Render::Vec2f>& quadCorners, const Render::Color& fill, const Render::Color& border)
     {
         if (quadCorners.empty())
         {
@@ -462,8 +503,8 @@ namespace RenderBridge
         m_highlight.border = border;
     }
 
-    void OverlayScene::setSelectionRect(const Render::BBox2d& rect, const Render::Color& fill,
-        const Render::Color& border)
+    void OverlayScene::setSelectionRect(
+        const Render::BBox2d& rect, const Render::Color& fill, const Render::Color& border)
     {
         m_selectionRect.valid = rect.isValid();
         if (m_selectionRect.valid)
@@ -495,8 +536,8 @@ namespace RenderBridge
         m_pointMarkers.group = std::move(group);
     }
 
-    void OverlayScene::setSnapIndicator(const Render::Vec2f& worldPos, bool visible,
-        SnapMarkerShape shape, const Render::Color& color)
+    void OverlayScene::setSnapIndicator(
+        const Render::Vec2f& worldPos, bool visible, SnapMarkerShape shape, const Render::Color& color)
     {
         m_snap.visible = visible;
         m_snap.worldPos = worldPos;
@@ -601,16 +642,26 @@ namespace RenderBridge
     {
         switch (id)
         {
-        case OverlayLayerId::SelectionBox:      return m_selectionBox.valid;
-        case OverlayLayerId::SelectionHighlight: return !m_highlight.quadCorners.empty();
-        case OverlayLayerId::SelectionRect:     return m_selectionRect.valid;
-        case OverlayLayerId::SelectionOutlines: return !m_outlines.paths.empty();
-        case OverlayLayerId::SelectionHandles:  return !m_selectionHandles.group.empty();
-        case OverlayLayerId::PointMarkers:      return !m_pointMarkers.group.empty();
-        case OverlayLayerId::SnapIndicator:     return m_snap.visible;
-        case OverlayLayerId::ToolPreview:       return !m_toolPreview.points.empty();
-        case OverlayLayerId::ControlLines:      return !m_controlLines.points.empty();
-        case OverlayLayerId::Count:             break;
+        case OverlayLayerId::SelectionBox:
+            return m_selectionBox.valid;
+        case OverlayLayerId::SelectionHighlight:
+            return !m_highlight.quadCorners.empty();
+        case OverlayLayerId::SelectionRect:
+            return m_selectionRect.valid;
+        case OverlayLayerId::SelectionOutlines:
+            return !m_outlines.paths.empty();
+        case OverlayLayerId::SelectionHandles:
+            return !m_selectionHandles.group.empty();
+        case OverlayLayerId::PointMarkers:
+            return !m_pointMarkers.group.empty();
+        case OverlayLayerId::SnapIndicator:
+            return m_snap.visible;
+        case OverlayLayerId::ToolPreview:
+            return !m_toolPreview.points.empty();
+        case OverlayLayerId::ControlLines:
+            return !m_controlLines.points.empty();
+        case OverlayLayerId::Count:
+            break;
         }
         return false;
     }
@@ -731,7 +782,8 @@ namespace RenderBridge
             for (size_t i = 0; i + 1 < m_toolPreview.points.size(); ++i)
             {
                 v.push_back(vtx(m_toolPreview.points[i].x(), m_toolPreview.points[i].y(), 0, m_toolPreview.color));
-                v.push_back(vtx(m_toolPreview.points[i + 1].x(), m_toolPreview.points[i + 1].y(), 0, m_toolPreview.color));
+                v.push_back(
+                    vtx(m_toolPreview.points[i + 1].x(), m_toolPreview.points[i + 1].y(), 0, m_toolPreview.color));
             }
             emitWorld(session, out, v, RT::PrimitiveTopology::Lines, seq);
         }

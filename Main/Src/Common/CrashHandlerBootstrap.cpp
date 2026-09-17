@@ -11,10 +11,10 @@
 #include <cstdio>
 
 #ifdef _WIN32
-// dbghelp 必须在 windows.h 之后
-#include <windows.h>
+    // dbghelp 必须在 windows.h 之后
+    #include <windows.h>
 
-#include <dbghelp.h>
+    #include <dbghelp.h>
 #endif
 
 namespace
@@ -59,8 +59,7 @@ namespace
 
             IMAGEHLP_MODULE64 moduleInfo = {};
             moduleInfo.SizeOfStruct = sizeof(moduleInfo);
-            const char* moduleName =
-                SymGetModuleInfo64(process, address, &moduleInfo) ? moduleInfo.ModuleName : "?";
+            const char* moduleName = SymGetModuleInfo64(process, address, &moduleInfo) ? moduleInfo.ModuleName : "?";
 
             DWORD64 displacement = 0;
             const bool haveSymbol = SymFromAddr(process, address, &displacement, symbol) != FALSE;
@@ -130,7 +129,6 @@ namespace
         std::fflush(stderr);
         return succeeded;
     }
-
 
     bool ensureCrashDumpDirectory(const QString& path)
     {

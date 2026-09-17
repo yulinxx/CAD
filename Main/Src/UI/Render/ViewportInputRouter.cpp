@@ -446,7 +446,7 @@ void ViewportInputRouter::handleKeyPress(QKeyEvent* event)
     // 单独按释放 = 单击重置视图，双击500ms内缩放到选中图元）。
     //
     // 绘制中必须立即派发给工具，不能进「临时平移」态：mouseMove 里
-    //「空格按住 + 任意移动」就会置 m_spacePanned=true（触控板单指移动也算），
+    // 「空格按住 + 任意移动」就会置 m_spacePanned=true（触控板单指移动也算），
     // 手放在鼠标上按空格几乎必然产生一次移动事件，于是释放时的确认被判成导航
     // 而丢掉 —— 表现就是「绘制中按空格没反应」。
     //

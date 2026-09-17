@@ -66,8 +66,7 @@ void AppInitializer::initialize()
 #else
     const Render::RT::Backend configuredBackend = Render::RT::Backend::OpenGL;
 #endif
-    SY_INFOF("[Render] Viewport backend (compile-time): %s",
-             Render::RT::rxBackendName(configuredBackend));
+    SY_INFOF("[Render] Viewport backend (compile-time): %s", Render::RT::rxBackendName(configuredBackend));
 
     CrashHandlerBootstrap::logPendingDumps();
 
@@ -106,7 +105,8 @@ void AppInitializer::initialize()
         if (settingsRepo)
         {
             SyLogger::GetInstance().SetLevel(SyLogLevel::Info);
-            SY_INFO("[AppInitializer] Default log level set to Info (will be overridden by SettingsService if available)");
+            SY_INFO(
+                "[AppInitializer] Default log level set to Info (will be overridden by SettingsService if available)");
         }
     }
     else

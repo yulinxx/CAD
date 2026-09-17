@@ -116,7 +116,8 @@ void WorkbenchLayoutManager::buildToolBars()
         }
     }
     m_configDrivenLayoutBuilt = true;
-    SY_DEBUGF("[WorkbenchLayoutManager] Tool bars built from client config: count=%lld", static_cast<long long>(m_registeredToolBars.size()));
+    SY_DEBUGF("[WorkbenchLayoutManager] Tool bars built from client config: count=%lld",
+        static_cast<long long>(m_registeredToolBars.size()));
 }
 
 void WorkbenchLayoutManager::initializeDockAreaSkeleton()
@@ -132,7 +133,8 @@ void WorkbenchLayoutManager::buildDockAreas()
     // 属于打包缺失级别的问题，必须以 ERROR 暴露而不是静默降级。
     if (buildDockAreasFromConfig())
     {
-        SY_DEBUGF("[WorkbenchLayoutManager] Dock areas built from client config: count=%lld", static_cast<long long>(m_registeredDocks.size()));
+        SY_DEBUGF("[WorkbenchLayoutManager] Dock areas built from client config: count=%lld",
+            static_cast<long long>(m_registeredDocks.size()));
         return;
     }
 
@@ -221,8 +223,8 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
     // 右侧面板 (PropertiesDock) 适中宽度，兼顾属性行和图层面板。
     if (m_panelState.leftDock && m_panelState.rightDock)
     {
-        m_parent->resizeDocks({ m_panelState.leftDock.data(), m_panelState.rightDock.data() },
-            { 180, 260 }, Qt::Horizontal);
+        m_parent->resizeDocks(
+            { m_panelState.leftDock.data(), m_panelState.rightDock.data() }, { 180, 260 }, Qt::Horizontal);
     }
 
     return !m_registeredDocks.empty();
@@ -421,7 +423,6 @@ void WorkbenchLayoutManager::clearLayoutContent(const UiWorkbench* oldWorkbench)
 
     // 工具栏/Dock 已全部销毁，下一次 buildToolBars 必须重新构建
     m_configDrivenLayoutBuilt = false;
-
 
     // 4: 清理中央控件 — 先释放 GL 资源，再 setCentralWidget(nullptr)
     // 关键流程：releaseGLResources() → setCentralWidget(nullptr) → hide() → deleteLater()

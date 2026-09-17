@@ -884,12 +884,10 @@ void SceneTreePanel::setSelectedIds(const QSet<QString>& ids)
                         runEnd = r;  // 去重 + 连续行合并进当前区间
                         continue;
                     }
-                    selection.append(QItemSelectionRange(model2d->index(runStart, 0),
-                                                         model2d->index(runEnd, 0)));
+                    selection.append(QItemSelectionRange(model2d->index(runStart, 0), model2d->index(runEnd, 0)));
                     runStart = runEnd = r;
                 }
-                selection.append(QItemSelectionRange(model2d->index(runStart, 0),
-                                                     model2d->index(runEnd, 0)));
+                selection.append(QItemSelectionRange(model2d->index(runStart, 0), model2d->index(runEnd, 0)));
 
                 // 一次性应用选择
                 m_view->selectionModel()->select(selection, QItemSelectionModel::Select | QItemSelectionModel::Rows);
@@ -931,12 +929,10 @@ void SceneTreePanel::setSelectedIds(const QSet<QString>& ids)
                         runEnd = r;  // 去重 + 连续行合并进当前区间
                         continue;
                     }
-                    selection.append(QItemSelectionRange(model3d->index(runStart, 0),
-                                                         model3d->index(runEnd, 0)));
+                    selection.append(QItemSelectionRange(model3d->index(runStart, 0), model3d->index(runEnd, 0)));
                     runStart = runEnd = r;
                 }
-                selection.append(QItemSelectionRange(model3d->index(runStart, 0),
-                                                     model3d->index(runEnd, 0)));
+                selection.append(QItemSelectionRange(model3d->index(runStart, 0), model3d->index(runEnd, 0)));
 
                 m_view->selectionModel()->select(selection, QItemSelectionModel::Select | QItemSelectionModel::Rows);
             }

@@ -2,18 +2,18 @@
 
 #ifdef ENABLE_HARDWARE
 
-#include <algorithm>
-#include <cmath>
-#include <unordered_set>
-#include <vector>
+    #include <algorithm>
+    #include <cmath>
+    #include <unordered_set>
+    #include <vector>
 
-#include "Engine/SyEntity/SyEntity.h"
-#include "Engine2D/Edit/LayerSnapshot.h"
-#include "Engine2D/Geo/GeometryContext.h"
-#include "Engine2D/Geometry/Geo2DPath.h"
-#include "Engine2D/Geometry/Geo2DTypes.h"
+    #include "Engine/SyEntity/SyEntity.h"
+    #include "Engine2D/Edit/LayerSnapshot.h"
+    #include "Engine2D/Geo/GeometryContext.h"
+    #include "Engine2D/Geometry/Geo2DPath.h"
+    #include "Engine2D/Geometry/Geo2DTypes.h"
 
-#include "Log/SyLogger.h"
+    #include "Log/SyLogger.h"
 
 namespace
 {
@@ -70,10 +70,10 @@ namespace
      * @param degraded 出参：该图元因段类型不支持而被整体离散时置 true
      */
     bool emitEntity(const Eg::SyEntity* entity,
-                    const Eg::GeometryContext& ctx,
-                    bool preferArcs,
-                    Hw::MotionPlanBuilder& out,
-                    bool& degraded)
+        const Eg::GeometryContext& ctx,
+        bool preferArcs,
+        Hw::MotionPlanBuilder& out,
+        bool& degraded)
     {
         degraded = false;
         if (!entity)
@@ -99,10 +99,8 @@ namespace
         bool needsFallback = false;
         for (const Eg::PathSegment& seg : segments)
         {
-            const bool expressible =
-                seg.eType == Eg::EPathSegmentType::Line
-                || seg.eType == Eg::EPathSegmentType::Arc
-                || (seg.eType == Eg::EPathSegmentType::PolylineApprox && seg.vApproxPoints.size() >= 2);
+            const bool expressible = seg.eType == Eg::EPathSegmentType::Line || seg.eType == Eg::EPathSegmentType::Arc ||
+                (seg.eType == Eg::EPathSegmentType::PolylineApprox && seg.vApproxPoints.size() >= 2);
             if (!expressible)
             {
                 needsFallback = true;
@@ -133,9 +131,7 @@ namespace
             case Eg::EPathSegmentType::Arc:
                 // Geo2DPath 约定分解出的圆弧一律为 CCW 扫掠（见 Geo2DTypes.h 的注释），
                 // 因此这里恒传 true；若哪天该约定变了，工件上的表现是圆弧走反向长边
-                out.emitArcTo(seg.ptEnd.x(), seg.ptEnd.y(),
-                              seg.ptCenter.x(), seg.ptCenter.y(),
-                              true, true);
+                out.emitArcTo(seg.ptEnd.x(), seg.ptEnd.y(), seg.ptCenter.x(), seg.ptCenter.y(), true, true);
                 break;
 
             case Eg::EPathSegmentType::PolylineApprox:
@@ -148,30 +144,31 @@ namespace
             default:
                 // 上面的 needsFallback 已经拦掉了，走到这里说明段类型枚举扩展了而这里没跟上
                 SY_ERRORF("[MotionPlanCompiler] Unhandled path segment type %d on entity %lld",
-                    static_cast<int>(seg.eType), static_cast<long long>(entity->id));
+                    static_cast<int>(seg.eType),
+                    static_cast<long long>(entity->id));
                 return false;
             }
         }
         return true;
     }
-}
+}  // namespace
 
 namespace MotionPlanCompiler
 {
     ToolpathCompileResult compile(const Eg::SceneManager& scene,
-                                  const LayerManager* layers,
-                                  const ToolpathJobSpec& spec,
-                                  Hw::MotionPlanBuilder& out)
+        const LayerManager* layers,
+        const ToolpathJobSpec& spec,
+        Hw::MotionPlanBuilder& out)
     {
         ToolpathCompileResult result;
         out.clear();
 
-if (!spec.defaultParams.valid())
+        if (!spec.defaultParams.valid())
         {
             result.error = QStringLiteral("Invalid default process params (power %1%%, speed %2mm/s, passes %3)")
-                           .arg(spec.defaultParams.powerPercent)
-                           .arg(spec.defaultParams.speedMmPerSec)
-                           .arg(spec.defaultParams.passes);  // 默认工艺参数非法
+                               .arg(spec.defaultParams.powerPercent)
+                               .arg(spec.defaultParams.speedMmPerSec)
+                               .arg(spec.defaultParams.passes);  // 默认工艺参数非法
             return result;
         }
         for (auto it = spec.layerParams.constBegin(); it != spec.layerParams.constEnd(); ++it)
@@ -184,7 +181,8 @@ if (!spec.defaultParams.valid())
         }
         if (spec.chordToleranceMm <= 0.0)
         {
-            result.error = QStringLiteral("Chord tolerance must be positive (current %1)").arg(spec.chordToleranceMm);  // 弦高容差必须为正数
+            result.error = QStringLiteral("Chord tolerance must be positive (current %1)")
+                               .arg(spec.chordToleranceMm);  // 弦高容差必须为正数
             return result;
         }
         // 上界不是「精度够用就行」的经验值，而是躲开 Engine2D 的一个实现陷阱：
@@ -192,17 +190,18 @@ if (!spec.defaultParams.valid())
         // 那里把 param（即这里的 dDiscretize）当成**采样点个数**用，且 <2 时回落到 32。
         // 于是 [0,2) 的任何容差都得到 32 点，而 5.0 会静默变成 5 点 —— 一个圆被切成五边形，
         // 却照样返回成功。宁可在入口拒绝，也不能把这种结果送去出光。
-if (spec.chordToleranceMm > kMaxChordToleranceMm)
+        if (spec.chordToleranceMm > kMaxChordToleranceMm)
         {
             result.error = QStringLiteral("Chord tolerance %1mm exceeds maximum %2mm")
-                           .arg(spec.chordToleranceMm)
-                           .arg(kMaxChordToleranceMm);  // 弦高容差过大
+                               .arg(spec.chordToleranceMm)
+                               .arg(kMaxChordToleranceMm);  // 弦高容差过大
             return result;
         }
         if (spec.selectionOnly && spec.selectedEntityIds.isEmpty())
         {
             // 「只加工选中」但没选任何东西：绝不能退化成加工全图
-            result.error = QStringLiteral("Selection-only mode enabled but no entities selected");  // 已勾选只加工选中图元但未选中任何图元
+            result.error = QStringLiteral(
+                "Selection-only mode enabled but no entities selected");  // 已勾选只加工选中图元但未选中任何图元
             return result;
         }
 
@@ -284,8 +283,7 @@ if (spec.chordToleranceMm > kMaxChordToleranceMm)
                 {
                     if (!b.entities.empty())
                     {
-                        SY_WARNF("[MotionPlanCompiler] Layer %d missing from layerOrder, appended last",
-                            b.layerId);
+                        SY_WARNF("[MotionPlanCompiler] Layer %d missing from layerOrder, appended last", b.layerId);
                         ordered.push_back(std::move(b));
                     }
                 }
@@ -380,8 +378,7 @@ if (spec.chordToleranceMm > kMaxChordToleranceMm)
 
         if (out.commandCount() == 0 || result.layerCount == 0)
         {
-            result.error = QStringLiteral(
-                "没有可加工的图元（共 %1 个图元，其中 %2 个被隐藏/锁定/无路径而跳过）")
+            result.error = QStringLiteral("没有可加工的图元（共 %1 个图元，其中 %2 个被隐藏/锁定/无路径而跳过）")
                                .arg(all.size())
                                .arg(result.skippedEntityCount);
             out.clear();
@@ -404,13 +401,19 @@ if (spec.chordToleranceMm > kMaxChordToleranceMm)
         result.boundsMaxY = finalHeader.boundsMaxY;
 
         SY_DEBUGF("[MotionPlanCompiler] '%s': %d layer(s), %d entity(ies), %lld command(s), "
-                 "bounds [%.3f,%.3f]-[%.3f,%.3f], skipped=%d degraded=%d",
-            spec.jobId.toUtf8().constData(), result.layerCount, result.entityCount,
-            static_cast<long long>(result.commandCount), result.boundsMinX, result.boundsMinY,
-            result.boundsMaxX, result.boundsMaxY,
-            result.skippedEntityCount, result.degradedEntityCount);
+                  "bounds [%.3f,%.3f]-[%.3f,%.3f], skipped=%d degraded=%d",
+            spec.jobId.toUtf8().constData(),
+            result.layerCount,
+            result.entityCount,
+            static_cast<long long>(result.commandCount),
+            result.boundsMinX,
+            result.boundsMinY,
+            result.boundsMaxX,
+            result.boundsMaxY,
+            result.skippedEntityCount,
+            result.degradedEntityCount);
         return result;
     }
-}
+}  // namespace MotionPlanCompiler
 
 #endif  // ENABLE_HARDWARE

@@ -3,7 +3,7 @@
 #include <QSurfaceFormat>
 
 #ifdef Q_OS_MACOS
-#include <QApplication>
+    #include <QApplication>
 #endif
 
 int runCADApplication(int argc, char** argv);

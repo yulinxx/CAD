@@ -36,7 +36,8 @@ bool DatabaseBootstrapper::ensureSchema()
     if (!dbAppVersion.empty() && dbAppVersion != MainApp::appVersion().c_str())
     {
         SY_WARNF("[DatabaseBootstrapper] App version mismatch: db=%s current=%s - clearing incompatible data",
-            dbAppVersion.c_str(), MainApp::appVersion().c_str());
+            dbAppVersion.c_str(),
+            MainApp::appVersion().c_str());
         // 版本不匹配时清除所有业务数据（保留 meta 表）
         m_database.execute("DELETE FROM recent_files");
         m_database.execute("DELETE FROM workspace_snapshots");

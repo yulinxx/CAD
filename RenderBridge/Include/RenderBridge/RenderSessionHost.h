@@ -142,9 +142,20 @@ namespace RenderBridge
 
         bool isReady() const;
 
-        Render::RT::RuntimeHandle runtime() const { return m_runtime; }
-        Render::RT::SessionHandle session() const { return m_session; }
-        Render::RT::SurfaceHandle surface() const { return m_surface; }
+        Render::RT::RuntimeHandle runtime() const
+        {
+            return m_runtime;
+        }
+
+        Render::RT::SessionHandle session() const
+        {
+            return m_session;
+        }
+
+        Render::RT::SurfaceHandle surface() const
+        {
+            return m_surface;
+        }
 
         /// 把后端能力打一条日志；tag 是调用方前缀（两个视口前缀不同）
         void logCapabilities(const char* tag) const;

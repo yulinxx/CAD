@@ -1,16 +1,17 @@
 #include "UI/Service/ViewCaptureService.h"
+#include "Ut/BBox3.h"
 #include "RenderWidget.h"
+
 #if BUILD_UI3D
-#include "UI3D/Render3D/RenderWidget3D.h"
+    #include "UI3D/Render3D/RenderWidget3D.h"
 #endif
 #include "Engine2D/Environment/SceneEnvironment.h"
 #include "Engine3D/SceneManager3D.h"
 #include "Engine3D/SyEntity/SyMeshEntity.h"
-#include "Ut/BBox3.h"
 
 #include <QApplication>
-#include <QDateTime>
 #include <QDir>
+#include <QDateTime>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QStandardPaths>
@@ -97,8 +98,11 @@ namespace Ui
         }
 
         // DLL 保证输出为 RGBA8、左上原点、逐行紧凑，因此这里既不翻转也不换序。
-        const QImage img(rgba.data(), static_cast<int>(width), static_cast<int>(height),
-            static_cast<qsizetype>(width) * 4, QImage::Format_RGBA8888);
+        const QImage img(rgba.data(),
+            static_cast<int>(width),
+            static_cast<int>(height),
+            static_cast<qsizetype>(width) * 4,
+            QImage::Format_RGBA8888);
         QImage result = img.copy();  // 脱离 rgba 的生命周期
 
         // 指定分辨率时按后备缓冲结果缩放。真正的「任意分辨率离屏重渲染」需要

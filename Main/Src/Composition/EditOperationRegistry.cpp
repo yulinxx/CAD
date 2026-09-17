@@ -279,25 +279,24 @@ void EditOperationRegistry::registerClipboardOps()
         }
     };
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::Edit_Copy, [editService, clipboard] {
-            if (!editService || !clipboard)
-                return;
-            auto* scene = editService->sceneManager();
-            if (!scene)
-                return;
-            auto selected = scene->getSelectedEntities();
-            if (selected.empty())
-                return;
-            std::vector<const Eg::SyEntity*> sources;
-            sources.reserve(selected.size());
-            for (Eg::SyEntity* e : selected)
-            {
-                if (e)
-                    sources.push_back(e);
-            }
-            clipboard->copy(sources);
-        }));
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Copy, [editService, clipboard] {
+        if (!editService || !clipboard)
+            return;
+        auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
+        auto selected = scene->getSelectedEntities();
+        if (selected.empty())
+            return;
+        std::vector<const Eg::SyEntity*> sources;
+        sources.reserve(selected.size());
+        for (Eg::SyEntity* e : selected)
+        {
+            if (e)
+                sources.push_back(e);
+        }
+        clipboard->copy(sources);
+    }));
 
     reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Cut, [editService, clipboard] {
         if (!editService || !clipboard)
@@ -355,8 +354,8 @@ void EditOperationRegistry::registerClipboardOps()
         pasteImage(true);
     }));
 
-    reg.registerOperation(std::make_unique<ParamLambdaOperation>(
-        OperationId::Edit_Duplicate, [=](const QVariantMap& params) {
+    reg.registerOperation(
+        std::make_unique<ParamLambdaOperation>(OperationId::Edit_Duplicate, [=](const QVariantMap& params) {
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
@@ -424,8 +423,8 @@ void EditOperationRegistry::registerTransformOps()
     auto* hub = m_viewportActionHub;
     auto* undoManager = m_undoManager;
 
-    reg.registerOperation(std::make_unique<ParamSceneMutatingLambdaOperation>(
-        OperationId::Edit_Move, [=](const QVariantMap& params) {
+    reg.registerOperation(
+        std::make_unique<ParamSceneMutatingLambdaOperation>(OperationId::Edit_Move, [=](const QVariantMap& params) {
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
@@ -460,8 +459,8 @@ void EditOperationRegistry::registerTransformOps()
                 false);
         }));
 
-    reg.registerOperation(std::make_unique<ParamSceneMutatingLambdaOperation>(
-        OperationId::Edit_Rotate, [=](const QVariantMap& params) {
+    reg.registerOperation(
+        std::make_unique<ParamSceneMutatingLambdaOperation>(OperationId::Edit_Rotate, [=](const QVariantMap& params) {
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
@@ -489,7 +488,8 @@ void EditOperationRegistry::registerTransformOps()
             }
             else
             {
-                const TransformParameters tp = OpRegistryHelpers::collectDialogParams(TransformType::Rotate, m_parentWidget);
+                const TransformParameters tp =
+                    OpRegistryHelpers::collectDialogParams(TransformType::Rotate, m_parentWidget);
                 if (tp.type != TransformType::Rotate || tp.rotateAngle == 0.0)
                     return;
                 angleRad = Ut::GeomMath::degToRad(tp.rotateAngle);
@@ -519,8 +519,8 @@ void EditOperationRegistry::registerTransformOps()
                 false);
         }));
 
-    reg.registerOperation(std::make_unique<ParamSceneMutatingLambdaOperation>(
-        OperationId::Edit_Mirror, [=](const QVariantMap& params) {
+    reg.registerOperation(
+        std::make_unique<ParamSceneMutatingLambdaOperation>(OperationId::Edit_Mirror, [=](const QVariantMap& params) {
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
@@ -553,7 +553,8 @@ void EditOperationRegistry::registerTransformOps()
             }
             else
             {
-                const TransformParameters tp = OpRegistryHelpers::collectDialogParams(TransformType::Mirror, m_parentWidget);
+                const TransformParameters tp =
+                    OpRegistryHelpers::collectDialogParams(TransformType::Mirror, m_parentWidget);
                 if (tp.type != TransformType::Mirror)
                     return;
                 axis = tp.mirrorAxis;
@@ -593,7 +594,8 @@ void EditOperationRegistry::registerTransformOps()
             return;
         const auto ids = OpRegistryHelpers::collectIds(selected);
         double minX, minY, maxX, maxY;
-        const double centerX = OpRegistryHelpers::calcCombinedBounds(selected, minX, minY, maxX, maxY) ? (minX + maxX) * 0.5 : 0.0;
+        const double centerX =
+            OpRegistryHelpers::calcCombinedBounds(selected, minX, minY, maxX, maxY) ? (minX + maxX) * 0.5 : 0.0;
         editService->transformEntities(
             ids,
             [&]() {
@@ -615,7 +617,8 @@ void EditOperationRegistry::registerTransformOps()
             return;
         const auto ids = OpRegistryHelpers::collectIds(selected);
         double minX, minY, maxX, maxY;
-        const double centerY = OpRegistryHelpers::calcCombinedBounds(selected, minX, minY, maxX, maxY) ? (minY + maxY) * 0.5 : 0.0;
+        const double centerY =
+            OpRegistryHelpers::calcCombinedBounds(selected, minX, minY, maxX, maxY) ? (minY + maxY) * 0.5 : 0.0;
         editService->transformEntities(
             ids,
             [&]() {
@@ -626,8 +629,8 @@ void EditOperationRegistry::registerTransformOps()
             false);
     }));
 
-    reg.registerOperation(
-        std::make_unique<ParamSceneMutatingLambdaOperation>(OperationId::Edit_Align, [editService](const QVariantMap& params) {
+    reg.registerOperation(std::make_unique<ParamSceneMutatingLambdaOperation>(
+        OperationId::Edit_Align, [editService](const QVariantMap& params) {
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
@@ -701,16 +704,16 @@ void EditOperationRegistry::registerTrimExtendOps()
     auto& reg = m_bus->registry();
     auto* editService = m_editService;
 
-    reg.registerOperation(
-        std::make_unique<ParamSceneMutatingLambdaOperation>(OperationId::Edit_Trim, [editService](const QVariantMap& params) {
+    reg.registerOperation(std::make_unique<ParamSceneMutatingLambdaOperation>(
+        OperationId::Edit_Trim, [editService](const QVariantMap& params) {
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
             if (!scene)
                 return;
-            TransformParameters tp = TransformParameters::createTrim(
-                params.value(QStringLiteral("targetId")).toULongLong(),
-                params.value(QStringLiteral("boundaryId")).toULongLong());
+            TransformParameters tp =
+                TransformParameters::createTrim(params.value(QStringLiteral("targetId")).toULongLong(),
+                    params.value(QStringLiteral("boundaryId")).toULongLong());
             Eg::SyEntity* target = nullptr;
             Eg::SyEntity* boundary = nullptr;
             if (!OpRegistryHelpers::resolveTargetAndBoundary(editService, tp, target, boundary))
@@ -724,8 +727,10 @@ void EditOperationRegistry::registerTrimExtendOps()
             if (!OpRegistryHelpers::segmentIntersection(targetSeg, boundarySeg, hitX, hitY))
                 return;
 
-            const double d1 = (hitX - targetSeg.x1) * (hitX - targetSeg.x1) + (hitY - targetSeg.y1) * (hitY - targetSeg.y1);
-            const double d2 = (hitX - targetSeg.x2) * (hitX - targetSeg.x2) + (hitY - targetSeg.y2) * (hitY - targetSeg.y2);
+            const double d1 =
+                (hitX - targetSeg.x1) * (hitX - targetSeg.x1) + (hitY - targetSeg.y1) * (hitY - targetSeg.y1);
+            const double d2 =
+                (hitX - targetSeg.x2) * (hitX - targetSeg.x2) + (hitY - targetSeg.y2) * (hitY - targetSeg.y2);
             const double newX1 = (d1 <= d2) ? hitX : targetSeg.x1;
             const double newY1 = (d1 <= d2) ? hitY : targetSeg.y1;
             const double newX2 = (d1 <= d2) ? targetSeg.x2 : hitX;
@@ -747,16 +752,16 @@ void EditOperationRegistry::registerTrimExtendOps()
                 false);
         }));
 
-    reg.registerOperation(
-        std::make_unique<ParamSceneMutatingLambdaOperation>(OperationId::Edit_Extend, [editService](const QVariantMap& params) {
+    reg.registerOperation(std::make_unique<ParamSceneMutatingLambdaOperation>(
+        OperationId::Edit_Extend, [editService](const QVariantMap& params) {
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
             if (!scene)
                 return;
-            TransformParameters tp = TransformParameters::createExtend(
-                params.value(QStringLiteral("targetId")).toULongLong(),
-                params.value(QStringLiteral("boundaryId")).toULongLong());
+            TransformParameters tp =
+                TransformParameters::createExtend(params.value(QStringLiteral("targetId")).toULongLong(),
+                    params.value(QStringLiteral("boundaryId")).toULongLong());
             Eg::SyEntity* target = nullptr;
             Eg::SyEntity* boundary = nullptr;
             if (!OpRegistryHelpers::resolveTargetAndBoundary(editService, tp, target, boundary))
@@ -775,10 +780,14 @@ void EditOperationRegistry::registerTrimExtendOps()
             const double ext = tlen * 100.0;
 
             OpRegistryHelpers::LineSegment2D rayFromP1, rayFromP2;
-            rayFromP1.x1 = targetSeg.x1 - ux * ext; rayFromP1.y1 = targetSeg.y1 - uy * ext;
-            rayFromP1.x2 = targetSeg.x1; rayFromP1.y2 = targetSeg.y1;
-            rayFromP2.x1 = targetSeg.x2; rayFromP2.y1 = targetSeg.y2;
-            rayFromP2.x2 = targetSeg.x2 + ux * ext; rayFromP2.y2 = targetSeg.y2 + uy * ext;
+            rayFromP1.x1 = targetSeg.x1 - ux * ext;
+            rayFromP1.y1 = targetSeg.y1 - uy * ext;
+            rayFromP1.x2 = targetSeg.x1;
+            rayFromP1.y2 = targetSeg.y1;
+            rayFromP2.x1 = targetSeg.x2;
+            rayFromP2.y1 = targetSeg.y2;
+            rayFromP2.x2 = targetSeg.x2 + ux * ext;
+            rayFromP2.y2 = targetSeg.y2 + uy * ext;
 
             double hitX1 = 0.0, hitY1 = 0.0, hitX2 = 0.0, hitY2 = 0.0;
             const bool ok1 = segmentIntersection(rayFromP1, boundarySeg, hitX1, hitY1);
@@ -786,17 +795,21 @@ void EditOperationRegistry::registerTrimExtendOps()
             if (!ok1 && !ok2)
                 return;
 
-            const double d1 = (hitX1 - targetSeg.x1) * (hitX1 - targetSeg.x1) + (hitY1 - targetSeg.y1) * (hitY1 - targetSeg.y1);
-            const double d2 = (hitX2 - targetSeg.x2) * (hitX2 - targetSeg.x2) + (hitY2 - targetSeg.y2) * (hitY2 - targetSeg.y2);
+            const double d1 =
+                (hitX1 - targetSeg.x1) * (hitX1 - targetSeg.x1) + (hitY1 - targetSeg.y1) * (hitY1 - targetSeg.y1);
+            const double d2 =
+                (hitX2 - targetSeg.x2) * (hitX2 - targetSeg.x2) + (hitY2 - targetSeg.y2) * (hitY2 - targetSeg.y2);
             double newX1 = targetSeg.x1, newY1 = targetSeg.y1;
             double newX2 = targetSeg.x2, newY2 = targetSeg.y2;
             if (ok1 && (!ok2 || d1 >= d2))
             {
-                newX1 = hitX1; newY1 = hitY1;
+                newX1 = hitX1;
+                newY1 = hitY1;
             }
             else if (ok2)
             {
-                newX2 = hitX2; newY2 = hitY2;
+                newX2 = hitX2;
+                newY2 = hitY2;
             }
 
             const double newLenSq = (newX2 - newX1) * (newX2 - newX1) + (newY2 - newY1) * (newY2 - newY1);
@@ -834,8 +847,10 @@ void EditOperationRegistry::registerBboxOps()
         const Ut::BBox2d bbox = entity->getBbox();
         SY_DEBUGF("[GetBbox] entity=%llu bbox=(%.3f, %.3f)-(%.3f, %.3f)",
             static_cast<unsigned long long>(entity->id),
-            bbox.minPt.x(), bbox.minPt.y(),
-            bbox.maxPt.x(), bbox.maxPt.y());
+            bbox.minPt.x(),
+            bbox.minPt.y(),
+            bbox.maxPt.x(),
+            bbox.maxPt.y());
     }));
 }
 
@@ -888,7 +903,8 @@ void EditOperationRegistry::registerBezierOps()
         auto* scene = editService->sceneManager();
         if (!scene)
             return;
-        const OperationId target = OpRegistryHelpers::canMergeSelectedBeziers(scene) ? OperationId::Edit_MergeBezier : OperationId::Edit_SplitBezier;
+        const OperationId target = OpRegistryHelpers::canMergeSelectedBeziers(scene) ? OperationId::Edit_MergeBezier
+                                                                                     : OperationId::Edit_SplitBezier;
         if (m_bus)
             m_bus->run(target);
     }));
@@ -927,9 +943,11 @@ void EditOperationRegistry::registerBezierOps()
     reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_MergeBezier, [editService] {
         if (!editService)
             return;
+
         auto* scene = editService->sceneManager();
         if (!scene)
             return;
+
         std::vector<Eg::SyEntity*> vCubic;
         std::vector<Eg::SyEntity*> vQuad;
         OpRegistryHelpers::collectBezierCandidates(scene, vCubic, vQuad);
@@ -967,12 +985,13 @@ void EditOperationRegistry::registerBezierOps()
 void EditOperationRegistry::registerArrayOp()
 {
     auto& reg = m_bus->registry();
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Array, [m_algorithmRunner = m_algorithmRunner] {
-        if (!m_algorithmRunner)
-            return;
-        OperationRequest req;
-        req.id = OperationId::Algo_Array;
-        req.source = OperationSource::Menu;
-        m_algorithmRunner->runForOperation(OperationId::Algo_Array, req);
-    }));
+    reg.registerOperation(
+        std::make_unique<LambdaOperation>(OperationId::Edit_Array, [m_algorithmRunner = m_algorithmRunner] {
+            if (!m_algorithmRunner)
+                return;
+            OperationRequest req;
+            req.id = OperationId::Algo_Array;
+            req.source = OperationSource::Menu;
+            m_algorithmRunner->runForOperation(OperationId::Algo_Array, req);
+        }));
 }

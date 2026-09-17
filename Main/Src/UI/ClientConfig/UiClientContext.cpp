@@ -76,9 +76,7 @@ const QString& UiClientContext::clientId() const
 
     m_resolved = true;
     // 该日志是排查「客户配置为什么没生效」的第一现场，务必保留
-    SY_DEBUGF("[UiClientContext] Active client id='%s' (source: %s)",
-        qPrintable(m_cachedClientId),
-        qPrintable(source));
+    SY_DEBUGF("[UiClientContext] Active client id='%s' (source: %s)", qPrintable(m_cachedClientId), qPrintable(source));
     return m_cachedClientId;
 }
 
@@ -98,9 +96,8 @@ QString UiClientContext::configResourcePath() const
     // 客户 ID 拼写错误或配置未随包发布时，回退到默认客户配置。
     // 这里不能直接失败：UI 构建已无硬编码回退路径，加载失败会导致空窗口。
     const QString fallback = configResourcePathFor(QString::fromUtf8(kDefaultClientId));
-    SY_WARNF("[UiClientContext] Client config not found: '%s', falling back to '%s'",
-        qPrintable(path),
-        qPrintable(fallback));
+    SY_WARNF(
+        "[UiClientContext] Client config not found: '%s', falling back to '%s'", qPrintable(path), qPrintable(fallback));
     return fallback;
 }
 

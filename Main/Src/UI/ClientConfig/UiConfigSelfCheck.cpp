@@ -14,7 +14,7 @@
 #include "UI2D/Operation/CommandCatalog.h"
 
 #if BUILD_UI3D
-#include "UI3D/Operation/CommandCatalog3D.h"
+    #include "UI3D/Operation/CommandCatalog3D.h"
 #endif
 
 #include "Log/SyLogger.h"
@@ -124,7 +124,6 @@ namespace
         };
         return kGeoModelOnly.contains(commandId);
     }
-
 }  // namespace
 
 QVector<UiConfigCommandRef> UiConfigSelfCheck::collectCommandRefs(const UiConfigData& config)
@@ -186,8 +185,8 @@ QVector<UiConfigFeatureRef> UiConfigSelfCheck::collectFeatureRefs(const UiConfig
             {
                 if (!action->feature.isEmpty())
                 {
-                    refs.append({ action->feature,
-                        QStringLiteral("toolBars/") + toolBar.id + QLatin1Char('/') + action->id });
+                    refs.append(
+                        { action->feature, QStringLiteral("toolBars/") + toolBar.id + QLatin1Char('/') + action->id });
                 }
             }
         }
@@ -222,6 +221,7 @@ bool UiConfigSelfCheck::isFeatureCompiledIn(const QString& featureId, bool& know
         const char* featureId;
         bool compiled;
     };
+
     static const FeatureBuildSwitch kMap[] = {
         { "nesting", BuildConfig::kNesting },
         { "vision", BuildConfig::kVision },
@@ -263,10 +263,10 @@ UiConfigSelfCheckReport UiConfigSelfCheck::run(const UiConfigData& config)
             continue;
         }
 
-        const bool wants2D = ref.workbenches.isEmpty()
-            || ref.workbenches.contains(QStringLiteral("2D"), Qt::CaseInsensitive);
-        const bool wants3D = ref.workbenches.isEmpty()
-            || ref.workbenches.contains(QStringLiteral("3D"), Qt::CaseInsensitive);
+        const bool wants2D =
+            ref.workbenches.isEmpty() || ref.workbenches.contains(QStringLiteral("2D"), Qt::CaseInsensitive);
+        const bool wants3D =
+            ref.workbenches.isEmpty() || ref.workbenches.contains(QStringLiteral("3D"), Qt::CaseInsensitive);
 
         QStringList missing;
         if (wants2D && !resolvableIn2D(ref.commandId))
@@ -286,8 +286,8 @@ UiConfigSelfCheckReport UiConfigSelfCheck::run(const UiConfigData& config)
         {
             continue;
         }
-        const QString detail = QStringLiteral("%1 @ %2 (catalog missing: %3)")
-                                   .arg(ref.commandId, ref.path, missing.join(QLatin1Char('/')));
+        const QString detail =
+            QStringLiteral("%1 @ %2 (catalog missing: %3)").arg(ref.commandId, ref.path, missing.join(QLatin1Char('/')));
         if (gatedOutByGeoModelCore(ref.commandId))
         {
             report.gatedOutByBuild << detail;
@@ -296,7 +296,6 @@ UiConfigSelfCheckReport UiConfigSelfCheck::run(const UiConfigData& config)
         {
             report.unresolvedCommands << detail;
         }
-
     }
 
     // ---- 2) feature：JSON / License / 编译开关 三侧交叉 ----
@@ -315,8 +314,7 @@ UiConfigSelfCheckReport UiConfigSelfCheck::run(const UiConfigData& config)
         const bool licensed = gate.isAllowed(ref.featureId);
         if (licensed && !compiled)
         {
-            report.licensedButNotCompiled
-                << QStringLiteral("%1 @ %2").arg(ref.featureId, ref.path);
+            report.licensedButNotCompiled << QStringLiteral("%1 @ %2").arg(ref.featureId, ref.path);
         }
         else if (!licensed && compiled)
         {
@@ -331,8 +329,7 @@ UiConfigSelfCheckReport UiConfigSelfCheck::run(const UiConfigData& config)
         {
             if (menu.workbenches.contains(QStringLiteral("3D"), Qt::CaseInsensitive))
             {
-                report.workbenchNotCompiled
-                    << QStringLiteral("3D @ menus/%1 (BUILD_UI3D is off)").arg(menu.id);
+                report.workbenchNotCompiled << QStringLiteral("3D @ menus/%1 (BUILD_UI3D is off)").arg(menu.id);
             }
         }
     }
@@ -353,23 +350,19 @@ void UiConfigSelfCheck::logReport(const UiConfigSelfCheckReport& report, const Q
         static_cast<int>(report.compiledButNotLicensed.size()),
         static_cast<int>(report.workbenchNotCompiled.size()));
 
-
     // 逐条打印：这些条目本身就是"去改哪一行 JSON / 开哪个构建开关"的答案，
     // 只给个计数等于没说。条数天然很少（正常构建应为 0）。
     for (const QString& item : report.unresolvedCommands)
     {
-        SY_ERRORF("[ConfigSelfCheck] command not in catalog, button will never respond: %s",
-            item.toUtf8().constData());
+        SY_ERRORF("[ConfigSelfCheck] command not in catalog, button will never respond: %s", item.toUtf8().constData());
     }
     for (const QString& item : report.licensedButNotCompiled)
     {
-        SY_ERRORF("[ConfigSelfCheck] feature licensed but not compiled into this build: %s",
-            item.toUtf8().constData());
+        SY_ERRORF("[ConfigSelfCheck] feature licensed but not compiled into this build: %s", item.toUtf8().constData());
     }
     for (const QString& item : report.workbenchNotCompiled)
     {
-        SY_WARNF("[ConfigSelfCheck] workbench declared in config but not compiled: %s",
-            item.toUtf8().constData());
+        SY_WARNF("[ConfigSelfCheck] workbench declared in config but not compiled: %s", item.toUtf8().constData());
     }
     if (!report.gatedOutByBuild.isEmpty())
     {
@@ -379,8 +372,7 @@ void UiConfigSelfCheck::logReport(const UiConfigSelfCheckReport& report, const Q
 
     for (const QString& item : report.compiledButNotLicensed)
     {
-        SY_INFOF("[ConfigSelfCheck] feature compiled but not licensed (hidden by gate): %s",
-            item.toUtf8().constData());
+        SY_INFOF("[ConfigSelfCheck] feature compiled but not licensed (hidden by gate): %s", item.toUtf8().constData());
     }
 
     if (!report.hasBlockingIssue())
@@ -403,6 +395,5 @@ void UiConfigSelfCheck::runAndLogForCurrentClient()
     }
 
     const UiConfigSelfCheckReport report = run(*config);
-    logReport(report, config->meta.clientId.isEmpty() ? UiClientContext::instance().clientId()
-                                                      : config->meta.clientId);
+    logReport(report, config->meta.clientId.isEmpty() ? UiClientContext::instance().clientId() : config->meta.clientId);
 }

@@ -6,7 +6,6 @@
 #include "LaserOperationRegistry.h"
 #include "DocumentPersistenceHelper.h"
 
-
 #include "UI2D/Operation/OperationRegistry.h"
 #include "UI2D/Operation/OperationRouting.h"
 
@@ -23,9 +22,7 @@
 #include "../Hardware/MachineProfile.h"
 #include "../Hardware/ProcessingJobService.h"
 
-
 #include "Common/AppInitializer.h"
-
 
 // UndoRedoManager → OperationBus 桥接观察者
 // 当 SceneEditService 等绕过 OperationBus::run() 直接推入 undo 命令时，
@@ -37,6 +34,7 @@ public:
         : m_bus(bus)
     {
     }
+
     void onUndoStateChanged() override
     {
         if (m_bus)
@@ -44,7 +42,9 @@ public:
             emit m_bus->undoStateChanged();
         }
     }
+
     void onCanUndoChanged(bool) override {}
+
     void onCanRedoChanged(bool) override {}
 
 private:
@@ -120,7 +120,6 @@ ApplicationCompositionRoot::~ApplicationCompositionRoot()
         m_deviceHost->stop();
     }
 
-
     // 进程退出时，FillGeometryUpdater（Meyers 单例）的析构晚于本组合根，
     // 若不在 SceneEditService 仍存活时解绑，其析构会访问已销毁对象导致崩溃。
     Eg::FillGeometryUpdater::instance().detach();
@@ -135,7 +134,6 @@ ProcessingJobService* ApplicationCompositionRoot::processingJobService()
 {
     return m_processingJobService.get();
 }
-
 
 bool ApplicationCompositionRoot::startHardware(const QString& configDir, QString& warningOut)
 {
@@ -156,7 +154,6 @@ bool ApplicationCompositionRoot::startHardware(const QString& configDir, QString
     return true;
 }
 
-
 ISelectionService* ApplicationCompositionRoot::selectionService()
 {
     return m_selectionService.get();
@@ -173,8 +170,7 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     , m_operationBus(std::make_unique<OperationBus>())
     , m_sceneManager(std::make_unique<Eg::SceneManager>())
     , m_sceneManager3D(std::make_unique<Eg::SceneManager3D>())
-    , m_machiningDataBridge(
-          std::make_unique<MachiningDataBridgeService>(m_sceneManager.get(), m_sceneManager3D.get()))
+    , m_machiningDataBridge(std::make_unique<MachiningDataBridgeService>(m_sceneManager.get(), m_sceneManager3D.get()))
     , m_undoRedoManager(std::make_unique<UndoRedoManager>(m_sceneManager.get()))
     , m_sceneEditService(std::make_unique<SceneEditService>(m_sceneManager.get(), m_undoRedoManager.get()))
     , m_clipboard(std::make_unique<Eg::EntityClipboard>())
@@ -210,7 +206,6 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     m_processingJobService = std::make_unique<ProcessingJobService>(m_deviceHost.get());
 
     registerAllOperations();
-
 
     // 桥接 UndoRedoManager 观察者 → OperationBus::undoStateChanged
     // 当 SceneEditService 等绕过 OperationBus::run() 直接推入 undo 命令时，
@@ -489,8 +484,7 @@ void ApplicationCompositionRoot::registerAllOperations()
     laserConfig.errorReporter = [this](const QString& message) {
         // 加工失败必须让操作员看见：只写日志的话，
         // 现场表现是「按了开始加工什么都没发生」
-        QMessageBox::warning(m_shellHost ? m_shellHost->mainWindow() : nullptr,
-            QObject::tr("Processing"), message);
+        QMessageBox::warning(m_shellHost ? m_shellHost->mainWindow() : nullptr, QObject::tr("Processing"), message);
     };
 
     m_laserOperationRegistry = std::make_unique<LaserOperationRegistry>(laserConfig);
@@ -500,7 +494,6 @@ void ApplicationCompositionRoot::registerAllOperations()
     PendingOperationRegistry pendingOps(m_operationBus.get());
     pendingOps.registerAll();
 }
-
 
 AlgorithmRunner* ApplicationCompositionRoot::algorithmRunner()
 {

@@ -1,11 +1,11 @@
 // 3D 默认场景构建依赖 UI3D 的 SceneDocument3D，BUILD_UI3D 关闭时整体不参与编译
 #if BUILD_UI3D
 
-#include "SceneBuilder3D.h"
+    #include "SceneBuilder3D.h"
 
-#include "UI3D/Service/SceneDocument3D.h"
-#include <QObject>
-#include <cstring>
+    #include "UI3D/Service/SceneDocument3D.h"
+    #include <QObject>
+    #include <cstring>
 
 // ABI 安全：返回裸指针（调用方通过 destroyScene 释放）
 SceneDocument3D* SceneBuilder3D::createDefaultScene(QString& rootNodeId)
