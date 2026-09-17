@@ -262,10 +262,11 @@ function(sanyi_add_shared_library target)
     target_compile_features(${target} PUBLIC cxx_std_17)
 
     if(SANYI_SHLIB_EXPORT_MACRO)
-        # CMake 标准做法：<target>_EXPORTS 用于 DLL 导出/导入
-        # CoreAPI.h 会根据 UICORE_EXPORTS 判断是否导出
-        set(_exports_macro "${SANYI_SHLIB_EXPORT_MACRO}_EXPORTS")
-        target_compile_definitions(${target} PRIVATE ${_exports_macro})
+        # EXPORT_MACRO 传入的就是头文件里 #ifdef 检查的完整宏名（如 LOG_EXPORTS、
+        # NESTING_EXPORTS、UICORE_EXPORTS），直接定义，不能再追加 _EXPORTS，
+        # 否则会变成 LOG_EXPORTS_EXPORTS，导致头文件走 dllimport 分支，
+        # 源文件定义导出函数时报 C2491。
+        target_compile_definitions(${target} PRIVATE ${SANYI_SHLIB_EXPORT_MACRO})
     endif()
     if(SANYI_SHLIB_COMPILE_DEFINITIONS)
         target_compile_definitions(${target} PRIVATE ${SANYI_SHLIB_COMPILE_DEFINITIONS})
