@@ -16,7 +16,9 @@
 #include <QVariant>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <functional>
+#include <vector>
 
 namespace
 {
@@ -491,6 +493,18 @@ public:
         m_renameCallback = std::move(callback);
     }
 
+    /// 按图元 id 定位到列 0 的索引（O(log N)）。供 setSelectedIds 批量选中使用，
+    /// 取代原先「对每个 id 线性扫一遍全部行」的 O(选中数 × 行数) 查找。
+    QModelIndex indexForId(const QString& id) const
+    {
+        auto it = m_nodeMap.constFind(id);
+        if (it == m_nodeMap.constEnd() || it.value() == nullptr)
+        {
+            return {};
+        }
+        return it.value()->index();
+    }
+
 private:
     /// 设定列结构（列数 + 表头文字）。clear() 后必须重做一次，否则模型会退化成零列
     void resetColumns()
@@ -841,35 +855,45 @@ void SceneTreePanel::setSelectedIds(const QSet<QString>& ids)
         auto* model2d = dynamic_cast<SceneTreeTableModel2D*>(m_model);
         if (model2d)
         {
-            // 优化2: 批量选择 - 使用 QItemSelection 一次性选择多个项目
-            QItemSelection selection;
-            QModelIndex firstIndex;
+            // 优化2: 批量选择。先把选中行号收集起来排序，再把连续行号合并成区间一次性 select。
+            // 旧实现对每个 id 各调一次 QItemSelection::select()，那是 range 插入合并、
+            // 选中项多时是超线性的（全选 31.7 万图元时就在这 O(N²) 卡死）。
+            std::vector<int> rows;
+            rows.reserve(idSet2D.size());
             for (qint64 id : idSet2D)
             {
                 const QModelIndex idx = model2d->indexForId(id);
-                if (!idx.isValid())
+                if (idx.isValid())
                 {
-                    continue;
-                }
-                selection.select(idx, idx);
-                if (!firstIndex.isValid())
-                {
-                    firstIndex = idx;
+                    rows.push_back(idx.row());
                 }
             }
 
-            // 一次性应用选择
-            m_view->selectionModel()->select(selection, QItemSelectionModel::Select | QItemSelectionModel::Rows);
-
-            if (firstIndex.isValid())
+            if (!rows.empty())
             {
-                QModelIndex parent = firstIndex.parent();
-                while (parent.isValid())
+                std::sort(rows.begin(), rows.end());
+
+                QItemSelection selection;
+                int runStart = rows.front();
+                int runEnd = runStart;
+                for (size_t i = 1; i < rows.size(); ++i)
                 {
-                    m_view->expand(parent);
-                    parent = parent.parent();
+                    const int r = rows[i];
+                    if (r == runEnd || r == runEnd + 1)
+                    {
+                        runEnd = r;  // 去重 + 连续行合并进当前区间
+                        continue;
+                    }
+                    selection.append(QItemSelectionRange(model2d->index(runStart, 0),
+                                                         model2d->index(runEnd, 0)));
+                    runStart = runEnd = r;
                 }
-                m_view->scrollTo(firstIndex);
+                selection.append(QItemSelectionRange(model2d->index(runStart, 0),
+                                                     model2d->index(runEnd, 0)));
+
+                // 一次性应用选择
+                m_view->selectionModel()->select(selection, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+                m_view->scrollTo(model2d->index(rows.front(), 0));
             }
         }
     }
@@ -878,22 +902,44 @@ void SceneTreePanel::setSelectedIds(const QSet<QString>& ids)
         auto* model3d = dynamic_cast<SceneTreeTableModel3D*>(m_model);
         if (model3d)
         {
-            // 3D模式也使用批量选择
-            QItemSelection selection;
+            // 3D 批量选择：与 2D 同思路 —— 先按 id 定位行号（O(log N)），排序后合并连续区间
+            // 一次性 select，避免「对每个 id 线性扫全部行」的 O(选中数 × 行数) 查找，
+            // 也避免对每个 id 各一次 QItemSelection::select() 的超线性 range 插入合并。
+            std::vector<int> rows;
+            rows.reserve(ids.size());
             for (const QString& id : ids)
             {
-                // 遍历查找匹配的项
-                for (int row = 0; row < m_model->rowCount(); ++row)
+                const QModelIndex idx = model3d->indexForId(id);
+                if (idx.isValid())
                 {
-                    const QModelIndex idx = m_model->index(row, 1, QModelIndex());
-                    if (idx.data(kIdRole).toString() == id)
-                    {
-                        selection.select(idx, idx);
-                        break;
-                    }
+                    rows.push_back(idx.row());
                 }
             }
-            m_view->selectionModel()->select(selection, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+
+            if (!rows.empty())
+            {
+                std::sort(rows.begin(), rows.end());
+
+                QItemSelection selection;
+                int runStart = rows.front();
+                int runEnd = runStart;
+                for (size_t i = 1; i < rows.size(); ++i)
+                {
+                    const int r = rows[i];
+                    if (r == runEnd || r == runEnd + 1)
+                    {
+                        runEnd = r;  // 去重 + 连续行合并进当前区间
+                        continue;
+                    }
+                    selection.append(QItemSelectionRange(model3d->index(runStart, 0),
+                                                         model3d->index(runEnd, 0)));
+                    runStart = runEnd = r;
+                }
+                selection.append(QItemSelectionRange(model3d->index(runStart, 0),
+                                                     model3d->index(runEnd, 0)));
+
+                m_view->selectionModel()->select(selection, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+            }
         }
     }
 
