@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -13,10 +14,10 @@ class UiWorkbench;
 
 struct AppPaths
 {
-    std::wstring appRootPath;
-    std::wstring configDir;
-    std::wstring resourcesDir;
-    std::wstring pluginsDir;
+    std::filesystem::path appRootPath;
+    std::filesystem::path configDir;
+    std::filesystem::path resourcesDir;
+    std::filesystem::path pluginsDir;
 };
 
 namespace MainApp

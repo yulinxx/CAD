@@ -50,10 +50,10 @@ AppPaths MainApp::buildAppPaths(const std::string& appName)
 {
     AppPaths paths;
 
-    paths.appRootPath = AppPathManager::appRootDir().toStdWString();
-    paths.configDir = AppPathManager::configDir().toStdWString();
-    paths.resourcesDir = AppPathManager::resourcesDir().toStdWString();
-    paths.pluginsDir = AppPathManager::pluginsDir().toStdWString();
+    paths.appRootPath = AppPathManager::appRootDir().toStdString();
+    paths.configDir = AppPathManager::configDir().toStdString();
+    paths.resourcesDir = AppPathManager::resourcesDir().toStdString();
+    paths.pluginsDir = AppPathManager::pluginsDir().toStdString();
 
     return paths;
 }
