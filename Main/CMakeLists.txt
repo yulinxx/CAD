@@ -93,7 +93,7 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/BuildConfig.h" "${_build_config_configur
 # 没有这份配置：运行期只会静默回退到 san_yi，既不报错也看不出少了什么。
 # 反方向（qrc 里登记了已删除的文件）rcc 自己会报错，不需要额外护栏。
 # ---------------------------------------------------------------------------
-file(GLOB _client_config_json RELATIVE "${SRC_ROOT}/UI/ClientConfig"
+file(GLOB _client_config_json CONFIGURE_DEPENDS RELATIVE "${SRC_ROOT}/UI/ClientConfig"
      "${SRC_ROOT}/UI/ClientConfig/configs/*.json")
 file(READ "${SRC_ROOT}/UI/ClientConfig/configs.qrc" _configs_qrc_content)
 set(_configs_qrc_missing "")
@@ -155,11 +155,11 @@ target_compile_features(${app_name} PRIVATE cxx_std_17)
 # （applicationDirPath()）。Renderx 自身只复制到其 dylib 输出目录，
 # macOS bundle 化后应用二进制位于 Contents/MacOS，需额外复制一份。
 if(SANYI_RENDERX_DIR AND EXISTS "${SANYI_RENDERX_DIR}/src/shader")
-    file(GLOB _renderx_shader_files
+    file(GLOB _renderx_shader_files CONFIGURE_DEPENDS
         "${SANYI_RENDERX_DIR}/src/shader/*.vert"
         "${SANYI_RENDERX_DIR}/src/shader/*.frag"
         "${SANYI_RENDERX_DIR}/src/shader/*.comp")
-    file(GLOB _renderx_font_files "${SANYI_RENDERX_DIR}/src/res/*.ttf")
+    file(GLOB _renderx_font_files CONFIGURE_DEPENDS "${SANYI_RENDERX_DIR}/src/res/*.ttf")
     add_custom_command(TARGET ${app_name} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${app_name}>"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${_renderx_shader_files} "$<TARGET_FILE_DIR:${app_name}>/"
@@ -328,7 +328,7 @@ if(TARGET UICommon_translations)
     add_dependencies(${app_name} UICommon_translations)
 endif()
 
-file(GLOB TRANSLATION_QM_FILES "${TRANSLATIONS_SRC_DIR}/*.qm")
+file(GLOB TRANSLATION_QM_FILES CONFIGURE_DEPENDS "${TRANSLATIONS_SRC_DIR}/*.qm")
 
 if(TRANSLATION_QM_FILES)
     add_custom_command(TARGET ${app_name} POST_BUILD
@@ -406,7 +406,7 @@ foreach(_tool ${_deploy_tools})
 
     # 部署 bin/ 目录
     if(EXISTS "${_tool_bin_dir}")
-        file(GLOB _tool_bin_files "${_tool_bin_dir}/*")
+        file(GLOB _tool_bin_files CONFIGURE_DEPENDS "${_tool_bin_dir}/*")
         list(LENGTH _tool_bin_files _tool_bin_file_count)
         if(_tool_bin_file_count GREATER 0)
             # Windows: 直接复制到输出目录（dll + exe 在一起）
@@ -438,7 +438,7 @@ foreach(_tool ${_deploy_tools})
 
     # 部署 lib/ 目录（仅 Linux/macOS）
     if(NOT WIN32 AND EXISTS "${_tool_lib_dir}")
-        file(GLOB _tool_lib_files "${_tool_lib_dir}/*.so*" "${_tool_lib_dir}/*.dylib")
+        file(GLOB _tool_lib_files CONFIGURE_DEPENDS "${_tool_lib_dir}/*.so*" "${_tool_lib_dir}/*.dylib")
         list(LENGTH _tool_lib_files _tool_lib_file_count)
         if(_tool_lib_file_count GREATER 0)
             add_custom_command(TARGET ${app_name} POST_BUILD

@@ -1,5 +1,5 @@
-find_package(GTest REQUIRED)
-find_package(OpenSSL REQUIRED)
+find_package(GTest CONFIG REQUIRED)
+find_package(OpenSSL CONFIG REQUIRED)
 include(GoogleTest)
 
 add_executable(LicenseTests

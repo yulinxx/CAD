@@ -782,7 +782,7 @@ namespace
             const std::string arg = argv[i];
             if (arg == "--frames" && i + 1 < argc)
             {
-                options.frames = std::atoi(argv[++i]);
+                options.frames = std::strtol(argv[++i], nullptr, 10);
             }
             else if (arg == "--no-teardown")
             {

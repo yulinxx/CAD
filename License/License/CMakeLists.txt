@@ -39,7 +39,7 @@ list(FILTER LIB_SOURCES EXCLUDE REGEX ".*/KeygenTool\\.cpp$")
 list(FILTER LIB_SOURCES EXCLUDE REGEX ".*/LicenseKeygenDLL\\.cpp$")
 
 # --- 第三方依赖 ---
-find_package(OpenSSL REQUIRED)
+find_package(OpenSSL CONFIG REQUIRED)
 
 # --- 统一入口创建 DLL ---
 sanyi_add_shared_library(${LIB_NAME}
@@ -78,7 +78,7 @@ endif()
 if(BUILD_LICENSE_TESTS)
     target_compile_definitions(${LIB_NAME} PRIVATE LICENSE_TEST_HOOKS)
     enable_testing()
-    find_package(GTest REQUIRED)
+    find_package(GTest CONFIG REQUIRED)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../Test" "${CMAKE_CURRENT_BINARY_DIR}/LicenseTests")
 endif()
 
