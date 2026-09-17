@@ -90,8 +90,29 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
     Fio::FioParseResult ir;
     char errBuf[1024] = { 0 };
 
+    // 把 FileIO 的 C 进度回调桥接到 ImportContext::progressCallback（Parse 阶段）。
+    // 回调在解析线程（异步导入时为工作线程）同步触发，progressCallback 的实现需线程安全
+    // （导入链路里它写的是线程安全的 ProgressTracker）。无消费者时不注册，零开销。
+    struct ParseProgressBridge
+    {
+        const std::function<void(ImportPhase, float)>* callback = nullptr;
+    };
+    ParseProgressBridge progressBridge{ &context.progressCallback };
+    Fio::ParseProgressCallback progressCb = nullptr;
+    if (context.progressCallback)
+    {
+        progressCb = [](float p, void* ctx) {
+            auto* bridge = static_cast<ParseProgressBridge*>(ctx);
+            if (bridge && bridge->callback && *bridge->callback)
+            {
+                (*bridge->callback)(ImportPhase::Parse, p);
+            }
+        };
+    }
+
     const auto startTime = std::chrono::steady_clock::now();
-    const bool ok = fileIO.importToIR(pathStr.c_str(), format, &ir, errBuf, sizeof(errBuf));
+    const bool ok =
+        fileIO.importToIR(pathStr.c_str(), format, &ir, errBuf, sizeof(errBuf), progressCb, &progressBridge);
     const auto parseMs =
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - startTime).count();
 

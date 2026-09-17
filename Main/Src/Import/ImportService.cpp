@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <QCoreApplication>
+#include <QEventLoop>
 #include <QFileInfo>
 #include <QMetaObject>
 #include <QPointer>
@@ -273,7 +274,7 @@ ImportResult ImportService::importWithContext(const ImportContext& context, cons
     }
 
     // ===== 4：刷新显示 =====
-    phaseRefreshDisplay(result, options);
+    phaseRefreshDisplay(mutableCtx, result, options);
 
     // ===== 5：回写状态 =====
     phaseWriteBackState(mutableCtx, result);
@@ -411,7 +412,7 @@ void ImportService::importAsync(
                     return;
                 }
 
-                safeSelf->phaseRefreshDisplay(result, options);
+                safeSelf->phaseRefreshDisplay(mainCtx, result, options);
                 safeSelf->phaseWriteBackState(mainCtx, result);
 
                 finishOnMainThread(result);
@@ -456,7 +457,7 @@ bool ImportService::canImport(const QString& filePath, const QString& workbenchI
 // ===== 1：识别文件格式 =====
 ImportResult ImportService::phaseDetectFormat(ImportContext& context)
 {
-    updateProgress(ImportPhase::DetectFormat, 0.0f);
+    updateProgress(context, ImportPhase::DetectFormat, 0.0f);
     emit importPhaseChanged(ImportPhase::DetectFormat);
 
     // Detect format phase
@@ -491,7 +492,7 @@ ImportResult ImportService::phaseDetectFormat(ImportContext& context)
         return ImportResult::fail(msg, ImportErrorType::FormatNotSupported);
     }
 
-    updateProgress(ImportPhase::DetectFormat, 1.0f);
+    updateProgress(context, ImportPhase::DetectFormat, 1.0f);
 
     return ImportResult::ok();
 }
@@ -499,7 +500,7 @@ ImportResult ImportService::phaseDetectFormat(ImportContext& context)
 // ===== Parse file =====
 ImportResult ImportService::phaseParse(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
 {
-    updateProgress(ImportPhase::Parse, 0.0f);
+    updateProgress(context, ImportPhase::Parse, 0.0f);
     emit importPhaseChanged(ImportPhase::Parse);
 
     // Parse file phase
@@ -519,7 +520,7 @@ ImportResult ImportService::phaseParse(const ImportContext& context, Fio::VecSyE
     }
 
     SY_DEBUGF("[ImportService] Parsed %d entities", static_cast<int>(outEntities.size()));
-    updateProgress(ImportPhase::Parse, 1.0f);
+    updateProgress(context, ImportPhase::Parse, 1.0f);
 
     return result;
 }
@@ -530,7 +531,7 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     const ImportOptions& options,
     const ImportResult& parseResult)
 {
-    updateProgress(ImportPhase::BuildDocument, 0.0f);
+    updateProgress(context, ImportPhase::BuildDocument, 0.0f);
     emit importPhaseChanged(ImportPhase::BuildDocument);
 
     // Build document phase
@@ -673,8 +674,23 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
                 preInsertIds.push_back(entity ? entity->id : 0);
             }
 
-            const std::vector<Eg::EntityId> finalIds =
-                m_editService->addEntities(std::move(flatEntities), "Import " + context.sourcePath.toStdString());
+            // 落库段细粒度进度：映射到 BuildDocument 阶段的 0.55~1.0，并在回调里节流泵送
+            // 事件循环。十万级图元的入场/建索引会长时间占满主线程，不泵事件的话窗口模态
+            // 进度对话框会冻住；这里与 AlgorithmApplicationService 的 apply 阶段同一手法。
+            // 无进度消费者时（同步导入）progressCallback 为空，只做空转，不改变原行为。
+            const auto commitProgress = [&context](double p) {
+                if (!context.progressCallback)
+                {
+                    return;  // 同步导入无进度消费者：不泵事件，保持原有行为
+                }
+                const float mapped = 0.55f + 0.45f * static_cast<float>(std::clamp(p, 0.0, 1.0));
+                context.progressCallback(ImportPhase::BuildDocument, mapped);
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 30);
+            };
+            const std::vector<Eg::EntityId> finalIds = m_editService->addEntities(std::move(flatEntities),
+                "Import " + context.sourcePath.toStdString(),
+                CommitMode::Undoable,
+                commitProgress);
 
             // 下标一一对应：addEntities 按入参顺序为每个非空图元返回最终 ID
             const size_t mapped = std::min(preInsertIds.size(), finalIds.size());
@@ -744,7 +760,7 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     }
 
     SY_DEBUGF("[ImportService] Document built: %d entities (%d mesh + %d flat)", entityCount, meshAdded, flatAdded);
-    updateProgress(ImportPhase::BuildDocument, 1.0f);
+    updateProgress(context, ImportPhase::BuildDocument, 1.0f);
 
     // 根据图元类型设置目标工作台 ID
     auto result = ImportResult::ok(QStringLiteral("Imported %1 entities successfully").arg(entityCount), entityCount);
@@ -753,9 +769,10 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
 }
 
 // ===== 4：刷新显示 =====
-void ImportService::phaseRefreshDisplay(const ImportResult& result, const ImportOptions& options)
+void ImportService::phaseRefreshDisplay(
+    const ImportContext& context, const ImportResult& result, const ImportOptions& options)
 {
-    updateProgress(ImportPhase::RefreshDisplay, 0.0f);
+    updateProgress(context, ImportPhase::RefreshDisplay, 0.0f);
     emit importPhaseChanged(ImportPhase::RefreshDisplay);
 
     // Refresh display phase
@@ -819,13 +836,13 @@ void ImportService::phaseRefreshDisplay(const ImportResult& result, const Import
         }
     }
 
-    updateProgress(ImportPhase::RefreshDisplay, 1.0f);
+    updateProgress(context, ImportPhase::RefreshDisplay, 1.0f);
 }
 
 // ===== Write back state =====
 void ImportService::phaseWriteBackState(const ImportContext& context, const ImportResult& result)
 {
-    updateProgress(ImportPhase::WriteBackState, 0.0f);
+    updateProgress(context, ImportPhase::WriteBackState, 0.0f);
     emit importPhaseChanged(ImportPhase::WriteBackState);
 
     // Write back state phase
@@ -877,7 +894,7 @@ void ImportService::phaseWriteBackState(const ImportContext& context, const Impo
         m_statusBarUpdateCallback(statusMsg);
     }
 
-    updateProgress(ImportPhase::WriteBackState, 1.0f);
+    updateProgress(context, ImportPhase::WriteBackState, 1.0f);
 }
 
 int ImportService::restoreImportedLayers(const ImportContext& context,
@@ -1134,11 +1151,20 @@ int ImportService::restoreImportedGroups(const ImportResult& parseResult,
 }
 
 
-void ImportService::updateProgress(ImportPhase phase, float progress)
+void ImportService::updateProgress(const ImportContext& context, ImportPhase phase, float progress)
 {
     // 阶段号只落 Debug 级：Info 级里已有每个 phase 的 START/END，这里避免重复噪音，
     // 但排查"卡在哪个阶段"时把日志级别降到 Debug 就能看到进度推进
     SY_DEBUGF("[ImportService] Progress: phase=%d, value=%.2f", static_cast<int>(phase), progress);
+
+    // 转发给上下文的进度回调：这是后台线程唯一安全的进度出口（调用方通常写入
+    // 线程安全的 ProgressTracker，再由 UI 定时器读取刷新进度条）。
+    // 解析阶段在工作线程调用、落库阶段在主线程调用，两侧都会经过这里。
+    if (context.progressCallback)
+    {
+        context.progressCallback(phase, progress);
+    }
+
     emit importProgress(progress);
 }
 

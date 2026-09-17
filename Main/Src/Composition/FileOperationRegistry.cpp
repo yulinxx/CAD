@@ -16,6 +16,7 @@
 #include "Engine2D/Interaction/LayerManager.h"
 #include "Engine/EntityIdGenerator.h"
 #include "Import/ImportService.h"
+#include "Import/ImportProgressRunner.h"
 #include "Export/ExportService.h"
 #include "Persistence/PersistenceService.h"
 #include "Persistence/LayerPersistenceBridge.h"
@@ -209,7 +210,8 @@ bool FileOperationRegistry::doOpenFile(const QString& filePath)
         *m_currentFilePath = path.toStdString();
     };
 
-    ImportResult result = m_importService->importWithContext(context, opts);
+    // 带进度对话框的异步导入：解析在工作线程、落库回主线程，主界面不冻结
+    ImportResult result = ImportProgressRunner::run(m_importService, context, opts, m_parentWidget);
     if (!result.success)
     {
         showFileError(QObject::tr("Import Error"), result.message);
@@ -245,7 +247,8 @@ void FileOperationRegistry::doImportByFormat(Fio::FileFormat fmt)
         ImportContext context;
         context.sourcePath = filePath;
 
-        ImportResult result = m_importService->importWithContext(context, opts);
+        // 带进度对话框的异步导入：解析在工作线程、落库回主线程，主界面不冻结
+        ImportResult result = ImportProgressRunner::run(m_importService, context, opts, m_parentWidget);
         if (!result.success)
         {
             showFileError(QObject::tr("Import Error"), result.message);
