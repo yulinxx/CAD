@@ -183,11 +183,6 @@ add_subdirectory(Engine/2D)
 add_subdirectory(Engine/3D)
 add_subdirectory(Engine/Persistence)
 
-# EngineAdapter - 算法适配层（接口隔离）
-if(BUILD_ENGINEADAPTER)
-    add_subdirectory(Engine/Adapter)
-endif()
-
 # 4. Render 层 - 渲染引擎（Renderx C API）
 option(BUILD_RENDERX "Build Renderx rendering engine" ON)
 if(BUILD_RENDERX)
@@ -231,10 +226,6 @@ else()
 endif()
 
 # 5. UI 层 - 用户界面
-# UICore - UI 抽象层（必须最先构建，其他 UI 模块依赖）
-if(BUILD_UICORE)
-    add_subdirectory(UI/Core)
-endif()
 
 add_subdirectory(UI/Common)
 
@@ -323,12 +314,30 @@ add_subdirectory(Main)
 #
 # 关闭此开关 = 根本不编译 Metal 视口代码路径，退回到 OpenGL；这不是运行时回退
 # ——Metal 初始化失败属于错误，不做静默降级。
-option(SY_ENABLE_METAL_VIEWPORT "Use Metal-backed viewports on Apple platforms" ON)
+#
+# 后端开关统一（2026）：SY_ENABLE_METAL_VIEWPORT 的默认值派生自
+# SANYI_DEFAULT_RENDER_BACKEND（Config.cmake 已在上方 include），不再各自为政，
+# 避免「SANYI_DEFAULT_RENDER_BACKEND=OPENGL 却仍编译 Metal 视口」的错配。
+# 用户仍可显式 -DSY_ENABLE_METAL_VIEWPORT=ON/OFF 覆盖默认。
+if(SANYI_DEFAULT_RENDER_BACKEND STREQUAL "METAL")
+    set(_sy_metal_viewport_default ON)
+else()
+    set(_sy_metal_viewport_default OFF)
+endif()
+option(SY_ENABLE_METAL_VIEWPORT
+    "Use Metal-backed viewports on Apple platforms (default derived from SANYI_DEFAULT_RENDER_BACKEND)"
+    ${_sy_metal_viewport_default})
+unset(_sy_metal_viewport_default)
 if(NOT APPLE)
     # 非 Apple 平台没有 Metal 后端，强制关闭并覆盖缓存值，
     # 免得被误设成 ON 后到处出现无法解析的后端分支。
     set(SY_ENABLE_METAL_VIEWPORT OFF CACHE BOOL
         "Use Metal-backed viewports on Apple platforms" FORCE)
+endif()
+if(SY_ENABLE_METAL_VIEWPORT AND NOT SANYI_DEFAULT_RENDER_BACKEND STREQUAL "METAL")
+    message(WARNING
+        "[SanYi] SY_ENABLE_METAL_VIEWPORT=ON 但 SANYI_DEFAULT_RENDER_BACKEND="
+        "${SANYI_DEFAULT_RENDER_BACKEND}；视口将编译 Metal 路径，默认后端却不是 METAL。")
 endif()
 if(SY_ENABLE_METAL_VIEWPORT)
     message(STATUS "[SanYi] viewport backend: Metal")
@@ -367,14 +376,6 @@ set(SANYI_PROJECT_LIBS
 )
 if(BUILD_CRASHHANDLER)
     list(APPEND SANYI_PROJECT_LIBS CrashHandler)
-endif()
-
-if(BUILD_UICORE)
-    list(APPEND SANYI_PROJECT_LIBS UICore)
-endif()
-
-if(BUILD_ENGINEADAPTER)
-    list(APPEND SANYI_PROJECT_LIBS EngineAdapter)
 endif()
 
 list(APPEND SANYI_PROJECT_LIBS

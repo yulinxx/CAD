@@ -21,8 +21,6 @@ set(SANYI_FILEIO_DIR        "${SANYI_ROOT}/FileIO/FileIO")
 set(SANYI_UI_COMMON_DIR         "${SANYI_ROOT}/UI/Common")
 set(SANYI_UI_2D_DIR             "${SANYI_ROOT}/UI/2D")
 set(SANYI_UI_3D_DIR             "${SANYI_ROOT}/UI/3D")
-set(SANYI_UICORE_DIR            "${SANYI_ROOT}/UI/Core")
-set(SANYI_ENGINEADAPTER_DIR     "${SANYI_ROOT}/Engine/Adapter")
 
 set(SANYI_NETWORK_DIR       "${SANYI_ROOT}/Network/Network")
 set(SANYI_NESTING_DIR       "${SANYI_ROOT}/Nesting/Nesting")
