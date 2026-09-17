@@ -160,12 +160,12 @@ int runCADApplication(int argc, char** argv)
         wchar_t path[MAX_PATH];
         if (GetModuleFileNameW(nullptr, path, MAX_PATH) > 0)
         {
-            appPaths.appRootPath = QFileInfo(QString::fromWCharArray(path)).absolutePath().toStdWString();
+            appPaths.appRootPath = QFileInfo(QString::fromWCharArray(path)).absolutePath().toStdString();
         }
 #else
         if (argc > 0 && argv && argv[0])
         {
-            appPaths.appRootPath = QFileInfo(QString::fromLocal8Bit(argv[0])).absolutePath().toStdWString();
+            appPaths.appRootPath = QFileInfo(QString::fromLocal8Bit(argv[0])).absolutePath().toStdString();
         }
 #endif
     }

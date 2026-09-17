@@ -20,6 +20,7 @@
 
 #ifdef _WIN32
 
+#include <filesystem>
 #include <windows.h>
 #include <minidumpapiset.h>
 #include <cstdio>
@@ -28,62 +29,65 @@
 namespace CrashHandler {
 
 static std::wstring g_serverUrl;
-static std::wstring g_dumpPath;
+static std::filesystem::path g_dumpPath;  // 使用 filesystem::path 管理路径
 
 // 生成 .dmp 文件路径
-inline std::wstring GetDumpPath() {
+inline std::filesystem::path GetDumpPath() {
     wchar_t tempPath[MAX_PATH];
     GetTempPathW(MAX_PATH, tempPath);
-    
+
     SYSTEMTIME st;
     GetLocalTime(&st);
-    
-    wchar_t path[MAX_PATH];
-    swprintf_s(path, L"%sCrash_%04d%02d%02d_%02d%02d%02d.dmp",
-        tempPath,
-        st.wYear, st.wMonth, st.wDay,
-        st.wHour, st.wMinute, st.wSecond);
-    return path;
+
+    // 使用 std::filesystem::path 拼接路径
+    std::filesystem::path dumpPath(tempPath);
+    dumpPath /= std::filesystem::path(
+        std::wstring(L"Crash_") +
+        std::to_wstring(st.wYear) +
+        std::to_wstring(st.wMonth) +
+        std::to_wstring(st.wDay) +
+        L"_" +
+        std::to_wstring(st.wHour) +
+        std::to_wstring(st.wMinute) +
+        std::to_wstring(st.wSecond) +
+        L".dmp"
+    );
+    return dumpPath;
 }
 
 // 定位 crash_reporter.py 所在目录：
 // 崩溃发生时 cwd 未必是安装目录（Explorer 直接启动、服务进程等场景），
 // 硬编码 L"." 会找不到脚本。改为可执行文件所在目录。
-inline std::wstring GetScriptDir() {
+inline std::filesystem::path GetScriptDir() {
     wchar_t buf[MAX_PATH];
     const DWORD n = GetModuleFileNameW(NULL, buf, MAX_PATH);
     if (n == 0 || n >= MAX_PATH) {
-        return L"."; // 失败时回退当前目录（原有行为）
+        return std::filesystem::path(L".");  // 失败时回退当前目录（原有行为）
     }
-    std::wstring path(buf, n);
-    const size_t slash = path.find_last_of(L"\\/");
-    if (slash != std::wstring::npos) {
-        path.resize(slash);
-    }
-    return path;
+    // 使用 std::filesystem::path 获取父目录
+    return std::filesystem::path(buf, std::filesystem::path::generic_format).parent_path();
 }
 
 // 调用 Python 脚本上传
-inline void UploadDump(const wchar_t* dumpPath) {
+inline void UploadDump(const std::filesystem::path& dumpPath) {
     if (g_serverUrl.empty()) return;
 
-    const std::wstring scriptDir = GetScriptDir();
+    const std::filesystem::path scriptDir = GetScriptDir();
 
     // 构造命令: python crash_reporter.py <server> <dump>
-    wchar_t cmd[MAX_PATH * 3];
-    swprintf_s(cmd, 
-        L"python.exe \"%s\\crash_reporter.py\" \"%s\" \"%s\"",
-        scriptDir.c_str(),
-        g_serverUrl.c_str(),
-        dumpPath);
-    
+    // 使用 wstring 构造命令
+    const std::wstring cmd = L"python.exe \"" +
+        (scriptDir / L"crash_reporter.py").wstring() + L"\" \"" +
+        g_serverUrl + L"\" \"" +
+        dumpPath.wstring() + L"\"";
+
     // 静默执行，等待完成；
     // 子进程工作目录设为脚本所在目录，避免崩溃时 cwd 不在安装目录导致上传失败
     STARTUPINFOW si = { sizeof(si) };
     PROCESS_INFORMATION pi = {};
-    CreateProcessW(NULL, cmd, NULL, NULL, FALSE, 
+    CreateProcessW(NULL, const_cast<wchar_t*>(cmd.c_str()), NULL, NULL, FALSE,
         CREATE_NO_WINDOW, NULL, scriptDir.c_str(), &si, &pi);
-    
+
     // 等待上传完成（最多60秒）
     WaitForSingleObject(pi.hProcess, 60000);
     CloseHandle(pi.hProcess);
@@ -94,16 +98,16 @@ inline void UploadDump(const wchar_t* dumpPath) {
 inline LONG WINAPI ExceptionFilter(EXCEPTION_POINTERS* ep) {
     // 生成 minidump
     g_dumpPath = GetDumpPath();
-    
+
     HANDLE hFile = CreateFileW(g_dumpPath.c_str(),
         GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
         FILE_ATTRIBUTE_NORMAL, NULL);
-    
+
     if (hFile != INVALID_HANDLE_VALUE) {
         MINIDUMP_EXCEPTION_INFORMATION mei = {
             GetCurrentThreadId(), ep, FALSE
         };
-        
+
         MiniDumpWriteDump(
             GetCurrentProcess(),
             GetCurrentProcessId(),
@@ -113,25 +117,27 @@ inline LONG WINAPI ExceptionFilter(EXCEPTION_POINTERS* ep) {
         
         CloseHandle(hFile);
     }
-    
+
     // 上传到服务器
-    UploadDump(g_dumpPath.c_str());
-    
+    UploadDump(g_dumpPath);
+
     // 显示崩溃对话框
-    wchar_t msg[MAX_PATH * 2];
-    swprintf_s(msg,
-        L"Program crashed!\n\n"        // 程序崩溃了！
-        L"Exception code: 0x%08X\n"    // 异常代码
-        L"Crash address: 0x%p\n"       // 崩溃地址
-        L"Crash report saved:\n%s\n\n" // 崩溃报告已保存
-        L"Please send this file to the developers.",  // 请将此文件发送给开发人员
-        ep->ExceptionRecord->ExceptionCode,
-        ep->ExceptionRecord->ExceptionAddress,
-        g_dumpPath.c_str());
-    
-    MessageBoxW(NULL, msg, L"SanYiCAD - Crash",  // SanYiCAD - 崩溃
+    const std::wstring msg =
+        L"Program crashed!\n\n"  // 程序崩溃了！
+        L"Exception code: 0x%08X\n"  // 异常代码
+        L"Crash address: 0x%p\n"  // 崩溃地址
+        L"Crash report saved:\n%s\n\n"  // 崩溃报告已保存
+        L"Please send this file to the developers.";  // 请将此文件发送给开发人员
+
+    std::wstring fullMsg;
+    fullMsg.reserve(MAX_PATH * 2);
+    fullMsg = msg;
+    fullMsg += L"\n\n";
+    fullMsg += g_dumpPath.wstring();
+
+    MessageBoxW(NULL, fullMsg.c_str(), L"SanYiCAD - Crash",  // SanYiCAD - 崩溃
         MB_OK | MB_ICONERROR | MB_TOPMOST);
-    
+
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
