@@ -233,7 +233,7 @@ endif()
 
 add_subdirectory(UI/Common)
 
-if(BUILD_UI_2D)
+if(BUILD_UI2D)
     add_subdirectory(UI/2D)
 endif()
 
