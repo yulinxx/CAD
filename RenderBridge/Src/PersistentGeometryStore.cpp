@@ -1,38 +1,15 @@
 #include "RenderBridge/PersistentGeometryStore.h"
 
-// renderx.h 只在 .cpp 内部引入，头文件不再暴露它
-#include "render/renderx.h"
+// 头文件只有前向声明，调用接口方法需要完整定义。
+// renderx.h 在本文件里已彻底不存在：后端细节只在适配层。
+#include "RenderAbstraction/IRenderDevice.h"
+#include "RenderAbstraction/IRenderScene.h"
 
 #include "Log/SyLogger.h"
 
 namespace RenderBridge
 {
-    namespace
-    {
-        // ---------- 类型转换辅助 ----------
-        // 头文件存 uint64_t 裸值，这里统一做裸值 ↔ RenderX Handle 的转换。
-
-        inline Render::RT::RuntimeHandle toRuntime(uint64_t v)
-        {
-            return static_cast<Render::RT::RuntimeHandle>(v);
-        }
-        inline Render::RT::GeometryStoreHandle toStore(uint64_t v)
-        {
-            return static_cast<Render::RT::GeometryStoreHandle>(v);
-        }
-        inline Render::RT::DrawListHandle toDrawList(uint64_t v)
-        {
-            return static_cast<Render::RT::DrawListHandle>(v);
-        }
-        inline bool isValidRuntime(uint64_t v)
-        {
-            return Render::RT::rxValid(toRuntime(v)) != 0;
-        }
-        inline bool isValidStore(uint64_t v)
-        {
-            return Render::RT::rxValid(toStore(v)) != 0;
-        }
-    }  // namespace
+    using namespace RenderAbstraction;
 
     // ========== 静态方法 ==========
 
@@ -83,72 +60,82 @@ namespace RenderBridge
         shutdown();
     }
 
-    bool PersistentGeometryStore::initialize(uint64_t runtime, const Config& config)
+    bool PersistentGeometryStore::initialize(
+        IRenderDevice& device, IRenderScene* scene, const Config& config)
     {
         shutdown();
-        if (!isValidRuntime(runtime))
-        {
-            return false;
-        }
+        m_device = &device;
+        m_scene = scene;
 
-        m_runtime = runtime;
         m_storeInitialBytes = config.storeInitialBytes;
         m_storeDescBytes = config.storeMaxBytes;
         m_storeGranularity = config.storeGranularity;
         m_maxStores = config.maxStores == 0 ? 1u : config.maxStores;
 
-        Render::RT::GeometryStoreDesc storeDesc{};
+        GeometryStoreDesc storeDesc{};
         storeDesc.initialBytes = m_storeInitialBytes;
         storeDesc.maxBytes = m_storeDescBytes;
         storeDesc.granularity = m_storeGranularity;
-        storeDesc.forIndices = 0;
+        storeDesc.forIndices = false;
 
-        const Render::RT::GeometryStoreHandle store = Render::RT::rxGeometryStoreCreate(toRuntime(m_runtime), &storeDesc);
-        if (!Render::RT::rxValid(store))
+        const GeometryStoreHandle store = device.createGeometryStore(storeDesc);
+        if (!isValid(store))
         {
+            m_device = nullptr;
+            m_scene = nullptr;
             return false;
         }
 
-        Render::RT::DrawListDesc listDesc{};
-        listDesc.initialCapacity = config.drawListInitialCapacity;
-        listDesc.enableMerging = config.drawListMerging ? 1 : 0;
-        listDesc.enableCulling = config.drawListCulling ? 1 : 0;
-
-        const Render::RT::DrawListHandle list = Render::RT::rxDrawListCreate(toRuntime(m_runtime), &listDesc);
-        if (!Render::RT::rxValid(list))
+        // 绘制列表走抽象层创建：列表的剔除判据（2D 矩形 / 3D 视锥）由后端在创建时
+        // 记住，之后按句柄分派 upsert / submit 的实现。scene 为空时跳过。
+        if (scene != nullptr)
         {
-            Render::RT::rxGeometryStoreDestroy(toRuntime(m_runtime), store);
-            return false;
+            DrawListDesc listDesc{};
+            listDesc.initialCapacity = config.drawListInitialCapacity;
+            listDesc.enableMerging = config.drawListMerging;
+            listDesc.enableCulling = config.drawListCulling;
+            listDesc.type = config.drawListViewType;
+
+            m_drawList = scene->createDrawList(listDesc);
+            if (!isValid(m_drawList))
+            {
+                device.destroyGeometryStore(store);
+                m_device = nullptr;
+                m_scene = nullptr;
+                return false;
+            }
         }
 
         m_stores.clear();
-        m_stores.push_back(static_cast<uint64_t>(store));
+        m_stores.push_back(store);
         m_blockStore.clear();
-        m_drawListRaw = static_cast<uint64_t>(list);
         return true;
     }
 
     void PersistentGeometryStore::shutdown()
     {
-        if (!isValidRuntime(m_runtime))
+        if (m_device == nullptr)
         {
             return;
         }
-        if (Render::RT::rxValid(toDrawList(m_drawListRaw)))
+        // 先拆绘制列表：它引用几何仓里的块，反向不引用
+        if (m_scene != nullptr && isValid(m_drawList))
         {
-            Render::RT::rxDrawListDestroy(toRuntime(m_runtime), toDrawList(m_drawListRaw));
-            m_drawListRaw = 0;
+            m_scene->destroyDrawList(m_drawList);
         }
-        for (uint64_t storeRaw : m_stores)
+        m_drawList = {};
+
+        for (const GeometryStoreHandle store : m_stores)
         {
-            if (isValidStore(storeRaw))
+            if (isValid(store))
             {
-                Render::RT::rxGeometryStoreDestroy(toRuntime(m_runtime), toStore(storeRaw));
+                m_device->destroyGeometryStore(store);
             }
         }
         m_stores.clear();
         m_blockStore.clear();
-        m_runtime = 0;
+        m_device = nullptr;
+        m_scene = nullptr;
 
         m_freeSlots.clear();
         m_nextSlot = 0;
@@ -156,16 +143,10 @@ namespace RenderBridge
 
     bool PersistentGeometryStore::valid() const
     {
-        return isValidRuntime(m_runtime);
+        return m_device != nullptr && !m_stores.empty();
     }
 
-    uint64_t PersistentGeometryStore::runtimeValue() const { return m_runtime; }
-    uint64_t PersistentGeometryStore::storeValue() const
-    {
-        return m_stores.empty() ? 0 : m_stores.front();
-    }
-    uint64_t PersistentGeometryStore::drawListValue() const { return m_drawListRaw; }
-    uint64_t PersistentGeometryStore::storeForBlock(uint64_t blockId) const
+    GeometryStoreHandle PersistentGeometryStore::storeForBlock(uint64_t blockId) const
     {
         uint32_t index = 0;
         if (!m_blockStore.empty())
@@ -176,8 +157,9 @@ namespace RenderBridge
                 index = found->second;
             }
         }
-        return index < m_stores.size() ? m_stores[index] : 0;
+        return index < m_stores.size() ? m_stores[index] : GeometryStoreHandle{};
     }
+
     uint32_t PersistentGeometryStore::storeCount() const
     {
         return static_cast<uint32_t>(m_stores.size());
@@ -185,15 +167,14 @@ namespace RenderBridge
 
     GeometryStoreStats PersistentGeometryStore::totalStats() const
     {
-        // 对各仓的 RenderX 统计做聚合，再逐字段填进本层的 POD 镜像
         GeometryStoreStats sum{};
-        for (uint64_t storeRaw : m_stores)
+        if (m_device == nullptr)
         {
-            Render::RT::GeometryStoreStats one{};
-            if (Render::RT::rxGeometryStoreGetStats(toRuntime(m_runtime), toStore(storeRaw), &one) != Render::RT::RxResult::Ok)
-            {
-                continue;
-            }
+            return sum;
+        }
+        for (const GeometryStoreHandle store : m_stores)
+        {
+            const GeometryStoreStats one = m_device->geometryStoreStats(store);
             sum.capacityBytes += one.capacityBytes;
             sum.usedBytes += one.usedBytes;
             // 最大连续空洞不是可加的，取最大者
@@ -227,11 +208,21 @@ namespace RenderBridge
         m_freeSlots.push_back(slot);
     }
 
+    bool PersistentGeometryStore::upsertDrawItem(
+        uint32_t slot, const DrawInstruction& command, const Aabb3* bounds)
+    {
+        if (m_scene == nullptr || !isValid(m_drawList))
+        {
+            return false;
+        }
+        return m_scene->upsertDrawItem(m_drawList, slot, command, bounds);
+    }
+
     void PersistentGeometryStore::removeCommand(uint32_t slot)
     {
-        if (valid())
+        if (m_scene != nullptr && isValid(m_drawList))
         {
-            Render::RT::rxDrawListRemove(toRuntime(m_runtime), toDrawList(m_drawListRaw), slot);
+            m_scene->removeDrawItem(m_drawList, slot);
         }
     }
 
@@ -243,9 +234,9 @@ namespace RenderBridge
 
     void PersistentGeometryStore::clearDrawList()
     {
-        if (valid())
+        if (m_scene != nullptr && isValid(m_drawList))
         {
-            Render::RT::rxDrawListClear(toRuntime(m_runtime), toDrawList(m_drawListRaw));
+            m_scene->clearDrawList(m_drawList);
         }
     }
 
@@ -265,11 +256,10 @@ namespace RenderBridge
         }
 
         size_t index = m_stores.size() - 1;
-        Render::RT::GeometryBlock block{};
-        Render::RT::RxResult result = Render::RT::rxGeometryAlloc(
-            toRuntime(m_runtime), toStore(m_stores[index]), bytes, &block);
+        GeometryBlock block{};
+        GeometryAllocResult result = m_device->allocGeometry(m_stores[index], bytes, block);
 
-        if (result == Render::RT::RxResult::ErrorOutOfMemory)
+        if (result == GeometryAllocResult::StoreFull)
         {
             // 活动仓已到单仓上限：开新仓继续（分片）
             if (!addStore())
@@ -277,20 +267,16 @@ namespace RenderBridge
                 return false;
             }
             index = m_stores.size() - 1;
-            result = Render::RT::rxGeometryAlloc(
-                toRuntime(m_runtime), toStore(m_stores[index]), bytes, &block);
+            result = m_device->allocGeometry(m_stores[index], bytes, block);
         }
 
-        if (result != Render::RT::RxResult::Ok && result != Render::RT::RxResult::ErrorGeometryStoreGrown)
+        if (result != GeometryAllocResult::Ok)
         {
             return false;
         }
 
-        // RenderX 块 → 本层 POD 镜像（句柄降为裸值）
-        out.buffer = static_cast<uint64_t>(block.buffer);
-        out.id = block.id;
-        out.offset = block.offset;
-        out.sizeBytes = block.sizeBytes;
+        // 成功后才落 out：失败路径不留下半个块
+        out = block;
 
         // 只登记分片块：仓 0 的块靠「查不到即默认 0」兜住
         if (index != 0)
@@ -306,10 +292,7 @@ namespace RenderBridge
         {
             return false;
         }
-        return Render::RT::rxGeometryWrite(
-            toRuntime(m_runtime),
-            toStore(storeForBlock(blockId)),
-            blockId, byteOffset, sizeBytes, data) == Render::RT::RxResult::Ok;
+        return m_device->writeGeometry(storeForBlock(blockId), blockId, byteOffset, sizeBytes, data);
     }
 
     void PersistentGeometryStore::freeBlock(uint64_t blockId)
@@ -318,10 +301,7 @@ namespace RenderBridge
         {
             return;
         }
-        Render::RT::rxGeometryFree(
-            toRuntime(m_runtime),
-            toStore(storeForBlock(blockId)),
-            blockId);
+        m_device->freeGeometry(storeForBlock(blockId), blockId);
         if (!m_blockStore.empty())
         {
             m_blockStore.erase(blockId);
@@ -334,9 +314,9 @@ namespace RenderBridge
         {
             return;
         }
-        for (uint64_t storeRaw : m_stores)
+        for (const GeometryStoreHandle store : m_stores)
         {
-            Render::RT::rxGeometryFlush(toRuntime(m_runtime), toStore(storeRaw));
+            m_device->flushGeometry(store);
         }
     }
 
@@ -367,13 +347,11 @@ namespace RenderBridge
     {
         if (bytes > 0 && index < m_stores.size())
         {
-            Render::RT::GeometryBlock tmp{};
-            const Render::RT::RxResult result = Render::RT::rxGeometryAlloc(
-                toRuntime(m_runtime), toStore(m_stores[index]), bytes, &tmp);
-            if (result == Render::RT::RxResult::Ok || result == Render::RT::RxResult::ErrorGeometryStoreGrown)
+            // 借一次分配把仓顶上去，拿到块立刻还回去：只为触发扩容，不占用空间
+            GeometryBlock tmp{};
+            if (m_device->allocGeometry(m_stores[index], bytes, tmp) == GeometryAllocResult::Ok)
             {
-                Render::RT::rxGeometryFree(
-                    toRuntime(m_runtime), toStore(m_stores[index]), tmp.id);
+                m_device->freeGeometry(m_stores[index], tmp.id);
             }
         }
         return totalStats().capacityBytes;
@@ -390,15 +368,14 @@ namespace RenderBridge
             return false;
         }
 
-        Render::RT::GeometryStoreDesc storeDesc{};
+        GeometryStoreDesc storeDesc{};
         storeDesc.initialBytes = m_storeInitialBytes;
         storeDesc.maxBytes = m_storeDescBytes;
         storeDesc.granularity = m_storeGranularity;
-        storeDesc.forIndices = 0;
+        storeDesc.forIndices = false;
 
-        const Render::RT::GeometryStoreHandle store =
-            Render::RT::rxGeometryStoreCreate(toRuntime(m_runtime), &storeDesc);
-        if (!Render::RT::rxValid(store))
+        const GeometryStoreHandle store = m_device->createGeometryStore(storeDesc);
+        if (!isValid(store))
         {
             SY_ERRORF("[GeomStore] 第 %u 个仓创建失败（单仓上限 %llu bytes）",
                 static_cast<uint32_t>(m_stores.size() + 1),
@@ -406,7 +383,7 @@ namespace RenderBridge
             return false;
         }
 
-        m_stores.push_back(static_cast<uint64_t>(store));
+        m_stores.push_back(store);
         SY_INFOF("[GeomStore] 单仓达上限，已开第 %u 个仓（分片生效）；"
                  "总容量 %llu bytes，此后合批只在仓内发生",
             static_cast<uint32_t>(m_stores.size()),

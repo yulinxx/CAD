@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file OverlayScene.cpp
  * @brief OverlayScene 实现（设计说明见头文件）
  *
@@ -9,8 +9,7 @@
  */
 #include "RenderBridge/OverlayScene.h"
 
-// renderx.h 在 .cpp 内部引入，头文件不再依赖它
-#include "render/renderx.h"
+#include "RenderAbstraction/IRenderScene.h"
 
 #include "RenderBridge/PinnedMarkerGeometry.h"
 #include "RenderBridge/ScreenConstantMetrics.h"
@@ -23,7 +22,7 @@
 #include <cstring>
 #include <utility>
 
-namespace RT = Render::RT;
+namespace RA = RenderAbstraction;
 
 namespace
 {
@@ -37,8 +36,8 @@ namespace
         float x, y, z, r, g, b, a;
     };
 
-    static_assert(
-        sizeof(OVertex) == RT::rxVertexStride(RT::VertexFormat::P3C4), "OVertex must match the DLL's P3C4 stride");
+    static_assert(sizeof(OVertex) == RA::vertexStride(RA::VertexFormat::PositionColorAlpha),
+        "OVertex must match the declared P3C4 stride");
 
     inline OVertex vtx(float x, float y, float z, const Render::Color& c)
     {
@@ -46,37 +45,36 @@ namespace
     }
 
     /// P3O2C4 顶点（世界锚点 + 像素偏移 + RGBA）定义在 PinnedMarkerGeometry.h，
-    /// 与 DLL stride 的一致性在这里断言 —— 那个纯几何头不认识 rxVertexStride。
+    /// 它不认识 vertexStride，一致性断言放在这里。
     using PVertex = Render::PinnedVertex;
-    static_assert(
-        sizeof(PVertex) == RT::rxVertexStride(RT::VertexFormat::P3O2C4), "PVertex must match the DLL's P3O2C4 stride");
+    static_assert(sizeof(PVertex) == RA::vertexStride(RA::VertexFormat::WorldAnchorOffsetColor),
+        "PVertex must match the declared P3O2C4 stride");
 
     /**
-     * @brief 把一批顶点写进瞬态环并追加一条 DrawCommand
+     * @brief 把一批顶点写进瞬态环并追加一条绘制指令
      *
      * 两个 emit 变体只在顶点格式与渲染空间上不同，其余（瞬态环分配、sortKey、
      * 字节偏移语义）完全一致，故用同一个模板生成，避免两份互相漂移的实现。
      */
     template<typename V>
-    void emitAs(RT::SessionHandle session,
-        std::vector<RT::DrawCommand>& out,
+    void emitAs(RA::IRenderScene& scene,
+        std::vector<RA::DrawInstruction>& out,
         const std::vector<V>& verts,
-        RT::PrimitiveTopology topo,
-        RT::VertexFormat format,
-        RT::RenderSpace space,
+        RA::PrimitiveType topo,
+        RA::VertexFormat format,
+        RA::RenderSpace space,
         uint16_t& seq)
     {
         if (verts.empty())
             return;
         const uint64_t bytes = static_cast<uint64_t>(verts.size()) * sizeof(V);
-        RT::TransientAlloc a{};
-        RT::rxSessionAllocTransient(session, bytes, &a);
-        // 环容量不足时 DLL 返回无效句柄；丢弃本批而不是画出错误几何。
-        if (!RT::rxValid(a.buffer) || !a.cpuPtr)
+        RA::TransientAlloc a{};
+        // 环容量不足时后端返回 false；丢弃本批而不是画出错误几何。
+        if (!scene.allocTransient(bytes, a) || a.cpuPtr == nullptr)
             return;
         std::memcpy(a.cpuPtr, verts.data(), static_cast<size_t>(bytes));
 
-        RT::DrawCommand c{};
+        RA::DrawInstruction c{};
         c.vertexBuffer = a.buffer;
         // vertexOffset 与 TransientAlloc::offset 同为**字节**偏移，原样填入，不除 stride。
         c.vertexOffset = a.offset;
@@ -84,30 +82,29 @@ namespace
         c.instanceCount = 1;
         c.topology = topo;
         c.space = space;
-        c.vertexFormat = format;
-        c.indexType = RT::IndexType::None;
-        // pipelineIndex 留 0：Runtime 按 (格式, 空间, 拓扑) 解析出的默认管线
+        c.format = format;
+        // pipelineIndex 留 0：后端按 (格式, 空间, 拓扑) 解析出的默认管线
         // 已开启 SrcAlpha/OneMinusSrcAlpha 混合，半透明覆盖层无需额外指定。
-        c.sortKey = RT::rxMakeSortKey(kOverlayLayer, kOverlayTransparent, 0, seq++);
+        c.sortKey = RA::makeSortKey(kOverlayLayer, kOverlayTransparent, 0, seq++);
         out.push_back(c);
     }
 
-    void emitWorld(RT::SessionHandle session,
-        std::vector<RT::DrawCommand>& out,
+    void emitWorld(RA::IRenderScene& scene,
+        std::vector<RA::DrawInstruction>& out,
         const std::vector<OVertex>& verts,
-        RT::PrimitiveTopology topo,
+        RA::PrimitiveType topo,
         uint16_t& seq)
     {
-        emitAs(session, out, verts, topo, RT::VertexFormat::P3C4, RT::RenderSpace::World, seq);
+        emitAs(scene, out, verts, topo, RA::VertexFormat::PositionColorAlpha, RA::RenderSpace::World, seq);
     }
 
-    void emitPinned(RT::SessionHandle session,
-        std::vector<RT::DrawCommand>& out,
+    void emitPinned(RA::IRenderScene& scene,
+        std::vector<RA::DrawInstruction>& out,
         const std::vector<PVertex>& verts,
-        RT::PrimitiveTopology topo,
+        RA::PrimitiveType topo,
         uint16_t& seq)
     {
-        emitAs(session, out, verts, topo, RT::VertexFormat::P3O2C4, RT::RenderSpace::WorldPinned, seq);
+        emitAs(scene, out, verts, topo, RA::VertexFormat::WorldAnchorOffsetColor, RA::RenderSpace::WorldPinned, seq);
     }
 
     void rectLineList(std::vector<OVertex>& v, const Render::BBox2d& b, const Render::Color& c)
@@ -152,8 +149,8 @@ namespace
 
     /// 把一组定尺寸标记合成两笔（全部填充一笔、全部边框一笔）。
     /// 顶点生成本身是纯几何，在 PinnedMarkerGeometry.h 里，可单测。
-    void emitPinnedMarkerGroup(RT::SessionHandle session,
-        std::vector<RT::DrawCommand>& out,
+    void emitPinnedMarkerGroup(RA::IRenderScene& scene,
+        std::vector<RA::DrawInstruction>& out,
         const RenderBridge::OverlayMarkerGroup& group,
         uint16_t& seq)
     {
@@ -170,8 +167,8 @@ namespace
 
         std::vector<PVertex> fillV, borderV;
         Render::buildPinnedMarkers(&g, 1, fillV, borderV);
-        emitPinned(session, out, fillV, RT::PrimitiveTopology::Triangles, seq);
-        emitPinned(session, out, borderV, RT::PrimitiveTopology::Lines, seq);
+        emitPinned(scene, out, fillV, RA::PrimitiveType::Triangles, seq);
+        emitPinned(scene, out, borderV, RA::PrimitiveType::Lines, seq);
     }
 
     /**
@@ -671,13 +668,8 @@ namespace RenderBridge
 
     // ==================== 提交 ====================
 
-    void OverlayScene::submit(uint64_t session, std::vector<RT::DrawCommand>& out) const
+    void OverlayScene::submit(RA::IRenderScene& scene, std::vector<RA::DrawInstruction>& out) const
     {
-        if (session == 0)
-        {
-            return;
-        }
-        const auto sess = static_cast<RT::SessionHandle>(session);
         // 序号沿枚举顺序递增：提交顺序即叠放顺序，不再依赖调用顺序
         uint16_t seq = 0;
 
@@ -686,7 +678,7 @@ namespace RenderBridge
         {
             std::vector<OVertex> v;
             rectLineList(v, m_selectionBox.box, m_selectionBox.border);
-            emitWorld(sess, out, v, RT::PrimitiveTopology::Lines, seq);
+            emitWorld(scene, out, v, RA::PrimitiveType::Lines, seq);
         }
 
         // 文字选区高亮：N 块四边形，填充与边框各一批。
@@ -702,7 +694,7 @@ namespace RenderBridge
                 {
                     filledQuad(v, &m_highlight.quadCorners[q * 4], m_highlight.fill);
                 }
-                emitWorld(sess, out, v, RT::PrimitiveTopology::Triangles, seq);
+                emitWorld(scene, out, v, RA::PrimitiveType::Triangles, seq);
             }
             if (m_highlight.border.a() > 1e-4f)
             {
@@ -719,7 +711,7 @@ namespace RenderBridge
                         v.push_back(vtx(b.x(), b.y(), 0, m_highlight.border));
                     }
                 }
-                emitWorld(sess, out, v, RT::PrimitiveTopology::Lines, seq);
+                emitWorld(scene, out, v, RA::PrimitiveType::Lines, seq);
             }
         }
 
@@ -730,11 +722,11 @@ namespace RenderBridge
             {
                 std::vector<OVertex> v;
                 filledRect(v, m_selectionRect.rect, m_selectionRect.fill);
-                emitWorld(sess, out, v, RT::PrimitiveTopology::Triangles, seq);
+                emitWorld(scene, out, v, RA::PrimitiveType::Triangles, seq);
             }
             std::vector<OVertex> v;
             rectLineList(v, m_selectionRect.rect, m_selectionRect.border);
-            emitWorld(sess, out, v, RT::PrimitiveTopology::Lines, seq);
+            emitWorld(scene, out, v, RA::PrimitiveType::Lines, seq);
         }
 
         // 流水虚线轮廓：整个选中集合成**一条**命令（颜色是逐顶点的，路径间不必分批）
@@ -762,12 +754,12 @@ namespace RenderBridge
                 for (const auto& s : segs)
                     v.push_back(vtx(s.x(), s.y(), 0, path.color));
             }
-            emitWorld(sess, out, v, RT::PrimitiveTopology::Lines, seq);
+            emitWorld(scene, out, v, RA::PrimitiveType::Lines, seq);
         }
 
         // 屏幕定尺寸方块标记：手柄与点标记各一层，各出填充 + 边框两笔
-        emitPinnedMarkerGroup(sess, out, m_selectionHandles.group, seq);
-        emitPinnedMarkerGroup(sess, out, m_pointMarkers.group, seq);
+        emitPinnedMarkerGroup(scene, out, m_selectionHandles.group, seq);
+        emitPinnedMarkerGroup(scene, out, m_pointMarkers.group, seq);
 
         // 捕捉指示器：只画彩色形状。捕捉命中时鼠标指针会被隐藏（见视图层），
         // 标记无需再加圆盘底。尺寸以逻辑像素声明，乘 DPR 换算成物理像素
@@ -776,7 +768,7 @@ namespace RenderBridge
             std::vector<PVertex> v;
             const float dpr = m_devicePixelRatio > 0.0f ? m_devicePixelRatio : 1.0f;
             emitSnapMarker(v, m_snap.worldPos, m_snap.shape, m_snap.color, dpr);
-            emitPinned(sess, out, v, RT::PrimitiveTopology::Lines, seq);
+            emitPinned(scene, out, v, RA::PrimitiveType::Lines, seq);
         }
 
         // 预览折线：LineStrip 语义展开为相邻点对，以便与其它线合并成一批
@@ -789,7 +781,7 @@ namespace RenderBridge
                 v.push_back(
                     vtx(m_toolPreview.points[i + 1].x(), m_toolPreview.points[i + 1].y(), 0, m_toolPreview.color));
             }
-            emitWorld(sess, out, v, RT::PrimitiveTopology::Lines, seq);
+            emitWorld(scene, out, v, RA::PrimitiveType::Lines, seq);
         }
 
         // 辅助线：调用方已按 LineList 语义成对排好
@@ -801,7 +793,7 @@ namespace RenderBridge
             {
                 v.push_back(vtx(p.x(), p.y(), 0, m_controlLines.color));
             }
-            emitWorld(sess, out, v, RT::PrimitiveTopology::Lines, seq);
+            emitWorld(scene, out, v, RA::PrimitiveType::Lines, seq);
         }
     }
 }  // namespace RenderBridge

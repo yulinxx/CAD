@@ -12,19 +12,20 @@
  * Null 后端是完整实现（与 Renderx 自己的 RxRuntimeTests 同一套用法），
  * 因此这些用例在没有显卡的机器上也能跑。
  *
- * 注意：本文件刻意**不**依赖 RenderBridge 的 DLL 符号——被测类与头文件里的
- * 工具函数都是 header-only，链接 RenderX + Log 即可。这样测试不会因为
- * RenderBridge 的导出面变化而失效。
+ * 注意：被测类只面向渲染抽象层，这里因此只需要一个 Null 后端设备——
+ * 走公开工厂拿到，不必碰任何 renderx.h 类型。绘制列表要 Scene，本文件用不到，
+ * initialize 传 nullptr。
  */
 
 #include <gtest/gtest.h>
 
 #include "RenderBridge/PersistentGeometryStore.h"
+#include "RenderBridge/RenderXAdapter.h"
 
-// 被测类头文件已不再 include renderx.h（类型隔离），这里显式引入 RenderX ABI
-#include "render/renderx.h"
+#include "RenderAbstraction/IRenderDevice.h"
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 namespace
@@ -42,23 +43,25 @@ namespace
     protected:
         void SetUp() override
         {
-            Render::RT::RuntimeDesc desc{};
-            desc.abiVersion = RENDERX_ABI_VERSION;
-            desc.backend = Render::RT::Backend::Null;
-            desc.enableValidation = 1;
-            desc.transientBufferBytes = 1024 * 1024;
-            desc.applicationName = "PersistentGeometryStoreTests";
-            m_runtime = Render::RT::rxRuntimeCreate(&desc);
-            ASSERT_TRUE(Render::RT::rxValid(m_runtime));
+            m_factory = RenderBridge::RenderXAdapter::createFactory();
+            ASSERT_NE(m_factory, nullptr);
+
+            RenderAbstraction::DeviceConfig config;
+            config.backend = RenderAbstraction::RenderBackend::Null;
+            config.enableValidation = true;
+            config.transientBufferBytes = 1024 * 1024;
+            config.applicationName = "PersistentGeometryStoreTests";
+
+            m_device = m_factory->createDevice(config);
+            ASSERT_NE(m_device, nullptr);
         }
 
         void TearDown() override
         {
+            // 顺序即所有权：仓依赖设备，设备依赖工厂建的 Runtime
             m_store.shutdown();
-            if (Render::RT::rxValid(m_runtime))
-            {
-                Render::RT::rxRuntimeDestroy(m_runtime);
-            }
+            m_device.reset();
+            m_factory.reset();
         }
 
         RenderBridge::PersistentGeometryStore::Config tinyConfig(uint32_t maxStores = 8) const
@@ -79,26 +82,21 @@ namespace
             return m_store.writeBlock(blockId, 0, static_cast<uint32_t>(kBlockBytes), payload.data());
         }
 
-        /// 几何仓的 initialize 收 uint64_t 裸值（RenderBridge 头已隔离 RenderX 类型）
-        uint64_t runtimeRaw() const
-        {
-            return static_cast<uint64_t>(m_runtime);
-        }
-
-        Render::RT::RuntimeHandle m_runtime{ Render::RT::RuntimeHandle::Invalid };
+        /// 被测类只面向抽象层：设备与（可空的）场景都由调用方给
+        std::unique_ptr<RenderAbstraction::IRenderFactory> m_factory;
+        std::unique_ptr<RenderAbstraction::IRenderDevice> m_device;
         RenderBridge::PersistentGeometryStore m_store;
     };
 
     /// 未达单仓上限时只有主仓：分片表保持为空，路径与改造前一致
     TEST_F(PersistentGeometryStoreTest, StaysOnSingleStoreWhileUnderLimit)
     {
-        ASSERT_TRUE(m_store.initialize(runtimeRaw(), tinyConfig()));
+        ASSERT_TRUE(m_store.initialize(*m_device, nullptr, tinyConfig()));
         EXPECT_EQ(m_store.storeCount(), 1u);
 
         RenderBridge::GeometryBlock block{};
         ASSERT_TRUE(m_store.allocBlock(kBlockBytes, block));
-        // buffer 是裸值句柄：0 表示无效
-        EXPECT_NE(block.buffer, 0u);
+        EXPECT_TRUE(RenderAbstraction::isValid(block.buffer)) << "块应当带回一个有效的缓冲句柄";
         EXPECT_EQ(m_store.storeCount(), 1u) << "一块都还没超上限，不该分片";
         EXPECT_TRUE(writePattern(block.id, 0x11));
     }
@@ -106,7 +104,7 @@ namespace
     /// 主仓达到单仓上限后自动开新仓，且**两块都仍可读写**（块路由正确）
     TEST_F(PersistentGeometryStoreTest, ShardsIntoSecondStoreWhenPrimaryHitsLimit)
     {
-        ASSERT_TRUE(m_store.initialize(runtimeRaw(), tinyConfig()));
+        ASSERT_TRUE(m_store.initialize(*m_device, nullptr, tinyConfig()));
 
         std::vector<RenderBridge::GeometryBlock> blocks;
         // 一直分配到发生分片为止；上限 1024 次是防呆，正常在 20 次内
@@ -134,7 +132,7 @@ namespace
         bool sawDistinctBuffer = false;
         for (const RenderBridge::GeometryBlock& block : blocks)
         {
-            if (block.buffer != blocks.front().buffer)
+            if (block.buffer.value != blocks.front().buffer.value)
             {
                 sawDistinctBuffer = true;
             }
@@ -145,7 +143,7 @@ namespace
     /// 释放跨仓的块后，统计里的已用量必须正确回落（释放也要路由到正确的仓）
     TEST_F(PersistentGeometryStoreTest, FreeRoutesToOwningStoreAcrossShards)
     {
-        ASSERT_TRUE(m_store.initialize(runtimeRaw(), tinyConfig()));
+        ASSERT_TRUE(m_store.initialize(*m_device, nullptr, tinyConfig()));
 
         std::vector<RenderBridge::GeometryBlock> blocks;
         for (int i = 0; i < 1024 && m_store.storeCount() == 1; ++i)
@@ -172,7 +170,7 @@ namespace
     /// 统计是各仓之和：分片后总容量必须超过单仓上限
     TEST_F(PersistentGeometryStoreTest, TotalStatsAggregatesAllStores)
     {
-        ASSERT_TRUE(m_store.initialize(runtimeRaw(), tinyConfig()));
+        ASSERT_TRUE(m_store.initialize(*m_device, nullptr, tinyConfig()));
 
         for (int i = 0; i < 1024 && m_store.storeCount() == 1; ++i)
         {
@@ -189,7 +187,7 @@ namespace
     /// 仓数上限生效：到顶后分配必须明确失败，而不是无限开仓把内存耗光
     TEST_F(PersistentGeometryStoreTest, StopsAtMaxStoresInsteadOfGrowingForever)
     {
-        ASSERT_TRUE(m_store.initialize(runtimeRaw(), tinyConfig(/*maxStores=*/2)));
+        ASSERT_TRUE(m_store.initialize(*m_device, nullptr, tinyConfig(/*maxStores=*/2)));
 
         int allocated = 0;
         for (int i = 0; i < 4096; ++i)
@@ -212,7 +210,7 @@ namespace
     /// shutdown 必须销毁全部仓（含分片出来的），且幂等
     TEST_F(PersistentGeometryStoreTest, ShutdownReleasesEveryStore)
     {
-        ASSERT_TRUE(m_store.initialize(runtimeRaw(), tinyConfig()));
+        ASSERT_TRUE(m_store.initialize(*m_device, nullptr, tinyConfig()));
 
         for (int i = 0; i < 1024 && m_store.storeCount() == 1; ++i)
         {

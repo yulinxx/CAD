@@ -17,7 +17,7 @@
  * ## 为什么走瞬态环而不是几何仓
  *
  * 覆盖层（橡皮筋、手柄、流水虚线）**每帧都变**，这正是瞬态环
- * （`rxSessionAllocTransient`）的目标负载：每帧全量重传，帧末自动回收。
+ * （`IRenderScene::allocTransient`）的目标负载：每帧全量重传，帧末自动回收。
  * 塞进 GeometryStore 只会让「常驻」这个前提失效，每帧都要 alloc/free 一遍，
  * 反而比瞬态环慢（`PersistentGeometryStore` 服务的是场景图元，不是这一类）。
  *
@@ -28,7 +28,7 @@
  *   锚点跟随平移，尺寸恒定为若干物理像素，不随缩放变化。像素换算在
  *   `world_pinned_p3o2c4.vert` 里完成，业务层不参与（见新渲染架构 §15）。
  * - 需要透明度（半透明填充）统一用 P3C4；WorldPinned 用 P3O2C4。
- * - `pipelineIndex` 留 0，让 Runtime 按 (格式, 空间, 拓扑) 自行解析 ——
+ * - `pipelineIndex` 留 0，让后端按 (格式, 空间, 拓扑) 自行解析 ——
  *   默认管线已开启 SrcAlpha/OneMinusSrcAlpha 混合。
  * - 排序层级固定 `layer=200, transparent=1`，保证绘制在图元（layer=100）之上。
  *
@@ -41,23 +41,22 @@
  *
  * ## 类型隔离说明
  *
- * 本头文件不 include renderx.h，Render::RT 类型通过前向声明引入。
- * 调用方需自行 include renderx.h（UI 层已这么做）。
+ * 本头文件不 include renderx.h：合成所需的场景对象由调用方按抽象层接口传入。
  */
 
 #include "RenderBridge/RenderBridgeAPI.h"
 
 #include "Render/RenderTypes.h"
+#include "RenderAbstraction/IRenderTypes.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <vector>
 
-// enum class 不能前向声明（会和 renderx.h 完整定义冲突），
-// 所以 SessionHandle 用 uint64_t 裸值传递
-namespace Render { namespace RT {
-    struct DrawCommand;
-}}
+namespace RenderAbstraction
+{
+    class IRenderScene;
+}
 
 namespace RenderBridge
 {
@@ -221,13 +220,13 @@ namespace RenderBridge
         bool hasLayer(OverlayLayerId id) const;
 
         /**
-         * @brief 把各层合成到瞬态环并追加 DrawCommand
+         * @brief 把各层合成到瞬态环并追加绘制指令
          *
-         * 必须由视口在 `rxSessionBeginFrame` / `rxSessionEndFrame` 之间调用。
-         * 环容量不足时丢弃该批（DLL 返回无效句柄），宁可这一帧少画一笔，
-         * 也不画出错位几何。
+         * 必须由视口在 beginFrame / endFrame 之间调用。
+         * 环容量不足时丢弃该批，宁可这一帧少画一笔，也不画出错位几何。
          */
-        void submit(uint64_t session, std::vector<Render::RT::DrawCommand>& out) const;
+        void submit(RenderAbstraction::IRenderScene& scene,
+            std::vector<RenderAbstraction::DrawInstruction>& out) const;
 
     private:
         struct SelectionBoxLayer

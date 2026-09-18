@@ -16,9 +16,6 @@
 #include "Persistence/Repositories/SettingsRepository.h"
 #include "UI/Settings/SettingsKeysCommon.h"
 
-// 渲染 DLL 的唯一公共头。这里只用它做后端名字符串化。
-#include "render/renderx.h"
-
 #include <QApplication>
 #include <QCoreApplication>
 #include <QDir>
@@ -61,12 +58,14 @@ void AppInitializer::initialize()
     // 真实生效的后端与设备名要等视口建 Surface 后由
     // RenderSessionHost::logCapabilities 打印（只有那里拿得到 caps）。
     // 曾经这里硬编码 Backend::OpenGL，在 Metal 构建下是一句失实日志。
+    // 后端名这里直接写字面量：它只描述「本构建选了哪个后端」，
+    // 不必为一个字符串去引渲染后端的头文件（应用层与后端零耦合）。
 #ifdef SY_ENABLE_METAL_VIEWPORT
-    const Render::RT::Backend configuredBackend = Render::RT::Backend::Metal;
+    const char* configuredBackendName = "Metal";
 #else
-    const Render::RT::Backend configuredBackend = Render::RT::Backend::OpenGL;
+    const char* configuredBackendName = "OpenGL";
 #endif
-    SY_INFOF("[Render] Viewport backend (compile-time): %s", Render::RT::rxBackendName(configuredBackend));
+    SY_INFOF("[Render] Viewport backend (compile-time): %s", configuredBackendName);
 
     CrashHandlerBootstrap::logPendingDumps();
 

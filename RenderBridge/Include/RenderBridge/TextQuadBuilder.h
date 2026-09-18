@@ -24,9 +24,8 @@
  *
  * ## 类型隔离说明
  *
- * 本头文件不 include renderx.h。所有 handle 用 uint64_t 裸值存储，
- * RenderX 类型（DrawCommand/SessionHandle 等）通过前向声明引入方法签名，
- * 调用方需自行 include renderx.h（UI 层已这么做）。
+ * 本头文件不 include renderx.h：设备与场景通过抽象层接口传入，
+ * 句柄一律是 RenderAbstraction 的 POD 包装，后端细节不外泄。
  */
 #pragma once
 
@@ -34,17 +33,16 @@
 
 #include "Engine/TextItem.h"
 #include "Render/RenderTypes.h"
+#include "RenderAbstraction/IRenderTypes.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <vector>
 
-// 前向声明：方法签名里用到的 RenderX 类型
-// enum class 不能前向声明（会和 renderx.h 完整定义冲突），
-// 所以 SessionHandle 用 uint64_t 裸值传递
-namespace Render { namespace RT {
-    struct DrawCommand;
-}}
+namespace RenderAbstraction {
+    class IRenderDevice;
+    class IRenderScene;
+}
 
 namespace Render
 {
@@ -72,9 +70,9 @@ namespace Render
          * 副本，因为每出现一个新字号就要用它建一个新的 FontHandle——图集里
          * 存的是位图而非矢量，换字号必须重新光栅化。
          *
-         * @param runtime DLL Runtime 句柄裸值，0 视为无效
+         * @param device 视口的渲染设备
          */
-        bool initialize(uint64_t runtime, const uint8_t* fontData, size_t bytes);
+        bool initialize(RenderAbstraction::IRenderDevice& device, const uint8_t* fontData, size_t bytes);
         void shutdown();
 
         bool valid() const;
@@ -93,11 +91,12 @@ namespace Render
         /**
          * @brief 把累积的顶点写入瞬态环，每个字号产出一笔 DrawCommand
          *
-         * 顺便把各字体图集的脏区上传（rxFontFlushAtlas）——必须在提交引用
-         * 该图集的命令之前完成，否则本帧新出现的字符会采样到空白。
+         * 顺便把各字体图集的脏区上传——必须在提交引用该图集的命令之前完成，
+         * 否则本帧新出现的字符会采样到空白。
          */
         void flush(
-            uint64_t session, uint8_t layer, uint16_t& seq, std::vector<Render::RT::DrawCommand>& out);
+            RenderAbstraction::IRenderScene& scene, uint8_t layer, uint16_t& seq,
+            std::vector<RenderAbstraction::DrawInstruction>& out);
 
     private:
         /// P2T2C4：位置（像素）+ UV + RGBA，32 字节
@@ -114,14 +113,15 @@ namespace Render
         struct Batch
         {
             int pixelHeight = 0;
-            uint64_t fontHandle = 0;  // Render::RT::FontHandle 裸值
+            RenderAbstraction::FontHandle font;
             std::vector<GVertex> verts;
         };
 
         /// 取（必要时创建）该像素高度对应的批次；失败返回 nullptr
         Batch* batchFor(int pixelHeight);
 
-        uint64_t m_runtime = 0;  // Render::RT::RuntimeHandle 裸值，0 = Invalid
+        /// 视口设备，不持有；nullptr 表示未初始化
+        RenderAbstraction::IRenderDevice* m_device = nullptr;
         std::vector<uint8_t> m_fontData;
         /// 按字号线性查找：一帧里的字号种类是个位数，哈希表反而更慢也更啰嗦
         std::vector<Batch> m_batches;

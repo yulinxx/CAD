@@ -1,14 +1,69 @@
 #include "RenderBridge/RenderSessionHost.h"
 
-#include "RenderBridge/HostCallbacks.h"
+// 持有 unique_ptr<IRenderDevice/IRenderSurface/IRenderScene>，删指针处需要完整类型
+#include "RenderAbstraction/IRenderFactory.h"
+
+// 句柄由本类自己建，这里只是把它们包成抽象层对象（私有实现头，不导出）
+#include "RenderXAdapter/RenderXAdapterInternal.h"
 
 // renderx.h 只在 .cpp 内部可见，头文件不再直接暴露它
 #include "render/renderx.h"
 
 #include "Log/SyLogger.h"
 
+#include <QOpenGLContext>
+
 namespace
 {
+    /**
+     * @brief 把 DLL 的日志回调桥接到宿主日志库
+     *
+     * DLL 自身不依赖任何日志实现。参数用 int32_t 兼容任何后端的 LogLevel 枚举值
+     * （Debug=0, Info=1, Warn=2, Error=3）。
+     */
+    void rxLogBridge(int32_t level, const char* message, void* /*userData*/)
+    {
+        if (!message)
+        {
+            return;
+        }
+        switch (static_cast<RenderAbstraction::LogLevel>(level))
+        {
+        case RenderAbstraction::LogLevel::Debug:
+        case RenderAbstraction::LogLevel::Info:
+            SY_INFOF("[Renderx] %s", message);
+            break;
+        case RenderAbstraction::LogLevel::Warn:
+            SY_WARNF("[Renderx] %s", message);
+            break;
+        case RenderAbstraction::LogLevel::Error:
+            SY_ERRORF("[Renderx] %s", message);
+            break;
+        }
+    }
+
+    /**
+     * @brief 把 Qt 的符号解析桥接给 DLL 的 GL 后端
+     *
+     * 不能让 DLL 走平台默认路径（Windows `wglGetProcAddress`、Linux
+     * `glXGetProcAddress`、macOS `dlsym`）：Qt 在部分平台上用的是另一套实现
+     * （Windows 的 ANGLE / EGL 后端最典型），两套混用会得到「函数指针非空但
+     * 行为不对」，没有任何报错，只表现为画面局部异常。
+     *
+     * 函数指针 → void* 的转换在 C++ 里是实现定义行为，但所有目标平台
+     * （Win/macOS/Linux 的 ABI）都保证两者同宽且可往返，GL 的
+     * getProcAddress 家族本身就是这么用的。
+     */
+    void* qtGlGetProcAddress(const char* name)
+    {
+        QOpenGLContext* ctx = QOpenGLContext::currentContext();
+        if (!ctx || !name)
+        {
+            return nullptr;
+        }
+        return reinterpret_cast<void*>(ctx->getProcAddress(name));
+    }
+
     // ---------- 类型转换辅助 ----------
     // RenderSessionHost.h 不再依赖 renderx.h，m_runtime/m_surface/m_session 存的是
     // uint64_t 裸值。这里统一做裸值 ↔ RenderX Handle 的转换。
@@ -231,14 +286,14 @@ namespace RenderBridge
         rd.backend = backend;
         rd.enableValidation = 0;
         rd.transientBufferBytes = config.transientBufferBytes;
-        rd.logCallback = reinterpret_cast<Render::RT::rxLogCallback>(&Render::host::rxLogBridge);
+        rd.logCallback = reinterpret_cast<Render::RT::rxLogCallback>(&rxLogBridge);
         rd.logUserData = nullptr;
         rd.applicationName = config.applicationName;
         if (!metal)
         {
             // 交给 DLL 用 Qt 的符号解析，而不是平台默认路径（见 qtGlGetProcAddress 注释）。
             // Metal 不解析 GL 符号：留空。
-            rd.glGetProcAddress = reinterpret_cast<void*>(&Render::host::qtGlGetProcAddress);
+            rd.glGetProcAddress = reinterpret_cast<void*>(&qtGlGetProcAddress);
         }
         // Metal 的 Runtime 在进程内共享，GL 的每视口一套——理由见 SharedMetalRuntime 注释。
         if (metal)
@@ -296,11 +351,27 @@ namespace RenderBridge
             shutdown();
             return false;
         }
+
+        // 句柄齐了，再包出抽象层视图。包失败不回收句柄：视口仍可用裸值工作，
+        // 只是走不了抽象层接口，这比整个渲染器建不起来轻得多。
+        m_deviceObj = RenderBridge::wrapRenderXDevice(m_runtime);
+        m_surfaceObj = RenderBridge::wrapRenderXSurface(m_runtime, m_surface);
+        m_sceneObj = RenderBridge::wrapRenderXScene(m_runtime, m_session);
+        if (!m_deviceObj || !m_surfaceObj || !m_sceneObj)
+        {
+            SY_ERRORF("RenderSessionHost[%s]: 抽象层对象包装失败，视口将无法使用渲染接口",
+                config.applicationName ? config.applicationName : "?");
+        }
         return true;
     }
 
     void RenderSessionHost::shutdown()
     {
+        // 先放抽象层视图：它们只是句柄的包装，必须比句柄先消失
+        m_sceneObj.reset();
+        m_surfaceObj.reset();
+        m_deviceObj.reset();
+
         // 逆序：会话持有表面与运行时内部对象，表面持有交换链
         if (Render::RT::rxValid(toSession(m_session)))
         {

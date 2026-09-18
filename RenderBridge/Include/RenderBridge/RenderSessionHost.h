@@ -61,6 +61,16 @@
 #include "RenderAbstraction/IRenderTypes.h"
 
 #include <cstdint>
+#include <memory>
+
+// 只前向声明：头文件不必引 IRenderFactory.h，成员 unique_ptr 的完整性由
+// 本类的析构函数（在 .cpp 内定义）保证
+namespace RenderAbstraction
+{
+    class IRenderDevice;
+    class IRenderSurface;
+    class IRenderScene;
+}
 
 namespace RenderBridge
 {
@@ -147,13 +157,15 @@ namespace RenderBridge
 
         bool isReady() const;
 
-        // ---------- 句柄访问 ----------
-        // 返回 uint64_t 裸值，调用方 static_cast 为目标 Handle 类型。
-        // 这样头文件不再依赖 renderx.h，同时保持调用方可用。
+        // ---------- 渲染接口视图 ----------
+        //
+        // 由本类持有的句柄包出来，视口用它调用渲染接口，不必知道后端的名字。
+        // 对象**不拥有**句柄，销毁仍由本类负责（见 initialize / shutdown 的顺序）。
+        // isReady() 为假时三个访问器都返回 nullptr。
 
-        uint64_t runtimeValue() const { return m_runtime; }
-        uint64_t sessionValue() const { return m_session; }
-        uint64_t surfaceValue() const { return m_surface; }
+        RenderAbstraction::IRenderDevice* device() const { return m_deviceObj.get(); }
+        RenderAbstraction::IRenderSurface* surface() const { return m_surfaceObj.get(); }
+        RenderAbstraction::IRenderScene* scene() const { return m_sceneObj.get(); }
 
         /// 把后端能力打一条日志；tag 是调用方前缀（两个视口前缀不同）
         void logCapabilities(const char* tag) const;
@@ -181,6 +193,19 @@ namespace RenderBridge
         uint64_t m_runtime{ kInvalidHandle };
         uint64_t m_surface{ kInvalidHandle };
         uint64_t m_session{ kInvalidHandle };
+
+        /**
+         * 同一批句柄的抽象层视图（见 device() / surface() / scene()）。
+         *
+         * 生命周期：在 initialize 末尾建立、shutdown 开头释放 —— 它们只是句柄的
+         * 包装，必须比句柄先消失。
+         *
+         * 上面存裸值、这里存对象，不是过渡态：本头文件不能 include renderx.h，
+         * 句柄只能以 uint64_t 存放；对象是给调用方的视图，对外不暴露裸值。
+         */
+        std::unique_ptr<RenderAbstraction::IRenderDevice> m_deviceObj;
+        std::unique_ptr<RenderAbstraction::IRenderSurface> m_surfaceObj;
+        std::unique_ptr<RenderAbstraction::IRenderScene> m_sceneObj;
         /**
          * 本实例的 Runtime 是否来自进程级共享持有者。
          *

@@ -43,7 +43,8 @@ sanyi_add_shared_library(${LIB_NAME}
     HEADERS ${LIB_HEADERS}
     PUBLIC_INCLUDE_DIRS
         "${CMAKE_CURRENT_SOURCE_DIR}/Include"
-        "${SANYI_ROOT}/RenderAbstraction/Include"
+        # 抽象层的包含路径由 link RenderAbstraction 带出来，不再重复写裸路径：
+        # 同一个依赖只表达一次，改起来才不会漏
         "${SANYI_UTILITY_DIR}/Include"
         "${SANYI_LOG_DIR}/Include"
         # 覆盖层与屏幕定尺寸标记几何共用应用层绘制词汇（Render::Vec2f / Color / BBox2d）
@@ -57,9 +58,13 @@ sanyi_add_shared_library(${LIB_NAME}
         PUBLIC
             Utility
             Log
-            # 类型隔离：RenderBridge 公共头不再 include renderx.h，但通过
-            # PUBLIC link 转发 RenderX DLL 给下游（UI2D/UI3D 仍直接调 rx* API）。
-            # 渲染层 API 收敛到 RenderBridge 内部是阶段 2 工作。
+            # 抽象层是 RenderBridge 的公开契约：公共头文件里到处是它的类型，
+            # 因此以 PUBLIC 传出去，下游不必自己再找一遍包含路径
+            RenderAbstraction
+        PRIVATE
+            # 渲染后端已完全收口到本模块内部：UI 层不再调 rx* API，
+            # 因此 RenderX 只以 PRIVATE 链接，不随 RenderBridge 转发给下游。
+            # 这同时让「UI 不得经传递闭包到达 RenderX」这条校验真正成立。
             RenderX
     QT_COMPONENTS
         Core Gui OpenGLWidgets
@@ -80,7 +85,7 @@ sanyi_export_imported_target(${LIB_NAME}
         Utility::Utility
         Log::Log
         RenderAbstraction
-        RenderX
+        # RenderX 不在这里：它已是本模块的 PRIVATE 依赖，下游拿不到也不该拿
 )
 
 message(STATUS "----------------------------------------")
