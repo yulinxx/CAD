@@ -34,9 +34,9 @@ namespace Eg
  * @struct UiServices
  * @brief UI 服务集合（具体类型聚合，实现 IUIServices 接口）
  *
- * 聚合了 UI 层所需的服务。当前暴露 15 个指针，其中 4 个是抽象接口
- * （ISelectionService / IUndoRedoManager / IInteractionDispatcher /
- * IRecentFileService），其余为具体类型，违反"UI 只保留入口、交互和状态同步"原则。
+ * 聚合了 UI 层所需的服务。本结构是**组合根的装配容器**：由
+ * ApplicationCompositionRoot 填充，再以聚焦分组 / 接口的形式交付消费者；
+ * 消费者之间不再传递本聚合（见下方【已收口】）。
  *
  * 2026-08-31 已删除 4 个死字段：layoutService、layerPersistenceBridge、
  * exportService、settingsService —— 它们只在装配处被赋值，全仓无读取点
@@ -44,11 +44,12 @@ namespace Eg
  * ApplicationCompositionRoot 的 unique_ptr 上，真正需要它们的
  * FileOperationRegistry 走 FileOperationConfig 单独注入，与本结构无关。
  *
- * 【已知问题】消费者直接依赖具体实现类，无法独立测试或替换实现。
- *
- * 【迁移方向】仅依赖抽象服务的消费者应改为依赖 IUIServices；
- * 需要具体服务的消费者应通过独立参数注入。读取点集中在 UiWorkbench 与
- * WorkbenchWindow 两处，逐字段下沉为构造参数是可行的下一步。
+ * 【已收口（P2）】消费者之间不再传递本聚合：
+ *  - 只依赖抽象服务的消费者直接依赖对应接口（如 WorkbenchMenuManager → IRecentFileService）
+ *  - 需要多个服务的消费者依赖聚焦分组（见 UiServiceGroups.h：UiState/Command/Scene/
+ *    Persistence/View）
+ *  - 工作台接口 UiWorkbench::initialize 收 WorkbenchServices bundle
+ * 本聚合仅由 ApplicationCompositionRoot 填充，作为**装配容器**使用。
  */
 struct UiServices : public IUIServices
 {
