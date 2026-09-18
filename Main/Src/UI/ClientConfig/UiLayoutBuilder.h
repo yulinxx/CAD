@@ -11,6 +11,8 @@
 
 #include "UiClientConfigBase.h"
 #include "ILayoutBuilder.h"
+#include "IMenuBuilder.h"
+#include "IUiCommandDispatcher.h"
 
 #include <QSet>
 #include <QVariantMap>
@@ -26,30 +28,10 @@ class QWidget;
 class UiPanelRegistry;
 class UiShortcutRegistry;
 
-/// 命令分发器抽象接口
-/// 适配现有 CommandCatalog + OperationBus 体系，同时允许单元测试注入假实现
-class IUiCommandDispatcher
-{
-public:
-    virtual ~IUiCommandDispatcher() = default;
+/// 命令分发器抽象接口见 IUiCommandDispatcher.h（已抽出）
 
-    /// 命令是否已注册
-    virtual bool isCommandRegistered(const QString& commandId) const = 0;
-
-    /// 分发命令（唯一入口）
-    /// @param params 调用方给出的参数（如最近文件项的 path），实现负责透传到操作总线；
-    ///        实现里的 enrichParams 只能补齐缺失项，不得整体覆盖。
-    virtual void dispatch(const QString& commandId, const QVariantMap& params) = 0;
-
-    /// 无参分发的便捷写法。非虚，只是转调上面那一条通路，不构成第二个入口。
-    void dispatch(const QString& commandId)
-    {
-        dispatch(commandId, QVariantMap{});
-    }
-};
-
-/// 数据驱动的布局构建器（实现 ILayoutBuilder，供按接口消费布局构建）
-class UiLayoutBuilder : public ILayoutBuilder
+/// 数据驱动的布局构建器（实现 ILayoutBuilder + IMenuBuilder，供按接口消费）
+class UiLayoutBuilder : public ILayoutBuilder, public IMenuBuilder
 {
 public:
     UiLayoutBuilder(QMainWindow* window, IUiCommandDispatcher* dispatcher, UiPanelRegistry* panelRegistry);
@@ -58,10 +40,10 @@ public:
     /// Dock / 工具栏 / 状态栏槽位不在此销毁：那些由上层布局管理器统一回收。
     ~UiLayoutBuilder();
 
-    void buildMenus(const std::vector<MenuDef>& menus);
+    void buildMenus(const std::vector<MenuDef>& menus) override;
     void buildToolBars(const std::vector<ToolBarDef>& toolBars) override;
     void buildDocks(const std::vector<DockDef>& docks) override;
-    void buildShortcuts(const std::vector<ShortcutDef>& shortcuts);
+    void buildShortcuts(const std::vector<ShortcutDef>& shortcuts) override;
 
     /// 构建状态栏槽位（P0-2a）
     /// 槽位控件由 UiPanelRegistry 按 widgetType 创建，与 Dock 使用同一套面板工厂。
@@ -75,12 +57,12 @@ public:
     /// @return 构建好的菜单；无可用条目时返回 nullptr（调用方据此决定不弹出）
     QMenu* buildContextMenu(const ContextMenuDef& def, QWidget* parent);
 
-    void clearBuiltLayout();
+    void clearBuiltLayout() override;
 
     /// 挂入快捷键台账（可为空）。挂上后：配置里的键会先叠加用户覆盖再生效，
     /// 且每个菜单动作/全局快捷键都登记进台账，供设置页的快捷键页编辑。
     /// 必须在 buildMenus/buildShortcuts 之前设置。
-    void setShortcutRegistry(UiShortcutRegistry* registry)
+    void setShortcutRegistry(UiShortcutRegistry* registry) override
     {
         m_shortcutRegistry = registry;
     }

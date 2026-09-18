@@ -21,7 +21,8 @@
 #include "Composition/ApplicationCompositionRoot.h"
 #include "UI/Settings/SettingsService.h"
 #include "UI/Services/IRecentFileService.h"
-#include "UI/ClientConfig/UiLayoutBuilder.h"
+#include "UI/ClientConfig/IMenuBuilder.h"
+#include "UI/ClientConfig/IUiCommandDispatcher.h"
 #include "UI/LanguageManager.h"
 #include "UI/ThemeManager.h"
 #include "UI/IconHelper.h"
@@ -42,7 +43,6 @@
 #include "ClientConfig/UiConfigurationManager.h"
 #include "ClientConfig/UiContextMenuService.h"
 #include "ClientConfig/UiFeatureGate.h"
-#include "ClientConfig/UiLayoutBuilder.h"
 #include "ClientConfig/UiPanelRegistry.h"
 #include "ClientConfig/UiShortcutRegistry.h"
 
@@ -393,7 +393,7 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
 
     // 命令分发器随 WorkbenchMenuManager 生命周期持有（成员 m_dispatcher）：
     // UiLayoutBuilder 会把该指针存入 QAction 触发回调并长期解引用，必须保证指针在菜单存在期间有效。
-    m_menuLayoutBuilder = std::make_unique<UiLayoutBuilder>(m_window, commandDispatcher(), m_menuPanelRegistry.get());
+    m_menuLayoutBuilder = createMenuBuilder(m_window, commandDispatcher(), m_menuPanelRegistry.get());
 
     // 注册 File ▸ Recent Files 动态段，必须在建菜单之前 ——
     // UiLayoutBuilder 建到该子菜单时会立刻填一次。
