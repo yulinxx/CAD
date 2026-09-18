@@ -19,7 +19,7 @@ struct MenuDef;
 class IUiCommandDispatcher;
 class UiConfigurationManager;
 class UiPanelRegistry;
-class UiLayoutBuilder;
+class IMenuBuilder;
 class UiShortcutRegistry;
 class IShortcutSettingsModel;
 struct UiConfigData;
@@ -154,7 +154,7 @@ private:
 
     // 客户 UI 配置不再由本类持有：统一取自 UiConfigurationManager::shared()，
     // 保证菜单 / 工具栏 / Dock / 状态栏 / 右键菜单消费同一份配置（P0-1）
-    std::unique_ptr<UiLayoutBuilder> m_menuLayoutBuilder;
+    std::unique_ptr<IMenuBuilder> m_menuLayoutBuilder;
     std::unique_ptr<UiPanelRegistry> m_menuPanelRegistry;
     // 快捷键台账：寿命必须长于 m_menuLayoutBuilder（后者每次重建都整体替换），
     // 设置页里的快捷键模型直接指向它。

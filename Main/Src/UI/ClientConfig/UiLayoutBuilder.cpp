@@ -734,3 +734,9 @@ std::unique_ptr<ILayoutBuilder> createLayoutBuilder(
 {
     return std::make_unique<UiLayoutBuilder>(window, dispatcher, panelRegistry);
 }
+
+std::unique_ptr<IMenuBuilder> createMenuBuilder(
+    QMainWindow* window, IUiCommandDispatcher* dispatcher, UiPanelRegistry* panelRegistry)
+{
+    return std::make_unique<UiLayoutBuilder>(window, dispatcher, panelRegistry);
+}

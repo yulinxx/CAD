@@ -380,7 +380,7 @@ bool Workbench2D::initialize(const WorkbenchServices& services)
     if (!services.uiState.stateCenter || !services.uiState.interactionDispatcher)
     {
         SY_ERRORF("[Workbench2D] initialize failed: stateCenter=%p interactionDispatcher=%p",
-            static_cast<void*>(services.stateCenter), static_cast<void*>(services.interactionDispatcher));
+            static_cast<void*>(services.uiState.stateCenter), static_cast<void*>(services.uiState.interactionDispatcher));
         return false;
     }
     m_uiState = services.uiState;
@@ -2342,7 +2342,7 @@ bool Workbench3D::initialize(const WorkbenchServices& services)
     if (!services.uiState.stateCenter || !services.uiState.interactionDispatcher)
     {
         SY_ERRORF("[Workbench3D] initialize failed: stateCenter=%p interactionDispatcher=%p",
-            static_cast<void*>(services.stateCenter), static_cast<void*>(services.interactionDispatcher));
+            static_cast<void*>(services.uiState.stateCenter), static_cast<void*>(services.uiState.interactionDispatcher));
         return false;
     }
     m_uiState = services.uiState;
