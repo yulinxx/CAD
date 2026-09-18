@@ -104,9 +104,11 @@ else if (level == Repaint)     → 仅消费脏 ID，不做几何同步
 |-----|------|------|
 | `Mesh3DBuilder::updateDirtyEntities()` | UI/3D | 增量更新脏图元，不扫描全场景 |
 | `Mesh3DBuilder::removeEntity()` | UI/3D | 移除单个图元的几何与槽位 |
+| `Mesh3DBuilder::setEntityVisible()` | UI/3D | 显隐对账，不重传顶点 |
 | `SceneRefreshCoordinator3D::takePendingDirtyIds()` | UI/3D | 消费并清空脏 ID 集合 |
 | `SceneRefreshCoordinator3D::takePendingDeletedIds()` | UI/3D | 消费并清空删除 ID 集合 |
 | `SceneRefreshCoordinator3D::setFlushCallback()` | UI/3D | 注入同步刷新回调 |
+| `SceneRefreshCoordinator3D::setRepaintHook()` | UI/3D | 重绘注入点（测试用，钉住「一次请求一次重绘」） |
 
 ---
 
@@ -156,7 +158,33 @@ else if (level == Repaint)     → 仅消费脏 ID，不做几何同步
 
 ---
 
-## 6. 当前需继续收口的点
+## 6. 实体显隐的刷新流（2026-09-18）
+
+实体级显隐此前不进入刷新链：`SyEntity::setVisible()` 只 `setModified()` 标脏，
+不产生场景变更记录，`readChanges()` 读不到，渲染侧只能全量重建。现在补上：
+
+```text
+setVisible(false/true) / setEntitiesVisible(ids, visible)
+→ SyEntity 可见性回调（SceneManager 入场时注入）
+→ recordChange(id, VisibilityChanged)
+→ notifySceneChanged()
+→ SceneRefreshCoordinator(2D) / SceneRefreshCoordinator3D
+  → 16ms 节流合帧
+  → 2D: LightUpdate 增量重提脏图元（可见性翻转触发 remove / add）
+  → 3D: LightUpdate → syncMeshGeometryIncremental / Mesh3DBuilder::setEntityVisible
+```
+
+要点：
+
+- 可见性变更只记 `VisibilityChanged`，**不推进 `structureRevision`**，场景树不重建；
+- 批量显隐走 `setEntitiesVisible`，一次循环、回调逐条记变更，最终由 16ms 定时器合并为
+  一帧增量重绘；
+- 图层级显隐仍走 `LayerManager::setLayerVisible` → `notifySceneChanged()`，语义不同
+  （图层显隐影响整层，实体显隐只影响单图元）。
+
+---
+
+## 7. 当前需继续收口的点
 
 - 继续减少视口内部的协调逻辑
 - 继续统一 2D 和 3D 的刷新语义

@@ -15,7 +15,7 @@
 
 | 层级 | 2D 职责实现 | 3D 职责实现 | 批处理手段 |
 | --- | --- | --- | --- |
-| 算法层 | `EntityTransform` | `SelectionManager3D::applyTransform` | 多步变换**先合并成一个矩阵**，整批只构造一次，每图元只做一次矩阵乘法；SmartLine 用 `transformBatch()` 避免虚函数分发；只改几何，不碰索引/通知 |
+| 算法层 | `EntityTransform` | `SelectionManager3D::applyTransform` | 多步变换**先合并成一个矩阵**，整批只构造一次，每图元只做一次矩阵乘法；SmartLine 用 `transformBatch()` 避免虚函数分发；3D 大选集（≥100）顶点变换并行化；只改几何，不碰索引/通知 |
 | 编辑层 | `SceneEditService` | `SceneManager3D::extractEntities` / `deleteEntities` | 整批结束后**一次**索引同步，**一次**场景广播 |
 | 渲染层 | `SceneRefreshCoordinator` | `RenderWidget3D` + `SceneMonitor3D` | 节流合并、脏 ID 增量、快照并行离散化、GL 批量上传 |
 | UI 层 | `Workbench2D` / 视口 / 面板 | `Workbench3D` / 视口 / 面板 | 切断非必要扇出；属性面板节流；场景树按结构签名门控 |
@@ -188,9 +188,40 @@ Esc 取消则用 before 快照整体还原。拖动期间
   再逐个 `addSelect()`，框选 500 个图元就是 500 次 UI 扇出
   （每次都是属性面板重建 + 状态栏 + 命令状态刷新）；
 - `applyTransform()` 烘焙顶点后，只对本批选中图元调 `updateEntitiesBounds()`
-  更新索引，不再全量 `rebuildSpatialIndex()`（O(M log N) 而非 O(N log N)）。
+  更新索引，不再全量 `rebuildSpatialIndex()`（O(M log N) 而非 O(N log N)）；
+- `applyTransform()` 顶点/法线变换在**大选集**（≥100 图元且并行开启）时走
+  `Eg::EngineParallel::parallelForIndex` 并行执行：每个图元独占自己的顶点数组，
+  矩阵只读，无共享写；小批量或并行关闭时退回串行。阈值与 2D 侧
+  `kParallelThreshold = 100` 一致。
 
-### 4.4 调用方收口
+### 4.4 实体可见性变更的增量记录（2026-09-18）
+
+**问题**：`SyEntity::setVisible()` 此前只调 `setModified()` 标脏，**不记录任何场景变更**。
+于是批量隐藏/显示实体时，`readChanges()` 读不到 `VisibilityChanged`，渲染侧无法走增量
+路径，只能退回全量重建 —— 选中大量图元反复显隐时是主要卡顿来源。
+
+**方案**：给 `SyEntity` 增加可见性变更回调，由 `SceneManager` / `SceneManager3D` 在
+实体入场时注入，回调体统一 `recordChange(id, SceneChangeKind::VisibilityChanged)`：
+
+```cpp
+// SyEntity.h
+void setVisible(bool visible) override {
+    if (m_bVisible != visible) {
+        m_bVisible = visible;
+        setModified();
+        if (m_visibilityChangedCb) m_visibilityChangedCb(this, visible);  // → recordChange
+    }
+}
+```
+
+**批量入口**：`SceneManager::setEntitiesVisible(ids|pointers, visible)` 与
+`SceneManager3D::setEntitiesVisible(...)`，一次循环设置多个图元；单次 `setVisible`
+也因回调自动进入变更流。
+
+**收益**：实体级显隐切换进入增量路径，不再退化为 `FullRefresh`；配合 16ms 定时器，
+批量显隐只产生一帧增量重绘。
+
+### 4.5 调用方收口
 
 | 位置 | 旧做法 | 现做法 |
 | --- | --- | --- |
@@ -208,7 +239,7 @@ Esc 取消则用 before 快照整体还原。拖动期间
 命令析构时会再次释放。现改为 `extractEntities` 摘出并保留所有权，形成
 「undo 归还 / redo 摘出」的可逆闭环（与 `DeleteMeshCommand3D` 同一模式）。
 
-### 4.5 3D 场景树的重建门控
+### 4.6 3D 场景树的重建门控
 
 文件：`Main/Src/UI/Workbench/UiWorkbench.cpp`
 
@@ -311,10 +342,11 @@ pending 标志，超时补一次尾包。属性面板展示端点/半径等几�
 | 对话框移动/旋转/镜像/对齐 | `EditOperationRegistry` → `transformEntities` | 矩阵合并一次，整批一次索引同步 | 入栈后一次通知；结构签名不变不重建树 |
 | 方向键 Nudge | `Edit_Nudge` → `nudgeSelected` | 同上；撤销命令可合并 | 同上 |
 | 删除 | `DeleteEntitiesCommand` | `removeRange` 批量摘除 | 一次选择+场景通知；结构签名变化 → 树防抖重建 |
+| 批量显隐 | `SceneManager::setEntitiesVisible` | 循环 `setVisible` → 回调 `recordChange(VisibilityChanged)` | 进入增量路径；16ms 合帧；结构签名不变不重建树 |
 | 粘贴 / 复制 | `addEntities` 批量落库 | 批量建索引（带进度分段） | 一次通知；结构签名变化 → 树重建 |
 | 撤销 / 重做 | `EntitySnapshotsCommand` | 快照整批替换/恢复 | 命令末尾一次通知 |
 | 3D 框选 | `RenderWidget3D::selectByScreenRect` | 逐图元投影求交（屏幕空间） | 一次 `selectMany`，只刷新一次属性面板 |
-| 3D 拖动变换 | `SelectionManager3D::applyTransform` | 一次矩阵烘焙顶点，只更新选中图元索引 | 一次 `markDataChanged`；`structureRevision` 不变，树不重建 |
+| 3D 拖动变换 | `SelectionManager3D::applyTransform` | 一次矩阵烘焙顶点（≥100 图元并行），只更新选中图元索引 | 一次 `markDataChanged`；`structureRevision` 不变，树不重建 |
 | 3D 删除 | `SceneEditService3D::deleteSelected` | 一次 `extractEntities`（一趟压缩） | 一次移除通知 + 一次场景通知；树经防抖重建一次 |
 
 ---
@@ -335,6 +367,11 @@ pending 标志，超时补一次尾包。属性面板展示端点/半径等几�
   `removeEntity`（每个都是 O(场景规模) 的查找与搬移 + 一次全场景选择同步与广播）；
 - ✅ 3D 选择变更走 `selectMany` 系列，禁止对命中集循环调用 `addSelect`；
 - ✅ 3D 批量变换后只对本批图元 `updateEntitiesBounds`，禁止全量 `rebuildSpatialIndex`；
+- ✅ 3D 大选集（≥100 图元）顶点变换走 `EngineParallel::parallelForIndex`，
+  每个图元独占自己的顶点数组、矩阵只读，禁止在并行体内触碰共享状态；
+- ✅ 实体显隐统一走 `setEntitiesVisible`（或直接 `setVisible`，由回调记录），
+  禁止绕过 SceneManager 直接改标志位——那样不会产生 `VisibilityChanged`，
+  渲染侧收不到变更、只能全量重建；
 - ✅ 场景树按 id 定位行走哈希表：`SceneTreeTableModel2D::indexForId` 的群组成员
   分支改为查 `m_childRowById`（与 `m_childParent` 同处维护），不再对全体已展开
   群组做线性扫描；
@@ -366,3 +403,12 @@ pending 标志，超时补一次尾包。属性面板展示端点/半径等几�
   `RenderWidget3D::mouseMoveEvent()` 各分支的 `update()` 同理节流；
   `buildFrustum` 新增重载接收预计算合并矩阵，避免每帧重复计算
   `projectionMatrix() * viewMatrix()`；`applyLightRefresh` 移除冗余 `update()`。
+- ✅ 2026-09-18：3D 阶段 3 增量渲染落地 —— `SceneRefreshCoordinator3D` 新增
+  `takePendingDirtyIds` / `takePendingDeletedIds`，`paintGL` 按 `pendingLevel` 分流
+  （`FullRefresh` 全量 / `LightUpdate` 走 `Mesh3DBuilder::updateDirtyEntities` 增量 /
+  `Repaint` 仅消费脏 ID）；`flushPendingRefresh` 通过注入的 `FlushCallback` 同步执行。
+- ✅ 2026-09-18：`SelectionManager3D::applyTransform` 大选集（≥100 图元）顶点/法线变换
+  并行化（`EngineParallel::parallelForIndex`）。
+- ✅ 2026-09-18：实体可见性变更增量记录 —— `SyEntity` 新增可见性变更回调，
+  `SceneManager` / `SceneManager3D` 入场时注入并 `recordChange(VisibilityChanged)`；
+  新增 `setEntitiesVisible` 批量 API。实体级显隐不再退回全量刷新。
