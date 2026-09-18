@@ -30,8 +30,6 @@ class SceneEditService3D;
 
 #include "Color/Color.hpp"
 
-#include <QFileInfo>
-
 // ==================== RAII 导入守卫 ====================
 // 替代 goto cleanup 模式：构造时设忙状态，析构时清除忙状态 + 写最终状态
 // 解决五阶段流程中 goto cleanup 的代码可读性和维护性问题

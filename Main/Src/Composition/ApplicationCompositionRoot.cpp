@@ -272,7 +272,7 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
     m_shellHost->setStateCenter(m_stateCenter.get());
     m_shellHost->setOperationBus(m_operationBus.get());
 
-    return uiServices;
+    return std::move(uiServices);
 }
 
 void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiServices)

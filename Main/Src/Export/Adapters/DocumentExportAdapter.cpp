@@ -30,8 +30,10 @@ Fio::VecSyEntityPtr DocumentExportAdapter::collect2D()
 
 Fio::VecSyEntityPtr DocumentExportAdapter::collect3D()
 {
-    // 3D 场景收集，后续由 3D 场景管理器接管
-    return collect2D();
+    // TODO: 3D 场景收集功能未实现，当前返回空结果
+    // 需要集成 3D 场景管理器 (SceneManager3D)
+    SY_DEBUG("[DocumentExportAdapter] collect3D not implemented, returning empty");
+    return Fio::VecSyEntityPtr();
 }
 
 Fio::VecSyEntityPtr DocumentExportAdapter::collectSelected()

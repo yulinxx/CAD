@@ -130,6 +130,7 @@ bool DocumentRepository::save(const DocumentRecord& record)
         return fail("DocumentRepository", "Failed to save document metadata");
     }
 
+    SY_DEBUGF("[DocumentRepository] Inserted document: %s", record.filePath.c_str());
     return true;
 }
 

@@ -24,7 +24,8 @@ namespace Ui
 
     QString ViewCaptureService::generateFileName(bool is3D) const
     {
-        const QString ts = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss_zzz");
+        // 使用 HHmmss (24小时制) 避免午夜时段文件名排序问题
+        const QString ts = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss_zzz");
         return QString("SanYiCAD_%1_%2.png").arg(is3D ? "3D" : "2D").arg(ts);
     }
 
