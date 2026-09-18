@@ -758,3 +758,9 @@ QMenu* UiLayoutBuilder::buildContextMenu(const ContextMenuDef& def, QWidget* par
         static_cast<int>(menu->actions().size()));
     return menu;
 }
+
+std::unique_ptr<IToolbarBuilder> createToolbarBuilder(
+    QMainWindow* window, IUiCommandDispatcher* dispatcher, UiPanelRegistry* panelRegistry)
+{
+    return std::make_unique<UiLayoutBuilder>(window, dispatcher, panelRegistry);
+}

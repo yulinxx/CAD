@@ -10,6 +10,7 @@
  */
 
 #include "UiClientConfigBase.h"
+#include "IToolbarBuilder.h"
 
 #include <QSet>
 #include <QVariantMap>
@@ -47,8 +48,8 @@ public:
     }
 };
 
-/// 数据驱动的布局构建器
-class UiLayoutBuilder
+/// 数据驱动的布局构建器（实现 IToolbarBuilder，供按接口消费工具栏构建）
+class UiLayoutBuilder : public IToolbarBuilder
 {
 public:
     UiLayoutBuilder(QMainWindow* window, IUiCommandDispatcher* dispatcher, UiPanelRegistry* panelRegistry);
@@ -58,7 +59,7 @@ public:
     ~UiLayoutBuilder();
 
     void buildMenus(const std::vector<MenuDef>& menus);
-    void buildToolBars(const std::vector<ToolBarDef>& toolBars);
+    void buildToolBars(const std::vector<ToolBarDef>& toolBars) override;
     void buildDocks(const std::vector<DockDef>& docks);
     void buildShortcuts(const std::vector<ShortcutDef>& shortcuts);
 
@@ -92,7 +93,7 @@ public:
     }
 
     /// 本次构建创建的工具栏（供上层注册到布局管理器，统一清理）
-    const std::vector<QToolBar*>& builtToolBars() const
+    const std::vector<QToolBar*>& builtToolBars() const override
     {
         return m_builtToolBars;
     }

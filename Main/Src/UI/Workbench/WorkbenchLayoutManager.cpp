@@ -12,6 +12,7 @@
 #include "ClientConfig/UiClientContext.h"
 #include "ClientConfig/UiConfigLoader.h"
 #include "ClientConfig/UiConfigurationManager.h"
+#include "ClientConfig/IToolbarBuilder.h"
 #include "ClientConfig/UiLayoutBuilder.h"
 #include "ClientConfig/UiPanelRegistry.h"
 
@@ -105,10 +106,11 @@ void WorkbenchLayoutManager::buildToolBars()
         return;
     }
 
-    UiLayoutBuilder builder(m_parent, m_commandDispatcher, m_panelRegistry.get());
-    builder.buildToolBars(config->toolBars);
+    std::unique_ptr<IToolbarBuilder> builder =
+        createToolbarBuilder(m_parent, m_commandDispatcher, m_panelRegistry.get());
+    builder->buildToolBars(config->toolBars);
 
-    for (QToolBar* tb : builder.builtToolBars())
+    for (QToolBar* tb : builder->builtToolBars())
     {
         if (tb)
         {
