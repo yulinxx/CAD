@@ -79,7 +79,7 @@ QStringList RecentFileService::loadRecentFiles() const
 
 void RecentFileService::saveRecentFiles(const QStringList& files) const
 {
-    SY_DEBUGF("[RecentFileService] Saving %d recent files to QSettings", files.size());
+    SY_DEBUGF("[RecentFileService] Saving %lld recent files to QSettings", files.size());
     // 数据库端由 addRecentFile 逐条写入，此处不做批量覆盖
     // QSettings 兜底：保留旧版兼容性
     QSettings settings;
