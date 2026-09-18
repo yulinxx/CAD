@@ -213,7 +213,6 @@ void WorkbenchWindow::setUiStateCenter(UiStateCenter* stateCenter)
 {
     // 状态中心入口只负责替换源头引用，不在这里做额外状态编排
     m_stateCenter = stateCenter;
-    m_uiServices.stateCenter = stateCenter;
     if (m_actionManager)
     {
         m_actionManager->setStateCenter(stateCenter);
@@ -229,7 +228,6 @@ void WorkbenchWindow::setUiStateCenter(UiStateCenter* stateCenter)
 void WorkbenchWindow::setOperationBus(OperationBus* bus)
 {
     m_operationBus = bus;
-    m_uiServices.operationBus = bus;
     if (m_actionManager)
     {
         m_actionManager->setOperationBus(bus);
@@ -258,14 +256,8 @@ void WorkbenchWindow::setUiServices(const UiServices& services)
     configureServices(services);
 }
 
-const UiServices& WorkbenchWindow::uiServices() const
-{
-    return m_uiServices;
-}
-
 void WorkbenchWindow::configureServices(const UiServices& services)
 {
-    m_uiServices = services;
     m_stateCenter = services.stateCenter;
 
     // 单位管理器：状态栏坐标按当前显示单位换算，切换单位时实时刷新
@@ -332,7 +324,7 @@ void WorkbenchWindow::configureServices(const UiServices& services)
     {
         m_menuManager->setOperationBus(services.operationBus);
         m_menuManager->setStateCenter(services.stateCenter);
-        m_menuManager->setRecentFileService(m_uiServices.recentFileService);
+        m_menuManager->setRecentFileService(services.recentFileService);
         m_menuManager->setWorkbench(m_workbench);
         if (m_workbench)
         {
@@ -597,10 +589,10 @@ void WorkbenchWindow::closeEvent(QCloseEvent* event)
         }
         if (result == QMessageBox::Save)
         {
-            if (m_uiServices.operationBus)
+            if (m_operationBus)
             {
                 // 同步等待保存完成，避免窗口关闭时数据未保存
-                OperationResult saveResult = m_uiServices.operationBus->run(OperationId::File_Save, {});
+                OperationResult saveResult = m_operationBus->run(OperationId::File_Save, {});
                 if (!saveResult.success)
                 {
                     // 保存失败：弹对话框让用户选择重试/放弃

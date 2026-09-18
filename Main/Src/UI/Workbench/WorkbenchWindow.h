@@ -101,9 +101,6 @@ public:
     /// 设置 UI 服务集合，并同步到底层框架桥接
     /// @param services UI 服务集合
     void setUiServices(const UiServices& services);
-    /// 获取当前 UI 服务集合
-    /// @return UI 服务集合引用
-    const UiServices& uiServices() const;
     /// 设置当前工作台
     /// @param workbench 工作台实例
     void setWorkbench(UiWorkbench* workbench);
@@ -250,8 +247,6 @@ private:
     UiStateCenter* m_stateCenter{ nullptr };
     /// 操作总线
     OperationBus* m_operationBus{ nullptr };
-    /// UI 服务集合
-    UiServices m_uiServices;
     /// 单位管理器（非拥有指针，来自 UiServices）
     UnitManager* m_unitManager{ nullptr };
     /// 最近一次鼠标世界坐标（毫米，基单位）
