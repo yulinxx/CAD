@@ -191,7 +191,10 @@ PrimitiveType fromRenderXPrimitive(Render::RT::PrimitiveTopology topo) {
     switch (topo) {
     case Render::RT::PrimitiveTopology::Points:    return PrimitiveType::Points;
     case Render::RT::PrimitiveTopology::Lines:     return PrimitiveType::Lines;
+    case Render::RT::PrimitiveTopology::LineStrip: return PrimitiveType::Lines;
+    case Render::RT::PrimitiveTopology::LineLoop: return PrimitiveType::Lines;
     case Render::RT::PrimitiveTopology::Triangles: return PrimitiveType::Triangles;
+    case Render::RT::PrimitiveTopology::TriangleStrip: return PrimitiveType::Triangles;
     }
     return PrimitiveType::Triangles;
 }
