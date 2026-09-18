@@ -108,6 +108,7 @@ SanYiCAD/
 |------|------|--------|------|
 | **FileIO** | 文件导入导出（DXF、PLT、SVG、STL、NC） | C++17 | Engine2D, Engine3D |
 | **Nesting** | 排样算法（矩形/不规则嵌套） | C++17 | Engine2D |
+| **Nesting v2 核心能力** | QUALITY 策略(GA+退火) / 24向旋转(15°) / 镜像翻转 / 共边切割 / 孔内套排 / GROUP嵌套展开 / 10种2D图元类型 / 局部坐标变换 / 进度回调与取消 | - | - |
 | **Hardware** | 激光硬件控制、材质数据库、工艺参数 | Qt SerialPort | UICommon |
 | **Engraving** | 浮雕生成、刀具路径计算、雕刻预览 | OpenCASCADE | Engine3D, GeoModelCore |
 | **GeoModelCore** | OpenCASCADE 几何建模集成 | OpenCASCADE | Engine3D |
