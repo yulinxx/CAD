@@ -1448,7 +1448,11 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
         // （如重命名入撤销栈），此时重建模型会删掉正在回调的模型对象，
         // 编辑器提交后视图持有悬空模型，表现为「重命名过一次后无法再双击编辑」。
         connect(m_services.operationBus, &OperationBus::undoStateChanged, this, [this]() {
-            QTimer::singleShot(0, this, &Workbench2D::refreshSceneTree);
+            QTimer::singleShot(0, this, [this]() {
+                // 增量优先：画线等纯新增走单行插入；删除/群组/改名回退全量。
+                // 改名等非结构变更经变更集里的非 Added 位触发全量快径 dataChanged。
+                applySceneTreeIncremental("undoStateChanged");
+            });
         });
         connect(m_services.operationBus, &OperationBus::operationCompleted, this, [this](OperationId, bool success) {
             if (!success)
@@ -1461,7 +1465,7 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
             // 白做功；删除/粘贴/成组等结构变化签名不同，才会走防抖重建。
             // 选中高亮由 syncSceneTreeSelection 单独维护，不依赖重建。
             // 改名等「不入结构签名但要刷新行文本」的操作由上方 undoStateChanged 兜底。
-            QTimer::singleShot(0, this, &Workbench2D::refreshSceneTreeIfNeeded);
+            QTimer::singleShot(0, this, [this]() { refreshSceneTreeIfNeeded("opCompleted"); });
         });
     }
 
@@ -1476,7 +1480,9 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
             m_sceneTreeRefreshTimer = new QTimer(this);
             m_sceneTreeRefreshTimer->setSingleShot(true);
             m_sceneTreeRefreshTimer->setInterval(150);
-            connect(m_sceneTreeRefreshTimer, &QTimer::timeout, this, &Workbench2D::refreshSceneTree);
+            connect(m_sceneTreeRefreshTimer, &QTimer::timeout, this, [this]() {
+                applySceneTreeIncremental("timer");
+            });
         }
         if (!m_sceneTreeObserver)
         {
@@ -1495,7 +1501,8 @@ void Workbench2D::onSceneTreeSceneChanged()
 {
     // 结构签名没变（例如只是拖了几何）就不重建：原来这里按「图元数量」判断，
     // 但群组拓扑变化不改数量，会让新建/解散的群组在树上残留。
-    refreshSceneTreeIfNeeded();
+    // 增量优先：纯新增只追加顶层行；删除/群组/改名等回退全量。
+    applySceneTreeIncremental("sceneObserver");
 }
 
 void Workbench2D::refreshSceneTree()
@@ -1521,14 +1528,21 @@ void Workbench2D::refreshSceneTree()
     m_lastSceneTreeStructureRevision = scene ? scene->structureRevision() : 0;
     m_lastSceneTreeTopologyRevision = scene ? scene->groupManager().topologyRevision() : 0;
 
-    SY_INFOF("[Workbench2D] scene tree rebuilt: topLevel=%d entities=%zu structRev=%llu topoRev=%llu",
+    // 全量重建已消费掉当前全部变更：推进增量游标，之后增量只读真正的新变更
+    m_sceneTreeCursor = scene ? scene->currentRevision() : m_sceneTreeCursor;
+
+    // 打点：上报本轮重建的触发来源，并立刻清零（避免后续重建误用旧标记）。
+    const char* src = m_sceneTreeRefreshSource ? m_sceneTreeRefreshSource : "misc";
+    m_sceneTreeRefreshSource = nullptr;
+    SY_INFOF("[Workbench2D] scene tree rebuilt src=%s: topLevel=%d entities=%zu structRev=%llu topoRev=%llu",
+        src,
         static_cast<int>(topology.topLevel.size()),
         m_lastSceneTreeEntityCount,
         static_cast<unsigned long long>(m_lastSceneTreeStructureRevision),
         static_cast<unsigned long long>(m_lastSceneTreeTopologyRevision));
 }
 
-void Workbench2D::refreshSceneTreeIfNeeded()
+void Workbench2D::refreshSceneTreeIfNeeded(const char* src)
 {
     if (!m_scenePanel2D)
     {
@@ -1557,6 +1571,12 @@ void Workbench2D::refreshSceneTreeIfNeeded()
     m_lastSceneTreeStructureRevision = structureRev;
     m_lastSceneTreeTopologyRevision = topologyRev;
 
+    // 打点：记住是哪个来源发起的本轮重建（首个请求者赢，后续 gated 调用不会覆盖）。
+    if (src && !m_sceneTreeRefreshSource)
+    {
+        m_sceneTreeRefreshSource = src;
+    }
+
     if (m_sceneTreeRefreshTimer)
     {
         // 防抖：批量增删（导入/阵列）合并成一次重建
@@ -1566,6 +1586,118 @@ void Workbench2D::refreshSceneTreeIfNeeded()
     {
         refreshSceneTree();
     }
+}
+
+void Workbench2D::applySceneTreeIncremental(const char* src)
+{
+    if (!m_scenePanel2D || !m_services.sceneEditService)
+    {
+        return;
+    }
+    Eg::SceneManager* scene = m_services.sceneEditService->sceneManager();
+    if (!scene)
+    {
+        return;
+    }
+
+    // 锁定态翻转不写变更流（recordChange 不覆盖锁定），增量判据会跳过；
+    // 置位强制标志时直接全量重建，行锁图标随 setTopology 快径 dataChanged 刷新。
+    if (m_sceneTreeForceRefresh)
+    {
+        m_sceneTreeForceRefresh = false;
+        if (src)
+        {
+            m_sceneTreeRefreshSource = src;
+        }
+        refreshSceneTree();
+        return;
+    }
+
+    // 群组拓扑变化（建组/解散/成员变动）无法用「追加顶层行」表达：新图元可能进了组、
+    // 群组行本身也会变，回退防抖全量重建。
+    if (scene->groupManager().topologyRevision() != m_lastSceneTreeTopologyRevision)
+    {
+        refreshSceneTreeIfNeeded(src);
+        return;
+    }
+
+    // 读上次游标以来的变更。游标太旧（变更日志被压实截断）或场景被整体重置时
+    // readChanges 返回 false，此时无法可靠重建增量，推进游标后回退全量。
+    Eg::SceneChangeSet set;
+    if (!scene->readChanges(m_sceneTreeCursor, set))
+    {
+        m_sceneTreeCursor = scene->currentRevision();
+        refreshSceneTreeIfNeeded(src);
+        return;
+    }
+    m_sceneTreeCursor = set.toRevision;
+
+    if (set.changes.empty())
+    {
+        // 无新变更：签名一致（已被全量/增量消费）则无事可做；不一致（如锁定
+        // 切换后手动启动的定时器）则全量刷新行内容。
+        const std::size_t count = scene->getEntityCount();
+        if (count != m_lastSceneTreeEntityCount || scene->structureRevision() != m_lastSceneTreeStructureRevision)
+        {
+            if (src)
+            {
+                m_sceneTreeRefreshSource = src;
+            }
+            refreshSceneTree();
+        }
+        return;
+    }
+
+    // 分类变更集：只有「全部是 Added 且图元当前仍在场景」才可增量；出现 Removed、
+    // 改名/几何等非结构变更，或 Added 但已离场（同批删除的竞态），一律回退全量。
+    // 注意撤销删除会把图元加回来（Added + Removed 位同时置上），必须按
+    // 「当前是否在场景里」判定，不能只信 kinds 位。
+    QVector<SceneTreeRow2D> added;
+    added.reserve(static_cast<int>(set.changes.size()));
+    bool hasNonAdd = false;
+    for (const Eg::SceneChange& ch : set.changes)
+    {
+        if (!Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::Added))
+        {
+            hasNonAdd = true;
+            break;
+        }
+        if (!scene->findEntityById(ch.entityId))
+        {
+            hasNonAdd = true;
+            break;
+        }
+        added.push_back({ static_cast<qint64>(ch.entityId), false });
+    }
+
+    if (hasNonAdd)
+    {
+        if (src)
+        {
+            m_sceneTreeRefreshSource = src;
+        }
+        refreshSceneTree();
+        return;
+    }
+
+    if (added.isEmpty())
+    {
+        return;  // 理论不可达：变更集非空且全部是 Added 时至少一条
+    }
+
+    // 纯新增：增量追加顶层行（O(新增数)），不 reset 模型，视图展开/滚动状态保留
+    m_scenePanel2D->appendTopLevelRows(added);
+
+    // 与 refreshSceneTree() 尾部一致地更新结构签名（不推进游标：已在上面推进到 toRevision）
+    m_lastSceneTreeEntityCount = scene->getEntityCount();
+    m_lastSceneTreeStructureRevision = scene->structureRevision();
+    m_lastSceneTreeTopologyRevision = scene->groupManager().topologyRevision();
+
+    SY_INFOF("[Workbench2D] scene tree incremental src=%s: +%lld rows entities=%zu structRev=%llu",
+        src ? src : "misc",
+        added.size(),
+        m_lastSceneTreeEntityCount,
+        static_cast<unsigned long long>(m_lastSceneTreeStructureRevision));
 }
 
 void Workbench2D::syncSceneTreeSelection()
@@ -1878,10 +2010,11 @@ void Workbench2D::applySelectionContext(const CommandUiSnapshot& snapshot)
     {
         const bool lockStateChanged = m_scenePanel2D->setCommandState(snapshot.hasSelection, snapshot.anyLocked());
         // 树行的锁图标由 SceneTreeBuilder2D 在重建时绘制，而图元级 setLocked 不改变图元数量，
-        // onSceneTreeSceneChanged 的计数守卫会把它挡掉 —— 不补这一下，锁图标会滞后到下一次增删。
+        // 增量判据（变更流）也读不到锁定变化 —— 不补这一下，锁图标会滞后到下一次增删。
         // 只在锁定态真的翻转时排一次去抖重建，避免每次选择变化都做 O(N) 重建。
         if (lockStateChanged && m_sceneTreeRefreshTimer)
         {
+            m_sceneTreeForceRefresh = true;
             m_sceneTreeRefreshTimer->start();
         }
     }
