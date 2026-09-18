@@ -3112,7 +3112,9 @@ void Workbench3D::applySceneTreeSelection3D(const QStringList& ids)
     // additive=false：整体替换，等价于原来的 clearSelection + 逐个 addSelect
     sel.selectMany(meshes, false);
 
-    m_services3D.renderWidget->markSceneDirty();
+    // 选中变更不修改几何，通过调度器节流合并更新，避免 m_meshDirty 导致
+    // gatherGeometry() 遍历所有图元
+    m_services3D.renderWidget->requestSceneUpdate();
     syncSceneTreeSelection3D();
 }
 
@@ -3131,7 +3133,8 @@ void Workbench3D::toggleEntityVisibility3D(const QString& id, bool visible)
     {
         mesh->setVisible(visible);
         m_sceneManager3D->markDataChanged();
-        refreshSceneTree3D();
+        // 可见性变更不推进 structureRevision，通过防抖定时器合并为一次树重建
+        m_sceneTree3DRefreshTimer->start();
     }
 }
 
@@ -3151,7 +3154,8 @@ void Workbench3D::renameEntity3D(const QString& id, const QString& newName)
         const QByteArray utf8 = newName.toUtf8();
         mesh->setName(utf8.constData());
         m_sceneManager3D->markDataChanged();
-        refreshSceneTree3D();
+        // 改名不推进 structureRevision，通过防抖定时器合并为一次树重建
+        m_sceneTree3DRefreshTimer->start();
     }
 }
 
@@ -3183,8 +3187,8 @@ void Workbench3D::setSceneTreeVisibility3D(const QStringList& ids, bool visible)
     if (changed)
     {
         m_sceneManager3D->markDataChanged();
-        // 可见性变更不推进 structureRevision，需显式重建以刷新树显示
-        refreshSceneTree3D();
+        // 可见性变更不推进 structureRevision，通过防抖定时器合并为一次树重建
+        m_sceneTree3DRefreshTimer->start();
     }
 }
 
@@ -3211,8 +3215,8 @@ void Workbench3D::setSceneTreeLock3D(const QStringList& ids, bool locked)
     if (changed)
     {
         m_sceneManager3D->markDataChanged();
-        // 锁定状态不推进 structureRevision，需显式重建以刷新锁定图标
-        refreshSceneTree3D();
+        // 锁定状态不推进 structureRevision，通过防抖定时器合并为一次树重建
+        m_sceneTree3DRefreshTimer->start();
     }
 }
 

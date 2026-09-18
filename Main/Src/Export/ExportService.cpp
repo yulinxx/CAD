@@ -150,7 +150,7 @@ Fio::VecSyEntityPtr ExportService::collectAllEntities() const
         entities.reserve(allEntities.size());
         for (auto* e : allEntities)
         {
-            // ABI: clone 在 Engine2D 分配，/MD 共享堆下跨 DLL delete 安全
+            // ABI: clone 在 Engine2D 分配，跨 DLL delete 安全（需保证所有模块使用相同堆）
             entities.push_back(std::unique_ptr<Eg::SyEntity>(e->clone()));
         }
     }
