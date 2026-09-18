@@ -64,6 +64,7 @@ void UiContextMenuService::registerDynamicSection(const QString& sectionId, UiMe
 
 void UiContextMenuService::unregisterDynamicSection(const QString& sectionId)
 {
+    SY_DEBUGF("[UiContextMenuService] Unregistering dynamic section: %s", qPrintable(sectionId));
     m_sections.remove(sectionId);
 }
 

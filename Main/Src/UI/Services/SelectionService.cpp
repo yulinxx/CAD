@@ -126,15 +126,18 @@ void SelectionService::deselect(const char* id)
 {
     if (!m_sceneManager || !id)
     {
+        SY_DEBUGF("[SelectionService] deselect: sceneManager or id is null, id=%s", id ? id : "(null)");
         return;
     }
 
     auto eid = Eg::parseEntityId(std::string(id));
     if (!eid)
     {
+        SY_DEBUGF("[SelectionService] deselect: failed to parse entity id: %s", id);
         return;
     }
 
+    SY_DEBUGF("[SelectionService] Deselect entity: %s", id);
     m_sceneManager->deselectEntity(*eid);
 }
 
@@ -142,12 +145,14 @@ void SelectionService::clear()
 {
     if (m_sceneManager)
     {
+        SY_DEBUG("[SelectionService] Clearing selection");
         m_sceneManager->clearSelection();
     }
 }
 
 void SelectionService::toggle(const char* id)
 {
+    SY_DEBUGF("[SelectionService] Toggle selection for: %s", id ? id : "(null)");
     if (isSelected(id))
     {
         deselect(id);

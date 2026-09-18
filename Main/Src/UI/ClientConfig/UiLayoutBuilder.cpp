@@ -259,10 +259,6 @@ void UiLayoutBuilder::buildMenus(const std::vector<MenuDef>& menus)
     {
         return;
     }
-    if (!menuBar)
-    {
-        return;
-    }
 
     for (const auto& menu : menus)
     {

@@ -349,6 +349,7 @@ void RenderViewport2D::syncSelectionToolState()
 
 void RenderViewport2D::setDocument(SceneDocument2D* document)
 {
+    SY_DEBUGF("[RenderViewport2D] Setting document: %p -> %p", static_cast<void*>(m_document), static_cast<void*>(document));
     m_document = document;
 
     // 缓存 SceneManager 指针，避免析构时通过 m_document 访问已释放内存

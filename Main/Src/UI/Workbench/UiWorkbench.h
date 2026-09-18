@@ -98,13 +98,8 @@ public:
     /// @param params 调用方参数（如动态最近文件项的 path），透传到操作总线
     virtual void dispatchCommand(const QString& commandId, const QVariantMap& params);
 
-    /// IUiCommandDispatcher 入口，等价于 dispatchCommand。
-    ///
-    /// 工作台自身就是分发器 —— 不要再为右键菜单／布局构建器另建适配器对象：
-    /// UiLayoutBuilder 会把 dispatcher 裸指针捕进 QAction 的 triggered 闭包，
-    /// 闭包的寿命跟随 QMenu，比任何局部适配器都长。历史上
-    /// buildConfiguredContextMenu 在栈上建适配器再传地址，函数返回即失效，
-    /// 点右键菜单项时 dispatch 打在已回收的栈帧上（3D 删除必崩）。
+    /// IUiCommandDispatcher 入口。
+    /// 工作台自身就是分发器，避免为右键菜单/布局构建器另建适配器对象导致悬空指针。
     void dispatch(const QString& commandId, const QVariantMap& params) override
     {
         dispatchCommand(commandId, params);
@@ -183,21 +178,16 @@ protected:
     virtual void restoreFromSnapshot(const UiStateSnapshot& snapshot);
 
 protected:
-    /// UI 服务分组（按职责内聚；由 initialize 从 UiServices 拆出后缓存，避免持有外部临时引用）
+    /// UI 服务分组（由 initialize 从 UiServices 拆出后缓存）
     UiStateServices m_uiState;
     CommandServices m_commands;
     SceneServices m_scene;
     PersistenceServices m_persistence;
     ViewServices m_view;
-    /// 初始化时缓存的状态，供首次激活使用
-    UiStateSnapshot m_initialState;
-    /// 上次停用前保存的状态快照，供下次激活时恢复
-    UiStateSnapshot m_savedState;
-    /// 共享 SettingsService singleton（app-level 共享，非每工作台私有）
-    SettingsService* m_settingsService{ nullptr };
-    /// 当前挂载的工作台窗口（组合根绑定点：属性面板推送、菜单管理器访问）
-    /// 由各子类在 attachToWindow 中赋值；2D/3D 都需要，故提到基类
-    WorkbenchWindow* m_workbenchWindow{ nullptr };
+    UiStateSnapshot m_initialState;  ///< 初始化时缓存的状态
+    UiStateSnapshot m_savedState;    ///< 上次停用前保存的状态快照
+    SettingsService* m_settingsService{ nullptr };  ///< app-level singleton
+    WorkbenchWindow* m_workbenchWindow{ nullptr };  ///< 当前挂载的工作台窗口
 };
 
 // ============================================================
@@ -248,109 +238,77 @@ public:
         return m_panelHostStyle;
     }
 
-    /// 重新抓取选择上下文快照并驱动全部命令 UI（工具栏/菜单栏/右键菜单/面板/状态栏）
-    /// 唯一刷新入口，由 UiStateBridge2D 在各触发源上统一调用，
-    /// 框架层重建菜单后也会经基类虚接口回调到这里。
+    /// 重新抓取选择上下文快照并驱动全部命令 UI
     void refreshCommandUiState() override;
 
-    /// 重建场景树模型并推送到面板（结构性变化：导入/撤销/增删）
+    /// 重建场景树模型并推送到面板
     void refreshSceneTree();
 
-    /// 只在「结构签名」变化时重建场景树（图元增删 / 群组拓扑）。
-    /// sceneChanged 会在拖动等高频路径上反复触发，全量重建在万级图元下每次都要
-    /// 几十毫秒，因此默认走这条；用户显式改可见性/锁定/重命名时仍调 refreshSceneTree()。
-    /// src 为打点用触发来源标记（sceneObserver / sceneMonitor / opCompleted / undoStateChanged 等）。
+    /// 只在结构签名变化时重建场景树
     void refreshSceneTreeIfNeeded(const char* src = nullptr);
 
-    /// 增量刷新场景树：读变更流（ISceneChangeStream），纯新增且无群组拓扑变化时
-    /// 只向面板模型追加顶层行（O(新增数)），删除/群组/改名等无法增量表达的变更回退
-    /// 全量重建。src 为打点用触发来源标记。
+    /// 增量刷新场景树
     void applySceneTreeIncremental(const char* src = nullptr);
 
 private:
     /// 创建中央视口
     QWidget* createCentralViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties);
-    /// 注入服务到视口：选择/交互/操作总线 + 编辑服务信号连接 + 状态回调 + 工具初始化
+    /// 注入服务到视口
     void setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& window);
-    /// 设置导入服务回调：zoomToFit / 场景树刷新 / 属性面板刷新
+    /// 设置导入服务回调
     void setupImportCallbacks(RenderViewport2D* vp, WorkbenchWindow& window);
-    /// 创建左侧绘图工具栏 + 顶部编辑工具栏 + 右侧颜色/图层工具栏
+    /// 创建工具栏
     void createToolbars(WorkbenchWindow& window);
-    /// 取出左侧绘图工具栏要展示的中枢 QAction（顺序即命令目录顺序）
+    /// 构建绘图工具栏动作
     QVector<QAction*> buildDrawToolActions();
-    /// 从命令目录汇总可支持的导入格式入口（2D/3D 共用视图）
+    /// 构建支持的导入格式列表
     static QStringList buildSupportedImportFormats(const QString& workbenchId);
-    /// 绑定并填充 2D 场景树面板（数据经算法层由引擎场景生成，UI 可定制/可缺失）
+    /// 绑定并填充 2D 场景树面板
     void setupSceneTree(WorkbenchWindow& window);
-    /// 引擎场景变更兜底：图元数量变化即视为结构变更，防抖后重建树，避免残留
+    /// 引擎场景变更兜底
     void onSceneTreeSceneChanged();
-    /// 仅同步面板选中高亮（选择变化，避免重建树导致折叠丢失）
+    /// 同步面板选中高亮
     void syncSceneTreeSelection();
     /// 将面板选择同步到引擎选择
     void applySceneTreeSelection(const QStringList& ids);
-    /// 切换图元可见性（直接写引擎并刷新）
+    /// 切换图元可见性
     void toggleEntityVisibility(const QString& id, bool visible);
-    /// 重命名图元（直接写引擎并刷新）
+    /// 重命名图元
     void renameEntity(const QString& id, const QString& newName);
-    /// 延迟重建场景树（合并多次快速操作为一次重建，避免 setData 回调链中 delete this）
+    /// 延迟重建场景树
     void scheduleTreeRefresh();
-    /// 从场景树批量删除图元（走编辑服务，可撤销）
+    /// 从场景树批量删除图元
     void deleteSceneTreeSelection(const QStringList& ids);
     /// 从场景树批量设置可见性
     void setSceneTreeVisibility(const QStringList& ids, bool visible);
     /// 从场景树批量设置锁定
     void setSceneTreeLock(const QStringList& ids, bool locked);
-    /// 将当前选中图元生成为属性模型并推送到属性面板（面板不存在则安全忽略）
-    /// 通过 EntityPropertyModel2D（算法层）+ PropertyModel（数据层）解耦，
-    /// 本方法仅作为组合根把"数据/算法"绑定到"UI"，面板可随时替换/移除。
+    /// 刷新属性面板
     void refreshPropertiesPanel();
-    /// 消费命令中枢广播的选择上下文快照，扇出到属性面板/状态栏/场景树/工具栏上下文
-    /// （单一事件总线：所有 UI 联动共用同一份快照，避免各自二次遍历导致规则漂移）
+    /// 应用选择上下文到各 UI 组件
     void applySelectionContext(const CommandUiSnapshot& snapshot);
 
 private:
-    /// 命令动作中枢：管理所有 QAction 的创建、绑定、刷新
+    /// 命令动作中枢
     std::unique_ptr<class CommandActionHub> m_commandHub;
-    /// 视口右键菜单请求：基于命令中枢构建并弹出右键菜单，实现选择/锁定的实时联动
+    /// 视口右键菜单请求
     void onViewportContextMenu(QContextMenuEvent* event);
-    /// 按客户配置构建 2D 右键菜单（P0-2b）
-    /// @param contextMenuId JSON contextMenus 节中的菜单 ID，例如 "canvas.2d"
-    /// @param hasSelection 当前是否有选中图元（决定图层动态段是否含「移动到图层…」）
-    /// @return 配置菜单；未配置或无可用条目时返回 nullptr，调用方回退到内建路径。
-    ///         返回的菜单归调用方所有，且必须在同一作用域内 delete（命令分发器是栈对象）。
+    /// 按客户配置构建 2D 右键菜单
     QMenu* buildConfiguredContextMenu(const QString& contextMenuId, bool hasSelection);
-    /// 顶部工具栏（编辑命令）— Qt 父对象管理生命周期
-    class TopToolBar* m_topToolBar{ nullptr };
-    /// 文字编辑字体工具栏（双击文字进入编辑时显示）— Qt 父对象管理生命周期
-    class QToolBar* m_textFontToolBar{ nullptr };
+    class TopToolBar* m_topToolBar{ nullptr };              ///< 顶部编辑工具栏
+    class QToolBar* m_textFontToolBar{ nullptr };           ///< 文字编辑字体工具栏
     class TextFontToolBar* m_textFontToolBarWidget{ nullptr };
-    /// 右侧工具栏（颜色/图层）— Qt 父对象管理生命周期
-    class RightToolBar* m_rightToolBar{ nullptr };
-    /// 左右面板承载样式（Draw Tools / Layers）
-    PanelHostStyle m_panelHostStyle{ PanelHostStyle::Toolbar };
-    /// 2D 渲染视口 — Qt 父对象管理生命周期（工作台切换时用于恢复工具状态）
-    class RenderViewport2D* m_viewport{ nullptr };
-    /// 2D 场景树面板（统一面板，支持 2D 和 3D）
-    class SceneTreePanel* m_scenePanel2D{ nullptr };
-    /// 场景变更观察者（捕获绕过操作总线的直接编辑，如视口 Delete 键）
+    class RightToolBar* m_rightToolBar{ nullptr };          ///< 右侧工具栏
+    PanelHostStyle m_panelHostStyle{ PanelHostStyle::Toolbar };  ///< 左右面板承载样式
+    class RenderViewport2D* m_viewport{ nullptr };         ///< 2D 渲染视口
+    class SceneTreePanel* m_scenePanel2D{ nullptr };        ///< 2D 场景树面板
     std::unique_ptr<SceneTreeSceneObserver2D> m_sceneTreeObserver;
-    /// 场景变更监控（IObserver → Qt 信号桥接：捕获拖拽/交互式修改等非操作总线路径的场景变更）
     SceneMonitor* m_sceneMonitor{ nullptr };
-    /// 命令 UI 刷新连线的生命周期句柄（UiStateBridge2D::install 返回）。
-    /// 用 QPointer 是因为它 parent 在本对象上，shutdown 路径可能先被父级批量回收；
-    /// deactivate 里销毁它即整批断开连线，见 UiStateBridge2D.h「连线的寿命」。
-    QPointer<QObject> m_uiStateConnections;
-    /// 场景树重建防抖定时器（合并批量增删，避免每步 O(N) 重建）
-    class QTimer* m_sceneTreeRefreshTimer{ nullptr };
-    /// 打点用：本轮场景树重建的触发来源（sceneObserver / sceneMonitor / opCompleted / undoStateChanged）。
-    /// refreshSceneTree() 消费后清零；诊断「同一次变更触发多次重建」时用，无业务语义。
-    const char* m_sceneTreeRefreshSource{ nullptr };
-    /// 场景树增量游标（ISceneChangeStream::Cursor）：记录上次消费到的修订号。
-    /// 全量重建后推进到 currentRevision()，之后增量只读真正的新增/变更。
-    uint64_t m_sceneTreeCursor{ 0 };
-    /// 强制全量刷新场景树标志：锁定态翻转不写变更流，增量会判「无事可做」而跳过，
-    /// 因此锁定切换时置位，让定时器回调直接全量重建（行锁图标随快径 dataChanged 刷新）。
-    bool m_sceneTreeForceRefresh{ false };
+    QPointer<QObject> m_uiStateConnections;                ///< 命令 UI 刷新连线句柄
+    class QTimer* m_sceneTreeRefreshTimer{ nullptr };      ///< 场景树重建防抖定时器
+    const char* m_sceneTreeRefreshSource{ nullptr };        ///< 场景树重建触发来源
+    uint64_t m_sceneTreeCursor{ 0 };                       ///< 场景树增量游标
+    bool m_sceneTreeForceRefresh{ false };                  ///< 强制全量刷新标志
     /// 场景树延迟重建标记（setData 回调链中 scheduleTreeRefresh 合并，避免 delete this）
     bool m_treeRefreshPending{ false };
     /// 命令 UI 状态刷新的节流冷却定时器 + 尾包标记。
@@ -359,37 +317,24 @@ private:
     /// 窗口末尾补一次」把频率压到约 10Hz，最终态一定是最后一次变化的结果。
     class QTimer* m_commandUiRefreshTimer{ nullptr };
     bool m_commandUiRefreshPending{ false };
-    /// 真正执行一次命令 UI 状态刷新（refreshCommandUiState 直接调用，或经冷却定时器补尾包）
+    /// 真正执行一次命令 UI 状态刷新
     void applyCommandUiState();
-    /// 场景树结构签名：图元增删（SceneManager::structureRevision）+ 群组拓扑
-    /// （GroupManager::topologyRevision）。三者都没变就不必重建树。
+    /// 场景树结构签名
     std::size_t m_lastSceneTreeEntityCount{ 0 };
     uint64_t m_lastSceneTreeStructureRevision{ 0 };
     uint64_t m_lastSceneTreeTopologyRevision{ 0 };
-    /// 2D 状态栏 widget。
-    /// 所有权在 Qt 父子关系：创建时挂在 WorkbenchWindow 上，mountStatusBar 里
-    /// QStatusBar::addWidget 会把它再 reparent 到 QStatusBar。QStatusBar 跨工作台
-    /// 切换一直存在，所以这个对象在 unmountStatusBar 之后仍然活着，下次 attach
-    /// 直接复用。用 QPointer 而不是裸指针：一旦哪天它被 Qt 或别处销毁，
-    /// `if (!m_statusBar2D) new ...` 这条复用判断会自动走到重建分支，而不是拿着
-    /// 悬空指针去 mount。
-    QPointer<StatusBar> m_statusBar2D;
+    QPointer<StatusBar> m_statusBar2D;  ///< 2D 状态栏 widget
 
-    /// 2D 设置协调器（共享 SettingsService  singleton）
+    /// 2D 设置协调器
     std::unique_ptr<SettingsUiCoordinator2D> m_settingsCoordinator;
 
-    /// 工具栏上下文管理器：管理不同编辑模式下的工具栏配置与切换
+    /// 工具栏上下文管理器
     std::unique_ptr<ToolBarContextManager> m_contextManager;
 
-    /// 网格显隐 metadata 连接（切换工作台时需断开，防止悬空视口指针回调）
+    /// 网格显隐 metadata 连接
     QMetaObject::Connection m_gridVisibilityMetadataConn;
 
-    /**
-     * @brief 由选择上下文快照推导应切换到的工具栏上下文。
-     *
-     * 入参而不是内部再去问 Hub：扇出链上所有消费者必须看同一份快照，
-     * 否则又回到「依赖 Hub 缓存是否已更新」的顺序耦合。
-     */
+    /// 由选择上下文快照推导应切换到的工具栏上下文
     ToolBarContext determineContextFromSelection(const CommandUiSnapshot& snapshot) const;
 };
 

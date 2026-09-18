@@ -12,15 +12,7 @@ class QToolButton;
 /**
  * @brief 左侧绘图工具面板（纯展示层）
  *
- * 只负责把命令中枢（CommandActionHub）托管的 QAction 摆成一列按钮：
- * 图标、文案、启用态、勾选态全部由 QAction 承载，点击直接 trigger 该 QAction，
- * 因此绘图工具的派发路径与菜单/右键菜单完全一致，本类不再持有 OperationBus，
- *也不再自己解析 toolName → OperationId。
- *
- * 承载样式无关：无论放进 QToolBar 还是 QDockWidget，复用同一份内容控件。
- *
- * 特殊处理：点击 Select 工具按钮时，如果当前是 Select 则切换到 Pan 模式，
- * 如果当前是 Pan 模式则切换到 Select 工具。
+ * 将命令中枢托管的 QAction 展示为一列按钮。Select/Pan 工具按钮可相互切换。
  */
 class DrawToolBarWidget : public QWidget
 {

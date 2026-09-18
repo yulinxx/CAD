@@ -62,6 +62,7 @@ bool UiConfigurationManager::applyConfiguration(const QString& resourcePath, Con
 
 void UiConfigurationManager::reset()
 {
+    SY_DEBUG("[UiConfigurationManager] Resetting configuration");
     m_configData.reset();
     m_panelRegistry.reset();
 }

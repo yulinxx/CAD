@@ -950,7 +950,13 @@ bool WorkbenchWindow::canExecuteCommand(const QString& commandId, const QString&
 {
     if (m_actionManager)
     {
-        return m_actionManager->canExecuteCommand(commandId, context);
+        if (!m_actionManager->canExecuteCommand(commandId, context))
+        {
+            SY_DEBUGF("[WorkbenchWindow] Command denied: commandId=%s context=%s", qPrintable(commandId),
+                qPrintable(context));
+            return false;
+        }
+        return true;
     }
 
     return true;

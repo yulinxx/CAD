@@ -44,14 +44,6 @@ using WorkbenchFactory = std::function<UiWorkbench*(const QString& workbenchId)>
  * @brief 工作台主窗口类
  *
  * 应用程序的主窗口，管理所有 UI 组件的布局和交互。
- * 通过状态中心（UiStateCenter）监听状态变化并更新界面。
- * - 菜单系统管理（文件、视图、工具）
- * - 工具栏管理
- * - 停靠面板管理
- * - 状态栏管理
- * - 主题切换
- * - 工作台切换
- * - UI 状态同步
  */
 class WorkbenchWindow : public QMainWindow
 {
@@ -122,18 +114,14 @@ public:
     /// 注册工具栏
     /// @param title 工具栏标题
     QToolBar* registerToolBar(const QString& title);
-    /// 清空工作台内容（移除所有注册的面板和工具栏）
+    /// 清空工作台内容
     void clearWorkbenchContent();
 
     // ==================== 状态栏挂载/卸载 ====================
 
-    /// 挂载工作台状态栏 widget 到 QStatusBar
-    /// 由 Workbench2D / Workbench3D 在 attachToWindow 时调用，
-    /// 将各自独立的 StatusBarBase 子类实例挂载到窗口状态栏。
-    /// @param statusBarWidget 工作台状态栏 widget（生命周期由调用方管理）
+    /// 挂载工作台状态栏 widget
     void mountStatusBar(StatusBarBase* statusBarWidget);
-    /// 卸载当前工作台状态栏 widget，从 QStatusBar 移除
-    /// 由 clearWorkbenchContent 在工作台切换时调用
+    /// 卸载当前工作台状态栏 widget
     void unmountStatusBar();
 
     /// 获取当前挂载的工作台状态栏 widget
@@ -185,84 +173,61 @@ public:
     }
 
 private:
-    /// 更新状态栏鼠标坐标显示（按当前显示单位换算）
+    /// 更新状态栏鼠标坐标显示
     void refreshPositionLabel();
-    /// 创建窗口初始占位内容，作为工作台首次挂接前的安全兜底
+    /// 创建窗口初始占位内容
     QWidget* createInitialCentralWidget();
-    /// 创建工具栏基础骨架，便于后续拆出更多工具栏分组
+    /// 创建工具栏基础骨架
     void initializeToolBarSkeleton();
-    /// 创建停靠区域基础骨架，便于后续拆出更多 dock 分组
+    /// 创建停靠区域基础骨架
     void initializeDockAreaSkeleton();
-    /// 创建状态栏骨架，统一承接状态文本与繁忙指示
+    /// 创建状态栏骨架
     void initializeStatusBarSkeleton();
-    /// 重新翻译所有 UI 文字（语言切换时调用）
+    /// 重新翻译所有 UI 文字
     void retranslateUi();
     /// 构建工具栏
     void buildToolBars();
-    /// 构建停靠区域（左侧项目面板、右侧属性面板）
+    /// 构建停靠区域
     void buildDockAreas();
     /// 构建状态栏
     void buildStatusBar();
     /// 绑定状态中心信号
     void bindStateSignals();
-    /// 解除状态中心信号绑定，避免重复连接
+    /// 解除状态中心信号绑定
     void unbindStateSignals();
-    /// 同步窗口本地状态与状态中心，避免出现两套状态来源
+    /// 同步窗口本地状态与状态中心
     void syncWindowStateFromStateCenter();
-    /// 窗口镜像只在这里同步，不要在别处直接改动本地状态
-    /// 同步选择语义到窗口本地镜像，避免展示层直接依赖状态中心快照
+    /// 同步选择语义到窗口本地镜像
     void syncWorkbenchSelectionFromStateCenter();
     /// 刷新状态栏文本
     void refreshStatusText();
-    /// 更新窗口标题，避免状态栏刷新时分散拼接标题逻辑
+    /// 更新窗口标题
     void updateWindowTitle();
     /// 更新繁忙指示器
-    /// @param busy 是否繁忙
     void updateBusyIndicator(bool busy);
-    /// 记录性能耗时并统一走框架级入口
-    /// @param scope 作用域名称
-    /// @param elapsedMs 耗时毫秒
+    /// 记录性能耗时
     void recordPerformance(const QString& scope, qint64 elapsedMs);
     /// 上报框架错误
-    /// @param errorCode 错误码
-    /// @param message 错误信息
-    /// @param context 上下文
     void reportFrameworkError(const QString& errorCode, const QString& message, const QString& context);
     /// 命令执行前的统一权限检查
-    /// @param commandId 命令 ID
-    /// @param context 调用上下文
-    /// @return 是否允许执行
     bool canExecuteCommand(const QString& commandId, const QString& context) const;
-    /// 归零命令状态，避免各处重复写 idle
+    /// 归零命令状态
     void resetCommandStateToIdle();
     /// 归零工作台相关的本地镜像状态
     void resetWorkbenchLocalMirror();
-    /// 清空选择状态，避免工作台切换后遗留旧选择文本
+    /// 清空选择状态
     void clearSelectionState();
     /// 统一写入工作台切换上下文
     void setWorkbenchSwitchContext(const QString& workbenchId, const QString& switchContextText);
 
 private:
-    /// UI 状态中心
     UiStateCenter* m_stateCenter{ nullptr };
-    /// 操作总线
     OperationBus* m_operationBus{ nullptr };
-    /// 单位管理器（非拥有指针，来自 UiServices）
     UnitManager* m_unitManager{ nullptr };
-    /// 最近一次鼠标世界坐标（毫米，基单位）
     double m_lastMouseX{ 0.0 };
     double m_lastMouseY{ 0.0 };
-    /// 是否已有有效的鼠标坐标
     bool m_hasMousePosition{ false };
-    /// 当前工作台
     UiWorkbench* m_workbench{ nullptr };
-    /// 主题切换回调
-    /// 当前挂载的工作台状态栏 widget（由 StatusBarBase 子类管理位置/选择/消息显示）
-    /// 工作台切换时通过 mountStatusBar/unmountStatusBar 替换。
-    /// 这里保持裸指针：StatusBarBase 在本头文件里只有前向声明（QPointer 需要完整
-    /// 类型），且该指针只由 mount/unmount 这一对函数写，作用域自洽。
-    /// 真正需要跨切换存活的复用指针在工作台侧（Workbench2D/3D 的 m_statusBar2D/3D），
-    /// 那两个已改成 QPointer。
     StatusBarBase* m_activeStatusBar{ nullptr };
 
     /// 工作台切换工厂
