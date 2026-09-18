@@ -6,10 +6,16 @@
     #include <QApplication>
 #endif
 
+#include "FileIO/Internal/BundleResources.h"
+
 int runCADApplication(int argc, char** argv);
 
 int main(int argc, char** argv)
 {
+    // 初始化 App Bundle 内部资源路径 (pdftocairo, Ghostscript 等)
+    // 必须在 QApplication 构造前完成，确保环境变量生效
+    Ut::BundleResources::initialize();
+
 #ifdef Q_OS_MACOS
     // macOS: 禁用 Input Method Kit 的 mach port 通信，避免 IMKCFRunLoopWakeUpReliable 崩溃
     // 这是 Qt 在 macOS 上的已知问题，会导致 segfault

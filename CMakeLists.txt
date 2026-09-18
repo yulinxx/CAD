@@ -510,6 +510,76 @@ if(SANYI_PYTHON_HOST)
 endif()
 
 # ============================================================================
+# macOS App Bundle: 打包 pdftocairo + Ghostscript 依赖
+# ============================================================================
+if(APPLE AND NOT CMAKE_CROSSCOMPILING)
+    # 查找 Homebrew 安装的工具
+    find_program(PDTOCAIRO pdftocairo PATHS /opt/homebrew/bin /usr/local/bin)
+    find_program(GHOSTSCRIPT gs PATHS /opt/homebrew/bin /usr/local/bin)
+    
+    if(PDTOCAIRO AND GHOSTSCRIPT)
+        message(STATUS "Found pdftocairo: ${PDTOCAIRO}")
+        message(STATUS "Found ghostscript: ${GHOSTSCRIPT}")
+        
+        # 打包到 App Bundle (SanYiCAD 是主可执行目标)
+        add_custom_command(TARGET SanYiCAD POST_BUILD
+            # 创建目录
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                $<TARGET_FILE_DIR:SanYiCAD>/../Resources/bin
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                $<TARGET_FILE_DIR:SanYiCAD>/../Resources/lib
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                $<TARGET_FILE_DIR:SanYiCAD>/../Resources/share/ghostscript
+            
+            # 复制可执行文件
+            COMMAND ${CMAKE_COMMAND} -E copy
+                ${PDTOCAIRO}
+                $<TARGET_FILE_DIR:SanYiCAD>/../Resources/bin/pdftocairo
+            COMMAND ${CMAKE_COMMAND} -E copy
+                ${GHOSTSCRIPT}
+                $<TARGET_FILE_DIR:SanYiCAD>/../Resources/bin/gs
+            
+            # 复制依赖库 (Homebrew 路径下的 dylib)
+            COMMAND bash -c "
+                cd $<TARGET_FILE_DIR:SanYiCAD>/../Resources/lib &&
+                for lib in \$(otool -L ${PDTOCAIRO} 2>/dev/null | grep -E '^\\s+/opt/homebrew|/usr/local' | awk '{print \$1}'); do
+                    cp -n \"\$lib\" . 2>/dev/null || true
+                done &&
+                for lib in \$(otool -L ${GHOSTSCRIPT} 2>/dev/null | grep -E '^\\s+/opt/homebrew|/usr/local' | awk '{print \$1}'); do
+                    cp -n \"\$lib\" . 2>/dev/null || true
+                done
+            "
+            
+            # 复制 Ghostscript 资源 (字体、初始化文件等)
+            COMMAND bash -c "
+                GS_ROOT=\$(dirname \$(dirname ${GHOSTSCRIPT}))/share/ghostscript &&
+                if [ -d \"\$GS_ROOT\" ]; then
+                    cp -R \"\$GS_ROOT\"/* $<TARGET_FILE_DIR:SanYiCAD>/../Resources/share/ghostscript/ 2>/dev/null || true
+                fi
+            "
+            
+            # 修正 rpath：让可执行文件在 @loader_path/../lib 找库
+            COMMAND install_name_tool -add_rpath @loader_path/../lib
+                $<TARGET_FILE_DIR:SanYiCAD>/../Resources/bin/pdftocairo
+            COMMAND install_name_tool -add_rpath @loader_path/../lib
+                $<TARGET_FILE_DIR:SanYiCAD>/../Resources/bin/gs
+            
+            # 修正库的 install_name 为 @rpath/xxx.dylib
+            COMMAND bash -c "
+                for f in $<TARGET_FILE_DIR:SanYiCAD>/../Resources/lib/*.dylib; do
+                    bn=\$(basename \"\$f\") &&
+                    install_name_tool -id @rpath/\$bn \"\$f\" 2>/dev/null || true
+                done
+            "
+            
+            COMMENT "Bundling pdftocairo + Ghostscript + deps into App Bundle"
+        )
+    else()
+        message(WARNING "pdftocairo/gs not found - AI/PDF import will not work on other Macs. Install with: brew install poppler ghostscript")
+    endif()
+endif()
+
+# ============================================================================
 # CPack 配置
 # ============================================================================
 include(CMake/Packaging.cmake)
