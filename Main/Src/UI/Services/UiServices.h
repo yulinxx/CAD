@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "IUiServices.h"
+#include "UiServiceGroups.h"
 
 class IInteractionDispatcher;
 class UiStateCenter;
@@ -104,6 +105,30 @@ struct UiServices : public IUIServices
     /// 与 importService 同理放这里：消费者是工作台层（2D 的视图命令注册、
     /// 3D 的导出视图操作），而它们拿不到 ApplicationCompositionRoot。
     Ui::ViewCaptureService* captureService{ nullptr };
+
+    // ---- 聚焦分组（供只依赖部分服务的消费者使用）----
+    // 由装配处按需取出并传给消费者，避免消费者依赖整个聚合。
+    UiStateServices uiState() const
+    {
+        return { stateCenter, interactionDispatcher };
+    }
+    CommandServices commands() const
+    {
+        return { operationBus, undoManager };
+    }
+    SceneServices scene() const
+    {
+        return { selectionService, document2D, layerManager, layerManagerBridge,
+                 layerEditService, sceneEditService, clipboard };
+    }
+    PersistenceServices persistence() const
+    {
+        return { persistenceService, importService, recentFileService };
+    }
+    ViewServices view() const
+    {
+        return { viewportActionHub, unitManager, captureService };
+    }
 
     // ---- IUIServices 接口实现 ----
 

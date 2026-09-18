@@ -5,7 +5,6 @@
 #include "UiWorkbench.h"
 #include "UiStateCenter.h"
 #include "UiPropertiesPanel.h"
-#include "Services/UiServices.h"
 #include "Services/UiFrameworkServices.h"
 #include "Log/SyLogger.h"
 #include "UI/StatusBarBase.h"
@@ -34,7 +33,6 @@ void WorkbenchStateManager::setUiStateCenter(UiStateCenter* stateCenter)
     // 状态中心入口只负责替换源头引用，不在这里做额外状态编排
     unbindStateSignals();
     m_stateCenter = stateCenter;
-    m_uiServices.stateCenter = stateCenter;
     bindStateSignals();
 }
 
@@ -47,23 +45,6 @@ void WorkbenchStateManager::setFrameworkServices(const UiFrameworkServices& serv
 void WorkbenchStateManager::setActiveStatusBar(StatusBarBase* statusBarWidget)
 {
     m_activeStatusBar = statusBarWidget;
-}
-
-void WorkbenchStateManager::configureServices(const UiServices& services)
-{
-    unbindStateSignals();
-    m_uiServices = services;
-    m_stateCenter = services.stateCenter;
-
-    if (m_menuManager)
-    {
-        m_menuManager->setOperationBus(services.operationBus);
-        m_menuManager->setStateCenter(services.stateCenter);
-        m_menuManager->setRecentFileService(m_uiServices.recentFileService);
-        m_menuManager->rebuildAllMenus();
-    }
-
-    bindStateSignals();
 }
 
 // ==================== 状态同步 ====================
