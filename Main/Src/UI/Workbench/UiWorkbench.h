@@ -183,8 +183,12 @@ protected:
     virtual void restoreFromSnapshot(const UiStateSnapshot& snapshot);
 
 protected:
-    /// UI 服务副本（避免持有外部临时引用）
-    UiServices m_services;
+    /// UI 服务分组（按职责内聚；由 initialize 从 UiServices 拆出后缓存，避免持有外部临时引用）
+    UiStateServices m_uiState;
+    CommandServices m_commands;
+    SceneServices m_scene;
+    PersistenceServices m_persistence;
+    ViewServices m_view;
     /// 初始化时缓存的状态，供首次激活使用
     UiStateSnapshot m_initialState;
     /// 上次停用前保存的状态快照，供下次激活时恢复

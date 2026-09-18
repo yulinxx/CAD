@@ -194,9 +194,9 @@ namespace
 UiStateSnapshot UiWorkbench::currentSnapshot() const
 {
     UiStateSnapshot snapshot = m_savedState;
-    if (m_services.stateCenter)
+    if (m_uiState.stateCenter)
     {
-        auto snap = m_services.stateCenter->snapshot();
+        auto snap = m_uiState.stateCenter->snapshot();
         snapshot.currentViewMode = snap.currentViewMode;
         snapshot.currentLayerId = snap.currentLayerId;
         snapshot.currentDocumentId = snap.currentDocumentId;
@@ -213,14 +213,14 @@ UiStateSnapshot UiWorkbench::currentSnapshot() const
 
 void UiWorkbench::restoreFromSnapshot(const UiStateSnapshot& snapshot)
 {
-    if (m_services.stateCenter)
+    if (m_uiState.stateCenter)
     {
-        m_services.stateCenter->setCurrentViewMode(snapshot.currentViewMode);
-        m_services.stateCenter->setCurrentLayerId(snapshot.currentLayerId);
-        m_services.stateCenter->setCurrentDocumentId(snapshot.currentDocumentId);
+        m_uiState.stateCenter->setCurrentViewMode(snapshot.currentViewMode);
+        m_uiState.stateCenter->setCurrentLayerId(snapshot.currentLayerId);
+        m_uiState.stateCenter->setCurrentDocumentId(snapshot.currentDocumentId);
         // 工具/输入状态恢复（仅写入状态中心，子类 activate() 负责应用到视口）
-        m_services.stateCenter->setActiveToolId(snapshot.activeToolId);
-        m_services.stateCenter->setInputFocusWidget(snapshot.inputFocusWidget);
+        m_uiState.stateCenter->setActiveToolId(snapshot.activeToolId);
+        m_uiState.stateCenter->setInputFocusWidget(snapshot.inputFocusWidget);
     }
 }
 
@@ -318,7 +318,7 @@ bool Workbench2D::isCommandRegistered(const QString& commandId) const
 
 void Workbench2D::dispatchCommand(const QString& commandId, const QVariantMap& params)
 {
-    if (!m_services.operationBus)
+    if (!m_commands.operationBus)
     {
         SY_WARNF("[Workbench2D] Cannot dispatch command without OperationBus: %s", qPrintable(commandId));
         return;
@@ -350,12 +350,12 @@ void Workbench2D::dispatchCommand(const QString& commandId, const QVariantMap& p
             return;
         }
         SY_DEBUGF("[Workbench2D] Dispatch tool command='%s'", qPrintable(commandId));
-        m_services.operationBus->run(toolOperation, params, OperationSource::Menu);
+        m_commands.operationBus->run(toolOperation, params, OperationSource::Menu);
         return;
     }
 
     SY_DEBUGF("[Workbench2D] Dispatch command='%s'", qPrintable(commandId));
-    m_services.operationBus->run(operation, params, OperationSource::Menu);
+    m_commands.operationBus->run(operation, params, OperationSource::Menu);
 }
 
 QString Workbench2D::commandText(const QString& commandId) const
@@ -382,7 +382,11 @@ bool Workbench2D::initialize(const UiServices& services)
         SY_ERROR("[Workbench2D] initialize failed: stateCenter or interactionDispatcher is null");
         return false;
     }
-    m_services = services;
+    m_uiState = services.uiState();
+    m_commands = services.commands();
+    m_scene = services.scene();
+    m_persistence = services.persistence();
+    m_view = services.view();
 
     // 使用应用共享 SettingsService singleton，2D/3D 逻辑一致
     m_settingsCoordinator = std::make_unique<SettingsUiCoordinator2D>(ApplicationCompositionRoot::getSettingsService());
@@ -432,9 +436,9 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
 
     // 视口动作中枢：注入当前视口，供菜单 Zoom 子菜单与右键菜单 View_* 操作统一分发。
     // 分发不经过窗口层回调 —— View_* 命令在 CoreOperationRegistry 里直接消费本中枢。
-    if (m_services.viewportActionHub)
+    if (m_view.viewportActionHub)
     {
-        m_services.viewportActionHub->setViewport(m_viewport);
+        m_view.viewportActionHub->setViewport(m_viewport);
     }
 
     createToolbars(window);
@@ -444,7 +448,7 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
     if (m_settingsCoordinator && m_viewport)
     {
         m_settingsCoordinator->loadAndApplySettings(
-            m_viewport->renderWidget(), m_viewport->gridSnapManager(), m_services.unitManager);
+            m_viewport->renderWidget(), m_viewport->gridSnapManager(), m_view.unitManager);
     }
 
     // 创建 2D 状态栏 widget 并挂载到窗口
@@ -453,7 +457,7 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
     {
         m_statusBar2D = new StatusBar(&window);
         // Position 标签弹出单位选择 → 复用与视图菜单完全相同的命令分发路径
-        m_statusBar2D->setUnitManager(m_services.unitManager);
+        m_statusBar2D->setUnitManager(m_view.unitManager);
         // dispatchCommand 现在带 params，信号只给 commandId，这里用 lambda 补空参数
         connect(m_statusBar2D, &StatusBar::sigUnitCommandRequested, this, [this](const QString& commandId) {
             dispatchCommand(commandId, QVariantMap{});
@@ -467,7 +471,7 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
     // 返回的句柄必须留到 deactivate 销毁：bus / layerBridge 跨工作台长寿，
     // 连线两端都不死时 Qt 不会自动回收，往返切换 N 次就会刷 N 次。
     m_uiStateConnections = UiStateBridge2D::install(
-        this, m_viewport, m_services.operationBus, m_services.layerManagerBridge, m_sceneMonitor);
+        this, m_viewport, m_commands.operationBus, m_scene.layerManagerBridge, m_sceneMonitor);
 }
 
 bool Workbench2D::showSettingsDialog(QWidget* /*parent*/)
@@ -489,7 +493,7 @@ bool Workbench2D::showSettingsDialog(QWidget* /*parent*/)
         ? m_workbenchWindow->menuManager()->shortcutSettingsModel()
         : nullptr;
     return m_settingsCoordinator->showSettingsDialog(
-        widget, m_viewport->gridSnapManager(), m_services.unitManager, shortcutModel);
+        widget, m_viewport->gridSnapManager(), m_view.unitManager, shortcutModel);
 }
 
 QWidget* Workbench2D::createCentralViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties)
@@ -502,17 +506,17 @@ QWidget* Workbench2D::createCentralViewport(WorkbenchWindow& window, PropertiesP
 void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& window)
 {
     Q_UNUSED(window);
-    vp->setSelectionService(m_services.selectionService);
-    vp->setInteractionDispatcher(m_services.interactionDispatcher);
-    vp->setOperationBus(m_services.operationBus);
-    vp->setLayerManager(m_services.layerManager);
+    vp->setSelectionService(m_scene.selectionService);
+    vp->setInteractionDispatcher(m_uiState.interactionDispatcher);
+    vp->setOperationBus(m_commands.operationBus);
+    vp->setLayerManager(m_scene.layerManager);
 
     // P1: 视口通过信号通知上层，不直接持有编辑服务
 
-    if (m_services.sceneEditService)
+    if (m_scene.sceneEditService)
     {
         QObject::connect(
-            vp, &RenderViewport2D::entitySubmitRequested, [service = m_services.sceneEditService](Eg::SyEntity* e) {
+            vp, &RenderViewport2D::entitySubmitRequested, [service = m_scene.sceneEditService](Eg::SyEntity* e) {
                 if (e)
                 {
                     service->addEntityFromPointer(e, "Draw");
@@ -521,14 +525,14 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
 
         // 场景变更监控：捕获拖拽/交互式修改、图元锁定/可见性等非操作总线路径的场景变更。
         // 订阅由 UiStateBridge2D::install 统一挂载（见 attachToWindow 末尾）。
-        if (auto* scene = m_services.sceneEditService->sceneManager())
+        if (auto* scene = m_scene.sceneEditService->sceneManager())
         {
             m_sceneMonitor = new SceneMonitor(this);
             m_sceneMonitor->watch(scene);
         }
     }
 
-    vp->setDocument(m_services.document2D);
+    vp->setDocument(m_scene.document2D);
 
     // 全局快捷键：Delete/Backspace 删除选中、Ctrl+A 全选、Esc 取消选择。
     // 采用窗口级 QShortcut（不依赖渲染控件焦点）：macOS 下 QOpenGLWidget 不会自动获焦，
@@ -573,10 +577,10 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         //     额外 clear 会在删除被锁定拒绝时把用户的选择一起清掉；
         //   - 全量刷新：删除会 notifySceneChanged()，视口按增量路径重建即可，
         //     菜单删除一直没有全刷也从没出现残影。
-        if (m_services.operationBus)
+        if (m_commands.operationBus)
         {
             SY_DEBUG("[Workbench2D] Delete shortcut activated, running Edit_Delete operation");
-            m_services.operationBus->run(OperationId::Edit_Delete, {}, OperationSource::Shortcut);
+            m_commands.operationBus->run(OperationId::Edit_Delete, {}, OperationSource::Shortcut);
         }
     };
     const auto clearSelectionShapes = [this, editingText]() {
@@ -596,9 +600,9 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         {
             return;
         }
-        if (m_services.selectionService)
+        if (m_scene.selectionService)
         {
-            m_services.selectionService->clear();
+            m_scene.selectionService->clear();
         }
         if (m_viewport)
         {
@@ -640,9 +644,9 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
     window.registerShortcut(backspaceSc);
     auto* selectAllSc = new QShortcut(QKeySequence::SelectAll, &window);
     QObject::connect(selectAllSc, &QShortcut::activated, this, [this, editingText]() {
-        if (!editingText() && m_services.operationBus)
+        if (!editingText() && m_commands.operationBus)
         {
-            m_services.operationBus->run(OperationId::Edit_SelectAll, {}, OperationSource::Shortcut);
+            m_commands.operationBus->run(OperationId::Edit_SelectAll, {}, OperationSource::Shortcut);
         }
     });
     window.registerShortcut(selectAllSc);
@@ -653,18 +657,18 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
     // F12 截图
     auto* captureSc = new QShortcut(QKeySequence(Qt::Key_F12), &window);
     QObject::connect(captureSc, &QShortcut::activated, this, [this, editingText]() {
-        if (editingText() || !m_services.operationBus)
+        if (editingText() || !m_commands.operationBus)
         {
             return;
         }
-        m_services.operationBus->run(OperationId::View_Capture, {}, OperationSource::Shortcut);
+        m_commands.operationBus->run(OperationId::View_Capture, {}, OperationSource::Shortcut);
     });
     window.registerShortcut(captureSc);
 
     // 状态回调：将视口状态写入状态中心
-    if (m_services.stateCenter)
+    if (m_uiState.stateCenter)
     {
-        vp->setStatusCallback([stateCenter = m_services.stateCenter](const QString& text) {
+        vp->setStatusCallback([stateCenter = m_uiState.stateCenter](const QString& text) {
             stateCenter->setStatusPrompt(text);
         });
 
@@ -672,7 +676,7 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         // UiStateBridge2D::install 挂载，此处不再逐个 connect，避免触发源散落漏接。
 
         // 鼠标移动时实时更新状态栏位置标签
-        vp->setPositionCallback([stateCenter = m_services.stateCenter, &window](double x, double y) {
+        vp->setPositionCallback([stateCenter = m_uiState.stateCenter, &window](double x, double y) {
             QVariantMap meta = stateCenter->metadata();
             meta["mouseX"] = x;
             meta["mouseY"] = y;
@@ -684,7 +688,7 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
 
 void Workbench2D::setupImportCallbacks(RenderViewport2D* vp, WorkbenchWindow& window)
 {
-    if (!m_services.importService)
+    if (!m_persistence.importService)
     {
         return;
     }
@@ -702,14 +706,14 @@ void Workbench2D::setupImportCallbacks(RenderViewport2D* vp, WorkbenchWindow& wi
     }
 
     // 导入后自动 zoomToFit
-    m_services.importService->setViewportFitCallback([vp]() {
+    m_persistence.importService->setViewportFitCallback([vp]() {
         QTimer::singleShot(0, vp, [vp]() {
             vp->zoomToFit();
         });
     });
 
     // 统一显示刷新（批量刷新场景树、属性面板，避免导入后多次分离刷新回调）
-    m_services.importService->setDisplayRefreshCallback([this]() {
+    m_persistence.importService->setDisplayRefreshCallback([this]() {
         refreshSceneTree();
         refreshPropertiesPanel();
     });
@@ -810,13 +814,13 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // 接通「UI 入口 → OperationBus → 视口」：把绘图工具的 Tool_* 操作注册到操作总线，
     // 触发后经总线转发表驱动的 LambdaOperation 激活视口对应工具。
     // 必须在视口（m_viewport）创建完成后再注册，故放在这里而非组合根。
-    DrawToolSwitchRegistry(m_services.operationBus, &m_viewport).registerAll();
+    DrawToolSwitchRegistry(m_commands.operationBus, &m_viewport).registerAll();
 
     // View → Grid & Snap 菜单的真正生效点：把 stateCenter 元数据映射到网格显隐。
     // 菜单/操作只翻转 metadata(gridVisible)，此处作为唯一消费者同步到视口网格渲染。
-    if (m_services.stateCenter && m_viewport)
+    if (m_uiState.stateCenter && m_viewport)
     {
-        const auto applyGridVisibleFromMetadata = [stateCenter = m_services.stateCenter, vp = m_viewport]() {
+        const auto applyGridVisibleFromMetadata = [stateCenter = m_uiState.stateCenter, vp = m_viewport]() {
             // gridVisible 只由 View → Grid 菜单写入，键不存在时不能当 false 用
             const QVariant value = stateCenter->metadata().value(QStringLiteral("gridVisible"));
             if (!value.isValid())
@@ -833,18 +837,18 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
             }
         };
         m_gridVisibilityMetadataConn = QObject::connect(
-            m_services.stateCenter, &UiStateCenter::metadataChanged, this, applyGridVisibleFromMetadata);
+            m_uiState.stateCenter, &UiStateCenter::metadataChanged, this, applyGridVisibleFromMetadata);
 
         // 用场景当前（已由设置应用过）的可见性给元数据播种，之后菜单勾选态与画布才一致。
         if (auto* renderWidget = m_viewport->renderWidget())
         {
             if (auto* env = renderWidget->sceneEnvironment())
             {
-                QVariantMap meta = m_services.stateCenter->metadata();
+                QVariantMap meta = m_uiState.stateCenter->metadata();
                 if (!meta.value(QStringLiteral("gridVisible")).isValid())
                 {
                     meta.insert(QStringLiteral("gridVisible"), env->settings().grid.visible);
-                    m_services.stateCenter->setMetadata(meta);
+                    m_uiState.stateCenter->setMetadata(meta);
                 }
             }
         }
@@ -854,12 +858,12 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // CommandActionHub：管理所有 QAction 的创建与绑定
     m_commandHub = std::make_unique<CommandActionHub>();
     m_commandHub->setMainWindow(&window);
-    m_commandHub->setOperationBus(m_services.operationBus);
+    m_commandHub->setOperationBus(m_commands.operationBus);
     // 单一数据源：一次遍历选中的图元集合，统一算出 count / 锁定(图层+图元) / 可编辑 /
     // 类型直方图 / 分组 / 贝塞尔，注入给命令中枢
-    m_commandHub->setSelectionContextProvider([selectionService = m_services.selectionService,
-                                                  layerManager = m_services.layerManager,
-                                                  sceneEditService = m_services.sceneEditService]() -> SelectionContext {
+    m_commandHub->setSelectionContextProvider([selectionService = m_scene.selectionService,
+                                                  layerManager = m_scene.layerManager,
+                                                  sceneEditService = m_scene.sceneEditService]() -> SelectionContext {
         SelectionContext result;
         if (!selectionService || !layerManager || !sceneEditService)
         {
@@ -960,11 +964,11 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // 一直置灰，置灰的 QAction 连 Ctrl+Z / Ctrl+Y 都不触发。整条链路没有任何
     // 报错，表现只是「撤销完全没反应」，极难往接线上查（2026-08-31 实际踩过：
     // ApplicationCompositionRoot::assembleUiServices 漏了这一项）。
-    if (!m_services.undoManager)
+    if (!m_commands.undoManager)
     {
         SY_WARN("[Workbench2D] UiServices::undoManager is null, Undo/Redo actions will stay disabled");
     }
-    m_commandHub->setUndoRedoProvider([undoManager = m_services.undoManager]() -> UndoRedoState {
+    m_commandHub->setUndoRedoProvider([undoManager = m_commands.undoManager]() -> UndoRedoState {
         UndoRedoState state;
         if (undoManager)
         {
@@ -974,7 +978,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         return state;
     });
     // 注入剪贴板内容提供器（Paste 按钮启用状态，实时反映剪贴板是否已复制图元）
-    m_commandHub->setClipboardProvider([clipboard = m_services.clipboard]() -> bool {
+    m_commandHub->setClipboardProvider([clipboard = m_scene.clipboard]() -> bool {
         return clipboard && clipboard->hasContent();
     });
     m_commandHub->rebuildAllActions();
@@ -1293,16 +1297,16 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         window.addToolBar(Qt::RightToolBarArea, m_rightToolBar);
     }
 
-    if (m_services.layerManager)
+    if (m_scene.layerManager)
     {
-        m_rightToolBar->setLayerManager(m_services.layerManager, m_services.layerManagerBridge);
+        m_rightToolBar->setLayerManager(m_scene.layerManager, m_scene.layerManagerBridge);
     }
 
-    if (m_services.stateCenter)
+    if (m_uiState.stateCenter)
     {
-        QVariantMap meta = m_services.stateCenter->metadata();
+        QVariantMap meta = m_uiState.stateCenter->metadata();
         meta.insert(QStringLiteral("rightPanelSource"), QStringLiteral("LayerManager"));
-        m_services.stateCenter->setMetadata(meta);
+        m_uiState.stateCenter->setMetadata(meta);
     }
 
     // 单击色块 → 若已选中未锁定图元则将其移动到该图层（可撤销），并设为当前图层
@@ -1312,18 +1316,18 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         // 因此在这里按同一份快照做前置判定 —— 否则点色块可以绕过锁定改动被锁图元。
         // 注意：「设为当前图层」不受锁定影响，必须始终执行，故只 gate 前半段。
         const bool selectionLocked = m_commandHub && m_commandHub->currentSnapshot().anyLocked();
-        if (!selectionLocked && m_services.selectionService && m_services.layerEditService)
+        if (!selectionLocked && m_scene.selectionService && m_scene.layerEditService)
         {
             std::vector<Eg::EntityId> selectedIds;
-            m_services.selectionService->visitSelectedIds(&collectSelectedIds, &selectedIds);
+            m_scene.selectionService->visitSelectedIds(&collectSelectedIds, &selectedIds);
             if (!selectedIds.empty())
             {
-                m_services.layerEditService->assignEntitiesToLayer(selectedIds, layerId, "Move selected to layer");
+                m_scene.layerEditService->assignEntitiesToLayer(selectedIds, layerId, "Move selected to layer");
             }
         }
-        if (m_services.layerManager)
+        if (m_scene.layerManager)
         {
-            m_services.layerManager->setCurrentLayer(layerId);
+            m_scene.layerManager->setCurrentLayer(layerId);
         }
         // 图层变更后刷新视图和动作状态
         refreshCommandUiState();
@@ -1335,20 +1339,20 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
 
     // 双击色块 → 打开图层管理对话框（其中设置当前图层会通过 sigCurrentLayerChanged 同步回右侧色块）
     QObject::connect(m_rightToolBar, &RightToolBar::sigLayerDoubleClicked, this, [this](int /*layerId*/) {
-        if (m_services.layerEditService)
+        if (m_scene.layerEditService)
         {
-            LayerManagerDialog::showDialog(m_services.layerEditService,
+            LayerManagerDialog::showDialog(m_scene.layerEditService,
                 m_commandHub ? m_commandHub->mainWindow() : nullptr,
-                m_services.layerManagerBridge);
+                m_scene.layerManagerBridge);
         }
     });
 
     // 撤销/重做会恢复/移除/重建图元（场景拓扑变化），增量刷新可能遗漏，
     // 强制全量重建视口，确保回退结果实时可见
-    if (m_services.operationBus)
+    if (m_commands.operationBus)
     {
         QObject::connect(
-            m_services.operationBus, &OperationBus::operationCompleted, this, [this](OperationId id, bool success) {
+            m_commands.operationBus, &OperationBus::operationCompleted, this, [this](OperationId id, bool success) {
                 if (success && (id == OperationId::Edit_Undo || id == OperationId::Edit_Redo))
                 {
                     if (m_viewport)
@@ -1449,19 +1453,19 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
     {
         connect(m_viewport, &RenderViewport2D::selectionChanged, this, &Workbench2D::syncSceneTreeSelection);
     }
-    if (m_services.operationBus)
+    if (m_commands.operationBus)
     {
         // 延迟到事件循环下一轮：撤销信号可能在场景树模型的 setData() 内同步发出
         // （如重命名入撤销栈），此时重建模型会删掉正在回调的模型对象，
         // 编辑器提交后视图持有悬空模型，表现为「重命名过一次后无法再双击编辑」。
-        connect(m_services.operationBus, &OperationBus::undoStateChanged, this, [this]() {
+        connect(m_commands.operationBus, &OperationBus::undoStateChanged, this, [this]() {
             QTimer::singleShot(0, this, [this]() {
                 // 增量优先：画线等纯新增走单行插入；删除/群组/改名回退全量。
                 // 改名等非结构变更经变更集里的非 Added 位触发全量快径 dataChanged。
                 applySceneTreeIncremental("undoStateChanged");
             });
         });
-        connect(m_services.operationBus, &OperationBus::operationCompleted, this, [this](OperationId, bool success) {
+        connect(m_commands.operationBus, &OperationBus::operationCompleted, this, [this](OperationId, bool success) {
             if (!success)
             {
                 return;
@@ -1479,7 +1483,7 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
     // 引擎场景变更兜底：任何直接修改（如视口 Delete 键删除、导入清空等）
     // 都会经 SceneNotifier 通知这里；由结构签名（图元增删 + 群组拓扑）判断是否
     // 需要重建，防抖后统一重建，避免 Scene 列表残留、也避免拖动时反复重建。
-    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
+    Eg::SceneManager* scene = m_scene.sceneEditService ? m_scene.sceneEditService->sceneManager() : nullptr;
     if (scene)
     {
         if (!m_sceneTreeRefreshTimer)
@@ -1518,12 +1522,12 @@ void Workbench2D::refreshSceneTree()
     {
         return;
     }
-    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
+    Eg::SceneManager* scene = m_scene.sceneEditService ? m_scene.sceneEditService->sceneManager() : nullptr;
     // 拓扑：O(N) 一次生成紧凑索引；群组成员与元数据均懒加载
     const SceneTreeTopology2D topology = SceneTreeBuilder2D::buildTopology(scene);
     m_scenePanel2D->setMode2D(
         topology,
-        [scene, layers = m_services.layerManager](qint64 id, bool isGroup) {
+        [scene, layers = m_scene.layerManager](qint64 id, bool isGroup) {
             return SceneTreeBuilder2D::rowMeta(scene, layers, SceneTreeRow2D{ id, isGroup });
         },
         [scene](qint64 groupId) {
@@ -1555,7 +1559,7 @@ void Workbench2D::refreshSceneTreeIfNeeded(const char* src)
     {
         return;
     }
-    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
+    Eg::SceneManager* scene = m_scene.sceneEditService ? m_scene.sceneEditService->sceneManager() : nullptr;
     if (!scene)
     {
         return;
@@ -1597,11 +1601,11 @@ void Workbench2D::refreshSceneTreeIfNeeded(const char* src)
 
 void Workbench2D::applySceneTreeIncremental(const char* src)
 {
-    if (!m_scenePanel2D || !m_services.sceneEditService)
+    if (!m_scenePanel2D || !m_scene.sceneEditService)
     {
         return;
     }
-    Eg::SceneManager* scene = m_services.sceneEditService->sceneManager();
+    Eg::SceneManager* scene = m_scene.sceneEditService->sceneManager();
     if (!scene)
     {
         return;
@@ -1713,7 +1717,7 @@ void Workbench2D::syncSceneTreeSelection()
     {
         return;
     }
-    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
+    Eg::SceneManager* scene = m_scene.sceneEditService ? m_scene.sceneEditService->sceneManager() : nullptr;
     auto selected = SceneTreeBuilder2D::selectedIds(scene);
     // SY_DEBUGF("[Workbench2D] syncSceneTreeSelection: selected count=%d", selected.size());
     m_scenePanel2D->setSelectedIds(selected);
@@ -1721,13 +1725,13 @@ void Workbench2D::syncSceneTreeSelection()
 
 void Workbench2D::applySceneTreeSelection(const QStringList& ids)
 {
-    if (!m_services.selectionService)
+    if (!m_scene.selectionService)
     {
         return;
     }
     if (ids.isEmpty())
     {
-        m_services.selectionService->clear();
+        m_scene.selectionService->clear();
         return;
     }
 
@@ -1743,12 +1747,12 @@ void Workbench2D::applySceneTreeSelection(const QStringList& ids)
     {
         cids.push_back(str.c_str());
     }
-    m_services.selectionService->selectMultiple(cids.data(), cids.size());
+    m_scene.selectionService->selectMultiple(cids.data(), cids.size());
 }
 
 void Workbench2D::toggleEntityVisibility(const QString& id, bool visible)
 {
-    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
+    Eg::SceneManager* scene = m_scene.sceneEditService ? m_scene.sceneEditService->sceneManager() : nullptr;
     if (!scene)
     {
         return;
@@ -1772,7 +1776,7 @@ void Workbench2D::toggleEntityVisibility(const QString& id, bool visible)
 
 void Workbench2D::renameEntity(const QString& id, const QString& newName)
 {
-    if (newName.isEmpty() || !m_services.sceneEditService)
+    if (newName.isEmpty() || !m_scene.sceneEditService)
     {
         return;
     }
@@ -1781,7 +1785,7 @@ void Workbench2D::renameEntity(const QString& id, const QString& newName)
     {
         return;
     }
-    Eg::SceneManager* scene = m_services.sceneEditService->sceneManager();
+    Eg::SceneManager* scene = m_scene.sceneEditService->sceneManager();
     if (!scene)
     {
         return;
@@ -1791,7 +1795,7 @@ void Workbench2D::renameEntity(const QString& id, const QString& newName)
     // 若直接写引擎，重命名不会进入撤销栈，之后撤销任何较早的操作都会用
     // 旧快照把名字覆盖回去（表现为"撤销后名字变回原来的"）。
     const std::string name = newName.toStdString();
-    m_services.sceneEditService->mutateEntities(
+    m_scene.sceneEditService->mutateEntities(
         { *eid },
         [scene, entityId = *eid, name]() {
             if (auto* entity = scene->findSyEntityById(entityId))
@@ -1809,7 +1813,7 @@ void Workbench2D::renameEntity(const QString& id, const QString& newName)
 
 void Workbench2D::deleteSceneTreeSelection(const QStringList& ids)
 {
-    if (ids.isEmpty() || !m_services.sceneEditService)
+    if (ids.isEmpty() || !m_scene.sceneEditService)
     {
         return;
     }
@@ -1827,7 +1831,7 @@ void Workbench2D::deleteSceneTreeSelection(const QStringList& ids)
     {
         return;
     }
-    m_services.sceneEditService->deleteEntities(eids, "Delete from Scene Tree");
+    m_scene.sceneEditService->deleteEntities(eids, "Delete from Scene Tree");
     // 删除后刷新树与选择（deleteEntities 为可撤销路径）
     refreshSceneTree();
     syncSceneTreeSelection();
@@ -1835,7 +1839,7 @@ void Workbench2D::deleteSceneTreeSelection(const QStringList& ids)
 
 void Workbench2D::setSceneTreeVisibility(const QStringList& ids, bool visible)
 {
-    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
+    Eg::SceneManager* scene = m_scene.sceneEditService ? m_scene.sceneEditService->sceneManager() : nullptr;
     if (!scene || ids.isEmpty())
     {
         return;
@@ -1903,7 +1907,7 @@ void Workbench2D::setSceneTreeVisibility(const QStringList& ids, bool visible)
 
 void Workbench2D::setSceneTreeLock(const QStringList& ids, bool locked)
 {
-    Eg::SceneManager* scene = m_services.sceneEditService ? m_services.sceneEditService->sceneManager() : nullptr;
+    Eg::SceneManager* scene = m_scene.sceneEditService ? m_scene.sceneEditService->sceneManager() : nullptr;
     if (!scene || ids.isEmpty())
     {
         return;
@@ -1933,7 +1937,7 @@ void Workbench2D::setSceneTreeLock(const QStringList& ids, bool locked)
 
 void Workbench2D::onViewportContextMenu(QContextMenuEvent* event)
 {
-    if (!event || !m_commandHub || !m_services.layerManager)
+    if (!event || !m_commandHub || !m_scene.layerManager)
     {
         return;
     }
@@ -1962,7 +1966,7 @@ void Workbench2D::onViewportContextMenu(QContextMenuEvent* event)
     }
 
     QMenu menu;
-    m_commandHub->populateContextMenu(&menu, snapshot, m_services.layerManager);
+    m_commandHub->populateContextMenu(&menu, snapshot, m_scene.layerManager);
     if (menu.isEmpty())
     {
         return;
@@ -2062,9 +2066,9 @@ void Workbench2D::refreshPropertiesPanel()
 
     // 读取当前选中图元 id（数据来源：引擎场景）
     std::vector<Eg::EntityId> entityIds;
-    if (m_services.sceneEditService)
+    if (m_scene.sceneEditService)
     {
-        if (auto* scene = m_services.sceneEditService->sceneManager())
+        if (auto* scene = m_scene.sceneEditService->sceneManager())
         {
             for (Eg::SyEntity* e : scene->getSelectedEntities())
             {
@@ -2077,7 +2081,7 @@ void Workbench2D::refreshPropertiesPanel()
     }
 
     // 创建编辑会话（算法层）：持有图元 id，负责按需解析图元、应用修改并集成撤销。
-    auto session = std::make_shared<EntityPropertyEditSession2D>(m_services.sceneEditService, std::move(entityIds));
+    auto session = std::make_shared<EntityPropertyEditSession2D>(m_scene.sceneEditService, std::move(entityIds));
 
     // 数据/算法产物推送给 UI 层：模型用于展示，会话作为编辑目标。
     // 面板仅消费 PropertyModel / IPropertyEditTarget，不感知算法与引擎细节。
@@ -2127,24 +2131,24 @@ void Workbench2D::deactivate()
     // 不断的后果不是崩溃而是叠加：N 次 2D↔3D 往返后，一次 2D 操作会触发 N 份场景树重建
     // 与 N 份命令状态刷新。这些连接全部在 attach 期建立（含 UiStateBridge2D::install），
     // 因此按"发送者 + 接收者"整体断开是安全的，下次 attach 会重新装。
-    if (m_services.operationBus)
+    if (m_commands.operationBus)
     {
-        QObject::disconnect(m_services.operationBus, nullptr, this, nullptr);
+        QObject::disconnect(m_commands.operationBus, nullptr, this, nullptr);
     }
-    if (m_services.layerManagerBridge)
+    if (m_scene.layerManagerBridge)
     {
-        QObject::disconnect(m_services.layerManagerBridge, nullptr, this, nullptr);
+        QObject::disconnect(m_scene.layerManagerBridge, nullptr, this, nullptr);
     }
 
     // 清除 ImportService 中持有的视口回调，防止切换后悬空指针
 
     // ImportService 生命周期长于工作台，不清理会导致 use-after-free
-    if (m_services.importService)
+    if (m_persistence.importService)
     {
-        m_services.importService->setViewportFitCallback(nullptr);
-        m_services.importService->setTreeRebuildCallback(nullptr);
-        m_services.importService->setPropertyRefreshCallback(nullptr);
-        m_services.importService->setDisplayRefreshCallback(nullptr);
+        m_persistence.importService->setViewportFitCallback(nullptr);
+        m_persistence.importService->setTreeRebuildCallback(nullptr);
+        m_persistence.importService->setPropertyRefreshCallback(nullptr);
+        m_persistence.importService->setDisplayRefreshCallback(nullptr);
     }
 
     // 同理：FileDropHandler 由 WorkbenchWindow 持有（跨切换永生），它的
@@ -2162,9 +2166,9 @@ void Workbench2D::deactivate()
     m_commandHub.reset();
 
     // 视口动作中枢：断开当前视口，避免切换工作台后悬空指针
-    if (m_services.viewportActionHub)
+    if (m_view.viewportActionHub)
     {
-        m_services.viewportActionHub->clearViewport();
+        m_view.viewportActionHub->clearViewport();
     }
 
     // 工具栏指针会随窗口清理而失效（clearWorkbenchContent 会 delete QToolBar）
@@ -2175,9 +2179,9 @@ void Workbench2D::deactivate()
     // 视口指针随窗口清理而失效
     m_viewport = nullptr;
     // 注销场景变更观察者并停用防抖定时器，避免切换工作台后悬空
-    if (m_sceneTreeObserver && m_services.sceneEditService)
+    if (m_sceneTreeObserver && m_scene.sceneEditService)
     {
-        if (auto* scene = m_services.sceneEditService->sceneManager())
+        if (auto* scene = m_scene.sceneEditService->sceneManager())
         {
             scene->removeObserver(m_sceneTreeObserver.get());
         }
@@ -2225,7 +2229,11 @@ void Workbench2D::deactivate()
 void Workbench2D::shutdown()
 {
     deactivate();
-    m_services = UiServices{};
+    m_uiState = {};
+    m_commands = {};
+    m_scene = {};
+    m_persistence = {};
+    m_view = {};
 }
 
 void Workbench2D::releaseCentralWidgetGLResources(QWidget* centralWidget) const
@@ -2335,7 +2343,11 @@ bool Workbench3D::initialize(const UiServices& services)
         SY_ERROR("[Workbench3D] initialize failed: stateCenter or interactionDispatcher is null");
         return false;
     }
-    m_services = services;
+    m_uiState = services.uiState();
+    m_commands = services.commands();
+    m_scene = services.scene();
+    m_persistence = services.persistence();
+    m_view = services.view();
 
     // 使用 ApplicationCompositionRoot 中的共享 SceneManager3D，
     // 确保导入的 3D 图元与 3D 工作台使用同一数据源
@@ -2530,7 +2542,7 @@ void Workbench3D::bind3DCursorSignal()
     auto* renderWidget = m_services3D.renderWidget;
     connect(renderWidget,
         &RenderWidget3D::sigCursorWorldPosition,
-        [stateCenter = m_services.stateCenter](float x, float y, float z, bool valid) {
+        [stateCenter = m_uiState.stateCenter](float x, float y, float z, bool valid) {
             if (!stateCenter)
             {
                 return;
@@ -2556,7 +2568,7 @@ void Workbench3D::bind3DSelectionSignal()
     // 跨 DLL 安全：信号参数改为 POD 指针数组
     connect(renderWidget,
         &RenderWidget3D::sigSelectionChanged,
-        [stateCenter = m_services.stateCenter](const Eg::SyMeshEntity** entities, int count) {
+        [stateCenter = m_uiState.stateCenter](const Eg::SyMeshEntity** entities, int count) {
             if (!stateCenter)
             {
                 return;
@@ -2751,7 +2763,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     // 注册放在工作台层的原因与上面两条一致：ViewCaptureService 由组合根持有，
     // UI3D 库看不到它，因此不能像 View_Wireframe 那样在 ViewOperations3D 里注册。
     own.operationBus->registerOperation(std::make_unique<LambdaOperation3D>(OperationId3D::View_Capture,
-        [captureService = m_services.captureService](OperationContext3D& ctx, const OperationRequest3D&) {
+        [captureService = m_view.captureService](OperationContext3D& ctx, const OperationRequest3D&) {
             OperationResult3D result;
             if (!captureService || !ctx.renderWidget)
             {
@@ -2995,10 +3007,10 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
 
     // 3D 导入完成后显式刷新一次树（导入会触发 markDataChanged → SceneMonitor ，
     // 此处 importFinished 作为兜底与显式接入点，二者叠加安全）
-    if (m_services.importService)
+    if (m_persistence.importService)
     {
         connect(
-            m_services.importService, &ImportService::importFinished, this, &Workbench3D::refreshSceneTree3DIfNeeded);
+            m_persistence.importService, &ImportService::importFinished, this, &Workbench3D::refreshSceneTree3DIfNeeded);
     }
 
     // 初始填充
@@ -3281,9 +3293,9 @@ void Workbench3D::activate()
     const auto& snapshot = m_savedState.currentViewMode.isEmpty() ? m_initialState : m_savedState;
     restoreFromSnapshot(snapshot);
 
-    if (m_services.stateCenter)
+    if (m_uiState.stateCenter)
     {
-        m_services.stateCenter->setCurrentWorkbenchId(id());
+        m_uiState.stateCenter->setCurrentWorkbenchId(id());
     }
 
     if (m_mainWindow3D)
@@ -3368,7 +3380,11 @@ void Workbench3D::deactivate()
 void Workbench3D::shutdown()
 {
     deactivate();
-    m_services = UiServices{};
+    m_uiState = {};
+    m_commands = {};
+    m_scene = {};
+    m_persistence = {};
+    m_view = {};
 }
 
 void Workbench3D::releaseCentralWidgetGLResources(QWidget* centralWidget) const
