@@ -26,6 +26,7 @@ std::vector<RecentFileRecord> RecentFileRepository::loadAll()
 
 bool RecentFileRepository::saveAll(const std::vector<RecentFileRecord>& records)
 {
+    SY_DEBUGF("[RecentFileRepository] Saving %zu recent files", records.size());
     Eg::Database::Transaction txn(m_database);
 
     // 清空现有数据
@@ -44,7 +45,12 @@ bool RecentFileRepository::saveAll(const std::vector<RecentFileRecord>& records)
         }
     }
 
-    return txn.commit();
+    if (!txn.commit())
+    {
+        return fail("RecentFileRepository", "Failed to commit transaction");
+    }
+    SY_DEBUGF("[RecentFileRepository] Saved %zu recent files", records.size());
+    return true;
 }
 
 bool RecentFileRepository::append(const RecentFileRecord& record)
@@ -56,6 +62,8 @@ bool RecentFileRepository::append(const RecentFileRecord& record)
     {
         return fail("RecentFileRepository", "Failed to append recent file");
     }
+
+    SY_DEBUGF("[RecentFileRepository] Appended recent file: %s", record.filePath.c_str());
 
     // 控制列表上限，删除超出上限的最旧记录
     constexpr int kMaxRecentFiles = 10;
