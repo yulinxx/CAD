@@ -17,7 +17,6 @@
 
 #include "UiStateCenter.h"
 #include "UiWorkbench.h"
-#include "UiServices.h"
 #include "UiFrameworkServices.h"
 #include "Composition/ApplicationCompositionRoot.h"
 #include "UI/Settings/SettingsService.h"
@@ -220,9 +219,9 @@ void WorkbenchMenuManager::setFrameworkServices(const UiFrameworkServices* servi
     m_frameworkServices = services;
 }
 
-void WorkbenchMenuManager::setUiServices(const UiServices* services)
+void WorkbenchMenuManager::setRecentFileService(IRecentFileService* service)
 {
-    m_uiServices = services;
+    m_recentFileService = service;
 }
 
 void WorkbenchMenuManager::setWorkbench(UiWorkbench* workbench)
@@ -319,7 +318,7 @@ void WorkbenchMenuManager::registerRecentFilesSection()
             return;
         }
 
-        IRecentFileService* recentFiles = m_uiServices ? m_uiServices->recentFileService : nullptr;
+        IRecentFileService* recentFiles = m_recentFileService;
         const QStringList files = recentFiles ? recentFiles->loadRecentFiles() : QStringList{};
 
         // 服务缺失与列表为空给同一种反馈：一个禁用占位项。

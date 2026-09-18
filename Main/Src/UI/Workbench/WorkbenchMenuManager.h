@@ -14,7 +14,7 @@ class UiStateCenter;
 class UiWorkbench;
 class WorkbenchWindow;
 struct UiFrameworkServices;
-struct UiServices;
+class IRecentFileService;
 struct MenuDef;
 class IUiCommandDispatcher;
 class UiConfigurationManager;
@@ -45,7 +45,7 @@ public:
     void setOperationBus(OperationBus* bus);
     void setStateCenter(UiStateCenter* stateCenter);
     void setFrameworkServices(const UiFrameworkServices* services);
-    void setUiServices(const UiServices* services);
+    void setRecentFileService(IRecentFileService* service);
     void setWorkbench(UiWorkbench* workbench);
 
 
@@ -147,8 +147,7 @@ private:
     OperationBus* m_operationBus{ nullptr };
     UiStateCenter* m_stateCenter{ nullptr };
     const UiFrameworkServices* m_frameworkServices{ nullptr };
-    const UiServices* m_uiServices{ nullptr };
-    UiWorkbench* m_workbench{ nullptr };
+    IRecentFileService* m_recentFileService{ nullptr };    UiWorkbench* m_workbench{ nullptr };
     // 全局编辑快捷键动作（窗口级，需在切换工作台时显式清理）
 
     std::vector<QAction*> m_editShortcuts;

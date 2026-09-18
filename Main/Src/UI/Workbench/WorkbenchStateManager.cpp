@@ -59,7 +59,7 @@ void WorkbenchStateManager::configureServices(const UiServices& services)
     {
         m_menuManager->setOperationBus(services.operationBus);
         m_menuManager->setStateCenter(services.stateCenter);
-        m_menuManager->setUiServices(&m_uiServices);
+        m_menuManager->setRecentFileService(m_uiServices.recentFileService);
         m_menuManager->rebuildAllMenus();
     }
 
