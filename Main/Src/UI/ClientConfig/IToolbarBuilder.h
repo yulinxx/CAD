@@ -29,7 +29,3 @@ public:
     /// 本次构建创建的工具栏（供上层注册到布局管理器统一清理）
     virtual const std::vector<QToolBar*>& builtToolBars() const = 0;
 };
-
-/// 工厂：由具体实现提供（见 UiLayoutBuilder.cpp）
-std::unique_ptr<IToolbarBuilder> createToolbarBuilder(
-    QMainWindow* window, IUiCommandDispatcher* dispatcher, UiPanelRegistry* panelRegistry);

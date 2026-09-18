@@ -13,7 +13,8 @@
 #include "ClientConfig/UiConfigLoader.h"
 #include "ClientConfig/UiConfigurationManager.h"
 #include "ClientConfig/IToolbarBuilder.h"
-#include "ClientConfig/UiLayoutBuilder.h"
+#include "ClientConfig/ILayoutBuilder.h"
+#include "ClientConfig/UiLabelLocalizer.h"
 #include "ClientConfig/UiPanelRegistry.h"
 
 #include <QDateTime>
@@ -106,8 +107,8 @@ void WorkbenchLayoutManager::buildToolBars()
         return;
     }
 
-    std::unique_ptr<IToolbarBuilder> builder =
-        createToolbarBuilder(m_parent, m_commandDispatcher, m_panelRegistry.get());
+    std::unique_ptr<ILayoutBuilder> builder =
+        createLayoutBuilder(m_parent, m_commandDispatcher, m_panelRegistry.get());
     builder->buildToolBars(config->toolBars);
 
     for (QToolBar* tb : builder->builtToolBars())
@@ -187,12 +188,13 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
 
     // 数据驱动构建 Dock（命令分发器此处不参与，仅为构造签名提供空实现）
     NullDispatcher dispatcher;
-    UiLayoutBuilder builder(m_parent, &dispatcher, m_panelRegistry.get());
-    builder.buildDocks(config->docks);
+    std::unique_ptr<ILayoutBuilder> builder =
+        createLayoutBuilder(m_parent, &dispatcher, m_panelRegistry.get());
+    builder->buildDocks(config->docks);
 
     // 将构建出的 Dock widget 挂入布局管理器注册表，统一清理（clearLayoutContent）
     // 与布局快照（restoreLayoutSnapshot）
-    for (QWidget* dockWidget : builder.builtDocks())
+    for (QWidget* dockWidget : builder->builtDocks())
     {
         if (auto* dock = qobject_cast<QDockWidget*>(dockWidget))
         {
@@ -262,9 +264,10 @@ void WorkbenchLayoutManager::buildStatusBar()
     clearStatusBarSlots();
 
     NullDispatcher dispatcher;
-    UiLayoutBuilder builder(m_parent, &dispatcher, m_panelRegistry.get());
-    builder.buildStatusBar(config->statusBar);
-    for (QWidget* slot : builder.builtStatusBarSlots())
+    std::unique_ptr<ILayoutBuilder> builder =
+        createLayoutBuilder(m_parent, &dispatcher, m_panelRegistry.get());
+    builder->buildStatusBar(config->statusBar);
+    for (QWidget* slot : builder->builtStatusBarSlots())
     {
         if (slot)
         {
@@ -564,7 +567,7 @@ void WorkbenchLayoutManager::retranslateDockTitles()
         {
             continue;
         }
-        const QString localized = UiLayoutBuilder::localizedLabel(source);
+        const QString localized = uiLocalizedLabel(source);
         dock->setWindowTitle(localized);
         // 布局快照恢复后靠 _workbench_dock_title 回填，必须同步成新译文，
         // 否则 restoreState() 后标题会退回语言切换前的旧文案。

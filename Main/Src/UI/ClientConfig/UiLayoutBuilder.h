@@ -10,7 +10,7 @@
  */
 
 #include "UiClientConfigBase.h"
-#include "IToolbarBuilder.h"
+#include "ILayoutBuilder.h"
 
 #include <QSet>
 #include <QVariantMap>
@@ -48,8 +48,8 @@ public:
     }
 };
 
-/// 数据驱动的布局构建器（实现 IToolbarBuilder，供按接口消费工具栏构建）
-class UiLayoutBuilder : public IToolbarBuilder
+/// 数据驱动的布局构建器（实现 ILayoutBuilder，供按接口消费布局构建）
+class UiLayoutBuilder : public ILayoutBuilder
 {
 public:
     UiLayoutBuilder(QMainWindow* window, IUiCommandDispatcher* dispatcher, UiPanelRegistry* panelRegistry);
@@ -60,13 +60,13 @@ public:
 
     void buildMenus(const std::vector<MenuDef>& menus);
     void buildToolBars(const std::vector<ToolBarDef>& toolBars) override;
-    void buildDocks(const std::vector<DockDef>& docks);
+    void buildDocks(const std::vector<DockDef>& docks) override;
     void buildShortcuts(const std::vector<ShortcutDef>& shortcuts);
 
     /// 构建状态栏槽位（P0-2a）
     /// 槽位控件由 UiPanelRegistry 按 widgetType 创建，与 Dock 使用同一套面板工厂。
     /// @param statusBar 状态栏配置
-    void buildStatusBar(const StatusBarDef& statusBar);
+    void buildStatusBar(const StatusBarDef& statusBar) override;
 
     /// 按配置构建一个右键菜单（P0-2b）
     /// 调用方负责 popup 与生命周期（通常用 QMenu::exec 后 deleteLater）。
@@ -87,7 +87,7 @@ public:
 
 
     /// 本次构建创建的 Dock widget（供上层注册到布局管理器，统一清理）
-    const std::vector<QWidget*>& builtDocks() const
+    const std::vector<QWidget*>& builtDocks() const override
     {
         return m_builtDocks;
     }
@@ -99,7 +99,7 @@ public:
     }
 
     /// 本次构建挂入状态栏的槽位控件（供上层统一清理）
-    const std::vector<QWidget*>& builtStatusBarSlots() const
+    const std::vector<QWidget*>& builtStatusBarSlots() const override
     {
         return m_builtStatusBarSlots;
     }
