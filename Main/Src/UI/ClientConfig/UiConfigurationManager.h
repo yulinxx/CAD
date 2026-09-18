@@ -10,6 +10,7 @@
 
 #include "UiConfigLoader.h"
 #include "UiPanelRegistry.h"
+#include "ILayoutConfig.h"
 
 #include <memory>
 
@@ -23,8 +24,8 @@ enum class ConfigFallbackPolicy
     Silent     // 加载失败使用空配置（极端情况，调用方自行降级）
 };
 
-/// UI 配置管理器
-class UiConfigurationManager
+/// UI 配置管理器（实现 ILayoutConfig，供消费者按接口读取布局配置）
+class UiConfigurationManager : public ILayoutConfig
 {
 public:
     UiConfigurationManager();
@@ -48,25 +49,25 @@ public:
     bool applyConfiguration(const QString& resourcePath, ConfigFallbackPolicy fallback = ConfigFallbackPolicy::Fallback);
 
     /// 面板注册表
-    UiPanelRegistry* panelRegistry() const
+    UiPanelRegistry* panelRegistry() const override
     {
         return m_panelRegistry.get();
     }
 
     /// 已加载的配置数据（未加载时为 nullptr）
-    const UiConfigData* configData() const
+    const UiConfigData* configData() const override
     {
         return m_configData.get();
     }
 
     /// 菜单配置数据（当前与主配置共用，便于菜单/工具栏/Dock 同源生成）
-    const UiConfigData* menuConfigData() const
+    const UiConfigData* menuConfigData() const override
     {
         return m_configData.get();
     }
 
     /// 当前配置是否已加载
-    bool hasConfig() const
+    bool hasConfig() const override
     {
         return m_configData != nullptr;
     }

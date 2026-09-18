@@ -19,6 +19,7 @@ class PersistenceService;
 class SceneTreePanel;
 class PropertiesPanelWidget;
 class UiConfigurationManager;
+class ILayoutConfig;
 class UiPanelRegistry;
 class UiWorkbench;
 
@@ -145,8 +146,8 @@ public:
         return m_registeredToolBars;
     }
 
-    /// 已加载的客户配置管理器（供右键菜单等按需读取同一份配置）
-    UiConfigurationManager* configManager() const
+    /// 已加载的布局配置（供右键菜单等按需读取同一份配置）
+    ILayoutConfig* configManager() const
     {
         return m_configManager;
     }
@@ -168,8 +169,8 @@ private:
     /// 由配置构建并挂入状态栏的框架级槽位控件（工作台切换时统一回收）
     std::vector<QPointer<QWidget>> m_statusBarSlots;
     QPointer<QProgressBar> m_busyProgressBar;
-    /// 客户化 UI 配置管理器：指向 UiConfigurationManager::shared()，本类不拥有其生命周期
-    UiConfigurationManager* m_configManager{ nullptr };
+    /// 布局配置：指向 UiConfigurationManager::shared()，本类不拥有其生命周期；按 ILayoutConfig 接口使用
+    ILayoutConfig* m_configManager{ nullptr };
     /// 面板工厂注册表（Dock 与状态栏槽位共用）
     std::unique_ptr<UiPanelRegistry> m_panelRegistry;
     /// 工具栏动作的命令分发器：由 WorkbenchWindow 注入菜单侧的同一个实例，本类不拥有
