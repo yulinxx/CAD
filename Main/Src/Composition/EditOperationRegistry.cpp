@@ -1,5 +1,6 @@
 #include "EditOperationRegistry.h"
 
+#include "Log/SyLogger.h"
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
 #include "UI2D/Operation/IOperation.h"
@@ -89,6 +90,7 @@ void EditOperationRegistry::registerAll()
 
     // ---- 撤销/重做/删除/全选/清除/反选 ----
     reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Undo, [undoManager, hub] {
+        SY_DEBUG("[EditOperationRegistry] Undo operation triggered");
         if (hub && hub->viewport() && hub->viewport()->handleTextUndoRequest(false))
             return;
         if (undoManager && undoManager->canUndo())
@@ -96,6 +98,7 @@ void EditOperationRegistry::registerAll()
     }));
 
     reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Redo, [undoManager, hub] {
+        SY_DEBUG("[EditOperationRegistry] Redo operation triggered");
         if (hub && hub->viewport() && hub->viewport()->handleTextUndoRequest(true))
             return;
         if (undoManager && undoManager->canRedo())
@@ -103,6 +106,7 @@ void EditOperationRegistry::registerAll()
     }));
 
     reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Delete, [editService] {
+        SY_DEBUG("[EditOperationRegistry] Delete operation triggered");
         if (editService)
             editService->deleteSelected("Delete");
     }));

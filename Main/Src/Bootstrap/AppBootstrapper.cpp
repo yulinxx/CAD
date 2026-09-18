@@ -125,6 +125,10 @@ bool AppBootstrapper::initialize()
                 SY_WARN("[AppBootstrapper] hardware started with a warning "
                         "(see the [MachineProfile]/[DeviceHost] entries above for details)");
             }
+            else
+            {
+                SY_INFO("[AppBootstrapper] Hardware started successfully");
+            }
         }
         else
         {
