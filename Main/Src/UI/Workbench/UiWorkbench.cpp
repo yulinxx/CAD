@@ -18,7 +18,11 @@
 #include <QStatusBar>
 #include <QFileInfo>
 #include <QDesktopServices>
+
 #include <QUrl>
+#include <string>
+#include <vector>
+#include <functional>
 
 #include "Composition/ApplicationCompositionRoot.h"
 #include "SceneDocument2D.h"
@@ -28,11 +32,11 @@
 #include "UI/Services/HelpDialogService.h"
 #include "UI/Services/ISelectionService.h"
 #include "UI/Service/ViewCaptureService.h"
-#include "Engine2D/Edit/IUndoRedoManager.h"
 #include "UiSceneTreePanel.h"
 #include "SceneTreeModel2D.h"
 #include "SceneTreeBuilder2D.h"
-#include "Engine2D/Core/SceneManager.h"
+
+
 #include "UiPropertiesPanel.h"
 #include "RenderViewport2D.h"
 #include "FileDropHandler.h"
@@ -43,11 +47,12 @@
 #include "WorkbenchWindow.h"
 #include "WorkbenchMenuManager.h"
 #include "WorkbenchLayoutManager.h"
-// 配置驱动右键菜单（P0-2b）：右键项与顶部菜单共享同一份客户配置与命令路径
+
 #include "ClientConfig/UiClientConfigBase.h"
 #include "ClientConfig/UiConfigurationManager.h"
 #include "ClientConfig/UiContextMenuService.h"
 #include "ClientConfig/UiLayoutBuilder.h"
+
 #include "UiStateBridge2D.h"
 #include "RenderWidget.h"
 
@@ -57,41 +62,43 @@
 #include "UI2D/Operation/OperationRouting.h"
 #include "UI2D/Operation/CommandCatalog.h"
 #include "UI2D/Edit/QtLayerManagerBridge.h"
-
-#include "UI2D/ToolBar/RightToolBar.h"
-#include "UI/Service/ToolBarContextManager.h"
-#include "UI2D/ToolBar/TopToolBar.h"
-#include "UI2D/ToolBar/TextFontToolBar.h"
-#include "UI/DrawTools/TextEditTool.h"
-#include "UI2D/DrawTools/ToolManager.h"
-#include "UI/UiMetrics.h"
-#include "UI/ThemeManager.h"
 #include "UI2D/Dlg/LayerManagerDialog.h"
 #include "UI2D/Service/EntityPropertyModel2D.h"
 #include "UI2D/Service/EntityPropertyEditSession2D.h"
+
 #include "UI2D/Service/SceneMonitor.h"
+#include "UI2D/Operation/CommandCatalog.h"
+#include "UI2D/Operation/OperationId.h"
+#include "UI2D/Operation/OperationBus.h"
+#include "UI2D/Settings/SettingsUiCoordinator2D.h"
+#include "UI2D/StatusBar/StatusBar.h"
+#include "UI2D/ToolBar/RightToolBar.h"
+#include "UI2D/ToolBar/TopToolBar.h"
+#include "UI2D/ToolBar/TextFontToolBar.h"
+#include "UI2D/DrawTools/ToolManager.h"
+
+#include "UI/Settings/SettingsService.h"
+#include "UI/DrawTools/TextEditTool.h"
+#include "UI/UiMetrics.h"
+#include "UI/ThemeManager.h"
+#include "UI/Service/ToolBarContextManager.h"
 
 #include "Engine2D/Edit/LayerEditService.h"
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Interaction/LayerManager.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Edit/IUndoRedoManager.h"
+
 #include "Engine/EntityIdUtils.h"
 #include "Engine/SyEntity/SyEntity.h"
-#include <string>
-#include <vector>
-#include <functional>
-#include "UI2D/Operation/CommandCatalog.h"
-#include "UI2D/Operation/OperationId.h"
-#include "UI2D/Operation/OperationBus.h"
+
 #include "UiStateCenter.h"
 
 #include "Import/ImportService.h"
 #include "Color/Color.hpp"
 #include "Log/SyLogger.h"
-#include "UI2D/StatusBar/StatusBar.h"
 
-#include "UI/Settings/SettingsService.h"
-#include "UI2D/Settings/SettingsUiCoordinator2D.h"
 
 #if BUILD_UI3D
     #include "UiViewport3D.h"
