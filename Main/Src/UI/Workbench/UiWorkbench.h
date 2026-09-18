@@ -255,7 +255,13 @@ public:
     /// 只在「结构签名」变化时重建场景树（图元增删 / 群组拓扑）。
     /// sceneChanged 会在拖动等高频路径上反复触发，全量重建在万级图元下每次都要
     /// 几十毫秒，因此默认走这条；用户显式改可见性/锁定/重命名时仍调 refreshSceneTree()。
-    void refreshSceneTreeIfNeeded();
+    /// src 为打点用触发来源标记（sceneObserver / sceneMonitor / opCompleted / undoStateChanged 等）。
+    void refreshSceneTreeIfNeeded(const char* src = nullptr);
+
+    /// 增量刷新场景树：读变更流（ISceneChangeStream），纯新增且无群组拓扑变化时
+    /// 只向面板模型追加顶层行（O(新增数)），删除/群组/改名等无法增量表达的变更回退
+    /// 全量重建。src 为打点用触发来源标记。
+    void applySceneTreeIncremental(const char* src = nullptr);
 
 private:
     /// 创建中央视口
@@ -332,6 +338,15 @@ private:
     QPointer<QObject> m_uiStateConnections;
     /// 场景树重建防抖定时器（合并批量增删，避免每步 O(N) 重建）
     class QTimer* m_sceneTreeRefreshTimer{ nullptr };
+    /// 打点用：本轮场景树重建的触发来源（sceneObserver / sceneMonitor / opCompleted / undoStateChanged）。
+    /// refreshSceneTree() 消费后清零；诊断「同一次变更触发多次重建」时用，无业务语义。
+    const char* m_sceneTreeRefreshSource{ nullptr };
+    /// 场景树增量游标（ISceneChangeStream::Cursor）：记录上次消费到的修订号。
+    /// 全量重建后推进到 currentRevision()，之后增量只读真正的新增/变更。
+    uint64_t m_sceneTreeCursor{ 0 };
+    /// 强制全量刷新场景树标志：锁定态翻转不写变更流，增量会判「无事可做」而跳过，
+    /// 因此锁定切换时置位，让定时器回调直接全量重建（行锁图标随快径 dataChanged 刷新）。
+    bool m_sceneTreeForceRefresh{ false };
     /// 场景树延迟重建标记（setData 回调链中 scheduleTreeRefresh 合并，避免 delete this）
     bool m_treeRefreshPending{ false };
     /// 命令 UI 状态刷新的节流冷却定时器 + 尾包标记。

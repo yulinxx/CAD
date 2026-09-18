@@ -16,6 +16,7 @@
 #include <QSet>
 #include <QString>
 #include <QStringList>
+#include <QVector>
 #include <QWidget>
 
 #include <functional>
@@ -53,6 +54,9 @@ public:
     void setMode2D(const SceneTreeTopology2D& topology, MetaProvider2D metaProvider, ChildrenProvider2D childrenProvider);
     /// 设置为 3D 模式
     void setMode3D(const SceneTreeModel3D& model);
+
+    /// 增量追加顶层行（仅 2D 模式；用于可安全增量表达的纯新增，不做整树 reset）
+    void appendTopLevelRows(const QVector<SceneTreeRow2D>& rows);
 
     /// 仅更新选中高亮（不重建拓扑）
     void setSelectedIds(const QSet<QString>& ids);

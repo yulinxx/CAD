@@ -32,7 +32,7 @@ CADApplicationRuntime::CADApplicationRuntime(std::unique_ptr<QApplication> app, 
     // 设置当前工作目录到应用根目录
     if (!m_appPaths.appRootPath.empty())
     {
-        QDir::setCurrent(QString::fromStdWString(m_appPaths.appRootPath));
+        QDir::setCurrent(QString::fromStdWString(m_appPaths.appRootPath.wstring()));
     }
 }
 
@@ -81,7 +81,7 @@ int CADApplicationRuntime::run()
     {
         LicenseConfig config{};
         License_ConfigInit(&config);
-        const QString configDir = QString::fromStdWString(m_appPaths.configDir);
+        const QString configDir = QString::fromStdWString(m_appPaths.configDir.wstring());
         const QByteArray configDirUtf8 = configDir.toUtf8();
         config.configDir = configDirUtf8.constData();
 

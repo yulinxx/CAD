@@ -83,6 +83,50 @@ public:
         endResetModel();
     }
 
+    /// 增量追加顶层行（仅用于可安全增量表达的纯新增：无群组拓扑变化、无删除）。
+    /// 本模型最终行序由拓扑构建顺序决定（排序在本模型下无实际效果），新行追加在
+    /// 末尾与全量重建的展示顺序一致；视图的展开/滚动状态因此得以保留。
+    void appendTopLevelRows(const QVector<SceneTreeRow2D>& rows)
+    {
+        if (rows.isEmpty())
+        {
+            return;
+        }
+        // 去重：忽略已在上层、或已是某已展开群组成员的行
+        QVector<SceneTreeRow2D> fresh;
+        fresh.reserve(rows.size());
+        for (const auto& r : rows)
+        {
+            if (m_topLevelRowById.contains(r.id))
+            {
+                continue;
+            }
+            if (m_childParent.contains(r.id))
+            {
+                continue;
+            }
+            fresh.push_back(r);
+        }
+        if (fresh.isEmpty())
+        {
+            return;
+        }
+
+        const int first = m_topLevel.size();
+        const int last = first + fresh.size() - 1;
+        beginInsertRows(QModelIndex(), first, last);
+        for (const auto& r : fresh)
+        {
+            m_topLevelRowById[r.id] = m_topLevel.size();
+            m_topLevel.push_back(r);
+            if (r.isGroup)
+            {
+                m_isGroup.insert(r.id);
+            }
+        }
+        endInsertRows();
+    }
+
     QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override
     {
         // 首先检查 row 是否有效
@@ -693,6 +737,18 @@ void SceneTreePanel::setMode2D(
     static_cast<SceneTreeTableModel2D*>(m_model)->setRenameCallback([this](qint64 id, const QString& newName) {
         emit renameRequested(QString::number(id), newName);
     });
+}
+
+void SceneTreePanel::appendTopLevelRows(const QVector<SceneTreeRow2D>& rows)
+{
+    if (m_mode != Mode::Mode2D || rows.isEmpty())
+    {
+        return;
+    }
+    if (auto* model2d = dynamic_cast<SceneTreeTableModel2D*>(m_model))
+    {
+        model2d->appendTopLevelRows(rows);
+    }
 }
 
 void SceneTreePanel::setMode3D(const SceneTreeModel3D& model)

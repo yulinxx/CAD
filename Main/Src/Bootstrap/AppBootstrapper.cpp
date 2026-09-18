@@ -114,7 +114,7 @@ bool AppBootstrapper::initialize()
     // 也刻意不因失败而返回 false —— 没有机器同样要能画图、改工艺参数。
     {
         QString hardwareWarning;
-        const QString configDir = QString::fromStdWString(m_paths.configDir);
+        const QString configDir = QString::fromStdWString(m_paths.configDir.wstring());
         if (m_compositionRoot->startHardware(configDir, hardwareWarning))
         {
             if (!hardwareWarning.isEmpty())
