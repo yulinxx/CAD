@@ -193,7 +193,7 @@ public:
         Render::RT::rxDrawListClear(m_runtime, static_cast<Render::RT::DrawListHandle>(list.value));
     }
 
-    BufferHandle uploadGeometry(const void* vertices, uint64_t sizeBytes, bool persistent) override {
+    BufferHandle uploadGeometry([[maybe_unused]] const void* vertices, [[maybe_unused]] uint64_t sizeBytes, [[maybe_unused]] bool persistent) override {
         // 使用 RenderBridge::PersistentGeometryStore 或其他机制
         // 简化版：创建缓冲并上传
         auto buffer = static_cast<RenderXDeviceAdapter*>(nullptr);
