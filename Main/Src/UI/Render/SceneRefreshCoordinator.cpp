@@ -122,6 +122,30 @@ void SceneRefreshCoordinator::setSceneManager(Eg::SceneManager* sm)
     }
 }
 
+std::unordered_set<uint64_t> SceneRefreshCoordinator::takePendingDirtyIds()
+{
+    std::unordered_set<uint64_t> result;
+    result.reserve(m_pendingDirtyIds.size());
+    for (auto id : m_pendingDirtyIds)
+    {
+        result.insert(static_cast<uint64_t>(id));
+    }
+    m_pendingDirtyIds.clear();
+    return result;
+}
+
+std::unordered_set<uint64_t> SceneRefreshCoordinator::takePendingDeletedIds()
+{
+    std::unordered_set<uint64_t> result;
+    result.reserve(m_pendingDeletedIds.size());
+    for (auto id : m_pendingDeletedIds)
+    {
+        result.insert(static_cast<uint64_t>(id));
+    }
+    m_pendingDeletedIds.clear();
+    return result;
+}
+
 void SceneRefreshCoordinator::stop()
 {
     if (m_sceneUpdateTimer)

@@ -21,6 +21,12 @@
  *
  * 一个字号一批：同字号的所有字形共用一张图集，合成一笔 DrawCommand。
  * 按项各出一笔会让 40 个刻度数字变成 40 次绘制调用。
+ *
+ * ## 类型隔离说明
+ *
+ * 本头文件不 include renderx.h。所有 handle 用 uint64_t 裸值存储，
+ * RenderX 类型（DrawCommand/SessionHandle 等）通过前向声明引入方法签名，
+ * 调用方需自行 include renderx.h（UI 层已这么做）。
  */
 #pragma once
 
@@ -28,10 +34,17 @@
 
 #include "Engine/TextItem.h"
 #include "Render/RenderTypes.h"
-#include "render/renderx.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
+
+// 前向声明：方法签名里用到的 RenderX 类型
+// enum class 不能前向声明（会和 renderx.h 完整定义冲突），
+// 所以 SessionHandle 用 uint64_t 裸值传递
+namespace Render { namespace RT {
+    struct DrawCommand;
+}}
 
 namespace Render
 {
@@ -58,14 +71,13 @@ namespace Render
          * DLL 不做文件 IO，字体数据由宿主自己读（qrc / 磁盘）。这里保留一份
          * 副本，因为每出现一个新字号就要用它建一个新的 FontHandle——图集里
          * 存的是位图而非矢量，换字号必须重新光栅化。
+         *
+         * @param runtime DLL Runtime 句柄裸值，0 视为无效
          */
-        bool initialize(Render::RT::RuntimeHandle runtime, const uint8_t* fontData, size_t bytes);
+        bool initialize(uint64_t runtime, const uint8_t* fontData, size_t bytes);
         void shutdown();
 
-        bool valid() const
-        {
-            return Render::RT::rxValid(m_runtime) && !m_fontData.empty();
-        }
+        bool valid() const;
 
         /// 清空上一帧累积的顶点。保留 FontHandle 与图集（跨帧复用）。
         void beginFrame();
@@ -85,7 +97,7 @@ namespace Render
          * 该图集的命令之前完成，否则本帧新出现的字符会采样到空白。
          */
         void flush(
-            Render::RT::SessionHandle session, uint8_t layer, uint16_t& seq, std::vector<Render::RT::DrawCommand>& out);
+            uint64_t session, uint8_t layer, uint16_t& seq, std::vector<Render::RT::DrawCommand>& out);
 
     private:
         /// P2T2C4：位置（像素）+ UV + RGBA，32 字节
@@ -96,20 +108,20 @@ namespace Render
             float r, g, b, a;
         };
 
-        static_assert(sizeof(GVertex) == Render::RT::rxVertexStride(Render::RT::VertexFormat::P2T2C4),
-            "GVertex 必须与 DLL 的 P2T2C4 步长一致");
+        // GVertex stride 与 DLL 的 P2T2C4 一致（类内才能访问 private）
+        static_assert(sizeof(GVertex) == 32, "GVertex 必须与 DLL 的 P2T2C4 步长一致");
 
         struct Batch
         {
             int pixelHeight = 0;
-            Render::RT::FontHandle font = Render::RT::FontHandle::Invalid;
+            uint64_t fontHandle = 0;  // Render::RT::FontHandle 裸值
             std::vector<GVertex> verts;
         };
 
         /// 取（必要时创建）该像素高度对应的批次；失败返回 nullptr
         Batch* batchFor(int pixelHeight);
 
-        Render::RT::RuntimeHandle m_runtime = Render::RT::RuntimeHandle::Invalid;
+        uint64_t m_runtime = 0;  // Render::RT::RuntimeHandle 裸值，0 = Invalid
         std::vector<uint8_t> m_fontData;
         /// 按字号线性查找：一帧里的字号种类是个位数，哈希表反而更慢也更啰嗦
         std::vector<Batch> m_batches;

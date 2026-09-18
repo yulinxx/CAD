@@ -23,6 +23,7 @@ include("${SANYI_ROOT}/CMake/Utils.cmake")
 sanyi_glob_sources(LIB_SOURCES BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Src"
     DIRS
         "."
+        "RenderXAdapter"
 )
 
 sanyi_glob_headers(LIB_HEADERS BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Include"
@@ -42,33 +43,44 @@ sanyi_add_shared_library(${LIB_NAME}
     HEADERS ${LIB_HEADERS}
     PUBLIC_INCLUDE_DIRS
         "${CMAKE_CURRENT_SOURCE_DIR}/Include"
-        "${SANYI_RENDERX_DIR}/include"
+        "${SANYI_ROOT}/RenderAbstraction/Include"
         "${SANYI_UTILITY_DIR}/Include"
         "${SANYI_LOG_DIR}/Include"
         # 覆盖层与屏幕定尺寸标记几何共用应用层绘制词汇（Render::Vec2f / Color / BBox2d）
         "${SANYI_UI_COMMON_DIR}/Include"
         # RenderTypes.h 里的离散化常量来自 EngineCommon（Eg::tess）
         "${SANYI_ENGINE_COMMON_DIR}/Include"
+    PRIVATE_INCLUDE_DIRS
+        # renderx.h 只在 .cpp 内部可见，不传递给下游（UI2D/UI3D 自己按需配置）
+        "${SANYI_RENDERX_DIR}/include"
     LINK_LIBRARIES
         PUBLIC
             Utility
             Log
+            # 类型隔离：RenderBridge 公共头不再 include renderx.h，但通过
+            # PUBLIC link 转发 RenderX DLL 给下游（UI2D/UI3D 仍直接调 rx* API）。
+            # 渲染层 API 收敛到 RenderBridge 内部是阶段 2 工作。
             RenderX
     QT_COMPONENTS
         Core Gui OpenGLWidgets
 )
 
+# Unity build 会把多个匿名命名空间合并成一个，导致 RenderSessionHost 等文件里的
+# 局部类型名冲突。暂时关闭，后续再单独解决。
+set_target_properties(${LIB_NAME} PROPERTIES UNITY_BUILD OFF)
+
 sanyi_export_imported_target(${LIB_NAME}
     LIB_NAME "${LIB_NAME}"
     PUBLIC_INCLUDE_DIRS
         "${CMAKE_CURRENT_SOURCE_DIR}/Include"
-        "${SANYI_RENDERX_DIR}/include"
+        "${SANYI_ROOT}/RenderAbstraction/Include"
         "${SANYI_UI_COMMON_DIR}/Include"
         "${SANYI_ENGINE_COMMON_DIR}/Include"
     INTERFACE_LINK_LIBRARIES
         Utility::Utility
         Log::Log
-        RenderX::RenderX
+        RenderAbstraction
+        RenderX
 )
 
 message(STATUS "----------------------------------------")
@@ -96,8 +108,10 @@ if(BUILD_RENDERBRIDGE_TESTS AND GTest_FOUND)
         "${SANYI_RENDERX_DIR}/include"
         "${SANYI_LOG_DIR}/Include"
     )
-    # 被测类与头文件里的包装都是 header-only，因此不需要链 RenderBridge 这个 DLL
+    # 被测类的实现已从容头文件移到 RenderBridge 源码里（类型隔离改造），
+    # 因此测试需要链 RenderBridge 这个 DLL，不能再只依赖头文件
     target_link_libraries(RenderBridgeTests PRIVATE
+        RenderBridge
         RenderX
         Log
         GTest::gtest

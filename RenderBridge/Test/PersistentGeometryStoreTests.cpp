@@ -21,6 +21,9 @@
 
 #include "RenderBridge/PersistentGeometryStore.h"
 
+// 被测类头文件已不再 include renderx.h（类型隔离），这里显式引入 RenderX ABI
+#include "render/renderx.h"
+
 #include <cstdint>
 #include <vector>
 
@@ -76,6 +79,12 @@ namespace
             return m_store.writeBlock(blockId, 0, static_cast<uint32_t>(kBlockBytes), payload.data());
         }
 
+        /// 几何仓的 initialize 收 uint64_t 裸值（RenderBridge 头已隔离 RenderX 类型）
+        uint64_t runtimeRaw() const
+        {
+            return static_cast<uint64_t>(m_runtime);
+        }
+
         Render::RT::RuntimeHandle m_runtime{ Render::RT::RuntimeHandle::Invalid };
         RenderBridge::PersistentGeometryStore m_store;
     };
@@ -83,12 +92,13 @@ namespace
     /// 未达单仓上限时只有主仓：分片表保持为空，路径与改造前一致
     TEST_F(PersistentGeometryStoreTest, StaysOnSingleStoreWhileUnderLimit)
     {
-        ASSERT_TRUE(m_store.initialize(m_runtime, tinyConfig()));
+        ASSERT_TRUE(m_store.initialize(runtimeRaw(), tinyConfig()));
         EXPECT_EQ(m_store.storeCount(), 1u);
 
-        Render::RT::GeometryBlock block{};
+        RenderBridge::GeometryBlock block{};
         ASSERT_TRUE(m_store.allocBlock(kBlockBytes, block));
-        EXPECT_TRUE(Render::RT::rxValid(block.buffer));
+        // buffer 是裸值句柄：0 表示无效
+        EXPECT_NE(block.buffer, 0u);
         EXPECT_EQ(m_store.storeCount(), 1u) << "一块都还没超上限，不该分片";
         EXPECT_TRUE(writePattern(block.id, 0x11));
     }
@@ -96,20 +106,20 @@ namespace
     /// 主仓达到单仓上限后自动开新仓，且**两块都仍可读写**（块路由正确）
     TEST_F(PersistentGeometryStoreTest, ShardsIntoSecondStoreWhenPrimaryHitsLimit)
     {
-        ASSERT_TRUE(m_store.initialize(m_runtime, tinyConfig()));
+        ASSERT_TRUE(m_store.initialize(runtimeRaw(), tinyConfig()));
 
-        std::vector<Render::RT::GeometryBlock> blocks;
+        std::vector<RenderBridge::GeometryBlock> blocks;
         // 一直分配到发生分片为止；上限 1024 次是防呆，正常在 20 次内
         for (int i = 0; i < 1024 && m_store.storeCount() == 1; ++i)
         {
-            Render::RT::GeometryBlock block{};
+            RenderBridge::GeometryBlock block{};
             ASSERT_TRUE(m_store.allocBlock(kBlockBytes, block)) << "第 " << i << " 块分配失败";
             blocks.push_back(block);
         }
 
         ASSERT_EQ(m_store.storeCount(), 2u) << "主仓 4KB 上限用尽后必须开第二个仓，否则总容量卡在单仓上限";
 
-        Render::RT::GeometryBlock sharded{};
+        RenderBridge::GeometryBlock sharded{};
         ASSERT_TRUE(m_store.allocBlock(kBlockBytes, sharded));
         blocks.push_back(sharded);
 
@@ -122,7 +132,7 @@ namespace
 
         // 落进第二仓的块，其 buffer 必须与主仓的块不同 —— 证明它真的换了 buffer
         bool sawDistinctBuffer = false;
-        for (const Render::RT::GeometryBlock& block : blocks)
+        for (const RenderBridge::GeometryBlock& block : blocks)
         {
             if (block.buffer != blocks.front().buffer)
             {
@@ -135,18 +145,18 @@ namespace
     /// 释放跨仓的块后，统计里的已用量必须正确回落（释放也要路由到正确的仓）
     TEST_F(PersistentGeometryStoreTest, FreeRoutesToOwningStoreAcrossShards)
     {
-        ASSERT_TRUE(m_store.initialize(m_runtime, tinyConfig()));
+        ASSERT_TRUE(m_store.initialize(runtimeRaw(), tinyConfig()));
 
-        std::vector<Render::RT::GeometryBlock> blocks;
+        std::vector<RenderBridge::GeometryBlock> blocks;
         for (int i = 0; i < 1024 && m_store.storeCount() == 1; ++i)
         {
-            Render::RT::GeometryBlock block{};
+            RenderBridge::GeometryBlock block{};
             ASSERT_TRUE(m_store.allocBlock(kBlockBytes, block));
             blocks.push_back(block);
         }
         ASSERT_EQ(m_store.storeCount(), 2u);
 
-        Render::RT::GeometryBlock sharded{};
+        RenderBridge::GeometryBlock sharded{};
         ASSERT_TRUE(m_store.allocBlock(kBlockBytes, sharded));
         blocks.push_back(sharded);
 
@@ -162,16 +172,16 @@ namespace
     /// 统计是各仓之和：分片后总容量必须超过单仓上限
     TEST_F(PersistentGeometryStoreTest, TotalStatsAggregatesAllStores)
     {
-        ASSERT_TRUE(m_store.initialize(m_runtime, tinyConfig()));
+        ASSERT_TRUE(m_store.initialize(runtimeRaw(), tinyConfig()));
 
         for (int i = 0; i < 1024 && m_store.storeCount() == 1; ++i)
         {
-            Render::RT::GeometryBlock block{};
+            RenderBridge::GeometryBlock block{};
             ASSERT_TRUE(m_store.allocBlock(kBlockBytes, block));
         }
         ASSERT_EQ(m_store.storeCount(), 2u);
 
-        const Render::RT::GeometryStoreStats stats = m_store.totalStats();
+        const RenderBridge::GeometryStoreStats stats = m_store.totalStats();
         EXPECT_GT(stats.capacityBytes, kTinyStoreMax)
             << "分片之后总容量必须大于单仓上限，否则「4GB 天花板」并没有被突破";
     }
@@ -179,12 +189,12 @@ namespace
     /// 仓数上限生效：到顶后分配必须明确失败，而不是无限开仓把内存耗光
     TEST_F(PersistentGeometryStoreTest, StopsAtMaxStoresInsteadOfGrowingForever)
     {
-        ASSERT_TRUE(m_store.initialize(m_runtime, tinyConfig(/*maxStores=*/2)));
+        ASSERT_TRUE(m_store.initialize(runtimeRaw(), tinyConfig(/*maxStores=*/2)));
 
         int allocated = 0;
         for (int i = 0; i < 4096; ++i)
         {
-            Render::RT::GeometryBlock block{};
+            RenderBridge::GeometryBlock block{};
             if (!m_store.allocBlock(kBlockBytes, block))
             {
                 break;
@@ -195,18 +205,18 @@ namespace
         EXPECT_EQ(m_store.storeCount(), 2u) << "不得突破 maxStores";
         EXPECT_GT(allocated, 0) << "至少应该能分配出两块仓的容量";
         // 到顶之后仍必须明确失败（而不是返回一个不可用的块）
-        Render::RT::GeometryBlock overflow{};
+        RenderBridge::GeometryBlock overflow{};
         EXPECT_FALSE(m_store.allocBlock(kBlockBytes, overflow));
     }
 
     /// shutdown 必须销毁全部仓（含分片出来的），且幂等
     TEST_F(PersistentGeometryStoreTest, ShutdownReleasesEveryStore)
     {
-        ASSERT_TRUE(m_store.initialize(m_runtime, tinyConfig()));
+        ASSERT_TRUE(m_store.initialize(runtimeRaw(), tinyConfig()));
 
         for (int i = 0; i < 1024 && m_store.storeCount() == 1; ++i)
         {
-            Render::RT::GeometryBlock block{};
+            RenderBridge::GeometryBlock block{};
             ASSERT_TRUE(m_store.allocBlock(kBlockBytes, block));
         }
         ASSERT_EQ(m_store.storeCount(), 2u);

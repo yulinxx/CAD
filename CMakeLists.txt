@@ -187,6 +187,9 @@ add_subdirectory(Engine/Persistence)
 include("${SANYI_ROOT}/CMake/UiEngineAccess.cmake")
 sanyi_define_ui_engine_access()
 
+# 4.5 渲染抽象层（业务级类型和接口，零RenderX依赖）
+add_subdirectory(RenderAbstraction)
+
 # 4. Render 层 - 渲染引擎（Renderx C API）
 option(BUILD_RENDERX "Build Renderx rendering engine" ON)
 if(BUILD_RENDERX)

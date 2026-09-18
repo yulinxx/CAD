@@ -1,10 +1,41 @@
 #include "RenderBridge/RenderSessionHost.h"
 
 #include "RenderBridge/HostCallbacks.h"
+
+// renderx.h 只在 .cpp 内部可见，头文件不再直接暴露它
+#include "render/renderx.h"
+
 #include "Log/SyLogger.h"
 
 namespace
 {
+    // ---------- 类型转换辅助 ----------
+    // RenderSessionHost.h 不再依赖 renderx.h，m_runtime/m_surface/m_session 存的是
+    // uint64_t 裸值。这里统一做裸值 ↔ RenderX Handle 的转换。
+
+    inline Render::RT::RuntimeHandle toRuntime(uint64_t v)
+    {
+        return static_cast<Render::RT::RuntimeHandle>(v);
+    }
+    inline Render::RT::SurfaceHandle toSurface(uint64_t v)
+    {
+        return static_cast<Render::RT::SurfaceHandle>(v);
+    }
+    inline Render::RT::SessionHandle toSession(uint64_t v)
+    {
+        return static_cast<Render::RT::SessionHandle>(v);
+    }
+    inline bool isValid(uint64_t v)
+    {
+        return Render::RT::rxValid(toRuntime(v)) != 0;
+    }
+
+    /// RA 枚举 → RenderX 枚举
+    inline Render::RT::Backend toBackend(RenderAbstraction::RenderBackend b)
+    {
+        return static_cast<Render::RT::Backend>(b);
+    }
+
     /**
      * @brief 进程级共享的 Metal Runtime
      *
@@ -184,7 +215,8 @@ namespace RenderBridge
         // 复用同一个宿主重建时，先把上一次的运行时收干净
         shutdown();
 
-        const bool metal = config.backend == Render::RT::Backend::Metal;
+        const auto backend = toBackend(config.backend);
+        const bool metal = backend == Render::RT::Backend::Metal;
         if (metal && config.nativeWindow == nullptr)
         {
             // Metal 的交换链必须挂在 NSView 上；没有句柄就无法建 surface，
@@ -196,10 +228,10 @@ namespace RenderBridge
 
         Render::RT::RuntimeDesc rd{};
         rd.abiVersion = RENDERX_ABI_VERSION;
-        rd.backend = config.backend;
+        rd.backend = backend;
         rd.enableValidation = 0;
         rd.transientBufferBytes = config.transientBufferBytes;
-        rd.logCallback = &Render::host::rxLogBridge;
+        rd.logCallback = reinterpret_cast<Render::RT::rxLogCallback>(&Render::host::rxLogBridge);
         rd.logUserData = nullptr;
         rd.applicationName = config.applicationName;
         if (!metal)
@@ -211,15 +243,15 @@ namespace RenderBridge
         // Metal 的 Runtime 在进程内共享，GL 的每视口一套——理由见 SharedMetalRuntime 注释。
         if (metal)
         {
-            m_runtime = SharedMetalRuntime::instance().acquire(rd);
+            m_runtime = static_cast<uint64_t>(SharedMetalRuntime::instance().acquire(rd));
             m_runtimeShared = true;
         }
         else
         {
-            m_runtime = Render::RT::rxRuntimeCreate(&rd);
+            m_runtime = static_cast<uint64_t>(Render::RT::rxRuntimeCreate(&rd));
             m_runtimeShared = false;
         }
-        if (!Render::RT::rxValid(m_runtime))
+        if (!isValid(m_runtime))
         {
             return false;
         }
@@ -244,22 +276,22 @@ namespace RenderBridge
             sd.windowKind = Render::RT::NativeWindowKind::ForeignGlContext;
             sd.handleA = nullptr;
         }
-        m_surface = Render::RT::rxSurfaceCreate(m_runtime, &sd);
-        if (!Render::RT::rxValid(m_surface))
+        m_surface = static_cast<uint64_t>(Render::RT::rxSurfaceCreate(toRuntime(m_runtime), &sd));
+        if (!Render::RT::rxValid(toSurface(m_surface)))
         {
             shutdown();
             return false;
         }
 
         Render::RT::SessionDesc ses{};
-        ses.runtime = m_runtime;
-        ses.surface = m_surface;
+        ses.runtime = toRuntime(m_runtime);
+        ses.surface = toSurface(m_surface);
         for (int i = 0; i < 4; ++i)
         {
             ses.clearColor[i] = config.clearColor[i];
         }
-        m_session = Render::RT::rxSessionCreate(&ses);
-        if (!Render::RT::rxValid(m_session))
+        m_session = static_cast<uint64_t>(Render::RT::rxSessionCreate(&ses));
+        if (!Render::RT::rxValid(toSession(m_session)))
         {
             shutdown();
             return false;
@@ -270,17 +302,17 @@ namespace RenderBridge
     void RenderSessionHost::shutdown()
     {
         // 逆序：会话持有表面与运行时内部对象，表面持有交换链
-        if (Render::RT::rxValid(m_session))
+        if (Render::RT::rxValid(toSession(m_session)))
         {
-            Render::RT::rxSessionDestroy(m_session);
-            m_session = Render::RT::SessionHandle::Invalid;
+            Render::RT::rxSessionDestroy(toSession(m_session));
+            m_session = 0;
         }
-        if (Render::RT::rxValid(m_surface))
+        if (Render::RT::rxValid(toSurface(m_surface)))
         {
-            Render::RT::rxSurfaceDestroy(m_runtime, m_surface);
-            m_surface = Render::RT::SurfaceHandle::Invalid;
+            Render::RT::rxSurfaceDestroy(toRuntime(m_runtime), toSurface(m_surface));
+            m_surface = 0;
         }
-        if (Render::RT::rxValid(m_runtime))
+        if (isValid(m_runtime))
         {
             if (m_runtimeShared)
             {
@@ -291,9 +323,9 @@ namespace RenderBridge
             }
             else
             {
-                Render::RT::rxRuntimeDestroy(m_runtime);
+                Render::RT::rxRuntimeDestroy(toRuntime(m_runtime));
             }
-            m_runtime = Render::RT::RuntimeHandle::Invalid;
+            m_runtime = 0;
         }
         m_runtimeShared = false;
     }
@@ -305,13 +337,13 @@ namespace RenderBridge
 
     bool RenderSessionHost::isReady() const
     {
-        return Render::RT::rxValid(m_runtime) && Render::RT::rxValid(m_surface) && Render::RT::rxValid(m_session);
+        return isValid(m_runtime) && Render::RT::rxValid(toSurface(m_surface)) && Render::RT::rxValid(toSession(m_session));
     }
 
     void RenderSessionHost::logCapabilities(const char* tag) const
     {
         Render::RT::Capabilities caps{};
-        if (Render::RT::rxRuntimeGetCapabilities(m_runtime, &caps) != Render::RT::RxResult::Ok)
+        if (Render::RT::rxRuntimeGetCapabilities(toRuntime(m_runtime), &caps) != Render::RT::RxResult::Ok)
         {
             return;
         }

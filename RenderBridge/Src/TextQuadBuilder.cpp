@@ -14,6 +14,8 @@
  */
 #include "RenderBridge/TextQuadBuilder.h"
 
+#include "render/renderx.h"
+
 #include "Log/SyLogger.h"
 #include "RenderBridge/TextLayoutUtf8.h"
 
@@ -27,6 +29,10 @@ namespace Render
         /// 字形图集边长。标尺数字 + 常见标注远小于此，一张够用。
         constexpr uint32_t kAtlasSide = 1024;
 
+        // GVertex stride 断言在类内部（private static_assert），
+        // 匿名命名空间无法访问 private 成员
+
+
         /// 世界坐标 → 物理像素。view 是列主序的世界→NDC 矩阵（Ut::Mat3f）
         void worldToPixel(
             const Render::Mat3f& view, float wx, float wy, uint32_t vpWidth, uint32_t vpHeight, float& outX, float& outY)
@@ -38,6 +44,16 @@ namespace Render
             // 屏幕空间 y 向下，NDC y 向上，故取反
             outY = (0.5f - ndcY * 0.5f) * static_cast<float>(vpHeight);
         }
+
+        // uint64_t → RenderX handle 转换辅助
+        inline Render::RT::RuntimeHandle toRuntime(uint64_t v)
+        {
+            return static_cast<Render::RT::RuntimeHandle>(v);
+        }
+        inline Render::RT::FontHandle toFont(uint64_t v)
+        {
+            return static_cast<Render::RT::FontHandle>(v);
+        }
     }  // namespace
 
     TextQuadBuilder::~TextQuadBuilder()
@@ -45,10 +61,10 @@ namespace Render
         shutdown();
     }
 
-    bool TextQuadBuilder::initialize(Render::RT::RuntimeHandle runtime, const uint8_t* fontData, size_t bytes)
+    bool TextQuadBuilder::initialize(uint64_t runtime, const uint8_t* fontData, size_t bytes)
     {
         shutdown();
-        if (!Render::RT::rxValid(runtime) || !fontData || bytes == 0)
+        if (!Render::RT::rxValid(toRuntime(runtime)) || !fontData || bytes == 0)
         {
             return false;
         }
@@ -57,18 +73,23 @@ namespace Render
         return true;
     }
 
+    bool TextQuadBuilder::valid() const
+    {
+        return Render::RT::rxValid(toRuntime(m_runtime)) != 0 && !m_fontData.empty();
+    }
+
     void TextQuadBuilder::shutdown()
     {
         for (Batch& batch : m_batches)
         {
-            if (Render::RT::rxValid(batch.font))
+            if (batch.fontHandle != 0)
             {
-                Render::RT::rxFontDestroy(m_runtime, batch.font);
+                Render::RT::rxFontDestroy(toRuntime(m_runtime), toFont(batch.fontHandle));
             }
         }
         m_batches.clear();
         m_fontData.clear();
-        m_runtime = Render::RT::RuntimeHandle::Invalid;
+        m_runtime = 0;
         m_warnedFontFailure = false;
     }
 
@@ -87,7 +108,7 @@ namespace Render
         {
             if (batch.pixelHeight == pixelHeight)
             {
-                return Render::RT::rxValid(batch.font) ? &batch : nullptr;
+                return batch.fontHandle != 0 ? &batch : nullptr;
             }
         }
 
@@ -99,7 +120,7 @@ namespace Render
         desc.atlasHeight = kAtlasSide;
 
         Render::RT::FontHandle font = Render::RT::FontHandle::Invalid;
-        const Render::RT::RxResult result = Render::RT::rxFontCreate(m_runtime, &desc, &font);
+        const Render::RT::RxResult result = Render::RT::rxFontCreate(toRuntime(m_runtime), &desc, &font);
         if (result != Render::RT::RxResult::Ok || !Render::RT::rxValid(font))
         {
             if (!m_warnedFontFailure)
@@ -111,11 +132,11 @@ namespace Render
                     static_cast<int>(result));
             }
             // 仍然登记这一项：否则每帧每条文本都会重试一次创建。
-            m_batches.push_back(Batch{ pixelHeight, Render::RT::FontHandle::Invalid, {} });
+            m_batches.push_back(Batch{ pixelHeight, 0, {} });
             return nullptr;
         }
 
-        m_batches.push_back(Batch{ pixelHeight, font, {} });
+        m_batches.push_back(Batch{ pixelHeight, static_cast<uint64_t>(font), {} });
         return &m_batches.back();
     }
 
@@ -134,7 +155,7 @@ namespace Render
         }
 
         Render::RT::FontMetrics metrics{};
-        if (Render::RT::rxFontMetrics(m_runtime, batch->font, &metrics) != Render::RT::RxResult::Ok)
+        if (Render::RT::rxFontMetrics(toRuntime(m_runtime), toFont(batch->fontHandle), &metrics) != Render::RT::RxResult::Ok)
         {
             return;
         }
@@ -148,7 +169,7 @@ namespace Render
             uint32_t codepoint = 0;
             i += decodeUtf8(item.text + i, textLength - i, codepoint);
             Render::RT::GlyphInfo glyph{};
-            if (Render::RT::rxFontGlyph(m_runtime, batch->font, codepoint, &glyph) != Render::RT::RxResult::Ok)
+            if (Render::RT::rxFontGlyph(toRuntime(m_runtime), toFont(batch->fontHandle), codepoint, &glyph) != Render::RT::RxResult::Ok)
             {
                 continue;
             }
@@ -215,7 +236,7 @@ namespace Render
             i += decodeUtf8(item.text + i, textLength - i, codepoint);
 
             Render::RT::GlyphInfo glyph{};
-            if (Render::RT::rxFontGlyph(m_runtime, batch->font, codepoint, &glyph) != Render::RT::RxResult::Ok)
+            if (Render::RT::rxFontGlyph(toRuntime(m_runtime), toFont(batch->fontHandle), codepoint, &glyph) != Render::RT::RxResult::Ok)
             {
                 continue;
             }
@@ -246,29 +267,30 @@ namespace Render
     }
 
     void TextQuadBuilder::flush(
-        Render::RT::SessionHandle session, uint8_t layer, uint16_t& seq, std::vector<Render::RT::DrawCommand>& out)
+        uint64_t session, uint8_t layer, uint16_t& seq, std::vector<Render::RT::DrawCommand>& out)
     {
-        if (!valid() || !Render::RT::rxValid(session))
+        if (!valid() || session == 0)
         {
             return;
         }
 
         const uint16_t glyphPipeline =
-            Render::RT::rxPipelineGetDefault(m_runtime, Render::RT::DefaultPipeline::ScreenGlyph);
+            Render::RT::rxPipelineGetDefault(toRuntime(m_runtime), Render::RT::DefaultPipeline::ScreenGlyph);
 
         for (Batch& batch : m_batches)
         {
-            if (batch.verts.empty() || !Render::RT::rxValid(batch.font))
+            if (batch.verts.empty() || batch.fontHandle == 0)
             {
                 continue;
             }
 
             // 本帧新出现的字形还只在 CPU 影子里，必须先上传，否则采样到空白。
-            Render::RT::rxFontFlushAtlas(m_runtime, batch.font);
+            Render::RT::rxFontFlushAtlas(toRuntime(m_runtime), toFont(batch.fontHandle));
 
             const uint64_t bytes = static_cast<uint64_t>(batch.verts.size()) * sizeof(GVertex);
             Render::RT::TransientAlloc alloc{};
-            Render::RT::rxSessionAllocTransient(session, bytes, &alloc);
+            Render::RT::rxSessionAllocTransient(
+                static_cast<Render::RT::SessionHandle>(session), bytes, &alloc);
             // 环容量不足时 DLL 返回无效句柄；丢弃本批而不是画出错误几何。
             if (!Render::RT::rxValid(alloc.buffer) || !alloc.cpuPtr)
             {
@@ -286,7 +308,7 @@ namespace Render
             cmd.space = Render::RT::RenderSpace::Screen;
             cmd.vertexFormat = Render::RT::VertexFormat::P2T2C4;
             cmd.indexType = Render::RT::IndexType::None;
-            cmd.texture = Render::RT::rxFontAtlas(m_runtime, batch.font);
+            cmd.texture = Render::RT::rxFontAtlas(toRuntime(m_runtime), toFont(batch.fontHandle));
             // 必须显式指定管线：字形与位图同为 P2T2C4 + Screen + Triangles，
             // 让 Runtime 自行解析会命中 ScreenTextured，把 R8 覆盖率当 RGBA 采样，
             // 结果是纯红色的字（g/b 通道恒为 0）。

@@ -38,16 +38,26 @@
  * 因此离散化时必须知道本帧的 `pixelToWorld` 与 `devicePixelRatio`。
  * 这两个值由视口在提交前通过 `setFrameParams` 注入，不由层自己持有 ——
  * 否则每层都要跟着窗口缩放改一遍。
+ *
+ * ## 类型隔离说明
+ *
+ * 本头文件不 include renderx.h，Render::RT 类型通过前向声明引入。
+ * 调用方需自行 include renderx.h（UI 层已这么做）。
  */
 
 #include "RenderBridge/RenderBridgeAPI.h"
 
 #include "Render/RenderTypes.h"
-#include "render/renderx.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+
+// enum class 不能前向声明（会和 renderx.h 完整定义冲突），
+// 所以 SessionHandle 用 uint64_t 裸值传递
+namespace Render { namespace RT {
+    struct DrawCommand;
+}}
 
 namespace RenderBridge
 {
@@ -217,7 +227,7 @@ namespace RenderBridge
          * 环容量不足时丢弃该批（DLL 返回无效句柄），宁可这一帧少画一笔，
          * 也不画出错位几何。
          */
-        void submit(Render::RT::SessionHandle session, std::vector<Render::RT::DrawCommand>& out) const;
+        void submit(uint64_t session, std::vector<Render::RT::DrawCommand>& out) const;
 
     private:
         struct SelectionBoxLayer

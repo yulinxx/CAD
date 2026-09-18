@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file OverlayScene.cpp
  * @brief OverlayScene 实现（设计说明见头文件）
  *
@@ -8,6 +8,9 @@
  * 现在是各自独立的层。
  */
 #include "RenderBridge/OverlayScene.h"
+
+// renderx.h 在 .cpp 内部引入，头文件不再依赖它
+#include "render/renderx.h"
 
 #include "RenderBridge/PinnedMarkerGeometry.h"
 #include "RenderBridge/ScreenConstantMetrics.h"
@@ -668,12 +671,13 @@ namespace RenderBridge
 
     // ==================== 提交 ====================
 
-    void OverlayScene::submit(RT::SessionHandle session, std::vector<RT::DrawCommand>& out) const
+    void OverlayScene::submit(uint64_t session, std::vector<RT::DrawCommand>& out) const
     {
-        if (!RT::rxValid(session))
+        if (session == 0)
         {
             return;
         }
+        const auto sess = static_cast<RT::SessionHandle>(session);
         // 序号沿枚举顺序递增：提交顺序即叠放顺序，不再依赖调用顺序
         uint16_t seq = 0;
 
@@ -682,7 +686,7 @@ namespace RenderBridge
         {
             std::vector<OVertex> v;
             rectLineList(v, m_selectionBox.box, m_selectionBox.border);
-            emitWorld(session, out, v, RT::PrimitiveTopology::Lines, seq);
+            emitWorld(sess, out, v, RT::PrimitiveTopology::Lines, seq);
         }
 
         // 文字选区高亮：N 块四边形，填充与边框各一批。
@@ -698,7 +702,7 @@ namespace RenderBridge
                 {
                     filledQuad(v, &m_highlight.quadCorners[q * 4], m_highlight.fill);
                 }
-                emitWorld(session, out, v, RT::PrimitiveTopology::Triangles, seq);
+                emitWorld(sess, out, v, RT::PrimitiveTopology::Triangles, seq);
             }
             if (m_highlight.border.a() > 1e-4f)
             {
@@ -715,7 +719,7 @@ namespace RenderBridge
                         v.push_back(vtx(b.x(), b.y(), 0, m_highlight.border));
                     }
                 }
-                emitWorld(session, out, v, RT::PrimitiveTopology::Lines, seq);
+                emitWorld(sess, out, v, RT::PrimitiveTopology::Lines, seq);
             }
         }
 
@@ -726,11 +730,11 @@ namespace RenderBridge
             {
                 std::vector<OVertex> v;
                 filledRect(v, m_selectionRect.rect, m_selectionRect.fill);
-                emitWorld(session, out, v, RT::PrimitiveTopology::Triangles, seq);
+                emitWorld(sess, out, v, RT::PrimitiveTopology::Triangles, seq);
             }
             std::vector<OVertex> v;
             rectLineList(v, m_selectionRect.rect, m_selectionRect.border);
-            emitWorld(session, out, v, RT::PrimitiveTopology::Lines, seq);
+            emitWorld(sess, out, v, RT::PrimitiveTopology::Lines, seq);
         }
 
         // 流水虚线轮廓：整个选中集合成**一条**命令（颜色是逐顶点的，路径间不必分批）
@@ -758,12 +762,12 @@ namespace RenderBridge
                 for (const auto& s : segs)
                     v.push_back(vtx(s.x(), s.y(), 0, path.color));
             }
-            emitWorld(session, out, v, RT::PrimitiveTopology::Lines, seq);
+            emitWorld(sess, out, v, RT::PrimitiveTopology::Lines, seq);
         }
 
         // 屏幕定尺寸方块标记：手柄与点标记各一层，各出填充 + 边框两笔
-        emitPinnedMarkerGroup(session, out, m_selectionHandles.group, seq);
-        emitPinnedMarkerGroup(session, out, m_pointMarkers.group, seq);
+        emitPinnedMarkerGroup(sess, out, m_selectionHandles.group, seq);
+        emitPinnedMarkerGroup(sess, out, m_pointMarkers.group, seq);
 
         // 捕捉指示器：只画彩色形状。捕捉命中时鼠标指针会被隐藏（见视图层），
         // 标记无需再加圆盘底。尺寸以逻辑像素声明，乘 DPR 换算成物理像素
@@ -772,7 +776,7 @@ namespace RenderBridge
             std::vector<PVertex> v;
             const float dpr = m_devicePixelRatio > 0.0f ? m_devicePixelRatio : 1.0f;
             emitSnapMarker(v, m_snap.worldPos, m_snap.shape, m_snap.color, dpr);
-            emitPinned(session, out, v, RT::PrimitiveTopology::Lines, seq);
+            emitPinned(sess, out, v, RT::PrimitiveTopology::Lines, seq);
         }
 
         // 预览折线：LineStrip 语义展开为相邻点对，以便与其它线合并成一批
@@ -785,7 +789,7 @@ namespace RenderBridge
                 v.push_back(
                     vtx(m_toolPreview.points[i + 1].x(), m_toolPreview.points[i + 1].y(), 0, m_toolPreview.color));
             }
-            emitWorld(session, out, v, RT::PrimitiveTopology::Lines, seq);
+            emitWorld(sess, out, v, RT::PrimitiveTopology::Lines, seq);
         }
 
         // 辅助线：调用方已按 LineList 语义成对排好
@@ -797,7 +801,7 @@ namespace RenderBridge
             {
                 v.push_back(vtx(p.x(), p.y(), 0, m_controlLines.color));
             }
-            emitWorld(session, out, v, RT::PrimitiveTopology::Lines, seq);
+            emitWorld(sess, out, v, RT::PrimitiveTopology::Lines, seq);
         }
     }
 }  // namespace RenderBridge

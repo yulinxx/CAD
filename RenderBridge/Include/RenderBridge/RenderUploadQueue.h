@@ -24,9 +24,13 @@
  *
  * 明确不做的事：不在这里维护线程、不持有 GL 上下文、不自己建几何仓、不认槽号。
  * 那些属于调用方（builder 持有仓与台账），塞进来就又是一个假抽象。
+ *
+ * ## 类型说明
+ *
+ * 所有渲染相关类型统一来自 RenderAbstraction（零 RenderX 依赖）。
  */
 
-#include "render/renderx.h"
+#include "RenderAbstraction/IRenderTypes.h"
 
 #include <cstdint>
 #include <mutex>
@@ -57,14 +61,14 @@ namespace RenderBridge
     {
         /// 交织顶点字节流，按 `format` 解释
         std::vector<uint8_t> bytes;
-        Render::RT::PrimitiveTopology topology = Render::RT::PrimitiveTopology::Lines;
-        Render::RT::VertexFormat format = Render::RT::VertexFormat::P3C3;
+        RenderAbstraction::PrimitiveType topology = RenderAbstraction::PrimitiveType::Lines;
+        RenderAbstraction::VertexFormat format = RenderAbstraction::VertexFormat::PositionColor;
         uint32_t vertexCount = 0;
         /// 2D 世界矩形 AABB（x/y 有效）
         float aabb2D[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
         uint8_t aabb2DValid = 0;
         /// 3D 世界空间 AABB，配六平面视锥剔除
-        Render::RT::RxAabb3 bounds3D{};
+        RenderAbstraction::Aabb3 bounds3D{};
         uint8_t bounds3DValid = 0;
     };
 

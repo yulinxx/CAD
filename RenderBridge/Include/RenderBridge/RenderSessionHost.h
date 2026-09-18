@@ -49,11 +49,16 @@
  *
  * **代价**：瞬态环常驻整个应用会话（环总量 = transientBufferBytes × 2），
  * 换来的是工作台切换不重建设备与内建管线。
+ *
+ * ## 类型隔离说明
+ *
+ * 本文件头不再 include renderx.h，所有渲染相关类型统一来自
+ * RenderAbstraction/IRenderTypes.h。handle 用 uint64_t 裸值传递，
+ * renderx.h 的 include 只保留在 RenderSessionHost.cpp 内部。
  */
 
 #include "RenderBridge/RenderBridgeAPI.h"
-
-#include "render/renderx.h"
+#include "RenderAbstraction/IRenderTypes.h"
 
 #include <cstdint>
 
@@ -107,7 +112,7 @@ namespace RenderBridge
             uint64_t transientBufferBytes = 64ull * 1024 * 1024;
             float clearColor[4]{ 0.94f, 0.94f, 0.94f, 1.0f };
             /// 渲染后端。默认 OpenGL，保持既有调用方零改动。
-            Render::RT::Backend backend = Render::RT::Backend::OpenGL;
+            RenderAbstraction::RenderBackend backend = RenderAbstraction::RenderBackend::OpenGL;
             /**
              * 原生窗口句柄。
              *
@@ -142,20 +147,13 @@ namespace RenderBridge
 
         bool isReady() const;
 
-        Render::RT::RuntimeHandle runtime() const
-        {
-            return m_runtime;
-        }
+        // ---------- 句柄访问 ----------
+        // 返回 uint64_t 裸值，调用方 static_cast 为目标 Handle 类型。
+        // 这样头文件不再依赖 renderx.h，同时保持调用方可用。
 
-        Render::RT::SessionHandle session() const
-        {
-            return m_session;
-        }
-
-        Render::RT::SurfaceHandle surface() const
-        {
-            return m_surface;
-        }
+        uint64_t runtimeValue() const { return m_runtime; }
+        uint64_t sessionValue() const { return m_session; }
+        uint64_t surfaceValue() const { return m_surface; }
 
         /// 把后端能力打一条日志；tag 是调用方前缀（两个视口前缀不同）
         void logCapabilities(const char* tag) const;
@@ -177,9 +175,12 @@ namespace RenderBridge
         static void shutdownSharedRuntime();
 
     private:
-        Render::RT::RuntimeHandle m_runtime{ Render::RT::RuntimeHandle::Invalid };
-        Render::RT::SurfaceHandle m_surface{ Render::RT::SurfaceHandle::Invalid };
-        Render::RT::SessionHandle m_session{ Render::RT::SessionHandle::Invalid };
+        /// 无效句柄哨兵，与 renderx.h 的 enum class : uint64_t Invalid 值一致
+        static constexpr uint64_t kInvalidHandle = 0;
+
+        uint64_t m_runtime{ kInvalidHandle };
+        uint64_t m_surface{ kInvalidHandle };
+        uint64_t m_session{ kInvalidHandle };
         /**
          * 本实例的 Runtime 是否来自进程级共享持有者。
          *

@@ -11,11 +11,10 @@
  * `glGetProcAddress` 传进 DLL，取地址点在调用方；放 .cpp 需要调用方
  * 依赖 Log 库的实现细节，代价大于收益。
  *
- * 只有视口（2D/3D）会 include 本文件，它们本来就链接 RenderBridge，
- * 也就间接 PUBLIC 依赖 RenderX。
+ * 日志回调签名使用 RenderAbstraction::LogLevel，不依赖 renderx.h。
  */
 
-#include "render/renderx.h"
+#include "RenderAbstraction/IRenderTypes.h"
 
 #include "Log/SyLogger.h"
 
@@ -26,22 +25,23 @@ namespace Render
     namespace host
     {
         /// 把 DLL 的日志回调桥接到宿主日志库。DLL 自身不依赖任何日志实现。
-        inline void rxLogBridge(Render::RT::LogLevel level, const char* message, void* /*userData*/)
+        /// 参数用 int32_t 兼容任何后端的 LogLevel 枚举值（Debug=0, Info=1, Warn=2, Error=3）
+        inline void rxLogBridge(int32_t level, const char* message, void* /*userData*/)
         {
             if (!message)
             {
                 return;
             }
-            switch (level)
+            switch (static_cast<RenderAbstraction::LogLevel>(level))
             {
-            case Render::RT::LogLevel::Debug:
-            case Render::RT::LogLevel::Info:
+            case RenderAbstraction::LogLevel::Debug:
+            case RenderAbstraction::LogLevel::Info:
                 SY_INFOF("[Renderx] %s", message);
                 break;
-            case Render::RT::LogLevel::Warn:
+            case RenderAbstraction::LogLevel::Warn:
                 SY_WARNF("[Renderx] %s", message);
                 break;
-            case Render::RT::LogLevel::Error:
+            case RenderAbstraction::LogLevel::Error:
                 SY_ERRORF("[Renderx] %s", message);
                 break;
             }

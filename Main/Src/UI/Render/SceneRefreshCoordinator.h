@@ -79,6 +79,8 @@ public:
     void markEntityDeleted(uint64_t entityId) override;
     UI::SceneRefreshLevel pendingLevel() const override;
     void flushPendingRefresh() override;
+    std::unordered_set<uint64_t> takePendingDirtyIds() override;
+    std::unordered_set<uint64_t> takePendingDeletedIds() override;
 
     /// 停止定时器，防止析构过程中访问已释放资源
     void stop() override;
