@@ -6,7 +6,7 @@
     #include <QApplication>
 #endif
 
-#include "FileIO/Internal/BundleResources.h"
+#include "Ut/BundleResources.h"
 
 int runCADApplication(int argc, char** argv);
 
