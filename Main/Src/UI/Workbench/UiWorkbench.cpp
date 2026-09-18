@@ -1349,7 +1349,8 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     });
 
     // 撤销/重做会恢复/移除/重建图元（场景拓扑变化），增量刷新可能遗漏，
-    // 强制全量重建视口，确保回退结果实时可见
+    // 使用 requestLightRefresh() 经调度器节流触发重绘，避免 applyFullRefresh
+    // 的全量几何重建（对 700K 实体场景极昂贵）
     if (m_commands.operationBus)
     {
         QObject::connect(
@@ -1358,7 +1359,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
                 {
                     if (m_viewport)
                     {
-                        m_viewport->requestFullRefresh();
+                        m_viewport->requestLightRefresh();
                     }
                 }
             });
@@ -1768,10 +1769,8 @@ void Workbench2D::toggleEntityVisibility(const QString& id, bool visible)
         entity->setVisible(visible);
         scene->notifySceneChanged();
         // 可见性不进结构签名（不是增删/拓扑变化），且树行要显示新的显隐图标，
-        // 所以这里显式重建一次：这是用户点击行为，频率低，代价可接受。
-        SY_DEBUGF(
-            "[Workbench2D] toggleEntityVisibility: id=%lld visible=%d", static_cast<long long>(*eid), visible ? 1 : 0);
-        refreshSceneTree();
+        // 延迟到下一事件循环重建，避免连续点击导致多次完整重建
+        QTimer::singleShot(0, this, [this]() { refreshSceneTree(); });
     }
 }
 
@@ -1899,10 +1898,8 @@ void Workbench2D::setSceneTreeVisibility(const QStringList& ids, bool visible)
     if (changed)
     {
         scene->notifySceneChanged();
-        // 同上：显隐不进结构签名，批量改完显式重建一次树（含取消选择的联动）
-        SY_DEBUGF(
-            "[Workbench2D] setSceneTreeVisibility: count=%d visible=%d", static_cast<int>(ids.size()), visible ? 1 : 0);
-        refreshSceneTree();
+        // 同上：显隐不进结构签名，延迟到下一事件循环重建一次树（含取消选择的联动）
+        QTimer::singleShot(0, this, [this]() { refreshSceneTree(); });
     }
 }
 
@@ -1930,9 +1927,8 @@ void Workbench2D::setSceneTreeLock(const QStringList& ids, bool locked)
     if (changed)
     {
         scene->notifySceneChanged();
-        // 锁定状态不进结构签名，显式重建一次树以刷新锁定图标
-        SY_DEBUGF("[Workbench2D] setSceneTreeLock: count=%d locked=%d", static_cast<int>(ids.size()), locked ? 1 : 0);
-        refreshSceneTree();
+        // 锁定状态不进结构签名，延迟到下一事件循环重建一次树以刷新锁定图标
+        QTimer::singleShot(0, this, [this]() { refreshSceneTree(); });
     }
 }
 
@@ -2007,8 +2003,9 @@ void Workbench2D::applySelectionContext(const CommandUiSnapshot& snapshot)
     // 新增需要随选择/锁定联动的组件时，在这里加一次推送，组件自身只渲染、不判定；
     // 反过来，这里任何一处再去问场景或问 Hub 缓存，都会把「规则漂移」放回来。
 
-    // 属性面板：重建属性模型并同步锁定态（面板可缺失，内部已探测）
-    refreshPropertiesPanel();
+    // 属性面板：10Hz 节流，避免拖动期间每帧重建（60fps → 10fps）
+    // 使用 singleShot 延迟 100ms，同一窗口内多次调用只执行一次
+    QTimer::singleShot(100, this, [this]() { refreshPropertiesPanel(); });
 
     // 状态栏选择指示器：直接用快照里的 selectionCount，不再二次遍历场景
     if (m_statusBar2D)
