@@ -130,6 +130,12 @@ struct UiServices : public IUIServices
         return { viewportActionHub, unitManager, captureService };
     }
 
+    /// 工作台装配集合（供 UiWorkbench::initialize 使用，避免其接口依赖扁平聚合）
+    WorkbenchServices workbench() const
+    {
+        return { uiState(), commands(), scene(), persistence(), view() };
+    }
+
     // ---- IUIServices 接口实现 ----
 
     ISelectionService* getSelectionService() const override { return selectionService; }

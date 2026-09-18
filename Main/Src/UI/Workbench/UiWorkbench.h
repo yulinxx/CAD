@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <memory>
 
-#include "UiServices.h"
+#include "UiServiceGroups.h"
 #include "UI/Service/ToolBarContextManager.h"
 #include "Services/UiStateCenter.h"
 #include "ClientConfig/UiLayoutBuilder.h"  // IUiCommandDispatcher：工作台直接实现该接口
@@ -122,7 +122,7 @@ public:
     /// 初始化工作台
     /// @param services UI 服务集合
     /// @return 是否初始化成功
-    virtual bool initialize(const UiServices& services) = 0;
+    virtual bool initialize(const WorkbenchServices& services) = 0;
 
     /// 附加到主窗口
     /// @param window 工作台窗口
@@ -227,7 +227,7 @@ public:
     bool isCommandRegistered(const QString& commandId) const override;
     void dispatchCommand(const QString& commandId, const QVariantMap& params) override;
     QString commandText(const QString& commandId) const override;
-    bool initialize(const UiServices& services) override;
+    bool initialize(const WorkbenchServices& services) override;
     void attachToWindow(WorkbenchWindow& window) override;
     void activate() override;
     void deactivate() override;
@@ -413,7 +413,7 @@ public:
     bool isCommandRegistered(const QString& commandId) const override;
     void dispatchCommand(const QString& commandId, const QVariantMap& params) override;
     QString commandText(const QString& commandId) const override;
-    bool initialize(const UiServices& services) override;
+    bool initialize(const WorkbenchServices& services) override;
     void attachToWindow(WorkbenchWindow& window) override;
     void activate() override;
     void deactivate() override;

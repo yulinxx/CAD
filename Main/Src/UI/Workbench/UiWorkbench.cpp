@@ -373,20 +373,20 @@ QString Workbench2D::displayName() const
     return QObject::tr("2D Workbench");
 }
 
-bool Workbench2D::initialize(const UiServices& services)
+bool Workbench2D::initialize(const WorkbenchServices& services)
 {
     SY_INFO("[Workbench2D] initialize: starting 2D workbench initialization");
 
-    if (!services.stateCenter || !services.interactionDispatcher)
+    if (!services.uiState.stateCenter || !services.uiState.interactionDispatcher)
     {
         SY_ERROR("[Workbench2D] initialize failed: stateCenter or interactionDispatcher is null");
         return false;
     }
-    m_uiState = services.uiState();
-    m_commands = services.commands();
-    m_scene = services.scene();
-    m_persistence = services.persistence();
-    m_view = services.view();
+    m_uiState = services.uiState;
+    m_commands = services.commands;
+    m_scene = services.scene;
+    m_persistence = services.persistence;
+    m_view = services.view;
 
     // 使用应用共享 SettingsService singleton，2D/3D 逻辑一致
     m_settingsCoordinator = std::make_unique<SettingsUiCoordinator2D>(ApplicationCompositionRoot::getSettingsService());
@@ -2334,26 +2334,26 @@ QString Workbench3D::commandText(const QString& commandId) const
 }
 
 // 1 — 初始化，存储服务引用
-bool Workbench3D::initialize(const UiServices& services)
+bool Workbench3D::initialize(const WorkbenchServices& services)
 {
     SY_INFO("[Workbench3D] initialize: starting 3D workbench initialization");
 
-    if (!services.stateCenter || !services.interactionDispatcher)
+    if (!services.uiState.stateCenter || !services.uiState.interactionDispatcher)
     {
         SY_ERROR("[Workbench3D] initialize failed: stateCenter or interactionDispatcher is null");
         return false;
     }
-    m_uiState = services.uiState();
-    m_commands = services.commands();
-    m_scene = services.scene();
-    m_persistence = services.persistence();
-    m_view = services.view();
+    m_uiState = services.uiState;
+    m_commands = services.commands;
+    m_scene = services.scene;
+    m_persistence = services.persistence;
+    m_view = services.view;
 
     // 使用 ApplicationCompositionRoot 中的共享 SceneManager3D，
     // 确保导入的 3D 图元与 3D 工作台使用同一数据源
-    if (services.importService && services.importService->sceneManager3D())
+    if (services.persistence.importService && services.persistence.importService->sceneManager3D())
     {
-        m_sceneManager3D = services.importService->sceneManager3D();
+        m_sceneManager3D = services.persistence.importService->sceneManager3D();
         SY_DEBUG("[Workbench3D] Using shared SceneManager3D from ImportService");
     }
     else

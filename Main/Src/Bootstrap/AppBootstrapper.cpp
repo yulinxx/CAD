@@ -167,7 +167,7 @@ void AppBootstrapper::bootstrap()
 #endif
         m_workbench = std::make_unique<Workbench2D>();
 
-    if (!m_workbench->initialize(uiServices))
+    if (!m_workbench->initialize(uiServices.workbench()))
     {
         SY_ERRORF(
             "[AppBootstrapper] error code=bootstrap.workbench_init_failed message=Workbench '%s' initialization failed",

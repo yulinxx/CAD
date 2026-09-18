@@ -78,3 +78,15 @@ struct ViewServices
     UnitManager* unitManager{ nullptr };
     Ui::ViewCaptureService* captureService{ nullptr };
 };
+
+/// 工作台装配所需的完整服务集合。
+/// 由 UiServices 拆出，作为工作台接口（UiWorkbench::initialize）的入参，
+/// 使工作台接口不再依赖扁平的 UiServices 聚合。
+struct WorkbenchServices
+{
+    UiStateServices uiState;
+    CommandServices commands;
+    SceneServices scene;
+    PersistenceServices persistence;
+    ViewServices view;
+};

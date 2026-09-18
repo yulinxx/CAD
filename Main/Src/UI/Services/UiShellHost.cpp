@@ -112,7 +112,7 @@ UiWorkbench* UiShellHost::resolveWorkbench(const QString& workbenchId)
         if (!m_workbench3D)
         {
             auto wb3d = std::make_unique<Workbench3D>();
-            if (!wb3d->initialize(m_services))
+            if (!wb3d->initialize(m_services.workbench()))
             {
                 SY_WARN("Workbench3D initialization failed, falling back to 2D");
                 return m_workbench;
