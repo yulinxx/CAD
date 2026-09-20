@@ -95,31 +95,11 @@ bool RecentFileRepository::remove(const std::string& filePath)
 RecentFileRecord RecentFileRepository::rowToRecord(const std::map<std::string, std::string>& row) const
 {
     RecentFileRecord rec;
-    auto it = row.find("id");
-    if (it != row.end())
-    {
-        rec.id = std::stoi(it->second);
-    }
-    it = row.find("file_path");
-    if (it != row.end())
-    {
-        rec.filePath = it->second;
-    }
-    it = row.find("title");
-    if (it != row.end())
-    {
-        rec.title = it->second;
-    }
-    it = row.find("format");
-    if (it != row.end())
-    {
-        rec.format = it->second;
-    }
-    it = row.find("last_opened_at");
-    if (it != row.end())
-    {
-        rec.lastOpenedTime = it->second;
-    }
+    rec.id = getInt(row, "id");
+    rec.filePath = getString(row, "file_path");
+    rec.title = getString(row, "title");
+    rec.format = getString(row, "format");
+    rec.lastOpenedTime = getString(row, "last_opened_at");
     return rec;
 }
 

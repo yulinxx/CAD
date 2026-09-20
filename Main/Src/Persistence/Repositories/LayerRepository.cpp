@@ -215,66 +215,18 @@ bool LayerRepository::batchUpdateOrder(
 LayerRecord LayerRepository::rowToRecord(const std::map<std::string, std::string>& row) const
 {
     LayerRecord rec;
-    auto it = row.find("id");
-    if (it != row.end())
-    {
-        rec.id = std::stoi(it->second);
-    }
-    it = row.find("document_id");
-    if (it != row.end())
-    {
-        rec.documentId = it->second;
-    }
-    it = row.find("layer_id");
-    if (it != row.end())
-    {
-        rec.layerId = std::stoi(it->second);
-    }
-    it = row.find("name");
-    if (it != row.end())
-    {
-        rec.name = it->second;
-    }
-    it = row.find("color");
-    if (it != row.end())
-    {
-        rec.color = it->second;
-    }
-    it = row.find("visible");
-    if (it != row.end())
-    {
-        rec.visible = (it->second == "1");
-    }
-    it = row.find("locked");
-    if (it != row.end())
-    {
-        rec.locked = (it->second == "1");
-    }
-    it = row.find("fill");
-    if (it != row.end())
-    {
-        rec.fill = (it->second == "1");
-    }
-    it = row.find("fill_color");
-    if (it != row.end())
-    {
-        rec.fillColor = it->second;
-    }
-    it = row.find("layer_type");
-    if (it != row.end())
-    {
-        rec.layerType = std::stoi(it->second);
-    }
-    it = row.find("order_index");
-    if (it != row.end())
-    {
-        rec.orderIndex = std::stoi(it->second);
-    }
-    it = row.find("updated_at");
-    if (it != row.end())
-    {
-        rec.updatedAt = it->second;
-    }
+    rec.id = getInt(row, "id");
+    rec.documentId = getString(row, "document_id");
+    rec.layerId = getInt(row, "layer_id");
+    rec.name = getString(row, "name");
+    rec.color = getString(row, "color", "#000000");
+    rec.visible = getBool(row, "visible", true);
+    rec.locked = getBool(row, "locked");
+    rec.fill = getBool(row, "fill");
+    rec.fillColor = getString(row, "fill_color");
+    rec.layerType = getInt(row, "layer_type");
+    rec.orderIndex = getInt(row, "order_index");
+    rec.updatedAt = getString(row, "updated_at");
     return rec;
 }
 

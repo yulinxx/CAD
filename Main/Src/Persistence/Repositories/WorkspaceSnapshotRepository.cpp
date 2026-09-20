@@ -51,31 +51,11 @@ bool WorkspaceSnapshotRepository::remove(const std::string& workbenchId)
 WorkspaceSnapshotRecord WorkspaceSnapshotRepository::rowToRecord(const std::map<std::string, std::string>& row) const
 {
     WorkspaceSnapshotRecord rec;
-    auto it = row.find("id");
-    if (it != row.end())
-    {
-        rec.id = std::stoi(it->second);
-    }
-    it = row.find("workbench_id");
-    if (it != row.end())
-    {
-        rec.workbenchId = it->second;
-    }
-    it = row.find("geometry");
-    if (it != row.end())
-    {
-        rec.geometry = it->second;
-    }
-    it = row.find("window_state");
-    if (it != row.end())
-    {
-        rec.windowState = it->second;
-    }
-    it = row.find("updated_at");
-    if (it != row.end())
-    {
-        rec.updatedAt = it->second;
-    }
+    rec.id = getInt(row, "id");
+    rec.workbenchId = getString(row, "workbench_id");
+    rec.geometry = getString(row, "geometry");
+    rec.windowState = getString(row, "window_state");
+    rec.updatedAt = getString(row, "updated_at");
     return rec;
 }
 

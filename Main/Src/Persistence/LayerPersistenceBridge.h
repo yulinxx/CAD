@@ -4,6 +4,7 @@
 #include "Persistence/Models/LayerRecord.h"
 
 #include <string>
+#include <unordered_map>
 
 class LayerRepository;
 class LayerManager;
@@ -16,6 +17,10 @@ class LayerManager;
  *
  * 注意：此类只做单向同步（运行态 → 数据库），不做反向同步（数据库 → 运行态）。
  * 反向同步（文档加载时从数据库恢复图层列表）由其他机制负责。
+ *
+ * 性能优化：
+ *   - 缓存图层排序索引，避免每次 syncLayerToDb 都做 O(n) 线性搜索
+ *   - 仅在 onLayerOrderChanged 时重建缓存
  */
 class LayerPersistenceBridge : public ILayerManagerObserver
 {
@@ -49,8 +54,17 @@ private:
     /// 将指定图层的当前状态写入数据库
     void syncLayerToDb(int nLayerId);
 
+    /// 重建图层排序索引缓存
+    void rebuildOrderCache();
+
+    /// 获取图层排序索引（O(1) 查表）
+    int getOrderIndex(int nLayerId) const;
+
     LayerManager* m_layerManager{ nullptr };
     LayerRepository* m_layerRepository{ nullptr };
     bool m_attached{ false };
     std::string m_documentId;
+
+    /// 图层排序索引缓存：layerId → orderIndex，避免每次 sync 都做 O(n) 搜索
+    std::unordered_map<int, int> m_orderCache;
 };

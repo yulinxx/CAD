@@ -70,36 +70,12 @@ std::vector<SettingRecord> SettingsRepository::loadGroup(const std::string& grou
 SettingRecord SettingsRepository::rowToRecord(const std::map<std::string, std::string>& row) const
 {
     SettingRecord rec;
-    auto it = row.find("id");
-    if (it != row.end())
-    {
-        rec.id = std::stoi(it->second);
-    }
-    it = row.find("group_name");
-    if (it != row.end())
-    {
-        rec.groupName = it->second;
-    }
-    it = row.find("key");
-    if (it != row.end())
-    {
-        rec.key = it->second;
-    }
-    it = row.find("value");
-    if (it != row.end())
-    {
-        rec.value = it->second;
-    }
-    it = row.find("data_type");
-    if (it != row.end())
-    {
-        rec.dataType = it->second;
-    }
-    it = row.find("updated_at");
-    if (it != row.end())
-    {
-        rec.updatedAt = it->second;
-    }
+    rec.id = getInt(row, "id");
+    rec.groupName = getString(row, "group_name");
+    rec.key = getString(row, "key");
+    rec.value = getString(row, "value");
+    rec.dataType = getString(row, "data_type", "string");
+    rec.updatedAt = getString(row, "updated_at");
     return rec;
 }
 

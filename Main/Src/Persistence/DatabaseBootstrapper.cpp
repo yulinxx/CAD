@@ -18,6 +18,34 @@ static constexpr int kSchemaVersion = 5;
 
 // 应用版本使用 MainApp::appVersion() 全局定义
 
+// ---- 注册所有表名和列名白名单，用于 Database 层 SQL 注入防护 ----
+static void registerSchemaWhiteList()
+{
+    Eg::Database::registerTableName("app_meta");
+    Eg::Database::registerTableName("recent_files");
+    Eg::Database::registerTableName("workspace_snapshots");
+    Eg::Database::registerTableName("layers");
+    Eg::Database::registerTableName("documents");
+    Eg::Database::registerTableName("settings");
+    Eg::Database::registerTableName("dialog_states");
+
+    Eg::Database::registerColumnNames("app_meta", {"id", "key", "value", "updated_at"});
+    Eg::Database::registerColumnNames("recent_files",
+        {"id", "file_path", "title", "format", "last_opened_at"});
+    Eg::Database::registerColumnNames("workspace_snapshots",
+        {"id", "workbench_id", "geometry", "window_state", "updated_at"});
+    Eg::Database::registerColumnNames("layers",
+        {"id", "document_id", "layer_id", "name", "color", "visible", "locked",
+         "fill", "fill_color", "layer_type", "order_index", "updated_at"});
+    Eg::Database::registerColumnNames("documents",
+        {"id", "file_path", "title", "format", "entity_count", "file_size",
+         "last_opened_at", "last_saved_at", "created_at"});
+    Eg::Database::registerColumnNames("settings",
+        {"id", "group_name", "key", "value", "data_type", "updated_at"});
+    Eg::Database::registerColumnNames("dialog_states",
+        {"id", "dialog_key", "document_id", "state_json", "created_at", "updated_at"});
+}
+
 DatabaseBootstrapper::DatabaseBootstrapper(Eg::Database& database)
     : m_database(database)
 {
@@ -32,19 +60,19 @@ bool DatabaseBootstrapper::ensureSchema()
         return false;
     }
 
+    // 注册表名/列名白名单，用于 Database 层 SQL 注入防护
+    registerSchemaWhiteList();
+
     // 检查应用版本兼容性
     std::string dbAppVersion = databaseAppVersion();
     if (!dbAppVersion.empty() && dbAppVersion != MainApp::appVersion().c_str())
     {
-        SY_WARNF("[DatabaseBootstrapper] App version mismatch: db=%s current=%s - clearing incompatible data",
+        SY_WARNF("[DatabaseBootstrapper] App version mismatch: db=%s current=%s - resetting schema for re-migration",
             dbAppVersion.c_str(),
             MainApp::appVersion().c_str());
-        // 版本不匹配时清除所有业务数据（保留 meta 表）
-        m_database.execute("DELETE FROM recent_files");
-        m_database.execute("DELETE FROM workspace_snapshots");
-        m_database.execute("DELETE FROM layers");
-        m_database.execute("DELETE FROM documents");
-        // 重置 schema 版本，强制重建
+        // P1修复：版本不匹配时不再删除所有业务数据，
+        // 而是仅重置 schema 版本号，让 runMigrations 重新执行迁移。
+        // 这样可以保留用户数据（最近文件、图层、设置等），同时确保表结构升级。
         m_database.execute("DELETE FROM app_meta WHERE key = 'schema_version'");
     }
 

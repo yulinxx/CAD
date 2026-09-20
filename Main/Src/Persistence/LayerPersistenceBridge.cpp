@@ -7,6 +7,7 @@
 #include "Log/SyLogger.h"
 
 #include <QDateTime>
+#include <algorithm>
 
 LayerPersistenceBridge::LayerPersistenceBridge(LayerManager* layerManager, LayerRepository* layerRepository)
     : m_layerManager(layerManager)
@@ -33,6 +34,8 @@ void LayerPersistenceBridge::attach()
     }
     m_layerManager->addObserver(this);
     m_attached = true;
+    // 初始化排序缓存
+    rebuildOrderCache();
     SY_INFO("[LayerPersistenceBridge] Attached to LayerManager");
 }
 
@@ -45,12 +48,15 @@ void LayerPersistenceBridge::detach()
     }
     m_layerManager->removeObserver(this);
     m_attached = false;
+    m_orderCache.clear();
     SY_INFO("[LayerPersistenceBridge] Detached from LayerManager");
 }
 
 /// 图层新增时同步写入数据库
 void LayerPersistenceBridge::onLayerAdded(int nLayerId, const char* name)
 {
+    // 新增图层后重建排序缓存
+    rebuildOrderCache();
     syncLayerToDb(nLayerId);
 }
 
@@ -67,6 +73,8 @@ void LayerPersistenceBridge::onLayerRemoved(int nLayerId)
                 m_layerRepository->lastError().c_str());
         }
     }
+    // 删除后重建排序缓存
+    rebuildOrderCache();
 }
 
 /// 图层属性变更时同步更新数据库
@@ -101,6 +109,9 @@ void LayerPersistenceBridge::onLayerOrderChanged()
         return;
     }
 
+    // 重建排序缓存
+    rebuildOrderCache();
+
     auto allLayers = m_layerManager->getAllLayerIds();
     std::vector<std::pair<int, int>> layerIdAndOrders;
     layerIdAndOrders.reserve(allLayers.size());
@@ -114,6 +125,29 @@ void LayerPersistenceBridge::onLayerOrderChanged()
         SY_ERRORF(
             "[LayerPersistenceBridge] Failed to batch update layer order: %s", m_layerRepository->lastError().c_str());
     }
+}
+
+/// 重建图层排序索引缓存（O(n) 一次性构建）
+void LayerPersistenceBridge::rebuildOrderCache()
+{
+    m_orderCache.clear();
+    if (!m_layerManager)
+    {
+        return;
+    }
+    auto allLayers = m_layerManager->getAllLayerIds();
+    m_orderCache.reserve(allLayers.size());
+    for (int i = 0; i < static_cast<int>(allLayers.size()); ++i)
+    {
+        m_orderCache[allLayers[i]] = i;
+    }
+}
+
+/// O(1) 获取图层排序索引
+int LayerPersistenceBridge::getOrderIndex(int nLayerId) const
+{
+    auto it = m_orderCache.find(nLayerId);
+    return (it != m_orderCache.end()) ? it->second : nLayerId;
 }
 
 /// 将指定图层的当前状态写入数据库
@@ -133,17 +167,8 @@ void LayerPersistenceBridge::syncLayerToDb(int nLayerId)
     Ut::Color fillClr = m_layerManager->layerFillColor(nLayerId);
     Eg::LayerType type = m_layerManager->layerType(nLayerId);
 
-    // 计算实际排序序号
-    int orderIndex = nLayerId;
-    auto allLayers = m_layerManager->getAllLayerIds();
-    for (int i = 0; i < static_cast<int>(allLayers.size()); ++i)
-    {
-        if (allLayers[i] == nLayerId)
-        {
-            orderIndex = i;
-            break;
-        }
-    }
+    // O(1) 从缓存获取排序索引（替代原来的 O(n) 线性搜索）
+    int orderIndex = getOrderIndex(nLayerId);
 
     // 构造数据库记录
     LayerRecord record;

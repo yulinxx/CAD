@@ -1,8 +1,11 @@
 #include "PersistenceService.h"
 
 #include <thread>
+#include <chrono>
+#include <typeindex>
 
 #include "DatabaseBootstrapper.h"
+#include "Repositories/SqliteRepositoryBase.h"
 #include "Repositories/RecentFileRepository.h"
 #include "Repositories/WorkspaceSnapshotRepository.h"
 #include "Repositories/LayerRepository.h"
@@ -62,18 +65,34 @@ void PersistenceService::shutdown()
     if (m_database && m_database->isOpen())
     {
         SY_DEBUG("[PersistenceService] Shutting down");
-        // 先等待一小段时间，让其他线程有时间完成数据库操作
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-        m_recentFiles.reset();
-        m_workspaceSnapshots.reset();
-        m_layers.reset();
-        m_settings.reset();
-        m_documents.reset();
+        // P1修复：用条件变量替代 sleep，等待所有活跃数据库操作完成
+        {
+            std::unique_lock<std::mutex> lock(m_activeOpMutex);
+            m_shuttingDown = true;
+            m_activeOpCv.wait(lock, [this] { return m_activeOperations.load() == 0; });
+        }
+
+        // 清理注册表中的仓储
+        m_repositories.clear();
+
+        // 按依赖顺序销毁仓储（与创建顺序相反）
         m_dialogStates.reset();
+        m_documents.reset();
+        m_settings.reset();
+        m_layers.reset();
+        m_workspaceSnapshots.reset();
+        m_recentFiles.reset();
         m_bootstrapper.reset();
         m_database->close();
+
+        SY_DEBUG("[PersistenceService] Shutdown complete");
     }
+}
+
+int PersistenceService::activeOperationCount() const
+{
+    return m_activeOperations.load();
 }
 
 bool PersistenceService::isOpen() const

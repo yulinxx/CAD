@@ -136,36 +136,12 @@ DialogStateRecord DialogStateRepository::rowToRecord(
     const std::map<std::string, std::string>& row) const
 {
     DialogStateRecord rec;
-    auto it = row.find("id");
-    if (it != row.end() && !it->second.empty())
-    {
-        rec.id = std::stoi(it->second);
-    }
-    it = row.find("dialog_key");
-    if (it != row.end())
-    {
-        rec.dialogKey = it->second;
-    }
-    it = row.find("document_id");
-    if (it != row.end())
-    {
-        rec.documentId = it->second;
-    }
-    it = row.find("state_json");
-    if (it != row.end())
-    {
-        rec.stateJson = it->second;
-    }
-    it = row.find("created_at");
-    if (it != row.end())
-    {
-        rec.createdAt = it->second;
-    }
-    it = row.find("updated_at");
-    if (it != row.end())
-    {
-        rec.updatedAt = it->second;
-    }
+    rec.id = getInt(row, "id");
+    rec.dialogKey = getString(row, "dialog_key");
+    rec.documentId = getString(row, "document_id");
+    rec.stateJson = getString(row, "state_json");
+    rec.createdAt = getString(row, "created_at");
+    rec.updatedAt = getString(row, "updated_at");
     return rec;
 }
 
