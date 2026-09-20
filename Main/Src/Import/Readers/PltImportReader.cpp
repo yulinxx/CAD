@@ -1,3 +1,7 @@
+/**
+ * @file PltImportReader.cpp
+ * @brief PLT格式导入读取器实现
+ */
 #include "PltImportReader.h"
 
 #include "Log/SyLogger.h"

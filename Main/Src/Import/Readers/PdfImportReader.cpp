@@ -1,3 +1,7 @@
+/**
+ * @file PdfImportReader.cpp
+ * @brief PDF格式导入读取器实现
+ */
 #include "PdfImportReader.h"
 
 #include "Log/SyLogger.h"

@@ -1,3 +1,9 @@
+/**
+ * @file DeviceHost.cpp
+ * @brief 硬件装配层实现
+ *
+ * 将 HAL 零件组装为可用的机器设备。
+ */
 #include "DeviceHost.h"
 
 #include <QElapsedTimer>

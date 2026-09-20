@@ -326,6 +326,7 @@ void SceneRefreshCoordinator::onSceneChanged()
             if (!m_sceneManager->captureSnapshot(changes, m_pendingSnapshot))
             {
                 // 快照拿不全就别走增量 —— 否则失败的那些图元会被当成「没变」而漏刷
+                SY_DEBUGF("[SceneRefresh] onSceneChanged: captureSnapshot failed, triggering FullRefresh");
                 m_refreshLevel = RefreshLevel::FullRefresh;
                 scheduleFullRefresh();
                 return;
@@ -346,6 +347,9 @@ void SceneRefreshCoordinator::onSceneChanged()
         }
         else
         {
+            // readChanges 失败，触发 FullRefresh
+            SY_DEBUGF("[SceneRefresh] onSceneChanged: readChanges failed, triggering FullRefresh, m_lastCursor=%llu",
+                static_cast<unsigned long long>(m_lastCursor));
             m_refreshLevel = RefreshLevel::FullRefresh;
             scheduleFullRefresh();
             return;
@@ -430,6 +434,8 @@ void SceneRefreshCoordinator::onSelectionChanged()
     if (selectionSetChanged && (hideNow || hideNow != m_lastHideSelectedEffective))
     {
         // 选中本体的增删只能靠世界层全量重建
+        SY_DEBUGF("[SceneRefresh] onSelectionChanged: triggering FullRefresh, selectionSetChanged=%d hideNow=%d lastHide=%d",
+            selectionSetChanged, hideNow, m_lastHideSelectedEffective);
         m_refreshLevel = RefreshLevel::FullRefresh;
     }
     else if (m_refreshLevel < RefreshLevel::Selection)
@@ -798,6 +804,8 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     {
         return;
     }
+
+    SY_DEBUGF("[SceneRefresh] applyFullRefresh: entityCount=%zu", sm->getEntityCount());
 
     // 全量重建：几何与台账都由 RenderSceneBuilder 的装配轮次自行对齐
     // （本轮没出现的图元会被回收），这里不需要再做任何缓存失效

@@ -1,3 +1,7 @@
+/**
+ * @file RecentFileRepository.cpp
+ * @brief 最近文件数据仓库实现
+ */
 #include "RecentFileRepository.h"
 
 #include "Engine/Persistence/Database.h"

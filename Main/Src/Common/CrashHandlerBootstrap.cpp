@@ -1,3 +1,7 @@
+/**
+ * @file CrashHandlerBootstrap.cpp
+ * @brief 崩溃处理器启动实现
+ */
 #include "CrashHandlerBootstrap.h"
 
 #include "AppPathManager.h"

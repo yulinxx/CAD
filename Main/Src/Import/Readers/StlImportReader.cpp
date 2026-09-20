@@ -1,3 +1,7 @@
+/**
+ * @file StlImportReader.cpp
+ * @brief STL格式导入读取器实现
+ */
 #include "StlImportReader.h"
 
 #include "Log/SyLogger.h"

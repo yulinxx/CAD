@@ -1,3 +1,7 @@
+/**
+ * @file ImportProgressRunner.cpp
+ * @brief 导入进度跟踪实现
+ */
 #include "Import/ImportProgressRunner.h"
 
 #include <algorithm>

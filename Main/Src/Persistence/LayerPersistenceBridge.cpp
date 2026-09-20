@@ -1,3 +1,7 @@
+/**
+ * @file LayerPersistenceBridge.cpp
+ * @brief 图层持久化桥接实现
+ */
 #include "LayerPersistenceBridge.h"
 
 #include "Repositories/LayerRepository.h"

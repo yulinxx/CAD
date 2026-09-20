@@ -1,3 +1,9 @@
+/**
+ * @file ProcessingJobService.cpp
+ * @brief 加工作业服务实现
+ *
+ * 管理加工任务的执行和调度。
+ */
 #include "ProcessingJobService.h"
 
 #include <QTimer>

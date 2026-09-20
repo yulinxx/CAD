@@ -46,8 +46,7 @@ namespace RenderBridge
         uint32_t drawListInitialCapacity = 4096;
         bool drawListMerging = true;
         bool drawListCulling = true;
-        RenderAbstraction::ViewVolumeType drawListViewType =
-            RenderAbstraction::ViewVolumeType::Rect2D;
+        RenderAbstraction::ViewVolumeType drawListViewType = RenderAbstraction::ViewVolumeType::Rect2D;
     };
 
     struct GeometryPipelineStats
@@ -65,12 +64,13 @@ namespace RenderBridge
         GeometryManager() = default;
         virtual ~GeometryManager() = default;
 
+    public:
         GeometryManager(const GeometryManager&) = delete;
         GeometryManager& operator=(const GeometryManager&) = delete;
 
         bool initialize(RenderAbstraction::IRenderDevice& device,
-                        RenderAbstraction::IRenderScene* scene,
-                        const GeometryPipelineConfig& config = {})
+            RenderAbstraction::IRenderScene* scene,
+            const GeometryPipelineConfig& config = {})
         {
             shutdown();
 
@@ -103,7 +103,10 @@ namespace RenderBridge
             m_currentEntityId = 0;
         }
 
-        bool valid() const { return m_store.valid(); }
+        bool valid() const
+        {
+            return m_store.valid();
+        }
 
         RenderAbstraction::DrawListHandle drawList() const
         {
@@ -185,30 +188,86 @@ namespace RenderBridge
             return result;
         }
 
-        GeometryStoreStats totalStats() const { return m_store.totalStats(); }
-        uint64_t reserveCapacity(uint64_t bytes) { return m_store.reserveCapacity(bytes); }
-        static uint64_t recommendedMaxBytes() { return PersistentGeometryStore::recommendedMaxBytes(); }
-        uint32_t storeCount() const { return m_store.storeCount(); }
-        void resetSlots() { m_store.resetSlots(); }
-        void clearDrawList() { m_store.clearDrawList(); }
-        void removeCommand(uint32_t slot) { m_store.removeCommand(slot); }
+        GeometryStoreStats totalStats() const
+        {
+            return m_store.totalStats();
+        }
+
+        uint64_t reserveCapacity(uint64_t bytes)
+        {
+            return m_store.reserveCapacity(bytes);
+        }
+
+        static uint64_t recommendedMaxBytes()
+        {
+            return PersistentGeometryStore::recommendedMaxBytes();
+        }
+
+        uint32_t storeCount() const
+        {
+            return m_store.storeCount();
+        }
+
+        void resetSlots()
+        {
+            m_store.resetSlots();
+        }
+
+        void clearDrawList()
+        {
+            m_store.clearDrawList();
+        }
+
+        void removeCommand(uint32_t slot)
+        {
+            m_store.removeCommand(slot);
+        }
 
         bool allocBlock(uint64_t bytes, RenderAbstraction::GeometryBlock& outBlock)
-        { return m_store.allocBlock(bytes, outBlock); }
+        {
+            return m_store.allocBlock(bytes, outBlock);
+        }
 
         bool writeBlock(uint64_t blockId, uint32_t offset, uint32_t sizeBytes, const void* data)
-        { return m_store.writeBlock(blockId, offset, sizeBytes, data); }
+        {
+            return m_store.writeBlock(blockId, offset, sizeBytes, data);
+        }
 
-        void freeBlock(uint64_t blockId) { m_store.freeBlock(blockId); }
-        uint32_t acquireSlot() { return m_store.acquireSlot(); }
-        void releaseSlot(uint32_t slot) { m_store.releaseSlot(slot); }
-        void removeSlot(uint32_t slot) { m_store.removeSlot(slot); }
+        void freeBlock(uint64_t blockId)
+        {
+            m_store.freeBlock(blockId);
+        }
 
-        bool upsertDrawItem(uint32_t slot, const RenderAbstraction::DrawInstruction& cmd, const RenderAbstraction::Aabb3* bounds)
-        { return m_store.upsertDrawItem(slot, cmd, bounds); }
+        uint32_t acquireSlot()
+        {
+            return m_store.acquireSlot();
+        }
 
-        PersistentGeometryStore& geometryStore() { return m_store; }
-        uint64_t currentEntityId() const { return m_currentEntityId; }
+        void releaseSlot(uint32_t slot)
+        {
+            m_store.releaseSlot(slot);
+        }
+
+        void removeSlot(uint32_t slot)
+        {
+            m_store.removeSlot(slot);
+        }
+
+        bool upsertDrawItem(
+            uint32_t slot, const RenderAbstraction::DrawInstruction& cmd, const RenderAbstraction::Aabb3* bounds)
+        {
+            return m_store.upsertDrawItem(slot, cmd, bounds);
+        }
+
+        PersistentGeometryStore& geometryStore()
+        {
+            return m_store;
+        }
+
+        uint64_t currentEntityId() const
+        {
+            return m_currentEntityId;
+        }
 
     protected:
         struct EntityEntryBase
@@ -224,11 +283,11 @@ namespace RenderBridge
 
         template<typename VertexT>
         bool upsertEntityInternal(uint64_t entityId,
-                                    const VertexT* vertices,
-                                    uint32_t vertexCount,
-                                    RenderAbstraction::PrimitiveType topology,
-                                    uint32_t layerIndex,
-                                    uint64_t hash)
+            const VertexT* vertices,
+            uint32_t vertexCount,
+            RenderAbstraction::PrimitiveType topology,
+            uint32_t layerIndex,
+            uint64_t hash)
         {
             if (!m_store.valid() || !vertices || vertexCount == 0)
             {
@@ -329,20 +388,25 @@ namespace RenderBridge
         }
 
         virtual RenderAbstraction::DrawInstruction doMakeDrawCommand(
-            const EntityEntryBase& /*entry*/, uint32_t /*layerIndex*/,
-            RenderAbstraction::PrimitiveType /*topology*/)
+            const EntityEntryBase& /*entry*/, uint32_t /*layerIndex*/, RenderAbstraction::PrimitiveType /*topology*/)
         {
             return {};
         }
 
-        virtual std::optional<RenderAbstraction::Aabb3> doComputeBounds(
-            const void* /*vertices*/, uint32_t /*count*/)
+        virtual std::optional<RenderAbstraction::Aabb3> doComputeBounds(const void* /*vertices*/, uint32_t /*count*/)
         {
             return std::nullopt;
         }
 
-        void markSeen(uint64_t id) { m_seen.insert(id); }
-        bool isSeen(uint64_t id) const { return m_seen.count(id) > 0; }
+        void markSeen(uint64_t id)
+        {
+            m_seen.insert(id);
+        }
+
+        bool isSeen(uint64_t id) const
+        {
+            return m_seen.count(id) > 0;
+        }
 
         PersistentGeometryStore m_store;
         std::unordered_map<uint64_t, EntityEntryBase> m_entities;
@@ -353,4 +417,4 @@ namespace RenderBridge
         uint64_t m_currentEntityId = 0;
     };
 
-} // namespace RenderBridge
+}  // namespace RenderBridge

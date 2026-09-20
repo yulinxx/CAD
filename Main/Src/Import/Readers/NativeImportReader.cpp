@@ -1,3 +1,7 @@
+/**
+ * @file NativeImportReader.cpp
+ * @brief 原生格式导入读取器实现
+ */
 #include "NativeImportReader.h"
 
 #include <QFileInfo>

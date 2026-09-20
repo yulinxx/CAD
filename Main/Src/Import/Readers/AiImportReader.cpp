@@ -1,3 +1,7 @@
+/**
+ * @file AiImportReader.cpp
+ * @brief Adobe Illustrator格式导入读取器实现
+ */
 #include "AiImportReader.h"
 
 #include "Log/SyLogger.h"

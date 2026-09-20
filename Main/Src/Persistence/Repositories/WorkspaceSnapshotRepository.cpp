@@ -1,3 +1,7 @@
+/**
+ * @file WorkspaceSnapshotRepository.cpp
+ * @brief 工作区快照数据仓库实现
+ */
 #include "WorkspaceSnapshotRepository.h"
 
 #include "Engine/Persistence/Database.h"

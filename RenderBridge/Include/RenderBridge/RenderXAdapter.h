@@ -18,21 +18,23 @@
 #include "RenderBridge/RenderBridgeAPI.h"
 #include "RenderAbstraction/IRenderFactory.h"
 
-namespace RenderBridge {
+namespace RenderBridge
+{
 
-class RENDERBRIDGE_API RenderXAdapter {
-public:
-    /**
-     * @brief 建工厂。
-     *
-     * 返回抽象层接口而非具体的 RenderXFactory：后者只有 .cpp 里有定义，
-     * 调用方拿不到完整类型，unique_ptr 的析构会当场编不过。
-     */
-    static std::unique_ptr<RenderAbstraction::IRenderFactory> createFactory();
+    class RENDERBRIDGE_API RenderXAdapter
+    {
+    public:
+        /**
+         * @brief 建工厂。
+         *
+         * 返回抽象层接口而非具体的 RenderXFactory：后者只有 .cpp 里有定义，
+         * 调用方拿不到完整类型，unique_ptr 的析构会当场编不过。
+         */
+        static std::unique_ptr<RenderAbstraction::IRenderFactory> createFactory();
 
-    // 禁止实例化
-    RenderXAdapter() = delete;
-    RenderXAdapter(const RenderXAdapter&) = delete;
-};
+        // 禁止实例化
+        RenderXAdapter() = delete;
+        RenderXAdapter(const RenderXAdapter&) = delete;
+    };
 
-} // namespace RenderBridge
+}  // namespace RenderBridge

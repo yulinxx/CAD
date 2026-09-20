@@ -1,3 +1,7 @@
+/**
+ * @file LayerRepository.cpp
+ * @brief 图层数据仓库实现
+ */
 #include "LayerRepository.h"
 
 #include "Engine/Persistence/Database.h"

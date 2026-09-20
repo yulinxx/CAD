@@ -1,3 +1,7 @@
+/**
+ * @file ImportReaderBase.cpp
+ * @brief 导入读取器基类实现
+ */
 #include "ImportReaderBase.h"
 
 #include <chrono>

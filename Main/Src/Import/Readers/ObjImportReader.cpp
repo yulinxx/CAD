@@ -1,3 +1,7 @@
+/**
+ * @file ObjImportReader.cpp
+ * @brief OBJ格式导入读取器实现
+ */
 #include "ObjImportReader.h"
 
 #include "Log/SyLogger.h"

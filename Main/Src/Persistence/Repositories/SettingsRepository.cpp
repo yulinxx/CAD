@@ -1,3 +1,7 @@
+/**
+ * @file SettingsRepository.cpp
+ * @brief 设置数据仓库实现
+ */
 #include "SettingsRepository.h"
 
 #include "Engine/Persistence/Database.h"

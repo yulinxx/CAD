@@ -1,3 +1,7 @@
+/**
+ * @file ImportDispatcher.cpp
+ * @brief 导入调度器实现
+ */
 #include "ImportDispatcher.h"
 #include "Log/SyLogger.h"
 #include "FileIO/FormatRegistry.h"

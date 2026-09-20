@@ -1,3 +1,7 @@
+/**
+ * @file DocumentPersistenceHelper.cpp
+ * @brief 文档持久化辅助实现
+ */
 #include "DocumentPersistenceHelper.h"
 
 #include "Persistence/PersistenceService.h"

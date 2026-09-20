@@ -1,3 +1,9 @@
+/**
+ * @file MotionPlanCompiler.cpp
+ * @brief 运动规划编译器实现
+ *
+ * 将几何数据编译为运动轨迹。
+ */
 #include "MotionPlanCompiler.h"
 
 #ifdef ENABLE_HARDWARE

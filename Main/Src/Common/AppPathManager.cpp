@@ -133,6 +133,8 @@ QString AppPathManager::appRootDir()
  *
  * 路径构成：appLocalDataDir() / crashes
  * Windows: C:/Users/<user>/AppData/Local/SanYiCAD/crashes/
+ * macOS:   ~/Library/Application Support/SanYiCAD/crashes/
+ * Linux:   ~/.local/share/SanYiCAD/crashes/
  */
 QString AppPathManager::crashDumpsDir()
 {
@@ -144,6 +146,8 @@ QString AppPathManager::crashDumpsDir()
  *
  * 路径构成：appLocalDataDir() / logs
  * Windows: C:/Users/<user>/AppData/Local/SanYiCAD/logs/
+ * macOS:   ~/Library/Application Support/SanYiCAD/logs/
+ * Linux:   ~/.local/share/SanYiCAD/logs/
  */
 QString AppPathManager::logsDir()
 {
@@ -155,8 +159,49 @@ QString AppPathManager::logsDir()
  *
  * 路径构成：appLocalDataDir() / data
  * Windows: C:/Users/<user>/AppData/Local/SanYiCAD/data/
+ * macOS:   ~/Library/Application Support/SanYiCAD/data/
+ * Linux:   ~/.local/share/SanYiCAD/data/
  */
 QString AppPathManager::dataDir()
 {
     return appLocalDataDir() + QStringLiteral("/data");
+}
+
+/**
+ * @brief 获取安全模块配置文件路径
+ *
+ * 路径构成：configDir() / safety_users.conf
+ * Windows: C:/Users/<user>/AppData/Local/SanYiCAD/config/safety_users.conf
+ * macOS:   ~/Library/Application Support/SanYiCAD/config/safety_users.conf
+ * Linux:   ~/.local/share/SanYiCAD/config/safety_users.conf
+ */
+QString AppPathManager::safetyConfigPath()
+{
+    return configDir() + QStringLiteral("/safety_users.conf");
+}
+
+/**
+ * @brief 获取材质数据库文件路径
+ *
+ * 路径构成：configDir() / materials.json
+ * Windows: C:/Users/<user>/AppData/Local/SanYiCAD/config/materials.json
+ * macOS:   ~/Library/Application Support/SanYiCAD/config/materials.json
+ * Linux:   ~/.local/share/SanYiCAD/config/materials.json
+ */
+QString AppPathManager::materialDatabasePath()
+{
+    return configDir() + QStringLiteral("/materials.json");
+}
+
+/**
+ * @brief 获取缓存目录路径
+ *
+ * 路径构成：appLocalDataDir() / cache
+ * Windows: C:/Users/<user>/AppData/Local/SanYiCAD/cache/
+ * macOS:   ~/Library/Application Support/SanYiCAD/cache/
+ * Linux:   ~/.local/share/SanYiCAD/cache/
+ */
+QString AppPathManager::cacheDir()
+{
+    return appLocalDataDir() + QStringLiteral("/cache");
 }

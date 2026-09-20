@@ -1,3 +1,7 @@
+/**
+ * @file DxfImportReader.cpp
+ * @brief DXF格式导入读取器实现
+ */
 #include "DxfImportReader.h"
 
 #include "Log/SyLogger.h"

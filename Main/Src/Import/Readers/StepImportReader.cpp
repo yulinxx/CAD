@@ -1,3 +1,7 @@
+/**
+ * @file StepImportReader.cpp
+ * @brief STEP格式导入读取器实现
+ */
 #include "StepImportReader.h"
 
 #include "Log/SyLogger.h"

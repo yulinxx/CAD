@@ -1,3 +1,7 @@
+/**
+ * @file ExportDispatcher.cpp
+ * @brief 导出调度器实现
+ */
 #include "ExportDispatcher.h"
 
 #include "Log/SyLogger.h"
