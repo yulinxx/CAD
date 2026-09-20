@@ -7,8 +7,6 @@
 
 #include "AppPathManager.h"
 
-#include "VersionInfo.h"
-
 #include <QDir>
 #include <QCoreApplication>
 #include <QStandardPaths>
@@ -46,7 +44,7 @@ QString AppPathManager::appLocalDataDir()
     {
         result.chop(kAppName.length() + 1);
     }
-    const QString orgName = QString::fromStdString(MainApp::organizationName());
+    const QString orgName = QCoreApplication::organizationName();
     if (result.endsWith(QStringLiteral("/") + orgName))
     {
         result.chop(orgName.length() + 1);
