@@ -2,32 +2,15 @@
  * @file ScreenConstantMetrics.h
  * @brief 屏幕定尺寸装饰的尺寸常量：唯一声明处
  *
- * ## 为什么需要这个文件
+ * 装饰在世界里有锚点，但大小恒为 N 个像素。换算在着色器中统一完成。
  *
- * 「装饰在世界里有锚点，但大小恒为 N 个像素」这件事，换算早已统一——
- * `RenderSpace::WorldPinned` 把 `clip.xy += offsetPx * (2.0/uViewport) * clip.w`
- * 放进 `world_pinned_p3o2c4.vert`，业务层与渲染层都不再各自乘
- * `pixelToWorldScale()`（见 `Docs/03-渲染主链/新渲染架构.md` §15）。
- *
- * 没统一的是**尺寸本身的声明**。改造前这些数字散在五个地方：
- * `SelectTool` 里两个字面量（16 / 14）、`BaseEditor` 里一个（12）、
- * `SelectionGizmo` 里一个（28）、`OverlaySceneBuilder` 里一个（吸附圈半径 10），
- * 另外 `OverlayState` 的字段默认值又抄了一遍 16 / 14。
- *
- * 后果不是「不好看」，而是**同一个量有两份真源**：手柄的可见方块尺寸取自
- * `SelectTool`，命中容差取自 `SelectionGizmo::handlePixelRadius()`，两者一旦
- * 漂移，视觉与命中区就错位，而且不报错（§15.4 记录过这类事故）。
- *
- * 所以新增定尺寸装饰时的规矩是：**先在这里加一个常量**，再在业务侧引用它，
+ * 新增定尺寸装饰时的规矩是：**先在这里加一个常量**，再在业务侧引用它，
  * 不要就地写字面量。
  *
  * 单位默认是**物理像素**（与 `uViewport` = backingSize 同一坐标系，
  * 已含 devicePixelRatio），不是逻辑像素。唯一的例外是捕捉指示器
  * `kSnapIndicatorRadiusPx`：它是逻辑像素，由 OverlayScene 乘 DPR 后再送渲染。
- *
- * ## 为什么在 RenderBridge 而不是 UI2D
- *
- * 这组常量原本放在 UI2D，但消费方横跨两侧：业务侧（`SelectTool`、
+ */
  * `SelectionGizmo`、`BaseEditor` 的命中容差）与渲染侧（`RenderSceneBuilder`、
  * 覆盖层构建器）。覆盖层与定尺寸标记几何都要在 RenderBridge 内落地，
  * 而 UI2D 依赖 RenderBridge，常量若留在 UI2D 就成环。因此与

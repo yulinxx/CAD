@@ -1,4 +1,10 @@
 #pragma once
+/**
+ * @file IRenderSurface.h
+ * @brief 渲染表面接口
+ *
+ * 管理渲染目标的抽象接口。
+ */
 #include "IRenderTypes.h"
 
 namespace RenderAbstraction {

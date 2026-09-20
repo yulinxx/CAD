@@ -1,4 +1,10 @@
 #pragma once
+/**
+ * @file IRenderFactory.h
+ * @brief 渲染工厂接口
+ *
+ * 创建渲染设备、表面和场景的抽象工厂接口。
+ */
 #include "IRenderDevice.h"
 #include "IRenderSurface.h"
 #include "IRenderScene.h"
