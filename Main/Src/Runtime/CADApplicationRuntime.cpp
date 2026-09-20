@@ -89,7 +89,6 @@ int CADApplicationRuntime::run()
         // 通过编译期宏 SANYI_ENABLE_LICENSE 显式启用许可校验
         // 生产构建应在 CMakeLists.txt 中 add_compile_definitions(SANYI_ENABLE_LICENSE)
 #ifdef SANYI_ENABLE_LICENSE
-        License_SetCheckEnabled(1);
         SY_INFO("[CADApplicationRuntime] License check ENABLED via SANYI_ENABLE_LICENSE macro");
 #endif
 
@@ -104,8 +103,17 @@ int CADApplicationRuntime::run()
         if (trialResult == -1)
         {
             // 试用期已过期，必须激活
-            SY_INFO("[CADApplicationRuntime] Trial expired, forcing license activation");
-            License_SetCheckEnabled(1);
+            SY_INFO("[CADApplicationRuntime] Trial expired, showing activation dialog");
+            LicenseDialog dlg(configDir);
+            if (dlg.exec() != QDialog::Accepted)
+            {
+                SY_WARN("[CADApplicationRuntime] Trial expired: user rejected activation");
+                // 试用期已过期且用户拒绝激活，退出程序
+            }
+            else
+            {
+                SY_INFO("[CADApplicationRuntime] User activated successfully after trial expired");
+            }
         }
         else if (trialResult == 0 && remainingDays > 0)
         {
