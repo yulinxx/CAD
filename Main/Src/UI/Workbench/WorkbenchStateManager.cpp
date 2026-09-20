@@ -1,3 +1,9 @@
+/**
+ * @file WorkbenchStateManager.cpp
+ * @brief 工作台状态管理器实现
+ *
+ * 管理工作台状态（窗口位置、面板可见性等）。
+ */
 #include "WorkbenchStateManager.h"
 #include "WorkbenchMenuManager.h"
 #include "WorkbenchLayoutManager.h"

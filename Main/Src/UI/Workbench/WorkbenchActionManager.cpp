@@ -1,3 +1,9 @@
+/**
+ * @file WorkbenchActionManager.cpp
+ * @brief 工作台动作管理器实现
+ *
+ * 管理动作和快捷键的注册与分发。
+ */
 #include "WorkbenchActionManager.h"
 #include "Services/UiFrameworkServices.h"
 #include "UiStateCenter.h"

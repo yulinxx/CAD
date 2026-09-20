@@ -1,3 +1,9 @@
+/**
+ * @file UiShellHost.cpp
+ * @brief UI Shell 主机实现
+ *
+ * 管理主窗口的生命周期和 UI 框架初始化。
+ */
 #include "UiShellHost.h"
 
 #include "Log/SyLogger.h"

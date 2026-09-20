@@ -1,3 +1,9 @@
+/**
+ * @file UiLayoutService.cpp
+ * @brief UI 布局服务实现
+ *
+ * 管理工作台布局的保存和恢复。
+ */
 #include "UiLayoutService.h"
 
 #include <QSettings>
