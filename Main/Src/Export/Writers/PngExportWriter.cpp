@@ -1,3 +1,7 @@
+/**
+ * @file PngExportWriter.cpp
+ * @brief PNG 导出写入器实现
+ */
 #include "PngExportWriter.h"
 
 PngExportWriter::PngExportWriter()

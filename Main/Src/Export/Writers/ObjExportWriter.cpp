@@ -1,3 +1,7 @@
+/**
+ * @file ObjExportWriter.cpp
+ * @brief OBJ 导出写入器实现
+ */
 #include "ObjExportWriter.h"
 
 #include "Log/SyLogger.h"

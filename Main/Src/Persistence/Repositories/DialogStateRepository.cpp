@@ -1,3 +1,9 @@
+/**
+ * @file DialogStateRepository.cpp
+ * @brief 对话框状态仓储实现
+ *
+ * 管理对话框状态的持久化。
+ */
 #include "DialogStateRepository.h"
 
 #include "Engine/Persistence/Database.h"

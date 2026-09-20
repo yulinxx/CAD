@@ -1,3 +1,9 @@
+/**
+ * @file SqliteRepositoryBase.cpp
+ * @brief SQLite 仓储基类实现
+ *
+ * 提供数据库操作的基础功能。
+ */
 #include "SqliteRepositoryBase.h"
 
 #include "Log/SyLogger.h"

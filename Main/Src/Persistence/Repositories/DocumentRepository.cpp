@@ -1,3 +1,9 @@
+/**
+ * @file DocumentRepository.cpp
+ * @brief 文档仓储实现
+ *
+ * 管理文档的持久化。
+ */
 #include "DocumentRepository.h"
 
 #include "Engine/Persistence/Database.h"

@@ -1,3 +1,7 @@
+/**
+ * @file NativeExportWriter.cpp
+ * @brief 原生格式导出写入器实现
+ */
 #include "NativeExportWriter.h"
 
 // 用于检测 3D 网格图元

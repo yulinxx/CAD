@@ -1,3 +1,9 @@
+/**
+ * @file ExportWriterBase.cpp
+ * @brief 导出写入器基类实现
+ *
+ * 提供导出功能的基础实现。
+ */
 #include "ExportWriterBase.h"
 
 #include <utility>
