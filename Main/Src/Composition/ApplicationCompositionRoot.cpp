@@ -1,3 +1,9 @@
+/**
+ * @file ApplicationCompositionRoot.cpp
+ * @brief 应用组合根实现
+ *
+ * 负责组装和初始化所有核心服务。
+ */
 #include "ApplicationCompositionRoot.h"
 #include "MachiningDataBridgeService.h"
 #include "FileOperationRegistry.h"

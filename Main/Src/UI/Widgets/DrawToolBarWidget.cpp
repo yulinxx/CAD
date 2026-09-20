@@ -1,3 +1,9 @@
+/**
+ * @file DrawToolBarWidget.cpp
+ * @brief 绘图工具栏窗口实现
+ *
+ * 显示绘图工具按钮（选择、画线、圆等）。
+ */
 #include "DrawToolBarWidget.h"
 
 #include <QAction>

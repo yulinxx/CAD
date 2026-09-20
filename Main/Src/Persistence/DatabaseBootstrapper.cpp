@@ -1,3 +1,9 @@
+/**
+ * @file DatabaseBootstrapper.cpp
+ * @brief 数据库引导程序实现
+ *
+ * 管理数据库 Schema 版本和升级。
+ */
 #include "DatabaseBootstrapper.h"
 
 #include "Engine/Persistence/Database.h"

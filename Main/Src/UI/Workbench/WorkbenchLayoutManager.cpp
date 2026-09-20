@@ -1,3 +1,9 @@
+/**
+ * @file WorkbenchLayoutManager.cpp
+ * @brief 工作台布局管理器实现
+ *
+ * 管理工作台的停靠面板布局。
+ */
 #include "WorkbenchLayoutManager.h"
 #include "WorkbenchMenuManager.h"
 #include "UiSceneTreePanel.h"

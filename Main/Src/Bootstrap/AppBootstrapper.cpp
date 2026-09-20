@@ -1,3 +1,9 @@
+/**
+ * @file AppBootstrapper.cpp
+ * @brief 应用引导程序实现
+ *
+ * 负责应用程序的启动初始化流程。
+ */
 #include "AppBootstrapper.h"
 
 #include <QDir>

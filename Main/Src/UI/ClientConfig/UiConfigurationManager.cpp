@@ -1,3 +1,9 @@
+/**
+ * @file UiConfigurationManager.cpp
+ * @brief UI 配置管理器实现
+ *
+ * 管理客户端配置的加载和解析。
+ */
 #include "UiConfigurationManager.h"
 
 #include "UiClientContext.h"

@@ -1,3 +1,9 @@
+/**
+ * @file WorkbenchMenuManager.cpp
+ * @brief 工作台菜单管理器实现
+ *
+ * 管理应用程序菜单的构建和响应。
+ */
 #include "WorkbenchMenuManager.h"
 #include "WorkbenchWindow.h"
 #include "BuildConfig.h"
