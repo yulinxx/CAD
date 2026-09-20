@@ -75,62 +75,15 @@ bool DocumentRepository::save(const DocumentRecord& record)
         return setError("DocumentRepository", "save: empty filePath");
     }
 
-    // 先检查是否已存在同路径的记录，若存在则更新而非插入
-    DocumentRecord existing;
-    try
-    {
-        existing = loadByPath(record.filePath);
-    }
-    catch (const std::exception& e)
-    {
-        m_lastError = std::string("save: loadByPath threw: ") + e.what();
-        SY_ERRORF("[DocumentRepository] %s", m_lastError.c_str());
-        return false;
-    }
-
-    if (existing.id > 0)
-    {
-        // 已有记录：通过 id 更新 fields
-        std::map<std::string, std::string> values;
-        values["title"] = record.title;
-        values["format"] = record.format;
-        values["entity_count"] = std::to_string(record.entityCount);
-        values["file_size"] = record.fileSize;
-        // 只在调用方明确提供了时间字段时才更新
-        if (!record.lastOpenedAt.empty())
-        {
-            values["last_opened_at"] = record.lastOpenedAt;
-        }
-        if (!record.lastSavedAt.empty())
-        {
-            values["last_saved_at"] = record.lastSavedAt;
-        }
-        if (!record.createdAt.empty())
-        {
-            values["created_at"] = record.createdAt;
-        }
-
-        std::string whereClause = "id = :id";
-        std::map<std::string, std::string> whereParams;
-        whereParams["id"] = std::to_string(existing.id);
-
-        if (!m_database.update("documents", values, whereClause, whereParams))
-        {
-            return fail("DocumentRepository", "Failed to update document metadata");
-        }
-
-        SY_DEBUGF("[DocumentRepository] Updated document: %s", record.filePath.c_str());
-        return true;
-    }
-
-    // New record: insert
+    // 使用 INSERT OR REPLACE 替代先 loadByPath 再 UPDATE/INSERT 的 N+1 查询模式
+    // documents 表的 file_path 已有 UNIQUE 约束，因此 INSERT OR REPLACE 可正确覆盖已有记录
     auto values = recordToRow(record);
     if (!m_database.insertOrReplace("documents", values))
     {
         return fail("DocumentRepository", "Failed to save document metadata");
     }
 
-    SY_DEBUGF("[DocumentRepository] Inserted document: %s", record.filePath.c_str());
+    SY_DEBUGF("[DocumentRepository] Saved document: %s", record.filePath.c_str());
     return true;
 }
 

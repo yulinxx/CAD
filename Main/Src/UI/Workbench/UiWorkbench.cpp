@@ -332,7 +332,7 @@ void Workbench2D::dispatchCommand(const QString& commandId, const QVariantMap& p
         SY_DEBUGF("[Workbench2D] Dispatch command='%s' menuId=%d source=Menu",
             qPrintable(commandId),
             static_cast<int>(menuId));
-        OperationRouting::dispatch(menuId, OperationSource::Menu, params);
+        OperationRouting::dispatch(menuId, m_commands.operationBus, OperationSource::Menu, params);
         return;
     }
 

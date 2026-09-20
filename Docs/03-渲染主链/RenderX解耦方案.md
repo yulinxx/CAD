@@ -51,6 +51,8 @@
 > - `RenderBridge::RenderXAdapter::createFactory()` —— 只建设备，用于不需要交换链的场景（契约测试等）。
 >
 > 两者的句柄所有权规则相反：宿主自建的句柄归宿主销毁，工厂建的 Runtime 归设备对象销毁。这一点在适配器构造函数里用显式的 `ownsRuntime` 表达。
+>
+> 还有一处**有意保留**的例外：`Tools/MetalViewportProto` 仍然直接 `#include "render/renderx.h"`。它是 Metal 可行性的冒烟工具，要验证的正是抽象层**之下**那条链（NSView → CAMetalLayer → nextDrawable → 出帧），走抽象层就等于绕开被测对象。它默认不构建、仅 Apple 平台、不链 RenderBridge 与 UI，因此不构成耦合返潮的入口（详见《新渲染架构.md》§26.7）。
 
 ## 1. 问题诊断
 

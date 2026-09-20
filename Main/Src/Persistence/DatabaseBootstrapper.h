@@ -66,6 +66,12 @@ private:
     /// 执行从当前版本到目标版本的迁移
     bool runMigrations(int currentVersion, int targetVersion);
 
+    /// 创建对话框状态表（v5 新增）
+    bool createDialogStateTable();
+
+    /// 为常用查询字段创建索引，提升查询性能
+    bool createIndices();
+
     Eg::Database& m_database;
     std::string m_lastError;
 };
