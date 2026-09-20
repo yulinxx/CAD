@@ -517,12 +517,14 @@ if(APPLE AND NOT CMAKE_CROSSCOMPILING)
     find_program(PDTOCAIRO pdftocairo PATHS /opt/homebrew/bin /usr/local/bin)
     find_program(GHOSTSCRIPT gs PATHS /opt/homebrew/bin /usr/local/bin)
     
-    if(PDTOCAIRO AND GHOSTSCRIPT AND TARGET SanYiCAD)
+    if(PDTOCAIRO AND GHOSTSCRIPT)
         message(STATUS "Found pdftocairo: ${PDTOCAIRO}")
         message(STATUS "Found ghostscript: ${GHOSTSCRIPT}")
         
         # 打包到 App Bundle (SanYiCAD 是主可执行目标)
-        add_custom_command(TARGET SanYiCAD POST_BUILD
+        # 注意：需要检查 target 是否存在
+        if(TARGET SanYiCAD)
+            add_custom_command(TARGET SanYiCAD POST_BUILD
             # 创建目录
             COMMAND ${CMAKE_COMMAND} -E make_directory
                 $<TARGET_FILE_DIR:SanYiCAD>/../Resources/bin
@@ -574,6 +576,7 @@ if(APPLE AND NOT CMAKE_CROSSCOMPILING)
             
             COMMENT "Bundling pdftocairo + Ghostscript + deps into App Bundle"
         )
+        endif()
     else()
         message(WARNING "pdftocairo/gs not found - AI/PDF import will not work on other Macs. Install with: brew install poppler ghostscript")
     endif()
