@@ -1064,15 +1064,37 @@ QVector<qint64> SceneTreePanel::selectedIdNumbers() const
         return ids;
     }
 
-    // 行的 internalId 就是图元 id（见模型 createIndex），无需走 data()/kIdRole
-    // 的字符串往返 —— 全选百万图元时这一步是主要开销。
     const auto selectedIndexes = m_view->selectionModel()->selectedRows(1);
     ids.reserve(selectedIndexes.size());
-    for (const QModelIndex& index : selectedIndexes)
+
+    if (m_mode == Mode::Mode2D)
     {
-        if (index.isValid())
+        // 2D 模型的行 internalId 就是图元 id（见 createIndex），无需走
+        // data()/kIdRole 的字符串往返 —— 全选百万图元时这一步是主要开销。
+        for (const QModelIndex& index : selectedIndexes)
         {
-            ids.push_back(static_cast<qint64>(index.internalId()));
+            if (index.isValid())
+            {
+                ids.push_back(static_cast<qint64>(index.internalId()));
+            }
+        }
+    }
+    else
+    {
+        // 3D 模型是 QStandardItemModel，internalId 是内部项指针而非图元 id，
+        // 必须从 kIdRole 取（与 selectedIds() 一致）。
+        for (const QModelIndex& index : selectedIndexes)
+        {
+            if (!index.isValid())
+            {
+                continue;
+            }
+            bool ok = false;
+            const qint64 v = index.data(kIdRole).toString().toLongLong(&ok);
+            if (ok)
+            {
+                ids.push_back(v);
+            }
         }
     }
     return ids;

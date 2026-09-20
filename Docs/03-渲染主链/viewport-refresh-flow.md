@@ -185,6 +185,21 @@ setVisible(false/true) / setEntitiesVisible(ids, visible)
 - 图层级显隐仍走 `LayerManager::setLayerVisible` → `notifySceneChanged()`，语义不同
   （图层显隐影响整层，实体显隐只影响单图元）。
 
+### 6.1 实体锁定：不进刷新链（2026-09-20）
+
+锁定是纯元数据，**不改变任何渲染结果**，因此刻意不进刷新链：
+
+```text
+setLocked(false/true) / setEntitiesLocked(ids, locked)
+→ SyEntity 锁定回调（SceneManager 入场时注入）
+→ recordChange(id, LockChanged)
+→ [不调 notifySceneChanged]
+→ UI 侧：refreshCommandUiState()（仅刷新 Lock/Unlock 菜单灰显）
+```
+
+- 与 `VisibilityChanged` 分列两个 kind：消费方能区分「需要重绘」与「只更新 UI 状态」；
+- 场景树当前不显示锁定态，因此也不重建树（旧实现为刷新一个不存在的图标做 O(N) 重建）。
+
 ---
 
 ## 7. 当前需继续收口的点

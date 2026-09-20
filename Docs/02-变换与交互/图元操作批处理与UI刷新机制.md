@@ -221,7 +221,32 @@ void setVisible(bool visible) override {
 **收益**：实体级显隐切换进入增量路径，不再退化为 `FullRefresh`；配合 16ms 定时器，
 批量显隐只产生一帧增量重绘。
 
-### 4.5 调用方收口
+### 4.5 实体锁定变更与批量锁定（2026-09-20）
+
+**问题**：2D 场景树「全选 → 锁定/解锁」旧路径有三重浪费：
+
+1. 场景树经 `QStringList` 传递 ~N 个字符串 ID，工作台再逐个
+   `id.toStdString()` + `parseEntityId` + `findEntityById`（百万图元下是主要开销）；
+2. `setLocked` 只改标志位，但工作台仍调 `scene->notifySceneChanged()` —— 锁定是纯元数据，
+   **不影响几何与渲染**，这次视口刷新完全多余；
+3. 为刷新一个当时并不存在的锁图标，触发一次 O(N) 全量场景树重建。
+
+**方案**：
+
+- 引擎加 `SceneChangeKind::LockChanged` 与 `SyEntity` 锁定变更回调（与可见性同一形状），
+  `SceneManager` / `SceneManager3D` 入场时注入并 `recordChange(LockChanged)`；
+- 新增批量接口 `setEntitiesLocked(ids|pointers, locked)`（2D/3D），**不触发
+  `notifySceneChanged`**；
+- 场景树信号改为 `QVector<qint64>`（`selectedIdNumbers()` 直接取行的 `internalId`，
+  不再构造 QString）；
+- 新增 `SceneTreePanel::refreshRows(ids)`：逐 id 定位行（O(log N)）后按连续区间发
+  `dataChanged`，不重建拓扑、不 reset 模型；
+- 移除 `applySelectionContext` 中「锁定态翻转 → 强制全量重建树」的分支。
+
+**收益**：批量锁定/解锁不再触发任何渲染刷新与全量树重建，只做一次批量标志位写入
++ 命令状态刷新。
+
+### 4.6 调用方收口
 
 | 位置 | 旧做法 | 现做法 |
 | --- | --- | --- |
@@ -239,7 +264,7 @@ void setVisible(bool visible) override {
 命令析构时会再次释放。现改为 `extractEntities` 摘出并保留所有权，形成
 「undo 归还 / redo 摘出」的可逆闭环（与 `DeleteMeshCommand3D` 同一模式）。
 
-### 4.6 3D 场景树的重建门控
+### 4.7 3D 场景树的重建门控
 
 文件：`Main/Src/UI/Workbench/UiWorkbench.cpp`
 
@@ -342,7 +367,8 @@ pending 标志，超时补一次尾包。属性面板展示端点/半径等几�
 | 对话框移动/旋转/镜像/对齐 | `EditOperationRegistry` → `transformEntities` | 矩阵合并一次，整批一次索引同步 | 入栈后一次通知；结构签名不变不重建树 |
 | 方向键 Nudge | `Edit_Nudge` → `nudgeSelected` | 同上；撤销命令可合并 | 同上 |
 | 删除 | `DeleteEntitiesCommand` | `removeRange` 批量摘除 | 一次选择+场景通知；结构签名变化 → 树防抖重建 |
-| 批量显隐 | `SceneManager::setEntitiesVisible` | 循环 `setVisible` → 回调 `recordChange(VisibilityChanged)` | 进入增量路径；16ms 合帧；结构签名不变不重建树 |
+| 批量显隐 | `SceneManager::setEntitiesVisible` | 循环 `setVisible` → 回调 `recordChange(VisibilityChanged)` | 进入增量路径；16ms 合帧；结构签名不变，树按行 `dataChanged` 增量刷新 |
+| 批量锁定 | `SceneManager::setEntitiesLocked` | 循环 `setLocked` → 回调 `recordChange(LockChanged)` | **不触发渲染刷新**；只刷命令状态；不重建树 |
 | 粘贴 / 复制 | `addEntities` 批量落库 | 批量建索引（带进度分段） | 一次通知；结构签名变化 → 树重建 |
 | 撤销 / 重做 | `EntitySnapshotsCommand` | 快照整批替换/恢复 | 命令末尾一次通知 |
 | 3D 框选 | `RenderWidget3D::selectByScreenRect` | 逐图元投影求交（屏幕空间） | 一次 `selectMany`，只刷新一次属性面板 |
@@ -372,6 +398,10 @@ pending 标志，超时补一次尾包。属性面板展示端点/半径等几�
 - ✅ 实体显隐统一走 `setEntitiesVisible`（或直接 `setVisible`，由回调记录），
   禁止绕过 SceneManager 直接改标志位——那样不会产生 `VisibilityChanged`，
   渲染侧收不到变更、只能全量重建；
+- ✅ 实体锁定统一走 `setEntitiesLocked`（或直接 `setLocked`，由回调记录）；
+  锁定不影响渲染，**禁止**为锁定调用 `notifySceneChanged()`；
+- ✅ 场景树批量信号传整数 ID（`QVector<qint64>`），禁止用 `QStringList` 传递大量
+  id；行内容变化（显隐）用 `refreshRows()` 增量刷新，禁止全量重建拓扑；
 - ✅ 场景树按 id 定位行走哈希表：`SceneTreeTableModel2D::indexForId` 的群组成员
   分支改为查 `m_childRowById`（与 `m_childParent` 同处维护），不再对全体已展开
   群组做线性扫描；
@@ -412,3 +442,8 @@ pending 标志，超时补一次尾包。属性面板展示端点/半径等几�
 - ✅ 2026-09-18：实体可见性变更增量记录 —— `SyEntity` 新增可见性变更回调，
   `SceneManager` / `SceneManager3D` 入场时注入并 `recordChange(VisibilityChanged)`；
   新增 `setEntitiesVisible` 批量 API。实体级显隐不再退回全量刷新。
+- ✅ 2026-09-20：实体锁定批量化 —— 新增 `SceneChangeKind::LockChanged`、
+  `SyEntity` 锁定变更回调、`setEntitiesLocked` 批量 API；场景树批量信号改传
+  `QVector<qint64>`（新增 `selectedIdNumbers()`），新增 `SceneTreePanel::refreshRows()`
+  增量刷新替代全量重建；移除锁定触发的 `notifySceneChanged()` 与强制树重建；
+  `Edit_SelectAll` 改用 `forEachEntity` 避免 `getAllEntities()` 的全量指针拷贝。
