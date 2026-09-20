@@ -12,11 +12,7 @@ public:
     /// 后端报告的设备名（如 "Apple M1 Pro"），同上
     virtual const char* deviceName() const = 0;
 
-    // 这里曾有 maxLineWidth / maxTextureSize 两条能力查询，已删：有实现、无调用者。
-    // 线宽上限只有后端内部用（Renderx 自己钳制），UI 要粗线时自己三角化；
-    // 纹理上限没人看，纹理由 UI 自建，越界在 createTexture 时就失败了。
-    // 留着等于把后端能力表照搬到抽象层，与已删的 getDefaultPipeline(格式,空间,拓扑)
-    // 同性质。需要时再加回。
+    // 能力查询接口（需要时再加回）
 
     virtual TextureHandle createTexture(const TextureDesc& desc) = 0;
     virtual void destroyTexture(TextureHandle texture) = 0;

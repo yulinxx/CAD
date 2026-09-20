@@ -1,11 +1,6 @@
 /**
  * @file OverlayScene.cpp
  * @brief OverlayScene 实现（设计说明见头文件）
- *
- * 几何生成部分移植自 UI2D 的 `OverlaySceneBuilder.cpp`：顶点格式与空间、
- * 瞬态环分配、sortKey 层级、定尺寸标记与捕捉形状的生成规则都原样保留，
- * 改动只在「谁持有状态」—— 原先是一个扁平的 `OverlayState`，
- * 现在是各自独立的层。
  */
 #include "RenderBridge/OverlayScene.h"
 

@@ -3,43 +3,35 @@
  * @file OverlayScene.h
  * @brief 覆盖层：按层持有交互/选择装饰，逐帧合成到瞬态环
  *
- * ## 它取代了什么
+ * ## 设计概述
  *
- * 覆盖层原先由 UI2D 的 `OverlayState`（一个装了 7 组 `has*` 标志的扁平结构）
- * 累积、由 `OverlaySceneBuilder::build` 翻译成 DrawCommand。扁平结构的问题是
- * 每次修改都得理解整体：`SelectionGizmo` 一次重绘会连续触发四个回调，
- * 任何一处误整体重置就会抹掉别人的成果（历史上出过「选中后虚线和选择框都不显示」）。
+ * 覆盖层采用**分层模型**：每组装饰对应一个独立层（`OverlayLayerId` 枚举），
+ * 由产生者设置、由产生者清除，层与层之间互不可见。提交时按枚举顺序合成，
+ * 枚举顺序即绘制叠放顺序。
  *
- * 现在每一组装饰是一个**独立的层**：谁产生谁设置，谁设置谁清除，
- * 层与层之间互不可见。提交时按 `OverlayLayerId` 的枚举顺序合成 ——
- * 枚举顺序即绘制叠放顺序，这一点写死在类型里，不再靠一个共享的自增序号。
+ * ## 瞬态环
  *
- * ## 为什么走瞬态环而不是几何仓
+ * 覆盖层内容每帧变化（橡皮筋、手柄、流水虚线），适合使用瞬态环
+ * （`IRenderScene::allocTransient`）管理：每帧全量重传，帧末自动回收。
  *
- * 覆盖层（橡皮筋、手柄、流水虚线）**每帧都变**，这正是瞬态环
- * （`IRenderScene::allocTransient`）的目标负载：每帧全量重传，帧末自动回收。
- * 塞进 GeometryStore 只会让「常驻」这个前提失效，每帧都要 alloc/free 一遍，
- * 反而比瞬态环慢（`PersistentGeometryStore` 服务的是场景图元，不是这一类）。
+ * ## 坐标系统
  *
- * ## 分层判据
- *
- * - 覆盖层坐标一律是**世界坐标**，由 World 管线经 uView 变换。
- * - 「手柄 / 旋转点 / 吸附指示器」这类**标记**走 `RenderSpace::WorldPinned`：
- *   锚点跟随平移，尺寸恒定为若干物理像素，不随缩放变化。像素换算在
- *   `world_pinned_p3o2c4.vert` 里完成，业务层不参与（见新渲染架构 §15）。
- * - 需要透明度（半透明填充）统一用 P3C4；WorldPinned 用 P3O2C4。
- * - `pipelineIndex` 留 0，让后端按 (格式, 空间, 拓扑) 自行解析 ——
- *   默认管线已开启 SrcAlpha/OneMinusSrcAlpha 混合。
+ * - 覆盖层坐标统一为**世界坐标**，经 World 管线 uView 变换。
+ * - 手柄、旋转点、吸附指示器等标记使用 `RenderSpace::WorldPinned`：
+ *   锚点跟随平移，尺寸恒定为物理像素，不随缩放变化。像素换算在
+ *   `world_pinned_p3o2c4.vert` 中完成。
+ * - 需要透明度（半透明填充）使用 P3C4；WorldPinned 用 P3O2C4。
+ * - `pipelineIndex` 留 0，后端按 (格式, 空间, 拓扑) 解析，默认管线已开启
+ *   SrcAlpha/OneMinusSrcAlpha 混合。
  * - 排序层级固定 `layer=200, transparent=1`，保证绘制在图元（layer=100）之上。
  *
  * ## 逐帧参数
  *
- * 虚线节距/相位与捕捉标记尺寸是**像素基准**，而顶点是世界坐标或像素偏移，
- * 因此离散化时必须知道本帧的 `pixelToWorld` 与 `devicePixelRatio`。
- * 这两个值由视口在提交前通过 `setFrameParams` 注入，不由层自己持有 ——
- * 否则每层都要跟着窗口缩放改一遍。
+ * 虚线节距/相位与捕捉标记尺寸基于像素基准，顶点是世界坐标或像素偏移，
+ * 离散化时需要本帧的 `pixelToWorld` 与 `devicePixelRatio`。
+ * 这两个值由视口通过 `setFrameParams` 注入。
  *
- * ## 类型隔离说明
+ * ## 类型隔离
  *
  * 本头文件不 include renderx.h：合成所需的场景对象由调用方按抽象层接口传入。
  */

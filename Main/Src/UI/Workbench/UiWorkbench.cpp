@@ -2009,8 +2009,7 @@ void Workbench2D::applySelectionContext(const CommandUiSnapshot& snapshot)
     }
 
     // 场景树右键菜单：与视口右键菜单共用同一份 hasSelection / anyLocked 判定，消除规则漂移。
-    // 注意：锁定态当前不在树中可视化，因此 setCommandState 只用于更新右键菜单灰显，
-    // 不再触发树重建（旧实现为刷新一个并不存在的锁图标而做 O(N) 全量重建）。
+    // 注意：锁定态当前不在树中可视化，因此 setCommandState 只用于更新右键菜单灰显。
     if (m_scenePanel2D)
     {
         m_scenePanel2D->setCommandState(snapshot.hasSelection, snapshot.anyLocked());
@@ -2813,11 +2812,8 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
 
     // 2. 菜单：统一由 WorkbenchMenuManager 从客户 JSON 生成（P0-2c）
     //
-    // 3D 菜单历史上由 MenuManager3D（5 个硬编码 Menu 子类）自行清空并创建窗口菜单栏，
-    // 与 2D 的配置驱动路径完全并行，客户想改 3D 菜单只能改 C++。
-    // 现在 2D / 3D 走同一条 JSON 链路：菜单项在客户配置里按 workbenches: ["3D"] 声明，
+    // 2D / 3D 走同一条 JSON 链路：菜单项在客户配置里按 workbenches: ["3D"] 声明，
     // 命令 ID 经 Workbench3D::dispatchCommand 落到 OperationBus3D。
-    // MenuManager3D 及其 bindXxxMenu / connectMenuSignals 已随硬编码路径一并移除。
     SY_DEBUG("[Workbench3D] Menus are built by WorkbenchMenuManager from client config");
 
     // 5. 转移并绑定工具栏。

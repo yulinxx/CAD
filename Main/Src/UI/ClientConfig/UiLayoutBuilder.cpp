@@ -410,8 +410,7 @@ void UiLayoutBuilder::buildMenuItem(
     {
         action->setShortcut(keySequence);
         // 菜单项快捷键即全局快捷键（单一来源）：默认的 WindowShortcut 只在菜单所属窗口激活时生效，
-        // 浮动出去的 Dock 是独立顶层窗口，按键就不响应了。历史上这个作用域由配置 shortcuts 节
-        // 另建的 ApplicationShortcut QShortcut 兜住，那批重复定义已移除，作用域必须在此补齐。
+        // 浮动出去的 Dock 是独立顶层窗口，按键就不响应了，必须设成 ApplicationShortcut。
         action->setShortcutContext(Qt::ApplicationShortcut);
         m_menuShortcutKeys.insert(keySequence.toString());
     }

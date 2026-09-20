@@ -4,11 +4,6 @@
  * @file UiContextMenuService.h
  * @brief 配置驱动的右键菜单服务（P0-2b）+ 全仓唯一的菜单动态段注册表
  *
- * 背景：
- *   右键菜单历史上完全由 C++ 硬编码组装（CommandActionHub::populateContextMenu /
- *   CommandActionHub3D::populateContextMenu），是 UI 定制体系里最后一块没有纳入
- *   JSON 的表面。客户想调整右键项就必须改 C++。
- *
  * 设计：
  *   静态部分 —— 由客户 JSON 的 contextMenus 节声明，走 UiLayoutBuilder 构建，
  *               与顶部菜单共享命令绑定、图标解析、授权门控行为。
