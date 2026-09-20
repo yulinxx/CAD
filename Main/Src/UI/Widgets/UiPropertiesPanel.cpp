@@ -1,3 +1,9 @@
+/**
+ * @file UiPropertiesPanel.cpp
+ * @brief 属性面板实现
+ *
+ * 显示和编辑选中图元的属性。
+ */
 #include "UiPropertiesPanel.h"
 
 #include <functional>

@@ -1,3 +1,9 @@
+/**
+ * @file SelectionService.cpp
+ * @brief 选择服务实现
+ *
+ * 管理图元选择状态，提供选中集的增删改查。
+ */
 #include "SelectionService.h"
 
 #include "Engine2D/Core/SceneManager.h"

@@ -1,3 +1,9 @@
+/**
+ * @file UiSceneTreePanel.cpp
+ * @brief 场景树面板实现
+ *
+ * 显示文档中的图元层次结构。
+ */
 #include "UiSceneTreePanel.h"
 
 #include "SceneTreeModel2D.h"

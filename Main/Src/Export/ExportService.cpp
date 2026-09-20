@@ -1,4 +1,10 @@
 #include <ctime>
+/**
+ * @file ExportService.cpp
+ * @brief 导出服务实现
+ *
+ * 管理文件导出流程，协调各格式写入器。
+ */
 #include "ExportService.h"
 #include "ExportDispatcher.h"
 

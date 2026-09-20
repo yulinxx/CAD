@@ -1,3 +1,9 @@
+/**
+ * @file ImportService.cpp
+ * @brief 导入服务实现
+ *
+ * 管理文件导入流程，协调各格式解析器。
+ */
 #include "ImportService.h"
 #include "ImportDispatcher.h"
 #include "ImportResult.h"

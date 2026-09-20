@@ -1,3 +1,9 @@
+/**
+ * @file PersistenceService.cpp
+ * @brief 持久化服务实现
+ *
+ * 管理数据库连接和所有仓储的生命周期。
+ */
 #include "PersistenceService.h"
 
 #include <thread>

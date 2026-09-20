@@ -1,3 +1,9 @@
+/**
+ * @file FileDialogService.cpp
+ * @brief 文件对话框服务实现
+ *
+ * 提供打开/保存文件对话框的封装。
+ */
 #include "UI/Services/FileDialogService.h"
 
 #include <QFileDialog>
