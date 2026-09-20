@@ -13,7 +13,8 @@
 // v2: 新增 documents 表
 // v3: layers 表新增 fill 列（填充图层标志，色块填充）
 // v4: layers 表新增 fill_color 列（填充色，色块填充）
-static constexpr int kSchemaVersion = 4;
+// v5: 新增 dialog_states 表和索引，为对话框数据持久化提供支持
+static constexpr int kSchemaVersion = 5;
 
 // 应用版本使用 MainApp::appVersion() 全局定义
 
@@ -81,6 +82,14 @@ bool DatabaseBootstrapper::ensureSchema()
     }
 
     SY_DEBUGF("[DatabaseBootstrapper] Schema is up to date (v%d)", kSchemaVersion);
+
+    // 为常用查询字段创建索引，提升查询性能
+    if (!createIndices())
+    {
+        SY_ERRORF("[DatabaseBootstrapper] Failed to create indices: %s", m_lastError.c_str());
+        return false;
+    }
+
     return true;
 }
 
@@ -266,6 +275,12 @@ bool DatabaseBootstrapper::createBusinessTables()
         return false;
     }
 
+    // 对话框状态表（v5 新增）
+    if (!createDialogStateTable())
+    {
+        return false;
+    }
+
     return true;
 }
 
@@ -394,6 +409,31 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
             }
             SY_DEBUG("[DatabaseBootstrapper] Migration v3->v4: added layers.fill_color column");
         }
+        else if (v == 4)
+        {
+            // v4 -> v5: 新增 dialog_states 表，用于对话框界面数据持久化
+            if (!createDialogStateTable())
+            {
+                m_lastError = "Migration v4->v5 failed: " + m_database.lastError();
+                SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+                return false;
+            }
+            SY_DEBUG("[DatabaseBootstrapper] Migration v4->v5: created dialog_states table");
+
+            // 为 layers 表创建 (document_id, layer_id) 唯一索引，确保图层数据唯一性
+            // 使用 IF NOT EXISTS 保证幂等性，旧数据库若存在重复数据会跳过
+            if (!m_database.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_layers_doc_layer ON layers(document_id, layer_id)"))
+            {
+                // 旧数据可能有重复，此处忽略错误，后续 createIndices() 会创建普通索引兜底
+                SY_WARNF("[DatabaseBootstrapper] Could not create unique index on layers(document_id, layer_id): %s",
+                    m_database.lastError().c_str());
+            }
+            else
+            {
+                SY_DEBUG("[DatabaseBootstrapper] Created unique index idx_layers_doc_layer");
+            }
+        }
         // 后续版本迁移在此追加 else if 分支
     }
 
@@ -411,5 +451,85 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
     }
 
     SY_DEBUGF("[DatabaseBootstrapper] Schema migrated to v%d", targetVersion);
+    return true;
+}
+
+bool DatabaseBootstrapper::createDialogStateTable()
+{
+    // 对话框状态表：支持任意对话框的界面数据持久化
+    // state_json 字段存储 JSON 序列化的对话框状态，灵活支持不同对话框结构
+    std::string sql = R"(
+        CREATE TABLE IF NOT EXISTS dialog_states (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            dialog_key      TEXT    NOT NULL,
+            document_id     TEXT    DEFAULT '',
+            state_json      TEXT    NOT NULL,
+            created_at      TEXT    DEFAULT (datetime('now')),
+            updated_at      TEXT    DEFAULT (datetime('now')),
+            UNIQUE(dialog_key, document_id)
+        )
+    )";
+
+    if (!m_database.execute(sql))
+    {
+        m_lastError = "Failed to create dialog_states table: " + m_database.lastError();
+        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        return false;
+    }
+    SY_DEBUG("[DatabaseBootstrapper] dialog_states table ready");
+    return true;
+}
+
+bool DatabaseBootstrapper::createIndices()
+{
+    // 为 layers 表的 document_id 字段创建索引，加速按文档查询
+    // 使用 IF NOT EXISTS 保证幂等性
+    if (!m_database.execute(
+        "CREATE INDEX IF NOT EXISTS idx_layers_document_id ON layers(document_id)"))
+    {
+        m_lastError = "Failed to create index idx_layers_document_id: " + m_database.lastError();
+        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        return false;
+    }
+
+    // 为 layers 表的 (document_id, layer_id) 组合创建唯一索引
+    // 确保同一文档下的图层ID唯一，支持 INSERT OR REPLACE 语义
+    // 旧数据库中若存在重复数据，此语句会跳过（IF NOT EXISTS 不会覆盖已有非唯一索引）
+    if (!m_database.execute(
+        "CREATE INDEX IF NOT EXISTS idx_layers_doc_layer ON layers(document_id, layer_id)"))
+    {
+        m_lastError = "Failed to create index idx_layers_doc_layer: " + m_database.lastError();
+        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        return false;
+    }
+
+    // 为 recent_files 表的 last_opened_at 字段创建索引，加速按时间排序查询
+    if (!m_database.execute(
+        "CREATE INDEX IF NOT EXISTS idx_recent_files_opened_at ON recent_files(last_opened_at DESC)"))
+    {
+        m_lastError = "Failed to create index idx_recent_files_opened_at: " + m_database.lastError();
+        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        return false;
+    }
+
+    // 为 dialog_states 表的 document_id 字段创建索引，加速按文档查询
+    if (!m_database.execute(
+        "CREATE INDEX IF NOT EXISTS idx_dialog_states_doc_id ON dialog_states(document_id)"))
+    {
+        m_lastError = "Failed to create index idx_dialog_states_doc_id: " + m_database.lastError();
+        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        return false;
+    }
+
+    // 为 dialog_states 表的 dialog_key 字段创建索引，加速按对话框标识查询
+    if (!m_database.execute(
+        "CREATE INDEX IF NOT EXISTS idx_dialog_states_key ON dialog_states(dialog_key)"))
+    {
+        m_lastError = "Failed to create index idx_dialog_states_key: " + m_database.lastError();
+        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        return false;
+    }
+
+    SY_DEBUG("[DatabaseBootstrapper] All indices created successfully");
     return true;
 }

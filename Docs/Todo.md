@@ -979,18 +979,18 @@ ManufacturingPreviewDocument
 
 ## 九、具体修改优先级
 
-### P0：必须优先处理
+### P0：必须优先处理 — ✅ 全部完成
 
-1. 合并 `SceneDocument3D` 和 `SceneDocument3DAdapter`，只保留一套正式文档入口。
-2. 处理 `SceneDocument3D::removeEntity()` 的空实现问题。
-3. 修复 `EntityToVertices` 缓存写入、删除、清空时的锁问题。
-4. 将 2D 离散化算法合并成一个公共 `Tessellator2D`。
-5. 移除或重写 `RenderWidget3DAdapter` 中的空方法和恒真能力。
-6. 将 UICommon 对 Engine2D、RenderX 的公共依赖降级或移除。
-7. 让 Engine3D 不再依赖 Engine2D。
-8. 明确 2D/3D 是同一文档的两个视图，还是两个不同文档。
+1. 合并 `SceneDocument3D` 和 `SceneDocument3DAdapter`，只保留一套正式文档入口。 — ✅ 已完成
+2. 处理 `SceneDocument3D::removeEntity()` 的空实现问题。 — ✅ 已完成
+3. 修复 `EntityToVertices` 缓存写入、删除、清空时的锁问题。 — ✅ 已完成（缓存整块删除，`entityToVertices` 退回纯函数）
+4. 将 2D 离散化算法合并成一个公共 `Tessellator2D`。 — ✅ 已完成
+5. 移除或重写 `RenderWidget3DAdapter` 中的空方法和恒真能力。 — ✅ 已完成
+6. 将 UICommon 对 Engine2D、RenderX 的公共依赖降级或移除。 — ✅ 已完成（改用 `Engine2DTypes.h` 前置声明）
+7. 让 Engine3D 不再依赖 Engine2D。 — ✅ 已完成
+8. 明确 2D/3D 是同一文档的两个视图，还是两个不同文档。 — ✅ 已完成（3D 双文档模型已合并）
 
-### P1：结构性重构
+### P1：结构性重构 — ✅ 全部完成
 
 1. 新建轻量 `RenderBridge` 模块。 — ✅ 已完成 (`RenderBridge` 模块：`RenderSessionHost` 会话生命周期 + `HostCallbacks` 宿主回调，2D/3D 视口共用)
 2. 引入：
@@ -1004,7 +1004,7 @@ RenderSnapshot
 
 — ✅ 已完成 `SceneChangeSet`(追加式修订日志) 与 `RenderSnapshot`(只读快照)；`DocumentRevision` 并入变更流修订号，`RenderEntityProxy` 由 `RenderEntitySnapshot` 承担。
 
-3. 将增量刷新从“按实体指针读取”改为“按变更快照读取”。 — ✅ 已完成（`SceneRefreshCoordinator` 的过滤循环、并行离散化、串行分支三处改读快照）
+3. 将增量刷新从"按实体指针读取"改为"按变更快照读取"。 — ✅ 已完成（`SceneRefreshCoordinator` 的过滤循环、并行离散化、串行分支三处改读快照）
 4. 抽取公共：
 
 ```text
@@ -1048,7 +1048,7 @@ OperationRegistry
 - `undoable` 标记责任不一致：2D 由 bus 按 `isUndoable()` 代填，3D 由 handler 显式返回 `Cmd::OpFlagUndoable`。
 - `UI/Common/Include/UI/Command/CommandEnableRule.h` 这个文件名已名不副实（里面现在是 `CmdCond`），可考虑改名。
 
-6. 统一 Selection Model，避免 Engine、Document、UI、RenderWidget 各维护一份选择状态。
+6. 统一 Selection Model，避免 Engine、Document、UI、RenderWidget 各维护一份选择状态。 — ✅ 已完成
 
 ### P2：真正实现多后端
 

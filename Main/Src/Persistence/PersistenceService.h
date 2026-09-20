@@ -13,6 +13,7 @@ class WorkspaceSnapshotRepository;
 class LayerRepository;
 class SettingsRepository;
 class DocumentRepository;
+class DialogStateRepository;
 
 /**
  * @brief 持久化服务 — 统一管理数据库连接和所有仓储对象
@@ -53,6 +54,9 @@ public:
     SettingsRepository* settings();
     DocumentRepository* documents();
 
+    /// 对话框状态仓储访问器（v5 新增）
+    DialogStateRepository* dialogStates();
+
     /// 最近一次操作的错误信息
     const std::string& lastError() const;
 
@@ -67,6 +71,9 @@ private:
     std::unique_ptr<LayerRepository> m_layers;
     std::unique_ptr<SettingsRepository> m_settings;
     std::unique_ptr<DocumentRepository> m_documents;
+
+    // 对话框状态仓储（v5 新增）
+    std::unique_ptr<DialogStateRepository> m_dialogStates;
 
     // 状态
     std::string m_lastError;

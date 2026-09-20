@@ -8,6 +8,7 @@
 #include "Repositories/LayerRepository.h"
 #include "Repositories/SettingsRepository.h"
 #include "Repositories/DocumentRepository.h"
+#include "Repositories/DialogStateRepository.h"
 
 #include "Engine/Persistence/Database.h"
 #include "Log/SyLogger.h"
@@ -49,6 +50,9 @@ bool PersistenceService::initialize(const std::string& dbPath)
     m_settings = std::make_unique<SettingsRepository>(*m_database);
     m_documents = std::make_unique<DocumentRepository>(*m_database);
 
+    // 创建对话框状态仓储（v5 新增）
+    m_dialogStates = std::make_unique<DialogStateRepository>(*m_database);
+
     SY_DEBUG("[PersistenceService] Initialized successfully");
     return true;
 }
@@ -66,6 +70,7 @@ void PersistenceService::shutdown()
         m_layers.reset();
         m_settings.reset();
         m_documents.reset();
+        m_dialogStates.reset();
         m_bootstrapper.reset();
         m_database->close();
     }
@@ -99,6 +104,11 @@ SettingsRepository* PersistenceService::settings()
 DocumentRepository* PersistenceService::documents()
 {
     return m_documents.get();
+}
+
+DialogStateRepository* PersistenceService::dialogStates()
+{
+    return m_dialogStates.get();
 }
 
 const std::string& PersistenceService::lastError() const

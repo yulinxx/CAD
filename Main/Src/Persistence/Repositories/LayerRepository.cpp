@@ -26,49 +26,25 @@ std::vector<LayerRecord> LayerRepository::loadByDocument(const std::string& docu
 
 bool LayerRepository::save(const LayerRecord& record)
 {
-    // 先检查是否已存在同文档+同图层ID的记录，若存在则更新而非插入
-    auto existingLayers = loadByDocument(record.documentId);
-    bool exists = false;
-    for (const auto& existing : existingLayers)
+    auto values = recordToRow(record);
+    std::map<std::string, std::string> whereParams;
+    whereParams["document_id"] = record.documentId;
+    whereParams["layer_id"] = std::to_string(record.layerId);
+
+    // 先尝试更新，避免 N+1 查询（不再调用 loadByDocument 预加载所有图层）
+    // 利用 changes() 判断是否存在已有记录，若存在则更新，否则插入
+    if (!m_database.update("layers", values, "document_id = :document_id AND layer_id = :layer_id", whereParams))
     {
-        if (existing.layerId == record.layerId)
-        {
-            exists = true;
-            break;
-        }
+        return fail("LayerRepository", "Failed to save layer");
     }
 
-    if (exists)
+    if (m_database.changes() > 0)
     {
-        // 已有记录：通过 (document_id, layer_id) 组合更新字段
-        std::map<std::string, std::string> values;
-        values["name"] = record.name;
-        values["color"] = record.color;
-        values["visible"] = record.visible ? "1" : "0";
-        values["locked"] = record.locked ? "1" : "0";
-        values["fill"] = record.fill ? "1" : "0";
-        values["fill_color"] = record.fillColor;
-        values["layer_type"] = std::to_string(record.layerType);
-        values["order_index"] = std::to_string(record.orderIndex);
-        if (!record.updatedAt.empty())
-        {
-            values["updated_at"] = record.updatedAt;
-        }
-
-        std::map<std::string, std::string> whereParams;
-        whereParams["document_id"] = record.documentId;
-        whereParams["layer_id"] = std::to_string(record.layerId);
-
-        if (!m_database.update("layers", values, "document_id = :document_id AND layer_id = :layer_id", whereParams))
-        {
-            return fail("LayerRepository", "Failed to update layer");
-        }
-
         SY_DEBUGF("[LayerRepository] Updated layer: doc=%s, layer=%d", record.documentId.c_str(), record.layerId);
         return true;
     }
-    // 新记录：插入
-    auto values = recordToRow(record);
+
+    // 无记录被更新，执行插入
     if (!m_database.insertOrReplace("layers", values))
     {
         return fail("LayerRepository", "Failed to save layer");

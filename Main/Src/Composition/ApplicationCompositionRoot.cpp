@@ -437,9 +437,6 @@ void ApplicationCompositionRoot::setupDirtyStateSync()
 
 void ApplicationCompositionRoot::registerAllOperations()
 {
-    // OperationRouting 注入 OperationBus（替代全局单例）
-    OperationRouting::setOperationBus(m_operationBus.get());
-
     SY_INFO("[ApplicationCompositionRoot] registering module operations on OperationBus");
 
     // 核心操作（撤销/重做/删除/圆角/倒角/选择/帮助 + 编辑操作 + 算法操作 + 视图操作）
