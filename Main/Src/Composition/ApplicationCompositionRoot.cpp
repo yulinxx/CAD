@@ -105,10 +105,16 @@ private:
 #include <QMessageBox>
 #include <QWidget>
 
+// 静态实例指针，由构造函数设置，析构函数清空
+static ApplicationCompositionRoot* s_instance = nullptr;
+
 // 应用组合根组件，负责创建和组装所有核心服务
 // 作为依赖注入的中心点，管理UI层和命令系统的生命周期
 ApplicationCompositionRoot::~ApplicationCompositionRoot()
 {
+    // 清理静态实例指针
+    s_instance = nullptr;
+    
     // 加工服务先销毁：它的析构会把还在跑的作业 abort 掉，
     // 而 abort 需要设备还活着。反过来先停设备，作业就无处可停了。
     m_processingJobService.reset();
@@ -189,6 +195,8 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     , m_exportService(std::make_unique<ExportService>())
     , m_exportDispatcher(std::make_unique<ExportDispatcher>())
 {
+    // 设置静态实例指针
+    s_instance = this;
     // 装配顺序：UI 服务 → 导入导出 → 对话框 → 脏状态 → 操作注册
     UiServices uiServices = assembleUiServices();
     setupImportExportServices(uiServices);
@@ -577,4 +585,32 @@ SettingsService* ApplicationCompositionRoot::getSettingsService()
         s->init();
     }
     return s.get();
+}
+
+ApplicationCompositionRoot* ApplicationCompositionRoot::instance()
+{
+    return s_instance;
+}
+
+void ApplicationCompositionRoot::saveCurrentWorkbenchSettings()
+{
+    // 获取 ShellHost 并尝试保存当前工作台的设置
+    auto* self = instance();
+    if (!self)
+    {
+        return;
+    }
+
+    auto* shellHost = self->shellHost();
+    if (!shellHost)
+    {
+        return;
+    }
+
+    // 尝试获取当前工作台
+    auto* workbench = shellHost->currentWorkbench();
+    if (workbench)
+    {
+        workbench->saveCurrentSettings();
+    }
 }

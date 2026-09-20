@@ -59,6 +59,9 @@ public:
     /// 获取主窗口指针
     WorkbenchWindow* mainWindow();
 
+    /// 获取当前工作台指针（用于退出时保存设置等）
+    UiWorkbench* currentWorkbench() const { return m_workbench; }
+
     /// 关闭宿主并释放工作台关联
     void shutdown();
 

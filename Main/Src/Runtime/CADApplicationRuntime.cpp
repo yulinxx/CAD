@@ -198,12 +198,13 @@ int CADApplicationRuntime::run()
     UiConfigSelfCheck::runAndLogForCurrentClient();
 
     // 退出时自动保存 common 设置（字体/主题/语言）到 SQLite 数据库
-
+    // 以及当前工作台的 2D/3D 域设置（兜底防崩溃丢失）
     QObject::connect(m_app.get(), &QCoreApplication::aboutToQuit, []() {
         if (auto* svc = ApplicationCompositionRoot::getSettingsService())
         {
             svc->saveCurrentCommonSettings();
         }
+        ApplicationCompositionRoot::saveCurrentWorkbenchSettings();
     });
 
     const int exitCode = m_app->exec();

@@ -161,6 +161,10 @@ public:
     /// @return true=工作台已处理，false=未处理（调用方退化为兜底提示）
     virtual bool showSettingsDialog(QWidget* parent);
 
+    /// 保存当前运行时设置到数据库（退出时调用，兜底防崩溃丢失）
+    /// 默认空实现，子类重写调用各自的 SettingsUiCoordinator::saveCurrentSettings()
+    virtual void saveCurrentSettings() {}
+
     /// 获取工作台的共享 SettingsService singleton（app-level）
     SettingsService* settingsService() const
     {
@@ -227,6 +231,8 @@ public:
     void releaseCentralWidgetGLResources(QWidget* centralWidget) const override;
 
     bool showSettingsDialog(QWidget* parent) override;
+
+    void saveCurrentSettings() override;
 
 public:
     /// 设置左右面板（Draw Tools / Layers）的承载样式（默认 Dock）
@@ -373,6 +379,8 @@ public:
 
     // 3D 工作台接管设置对话框，避免 CoreOperationRegistry 兜底弹出冗余提示
     bool showSettingsDialog(QWidget* parent) override;
+
+    void saveCurrentSettings() override;
 
 private:
     // ServiceOwner 定义在 .cpp 中（PIMPL 模式，避免头文件引入 20+ 3D 依赖）

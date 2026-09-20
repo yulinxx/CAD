@@ -497,6 +497,16 @@ bool Workbench2D::showSettingsDialog(QWidget* /*parent*/)
         widget, m_viewport->gridSnapManager(), m_view.unitManager, shortcutModel);
 }
 
+void Workbench2D::saveCurrentSettings()
+{
+    if (!m_settingsCoordinator || !m_viewport)
+    {
+        return;
+    }
+    m_settingsCoordinator->saveCurrentSettings(
+        m_viewport->renderWidget(), m_viewport->gridSnapManager(), m_view.unitManager);
+}
+
 QWidget* Workbench2D::createCentralViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties)
 {
     Q_UNUSED(properties);
@@ -3439,5 +3449,14 @@ bool Workbench3D::showSettingsDialog(QWidget* /*parent*/)
 
     m_mainWindow3D->setStatusMessage(QObject::tr("Settings applied and saved"));
     return true;
+}
+
+void Workbench3D::saveCurrentSettings()
+{
+    if (!m_mainWindow3D || !m_serviceOwner || !m_serviceOwner->settingsCoordinator)
+    {
+        return;
+    }
+    m_serviceOwner->settingsCoordinator->saveCurrentSettings(m_mainWindow3D->renderWidget());
 }
 #endif
