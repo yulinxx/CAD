@@ -402,6 +402,18 @@ public:
         return createIndex(rowIt.value(), 0, static_cast<quintptr>(id));
     }
 
+    /// 对 [first, last] 索引发 dataChanged（显隐/锁定等行内容变化用，不重建拓扑）。
+    /// 信号是类的 protected 成员，外部无法直接 emit，故由模型自己暴露这个入口。
+    /// 入参带 parent，因此群组成员的区间也能正确刷新。
+    void notifyRowsChanged(const QModelIndex& first, const QModelIndex& last)
+    {
+        if (!first.isValid() || !last.isValid())
+        {
+            return;
+        }
+        emit dataChanged(first, last);
+    }
+
 private:
     /// 顶层行集合是否与当前一致（同 id、同分组标志、同顺序）
     bool rowsEqual(const QVector<SceneTreeRow2D>& rows) const
@@ -549,6 +561,17 @@ public:
         return it.value()->index();
     }
 
+    /// 对 [first, last] 索引发 dataChanged（显隐/锁定等行内容变化用，不重建拓扑）。
+    /// 入参带 parent，因此群组成员的区间也能正确刷新。
+    void notifyRowsChanged(const QModelIndex& first, const QModelIndex& last)
+    {
+        if (!first.isValid() || !last.isValid())
+        {
+            return;
+        }
+        emit dataChanged(first, last);
+    }
+
 private:
     /// 设定列结构（列数 + 表头文字）。clear() 后必须重做一次，否则模型会退化成零列
     void resetColumns()
@@ -654,16 +677,16 @@ SceneTreePanel::SceneTreePanel(QWidget* parent)
     actClear->setObjectName(QStringLiteral("ctxClear"));
 
     connect(actShow, &QAction::triggered, this, [this]() {
-        emit batchVisibilityRequested(selectedIds(), true);
+        emit batchVisibilityRequested(selectedIdNumbers(), true);
     });
     connect(actHide, &QAction::triggered, this, [this]() {
-        emit batchVisibilityRequested(selectedIds(), false);
+        emit batchVisibilityRequested(selectedIdNumbers(), false);
     });
     connect(actLock, &QAction::triggered, this, [this]() {
-        emit batchLockRequested(selectedIds(), true);
+        emit batchLockRequested(selectedIdNumbers(), true);
     });
     connect(actUnlock, &QAction::triggered, this, [this]() {
-        emit batchLockRequested(selectedIds(), false);
+        emit batchLockRequested(selectedIdNumbers(), false);
     });
     connect(actDelete, &QAction::triggered, this, [this]() {
         emit deleteRequested(selectedIds());
@@ -1031,6 +1054,123 @@ QStringList SceneTreePanel::selectedIds() const
         }
     }
     return ids;
+}
+
+QVector<qint64> SceneTreePanel::selectedIdNumbers() const
+{
+    QVector<qint64> ids;
+    if (!m_view || !m_model || !m_view->selectionModel())
+    {
+        return ids;
+    }
+
+    // 行的 internalId 就是图元 id（见模型 createIndex），无需走 data()/kIdRole
+    // 的字符串往返 —— 全选百万图元时这一步是主要开销。
+    const auto selectedIndexes = m_view->selectionModel()->selectedRows(1);
+    ids.reserve(selectedIndexes.size());
+    for (const QModelIndex& index : selectedIndexes)
+    {
+        if (index.isValid())
+        {
+            ids.push_back(static_cast<qint64>(index.internalId()));
+        }
+    }
+    return ids;
+}
+
+void SceneTreePanel::refreshRows(const QVector<qint64>& ids)
+{
+    if (!m_view || !m_model || ids.isEmpty())
+    {
+        return;
+    }
+
+    auto* model2d = dynamic_cast<SceneTreeTableModel2D*>(m_model);
+    auto* model3d = dynamic_cast<SceneTreeTableModel3D*>(m_model);
+    if (!model2d && !model3d)
+    {
+        return;
+    }
+
+    // 按 parent 分组收集行号：顶层行是绝大多数（单 parent），群组成员各归其父。
+    // 分组后组内排序、合并连续区间，逐区间发一次 dataChanged —— 不重建拓扑、
+    // 不 reset 模型，N 个 id 的信号被压成少量区间。
+    std::vector<QModelIndex> parents;
+    std::vector<std::vector<int>> rowsByParent;
+    const auto addRef = [&parents, &rowsByParent](const QModelIndex& idx) {
+        if (!idx.isValid())
+        {
+            return;
+        }
+        const QModelIndex p = idx.parent();
+        size_t pi = 0;
+        for (; pi < parents.size(); ++pi)
+        {
+            if (parents[pi] == p)
+            {
+                break;
+            }
+        }
+        if (pi == parents.size())
+        {
+            parents.push_back(p);
+            rowsByParent.emplace_back();
+        }
+        rowsByParent[pi].push_back(idx.row());
+    };
+
+    if (model2d)
+    {
+        for (qint64 id : ids)
+        {
+            addRef(model2d->indexForId(id));
+        }
+    }
+    else
+    {
+        for (qint64 id : ids)
+        {
+            addRef(model3d->indexForId(QString::number(id)));
+        }
+    }
+
+    for (size_t pi = 0; pi < parents.size(); ++pi)
+    {
+        auto& rows = rowsByParent[pi];
+        if (rows.empty())
+        {
+            continue;
+        }
+        std::sort(rows.begin(), rows.end());
+        const QModelIndex& parent = parents[pi];
+        const int lastCol = m_model->columnCount(parent) - 1;
+        const auto emitRun = [&](int a, int b) {
+            const QModelIndex first = m_model->index(a, 0, parent);
+            const QModelIndex last = m_model->index(b, lastCol, parent);
+            if (model2d)
+            {
+                model2d->notifyRowsChanged(first, last);
+            }
+            else
+            {
+                model3d->notifyRowsChanged(first, last);
+            }
+        };
+        int runStart = rows.front();
+        int runEnd = runStart;
+        for (size_t i = 1; i < rows.size(); ++i)
+        {
+            const int r = rows[i];
+            if (r == runEnd || r == runEnd + 1)
+            {
+                runEnd = r;
+                continue;
+            }
+            emitRun(runStart, runEnd);
+            runStart = runEnd = r;
+        }
+        emitRun(runStart, runEnd);
+    }
 }
 
 bool SceneTreePanel::setCommandState(bool hasSelection, bool anyLocked)

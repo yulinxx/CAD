@@ -64,6 +64,19 @@ public:
     /// 当前选中的图元节点 ID 列表
     QStringList selectedIds() const;
 
+    /// 当前选中的图元节点 ID（整数）。批量显隐/锁定等热路径用它，
+    /// 避免 N 个 QString 的构造、传递与再解析（全选百万图元时是主要开销）。
+    QVector<qint64> selectedIdNumbers() const;
+
+    /**
+     * @brief 对指定 id 的行发 dataChanged（不重建拓扑）
+     *
+     * 显隐/锁定这类「只有行内容变了」的刷新走这里：逐 id 定位行（O(log N)）
+     * 后只对命中的行发 dataChanged，不触发 buildTopology 的 O(N) 全量遍历，
+     * 也不 reset 模型（保留展开/滚动状态）。
+     */
+    void refreshRows(const QVector<qint64>& ids);
+
     /// 获取当前模式
     Mode mode() const { return m_mode; }
 
@@ -81,10 +94,10 @@ signals:
     void renameRequested(const QString& id, const QString& newName);
     /// 批量删除请求（ids 为选中的图元 id）
     void deleteRequested(const QStringList& ids);
-    /// 批量显示/隐藏请求
-    void batchVisibilityRequested(const QStringList& ids, bool visible);
-    /// 批量锁定/解锁请求
-    void batchLockRequested(const QStringList& ids, bool locked);
+    /// 批量显示/隐藏请求（整数 id，避免字符串转换开销）
+    void batchVisibilityRequested(const QVector<qint64>& ids, bool visible);
+    /// 批量锁定/解锁请求（整数 id）
+    void batchLockRequested(const QVector<qint64>& ids, bool locked);
 
  private:
     void onModelSelectionChanged();

@@ -285,10 +285,10 @@ private:
     void scheduleTreeRefresh();
     /// 从场景树批量删除图元
     void deleteSceneTreeSelection(const QStringList& ids);
-    /// 从场景树批量设置可见性
-    void setSceneTreeVisibility(const QStringList& ids, bool visible);
-    /// 从场景树批量设置锁定
-    void setSceneTreeLock(const QStringList& ids, bool locked);
+    /// 从场景树批量设置可见性（整数 id，避免字符串转换开销）
+    void setSceneTreeVisibility(const QVector<qint64>& ids, bool visible);
+    /// 从场景树批量设置锁定（整数 id）
+    void setSceneTreeLock(const QVector<qint64>& ids, bool locked);
     /// 刷新属性面板
     void refreshPropertiesPanel();
     /// 应用选择上下文到各 UI 组件
@@ -426,10 +426,10 @@ private:
     void toggleEntityVisibility3D(const QString& id, bool visible);
     /// 重命名图元（直接写引擎并刷新）
     void renameEntity3D(const QString& id, const QString& newName);
-    /// 批量设置图元可见性
-    void setSceneTreeVisibility3D(const QStringList& ids, bool visible);
-    /// 批量设置图元锁定状态
-    void setSceneTreeLock3D(const QStringList& ids, bool locked);
+    /// 批量设置图元可见性（整数 id）
+    void setSceneTreeVisibility3D(const QVector<qint64>& ids, bool visible);
+    /// 批量设置图元锁定状态（整数 id）
+    void setSceneTreeLock3D(const QVector<qint64>& ids, bool locked);
     /// 删除选中的图元
     void deleteSceneTreeSelection3D(const QStringList& ids);
 

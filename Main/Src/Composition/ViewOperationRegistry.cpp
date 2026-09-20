@@ -15,6 +15,7 @@
 #include "UI/Service/ViewCaptureService.h"
 #include "UI/Render/RenderViewport2D.h"
 #include "Engine2D/Edit/LayerEditService.h"
+#include "UI/TestView/TestViewWindow.h"
 
 ViewOperationRegistry::ViewOperationRegistry(OperationBus* bus,
     ViewportActionHub* viewportActionHub,
@@ -122,4 +123,17 @@ void ViewOperationRegistry::registerAll()
                 }
             }
         }));
+
+    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::View_TestView, [hub, parentWidget] {
+        if (!hub)
+            return;
+        if (auto* vp = hub->viewport())
+        {
+            if (auto* scene = vp->sceneManager())
+            {
+                auto* window = new TestViewWindow(scene, false, parentWidget);
+                window->show();
+            }
+        }
+    }));
 }

@@ -1847,99 +1847,83 @@ void Workbench2D::deleteSceneTreeSelection(const QStringList& ids)
     syncSceneTreeSelection();
 }
 
-void Workbench2D::setSceneTreeVisibility(const QStringList& ids, bool visible)
+void Workbench2D::setSceneTreeVisibility(const QVector<qint64>& ids, bool visible)
 {
     Eg::SceneManager* scene = m_scene.sceneEditService ? m_scene.sceneEditService->sceneManager() : nullptr;
     if (!scene || ids.isEmpty())
     {
         return;
     }
-    bool changed = false;
-    // 隐藏时需要从选择集中移除
-    QStringList idsToDeselect;
-    for (const QString& id : ids)
+
+    // 整数 id 直接转 EntityId，批量设置（内部经回调记录 VisibilityChanged，
+    // 渲染侧走增量路径）。避免逐个 QString→std::string→parse 的开销。
+    std::vector<Eg::EntityId> entityIds;
+    entityIds.reserve(static_cast<size_t>(ids.size()));
+    for (qint64 id : ids)
     {
-        const auto eid = Eg::parseEntityId(id.toStdString());
-        if (!eid)
-        {
-            continue;
-        }
-        if (auto* entity = scene->findEntityById(*eid))
-        {
-            entity->setVisible(visible);
-            changed = true;
-            // 隐藏时记录需要取消选择的图元
-            if (!visible && entity->selected())
-            {
-                idsToDeselect.append(id);
-            }
-        }
+        entityIds.push_back(static_cast<Eg::EntityId>(id));
     }
-    // 隐藏图元时清除选择 - 优化：批量操作避免多次触发选择变化通知
-    if (!idsToDeselect.isEmpty())
+    scene->setEntitiesVisible(entityIds, visible);
+
+    // 隐藏图元时从选择集中移除：重建为「仅保留仍可见的」
+    if (!visible)
     {
-        // 收集所有当前选中的图元
-        std::vector<Eg::SyEntity*> currentSelected;
-        scene->forEachSelected([&currentSelected](Eg::SyEntity* e) {
-            currentSelected.push_back(e);
+        std::vector<Eg::SyEntity*> stillVisible;
+        bool hadHiddenSelected = false;
+        scene->forEachSelected([&stillVisible, &hadHiddenSelected](Eg::SyEntity* e) {
+            if (!e)
+            {
+                return;
+            }
+            if (e->visible())
+            {
+                stillVisible.push_back(e);
+            }
+            else
+            {
+                hadHiddenSelected = true;
+            }
         });
-
-        // 构建需要保留的图元列表（从当前选中中移除要隐藏的）
-        std::vector<Eg::SyEntity*> toKeep;
-        toKeep.reserve(currentSelected.size());
-        std::unordered_set<QString> idsToDeselectSet(idsToDeselect.begin(), idsToDeselect.end());
-
-        for (Eg::SyEntity* e : currentSelected)
+        if (hadHiddenSelected)
         {
-            QString id = QString::number(static_cast<qint64>(e->id));
-            if (!idsToDeselectSet.count(id))
-            {
-                toKeep.push_back(e);
-            }
-        }
-
-        // 批量操作：先清空选择，再批量选择保留的图元（只触发2次通知而非N次）
-        scene->clearSelection();
-        if (!toKeep.empty())
-        {
-            scene->selectEntities(toKeep);
+            // selectEntities 是整批替换语义，空列表即清空选择，一次通知完成
+            scene->selectEntities(stillVisible);
         }
     }
-    if (changed)
+
+    // 可见性影响渲染，需触发一次场景通知（经 16ms 节流合帧）
+    scene->notifySceneChanged();
+
+    // 场景树增量刷新受影响行（复选框 + 文本），不重建拓扑、不 reset 模型
+    if (m_scenePanel2D)
     {
-        scene->notifySceneChanged();
-        // 同上：显隐不进结构签名，延迟到下一事件循环重建一次树（含取消选择的联动）
-        QTimer::singleShot(0, this, [this]() { refreshSceneTree(); });
+        m_scenePanel2D->refreshRows(ids);
     }
 }
 
-void Workbench2D::setSceneTreeLock(const QStringList& ids, bool locked)
+void Workbench2D::setSceneTreeLock(const QVector<qint64>& ids, bool locked)
 {
     Eg::SceneManager* scene = m_scene.sceneEditService ? m_scene.sceneEditService->sceneManager() : nullptr;
     if (!scene || ids.isEmpty())
     {
         return;
     }
-    bool changed = false;
-    for (const QString& id : ids)
+
+    // 批量锁定（内部经回调记录 LockChanged）。锁定是纯元数据：不改几何、不影响渲染，
+    // 因此这里**不**调 notifySceneChanged()，避免无谓的视口刷新。
+    std::vector<Eg::EntityId> entityIds;
+    entityIds.reserve(static_cast<size_t>(ids.size()));
+    for (qint64 id : ids)
     {
-        const auto eid = Eg::parseEntityId(id.toStdString());
-        if (!eid)
-        {
-            continue;
-        }
-        if (auto* entity = scene->findEntityById(*eid))
-        {
-            entity->setLocked(locked);
-            changed = true;
-        }
+        entityIds.push_back(static_cast<Eg::EntityId>(id));
     }
-    if (changed)
-    {
-        scene->notifySceneChanged();
-        // 锁定状态不进结构签名，延迟到下一事件循环重建一次树以刷新锁定图标
-        QTimer::singleShot(0, this, [this]() { refreshSceneTree(); });
-    }
+    scene->setEntitiesLocked(entityIds, locked);
+
+    // Lock/Unlock 菜单项的灰显依赖 anyLocked，刷新命令状态即可。
+    refreshCommandUiState();
+
+    // 锁定态当前不在场景树中可视化（SceneTreeRowMeta2D::locked 未接入模型渲染），
+    // 因此无需刷新树。若将来加锁图标，用 m_scenePanel2D->refreshRows(ids) 增量刷新。
 }
 
 void Workbench2D::onViewportContextMenu(QContextMenuEvent* event)
@@ -2024,18 +2008,12 @@ void Workbench2D::applySelectionContext(const CommandUiSnapshot& snapshot)
         m_statusBar2D->setSelectionInfo(n, tr("Selected: %1").arg(n));
     }
 
-    // 场景树右键菜单：与视口右键菜单共用同一份 hasSelection / anyLocked 判定，消除规则漂移
+    // 场景树右键菜单：与视口右键菜单共用同一份 hasSelection / anyLocked 判定，消除规则漂移。
+    // 注意：锁定态当前不在树中可视化，因此 setCommandState 只用于更新右键菜单灰显，
+    // 不再触发树重建（旧实现为刷新一个并不存在的锁图标而做 O(N) 全量重建）。
     if (m_scenePanel2D)
     {
-        const bool lockStateChanged = m_scenePanel2D->setCommandState(snapshot.hasSelection, snapshot.anyLocked());
-        // 树行的锁图标由 SceneTreeBuilder2D 在重建时绘制，而图元级 setLocked 不改变图元数量，
-        // 增量判据（变更流）也读不到锁定变化 —— 不补这一下，锁图标会滞后到下一次增删。
-        // 只在锁定态真的翻转时排一次去抖重建，避免每次选择变化都做 O(N) 重建。
-        if (lockStateChanged && m_sceneTreeRefreshTimer)
-        {
-            m_sceneTreeForceRefresh = true;
-            m_sceneTreeRefreshTimer->start();
-        }
+        m_scenePanel2D->setCommandState(snapshot.hasSelection, snapshot.anyLocked());
     }
 
     // 菜单栏：菜单项是独立于命令中枢创建的 QAction（config-driven 与 legacy 两条构建路径），
@@ -3166,65 +3144,55 @@ void Workbench3D::renameEntity3D(const QString& id, const QString& newName)
     }
 }
 
-void Workbench3D::setSceneTreeVisibility3D(const QStringList& ids, bool visible)
+void Workbench3D::setSceneTreeVisibility3D(const QVector<qint64>& ids, bool visible)
 {
     if (!m_sceneManager3D || ids.isEmpty())
     {
         return;
     }
-    bool changed = false;
-    for (const QString& id : ids)
+
+    // 整数 id 直接转 uint64_t，批量设置（内部经回调记录 VisibilityChanged）
+    std::vector<uint64_t> entityIds;
+    entityIds.reserve(static_cast<size_t>(ids.size()));
+    for (qint64 id : ids)
     {
-        const auto eid = Eg::parseEntityId(id.toStdString());
-        if (!eid)
-        {
-            continue;
-        }
-        if (auto* mesh = m_sceneManager3D->findMeshById(*eid))
-        {
-            mesh->setVisible(visible);
-            changed = true;
-        }
+        entityIds.push_back(static_cast<uint64_t>(id));
     }
+    m_sceneManager3D->setEntitiesVisible(entityIds, visible);
+
     // 隐藏图元时清除选择（3D 目前只支持清空全部选择）
-    if (!visible && changed)
+    if (!visible)
     {
         m_sceneManager3D->clearSelection();
     }
-    if (changed)
+
+    // 可见性影响渲染，标记数据变更（经调度器节流）
+    m_sceneManager3D->markDataChanged();
+
+    // 场景树增量刷新受影响行，不重建拓扑
+    if (m_scenePanel3D)
     {
-        m_sceneManager3D->markDataChanged();
-        // 可见性变更不推进 structureRevision，通过防抖定时器合并为一次树重建
-        m_sceneTree3DRefreshTimer->start();
+        m_scenePanel3D->refreshRows(ids);
     }
 }
 
-void Workbench3D::setSceneTreeLock3D(const QStringList& ids, bool locked)
+void Workbench3D::setSceneTreeLock3D(const QVector<qint64>& ids, bool locked)
 {
     if (!m_sceneManager3D || ids.isEmpty())
     {
         return;
     }
-    bool changed = false;
-    for (const QString& id : ids)
+
+    // 批量锁定（内部经回调记录 LockChanged）。锁定不影响渲染，不调 markDataChanged()。
+    std::vector<uint64_t> entityIds;
+    entityIds.reserve(static_cast<size_t>(ids.size()));
+    for (qint64 id : ids)
     {
-        const auto eid = Eg::parseEntityId(id.toStdString());
-        if (!eid)
-        {
-            continue;
-        }
-        if (auto* mesh = m_sceneManager3D->findMeshById(*eid))
-        {
-            mesh->setLocked(locked);
-            changed = true;
-        }
+        entityIds.push_back(static_cast<uint64_t>(id));
     }
-    if (changed)
-    {
-        m_sceneManager3D->markDataChanged();
-        // 锁定状态不推进 structureRevision，通过防抖定时器合并为一次树重建
-        m_sceneTree3DRefreshTimer->start();
-    }
+    m_sceneManager3D->setEntitiesLocked(entityIds, locked);
+
+    // 锁定态当前不在场景树中可视化，无需刷新树；命令状态由选择上下文刷新兜底。
 }
 
 void Workbench3D::deleteSceneTreeSelection3D(const QStringList& ids)

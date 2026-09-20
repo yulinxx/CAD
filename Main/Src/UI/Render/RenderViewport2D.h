@@ -270,6 +270,9 @@ private:
 
     Eg::SceneManager* sceneManager() const;
 
+    // ViewOperationRegistry 需要访问 sceneManager 用于创建 TestView
+    friend class ViewOperationRegistry;
+
     // 连接输入路由器的依赖
     void wireInputRouter();
     void syncInputRouterCallbacks();

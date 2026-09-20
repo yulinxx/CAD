@@ -115,20 +115,23 @@ void EditOperationRegistry::registerAll()
         if (editService && editService->sceneManager())
         {
             auto* scene = editService->sceneManager();
+            // 直接遍历容器收集可见图元，避免 getAllEntities() 对全场景指针的整份拷贝
+            //（百万级场景下一次全选就是数 MB 的无谓分配）。
             Eg::VecSyEntityPtr visibleEntities;
-            const auto allEntities = scene->getAllEntities();
-            for (auto* entity : allEntities)
-            {
-                if (entity && entity->visible())
+            scene->forEachEntity([&visibleEntities](Eg::SyEntity* entity) {
+                if (!entity || !entity->visible())
                 {
-                    if (auto* layer = entity->layer())
-                    {
-                        if (!layer->isVisible())
-                            continue;
-                    }
-                    visibleEntities.push_back(entity);
+                    return;
                 }
-            }
+                if (auto* layer = entity->layer())
+                {
+                    if (!layer->isVisible())
+                    {
+                        return;
+                    }
+                }
+                visibleEntities.push_back(entity);
+            });
             scene->selectEntities(visibleEntities);
         }
     }));

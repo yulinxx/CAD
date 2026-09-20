@@ -158,6 +158,7 @@
         ] },
         { "type": "action", "id": "view.switch_to_2d", "label": "Switch to 2D", "command": "view.switch_to_2d", "icon": ":/ui/common/Icons/View3D/switch_to_2d.svg", "shortcut": "Ctrl+Shift+2", "workbenches": ["3D"] },
         { "type": "action", "id": "view.switch_to_3d", "label": "Switch to 3D", "command": "view.switch_to_3d", "icon": ":/ui/common/Icons/View/switch_to_3d.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "view.test_view", "label": "Test View", "command": "view.test_view", "workbenches": ["2D"] },
         { "type": "action", "id": "view.capture", "label": "Capture View", "command": "view.capture", "workbenches": ["2D", "3D"] }
       ]
     },
