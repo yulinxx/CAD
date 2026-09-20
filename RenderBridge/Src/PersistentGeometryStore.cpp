@@ -1,3 +1,10 @@
+/**
+ * @file PersistentGeometryStore.cpp
+ * @brief 常驻几何仓实现
+ *
+ * 管理 GeometryStore 的创建、扩容、块分配与回收。
+ * 与 Mesh3DBuilder 共用同一套实现。
+ */
 #include "RenderBridge/PersistentGeometryStore.h"
 
 // 头文件只有前向声明，调用接口方法需要完整定义。

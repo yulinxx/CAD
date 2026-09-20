@@ -2,11 +2,9 @@
  * @file EntityToVertices.cpp
  * @brief 引擎图元 → 渲染顶点转换实现
  *
- * 阶段1 收口：不再直接识别具体 SyEntity 派生类型（SyLine/SyCircle/...），
- * 改为消费 Engine 侧统一边界 emitEntityGeometry 输出的几何原语契约
+ * 消费 Engine 侧统一边界 emitEntityGeometry 输出的几何原语契约
  * （ISceneGeometrySink），由本地 IncrementalVertexSink 完成离散化。
- * 离散化公式与全量路径（render_c_api_frame.cpp 的 tessellate*）保持一致，
- * 统一参数来自 Render::tess（UI/Common/Include/Render/RenderTypes.h）。
+ * 离散化公式与全量路径保持一致，统一参数来自 Render::tess。
  */
 #include "EntityToVertices.h"
 

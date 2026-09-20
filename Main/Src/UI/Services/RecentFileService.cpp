@@ -1,3 +1,9 @@
+/**
+ * @file RecentFileService.cpp
+ * @brief 最近文件服务实现
+ *
+ * 管理最近打开的文件列表，提供增删改查功能。
+ */
 #include "UI/Services/RecentFileService.h"
 
 #include <QDateTime>

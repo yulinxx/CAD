@@ -2,15 +2,7 @@
  * @file TextQuadBuilder.cpp
  * @brief TextQuadBuilder 实现（见头文件说明）
  *
- * 排版规则全部在这里，DLL 一概不知。三处旧实现的缺陷在此修正：
- *
- * 1. UTF-8。旧 buildTextQuads 逐**字节**当码点（`for (const char* p = text; *p; ++p)`），
- *    ASCII 正常，任何中文会被拆成 2~3 个 0x80~0xFF 的伪码点，画出乱码方块。
- * 2. vAlign 编号。旧实现用 1=Top / 2=Middle / 3=Bottom，而 Eg::UiTextVAlign 是
- *    0=Top / 1=Middle / 2=Bottom，整体错位一位。这里直接对 Eg 的枚举做 switch，
- *    不再有第二套编号。
- * 3. 行高用字体级度量（ascent/descent）而不是「本行字形包围盒」。后者会让
- *    「100」和「120」因为有没有下伸部而落在不同基线上，标尺数字看起来在抖。
+ * 排版规则全部在这里，DLL 一概不知。
  */
 #include "RenderBridge/TextQuadBuilder.h"
 

@@ -1,3 +1,10 @@
+/**
+ * @file SceneRenderPipeline.cpp
+ * @brief 场景渲染管线实现
+ *
+ * 协调 GeometryPipeline 与 PersistentGeometryStore，
+ * 提供统一的场景渲染入口。
+ */
 #include "RenderBridge/SceneRenderPipeline.h"
 
 #include "RenderBridge/GeometryPipeline.h"

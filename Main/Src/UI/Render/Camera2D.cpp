@@ -1,3 +1,9 @@
+/**
+ * @file Camera2D.cpp
+ * @brief 2D 相机实现
+ *
+ * 管理视图变换矩阵，支持平移、缩放、旋转等操作。
+ */
 #include "Camera2D.h"
 
 #include <QPoint>

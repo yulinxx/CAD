@@ -1,3 +1,9 @@
+/**
+ * @file ViewportRendererFactory.cpp
+ * @brief 视口渲染器工厂实现
+ *
+ * 根据类型创建对应的渲染器适配器。
+ */
 #include "ViewportRendererFactory.h"
 
 #if BUILD_UI3D

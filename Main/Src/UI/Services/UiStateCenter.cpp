@@ -1,3 +1,9 @@
+/**
+ * @file UiStateCenter.cpp
+ * @brief UI 状态中心实现
+ *
+ * 集中管理全局 UI 状态（主题、视图模式、工作台等）。
+ */
 #include "UiStateCenter.h"
 
 /// @param parent 父对象

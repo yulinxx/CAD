@@ -1,3 +1,9 @@
+/**
+ * @file ViewportNavigation2D.cpp
+ * @brief 2D 视口导航实现
+ *
+ * 处理鼠标滚轮缩放、平移、触屏手势等导航操作。
+ */
 #include "ViewportNavigation2D.h"
 
 #include "Camera2D.h"
