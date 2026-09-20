@@ -289,7 +289,8 @@ private:
     /// 必须重建：否则放大看虚线会显棱角，缩小则白白背着过密的顶点。
     float m_outlineScaleAtBuild{ 0.0f };
 
-    /// 上次触发曲线 LOD 重建时所用的 pixelToWorld 比例（0 = 尚未记录）。
+    /// 上次触发曲线 LOD 重建时所用的 worldToScreenScale 比例（0 = 尚未记录）。
+    /// worldToScreenScale = 1/pixelToWorldScale，即世界单位→屏幕像素的换算比例。
     /// 曲线段数 ∝ √zoom（弦高误差标准），zoom 跨过 2 倍才全量刷新一次：
     /// 折线/点 contentHash 不变会跳过上传，实际只有曲线类图元重新离散化。
     float m_curveLodScaleAtBuild{ 0.0f };

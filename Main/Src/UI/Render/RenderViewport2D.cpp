@@ -990,18 +990,20 @@ void RenderViewport2D::applyCameraToWidget()
         }
     }
 
-    // 曲线 LOD：缩放（pixelToWorld 的倒数 = 世界单位→屏幕像素）跨过 2 倍时，
-    // 触发全量刷新让圆/弧/椭圆按新段数重新离散化。
+    // 曲线 LOD：缩放（世界单位→屏幕像素，即 zoom）跨过 2 倍时，
+    // 触发分批刷新让圆/弧/椭圆按新段数重新离散化。
     // 段数 ∝ √zoom，zoom 跨 2 倍 → 段数跨 √2 ≈ 1.4 倍，弦高误差从 1px 涨到约 1.4px，
     // 仍可接受；若用更小阈值会在 zoom 连续滚动时频繁全量遍历（百万图元下每帧做不起）。
-    if (scale > 0.0f)
+    const float worldToScreenScale = 1.0f / m_renderWidget->pixelToWorldScale();
+    if (worldToScreenScale > 0.0f)
     {
         constexpr float kCurveLodRatio = 2.0f;
-        const bool curveCrossed = m_curveLodScaleAtBuild <= 0.0f || scale > m_curveLodScaleAtBuild * kCurveLodRatio ||
-            scale * kCurveLodRatio < m_curveLodScaleAtBuild;
+        const bool curveCrossed = m_curveLodScaleAtBuild <= 0.0f ||
+            worldToScreenScale > m_curveLodScaleAtBuild * kCurveLodRatio ||
+            worldToScreenScale * kCurveLodRatio < m_curveLodScaleAtBuild;
         if (curveCrossed)
         {
-            m_curveLodScaleAtBuild = scale;
+            m_curveLodScaleAtBuild = worldToScreenScale;
             if (m_refreshCoordinator)
             {
                 // 分批重建曲线，而不是一次性全量刷新：只收集圆/弧/椭圆，
