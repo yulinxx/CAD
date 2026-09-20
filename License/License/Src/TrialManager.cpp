@@ -1,4 +1,4 @@
-#include "TrialManager.h"
+#include "License/TrialManager.h"
 #include "MachineFingerprint.h"
 
 #include <openssl/evp.h>
