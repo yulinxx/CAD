@@ -10,7 +10,6 @@
  * 单位默认是**物理像素**（与 `uViewport` = backingSize 同一坐标系，
  * 已含 devicePixelRatio），不是逻辑像素。唯一的例外是捕捉指示器
  * `kSnapIndicatorRadiusPx`：它是逻辑像素，由 OverlayScene 乘 DPR 后再送渲染。
- */
  * `SelectionGizmo`、`BaseEditor` 的命中容差）与渲染侧（`RenderSceneBuilder`、
  * 覆盖层构建器）。覆盖层与定尺寸标记几何都要在 RenderBridge 内落地，
  * 而 UI2D 依赖 RenderBridge，常量若留在 UI2D 就成环。因此与

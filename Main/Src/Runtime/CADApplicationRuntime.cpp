@@ -99,7 +99,7 @@ int CADApplicationRuntime::run()
             LicenseContext* licenseCtx = License_Create(&config);
             const bool licenseOk = licenseCtx && License_Check(licenseCtx) == LICENSE_OK;
 
-            // [P0-3] 功能授权闸门接线：把注册码里的 features 读入 UiFeatureGate，
+            // 功能授权闸门接线：把注册码里的 features 读入 UiFeatureGate，
             // 供菜单/工具栏/状态栏/右键菜单按 feature 字段决定是否创建入口。
             // 在此之前 features 字段虽然被签发、被解析，但从未被任何 UI 消费，
             // License 实际退化成了「能不能启动」的二元开关。
