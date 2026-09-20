@@ -38,14 +38,14 @@
 #endif
 
 // ============================================================
-// SHA256 哈希（跨平台，仅依赖 OpenSSL）
+// SHA1 哈希（跨平台，仅依赖 OpenSSL）
 // ============================================================
-static std::string Sha256Hex(const std::string& input)
+static std::string Sha1Hex(const std::string& input)
 {
     unsigned char hash[EVP_MAX_MD_SIZE];
     unsigned int hashLen = 0;
     EVP_MD_CTX* ctx = EVP_MD_CTX_new();
-    EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr);
+    EVP_DigestInit_ex(ctx, EVP_sha1(), nullptr);
     EVP_DigestUpdate(ctx, input.data(), input.size());
     EVP_DigestFinal_ex(ctx, hash, &hashLen);
     EVP_MD_CTX_free(ctx);
@@ -338,5 +338,5 @@ std::string MachineFingerprint::Generate()
     {
         return {};
     }
-    return Sha256Hex(raw);
+    return Sha1Hex(raw);
 }

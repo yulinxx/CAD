@@ -1,8 +1,12 @@
 #include "CADApplicationRuntime.h"
 
 #include <QApplication>
+#include <QCheckBox>
+#include <QDate>
 #include <QDir>
 #include <QFileInfo>
+#include <QMessageBox>
+#include <QSettings>
 
 #include <cstdio>
 
@@ -107,8 +111,9 @@ int CADApplicationRuntime::run()
             LicenseDialog dlg(configDir);
             if (dlg.exec() != QDialog::Accepted)
             {
-                SY_WARN("[CADApplicationRuntime] Trial expired: user rejected activation");
+                SY_WARN("[CADApplicationRuntime] Trial expired: user rejected activation, exiting");
                 // 试用期已过期且用户拒绝激活，退出程序
+                return -1;
             }
             else
             {
@@ -117,11 +122,47 @@ int CADApplicationRuntime::run()
         }
         else if (trialResult == 0 && remainingDays > 0)
         {
-            // 试用期有效，设置无限制模式
+            // 试用期有效，设置无限制模式，并提示用户
             UiFeatureGate::instance().setUnrestricted(true);
             SY_INFOF("[CADApplicationRuntime] Trial active: %d days remaining", remainingDays);
+
+            // 检查是否需要显示试用期提示（每天只提示一次）
+            const QString kTrialPromptKey = QStringLiteral("TrialPromptLastDate");
+            QSettings settings;
+            const QString lastPromptDate = settings.value(kTrialPromptKey).toString();
+            const QString today = QDate::currentDate().toString(QStringLiteral("yyyy-MM-dd"));
+
+            bool shouldPrompt = lastPromptDate.isEmpty() || (lastPromptDate != today);
+
+            if (shouldPrompt)
+            {
+                // 试用期有效：显示剩余天数，可选择注册
+                QMessageBox trialBox(QMessageBox::Information,
+                    QStringLiteral("Trial Version"),  // 试用期提示
+                    QStringLiteral("You are using trial version. %1 days remaining.\n\nPlease register to unlock all features.").arg(remainingDays),
+                    QMessageBox::Ok | QMessageBox::Yes);  // OK = 继续, Yes = 注册
+                trialBox.setButtonText(QMessageBox::Ok, QStringLiteral("Continue"));
+                trialBox.setButtonText(QMessageBox::Yes, QStringLiteral("Register Now"));  // 注册
+                trialBox.setCheckBox(new QCheckBox(QStringLiteral("Don't show today")));  // 今天不再提示
+
+                const int ret = trialBox.exec();
+
+                // 检查用户是否勾选了"今天不再提示"
+                if (trialBox.checkBox() && trialBox.checkBox()->isChecked())
+                {
+                    settings.setValue(kTrialPromptKey, today);
+                }
+
+                // 如果用户点击"立即注册"，显示注册对话框
+                if (ret == QMessageBox::Yes)
+                {
+                    SY_INFO("[CADApplicationRuntime] User requested registration from trial prompt");
+                    LicenseDialog dlg(configDir);
+                    dlg.exec();
+                }
+            }
         }
-        // === 试用期检查结束 ===
+        // === Trial check end ===
 
         if (License_IsCheckEnabled())
         {

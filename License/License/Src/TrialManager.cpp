@@ -66,18 +66,18 @@ namespace
         return ".";
     }
 
-    // SHA256 哈希（仅用于存储，不用于安全）
-    std::string sha256Hex(const std::string& input)
+    // SHA1 hash (for storage only, not for security)
+    std::string sha1Hex(const std::string& input)
     {
-        unsigned char hash[32];
+        unsigned char hash[20];
         EVP_MD_CTX* ctx = EVP_MD_CTX_new();
-        EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr);
+        EVP_DigestInit_ex(ctx, EVP_sha1(), nullptr);
         EVP_DigestUpdate(ctx, input.data(), input.size());
         EVP_DigestFinal_ex(ctx, hash, nullptr);
         EVP_MD_CTX_free(ctx);
 
         std::ostringstream oss;
-        for (int i = 0; i < 32; ++i)
+        for (int i = 0; i < 20; ++i)
         {
             oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[i]);
         }
@@ -104,26 +104,46 @@ extern "C"
 
     int Trial_Check(int* remainingDays)
     {
-        static bool checked = false;
-        static int cachedResult = 0;
-        static int cachedDays = 0;
-
-        if (!checked)
+        try
         {
-            TrialManager& mgr = TrialManager::instance();
-            TrialManager::Status status = mgr.check();
-            checked = true;
-            cachedResult = (status == TrialManager::Status::Expired) ? -1 : 0;
-            cachedDays = mgr.remainingDays();
-        }
+            static bool checked = false;
+            static int cachedResult = 0;
+            static int cachedDays = 0;
 
-        if (remainingDays)
+            if (!checked)
+            {
+                TrialManager& mgr = TrialManager::instance();
+                TrialManager::Status status = mgr.check();
+                checked = true;
+
+                // 只有明确过期的才返回 -1，其他情况（包括出错）都允许继续
+                if (status == TrialManager::Status::Expired)
+                {
+                    cachedResult = -1;
+                }
+                else
+                {
+                    cachedResult = 0;  // Active 或其他状态都允许继续
+                }
+                cachedDays = mgr.remainingDays();
+            }
+
+            if (remainingDays)
+            {
+                *remainingDays = cachedDays;
+            }
+
+            return cachedResult;
+        }
+        catch (...)
         {
-            *remainingDays = cachedDays;
+            // 任何异常都允许继续启动，避免阻塞用户
+            if (remainingDays)
+            {
+                *remainingDays = 0;
+            }
+            return 0;
         }
-
-        // 如果是试用期已过期，尝试从 License 检查流程走（让用户激活）
-        return cachedResult;
     }
 
     void Trial_Reset()
@@ -228,7 +248,7 @@ void TrialManager::init()
 
     // 首次启动或验证失败，创建新记录
     m_startDate = getCurrentDate();
-    m_machineHash = sha256Hex(MachineFingerprint::Generate());
+    m_machineHash = sha1Hex(MachineFingerprint::Generate());
     m_trialDays = kDefaultTrialDays;
 
     // 确保目录存在
@@ -264,7 +284,7 @@ bool TrialManager::validate() const
 
 bool TrialManager::checkMachineMatch() const
 {
-    const std::string currentHash = sha256Hex(MachineFingerprint::Generate());
+    const std::string currentHash = sha1Hex(MachineFingerprint::Generate());
     return currentHash == m_machineHash;
 }
 
