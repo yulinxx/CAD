@@ -1,3 +1,9 @@
+/**
+ * @file UiViewport3D.cpp
+ * @brief 3D 视口实现
+ *
+ * 管理 3D 渲染和交互。
+ */
 #include "UiViewport3D.h"
 
 #include "UI3D/Render3D/IRenderer3D.h"

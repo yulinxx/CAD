@@ -1,3 +1,9 @@
+/**
+ * @file SceneTreeBuilder2D.cpp
+ * @brief 2D 场景树构建器实现
+ *
+ * 从 2D 场景管理器构建场景树模型。
+ */
 #include "SceneTreeBuilder2D.h"
 
 #include "Engine2D/Core/SceneManager.h"

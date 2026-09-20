@@ -1,3 +1,9 @@
+/**
+ * @file SceneDocument2D.cpp
+ * @brief 2D 场景文档实现
+ *
+ * 管理 2D 文档的创建、加载和保存。
+ */
 #include "SceneDocument2D.h"
 
 #include "Engine2D/Core/SceneManager.h"

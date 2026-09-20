@@ -1,3 +1,9 @@
+/**
+ * @file RenderWidget3DAdapter.cpp
+ * @brief 3D 渲染控件适配器实现
+ *
+ * 将 3D 渲染功能适配到现有 UI 框架。
+ */
 #if BUILD_UI3D
 
     #include "RenderWidget3DAdapter.h"

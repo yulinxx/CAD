@@ -1,3 +1,9 @@
+/**
+ * @file SceneTreeBuilder3D.cpp
+ * @brief 3D 场景树构建器实现
+ *
+ * 从 3D 场景管理器构建场景树模型。
+ */
 #include "SceneTreeBuilder3D.h"
 
 #include "Engine3D/SceneManager3D.h"

@@ -1,3 +1,9 @@
+/**
+ * @file UiGeometryAlgorithms.cpp
+ * @brief UI 几何算法实现
+ *
+ * 提供界面层使用的几何计算功能。
+ */
 #include "UiGeometryAlgorithms.h"
 
 #include <algorithm>

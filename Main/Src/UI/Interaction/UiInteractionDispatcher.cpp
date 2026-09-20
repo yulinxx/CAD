@@ -1,3 +1,9 @@
+/**
+ * @file UiInteractionDispatcher.cpp
+ * @brief UI 交互调度器实现
+ *
+ * 处理用户输入事件的分发。
+ */
 #include "UiInteractionDispatcher.h"
 
 #include "UiStateCenter.h"
