@@ -14,6 +14,7 @@
         #define WIN32_LEAN_AND_MEAN
     #endif
     #include <windows.h>
+    #include <shlobj.h>
 #endif
 
 namespace
@@ -27,8 +28,8 @@ namespace
         s_configDir = dir;
     }
 
-    // 默认配置目录（Windows: %APPDATA%/SanYiCAD, macOS: ~/Library/Application Support/SanYiCAD）
-    std::string getDefaultConfigDir()
+    // 获取配置目录
+    std::string getConfigDir()
     {
         if (!s_configDir.empty())
         {
@@ -43,35 +44,26 @@ namespace
             CoTaskMemFree(appData);
             // 转换为 UTF-8
             int len = WideCharToMultiByte(CP_UTF8, 0, path.c_str(), -1, nullptr, 0, nullptr, nullptr);
-            s_configDir.resize(len - 1);
-            WideCharToMultiByte(CP_UTF8, 0, path.c_str(), -1, &s_configDir[0], len, nullptr, nullptr);
-            s_configDir += "\\SanYiCAD";
-            return s_configDir;
+            std::string result;
+            result.resize(len - 1);
+            WideCharToMultiByte(CP_UTF8, 0, path.c_str(), -1, &result[0], len, nullptr, nullptr);
+            result += "\\SanYiCAD";
+            return result;
         }
     #elif defined(__APPLE__)
         const char* home = getenv("HOME");
         if (home)
         {
-            s_configDir = std::string(home) + "/Library/Application Support/SanYiCAD";
-            return s_configDir;
+            return std::string(home) + "/Library/Application Support/SanYiCAD";
         }
     #else  // Linux
         const char* home = getenv("HOME");
         if (home)
         {
-            s_configDir = std::string(home) + "/.config/sanyicad";
-            return s_configDir;
+            return std::string(home) + "/.config/sanyicad";
         }
     #endif
         return ".";
-    }
-
-    // 日期比较：返回 start < end ? -1 : (start > end ? 1 : 0)
-    int compareDate(const std::string& a, const std::string& b)
-    {
-        if (a < b) return -1;
-        if (a > b) return 1;
-        return 0;
     }
 
     // SHA256 哈希（仅用于存储，不用于安全）
@@ -138,7 +130,7 @@ extern "C"
     {
         // 删除试用文件
         std::error_code ec;
-        std::filesystem::path trialFile = TrialManager::instance().getTrialFilePath();
+        std::filesystem::path trialFile = std::filesystem::path(getConfigDir()) / "trial.info";
         std::filesystem::remove(trialFile, ec);
 
     #ifdef _WIN32
@@ -196,7 +188,8 @@ std::string TrialManager::startDate() const
 
 void TrialManager::init()
 {
-    const std::filesystem::path trialFile = getTrialFilePath();
+    const std::string configDir = getConfigDir();
+    const std::filesystem::path trialFile = std::filesystem::path(configDir) / "trial.info";
 
     // 尝试加载现有记录
     bool loaded = false;
@@ -204,7 +197,7 @@ void TrialManager::init()
     // 先尝试文件
     if (std::filesystem::exists(trialFile))
     {
-        loaded = loadFromFile();
+        loaded = loadFromFile(configDir);
     }
 
     // Windows: 再检查注册表
@@ -243,7 +236,7 @@ void TrialManager::init()
     std::filesystem::create_directories(trialFile.parent_path(), ec);
 
     // 保存
-    saveToFile();
+    saveToFile(configDir);
 
     #ifdef _WIN32
     saveToRegistry();
@@ -275,9 +268,9 @@ bool TrialManager::checkMachineMatch() const
     return currentHash == m_machineHash;
 }
 
-bool TrialManager::saveToFile() const
+bool TrialManager::saveToFile(const std::string& configDir) const
 {
-    const std::filesystem::path path = getTrialFilePath();
+    const std::filesystem::path path = std::filesystem::path(configDir) / "trial.info";
     std::ofstream file(path, std::ios::out | std::ios::trunc);
     if (!file)
     {
@@ -291,9 +284,9 @@ bool TrialManager::saveToFile() const
     return file.good();
 }
 
-bool TrialManager::loadFromFile()
+bool TrialManager::loadFromFile(const std::string& configDir)
 {
-    const std::filesystem::path path = getTrialFilePath();
+    const std::filesystem::path path = std::filesystem::path(configDir) / "trial.info";
     std::ifstream file(path);
     if (!file)
     {
@@ -415,28 +408,16 @@ bool TrialManager::loadFromRegistry()
 
 #endif  // _WIN32
 
-std::filesystem::path TrialManager::getTrialFilePath() const
-{
-    std::string configDir = getDefaultConfigDir();
-    #ifdef _WIN32
-    return std::filesystem::path(configDir) / "trial.info";
-    #elif defined(__APPLE__)
-    return std::filesystem::path(configDir) / "trial.info";
-    #else
-    return std::filesystem::path(configDir) / "trial.info";
-    #endif
-}
-
 // static
 std::string TrialManager::getCurrentDate()
 {
     time_t now = time(nullptr);
     struct tm tmInfo{};
-    #ifdef _WIN32
+#ifdef _WIN32
     localtime_s(&tmInfo, &now);
-    #else
+#else
     localtime_r(&now, &tmInfo);
-    #endif
+#endif
 
     char buf[11] = {};
     strftime(buf, sizeof(buf), "%Y-%m-%d", &tmInfo);
@@ -463,12 +444,10 @@ int TrialManager::daysBetween(const std::string& start, const std::string& end)
 
     // 转换为一年中的第几天
     int startDay = sy * 365 + sy / 4 - sy / 100 + sy / 400
-                 + (sy % 4 == 0 && (sy % 100 != 0 || sy % 400 == 0) ? 1 : 0)  // 闰年判断
                  + (sm > 1 ? (sm - 1) * 31 : 0)
                  + sd;
 
     int endDay = ey * 365 + ey / 4 - ey / 100 + ey / 400
-               + (ey % 4 == 0 && (ey % 100 != 0 || ey % 400 == 0) ? 1 : 0)
                + (em > 1 ? (em - 1) * 31 : 0)
                + ed;
 

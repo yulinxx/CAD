@@ -87,25 +87,22 @@ private:
     bool checkMachineMatch() const;
 
     /// 保存到文件
-    bool saveToFile() const;
+    bool saveToFile(const std::string& configDir) const;
 
     /// 从文件加载
-    bool loadFromFile() const;
+    bool loadFromFile(const std::string& configDir);
 
     /// 保存到注册表（仅 Windows）
     bool saveToRegistry() const;
 
     /// 从注册表加载（仅 Windows）
-    bool loadFromRegistry() const;
+    bool loadFromRegistry();
 
     /// 获取当前日期
     static std::string getCurrentDate();
 
     /// 计算日期之间的天数差
     static int daysBetween(const std::string& start, const std::string& end);
-
-    /// 获取试用文件路径
-    std::filesystem::path getTrialFilePath() const;
 
     // 成员变量
     std::string m_startDate;
