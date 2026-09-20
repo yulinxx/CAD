@@ -512,7 +512,7 @@ endif()
 # ============================================================================
 # macOS App Bundle: 打包 pdftocairo + Ghostscript 依赖
 # ============================================================================
-if(APPLE AND NOT CMAKE_CROSSCOMPILING)
+if(APPLE AND NOT CMAKE_CROSSCOMPILING AND TARGET SanYiCAD)
     # 查找 Homebrew 安装的工具
     find_program(PDTOCAIRO pdftocairo PATHS /opt/homebrew/bin /usr/local/bin)
     find_program(GHOSTSCRIPT gs PATHS /opt/homebrew/bin /usr/local/bin)
@@ -577,6 +577,8 @@ if(APPLE AND NOT CMAKE_CROSSCOMPILING)
     else()
         message(WARNING "pdftocairo/gs not found - AI/PDF import will not work on other Macs. Install with: brew install poppler ghostscript")
     endif()
+else()
+    message(STATUS "Skipping pdftocairo/gs bundling (SanYiCAD target not found)")
 endif()
 
 # ============================================================================
