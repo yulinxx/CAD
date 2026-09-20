@@ -403,7 +403,7 @@ private:
     void setup3DDeleteShortcuts(WorkbenchWindow& window);
     /// 3D 视口右键菜单请求：基于命令中枢快照构建并弹出（与 2D 统一的单一事实来源）
     void on3DContextMenuRequested(const QPoint& globalPos);
-    /// 按客户配置构建 3D 右键菜单（P0-2b）
+    /// 按客户配置构建 3D 右键菜单
     /// @param contextMenuId JSON contextMenus 节中的菜单 ID，例如 "canvas.3d"
     /// @return 配置菜单；未配置时返回 nullptr，调用方回退到内建路径。
     ///         返回的菜单归调用方所有，且必须在同一作用域内 delete（命令分发器是栈对象）。

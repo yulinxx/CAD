@@ -1937,7 +1937,7 @@ void Workbench2D::onViewportContextMenu(QContextMenuEvent* event)
     // 避免右键菜单再走一套独立的选择数据源导致显隐/灰显规则漂移。
     const CommandUiSnapshot snapshot = m_commandHub->captureSnapshot(m_commandHub->mainWindow());
 
-    // 配置驱动优先（P0-2b）：客户 JSON 声明了 contextMenus["canvas.2d"] 时由配置接管。
+    // 配置驱动优先：客户 JSON 声明了 contextMenus["canvas.2d"] 时由配置接管。
     if (QMenu* configured = buildConfiguredContextMenu(QStringLiteral("canvas.2d"), snapshot.hasSelection))
     {
         // 配置化菜单的 QAction 是每次弹出新建的临时对象，不在中枢的动作表里，
@@ -2643,7 +2643,7 @@ void Workbench3D::on3DContextMenuRequested(const QPoint& globalPos)
             break;
         }
     }
-    // 配置驱动优先（P0-2b）：客户 JSON 声明了 contextMenus["canvas.3d"] 时由配置接管
+    // 配置驱动优先：客户 JSON 声明了 contextMenus["canvas.3d"] 时由配置接管
     if (QMenu* configured = buildConfiguredContextMenu(QStringLiteral("canvas.3d")))
     {
         // 与 2D 同构：配置化菜单的 QAction 是每次弹出新建的临时对象，中枢的
@@ -2810,7 +2810,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     own.commandActionHub->rebuildAll();
     SY_DEBUG("[Workbench3D] CommandActionHub3D rebuilt with all actions");
 
-    // 2. 菜单：统一由 WorkbenchMenuManager 从客户 JSON 生成（P0-2c）
+    // 2. 菜单：统一由 WorkbenchMenuManager 从客户 JSON 生成
     //
     // 2D / 3D 走同一条 JSON 链路：菜单项在客户配置里按 workbenches: ["3D"] 声明，
     // 命令 ID 经 Workbench3D::dispatchCommand 落到 OperationBus3D。
@@ -3379,7 +3379,7 @@ bool Workbench3D::requiresSkeletonDocks() const
 
 bool Workbench3D::managesOwnMenus() const
 {
-    // 菜单统一由 WorkbenchMenuManager 从客户 JSON 构建（P0-2c），
+    // 菜单统一由 WorkbenchMenuManager 从客户 JSON 构建，
     // 3D 工作台不再自行管理窗口菜单栏。硬编码的 MenuManager3D 路径已移除。
     return false;
 }

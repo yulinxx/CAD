@@ -31,7 +31,7 @@ public:
     UiConfigurationManager();
     ~UiConfigurationManager();
 
-    /// 进程级共享实例：客户 UI 配置的唯一事实源（P0-1）
+    /// 进程级共享实例：客户 UI 配置的唯一事实源
     ///
     /// 历史实现里 WorkbenchMenuManager 与 WorkbenchLayoutManager 各自 new 了一个
     /// UiConfigurationManager 并**分别**加载配置，两份副本一旦解析出不同客户

@@ -392,14 +392,14 @@ std::optional<UiConfigData> UiConfigLoader::parseConfig(const QJsonDocument& doc
         }
     }
 
-    // statusBar（P0-2a）：整节缺省时保留默认值（可见 + 无槽位），
+    // statusBar：整节缺省时保留默认值（可见 + 无槽位），
     // 由 UiLayoutBuilder 构建出一个空状态栏容器，行为与历史硬编码骨架一致。
     if (root.contains(QStringLiteral("statusBar")))
     {
         data.statusBar = parseStatusBar(root.value(QStringLiteral("statusBar")).toObject());
     }
 
-    // contextMenus（P0-2b）
+    // contextMenus
     const QJsonArray contextMenus = root.value(QStringLiteral("contextMenus")).toArray();
     for (const auto& value : contextMenus)
     {

@@ -84,7 +84,7 @@ void WorkbenchLayoutManager::buildToolBars()
 {
     // 配置驱动是唯一路径：不再保留硬编码回退分支。
     // 保留两条路径的代价是硬编码分支会持续接收新功能，而配置分支永远追不上，
-    // 最终两边行为分叉——这是 P0-1 要消除的核心风险。
+    // 最终两边行为分叉——这是需要消除的核心风险。
     if (!ensureConfigLoaded())
     {
         SY_ERROR("[WorkbenchLayoutManager] Toolbar build aborted: client config unavailable");
@@ -158,7 +158,7 @@ bool WorkbenchLayoutManager::ensureConfigLoaded()
         return m_configManager->configData() != nullptr;
     }
 
-    // 客户配置取自进程级共享实例（P0-1）：与 WorkbenchMenuManager、右键菜单服务
+    // 客户配置取自进程级共享实例：与 WorkbenchMenuManager、右键菜单服务
     // 消费同一份 UiConfigData，客户 ID 由 UiClientContext 在运行时统一解析。
     // 本类只借用指针，不拥有生命周期。
     m_configManager = &UiConfigurationManager::shared();

@@ -4,7 +4,7 @@
  * @file UiClientContext.h
  * @brief 客户上下文：运行时唯一的「当前客户 ID」事实源
  *
- * 背景（P0-1）：
+ * 背景：
  *   历史实现存在两条互相独立的客户 ID 来源——
  *     - 菜单侧读运行时环境变量 SANYI_CLIENT_ID（WorkbenchMenuManager）
  *     - 布局侧读编译期宏 SANYI_CLIENT_ID（WorkbenchLayoutManager）

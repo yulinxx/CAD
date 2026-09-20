@@ -45,12 +45,12 @@ public:
     void buildDocks(const std::vector<DockDef>& docks) override;
     void buildShortcuts(const std::vector<ShortcutDef>& shortcuts) override;
 
-    /// 构建状态栏槽位（P0-2a）
+    /// 构建状态栏槽位
     /// 槽位控件由 UiPanelRegistry 按 widgetType 创建，与 Dock 使用同一套面板工厂。
     /// @param statusBar 状态栏配置
     void buildStatusBar(const StatusBarDef& statusBar) override;
 
-    /// 按配置构建一个右键菜单（P0-2b）
+    /// 按配置构建一个右键菜单
     /// 调用方负责 popup 与生命周期（通常用 QMenu::exec 后 deleteLater）。
     /// @param def 右键菜单配置
     /// @param parent 菜单父对象

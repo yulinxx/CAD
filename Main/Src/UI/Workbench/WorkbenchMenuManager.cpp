@@ -380,7 +380,7 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
     {
         m_menuPanelRegistry = std::make_unique<UiPanelRegistry>();
         // 内置面板/状态栏槽位工厂集中注册，与 WorkbenchLayoutManager 使用同一份实现，
-        // 避免两个注册表内容漂移（P0-1）
+        // 避免两个注册表内容漂移
         registerBuiltinUiPanels(*m_menuPanelRegistry);
     }
 

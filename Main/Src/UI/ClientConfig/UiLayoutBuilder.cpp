@@ -379,7 +379,7 @@ void UiLayoutBuilder::buildMenuItem(
             qPrintable(actionDef.commandId));
         return;
     }
-    // 授权门控（P0-3）：未授权功能不创建入口，客户看不到未购买的功能
+    // 授权门控：未授权功能不创建入口，客户看不到未购买的功能
     if (!featureAllowed(actionDef.feature))
     {
         SY_DEBUGF("[UiLayoutBuilder] Skip action id='%s' command='%s' — feature '%s' not licensed",
@@ -636,7 +636,7 @@ void UiLayoutBuilder::buildStatusBar(const StatusBarDef& statusBarDef)
             SY_DEBUGF("[UiLayoutBuilder] Skip status slot id='%s' visible=0", qPrintable(slotDef.id));
             continue;
         }
-        // 授权门控（P0-3）：例如「视觉定位坐标显示」这类选装功能的状态栏指示器
+        // 授权门控：例如「视觉定位坐标显示」这类选装功能的状态栏指示器
         if (!featureAllowed(slotDef.feature))
         {
             SY_DEBUGF("[UiLayoutBuilder] Skip status slot id='%s' — feature '%s' not licensed",

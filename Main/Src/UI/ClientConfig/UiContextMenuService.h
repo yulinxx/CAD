@@ -2,7 +2,7 @@
 
 /**
  * @file UiContextMenuService.h
- * @brief 配置驱动的右键菜单服务（P0-2b）+ 全仓唯一的菜单动态段注册表
+ * @brief 配置驱动的右键菜单服务 + 全仓唯一的菜单动态段注册表
  *
  * 设计：
  *   静态部分 —— 由客户 JSON 的 contextMenus 节声明，走 UiLayoutBuilder 构建，

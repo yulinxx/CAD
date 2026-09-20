@@ -264,7 +264,7 @@ target_link_libraries(${APP_NAME}
 )
 
 # 客户化 UI 配置
-# 注意（P0-1）：SANYI_CLIENT_ID 已不再作为编译期宏注入。
+# 注意：SANYI_CLIENT_ID 已不再作为编译期宏注入。
 # 客户 ID 现由 UiClientContext 在运行时解析（环境变量 / QSettings / 默认值），
 # 同一份二进制可服务多个客户。这里只把默认客户 ID 传给安装包脚本使用。
 target_compile_definitions(${APP_NAME} PRIVATE SANYI_DEFAULT_CLIENT_ID="${SANYI_DEFAULT_CLIENT_ID}")

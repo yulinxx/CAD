@@ -4,7 +4,7 @@
  * @file UiFeatureGate.h
  * @brief 功能授权闸门：把 License 的 features 字段接到 UI 配置的 feature 字段上
  *
- * 背景（P0-3）：
+ * 背景：
  *   注册码载荷（LicenseInfo.features）与 UI 配置（MenuActionDef::feature /
  *   ToolBarActionDef::feature / ToolBarDef::feature）两端**都已存在** feature 字段，
  *   且配置侧已被 UiConfigLoader 正确解析，但中间缺少「消费」这一环——

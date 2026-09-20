@@ -140,7 +140,7 @@ enum class StatusBarSlotAlign
     Permanent
 };
 
-/// 状态栏槽位定义（P0-2a：状态栏纳入配置驱动）
+/// 状态栏槽位定义
 /// 与 Dock 同构：JSON 只声明 widgetType，实际控件由 UiPanelRegistry 工厂创建，
 /// 客户新增状态栏指示器只需注册一个工厂 + 改 JSON，不必改 C++ 布局代码。
 struct StatusBarSlotDef
@@ -168,7 +168,7 @@ struct StatusBarDef
     std::vector<StatusBarSlotDef> items;
 };
 
-/// 右键菜单定义（P0-2b：右键菜单纳入配置驱动）
+/// 右键菜单定义
 /// id 由业务侧在弹出时按上下文选择，例如：
 ///   "canvas.2d.selection"  —— 2D 画布有选中时
 ///   "canvas.2d.empty"      —— 2D 画布空白处

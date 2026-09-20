@@ -47,14 +47,14 @@ QString FileDialogService::allSupportedFilter()
 
 QString FileDialogService::importFilterForFormat(Fio::FileFormat fmt)
 {
-    // 过滤器字符串统一来自 FormatRegistry（P1-11 收敛后的唯一入口）
+    // 过滤器字符串统一来自 FormatRegistry
     const char* filter = Fio::FormatRegistry::instance().importFilter(fmt);
     return filter ? QString::fromUtf8(filter) : QObject::tr("All Files (*.*)");
 }
 
 QString FileDialogService::exportFilterForFormat(Fio::FileFormat fmt)
 {
-    // 过滤器字符串统一来自 FormatRegistry（P1-11 收敛后的唯一入口）
+    // 过滤器字符串统一来自 FormatRegistry
     const char* filter = Fio::FormatRegistry::instance().exportFilter(fmt);
     return filter ? QString::fromUtf8(filter) : QObject::tr("All Files (*.*)");
 }
