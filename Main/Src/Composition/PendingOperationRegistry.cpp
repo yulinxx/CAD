@@ -1,3 +1,9 @@
+/**
+ * @file PendingOperationRegistry.cpp
+ * @brief 待处理操作注册实现
+ *
+ * 管理待处理操作的注册。
+ */
 #include "PendingOperationRegistry.h"
 
 #include "UI2D/Operation/OperationBus.h"

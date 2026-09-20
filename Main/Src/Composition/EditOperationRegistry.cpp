@@ -1,3 +1,9 @@
+/**
+ * @file EditOperationRegistry.cpp
+ * @brief 编辑操作注册实现
+ *
+ * 注册和管理编辑相关的操作命令。
+ */
 #include "EditOperationRegistry.h"
 
 #include "Log/SyLogger.h"

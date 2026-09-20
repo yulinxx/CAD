@@ -1,3 +1,9 @@
+/**
+ * @file FileOperationRegistry.cpp
+ * @brief 文件操作注册实现
+ *
+ * 注册和管理文件相关的操作命令。
+ */
 #include "FileOperationRegistry.h"
 #include "DocumentPersistenceHelper.h"
 

@@ -1,3 +1,9 @@
+/**
+ * @file ViewOperationRegistry.cpp
+ * @brief 视图操作注册实现
+ *
+ * 注册和管理视图相关的操作命令。
+ */
 #include "ViewOperationRegistry.h"
 
 #include <QDesktopServices>

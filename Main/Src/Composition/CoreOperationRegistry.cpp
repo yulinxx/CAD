@@ -1,3 +1,9 @@
+/**
+ * @file CoreOperationRegistry.cpp
+ * @brief 核心操作注册实现
+ *
+ * 协调各模块的操作注册。
+ */
 #include "CoreOperationRegistry.h"
 #include "EditOperationRegistry.h"
 #include "ViewOperationRegistry.h"

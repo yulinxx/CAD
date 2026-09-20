@@ -1,3 +1,9 @@
+/**
+ * @file AlgorithmOperationRegistry.cpp
+ * @brief 算法操作注册实现
+ *
+ * 注册和管理算法相关的操作命令。
+ */
 #include "AlgorithmOperationRegistry.h"
 
 #include "UI2D/Operation/OperationBus.h"

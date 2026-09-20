@@ -1,3 +1,9 @@
+/**
+ * @file ViewCaptureService.cpp
+ * @brief 视图捕获服务实现
+ *
+ * 提供视图截图和导出功能。
+ */
 #include "UI/Service/ViewCaptureService.h"
 #include "Ut/BBox3.h"
 #include "RenderWidget.h"

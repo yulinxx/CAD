@@ -1,3 +1,9 @@
+/**
+ * @file HelpOperationRegistry.cpp
+ * @brief 帮助操作注册实现
+ *
+ * 注册帮助相关的操作命令。
+ */
 #include "HelpOperationRegistry.h"
 
 #include "UI2D/Operation/OperationBus.h"
