@@ -102,9 +102,12 @@ else if (level == Repaint)     → 仅消费脏 ID，不做几何同步
 
 | API | 位置 | 说明 |
 |-----|------|------|
-| `Mesh3DBuilder::updateDirtyEntities()` | UI/3D | 增量更新脏图元，不扫描全场景 |
-| `Mesh3DBuilder::removeEntity()` | UI/3D | 移除单个图元的几何与槽位 |
+| `Mesh3DBuilder::initialize()` | UI/3D | 初始化 `GeometryManager`（几何仓 + 绘制列表） |
+| `Mesh3DBuilder::updateDirtyEntities()` | UI/3D | 增量更新脏图元，通过 `GeometryManager` 写入几何仓 |
+| `Mesh3DBuilder::removeEntity()` | UI/3D | 移除单个图元的几何与槽位（经 `GeometryManager` 回收） |
 | `Mesh3DBuilder::setEntityVisible()` | UI/3D | 显隐对账，不重传顶点 |
+| `GeometryManager::allocBlock()` | RenderBridge | 几何仓块分配（2D/3D 共用） |
+| `GeometryManager::upsertDrawItem()` | RenderBridge | 绘制命令 upsert 到 DrawList |
 | `SceneRefreshCoordinator3D::takePendingDirtyIds()` | UI/3D | 消费并清空脏 ID 集合 |
 | `SceneRefreshCoordinator3D::takePendingDeletedIds()` | UI/3D | 消费并清空删除 ID 集合 |
 | `SceneRefreshCoordinator3D::setFlushCallback()` | UI/3D | 注入同步刷新回调 |
