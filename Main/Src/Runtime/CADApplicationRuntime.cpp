@@ -96,72 +96,32 @@ int CADApplicationRuntime::run()
         SY_INFO("[CADApplicationRuntime] License check ENABLED via SANYI_ENABLE_LICENSE macro");
 #endif
 
-        // === 试用期检查（优先于 License 检查）===
+        // === 试用期检查（暂时禁用，待调试）===
         // 设置配置目录
-        Trial_SetConfigDir(configDirUtf8.constData());
+        // Trial_SetConfigDir(configDirUtf8.constData());
 
         // 检查试用期状态
-        int remainingDays = 0;
-        const int trialResult = Trial_Check(&remainingDays);
+        // int remainingDays = 0;
+        // const int trialResult = Trial_Check(&remainingDays);
 
-        if (trialResult == -1)
-        {
-            // 试用期已过期，必须激活
-            SY_INFO("[CADApplicationRuntime] Trial expired, showing activation dialog");
-            LicenseDialog dlg(configDir);
-            if (dlg.exec() != QDialog::Accepted)
-            {
-                SY_WARN("[CADApplicationRuntime] Trial expired: user rejected activation, exiting");
-                // 试用期已过期且用户拒绝激活，退出程序
-                return -1;
-            }
-            else
-            {
-                SY_INFO("[CADApplicationRuntime] User activated successfully after trial expired");
-            }
-        }
-        else if (trialResult == 0 && remainingDays > 0)
-        {
-            // 试用期有效，设置无限制模式，并提示用户
-            UiFeatureGate::instance().setUnrestricted(true);
-            SY_INFOF("[CADApplicationRuntime] Trial active: %d days remaining", remainingDays);
+        // SY_INFOF("[CADApplicationRuntime] Trial check: result=%d, remainingDays=%d", trialResult, remainingDays);
 
-            // 检查是否需要显示试用期提示（每天只提示一次）
-            const QString kTrialPromptKey = QStringLiteral("TrialPromptLastDate");
-            QSettings settings;
-            const QString lastPromptDate = settings.value(kTrialPromptKey).toString();
-            const QString today = QDate::currentDate().toString(QStringLiteral("yyyy-MM-dd"));
-
-            bool shouldPrompt = lastPromptDate.isEmpty() || (lastPromptDate != today);
-
-            if (shouldPrompt)
-            {
-                // 试用期有效：显示剩余天数，可选择注册
-                QMessageBox trialBox(QMessageBox::Information,
-                    QStringLiteral("Trial Version"),  // 试用期提示
-                    QStringLiteral("You are using trial version. %1 days remaining.\n\nPlease register to unlock all features.").arg(remainingDays),
-                    QMessageBox::Ok | QMessageBox::Yes);  // OK = 继续, Yes = 注册
-                trialBox.setButtonText(QMessageBox::Ok, QStringLiteral("Continue"));
-                trialBox.setButtonText(QMessageBox::Yes, QStringLiteral("Register Now"));  // 注册
-                trialBox.setCheckBox(new QCheckBox(QStringLiteral("Don't show today")));  // 今天不再提示
-
-                const int ret = trialBox.exec();
-
-                // 检查用户是否勾选了"今天不再提示"
-                if (trialBox.checkBox() && trialBox.checkBox()->isChecked())
-                {
-                    settings.setValue(kTrialPromptKey, today);
-                }
-
-                // 如果用户点击"立即注册"，显示注册对话框
-                if (ret == QMessageBox::Yes)
-                {
-                    SY_INFO("[CADApplicationRuntime] User requested registration from trial prompt");
-                    LicenseDialog dlg(configDir);
-                    dlg.exec();
-                }
-            }
-        }
+        // 暂时禁用试用期强制激活，确保能正常启动
+        // if (trialResult == -1)
+        // {
+        //     SY_INFO("[CADApplicationRuntime] Trial expired, showing activation dialog");
+        //     LicenseDialog dlg(configDir);
+        //     if (dlg.exec() != QDialog::Accepted)
+        //     {
+        //         SY_WARN("[CADApplicationRuntime] Trial expired: user rejected activation, exiting");
+        //         return -1;
+        //     }
+        // }
+        // else if (trialResult == 0 && remainingDays > 0)
+        // {
+        //     UiFeatureGate::instance().setUnrestricted(true);
+        //     SY_INFOF("[CADApplicationRuntime] Trial active: %d days remaining", remainingDays);
+        // }
         // === Trial check end ===
 
         if (License_IsCheckEnabled())
