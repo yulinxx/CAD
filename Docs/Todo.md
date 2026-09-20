@@ -3,8 +3,10 @@
 > **文档性质**：框架分析与重构任务清单（**规划/分析类**，非现状说明）。
 > 当前架构现状与后续计划以 [`01-当前架构/框架现状与修理计划.md`](01-当前架构/框架现状与修理计划.md) 为准。
 >
-> **状态说明（2026-09-18）**：本文是分析时点（2026-07/08）的逐项问题记录，部分条目已落地或已随架构演进改变
-> （例如：渲染主路径已统一为 `Renderx`/`RenderX`；UI-Engine 解耦 Phase 0–3 已完成；导出宏/独立构建已收口）。
+> **状态说明（2026-09-20）**：本文是分析时点（2026-07/08）的逐项问题记录，部分条目已落地或已随架构演进改变
+> （例如：渲染主路径已统一为 `Renderx`/`RenderX`；UI-Engine 解耦 Phase 0–3 已完成；导出宏/独立构建已收口；
+> 3D 双文档模型已合并、EntityToVertices 缓存已移除、UICommon→Engine2D 依赖已解耦、
+> OperationRouting 去单例、DialogParameterBase 导出宏修复、RenderBridge 模块落地）。
 > 引用具体路径/模块时请以代码与现状文档为准。
 
 ## 一、结论先行
@@ -109,50 +111,35 @@ OpenGL
 ```text
 UiWorkbench
     │
-    ├── SceneDocument3D
-    │
-    └── SceneDocument3DAdapter
-             │
-             ▼
-       UiViewport3D
-             │
-             ▼
-       IRenderer3D
-             │
-             ▼
-       RenderWidget3DAdapter
-             │
-             ▼
-       RenderWidget3D : QOpenGLWidget
-             │
-             ▼
-       Mesh3DBuilder
-             │
-             ▼
-       RenderX
-             │
-             ▼
-       OpenGL
+    └── SceneDocument3D
+                 │
+                 ▼
+           UiViewport3D
+                 │
+                 ▼
+           IRenderer3D
+                 │
+                 ▼
+           RenderWidget3DAdapter
+                 │
+                 ▼
+           RenderWidget3D : QOpenGLWidget
+                 │
+                 ▼
+           Mesh3DBuilder
+                 │
+                 ▼
+           RenderX
+                 │
+                 ▼
+           OpenGL
 ```
 
-`UiWorkbench` 同时创建了：
-
-- `SceneDocument3D`
-- `SceneDocument3DAdapter`
-
-但真正传给 3D viewport 的仍然是 `SceneDocument3DAdapter`：
-
-- [UiWorkbench.cpp](C:/Users/xx/Documents/Cpp/CAD/Main/Src/UI/Workbench/UiWorkbench.cpp:133)
-- [UiWorkbench.cpp](C:/Users/xx/Documents/Cpp/CAD/Main/Src/UI/Workbench/UiWorkbench.cpp:2166)
-- [UiWorkbench.cpp](C:/Users/xx/Documents/Cpp/CAD/Main/Src/UI/Workbench/UiWorkbench.cpp:2253)
-
-这不是简单的“代码重复”，而是两个可能成为真实数据入口的文档模型并存，后期一定会导致：
-
-- 选择状态不同步；
-- 删除和清空行为不同；
-- 撤销/重做入口不同；
-- 3D 树节点和引擎实体生命周期不一致；
-- UI 使用错误的文档对象。
+**✅ 已修复（2026-09-20）**：
+- 3D 双文档模型已合并：`SceneDocument3DAdapter` 已删除，`SceneDocument3D` 吸收了其职责（场景树、选择模型、编辑服务），成为单一正式文档入口。
+- `SceneDocument3D::removeEntity()` 和 `clear()` 已修复，路由通过 `SceneEditService3D::deleteEntity()` / `clearScene()` 执行，支持撤销/重做。
+- `SceneNode::selected()` 从恒返 `false` 改为使用 `m_selected` 成员，由 `SelectionModel` 维护选择状态，不再穿透到引擎层。
+- `UiWorkbench` 仅创建 `SceneDocument3D`，不再创建 `SceneDocument3DAdapter`。
 
 ---
 
@@ -458,7 +445,9 @@ typedef struct rx_runtime_desc {...} rx_runtime_desc;
 
 ---
 
-## 4.3 2D 存在两套几何离散化路径
+### 4.3 2D 存在两套几何离散化路径
+
+**✅ 已修复（2026-09-13）**：全量路径（`RenderSceneBuilder`）与增量路径（`entityToVertices`）已统一使用 `Tessellator2D` 进行离散化。`EntityToVertices` 缓存已整块删除，`entityToVertices` 退回纯函数，不再有并发安全或生命周期问题。
 
 当前有两套逻辑：
 
@@ -779,6 +768,10 @@ struct RendererCapabilities
 - [UI/Common/CMakeLists.txt](C:/Users/xx/Documents/Cpp/CAD/UI/Common/CMakeLists.txt:120)
 - [UI/Common/CMakeLists.txt](C:/Users/xx/Documents/Cpp/CAD/UI/Common/CMakeLists.txt:136)
 
+**✅ 已修复（2026-09-20）**：UICommon 不再公共依赖 Engine2D。通过在 `DialogParameters.h` 中使用内联前向声明（`namespace Eg { struct BooleanParameters; ... }`）替代 `Engine2DTypes.h`，彻底移除了对 Engine2D 头文件的公共依赖。`Engine2DTypes.h` 已不再被任何文件包含。
+
+**✅ DialogParameterBase 导出修复（2026-09-20）**：`DIALOG_PARAMETER_STRUCT` 宏中添加 `UICOMMON_API` 修饰符（`class UICOMMON_API ClassName`），确保 `toAlgorithmParams()` / `fromAlgorithmParams()` 等方法在 DLL 中正确导出。`DialogParameters.cpp` 中的实现已添加 `UICOMMON_API` 前缀，解决了 UI2D 链接时找不到符号的问题。
+
 这会导致：
 
 ```text
@@ -814,6 +807,8 @@ UI3D
 ---
 
 ### 2. Engine3D 私有依赖 Engine2D
+
+**✅ 已修复（2026-09-13）**：`Engine3D/CMakeLists.txt` 已移除对 `Engine2D` 的私有链接。共享类型已迁移至 `EngineCommon`/`GeometryCommon`/`MathCommon`。
 
 `Engine3D/CMakeLists.txt` 中私有链接了 `Engine2D`：
 
@@ -986,9 +981,11 @@ ManufacturingPreviewDocument
 3. 修复 `EntityToVertices` 缓存写入、删除、清空时的锁问题。 — ✅ 已完成（缓存整块删除，`entityToVertices` 退回纯函数）
 4. 将 2D 离散化算法合并成一个公共 `Tessellator2D`。 — ✅ 已完成
 5. 移除或重写 `RenderWidget3DAdapter` 中的空方法和恒真能力。 — ✅ 已完成
-6. 将 UICommon 对 Engine2D、RenderX 的公共依赖降级或移除。 — ✅ 已完成（改用 `Engine2DTypes.h` 前置声明）
+6. 将 UICommon 对 Engine2D、RenderX 的公共依赖降级或移除。 — ✅ 已完成（改用内联前向声明，`Engine2DTypes.h` 已废弃）
 7. 让 Engine3D 不再依赖 Engine2D。 — ✅ 已完成
 8. 明确 2D/3D 是同一文档的两个视图，还是两个不同文档。 — ✅ 已完成（3D 双文档模型已合并）
+9. 移除 `OperationRouting::setOperationBus()`，`dispatch()` 显式传递 `OperationBus*`。 — ✅ 已完成
+10. `DialogParameterBase` 宏添加 `UICOMMON_API` 确保 DLL 导出。 — ✅ 已完成
 
 ### P1：结构性重构 — ✅ 全部完成
 
@@ -2585,6 +2582,8 @@ InteractionCommon
 
 # 10. Engine3D 依赖 Engine2D
 
+**✅ 已修复（2026-09-13）**：`Engine3D/CMakeLists.txt` 已移除对 `Engine2D` 的私有链接，共享类型迁移至 `EngineCommon`/`GeometryCommon`/`MathCommon`。
+
 ## 当前问题
 
 `Engine3D/CMakeLists.txt` 私有链接 `Engine2D`：
@@ -2662,6 +2661,8 @@ OperationRegistry
 CommandCatalog
 OperationRouting
 ```
+
+**✅ 已修复（2026-09-20）**：`OperationRouting::setOperationBus()` 已移除，`dispatch()` 签名改为 `dispatch(MenuActionId, OperationBus*, ...)`，所有调用方（`CommandActionHubActions2D.cpp`、`UiWorkbench.cpp`）显式传递 bus 实例。
 
 虽然当前已有 `OperationBusBase`，但上层仍然存在两套命令系统。
 
