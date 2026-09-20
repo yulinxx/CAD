@@ -12,6 +12,7 @@
 #include "Common/CrashHandlerBootstrap.h"
 #include "License/LicenseDialog.h"
 #include "License/LicenseDLL.h"
+#include "License/TrialManager.h"
 #include "Composition/ApplicationCompositionRoot.h"
 #include "UI/ClientConfig/UiConfigSelfCheck.h"
 #include "UI/ClientConfig/UiFeatureGate.h"
@@ -91,6 +92,28 @@ int CADApplicationRuntime::run()
         License_SetCheckEnabled(1);
         SY_INFO("[CADApplicationRuntime] License check ENABLED via SANYI_ENABLE_LICENSE macro");
 #endif
+
+        // === 试用期检查（优先于 License 检查）===
+        // 设置配置目录
+        Trial_SetConfigDir(configDirUtf8.constData());
+
+        // 检查试用期状态
+        int remainingDays = 0;
+        const int trialResult = Trial_Check(&remainingDays);
+
+        if (trialResult == -1)
+        {
+            // 试用期已过期，必须激活
+            SY_INFO("[CADApplicationRuntime] Trial expired, forcing license activation");
+            License_SetCheckEnabled(1);
+        }
+        else if (trialResult == 0 && remainingDays > 0)
+        {
+            // 试用期有效，设置无限制模式
+            UiFeatureGate::instance().setUnrestricted(true);
+            SY_INFOF("[CADApplicationRuntime] Trial active: %d days remaining", remainingDays);
+        }
+        // === 试用期检查结束 ===
 
         if (License_IsCheckEnabled())
         {
