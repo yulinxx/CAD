@@ -324,7 +324,7 @@ function(sanyi_add_shared_library target)
     endif()
 
     if(SANYI_SHLIB_LINK_LIBRARIES)
-        target_link_libraries(${target} ${SANYI_SHLIB_LINK_LIBRARIES})
+        target_link_libraries(${target} PUBLIC ${SANYI_SHLIB_LINK_LIBRARIES})
     endif()
 
     sanyi_add_version_info(${target} "${target}" "${SANYI_SHLIB_DESCRIPTION}")
