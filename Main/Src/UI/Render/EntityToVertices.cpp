@@ -78,7 +78,7 @@ namespace
 
         void emitPoint(const Ut::Vec2d& position, const Ut::Color& color) override
         {
-            m_outType = Render::PrimitiveType::PointList;
+            m_outType = Render::PrimitiveType::Points;
             float rgba[4];
             colorToRGBA(color, rgba);
             addVertex(position.x(), position.y(), rgba);
@@ -216,7 +216,7 @@ namespace
             // 不足 3 的尾巴丢弃而不是补齐——补齐会画出数据里并不存在的三角形。
             // 与全量路径 RenderSceneBuilder::emitTriangles 保持同一约定。
             const size_t usable = count - (count % 3);
-            m_outType = Render::PrimitiveType::TriangleList;
+            m_outType = Render::PrimitiveType::Triangles;
             float rgba[4];
             colorToRGBA(color, rgba);
             for (size_t i = 0; i < usable; ++i)
