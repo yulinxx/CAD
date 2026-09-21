@@ -74,7 +74,7 @@ void PersistenceService::shutdown()
         return;
     }
 
-    SY_DEBUG("[PersistenceService] Shutting down");
+    // SY_DEBUG("[PersistenceService] Shutting down");
 
     // P1修复：用条件变量替代 sleep，等待所有活跃数据库操作完成
     {
