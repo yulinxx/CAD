@@ -28,6 +28,12 @@ WorkbenchStateManager::WorkbenchStateManager(
     , m_menuManager(menuManager)
     , m_layoutManager(layoutManager)
 {
+    // 单次定时器：同一事件循环内的多次信号只触发一次刷新
+    m_refreshCoalescer.setSingleShot(true);
+    m_refreshCoalescer.setInterval(0);
+    QObject::connect(&m_refreshCoalescer, &QTimer::timeout, &m_refreshCoalescer, [this]() {
+        doRefreshFromState();
+    });
 }
 
 WorkbenchStateManager::~WorkbenchStateManager() = default;
@@ -70,13 +76,13 @@ void WorkbenchStateManager::bindStateSignals()
     // 使用 m_parent 作为连接上下文，解绑时可精确断开本管理器挂到状态中心上的连接，
     // 不会误伤其他组件（如 UiWorkbench）对状态中心的监听
     QObject::connect(m_stateCenter, &UiStateCenter::stateChanged, m_parent, [this]() {
-        refreshFromState();
+        m_refreshCoalescer.start();
     });
     QObject::connect(m_stateCenter, &UiStateCenter::busyChanged, m_parent, [this](bool) {
-        refreshFromState();
+        m_refreshCoalescer.start();
     });
     QObject::connect(m_stateCenter, &UiStateCenter::dirtyChanged, m_parent, [this](bool) {
-        refreshFromState();
+        m_refreshCoalescer.start();
     });
 }
 
@@ -93,18 +99,27 @@ void WorkbenchStateManager::unbindStateSignals()
     QObject::disconnect(m_stateCenter, nullptr, m_parent, nullptr);
 }
 
+void WorkbenchStateManager::syncWindowStateFromStateCenter(const UiStateSnapshot& state)
+{
+    m_windowState.currentWorkbenchId = state.currentWorkbenchId;
+    m_windowState.currentThemeId = state.currentThemeId;
+    m_windowState.busy = state.busy;
+}
+
 void WorkbenchStateManager::syncWindowStateFromStateCenter()
 {
     if (!m_stateCenter)
     {
         return;
     }
+    syncWindowStateFromStateCenter(m_stateCenter->snapshot());
+}
 
-    const auto state = m_stateCenter->snapshot();
-    // 以状态中心为准同步窗口层状态，避免窗口本地状态与全局状态漂移
-    m_windowState.currentWorkbenchId = state.currentWorkbenchId;
-    m_windowState.currentThemeId = state.currentThemeId;
-    m_windowState.busy = state.busy;
+void WorkbenchStateManager::syncWorkbenchSelectionFromStateCenter(const UiStateSnapshot& state)
+{
+    m_windowState.currentSelectionText = state.currentSelectionText;
+    m_windowState.currentSelectionSource = state.currentSelectionSource;
+    m_windowState.currentSelectionType = state.currentSelectionType;
 }
 
 void WorkbenchStateManager::syncWorkbenchSelectionFromStateCenter()
@@ -113,45 +128,50 @@ void WorkbenchStateManager::syncWorkbenchSelectionFromStateCenter()
     {
         return;
     }
-
-    const auto state = m_stateCenter->snapshot();
-    // 选择上下文单独同步，避免刷新状态栏时把选择语义和窗口语义混在一起
-    m_windowState.currentSelectionText = state.currentSelectionText;
-    m_windowState.currentSelectionSource = state.currentSelectionSource;
-    m_windowState.currentSelectionType = state.currentSelectionType;
+    syncWorkbenchSelectionFromStateCenter(m_stateCenter->snapshot());
 }
 
 // ==================== UI 刷新 ====================
 
+void WorkbenchStateManager::refreshStatusText(const UiStateSnapshot& state)
+{
+    m_layoutManager->updateBusyIndicator(state.busy);
+}
+
 void WorkbenchStateManager::refreshStatusText()
 {
-    // 只刷新繁忙指示器，不再拼接全局状态汇总文字（WB/Doc/Cmd/Layer/View/Dirty 等）
-    bool busy = false;
-    if (m_stateCenter)
+    if (!m_stateCenter)
     {
-        busy = m_stateCenter->snapshot().busy;
+        return;
     }
-    else
-    {
-        busy = m_windowState.busy;
-    }
-    m_layoutManager->updateBusyIndicator(busy);
+    refreshStatusText(m_stateCenter->snapshot());
 }
 
 void WorkbenchStateManager::refreshFromState()
 {
-    // 这里是框架层的总刷新入口，不把工作台实现逻辑写进来
+    doRefreshFromState();
+}
+
+void WorkbenchStateManager::doRefreshFromState()
+{
+    if (!m_stateCenter)
+    {
+        return;
+    }
+
     SY_DEBUG("[WorkbenchStateManager] Refreshing from state center");
-    syncWindowStateFromStateCenter();
-    syncWorkbenchSelectionFromStateCenter();
-    // 刷新状态栏前先同步本地镜像，避免展示时读到半更新状态
-    refreshStatusText();
-    updateWindowTitle();
+
+    // 取一次 snapshot，所有子方法复用，避免 3-4 次重复拷贝
+    const auto state = m_stateCenter->snapshot();
+
+    syncWindowStateFromStateCenter(state);
+    syncWorkbenchSelectionFromStateCenter(state);
+    refreshStatusText(state);
+    updateWindowTitle(state);
 
     // 统一更新状态栏消息和选择信息（通过 StatusBarBase 接口，不直接操作裸 QLabel）
-    if (m_stateCenter && m_activeStatusBar)
+    if (m_activeStatusBar)
     {
-        const auto state = m_stateCenter->snapshot();
         QString prompt = state.statusPrompt;
         if (prompt.isEmpty())
         {
@@ -173,47 +193,46 @@ void WorkbenchStateManager::refreshFromState()
     // 由 WorkbenchMenuManager::refreshConfiguredMenuState 单点同步。
 }
 
-void WorkbenchStateManager::updateWindowTitle()
+void WorkbenchStateManager::updateWindowTitle(const UiStateSnapshot& state)
 {
-    if (m_stateCenter)
+    QString docFile;
+    QString docId = state.currentDocumentId;
+    if (!docId.isEmpty() && docId != QStringLiteral("none"))
     {
-        const auto state = m_stateCenter->snapshot();
-
-        // 提取文档文件名用于窗口标题
-        QString docFile;
-        QString docId = state.currentDocumentId;
-        if (!docId.isEmpty() && docId != QStringLiteral("none"))
-        {
-            QFileInfo fi(docId);
-            docFile = fi.fileName();
-        }
-
-        QString title;
-        if (docFile.isEmpty())
-        {
-            title =
-                QStringLiteral("%1 - %2 - %3")
-                    .arg(QString::fromStdString(MainApp::appName()), state.currentWorkbenchId, state.currentViewMode);
-        }
-        else
-        {
-            title = QStringLiteral("%1 - %2 [%3 - %4]")
-                        .arg(docFile,
-                            QString::fromStdString(MainApp::appName()),
-                            state.currentWorkbenchId,
-                            state.currentViewMode);
-        }
-
-        if (state.dirty)
-        {
-            title.prepend(QStringLiteral("* "));
-        }
-        m_parent->setWindowTitle(title);
-        return;
+        QFileInfo fi(docId);
+        docFile = fi.fileName();
     }
 
-    m_parent->setWindowTitle(
-        QStringLiteral("%1 - %2").arg(QString::fromStdString(MainApp::appName()), m_windowState.currentWorkbenchId));
+    QString title;
+    if (docFile.isEmpty())
+    {
+        title =
+            QStringLiteral("%1 - %2 - %3")
+                .arg(QString::fromStdString(MainApp::appName()), state.currentWorkbenchId, state.currentViewMode);
+    }
+    else
+    {
+        title = QStringLiteral("%1 - %2 [%3 - %4]")
+                    .arg(docFile,
+                        QString::fromStdString(MainApp::appName()),
+                        state.currentWorkbenchId,
+                        state.currentViewMode);
+    }
+
+    if (state.dirty)
+    {
+        title.prepend(QStringLiteral("* "));
+    }
+    m_parent->setWindowTitle(title);
+}
+
+void WorkbenchStateManager::updateWindowTitle()
+{
+    if (!m_stateCenter)
+    {
+        return;
+    }
+    updateWindowTitle(m_stateCenter->snapshot());
 }
 
 // ==================== 工作台切换状态收尾 ====================

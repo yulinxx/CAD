@@ -118,6 +118,9 @@ void SceneRefreshCoordinator::setSceneManager(Eg::SceneManager* sm)
     m_sceneManager = sm;
     if (m_sceneManager)
     {
+        // 同步游标到当前修订号，避免程序启动后立即触发 FullRefresh
+        // （场景加载后 revision 可能已经很大，但 m_lastCursor 初始为 0）
+        m_lastCursor = m_sceneManager->currentRevision();
         m_sceneManager->addObserver(this);
     }
 }
@@ -326,7 +329,6 @@ void SceneRefreshCoordinator::onSceneChanged()
             if (!m_sceneManager->captureSnapshot(changes, m_pendingSnapshot))
             {
                 // 快照拿不全就别走增量 —— 否则失败的那些图元会被当成「没变」而漏刷
-                SY_DEBUGF("[SceneRefresh] onSceneChanged: captureSnapshot failed, triggering FullRefresh");
                 m_refreshLevel = RefreshLevel::FullRefresh;
                 scheduleFullRefresh();
                 return;
@@ -348,8 +350,8 @@ void SceneRefreshCoordinator::onSceneChanged()
         else
         {
             // readChanges 失败，触发 FullRefresh
-            SY_DEBUGF("[SceneRefresh] onSceneChanged: readChanges failed, triggering FullRefresh, m_lastCursor=%llu",
-                static_cast<unsigned long long>(m_lastCursor));
+            // 同时更新游标到当前修订号，避免后续每次 notifySceneChanged 都重复触发 FullRefresh
+            m_lastCursor = m_sceneManager->currentRevision();
             m_refreshLevel = RefreshLevel::FullRefresh;
             scheduleFullRefresh();
             return;
@@ -434,8 +436,6 @@ void SceneRefreshCoordinator::onSelectionChanged()
     if (selectionSetChanged && (hideNow || hideNow != m_lastHideSelectedEffective))
     {
         // 选中本体的增删只能靠世界层全量重建
-        SY_DEBUGF("[SceneRefresh] onSelectionChanged: triggering FullRefresh, selectionSetChanged=%d hideNow=%d lastHide=%d",
-            selectionSetChanged, hideNow, m_lastHideSelectedEffective);
         m_refreshLevel = RefreshLevel::FullRefresh;
     }
     else if (m_refreshLevel < RefreshLevel::Selection)
@@ -457,6 +457,16 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
 {
     if (!m_renderWidget || !sm)
     {
+        return;
+    }
+
+    // 纯选择变更优化：脏集合和删除集合都为空时，场景几何未变，
+    // 无需创建 BatchGuard（GL 上下文切换）、无需 reconcileBitmaps/Texts。
+    // 选择轮廓/手柄已由 onSelectionChanged → syncSelectionToolState 直接更新到 GPU，
+    // 此处只需触发一次 repaint 即可。
+    if (m_pendingDirtyIds.empty() && m_pendingDeletedIds.empty())
+    {
+        m_renderWidget->update();
         return;
     }
 
@@ -804,8 +814,6 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     {
         return;
     }
-
-    SY_DEBUGF("[SceneRefresh] applyFullRefresh: entityCount=%zu", sm->getEntityCount());
 
     // 全量重建：几何与台账都由 RenderSceneBuilder 的装配轮次自行对齐
     // （本轮没出现的图元会被回收），这里不需要再做任何缓存失效
