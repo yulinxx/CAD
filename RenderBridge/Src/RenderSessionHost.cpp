@@ -195,9 +195,11 @@ namespace
             m_transientBytes = desc.transientBufferBytes;
             m_holders = 1;
             m_shutdownRequested = false;
-            SY_INFOF("[SharedRuntime] 建立进程级 Metal runtime"
-                     "（transient=%llu bytes；应用级生命周期，2D/3D 共用，不随视口重建）",
+
+            SY_INFOF("[SharedRuntime] Created process-level Metal runtime"
+                     " (transient=%llu bytes; app-level lifetime, shared by 2D/3D, survives viewport recreation)",
                 static_cast<unsigned long long>(m_transientBytes));
+                
             return m_runtime;
         }
 
@@ -217,7 +219,7 @@ namespace
                 destroy("应用已请求退出，且最后一个视口已拆除");
                 return;
             }
-            SY_INFOF("[SharedRuntime] 视口释放（当前持有点 %u 个；runtime 保留给下一个视口）", m_holders);
+            SY_INFOF("[SharedRuntime] Viewport released (current holders: %u; runtime preserved for next viewport)", m_holders);
         }
 
         /// 应用退出：只置标志。真正销毁交给最后一个视口的 release()（见类注释）
@@ -242,7 +244,7 @@ namespace
         void destroy(const char* reason)
         {
             m_shutdownRequested = false;
-            SY_INFOF("[SharedRuntime] 销毁进程级 Metal runtime（%s）", reason ? reason : "?");
+            SY_INFOF("[SharedRuntime] Destroying process-level Metal runtime (%s)", reason ? reason : "?");
             Render::RT::rxRuntimeDestroy(m_runtime);
             m_runtime = Render::RT::RuntimeHandle::Invalid;
             m_transientBytes = 0;

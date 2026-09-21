@@ -49,7 +49,11 @@ void AppInitializer::initialize()
 {
     SyLogger::SetLogPathCallback(&appLogPathThunk, nullptr);
 
+
     SyLogger::GetInstance().Initialize(MainApp::appName().c_str(), SyLogLevel::Debug, true, true);
+
+
+    SY_INFO("\n\n");
 
     SY_INFO("==============================================================");
     SY_INFOF("Starting %s v%s", MainApp::appName().c_str(), MainApp::appVersion().c_str());
@@ -104,8 +108,6 @@ void AppInitializer::initialize()
         if (settingsRepo)
         {
             SyLogger::GetInstance().SetLevel(SyLogLevel::Info);
-            SY_INFO(
-                "[AppInitializer] Default log level set to Info (will be overridden by SettingsService if available)");
         }
     }
     else
@@ -118,7 +120,9 @@ void AppInitializer::initialize()
 
 void AppInitializer::shutdown()
 {
+    SY_INFO("==============================================================");
     SY_INFO("Application shutting down");
+    SY_INFO("==============================================================\n\n");
     s_persistenceService.reset();
     SyLogger::GetInstance().Shutdown();
 }

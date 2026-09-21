@@ -159,7 +159,7 @@ void WorkbenchStateManager::doRefreshFromState()
         return;
     }
 
-    SY_DEBUG("[WorkbenchStateManager] Refreshing from state center");
+    // SY_DEBUG("[WorkbenchStateManager] Refreshing from state center");
 
     // 取一次 snapshot，所有子方法复用，避免 3-4 次重复拷贝
     const auto state = m_stateCenter->snapshot();

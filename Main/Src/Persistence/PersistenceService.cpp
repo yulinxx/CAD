@@ -68,32 +68,35 @@ bool PersistenceService::initialize(const std::string& dbPath)
 
 void PersistenceService::shutdown()
 {
-    if (m_database && m_database->isOpen())
+    // 幂等检查：避免重复 shutdown
+    if (!m_database || !m_database->isOpen())
     {
-        SY_DEBUG("[PersistenceService] Shutting down");
-
-        // P1修复：用条件变量替代 sleep，等待所有活跃数据库操作完成
-        {
-            std::unique_lock<std::mutex> lock(m_activeOpMutex);
-            m_shuttingDown = true;
-            m_activeOpCv.wait(lock, [this] { return m_activeOperations.load() == 0; });
-        }
-
-        // 清理注册表中的仓储
-        m_repositories.clear();
-
-        // 按依赖顺序销毁仓储（与创建顺序相反）
-        m_dialogStates.reset();
-        m_documents.reset();
-        m_settings.reset();
-        m_layers.reset();
-        m_workspaceSnapshots.reset();
-        m_recentFiles.reset();
-        m_bootstrapper.reset();
-        m_database->close();
-
-        SY_DEBUG("[PersistenceService] Shutdown complete");
+        return;
     }
+
+    SY_DEBUG("[PersistenceService] Shutting down");
+
+    // P1修复：用条件变量替代 sleep，等待所有活跃数据库操作完成
+    {
+        std::unique_lock<std::mutex> lock(m_activeOpMutex);
+        m_shuttingDown = true;
+        m_activeOpCv.wait(lock, [this] { return m_activeOperations.load() == 0; });
+    }
+
+    // 清理注册表中的仓储
+    m_repositories.clear();
+
+    // 按依赖顺序销毁仓储（与创建顺序相反）
+    m_dialogStates.reset();
+    m_documents.reset();
+    m_settings.reset();
+    m_layers.reset();
+    m_workspaceSnapshots.reset();
+    m_recentFiles.reset();
+    m_bootstrapper.reset();
+    m_database->close();
+
+    SY_DEBUG("[PersistenceService] Shutdown complete");
 }
 
 int PersistenceService::activeOperationCount() const

@@ -140,6 +140,7 @@ WorkbenchWindow::WorkbenchWindow(QWidget* parent)
     , m_fileDropHandler(std::make_unique<FileDropHandler>(this))
 {
     SY_DEBUG("[WorkbenchWindow] Creating main window");
+    
     setWindowTitle(QString::fromStdString(MainApp::appName()));
     resize(1440, 900);
     // 启用文件拖放，2D/3D 工作台共用统一 FileDropHandler
@@ -169,8 +170,8 @@ WorkbenchWindow::WorkbenchWindow(QWidget* parent)
     m_stateManager = std::make_unique<WorkbenchStateManager>(this, m_menuManager, m_layoutManager.get());
     // 启用鼠标追踪，确保 3D 视口中的 QOpenGLWidget 能收到无按键 mouseMoveEvent
     setMouseTracking(true);
-    SY_DEBUG("[WorkbenchWindow] Initializing workbench shell");
     initializeWorkbenchShell();
+
     SY_INFO("[WorkbenchWindow] Main window created successfully");
 }
 

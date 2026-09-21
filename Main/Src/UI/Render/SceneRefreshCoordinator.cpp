@@ -414,6 +414,9 @@ void SceneRefreshCoordinator::onSelectionChanged()
         }
 
         m_lastSelectedIds = std::move(currentSelected);
+        // 同步缓存：onSelectionChanged 是选中集变更的唯一入口
+        m_cachedSelectedIds = m_lastSelectedIds;
+        m_selectedIdsCacheValid = true;
     }
 
     // 这里判的是「这次刷新要做到什么级别」，因此看的是**有效**隐藏状态
@@ -510,19 +513,8 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     // 时要用它识别「有效状态翻转」（见该处的注释）
     m_lastHideSelectedEffective = hideSelected;
 
-    // 如果启用隐藏选中实体，获取当前选中的实体ID集合
-    std::unordered_set<uint64_t> selectedIds;
-    if (hideSelected)
-    {
-        const auto selectedEntities = sm->getSelectedEntities();
-        for (const auto* e : selectedEntities)
-        {
-            if (e)
-            {
-                selectedIds.insert(static_cast<uint64_t>(e->id));
-            }
-        }
-    }
+    // 如果启用隐藏选中实体，使用缓存的选中 ID 集合（避免每次刷新都遍历选择集构建哈希表）
+    const std::unordered_set<uint64_t>& selectedIds = m_cachedSelectedIds;
 
     // 优化：收集需要处理的图元ID（可见的、非 IMAGE/TEXT 的）
     // 用于后续的并行处理
@@ -833,19 +825,8 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     // 时要用它识别「有效状态翻转」（见该处的注释）
     m_lastHideSelectedEffective = hideSelected;
 
-    // 如果启用隐藏选中实体，获取当前选中的实体ID集合
-    std::unordered_set<uint64_t> selectedIds;
-    if (hideSelected)
-    {
-        const auto selectedEntities = sm->getSelectedEntities();
-        for (const auto* e : selectedEntities)
-        {
-            if (e)
-            {
-                selectedIds.insert(static_cast<uint64_t>(e->id));
-            }
-        }
-    }
+    // 如果启用隐藏选中实体，使用缓存的选中 ID 集合
+    const std::unordered_set<uint64_t>& selectedIds = m_cachedSelectedIds;
 
     sm->forEachEntity([this, hideSelected, &selectedIds](Eg::SyEntity* e) {
         // 账本必须与 gatherGeometry 的提交规则一致：它不按 selected() 跳过，
@@ -900,19 +881,8 @@ void SceneRefreshCoordinator::reconcileBitmaps(Eg::SceneManager* sm, bool fullRe
     // 获取"选中时隐藏原图"的**有效**设置（开关 + 虚线画得出来），见 hideSelectedEffective()
     const bool hideSelected = hideSelectedEffective();
 
-    // 如果启用隐藏选中实体，获取当前选中的实体ID集合
-    std::unordered_set<uint64_t> selectedIds;
-    if (hideSelected)
-    {
-        const auto selectedEntities = sm->getSelectedEntities();
-        for (const auto* e : selectedEntities)
-        {
-            if (e)
-            {
-                selectedIds.insert(static_cast<uint64_t>(e->id));
-            }
-        }
-    }
+    // 如果启用隐藏选中实体，使用缓存的选中 ID 集合
+    const std::unordered_set<uint64_t>& selectedIds = m_cachedSelectedIds;
 
     // 期望集合：场景中所有可见 SyImage（可见 = 图元可见 && 图层可见）
     std::unordered_set<uint64_t> desired;
@@ -999,19 +969,8 @@ void SceneRefreshCoordinator::reconcileTexts(Eg::SceneManager* sm, bool fullReco
     // 获取"选中时隐藏原图"的**有效**设置（开关 + 虚线画得出来），见 hideSelectedEffective()
     const bool hideSelected = hideSelectedEffective();
 
-    // 如果启用隐藏选中实体，获取当前选中的实体ID集合
-    std::unordered_set<uint64_t> selectedIds;
-    if (hideSelected)
-    {
-        const auto selectedEntities = sm->getSelectedEntities();
-        for (const auto* e : selectedEntities)
-        {
-            if (e)
-            {
-                selectedIds.insert(static_cast<uint64_t>(e->id));
-            }
-        }
-    }
+    // 如果启用隐藏选中实体，使用缓存的选中 ID 集合
+    const std::unordered_set<uint64_t>& selectedIds = m_cachedSelectedIds;
 
     // 期望集合：场景中所有可见 SyText（可见 = 图元可见 && 图层可见）
     std::unordered_set<uint64_t> desired;

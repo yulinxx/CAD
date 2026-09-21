@@ -68,6 +68,7 @@ public:
 
     /// 试用天数配置
     static constexpr int kDefaultTrialDays = 30;
+    int trialDays() const;
 
     /// 禁用拷贝
     TrialManager(const TrialManager&) = delete;

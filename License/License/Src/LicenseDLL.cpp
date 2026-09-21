@@ -134,7 +134,7 @@ extern "C"
 
     LicenseContext* License_Create(const LicenseConfig* config)
     {
-        SY_INFO("[LicenseDLL] License_Create: creating license context");
+        // SY_INFO("[LicenseDLL] License_Create: creating license context");
         try
         {
             if (!config)
@@ -166,7 +166,7 @@ extern "C"
             auto* ctx = new LicenseContext();
             ctx->manager = std::make_unique<LicenseManager>(config->configDir);
             setLastError(nullptr);
-            SY_INFO("[LicenseDLL] License_Create: license context created successfully");
+            // SY_INFO("[LicenseDLL] License_Create: license context created successfully");
             return ctx;
         }
         catch (const std::exception& ex)
@@ -183,13 +183,13 @@ extern "C"
 
     void License_Destroy(LicenseContext* ctx)
     {
-        SY_INFO("[LicenseDLL] License_Destroy: destroying license context");
+        // SY_INFO("[LicenseDLL] License_Destroy: destroying license context");
         delete ctx;
     }
 
     int License_Check(LicenseContext* ctx)
     {
-        SY_INFO("[LicenseDLL] License_Check: verifying license");
+        // SY_INFO("[LicenseDLL] License_Check: verifying license");
         try
         {
             LicenseManager* manager = getManager(ctx);
@@ -208,7 +208,7 @@ extern "C"
                 return LICENSE_ERR_VERIFY_FAILED;
             }
 
-            SY_INFO("[LicenseDLL] License_Check: license verification passed");
+            // SY_INFO("[LicenseDLL] License_Check: license verification passed");
             setLastError(nullptr);
             return LICENSE_OK;
         }
@@ -226,7 +226,7 @@ extern "C"
 
     int License_Activate(LicenseContext* ctx, const char* regCode)
     {
-        SY_INFO("[LicenseDLL] License_Activate: activating license");
+        // SY_INFO("[LicenseDLL] License_Activate: activating license");
         try
         {
             LicenseManager* manager = getManager(ctx);
@@ -252,7 +252,7 @@ extern "C"
                 return LICENSE_ERR_VERIFY_FAILED;
             }
 
-            SY_INFO("[LicenseDLL] License_Activate: license activation succeeded");
+            // SY_INFO("[LicenseDLL] License_Activate: license activation succeeded");
             setLastError(nullptr);
             return LICENSE_OK;
         }
@@ -270,7 +270,7 @@ extern "C"
 
     int License_ReValidate(LicenseContext* ctx)
     {
-        SY_INFO("[LicenseDLL] License_ReValidate: re-validating license");
+        // SY_INFO("[LicenseDLL] License_ReValidate: re-validating license");
         try
         {
             LicenseManager* manager = getManager(ctx);
@@ -288,7 +288,7 @@ extern "C"
                 return LICENSE_ERR_VERIFY_FAILED;
             }
 
-            SY_INFO("[LicenseDLL] License_ReValidate: license re-validation passed");
+            // SY_INFO("[LicenseDLL] License_ReValidate: license re-validation passed");
             setLastError(nullptr);
             return LICENSE_OK;
         }
@@ -306,7 +306,7 @@ extern "C"
 
     int License_Clear(LicenseContext* ctx)
     {
-        SY_INFO("[LicenseDLL] License_Clear: clearing license");
+        // SY_INFO("[LicenseDLL] License_Clear: clearing license");
         try
         {
             LicenseManager* manager = getManager(ctx);

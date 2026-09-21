@@ -95,7 +95,6 @@ bool DatabaseBootstrapper::ensureSchema()
     if (currentVersion == 0)
     {
         // 首次创建：建表
-        SY_DEBUG("[DatabaseBootstrapper] First run, creating schema v1");
         if (!createMetaTable())
         {
             return false;
@@ -114,8 +113,6 @@ bool DatabaseBootstrapper::ensureSchema()
             return false;
         }
     }
-
-    SY_DEBUGF("[DatabaseBootstrapper] Schema is up to date (v%d)", kSchemaVersion);
 
     // 为常用查询字段创建索引，提升查询性能
     if (!createIndices())
@@ -510,7 +507,7 @@ bool DatabaseBootstrapper::createDialogStateTable()
         SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
         return false;
     }
-    SY_DEBUG("[DatabaseBootstrapper] dialog_states table ready");
+
     return true;
 }
 

@@ -273,7 +273,6 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
             std::make_unique<LayerPersistenceBridge>(m_layerManager.get(), persistenceService()->layers());
 
         m_layerPersistenceBridge->attach();
-        SY_INFO("[ApplicationCompositionRoot] LayerPersistenceBridge attached");
     }
 
     // LayerManager 注入 SceneEditService，添加图元时自动分配图层

@@ -165,6 +165,11 @@ private:
     // 将其加入待处理脏集合，驱动增量路径正确增删（见 onSelectionChanged）。
     std::unordered_set<uint64_t> m_lastSelectedIds;
 
+    // 缓存的选中 ID 集合：供 applyLightRefresh/applyFullRefresh/reconcile* 使用
+    // 避免每次刷新都遍历选择集构建哈希表
+    mutable std::unordered_set<uint64_t> m_cachedSelectedIds;
+    mutable bool m_selectedIdsCacheValid{ false };
+
     // 当前已同步到位图渲染层的 SyImage 图元 ID 集合（多图支持，本地账本）
     std::unordered_set<uint64_t> m_bitmapImageIds;
 

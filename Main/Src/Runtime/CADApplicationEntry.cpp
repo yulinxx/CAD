@@ -7,6 +7,7 @@
 #include <string>
 
 #include "Log/SyLogger.h"
+#include "Ut/BundleResources.h"
 #include "VersionInfo.h"
 
 #ifdef _WIN32
@@ -155,6 +156,10 @@ int runCADApplication(int argc, char** argv)
     // QApplication 必须在 buildAppPaths() 之前创建，否则 AppPathManager 在解析路径时
     // 调用 QCoreApplication::applicationDirPath() 会因 QApplication 尚未存在而告警。
     auto app = std::make_unique<QApplication>(argc, argv);
+
+    // 初始化 App Bundle 内部资源路径 (pdftocairo, Ghostscript 等)
+    // 必须在 QApplication 创建后调用，以确保 QCoreApplication::applicationDirPath() 可用
+    Ut::BundleResources::initialize();
 
     auto appPaths = MainApp::buildAppPaths(MainApp::appName());
     if (appPaths.appRootPath.empty())

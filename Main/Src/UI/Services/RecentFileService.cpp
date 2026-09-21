@@ -66,7 +66,7 @@ QStringList RecentFileService::loadRecentFiles() const
         auto records = m_persistence->recentFiles()->loadAll();
         if (!records.empty())
         {
-            SY_DEBUGF("[RecentFileService] Loaded %zu recent files from database", records.size());
+            // SY_DEBUGF("[RecentFileService] Loaded %zu recent files from database", records.size());
             QStringList result;
             result.reserve(static_cast<int>(records.size()));
             for (const auto& rec : records)

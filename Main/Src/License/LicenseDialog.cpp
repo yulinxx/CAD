@@ -82,9 +82,9 @@ void LicenseDialog::SetupUi()
     auto* mcLabel = new QLabel(tr("Machine Code:"), this);
     m_machineCodeLabel = new QLabel(m_machineCode, this);
     m_machineCodeLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    m_machineCodeLabel->setStyleSheet(
-        QStringLiteral("font-family: monospace; padding: 4px; background: %1; border: 1px solid %2;")
-            .arg(TM->colors().iconBg, TM->colors().borderNormal));
+    // m_machineCodeLabel->setStyleSheet(
+    //     QStringLiteral("font-family: monospace; padding: 4px; background: %1; border: 1px solid %2; color: %3;")
+    //         .arg(TM->colors().iconBg, TM->colors().borderNormal, TM->colors().textPrimary));
     machineCodeLayout->addWidget(mcLabel);
     machineCodeLayout->addWidget(m_machineCodeLabel, 1);
     mainLayout->addLayout(machineCodeLayout);

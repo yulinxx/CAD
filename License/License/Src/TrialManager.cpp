@@ -116,6 +116,10 @@ extern "C"
                 TrialManager::Status status = mgr.check();
                 checked = true;
 
+                // 调试输出
+                printf("[Trial] check: status=%d, startDate='%s', trialDays=%d\n",
+                    static_cast<int>(status), mgr.startDate().c_str(), mgr.trialDays());
+
                 // 只有明确过期的才返回 -1，其他情况（包括出错）都允许继续
                 if (status == TrialManager::Status::Expired)
                 {
@@ -126,6 +130,7 @@ extern "C"
                     cachedResult = 0;  // Active 或其他状态都允许继续
                 }
                 cachedDays = mgr.remainingDays();
+                printf("[Trial] remainingDays=%d\n", cachedDays);
             }
 
             if (remainingDays)
@@ -185,11 +190,6 @@ TrialManager::Status TrialManager::check()
 
 int TrialManager::remainingDays() const
 {
-    if (m_status != Status::Active)
-    {
-        return -1;
-    }
-
     const std::string today = getCurrentDate();
     const int used = daysBetween(m_startDate, today);
     const int remaining = m_trialDays - used;
@@ -204,6 +204,11 @@ bool TrialManager::isActive() const
 std::string TrialManager::startDate() const
 {
     return m_startDate;
+}
+
+int TrialManager::trialDays() const
+{
+    return m_trialDays;
 }
 
 void TrialManager::init()
@@ -231,9 +236,11 @@ void TrialManager::init()
     if (loaded)
     {
         // 验证有效性
+        printf("[Trial] loaded=true, validating...\n");
         if (validate())
         {
             const int remaining = remainingDays();
+            printf("[Trial] validate ok, remaining=%d\n", remaining);
             if (remaining <= 0)
             {
                 m_status = Status::Expired;
@@ -243,6 +250,10 @@ void TrialManager::init()
                 m_status = Status::Active;
             }
             return;
+        }
+        else
+        {
+            printf("[Trial] validate FAILED, will create new trial\n");
         }
     }
 
@@ -452,7 +463,6 @@ int TrialManager::daysBetween(const std::string& start, const std::string& end)
         return 0;
     }
 
-    // 简单实现：按日历日计算
     // 解析 YYYY-MM-DD
     int sy = std::stoi(start.substr(0, 4));
     int sm = std::stoi(start.substr(5, 2));
@@ -462,14 +472,21 @@ int TrialManager::daysBetween(const std::string& start, const std::string& end)
     int em = std::stoi(end.substr(5, 2));
     int ed = std::stoi(end.substr(8, 2));
 
-    // 转换为一年中的第几天
-    int startDay = sy * 365 + sy / 4 - sy / 100 + sy / 400
-                 + (sm > 1 ? (sm - 1) * 31 : 0)
-                 + sd;
+    // 使用 C 标准库 mktime 计算天数差
+    struct tm startTm{}, endTm{};
+    startTm.tm_year = sy - 1900;
+    startTm.tm_mon = sm - 1;
+    startTm.tm_mday = sd;
+    startTm.tm_hour = 12;  // 避免夏令时边界问题
 
-    int endDay = ey * 365 + ey / 4 - ey / 100 + ey / 400
-               + (em > 1 ? (em - 1) * 31 : 0)
-               + ed;
+    endTm.tm_year = ey - 1900;
+    endTm.tm_mon = em - 1;
+    endTm.tm_mday = ed;
+    endTm.tm_hour = 12;
 
-    return endDay - startDay;
+    // 使用 timegm 而不是 mktime（避免时区影响）
+    time_t startTime = timegm(&startTm);
+    time_t endTime = timegm(&endTm);
+
+    return static_cast<int>((endTime - startTime) / (24 * 60 * 60));
 }

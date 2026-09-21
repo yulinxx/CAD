@@ -40,7 +40,6 @@ void LayerPersistenceBridge::attach()
     m_attached = true;
     // 初始化排序缓存
     rebuildOrderCache();
-    SY_INFO("[LayerPersistenceBridge] Attached to LayerManager");
 }
 
 /// 停止监听图层变更事件

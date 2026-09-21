@@ -12,9 +12,8 @@ int runCADApplication(int argc, char** argv);
 
 int main(int argc, char** argv)
 {
-    // 初始化 App Bundle 内部资源路径 (pdftocairo, Ghostscript 等)
-    // 必须在 QApplication 构造前完成，确保环境变量生效
-    Ut::BundleResources::initialize();
+    // 注意：BundleResources::initialize() 现在在 QApplication 创建后调用
+    // 以避免 QCoreApplication::applicationDirPath 警告
 
 #ifdef Q_OS_MACOS
     // macOS: 禁用 Input Method Kit 的 mach port 通信，避免 IMKCFRunLoopWakeUpReliable 崩溃
