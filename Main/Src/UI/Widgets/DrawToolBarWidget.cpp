@@ -3,6 +3,14 @@
  * @brief 绘图工具栏窗口实现
  *
  * 显示绘图工具按钮（选择、画线、圆等）。
+ *
+ * Select/Pan 按钮高亮逻辑：
+ * - 启动时默认 Select 高亮
+ * - 点击切换为 Pan 时，Pan 高亮（按钮保持高亮，只是图标变化）
+ * - 切换到其他绘图工具时，其他工具高亮，Select/Pan 按钮取消高亮
+ * - 按 ESC 回到 Select/Pan，取消其他工具高亮，将 Select/Pan 高亮
+ *
+ * 总结：Select/Pan 作为一对互斥状态，和其他工具也是互斥的！
  */
 #include "DrawToolBarWidget.h"
 
@@ -25,6 +33,7 @@ namespace
 
 DrawToolBarWidget::DrawToolBarWidget(QWidget* parent)
     : QWidget(parent)
+    , m_currentToolName(QStringLiteral("SelectTool"))  // 默认激活 SelectTool
 {
     setObjectName(QStringLiteral("DrawToolBarWidget"));
     setMinimumWidth(48);
@@ -52,16 +61,37 @@ void DrawToolBarWidget::setIsPanModeCallback(IsPanModeCallback callback)
 void DrawToolBarWidget::setCurrentToolName(const QString& toolName)
 {
     m_currentToolName = toolName;
+    if (m_selectButton)
+    {
+        // 高亮状态：当前工具是 SelectTool 或处于 Pan 模式时高亮
+        const bool isPanMode = m_isPanModeCallback ? m_isPanModeCallback() : false;
+        const bool shouldHighlight = (toolName == QStringLiteral("SelectTool")) || isPanMode;
+        m_selectButton->setChecked(shouldHighlight);
+    }
+}
+
+void DrawToolBarWidget::updateSelectButtonHighlight()
+{
+    if (m_selectButton)
+    {
+        // 更新 Pan 模式状态
+        m_isPanMode = m_isPanModeCallback ? m_isPanModeCallback() : false;
+        // 高亮状态：当前工具是 SelectTool 或处于 Pan 模式时高亮
+        const bool shouldHighlight = (m_currentToolName == QStringLiteral("SelectTool")) || m_isPanMode;
+        m_selectButton->setChecked(shouldHighlight);
+    }
 }
 
 void DrawToolBarWidget::updateSelectButtonIcon()
 {
     if (m_selectButton)
     {
-        bool isPanMode = m_isPanModeCallback ? m_isPanModeCallback() : false;
+        // 更新 Pan 模式状态（用于解决信号顺序问题）
+        m_isPanMode = m_isPanModeCallback ? m_isPanModeCallback() : false;
         // 走皮肤着色并记录当前图标路径，主题切换时可被 refreshAllThemedIcons 一并刷新
-        IconHelper::setThemedIcon(m_selectButton, isPanMode ? kPanIconPath : kSelectIconPath);
-        m_selectButton->setToolTip(isPanMode ? tr("Pan (Click to Select)") : tr("Select (Click to Pan)"));
+        IconHelper::setThemedIcon(m_selectButton, m_isPanMode ? kPanIconPath : kSelectIconPath);
+        m_selectButton->setToolTip(m_isPanMode ? tr("Pan (Click to Select)") : tr("Select (Click to Pan)"));
+        // 高亮状态由 setCurrentToolName 控制，此处不更新 checked 避免信号顺序问题
     }
 }
 
@@ -114,27 +144,34 @@ void DrawToolBarWidget::rebuildButtons()
         {
             // 保存 Select 按钮指针
             m_selectButton = button;
+            // 必须设置 checkable 才能支持 checked（高亮）状态
+            button->setCheckable(true);
 
             // 初始图标/提示按当前 Pan 状态设置
             updateSelectButtonIcon();
+            // 初始高亮状态（默认 Select 高亮）
+            updateSelectButtonHighlight();
 
             // 覆盖 clicked 信号来处理 Select/Pan 切换
-            connect(button, &QToolButton::clicked, this, [this, action]() {
+            connect(button, &QToolButton::clicked, this, [this, action, button]() {
                 const bool isPanMode = m_isPanModeCallback ? m_isPanModeCallback() : false;
                 if (isPanMode)
                 {
                     // 当前是 Pan：切回 Select（setActiveTool 会顺带关闭 Pan）
                     action->trigger();
+                    button->setChecked(true);  // 同步高亮状态
                 }
                 else if (action->isChecked())
                 {
                     // 已是 Select：进入 Pan 模式
                     m_panModeToggleCallback();
+                    button->setChecked(false);  // 同步高亮状态
                 }
                 else
                 {
                     // 其他工具激活时：先切到 Select，不进入 Pan
                     action->trigger();
+                    button->setChecked(true);  // 同步高亮状态
                 }
                 // 切换后更新图标
                 QTimer::singleShot(0, this, &DrawToolBarWidget::updateSelectButtonIcon);

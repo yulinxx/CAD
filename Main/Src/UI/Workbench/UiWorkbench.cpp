@@ -1017,10 +1017,11 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     const QVector<QAction*> drawToolActions = buildDrawToolActions();
     drawWidget->setToolActions(drawToolActions);
 
-    // 监听 Pan 模式变化，更新 Select 按钮图标
+    // 监听 Pan 模式变化，更新 Select 按钮图标和高亮状态
     if (m_viewport)
     {
         connect(m_viewport, &RenderViewport2D::panModeChanged, drawWidget, &DrawToolBarWidget::updateSelectButtonIcon);
+        connect(m_viewport, &RenderViewport2D::panModeChanged, drawWidget, &DrawToolBarWidget::updateSelectButtonHighlight);
     }
 
     SY_DEBUGF("[Workbench2D] Draw tool panel built: tools=%d host=%s",
@@ -1047,6 +1048,9 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     QObject::connect(
         m_viewport, &RenderViewport2D::activeToolChanged, m_commandHub.get(), &CommandActionHub::setActiveToolAction);
     m_commandHub->setActiveToolAction(m_viewport->activeToolName());
+
+    // 工具切换时同步 DrawToolBarWidget 的高亮状态
+    QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged, drawWidget, &DrawToolBarWidget::setCurrentToolName);
 
     // 文字编辑工具栏绑定：工具切换到 TextEditTool 时，绑定到 TextFontToolBar
     // 以便在进入编辑时自动刷新字体面板信息

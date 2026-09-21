@@ -13,6 +13,9 @@ class QToolButton;
  * @brief 左侧绘图工具面板（纯展示层）
  *
  * 将命令中枢托管的 QAction 展示为一列按钮。Select/Pan 工具按钮可相互切换。
+ *
+ * 高亮行为：Select/Pan 作为一对互斥状态，和其他工具也是互斥的。
+ * 任何时候只有一个工具高亮，按 ESC 回到 Select/Pan 状态。
  */
 class DrawToolBarWidget : public QWidget
 {
@@ -40,6 +43,9 @@ public:
     /// 设置当前活动工具名称（用于 Select/Pan toggle 逻辑）
     void setCurrentToolName(const QString& toolName);
 
+    /// 更新 Select/Pan 按钮高亮状态（Pan 模式变化时调用）
+    void updateSelectButtonHighlight();
+
     /// 更新 Select 按钮图标（根据当前是 Select 还是 Pan 模式）
     void updateSelectButtonIcon();
 
@@ -53,6 +59,8 @@ private:
     QVector<QAction*> m_toolActions;
     // 当前活动工具名称
     QString m_currentToolName;
+    // 当前是否处于 Pan 模式（用于解决信号顺序问题）
+    bool m_isPanMode = false;
     // Pan 模式切换回调
     PanModeCallback m_panModeToggleCallback;
     // 获取当前是否处于 Pan 模式的回调
