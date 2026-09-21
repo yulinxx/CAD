@@ -146,6 +146,12 @@ int runCADApplication(int argc, char** argv)
         return cliResult;
     }
 
+    // 必须在 QApplication 创建前设置组织名和应用名，确保 Qt 内部组件（如字体缓存）
+    // 使用正确的路径，避免出现 AppData/Roaming/SanYi 等错误路径
+    QCoreApplication::setOrganizationName(QString::fromStdString(MainApp::organizationName()));
+    QCoreApplication::setOrganizationDomain(QString::fromStdString(MainApp::organizationDomain()));
+    QCoreApplication::setApplicationName(QString::fromStdString(MainApp::appName()));
+
     // QApplication 必须在 buildAppPaths() 之前创建，否则 AppPathManager 在解析路径时
     // 调用 QCoreApplication::applicationDirPath() 会因 QApplication 尚未存在而告警。
     auto app = std::make_unique<QApplication>(argc, argv);

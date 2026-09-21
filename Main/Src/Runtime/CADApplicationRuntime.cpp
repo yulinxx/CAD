@@ -30,8 +30,7 @@ CADApplicationRuntime::CADApplicationRuntime(std::unique_ptr<QApplication> app, 
 {
     m_app->setApplicationName(QString::fromStdString(MainApp::appName()));
     m_app->setApplicationVersion(QString::fromStdString(MainApp::appVersion()));
-    m_app->setOrganizationName(QString::fromStdString(MainApp::organizationName()));
-    m_app->setOrganizationDomain(QString::fromStdString(MainApp::organizationDomain()));
+    // organizationName/Domain 已在 CADApplicationEntry 中 QApplication 创建前设置
     m_app->setWindowIcon(QIcon(":/ui/common/Icons/Help/theme.svg"));
 
     // 设置当前工作目录到应用根目录
