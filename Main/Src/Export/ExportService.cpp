@@ -81,6 +81,25 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
 
     emit exportStarted(context.targetPath);
 
+    // 构造完整上下文，注入 sceneManager 指针供 Native 格式借用实体
+    ExportContext fullCtx = context;
+    if (!fullCtx.sceneManager)
+    {
+        fullCtx.sceneManager = m_sceneManager;
+    }
+    if (!fullCtx.sceneManager3D)
+    {
+        fullCtx.sceneManager3D = m_sceneManager3D;
+    }
+
+    // 注入进度回调，桥接 Qt 信号
+    if (!fullCtx.progressCallback)
+    {
+        fullCtx.progressCallback = [this](float progress, const char* /*stage*/) {
+            emit exportProgress(progress);
+        };
+    }
+
     // 收集场景图元（P5 收口: 复用 collectAllEntities 消除重复）
     Fio::VecSyEntityPtr entities = collectAllEntities();
 
@@ -103,7 +122,7 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
     }
 
     // 通过分发器执行导出
-    ExportResult result = m_dispatcher->dispatch(context, entities);
+    ExportResult result = m_dispatcher->dispatch(fullCtx, entities);
 
     if (result.success)
     {
