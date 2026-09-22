@@ -92,6 +92,9 @@ public:
     /// 停止定时器，防止析构过程中访问已释放资源
     void stop() override;
 
+    /// 设置拖动中是否强制显示选中图元（拖动时暂时显示原图形，拖动结束后恢复隐藏）
+    void setForceShowSelectedDuringDrag(bool forceShow);
+
     // ==================== 场景变更回调（IObserver 实现） ====================
 
     /// 场景数据变更通知（图元增删改）
@@ -120,6 +123,8 @@ signals:
 
 private slots:
     void updateSceneRender();
+    /// 独立的曲线 LOD 消费 slot，由 m_curveLodTimer 触发
+    void onCurveLodTimer();
 
 private:
     // 级别语义与 3D 共用，见 UI/Render/ISceneRefreshScheduler.h
@@ -151,10 +156,17 @@ private:
     // 场景更新节流定时器
     QTimer* m_sceneUpdateTimer{ nullptr };
 
+    // 曲线 LOD 分批消费专用定时器（独立于场景更新，避免场景操作频繁时 LOD 进度被阻塞）
+    // 间隔 32ms（约 30fps），低优先级后台任务，不与场景刷新竞争同一个时间槽。
+    QTimer* m_curveLodTimer{ nullptr };
+
     RefreshLevel m_refreshLevel{ RefreshLevel::None };
 
     /// 上一次刷新生效的「隐藏选中本体」状态，用于判断是否需要全量重建
     bool m_lastHideSelectedEffective{ false };
+
+    /// 拖动中强制显示选中图元（覆盖 hideSelectedEffective）
+    bool m_forceShowSelectedDuringDrag{ false };
 
     // 脏标记集合（增量渲染）
     std::unordered_set<Eg::EntityId> m_pendingDirtyIds;
