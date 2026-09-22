@@ -28,6 +28,7 @@ set(PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
 # ============================================================================
 set(SHARED_PROJECT_INCLUDE_DIRS
     "${CMAKE_CURRENT_BINARY_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}"
     "${SRC_ROOT}"
     "${SRC_ROOT}/Common"
     "${UI_ROOT}"

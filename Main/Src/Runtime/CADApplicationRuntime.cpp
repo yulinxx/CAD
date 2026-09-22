@@ -32,6 +32,13 @@ CADApplicationRuntime::CADApplicationRuntime(std::unique_ptr<QApplication> app, 
 {
     m_app->setApplicationName(QString::fromStdString(MainApp::appName()));
     m_app->setApplicationVersion(QString::fromStdString(MainApp::appVersion()));
+
+    // 检测应用名称是否正确配置
+    if (MainApp::appName().empty())
+    {
+        SY_WARN("[CADApplicationRuntime] Application name is empty! "
+                "Check CMake configuration: APP_NAME may not be properly propagated to templates.");
+    }
     // organizationName/Domain 已在 CADApplicationEntry 中 QApplication 创建前设置
     m_app->setWindowIcon(QIcon(":/ui/common/Icons/Help/theme.svg"));
 

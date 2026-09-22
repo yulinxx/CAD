@@ -5,15 +5,15 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>zh_CN</string>
     <key>CFBundleExecutable</key>
-    <string>@app_name@</string>
+    <string>@APP_NAME@</string>
     <key>CFBundleIdentifier</key>
-    <string>com.sanyi.@app_name@</string>
+    <string>com.sanyi.@APP_NAME@</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>@app_name@</string>
+    <string>@APP_NAME@</string>
     <key>CFBundleDisplayName</key>
-    <string>@app_name@</string>
+    <string>@APP_NAME@</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

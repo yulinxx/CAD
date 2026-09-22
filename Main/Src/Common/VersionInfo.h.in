@@ -2,7 +2,7 @@
 
 #include <string>
 
-#define APP_NAME "@app_name@"
+#define APP_NAME "@APP_NAME@"
 #define APP_VERSION "@PROJECT_VERSION@"
 #define APP_ORGANIZATION_NAME "@APP_ORGANIZATION_NAME@"
 #define APP_ORGANIZATION_DOMAIN "@APP_ORGANIZATION_DOMAIN@"
