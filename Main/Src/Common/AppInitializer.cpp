@@ -52,12 +52,7 @@ void AppInitializer::initialize()
 
     SyLogger::GetInstance().Initialize(MainApp::appName().c_str(), SyLogLevel::Debug, true, true);
 
-
-    SY_INFO("\n\n");
-
-    SY_INFO("==============================================================");
-    SY_INFOF("Starting %s v%s", MainApp::appName().c_str(), MainApp::appVersion().c_str());
-    SY_INFO("==============================================================");
+    SY_INFOF("=== Starting %s v%s ===", MainApp::appName().c_str(), MainApp::appVersion().c_str());
     // 这里只能声明「本构建把视口编译成了哪个后端」——那是编译期事实，启动瞬间即可知。
     // 真实生效的后端与设备名要等视口建 Surface 后由
     // RenderSessionHost::logCapabilities 打印（只有那里拿得到 caps）。
@@ -120,10 +115,17 @@ void AppInitializer::initialize()
 
 void AppInitializer::shutdown()
 {
+    // 先执行清理工作，这些操作会产生日志
+    s_persistenceService.reset();
+
+    // 等待前面的日志写入完成
+    SyLogger::GetInstance().Flush();
+
+    // 最后打印 shutdown 日志
     SY_INFO("==============================================================");
     SY_INFO("Application shutting down");
     SY_INFO("==============================================================\n\n");
-    s_persistenceService.reset();
+
     SyLogger::GetInstance().Shutdown();
 }
 
