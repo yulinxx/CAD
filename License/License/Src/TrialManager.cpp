@@ -1,5 +1,6 @@
 #include "License/TrialManager.h"
 #include "MachineFingerprint.h"
+#include "Log/SyLogger.h"
 
 #include <openssl/evp.h>
 
@@ -118,7 +119,7 @@ extern "C"
                 checked = true;
 
                 // 调试输出
-                printf("[Trial] check: status=%d, startDate='%s', trialDays=%d\n",
+                SY_DEBUGF("[Trial] check: status=%d, startDate='%s', trialDays=%d",
                     static_cast<int>(status), mgr.startDate().c_str(), mgr.trialDays());
 
                 // 只有明确过期的才返回 -1，其他情况（包括出错）都允许继续
@@ -131,7 +132,7 @@ extern "C"
                     cachedResult = 0;  // Active 或其他状态都允许继续
                 }
                 cachedDays = mgr.remainingDays();
-                printf("[Trial] remainingDays=%d\n", cachedDays);
+                SY_DEBUGF("[Trial] remainingDays=%d", cachedDays);
             }
 
             if (remainingDays)
@@ -237,11 +238,11 @@ void TrialManager::init()
     if (loaded)
     {
         // 验证有效性
-        printf("[Trial] loaded=true, validating...\n");
+        SY_DEBUG("[Trial] loaded=true, validating...");
         if (validate())
         {
             const int remaining = remainingDays();
-            printf("[Trial] validate ok, remaining=%d\n", remaining);
+            SY_DEBUGF("[Trial] validate ok, remaining=%d", remaining);
             if (remaining <= 0)
             {
                 m_status = Status::Expired;
@@ -254,7 +255,7 @@ void TrialManager::init()
         }
         else
         {
-            printf("[Trial] validate FAILED, will create new trial\n");
+            SY_DEBUG("[Trial] validate FAILED, will create new trial");
         }
     }
 

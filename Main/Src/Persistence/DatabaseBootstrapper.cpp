@@ -561,6 +561,6 @@ bool DatabaseBootstrapper::createIndices()
         return false;
     }
 
-    SY_DEBUG("[DatabaseBootstrapper] All indices created successfully");
+    // SY_DEBUG("[DatabaseBootstrapper] All indices created successfully");
     return true;
 }

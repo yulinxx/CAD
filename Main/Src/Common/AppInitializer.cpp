@@ -60,8 +60,8 @@ void AppInitializer::initialize()
     }
 
     SY_INFO("==============================================================");
-    SY_INFOF("=== Starting %s v%s ===", MainApp::appName().c_str(), MainApp::appVersion().c_str());
-    SY_INFO("==============================================================");
+    SY_INFOF("================== Starting %s v%s ==================", MainApp::appName().c_str(), MainApp::appVersion().c_str());
+    SY_INFO("==============================================================\n\n");
 
     // 这里只能声明「本构建把视口编译成了哪个后端」——那是编译期事实，启动瞬间即可知。
     // 真实生效的后端与设备名要等视口建 Surface 后由

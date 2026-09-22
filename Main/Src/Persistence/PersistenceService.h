@@ -89,7 +89,7 @@ public:
         return nullptr;
     }
 
-    // ---- 传统访问器（向后兼容） ----
+    // ---- 仓储访问器 ----
 
     RecentFileRepository* recentFiles();
     WorkspaceSnapshotRepository* workspaceSnapshots();
@@ -108,7 +108,7 @@ private:
     std::unique_ptr<Eg::Database> m_database;
     std::unique_ptr<DatabaseBootstrapper> m_bootstrapper;
 
-    // 仓储对象（传统方式持有，向后兼容）
+    // 仓储对象
     std::unique_ptr<RecentFileRepository> m_recentFiles;
     std::unique_ptr<WorkspaceSnapshotRepository> m_workspaceSnapshots;
     std::unique_ptr<LayerRepository> m_layers;
