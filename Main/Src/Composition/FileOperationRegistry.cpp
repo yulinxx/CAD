@@ -418,9 +418,19 @@ void FileOperationRegistry::registerFileSaveOps()
             }
             doExport(filePath.toStdString());
         }
-        else
+        else if (QString::fromStdString(*m_currentFilePath).endsWith(QLatin1String(".sy"), Qt::CaseInsensitive))
         {
             doExport(*m_currentFilePath);
+        }
+        else
+        {
+            QString filePath = FileDialogService::getSaveFileName(
+                m_parentWidget, QObject::tr("Save"), FileDialogService::saveFileFilter());
+            if (filePath.isEmpty())
+            {
+                return;
+            }
+            doExport(filePath.toStdString());
         }
     }));
 

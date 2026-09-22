@@ -163,9 +163,9 @@ void DrawToolBarWidget::rebuildButtons()
                 }
                 else if (action->isChecked())
                 {
-                    // 已是 Select：进入 Pan 模式
+                    // 已是 Select：进入 Pan 模式，保持高亮
                     m_panModeToggleCallback();
-                    button->setChecked(false);  // 同步高亮状态
+                    button->setChecked(true);  // Pan 模式下保持高亮
                 }
                 else
                 {
@@ -173,8 +173,11 @@ void DrawToolBarWidget::rebuildButtons()
                     action->trigger();
                     button->setChecked(true);  // 同步高亮状态
                 }
-                // 切换后更新图标
-                QTimer::singleShot(0, this, &DrawToolBarWidget::updateSelectButtonIcon);
+                // 切换后更新图标和高亮
+                QTimer::singleShot(0, this, [this]() {
+                    updateSelectButtonIcon();
+                    updateSelectButtonHighlight();
+                });
             });
         }
         else
