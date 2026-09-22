@@ -9,6 +9,7 @@
 #include <QObject>
 #include <QPushButton>
 #include <QSettings>
+#include <QCoreApplication>
 
 #include <cstdio>
 
@@ -143,19 +144,24 @@ int CADApplicationRuntime::run()
             UiFeatureGate::instance().setUnrestricted(true);
             SY_INFOF("[CADApplicationRuntime] Trial active: %d days remaining", remainingDays);
 
-            QString trialMsg = QString::fromUtf8("Trial Version\n\n"
+            // 翻译上下文：CADApplicationRuntime
+            auto tr = [](const char* text) {
+                return QCoreApplication::translate("CADApplicationRuntime", text);
+            };
+
+            QString trialMsg = tr("Trial Version\n\n"
                 "You have %1 day(s) remaining in your trial period.\n\n"
                 "You can continue using the trial version or activate a license now.")
                 .arg(remainingDays);
 
             int trialChoice = -1;  // 0=Register, 1=Continue
             QMessageBox trialBox(QMessageBox::Information,
-                QString::fromUtf8("Trial Period"),
+                tr("Trial Period"),
                 trialMsg,
                 QMessageBox::NoButton,
                 nullptr);
-            QPushButton* regBtn = trialBox.addButton(QString::fromUtf8("Register Now"), QMessageBox::AcceptRole);
-            QPushButton* contBtn = trialBox.addButton(QString::fromUtf8("Continue Trial"), QMessageBox::RejectRole);
+            QPushButton* regBtn = trialBox.addButton(tr("Register Now"), QMessageBox::AcceptRole);
+            QPushButton* contBtn = trialBox.addButton(tr("Continue Trial"), QMessageBox::RejectRole);
             QObject::connect(regBtn, &QPushButton::clicked, [&trialChoice]() { trialChoice = 0; });
             QObject::connect(contBtn, &QPushButton::clicked, [&trialChoice]() { trialChoice = 1; });
             trialBox.exec();
