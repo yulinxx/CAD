@@ -24,6 +24,8 @@ option(SANYI_UNITY_BUILD "Enable unity build (faster compilation)" ON)
 if(SANYI_UNITY_BUILD)
     set(CMAKE_UNITY_BUILD ON)
     set(CMAKE_UNITY_BUILD_BATCH_SIZE 16)
+    # 排除 Objective-C++ 文件，避免与 C++ 混合导致编译错误
+    list(APPEND CMAKE_UNITY_BUILD_SUPPORTED_SOURCE_EXTENSIONS ".mm")
 endif()
 
 set(SANYI_ROOT "${PROJECT_SOURCE_DIR}" CACHE INTERNAL "SanYi CAD project root")

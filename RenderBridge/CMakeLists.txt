@@ -70,10 +70,6 @@ sanyi_add_shared_library(${LIB_NAME}
         Core Gui OpenGLWidgets
 )
 
-# Unity build 会把多个匿名命名空间合并成一个，导致 RenderSessionHost 等文件里的
-# 局部类型名冲突。暂时关闭，后续再单独解决。
-set_target_properties(${LIB_NAME} PROPERTIES UNITY_BUILD OFF)
-
 sanyi_export_imported_target(${LIB_NAME}
     LIB_NAME "${LIB_NAME}"
     PUBLIC_INCLUDE_DIRS
