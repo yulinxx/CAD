@@ -104,6 +104,22 @@ SceneTreeTopology2D SceneTreeBuilder2D::buildTopology(Eg::SceneManager* scene)
     // 顶层群组只查一次：旧实现对 getTopLevelGroups() 连查三次（每次都分配一个 vector）
     const std::vector<Eg::SyGroup*> topLevelGroups = scene->groupManager().getTopLevelGroups();
 
+    // 无群组快速路径：直接将所有图元作为顶层行，
+    // 省去 QSet 构建 + 29 万次 contains 查找 + 递归遍历群组的开销。
+    // 导入的文件通常没有群组结构，这条路径命中极高频。
+    if (topLevelGroups.empty())
+    {
+        const size_t total = scene->entityCount();
+        topo.topLevel.reserve(static_cast<int>(total));
+        scene->forEachEntity([&topo](Eg::SyEntity* entity) {
+            if (entity)
+            {
+                topo.topLevel.push_back({ static_cast<qint64>(entity->id), false });
+            }
+        });
+        return topo;
+    }
+
     // 收集所有已入群组的图元 ID，避免在顶层重复列出
     QSet<qint64> groupedIds;
     for (auto* group : topLevelGroups)

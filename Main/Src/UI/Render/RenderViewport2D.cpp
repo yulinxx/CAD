@@ -990,27 +990,14 @@ void RenderViewport2D::applyCameraToWidget()
         }
     }
 
-    // 曲线 LOD：缩放（世界单位→屏幕像素，即 zoom）跨过 2 倍时，
-    // 触发分批刷新让圆/弧/椭圆按新段数重新离散化。
-    // 段数 ∝ √zoom，zoom 跨 2 倍 → 段数跨 √2 ≈ 1.4 倍，弦高误差从 1px 涨到约 1.4px，
-    // 仍可接受；若用更小阈值会在 zoom 连续滚动时频繁全量遍历（百万图元下每帧做不起）。
-    const float worldToScreenScale = 1.0f / m_renderWidget->pixelToWorldScale();
-    if (worldToScreenScale > 0.0f)
+    // 曲线 LOD：相机每次变化都交给协调器判断「是否该重新收集」—— 它内部按
+    // 「缩放滞后（放大 1.3 倍升级 / 缩小 2 倍降级，中间留死区）+ 可视区域是否越出
+    // 上次收集范围」判定，不需要重建时只做几次比较就返回。
+    // 收集范围只有可视区域（含余量），所以「平移」也必须参与判定：否则搬进画面的
+    // 图元会一直停在旧精度。判定状态（缩放基准、已收集矩形）都在协调器里统一维护。
+    if (m_refreshCoordinator)
     {
-        constexpr float kCurveLodRatio = 2.0f;
-        const bool curveCrossed = m_curveLodScaleAtBuild <= 0.0f ||
-            worldToScreenScale > m_curveLodScaleAtBuild * kCurveLodRatio ||
-            worldToScreenScale * kCurveLodRatio < m_curveLodScaleAtBuild;
-        if (curveCrossed)
-        {
-            m_curveLodScaleAtBuild = worldToScreenScale;
-            if (m_refreshCoordinator)
-            {
-                // 分批重建曲线，而不是一次性全量刷新：只收集圆/弧/椭圆，
-                // 每帧重建一批（见 SceneRefreshCoordinator::requestCurveLodRefresh）。
-                m_refreshCoordinator->requestCurveLodRefresh();
-            }
-        }
+        m_refreshCoordinator->requestCurveLodRefresh();
     }
 }
 

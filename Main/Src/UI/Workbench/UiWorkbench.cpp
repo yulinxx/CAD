@@ -725,7 +725,14 @@ void Workbench2D::setupImportCallbacks(RenderViewport2D* vp, WorkbenchWindow& wi
 
     // 统一显示刷新（批量刷新场景树、属性面板，避免导入后多次分离刷新回调）
     m_persistence.importService->setDisplayRefreshCallback([this]() {
-        refreshSceneTree();
+        // 走结构签名门控，不要无条件全量重建。
+        // 导入期的场景观察者（SceneNotifier → onSceneTreeSceneChanged）已经把本批新增
+        // 按增量追加进树、并刷新了结构签名；这里再直接 refreshSceneTree()，等于把整棵树
+        // （buildTopology 的 O(N) 扫描 + 换模型 + 全表 dataChanged）白做一遍。
+        // 29 万图元下实测日志里连着出现「incremental +293040 rows」与「rebuilt topLevel=293040」，
+        // 就是这条路径与观察者路径重复所致。
+        // 签名一致时直接跳过；确实变了（观察者没覆盖到的导入路径）才防抖重建。
+        refreshSceneTreeIfNeeded("importDone");
         refreshPropertiesPanel();
     });
 }
@@ -1621,6 +1628,34 @@ void Workbench2D::applySceneTreeIncremental(const char* src)
     {
         return;
     }
+
+    // 重入保护：本函数在「分类变更 → 追加行」期间会触发嵌套的场景通知
+    // （模型信号 → 场景写回 → SceneNotifier → onSceneTreeSceneChanged），
+    // 而嵌套调用读到的 m_sceneTreeCursor 还是外层尚未推进的旧值，
+    // 于是把同一批变更又整表扫一遍、还会再追加一遍行（29 万图元下即为一次完整重扫）。
+    // 外层正在消费的就是这批变更，嵌套调用不再重复处理。
+    //
+    // 但不能直接丢弃：嵌套期间新产生的变更若无人再通知就会漏掉。
+    // 因此投递一次延后重跑，等到下一轮事件循环时外层已返回、游标已推进，
+    // 那时只会读到真正的新变更。收敛性：重跑若读到空变更且签名一致会直接返回，不再投递。
+    if (m_sceneTreeIncrementalBusy)
+    {
+        QTimer::singleShot(0, this, [this]() { applySceneTreeIncremental("deferred"); });
+        return;
+    }
+
+    // 下面分支多（多个 return），用作用域守卫统一复位，避免漏写导致后续调用被永久丢弃
+    struct BusyGuard
+    {
+        bool& flag;
+        explicit BusyGuard(bool& f)
+            : flag(f)
+        {
+            flag = true;
+        }
+        ~BusyGuard() { flag = false; }
+    } busyGuard(m_sceneTreeIncrementalBusy);
+
     Eg::SceneManager* scene = m_scene.sceneEditService->sceneManager();
     if (!scene)
     {
@@ -1672,6 +1707,30 @@ void Workbench2D::applySceneTreeIncremental(const char* src)
             }
             refreshSceneTree();
         }
+        return;
+    }
+
+    // 纯「非结构」变更（几何/样式/选中）：场景树的行集合、分组、图标都不变，
+    // 无需任何刷新。否则移动/缩放图元时每帧的 GeometryChanged 都会落到下方
+    // hasNonAdd 分支触发全量 rebuild（O(场景规模)），万级场景拖动即卡死。
+    bool hasTreeRelevant = false;
+    for (const Eg::SceneChange& ch : set.changes)
+    {
+        if (Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::Added) ||
+            Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::Removed) ||
+            Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::StructureChanged) ||
+            Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::LayerChanged) ||
+            Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::VisibilityChanged) ||
+            Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::LockChanged))
+        {
+            hasTreeRelevant = true;
+            break;
+        }
+    }
+    if (!hasTreeRelevant)
+    {
+        // 只有 GeometryChanged / StyleChanged / SelectionChanged：树无关，消费掉即可。
+        // 游标已在上方推进到 toRevision，这里无需再动。
         return;
     }
 

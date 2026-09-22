@@ -315,6 +315,9 @@ private:
     const char* m_sceneTreeRefreshSource{ nullptr };        ///< 场景树重建触发来源
     uint64_t m_sceneTreeCursor{ 0 };                       ///< 场景树增量游标
     bool m_sceneTreeForceRefresh{ false };                  ///< 强制全量刷新标志
+    /// applySceneTreeIncremental 重入标志：分类/追加期间会触发嵌套的场景通知，
+    /// 嵌套调用读到的游标还是外层尚未推进的旧值，会把同一批变更整表再扫一遍。
+    bool m_sceneTreeIncrementalBusy{ false };
     /// 场景树延迟重建标记（setData 回调链中 scheduleTreeRefresh 合并，避免 delete this）
     bool m_treeRefreshPending{ false };
     /// 命令 UI 状态刷新的节流冷却定时器 + 尾包标记。

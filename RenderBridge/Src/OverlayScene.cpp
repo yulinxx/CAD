@@ -672,7 +672,18 @@ namespace RenderBridge
         if (m_selectionBox.valid)
         {
             std::vector<OVertex> v;
-            rectLineList(v, m_selectionBox.box, m_selectionBox.border);
+            Render::BBox2d box = m_selectionBox.box;
+            // 检测退化盒子（点图元等）：在渲染时用 pixelToWorld 扩展为最小屏幕尺寸
+            if (box.width() < 1e-6 && box.height() < 1e-6)
+            {
+                constexpr float kMinSizePx = 6.0f;  // 最小 6 像素
+                const float p2w = m_frameParams.pixelToWorld > 0.0f ? m_frameParams.pixelToWorld : 1.0f;
+                const float halfSizeWorld = kMinSizePx * 0.5f * p2w;
+                const float cx = static_cast<float>(box.minPt.x());
+                const float cy = static_cast<float>(box.minPt.y());
+                box = Render::BBox2d(cx - halfSizeWorld, cy - halfSizeWorld, cx + halfSizeWorld, cy + halfSizeWorld);
+            }
+            rectLineList(v, box, m_selectionBox.border);
             emitWorld(scene, out, v, RA::PrimitiveType::Lines, seq);
         }
 

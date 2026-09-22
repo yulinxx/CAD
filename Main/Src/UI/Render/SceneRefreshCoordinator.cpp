@@ -13,8 +13,12 @@
 #include "Engine/Layer/SyLayer.h"
 #include "Engine2D/SyEntity/SyImage.h"
 #include "Engine2D/SyEntity/SyText.h"
+#include "Engine2D/SyEntity/SyPolygon.h"
+#include "Engine2D/Geometry/EntityGeometryEmitter.h"
 #include "Engine/SyEntity/EType.h"
 #include "Engine/Parallel/EngineParallel.h"
+
+#include "Ut/BBox2d.h"
 
 #include "Log/SyLogger.h"
 #include "Log/SyPerfCounter.h"
@@ -275,6 +279,179 @@ void SceneRefreshCoordinator::requestFullRefresh()
     scheduleFullRefresh();
 }
 
+// 曲线 LOD 消费泵：只启动节流定时器、不提升 RefreshLevel —— 曲线 LOD 是独立的
+// 后台分批任务，由 updateSceneRender 在每帧末尾无条件推进一步。
+void SceneRefreshCoordinator::ensureCurveLodPump()
+{
+    if (m_sceneUpdateTimer && !m_sceneUpdateTimer->isActive())
+    {
+        m_sceneUpdateTimer->start();
+    }
+    else if (!m_sceneUpdateTimer)
+    {
+        processCurveLodBatch();
+    }
+}
+
+void SceneRefreshCoordinator::finishCurveLodQueue()
+{
+    m_curveLodQueue.clear();
+    m_curveLodCursor = 0;
+
+    // 本轮队列还没消费完时相机可能又变了（连续缩放/平移）：那时 requestCurveLodRefresh
+    // 只记了待办、没打断进行中的批次。这里排空后立刻按当时的状态重新评估一次，
+    // 否则「平移出上次收集区域」的新视野会一直停在旧精度（视口裁剪必须配这一步）。
+    if (m_curveLodRecollectPending)
+    {
+        m_curveLodRecollectPending = false;
+        refillCurveLodQueueIfStale();
+        if (!m_curveLodQueue.empty())
+        {
+            ensureCurveLodPump();
+        }
+    }
+}
+
+void SceneRefreshCoordinator::refillCurveLodQueueIfStale()
+{
+    if (!m_sceneManager || !m_renderWidget)
+    {
+        return;
+    }
+
+    const float pixelToWorld = m_renderWidget->pixelToWorldScale();
+    if (!(pixelToWorld > 0.0f))
+    {
+        return;
+    }
+    const double worldToScreenScale = 1.0 / static_cast<double>(pixelToWorld);
+
+    // 可视世界矩形（含 1.25 倍余量）。曲线 LOD 的精度只对看得见的图元有意义 ——
+    // 为了恢复视野内几十/几百个图元的精度去重算整份场景（29 万图元）既慢又白做。
+    // 余量是为了减少平移/微缩放时反复重新收集的边缘抖动。
+    // 矩阵退化（visibleWorldBounds 返回 false）时退化为不裁剪，与旧行为一致。
+    Ut::BBox2d collectBox;
+    Ut::BBox2d visibleBox;
+    bool hasVisibleBox = false;
+    {
+        float bounds[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        if (m_renderWidget->visibleWorldBounds(bounds))
+        {
+            const double minX = static_cast<double>(bounds[0]);
+            const double minY = static_cast<double>(bounds[1]);
+            const double maxX = static_cast<double>(bounds[2]);
+            const double maxY = static_cast<double>(bounds[3]);
+            visibleBox = Ut::BBox2d(minX, minY, maxX, maxY);
+
+            constexpr double kVisibleMargin = 1.25;
+            const double centerX = 0.5 * (minX + maxX);
+            const double centerY = 0.5 * (minY + maxY);
+            const double halfW = 0.5 * (maxX - minX) * kVisibleMargin;
+            const double halfH = 0.5 * (maxY - minY) * kVisibleMargin;
+            collectBox = Ut::BBox2d(centerX - halfW, centerY - halfH, centerX + halfW, centerY + halfH);
+            hasVisibleBox = true;
+        }
+    }
+
+    // 过期判据：
+    //   缩放滞后（放大到 1.3 倍就升级、缩小到 3 倍以下才降级，中间留死区避免抖动），或
+    //   可视区域越出上次收集覆盖的矩形（平移）。
+    // 降级阈值 2.0 → 3.0：缩小过程中 LOD 重收集过于频繁（29 万多边形全量入队时一次
+    // 就要处理数秒），放大幅降级死区，让缩小时尽量沿用已建好的高精度数据，
+    // 只有缩得足够远（精度冗余明显）时才一次性降级。
+    constexpr double kCurveLodUpgradeRatio = 1.3;
+    constexpr double kCurveLodDowngradeRatio = 3.0;
+    const bool firstTime = m_curveLodScaleAtBuild <= 0.0;
+    const bool needsUpgrade =
+        firstTime || worldToScreenScale > m_curveLodScaleAtBuild * kCurveLodUpgradeRatio;
+    const bool needsDowngrade =
+        !firstTime && worldToScreenScale * kCurveLodDowngradeRatio < m_curveLodScaleAtBuild;
+    const bool regionMoved = hasVisibleBox && m_curveLodCollectedBoxValid &&
+        !m_curveLodCollectedBox.contains(visibleBox);
+    if (!needsUpgrade && !needsDowngrade && !regionMoved)
+    {
+        return;
+    }
+
+    m_curveLodScaleAtBuild = worldToScreenScale;
+    m_curveLodCollectedBox = collectBox;
+    m_curveLodCollectedBoxValid = hasVisibleBox;
+
+    // 收集曲线类图元 ID：只有它们的离散化段数/顶点数随缩放变化。
+    // 必须覆盖所有「按 worldToScreenScale 自适应离散化/简化」的类型（见
+    // EntityGeometryEmitter::emitEntityGeometry），否则放大后图元不会重建、精度停留低档。
+    //   - CIRCLE/ARC/ELLIPSE：GPU 原生，弦误差随 zoom 变化
+    //   - BEZIER2/BEZIER/SPLINE/NURBS/SMARTLINE：BezierAlgorithms 自适应离散化
+    //   - POLYGON：zoom out 时 Douglas-Peucker 简化，zoom in 要恢复原始顶点
+    const Eg::EType curveTypes[] = { Eg::EType::CIRCLE,
+        Eg::EType::ARC,
+        Eg::EType::ELLIPSE,
+        Eg::EType::BEZIER2,
+        Eg::EType::BEZIER,
+        Eg::EType::SPLINE,
+        Eg::EType::NURBS,
+        Eg::EType::SMARTLINE,
+        Eg::EType::POLYGON };
+
+    m_curveLodQueue.clear();
+    m_curveLodCursor = 0;
+
+    // 诊断：统计各类型入队数量，定位「放大不恢复精度」时是哪些类型没被覆盖；
+    // polyInvariantSkipped 记「顶点数不超过简化阈值、随缩放不会变化，因而被跳过」的多边形数。
+    // 这类多边形在每个缩放下都原样发射顶点（重新离散得到相同结果），纳入 LOD 队列
+    // 只会白做一遍顶点解码 + GPU 重传（抽稀图纸里 29 万图元中绝大多数属此类）。
+    size_t perTypeCounts[sizeof(curveTypes) / sizeof(curveTypes[0])] = { 0 };
+    size_t polygonInvariantSkipped = 0;
+    for (size_t t = 0; t < sizeof(curveTypes) / sizeof(curveTypes[0]); ++t)
+    {
+        size_t& typeCount = perTypeCounts[t];
+        const bool isPolygon = (curveTypes[t] == Eg::EType::POLYGON);
+        // forEachEntityByType 走类型索引，O(k) 且不拷贝整份指针数组
+        // （getEntitiesByType 按值返回，POLYGON 那 29 万个指针会白拷 2.3MB）。
+        m_sceneManager->forEachEntityByType(curveTypes[t], [&](Eg::SyEntity* entity) {
+            if (!entity)
+            {
+                return;
+            }
+            // POLYGON 只有顶点数 > kPolygonSimplifyMinVertices 时才走 Douglas-Peucker 简化
+            // （见 EntityGeometryEmitter emitEntityGeometry 的 POLYGON 分支）。
+            // 顶点数不超过阈值的多边形在任意缩放下离散结果都相同，入 LOD 队列纯浪费。
+            if (isPolygon)
+            {
+                const auto* polygon = static_cast<const Eg::SyPolygon*>(entity);
+                if (polygon->vertices().size() <= Eg::kPolygonSimplifyMinVertices)
+                {
+                    ++polygonInvariantSkipped;
+                    return;
+                }
+            }
+            if (hasVisibleBox)
+            {
+                // 包围盒命中缓存（且导入时已由文件里的 cached_bbox 播种），这里是 O(1) 判断
+                const Ut::BBox2d box = entity->getBbox();
+                if (!box.isValid() || !box.intersects(collectBox))
+                {
+                    return;
+                }
+            }
+            m_curveLodQueue.push_back(static_cast<uint64_t>(entity->id));
+            ++typeCount;
+        });
+    }
+
+    // 全场景类型总览（含不在 LOD 队列里的类型），一次性看清图元构成
+    size_t totalEntities = m_sceneManager->getEntityCount();
+    SY_DEBUGF("[SceneRefreshCoordinator] curveLodRefresh: total=%zu queued=%zu clipped=%d scale=%.4f "
+              "polyInvariant=%zu circ=%zu arc=%zu ell=%zu b2=%zu bez=%zu spl=%zu nurbs=%zu smart=%zu poly=%zu",
+        totalEntities,
+        m_curveLodQueue.size(),
+        hasVisibleBox ? 1 : 0,
+        worldToScreenScale,
+        polygonInvariantSkipped,
+        perTypeCounts[0], perTypeCounts[1], perTypeCounts[2], perTypeCounts[3], perTypeCounts[4],
+        perTypeCounts[5], perTypeCounts[6], perTypeCounts[7], perTypeCounts[8]);
+}
+
 void SceneRefreshCoordinator::requestCurveLodRefresh()
 {
     if (!m_sceneManager || !m_renderWidget)
@@ -282,35 +459,24 @@ void SceneRefreshCoordinator::requestCurveLodRefresh()
         return;
     }
 
-    // 收集曲线类图元（圆/弧/椭圆）ID：只有它们的离散化段数随缩放变化。
-    m_curveLodQueue.clear();
-    m_curveLodCursor = 0;
-
-    const Eg::EType curveTypes[] = { Eg::EType::CIRCLE, Eg::EType::ARC, Eg::EType::ELLIPSE };
-    for (Eg::EType type : curveTypes)
+    // 队列还有未完成的重建（cursor 未到末尾）：不重置、不重新收集。
+    // processCurveLodBatch 每帧从 renderWidget 读最新 worldToScreenScale，继续重建会
+    // 自然用最新缩放。否则缩放连续触发时（滚轮/拖拽每帧都变），每次都 clear 队列 +
+    // 重新收集 + 归零 cursor，重建进度永远被重置，放大后精度就一直停留在低档
+    // （正是「放大后曲线仍糊」的根因）。
+    // 但相机确实又变了，记一笔待办：队列排空时由 finishCurveLodQueue 重新评估
+    // （否则平移出上次收集区域后，新进视野的图元会一直停在旧精度）。
+    if (m_curveLodCursor < m_curveLodQueue.size())
     {
-        const Eg::VecSyEntityPtr entities = m_sceneManager->getEntitiesByType(type);
-        for (const Eg::SyEntity* entity : entities)
-        {
-            if (entity)
-            {
-                m_curveLodQueue.push_back(static_cast<uint64_t>(entity->id));
-            }
-        }
+        m_curveLodRecollectPending = true;
+        ensureCurveLodPump();
+        return;
     }
 
+    refillCurveLodQueueIfStale();
     if (!m_curveLodQueue.empty())
     {
-        // 只启动定时器、不提升 RefreshLevel：曲线 LOD 是独立的后台分批任务，
-        // 由 updateSceneRender 在无场景级刷新时逐帧消费。
-        if (m_sceneUpdateTimer && !m_sceneUpdateTimer->isActive())
-        {
-            m_sceneUpdateTimer->start();
-        }
-        else if (!m_sceneUpdateTimer)
-        {
-            processCurveLodBatch();
-        }
+        ensureCurveLodPump();
     }
 }
 
@@ -413,6 +579,47 @@ void SceneRefreshCoordinator::onSelectionChanged()
             }
         }
 
+        // 「隐藏选中本体」有效时，选择集变化在世界层的效果就是：
+        //   新选中的 → 本体要从世界层摘掉（m_selectionHideIds）
+        //   取消选中的 → 本体要加回世界层（m_selectionRestoreIds）
+        // 只记差集，交给 applyLightRefresh 增量处理。这里必须用**上一次实际生效**的
+        // 隐藏状态来分情形，否则「有效状态翻转」那两种情形会漏掉整批本体：
+        //   hidePrev=true, hideNow=false → 上次被摘掉的选中集（含本次已取消选中的）
+        //                                  全都要加回来；
+        //   hidePrev=false, hideNow=true → 当前所有选中都要摘掉。
+        if (selectionSetChanged)
+        {
+            const bool hidePrev = m_lastHideSelectedEffective;
+            const bool hideNow = hideSelectedEffective();
+            if (hideNow && hidePrev)
+            {
+                for (uint64_t id : currentSelected)
+                {
+                    if (!m_lastSelectedIds.count(id))
+                    {
+                        m_selectionHideIds.insert(id);
+                    }
+                }
+                for (uint64_t id : m_lastSelectedIds)
+                {
+                    if (!currentSelected.count(id))
+                    {
+                        m_selectionRestoreIds.insert(id);
+                    }
+                }
+            }
+            else if (hideNow)
+            {
+                m_selectionHideIds.insert(currentSelected.begin(), currentSelected.end());
+            }
+            else if (hidePrev)
+            {
+                // 上次摘掉过的本体必须回来：上次的选中集 ∪ 本次选中集
+                m_selectionRestoreIds.insert(m_lastSelectedIds.begin(), m_lastSelectedIds.end());
+                m_selectionRestoreIds.insert(currentSelected.begin(), currentSelected.end());
+            }
+        }
+
         m_lastSelectedIds = std::move(currentSelected);
         // 同步缓存：onSelectionChanged 是选中集变更的唯一入口
         m_cachedSelectedIds = m_lastSelectedIds;
@@ -425,21 +632,21 @@ void SceneRefreshCoordinator::onSelectionChanged()
     //   开关关着 / 开关开着但轮廓画不出来（选中集超预算）
     //       → 本体根本没被摘，选择集变化不动世界层 → 廉价的 Selection 级就够；
     //   开关开着且轮廓可画
-    //       → 选中本体必须从世界层摘掉，选择集变了就得全量重建；
+    //       → 选中本体的增删需要动世界层，但只需要动**差集**那几个图元；
     //   有效状态本身翻转（上次摘了、这次不该摘；或反过来）
-    //       → 必须全量重建才能把上次摘掉的本体加回来。
+    //       → 差集可能是一整批，仍然只处理这批。
     //
-    // 加 m_lastHideSelectedEffective（上次刷新**实际**生效的隐藏状态）就是为了第三种：
-    // 只看当前值的话，「5 选（已摘本体）→ 3000 选（超预算，不该摘）」会被判成
-    // 「不需要重建」，那 5 个本体就永远回不来了。
-    //
-    // 反过来说，之前只看开关时，第三种情形每点选一次都要付一次 O(场景) 全量重建，
-    // 而画面其实毫无变化（本体本就没摘）——这是 70 万图元场景里可感知的白做。
-    const bool hideNow = m_renderWidget != nullptr && m_renderWidget->hideSelectedOriginalEffective();
-    if (selectionSetChanged && (hideNow || hideNow != m_lastHideSelectedEffective))
+    // 历史上第三种情形走的是 FullRefresh（重建整份场景）：29 万图元、高缩放下单次
+    // 十几秒，而且顺带把视口外所有图元的 LOD 一并重建（用户感知就是"选一下/移动一下
+    // 卡很久，然后连视图范围外的图元精度也全部恢复了"）。
+    // 现在改由 m_selectionHideIds / m_selectionRestoreIds 记差集，applyLightRefresh
+    // 里增删这几个图元即可 —— 效果与全量重建一致，代价与选中数量成正比。
+    if (!m_selectionHideIds.empty() || !m_selectionRestoreIds.empty())
     {
-        // 选中本体的增删只能靠世界层全量重建
-        m_refreshLevel = RefreshLevel::FullRefresh;
+        if (m_refreshLevel < RefreshLevel::LightUpdate)
+        {
+            m_refreshLevel = RefreshLevel::LightUpdate;
+        }
     }
     else if (m_refreshLevel < RefreshLevel::Selection)
     {
@@ -463,11 +670,37 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         return;
     }
 
-    // 纯选择变更优化：脏集合和删除集合都为空时，场景几何未变，
+    // 获取"选中时隐藏原图"的**有效**设置（开关 + 虚线画得出来），见 hideSelectedEffective()
+    const bool hideSelected = hideSelectedEffective();
+
+    // 有效状态翻转不一定由选择集变化触发：改轮廓预算、缩放导致轮廓顶点数越过预算都会翻，
+    // 那些触发方补不出差集。这里统一兜底 —— 只要状态翻了，就按当前选中集补出整批差集，
+    // 交给本函数下面的增量路径处理，不必再让任何触发方去走 O(场景) 的全量重建
+    // （29 万图元、高缩放下单次十几秒，且会顺带把视口外所有图元的 LOD 一并重建）。
+    if (hideSelected != m_lastHideSelectedEffective)
+    {
+        if (hideSelected)
+        {
+            m_selectionHideIds.insert(m_cachedSelectedIds.begin(), m_cachedSelectedIds.end());
+        }
+        else
+        {
+            m_selectionRestoreIds.insert(m_cachedSelectedIds.begin(), m_cachedSelectedIds.end());
+        }
+    }
+    // 记下本次实际生效的隐藏状态：onSelectionChanged 判断「这次选择集变化要补哪些差集」
+    // 时要用它识别「有效状态翻转」（见该处的注释）
+    m_lastHideSelectedEffective = hideSelected;
+
+    // 缓存的选中 ID 集合：判断某个图元的本体此刻该不该在世界层里，只看它。
+    const std::unordered_set<uint64_t>& selectedIds = m_cachedSelectedIds;
+
+    // 纯选择变更优化：脏集合、删除集合、选中差集都为空时，场景几何未变，
     // 无需创建 BatchGuard（GL 上下文切换）、无需 reconcileBitmaps/Texts。
     // 选择轮廓/手柄已由 onSelectionChanged → syncSelectionToolState 直接更新到 GPU，
     // 此处只需触发一次 repaint 即可。
-    if (m_pendingDirtyIds.empty() && m_pendingDeletedIds.empty())
+    if (m_pendingDirtyIds.empty() && m_pendingDeletedIds.empty() && m_selectionHideIds.empty() &&
+        m_selectionRestoreIds.empty())
     {
         m_renderWidget->update();
         return;
@@ -501,20 +734,30 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         m_renderedEntityIds.erase(uid);
     }
 
+    // 「隐藏选中本体」新选中的那批：直接从世界层摘掉本体。
+    // 与删除走同一条形状 —— 摘本体不需要任何离散化，只要账本跟着改。
+    // 这里再按「此刻该不该摘」复核一次：差集是上一轮选择变化记下的，这一轮之间
+    // 选择集或有效隐藏状态还可能再翻（例如连续两次选择变化），过期条目在这里被过滤，
+    // 保证最终状态只由**当前**的 hideSelected + selectedIds 决定。
+    for (uint64_t uid : m_selectionHideIds)
+    {
+        if (!hideSelected || !selectedIds.count(uid))
+        {
+            continue;
+        }
+        if (m_renderedEntityIds.count(uid))
+        {
+            m_renderWidget->removeRenderEntity(uid);
+            m_renderedEntityIds.erase(uid);
+        }
+    }
+    m_selectionHideIds.clear();
+
     // 本轮脏集合里是否出现过位图 / 文字图元。下面用它决定要不要跑 reconcile*：
     // reconcileBitmaps/reconcileTexts 现在使用 getEntitiesByType 按类型索引获取，
     // 避免全场景扫描。标志在这个循环里顺手收集，不额外多做一次 findEntityById。
     bool touchedImage = false;
     bool touchedText = false;
-
-    // 获取"选中时隐藏原图"的**有效**设置（开关 + 虚线画得出来），见 hideSelectedEffective()
-    const bool hideSelected = hideSelectedEffective();
-    // 记下本次实际生效的隐藏状态：onSelectionChanged 判断「这次选择集变化要不要全量重建」
-    // 时要用它识别「有效状态翻转」（见该处的注释）
-    m_lastHideSelectedEffective = hideSelected;
-
-    // 如果启用隐藏选中实体，使用缓存的选中 ID 集合（避免每次刷新都遍历选择集构建哈希表）
-    const std::unordered_set<uint64_t>& selectedIds = m_cachedSelectedIds;
 
     // 优化：收集需要处理的图元ID（可见的、非 IMAGE/TEXT 的）
     // 用于后续的并行处理
@@ -696,6 +939,66 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         }
     }
 
+    // 「隐藏选中本体」取消选中的那批：把本体重新加回世界层。
+    // 没有快照可用（选择变更不进变更流），这里在主线程直接读活对象 —— 与
+    // applyFullRefresh 同源、同一条 entityToVertices 口径，结果与全量重建一致。
+    // 位图/文字不走这条顶点路径，交给下面的 reconcile*。
+    if (!m_selectionRestoreIds.empty())
+    {
+        for (uint64_t uid : m_selectionRestoreIds)
+        {
+            // 此刻仍该被摘的（仍然被选中且隐藏有效）不动它 —— 与上面 hide 侧同一个判据，
+            // 两边对称，连续两次选择变化时过期的差集条目不会把本体错误地放回去。
+            if (hideSelected && selectedIds.count(uid))
+            {
+                continue;
+            }
+
+            // 已经在世界层里（例如同时也在脏集合里被重提交过）就不重复加
+            if (m_renderedEntityIds.count(uid))
+            {
+                continue;
+            }
+
+            const Eg::SyEntity* e = sm->findEntityById(static_cast<Eg::EntityId>(uid));
+            if (e == nullptr || !e->visible())
+            {
+                continue;
+            }
+            const Eg::SyLayer* layer = e->layer();
+            if (layer != nullptr && !layer->isVisible())
+            {
+                continue;
+            }
+
+            if (e->eType == Eg::EType::IMAGE)
+            {
+                touchedImage = true;
+                continue;
+            }
+            if (e->eType == Eg::EType::TEXT)
+            {
+                touchedText = true;
+                continue;
+            }
+
+            std::vector<Render::VertexP3C3> vertices;
+            Render::PrimitiveType primType;
+            if (!entityToVertices(e, vertices, primType, cameraCenter, worldToScreenScale, chordErrorPixels))
+            {
+                continue;
+            }
+
+            m_renderWidget->addRenderEntity(uid,
+                vertices.data(),
+                static_cast<uint32_t>(vertices.size()),
+                primType,
+                layerIndexOfEntity(sm, e->id));
+            m_renderedEntityIds.insert(uid);
+        }
+        m_selectionRestoreIds.clear();
+    }
+
     // 位图层协调：以场景为真源，增量处理新增/修改/删除/图层显隐。
     //
     // 两个短路条件是「或」而不是「与」，缺哪个都会漏画：
@@ -727,8 +1030,7 @@ void SceneRefreshCoordinator::processCurveLodBatch()
 
     if (m_curveLodCursor >= m_curveLodQueue.size())
     {
-        m_curveLodQueue.clear();
-        m_curveLodCursor = 0;
+        finishCurveLodQueue();
         return;
     }
 
@@ -788,15 +1090,11 @@ void SceneRefreshCoordinator::processCurveLodBatch()
     if (m_curveLodCursor < m_curveLodQueue.size())
     {
         // 还有剩余，下一帧继续（不提升 RefreshLevel，仍是纯后台分批）
-        if (m_sceneUpdateTimer && !m_sceneUpdateTimer->isActive())
-        {
-            m_sceneUpdateTimer->start();
-        }
+        ensureCurveLodPump();
     }
     else
     {
-        m_curveLodQueue.clear();
-        m_curveLodCursor = 0;
+        finishCurveLodQueue();
     }
 }
 
@@ -855,6 +1153,21 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
             m_renderWidget->removeRenderEntity(uid);
         }
     }
+
+    // 全量重建已按当前选中集把本体的增删做到位，待处理的选中差集就此过期：
+    // 留着会在下一轮增量里多摘/多加一次（比如上一轮的"取消选中要加回来"撞上本次重建的"应摘除"）。
+    m_selectionHideIds.clear();
+    m_selectionRestoreIds.clear();
+
+    // 全量重建还把整份场景按当前缩放重新离散了一遍，曲线 LOD 的「已收集区域」记录
+    // 就此作废：重新锚定缩放基准（否则下一帧拿旧基准比较会白白重收集一次），
+    // 并把区域记录置为无效 —— 全场景都已是当前精度，平移不需要再补收集。
+    m_curveLodQueue.clear();
+    m_curveLodCursor = 0;
+    m_curveLodRecollectPending = false;
+    const float pxToWorldNow = m_renderWidget->pixelToWorldScale();
+    m_curveLodScaleAtBuild = pxToWorldNow > 0.0f ? 1.0 / static_cast<double>(pxToWorldNow) : 0.0;
+    m_curveLodCollectedBoxValid = false;
 
     // 位图层全量协调：submitSceneFromDataSource 内部 renderBeginScene 已清空 GPU 位图，
     // 这里以场景为真源整体重建，保证与场景生命周期完全一致
@@ -1065,18 +1378,18 @@ void SceneRefreshCoordinator::updateSceneRender()
         return;
     }
 
-    // 场景级刷新优先于曲线 LOD：全量/增量会以最新缩放重建，曲线队列的旧任务已过期
-    if (m_refreshLevel != RefreshLevel::None && !m_curveLodQueue.empty())
+    /// 本帧是否真的跑过一条场景级刷新路径（决定要不要清账）
+    bool consumed = false;
+
+    // 全量刷新时才清空曲线 LOD 队列：全量重建会以最新缩放重新离散所有图元，
+    // 此时 LOD 队列里的旧任务确实已过期。
+    // 增量刷新（LightUpdate / Selection / Repaint）只更新脏图元，未变更的曲线图元
+    // 仍保持旧 LOD 精度，需要保留队列继续分批重建。否则会出现"部分曲线永久低精度"——
+    // 因为 m_curveLodScaleAtBuild 已被更新为新缩放值，后续不会再触发 LOD 重建。
+    if (m_refreshLevel == RefreshLevel::FullRefresh && !m_curveLodQueue.empty())
     {
         m_curveLodQueue.clear();
         m_curveLodCursor = 0;
-    }
-
-    // 无场景级刷新时，处理曲线 LOD 分批重建（每帧一批，独立于 RefreshLevel）
-    if (m_refreshLevel == RefreshLevel::None && !m_curveLodQueue.empty())
-    {
-        processCurveLodBatch();
-        return;
     }
 
     RefreshLevel level = m_refreshLevel;
@@ -1085,6 +1398,12 @@ void SceneRefreshCoordinator::updateSceneRender()
     if (level == RefreshLevel::Repaint)
     {
         applyRepaintRefresh();
+        // 曲线 LOD 与场景级刷新解耦：Repaint 也要继续推进队列，否则这一帧的
+        // 定时器被 Repaint 消费掉、processCurveLodBatch 又没跑，队列就永久搁浅。
+        if (!m_curveLodQueue.empty())
+        {
+            processCurveLodBatch();
+        }
         return;
     }
 
@@ -1098,6 +1417,7 @@ void SceneRefreshCoordinator::updateSceneRender()
     if (level >= RefreshLevel::FullRefresh)
     {
         applyFullRefresh(sm);
+        consumed = true;
     }
     // LightUpdate / Selection 增量刷新：
     // 删除图元（m_pendingDeletedIds）必须被处理，否则会从渲染世界中被永久遗漏
@@ -1109,11 +1429,27 @@ void SceneRefreshCoordinator::updateSceneRender()
     else if ((level == RefreshLevel::LightUpdate) || (level == RefreshLevel::Selection) || !m_pendingDeletedIds.empty())
     {
         applyLightRefresh(sm);
+        consumed = true;
     }
 
-    m_pendingDirtyIds.clear();
-    m_pendingDeletedIds.clear();
-    // 本批快照已消费完：清掉条目，避免把整份 clone 副本一直挂在内存里。
-    // 修订号保留在游标上（m_lastCursor），下批快照从新修订号继续累积。
-    m_pendingSnapshot.reset(m_lastCursor);
+    // 只在真的跑过一次场景级刷新时清账：否则「纯 LOD 批」的那一帧（level == None）
+    // 会把还没被消费的脏/删除集合与快照一起丢掉。
+    if (consumed)
+    {
+        m_pendingDirtyIds.clear();
+        m_pendingDeletedIds.clear();
+        // 本批快照已消费完：清掉条目，避免把整份 clone 副本一直挂在内存里。
+        // 修订号保留在游标上（m_lastCursor），下批快照从新修订号继续累积。
+        m_pendingSnapshot.reset(m_lastCursor);
+    }
+
+    // 曲线 LOD 分批：始终推进，不受本次场景级刷新影响。
+    // 曾经的写法是「仅当 m_refreshLevel == None 时才处理 LOD 且随即 return」，
+    // 于是任何一次 LightUpdate/Selection/FullRefresh 都会把这一帧的（单次触发的）
+    // 节流定时器消费掉而不重启 —— 队列随即永久搁浅，放大后曲线一直停在低精度，
+    // 只有等到下一次全量重建才恢复（正是「选图元移动后才恢复精度，连视口外的也恢复」）。
+    if (!m_curveLodQueue.empty())
+    {
+        processCurveLodBatch();
+    }
 }

@@ -29,6 +29,7 @@
 #include "Engine/Scene/RenderSnapshot.h"
 #include "Engine2D/Core/SceneNotifier.h"
 #include "UI/Render/ISceneRefreshScheduler.h"
+#include "Ut/BBox2d.h"
 
 class FrameTimer;
 
@@ -67,11 +68,17 @@ public:
     void requestFullRefresh() override;
 
     /**
-     * @brief 曲线 LOD 分批重建 — zoom 跨阈值后逐批重建圆/弧/椭圆
+     * @brief 曲线 LOD 分批重建 — 按缩放与可视区域判断是否需要（重新）收集
      *
-     * 与全量刷新的区别：只收集曲线类图元（CIRCLE/ARC/ELLIPSE），每帧重建一批
-     * （processCurveLodBatch），跨多帧完成，避免一次性重 tessellate 上万个曲线
-     * 造成单帧卡顿。折线/点/文本与缩放无关，不进队列。
+     * 收集范围只覆盖当前可视区域（含少量余量）：曲线精度只对看得见的图元有意义，
+     * 为了视野内几十个图元去重算 29 万图元既慢又白做。代价是视野移动后新进画面的
+     * 图元需要补收集 —— 所以本函数在相机每次变化时都会被调用，由它自己判断是否过期：
+     *   - 缩放跨过滞后阈值（放大 1.3 倍 / 缩小 2 倍），或
+     *   - 可视区域越出了上次收集覆盖的矩形（平移）
+     * 两者都不成立时它只做几次比较就返回。
+     *
+     * 收集到的 ID 放进 m_curveLodQueue，由 processCurveLodBatch 每帧消费一批，
+     * 跨多帧完成，避免一次性重 tessellate 上万个曲线造成单帧卡顿。
      */
     void requestCurveLodRefresh();
 
@@ -126,6 +133,15 @@ private:
     void applyFullRefresh(Eg::SceneManager* sm);
     void processCurveLodBatch();
 
+    /// 确保曲线 LOD 的消费泵（节流定时器）在跑
+    void ensureCurveLodPump();
+
+    /// 队列排空后的收尾：清队列 + 处理「排队期间又要求重新收集」的待办
+    void finishCurveLodQueue();
+
+    /// 按当前缩放/可视区域判断曲线 LOD 是否过期；过期就重新收集整个队列
+    void refillCurveLodQueueIfStale();
+
     /// 「隐藏选中本体」是否有效：设置开启且虚线轮廓能绘制
     bool hideSelectedEffective() const;
 
@@ -156,14 +172,32 @@ private:
     // 按批次累积，刷完由 updateSceneRender 清空。
     Eg::SceneSnapshot m_pendingSnapshot;
 
-    // 曲线 LOD 分批重建队列：zoom 跨阈值时收集所有曲线图元 ID（requestCurveLodRefresh），
-    // 每帧由 processCurveLodBatch 重建一批。游标记录已处理到的位置。
+    // 曲线 LOD 分批重建队列：相机变化时按「缩放滞后 + 可视区域」收集需要重建精度的
+    // 曲线图元 ID（requestCurveLodRefresh），每帧由 processCurveLodBatch 重建一批。
+    // 游标记录已处理到的位置。
     std::vector<uint64_t> m_curveLodQueue;
     size_t m_curveLodCursor = 0;
+
+    /// 上次收集队列时的 worldToScreenScale（缩放滞后判据的基准）。
+    /// <= 0 表示还没收集过。
+    double m_curveLodScaleAtBuild{ 0.0 };
+    /// 上次收集队列时覆盖的世界矩形（含余量）。可视区域一旦越出它就必须重新收集，
+    /// 否则平移后新进视野的图元会一直停在旧精度。
+    Ut::BBox2d m_curveLodCollectedBox;
+    bool m_curveLodCollectedBoxValid{ false };
+    /// 队列尚在消费期间又出现了新的收集请求：排空后立即按当时的状态重新评估
+    bool m_curveLodRecollectPending{ false };
 
     // 上一帧已同步的选中集合：用于在选择变更时计算“发生选中态翻转”的图元，
     // 将其加入待处理脏集合，驱动增量路径正确增删（见 onSelectionChanged）。
     std::unordered_set<uint64_t> m_lastSelectedIds;
+
+    // 「隐藏选中本体」生效时，选择集变化在世界层上等价于：新选中的要从世界层摘掉，
+    // 取消选中的要把本体加回来。这里只记这两个差集，由 applyLightRefresh 增量处理 ——
+    // 曾经这条路径直接升 FullRefresh（重建整份场景 29 万图元），选中/取消一次要十几秒，
+    // 而且顺带把视口外所有图元的 LOD 也一起重建了。
+    std::unordered_set<uint64_t> m_selectionHideIds;    ///< 新选中：需从世界层移除本体
+    std::unordered_set<uint64_t> m_selectionRestoreIds; ///< 取消选中：需把本体加回世界层
 
     // 缓存的选中 ID 集合：供 applyLightRefresh/applyFullRefresh/reconcile* 使用
     // 避免每次刷新都遍历选择集构建哈希表

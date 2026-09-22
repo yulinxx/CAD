@@ -97,7 +97,7 @@ void PersistenceService::shutdown()
     m_database->close();
 
     SY_DEBUG("[PersistenceService] Shutdown complete");
-    SY_DEBUG("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n\n");
+    // SY_DEBUG("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n\n");
 
 }
 

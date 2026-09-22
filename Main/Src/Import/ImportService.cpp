@@ -667,7 +667,7 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
         flatAdded = static_cast<int>(flatEntities.size());
         if (m_editService)
         {
-            SY_DEBUGF("[ImportService] Adding %d entity(ies) via SceneEditService (undoable)", flatAdded);
+            SY_DEBUGF("[ImportService] Adding %d entity(ies) via SceneEditService (direct, no undo)", flatAdded);
 
             // 入库前记下当前 ID：addEntities 在「ID 为 0 / 临时 ID / 与场景已有图元冲突」时
             // 会给图元换一个新持久 ID，而 parseResult 里的 entityLayerMap / entityGroupMap
@@ -692,9 +692,11 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
                 context.progressCallback(ImportPhase::BuildDocument, mapped);
                 QCoreApplication::processEvents(QEventLoop::AllEvents, 30);
             };
+            // 导入操作使用 CommitMode::Direct：用户几乎不会撤销一次"打开/导入文件"操作，
+            // 走 Direct 可省去 Undo 命令对象的构建开销和额外的内存占用（29 万图元场景下显著）。
             const std::vector<Eg::EntityId> finalIds = m_editService->addEntities(std::move(flatEntities),
                 "Import " + context.sourcePath.toStdString(),
-                CommitMode::Undoable,
+                CommitMode::Direct,
                 commitProgress);
 
             // 下标一一对应：addEntities 按入参顺序为每个非空图元返回最终 ID

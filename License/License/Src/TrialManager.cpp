@@ -4,6 +4,7 @@
 #include <openssl/evp.h>
 
 #include <ctime>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -472,21 +473,47 @@ int TrialManager::daysBetween(const std::string& start, const std::string& end)
     int em = std::stoi(end.substr(5, 2));
     int ed = std::stoi(end.substr(8, 2));
 
-    // 使用 C 标准库 mktime 计算天数差
+    // 使用 mktime 计算天数差（设置 TZ 为 UTC 避免时区影响）
     struct tm startTm{}, endTm{};
     startTm.tm_year = sy - 1900;
     startTm.tm_mon = sm - 1;
     startTm.tm_mday = sd;
     startTm.tm_hour = 12;  // 避免夏令时边界问题
+    startTm.tm_isdst = 0;  // 禁用夏令时
 
     endTm.tm_year = ey - 1900;
     endTm.tm_mon = em - 1;
     endTm.tm_mday = ed;
     endTm.tm_hour = 12;
+    endTm.tm_isdst = 0;    // 禁用夏令时
 
-    // 使用 timegm 而不是 mktime（避免时区影响）
-    time_t startTime = timegm(&startTm);
-    time_t endTime = timegm(&endTm);
+    // 保存原时区并设置为 UTC
+    const char* oldTz = std::getenv("TZ");
+    #ifdef _WIN32
+        _putenv_s("TZ", "UTC");
+    #else
+        setenv("TZ", "UTC", 1);
+    #endif
+    tzset();
+
+    time_t startTime = std::mktime(&startTm);
+    time_t endTime = std::mktime(&endTm);
+
+    // 恢复原时区
+    if (oldTz) {
+    #ifdef _WIN32
+        _putenv_s("TZ", oldTz);
+    #else
+        setenv("TZ", oldTz, 1);
+    #endif
+    } else {
+    #ifdef _WIN32
+        _putenv_s("TZ", "");
+    #else
+        unsetenv("TZ");
+    #endif
+    }
+    tzset();
 
     return static_cast<int>((endTime - startTime) / (24 * 60 * 60));
 }
