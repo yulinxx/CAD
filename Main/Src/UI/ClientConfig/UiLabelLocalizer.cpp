@@ -2,6 +2,22 @@
 
 #include <QByteArray>
 #include <QCoreApplication>
+#include <QCache>
+
+// 翻译上下文优先级表（按查找顺序）
+static const char* TRANSLATION_CONTEXTS[] = {
+    "WorkbenchMenuManager",  // 菜单和Dock标题
+    "MainWindow",           // 2D命令
+    "MainWindow3D",         // 3D命令
+    "UiLayoutBuilder",      // UI布局（历史兼容）
+    "Navigation3D",          // 导航模式
+    "Shortcuts"             // 快捷键
+};
+static constexpr int NUM_CONTEXTS = sizeof(TRANSLATION_CONTEXTS) / sizeof(TRANSLATION_CONTEXTS[0]);
+
+// 翻译缓存 - 避免重复查询
+// 注意：缓存key使用QLatin1String避免字符串拷贝
+static QCache<QString, QString> s_translationCache(1024);
 
 QString uiLocalizedLabel(const QString& label, const QString& fallbackId)
 {
@@ -10,27 +26,29 @@ QString uiLocalizedLabel(const QString& label, const QString& fallbackId)
         return fallbackId;
     }
 
-    // 优先从 WorkbenchMenuManager 上下文翻译（集中声明于
-    // MenuLayoutTranslationStrings.cpp，覆盖全部 JSON 菜单/Dock 文案），
-    // 再回退 MainWindow（命令目录文案）与 UiLayoutBuilder，兼容历史条目。
-    // QByteArray 需持有到所有 translate 调用结束，否则 constData() 指针会悬垂
+    // 1. 先查缓存
+    const QString* cached = s_translationCache.object(label);
+    if (cached)
+    {
+        return *cached;
+    }
+
+    // 2. 依次查询各翻译上下文
     const QByteArray sourceUtf8 = label.toUtf8();
     const char* source = sourceUtf8.constData();
-    QString translated = QCoreApplication::translate("WorkbenchMenuManager", source);
-    if (translated != label)
+
+    for (int i = 0; i < NUM_CONTEXTS; ++i)
     {
-        return translated;
+        const QString translated = QCoreApplication::translate(TRANSLATION_CONTEXTS[i], source);
+        if (translated != label)  // 找到有效翻译
+        {
+            // 缓存结果（仅缓存有翻译的条目）
+            s_translationCache.insert(label, new QString(translated));
+            return translated;
+        }
     }
-    translated = QCoreApplication::translate("MainWindow", source);
-    if (translated != label)
-    {
-        return translated;
-    }
-    translated = QCoreApplication::translate("UiLayoutBuilder", source);
-    if (translated != label)
-    {
-        return translated;
-    }
-    // 与原 actionLabel 行为一致：有英文源文案时始终返回源文案，不回退到 id
-    return label;
+
+    // 3. 无翻译时返回 fallback 或原文
+    const QString result = fallbackId.isEmpty() ? label : fallbackId;
+    return result;
 }
