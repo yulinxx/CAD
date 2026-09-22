@@ -673,16 +673,30 @@ namespace RenderBridge
         {
             std::vector<OVertex> v;
             Render::BBox2d box = m_selectionBox.box;
-            // 检测退化盒子（点图元等）：在渲染时用 pixelToWorld 扩展为最小屏幕尺寸
-            if (box.width() < 1e-6 && box.height() < 1e-6)
+            // 检测退化盒子（点图元）或单方向退化（水平/垂直线）：
+            // 使用固定世界单位，确保选择框大小与视图缩放无关
+            constexpr float kMinSizeWorld = 10.0f;  // 固定 10 世界单位
+            
+            float minX = static_cast<float>(box.minPt.x());
+            float minY = static_cast<float>(box.minPt.y());
+            float maxX = static_cast<float>(box.maxPt.x());
+            float maxY = static_cast<float>(box.maxPt.y());
+            
+            // X方向太窄（垂直线）
+            if (maxX - minX < kMinSizeWorld)
             {
-                constexpr float kMinSizePx = 6.0f;  // 最小 6 像素
-                const float p2w = m_frameParams.pixelToWorld > 0.0f ? m_frameParams.pixelToWorld : 1.0f;
-                const float halfSizeWorld = kMinSizePx * 0.5f * p2w;
-                const float cx = static_cast<float>(box.minPt.x());
-                const float cy = static_cast<float>(box.minPt.y());
-                box = Render::BBox2d(cx - halfSizeWorld, cy - halfSizeWorld, cx + halfSizeWorld, cy + halfSizeWorld);
+                const float cx = (minX + maxX) * 0.5f;
+                minX = cx - kMinSizeWorld * 0.5f;
+                maxX = cx + kMinSizeWorld * 0.5f;
             }
+            // Y方向太窄（水平线）
+            if (maxY - minY < kMinSizeWorld)
+            {
+                const float cy = (minY + maxY) * 0.5f;
+                minY = cy - kMinSizeWorld * 0.5f;
+                maxY = cy + kMinSizeWorld * 0.5f;
+            }
+            box = Render::BBox2d(minX, minY, maxX, maxY);
             rectLineList(v, box, m_selectionBox.border);
             emitWorld(scene, out, v, RA::PrimitiveType::Lines, seq);
         }
