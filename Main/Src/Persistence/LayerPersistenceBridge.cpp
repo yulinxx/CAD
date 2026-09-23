@@ -11,6 +11,7 @@
 #include "Log/SyLogger.h"
 
 #include <QDateTime>
+#include <QThread>
 #include <algorithm>
 
 LayerPersistenceBridge::LayerPersistenceBridge(LayerManager* layerManager, LayerRepository* layerRepository)
@@ -153,7 +154,7 @@ int LayerPersistenceBridge::getOrderIndex(int nLayerId) const
     return (it != m_orderCache.end()) ? it->second : nLayerId;
 }
 
-/// 将指定图层的当前状态写入数据库
+/// 将指定图层的当前状态写入数据库（带重试机制）
 void LayerPersistenceBridge::syncLayerToDb(int nLayerId)
 {
     if (!m_layerManager || !m_layerRepository)
@@ -187,11 +188,34 @@ void LayerPersistenceBridge::syncLayerToDb(int nLayerId)
     record.orderIndex = orderIndex;
     record.updatedAt = QDateTime::currentDateTime().toString(Qt::ISODate).toStdString();
 
-    // 写入数据库
-    if (!m_layerRepository->save(record))
+    // 写入数据库（带重试机制，处理 database is locked 情况）
+    static constexpr int kMaxRetries = 3;
+    static constexpr int kRetryDelayMs = 50;
+    
+    for (int retry = 0; retry < kMaxRetries; ++retry)
     {
-        SY_ERRORF("[LayerPersistenceBridge] Failed to sync layer %d to database: %s",
-            nLayerId,
-            m_layerRepository->lastError().c_str());
+        if (m_layerRepository->save(record))
+        {
+            return;  // 成功
+        }
+        
+        const std::string& error = m_layerRepository->lastError();
+        // 检查是否是锁定错误
+        if (error.find("database is locked") == std::string::npos)
+        {
+            // 非锁定错误，不再重试
+            SY_ERRORF("[LayerPersistenceBridge] Failed to sync layer %d to database: %s",
+                nLayerId, error.c_str());
+            return;
+        }
+        
+        // 锁定错误，等待后重试
+        SY_DEBUGF("[LayerPersistenceBridge] Database locked, retrying (%d/%d) for layer %d...",
+            retry + 1, kMaxRetries, nLayerId);
+        QThread::msleep(kRetryDelayMs);
     }
+    
+    // 重试次数用尽
+    SY_ERRORF("[LayerPersistenceBridge] Failed to sync layer %d to database after %d retries: %s",
+        nLayerId, kMaxRetries, m_layerRepository->lastError().c_str());
 }
