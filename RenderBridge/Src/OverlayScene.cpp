@@ -66,7 +66,11 @@ namespace
         RA::TransientAlloc a{};
         // 环容量不足时后端返回 false；丢弃本批而不是画出错误几何。
         if (!scene.allocTransient(bytes, a) || a.cpuPtr == nullptr)
+        {
+            SY_DEBUGF("[OverlayScene] allocTransient failed: bytes=%llu, a.buffer=%llu, a.cpuPtr=%p",
+                bytes, a.buffer.value, static_cast<void*>(a.cpuPtr));
             return;
+        }
         std::memcpy(a.cpuPtr, verts.data(), static_cast<size_t>(bytes));
 
         RA::DrawInstruction c{};
@@ -674,9 +678,10 @@ namespace RenderBridge
             std::vector<OVertex> v;
             Render::BBox2d box = m_selectionBox.box;
             // 检测退化盒子（点图元）或单方向退化（水平/垂直线）：
-            // 使用固定世界单位，确保选择框大小与视图缩放无关
-            constexpr float kMinSizeWorld = 10.0f;  // 固定 10 世界单位
-            
+            // 最小尺寸按像素基准换算世界单位，确保选择框在任意缩放下视觉尺寸一致
+            const float p2wBox = m_frameParams.pixelToWorld > 0.0f ? m_frameParams.pixelToWorld : 1.0f;
+            constexpr float kMinSizePx = 8.0f;
+            const float kMinSizeWorld = kMinSizePx * p2wBox;
             float minX = static_cast<float>(box.minPt.x());
             float minY = static_cast<float>(box.minPt.y());
             float maxX = static_cast<float>(box.maxPt.x());
