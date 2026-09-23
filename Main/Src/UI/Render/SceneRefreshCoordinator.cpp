@@ -119,14 +119,16 @@ void SceneRefreshCoordinator::setRenderWidget(RenderWidget* widget)
     }
 }
 
-void SceneRefreshCoordinator::setSceneManager(Eg::SceneManager* sm)
+void SceneRefreshCoordinator::setSceneContext(Eg::ISceneContext* ctx)
 {
-    // P5: 观察者注册收敛 — 切换 SceneManager 时自动注销旧观察者、注册新观察者
+    // P5: 观察者注册收敛 — 切换场景时自动注销旧观察者、注册新观察者
+    // 观察者模式是 2D 特有扩展；2D 路径唯一实现是 SceneManager，
+    // 全局 -fvisibility=hidden 下 dynamic_cast 跨 DLL 不可靠，用 static_cast。
     if (m_sceneManager)
     {
         m_sceneManager->removeObserver(this);
     }
-    m_sceneManager = sm;
+    m_sceneManager = static_cast<Eg::SceneManager*>(ctx);
     if (m_sceneManager)
     {
         // 同步游标到当前修订号，避免程序启动后立即触发 FullRefresh
@@ -1186,24 +1188,44 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
         }
     }
 
-    sm->forEachEntity([this, hideSelected, &selectedIds, &accountBox, hasAccountBox](Eg::SyEntity* e) {
+    // 过滤条件与 gatherGeometry（SceneManager::gatherGeometry）严格对齐：
+    // 几何非法 / 无图层 / 图层隐藏 / 本体隐藏 / bbox 无效 / 视口裁剪的图元都不会上 GPU，也就不入账。
+    // 旧实现「layer==null 也入账、bbox 无效也入账」会把 GPU 上不存在的图元记进账本，
+    // 增量路径对账时可能误走 modifyRenderEntity。
+    // isValid() 必须与空间索引 isIndexableEntity 一致：非法几何不在索引里，
+    // 若 GPU 仍渲染（旧 gatherGeometry 不查 isValid），queryByBox 账本会漏记。
+    auto accountEntity = [this, hideSelected, &selectedIds](Eg::SyEntity* e) {
         if (!e || !e->visible())
             return;
-        const Eg::SyLayer* layer = e->layer();
-        if (layer && !layer->isVisible())
+        if (!e->isValid())
             return;
-        // 视口裁剪：账本只记 GPU 上实际存在的图元
-        if (hasAccountBox)
-        {
-            const Ut::BBox2d bbox = e->getBbox();
-            if (bbox.isValid() && !accountBox.intersects(bbox))
-                return;
-        }
+        const Eg::SyLayer* layer = e->layer();
+        if (!layer || !layer->isVisible())
+            return;
+        if (!e->getBbox().isValid())
+            return;
         auto uid = static_cast<uint64_t>(e->id);
         if (hideSelected && selectedIds.count(uid))
             return; // 隐藏选中图元已从 GPU 移除，不入账
         m_renderedEntityIds.insert(uid);
-    });
+    };
+
+    if (hasAccountBox)
+    {
+        // 视口裁剪走空间索引：RTree 范围查询 O(log n + k)，避免全场景 O(N) 扫描。
+        // queryByBox 用索引缓存的 AABB 判相交（查询前 flush 待修索引），与
+        // gatherGeometry 的 getBbox()+intersects 等价；无效 bbox 图元不在索引里，天然跳过。
+        const Eg::VecSyEntityPtr candidates = sm->queryByBox(accountBox, /*containedOnly=*/false);
+        for (Eg::SyEntity* e : candidates)
+        {
+            accountEntity(e);
+        }
+    }
+    else
+    {
+        // 矩阵退化拿不到视口盒时退化为全量遍历（与 gatherGeometry 无裁剪分支一致）
+        sm->forEachEntity(accountEntity);
+    }
 
     // "选中时隐藏原图"：上面的 submitSceneFromDataSource 已把全部图元（含选中）上传到 GPU，
     // 这里把选中图元的本体从 GPU 移除，使画面只剩流水虚线轮廓。账本已在上面循环中排除它们，

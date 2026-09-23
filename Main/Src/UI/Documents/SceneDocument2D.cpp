@@ -18,6 +18,7 @@
 #include "Engine2D/SyEntity/SySmartLine.h"
 #include "Engine2D/SyEntity/SyText.h"
 #include "Engine2D/Edit/SceneEditService.h"
+#include "Engine/ISceneManager.h"
 #include "Ut/Vec.h"
 #include "Log/SyLogger.h"
 
@@ -517,4 +518,13 @@ void SceneDocument2D::clear()
     m_scene->clearScene();
     m_isModified = true;
     SY_DEBUGF("[SceneDocument2D] document cleared: entities=%lld", static_cast<long long>(count));
+}
+
+Eg::ISceneContext* SceneDocument2D::sceneContext() const
+{
+    if (m_editService && m_editService->sceneManager())
+    {
+        return m_editService->sceneManager();
+    }
+    return m_scene;
 }

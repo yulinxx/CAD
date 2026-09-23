@@ -37,6 +37,7 @@ class RenderWidget;
 
 namespace Eg
 {
+    class ISceneContext;
     class SceneManager;
 }
 
@@ -53,8 +54,8 @@ public:
     /// 设置渲染控件（必须）
     void setRenderWidget(RenderWidget* widget);
 
-    /// 设置场景管理器（必须）— 同时负责观察者注册/注销
-    void setSceneManager(Eg::SceneManager* sm);
+    /// 设置场景上下文（必须）— 同时负责观察者注册/注销
+    void setSceneContext(Eg::ISceneContext* ctx);
 
     // ==================== ISceneRefreshScheduler 实现 ====================
 

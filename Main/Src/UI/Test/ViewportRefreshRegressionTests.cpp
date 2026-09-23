@@ -263,7 +263,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_SetSceneManager)
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
     coordinator.stop();
     SUCCEED();
 }
@@ -295,7 +295,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_OnSceneChangedWithSceneManager)
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
     coordinator.onSceneChanged();  // 有 SceneManager 但无 Widget 时不应崩溃
     SUCCEED();
 }
@@ -343,7 +343,7 @@ TEST(RefreshChainRegressionTest, SceneChanged_SchedulesSceneUpdate)
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
@@ -362,7 +362,7 @@ TEST(RefreshChainRegressionTest, SceneChanged_CollectsDirtyIds)
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
@@ -384,7 +384,7 @@ TEST(RefreshChainRegressionTest, SceneChanged_CollectsDeletedIds)
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
@@ -415,7 +415,7 @@ TEST(RefreshChainRegressionTest, SceneChanged_EmptyScene)
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     coordinator.onSceneChanged();
     coordinator.stop();
@@ -438,7 +438,7 @@ TEST(RefreshPathRegressionTest, LightUpdatePath_RequiresSceneManager)
     // LightUpdate 路径需要 SceneManager 来获取图元数据
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
@@ -457,7 +457,7 @@ TEST(RefreshPathRegressionTest, FullRefreshPath_RequiresSceneManager)
     // FullRefresh 路径需要 SceneManager 来获取所有图元
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
@@ -475,7 +475,7 @@ TEST(RefreshPathRegressionTest, FullRefreshPath_MarksSceneClean)
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
@@ -499,7 +499,7 @@ TEST(RefreshPathRegressionTest, IncrementalToFull_Switch)
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     // 先增量（LightUpdate），再全量（FullRefresh）
     coordinator.onSceneChanged();
@@ -512,7 +512,7 @@ TEST(RefreshPathRegressionTest, FullToIncremental_Switch)
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     // 先全量，再增量
     coordinator.requestFullRefresh();
@@ -525,7 +525,7 @@ TEST(RefreshPathRegressionTest, MultipleFullRefreshes)
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     for (int i = 0; i < 5; ++i)
     {
@@ -539,7 +539,7 @@ TEST(RefreshPathRegressionTest, MultipleIncrementalUpdates)
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     for (int i = 0; i < 10; ++i)
     {
@@ -560,7 +560,7 @@ TEST(RefreshCleanupRegressionTest, MarkClean_AfterUpdateSceneRender)
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
@@ -583,7 +583,7 @@ TEST(RefreshCleanupRegressionTest, PendingIds_ClearedAfterFullRefresh)
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
@@ -605,7 +605,7 @@ TEST(RefreshStressRegressionTest, BulkEntities_SceneChanged)
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     for (int i = 0; i < 50; ++i)
@@ -630,7 +630,7 @@ TEST(RefreshStressRegressionTest, BulkEntities_FullRefresh)
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     for (int i = 0; i < 50; ++i)
@@ -652,7 +652,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_OnSceneChangedWithDirtyEntities)
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
@@ -674,7 +674,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_OnSceneChangedWithDeletedEntitie
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
@@ -710,8 +710,8 @@ TEST(ViewportRefreshRegressionTest, Coordinator_SetSceneManagerTwice)
     Eg::SceneManager scene2;
 
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene1);
-    coordinator.setSceneManager(&scene2);
+    coordinator.setSceneContext(&scene1);
+    coordinator.setSceneContext(&scene2);
     coordinator.stop();
     SUCCEED();
 }
@@ -720,7 +720,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_RequestFullRefreshAfterSceneChan
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     coordinator.onSceneChanged();
     coordinator.requestFullRefresh();
@@ -732,7 +732,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_RepaintDoesNotTriggerFullRefresh
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     coordinator.requestRepaint();
     coordinator.stop();
@@ -744,7 +744,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_PendingLevelNeverDowngrades)
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     EXPECT_EQ(coordinator.pendingLevel(), UI::SceneRefreshLevel::None);
 
@@ -762,7 +762,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_LightRefreshThenRepaintNoDowngra
 {
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     coordinator.requestLightRefresh();
     coordinator.requestRepaint();
@@ -832,7 +832,7 @@ TEST(RefreshPathRegressionTest, IncrementalToFull_BackToIncremental)
     // 验证：增量 → 全量 → 增量 切换稳定
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
@@ -859,7 +859,7 @@ TEST(RefreshPathRegressionTest, MultipleIncrementalUpdates_NoDataLoss)
     // 验证：多次增量刷新不丢失数据
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     for (int i = 0; i < 10; ++i)
     {
@@ -881,7 +881,7 @@ TEST(RefreshPathRegressionTest, FullRefreshAfterSeriesOfIncremental)
     // 验证：连续增量后全量刷新正常
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     for (int i = 0; i < 5; ++i)
     {
@@ -907,7 +907,7 @@ TEST(RefreshPathRegressionTest, RepaintAfterFullRefresh_NoDowngrade)
     // 验证：全量刷新后 Repaint 不会降级（升级不降级规则）
     Eg::SceneManager scene;
     SceneRefreshCoordinator coordinator;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     coordinator.requestFullRefresh();
     coordinator.requestRepaint();

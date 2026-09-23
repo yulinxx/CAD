@@ -14,6 +14,7 @@ class SceneEditService;
 
 namespace Eg
 {
+    class ISceneContext;
     class SceneManager;
     struct SyEntity;
 }  // namespace Eg
@@ -53,6 +54,10 @@ public:
     {
         return m_editService;
     }
+
+    /// 统一场景上下文入口 — 替代直接暴露 Eg::SceneManager*
+    /// 返回 ISceneContext，UI 层仅依赖此接口
+    Eg::ISceneContext* sceneContext() const;
 
     // ---- 图元创建 (返回 Eg 图元 ID) ----
 

@@ -6,7 +6,7 @@
  */
 #include "ViewportInputRouter.h"
 #include "RenderWidget.h"
-#include "Camera2D.h"
+#include "UI/Render/Camera2D.h"
 #include "ViewportNavigation2D.h"
 #include "SceneRefreshCoordinator.h"
 #include "ISelectionService.h"

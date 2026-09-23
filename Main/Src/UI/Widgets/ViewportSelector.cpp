@@ -2,33 +2,33 @@
 
 #include "ISelectionService.h"
 
-#include "Engine2D/Core/SceneManager.h"
+#include "Engine/Scene/ISceneContext.h"
 #include "Engine/SyEntity/SyEntity.h"
 #include "Engine/EntityIdUtils.h"
 
-ViewportSelector::ViewportSelector(Eg::SceneManager* sceneManager, ISelectionService* selectionService)
-    : m_sceneManager(sceneManager)
+ViewportSelector::ViewportSelector(Eg::ISceneContext* sceneContext, ISelectionService* selectionService)
+    : m_sceneContext(sceneContext)
     , m_selectionService(selectionService)
 {
 }
 
 std::optional<Ut::BBox2d> ViewportSelector::selectionBBox() const
 {
-    if (!m_selectionService || !m_sceneManager)
+    if (!m_selectionService || !m_sceneContext)
     {
         return std::nullopt;
     }
 
-    // 通过 ID 遍历选中项，再用 SceneManager 查询图元指针合并 BBox
+    // 通过 ID 遍历选中项，再用 SceneContext 查询图元指针合并 BBox
     // 这样 ISelectionService 保持纯 ID 接口，不泄漏 SyEntity*
     struct BBoxContext
     {
         Ut::BBox2d combined;
         bool hasEntity = false;
-        Eg::SceneManager* sceneManager = nullptr;
+        Eg::ISceneContext* sceneContext = nullptr;
     } ctx;
 
-    ctx.sceneManager = m_sceneManager;
+    ctx.sceneContext = m_sceneContext;
 
     m_selectionService->visitSelectedIds(
         [](const char* id, void* context) {
@@ -37,18 +37,20 @@ std::optional<Ut::BBox2d> ViewportSelector::selectionBBox() const
                 return;
             }
             auto* bc = static_cast<BBoxContext*>(context);
-            // ID 字符串 -> EntityId -> SyEntity*
+            // ID 字符串 -> EntityId -> IEntity*
             auto eid = Eg::parseEntityId(std::string(id));
             if (!eid)
             {
                 return;
             }
-            Eg::SyEntity* entity = bc->sceneManager->findEntityById(*eid);
-            if (!entity)
+            Eg::IEntity* entity = bc->sceneContext->findEntityById(*eid);
+            // 2D 路径图元均为 SyEntity；hidden visibility 下不用 dynamic_cast
+            auto* syEntity = static_cast<Eg::SyEntity*>(entity);
+            if (!syEntity)
             {
                 return;
             }
-            Ut::BBox2d bbox = entity->getBbox();
+            Ut::BBox2d bbox = syEntity->getBbox();
             if (bbox.isValid())
             {
                 bc->combined.expand(bbox);

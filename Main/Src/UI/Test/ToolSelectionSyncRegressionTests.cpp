@@ -97,7 +97,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_InitializeTools)
 
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tm.initializeTools(ctx);
     EXPECT_TRUE(tm.isInitialized());
@@ -110,7 +110,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_InitializeWithoutRegister)
     ToolManager tm;
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tm.initializeTools(ctx);
     // 未注册任何工具工厂时保持 isInitialized()==false（实现有意为之，见 ToolManager::initializeTools 注释）
@@ -125,7 +125,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_DoubleInitialize)
 
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tm.initializeTools(ctx);
     tm.initializeTools(ctx);  // 二次初始化不应崩溃
@@ -141,7 +141,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_SetActiveTool)
 
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tm.initializeTools(ctx);
     EXPECT_TRUE(tm.setActiveTool("SelectTool"));
@@ -156,7 +156,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_SetActiveTool_Unknown)
 
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tm.initializeTools(ctx);
     EXPECT_FALSE(tm.setActiveTool("UnknownTool"));
@@ -172,7 +172,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_SwitchBetweenTools)
 
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tm.initializeTools(ctx);
 
@@ -192,7 +192,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_CancelCurrentTool)
 
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tm.initializeTools(ctx);
     tm.setActiveTool("SelectTool");
@@ -210,7 +210,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_CancelCurrentTool_NoActive)
 
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tm.initializeTools(ctx);
     tm.cancelCurrentTool();  // 无活动工具时不崩溃
@@ -226,7 +226,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_EntityCallback)
 
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tm.initializeTools(ctx);
 
@@ -245,7 +245,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_SwitchToolCallback)
 
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tm.initializeTools(ctx);
 
@@ -264,7 +264,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_NullCallbackSet)
 
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tm.initializeTools(ctx);
 
@@ -288,7 +288,7 @@ TEST(SelectToolRegressionTest, Initialize)
     SelectTool tool;
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tool.initialize(ctx);
     EXPECT_FALSE(tool.hasSelectedEntities());
@@ -306,7 +306,7 @@ TEST(SelectToolRegressionTest, OnActivate_OnDeactivate)
     SelectTool tool;
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tool.initialize(ctx);
     tool.onActivate();
@@ -319,7 +319,7 @@ TEST(SelectToolRegressionTest, Cancel)
     SelectTool tool;
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tool.initialize(ctx);
     tool.cancel();
@@ -333,7 +333,7 @@ TEST(SelectToolRegressionTest, SyncSelectionFromScene_Empty)
     SelectTool tool;
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tool.initialize(ctx);
     tool.syncSelectionFromScene();
@@ -357,7 +357,7 @@ TEST(SelectToolRegressionTest, SyncSelectionFromScene_WithEntities)
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
     tool.initialize(ctx);
     tool.syncSelectionFromScene();
     EXPECT_TRUE(tool.hasSelectedEntities());
@@ -665,7 +665,7 @@ TEST(SelectToolRegressionTest, SyncFromScene_AfterExternalDelete)
     scene.selectEntity(scene.findSyEntityById(lineId));
 
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
     tool.initialize(ctx);
     tool.syncSelectionFromScene();
     EXPECT_TRUE(tool.hasSelectedEntities());
@@ -691,7 +691,7 @@ TEST(SelectToolRegressionTest, SyncFromScene_AfterExternalClear)
     scene.selectAll();
 
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
     tool.initialize(ctx);
     tool.syncSelectionFromScene();
     EXPECT_TRUE(tool.hasSelectedEntities());
@@ -723,7 +723,7 @@ TEST(SelectToolRegressionTest, SyncFromScene_AfterExternalSelectChange)
     scene.selectEntity(scene.findSyEntityById(id1));
 
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
     tool.initialize(ctx);
     tool.syncSelectionFromScene();
     EXPECT_TRUE(tool.hasSelectedEntities());
@@ -763,7 +763,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_GetTool_UnknownName)
 
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tm.initializeTools(ctx);
     EXPECT_EQ(tm.getTool("UnknownTool"), nullptr);
@@ -795,7 +795,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_AllToolsReceiveEntityCallback)
 
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tm.initializeTools(ctx);
 
@@ -815,7 +815,7 @@ TEST(SelectToolRegressionTest, HasSelectedEntities_AfterSyncFromEmpty)
     SelectTool tool;
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
     tool.initialize(ctx);
 
     tool.syncSelectionFromScene();
@@ -844,7 +844,7 @@ TEST(SelectToolRegressionTest, HasSelectedEntities_AfterPartialDeselect)
     EXPECT_EQ(scene.getSelectedEntityCount(), 2u);
 
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
     tool.initialize(ctx);
     tool.syncSelectionFromScene();
     EXPECT_TRUE(tool.hasSelectedEntities());
@@ -875,7 +875,7 @@ TEST(SelectToolRegressionTest, Deactivate_DoesNotAffectSelection)
 
     // 工具停用不应影响场景选择状态
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
     tool.initialize(ctx);
     tool.onActivate();
     tool.onDeactivate();
@@ -892,7 +892,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_CancelActiveToolDuringOperatio
 
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tm.initializeTools(ctx);
     tm.setActiveTool("SelectTool");
@@ -914,7 +914,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_RepeatedActivateDeactivate)
 
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tm.initializeTools(ctx);
 
@@ -1042,7 +1042,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_AllToolsReceiveSwitchCallback)
 
     Eg::SceneManager scene;
     ToolContext ctx;
-    ctx.sceneManager = &scene;
+    ctx.sceneContext = &scene;
 
     tm.initializeTools(ctx);
 
@@ -1290,7 +1290,7 @@ namespace
     void initSelectToolForDrag(SelectTool& tool, Eg::SceneManager& scene, SceneEditService& edit)
     {
         ToolContext ctx;
-        ctx.sceneManager = &scene;
+        ctx.sceneContext = &scene;
         ctx.sceneEditService = &edit;
         ctx.pixelToWorld = []() -> double { return 0.05; };
         tool.initialize(ctx);

@@ -17,7 +17,7 @@
 #include <functional>
 #include <memory>
 
-#include "Camera2D.h"
+#include "UI/Render/Camera2D.h"
 #include "ViewportSelector.h"
 
 #include "UI/IViewportHost.h"  // P1: 2D/3D 公共视口宿主接口
@@ -54,6 +54,7 @@ class QResizeEvent;
 
 namespace Eg
 {
+    class ISceneContext;
     class SceneManager;
     struct SyEntity;
 }  // namespace Eg
@@ -182,6 +183,12 @@ public:
         return m_renderWidget;
     }
 
+    /// 获取渲染协调器（覆盖层/LOD 等渲染参数统一入口），装备完成前可能为空
+    Ui2D::ViewRenderCoordinator* renderCoordinator() const
+    {
+        return m_renderCoordinator.get();
+    }
+
     void resetView();
     void zoomToFit();
     void zoomToSelection();
@@ -295,7 +302,7 @@ private:
 
     // 文档和服务
     SceneDocument2D* m_document{ nullptr };
-    Eg::SceneManager* m_sceneManager{ nullptr };
+    Eg::ISceneContext* m_sceneContext{ nullptr };
     std::shared_ptr<bool> m_alive{ std::make_shared<bool>(true) };
     ISelectionService* m_selectionService{ nullptr };
     IInteractionDispatcher* m_interactionDispatcher{ nullptr };

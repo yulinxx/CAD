@@ -6,7 +6,7 @@
  */
 #include "ViewportNavigation2D.h"
 
-#include "Camera2D.h"
+#include "UI/Render/Camera2D.h"
 #include "RenderWidget.h"
 
 #include <QNativeGestureEvent>

@@ -186,7 +186,7 @@ void RenderViewport2D::initRenderWidget()
 
 Eg::SceneManager* RenderViewport2D::sceneManager() const
 {
-    return m_sceneManager;
+    return static_cast<Eg::SceneManager*>(m_sceneContext);
 }
 
 // 对世界坐标应用吸附（图元/网格/起点），并刷新捕捉指示器。
@@ -358,24 +358,24 @@ void RenderViewport2D::setDocument(SceneDocument2D* document)
     // 编辑服务外观获取场景对象
     if (m_document && m_document->editService())
     {
-        m_sceneManager = m_document->editService()->sceneManager();
+        m_sceneContext = m_document->sceneContext();
     }
     else
     {
-        m_sceneManager = nullptr;
+        m_sceneContext = nullptr;
     }
 
     // 同步选择控制器
     if (m_selector)
     {
-        m_selector->setSceneManager(m_sceneManager);
+        m_selector->setSceneContext(m_sceneContext);
     }
 
-    // P5: 观察者注册收敛到 SceneRefreshCoordinator::setSceneManager
-    // 该方法自动从旧 SceneManager 注销、向新 SceneManager 注册
+    // P5: 观察者注册收敛到 SceneRefreshCoordinator::setSceneContext
+    // 该方法自动从旧场景注销、向新场景注册
     if (m_refreshCoordinator)
     {
-        m_refreshCoordinator->setSceneManager(m_sceneManager);
+        m_refreshCoordinator->setSceneContext(m_sceneContext);
     }
 
     // 输入路由器同步文档
@@ -388,13 +388,15 @@ void RenderViewport2D::setDocument(SceneDocument2D* document)
     // 优先使用场景空间索引按捕捉半径做区域查询，无索引时 SnapEngine 自动回退全量遍历。
     if (m_gridSnapManager)
     {
-        m_gridSnapManager->setSceneManager(m_sceneManager);
-        if (m_sceneManager)
+        m_gridSnapManager->setSceneContext(m_sceneContext);
+        if (m_sceneContext)
         {
-            m_gridSnapManager->setSpatialQueryCallback([scene = m_sceneManager](const Ut::BBox2d& box) {
+            m_gridSnapManager->setSpatialQueryCallback([ctx = m_sceneContext](const Ut::BBox2d& box) {
                 // 捕捉走 queryByBoxForSnap：拖动热路径上每帧都查，不能在这里补齐
                 // 被延后的空间索引（否则拖动期的 N 次索引操作会被拉回来）。
-                return scene->queryByBoxForSnap(box);
+                // 2D 路径唯一实现是 SceneManager；hidden visibility 下不用 dynamic_cast。
+                auto* sm = static_cast<Eg::SceneManager*>(ctx);
+                return sm ? sm->queryByBoxForSnap(box) : std::vector<Eg::SyEntity*>{};
             });
         }
         else
@@ -448,7 +450,7 @@ void RenderViewport2D::setLayerManager(LayerManager* manager)
 
 void RenderViewport2D::initializeTools()
 {
-    if (!m_renderWidget || !m_sceneManager)
+    if (!m_renderWidget || !m_sceneContext)
     {
         return;
     }
@@ -463,8 +465,8 @@ void RenderViewport2D::initializeTools()
     // 注册所有工具。
     // 额外注入场景编辑服务（Gizmo 变换 Undo）、图层管理器（锁定图层过滤）、
     // 重置视图回调（空格键）、网格+对象捕捉管理器等选择工具所需的依赖。
-    Ui2D::ToolContext ctx;
-    ctx.sceneManager = m_sceneManager;
+    ToolContext ctx;
+    ctx.sceneContext = m_sceneContext;
     ctx.renderWidget = m_renderWidget;
     ctx.renderCoordinator = coordinator;
     ctx.onStatusMessage = [this](const QString& msg) {

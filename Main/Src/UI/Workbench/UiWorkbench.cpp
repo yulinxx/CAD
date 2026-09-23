@@ -421,6 +421,12 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
         m_viewport = vp;
         setupViewportServices(vp, window);
         vp->initializeTools();
+        // LOD 参数调用链收敛：设置面板经 ViewRenderCoordinator 读写曲线精度
+        // （initializeTools 之后 coordinator 才创建）
+        if (m_settingsCoordinator)
+        {
+            m_settingsCoordinator->setRenderCoordinator(vp->renderCoordinator());
+        }
         setupImportCallbacks(vp, window);
         vp->setActiveTool(QStringLiteral("SelectTool"));
     }

@@ -59,7 +59,7 @@ TEST(RenderViewport2DRegressionTest, RefreshCoordinator_SetSceneManager)
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
     coordinator.stop();
     SUCCEED();
 }
@@ -68,7 +68,7 @@ TEST(RenderViewport2DRegressionTest, RefreshCoordinator_LifecycleSequence)
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     // 完整生命周期序列：构造 → 设置场景 → 各种刷新 → 停止
     coordinator.requestRepaint();
@@ -93,7 +93,7 @@ TEST(RenderViewport2DRegressionTest, RefreshLevel_RepaintUpgradesToLightUpdate)
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     // Repaint → onSceneChanged 应升级到 LightUpdate
     coordinator.requestRepaint();
@@ -106,7 +106,7 @@ TEST(RenderViewport2DRegressionTest, RefreshLevel_LightUpdateUpgradesToFullRefre
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     // LightUpdate → requestFullRefresh 应升级到 FullRefresh
     coordinator.onSceneChanged();
@@ -119,7 +119,7 @@ TEST(RenderViewport2DRegressionTest, RefreshLevel_RepaintDoesNotDowngradeFullRef
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     // FullRefresh → Repaint 不应降级
     coordinator.requestFullRefresh();
@@ -132,7 +132,7 @@ TEST(RenderViewport2DRegressionTest, RefreshLevel_AllFourLevelsSequence)
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     // None → Repaint → LightUpdate → FullRefresh 完整序列
     coordinator.requestRepaint();
@@ -148,7 +148,7 @@ TEST(RenderViewport2DRegressionTest, RefreshLevel_RepaintUpgradesToLightRefresh)
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     // Repaint → requestLightRefresh 应升级到 LightUpdate
     coordinator.requestRepaint();
@@ -161,7 +161,7 @@ TEST(RenderViewport2DRegressionTest, RefreshLevel_LightRefreshUpgradesToFullRefr
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     // LightRefresh → requestFullRefresh 应升级到 FullRefresh
     coordinator.requestLightRefresh();
@@ -174,7 +174,7 @@ TEST(RenderViewport2DRegressionTest, RefreshLevel_LightRefreshDoesNotDowngradeFu
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     // FullRefresh → requestLightRefresh 不应降级
     coordinator.requestFullRefresh();
@@ -252,7 +252,7 @@ TEST(RenderViewport2DRegressionTest, SelectionChange_TriggersRepaint)
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
@@ -276,7 +276,7 @@ TEST(RenderViewport2DRegressionTest, SelectionChange_ClearSelectionTriggersRepai
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
@@ -319,7 +319,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_SceneChangeRefreshesWithEntitie
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     // 添加图元
     auto line = std::make_unique<Eg::SyLine>();
@@ -339,7 +339,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_SceneChangeWithMultipleEntities
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     // 添加多个图元
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -361,7 +361,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_MixedTypeEntities)
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     // 添加混合类型图元
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -515,7 +515,7 @@ TEST(RenderViewport2DRegressionTest, Stress_LargeBatchEntityAdd)
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     // 大批量添加图元
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
@@ -537,7 +537,7 @@ TEST(RenderViewport2DRegressionTest, Stress_RepeatedAddAndDelete)
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     // 反复添加和删除图元
     for (int round = 0; round < 5; ++round)
@@ -570,7 +570,7 @@ TEST(RenderViewport2DRegressionTest, Stress_RapidRefreshSequence)
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     // 快速交替刷新请求
     for (int i = 0; i < 50; ++i)
@@ -650,7 +650,7 @@ TEST(RenderViewport2DRegressionTest, EntityPropertyChange_VisibilityToggle)
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
@@ -675,7 +675,7 @@ TEST(RenderViewport2DRegressionTest, EntityPropertyChange_LockToggle)
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
@@ -850,7 +850,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_SceneChangeAfterClear)
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
@@ -874,7 +874,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_SelectionChangeSequence)
 {
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
@@ -1392,7 +1392,7 @@ TEST(RenderViewport2DRegressionTest, InputRouter_DeleteKeyTriggersRefreshCoordin
     ViewportInputRouter router;
     SceneRefreshCoordinator coordinator;
     Eg::SceneManager scene;
-    coordinator.setSceneManager(&scene);
+    coordinator.setSceneContext(&scene);
     router.setRefreshCoordinator(&coordinator);
 
     // Delete 键触发刷新协调器
