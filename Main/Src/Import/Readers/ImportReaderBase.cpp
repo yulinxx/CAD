@@ -266,12 +266,63 @@ ImportResult ImportReaderBase::readViaLegacy(
     const ImportContext& context, Fio::FileFormat format, Fio::VecSyEntityPtr& outEntities) const
 {
     const QByteArray tag = m_formatName.toUtf8();
-    SY_WARNF(
-        "[ImportReader:%s] Falling back to the legacy import path (no IR, no layer/group restore)", tag.constData());
+    const std::string pathStr = context.sourcePath.toUtf8().toStdString();
+
+    // ===== 优先尝试 IR 路径：即使上层 tryImportViaIR 失败（如 entityCount=0），
+    // IR 路径仍然可能成功并带回图层/群组信息，比纯 legacy 路径更完整。
+    // 仅当 importToIR 也失败时才走旧版 importFile 路径。
+    {
+        Fio::FileIOManager fileIO;
+        char irErrBuf[1024] = { 0 };
+        Fio::FioParseResult ir;
+
+        if (fileIO.importToIR(pathStr.c_str(), format, &ir, irErrBuf, sizeof(irErrBuf), nullptr, nullptr)
+            && ir.entityCount > 0)
+        {
+            SY_DEBUGF("[ImportReader:%s] readViaLegacy: IR path succeeded as fallback, entities=%u, layers=%u, groups=%u",
+                tag.constData(), ir.entityCount, ir.layerCount, ir.groupCount);
+
+            // 转换图元 + 收集图层/群组映射
+            std::unordered_map<int64_t, uint32_t> entityLayerMap;
+            std::unordered_map<int64_t, uint64_t> entityGroupMap;
+            auto converted = Eg::FioEntityConverter::convertAll(ir, &entityLayerMap, &entityGroupMap);
+
+            outEntities.clear();
+            outEntities.reserve(converted.size());
+            for (auto& e : converted)
+            {
+                outEntities.emplace_back(std::move(e));
+            }
+
+            ImportResult result = ImportResult::ok(
+                successMessage(format), static_cast<int>(outEntities.size()), static_cast<int>(ir.layerCount), QStringList{});
+
+            if (ir.warningCount > 0)
+            {
+                result.addWarning(QStringLiteral("%1 parser reported %2 warning(s) via fallback IR path")
+                    .arg(m_formatName)
+                    .arg(ir.warningCount));
+            }
+
+            result.importedLayers = Eg::FioEntityConverter::extractLayers(ir);
+            result.entityLayerMap = std::move(entityLayerMap);
+            result.importedGroups = Eg::FioEntityConverter::extractGroups(ir);
+            result.entityGroupMap = std::move(entityGroupMap);
+
+            SY_INFOF("[ImportReader:%s] readViaLegacy: fallback IR path complete, %zu entities, %zu layers, %zu groups",
+                tag.constData(), outEntities.size(), result.importedLayers.size(), result.importedGroups.size());
+
+            return result;
+        }
+
+        SY_DEBUGF("[ImportReader:%s] readViaLegacy: IR fallback failed (%s), falling back to legacy importFile",
+            tag.constData(), irErrBuf[0] ? irErrBuf : "no error");
+    }
+
+    // ===== IR 路径失败，走旧版 importFile 路径（不携带图层/群组信息） =====
+    SY_WARNF("[ImportReader:%s] Falling back to legacy importFile path (no layer/group restore)", tag.constData());
 
     Fio::FileIOManager fileIO;
-    std::string pathStr = context.sourcePath.toUtf8().toStdString();
-
     QStringList warns;
     Fio::FileIOManager::WarningCallback warningCb = [](const char* warning, void* ctx) {
         static_cast<QStringList*>(ctx)->append(QString::fromUtf8(warning));
@@ -306,11 +357,6 @@ ImportResult ImportReaderBase::readViaLegacy(
         outEntities.emplace_back(raw[i]);
     }
     Fio::FileIOManager::freeEntityArray(raw);
-
-    for (const QString& warn : warns)
-    {
-        // Warnings are already collected in the result; log summary only
-    }
 
     if (!warns.isEmpty())
     {

@@ -9,8 +9,7 @@ struct ImportOptions
     bool autoCenter{ true };
     /// 导入完成后自动切换工作台（2D/3D）
     bool autoSwitchWorkbench{ true };
-    /// 作为新文档导入（清空当前场景）
+    /// 作为新文档导入（清空当前场景）。false = 合并到当前文档（不清空场景，追加图元）。
+    /// 该字段单独控制清空/合并行为；不存在与之互斥的第二字段。
     bool importAsNewDocument{ true };
-    /// 合并到当前文档（不清空场景，追加图元）
-    bool mergeIntoCurrentDocument{ false };
 };
