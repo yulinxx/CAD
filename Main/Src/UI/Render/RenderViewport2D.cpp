@@ -22,6 +22,7 @@
 #include "Engine2D/Edit/SceneEditService.h"
 
 #include "UI2D/DrawTools/ToolManager.h"
+#include "UI2D/DrawTools/ToolContext.h"
 #include "UI2D/DrawTools/SelectTool.h"
 #include "UI2D/ViewWidget/ToolInitializer.h"
 #include "UI2D/ViewWidget/ViewRenderCoordinator.h"
@@ -462,54 +463,51 @@ void RenderViewport2D::initializeTools()
     // 注册所有工具。
     // 额外注入场景编辑服务（Gizmo 变换 Undo）、图层管理器（锁定图层过滤）、
     // 重置视图回调（空格键）、网格+对象捕捉管理器等选择工具所需的依赖。
-    ToolInitializer::registerAllTools(
-        *m_toolManager,
-        m_sceneManager,
-        m_renderWidget,
-        coordinator,
-        [this](const QString& msg) {
-            updateStatus(msg);
-        },
-        /*sceneEdit=*/m_document ? m_document->editService() : nullptr,
-        /*layerManager=*/m_layerManager,
-        /*onResetView=*/
-        [this]() {
-            zoomToFit();
-        },
-        /*onEntityDoubleClick=*/
-        [this](Eg::SyEntity* entity) {
-            if (entity)
-            {
-                EntityPropertiesDialog2D::showDialog(this, entity);
-            }
-        },
-        /*gridSnapManager=*/m_gridSnapManager.get(),
-        /*operationBus=*/m_operationBus,
-        /*panViewByPixels=*/
-        [this](double dxPx, double dyPx) {
-            // 工具侧按**逻辑**像素表达平移意图，相机吃的是物理像素：DPR 换算在这里做一次，
-            // 免得每个工具各自去查 devicePixelRatio。
-            if (!m_inputRouter || !m_renderWidget)
-            {
-                return;
-            }
-            const double dpr = static_cast<double>(m_renderWidget->devicePixelRatio());
-            m_inputRouter->panViewByPhysicalPixels(dxPx * dpr, dyPx * dpr);
-        },
-        /*onDragBegin=*/[this]() {
-            // 拖动开始时，临时显示选中图元的原图形（覆盖"选中时隐藏原图"设置）
-            if (m_refreshCoordinator)
-            {
-                m_refreshCoordinator->setForceShowSelectedDuringDrag(true);
-            }
-        },
-        /*onDragEnd=*/[this]() {
-            // 拖动结束时，恢复"选中时隐藏原图"设置
-            if (m_refreshCoordinator)
-            {
-                m_refreshCoordinator->setForceShowSelectedDuringDrag(false);
-            }
-        });
+    Ui2D::ToolContext ctx;
+    ctx.sceneManager = m_sceneManager;
+    ctx.renderWidget = m_renderWidget;
+    ctx.renderCoordinator = coordinator;
+    ctx.onStatusMessage = [this](const QString& msg) {
+        updateStatus(msg);
+    };
+    ctx.sceneEditService = m_document ? m_document->editService() : nullptr;
+    ctx.layerManager = m_layerManager;
+    ctx.onResetView = [this]() {
+        zoomToFit();
+    };
+    ctx.onEntityDoubleClick = [this](Eg::SyEntity* entity) {
+        if (entity)
+        {
+            EntityPropertiesDialog2D::showDialog(this, entity);
+        }
+    };
+    ctx.gridSnapManager = m_gridSnapManager.get();
+    ctx.operationBus = m_operationBus;
+    ctx.panViewByPixels = [this](double dxPx, double dyPx) {
+        // 工具侧按**逻辑**像素表达平移意图，相机吃的是物理像素：DPR 换算在这里做一次，
+        // 免得每个工具各自去查 devicePixelRatio。
+        if (!m_inputRouter || !m_renderWidget)
+        {
+            return;
+        }
+        const double dpr = static_cast<double>(m_renderWidget->devicePixelRatio());
+        m_inputRouter->panViewByPhysicalPixels(dxPx * dpr, dyPx * dpr);
+    };
+    ctx.onDragBegin = [this]() {
+        // 拖动开始时，临时显示选中图元的原图形（覆盖"选中时隐藏原图"设置）
+        if (m_refreshCoordinator)
+        {
+            m_refreshCoordinator->setForceShowSelectedDuringDrag(true);
+        }
+    };
+    ctx.onDragEnd = [this]() {
+        // 拖动结束时，恢复"选中时隐藏原图"设置
+        if (m_refreshCoordinator)
+        {
+            m_refreshCoordinator->setForceShowSelectedDuringDrag(false);
+        }
+    };
+    ToolInitializer::registerAllTools(*m_toolManager, ctx);
 
     // P1: 通过信号通知上层提交图元，视口不直接持有编辑服务
     m_toolManager->setEntityCallbackForAllTools([this](Eg::SyEntity* e) {
