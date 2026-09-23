@@ -578,6 +578,24 @@ public:
         emit dataChanged(first, last);
     }
 
+    /// 批量路径直接改写复选框态（不经 setData，避免回调回环）。
+    /// 右键 Show/Hide 只改引擎 + 本方法 + refreshRows，不 reset 模型。
+    void setRowVisibleState(const QString& id, bool visible)
+    {
+        const QModelIndex idx = indexForId(id);
+        if (!idx.isValid())
+        {
+            return;
+        }
+        QStandardItem* item = itemFromIndex(idx);
+        if (!item)
+        {
+            return;
+        }
+        item->setCheckState(visible ? Qt::Checked : Qt::Unchecked);
+        item->setData(visible, kVisRole);
+    }
+
 private:
     /// 设定列结构（列数 + 表头文字）。clear() 后必须重做一次，否则模型会退化成零列
     void resetColumns()
@@ -1199,6 +1217,25 @@ void SceneTreePanel::refreshRows(const QVector<qint64>& ids)
         }
         emitRun(runStart, runEnd);
     }
+}
+
+void SceneTreePanel::setRowsVisible(const QVector<qint64>& ids, bool visible)
+{
+    if (m_mode != Mode::Mode3D)
+    {
+        refreshRows(ids);
+        return;
+    }
+    auto* model3d = dynamic_cast<SceneTreeTableModel3D*>(m_model);
+    if (!model3d)
+    {
+        return;
+    }
+    for (qint64 id : ids)
+    {
+        model3d->setRowVisibleState(QString::number(id), visible);
+    }
+    refreshRows(ids);
 }
 
 bool SceneTreePanel::setCommandState(bool hasSelection, bool anyLocked)

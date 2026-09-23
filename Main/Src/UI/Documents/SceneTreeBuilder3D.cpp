@@ -10,6 +10,7 @@
 #include "Engine3D/SyEntity/SyMeshEntity.h"
 
 #include <QObject>
+#include <unordered_set>
 #include <vector>
 
 namespace
@@ -22,6 +23,14 @@ namespace
         {
             out->push_back(mesh);
         }
+    }
+
+    /// 选中 ID 收集为整数集合：build 主循环用 mesh->id 直查，
+    /// 避免每个图元都 QString::number + QSet<QString>::contains 的双重字符串分配。
+    bool collectSelectedId(Eg::EntityId id, void* ctx)
+    {
+        static_cast<std::unordered_set<uint64_t>*>(ctx)->insert(id);
+        return true;
     }
 }  // namespace
 
@@ -52,13 +61,16 @@ SceneTreeModel3D SceneTreeBuilder3D::build(Eg::SceneManager3D* scene)
         return model;
     }
 
-    // 3D 场景选择状态统一存放在 SceneManager3D 的选择列表中（而非图元标志位），
-    // 这里一次性收集，供节点选中态与 selectedCount 复用，保证与 selectedIds() 一致。
-    const QSet<QString> selected = selectedIds(scene);
+    // 选中态走整数集合一次收集（与 selectedIds() 语义一致，但主循环零字符串查找）
+    std::unordered_set<uint64_t> selectedSet;
+    selectedSet.reserve(scene->getSelectedEntityCount());
+    scene->forEachSelectedEntityId(&collectSelectedId, &selectedSet);
 
     std::vector<const Eg::SyMeshEntity*> meshes;
+    meshes.reserve(scene->getEntityCount());
     scene->forEachEntity(&collectMesh, &meshes);
 
+    model.nodes.reserve(static_cast<int>(meshes.size()));
     for (const Eg::SyMeshEntity* mesh : meshes)
     {
         if (!mesh)
@@ -66,7 +78,7 @@ SceneTreeModel3D SceneTreeBuilder3D::build(Eg::SceneManager3D* scene)
             continue;
         }
 
-        const bool isSelected = selected.contains(QString::number(mesh->id));
+        const bool isSelected = selectedSet.count(mesh->id) > 0;
         SceneTreeNode3D node = buildMeshNode(mesh, isSelected);
         if (node.selected)
         {

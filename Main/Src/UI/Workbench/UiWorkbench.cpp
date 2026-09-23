@@ -1784,7 +1784,7 @@ void Workbench2D::applySceneTreeIncremental(const char* src)
     m_lastSceneTreeStructureRevision = scene->structureRevision();
     m_lastSceneTreeTopologyRevision = scene->groupManager().topologyRevision();
 
-    SY_INFOF("[Workbench2D] scene tree incremental src=%s: +%lld rows entities=%zu structRev=%llu",
+    SY_DEBUGF("[Workbench2D] scene tree incremental src=%s: +%lld rows entities=%zu structRev=%llu",
         src ? src : "misc",
         added.size(),
         m_lastSceneTreeEntityCount,
@@ -3182,8 +3182,12 @@ void Workbench3D::toggleEntityVisibility3D(const QString& id, bool visible)
     {
         mesh->setVisible(visible);
         m_sceneManager3D->markDataChanged();
-        // 可见性变更不推进 structureRevision，通过防抖定时器合并为一次树重建
-        m_sceneTree3DRefreshTimer->start();
+        // 勾选路径：模型 setData 已先改写本行复选框，再进本回调；
+        // 可见性不推进 structureRevision，无需 O(N) 树重建，只发一次 dataChanged 兜底
+        if (m_scenePanel3D)
+        {
+            m_scenePanel3D->refreshRows({ static_cast<qint64>(mesh->id) });
+        }
     }
 }
 
@@ -3203,8 +3207,12 @@ void Workbench3D::renameEntity3D(const QString& id, const QString& newName)
         const QByteArray utf8 = newName.toUtf8();
         mesh->setName(utf8.constData());
         m_sceneManager3D->markDataChanged();
-        // 改名不推进 structureRevision，通过防抖定时器合并为一次树重建
-        m_sceneTree3DRefreshTimer->start();
+        // 改名：回调先于模型 setData 落盘，行文本由 setData 更新；
+        // 不推进 structureRevision，不重建整树
+        if (m_scenePanel3D)
+        {
+            m_scenePanel3D->refreshRows({ static_cast<qint64>(mesh->id) });
+        }
     }
 }
 
@@ -3233,10 +3241,10 @@ void Workbench3D::setSceneTreeVisibility3D(const QVector<qint64>& ids, bool visi
     // 可见性影响渲染，标记数据变更（经调度器节流）
     m_sceneManager3D->markDataChanged();
 
-    // 场景树增量刷新受影响行，不重建拓扑
+    // 场景树增量刷新受影响行（复选框态 + 发 dataChanged），不重建拓扑
     if (m_scenePanel3D)
     {
-        m_scenePanel3D->refreshRows(ids);
+        m_scenePanel3D->setRowsVisible(ids, visible);
     }
 }
 

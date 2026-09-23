@@ -77,6 +77,9 @@ public:
      */
     void refreshRows(const QVector<qint64>& ids);
 
+    /// 批量改写 3D 复选框态 + refreshRows（右键 Show/Hide；不重建拓扑、不走 setData 回调）
+    void setRowsVisible(const QVector<qint64>& ids, bool visible);
+
     /// 获取当前模式
     Mode mode() const { return m_mode; }
 
