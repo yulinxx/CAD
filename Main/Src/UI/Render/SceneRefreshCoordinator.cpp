@@ -404,12 +404,10 @@ void SceneRefreshCoordinator::refillCurveLodQueueIfStale()
     constexpr double kCurveLodUpgradeRatio = 1.3;
     constexpr double kCurveLodDowngradeRatio = 2.0;
     const bool firstTime = m_curveLodScaleAtBuild <= 0.0;
-    const bool needsUpgrade =
-        firstTime || worldToScreenScale > m_curveLodScaleAtBuild * kCurveLodUpgradeRatio;
-    const bool needsDowngrade =
-        !firstTime && worldToScreenScale * kCurveLodDowngradeRatio < m_curveLodScaleAtBuild;
-    const bool regionMoved = hasVisibleBox && m_curveLodCollectedBoxValid &&
-        !m_curveLodCollectedBox.contains(visibleBox);
+    const bool needsUpgrade = firstTime || worldToScreenScale > m_curveLodScaleAtBuild * kCurveLodUpgradeRatio;
+    const bool needsDowngrade = !firstTime && worldToScreenScale * kCurveLodDowngradeRatio < m_curveLodScaleAtBuild;
+    const bool regionMoved =
+        hasVisibleBox && m_curveLodCollectedBoxValid && !m_curveLodCollectedBox.contains(visibleBox);
     if (!needsUpgrade && !needsDowngrade && !regionMoved)
     {
         return;
@@ -483,15 +481,7 @@ void SceneRefreshCoordinator::refillCurveLodQueueIfStale()
 
     // 全场景类型总览（含不在 LOD 队列里的类型），一次性看清图元构成
     size_t totalEntities = m_sceneManager->getEntityCount();
-    SY_DEBUGF("[SceneRefreshCoordinator] curveLodRefresh: total=%zu queued=%zu clipped=%d scale=%.4f "
-              "polyInvariant=%zu circ=%zu arc=%zu ell=%zu b2=%zu bez=%zu spl=%zu nurbs=%zu smart=%zu poly=%zu",
-        totalEntities,
-        m_curveLodQueue.size(),
-        hasVisibleBox ? 1 : 0,
-        worldToScreenScale,
-        polygonInvariantSkipped,
-        perTypeCounts[0], perTypeCounts[1], perTypeCounts[2], perTypeCounts[3], perTypeCounts[4],
-        perTypeCounts[5], perTypeCounts[6], perTypeCounts[7], perTypeCounts[8]);
+    (void)totalEntities;  // 预留调试用
 }
 
 void SceneRefreshCoordinator::requestCurveLodRefresh()
@@ -1031,11 +1021,8 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
                 continue;
             }
 
-            m_renderWidget->addRenderEntity(uid,
-                vertices.data(),
-                static_cast<uint32_t>(vertices.size()),
-                primType,
-                layerIndexOfEntity(sm, e->id));
+            m_renderWidget->addRenderEntity(
+                uid, vertices.data(), static_cast<uint32_t>(vertices.size()), primType, layerIndexOfEntity(sm, e->id));
             m_renderedEntityIds.insert(uid);
         }
         m_selectionRestoreIds.clear();

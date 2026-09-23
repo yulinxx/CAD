@@ -90,7 +90,7 @@ void ViewOperationRegistry::registerAll()
 
     reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::View_LayerManager, [=] {
         if (layerEditService)
-            LayerManagerDialog::showDialog(layerEditService, m_parentWidget);
+            LayerManagerDialog::showDialog(layerEditService, parentWidget);
     }));
 
     reg.registerOperation(std::make_unique<ParamLambdaOperation>(
