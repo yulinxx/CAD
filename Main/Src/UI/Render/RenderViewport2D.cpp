@@ -495,6 +495,20 @@ void RenderViewport2D::initializeTools()
             }
             const double dpr = static_cast<double>(m_renderWidget->devicePixelRatio());
             m_inputRouter->panViewByPhysicalPixels(dxPx * dpr, dyPx * dpr);
+        },
+        /*onDragBegin=*/[this]() {
+            // 拖动开始时，临时显示选中图元的原图形（覆盖"选中时隐藏原图"设置）
+            if (m_refreshCoordinator)
+            {
+                m_refreshCoordinator->setForceShowSelectedDuringDrag(true);
+            }
+        },
+        /*onDragEnd=*/[this]() {
+            // 拖动结束时，恢复"选中时隐藏原图"设置
+            if (m_refreshCoordinator)
+            {
+                m_refreshCoordinator->setForceShowSelectedDuringDrag(false);
+            }
         });
 
     // P1: 通过信号通知上层提交图元，视口不直接持有编辑服务

@@ -4,14 +4,26 @@
 > **选择、拖动移动、删除、旋转、缩放、镜像、对齐、Nudge**（方向键微调）等操作。
 > 目标：大量图元场景下操作跟手、UI 不卡顿。
 >
-> 相关文档：[撤销重做机制.md](撤销重做机制.md)、[图元选择与菜单工具栏联动机制.md](图元选择与菜单工具栏联动机制.md)、
-> [数据与渲染.md](数据与渲染.md)
+> 相关文档：[撤销重做机制.md](撤销重做机制.md)、[图元选择与菜单工具栏联动机制.md](图元选择与菜单工具栏联动机制.md)
 
 ---
 
 ## 1. 总体原则
 
 任何批量图元操作都遵循同一条流水线，分四层收口，避免「N 个图元 = N 次计算 + N 次通知 + N 次 UI 更新」：
+
+```mermaid
+flowchart TB
+    subgraph 批量流水线
+        A[算法层<br/>EntityTransform] -->|只改几何| B[编辑层<br/>SceneEditService]
+        B -->|一次索引同步 + 一次广播| C[渲染层<br/>SceneRefreshCoordinator]
+        C -->|节流合并帧| D[UI层<br/>Workbench/视口/面板]
+    end
+
+    A -.->|"矩阵合并一次<br/>只做矩阵乘法"| A
+    B -.->|"一次索引更新<br/>一次场景通知"| B
+    C -.->|"16ms 定时器<br/>四级刷新"| C
+```
 
 | 层级 | 2D 职责实现 | 3D 职责实现 | 批处理手段 |
 | --- | --- | --- | --- |
@@ -40,10 +52,21 @@
   但同样只改几何、不逐个同步索引。
 - 单图元方法（`moveById` 等）保持「改几何 + 同步索引」的完整语义，可独立使用。
 
-```text
-旧：for 每个 id: 构造矩阵 -> 变换 -> 更新索引（N 次矩阵构造 + N 次索引写）
-新：循环外构造 1 个矩阵 -> for 每个 id: 一次矩阵乘法
-                          -> 编辑层整批统一更新一次索引
+```mermaid
+flowchart LR
+    subgraph 旧流程
+        A1[for each id] --> A2[构造矩阵]
+        A2 --> A3[变换图元]
+        A3 --> A4[更新索引]
+        A4 --> A1
+    end
+
+    subgraph 新流程
+        B1[循环外构造<br/>1个矩阵] --> B2[for each id]
+        B2 --> B3[一次矩阵乘法]
+        B3 --> B4[只改几何]
+        B4 --> B5[编辑层统一<br/>更新一次索引]
+    end
 ```
 
 ### 2.1.1 SmartLine 批量变换（2026-09-16）
@@ -83,16 +106,22 @@ SVG 导入的复合曲线大多以 `SmartLine` 存储（一条 SVG 子路径 = �
 所有菜单/对话框变换（移动、旋转、镜像、水平/垂直镜像、对齐、修剪、延伸、Nudge、倒圆角/倒角）
 都经由它执行，固定顺序：
 
-1. `captureEntitySnapshots(before)` 拍变换前快照（撤销用）；
-2. 执行 mutator —— **只允许改几何**，不得在内部逐个更新索引或发通知；
-3. `captureEntitySnapshots(after)` 拍变换后快照（重放用）；
-4. `notifyGeometryChanged()` 做移动联动（如填充色块跟随），before/after 按 id
-   建 `unordered_map` 匹配，复杂度 O(N)（旧实现线性 `find_if` 为 O(N²)）；
-5. 收集 ids 对应的图元，**一次** `updateEntityBoundsBulk()`：批量更新空间索引 +
-   记录 `GeometryChanged` 变更，**不发通知**（旧实现是逐图元
-   `updateEntityBoundsNoNotify()`，每个图元一次 remove+insert 并各自触发树重平衡）；
-6. `pushExecutedSnapshotCommand()` 入撤销栈，入栈完成后触发**唯一一次**
-   `notifySceneChanged()`。
+```mermaid
+sequenceDiagram
+    participant U as 调用方
+    participant S as SceneEditService::transformEntities
+    participant E as EntitySnapshotsCommand
+
+    U->>S: transformEntities(ids, mutator, desc)
+    S->>S: 1. captureEntitySnapshots(before)
+    S->>S: 2. 执行 mutator（只改几何）
+    S->>S: 3. captureEntitySnapshots(after)
+    S->>S: 4. notifyGeometryChanged（联动）
+    S->>S: 5. updateEntityBoundsBulk（批量索引）
+    S->>S: 6. pushExecutedSnapshotCommand()
+    S->>S: 7. notifySceneChanged（一次广播）
+    S-->>U: 完成
+```
 
 要点：
 
@@ -327,6 +356,41 @@ void setVisible(bool visible) override {
 `BatchGuard` 析构时 `endBatchUpload()` 已调用 `update()`，重复调用被 QueuedConnection
 的 UniqueConnection 机制静默丢弃。
 
+### 5.5 曲线 LOD 独立定时器（2026-09-22）
+
+**问题**：场景更新定时器（16ms）同时用于 LOD 消费时，Repaint 级别会占用该定时器，
+导致 LOD 队列永久搁浅。
+
+**方案**：新增独立的 `m_curveLodTimer`（32ms 单次触发），与场景更新定时器完全解耦：
+
+- 场景操作密集时两个定时器互不干扰，LOD 分批能稳定每 32ms 推进一次；
+- `ensureCurveLodPump()` 启动独立的 LOD 定时器；
+- `onCurveLodTimer()` 执行一批后，若队列未空则自动续跑。
+
+### 5.6 LOD 降级阈值调整（2026-09-22）
+
+**问题**：原先降级阈值 3.0 导致缩小时图元长期携带高精度顶点，GPU 绘制冗余大量顶点
+（例如 256 段圆只需 8 段时的冗余是 32 倍）。
+
+**方案**：降级阈值从 3.0 调整为 2.0：
+
+- 放大升级阈值保持 1.3 倍；
+- 缩小降级阈值调整为 2.0 倍；
+- 2.0 在抖动和冗余顶点之间取得更好的平衡：
+  - 视口裁剪（1.25 倍余量）已保证平移时小幅缩小不触发重收集；
+  - 配合容差公式修复（max(1e-6)），每次降级的重建代价本身也更小。
+
+### 5.7 视口裁剪优化（2026-09-22）
+
+**问题**：账本记录了全场景图元，但视口裁剪生效时 GPU 上实际只有视口内图元。
+增量路径会把视口外图元误当新图元 `addRenderEntity`，造成重复提交。
+
+**方案**：`applyFullRefresh()` 中新增视口裁剪逻辑：
+
+- 账本只记录视口内（+ 1.25 倍裁剪余量）已提交的图元；
+- 视口外图元不入账，下次出现在脏集合时走 `addRenderEntity` 补传；
+- 使用 `visibleWorldBounds()` 获取视口世界坐标边界。
+
 ---
 
 ## 6. UI 侧：拖动期间的扇出切断与节流
@@ -410,40 +474,7 @@ pending 标志，超时补一次尾包。属性面板展示端点/半径等几�
 
 ---
 
-## 9. 修订记录
+## 9. 约束与原则
 
-- ✅ 2026-09-15：选择类操作不再全量重建场景树；拖动期新增
-  `selectionOutlineInvalidated()` 切断属性面板/场景树扇出；属性面板 10Hz 节流；
-  `setSelectedIds` 选中一致短路。
-- ✅ 2026-09-15：`EntityTransform` 批量变换改为矩阵合并一次构造、批量只改几何；
-  `SceneEditService::transformEntities` 统一一次索引同步 + 入栈后一次广播；
-  `notifyGeometryChanged` 改为 O(N) 哈希匹配；Nudge/倒圆角/倒角 mutator 移除冗余逐图元
-  索引更新；`operationCompleted` 统一改走结构签名门控重建。
-- ✅ 2026-09-15：3D 侧批量操作落地 —— `SceneManager3D` 新增
-  `extractEntities` / `updateEntitiesBounds` / `structureRevision`，移除路径改为一趟压缩，
-  移除通知改为批量语义；`SelectionManager3D` 新增 `selectMany` 系列并把选择变更收敛到
-  `commitSelectionChanged()`，事件观察改为 O(选中集) 的 `dropFromSelection`，
-  变换后只更新选中图元索引；框选、删除、新增、撤销重做各调用方全部改走批量接口，
-  并修掉 `DeleteEntitiesCommand::redo` 的二次释放；`Workbench3D` 场景树重建改为按
-  `structureRevision()` 门控。
-- ✅ 2026-09-16：overlay 与交互 update 的帧合并 —— `ViewRenderCoordinator::requestRepaint()`、
-  `SceneRefreshCoordinator3D::scheduleDispatch()` 改用
-  `QMetaObject::invokeMethod(..., Qt::QueuedConnection | Qt::UniqueConnection)` 合并同帧
-  多次调用为一次 `update()` / `dispatch()`；`RenderWidget::setViewMatrix()` 与
-  `RenderWidget3D::mouseMoveEvent()` 各分支的 `update()` 同理节流；
-  `buildFrustum` 新增重载接收预计算合并矩阵，避免每帧重复计算
-  `projectionMatrix() * viewMatrix()`；`applyLightRefresh` 移除冗余 `update()`。
-- ✅ 2026-09-18：3D 阶段 3 增量渲染落地 —— `SceneRefreshCoordinator3D` 新增
-  `takePendingDirtyIds` / `takePendingDeletedIds`，`paintGL` 按 `pendingLevel` 分流
-  （`FullRefresh` 全量 / `LightUpdate` 走 `Mesh3DBuilder::updateDirtyEntities` 增量 /
-  `Repaint` 仅消费脏 ID）；`flushPendingRefresh` 通过注入的 `FlushCallback` 同步执行。
-- ✅ 2026-09-18：`SelectionManager3D::applyTransform` 大选集（≥100 图元）顶点/法线变换
-  并行化（`EngineParallel::parallelForIndex`）。
-- ✅ 2026-09-18：实体可见性变更增量记录 —— `SyEntity` 新增可见性变更回调，
-  `SceneManager` / `SceneManager3D` 入场时注入并 `recordChange(VisibilityChanged)`；
-  新增 `setEntitiesVisible` 批量 API。实体级显隐不再退回全量刷新。
-- ✅ 2026-09-20：实体锁定批量化 —— 新增 `SceneChangeKind::LockChanged`、
-  `SyEntity` 锁定变更回调、`setEntitiesLocked` 批量 API；场景树批量信号改传
-  `QVector<qint64>`（新增 `selectedIdNumbers()`），新增 `SceneTreePanel::refreshRows()`
-  增量刷新替代全量重建；移除锁定触发的 `notifySceneChanged()` 与强制树重建；
-  `Edit_SelectAll` 改用 `forEachEntity` 避免 `getAllEntities()` 的全量指针拷贝。
+- ✅ 3D 撤销/重做走增量命令（`ReplaceEntitiesCommand3D`：移除 N + 新增 M），
+  禁止用「整场景 clone 两份 before/after」表达一次只动几个图元的操作。

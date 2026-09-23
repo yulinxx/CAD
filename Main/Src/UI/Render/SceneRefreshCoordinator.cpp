@@ -81,6 +81,13 @@ SceneRefreshCoordinator::SceneRefreshCoordinator(QObject* parent)
     m_sceneUpdateTimer->setSingleShot(true);
     m_sceneUpdateTimer->setInterval(kSceneUpdateDelay);
     connect(m_sceneUpdateTimer, &QTimer::timeout, this, &SceneRefreshCoordinator::updateSceneRender);
+
+    // 曲线 LOD 独立消费定时器：32ms 单次触发，每次处理一批后若还有剩余则自行续跑。
+    // 与 m_sceneUpdateTimer 解耦，确保场景操作密集时 LOD 分批仍能稳定推进。
+    m_curveLodTimer = new QTimer(this);
+    m_curveLodTimer->setSingleShot(true);
+    m_curveLodTimer->setInterval(32);
+    connect(m_curveLodTimer, &QTimer::timeout, this, &SceneRefreshCoordinator::onCurveLodTimer);
 }
 
 SceneRefreshCoordinator::~SceneRefreshCoordinator()
@@ -158,6 +165,10 @@ void SceneRefreshCoordinator::stop()
     if (m_sceneUpdateTimer)
     {
         m_sceneUpdateTimer->stop();
+    }
+    if (m_curveLodTimer)
+    {
+        m_curveLodTimer->stop();
     }
     // P5: 观察者注销 — 在 stop() 中统一处理，避免析构时 SceneManager 已销毁（UAF）
     if (m_sceneManager)
@@ -254,8 +265,23 @@ void SceneRefreshCoordinator::scheduleFullRefresh()
 
 bool SceneRefreshCoordinator::hideSelectedEffective() const
 {
+    // 拖动中强制显示选中图元，忽略隐藏设置
+    if (m_forceShowSelectedDuringDrag)
+    {
+        return false;
+    }
     // 开关 + 「虚线此刻真的画得出来」二者必须同时成立，理由见头文件。
     return m_renderWidget != nullptr && m_renderWidget->hideSelectedOriginalEffective();
+}
+
+void SceneRefreshCoordinator::setForceShowSelectedDuringDrag(bool forceShow)
+{
+    if (m_forceShowSelectedDuringDrag != forceShow)
+    {
+        m_forceShowSelectedDuringDrag = forceShow;
+        // 状态变化后需要刷新场景以应用新的隐藏/显示逻辑
+        scheduleSceneUpdate();
+    }
 }
 
 void SceneRefreshCoordinator::requestLightRefresh()
@@ -279,18 +305,30 @@ void SceneRefreshCoordinator::requestFullRefresh()
     scheduleFullRefresh();
 }
 
-// 曲线 LOD 消费泵：只启动节流定时器、不提升 RefreshLevel —— 曲线 LOD 是独立的
-// 后台分批任务，由 updateSceneRender 在每帧末尾无条件推进一步。
+// 曲线 LOD 消费泵：启动独立的 LOD 定时器，与场景更新定时器完全解耦。
+// 场景操作频繁时两个定时器互不干扰，LOD 分批能稳定每 32ms 推进一次。
 void SceneRefreshCoordinator::ensureCurveLodPump()
 {
-    if (m_sceneUpdateTimer && !m_sceneUpdateTimer->isActive())
+    if (m_curveLodTimer && !m_curveLodTimer->isActive())
     {
-        m_sceneUpdateTimer->start();
+        m_curveLodTimer->start();
     }
-    else if (!m_sceneUpdateTimer)
+    else if (!m_curveLodTimer)
     {
         processCurveLodBatch();
     }
+}
+
+// LOD 定时器 slot：执行一批，队列未空则自动续跑
+void SceneRefreshCoordinator::onCurveLodTimer()
+{
+    if (m_curveLodQueue.empty() || m_curveLodCursor >= m_curveLodQueue.size())
+    {
+        finishCurveLodQueue();
+        return;
+    }
+    processCurveLodBatch();
+    // processCurveLodBatch 内部会在有剩余时调用 ensureCurveLodPump 续跑，无需在此重复
 }
 
 void SceneRefreshCoordinator::finishCurveLodQueue()
@@ -354,13 +392,15 @@ void SceneRefreshCoordinator::refillCurveLodQueueIfStale()
     }
 
     // 过期判据：
-    //   缩放滞后（放大到 1.3 倍就升级、缩小到 3 倍以下才降级，中间留死区避免抖动），或
+    //   缩放滞后（放大到 1.3 倍就升级、缩小到 2 倍以下才降级，中间留死区避免抖动），或
     //   可视区域越出上次收集覆盖的矩形（平移）。
-    // 降级阈值 2.0 → 3.0：缩小过程中 LOD 重收集过于频繁（29 万多边形全量入队时一次
-    // 就要处理数秒），放大幅降级死区，让缩小时尽量沿用已建好的高精度数据，
-    // 只有缩得足够远（精度冗余明显）时才一次性降级。
+    // 降级阈值从 3.0 调整为 2.0：原先 3 倍死区导致缩小时图元长期携带高精度顶点，
+    // GPU 绘制不必要的大量顶点（例如 256 段圆只需 8 段时的冗余是 32 倍）。
+    // 2.0 在抖动和冗余顶点之间取得更好的平衡：
+    //   - 视口裁剪（1.25 倍余量）已保证平移时小幅缩小不触发重收集
+    //   - 配合容差公式修复（max(1e-6)），每次降级的重建代价本身也更小
     constexpr double kCurveLodUpgradeRatio = 1.3;
-    constexpr double kCurveLodDowngradeRatio = 3.0;
+    constexpr double kCurveLodDowngradeRatio = 2.0;
     const bool firstTime = m_curveLodScaleAtBuild <= 0.0;
     const bool needsUpgrade =
         firstTime || worldToScreenScale > m_curveLodScaleAtBuild * kCurveLodUpgradeRatio;
@@ -1126,21 +1166,43 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     // 如果启用隐藏选中实体，使用缓存的选中 ID 集合
     const std::unordered_set<uint64_t>& selectedIds = m_cachedSelectedIds;
 
-    sm->forEachEntity([this, hideSelected, &selectedIds](Eg::SyEntity* e) {
-        // 账本必须与 gatherGeometry 的提交规则一致：它不按 selected() 跳过，
-        // 因此选中图元同样已在 GPU 上，账本里也要记上。否则下一轮增量会把已存在的
-        // 图元当作新图元 addRenderEntity，造成重复提交。
-        // 但如果启用了"选中时隐藏原图"，则选中实体不应被渲染，账本也不应记录
-        if (e && e->visible() && (!e->layer() || e->layer()->isVisible()))
+    // 账本必须与 GPU 实际内容严格一致。视口裁剪生效时，gatherGeometry 只提交了
+    // 视口内图元；视口外图元已被 RenderSceneBuilder::endRebuild 回收。
+    // 因此账本只记视口内已提交的图元：视口外图元不入账，下次它们出现在脏集合时，
+    // 增量路径会走 addRenderEntity 补传，而不是误用 modifyRenderEntity（找不到 GPU 块）。
+    Ut::BBox2d accountBox;
+    bool hasAccountBox = false;
+    {
+        float bounds[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        if (m_renderWidget->visibleWorldBounds(bounds))
         {
-            auto uid = static_cast<uint64_t>(e->id);
-            if (hideSelected && selectedIds.count(uid))
-            {
-                // 选中且启用了隐藏，不记录到渲染账本（也不会被渲染）
-                return;
-            }
-            m_renderedEntityIds.insert(uid);
+            constexpr double kCullMargin = 1.25;
+            const double cx = 0.5 * (static_cast<double>(bounds[0]) + bounds[2]);
+            const double cy = 0.5 * (static_cast<double>(bounds[1]) + bounds[3]);
+            const double hw = 0.5 * (bounds[2] - bounds[0]) * kCullMargin;
+            const double hh = 0.5 * (bounds[3] - bounds[1]) * kCullMargin;
+            accountBox = Ut::BBox2d(cx - hw, cy - hh, cx + hw, cy + hh);
+            hasAccountBox = true;
         }
+    }
+
+    sm->forEachEntity([this, hideSelected, &selectedIds, &accountBox, hasAccountBox](Eg::SyEntity* e) {
+        if (!e || !e->visible())
+            return;
+        const Eg::SyLayer* layer = e->layer();
+        if (layer && !layer->isVisible())
+            return;
+        // 视口裁剪：账本只记 GPU 上实际存在的图元
+        if (hasAccountBox)
+        {
+            const Ut::BBox2d bbox = e->getBbox();
+            if (bbox.isValid() && !accountBox.intersects(bbox))
+                return;
+        }
+        auto uid = static_cast<uint64_t>(e->id);
+        if (hideSelected && selectedIds.count(uid))
+            return; // 隐藏选中图元已从 GPU 移除，不入账
+        m_renderedEntityIds.insert(uid);
     });
 
     // "选中时隐藏原图"：上面的 submitSceneFromDataSource 已把全部图元（含选中）上传到 GPU，
@@ -1398,8 +1460,7 @@ void SceneRefreshCoordinator::updateSceneRender()
     if (level == RefreshLevel::Repaint)
     {
         applyRepaintRefresh();
-        // 曲线 LOD 与场景级刷新解耦：Repaint 也要继续推进队列，否则这一帧的
-        // 定时器被 Repaint 消费掉、processCurveLodBatch 又没跑，队列就永久搁浅。
+        // 场景刷新帧顺带推进 LOD 一次，独立定时器负责持续续跑
         if (!m_curveLodQueue.empty())
         {
             processCurveLodBatch();
@@ -1443,11 +1504,11 @@ void SceneRefreshCoordinator::updateSceneRender()
         m_pendingSnapshot.reset(m_lastCursor);
     }
 
-    // 曲线 LOD 分批：始终推进，不受本次场景级刷新影响。
-    // 曾经的写法是「仅当 m_refreshLevel == None 时才处理 LOD 且随即 return」，
-    // 于是任何一次 LightUpdate/Selection/FullRefresh 都会把这一帧的（单次触发的）
-    // 节流定时器消费掉而不重启 —— 队列随即永久搁浅，放大后曲线一直停在低精度，
-    // 只有等到下一次全量重建才恢复（正是「选图元移动后才恢复精度，连视口外的也恢复」）。
+    // 曲线 LOD 分批：场景刷新帧顺带推进一次。
+    // LOD 的持续推进主要由独立的 m_curveLodTimer（32ms）承担；
+    // 这里额外推进一次是为了利用"场景刷新已经切过 GL 上下文"的时机，
+    // 减少单独触发时的上下文切换开销。processCurveLodBatch 内部有剩余时
+    // 会自行调用 ensureCurveLodPump 续跑独立定时器。
     if (!m_curveLodQueue.empty())
     {
         processCurveLodBatch();

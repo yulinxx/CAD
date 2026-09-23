@@ -1024,11 +1024,10 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     const QVector<QAction*> drawToolActions = buildDrawToolActions();
     drawWidget->setToolActions(drawToolActions);
 
-    // 监听 Pan 模式变化，更新 Select 按钮图标和高亮状态
+    // 监听 Pan 模式变化，更新 Select 按钮图标和状态
     if (m_viewport)
     {
-        connect(m_viewport, &RenderViewport2D::panModeChanged, drawWidget, &DrawToolBarWidget::updateSelectButtonIcon);
-        connect(m_viewport, &RenderViewport2D::panModeChanged, drawWidget, &DrawToolBarWidget::updateSelectButtonHighlight);
+        connect(m_viewport, &RenderViewport2D::panModeChanged, drawWidget, &DrawToolBarWidget::setPanMode);
     }
 
     SY_DEBUGF("[Workbench2D] Draw tool panel built: tools=%d host=%s",

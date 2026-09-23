@@ -4,9 +4,9 @@
 #include <QVector>
 #include <QString>
 #include <QIcon>
+#include <QAction>
 #include <functional>
 
-class QAction;
 class QToolButton;
 
 /**
@@ -14,8 +14,11 @@ class QToolButton;
  *
  * 将命令中枢托管的 QAction 展示为一列按钮。Select/Pan 工具按钮可相互切换。
  *
- * 高亮行为：Select/Pan 作为一对互斥状态，和其他工具也是互斥的。
- * 任何时候只有一个工具高亮，按 ESC 回到 Select/Pan 状态。
+ * 高亮逻辑：
+ * - 启动默认 Select 高亮
+ * - 点击 Select/Pan 按钮时在 Select 和 Pan 之间切换，保持高亮
+ * - 点击其他工具时，其他工具高亮，Select/Pan 取消高亮
+ * - 按 ESC 回到 Select/Pan 状态并高亮
  */
 class DrawToolBarWidget : public QWidget
 {
@@ -26,45 +29,37 @@ public:
     ~DrawToolBarWidget() override;
 
 public:
-    /**
-     * @brief 用命令中枢的 QAction 填充按钮列
-     *
-     * @param actions 已按目录顺序排好的工具动作；nullptr 项会被跳过
-     */
     void setToolActions(const QVector<QAction*>& actions);
 
-    /// 设置 Pan 模式切换回调（用于 Select 和 Pan 之间的切换）
     using PanModeCallback = std::function<bool()>;
     void setPanModeToggleCallback(PanModeCallback callback);
-    /// 设置获取当前 Pan 模式的回调
+
     using IsPanModeCallback = std::function<bool()>;
     void setIsPanModeCallback(IsPanModeCallback callback);
 
-    /// 设置当前活动工具名称（用于 Select/Pan toggle 逻辑）
+    /// 设置当前活动工具名称
     void setCurrentToolName(const QString& toolName);
 
-    /// 更新 Select/Pan 按钮高亮状态（Pan 模式变化时调用）
-    void updateSelectButtonHighlight();
+    /// 设置 Pan 模式状态
+    void setPanMode(bool enabled);
 
-    /// 更新 Select 按钮图标（根据当前是 Select 还是 Pan 模式）
-    void updateSelectButtonIcon();
+    /// 更新按钮高亮状态（Pan 模式变化时调用）
+    void updateHighlight();
 
 signals:
-    /// 图标需要更新时发出
     void iconNeedsUpdate();
 
 private:
     void rebuildButtons();
+    void updateSelectButtonAction();
 
     QVector<QAction*> m_toolActions;
-    // 当前活动工具名称
     QString m_currentToolName;
-    // 当前是否处于 Pan 模式（用于解决信号顺序问题）
     bool m_isPanMode = false;
-    // Pan 模式切换回调
+
     PanModeCallback m_panModeToggleCallback;
-    // 获取当前是否处于 Pan 模式的回调
     IsPanModeCallback m_isPanModeCallback;
-    // Select 按钮指针（用于更新图标）
     QToolButton* m_selectButton = nullptr;
+    QAction* m_selectAction = nullptr;
+    QAction* m_panAction = nullptr;
 };
