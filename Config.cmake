@@ -2,126 +2,50 @@
 # Config.cmake - SanYi CAD 全局构建配置
 # ============================================================================
 #
-# 本文件是项目的核心配置文件，定义所有编译环境相关的选项。
 # 使用方法：
 #   cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
 #   cmake --build build --config Release
 #
-# 常用配置示例：
-#   # macOS 开发构建
-#   cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug
-#
-#   # Windows 发布构建
-#   cmake -B build -S . -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
-#
-#   # 启用所有可选模块
-#   cmake -B build -S . -DBUILD_VISION=ON -DBUILD_HARDWARE=ON -DBUILD_NESTING=ON
-#
 # ============================================================================
-#
-# 本文件是路径配置与测试开关的**唯一配置处**：
-#   - 路径：VCPKG_DIR / Qt_INSTALL_DIR / 工具链 / 输出目录，全部只在这里定义；
-#   - 测试开关：所有 BUILD_*_TESTS 只在这里定义。
-# 其它 CMakeLists.txt 一律不得重复定义同名项 —— 重复定义会互相覆盖，
-# 且普通 set() 会遮蔽同名 option()（CMP0077），使命令行 -D 传参静默失效。
-#
-# 重复 include 保护：本文件既被根 CMakeLists.txt 包含，也被各模块的独立构建
-# 入口包含（如 FileIO、Engraving/ci）。同一次 configure 内只执行一次，避免下面的
-# CACHE ... FORCE 反复改写缓存并重复刷屏。
-# 用**普通变量**而非缓存变量：缓存会跨 configure 持久化，导致下次 configure
-# 本文件被直接跳过、文件里的改动不生效。
+#                         📌 常用配置（在此修改）
+# ============================================================================
+# vcpkg 根目录
+set(VCPKG_DIR "C:/Users/xx/vcpkg")
+
+# Qt 安装目录
+set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.11.2/msvc2022_64")
+
+# 构建类型: Debug | Release | RelWithDebInfo | MinSizeRel
+set(CMAKE_BUILD_TYPE "Release")
+
+# ============================================================================
+#                         📌 模块开关（按需启用）
+# ============================================================================
+# 核心模块（默认开启）
+option(BUILD_RENDERX "渲染引擎" ON)
+option(BUILD_UI2D "2D 用户界面" ON)
+option(BUILD_NESTING "排样模块" ON)
+option(BUILD_CRASHHANDLER "崩溃捕获" ON)
+
+# 可选模块（默认关闭）
+option(BUILD_VISION "视觉模块" OFF)
+option(BUILD_NETWORK "网络模块" OFF)
+option(BUILD_HARDWARE "硬件模块" OFF)
+option(BUILD_ENGRAVING "雕刻模块" OFF)
+option(BUILD_GEOMODELCORE "几何建模" OFF)
+option(BUILD_PYTHON "Python 集成" OFF)
+
+# 测试开关
+option(BUILD_ALL_TESTS "开启全部测试" OFF)
+
+# ============================================================================
+
+# 本文件是路径配置与测试开关的**唯一配置处**
+# 重复 include 保护
 if(SANYI_CONFIG_INCLUDED)
     return()
 endif()
 set(SANYI_CONFIG_INCLUDED TRUE)
-
-# --------------------------------------------------------------------
-# 基础路径配置
-# --------------------------------------------------------------------
-# 路径解析顺序（从高到低）：
-#   1. 已定义的 CMake 变量（-D 或上层 include）
-#   2. 环境变量 VCPKG_DIR / Qt_INSTALL_DIR
-#   3. Qt6_DIR 推导（仅 Qt）
-#   4. 常见安装位置探测（无用户目录）
-# 均未命中时给出明确错误，不写入任何用户机器相关的默认值。
-
-# vcpkg 根目录
-if(NOT DEFINED VCPKG_DIR OR VCPKG_DIR STREQUAL "")
-    if(DEFINED ENV{VCPKG_DIR} AND NOT "$ENV{VCPKG_DIR}" STREQUAL "")
-        set(VCPKG_DIR "$ENV{VCPKG_DIR}" CACHE PATH "VCPKG installation directory")
-    else()
-        # 常见安装位置（不含任何用户主目录）
-        set(_vcpkg_candidates "")
-        if(WIN32)
-            list(APPEND _vcpkg_candidates
-                "C:/vcpkg"
-                "$ENV{ProgramFiles}/vcpkg"
-                "$ENV{ProgramFiles\(x86\)}/vcpkg"
-            )
-        elseif(APPLE)
-            list(APPEND _vcpkg_candidates "/usr/local/vcpkg" "/opt/vcpkg")
-        else()
-            list(APPEND _vcpkg_candidates "/usr/local/vcpkg" "/opt/vcpkg")
-        endif()
-        set(VCPKG_DIR "")
-        foreach(_cand IN LISTS _vcpkg_candidates)
-            if(EXISTS "${_cand}/scripts/buildsystems/vcpkg.cmake")
-                set(VCPKG_DIR "${_cand}" CACHE PATH "VCPKG installation directory")
-                break()
-            endif()
-        endforeach()
-        if(VCPKG_DIR STREQUAL "")
-            set(VCPKG_DIR "" CACHE PATH "VCPKG installation directory (set via VCPKG_DIR env or -DVCPKG_DIR=...)")
-        endif()
-    endif()
-endif()
-
-# Qt 安装目录
-if(NOT DEFINED Qt_INSTALL_DIR OR Qt_INSTALL_DIR STREQUAL "")
-    if(DEFINED ENV{Qt_INSTALL_DIR} AND NOT "$ENV{Qt_INSTALL_DIR}" STREQUAL "")
-        set(Qt_INSTALL_DIR "$ENV{Qt_INSTALL_DIR}" CACHE PATH "Qt installation directory")
-    elseif(DEFINED Qt6_DIR)
-        get_filename_component(_qt6_root "${Qt6_DIR}" DIRECTORY)
-        get_filename_component(Qt_INSTALL_DIR "${_qt6_root}" DIRECTORY)
-        set(Qt_INSTALL_DIR "${Qt_INSTALL_DIR}" CACHE PATH "Qt installation directory")
-    else()
-        # 常见安装位置（不含任何用户主目录）
-        set(_qt_candidates "")
-        if(WIN32)
-            list(APPEND _qt_candidates
-                "C:/Qt"
-                "C:/Program Files/Qt"
-                "$ENV{ProgramFiles}/Qt"
-            )
-            # 在 C:/Qt 下探测最新 6.x 安装
-            if(EXISTS "C:/Qt")
-                file(GLOB _qt_ver_dirs "C:/Qt/6.*")
-                list(SORT _qt_ver_dirs ORDER DESCENDING)
-                foreach(_ver IN LISTS _qt_ver_dirs)
-                    get_filename_component(_ver_name "${_ver}" NAME)
-                    list(APPEND _qt_candidates
-                        "${_ver}/msvc2022_64"
-                        "${_ver}/msvc2019_64"
-                    )
-                endforeach()
-            endif()
-        elseif(APPLE)
-            list(APPEND _qt_candidates "/usr/local/Qt" "/opt/Qt")
-        else()
-            list(APPEND _qt_candidates "/usr/local/Qt" "/opt/Qt" "/usr/lib/qt6")
-        endif()
-        set(Qt_INSTALL_DIR "")
-        foreach(_cand IN LISTS _qt_candidates)
-            if(EXISTS "${_cand}/lib/cmake/Qt6/Qt6Config.cmake")
-                set(Qt_INSTALL_DIR "${_cand}" CACHE PATH "Qt installation directory")
-                break()
-            endif()
-        endforeach()
-        if(Qt_INSTALL_DIR STREQUAL "")
-            set(Qt_INSTALL_DIR "" CACHE PATH "Qt installation directory (set via Qt_INSTALL_DIR env or -DQt_INSTALL_DIR=...)")
-        endif()
-    endif()
-endif()
 
 # Qt 主版本号
 set(QT_VERSION_MAJOR 6)
@@ -171,6 +95,9 @@ if(MSVC)
 
     # UTF-8 编码支持
     add_compile_options(/utf-8)
+
+    # 关闭 Unicode 字符警告（中文注释导致）
+    add_compile_options(/wd4819)
 
     # 关闭 CRT 迭代扩展警告 (vcpkg 依赖大量模板导致)
     add_compile_options(/wd4503)

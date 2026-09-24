@@ -12,7 +12,7 @@
 #define VERSION_PATCH 0
 
 // 构建时间（由 CMake 注入）
-#define APP_BUILD_TIME "2026-09-24 01:39:38"
+#define APP_BUILD_TIME "2026-09-24 06:19:09"
 #define APP_BUILD_DATE "2026-09-24"
 #define APP_BUILD_TYPE "Release"
 
