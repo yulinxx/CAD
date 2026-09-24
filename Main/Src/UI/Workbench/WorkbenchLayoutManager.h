@@ -117,6 +117,8 @@ public:
     void setSkeletonDocksVisible(bool visible);
     /// 设置场景树面板可见性（3D 模式下需要单独显示）
     void setSceneDockVisible(bool visible);
+    /// 设置属性面板可见性（3D 模式下需要单独显示）
+    void setPropertiesDockVisible(bool visible);
 
     // ==================== 繁忙指示器 ====================
 

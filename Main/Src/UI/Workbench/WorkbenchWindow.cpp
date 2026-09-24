@@ -889,9 +889,14 @@ void WorkbenchWindow::updateBusyIndicator(bool busy)
 /// @param themeId 当前主题 ID
 void WorkbenchWindow::refreshThemeMenuChecks(const QString& themeId)
 {
+    // 主题真相只写状态中心；windowState 经 sync 拉取（双状态源收口）
+    if (m_stateCenter)
+    {
+        m_stateCenter->setCurrentThemeId(themeId);
+    }
     if (m_stateManager)
     {
-        m_stateManager->windowState().currentThemeId = themeId;
+        m_stateManager->syncWindowStateFromStateCenter();
     }
     updateWindowTitle();
 
@@ -926,11 +931,6 @@ void WorkbenchWindow::triggerTheme(const QString& themeId)
     if (m_stateCenter)
     {
         m_stateCenter->setCurrentThemeId(themeId);
-        // 主题状态变化后同步本地状态，避免窗口与状态中心短时间不一致
-        if (m_stateManager)
-        {
-            m_stateManager->windowState().currentThemeId = themeId;
-        }
     }
     updateWindowTitle();
 
@@ -1151,29 +1151,32 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     // 新工作台自行决定是否需要骨架停靠面板
     setSkeletonDocksVisible(m_workbench->requiresSkeletonDocks());
 
-    // 3D 模式下 Scene 面板需要始终显示（即使 requiresSkeletonDocks() 为 false）
-    // 因为 SceneTreePanel 是工作台自己的面板，不是 skeleton 的面板
+    // 3D 模式下 Scene / Properties 面板需要始终显示（即使 requiresSkeletonDocks() 为 false）
+    // 因为 SceneTreePanel / PropertiesPanel 是工作台自己的面板，不是 skeleton 的面板
     if (!m_workbench->requiresSkeletonDocks())
     {
         if (auto* layoutMgr = m_layoutManager.get())
         {
             layoutMgr->setSceneDockVisible(true);
+            layoutMgr->setPropertiesDockVisible(true);
         }
+    }
+
+    // 业务状态只经 UiStateCenter 写入；windowState 是镜像，由 sync 从状态中心拉取
+    // （避免两边各自演化的双写路径 —— 见《耦合性分析.md》D.1 双状态源收口）
+    if (m_stateCenter)
+    {
+        m_stateCenter->setBusy(false);
+        m_stateCenter->setCurrentWorkbenchId(workbenchId);
+    }
+    if (m_stateManager)
+    {
+        m_stateManager->syncWindowStateFromStateCenter();
     }
 
     refreshFromState();
     refreshStatusText();
     updateWindowTitle();
-
-    if (m_stateCenter)
-    {
-        m_stateCenter->setBusy(false);
-    }
-    if (m_stateManager)
-    {
-        m_stateManager->windowState().busy = false;
-        m_stateManager->windowState().currentWorkbenchId = workbenchId;
-    }
 
     // 更新 FileDropHandler 的工作台 ID，确保拖放过滤使用正确的扩展名
     if (m_fileDropHandler)

@@ -1,4 +1,5 @@
 #include "Workbench2D.h"
+#include "WorkbenchTiming.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -54,6 +55,7 @@
 #include "ClientConfig/UiLayoutBuilder.h"
 
 #include "UiStateBridge2D.h"
+#include "UiDockIds.h"
 #include "RenderWidget.h"
 
 #include "UI2D/Operation/CommandActionHub.h"
@@ -291,11 +293,12 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
     // 属性被编辑后（已入撤销栈）延迟重建模型，避免在内联编辑器提交过程中重入
     if (auto* props = window.propertiesDock())
     {
-        QObject::connect(props, &PropertiesPanelWidget::sigPropertyEdited, this, [this]() {
+        auto conn = QObject::connect(props, &PropertiesPanelWidget::sigPropertyEdited, this, [this]() {
             QTimer::singleShot(0, this, [this]() {
                 refreshPropertiesPanel();
             });
         });
+        m_workbenchConnections.push_back(conn);
     }
 
     // 视口动作中枢：注入当前视口，供菜单 Zoom 子菜单与右键菜单 View_* 操作统一分发。
@@ -1311,7 +1314,7 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
         auto* dock = window.registerDockWidget(QObject::tr("Scene"), panel, Qt::LeftDockWidgetArea);
         if (dock)
         {
-            dock->setObjectName(QStringLiteral("SceneDock"));
+            dock->setObjectName(UiDockIds::sceneQString());
             // 限制 Scene 面板宽度：最小 180、最大 300
             dock->setMinimumWidth(180);
             dock->setMaximumWidth(300);
@@ -1371,7 +1374,7 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
         {
             m_sceneTreeRefreshTimer = new QTimer(this);
             m_sceneTreeRefreshTimer->setSingleShot(true);
-            m_sceneTreeRefreshTimer->setInterval(150);
+            m_sceneTreeRefreshTimer->setInterval(WorkbenchTiming::kSceneTreeDebounceMs);
             connect(m_sceneTreeRefreshTimer, &QTimer::timeout, this, [this]() {
                 applySceneTreeIncremental("timer");
             });
@@ -1922,8 +1925,9 @@ void Workbench2D::applySelectionContext(const CommandUiSnapshot& snapshot)
     // 反过来，这里任何一处再去问场景或问 Hub 缓存，都会把「规则漂移」放回来。
 
     // 属性面板：10Hz 节流，避免拖动期间每帧重建（60fps → 10fps）
-    // 使用 singleShot 延迟 100ms，同一窗口内多次调用只执行一次
-    QTimer::singleShot(100, this, [this]() { refreshPropertiesPanel(); });
+    // 必须复用同一个 singleShot 定时器：每次 new QTimer::singleShot 会在高频
+    // 选择变化下叠出 N 个并行回调，与注释宣称的「只执行一次」不符。
+    schedulePropertiesPanelRefresh();
 
     // 状态栏选择指示器：直接用快照里的 selectionCount，不再二次遍历场景
     if (m_statusBar2D)
@@ -1958,6 +1962,25 @@ void Workbench2D::applySelectionContext(const CommandUiSnapshot& snapshot)
             m_contextManager->setCurrentContext(newCtx);
         }
     }
+}
+
+void Workbench2D::schedulePropertiesPanelRefresh()
+{
+    if (!m_propertiesRefreshTimer)
+    {
+        m_propertiesRefreshTimer = new QTimer(this);
+        m_propertiesRefreshTimer->setSingleShot(true);
+        m_propertiesRefreshTimer->setInterval(WorkbenchTiming::kPropertiesDebounceMs);
+        connect(m_propertiesRefreshTimer, &QTimer::timeout, this, [this]() {
+            refreshPropertiesPanel();
+        });
+    }
+    // 已在等待窗口内 → 不重启也不新起：尾包语义，窗口结束只跑一次最新状态
+    if (m_propertiesRefreshTimer->isActive())
+    {
+        return;
+    }
+    m_propertiesRefreshTimer->start();
 }
 
 void Workbench2D::refreshPropertiesPanel()
@@ -2040,6 +2063,11 @@ void Workbench2D::deactivate()
     // 不断的后果不是崩溃而是叠加：N 次 2D↔3D 往返后，一次 2D 操作会触发 N 份场景树重建
     // 与 N 份命令状态刷新。这些连接全部在 attach 期建立（含 UiStateBridge2D::install），
     // 因此按"发送者 + 接收者"整体断开是安全的，下次 attach 会重新装。
+    for (auto& conn : m_workbenchConnections)
+    {
+        disconnect(conn);
+    }
+    m_workbenchConnections.clear();
     if (m_commands.operationBus)
     {
         QObject::disconnect(m_commands.operationBus, nullptr, this, nullptr);
@@ -2101,6 +2129,13 @@ void Workbench2D::deactivate()
         m_sceneTreeRefreshTimer->stop();
         m_sceneTreeRefreshTimer->deleteLater();
         m_sceneTreeRefreshTimer = nullptr;
+    }
+    // 属性面板节流定时器：切台后 propertiesDock 已销毁，挂起的回调必须取消
+    if (m_propertiesRefreshTimer)
+    {
+        m_propertiesRefreshTimer->stop();
+        m_propertiesRefreshTimer->deleteLater();
+        m_propertiesRefreshTimer = nullptr;
     }
     m_lastSceneTreeEntityCount = 0;
     m_lastSceneTreeStructureRevision = 0;

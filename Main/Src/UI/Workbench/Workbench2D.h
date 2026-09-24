@@ -143,14 +143,10 @@ private:
     bool m_sceneTreeIncrementalBusy{ false };
     /// 场景树延迟重建标记（setData 回调链中 scheduleTreeRefresh 合并，避免 delete this）
     bool m_treeRefreshPending{ false };
-    /// 命令 UI 状态刷新的节流冷却定时器 + 尾包标记。
-    /// 拖动这类「每个鼠标移动都改一次场景」的路径会高频打 refreshCommandUiState（唯一入口），
-    /// 每次都要重算全部命令/菜单的启用态并重建属性面板；这里用「首次立即 + 冷却窗口内合并 +
-    /// 窗口末尾补一次」把频率压到约 10Hz，最终态一定是最后一次变化的结果。
-    QTimer* m_commandUiRefreshTimer{ nullptr };
-    bool m_commandUiRefreshPending{ false };
-    /// 真正执行一次命令 UI 状态刷新
-    void applyCommandUiState();
+    /// 属性面板重建节流定时器：active 期间的多次请求合并为窗口末尾一次
+    QTimer* m_propertiesRefreshTimer{ nullptr };
+    /// 请求一次属性面板重建（节流合并，非每请求一个 singleShot）
+    void schedulePropertiesPanelRefresh();
     /// 场景树结构签名
     std::size_t m_lastSceneTreeEntityCount{ 0 };
     uint64_t m_lastSceneTreeStructureRevision{ 0 };
@@ -165,6 +161,9 @@ private:
 
     /// 网格显隐 metadata 连接
     QMetaObject::Connection m_gridVisibilityMetadataConn;
+
+    /// 本工作台在 attach 期间建立的 Qt 连接，deactivate 时整批 disconnect（RAII 批量回收）
+    std::vector<QMetaObject::Connection> m_workbenchConnections;
 
     /// 由选择上下文快照推导应切换到的工具栏上下文
     ToolBarContext determineContextFromSelection(const CommandUiSnapshot& snapshot) const;

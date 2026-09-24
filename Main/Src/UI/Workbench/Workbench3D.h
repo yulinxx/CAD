@@ -92,6 +92,16 @@ private:
     void setupSceneTree3D(WorkbenchWindow& window);
     /// 重建场景树模型并推送到面板（结构性变化：导入/撤销/增删）
     void refreshSceneTree3D();
+    /// 消费上次游标以来的变更：纯 Added 追加行，否则回退全量（与 2D applySceneTreeIncremental 同语义）
+    void applySceneTreeIncremental3D(const char* src = nullptr);
+
+    // ---- 3D 属性面板（与 2D 同一 PropertiesPanelWidget + PropertyModel 契约） ----
+    /// 探测属性面板并绑定编辑回刷（面板可缺失，配置驱动 UI）
+    void setupProperties3D(WorkbenchWindow& window);
+    /// 按当前选中图元重建属性模型并推送到面板
+    void refreshPropertiesPanel3D();
+    /// 请求一次属性面板重建（100ms 尾包合并，与 2D 同语义）
+    void schedulePropertiesPanelRefresh3D();
 
     /// 只在结构签名变化时重建场景树（批量操作防抖）
     void refreshSceneTree3DIfNeeded();
@@ -133,7 +143,16 @@ private:
 
     /// 3D 场景树重建防抖定时器（合并批量增删，避免每步 O(N) 重建）
     QTimer* m_sceneTree3DRefreshTimer{ nullptr };
-    /// 3D 场景树结构签名：用于判定是否需要重建
+    /// 3D 场景树结构签名：图元数量 + 结构修订号
+    std::size_t m_lastSceneTree3DEntityCount{ 0 };
     uint64_t m_lastSceneTree3DStructureRevision{ 0 };
+    /// 场景树增量游标（ISceneChangeStream；与 2D 同语义）
+    uint64_t m_sceneTree3DCursor{ 0 };
+    /// applySceneTreeIncremental3D 重入标志（分类/追加期间可能触发嵌套场景通知）
+    bool m_sceneTree3DIncrementalBusy{ false };
+    /// 属性面板重建节流定时器：active 期间多次请求合并为窗口末尾一次（与 2D 同语义）
+    QTimer* m_propertiesRefreshTimer3D{ nullptr };
+    /// 本工作台在 attach 期间建立的 Qt 连接，deactivate 时整批 disconnect（RAII 批量回收）
+    std::vector<QMetaObject::Connection> m_workbenchConnections;
 };
 #endif

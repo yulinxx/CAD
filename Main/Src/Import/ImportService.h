@@ -13,7 +13,6 @@
 
 class ImportDispatcher;
 class SceneDocument2D;
-class SceneTreeDockWidget;
 class PropertiesPanelWidget;
 class SceneEditService;
 class SceneEditService3D;

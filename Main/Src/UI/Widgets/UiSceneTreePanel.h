@@ -25,6 +25,7 @@ struct SceneTreeTopology2D;
 struct SceneTreeRow2D;
 struct SceneTreeRowMeta2D;
 struct SceneTreeModel3D;
+struct SceneTreeNode3D;
 
 class QModelIndex;
 class QMenu;
@@ -57,6 +58,9 @@ public:
 
     /// 增量追加顶层行（仅 2D 模式；用于可安全增量表达的纯新增，不做整树 reset）
     void appendTopLevelRows(const QVector<SceneTreeRow2D>& rows);
+
+    /// 增量追加顶层节点（仅 3D 模式；用于可安全增量表达的纯新增，不做整树 reset）
+    void appendTopLevelNodes(const QList<SceneTreeNode3D>& nodes);
 
     /// 仅更新选中高亮（不重建拓扑）
     void setSelectedIds(const QSet<QString>& ids);

@@ -5,6 +5,7 @@
  * 管理工作台的停靠面板布局。
  */
 #include "WorkbenchLayoutManager.h"
+#include "UiDockIds.h"
 #include "WorkbenchMenuManager.h"
 #include "UiSceneTreePanel.h"
 #include "UiPropertiesPanel.h"
@@ -207,11 +208,11 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
 
             // 同步面板状态引用，保持对外接口稳定（setSkeletonDocksVisible 等依赖它）
             const QString dockId = dock->objectName();
-            if (dockId == QStringLiteral("SceneDock"))
+            if (dockId == UiDockIds::sceneQString())
             {
                 m_panelState.leftDock = dock;
             }
-            else if (dockId == QStringLiteral("PropertiesDock"))
+            else if (dockId == UiDockIds::propertiesQString())
             {
                 m_panelState.rightDock = dock;
             }
@@ -326,11 +327,11 @@ QDockWidget* WorkbenchLayoutManager::registerDockWidget(const QString& title, QW
     QString dockId;
     if (qobject_cast<SceneTreePanel*>(widget))
     {
-        dockId = QStringLiteral("SceneDock");
+        dockId = UiDockIds::sceneQString();
     }
     else if (qobject_cast<PropertiesPanelWidget*>(widget))
     {
-        dockId = QStringLiteral("PropertiesDock");
+        dockId = UiDockIds::propertiesQString();
     }
     else
     {
@@ -347,11 +348,11 @@ QDockWidget* WorkbenchLayoutManager::registerDockWidget(const QString& title, QW
     dock->setProperty("_workbench_dock_title", title);
 
     // 同步面板状态引用，保持对外接口稳定（setSkeletonDocksVisible 等依赖它）
-    if (dockId == QStringLiteral("SceneDock"))
+    if (dockId == UiDockIds::sceneQString())
     {
         m_panelState.leftDock = dock;
     }
-    else if (dockId == QStringLiteral("PropertiesDock"))
+    else if (dockId == UiDockIds::propertiesQString())
     {
         m_panelState.rightDock = dock;
     }
@@ -608,7 +609,7 @@ void WorkbenchLayoutManager::setSceneDockVisible(bool visible)
     {
         for (auto* dock : m_registeredDocks)
         {
-            if (dock && dock->objectName() == QStringLiteral("SceneDock"))
+            if (dock && dock->objectName() == UiDockIds::Scene)
             {
                 sceneDock = dock;
                 m_panelState.leftDock = dock;
@@ -623,6 +624,28 @@ void WorkbenchLayoutManager::setSceneDockVisible(bool visible)
         sceneDock->setMinimumWidth(180);
         sceneDock->setMaximumWidth(300);
         sceneDock->setVisible(visible);
+    }
+}
+
+void WorkbenchLayoutManager::setPropertiesDockVisible(bool visible)
+{
+    QDockWidget* propsDock = m_panelState.rightDock.data();
+    if (!propsDock)
+    {
+        for (auto* dock : m_registeredDocks)
+        {
+            if (dock && dock->objectName() == UiDockIds::Properties)
+            {
+                propsDock = dock;
+                m_panelState.rightDock = dock;
+                break;
+            }
+        }
+    }
+
+    if (propsDock)
+    {
+        propsDock->setVisible(visible);
     }
 }
 
