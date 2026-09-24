@@ -35,6 +35,7 @@ public:
     /// 设置框架级服务
     void setFrameworkServices(const UiFrameworkServices& services);
     /// 设置当前挂载的工作台状态栏 widget（由 WorkbenchWindow 在 mount/unmount 时同步）
+    /// 定义在 .cpp：QPointer 的赋值/访问需要 StatusBarBase 完整类型
     void setActiveStatusBar(StatusBarBase* statusBarWidget);
 
     // ==================== 状态同步 ====================
@@ -119,8 +120,9 @@ private:
 
     /// 窗口状态镜像
     UiStateSnapshot m_windowState;
-    /// 当前挂载的工作台状态栏 widget（由 WorkbenchWindow 在 mount/unmount 时同步）
-    StatusBarBase* m_activeStatusBar{ nullptr };
+    /// 当前挂载的工作台状态栏 widget（由 WorkbenchWindow 在 mount/unmount 时同步；
+    /// 与 WorkbenchWindow::m_activeStatusBar 同为 QPointer，对端销毁自动置空）
+    QPointer<StatusBarBase> m_activeStatusBar;
 
     /// 刷新去重：多个信号在同一事件循环内密集触发时，合并为一次刷新
     QTimer m_refreshCoalescer;

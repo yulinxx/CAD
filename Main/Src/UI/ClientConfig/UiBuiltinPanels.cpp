@@ -64,7 +64,11 @@ void registerBuiltinUiPanels(UiPanelRegistry& registry)
         return static_cast<QWidget*>(label);
     });
 
-    // 空白填充：把后续槽位推到右侧，供客户调整状态栏排布
+    // 空白填充：把**配置槽位中排在它之后**的槽位推到右侧。
+    // 注意：工作台级 StatusBarBase（坐标/选择/消息）是随后由 mountStatusBar 追加的，
+    // 位置永远在这个 Spacer 之后 —— 若把 Spacer 放在 items 首位，它会在状态栏最左侧
+    // 撑出一段空白并把工作台内容顶到右边。默认配置（base.json）因此不使用它；
+    // 客户如需右推后续配置槽位，可自行加入。
     registry.registerPanel(QStringLiteral("Spacer"), [](QWidget* parent) {
         auto* spacer = new QWidget(parent);
         spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);

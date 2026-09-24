@@ -113,8 +113,7 @@ void WorkbenchLayoutManager::buildToolBars()
         return;
     }
 
-    std::unique_ptr<ILayoutBuilder> builder =
-        createLayoutBuilder(m_parent, m_commandDispatcher, m_panelRegistry.get());
+    std::unique_ptr<ILayoutBuilder> builder = createLayoutBuilder(m_parent, m_commandDispatcher, m_panelRegistry.get());
     builder->buildToolBars(config->toolBars);
 
     for (QToolBar* tb : builder->builtToolBars())
@@ -194,8 +193,7 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
 
     // 数据驱动构建 Dock（命令分发器此处不参与，仅为构造签名提供空实现）
     NullDispatcher dispatcher;
-    std::unique_ptr<ILayoutBuilder> builder =
-        createLayoutBuilder(m_parent, &dispatcher, m_panelRegistry.get());
+    std::unique_ptr<ILayoutBuilder> builder = createLayoutBuilder(m_parent, &dispatcher, m_panelRegistry.get());
     builder->buildDocks(config->docks);
 
     // 将构建出的 Dock widget 挂入布局管理器注册表，统一清理（clearLayoutContent）
@@ -270,8 +268,7 @@ void WorkbenchLayoutManager::buildStatusBar()
     clearStatusBarSlots();
 
     NullDispatcher dispatcher;
-    std::unique_ptr<ILayoutBuilder> builder =
-        createLayoutBuilder(m_parent, &dispatcher, m_panelRegistry.get());
+    std::unique_ptr<ILayoutBuilder> builder = createLayoutBuilder(m_parent, &dispatcher, m_panelRegistry.get());
     builder->buildStatusBar(config->statusBar);
     for (QWidget* slot : builder->builtStatusBarSlots())
     {
@@ -279,6 +276,15 @@ void WorkbenchLayoutManager::buildStatusBar()
         {
             m_statusBarSlots.emplace_back(slot);
         }
+    }
+
+    // 若此刻正处于 busy（切换期间 busy 由 triggerWorkbench 统一收口，但启动路径
+    // 也可能先收到 busyChanged），把繁忙进度条重新挪到永久区末尾，
+    // 保证槽位重建后 permanent 区顺序仍是 [配置槽位..., BusyProgressBar]。
+    if (m_busyProgressBar && m_panelState.statusBar)
+    {
+        m_panelState.statusBar->removeWidget(m_busyProgressBar);
+        m_panelState.statusBar->addPermanentWidget(m_busyProgressBar);
     }
 }
 
@@ -591,9 +597,6 @@ void WorkbenchLayoutManager::setSkeletonDocksVisible(bool visible)
     {
         m_panelState.rightDock->setVisible(visible);
     }
-
-    // 注意：posLabel/selLabel/msgLabel 已移除 —— 这些由 StatusBarBase 子类管理
-    // 工作台状态栏 widget 的显示/隐藏由 WorkbenchWindow::setSkeletonDocksVisible 控制
 }
 
 void WorkbenchLayoutManager::setSceneDockVisible(bool visible)

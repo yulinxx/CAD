@@ -11,7 +11,7 @@
 #include "UiServiceGroups.h"
 #include "UI/Service/ToolBarContextManager.h"
 #include "Services/UiStateCenter.h"
-#include "ClientConfig/UiLayoutBuilder.h"
+#include "ClientConfig/UiLayoutBuilder.h"  // IUiCommandDispatcher：工作台直接实现该接口
 
 class QAction;
 class QWidget;
@@ -31,8 +31,8 @@ struct CommandUiSnapshot;
 // 3D 类型前向声明（避免头文件膨胀，实际 include 下沉到 .cpp）
 #if BUILD_UI3D
     #include <QShortcut>
-    #include "UI3D/Service/ServicePack3D.h"
-    #include "UI/MainWindow/MainWindow3D.h"
+    #include "UI3D/Service/ServicePack3D.h"  // 值成员需要完整定义
+    #include "UI/MainWindow/MainWindow3D.h"  // unique_ptr 成员，MOC 需要完整类型
 
 namespace Eg
 {
@@ -188,8 +188,8 @@ protected:
     SceneServices m_scene;
     PersistenceServices m_persistence;
     ViewServices m_view;
-    UiStateSnapshot m_initialState;  ///< 初始化时缓存的状态
-    UiStateSnapshot m_savedState;    ///< 上次停用前保存的状态快照
+    UiStateSnapshot m_initialState;                 ///< 初始化时缓存的状态
+    UiStateSnapshot m_savedState;                   ///< 上次停用前保存的状态快照
     SettingsService* m_settingsService{ nullptr };  ///< app-level singleton
     WorkbenchWindow* m_workbenchWindow{ nullptr };  ///< 当前挂载的工作台窗口
 };

@@ -30,7 +30,6 @@
     "visible": true,
     "sizeGripEnabled": true,
     "items": [
-      { "id": "statusSpacer", "widgetType": "Spacer", "align": "left", "stretch": 1 },
       { "id": "visionIndicator", "widgetType": "MessageLabel", "align": "permanent", "minimumWidth": 120, "feature": "vision" },
       { "id": "clientIndicator", "widgetType": "ClientIndicator", "align": "permanent" },
       { "id": "licenseIndicator", "widgetType": "LicenseIndicator", "align": "permanent" }

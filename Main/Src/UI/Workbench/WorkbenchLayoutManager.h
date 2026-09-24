@@ -25,7 +25,6 @@ class UiWorkbench;
 
 /// 面板状态：集中管理状态栏、工具栏与停靠面板指针
 /// 从 WorkbenchWindow::PanelState 提升为独立类型，供 WorkbenchLayoutManager 使用
-/// 注意：posLabel/selLabel/msgLabel 已移除 —— 这些由 StatusBarBase 子类管理
 ///
 /// 一律用 QPointer 而非裸指针：这些 widget 的所有权在 QMainWindow（父子关系），
 /// 而 clearLayoutContent 在工作台切换时会**同步 delete** 全部 Dock。用裸指针时

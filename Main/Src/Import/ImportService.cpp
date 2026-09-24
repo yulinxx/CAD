@@ -176,11 +176,6 @@ void ImportService::setWorkbenchSwitchCallback(std::function<void(const QString&
     m_workbenchSwitchCallback = std::move(cb);
 }
 
-void ImportService::setStatusBarUpdateCallback(std::function<void(const QString&)> cb)
-{
-    m_statusBarUpdateCallback = std::move(cb);
-}
-
 void ImportService::setRecentFileAddCallback(std::function<void(const QString&)> cb)
 {
     m_recentFileAddCallback = std::move(cb);

@@ -97,11 +97,10 @@ public:
     /// @param workbench 工作台实例
     void setWorkbench(UiWorkbench* workbench);
     /// 设置工作台切换工厂
-    /// @param factory 工作台工厂回调
+    /// @param factory 工作台切换工厂回调
     void setWorkbenchFactory(WorkbenchFactory factory);
+
     /// 更新状态栏鼠标坐标显示
-
-
     /// @param x 世界坐标 X（毫米）
     /// @param y 世界坐标 Y（毫米）
     void updatePositionLabel(double x, double y);
@@ -124,11 +123,10 @@ public:
     /// 卸载当前工作台状态栏 widget
     void unmountStatusBar();
 
-    /// 获取当前挂载的工作台状态栏 widget
-    StatusBarBase* activeStatusBar() const
-    {
-        return m_activeStatusBar;
-    }
+    /// 获取当前挂载的工作台状态栏 widget（可能为空；QPointer 与工作台侧同策略，
+    /// widget 由 QStatusBar 持有所有权，对端销毁时自动置空）。
+    /// 定义在 .cpp：QPointer 的 T* 转换需要 StatusBarBase 完整类型。
+    StatusBarBase* activeStatusBar() const;
 
     /// 获取当前工作台实例
     UiWorkbench* currentWorkbench() const
@@ -164,7 +162,6 @@ public:
     /// 记录当前主题并刷新窗口标题（菜单勾选态由配置驱动菜单自行同步）
     /// @param themeId 当前主题 ID
     void refreshThemeMenuChecks(const QString& themeId);
-
 
     /// 菜单管理器
     WorkbenchMenuManager* menuManager() const
@@ -228,7 +225,9 @@ private:
     double m_lastMouseY{ 0.0 };
     bool m_hasMousePosition{ false };
     UiWorkbench* m_workbench{ nullptr };
-    StatusBarBase* m_activeStatusBar{ nullptr };
+    /// 当前挂载的工作台状态栏 widget —— 不拥有；所有权在 QStatusBar（addWidget 后
+    /// reparent），与 StateManager/工作台侧统一用 QPointer，避免三处裸指针悬空风险。
+    QPointer<StatusBarBase> m_activeStatusBar;
 
     /// 工作台切换工厂
     WorkbenchFactory m_workbenchFactory;

@@ -169,25 +169,18 @@ void WorkbenchStateManager::doRefreshFromState()
     refreshStatusText(state);
     updateWindowTitle(state);
 
-    // 统一更新状态栏消息和选择信息（通过 StatusBarBase 接口，不直接操作裸 QLabel）
+    // 统一更新状态栏消息（通过 StatusBarBase 接口，不直接操作裸 QLabel）。
+    // statusPrompt 的唯一读取点是 snapshot.statusPrompt 成员：setStatusPrompt 与
+    // setMetadata 都会把它同步进成员，无需再回退读 metadata。
     if (m_activeStatusBar)
     {
         QString prompt = state.statusPrompt;
-        if (prompt.isEmpty())
-        {
-            prompt = state.metadata.value(QStringLiteral("statusPrompt")).toString();
-        }
         if (prompt.isEmpty())
         {
             prompt = m_parent->tr("Ready");
         }
         m_activeStatusBar->setMessageText(prompt);
     }
-
-    const auto& panel = m_layoutManager->panelState();
-
-    // 注意：posLabel/selLabel/msgLabel 已移除 —— 这些由 StatusBarBase 子类管理，
-    // 状态栏消息与选择信息在上方通过 m_activeStatusBar 接口统一更新
 
     // 菜单勾选态不在这里推：配置驱动菜单已连到状态中心的 stateChanged / metadataChanged，
     // 由 WorkbenchMenuManager::refreshConfiguredMenuState 单点同步。
@@ -206,9 +199,8 @@ void WorkbenchStateManager::updateWindowTitle(const UiStateSnapshot& state)
     QString title;
     if (docFile.isEmpty())
     {
-        title =
-            QStringLiteral("%1 - %2 - %3")
-                .arg(QString::fromStdString(MainApp::appName()), state.currentWorkbenchId, state.currentViewMode);
+        title = QStringLiteral("%1 - %2 - %3")
+                    .arg(QString::fromStdString(MainApp::appName()), state.currentWorkbenchId, state.currentViewMode);
     }
     else
     {
@@ -288,7 +280,8 @@ void WorkbenchStateManager::setWorkbenchSwitchContext(const QString& workbenchId
         return;
     }
 
-    SY_DEBUGF("[WorkbenchStateManager] Setting workbench switch context: %s, text=%s", qPrintable(workbenchId),
+    SY_DEBUGF("[WorkbenchStateManager] Setting workbench switch context: %s, text=%s",
+        qPrintable(workbenchId),
         qPrintable(switchContextText));
     // 工作台切换上下文统一在这里写入，避免 triggerWorkbench 里散落重复设置
     // 这里只写切换语义，不混入命令态和主题态

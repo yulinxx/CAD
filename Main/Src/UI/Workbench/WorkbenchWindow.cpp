@@ -141,7 +141,7 @@ WorkbenchWindow::WorkbenchWindow(QWidget* parent)
     , m_fileDropHandler(std::make_unique<FileDropHandler>(this))
 {
     SY_DEBUG("[WorkbenchWindow] Creating main window");
-    
+
     setWindowTitle(QString::fromStdString(MainApp::appName()));
     resize(1440, 900);
     // 启用文件拖放，2D/3D 工作台共用统一 FileDropHandler
@@ -469,6 +469,11 @@ void WorkbenchWindow::buildStatusBar()
 }
 
 // ==================== 状态栏挂载/卸载 ====================
+
+StatusBarBase* WorkbenchWindow::activeStatusBar() const
+{
+    return m_activeStatusBar;
+}
 
 void WorkbenchWindow::mountStatusBar(StatusBarBase* statusBarWidget)
 {
@@ -866,13 +871,10 @@ void WorkbenchWindow::restoreDockWidgetTitles()
 
 void WorkbenchWindow::setSkeletonDocksVisible(bool visible)
 {
+    // 只管骨架 Dock。状态栏 widget 的显隐由 mountStatusBar/unmountStatusBar
+    // 按挂载生命周期管理（mount 时 show），与 Dock 是否需要无关 —— 3D 工作台
+    // 同样有可见的坐标/选择/消息状态栏。
     m_layoutManager->setSkeletonDocksVisible(visible);
-
-    // 工作台状态栏 widget 整体显示/隐藏（3D 工作台隐藏，2D 工作台显示）
-    if (m_activeStatusBar)
-    {
-        m_activeStatusBar->setVisible(visible);
-    }
 }
 
 /// 更新繁忙指示器
@@ -957,8 +959,8 @@ bool WorkbenchWindow::canExecuteCommand(const QString& commandId, const QString&
     {
         if (!m_actionManager->canExecuteCommand(commandId, context))
         {
-            SY_DEBUGF("[WorkbenchWindow] Command denied: commandId=%s context=%s", qPrintable(commandId),
-                qPrintable(context));
+            SY_DEBUGF(
+                "[WorkbenchWindow] Command denied: commandId=%s context=%s", qPrintable(commandId), qPrintable(context));
             return false;
         }
         return true;

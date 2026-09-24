@@ -147,18 +147,6 @@ TEST(ImportExportRegressionTest, ImportService_WorkbenchSwitchCallback)
     SUCCEED();
 }
 
-TEST(ImportExportRegressionTest, ImportService_StatusBarUpdateCallback)
-{
-    ImportService service;
-
-    QString lastMsg;
-    service.setStatusBarUpdateCallback([&](const QString& msg) {
-        lastMsg = msg;
-    });
-
-    SUCCEED();
-}
-
 TEST(ImportExportRegressionTest, ImportService_RecentFileCallback)
 {
     ImportService service;

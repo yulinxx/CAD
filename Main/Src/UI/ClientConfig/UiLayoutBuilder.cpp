@@ -686,7 +686,7 @@ void UiLayoutBuilder::buildStatusBar(const StatusBarDef& statusBarDef)
 
         if (slotDef.align == StatusBarSlotAlign::Permanent)
         {
-            // 永久区：靠右且不被 showMessage 的临时消息覆盖
+            // 永久区：固定在状态栏右侧
             bar->addPermanentWidget(widget, slotDef.stretch);
         }
         else

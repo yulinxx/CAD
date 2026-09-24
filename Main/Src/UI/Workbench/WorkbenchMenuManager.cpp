@@ -36,8 +36,6 @@
 #include "UI2D/Dlg/LayerManagerDialog.h"
 #include "UI2D/ToolBar/RightToolBar.h"
 #include "UI2D/ToolBar/TopToolBar.h"
-#include "UI2D/StatusBar/StatusBar.h"
-#include "UI/StatusBar/StatusBar3D.h"
 #include "UI/Widgets/UiSceneTreePanel.h"
 #include "UI/Widgets/UiPropertiesPanel.h"
 #if BUILD_UI3D
