@@ -210,6 +210,7 @@ SVGnest/
 Archive/
 RenderEngine/
 scripts/
+Tools/
 # [A7 修复] .github/ 工作流必须入库，删除此忽略规则
 
 # ---- 测试运行产生的落地文件 ----
