@@ -52,9 +52,40 @@
 - `Main/Src/UI/Test/ViewportRefreshRegressionTests.cpp`
 - `Main/Src/UI/Test/ViewportInputRegressionTests.cpp`
 - `Main/Src/UI/Test/Scene3DRegressionTests.cpp`
+- `Main/Src/UI/Test/SceneEditIntegrationTests.cpp`（**2026-09-24 新增**：撤销状态交换的端到端链路，10 个用例 / 69 条断言，覆盖变换往返、拖动提交与取消、属性面板与算法包装、事务往返、群组归属存活、子集作用域守卫。独立目标 `SceneEditIntegrationTests`，开关 `BUILD_SCENE_EDIT_TESTS`）
 - `Main/Src/UI/Test/CommandUiWiringTests.cpp`（顶部工具栏 actionId 与命令目录的接线一致性；左侧绘图面板与中枢工具动作的接线；客户配置里全部 commandId 的可解析性与配置可信性自检）
 - `UI/2D/Test/ToolsInteropTests.cpp`
 - `UI/3D/Test/OperationBus3DTests.cpp`
+
+> `SceneEditIntegrationTests` 独立成目标而不是并进 `MainTests`：这批用例只走 Engine2D 的
+> 公开接口、完全不依赖 Qt，而 `MainTests` 会把整个 Main 应用源码拖进编译。独立目标既
+> 能秒级迭代，也不引入 Qt 依赖。
+
+### 1.2.1 性能基准（不是单元测试，但同样是常态防线）
+
+性能基准与测试并列维护：它们不判定"对错"，只提供**可对比的数字**，用来回答"这条问题
+还在不在、改了有没有效"。两者都不依赖 GPU 与窗口系统，可无人值守复现。
+
+| 工具 | 覆盖 | 开关 | 原始数据 |
+|------|------|------|----------|
+| `Tools/PerfBenchmark`（`SanYiPerfBenchmark`） | 数据层 22 项指标：场景构建 / 全选 / 框选 / 点拾取 / 快照捕获 / 批量移动（含撤销重做） / 逐条删除 / 索引批量更新，以及批量移动的**六相位拆分** | `BUILD_PERF_BENCHMARK` | `Docs/performance-audit/baseline.csv` |
+| `Tools/RenderBenchmark`（`SanYiRenderBenchmark`） | 渲染帧路径 8 项指标：缩放档位 / 镜头平移 / 拖动 / 强制全量重排 / 瞬态环重传。挂在 RenderX 的 **Null 后端**上 | `BUILD_RENDER_BENCHMARK` | `Docs/performance-audit/render-baseline.csv` |
+
+跑法：
+
+```
+cmake --build build --config Release --target SanYiPerfBenchmark SanYiRenderBenchmark --parallel 1
+./build/bin_Qt6/Release/SanYiPerfBenchmark.exe   1000000 Docs/performance-audit/baseline.csv <轮次标签>
+./build/bin_Qt6/Release/SanYiRenderBenchmark.exe 1000000 Docs/performance-audit/render-baseline.csv <轮次标签>
+```
+
+两条使用纪律（都踩过坑）：
+
+1. **每轮写入 CSV 时带轮次标签**（第 3 个参数），CSV 会写一行 `# run=<标签> … at=<时间>`。
+   没有标签就只能靠"数第几块"指代，而机器负载能让同一份代码的数字差出 2.5 倍。
+2. **判定收益必须用对照路径归一**，不要拿跨运行的绝对值比较。渲染基准里的
+   `frame_fit_nocull`（同视野、关闭剔除）与数据层里的 `transform_apply_only` 就是为此
+   存在的对照项。
 
 ### 1.3 回归测试
 

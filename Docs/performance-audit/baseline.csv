@@ -1,0 +1,134 @@
+entities,metric,unit,median_ms,note
+1000000,entity_alloc,ms,267.394,构造对象
+1000000,scene_add,ms,27075.1,入场景 + 建索引
+1000000,insert_addEntities,ms,667.855,普通添加
+1000000,insert_preserveId,ms,657.672,批量保留 id
+1000000,select_all,ms,19.169,
+1000000,selected_readback,ms,2.6648,
+1000000,query_box_10pct,ms,6.8335,
+1000000,query_box_1pct,ms,0.1724,
+1000000,query_point_x1000,ms,1.3019,1000 次点拾取
+1000000,snapshot_capture_10pct,ms,87.208,captureEntitySnapshots（含克隆）
+1000000,transform_apply_only,ms,50.0709,仅矩阵变换（无快照/索引/撤销）
+1000000,transform_10pct,ms,6482.75,全链路，测后回滚
+1000000,undo_redo_10pct,ms,5918.16,一次 undo + 一次 redo
+1000000,update_bounds_bulk_10pct,ms,108.168,批量 remove + insert
+1000000,delete_single_xN,ms,3.6769,逐条删除，只测一次（测后场景少 N 个图元）
+1000000,entity_alloc,ms,200.533,构造对象
+1000000,scene_add,ms,11015.4,入场景 + 建索引
+1000000,insert_addEntities,ms,378.628,普通添加
+1000000,insert_preserveId,ms,393.245,批量保留 id
+1000000,select_all,ms,11.8693,
+1000000,selected_readback,ms,2.2417,
+1000000,query_box_10pct,ms,5.4644,
+1000000,query_box_1pct,ms,0.1349,
+1000000,query_point_x1000,ms,0.8666,1000 次点拾取
+1000000,snapshot_capture_10pct,ms,46.2288,captureEntitySnapshots（含克隆）
+1000000,transform_apply_only,ms,21.8981,仅矩阵变换（无快照/索引/撤销）
+1000000,transform_10pct,ms,2992.94,全链路，测后回滚
+1000000,undo_redo_10pct,ms,3077.87,一次 undo + 一次 redo
+1000000,update_bounds_bulk_10pct,ms,62.7505,批量 remove + insert
+1000000,delete_single_xN,ms,2.4853,逐条删除，只测一次（测后场景少 N 个图元）
+1000000,entity_alloc,ms,222.623,构造对象
+1000000,scene_add,ms,1625.81,入场景 + 建索引
+1000000,insert_addEntities,ms,34.0634,普通添加
+1000000,insert_preserveId,ms,32.9564,批量保留 id
+1000000,select_all,ms,13.7097,
+1000000,selected_readback,ms,2.3345,
+1000000,query_box_10pct,ms,7.0625,
+1000000,query_box_1pct,ms,0.1137,
+1000000,query_point_x1000,ms,0.9523,1000 次点拾取
+1000000,snapshot_capture_10pct,ms,49.3814,captureEntitySnapshots（含克隆）
+1000000,transform_apply_only,ms,26.2537,仅矩阵变换（无快照/索引/撤销）
+1000000,transform_10pct,ms,1129.01,全链路，测后回滚
+1000000,undo_redo_10pct,ms,1197.14,一次 undo + 一次 redo
+1000000,update_bounds_bulk_10pct,ms,67.6981,批量 remove + insert
+1000000,delete_single_xN,ms,2.423,逐条删除，只测一次（测后场景少 N 个图元）
+1000000,entity_alloc,ms,206.865,构造对象
+1000000,scene_add,ms,1754.58,入场景 + 建索引
+1000000,insert_addEntities,ms,35.9277,普通添加
+1000000,insert_preserveId,ms,32.6907,批量保留 id
+1000000,select_all,ms,15.6115,
+1000000,selected_readback,ms,1.7939,
+1000000,query_box_10pct,ms,5.437,
+1000000,query_box_1pct,ms,0.1006,
+1000000,query_point_x1000,ms,1.031,1000 次点拾取
+1000000,snapshot_capture_10pct,ms,48.2854,captureEntitySnapshots（含克隆）
+1000000,transform_apply_only,ms,23.2818,仅矩阵变换（无快照/索引/撤销）
+1000000,transform_10pct,ms,1515.86,全链路，测后回滚
+1000000,undo_redo_10pct,ms,1214.88,一次 undo + 一次 redo
+1000000,swap_phase_capture,ms,40.0477,1/6 捕获 before 快照（含克隆）
+1000000,swap_phase_apply,ms,19.2779,2/6 矩阵变换
+1000000,swap_phase_index_bulk,ms,434.644,3/6 索引批量更新
+1000000,swap_phase_push,ms,10.9095,4/6 命令入栈（构造快照命令）
+1000000,swap_phase_undo,ms,579.344,5/6 撤销 = 状态换出
+1000000,swap_phase_redo,ms,579.835,6/6 重做 = 状态换入
+1000000,update_bounds_bulk_10pct,ms,91.2021,批量 remove + insert
+1000000,delete_single_xN,ms,2.9234,逐条删除，只测一次（测后场景少 N 个图元）
+1000000,entity_alloc,ms,199.809,构造对象
+1000000,scene_add,ms,1467.48,入场景 + 建索引
+1000000,insert_addEntities,ms,31.1145,普通添加
+1000000,insert_preserveId,ms,27.9752,批量保留 id
+1000000,select_all,ms,15.8658,
+1000000,selected_readback,ms,2.7605,
+1000000,query_box_10pct,ms,5.1122,
+1000000,query_box_1pct,ms,0.1053,
+1000000,query_point_x1000,ms,0.9186,1000 次点拾取
+1000000,snapshot_capture_10pct,ms,49.9839,captureEntitySnapshots（含克隆）
+1000000,transform_apply_only,ms,24.5572,仅矩阵变换（无快照/索引/撤销）
+1000000,transform_10pct,ms,1168.95,全链路，测后回滚
+1000000,undo_redo_10pct,ms,1248.4,一次 undo + 一次 redo
+1000000,transform_apply_10pct,ms,520.669,一次批量移动（不含撤销）
+1000000,swap_phase_capture,ms,39.0559,1/6 捕获 before 快照（含克隆）
+1000000,swap_phase_apply,ms,19.8018,2/6 矩阵变换
+1000000,swap_phase_index_bulk,ms,437.348,3/6 索引批量更新
+1000000,swap_phase_push,ms,10.7499,4/6 命令入栈（构造快照命令）
+1000000,swap_phase_undo,ms,581.678,5/6 撤销 = 状态换出
+1000000,swap_phase_redo,ms,597.858,6/6 重做 = 状态换入
+1000000,update_bounds_bulk_10pct,ms,62.6808,批量 remove + insert（几何静止，偏乐观）
+1000000,delete_single_xN,ms,2.5971,逐条删除，只测一次（测后场景少 N 个图元）
+1000000,entity_alloc,ms,217.219,构造对象
+1000000,scene_add,ms,1828.45,入场景 + 建索引
+1000000,insert_addEntities,ms,44.3511,普通添加
+1000000,insert_preserveId,ms,38.981,批量保留 id
+1000000,select_all,ms,17.6502,
+1000000,selected_readback,ms,2.6932,
+1000000,query_box_10pct,ms,7.2066,
+1000000,query_box_1pct,ms,0.1085,
+1000000,query_point_x1000,ms,1.2908,1000 次点拾取
+1000000,snapshot_capture_10pct,ms,62.0643,captureEntitySnapshots（含克隆）
+1000000,transform_apply_only,ms,62.0894,仅矩阵变换（无快照/索引/撤销）
+1000000,transform_10pct,ms,1866.19,全链路，测后回滚
+1000000,undo_redo_10pct,ms,1925.21,一次 undo + 一次 redo
+1000000,transform_apply_10pct,ms,915.783,一次批量移动（不含撤销）
+1000000,swap_phase_capture,ms,74.391,1/6 捕获 before 快照（含克隆）
+1000000,swap_phase_apply,ms,52.2372,2/6 矩阵变换
+1000000,swap_phase_index_bulk,ms,798.176,3/6 索引批量更新
+1000000,swap_phase_push,ms,19.1133,4/6 命令入栈（构造快照命令）
+1000000,swap_phase_undo,ms,1091.08,5/6 撤销 = 状态换出
+1000000,swap_phase_redo,ms,967.71,6/6 重做 = 状态换入
+1000000,update_bounds_bulk_10pct,ms,756.674,10 万图元确实移动后的索引 remove+insert
+1000000,delete_single_xN,ms,6.1158,逐条删除，只测一次（测后场景少 N 个图元）
+# run=swap-path-instrumented entities=1000000 at=2026-09-24 15:28:39
+1000000,entity_alloc,ms,216.714,构造对象
+1000000,scene_add,ms,1627.62,入场景 + 建索引
+1000000,insert_addEntities,ms,34.2297,普通添加
+1000000,insert_preserveId,ms,33.3747,批量保留 id
+1000000,select_all,ms,14.9997,
+1000000,selected_readback,ms,2.6744,
+1000000,query_box_10pct,ms,6.5335,
+1000000,query_box_1pct,ms,0.1031,
+1000000,query_point_x1000,ms,0.9717,1000 次点拾取
+1000000,snapshot_capture_10pct,ms,50.2179,captureEntitySnapshots（含克隆）
+1000000,transform_apply_only,ms,24.3092,仅矩阵变换（无快照/索引/撤销）
+1000000,transform_10pct,ms,1224.49,全链路，测后回滚
+1000000,undo_redo_10pct,ms,1230.22,一次 undo + 一次 redo
+1000000,transform_apply_10pct,ms,536.793,一次批量移动（不含撤销）
+1000000,swap_phase_capture,ms,42.5737,1/6 捕获 before 快照（含克隆）
+1000000,swap_phase_apply,ms,19.6824,2/6 矩阵变换
+1000000,swap_phase_index_bulk,ms,451.887,3/6 索引批量更新
+1000000,swap_phase_push,ms,10.8469,4/6 命令入栈（构造快照命令）
+1000000,swap_phase_undo,ms,615.12,5/6 撤销 = 状态换出
+1000000,swap_phase_redo,ms,605.343,6/6 重做 = 状态换入
+1000000,update_bounds_bulk_10pct,ms,446.575,10 万图元确实移动后的索引 remove+insert
+1000000,delete_single_xN,ms,2.8287,逐条删除，只测一次（测后场景少 N 个图元）

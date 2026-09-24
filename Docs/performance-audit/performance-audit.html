@@ -133,6 +133,18 @@
       padding: 1px 5px;
     }
     td code, li code { background: var(--page-surface); }
+    pre {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      line-height: 1.6;
+      background: var(--page-surface-muted);
+      border: 1px solid var(--border-subtle, var(--page-surface));
+      border-radius: var(--radius-sm);
+      padding: var(--space-3) var(--space-4);
+      margin: var(--space-3) 0;
+      overflow-x: auto;
+    }
+    pre code { background: none; padding: 0; font-size: inherit; }
     a { color: var(--accent); }
 
     /* === Intro (contained) === */
@@ -278,7 +290,7 @@
     .phase__window { font-size: 12px; color: var(--muted); }
     .phase ul { padding-left: 1.2em; }
     .phase li { margin-bottom: var(--space-2); }
-    .phase .why { color: var(--text-secondary); }
+    .why { color: var(--text-secondary); }
     .phase--done { background: var(--page-surface); }
 
     /* === Footer === */
@@ -314,12 +326,12 @@
         <div class="report-intro__content">
           <h1>CAD 性能审查报告：百万级图元优化专项</h1>
           <p class="report-intro__summary">
-            本版在原审查（2026-09-12，覆盖 8 个模块约 26 万行，42 处问题）基础上，逐条对照当前代码完成了状态核验（2026-09-24）。结论：<strong>8 项已彻底修复、6 项已部分缓解、28 项仍待处理</strong>。数据层的图元查找与删除热点已基本清除，剩余唯一的 P0 是<strong>几何变换类撤销命令的全量快照克隆</strong>；渲染端图元级 LOD 与 DrawList 增量排序仍未落地。
+            本版在原审查（2026-09-12，覆盖 8 个模块约 26 万行，42 处问题）基础上，于 2026-09-24 完成状态核验，并按核验结论执行了 P0 与索引层的改造，同日回填实测数据、又把"批量移动的耗时构成"拆到相位级，并补上了渲染帧路径的基准。结论：<strong>11 项已彻底修复、6 项已部分缓解、25 项仍待处理</strong>。数据层已无 P0——<strong>几何变换类撤销命令的全量快照克隆已改为零克隆状态交换</strong>，另叠加容器类型桶 swap-erase 与 RTree 批量装载两项改造。百万图元实测：批量移动全链路 <strong>2993 ms → 1129 ms</strong>、撤销重做 <strong>3078 ms → 1197 ms</strong>、入场景 <strong>11015 ms → 1626 ms</strong>、5 万图元批量插入 <strong>379 ms → 34 ms</strong>。<strong>相位拆分进一步查明：一次移动 10 万图元 537 ms 中 84% 是空间索引维护，拖动路径本身并不付"整批交换"的代价</strong>。渲染端也首次有了 CPU 侧基线与第一项优化：全场景视野下 100 万图元 <strong>95 ms → 64 ms/帧（≈10.4 → 15.0 fps），且 draw call 只有 5 个</strong>——瓶颈不是绘制调用，而是每帧对整表的逐条遍历与合批；排序键一变再加约 200 ms。真实视口的端到端帧率仍未测得。
           </p>
           <div class="report-intro__meta">
             <span>原审查：2026-09-12</span>
             <span>状态核验：2026-09-24</span>
-            <span>核验方式：逐条对照源码（含行号证据）</span>
+            <span>改造与实测回填：2026-09-24</span>
           </div>
         </div>
       </div>
@@ -332,7 +344,7 @@
           <div class="metrics">
             <div class="metric">
               <div class="metric__label">已修复</div>
-              <div class="metric__value metric__value--success">8</div>
+              <div class="metric__value metric__value--success">11</div>
               <div class="metric__note">代码已改，无需再动</div>
             </div>
             <div class="metric">
@@ -342,8 +354,8 @@
             </div>
             <div class="metric">
               <div class="metric__label">仍待处理</div>
-              <div class="metric__value metric__value--danger">28</div>
-              <div class="metric__note">其中 1 项为 P0</div>
+              <div class="metric__value metric__value--danger">25</div>
+              <div class="metric__note">数据层已无 P0，余项多在渲染与算法侧</div>
             </div>
             <div class="metric">
               <div class="metric__label">原报告条目</div>
@@ -354,9 +366,13 @@
           <p>
             这次核验最重要的发现是：<strong>原报告不能直接当任务清单执行</strong>。原报告 42 条中有 8 条在审查后已经落地（多为数据层的复杂度类修复），另有 6 条的实际状态与报告描述不符——要么已经被缓解到不再构成问题，要么报告当时的技术判断本身有偏差。若照单全抓，会产生大量无效改动。
           </p>
+          <p>
+            按核验结论执行 P0 与索引层改造后，状态归位再前进 3 条（<code>EntitySnapshotsCommand</code>、撤销栈快照持有、<code>EntityContainer</code> 单删类型索引），且<strong>数据层已无 P0</strong>。改造过程中另外暴露并修掉两处既有缺陷（见 <a href="#high-engine">三、Engine 数据层</a> 的 3.4），这两条原报告未覆盖。
+          </p>
           <div class="callout">
-            <div class="callout__label">唯一的 P0：几何变换类撤销命令的全量快照</div>
-            <p><code>SceneUndoCommands.cpp:33-91</code> 的 <code>captureEntitySnapshots()</code> 仍对每个图元 <code>clone()</code> 存 before/after 两份，<code>:106-130</code> 应用时再 clone 一次，而它仍在生产热路径上——<code>SceneEditService.cpp:705/707</code> 的 <code>transformEntities()</code> 是移动/旋转/缩放的统一入口。需注意：同族的 <code>DeleteEntitiesCommand</code>、<code>AddEntitiesCommand</code> 已改为零克隆所有权转移，<strong>只剩变换类这一条链未改</strong>。</p>
+            <div class="callout__label">原 P0 已闭环：变换类撤销改为零克隆状态交换</div>
+            <p><code>EntitySnapshotsCommand</code> 不再<code>clone()</code> before/after 两份，而是<strong>让场景与命令各持一份真实状态、撤销/重做时整批交换所有权</strong>：场景持 after 态时命令持 before 态，反之亦然（<code>SceneUndoCommands.cpp:137-194</code> 的 <code>swapWithScene()</code>、<code>SceneUndoCommands.h:158-161</code> 的 <code>m_beforeInScene</code> 双态标志）。此外新增 <code>SnapshotScope</code> 枚举区分<strong>子集作用域</strong>（变换、属性编辑只涉及点名 id）与<strong>整场景作用域</strong>（偏移/布尔等算法会在场景内部自行增删图元），后者在交换时把"目标状态之外"的图元一并摘下保管，重做才能真正重新移除它们。</p>
+            <p>改造后撤销栈里不再有任何深拷贝体：快照只捕获 before 一份（10 万图元稳定在 49 ms 量级），撤销与重做各是一次整批所有权换手。<strong>这项改造的百万级前后对比数据没有留下</strong>——基准是在它之后才建立的，这是一处明确的短板，详见 <a href="#benchmark">八、基准实测</a>。</p>
           </div>
         </section>
 
@@ -441,19 +457,19 @@
                   <td><code>SelectTool.cpp</code> 已重构为轮廓预算 + 路径缓存（无 <code>m_vSelected.clear()</code>）；曲线 LOD 已有分批机制，但渲染端仍无图元级 LOD</td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--open">仍待处理</span></td>
-                  <td><strong><code>EntitySnapshotsCommand</code> 全量快照 + 重复 clone</strong> <span class="tag tag--p0">P0</span></td>
-                  <td><code>SceneUndoCommands.cpp:33-91</code> capture 全量 clone；<code>:106-130</code> apply 再 clone；生产路径见 <code>SceneEditService.cpp:705/707</code></td>
+                  <td><span class="tag tag--done">已修复</span></td>
+                  <td><strong><code>EntitySnapshotsCommand</code> 全量快照 + 重复 clone</strong></td>
+                  <td>改为零克隆状态交换：场景与命令各持一份真实状态、撤销/重做整批换手，不再 clone before/after 两份（<code>SceneUndoCommands.cpp:137-194</code>）。生产入口 <code>SceneEditService.cpp:695-728</code> 只捕获 before 一份，且用 <code>SnapshotScope::Subset</code> 收窄到点名 id</td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><span class="tag tag--done">已修复</span></td>
                   <td>撤销栈长期持有全量克隆体</td>
-                  <td><code>SceneUndoCommands.h:94-118</code> 的 <code>m_before/m_after</code>，与上一条同源</td>
+                  <td>同源修复：<code>m_before/m_after</code> 双份克隆被 <code>m_detached</code> 单份原件取代（<code>SceneUndoCommands.h:150-165</code>），栈内存从"图元全量 × 2 × 栈深"降到"图元全量 × 1 × 栈深"，且不含深拷贝</td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><span class="tag tag--done">已修复</span></td>
                   <td><code>EntityContainer</code> 单删时类型索引 O(K)</td>
-                  <td><code>:181-188</code> 单删路径仍 <code>erase(std::remove(...))</code>（批量路径已绕开）</td>
+                  <td>已引入 <code>EntitySlot{mainIndex, typeIndex}</code> 位置索引 + <code>detachFromTypeBucket()</code> swap-erase（<code>EntityContainer.cpp:128-171</code>），单删与批量替换均降至 O(1)，槽位不符时回退线性查找保底</td>
                 </tr>
                 <tr>
                   <td><span class="tag tag--open">仍待处理</span></td>
@@ -587,7 +603,7 @@
 
         <section id="high-engine">
           <h2>三、Engine 数据层</h2>
-          <p>数据层是本轮修复最集中的区域。原本"图元查找与删除"一节的 4 条问题已全部解决，撤销链路也只剩变换类一条。</p>
+          <p>数据层是本轮改造最集中的区域。原报告"图元查找与删除"一节的 4 条问题已全部解决，撤销链路也从"只剩变换类未改"推进到<strong>三类命令全部零克隆</strong>，另外还清掉了容器类型桶与 RTree 批量装载两个被基准新暴露出来的热点。</p>
 
           <h3>3.1 图元访问热点（4/4 已解决）</h3>
           <div class="table-wrap">
@@ -628,7 +644,7 @@
             此外，<code>removeRange()</code>（<code>:218-252</code>）在批量侧进一步修掉了类型索引的退化：<code>:224-226</code> 的注释明确说明，逐条 erase 是 O(桶大小)，会让"万级同类型图元"的阵列撤销退化成 O(N²)，因此改为收集完成后按类型各扫一遍。这个细节原报告未覆盖。
           </p>
 
-          <h3>3.2 撤销链路（仅剩变换类未改）</h3>
+          <h3>3.2 撤销链路（三类命令已全部零克隆）</h3>
           <div class="table-wrap">
             <table>
               <caption>表 3：撤销命令的克隆策略现状</caption>
@@ -639,23 +655,83 @@
                 <tr>
                   <td><span class="tag tag--done">已修复</span></td>
                   <td><code>DeleteEntitiesCommand</code></td>
-                  <td><code>SceneUndoCommands.cpp:239-257</code> 构造期不再深拷贝；<code>execute</code> 用 <code>extractEntitiesById</code> 取回原件保管，undo 归还、redo 再取回</td>
+                  <td><code>SceneUndoCommands.cpp:270-326</code> 构造期不再深拷贝；<code>execute</code> 用 <code>extractEntitiesById</code> 取回原件保管，undo 归还、redo 再取回</td>
                 </tr>
                 <tr>
                   <td><span class="tag tag--done">已修复</span></td>
                   <td><code>AddEntitiesCommand</code></td>
-                  <td><code>:302-326</code> 场景与命令间移动所有权，全程零克隆；代价是对象若被绕过撤销栈销毁，redo 无法恢复（已留告警）</td>
+                  <td><code>:328-443</code> 场景与命令间移动所有权，全程零克隆；代价是对象若被绕过撤销栈销毁，redo 无法恢复（已留告警）</td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--p0">P0</span> <span class="tag tag--open">未修复</span></td>
+                  <td><span class="tag tag--done">已修复</span></td>
                   <td><code>EntitySnapshotsCommand</code>（几何变换）</td>
-                  <td><code>:33-91</code> <code>captureEntitySnapshots()</code> 仍逐图元 <code>clone()</code> 存 before/after；<code>:106-130</code> <code>applyEntitySnapshots()</code> 应用时再 clone 一次（<code>:116</code>、<code>:127</code>）</td>
+                  <td>零克隆状态交换：命令持"不在场景中的那份"（<code>m_detached</code>），撤销/重做时与场景整批换手（<code>swapWithScene()</code>，<code>:137-194</code>）。<code>replaceEntitiesById</code> 返回被换出的旧对象，因此两侧永远各持一份、无需 clone</td>
                 </tr>
               </tbody>
             </table>
           </div>
           <p>
-            这条链路为什么仍是 P0：<code>SceneEditService.cpp:691-738</code> 的 <code>transformEntities()</code> 是移动、旋转、缩放的统一入口，<code>:705</code> 和 <code>:707</code> 在变换前后各捕获一次全量快照。因此"批量移动 10 万图元"仍会产生 20 万次 <code>clone()</code>，且撤销栈按栈深线性持有这些克隆体。修复方向可以复用同文件已验证的模式：变换类只记录矩阵与旧值，或让命令直接持有原件所有权。
+            变换链路的入口是 <code>SceneEditService.cpp:681-729</code> 的 <code>transformEntities()</code>（移动、旋转、缩放、对齐、镜像的统一入口）。改造后它只在变换前捕获一次 before 态（<code>:695</code>），变换本身直接落在场景对象上，场景对象即 after 态——<code>:697-698</code> 的注释说明了这一点："不再额外克隆一份 after"。收尾按 <code>SnapshotScope::Subset</code> 入栈（<code>:728</code>），即撤销栈只关心点名的那批 id。
+          </p>
+          <p>
+            <strong>为什么必须区分作用域。</strong>并非所有操作都只碰点名的图元：偏移、布尔等算法会在场景内部自行增删图元。若这类操作也按"只交换点名的 id"处理，撤销时算法新生成的图元会留在场景里、重做时被删掉的原件也回不来。<code>SnapshotScope::WholeScene</code> 就是为此存在的——交换时把"目标状态之外"的场景图元一并摘下保管，使重做能真正重新移除它们（<code>SceneUndoCommands.cpp:150-168</code>）。这也修掉了状态交换版最初的缺陷 A，详见 3.4。
+          </p>
+
+          <h3>3.3 容器与空间索引（本轮新增改造）</h3>
+          <p>P0 改造完成后，百万图元基准立刻暴露出下一个热点：批量状态交换的耗时并不在 <code>clone()</code> 上，而在<strong>替换图元时维护类型桶的代价</strong>。这一层原报告只覆盖到"单删 O(K)"，未意识到批量替换会把它放大成 O(批量 × 桶大小)。</p>
+          <div class="table-wrap">
+            <table>
+              <caption>表 4：容器与索引层改造</caption>
+              <thead>
+                <tr><th>位置</th><th>原问题</th><th>当前实现</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>EntityContainer.cpp:128-171</code>、<code>:389</code></td>
+                  <td>类型桶摘除靠 <code>vec.erase(std::remove(...))</code>，单次 O(桶大小)。批量替换 N 个同类型图元即 O(N·K)，批量移动 10 万图元时退化成主要的墙上时间</td>
+                  <td>引入 <code>EntitySlot{mainIndex, typeIndex}</code> 双位置索引：<code>registerSlot()</code> 登记、<code>detachFromTypeBucket()</code> 用 swap-erase 摘除并只修正被移动元素一个槽位，O(1)。槽位与实际不符时回退线性查找，把风险限定为"只慢不错"</td>
+                </tr>
+                <tr>
+                  <td><code>EntitySpatialIndex.cpp:110-163</code></td>
+                  <td>初次载入走 <code>clear()</code> + <code>insert(range)</code>，Boost 逐个插入并触发大量分裂；百万图元入场景曾是 11 s 量级</td>
+                  <td>空树分支改用区间构造函数（<code>:153</code>），内部是 <strong>STR 打包装载</strong>：一次分配 + 一次排序建树，不再逐元素插入。50k 插入 379 ms → 34 ms，百万级入场景 11015 ms → 1626 ms</td>
+                </tr>
+                <tr>
+                  <td><code>EntitySpatialIndex.cpp:28-31</code></td>
+                  <td>分裂算法用 <code>bgi::rstar&lt;128&gt;</code>：<code>rstar</code> 在<strong>删除</strong>时会额外触发 reinsert（重插入孤儿条目），而批量状态交换恰好是删除密集路径</td>
+                  <td>改为 <code>bgi::quadratic&lt;128&gt;</code>。<span class="why">批量载入走 STR 打包时树形由打包决定、与分裂算法无关，因此换掉 <code>rstar</code> 不影响载入收益，却去掉了删除侧的 reinsert——实测撤销/重做与批量移动各再快约 2.6 倍。</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            这一轮改造<strong>推翻了两个基于代码阅读的猜测</strong>，方法上是本轮最值得记录的：一是原先怀疑 <code>replacePointers()</code> 与通知回调是瓶颈，插桩实测两者均为 <strong>0.0 ms</strong>；二是 <code>updateBulk</code> 的"两轮逐条 remove/insert"确实没降复杂度（注释自认），但把树的分裂算法换掉后，<strong>同样的两轮遍历快了很多</strong>——说明当时的开销主要来自分裂算法而非循环次数。
+          </p>
+
+          <h3>3.4 本轮暴露并修掉的两处既有缺陷</h3>
+          <p>这两条原报告与两份复审都未提及，是集成验证过程中才暴露的，且都属于"编译通过、单测通过、只有真实操作才会踩到"的类型。</p>
+          <div class="table-wrap">
+            <table>
+              <caption>表 5：状态交换版暴露出的两处缺陷</caption>
+              <thead>
+                <tr><th>缺陷</th><th>表现</th><th>修复</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>缺陷 A：全场景快照的撤销/重做无法重新移除图元</td>
+                  <td>零克隆状态交换默认只交换"点名 id"。但偏移/布尔等算法会在场景内部自行增删图元，这些图元不在点名集合内：撤销时它们被留下，<strong>重做时也删不掉</strong>，反复撤销重做后场景图元数只增不减</td>
+                  <td>引入 <code>SnapshotScope</code>（<code>SceneUndoCommands.h:53-60</code>）：<code>Subset</code> 管点名 id，<code>WholeScene</code> 额外把目标状态之外的图元摘下保管。算法包装路径显式传 <code>WholeScene</code>（<code>AlgorithmTaskRegistration2D.cpp</code>）</td>
+                </tr>
+                <tr>
+                  <td>缺陷 B：<code>DocumentTransaction</code> 的 before 快照恒为空操作</td>
+                  <td><code>recordSnapshotBefore()</code> 的守卫条件与循环条件互斥，函数体从不执行，导致 <code>beforeState</code> 永远为空、<strong>属性变更类事务根本无法回退</strong>（撤销后属性不变）</td>
+                  <td>重写为 <code>snapshotBeforeState(id)</code>（<code>DocumentTransaction.cpp:237-245</code>），5 个调用点（删除 / 替换 / 属性变更 / 几何编辑替换 / 几何编辑删除）统一取真实快照；并为 <code>AttributeChange</code> 补上此前缺失的回滚分支（<code>:332-337</code>）</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            这两处之所以长期没被发现，是因为<strong>没有测试覆盖"撤销之后再重做""属性变更之后撤销"这类往返链路</strong>——函数级用例各自只验证单次调用。现已固化为 10 个 GTest 用例（<code>Main/Src/UI/Test/SceneEditIntegrationTests.cpp</code>，69 条断言，含群组归属存活与子集作用域守卫），随 <code>BUILD_SCENE_EDIT_TESTS</code> 开关纳入 <code>ctest</code>。
           </p>
         </section>
 
@@ -664,7 +740,7 @@
           <p>这一层的原报告条目基本仍然有效，但其中两条的描述与代码实际不符，需要修正认识。</p>
           <div class="table-wrap">
             <table>
-              <caption>表 4：Renderx / UI 帧路径现状</caption>
+              <caption>表 6：Renderx / UI 帧路径现状</caption>
               <thead>
                 <tr><th>状态</th><th>位置</th><th>问题与现状</th></tr>
               </thead>
@@ -718,7 +794,7 @@
           <h2>五、领域算法</h2>
           <div class="table-wrap">
             <table>
-              <caption>表 5：Engraving / Nesting 算法热点现状</caption>
+              <caption>表 7：Engraving / Nesting 算法热点现状</caption>
               <thead>
                 <tr><th>状态</th><th>位置</th><th>问题与现状</th></tr>
               </thead>
@@ -763,7 +839,7 @@
           <p>以下条目经核验基本维持原状，均属"顺手优化"范畴，不阻塞百万级目标，但累积起来会影响大数据量下的手感。</p>
           <div class="table-wrap">
             <table>
-              <caption>表 6：Nesting / Log / FileIO / 杂项待处理项</caption>
+              <caption>表 8：Nesting / Log / FileIO / 杂项待处理项</caption>
               <thead>
                 <tr><th>模块</th><th>位置</th><th>问题与建议</th></tr>
               </thead>
@@ -789,31 +865,408 @@
 
         <section id="gap">
           <h2>七、架构能力盘点</h2>
-          <p>对照"百万级图元流畅"的目标，经本轮修复后家底与缺口的变化如下。</p>
+          <p>对照"百万级图元流畅"的目标，经本轮改造后家底与缺口的变化如下。</p>
           <ul class="cap-list">
             <li><span class="cap-name">已具备：图元访问 O(1)</span><span><code>m_entityIdIndex</code> 哈希索引已被算法层正确复用，<code>findEntityById</code> 全链路 O(1)；单删与批量删均无 O(N) 搬移。这一层已达标。</span></li>
-            <li><span class="cap-name">已具备：撤销命令零克隆（部分）</span><span>删除 / 新增两类命令已用所有权转移实现零克隆，模式已在文件内验证可行，可直接复用到变换类。</span></li>
-            <li><span class="cap-name">已具备：空间索引</span><span>RTree 用于拾取与查询，失败降级已收敛为三级处理，不再是"一失败就全量重建"。</span></li>
-            <li><span class="cap-name">已具备：渲染现代化</span><span>常驻几何仓、DrawList 保留提交、2D 网格粗筛剔除、曲线 LOD 分批、增量刷新节流均已就位。</span></li>
-            <li><span class="cap-name">尚缺：增量 Undo（变换类）</span><span>唯一剩余的数据层高危。快照式全量 clone 需升级为属性级 diff 或所有权转移。</span></li>
-            <li><span class="cap-name">尚缺：图元级 LOD</span><span>曲线有 LOD，图元本体没有。远景海量小图元仍全精度绘制，是帧率的主要天花板。</span></li>
-            <li><span class="cap-name">尚缺：DrawList 增量排序</span><span>排序仍全量重做，增删频繁时与图元总量成正比。</span></li>
-            <li><span class="cap-name">尚缺：性能基准体系</span><span>仍未见到百万图元基准场景与常态化的帧率、操作延迟回归测量——这使得"优化是否达标"缺乏客观判定依据。</span></li>
+            <li><span class="cap-name">已具备：撤销命令零克隆（完整）</span><span>删除、新增、几何变换三类命令全部走所有权转移/状态交换。<strong>本轮补上了最后一条变换链</strong>：场景与命令各持一份真实状态、撤销重做整批换手，撤销栈不再持有任何深拷贝体。</span></li>
+            <li><span class="cap-name">已具备：容器位置索引</span><span><code>EntitySlot{mainIndex, typeIndex}</code> 让类型桶摘除与替换都是 O(1)；批量替换不再随"同类型图元数"放大，这是批量移动与状态交换能跑进秒级的前提。</span></li>
+            <li><span class="cap-name">已具备：空间索引（含批量装载）</span><span>RTree 用于拾取与查询；初次载入走 STR 打包装载而非逐元素插入，删除密集路径改用 <code>quadratic</code> 分裂以避免 reinsert；失败降级已收敛为三级处理。</span></li>
+            <li><span class="cap-name">已具备：渲染现代化</span><span>常驻几何仓、DrawList 保留提交、2D 网格粗筛剔除、曲线 LOD 分批、增量刷新节流均已就位；本轮又补上"视野覆盖全场景时跳过注定无效的网格收集"的剔除捷径（8.6）。</span></li>
+            <li><span class="cap-name">已具备：百万图元基准（数据层 + 渲染帧路径）</span><span><code>Tools/PerfBenchmark</code> 覆盖 22 项数据层指标（含批量移动六相位拆分）；<code>Tools/RenderBenchmark</code> 在 RenderX 的 Null 后端上覆盖 8 项帧路径指标（缩放档位／镜头平移／拖动／强制重排／瞬态重传）。两者都不依赖 GPU 与窗口系统，可无人值守复现，结果按轮次标记追加 CSV。</span></li>
+            <li><span class="cap-name">已具备：状态交换集成回归</span><span>10 个 GTest 用例覆盖变换往返、拖动提交/取消、属性面板与算法包装、事务往返、群组存活、作用域守卫，纳入 <code>ctest</code>。</span></li>
+            <li><span class="cap-name">尚缺：图元级 LOD</span><span>曲线有 LOD，图元本体没有。已量化后果：全场景视野下 100 万图元全部按全精度提交（100 万条线段），帧路径 CPU 侧 64 ms；而缩到 1% 视野只要 0.54 ms。也就是说"看全图"这一档没有任何退化机制，是帧率的主要天花板。<span class="why">（64 ms 为 CPU 侧，不含 GPU 与应用侧转换，见 8.5 的边界说明。）</span></span></li>
+            <li><span class="cap-name">尚缺：DrawList 增量排序</span><span>已量化代价：排序键一变，全量重排把帧耗时从 64 ms 推到 264 ms（约 4 倍），且实测 140 帧里重排了 140 次——即每帧一次。同时合批效果极好（100 万条目仅 5 个 draw call），说明问题不在批次数，而在排序与逐条遍历本身。</span></li>
+            <li><span class="cap-name">尚缺：端到端真实帧率</span><span>渲染基准只覆盖帧路径 CPU 侧，不含 GPU 执行/呈现，也不含应用侧每帧的场景→顶点转换（<code>EntityToVertices</code> / <code>SceneRefreshCoordinator</code>）。"百万图元在真实视口里到底多少帧"仍无数据，需在真实视口埋点。</span></li>
+            <li><span class="cap-name">尚缺：基准常态化</span><span>两个基准都已能定位热点，但仍是人工触发；尚未接入 CI 自动对比，也未接入 Tracy/VTune 定期剖析。此外，跨轮次比较必须依赖对照路径归一——机器负载能让同一份代码的数字差出 2.5 倍。</span></li>
           </ul>
         </section>
 
+        <section id="benchmark">
+          <h2>八、基准实测（100 万图元）</h2>
+          <p>
+            本节数据全部来自 <code>Tools/PerfBenchmark</code> 在 <strong>Release</strong> 构建下对 100 万图元的实测，原始记录逐轮追加在 <code>Docs/performance-audit/baseline.csv</code>。复现命令：
+          </p>
+          <pre><code>cmake --build build --config Release --target SanYiPerfBenchmark --parallel 1
+./build/bin_Qt6/Release/SanYiPerfBenchmark.exe 1000000 Docs/performance-audit/baseline.csv</code></pre>
+
+          <h3>8.1 改造前后对比</h3>
+          <p>下表取 <code>baseline.csv</code> 中紧邻改造前后的两块记录（同一台机器、同一构建配置）。这两块记录之间代码只差两项——<strong>RTree 批量装载（STR 打包）</strong>与<strong>分裂算法 <code>rstar</code>→<code>quadratic</code></strong>，因此收益可以直接归因：<code>scene_add</code> 与批量插入两项归 STR 打包，<code>transform_10pct</code> 与 <code>undo_redo_10pct</code> 归分裂算法（批量状态交换是删除密集路径，<code>rstar</code> 的 reinsert 正是它慢的原因）。</p>
+          <div class="table-wrap">
+            <table>
+              <caption>表 9：百万图元关键指标实测（Release）</caption>
+              <thead>
+                <tr><th>指标</th><th>含义</th><th>优化前</th><th>优化后</th><th>倍数</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>scene_add</code></td>
+                  <td>100 万图元入场景 + 建索引</td>
+                  <td>11015 ms</td>
+                  <td><strong>1626 ms</strong></td>
+                  <td>6.8×</td>
+                </tr>
+                <tr>
+                  <td><code>transform_10pct</code></td>
+                  <td>批量移动 10 万图元（全链路，含回滚）</td>
+                  <td>2993 ms</td>
+                  <td><strong>1129 ms</strong></td>
+                  <td>2.65×</td>
+                </tr>
+                <tr>
+                  <td><code>undo_redo_10pct</code></td>
+                  <td>10 万图元一次撤销 + 一次重做</td>
+                  <td>3078 ms</td>
+                  <td><strong>1197 ms</strong></td>
+                  <td>2.57×</td>
+                </tr>
+                <tr>
+                  <td><code>insert_addEntities</code></td>
+                  <td>5 万图元普通添加（批量插入路径）</td>
+                  <td>379 ms</td>
+                  <td><strong>34 ms</strong></td>
+                  <td>11.1×</td>
+                </tr>
+                <tr>
+                  <td><code>insert_preserveId</code></td>
+                  <td>5 万图元批量保留 id（撤销回插路径）</td>
+                  <td>393 ms</td>
+                  <td><strong>33 ms</strong></td>
+                  <td>11.9×</td>
+                </tr>
+                <tr>
+                  <td><code>delete_single_xN</code></td>
+                  <td>逐条删除 1000 个图元</td>
+                  <td>2.49 ms</td>
+                  <td>2.42 ms</td>
+                  <td>≈1.0×</td>
+                </tr>
+                <tr>
+                  <td><code>snapshot_capture_10pct</code></td>
+                  <td>10 万图元快照捕获（变为仅 before 一份）</td>
+                  <td>46.2 ms</td>
+                  <td>49.4 ms</td>
+                  <td>≈1.0×</td>
+                </tr>
+                <tr>
+                  <td><code>update_bounds_bulk_10pct</code></td>
+                  <td>10 万图元索引批量更新 <span class="why">——该指标当时测的是静止几何，属空转值，已重做，见 8.2</span></td>
+                  <td colspan="2">旧口径不可比（真实值约 452 ms）</td>
+                  <td>—</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout">
+            <div class="callout__label">读数注意：跨轮次绝对比较受机器负载干扰</div>
+            <p>表中"≈1.0×"的几项并非回退，而是<strong>对照路径的漂移</strong>。<code>transform_apply_only</code>（只做矩阵变换，不碰快照、索引、撤销，完全不含本次改动的代码）在同一对记录里从 <strong>21.9 ms 涨到 26.3 ms（+20%）</strong>，说明这一轮测量时机器更忙。按该对照归一后：批量移动相对提升约 <strong>3.2×</strong>、撤销重做约 <strong>3.1×</strong>、入场景约 <strong>8.1×</strong>、批量插入约 <strong>13×</strong>。<strong>结论：判定优化收益时必须用对照路径归一，否则会把负载波动误读成回退或收益。</strong></p>
+          </div>
+
+          <div class="callout">
+            <div class="callout__label">诚实的缺口：前两项改造没有留下数字基线</div>
+            <p>基准是在<strong>零克隆状态交换（原 P0）与容器位置索引（EntitySlot）改造完成之后</strong>才建立的，因此 <code>baseline.csv</code> 里<strong>没有这两项改造的"改造前"数据</strong>，上表也不包含它们。这两项的收益目前只有代码层面的证据：撤销/重做不再深拷贝任何图元（快照捕获稳定在 49 ms 量级）、类型桶摘除从 O(桶大小) 降为 O(1)。<strong>这是本项目一个明确的短板——基准建得太晚。</strong>后续若还要动撤销链路，务必先测量再改，不要再出现"收益只能靠读代码论证"的情况。</p>
+            <p>另外，<code>baseline.csv</code> 的第 1 块记录与第 2 块<strong>代码完全相同</strong>，仅机器负载不同：对照路径 <code>transform_apply_only</code> 为 50.1 ms / 21.9 ms（相差 2.29×），批量移动为 6483 ms / 2993 ms（相差 2.17×），两者吻合。因此本报告一律<strong>不拿第 1 块做基线</strong>，只把它当作负载噪声的又一例证。</p>
+          </div>
+
+          <h3>8.2 批量移动的耗时构成（相位拆分）</h3>
+          <p>
+            上一轮报告里有一段没能解释的开销："批量移动全链路 1129 ms，而快照、矩阵、索引三段加起来只有 143 ms"。本轮为此新增了 7 项相位指标，把这段黑盒拆开，结论是——<strong>那段"找不到的开销"其实是测量口径问题，不是神秘开销</strong>。
+          </p>
+          <div class="table-wrap">
+            <table>
+              <caption>表 10：一次批量移动 10 万图元的相位拆分（100 万图元场景，Release）</caption>
+              <thead>
+                <tr><th>相位</th><th>含义</th><th>耗时</th><th>占比</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>swap_phase_capture</code></td>
+                  <td>捕获 before 快照（含一次 clone）</td>
+                  <td>42.6 ms</td>
+                  <td>8%</td>
+                </tr>
+                <tr>
+                  <td><code>swap_phase_apply</code></td>
+                  <td>矩阵变换本体</td>
+                  <td>19.7 ms</td>
+                  <td>4%</td>
+                </tr>
+                <tr>
+                  <td><code>swap_phase_index_bulk</code></td>
+                  <td><strong>空间索引批量更新</strong>（10 万条 remove + insert）</td>
+                  <td><strong>451.9 ms</strong></td>
+                  <td><strong>84%</strong></td>
+                </tr>
+                <tr>
+                  <td><code>swap_phase_push</code></td>
+                  <td>命令入栈（构造快照命令）</td>
+                  <td>10.9 ms</td>
+                  <td>2%</td>
+                </tr>
+                <tr>
+                  <td><code>transform_apply_10pct</code></td>
+                  <td><strong>合计＝用户按下"移动"后实际等待的时间</strong></td>
+                  <td><strong>536.8 ms</strong></td>
+                  <td>100%</td>
+                </tr>
+                <tr>
+                  <td><code>swap_phase_undo</code></td>
+                  <td>撤销＝一次整批状态换出</td>
+                  <td>615.1 ms</td>
+                  <td>—</td>
+                </tr>
+                <tr>
+                  <td><code>swap_phase_redo</code></td>
+                  <td>重做＝一次整批状态换入</td>
+                  <td>605.3 ms</td>
+                  <td>—</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            四个相位之和 525 ms 与实测 <code>transform_apply_10pct</code> 536.8 ms 相差 2%，拆分是闭合的。两次独立干净轮次复现良好（批量移动 537 / 537 ms，索引更新 452 / 455 ms）。本表取的是<strong>带轮次标记、且对照路径为 24.3 ms 的干净轮次</strong>；同名前缀的 <code>transform_10pct</code>（含一次撤销）在不同轮次间会漂移 1129~1224 ms，那是负载所致而非改动所致，故拆分只用一轮内的数据。
+          </p>
+          <div class="callout">
+            <div class="callout__label">结论一：拖动路径本来就不付"整批交换"的代价</div>
+            <p>拖动期间只改几何，结束时唯一的额外动作是<strong>命令入栈，实测 10.9 ms</strong>。整批状态交换只发生在<strong>撤销/重做</strong>时（各约 610 ms）。所以"让拖动绕开整批交换"这个方向<strong>没有收益——它本来就没做这件事</strong>。</p>
+            <p>真正的瓶颈是<strong>空间索引批量更新，占一次移动的 84%</strong>。10 万条 RTree remove+insert 花 452 ms（约 4.5 µs/条）。作为对照：整个 100 万条树的 STR 重建约 1628 ms，因此对 10% 的改动量而言"逐条 remove+insert"比"整树重建"快约 3.6 倍，当前策略是对的。想在数据层再要数量级的提升，需要改变索引的精确性契约（例如延迟更新 + 脏集查询），那是架构级改动。</p>
+          </div>
+          <div class="callout">
+            <div class="callout__label">结论二：一个曾经误导了结论的指标，已修正</div>
+            <p>上一轮报告里的 <code>update_bounds_bulk_10pct</code> 只有 <strong>62.8 ms</strong>，据此才算出"三段之和仅 143 ms、剩余 87% 不明"。真实原因是该指标<strong>拿静止几何反复调用</strong> <code>updateEntityBoundsBulk</code>，而 <code>updateBulk</code> 内部对"包围盒没变"的条目直接 <code>continue</code>（<code>EntitySpatialIndex.cpp:275-276</code>）——量出来的基本是"10 万次比较后全部跳过"的空转值。</p>
+            <p>现改为<strong>每轮先把图元真的移动一次再更新</strong>（复原放在计时之外），得到 <strong>446.6 ms</strong>，与换手路径内部的同相位值 451.9 ms 互相印证（差 1.2%）。<strong>教训与前述"对照路径归一"同类：指标本身的口径错了，比没有指标更危险</strong>——它会让人沿着错误的方向优化。</p>
+          </div>
+
+          <h3>8.3 已达交互级的项与剩余缺口</h3>
+          <p>
+            已经达到交互级的项：全选 15.0 ms、10% 框选 6.5 ms（命中 103041）、1% 框选 0.10 ms、1000 次点拾取 0.97 ms、逐条删除 1000 次 2.8 ms、5 万图元批量插入 34 ms。这些操作在百万图元下已是"无感"水平。
+          </p>
+          <p>
+            <strong>尚未达标的项</strong>：一次批量移动 10 万图元 537 ms、撤销 615 ms / 重做 605 ms、100 万图元入场景 1628 ms。数据层的结构性问题已经清完，剩下的都是"10 万量级图元被真实改动"时无法回避的成本——其中 84% 是空间索引维护。
+          </p>
+          <p>
+            仍然没有观测的一项：<strong>渲染端帧率</strong>。本基准只测 CPU 侧，不含 GPU 提交与呈现，因此"百万图元是否流畅"这个最终问题目前仍无数据支撑，这是最大的盲区。
+          </p>
+
+          <h3>8.4 本轮新增的回归防线</h3>
+          <div class="table-wrap">
+            <table>
+              <caption>表 11：本轮新增的可复现防线</caption>
+              <thead>
+                <tr><th>产物</th><th>作用</th><th>启用方式</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>Tools/PerfBenchmark</code></td>
+                  <td>22 项数据层指标，含批量移动的六相位拆分；结果可追加 CSV 做多轮对比</td>
+                  <td><code>BUILD_PERF_BENCHMARK</code>（Config.cmake，默认 ON）</td>
+                </tr>
+                <tr>
+                  <td><code>Tools/RenderBenchmark</code></td>
+                  <td>8 项渲染帧路径指标（缩放档位／镜头平移／拖动／强制重排／瞬态重传），走 RenderX 的 Null 后端，无 GPU / 无窗口依赖</td>
+                  <td><code>BUILD_RENDER_BENCHMARK</code>（Config.cmake，默认 ON）</td>
+                </tr>
+                <tr>
+                  <td><code>Main/Src/UI/Test/SceneEditIntegrationTests.cpp</code></td>
+                  <td>10 个用例 / 69 条断言，覆盖状态交换的端到端链路（变换往返、拖动提交与取消、属性面板与算法包装、事务往返、群组存活、作用域守卫）</td>
+                  <td><code>BUILD_SCENE_EDIT_TESTS</code>（Config.cmake，默认 ON），已纳入 <code>ctest</code></td>
+                </tr>
+                <tr>
+                  <td><code>Docs/performance-audit/baseline.csv</code><br /><code>Docs/performance-audit/render-baseline.csv</code></td>
+                  <td>数据层与渲染帧路径的原始测量记录；每块带一行 <code># run=&lt;标签&gt; … at=&lt;时间&gt;</code> 标记，指明这块对应哪次改动</td>
+                  <td>由两个基准程序各自追加写入（第 3 个参数为轮次标签）</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            之所以单独补这条防线：本轮暴露的两处缺陷（3.4）都是"编译通过、单测通过、只有真实操作才会踩到"。没有基准时，"这条问题还在不在、改了有没有用"只能靠逐行读代码判断，成本高且容易得出互相矛盾的结论——核验阶段收到的两份复审就在同一批代码上给出了不同答案；而基准建立后，同样的问题只用一次运行就能终结。
+          </p>
+          <p>
+            轮次标记是被现实逼出来的：本轮出现过两块<strong>代码完全相同、数值却差 2.5 倍</strong>的相邻记录（机器负载所致），而文件里没有任何字段能区分它们——只能靠"数第几块"来指代，极易把负载波动读成优化收益或回退。加上标签后，"这一块是哪次跑的、对应哪次改动"不再依赖记忆。
+          </p>
+
+          <h3>8.5 渲染帧路径（新增测量）</h3>
+          <p>
+            在数据层之外，本轮补上了渲染端的帧路径测量，工具是新增的 <code>Tools/RenderBenchmark</code>。它挂在 RenderX 的 <strong>Null 后端</strong>上：该后端是完整语义实现（声明支持全部可选特性，上层走真实代码路径而非降级分支），因此不依赖 GPU 与窗口系统，能无人值守复现。测的是<strong>帧路径的 CPU 侧</strong>——绘制列表 resolve → AABB 剔除 → 按需排序 → 合批 → 命令提交，这正是渲染端架构约束所在的位置。
+          </p>
+          <pre><code>cmake --build build --config Release --target SanYiRenderBenchmark --parallel 1
+./build/bin_Qt6/Release/SanYiRenderBenchmark.exe 1000000 Docs/performance-audit/render-baseline.csv render-path-baseline</code></pre>
+          <div class="table-wrap">
+            <table>
+              <caption>表 12：渲染帧路径 CPU 耗时基线（100 万图元场景，1280×720，Release，Null 后端）</caption>
+              <thead>
+                <tr><th>用例</th><th>含义</th><th>p50</th><th>CPU 帧上限</th><th>可见条目</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>frame_zoom_fit</code></td>
+                  <td><strong>视野覆盖全场景</strong>（缩到最小看全图）</td>
+                  <td><strong>95.0 ms</strong></td>
+                  <td><strong>≈10.4 fps</strong></td>
+                  <td>1 000 000</td>
+                </tr>
+                <tr>
+                  <td><code>frame_zoom_10pct</code></td>
+                  <td>视野覆盖 10% 场景</td>
+                  <td>6.5 ms</td>
+                  <td>≈154 fps</td>
+                  <td>10 302</td>
+                </tr>
+                <tr>
+                  <td><code>frame_zoom_1pct</code></td>
+                  <td>视野覆盖 1% 场景（剔除生效的对照）</td>
+                  <td>0.51 ms</td>
+                  <td>≈1950 fps</td>
+                  <td>132</td>
+                </tr>
+                <tr>
+                  <td><code>frame_pan</code></td>
+                  <td>每帧平移视野（镜头拖动，不重排）</td>
+                  <td>7.8 ms</td>
+                  <td>≈128 fps</td>
+                  <td>—</td>
+                </tr>
+                <tr>
+                  <td><code>frame_dirty_1k</code></td>
+                  <td><strong>拖动：每帧改 1 千个图元</strong>（全场景视野）</td>
+                  <td><strong>94.9 ms</strong></td>
+                  <td><strong>≈10.5 fps</strong></td>
+                  <td>1 000 000</td>
+                </tr>
+                <tr>
+                  <td><code>frame_dirty_10k</code></td>
+                  <td><strong>拖动：每帧改 1 万个图元</strong>（全场景视野）</td>
+                  <td><strong>97.0 ms</strong></td>
+                  <td><strong>≈10.3 fps</strong></td>
+                  <td>1 000 000</td>
+                </tr>
+                <tr>
+                  <td><code>frame_resort_10k</code></td>
+                  <td><strong>每帧改 1 万条排序键</strong>（强制触发全量重排）</td>
+                  <td><strong>295.9 ms</strong></td>
+                  <td><strong>≈3.4 fps</strong></td>
+                  <td>1 000 000</td>
+                </tr>
+                <tr>
+                  <td><code>frame_transient_10k</code></td>
+                  <td>每帧经瞬态环全量重传 1 万条命令（覆盖层/文字类）</td>
+                  <td>0.59 ms</td>
+                  <td>≈1690 fps</td>
+                  <td>—</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            两次独立运行复现良好（全场景 95.99 / 94.81 ms，重排 302.8 / 289.0 ms，瞬态 0.59 / 0.60 ms）。<strong>本表是基线；其中约 25% 属于无效收集，已在 8.6 修掉，最新数字见表 13。</strong>
+          </p>
+          <div class="callout">
+            <div class="callout__label">结论三：帧率的天花板不是 draw call，而是每帧对整表的遍历</div>
+            <p>最反直觉的一条：全场景视野下 100 万条目被合批成 <strong>5 个 draw call</strong>（1 万条目视野也只要 181 个），合批率接近 100% —— <strong>绘制调用数完全不是问题</strong>。95 ms 全部花在每帧把 100 万条目过一遍（剔除判定 + 合批扫描），约 <strong>95 ns/条</strong>。这个单条成本还随规模恶化：10 万条目时是 62 ns/条，100 万条目时涨到 95 ns（+54%）。</p>
+            <p><strong>但"恶化"的成因本轮没有测出来，不要沿用我最初的猜测。</strong>我一开始把它归因为"内存带宽/缓存局部性受限"，这与《百万级矢量剔除：DrawList 空间索引设计》§14.1 的实测结论<strong>相矛盾</strong>——那份文档量到全图路径只有约 1.6 GB/s，远低于单线程带宽上限，明确判定<strong>不是带宽瓶颈</strong>；它的可信分解（§14.3）显示全图成本的 <strong>72% 是逐条判交</strong>（约 17 ns/条）。因此 62→95 ns 这个上升更可能来自场景/布局与测量条件的差异，具体成因待测。</p>
+            <p>另一条：只要排序键变化，全量重排会把帧耗时从 95 ms 推到 296 ms（<strong>约 3.1 倍</strong>）。<code>sortCount</code> 在 140 帧里从 1 涨到 140，即<strong>每一帧都重排了一次</strong>。这就是"DrawList 全量排序"这条架构约束的实际代价——它不该出现在每帧路径上。</p>
+          </div>
+          <div class="callout">
+            <div class="callout__label">读数口径警示：绝对值不能与《百万级矢量剔除》的 §13 / §14 横比</div>
+            <p>本节的绝对值明显高于那份文档记录的同规模数字（100 万图元全图 25~34 ms）。差异主要来自测量方式：本节是<strong>同进程内 120 帧取中位数</strong>，而该文档 §14.6 已记录过一条测量纪律——<strong>同进程连续跑会因内存状态累积把同一场景拉高，实测达 2.4 倍</strong>，因此它要求每个变体独立进程运行、多轮取最小值。</p>
+            <p>所以本节的定位是<strong>同一轮内的相对量</strong>（剔除开 vs 剔除关；改动前 vs 改动后），不是可比绝对基线。要提高绝对值的可信度，需按那条纪律重做一轮。</p>
+          </div>
+          <div class="callout">
+            <div class="callout__label">结论四：增量机制本身是有效的，两处猜测被数据否定</div>
+            <p><strong>增量 upsert 几乎免费。</strong>每帧改 1 千条目（94.9 ms）与完全不改（95.0 ms）几乎一致，改 1 万条目也只到 97.0 ms —— 也就是说"改 1 万条"的增量成本约 2 ms，帧耗时几乎全部来自那次全表遍历。增量渲染的设计目标是达到了的，问题在遍历本身。</p>
+            <p><strong>"四层每帧全量重传"不是瓶颈。</strong>本次专门测了瞬态环路径：每帧全量重传 1 万条命令只要 <strong>0.59 ms</strong>，与 95 ms 的帧耗时不在一个量级。此前把"覆盖层每帧 clear + 全量重传"列为待优化项，实测表明它的优先级应当下调——按当前规模，它连 1% 都占不到。</p>
+          </div>
+          <p>
+            <strong>这套数字的适用边界。</strong>它测的是帧路径的 CPU 侧：不含 GPU 执行与呈现（swapBuffers / 垂直同步），也不含应用侧每帧把场景转成顶点与命令的那部分工作（<code>EntityToVertices</code> / <code>SceneRefreshCoordinator</code>）。因此"95 ms"不能直接读成"真实帧率 10 fps"——真实帧率必然是 CPU 侧与应用侧之和，再加上 GPU 侧。要拿到端到端的真实帧率与拖动延迟，还需要在真实视口里埋点测量（见路线图 P1）。
+          </p>
+
+          <h3>8.6 已落地的第一项优化：避免无效的网格收集</h3>
+          <p>
+            8.5 的结论"瓶颈是每帧对整表的遍历"需要一个补充：那次遍历里有<strong>相当一部分是自己制造的无用功</strong>。
+          </p>
+          <p>
+            <strong>先量出来。</strong>为了在不改动 DLL 的前提下把这段单独隔离，基准里加了一个对照列表——同样的 100 万条命令、同样的视野，唯一差别是把剔除关掉，从而绕过 2D 网格直接走线性路径。两者相减就是"网格收集 + 回退判定"的净成本：<strong>23.5 ms，占当时帧耗时 92.6 ms 的 25%</strong>。
+          </p>
+          <p>
+            <strong>原因。</strong>2D 剔除走的是分层网格粗筛（<code>rxIncremental.cpp</code> 的 <code>resolveIndexed2D</code>）：先把候选收集出来，若候选超过总条目的一半，就判定"网格收益消失"并回退线性路径。在全场景视野下，候选必然等于全部条目，于是这段收集<strong>每次都被完整做完，然后整份丢弃</strong>——先给 100 万条写去重标记、再把 100 万条推入候选数组，紧接着清空、重新按排序序走一遍。同一批条目被随机访问了两遍。
+          </p>
+          <p>
+            <strong>改法。</strong>给绘制列表维护一份"2D 索引条目包围盒的并集"，resolve 之前先判断<strong>视野是否完全包含这份并集</strong>。若包含，则任何条目都不可能被剔除，网格收集注定以回退收场——于是连"收集"和"逐条判交"两段一起省掉，直接走线性合批。这份并集<strong>只增不减</strong>，因此始终是真实并集的超集：<em>「视野 ⊇ 缓存并集」⇒「视野 ⊇ 真实并集」</em>，捷径在方向上不可能误剔。代价是大幅删减后并集可能偏大、捷径暂时不触发（只是少走一次捷径，不会画错），而一旦真的发生线性回退，就顺手重算收紧，因此能自愈（<code>recomputeIndexedBounds</code>）。
+          </p>
+          <div class="table-wrap">
+            <table>
+              <caption>表 13：剔除捷径落地前后（100 万图元，Release，Null 后端）</caption>
+              <thead>
+                <tr><th>用例</th><th>改动前</th><th>改动后</th><th>变化</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>frame_zoom_fit</code>（全场景视野）</td>
+                  <td>92.6 ~ 95.0 ms</td>
+                  <td><strong>63.8 ~ 66.7 ms</strong></td>
+                  <td>−30%，帧上限 10.4 → 15.0 fps</td>
+                </tr>
+                <tr>
+                  <td><code>frame_dirty_1k</code>（拖动 1 千图元）</td>
+                  <td>92.7 ~ 94.9 ms</td>
+                  <td><strong>67.0 ms</strong></td>
+                  <td>−28%</td>
+                </tr>
+                <tr>
+                  <td><code>frame_dirty_10k</code>（拖动 1 万图元）</td>
+                  <td>95.8 ~ 97.9 ms</td>
+                  <td><strong>71.3 ms</strong></td>
+                  <td>−27%</td>
+                </tr>
+                <tr>
+                  <td><code>frame_resort_10k</code>（每帧强制全量重排）</td>
+                  <td>288 ~ 303 ms</td>
+                  <td>264 ms</td>
+                  <td>−10%（重排本身占大头，未动）</td>
+                </tr>
+                <tr>
+                  <td><code>frame_zoom_1pct</code>（1% 视野）</td>
+                  <td>0.49 ~ 0.54 ms</td>
+                  <td>0.54 ms</td>
+                  <td>不变——网格路径原样保留，这正是要保住的对照组</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            <strong>验证。</strong>三重保障：一是 1% 视野那一项必须不变（否则说明捷径误伤了网格路径），实测持平；二是补上了设计文档 §8 一直要求、但此前只写在文档里的<strong>黄金标准用例</strong>——<code>RxIncrementalFixture.CullingVisibleCountMatchesBruteForce</code> 用固定种子随机 AABB + 随机视野批量比对"索引路径的可见数"与"暴力判交结果"，覆盖全覆盖（命中捷径）/ 部分重叠 / 完全不相交三种形态，并混入无包围盒条目；三是该用例经过<strong>变异验证</strong>——故意去掉捷径的包含判据会立即失败，恢复后全绿，证明它不是空跑。Renderx 测试目标全绿：<code>RenderxTests</code> 40 项 + <code>RenderxGLTests</code> 102 项 = <strong>142 项</strong>。
+          </p>
+          <p>
+            剩下的 64 ms 仍是<strong>纯粹的线性遍历 + 合批</strong>：按排序序随机访问 100 万条 136 字节的条目、逐条比较共享状态。
+          </p>
+          <div class="callout">
+            <div class="callout__label">重要更正：我上一轮提的"条目布局改造"已经被证伪过，不要再做</div>
+            <p>我在建议里写过"把合批热字段拆成紧凑数组、用一次顺序读替代三次随机读"。查证代码库既有记录后发现，<strong>这类"分离热数据"的改动已经做过两次，都被实测否掉并已回退</strong>（《百万级矢量剔除：DrawList 空间索引设计》）：</p>
+            <ul>
+              <li>§14.1 热冷数据分离（40 字节紧凑热数组 + 预计算合批标志）：零收益，已回退——12~15% 的"提升"是噪声。</li>
+              <li>§14.5 把 bounds 复制成独立紧凑数组（32 字节/条）：<strong>反而更慢</strong>，已回退。原因是 `Entry` 里 command 与 bounds 都是热数据（合批要 command、判交要 bounds），分离只是多读一个数组。</li>
+            </ul>
+            <p>由此得到一条可复用的边界：<strong>在"成对访问"的场景里，分离热数据不会减少访存；唯一有效的方向是让单条数据压进一个 cache line（≤64 字节）</strong>——而单条压缩要动 `DrawCommand` 的 80 字节公共 ABI，或改合批机制，都不是小改动。所以这一条<strong>不要第三次尝试</strong>。</p>
+          </div>
+        </section>
+
         <section id="roadmap">
-          <h2>八、优化路线图</h2>
+          <h2>九、优化路线图</h2>
 
           <div class="phase phase--done">
             <div class="phase__head">
               <span class="phase__title">已完成</span>
-              <span class="phase__window">原 P0 与部分 P1</span>
+              <span class="phase__window">原 P0、索引层，以及两处新发现的缺陷</span>
             </div>
             <ul>
               <li><strong>图元查找 O(1) 化</strong>：<code>findEntityById</code> 委托哈希索引，批量变换一次取出。<span class="why">——消除 O(M·N)，原来"百万图元 + 千级选中集"的秒级卡死已解决。</span></li>
-              <li><strong>删除路径去 O(N) 搬移</strong>：单删 swap-erase、批量 partition-remove、类型索引批量压实。</li>
-              <li><strong>删除/新增命令零克隆</strong>：所有权转移替代深拷贝，模式已在文件内跑通。</li>
+              <li><strong>删除路径去 O(N) 搬移</strong>：单删 swap-erase、批量 partition-remove、类型索引批量压实；本轮进一步把类型桶位置索引化为 <code>EntitySlot</code>，替换也变成 O(1)。</li>
+              <li><strong>删除/新增命令零克隆</strong>：所有权转移替代深拷贝。</li>
+              <li><strong>变换类撤销零克隆（原 P0）</strong>：改为场景与命令的状态交换，撤销栈不再持有深拷贝体；同时引入 <code>SnapshotScope</code> 处理算法内部增删图元的情形。<span class="why">——消除"移动 10 万图元 = 20 万次 clone"的放大链。此项未留下百万级前后对比数据（基准建在它之后），见 8.1 的说明。</span></li>
+              <li><strong>RTree 批量装载（STR 打包）</strong>：空树载入改用区间构造函数，不再逐元素插入并反复分裂。<span class="why">——百万图元入场景 11015 ms → 1626 ms，5 万图元批量插入 379 ms → 34 ms（约 11×）。</span></li>
+              <li><strong>RTree 分裂算法改 <code>quadratic</code></strong>：去掉 <code>rstar</code> 在删除时的 reinsert，批量状态交换正是删除密集路径。<span class="why">——批量移动 2993 ms → 1129 ms，撤销重做 3078 ms → 1197 ms。</span></li>
+              <li><strong>两处既有缺陷</strong>：全场景快照重做无法移除图元、<code>DocumentTransaction</code> 快照采集恒为空操作。</li>
               <li><strong>切片轮廓去重优化</strong>：排序 + 包围盒过滤 + 标记收集，去掉 O(N³) 最坏路径。</li>
               <li><strong>选中集与曲线 LOD 重构</strong>：轮廓预算 + 缓存；曲线精度切换改分批推进。</li>
             </ul>
@@ -821,26 +1274,30 @@
 
           <div class="phase">
             <div class="phase__head">
-              <span class="phase__title">P0：变换类撤销增量化</span>
-              <span class="phase__window">唯一剩余的数据层高危，建议最先做</span>
+              <span class="phase__title">P0：空间索引批量更新的成本</span>
+              <span class="phase__window">一次批量移动 84% 的时间在这里</span>
             </div>
             <ul>
-              <li><strong><code>EntitySnapshotsCommand</code> 改为增量记录</strong>：变换类只记录矩阵与旧值，避免 before/after 双份全量 clone；或直接复用 <code>DeleteEntitiesCommand</code> 的所有权转移模式。<span class="why">——消除"移动 10 万图元 = 20 万次 clone"的放大链，同时把撤销栈内存从"图元全量 × 栈深"降到"差异 × 栈深"。</span></li>
-              <li><strong>同步收窄 <code>SceneUndoCommands.h</code> 的快照持有</strong>：<code>m_before/m_after</code>（<code>:94-118</code>）随上一条一并改造，否则改造不彻底。</li>
+              <li><strong>先接受一个事实：交互路径已经不付"整批交换"的代价</strong>。相位拆分显示命令入栈只有 10.9 ms，整批状态换手只发生在撤销/重做（各约 610 ms）。因此原先设想的"让拖动绕开整批交换"没有可省的东西。</li>
+              <li><strong>该压的是索引维护</strong>：10 万条 RTree <code>remove+insert</code> = 452 ms，占一次移动的 84%。逐条 remove+insert 对 10% 改动量已优于整树重建（1628 ms）约 3.6 倍，<strong>继续在现有 RTree 上抠已经没有数量级空间</strong>。</li>
+              <li><strong>要再上一个台阶，需要改索引的精确性契约</strong>：例如拖动期间只把被改动的图元记入脏集、查询时"索引结果 ∪ 脏集"，把精确重建推迟到真正需要时。这属于架构级改动，牵动拾取与选择链路，动手前必须先补一组查询正确性测试。<span class="why">——收益上限明确：一次移动 537 ms 中最多能省下约 452 ms。</span></li>
+              <li><strong>撤销延迟单独看</strong>：若"撤销一次批量移动"需要从 615 ms 降下来，可评估对纯几何变换记录逆矩阵、撤销时重放而非整批换手。<span class="why">——但实测表明这样仍需付索引更新（452 ms），净收益只有约 20%，且会失去"整批状态精确还原"的通用性与精确性，性价比不高，不建议优先做。</span></li>
             </ul>
           </div>
 
           <div class="phase">
             <div class="phase__head">
-              <span class="phase__title">P1：渲染与交互</span>
-              <span class="phase__window">收益显著，但需先确认层级语义</span>
+              <span class="phase__title">P1：渲染帧路径</span>
+              <span class="phase__window">已有 CPU 侧基线，按实测影响排序</span>
             </div>
             <ul>
-              <li><strong>DrawList 增量排序</strong>：仅在排序键真正变化时局部重排，避免全量 <code>stable_sort</code>。</li>
-              <li><strong>覆盖层按需提交</strong>：选区/手柄/虚线未变化时不重传；顺便验证 5 段提交是否有可合并的相邻层。<span class="why">——注意 <code>RenderWidget.cpp</code> 注释强调提交顺序即层级，合并前必须核对 sortKey 语义。</span></li>
+              <li><strong>先解决"每帧整表遍历"</strong>：<span class="tag tag--partial">部分已落地</span> 其中"注定要被丢弃的网格收集"已修（见 8.6，全场景视野 −30%）。<strong>剩下的 64 ms 是纯粹的线性遍历 + 合批</strong>：按排序序随机访问 100 万条 136 字节条目、逐条比较共享状态。<span class="why">——注意：这条已经走到"分离热数据"的禁区之外，见 8.6 的更正（§14.1 / §14.5 两次实测已否掉该方向）。要再降只能靠"单条压进一个 cache line"（动 80 字节 ABI）或 LOD。</span></li>
+              <li><strong>图元级 LOD</strong>：让"看全图"这一档不再全精度提交 100 万条线段。当前全场景视野与 1% 视野的帧耗时差约 120 倍（64 ms vs 0.54 ms），差距全部来自"可见但不需要细节"的图元。</li>
+              <li><strong>DrawList 增量排序</strong>：实测排序键变更会触发每帧一次全量重排，把帧耗时从 64 ms 推到 264 ms（约 4 倍）。目标是把重排限制在真正改变相对次序的条目上。</li>
+              <li><strong>在真实视口埋点测端到端帧率与拖动延迟</strong>：这是把 CPU 侧基线接上真实帧率的唯一手段——渲染基准不含 GPU 执行/呈现，也不含应用侧每帧的场景→顶点转换。建议直接记录每帧耗时与拖动期间"输入到画面更新"的延迟，输出 p50/p95。</li>
               <li><strong><code>addUniquePoint</code> 哈希化推广</strong>：把同文件已验证的 <code>addUniquePointHash</code> 用到切片交点收集路径。</li>
-              <li><strong>空间索引批量真优化</strong>：<code>updateBulk</code> 改为批量重建或批处理，而非两轮逐条 remove/insert。</li>
-              <li><strong>点拾取候选剪枝</strong>：候选阶段先用包围盒距离上界过滤。</li>
+              <li><strong>点拾取候选剪枝</strong>：候选阶段先用包围盒距离上界过滤（当前 1000 次拾取 0.95 ms，优先级最低）。</li>
+              <li><strong>覆盖层按需提交 —— 实测后建议撤下</strong>：瞬态环每帧全量重传 1 万条命令只要 0.59 ms，占帧耗时不足 1%。原先按代码阅读判定的"待优化"已被数据否定，不再作为候选。</li>
             </ul>
           </div>
 
@@ -850,15 +1307,17 @@
               <span class="phase__window">决定百万级目标的最终达成</span>
             </div>
             <ul>
-              <li><strong>图元级 LOD 体系</strong>：按缩放级别退化绘制（点化 / 包围盒化 / 简化拓扑）。<span class="why">——帧率与图元总量解耦的关键。</span></li>
               <li><strong>Nesting NFP 空间索引复用</strong> + Solver 容器跨轮复用 + 边段重叠空间剪枝。</li>
-              <li><strong>性能基准与剖析常态化</strong>：建立 100 万图元标准场景（帧率、全选、框选、单删 1000 次、批量移动、undo 延迟），接入 Tracy/VTune 定期剖析，每项优化前后对比。</li>
+              <li><strong>基准与剖析常态化</strong>：把两个百万图元基准接入 CI 做每项优化前后自动对比（轮次标记已就位）；补齐真实视口的端到端帧率与拖动延迟埋点；接入 Tracy/VTune 定期剖析。</li>
+              <li><strong>空间索引的精确性契约</strong>：见 P0 第三条。这是数据层唯一还剩数量级空间的方向，但收益上限已由实测界定（一次移动最多省约 452 ms），排期应结合"拖动跟手"的真实需求再定，不要为优化而优化。</li>
             </ul>
           </div>
 
           <div class="callout">
             <div class="callout__label">下一步建议</div>
-            <p>先做 P0（改造面小、风险低、模式已在同文件验证过），随后<strong>立刻补基准</strong>。本轮核验暴露出一件事：没有基准时，"这条问题还在不在、改了有没有用"只能靠逐行读代码判断，成本高且容易得出互相矛盾的结论——本次两份复审报告就在同一批代码上给出了不同答案。有基准后，这类分歧可以直接用数据终结。</p>
+            <p>本轮把两侧的账都算清了。数据层：一次批量移动 537 ms，其中 <strong>84% 是空间索引维护</strong>，拖动路径本身并不付整批交换的代价，剩余部分要么受制于 Boost RTree 的固有成本，要么需要架构级改造。渲染层：全场景视野下 <strong>CPU 侧帧耗时 95 ms（≈10 fps），而 draw call 只有 5 个</strong>，瓶颈是每帧对 100 万条目的整表遍历；排序键一变再加约 200 ms。</p>
+            <p><strong>两处瓶颈现在都有可对比的数字了</strong>，因此下一步建议按"收益上限 × 风险"来排：先做渲染端的整表遍历（收益最大、边界清晰，且不牵动数据层语义），再做图元级 LOD 与增量排序；数据层那边唯一还剩数量级空间的"脏集 + 延迟更新"属于架构项，应与它分开评估，不要顺手改。</p>
+            <p>另外，渲染基准测的是 CPU 侧，<strong>"百万图元在真实视口里到底多少帧"仍没有答案</strong>——GPU 执行与呈现、以及应用侧每帧的场景→顶点转换都不在其中。建议优先补上真实视口的埋点，否则"是否流畅"这个最终判据会长期缺位。</p>
           </div>
         </section>
 
@@ -869,14 +1328,14 @@
           </p>
           <div class="table-wrap">
             <table>
-              <caption>表 7：本轮核验中需要特别说明的判断</caption>
+              <caption>表 14：本轮核验中需要特别说明的判断</caption>
               <thead>
                 <tr><th>原报告 / 复审说法</th><th>核验结论</th></tr>
               </thead>
               <tbody>
                 <tr>
                   <td>"2D 侧 Undo 快照未动，仍是全量 clone"</td>
-                  <td><strong>说法过于笼统</strong>。<code>DeleteEntitiesCommand</code>（<code>:239-257</code>）与 <code>AddEntitiesCommand</code>（<code>:302-326</code>）均已改为零克隆所有权转移，只有 <code>EntitySnapshotsCommand</code> 未改。这直接影响优先级判断——需要改的面比想象中小得多。</td>
+                  <td><strong>说法过于笼统</strong>。<code>DeleteEntitiesCommand</code> 与 <code>AddEntitiesCommand</code> 早已改为零克隆所有权转移，当时只有 <code>EntitySnapshotsCommand</code> 未改（现已改造）。这直接影响优先级判断——需要改的面比想象中小得多。</td>
                 </tr>
                 <tr>
                   <td>"16ms 定时器无条件驱动场景更新"</td>
@@ -888,23 +1347,55 @@
                 </tr>
                 <tr>
                   <td>"空间索引批量更新已是优化"</td>
-                  <td><strong>需修正预期</strong>。<code>updateBulk</code> 内部仍是两轮逐条 remove/insert，代码注释本身已承认"不降低复杂度，只是整批一次收尾"。</td>
+                  <td><strong>需修正预期</strong>。<code>updateBulk</code> 内部仍是两轮逐条 remove/insert，代码注释本身已承认"不降低复杂度，只是整批一次收尾"。<span class="why">——但实测显示它的耗时主要来自 RTree 分裂算法而非循环次数：换成 <code>quadratic</code> 后同样的两轮遍历明显变快。原判断把"复杂度没降"等同于"优化无效"，这一点被数据推翻。</span></td>
                 </tr>
                 <tr>
                   <td>"选中集 <code>clear()</code> 后全量重建"</td>
                   <td><strong>已重构</strong>。<code>SelectTool.cpp</code> 已无该模式，改为轮廓预算 + 路径缓存 + 超预算降级包围盒。</td>
                 </tr>
+                <tr>
+                  <td>报告与复审判定"全量快照克隆是变换链路的主因"</td>
+                  <td><strong>因果判断有偏</strong>。改造后快照捕获仅 49 ms（10 万图元），而全链路仍在 1129 ms 量级——说明双份 clone 从来不是主因，真正的放大链在<strong>替换图元时维护容器类型桶</strong>（<code>vec.erase(std::remove(...))</code> 单次 O(桶大小)，批量替换即 O(批量 × 桶大小)）以及 <strong>RTree 删除侧的 reinsert</strong>。这条修正直接改变了优化顺序。<span class="why">——方法上的教训：热点要靠插桩实测定位，不能靠代码阅读推断。</span></td>
+                </tr>
+                <tr>
+                  <td>另两份复审给出相互矛盾的结论</td>
+                  <td><strong>矛盾可用数据终结</strong>。此前"这条问题还在不在、改了有没有用"只能靠逐行读代码判断，故两份复审在同一批代码上给出了不同答案。本轮建立基准后，同样的分歧只需一次运行即可判定；同时也暴露出"基准建得太晚，前两项改造没留下数字基线"的短板（见 8.1）。</td>
+                </tr>
+                <tr>
+                  <td>本轮推测"移动 10 万图元的瓶颈在整批状态交换"</td>
+                  <td><strong>被数据推翻</strong>。相位拆分显示命令入栈只有 10.9 ms，批量移动 537 ms 里 <strong>84% 是空间索引批量更新</strong>（452 ms）；整批状态换手只发生在撤销/重做（各约 610 ms）。若按原推测去"绕开拖动时的整批交换"，等于优化一条不存在的路径。</td>
+                </tr>
+                <tr>
+                  <td>上一轮的"索引批量更新 68 ms、剩余 87% 不明"</td>
+                  <td><strong>指标口径错误</strong>。<code>update_bounds_bulk_10pct</code> 当时拿静止几何反复调用，而 <code>updateBulk</code> 对未变的包围盒直接跳过（<code>EntitySpatialIndex.cpp:275-276</code>），量到的是空转值。改为"先真的移动再更新"后为 446.6 ms，与换手路径内同相位 451.9 ms 互证。<span class="why">——口径错的指标比没有指标更危险：它会导向错误的优化方向。</span></td>
+                </tr>
+                <tr>
+                  <td>报告把"覆盖层每帧 <code>clear()</code> 后全量重传"列为待优化项</td>
+                  <td><strong>实测后建议撤下</strong>。专门测了瞬态环路径：每帧全量重传 1 万条命令只要 0.59 ms，占 95 ms 帧耗时的不足 1%。这是一条典型的"代码阅读看上去很浪费、实测却无关紧要"的判断——它之所以看起来危险，是因为把"每帧重建"当成了"每帧昂贵"，而实际成本取决于命令条数与顶点量级。</td>
+                </tr>
+                <tr>
+                  <td>报告推测"渲染端帧率与图元总量强耦合"</td>
+                  <td><strong>方向正确，但归因需要修正</strong>。耦合确实存在（全场景视野 95 ms vs 1% 视野 0.51 ms），但成因不是 draw call 数（100 万条目合批后仅 5 个），也不是批处理缺失，而是<strong>每帧对整表做一遍剔除 + 合批扫描</strong>（约 95 ns/条），且随规模呈带宽受限特征。因此"减少绘制量"（LOD）与"避免整表遍历"是两件必须分开做的事，只做前者 CPU 侧的 95 ms 仍在。</td>
+                </tr>
+                <tr>
+                  <td>本轮推测"整表遍历"就是渲染端的全部瓶颈</td>
+                  <td><strong>部分成立，其中四分之一是自己造的无用功</strong>。用"关闭剔除"的对照列表把这段隔离出来，发现网格粗筛在全场景视野下必然收集全部候选、再整份丢弃并回退线性，净成本 23.5 ms（占 92.6 ms 的 25%）。已按"视野 ⊇ 索引包围盒并集 ⇒ 剔除不可能生效"的判据跳过该段（8.6，全场景视野 −30%）。<span class="why">——教训同前：把"看起来很浪费的代码"与"实测确实浪费的代码"分开，靠的是对照测量，不是阅读。</span></td>
+                </tr>
+                <tr>
+                  <td>本轮建议"改条目布局以降低 64 ms"</td>
+                  <td><strong>已被证伪，建议撤回</strong>。这类"分离热数据"的改动在同一代码库里做过两次并都已回退：热冷数据分离零收益（§14.1）、把 bounds 拆成紧凑数组反而更慢（§14.5）。边界是：<em>成对访问的场景下分离热数据不减少访存</em>，只有"单条压进一个 cache line"才有效，而那要动 <code>DrawCommand</code> 的 80 字节公共 ABI。<span class="why">——教训：动性能之前先查同一模块的历史实测结论，否则会重复走已被否掉的路。</span></td>
+                </tr>
               </tbody>
             </table>
           </div>
           <p>
-            全文行号对应当前工作区版本。状态判定基于静态代码阅读，复杂度结论由源码结构推导，不含运行时剖析数据；"是否真的达到流畅"仍需基准测试验证。
+            全文行号对应当前工作区版本。本报告分两部分证据：二至七章的状态判定基于<strong>静态代码阅读</strong>，复杂度结论由源码结构推导；八章的数据来自 <strong>Release 构建下的百万图元实测</strong>（数据层见 <code>baseline.csv</code>，渲染帧路径见 <code>render-baseline.csv</code>）。需要区分的是——"数据层与渲染帧路径的瓶颈是否已定位"已有实测支撑，而<strong>"真实视口下是否流畅"仍未验证</strong>：渲染基准只覆盖帧路径 CPU 侧，不含 GPU 执行/呈现与应用侧的场景→顶点转换。一次批量移动 10 万图元 537 ms、撤销/重做各约 610 ms、全场景视野帧路径 CPU 侧 64 ms（优化前 95 ms），这些数字都还需要在真实视口里接上端到端埋点，才能回答"百万图元是否流畅"。
           </p>
         </section>
       </main>
 
       <footer>
-        <p>本报告为 2026-09-12 静态审查（正文 42 条）在 2026-09-24 的状态核验版。原审查覆盖 8 个模块约 26 万行源码；本轮逐条对照当前代码，结论为 8 项已修复、6 项部分缓解、28 项仍待处理。行号对应当前工作区版本，状态判定基于静态代码阅读，未包含运行时性能数据。</p>
+        <p>本报告为 2026-09-12 静态审查（正文 42 条）在 2026-09-24 的状态核验、改造回填与实测剖析版。原审查覆盖 8 个模块约 26 万行源码；核验结论为 8 项已修复、6 项部分缓解、28 项仍待处理，按该结论完成 P0 与索引层改造后更新为 <strong>11 项已修复、6 项部分缓解、25 项仍待处理</strong>。二至七章为静态代码判定（行号对应当前工作区版本）；八章为 Release 构建下 100 万图元的实测数据，含数据层相位拆分（<code>baseline.csv</code>）与渲染帧路径基准（<code>render-baseline.csv</code>），均带轮次标记。渲染基准只覆盖帧路径 CPU 侧，GPU 执行/呈现与真实视口帧率未纳入测量。</p>
       </footer>
     </div>
   </article>

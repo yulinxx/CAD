@@ -333,6 +333,12 @@ option(BUILD_PYTHON "Build Python module (PythonHost integration framework)" OFF
 
 # ===== 工具 =====
 option(BUILD_KEYGEN_TOOL "Build KeygenTool (offline license key generator)" OFF)
+# 百万级图元性能基准（Tools/PerfBenchmark）。默认构建，便于随时复测与优化前后对比；
+# 本项按 CMake 常规：首次 configure 写入缓存，需要关闭时用 -DBUILD_PERF_BENCHMARK=OFF。
+option(BUILD_PERF_BENCHMARK "Build million-entity performance benchmark" ON)
+# 渲染帧路径基准（Tools/RenderBenchmark）。走 RenderX 的 Null 后端，
+# 不依赖 GPU 与窗口系统，可无人值守复现，默认构建。
+option(BUILD_RENDER_BENCHMARK "Build headless render frame-path benchmark" ON)
 
 # --------------------------------------------------------------------
 # 测试开关（本项目测试开关的唯一配置处）
@@ -370,6 +376,7 @@ set(BUILD_UI2D_TESTS             OFF CACHE BOOL "UI2D 单元测试" FORCE)
 set(BUILD_UI3D_TESTS             ON  CACHE BOOL "UI3D 单元测试" FORCE)
 set(BUILD_MAIN_TESTS             OFF CACHE BOOL "Main 单元测试（含撤销/重做回归）" FORCE)
 set(BUILD_VIEWPORT_REFRESH_TESTS ON  CACHE BOOL "2D 视口刷新契约测试" FORCE)
+set(BUILD_SCENE_EDIT_TESTS       ON  CACHE BOOL "场景编辑集成回归测试（撤销状态交换链路）" FORCE)
 
 # 全部模块测试开关清单：供总开关应用、GTest 缺失统一降级、以及状态输出使用
 set(SANYI_TEST_SWITCHES
@@ -394,6 +401,7 @@ set(SANYI_TEST_SWITCHES
     BUILD_UI3D_TESTS
     BUILD_MAIN_TESTS
     BUILD_VIEWPORT_REFRESH_TESTS
+    BUILD_SCENE_EDIT_TESTS
     CACHE INTERNAL "全部单元测试开关")
 
 # 总开关为 ON 时覆盖上面所有逐模块取值

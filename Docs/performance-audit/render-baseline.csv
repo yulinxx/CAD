@@ -1,0 +1,20 @@
+entities,metric,unit,median_ms,note
+# run=render-path-baseline entities=1000000 at=2026-09-24 15:54:28 backend=Null
+1000000,frame_zoom_fit,ms,95.9911,p95=128.4065 视野覆盖全场景（远景全精度绘制）
+1000000,frame_zoom_10pct,ms,6.8394,p95=10.2123 视野覆盖 10% 场景
+1000000,frame_zoom_1pct,ms,0.4859,p95=0.5449 视野覆盖 1% 场景
+1000000,frame_pan,ms,7.5977,p95=9.6697 每帧平移视野（镜头拖动）
+1000000,frame_dirty_1k,ms,94.3331,p95=111.6970 每帧改 1 千个图元的包围盒
+1000000,frame_dirty_10k,ms,97.8852,p95=107.6938 每帧改 1 万个图元的包围盒
+1000000,frame_resort_10k,ms,302.819,p95=326.2872 每帧改 1 万条的排序键（触发全量重排）
+1000000,frame_transient_10k,ms,0.5903,p95=0.7128 每帧经瞬态环全量重传 1 万条命令
+# run=after-grid-shortcut entities=1000000 at=2026-09-24 16:13:08 backend=Null
+1000000,frame_zoom_fit,ms,66.6621,p95=72.1814 视野覆盖全场景（远景全精度绘制）
+1000000,frame_zoom_10pct,ms,5.8158,p95=7.5664 视野覆盖 10% 场景
+1000000,frame_zoom_1pct,ms,0.5423,p95=0.5925 视野覆盖 1% 场景
+1000000,frame_fit_nocull,ms,66.1729,p95=72.4798 全场景视野但关闭剔除（纯线性路径，对照）
+1000000,frame_pan,ms,7.1252,p95=9.6565 每帧平移视野（镜头拖动）
+1000000,frame_dirty_1k,ms,66.9819,p95=74.3883 每帧改 1 千个图元的包围盒
+1000000,frame_dirty_10k,ms,71.2567,p95=77.5576 每帧改 1 万个图元的包围盒
+1000000,frame_resort_10k,ms,264.068,p95=277.0955 每帧改 1 万条的排序键（触发全量重排）
+1000000,frame_transient_10k,ms,0.5742,p95=0.6446 每帧经瞬态环全量重传 1 万条命令

@@ -892,12 +892,12 @@ void ImportService::phaseWriteBackState(const ImportContext& context, const Impo
     }
 
     // 更新状态栏（使用成员变量回调，全局配置）
-    if (m_statusBarUpdateCallback)
+    if (m_statusPromptCallback)
     {
         QString statusMsg = tr("Imported %1 entities from %2")
                                 .arg(result.entityCount)
                                 .arg(QFileInfo(context.sourcePath).fileName());
-        m_statusBarUpdateCallback(statusMsg);
+        m_statusPromptCallback(statusMsg);
     }
 
     updateProgress(context, ImportPhase::WriteBackState, 1.0f);

@@ -210,7 +210,12 @@ SVGnest/
 Archive/
 RenderEngine/
 scripts/
-Tools/
+# Tools/ 下绝大多数是本地脚本与一次性原型，不入库；但两个性能基准是长期资产，
+# 必须入库（它们是"优化前后可比"的唯一依据）。因此改为排除目录内容后按需放行——
+# 注意不能写成 「Tools/ + !Tools/xxx/」：父目录被整体排除时，子目录的负向规则无效。
+Tools/*
+!Tools/PerfBenchmark/
+!Tools/RenderBenchmark/
 # [A7 修复] .github/ 工作流必须入库，删除此忽略规则
 
 # ---- 测试运行产生的落地文件 ----

@@ -232,11 +232,24 @@ else()
     message(STATUS "  PyBindCore: DISABLED")
 endif()
 
-# 7.5 KeygenTool - 离线注册码生成工具
-option(BUILD_KEYGEN_TOOL "Build KeygenTool (offline license key generator)" OFF)
+# 7.5 KeygenTool - 离线注册码生成工具（开关由 Config.cmake 统一定义，此处不重复定义）
 if(BUILD_KEYGEN_TOOL)
     add_subdirectory(Tools/KeygenTool)
     message(STATUS "  KeygenTool: ENABLED")
+endif()
+
+# 7.55 百万级图元性能基准（开关由 Config.cmake 统一定义）
+# 建立可重复运行的性能基线，供优化前后对比。
+if(BUILD_PERF_BENCHMARK)
+    add_subdirectory(Tools/PerfBenchmark)
+    message(STATUS "  PerfBenchmark: ENABLED")
+endif()
+
+# 7.56 渲染帧路径基准（开关由 Config.cmake 统一定义）
+# 走 RenderX 的 Null 后端，无 GPU / 无窗口依赖，测帧路径的 CPU 侧耗时。
+if(BUILD_RENDER_BENCHMARK)
+    add_subdirectory(Tools/RenderBenchmark)
+    message(STATUS "  RenderBenchmark: ENABLED")
 endif()
 
 # 7.6 Metal 原生视口原型（仅 Apple）——一次性可行性验证，不是产品代码。
