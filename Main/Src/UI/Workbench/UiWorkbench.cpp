@@ -36,7 +36,6 @@
 #include "SceneTreeModel2D.h"
 #include "SceneTreeBuilder2D.h"
 
-
 #include "UiPropertiesPanel.h"
 #include "RenderViewport2D.h"
 #include "FileDropHandler.h"
@@ -98,7 +97,6 @@
 #include "Import/ImportService.h"
 #include "Color/Color.hpp"
 #include "Log/SyLogger.h"
-
 
 #if BUILD_UI3D
     #include "UiViewport3D.h"
@@ -380,7 +378,8 @@ bool Workbench2D::initialize(const WorkbenchServices& services)
     if (!services.uiState.stateCenter || !services.uiState.interactionDispatcher)
     {
         SY_ERRORF("[Workbench2D] initialize failed: stateCenter=%p interactionDispatcher=%p",
-            static_cast<void*>(services.uiState.stateCenter), static_cast<void*>(services.uiState.interactionDispatcher));
+            static_cast<void*>(services.uiState.stateCenter),
+            static_cast<void*>(services.uiState.interactionDispatcher));
         return false;
     }
     m_uiState = services.uiState;
@@ -477,8 +476,8 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
     // 放在最后：此时视口、工具栏、场景树、状态栏均已就绪，install 内的首次刷新可覆盖全部 UI。
     // 返回的句柄必须留到 deactivate 销毁：bus / layerBridge 跨工作台长寿，
     // 连线两端都不死时 Qt 不会自动回收，往返切换 N 次就会刷 N 次。
-    m_uiStateConnections = UiStateBridge2D::install(
-        this, m_viewport, m_commands.operationBus, m_scene.layerManagerBridge, m_sceneMonitor);
+    m_uiStateConnections =
+        UiStateBridge2D::install(this, m_viewport, m_commands.operationBus, m_scene.layerManagerBridge, m_sceneMonitor);
 }
 
 bool Workbench2D::showSettingsDialog(QWidget* /*parent*/)
@@ -692,12 +691,8 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         // 选择变化 → 刷新命令 UI（工具栏/右键菜单/面板/状态栏）的连线统一由
         // UiStateBridge2D::install 挂载，此处不再逐个 connect，避免触发源散落漏接。
 
-        // 鼠标移动时实时更新状态栏位置标签
-        vp->setPositionCallback([stateCenter = m_uiState.stateCenter, &window](double x, double y) {
-            QVariantMap meta = stateCenter->metadata();
-            meta["mouseX"] = x;
-            meta["mouseY"] = y;
-            stateCenter->setMetadata(meta);
+        // 鼠标移动时实时更新状态栏位置标签（唯一通路；不再写 metadata 镜像）
+        vp->setPositionCallback([&window](double x, double y) {
             window.updatePositionLabel(x, y);
         });
     }
@@ -1062,7 +1057,8 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     m_commandHub->setActiveToolAction(m_viewport->activeToolName());
 
     // 工具切换时同步 DrawToolBarWidget 的高亮状态
-    QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged, drawWidget, &DrawToolBarWidget::setCurrentToolName);
+    QObject::connect(
+        m_viewport, &RenderViewport2D::activeToolChanged, drawWidget, &DrawToolBarWidget::setCurrentToolName);
 
     // 文字编辑工具栏绑定：工具切换到 TextEditTool 时，绑定到 TextFontToolBar
     // 以便在进入编辑时自动刷新字体面板信息
@@ -1504,7 +1500,9 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
             // 白做功；删除/粘贴/成组等结构变化签名不同，才会走防抖重建。
             // 选中高亮由 syncSceneTreeSelection 单独维护，不依赖重建。
             // 改名等「不入结构签名但要刷新行文本」的操作由上方 undoStateChanged 兜底。
-            QTimer::singleShot(0, this, [this]() { refreshSceneTreeIfNeeded("opCompleted"); });
+            QTimer::singleShot(0, this, [this]() {
+                refreshSceneTreeIfNeeded("opCompleted");
+            });
         });
     }
 
@@ -1645,7 +1643,9 @@ void Workbench2D::applySceneTreeIncremental(const char* src)
     // 那时只会读到真正的新变更。收敛性：重跑若读到空变更且签名一致会直接返回，不再投递。
     if (m_sceneTreeIncrementalBusy)
     {
-        QTimer::singleShot(0, this, [this]() { applySceneTreeIncremental("deferred"); });
+        QTimer::singleShot(0, this, [this]() {
+            applySceneTreeIncremental("deferred");
+        });
         return;
     }
 
@@ -1653,12 +1653,17 @@ void Workbench2D::applySceneTreeIncremental(const char* src)
     struct BusyGuard
     {
         bool& flag;
+
         explicit BusyGuard(bool& f)
             : flag(f)
         {
             flag = true;
         }
-        ~BusyGuard() { flag = false; }
+
+        ~BusyGuard()
+        {
+            flag = false;
+        }
     } busyGuard(m_sceneTreeIncrementalBusy);
 
     Eg::SceneManager* scene = m_scene.sceneEditService->sceneManager();
@@ -1848,7 +1853,9 @@ void Workbench2D::toggleEntityVisibility(const QString& id, bool visible)
         scene->notifySceneChanged();
         // 可见性不进结构签名（不是增删/拓扑变化），且树行要显示新的显隐图标，
         // 延迟到下一事件循环重建，避免连续点击导致多次完整重建
-        QTimer::singleShot(0, this, [this]() { refreshSceneTree(); });
+        QTimer::singleShot(0, this, [this]() {
+            refreshSceneTree();
+        });
     }
 }
 
@@ -2067,7 +2074,9 @@ void Workbench2D::applySelectionContext(const CommandUiSnapshot& snapshot)
 
     // 属性面板：10Hz 节流，避免拖动期间每帧重建（60fps → 10fps）
     // 使用 singleShot 延迟 100ms，同一窗口内多次调用只执行一次
-    QTimer::singleShot(100, this, [this]() { refreshPropertiesPanel(); });
+    QTimer::singleShot(100, this, [this]() {
+        refreshPropertiesPanel();
+    });
 
     // 状态栏选择指示器：直接用快照里的 selectionCount，不再二次遍历场景
     if (m_statusBar2D)
@@ -2394,7 +2403,8 @@ bool Workbench3D::initialize(const WorkbenchServices& services)
     if (!services.uiState.stateCenter || !services.uiState.interactionDispatcher)
     {
         SY_ERRORF("[Workbench3D] initialize failed: stateCenter=%p interactionDispatcher=%p",
-            static_cast<void*>(services.uiState.stateCenter), static_cast<void*>(services.uiState.interactionDispatcher));
+            static_cast<void*>(services.uiState.stateCenter),
+            static_cast<void*>(services.uiState.interactionDispatcher));
         return false;
     }
     m_uiState = services.uiState;
@@ -2580,7 +2590,6 @@ void Workbench3D::bind3DRenderSignals(ServiceOwner& own)
         return;
     }
 
-    bind3DCursorSignal();
     bind3DSelectionSignal();
 
     // 右键菜单请求：交给命令中枢基于统一快照构建并弹出（与 2D 视口一致）
@@ -2590,32 +2599,10 @@ void Workbench3D::bind3DRenderSignals(ServiceOwner& own)
         &Workbench3D::on3DContextMenuRequested);
 }
 
-/// 绑定光标世界坐标信号
-void Workbench3D::bind3DCursorSignal()
-{
-    auto* renderWidget = m_services3D.renderWidget;
-    connect(renderWidget,
-        &RenderWidget3D::sigCursorWorldPosition,
-        [stateCenter = m_uiState.stateCenter](float x, float y, float z, bool valid) {
-            if (!stateCenter)
-            {
-                return;
-            }
-            QVariantMap meta;
-            if (valid)
-            {
-                meta[QStringLiteral("positionText")] =
-                    QObject::tr("Position: (%1, %2, %3) mm").arg(x, 0, 'f', 2).arg(y, 0, 'f', 2).arg(z, 0, 'f', 2);
-            }
-            else
-            {
-                meta[QStringLiteral("positionText")] = QObject::tr("Position: -");
-            }
-            stateCenter->setMetadata(meta);
-        });
-}
-
-/// 绑定选中变化信号
+/// 绑定选中变化信号：选择语义进 StateCenter（selectionContext）。
+/// 坐标/选择的显示通路只有一条 —— 直连挂载的 StatusBar3D
+/// （见 build3DWorkbenchUi 内的 sigCursorWorldPosition / sigSelectionChanged 连线），
+/// 不再往 metadata 写 positionText / 3d_selCount / 3d_modelName 等无消费者的镜像。
 void Workbench3D::bind3DSelectionSignal()
 {
     auto* renderWidget = m_services3D.renderWidget;
@@ -2627,15 +2614,6 @@ void Workbench3D::bind3DSelectionSignal()
             {
                 return;
             }
-            QString modelName;
-            if (count > 0 && entities && entities[0])
-            {
-                modelName = QString::number(entities[0]->id);
-            }
-
-            QVariantMap meta;
-            meta[QStringLiteral("3d_selCount")] = count;
-            meta[QStringLiteral("3d_modelName")] = modelName;
 
             if (count > 0)
             {
@@ -2646,7 +2624,6 @@ void Workbench3D::bind3DSelectionSignal()
             {
                 stateCenter->setSelectionContext(QObject::tr("3D-Viewport"), QStringLiteral("none"));
             }
-            stateCenter->setMetadata(meta);
         });
 }
 
@@ -2936,15 +2913,19 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
             });
     }
 
-    // 6. 状态栏：创建独立的 StatusBar3D 并挂载到 WorkbenchWindow
-    //    Workbench3D 拥有 StatusBar3D 的完整生命周期，不再从 MainWindow3D reparent
-    //    MainWindow3D 保留自己的 StatusBar3D 供内部使用（如导航提示）
+    // 6. 状态栏：创建独立的 StatusBar3D 并挂载到 WorkbenchWindow（全应用唯一可见实例）。
+    //    MainWindow3D 只是被 hide() 的服务容器，不再持有自己的状态栏；
+    //    其 updateStatusBar/setStatusMessage 经 bindStatusBar 改写到下面这个挂载实例。
     if (!m_statusBar3D)
     {
         m_statusBar3D = new StatusBar3D(&window);
         SY_DEBUG("[Workbench3D] StatusBar3D created for WorkbenchWindow");
     }
     window.mountStatusBar(m_statusBar3D);
+    if (m_mainWindow3D)
+    {
+        m_mainWindow3D->bindStatusBar(m_statusBar3D);
+    }
 
     // 将光标世界坐标信号直接连接到 StatusBar3D 的位置标签
     if (m_services3D.renderWidget)

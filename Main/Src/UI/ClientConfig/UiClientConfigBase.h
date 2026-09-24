@@ -132,8 +132,8 @@ struct ShortcutDef
 };
 
 /// 状态栏槽位对齐方式
-/// Left      —— addWidget，随窗口左侧排列，可被临时消息覆盖
-/// Permanent —— addPermanentWidget，固定在右侧，不被 showMessage 覆盖
+/// Left      —— addWidget，随窗口左侧排列（配置槽位，先于工作台级 StatusBarBase）
+/// Permanent —— addPermanentWidget，固定在右侧永久区
 enum class StatusBarSlotAlign
 {
     Left,
@@ -146,11 +146,11 @@ enum class StatusBarSlotAlign
 struct StatusBarSlotDef
 {
     QString id;
-    QString widgetType;                                        // 槽位控件类型（UiPanelRegistry 解析）
-    StatusBarSlotAlign align{ StatusBarSlotAlign::Left };       // 对齐方式
-    int stretch{ 0 };                                          // 伸缩因子（仅 Left 有效）
-    int minimumWidth{ 0 };                                     // 最小宽度，0 表示不限制
-    QString feature;                                           // 可选：需要的许可功能 ID
+    QString widgetType;                                    // 槽位控件类型（UiPanelRegistry 解析）
+    StatusBarSlotAlign align{ StatusBarSlotAlign::Left };  // 对齐方式
+    int stretch{ 0 };                                      // 伸缩因子（仅 Left 有效）
+    int minimumWidth{ 0 };                                 // 最小宽度，0 表示不限制
+    QString feature;                                       // 可选：需要的许可功能 ID
     bool visible = true;
 };
 

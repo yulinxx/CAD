@@ -94,9 +94,6 @@ public:
     /// @param callback 参数为目标工作台 ID
     void setWorkbenchSwitchCallback(std::function<void(const QString&)> callback);
 
-    /// 设置状态栏更新回调（导入完成后更新状态栏）
-    void setStatusBarUpdateCallback(std::function<void(const QString&)> callback);
-
     /// 设置最近文件添加回调（导入完成后添加到最近文件列表）
     void setRecentFileAddCallback(std::function<void(const QString&)> callback);
 
@@ -186,7 +183,6 @@ private:
     /// @return 成功创建的群组数量
     int restoreImportedGroups(const ImportResult& parseResult, const std::unordered_map<int64_t, int64_t>& idRemap);
 
-
 private:
     /// 更新进度：转发给 context.progressCallback（可跨线程安全消费，如进度对话框的 tracker），
     /// 并发出 importProgress 信号。
@@ -223,8 +219,6 @@ private:
     std::function<void()> m_displayRefreshCallback;
     /// 工作台切换回调
     std::function<void(const QString&)> m_workbenchSwitchCallback;
-    /// 状态栏更新回调
-    std::function<void(const QString&)> m_statusBarUpdateCallback;
     /// 最近文件添加回调
     std::function<void(const QString&)> m_recentFileAddCallback;
     /// 当前文档路径更新回调

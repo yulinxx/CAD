@@ -299,7 +299,6 @@
     "visible": true,
     "sizeGripEnabled": true,
     "items": [
-      { "id": "statusSpacer", "widgetType": "Spacer", "align": "left", "stretch": 1 },
       { "id": "clientIndicator", "widgetType": "ClientIndicator", "align": "permanent" },
       { "id": "licenseIndicator", "widgetType": "LicenseIndicator", "align": "permanent" }
     ]

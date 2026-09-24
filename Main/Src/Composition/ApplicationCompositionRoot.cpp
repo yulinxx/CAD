@@ -120,7 +120,7 @@ ApplicationCompositionRoot::~ApplicationCompositionRoot()
 {
     // 清理静态实例指针
     s_instance = nullptr;
-    
+
     // 加工服务先销毁：它的析构会把还在跑的作业 abort 掉，
     // 而 abort 需要设备还活着。反过来先停设备，作业就无处可停了。
     m_processingJobService.reset();
@@ -329,7 +329,7 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_importService->setStatusPromptCallback([this](const QString& prompt) {
         if (m_stateCenter)
         {
-            m_stateCenter->setMetadata({ { QStringLiteral("statusPrompt"), prompt } });
+            m_stateCenter->setStatusPrompt(prompt);
         }
     });
 
@@ -365,7 +365,7 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_exportService->setStatusPromptCallback([this](const QString& prompt) {
         if (m_stateCenter)
         {
-            m_stateCenter->setMetadata({ { QStringLiteral("statusPrompt"), prompt } });
+            m_stateCenter->setStatusPrompt(prompt);
         }
     });
 
@@ -391,9 +391,10 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
                 return;
             }
             m_stateCenter->setBusy(false);
+            m_stateCenter->setStatusPrompt(result.success
+                    ? QString("Import complete: %1 entities").arg(result.entityCount)
+                    : QString("Import failed: %1").arg(result.message));
             QVariantMap meta = m_stateCenter->metadata();
-            meta["statusPrompt"] = result.success ? QString("Import complete: %1 entities").arg(result.entityCount)
-                                                  : QString("Import failed: %1").arg(result.message);
             meta["notificationType"] = result.success ? "info" : "error";
             m_stateCenter->setMetadata(meta);
         });
@@ -415,10 +416,11 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
 
             m_stateCenter->setBusy(false);
 
+            m_stateCenter->setStatusPrompt(result.success
+                    ? QString("Export complete: %1 entities").arg(result.exportedEntityCount)
+                    : QString("Export failed: %1").arg(result.message));
+
             QVariantMap meta = m_stateCenter->metadata();
-            meta["statusPrompt"] = result.success
-                ? QString("Export complete: %1 entities").arg(result.exportedEntityCount)
-                : QString("Export failed: %1").arg(result.message);
             meta["notificationType"] = result.success ? "info" : "error";
 
             m_stateCenter->setMetadata(meta);
