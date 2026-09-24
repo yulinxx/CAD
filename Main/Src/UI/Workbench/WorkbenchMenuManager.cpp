@@ -151,10 +151,14 @@ struct MenuDispatcher final : public IUiCommandDispatcher
             self->workbenchWindow()->triggerTheme(commandId);
             return;
         }
-        // 关于对话框：help.about 是窗口级动作，不应进入命令目录。
+        // 关于对话框：help.about 是窗口级动作，在进命令总线前短路
+        //（目录里保留条目仅供历史兼容，不作为分发路径）。
+        // 模式必须取当前工作台 —— 硬编码 Mode2D 会让 3D 下打开 2D 版 About。
         if (commandId == QLatin1String("help.about") && self && self->workbenchWindow())
         {
-            AboutDialog::showDialog(AppMode::Mode2D, self->workbenchWindow());
+            const UiWorkbench* wb = self->workbenchWindow()->currentWorkbench();
+            const AppMode mode = (wb && wb->id() == QLatin1String("3D")) ? AppMode::Mode3D : AppMode::Mode2D;
+            AboutDialog::showDialog(mode, self->workbenchWindow());
             return;
         }
         // 语言切换：language.<code> → AppLanguage，落盘后由 SettingsService 应用。
@@ -285,10 +289,13 @@ void WorkbenchMenuManager::rebuildAllMenus()
 
 bool WorkbenchMenuManager::isWindowLevelCommand(const QString& commandId)
 {
-    // 唯一真相：MenuDispatcher 短路处理的命令集合。改这里即同时改变
-    // 「按钮是否可点」（isCommandRegistered）与「契约测试是否放行」两处行为。
+    // 唯一真相：MenuDispatcher::dispatch 短路处理的完整命令集合
+    // （工作台切换 / 主题 / 语言 / 关于）。改这里即同时改变三处行为：
+    // 「按钮是否可点」（MenuDispatcher::isCommandRegistered）、「过滤是否放行」
+    // （rebuildMenusFromConfig 的 commandAvailable）与「契约测试/自检是否跳过
+    // 目录校验」（CommandUiWiringTests、UiConfigSelfCheck）。不要再开第二份名单。
     return MenuDispatcher::isWorkbenchSwitchCommand(commandId) || MenuDispatcher::isThemeCommand(commandId) ||
-        MenuDispatcher::isLanguageCommand(commandId);
+        MenuDispatcher::isLanguageCommand(commandId) || commandId == QLatin1String("help.about");
 }
 
 IUiCommandDispatcher* WorkbenchMenuManager::commandDispatcher()
@@ -423,11 +430,10 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
         {
             return false;
         }
-        // 工作台切换 / 主题 / 语言属于窗口级动作命令（由 MenuDispatcher 直接处理），
+        // 窗口级命令（工作台切换 / 主题 / 语言 / 关于）由 MenuDispatcher 短路处理，
         // 不注册在 2D/3D 命令目录中，过滤时必须放行，否则对应菜单项会被移除。
-        if (MenuDispatcher::isWorkbenchSwitchCommand(commandId) || MenuDispatcher::isThemeCommand(commandId) ||
-            MenuDispatcher::isLanguageCommand(commandId) || commandId == QLatin1String("help.about") ||
-            commandId.startsWith(QStringLiteral("language."), Qt::CaseInsensitive))
+        // 判定复用 isWindowLevelCommand 单一名单，这里不再维护第二份前缀白名单。
+        if (isWindowLevelCommand(commandId))
         {
             return true;
         }
@@ -435,8 +441,7 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
         {
             return true;
         }
-        const bool registered = m_workbench->isCommandRegistered(commandId);
-        return registered;
+        return m_workbench->isCommandRegistered(commandId);
     };
 
     std::vector<MenuDef> filteredMenus =

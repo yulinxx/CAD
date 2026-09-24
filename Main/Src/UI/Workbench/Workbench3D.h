@@ -76,7 +76,6 @@ private:
     void setup3DMenuAndShortcuts(WorkbenchWindow& window);
     void create3DViewport(WorkbenchWindow& window);
     void bind3DRenderSignals(ServiceOwner& own);
-    void bind3DCursorSignal();
     void bind3DSelectionSignal();
     void setup3DDeleteShortcuts(WorkbenchWindow& window);
     /// 3D 视口右键菜单请求：基于命令中枢快照构建并弹出（与 2D 统一的单一事实来源）
@@ -84,7 +83,8 @@ private:
     /// 按客户配置构建 3D 右键菜单
     /// @param contextMenuId JSON contextMenus 节中的菜单 ID，例如 "canvas.3d"
     /// @return 配置菜单；未配置时返回 nullptr，调用方回退到内建路径。
-    ///         返回的菜单归调用方所有，且必须在同一作用域内 delete（命令分发器是栈对象）。
+    ///         返回的菜单归调用方所有，可在任意时机销毁（分发器是
+    ///         WorkbenchMenuManager 持有的长寿命 MenuDispatcher，不依赖菜单寿命）。
     QMenu* buildConfiguredContextMenu(const QString& contextMenuId);
 
     // ---- 3D 场景树（数据/算法/UI 分离，UI 可定制/可缺失） ----

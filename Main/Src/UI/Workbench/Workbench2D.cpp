@@ -549,12 +549,8 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         // 选择变化 → 刷新命令 UI（工具栏/右键菜单/面板/状态栏）的连线统一由
         // UiStateBridge2D::install 挂载，此处不再逐个 connect，避免触发源散落漏接。
 
-        // 鼠标移动时实时更新状态栏位置标签
-        vp->setPositionCallback([stateCenter = m_uiState.stateCenter, &window](double x, double y) {
-            QVariantMap meta = stateCenter->metadata();
-            meta["mouseX"] = x;
-            meta["mouseY"] = y;
-            stateCenter->setMetadata(meta);
+        // 鼠标移动时实时更新状态栏位置标签（唯一通路；不再写 metadata 镜像）
+        vp->setPositionCallback([&window](double x, double y) {
             window.updatePositionLabel(x, y);
         });
     }
@@ -1898,10 +1894,13 @@ QMenu* Workbench2D::buildConfiguredContextMenu(const QString& contextMenuId, boo
         return nullptr;
     }
 
-    // 分发器直接用工作台自身（UiWorkbench 实现 IUiCommandDispatcher）：
-    // UiLayoutBuilder 把 dispatcher 裸指针捕进 QAction 的 triggered 闭包，闭包活到菜单析构，
-    // 而菜单在调用方 exec()，此处再建局部适配器就是悬垂指针。
-    return UiContextMenuService::instance().buildMenu(config, contextMenuId, this, m_commandHub->mainWindow());
+    // 分发器统一取 WorkbenchMenuManager::commandDispatcher()（MenuDispatcher）：
+    // 与顶部菜单栏/工具栏同一条分发链 —— 窗口级命令（工作台切换/主题/语言/about）
+    // 在右键里同样可用，而不是进 UiWorkbench::dispatchCommand 被判 unknown。
+    // 寿命随菜单管理器（长于菜单本体），UiLayoutBuilder 捕获的裸指针始终有效。
+    auto* dispatcher = m_workbenchWindow ? m_workbenchWindow->menuManager()->commandDispatcher()
+                                         : static_cast<IUiCommandDispatcher*>(this);
+    return UiContextMenuService::instance().buildMenu(config, contextMenuId, dispatcher, m_commandHub->mainWindow());
 }
 
 void Workbench2D::refreshCommandUiState()

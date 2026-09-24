@@ -390,10 +390,11 @@ void WorkbenchLayoutManager::clearLayoutContent(const UiWorkbench* oldWorkbench)
     }
     m_registeredToolBars.clear();
 
-    // 2: 清理菜单栏 - 3D 工作台使用 MenuManager3D 独立管理菜单，
-    // 切换到 2D 时需要清空菜单栏，避免 3D 菜单残留导致混乱
-    // 注意：mb->clear() 会同步删除 QAction，但旧 QAction 上可能还有
-    // lambda/connect 持有引用。先 disconnect 所有 action，再 clear。
+    // 2: 清理菜单栏 - 工作台切换的内容拆除阶段。
+    // 菜单树的重建权归 WorkbenchMenuManager::rebuildAllMenus（triggerWorkbench 末步），
+    // 这里只负责拆除时断开旧 QAction 的 connect 并回收整棵菜单树，
+    // 避免上一个工作台的菜单残留。注意：mb->clear() 会同步删除 QAction，
+    // 但旧 QAction 上可能还有 lambda/connect 持有引用，先 disconnect 再 clear。
     if (auto* mb = m_parent->menuBar())
     {
         const auto actions = mb->actions();

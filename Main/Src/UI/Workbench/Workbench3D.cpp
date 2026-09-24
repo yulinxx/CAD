@@ -351,7 +351,6 @@ void Workbench3D::bind3DRenderSignals(ServiceOwner& own)
         return;
     }
 
-    bind3DCursorSignal();
     bind3DSelectionSignal();
 
     // 右键菜单请求：交给命令中枢基于统一快照构建并弹出（与 2D 视口一致）
@@ -361,32 +360,8 @@ void Workbench3D::bind3DRenderSignals(ServiceOwner& own)
         &Workbench3D::on3DContextMenuRequested);
 }
 
-/// 绑定光标世界坐标信号
-void Workbench3D::bind3DCursorSignal()
-{
-    auto* renderWidget = m_services3D.renderWidget;
-    connect(renderWidget,
-        &RenderWidget3D::sigCursorWorldPosition,
-        [stateCenter = m_uiState.stateCenter](float x, float y, float z, bool valid) {
-            if (!stateCenter)
-            {
-                return;
-            }
-            QVariantMap meta;
-            if (valid)
-            {
-                meta[QStringLiteral("positionText")] =
-                    QObject::tr("Position: (%1, %2, %3) mm").arg(x, 0, 'f', 2).arg(y, 0, 'f', 2).arg(z, 0, 'f', 2);
-            }
-            else
-            {
-                meta[QStringLiteral("positionText")] = QObject::tr("Position: -");
-            }
-            stateCenter->setMetadata(meta);
-        });
-}
-
 /// 绑定选中变化信号
+/// 不再往 metadata 写 positionText / 3d_selCount / 3d_modelName 等无消费者的镜像。
 void Workbench3D::bind3DSelectionSignal()
 {
     auto* renderWidget = m_services3D.renderWidget;
@@ -398,16 +373,6 @@ void Workbench3D::bind3DSelectionSignal()
             {
                 return;
             }
-            QString modelName;
-            if (count > 0 && entities && entities[0])
-            {
-                modelName = QString::number(entities[0]->id);
-            }
-
-            QVariantMap meta;
-            meta[QStringLiteral("3d_selCount")] = count;
-            meta[QStringLiteral("3d_modelName")] = modelName;
-
             if (count > 0)
             {
                 stateCenter->setSelectionContext(
@@ -417,7 +382,6 @@ void Workbench3D::bind3DSelectionSignal()
             {
                 stateCenter->setSelectionContext(QObject::tr("3D-Viewport"), QStringLiteral("none"));
             }
-            stateCenter->setMetadata(meta);
         });
 }
 
@@ -512,12 +476,14 @@ QMenu* Workbench3D::buildConfiguredContextMenu(const QString& contextMenuId)
         return nullptr;
     }
 
-    // 分发器直接用工作台自身（UiWorkbench 实现 IUiCommandDispatcher），
-    // 右键项与 3D 顶部菜单 / 工具栏共用同一条 dispatchCommand 路径。
-    // 不要在这里建局部适配器：UiLayoutBuilder 会把 dispatcher 裸指针捕进 QAction 的
-    // triggered 闭包，而菜单是在调用方 exec() 的 —— 本函数返回后栈帧即失效，
-    // 点「删除」时 dispatch 会打在已被 exec() 调用链覆写的栈内存上（必崩）。
-    return UiContextMenuService::instance().buildMenu(config, contextMenuId, this, m_services3D.renderWidget);
+    // 分发器统一取 WorkbenchMenuManager::commandDispatcher()（MenuDispatcher）：
+    // 与 3D 顶部菜单/工具栏共用同一条分发链，窗口级命令在右键里同样可用；
+    // 寿命随菜单管理器，闭包捕获的裸指针长期有效。
+    // 不要在这里建局部适配器：UiLayoutBuilder 把 dispatcher 裸指针捕进 QAction 的
+    // triggered 闭包，而菜单是在调用方 exec() 的 —— 局部对象出栈即悬垂。
+    auto* dispatcher = m_workbenchWindow ? m_workbenchWindow->menuManager()->commandDispatcher()
+                                         : static_cast<IUiCommandDispatcher*>(this);
+    return UiContextMenuService::instance().buildMenu(config, contextMenuId, dispatcher, m_services3D.renderWidget);
 }
 
 /// 步骤三：创建 CommandActionHub3D、注册命令、初始化菜单管理器和快捷键

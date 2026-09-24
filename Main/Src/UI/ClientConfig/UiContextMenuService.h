@@ -68,7 +68,8 @@ public:
     /// 按配置构建右键菜单
     /// @param config 当前客户配置（通常取自 WorkbenchLayoutManager::configManager()）
     /// @param contextMenuId 菜单 ID，例如 "canvas.2d"
-    /// @param dispatcher 命令分发器（复用工作台的 MenuDispatcher，保证命令路径一致）
+    /// @param dispatcher 命令分发器（生产路径传 WorkbenchMenuManager::commandDispatcher()，
+    ///        即与主菜单栏/工具栏共用的 MenuDispatcher；测试可传任意实现）
     /// @param parent 菜单父对象
     /// @return 构建好的菜单；配置缺失或无可用条目时返回 nullptr（调用方据此回退）
     QMenu* buildMenu(const UiConfigData* config,

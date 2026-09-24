@@ -891,15 +891,7 @@ void ImportService::phaseWriteBackState(const ImportContext& context, const Impo
         SY_TRACE("[ImportService] Document persistence skipped: no callback registered");
     }
 
-    // 更新状态栏（使用成员变量回调，全局配置）
-    if (m_statusBarUpdateCallback)
-    {
-        QString statusMsg = tr("Imported %1 entities from %2")
-                                .arg(result.entityCount)
-                                .arg(QFileInfo(context.sourcePath).fileName());
-        m_statusBarUpdateCallback(statusMsg);
-    }
-
+    // 完成提示统一走 statusPromptCallback → UiStateCenter::setStatusPrompt（唯一的提示通路）
     updateProgress(context, ImportPhase::WriteBackState, 1.0f);
 }
 
