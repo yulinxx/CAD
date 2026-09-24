@@ -1291,6 +1291,51 @@ void SceneTreePanel::setRowsVisible(const QVector<qint64>& ids, bool visible)
     refreshRows(ids);
 }
 
+void SceneTreePanel::updateNodes3D(const QList<SceneTreeNode3D>& nodes)
+{
+    if (m_mode != Mode::Mode3D || nodes.isEmpty())
+    {
+        return;
+    }
+    auto* model3d = dynamic_cast<SceneTreeTableModel3D*>(m_model);
+    if (!model3d)
+    {
+        return;
+    }
+    QVector<qint64> touched;
+    touched.reserve(nodes.size());
+    for (const SceneTreeNode3D& node : nodes)
+    {
+        auto it = model3d->m_nodeMap.find(node.id);
+        if (it == model3d->m_nodeMap.end() || it.value() == nullptr)
+        {
+            continue;
+        }
+        QStandardItem* visibleItem = it.value();
+        visibleItem->setCheckState(node.visible ? Qt::Checked : Qt::Unchecked);
+        visibleItem->setData(node.visible, kVisRole);
+
+        const QModelIndex visIdx = visibleItem->index();
+        if (visIdx.isValid())
+        {
+            QStandardItem* nameItem = model3d->itemFromIndex(visIdx.sibling(visIdx.row(), 1));
+            if (nameItem)
+            {
+                nameItem->setText(node.displayName);
+                nameItem->setData(node.displayName, kNameRole);
+                nameItem->setData(node.displayName, Qt::EditRole);
+            }
+        }
+        bool ok = false;
+        const qint64 numericId = node.id.toLongLong(&ok);
+        if (ok)
+        {
+            touched.push_back(numericId);
+        }
+    }
+    refreshRows(touched);
+}
+
 bool SceneTreePanel::setCommandState(bool hasSelection, bool anyLocked)
 {
     const bool lockChanged = (m_anyLocked != anyLocked);

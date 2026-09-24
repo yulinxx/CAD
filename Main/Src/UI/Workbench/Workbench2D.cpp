@@ -290,12 +290,14 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
         vp->setActiveTool(QStringLiteral("SelectTool"));
     }
 
-    // 属性被编辑后（已入撤销栈）延迟重建模型，避免在内联编辑器提交过程中重入
+    // 属性被编辑后（已入撤销栈）延迟重建模型，避免在内联编辑器提交过程中重入。
+    // 同时刷新场景树选中行：Name/基点等编辑不推进结构签名，树不会自动跟上。
     if (auto* props = window.propertiesDock())
     {
         auto conn = QObject::connect(props, &PropertiesPanelWidget::sigPropertyEdited, this, [this]() {
             QTimer::singleShot(0, this, [this]() {
                 refreshPropertiesPanel();
+                refreshSceneTreeRowsForSelection2D();
             });
         });
         m_workbenchConnections.push_back(conn);
@@ -2026,6 +2028,32 @@ void Workbench2D::refreshPropertiesPanel()
     if (m_commandHub)
     {
         props->setLockState(m_commandHub->currentSnapshot().anyLocked());
+    }
+}
+
+void Workbench2D::refreshSceneTreeRowsForSelection2D()
+{
+    if (!m_scenePanel2D || !m_scene.sceneEditService)
+    {
+        return;
+    }
+    Eg::SceneManager* scene = m_scene.sceneEditService->sceneManager();
+    if (!scene)
+    {
+        return;
+    }
+
+    QVector<qint64> ids;
+    scene->forEachSelected(
+        [&ids](Eg::SyEntity* e) {
+            if (e)
+            {
+                ids.push_back(static_cast<qint64>(e->id));
+            }
+        });
+    if (!ids.isEmpty())
+    {
+        m_scenePanel2D->refreshRows(ids);
     }
 }
 

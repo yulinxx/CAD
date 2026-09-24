@@ -47,7 +47,7 @@ public:
     /// 与算法/数据层完全解耦；面板不存在或被替换都不影响数据产生端。
     void setPropertyModel(const PropertyModel& model);
 
-    /// 设置编辑目标（算法层实现，负责应用修改并集成撤销）。
+    /// 设置编辑目标（算法层实现，负责应用修改；是否入撤销由实现决定 —— 2D 有、3D 当前无）。
     /// 面板仅通过 IPropertyEditTarget 接口提交编辑，不感知引擎/撤销细节。
     void setEditTarget(std::shared_ptr<IPropertyEditTarget> target);
 
@@ -56,7 +56,7 @@ public:
     void setLockState(bool locked);
 
 signals:
-    /// 某属性被成功编辑（已入撤销栈）。由绑定层监听并触发模型重建。
+    /// 某属性被成功提交。由绑定层监听并触发模型重建（及场景树行回刷）。
     void sigPropertyEdited();
 
 protected:

@@ -114,6 +114,8 @@ private:
     void setSceneTreeLock(const QVector<qint64>& ids, bool locked);
     /// 刷新属性面板
     void refreshPropertiesPanel();
+    /// 属性面板编辑后刷新场景树选中行（Name 等不推进结构签名）
+    void refreshSceneTreeRowsForSelection2D();
     /// 应用选择上下文到各 UI 组件
     void applySelectionContext(const CommandUiSnapshot& snapshot);
 

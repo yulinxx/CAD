@@ -829,10 +829,13 @@ void Workbench3D::setupProperties3D(WorkbenchWindow& window)
 
     props->setWorkbenchMode(PropertiesPanelWidget::WorkbenchMode::ThreeD);
 
-    // 属性被编辑后延迟重建模型，避免在内联编辑器提交过程中重入（与 2D 同语义）
+    // 属性被编辑后延迟重建模型，避免在内联编辑器提交过程中重入（与 2D 同语义）。
+    // 同时把 Name/Visible 写回场景树选中行：属性编辑不推进 structureRevision，
+    // refreshSceneTree3DIfNeeded 会 early-return，树不会自动跟上。
     auto conn = QObject::connect(props, &PropertiesPanelWidget::sigPropertyEdited, this, [this]() {
         QTimer::singleShot(0, this, [this]() {
             refreshPropertiesPanel3D();
+            refreshSceneTreeRowsForSelection3D();
         });
     });
     m_workbenchConnections.push_back(conn);
@@ -902,6 +905,61 @@ void Workbench3D::refreshPropertiesPanel3D()
     props->setPropertyModel(session->buildModel());
 }
 
+void Workbench3D::refreshSceneTreeRowsForSelection3D()
+{
+    if (!m_scenePanel3D || !m_sceneManager3D)
+    {
+        return;
+    }
+
+    std::vector<Eg::EntityId> entityIds;
+    if (m_services3D.renderWidget)
+    {
+        const auto& selected = m_services3D.renderWidget->selectionManager().getSelectedEntities();
+        entityIds.reserve(selected.size());
+        for (const Eg::SyMeshEntity* e : selected)
+        {
+            if (e)
+            {
+                entityIds.push_back(e->id);
+            }
+        }
+    }
+    else
+    {
+        m_sceneManager3D->forEachSelectedEntityId(
+            [](Eg::EntityId id, void* ctx) {
+                static_cast<std::vector<Eg::EntityId>*>(ctx)->push_back(id);
+            },
+            &entityIds);
+    }
+    if (entityIds.empty())
+    {
+        return;
+    }
+
+    std::unordered_set<uint64_t> selectedSet;
+    selectedSet.reserve(entityIds.size());
+    for (Eg::EntityId id : entityIds)
+    {
+        selectedSet.insert(id);
+    }
+
+    QList<SceneTreeNode3D> nodes;
+    nodes.reserve(static_cast<int>(entityIds.size()));
+    for (Eg::EntityId id : entityIds)
+    {
+        if (auto* mesh = m_sceneManager3D->findMeshById(id))
+        {
+            nodes.append(SceneTreeBuilder3D::buildMeshNode(mesh, selectedSet.count(id) > 0));
+        }
+    }
+    if (!nodes.isEmpty())
+    {
+        m_scenePanel3D->updateNodes3D(nodes);
+    }
+}
+
 void Workbench3D::refreshSceneTree3D()
 {
     if (!m_scenePanel3D)
@@ -933,6 +991,19 @@ void Workbench3D::refreshSceneTree3DIfNeeded()
     const uint64_t structureRev = m_sceneManager3D->structureRevision();
     if (count == m_lastSceneTree3DEntityCount && structureRev == m_lastSceneTree3DStructureRevision)
     {
+        // 结构未变：仍可能有可见性/锁定变更积压在变更流里（属性面板编辑、
+        // 锁定不发 notify 但 Visibility 会）。只消费行内容，不重建拓扑。
+        if (m_sceneManager3D->currentRevision() > m_sceneTree3DCursor)
+        {
+            if (m_sceneTree3DRefreshTimer)
+            {
+                m_sceneTree3DRefreshTimer->start();
+            }
+            else
+            {
+                applySceneTreeIncremental3D("rowContent");
+            }
+        }
         return;
     }
 
@@ -999,27 +1070,54 @@ void Workbench3D::applySceneTreeIncremental3D(const char* src)
         return;
     }
 
-    // 纯几何/样式/选中变更不影响 3D 树行集合，消费掉即可
-    bool hasTreeRelevant = false;
+    // 纯几何/样式/选中变更不影响 3D 树行集合，消费掉即可；
+    // 可见性/锁定/改名影响行内容 → refreshRows，不重建拓扑。
+    // 必须扫完全部变更再分类：不能在遇到首个 Added/Removed 时 break，
+    // 否则混在后面的 VisibilityChanged 会漏进「纯 Added 追加」路径。
+    bool hasStructural = false;  // Added/Removed：追加或全量
+    bool hasRowContent = false;
+    QList<SceneTreeNode3D> rowContentNodes;
     for (const Eg::SceneChange& ch : set.changes)
     {
         if (Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::Added) ||
-            Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::Removed) ||
+            Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::Removed))
+        {
+            hasStructural = true;
+            continue;
+        }
+        if (Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::VisibilityChanged) ||
             Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::StructureChanged) ||
-            Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::VisibilityChanged) ||
             Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::LockChanged))
         {
-            hasTreeRelevant = true;
-            break;
+            hasRowContent = true;
+            if (auto* mesh = m_sceneManager3D->findMeshById(ch.entityId))
+            {
+                rowContentNodes.append(SceneTreeBuilder3D::buildMeshNode(mesh, false));
+            }
         }
     }
-    if (!hasTreeRelevant)
+    if (!hasStructural && !hasRowContent)
     {
         return;
     }
+    // 纯行内容变更（可见性/锁定/改名）：写回节点并 refreshRows，不重建拓扑
+    if (!hasStructural)
+    {
+        if (!rowContentNodes.isEmpty() && m_scenePanel3D)
+        {
+            m_scenePanel3D->updateNodes3D(rowContentNodes);
+        }
+        return;
+    }
+    // 有增删且同批还夹着行内容变更：保守走全量（下面的纯 Added 判定也会因非 Added 位回退）
+    if (hasRowContent)
+    {
+        refreshSceneTree3D();
+        return;
+    }
 
-    // 只有「全部是 Added 且图元当前仍在场景」才可增量；出现 Removed/可见性/锁定等
-    // 一律回退全量。撤销会同时置 Added+Removed，必须按「当前是否在场景」判定。
+    // 有增删：只有「全部是 Added 且图元当前仍在场景」才可增量追加；
+    // 出现 Removed 一律回退全量。撤销会同时置 Added+Removed，必须按「当前是否在场景」判定。
     std::unordered_set<uint64_t> selectedSet;
     bool selectedInited = false;
     QList<SceneTreeNode3D> added;

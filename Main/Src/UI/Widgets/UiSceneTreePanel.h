@@ -84,6 +84,11 @@ public:
     /// 批量改写 3D 复选框态 + refreshRows（右键 Show/Hide；不重建拓扑、不走 setData 回调）
     void setRowsVisible(const QVector<qint64>& ids, bool visible);
 
+    /// 按引擎当前状态改写已有 3D 行的内容（Name/Visible 等）+ refreshRows。
+    /// 属性面板编辑后反向同步树用：3D 模型是 QStandardItem 物化缓存，
+    /// 仅发 dataChanged 不会从引擎回读，必须先写回行内容再通知视图。
+    void updateNodes3D(const QList<SceneTreeNode3D>& nodes);
+
     /// 获取当前模式
     Mode mode() const { return m_mode; }
 
