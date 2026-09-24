@@ -7,6 +7,8 @@
 #include "Log/SyLogger.h"
 #include "FileIO/FormatRegistry.h"
 
+#include <QCoreApplication>
+
 void ExportDispatcher::registerWriter(std::unique_ptr<IExportWriter> writer)
 {
     if (!writer)
@@ -30,7 +32,8 @@ ExportResult ExportDispatcher::dispatch(const ExportContext& context, const Fio:
 
     if (fmt == Fio::FileFormat::Unknown)
     {
-        QString msg = QStringLiteral("Cannot detect format for: %1").arg(context.targetPath);
+        QString msg = QCoreApplication::translate("ExportDispatcher", "Cannot detect format for: %1")
+                          .arg(context.targetPath);
         SY_ERRORF("[ExportDispatcher] %s", msg.toUtf8().constData());
         return ExportResult::fail(msg);
     }
@@ -38,7 +41,8 @@ ExportResult ExportDispatcher::dispatch(const ExportContext& context, const Fio:
     IExportWriter* writer = findWriter(fmt);
     if (!writer)
     {
-        QString msg = QStringLiteral("No writer registered for format=%1").arg(static_cast<int>(fmt));
+        QString msg = QCoreApplication::translate("ExportDispatcher", "No writer registered for format=%1")
+                          .arg(static_cast<int>(fmt));
         SY_ERRORF("[ExportDispatcher] %s", msg.toUtf8().constData());
         return ExportResult::fail(msg);
     }

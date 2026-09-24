@@ -444,6 +444,7 @@ std::optional<MenuActionDef> UiConfigLoader::parseMenuAction(const QJsonObject& 
     MenuActionDef action;
     action.id = obj.value(QStringLiteral("id")).toString();
     action.label = obj.value(QStringLiteral("label")).toString();
+    action.tooltip = obj.value(QStringLiteral("tooltip")).toString();
     action.commandId = obj.value(QStringLiteral("commandId")).toString();
     if (action.commandId.isEmpty())
     {
@@ -576,6 +577,7 @@ std::optional<ToolBarActionDef> UiConfigLoader::parseToolBarAction(const QJsonOb
     ToolBarActionDef action;
     action.id = obj.value(QStringLiteral("id")).toString();
     action.label = obj.value(QStringLiteral("label")).toString();
+    action.tooltip = obj.value(QStringLiteral("tooltip")).toString();
     action.iconName = obj.value(QStringLiteral("icon")).toString();
     action.commandId = obj.value(QStringLiteral("commandId")).toString();
     if (action.commandId.isEmpty())

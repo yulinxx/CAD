@@ -40,6 +40,16 @@ DrawToolBarWidget::~DrawToolBarWidget()
     // m_panAction 现在以 this 为父对象，由 Qt 自动管理生命周期
 }
 
+void DrawToolBarWidget::changeEvent(QEvent* event)
+{
+    QWidget::changeEvent(event);
+    if (event->type() == QEvent::LanguageChange)
+    {
+        // Select/Pan 悬停提示是 tr() 动态设置的，语言切换后必须重算
+        updateHighlight();
+    }
+}
+
 void DrawToolBarWidget::setToolActions(const QVector<QAction*>& actions)
 {
     m_toolActions = actions;

@@ -79,11 +79,12 @@ namespace
             {
                 if (m_result.success)
                 {
-                    promptCb(QStringLiteral("Import completed: %1 entities").arg(m_result.entityCount));
+                    promptCb(QCoreApplication::translate("ImportService", "Import completed: %1 entities")
+                                 .arg(m_result.entityCount));
                 }
                 else
                 {
-                    promptCb(QStringLiteral("Import failed: %1").arg(m_result.message));
+                    promptCb(QCoreApplication::translate("ImportService", "Import failed: %1").arg(m_result.message));
                 }
             }
         }
@@ -208,7 +209,7 @@ ImportResult ImportService::importWithContext(const ImportContext& context, cons
 
     if (!m_dispatcher)
     {
-        QString msg = QStringLiteral("ImportDispatcher not set");
+        QString msg = tr("ImportDispatcher not set");
         SY_ERRORF("[ImportService] importWithContext aborted: %s", msg.toUtf8().constData());
         const ImportResult r = ImportResult::fail(msg, ImportErrorType::Unknown);
         emit importFinished(r);
@@ -227,7 +228,7 @@ ImportResult ImportService::importWithContext(const ImportContext& context, cons
 
     if (m_statusPromptCallback)
     {
-        m_statusPromptCallback(QStringLiteral("Importing: %1").arg(context.sourcePath));
+        m_statusPromptCallback(tr("Importing: %1").arg(context.sourcePath));
     }
 
     emit importStarted(context.sourcePath);
@@ -248,7 +249,7 @@ ImportResult ImportService::importWithContext(const ImportContext& context, cons
 
     if (isCanceled(mutableCtx))
     {
-        return fail(ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
+        return fail(ImportResult::fail(tr("Import canceled"), ImportErrorType::Canceled));
     }
 
     // ===== 2：解析文件 =====
@@ -261,7 +262,7 @@ ImportResult ImportService::importWithContext(const ImportContext& context, cons
 
     if (isCanceled(mutableCtx))
     {
-        return fail(ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
+        return fail(ImportResult::fail(tr("Import canceled"), ImportErrorType::Canceled));
     }
 
     // ===== 3：构建文档 =====
@@ -274,7 +275,7 @@ ImportResult ImportService::importWithContext(const ImportContext& context, cons
 
     if (isCanceled(mutableCtx))
     {
-        return fail(ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
+        return fail(ImportResult::fail(tr("Import canceled"), ImportErrorType::Canceled));
     }
 
     // ===== 4：刷新显示 =====
@@ -298,7 +299,7 @@ void ImportService::importAsync(
 
     if (!m_dispatcher)
     {
-        QString msg = QStringLiteral("ImportDispatcher not set");
+        QString msg = tr("ImportDispatcher not set");
         SY_ERRORF("[ImportService] importAsync aborted: %s", msg.toUtf8().constData());
         if (onComplete)
         {
@@ -315,7 +316,7 @@ void ImportService::importAsync(
     }
     if (m_statusPromptCallback)
     {
-        m_statusPromptCallback(QStringLiteral("Importing: %1").arg(context.sourcePath));
+        m_statusPromptCallback(tr("Importing: %1").arg(context.sourcePath));
     }
     emit importStarted(context.sourcePath);
 
@@ -338,8 +339,8 @@ void ImportService::importAsync(
                 if (safeSelf->m_statusPromptCallback)
                 {
                     safeSelf->m_statusPromptCallback(r.success
-                            ? QStringLiteral("Import completed: %1 entities").arg(r.entityCount)
-                            : QStringLiteral("Import failed: %1").arg(r.message));
+                            ? ImportService::tr("Import completed: %1 entities").arg(r.entityCount)
+                            : ImportService::tr("Import failed: %1").arg(r.message));
                 }
                 emit safeSelf->importFinished(r);
                 if (onComplete)
@@ -373,7 +374,8 @@ void ImportService::importAsync(
         if (safeSelf->isCanceled(mutableCtx))
         {
             SY_INFO("[ImportService] Async import canceled after Phase 1");
-            finishOnMainThread(ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
+            finishOnMainThread(ImportResult::fail(
+                ImportService::tr("Import canceled"), ImportErrorType::Canceled));
             return;
         }
 
@@ -389,7 +391,8 @@ void ImportService::importAsync(
         if (safeSelf->isCanceled(mutableCtx))
         {
             SY_INFO("[ImportService] Async import canceled after Phase 2");
-            finishOnMainThread(ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
+            finishOnMainThread(ImportResult::fail(
+                ImportService::tr("Import canceled"), ImportErrorType::Canceled));
             return;
         }
 
@@ -405,7 +408,8 @@ void ImportService::importAsync(
                 if (safeSelf->isCanceled(mainCtx))
                 {
                     SY_INFO("[ImportService] Async import canceled before Phase 3");
-                    finishOnMainThread(ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
+                    finishOnMainThread(ImportResult::fail(
+                        ImportService::tr("Import canceled"), ImportErrorType::Canceled));
                     return;
                 }
 
@@ -472,7 +476,7 @@ ImportResult ImportService::phaseDetectFormat(ImportContext& context)
     QFileInfo fi(context.sourcePath);
     if (!fi.exists())
     {
-        QString msg = QStringLiteral("File not found: %1").arg(context.sourcePath);
+        QString msg = tr("File not found: %1").arg(context.sourcePath);
         SY_ERRORF("[ImportService] %s", msg.toUtf8().constData());
         return ImportResult::fail(msg, ImportErrorType::FileNotFound);
     }
@@ -485,7 +489,7 @@ ImportResult ImportService::phaseDetectFormat(ImportContext& context)
 
     if (context.format == Fio::FileFormat::Unknown)
     {
-        QString msg = QStringLiteral("Unsupported file format: %1").arg(fi.suffix().toUpper());
+        QString msg = tr("Unsupported file format: %1").arg(fi.suffix().toUpper());
         SY_ERRORF("[ImportService] %s", msg.toUtf8().constData());
         return ImportResult::fail(msg, ImportErrorType::FormatNotSupported);
     }
@@ -493,7 +497,7 @@ ImportResult ImportService::phaseDetectFormat(ImportContext& context)
     // 检查是否有对应的读取器
     if (!m_dispatcher->canImport(context.sourcePath))
     {
-        QString msg = QStringLiteral("No reader registered for format: %1").arg(fi.suffix().toUpper());
+        QString msg = tr("No reader registered for format: %1").arg(fi.suffix().toUpper());
         SY_ERRORF("[ImportService] %s", msg.toUtf8().constData());
         return ImportResult::fail(msg, ImportErrorType::FormatNotSupported);
     }
@@ -577,7 +581,7 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     {
         SY_ERRORF("[ImportService] All %d parsed entity(ies) were rejected by validation, nothing to import",
             nullCount + invalidCount);
-        return ImportResult::fail(QStringLiteral("No valid entities to import"), ImportErrorType::ParseFailed);
+        return ImportResult::fail(tr("No valid entities to import"), ImportErrorType::ParseFailed);
     }
 
     // 如果作为新文档导入，先清空场景
@@ -730,7 +734,7 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
         else
         {
             SY_ERRORF("[ImportService] No 2D scene available, %d entity(ies) cannot be imported", flatAdded);
-            return ImportResult::fail(QStringLiteral("No scene manager available"), ImportErrorType::Unknown);
+            return ImportResult::fail(tr("No scene manager available"), ImportErrorType::Unknown);
         }
         SY_DEBUGF("[ImportService] %d entity(ies) added to the 2D scene", flatAdded);
     }
@@ -739,7 +743,7 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     if (entityCount == 0)
     {
         SY_ERROR("[ImportService] No entity landed in any scene");
-        return ImportResult::fail(QStringLiteral("No scene manager available"), ImportErrorType::Unknown);
+        return ImportResult::fail(tr("No scene manager available"), ImportErrorType::Unknown);
     }
 
     // ===== 3.4 还原源文件的图层与群组结构 =====
@@ -771,7 +775,7 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     updateProgress(context, ImportPhase::BuildDocument, 1.0f);
 
     // 根据图元类型设置目标工作台 ID
-    auto result = ImportResult::ok(QStringLiteral("Imported %1 entities successfully").arg(entityCount), entityCount);
+    auto result = ImportResult::ok(tr("Imported %1 entities successfully").arg(entityCount), entityCount);
     result.usedWorkbenchId = hasMeshEntities ? QStringLiteral("3D") : QStringLiteral("2D");
     return result;
 }
@@ -895,7 +899,7 @@ void ImportService::phaseWriteBackState(const ImportContext& context, const Impo
     // 更新状态栏（使用成员变量回调，全局配置）
     if (m_statusBarUpdateCallback)
     {
-        QString statusMsg = QStringLiteral("Imported %1 entities from %2")
+        QString statusMsg = tr("Imported %1 entities from %2")
                                 .arg(result.entityCount)
                                 .arg(QFileInfo(context.sourcePath).fileName());
         m_statusBarUpdateCallback(statusMsg);

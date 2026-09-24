@@ -129,6 +129,11 @@ QString UiLayoutBuilder::localizedLabel(const QString& label, const QString& fal
     return uiLocalizedLabel(label, fallbackId);
 }
 
+QString UiLayoutBuilder::localizedTooltip(const QString& tooltip, const QString& fallbackId)
+{
+    return uiLocalizedLabel(tooltip, fallbackId);
+}
+
 void UiLayoutBuilder::releaseBuiltShortcuts()
 {
     for (QShortcut* shortcut : m_builtShortcuts)
@@ -246,6 +251,8 @@ void UiLayoutBuilder::buildMenus(const std::vector<MenuDef>& menus)
         {
             continue;
         }
+        // 允许菜单项展示 ToolTip / StatusTip（JSON tooltip 字段）
+        qMenu->setToolTipsVisible(true);
         qMenu->setObjectName(menu.id);
         if (!menu.iconName.isEmpty())
         {
@@ -302,6 +309,7 @@ void UiLayoutBuilder::buildMenuItem(
         {
             return;
         }
+        subMenu->setToolTipsVisible(true);
         subMenu->setObjectName(sub.id);
         if (!sub.iconName.isEmpty())
         {
@@ -397,6 +405,14 @@ void UiLayoutBuilder::buildMenuItem(
     action->setCheckable(actionDef.checkable);
     action->setChecked(actionDef.checked);
 
+    // JSON tooltip 字段：复杂/少用命令给出悬停说明（本地化后同时写入 toolTip/statusTip）
+    if (!actionDef.tooltip.isEmpty())
+    {
+        const QString tip = localizedTooltip(actionDef.tooltip, actionDef.id);
+        action->setToolTip(tip);
+        action->setStatusTip(tip);
+    }
+
     // 加入互斥复选组（主题、语言等），由 Qt 自动处理单选逻辑
     if (exclusiveGroup && actionDef.checkable)
     {
@@ -487,6 +503,12 @@ void UiLayoutBuilder::buildToolBars(const std::vector<ToolBarDef>& toolBars)
             if (!actionDef.iconName.isEmpty())
             {
                 action->setIcon(QIcon(actionDef.iconName));
+            }
+            if (!actionDef.tooltip.isEmpty())
+            {
+                const QString tip = localizedTooltip(actionDef.tooltip, actionDef.id);
+                action->setToolTip(tip);
+                action->setStatusTip(tip);
             }
             bindAction(action, actionDef.commandId, actionDef.label, actionDef.iconName, tb.workbenchId);
         }

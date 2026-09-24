@@ -8,6 +8,7 @@
 
 #include <chrono>
 
+#include <QCoreApplication>
 #include <QFileInfo>
 
 void ImportDispatcher::registerReader(std::unique_ptr<IImportReader> reader)
@@ -41,7 +42,7 @@ ImportResult ImportDispatcher::dispatch(const ImportContext& context, Fio::VecSy
     QFileInfo fi(context.sourcePath);
     if (!fi.exists())
     {
-        QString msg = QStringLiteral("File not found: %1").arg(context.sourcePath);
+        QString msg = QCoreApplication::translate("ImportDispatcher", "File not found: %1").arg(context.sourcePath);
         SY_ERRORF("[ImportDispatcher] %s", msg.toUtf8().constData());
         return ImportResult::fail(msg, ImportErrorType::FileNotFound);
     }
@@ -55,7 +56,8 @@ ImportResult ImportDispatcher::dispatch(const ImportContext& context, Fio::VecSy
 
     if (fmt == Fio::FileFormat::Unknown)
     {
-        QString msg = QStringLiteral("Unsupported file format: %1").arg(fi.suffix().toUpper());
+        QString msg =
+            QCoreApplication::translate("ImportDispatcher", "Unsupported file format: %1").arg(fi.suffix().toUpper());
         SY_ERRORF("[ImportDispatcher] %s", msg.toUtf8().constData());
         return ImportResult::fail(msg, ImportErrorType::FormatNotSupported);
     }
@@ -63,7 +65,8 @@ ImportResult ImportDispatcher::dispatch(const ImportContext& context, Fio::VecSy
     IImportReader* reader = findReader(fmt);
     if (!reader)
     {
-        QString msg = QStringLiteral("No reader registered for format=%1").arg(static_cast<int>(fmt));
+        QString msg = QCoreApplication::translate("ImportDispatcher", "No reader registered for format=%1")
+                          .arg(static_cast<int>(fmt));
         SY_ERRORF("[ImportDispatcher] %s (suffix='%s', %zu reader(s) registered)",
             msg.toUtf8().constData(),
             fi.suffix().toUtf8().constData(),

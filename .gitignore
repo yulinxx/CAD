@@ -23,6 +23,23 @@ compile_commands.json
 *.local.cmake
 CMakeUserPresets.json
 
+# ---- CMake 生成的测试/打包脚本（in-source 构建产物）----
+CTestTestfile.cmake
+**/CTestTestfile.cmake
+*_include.cmake
+**/*_include.cmake
+*_discovery.cmake
+**/*_discovery.cmake
+*_tests.cmake
+**/*_tests.cmake
+cmake_test_discovery_*.json
+CPackConfig.cmake
+CPackSourceConfig.cmake
+CPackSourceConfig.cmake
+# 由 sanyi_export_imported_target 写入 CMake/ 的模块 Config（含相对路径，可再生）
+CMake/*Config.cmake
+# 手写公共 Config 不在此列：CMakeLists.txt / Config.cmake / CMake/Utils.cmake 等
+
 # ---- Ninja 中间文件 ----
 *.ninja
 *.ninja_deps

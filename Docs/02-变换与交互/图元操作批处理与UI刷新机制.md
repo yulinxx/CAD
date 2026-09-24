@@ -114,12 +114,11 @@ sequenceDiagram
 
     U->>S: transformEntities(ids, mutator, desc)
     S->>S: 1. captureEntitySnapshots(before)
-    S->>S: 2. 执行 mutator（只改几何）
-    S->>S: 3. captureEntitySnapshots(after)
-    S->>S: 4. notifyGeometryChanged（联动）
-    S->>S: 5. updateEntityBoundsBulk（批量索引）
-    S->>S: 6. pushExecutedSnapshotCommand()
-    S->>S: 7. notifySceneChanged（一次广播）
+    S->>S: 2. 执行 mutator（只改几何，场景即 after 态）
+    S->>S: 3. notifyGeometryChanged（联动，直接读场景活对象）
+    S->>S: 4. updateEntityBoundsBulk（批量索引）
+    S->>S: 5. pushExecutedSnapshotCommand()
+    S->>S: 6. notifySceneChanged（一次广播）
     S-->>U: 完成
 ```
 
@@ -132,8 +131,9 @@ sequenceDiagram
   调用方都必须在批量结束后补一次 `notifySceneChanged()`；
 - 同一条命令无论选中多少图元，只有一次场景广播；方向键连按的 Nudge 命令在撤销栈上
   按 id 集合合并（`canMergeWith`），但每次仍只广播一次；
-- 重做时 `EntitySnapshotsCommand::redo()` 用 after 快照整批 `replaceEntitiesById`，
-  同样是批量落库、一次通知。
+- 撤销/重做靠「场景 ↔ 命令」整体交换两份状态完成（零克隆）：`undo()` 把 before 态
+  换入场景、`redo()` 再换回 after 态，两者都走 `replaceEntitiesById`，
+  同样是批量落库、一次通知；
 
 ### 2.3 交互拖动（Gizmo）路径
 

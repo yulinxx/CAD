@@ -113,13 +113,13 @@ void FileOperationRegistry::executeWithExceptionGuard(const char* operationName,
     {
         SY_ERRORF("[FileOperation] %s exception: %s", operationName, e.what());
         showFileError(QObject::tr("%1 Error").arg(QString::fromLatin1(operationName)),
-            QStringLiteral("%1 failed: %2").arg(QString::fromLatin1(operationName), e.what()));
+            QObject::tr("%1 failed: %2").arg(QString::fromLatin1(operationName), e.what()));
     }
     catch (...)
     {
         SY_ERRORF("[FileOperation] %s unknown exception", operationName);
         showFileError(QObject::tr("%1 Error").arg(QString::fromLatin1(operationName)),
-            QStringLiteral("%1 failed with unknown exception").arg(QString::fromLatin1(operationName)));
+            QObject::tr("%1 failed with unknown exception").arg(QString::fromLatin1(operationName)));
     }
 }
 

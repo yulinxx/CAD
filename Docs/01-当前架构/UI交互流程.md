@@ -302,8 +302,7 @@ flowchart TD
     Edit --> Target["IPropertyEditTarget::editValue/editPointAt"]
     Target --> Snap["SceneEditService::captureSnapshots（修改前）"]
     Snap --> Set["IPropertyProvider setter 修改图元"]
-    Set --> Snap2["captureSnapshots（修改后）"]
-    Snap2 --> Push["pushExecutedChange 入撤销栈"]
+    Set --> Push["pushExecutedChange 入撤销栈<br/>（场景当前即修改后态）"]
     Push --> Rebuild["sigPropertyEdited → 重建模型刷新面板"]
 ```
 

@@ -96,9 +96,6 @@ message(STATUS "----------------------------------------")
 # 用 Null 后端 Runtime：几何仓的分配/写入/释放只需要 Runtime，不需要 GPU，
 # 因此这些用例在没有显卡的机器上也能跑（与 Renderx 自己的 RxRuntimeTests 同一套用法）。
 #
-# 用独立 option 名（而不是复用 BUILD_*_TESTS）：Config.cmake 用普通变量统一
-# set(... OFF) 会遮蔽同名 option，这是仓库里既有的坑（见 Main 的 ViewportRefreshTests）。
-option(BUILD_RENDERBRIDGE_TESTS "Build RenderBridge host-side contract tests" ON)
 if(BUILD_RENDERBRIDGE_TESTS AND GTest_FOUND)
     add_executable(RenderBridgeTests
         "${CMAKE_CURRENT_SOURCE_DIR}/Test/PersistentGeometryStoreTests.cpp"

@@ -47,21 +47,32 @@ namespace Render
     }
 
     bool TextQuadBuilder::initialize(
-        RenderAbstraction::IRenderDevice& device, const uint8_t* fontData, size_t bytes)
+        RenderAbstraction::IRenderDevice& device, std::shared_ptr<const std::vector<uint8_t>> fontData)
     {
         shutdown();
-        if (!fontData || bytes == 0)
+        if (!fontData || fontData->empty())
         {
             return false;
         }
         m_device = &device;
-        m_fontData.assign(fontData, fontData + bytes);
+        m_fontData = std::move(fontData);
         return true;
+    }
+
+    bool TextQuadBuilder::initialize(
+        RenderAbstraction::IRenderDevice& device, const uint8_t* fontData, size_t bytes)
+    {
+        if (!fontData || bytes == 0)
+        {
+            shutdown();
+            return false;
+        }
+        return initialize(device, std::make_shared<const std::vector<uint8_t>>(fontData, fontData + bytes));
     }
 
     bool TextQuadBuilder::valid() const
     {
-        return m_device != nullptr && !m_fontData.empty();
+        return m_device != nullptr && m_fontData && !m_fontData->empty();
     }
 
     void TextQuadBuilder::shutdown()
@@ -74,7 +85,7 @@ namespace Render
             }
         }
         m_batches.clear();
-        m_fontData.clear();
+        m_fontData.reset();
         m_device = nullptr;
         m_warnedFontFailure = false;
     }
@@ -99,8 +110,8 @@ namespace Render
         }
 
         RenderAbstraction::FontDesc desc{};
-        desc.data = m_fontData.data();
-        desc.dataBytes = m_fontData.size();
+        desc.data = m_fontData->data();
+        desc.dataBytes = m_fontData->size();
         desc.pixelHeight = static_cast<float>(pixelHeight);
         desc.atlasWidth = kAtlasSide;
         desc.atlasHeight = kAtlasSide;

@@ -18,7 +18,7 @@ using LogCallback = void (*)(LogLevel level, const char* message, void* userData
 struct DeviceConfig {
     RenderBackend backend = RenderBackend::Auto;
     bool enableValidation = false;
-    uint64_t transientBufferBytes = 64ull * 1024 * 1024;
+    uint64_t transientBufferBytes = 32ull * 1024 * 1024;
     LogCallback logCallback = nullptr;
     void* logUserData = nullptr;
     const char* applicationName = "CAD";

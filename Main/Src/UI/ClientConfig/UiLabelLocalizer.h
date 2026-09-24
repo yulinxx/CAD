@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <QCache>
 
 /**
  * @file UiLabelLocalizer.h
@@ -14,3 +15,17 @@
  * 具体的 UiLayoutBuilder 头。
  */
 QString uiLocalizedLabel(const QString& label, const QString& fallbackId = QString());
+
+// 翻译缓存 - 避免重复查询（语言切换时必须清除）
+// 注意：缓存key使用QLatin1String避免字符串拷贝
+inline QCache<QString, QString>& getTranslationCache()
+{
+    static QCache<QString, QString> cache(1024);
+    return cache;
+}
+
+// 清除翻译缓存（语言切换时调用）
+inline void clearTranslationCache()
+{
+    getTranslationCache().clear();
+}

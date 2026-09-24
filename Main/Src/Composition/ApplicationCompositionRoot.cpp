@@ -12,6 +12,8 @@
 #include "LaserOperationRegistry.h"
 #include "DocumentPersistenceHelper.h"
 
+#include <QCoreApplication>
+
 #include "UI2D/Operation/OperationRegistry.h"
 #include "UI2D/Operation/OperationRouting.h"
 
@@ -392,8 +394,10 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
             }
             m_stateCenter->setBusy(false);
             QVariantMap meta = m_stateCenter->metadata();
-            meta["statusPrompt"] = result.success ? QString("Import complete: %1 entities").arg(result.entityCount)
-                                                  : QString("Import failed: %1").arg(result.message);
+            meta["statusPrompt"] = result.success
+                ? QCoreApplication::translate("ApplicationCompositionRoot", "Import complete: %1 entities")
+                      .arg(result.entityCount)
+                : QCoreApplication::translate("ApplicationCompositionRoot", "Import failed: %1").arg(result.message);
             meta["notificationType"] = result.success ? "info" : "error";
             m_stateCenter->setMetadata(meta);
         });
@@ -417,8 +421,9 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
 
             QVariantMap meta = m_stateCenter->metadata();
             meta["statusPrompt"] = result.success
-                ? QString("Export complete: %1 entities").arg(result.exportedEntityCount)
-                : QString("Export failed: %1").arg(result.message);
+                ? QCoreApplication::translate("ApplicationCompositionRoot", "Export complete: %1 entities")
+                      .arg(result.exportedEntityCount)
+                : QCoreApplication::translate("ApplicationCompositionRoot", "Export failed: %1").arg(result.message);
             meta["notificationType"] = result.success ? "info" : "error";
 
             m_stateCenter->setMetadata(meta);

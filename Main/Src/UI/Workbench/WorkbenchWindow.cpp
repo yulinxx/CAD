@@ -109,6 +109,7 @@
 
 #include "VersionInfo.h"
 #include "UiLayoutService.h"
+#include "UI/ClientConfig/UiLabelLocalizer.h"
 #include "Composition/ApplicationCompositionRoot.h"
 #include "UI/Settings/SettingsService.h"
 #include "Persistence/PersistenceService.h"
@@ -188,6 +189,9 @@ void WorkbenchWindow::changeEvent(QEvent* event)
 
 void WorkbenchWindow::retranslateUi()
 {
+    // 清除 UI 布局缓存（语言切换时必须，否则会返回旧语言的缓存翻译）
+    clearTranslationCache();
+
     setWindowTitle(QString::fromStdString(MainApp::appName()));
 
     // 语言切换时重建菜单文案。
@@ -970,7 +974,7 @@ namespace
     // 统一工作台切换时展示的上下文文本，避免切换链中多处拼接文案
     QString workbenchSwitchText(const QString& workbenchId)
     {
-        return QStringLiteral("Switching to %1").arg(workbenchId);
+        return QObject::tr("Switching to %1").arg(workbenchId);
     }
 }  // namespace
 
@@ -1006,7 +1010,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         {
             m_stateCenter->setCurrentWorkbenchId(workbenchId);
             m_stateCenter->setCurrentViewMode(QStringLiteral("none"));
-            m_stateCenter->setSelectionContext(QStringLiteral("Workbench-Switch"), QStringLiteral("Ready"));
+            m_stateCenter->setSelectionContext(QStringLiteral("Workbench-Switch"), QObject::tr("Ready"));
         }
         // 菜单不需要在这里刷新：配置驱动菜单会随状态中心的 currentWorkbenchChanged
         // 自行重建与同步（rebuildAllMenus / refreshConfiguredMenuState）。

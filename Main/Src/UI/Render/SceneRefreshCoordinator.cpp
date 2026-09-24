@@ -2,7 +2,6 @@
  * @file SceneRefreshCoordinator.cpp
  * @brief 场景刷新协调器实现 — 四级刷新策略与增量渲染管线
  *
- * P5 刷新语义统一 (2026-08-02)
  */
 #include "SceneRefreshCoordinator.h"
 #include "RenderWidget.h"
@@ -121,7 +120,7 @@ void SceneRefreshCoordinator::setRenderWidget(RenderWidget* widget)
 
 void SceneRefreshCoordinator::setSceneContext(Eg::ISceneContext* ctx)
 {
-    // P5: 观察者注册收敛 — 切换场景时自动注销旧观察者、注册新观察者
+    // 观察者注册收敛 — 切换场景时自动注销旧观察者、注册新观察者
     // 观察者模式是 2D 特有扩展；2D 路径唯一实现是 SceneManager，
     // 全局 -fvisibility=hidden 下 dynamic_cast 跨 DLL 不可靠，用 static_cast。
     if (m_sceneManager)
@@ -172,7 +171,7 @@ void SceneRefreshCoordinator::stop()
     {
         m_curveLodTimer->stop();
     }
-    // P5: 观察者注销 — 在 stop() 中统一处理，避免析构时 SceneManager 已销毁（UAF）
+    // 观察者注销 — 在 stop() 中统一处理，避免析构时 SceneManager 已销毁（UAF）
     if (m_sceneManager)
     {
         m_sceneManager->removeObserver(this);
@@ -272,6 +271,7 @@ bool SceneRefreshCoordinator::hideSelectedEffective() const
     {
         return false;
     }
+
     // 开关 + 「虚线此刻真的画得出来」二者必须同时成立，理由见头文件。
     return m_renderWidget != nullptr && m_renderWidget->hideSelectedOriginalEffective();
 }
@@ -329,6 +329,7 @@ void SceneRefreshCoordinator::onCurveLodTimer()
         finishCurveLodQueue();
         return;
     }
+
     processCurveLodBatch();
     // processCurveLodBatch 内部会在有剩余时调用 ensureCurveLodPump 续跑，无需在此重复
 }
@@ -574,7 +575,7 @@ void SceneRefreshCoordinator::onSceneChanged()
 
 void SceneRefreshCoordinator::onSelectionChanged()
 {
-    // P5: 观察者注册收敛 — 发射信号供视口同步工具状态
+    // 观察者注册收敛 — 发射信号供视口同步工具状态
     emit selectionChanged();
 
     // 选择变化走增量渲染。选中态不改变主几何：图元本体始终以原色实线提交，
@@ -1193,7 +1194,7 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
             return;
         auto uid = static_cast<uint64_t>(e->id);
         if (hideSelected && selectedIds.count(uid))
-            return; // 隐藏选中图元已从 GPU 移除，不入账
+            return;  // 隐藏选中图元已从 GPU 移除，不入账
         m_renderedEntityIds.insert(uid);
     };
 

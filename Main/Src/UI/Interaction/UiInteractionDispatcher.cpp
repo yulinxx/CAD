@@ -10,104 +10,121 @@
 #include "UiFrameworkServices.h"
 #include "Log/SyLogger.h"
 
+#include <QCoreApplication>
+
 namespace
 {
+    // 状态栏提示：英文源串，经 translate 本地化（上下文 UiInteractionDispatcher）
     QString statusPromptForCommand(const QString& commandId)
     {
         if (commandId.startsWith(QStringLiteral("draw.line")))
         {
-            return QStringLiteral("Draw line - click to start");
+            return QCoreApplication::translate("UiInteractionDispatcher", "Draw line - click to start");
         }
         if (commandId.startsWith(QStringLiteral("draw.circle")))
         {
-            return QStringLiteral("Draw circle - click center, drag radius");
+            return QCoreApplication::translate("UiInteractionDispatcher", "Draw circle - click center, drag radius");
         }
         if (commandId.startsWith(QStringLiteral("draw.arc")))
         {
-            return QStringLiteral("Draw arc - click start, center, end");
+            return QCoreApplication::translate("UiInteractionDispatcher", "Draw arc - click start, center, end");
         }
         if (commandId.startsWith(QStringLiteral("draw.rect")))
         {
-            return QStringLiteral("Draw rectangle - click corner, drag to opposite");
+            return QCoreApplication::translate(
+                "UiInteractionDispatcher", "Draw rectangle - click corner, drag to opposite");
         }
         if (commandId.startsWith(QStringLiteral("draw.polyline")))
         {
-            return QStringLiteral("Draw polyline - click points, right-click to finish");
+            return QCoreApplication::translate(
+                "UiInteractionDispatcher", "Draw polyline - click points, right-click to finish");
         }
         if (commandId.startsWith(QStringLiteral("draw.spline")))
         {
-            return QStringLiteral("Draw spline - click control points");
+            return QCoreApplication::translate("UiInteractionDispatcher", "Draw spline - click control points");
         }
         if (commandId.startsWith(QStringLiteral("draw.ellipse")))
         {
-            return QStringLiteral("Draw ellipse - click center, drag axes");
+            return QCoreApplication::translate("UiInteractionDispatcher", "Draw ellipse - click center, drag axes");
         }
         if (commandId.startsWith(QStringLiteral("edit.move")))
         {
-            return QStringLiteral("Move - select entities, drag to destination");
+            return QCoreApplication::translate(
+                "UiInteractionDispatcher", "Move - select entities, drag to destination");
         }
         if (commandId.startsWith(QStringLiteral("edit.copy")))
         {
-            return QStringLiteral("Copy - select entities, specify destination");
+            return QCoreApplication::translate(
+                "UiInteractionDispatcher", "Copy - select entities, specify destination");
         }
         if (commandId.startsWith(QStringLiteral("edit.rotate")))
         {
-            return QStringLiteral("Rotate - select entities, specify angle");
+            return QCoreApplication::translate("UiInteractionDispatcher", "Rotate - select entities, specify angle");
         }
         if (commandId.startsWith(QStringLiteral("edit.scale")))
         {
-            return QStringLiteral("Scale - select entities, specify factor");
+            return QCoreApplication::translate("UiInteractionDispatcher", "Scale - select entities, specify factor");
         }
         if (commandId.startsWith(QStringLiteral("edit.delete")))
         {
-            return QStringLiteral("Delete - select entities to remove");
+            return QCoreApplication::translate("UiInteractionDispatcher", "Delete - select entities to remove");
         }
         if (commandId.startsWith(QStringLiteral("edit.fillet")))
         {
-            return QStringLiteral("Fillet - select two lines or arcs");
+            return QCoreApplication::translate("UiInteractionDispatcher", "Fillet - select two lines or arcs");
         }
         if (commandId.startsWith(QStringLiteral("edit.chamfer")))
         {
-            return QStringLiteral("Chamfer - select two lines");
+            return QCoreApplication::translate("UiInteractionDispatcher", "Chamfer - select two lines");
         }
         if (commandId.startsWith(QStringLiteral("edit.trim")))
         {
-            return QStringLiteral("Trim - select cutting edge, then entities to trim");
+            return QCoreApplication::translate(
+                "UiInteractionDispatcher", "Trim - select cutting edge, then entities to trim");
         }
         if (commandId.startsWith(QStringLiteral("edit.extend")))
         {
-            return QStringLiteral("Extend - select boundary, then entities to extend");
+            return QCoreApplication::translate(
+                "UiInteractionDispatcher", "Extend - select boundary, then entities to extend");
         }
         if (commandId.startsWith(QStringLiteral("edit.offset")))
         {
-            return QStringLiteral("Offset - select entity, specify distance");
+            return QCoreApplication::translate("UiInteractionDispatcher", "Offset - select entity, specify distance");
         }
         if (commandId.startsWith(QStringLiteral("edit.mirror")))
         {
-            return QStringLiteral("Mirror - select entities, specify mirror line");
+            return QCoreApplication::translate(
+                "UiInteractionDispatcher", "Mirror - select entities, specify mirror line");
         }
         if (commandId.startsWith(QStringLiteral("edit.array")))
         {
-            return QStringLiteral("Array - select entities, specify pattern");
+            return QCoreApplication::translate("UiInteractionDispatcher", "Array - select entities, specify pattern");
         }
         if (commandId.startsWith(QStringLiteral("edit.stretch")))
         {
-            return QStringLiteral("Stretch - select entities with crossing window");
+            return QCoreApplication::translate(
+                "UiInteractionDispatcher", "Stretch - select entities with crossing window");
         }
         if (commandId.startsWith(QStringLiteral("select")))
         {
-            return QStringLiteral("Select - click or drag to select entities");
+            return QCoreApplication::translate(
+                "UiInteractionDispatcher", "Select - click or drag to select entities");
         }
         if (commandId.startsWith(QStringLiteral("view.pan")))
         {
-            return QStringLiteral("Pan - drag to navigate");
+            return QCoreApplication::translate("UiInteractionDispatcher", "Pan - drag to navigate");
         }
         if (commandId.startsWith(QStringLiteral("view.zoom")))
         {
-            return QStringLiteral("Zoom - scroll or drag to zoom");
+            return QCoreApplication::translate("UiInteractionDispatcher", "Zoom - scroll or drag to zoom");
         }
 
-        return QStringLiteral("Ready");
+        return QCoreApplication::translate("UiInteractionDispatcher", "Ready");
+    }
+
+    QString readyPrompt()
+    {
+        return QCoreApplication::translate("UiInteractionDispatcher", "Ready");
     }
 }  // namespace
 
@@ -125,13 +142,13 @@ void DefaultInteractionDispatcher::syncCommandFinishState()
     m_stateCenter->setCurrentCommandPhase(QStringLiteral("idle"));
     m_stateCenter->setCurrentCommandId(QString());
     m_stateCenter->setCurrentCommandType(QString());
-    m_stateCenter->setStatusPrompt(QStringLiteral("Ready"));
+    m_stateCenter->setStatusPrompt(readyPrompt());
     m_stateCenter->clearInteractionState();
 
     QVariantMap meta = m_stateCenter->metadata();
     meta.remove(QStringLiteral("commandId"));
     meta.remove(QStringLiteral("commandType"));
-    meta.insert(QStringLiteral("statusPrompt"), QStringLiteral("Ready"));
+    meta.insert(QStringLiteral("statusPrompt"), readyPrompt());
     m_stateCenter->setMetadata(meta);
 
     m_activeCommandId.clear();

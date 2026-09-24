@@ -58,7 +58,7 @@
         { "type": "action", "id": "edit.redo", "label": "Redo", "command": "edit.redo", "icon": ":/ui/common/Icons/Actions/redo.svg", "shortcut": "Ctrl+Y", "workbenches": ["2D", "3D"] },
         { "type": "separator" },
         { "type": "action", "id": "edit.select_all", "label": "Select All", "command": "edit.select_all", "icon": ":/ui/common/Icons/Actions/select_all.svg", "workbenches": ["2D", "3D"] },
-        { "type": "action", "id": "edit.invert_selection", "label": "Invert Selection", "command": "edit.invert_selection", "icon": ":/ui/common/Icons/Actions/invert.svg", "shortcut": "Ctrl+Shift+I", "workbenches": ["2D", "3D"] },
+        { "type": "action", "id": "edit.invert_selection", "label": "Invert Selection", "tooltip": "Select everything that is not currently selected", "command": "edit.invert_selection", "icon": ":/ui/common/Icons/Actions/invert.svg", "shortcut": "Ctrl+Shift+I", "workbenches": ["2D", "3D"] },
         { "type": "action", "id": "edit.deselect", "label": "Clear Selection", "command": "edit.deselect", "icon": ":/ui/common/Icons/Actions/clear.svg", "workbenches": ["2D"] },
         { "type": "action", "id": "edit.deselect_3d", "label": "Clear Selection", "command": "edit.clear_selection", "icon": ":/ui/common/Icons/Actions/clear.svg", "workbenches": ["3D"] },
         { "type": "separator" },
@@ -95,17 +95,17 @@
         { "type": "action", "id": "edit.ungroup", "label": "Ungroup", "command": "edit.ungroup", "icon": ":/ui/common/Icons/Actions/ungroup.svg", "workbenches": ["2D"] },
         { "type": "separator" },
         { "type": "submenu", "id": "edit.path_operations", "label": "Path Operations", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"], "items": [
-          { "type": "action", "id": "edit.offset", "label": "Offset...", "command": "edit.offset", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"] },
-          { "type": "separator" },
-          { "type": "action", "id": "edit.trim", "label": "Trim", "command": "edit.trim", "icon": ":/ui/common/Icons/Actions/trim.svg", "workbenches": ["2D"] },
-          { "type": "action", "id": "edit.extend", "label": "Extend", "command": "edit.extend", "icon": ":/ui/common/Icons/Actions/extend.svg", "workbenches": ["2D"] },
-          { "type": "action", "id": "edit.fillet", "label": "Fillet...", "command": "edit.fillet", "icon": ":/ui/common/Icons/Actions/fillet.svg", "workbenches": ["2D"] },
-          { "type": "action", "id": "edit.chamfer", "label": "Chamfer...", "command": "edit.chamfer", "icon": ":/ui/common/Icons/Actions/chamfer.svg", "workbenches": ["2D"] },
-          { "type": "separator" },
-          { "type": "action", "id": "edit.boolean_union", "label": "Union", "command": "edit.boolean_union", "icon": ":/ui/common/Icons/Actions/boolean_union.svg", "workbenches": ["2D"] },
-          { "type": "action", "id": "edit.boolean_intersection", "label": "Intersection", "command": "edit.boolean_intersection", "icon": ":/ui/common/Icons/Actions/boolean_intersection.svg", "workbenches": ["2D"] },
-          { "type": "action", "id": "edit.boolean_difference", "label": "Difference", "command": "edit.boolean_difference", "icon": ":/ui/common/Icons/Actions/boolean_difference.svg", "workbenches": ["2D"] },
-          { "type": "action", "id": "edit.boolean_xor", "label": "Xor", "command": "edit.boolean_xor", "icon": ":/ui/common/Icons/Actions/boolean_xor.svg", "workbenches": ["2D"] }
+        { "type": "action", "id": "edit.offset", "label": "Offset...", "tooltip": "Create a parallel curve at a set distance from the selected path", "command": "edit.offset", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"] },
+        { "type": "separator" },
+        { "type": "action", "id": "edit.trim", "label": "Trim", "tooltip": "Trim entities back to the nearest cutting edge", "command": "edit.trim", "icon": ":/ui/common/Icons/Actions/trim.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "edit.extend", "label": "Extend", "tooltip": "Extend entities to the next boundary edge", "command": "edit.extend", "icon": ":/ui/common/Icons/Actions/extend.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "edit.fillet", "label": "Fillet...", "tooltip": "Round the corner between two lines or arcs with a radius", "command": "edit.fillet", "icon": ":/ui/common/Icons/Actions/fillet.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "edit.chamfer", "label": "Chamfer...", "tooltip": "Bevel the corner between two lines at a set distance", "command": "edit.chamfer", "icon": ":/ui/common/Icons/Actions/chamfer.svg", "workbenches": ["2D"] },
+        { "type": "separator" },
+        { "type": "action", "id": "edit.boolean_union", "label": "Union", "tooltip": "Merge overlapping paths into one outline", "command": "edit.boolean_union", "icon": ":/ui/common/Icons/Actions/boolean_union.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "edit.boolean_intersection", "label": "Intersection", "tooltip": "Keep only the region where selected paths overlap", "command": "edit.boolean_intersection", "icon": ":/ui/common/Icons/Actions/boolean_intersection.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "edit.boolean_difference", "label": "Difference", "tooltip": "Subtract the top path from the bottom path", "command": "edit.boolean_difference", "icon": ":/ui/common/Icons/Actions/boolean_difference.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "edit.boolean_xor", "label": "Xor", "tooltip": "Keep non-overlapping regions of the selected paths", "command": "edit.boolean_xor", "icon": ":/ui/common/Icons/Actions/boolean_xor.svg", "workbenches": ["2D"] }
         ] }
       ]
     },
@@ -131,9 +131,9 @@
         ] },
         { "type": "submenu", "id": "view.grid_snap", "label": "Grid && Snap", "icon": ":/ui/common/Icons/View3D/grid.svg", "workbenches": ["2D"], "items": [
           { "type": "action", "id": "view.grid_visible", "label": "Show Grid", "command": "view.grid_visible", "icon": ":/ui/common/Icons/View3D/grid.svg", "checkable": true, "workbenches": ["2D"] },
-          { "type": "action", "id": "view.snap_enabled", "label": "Snap Enabled", "command": "view.snap_enabled", "icon": ":/ui/common/Icons/View/snap.svg", "checkable": true, "workbenches": ["2D"] },
-          { "type": "action", "id": "view.ortho_mode", "label": "Ortho Mode", "command": "view.ortho_mode", "icon": ":/ui/common/Icons/View/ortho.svg", "checkable": true, "workbenches": ["2D"] },
-          { "type": "action", "id": "view.angle_snap", "label": "Angle Snap", "command": "view.angle_snap", "icon": ":/ui/common/Icons/View/angle_snap.svg", "checkable": true, "workbenches": ["2D"] }
+        { "type": "action", "id": "view.snap_enabled", "label": "Snap Enabled", "tooltip": "Snap the cursor to grid points and key geometry when drawing", "command": "view.snap_enabled", "icon": ":/ui/common/Icons/View/snap.svg", "checkable": true, "workbenches": ["2D"] },
+        { "type": "action", "id": "view.ortho_mode", "label": "Ortho Mode", "tooltip": "Constrain drawing and movement to horizontal / vertical directions", "command": "view.ortho_mode", "icon": ":/ui/common/Icons/View/ortho.svg", "checkable": true, "workbenches": ["2D"] },
+        { "type": "action", "id": "view.angle_snap", "label": "Angle Snap", "tooltip": "Snap angles to fixed increments (default 15 degrees) while rotating", "command": "view.angle_snap", "icon": ":/ui/common/Icons/View/angle_snap.svg", "checkable": true, "workbenches": ["2D"] }
         ] },
         { "type": "separator" },
         { "type": "action", "id": "view.layer_manager", "label": "Layer Manager...", "command": "view.layer_manager", "icon": ":/ui/common/Icons/View/layers.svg", "workbenches": ["2D"] },
@@ -174,7 +174,7 @@
         { "type": "action", "id": "tool.line", "label": "Line", "command": "tool.line", "icon": ":/ui/common/Icons/Tools/line.svg", "workbenches": ["2D"] },
         { "type": "action", "id": "tool.polyline", "label": "Polyline", "command": "tool.polyline", "icon": ":/ui/common/Icons/Tools/polyline.svg", "workbenches": ["2D"] },
         { "type": "action", "id": "tool.polygon", "label": "Polygon", "command": "tool.polygon", "icon": ":/ui/common/Icons/Tools/polygon.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "tool.smartline", "label": "Smart Line", "command": "tool.smartline", "icon": ":/ui/common/Icons/Tools/smartline.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "tool.smartline", "label": "Smart Line", "tooltip": "Draw continuous lines that auto-detect endpoints, arcs and angles", "command": "tool.smartline", "icon": ":/ui/common/Icons/Tools/smartline.svg", "workbenches": ["2D"] },
         { "type": "separator" },
         { "type": "action", "id": "tool.circle", "label": "Circle", "command": "tool.circle", "icon": ":/ui/common/Icons/Tools/circle.svg", "workbenches": ["2D"] },
         { "type": "action", "id": "tool.arc", "label": "Arc", "command": "tool.arc", "icon": ":/ui/common/Icons/Tools/arc.svg", "workbenches": ["2D"] },
@@ -195,8 +195,8 @@
         { "type": "action", "id": "model.make_cylinder", "label": "Cylinder", "command": "model.make_cylinder", "icon": ":/ui/common/Icons/Model3D/primitive_cylinder.svg", "workbenches": ["3D"] },
         { "type": "separator", "workbenches": ["3D"] },
         { "type": "submenu", "id": "model.boolean", "label": "Boolean", "icon": ":/ui/common/Icons/Actions/boolean_union.svg", "workbenches": ["3D"], "items": [
-          { "type": "action", "id": "model.boolean_fuse", "label": "Fuse", "command": "model.boolean_fuse", "icon": ":/ui/common/Icons/Actions/boolean_union.svg", "shortcut": "Ctrl+Shift+U", "workbenches": ["3D"] },
-          { "type": "action", "id": "model.boolean_cut", "label": "Cut", "command": "model.boolean_cut", "icon": ":/ui/common/Icons/Actions/boolean_difference.svg", "shortcut": "Ctrl+Shift+X", "workbenches": ["3D"] }
+          { "type": "action", "id": "model.boolean_fuse", "label": "Fuse", "tooltip": "Boolean-union selected 3D solids into one body", "command": "model.boolean_fuse", "icon": ":/ui/common/Icons/Actions/boolean_union.svg", "shortcut": "Ctrl+Shift+U", "workbenches": ["3D"] },
+          { "type": "action", "id": "model.boolean_cut", "label": "Cut", "tooltip": "Subtract the second solid from the first", "command": "model.boolean_cut", "icon": ":/ui/common/Icons/Actions/boolean_difference.svg", "shortcut": "Ctrl+Shift+X", "workbenches": ["3D"] }
         ] },
         { "type": "submenu", "id": "model.split", "label": "Split", "icon": ":/ui/common/Icons/Actions/cut.svg", "workbenches": ["3D"], "items": [
           { "type": "action", "id": "model.split_half_x", "label": "Half by X", "command": "model.split_half_x", "icon": ":/ui/common/Icons/Actions/cut.svg", "workbenches": ["3D"] },
@@ -212,15 +212,15 @@
       "visible": true,
       "workbenches": ["2D", "3D"],
       "items": [
-        { "type": "action", "id": "algo.fill", "label": "Fill", "command": "algo.fill", "icon": ":/ui/common/Icons/Actions/algo_fill.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "algo.nesting", "label": "Nesting", "command": "algo.nesting", "icon": ":/ui/common/Icons/Actions/algo_nesting.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "algo.array", "label": "Array", "command": "algo.array", "icon": ":/ui/common/Icons/Actions/algo_array.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "algo.offset", "label": "Offset...", "command": "algo.offset", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "algo.relief_engraving", "label": "Bitmap Relief Engraving...", "command": "algo.relief_engraving", "icon": ":/ui/common/Icons/Actions/algo_relief.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "algo.relief_engraving_mesh", "label": "Mesh Relief Engraving...", "command": "algo.relief_engraving_mesh", "icon": ":/ui/common/Icons/Actions/algo_relief.svg", "shortcut": "Ctrl+Shift+E", "workbenches": ["3D"] },
-        { "type": "action", "id": "algo.nesting_from_mesh", "label": "Nesting from Mesh", "command": "algo.nesting_from_mesh", "icon": ":/ui/common/Icons/Actions/group.svg", "workbenches": ["3D"] },
-        { "type": "action", "id": "process.generate_relief_toolpath", "label": "Generate Relief Toolpath", "command": "process.generate_relief_toolpath", "icon": ":/ui/common/Icons/Actions/cut.svg", "shortcut": "Ctrl+Shift+G", "workbenches": ["3D"] },
-        { "type": "action", "id": "process.export_relief_toolpath", "label": "Export Relief Toolpath", "command": "process.export_relief_toolpath", "icon": ":/ui/common/Icons/File/save_as.svg", "workbenches": ["3D"] }
+        { "type": "action", "id": "algo.fill", "label": "Fill", "tooltip": "Fill closed regions with hatching or solid patterns", "command": "algo.fill", "icon": ":/ui/common/Icons/Actions/algo_fill.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "algo.nesting", "label": "Nesting", "tooltip": "Automatically arrange parts on a sheet to minimize material waste", "command": "algo.nesting", "icon": ":/ui/common/Icons/Actions/algo_nesting.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "algo.array", "label": "Array", "tooltip": "Create rectangular or circular copies of the selection", "command": "algo.array", "icon": ":/ui/common/Icons/Actions/algo_array.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "algo.offset", "label": "Offset...", "tooltip": "Offset multiple paths by a distance for kerf compensation", "command": "algo.offset", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "algo.relief_engraving", "label": "Bitmap Relief Engraving...", "tooltip": "Convert a bitmap into a relief engraving toolpath", "command": "algo.relief_engraving", "icon": ":/ui/common/Icons/Actions/algo_relief.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "algo.relief_engraving_mesh", "label": "Mesh Relief Engraving...", "tooltip": "Generate a relief engraving toolpath from a 3D mesh height field", "command": "algo.relief_engraving_mesh", "icon": ":/ui/common/Icons/Actions/algo_relief.svg", "shortcut": "Ctrl+Shift+E", "workbenches": ["3D"] },
+        { "type": "action", "id": "algo.nesting_from_mesh", "label": "Nesting from Mesh", "tooltip": "Project mesh outlines and nest them as 2D parts", "command": "algo.nesting_from_mesh", "icon": ":/ui/common/Icons/Actions/group.svg", "workbenches": ["3D"] },
+        { "type": "action", "id": "process.generate_relief_toolpath", "label": "Generate Relief Toolpath", "tooltip": "Compile the current relief into machine motion commands", "command": "process.generate_relief_toolpath", "icon": ":/ui/common/Icons/Actions/cut.svg", "shortcut": "Ctrl+Shift+G", "workbenches": ["3D"] },
+        { "type": "action", "id": "process.export_relief_toolpath", "label": "Export Relief Toolpath", "tooltip": "Write the generated relief toolpath to a file", "command": "process.export_relief_toolpath", "icon": ":/ui/common/Icons/File/save_as.svg", "workbenches": ["3D"] }
       ]
     },
     {
@@ -233,7 +233,7 @@
         { "type": "action", "id": "laser.pause_process", "label": "Pause Process", "command": "laser.pause_process", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D"] },
         { "type": "action", "id": "laser.stop_process", "label": "Stop Process", "command": "laser.stop_process", "icon": ":/ui/common/Icons/Actions/laser.svg", "workbenches": ["2D"] },
         { "type": "separator" },
-        { "type": "action", "id": "laser.emergency_stop", "label": "Emergency Stop", "command": "laser.emergency_stop", "icon": ":/ui/common/Icons/Actions/laser_emergency.svg", "workbenches": ["2D"] }
+        { "type": "action", "id": "laser.emergency_stop", "label": "Emergency Stop", "tooltip": "Immediately halt all motion and turn off the laser", "command": "laser.emergency_stop", "icon": ":/ui/common/Icons/Actions/laser_emergency.svg", "workbenches": ["2D"] }
       ]
     },
     {
@@ -250,7 +250,10 @@
           { "type": "action", "id": "theme.system", "label": "System", "command": "theme.system", "checkable": true, "workbenches": ["2D", "3D"] },
           { "type": "action", "id": "theme.light", "label": "Light", "command": "theme.light", "checkable": true, "workbenches": ["2D", "3D"] },
           { "type": "action", "id": "theme.dark", "label": "Dark", "command": "theme.dark", "checkable": true, "workbenches": ["2D", "3D"] },
-          { "type": "action", "id": "theme.blue", "label": "Blue", "command": "theme.blue", "checkable": true, "workbenches": ["2D", "3D"] }
+          { "type": "action", "id": "theme.blue", "label": "Blue", "command": "theme.blue", "checkable": true, "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "theme.slate", "label": "Slate", "command": "theme.slate", "checkable": true, "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "theme.highcontrast", "label": "High Contrast", "command": "theme.highcontrast", "checkable": true, "workbenches": ["2D", "3D"] },
+          { "type": "action", "id": "theme.default", "label": "Default", "command": "theme.default", "checkable": true, "workbenches": ["2D", "3D"] }
         ] },
         { "type": "separator" },
         { "type": "submenu", "id": "help.language", "label": "Language", "icon": ":/ui/common/Icons/Help/language.svg", "workbenches": ["2D", "3D"], "items": [

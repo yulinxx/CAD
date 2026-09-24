@@ -195,4 +195,3 @@ protected:
 };
 
 // ============================================================
-using Workbench2DMain = Workbench2D;

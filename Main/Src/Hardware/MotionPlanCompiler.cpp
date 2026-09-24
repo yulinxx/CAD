@@ -13,6 +13,8 @@
     #include <unordered_set>
     #include <vector>
 
+    #include <QCoreApplication>
+
     #include "Engine/SyEntity/SyEntity.h"
     #include "Engine2D/Edit/LayerSnapshot.h"
     #include "Engine2D/Geo/GeometryContext.h"
@@ -384,7 +386,9 @@ namespace MotionPlanCompiler
 
         if (out.commandCount() == 0 || result.layerCount == 0)
         {
-            result.error = QStringLiteral("没有可加工的图元（共 %1 个图元，其中 %2 个被隐藏/锁定/无路径而跳过）")
+            result.error = QCoreApplication::translate(
+                               "MotionPlanCompiler",
+                               "No processable entities (total %1, %2 skipped as hidden/locked/no path)")
                                .arg(all.size())
                                .arg(result.skippedEntityCount);
             out.clear();

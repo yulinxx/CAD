@@ -88,29 +88,23 @@ namespace RenderBridge
          *
          * **单位的坑（先看这里再看数字）**：`transientBufferBytes` 是**单段**容量，
          * 环的缓冲总量是它的 **2 倍**（TransientRing::kSegmentCount = 2）。所以
-         * 64MB 预算 = 单段 64MB + 常驻缓冲 128MB；告警阈值是单段的 75%，
-         * 即 **48MB**。可用显存实测反证：128MB 预算时 `gpuMem` 比 64MB 预算时
+         * 32MB 预算 = 单段 32MB + 常驻缓冲 64MB；告警阈值是单段的 75%，
+         * 即 **24MB**。可用显存实测反证：128MB 预算时 `gpuMem` 比 64MB 预算时
          * 高出的那部分正好是 2×128MB。
          *
-         * **为什么是 64MB**：在 64MB 预算（单段 64MB、告警阈值 48MB）下导入
-         * `13451_Golden_Crown_v1_L2.obj`（193920 三角形 / 348288 顶点 /
-         * 13.9MB 几何 blob）并选中实体操作，全程**未触发 75% 告警、也未触发溢出
-         * 告警** → 单帧用量 < 48MB，且从未超过 64MB。
+         * **为什么是 32MB（从 64MB 下调）**：64MB 预算下导入
+         * `13451_Golden_Crown_v1_L2.obj` 并选中实体操作，全程未触发 75% 告警
+         * → 单帧用量 < 48MB、且从未超过 64MB。空闲启动并不触碰瞬态环，下调
+         * 只影响「重载帧是否走溢出缓冲」；两条安全网仍然兜底：
          *
-         * 证据强度如实说明：**最强的场景（选中 5 个实体 + 三轴拖拽，此时选中
-         * 高亮与线框逐帧全量重传）是在 128MB 预算下跑的**，那次阈值是 96MB，
-         * 只能证明用量 < 96MB，不足以定值；64MB 下的那次操作较轻。因此这个值是
-         * 「无溢出 + 有余量」的结论，不是精确定值——但下面两条安全网让它可以先用。
-         *
-         * **安全网**：`Session::endFrame` 在用量越过单段 75%（48MB）时明确告警；
+         * **安全网**：`Session::endFrame` 在用量越过单段 75%（24MB）时明确告警；
          * 真正超出单段容量时 TransientRing 会为该次分配另开缓冲（帧末释放），
          * **不会画错，只是慢一点**。所以最坏情况是「一条告警 + 轻微回退」，
          * 真吃到告警把它抬回去即可。
          *
-         * 取 64MB 而不是 128MB 的收益：常驻缓冲从 256MB 降到 128MB —— 与收口前
-         * 「2D 单开」的占用持平，而切换零重建的收益不变。
+         * 取 32MB 而不是 64MB 的收益：常驻缓冲从 128MB 降到 64MB。
          */
-        static constexpr uint64_t kSharedRuntimeTransientBytes = 64ull * 1024 * 1024;
+        static constexpr uint64_t kSharedRuntimeTransientBytes = 32ull * 1024 * 1024;
 
         /// 创建参数：只暴露两个视口真正不同的部分，其余走同一套默认
         struct Config
@@ -119,7 +113,7 @@ namespace RenderBridge
             uint32_t width = 0;
             uint32_t height = 0;
             bool enableDepth = false;
-            uint64_t transientBufferBytes = 64ull * 1024 * 1024;
+            uint64_t transientBufferBytes = 32ull * 1024 * 1024;
             float clearColor[4]{ 0.94f, 0.94f, 0.94f, 1.0f };
             /// 渲染后端。默认 OpenGL，保持既有调用方零改动。
             RenderAbstraction::RenderBackend backend = RenderAbstraction::RenderBackend::OpenGL;

@@ -4,6 +4,8 @@
 #include "UI2D/Operation/OperationId.h"
 #include "UI2D/Operation/IOperation.h"
 
+#include <QCoreApplication>
+
 #include "Log/SyLogger.h"
 
 #include "../Hardware/DeviceHost.h"
@@ -54,8 +56,8 @@ void LaserOperationRegistry::registerAll()
             if (!job || !m_config.sceneManager)
             {
                 reportError("StartProcess",
-                    QStringLiteral(
-                        "Processing service not configured, cannot start processing"));  // 加工服务未装配，无法开始加工
+                    QCoreApplication::translate(
+                        "LaserOperationRegistry", "Processing service not configured, cannot start processing"));
                 return;
             }
             QString error;
@@ -78,7 +80,8 @@ void LaserOperationRegistry::registerAll()
         [this, job] {
             if (!job)
             {
-                reportError("PauseProcess", QStringLiteral("Processing service not configured"));  // 加工服务未装配
+                reportError("PauseProcess",
+                    QCoreApplication::translate("LaserOperationRegistry", "Processing service not configured"));
                 return;
             }
             QString error;
@@ -101,7 +104,8 @@ void LaserOperationRegistry::registerAll()
         [this, job] {
             if (!job)
             {
-                reportError("StopProcess", QStringLiteral("Processing service not configured"));  // 加工服务未装配
+                reportError("StopProcess",
+                    QCoreApplication::translate("LaserOperationRegistry", "Processing service not configured"));
                 return;
             }
             QString error;

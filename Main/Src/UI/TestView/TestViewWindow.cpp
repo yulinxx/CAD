@@ -348,7 +348,7 @@ TestViewWindow::TestViewWindow(Eg::SceneManager* scene, bool liveSync, QWidget* 
     layout->setContentsMargins(2, 2, 2, 2);
 
     auto* syncBox = new QCheckBox(tr("Sync with scene (live)"), container);
-    syncBox->setToolTip(tr("实时同步场景变化（关闭时保持当前快照）"));
+    syncBox->setToolTip(tr("Live-sync scene changes (off keeps the current snapshot)"));
     syncBox->setChecked(liveSync);
     layout->addWidget(syncBox);
 

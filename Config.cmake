@@ -18,45 +18,133 @@
 #   cmake -B build -S . -DBUILD_VISION=ON -DBUILD_HARDWARE=ON -DBUILD_NESTING=ON
 #
 # ============================================================================
+#
+# 本文件是路径配置与测试开关的**唯一配置处**：
+#   - 路径：VCPKG_DIR / Qt_INSTALL_DIR / 工具链 / 输出目录，全部只在这里定义；
+#   - 测试开关：所有 BUILD_*_TESTS 只在这里定义。
+# 其它 CMakeLists.txt 一律不得重复定义同名项 —— 重复定义会互相覆盖，
+# 且普通 set() 会遮蔽同名 option()（CMP0077），使命令行 -D 传参静默失效。
+#
+# 重复 include 保护：本文件既被根 CMakeLists.txt 包含，也被各模块的独立构建
+# 入口包含（如 FileIO、Engraving/ci）。同一次 configure 内只执行一次，避免下面的
+# CACHE ... FORCE 反复改写缓存并重复刷屏。
+# 用**普通变量**而非缓存变量：缓存会跨 configure 持久化，导致下次 configure
+# 本文件被直接跳过、文件里的改动不生效。
+if(SANYI_CONFIG_INCLUDED)
+    return()
+endif()
+set(SANYI_CONFIG_INCLUDED TRUE)
 
 # --------------------------------------------------------------------
 # 基础路径配置
 # --------------------------------------------------------------------
-# 以下路径可根据实际安装位置修改
+# 路径解析顺序（从高到低）：
+#   1. 已定义的 CMake 变量（-D 或上层 include）
+#   2. 环境变量 VCPKG_DIR / Qt_INSTALL_DIR
+#   3. Qt6_DIR 推导（仅 Qt）
+#   4. 常见安装位置探测（无用户目录）
+# 均未命中时给出明确错误，不写入任何用户机器相关的默认值。
 
-# vcpkg 根目录（自动检测，优先使用 VCPKG_DIR 环境变量）
+# vcpkg 根目录
 if(NOT DEFINED VCPKG_DIR OR VCPKG_DIR STREQUAL "")
-    if(DEFINED ENV{VCPKG_DIR})
+    if(DEFINED ENV{VCPKG_DIR} AND NOT "$ENV{VCPKG_DIR}" STREQUAL "")
         set(VCPKG_DIR "$ENV{VCPKG_DIR}" CACHE PATH "VCPKG installation directory")
-    elseif(WIN32)
-        # set(VCPKG_DIR "C:/vcpkg/" CACHE PATH "VCPKG installation directory")
-        set(VCPKG_DIR "C:/Users/xx/vcpkg/" CACHE PATH "VCPKG installation directory")
-    elseif(UNIX AND NOT APPLE)
-        set(VCPKG_DIR "/usr/local/vcpkg/" CACHE PATH "VCPKG installation directory")
-    elseif(APPLE)
-        set(VCPKG_DIR "/Users/ms/vcpkg" CACHE PATH "VCPKG installation directory")
+    else()
+        # 常见安装位置（不含任何用户主目录）
+        set(_vcpkg_candidates "")
+        if(WIN32)
+            list(APPEND _vcpkg_candidates
+                "C:/vcpkg"
+                "$ENV{ProgramFiles}/vcpkg"
+                "$ENV{ProgramFiles\(x86\)}/vcpkg"
+            )
+        elseif(APPLE)
+            list(APPEND _vcpkg_candidates "/usr/local/vcpkg" "/opt/vcpkg")
+        else()
+            list(APPEND _vcpkg_candidates "/usr/local/vcpkg" "/opt/vcpkg")
+        endif()
+        set(VCPKG_DIR "")
+        foreach(_cand IN LISTS _vcpkg_candidates)
+            if(EXISTS "${_cand}/scripts/buildsystems/vcpkg.cmake")
+                set(VCPKG_DIR "${_cand}" CACHE PATH "VCPKG installation directory")
+                break()
+            endif()
+        endforeach()
+        if(VCPKG_DIR STREQUAL "")
+            set(VCPKG_DIR "" CACHE PATH "VCPKG installation directory (set via VCPKG_DIR env or -DVCPKG_DIR=...)")
+        endif()
     endif()
 endif()
 
-# Qt 安装目录（优先使用 Qt6_DIR 或 Qt_INSTALL_DIR 环境变量）
+# Qt 安装目录
 if(NOT DEFINED Qt_INSTALL_DIR OR Qt_INSTALL_DIR STREQUAL "")
-    if(DEFINED ENV{Qt_INSTALL_DIR})
+    if(DEFINED ENV{Qt_INSTALL_DIR} AND NOT "$ENV{Qt_INSTALL_DIR}" STREQUAL "")
         set(Qt_INSTALL_DIR "$ENV{Qt_INSTALL_DIR}" CACHE PATH "Qt installation directory")
     elseif(DEFINED Qt6_DIR)
         get_filename_component(_qt6_root "${Qt6_DIR}" DIRECTORY)
         get_filename_component(Qt_INSTALL_DIR "${_qt6_root}" DIRECTORY)
-    elseif(WIN32)
-        # set(Qt_INSTALL_DIR "C:/Qt/6.11.2/msvc2022_64" CACHE PATH "Qt installation directory")
-        set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.11.2/msvc2022_64" CACHE PATH "Qt installation directory")
-    elseif(UNIX AND NOT APPLE)
-        set(Qt_INSTALL_DIR "/usr/local/Qt/6.11.1/gcc_64" CACHE PATH "Qt installation directory")
-    elseif(APPLE)
-        set(Qt_INSTALL_DIR "/Users/ms/Qt/6.11.1/macos" CACHE PATH "Qt installation directory")
+        set(Qt_INSTALL_DIR "${Qt_INSTALL_DIR}" CACHE PATH "Qt installation directory")
+    else()
+        # 常见安装位置（不含任何用户主目录）
+        set(_qt_candidates "")
+        if(WIN32)
+            list(APPEND _qt_candidates
+                "C:/Qt"
+                "C:/Program Files/Qt"
+                "$ENV{ProgramFiles}/Qt"
+            )
+            # 在 C:/Qt 下探测最新 6.x 安装
+            if(EXISTS "C:/Qt")
+                file(GLOB _qt_ver_dirs "C:/Qt/6.*")
+                list(SORT _qt_ver_dirs ORDER DESCENDING)
+                foreach(_ver IN LISTS _qt_ver_dirs)
+                    get_filename_component(_ver_name "${_ver}" NAME)
+                    list(APPEND _qt_candidates
+                        "${_ver}/msvc2022_64"
+                        "${_ver}/msvc2019_64"
+                    )
+                endforeach()
+            endif()
+        elseif(APPLE)
+            list(APPEND _qt_candidates "/usr/local/Qt" "/opt/Qt")
+        else()
+            list(APPEND _qt_candidates "/usr/local/Qt" "/opt/Qt" "/usr/lib/qt6")
+        endif()
+        set(Qt_INSTALL_DIR "")
+        foreach(_cand IN LISTS _qt_candidates)
+            if(EXISTS "${_cand}/lib/cmake/Qt6/Qt6Config.cmake")
+                set(Qt_INSTALL_DIR "${_cand}" CACHE PATH "Qt installation directory")
+                break()
+            endif()
+        endforeach()
+        if(Qt_INSTALL_DIR STREQUAL "")
+            set(Qt_INSTALL_DIR "" CACHE PATH "Qt installation directory (set via Qt_INSTALL_DIR env or -DQt_INSTALL_DIR=...)")
+        endif()
     endif()
 endif()
 
 # Qt 主版本号
 set(QT_VERSION_MAJOR 6)
+
+# 路径未命中时明确失败，避免后续 configure 产生难懂的连锁错误
+if(VCPKG_DIR STREQUAL "" OR NOT EXISTS "${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake")
+    message(FATAL_ERROR
+        "[Config] VCPKG_DIR not found or invalid: '${VCPKG_DIR}'\n"
+        "  Set environment variable VCPKG_DIR, or pass -DVCPKG_DIR=<path> to cmake.")
+endif()
+if(Qt_INSTALL_DIR STREQUAL "" OR NOT EXISTS "${Qt_INSTALL_DIR}/lib/cmake/Qt6/Qt6Config.cmake")
+    message(FATAL_ERROR
+        "[Config] Qt_INSTALL_DIR not found or invalid: '${Qt_INSTALL_DIR}'\n"
+        "  Set environment variable Qt_INSTALL_DIR, or pass -DQt_INSTALL_DIR=<path> to cmake.")
+endif()
+
+# --------------------------------------------------------------------
+# vcpkg 工具链
+# --------------------------------------------------------------------
+# 必须在 project() 之前生效 —— 根脚本在 project() 之前 include 本文件，正是为此。
+# 各模块不得再自行 set(CMAKE_TOOLCHAIN_FILE ...)。
+set(CMAKE_TOOLCHAIN_FILE "${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake"
+    CACHE STRING "Vcpkg toolchain file")
 
 # --------------------------------------------------------------------
 # 构建类型配置
@@ -137,16 +225,31 @@ if(SANYI_UNITY_BUILD)
     set(CMAKE_UNITY_BUILD ON)
     # Unity 构建的块大小，可根据内存调整
     set(CMAKE_UNITY_BUILD_BATCH_SIZE 16)
+    # 默认排除 Objective-C++，避免与 C++ 混在一个 unity 块里导致编译错误
+    list(APPEND CMAKE_UNITY_BUILD_SUPPORTED_SOURCE_EXTENSIONS ".mm")
 endif()
 
 # --------------------------------------------------------------------
 # 输出目录配置
 # --------------------------------------------------------------------
-# 注意: 输出目录由 CMakeLists.txt 统一管理 (带 Qt 版本后缀)
-# 此处仅设置基础路径，实际路径在 CMakeLists.txt 中配置
-# set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-# set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-# set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+# 统一带 Qt 版本后缀，避免同机多 Qt 版本的产物互相覆盖。
+# 这是本项目输出目录的唯一配置处：各模块不得再自行 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ...)。
+set(_SANYI_BIN_DIR "${CMAKE_BINARY_DIR}/bin_Qt${QT_VERSION_MAJOR}")
+set(_SANYI_LIB_DIR "${CMAKE_BINARY_DIR}/lib_Qt${QT_VERSION_MAJOR}")
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${_SANYI_BIN_DIR}" CACHE PATH "Runtime output directory")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${_SANYI_BIN_DIR}" CACHE PATH "Library output directory")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${_SANYI_LIB_DIR}" CACHE PATH "Archive output directory")
+
+# 多配置生成器（Visual Studio / Xcode）需要再按配置分子目录
+foreach(_sanyi_cfg Debug Release RelWithDebInfo MinSizeRel)
+    string(TOUPPER "${_sanyi_cfg}" _sanyi_cfg_u)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_sanyi_cfg_u} "${_SANYI_BIN_DIR}/${_sanyi_cfg}")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${_sanyi_cfg_u} "${_SANYI_BIN_DIR}/${_sanyi_cfg}")
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${_sanyi_cfg_u} "${_SANYI_LIB_DIR}/${_sanyi_cfg}")
+endforeach()
+
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 # --------------------------------------------------------------------
 # Qt 配置
@@ -228,14 +331,77 @@ option(BUILD_GEOMODELCORE "Build GeoModelCore module (OpenCASCADE-based geometry
 option(BUILD_CRASHHANDLER "Build CrashHandler module (crash capture and reporting)" ON)
 option(BUILD_PYTHON "Build Python module (PythonHost integration framework)" OFF)
 
-# ===== 工具和测试 =====
-option(BUILD_ALL_TESTS "Build all unit tests" OFF)
+# ===== 工具 =====
 option(BUILD_KEYGEN_TOOL "Build KeygenTool (offline license key generator)" OFF)
 
-# 禁用各模块测试 (避免测试代码与主代码冲突)
-set(BUILD_RENDERX_TESTS OFF)
-set(BUILD_UI2D_TESTS OFF)
-set(BUILD_MAIN_TESTS OFF)
+# --------------------------------------------------------------------
+# 测试开关（本项目测试开关的唯一配置处）
+# --------------------------------------------------------------------
+# 规则：所有 BUILD_*_TESTS 只在本文件定义。其它 CMakeLists.txt 一律不得再
+#       用 option() / set() 定义同名开关，因为：
+#         - 重复定义会互相覆盖，谁先定义谁生效，排查成本极高；
+#         - 普通 set() 会遮蔽同名 option()（CMP0077），使 -D 传参静默失效。
+#
+# 取值方式：下面每个开关都是**显式取值**，本文件即权威来源，改完重新 configure
+#           立即生效（用 FORCE 写回缓存，避免旧缓存粘滞导致「改了文件没反应」）。
+
+# 便捷总开关：ON = 把下面全部模块测试一并打开；OFF = 保持各模块的显式取值
+set(BUILD_ALL_TESTS OFF CACHE BOOL "打开全部模块测试（便捷总开关）" FORCE)
+
+# ---- 逐模块测试开关（当前取值沿用收敛前的既有行为，可按需手动调整）----
+set(BUILD_UTILITY_TESTS          OFF CACHE BOOL "Utility 单元测试" FORCE)
+set(BUILD_LOG_TESTS              OFF CACHE BOOL "Log 单元测试" FORCE)
+set(BUILD_ENGINE2D_TESTS         OFF CACHE BOOL "Engine2D 单元测试" FORCE)
+set(BUILD_ENGINE3D_TESTS         OFF CACHE BOOL "Engine3D 单元测试" FORCE)
+set(BUILD_GEOMODELCORE_TESTS     OFF CACHE BOOL "GeoModelCore 单元测试" FORCE)
+set(BUILD_FILEIO_TESTS           OFF CACHE BOOL "FileIO 单元测试" FORCE)
+set(BUILD_LICENSE_TESTS          ON  CACHE BOOL "License 单元测试" FORCE)
+set(BUILD_NESTING_TESTS          OFF CACHE BOOL "Nesting 单元测试" FORCE)
+set(BUILD_CAM_TESTS              OFF CACHE BOOL "CAM 单元测试" FORCE)
+set(BUILD_ENGRAVING_TESTS        OFF CACHE BOOL "Engraving 单元测试" FORCE)
+set(BUILD_HARDWARE_TESTS         OFF CACHE BOOL "Hardware 单元测试" FORCE)
+set(BUILD_VISION_TESTS           OFF CACHE BOOL "Vision 单元测试" FORCE)
+set(BUILD_PYTHONHOST_TESTS       OFF CACHE BOOL "PythonHost 单元测试" FORCE)
+set(BUILD_CRASHHANDLER_TESTS     OFF CACHE BOOL "CrashHandler 单元测试" FORCE)
+set(BUILD_RENDERX_TESTS          OFF CACHE BOOL "Renderx 单元测试" FORCE)
+set(BUILD_RENDERBRIDGE_TESTS     ON  CACHE BOOL "RenderBridge 契约测试" FORCE)
+set(BUILD_UI_COMMON_TESTS        ON  CACHE BOOL "UICommon 单元测试" FORCE)
+set(BUILD_UI2D_TESTS             OFF CACHE BOOL "UI2D 单元测试" FORCE)
+set(BUILD_UI3D_TESTS             ON  CACHE BOOL "UI3D 单元测试" FORCE)
+set(BUILD_MAIN_TESTS             OFF CACHE BOOL "Main 单元测试（含撤销/重做回归）" FORCE)
+set(BUILD_VIEWPORT_REFRESH_TESTS ON  CACHE BOOL "2D 视口刷新契约测试" FORCE)
+
+# 全部模块测试开关清单：供总开关应用、GTest 缺失统一降级、以及状态输出使用
+set(SANYI_TEST_SWITCHES
+    BUILD_UTILITY_TESTS
+    BUILD_LOG_TESTS
+    BUILD_ENGINE2D_TESTS
+    BUILD_ENGINE3D_TESTS
+    BUILD_GEOMODELCORE_TESTS
+    BUILD_FILEIO_TESTS
+    BUILD_LICENSE_TESTS
+    BUILD_NESTING_TESTS
+    BUILD_CAM_TESTS
+    BUILD_ENGRAVING_TESTS
+    BUILD_HARDWARE_TESTS
+    BUILD_VISION_TESTS
+    BUILD_PYTHONHOST_TESTS
+    BUILD_CRASHHANDLER_TESTS
+    BUILD_RENDERX_TESTS
+    BUILD_RENDERBRIDGE_TESTS
+    BUILD_UI_COMMON_TESTS
+    BUILD_UI2D_TESTS
+    BUILD_UI3D_TESTS
+    BUILD_MAIN_TESTS
+    BUILD_VIEWPORT_REFRESH_TESTS
+    CACHE INTERNAL "全部单元测试开关")
+
+# 总开关为 ON 时覆盖上面所有逐模块取值
+if(BUILD_ALL_TESTS)
+    foreach(_sanyi_test IN LISTS SANYI_TEST_SWITCHES)
+        set(${_sanyi_test} ON CACHE BOOL "opened by BUILD_ALL_TESTS" FORCE)
+    endforeach()
+endif()
 
 # --------------------------------------------------------------------
 # 依赖库查找配置
@@ -303,5 +469,16 @@ message(STATUS "  GeoModelCore:   ${BUILD_GEOMODELCORE}")
 message(STATUS "  CrashHandler:   ${BUILD_CRASHHANDLER}")
 message(STATUS "  Python:         ${BUILD_PYTHON}")
 message(STATUS "[Tests]")
-message(STATUS "  Unit Tests: ${BUILD_ALL_TESTS}")
+message(STATUS "  Master switch (BUILD_ALL_TESTS): ${BUILD_ALL_TESTS}")
+set(_sanyi_enabled_tests "")
+foreach(_sanyi_test IN LISTS SANYI_TEST_SWITCHES)
+    if(${_sanyi_test})
+        list(APPEND _sanyi_enabled_tests "${_sanyi_test}")
+    endif()
+endforeach()
+if(_sanyi_enabled_tests)
+    message(STATUS "  Enabled: ${_sanyi_enabled_tests}")
+else()
+    message(STATUS "  Enabled: none")
+endif()
 message(STATUS "")

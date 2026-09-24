@@ -94,10 +94,10 @@ namespace
         }
     };
 
-    /// HwResult → 可展示的中文错误串。
+    /// HwResult → 可展示的错误串（源串英文，经 tr 本地化）。
     QString describe(const QString& what, const Hw::HwResult& result)
     {
-        return QStringLiteral("%1 failed: [%2] %3")  // 失败
+        return ProcessingJobService::tr("%1 failed: [%2] %3")
             .arg(what)
             .arg(QString::fromUtf8(Hw::hwErrorName(result.error)))
             .arg(QString::fromUtf8(result.message));
@@ -134,25 +134,25 @@ struct ProcessingJobService::Impl
     {
         if (!host)
         {
-            errorOut = QStringLiteral("Device host not configured");  // 未装配设备宿主
+            errorOut = tr("Device host not configured");  // 未装配设备宿主
             return false;
         }
         if (active)
         {
-            errorOut = QStringLiteral("Job already in progress (%1), stop it first").arg(jobId);  // 已有加工作业正在进行
+            errorOut = tr("Job already in progress (%1), stop it first").arg(jobId);  // 已有加工作业正在进行
             return false;
         }
         if (!host->isRunning())
         {
-            errorOut = QStringLiteral("Device not started, cannot start processing");  // 设备未启动，无法开始加工
+            errorOut = tr("Device not started, cannot start processing");  // 设备未启动，无法开始加工
             return false;
         }
         if (!host->canStartProcessing())
         {
             const QStringList violations = host->safetyViolations();
             errorOut = violations.isEmpty()
-                ? QStringLiteral("Safety conditions not met, processing prohibited")  // 安全条件不满足，禁止开始加工
-                : QStringLiteral("Safety conditions not met, processing prohibited: %1").arg(violations.first());
+                ? tr("Safety conditions not met, processing prohibited")  // 安全条件不满足，禁止开始加工
+                : tr("Safety conditions not met, processing prohibited: %1").arg(violations.first());
             return false;
         }
         return true;
@@ -225,8 +225,7 @@ bool ProcessingJobService::startPlan(const Hw::MotionPlanView& view, const QStri
 
     if (!view.valid())
     {
-        errorOut =
-            QStringLiteral("Processing plan is empty, no executable commands");  // 加工计划为空，没有任何可执行指令
+        errorOut = tr("Processing plan is empty, no executable commands");  // 加工计划为空，没有任何可执行指令
         SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
         return false;
     }
@@ -235,7 +234,7 @@ bool ProcessingJobService::startPlan(const Hw::MotionPlanView& view, const QStri
     if (!runner.valid())
     {
         // 例如只接了激光电源或纯 IO 板的机型
-        errorOut = QStringLiteral("Device %1 provides neither motion nor galvo capability, cannot execute plan")
+        errorOut = tr("Device %1 provides neither motion nor galvo capability, cannot execute plan")
                        .arg(m_impl->host->deviceId());  // 设备既不提供运动卡也不提供振镜卡能力
         SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
         return false;
@@ -245,7 +244,7 @@ bool ProcessingJobService::startPlan(const Hw::MotionPlanView& view, const QStri
     if (loaded.failed())
     {
         // loadPlan 里通常是软限位/幅面预检失败，错误信息带具体越界轴，直接透出
-        errorOut = describe(QStringLiteral("下发加工计划"), loaded);
+        errorOut = describe(tr("Load processing plan"), loaded);
         SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
         return false;
     }
@@ -253,7 +252,7 @@ bool ProcessingJobService::startPlan(const Hw::MotionPlanView& view, const QStri
     const Hw::HwResult started = runner.start();
     if (started.failed())
     {
-        errorOut = describe(QStringLiteral("启动加工"), started);
+        errorOut = describe(tr("Start processing"), started);
         SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
         return false;
     }
@@ -284,21 +283,21 @@ bool ProcessingJobService::pauseJob(QString& errorOut)
 {
     if (!m_impl->active)
     {
-        errorOut = QStringLiteral("当前没有正在进行的加工作业");
+        errorOut = tr("No processing job is currently running");
         SY_WARNF("[ProcessingJob] pauseJob refused: %s", errorOut.toUtf8().constData());
         return false;
     }
     const PlanRunner runner = PlanRunner::resolve(m_impl->host);
     if (!runner.valid())
     {
-        errorOut = QStringLiteral("设备已断开");
+        errorOut = tr("Device disconnected");
         SY_WARNF("[ProcessingJob] pauseJob refused: %s", errorOut.toUtf8().constData());
         return false;
     }
     const Hw::HwResult r = runner.pause();
     if (r.failed())
     {
-        errorOut = describe(QStringLiteral("暂停加工"), r);
+        errorOut = describe(tr("Pause processing"), r);
         SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
         return false;
     }
@@ -313,7 +312,7 @@ bool ProcessingJobService::resumeJob(QString& errorOut)
 {
     if (!m_impl->active)
     {
-        errorOut = QStringLiteral("当前没有正在进行的加工作业");
+        errorOut = tr("No processing job is currently running");
         SY_WARN("[ProcessingJob] resumeJob refused: no active job");
         return false;
     }
@@ -322,22 +321,22 @@ bool ProcessingJobService::resumeJob(QString& errorOut)
     if (!m_impl->host->canStartProcessing())
     {
         const QStringList violations = m_impl->host->safetyViolations();
-        errorOut = violations.isEmpty() ? QStringLiteral("安全条件不满足，禁止恢复加工")
-                                        : QStringLiteral("安全条件不满足，禁止恢复加工：%1").arg(violations.first());
+        errorOut = violations.isEmpty() ? tr("Safety conditions not met, resume prohibited")
+                                        : tr("Safety conditions not met, resume prohibited: %1").arg(violations.first());
         SY_WARNF("[ProcessingJob] resumeJob refused: %s", errorOut.toUtf8().constData());
         return false;
     }
     const PlanRunner runner = PlanRunner::resolve(m_impl->host);
     if (!runner.valid())
     {
-        errorOut = QStringLiteral("设备已断开");
+        errorOut = tr("Device disconnected");
         SY_ERROR("[ProcessingJob] resumeJob failed: runner invalid (device disconnected)");
         return false;
     }
     const Hw::HwResult r = runner.resume();
     if (r.failed())
     {
-        errorOut = describe(QStringLiteral("恢复加工"), r);
+        errorOut = describe(tr("Resume processing"), r);
         SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
         return false;
     }
@@ -350,7 +349,7 @@ bool ProcessingJobService::abortJob(QString& errorOut)
 {
     if (!m_impl->active)
     {
-        errorOut = QStringLiteral("当前没有正在进行的加工作业");
+        errorOut = tr("No processing job is currently running");
         SY_WARN("[ProcessingJob] abortJob refused: no active job");
         return false;
     }
@@ -361,14 +360,14 @@ bool ProcessingJobService::abortJob(QString& errorOut)
         m_impl->active = false;
         m_impl->pollTimer.stop();
         SY_ERROR("[ProcessingJob] abortJob: device disappeared during active job, cleaning up local state");
-        emit jobFinished(false, QStringLiteral("设备已断开，作业中止"));
-        errorOut = QStringLiteral("设备已断开");
+        emit jobFinished(false, tr("Device disconnected, job aborted"));
+        errorOut = tr("Device disconnected");
         return false;
     }
     const Hw::HwResult r = runner.abort();
     if (r.failed())
     {
-        errorOut = describe(QStringLiteral("中止加工"), r);
+        errorOut = describe(tr("Abort processing"), r);
         SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
         return false;
     }
@@ -425,7 +424,7 @@ void ProcessingJobService::pollProgress()
         SY_ERRORF("[ProcessingJob] Device disappeared while job '%s' was active", m_impl->jobId.toUtf8().constData());
         m_impl->active = false;
         m_impl->pollTimer.stop();
-        emit jobFinished(false, QStringLiteral("设备在加工过程中断开"));
+        emit jobFinished(false, tr("Device disconnected during processing"));
         return;
     }
 
@@ -450,20 +449,20 @@ void ProcessingJobService::pollProgress()
         m_impl->active = false;
         m_impl->pollTimer.stop();
         SY_DEBUGF("[ProcessingJob] Finished '%s'", m_impl->jobId.toUtf8().constData());
-        emit jobFinished(true, QStringLiteral("加工完成：%1").arg(m_impl->jobId));
+        emit jobFinished(true, tr("Processing completed: %1").arg(m_impl->jobId));
         break;
 
     case Hw::PlanState::Aborted:
         m_impl->active = false;
         m_impl->pollTimer.stop();
-        emit jobFinished(false, QStringLiteral("加工已中止：%1").arg(m_impl->jobId));
+        emit jobFinished(false, tr("Processing aborted: %1").arg(m_impl->jobId));
         break;
 
     case Hw::PlanState::Error:
         m_impl->active = false;
         m_impl->pollTimer.stop();
         SY_ERRORF("[ProcessingJob] Job '%s' failed: %s", m_impl->jobId.toUtf8().constData(), Hw::hwErrorName(p.error));
-        emit jobFinished(false, QStringLiteral("加工出错：[%1]").arg(QString::fromUtf8(Hw::hwErrorName(p.error))));
+        emit jobFinished(false, tr("Processing error: [%1]").arg(QString::fromUtf8(Hw::hwErrorName(p.error))));
         break;
 
     default:

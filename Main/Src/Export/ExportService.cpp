@@ -64,7 +64,7 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
 {
     if (!m_dispatcher)
     {
-        QString msg = QStringLiteral("ExportDispatcher not set");
+        QString msg = tr("ExportDispatcher not set");
         SY_ERRORF("[ExportService] %s", msg.toUtf8().constData());
         return ExportResult::fail(msg);
     }
@@ -76,7 +76,7 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
     }
     if (m_statusPromptCallback)
     {
-        m_statusPromptCallback(QStringLiteral("Exporting: %1").arg(context.targetPath));
+        m_statusPromptCallback(tr("Exporting: %1").arg(context.targetPath));
     }
 
     emit exportStarted(context.targetPath);
@@ -105,7 +105,7 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
 
     if (entities.empty())
     {
-        QString msg = QStringLiteral("No entities to export");
+        QString msg = tr("No entities to export");
         SY_WARNF("[ExportService] %s", msg.toUtf8().constData());
 
         ExportResult emptyResult = ExportResult::fail(msg);
@@ -115,7 +115,7 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
         }
         if (m_statusPromptCallback)
         {
-            m_statusPromptCallback(QStringLiteral("Export: no entities"));
+            m_statusPromptCallback(tr("Export: no entities"));
         }
         emit exportFinished(emptyResult);
         return emptyResult;
@@ -127,8 +127,7 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
     if (result.success)
     {
         result.exportedEntityCount = static_cast<int>(entities.size());
-        result.message =
-            QStringLiteral("Exported %1 entities to: %2").arg(result.exportedEntityCount).arg(context.targetPath);
+        result.message = tr("Exported %1 entities to: %2").arg(result.exportedEntityCount).arg(context.targetPath);
 
         // Export completed
         postExportRecord(result, context);
@@ -145,8 +144,8 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
     }
     if (m_statusPromptCallback)
     {
-        QString prompt = result.success ? QStringLiteral("Export completed: %1 entities").arg(result.exportedEntityCount)
-                                        : QStringLiteral("Export failed: %1").arg(result.message);
+        QString prompt = result.success ? tr("Export completed: %1 entities").arg(result.exportedEntityCount)
+                                        : tr("Export failed: %1").arg(result.message);
         m_statusPromptCallback(prompt);
     }
 

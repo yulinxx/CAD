@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CAD 性能审查报告 — 百万级图元优化专项</title>
+  <title>CAD 性能审查报告：百万级图元优化专项（状态核验版）</title>
 
   <style>
     :root {
@@ -167,7 +167,7 @@
       opacity: 0.58;
       transform: rotate(-8deg);
     }
-    .report-intro h1 { line-height: 1.25; overflow-wrap: anywhere; font-size: 1.9rem; }
+    .report-intro h1 { line-height: 1.25; overflow-wrap: anywhere; font-size: 1.85rem; }
     .report-intro__summary {
       max-width: 70ch;
       margin-top: var(--space-3);
@@ -211,12 +211,13 @@
       line-height: 1.2;
       font-variant-numeric: tabular-nums;
     }
-    .metric__value--danger { color: var(--danger); }
+    .metric__value--success { color: var(--success); }
     .metric__value--warning { color: var(--warning); }
+    .metric__value--danger { color: var(--danger); }
     .metric__value--accent { color: var(--accent); }
     .metric__note { font-size: 12px; color: var(--muted); margin-top: var(--space-1); }
 
-    /* === Severity tags === */
+    /* === Tags: severity + status === */
     .tag {
       display: inline-block;
       font-size: 12px;
@@ -229,7 +230,12 @@
     .tag--high { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, #FFFFFF); }
     .tag--mid { color: var(--warning); background: color-mix(in srgb, var(--warning) 16%, #FFFFFF); }
     .tag--low { color: var(--info); background: color-mix(in srgb, var(--info) 10%, #FFFFFF); }
-    .tag--verified { color: var(--success); background: color-mix(in srgb, var(--success) 14%, #FFFFFF); margin-left: var(--space-1); }
+    .tag--done { color: var(--success); background: color-mix(in srgb, var(--success) 14%, #FFFFFF); }
+    .tag--partial { color: var(--warning); background: color-mix(in srgb, var(--warning) 16%, #FFFFFF); }
+    .tag--open { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, #FFFFFF); }
+    .tag--p0 { color: #FFFFFF; background: var(--danger); }
+    .tag--verified { color: var(--success); background: color-mix(in srgb, var(--success) 14%, #FFFFFF); }
+    .tag-row { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 
     /* === Callout === */
     .callout {
@@ -247,7 +253,7 @@
       padding: var(--space-3) 0;
       border-bottom: 1px solid var(--rule);
       display: grid;
-      grid-template-columns: 200px 1fr;
+      grid-template-columns: 210px 1fr;
       gap: var(--space-4);
     }
     .cap-list li:last-child { border-bottom: none; }
@@ -273,6 +279,7 @@
     .phase ul { padding-left: 1.2em; }
     .phase li { margin-bottom: var(--space-2); }
     .phase .why { color: var(--text-secondary); }
+    .phase--done { background: var(--page-surface); }
 
     /* === Footer === */
     footer {
@@ -307,12 +314,12 @@
         <div class="report-intro__content">
           <h1>CAD 性能审查报告：百万级图元优化专项</h1>
           <p class="report-intro__summary">
-            本次审查覆盖 Renderx、Engine、GeoModelCore、UI、Engraving、Nesting、FileIO、Log 等模块约 26 万行源码，共定位 40 余处性能问题，其中 14 处高危。核心结论：架构已具备百万级图元的雏形（RTree 空间索引、ID 哈希索引、渲染常驻几何仓、增量刷新框架），但<strong>图元查找/删除的 O(N) 热点、Undo 快照的重复深拷贝、每帧渲染提交次数、算法模块的 O(N²) 去重</strong>四条链路是当前最直接的卡顿来源。
+            本版在原审查（2026-09-12，覆盖 8 个模块约 26 万行，42 处问题）基础上，逐条对照当前代码完成了状态核验（2026-09-24）。结论：<strong>8 项已彻底修复、6 项已部分缓解、28 项仍待处理</strong>。数据层的图元查找与删除热点已基本清除，剩余唯一的 P0 是<strong>几何变换类撤销命令的全量快照克隆</strong>；渲染端图元级 LOD 与 DrawList 增量排序仍未落地。
           </p>
           <div class="report-intro__meta">
-            <span>审查日期：2026-09-12</span>
-            <span>审查方式：静态代码审查（热路径精读）</span>
-            <span>目标：百万级图元下操作流畅</span>
+            <span>原审查：2026-09-12</span>
+            <span>状态核验：2026-09-24</span>
+            <span>核验方式：逐条对照源码（含行号证据）</span>
           </div>
         </div>
       </div>
@@ -324,154 +331,383 @@
           <h2>一、结论概览</h2>
           <div class="metrics">
             <div class="metric">
-              <div class="metric__label">高危问题</div>
-              <div class="metric__value metric__value--danger">14</div>
-              <div class="metric__note">直接影响大规模图元操作流畅度</div>
+              <div class="metric__label">已修复</div>
+              <div class="metric__value metric__value--success">8</div>
+              <div class="metric__note">代码已改，无需再动</div>
             </div>
             <div class="metric">
-              <div class="metric__label">中危问题</div>
-              <div class="metric__value metric__value--warning">17</div>
-              <div class="metric__note">大数据量下逐渐显现的开销</div>
+              <div class="metric__label">部分缓解</div>
+              <div class="metric__value metric__value--warning">6</div>
+              <div class="metric__note">已改善，但未彻底消除</div>
             </div>
             <div class="metric">
-              <div class="metric__label">低危问题</div>
-              <div class="metric__value metric__value--accent">11</div>
-              <div class="metric__note">局部优化点，收益较小</div>
+              <div class="metric__label">仍待处理</div>
+              <div class="metric__value metric__value--danger">28</div>
+              <div class="metric__note">其中 1 项为 P0</div>
             </div>
             <div class="metric">
-              <div class="metric__label">重点扫描代码</div>
-              <div class="metric__value">26万+</div>
-              <div class="metric__note">行，覆盖 8 个核心模块</div>
+              <div class="metric__label">原报告条目</div>
+              <div class="metric__value metric__value--accent">42</div>
+              <div class="metric__note">跨 8 个模块，26 万+ 行</div>
             </div>
           </div>
           <p>
-            问题分布呈明显的"哑铃型"：一端是 <strong>Engine 核心数据结构</strong>（图元容器、查找、Undo 快照），决定了所有编辑操作的复杂度下限；另一端是<strong>领域算法</strong>（雕刻切片去重、排样 NFP），决定了几何重任务的上限。渲染管线（Renderx）整体设计领先于数据层——常驻几何仓、DrawList 保留提交、批量上传框架都已就位，瓶颈更多在"喂给渲染器的数据生产速度"而非渲染器本身。
+            这次核验最重要的发现是：<strong>原报告不能直接当任务清单执行</strong>。原报告 42 条中有 8 条在审查后已经落地（多为数据层的复杂度类修复），另有 6 条的实际状态与报告描述不符——要么已经被缓解到不再构成问题，要么报告当时的技术判断本身有偏差。若照单全抓，会产生大量无效改动。
           </p>
           <div class="callout">
-            <div class="callout__label">最快的收益点</div>
-            <p><code>EntityTransform::findEntityById()</code> 当前对每次 ID 查找都做"全量图元指针拷贝 + 线性扫描"，而 <code>SceneManager::findEntityById()</code> 本身就是 O(1) 哈希查找——改为直接委托即可消除一整类 O(N·M) 热点，属于一行级修复（本报告已人工复核确认）。<span class="why">——审查后已按此实现，见文末"审查后同步记录"。</span></p>
+            <div class="callout__label">唯一的 P0：几何变换类撤销命令的全量快照</div>
+            <p><code>SceneUndoCommands.cpp:33-91</code> 的 <code>captureEntitySnapshots()</code> 仍对每个图元 <code>clone()</code> 存 before/after 两份，<code>:106-130</code> 应用时再 clone 一次，而它仍在生产热路径上——<code>SceneEditService.cpp:705/707</code> 的 <code>transformEntities()</code> 是移动/旋转/缩放的统一入口。需注意：同族的 <code>DeleteEntitiesCommand</code>、<code>AddEntitiesCommand</code> 已改为零克隆所有权转移，<strong>只剩变换类这一条链未改</strong>。</p>
+          </div>
+        </section>
+
+        <section id="ledger">
+          <h2>二、状态总览</h2>
+          <p>下表把 42 条原报告条目按当前真实状态归位。<span class="tag tag--done">已修复</span> 表示代码已改且无需再动；<span class="tag tag--partial">部分缓解</span> 表示已明显改善但复杂度或开销未彻底消除；<span class="tag tag--open">仍待处理</span> 表示代码基本维持原状。</p>
+          <div class="table-wrap">
+            <table>
+              <caption>表 1：42 条问题的当前状态归位</caption>
+              <thead>
+                <tr><th>状态</th><th>条目</th><th>当前证据</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="tag tag--done">已修复</span></td>
+                  <td><code>EntityTransform::findEntityById</code> 线性扫描</td>
+                  <td><code>EntityTransform.cpp:284-293</code> 直接委托 <code>m_sceneManager->findEntityById(id)</code>，注释保留旧复杂度说明</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--done">已修复</span></td>
+                  <td><code>mirrorByIds</code> 逐 ID 线性查找 O(M·N)</td>
+                  <td>已改为按 ID 集批量取出后统一变换，变换矩阵整批只构造一次</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--done">已修复</span></td>
+                  <td>6 个 <code>*All</code> 全图变换接口产生全量指针副本</td>
+                  <td>全库 grep 无匹配，接口连同测试已删除（经核查无生产调用方）</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--done">已修复</span></td>
+                  <td><code>EntityContainer::remove</code> 中段 erase O(N)</td>
+                  <td><code>EntityContainer.cpp:193-204</code> 改 swap-erase，仅更新被移动元素索引</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--done">已修复</span></td>
+                  <td><code>removeRange</code> 批量删除与类型索引退化</td>
+                  <td><code>:218-252</code> partition-remove；类型索引改批量压实，避免万级同类型 O(N²)</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--done">已修复</span></td>
+                  <td><code>DeleteEntitiesCommand</code> 每轮 undo/redo 都 clone</td>
+                  <td><code>SceneUndoCommands.cpp:239-257</code> 零克隆：<code>extractEntitiesById</code> 取回原件保管，undo 归还、redo 再取回</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--done">已修复</span></td>
+                  <td><code>AddEntitiesCommand</code> 每轮 clone</td>
+                  <td><code>:302-326</code> 场景与命令间移动所有权；对象被外部销毁时降级为告警</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--done">已修复</span></td>
+                  <td><code>MeshSlicer::deduplicateContours</code> O(N²)+erase 搬移</td>
+                  <td><code>MeshSlicer.cpp:256-324</code> 周长/包围盒预处理 + 按周长排序 + 包围盒过滤 + <code>removed</code> 标记后统一收集</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--partial">部分缓解</span></td>
+                  <td><code>SceneRefreshCoordinator</code> "16ms 定时器无条件驱动"</td>
+                  <td>实为 <code>setSingleShot(true)</code> 的合并节流定时器（<code>Main/Src/UI/Render/SceneRefreshCoordinator.cpp:79-82</code>），另配 <code>:86-89</code> 独立曲线 LOD 定时器。原描述失准</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--partial">部分缓解</span></td>
+                  <td>增量刷新逐 ID 反查实体</td>
+                  <td>仍逐 ID 调用（<code>:996/:1084</code>），但该查找已是 O(1)，成本可接受</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--partial">部分缓解</span></td>
+                  <td><code>EntitySpatialIndex</code> 失败回退全量重建</td>
+                  <td><code>EntitySpatialIndex.cpp:178-199</code> 已加"指针精确删"作为首选，仅当 tree/map 条目数不一致才重建</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--partial">部分缓解</span></td>
+                  <td><code>updateBulk</code> / <code>updateEntityBoundsBulk</code> 逐图元更新</td>
+                  <td><code>SpatialIndex2D.cpp:97-118</code> 仍两轮循环；<code>SceneEditService.cpp:719-721</code> 注释自认"不降低复杂度，只是整批一次收尾"</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--partial">部分缓解</span></td>
+                  <td><code>MeshSlicer::addUniquePoint</code> 线性去重</td>
+                  <td>哈希版 <code>addUniquePointHash</code>/<code>weldVertex</code>（<code>:85-116</code>）已用于顶点焊接，但 <code>hits</code> 收集路径（<code>:387-405</code>）仍调线性版</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--partial">部分缓解</span></td>
+                  <td>选中集全量重建 / 曲线精度切换</td>
+                  <td><code>SelectTool.cpp</code> 已重构为轮廓预算 + 路径缓存（无 <code>m_vSelected.clear()</code>）；曲线 LOD 已有分批机制，但渲染端仍无图元级 LOD</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><strong><code>EntitySnapshotsCommand</code> 全量快照 + 重复 clone</strong> <span class="tag tag--p0">P0</span></td>
+                  <td><code>SceneUndoCommands.cpp:33-91</code> capture 全量 clone；<code>:106-130</code> apply 再 clone；生产路径见 <code>SceneEditService.cpp:705/707</code></td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td>撤销栈长期持有全量克隆体</td>
+                  <td><code>SceneUndoCommands.h:94-118</code> 的 <code>m_before/m_after</code>，与上一条同源</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>EntityContainer</code> 单删时类型索引 O(K)</td>
+                  <td><code>:181-188</code> 单删路径仍 <code>erase(std::remove(...))</code>（批量路径已绕开）</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>SyPolygon</code> 顶点惰性计算时机不可控</td>
+                  <td><code>SyPolygon.cpp:27-41</code> 首次访问触发 <code>computeVertices()</code>，热路径可能突刺</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>RenderWidget</code> 每帧 5 段 Submit + overlay 全量重传</td>
+                  <td><code>RenderWidget.cpp:1035-1116</code> 共 5 处 <code>submit()</code>；<code>:1099</code> 每帧 <code>clear()</code> 后 <code>flushOverlay</code></td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>DrawList::resolve</code> 全量重排</td>
+                  <td><code>rxIncremental.cpp:1128-1145</code> <code>m_orderDirty</code> 时全量收集 + <code>std::stable_sort</code></td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td>渲染端无图元级 LOD</td>
+                  <td>Renderx 全库 grep <code>LOD</code> 零匹配</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td>全量重建后同步 flush / 大场景未分批</td>
+                  <td><code>RenderWidget.cpp:460-463</code>、<code>:461-463</code></td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>DrawList::upsert</code> 槽号直接用 64 位图元 ID</td>
+                  <td><code>:478-486</code> 注释已提示应紧凑分配</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>GeometryStore::flush</code> 每帧排序合并 dirty range</td>
+                  <td><code>:368-407</code></td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>RenderSceneBuilder</code> upsert 全量重算 aabb</td>
+                  <td><code>:219-234</code></td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>SceneManager</code> 点拾取候选跑完整距离检查</td>
+                  <td><code>SceneManager.cpp:777-788</code></td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>Nesting::CollinearOverlapMm</code> 三层循环 O(n·m)</td>
+                  <td><code>Geometry.cpp:795-821</code></td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>Placer::CollectCandidates</code> 每放置件算 NFP</td>
+                  <td><code>Placer.cpp:98-99</code> 仍逐件 <code>GetOrCompute</code></td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>Solver</code> 每轮重建临时容器与 bestLayout</td>
+                  <td><code>Solver.cpp:133-145</code> <code>pend</code>/<code>pendOrient</code>/<code>bestLayout</code> 每轮新建</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>SimplifyRDP</code> 递归 + <code>tail</code> 复制</td>
+                  <td><code>Geometry.cpp:727-769</code></td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>RdpRecurse</code> 重复投影与除法</td>
+                  <td><code>Geometry.cpp:68-89</code> 未缓存方向向量与平方长度</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>MirrorX</code> 先构造再 <code>reverse</code></td>
+                  <td><code>Geometry.cpp:515-532</code>，<code>:528</code> 仍 <code>std::reverse</code></td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>ConvexHull</code> 排序后 <code>unique</code> 多趟遍历</td>
+                  <td><code>Geometry.cpp:396-399</code></td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>MeshSlicer::connectSegmentsToContours</code> 邻接表缓存不友好</td>
+                  <td><code>:344-470</code> 仍 <code>vector&lt;vector&lt;int&gt;&gt;</code> + 频繁 push_back</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>SyLogger::PrepareLogger</code> 每条日志持锁</td>
+                  <td><code>SyLogger.cpp:302-315</code>，<code>:312</code> 仍 <code>lock_guard(m_mutex)</code></td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>SyLogger::FormatString</code> 超栈缓冲二次 <code>va_copy</code></td>
+                  <td><code>:167-193</code></td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>DxfParser</code> 逐个 <code>push_back</code> 无预分配</td>
+                  <td><code>DxfParser.cpp:394</code> 起 7 处 <code>push_back</code>，仅顶点容器有 <code>reserve</code></td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>SySerializer</code> 错误路径链式 append</td>
+                  <td><code>:509-513</code></td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>SyEntity</code> 热循环虚函数分发</td>
+                  <td><code>SyEntity.h:190, 268-271</code>（长期项）</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>SyEntity</code> 拷贝构造带 <code>strName</code> 字符串拷贝</td>
+                  <td><code>SyEntity.h:86</code></td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>LargestEmptyRect</code> 网格点全环 PointInPolygon</td>
+                  <td><code>Nesting/Geometry.cpp:847-857</code></td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>EntitySpatialIndex</code> RTree 与 <code>unordered_map</code> 双结构维护</td>
+                  <td><code>:11-119</code> 两套结构同步成本仍在</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </section>
 
         <section id="high-engine">
-          <h2>二、高危问题：Engine 数据层（P0，优先修复）</h2>
+          <h2>三、Engine 数据层</h2>
+          <p>数据层是本轮修复最集中的区域。原本"图元查找与删除"一节的 4 条问题已全部解决，撤销链路也只剩变换类一条。</p>
 
-          <h3>2.1 图元查找与删除的复杂度陷阱</h3>
+          <h3>3.1 图元访问热点（4/4 已解决）</h3>
           <div class="table-wrap">
             <table>
-              <caption>表 1：Engine 图元访问热点（均已人工复核）</caption>
+              <caption>表 2：Engine 图元访问热点</caption>
               <thead>
-                <tr><th>位置</th><th>问题</th><th>复杂度影响</th><th>建议</th></tr>
+                <tr><th>状态</th><th>位置</th><th>原问题</th><th>当前实现</th></tr>
               </thead>
               <tbody>
                 <tr>
-                  <td><span class="tag tag--high">高</span><br><code>Engine/2D/Src/Algorithm/EntityTransform.cpp:364-380</code> <span class="tag tag--verified">已复核</span></td>
-                  <td><code>findEntityById()</code> 先 <code>getAllEntities()</code> 拷贝全部图元指针，再逐 ID 线性比较</td>
-                  <td>单次查找 O(N) 且带全量 vector 拷贝</td>
-                  <td>【审查后已实现】直接委托 <code>m_sceneManager->findEntityById(id)</code>（容器内哈希索引，O(1)）</td>
+                  <td><span class="tag tag--done">已修复</span></td>
+                  <td><code>EntityTransform.cpp:284-293</code></td>
+                  <td><code>findEntityById()</code> 先拷贝全部图元指针再线性比较，单次 O(N)</td>
+                  <td>直接委托 <code>m_sceneManager->findEntityById(id)</code>，命中容器内哈希索引 O(1)</td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--mid">中</span><br><code>EntityTransform.cpp:562-581</code></td>
-                  <td><code>mirrorByIds()</code> 对 M 个 ID 各调一次上述线性查找</td>
-                  <td>批量镜像 O(M·N)，百万图元下选 1000 个图元即 10 亿次比较</td>
-                  <td>【审查后已实现】一次性按 ID 集哈希批量取出，再统一变换（变换矩阵亦整批只构造一次）</td>
+                  <td><span class="tag tag--done">已修复</span></td>
+                  <td><code>EntityTransform.cpp</code> 批量变换</td>
+                  <td><code>mirrorByIds()</code> 对 M 个 ID 各做一次线性查找，O(M·N)</td>
+                  <td>按 ID 集批量取出后统一变换，矩阵整批只构造一次</td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--high">高</span><br><code>EntityTransform.cpp:136, 382, 586, 638</code></td>
-                  <td><code>mirrorAll / rotateAll</code> 等通过 <code>getAllEntities()</code> 返回全量指针副本</td>
-                  <td>每次"全图变换"产生 8MB 级临时 vector（百万指针）</td>
-                  <td>【2026-09-16 已移除】这 6 个 <code>*All</code> 接口（<code>moveAll / rotateAll / scaleAll / shearAll / mirrorAll / mirrorAllByLine</code>）经核查无生产调用方——唯一调用方 <code>MoveProcessor</code> 自身零调用——已连同对应测试一并删除，"全图变换"这条路径不复存在，无需再改遍历方式</td>
+                  <td><span class="tag tag--done">已修复</span></td>
+                  <td>6 个 <code>*All</code> 接口</td>
+                  <td>全图变换返回全量指针副本，单次产生 8MB 级临时 vector</td>
+                  <td>接口已删除（无生产调用方），该代码路径不复存在</td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--high">高</span><br><code>Engine/2D/Src/Core/EntityContainer.cpp:188-196</code> <span class="tag tag--verified">已复核</span></td>
-                  <td>单条 <code>remove()</code> 对 <code>m_vEntities</code> 做中段 erase（尾部整体搬移），随后从删除点开始重建 ID→index 索引</td>
-                  <td>单删 O(N)；逐条删 M 个图元退化 O(N·M)</td>
-                  <td>复用同文件 <code>removeRange()</code> 已实现的"标记-压缩"模式，或改 swap-remove / slot-map 结构</td>
+                  <td><span class="tag tag--done">已修复</span></td>
+                  <td><code>EntityContainer.cpp:193-204</code></td>
+                  <td>单条 <code>remove()</code> 中段 erase 并重建索引，单删 O(N)</td>
+                  <td>swap-erase：与末位交换后 <code>pop_back</code>，仅更新被移动元素索引，降至 O(1)</td>
                 </tr>
               </tbody>
             </table>
           </div>
           <p>
-            值得肯定的是，<code>removeRange()</code>（EntityContainer.cpp:209 起）已经用 partition-remove 模式解决了批量删除问题，注释中也明确记录了复杂度推导——说明团队有性能意识，但同样的思路尚未覆盖单删路径和算法层的查找路径。
+            此外，<code>removeRange()</code>（<code>:218-252</code>）在批量侧进一步修掉了类型索引的退化：<code>:224-226</code> 的注释明确说明，逐条 erase 是 O(桶大小)，会让"万级同类型图元"的阵列撤销退化成 O(N²)，因此改为收集完成后按类型各扫一遍。这个细节原报告未覆盖。
           </p>
 
-          <h3>2.2 Undo/Redo 快照的重复深拷贝链</h3>
+          <h3>3.2 撤销链路（仅剩变换类未改）</h3>
           <div class="table-wrap">
             <table>
-              <caption>表 2：撤销链路的克隆放大（SceneUndoCommands）</caption>
+              <caption>表 3：撤销命令的克隆策略现状</caption>
               <thead>
-                <tr><th>位置</th><th>问题</th><th>建议</th></tr>
+                <tr><th>状态</th><th>命令</th><th>当前实现</th></tr>
               </thead>
               <tbody>
                 <tr>
-                  <td><span class="tag tag--high">高</span><br><code>SceneUndoCommands.cpp:17, 42, 65</code> <span class="tag tag--verified">已复核</span></td>
-                  <td><code>captureEntitySnapshots()</code> 对每个图元 <code>clone()</code> 存 before/after 两份全量快照</td>
-                  <td rowspan="3">改为<strong>增量快照</strong>：变换类命令只记录"变换矩阵/旧值"，位置类只记录几何差异；删除命令可让图元原位保留所有权、仅记录索引位置，undo 时直接回插原对象而非重新 clone</td>
+                  <td><span class="tag tag--done">已修复</span></td>
+                  <td><code>DeleteEntitiesCommand</code></td>
+                  <td><code>SceneUndoCommands.cpp:239-257</code> 构造期不再深拷贝；<code>execute</code> 用 <code>extractEntitiesById</code> 取回原件保管，undo 归还、redo 再取回</td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--high">高</span><br><code>SceneUndoCommands.cpp:109-121</code> <span class="tag tag--verified">已复核</span></td>
-                  <td><code>applyEntitySnapshots()</code> 在 redo/undo 应用时对快照<strong>再次 clone</strong> 后才替换/插入场景</td>
+                  <td><span class="tag tag--done">已修复</span></td>
+                  <td><code>AddEntitiesCommand</code></td>
+                  <td><code>:302-326</code> 场景与命令间移动所有权，全程零克隆；代价是对象若被绕过撤销栈销毁，redo 无法恢复（已留告警）</td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--high">高</span><br><code>SceneUndoCommands.cpp:286</code></td>
-                  <td><code>DeleteEntitiesCommand::undo()</code> 对已保存的 <code>m_removed</code> 快照又做一次 <code>snap->clone()</code></td>
+                  <td><span class="tag tag--p0">P0</span> <span class="tag tag--open">未修复</span></td>
+                  <td><code>EntitySnapshotsCommand</code>（几何变换）</td>
+                  <td><code>:33-91</code> <code>captureEntitySnapshots()</code> 仍逐图元 <code>clone()</code> 存 before/after；<code>:106-130</code> <code>applyEntitySnapshots()</code> 应用时再 clone 一次（<code>:116</code>、<code>:127</code>）</td>
                 </tr>
               </tbody>
             </table>
           </div>
           <p>
-            一次"移动 10 万个图元"的操作，当前会产生：before 快照 10 万份 clone + after 快照 10 万份 clone，此后每次 undo/redo 再各加 10 万份 clone，且撤销栈长期持有全部克隆体（<code>SceneUndoCommands.h:114-116, 140, 164</code>）。内存与 GC 压力随栈深度线性增长，这是批量编辑场景"越用越卡"的典型根源。
+            这条链路为什么仍是 P0：<code>SceneEditService.cpp:691-738</code> 的 <code>transformEntities()</code> 是移动、旋转、缩放的统一入口，<code>:705</code> 和 <code>:707</code> 在变换前后各捕获一次全量快照。因此"批量移动 10 万图元"仍会产生 20 万次 <code>clone()</code>，且撤销栈按栈深线性持有这些克隆体。修复方向可以复用同文件已验证的模式：变换类只记录矩阵与旧值，或让命令直接持有原件所有权。
           </p>
         </section>
 
         <section id="high-render">
-          <h2>三、渲染与交互层热点（P1）</h2>
+          <h2>四、渲染与交互层</h2>
+          <p>这一层的原报告条目基本仍然有效，但其中两条的描述与代码实际不符，需要修正认识。</p>
           <div class="table-wrap">
             <table>
-              <caption>表 3：Renderx / UI 帧路径热点（高/中危混排，按严重度标记）</caption>
+              <caption>表 4：Renderx / UI 帧路径现状</caption>
               <thead>
-                <tr><th>位置</th><th>问题</th><th>建议</th></tr>
+                <tr><th>状态</th><th>位置</th><th>问题与现状</th></tr>
               </thead>
               <tbody>
                 <tr>
-                  <td><span class="tag tag--high">高</span><br><code>RenderWidget.cpp:738-816</code></td>
-                  <td>每帧最多 5 次 Session Submit，覆盖层每帧清空并全量重建 transientCommands，驱动同步点过多</td>
-                  <td>按层合并 Submit、复用命令缓冲；覆盖层只提交实际变化（选区/手柄/虚线）</td>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>RenderWidget.cpp:1035-1116</code></td>
+                  <td>仍为 5 段提交（环境层 / 位图 / 场景 DrawList / 世界文字 / 覆盖层）。其中 4 段由内容是否为空守卫，但覆盖层每帧 <code>clear()</code> 后全量重传瞬态命令。<span class="why">注意：注释明确说明分段是刻意的——"提交顺序压过 sortKey"，合并前必须先确认层级语义不被破坏。</span></td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--high">高</span><br><code>DrawList::resolve()</code> :627-645</td>
-                  <td><code>m_orderDirty</code> 时每帧全量收集存活条目并重新排序，频繁增删时 CPU 排序压力随总量上升</td>
-                  <td>增量维护排序，仅对排序键真正变化的条目做局部重排</td>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>rxIncremental.cpp:1128-1145</code></td>
+                  <td><code>m_orderDirty</code> 时全量收集存活槽位并 <code>std::stable_sort</code>。已具备 <code>resolveIndexed2D</code> 网格粗筛剔除，但排序本身未做增量维护。</td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--high">高</span><br><code>DrawList::resolve()</code> :620-685</td>
-                  <td>无图元级 LOD：远景海量小图元仍按完整精度绘制，帧率与图元总量强耦合</td>
-                  <td>引入基于缩放级别的 LOD：远处图元退化为点/包围盒/简化拓扑</td>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td>Renderx 全库</td>
+                  <td>无图元级 LOD，远近图元同等精度绘制，帧率仍与图元总量强耦合。</td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--mid">中</span><br><code>SceneRefreshCoordinator.cpp:45-60</code></td>
-                  <td>16ms 定时器无条件驱动场景更新，高负载时与渲染节奏叠加形成重复刷新</td>
-                  <td>与帧完成信号同步，按当前帧吞吐动态节流（掉帧时自动降频）</td>
+                  <td><span class="tag tag--partial">描述需修正</span></td>
+                  <td><code>SceneRefreshCoordinator.cpp:79-82</code></td>
+                  <td>原报告称"16ms 定时器无条件驱动场景更新"，实际是 <code>setSingleShot(true)</code> 的合并节流器——多次变更合并为一次刷新，<strong>这正是报告建议的做法</strong>。另 <code>:86-89</code> 还有独立的曲线 LOD 定时器（32ms 分批推进）。</td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--mid">中</span><br><code>SceneRefreshCoordinator.cpp:339-472</code></td>
-                  <td>增量刷新路径仍按 ID 逐个反查实体并逐图元离散化上传</td>
-                  <td>维护 ID→渲染槽位的常驻映射，批量离散化、合并上传区间</td>
+                  <td><span class="tag tag--partial">已缓解</span></td>
+                  <td><code>EntitySpatialIndex.cpp:178-199</code></td>
+                  <td>原"失败即全量重建"已改为三级降级：按值删 → 指针精确删 → 仅当 tree/map 条目数不一致时才重建，且保留告警日志。风险已大幅降低但未彻底消除。</td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--mid">中</span><br><code>SelectTool.cpp:991-1002</code></td>
-                  <td>单击选择后 <code>clear()</code> 再 <code>forEachSelected</code> 全量重建选中集</td>
-                  <td>增量维护选中差集（仅增删变化项），选中集较大时收益显著</td>
+                  <td><span class="tag tag--partial">已缓解</span></td>
+                  <td><code>SpatialIndex2D.cpp:97-118</code></td>
+                  <td><code>updateBulk</code> 是"先全部移除、再全部插入"两轮循环，并不减少 remove/insert 次数。代码注释已自认"收益是整批一次收尾，不降低复杂度"。</td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--mid">中</span><br><code>EntitySpatialIndex.cpp:69-82, 103-127</code></td>
-                  <td>RTree 更新/删除失败时回退 <code>clear()</code> + 全量重建（代码内已标注 O(n log n) 警告）；且索引与 <code>unordered_map</code> 副本双重维护</td>
-                  <td>为条目设计唯一 index key 消除歧义失败；失败改为异步标记重建而非同步全量重建</td>
+                  <td><span class="tag tag--partial">已重构</span></td>
+                  <td><code>SelectTool.cpp</code> / 选中集</td>
+                  <td>原"<code>clear()</code> 后全量重建选中集"已不存在：改为轮廓预算（<code>kMaxOutlineEntities</code>/<code>kMaxOutlineVertices</code>，超预算降级为包围盒）+ 路径缓存，选中态用虚线替代本体绘制。</td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--mid">中</span><br><code>SceneManager.cpp:777-788</code></td>
-                  <td>点拾取：RTree 候选之后再对候选跑完整几何距离检查</td>
-                  <td>候选阶段用包围盒距离上界先剪枝，精确测试只留给最终少数候选</td>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>SceneManager.cpp:777-788</code></td>
+                  <td>点拾取先用 RTree 缩小候选，再对候选跑完整几何距离检查，未做包围盒距离上界预剪枝。</td>
                 </tr>
               </tbody>
             </table>
@@ -479,38 +715,43 @@
         </section>
 
         <section id="high-algo">
-          <h2>四、高危问题：领域算法（P1，几何重任务）</h2>
+          <h2>五、领域算法</h2>
           <div class="table-wrap">
             <table>
-              <caption>表 4：Engraving / Nesting 算法热点</caption>
+              <caption>表 5：Engraving / Nesting 算法热点现状</caption>
               <thead>
-                <tr><th>位置</th><th>问题</th><th>建议</th></tr>
+                <tr><th>状态</th><th>位置</th><th>问题与现状</th></tr>
               </thead>
               <tbody>
                 <tr>
-                  <td><span class="tag tag--high">高</span><br><code>Engraving/Src/MeshSlicer.cpp:226-246</code></td>
-                  <td><code>deduplicateContours</code> 轮廓两两比较 O(N²)，命中后 <code>vector::erase</code> 再搬移 O(N)，最坏逼近 O(N³)</td>
-                  <td>先按周长/包围盒排序分组，组内比较；删除改标记-压缩</td>
+                  <td><span class="tag tag--done">已修复</span></td>
+                  <td><code>MeshSlicer.cpp:256-324</code></td>
+                  <td><code>deduplicateContours</code> 已按建议重写：周长与包围盒预处理、按周长降序排序（大轮廓优先）、包围盒快速过滤、<code>removed</code> 标记替代 <code>erase</code> 搬移。</td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--high">高</span><br><code>MeshSlicer.cpp:54-66</code></td>
-                  <td><code>addUniquePoint</code> 对每个候选点线性遍历已有点集做距离比较</td>
-                  <td>复用文件内 <code>weldVertex</code> 的量化哈希思路，网格桶 O(1) 去重</td>
+                  <td><span class="tag tag--partial">部分缓解</span></td>
+                  <td><code>MeshSlicer.cpp:387-405</code></td>
+                  <td>哈希去重思路（<code>addUniquePointHash</code>、<code>weldVertex</code>）已在顶点焊接路径落地，但切片交点的 <code>hits</code> 收集仍调用线性版 <code>addUniquePoint</code>。线段密集时是剩余热点。</td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--high">高</span><br><code>Nesting/Src/Core/Geometry.cpp:795-821</code></td>
-                  <td><code>CollinearOverlapMm</code> 三层循环比较两路径全部边段，O(n·m)</td>
-                  <td>边段建包围盒/扫描线索引，平行段先空间剪枝</td>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>Nesting/Geometry.cpp:795-821</code></td>
+                  <td><code>CollinearOverlapMm</code> 仍为三层循环逐边段比较，O(n·m)。</td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--high">高</span><br><code>Nesting/Src/Placement/Placer.cpp:98-106</code></td>
-                  <td><code>CollectCandidates</code> 对每个已放置件触发一次 NFP 外轮廓计算（虽有缓存，新增放置仍常未命中）</td>
-                  <td>已放置件按空间位置分组，同区域复用 NFP 候选；候选按包围盒相交预过滤</td>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>Placer.cpp:98-99</code></td>
+                  <td><code>CollectCandidates</code> 仍对每个已放置件调 <code>GetOrCompute</code> 计算 NFP 外轮廓，缓存未命中时重复构造。</td>
                 </tr>
                 <tr>
-                  <td><span class="tag tag--high">高</span><br><code>Nesting/Src/Engine/Solver.cpp:133-172</code></td>
-                  <td>GA 每代评估都新建 <code>pend / pendOrient / bestLayout</code> 临时容器并逐板材 <code>placer.Run()</code>，分配与拷贝集中</td>
-                  <td>容器外提复用、原地重排；板材先粗筛利用率再精排</td>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>Solver.cpp:133-145</code></td>
+                  <td>GA 每轮评估仍新建 <code>pend</code>/<code>pendOrient</code>/<code>bestLayout</code> 三个容器（已 <code>reserve</code>，但未跨轮复用），并逐板材调 <code>placer.Run()</code>。</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag--open">仍待处理</span></td>
+                  <td><code>MeshSlicer.cpp:344-470</code></td>
+                  <td><code>connectSegmentsToContours</code> 仍用 <code>vector&lt;vector&lt;int&gt;&gt;</code> 邻接表，缓存局部性差、push_back 频繁。</td>
                 </tr>
               </tbody>
             </table>
@@ -518,157 +759,152 @@
         </section>
 
         <section id="midlow">
-          <h2>五、中低危问题汇总</h2>
+          <h2>六、中低危问题</h2>
+          <p>以下条目经核验基本维持原状，均属"顺手优化"范畴，不阻塞百万级目标，但累积起来会影响大数据量下的手感。</p>
           <div class="table-wrap">
             <table>
-              <caption>表 5：中危问题（本表 11 项；另有 6 项中危混排于表 1 与表 3）</caption>
+              <caption>表 6：Nesting / Log / FileIO / 杂项待处理项</caption>
               <thead>
                 <tr><th>模块</th><th>位置</th><th>问题与建议</th></tr>
               </thead>
               <tbody>
-                <tr><td>Engine</td><td><code>SceneUndoCommands.h:94-118</code></td><td>撤销命令长期持有 before/after 全量克隆体，内存随栈深度线性增长 → 增量 diff 记录</td></tr>
-                <tr><td>Engine</td><td><code>SyPolygon.cpp:27-41</code></td><td>顶点惰性计算时机不可控，渲染/编辑热路径可能触发突刺 → 批量操作前统一预热缓存</td></tr>
-                <tr><td>Engine</td><td><code>EntityContainer::remove()</code> :178-183</td><td>类型索引 <code>m_entitiesByType</code> 桶内 <code>erase(std::remove...)</code> 为 O(K)，单类型大桶时叠加在单删路径上 → 桶改哈希集合存指针</td></tr>
-                <tr><td>Renderx</td><td><code>RenderWidget.cpp:461-463</code></td><td>全量重建后立即同步 flush，重建路径内重复驱动同步 → 区分增量提交与全量提交</td></tr>
-                <tr><td>Nesting</td><td><code>Geometry.cpp:708-776</code></td><td><code>SimplifyRDP</code> 递归 + <code>tail</code> 复制，顶点多时递归深度与中间拷贝成热点 → 显式栈迭代</td></tr>
-                <tr><td>Nesting</td><td><code>Geometry.cpp:79-83</code></td><td><code>RdpRecurse</code> 对同一基线段重复做投影/除法 → 缓存方向向量与平方长度</td></tr>
-                <tr><td>Nesting</td><td><code>Geometry.cpp:507-524</code></td><td><code>MirrorX</code> 构造后再 <code>reverse</code> → 倒序写入一步到位</td></tr>
-                <tr><td>Nesting</td><td><code>Geometry.cpp:386-391</code></td><td><code>ConvexHull</code> 排序后再 <code>unique</code> 多趟遍历 → 排序中内联去重</td></tr>
-                <tr><td>Nesting</td><td><code>Solver.cpp:145-171</code></td><td><code>bestLayout</code> 每板材重建并 move → 预分配复用或只存最佳板材索引</td></tr>
-                <tr><td>Engraving</td><td><code>MeshSlicer.cpp:344-470</code></td><td>邻接表 <code>vector&lt;vector&lt;int&gt;&gt;</code> 缓存不友好、push_back 频繁 → 扁平 CSR 布局 + 预分配</td></tr>
-                <tr><td>Log</td><td><code>SyLogger.cpp:321-334</code></td><td><code>PrepareLogger()</code> 每条日志持锁取 logger，高频路径锁竞争 → 原子指针缓存句柄，锁只护配置变更</td></tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="table-wrap" style="margin-top: var(--space-5);">
-            <table>
-              <caption>表 6：低危问题（9 项，顺手优化）</caption>
-              <thead>
-                <tr><th>位置</th><th>问题与建议</th></tr>
-              </thead>
-              <tbody>
-                <tr><td><code>DrawList::upsert():478-486</code></td><td>槽号直接用 64 位图元 ID 导致数组膨胀 → 紧凑槽位分配</td></tr>
-                <tr><td><code>RenderWidget.cpp:738-816</code></td><td>overlay 每帧全量提交瞬态命令 → 仅提交变化层</td></tr>
-                <tr><td><code>SyEntity.h:190, 268-271</code></td><td>热循环中大量虚函数分发，简单图元可考虑模板化分派（长期项）</td></tr>
-                <tr><td><code>SyEntity.h:86</code></td><td>拷贝构造带 <code>strName</code> 字符串拷贝 → 共享字符串/内部名 ID 化</td></tr>
-                <tr><td><code>DxfParser.cpp:1448-1458</code></td><td>解析逐个 <code>push_back</code> → 预扫描计数后 <code>reserve</code></td></tr>
-                <tr><td><code>SySerializer.cpp:509-513</code></td><td>错误路径链式 append 构造字符串 → <code>std::format</code> 一次成型</td></tr>
-                <tr><td><code>SyLogger.cpp:167-193</code></td><td>超栈缓冲二次 <code>va_copy</code> 格式化 → 长日志限流/模板化短路径</td></tr>
-                <tr><td><code>Geometry.cpp:847-857</code></td><td><code>LargestEmptyRect</code> 网格点全环 PointInPolygon → 网格空间索引预过滤</td></tr>
-                <tr><td><code>RenderWidget.cpp:460-463</code></td><td>全量加载缓存 miss 集中 → 分批 flush（与中危项合并实施）</td></tr>
+                <tr><td>Nesting</td><td><code>Geometry.cpp:727-769</code></td><td><code>SimplifyRDP</code> 递归调用自身，后半段还复制 <code>tail</code> → 改显式栈迭代</td></tr>
+                <tr><td>Nesting</td><td><code>Geometry.cpp:68-89</code></td><td><code>RdpRecurse</code> 对同一基线段重复做投影/除法 → 缓存方向向量与平方长度</td></tr>
+                <tr><td>Nesting</td><td><code>Geometry.cpp:515-532</code></td><td><code>MirrorX</code> 构造后再 <code>std::reverse</code> → 倒序写入一步到位</td></tr>
+                <tr><td>Nesting</td><td><code>Geometry.cpp:396-399</code></td><td><code>ConvexHull</code> 排序后再 <code>unique</code> 多趟遍历 → 排序中内联去重</td></tr>
+                <tr><td>Log</td><td><code>SyLogger.cpp:312</code></td><td><code>PrepareLogger()</code> 每条日志持锁取 logger → 原子指针缓存句柄，锁只护配置变更</td></tr>
+                <tr><td>Log</td><td><code>SyLogger.cpp:167-193</code></td><td>超栈缓冲触发二次 <code>va_copy</code> 格式化 → 长日志限流或模板化短路径</td></tr>
+                <tr><td>FileIO</td><td><code>DxfParser.cpp:394</code> 等</td><td>图元逐个 <code>push_back</code>，仅顶点容器有 reserve → 解析前预扫描计数或按文件大小预估</td></tr>
+                <tr><td>FileIO</td><td><code>SySerializer.cpp:509-513</code></td><td>错误路径链式 append 构造字符串 → <code>std::format</code> 一次成型</td></tr>
+                <tr><td>Renderx</td><td><code>DrawList::upsert():478-486</code></td><td>槽号直接用 64 位图元 ID 导致数组膨胀 → 为业务实体分配紧凑槽位</td></tr>
+                <tr><td>Renderx</td><td><code>GeometryStore::flush():368-407</code></td><td>每帧对 dirty range 排序合并 → 增量合并</td></tr>
+                <tr><td>Renderx</td><td><code>RenderSceneBuilder.cpp:219-234</code></td><td>upsert 按顶点全量重算 aabb → 平移类修改增量更新包围盒</td></tr>
+                <tr><td>Engine</td><td><code>SyEntity.h:86</code></td><td>拷贝构造带 <code>strName</code> 字符串拷贝 → 共享字符串或内部名 ID 化</td></tr>
+                <tr><td>Engine</td><td><code>SyEntity.h:190, 268-271</code></td><td>热循环中大量虚函数分发 → 简单图元可考虑模板化分派（长期项）</td></tr>
+                <tr><td>Nesting</td><td><code>Geometry.cpp:847-857</code></td><td><code>LargestEmptyRect</code> 网格点对全环做 PointInPolygon → 网格空间索引预过滤</td></tr>
               </tbody>
             </table>
           </div>
         </section>
 
         <section id="gap">
-          <h2>六、架构能力盘点：已具备 vs 尚缺</h2>
-          <p>对照"百万级图元流畅"的目标，当前架构的家底与缺口如下：</p>
+          <h2>七、架构能力盘点</h2>
+          <p>对照"百万级图元流畅"的目标，经本轮修复后家底与缺口的变化如下。</p>
           <ul class="cap-list">
-            <li><span class="cap-name">已具备：空间索引</span><span>RTree 已用于拾取与查询（Engine/2D EntitySpatialIndex、SceneManager::queryByPoint），基础正确，需消除全量重建回退。</span></li>
-            <li><span class="cap-name">已具备：ID 哈希索引</span><span>EntityContainer 内 <code>m_entityIdIndex</code> 提供 O(1) 查找，但算法层未充分利用（仍在线性扫描）。</span></li>
-            <li><span class="cap-name">已具备：渲染现代化</span><span>Renderx 有常驻几何仓（GeometryStore）、DrawList 保留模式、批量上传与增量刷新协调器，方向正确。</span></li>
-            <li><span class="cap-name">已具备：批量操作意识</span><span><code>removeRange</code> 的 partition-remove、<code>addRange</code> 等批量接口已落地，注释记录了复杂度推导。</span></li>
-            <li><span class="cap-name">尚缺：图元级 LOD</span><span>无视距降级策略，远景海量小图元仍全精度绘制，是帧率的主要天花板。</span></li>
-            <li><span class="cap-name">尚缺：免搬移存储</span><span>主容器 <code>vector&lt;unique_ptr&gt;</code> 中段 erase 搬移 + 索引重建，需 slot-map / 代际句柄结构。</span></li>
-            <li><span class="cap-name">尚缺：增量 Undo</span><span>快照式全量 clone 需升级为属性级 diff / 命令参数化反演。</span></li>
-            <li><span class="cap-name">尚缺：性能基准体系</span><span>未见百万图元基准场景与帧率/操作延迟的常态化回归测量，优化效果无法量化验证。</span></li>
+            <li><span class="cap-name">已具备：图元访问 O(1)</span><span><code>m_entityIdIndex</code> 哈希索引已被算法层正确复用，<code>findEntityById</code> 全链路 O(1)；单删与批量删均无 O(N) 搬移。这一层已达标。</span></li>
+            <li><span class="cap-name">已具备：撤销命令零克隆（部分）</span><span>删除 / 新增两类命令已用所有权转移实现零克隆，模式已在文件内验证可行，可直接复用到变换类。</span></li>
+            <li><span class="cap-name">已具备：空间索引</span><span>RTree 用于拾取与查询，失败降级已收敛为三级处理，不再是"一失败就全量重建"。</span></li>
+            <li><span class="cap-name">已具备：渲染现代化</span><span>常驻几何仓、DrawList 保留提交、2D 网格粗筛剔除、曲线 LOD 分批、增量刷新节流均已就位。</span></li>
+            <li><span class="cap-name">尚缺：增量 Undo（变换类）</span><span>唯一剩余的数据层高危。快照式全量 clone 需升级为属性级 diff 或所有权转移。</span></li>
+            <li><span class="cap-name">尚缺：图元级 LOD</span><span>曲线有 LOD，图元本体没有。远景海量小图元仍全精度绘制，是帧率的主要天花板。</span></li>
+            <li><span class="cap-name">尚缺：DrawList 增量排序</span><span>排序仍全量重做，增删频繁时与图元总量成正比。</span></li>
+            <li><span class="cap-name">尚缺：性能基准体系</span><span>仍未见到百万图元基准场景与常态化的帧率、操作延迟回归测量——这使得"优化是否达标"缺乏客观判定依据。</span></li>
           </ul>
         </section>
 
         <section id="roadmap">
-          <h2>七、优化路线图</h2>
+          <h2>八、优化路线图</h2>
 
-          <div class="phase">
+          <div class="phase phase--done">
             <div class="phase__head">
-              <span class="phase__title">P0：立即修复（1–2 天，纯局部改动）</span>
-              <span class="phase__window">风险极低，收益立竿见影</span>
+              <span class="phase__title">已完成</span>
+              <span class="phase__window">原 P0 与部分 P1</span>
             </div>
             <ul>
-              <li><strong>findEntityById 直连哈希查找</strong>：<code>EntityTransform::findEntityById</code> 委托 <code>SceneManager::findEntityById</code>；<code>mirrorByIds</code> 等批量接口一次取出全部目标再变换。<span class="why">——消除 O(M·N)，百万图元 + 千级选中集场景从"秒级卡死"到"毫秒级"。</span></li>
-              <li><strong>RenderWidget 帧内 Submit 合并</strong>：5 次 Submit 合并为按层 1–2 次，覆盖层仅提交变化。<span class="why">——直接减少每帧驱动同步开销。</span></li>
-              <li><strong>DXF/序列化 reserve 与日志锁收窄</strong>。<span class="why">——大文件导入与高频日志路径的廉价收益。</span></li>
+              <li><strong>图元查找 O(1) 化</strong>：<code>findEntityById</code> 委托哈希索引，批量变换一次取出。<span class="why">——消除 O(M·N)，原来"百万图元 + 千级选中集"的秒级卡死已解决。</span></li>
+              <li><strong>删除路径去 O(N) 搬移</strong>：单删 swap-erase、批量 partition-remove、类型索引批量压实。</li>
+              <li><strong>删除/新增命令零克隆</strong>：所有权转移替代深拷贝，模式已在文件内跑通。</li>
+              <li><strong>切片轮廓去重优化</strong>：排序 + 包围盒过滤 + 标记收集，去掉 O(N³) 最坏路径。</li>
+              <li><strong>选中集与曲线 LOD 重构</strong>：轮廓预算 + 缓存；曲线精度切换改分批推进。</li>
             </ul>
           </div>
 
           <div class="phase">
             <div class="phase__head">
-              <span class="phase__title">P1：短期改造（1–2 周）</span>
-              <span class="phase__window">结构性修复，回归测试需跟上</span>
+              <span class="phase__title">P0：变换类撤销增量化</span>
+              <span class="phase__window">唯一剩余的数据层高危，建议最先做</span>
             </div>
             <ul>
-              <li><strong>EntityContainer 单删对齐批量策略</strong>：标记-压缩或 swap-remove，消除中段搬移与索引重建。<span class="why">——逐条删除/框选删除从 O(N·M) 降至 O(N)。</span></li>
-              <li><strong>Undo 快照增量化</strong>：变换命令记录矩阵与旧值，删除命令保留对象所有权原位回插。<span class="why">——消除 clone 放大链，撤销栈内存从"图元全量 × 栈深"降到"差异 × 栈深"。</span></li>
-              <li><strong>空间索引加固</strong>：条目唯一 key，失败改异步标记重建。<span class="why">——避免编辑高峰期偶发全量重建造成的瞬时卡顿。</span></li>
-              <li><strong>MeshSlicer 去重哈希化</strong>（weldVertex 模式推广）+ 轮廓排序分组。<span class="why">——切片后处理从 O(N²)~O(N³) 降到近似 O(N)。</span></li>
-              <li><strong>选中集增量维护</strong>与<strong>刷新节流</strong>。<span class="why">——交互高频路径减负。</span></li>
+              <li><strong><code>EntitySnapshotsCommand</code> 改为增量记录</strong>：变换类只记录矩阵与旧值，避免 before/after 双份全量 clone；或直接复用 <code>DeleteEntitiesCommand</code> 的所有权转移模式。<span class="why">——消除"移动 10 万图元 = 20 万次 clone"的放大链，同时把撤销栈内存从"图元全量 × 栈深"降到"差异 × 栈深"。</span></li>
+              <li><strong>同步收窄 <code>SceneUndoCommands.h</code> 的快照持有</strong>：<code>m_before/m_after</code>（<code>:94-118</code>）随上一条一并改造，否则改造不彻底。</li>
             </ul>
           </div>
 
           <div class="phase">
             <div class="phase__head">
-              <span class="phase__title">P2：中期架构升级（按里程碑规划）</span>
+              <span class="phase__title">P1：渲染与交互</span>
+              <span class="phase__window">收益显著，但需先确认层级语义</span>
+            </div>
+            <ul>
+              <li><strong>DrawList 增量排序</strong>：仅在排序键真正变化时局部重排，避免全量 <code>stable_sort</code>。</li>
+              <li><strong>覆盖层按需提交</strong>：选区/手柄/虚线未变化时不重传；顺便验证 5 段提交是否有可合并的相邻层。<span class="why">——注意 <code>RenderWidget.cpp</code> 注释强调提交顺序即层级，合并前必须核对 sortKey 语义。</span></li>
+              <li><strong><code>addUniquePoint</code> 哈希化推广</strong>：把同文件已验证的 <code>addUniquePointHash</code> 用到切片交点收集路径。</li>
+              <li><strong>空间索引批量真优化</strong>：<code>updateBulk</code> 改为批量重建或批处理，而非两轮逐条 remove/insert。</li>
+              <li><strong>点拾取候选剪枝</strong>：候选阶段先用包围盒距离上界过滤。</li>
+            </ul>
+          </div>
+
+          <div class="phase">
+            <div class="phase__head">
+              <span class="phase__title">P2：架构升级</span>
               <span class="phase__window">决定百万级目标的最终达成</span>
             </div>
             <ul>
-              <li><strong>图元 LOD 体系</strong>：按缩放级别退化绘制（点化/包围盒化/简化拓扑），配合 DrawList 增量排序。<span class="why">——帧率与图元总量解耦的关键。</span></li>
-              <li><strong>Nesting NFP 空间索引复用</strong>与 Solver 容器复用。<span class="why">——排样计算量随零件数近似线性而非平方增长。</span></li>
-              <li><strong>性能基准与剖析常态化</strong>：建立 100 万图元标准场景（含帧率、选择延迟、删除延迟、undo 延迟指标），接入 Tracy/VTune 定期剖析，每项优化前后对比。<span class="why">——没有度量就没有"性能达到很好的状态"的判定标准。</span></li>
+              <li><strong>图元级 LOD 体系</strong>：按缩放级别退化绘制（点化 / 包围盒化 / 简化拓扑）。<span class="why">——帧率与图元总量解耦的关键。</span></li>
+              <li><strong>Nesting NFP 空间索引复用</strong> + Solver 容器跨轮复用 + 边段重叠空间剪枝。</li>
+              <li><strong>性能基准与剖析常态化</strong>：建立 100 万图元标准场景（帧率、全选、框选、单删 1000 次、批量移动、undo 延迟），接入 Tracy/VTune 定期剖析，每项优化前后对比。</li>
             </ul>
           </div>
 
           <div class="callout">
-            <div class="callout__label">验证建议</div>
-            <p>所有复杂度类优化（P0/P1）落地前，建议先写一个可重复运行的基准：生成 100 万个混合图元 → 测量全选、框选、单删 1000 次、批量移动、undo/redo 的耗时与帧率。这组数据既是优化效果的验收依据，也是后续防止性能回退的回归基线。</p>
+            <div class="callout__label">下一步建议</div>
+            <p>先做 P0（改造面小、风险低、模式已在同文件验证过），随后<strong>立刻补基准</strong>。本轮核验暴露出一件事：没有基准时，"这条问题还在不在、改了有没有用"只能靠逐行读代码判断，成本高且容易得出互相矛盾的结论——本次两份复审报告就在同一批代码上给出了不同答案。有基准后，这类分歧可以直接用数据终结。</p>
           </div>
         </section>
 
-        <section id="sync-log">
-          <h2>附录：审查后同步记录（2026-09-16）</h2>
+        <section id="appendix">
+          <h2>附录：核验说明</h2>
           <p>
-            本报告是 2026-09-12 的静态审查快照，正文条目保持原样；下表列出审查之后已处理的部分，
-            当前状态以代码与《图元操作批处理与 UI 刷新机制》为准。正文行号对应 2026-09-12 的版本，此后代码已多有改动。
+            本轮核验于 2026-09-24 执行，方法为逐条打开原报告点名的文件、定位对应函数并读取当前实现，同时在必要时反查调用方以确认该路径是否仍在生产链路上。核验覆盖 <code>Engine/2D</code>、<code>Renderx/src/rt</code>、<code>UI/2D</code>、<code>UI/3D</code>、<code>Main/Src/UI/Render</code>、<code>Engraving</code>、<code>Nesting</code>、<code>Log</code>、<code>FileIO</code>。
           </p>
           <div class="table-wrap">
             <table>
-              <caption>表 7：审查后已处理的条目</caption>
+              <caption>表 7：本轮核验中需要特别说明的判断</caption>
               <thead>
-                <tr><th>审查条目</th><th>处理结果</th></tr>
+                <tr><th>原报告 / 复审说法</th><th>核验结论</th></tr>
               </thead>
               <tbody>
                 <tr>
-                  <td>表 1：<code>mirrorAll / rotateAll</code> 等"全图变换"产生全量指针副本</td>
-                  <td><strong>已移除</strong>：6 个 <code>*All</code> 接口经核查无生产调用方（唯一调用方 <code>MoveProcessor</code> 自身零调用），连同对应测试一并删除。</td>
+                  <td>"2D 侧 Undo 快照未动，仍是全量 clone"</td>
+                  <td><strong>说法过于笼统</strong>。<code>DeleteEntitiesCommand</code>（<code>:239-257</code>）与 <code>AddEntitiesCommand</code>（<code>:302-326</code>）均已改为零克隆所有权转移，只有 <code>EntitySnapshotsCommand</code> 未改。这直接影响优先级判断——需要改的面比想象中小得多。</td>
                 </tr>
                 <tr>
-                  <td>表 1：<code>findEntityById()</code> 全量拷贝 + 逐 ID 线性比较（单次 O(N)）</td>
-                  <td><strong>已修复</strong>：改为直接委托 <code>SceneManager::findEntityById</code>（容器内哈希索引，O(1)）。<span class="why">——本条在审查后、本轮改动前即已修复。</span></td>
+                  <td>"16ms 定时器无条件驱动场景更新"</td>
+                  <td><strong>描述失准</strong>。该定时器为 <code>setSingleShot(true)</code> 的合并节流器，本就是报告建议的形态；且代码另有独立的曲线 LOD 分批定时器。此处不存在待修问题。</td>
                 </tr>
                 <tr>
-                  <td>表 1：<code>mirrorByIds()</code> 对 M 个 ID 各做一次线性查找（O(M·N)）</td>
-                  <td><strong>已修复</strong>：批量接口一次按 ID 取出目标再统一变换，矩阵整批只构造一次。</td>
+                  <td>"RTree 失败回退全量重建"</td>
+                  <td><strong>已大幅缓解</strong>。<code>EntitySpatialIndex.cpp:178-199</code> 已引入"指针精确删"作为首选路径，全量重建降级为条目数不一致时的最后手段，并保留告警。</td>
                 </tr>
                 <tr>
-                  <td>表 3：空间索引逐图元 <code>remove + insert</code>，每次触发树重平衡</td>
-                  <td><strong>已修复</strong>：批量变换收尾改为一次 <code>updateEntityBoundsBulk()</code>；并消除了"mutator 内更新一遍 + 收尾再更新一遍"的重复更新（第二遍恰是逐图元慢路径）。</td>
+                  <td>"空间索引批量更新已是优化"</td>
+                  <td><strong>需修正预期</strong>。<code>updateBulk</code> 内部仍是两轮逐条 remove/insert，代码注释本身已承认"不降低复杂度，只是整批一次收尾"。</td>
                 </tr>
                 <tr>
-                  <td>表 2：撤销链路用"全量快照"表达只动几个图元的操作</td>
-                  <td><strong>部分修复</strong>：3D 侧新增增量命令 <code>ReplaceEntitiesCommand3D</code>（移除 N + 新增 M），布尔/分割/建体不再整场景 clone 两份；2D 的 <code>EntitySnapshotsCommand</code> 仍为快照式，未动。</td>
+                  <td>"选中集 <code>clear()</code> 后全量重建"</td>
+                  <td><strong>已重构</strong>。<code>SelectTool.cpp</code> 已无该模式，改为轮廓预算 + 路径缓存 + 超预算降级包围盒。</td>
                 </tr>
               </tbody>
             </table>
           </div>
           <p>
-            另有两项交互层扇出问题已同轮处理，它们不在本报告原条目的行号范围内：3D 每次场景通知同步触发整套 UI 刷新
-            （改为合并到事件循环下一轮，并去掉冗余的全场景选择重扫）；3D 拖拽预览逐帧在 CPU 重算并重传选中图元顶点
-            （改为复用常驻几何 + 模型矩阵提交，新增 <code>rxSessionSetModelMatrix</code>，ABI 5.3）。
+            全文行号对应当前工作区版本。状态判定基于静态代码阅读，复杂度结论由源码结构推导，不含运行时剖析数据；"是否真的达到流畅"仍需基准测试验证。
           </p>
         </section>
       </main>
 
       <footer>
-        <p>审查说明：本报告基于 2026-09-12 工作区源码的静态审查，正文行号对应 2026-09-12 的代码版本（此后代码已多有改动）；标注"已复核"的条目由审查者逐行阅读原文确认，其余条目由模块化扫描定位、建议实施前对照代码二次确认。复杂度推断基于源码结构分析，未包含运行时剖析数据。审查后已处理的条目见文末"审查后同步记录"（2026-09-16）。</p>
+        <p>本报告为 2026-09-12 静态审查（正文 42 条）在 2026-09-24 的状态核验版。原审查覆盖 8 个模块约 26 万行源码；本轮逐条对照当前代码，结论为 8 项已修复、6 项部分缓解、28 项仍待处理。行号对应当前工作区版本，状态判定基于静态代码阅读，未包含运行时性能数据。</p>
       </footer>
     </div>
   </article>

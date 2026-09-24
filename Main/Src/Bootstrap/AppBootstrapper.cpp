@@ -14,6 +14,10 @@
 #include "RenderBridge/RenderSessionHost.h"
 
 #include "UI/Workbench/UiWorkbench.h"
+#include "UI/Workbench/Workbench2D.h"
+#if BUILD_UI3D
+    #include "UI/Workbench/Workbench3D.h"
+#endif
 #include "UI/Workbench/WorkbenchWindow.h"
 #include "UI/Services/UiFrameworkServices.h"
 

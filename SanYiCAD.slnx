@@ -1,0 +1,414 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Solution>
+	<Configurations>
+		<BuildType Name="Debug"/>
+		<BuildType Name="Release"/>
+		<BuildType Name="MinSizeRel"/>
+		<BuildType Name="RelWithDebInfo"/>
+		<Platform Name="x64"/>
+	</Configurations>
+	<Project Path="Main/SanYiCAD.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="807106aa-a9d4-31fb-ba0e-9c0af68aec12">
+		<BuildDependency Project="CrashHandler/CrashHandler/CrashHandler.vcxproj"/>
+		<BuildDependency Project="Engine/2D/Engine2D.vcxproj"/>
+		<BuildDependency Project="Engine/3D/Engine3D.vcxproj"/>
+		<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+		<BuildDependency Project="Engine/Persistence/EnginePersistence.vcxproj"/>
+		<BuildDependency Project="FileIO/FileIO/FileIO.vcxproj"/>
+		<BuildDependency Project="License/License/License.vcxproj"/>
+		<BuildDependency Project="Log/Log/Log.vcxproj"/>
+		<BuildDependency Project="Nesting/Nesting/Nesting.vcxproj"/>
+		<BuildDependency Project="RenderBridge/RenderBridge.vcxproj"/>
+		<BuildDependency Project="Renderx/RenderX.vcxproj"/>
+		<BuildDependency Project="Main/SanYiCAD_autogen.vcxproj"/>
+		<BuildDependency Project="UI/2D/UI2D.vcxproj"/>
+		<BuildDependency Project="UI/3D/UI3D.vcxproj"/>
+		<BuildDependency Project="UI/Common/UICommon.vcxproj"/>
+		<BuildDependency Project="UI/Common/UICommon_translations.vcxproj"/>
+		<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="Main/SanYiCAD_autogen.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="ba522611-13eb-3005-b926-90a31ffbe039">
+		<BuildDependency Project="Main/SanYiCAD_autogen_timestamp_deps.vcxproj"/>
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="Main/SanYiCAD_autogen_timestamp_deps.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="94eb91ea-a42f-300b-8604-fa91dbfb9298">
+		<BuildDependency Project="CrashHandler/CrashHandler/CrashHandler.vcxproj"/>
+		<BuildDependency Project="Engine/2D/Engine2D.vcxproj"/>
+		<BuildDependency Project="Engine/3D/Engine3D.vcxproj"/>
+		<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+		<BuildDependency Project="Engine/Persistence/EnginePersistence.vcxproj"/>
+		<BuildDependency Project="FileIO/FileIO/FileIO.vcxproj"/>
+		<BuildDependency Project="License/License/License.vcxproj"/>
+		<BuildDependency Project="Log/Log/Log.vcxproj"/>
+		<BuildDependency Project="Nesting/Nesting/Nesting.vcxproj"/>
+		<BuildDependency Project="RenderBridge/RenderBridge.vcxproj"/>
+		<BuildDependency Project="Renderx/RenderX.vcxproj"/>
+		<BuildDependency Project="UI/2D/UI2D.vcxproj"/>
+		<BuildDependency Project="UI/3D/UI3D.vcxproj"/>
+		<BuildDependency Project="UI/Common/UICommon.vcxproj"/>
+		<BuildDependency Project="UI/Common/UICommon_translations.vcxproj"/>
+		<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="UI/Common/UICommon_translations.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="2e5fa033-6b3b-34bd-8fe2-7f526990eb91">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="UI/Common/UICommon_translations_update.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="390165de-d7c5-347e-9311-4be964aed389">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<Build Solution="Debug|*" Project="false"/>
+		<Build Solution="Release|*" Project="false"/>
+		<Build Solution="MinSizeRel|*" Project="false"/>
+		<Build Solution="RelWithDebInfo|*" Project="false"/>
+	</Project>
+	<Folder Name="/CMakePredefinedTargets/">
+		<Project Path="ALL_BUILD.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="33472ccc-c5c2-314d-addb-3e6a7a3a8526" DefaultStartup="true">
+			<BuildDependency Project="CrashHandler/CrashHandler/CrashHandler.vcxproj"/>
+			<BuildDependency Project="Engine/2D/Engine2D.vcxproj"/>
+			<BuildDependency Project="Engine/3D/Engine3D.vcxproj"/>
+			<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+			<BuildDependency Project="Engine/Persistence/EnginePersistence.vcxproj"/>
+			<BuildDependency Project="FileIO/FileIO/FileIO.vcxproj"/>
+			<BuildDependency Project="License/License/License.vcxproj"/>
+			<BuildDependency Project="License/License/LicenseTests/LicenseTests.vcxproj"/>
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="Nesting/Nesting/Nesting.vcxproj"/>
+			<BuildDependency Project="RenderBridge/RenderBridge.vcxproj"/>
+			<BuildDependency Project="RenderBridge/RenderBridgeTests.vcxproj"/>
+			<BuildDependency Project="Renderx/RenderX.vcxproj"/>
+			<BuildDependency Project="Renderx/RenderxShaders.vcxproj"/>
+			<BuildDependency Project="Main/SanYiCAD.vcxproj"/>
+			<BuildDependency Project="UI/2D/UI2D.vcxproj"/>
+			<BuildDependency Project="UI/3D/UI3D.vcxproj"/>
+			<BuildDependency Project="UI/3D/UI3DCommandCatalogTests.vcxproj"/>
+			<BuildDependency Project="UI/3D/UI3DEditTests.vcxproj"/>
+			<BuildDependency Project="UI/3D/UI3DLightingTests.vcxproj"/>
+			<BuildDependency Project="UI/3D/UI3DOperationTests.vcxproj"/>
+			<BuildDependency Project="UI/3D/UI3DRefreshTests.vcxproj"/>
+			<BuildDependency Project="UI/3D/UI3DStorageTests.vcxproj"/>
+			<BuildDependency Project="UI/Common/UICommon.vcxproj"/>
+			<BuildDependency Project="UI/Common/Test/UICommonCommandKernelTests.vcxproj"/>
+			<BuildDependency Project="UI/Common/UICommon_translations.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="Main/ViewportRefreshTests.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="INSTALL.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="f47fb940-fd22-311c-b837-a8ba27a8316b">
+			<BuildDependency Project="ALL_BUILD.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+			<Build Solution="Debug|*" Project="false"/>
+			<Build Solution="Release|*" Project="false"/>
+			<Build Solution="MinSizeRel|*" Project="false"/>
+			<Build Solution="RelWithDebInfo|*" Project="false"/>
+		</Project>
+		<Project Path="PACKAGE.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="cf4e3667-e415-3dca-aeca-3b6ec02491c4">
+			<BuildDependency Project="ALL_BUILD.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+			<Build Solution="Debug|*" Project="false"/>
+			<Build Solution="Release|*" Project="false"/>
+			<Build Solution="MinSizeRel|*" Project="false"/>
+			<Build Solution="RelWithDebInfo|*" Project="false"/>
+		</Project>
+		<Project Path="RUN_TESTS.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="e993cbc4-f5b4-3813-ada5-0ee16eaf0fac">
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+			<Build Solution="Debug|*" Project="false"/>
+			<Build Solution="Release|*" Project="false"/>
+			<Build Solution="MinSizeRel|*" Project="false"/>
+			<Build Solution="RelWithDebInfo|*" Project="false"/>
+		</Project>
+		<Project Path="ZERO_CHECK.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="08c22566-57c8-3cf3-8a72-e1188672f0c1"/>
+	</Folder>
+	<Folder Name="/Core/">
+		<Project Path="CrashHandler/CrashHandler/CrashHandler.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="3d465530-459f-34ae-a1f8-5971f88d38b9">
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="License/License/License.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="a9a309e2-4e78-3392-afe5-e4431d6a3e68">
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="Log/Log/Log.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="2706962b-26a5-3e6e-adbf-b47290b7e079">
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="Utility/Utility/Utility.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="b584e69f-6faf-349b-a1a4-2dcb4ea36ab2">
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+	</Folder>
+	<Folder Name="/Engine/">
+		<Project Path="Engine/2D/Engine2D.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="6917e49f-1637-34fd-b892-df4a77804e92">
+			<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="Engine/3D/Engine3D.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="35a72153-8c7e-3f87-b02a-eda63ee27d2e">
+			<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="Engine/Common/EngineCommon.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="5100024c-f1f3-3a86-91a1-aa24fd96e077">
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="Engine/Persistence/EnginePersistence.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="25ed0e36-2e96-3518-ad50-0cba5989b01e">
+			<BuildDependency Project="Engine/2D/Engine2D.vcxproj"/>
+			<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+	</Folder>
+	<Folder Name="/Modules/">
+		<Project Path="FileIO/FileIO/FileIO.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="beed4cb6-9db1-3f25-81c8-0bc174fc9dbd">
+			<BuildDependency Project="Engine/2D/Engine2D.vcxproj"/>
+			<BuildDependency Project="Engine/3D/Engine3D.vcxproj"/>
+			<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="Nesting/Nesting/Nesting.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="404a6379-1ad5-3556-b5d1-0b9732fb032d">
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+	</Folder>
+	<Folder Name="/Render/">
+		<Project Path="Renderx/RenderX.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="e060b84f-1016-3da3-8820-c685c33a0c2a">
+			<BuildDependency Project="Renderx/RenderxShaders.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="Renderx/RenderxShaders.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="e0152abe-1e3e-32fb-adba-4591fa8b3d50">
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+	</Folder>
+	<Folder Name="/Tests/">
+		<Project Path="License/License/LicenseTests/LicenseTests.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="6a034ee0-d731-3740-a763-13b1fbff270a">
+			<BuildDependency Project="License/License/License.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="RenderBridge/RenderBridgeTests.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="580560c1-b61a-389b-b40c-d242ce2d0ef6">
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="RenderBridge/RenderBridge.vcxproj"/>
+			<BuildDependency Project="Renderx/RenderX.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+	</Folder>
+	<Folder Name="/Tests/Main/">
+		<Project Path="Main/ViewportRefreshTests.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="fca0c31b-8063-31e3-9a0b-392ecc5e4868">
+			<BuildDependency Project="Engine/2D/Engine2D.vcxproj"/>
+			<BuildDependency Project="Engine/3D/Engine3D.vcxproj"/>
+			<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+			<BuildDependency Project="Engine/Persistence/EnginePersistence.vcxproj"/>
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="RenderBridge/RenderBridge.vcxproj"/>
+			<BuildDependency Project="UI/2D/UI2D.vcxproj"/>
+			<BuildDependency Project="UI/Common/UICommon.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="Main/ViewportRefreshTests_autogen.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="Main/ViewportRefreshTests_autogen.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="273bf953-bdc6-3fa7-a43a-7918764e28d2">
+			<BuildDependency Project="Main/ViewportRefreshTests_autogen_timestamp_deps.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="Main/ViewportRefreshTests_autogen_timestamp_deps.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="e5bd0367-6cb8-3084-9084-b80eb5102080">
+			<BuildDependency Project="Engine/2D/Engine2D.vcxproj"/>
+			<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="UI/2D/UI2D.vcxproj"/>
+			<BuildDependency Project="UI/Common/UICommon.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+	</Folder>
+	<Folder Name="/Tests/UI3D/">
+		<Project Path="UI/3D/UI3DCommandCatalogTests.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="ea0464b2-20ef-37c4-b8bf-708984333b7b">
+			<BuildDependency Project="Engine/2D/Engine2D.vcxproj"/>
+			<BuildDependency Project="Engine/3D/Engine3D.vcxproj"/>
+			<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+			<BuildDependency Project="Engine/Persistence/EnginePersistence.vcxproj"/>
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="RenderBridge/RenderBridge.vcxproj"/>
+			<BuildDependency Project="UI/3D/UI3D.vcxproj"/>
+			<BuildDependency Project="UI/Common/UICommon.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/3D/UI3DEditTests.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="0d0419c2-568d-3850-bfd1-869138b354e1">
+			<BuildDependency Project="Engine/3D/Engine3D.vcxproj"/>
+			<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="UI/3D/UI3DEditTests_autogen.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/3D/UI3DEditTests_autogen.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="ed968b25-689e-30b5-863a-cfd28a1074c2">
+			<BuildDependency Project="UI/3D/UI3DEditTests_autogen_timestamp_deps.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/3D/UI3DEditTests_autogen_timestamp_deps.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="892b8ec8-60b3-3ccd-a1b1-03d8c14c65e9">
+			<BuildDependency Project="Engine/3D/Engine3D.vcxproj"/>
+			<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/3D/UI3DLightingTests.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="e0db9dee-5fc3-30bf-a660-e12bca39f0da">
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/3D/UI3DOperationTests.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="5e201e42-7144-350d-bf36-17437c1e1883">
+			<BuildDependency Project="Engine/2D/Engine2D.vcxproj"/>
+			<BuildDependency Project="Engine/3D/Engine3D.vcxproj"/>
+			<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+			<BuildDependency Project="Engine/Persistence/EnginePersistence.vcxproj"/>
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="UI/3D/UI3DOperationTests_autogen.vcxproj"/>
+			<BuildDependency Project="UI/Common/UICommon.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/3D/UI3DOperationTests_autogen.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="80f6f429-5889-316b-9221-13795bb76a9c">
+			<BuildDependency Project="UI/3D/UI3DOperationTests_autogen_timestamp_deps.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/3D/UI3DOperationTests_autogen_timestamp_deps.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="97a22dce-4e26-3ff5-8062-f63c13ac1473">
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="UI/Common/UICommon.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/3D/UI3DRefreshTests.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="caa7375d-5d10-3cd2-9a89-bc89f3223544">
+			<BuildDependency Project="Engine/2D/Engine2D.vcxproj"/>
+			<BuildDependency Project="Engine/3D/Engine3D.vcxproj"/>
+			<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+			<BuildDependency Project="Engine/Persistence/EnginePersistence.vcxproj"/>
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="RenderBridge/RenderBridge.vcxproj"/>
+			<BuildDependency Project="UI/3D/UI3D.vcxproj"/>
+			<BuildDependency Project="UI/Common/UICommon.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/3D/UI3DStorageTests.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="d0c7579e-f37c-358c-b60e-523ebacab06d">
+			<BuildDependency Project="Engine/2D/Engine2D.vcxproj"/>
+			<BuildDependency Project="Engine/3D/Engine3D.vcxproj"/>
+			<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+			<BuildDependency Project="Engine/Persistence/EnginePersistence.vcxproj"/>
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="RenderBridge/RenderBridge.vcxproj"/>
+			<BuildDependency Project="UI/3D/UI3D.vcxproj"/>
+			<BuildDependency Project="UI/3D/UI3DStorageTests_autogen.vcxproj"/>
+			<BuildDependency Project="UI/Common/UICommon.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/3D/UI3DStorageTests_autogen.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="9fd705ae-57b8-395e-ba32-a07e37aec536">
+			<BuildDependency Project="UI/3D/UI3DStorageTests_autogen_timestamp_deps.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/3D/UI3DStorageTests_autogen_timestamp_deps.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="f5840f28-a069-3f3e-a27b-54f1562e83d5">
+			<BuildDependency Project="Engine/3D/Engine3D.vcxproj"/>
+			<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+			<BuildDependency Project="UI/3D/UI3D.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+	</Folder>
+	<Folder Name="/Tests/UICommon/">
+		<Project Path="UI/Common/Test/UICommonCommandKernelTests.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="ea68656c-872f-3eb4-a8ad-3f35a334266b">
+			<BuildDependency Project="Engine/2D/Engine2D.vcxproj"/>
+			<BuildDependency Project="Engine/3D/Engine3D.vcxproj"/>
+			<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+			<BuildDependency Project="Engine/Persistence/EnginePersistence.vcxproj"/>
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="UI/Common/UICommon.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+	</Folder>
+	<Folder Name="/UI/">
+		<Project Path="RenderBridge/RenderBridge.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="fc9b6825-a9a6-317e-90e6-606c5d3f56e8">
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="Renderx/RenderX.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/2D/UI2D.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="06439078-e810-36c2-9f8a-9657847567ec">
+			<BuildDependency Project="Engine/2D/Engine2D.vcxproj"/>
+			<BuildDependency Project="Engine/3D/Engine3D.vcxproj"/>
+			<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+			<BuildDependency Project="Engine/Persistence/EnginePersistence.vcxproj"/>
+			<BuildDependency Project="FileIO/FileIO/FileIO.vcxproj"/>
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="Nesting/Nesting/Nesting.vcxproj"/>
+			<BuildDependency Project="RenderBridge/RenderBridge.vcxproj"/>
+			<BuildDependency Project="UI/2D/UI2D_autogen.vcxproj"/>
+			<BuildDependency Project="UI/2D/UI2D_autogen_timestamp_deps.vcxproj"/>
+			<BuildDependency Project="UI/Common/UICommon.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/2D/UI2D_autogen.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="fb7bbe81-903d-38f1-bc3c-92d36c85e4b5">
+			<BuildDependency Project="UI/2D/UI2D_autogen_timestamp_deps.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/2D/UI2D_autogen_timestamp_deps.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="3f0f7d28-be65-3d84-8fa5-cd06a6674b87">
+			<BuildDependency Project="FileIO/FileIO/FileIO.vcxproj"/>
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="Nesting/Nesting/Nesting.vcxproj"/>
+			<BuildDependency Project="RenderBridge/RenderBridge.vcxproj"/>
+			<BuildDependency Project="UI/Common/UICommon.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/3D/UI3D.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="99842ff9-fbac-32a0-9844-beb6ee9a6a33">
+			<BuildDependency Project="Engine/2D/Engine2D.vcxproj"/>
+			<BuildDependency Project="Engine/3D/Engine3D.vcxproj"/>
+			<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+			<BuildDependency Project="Engine/Persistence/EnginePersistence.vcxproj"/>
+			<BuildDependency Project="FileIO/FileIO/FileIO.vcxproj"/>
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="Nesting/Nesting/Nesting.vcxproj"/>
+			<BuildDependency Project="RenderBridge/RenderBridge.vcxproj"/>
+			<BuildDependency Project="UI/3D/UI3D_autogen.vcxproj"/>
+			<BuildDependency Project="UI/Common/UICommon.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/3D/UI3D_autogen.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="45ce0903-816e-3c7b-ba1b-55e0f1554fe8">
+			<BuildDependency Project="UI/3D/UI3D_autogen_timestamp_deps.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/3D/UI3D_autogen_timestamp_deps.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="bf4c3894-a876-3c0d-acdc-0da314790189">
+			<BuildDependency Project="FileIO/FileIO/FileIO.vcxproj"/>
+			<BuildDependency Project="Nesting/Nesting/Nesting.vcxproj"/>
+			<BuildDependency Project="RenderBridge/RenderBridge.vcxproj"/>
+			<BuildDependency Project="UI/Common/UICommon.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/Common/UICommon.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="f3a66fb7-0a70-3a6b-9644-0df46544c77d">
+			<BuildDependency Project="Engine/2D/Engine2D.vcxproj"/>
+			<BuildDependency Project="Engine/3D/Engine3D.vcxproj"/>
+			<BuildDependency Project="Engine/Common/EngineCommon.vcxproj"/>
+			<BuildDependency Project="Engine/Persistence/EnginePersistence.vcxproj"/>
+			<BuildDependency Project="Log/Log/Log.vcxproj"/>
+			<BuildDependency Project="Nesting/Nesting/Nesting.vcxproj"/>
+			<BuildDependency Project="UI/Common/UICommon_autogen.vcxproj"/>
+			<BuildDependency Project="UI/Common/UICommon_autogen_timestamp_deps.vcxproj"/>
+			<BuildDependency Project="UI/Common/UICommon_translations.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/Common/UICommon_autogen.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="e92f06df-27c9-3611-afab-05b05fd5009e">
+			<BuildDependency Project="UI/Common/UICommon_autogen_timestamp_deps.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+		<Project Path="UI/Common/UICommon_autogen_timestamp_deps.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="2650330c-2399-3a1e-b450-9e8a1941393e">
+			<BuildDependency Project="Nesting/Nesting/Nesting.vcxproj"/>
+			<BuildDependency Project="UI/Common/UICommon_translations.vcxproj"/>
+			<BuildDependency Project="Utility/Utility/Utility.vcxproj"/>
+			<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		</Project>
+	</Folder>
+</Solution>

@@ -86,6 +86,10 @@ set(MAIN_APP_HEADERS
     ${SRC_ROOT}/UI/ClientConfig/ExampleCustomPanel.h
 )
 
+if(BUILD_UI3D)
+    list(APPEND MAIN_APP_HEADERS ${SRC_ROOT}/UI/Workbench/Workbench3D.h)
+endif()
+
 file(GLOB_RECURSE MAIN_RESOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.qrc"
 )
@@ -533,7 +537,7 @@ message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "")
 message(STATUS "----------------------------------------")
 
-option(BUILD_MAIN_TESTS "Build Main module unit tests" ON)
+# 开关由 Config.cmake 统一配置（BUILD_MAIN_TESTS）
 if(BUILD_MAIN_TESTS AND GTest_FOUND)
     file(GLOB MAIN_TEST_SOURCES CONFIGURE_DEPENDS
         "${UI_ROOT}/Test/*.cpp"
@@ -698,16 +702,11 @@ target_link_libraries(MainTests
 endif()
 
 # ============================================================================
-# 视口刷新契约测试（独立目标，不受 BUILD_MAIN_TESTS 约束）
+# 视口刷新契约测试（独立于 BUILD_MAIN_TESTS 的独立目标）
 # ============================================================================
-# 为什么必须单独开一个目标：Config.cmake 用**普通变量**统一 set(BUILD_MAIN_TESTS OFF)，
-# 普通变量会遮蔽本文件里同名的 option()（CMP0077 NEW），因此 -DBUILD_MAIN_TESTS=ON
-# 是无效的 —— 与 Renderx 的 BUILD_RENDERX_TESTS 属同一类约定。
-# 结果是 UI/Test 下的 ViewportRefreshRegressionTests 那 56 条刷新契约用例
-# **从不参与编译**，2D 的刷新语义（四级级别/脏标记/隐藏本体判据）一直没有回归网。
-#
-# 这里只编译该用例 + 它真正依赖的两个实现文件，不把整个 Main 应用拖进来。
-option(BUILD_VIEWPORT_REFRESH_TESTS "Build 2D viewport refresh contract tests" ON)
+# 单独开一个目标的原因：MainTests 会把整个 Main 应用源码拖进编译，而这批刷新
+# 契约用例只依赖 SceneRefreshCoordinator / EntityToVertices 两个实现文件。
+# 开关由 Config.cmake 统一配置（BUILD_VIEWPORT_REFRESH_TESTS）。
 if(BUILD_VIEWPORT_REFRESH_TESTS AND GTest_FOUND)
     add_executable(ViewportRefreshTests
         "${UI_ROOT}/Test/ViewportRefreshRegressionTests.cpp"

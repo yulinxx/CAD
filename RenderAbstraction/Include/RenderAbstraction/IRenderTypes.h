@@ -399,7 +399,8 @@ inline bool isValid(FontHandle h) { return h.value != 0; }
 
 /// 字体创建描述
 struct FontDesc {
-    /// TTF/OTF 字节。渲染侧会**内部拷贝**一份，调用方可以立即释放
+    /// TTF/OTF 字节。渲染侧会**内部拷贝**一份，调用方可以立即释放；
+    /// 同一 data 指针 + size 的多次 createFont 会共享同一份内部拷贝（见 rxFont）。
     const void* data = nullptr;
     uint64_t dataBytes = 0;
     /// 光栅化像素高度。SDF 模式下这只是距离场的采样精度，不是显示字号

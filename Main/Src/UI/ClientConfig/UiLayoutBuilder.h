@@ -102,6 +102,9 @@ public:
     /// 语言切换后可直接用保存的英文源标题重新调用本方法刷新。
     static QString localizedLabel(const QString& label, const QString& fallbackId = QString());
 
+    /// 与 localizedLabel 相同的查询链，用于 JSON tooltip 字段。
+    static QString localizedTooltip(const QString& tooltip, const QString& fallbackId = QString());
+
 private:
     void buildMenuItem(QMenu* parent, const std::variant<MenuActionDef, SubMenuDef, MenuItemType>& item, QActionGroup* exclusiveGroup = nullptr);
     void releaseBuiltShortcuts();

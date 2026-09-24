@@ -37,6 +37,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 namespace RenderAbstraction {
@@ -64,14 +65,17 @@ namespace Render
         TextQuadBuilder& operator=(const TextQuadBuilder&) = delete;
 
         /**
-         * @brief 注入字体字节
+         * @brief 注入字体字节（共享引用，不拷贝）
          *
-         * DLL 不做文件 IO，字体数据由宿主自己读（qrc / 磁盘）。这里保留一份
-         * 副本，因为每出现一个新字号就要用它建一个新的 FontHandle——图集里
-         * 存的是位图而非矢量，换字号必须重新光栅化。
+         * 屏幕文字 / 世界文字 / 3D 帧率共用同一份 qrc 字节时，各方持
+         * shared_ptr 即可，避免 16MB 的 TTF 在堆上出现多份。
          *
          * @param device 视口的渲染设备
+         * @param fontData 进程内共享的字体字节；空指针等价于加载失败
          */
+        bool initialize(RenderAbstraction::IRenderDevice& device, std::shared_ptr<const std::vector<uint8_t>> fontData);
+
+        /// 兼容旧调用：临时拷一份字节再按共享路径走（新代码请直接传 shared_ptr）
         bool initialize(RenderAbstraction::IRenderDevice& device, const uint8_t* fontData, size_t bytes);
         void shutdown();
 
@@ -122,7 +126,8 @@ namespace Render
 
         /// 视口设备，不持有；nullptr 表示未初始化
         RenderAbstraction::IRenderDevice* m_device = nullptr;
-        std::vector<uint8_t> m_fontData;
+        /// 共享字体字节（与 WorldTextQuadBuilder / 3D 帧率共用同一份时无额外拷贝）
+        std::shared_ptr<const std::vector<uint8_t>> m_fontData;
         /// 按字号线性查找：一帧里的字号种类是个位数，哈希表反而更慢也更啰嗦
         std::vector<Batch> m_batches;
         /// 字体创建失败只告警一次，否则每个文本项一条日志会把日志刷爆

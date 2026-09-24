@@ -6,11 +6,11 @@ if(POLICY CMP0167)
     cmake_policy(SET CMP0167 NEW)
 endif()
 
-# 包含全局配置文件 (定义所有编译环境选项)
+# 包含全局配置文件：路径（VCPKG_DIR / Qt_INSTALL_DIR / 工具链 / 输出目录）与测试开关
+# 全部在 Config.cmake 中定义，本文件不再重复定义任何同名项。
+# 必须早于 project() —— Config.cmake 里设置的 CMAKE_TOOLCHAIN_FILE 只有早于
+# project() 才会被采用。
 include(Config.cmake)
-
-# 集成VCPKG (使用 Config.cmake 中配置的 VCPKG_DIR)
-set(CMAKE_TOOLCHAIN_FILE "${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "Vcpkg toolchain file")
 
 # 项目基本信息
 project(SanYiCAD
@@ -18,15 +18,6 @@ project(SanYiCAD
     DESCRIPTION "SanYi CAD System"
     LANGUAGES CXX
 )
-
-# 启用 Unity Build（加快编译速度）
-option(SANYI_UNITY_BUILD "Enable unity build (faster compilation)" ON)
-if(SANYI_UNITY_BUILD)
-    set(CMAKE_UNITY_BUILD ON)
-    set(CMAKE_UNITY_BUILD_BATCH_SIZE 16)
-    # 排除 Objective-C++ 文件，避免与 C++ 混合导致编译错误
-    list(APPEND CMAKE_UNITY_BUILD_SUPPORTED_SOURCE_EXTENSIONS ".mm")
-endif()
 
 set(SANYI_ROOT "${PROJECT_SOURCE_DIR}" CACHE INTERNAL "SanYi CAD project root")
 include("${SANYI_ROOT}/CMake/SanYiPaths.cmake")
@@ -81,86 +72,26 @@ if(MSVC AND SANYI_MSVC_ANALYZE)
     message(STATUS "  MSVC /analyze: ON (format-string diagnostics promoted to errors)")
 endif()
 
-# 统一输出目录（缓存变量，跨 project() 作用域可见）
-# 注意: 基础目录已在 Config.cmake 中配置，此处添加 Qt 版本后缀以保持兼容性
-
+# ---------------------------------------------------------------------------
+# 测试基础设施
+# ---------------------------------------------------------------------------
+# 测试开关本身全部定义在 Config.cmake（唯一配置处），这里只做两件事：
+#   1. 探测 GTest 并接入 GoogleTest；
+#   2. GTest 不可用时，把 Config.cmake 里的全部测试开关统一降级为 OFF。
+# 这里是唯一的降级点 —— 各模块不得再自行 FORCE 改写测试开关。
 find_package(GTest CONFIG QUIET)
 if(GTest_FOUND)
     include(GoogleTest)
-    message(STATUS "  Google Test: Found, unit tests enabled")
-    
-    option(BUILD_ALL_TESTS "Build all unit tests" OFF)
-    option(BUILD_UTILITY_TESTS "Build Utility unit tests" ${BUILD_ALL_TESTS})
-    option(BUILD_LOG_TESTS "Build Log unit tests" ${BUILD_ALL_TESTS})
-    option(BUILD_ENGINE2D_TESTS "Build Engine2D unit tests" ${BUILD_ALL_TESTS})
-    option(BUILD_ENGINE3D_TESTS "Build Engine3D unit tests" ${BUILD_ALL_TESTS})
-    if(BUILD_NESTING)
-        option(BUILD_NESTING_TESTS "Build Nesting unit tests" ${BUILD_ALL_TESTS})
-    else()
-        option(BUILD_NESTING_TESTS "Build Nesting unit tests" OFF)
-    endif()
-    if(BUILD_CAM)
-        option(BUILD_CAM_TESTS "Build CAM unit tests" ${BUILD_ALL_TESTS})
-    else()
-        option(BUILD_CAM_TESTS "Build CAM unit tests" OFF)
-    endif()
-    option(BUILD_GEOMODELCORE_TESTS "Build GeoModelCore unit tests" ${BUILD_ALL_TESTS})
-    option(BUILD_FILEIO_TESTS "Build FileIO unit tests" ${BUILD_ALL_TESTS})
-    option(BUILD_LICENSE_TESTS "Build License unit tests" ON)
-    if(BUILD_ENGRAVING)
-        option(BUILD_ENGRAVING_TESTS "Build Engraving unit tests" ON)
-    else()
-        option(BUILD_ENGRAVING_TESTS "Build Engraving unit tests" OFF)
-    endif()
-    # 硬件抽象层（设备 HAL / IO 点位 / 安全策略）的测试。
-    # 默认 ON：这些测试全部跑在 SimulatedDevice 上，不需要任何真实硬件，
-    # 而 HAL 的回归价值恰恰在于「改了适配器不要破坏契约」。
-    if(BUILD_HARDWARE)
-        option(BUILD_HARDWARE_TESTS "Build Hardware unit tests" ON)
-    else()
-        option(BUILD_HARDWARE_TESTS "Build Hardware unit tests" OFF)
-    endif()
-    # 视觉模块测试。默认 ON：全部跑在 SimulatedCamera / FileReplayCamera 上，
-    # 不需要真实相机，而视觉的回归价值恰恰在于「改了算子不要破坏契约与精度」。
-    if(BUILD_VISION)
-        option(BUILD_VISION_TESTS "Build Vision unit tests" ON)
-    else()
-        option(BUILD_VISION_TESTS "Build Vision unit tests" OFF)
-    endif()
-    
     enable_testing()
+    message(STATUS "  Google Test: Found, unit tests enabled")
 else()
     message(STATUS "  Google Test: Not found, unit tests disabled")
-    set(BUILD_UTILITY_TESTS OFF CACHE BOOL "Build Utility unit tests" FORCE)
-    set(BUILD_LOG_TESTS OFF CACHE BOOL "Build Log unit tests" FORCE)
-    set(BUILD_ENGINE2D_TESTS OFF CACHE BOOL "Build Engine2D unit tests" FORCE)
-    set(BUILD_ENGINE3D_TESTS OFF CACHE BOOL "Build Engine3D unit tests" FORCE)
-    set(BUILD_GEOMODELCORE_TESTS OFF CACHE BOOL "Build GeoModelCore unit tests" FORCE)
-    set(BUILD_NESTING_TESTS OFF CACHE BOOL "Build Nesting unit tests" FORCE)
-    set(BUILD_FILEIO_TESTS OFF CACHE BOOL "Build FileIO unit tests" FORCE)
-    set(BUILD_LICENSE_TESTS OFF CACHE BOOL "Build License unit tests" FORCE)
-    set(BUILD_ENGRAVING_TESTS OFF CACHE BOOL "Build Engraving unit tests" FORCE)
-    set(BUILD_HARDWARE_TESTS OFF CACHE BOOL "Build Hardware unit tests" FORCE)
-    set(BUILD_VISION_TESTS OFF CACHE BOOL "Build Vision unit tests" FORCE)
+    foreach(_sanyi_test IN LISTS SANYI_TEST_SWITCHES)
+        set(${_sanyi_test} OFF CACHE BOOL "disabled: GTest not found" FORCE)
+    endforeach()
 endif()
 
-# 输出目录配置 (带 Qt 版本后缀以保持兼容性)
-# 注意: 基础目录已在 Config.cmake 中配置
-set(_SANYI_BIN_DIR "${CMAKE_BINARY_DIR}/bin_Qt${QT_VERSION_MAJOR}" CACHE INTERNAL "SanYi runtime output dir")
-set(_SANYI_LIB_DIR "${CMAKE_BINARY_DIR}/lib_Qt${QT_VERSION_MAJOR}" CACHE INTERNAL "SanYi library output dir")
-
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${_SANYI_BIN_DIR}")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${_SANYI_BIN_DIR}")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${_SANYI_LIB_DIR}")
-
-foreach(cfg Debug Release RelWithDebInfo MinSizeRel)
-    string(TOUPPER "${cfg}" cfg_u)
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${cfg_u} "${_SANYI_BIN_DIR}/${cfg}")
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${cfg_u} "${_SANYI_BIN_DIR}/${cfg}")
-    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${cfg_u} "${_SANYI_LIB_DIR}/${cfg}")
-endforeach()
-
-set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+# 输出目录、USE_FOLDERS 等由 Config.cmake 统一配置（唯一配置处）
 
 message(STATUS "")
 message(STATUS "***************************************************************")
@@ -192,8 +123,7 @@ sanyi_define_ui_engine_access()
 # 4.5 渲染抽象层（业务级类型和接口，零RenderX依赖）
 add_subdirectory(RenderAbstraction)
 
-# 4. Render 层 - 渲染引擎（Renderx C API）
-option(BUILD_RENDERX "Build Renderx rendering engine" ON)
+# 4. Render 层 - 渲染引擎（Renderx C API）；开关由 Config.cmake 定义
 if(BUILD_RENDERX)
     add_subdirectory(Renderx)
     # RenderBridge：宿主与渲染 DLL 之间的桥接层（会话生命周期、宿主回调）

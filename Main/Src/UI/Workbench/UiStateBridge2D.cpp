@@ -4,6 +4,7 @@
  */
 #include "UiStateBridge2D.h"
 
+#include "Workbench2D.h"
 #include "UiWorkbench.h"
 
 #include "RenderViewport2D.h"

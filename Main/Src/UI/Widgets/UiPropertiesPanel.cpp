@@ -11,6 +11,7 @@
 
 #include <QAbstractItemModel>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
@@ -66,9 +67,9 @@ namespace
             layout->setSpacing(4);
             m_x = makeCoordSpin(this);
             m_y = makeCoordSpin(this);
-            layout->addWidget(new QLabel(QStringLiteral("X:"), this));
+            layout->addWidget(new QLabel(QCoreApplication::translate("UiPropertiesPanel", "X:"), this));
             layout->addWidget(m_x, 1);
-            layout->addWidget(new QLabel(QStringLiteral("Y:"), this));
+            layout->addWidget(new QLabel(QCoreApplication::translate("UiPropertiesPanel", "Y:"), this));
             layout->addWidget(m_y, 1);
         }
 
@@ -103,10 +104,12 @@ namespace
             layout->setContentsMargins(2, 2, 2, 2);
             layout->setSpacing(4);
             auto* indexRow = new QHBoxLayout();
-            indexRow->addWidget(new QLabel(QStringLiteral("Index:"), this));
+            indexRow->addWidget(new QLabel(QCoreApplication::translate("UiPropertiesPanel", "Index:"), this));
             m_index = new QSpinBox(this);
             m_index->setRange(0, 0);
             m_index->setMinimumWidth(90);
+            m_index->setToolTip(QCoreApplication::translate(
+                "UiPropertiesPanel", "Vertex index in the point list. Type a number to jump directly."));
             indexRow->addWidget(m_index, 1);
             m_countLabel = new QLabel(this);
             indexRow->addWidget(m_countLabel);
@@ -495,10 +498,11 @@ PropertiesPanelWidget::PropertiesPanelWidget(QWidget* parent)
     m_tree->setHeaderLabels({ tr("Field"), tr("Value") });
     m_tree->setColumnCount(2);
     m_tree->setSelectionBehavior(QAbstractItemView::SelectRows);
-    // 行高适当放大，保证内联编辑框/下拉框完整显示
+    m_tree->setRootIsDecorated(true);
     m_tree->setStyleSheet(QStringLiteral("QTreeWidget::item { min-height: 26px; }"));
-    // 编辑统一在 itemDoubleClicked 中手动处理：标量内联、复合类型弹窗
+    m_tree->setUniformRowHeights(false);
     m_tree->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_tree->setToolTip(tr("Entity properties. Double-click a value cell to edit it when editable."));
     // Interactive 模式允许用户拖动调整列宽，stretchLastSection 使最后一列填满窗口
     m_tree->header()->setStretchLastSection(true);
     m_tree->header()->setSectionResizeMode(0, QHeaderView::Interactive);
@@ -544,9 +548,14 @@ PropertiesPanelWidget::PropertiesPanelWidget(QWidget* parent)
 
 void PropertiesPanelWidget::changeEvent(QEvent* event)
 {
-    if (event->type() == QEvent::LanguageChange && m_tree)
+    if (event->type() == QEvent::LanguageChange)
     {
-        m_tree->setHeaderLabels({ tr("Field"), tr("Value") });
+        if (m_tree)
+        {
+            m_tree->setHeaderLabels({ tr("Field"), tr("Value") });
+        }
+        // 属性项显示名是生成时本地化的，语言切换后必须重建树才能刷新
+        refresh();
     }
     QWidget::changeEvent(event);
 }

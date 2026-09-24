@@ -27,6 +27,7 @@ struct MenuActionDef
 {
     QString id;               // 动作唯一标识
     QString label;            // 显示文本
+    QString tooltip;          // 悬停提示（可空；空则不设置 ToolTip）
     QString commandId;        // 关联的命令 ID
     QString iconName;         // 图标资源路径（可空）
     QString shortcut;         // 快捷键
@@ -87,6 +88,7 @@ struct ToolBarActionDef
 {
     QString id;
     QString label;
+    QString tooltip;  // 悬停提示（可空）
     QString iconName;
     QString commandId;
     QString shortcut;

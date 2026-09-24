@@ -12,6 +12,10 @@
 #include "WorkbenchWindow.h"
 #include "UI2D/Operation/OperationBus.h"
 
+#if BUILD_UI3D
+#include "Workbench3D.h"
+#endif
+
 /// 创建主窗口实例
 UiShellHost::UiShellHost()
     : m_mainWindow(std::make_unique<WorkbenchWindow>())

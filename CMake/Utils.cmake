@@ -357,7 +357,21 @@ function(sanyi_export_imported_target target)
     set(_includes "")
     if(SANYI_EIT_PUBLIC_INCLUDE_DIRS)
         foreach(inc IN LISTS SANYI_EIT_PUBLIC_INCLUDE_DIRS)
-            list(APPEND _includes "${inc}")
+            # 仅相对化项目树内的 include：生成的 Config.cmake 用
+            # ${CMAKE_CURRENT_LIST_DIR}/<rel> 还原，避免把本机绝对路径
+            # 烤进仓库里的生成物。项目外依赖（vcpkg/Qt 等）保持原样。
+            if(IS_ABSOLUTE "${inc}")
+                file(RELATIVE_PATH _rel "${CMAKE_SOURCE_DIR}" "${inc}")
+                if(NOT _rel MATCHES "^\\.\\.")
+                    file(RELATIVE_PATH _rel_config "${_config_dir}" "${inc}")
+                    string(REPLACE "\\" "/" _rel_config "${_rel_config}")
+                    list(APPEND _includes "\${CMAKE_CURRENT_LIST_DIR}/${_rel_config}")
+                else()
+                    list(APPEND _includes "${inc}")
+                endif()
+            else()
+                list(APPEND _includes "${inc}")
+            endif()
         endforeach()
     endif()
 

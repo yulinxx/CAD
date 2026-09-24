@@ -1,5 +1,6 @@
 #include "MachineProfile.h"
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -248,9 +249,11 @@ namespace MachineProfileLoader
         const QString path = resolvePath(configDir);
         if (path.isEmpty())
         {
-            warningOut = QStringLiteral("未找到机器档案（%1 或 %2），已进入模拟设备模式：当前不会驱动任何真实硬件。")
-                             .arg(QString::fromLatin1(kProfileEnvKey))
-                             .arg(QDir(configDir).filePath(QString::fromLatin1(kProfileFileName)));
+            warningOut =
+                QCoreApplication::translate(
+                    "MachineProfile", "Machine profile not found (%1 or %2); falling back to simulated device mode.")
+                    .arg(QString::fromLatin1(kProfileEnvKey))
+                    .arg(QDir(configDir).filePath(QString::fromLatin1(kProfileFileName)));
             // 日志走英文：warningOut 是给界面看的中文提示，而日志会流向控制台与
             // 现场日志文件，那里的编码不受我们控制，中文常出现 mojibake。
             SY_WARNF("[MachineProfile] no machine profile found (env %s or file %s), "
@@ -266,7 +269,8 @@ namespace MachineProfileLoader
         {
             // 解析失败仍然回退，但把原因升级为 ERROR 并原样交给调用方展示：
             // 「配置写错了」和「这台机器没配硬件」是两件事，日志必须区分
-            warningOut = QStringLiteral("%1; temporarily using simulated device.").arg(error);  // 已临时进入模拟设备模式
+            warningOut = QCoreApplication::translate("MachineProfile", "%1; temporarily using simulated device.")
+                             .arg(error);  // 已临时进入模拟设备模式
             SY_WARNF("[MachineProfile] %s", warningOut.toUtf8().constData());
             return builtinSimulatedProfile();
         }

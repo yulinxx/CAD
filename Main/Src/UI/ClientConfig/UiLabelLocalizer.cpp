@@ -2,7 +2,6 @@
 
 #include <QByteArray>
 #include <QCoreApplication>
-#include <QCache>
 
 // 翻译上下文优先级表（按查找顺序）
 static const char* TRANSLATION_CONTEXTS[] = {
@@ -15,10 +14,6 @@ static const char* TRANSLATION_CONTEXTS[] = {
 };
 static constexpr int NUM_CONTEXTS = sizeof(TRANSLATION_CONTEXTS) / sizeof(TRANSLATION_CONTEXTS[0]);
 
-// 翻译缓存 - 避免重复查询
-// 注意：缓存key使用QLatin1String避免字符串拷贝
-static QCache<QString, QString> s_translationCache(1024);
-
 QString uiLocalizedLabel(const QString& label, const QString& fallbackId)
 {
     if (label.isEmpty())
@@ -27,7 +22,8 @@ QString uiLocalizedLabel(const QString& label, const QString& fallbackId)
     }
 
     // 1. 先查缓存
-    const QString* cached = s_translationCache.object(label);
+    QCache<QString, QString>& cache = getTranslationCache();
+    const QString* cached = cache.object(label);
     if (cached)
     {
         return *cached;
@@ -43,7 +39,7 @@ QString uiLocalizedLabel(const QString& label, const QString& fallbackId)
         if (translated != label)  // 找到有效翻译
         {
             // 缓存结果（仅缓存有翻译的条目）
-            s_translationCache.insert(label, new QString(translated));
+            cache.insert(label, new QString(translated));
             return translated;
         }
     }

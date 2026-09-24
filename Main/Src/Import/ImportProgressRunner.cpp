@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <memory>
 
+#include <QCoreApplication>
 #include <QPointer>
 #include <QWidget>
 
@@ -57,22 +58,23 @@ namespace
         }
     }
 
-    const char* phaseLabel(ImportPhase phase)
+    // 阶段文案：英文为源串，经 translate 本地化后显示
+    QString phaseLabel(ImportPhase phase)
     {
         switch (phase)
         {
         case ImportPhase::DetectFormat:
-            return "识别文件格式";
+            return QCoreApplication::translate("ImportProgressRunner", "Detecting file format");
         case ImportPhase::Parse:
-            return "解析文件";
+            return QCoreApplication::translate("ImportProgressRunner", "Parsing file");
         case ImportPhase::BuildDocument:
-            return "写入场景";
+            return QCoreApplication::translate("ImportProgressRunner", "Writing to scene");
         case ImportPhase::RefreshDisplay:
-            return "刷新显示";
+            return QCoreApplication::translate("ImportProgressRunner", "Refreshing display");
         case ImportPhase::WriteBackState:
-            return "收尾";
+            return QCoreApplication::translate("ImportProgressRunner", "Finishing up");
         default:
-            return "导入中";
+            return QCoreApplication::translate("ImportProgressRunner", "Importing");
         }
     }
 }  // namespace
@@ -82,22 +84,26 @@ ImportResult ImportProgressRunner::run(
 {
     if (!service)
     {
-        return ImportResult::fail(QStringLiteral("Import service unavailable"), ImportErrorType::Unknown);
+        return ImportResult::fail(
+            QCoreApplication::translate("ImportProgressRunner", "Import service unavailable"), ImportErrorType::Unknown);
     }
 
     auto tracker = std::make_shared<ProgressTracker>();
-    tracker->addStage("导入文件", 1.0, 100.0);
+    tracker->addStage(
+        QCoreApplication::translate("ImportProgressRunner", "Import file").toStdString(), 1.0, 100.0);
     tracker->begin();
-    tracker->beginStage(0, phaseLabel(ImportPhase::DetectFormat));
+    tracker->beginStage(0, phaseLabel(ImportPhase::DetectFormat).toStdString());
 
-    auto* dialog = new ProgressDialog(tracker, QStringLiteral("导入文件"), parent);
+    auto* dialog = new ProgressDialog(
+        tracker, QCoreApplication::translate("ImportProgressRunner", "Import file"), parent);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setCancelable(true);
 
     // 对话框可能在导入结束前被强制关闭（连续两次取消），用 QPointer 兜底防止悬空
     QPointer<ProgressDialog> dialogPtr = dialog;
     auto result = std::make_shared<ImportResult>(
-        ImportResult::fail(QStringLiteral("Import canceled"), ImportErrorType::Canceled));
+        ImportResult::fail(
+            QCoreApplication::translate("ImportProgressRunner", "Import canceled"), ImportErrorType::Canceled));
 
     // 落库阶段（BuildDocument 起）不可取消：图元已在事务中，无法中途回滚。
     // 该阶段回调固定跑在主线程，故可安全触碰对话框。
@@ -109,7 +115,7 @@ ImportResult ImportProgressRunner::run(
     context.progressCallback = [tracker, dialogPtr, applyPhaseEntered](ImportPhase phase, float progress) {
         const float clamped = std::clamp(progress, 0.0f, 1.0f);
         const float overall = phaseBase(phase) + phaseSpan(phase) * clamped;
-        tracker->updateStage(static_cast<double>(overall) * 100.0, phaseLabel(phase));
+        tracker->updateStage(static_cast<double>(overall) * 100.0, phaseLabel(phase).toStdString());
 
         if (phase == ImportPhase::BuildDocument && !*applyPhaseEntered)
         {
@@ -130,7 +136,11 @@ ImportResult ImportProgressRunner::run(
         *result = r;
         // 不调用 tracker->end()：它会把 isRunning 置 false，导致 getElapsedMs() 归零，
         // 对话框收尾读到的耗时变成 0。这里只把进度推到 100%，计时由对话框自己停。
-        tracker->updateStage(100.0, r.success ? "完成" : "已结束");
+        tracker->updateStage(
+            100.0,
+            (r.success ? QCoreApplication::translate("ImportProgressRunner", "Completed")
+                       : QCoreApplication::translate("ImportProgressRunner", "Finished"))
+                .toStdString());
         if (dialogPtr)
         {
             if (*applyPhaseEntered)

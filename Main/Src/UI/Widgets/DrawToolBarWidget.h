@@ -46,6 +46,10 @@ public:
     /// 更新按钮高亮状态（Pan 模式变化时调用）
     void updateHighlight();
 
+protected:
+    /// 语言切换时重译 Select/Pan 悬停提示（本类不是 ToolBarBase，需自行处理 LanguageChange）
+    void changeEvent(QEvent* event) override;
+
 signals:
     void iconNeedsUpdate();
 

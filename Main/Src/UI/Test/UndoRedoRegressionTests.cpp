@@ -3,12 +3,16 @@
  * @brief 撤销/重做回归测试 — 覆盖命令栈、事务、批量操作、快照、保存点
  *
  * 测试范围：
- *  - UndoRedoManager 基础命令 (AddEntity / DeleteEntity / MoveEntity / ModifyEntity / LambdaCommand)
- *  - EntitySnapshotsCommand 快照命令
+ *  - UndoRedoManager 基础命令 (ModifyEntityCommand / LambdaCommand)
+ *  - 图元增删命令 (AddEntitiesCommand / DeleteEntitiesCommand)
+ *  - EntitySnapshotsCommand 快照命令（含连续微调合并 / 拖拽不合并）
  *  - Batch 事务（beginBatch / endBatch）
  *  - SavePoint 保存点
- *  - 历史上限 (200)
- *  - 合并 (MoveEntityCommand merge)
+ *  - 历史上限（按 maxHistorySize 自适应，不写死数值）
+ *
+ * 注：原先针对 MoveEntityCommand 的用例随该类一并移除 —— 平移现在统一走
+ *     SceneEditService + EntitySnapshotsCommand，其「连续微调合并成一条」的
+ *     语义由 EntitySnapshots_MergeTwoCommands / _MergeIsSymmetric 覆盖。
  */
 
 #include <gtest/gtest.h>
@@ -24,9 +28,25 @@
 #include <vector>
 #include <atomic>
 
+namespace
+{
+    /**
+     * @brief 测试辅助：执行一次「新增单个图元」并入撤销栈。
+     *
+     * AddEntitiesCommand 属于 Engine2D DLL 内部类型，外部模块只能经
+     * Eg::createAddEntitiesCommand 工厂构造：工厂按 id 克隆后交给命令接管，
+     * 因此图元所有权仍留在用例这边（用例里多是临时对象，语义等价）。
+     * 用例统一走本函数，新增单个图元的写法才不会各处开花。
+     */
+    void executeAddEntity(UndoRedoManager& undoMgr, Eg::SceneManager& scene, const Eg::SyEntity* entity)
+    {
+        undoMgr.executeCommand(Eg::createAddEntitiesCommand(&scene, &entity, 1, "Add"));
+    }
+}  // namespace
+
 // ==================== 基础命令测试 ====================
 
-TEST(UndoRedoRegressionTest, AddEntityCommand_ExecuteAndUndo)
+TEST(UndoRedoRegressionTest, AddEntitiesCommand_ExecuteAndUndo)
 {
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
@@ -35,8 +55,7 @@ TEST(UndoRedoRegressionTest, AddEntityCommand_ExecuteAndUndo)
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId entityId = line->id;
 
-    auto cmd = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line));
-    undoMgr.executeCommand(std::move(cmd).release());
+    executeAddEntity(undoMgr, scene, line.get());
 
     // 执行后图元应存在
     EXPECT_EQ(scene.getEntityCount(), 1u);
@@ -63,7 +82,7 @@ TEST(UndoRedoRegressionTest, AddEntityCommand_ExecuteAndUndo)
     EXPECT_EQ(restoredLine->pointRef().size(), 2u);
 }
 
-TEST(UndoRedoRegressionTest, DeleteEntityCommand_ExecuteAndUndo)
+TEST(UndoRedoRegressionTest, DeleteEntitiesCommand_ExecuteAndUndo)
 {
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
@@ -72,7 +91,6 @@ TEST(UndoRedoRegressionTest, DeleteEntityCommand_ExecuteAndUndo)
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId entityId = line->id;
-    Eg::SyLine* rawLine = line.get();
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
@@ -80,11 +98,9 @@ TEST(UndoRedoRegressionTest, DeleteEntityCommand_ExecuteAndUndo)
 
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
-    // 删除命令 — 使用场景中实际持有的图元指针
-    auto* entityInScene = scene.findSyEntityById(entityId);
-    ASSERT_NE(entityInScene, nullptr);
-    auto cmd = std::make_unique<UndoRedoManager::DeleteEntityCommand>(&scene, entityInScene);
-    undoMgr.executeCommand(std::move(cmd).release());
+    // 删除按 id 进行：命令在 execute 时取走原件保管，undo 归还。
+    ASSERT_NE(scene.findSyEntityById(entityId), nullptr);
+    undoMgr.executeCommand(Eg::createDeleteEntitiesCommand(&scene, &entityId, 1, "Delete"));
 
     EXPECT_EQ(scene.getEntityCount(), 0u);
     EXPECT_TRUE(undoMgr.canUndo());
@@ -94,40 +110,6 @@ TEST(UndoRedoRegressionTest, DeleteEntityCommand_ExecuteAndUndo)
     EXPECT_EQ(scene.getEntityCount(), 1u);
     auto* restored = scene.findSyEntityById(entityId);
     ASSERT_NE(restored, nullptr);
-}
-
-TEST(UndoRedoRegressionTest, MoveEntityCommand_Merge)
-{
-    Eg::SceneManager scene;
-    UndoRedoManager undoMgr(&scene);
-
-    auto line = std::make_unique<Eg::SyLine>();
-    line->basePoint = Ut::Vec2d(0, 0);
-    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 0) });
-    Eg::EntityId entityId = line->id;
-
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
-    vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
-
-    auto* rawLine = dynamic_cast<Eg::SyLine*>(scene.findSyEntityById(entityId));
-    ASSERT_NE(rawLine, nullptr);
-
-    // 连续多次移动，应合并为一条命令
-    // 首条命令通过 executeCommand 执行并入栈
-    auto cmd1 = std::make_unique<UndoRedoManager::MoveEntityCommand>(&scene, rawLine, Ut::Vec2d(5, 0));
-    undoMgr.executeCommand(std::move(cmd1).release());
-    EXPECT_DOUBLE_EQ(rawLine->basePoint.x(), 5.0);
-
-    // 后续移动命令通过 pushExecutedCommand 入栈，触发合并逻辑
-    auto cmd2 = std::make_unique<UndoRedoManager::MoveEntityCommand>(&scene, rawLine, Ut::Vec2d(5, 0));
-    cmd2->execute();                                         // 先执行
-    undoMgr.pushExecutedCommand(std::move(cmd2).release());  // 再入栈（触发合并）
-    EXPECT_DOUBLE_EQ(rawLine->basePoint.x(), 10.0);
-
-    // 合并后 undo 一次应回到原始位置
-    undoMgr.undo();
-    EXPECT_DOUBLE_EQ(rawLine->basePoint.x(), 0.0);
 }
 
 TEST(UndoRedoRegressionTest, ModifyEntityCommand_CustomApply)
@@ -241,14 +223,10 @@ TEST(UndoRedoRegressionTest, EntitySnapshotsCommand_RoundTrip)
     ASSERT_NE(circlePtr, nullptr);
     circlePtr->dRadius = 5.0;
 
-    // 拍摄修改后快照
-    Eg::SyEntity* afterSnap[2] = { nullptr, nullptr };
-    size_t afterCount = Eg::captureEntitySnapshots(&scene, snapIds, 2, afterSnap, 2);
-    ASSERT_EQ(afterCount, 2u);
-
-    // 执行快照命令
-    undoMgr.executeCommand(Eg::createEntitySnapshotsCommand(
-        &scene, beforeSnap, beforeCount, afterSnap, afterCount, "Modify line and circle"));
+    // 执行快照命令。修改在这里已经生效，场景当前状态即「修改后」态，
+    // 因此只需传 before 一份快照（命令靠与场景整体交换完成撤销/重做）。
+    undoMgr.executeCommand(
+        Eg::createEntitySnapshotsCommand(&scene, beforeSnap, beforeCount, "Modify line and circle"));
 
     // 验证修改生效
     auto* modifiedLine = scene.findSyEntityById(lineId);
@@ -296,8 +274,7 @@ TEST(UndoRedoRegressionTest, BatchTransaction_GroupedUndo)
     {
         auto line = std::make_unique<Eg::SyLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0, 10.0) });
-        auto cmd = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line));
-        undoMgr.executeCommand(std::move(cmd).release());
+        executeAddEntity(undoMgr, scene, line.get());
     }
 
     undoMgr.endBatch();
@@ -326,8 +303,7 @@ TEST(UndoRedoRegressionTest, BatchTransaction_Description)
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
-    auto cmd = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line));
-    undoMgr.executeCommand(std::move(cmd).release());
+    executeAddEntity(undoMgr, scene, line.get());
 
     undoMgr.endBatch();
 
@@ -348,8 +324,7 @@ TEST(UndoRedoRegressionTest, SavePoint_DetectDirty)
     // 执行命令后：不在保存点
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
-    auto cmd = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line));
-    undoMgr.executeCommand(std::move(cmd).release());
+    executeAddEntity(undoMgr, scene, line.get());
     EXPECT_FALSE(undoMgr.isAtSavePoint());
 
     // 撤销后：回到保存点
@@ -364,17 +339,17 @@ TEST(UndoRedoRegressionTest, HistoryLimit_TrimsExcess)
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
-    // 执行超过 200 条命令
-    for (int i = 0; i < 250; ++i)
+    // 以实际上限为基准执行「上限 + 50」条命令（上限由 maxHistorySize 决定，不写死具体数值）
+    const size_t limit = undoMgr.maxHistorySize();
+    for (size_t i = 0; i < limit + 50; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0, 10.0) });
-        auto cmd = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line));
-        undoMgr.executeCommand(std::move(cmd).release());
+        executeAddEntity(undoMgr, scene, line.get());
     }
 
-    // 历史不应超过 200
-    EXPECT_LE(undoMgr.undoCount(), 200u);
+    // 超出部分被裁剪，历史恰好停在上限
+    EXPECT_EQ(undoMgr.undoCount(), limit);
 }
 
 // ==================== 清除测试 ====================
@@ -386,8 +361,7 @@ TEST(UndoRedoRegressionTest, Clear_ResetsAll)
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
-    auto cmd = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line));
-    undoMgr.executeCommand(std::move(cmd).release());
+    executeAddEntity(undoMgr, scene, line.get());
 
     EXPECT_TRUE(undoMgr.canUndo());
 
@@ -408,8 +382,7 @@ TEST(UndoRedoRegressionTest, DescriptionText)
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
-    auto cmd = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line));
-    undoMgr.executeCommand(std::move(cmd).release());
+    executeAddEntity(undoMgr, scene, line.get());
 
     EXPECT_FALSE(undoMgr.undoText()[0] == '\0');
     EXPECT_TRUE(undoMgr.redoText()[0] == '\0');
@@ -449,13 +422,11 @@ TEST(UndoRedoRegressionTest, NestedBatchTransaction)
 
     auto line1 = std::make_unique<Eg::SyLine>();
     line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
-    auto cmd1 = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line1));
-    undoMgr.executeCommand(std::move(cmd1).release());
+    executeAddEntity(undoMgr, scene, line1.get());
 
     auto line2 = std::make_unique<Eg::SyLine>();
     line2->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(20, 20) });
-    auto cmd2 = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line2));
-    undoMgr.executeCommand(std::move(cmd2).release());
+    executeAddEntity(undoMgr, scene, line2.get());
 
     undoMgr.endBatch();
 
@@ -513,8 +484,7 @@ TEST(UndoRedoRegressionTest, Observer_NotifiedOnExecuteCommand)
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
-    auto cmd = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line));
-    undoMgr.executeCommand(std::move(cmd).release());
+    executeAddEntity(undoMgr, scene, line.get());
 
     // 执行命令后观察者应收到通知
     EXPECT_GT(observer.stateChangedCount, 0);
@@ -589,8 +559,7 @@ TEST(UndoRedoRegressionTest, SavePoint_AfterMultipleUndo)
     {
         auto line = std::make_unique<Eg::SyLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0, 10.0) });
-        auto cmd = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line));
-        undoMgr.executeCommand(std::move(cmd).release());
+        executeAddEntity(undoMgr, scene, line.get());
     }
 
     EXPECT_EQ(scene.getEntityCount(), 3u);
@@ -628,18 +597,18 @@ TEST(UndoRedoRegressionTest, HistoryLimit_ExactlyAtLimit)
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
-    // 恰好执行 200 条命令
-    for (int i = 0; i < 200; ++i)
+    // 恰好执行「上限」条命令，此时不应触发裁剪
+    const size_t limit = undoMgr.maxHistorySize();
+    for (size_t i = 0; i < limit; ++i)
     {
         auto line = std::make_unique<Eg::SyLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0, 10.0) });
-        auto cmd = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line));
-        undoMgr.executeCommand(std::move(cmd).release());
+        executeAddEntity(undoMgr, scene, line.get());
     }
 
-    // 恰好 200 条命令，不应被裁剪
-    EXPECT_EQ(undoMgr.undoCount(), 200u);
-    EXPECT_EQ(scene.getEntityCount(), 200u);
+    // 恰好达到上限，未被裁剪；场景中的图元数等于执行次数
+    EXPECT_EQ(undoMgr.undoCount(), limit);
+    EXPECT_EQ(scene.getEntityCount(), limit);
 }
 
 // ==================== 空 Batch 边界测试 ====================
@@ -665,13 +634,11 @@ TEST(UndoRedoRegressionTest, Batch_UndoRedoStackState)
 
     auto line1 = std::make_unique<Eg::SyLine>();
     line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
-    auto cmd1 = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line1));
-    undoMgr.executeCommand(std::move(cmd1).release());
+    executeAddEntity(undoMgr, scene, line1.get());
 
     auto line2 = std::make_unique<Eg::SyLine>();
     line2->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(20, 20) });
-    auto cmd2 = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line2));
-    undoMgr.executeCommand(std::move(cmd2).release());
+    executeAddEntity(undoMgr, scene, line2.get());
 
     undoMgr.endBatch();
 
@@ -715,10 +682,7 @@ TEST(UndoRedoRegressionTest, EntitySnapshots_MergeTwoCommands)
     auto* l1 = scene.findSyEntityById(lineId);
     l1->setName("V2");
 
-    Eg::SyEntity* afterSnap1[1] = { nullptr };
-    size_t afterCount1 = Eg::captureEntitySnapshots(&scene, snapId, 1, afterSnap1, 1);
-
-    auto* snap1 = Eg::createEntitySnapshotsCommand(&scene, beforeSnap1, beforeCount1, afterSnap1, afterCount1, "snap");
+    auto* snap1 = Eg::createEntitySnapshotsCommand(&scene, beforeSnap1, beforeCount1, "snap");
     undoMgr.executeCommand(snap1);
     EXPECT_STREQ(scene.findSyEntityById(lineId)->name(), "V2");
 
@@ -729,10 +693,7 @@ TEST(UndoRedoRegressionTest, EntitySnapshots_MergeTwoCommands)
     auto* l2 = scene.findSyEntityById(lineId);
     l2->setName("V3");
 
-    Eg::SyEntity* afterSnap2[1] = { nullptr };
-    size_t afterCount2 = Eg::captureEntitySnapshots(&scene, snapId, 1, afterSnap2, 1);
-
-    auto* snap2 = Eg::createEntitySnapshotsCommand(&scene, beforeSnap2, beforeCount2, afterSnap2, afterCount2, "snap");
+    auto* snap2 = Eg::createEntitySnapshotsCommand(&scene, beforeSnap2, beforeCount2, "snap");
     snap2->execute();
     undoMgr.pushExecutedCommand(snap2);
     EXPECT_STREQ(scene.findSyEntityById(lineId)->name(), "V3");
@@ -765,11 +726,8 @@ TEST(UndoRedoRegressionTest, EntitySnapshots_NonMergeableKeepsSeparateRecords)
     Eg::SyEntity* beforeSnap1[1] = { nullptr };
     size_t beforeCount1 = Eg::captureEntitySnapshots(&scene, snapId, 1, beforeSnap1, 1);
     scene.findSyEntityById(lineId)->setName("V2");
-    Eg::SyEntity* afterSnap1[1] = { nullptr };
-    size_t afterCount1 = Eg::captureEntitySnapshots(&scene, snapId, 1, afterSnap1, 1);
 
-    auto* drag1 = Eg::createEntitySnapshotsCommand(
-        &scene, beforeSnap1, beforeCount1, afterSnap1, afterCount1, "Transform", false);
+    auto* drag1 = Eg::createEntitySnapshotsCommand(&scene, beforeSnap1, beforeCount1, "Transform", false);
     drag1->execute();
     undoMgr.pushExecutedCommand(drag1);
 
@@ -777,11 +735,8 @@ TEST(UndoRedoRegressionTest, EntitySnapshots_NonMergeableKeepsSeparateRecords)
     Eg::SyEntity* beforeSnap2[1] = { nullptr };
     size_t beforeCount2 = Eg::captureEntitySnapshots(&scene, snapId, 1, beforeSnap2, 1);
     scene.findSyEntityById(lineId)->setName("V3");
-    Eg::SyEntity* afterSnap2[1] = { nullptr };
-    size_t afterCount2 = Eg::captureEntitySnapshots(&scene, snapId, 1, afterSnap2, 1);
 
-    auto* drag2 = Eg::createEntitySnapshotsCommand(
-        &scene, beforeSnap2, beforeCount2, afterSnap2, afterCount2, "Transform", false);
+    auto* drag2 = Eg::createEntitySnapshotsCommand(&scene, beforeSnap2, beforeCount2, "Transform", false);
     drag2->execute();
     undoMgr.pushExecutedCommand(drag2);
 
@@ -820,11 +775,8 @@ TEST(UndoRedoRegressionTest, EntitySnapshots_MergeIsSymmetric)
     Eg::SyEntity* beforeSnap1[1] = { nullptr };
     size_t beforeCount1 = Eg::captureEntitySnapshots(&scene, snapId, 1, beforeSnap1, 1);
     scene.findSyEntityById(lineId)->setName("V2");
-    Eg::SyEntity* afterSnap1[1] = { nullptr };
-    size_t afterCount1 = Eg::captureEntitySnapshots(&scene, snapId, 1, afterSnap1, 1);
 
-    auto* nudge = Eg::createEntitySnapshotsCommand(
-        &scene, beforeSnap1, beforeCount1, afterSnap1, afterCount1, "Transform", true);
+    auto* nudge = Eg::createEntitySnapshotsCommand(&scene, beforeSnap1, beforeCount1, "Transform", true);
     nudge->execute();
     undoMgr.pushExecutedCommand(nudge);
 
@@ -832,11 +784,8 @@ TEST(UndoRedoRegressionTest, EntitySnapshots_MergeIsSymmetric)
     Eg::SyEntity* beforeSnap2[1] = { nullptr };
     size_t beforeCount2 = Eg::captureEntitySnapshots(&scene, snapId, 1, beforeSnap2, 1);
     scene.findSyEntityById(lineId)->setName("V3");
-    Eg::SyEntity* afterSnap2[1] = { nullptr };
-    size_t afterCount2 = Eg::captureEntitySnapshots(&scene, snapId, 1, afterSnap2, 1);
 
-    auto* drag = Eg::createEntitySnapshotsCommand(
-        &scene, beforeSnap2, beforeCount2, afterSnap2, afterCount2, "Transform", false);
+    auto* drag = Eg::createEntitySnapshotsCommand(&scene, beforeSnap2, beforeCount2, "Transform", false);
     drag->execute();
     undoMgr.pushExecutedCommand(drag);
 
@@ -962,13 +911,13 @@ TEST(UndoRedoRegressionTest, Batch_MixedEntityTypes)
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
-    undoMgr.executeCommand(std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line)).release());
+    executeAddEntity(undoMgr, scene, line.get());
 
     auto circle = std::make_unique<Eg::SyCircle>();
     circle->basePoint = Ut::Vec2d(5, 5);
     circle->dRadius = 3.0;
     Eg::EntityId circleId = circle->id;
-    undoMgr.executeCommand(std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(circle)).release());
+    executeAddEntity(undoMgr, scene, circle.get());
 
     undoMgr.endBatch();
 
@@ -983,7 +932,7 @@ TEST(UndoRedoRegressionTest, Batch_MixedEntityTypes)
     EXPECT_NE(scene.findSyEntityById(circleId), nullptr);
 }
 
-TEST(UndoRedoRegressionTest, AddEntityCommand_PreservesNameAndSelectionState)
+TEST(UndoRedoRegressionTest, AddEntitiesCommand_PreservesNameAndSelectionState)
 {
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
@@ -994,8 +943,7 @@ TEST(UndoRedoRegressionTest, AddEntityCommand_PreservesNameAndSelectionState)
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId entityId = line->id;
 
-    auto cmd = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line));
-    undoMgr.executeCommand(cmd.release());
+    executeAddEntity(undoMgr, scene, line.get());
 
     auto* added = scene.findSyEntityById(entityId);
     ASSERT_NE(added, nullptr);
