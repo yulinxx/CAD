@@ -509,6 +509,36 @@ public:
         }
     }
 
+    /// 增量追加顶层节点（仅用于可安全增量表达的纯新增：无删除、无重命名）。
+    /// 本模型行序由 forEachEntity 顺序决定，新图元 append 到 m_entities 末尾，
+    /// 追加在末尾与全量重建的展示顺序一致；视图展开/滚动状态因此得以保留。
+    void appendTopLevelNodes(const QList<SceneTreeNode3D>& nodes)
+    {
+        if (nodes.isEmpty())
+        {
+            return;
+        }
+        // 去重：忽略已在树上的节点（撤销-重做竞态下同批变更可能重复）
+        QList<SceneTreeNode3D> fresh;
+        fresh.reserve(nodes.size());
+        for (const auto& n : nodes)
+        {
+            if (m_nodeMap.contains(n.id))
+            {
+                continue;
+            }
+            fresh.push_back(n);
+        }
+        if (fresh.isEmpty())
+        {
+            return;
+        }
+        for (const auto& n : fresh)
+        {
+            addNode(nullptr, n);
+        }
+    }
+
     bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) override
     {
         if (!index.isValid())
@@ -806,6 +836,18 @@ void SceneTreePanel::appendTopLevelRows(const QVector<SceneTreeRow2D>& rows)
     if (auto* model2d = dynamic_cast<SceneTreeTableModel2D*>(m_model))
     {
         model2d->appendTopLevelRows(rows);
+    }
+}
+
+void SceneTreePanel::appendTopLevelNodes(const QList<SceneTreeNode3D>& nodes)
+{
+    if (m_mode != Mode::Mode3D || nodes.isEmpty())
+    {
+        return;
+    }
+    if (auto* model3d = dynamic_cast<SceneTreeTableModel3D*>(m_model))
+    {
+        model3d->appendTopLevelNodes(nodes);
     }
 }
 

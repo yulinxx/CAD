@@ -76,7 +76,6 @@ private:
     void setup3DMenuAndShortcuts(WorkbenchWindow& window);
     void create3DViewport(WorkbenchWindow& window);
     void bind3DRenderSignals(ServiceOwner& own);
-    void bind3DCursorSignal();
     void bind3DSelectionSignal();
     void setup3DDeleteShortcuts(WorkbenchWindow& window);
     /// 3D 视口右键菜单请求：基于命令中枢快照构建并弹出（与 2D 统一的单一事实来源）
@@ -84,7 +83,8 @@ private:
     /// 按客户配置构建 3D 右键菜单
     /// @param contextMenuId JSON contextMenus 节中的菜单 ID，例如 "canvas.3d"
     /// @return 配置菜单；未配置时返回 nullptr，调用方回退到内建路径。
-    ///         返回的菜单归调用方所有，且必须在同一作用域内 delete（命令分发器是栈对象）。
+    ///         返回的菜单归调用方所有，可在任意时机销毁（分发器是
+    ///         WorkbenchMenuManager 持有的长寿命 MenuDispatcher，不依赖菜单寿命）。
     QMenu* buildConfiguredContextMenu(const QString& contextMenuId);
 
     // ---- 3D 场景树（数据/算法/UI 分离，UI 可定制/可缺失） ----
@@ -92,6 +92,16 @@ private:
     void setupSceneTree3D(WorkbenchWindow& window);
     /// 重建场景树模型并推送到面板（结构性变化：导入/撤销/增删）
     void refreshSceneTree3D();
+    /// 消费上次游标以来的变更：纯 Added 追加行，否则回退全量（与 2D applySceneTreeIncremental 同语义）
+    void applySceneTreeIncremental3D(const char* src = nullptr);
+
+    // ---- 3D 属性面板（与 2D 同一 PropertiesPanelWidget + PropertyModel 契约） ----
+    /// 探测属性面板并绑定编辑回刷（面板可缺失，配置驱动 UI）
+    void setupProperties3D(WorkbenchWindow& window);
+    /// 按当前选中图元重建属性模型并推送到面板
+    void refreshPropertiesPanel3D();
+    /// 请求一次属性面板重建（100ms 尾包合并，与 2D 同语义）
+    void schedulePropertiesPanelRefresh3D();
 
     /// 只在结构签名变化时重建场景树（批量操作防抖）
     void refreshSceneTree3DIfNeeded();
@@ -133,7 +143,16 @@ private:
 
     /// 3D 场景树重建防抖定时器（合并批量增删，避免每步 O(N) 重建）
     QTimer* m_sceneTree3DRefreshTimer{ nullptr };
-    /// 3D 场景树结构签名：用于判定是否需要重建
+    /// 3D 场景树结构签名：图元数量 + 结构修订号
+    std::size_t m_lastSceneTree3DEntityCount{ 0 };
     uint64_t m_lastSceneTree3DStructureRevision{ 0 };
+    /// 场景树增量游标（ISceneChangeStream；与 2D 同语义）
+    uint64_t m_sceneTree3DCursor{ 0 };
+    /// applySceneTreeIncremental3D 重入标志（分类/追加期间可能触发嵌套场景通知）
+    bool m_sceneTree3DIncrementalBusy{ false };
+    /// 属性面板重建节流定时器：active 期间多次请求合并为窗口末尾一次（与 2D 同语义）
+    QTimer* m_propertiesRefreshTimer3D{ nullptr };
+    /// 本工作台在 attach 期间建立的 Qt 连接，deactivate 时整批 disconnect（RAII 批量回收）
+    std::vector<QMetaObject::Connection> m_workbenchConnections;
 };
 #endif

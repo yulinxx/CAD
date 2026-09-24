@@ -8,7 +8,7 @@
  * 三方职责划分（与 2D 场景树 / 属性面板 PropertyModel 同一解耦范式）：
  *   - 算法/领域层：SceneTreeBuilder3D 根据引擎场景生成本模型
  *   - 数据层：本文件（SceneTreeNode3D / SceneTreeModel3D，纯数据）
- *   - UI 层：SceneTreePanel3D 仅消费本模型进行渲染
+ *   - UI 层：SceneTreePanel 仅消费本模型进行渲染
  *
  * 因此 3D 场景树面板（UI）可以随时新增/删除/替换/定制，不影响算法层与数据层。
  */

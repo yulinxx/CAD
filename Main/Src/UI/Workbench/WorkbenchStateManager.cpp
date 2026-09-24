@@ -318,7 +318,6 @@ void WorkbenchStateManager::setWorkbenchTransitionState(const QString& phase, co
 void WorkbenchStateManager::resetWorkbenchTransientState()
 {
     SY_DEBUG("[WorkbenchStateManager] Resetting transient workbench state");
-    m_windowState.busy = false;
 
     if (m_stateCenter)
     {
@@ -341,6 +340,12 @@ void WorkbenchStateManager::resetWorkbenchTransientState()
         m_stateCenter->setMetadata(meta);
         clearSelectionState();
         // 保留 dirty 标记：切换工作台不应清除"未保存"状态
+        // 业务状态只写状态中心；本地镜像在下方统一从状态中心拉取
+        syncWindowStateFromStateCenter();
+    }
+    else
+    {
+        m_windowState.busy = false;
     }
     // 本地镜像收尾单独处理，避免状态中心清理和窗口镜像清理混在一起
     resetWorkbenchLocalMirror();

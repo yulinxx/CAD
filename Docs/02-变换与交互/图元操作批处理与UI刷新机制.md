@@ -295,7 +295,7 @@ void setVisible(bool visible) override {
 
 ### 4.7 3D 场景树的重建门控
 
-文件：`Main/Src/UI/Workbench/UiWorkbench.cpp`
+文件：`Main/Src/UI/Workbench/Workbench2D.cpp`（原 `UiWorkbench.cpp` 已拆分为 `Workbench2D.cpp` / `Workbench3D.cpp`）
 
 - `Workbench3D::refreshSceneTree3DIfNeeded()`：按 `structureRevision()` 判断，
   签名未变（选择、拖动变换、显隐切换、锁定）一律不重建；

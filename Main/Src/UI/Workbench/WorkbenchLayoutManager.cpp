@@ -5,6 +5,7 @@
  * 管理工作台的停靠面板布局。
  */
 #include "WorkbenchLayoutManager.h"
+#include "UiDockIds.h"
 #include "WorkbenchMenuManager.h"
 #include "UiSceneTreePanel.h"
 #include "UiPropertiesPanel.h"
@@ -207,11 +208,11 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
 
             // 同步面板状态引用，保持对外接口稳定（setSkeletonDocksVisible 等依赖它）
             const QString dockId = dock->objectName();
-            if (dockId == QStringLiteral("SceneDock"))
+            if (dockId == UiDockIds::sceneQString())
             {
                 m_panelState.leftDock = dock;
             }
-            else if (dockId == QStringLiteral("PropertiesDock"))
+            else if (dockId == UiDockIds::propertiesQString())
             {
                 m_panelState.rightDock = dock;
             }
@@ -326,11 +327,11 @@ QDockWidget* WorkbenchLayoutManager::registerDockWidget(const QString& title, QW
     QString dockId;
     if (qobject_cast<SceneTreePanel*>(widget))
     {
-        dockId = QStringLiteral("SceneDock");
+        dockId = UiDockIds::sceneQString();
     }
     else if (qobject_cast<PropertiesPanelWidget*>(widget))
     {
-        dockId = QStringLiteral("PropertiesDock");
+        dockId = UiDockIds::propertiesQString();
     }
     else
     {
@@ -347,11 +348,11 @@ QDockWidget* WorkbenchLayoutManager::registerDockWidget(const QString& title, QW
     dock->setProperty("_workbench_dock_title", title);
 
     // 同步面板状态引用，保持对外接口稳定（setSkeletonDocksVisible 等依赖它）
-    if (dockId == QStringLiteral("SceneDock"))
+    if (dockId == UiDockIds::sceneQString())
     {
         m_panelState.leftDock = dock;
     }
-    else if (dockId == QStringLiteral("PropertiesDock"))
+    else if (dockId == UiDockIds::propertiesQString())
     {
         m_panelState.rightDock = dock;
     }
@@ -390,10 +391,11 @@ void WorkbenchLayoutManager::clearLayoutContent(const UiWorkbench* oldWorkbench)
     }
     m_registeredToolBars.clear();
 
-    // 2: 清理菜单栏 - 3D 工作台使用 MenuManager3D 独立管理菜单，
-    // 切换到 2D 时需要清空菜单栏，避免 3D 菜单残留导致混乱
-    // 注意：mb->clear() 会同步删除 QAction，但旧 QAction 上可能还有
-    // lambda/connect 持有引用。先 disconnect 所有 action，再 clear。
+    // 2: 清理菜单栏 - 工作台切换的内容拆除阶段。
+    // 菜单树的重建权归 WorkbenchMenuManager::rebuildAllMenus（triggerWorkbench 末步），
+    // 这里只负责拆除时断开旧 QAction 的 connect 并回收整棵菜单树，
+    // 避免上一个工作台的菜单残留。注意：mb->clear() 会同步删除 QAction，
+    // 但旧 QAction 上可能还有 lambda/connect 持有引用，先 disconnect 再 clear。
     if (auto* mb = m_parent->menuBar())
     {
         const auto actions = mb->actions();
@@ -607,7 +609,7 @@ void WorkbenchLayoutManager::setSceneDockVisible(bool visible)
     {
         for (auto* dock : m_registeredDocks)
         {
-            if (dock && dock->objectName() == QStringLiteral("SceneDock"))
+            if (dock && dock->objectName() == UiDockIds::Scene)
             {
                 sceneDock = dock;
                 m_panelState.leftDock = dock;
@@ -622,6 +624,28 @@ void WorkbenchLayoutManager::setSceneDockVisible(bool visible)
         sceneDock->setMinimumWidth(180);
         sceneDock->setMaximumWidth(300);
         sceneDock->setVisible(visible);
+    }
+}
+
+void WorkbenchLayoutManager::setPropertiesDockVisible(bool visible)
+{
+    QDockWidget* propsDock = m_panelState.rightDock.data();
+    if (!propsDock)
+    {
+        for (auto* dock : m_registeredDocks)
+        {
+            if (dock && dock->objectName() == UiDockIds::Properties)
+            {
+                propsDock = dock;
+                m_panelState.rightDock = dock;
+                break;
+            }
+        }
+    }
+
+    if (propsDock)
+    {
+        propsDock->setVisible(visible);
     }
 }
 

@@ -37,7 +37,7 @@
 
 **结果**：
 - ❌ `persistenceService` - **不可移除**，在 `WorkbenchWindow.cpp:304` 被使用
-- ❌ `clipboard` - **不可移除**，在 `UiWorkbench.cpp:978` 被使用
+- ❌ `clipboard` - **不可移除**，在 `Workbench2D.cpp` 被使用
 
 ---
 

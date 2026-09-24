@@ -1,4 +1,5 @@
 #include "Workbench3D.h"
+#include "WorkbenchTiming.h"
 
 #if BUILD_UI3D
     #include <QAction>
@@ -17,6 +18,7 @@
 
     #include <functional>
     #include <string>
+    #include <unordered_set>
     #include <vector>
 
     #include "Composition/ApplicationCompositionRoot.h"
@@ -26,8 +28,9 @@
     #include "UiStateCenter.h"
     #include "UiViewport3D.h"
     #include "SceneBuilder3D.h"
-    #include "WorkbenchMenuManager.h"
-    #include "WorkbenchWindow.h"
+#include "WorkbenchMenuManager.h"
+#include "WorkbenchWindow.h"
+#include "UiDockIds.h"
 
     #include "ClientConfig/UiClientConfigBase.h"
     #include "ClientConfig/UiConfigurationManager.h"
@@ -109,7 +112,13 @@ void Workbench3D::ServiceOwnerDeleter::operator()(ServiceOwner* p) const
     #include "ViewportRendererFactory.h"
 
     #include "SceneTreeBuilder3D.h"
+    #include "UiSceneTreePanel.h"
+    #include "SceneTreeModel3D.h"
     #include "Engine/EntityIdUtils.h"
+
+    #include "UiPropertiesPanel.h"
+    #include "UI3D/Service/EntityPropertyEditSession3D.h"
+    #include "UI3D/Service/EntityPropertyModel3D.h"
 
 QString Workbench3D::id() const
 {
@@ -218,6 +227,7 @@ void Workbench3D::build3DWorkbenchUi(WorkbenchWindow& window)
     create3DServices();
     setup3DViewportAndSignals(window);
     setupSceneTree3D(window);
+    setupProperties3D(window);
     setup3DMenuAndShortcuts(window);
 }
 
@@ -351,7 +361,6 @@ void Workbench3D::bind3DRenderSignals(ServiceOwner& own)
         return;
     }
 
-    bind3DCursorSignal();
     bind3DSelectionSignal();
 
     // 右键菜单请求：交给命令中枢基于统一快照构建并弹出（与 2D 视口一致）
@@ -361,64 +370,30 @@ void Workbench3D::bind3DRenderSignals(ServiceOwner& own)
         &Workbench3D::on3DContextMenuRequested);
 }
 
-/// 绑定光标世界坐标信号
-void Workbench3D::bind3DCursorSignal()
-{
-    auto* renderWidget = m_services3D.renderWidget;
-    connect(renderWidget,
-        &RenderWidget3D::sigCursorWorldPosition,
-        [stateCenter = m_uiState.stateCenter](float x, float y, float z, bool valid) {
-            if (!stateCenter)
-            {
-                return;
-            }
-            QVariantMap meta;
-            if (valid)
-            {
-                meta[QStringLiteral("positionText")] =
-                    QObject::tr("Position: (%1, %2, %3) mm").arg(x, 0, 'f', 2).arg(y, 0, 'f', 2).arg(z, 0, 'f', 2);
-            }
-            else
-            {
-                meta[QStringLiteral("positionText")] = QObject::tr("Position: -");
-            }
-            stateCenter->setMetadata(meta);
-        });
-}
-
 /// 绑定选中变化信号
+/// 不再往 metadata 写 positionText / 3d_selCount / 3d_modelName 等无消费者的镜像。
 void Workbench3D::bind3DSelectionSignal()
 {
     auto* renderWidget = m_services3D.renderWidget;
     // 跨 DLL 安全：信号参数改为 POD 指针数组
-    connect(renderWidget,
+    auto conn = connect(renderWidget,
         &RenderWidget3D::sigSelectionChanged,
-        [stateCenter = m_uiState.stateCenter](const Eg::SyMeshEntity** entities, int count) {
-            if (!stateCenter)
+        [this, stateCenter = m_uiState.stateCenter](const Eg::SyMeshEntity** entities, int count) {
+            if (stateCenter)
             {
-                return;
+                if (count > 0)
+                {
+                    stateCenter->setSelectionContext(
+                        QObject::tr("3D-Viewport"), QObject::tr("%1 entities selected").arg(count));
+                }
+                else
+                {
+                    stateCenter->setSelectionContext(QObject::tr("3D-Viewport"), QStringLiteral("none"));
+                }
             }
-            QString modelName;
-            if (count > 0 && entities && entities[0])
-            {
-                modelName = QString::number(entities[0]->id);
-            }
-
-            QVariantMap meta;
-            meta[QStringLiteral("3d_selCount")] = count;
-            meta[QStringLiteral("3d_modelName")] = modelName;
-
-            if (count > 0)
-            {
-                stateCenter->setSelectionContext(
-                    QObject::tr("3D-Viewport"), QObject::tr("%1 entities selected").arg(count));
-            }
-            else
-            {
-                stateCenter->setSelectionContext(QObject::tr("3D-Viewport"), QStringLiteral("none"));
-            }
-            stateCenter->setMetadata(meta);
+            schedulePropertiesPanelRefresh3D();
         });
+    m_workbenchConnections.push_back(conn);
 }
 
 /// 创建全局删除快捷键
@@ -512,12 +487,14 @@ QMenu* Workbench3D::buildConfiguredContextMenu(const QString& contextMenuId)
         return nullptr;
     }
 
-    // 分发器直接用工作台自身（UiWorkbench 实现 IUiCommandDispatcher），
-    // 右键项与 3D 顶部菜单 / 工具栏共用同一条 dispatchCommand 路径。
-    // 不要在这里建局部适配器：UiLayoutBuilder 会把 dispatcher 裸指针捕进 QAction 的
-    // triggered 闭包，而菜单是在调用方 exec() 的 —— 本函数返回后栈帧即失效，
-    // 点「删除」时 dispatch 会打在已被 exec() 调用链覆写的栈内存上（必崩）。
-    return UiContextMenuService::instance().buildMenu(config, contextMenuId, this, m_services3D.renderWidget);
+    // 分发器统一取 WorkbenchMenuManager::commandDispatcher()（MenuDispatcher）：
+    // 与 3D 顶部菜单/工具栏共用同一条分发链，窗口级命令在右键里同样可用；
+    // 寿命随菜单管理器，闭包捕获的裸指针长期有效。
+    // 不要在这里建局部适配器：UiLayoutBuilder 把 dispatcher 裸指针捕进 QAction 的
+    // triggered 闭包，而菜单是在调用方 exec() 的 —— 局部对象出栈即悬垂。
+    auto* dispatcher = m_workbenchWindow ? m_workbenchWindow->menuManager()->commandDispatcher()
+                                         : static_cast<IUiCommandDispatcher*>(this);
+    return UiContextMenuService::instance().buildMenu(config, contextMenuId, dispatcher, m_services3D.renderWidget);
 }
 
 /// 步骤三：创建 CommandActionHub3D、注册命令、初始化菜单管理器和快捷键
@@ -770,7 +747,7 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
         auto* sceneDock = window.registerDockWidget(QObject::tr("Scene"), sharedPanel, Qt::LeftDockWidgetArea);
         if (sceneDock)
         {
-            sceneDock->setObjectName(QStringLiteral("SceneDock"));
+            sceneDock->setObjectName(UiDockIds::sceneQString());
             sceneDock->setMinimumWidth(180);
             sceneDock->setMaximumWidth(300);
         }
@@ -823,8 +800,10 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
     {
         m_sceneTree3DRefreshTimer = new QTimer(this);
         m_sceneTree3DRefreshTimer->setSingleShot(true);
-        m_sceneTree3DRefreshTimer->setInterval(150);
-        connect(m_sceneTree3DRefreshTimer, &QTimer::timeout, this, &Workbench3D::refreshSceneTree3D);
+        m_sceneTree3DRefreshTimer->setInterval(WorkbenchTiming::kSceneTreeDebounceMs);
+        connect(m_sceneTree3DRefreshTimer, &QTimer::timeout, this, [this]() {
+            applySceneTreeIncremental3D("debounce");
+        });
     }
 
     // 3D 导入完成后显式刷新一次树（导入会触发 markDataChanged → SceneMonitor ，
@@ -839,6 +818,90 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
     refreshSceneTree3D();
 }
 
+void Workbench3D::setupProperties3D(WorkbenchWindow& window)
+{
+    // 属性面板是可选 UI：配置驱动时可能不存在，因此先探测再绑定
+    auto* props = window.propertiesDock();
+    if (!props)
+    {
+        return;
+    }
+
+    props->setWorkbenchMode(PropertiesPanelWidget::WorkbenchMode::ThreeD);
+
+    // 属性被编辑后延迟重建模型，避免在内联编辑器提交过程中重入（与 2D 同语义）
+    auto conn = QObject::connect(props, &PropertiesPanelWidget::sigPropertyEdited, this, [this]() {
+        QTimer::singleShot(0, this, [this]() {
+            refreshPropertiesPanel3D();
+        });
+    });
+    m_workbenchConnections.push_back(conn);
+
+    refreshPropertiesPanel3D();
+}
+
+void Workbench3D::schedulePropertiesPanelRefresh3D()
+{
+    if (!m_propertiesRefreshTimer3D)
+    {
+        m_propertiesRefreshTimer3D = new QTimer(this);
+        m_propertiesRefreshTimer3D->setSingleShot(true);
+        m_propertiesRefreshTimer3D->setInterval(WorkbenchTiming::kPropertiesDebounceMs);
+        connect(m_propertiesRefreshTimer3D, &QTimer::timeout, this, [this]() {
+            refreshPropertiesPanel3D();
+        });
+    }
+    // 已在等待窗口内 → 不重启也不新起：尾包语义，窗口结束只跑一次最新状态
+    if (m_propertiesRefreshTimer3D->isActive())
+    {
+        return;
+    }
+    m_propertiesRefreshTimer3D->start();
+}
+
+void Workbench3D::refreshPropertiesPanel3D()
+{
+    if (!m_workbenchWindow)
+    {
+        return;
+    }
+    auto* props = m_workbenchWindow->propertiesDock();
+    if (!props)
+    {
+        return;
+    }
+
+    // 读取当前选中图元 id（数据来源：引擎场景 / SelectionManager）
+    std::vector<Eg::EntityId> entityIds;
+    if (m_services3D.renderWidget)
+    {
+        const auto& selected = m_services3D.renderWidget->selectionManager().getSelectedEntities();
+        entityIds.reserve(selected.size());
+        for (const Eg::SyMeshEntity* e : selected)
+        {
+            if (e)
+            {
+                entityIds.push_back(e->id);
+            }
+        }
+    }
+    else if (m_sceneManager3D)
+    {
+        m_sceneManager3D->forEachSelectedEntityId(
+            [](Eg::EntityId id, void* ctx) {
+                static_cast<std::vector<Eg::EntityId>*>(ctx)->push_back(id);
+            },
+            &entityIds);
+    }
+
+    // 创建编辑会话（算法层）：持有图元 id，负责按需解析图元、应用修改
+    auto session = std::make_shared<EntityPropertyEditSession3D>(m_sceneManager3D, std::move(entityIds));
+
+    // 数据/算法产物推送给 UI 层：模型用于展示，会话作为编辑目标。
+    props->setEditTarget(session);
+    props->setPropertyModel(session->buildModel());
+}
+
 void Workbench3D::refreshSceneTree3D()
 {
     if (!m_scenePanel3D)
@@ -847,7 +910,13 @@ void Workbench3D::refreshSceneTree3D()
     }
     m_scenePanel3D->setMode3D(SceneTreeBuilder3D::build(m_sceneManager3D));
     // 记录本轮重建时的结构签名：之后的 sceneChanged 只要签名没变就不必再建
+    m_lastSceneTree3DEntityCount = m_sceneManager3D ? m_sceneManager3D->getEntityCount() : 0;
     m_lastSceneTree3DStructureRevision = m_sceneManager3D ? m_sceneManager3D->structureRevision() : 0;
+    // 全量重建已消费掉当前全部变更：推进增量游标，之后增量只读真正的新变更
+    if (m_sceneManager3D)
+    {
+        m_sceneTree3DCursor = m_sceneManager3D->currentRevision();
+    }
 }
 
 void Workbench3D::refreshSceneTree3DIfNeeded()
@@ -860,14 +929,16 @@ void Workbench3D::refreshSceneTree3DIfNeeded()
     // 结构签名只认图元增删：可见性 / 锁定 / 几何变换都不推进它。
     // 行集合不变时重建（build + 换模型 + 全表 dataChanged）纯属白做功，
     // 而拖动、显隐切换、批量锁定这些高频操作都会触发 sceneChanged。
+    const std::size_t count = m_sceneManager3D->getEntityCount();
     const uint64_t structureRev = m_sceneManager3D->structureRevision();
-    if (structureRev == m_lastSceneTree3DStructureRevision)
+    if (count == m_lastSceneTree3DEntityCount && structureRev == m_lastSceneTree3DStructureRevision)
     {
         return;
     }
 
     // 先记下已消费的签名再启表：否则连续 sceneChanged 每次都会重启单次定时器，
     // 重建被无限推迟；重建函数结束后会把签名再刷成最新值。
+    m_lastSceneTree3DEntityCount = count;
     m_lastSceneTree3DStructureRevision = structureRev;
 
     if (m_sceneTree3DRefreshTimer)
@@ -877,8 +948,130 @@ void Workbench3D::refreshSceneTree3DIfNeeded()
     }
     else
     {
-        refreshSceneTree3D();
+        applySceneTreeIncremental3D();
     }
+}
+
+void Workbench3D::applySceneTreeIncremental3D(const char* src)
+{
+    if (!m_scenePanel3D || !m_sceneManager3D)
+    {
+        return;
+    }
+
+    // 重入保护：分类/追加期间会触发嵌套场景通知；嵌套读到的游标仍是旧值，
+    // 会把同一批变更再扫一遍。外层正在消费这批，嵌套延后到下一轮事件循环重跑。
+    if (m_sceneTree3DIncrementalBusy)
+    {
+        QTimer::singleShot(0, this, [this]() { applySceneTreeIncremental3D("deferred"); });
+        return;
+    }
+    struct BusyGuard
+    {
+        bool& flag;
+        explicit BusyGuard(bool& f)
+            : flag(f)
+        {
+            flag = true;
+        }
+        ~BusyGuard() { flag = false; }
+    } busyGuard(m_sceneTree3DIncrementalBusy);
+
+    Eg::SceneChangeSet set;
+    if (!m_sceneManager3D->readChanges(m_sceneTree3DCursor, set))
+    {
+        // 游标太旧或日志截断：推进游标后必须全量重建
+        m_sceneTree3DCursor = m_sceneManager3D->currentRevision();
+        refreshSceneTree3D();
+        return;
+    }
+    m_sceneTree3DCursor = set.toRevision;
+
+    if (set.changes.empty())
+    {
+        // 无新变更：签名一致则无事可做；不一致（如手动启动的定时器）则全量刷新
+        const std::size_t count = m_sceneManager3D->getEntityCount();
+        if (count != m_lastSceneTree3DEntityCount ||
+            m_sceneManager3D->structureRevision() != m_lastSceneTree3DStructureRevision)
+        {
+            refreshSceneTree3D();
+        }
+        return;
+    }
+
+    // 纯几何/样式/选中变更不影响 3D 树行集合，消费掉即可
+    bool hasTreeRelevant = false;
+    for (const Eg::SceneChange& ch : set.changes)
+    {
+        if (Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::Added) ||
+            Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::Removed) ||
+            Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::StructureChanged) ||
+            Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::VisibilityChanged) ||
+            Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::LockChanged))
+        {
+            hasTreeRelevant = true;
+            break;
+        }
+    }
+    if (!hasTreeRelevant)
+    {
+        return;
+    }
+
+    // 只有「全部是 Added 且图元当前仍在场景」才可增量；出现 Removed/可见性/锁定等
+    // 一律回退全量。撤销会同时置 Added+Removed，必须按「当前是否在场景」判定。
+    std::unordered_set<uint64_t> selectedSet;
+    bool selectedInited = false;
+    QList<SceneTreeNode3D> added;
+    added.reserve(static_cast<int>(set.changes.size()));
+    bool hasNonAdd = false;
+    for (const Eg::SceneChange& ch : set.changes)
+    {
+        if (!Eg::hasSceneChangeKind(ch.kinds, Eg::SceneChangeKind::Added))
+        {
+            hasNonAdd = true;
+            break;
+        }
+        auto* mesh = m_sceneManager3D->findMeshById(ch.entityId);
+        if (!mesh)
+        {
+            hasNonAdd = true;
+            break;
+        }
+        if (!selectedInited)
+        {
+            m_sceneManager3D->forEachSelectedEntityId(
+                [](Eg::EntityId id, void* ctx) {
+                    static_cast<std::unordered_set<uint64_t>*>(ctx)->insert(id);
+                },
+                &selectedSet);
+            selectedInited = true;
+        }
+        const bool isSelected = selectedSet.count(ch.entityId) > 0;
+        added.append(SceneTreeBuilder3D::buildMeshNode(mesh, isSelected));
+    }
+
+    if (hasNonAdd)
+    {
+        refreshSceneTree3D();
+        return;
+    }
+    if (added.isEmpty())
+    {
+        return;
+    }
+
+    m_scenePanel3D->appendTopLevelNodes(added);
+
+    // 与 refreshSceneTree3D() 尾部一致地更新结构签名（游标已在上方推进）
+    m_lastSceneTree3DEntityCount = m_sceneManager3D->getEntityCount();
+    m_lastSceneTree3DStructureRevision = m_sceneManager3D->structureRevision();
+
+    SY_DEBUGF("[Workbench3D] scene tree incremental src=%s: +%lld nodes entities=%zu structRev=%llu",
+        src ? src : "misc",
+        static_cast<long long>(added.size()),
+        m_lastSceneTree3DEntityCount,
+        static_cast<unsigned long long>(m_lastSceneTree3DStructureRevision));
 }
 
 void Workbench3D::syncSceneTreeSelection3D()
@@ -936,6 +1129,7 @@ void Workbench3D::applySceneTreeSelection3D(const QStringList& ids)
     // gatherGeometry() 遍历所有图元
     m_services3D.renderWidget->requestSceneUpdate();
     syncSceneTreeSelection3D();
+    schedulePropertiesPanelRefresh3D();
 }
 
 void Workbench3D::toggleEntityVisibility3D(const QString& id, bool visible)
@@ -959,6 +1153,7 @@ void Workbench3D::toggleEntityVisibility3D(const QString& id, bool visible)
         {
             m_scenePanel3D->refreshRows({ static_cast<qint64>(mesh->id) });
         }
+        schedulePropertiesPanelRefresh3D();
     }
 }
 
@@ -984,6 +1179,7 @@ void Workbench3D::renameEntity3D(const QString& id, const QString& newName)
         {
             m_scenePanel3D->refreshRows({ static_cast<qint64>(mesh->id) });
         }
+        schedulePropertiesPanelRefresh3D();
     }
 }
 
@@ -1176,6 +1372,21 @@ void Workbench3D::deactivate()
     // 场景树面板随窗口销毁，清空引用避免悬空
     m_scenePanel3D = nullptr;
 
+    // 本工作台建立的连接整批断开（属性面板编辑回刷等），避免切台后回调命中悬空对象
+    for (auto& conn : m_workbenchConnections)
+    {
+        disconnect(conn);
+    }
+    m_workbenchConnections.clear();
+
+    // 属性面板节流定时器：切台后 propertiesDock 已销毁，挂起的回调必须取消
+    if (m_propertiesRefreshTimer3D)
+    {
+        m_propertiesRefreshTimer3D->stop();
+        m_propertiesRefreshTimer3D->deleteLater();
+        m_propertiesRefreshTimer3D = nullptr;
+    }
+
     // 清理 3D 场景树防抖定时器
     if (m_sceneTree3DRefreshTimer)
     {
@@ -1183,7 +1394,10 @@ void Workbench3D::deactivate()
         m_sceneTree3DRefreshTimer->deleteLater();
         m_sceneTree3DRefreshTimer = nullptr;
     }
+    m_lastSceneTree3DEntityCount = 0;
     m_lastSceneTree3DStructureRevision = 0;
+    m_sceneTree3DCursor = 0;
+    m_sceneTree3DIncrementalBusy = false;
 
     // 2) 先销毁 3D 主窗口包装对象。
     //    它会持有大量 QAction / signal-slot / UI 状态引用，必须先于服务释放。

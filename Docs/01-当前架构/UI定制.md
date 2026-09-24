@@ -153,7 +153,7 @@ set(SANYI_DEFAULT_CLIENT_ID "san_yi" CACHE STRING "Default UI client ID written 
 ```cpp
 // Main/Src/UI/ClientConfig/UiBuiltinPanels.cpp
 void registerBuiltinUiPanels(UiPanelRegistry& registry) {
-    registry.registerPanel("SceneTreePanel",   [](QWidget* p){ return new SceneTreePanel2D(p); });
+    registry.registerPanel("SceneTreePanel",   [](QWidget* p){ return new SceneTreePanel(p); });
     registry.registerPanel("PropertiesPanel",  [](QWidget* p){ return new PropertiesPanelWidget(p); });
     registry.registerPanel("ClientIndicator",  ...);   // 状态栏槽位
     registry.registerPanel("LicenseIndicator", ...);
@@ -184,10 +184,10 @@ void registerBuiltinUiPanels(UiPanelRegistry& registry) {
 
 
 **场景树面板（数据/算法/UI 分离，UI 可定制/可缺失）**：
-- 2D 场景树：`SceneTreeBuilder2D`（算法层，读 Engine2D 场景）→ `SceneTreeModel2D`（数据层）→ `SceneTreePanel2D`（UI，由 `WorkbenchLayoutManager` 经面板注册表创建）。
-- 3D 场景树：`SceneTreeBuilder3D`（算法层，读 `SceneManager3D`）→ `SceneTreeModel3D`（数据层）→ `SceneTreePanel3D`（UI，由 `Workbench3D::setupSceneTree3D` 直接创建并注册 dock）。
+- 场景树：`SceneTreeBuilder2D`（算法层，读 Engine2D 场景）→ `SceneTreeModel2D`（数据层）→ 统一 `SceneTreePanel`（UI，由 `WorkbenchLayoutManager` 经面板注册表创建；3D 走 `setMode3D` 切换数据源）。
+- 3D 场景树：`SceneTreeBuilder3D`（算法层，读 `SceneManager3D`）→ `SceneTreeModel3D`（数据层）→ 统一 `SceneTreePanel`（UI，由 `Workbench3D::setupSceneTree3D` 直接创建并注册 dock；与 2D 共享同一控件，按 `Mode3D` 切换数据源）。
 - 两套面板只消费各自纯数据模型并发出选择/可见性/重命名信号，业务逻辑不感知 UI；面板可替换/移除/定制，不影响算法层与数据层。
-- 3D 树刷新时机：导入时 `SceneManager3D::markDataChanged()` 触发 `SceneMonitor3D::sceneChanged` → `Workbench3D::refreshSceneTree3D`；另在 `ImportService::importFinished` 显式兜底一次。
+- 3D 树刷新时机：导入/增删时 `SceneMonitor3D::sceneChanged` → `Workbench3D::refreshSceneTree3DIfNeeded`（structureRevision 门控 + 150ms 防抖）→ `applySceneTreeIncremental3D`（纯新增 `appendTopLevelNodes`，否则回退 `refreshSceneTree3D`）；另在 `ImportService::importFinished` 显式兜底一次。
 - 算法层单测：`Main/Src/UI/Test/SceneTreeBuilder3DTests.cpp`（空场景/节点填充/名称回退/选中计数/`selectedIds`）。
 
 ### 3.4 图标
@@ -564,7 +564,7 @@ UiContextMenuService::instance().registerDynamicSection(
 > 适配器是**栈对象**，因此弹出后必须在同一作用域内 `delete menu`，
 > **不能用 `deleteLater()`** —— 否则 dispatcher 已析构而菜单还在。
 
-> 尚未迁移的右键入口：`UiSceneTreePanel2D` 的场景树右键仍是硬编码。
+> 尚未迁移的右键入口：`SceneTreePanel` 的场景树右键仍是硬编码。
 > 需要定制时按同样的 `contextMenus` + `dynamicSections` 模式迁移。
 
 ### 3.13 功能授权分级（`feature`）
@@ -823,7 +823,7 @@ if (clientId == QLatin1String("client_a")) {
 | 工作台过滤 | ✅ 已具备 | 保持 |
 | 面板/槽位工厂注册 | ✅ 已收口到 `registerBuiltinUiPanels()` | 保持 |
 | 状态栏配置化 | ✅ 已具备（`statusBar.items[]`） | 保持 |
-| 右键菜单配置化 + 动态段 | ✅ 画布右键已迁移 | 场景树右键（`UiSceneTreePanel2D`）待迁移 |
+| 右键菜单配置化 + 动态段 | ✅ 画布右键已迁移 | 场景树右键（`SceneTreePanel`）待迁移 |
 | License → UI 授权闸门 | ✅ 已接线（`UiFeatureGate`） | 补 `feature` 命名规范与授权矩阵文档 |
 | 客户专属 C++ 目录 | ❌ 尚无图元 | 新增 `custom/<clientId>/` 目录 + 运行期注册约定 |
 | 配置校验测试 | ⚠️ 部分 | 补“命令 ID 注册检查”“feature 拼写检查”单测 |

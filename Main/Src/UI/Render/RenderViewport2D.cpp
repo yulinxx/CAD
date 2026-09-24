@@ -480,7 +480,8 @@ void RenderViewport2D::initializeTools()
     ctx.onEntityDoubleClick = [this](Eg::SyEntity* entity) {
         if (entity)
         {
-            EntityPropertiesDialog2D::showDialog(this, entity);
+            // 传入 editService：对话框 Apply 走 EntityPropertyEditSession2D（与侧栏同一撤销语义）
+            EntityPropertiesDialog2D::showDialog(this, entity, m_document ? m_document->editService() : nullptr);
         }
     };
     ctx.gridSnapManager = m_gridSnapManager.get();

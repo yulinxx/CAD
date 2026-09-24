@@ -148,7 +148,6 @@ void DefaultInteractionDispatcher::syncCommandFinishState()
     QVariantMap meta = m_stateCenter->metadata();
     meta.remove(QStringLiteral("commandId"));
     meta.remove(QStringLiteral("commandType"));
-    meta.insert(QStringLiteral("statusPrompt"), readyPrompt());
     m_stateCenter->setMetadata(meta);
 
     m_activeCommandId.clear();

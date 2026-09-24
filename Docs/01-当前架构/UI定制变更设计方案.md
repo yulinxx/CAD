@@ -891,7 +891,7 @@ cmake --build build_client_b
 
 - ❌ 不需要创建 C++ 类
 - ❌ 不需要修改 `WorkbenchWindow.cpp`
-- ❌ 不需要修改 `UiWorkbench.cpp`
+- ❌ 不需要修改 `Workbench2D.cpp` / `Workbench3D.cpp`
 - ❌ 不需要修改任何 CMake if/else 分支
 
 ### 9.3 新增客户 vs 修改菜单的对比

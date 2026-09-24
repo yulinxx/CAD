@@ -6,7 +6,7 @@
  *
  * 职责：读取 Engine3D 场景（SceneManager3D），生成 SceneTreeModel3D
  * 纯数据模型。本层封装所有引擎访问细节，不依赖任何 UI 控件；UI 层
- * （SceneTreePanel3D）只消费生成的数据模型。
+ * （SceneTreePanel）只消费生成的数据模型。
  *
  * 与 SceneTreeBuilder2D 同范式：static 纯函数，无状态，便于单测与替换。
  */
@@ -31,7 +31,6 @@ public:
     /// 查询引擎场景当前选中的图元 ID 集合
     static QSet<QString> selectedIds(Eg::SceneManager3D* scene);
 
-private:
-    /// 将单个网格图元转为数据节点（selected 由场景选择列表提供，非图元标志位）
+    /// 将单个网格图元转为数据节点（增量追加用；selected 由调用方按场景选择集提供）
     static SceneTreeNode3D buildMeshNode(const struct Eg::SyMeshEntity* mesh, bool selected);
 };
