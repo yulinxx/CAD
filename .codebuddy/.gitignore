@@ -1,1 +1,14 @@
+# .codebuddy
 db/
+
+# ---- OS 系统临时文件 ----
+# Windows
+Thumbs.db
+desktop.ini
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+# Linux
+*~
+
