@@ -12,11 +12,17 @@ build_*/
 out/
 cmake-build-*/
 .github/
+*.dir/
+*_autogen/
+x64/
+bin_Qt6/
+Main/BuildConfig.h
 
 # ---- CMake 中间文件 ----
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
+*_version.rc
 install_manifest.txt
 compile_commands.json
 # [A1 修复] 仅忽略用户私有配置和 CMake 生成的 .cmake，不排除公共构建逻辑
@@ -204,6 +210,7 @@ SVGnest/
 Archive/
 RenderEngine/
 scripts/
+Tools/
 # [A7 修复] .github/ 工作流必须入库，删除此忽略规则
 
 # ---- 测试运行产生的落地文件 ----

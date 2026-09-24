@@ -44,7 +44,6 @@ QString uiLocalizedLabel(const QString& label, const QString& fallbackId)
         }
     }
 
-    // 3. 无翻译时返回 fallback 或原文
-    const QString result = fallbackId.isEmpty() ? label : fallbackId;
-    return result;
+    // 3. 无翻译时返回原始 label
+    return label;
 }
