@@ -9,11 +9,28 @@
 # ============================================================================
 #                         📌 常用配置（在此修改）
 # ============================================================================
-# vcpkg 根目录
-set(VCPKG_DIR "C:/Users/xx/vcpkg")
 
-# Qt 安装目录
-set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.11.2/msvc2022_64")
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  [1] Qt6 路径（根据操作系统自动选择）
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+if(WIN32)
+    set(Qt_INSTALL_DIR "C:/Qt/6.11.0/msvc2022_64/" CACHE PATH "Qt6 Windows")
+elseif(APPLE)
+    set(Qt_INSTALL_DIR "$ENV{HOME}/Qt/6.11.1/macos/" CACHE PATH "Qt6 macOS")
+elseif(UNIX)
+    set(Qt_INSTALL_DIR "$ENV{HOME}/Install/Qt/6.11.1/gcc_64/" CACHE PATH "Qt6 Linux")
+endif()
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  [2] vcpkg 路径（根据操作系统自动选择）
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+if(WIN32)
+    set(VCPKG_DIR "C:/vcpkg/" CACHE PATH "vcpkg Windows")
+elseif(APPLE)
+    set(VCPKG_DIR "$ENV{HOME}/vcpkg/" CACHE PATH "vcpkg macOS")
+elseif(UNIX)
+    set(VCPKG_DIR "$ENV{HOME}/Install/vcpkg/" CACHE PATH "vcpkg Linux")
+endif()
 
 # 构建类型: Debug | Release | RelWithDebInfo | MinSizeRel
 set(CMAKE_BUILD_TYPE "Release")
@@ -152,8 +169,8 @@ if(SANYI_UNITY_BUILD)
     set(CMAKE_UNITY_BUILD ON)
     # Unity 构建的块大小，可根据内存调整
     set(CMAKE_UNITY_BUILD_BATCH_SIZE 16)
-    # 默认排除 Objective-C++，避免与 C++ 混在一个 unity 块里导致编译错误
-    list(APPEND CMAKE_UNITY_BUILD_SUPPORTED_SOURCE_EXTENSIONS ".mm")
+    # 注意：.mm 不得进 unity batch —— 各模块对 .mm 设 SKIP_UNITY_BUILD_INCLUSION
+    # （见 UI/Common、Main、Renderx 的 CMakeLists），勿用无效的 *_EXCLUDED_* 变量。
 endif()
 
 # --------------------------------------------------------------------
