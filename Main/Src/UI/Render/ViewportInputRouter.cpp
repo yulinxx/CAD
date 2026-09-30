@@ -604,20 +604,11 @@ QRectF ViewportInputRouter::inputMethodCursorRect() const
 
 void ViewportInputRouter::handleContextMenu(QContextMenuEvent* event)
 {
-    if (m_interactionDispatcher && m_interactionDispatcher->hasActiveCommand())
-    {
-        m_interactionDispatcher->cancel();
-        event->accept();
-        return;
-    }
+    // 交互分发器的 begin/submit/cancel 当前无生产调用方，hasActiveCommand() 恒 false。
+    // 取消语义已在各工具层 (SelectionTool/DrawTools) 的 onMousePress/onMouseMove 中实现。
     event->ignore();
 }
 
-bool ViewportInputRouter::hasActiveCommand() const
-{
-    // 视口右键前判断是否处于绘制/编辑命令中：处于命令则取消当前命令而不弹菜单
-    return m_interactionDispatcher && m_interactionDispatcher->hasActiveCommand();
-}
 
 // ==================== 坐标转换 ====================
 
@@ -694,13 +685,8 @@ bool ViewportInputRouter::dispatchMousePressToInput(const QPointF& worldPos, QMo
         return false;
     }
 
-    if (m_interactionDispatcher && m_interactionDispatcher->hasActiveCommand() &&
-        m_interactionDispatcher->dispatchEvent(
-            { InteractionEventType::MouseDown, static_cast<int>(worldPos.x()), static_cast<int>(worldPos.y()), -1 }))
-    {
-        event->accept();
-        return true;
-    }
+    // 交互分发器的 begin/submit/cancel 当前无生产调用方，hasActiveCommand() 恒 false。
+    // 直接分发给活动工具。
 
     if (dispatchToActiveTool(worldPos, event, &ITool::onMousePress))
     {
@@ -721,14 +707,8 @@ bool ViewportInputRouter::dispatchRightButtonPressToInput(const QPointF& worldPo
         return false;
     }
 
-    // 交互分发器有活跃命令时，右键视为取消该命令
-    if (m_interactionDispatcher && m_interactionDispatcher->hasActiveCommand() &&
-        m_interactionDispatcher->dispatchEvent(
-            { InteractionEventType::MouseDown, static_cast<int>(worldPos.x()), static_cast<int>(worldPos.y()), -1 }))
-    {
-        event->accept();
-        return true;
-    }
+    // 交互分发器的 begin/submit/cancel 当前无生产调用方，hasActiveCommand() 恒 false。
+    // 绘制态取消已在各工具 onMousePress/onMouseMove 中实现。
 
     if (m_toolManager)
     {
@@ -763,13 +743,8 @@ bool ViewportInputRouter::dispatchRightButtonPressToInput(const QPointF& worldPo
 
 bool ViewportInputRouter::dispatchMouseMoveToInput(const QPointF& worldPos, QMouseEvent* event)
 {
-    if (m_interactionDispatcher && m_interactionDispatcher->hasActiveCommand() &&
-        m_interactionDispatcher->dispatchEvent(
-            { InteractionEventType::MouseMove, static_cast<int>(worldPos.x()), static_cast<int>(worldPos.y()), -1 }))
-    {
-        event->accept();
-        return true;
-    }
+    // 交互分发器的 begin/submit/cancel 当前无生产调用方，hasActiveCommand() 恒 false。
+    // 直接分发给活动工具。
 
     return dispatchToActiveTool(worldPos, event, &ITool::onMouseMove);
 }
@@ -781,13 +756,8 @@ bool ViewportInputRouter::dispatchMouseReleaseToInput(const QPointF& worldPos, Q
         return false;
     }
 
-    if (m_interactionDispatcher && m_interactionDispatcher->hasActiveCommand() &&
-        m_interactionDispatcher->dispatchEvent(
-            { InteractionEventType::MouseUp, static_cast<int>(worldPos.x()), static_cast<int>(worldPos.y()), -1 }))
-    {
-        event->accept();
-        return true;
-    }
+    // 交互分发器的 begin/submit/cancel 当前无生产调用方，hasActiveCommand() 恒 false。
+    // 直接分发给活动工具。
 
     if (dispatchToActiveTool(worldPos, event, &ITool::onMouseRelease))
     {
@@ -849,32 +819,9 @@ bool ViewportInputRouter::handlePanMouseRelease(QMouseEvent* event)
 
 bool ViewportInputRouter::handleInteractionDispatcherKeyPress(QKeyEvent* event)
 {
-    if (!m_interactionDispatcher || !m_interactionDispatcher->hasActiveCommand())
-    {
-        return false;
-    }
-
-    if (event->key() != Qt::Key_Escape && event->key() != Qt::Key_Return && event->key() != Qt::Key_Enter)
-    {
-        if (m_interactionDispatcher->dispatchEvent({ InteractionEventType::KeyPress, -1, -1, event->key() }))
-        {
-            event->accept();
-            return true;
-        }
-    }
-
-    if (event->key() == Qt::Key_Escape)
-    {
-        m_interactionDispatcher->cancel();
-        event->accept();
-        return true;
-    }
-    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)
-    {
-        m_interactionDispatcher->submit();
-        event->accept();
-        return true;
-    }
+    // 交互分发器的 begin/submit/cancel 当前无生产调用方，hasActiveCommand() 恒 false。
+    // ESC/Enter 确认/取消语义已在各工具层实现。
+    Q_UNUSED(event);
     return false;
 }
 

@@ -912,13 +912,8 @@ void RenderViewport2D::keyPressEvent(QKeyEvent* event)
 
 void RenderViewport2D::contextMenuEvent(QContextMenuEvent* event)
 {
-    // 处于交互命令（如绘制）中时，交给输入路由取消当前命令并忽略菜单
-    if (m_inputRouter && m_inputRouter->hasActiveCommand())
-    {
-        m_inputRouter->handleContextMenu(event);
-        return;
-    }
-    // 否则通知上层（Workbench）基于命令中枢构建并弹出右键菜单，实现选择/锁定的实时联动
+    // 交互分发器的 begin/submit/cancel 当前无生产调用方，hasActiveCommand() 恒 false。
+    // 直接通知上层基于命令中枢构建并弹出右键菜单。
     emit contextMenuRequested(event);
 }
 
