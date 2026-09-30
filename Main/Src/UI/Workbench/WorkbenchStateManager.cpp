@@ -322,7 +322,7 @@ void WorkbenchStateManager::resetWorkbenchTransientState()
     if (m_stateCenter)
     {
         // 工作台切换收尾只做"清空/归零"，不在这里引入新的状态来源
-        m_stateCenter->setBusy(false);
+        m_stateCenter->popBusy();
         resetCommandStateToIdle();
         setWorkbenchTransitionState(QStringLiteral("reset"), QStringLiteral("Idle"));
         // metadata 采用读-改-写，保留 statusPrompt 等既有键

@@ -38,7 +38,7 @@ UiStateSnapshot UiStateCenter::snapshot() const
     state.currentSelectionSource = m_selectionSource;
     state.currentSelectionType = m_selectionType;
 
-    state.busy = m_busy;
+    state.busy = m_busyCount > 0;
     state.dirty = m_dirty;
     state.commandFailed = m_commandFailed;
     state.failedCommandId = m_failedCommandId;
@@ -140,7 +140,7 @@ int UiStateCenter::interactionKey() const
 
 bool UiStateCenter::busy() const
 {
-    return m_busy;
+    return m_busyCount > 0;
 }
 
 bool UiStateCenter::dirty() const
@@ -416,14 +416,43 @@ void UiStateCenter::setSelectionContext(const QString& source, const QString& te
 
 void UiStateCenter::setBusy(bool busy)
 {
-    if (m_busy == busy)
+    if (busy)
     {
+        pushBusy();
+    }
+    else
+    {
+        popBusy();
+    }
+}
+
+void UiStateCenter::pushBusy()
+{
+    if (m_busyCount == 0)
+    {
+        m_busyCount = 1;
+        emit busyChanged(true);
+        emit stateChanged();
+    }
+    else
+    {
+        ++m_busyCount;
+    }
+}
+
+void UiStateCenter::popBusy()
+{
+    if (m_busyCount <= 0)
+    {
+        SY_WARN("[UiStateCenter] popBusy without matching pushBusy, ignored");
         return;
     }
-
-    m_busy = busy;
-    emit busyChanged(busy);
-    emit stateChanged();
+    --m_busyCount;
+    if (m_busyCount == 0)
+    {
+        emit busyChanged(false);
+        emit stateChanged();
+    }
 }
 
 void UiStateCenter::setDirty(bool dirty)

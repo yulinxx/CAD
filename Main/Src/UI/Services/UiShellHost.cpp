@@ -102,7 +102,7 @@ void UiShellHost::initializeAndShow()
 
     if (m_stateCenter)
     {
-        m_stateCenter->setBusy(false);
+        m_stateCenter->popBusy();
     }
 
     m_mainWindow->show();

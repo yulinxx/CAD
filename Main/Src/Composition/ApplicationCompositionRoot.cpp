@@ -324,7 +324,14 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_importService->setBusyStateCallback([this](bool busy) {
         if (m_stateCenter)
         {
-            m_stateCenter->setBusy(busy);
+            if (busy)
+            {
+                m_stateCenter->pushBusy();
+            }
+            else
+            {
+                m_stateCenter->popBusy();
+            }
         }
     });
 
@@ -360,7 +367,14 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_exportService->setBusyStateCallback([this](bool busy) {
         if (m_stateCenter)
         {
-            m_stateCenter->setBusy(busy);
+            if (busy)
+            {
+                m_stateCenter->pushBusy();
+            }
+            else
+            {
+                m_stateCenter->popBusy();
+            }
         }
     });
 
@@ -382,7 +396,7 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     QObject::connect(m_importService.get(), &ImportService::importStarted, m_stateCenter.get(), [this](const QString&) {
         if (m_stateCenter)
         {
-            m_stateCenter->setBusy(true);
+            m_stateCenter->pushBusy();
         }
     });
 
@@ -392,7 +406,7 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
             {
                 return;
             }
-            m_stateCenter->setBusy(false);
+            m_stateCenter->popBusy();
             m_stateCenter->setStatusPrompt(result.success
                     ? QString("Import complete: %1 entities").arg(result.entityCount)
                     : QString("Import failed: %1").arg(result.message));
@@ -409,7 +423,7 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     QObject::connect(m_exportService.get(), &ExportService::exportStarted, m_stateCenter.get(), [this](const QString&) {
         if (m_stateCenter)
         {
-            m_stateCenter->setBusy(true);
+            m_stateCenter->pushBusy();
         }
     });
 
@@ -420,7 +434,7 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
                 return;
             }
 
-            m_stateCenter->setBusy(false);
+            m_stateCenter->popBusy();
 
             m_stateCenter->setStatusPrompt(result.success
                     ? QString("Export complete: %1 entities").arg(result.exportedEntityCount)

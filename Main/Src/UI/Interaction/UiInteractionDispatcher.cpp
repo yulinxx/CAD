@@ -138,7 +138,7 @@ void DefaultInteractionDispatcher::syncCommandFinishState()
         return;
     }
 
-    m_stateCenter->setBusy(false);
+    m_stateCenter->popBusy();
     m_stateCenter->setCurrentCommandPhase(QStringLiteral("idle"));
     m_stateCenter->setCurrentCommandId(QString());
     m_stateCenter->setCurrentCommandType(QString());
@@ -166,7 +166,7 @@ void DefaultInteractionDispatcher::begin(const QString& commandId)
         m_stateCenter->setStatusPrompt(statusPromptForCommand(commandId));
         m_stateCenter->clearInteractionState();
         m_stateCenter->setCurrentCommandPhase(QStringLiteral("active"));
-        m_stateCenter->setBusy(true);
+        m_stateCenter->pushBusy();
     }
 
     SY_DEBUGF("[InteractionDispatcher] Begin command: id=%s type=%s",

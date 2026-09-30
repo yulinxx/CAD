@@ -252,9 +252,13 @@ public slots:
     /// @param text 选择文本
     void setSelectionContext(const QString& source, const QString& text);
 
-    /// 设置繁忙状态
+    /// 设置繁忙状态（保留兼容：内部转为 push/pop）
     /// @param busy 是否繁忙
     void setBusy(bool busy);
+
+    /// 计数式繁忙：pushBusy/popBusy 配对使用，仅 0↔1 时触发信号
+    void pushBusy();
+    void popBusy();
 
     /// 设置脏状态
     /// @param dirty 是否有未保存更改
@@ -427,8 +431,8 @@ private:
     /// 当前选择类型
     QString m_selectionType{ QStringLiteral("none") };
 
-    /// 繁忙状态
-    bool m_busy{ false };
+    /// 繁忙状态（计数器：0=空闲，>0=繁忙）
+    int m_busyCount{ 0 };
     /// 脏状态
     bool m_dirty{ false };
     /// 命令是否处于失败状态（触发 UI 回退的标识）

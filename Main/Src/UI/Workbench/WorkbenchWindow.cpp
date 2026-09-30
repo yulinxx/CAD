@@ -1051,7 +1051,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     if (m_stateCenter)
     {
         saveLayoutSnapshot(previousWorkbenchId);
-        m_stateCenter->setBusy(true);
+        m_stateCenter->pushBusy();
         m_stateCenter->setMetadata({ { QStringLiteral("viewportStatus"), QStringLiteral("Switching") } });
     }
 
@@ -1166,7 +1166,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     // （避免两边各自演化的双写路径 —— 见《耦合性分析.md》D.1 双状态源收口）
     if (m_stateCenter)
     {
-        m_stateCenter->setBusy(false);
+        m_stateCenter->popBusy();
         m_stateCenter->setCurrentWorkbenchId(workbenchId);
     }
     if (m_stateManager)
