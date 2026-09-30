@@ -528,7 +528,6 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     // 注册，Settings 再解析活动工作台转发给 UiWorkbench::showSettingsDialog。
     // 注册必须发生在 registerAll 之前：OperationRegistryBase 用 try_emplace，先到先得，
     // 后注册的同名 Operation 会被忽略（HelpOperations3D 里已不再注册这两项）。
-    #if 0
     own.operationBus->registerOperation(std::make_unique<LambdaOperation3D>(
         OperationId3D::Help_Settings, [windowPtr = &window](OperationContext3D&, const OperationRequest3D&) {
             OperationResult3D result;
@@ -553,7 +552,6 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
             HelpDialogService::showShortcutsDialog(windowPtr, shortcutModel);
             return result;
         }));
-    #endif
 
     // 「导出视图」：3D 侧的 View_Capture。
     //
