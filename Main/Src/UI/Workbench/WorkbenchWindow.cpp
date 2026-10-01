@@ -1161,18 +1161,10 @@ if (m_stateCenter)
     // 工作台级状态栏 widget（坐标/选择/消息）由各 Workbench 在 attachToWindow 中
     // 创建并通过 mountStatusBar 挂载；配置驱动的框架级槽位已在第 6d 步重建。
     // 新工作台自行决定是否需要骨架停靠面板
-    setSkeletonDocksVisible(m_workbench->requiresSkeletonDocks());
-
-    // 3D 模式下 Scene / Properties 面板需要始终显示（即使 requiresSkeletonDocks() 为 false）
-    // 因为 SceneTreePanel / PropertiesPanel 是工作台自己的面板，不是 skeleton 的面板
-    if (!m_workbench->requiresSkeletonDocks())
-    {
-        if (auto* layoutMgr = m_layoutManager.get())
+    if (m_layoutManager)
         {
-            layoutMgr->setSceneDockVisible(true);
-            layoutMgr->setPropertiesDockVisible(true);
+            m_layoutManager->applyDockPolicy(m_workbench->requiresSkeletonDocks(), workbenchId);
         }
-    }
 
     // 业务状态只经 UiStateCenter 写入；windowState 是镜像，由 sync 从状态中心拉取
     // （避免两边各自演化的双写路径 —— 见《耦合性分析.md》D.1 双状态源收口）

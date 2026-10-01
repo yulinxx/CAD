@@ -222,7 +222,10 @@ Workbench3D::~Workbench3D()
 //   setup3DMenuAndShortcuts()      — 创建 CommandActionHub3D / 工具栏 / 状态栏 / 快捷键
 void Workbench3D::build3DWorkbenchUi(WorkbenchWindow& window)
 {
-    window.setSkeletonDocksVisible(false);
+    if (window.layoutManager())
+    {
+        window.layoutManager()->applyDockPolicy(false, QStringLiteral("3D"));
+    }
 
     create3DServices();
     setup3DViewportAndSignals(window);

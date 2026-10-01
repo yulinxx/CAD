@@ -627,25 +627,53 @@ void WorkbenchLayoutManager::setSceneDockVisible(bool visible)
     }
 }
 
-void WorkbenchLayoutManager::setPropertiesDockVisible(bool visible)
+void WorkbenchLayoutManager::applyDockPolicy(bool requiresSkeleton, const QString& workbenchId)
 {
-    QDockWidget* propsDock = m_panelState.rightDock.data();
-    if (!propsDock)
+    // 1. 骨架 Dock（左/右通用侧栏）按 requiresSkeleton 控制
+    if (m_panelState.leftDock)
     {
+        m_panelState.leftDock->setVisible(requiresSkeleton);
+    }
+    if (m_panelState.rightDock)
+    {
+        m_panelState.rightDock->setVisible(requiresSkeleton);
+    }
+
+    // 2. 3D 专属策略：Scene / Properties 即使在 requiresSkeleton=false 时也要显示
+    //    2D 下由 requiresSkeleton 控制（已在上方处理）
+    if (workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0)
+    {
+        // Scene Dock
+        QDockWidget* sceneDock = nullptr;
+        for (auto* dock : m_registeredDocks)
+        {
+            if (dock && dock->objectName() == UiDockIds::Scene)
+            {
+                sceneDock = dock;
+                break;
+            }
+        }
+        if (sceneDock)
+        {
+            sceneDock->setMinimumWidth(180);
+            sceneDock->setMaximumWidth(300);
+            sceneDock->setVisible(true);
+        }
+
+        // Properties Dock
+        QDockWidget* propsDock = nullptr;
         for (auto* dock : m_registeredDocks)
         {
             if (dock && dock->objectName() == UiDockIds::Properties)
             {
                 propsDock = dock;
-                m_panelState.rightDock = dock;
                 break;
             }
         }
-    }
-
-    if (propsDock)
-    {
-        propsDock->setVisible(visible);
+        if (propsDock)
+        {
+            propsDock->setVisible(true);
+        }
     }
 }
 
