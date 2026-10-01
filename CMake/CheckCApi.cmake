@@ -5,7 +5,10 @@
 #   每个对外 C ABI 模块至少提供
 #     - <Module>_GetVersionString()  （或等价命名，含 GetVersionString）
 #     - <Module>_GetVersion() / <Module>_GetAbiVersion() 之一
-#
+#     - 建议：<Module>_MAKE_VERSION 宏于公共头
+#   当前 C ABI 模块（含 extern "C" 导出）：
+#     CrashHandler、License、Log、Engraving、GeoModelCore、Vision、Nesting、Renderx
+#     Utility/UI3D 含占位导出，建议移出；Hardware/FileIO/Network/PythonHost 无 C ABI
 # 这里维护的是"含 C ABI 函数声明"的头（不是仅含导出宏的 *API.h）。
 # 新增 C ABI 模块时，把其函数头登记到下面的列表。
 # ============================================================================

@@ -5,7 +5,7 @@
 #include "UiPanelRegistry.h"
 #include "UiShortcutRegistry.h"
 
-#include "UI2D/Operation/CommandCatalog.h"
+
 #include "Log/SyLogger.h"
 
 #include <QAction>
@@ -93,24 +93,7 @@ namespace
         return UiLayoutBuilder::localizedLabel(label, id);
     }
 
-    QString resolveIconFromCatalog(const QString& commandId)
-    {
-        if (commandId.isEmpty())
-        {
-            return QString();
-        }
-        const OperationId opId = CommandCatalog::operationForCommandId(commandId);
-        if (opId != OperationId::None)
-        {
-            const CommandEntry2D* entry = CommandCatalog::findByOperation(opId);
-            if (entry && entry->iconResource)
-            {
-                return QString::fromUtf8(entry->iconResource);
-            }
-        }
-        return QString();
-    }
-}  // namespace
+    }  // namespace
 
 UiLayoutBuilder::UiLayoutBuilder(QMainWindow* window, IUiCommandDispatcher* dispatcher, UiPanelRegistry* panelRegistry)
     : m_window(window)
@@ -177,9 +160,9 @@ void UiLayoutBuilder::bindAction(QAction* action,
         action->setText(localizedLabel(text));
     }
     QString resolvedIcon = iconResource;
-    if (resolvedIcon.isEmpty())
+    if (resolvedIcon.isEmpty() && m_dispatcher)
     {
-        resolvedIcon = resolveIconFromCatalog(commandId);
+        resolvedIcon = m_dispatcher->commandIcon(commandId);
     }
     if (!resolvedIcon.isEmpty())
     {

@@ -18,22 +18,27 @@
 
 | 模块 | 当前定位 | 公开边界 |
 |------|----------|----------|
-| `Utility` | 基础工具库 | 内部 C++ DLL |
-| `Log` | 日志系统 | C 接口 + C++ 封装 |
-| `CrashHandler` | 崩溃捕获 | C++ DLL |
-| `License` | 许可校验 | C++ DLL |
+| `Utility` | 基础工具库 | 内部 C++ DLL（含占位 `extern "C"` 版本导出，建议移出） |
+| `Log` | 日志系统 | C ABI（`SyLog_GetVersion*` 等）+ C++ 封装 |
+| `CrashHandler` | 崩溃捕获 | C ABI（`CrashHandler_*` 系列） |
+| `License` | 许可校验 | C ABI（`License_*` 系列） |
 | `EngineCommon` | 引擎公共基类与通用类型 | 内部 C++ DLL |
 | `Engine2D` | 2D 几何与文档核心 | 内部 C++ DLL |
 | `Engine3D` | 3D 几何与场景核心 | 内部 C++ DLL |
 | `EnginePersistence` | 文档持久化 | 内部 C++ DLL |
-| `FileIO` | 导入导出 | 内部 C++ DLL |
-| `Renderx` / `RenderX` | 统一渲染入口 | C ABI |
+| `FileIO` | 导入导出 | 内部 C++ DLL（无 `extern "C"` 导出） |
+| `Renderx` / `RenderX` | 统一渲染入口 | C ABI（`rx*` 系列，`renderx.h` 为 C++ 头，待拆分纯 C 头） |
 | `RenderBridge` | 宿主与渲染 DLL 的桥接（会话生命周期、宿主回调、常驻几何仓与绘制列表、覆盖层容器） | 内部 C++ DLL |
 | `UICommon` | UI 公共能力 | 内部 C++ DLL |
 | `UI2D` | 2D 视图与交互 | 内部 C++ DLL |
-| `UI3D` | 3D 视图与交互 | 内部 C++ DLL |
+| `UI3D` | 3D 视图与交互 | 内部 C++ DLL（含占位 `extern "C"` 版本导出，建议移出） |
 | `Nesting` | 套料/排样 | C ABI（v2，`structSize` 前向兼容，见 [`套料算法.md`](../06-算法专题/套料算法.md) §8） |
-| `Hardware`、`Network`、`Vision`、`Engraving`、`GeoModelCore`、`PythonHost` | 扩展模块 | 按各自模块边界控制 |
+| `Hardware` | 硬件抽象 | 内部 C++ DLL（无 `extern "C"` 导出） |
+| `Network` | 网络通信 | 内部 C++ DLL |
+| `Vision` | 视觉相机 | C ABI（`Vision_*` 系列，`VisionServiceC.h`，待拆分纯 C 头） |
+| `Engraving` | 雕刻/切片 | C ABI（`Engraving_*` 系列，`EngravingCAPI.h`） |
+| `GeoModelCore` | 几何内核 | C ABI（`GeoModel_*` 系列，`GeoModelDLL.h`，待拆分纯 C 头） |
+| `PythonHost` / `PyBindCore` | Python 绑定 | 内部 C++ DLL / Python 模块 |
 
 
 ---

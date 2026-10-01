@@ -17,6 +17,15 @@ class IUiCommandDispatcher
 public:
     virtual ~IUiCommandDispatcher() = default;
 
+    /// 获取命令关联的图标路径（如 ":/ui/common/Icons/Edit/undo.svg"）
+    /// 仅用于构建 UI 时的图标回退，不影响命令分发逻辑。
+    /// 返回空字符串表示无默认图标。
+    virtual QString commandIcon(const QString& commandId) const
+    {
+        Q_UNUSED(commandId);
+        return QString();
+    }
+
     /// 命令是否已注册
     virtual bool isCommandRegistered(const QString& commandId) const = 0;
 

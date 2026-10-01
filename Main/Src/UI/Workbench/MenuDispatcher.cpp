@@ -150,3 +150,9 @@ void MenuDispatcher::dispatch(const QString& commandId, const QVariantMap& param
     //（此路径通常由 WorkbenchMenuManager::dispatchCommand 处理，MenuDispatcher 只做窗口级短路）
     SY_DEBUGF("[MenuDispatcher] unhandled commandId=%s (not window-level)", commandId.toUtf8().constData());
 }
+
+QString MenuDispatcher::commandIcon(const QString& commandId) const
+{
+    Q_UNUSED(commandId);
+    return QString();
+}
