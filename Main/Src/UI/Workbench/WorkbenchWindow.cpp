@@ -1048,12 +1048,12 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         workbenchId.toUtf8().constData());
 
     // 1: 保存旧工作台布局快照，标记繁忙
-    if (m_stateCenter)
-    {
-        saveLayoutSnapshot(previousWorkbenchId);
-        m_stateCenter->pushBusy();
-        m_stateCenter->setMetadata({ { QStringLiteral("viewportStatus"), QStringLiteral("Switching") } });
-    }
+if (m_stateCenter)
+        {
+            saveLayoutSnapshot(previousWorkbenchId);
+            m_stateCenter->pushBusy();
+            m_stateCenter->updateMetadata(QStringLiteral("viewportStatus"), QStringLiteral("Switching"));
+        }
 
     // 2: 停用旧工作台（释放资源、清理快捷键等）
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: deactivating old workbench");

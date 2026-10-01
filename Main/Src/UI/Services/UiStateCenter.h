@@ -276,7 +276,16 @@ public slots:
     /// @param state 刷新状态标识（"idle", "incremental", "full", "pending"）
     void setRefreshState(const QString& state);
 
-    /// 设置元数据
+    /// 设置元数据（合并语义：单键更新，保留其它键）
+    /// @param key 键
+    /// @param value 值
+    void updateMetadata(const QString& key, const QVariant& value);
+
+    /// 批量更新元数据（合并语义）
+    /// @param metadata 要合并的键值对
+    void updateMetadata(const QVariantMap& metadata);
+
+    /// 设置元数据（整包替换语义，**慎用：会清空其它键**）
     /// @param metadata 元数据映射
     void setMetadata(const QVariantMap& metadata);
 

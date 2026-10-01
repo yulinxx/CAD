@@ -266,7 +266,8 @@ void WorkbenchStateManager::clearSelectionState()
     // 清空选择相关状态，避免工作台切换后沿用旧选择文本
     m_stateCenter->setCurrentSelectionText(QString());
     m_stateCenter->setSelectionContext(QStringLiteral("none"), QString());
-    m_stateCenter->setMetadata({ { QStringLiteral("selectionSource"), QStringLiteral("none") },
+    // 同步更新 metadata 中的三个选择键（合并语义，不清空其它键）
+    m_stateCenter->updateMetadata({ { QStringLiteral("selectionSource"), QStringLiteral("none") },
         { QStringLiteral("selectionText"), QString() },
         { QStringLiteral("selectionType"), QStringLiteral("none") } });
 }

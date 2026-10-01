@@ -504,6 +504,90 @@ void UiStateCenter::clearCommandFailed()
     emit stateChanged();
 }
 
+void UiStateCenter::updateMetadata(const QString& key, const QVariant& value)
+{
+    if (m_metadata.value(key) == value)
+    {
+        return;
+    }
+    m_metadata[key] = value;
+
+    // 同步回读核心键（保持旧行为兼容，但仅更新变化的键）
+    if (key == QStringLiteral("statusPrompt"))
+    {
+        m_statusPrompt = value.toString();
+    }
+    else if (key == QStringLiteral("selectionSource"))
+    {
+        m_selectionSource = value.toString();
+    }
+    else if (key == QStringLiteral("selectionText"))
+    {
+        m_selectionText = value.toString();
+    }
+    else if (key == QStringLiteral("selectionType"))
+    {
+        m_selectionType = value.toString();
+    }
+    else if (key == QStringLiteral("commandOwner"))
+    {
+        m_commandOwner = value.toString();
+    }
+    else if (key == QStringLiteral("commandType"))
+    {
+        m_commandType = value.toString();
+    }
+
+    emit metadataChanged();
+    emit stateChanged();
+}
+
+void UiStateCenter::updateMetadata(const QVariantMap& metadata)
+{
+    bool changed = false;
+    for (auto it = metadata.constBegin(); it != metadata.constEnd(); ++it)
+    {
+        const QString& key = it.key();
+        const QVariant& value = it.value();
+        if (m_metadata.value(key) != value)
+        {
+            m_metadata[key] = value;
+            changed = true;
+
+            // 同步回读核心键
+            if (key == QStringLiteral("statusPrompt"))
+            {
+                m_statusPrompt = value.toString();
+            }
+            else if (key == QStringLiteral("selectionSource"))
+            {
+                m_selectionSource = value.toString();
+            }
+            else if (key == QStringLiteral("selectionText"))
+            {
+                m_selectionText = value.toString();
+            }
+            else if (key == QStringLiteral("selectionType"))
+            {
+                m_selectionType = value.toString();
+            }
+            else if (key == QStringLiteral("commandOwner"))
+            {
+                m_commandOwner = value.toString();
+            }
+            else if (key == QStringLiteral("commandType"))
+            {
+                m_commandType = value.toString();
+            }
+        }
+    }
+    if (changed)
+    {
+        emit metadataChanged();
+        emit stateChanged();
+    }
+}
+
 void UiStateCenter::setMetadata(const QVariantMap& metadata)
 {
     m_metadata = metadata;
