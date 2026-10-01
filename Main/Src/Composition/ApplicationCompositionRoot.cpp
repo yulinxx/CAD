@@ -408,15 +408,11 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
             }
             m_stateCenter->popBusy();
             m_stateCenter->setStatusPrompt(result.success
-                    ? QString("Import complete: %1 entities").arg(result.entityCount)
-                    : QString("Import failed: %1").arg(result.message));
-            QVariantMap meta = m_stateCenter->metadata();
-            meta["statusPrompt"] = result.success
-                ? QCoreApplication::translate("ApplicationCompositionRoot", "Import complete: %1 entities")
-                      .arg(result.entityCount)
-                : QCoreApplication::translate("ApplicationCompositionRoot", "Import failed: %1").arg(result.message);
-            meta["notificationType"] = result.success ? "info" : "error";
-            m_stateCenter->setMetadata(meta);
+                    ? QCoreApplication::translate("ApplicationCompositionRoot", "Import complete: %1 entities")
+                          .arg(result.entityCount)
+                    : QCoreApplication::translate("ApplicationCompositionRoot", "Import failed: %1").arg(result.message));
+            // notificationType 保留在 metadata 作为扩展（若有消费者）
+            m_stateCenter->updateMetadata(QStringLiteral("notificationType"), result.success ? QStringLiteral("info") : QStringLiteral("error"));
         });
 
     // 导出进度 → 状态中心
@@ -435,19 +431,11 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
             }
 
             m_stateCenter->popBusy();
-
             m_stateCenter->setStatusPrompt(result.success
-                    ? QString("Export complete: %1 entities").arg(result.exportedEntityCount)
-                    : QString("Export failed: %1").arg(result.message));
-
-            QVariantMap meta = m_stateCenter->metadata();
-            meta["statusPrompt"] = result.success
-                ? QCoreApplication::translate("ApplicationCompositionRoot", "Export complete: %1 entities")
-                      .arg(result.exportedEntityCount)
-                : QCoreApplication::translate("ApplicationCompositionRoot", "Export failed: %1").arg(result.message);
-            meta["notificationType"] = result.success ? "info" : "error";
-
-            m_stateCenter->setMetadata(meta);
+                    ? QCoreApplication::translate("ApplicationCompositionRoot", "Export complete: %1 entities")
+                          .arg(result.exportedEntityCount)
+                    : QCoreApplication::translate("ApplicationCompositionRoot", "Export failed: %1").arg(result.message));
+            m_stateCenter->updateMetadata(QStringLiteral("notificationType"), result.success ? QStringLiteral("info") : QStringLiteral("error"));
         });
 }
 

@@ -234,9 +234,9 @@ void UiStateCenter::setStatusPrompt(const QString& prompt)
     }
 
     m_statusPrompt = prompt;
-    m_metadata.insert(QStringLiteral("statusPrompt"), prompt);
+    // 不再写 metadata["statusPrompt"]：消除双写 + 回读环
+    // metadata 降级为纯扩展袋，不再镜像核心字段
     emit statusPromptChanged(prompt);
-    emit metadataChanged();
     emit stateChanged();
 }
 
@@ -613,10 +613,8 @@ void UiStateCenter::setMetadata(const QVariantMap& metadata)
     {
         m_commandType = m_metadata.value(QStringLiteral("commandType")).toString();
     }
-    if (m_metadata.contains(QStringLiteral("statusPrompt")))
-    {
-        m_statusPrompt = m_metadata.value(QStringLiteral("statusPrompt")).toString();
-    }
+    // 不再回读 statusPrompt：消除双向同步环
+    // metadata 降级为纯扩展袋，核心字段仅由各自 setter 维护
 
     emit metadataChanged();
     emit stateChanged();
