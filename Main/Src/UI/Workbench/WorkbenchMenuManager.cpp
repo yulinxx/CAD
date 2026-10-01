@@ -7,6 +7,7 @@
 #include "WorkbenchMenuManager.h"
 #include "WorkbenchWindow.h"
 #include "BuildConfig.h"
+#include "MenuDispatcher.h"
 
 #include "Log/SyLogger.h"
 #include "UI2D/Manager/UnitManager.h"
@@ -91,118 +92,6 @@ namespace
         return false;
     }
 }  // namespace
-
-// 配置驱动菜单的命令分发器：文件作用域定义，便于 WorkbenchMenuManager 以成员方式持有，
-// 保证 UiLayoutBuilder 在 QAction 触发回调中取到的分发器指针长期有效（不可用栈上临时对象）。
-struct MenuDispatcher final : public IUiCommandDispatcher
-{
-    WorkbenchMenuManager* self = nullptr;
-    UiWorkbench* workbench = nullptr;
-
-    // 工作台切换命令属于窗口级动作（不进入命令总线/工作台命令目录），
-    // 在分发器层面放行，保证 JSON 菜单中的 Switch to 2D/3D 始终可点击。
-    static bool isWorkbenchSwitchCommand(const QString& commandId)
-    {
-        return commandId == QLatin1String("view.switch_to_2d") || commandId == QLatin1String("view.switch_to_3d");
-    }
-
-    // 主题切换命令（theme.*）：与工作台切换同理，直接在分发器层面放行。
-    static bool isThemeCommand(const QString& commandId)
-    {
-        return commandId.startsWith(QLatin1String("theme."));
-    }
-
-    // 语言切换命令（language.*）：同上。语言由 LanguageManager 统一管理，
-    // 不注册在 2D/3D 命令目录中，需要分发器识别才可点击。
-    static bool isLanguageCommand(const QString& commandId)
-    {
-        return commandId.startsWith(QLatin1String("language."));
-    }
-
-    bool isCommandRegistered(const QString& commandId) const override
-    {
-        if (WorkbenchMenuManager::isWindowLevelCommand(commandId))
-        {
-            // 3D 未编译时，禁用切换到 3D 的命令
-            if (commandId == QLatin1String("view.switch_to_3d") && !BuildConfig::kUi3D)
-            {
-                return false;
-            }
-            return true;
-        }
-        return workbench && workbench->isCommandRegistered(commandId);
-    }
-
-    void dispatch(const QString& commandId, const QVariantMap& params) override
-    {
-        // 工作台切换统一由主窗口 triggerWorkbench 处理（含防重复切换保护）。
-
-        if (isWorkbenchSwitchCommand(commandId) && self && self->workbenchWindow())
-        {
-            const QString target =
-                commandId == QLatin1String("view.switch_to_3d") ? QStringLiteral("3D") : QStringLiteral("2D");
-            self->workbenchWindow()->triggerWorkbench(target);
-            return;
-        }
-        // 主题切换：直接走主窗口主题切换，不进命令总线。
-
-        if (isThemeCommand(commandId) && self && self->workbenchWindow())
-        {
-            self->workbenchWindow()->triggerTheme(commandId);
-            return;
-        }
-        // 关于对话框：help.about 是窗口级动作，在进命令总线前短路
-        //（目录里保留条目仅供历史兼容，不作为分发路径）。
-        // 模式必须取当前工作台 —— 硬编码 Mode2D 会让 3D 下打开 2D 版 About。
-        if (commandId == QLatin1String("help.about") && self && self->workbenchWindow())
-        {
-            const UiWorkbench* wb = self->workbenchWindow()->currentWorkbench();
-            const AppMode mode = (wb && wb->id() == QLatin1String("3D")) ? AppMode::Mode3D : AppMode::Mode2D;
-            AboutDialog::showDialog(mode, self->workbenchWindow());
-            return;
-        }
-        // 语言切换：language.<code> → AppLanguage，落盘后由 SettingsService 应用。
-        if (isLanguageCommand(commandId))
-        {
-            QString code = commandId.mid(QStringLiteral("language.").size());
-            AppLanguage lang = AppLanguage::English;
-            if (const auto parsed = LanguageManager::fromCode(code); parsed.has_value())
-            {
-                lang = *parsed;
-            }
-            else
-            {
-                SY_WARNF("[MenuDispatcher] unknown language code '%s', ignore", qPrintable(code));
-                return;
-            }
-            // 必须落盘：只调 LM->setLanguage 的话语言只活在内存里，一旦有人再走
-            // applyCommonSettings（设置对话框确定、SettingsService 懒初始化）就会被
-            // 库里的 common/language 覆盖回去，表现为「切个工作台语言就丢了」。
-            // SettingsService::setLanguage 内部会写库并调 LM->setLanguage。
-            if (auto* settings = ApplicationCompositionRoot::getSettingsService(); settings && settings->isInitialized())
-            {
-                settings->setLanguage(lang);
-            }
-            else
-            {
-                LM->setLanguage(lang);
-            }
-            // 语言切换成功会经 LanguageChange → retranslateUi → rebuildAllMenus 回填勾选；
-            // 但 .qm 缺失时不发 LanguageChange，这里补一次，保证勾选态与实际语言一致。
-            if (self)
-            {
-                self->refreshConfiguredMenuState();
-            }
-            return;
-        }
-        if (!workbench)
-        {
-            SY_WARNF("[WorkbenchMenuManager] No active workbench for command='%s'", qPrintable(commandId));
-            return;
-        }
-        workbench->dispatchCommand(commandId, params);
-    }
-};
 
 WorkbenchMenuManager::WorkbenchMenuManager(WorkbenchWindow* window, QObject* parent)
     : QObject(parent)
@@ -302,12 +191,20 @@ IUiCommandDispatcher* WorkbenchMenuManager::commandDispatcher()
 {
     if (!m_dispatcher)
     {
-        m_dispatcher = std::make_unique<MenuDispatcher>();
-        m_dispatcher->self = this;
+        m_dispatcher = std::make_unique<MenuDispatcher>(this);
+        m_dispatcher->setSelf(this);
     }
     // 每次取用都同步工作台：菜单/工具栏的构建时机早于 setWorkbench 的场景是常态，
     // 而 isCommandRegistered() 要靠当前工作台的命令目录才能给出正确答案。
-    m_dispatcher->workbench = m_workbench;
+    m_dispatcher->setWorkbench(m_workbench);
+    if (m_window)
+    {
+        m_dispatcher->setWorkbenchWindow(m_window);
+    }
+    if (m_stateCenter)
+    {
+        m_dispatcher->setStateCenter(m_stateCenter);
+    }
     return m_dispatcher.get();
 }
 
