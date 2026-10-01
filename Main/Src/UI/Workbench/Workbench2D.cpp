@@ -898,19 +898,16 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         static_cast<int>(drawToolActions.size()),
         m_panelHostStyle == PanelHostStyle::Dock ? "Dock" : "ToolBar");
 
-    // 依据承载样式创建左侧面板（Draw Tools）
     if (m_panelHostStyle == PanelHostStyle::Dock)
-    {
-        window.registerDockWidget(QObject::tr("Draw Tools"), drawWidget, Qt::LeftDockWidgetArea);
-    }
-    else
-    {
-        auto* leftToolBar = new QToolBar(QObject::tr("Draw Tools"), &window);
-        leftToolBar->setObjectName(QStringLiteral("DrawToolBar"));
-        leftToolBar->setMovable(false);
-        window.addToolBar(Qt::LeftToolBarArea, leftToolBar);
-        leftToolBar->addWidget(drawWidget);
-    }
+        {
+            window.registerDockWidget(QObject::tr("Draw Tools"), drawWidget, Qt::LeftDockWidgetArea);
+        }
+        else
+        {
+            // 左侧绘图工具栏已由 WorkbenchLayoutManager::buildToolBars() 从 JSON 配置驱动构建（id="draw.left"）。
+            // 此处不再硬编码创建 QToolBar，避免双份左侧栏并打通配置驱动全链路。
+            // DrawToolBarWidget 的高亮/激活同步逻辑仍保留，后续可迁移到配置驱动 action 上。
+        }
 
     // 视口 → UI 的勾选态回写（Esc 回到 SelectTool、工具用完自动返回等）。
     // 勾选态由中枢的 QActionGroup 单点维护，展示层不再各自记 activeTool。
