@@ -1026,7 +1026,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     }
 
     const QString currentWorkbenchId =
-        m_stateManager ? m_stateManager->windowState().currentWorkbenchId : QStringLiteral("default");
+        m_stateCenter ? m_stateCenter->currentWorkbenchId() : QStringLiteral("default");
     if (workbenchId.compare(currentWorkbenchId, Qt::CaseInsensitive) == 0)
     {
         SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: same workbench %s, skipping", workbenchId.toUtf8().constData());
@@ -1040,7 +1040,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     m_switchingWorkbench = true;
 
     const auto previousWorkbenchId =
-        m_stateManager ? m_stateManager->windowState().currentWorkbenchId : QStringLiteral("default");
+        m_stateCenter ? m_stateCenter->currentWorkbenchId() : QStringLiteral("default");
     const auto switchContextText = workbenchSwitchText(workbenchId);
 
     SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: switching from %s to %s",
