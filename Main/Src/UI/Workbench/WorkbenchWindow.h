@@ -247,7 +247,8 @@ private:
 public:
     /// 注册全局快捷键（由工作台调用，切换时自动清理）
     /// @param shortcut 快捷键实例
-    void registerShortcut(QShortcut* shortcut);
+    /// @param commandId 可选的命令 ID，用于快捷键台账管理（冲突检测/设置页）
+    void registerShortcut(QShortcut* shortcut, const QString& commandId = QString());
     /// 注销全局快捷键
     /// @param shortcut 快捷键实例
     void unregisterShortcut(QShortcut* shortcut);

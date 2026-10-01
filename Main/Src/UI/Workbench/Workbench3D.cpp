@@ -425,13 +425,13 @@ void Workbench3D::setup3DDeleteShortcuts(WorkbenchWindow& window)
     m_deleteShortcut = new QShortcut(QKeySequence(Qt::Key_Delete), &window);
     m_deleteShortcut->setContext(Qt::ApplicationShortcut);
     connect(m_deleteShortcut, &QShortcut::activated, this, deleteSelected3D);
-    window.registerShortcut(m_deleteShortcut);
+    window.registerShortcut(m_deleteShortcut, QStringLiteral("edit.delete"));
 
     // 全局 Backspace 快捷键
     m_backspaceShortcut = new QShortcut(QKeySequence(Qt::Key_Backspace), &window);
     m_backspaceShortcut->setContext(Qt::ApplicationShortcut);
     connect(m_backspaceShortcut, &QShortcut::activated, this, deleteSelected3D);
-    window.registerShortcut(m_backspaceShortcut);
+    window.registerShortcut(m_backspaceShortcut, QStringLiteral("edit.delete"));
 }
 
 void Workbench3D::on3DContextMenuRequested(const QPoint& globalPos)
@@ -617,7 +617,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
             own.operationBus->run(OperationId3D::View_Capture);
         }
     });
-    window.registerShortcut(captureSc);
+    window.registerShortcut(captureSc, QStringLiteral("view.capture"));
 
     // 1. 先创建所有 Action（bindXxx 依赖 action() 返回有效指针）
     own.commandActionHub->setOperationBus(own.operationBus.get());

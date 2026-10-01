@@ -514,13 +514,13 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
     QObject::connect(deleteSc, &QShortcut::activated, this, [deleteSelectedShapes]() {
         deleteSelectedShapes(/*forward=*/true);
     });
-    window.registerShortcut(deleteSc);
+    window.registerShortcut(deleteSc, QStringLiteral("edit.delete"));
     auto* backspaceSc = new QShortcut(QKeySequence(Qt::Key_Backspace), &window);
     backspaceSc->setContext(Qt::ApplicationShortcut);
     QObject::connect(backspaceSc, &QShortcut::activated, this, [deleteSelectedShapes]() {
         deleteSelectedShapes(/*forward=*/false);
     });
-    window.registerShortcut(backspaceSc);
+    window.registerShortcut(backspaceSc, QStringLiteral("edit.delete"));
     auto* selectAllSc = new QShortcut(QKeySequence::SelectAll, &window);
     QObject::connect(selectAllSc, &QShortcut::activated, this, [this, editingText]() {
         if (!editingText() && m_commands.operationBus)
@@ -528,10 +528,10 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
             m_commands.operationBus->run(OperationId::Edit_SelectAll, {}, OperationSource::Shortcut);
         }
     });
-    window.registerShortcut(selectAllSc);
+    window.registerShortcut(selectAllSc, QStringLiteral("edit.select_all"));
     auto* escSc = new QShortcut(QKeySequence(Qt::Key_Escape), &window);
     QObject::connect(escSc, &QShortcut::activated, this, clearSelectionShapes);
-    window.registerShortcut(escSc);
+    window.registerShortcut(escSc, QStringLiteral("edit.deselect"));
 
     // F12 截图
     auto* captureSc = new QShortcut(QKeySequence(Qt::Key_F12), &window);
@@ -542,7 +542,7 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         }
         m_commands.operationBus->run(OperationId::View_Capture, {}, OperationSource::Shortcut);
     });
-    window.registerShortcut(captureSc);
+    window.registerShortcut(captureSc, QStringLiteral("view.capture"));
 
     // 状态回调：将视口状态写入状态中心
     if (m_uiState.stateCenter)

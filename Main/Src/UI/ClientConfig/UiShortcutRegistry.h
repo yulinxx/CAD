@@ -110,6 +110,12 @@ public:
     QString localizedDisplayName(const QString& source) const override;
     QString localizedCategory(const QString& source) const override;
 
+    /// 获取底层注册表（供 WorkbenchActionManager 同步窗口级快捷键）
+    UiShortcutRegistry* registry() const
+    {
+        return m_registry;
+    }
+
 private:
     UiShortcutRegistry* m_registry{ nullptr };
 };

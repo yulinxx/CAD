@@ -6,6 +6,8 @@
 #include "FileDropHandler.h"
 
 #include "UI2D/Manager/UnitManager.h"
+#include "UI/ClientConfig/UiShortcutRegistry.h"
+#include "UI/ClientConfig/UiShortcutRegistry.h"  // for UiShortcutSettingsModel
 
 /**
  * @file WorkbenchWindow.cpp
@@ -334,6 +336,15 @@ void WorkbenchWindow::configureServices(const UiServices& services)
         if (m_workbench)
         {
             m_menuManager->rebuildAllMenus();
+        }
+        // 同步快捷键台账到 ActionManager（用于窗口级快捷键的台账同步/冲突检测）
+        if (m_actionManager && m_menuManager->shortcutSettingsModel())
+        {
+            auto* settingsModel = static_cast<UiShortcutSettingsModel*>(m_menuManager->shortcutSettingsModel());
+            if (settingsModel)
+            {
+                m_actionManager->setShortcutRegistry(settingsModel->registry());
+            }
         }
     }
 
@@ -755,11 +766,12 @@ void WorkbenchWindow::clearWorkbenchContent()
 }
 
 /// 注册全局快捷键（由工作台调用，切换时自动清理）
-void WorkbenchWindow::registerShortcut(QShortcut* shortcut)
+/// @param commandId 可选的命令 ID，用于快捷键台账管理（冲突检测/设置页）
+void WorkbenchWindow::registerShortcut(QShortcut* shortcut, const QString& commandId)
 {
     if (m_actionManager)
     {
-        m_actionManager->registerShortcut(shortcut);
+        m_actionManager->registerShortcut(shortcut, commandId);
     }
 }
 
