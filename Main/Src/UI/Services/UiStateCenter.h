@@ -293,26 +293,27 @@ public slots:
     /// @param prompt 状态提示内容
     void setStatusPrompt(const QString& prompt);
 
-    /// 统一设置任务进度和消息
-    /// @param progress 进度值 (0-100)，-1 表示清除进度
-    /// @param message 状态消息
-    void setProgress(int progress, const QString& message);
-
-    /// 设置任务阶段和消息（用于导入/导出/保存等阶段性任务）
-    /// @param phase 阶段标识（如 "parsing", "building", "writing"）
-    /// @param message 阶段描述消息
-    void setTaskPhase(const QString& phase, const QString& message);
-
-    /// 设置错误状态（统一错误通知入口）
-    /// @param code 错误码
-    /// @param message 错误描述
-    void setError(int code, const QString& message);
-
-    /// 清除错误状态
-    void clearError();
-
-    /// 清除任务进度和阶段（任务完成时调用）
-    void clearTask();
+    // DEPRECATED: 以下 API 无生产调用者，仅为测试保留（如需恢复请取消注释并补全实现）
+    // /// 统一设置任务进度和消息
+    // /// @param progress 进度值 (0-100)，-1 表示清除进度
+    // /// @param message 状态消息
+    // void setProgress(int progress, const QString& message);
+    //
+    // /// 设置任务阶段和消息（用于导入/导出/保存等阶段性任务）
+    // /// @param phase 阶段标识（如 "parsing", "building", "writing"）
+    // /// @param message 阶段描述消息
+    // void setTaskPhase(const QString& phase, const QString& message);
+    //
+    // /// 设置错误状态（统一错误通知入口）
+    // /// @param code 错误码
+    // /// @param message 错误描述
+    // void setError(int code, const QString& message);
+    //
+    // /// 清除错误状态
+    // void clearError();
+    //
+    // /// 清除任务进度和阶段（任务完成时调用）
+    // void clearTask();
 
     /// 设置当前激活工具 ID
     /// @param toolId 工具 ID
@@ -370,26 +371,8 @@ signals:
     /// 渲染刷新状态变更信号
     void refreshStateChanged(const QString& state);
 
-    /// 状态提示变更信号
-    void statusPromptChanged(const QString& prompt);
-
     /// 元数据变更信号
     void metadataChanged();
-
-    /// 任务进度变更信号
-    /// @param progress 进度值 (0-100)，-1 表示无任务
-    /// @param message 状态消息
-    void progressChanged(int progress, const QString& message);
-
-    /// 任务阶段变更信号
-    /// @param phase 阶段标识
-    /// @param message 阶段描述
-    void taskPhaseChanged(const QString& phase, const QString& message);
-
-    /// 错误状态变更信号
-    /// @param code 错误码
-    /// @param message 错误描述
-    void errorOccurred(int code, const QString& message);
 
     /// 激活工具变更信号
     /// @param toolId 工具 ID

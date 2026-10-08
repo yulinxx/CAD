@@ -235,8 +235,7 @@ void UiStateCenter::setStatusPrompt(const QString& prompt)
 
     m_statusPrompt = prompt;
     // 不再写 metadata["statusPrompt"]：消除双写 + 回读环
-    // metadata 降级为纯扩展袋，不再镜像核心字段
-    emit statusPromptChanged(prompt);
+    // metadata 降级为纯扩展袋，核心字段仅由各自 setter 维护
     emit stateChanged();
 }
 
@@ -390,7 +389,7 @@ void UiStateCenter::setCurrentSelectionText(const QString& text)
         return;
     }
     m_selectionText = text;
-    emit currentSelectionTextChanged(text);
+    // 不再发 currentSelectionTextChanged（死信号，无消费者）
     emit stateChanged();
 }
 
@@ -409,7 +408,7 @@ void UiStateCenter::setSelectionContext(const QString& source, const QString& te
     m_metadata.insert(QStringLiteral("selectionText"), text);
     m_metadata.insert(QStringLiteral("selectionType"), m_selectionType);
 
-    emit currentSelectionTextChanged(text);
+    // 不再发 currentSelectionTextChanged（死信号，无消费者）
     emit metadataChanged();
     emit stateChanged();
 }
@@ -620,97 +619,98 @@ void UiStateCenter::setMetadata(const QVariantMap& metadata)
     emit stateChanged();
 }
 
-/// 统一设置任务进度和消息
-/// @param progress 进度值 (0-100)，-1 表示清除进度
-/// @param message 状态消息
-void UiStateCenter::setProgress(int progress, const QString& message)
-{
-    if (m_progress == progress && m_statusMessage == message)
-    {
-        return;
-    }
-
-    m_progress = progress;
-    m_statusMessage = message;
-
-    // 同步写入元数据，方便状态栏等展示层读取
-    m_metadata.insert(QStringLiteral("progress"), progress);
-    m_metadata.insert(QStringLiteral("statusMessage"), message);
-
-    emit progressChanged(progress, message);
-    emit stateChanged();
-}
-
-/// 设置任务阶段和消息
-/// @param phase 阶段标识
-/// @param message 阶段描述
-void UiStateCenter::setTaskPhase(const QString& phase, const QString& message)
-{
-    if (m_taskPhase == phase && m_statusMessage == message)
-    {
-        return;
-    }
-
-    m_taskPhase = phase;
-    m_statusMessage = message;
-
-    m_metadata.insert(QStringLiteral("taskPhase"), phase);
-    m_metadata.insert(QStringLiteral("statusMessage"), message);
-
-    emit taskPhaseChanged(phase, message);
-    emit stateChanged();
-}
-
-/// 统一设置错误状态
-/// @param code 错误码
-/// @param message 错误描述
-void UiStateCenter::setError(int code, const QString& message)
-{
-    m_errorCode = code;
-    m_statusMessage = message;
-
-    m_metadata.insert(QStringLiteral("errorCode"), code);
-    m_metadata.insert(QStringLiteral("errorMessage"), message);
-
-    emit errorOccurred(code, message);
-    emit stateChanged();
-}
-
-/// 清除错误状态
-void UiStateCenter::clearError()
-{
-    if (m_errorCode == 0 && m_statusMessage.isEmpty())
-    {
-        return;
-    }
-
-    m_errorCode = 0;
-    m_statusMessage.clear();
-
-    m_metadata.insert(QStringLiteral("errorCode"), 0);
-    m_metadata.insert(QStringLiteral("errorMessage"), QString());
-
-    emit stateChanged();
-}
-
-/// 清除任务进度和阶段（任务完成时调用）
-void UiStateCenter::clearTask()
-{
-    if (m_progress == -1 && m_taskPhase.isEmpty() && m_statusMessage.isEmpty())
-    {
-        return;
-    }
-
-    m_progress = -1;
-    m_taskPhase.clear();
-    m_statusMessage.clear();
-
-    m_metadata.insert(QStringLiteral("progress"), -1);
-    m_metadata.insert(QStringLiteral("taskPhase"), QString());
-    m_metadata.insert(QStringLiteral("statusMessage"), QString());
-
-    emit stateChanged();
-}
+// DEPRECATED: 以下 API 无生产调用者，仅为测试保留（如需恢复请取消注释并补全实现）
+// /// 统一设置任务进度和消息
+// /// @param progress 进度值 (0-100)，-1 表示清除进度
+// /// @param message 状态消息
+// void UiStateCenter::setProgress(int progress, const QString& message)
+// {
+//     if (m_progress == progress && m_statusMessage == message)
+//     {
+//         return;
+//     }
+//
+//     m_progress = progress;
+//     m_statusMessage = message;
+//
+//     // 同步写入元数据，方便状态栏等展示层读取
+//     m_metadata.insert(QStringLiteral("progress"), progress);
+//     m_metadata.insert(QStringLiteral("statusMessage"), message);
+//
+//     emit progressChanged(progress, message);
+//     emit stateChanged();
+// }
+//
+// /// 设置任务阶段和消息
+// /// @param phase 阶段标识
+// /// @param message 阶段描述
+// void UiStateCenter::setTaskPhase(const QString& phase, const QString& message)
+// {
+//     if (m_taskPhase == phase && m_statusMessage == message)
+//     {
+//         return;
+//     }
+//
+//     m_taskPhase = phase;
+//     m_statusMessage = message;
+//
+//     m_metadata.insert(QStringLiteral("taskPhase"), phase);
+//     m_metadata.insert(QStringLiteral("statusMessage"), message);
+//
+//     emit taskPhaseChanged(phase, message);
+//     emit stateChanged();
+// }
+//
+// /// 统一设置错误状态
+// /// @param code 错误码
+// /// @param message 错误描述
+// void UiStateCenter::setError(int code, const QString& message)
+// {
+//     m_errorCode = code;
+//     m_statusMessage = message;
+//
+//     m_metadata.insert(QStringLiteral("errorCode"), code);
+//     m_metadata.insert(QStringLiteral("errorMessage"), message);
+//
+//     emit errorOccurred(code, message);
+//     emit stateChanged();
+// }
+//
+// /// 清除错误状态
+// void UiStateCenter::clearError()
+// {
+//     if (m_errorCode == 0 && m_statusMessage.isEmpty())
+//     {
+//         return;
+//     }
+//
+//     m_errorCode = 0;
+//     m_statusMessage.clear();
+//
+//     m_metadata.insert(QStringLiteral("errorCode"), 0);
+//     m_metadata.insert(QStringLiteral("errorMessage"), QString());
+//
+//     emit stateChanged();
+// }
+//
+// /// 清除任务进度和阶段（任务完成时调用）
+// void UiStateCenter::clearTask()
+// {
+//     if (m_progress == -1 && m_taskPhase.isEmpty() && m_statusMessage.isEmpty())
+//     {
+//         return;
+//     }
+//
+//     m_progress = -1;
+//     m_taskPhase.clear();
+//     m_statusMessage.clear();
+//
+//     m_metadata.insert(QStringLiteral("progress"), -1);
+//     m_metadata.insert(QStringLiteral("taskPhase"), QString());
+//     m_metadata.insert(QStringLiteral("statusMessage"), QString());
+//
+//     emit stateChanged();
+// }
 
 void UiStateCenter::setActiveToolId(const QString& toolId)
 {

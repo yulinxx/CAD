@@ -1,0 +1,159 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 20,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default Config",
+      "description": "Default build configuration",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "tests-all",
+      "displayName": "All Tests Enabled",
+      "description": "Enable all core module tests for test safety net",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-tests",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_ALL_TESTS": "ON",
+        "BUILD_UTILITY_TESTS": "ON",
+        "BUILD_LOG_TESTS": "ON",
+        "BUILD_ENGINE2D_TESTS": "ON",
+        "BUILD_ENGINE3D_TESTS": "ON",
+        "BUILD_FILEIO_TESTS": "ON",
+        "BUILD_NESTING_TESTS": "ON",
+        "BUILD_CAM_TESTS": "ON",
+        "BUILD_RENDERX_TESTS": "ON",
+        "BUILD_RENDERBRIDGE_TESTS": "ON",
+        "BUILD_UI_COMMON_TESTS": "ON",
+        "BUILD_UI2D_TESTS": "ON",
+        "BUILD_UI3D_TESTS": "ON",
+        "BUILD_MAIN_TESTS": "ON",
+        "BUILD_VIEWPORT_REFRESH_TESTS": "ON",
+        "BUILD_SCENE_EDIT_TESTS": "ON",
+        "BUILD_LICENSE_TESTS": "ON",
+        "BUILD_CRASHHANDLER_TESTS": "ON",
+        "BUILD_HARDWARE_TESTS": "ON",
+        "BUILD_VISION_TESTS": "ON",
+        "BUILD_ENGRAVING_TESTS": "ON",
+        "BUILD_GEOMODELCORE_TESTS": "ON",
+        "BUILD_PYTHONHOST_TESTS": "ON"
+      }
+    },
+    {
+      "name": "tests-core",
+      "displayName": "Core Tests Only",
+      "description": "Enable only core module tests (no UI/hardware)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-core-tests",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_ALL_TESTS": "OFF",
+        "BUILD_UTILITY_TESTS": "ON",
+        "BUILD_LOG_TESTS": "ON",
+        "BUILD_ENGINE2D_TESTS": "ON",
+        "BUILD_ENGINE3D_TESTS": "ON",
+        "BUILD_FILEIO_TESTS": "ON",
+        "BUILD_NESTING_TESTS": "ON",
+        "BUILD_CAM_TESTS": "ON",
+        "BUILD_RENDERX_TESTS": "ON",
+        "BUILD_RENDERBRIDGE_TESTS": "ON",
+        "BUILD_UI_COMMON_TESTS": "ON",
+        "BUILD_UI2D_TESTS": "ON",
+        "BUILD_UI3D_TESTS": "ON",
+        "BUILD_MAIN_TESTS": "ON",
+        "BUILD_VIEWPORT_REFRESH_TESTS": "ON",
+        "BUILD_SCENE_EDIT_TESTS": "ON",
+        "BUILD_LICENSE_TESTS": "ON",
+        "BUILD_CRASHHANDLER_TESTS": "OFF",
+        "BUILD_HARDWARE_TESTS": "OFF",
+        "BUILD_VISION_TESTS": "OFF",
+        "BUILD_ENGRAVING_TESTS": "OFF",
+        "BUILD_GEOMODELCORE_TESTS": "OFF",
+        "BUILD_PYTHONHOST_TESTS": "OFF"
+      }
+    },
+    {
+      "name": "ci-windows",
+      "displayName": "CI Windows",
+      "description": "CI configuration for Windows",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build-ci",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_ALL_TESTS": "ON",
+        "BUILD_HARDWARE": "OFF",
+        "BUILD_VISION": "OFF",
+        "BUILD_ENGRAVING": "OFF",
+        "BUILD_GEOMODELCORE": "OFF",
+        "BUILD_PYTHON": "OFF",
+        "SANYI_PYBIND_CORE": "OFF"
+      }
+    },
+    {
+      "name": "ci-macos",
+      "displayName": "CI macOS",
+      "description": "CI configuration for macOS",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-ci",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_ALL_TESTS": "ON",
+        "BUILD_HARDWARE": "OFF",
+        "BUILD_VISION": "OFF",
+        "BUILD_ENGRAVING": "OFF",
+        "BUILD_GEOMODELCORE": "OFF",
+        "BUILD_PYTHON": "OFF",
+        "SANYI_PYBIND_CORE": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "tests-all",
+      "configurePreset": "tests-all",
+      "configuration": "Debug"
+    },
+    {
+      "name": "tests-core",
+      "configurePreset": "tests-core",
+      "configuration": "Debug"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "tests-all",
+      "configurePreset": "tests-all",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 4,
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "tests-core",
+      "configurePreset": "tests-core",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 4,
+        "noTestsAction": "error"
+      }
+    }
+  ]
+}

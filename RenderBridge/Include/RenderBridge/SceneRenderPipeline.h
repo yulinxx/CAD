@@ -234,6 +234,32 @@ namespace RenderBridge
          */
         RenderAbstraction::IRenderScene* scene() const { return m_scene; }
 
+        /**
+         * @brief 提交瞬态顶点数据（封装 allocTransient + memcpy + DrawInstruction 模式）
+         *
+         * 将顶点数据写入瞬态环并追加一条绘制指令。
+         * 顶点数据会被拷贝到瞬态环中，调用方无需保持数据存活。
+         *
+         * @param vertices 顶点数据指针
+         * @param vertexCount 顶点数量
+         * @param format 顶点格式
+         * @param topology 图元拓扑
+         * @param space 渲染空间
+         * @param layer 排序层级
+         * @param seq 排序序号
+         * @param out 输出命令列表
+         * @return 成功返回 true，瞬态环容量不足时返回 false
+         */
+        bool submitTransientVertices(
+            const void* vertices,
+            uint32_t vertexCount,
+            RenderAbstraction::VertexFormat format,
+            RenderAbstraction::PrimitiveType topology,
+            RenderAbstraction::RenderSpace space,
+            uint8_t layer,
+            uint16_t seq,
+            std::vector<RenderAbstraction::DrawInstruction>& out);
+
     private:
         /**
          * @brief 确保瞬态命令缓冲区有足够的容量

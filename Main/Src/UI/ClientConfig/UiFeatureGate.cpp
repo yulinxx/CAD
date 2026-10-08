@@ -87,7 +87,7 @@ QStringList UiFeatureGate::licensedFeatures() const
     return list;
 }
 
-void UiFeatureGate::resetForTest()
+void UiFeatureGate::resetForTestImpl()
 {
     m_features.clear();
     m_unrestricted = true;

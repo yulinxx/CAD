@@ -79,6 +79,9 @@ public:
     /// 获取 ApplicationCompositionRoot 单例实例（由 AppBootstrapper 创建时设置）
     static ApplicationCompositionRoot* instance();
 
+    /// 重置单例状态（仅测试使用：清理所有持有的服务与状态，模拟进程重启）
+    static void resetForTest();
+
     /// 保存当前工作台的运行时设置到数据库（退出时兜底）
     static void saveCurrentWorkbenchSettings();
 

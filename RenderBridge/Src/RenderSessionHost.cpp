@@ -425,4 +425,22 @@ namespace RenderBridge
             caps.deviceName,
             caps.maxLineWidth);
     }
+
+    bool RenderSessionHost::tryBeginFrame(uint32_t width, uint32_t height)
+    {
+        if (!m_sceneObj)
+        {
+            return false;
+        }
+        if (m_sceneObj->beginFrame())
+        {
+            return true;
+        }
+        // 交换链尺寸可能已失效：按新尺寸调整一次后重试本帧
+        if (m_surfaceObj)
+        {
+            m_surfaceObj->resize(width, height);
+        }
+        return m_sceneObj->beginFrame();
+    }
 }  // namespace RenderBridge

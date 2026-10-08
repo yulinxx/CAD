@@ -128,7 +128,7 @@ ApplicationCompositionRoot::~ApplicationCompositionRoot()
     m_processingJobService.reset();
 
     // 硬件必须最先停：定时器停掉、设备 close（关光 + 输出置安全态）之后，
-    // 其他服务才可以安全销毁。反过来的话，tick 里可能访问到已销毁的对象。
+    // 其他服务才可以安全销毁。反过来先停设备，作业就无处可停了。
     if (m_deviceHost)
     {
         m_deviceHost->stop();
@@ -137,6 +137,17 @@ ApplicationCompositionRoot::~ApplicationCompositionRoot()
     // 进程退出时，FillGeometryUpdater（Meyers 单例）的析构晚于本组合根，
     // 若不在 SceneEditService 仍存活时解绑，其析构会访问已销毁对象导致崩溃。
     Eg::FillGeometryUpdater::instance().detach();
+}
+
+/// 重置单例状态（仅测试使用：清理所有持有的服务与状态，模拟进程重启）
+void ApplicationCompositionRoot::resetForTest()
+{
+    // 显式销毁当前实例，触发析构逻辑清理所有服务
+    if (s_instance)
+    {
+        delete s_instance;
+        s_instance = nullptr;
+    }
 }
 
 DeviceHost* ApplicationCompositionRoot::deviceHost()

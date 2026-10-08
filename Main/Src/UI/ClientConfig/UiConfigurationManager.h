@@ -31,11 +31,11 @@ public:
     UiConfigurationManager();
     ~UiConfigurationManager();
 
-    /// 进程级共享实例：客户 UI 配置的唯一事实源
+/// 进程级共享实例：客户 UI 配置的唯一事实源
     ///
     /// 历史实现里 WorkbenchMenuManager 与 WorkbenchLayoutManager 各自 new 了一个
     /// UiConfigurationManager 并**分别**加载配置，两份副本一旦解析出不同客户
-    /// （菜单读环境变量、布局读编译期宏）就会出现「菜单和布局来自不同客户」。
+    /// （菜单读环境变量、布局读编译期宏）就会出现「菜单来自 A 配置、布局来自 B 配置」。
     /// 现在所有消费方都从这里取配置：首次访问时按 UiClientContext 解析出的
     /// 资源路径加载，之后复用。
     ///
@@ -74,6 +74,18 @@ public:
 
     /// 清空已加载配置
     void reset();
+
+    /// 重置实例状态（仅测试使用：清空配置与面板注册表，等同 reset()）
+    void resetForTestImpl()
+    {
+        reset();
+    }
+
+    /// 重置共享实例状态（仅测试使用：清空配置与面板注册表）
+    static void resetForTest()
+    {
+        shared().reset();
+    }
 
 private:
     std::unique_ptr<UiConfigData> m_configData;

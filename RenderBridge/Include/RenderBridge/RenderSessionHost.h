@@ -165,6 +165,18 @@ namespace RenderBridge
         void logCapabilities(const char* tag) const;
 
         /**
+         * @brief 尝试开始一帧，失败时自动调整表面尺寸后重试
+         *
+         * 封装 2D/3D 视口共用的 beginFrame 重试逻辑：
+         * 首次失败后按新尺寸调整表面，再试一次。
+         *
+         * @param width 视口宽度（像素）
+         * @param height 视口高度（像素）
+         * @return 成功返回 true，重试后仍失败返回 false
+         */
+        bool tryBeginFrame(uint32_t width, uint32_t height);
+
+        /**
          * @brief 请求销毁进程级共享的 Metal Runtime（应用退出时调用一次）
          *
          * **只置标志，不一定当场销毁**：真正的销毁要等最后一个视口销毁（即最后一次

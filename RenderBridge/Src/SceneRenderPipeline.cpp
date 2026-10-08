@@ -167,4 +167,46 @@ namespace RenderBridge
         }
         return {};
     }
+
+    bool SceneRenderPipeline::submitTransientVertices(
+        const void* vertices,
+        uint32_t vertexCount,
+        RenderAbstraction::VertexFormat format,
+        RenderAbstraction::PrimitiveType topology,
+        RenderAbstraction::RenderSpace space,
+        uint8_t layer,
+        uint16_t seq,
+        std::vector<RenderAbstraction::DrawInstruction>& out)
+    {
+        if (!m_scene || !vertices || vertexCount == 0)
+        {
+            return false;
+        }
+
+        const uint64_t bytes = static_cast<uint64_t>(vertexCount) * RenderAbstraction::vertexStride(format);
+        if (bytes == 0)
+        {
+            return false;
+        }
+
+        RenderAbstraction::TransientAlloc alloc{};
+        if (!m_scene->allocTransient(bytes, alloc))
+        {
+            return false;
+        }
+
+        std::memcpy(alloc.cpuPtr, vertices, bytes);
+
+        RenderAbstraction::DrawInstruction cmd{};
+        cmd.vertexBuffer = alloc.buffer;
+        cmd.vertexOffset = alloc.offset;
+        cmd.vertexCount = vertexCount;
+        cmd.topology = topology;
+        cmd.format = format;
+        cmd.space = space;
+        cmd.sortKey = RenderAbstraction::makeSortKey(layer, 0, 0, seq);
+
+        out.push_back(cmd);
+        return true;
+    }
 }

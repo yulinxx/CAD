@@ -34,6 +34,12 @@ public:
     /// 全局实例
     static UiClientContext& instance();
 
+    /// 重置单例状态（仅测试使用：清空缓存与覆盖）
+    static void resetForTest()
+    {
+        instance().resetCacheForTest();
+    }
+
     /// 设置显式覆盖客户 ID（最高优先级）
     /// 传空字符串表示清除覆盖。调用后缓存失效，下次查询重新解析。
     /// @param clientId 客户 ID，例如 "client_a"

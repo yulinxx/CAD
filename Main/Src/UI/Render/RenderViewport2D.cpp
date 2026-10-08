@@ -57,6 +57,7 @@ RenderViewport2D::RenderViewport2D(QWidget* parent)
     // 刷新协调器：封装四级刷新策略与增量渲染管线
     m_refreshCoordinator = std::make_unique<SceneRefreshCoordinator>(this);
     m_refreshCoordinator->setRenderWidget(m_renderWidget);
+    m_refreshCoordinator->setPerfMonitorEnabled(true);
 
     // P5: 观察者注册收敛到 SceneRefreshCoordinator，视口通过信号同步工具状态
     QObject::connect(m_refreshCoordinator.get(), &SceneRefreshCoordinator::selectionChanged, this, [this]() {

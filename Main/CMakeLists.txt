@@ -53,32 +53,58 @@ set(SHARED_PROJECT_INCLUDE_DIRS
     "${PROJECT_ROOT}/FileIO/FileIO/Include"
 )
 
-# 自动收集所有源文件（新增 .cpp/.mm 文件无需修改此处）
-file(GLOB_RECURSE MAIN_APP_SOURCES CONFIGURE_DEPENDS
+# 应用源文件：按子目录显式登记（硬化模块边界，2026-10-07）
+#
+# 原先 file(GLOB_RECURSE "${SRC_ROOT}/*.cpp") 会把 Src 下任何目录
+# （含临时 / 兼容 / 测试代码）一并收进应用目标，模块边界不可见。
+# 改为按子目录逐条登记：
+#   - 模块边界可见，一眼看出哪些目录属于应用可执行文件；
+#   - 新增子目录必须在此显式登记，遏制目录随意扩张；
+#   - 目录内仍用非递归 GLOB + CONFIGURE_DEPENDS，新增 .cpp 自动收集，
+#     无需逐文件维护。
+# UI/Test 由测试目标（MainTests）独立编译，不属于应用可执行文件，
+# 故不在此登记。
+file(GLOB MAIN_APP_SOURCES CONFIGURE_DEPENDS
     "${SRC_ROOT}/*.cpp"
-    "${SRC_ROOT}/*.mm"
+    # --- 核心启动 ---
+    "${SRC_ROOT}/Bootstrap/*.cpp"
+    "${SRC_ROOT}/Common/*.cpp"
+    "${SRC_ROOT}/Composition/*.cpp"
+    "${SRC_ROOT}/Platform/*.cpp"
+    "${SRC_ROOT}/Runtime/*.cpp"
+    # --- 导入 ---
+    "${SRC_ROOT}/Import/*.cpp"
+    "${SRC_ROOT}/Import/Readers/*.cpp"
+    # --- 导出 ---
+    "${SRC_ROOT}/Export/*.cpp"
+    "${SRC_ROOT}/Export/Adapters/*.cpp"
+    "${SRC_ROOT}/Export/Writers/*.cpp"
+    # --- 持久化 ---
+    "${SRC_ROOT}/Persistence/*.cpp"
+    "${SRC_ROOT}/Persistence/Repositories/*.cpp"
+    # --- 许可 / 硬件 ---
+    "${SRC_ROOT}/License/*.cpp"
+    "${SRC_ROOT}/Hardware/*.cpp"
+    # --- UI 层 ---
+    "${UI_ROOT}/Adapters/*.cpp"
+    "${UI_ROOT}/ClientConfig/*.cpp"
+    "${UI_ROOT}/Documents/*.cpp"
+    "${UI_ROOT}/Entities/*.cpp"
+    "${UI_ROOT}/Interaction/*.cpp"
+    "${UI_ROOT}/Render/*.cpp"
+    "${UI_ROOT}/Services/*.cpp"
+    "${UI_ROOT}/TestView/*.cpp"
+    "${UI_ROOT}/Widgets/*.cpp"
+    "${UI_ROOT}/Workbench/*.cpp"
 )
 
-# 排除测试目录下的文件（这些由测试目标独立编译，不属于应用可执行文件）
-list(FILTER MAIN_APP_SOURCES EXCLUDE REGEX ".*/UI/Test/.*\.cpp$")
-
-# macOS 平台专用 Objective-C++ 文件：.mm 已被上面的 glob 自动收集。
-# 但需要排除非 macOS 平台的 .mm 文件
-if(NOT APPLE)
-    list(FILTER MAIN_APP_SOURCES EXCLUDE REGEX ".*\\.mm$")
-endif()
-
-# .mm 文件包含 Obj-C 头文件，不能与 C++ 文件混在同一个 Unity batch 中
+# macOS 平台专用 Objective-C++ 文件（.mm 含 Obj-C 头，不进 Unity batch）
 if(APPLE)
-    set(_mm_files "")
-    foreach(_f ${MAIN_APP_SOURCES})
-        if(_f MATCHES "\\.mm$")
-            list(APPEND _mm_files "${_f}")
-        endif()
-    endforeach()
-    if(_mm_files)
-        set_source_files_properties(${_mm_files} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
-    endif()
+    file(GLOB MAIN_APP_MM_SOURCES CONFIGURE_DEPENDS
+        "${SRC_ROOT}/Platform/*.mm"
+    )
+    list(APPEND MAIN_APP_SOURCES ${MAIN_APP_MM_SOURCES})
+    set_source_files_properties(${MAIN_APP_MM_SOURCES} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 endif()
 
 set(MAIN_APP_HEADERS

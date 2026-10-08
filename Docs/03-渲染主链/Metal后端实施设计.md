@@ -1,5 +1,14 @@
 # Metal 后端实施设计
 
+> **【已实施，2026-10-07 勘误】**：本设计已落地。Metal 后端现已实现于
+> `Renderx/src/rhi/metal/`（`metalDevice.mm` / `metalCommandList.mm`，
+> Objective-C++，MSL 着色器构建期编译为 `.metallib` 嵌入 DLL），
+> `Renderx/CMakeLists.txt` 的 APPLE 分支已单独收集 `.mm` 源，
+> `rhiFactory.cpp` 对 `BackendKind::Metal` 调用 `createMetalDevice`，
+> `isBackendAvailable(Metal)` 在 Apple 平台返回 true。下文「0. 现状盘点」
+> 为**实施前快照**，其中「Metal 设备/表面/命令 未实现」「`.mm` 构建集成 缺失」
+> 两行已过时，仅作历史记录。
+
 > 定位：为 RenderX 补齐第二个真实 GPU 后端，解锁 macOS 现代渲染能力
 > （GL 4.1 无 compute / 无 indirect draw / 线宽恒 1px），并为 GPU-driven 剔除铺路。
 >
@@ -22,8 +31,8 @@
 | 资源句柄池（世代式，防悬垂） | 可复用 | `src/rhi/rhiResourcePool.h` |
 | Shader 构建期嵌入（含 `.metal` / `.metallib`） | 已就绪 | `CMake/EmbedShaders.cmake` |
 | 表面抽象（含 `CocoaNsView`） | 已就绪 | `src/rhi/rhiSurface.h` |
-| **Metal 设备 / 表面 / 命令** | **未实现** | `rhiFactory.cpp` 明确报「Phase 7 尚未实现」 |
-| **`.mm` 构建集成** | **缺失** | `Renderx/CMakeLists.txt` 的 GLOB 只收 `src/*.cpp` |
+| **Metal 设备 / 表面 / 命令** | **未实现**（实施前快照，现已实现，见顶部勘误） | `rhiFactory.cpp` 明确报「Phase 7 尚未实现」 |
+| **`.mm` 构建集成** | **缺失**（实施前快照，现已接入 APPLE 分支） | `Renderx/CMakeLists.txt` 的 GLOB 只收 `src/*.cpp` |
 
 一句话：**抽象层和构建机制的准备工作已经做完，缺的是 Metal 后端本体与 `.mm` 的构建接入。**
 
