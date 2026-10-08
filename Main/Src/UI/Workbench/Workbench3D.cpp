@@ -259,10 +259,6 @@ void Workbench3D::create3DServices()
     own.brepModelService = std::make_unique<BRepModelService3D>();
     #endif
 
-    if (own.undoRedoManager)
-    {
-        own.undoRedoManager->setSceneManager(m_sceneManager3D);
-    }
     if (own.sceneMonitor)
     {
         own.sceneMonitor->rewatch(m_sceneManager3D);
