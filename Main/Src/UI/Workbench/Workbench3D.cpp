@@ -438,13 +438,8 @@ void Workbench3D::on3DContextMenuRequested(const QPoint& globalPos)
     auto* renderWidget = m_services3D.renderWidget;
     if (!renderWidget || !m_serviceOwner || !m_serviceOwner->commandActionHub)
     {
-        SY_DEBUGF("[Workbench3D] context menu requested but early-return: renderWidget=%p owner=%p hub=%p",
-            static_cast<void*>(renderWidget),
-            m_serviceOwner.get(),
-            m_serviceOwner ? static_cast<void*>(m_serviceOwner->commandActionHub.get()) : nullptr);
         return;
     }
-    SY_DEBUG("[Workbench3D] on3DContextMenuRequested: building menu");
     QMenu menu;
     // 基于命令中枢实时快照构建菜单（count / 锁定 来自与 3D 工具栏相同的单一事实来源），
     // 避免右键菜单再走一套独立的选择数据源导致显隐/灰显规则漂移（与 2D 一致）。
@@ -498,7 +493,16 @@ QMenu* Workbench3D::buildConfiguredContextMenu(const QString& contextMenuId)
     // triggered 闭包，而菜单是在调用方 exec() 的 —— 局部对象出栈即悬垂。
     auto* dispatcher = m_workbenchWindow ? m_workbenchWindow->menuManager()->commandDispatcher()
                                          : static_cast<IUiCommandDispatcher*>(this);
-    return UiContextMenuService::instance().buildMenu(config, contextMenuId, dispatcher, m_services3D.renderWidget);
+    // 菜单 parent 必须是顶层窗口：传视口子控件时，QMenu popup 的 transient parent
+    // 解析到 RenderWidget3D 的子原生窗口，macOS 上 Qt 报
+    // "QWidgetWindow ... must be a top level window"，菜单静默不弹。
+    // 与 2D 传 m_commandHub->mainWindow() 同口径；兜底用 widget->window()。
+    QWidget* menuParent = m_workbenchWindow;
+    if (!menuParent && m_services3D.renderWidget)
+    {
+        menuParent = m_services3D.renderWidget->window();
+    }
+    return UiContextMenuService::instance().buildMenu(config, contextMenuId, dispatcher, menuParent);
 }
 
 /// 步骤三：创建 CommandActionHub3D、注册命令、初始化菜单管理器和快捷键
