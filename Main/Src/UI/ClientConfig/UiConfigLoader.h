@@ -4,7 +4,7 @@
  * @file UiConfigLoader.h
  * @brief 客户化 UI 配置加载器
  *
- * 与 Docs/01-当前架构/UI定制变更设计方案.md 第 6.2 节对应。
+ * 实现说明见 Docs/01-当前架构/UI定制.md。
  * 从 Qt 资源或文件路径加载 JSON 配置，解析为 C++ 数据结构。
  * 支持 "extends" 继承机制（合并父配置）与运行时字段校验。
  */

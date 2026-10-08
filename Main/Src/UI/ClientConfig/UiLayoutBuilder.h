@@ -4,7 +4,7 @@
  * @file UiLayoutBuilder.h
  * @brief 数据驱动的 UI 布局构建器
  *
- * 与 Docs/01-当前架构/UI定制变更设计方案.md 第 6.4 节对应。
+ * 实现说明见 Docs/01-当前架构/UI定制.md。
  * 根据 UiConfigData 构建实际的 Qt Widgets（菜单/工具栏/Dock/快捷键）。
  * 命令绑定通过 IUiCommandDispatcher 抽象，与具体命令系统解耦。
  */
@@ -19,6 +19,7 @@
 #include <vector>
 
 class QAction;
+class QActionGroup;
 class QMainWindow;
 class QMenu;
 class QShortcut;

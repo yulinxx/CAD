@@ -4,7 +4,7 @@
  * @file UiConfigurationManager.h
  * @brief 客户化 UI 配置管理器
  *
- * 与 Docs/01-当前架构/UI定制变更设计方案.md 第 6.3 节对应。
+ * 实现说明见 Docs/01-当前架构/UI定制.md。
  * 多客户 UI 配置的总控点：加载客户配置、持有面板工厂、提供统一配置入口。
  */
 
