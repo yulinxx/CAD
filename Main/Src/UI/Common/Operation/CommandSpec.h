@@ -6,6 +6,11 @@
  * 两侧 CommandCatalog 仅保留 OperationId 映射，消除重复维护。
  *
  * P1-4：2D/3D 命令镜像 19 对去重，see 架构审查报告。
+ *
+ * ⚠ 债务标记（P1-4 未完成）：本表当前零消费者——全仓库无任何 .cpp/.h include
+ * 此文件，2D/3D CommandCatalog 仍各自独立维护命令定义。待 CommandCatalog.cpp
+ * 的并行重构（3D Undo/命令迁移）冻结后，二选一：让两侧 Catalog 消费本表完成
+ * 去重，或删除本文件并关闭 P1-4。在此之前请勿依赖本表做任何行为假设。
  */
 #pragma once
 
