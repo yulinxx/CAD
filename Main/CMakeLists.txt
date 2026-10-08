@@ -598,7 +598,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
     set_source_files_properties(${PROTO_GEN_SRC} PROPERTIES GENERATED TRUE)
 
     # P5 测试扩展: 添加 BaseTool.cpp（非导出类，UI2D 库不导出其符号）
-    set(BASE_TOOL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Src/Ui/DrawTools/BaseTool.cpp")
+    set(BASE_TOOL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Src/UI/DrawTools/BaseTool.cpp")
 
     find_package(protobuf CONFIG REQUIRED)
 
