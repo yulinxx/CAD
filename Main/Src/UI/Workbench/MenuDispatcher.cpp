@@ -87,8 +87,6 @@ bool MenuDispatcher::isCommandRegistered(const QString& commandId) const
 
 void MenuDispatcher::dispatch(const QString& commandId, const QVariantMap& params)
 {
-    Q_UNUSED(params);
-
     // 工作台切换统一由主窗口 triggerWorkbench 处理（含防重复切换保护）。
     if (isWorkbenchSwitchCommand(commandId) && m_self && m_self->workbenchWindow())
     {
@@ -146,9 +144,17 @@ void MenuDispatcher::dispatch(const QString& commandId, const QVariantMap& param
         return;
     }
 
-    // 非窗口级命令：交由工作台 isCommandRegistered + OperationBus 分发
-    //（此路径通常由 WorkbenchMenuManager::dispatchCommand 处理，MenuDispatcher 只做窗口级短路）
-    SY_DEBUGF("[MenuDispatcher] unhandled commandId=%s (not window-level)", commandId.toUtf8().constData());
+    // 非窗口级命令：转发给当前工作台（isCommandRegistered 已按工作台目录裁决过
+    // 按钮可用性，这里落到 2D/3D 各自的 OperationBus）。
+    // 注意：UiLayoutBuilder 把菜单/快捷键直接绑到本 dispatcher，这条转发是唯一
+    // 通路 —— P2-1 拆分时曾把它丢失，表现为 3D 下 file.import_obj 等命令
+    // 只留一条 unhandled 日志而毫无动作。
+    if (!m_workbench)
+    {
+        SY_WARNF("[MenuDispatcher] No active workbench for command='%s'", commandId.toUtf8().constData());
+        return;
+    }
+    m_workbench->dispatchCommand(commandId, params);
 }
 
 QString MenuDispatcher::commandIcon(const QString& commandId) const

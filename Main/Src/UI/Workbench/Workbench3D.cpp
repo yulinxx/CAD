@@ -438,8 +438,13 @@ void Workbench3D::on3DContextMenuRequested(const QPoint& globalPos)
     auto* renderWidget = m_services3D.renderWidget;
     if (!renderWidget || !m_serviceOwner || !m_serviceOwner->commandActionHub)
     {
+        SY_DEBUGF("[Workbench3D] context menu requested but early-return: renderWidget=%p owner=%p hub=%p",
+            static_cast<void*>(renderWidget),
+            m_serviceOwner.get(),
+            m_serviceOwner ? static_cast<void*>(m_serviceOwner->commandActionHub.get()) : nullptr);
         return;
     }
+    SY_DEBUG("[Workbench3D] on3DContextMenuRequested: building menu");
     QMenu menu;
     // 基于命令中枢实时快照构建菜单（count / 锁定 来自与 3D 工具栏相同的单一事实来源），
     // 避免右键菜单再走一套独立的选择数据源导致显隐/灰显规则漂移（与 2D 一致）。
