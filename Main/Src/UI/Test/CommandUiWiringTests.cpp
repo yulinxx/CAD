@@ -20,6 +20,7 @@
 #include "UI/ClientConfig/UiClientConfigBase.h"
 #include "UI/ClientConfig/UiConfigLoader.h"
 #include "UI/ClientConfig/UiConfigSelfCheck.h"
+#include "UI/ClientConfig/UiFeatureGate.h"
 #include "UI/Widgets/DrawToolBarWidget.h"
 
 #include "UI/Workbench/WorkbenchMenuManager.h"
@@ -632,6 +633,24 @@ namespace
             QStringLiteral(":/configs/client_b.json"),
         };
     }
+
+    /// 测试进程不走许可流程，UiFeatureGate 默认 unrestricted（等价于放行全部），
+    /// 会把「出厂配置引用了本构建未编译的模块」误判成"授权放行了不存在的功能"。
+    /// 这里把授权集设成给定集合（模拟"许可证与构建匹配"的生产前提），
+    /// 析构时 resetForTest 恢复默认，避免污染同进程后续用例。
+    struct ScopedLicense
+    {
+        explicit ScopedLicense(const QStringList& features)
+        {
+            UiFeatureGate::instance().setLicensedFeatures(features);
+        }
+        ~ScopedLicense()
+        {
+            UiFeatureGate::resetForTest();
+        }
+        ScopedLicense(const ScopedLicense&) = delete;
+        ScopedLicense& operator=(const ScopedLicense&) = delete;
+    };
 }  // namespace
 
 TEST(CommandConfigContractTest, EveryConfiguredCommandIdResolvesInItsWorkbenchCatalog)
@@ -695,6 +714,31 @@ TEST(UiConfigSelfCheckTest, UnknownCommandIdIsReportedAsUnresolved)
 
 TEST(UiConfigSelfCheckTest, ShippedConfigsPassTheSelfCheck)
 {
+    // 出厂配置允许声明"本构建未编译"的 feature（默认构建下 vision / relief3d 就属
+    // 此类），它们是否出现由客户 License 决定，不能在无 License 的测试进程里被算成
+    // "卖了不存在的功能"。先把授权集设成与本次构建开关一致，模拟许可证与构建匹配。
+    QStringList buildMatchingLicense;
+    for (const QString& path : allClientConfigPaths())
+    {
+        UiConfigLoader loader(path);
+        auto config = loader.load();
+        ASSERT_TRUE(config.has_value()) << path.toStdString();
+
+        for (const UiConfigFeatureRef& ref : UiConfigSelfCheck::collectFeatureRefs(*config))
+        {
+            bool known = false;
+            if (UiConfigSelfCheck::isFeatureCompiledIn(ref.featureId, known) && known)
+            {
+                const QString id = ref.featureId.trimmed().toLower();
+                if (!buildMatchingLicense.contains(id))
+                {
+                    buildMatchingLicense << id;
+                }
+            }
+        }
+    }
+    const ScopedLicense license(buildMatchingLicense);
+
     for (const QString& path : allClientConfigPaths())
     {
         UiConfigLoader loader(path);
@@ -710,6 +754,53 @@ TEST(UiConfigSelfCheckTest, ShippedConfigsPassTheSelfCheck)
             << path.toStdString() << ":\n"
             << report.licensedButNotCompiled.join(QLatin1Char('\n')).toStdString();
     }
+}
+
+TEST(UiConfigSelfCheckTest, ExplicitLicenseForUncompiledFeatureIsReported)
+{
+    // 反例：上面那条断言在"授权与构建一致"前提下恒真，自检的报错能力必须由这里
+    // 单独锁住——License 真放行了本构建没有的模块时，licensedButNotCompiled 必须非空。
+    // 挑一个当前构建关掉的 feature；全开时无从构造，跳过。
+    const QStringList candidates = {
+        QStringLiteral("vision"),
+        QStringLiteral("relief3d"),
+        QStringLiteral("hardware"),
+        QStringLiteral("nesting"),
+        QStringLiteral("3d"),
+    };
+    QString uncompiled;
+    for (const QString& candidate : candidates)
+    {
+        bool known = false;
+        if (!UiConfigSelfCheck::isFeatureCompiledIn(candidate, known) && known)
+        {
+            uncompiled = candidate;
+            break;
+        }
+    }
+    if (uncompiled.isEmpty())
+    {
+        GTEST_SKIP() << "本构建全部 feature 开关均开启，无法构造反例";
+    }
+
+    const ScopedLicense license({ uncompiled });
+
+    UiConfigData config;
+    MenuDef menu;
+    menu.id = QStringLiteral("edit");
+    menu.workbenches = { QStringLiteral("2D") };
+    MenuActionDef action;
+    action.id = QStringLiteral("edit.feature_probe");
+    // commandId 留空：feature 引用的收集不依赖命令，这里只测 feature 三侧交叉
+    action.feature = uncompiled;
+    menu.items.push_back(action);
+    config.menus.push_back(menu);
+
+    const UiConfigSelfCheckReport report = UiConfigSelfCheck::run(config);
+    ASSERT_EQ(report.licensedButNotCompiled.size(), 1)
+        << report.licensedButNotCompiled.join(QLatin1Char('\n')).toStdString();
+    EXPECT_TRUE(report.licensedButNotCompiled.first().contains(uncompiled));
+    EXPECT_TRUE(report.hasBlockingIssue());
 }
 
 TEST(UiConfigSelfCheckTest, EveryFeatureUsedInConfigsHasABuildSwitchMapping)
