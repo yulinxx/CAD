@@ -33,6 +33,8 @@
 
 
 #include <QAction>
+#include <QCoreApplication>
+#include <QEvent>
 #include <QMainWindow>
 #include <QMenu>
 #include <QString>
@@ -962,6 +964,54 @@ TEST(DrawToolBarWidgetTest, ToolActionsCarryCatalogCommandId)
         // commandId 是跨入口的统一标识：快照刷新、日志、配置契约测试都靠它认人
         EXPECT_EQ(action->property("commandId").toString(), QString::fromUtf8(entry->shortcutId));
     }
+}
+
+TEST(DrawToolBarWidgetTest, LanguageChangeAfterHubDestructionIsSafe)
+{
+    // 复现工作台切换的时序崩溃（minidump SanYiCAD_20261008_142744）：
+    // 1. Workbench2D::deactivate() 里 hub.reset()，~CommandActionHub 对每个 QAction deleteLater；
+    // 2. clearWorkbenchContent() 的 sendPostedEvents(DeferredDelete) 把动作真正释放；
+    // 3. host=ToolBar 的 DrawToolBarWidget 不进 Dock 清理范围，仍缓存着已释放的 SelectTool 动作；
+    // 4. 切换期间的 LanguageChange 传播到子 widget → changeEvent → updateHighlight → 悬空解引用。
+    QMainWindow window;
+    DrawToolBarWidget widget(&window);
+    widget.setIsPanModeCallback([]() { return false; });
+    widget.setPanModeToggleCallback([]() { return true; });
+
+    {
+        CommandActionHub hub;
+        hub.setMainWindow(&window);
+        hub.rebuildToolActions();
+        widget.setToolActions(leftToolbarActions(hub));
+
+        // 覆盖面自检：Select 缓存路径（m_selectAction）只有在 Select 按钮存在时才会被填充
+        bool hasSelectButton = false;
+        for (QToolButton* button : widget.findChildren<QToolButton*>())
+        {
+            QAction* action = button->defaultAction();
+            if (action && action->property("toolName").toString() == QStringLiteral("SelectTool"))
+            {
+                hasSelectButton = true;
+                break;
+            }
+        }
+        ASSERT_TRUE(hasSelectButton) << "没有 Select 按钮，崩溃路径就没被测试覆盖到";
+    }
+
+    // 模拟 clearWorkbenchContent 第 5 步：刷出枢纽析构投递的 DeferredDelete
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+
+    // 模拟语言切换：QWidget::event 会把 LanguageChange 传播给所有子 widget
+    QEvent languageChange(QEvent::LanguageChange);
+    QCoreApplication::sendEvent(&window, &languageChange);
+
+    // 可观察的脱钩断言：updateHighlight 在动作已释放时必须早退；
+    // 无 QPointer 保护时它会拿悬空指针重新 setDefaultAction 把按钮挂回已释放动作上
+    for (QToolButton* button : widget.findChildren<QToolButton*>())
+    {
+        EXPECT_EQ(button->defaultAction(), nullptr) << "updateHighlight 用悬空动作把按钮重新挂了回去";
+    }
+    SUCCEED();
 }
 
 
