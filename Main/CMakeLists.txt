@@ -611,6 +611,11 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
         ${SRC_ROOT}/UI/ClientConfig/configs.qrc
     )
 
+    # 测试 TU 彼此在匿名 namespace 内定义同名辅助符号（kFio2DFactoryRegistered /
+    # findChange / recordOneFrame ...），unity batch 合并后会 redefinition；
+    # 被测应用源码仍按 unity 编译（与主程序目标保持一致）。
+    set_source_files_properties(${MAIN_TEST_SOURCES} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
     target_compile_features(MainTests PRIVATE cxx_std_17)
 
     target_include_directories(MainTests
@@ -667,6 +672,10 @@ target_link_libraries(MainTests
             GTest::gtest_main
             GTest::gmock
     )
+
+    # QSignalSpy 等 Qt Test 头文件/库：主程序不带 Test 组件，测试目标单独补
+    find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Test REQUIRED)
+    target_link_libraries(MainTests PRIVATE Qt${QT_VERSION_MAJOR}::Test)
 
     if(WIN32)
         # MainTests 编译了全部 MAIN_APP_SOURCES，其中 CrashHandlerBootstrap.cpp 的
