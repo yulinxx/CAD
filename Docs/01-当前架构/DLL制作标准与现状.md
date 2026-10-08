@@ -97,12 +97,12 @@ UI/2D/
 的 `SyImage`，传进 `Engine2D` 内部再 `dynamic_cast<const SyImage*>` 会返回 `nullptr`，
 而且**不报任何错**，只是静默走进 else 分支。
 
-已知踩过的坑（2026-08-30 修复）：`Geo2DQuery::isClosed()` 用 `dynamic_cast` 认位图，在真实
-进程里恒为 false，于是 `hitTest()` 跳过「点是否在图元内部」这一判据，`SelectionGizmo` 判不出
+实例（说明该坑的形态）：`Geo2DQuery::isClosed()` 一旦用 `dynamic_cast` 认位图，在真实
+进程里就恒为 false，于是 `hitTest()` 跳过「点是否在图元内部」这一判据，`SelectionGizmo` 判不出
 `HandleKind::Body`，表现为「位图能缩放能旋转、就是拖不动」。同一进程里
-`Geo2DPath::isClosedContour()` 用的是 `eType` switch，一直是对的，两边结论长期不一致。
+`Geo2DPath::isClosedContour()` 用 `eType` switch 判型，结论正确——两种写法必须给出一致结论。
 
-这个缺陷还有一个恶性特征：**把相关代码单独链成一个小程序去测，`dynamic_cast` 是正确的**，
+这类缺陷还有一个恶性特征：**把相关代码单独链成一个小程序去测，`dynamic_cast` 是正确的**，
 测试全绿。要复现必须在多库进程里跑（`MainTests` 这种链全部 dylib 的目标）。
 
 `Engine/2D/Src/Algorithm/` 下的 `Geo2DSampling` / `Geo2DAnalysis` / `Geo2DEdit` 仍有上百处
@@ -110,7 +110,7 @@ UI/2D/
 对应 `.cpp` 把虚函数锚定在 `Engine2D` 内，typeinfo 只有一份；这是巧合而不是保证——任何图元
 一旦改成纯头文件实现，就会立刻重现同一类静默失效。这批替换尚未进行。
 
-**当前统计**（2026-09-13 审计）：
+**当前统计**：
 - `Geo2DEdit.cpp`: 45 处 `dynamic_cast`
 - `SceneManager.cpp`: 2 处 `dynamic_cast`
 - `UndoRedoManager.cpp` / `SceneUndoCommands.cpp`: 4 处（命令合并场景，非图元判型）

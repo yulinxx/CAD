@@ -1,6 +1,6 @@
 # Workbench2D 拆解方案
 
-> **状态（2026-10-07）**：方案设计，待执行。
+> **状态**：方案设计，待执行。
 > Workbench2D.cpp 现 2215 行，God Class。本方案给出
 > 渐进式拆解蓝图。与 RenderWidget3D 拆解（几何构建已抽离）
 > 不同，Workbench2D 拆解涉及 Qt 信号槽迁移，**执行需

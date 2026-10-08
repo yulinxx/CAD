@@ -54,14 +54,7 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-    subgraph 旧流程
-        A1[for each id] --> A2[构造矩阵]
-        A2 --> A3[变换图元]
-        A3 --> A4[更新索引]
-        A4 --> A1
-    end
-
-    subgraph 新流程
+    subgraph 批量流程
         B1[循环外构造<br/>1个矩阵] --> B2[for each id]
         B2 --> B3[一次矩阵乘法]
         B3 --> B4[只改几何]
@@ -69,26 +62,26 @@ flowchart LR
     end
 ```
 
-### 2.1.1 SmartLine 批量变换（2026-09-16）
+### 2.1.1 SmartLine 批量变换
 
 文件：`Engine/2D/Src/SyEntity/SySmartLine.cpp` (`transformBatch`)、`Engine/2D/Src/Algorithm/EntityTransform.cpp` (`applyMatrixToIds`)
 
-SVG 导入的复合曲线大多以 `SmartLine` 存储（一条 SVG 子路径 = 一个 SmartLine，含数百段贝塞尔/线段）。旧实现逐段调用虚函数 `transform()`，每段一次 vtable 查找、分发开销大。
+SVG 导入的复合曲线大多以 `SmartLine` 存储（一条 SVG 子路径 = 一个 SmartLine，含数百段贝塞尔/线段）。逐段调用虚函数 `transform()` 会让每段都付出一次 vtable 查找与分发开销，**必须**走批量路径。
 
-**优化**：
-- 新增 `SySmartLine::transformBatch(const Ut::Mat3d& mat)`：预计算矩阵分量，按已知类型分发（LINE/ARC/BEZIER2/BEZIER/CIRCLE/ELLIPSE/POINT/POLYGON），内联矩阵乘法，避免虚函数分发。
+**做法**：
+- `SySmartLine::transformBatch(const Ut::Mat3d& mat)`：预计算矩阵分量，按已知类型分发（LINE/ARC/BEZIER2/BEZIER/CIRCLE/ELLIPSE/POINT/POLYGON），内联矩阵乘法，避免虚函数分发。
 - `EntityTransform::applyMatrixToIds()` 检测到 `EType::SMARTLINE` 时直接调用 `transformBatch()`。
 - 所有子段标记 `setModified()`，级联缓存失效，防止渲染脏读。
 
 **收益**：SmartLine 变换加速 30-50%，1000 段路径从 ~5ms 降到 ~2-3ms。
 
-### 2.1.2 空间索引批量更新（2026-09-16）
+### 2.1.2 空间索引批量更新
 
 文件：`Engine/2D/Src/Core/EntitySpatialIndex.cpp`、`Engine/2D/Src/SpatialIndex/SpatialIndex2D.cpp`、`Engine/2D/Src/Core/SceneManager.cpp`
 
-批量变换时旧实现逐图元调用 `updateEntityBoundsNoNotify()` → `spatialIndex.update()` = remove + insert（2×O(log N)），每次触发 RTree 重平衡。
+批量变换时**不得**逐图元调用 `updateEntityBoundsNoNotify()` → `spatialIndex.update()` = remove + insert（2×O(log N)），那会让 RTree 每次都重平衡。
 
-**优化**：
+**做法**：
 - `EntitySpatialIndex::updateBulk(entities)` / `SpatialIndex2D::updateBulk()` / `SceneManager::updateEntityBoundsBulk()`：先收集所有旧包围盒一次性移除，再批量插入新包围盒，RTree 只做一次批量重建。
 - `EntityTransform::applyMatrixToIds()` **只改几何**，不在图元循环里更新索引；整批结束后由
   `SceneEditService::transformEntities()` 收集受影响图元并一次性调用 `updateEntityBoundsBulk()`。
@@ -187,22 +180,22 @@ Esc 取消则用 before 快照整体还原。拖动期间
 | `addEntitiesRemovedObserver(fn)` | 图元移除通知，**批量语义**：`fn(SyMeshEntity* const*, size_t)`，一次删除只回调一次 |
 
 前两者共用 `Impl::detach()` 一个实现：**一趟压缩**从容器移出目标图元（读游标前移保留元素），
-同时一次性清理 ID 索引、空间索引、选择集。旧实现逐个 `erase(begin + index)`
-每次都要搬移尾部元素，M 个图元即 O(N·M)。
+同时一次性清理 ID 索引、空间索引、选择集。**不得**逐个 `erase(begin + index)`
+—— 那样每次都要搬移尾部元素，M 个图元即 O(N·M)。
 
 `removeEntity()`（单图元）也复用这条路径，避免移除语义出现两条行为不一致的分支。
 
 ### 4.2 移除通知为什么必须是批量语义
 
-`SelectionManager3D` 订阅了移除通知以清理自己的选中列表。旧签名是
-`void(SyMeshEntity*)`，逐图元回调，而回调体 `syncSelectionFromScene()` 每次都要
+`SelectionManager3D` 订阅了移除通知以清理自己的选中列表。签名**不得**是逐图元的
+`void(SyMeshEntity*)`：那样回调体 `syncSelectionFromScene()` 每次都要
 `forEachEntity` 把**全场景**图元塞进哈希表：
 
 ```text
 删 M 个图元 → M 次全场景遍历 + M 次哈希表构造 = O(N·M)，且删完才轮到重建树
 ```
 
-现在通知一次带上整批指针（通知期间对象仍存活，观察者可安全比较），
+因此通知一次带上整批指针（通知期间对象仍存活，观察者可安全比较），
 观察者只做 `dropFromSelection()`：按移除集合剔除选中项，O(选中集 + 移除数)。
 
 ### 4.3 批量选择接口
@@ -213,8 +206,8 @@ Esc 取消则用 before 快照整体还原。拖动期间
   整批改选择集，**只通知一次** `onSelectionChanged`；
   内部用局部 `unordered_set` 去重，替代逐图元 O(选中数) 的线性 `find`；
 - 所有选择变更统一走私有出口 `commitSelectionChanged()`，单图元接口与批量接口共用；
-- `selectByBox()` 改为收集命中集后一次 `selectMany()`。旧实现 `clearSelection()`
-  再逐个 `addSelect()`，框选 500 个图元就是 500 次 UI 扇出
+- `selectByBox()` 收集命中集后一次 `selectMany()`，**不得** `clearSelection()`
+  后再逐个 `addSelect()` —— 框选 500 个图元就是 500 次 UI 扇出
   （每次都是属性面板重建 + 状态栏 + 命令状态刷新）；
 - `applyTransform()` 烘焙顶点后，只对本批选中图元调 `updateEntitiesBounds()`
   更新索引，不再全量 `rebuildSpatialIndex()`（O(M log N) 而非 O(N log N)）；
@@ -223,11 +216,11 @@ Esc 取消则用 before 快照整体还原。拖动期间
   矩阵只读，无共享写；小批量或并行关闭时退回串行。阈值与 2D 侧
   `kParallelThreshold = 100` 一致。
 
-### 4.4 实体可见性变更的增量记录（2026-09-18）
+### 4.4 实体可见性变更的增量记录
 
-**问题**：`SyEntity::setVisible()` 此前只调 `setModified()` 标脏，**不记录任何场景变更**。
-于是批量隐藏/显示实体时，`readChanges()` 读不到 `VisibilityChanged`，渲染侧无法走增量
-路径，只能退回全量重建 —— 选中大量图元反复显隐时是主要卡顿来源。
+**问题**：`SyEntity::setVisible()` 若只调 `setModified()` 标脏而**不记录场景变更**，
+批量隐藏/显示实体时 `readChanges()` 读不到 `VisibilityChanged`，渲染侧无法走增量
+路径，只能退回全量重建 —— 选中大量图元反复显隐时的主要卡顿来源就在这里。
 
 **方案**：给 `SyEntity` 增加可见性变更回调，由 `SceneManager` / `SceneManager3D` 在
 实体入场时注入，回调体统一 `recordChange(id, SceneChangeKind::VisibilityChanged)`：
@@ -250,15 +243,16 @@ void setVisible(bool visible) override {
 **收益**：实体级显隐切换进入增量路径，不再退化为 `FullRefresh`；配合 16ms 定时器，
 批量显隐只产生一帧增量重绘。
 
-### 4.5 实体锁定变更与批量锁定（2026-09-20）
+### 4.5 实体锁定变更与批量锁定
 
-**问题**：2D 场景树「全选 → 锁定/解锁」旧路径有三重浪费：
+**问题**：2D 场景树「全选 → 锁定/解锁」必须避开三重浪费：
 
-1. 场景树经 `QStringList` 传递 ~N 个字符串 ID，工作台再逐个
-   `id.toStdString()` + `parseEntityId` + `findEntityById`（百万图元下是主要开销）；
-2. `setLocked` 只改标志位，但工作台仍调 `scene->notifySceneChanged()` —— 锁定是纯元数据，
+1. 场景树经 `QStringList` 传递 ~N 个字符串 ID、工作台再逐个
+   `id.toStdString()` + `parseEntityId` + `findEntityById`（百万图元下是主要开销）——
+   因此批量信号**必须**改传整数 ID；
+2. `setLocked` 只改标志位却调用 `scene->notifySceneChanged()` —— 锁定是纯元数据，
    **不影响几何与渲染**，这次视口刷新完全多余；
-3. 为刷新一个当时并不存在的锁图标，触发一次 O(N) 全量场景树重建。
+3. 为刷新一个锁图标而触发一次 O(N) 全量场景树重建。
 
 **方案**：
 
@@ -277,21 +271,19 @@ void setVisible(bool visible) override {
 
 ### 4.6 调用方收口
 
-| 位置 | 旧做法 | 现做法 |
-| --- | --- | --- |
-| `RenderWidget3D::selectByScreenRect` | `clearSelection` + 逐个 `addSelect` | 一次 `selectMany(hits, additive)` |
-| `SceneEditService3D::deleteSelected` | 逐个 `removeEntity` | 一次 `extractEntities`，所有权交撤销命令 |
-| `SceneEditService3D::addEntities`（建撤销命令） | 逐个 `removeEntity` 摘回刚加入的图元 | 一次 `extractEntities` |
-| `DeleteMeshCommand3D::execute`（redo） | 逐个 `removeEntity` | 一次 `extractEntities` |
-| `AddMeshCommand3D::undo` | 逐个 `removeEntity` | 一次 `extractEntities` |
-| `UndoCommands3D::DeleteEntitiesCommand::undo/redo` | 逐个 `addEntity` / `removeEntity` + `delete` | 一次 `addEntities` / `extractEntities` |
-| `Workbench3D::deleteSceneTreeSelection3D` | 逐个 `removeEntity` | 一次 `deleteEntities` |
-| `Workbench3D::applySceneTreeSelection3D` | `clearSelection` + 逐个 `addSelect` | 一次 `selectMany(meshes, false)` |
+| 位置 | 现做法 |
+| --- | --- |
+| `RenderWidget3D::selectByScreenRect` | 一次 `selectMany(hits, additive)` |
+| `SceneEditService3D::deleteSelected` | 一次 `extractEntities`，所有权交撤销命令 |
+| `SceneEditService3D::addEntities`（建撤销命令） | 一次 `extractEntities`（摘回刚加入的图元） |
+| `DeleteMeshCommand3D::execute`（redo） | 一次 `extractEntities` |
+| `AddMeshCommand3D::undo` | 一次 `extractEntities` |
+| `Workbench3D::deleteSceneTreeSelection3D` | 一次 `deleteEntities` |
+| `Workbench3D::applySceneTreeSelection3D` | 一次 `selectMany(meshes, false)` |
 
-其中 `DeleteEntitiesCommand::redo` 顺带修掉了一个二次释放：旧实现
-`delete scene->removeEntity(...)` 在命令仍持有 `unique_ptr` 的情况下销毁了对象，
-命令析构时会再次释放。现改为 `extractEntities` 摘出并保留所有权，形成
-「undo 归还 / redo 摘出」的可逆闭环（与 `DeleteMeshCommand3D` 同一模式）。
+**约束**：禁止 `delete scene->removeEntity(...)` —— 在命令仍持有 `unique_ptr` 的情况下
+销毁对象会造成二次释放（命令析构时再次释放）。必须用 `extractEntities` 摘出并保留
+所有权，形成「undo 归还 / redo 摘出」的可逆闭环（与 `DeleteMeshCommand3D` 同一模式）。
 
 ### 4.7 3D 场景树的重建门控
 
@@ -320,7 +312,7 @@ void setVisible(bool visible) override {
   - 删除 ID 走 `removeRenderEntity` 增量移除；
 - 位图/文字有独立对账账本，纯矢量操作不触发它们的全量对账。
 
-### 5.1 overlay 变更请求的帧合并（2026-09-16）
+### 5.1 overlay 变更请求的帧合并
 
 `ViewRenderCoordinator::requestRepaint()` 与 `SceneRefreshCoordinator3D::scheduleDispatch()`
 均改用 `QMetaObject::invokeMethod(..., Qt::QueuedConnection | Qt::UniqueConnection)`：
@@ -334,29 +326,29 @@ void setVisible(bool visible) override {
 
 此机制与 16ms 定时器互补：定时器管「何时刷新」，QueuedConnection 管「一帧内刷几次」。
 
-### 5.2 相机/鼠标拖拽期间的 update 节流（2026-09-16）
+### 5.2 相机/鼠标拖拽期间的 update 节流
 
 - 2D `RenderWidget::setViewMatrix()`：相机拖拽时的 `QOpenGLWidget::update()` 改为
   `QMetaObject::invokeMethod(this, "update", Qt::QueuedConnection | Qt::UniqueConnection)`；
 - 3D `RenderWidget3D::mouseMoveEvent()`：`m_transforming` / `m_rotating` / `m_panning` /
   `m_boxSelecting` 各分支的 `update()` 全部改为 `QMetaObject::invokeMethod` 节流。
 
-### 5.3 MVP 矩阵预计算（2026-09-16）
+### 5.3 MVP 矩阵预计算
 
-`RenderWidget3D::paintGL()` 中，原先每帧两次计算 `projectionMatrix() * viewMatrix()`：
-一次用于 `buildFrustum()` 构造视锥体，一次传给 shader 的 `uViewProjMatrix`。
+`RenderWidget3D::paintGL()` 中 `projectionMatrix() * viewMatrix()` 每帧要用两处：
+一次 `buildFrustum()` 构造视锥体，一次传给 shader 的 `uViewProjMatrix`。
 
-新增 `buildFrustum(RxFrustum&, const QMatrix4x4& combined)` 重载，接收预计算的合并矩阵；
-`paintGL()` 先算一次 `combined = projectionMatrix() * viewMatrix()`，然后同时用于
-`buildFrustum` 和 shader 上传，避免重复乘法。
+**必须只算一次**：`paintGL()` 先算 `combined = projectionMatrix() * viewMatrix()`，
+再同时交给 `buildFrustum(RxFrustum&, const QMatrix4x4& combined)`（接收预计算的合并矩阵）
+与 shader 上传，避免每帧重复乘法。
 
-### 5.4 移除冗余 update（2026-09-16）
+### 5.4 移除冗余 update
 
-`SceneRefreshCoordinator::applyLightRefresh()` 末尾的 `m_renderWidget->update()` 已移除：
-`BatchGuard` 析构时 `endBatchUpload()` 已调用 `update()`，重复调用被 QueuedConnection
+`SceneRefreshCoordinator::applyLightRefresh()` 末尾**不得**再调 `m_renderWidget->update()`：
+`BatchGuard` 析构时 `endBatchUpload()` 已调用 `update()`，重复调用会被 QueuedConnection
 的 UniqueConnection 机制静默丢弃。
 
-### 5.5 曲线 LOD 独立定时器（2026-09-22）
+### 5.5 曲线 LOD 独立定时器
 
 **问题**：场景更新定时器（16ms）同时用于 LOD 消费时，Repaint 级别会占用该定时器，
 导致 LOD 队列永久搁浅。
@@ -367,12 +359,12 @@ void setVisible(bool visible) override {
 - `ensureCurveLodPump()` 启动独立的 LOD 定时器；
 - `onCurveLodTimer()` 执行一批后，若队列未空则自动续跑。
 
-### 5.6 LOD 降级阈值调整（2026-09-22）
+### 5.6 LOD 降级阈值调整
 
-**问题**：原先降级阈值 3.0 导致缩小时图元长期携带高精度顶点，GPU 绘制冗余大量顶点
+**问题**：降级阈值过大时，缩小视图会让图元长期携带高精度顶点，GPU 绘制冗余大量顶点
 （例如 256 段圆只需 8 段时的冗余是 32 倍）。
 
-**方案**：降级阈值从 3.0 调整为 2.0：
+**方案**：降级阈值取 2.0：
 
 - 放大升级阈值保持 1.3 倍；
 - 缩小降级阈值调整为 2.0 倍；
@@ -380,7 +372,7 @@ void setVisible(bool visible) override {
   - 视口裁剪（1.25 倍余量）已保证平移时小幅缩小不触发重收集；
   - 配合容差公式修复（max(1e-6)），每次降级的重建代价本身也更小。
 
-### 5.7 视口裁剪优化（2026-09-22）
+### 5.7 视口裁剪优化
 
 **问题**：账本记录了全场景图元，但视口裁剪生效时 GPU 上实际只有视口内图元。
 增量路径会把视口外图元误当新图元 `addRenderEntity`，造成重复提交。

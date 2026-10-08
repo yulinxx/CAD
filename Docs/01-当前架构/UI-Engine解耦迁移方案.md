@@ -1,7 +1,7 @@
 # UI-Engine 解耦迁移方案
 
-> **背景**：曾提出一套"UI/Core 抽象接口 + Engine/Adapter 接口 + Config 渲染后端选择"的重构清单（A/B/C）。
-> 本文先给结论：**原方案按原样执行会让框架变更差**，随后给出经过修订、可落地的迁移方案。
+> **背景**：有一套"UI/Core 抽象接口 + Engine/Adapter 接口 + Config 渲染后端选择"的重构清单（A/B/C）**不予采纳**（理由见第 1 章）。
+> 本文给出结论与可落地的迁移方案：**按 A/B/C 原样执行会让框架变更差**。
 >
 > **关联文档**：`Docs/01-当前架构/耦合性分析.md`、`渲染与视口边界.md`、`模块边界定义.md`。
 > 本文不重复上述文档的总体边界描述，只聚焦"UI ↔ Engine 解耦"这一条线的**取舍与落地**。
@@ -19,7 +19,7 @@
 
 ---
 
-## 1. 为什么不能按原方案 A/B/C 做
+## 1. 为什么不能按 A/B/C 方案做
 
 ### 1.1 `EngineAdapter` 是死代码，且是空实现
 
@@ -157,8 +157,8 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 | `Core::IApplication` | 业务层引用 0 | 与 `ApplicationCompositionRoot` 二选一 |
 | `Core::IDrawTool` | 业务层引用 0 | 删除或接线 |
 | `sanyi_declare_module` | 定义 0 使用；24 个模块全走 `sanyi_add_shared_library` | 全量迁移或删除 |
-| `SANYI_DEFAULT_RENDER_BACKEND` | 仅 `find_package`，UI 不消费 | Phase 1 接线 |
-| `BUILD_UI_DIMENSION` | 仅 `UI/CMakeLists.txt`（独立工程）互斥；根工程不 gate | Phase 3 补根工程门控 |
+| `SANYI_DEFAULT_RENDER_BACKEND` | 仅 `find_package`，UI 不消费 | 统一到单一后端开关，由视口开关派生 |
+| `BUILD_UI_DIMENSION` | 仅 `UI/CMakeLists.txt`（独立工程）互斥；根工程不 gate | 由根工程作为唯一权威开关门控 |
 
 ### 2.5 已经正确、不要动的部分
 
@@ -193,11 +193,11 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 
 ---
 
-### Phase 0 — 审计与止损 ✅ 已完成（2026-09）
+### Phase 0 — 审计与止损
 
 **目标**：让"看起来怎样 = 实际怎样"，清出正确地基。
 
-**实际执行结果**：
+**处理结果**：
 
 | 项 | 处理 | 验证 |
 |---|---|---|
@@ -214,14 +214,13 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 
 ---
 
-### Phase 1 — 渲染后端：以"统一开关 + 删死抽象"收口（原计划已修订）
+### Phase 1 — 渲染后端：以"统一开关 + 删死抽象"收口
 
-> **2026-09 实测修订**：原 Phase 1 假设"渲染后端没有抽象"，与事实不符 ——
-> 后端**已经是运行时可选**的。因此原计划的大改造（把 widget 基类改为运行时、
-> 引入 `IRenderBackend` / `RenderBackendFactory`）**成本高、风险大、收益低**，已取消。
-> 保留的是真正存在的问题：两个后端开关互不相连 + 死抽象。
+> **前提（实测）**：渲染后端**已经是运行时可选**的，不存在"后端没有抽象"的问题。
+> 因此**不采用**把 widget 基类改为运行时、引入 `IRenderBackend` / `RenderBackendFactory`
+> 的大改造（成本高、风险大、收益低）。需要处理的只有两个真实问题：两个后端开关互不相连 + 死抽象。
 
-**已成立（无需改造）**：
+**已经成立（无需改造）**：
 
 | 能力 | 证据 |
 |---|---|
@@ -232,11 +231,10 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 
 **实际执行**：
 
-1. **统一两个后端开关** ✅
-   `SY_ENABLE_METAL_VIEWPORT` 的默认值改为派生自 `SANYI_DEFAULT_RENDER_BACKEND`
+1. **两个后端开关必须统一**：`SY_ENABLE_METAL_VIEWPORT` 的默认值派生自 `SANYI_DEFAULT_RENDER_BACKEND`
    （`CMakeLists.txt` 视口开关段），并加一致性 WARNING；用户仍可显式覆盖。
-   - 修复前问题：`-DSANYI_DEFAULT_RENDER_BACKEND=OPENGL`（Apple）仍会编译 Metal 视口。
-2. **删除死抽象 `UI::IRenderSurface`** ✅（0 实现、0 include）。
+   - 约束：两个开关不得各自取值，否则 `-DSANYI_DEFAULT_RENDER_BACKEND=OPENGL`（Apple）仍会编译 Metal 视口。
+2. **不保留死抽象 `UI::IRenderSurface`**（0 实现、0 include）。
 3. **明确不做运行时基类切换**（决策）：
    唯一编译期耦合是 widget 基类（`QOpenGLWidget` vs `QWidget`），由
    `SY_ENABLE_METAL_VIEWPORT` 切换。该宏改变类定义，必须 PUBLIC 否则 ODR 冲突
@@ -247,9 +245,9 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 
 ---
 
-### Phase 2 — UI→Engine 依赖收口 + 方向强制 ✅ 已完成（2026-09）
+### Phase 2 — UI→Engine 依赖收口 + 方向强制
 
-**不做接口**，只收口依赖面。实际执行：
+**不做接口**，只收口依赖面：
 
 1. **`CMake/UiEngineAccess.cmake`** — INTERFACE 目标 `UiEngineAccess`，
    `INTERFACE` 链接 `EngineCommon/Engine2D/Engine3D/EnginePersistence`。
@@ -266,7 +264,7 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
    - `UI*` 不得直接链 `EngineCommon/Engine2D/Engine3D/EnginePersistence`（只能经门面）
 4. **CI**：`.github/workflows/ci.yml` 的 Configure 步骤自动触发该检查，违规即失败。
 
-**验收（已验证）**：
+**验收**：
 - 配置输出：`[UiEngineAccess] ... 已定义` + `[SanYi] 依赖方向校验: OK`。
 - 注入违规（给 `UICommon` 加 `Engine2D` 直链）→ configure 立即 `FATAL_ERROR`
   （`CheckDependencies.cmake:67`）；移除后恢复通过。
@@ -274,7 +272,7 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 
 ---
 
-### Phase 3 — 目录统一 + 维度门控 ✅ 已完成（2026-09）
+### Phase 3 — 目录统一 + 维度门控
 
 **1. 2D/3D 目录骨架 — 实测已对齐，无需搬迁**
 
@@ -286,16 +284,16 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 仅3D: Edit, Plugin, Relief, Render, Shortcut(空), Storage, Tool(域内专用)
 ```
 
-- `Action`、`Shortcut` 为空目录（且未被 git 跟踪）→ 已删除。
+- `Action`、`Shortcut` 为空目录（未被 git 跟踪），不保留。
 - 其余差异目录（`Option` / `Edit` / `Plugin` / `Relief` / `Storage` / `Tool`）是
   **真实域内功能**，统一骨架里没有对应类目；强行搬迁属主观且会打断
   **48 处** `#include "Option/..."` 等路径。**决定不搬迁**（避免为"整齐"付真实代价）。
 - `Render` 已在骨架内（3D 有 `Src/Render`）。
 
-**2. 根工程 `BUILD_UI_DIMENSION` 门控 — 已实现**
+**2. 根工程 `BUILD_UI_DIMENSION` 门控 — 现状**
 
 `Config.cmake` 新增唯一权威开关 `BUILD_UI_DIMENSION`（`2D|3D|BOTH`，默认 `BOTH`），
-派生 `BUILD_UI3D` 与 `SANYI_DEFAULT_UI_DIMENSION`（`FORCE` 写回缓存，修复 2D→BOTH
+派生 `BUILD_UI3D` 与 `SANYI_DEFAULT_UI_DIMENSION`（`FORCE` 写回缓存，避免 2D→BOTH
 粘滞）。非法取值 `FATAL_ERROR`。
 
 | 取值 | UI2D | UI3D | 运行时默认 |
@@ -307,25 +305,25 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 > 约束：UI2D 全应用必需（Main 数百处引用、无桩回退），任何取值都不关闭；
 > 根 `CMakeLists.txt` 对 `BUILD_UI2D=OFF` 直接 `FATAL_ERROR`。
 
-**验收（已验证）**：
+**验收**：
 - `cmake -DBUILD_UI_DIMENSION=2D` → `UI3D: DISABLED`，`SanYiCAD.slnx` 中 UI3D 引用 = **0**。
-- `BOTH` → UI3D 重新 ON（粘滞已修复）。
+- `BOTH` → UI3D 重新 ON（无粘滞）。
 - 非法值 → 配置期 `FATAL_ERROR`。
 
 ---
 
-## 5. 与原方案 A/B/C 的对照
+## 5. 不采纳方案与当前约定的对照
 
-| 原方案 | 修订后 | 原因 |
+| 不采纳的做法 | 当前约定 | 理由 |
 |---|---|---|
-| UI 继承 `Core::IViewWidget` | ❌ 不做 → 统一到 `UI::IViewportHost` | 与 Qt 基类打架，且已有可用抽象 |
-| UI 通过 `IGeometry2D` 调算法 | ❌ 不做 → `UiEngineAccess` 门面收口 | 边界错、且是空壳 |
-| OpenGL/Metal 选择进 Config | ✅ **已完成**（统一为 `SANYI_DEFAULT_RENDER_BACKEND` 单一开关） | 后端本就是运行时可选，缺的是开关统一 |
-| 引入 `IRenderBackend` / `RenderBackendFactory` | ❌ 取消 | `RenderSessionHost` 已承担该职责，重复 |
-| 运行时切换 widget 基类 | ❌ 不做 | 需裸 `QWidget` 自管 GL 上下文，高风险无收益 |
-| 统一 2D/3D 目录 | ✅ 保留（Phase 3） | 低风险、可读性收益 |
-| `sanyi_declare_module` | ✅ 已删除（0 引用） | 0 引用即技术债 |
-| `BUILD_UI_DIMENSION` | ✅ 保留，补根工程门控 | 半生效 |
+| UI 继承 `Core::IViewWidget` | 不做 → 统一到 `UI::IViewportHost` | 与 Qt 基类打架，且已有可用抽象 |
+| UI 通过 `IGeometry2D` 调算法 | 不做 → `UiEngineAccess` 门面收口 | 边界错、且是空壳 |
+| OpenGL/Metal 选择各写一套开关 | 统一为 `SANYI_DEFAULT_RENDER_BACKEND` 单一开关 | 后端本就是运行时可选，缺的是开关统一 |
+| 引入 `IRenderBackend` / `RenderBackendFactory` | 不引入 | `RenderSessionHost` 已承担该职责，重复 |
+| 运行时切换 widget 基类 | 不做 | 需裸 `QWidget` 自管 GL 上下文，高风险无收益 |
+| 统一 2D/3D 目录 | 保留（Phase 3） | 低风险、可读性收益 |
+| 保留 `sanyi_declare_module` | 不保留 | 0 引用即技术债 |
+| `BUILD_UI_DIMENSION` 半生效 | 补根工程门控 | 必须是唯一权威开关 |
 
 ---
 
@@ -342,7 +340,7 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 
 ## 7. 附录：Phase 0 删除/合并清单（执行用）
 
-### 7.1 删除候选（0 引用）
+### 7.1 删除项（0 引用，不得重新引入）
 
 | 路径 | 证据 | 动作 |
 |---|---|---|
@@ -354,8 +352,8 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 
 | 路径 | 现状 | 接线目标 |
 |---|---|---|
-| `SANYI_DEFAULT_RENDER_BACKEND` | 仅 `find_package` | Phase 1 的 `RenderBackendFactory` |
-| `BUILD_UI_DIMENSION` | 仅独立 UI 工程 | Phase 3 根工程门控 |
+| `SANYI_DEFAULT_RENDER_BACKEND` | 仅 `find_package` | 单一后端开关，驱动视口开关派生 |
+| `BUILD_UI_DIMENSION` | 仅独立 UI 工程 | 根工程门控（`2D|3D|BOTH`） |
 
 > `UI/Core` 若选择"保留并接线"（§7.1 方案②），则 `Core::ICommand` 需与 `UI::Plugin::ICommandPlugin` + `OperationBus` 统一，并同步删除 `UI/Common` 的重复抽象。
 
@@ -367,18 +365,18 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 
 ---
 
-## 8. 执行顺序与进度
+## 8. 执行顺序与当前约束
 
 ```
-Phase 0  审计 + 删除死抽象            ✅ 已完成（目录删除，构建通过）
-Phase 1  渲染后端收口（统一开关+删死抽象）✅ 已完成（不做运行时基类改造）
-Phase 2  UiEngineAccess 门面 + CI 方向校验   ✅ 已完成（依赖收口 + 校验通过）
-Phase 3  目录统一 + 维度门控                  ✅ 已完成（骨架本就对齐；BUILD_UI_DIMENSION 门控）
+Phase 0  审计 + 止损                 死抽象不得重新引入，构建必须通过
+Phase 1  渲染后端收口                 单一开关 SANYI_DEFAULT_RENDER_BACKEND，不做运行时基类切换
+Phase 2  UiEngineAccess 门面 + CI 方向校验  UI 不得直链 Engine 目标
+Phase 3  目录统一 + 维度门控           BUILD_UI_DIMENSION 是唯一权威开关
 ```
 
-> 四个 Phase 全部完成。全程未改动业务逻辑语义：
-> - 消除了"假解耦"（UI/Core、EngineAdapter、IRenderSurface、4 个死 CMake 宏）；
+> 各阶段的约束必须持续保持，且不改动业务逻辑语义：
+> - 不得重新引入"假解耦"（UI/Core、EngineAdapter、IRenderSurface、4 个死 CMake 宏）；
 > - 后端开关统一为 `SANYI_DEFAULT_RENDER_BACKEND`；
-> - UI→Engine 依赖收口到 `UiEngineAccess` 门面，并由 `CheckDependencies.cmake`
+> - UI→Engine 依赖只经 `UiEngineAccess` 门面，并由 `CheckDependencies.cmake`
 >   在 configure 阶段强制方向（CI 门禁）；
-> - 根工程新增 `BUILD_UI_DIMENSION=2D|3D|BOTH` 门控。
+> - 根工程以 `BUILD_UI_DIMENSION=2D|3D|BOTH` 作为唯一维度门控。

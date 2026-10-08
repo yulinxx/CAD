@@ -109,33 +109,33 @@ SY_ERROR("[OperationBus] execute failed op=%s error=%s",
 ### 3.2 日志覆盖范围
 
 #### 启动流程
-- ✅ `CADApplicationRuntime`：应用启动、初始化、关闭
-- ✅ `AppBootstrapper`：组合根初始化、工作台创建、启动序列
+- `CADApplicationRuntime`：应用启动、初始化、关闭
+- `AppBootstrapper`：组合根初始化、工作台创建、启动序列
 
 #### 命令生命周期
-- ✅ `InteractionDispatcher` / `OperationBus`：命令执行、提交、取消、撤销、重做
-- ✅ `OperationRegistry` / `PendingOp`：操作注册与占位操作
-- ✅ `CommandActionHub`：工具激活快速路径
+- `InteractionDispatcher` / `OperationBus`：命令执行、提交、取消、撤销、重做
+- `OperationRegistry` / `PendingOp`：操作注册与占位操作
+- `CommandActionHub`：工具激活快速路径
 
 #### 文档操作
-- ✅ `SceneDocument2D`：图元创建、删除、清空
-- ✅ `SceneEditService3D`：3D 编辑事务
+- `SceneDocument2D`：图元创建、删除、清空
+- `SceneEditService3D`：3D 编辑事务
 
 #### 工作台与 UI
-- ✅ `WorkbenchWindow`：主窗口创建、工作台切换、菜单构建
-- ✅ `UiShellHost`：Shell 与工作台切换
-- ✅ `Workbench2D` / `Workbench3D`：工作台装配
+- `WorkbenchWindow`：主窗口创建、工作台切换、菜单构建
+- `UiShellHost`：Shell 与工作台切换
+- `Workbench2D` / `Workbench3D`：工作台装配
 
 #### 渲染管线
-- ✅ `RenderViewport2D`：视口刷新、相机变化
-- ✅ `SceneRefreshCoordinator`：增量 / 全量刷新调度
-- ✅ `RenderWidget3D` / `RenderWidget3DAdapter`：3D 控件与适配
-- ✅ `Viewport3D` / `Renderer3DFactory`：3D 视口与渲染器工厂
+- `RenderViewport2D`：视口刷新、相机变化
+- `SceneRefreshCoordinator`：增量 / 全量刷新调度
+- `RenderWidget3D` / `RenderWidget3DAdapter`：3D 控件与适配
+- `Viewport3D` / `Renderer3DFactory`：3D 视口与渲染器工厂
 
 #### 工具系统
-- ✅ `ToolManager`（UI/2D）：工具切换、激活/失活、状态变化
-- ✅ `TextEditTool` / `TextInputTool` / `SelectTool`：具体工具行为
-- ✅ `OperationBus3D` / `CommandRegistry3D`：3D 操作与命令注册
+- `ToolManager`（UI/2D）：工具切换、激活/失活、状态变化
+- `TextEditTool` / `TextInputTool` / `SelectTool`：具体工具行为
+- `OperationBus3D` / `CommandRegistry3D`：3D 操作与命令注册
 
 ### 3.2 按流程分类
 
@@ -198,7 +198,7 @@ SY_ERROR("[OperationBus] execute failed op=%s error=%s",
    就悄悄废掉了一条排查手段，而且没有任何编译期信号。
 
 做法：凡是「同一件事既要给人看又要给机器看」的地方，就在数据结构里放两个字段，
-一个进界面，一个进日志，并在注释里写明分工，避免后来人图省事直接打那个好看的。
+一个进界面，一个进日志，并在注释里写明分工，避免后人图省事直接打那个好看的。
 
 **范例：安全裁决（`Hw::SafetyVerdict`）**
 
@@ -304,7 +304,7 @@ SyLogger::setFile("app.log");
    grep "op=Tool_Line" app.log
 
 4. 根据时间范围筛选
-   grep "2026-07-10 14:30" app.log
+   grep "14:30" app.log
 
 5. 追踪完整流程
    grep "traceId=xxx" app.log
@@ -371,13 +371,13 @@ SyLogger::setFile("app.log");
 
 > **"日志最后一行"不等于崩溃位置。** 最后一行之后通常还有若干条已产生但未写出的记录。
 
-**已缓解（2026-08-26）**：新增 `SyLogger::Flush()`，崩溃回调
+**缓解手段**：`SyLogger::Flush()`。崩溃回调
 （`Main/Src/Common/CrashHandlerBootstrap.cpp`）**第一件事**就是调它，把队列冲出去。
 该函数**刻意不加锁** —— 崩溃时其他线程可能正持着 logger 的互斥量且永远不会再释放
 （比如崩在临界区里），加锁等于把崩溃现场变成死锁；`spdlog::logger::flush()` 自身线程安全，
 最坏情况是与并发写入交错，远好过丢掉整段日志。
 
-所以现在日志尾部**可信度提高了，但仍不是权威**：flush 之后崩溃处理器本身还会继续产生日志，
+所以日志尾部**可信度较高，但仍不是权威**：flush 之后崩溃处理器本身还会继续产生日志，
 且 flush 只覆盖到"崩溃回调进入的那一刻"。取证顺序不变：
 
 1. **看 stderr 的符号化调用栈。** 崩溃回调
@@ -388,7 +388,7 @@ SyLogger::setFile("app.log");
    `[gl][driver] HIGH type=0x824C id=1281: ...`。非法 GL 用法会自己报出位置，不要靠猜。
    注意 `GL_DEBUG_TYPE_OTHER`（驱动闲聊，如 "driver allocated storage for renderbuffer"）
    已降级到 debug —— warning 级别必须条条值得看，否则真正的问题会被冲掉。
-3. **再看业务日志。** 用它确认崩溃前的最后一个已完成动作，而不是用它定位崩溃点。
+3. **再看业务日志。** 用它确认崩溃前的最后一个走完的动作，而不是用它定位崩溃点。
 
 判断"进程是否还活着"永远比读日志尾部可靠。
 
@@ -418,4 +418,4 @@ SyLogger::setFile("app.log");
 
 1. 新增模块日志时使用 `[ModuleName]` 统一前缀。
 2. 删除或重命名模块时同步更新本节。
-3. 已删除组件（`SceneCompiler`、`RenderCoreRenderer`、`SceneTraverser`、`CreateCommands`/`TransformCommands`/`SelectCommands` 等）不再出现在本节。
+3. 本节只列当前代码中实际存在的组件标签（`SceneCompiler`、`RenderCoreRenderer`、`SceneTraverser`、`CreateCommands`/`TransformCommands`/`SelectCommands` 等已不在代码中，故不列）。
