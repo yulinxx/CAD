@@ -130,7 +130,7 @@ void MenuDispatcher::dispatch(const QString& commandId, const QVariantMap& param
         }
         else
         {
-            LM->setLanguage(lang);
+            LanguageManager::instance()->setLanguage(lang);
         }
         return;
     }
