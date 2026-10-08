@@ -365,8 +365,7 @@ void UiStateCenter::setCurrentCommandOwner(const QString& owner)
     }
 
     m_commandOwner = owner;
-    m_metadata.insert(QStringLiteral("commandOwner"), owner);
-    emit metadataChanged();
+    // 不再镜像写 metadata["commandOwner"]：核心字段仅由本 setter 维护
     emit stateChanged();
 }
 
@@ -377,8 +376,7 @@ void UiStateCenter::setCurrentCommandType(const QString& type)
         return;
     }
     m_commandType = type;
-    m_metadata.insert(QStringLiteral("commandType"), type);
-    emit metadataChanged();
+    // 不再镜像写 metadata["commandType"]：核心字段仅由本 setter 维护
     emit stateChanged();
 }
 
@@ -404,12 +402,8 @@ void UiStateCenter::setSelectionContext(const QString& source, const QString& te
     m_selectionSource = source;
     m_selectionType = source.contains(QStringLiteral("3D")) ? QStringLiteral("3D") : QStringLiteral("2D");
 
-    m_metadata.insert(QStringLiteral("selectionSource"), source);
-    m_metadata.insert(QStringLiteral("selectionText"), text);
-    m_metadata.insert(QStringLiteral("selectionType"), m_selectionType);
-
+    // 不再镜像写 metadata 中的 selection* 三键：核心字段仅由本 setter 维护
     // 不再发 currentSelectionTextChanged（死信号，无消费者）
-    emit metadataChanged();
     emit stateChanged();
 }
 
@@ -475,10 +469,7 @@ void UiStateCenter::setCommandFailed(const QString& commandId, const QString& me
     m_failedCommandId = commandId;
     m_failureMessage = message;
 
-    // 同时写入元数据，方便展示层读取
-    m_metadata.insert(QStringLiteral("commandFailed"), true);
-    m_metadata.insert(QStringLiteral("failedCommandId"), commandId);
-    m_metadata.insert(QStringLiteral("failureMessage"), message);
+    // 不再镜像写 metadata：失败态唯一真相是上方三个成员 + commandFailed 信号
 
     emit commandFailed(commandId, message);
     emit stateChanged();
@@ -496,9 +487,7 @@ void UiStateCenter::clearCommandFailed()
     m_failedCommandId.clear();
     m_failureMessage.clear();
 
-    m_metadata.insert(QStringLiteral("commandFailed"), false);
-    m_metadata.insert(QStringLiteral("failedCommandId"), QString());
-    m_metadata.insert(QStringLiteral("failureMessage"), QString());
+    // 不再镜像写 metadata：与 setCommandFailed 对称移除
 
     emit stateChanged();
 }
@@ -510,32 +499,8 @@ void UiStateCenter::updateMetadata(const QString& key, const QVariant& value)
         return;
     }
     m_metadata[key] = value;
-
-    // 同步回读核心键（保持旧行为兼容，但仅更新变化的键）
-    if (key == QStringLiteral("statusPrompt"))
-    {
-        m_statusPrompt = value.toString();
-    }
-    else if (key == QStringLiteral("selectionSource"))
-    {
-        m_selectionSource = value.toString();
-    }
-    else if (key == QStringLiteral("selectionText"))
-    {
-        m_selectionText = value.toString();
-    }
-    else if (key == QStringLiteral("selectionType"))
-    {
-        m_selectionType = value.toString();
-    }
-    else if (key == QStringLiteral("commandOwner"))
-    {
-        m_commandOwner = value.toString();
-    }
-    else if (key == QStringLiteral("commandType"))
-    {
-        m_commandType = value.toString();
-    }
+    // metadata 是纯扩展袋：不再回读同步核心键（statusPrompt/selection*/command*），
+    // 核心字段仅由各自 setter 维护
 
     emit metadataChanged();
     emit stateChanged();
@@ -552,32 +517,7 @@ void UiStateCenter::updateMetadata(const QVariantMap& metadata)
         {
             m_metadata[key] = value;
             changed = true;
-
-            // 同步回读核心键
-            if (key == QStringLiteral("statusPrompt"))
-            {
-                m_statusPrompt = value.toString();
-            }
-            else if (key == QStringLiteral("selectionSource"))
-            {
-                m_selectionSource = value.toString();
-            }
-            else if (key == QStringLiteral("selectionText"))
-            {
-                m_selectionText = value.toString();
-            }
-            else if (key == QStringLiteral("selectionType"))
-            {
-                m_selectionType = value.toString();
-            }
-            else if (key == QStringLiteral("commandOwner"))
-            {
-                m_commandOwner = value.toString();
-            }
-            else if (key == QStringLiteral("commandType"))
-            {
-                m_commandType = value.toString();
-            }
+            // 纯扩展袋语义：不回读同步核心键
         }
     }
     if (changed)
@@ -590,30 +530,8 @@ void UiStateCenter::updateMetadata(const QVariantMap& metadata)
 void UiStateCenter::setMetadata(const QVariantMap& metadata)
 {
     m_metadata = metadata;
-
-    if (m_metadata.contains(QStringLiteral("selectionSource")))
-    {
-        m_selectionSource = m_metadata.value(QStringLiteral("selectionSource")).toString();
-    }
-    if (m_metadata.contains(QStringLiteral("selectionText")))
-    {
-        m_selectionText = m_metadata.value(QStringLiteral("selectionText")).toString();
-    }
-    if (m_metadata.contains(QStringLiteral("selectionType")))
-    {
-        m_selectionType = m_metadata.value(QStringLiteral("selectionType")).toString();
-    }
-
-    if (m_metadata.contains(QStringLiteral("commandOwner")))
-    {
-        m_commandOwner = m_metadata.value(QStringLiteral("commandOwner")).toString();
-    }
-    if (m_metadata.contains(QStringLiteral("commandType")))
-    {
-        m_commandType = m_metadata.value(QStringLiteral("commandType")).toString();
-    }
-    // 不再回读 statusPrompt：消除双向同步环
-    // metadata 降级为纯扩展袋，核心字段仅由各自 setter 维护
+    // metadata 是纯扩展袋：不再回读同步核心键（selection*/command*/statusPrompt）
+    // 核心字段仅由各自 setter 维护
 
     emit metadataChanged();
     emit stateChanged();
