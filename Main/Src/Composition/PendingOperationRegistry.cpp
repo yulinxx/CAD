@@ -5,6 +5,7 @@
  * 管理待处理操作的注册。
  */
 #include "PendingOperationRegistry.h"
+#include "OpRegistryTypes.h"
 
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
@@ -36,9 +37,9 @@ void PendingOperationRegistry::registerAll()
         {
             if (!reg.has(ops[i]))
             {
-                reg.registerOperation(std::make_unique<LambdaOperation>(ops[i], [opId = ops[i], category] {
+                Ops::declare(reg, ops[i], [opId = ops[i], category] {
                     SY_WARNF("[PendingOp] %s: OperationId=%d not yet implemented", category, static_cast<int>(opId));
-                }));
+                });
                 ++registered;
             }
         }

@@ -10,7 +10,6 @@
 #include "Engine2D/Edit/IUndoRedoManager.h"
 #include "Engine2D/Algorithm/EntityTransform.h"
 #include "Engine2D/Geometry/BezierAlgorithms.h"
-#include "Engine2D/Core/SceneChangeSet.h"
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyBezier.h"
 #include "Engine2D/SyEntity/SyBezier2.h"
@@ -89,6 +88,57 @@ public:
     bool mutatesScene() const override { return true; }
     bool isUndoable() const override { return true; }
 };
+
+// ==================== 声明式注册入口（P2-2.5） ====================
+// 统一 8 个 *OperationRegistry 的注册形态，把
+//   reg.registerOperation(std::make_unique<LambdaOperation>(id, fn));
+// 压成
+//   Ops::declare(reg, id, fn);
+// 包裹层收敛于此：后续加重复 id 检测 / 登记日志只需改这一处。
+// 有 canExec 闸门的命令用 *Checked 变体；场景变更类用 *Mutating 变体
+// （undoable + mutatesScene 标志由包装类型自带，语义不变）。
+namespace Ops
+{
+    inline void declare(OperationRegistry& reg, OperationId id, LambdaOperation::Fn fn)
+    {
+        reg.registerOperation(std::make_unique<LambdaOperation>(id, std::move(fn)));
+    }
+
+    inline void declareChecked(
+        OperationRegistry& reg, OperationId id, LambdaOperation::Fn fn, LambdaOperation::CanExecFn canExec)
+    {
+        reg.registerOperation(std::make_unique<LambdaOperation>(id, std::move(fn), std::move(canExec)));
+    }
+
+    inline void declareMutating(OperationRegistry& reg, OperationId id, SceneMutatingLambdaOperation::Fn fn)
+    {
+        reg.registerOperation(std::make_unique<SceneMutatingLambdaOperation>(id, std::move(fn)));
+    }
+
+    inline void declareMutatingChecked(OperationRegistry& reg,
+        OperationId id,
+        SceneMutatingLambdaOperation::Fn fn,
+        SceneMutatingLambdaOperation::CanExecFn canExec)
+    {
+        reg.registerOperation(std::make_unique<SceneMutatingLambdaOperation>(id, std::move(fn), std::move(canExec)));
+    }
+
+    inline void declareParam(
+        OperationRegistry& reg, OperationId id, ParamLambdaOperation::ParamFn fn,
+        ParamLambdaOperation::CanExecFn canExec = [] { return true; })
+    {
+        reg.registerOperation(std::make_unique<ParamLambdaOperation>(id, std::move(fn), std::move(canExec)));
+    }
+
+    inline void declareParamMutating(OperationRegistry& reg,
+        OperationId id,
+        ParamSceneMutatingLambdaOperation::ParamFn fn,
+        ParamSceneMutatingLambdaOperation::CanExecFn canExec = [] { return true; })
+    {
+        reg.registerOperation(
+            std::make_unique<ParamSceneMutatingLambdaOperation>(id, std::move(fn), std::move(canExec)));
+    }
+}  // namespace Ops
 
 // ==================== 工具函数 ====================
 

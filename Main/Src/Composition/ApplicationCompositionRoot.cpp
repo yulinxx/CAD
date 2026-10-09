@@ -190,7 +190,6 @@ ISelectionService* ApplicationCompositionRoot::selectionService()
 ApplicationCompositionRoot::ApplicationCompositionRoot()
     : m_stateCenter(std::make_unique<UiStateCenter>())
     , m_layoutService(std::make_unique<DefaultUiLayoutService>())
-    , m_interactionDispatcher(std::make_unique<DefaultInteractionDispatcher>())
     , m_shellHost(std::make_unique<UiShellHost>())
     , m_operationBus(std::make_unique<OperationBus>())
     , m_sceneManager(std::make_unique<Eg::SceneManager>())
@@ -253,7 +252,6 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
     // 组装 UI 服务集合
     UiServices uiServices;
     uiServices.stateCenter = m_stateCenter.get();
-    uiServices.interactionDispatcher = interactionDispatcher();
     uiServices.operationBus = m_operationBus.get();
     uiServices.document2D = m_document2D.get();
     uiServices.sceneEditService = m_sceneEditService.get();
@@ -558,11 +556,6 @@ UiStateCenter* ApplicationCompositionRoot::stateCenter()
 UiLayoutService* ApplicationCompositionRoot::layoutService()
 {
     return m_layoutService.get();
-}
-
-IInteractionDispatcher* ApplicationCompositionRoot::interactionDispatcher()
-{
-    return m_interactionDispatcher.get();
 }
 
 OperationBus* ApplicationCompositionRoot::operationBus()

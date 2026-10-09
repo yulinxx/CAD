@@ -383,72 +383,64 @@ signals:
     void inputFocusWidgetChanged(const QString& widgetName);
 
 private:
-    /// 当前工作台 ID
-    QString m_workbenchId{ QStringLiteral("default") };
-    /// 当前主题 ID
-    QString m_themeId{ QStringLiteral("system") };
-    /// 当前视图模式
-    QString m_viewMode{ QStringLiteral("none") };
+    /// ===== 分组状态（P1-5）=====
+    /// 新增状态必须归入以下某一组；禁止新增顶层字段。
+    /// 需要新的状态类别时，应另立中心或经架构评审后扩展本文件（见《框架冗余与复杂度审查》§3.3.1）。
 
-    /// 当前图层 ID
-    QString m_layerId{ QStringLiteral("default") };
-    /// 图层可见性状态
-    bool m_layerVisible{ true };
-    /// 图层锁定状态
-    bool m_layerLocked{ false };
-    /// 当前文档 ID
-    QString m_documentId{ QStringLiteral("none") };
-    /// 当前命令 ID
-    QString m_commandId{ QStringLiteral("idle") };
+    /// 工作台域：切换工作台时随快照保存/恢复的标识类状态
+    struct WorkspaceState
+    {
+        QString workbenchId{ QStringLiteral("default") };
+        QString themeId{ QStringLiteral("system") };
+        QString viewMode{ QStringLiteral("none") };
+        QString documentId{ QStringLiteral("none") };
+        QString activeToolId;
+        QString inputFocusWidget;
+    };
 
-    /// 当前命令阶段
-    QString m_commandPhase{ QStringLiteral("idle") };
-    /// 当前命令来源
-    QString m_commandOwner{ QStringLiteral("none") };
-    /// 当前命令类型
-    QString m_commandType{ QStringLiteral("none") };
-    /// 当前交互事件类型
-    QString m_interactionKind;
-    /// 当前交互事件指针 X
-    int m_interactionPointerX{ -1 };
-    /// 当前交互事件指针 Y
-    int m_interactionPointerY{ -1 };
-    /// 当前交互事件按键
-    int m_interactionKey{ -1 };
+    /// 命令域：命令生命周期、启用反馈与任务/错误状态
+    struct CommandState
+    {
+        QString commandId{ QStringLiteral("idle") };
+        QString commandPhase{ QStringLiteral("idle") };
+        QString commandOwner{ QStringLiteral("none") };
+        QString commandType{ QStringLiteral("none") };
+        int busyCount{ 0 };  ///< 计数式繁忙：0=空闲，>0=繁忙
+        bool dirty{ false };
+        bool failed{ false };  ///< 命令是否处于失败状态（触发 UI 回退的标识）
+        QString failedCommandId;
+        QString failureMessage;
+        int progress{ -1 };  ///< (0-100)，-1 表示无进行中的任务
+        QString statusMessage;
+        QString statusPrompt;
+        QString taskPhase;
+        int errorCode{ 0 };
+    };
 
-    /// 当前选择文本
-    QString m_selectionText;
-    /// 当前选择来源
-    QString m_selectionSource{ QStringLiteral("none") };
-    /// 当前选择类型
-    QString m_selectionType{ QStringLiteral("none") };
+    /// 视图域：图层、渲染刷新、元数据与交互指针
+    struct ViewState
+    {
+        QString layerId{ QStringLiteral("default") };
+        bool layerVisible{ true };
+        bool layerLocked{ false };
+        QString refreshState{ QStringLiteral("idle") };
+        QVariantMap metadata;
+        QString interactionKind;
+        int interactionPointerX{ -1 };
+        int interactionPointerY{ -1 };
+        int interactionKey{ -1 };
+    };
 
-    /// 繁忙状态（计数器：0=空闲，>0=繁忙）
-    int m_busyCount{ 0 };
-    /// 脏状态
-    bool m_dirty{ false };
-    /// 命令是否处于失败状态（触发 UI 回退的标识）
-    bool m_commandFailed{ false };
-    /// 失败的命令 ID
-    QString m_failedCommandId;
-    /// 失败原因描述
-    QString m_failureMessage;
-    /// 当前任务进度 (0-100)，-1 表示无进行中的任务
-    int m_progress{ -1 };
-    /// 当前状态消息
-    QString m_statusMessage;
-    /// 当前状态提示
-    QString m_statusPrompt;
-    /// 当前任务阶段
-    QString m_taskPhase;
-    /// 最近错误码
-    int m_errorCode{ 0 };
-    /// 元数据
-    QVariantMap m_metadata;
-    /// 渲染刷新状态
-    QString m_refreshState{ QStringLiteral("idle") };
-    /// 当前激活工具 ID
-    QString m_activeToolId;
-    /// 当前输入焦点控件名称
-    QString m_inputFocusWidget;
+    /// 选择域：当前选择的文本化描述
+    struct SelectionState
+    {
+        QString text;
+        QString source{ QStringLiteral("none") };
+        QString type{ QStringLiteral("none") };
+    };
+
+    WorkspaceState m_workspace;
+    CommandState m_command;
+    ViewState m_view;
+    SelectionState m_selection;
 };

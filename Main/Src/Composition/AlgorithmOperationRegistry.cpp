@@ -5,6 +5,7 @@
  * 注册和管理算法相关的操作命令。
  */
 #include "AlgorithmOperationRegistry.h"
+#include "OpRegistryTypes.h"
 
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
@@ -31,7 +32,7 @@ void AlgorithmOperationRegistry::registerAll()
 
     AlgorithmRunner* runner = m_algorithmRunner;
     const auto registerAlgoOp = [&reg, runner](OperationId id) {
-        reg.registerOperation(std::make_unique<ParamLambdaOperation>(id, [id, runner](const QVariantMap& params) {
+        Ops::declareParam(reg, id, [id, runner](const QVariantMap& params) {
             if (!runner)
                 return;
             OperationRequest req;
@@ -39,7 +40,7 @@ void AlgorithmOperationRegistry::registerAll()
             req.params = params;
             req.source = OperationSource::Menu;
             runner->runForOperation(id, req);
-        }));
+        });
     };
 
     registerAlgoOp(OperationId::Algo_Fill);
@@ -54,8 +55,7 @@ void AlgorithmOperationRegistry::registerAll()
     registerAlgoOp(OperationId::Algo_BooleanDifference);
     registerAlgoOp(OperationId::Algo_BooleanXor);
 
-    reg.registerOperation(
-        std::make_unique<LambdaOperation>(OperationId::Algo_ReliefEngravingFromImage, [parentWidget = m_parentWidget] {
+    Ops::declare(reg, OperationId::Algo_ReliefEngravingFromImage, [parentWidget = m_parentWidget] {
             ReliefEngravingOperation2D::run(parentWidget);
-        }));
+        });
 }

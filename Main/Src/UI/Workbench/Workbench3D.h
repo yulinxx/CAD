@@ -27,7 +27,7 @@ class BRepModelService3D;
 /**
  * @class Workbench3D
  * @brief 3D 工作台实现
- * 使用 MainWindow3D + ServiceLocator3D 架构
+ * 使用 MainWindow3D 架构（服务经 ServicePack3D 直接传递，无全局定位器）
  */
 class Workbench3D final : public UiWorkbench
 {

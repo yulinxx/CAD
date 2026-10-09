@@ -96,10 +96,9 @@ void Workbench3D::ServiceOwnerDeleter::operator()(ServiceOwner* p) const
 // Workbench3D 实现
 // 统一工作台初始化模板
 // 流程：initialize → attachToWindow → activate ↔ deactivate → shutdown
-// 使用 MainWindow3D + ServiceLocator3D 架构
+// 使用 MainWindow3D 架构（服务经 ServicePack3D 直接传递，无全局定位器）
 // 渲染链路：Viewport3D -> IRenderer3D -> RenderWidget3DAdapter -> RenderWidget3D
 
-    #include "UI3D/Service/ServiceLocator3D.h"
     #include "UI3D/Operation/CommandRegistry3D.h"
     #include "UI3D/Algorithm/AlgorithmTaskRegistration3D.h"
 
@@ -171,10 +170,10 @@ bool Workbench3D::initialize(const WorkbenchServices& services)
 {
     SY_INFO("[Workbench3D] initialize: starting 3D workbench initialization");
 
-    if (!services.uiState.stateCenter || !services.uiState.interactionDispatcher)
+    if (!services.uiState.stateCenter)
     {
-        SY_ERRORF("[Workbench3D] initialize failed: stateCenter=%p interactionDispatcher=%p",
-            static_cast<void*>(services.uiState.stateCenter), static_cast<void*>(services.uiState.interactionDispatcher));
+        SY_ERRORF("[Workbench3D] initialize failed: stateCenter=%p",
+            static_cast<void*>(services.uiState.stateCenter));
         return false;
     }
     m_uiState = services.uiState;
@@ -234,7 +233,7 @@ void Workbench3D::build3DWorkbenchUi(WorkbenchWindow& window)
     setup3DMenuAndShortcuts(window);
 }
 
-/// 步骤一：创建所有 3D 服务，组装 ServicePack3D，注册到 ServiceLocator3D
+/// 步骤一：创建所有 3D 服务并组装 ServicePack3D
 void Workbench3D::create3DServices()
 {
     SY_DEBUG("[Workbench3D] Creating 3D services...");
@@ -282,8 +281,7 @@ void Workbench3D::create3DServices()
     m_services3D.brepModelService = own.brepModelService.get();
     #endif
 
-    ServiceLocator3D::adopt(m_services3D);
-    SY_DEBUG("[Workbench3D] 3D services created and adopted");
+    SY_DEBUG("[Workbench3D] 3D services created");
 }
 
 /// 步骤二：创建 MainWindow3D、Viewport3D 和渲染链，绑定视口信号
@@ -356,7 +354,7 @@ void Workbench3D::bind3DRenderSignals(ServiceOwner& own)
     // 通过 m_services3D.renderWidget 获取已在 create3DViewport 中注册的 widget
     if (!m_services3D.renderWidget)
     {
-        SY_ERROR("[Workbench3D] RenderWidget3D not available in ServiceLocator3D");
+        SY_ERROR("[Workbench3D] RenderWidget3D not available in ServicePack3D");
         return;
     }
 
@@ -1509,10 +1507,9 @@ void Workbench3D::deactivate()
     m_mainWindow3D.reset();
     SY_DEBUG("[Workbench3D] MainWindow3D destroyed");
 
-    // 3) 再释放 3D 服务 locator 与共享服务对象。
+    // 3) 再释放共享服务对象。
     //    注意：窗口销毁已经完成，这里再 shutdown 服务，可减少 Qt 析构阶段访问悬空对象的风险。
     SY_DEBUG("[Workbench3D] Releasing 3D services...");
-    ServiceLocator3D::shutdown();
     m_services3D = ServicePack3D{};
     m_serviceOwner.reset();
     SY_DEBUG("[Workbench3D] Service released");

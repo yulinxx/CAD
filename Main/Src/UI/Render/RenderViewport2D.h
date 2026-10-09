@@ -26,7 +26,6 @@
 class RenderWidget;
 class SceneDocument2D;
 class ISelectionService;
-class IInteractionDispatcher;
 class OperationBus;
 class ToolManager;
 class ITool;
@@ -163,7 +162,6 @@ public:
     }
 
     void setSelectionService(ISelectionService* service);
-    void setInteractionDispatcher(IInteractionDispatcher* dispatcher);
     void setOperationBus(OperationBus* bus);
     /// 注入图层管理器，供选择工具过滤锁定图层
     void setLayerManager(LayerManager* manager);
@@ -305,7 +303,6 @@ private:
     Eg::ISceneContext* m_sceneContext{ nullptr };
     std::shared_ptr<bool> m_alive{ std::make_shared<bool>(true) };
     ISelectionService* m_selectionService{ nullptr };
-    IInteractionDispatcher* m_interactionDispatcher{ nullptr };
     OperationBus* m_operationBus{ nullptr };
     LayerManager* m_layerManager{ nullptr };
 

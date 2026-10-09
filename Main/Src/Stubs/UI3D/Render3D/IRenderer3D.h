@@ -25,6 +25,7 @@ public:
   virtual void setCamera(CameraController3D*) = 0;
   virtual void resize(int, int) = 0;
   virtual void resetView() = 0;
+  virtual void fitAll() = 0;
   virtual void selectNodeById(const QString&) = 0;
   virtual QString selectedNodeId() const = 0;
   virtual QStringList selectedPathNames() const = 0;

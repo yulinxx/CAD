@@ -5,6 +5,7 @@
  * 协调各模块的操作注册。
  */
 #include "CoreOperationRegistry.h"
+#include "OpRegistryTypes.h"
 #include "EditOperationRegistry.h"
 #include "ViewOperationRegistry.h"
 #include "AlgorithmOperationRegistry.h"

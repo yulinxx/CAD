@@ -6,7 +6,6 @@
 #include "IUiServices.h"
 #include "UiServiceGroups.h"
 
-class IInteractionDispatcher;
 class UiStateCenter;
 class ISelectionService;
 class IUndoRedoManager;
@@ -55,9 +54,6 @@ struct UiServices : public IUIServices
 {
     /// UI 状态中心
     UiStateCenter* stateCenter{ nullptr };
-
-    /// 交互式命令生命周期分发器
-    IInteractionDispatcher* interactionDispatcher{ nullptr };
 
     /// 操作总线（新操作主线）
     OperationBus* operationBus{ nullptr };
@@ -111,7 +107,7 @@ struct UiServices : public IUIServices
     // 由装配处按需取出并传给消费者，避免消费者依赖整个聚合。
     UiStateServices uiState() const
     {
-        return { stateCenter, interactionDispatcher };
+        return { stateCenter };
     }
     CommandServices commands() const
     {
@@ -141,5 +137,4 @@ struct UiServices : public IUIServices
 
     ISelectionService* getSelectionService() const override { return selectionService; }
     IUndoRedoManager* getUndoManager() const override { return undoManager; }
-    IInteractionDispatcher* getInteractionDispatcher() const override { return interactionDispatcher; }
 };

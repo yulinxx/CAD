@@ -1,4 +1,5 @@
 #include "LaserOperationRegistry.h"
+#include "OpRegistryTypes.h"
 
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
@@ -50,9 +51,7 @@ void LaserOperationRegistry::registerAll()
     DeviceHost* host = m_config.deviceHost;
 
     // --- 开始加工 ---
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::Laser_StartProcess,
-        [this, job] {
+    Ops::declareChecked(reg, OperationId::Laser_StartProcess, [this, job] {
             if (!job || !m_config.sceneManager)
             {
                 reportError("StartProcess",
@@ -65,19 +64,16 @@ void LaserOperationRegistry::registerAll()
             {
                 reportError("StartProcess", error);
             }
-        },
-        [job, host] {
+        }, [job, host] {
             // canExec 决定菜单/工具栏的可用态：设备没起来、安全门没关、
             // 或者已经在加工时，「开始加工」必须是灰的 ——
             // 让操作员点了之后才看到报错，是最容易被投诉的交互
             return job && host && host->isRunning() && host->canStartProcessing() && !job->isRunning() &&
                 !job->isPaused();
-        }));
+        });
 
     // --- 暂停 / 恢复（同一个命令来回切） ---
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::Laser_PauseProcess,
-        [this, job] {
+    Ops::declareChecked(reg, OperationId::Laser_PauseProcess, [this, job] {
             if (!job)
             {
                 reportError("PauseProcess",
@@ -93,15 +89,12 @@ void LaserOperationRegistry::registerAll()
             {
                 reportError("PauseProcess", error);
             }
-        },
-        [job] {
+        }, [job] {
             return job && (job->isRunning() || job->isPaused());
-        }));
+        });
 
     // --- 停止加工 ---
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::Laser_StopProcess,
-        [this, job] {
+    Ops::declareChecked(reg, OperationId::Laser_StopProcess, [this, job] {
             if (!job)
             {
                 reportError("StopProcess",
@@ -113,15 +106,12 @@ void LaserOperationRegistry::registerAll()
             {
                 reportError("StopProcess", error);
             }
-        },
-        [job] {
+        }, [job] {
             return job && (job->isRunning() || job->isPaused());
-        }));
+        });
 
     // --- 急停 ---
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::Laser_EmergencyStop,
-        [job, host] {
+    Ops::declareChecked(reg, OperationId::Laser_EmergencyStop, [job, host] {
             // 顺序：先让设备执行急停动作（关光 → 停机械），再收作业状态。
             // 反过来的话，中止作业那几毫秒里激光还亮着
             if (host)
@@ -133,12 +123,11 @@ void LaserOperationRegistry::registerAll()
                 QString ignored;
                 job->abortJob(ignored);
             }
-        },
-        [] {
+        }, [] {
             // 急停永远可按。任何 canExec 判断都可能把它变灰，
             // 而「需要急停的时刻」恰恰是状态最混乱的时刻
             return true;
-        }));
+        });
 
     SY_INFO("[LaserOperation] registered: StartProcess / PauseProcess / StopProcess / EmergencyStop");
 }

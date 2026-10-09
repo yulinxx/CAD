@@ -35,7 +35,6 @@ class QContextMenuEvent;
 class RenderWidget;
 class Camera2D;
 class ToolManager;
-class IInteractionDispatcher;
 class ISelectionService;
 class OperationBus;
 class SceneDocument2D;
@@ -60,7 +59,6 @@ public:
     void setRenderWidget(RenderWidget* widget);
     void setCamera(Camera2D* camera);
     void setToolManager(ToolManager* tm);
-    void setInteractionDispatcher(IInteractionDispatcher* dispatcher);
     void setSelectionService(ISelectionService* service);
     void setOperationBus(OperationBus* bus);
     void setDocument(SceneDocument2D* document);
@@ -249,7 +247,6 @@ private:
     // ==================== 键盘事件分发 ====================
 
     bool handleKeyPressDispatch(QKeyEvent* event);
-    bool handleInteractionDispatcherKeyPress(QKeyEvent* event);
     bool handleToolKeyPress(QKeyEvent* event);
     bool handleEscapeKeyPress(QKeyEvent* event);
 
@@ -258,7 +255,6 @@ private:
     RenderWidget* m_renderWidget{ nullptr };
     Camera2D* m_camera{ nullptr };
     ToolManager* m_toolManager{ nullptr };
-    IInteractionDispatcher* m_interactionDispatcher{ nullptr };
     ISelectionService* m_selectionService{ nullptr };
     OperationBus* m_operationBus{ nullptr };
     SceneDocument2D* m_document{ nullptr };

@@ -5,6 +5,7 @@
  * 注册和管理视图相关的操作命令。
  */
 #include "ViewOperationRegistry.h"
+#include "OpRegistryTypes.h"
 
 #include <QDesktopServices>
 #include <QFileInfo>
@@ -53,10 +54,10 @@ void ViewOperationRegistry::registerAll()
     auto* unitManager = m_unitManager;
 
     const auto registerViewOp = [&reg, hub](OperationId id, const QString& action) {
-        reg.registerOperation(std::make_unique<LambdaOperation>(id, [hub, action] {
+        Ops::declare(reg, id, [hub, action] {
             if (hub)
                 hub->handle(action);
-        }));
+        });
     };
 
     registerViewOp(OperationId::View_ZoomFit, QStringLiteral("zoom_fit"));
@@ -75,35 +76,33 @@ void ViewOperationRegistry::registerAll()
         stateCenter->setMetadata(meta);
     };
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::View_GridVisible, [toggleMetadata] {
+    Ops::declare(reg, OperationId::View_GridVisible, [toggleMetadata] {
         toggleMetadata("gridVisible");
-    }));
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::View_SnapEnabled, [toggleMetadata] {
+    });
+    Ops::declare(reg, OperationId::View_SnapEnabled, [toggleMetadata] {
         toggleMetadata("snapEnabled");
-    }));
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::View_OrthoMode, [toggleMetadata] {
+    });
+    Ops::declare(reg, OperationId::View_OrthoMode, [toggleMetadata] {
         toggleMetadata("orthoMode");
-    }));
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::View_AngleSnap, [toggleMetadata] {
+    });
+    Ops::declare(reg, OperationId::View_AngleSnap, [toggleMetadata] {
         toggleMetadata("angleSnap");
-    }));
+    });
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::View_LayerManager, [=] {
+    Ops::declare(reg, OperationId::View_LayerManager, [=] {
         if (layerEditService)
             LayerManagerDialog::showDialog(layerEditService, parentWidget);
-    }));
+    });
 
-    reg.registerOperation(std::make_unique<ParamLambdaOperation>(
-        OperationId::View_SetDisplayUnit, [unitManager](const QVariantMap& params) {
+    Ops::declareParam(reg, OperationId::View_SetDisplayUnit, [unitManager](const QVariantMap& params) {
             if (!unitManager)
                 return;
             const int unit =
                 params.value(QStringLiteral("unit"), static_cast<int>(UnitManager::Unit::Millimeter)).toInt();
             unitManager->setDisplayUnit(static_cast<UnitManager::Unit>(unit));
-        }));
+        });
 
-    reg.registerOperation(
-        std::make_unique<LambdaOperation>(OperationId::View_Capture, [captureService = m_captureService, hub] {
+    Ops::declare(reg, OperationId::View_Capture, [captureService = m_captureService, hub] {
             if (!captureService || !hub)
                 return;
             if (auto* vp = hub->viewport())
@@ -128,9 +127,9 @@ void ViewOperationRegistry::registerAll()
                     }
                 }
             }
-        }));
+        });
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::View_TestView, [hub, parentWidget] {
+    Ops::declare(reg, OperationId::View_TestView, [hub, parentWidget] {
         if (!hub)
             return;
         if (auto* vp = hub->viewport())
@@ -141,5 +140,5 @@ void ViewOperationRegistry::registerAll()
                 window->show();
             }
         }
-    }));
+    });
 }

@@ -5,6 +5,7 @@
  * 注册帮助相关的操作命令。
  */
 #include "HelpOperationRegistry.h"
+#include "OpRegistryTypes.h"
 
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
@@ -47,11 +48,11 @@ void HelpOperationRegistry::registerAll()
     auto& reg = m_bus->registry();
     QWidget* parentWidget = m_parentWidget;
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Help_About, [parentWidget] {
+    Ops::declare(reg, OperationId::Help_About, [parentWidget] {
         HelpDialogService::showAboutDialog(parentWidget);
-    }));
+    });
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Help_Settings, [parentWidget] {
+    Ops::declare(reg, OperationId::Help_Settings, [parentWidget] {
         // Help > Settings / 设置对话框入口
         SY_DEBUGF("[HelpOperationRegistry] Help_Settings triggered, parentWidget=%p", static_cast<void*>(parentWidget));
         auto* window = qobject_cast<WorkbenchWindow*>(parentWidget);
@@ -67,16 +68,16 @@ void HelpOperationRegistry::registerAll()
         {
             SY_WARNF("[HelpOperationRegistry] Cannot show settings: no active workbench");
         }
-    }));
+    });
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Help_Docs, [parentWidget] {
+    Ops::declare(reg, OperationId::Help_Docs, [parentWidget] {
         HelpDialogService::showDocumentationDialog(parentWidget);
-    }));
+    });
 
 #if 0
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Help_Shortcut, [parentWidget] {
+    Ops::declare(reg, OperationId::Help_Shortcut, [parentWidget] {
         // 2D 与 3D 共用 HelpDialogService 的同一条实现，内容取当前工作台的台账
         HelpDialogService::showShortcutsDialog(parentWidget, activeShortcutModel(parentWidget));
-    }));
+    });
 #endif
 }

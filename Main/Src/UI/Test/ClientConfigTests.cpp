@@ -11,6 +11,7 @@
 
 #include <gtest/gtest.h>
 
+#include "BuildConfig.h"
 #include "UI/ClientConfig/UiClientConfigBase.h"
 #include "UI/ClientConfig/UiConfigLoader.h"
 #include "UI/ClientConfig/UiConfigurationManager.h"
@@ -986,7 +987,8 @@ TEST(WorkbenchMenuManagerTest, CommandDispatcherIsSharedAndStable)
 
     // 无工作台时仍放行窗口级命令（主题/语言/工作台切换），否则这些菜单项会被误禁
     EXPECT_TRUE(first->isCommandRegistered(QStringLiteral("theme.dark")));
-    EXPECT_TRUE(first->isCommandRegistered(QStringLiteral("view.switch_to_3d")));
+    // 切到 3D 是窗口级命令，但仅在编译了 3D 时可用（与 MenuDispatcher::isCommandRegistered 一致）
+    EXPECT_EQ(first->isCommandRegistered(QStringLiteral("view.switch_to_3d")), BuildConfig::kUi3D);
     // 工作台命令目录不可用时，业务命令一律判为未注册
     EXPECT_FALSE(first->isCommandRegistered(QStringLiteral("tool.select")));
 }

@@ -525,10 +525,9 @@ TEST(SelectionSyncRegressionTest, MockSelectionService_SelectMultipleClearsPrevi
 
 // ==================== 键盘事件路由优先级测试 ====================
 
-// 模拟键盘事件路由的三级优先级：
-// 1. InteractionDispatcher (Escape/Enter)
-// 2. ActiveTool (工具特定快捷键)
-// 3. Delete (删除选中图元)
+// 模拟键盘事件路由的两级优先级：
+// 1. ActiveTool (工具特定快捷键)
+// 2. Delete (删除选中图元)
 
 TEST(KeyRoutingRegressionTest, DeleteKey_RemovesEntityFromScene)
 {
@@ -563,7 +562,7 @@ TEST(KeyRoutingRegressionTest, DeleteKey_EmptyScene_NoCrash)
 
 TEST(KeyRoutingRegressionTest, EscapeKey_ShouldNotCrash)
 {
-    // Escape 键处理由 IInteractionDispatcher 实现，此处验证组件级安全
+    // Escape 键处理由各工具层实现，此处验证组件级安全
     SceneRefreshCoordinator coordinator;
     coordinator.stop();
     SUCCEED();
@@ -571,7 +570,7 @@ TEST(KeyRoutingRegressionTest, EscapeKey_ShouldNotCrash)
 
 TEST(KeyRoutingRegressionTest, EnterKey_ShouldNotCrash)
 {
-    // Enter 键处理由 IInteractionDispatcher 实现，此处验证组件级安全
+    // Enter 键处理由各工具层实现，此处验证组件级安全
     SceneRefreshCoordinator coordinator;
     coordinator.stop();
     SUCCEED();
@@ -817,15 +816,14 @@ TEST(RefreshIntegrationTest, Coordinator_StopAfterSceneChange)
     SUCCEED();
 }
 
-// ==================== 键盘路由三级优先级链测试 ====================
+// ==================== 键盘路由优先级链测试 ====================
 // 键盘事件路由优先级（从 handleKeyPress 实现）：
-// 1. InteractionDispatcher (Escape/Enter) — 优先级最高
-// 2. ActiveTool (工具特定快捷键，如空格确认) — 第二优先级
-// 3. Delete (删除选中图元) — 最低优先级
+// 1. ActiveTool (工具特定快捷键，如空格确认) — 优先级最高
+// 2. Delete (删除选中图元) — 最低优先级
 
 TEST(KeyRoutingRegressionTest, PriorityChain_DeleteKeyIsLowest)
 {
-    // Delete 键在三级优先级链中最低，需要前两级都不处理时才生效
+    // Delete 键在优先级链中最低，需要工具层不处理时才生效
     Eg::SceneManager scene;
 
     auto line = std::make_unique<Eg::SyLine>();
@@ -863,8 +861,7 @@ TEST(KeyRoutingRegressionTest, PriorityChain_DeleteOnEmptySelection)
 
 TEST(KeyRoutingRegressionTest, PriorityChain_EscapeResetsToolState)
 {
-    // Escape 键在 InteractionDispatcher 有活跃命令时取消命令
-    // 无活跃命令时由工具处理（取消当前绘制）
+    // Escape 键由工具层处理（取消当前绘制）
     SceneRefreshCoordinator coordinator;
     coordinator.stop();
     SUCCEED();
@@ -872,8 +869,7 @@ TEST(KeyRoutingRegressionTest, PriorityChain_EscapeResetsToolState)
 
 TEST(KeyRoutingRegressionTest, PriorityChain_EnterConfirmsTool)
 {
-    // Enter 键在 InteractionDispatcher 有活跃命令时提交命令
-    // 无活跃命令时由工具处理（确认当前图元）
+    // Enter 键由工具层处理（确认当前图元）
     SceneRefreshCoordinator coordinator;
     coordinator.stop();
     SUCCEED();
@@ -882,8 +878,7 @@ TEST(KeyRoutingRegressionTest, PriorityChain_EnterConfirmsTool)
 // ==================== 鼠标事件分发优先级链测试 ====================
 // 鼠标事件分发优先级（从 dispatchMousePressToInput 实现）：
 // 1. 中键/平移模式 — 最高优先级（handlePanMousePress）
-// 2. InteractionDispatcher (hasActiveCommand) — 第二优先级
-// 3. ActiveTool (onMousePress/onMouseMove/onMouseRelease) — 最低优先级，也是唯一兜底
+// 2. ActiveTool (onMousePress/onMouseMove/onMouseRelease) — 最低优先级，也是唯一兜底
 //    （SelectTool 常驻激活，点选/框选都在工具层，视口层没有第二套拾取）
 
 TEST(MouseDispatchRegressionTest, PriorityChain_PanBlocksTool)

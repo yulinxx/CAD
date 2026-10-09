@@ -5,6 +5,7 @@
  * 注册和管理编辑相关的操作命令。
  */
 #include "EditOperationRegistry.h"
+#include "OpRegistryTypes.h"
 
 #include "Log/SyLogger.h"
 #include "UI2D/Operation/OperationBus.h"
@@ -19,7 +20,7 @@
 #include "Engine2D/Algorithm/EntityTransform.h"
 #include "Engine2D/Algorithm/Discretizer/EntityDiscretizer.h"
 #include "Engine2D/Geometry/BezierAlgorithms.h"
-#include "Engine2D/Core/SceneChangeSet.h"
+#include "Engine2D/Core/SceneEditBatch.h"
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyBezier.h"
 #include "Engine2D/SyEntity/SyBezier2.h"
@@ -95,29 +96,29 @@ void EditOperationRegistry::registerAll()
     auto* hub = m_viewportActionHub;
 
     // ---- 撤销/重做/删除/全选/清除/反选 ----
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Undo, [undoManager, hub] {
+    Ops::declare(reg, OperationId::Edit_Undo, [undoManager, hub] {
         SY_DEBUG("[EditOperationRegistry] Undo operation triggered");
         if (hub && hub->viewport() && hub->viewport()->handleTextUndoRequest(false))
             return;
         if (undoManager && undoManager->canUndo())
             undoManager->undo();
-    }));
+    });
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Redo, [undoManager, hub] {
+    Ops::declare(reg, OperationId::Edit_Redo, [undoManager, hub] {
         SY_DEBUG("[EditOperationRegistry] Redo operation triggered");
         if (hub && hub->viewport() && hub->viewport()->handleTextUndoRequest(true))
             return;
         if (undoManager && undoManager->canRedo())
             undoManager->redo();
-    }));
+    });
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Delete, [editService] {
+    Ops::declare(reg, OperationId::Edit_Delete, [editService] {
         SY_DEBUG("[EditOperationRegistry] Delete operation triggered");
         if (editService)
             editService->deleteSelected("Delete");
-    }));
+    });
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_SelectAll, [editService] {
+    Ops::declare(reg, OperationId::Edit_SelectAll, [editService] {
         if (editService && editService->sceneManager())
         {
             auto* scene = editService->sceneManager();
@@ -140,20 +141,19 @@ void EditOperationRegistry::registerAll()
             });
             scene->selectEntities(visibleEntities);
         }
-    }));
+    });
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_ClearSelection, [editService] {
+    Ops::declare(reg, OperationId::Edit_ClearSelection, [editService] {
         if (editService && editService->sceneManager())
             editService->sceneManager()->clearSelection();
-    }));
+    });
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_InvertSelection, [editService] {
+    Ops::declare(reg, OperationId::Edit_InvertSelection, [editService] {
         if (editService && editService->sceneManager())
             editService->sceneManager()->invertSelection();
-    }));
+    });
 
-    reg.registerOperation(
-        std::make_unique<ParamLambdaOperation>(OperationId::Edit_Nudge, [editService](const QVariantMap& params) {
+    Ops::declareParam(reg, OperationId::Edit_Nudge, [editService](const QVariantMap& params) {
             if (!editService)
                 return;
             const double dx = params.value(QStringLiteral("dx")).toDouble();
@@ -161,10 +161,9 @@ void EditOperationRegistry::registerAll()
             if (dx == 0.0 && dy == 0.0)
                 return;
             editService->nudgeSelected(dx, dy, "Nudge");
-        }));
+        });
 
-    reg.registerOperation(
-        std::make_unique<ParamLambdaOperation>(OperationId::Edit_Fillet, [editService](const QVariantMap& params) {
+    Ops::declareParam(reg, OperationId::Edit_Fillet, [editService](const QVariantMap& params) {
             double radius = params.value("radius", -1.0).toDouble();
             if (radius < 0.0)
             {
@@ -181,10 +180,9 @@ void EditOperationRegistry::registerAll()
                     return;
             }
             Eg::FilletChamfer::applyFillet(*editService, radius);
-        }));
+        });
 
-    reg.registerOperation(
-        std::make_unique<ParamLambdaOperation>(OperationId::Edit_Chamfer, [editService](const QVariantMap& params) {
+    Ops::declareParam(reg, OperationId::Edit_Chamfer, [editService](const QVariantMap& params) {
             double distance = params.value("distance", -1.0).toDouble();
             if (distance < 0.0)
             {
@@ -201,7 +199,7 @@ void EditOperationRegistry::registerAll()
                     return;
             }
             Eg::FilletChamfer::applyChamfer(*editService, distance);
-        }));
+        });
 
     registerClipboardOps();
     registerTransformOps();
@@ -292,7 +290,7 @@ void EditOperationRegistry::registerClipboardOps()
         }
     };
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Copy, [editService, clipboard] {
+    Ops::declare(reg, OperationId::Edit_Copy, [editService, clipboard] {
         if (!editService || !clipboard)
             return;
         auto* scene = editService->sceneManager();
@@ -309,9 +307,9 @@ void EditOperationRegistry::registerClipboardOps()
                 sources.push_back(e);
         }
         clipboard->copy(sources);
-    }));
+    });
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Cut, [editService, clipboard] {
+    Ops::declare(reg, OperationId::Edit_Cut, [editService, clipboard] {
         if (!editService || !clipboard)
             return;
         auto* scene = editService->sceneManager();
@@ -326,10 +324,9 @@ void EditOperationRegistry::registerClipboardOps()
             sources.push_back(e);
         clipboard->copy(sources);
         editService->deleteSelected("Cut");
-    }));
+    });
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(
-        OperationId::Edit_Paste, [editService, clipboard, pasteAnchor, pasteText, pasteImage] {
+    Ops::declare(reg, OperationId::Edit_Paste, [editService, clipboard, pasteAnchor, pasteText, pasteImage] {
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
@@ -357,18 +354,17 @@ void EditOperationRegistry::registerClipboardOps()
             if (pasteText(true))
                 return;
             pasteImage(true);
-        }));
+        });
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_PasteText, [pasteText] {
+    Ops::declare(reg, OperationId::Edit_PasteText, [pasteText] {
         pasteText(true);
-    }));
+    });
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_PasteImage, [pasteImage] {
+    Ops::declare(reg, OperationId::Edit_PasteImage, [pasteImage] {
         pasteImage(true);
-    }));
+    });
 
-    reg.registerOperation(
-        std::make_unique<ParamLambdaOperation>(OperationId::Edit_Duplicate, [=](const QVariantMap& params) {
+    Ops::declareParam(reg, OperationId::Edit_Duplicate, [=](const QVariantMap& params) {
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
@@ -424,7 +420,7 @@ void EditOperationRegistry::registerClipboardOps()
 
             if (!added.empty())
                 editService->addEntities(std::move(added), "Duplicate");
-        }));
+        });
 }
 
 void EditOperationRegistry::registerTransformOps()
@@ -436,8 +432,7 @@ void EditOperationRegistry::registerTransformOps()
     auto* hub = m_viewportActionHub;
     auto* undoManager = m_undoManager;
 
-    reg.registerOperation(
-        std::make_unique<ParamSceneMutatingLambdaOperation>(OperationId::Edit_Move, [=](const QVariantMap& params) {
+    Ops::declareParamMutating(reg, OperationId::Edit_Move, [=](const QVariantMap& params) {
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
@@ -470,10 +465,9 @@ void EditOperationRegistry::registerTransformOps()
                 },
                 "Move",
                 false);
-        }));
+        });
 
-    reg.registerOperation(
-        std::make_unique<ParamSceneMutatingLambdaOperation>(OperationId::Edit_Rotate, [=](const QVariantMap& params) {
+    Ops::declareParamMutating(reg, OperationId::Edit_Rotate, [=](const QVariantMap& params) {
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
@@ -530,10 +524,9 @@ void EditOperationRegistry::registerTransformOps()
                 },
                 "Rotate",
                 false);
-        }));
+        });
 
-    reg.registerOperation(
-        std::make_unique<ParamSceneMutatingLambdaOperation>(OperationId::Edit_Mirror, [=](const QVariantMap& params) {
+    Ops::declareParamMutating(reg, OperationId::Edit_Mirror, [=](const QVariantMap& params) {
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
@@ -594,9 +587,9 @@ void EditOperationRegistry::registerTransformOps()
                 },
                 "Mirror",
                 false);
-        }));
+        });
 
-    reg.registerOperation(std::make_unique<SceneMutatingLambdaOperation>(OperationId::Edit_MirrorH, [editService] {
+    Ops::declareMutating(reg, OperationId::Edit_MirrorH, [editService] {
         if (!editService)
             return;
         auto* scene = editService->sceneManager();
@@ -617,9 +610,9 @@ void EditOperationRegistry::registerTransformOps()
             },
             "Mirror Horizontal",
             false);
-    }));
+    });
 
-    reg.registerOperation(std::make_unique<SceneMutatingLambdaOperation>(OperationId::Edit_MirrorV, [editService] {
+    Ops::declareMutating(reg, OperationId::Edit_MirrorV, [editService] {
         if (!editService)
             return;
         auto* scene = editService->sceneManager();
@@ -640,10 +633,9 @@ void EditOperationRegistry::registerTransformOps()
             },
             "Mirror Vertical",
             false);
-    }));
+    });
 
-    reg.registerOperation(std::make_unique<ParamSceneMutatingLambdaOperation>(
-        OperationId::Edit_Align, [editService](const QVariantMap& params) {
+    Ops::declareParamMutating(reg, OperationId::Edit_Align, [editService](const QVariantMap& params) {
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
@@ -662,7 +654,7 @@ void EditOperationRegistry::registerTransformOps()
                 },
                 "Align",
                 false);
-        }));
+        });
 }
 
 void EditOperationRegistry::registerGroupOps()
@@ -671,7 +663,7 @@ void EditOperationRegistry::registerGroupOps()
     auto& reg = m_bus->registry();
     auto* editService = m_editService;
 
-    reg.registerOperation(std::make_unique<SceneMutatingLambdaOperation>(OperationId::Edit_GroupToggle, [editService] {
+    Ops::declareMutating(reg, OperationId::Edit_GroupToggle, [editService] {
         if (!editService)
             return;
         auto* scene = editService->sceneManager();
@@ -703,12 +695,12 @@ void EditOperationRegistry::registerGroupOps()
                 editService->groupEntities(ids, "Group");
             }
         }
-    }));
+    });
 
-    reg.registerOperation(std::make_unique<SceneMutatingLambdaOperation>(OperationId::Edit_Ungroup, [editService] {
+    Ops::declareMutating(reg, OperationId::Edit_Ungroup, [editService] {
         if (editService)
             editService->ungroupSelectedEntities();
-    }));
+    });
 }
 
 void EditOperationRegistry::registerTrimExtendOps()
@@ -717,8 +709,7 @@ void EditOperationRegistry::registerTrimExtendOps()
     auto& reg = m_bus->registry();
     auto* editService = m_editService;
 
-    reg.registerOperation(std::make_unique<ParamSceneMutatingLambdaOperation>(
-        OperationId::Edit_Trim, [editService](const QVariantMap& params) {
+    Ops::declareParamMutating(reg, OperationId::Edit_Trim, [editService](const QVariantMap& params) {
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
@@ -763,10 +754,9 @@ void EditOperationRegistry::registerTrimExtendOps()
                 },
                 "Trim",
                 false);
-        }));
+        });
 
-    reg.registerOperation(std::make_unique<ParamSceneMutatingLambdaOperation>(
-        OperationId::Edit_Extend, [editService](const QVariantMap& params) {
+    Ops::declareParamMutating(reg, OperationId::Edit_Extend, [editService](const QVariantMap& params) {
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
@@ -840,7 +830,7 @@ void EditOperationRegistry::registerTrimExtendOps()
                 },
                 "Extend",
                 false);
-        }));
+        });
 }
 
 void EditOperationRegistry::registerBboxOps()
@@ -848,7 +838,7 @@ void EditOperationRegistry::registerBboxOps()
     auto& reg = m_bus->registry();
     auto* editService = m_editService;
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_GetBbox, [editService] {
+    Ops::declare(reg, OperationId::Edit_GetBbox, [editService] {
         if (!editService)
             return;
         auto* scene = editService->sceneManager();
@@ -864,7 +854,7 @@ void EditOperationRegistry::registerBboxOps()
             bbox.minPt.y(),
             bbox.maxPt.x(),
             bbox.maxPt.y());
-    }));
+    });
 }
 
 void EditOperationRegistry::registerDiscretizeOp()
@@ -872,7 +862,7 @@ void EditOperationRegistry::registerDiscretizeOp()
     auto& reg = m_bus->registry();
     auto* editService = m_editService;
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_Discretize, [editService] {
+    Ops::declare(reg, OperationId::Edit_Discretize, [editService] {
         if (!editService)
             return;
         auto* scene = editService->sceneManager();
@@ -892,17 +882,17 @@ void EditOperationRegistry::registerDiscretizeOp()
         if (!discretizer.doDiscretize(entity, vOutLines) || vOutLines.empty())
             return;
 
-        SceneChangeSet changeSet;
-        changeSet.toRemove.push_back(entity->id);
+        SceneEditBatch batch;
+        batch.toRemove.push_back(entity->id);
         for (const auto& line : vOutLines)
         {
             if (line.size() < 2)
                 continue;
-            changeSet.toAdd.push_back(std::make_unique<Eg::SyLine>(line));
+            batch.toAdd.push_back(std::make_unique<Eg::SyLine>(line));
         }
-        if (!changeSet.toAdd.empty())
-            editService->applyChangeSet(std::move(changeSet), "Discretize");
-    }));
+        if (!batch.toAdd.empty())
+            editService->applyEditBatch(std::move(batch), "Discretize");
+    });
 }
 
 void EditOperationRegistry::registerBezierOps()
@@ -910,7 +900,7 @@ void EditOperationRegistry::registerBezierOps()
     auto& reg = m_bus->registry();
     auto* editService = m_editService;
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_BezierToggle, [this, editService] {
+    Ops::declare(reg, OperationId::Edit_BezierToggle, [this, editService] {
         if (!editService)
             return;
         auto* scene = editService->sceneManager();
@@ -920,10 +910,9 @@ void EditOperationRegistry::registerBezierOps()
                                                                                      : OperationId::Edit_SplitBezier;
         if (m_bus)
             m_bus->run(target);
-    }));
+    });
 
-    reg.registerOperation(
-        std::make_unique<ParamLambdaOperation>(OperationId::Edit_SplitBezier, [editService](const QVariantMap& params) {
+    Ops::declareParam(reg, OperationId::Edit_SplitBezier, [editService](const QVariantMap& params) {
             if (!editService)
                 return;
             auto* scene = editService->sceneManager();
@@ -936,7 +925,7 @@ void EditOperationRegistry::registerBezierOps()
             if (selected.empty())
                 return;
 
-            SceneChangeSet changeSet;
+            SceneEditBatch batch;
             int nSplit = 0;
             for (Eg::SyEntity* e : selected)
             {
@@ -944,16 +933,16 @@ void EditOperationRegistry::registerBezierOps()
                     continue;
                 auto* bezier = static_cast<Eg::SyBezier*>(e);
                 auto pair = Eg::BezierAlgorithms::splitBezier(bezier, dT);
-                changeSet.toRemove.push_back(e->id);
-                changeSet.toAdd.push_back(std::make_unique<Eg::SyBezier>(pair.first));
-                changeSet.toAdd.push_back(std::make_unique<Eg::SyBezier>(pair.second));
+                batch.toRemove.push_back(e->id);
+                batch.toAdd.push_back(std::make_unique<Eg::SyBezier>(pair.first));
+                batch.toAdd.push_back(std::make_unique<Eg::SyBezier>(pair.second));
                 ++nSplit;
             }
             if (nSplit > 0)
-                editService->applyChangeSet(std::move(changeSet), "Split Bezier");
-        }));
+                editService->applyEditBatch(std::move(batch), "Split Bezier");
+        });
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::Edit_MergeBezier, [editService] {
+    Ops::declare(reg, OperationId::Edit_MergeBezier, [editService] {
         if (!editService)
             return;
 
@@ -965,7 +954,7 @@ void EditOperationRegistry::registerBezierOps()
         std::vector<Eg::SyEntity*> vQuad;
         OpRegistryHelpers::collectBezierCandidates(scene, vCubic, vQuad);
 
-        SceneChangeSet changeSet;
+        SceneEditBatch batch;
         if (vCubic.size() == 2)
         {
             auto* b1 = static_cast<Eg::SyBezier*>(vCubic[0]);
@@ -973,9 +962,9 @@ void EditOperationRegistry::registerBezierOps()
             auto merged = Eg::BezierAlgorithms::mergeBeziers(b1, b2);
             if (merged)
             {
-                changeSet.toRemove.push_back(vCubic[0]->id);
-                changeSet.toRemove.push_back(vCubic[1]->id);
-                changeSet.toAdd.push_back(std::make_unique<Eg::SyBezier>(*merged));
+                batch.toRemove.push_back(vCubic[0]->id);
+                batch.toRemove.push_back(vCubic[1]->id);
+                batch.toAdd.push_back(std::make_unique<Eg::SyBezier>(*merged));
             }
         }
         else if (vQuad.size() == 2)
@@ -985,26 +974,25 @@ void EditOperationRegistry::registerBezierOps()
             auto merged = Eg::BezierAlgorithms::mergeBeziers(b1, b2);
             if (merged)
             {
-                changeSet.toRemove.push_back(vQuad[0]->id);
-                changeSet.toRemove.push_back(vQuad[1]->id);
-                changeSet.toAdd.push_back(std::make_unique<Eg::SyBezier2>(*merged));
+                batch.toRemove.push_back(vQuad[0]->id);
+                batch.toRemove.push_back(vQuad[1]->id);
+                batch.toAdd.push_back(std::make_unique<Eg::SyBezier2>(*merged));
             }
         }
-        if (!changeSet.empty())
-            editService->applyChangeSet(std::move(changeSet), "Merge Bezier");
-    }));
+        if (!batch.empty())
+            editService->applyEditBatch(std::move(batch), "Merge Bezier");
+    });
 }
 
 void EditOperationRegistry::registerArrayOp()
 {
     auto& reg = m_bus->registry();
-    reg.registerOperation(
-        std::make_unique<LambdaOperation>(OperationId::Edit_Array, [m_algorithmRunner = m_algorithmRunner] {
+    Ops::declare(reg, OperationId::Edit_Array, [m_algorithmRunner = m_algorithmRunner] {
             if (!m_algorithmRunner)
                 return;
             OperationRequest req;
             req.id = OperationId::Algo_Array;
             req.source = OperationSource::Menu;
             m_algorithmRunner->runForOperation(OperationId::Algo_Array, req);
-        }));
+        });
 }

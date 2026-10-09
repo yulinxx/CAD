@@ -11,6 +11,7 @@
 
 #include "Log/SyLogger.h"
 #include <QAction>
+#include <QEvent>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QSize>

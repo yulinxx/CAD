@@ -41,25 +41,50 @@ QObject* UiStateBridge2D::install(Workbench2D* workbench,
     auto* guard = new QObject(workbench);
     guard->setObjectName(QStringLiteral("UiStateBridge2DConnections"));
 
+    // 合并触发：一次操作成功常在同一轮事件循环里连发 undoStateChanged +
+    // operationCompleted（+ 场景变化）信号，各自直连会做 N 轮完整快照与
+    // 菜单/工具栏遍历。这里统一收敛到一个 间隔 0 的单发定时器：
+    // 同轮只排一次尾随刷新，执行时取最新状态（晚到的状态不会丢）。
+    auto* coalescer = new QTimer(guard);
+    coalescer->setSingleShot(true);
+    coalescer->setInterval(0);
+    const auto requestRefresh = [coalescer]() {
+        if (!coalescer->isActive())
+        {
+            coalescer->start();
+        }
+    };
+    QObject::connect(coalescer, &QTimer::timeout, guard, [workbench, guard]() {
+        refreshAll(workbench);
+        // 场景变化附带的场景树刷新（结构签名判定，纯几何变更不会重建树）
+        const bool treePending = guard->property("pendingSceneTreeRefresh").toBool();
+        guard->setProperty("pendingSceneTreeRefresh", false);
+        if (treePending)
+        {
+            workbench->refreshSceneTreeIfNeeded("sceneMonitor");
+        }
+    });
+
     // 选择变化（点选/框选/绘制后自动选中/撤销等所有路径）
     if (viewport)
     {
-        QObject::connect(viewport, &RenderViewport2D::selectionChanged, guard, [workbench]() {
-            refreshAll(workbench);
+        QObject::connect(viewport, &RenderViewport2D::selectionChanged, guard, [requestRefresh]() {
+            requestRefresh();
         });
     }
 
     // 图层锁定/属性变更（锁定图层后其中图元的 Delete/Mirror/Align/Group 应变灰）
     if (layerBridge)
     {
-        QObject::connect(layerBridge, &QtLayerManagerBridge::sigLayerChanged, guard, [workbench](int) {
-            refreshAll(workbench);
+        QObject::connect(layerBridge, &QtLayerManagerBridge::sigLayerChanged, guard, [requestRefresh](int) {
+            requestRefresh();
         });
     }
 
     // 图层顺序 → 绘制次序（z-order）：换序只改 LayerManager 的图层顺序，图元本身没变，
     // 因此增量刷新不会重算 sortKey。必须显式走一次全量装配，否则画面上的重叠关系
     // 不会跟着图层顺序变（见 RenderSceneBuilder 的 sortKey 组装）。
+    // 注意这一路是渲染侧直连，不并入 UI 状态合并器（两者刷新对象不同）。
     if (layerBridge && viewport)
     {
         QObject::connect(layerBridge, &QtLayerManagerBridge::sigLayerOrderChanged, guard, [viewport]() {
@@ -70,34 +95,29 @@ QObject* UiStateBridge2D::install(Workbench2D* workbench,
     if (bus)
     {
         // 撤销/重做栈变化（含经 LayerEditService 直接入栈的图层操作）
-        QObject::connect(bus, &OperationBus::undoStateChanged, guard, [workbench]() {
-            refreshAll(workbench);
+        QObject::connect(bus, &OperationBus::undoStateChanged, guard, [requestRefresh]() {
+            requestRefresh();
         });
 
         // 任意操作成功完成后刷新一次：替代原来仅监听特定操作的白名单，
         // 新增写剪贴板或改变选择的操作无需再回来改这里
-        QObject::connect(bus, &OperationBus::operationCompleted, guard, [workbench](OperationId, bool success) {
-            if (success)
-            {
-                refreshAll(workbench);
-            }
-        });
+        QObject::connect(bus, &OperationBus::operationCompleted, guard,
+            [requestRefresh](OperationId, bool success) {
+                if (success)
+                {
+                    requestRefresh();
+                }
+            });
     }
 
     // 场景变化：图元级 setLocked / setVisible 等只发 notifySceneChanged、不改图元数量、
     // 也不经操作总线的变更走这一路。3D 侧（UiStateBridge3D 订阅 SceneMonitor3D::sceneChanged）
     // 早已覆盖，2D 此前缺失 —— 场景树锁定当前选中图元后 Delete/Align 仍可点即源于此。
-    // 延后到事件循环下一轮，确保引擎侧批量变更已全部落地。
     if (sceneMonitor)
     {
-        QObject::connect(sceneMonitor, &SceneMonitor::sceneChanged, guard, [workbench]() {
-            QTimer::singleShot(0, workbench, [workbench]() {
-                refreshAll(workbench);
-                // 场景变化时刷新场景树（可见性/锁定状态变化需要同步到树显示）。
-                // 这里走「结构签名」判定：拖动图元这类只改几何的变更不会命中，
-                // 不会把万级场景的树在每次变更后重建一遍。
-                workbench->refreshSceneTreeIfNeeded("sceneMonitor");
-            });
+        QObject::connect(sceneMonitor, &SceneMonitor::sceneChanged, guard, [guard, requestRefresh]() {
+            guard->setProperty("pendingSceneTreeRefresh", true);
+            requestRefresh();
         });
     }
 

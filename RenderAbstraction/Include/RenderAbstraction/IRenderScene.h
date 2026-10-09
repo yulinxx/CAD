@@ -6,6 +6,13 @@
 
 namespace RenderAbstraction {
 
+// 定位说明（审查文档 §3.6）：本层是 **ABI/头文件隔离层，不是可插拔后端抽象**。
+// UI 通过它隔离 renderx 的 C API（POD 布局与 rx* 头不进入 UI 编译单元）；
+// 当前全仓唯一实现是 RenderBridge 的 RenderXSceneAdapter / RenderXDeviceAdapter。
+// 「换一个 IRenderScene 实现即可换后端」是误解 —— 后端适配器与 RenderSessionHost
+// 生命周期管理需一并重写。不要在此层之上假设多实现存在，也不要因「单实现」删除本层。
+// IRenderDevice 同此定位。
+
 class IRenderScene {
 public:
     virtual ~IRenderScene() = default;

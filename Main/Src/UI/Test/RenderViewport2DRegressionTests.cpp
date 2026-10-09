@@ -926,13 +926,6 @@ TEST(RenderViewport2DRegressionTest, InputRouter_SetToolManager)
     SUCCEED();
 }
 
-TEST(RenderViewport2DRegressionTest, InputRouter_SetInteractionDispatcher)
-{
-    ViewportInputRouter router;
-    router.setInteractionDispatcher(nullptr);
-    SUCCEED();
-}
-
 TEST(RenderViewport2DRegressionTest, InputRouter_SetSelectionService)
 {
     ViewportInputRouter router;
@@ -972,7 +965,6 @@ TEST(RenderViewport2DRegressionTest, InputRouter_FullDependencyInjection)
     router.setRefreshCoordinator(&coordinator);
     router.setRenderWidget(nullptr);
     router.setToolManager(nullptr);
-    router.setInteractionDispatcher(nullptr);
     router.setSelectionService(nullptr);
     router.setOperationBus(nullptr);
     router.setDocument(nullptr);
@@ -1243,9 +1235,9 @@ TEST(RenderViewport2DRegressionTest, InputRouter_EventFilterNonRenderWidget)
 
 // ==================== 键盘路由优先级测试 ====================
 
-TEST(RenderViewport2DRegressionTest, InputRouter_KeyboardPriority_InteractionDispatcherFirst)
+TEST(RenderViewport2DRegressionTest, InputRouter_KeyboardPriority_EscapeKey)
 {
-    // 键盘路由优先级：interactionDispatcher → tool → Delete
+    // 键盘路由优先级：tool → Delete（交互命令分发器已移除）
     ViewportInputRouter router;
     // 验证路由链存在，不崩溃
     QKeyEvent escEvent(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
@@ -1380,7 +1372,7 @@ TEST(RenderViewport2DRegressionTest, InputRouter_ContextMenuNullDispatcher)
 {
     ViewportInputRouter router;
     QContextMenuEvent contextEvent(QContextMenuEvent::Mouse, QPoint(100, 100), QPoint(100, 100));
-    // 无交互分发器时不崩溃
+    // 无命令分发器时不崩溃
     router.handleContextMenu(&contextEvent);
     SUCCEED();
 }

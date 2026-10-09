@@ -10,7 +10,6 @@
 #include "ViewportNavigation2D.h"
 #include "SceneRefreshCoordinator.h"
 #include "ISelectionService.h"
-#include "UiInteractionDispatcher.h"
 #include "SceneDocument2D.h"
 
 #include "UI2D/Operation/OperationBus.h"
@@ -120,11 +119,6 @@ void ViewportInputRouter::setCamera(Camera2D* camera)
 void ViewportInputRouter::setToolManager(ToolManager* tm)
 {
     m_toolManager = tm;
-}
-
-void ViewportInputRouter::setInteractionDispatcher(IInteractionDispatcher* dispatcher)
-{
-    m_interactionDispatcher = dispatcher;
 }
 
 void ViewportInputRouter::setSelectionService(ISelectionService* service)
@@ -817,14 +811,6 @@ bool ViewportInputRouter::handlePanMouseRelease(QMouseEvent* event)
 
 // ==================== 键盘事件分发 ====================
 
-bool ViewportInputRouter::handleInteractionDispatcherKeyPress(QKeyEvent* event)
-{
-    // 交互分发器的 begin/submit/cancel 当前无生产调用方，hasActiveCommand() 恒 false。
-    // ESC/Enter 确认/取消语义已在各工具层实现。
-    Q_UNUSED(event);
-    return false;
-}
-
 bool ViewportInputRouter::handleToolKeyPress(QKeyEvent* event)
 {
     if (!m_toolManager)
@@ -848,11 +834,6 @@ bool ViewportInputRouter::handleToolKeyPress(QKeyEvent* event)
 
 bool ViewportInputRouter::handleKeyPressDispatch(QKeyEvent* event)
 {
-    if (handleInteractionDispatcherKeyPress(event))
-    {
-        return true;
-    }
-
     if (handleToolKeyPress(event))
     {
         return true;

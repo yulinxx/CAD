@@ -5,6 +5,7 @@
  * 注册和管理文件相关的操作命令。
  */
 #include "FileOperationRegistry.h"
+#include "OpRegistryTypes.h"
 #include "DocumentPersistenceHelper.h"
 
 #include "UI2D/Operation/OperationBus.h"
@@ -74,9 +75,9 @@ namespace
     {
         for (const auto& entry : map)
         {
-            reg.registerOperation(std::make_unique<LambdaOperation>(entry.opId, [handler, fmt = entry.format] {
+            Ops::declare(reg, entry.opId, [handler, fmt = entry.format] {
                 handler(fmt);
-            }));
+            });
         }
     }
 }  // namespace
@@ -355,7 +356,7 @@ void FileOperationRegistry::registerFileNewOps()
     auto& reg = m_bus->registry();
     auto* scene = m_sceneManager;
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::File_New, [this, scene] {
+    Ops::declare(reg, OperationId::File_New, [this, scene] {
         bool needsSave = (m_stateCenter && m_stateCenter->dirty());
         if (needsSave)
         {
@@ -375,14 +376,14 @@ void FileOperationRegistry::registerFileNewOps()
         {
             m_stateCenter->setDirty(false);
         }
-    }));
+    });
 }
 
 void FileOperationRegistry::registerFileOpenOps()
 {
     auto& reg = m_bus->registry();
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::File_Open, [this] {
+    Ops::declare(reg, OperationId::File_Open, [this] {
         QString filePath = FileDialogService::getOpenFileName(
             m_parentWidget, QObject::tr("Open File"), FileDialogService::openFileFilter());
         if (filePath.isEmpty())
@@ -399,19 +400,18 @@ void FileOperationRegistry::registerFileOpenOps()
             return;
         }
         doOpenFile(filePath);
-    }));
+    });
 
-    reg.registerOperation(
-        std::make_unique<ParamLambdaOperation>(OperationId::File_OpenRecent, [this](const QVariantMap& params) {
+    Ops::declareParam(reg, OperationId::File_OpenRecent, [this](const QVariantMap& params) {
             doOpenFile(params.value(QStringLiteral("filePath")).toString());
-        }));
+        });
 }
 
 void FileOperationRegistry::registerFileSaveOps()
 {
     auto& reg = m_bus->registry();
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::File_Save, [this] {
+    Ops::declare(reg, OperationId::File_Save, [this] {
         if (m_currentFilePath->empty())
         {
             QString filePath = FileDialogService::getSaveFileName(
@@ -436,16 +436,16 @@ void FileOperationRegistry::registerFileSaveOps()
             }
             doExport(filePath.toStdString());
         }
-    }));
+    });
 
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::File_SaveAs, [this] {
+    Ops::declare(reg, OperationId::File_SaveAs, [this] {
         QString filePath = FileDialogService::getSaveFileName(
             m_parentWidget, QObject::tr("Save As"), FileDialogService::saveFileFilter());
         if (!filePath.isEmpty())
         {
             doExport(filePath.toStdString());
         }
-    }));
+    });
 }
 
 void FileOperationRegistry::registerImportOps()
@@ -458,13 +458,12 @@ void FileOperationRegistry::registerImportOps()
     });
 
     // 导入图片（特殊处理，不走格式映射；支持拖放 filePath 参数或弹文件对话框）
-    reg.registerOperation(
-        std::make_unique<ParamLambdaOperation>(OperationId::File_ImportImage, [this](const QVariantMap& params) {
+    Ops::declareParam(reg, OperationId::File_ImportImage, [this](const QVariantMap& params) {
             doImportImage(params.value(QStringLiteral("filePath")).toString());
-        }));
+        });
 
     // “All Supported...”：弹出所有支持格式的对话框，按扩展名自动路由到对应导入器
-    reg.registerOperation(std::make_unique<LambdaOperation>(OperationId::File_ImportAll, [this] {
+    Ops::declare(reg, OperationId::File_ImportAll, [this] {
         QString filePath = FileDialogService::getOpenFileName(
             m_parentWidget, QObject::tr("Import File"), FileDialogService::allSupportedFilter());
         if (filePath.isEmpty())
@@ -472,7 +471,7 @@ void FileOperationRegistry::registerImportOps()
             return;
         }
         doOpenFile(filePath);
-    }));
+    });
 }
 
 void FileOperationRegistry::registerExportOps()
@@ -503,7 +502,7 @@ void FileOperationRegistry::registerAll()
     registerExportOps();
 
     // 退出操作
-    m_bus->registry().registerOperation(std::make_unique<LambdaOperation>(OperationId::File_Exit, [this] {
+    Ops::declare(m_bus->registry(), OperationId::File_Exit, [this] {
         FileOperationUtils::exitApplication(m_parentWidget);
-    }));
+    });
 }

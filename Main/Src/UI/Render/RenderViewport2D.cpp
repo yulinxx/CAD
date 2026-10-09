@@ -13,7 +13,6 @@
 #include "ViewportInputRouter.h"
 #include "SceneDocument2D.h"
 #include "ISelectionService.h"
-#include "UiInteractionDispatcher.h"
 
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
@@ -426,15 +425,6 @@ void RenderViewport2D::setSelectionService(ISelectionService* service)
     }
 }
 
-void RenderViewport2D::setInteractionDispatcher(IInteractionDispatcher* dispatcher)
-{
-    m_interactionDispatcher = dispatcher;
-    if (m_inputRouter)
-    {
-        m_inputRouter->setInteractionDispatcher(dispatcher);
-    }
-}
-
 void RenderViewport2D::setOperationBus(OperationBus* bus)
 {
     m_operationBus = bus;
@@ -533,52 +523,6 @@ void RenderViewport2D::initializeTools()
     if (m_inputRouter)
     {
         m_inputRouter->setToolManager(m_toolManager.get());
-    }
-
-    // 活动命令的事件消费绑定到工具层；输入路由器不再直接决定命令事件如何落到工具。
-    if (m_interactionDispatcher)
-    {
-        m_interactionDispatcher->setEventHandler([this](const InteractionEvent& interaction) {
-            if (!m_toolManager)
-            {
-                return false;
-            }
-
-            auto* tool = m_toolManager->getActiveTool();
-            if (!tool)
-            {
-                return false;
-            }
-
-            // 统一应用吸附（与输入路由器同一入口），保证命令/交互分发路径也可捕捉
-            const QPointF worldPos = applySnap(QPointF(interaction.x, interaction.y));
-            switch (interaction.type)
-            {
-            case InteractionEventType::MouseDown:
-            {
-                QMouseEvent event(
-                    QEvent::MouseButtonPress, worldPos, worldPos, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
-                return tool->onMousePress(worldPos, &event);
-            }
-            case InteractionEventType::MouseMove:
-            {
-                QMouseEvent event(QEvent::MouseMove, worldPos, worldPos, Qt::NoButton, Qt::NoButton, Qt::NoModifier);
-                return tool->onMouseMove(worldPos, &event);
-            }
-            case InteractionEventType::MouseUp:
-            {
-                QMouseEvent event(
-                    QEvent::MouseButtonRelease, worldPos, worldPos, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
-                return tool->onMouseRelease(worldPos, &event);
-            }
-            case InteractionEventType::KeyPress:
-            {
-                QKeyEvent event(QEvent::KeyPress, interaction.key, Qt::NoModifier);
-                return tool->onKeyPress(&event);
-            }
-            }
-            return false;
-        });
     }
 
     updateStatus(tr("2D tools initialized"));

@@ -3,7 +3,6 @@
 #include <memory>
 #include <vector>
 
-#include "UI/Interaction/UiInteractionDispatcher.h"
 #include "UI/Services/UiLayoutService.h"
 #include "UI/Services/UiShellHost.h"
 #include "UI/Services/UiStateCenter.h"
@@ -52,7 +51,6 @@ class UnitManager;
 class DeviceHost;
 class ProcessingJobService;
 class LaserOperationRegistry;
-class ImportExportRegistry;
 
 
 namespace Ui
@@ -94,9 +92,6 @@ public:
 
     /// 获取布局服务
     UiLayoutService* layoutService();
-
-    /// 获取交互式命令生命周期分发器
-    IInteractionDispatcher* interactionDispatcher();
 
     /// 获取操作总线
     OperationBus* operationBus();
@@ -254,9 +249,6 @@ private:
 
     /// 布局服务
     std::unique_ptr<UiLayoutService> m_layoutService;
-
-    /// 交互式命令生命周期分发器
-    std::unique_ptr<IInteractionDispatcher> m_interactionDispatcher;
 
     /// 操作总线（新命令主线）
     std::unique_ptr<OperationBus> m_operationBus;

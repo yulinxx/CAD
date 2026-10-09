@@ -7,7 +7,6 @@
  * 定义消费者应依赖的最小抽象集。当前暴露：
  * - getSelectionService()（选择状态查询/操作）
  * - getUndoManager()（撤销/重做栈）
- * - getInteractionDispatcher()（交互式命令生命周期）
  *
  * 需要具体服务（如 SceneDocument2D*、LayerManager* 等）的消费者，
  * 应通过独立参数注入，而非依赖此接口。
@@ -19,7 +18,6 @@
 
 class ISelectionService;
 class IUndoRedoManager;
-class IInteractionDispatcher;
 
 class IUIServices
 {
@@ -31,7 +29,4 @@ public:
 
     /// 撤销重做管理器
     virtual IUndoRedoManager* getUndoManager() const = 0;
-
-    /// 交互式命令生命周期分发器
-    virtual IInteractionDispatcher* getInteractionDispatcher() const = 0;
 };

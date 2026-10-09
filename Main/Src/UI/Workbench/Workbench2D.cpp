@@ -131,6 +131,12 @@ public:
     {
     }
 
+    /// 广播优先级：场景树在渲染与 UI 状态之后重建（派生数据）
+    int observerPriority() const override
+    {
+        return Eg::ObserverPriority::SceneTree;
+    }
+
     void onSceneChanged() override
     {
         if (m_cb)
@@ -236,10 +242,10 @@ bool Workbench2D::initialize(const WorkbenchServices& services)
 {
     SY_INFO("[Workbench2D] initialize: starting 2D workbench initialization");
 
-    if (!services.uiState.stateCenter || !services.uiState.interactionDispatcher)
+    if (!services.uiState.stateCenter)
     {
-        SY_ERRORF("[Workbench2D] initialize failed: stateCenter=%p interactionDispatcher=%p",
-            static_cast<void*>(services.uiState.stateCenter), static_cast<void*>(services.uiState.interactionDispatcher));
+        SY_ERRORF("[Workbench2D] initialize failed: stateCenter=%p",
+            static_cast<void*>(services.uiState.stateCenter));
         return false;
     }
     m_uiState = services.uiState;
@@ -386,7 +392,6 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
 {
     Q_UNUSED(window);
     vp->setSelectionService(m_scene.selectionService);
-    vp->setInteractionDispatcher(m_uiState.interactionDispatcher);
     vp->setOperationBus(m_commands.operationBus);
     vp->setLayerManager(m_scene.layerManager);
 

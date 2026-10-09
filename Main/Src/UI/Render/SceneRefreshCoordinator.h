@@ -98,6 +98,12 @@ public:
 
     // ==================== 场景变更回调（IObserver 实现） ====================
 
+    /// 广播优先级：渲染刷新最先收到变更通知（见 Eg::ObserverPriority）
+    int observerPriority() const override
+    {
+        return Eg::ObserverPriority::Render;
+    }
+
     /// 场景数据变更通知（图元增删改）
     void onSceneChanged() override;
 

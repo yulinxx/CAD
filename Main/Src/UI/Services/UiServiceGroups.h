@@ -13,7 +13,6 @@
  */
 
 class UiStateCenter;
-class IInteractionDispatcher;
 class OperationBus;
 class IUndoRedoManager;
 class ISelectionService;
@@ -37,11 +36,10 @@ namespace Eg
     class EntityClipboard;
 }
 
-/// UI 状态与交互：状态中心 + 交互式命令分发
+/// UI 状态：状态中心
 struct UiStateServices
 {
     UiStateCenter* stateCenter{ nullptr };
-    IInteractionDispatcher* interactionDispatcher{ nullptr };
 };
 
 /// 命令与撤销：操作总线 + 撤销重做
