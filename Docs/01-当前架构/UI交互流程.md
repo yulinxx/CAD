@@ -237,9 +237,10 @@ flowchart TD
 **鼠标事件优先级**（`RenderViewport2D::mousePressEvent`）：
 1. 中键 → 平移
 2. 左键 + 平移模式 → 平移
-3. 左键 + IInteractionDispatcher 活动命令 → 转发（当前为预留空实现）
-4. **左键 + ToolManager 活动工具 → 转发到 ITool（当前实际路径）**
-5. 左键 + Selector → 选择
+3. **左键 + ToolManager 活动工具 → 转发到 ITool（当前实际路径）**
+4. 左键 + Selector → 选择
+
+> 注：历史文档中的 `IInteractionDispatcher` 命令转发层已删除（整层空转、零生产调用）。
 
 ---
 

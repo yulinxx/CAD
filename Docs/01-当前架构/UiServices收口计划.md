@@ -2,7 +2,7 @@
 
 ## 背景
 
-`UiServices` 是 UI 层所需服务的聚合结构，当前暴露 15 个指针，其中只有 4 个是抽象接口（`ISelectionService`、`IUndoRedoManager`、`IInteractionDispatcher`、`IRecentFileService`），其余为具体实现类，违反"UI 只保留入口、交互和状态同步"原则。
+`UiServices` 是 UI 层所需服务的聚合结构，当前暴露 15 个指针，其中只有 3 个是抽象接口（`ISelectionService`、`IUndoRedoManager`、`IRecentFileService`；原 `IInteractionDispatcher` 已整层删除），其余为具体实现类，违反"UI 只保留入口、交互和状态同步"原则。
 
 ---
 
@@ -16,7 +16,7 @@
 | `layerManager` | `LayerManager*` | 中 (13+ 处) | 中耦合 | 需创建接口 |
 | `selectionService` | `ISelectionService*` | 高 | 低 | ✅ 已是接口 |
 | `undoManager` | `IUndoRedoManager*` | 高 | 低 | ✅ 已是接口 |
-| `interactionDispatcher` | `IInteractionDispatcher*` | 高 | 低 | ✅ 已是接口 |
+| ~~`interactionDispatcher`~~ | ~~`IInteractionDispatcher*`~~ | — | — | 🗑️ 已整层删除（原「✅ 已是接口」） |
 | `layerManagerBridge` | `QtLayerManagerBridge*` | 中 | 中耦合 | 需评估 |
 | `layerEditService` | `LayerEditService*` | 中 | 中耦合 | 需评估 |
 | `unitManager` | `UnitManager*` | 中 (17 处) | 低 | 需评估 |

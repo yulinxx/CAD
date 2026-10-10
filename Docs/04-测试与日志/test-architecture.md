@@ -236,7 +236,7 @@ Engine/2D/Test/
 ├── SceneManagerTests.cpp    # 场景管理测试
 ├── SceneNotifierTests.cpp   # 场景通知器测试
 ├── SelectionSemanticsTests.cpp
-├── SpatialIndex2DTests.cpp # 空间索引测试
+├── SpatialIndex2DTests.cpp # 线段级空间索引测试（SegmentIndex2D）
 ├── TessellatorTests.cpp     # 细分器测试
 ├── PathOptimizerTests.cpp   # 路径优化测试
 ├── ArrayAlgorithmTests.cpp  # 阵列算法测试

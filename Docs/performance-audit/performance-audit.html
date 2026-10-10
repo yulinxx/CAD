@@ -444,7 +444,7 @@
                 <tr>
                   <td><span class="tag tag--partial">部分缓解</span></td>
                   <td><code>updateBulk</code> / <code>updateEntityBoundsBulk</code> 逐图元更新</td>
-                  <td><code>SpatialIndex2D.cpp:97-118</code> 仍两轮循环；<code>SceneEditService.cpp:719-721</code> 注释自认"不降低复杂度，只是整批一次收尾"</td>
+                  <td><code>SpatialIndex2D.cpp:97-118</code> 仍两轮循环（注：该 <code>SpatialIndex2D</code> 类已零消费者删除，现存实体级 <code>EntitySpatialIndex::updateBulk</code>）；<code>SceneEditService.cpp:719-721</code> 注释自认"不降低复杂度，只是整批一次收尾"</td>
                 </tr>
                 <tr>
                   <td><span class="tag tag--partial">部分缓解</span></td>
@@ -773,7 +773,7 @@
                 <tr>
                   <td><span class="tag tag--partial">已缓解</span></td>
                   <td><code>SpatialIndex2D.cpp:97-118</code></td>
-                  <td><code>updateBulk</code> 是"先全部移除、再全部插入"两轮循环，并不减少 remove/insert 次数。代码注释已自认"收益是整批一次收尾，不降低复杂度"。</td>
+                  <td><code>updateBulk</code> 是"先全部移除、再全部插入"两轮循环，并不减少 remove/insert 次数。代码注释已自认"收益是整批一次收尾，不降低复杂度"。（注：该 <code>SpatialIndex2D</code> 类已零消费者删除；现存 <code>EntitySpatialIndex::updateBulk</code> 同为两轮模式）</td>
                 </tr>
                 <tr>
                   <td><span class="tag tag--partial">已重构</span></td>

@@ -77,12 +77,12 @@ SVG 导入的复合曲线大多以 `SmartLine` 存储（一条 SVG 子路径 = �
 
 ### 2.1.2 空间索引批量更新
 
-文件：`Engine/2D/Src/Core/EntitySpatialIndex.cpp`、`Engine/2D/Src/SpatialIndex/SpatialIndex2D.cpp`、`Engine/2D/Src/Core/SceneManager.cpp`
+文件：`Engine/2D/Src/Core/EntitySpatialIndex.cpp`、`Engine/2D/Src/Core/SceneManager.cpp`
 
 批量变换时**不得**逐图元调用 `updateEntityBoundsNoNotify()` → `spatialIndex.update()` = remove + insert（2×O(log N)），那会让 RTree 每次都重平衡。
 
 **做法**：
-- `EntitySpatialIndex::updateBulk(entities)` / `SpatialIndex2D::updateBulk()` / `SceneManager::updateEntityBoundsBulk()`：先收集所有旧包围盒一次性移除，再批量插入新包围盒，RTree 只做一次批量重建。
+- `EntitySpatialIndex::updateBulk(entities)` / `SceneManager::updateEntityBoundsBulk()`：先收集所有旧包围盒一次性移除，再批量插入新包围盒，RTree 只做一次批量重建。（原 `SpatialIndex2D::updateBulk()` 已随该类零消费者删除）
 - `EntityTransform::applyMatrixToIds()` **只改几何**，不在图元循环里更新索引；整批结束后由
   `SceneEditService::transformEntities()` 收集受影响图元并一次性调用 `updateEntityBoundsBulk()`。
 
@@ -165,7 +165,8 @@ Esc 取消则用 before 快照整体还原。拖动期间
 ## 4. 3D 侧：批量选择 / 删除 / 变换
 
 3D 与 2D 是两套独立引擎（`Engine3D` / `UI3D`），但批处理原则一致。
-关键差异：3D 的选择状态归 `SelectionManager3D`，图元容器与索引归 `SceneManager3D`。
+关键事实源：3D 的选择状态是 `SceneManager3D::selectionManager()`（单店合一，
+`ISceneManager` 选择 API 与 UI 共用同一份），图元容器与索引归 `SceneManager3D`。
 
 ### 4.1 引擎层新增的批量接口
 
@@ -177,26 +178,29 @@ Esc 取消则用 before 快照整体还原。拖动期间
 | `deleteEntities(entities, count)` | 批量摘出并**销毁**（所有权留在场景内） |
 | `updateEntitiesBounds(entities, count)` | 批量更新空间索引，替代全量 `rebuildSpatialIndex()` |
 | `structureRevision()` | 结构修订号：只在图元增删（添加 / 移除 / 清空）时推进 |
-| `addEntitiesRemovedObserver(fn)` | 图元移除通知，**批量语义**：`fn(SyMeshEntity* const*, size_t)`，一次删除只回调一次 |
+| `notifyEntitiesRemoved(entities, count)`（内部） | 图元移除时直调 `selectionManager().dropFromSelection()`，**批量语义**：一次删除只同步一次 |
 
 前两者共用 `Impl::detach()` 一个实现：**一趟压缩**从容器移出目标图元（读游标前移保留元素），
-同时一次性清理 ID 索引、空间索引、选择集。**不得**逐个 `erase(begin + index)`
+同时一次性清理 ID 索引、空间索引。**不得**逐个 `erase(begin + index)`
 —— 那样每次都要搬移尾部元素，M 个图元即 O(N·M)。
 
 `removeEntity()`（单图元）也复用这条路径，避免移除语义出现两条行为不一致的分支。
 
-### 4.2 移除通知为什么必须是批量语义
+### 4.2 移除同步为什么必须是批量语义
 
-`SelectionManager3D` 订阅了移除通知以清理自己的选中列表。签名**不得**是逐图元的
-`void(SyMeshEntity*)`：那样回调体 `syncSelectionFromScene()` 每次都要
+选择管理器由 `SceneManager3D` 持有（单店合一），图元移除时由场景在图元仍存活的窗口内
+直接调用 `SelectionManager3D::dropFromSelection(entities, count)`。
+签名**不得**是逐图元的 `void(SyMeshEntity*)`：那样每次回调都要
 `forEachEntity` 把**全场景**图元塞进哈希表：
 
 ```text
 删 M 个图元 → M 次全场景遍历 + M 次哈希表构造 = O(N·M)，且删完才轮到重建树
 ```
 
-因此通知一次带上整批指针（通知期间对象仍存活，观察者可安全比较），
-观察者只做 `dropFromSelection()`：按移除集合剔除选中项，O(选中集 + 移除数)。
+因此同步一次带上整批指针（同步期间对象仍存活，可安全比较），
+`dropFromSelection()` 按移除集合剔除选中项，O(选中集 + 移除数)。
+（此处曾是 `addEntitiesRemovedObserver` 观察者机制；唯一注册者就是选择管理器，
+单店合一后改为直调，观察者 API 已删除。）
 
 ### 4.3 批量选择接口
 
