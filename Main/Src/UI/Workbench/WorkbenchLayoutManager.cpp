@@ -36,6 +36,9 @@
 #include <QWidget>
 #include <QPointer>
 
+// 定义在文件后部（注册与清理区），首次使用点之前前置声明
+static void applyDockWidthConstraints(QDockWidget* dock);
+
 namespace
 {
     /// Dock 构建用的空命令分发器。
@@ -228,6 +231,11 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
         }
     }
 
+    for (auto* dock : m_registeredDocks)
+    {
+        applyDockWidthConstraints(dock);
+    }
+
     // 初始面板宽度：默认窄一些，不挤压中间视图；不限制最大宽度，用户可手动拖宽。
     // 右侧面板 (PropertiesDock) 适中宽度，兼顾属性行和图层面板。
     if (m_panelState.leftDock && m_panelState.rightDock)
@@ -317,6 +325,24 @@ QWidget* WorkbenchLayoutManager::createInitialCentralWidget()
 
 // ==================== 注册与清理 ====================
 
+static void applyDockWidthConstraints(QDockWidget* dock)
+{
+    if (!dock)
+    {
+        return;
+    }
+    const QString dockId = dock->objectName();
+    if (dockId == UiDockIds::sceneQString())
+    {
+        dock->setMinimumWidth(180);
+        dock->setMaximumWidth(300);
+    }
+    else if (dockId == UiDockIds::propertiesQString())
+    {
+        dock->setMinimumWidth(260);
+    }
+}
+
 QDockWidget* WorkbenchLayoutManager::registerDockWidget(const QString& title, QWidget* widget, Qt::DockWidgetArea area)
 {
     // 注册停靠面板只负责把面板挂到指定区域，不在这里注入业务行为
@@ -338,6 +364,7 @@ QDockWidget* WorkbenchLayoutManager::registerDockWidget(const QString& title, QW
         dockId = title;
     }
     dock->setObjectName(dockId);
+    applyDockWidthConstraints(dock);
 
     dock->setWidget(widget);
     m_parent->addDockWidget(area, dock);
@@ -507,8 +534,15 @@ void WorkbenchLayoutManager::saveLayoutSnapshot(const QString& workbenchId)
         rec.geometry = m_parent->saveGeometry().toBase64().toStdString();
         rec.windowState = m_parent->saveState().toBase64().toStdString();
         rec.updatedAt = QDateTime::currentDateTime().toString(Qt::ISODate).toStdString();
-        m_persistenceService->workspaceSnapshots()->save(rec);
-        SY_DEBUGF("[WorkbenchLayoutManager] Saved layout snapshot to database: %s", rec.workbenchId.c_str());
+        if (m_persistenceService->workspaceSnapshots()->save(rec))
+        {
+            SY_DEBUGF("[WorkbenchLayoutManager] Saved layout snapshot to database: %s", rec.workbenchId.c_str());
+        }
+        else
+        {
+            SY_WARNF("[WorkbenchLayoutManager] Failed to save layout snapshot to database, QSettings copy may be stale: %s",
+                rec.workbenchId.c_str());
+        }
     }
 
     // QSettings 兜底
@@ -627,53 +661,25 @@ void WorkbenchLayoutManager::setSceneDockVisible(bool visible)
     }
 }
 
-void WorkbenchLayoutManager::applyDockPolicy(bool requiresSkeleton, const QString& workbenchId)
+void WorkbenchLayoutManager::setPropertiesDockVisible(bool visible)
 {
-    // 1. 骨架 Dock（左/右通用侧栏）按 requiresSkeleton 控制
-    if (m_panelState.leftDock)
+    QDockWidget* propsDock = m_panelState.rightDock.data();
+    if (!propsDock)
     {
-        m_panelState.leftDock->setVisible(requiresSkeleton);
-    }
-    if (m_panelState.rightDock)
-    {
-        m_panelState.rightDock->setVisible(requiresSkeleton);
-    }
-
-    // 2. 3D 专属策略：Scene / Properties 即使在 requiresSkeleton=false 时也要显示
-    //    2D 下由 requiresSkeleton 控制（已在上方处理）
-    if (workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0)
-    {
-        // Scene Dock
-        QDockWidget* sceneDock = nullptr;
-        for (auto* dock : m_registeredDocks)
-        {
-            if (dock && dock->objectName() == UiDockIds::Scene)
-            {
-                sceneDock = dock;
-                break;
-            }
-        }
-        if (sceneDock)
-        {
-            sceneDock->setMinimumWidth(180);
-            sceneDock->setMaximumWidth(300);
-            sceneDock->setVisible(true);
-        }
-
-        // Properties Dock
-        QDockWidget* propsDock = nullptr;
         for (auto* dock : m_registeredDocks)
         {
             if (dock && dock->objectName() == UiDockIds::Properties)
             {
                 propsDock = dock;
+                m_panelState.rightDock = dock;
                 break;
             }
         }
-        if (propsDock)
-        {
-            propsDock->setVisible(true);
-        }
+    }
+
+    if (propsDock)
+    {
+        propsDock->setVisible(visible);
     }
 }
 

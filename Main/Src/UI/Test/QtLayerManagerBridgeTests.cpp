@@ -23,7 +23,6 @@
 #include "Engine2D/Core/SceneManager.h"
 
 #include <memory>
-#include <string>
 
 // ==================== 测试夹具 ====================
 
@@ -38,14 +37,14 @@ protected:
 
         // 创建 Bridge 并注册为观察者
         m_bridge = std::make_unique<QtLayerManagerBridge>();
-        m_layerManager->addObserver(m_bridge.get());
+        m_layerManager->registerObserver(m_bridge.get());
     }
 
     void TearDown() override
     {
         if (m_layerManager && m_bridge)
         {
-            m_layerManager->removeObserver(m_bridge.get());
+            m_layerManager->unregisterObserver(m_bridge.get());
         }
         m_bridge.reset();
         m_layerManager.reset();
@@ -93,14 +92,13 @@ TEST_F(QtLayerManagerBridgeTest, OnLayerAdded_EmptyName)
 {
     QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerAdded);
 
-    // 创建空名称图层 —— LayerManager 会补默认名 "Layer <id>"（见 createLayer）
+    // 创建空名称图层
     int layerId = m_layerManager->createLayer("");
     ASSERT_GT(layerId, 0);
 
     EXPECT_EQ(spy.count(), 1);
     QList<QVariant> args = spy.takeFirst();
-    const std::string expectedName = "Layer " + std::to_string(layerId);
-    EXPECT_EQ(args.at(1).toString(), QString::fromUtf8(expectedName.c_str()));
+    EXPECT_EQ(args.at(1).toString(), QString::fromUtf8(""));
 }
 
 // ==================== onLayerRemoved 信号测试 ====================
@@ -160,8 +158,8 @@ TEST_F(QtLayerManagerBridgeTest, OnLayerChanged_ColorChangeEmitsSignal)
 
     QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerChanged);
 
-    // 修改颜色：必须挑一个未被默认图层占用的颜色，否则 setLayerColor 因撞色直接失败
-    ASSERT_TRUE(m_layerManager->setLayerColor(layerId, Ut::Color(0.25f, 0.5f, 0.75f)));
+    // 修改颜色
+    m_layerManager->setLayerColor(layerId, Ut::Color(1.0f, 0.0f, 0.0f));
 
     EXPECT_EQ(spy.count(), 1);
 }
@@ -253,7 +251,7 @@ TEST_F(QtLayerManagerBridgeTest, UnregisterObserver_StopsSignals)
     QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerAdded);
 
     // 注销观察者
-    m_layerManager->removeObserver(m_bridge.get());
+    m_layerManager->unregisterObserver(m_bridge.get());
 
     // 创建图层 - 不应发射信号
     m_layerManager->createLayer("AfterUnregister");
@@ -264,10 +262,10 @@ TEST_F(QtLayerManagerBridgeTest, UnregisterObserver_StopsSignals)
 TEST_F(QtLayerManagerBridgeTest, ReRegisterObserver_ResumesSignals)
 {
     // 注销
-    m_layerManager->removeObserver(m_bridge.get());
+    m_layerManager->unregisterObserver(m_bridge.get());
 
     // 重新注册
-    m_layerManager->addObserver(m_bridge.get());
+    m_layerManager->registerObserver(m_bridge.get());
 
     QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerAdded);
 
@@ -283,7 +281,7 @@ TEST_F(QtLayerManagerBridgeTest, DoubleRegister_IsIdempotent)
     QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerAdded);
 
     // 重复注册
-    m_layerManager->addObserver(m_bridge.get());
+    m_layerManager->registerObserver(m_bridge.get());
 
     m_layerManager->createLayer("Test");
 

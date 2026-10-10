@@ -8,7 +8,6 @@
 #include "Services/UiFrameworkServices.h"
 #include "UiStateCenter.h"
 #include "UI2D/Operation/OperationBus.h"
-#include "UI/ClientConfig/UiShortcutRegistry.h"
 
 #include <QShortcut>
 
@@ -34,17 +33,11 @@ void WorkbenchActionManager::setStateCenter(UiStateCenter* stateCenter)
 
 // ==================== 快捷键管理 ====================
 
-void WorkbenchActionManager::registerShortcut(QShortcut* shortcut, const QString& commandId)
+void WorkbenchActionManager::registerShortcut(QShortcut* shortcut)
 {
-    if (!shortcut)
-        return;
-
-    m_registeredShortcuts.push_back(shortcut);
-
-    // 同步到快捷键台账（用于冲突检测/设置页同步）
-    if (m_shortcutRegistry && !commandId.isEmpty())
+    if (shortcut)
     {
-        m_shortcutRegistry->recordShortcut(shortcut, commandId, shortcut->key());
+        m_registeredShortcuts.push_back(shortcut);
     }
 }
 
@@ -101,7 +94,7 @@ void WorkbenchActionManager::reportFrameworkError(
     }
     else if (m_stateCenter)
     {
-        m_stateCenter->updateMetadata({ { QStringLiteral("lastErrorCode"), errorCode },
+        m_stateCenter->setMetadata({ { QStringLiteral("lastErrorCode"), errorCode },
             { QStringLiteral("lastErrorMessage"), message },
             { QStringLiteral("lastErrorContext"), context } });
     }

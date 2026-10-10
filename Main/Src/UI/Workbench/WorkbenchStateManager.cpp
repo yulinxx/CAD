@@ -170,8 +170,8 @@ void WorkbenchStateManager::doRefreshFromState()
     updateWindowTitle(state);
 
     // 统一更新状态栏消息（通过 StatusBarBase 接口，不直接操作裸 QLabel）。
-    // statusPrompt 的唯一读取点是 snapshot.statusPrompt 成员：setStatusPrompt 是其唯一写入者，
-    // metadata 不再参与该字段的读写。
+    // statusPrompt 的唯一读取点是 snapshot.statusPrompt 成员：setStatusPrompt 与
+    // setMetadata 都会把它同步进成员，无需再回退读 metadata。
     if (m_activeStatusBar)
     {
         QString prompt = state.statusPrompt;
@@ -264,9 +264,11 @@ void WorkbenchStateManager::clearSelectionState()
     }
 
     // 清空选择相关状态，避免工作台切换后沿用旧选择文本
-    // setSelectionContext 是唯一真相入口；metadata 三选择键已废弃，不再同步
     m_stateCenter->setCurrentSelectionText(QString());
     m_stateCenter->setSelectionContext(QStringLiteral("none"), QString());
+    m_stateCenter->setMetadata({ { QStringLiteral("selectionSource"), QStringLiteral("none") },
+        { QStringLiteral("selectionText"), QString() },
+        { QStringLiteral("selectionType"), QStringLiteral("none") } });
 }
 
 void WorkbenchStateManager::setWorkbenchSwitchContext(const QString& workbenchId, const QString& switchContextText)
@@ -287,11 +289,13 @@ void WorkbenchStateManager::setWorkbenchSwitchContext(const QString& workbenchId
     m_stateCenter->setSelectionContext(QStringLiteral("Workbench-Switch"), switchContextText);
     m_stateCenter->setStatusPrompt(switchContextText);
 
-    // metadata 采用读-改-写，只保留扩展键（workbenchId/switchContext）；
-    // selection* 三键已废弃——setSelectionContext 不再镜像写，回读同步也已移除
+    // metadata 采用读-改-写，避免整体替换丢掉 statusPrompt/workbenchId/switchContext 等既有键
     QVariantMap meta = m_stateCenter->metadata();
     meta.insert(QStringLiteral("workbenchId"), workbenchId);
     meta.insert(QStringLiteral("switchContext"), switchContextText);
+    meta.insert(QStringLiteral("selectionSource"), QStringLiteral("Workbench-Switch"));
+    meta.insert(QStringLiteral("selectionText"), switchContextText);
+    meta.insert(QStringLiteral("selectionType"), QStringLiteral("none"));
     m_stateCenter->setMetadata(meta);
 }
 
@@ -321,10 +325,14 @@ void WorkbenchStateManager::resetWorkbenchTransientState()
         m_stateCenter->popBusy();
         resetCommandStateToIdle();
         setWorkbenchTransitionState(QStringLiteral("reset"), QStringLiteral("Idle"));
-        // metadata 采用读-改-写，保留扩展键；selection*/commandType 已废弃不再写入
+        // metadata 采用读-改-写，保留 statusPrompt 等既有键
         QVariantMap meta = m_stateCenter->metadata();
         meta.insert(QStringLiteral("workbenchId"), QStringLiteral("none"));
+        meta.insert(QStringLiteral("commandType"), QStringLiteral("none"));
         meta.insert(QStringLiteral("commandState"), QStringLiteral("idle"));
+        meta.insert(QStringLiteral("selectionSource"), QStringLiteral("none"));
+        meta.insert(QStringLiteral("selectionText"), QString());
+        meta.insert(QStringLiteral("selectionType"), QStringLiteral("none"));
         meta.insert(QStringLiteral("viewportStatus"), QStringLiteral("Idle"));
         meta.insert(QStringLiteral("rightPanelSource"), QStringLiteral("none"));
         meta.insert(QStringLiteral("drawToolSource"), QStringLiteral("none"));

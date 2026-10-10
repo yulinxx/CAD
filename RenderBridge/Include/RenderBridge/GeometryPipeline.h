@@ -281,6 +281,20 @@ namespace RenderBridge
             uint16_t sequence = 0;
         };
 
+        void cleanupFailedEntity(EntityEntryBase& entry, uint64_t entityId, bool isNew)
+        {
+            if (entry.blockId != 0)
+            {
+                m_store.freeBlock(entry.blockId);
+                entry.blockId = 0;
+            }
+            if (!isNew)
+            {
+                releaseEntry(entry);
+            }
+            m_entities.erase(entityId);
+        }
+
         template<typename VertexT>
         bool upsertEntityInternal(uint64_t entityId,
             const VertexT* vertices,
@@ -317,11 +331,7 @@ namespace RenderBridge
                 RenderAbstraction::GeometryBlock block{};
                 if (!allocBlock(bytes, block))
                 {
-                    if (!isNew)
-                    {
-                        releaseEntry(entry);
-                    }
-                    m_entities.erase(entityId);
+                    cleanupFailedEntity(entry, entityId, isNew);
                     return false;
                 }
                 entry.blockId = block.id;
@@ -335,16 +345,7 @@ namespace RenderBridge
 
             if (!m_store.writeBlock(entry.blockId, 0, static_cast<uint32_t>(bytes), vertices))
             {
-                if (entry.blockId != 0)
-                {
-                    m_store.freeBlock(entry.blockId);
-                    entry.blockId = 0;
-                }
-                if (!isNew)
-                {
-                    releaseEntry(entry);
-                }
-                m_entities.erase(entityId);
+                cleanupFailedEntity(entry, entityId, isNew);
                 return false;
             }
 
@@ -357,16 +358,7 @@ namespace RenderBridge
 
             if (!m_store.upsertDrawItem(entry.slot, cmd, bounds ? &*bounds : nullptr))
             {
-                if (entry.blockId != 0)
-                {
-                    m_store.freeBlock(entry.blockId);
-                    entry.blockId = 0;
-                }
-                if (!isNew)
-                {
-                    releaseEntry(entry);
-                }
-                m_entities.erase(entityId);
+                cleanupFailedEntity(entry, entityId, isNew);
                 return false;
             }
 

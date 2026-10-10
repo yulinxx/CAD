@@ -6,8 +6,6 @@
 #include "FileDropHandler.h"
 
 #include "UI2D/Manager/UnitManager.h"
-#include "UI/ClientConfig/UiShortcutRegistry.h"
-#include "UI/ClientConfig/UiShortcutRegistry.h"  // for UiShortcutSettingsModel
 
 /**
  * @file WorkbenchWindow.cpp
@@ -110,26 +108,29 @@
 #include <chrono>
 
 #include "VersionInfo.h"
-#include "UiLayoutService.h"
-#include "UI/ClientConfig/UiLabelLocalizer.h"
-#include "Composition/ApplicationCompositionRoot.h"
-#include "UI/Settings/SettingsService.h"
-#include "Persistence/PersistenceService.h"
-#include "Persistence/Repositories/WorkspaceSnapshotRepository.h"
-#include "Persistence/Models/WorkspaceSnapshotRecord.h"
-#include "UI2D/Operation/OperationBus.h"
-#include "UI2D/Operation/OperationId.h"
-#include "UI2D/Operation/CommandCatalog.h"
 #include "UiStateCenter.h"
-#include "UI/ThemeManager.h"
 #include "UiWorkbench.h"
 #include "UiSceneTreePanel.h"
 #include "UiPropertiesPanel.h"
+#include "UiLayoutService.h"
+#include "Composition/ApplicationCompositionRoot.h"
+#include "Persistence/PersistenceService.h"
+#include "Persistence/Repositories/WorkspaceSnapshotRepository.h"
+#include "Persistence/Models/WorkspaceSnapshotRecord.h"
+
+#include "UI2D/Operation/OperationBus.h"
+#include "UI2D/Operation/OperationId.h"
+#include "UI2D/Operation/CommandCatalog.h"
+#include "UI2D/Dlg/LayerManagerDialog.h"
+
 #include "Engine2D/Edit/LayerEditService.h"
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Interaction/LayerManager.h"
-#include "UI2D/Dlg/LayerManagerDialog.h"
+
+#include "UI/ThemeManager.h"
+#include "UI/Settings/SettingsService.h"
 #include "UI/Interaction/UiInteractionGate.h"
+#include "UI/ClientConfig/UiLabelLocalizer.h"
 
 #include <QCloseEvent>
 #include <QMessageBox>
@@ -336,15 +337,6 @@ void WorkbenchWindow::configureServices(const UiServices& services)
         if (m_workbench)
         {
             m_menuManager->rebuildAllMenus();
-        }
-        // 同步快捷键台账到 ActionManager（用于窗口级快捷键的台账同步/冲突检测）
-        if (m_actionManager && m_menuManager->shortcutSettingsModel())
-        {
-            auto* settingsModel = static_cast<UiShortcutSettingsModel*>(m_menuManager->shortcutSettingsModel());
-            if (settingsModel)
-            {
-                m_actionManager->setShortcutRegistry(settingsModel->registry());
-            }
         }
     }
 
@@ -766,12 +758,11 @@ void WorkbenchWindow::clearWorkbenchContent()
 }
 
 /// 注册全局快捷键（由工作台调用，切换时自动清理）
-/// @param commandId 可选的命令 ID，用于快捷键台账管理（冲突检测/设置页）
-void WorkbenchWindow::registerShortcut(QShortcut* shortcut, const QString& commandId)
+void WorkbenchWindow::registerShortcut(QShortcut* shortcut)
 {
     if (m_actionManager)
     {
-        m_actionManager->registerShortcut(shortcut, commandId);
+        m_actionManager->registerShortcut(shortcut);
     }
 }
 
@@ -1038,7 +1029,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     }
 
     const QString currentWorkbenchId =
-        m_stateCenter ? m_stateCenter->currentWorkbenchId() : QStringLiteral("default");
+        m_stateManager ? m_stateManager->windowState().currentWorkbenchId : QStringLiteral("default");
     if (workbenchId.compare(currentWorkbenchId, Qt::CaseInsensitive) == 0)
     {
         SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: same workbench %s, skipping", workbenchId.toUtf8().constData());
@@ -1052,7 +1043,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     m_switchingWorkbench = true;
 
     const auto previousWorkbenchId =
-        m_stateCenter ? m_stateCenter->currentWorkbenchId() : QStringLiteral("default");
+        m_stateManager ? m_stateManager->windowState().currentWorkbenchId : QStringLiteral("default");
     const auto switchContextText = workbenchSwitchText(workbenchId);
 
     SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: switching from %s to %s",
@@ -1060,12 +1051,12 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         workbenchId.toUtf8().constData());
 
     // 1: 保存旧工作台布局快照，标记繁忙
-if (m_stateCenter)
-        {
-            saveLayoutSnapshot(previousWorkbenchId);
-            m_stateCenter->pushBusy();
-            m_stateCenter->updateMetadata(QStringLiteral("viewportStatus"), QStringLiteral("Switching"));
-        }
+    if (m_stateCenter)
+    {
+        saveLayoutSnapshot(previousWorkbenchId);
+        m_stateCenter->pushBusy();
+        m_stateCenter->setMetadata({ { QStringLiteral("viewportStatus"), QStringLiteral("Switching") } });
+    }
 
     // 2: 停用旧工作台（释放资源、清理快捷键等）
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: deactivating old workbench");
@@ -1161,10 +1152,18 @@ if (m_stateCenter)
     // 工作台级状态栏 widget（坐标/选择/消息）由各 Workbench 在 attachToWindow 中
     // 创建并通过 mountStatusBar 挂载；配置驱动的框架级槽位已在第 6d 步重建。
     // 新工作台自行决定是否需要骨架停靠面板
-    if (m_layoutManager)
+    setSkeletonDocksVisible(m_workbench->requiresSkeletonDocks());
+
+    // 3D 模式下 Scene / Properties 面板需要始终显示（即使 requiresSkeletonDocks() 为 false）
+    // 因为 SceneTreePanel / PropertiesPanel 是工作台自己的面板，不是 skeleton 的面板
+    if (!m_workbench->requiresSkeletonDocks())
+    {
+        if (auto* layoutMgr = m_layoutManager.get())
         {
-            m_layoutManager->applyDockPolicy(m_workbench->requiresSkeletonDocks(), workbenchId);
+            layoutMgr->setSceneDockVisible(true);
+            layoutMgr->setPropertiesDockVisible(true);
         }
+    }
 
     // 业务状态只经 UiStateCenter 写入；windowState 是镜像，由 sync 从状态中心拉取
     // （避免两边各自演化的双写路径 —— 见《耦合性分析.md》D.1 双状态源收口）

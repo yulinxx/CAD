@@ -4,7 +4,7 @@
  * @file UiPanelRegistry.h
  * @brief 面板工厂注册表
  *
- * 实现说明见 Docs/01-当前架构/UI定制.md。
+ * 与 Docs/01-当前架构/UI定制变更设计方案.md 第 6.5 节对应。
  * 客户自定义面板通过工厂注册，JSON 配置中通过 widgetType 引用，
  * UiLayoutBuilder 构建 Dock 时通过 createPanel 创建实际 widget。
  */

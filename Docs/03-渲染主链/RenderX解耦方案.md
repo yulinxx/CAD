@@ -1,12 +1,12 @@
 # RenderX 解耦方案设计文档
 
-> ## 现状
+> ## 落地结果（已实施）
 >
-> 后续章节是方案稿；与本节不一致时以本节为准。
+> 本文是**规划稿**。下面是实际落地的状态与几处被取代的设计 —— 阅读后面的章节时请以本节为准。
 >
-> ### 指标
+> ### 达成的指标
 >
-> | 指标 | 目标 | 现状 |
+> | 指标 | 规划目标 | 实测 |
 > |------|----------|------|
 > | 直接 `#include "render/renderx.h"` 的 UI 文件数 | 0 | **0** |
 > | UI 代码中的 `Render::RT::*` 类型 / `rx*` 调用 | 0 | **0** |
@@ -18,30 +18,30 @@
 > `[SanYi] 依赖方向校验: OK（…; UI 通过 RenderAbstraction 访问渲染）`。
 > 临时放行需显式传 `-DSANYI_STRICT_RENDER_ISOLATION=OFF`。
 >
-> ### 关键设计决策
+> ### 被取代的设计（本文后续章节仍按原样保留，作规划记录）
 >
-> | 设计点 | 采用 | 理由 |
+> | 规划 | 实际做法 | 为什么改 |
 > |------|----------|----------|
-> | `IRenderCommandList`（接口 3，独立文件） | **不设** | 与 `IRenderScene` 职责重叠；`IRenderScene` 自己就是命令提交入口 |
-> | 命令表句柄 + 每帧重建整表 | **不设**，用 `DrawListHandle` + `upsertDrawItem` / `submitDrawList` | 常驻场景的真实模型是**保留式增量**（只改动的图元重发），整表提交做不到增量 |
-> | 几何上传 | `IRenderDevice` 上的**常驻几何仓**接口（`createGeometryStore` / `allocGeometry` / `writeGeometry` / `freeGeometry`） | 几何仓的分片（多仓绕过单仓 4GB 上限）、块身份、脏区刷写都是业务层必须参与的事实，「给我一个 BufferHandle」表达不了 |
-> | `IRenderFactory::createSurface` / `createScene` | **不设**，工厂只负责 `createDevice` | 表面/会话的创建依赖宿主侧事实（Qt 拥有 GL 上下文、Metal 交换链要挂宿主 NSView、Metal 的 Runtime 是进程级共享且销毁时机与最后一个视口对齐），`DeviceConfig`/`SurfaceConfig` 表达不了。产品实际入口是 `RenderBridge::RenderSessionHost` |
-> | `NativeWindowHandle` / `SurfaceConfig` | **不设** | 只服务于 `createSurface` / `createScene`，而工厂不提供这两个方法 |
+> | `IRenderCommandList`（接口 3，独立文件） | **删除** | 与 `IRenderScene` 职责重叠；`IRenderScene` 自己就是命令提交入口 |
+> | `CommandListHandle` + `createCommandList` / `submitToScreen` + 每帧重建整表 | **删除**，改成 `DrawListHandle` + `upsertDrawItem` / `submitDrawList` | 常驻场景的真实模型是**保留式增量**（只改动的图元重发），整表提交做不到增量 |
+> | `IRenderScene::uploadGeometry()` 返回 `BufferHandle` | 换成 `IRenderDevice` 上的**常驻几何仓**接口（`createGeometryStore` / `allocGeometry` / `writeGeometry` / `freeGeometry`） | 几何仓的分片（多仓绕过单仓 4GB 上限）、块身份、脏区刷写都是业务层必须参与的事实，「给我一个 BufferHandle」表达不了 |
+> | `IRenderFactory::createSurface` / `createScene` | **删除**，工厂只负责 `createDevice` | 表面/会话的创建依赖宿主侧事实（Qt 拥有 GL 上下文、Metal 交换链要挂宿主 NSView、Metal 的 Runtime 是进程级共享且销毁时机与最后一个视口对齐），`DeviceConfig`/`SurfaceConfig` 表达不了。产品实际入口是 `RenderBridge::RenderSessionHost` |
+> | `NativeWindowHandle` / `SurfaceConfig` | **删除** | 只被上面两个被删的方法用到 |
 > | 2D/3D 用同一个 AABB 契约 | `ViewVolume`（带类型标签：世界矩形 / 六平面视锥）+ 统一的 `Aabb3` | 2D 的矩形判据只用 x/y，斜视角下会误裁可见图元；两者是**不同的剔除判据**，不该共用一个结构 |
-> | 按 (格式,空间,拓扑) 取默认管线 | **不设**，只提供 `defaultPipeline(PipelineKind)` | 三元组解析不出「同格式同空间同拓扑、片元不同」的那几条（字形 vs 贴图、网格 vs 线框、高亮 vs gizmo），是个会静默给错管线的陷阱 |
-> | RenderBridge 对 RenderX 的链接可见性 | **PRIVATE** | 这是规则 4 的绕过路径：UI 只链 RenderBridge 也能拿到 RenderX 的头路径与符号 |
-> | `RenderBridge/Include/RenderBridge/HostCallbacks.h`（宿主回调） | **不设**，两个函数是 `RenderSessionHost.cpp` 的文件内静态函数 | 公开头的前提是「多个调用方共用」；视口改走 `RenderSessionHost` 后取地址点只剩一处，公开头就没意义了。且它是 UI 侧最后一个能看见宿主桥接细节的入口 |
-> | `RenderBridge/Include/RenderBridge/RenderUploadQueue.h` | **不设** | 无包含者；它照搬后端的上传队列模型（`PrimitiveTopology`/`VertexFormat`/`RxAabb3`），而命令表模型是保留式绘制列表 |
-> | `IRenderDevice::maxLineWidth` / `maxTextureSize` | **不设**，只提供 `backendName` / `deviceName` | 同样是「照搬后端能力表」：线宽上限只有后端内部用（UI 要粗线自己三角化），纹理上限没人看。留下来的 `backendName` / `deviceName` 有真实调用者 —— 3D 视口的 GL 信息面板 |
+> | `IRenderDevice::getDefaultPipeline(格式,空间,拓扑)` | **删除**，保留 `defaultPipeline(PipelineKind)` | 三元组解析不出「同格式同空间同拓扑、片元不同」的那几条（字形 vs 贴图、网格 vs 线框、高亮 vs gizmo），是个会静默给错管线的陷阱 |
+> | RenderBridge 用 `PUBLIC` 转发 RenderX | 改为 **PRIVATE** | 这是规则 4 的绕过路径：UI 只链 RenderBridge 也能拿到 RenderX 的头路径与符号 |
+> | `RenderBridge/Include/RenderBridge/HostCallbacks.h`（宿主回调） | **删除**，两个函数移进 `RenderSessionHost.cpp` 的文件内静态函数 | 公开头的前提是「多个调用方共用」；视口改走 `RenderSessionHost` 后取地址点只剩一处，公开头就没意义了。且它是 UI 侧最后一个能看见宿主桥接细节的入口 |
+> | `RenderBridge/Include/RenderBridge/RenderUploadQueue.h` | **删除** | 全仓库零包含者。它照搬了后端的上传队列模型（`PrimitiveTopology`/`VertexFormat`/`RxAabb3`），而与它对应的命令表模型早已换成保留式绘制列表 |
+> | `IRenderDevice::maxLineWidth` / `maxTextureSize` | **删除**，只保留 `backendName` / `deviceName` | 同样是「照搬后端能力表」：线宽上限只有后端内部用（UI 要粗线自己三角化），纹理上限没人看。留下来的 `backendName` / `deviceName` 有真实调用者 —— 3D 视口的 GL 信息面板 |
 >
-> ### 契约与自检要点
+> ### 落地时新增/发现并修掉的缺陷
 >
-> - `RenderXAdapter::createFactory()` 已导出并返回 `unique_ptr<RenderXFactory>` 之外的完整类型，是不需要交换链场景的公共入口
-> - 工厂路径的设备/表面/场景适配器销毁自己创建的句柄
-> - `IRenderScene.h` 自洽：使用 `IRenderDevice` 时显式包含它，不依赖 include 顺序
-> - `RenderXSurfaceAdapter::width()/height()` 反映最近一次 `resize` 记录的尺寸
-> - 顶点步长契约三处锁定：抽象层 `RenderAbstraction::vertexStride()`、宿主结构体的 `static_assert`、适配层的运行时校验（确认该表与后端实际步长一致）
-> - 失败诊断收在适配层 `checkRx()`，UI 只拿 bool
+> - `RenderXAdapter::createFactory()` 从未导出，且返回 `unique_ptr<RenderXFactory>`（调用方拿不到完整类型）—— 文档里写的公共入口一直不可用
+> - 工厂路径的设备/表面/场景适配器都不销毁自己创建的句柄（资源泄漏）
+> - `IRenderScene.h` 不自洽：用了 `IRenderDevice` 却没包含它，靠 include 顺序侥幸成立
+> - `RenderXSurfaceAdapter::width()/height()` 恒为 0（`resize` 没记录尺寸）
+> - 顶点步长契约原来只锁在 RenderX 侧；现在抽象层有 `RenderAbstraction::vertexStride()`，宿主结构体对着它做 `static_assert`，适配层另有一处运行时校验确认那张表与后端实际步长一致
+> - 失败诊断原先散在 UI 调用点（UI 拼 `rxResultName`）；现已收进适配层，UI 只拿 bool
 >
 > ### 仍然存在的事实
 >
@@ -569,11 +569,10 @@ struct DeviceHandle { uint64_t value; };
 
 ### 7.3 过渡期兼容
 
-迁移期间 RenderBridge 保持功能不变：新代码走 RenderAbstraction 接口，
-RenderXAdapter 内部调用 renderx.h。这确保了：
+在迁移期间，RenderBridge 保持现有功能不变。新代码走 RenderAbstraction 接口，旧代码（RenderXAdapter内部）仍然调用 renderx.h。这确保了：
 
 - 新功能使用新接口
-- 既有功能不受影响
+- 旧功能继续工作
 - 逐步替换，无停机风险
 
 ### 7.4 3D光照的特殊处理

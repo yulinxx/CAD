@@ -128,7 +128,7 @@ ApplicationCompositionRoot::~ApplicationCompositionRoot()
     m_processingJobService.reset();
 
     // 硬件必须最先停：定时器停掉、设备 close（关光 + 输出置安全态）之后，
-    // 其他服务才可以安全销毁。反过来先停设备，作业就无处可停了。
+    // 其他服务才可以安全销毁。反过来的话，tick 里可能访问到已销毁的对象。
     if (m_deviceHost)
     {
         m_deviceHost->stop();
@@ -137,17 +137,6 @@ ApplicationCompositionRoot::~ApplicationCompositionRoot()
     // 进程退出时，FillGeometryUpdater（Meyers 单例）的析构晚于本组合根，
     // 若不在 SceneEditService 仍存活时解绑，其析构会访问已销毁对象导致崩溃。
     Eg::FillGeometryUpdater::instance().detach();
-}
-
-/// 重置单例状态（仅测试使用：清理所有持有的服务与状态，模拟进程重启）
-void ApplicationCompositionRoot::resetForTest()
-{
-    // 显式销毁当前实例，触发析构逻辑清理所有服务
-    if (s_instance)
-    {
-        delete s_instance;
-        s_instance = nullptr;
-    }
 }
 
 DeviceHost* ApplicationCompositionRoot::deviceHost()
@@ -330,26 +319,7 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
 
     // 注入图层管理器：DXF 等导入后按源图层表还原图层结构
     m_importService->setLayerManager(m_layerManager.get());
-    m_importService->setBusyStateCallback([this](bool busy) {
-        if (m_stateCenter)
-        {
-            if (busy)
-            {
-                m_stateCenter->pushBusy();
-            }
-            else
-            {
-                m_stateCenter->popBusy();
-            }
-        }
-    });
-
-    m_importService->setStatusPromptCallback([this](const QString& prompt) {
-        if (m_stateCenter)
-        {
-            m_stateCenter->setStatusPrompt(prompt);
-        }
-    });
+    wireCommonCallbacks(m_importService.get());
 
     m_importService->setDocumentPersistenceCallback([this](const QString& filePath, int entityCount) {
         DocumentPersistenceHelper::recordImport(m_persistenceService.get(), filePath, entityCount);
@@ -373,26 +343,7 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     m_exportService->setSceneManager(m_sceneManager.get());
     m_exportService->setSceneManager3D(m_sceneManager3D.get());
     m_exportService->setPersistenceService(persistenceService());
-    m_exportService->setBusyStateCallback([this](bool busy) {
-        if (m_stateCenter)
-        {
-            if (busy)
-            {
-                m_stateCenter->pushBusy();
-            }
-            else
-            {
-                m_stateCenter->popBusy();
-            }
-        }
-    });
-
-    m_exportService->setStatusPromptCallback([this](const QString& prompt) {
-        if (m_stateCenter)
-        {
-            m_stateCenter->setStatusPrompt(prompt);
-        }
-    });
+    wireCommonCallbacks(m_exportService.get());
 
     // 注入到 UI 服务集合。导出服务不进 UiServices：唯一的消费者
     // FileOperationRegistry 走 FileOperationConfig::exportService 单独注入。
@@ -402,50 +353,16 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
     uiServices.captureService = m_captureService.get();
 
     // 导入进度 → 状态中心
-    QObject::connect(m_importService.get(), &ImportService::importStarted, m_stateCenter.get(), [this](const QString&) {
-        if (m_stateCenter)
-        {
-            m_stateCenter->pushBusy();
-        }
-    });
-
-    QObject::connect(
-        m_importService.get(), &ImportService::importFinished, m_stateCenter.get(), [this](const ImportResult& result) {
-            if (!m_stateCenter)
-            {
-                return;
-            }
-            m_stateCenter->popBusy();
-            m_stateCenter->setStatusPrompt(result.success
-                    ? QCoreApplication::translate("ApplicationCompositionRoot", "Import complete: %1 entities")
-                          .arg(result.entityCount)
-                    : QCoreApplication::translate("ApplicationCompositionRoot", "Import failed: %1").arg(result.message));
-            // notificationType 保留在 metadata 作为扩展（若有消费者）
-            m_stateCenter->updateMetadata(QStringLiteral("notificationType"), result.success ? QStringLiteral("info") : QStringLiteral("error"));
-        });
+    connectStartToBusy(m_importService.get(), &ImportService::importStarted);
+    connectFinishToBusy(m_importService.get(), &ImportService::importFinished,
+        [](const ImportResult& r) { return r.entityCount; },
+        QString("Import complete: %1 entities"), QString("Import failed: %1"));
 
     // 导出进度 → 状态中心
-    QObject::connect(m_exportService.get(), &ExportService::exportStarted, m_stateCenter.get(), [this](const QString&) {
-        if (m_stateCenter)
-        {
-            m_stateCenter->pushBusy();
-        }
-    });
-
-    QObject::connect(
-        m_exportService.get(), &ExportService::exportFinished, m_stateCenter.get(), [this](const ExportResult& result) {
-            if (!m_stateCenter)
-            {
-                return;
-            }
-
-            m_stateCenter->popBusy();
-            m_stateCenter->setStatusPrompt(result.success
-                    ? QCoreApplication::translate("ApplicationCompositionRoot", "Export complete: %1 entities")
-                          .arg(result.exportedEntityCount)
-                    : QCoreApplication::translate("ApplicationCompositionRoot", "Export failed: %1").arg(result.message));
-            m_stateCenter->updateMetadata(QStringLiteral("notificationType"), result.success ? QStringLiteral("info") : QStringLiteral("error"));
-        });
+    connectStartToBusy(m_exportService.get(), &ExportService::exportStarted);
+    connectFinishToBusy(m_exportService.get(), &ExportService::exportFinished,
+        [](const ExportResult& r) { return r.exportedEntityCount; },
+        QString("Export complete: %1 entities"), QString("Export failed: %1"));
 }
 
 void ApplicationCompositionRoot::setupDialogServices()

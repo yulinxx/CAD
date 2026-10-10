@@ -18,27 +18,22 @@
 
 | 模块 | 当前定位 | 公开边界 |
 |------|----------|----------|
-| `Utility` | 基础工具库 | 内部 C++ DLL（含占位 `extern "C"` 版本导出，建议移出） |
-| `Log` | 日志系统 | C ABI（`SyLog_GetVersion*` 等）+ C++ 封装 |
-| `CrashHandler` | 崩溃捕获 | C ABI（`CrashHandler_*` 系列） |
-| `License` | 许可校验 | C ABI（`License_*` 系列） |
+| `Utility` | 基础工具库 | 内部 C++ DLL |
+| `Log` | 日志系统 | C 接口 + C++ 封装 |
+| `CrashHandler` | 崩溃捕获 | C++ DLL |
+| `License` | 许可校验 | C++ DLL |
 | `EngineCommon` | 引擎公共基类与通用类型 | 内部 C++ DLL |
 | `Engine2D` | 2D 几何与文档核心 | 内部 C++ DLL |
 | `Engine3D` | 3D 几何与场景核心 | 内部 C++ DLL |
 | `EnginePersistence` | 文档持久化 | 内部 C++ DLL |
-| `FileIO` | 导入导出 | 内部 C++ DLL（无 `extern "C"` 导出） |
-| `Renderx` / `RenderX` | 统一渲染入口 | C ABI（`rx*` 系列，`renderx.h` 为 C++ 头，待拆分纯 C 头） |
+| `FileIO` | 导入导出 | 内部 C++ DLL |
+| `Renderx` / `RenderX` | 统一渲染入口 | C ABI |
 | `RenderBridge` | 宿主与渲染 DLL 的桥接（会话生命周期、宿主回调、常驻几何仓与绘制列表、覆盖层容器） | 内部 C++ DLL |
 | `UICommon` | UI 公共能力 | 内部 C++ DLL |
 | `UI2D` | 2D 视图与交互 | 内部 C++ DLL |
-| `UI3D` | 3D 视图与交互 | 内部 C++ DLL（含占位 `extern "C"` 版本导出，建议移出） |
+| `UI3D` | 3D 视图与交互 | 内部 C++ DLL |
 | `Nesting` | 套料/排样 | C ABI（v2，`structSize` 前向兼容，见 [`套料算法.md`](../06-算法专题/套料算法.md) §8） |
-| `Hardware` | 硬件抽象 | 内部 C++ DLL（无 `extern "C"` 导出） |
-| `Network` | 网络通信 | 内部 C++ DLL |
-| `Vision` | 视觉相机 | C ABI（`Vision_*` 系列，`VisionServiceC.h`，待拆分纯 C 头） |
-| `Engraving` | 雕刻/切片 | C ABI（`Engraving_*` 系列，`EngravingCAPI.h`） |
-| `GeoModelCore` | 几何内核 | C ABI（`GeoModel_*` 系列，`GeoModelDLL.h`，待拆分纯 C 头） |
-| `PythonHost` / `PyBindCore` | Python 绑定 | 内部 C++ DLL / Python 模块 |
+| `Hardware`、`Network`、`Vision`、`Engraving`、`GeoModelCore`、`PythonHost` | 扩展模块 | 按各自模块边界控制 |
 
 
 ---
@@ -97,12 +92,12 @@ UI/2D/
 的 `SyImage`，传进 `Engine2D` 内部再 `dynamic_cast<const SyImage*>` 会返回 `nullptr`，
 而且**不报任何错**，只是静默走进 else 分支。
 
-实例（说明该坑的形态）：`Geo2DQuery::isClosed()` 一旦用 `dynamic_cast` 认位图，在真实
-进程里就恒为 false，于是 `hitTest()` 跳过「点是否在图元内部」这一判据，`SelectionGizmo` 判不出
+已知踩过的坑（2026-08-30 修复）：`Geo2DQuery::isClosed()` 用 `dynamic_cast` 认位图，在真实
+进程里恒为 false，于是 `hitTest()` 跳过「点是否在图元内部」这一判据，`SelectionGizmo` 判不出
 `HandleKind::Body`，表现为「位图能缩放能旋转、就是拖不动」。同一进程里
-`Geo2DPath::isClosedContour()` 用 `eType` switch 判型，结论正确——两种写法必须给出一致结论。
+`Geo2DPath::isClosedContour()` 用的是 `eType` switch，一直是对的，两边结论长期不一致。
 
-这类缺陷还有一个恶性特征：**把相关代码单独链成一个小程序去测，`dynamic_cast` 是正确的**，
+这个缺陷还有一个恶性特征：**把相关代码单独链成一个小程序去测，`dynamic_cast` 是正确的**，
 测试全绿。要复现必须在多库进程里跑（`MainTests` 这种链全部 dylib 的目标）。
 
 `Engine/2D/Src/Algorithm/` 下的 `Geo2DSampling` / `Geo2DAnalysis` / `Geo2DEdit` 仍有上百处
@@ -110,7 +105,7 @@ UI/2D/
 对应 `.cpp` 把虚函数锚定在 `Engine2D` 内，typeinfo 只有一份；这是巧合而不是保证——任何图元
 一旦改成纯头文件实现，就会立刻重现同一类静默失效。这批替换尚未进行。
 
-**当前统计**：
+**当前统计**（2026-09-13 审计）：
 - `Geo2DEdit.cpp`: 45 处 `dynamic_cast`
 - `SceneManager.cpp`: 2 处 `dynamic_cast`
 - `UndoRedoManager.cpp` / `SceneUndoCommands.cpp`: 4 处（命令合并场景，非图元判型）

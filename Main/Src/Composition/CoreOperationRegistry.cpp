@@ -2,7 +2,8 @@
  * @file CoreOperationRegistry.cpp
  * @brief 核心操作注册实现
  *
- * 协调各模块的操作注册。
+ * 已简化为薄壳：直接由 ApplicationCompositionRoot 调用各模块注册器，
+ * 消除了不必要的中间转发层。
  */
 #include "CoreOperationRegistry.h"
 #include "OpRegistryTypes.h"
@@ -10,6 +11,7 @@
 #include "ViewOperationRegistry.h"
 #include "AlgorithmOperationRegistry.h"
 #include "HelpOperationRegistry.h"
+#include "PendingOperationRegistry.h"
 
 CoreOperationRegistry::CoreOperationRegistry(OperationBus* bus,
     SceneEditService* editService,
@@ -60,12 +62,7 @@ void CoreOperationRegistry::registerAll()
 
     HelpOperationRegistry helpRegistry(m_bus, m_parentWidget);
     helpRegistry.registerAll();
+
+    PendingOperationRegistry pendingRegistry(m_bus);
+    pendingRegistry.registerAll();
 }
-
-void CoreOperationRegistry::registerHelpOperations() {}
-
-void CoreOperationRegistry::registerEditOperations() {}
-
-void CoreOperationRegistry::registerAlgorithmOperations() {}
-
-void CoreOperationRegistry::registerViewOperations() {}

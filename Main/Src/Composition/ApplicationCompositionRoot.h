@@ -77,9 +77,6 @@ public:
     /// 获取 ApplicationCompositionRoot 单例实例（由 AppBootstrapper 创建时设置）
     static ApplicationCompositionRoot* instance();
 
-    /// 重置单例状态（仅测试使用：清理所有持有的服务与状态，模拟进程重启）
-    static void resetForTest();
-
     /// 保存当前工作台的运行时设置到数据库（退出时兜底）
     static void saveCurrentWorkbenchSettings();
 
@@ -240,6 +237,67 @@ private:
     void registerAllOperations();
     // 惰性创建 2D 算法服务与执行器
     AlgorithmRunner* algorithmRunner();
+
+    // 共享连接：开始信号 → setBusy(true)（模板方法）
+    template<typename ServiceT>
+    void connectStartToBusy(ServiceT* service, void (ServiceT::*started)(const QString&))
+    {
+        QObject::connect(service, started, m_stateCenter.get(), [this]() {
+            if (m_stateCenter)
+            {
+                m_stateCenter->pushBusy();
+            }
+        });
+    }
+
+    // 共享回调：busy 状态 + 状态提示 → UiStateCenter（模板方法，适用于 ImportService/ExportService）
+    template<typename ServiceT>
+    void wireCommonCallbacks(ServiceT* service)
+    {
+        service->setBusyStateCallback([this](bool busy) {
+            if (m_stateCenter)
+            {
+                if (busy)
+                {
+                    m_stateCenter->pushBusy();
+                }
+                else
+                {
+                    m_stateCenter->popBusy();
+                }
+            }
+        });
+        service->setStatusPromptCallback([this](const QString& prompt) {
+            if (m_stateCenter)
+            {
+                m_stateCenter->setStatusPrompt(prompt);
+            }
+        });
+    }
+
+    // 共享连接：完成信号 → setBusy(false) + 状态提示（模板方法）
+    template<typename ServiceT, typename ResultT, typename CountT>
+    void connectFinishToBusy(ServiceT* service, void (ServiceT::*finished)(const ResultT&),
+        CountT count, const QString& completeText, const QString& failText)
+    {
+        QObject::connect(service, finished, m_stateCenter.get(),
+            [this, count, completeText, failText](const ResultT& result) {
+                if (!m_stateCenter)
+                {
+                    return;
+                }
+                m_stateCenter->popBusy();
+                m_stateCenter->setStatusPrompt(result.success
+                        ? completeText.arg(count(result))
+                        : failText.arg(result.message));
+                QVariantMap meta = m_stateCenter->metadata();
+                meta["statusPrompt"] = result.success
+                    ? completeText.arg(count(result))
+                    : failText.arg(result.message);
+                meta["notificationType"] = result.success ? "info" : "error";
+                m_stateCenter->setMetadata(meta);
+            });
+    }
 
     /// UI Shell 宿主
     std::unique_ptr<UiShellHost> m_shellHost;

@@ -32,18 +32,11 @@ public:
     // ==================== 快捷键管理 ====================
 
     /// 注册全局快捷键（由工作台调用，切换时自动清理）
-    /// @param commandId 可选的命令 ID，用于快捷键台账管理（冲突检测/设置页）
-    void registerShortcut(QShortcut* shortcut, const QString& commandId = QString());
+    void registerShortcut(QShortcut* shortcut);
     /// 注销全局快捷键
     void unregisterShortcut(QShortcut* shortcut);
     /// 清理所有注册的快捷键
     void clearAllShortcuts();
-
-    /// 设置快捷键台账（用于窗口级快捷键的台账同步）
-    void setShortcutRegistry(class UiShortcutRegistry* registry)
-    {
-        m_shortcutRegistry = registry;
-    }
 
     // ==================== 命令执行 ====================
 
@@ -77,8 +70,6 @@ private:
     UiFrameworkServices m_frameworkServices;
     /// 状态中心（用于错误兜底上报）
     UiStateCenter* m_stateCenter{ nullptr };
-    /// 快捷键台账（用于冲突检测/设置页同步）
-    class UiShortcutRegistry* m_shortcutRegistry{ nullptr };
     /// 注册的全局快捷键列表（由工作台注册，切换时统一清理）
     std::vector<QShortcut*> m_registeredShortcuts;
 };

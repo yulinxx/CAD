@@ -40,7 +40,6 @@ public:
 
     // 接口实现
     bool isCommandRegistered(const QString& commandId) const override;
-    QString commandIcon(const QString& commandId) const override;
 
     // 单一真相：窗口级命令名单（工作台切换 / 主题 / 语言 / help.about）
     static bool isWindowLevelCommand(const QString& commandId);

@@ -157,7 +157,7 @@
           { "type": "action", "id": "view.floor", "label": "Show Floor", "command": "view.floor", "icon": ":/ui/common/Icons/View3D/floor.svg", "checkable": true, "workbenches": ["3D"] }
         ] },
         { "type": "action", "id": "view.switch_to_2d", "label": "Switch to 2D", "command": "view.switch_to_2d", "icon": ":/ui/common/Icons/View3D/switch_to_2d.svg", "shortcut": "Ctrl+Shift+2", "workbenches": ["3D"] },
-        { "type": "action", "id": "view.switch_to_3d", "label": "Switch to 3D", "command": "view.switch_to_3d", "icon": ":/ui/common/Icons/View/switch_to_3d.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "view.switch_to_3d", "label": "Switch to 3D", "command": "view.switch_to_3d", "icon": ":/ui/common/Icons/View/switch_to_3d.svg", "shortcut": "Ctrl+Shift+3", "workbenches": ["2D"] },
         { "type": "action", "id": "view.test_view", "label": "Test View", "command": "view.test_view", "workbenches": ["2D"] },
         { "type": "action", "id": "view.capture", "label": "Capture View", "command": "view.capture", "icon": ":/ui/common/Icons/Actions/capture.svg", "workbenches": ["2D", "3D"] }
       ]
@@ -298,7 +298,7 @@
     "   见 UiWorkbench.cpp 的 setupShortcuts 注释）。",
     "2) 3D 视口的 W/E/R/Q 变换模式键由 RenderWidget3D::keyPressEvent 独占，配置里不要重复声明。"
   ],
-"statusBar": {
+  "statusBar": {
     "visible": true,
     "sizeGripEnabled": true,
     "items": [
@@ -306,29 +306,6 @@
       { "id": "licenseIndicator", "widgetType": "LicenseIndicator", "align": "permanent" }
     ]
   },
-  "toolBars": [
-    {
-      "id": "draw.left",
-      "title": "Draw Tools",
-      "position": "Left",
-      "workbenchId": "2D",
-      "items": [
-        { "id": "tool.select", "command": "tool.select", "label": "Select", "icon": ":/ui/common/Icons/Tools/select.svg" },
-        { "id": "tool.point", "command": "tool.point", "label": "Point", "icon": ":/ui/common/Icons/Tools/point.svg" },
-        { "id": "tool.line", "command": "tool.line", "label": "Line", "icon": ":/ui/common/Icons/Tools/line.svg" },
-        { "id": "tool.polyline", "command": "tool.polyline", "label": "Polyline", "icon": ":/ui/common/Icons/Tools/polyline.svg" },
-        { "id": "tool.polygon", "command": "tool.polygon", "label": "Polygon", "icon": ":/ui/common/Icons/Tools/polygon.svg" },
-        { "id": "tool.bezier2", "command": "tool.bezier2", "label": "Quadratic Bezier", "icon": ":/ui/common/Icons/Tools/bezier2.svg" },
-        { "id": "tool.bezier3", "command": "tool.bezier3", "label": "Cubic Bezier", "icon": ":/ui/common/Icons/Tools/bezier3.svg" },
-        { "id": "tool.arc_3pt", "command": "tool.arc_3pt", "label": "3-Point Arc", "icon": ":/ui/common/Icons/Tools/arc_3pt.svg" },
-        { "id": "tool.circle", "command": "tool.circle", "label": "Circle", "icon": ":/ui/common/Icons/Tools/circle.svg" },
-        { "id": "tool.rectangle", "command": "tool.rectangle", "label": "Rectangle", "icon": ":/ui/common/Icons/Tools/rectangle.svg" },
-        { "id": "tool.ellipse", "command": "tool.ellipse", "label": "Ellipse", "icon": ":/ui/common/Icons/Tools/ellipse.svg" },
-        { "id": "tool.text", "command": "tool.text", "label": "Text", "icon": ":/ui/common/Icons/Tools/text.svg" },
-        { "id": "tool.dimension", "command": "tool.dimension", "label": "Dimension", "icon": ":/ui/common/Icons/Tools/dimension.svg" }
-      ]
-    }
-  ],
   "contextMenus": [
     {
       "id": "canvas.2d",

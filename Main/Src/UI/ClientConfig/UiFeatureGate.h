@@ -63,14 +63,8 @@ public:
     /// 当前授权功能集（排序后，便于日志与测试断言）
     QStringList licensedFeatures() const;
 
-/// 清空授权集并回到受限模式（仅测试使用）
-    void resetForTestImpl();
-
-    /// 重置单例状态（仅测试使用：清空授权集并回到无限制模式）
-    static void resetForTest()
-    {
-        instance().resetForTestImpl();
-    }
+    /// 清空授权集并回到受限模式（仅测试使用）
+    void resetForTest();
 
 private:
     UiFeatureGate() = default;

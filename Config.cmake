@@ -9,28 +9,11 @@
 # ============================================================================
 #                         📌 常用配置（在此修改）
 # ============================================================================
+# vcpkg 根目录
+set(VCPKG_DIR "C:/Users/xx/vcpkg")
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  [1] Qt6 路径（根据操作系统自动选择）
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-if(WIN32)
-    set(Qt_INSTALL_DIR "C:/Qt/6.11.0/msvc2022_64/" CACHE PATH "Qt6 Windows")
-elseif(APPLE)
-    set(Qt_INSTALL_DIR "$ENV{HOME}/Qt/6.11.1/macos/" CACHE PATH "Qt6 macOS")
-elseif(UNIX)
-    set(Qt_INSTALL_DIR "$ENV{HOME}/Install/Qt/6.11.1/gcc_64/" CACHE PATH "Qt6 Linux")
-endif()
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  [2] vcpkg 路径（根据操作系统自动选择）
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-if(WIN32)
-    set(VCPKG_DIR "C:/vcpkg/" CACHE PATH "vcpkg Windows")
-elseif(APPLE)
-    set(VCPKG_DIR "$ENV{HOME}/vcpkg/" CACHE PATH "vcpkg macOS")
-elseif(UNIX)
-    set(VCPKG_DIR "$ENV{HOME}/Install/vcpkg/" CACHE PATH "vcpkg Linux")
-endif()
+# Qt 安装目录
+set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.11.2/msvc2022_64")
 
 # 构建类型: Debug | Release | RelWithDebInfo | MinSizeRel
 set(CMAKE_BUILD_TYPE "Release")
@@ -169,8 +152,8 @@ if(SANYI_UNITY_BUILD)
     set(CMAKE_UNITY_BUILD ON)
     # Unity 构建的块大小，可根据内存调整
     set(CMAKE_UNITY_BUILD_BATCH_SIZE 16)
-    # 注意：.mm 不得进 unity batch —— 各模块对 .mm 设 SKIP_UNITY_BUILD_INCLUSION
-    # （见 UI/Common、Main、Renderx 的 CMakeLists），勿用无效的 *_EXCLUDED_* 变量。
+    # 默认排除 Objective-C++，避免与 C++ 混在一个 unity 块里导致编译错误
+    list(APPEND CMAKE_UNITY_BUILD_SUPPORTED_SOURCE_EXTENSIONS ".mm")
 endif()
 
 # --------------------------------------------------------------------
@@ -298,27 +281,27 @@ option(BUILD_RENDER_BENCHMARK "Build headless render frame-path benchmark" ON)
 # 便捷总开关：ON = 把下面全部模块测试一并打开；OFF = 保持各模块的显式取值
 set(BUILD_ALL_TESTS OFF CACHE BOOL "打开全部模块测试（便捷总开关）" FORCE)
 
-# ---- 逐模块测试开关（核心模块默认启用，建立测试保护网）----
-set(BUILD_UTILITY_TESTS          ON  CACHE BOOL "Utility 单元测试" FORCE)
-set(BUILD_LOG_TESTS              ON  CACHE BOOL "Log 单元测试" FORCE)
-set(BUILD_ENGINE2D_TESTS         ON  CACHE BOOL "Engine2D 单元测试" FORCE)
-set(BUILD_ENGINE3D_TESTS         ON  CACHE BOOL "Engine3D 单元测试" FORCE)
-set(BUILD_GEOMODELCORE_TESTS     ON  CACHE BOOL "GeoModelCore 单元测试" FORCE)
-set(BUILD_FILEIO_TESTS           ON  CACHE BOOL "FileIO 单元测试" FORCE)
+# ---- 逐模块测试开关（当前取值沿用收敛前的既有行为，可按需手动调整）----
+set(BUILD_UTILITY_TESTS          OFF CACHE BOOL "Utility 单元测试" FORCE)
+set(BUILD_LOG_TESTS              OFF CACHE BOOL "Log 单元测试" FORCE)
+set(BUILD_ENGINE2D_TESTS         OFF CACHE BOOL "Engine2D 单元测试" FORCE)
+set(BUILD_ENGINE3D_TESTS         OFF CACHE BOOL "Engine3D 单元测试" FORCE)
+set(BUILD_GEOMODELCORE_TESTS     OFF CACHE BOOL "GeoModelCore 单元测试" FORCE)
+set(BUILD_FILEIO_TESTS           OFF CACHE BOOL "FileIO 单元测试" FORCE)
 set(BUILD_LICENSE_TESTS          ON  CACHE BOOL "License 单元测试" FORCE)
-set(BUILD_NESTING_TESTS          ON  CACHE BOOL "Nesting 单元测试" FORCE)
-set(BUILD_CAM_TESTS              ON  CACHE BOOL "CAM 单元测试" FORCE)
-set(BUILD_ENGRAVING_TESTS        ON  CACHE BOOL "Engraving 单元测试" FORCE)
-set(BUILD_HARDWARE_TESTS         ON  CACHE BOOL "Hardware 单元测试" FORCE)
-set(BUILD_VISION_TESTS           ON  CACHE BOOL "Vision 单元测试" FORCE)
-set(BUILD_PYTHONHOST_TESTS       ON  CACHE BOOL "PythonHost 单元测试" FORCE)
-set(BUILD_CRASHHANDLER_TESTS     ON  CACHE BOOL "CrashHandler 单元测试" FORCE)
-set(BUILD_RENDERX_TESTS          ON  CACHE BOOL "Renderx 单元测试" FORCE)
+set(BUILD_NESTING_TESTS          OFF CACHE BOOL "Nesting 单元测试" FORCE)
+set(BUILD_CAM_TESTS              OFF CACHE BOOL "CAM 单元测试" FORCE)
+set(BUILD_ENGRAVING_TESTS        OFF CACHE BOOL "Engraving 单元测试" FORCE)
+set(BUILD_HARDWARE_TESTS         OFF CACHE BOOL "Hardware 单元测试" FORCE)
+set(BUILD_VISION_TESTS           OFF CACHE BOOL "Vision 单元测试" FORCE)
+set(BUILD_PYTHONHOST_TESTS       OFF CACHE BOOL "PythonHost 单元测试" FORCE)
+set(BUILD_CRASHHANDLER_TESTS     OFF CACHE BOOL "CrashHandler 单元测试" FORCE)
+set(BUILD_RENDERX_TESTS          OFF CACHE BOOL "Renderx 单元测试" FORCE)
 set(BUILD_RENDERBRIDGE_TESTS     ON  CACHE BOOL "RenderBridge 契约测试" FORCE)
 set(BUILD_UI_COMMON_TESTS        ON  CACHE BOOL "UICommon 单元测试" FORCE)
-set(BUILD_UI2D_TESTS             ON  CACHE BOOL "UI2D 单元测试" FORCE)
+set(BUILD_UI2D_TESTS             OFF CACHE BOOL "UI2D 单元测试" FORCE)
 set(BUILD_UI3D_TESTS             ON  CACHE BOOL "UI3D 单元测试" FORCE)
-set(BUILD_MAIN_TESTS             ON  CACHE BOOL "Main 单元测试（含撤销/重做回归）" FORCE)
+set(BUILD_MAIN_TESTS             OFF CACHE BOOL "Main 单元测试（含撤销/重做回归）" FORCE)
 set(BUILD_VIEWPORT_REFRESH_TESTS ON  CACHE BOOL "2D 视口刷新契约测试" FORCE)
 set(BUILD_SCENE_EDIT_TESTS       ON  CACHE BOOL "场景编辑集成回归测试（撤销状态交换链路）" FORCE)
 

@@ -1,11 +1,5 @@
 # Metal 后端实施设计
 
-> **状态：已实施。** Metal 后端实现于 `Renderx/src/rhi/metal/`
-> （`metalDevice.mm` / `metalCommandList.mm`，Objective-C++，MSL 着色器构建期
-> 编译为 `.metallib` 嵌入 DLL），`Renderx/CMakeLists.txt` 的 APPLE 分支单独收集
-> `.mm` 源，`rhiFactory.cpp` 对 `BackendKind::Metal` 调用 `createMetalDevice`，
-> `isBackendAvailable(Metal)` 在 Apple 平台返回 true。
-
 > 定位：为 RenderX 补齐第二个真实 GPU 后端，解锁 macOS 现代渲染能力
 > （GL 4.1 无 compute / 无 indirect draw / 线宽恒 1px），并为 GPU-driven 剔除铺路。
 >
@@ -28,10 +22,10 @@
 | 资源句柄池（世代式，防悬垂） | 可复用 | `src/rhi/rhiResourcePool.h` |
 | Shader 构建期嵌入（含 `.metal` / `.metallib`） | 已就绪 | `CMake/EmbedShaders.cmake` |
 | 表面抽象（含 `CocoaNsView`） | 已就绪 | `src/rhi/rhiSurface.h` |
-| **Metal 设备 / 表面 / 命令** | **已实现** | `src/rhi/metal/`、`rhiFactory.cpp`（`createMetalDevice`） |
-| **`.mm` 构建集成** | **已接入** | `Renderx/CMakeLists.txt` 的 APPLE 分支 |
+| **Metal 设备 / 表面 / 命令** | **未实现** | `rhiFactory.cpp` 明确报「Phase 7 尚未实现」 |
+| **`.mm` 构建集成** | **缺失** | `Renderx/CMakeLists.txt` 的 GLOB 只收 `src/*.cpp` |
 
-一句话：**抽象层与构建机制齐备，Metal 后端本体与 `.mm` 构建接入均已就位。**
+一句话：**抽象层和构建机制的准备工作已经做完，缺的是 Metal 后端本体与 `.mm` 的构建接入。**
 
 ---
 
@@ -46,7 +40,7 @@
 
 ### 1.2 非目标
 
-- 不做 Vulkan（另议）。
+- 不做 Vulkan（Phase 8，另议）。
 - 不在 Windows/Linux 构建中引入 Metal 相关源文件与依赖。
 - 不改动 GL 后端的任何行为。
 - 不在本阶段接入 GPU-driven 剔除（属 M3 之后的独立一轮）。
@@ -69,7 +63,7 @@
 
 **决策：手写 MSL（`src/shader/metal/*.metal`），macOS 构建期编译为 `.metallib` 并嵌入。**
 
-理由：本项目 GL 侧已确立「shader 构建期嵌入、运行期零 IO、不依赖运行目录布局」这条契约（依赖 Bundle/工作目录路径推导会让视口整屏不可用，风险不可接受）。运行时编译会把风险从构建期挪回运行期，与既有契约相悖。
+理由：本项目 GL 侧已经确立了「shader 不依赖运行目录布局」这条契约（`Docs/Mac渲染.md` 记录过 bundle 下路径推导失败导致视口全黑的故障）。运行时编译会把风险从构建期挪回运行期，与既有契约相悖。
 
 代价：GLSL 与 MSL 双份维护。缓解方式是**把共享部分（`rx_push_constants.glsl`）以同样的思路在 MSL 侧建立一份对应声明**，并用测试锁定两侧字段布局一致。
 
@@ -110,8 +104,8 @@ Metal 的绑定模型比 GL 简单：`(set, binding)` 可以直接映射为 buff
 
 `GraphicsPipelineDesc` 到 `MTLRenderPipelineDescriptor` 的映射是直接的，但有两处必须显式处理：
 
-1. **`FillMode::Wireframe`**：macOS 的 Metal **支持**多边形线框，`Capabilities::wireframeFill` 为 **true**。
-   关键在于它不是管线描述符属性，而是**编码器状态** `MTLRenderCommandEncoder.triangleFillMode = MTLTriangleFillModeLines`——管线描述符里存不下，必须在 `bindPipeline` 时下发（`MetalCommandList::bindPipeline`），并且每个 render pass 新建编码器时要重新下发（`beginRenderPass` 清管线句柄）。**不需要**上层三角化线框，`Mesh3DWire` 与 `Highlight3D` 直接可用；回归用例 `RenderxMetalTests.Mesh3DWireFillDrawsEdgesInsteadOfSolidArea` 锁定该行为。
+1. **`FillMode::Wireframe`**：~~Metal 没有多边形线框模式，`Capabilities::wireframeFill` 为 **false**……这是必须在 M4 处理的已知缺口。~~
+   **【2026-09-16 更正：已实现，上述结论不成立】** macOS 的 Metal **支持**多边形线框，`Capabilities::wireframeFill` 现为 **true**。当初判断失误的原因是把「Metal 没有 `VK_POLYGON_MODE_LINE` 那样的**管线描述符属性**」读成了「Metal 不支持线框」——Metal 的对应物是**编码器状态** `MTLRenderCommandEncoder.triangleFillMode = MTLTriangleFillModeLines`，管线描述符里存不下，必须在 `bindPipeline` 时下发（`MetalCommandList::bindPipeline`），并且每个 render pass 新建编码器时要重新下发（`beginRenderPass` 清管线句柄）。**不需要**上层三角化线框，`Mesh3DWire` 与 `Highlight3D` 直接可用；回归用例 `RenderxMetalTests.Mesh3DWireFillDrawsEdgesInsteadOfSolidArea` 锁定该行为。
 2. **深度范围**：GL 裁剪空间 z ∈ [-1,1]，Metal 为 [0,1]。若宿主的投影矩阵按 GL 约定生成，Metal 上会出现深度错误。**这是最容易被忽略、且症状隐蔽的一条**（表现为远平面物体消失或 z-fighting）。处理方式见 §6。
 
 ### D5 命令录制与状态冗余消除
@@ -278,7 +272,7 @@ cmake --build build-mac --target RenderxTests --config Debug
 | 风险 | 影响 | 缓解 |
 |------|------|------|
 | **深度范围差异**（GL [-1,1] vs Metal [0,1]） | 3D 深度错误、远平面消失，症状隐蔽 | M4 显式验证；确认宿主投影矩阵约定，必要时在 Metal 侧做 z 重映射 |
-| **线框**（Metal 无 `VK_POLYGON_MODE_LINE` 那样的描述符属性） | 已具备 | 用编码器状态 `MTLTriangleFillModeLines`，`Capabilities::wireframeFill = true`，见 §D4 第 1 条 |
+| ~~**线框缺口**（Metal 无 polygon line）~~ **【2026-09-16 已消除】** | — | ~~`Capabilities::wireframeFill = false`，上层查能力后改走三角化线框~~ 实际 Metal 支持，改用编码器状态 `MTLTriangleFillModeLines`，见 §D4 第 1 条的更正说明 |
 | MSL 与 GLSL 双份维护 | 改一处漏一处，两侧渲染不一致 | 对比验证作为护栏；共享声明（pushConstant 块）两侧用测试锁定布局 |
 | 开发机无法验证 | 问题积压到 Mac 侧才暴露 | 分 M1-M4 交付，每阶段独立验收 |
 | ARC 与手动内存管理混用 | Metal 对象生命周期错误、崩溃 | `.mm` 统一开启 ARC，`id<MTL*>` 由 ARC 管理；C++ 侧只持有裸指针并在析构时置空 |

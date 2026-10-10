@@ -89,7 +89,7 @@ sequenceDiagram
 **关键点**
 1. 菜单「顺序 / 分组 / 文案」全部来自 JSON 配置，代码不重建菜单树。
 2. 配置驱动是**唯一**路径：菜单 / 工具栏 / Dock / 状态栏 / 右键菜单全部由 JSON 生成，
-   代码中不得出现硬编码 Dock 骨架与 `SANYI_ENABLE_CONFIG_DRIVEN_UI` 宏。
+   硬编码 Dock 骨架与 `SANYI_ENABLE_CONFIG_DRIVEN_UI` 宏已删除。
 3. 客户 ID 由 `UiClientContext` **运行时**解析
    （override > `SANYI_CLIENT_ID` 环境变量 > `QSettings Client/Id` > `san_yi`），
    换客户不需要重新编译，一份二进制服务全部客户。
@@ -125,7 +125,7 @@ flowchart TD
 
 **关键点**
 - 配置驱动是唯一路径。连 `san_yi.json` 都加载失败时只打一条 `SY_ERRORF`
-  并**不建任何菜单**，也不存在 `buildLegacyMenus()` 之类的静态兜底路径。
+  并**不建任何菜单**；原来的 `buildLegacyMenus()` 静态兜底已于 2026-08-26 删除。
 - 命令未注册的菜单项仍保留在菜单上（禁用态），避免结构与文档漂移。
 - 带 `feature` 且未授权的项**不创建**（与「禁用态」不同）。
 - 顶层菜单顺序固定：`File → Edit → View → Draw → Algorithm → Laser → Vision → Help`。
@@ -204,7 +204,7 @@ flowchart LR
     Resolve -.解析落空.-> Fallback["createUnmanagedAction()<br/>占位项禁用 / 其余打告警"]
 ```
 
-复用 Hub 的 QAction 是启用态联动的前提。一旦走到 `createUnmanagedAction()`，该按钮的 `enabled` 就固定为配置里的静态值，不再随选择/锁定变化 —— 对齐按钮的启用态联动会因此失效。
+复用 Hub 的 QAction 是启用态联动的前提。一旦走到 `createUnmanagedAction()`，该按钮的 `enabled` 就固定为配置里的静态值，不再随选择/锁定变化 —— 这正是 6 个对齐按钮曾长期失效的机制。
 
 ### 3.3 左侧工具栏点击（绘图工具型，进入交互式流程）
 

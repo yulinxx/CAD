@@ -560,6 +560,17 @@ void PropertiesPanelWidget::changeEvent(QEvent* event)
     QWidget::changeEvent(event);
 }
 
+QSize PropertiesPanelWidget::sizeHint() const
+{
+    // 属性面板停靠在侧栏，宽度本应由停靠布局控制；但 QTreeWidget 的自然宽度会被
+    // 停靠区当作首选宽度，导致切换工作台后右侧属性栏被顶宽（中央视图被压到下限）。
+    // 这里给一个适中的首选宽度。注意这只是"首选值"而非硬上限：用户拖动分隔条
+    // 仍可自由加宽，落盘后由布局快照恢复。
+    QSize hint = QWidget::sizeHint();
+    hint.setWidth(260);
+    return hint;
+}
+
 void PropertiesPanelWidget::setEditTarget(std::shared_ptr<IPropertyEditTarget> target)
 {
     m_editTarget = std::move(target);

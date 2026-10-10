@@ -5,10 +5,9 @@
  * 管理应用程序菜单的构建和响应。
  */
 #include "WorkbenchMenuManager.h"
+#include "MenuDispatcher.h"
 #include "WorkbenchWindow.h"
 #include "BuildConfig.h"
-#include "MenuDispatcher.h"
-#include "MenuFilter.h"
 
 #include "Log/SyLogger.h"
 #include "UI2D/Manager/UnitManager.h"
@@ -74,6 +73,23 @@ namespace
     QString currentWorkbenchId(const UiStateCenter* stateCenter)
     {
         return stateCenter ? stateCenter->currentWorkbenchId() : QStringLiteral("2D");
+    }
+
+    bool commandEnabledForWorkbench(const QStringList& workbenches, const QString& workbenchId)
+
+    {
+        if (workbenches.isEmpty())
+        {
+            return true;
+        }
+        for (const auto& wb : workbenches)
+        {
+            if (wb.compare(workbenchId, Qt::CaseInsensitive) == 0)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 }  // namespace
 
@@ -162,33 +178,22 @@ void WorkbenchMenuManager::rebuildAllMenus()
 
 bool WorkbenchMenuManager::isWindowLevelCommand(const QString& commandId)
 {
-    // 唯一真相：MenuDispatcher::dispatch 短路处理的完整命令集合
-    // （工作台切换 / 主题 / 语言 / 关于）。改这里即同时改变三处行为：
-    // 「按钮是否可点」（MenuDispatcher::isCommandRegistered）、「过滤是否放行」
-    // （rebuildMenusFromConfig 的 commandAvailable）与「契约测试/自检是否跳过
-    // 目录校验」（CommandUiWiringTests、UiConfigSelfCheck）。不要再开第二份名单。
-    return MenuDispatcher::isWorkbenchSwitchCommand(commandId) || MenuDispatcher::isThemeCommand(commandId) ||
-        MenuDispatcher::isLanguageCommand(commandId) || commandId == QLatin1String("help.about");
+    // 唯一真相收口在 MenuDispatcher，本方法仅为兼容既有调用点而委托
+    return MenuDispatcher::isWindowLevelCommand(commandId);
 }
 
 IUiCommandDispatcher* WorkbenchMenuManager::commandDispatcher()
 {
     if (!m_dispatcher)
     {
-        m_dispatcher = std::make_unique<MenuDispatcher>(this);
+        m_dispatcher = std::make_unique<MenuDispatcher>();
         m_dispatcher->setSelf(this);
+        m_dispatcher->setWorkbenchWindow(m_window);
+        m_dispatcher->setStateCenter(m_stateCenter);
     }
     // 每次取用都同步工作台：菜单/工具栏的构建时机早于 setWorkbench 的场景是常态，
     // 而 isCommandRegistered() 要靠当前工作台的命令目录才能给出正确答案。
     m_dispatcher->setWorkbench(m_workbench);
-    if (m_window)
-    {
-        m_dispatcher->setWorkbenchWindow(m_window);
-    }
-    if (m_stateCenter)
-    {
-        m_dispatcher->setStateCenter(m_stateCenter);
-    }
     return m_dispatcher.get();
 }
 
@@ -395,14 +400,156 @@ void WorkbenchMenuManager::bindShortcuts()
 }
 
 std::vector<MenuDef> WorkbenchMenuManager::filterMenusForWorkbench(const std::vector<MenuDef>& menus,
+
     const QString& workbenchId,
     const std::function<bool(const QString&)>& commandAvailable,
     const QString& workbenchKind)
 {
-    // P2-1：过滤逻辑已完整移植到 MenuFilter（递归子菜单、dynamicSections 保留、
-    // 大小写不敏感匹配、visibilityScope 判定、分隔符归一化、空菜单裁剪），
-    // 本函数退化为纯委托，保持静态 API 与既有测试不变。
-    return MenuFilter::filterMenusForWorkbench(menus, workbenchId, commandAvailable, workbenchKind);
+    // 分隔符归一化：JSON 里的分隔符是按“全部菜单项都在”排版的，
+    // 过滤掉不属于当前工作台的动作后会留下开头/结尾/连续的空分隔线，
+    // 这会让 3D 菜单看起来像一堆断裂的空行。这里在数据层收敛，构建层无需关心。
+    const auto normalizeSeparators = [](std::vector<std::variant<MenuActionDef, SubMenuDef, MenuItemType>>& items) {
+        const auto isSeparator = [](const std::variant<MenuActionDef, SubMenuDef, MenuItemType>& item) {
+            return std::holds_alternative<MenuItemType>(item) && std::get<MenuItemType>(item) == MenuItemType::Separator;
+        };
+        std::vector<std::variant<MenuActionDef, SubMenuDef, MenuItemType>> normalized;
+
+        normalized.reserve(items.size());
+        for (const auto& item : items)
+        {
+            if (isSeparator(item) && (normalized.empty() || isSeparator(normalized.back())))
+            {
+                continue;
+            }
+            normalized.push_back(item);
+        }
+        while (!normalized.empty() && isSeparator(normalized.back()))
+        {
+            normalized.pop_back();
+        }
+        items.swap(normalized);
+    };
+
+    const auto visibilityAllowed = [&](const QString& scope) {
+        if (scope.isEmpty())
+        {
+            return true;
+        }
+        if (workbenchKind.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0)
+        {
+            return scope.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0 ||
+                scope.compare(QStringLiteral("shared"), Qt::CaseInsensitive) == 0;
+        }
+        return scope.compare(QStringLiteral("2D"), Qt::CaseInsensitive) == 0 ||
+            scope.compare(QStringLiteral("shared"), Qt::CaseInsensitive) == 0;
+    };
+
+    std::function<bool(const MenuActionDef&, MenuActionDef&)> filterAction = [&](const MenuActionDef& action,
+                                                                                 MenuActionDef& outAction) -> bool {
+        if (!action.visible || !commandEnabledForWorkbench(action.workbenches, workbenchId))
+        {
+            return false;
+        }
+        if (!visibilityAllowed(action.visibilityScope))
+        {
+            return false;
+        }
+        if (!commandAvailable(action.commandId))
+        {
+            return false;
+        }
+
+        outAction = action;
+        return true;
+    };
+
+    std::function<bool(const SubMenuDef&, SubMenuDef&)> filterSubMenu = [&](const SubMenuDef& sub,
+                                                                            SubMenuDef& outSub) -> bool {
+        if (!sub.visible || !commandEnabledForWorkbench(sub.workbenches, workbenchId))
+        {
+            return false;
+        }
+        if (!visibilityAllowed(sub.visibilityScope))
+        {
+            return false;
+        }
+        outSub = sub;
+        outSub.items.clear();
+        for (const auto& subItem : sub.items)
+        {
+            if (std::holds_alternative<MenuActionDef>(subItem))
+            {
+                MenuActionDef filteredAction;
+                if (filterAction(std::get<MenuActionDef>(subItem), filteredAction))
+                {
+                    outSub.items.push_back(filteredAction);
+                }
+            }
+            else if (std::holds_alternative<SubMenuDef>(subItem))
+            {
+                SubMenuDef filteredSub;
+                if (filterSubMenu(std::get<SubMenuDef>(subItem), filteredSub))
+                {
+                    outSub.items.push_back(filteredSub);
+                }
+            }
+            else if (std::holds_alternative<MenuItemType>(subItem))
+            {
+                outSub.items.push_back(subItem);
+            }
+        }
+        normalizeSeparators(outSub.items);
+        // 声明了 dynamicSections 的子菜单不能因为"静态条目为空"被裁掉 ——
+        // 这类子菜单的条目本来就在运行时才生成（File ▸ Recent Files 是纯动态的，
+        // 静态条目一个都没有）。裁掉的话 UiLayoutBuilder 根本看不到它，动态段永远填不进去。
+        return !outSub.items.empty() || !outSub.dynamicSections.isEmpty();
+    };
+
+    std::vector<MenuDef> filteredMenus;
+    filteredMenus.reserve(menus.size());
+    for (const auto& menu : menus)
+    {
+        if (!menu.visible || !commandEnabledForWorkbench(menu.workbenches, workbenchId))
+        {
+            continue;
+        }
+        if (!visibilityAllowed(menu.visibilityScope))
+        {
+            continue;
+        }
+        MenuDef menuCopy = menu;
+        menuCopy.items.clear();
+        for (const auto& item : menu.items)
+        {
+            if (std::holds_alternative<MenuActionDef>(item))
+            {
+                MenuActionDef filteredAction;
+                if (filterAction(std::get<MenuActionDef>(item), filteredAction))
+                {
+                    menuCopy.items.push_back(filteredAction);
+                }
+            }
+            else if (std::holds_alternative<SubMenuDef>(item))
+            {
+                SubMenuDef filteredSub;
+                if (filterSubMenu(std::get<SubMenuDef>(item), filteredSub))
+                {
+                    menuCopy.items.push_back(filteredSub);
+                }
+            }
+            else if (std::holds_alternative<MenuItemType>(item))
+            {
+                menuCopy.items.push_back(item);
+            }
+        }
+        normalizeSeparators(menuCopy.items);
+        if (!menuCopy.items.empty())
+
+        {
+            filteredMenus.push_back(menuCopy);
+        }
+    }
+    return filteredMenus;
 }
 
 void WorkbenchMenuManager::bindConfiguredMenuState()

@@ -146,7 +146,7 @@ QMenu* UiContextMenuService::buildMenu(
     return menu;
 }
 
-void UiContextMenuService::resetForTestImpl()
+void UiContextMenuService::resetForTest()
 {
     m_sections.clear();
 }

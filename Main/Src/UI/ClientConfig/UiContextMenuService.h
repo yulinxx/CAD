@@ -81,13 +81,7 @@ public:
     static bool hasConfigFor(const UiConfigData* config, const QString& contextMenuId);
 
     /// 清空已注册的动态段（仅测试使用）
-    void resetForTestImpl();
-
-    /// 重置单例状态（仅测试使用：清空动态段注册表）
-    static void resetForTest()
-    {
-        instance().resetForTestImpl();
-    }
+    void resetForTest();
 
 private:
     UiContextMenuService() = default;

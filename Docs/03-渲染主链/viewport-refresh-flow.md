@@ -47,7 +47,7 @@ Document / Scene
 - `RenderWidget` / `RenderWidget3D` 负责渲染设备连接
 - `Renderx` / `RenderX` 负责最终渲染执行
 
-### 2.4 帧外上传必须自己 makeCurrent
+### 2.4 帧外上传必须自己 makeCurrent（2026-08-26 已修）
 
 `SceneRefreshCoordinator` 是在**定时器回调**里调 `RenderWidget::submitSceneFromDataSource`
 与 `addRenderEntity` 的 —— 不在 `paintGL` 内，因此没有当前 GL 上下文；而这两个入口会一路
@@ -56,36 +56,36 @@ Document / Scene
 无当前上下文时这些调用在 Windows 上通常直接返回：**既不报错也不上传**。数据要等下一帧
 帧内 flush 才偶然补上，症状就是"改完场景要动一下鼠标才刷新"。
 
-因此这两个入口按需 `makeCurrent` / `doneCurrent`，且已在帧内时不重复切换。
+现在这两个入口按需 `makeCurrent` / `doneCurrent`，且已在帧内时不重复切换。
 约定：**任何会发 GL 调用的入口自己确认上下文当前性，不把这个前提外推给调用方**
 （释放路径的同一条结论见《新渲染架构.md》§21.1，上传路径见 §22.2）。
 
 ---
 
-## 3. 3D 增量渲染
+## 3. 3D 增量渲染（阶段 3，2026-09-18 完成）
 
-### 3.1 设计目标
+### 3.1 背景
 
-3D 刷新由 `RenderWidget3D::markSceneDirty()` 记账、由 `paintGL` 按刷新级别分流消费：
-几何只在脏图元上重算与重传，`FullRefresh` 只作兜底档，避免每帧从场景全量重收集顶点、
-逐图元重分配 VBO。
+3D 侧原本没有任何刷新调度 —— `RenderWidget3D::markSceneDirty()` 的函数体就是一句
+`update()`，每帧在 `paintGL` 里从场景全量重收集顶点、逐图元重分配 VBO、逐图元
+一次 draw call。只有"全量重画"一档。
 
-### 3.2 分期
+### 3.2 分期路线图
 
 | 阶段 | 状态 | 内容 |
 |------|------|------|
-| 阶段 1 | 现状 | 抽出 `ISceneRefreshScheduler` 公共契约 |
-| 阶段 2 | 现状 | 3D 骨架实现：级别与脏 ID 记账，整帧重绘，QueuedConnection 节流 |
-| 阶段 3 | 现状 | 接入常驻顶点仓与增量提交，FullRefresh 退为兜底 |
-| 阶段 4 | 规划 | `markEntityDirty` 参与增量判定 |
+| 阶段 1 | ✅ 完成 | 抽出 `ISceneRefreshScheduler` 公共契约 |
+| 阶段 2 | ✅ 完成 | 3D 骨架实现：级别与脏 ID 记账，整帧重绘，QueuedConnection 节流 |
+| 阶段 3 | ✅ 完成 | 接入常驻顶点仓与增量提交，FullRefresh 退为兜底 |
+| 阶段 4 | 待做 | `markEntityDirty` 参与增量判定 |
 
-### 3.3 增量路径
+### 3.3 阶段 3 核心改动
 
 **增量路径（`syncMeshGeometryIncremental`）：**
-- 不调用 `gatherGeometry()` 扫描全场景
+- 不再调用 `gatherGeometry()` 扫描全场景
 - 通过 `Mesh3DBuilder::updateDirtyEntities(dirtyIds, sm)` 只遍历脏 ID 集合
 - 对每个脏图元：查找实体 → `emitTriangleSoup`（content hash 跳过内容未变的）→ 自动收录新图元
-- 复杂度 O(脏图元数)，与场景总数无关
+- 复杂度从 O(场景总数) 降为 O(脏图元数)
 
 **paintGL 分流逻辑：**
 ```cpp
@@ -94,9 +94,9 @@ else if (level >= LightUpdate) → syncMeshGeometryIncremental() // 按脏 ID �
 else if (level == Repaint)     → 仅消费脏 ID，不做几何同步
 ```
 
-**flushPendingRefresh 的同步语义：**
-- 通过注入的 `FlushCallback` 同步执行（`update() + processEvents()`），
-  保证脏 ID 不在 `paintGL` 消费前被清空
+**flushPendingRefresh 同步语义修复：**
+- 原实现走 `dispatch()`（异步 `update()`），导致脏 ID 在 `paintGL` 消费前被清空
+- 现通过注入的 `FlushCallback` 同步执行（`update() + processEvents()`）
 
 ### 3.4 关键 API
 
@@ -126,7 +126,7 @@ else if (level == Repaint)     → 仅消费脏 ID，不做几何同步
 
 ---
 
-## 5. 帧合并机制
+## 5. 帧合并机制（2026-09-16）
 
 ### 5.1 问题
 
@@ -161,10 +161,10 @@ else if (level == Repaint)     → 仅消费脏 ID，不做几何同步
 
 ---
 
-## 6. 实体显隐的刷新流
+## 6. 实体显隐的刷新流（2026-09-18）
 
-实体级显隐进入刷新链。`SyEntity::setVisible()` 只 `setModified()` 标脏，
-不产生场景变更记录，`readChanges()` 读不到，因此由下面这条链单独驱动：
+实体级显隐此前不进入刷新链：`SyEntity::setVisible()` 只 `setModified()` 标脏，
+不产生场景变更记录，`readChanges()` 读不到，渲染侧只能全量重建。现在补上：
 
 ```text
 setVisible(false/true) / setEntitiesVisible(ids, visible)
@@ -185,7 +185,7 @@ setVisible(false/true) / setEntitiesVisible(ids, visible)
 - 图层级显隐仍走 `LayerManager::setLayerVisible` → `notifySceneChanged()`，语义不同
   （图层显隐影响整层，实体显隐只影响单图元）。
 
-### 6.1 实体锁定：不进刷新链
+### 6.1 实体锁定：不进刷新链（2026-09-20）
 
 锁定是纯元数据，**不改变任何渲染结果**，因此刻意不进刷新链：
 
@@ -198,7 +198,7 @@ setLocked(false/true) / setEntitiesLocked(ids, locked)
 ```
 
 - 与 `VisibilityChanged` 分列两个 kind：消费方能区分「需要重绘」与「只更新 UI 状态」；
-- 场景树当前不显示锁定态，因此也不重建树（避免为刷新一个不存在的图标做 O(N) 重建）。
+- 场景树当前不显示锁定态，因此也不重建树（旧实现为刷新一个不存在的图标做 O(N) 重建）。
 
 ---
 

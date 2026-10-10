@@ -8,16 +8,17 @@
 - UI 边界 ≈ **配置 + 注册表 + 构建器**，不负责业务语义。
 - 业务语义入口唯一：`OperationBus::run(OperationId)`。
 - **配置驱动是唯一的 UI 构建路径**。菜单 / 工具栏 / 停靠面板 / 状态栏 / 右键菜单
-  全部由客户 JSON 生成，不存在硬编码回退分支。
+  全部由客户 JSON 生成，硬编码回退分支已删除。
 
-> **当前硬约束**
+> **2026-08-25 起的重要变更（P0 收口）**
 >
-> 1. **客户 ID 运行时解析**：不使用编译期宏 `SANYI_CLIENT_ID`；客户 ID 由
->    `UiClientContext` 在运行时解析，**一份二进制服务多个客户**。
-> 2. **配置驱动是唯一路径**：不得新增 `SANYI_ENABLE_CONFIG_DRIVEN_UI` 宏的分支；
->    `WorkbenchLayoutManager` 中不允许出现 `#ifdef` 或硬编码 Dock 骨架。
-> 3. **状态栏、右键菜单、3D 菜单同属一套 JSON**：`MenuManager3D` 不得走硬编码路径。
-> 4. **License feature gating 必须生效**：JSON 中的 `feature` 字段在运行期真实生效。
+> 1. **客户 ID 改为运行时解析**：编译期宏 `SANYI_CLIENT_ID` 已废除。
+>    客户 ID 由 `UiClientContext` 在运行时解析，**一份二进制可服务多个客户**。
+> 2. **`SANYI_ENABLE_CONFIG_DRIVEN_UI` 已废弃**：配置驱动是唯一路径，
+>    `WorkbenchLayoutManager` 中的 `#ifdef` 与硬编码 Dock 骨架已删除。
+>    不要再新增该宏的分支。
+> 3. **状态栏、右键菜单、3D 菜单纳入同一套 JSON**：`MenuManager3D` 硬编码路径已移除。
+> 4. **License feature gating 已接线**：JSON 中的 `feature` 字段现在真正生效。
 
 ---
 
@@ -161,8 +162,8 @@ void registerBuiltinUiPanels(UiPanelRegistry& registry) {
 }
 ```
 
-> **约束**：`WorkbenchMenuManager` 与 `WorkbenchLayoutManager` 必须共用本函数这一份注册表，
-> 不得各自维护，否则两边注册的 `widgetType` 集合会漂移。**新增槽位/面板只改这一处**。
+> **历史坑**：此前 `WorkbenchMenuManager` 与 `WorkbenchLayoutManager` 各自维护一份注册表，
+> 导致两边注册的 `widgetType` 集合会漂移。现已统一到本函数，**新增槽位/面板只改这一处**。
 
 定制面板：
 1. 编写 `MyCustomPanel : public QWidget`；
@@ -631,9 +632,10 @@ UiClientContext::clientId()                       // 覆盖 > 环境变量 > QSe
 > 4. `ui.dock_config_build_failed`
 
 > **不要再新增 `#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI` 分支。**
-> 该宏留在 CMake 里仅为兼容旧脚本，代码里已无引用；它的 ON 分支里 `NullDispatcher`
+> 该宏留在 CMake 里仅为兼容旧脚本，代码里已无引用。
+> 历史教训：这个宏曾长期默认 OFF，而 ON 分支里的 `NullDispatcher`
 > 定义在 `buildDockAreasFromConfig()` 内部却被 `buildToolBars()` 引用 ——
-> **开启后根本编译不过**。双分支结构必然腐坏，这是配置驱动必须保持唯一路径的理由。
+> 也就是说**开启后根本编译不过**，这正是「配置驱动代码写了却从没跑过」的根因。
 
 ---
 
@@ -644,9 +646,9 @@ UiClientContext::clientId()                       // 覆盖 > 环境变量 > QSe
 单点同步。2D / 3D 菜单走**同一套** JSON + 命令目录路径，`MenuManager3D` 及其 5 个 Menu 子类的
 硬编码构建路径已移除，`Workbench3D::managesOwnMenus()` 恒返回 `false`。
 
-> **约束**：不要引入依赖 `m_menuState` 的 `refresh*MenuForWorkbench()` /
-> `syncDrawMenuToTool()` / `refreshThemeMenuChecks()` 这类刷新函数 ——
-> JSON 驱动路径从不写 `m_menuState`，它们在默认构建下 100% 空转。
+> 历史实现里那一批 `refresh*MenuForWorkbench()` / `syncDrawMenuToTool()` /
+> `refreshThemeMenuChecks()` 等函数已于 2026-08-26 随 legacy 菜单链删除 ——
+> 它们全部依赖 `m_menuState`，而 JSON 驱动路径从不写这个成员，在默认构建下 100% 空转。
 
 
 ```
@@ -659,8 +661,9 @@ QAction::triggered
       → OperationBus::run(OperationId, params, source) // 执行
 ```
 
-这是唯一一条分发链，不得新增旁路。尤其不要走「无工作台时直接 `OperationBus::run(opId)`」——
-该路径绕过 `enrichParams`，会丢掉旋转 angle / 对齐 mode / 单位 unit。
+这是唯一一条分发链。`dispatchCommandSafely()` 已删除，也不再存在
+「无工作台时直接 `OperationBus::run(opId)`」的旁路 —— 那条旁路绕过 `enrichParams`，
+会丢掉旋转 angle / 对齐 mode / 单位 unit。
 
 
 命令字符串命名规范（统一小写下划线）：`file.*`、`edit.*`、`view.*`、`tool.*`、`2d.*`、`algo.*`、`help.*`。
@@ -814,7 +817,7 @@ if (clientId == QLatin1String("client_a")) {
 
 | 现状 | 评估 | 建议 |
 |------|------|------|
-| JSON 配置驱动 + extends 继承 | ✅ 唯一路径，无硬编码分支 | 保持，强化配置校验测试 |
+| JSON 配置驱动 + extends 继承 | ✅ 唯一路径，硬编码分支已删 | 保持，强化配置校验测试 |
 | 客户 ID 运行时解析 | ✅ 已具备（`UiClientContext`） | 保持；不要再引入客户维度的条件编译 |
 | 命令目录统一（2D/3D） | ✅ 已具备 | 保持 |
 | 工作台过滤 | ✅ 已具备 | 保持 |
@@ -876,7 +879,7 @@ if (clientId == QLatin1String("client_a")) {
 | JSON 标了 feature、License 放行，但模块没编译 | 点了没反应，且**一条日志都没有**（等于卖了一个不存在的功能） |
 | JSON 声明了 3D 工作台，构建没开 `BUILD_UI3D` | 菜单项凭空消失，看不出是配置写错还是构建裁掉了 |
 
-这三类问题由启动自检一次性报出来，不依赖人工翻 JSON。
+这三类问题历史上都靠人工翻 JSON 才发现。现在由启动自检一次性报出来。
 
 ### 10.1 `BuildConfig.h`：把编译期开关变成运行期可读的真值
 
@@ -962,11 +965,11 @@ JSON 里用到的 feature 必须都登记了映射。纯授权控制项（没有
 `Main/CMakeLists.txt` 另有一条**构建期**护栏：glob `UI/ClientConfig/configs/*.json`
 与 `configs.qrc` 的内容比对，磁盘上存在但没登记进资源的直接 `FATAL_ERROR`。
 理由：漏登记时打包后运行期取不到那份配置，只会静默回退到默认客户，既不报错也看不出
-少了什么。反方向（qrc 登记的文件在磁盘上已不存在）rcc 自己会报错，不需要额外护栏。
+少了什么。反方向（qrc 登记了已删除的文件）rcc 自己会报错，不需要额外护栏。
 
 ---
 
-## 11. 皮肤链路的两个真实缺陷
+## 11. 皮肤链路的两个真实缺陷（2026-08-31）
 
 ### 11.1 深色模式下停靠面板发黑
 
@@ -1013,7 +1016,7 @@ JSON 里用到的 feature 必须都登记了映射。纯授权控制项（没有
 
 全应用 6 个取色点（`LayerManagerDialog` 描边/填充、`UiPropertiesPanel`、
 `EntityPropertiesDialogBase`、`SettingsColorRowHelper`、`FillDialog`）一律改走它 ——
-`FillDialog` 同样保留原生面板，不使用 `DontUseNativeDialog`。
+`FillDialog` 原先靠 `DontUseNativeDialog` 绕过问题，现在也统一回原生面板。
 仓库内已无 `QColorDialog::getColor` 直接调用。
 
 **教训。** 同一个平台缺陷若允许每个调用点各自绕（一个加 flag、一个不加），
