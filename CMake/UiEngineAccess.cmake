@@ -9,7 +9,7 @@
 #   UI 与 Engine 共享同一套领域模型（SceneManager / SyEntity / Selection /
 #   撤销命令等），无法用窄接口隔离（详见
 #   Docs/01-当前架构/UI-Engine解耦迁移方案.md §1.2）。本门面只做"依赖收口"：
-#   UI 的 365 处 #include "Engine*/..." 无需改动，包含目录由本目标传递。
+#   UI 的全部 #include "Engine*/..." 无需改动，包含目录由本目标传递。
 #
 # 规则（由 sanyi_check_dependency_directions 强制）
 #   - UI/* 模块只允许链接 UiEngineAccess，禁止直接链接 Engine*。
