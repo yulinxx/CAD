@@ -13,7 +13,7 @@
  *   auto ids = selService.selectedIdsQ();
  * @endcode
  */
-#include "ISelectionService.h"
+#include "UI/Services/ISelectionService.h"
 
 #include <QPointF>
 #include <QString>

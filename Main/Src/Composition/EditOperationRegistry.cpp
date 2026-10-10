@@ -15,7 +15,7 @@
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Core/EntityClipboard.h"
 #include "Engine2D/Edit/SceneEditService.h"
-#include "Engine2D/Edit/IUndoRedoManager.h"
+#include "Engine/Edit/IUndoRedoManager.h"
 #include "Engine2D/Edit/FilletChamfer.h"
 #include "Engine2D/Algorithm/EntityTransform.h"
 #include "Engine2D/Algorithm/Discretizer/EntityDiscretizer.h"

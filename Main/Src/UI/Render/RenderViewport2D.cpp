@@ -12,7 +12,7 @@
 #include "SceneRefreshCoordinator.h"
 #include "ViewportInputRouter.h"
 #include "SceneDocument2D.h"
-#include "ISelectionService.h"
+#include "UI/Services/ISelectionService.h"
 
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"

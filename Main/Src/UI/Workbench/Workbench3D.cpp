@@ -56,6 +56,7 @@
     #include "UI3D/Service/SceneMonitor3D.h"
     #include "UI3D/Service/SceneDocument3D.h"
     #include "UI3D/Service/CameraController3D.h"
+    #include "UI3D/Service/SelectionService3D.h"
     #include "UI3D/Settings/SettingsUiCoordinator3D.h"
     #include "UI3D/Operation/CommandActionHub3D.h"
     #include "UI3D/Operation/AlgorithmRunner3D.h"
@@ -73,6 +74,7 @@ struct Workbench3D::ServiceOwner
     std::unique_ptr<SceneEditService3D> sceneEditService;
     std::unique_ptr<SceneMonitor3D> sceneMonitor;
     std::unique_ptr<SceneDocument3D> sceneDocument;
+    std::unique_ptr<SelectionService3D> selectionService;
 
     std::unique_ptr<CameraController3D> cameraController;
     std::unique_ptr<AlgorithmApplicationService> algorithmService;
@@ -248,6 +250,7 @@ void Workbench3D::create3DServices()
     own.sceneMonitor = std::make_unique<SceneMonitor3D>(nullptr);
     // 3D 唯一文档入口：SceneDocument3D 自持引擎场景、UI 树与选择集
     own.sceneDocument = std::make_unique<SceneDocument3D>(m_sceneManager3D);
+    own.selectionService = std::make_unique<SelectionService3D>(m_sceneManager3D);
     own.cameraController = std::make_unique<CameraController3D>();
     own.algorithmService = std::make_unique<AlgorithmApplicationService>(nullptr);
     own.settingsService = ApplicationCompositionRoot::getSettingsService();
@@ -276,6 +279,7 @@ void Workbench3D::create3DServices()
     m_services3D.algorithmService = own.algorithmService.get();
     m_services3D.settingsService = own.settingsService;
     m_services3D.settingsCoordinator = own.settingsCoordinator.get();
+    m_services3D.selectionService = own.selectionService.get();
 
     #ifdef ENABLE_GEOMODELCORE
     m_services3D.brepModelService = own.brepModelService.get();
@@ -441,8 +445,9 @@ void Workbench3D::on3DContextMenuRequested(const QPoint& globalPos)
     QMenu menu;
     // 基于命令中枢实时快照构建菜单（count / 锁定 来自与 3D 工具栏相同的单一事实来源），
     // 避免右键菜单再走一套独立的选择数据源导致显隐/灰显规则漂移（与 2D 一致）。
+    // 指针级读取统一走 sceneManager()->selectionManager()（单店合一后与视口选择同一事实源）
     CommandUiSnapshot3D snapshot;
-    const auto& selected = renderWidget->selectionManager().getSelectedEntities();
+    const auto& selected = m_sceneManager3D->selectionManager().getSelectedEntities();
     snapshot.hasSelection = !selected.empty();
     snapshot.selectionCount = static_cast<int>(selected.size());
     // 统一锁定判定：任一选中图元被锁定则视为有锁（与 2D 语义一致）
@@ -878,11 +883,11 @@ void Workbench3D::refreshPropertiesPanel3D()
         return;
     }
 
-    // 读取当前选中图元 id（数据来源：引擎场景 / SelectionManager）
+    // 读取当前选中图元 id（数据来源：引擎场景单店 — sceneManager()->selectionManager()）
     std::vector<Eg::EntityId> entityIds;
-    if (m_services3D.renderWidget)
+    if (m_sceneManager3D)
     {
-        const auto& selected = m_services3D.renderWidget->selectionManager().getSelectedEntities();
+        const auto& selected = m_sceneManager3D->selectionManager().getSelectedEntities();
         entityIds.reserve(selected.size());
         for (const Eg::SyMeshEntity* e : selected)
         {
@@ -891,14 +896,6 @@ void Workbench3D::refreshPropertiesPanel3D()
                 entityIds.push_back(e->id);
             }
         }
-    }
-    else if (m_sceneManager3D)
-    {
-        m_sceneManager3D->forEachSelectedEntityId(
-            [](Eg::EntityId id, void* ctx) {
-                static_cast<std::vector<Eg::EntityId>*>(ctx)->push_back(id);
-            },
-            &entityIds);
     }
 
     // 创建编辑会话（算法层）：持有图元 id，负责按需解析图元、应用修改
@@ -917,9 +914,9 @@ void Workbench3D::refreshSceneTreeRowsForSelection3D()
     }
 
     std::vector<Eg::EntityId> entityIds;
-    if (m_services3D.renderWidget)
+    if (m_sceneManager3D)
     {
-        const auto& selected = m_services3D.renderWidget->selectionManager().getSelectedEntities();
+        const auto& selected = m_sceneManager3D->selectionManager().getSelectedEntities();
         entityIds.reserve(selected.size());
         for (const Eg::SyMeshEntity* e : selected)
         {
@@ -928,14 +925,6 @@ void Workbench3D::refreshSceneTreeRowsForSelection3D()
                 entityIds.push_back(e->id);
             }
         }
-    }
-    else
-    {
-        m_sceneManager3D->forEachSelectedEntityId(
-            [](Eg::EntityId id, void* ctx) {
-                static_cast<std::vector<Eg::EntityId>*>(ctx)->push_back(id);
-            },
-            &entityIds);
     }
     if (entityIds.empty())
     {
@@ -1178,58 +1167,47 @@ void Workbench3D::applySceneTreeIncremental3D(const char* src)
 
 void Workbench3D::syncSceneTreeSelection3D()
 {
-    if (!m_scenePanel3D || !m_sceneManager3D || !m_services3D.renderWidget)
+    if (!m_scenePanel3D || !m_sceneManager3D || !m_services3D.selectionService)
     {
         return;
     }
 
-    // 从 SelectionManager3D 获取选中ID，而不是从 SceneManager3D
-    // 因为框选/点击选择直接操作的是 SelectionManager3D
-    auto& sel = m_services3D.renderWidget->selectionManager();
-    const auto& selectedEntities = sel.getSelectedEntities();
-
+    // id 级读取走 SelectionService（实现 ISelectionService），消除直接依赖 SelectionManager3D
     QSet<QString> selected;
-    for (const Eg::SyMeshEntity* entity : selectedEntities)
-    {
-        if (entity)
-        {
-            selected.insert(QString::number(entity->id));
-        }
-    }
+    m_services3D.selectionService->visitSelectedIds(
+        [](const char* id, void* ctx) {
+            static_cast<QSet<QString>*>(ctx)->insert(QString::fromUtf8(id));
+        },
+        &selected);
 
     m_scenePanel3D->setSelectedIds(selected);
 }
 
 void Workbench3D::applySceneTreeSelection3D(const QStringList& ids)
 {
-    if (!m_sceneManager3D || !m_services3D.renderWidget)
+    if (!m_sceneManager3D || !m_services3D.selectionService)
     {
         return;
     }
-    auto& sel = m_services3D.renderWidget->selectionManager();
 
-    // 收集后一次提交：逐个 addSelect 会让每个图元触发一次属性面板/状态栏刷新，
-    // 场景树里多选（尤其全选）时会形成成片的无效刷新
-    std::vector<Eg::SyMeshEntity*> meshes;
-    meshes.reserve(static_cast<size_t>(ids.size()));
+    // id 级入口收口 SelectionService（整体替换）
+    std::vector<const char*> cIds;
+    cIds.reserve(static_cast<size_t>(ids.size()));
+    std::vector<QByteArray> byteArrays;
+    byteArrays.reserve(static_cast<size_t>(ids.size()));
     for (const QString& id : ids)
     {
-        const auto eid = Eg::parseEntityId(id.toStdString());
-        if (!eid)
-        {
-            continue;
-        }
-        if (auto* mesh = m_sceneManager3D->findMeshById(*eid))
-        {
-            meshes.push_back(mesh);
-        }
+        byteArrays.push_back(id.toUtf8());
+        cIds.push_back(byteArrays.back().constData());
     }
-    // additive=false：整体替换，等价于原来的 clearSelection + 逐个 addSelect
-    sel.selectMany(meshes, false);
+    m_services3D.selectionService->selectMultiple(cIds.data(), cIds.size());
 
     // 选中变更不修改几何，通过调度器节流合并更新，避免 m_meshDirty 导致
     // gatherGeometry() 遍历所有图元
-    m_services3D.renderWidget->requestSceneUpdate();
+    if (m_services3D.renderWidget)
+    {
+        m_services3D.renderWidget->requestSceneUpdate();
+    }
     syncSceneTreeSelection3D();
     schedulePropertiesPanelRefresh3D();
 }
@@ -1302,9 +1280,9 @@ void Workbench3D::setSceneTreeVisibility3D(const QVector<qint64>& ids, bool visi
     m_sceneManager3D->setEntitiesVisible(entityIds, visible);
 
     // 隐藏图元时清除选择（3D 目前只支持清空全部选择）
-    if (!visible)
+    if (!visible && m_services3D.selectionService)
     {
-        m_sceneManager3D->clearSelection();
+        m_services3D.selectionService->clear();
     }
 
     // 可见性影响渲染，标记数据变更（经调度器节流）

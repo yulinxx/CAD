@@ -12,7 +12,7 @@
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Core/EntityClipboard.h"
 #include "Engine2D/Edit/UndoRedoManager.h"
-#include "Engine2D/Edit/IUndoRedoManager.h"
+#include "Engine/Edit/IUndoRedoManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Edit/LayerEditService.h"
 #include "Engine2D/Interaction/LayerManager.h"

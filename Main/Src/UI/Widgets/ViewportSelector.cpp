@@ -1,6 +1,6 @@
 #include "ViewportSelector.h"
 
-#include "ISelectionService.h"
+#include "UI/Services/ISelectionService.h"
 
 #include "Engine/Scene/ISceneContext.h"
 #include "Engine/SyEntity/SyEntity.h"

@@ -9,7 +9,7 @@
 #include "UI/Render/Camera2D.h"
 #include "ViewportNavigation2D.h"
 #include "SceneRefreshCoordinator.h"
-#include "ISelectionService.h"
+#include "UI/Services/ISelectionService.h"
 #include "SceneDocument2D.h"
 
 #include "UI2D/Operation/OperationBus.h"
