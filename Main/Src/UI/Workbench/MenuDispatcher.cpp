@@ -156,9 +156,3 @@ void MenuDispatcher::dispatch(const QString& commandId, const QVariantMap& param
     }
     m_workbench->dispatchCommand(commandId, params);
 }
-
-QString MenuDispatcher::commandIcon(const QString& commandId) const
-{
-    Q_UNUSED(commandId);
-    return QString();
-}

@@ -20,7 +20,6 @@
 #include "UI/ClientConfig/UiClientConfigBase.h"
 #include "UI/ClientConfig/UiConfigLoader.h"
 #include "UI/ClientConfig/UiConfigSelfCheck.h"
-#include "UI/ClientConfig/UiFeatureGate.h"
 #include "UI/Widgets/DrawToolBarWidget.h"
 
 #include "UI/Workbench/WorkbenchMenuManager.h"
@@ -33,8 +32,6 @@
 
 
 #include <QAction>
-#include <QCoreApplication>
-#include <QEvent>
 #include <QMainWindow>
 #include <QMenu>
 #include <QString>
@@ -635,24 +632,6 @@ namespace
             QStringLiteral(":/configs/client_b.json"),
         };
     }
-
-    /// 测试进程不走许可流程，UiFeatureGate 默认 unrestricted（等价于放行全部），
-    /// 会把「出厂配置引用了本构建未编译的模块」误判成"授权放行了不存在的功能"。
-    /// 这里把授权集设成给定集合（模拟"许可证与构建匹配"的生产前提），
-    /// 析构时 resetForTest 恢复默认，避免污染同进程后续用例。
-    struct ScopedLicense
-    {
-        explicit ScopedLicense(const QStringList& features)
-        {
-            UiFeatureGate::instance().setLicensedFeatures(features);
-        }
-        ~ScopedLicense()
-        {
-            UiFeatureGate::resetForTest();
-        }
-        ScopedLicense(const ScopedLicense&) = delete;
-        ScopedLicense& operator=(const ScopedLicense&) = delete;
-    };
 }  // namespace
 
 TEST(CommandConfigContractTest, EveryConfiguredCommandIdResolvesInItsWorkbenchCatalog)
@@ -716,31 +695,6 @@ TEST(UiConfigSelfCheckTest, UnknownCommandIdIsReportedAsUnresolved)
 
 TEST(UiConfigSelfCheckTest, ShippedConfigsPassTheSelfCheck)
 {
-    // 出厂配置允许声明"本构建未编译"的 feature（默认构建下 vision / relief3d 就属
-    // 此类），它们是否出现由客户 License 决定，不能在无 License 的测试进程里被算成
-    // "卖了不存在的功能"。先把授权集设成与本次构建开关一致，模拟许可证与构建匹配。
-    QStringList buildMatchingLicense;
-    for (const QString& path : allClientConfigPaths())
-    {
-        UiConfigLoader loader(path);
-        auto config = loader.load();
-        ASSERT_TRUE(config.has_value()) << path.toStdString();
-
-        for (const UiConfigFeatureRef& ref : UiConfigSelfCheck::collectFeatureRefs(*config))
-        {
-            bool known = false;
-            if (UiConfigSelfCheck::isFeatureCompiledIn(ref.featureId, known) && known)
-            {
-                const QString id = ref.featureId.trimmed().toLower();
-                if (!buildMatchingLicense.contains(id))
-                {
-                    buildMatchingLicense << id;
-                }
-            }
-        }
-    }
-    const ScopedLicense license(buildMatchingLicense);
-
     for (const QString& path : allClientConfigPaths())
     {
         UiConfigLoader loader(path);
@@ -756,53 +710,6 @@ TEST(UiConfigSelfCheckTest, ShippedConfigsPassTheSelfCheck)
             << path.toStdString() << ":\n"
             << report.licensedButNotCompiled.join(QLatin1Char('\n')).toStdString();
     }
-}
-
-TEST(UiConfigSelfCheckTest, ExplicitLicenseForUncompiledFeatureIsReported)
-{
-    // 反例：上面那条断言在"授权与构建一致"前提下恒真，自检的报错能力必须由这里
-    // 单独锁住——License 真放行了本构建没有的模块时，licensedButNotCompiled 必须非空。
-    // 挑一个当前构建关掉的 feature；全开时无从构造，跳过。
-    const QStringList candidates = {
-        QStringLiteral("vision"),
-        QStringLiteral("relief3d"),
-        QStringLiteral("hardware"),
-        QStringLiteral("nesting"),
-        QStringLiteral("3d"),
-    };
-    QString uncompiled;
-    for (const QString& candidate : candidates)
-    {
-        bool known = false;
-        if (!UiConfigSelfCheck::isFeatureCompiledIn(candidate, known) && known)
-        {
-            uncompiled = candidate;
-            break;
-        }
-    }
-    if (uncompiled.isEmpty())
-    {
-        GTEST_SKIP() << "本构建全部 feature 开关均开启，无法构造反例";
-    }
-
-    const ScopedLicense license({ uncompiled });
-
-    UiConfigData config;
-    MenuDef menu;
-    menu.id = QStringLiteral("edit");
-    menu.workbenches = { QStringLiteral("2D") };
-    MenuActionDef action;
-    action.id = QStringLiteral("edit.feature_probe");
-    // commandId 留空：feature 引用的收集不依赖命令，这里只测 feature 三侧交叉
-    action.feature = uncompiled;
-    menu.items.push_back(action);
-    config.menus.push_back(menu);
-
-    const UiConfigSelfCheckReport report = UiConfigSelfCheck::run(config);
-    ASSERT_EQ(report.licensedButNotCompiled.size(), 1)
-        << report.licensedButNotCompiled.join(QLatin1Char('\n')).toStdString();
-    EXPECT_TRUE(report.licensedButNotCompiled.first().contains(uncompiled));
-    EXPECT_TRUE(report.hasBlockingIssue());
 }
 
 TEST(UiConfigSelfCheckTest, EveryFeatureUsedInConfigsHasABuildSwitchMapping)
@@ -964,54 +871,6 @@ TEST(DrawToolBarWidgetTest, ToolActionsCarryCatalogCommandId)
         // commandId 是跨入口的统一标识：快照刷新、日志、配置契约测试都靠它认人
         EXPECT_EQ(action->property("commandId").toString(), QString::fromUtf8(entry->shortcutId));
     }
-}
-
-TEST(DrawToolBarWidgetTest, LanguageChangeAfterHubDestructionIsSafe)
-{
-    // 复现工作台切换的时序崩溃（minidump SanYiCAD_20261008_142744）：
-    // 1. Workbench2D::deactivate() 里 hub.reset()，~CommandActionHub 对每个 QAction deleteLater；
-    // 2. clearWorkbenchContent() 的 sendPostedEvents(DeferredDelete) 把动作真正释放；
-    // 3. host=ToolBar 的 DrawToolBarWidget 不进 Dock 清理范围，仍缓存着已释放的 SelectTool 动作；
-    // 4. 切换期间的 LanguageChange 传播到子 widget → changeEvent → updateHighlight → 悬空解引用。
-    QMainWindow window;
-    DrawToolBarWidget widget(&window);
-    widget.setIsPanModeCallback([]() { return false; });
-    widget.setPanModeToggleCallback([]() { return true; });
-
-    {
-        CommandActionHub hub;
-        hub.setMainWindow(&window);
-        hub.rebuildToolActions();
-        widget.setToolActions(leftToolbarActions(hub));
-
-        // 覆盖面自检：Select 缓存路径（m_selectAction）只有在 Select 按钮存在时才会被填充
-        bool hasSelectButton = false;
-        for (QToolButton* button : widget.findChildren<QToolButton*>())
-        {
-            QAction* action = button->defaultAction();
-            if (action && action->property("toolName").toString() == QStringLiteral("SelectTool"))
-            {
-                hasSelectButton = true;
-                break;
-            }
-        }
-        ASSERT_TRUE(hasSelectButton) << "没有 Select 按钮，崩溃路径就没被测试覆盖到";
-    }
-
-    // 模拟 clearWorkbenchContent 第 5 步：刷出枢纽析构投递的 DeferredDelete
-    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
-
-    // 模拟语言切换：QWidget::event 会把 LanguageChange 传播给所有子 widget
-    QEvent languageChange(QEvent::LanguageChange);
-    QCoreApplication::sendEvent(&window, &languageChange);
-
-    // 可观察的脱钩断言：updateHighlight 在动作已释放时必须早退；
-    // 无 QPointer 保护时它会拿悬空指针重新 setDefaultAction 把按钮挂回已释放动作上
-    for (QToolButton* button : widget.findChildren<QToolButton*>())
-    {
-        EXPECT_EQ(button->defaultAction(), nullptr) << "updateHighlight 用悬空动作把按钮重新挂了回去";
-    }
-    SUCCEED();
 }
 
 

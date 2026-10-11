@@ -1,30 +1,24 @@
 #pragma once
 
 #include "UiWorkbench.h"
+#include "Workbench2DSceneTreeManager.h"
+#include "Workbench2DContextMenuBuilder.h"
+#include "Workbench2DPropertiesPanelManager.h"
+#include "Workbench2DShortcutManager.h"
+#include "Workbench2DToolbarFactory.h"
+#include "Workbench2DViewportSetup.h"
 
 class QAction;
 class QMenu;
 class QTimer;
 class QContextMenuEvent;
 class CommandActionHub;
-class TopToolBar;
-class RightToolBar;
-class TextFontToolBar;
 class RenderViewport2D;
 class SceneTreePanel;
-class SceneTreeSceneObserver2D;
 class SceneMonitor;
-class ToolBarContextManager;
 class SettingsUiCoordinator2D;
 class OperationBus;
 struct CommandUiSnapshot;
-
-/// 2D 左右面板（Draw Tools / Layers）的承载样式
-enum class PanelHostStyle
-{
-    Toolbar,  ///< 固定工具栏（QToolBar 停靠在左右两侧）
-    Dock      ///< Dock 停靠面板（QDockWidget，默认）
-};
 
 /**
  * @class Workbench2D
@@ -79,6 +73,8 @@ public:
     /// 增量刷新场景树
     void applySceneTreeIncremental(const char* src = nullptr);
 
+    SceneTreePanel* scenePanel() const;
+
 private:
     /// 创建中央视口
     QWidget* createCentralViewport(WorkbenchWindow& window, PropertiesPanelWidget* properties);
@@ -88,10 +84,8 @@ private:
     void setupImportCallbacks(RenderViewport2D* vp, WorkbenchWindow& window);
     /// 创建工具栏
     void createToolbars(WorkbenchWindow& window);
-    /// 构建绘图工具栏动作
-    QVector<QAction*> buildDrawToolActions();
-    /// 构建支持的导入格式列表
-    static QStringList buildSupportedImportFormats(const QString& workbenchId);
+    /// 给工厂创建的右侧图层栏注入图层服务并接线
+    void setupRightToolbarLayers();
     /// 绑定并填充 2D 场景树面板
     void setupSceneTree(WorkbenchWindow& window);
     /// 引擎场景变更兜底
@@ -112,61 +106,34 @@ private:
     void setSceneTreeVisibility(const QVector<qint64>& ids, bool visible);
     /// 从场景树批量设置锁定（整数 id）
     void setSceneTreeLock(const QVector<qint64>& ids, bool locked);
-    /// 刷新属性面板
-    void refreshPropertiesPanel();
-    /// 属性面板编辑后刷新场景树选中行（Name 等不推进结构签名）
-    void refreshSceneTreeRowsForSelection2D();
+    /// 视口右键菜单请求（转发给右键菜单构建器）
+    void onViewportContextMenu(QContextMenuEvent* event);
     /// 应用选择上下文到各 UI 组件
     void applySelectionContext(const CommandUiSnapshot& snapshot);
 
 private:
     /// 命令动作中枢
     std::unique_ptr<CommandActionHub> m_commandHub;
-    /// 视口右键菜单请求
-    void onViewportContextMenu(QContextMenuEvent* event);
-    /// 按客户配置构建 2D 右键菜单
-    QMenu* buildConfiguredContextMenu(const QString& contextMenuId, bool hasSelection);
-    TopToolBar* m_topToolBar{ nullptr };              ///< 顶部编辑工具栏
-    QToolBar* m_textFontToolBar{ nullptr };           ///< 文字编辑字体工具栏
-    TextFontToolBar* m_textFontToolBarWidget{ nullptr };
-    RightToolBar* m_rightToolBar{ nullptr };          ///< 右侧工具栏
     PanelHostStyle m_panelHostStyle{ PanelHostStyle::Toolbar };  ///< 左右面板承载样式
     RenderViewport2D* m_viewport{ nullptr };         ///< 2D 渲染视口
-    SceneTreePanel* m_scenePanel2D{ nullptr };        ///< 2D 场景树面板
-    std::unique_ptr<SceneTreeSceneObserver2D> m_sceneTreeObserver;
+    std::unique_ptr<Workbench2DSceneTreeManager> m_sceneTreeManager;
+    std::unique_ptr<Workbench2DContextMenuBuilder> m_contextMenuBuilder;
+    std::unique_ptr<Workbench2DPropertiesPanelManager> m_propertiesManager;
+    std::unique_ptr<Workbench2DShortcutManager> m_shortcutManager;
+    std::unique_ptr<Workbench2DToolbarFactory> m_toolbarFactory;
+    std::unique_ptr<Workbench2DViewportSetup> m_viewportSetup;
     SceneMonitor* m_sceneMonitor{ nullptr };
     QPointer<QObject> m_uiStateConnections;                ///< 命令 UI 刷新连线句柄
-    QTimer* m_sceneTreeRefreshTimer{ nullptr };      ///< 场景树重建防抖定时器
-    const char* m_sceneTreeRefreshSource{ nullptr };        ///< 场景树重建触发来源
-    uint64_t m_sceneTreeCursor{ 0 };                       ///< 场景树增量游标
-    bool m_sceneTreeForceRefresh{ false };                  ///< 强制全量刷新标志
-    /// applySceneTreeIncremental 重入标志：分类/追加期间会触发嵌套的场景通知，
-    /// 嵌套调用读到的游标还是外层尚未推进的旧值，会把同一批变更整表再扫一遍。
-    bool m_sceneTreeIncrementalBusy{ false };
-    /// 场景树延迟重建标记（setData 回调链中 scheduleTreeRefresh 合并，避免 delete this）
-    bool m_treeRefreshPending{ false };
-    /// 属性面板重建节流定时器：active 期间的多次请求合并为窗口末尾一次
-    QTimer* m_propertiesRefreshTimer{ nullptr };
-    /// 请求一次属性面板重建（节流合并，非每请求一个 singleShot）
-    void schedulePropertiesPanelRefresh();
-    /// 场景树结构签名
-    std::size_t m_lastSceneTreeEntityCount{ 0 };
-    uint64_t m_lastSceneTreeStructureRevision{ 0 };
-    uint64_t m_lastSceneTreeTopologyRevision{ 0 };
     QPointer<StatusBar> m_statusBar2D;  ///< 2D 状态栏 widget
 
     /// 2D 设置协调器
     std::unique_ptr<SettingsUiCoordinator2D> m_settingsCoordinator;
 
-    /// 工具栏上下文管理器
-    std::unique_ptr<ToolBarContextManager> m_contextManager;
-
-    /// 网格显隐 metadata 连接
-    QMetaObject::Connection m_gridVisibilityMetadataConn;
-
     /// 本工作台在 attach 期间建立的 Qt 连接，deactivate 时整批 disconnect（RAII 批量回收）
     std::vector<QMetaObject::Connection> m_workbenchConnections;
-
-    /// 由选择上下文快照推导应切换到的工具栏上下文
-    ToolBarContext determineContextFromSelection(const CommandUiSnapshot& snapshot) const;
 };
+
+inline SceneTreePanel* Workbench2D::scenePanel() const
+{
+    return m_sceneTreeManager ? m_sceneTreeManager->panel() : nullptr;
+}

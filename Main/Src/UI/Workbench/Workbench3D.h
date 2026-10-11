@@ -105,8 +105,7 @@ private:
     /// 属性面板编辑后把选中图元的 Name/Visible 写回场景树行（结构签名未变，不能走全量）
     void refreshSceneTreeRowsForSelection3D();
 
-    /// 只在结构签名变化时重建场景树（批量操作防抖）；
-    /// 结构未变时仍消费变更流中的可见性/锁定积压，避免日志堆积与树不同步
+    /// 只在结构签名变化时重建场景树（批量操作防抖）
     void refreshSceneTree3DIfNeeded();
 
     /// 仅同步面板选中高亮（选择变化，避免重建树导致折叠丢失）

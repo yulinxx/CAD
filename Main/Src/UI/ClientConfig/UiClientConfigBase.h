@@ -4,7 +4,7 @@
  * @file UiClientConfigBase.h
  * @brief 客户化 UI 配置数据结构定义
  *
- * 实现说明见 Docs/01-当前架构/UI定制.md。
+ * 与 Docs/01-当前架构/UI定制变更设计方案.md 第 6.1 节对应。
  * 所有 JSON 配置解析后的 C++ 数据结构在此统一声明，
  * 供 UiConfigLoader 填充、UiLayoutBuilder 消费。
  */

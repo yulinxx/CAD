@@ -5,7 +5,6 @@
 #include <QString>
 #include <QIcon>
 #include <QAction>
-#include <QPointer>
 #include <functional>
 
 class QToolButton;
@@ -65,12 +64,6 @@ private:
     PanModeCallback m_panModeToggleCallback;
     IsPanModeCallback m_isPanModeCallback;
     QToolButton* m_selectButton = nullptr;
-    // 借用的中枢 QAction（parent 是主窗口，生命周期归 CommandActionHub）。
-    // 枢纽 reset() 时会 deleteLater 这些动作，切换工作台的
-    // sendPostedEvents(DeferredDelete) 随即把它们真正释放——
-    // 而本 widget 若未随 Dock 销毁（host=ToolBar 时只挂在主窗口上），
-    // 仍会收到 LanguageChange 并走进 updateHighlight。
-    // 必须用 QPointer 跟踪，悬空时自动置空、由 updateHighlight 的空判保护。
-    QPointer<QAction> m_selectAction;
+    QAction* m_selectAction = nullptr;
     QAction* m_panAction = nullptr;
 };

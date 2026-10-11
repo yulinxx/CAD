@@ -230,33 +230,6 @@ void UiConfigLoader::mergeConfig(UiConfigData& base, const UiConfigData& overrid
         });
         if (it != base.menus.end())
         {
-            // P1-5: 检测被静默丢失的条目（被整条菜单替换时）
-            const MenuDef oldMenu = *it;
-            for (const auto& oldItem : oldMenu.items)
-            {
-                if (std::holds_alternative<MenuActionDef>(oldItem))
-                {
-                    const MenuActionDef& oldAction = std::get<MenuActionDef>(oldItem);
-                    bool found = false;
-                    for (const auto& newItem : menu.items)
-                    {
-                        if (std::holds_alternative<MenuActionDef>(newItem))
-                        {
-                            const MenuActionDef& newAction = std::get<MenuActionDef>(newItem);
-                            if (newAction.id == oldAction.id)
-                            {
-                                found = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (!found)
-                    {
-                        SY_WARNF("[UiConfigLoader] menu '%s' 合并替换导致条目丢失: %s",
-                            qPrintable(menu.id), qPrintable(oldAction.id));
-                    }
-                }
-            }
             *it = menu;
         }
         else

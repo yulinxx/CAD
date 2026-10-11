@@ -131,8 +131,6 @@ extern "C"
 
     LICENSE_C_API LICENSE_API int License_GetLastErrorMessage(char* buffer, size_t bufferSize);
 
-    LICENSE_C_API LICENSE_API const char* License_StatusText(int32_t status);
-
 #ifdef __cplusplus
 }
 #endif

@@ -19,8 +19,6 @@
 namespace RenderAbstraction {
 
 // ==================== 句柄 ====================
-// 用 uint64_t 值包装，与 RenderX 的 enum class : uint64_t 等大
-// 但类型安全，防止误传
 
 struct DeviceHandle { uint64_t value = 0; };
 /// 保留式绘制列表句柄：由后端持有场景状态，只在图元变化时 upsert 槽位

@@ -52,8 +52,8 @@
 - A 之前写测试，等于在错误的地基上盖楼——测试失败你分不清是后端错还是测试错。
 - B 是护栏：Metal 的改动若顺手动了 `rhiCore.h` 或 RT 层，Null 后端会先替你暴露出来，
   比等到 Metal 真机调试便宜得多。
-- C 之前**不要碰优化**。当前最大的不确定性是「代码能不能跑」，不是「跑得快不快」——
-  已排除的优化方案见《百万级矢量剔除-空间索引设计.md》§14。
+- C 之前**不要碰优化**。当前最大的不确定性是「代码能不能跑」，不是「跑得快不快」。
+  此前两次性能优化返工（热冷分离、紧凑 bounds）都是因为「没验证前提就动手」。
 - D 之前不要做 E。GUI 没接上时，性能数据没有真实负载，量出来的都是合成场景。
 
 ---
@@ -488,7 +488,7 @@ Metal 后端只有测试能跑、GUI 用不上，是因为宿主侧还没接：
 
 这是最容易出事的一条纪律。**同一个仓库同时在 Windows 上构建**，而在 Mac 上
 「能编过」不代表 Windows 上也能编过——反过来，一个为了 Mac 顺手改的共享接口，
-会让 Windows 侧立刻断链（「Mac 能编、Windows 链接失败」这类依赖就是这么来的）。
+会让 Windows 侧立刻断链（历史上出现过「Mac 能编、Windows 链接失败」的偶然依赖）。
 
 按「是否可以动」分三类：
 
@@ -531,7 +531,7 @@ cmake -S Renderx -B Renderx/build ; cmake --build Renderx/build --target RenderX
 用几个三角形的合成场景测出来的数字没有任何指导意义。
 
 **判定纪律**：改动前后各测 3 次取中位数；差异小于 5% 视为无差异，
-**不要为无差异的改动增加复杂度**。
+**不要为无差异的改动增加复杂度**。这是此前两次返工的直接教训。
 
 ---
 
@@ -557,10 +557,11 @@ cmake -S Renderx -B Renderx/build ; cmake --build Renderx/build --target RenderX
 - [ ] **深度范围**：GL 裁剪空间 z ∈ [-1,1]，Metal 为 [0,1]。若宿主的投影矩阵按
       GL 约定生成，Metal 上会出现远平面消失或 z-fighting。**这是最隐蔽的一条**，
       症状不报错、只画错。处理方式：在 Metal 侧对 z 做重映射，或让宿主按平台生成矩阵。
-- [x] **线框填充**：macOS 的 Metal
+- [x] **线框填充**（2026-09-16 完成）**：原先这条写的是「Metal 没有多边形线框模式，
+      `createGraphicsPipeline` 会降级为实心并记 warn」——该结论**已证伪**。macOS 的 Metal
       支持 `MTLTriangleFillModeLines`，只是它是**编码器状态**（不是管线描述符属性），
       因此要在 `bindPipeline` 里随管线下发，并在 `beginRenderPass` 清管线句柄（每个 pass
-      新建编码器、状态不继承）。`Capabilities::wireframeFill` 为 true，
+      新建编码器、状态不继承）。`Capabilities::wireframeFill` 已改为 true，
       `Mesh3DWire` / `Highlight3D` 直接可用，无需上层三角化线框。
 - [ ] `setDepthBias` 已接（`bindPipeline` 里），验证 3D gizmo 不再 z-fighting
 

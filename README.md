@@ -31,12 +31,9 @@ SanYiCAD/
 │   └── 3D/                   # 3D 场景管理、网格操作
 ├── Renderx/                  # 渲染 DLL（RenderX.dll，纯 C API + POD 契约）
 │   ├── include/render/       # 对外唯一公共头 renderx.h
-│   ├── src/rhi/              # RHI 抽象：实现 gl/ metal/ null/ 三个后端
+│   ├── src/rhi/              # RHI 抽象：目前实现 gl/ 与 null/ 两个后端
 │   ├── src/rt/               # Runtime / Session / 增量渲染 / 字形图集
-│   └── src/shader/           # 内嵌着色器（构建期打包进 DLL；Metal 侧编译 MSL）
-├── RenderBridge/             # 宿主侧渲染装配层：runtime/surface/session 生命周期归口
-│   │                         # 2D/3D 视口的公共创建/销毁逻辑与后端窗口契约分叉
-├── RenderAbstraction/        # 渲染抽象接口（纯头文件）：IRenderFactory/Device/Surface/Scene
+│   └── src/shader/           # 内嵌着色器（构建期打包进 DLL）
 ├── UI/                       # UI 组件库
 │   ├── Common/               # 通用 UI 组件、状态管理、命令内核
 │   ├── 2D/                   # 2D 工作台 UI、工具面板、属性面板
@@ -87,17 +84,12 @@ SanYiCAD/
 
 | 模块 | 职责 | 技术栈 | 依赖 |
 |------|------|--------|------|
-| **RenderX** | 渲染 DLL（纯 C API + POD 契约，无 Engine / Qt 依赖） | C API + OpenGL/Metal | 无 |
-| **RenderBridge** | 宿主侧渲染装配：runtime/surface/session 生命周期归口，2D/3D 视口公共创建/销毁逻辑 | C++17 | RenderX |
-| **RenderAbstraction** | 渲染抽象接口（纯头文件）：IRenderFactory/Device/Surface/Scene，任何渲染后端须且仅须通过这些类型通信 | C++17 头文件 | 无 |
+| **RenderX** | 唯一渲染 DLL（纯 C API + POD 契约，无 Engine / Qt 依赖） | C API + OpenGL | 无 |
 
-> 渲染架构分三层：`RenderAbstraction`（抽象接口，纯头文件）→ `RenderBridge`（宿主装配层，持有 IRenderDevice/Surface/Scene）→ `RenderX`（GPU 侧实现，gl/metal/null 三个 RHI 后端）。
->
-> 后端现状：
-> - **OpenGL**：跨平台生产后端，已实现
-> - **Metal**：Apple 平台生产后端，已实现（src/rhi/metal/，Objective-C++，MSL 着色器构建期编译为 .metallib 嵌入 DLL）
-> - **Null**：不产生 GPU 调用，用于单测与无头环境，已实现
-> - **Vulkan**：Phase 8 占位，`isBackendAvailable` 显式返回 false，`createDevice` 报错返回 nullptr，**不做静默回退**。请勿把枚举取值当作可用后端。
+> 后端现状：只有 **OpenGL** 与 **Null**（无头/单测）两个后端已实现。
+> `renderx.h` 的 `Backend` 枚举里保留了 `Metal`（Phase 7）与 `Vulkan`（Phase 8）取值，
+> 但 `isBackendAvailable` 对二者显式返回 false，`createDevice` 直接报错返回 nullptr，
+> **不做静默回退**。请勿把枚举取值当作可用后端。
 >
 > 已删除的旧模块：`RenderCommon` / `Render2D` / `Render3D` / `Render/Core` / `UiRenderCore`。
 > 它们的职责已分别落到 RenderX（GPU 侧）与 `Main/Src/UI/Render`（宿主侧场景刷新与离散化）。
@@ -149,35 +141,29 @@ SanYiCAD/
           ┌───────────────────────────────┼───────────────────────────────┐
           │                               │                               │
           ▼                               ▼                               ▼
-    ┌───────────────┐             ┌───────────────┐             ┌───────────────┐
-    │    UI2D       │             │    UI3D       │             │   Hardware    │
-    │  2D 工作台    │             │  3D 工作台    │             │  激光控制     │
-    └───────┬───────┘             └───────┬───────┘             └───────┬───────┘
-            │                             │                             │
-            ▼                             ▼                             │
-    ┌───────────────┐             ┌───────────────┐                     │
-    │   UICommon    │             │  RenderBridge │                     │
-    │  通用 UI 组件 │             │ 宿主渲染装配  │                     │
-    └───────┬───────┘             └───────┬───────┘                     │
-            │                             │                             │
-            ▼                             ▼                             │
-    ┌───────────────┐             ┌───────────────┐                     │
-    │   Engine2D    │             │    RenderX    │◄─ RenderAbstraction │
-    │ 2D 几何引擎   │             │ 渲染 DLL      │  （抽象接口）       │
-    └───────┬───────┘             └───────────────┘                     │
-            │                             │                             │
-            ▼                             │                             │
-    ┌───────────────┐                   │                             │
-    │   Engine3D    │                   │                             │
-    │ 3D 场景引擎   │                   │                             │
-    └───────┬───────┘                   │                             │
-            │                             │                             │
-            └───────────────┬─────────────┘                             │
-                            ▼                                           │
-                    ┌───────────────┐                                   │
-                    │  EngineCommon │                                   │
-                    │  通用几何工具 │                                   │
-                    └───────┬───────┘                                   │
+   ┌───────────────┐             ┌───────────────┐             ┌───────────────┐
+   │    UI2D       │             │    UI3D       │             │   Hardware    │
+   │  2D 工作台    │             │  3D 工作台    │             │  激光控制     │
+   └───────┬───────┘             └───────┬───────┘             └───────┬───────┘
+           │                             │                             │
+           ▼                             ▼                             │
+   ┌───────────────┐             ┌───────────────┐                     │
+   │   UICommon    │◄────────────│    RenderX    │                     │
+   │  通用 UI 组件 │             │ 渲染 DLL(C API)│                     │
+   └───────┬───────┘             └───────────────┘                     │
+           │                                                           │
+           ▼                                                           │
+   ┌───────────────┐             ┌───────────────┐                     │
+   │   Engine2D    │             │   Engine3D    │                     │
+   │ 2D 几何引擎   │             │ 3D 场景引擎   │                     │
+   └───────┬───────┘             └───────┬───────┘                     │
+           │                             │                             │
+           └───────────────┬─────────────┘                             │
+                           ▼                                           │
+                   ┌───────────────┐                                   │
+                   │  EngineCommon │                                   │
+                   │  通用几何工具 │                                   │
+                   └───────┬───────┘                                   │
                            │                                           │
                            ▼                                           │
                    ┌───────────────┐                                   │
@@ -283,30 +269,19 @@ set(QT_VERSION_MAJOR 6 CACHE STRING "Major version of Qt")
 set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.11.1/msvc2022_64" CACHE PATH "Qt installation directory")
 ```
 
-2. 编译选项配置（定义于 `Config.cmake`）：
+2. 编译选项配置：
 
 | 选项 | 默认值 | 说明 |
 |------|--------|------|
-| `BUILD_RENDERX` | ON | 渲染引擎（RenderX DLL） |
-| `BUILD_UI2D` | ON | 2D 用户界面（始终 ON，Main 硬依赖） |
-| `BUILD_UI3D` | 由 `SANYI_UI_DIMENSIONS` / `BUILD_UI_DIMENSION` 控制 | 3D 用户界面 |
-| `BUILD_NESTING` | ON | 排样模块 |
-| `BUILD_CRASHHANDLER` | ON | 崩溃捕获 |
-| `BUILD_HARDWARE` | OFF | 激光硬件控制模块 |
-| `BUILD_ENGRAVING` | OFF | 雕刻工艺模块 |
-| `BUILD_GEOMODELCORE` | OFF | OpenCASCADE 几何建模 |
+| `BUILD_HARDWARE` | ON | 激光硬件控制模块 |
+| `BUILD_ENGRAVING` | ON | 雕刻工艺模块 |
+| `BUILD_GEOMODELCORE` | ON | OpenCASCADE 几何建模 |
 | `BUILD_VISION` | OFF | 视觉模块 |
 | `BUILD_NETWORK` | OFF | 网络同步模块 |
-| `BUILD_PYTHON` | OFF | Python 集成（PythonHost） |
+| `BUILD_SANYI_RENDER` | ON | 独立渲染 DLL |
 | `BUILD_KEYGEN_TOOL` | OFF | 注册码生成工具 |
-| `BUILD_ALL_TESTS` | OFF | 所有单元测试总开关（便捷开关，开启后逐模块 FORCE 为 ON） |
-| `BUILD_PERF_BENCHMARK` | ON | 百万图元性能基准 |
-| `BUILD_RENDER_BENCHMARK` | ON | 无头渲染帧路径基准 |
-| `SY_ENABLE_METAL_VIEWPORT` | 由平台决定 | Metal 原生视口（仅 Apple 平台） |
-
-> 注意：`BUILD_UI2D` 不支持关闭（Main 硬依赖 UI2D，无桩回退）。
-> 各模块测试开关（`BUILD_ENGINE2D_TESTS` 等）在 `BUILD_ALL_TESTS=ON` 时被
-> FORCE 为 ON，单独配置时以 `Config.cmake` 中的 FORCE 值为准。
+| `BUILD_MAIN_TESTS` | OFF | 主应用集成测试 |
+| `BUILD_ALL_TESTS` | OFF | 所有单元测试 |
 
 ### 编译
 
@@ -431,18 +406,13 @@ void OnSave() {
 
 | 后端类型 | 说明 | 状态 |
 |----------|------|------|
-| OpenGL | 跨平台硬件加速，生产后端 | 已实现（默认，跨平台） |
-| Metal | Apple 平台硬件加速，生产后端 | 已实现（仅 Apple 平台编译；非 Apple 平台 `isBackendAvailable` 返回 false，`createDevice` 报错不静默回退） |
+| OpenGL | 跨平台硬件加速，当前唯一的生产后端 | 已实现（默认） |
 | Null | 不产生任何 GPU 调用，用于单测与无头环境 | 已实现 |
-| Vulkan | 新一代图形 API | 未实现（Phase 8 占位，选中即报错） |
+| Metal | Apple 平台硬件加速 | 未实现（Phase 7，枚举占位） |
+| Vulkan | 新一代图形 API | 未实现（Phase 8，枚举占位） |
 
 选择未实现的后端时，`rxRuntimeCreate` / `createDevice` 会通过 `logCallback`
 报明原因并返回 nullptr，不会退化成 Null 后端画出一片黑屏。
-
-> 宿主视口通过编译期开关 `SY_ENABLE_METAL_VIEWPORT` 把具体后端显式传给
-> Runtime（见根 CMakeLists），Runtime 解析 Auto 之前就已确定后端——因此
-> Metal 的进程级 Runtime 共享（设备/管线预热/字形图集/GeometryStore）只在
-> Apple 平台生效。
 
 ---
 
@@ -496,4 +466,4 @@ void OnSave() {
 | UI 层 | ✅ 稳定 | 2D/3D 工作台功能完整 |
 | 功能模块 | ✅ 稳定 | FileIO/Nesting/Hardware/Engraving |
 | Python | ⚠️ 开发中 | PythonHost 基础框架完成 |
-| 渲染后端 | ✅ 活跃开发 | OpenGL（跨平台）与 Metal（Apple）已实现；Null 用于单测；Vulkan 为 Phase 8 占位，选中即报错 |
+| 渲染后端 | ⚠️ 开发中 | 仅 OpenGL 与 Null 已实现；Vulkan/Metal 只是枚举占位，选中即报错 |

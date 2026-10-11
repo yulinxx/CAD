@@ -10,6 +10,7 @@
 #include "UiStateCenter.h"
 #include "UiWorkbench.h"
 #include "WorkbenchWindow.h"
+#include "WorkbenchMenuManager.h"
 #include "UI2D/Operation/OperationBus.h"
 
 #if BUILD_UI3D
@@ -95,6 +96,13 @@ void UiShellHost::initializeAndShow()
     m_workbench->attachToWindow(*m_mainWindow);
     SY_DEBUG("[UiShellHost] activating workbench");
     m_workbench->activate();
+
+    // 关键：工作台 attachToWindow 后命令中枢才就绪，必须在此重建菜单，
+    // 否则菜单构建时 commandAvailable 会因 m_commandDispatcher 为空而全量过滤。
+    if (m_mainWindow && m_mainWindow->menuManager())
+    {
+        m_mainWindow->menuManager()->rebuildAllMenus();
+    }
 
     m_mainWindow->setWorkbenchFactory([this](const QString& id) -> UiWorkbench* {
         return resolveWorkbench(id);

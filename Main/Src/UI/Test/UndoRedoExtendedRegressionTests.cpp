@@ -49,8 +49,8 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_RestoresAllProperties)
     // 删除
     auto* entityInScene = scene.findSyEntityById(lineId);
     ASSERT_NE(entityInScene, nullptr);
-    const Eg::EntityId delId = entityInScene->id;
-    undoMgr.executeCommand(Eg::createDeleteEntitiesCommand(&scene, &delId, 1, "Delete"));
+    auto cmd = std::make_unique<UndoRedoManager::DeleteEntityCommand>(&scene, entityInScene);
+    undoMgr.executeCommand(std::move(cmd).release());
     EXPECT_EQ(scene.getEntityCount(), 0u);
 
     // 撤销删除
@@ -94,8 +94,8 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_PolygonAttributes)
     // 删除
     auto* entityInScene = scene.findSyEntityById(polyId);
     ASSERT_NE(entityInScene, nullptr);
-    const Eg::EntityId delId = entityInScene->id;
-    undoMgr.executeCommand(Eg::createDeleteEntitiesCommand(&scene, &delId, 1, "Delete"));
+    auto cmd = std::make_unique<UndoRedoManager::DeleteEntityCommand>(&scene, entityInScene);
+    undoMgr.executeCommand(std::move(cmd).release());
     EXPECT_EQ(scene.getEntityCount(), 0u);
 
     // 撤销
@@ -132,8 +132,8 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_CircleAttributes)
     // 删除
     auto* entityInScene = scene.findSyEntityById(circleId);
     ASSERT_NE(entityInScene, nullptr);
-    const Eg::EntityId delId = entityInScene->id;
-    undoMgr.executeCommand(Eg::createDeleteEntitiesCommand(&scene, &delId, 1, "Delete"));
+    auto cmd = std::make_unique<UndoRedoManager::DeleteEntityCommand>(&scene, entityInScene);
+    undoMgr.executeCommand(std::move(cmd).release());
     EXPECT_EQ(scene.getEntityCount(), 0u);
 
     // 撤销
@@ -163,8 +163,8 @@ TEST(UndoRedoExtendedRegressionTest, DrawUndo_EntityRemoved)
     Eg::EntityId lineId = line->id;
 
     // 绘图（添加图元）
-    const Eg::SyEntity* addedEntities[] = { line.get() };
-    undoMgr.executeCommand(Eg::createAddEntitiesCommand(&scene, addedEntities, 1, "Add"));
+    auto cmd = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line));
+    undoMgr.executeCommand(std::move(cmd).release());
     EXPECT_EQ(scene.getEntityCount(), 1u);
     EXPECT_NE(scene.findSyEntityById(lineId), nullptr);
 
@@ -195,8 +195,8 @@ TEST(UndoRedoExtendedRegressionTest, ImportBatch_UndoRemovesAll)
         auto line = std::make_unique<Eg::SyLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i * 10, 10.0 + i * 10) });
         ids.push_back(line->id);
-        const Eg::SyEntity* addedEntities[] = { line.get() };
-        undoMgr.executeCommand(Eg::createAddEntitiesCommand(&scene, addedEntities, 1, "Add"));
+        auto cmd = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line));
+        undoMgr.executeCommand(std::move(cmd).release());
     }
     undoMgr.endBatch();
 
@@ -233,8 +233,8 @@ TEST(UndoRedoExtendedRegressionTest, SelectionState_DrawUndoSelectionCleared)
     // 删除
     auto* entityInScene = scene.findSyEntityById(lineId);
     ASSERT_NE(entityInScene, nullptr);
-    const Eg::EntityId delId = entityInScene->id;
-    undoMgr.executeCommand(Eg::createDeleteEntitiesCommand(&scene, &delId, 1, "Delete"));
+    auto cmd = std::make_unique<UndoRedoManager::DeleteEntityCommand>(&scene, entityInScene);
+    undoMgr.executeCommand(std::move(cmd).release());
     EXPECT_EQ(scene.getSelectedEntityCount(), 0u);
 
     // undo: selection state is not auto-restored
@@ -275,8 +275,8 @@ TEST(UndoRedoExtendedRegressionTest, SelectionState_MultipleSelectAfterUndo)
     // 删除 id2: 选中图元被删除，选择计数归零
     auto* entity2 = scene.findSyEntityById(id2);
     ASSERT_NE(entity2, nullptr);
-    const Eg::EntityId delId = entity2->id;
-    undoMgr.executeCommand(Eg::createDeleteEntitiesCommand(&scene, &delId, 1, "Delete"));
+    auto cmd = std::make_unique<UndoRedoManager::DeleteEntityCommand>(&scene, entity2);
+    undoMgr.executeCommand(std::move(cmd).release());
     EXPECT_EQ(scene.getSelectedEntityCount(), 0u);
 
     // undo: entity restored but selection state is not auto-restored
@@ -303,8 +303,8 @@ TEST(UndoRedoExtendedRegressionTest, DirtyState_AfterUndoRedo)
     // 删除
     auto* entityInScene = scene.findSyEntityById(lineId);
     ASSERT_NE(entityInScene, nullptr);
-    const Eg::EntityId delId = entityInScene->id;
-    undoMgr.executeCommand(Eg::createDeleteEntitiesCommand(&scene, &delId, 1, "Delete"));
+    auto cmd = std::make_unique<UndoRedoManager::DeleteEntityCommand>(&scene, entityInScene);
+    undoMgr.executeCommand(std::move(cmd).release());
 
     // 撤销
     undoMgr.undo();
@@ -328,8 +328,8 @@ TEST(UndoRedoExtendedRegressionTest, BatchImport_MultiRoundUndoRedo)
     {
         auto line = std::make_unique<Eg::SyLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0, 10.0) });
-        const Eg::SyEntity* addedEntities[] = { line.get() };
-        undoMgr.executeCommand(Eg::createAddEntitiesCommand(&scene, addedEntities, 1, "Add"));
+        auto cmd = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line));
+        undoMgr.executeCommand(std::move(cmd).release());
     }
     undoMgr.endBatch();
     EXPECT_EQ(scene.getEntityCount(), 2u);
@@ -348,8 +348,8 @@ TEST(UndoRedoExtendedRegressionTest, BatchImport_MultiRoundUndoRedo)
     {
         auto line = std::make_unique<Eg::SyLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0, 10.0) });
-        const Eg::SyEntity* addedEntities[] = { line.get() };
-        undoMgr.executeCommand(Eg::createAddEntitiesCommand(&scene, addedEntities, 1, "Add"));
+        auto cmd = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line));
+        undoMgr.executeCommand(std::move(cmd).release());
     }
     undoMgr.endBatch();
     EXPECT_EQ(scene.getEntityCount(), 4u);
@@ -369,8 +369,8 @@ TEST(UndoRedoExtendedRegressionTest, DrawAfterUndo_EntityCountCorrect)
 
     auto line1 = std::make_unique<Eg::SyLine>();
     line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
-    const Eg::SyEntity* addedEntities[] = { line1.get() };
-    undoMgr.executeCommand(Eg::createAddEntitiesCommand(&scene, addedEntities, 1, "Add"));
+    auto cmd1 = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line1));
+    undoMgr.executeCommand(std::move(cmd1).release());
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
     // 撤销
@@ -380,8 +380,8 @@ TEST(UndoRedoExtendedRegressionTest, DrawAfterUndo_EntityCountCorrect)
     // 重新绘制
     auto line2 = std::make_unique<Eg::SyLine>();
     line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
-    const Eg::SyEntity* addedEntities2[] = { line2.get() };
-    undoMgr.executeCommand(Eg::createAddEntitiesCommand(&scene, addedEntities2, 1, "Add"));
+    auto cmd2 = std::make_unique<UndoRedoManager::AddEntityCommand>(&scene, std::move(line2));
+    undoMgr.executeCommand(std::move(cmd2).release());
     EXPECT_EQ(scene.getEntityCount(), 1u);
 }
 
@@ -524,8 +524,7 @@ TEST(UndoRedoExtendedRegressionTest, RedoStackClearedOnNewCommand)
     // 第一个操作：删除
     auto* entity = scene.findSyEntityById(lineId);
     ASSERT_NE(entity, nullptr);
-    const Eg::EntityId delId = entity->id;
-    undoMgr.executeCommand(Eg::createDeleteEntitiesCommand(&scene, &delId, 1, "Delete"));
+    undoMgr.executeCommand(std::make_unique<UndoRedoManager::DeleteEntityCommand>(&scene, entity).release());
     EXPECT_EQ(scene.getEntityCount(), 0u);
 
     // 撤销
@@ -600,8 +599,8 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_SelectionViaSceneManager)
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
     auto* entity = scene.findSyEntityById(lineId);
-    const Eg::EntityId delId = entity->id;
-    undoMgr.executeCommand(Eg::createDeleteEntitiesCommand(&scene, &delId, 1, "Delete"));
+    auto cmd = std::make_unique<UndoRedoManager::DeleteEntityCommand>(&scene, entity);
+    undoMgr.executeCommand(std::move(cmd).release());
 
     EXPECT_EQ(scene.getSelectedEntityCount(), 0u);
 
@@ -635,8 +634,8 @@ TEST(UndoRedoExtendedRegressionTest, UndoRedo_ImportEntitySelectionRestore)
     // 删除
     auto* entity = scene.findSyEntityById(lineId);
     ASSERT_NE(entity, nullptr);
-    const Eg::EntityId delId = entity->id;
-    undoMgr.executeCommand(Eg::createDeleteEntitiesCommand(&scene, &delId, 1, "Delete"));
+    auto cmd = std::make_unique<UndoRedoManager::DeleteEntityCommand>(&scene, entity);
+    undoMgr.executeCommand(std::move(cmd).release());
     EXPECT_EQ(scene.getEntityCount(), 0u);
     EXPECT_EQ(scene.getSelectedEntityCount(), 0u);
 
@@ -717,8 +716,7 @@ TEST(UndoRedoExtendedRegressionTest, UndoRedo_MultipleUndoRedoCycles)
     // 删除
     auto* entity = scene.findSyEntityById(lineId);
     ASSERT_NE(entity, nullptr);
-    const Eg::EntityId delId = entity->id;
-    undoMgr.executeCommand(Eg::createDeleteEntitiesCommand(&scene, &delId, 1, "Delete"));
+    undoMgr.executeCommand(std::make_unique<UndoRedoManager::DeleteEntityCommand>(&scene, entity).release());
 
     // 5 次 undo/redo 循环
     for (int i = 0; i < 5; ++i)

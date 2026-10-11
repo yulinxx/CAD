@@ -360,14 +360,13 @@ TEST_F(LayerPersistenceBridgeTest, MultipleLayers_ChangeColor)
     int layerId = m_layerManager->createLayer("ColorLayer");
     ASSERT_GT(layerId, 0);
 
-    // 修改颜色：默认图层里已有红色，撞色时 setLayerColor 直接拒绝，这里挑洋红
-    // （Ut::Color 使用 0-1 浮点范围）
-    ASSERT_TRUE(m_layerManager->setLayerColor(layerId, Ut::Color::fromRGB255(255, 0, 255)));
+    // 修改颜色（Ut::Color 使用 0-1 浮点范围）
+    ASSERT_TRUE(m_layerManager->setLayerColor(layerId, Ut::Color(1.0f, 0.0f, 0.0f)));
 
     auto record = findLayerInDb("doc_001", layerId);
     ASSERT_TRUE(record.has_value());
-    // 颜色应被更新（洋红 #ff00ff，toHexRGB 返回小写十六进制）
-    EXPECT_EQ(record->color, "#ff00ff");
+    // 颜色应被更新（红色 #ff0000，toHexRGB 返回小写十六进制）
+    EXPECT_EQ(record->color, "#ff0000");
 }
 
 // ==================== 空指针安全性测试 ====================

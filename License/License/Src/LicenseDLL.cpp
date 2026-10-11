@@ -451,35 +451,4 @@ extern "C"
         buffer[bufferSize - 1] = '\0';
         return LICENSE_OK;
     }
-
-    const char* License_StatusText(int32_t status)
-    {
-        switch (status)
-        {
-        case LICENSE_OK:
-            return "OK";
-        case LICENSE_ERR_INVALID_ARG:
-            return "Invalid argument";
-        case LICENSE_ERR_NULL_POINTER:
-            return "Null pointer";
-        case LICENSE_ERR_NOT_INITIALIZED:
-            return "Not initialized";
-        case LICENSE_ERR_BUFFER_TOO_SMALL:
-            return "Buffer too small";
-        case LICENSE_ERR_IO:
-            return "IO error";
-        case LICENSE_ERR_VERIFY_FAILED:
-            return "Verification failed";
-        case LICENSE_ERR_EXPIRED:
-            return "License expired";
-        case LICENSE_ERR_VERSION_MISMATCH:
-            return "Version mismatch";
-        case LICENSE_ERR_OUT_OF_RANGE:
-            return "Out of range";
-        case LICENSE_ERR_INTERNAL:
-            return "Internal error";
-        default:
-            return "Unknown error";
-        }
-    }
 }
