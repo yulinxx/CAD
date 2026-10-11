@@ -5,6 +5,7 @@
 #include <QString>
 #include <QIcon>
 #include <QAction>
+#include <QPointer>
 #include <functional>
 
 class QToolButton;
@@ -64,6 +65,8 @@ private:
     PanModeCallback m_panModeToggleCallback;
     IsPanModeCallback m_isPanModeCallback;
     QToolButton* m_selectButton = nullptr;
-    QAction* m_selectAction = nullptr;
+    // 中枢托管，工作台切换（2D→3D）时会先于本控件销毁；用 QPointer 自动置空，
+    // 避免本控件在 LanguageChange 等事件里解引用已释放的 QAction。
+    QPointer<QAction> m_selectAction;
     QAction* m_panAction = nullptr;
 };
