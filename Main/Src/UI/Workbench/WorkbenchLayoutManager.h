@@ -120,6 +120,11 @@ public:
     /// 设置属性面板可见性（3D 模式下需要单独显示）
     void setPropertiesDockVisible(bool visible);
 
+    /// 统一应用 Dock 显隐策略（单一入口，消除三个 setter 打架）
+    /// @param requiresSkeleton 工作台是否需要骨架 Dock（2D=true, 3D=false）
+    /// @param workbenchId 工作台 ID（"2D"/"3D"），用于精细策略
+    void applyDockPolicy(bool requiresSkeleton, const QString& workbenchId = QString());
+
     // ==================== 繁忙指示器 ====================
 
     /// 更新繁忙进度条
