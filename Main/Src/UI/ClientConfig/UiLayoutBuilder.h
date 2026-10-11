@@ -16,6 +16,7 @@
 
 #include <QSet>
 #include <QVariantMap>
+#include <QActionGroup>
 #include <vector>
 
 class QAction;

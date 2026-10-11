@@ -4,6 +4,7 @@
 #include "License/TrialManager.h"
 #include "License/LicenseDialog.h"
 #include "UI/ClientConfig/UiFeatureGate.h"
+#include "Log/SyLogger.h"
 
 #include <QMessageBox>
 #include <QPushButton>
