@@ -45,7 +45,7 @@ public:
     SceneDocument2D(const SceneDocument2D&) = delete;
     SceneDocument2D& operator=(const SceneDocument2D&) = delete;
 
-    /// 阶段1收口：不再向 UI 暴露底层 SceneManager。
+    /// 不再向 UI 暴露底层 SceneManager。
     /// 需要场景对象的渲染桥接层请通过 editService()->sceneManager() 获取，
     /// 其余 UI 一律通过本类外观方法或 SceneEditService 操作场景。
     void setEditService(SceneEditService* editService);

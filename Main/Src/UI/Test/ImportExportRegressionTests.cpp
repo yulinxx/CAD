@@ -1124,7 +1124,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_AllSupportedTypes)
     // 已知类型至少应转换成功（Unknown 类型会被跳过）
     EXPECT_GE(result.size(), 4u);
     // 验证类型分布
-    size_t lineCount = 0, circleCount = 0, arcCount = 0, pointCount = 0;
+    size_t lineCount = 0, circleCount = 0, arcCount = 0, ptCount = 0;
     for (auto& e : result)
     {
         if (e->eType == Eg::EType::LINE)
@@ -1141,12 +1141,13 @@ TEST(ImportExportRegressionTest, FioEntityConverter_AllSupportedTypes)
         }
         else if (e->eType == Eg::EType::POINT)
         {
-            pointCount++;
+            ptCount++;
         }
     }
     EXPECT_GE(lineCount, 1u);
     EXPECT_GE(circleCount, 1u);
     EXPECT_GE(arcCount, 1u);
+    EXPECT_GE(ptCount, 1u);
 }
 
 TEST(ImportExportRegressionTest, FioEntityConverter_MaxLayerCount)

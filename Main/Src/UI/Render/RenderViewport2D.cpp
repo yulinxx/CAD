@@ -354,7 +354,7 @@ void RenderViewport2D::setDocument(SceneDocument2D* document)
     m_document = document;
 
     // 缓存 SceneManager 指针，避免析构时通过 m_document 访问已释放内存
-    // 阶段1收口：SceneDocument2D 不再暴露 sceneManager()，渲染桥接层通过
+    // SceneDocument2D 不再暴露 sceneManager()，渲染桥接层通过
     // 编辑服务外观获取场景对象
     if (m_document && m_document->editService())
     {
@@ -456,7 +456,7 @@ void RenderViewport2D::initializeTools()
     // 注册所有工具。
     // 额外注入场景编辑服务（Gizmo 变换 Undo）、图层管理器（锁定图层过滤）、
     // 重置视图回调（空格键）、网格+对象捕捉管理器等选择工具所需的依赖。
-    ToolContext ctx;
+    ToolContext2D ctx;
     ctx.sceneContext = m_sceneContext;
     ctx.renderWidget = m_renderWidget;
     ctx.renderCoordinator = coordinator;

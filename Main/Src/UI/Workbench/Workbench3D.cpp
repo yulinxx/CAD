@@ -1,10 +1,12 @@
 #include "Workbench3D.h"
 #include "WorkbenchTiming.h"
+#include "WorkbenchLayoutManager.h"
 
 #if BUILD_UI3D
     #include <QAction>
     #include <QApplication>
     #include <QDesktopServices>
+    #include <QDockWidget>
     #include <QFileInfo>
     #include <QLineEdit>
     #include <QMenu>
@@ -315,7 +317,7 @@ void Workbench3D::create3DViewport(WorkbenchWindow& window)
 {
     SY_DEBUG("[Workbench3D] Creating Viewport3D...");
     auto* viewport = new Viewport3D(&window);
-    SY_DEBUGF("[Workbench3D] Viewport3D created: %p", viewport);
+    SY_DEBUGF("[Workbench3D] Viewport3D created: %p", static_cast<void*>(viewport));
 
     // 先设为中心控件，确保 Viewport3D 有正确的尺寸和窗口状态
     // 必须在 setRenderer 之前执行，否则 RenderWidget3DAdapter 初始化时
@@ -330,14 +332,14 @@ void Workbench3D::create3DViewport(WorkbenchWindow& window)
 
     viewport->setRenderer(std::move(renderer));
     viewport->setSceneDocument(m_serviceOwner->sceneDocument.get());
-    SY_DEBUGF("[Workbench3D] SceneDocument3D set to Viewport3D: %p", m_serviceOwner->sceneDocument.get());
+    SY_DEBUGF("[Workbench3D] SceneDocument3D set to Viewport3D: %p", static_cast<void*>(m_serviceOwner->sceneDocument.get()));
 
     // 从适配器中取出内部 RenderWidget3D 指针，注册到 ServicePack3D
     // 这样新号绑定、SceneEditService3D、操作注册等都能访问到实际的渲染控件
     if (auto* r3dAdapter = dynamic_cast<RenderWidget3DAdapter*>(viewport->renderer()))
     {
         m_services3D.renderWidget = r3dAdapter->widget();
-        SY_DEBUGF("[Workbench3D] RenderWidget3D registered to ServicePack3D: %p", m_services3D.renderWidget);
+        SY_DEBUGF("[Workbench3D] RenderWidget3D registered to ServicePack3D: %p", static_cast<void*>(m_services3D.renderWidget));
         if (m_services3D.sceneEditService && m_services3D.renderWidget)
         {
             m_services3D.sceneEditService->bindRenderWidget(m_services3D.renderWidget);

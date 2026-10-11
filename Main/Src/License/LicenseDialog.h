@@ -1,13 +1,13 @@
 #pragma once
 
-#include <QDialog>
+#include "UI/Dlg/LocalizableDialog.h"
 #include <QString>
 
 class QLineEdit;
 class QLabel;
 class QPushButton;
 
-class LicenseDialog : public QDialog
+class LicenseDialog : public LocalizableDialog
 {
     Q_OBJECT
 
@@ -20,6 +20,7 @@ private slots:
 
 private:
     void SetupUi();
+    void retranslateUi() override;
 
     QLineEdit* m_regCodeEdit = nullptr;
     QLabel* m_machineCodeLabel = nullptr;

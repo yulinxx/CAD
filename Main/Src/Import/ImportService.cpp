@@ -138,7 +138,7 @@ void ImportService::setEditService(SceneEditService* editService)
 void ImportService::setLayerManager(LayerManager* layerManager)
 {
     m_layerManager = layerManager;
-    SY_DEBUGF("[ImportService] setLayerManager: %p", m_layerManager);
+    SY_DEBUGF("[ImportService] setLayerManager: %p", static_cast<void*>(m_layerManager));
 }
 
 void ImportService::setBusyStateCallback(std::function<void(bool)> cb)

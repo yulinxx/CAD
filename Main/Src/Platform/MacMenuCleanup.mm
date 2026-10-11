@@ -93,7 +93,7 @@ void cleanupMacEditMenuSystemItems()
             {
                 // 检查分隔线之后是否还有非分隔线项
                 BOOL hasItemAfter = NO;
-                for (NSInteger j = i + 1; j < [items count]; ++j)
+                for (NSInteger j = i + 1; j < (NSInteger)[items count]; ++j)
                 {
                     NSMenuItem* afterItem = items[j];
                     if (![afterItem isSeparatorItem] && !isSystemInjectedItem(afterItem))

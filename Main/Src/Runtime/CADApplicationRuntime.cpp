@@ -2,6 +2,7 @@
 
 #include <QApplication>
 #include <QDir>
+#include <QIcon>
 #include <QObject>
 #include <QSettings>
 #include <QCoreApplication>

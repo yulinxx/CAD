@@ -230,10 +230,17 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
 
     // 初始面板宽度：默认窄一些，不挤压中间视图；不限制最大宽度，用户可手动拖宽。
     // 右侧面板 (PropertiesDock) 适中宽度，兼顾属性行和图层面板。
+    // 同时设置最小宽度，防止拖拽时过窄导致内容不可见
     if (m_panelState.leftDock && m_panelState.rightDock)
     {
+        m_panelState.leftDock->setMinimumWidth(160);
+        m_panelState.leftDock->setMaximumWidth(400);
+
+        m_panelState.rightDock->setMinimumWidth(200);
+        m_panelState.rightDock->setMaximumWidth(500);
+
         m_parent->resizeDocks(
-            { m_panelState.leftDock.data(), m_panelState.rightDock.data() }, { 180, 260 }, Qt::Horizontal);
+            { m_panelState.leftDock.data(), m_panelState.rightDock.data() }, { 180, 240 }, Qt::Horizontal);
     }
 
     return !m_registeredDocks.empty();
@@ -320,9 +327,7 @@ QWidget* WorkbenchLayoutManager::createInitialCentralWidget()
 QDockWidget* WorkbenchLayoutManager::registerDockWidget(const QString& title, QWidget* widget, Qt::DockWidgetArea area)
 {
     // 注册停靠面板只负责把面板挂到指定区域，不在这里注入业务行为
-    auto* dock = new QDockWidget(title, m_parent);
 
-    // 设置 objectName 以便后续 setSkeletonDocksVisible / setSceneDockVisible 等方法能正确识别
     // 根据 widget 类型推断 dock id
     QString dockId;
     if (qobject_cast<SceneTreePanel*>(widget))
@@ -337,17 +342,46 @@ QDockWidget* WorkbenchLayoutManager::registerDockWidget(const QString& title, QW
     {
         dockId = title;
     }
-    dock->setObjectName(dockId);
 
-    dock->setWidget(widget);
-    m_parent->addDockWidget(area, dock);
-    m_registeredDocks.push_back(dock);
+    // 优先复用配置驱动创建的骨架 Dock（相同 objectName），避免重复创建导致布局恢复冲突
+    QDockWidget* dock = m_parent->findChild<QDockWidget*>(dockId);
+    if (dock)
+    {
+        // 已存在：替换内部 widget，显示并确保在正确区域
+        QWidget* oldWidget = dock->widget();
+        if (oldWidget && oldWidget != widget)
+        {
+            oldWidget->setParent(nullptr);
+            oldWidget->deleteLater();
+        }
+        dock->setWidget(widget);
+        dock->setWindowTitle(title);
+        dock->setVisible(true);
+
+        // 确保在正确的停靠区域（若已在其他区域则移动）
+        Qt::DockWidgetArea currentArea = m_parent->dockWidgetArea(dock);
+        if (currentArea != area)
+        {
+            m_parent->removeDockWidget(dock);
+            m_parent->addDockWidget(area, dock);
+        }
+    }
+    else
+    {
+        // 不存在：创建新 dock
+        dock = new QDockWidget(title, m_parent);
+        dock->setObjectName(dockId);
+        dock->setWidget(widget);
+        m_parent->addDockWidget(area, dock);
+
+        // 仅新创建的 dock 加入注册表（复用的已在 buildDockAreasFromConfig 中加入）
+        m_registeredDocks.push_back(dock);
+    }
 
     // 保存标题到 dock widget 的属性中，以便 restoreLayoutSnapshot 后重新设置
-    // restoreState() 会覆盖 dock 标题，需要在恢复后重新设置
     dock->setProperty("_workbench_dock_title", title);
 
-    // 同步面板状态引用，保持对外接口稳定（setSkeletonDocksVisible 等依赖它）
+    // 同步面板状态引用，保持对外接口稳定
     if (dockId == UiDockIds::sceneQString())
     {
         m_panelState.leftDock = dock;
@@ -357,7 +391,6 @@ QDockWidget* WorkbenchLayoutManager::registerDockWidget(const QString& title, QW
         m_panelState.rightDock = dock;
     }
 
-    // 仅更新面板状态引用，方便后续统一刷新与清理
     if (auto* tree = qobject_cast<SceneTreePanel*>(widget))
     {
         m_panelState.sceneTreeDock = tree;

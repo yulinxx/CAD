@@ -127,7 +127,7 @@ private:
 private:
     // PIMPL + 自定义删除器：避免 MOC 编译时需要 ServiceOwner 完整定义
     std::unique_ptr<ServiceOwner, ServiceOwnerDeleter> m_serviceOwner;
-    class ServicePack3D m_services3D{};
+    struct ServicePack3D m_services3D{};
 
     std::unique_ptr<MainWindow3D> m_mainWindow3D;
 

@@ -157,25 +157,6 @@ QString Workbench2D::id() const
     return QStringLiteral("2D");
 }
 
-namespace
-{
-    bool workbenchFlagEnabled(const QStringList& workbenches, const QString& workbenchId)
-    {
-        if (workbenches.isEmpty())
-        {
-            return true;
-        }
-        for (const auto& wb : workbenches)
-        {
-            if (wb.compare(workbenchId, Qt::CaseInsensitive) == 0)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-}  // namespace
-
 bool Workbench2D::isCommandRegistered(const QString& commandId) const
 {
     return CommandCatalog::operationForCommandId(commandId) != OperationId::None;
@@ -995,38 +976,38 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
             {
                 { "",
                     {
-                        { "edit.undo", tr("Undo"), ":/ui/common/Icons/Actions/undo.svg" },
-                        { "edit.redo", tr("Redo"), ":/ui/common/Icons/Actions/redo.svg" },
+                        { "edit.undo", tr("Undo"), ":/ui/common/Icons/Actions/undo.svg", false, "", "", "", "", "", true },
+                        { "edit.redo", tr("Redo"), ":/ui/common/Icons/Actions/redo.svg", false, "", "", "", "", "", true },
                     } },
                 { "",
                     {
-                        { "edit.mirror_horizontal", tr("Mirror H"), ":/ui/common/Icons/Actions/mirror_h.svg" },
-                        { "edit.mirror_vertical", tr("Mirror V"), ":/ui/common/Icons/Actions/mirror_v.svg" },
+                        { "edit.mirror_horizontal", tr("Mirror H"), ":/ui/common/Icons/Actions/mirror_h.svg", false, "", "", "", "", "", true },
+                        { "edit.mirror_vertical", tr("Mirror V"), ":/ui/common/Icons/Actions/mirror_v.svg", false, "", "", "", "", "", true },
                     } },
                 { "",
                     {
-                        { "edit.align_left", tr("Align Left"), ":/ui/common/Icons/Actions/align_left.svg" },
-                        { "edit.align_right", tr("Align Right"), ":/ui/common/Icons/Actions/align_right.svg" },
-                        { "edit.align_center_h", tr("Align Center H"), ":/ui/common/Icons/Actions/align_center_h.svg" },
-                        { "edit.align_top", tr("Align Top"), ":/ui/common/Icons/Actions/align_top.svg" },
-                        { "edit.align_bottom", tr("Align Bottom"), ":/ui/common/Icons/Actions/align_bottom.svg" },
-                        { "edit.align_center_v", tr("Align Center V"), ":/ui/common/Icons/Actions/align_center_v.svg" },
+                        { "edit.align_left", tr("Align Left"), ":/ui/common/Icons/Actions/align_left.svg", false, "", "", "", "", "", true },
+                        { "edit.align_right", tr("Align Right"), ":/ui/common/Icons/Actions/align_right.svg", false, "", "", "", "", "", true },
+                        { "edit.align_center_h", tr("Align Center H"), ":/ui/common/Icons/Actions/align_center_h.svg", false, "", "", "", "", "", true },
+                        { "edit.align_top", tr("Align Top"), ":/ui/common/Icons/Actions/align_top.svg", false, "", "", "", "", "", true },
+                        { "edit.align_bottom", tr("Align Bottom"), ":/ui/common/Icons/Actions/align_bottom.svg", false, "", "", "", "", "", true },
+                        { "edit.align_center_v", tr("Align Center V"), ":/ui/common/Icons/Actions/align_center_v.svg", false, "", "", "", "", "", true },
                     } },
                 { "",
                     {
-                        { "edit.select_all", tr("Select All"), ":/ui/common/Icons/Actions/select_all.svg" },
-                        { "edit.invert_selection", tr("Invert Selection"), ":/ui/common/Icons/Actions/invert_selection.svg" },
-                        { "edit.deselect", tr("Deselect"), ":/ui/common/Icons/Actions/deselect.svg" },
+                        { "edit.select_all", tr("Select All"), ":/ui/common/Icons/Actions/select_all.svg", false, "", "", "", "", "", true },
+                        { "edit.invert_selection", tr("Invert Selection"), ":/ui/common/Icons/Actions/invert_selection.svg", false, "", "", "", "", "", true },
+                        { "edit.deselect", tr("Deselect"), ":/ui/common/Icons/Actions/deselect.svg", false, "", "", "", "", "", true },
                     } },
                 { "",
                     {
-                        { "edit.copy", tr("Copy"), ":/ui/common/Icons/Actions/copy.svg" },
-                        { "edit.paste", tr("Paste"), ":/ui/common/Icons/Actions/paste.svg" },
-                        { "edit.delete", tr("Delete"), ":/ui/common/Icons/Actions/delete.svg" },
+                        { "edit.copy", tr("Copy"), ":/ui/common/Icons/Actions/copy.svg", false, "", "", "", "", "", true },
+                        { "edit.paste", tr("Paste"), ":/ui/common/Icons/Actions/paste.svg", false, "", "", "", "", "", true },
+                        { "edit.delete", tr("Delete"), ":/ui/common/Icons/Actions/delete.svg", false, "", "", "", "", "", true },
                     } },
                 { "",
                     {
-                        { "edit.group", tr("Group"), ":/ui/common/Icons/Actions/group.svg", true },
+                        { "edit.group", tr("Group"), ":/ui/common/Icons/Actions/group.svg", true, "", "", "", "", "", true },
                     } },
             },
         });
@@ -1046,18 +1027,18 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
             {
                 { tr("Content"),
                     {
-                        { "QR_Content", tr("Content") },
-                        { "QR_ErrorCorrection", tr("Error Correction") },
+                        { "QR_Content", tr("Content"), "", false, "", "", "", "", "", true },
+                        { "QR_ErrorCorrection", tr("Error Correction"), "", false, "", "", "", "", "", true },
                     } },
                 { tr("Appearance"),
                     {
-                        { "QR_Size", tr("Size") },
-                        { "QR_Foreground", tr("Foreground") },
-                        { "QR_Background", tr("Background") },
+                        { "QR_Size", tr("Size"), "", false, "", "", "", "", "", true },
+                        { "QR_Foreground", tr("Foreground"), "", false, "", "", "", "", "", true },
+                        { "QR_Background", tr("Background"), "", false, "", "", "", "", "", true },
                     } },
                 { tr("Advanced"),
                     {
-                        { "QR_Logo", tr("Logo") },
+                        { "QR_Logo", tr("Logo"), "", false, "", "", "", "", "", true },
                     } },
             },
         });
@@ -1070,14 +1051,14 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
             {
                 { tr("Adjust"),
                     {
-                        { "Bitmap_Crop", tr("Crop") },
-                        { "Bitmap_Rotate", tr("Rotate") },
-                        { "Bitmap_Brightness", tr("Brightness") },
-                        { "Bitmap_Contrast", tr("Contrast") },
+                        { "Bitmap_Crop", tr("Crop"), "", false, "", "", "", "", "", true },
+                        { "Bitmap_Rotate", tr("Rotate"), "", false, "", "", "", "", "", true },
+                        { "Bitmap_Brightness", tr("Brightness"), "", false, "", "", "", "", "", true },
+                        { "Bitmap_Contrast", tr("Contrast"), "", false, "", "", "", "", "", true },
                     } },
                 { tr("Filter"),
                     {
-                        { "Bitmap_Filter", tr("Filter") },
+                        { "Bitmap_Filter", tr("Filter"), "", false, "", "", "", "", "", true },
                     } },
             },
         });
@@ -1090,14 +1071,14 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
             {
                 { tr("Path"),
                     {
-                        { "Vector_NodeEdit", tr("Node Edit") },
-                        { "Vector_Simplify", tr("Simplify") },
-                        { "Vector_Boolean", tr("Boolean") },
+                        { "Vector_NodeEdit", tr("Node Edit"), "", false, "", "", "", "", "", true },
+                        { "Vector_Simplify", tr("Simplify"), "", false, "", "", "", "", "", true },
+                        { "Vector_Boolean", tr("Boolean"), "", false, "", "", "", "", "", true },
                     } },
                 { tr("Style"),
                     {
-                        { "Vector_Stroke", tr("Stroke") },
-                        { "Vector_Fill", tr("Fill") },
+                        { "Vector_Stroke", tr("Stroke"), "", false, "", "", "", "", "", true },
+                        { "Vector_Fill", tr("Fill"), "", false, "", "", "", "", "", true },
                     } },
             },
         });
@@ -1110,18 +1091,18 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
             {
                 { tr("Transform"),
                     {
-                        { "Image_Crop", tr("Crop") },
-                        { "Image_Rotate", tr("Rotate") },
-                        { "Image_Flip", tr("Flip") },
+                        { "Image_Crop", tr("Crop"), "", false, "", "", "", "", "", true },
+                        { "Image_Rotate", tr("Rotate"), "", false, "", "", "", "", "", true },
+                        { "Image_Flip", tr("Flip"), "", false, "", "", "", "", "", true },
                     } },
                 { tr("Adjust"),
                     {
-                        { "Image_Brightness", tr("Brightness") },
-                        { "Image_Contrast", tr("Contrast") },
+                        { "Image_Brightness", tr("Brightness"), "", false, "", "", "", "", "", true },
+                        { "Image_Contrast", tr("Contrast"), "", false, "", "", "", "", "", true },
                     } },
                 { tr("Filter"),
                     {
-                        { "Image_Filter", tr("Filter") },
+                        { "Image_Filter", tr("Filter"), "", false, "", "", "", "", "", true },
                     } },
             },
         });

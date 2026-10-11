@@ -82,7 +82,7 @@ struct UiServices : public IUIServices
     /// 导入服务（文件导入总入口）
     ImportService* importService{ nullptr };
 
-    /// 场景编辑服务（带Undo的图元操作入口，阶段1收口：不再暴露底层 SceneManager）
+    /// 场景编辑服务（带Undo的图元操作入口，不再暴露底层 SceneManager）
     class SceneEditService* sceneEditService{ nullptr };
 
     /// 最近文件服务（全仓唯一的最近文件读写入口，实现为 Main 的 RecentFileService）

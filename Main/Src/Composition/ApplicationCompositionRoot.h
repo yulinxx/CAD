@@ -204,7 +204,7 @@ public:
         return m_unitManager.get();
     }
 
-    /// 获取选择服务（阶段1收口：由组合根统一创建并经 UiServices 注入）
+    /// 获取选择服务（由组合根统一创建并经 UiServices 注入）
     ISelectionService* selectionService();
 
     /// 获取硬件装配层。始终非空；未启动硬件时其 isRunning() 为 false。
@@ -289,7 +289,7 @@ private:
     /// 截图服务（F12 截图 / 固定视角全场景）
     std::unique_ptr<Ui::ViewCaptureService> m_captureService;
 
-    /// 选择服务（阶段1收口：绑定 SceneManager，由组合根统一创建）
+    /// 选择服务（绑定 SceneManager，由组合根统一创建）
     std::unique_ptr<SelectionService> m_selectionService;
 
     /// 2D 场景文档（依赖 SceneEditService）

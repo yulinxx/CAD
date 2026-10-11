@@ -33,7 +33,7 @@ class QKeyEvent;
 class QInputMethodEvent;
 class QContextMenuEvent;
 class RenderWidget;
-class Camera2D;
+struct Camera2D;
 class ToolManager;
 class ISelectionService;
 class OperationBus;

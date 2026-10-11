@@ -11,7 +11,7 @@
  * 新增配置来源只需实现本接口，无需改动消费者。
  */
 
-class UiConfigData;
+struct UiConfigData;
 class UiPanelRegistry;
 
 class ILayoutConfig

@@ -37,7 +37,7 @@
 namespace Eg
 {
     class SceneManager;
-    class SyEntity;
+    struct SyEntity;
     class EntityClipboard;
 }
 

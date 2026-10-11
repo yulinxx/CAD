@@ -8,7 +8,7 @@
 class QWheelEvent;
 class QNativeGestureEvent;
 class RenderWidget;
-class Camera2D;
+struct Camera2D;
 
 /**
  * @brief 2D 视口导航控制器 — 相机 + 手势 + 坐标换算的单一实现

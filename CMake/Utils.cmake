@@ -259,6 +259,10 @@ function(sanyi_add_shared_library target)
 
     target_compile_features(${target} PUBLIC cxx_std_17)
 
+    # Qt 6.11+ 兼容性：禁用 P0846 (std::get_if 等 C++20 特性) 以兼容 C++17
+    # 同时定义 QT_COMPILER_HAS_P0846=1 以避免 qcompilerdetection.h 的 fallback 分支错误
+    target_compile_definitions(${target} PRIVATE QT_NO_P0846 QT_COMPILER_HAS_P0846=1)
+
     if(SANYI_SHLIB_EXPORT_MACRO)
         # CMake 标准做法：<target>_EXPORTS 用于 DLL 导出/导入
         # 例如 LIB_EXPORT_MACRO="UICORE_API" 产生 UICORE_EXPORTS

@@ -19,6 +19,16 @@ project(SanYiCAD
     LANGUAGES CXX
 )
 
+# 编译器特定配置（MSVC / GCC / Clang 的警告与运行时开关）。
+#
+# **必须**在 project() 之后：Config.cmake 早于 project() 被 include（它设置
+# CMAKE_TOOLCHAIN_FILE），而 CMAKE_CXX_COMPILER_ID 是 project() 才设置的。
+# 这段判断原先留在 Config.cmake 里，因此永远不成立 —— 六条 -Wno-unused-*
+# 与 macOS 的 -Wno-deprecated-declarations 从未生效（实测 build.ninja 里 0 处）。
+#
+# 位置也要早于任何 add_subdirectory：add_compile_options 只作用于之后定义的 target。
+include("${CMAKE_CURRENT_SOURCE_DIR}/CMake/CompilerOptions.cmake")
+
 set(SANYI_ROOT "${PROJECT_SOURCE_DIR}" CACHE INTERNAL "SanYi CAD project root")
 include("${SANYI_ROOT}/CMake/SanYiPaths.cmake")
 include("${SANYI_ROOT}/CMake/Utils.cmake")
@@ -365,6 +375,11 @@ endif()
 
 if(BUILD_RENDERX)
     list(APPEND SANYI_PROJECT_LIBS RenderX)
+    # RenderBridge 是 shared lib 且被 Main 链接（见 Main/CMakeLists.txt）。
+    # 此前它只 add_subdirectory 而没进任何 install(TARGETS)，
+    # 于是 `cmake --install` 产出的 bin/ 里有 SanYiCAD 与其余 DLL，唯独缺它
+    # —— 装出来的应用根本起不来。与 RenderX 同开关，因此一起 append。
+    list(APPEND SANYI_PROJECT_LIBS RenderBridge)
 endif()
 
 if(BUILD_HARDWARE)

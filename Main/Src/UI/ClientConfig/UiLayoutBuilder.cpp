@@ -246,15 +246,6 @@ void UiLayoutBuilder::buildMenus(const std::vector<MenuDef>& menus)
         {
             buildMenuItem(qMenu, item);
         }
-
-        int enabledCount = 0;
-        for (QAction* act : qMenu->actions())
-        {
-            if (act && act->isEnabled())
-            {
-                ++enabledCount;
-            }
-        }
     }
 
     // SY_DEBUGF("[UiLayoutBuilder] All menus built: total=%d topLevelMenus=%d",

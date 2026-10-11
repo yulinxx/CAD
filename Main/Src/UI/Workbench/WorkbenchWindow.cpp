@@ -1188,6 +1188,13 @@ if (m_stateCenter)
         m_fileDropHandler->setCurrentWorkbenchId(workbenchId);
     }
 
+    // 确保工具栏和状态栏槽位在工作台切换后完整恢复
+    if (m_layoutManager)
+    {
+        m_layoutManager->buildToolBars();
+        m_layoutManager->buildStatusBar();
+    }
+
     SY_DEBUGF("[WorkbenchWindow] workbench state committed: id=%s busy=0", workbenchId.toUtf8().constData());
 
     // 取消切换中标志，允许下次切换

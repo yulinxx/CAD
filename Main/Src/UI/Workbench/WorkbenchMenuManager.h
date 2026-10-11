@@ -23,7 +23,7 @@ class IMenuBuilder;
 class UiShortcutRegistry;
 class IShortcutSettingsModel;
 struct UiConfigData;
-struct MenuDispatcher;
+class MenuDispatcher;
 /// 命令 UI 状态快照（选择/锁定/剪贴板/撤销栈），定义在 UI2D 命令中枢
 struct CommandUiSnapshot;
 #if BUILD_UI3D

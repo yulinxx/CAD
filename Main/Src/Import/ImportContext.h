@@ -47,8 +47,8 @@ struct ImportContext
     /// 进度回调：参数为当前阶段和进度值（0.0 ~ 1.0）
     std::function<void(ImportPhase, float)> progressCallback;
 
-    /// 最近文件添加回调（阶段5回写状态使用）
+    /// 最近文件添加回调（回写状态使用）
     std::function<void(const QString&)> recentFileAddCallback;
-    /// 当前文档路径更新回调（阶段5回写状态使用）
+    /// 当前文档路径更新回调（回写状态使用）
     std::function<void(const QString&)> currentDocumentPathCallback;
 };

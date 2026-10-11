@@ -8,6 +8,7 @@
 
 #include "FileIO/Parsers/NativeParser.h"
 #include "FileIO/SyDocument.h"
+#include "Engine/SyEntity/SyEntity.h"
 
 #include "Log/SyLogger.h"
 

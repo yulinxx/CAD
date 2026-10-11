@@ -535,7 +535,15 @@ void SceneRefreshCoordinator::onSceneChanged()
 
             for (const auto& change : changes.changes)
             {
-                if (hasSceneChangeKind(change.kinds, Eg::SceneChangeKind::Removed))
+                // 判据是「图元**此刻**还在不在场景里」，而不是 kinds 里的 Removed 位。
+                //
+                // 撤销删除的路径是「先 Removed（删除）、再 Added（撤销归还）」，
+                // 只信 Removed 位会把刚回到场景的图元判成已删除并 removeRenderEntity() ——
+                // 症状是图元在场景树里、能被选中、数据完好，但画面上永远不出现。
+                // mergeSceneChangeKind 已保证掩码不会自相矛盾，这里再按活对象复核一次：
+                // 两道防线互为兜底（掩码可能因变更日志被截断而丢失上下文）。
+                const bool stillInScene = m_sceneManager->findEntityById(change.entityId) != nullptr;
+                if (!stillInScene)
                 {
                     m_pendingDeletedIds.insert(change.entityId);
                 }

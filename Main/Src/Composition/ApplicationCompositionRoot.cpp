@@ -21,6 +21,7 @@
 #include "UI/Services/UiServices.h"
 #include "UI/Services/UiShellHost.h"
 #include "UI/Workbench/WorkbenchWindow.h"
+#include "UI/Workbench/UiWorkbench.h"
 #include "UI/Services/UiStateCenter.h"
 #include "UI/Services/HelpDialogService.h"
 
@@ -296,7 +297,7 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
     m_shellHost->setStateCenter(m_stateCenter.get());
     m_shellHost->setOperationBus(m_operationBus.get());
 
-    return std::move(uiServices);
+    return uiServices;
 }
 
 void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiServices)

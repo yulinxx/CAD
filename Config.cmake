@@ -33,7 +33,20 @@ elseif(UNIX)
 endif()
 
 # 构建类型: Debug | Release | RelWithDebInfo | MinSizeRel
-set(CMAKE_BUILD_TYPE "Release")
+#
+# 只在「调用方没有指定」时给默认值。**不能用裸 set()**：那会创建一个普通变量，
+# 遮蔽 cache 里由 -DCMAKE_BUILD_TYPE= 或 CMakePresets 写入的值，且本文件每次
+# configure 都会重新执行一遍。实测后果是 CMakeCache.txt 里记着 Debug，
+# 实际编译却按 Release（-O3 -DNDEBUG）产出——全仓 assert() 因此被编译掉，
+# 其中包含 ParallelRegion 构造/析构配对的唯一检查。
+#
+# 多配置生成器（VS/Xcode）不使用 CMAKE_BUILD_TYPE，此处置默认值对它们无副作用；
+# 这里不能查 CMAKE_CONFIGURATION_TYPES，因为它由 project() 设置，而本文件在
+# project() 之前被 include。
+if(NOT DEFINED CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING
+        "Build type: Debug | Release | RelWithDebInfo | MinSizeRel")
+endif()
 
 # ============================================================================
 #                         📌 模块开关（按需启用）
@@ -88,65 +101,17 @@ set(CMAKE_TOOLCHAIN_FILE "${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake"
     CACHE STRING "Vcpkg toolchain file")
 
 # --------------------------------------------------------------------
-# 构建类型配置
-# --------------------------------------------------------------------
-# 可选值: Debug, Release, RelWithDebInfo, MinSizeRel
-# 默认使用 Release 以获得最佳性能
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type: Debug|Release|RelWithDebInfo|MinSizeRel" FORCE)
-    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
-endif()
-
+# 构建类型：唯一默认值定义在上面的「构建类型」小节（见 set(CMAKE_BUILD_TYPE ...)）。
+# 这里只做状态输出。原先此处还有一份重复的 `if(NOT CMAKE_BUILD_TYPE)` 兜底，
+# 与上面那份是同一个配置的两个来源 —— 已删除，保持单一事实源。
 message(STATUS "======================================================================")
 message(STATUS "[Config] Build Type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "======================================================================")
 
-# --------------------------------------------------------------------
-# 编译器配置
-# --------------------------------------------------------------------
-
-# MSVC 特定配置
-if(MSVC)
-    # 动态链接 CRT (MD/MDd)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL" CACHE STRING "MSVC runtime library" FORCE)
-
-    # UTF-8 编码支持
-    add_compile_options(/utf-8)
-
-    # 关闭 Unicode 字符警告（中文注释导致）
-    add_compile_options(/wd4819)
-
-    # 关闭 CRT 迭代扩展警告 (vcpkg 依赖大量模板导致)
-    add_compile_options(/wd4503)
-
-    message(STATUS "[Config] Compiler: MSVC ${MSVC_VERSION}")
-endif()
-
-# GCC/Clang 特定配置
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    # 统一警告级别
-    add_compile_options(-Wall -Wextra -Wpedantic)
-
-    # 额外警告抑制 (跨平台兼容)
-    add_compile_options(
-        -Wno-unused-parameter
-        -Wno-unused-variable
-        -Wno-unused-private-field
-        -Wno-unused-lambda-capture
-        -Wno-nullability-extension
-        -Wno-reorder
-    )
-
-    # macOS 特定
-    if(APPLE)
-        # 抑制大小写不敏感路径警告
-        add_compile_options(-Wno-nonportable-include-path)
-        # 抑制 OpenGL 废弃警告（使用 Metal 作为后端）
-        add_compile_options(-Wno-deprecated-declarations)
-    endif()
-
-    message(STATUS "[Config] Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
-endif()
+# 注：编译器特定配置（MSVC / GCC / Clang 的警告与运行时开关）已移到
+#     CMake/CompilerOptions.cmake，由 CMakeLists.txt 在 project() **之后** include。
+#     原因见该文件头部：CMAKE_CXX_COMPILER_ID 在 project() 之前为空，
+#     留在本文件里会让整个判断块成为死代码。
 
 # --------------------------------------------------------------------
 # C++ 标准配置
@@ -154,6 +119,9 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Qt 6.11+ 兼容性：禁用 P0846 (std::get_if 等 C++20 特性) 以兼容 C++17
+add_compile_definitions(QT_NO_P0846)
 
 # --------------------------------------------------------------------
 # 符号可见性控制
@@ -166,9 +134,11 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 # --------------------------------------------------------------------
 option(SANYI_UNITY_BUILD "Enable unity build (faster compilation)" ON)
 if(SANYI_UNITY_BUILD)
-    set(CMAKE_UNITY_BUILD ON)
-    # Unity 构建的块大小，可根据内存调整
-    set(CMAKE_UNITY_BUILD_BATCH_SIZE 16)
+    # 不再全局开启 CMAKE_UNITY_BUILD，改为各模块通过 sanyi_add_shared_library 的
+    # UNITY_BUILD 参数显式开启。全局开启会导致 Renderx 等包含复杂命名空间的模块
+    # 在 unity build 下出现命名空间泄漏问题。
+    # set(CMAKE_UNITY_BUILD ON)
+    # set(CMAKE_UNITY_BUILD_BATCH_SIZE 16)
     # 注意：.mm 不得进 unity batch —— 各模块对 .mm 设 SKIP_UNITY_BUILD_INCLUSION
     # （见 UI/Common、Main、Renderx 的 CMakeLists），勿用无效的 *_EXCLUDED_* 变量。
 endif()

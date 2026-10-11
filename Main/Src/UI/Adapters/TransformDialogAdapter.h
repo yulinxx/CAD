@@ -25,7 +25,7 @@ class QLabel;
 class QButtonGroup;
 class QGroupBox;
 class QCheckBox;
-class QDialogButtonBox;
+class QPushButton;
 class SceneDocument2D;
 
 class TransformDialogAdapter : public ITransformInputProvider
@@ -174,4 +174,9 @@ private:
     QDoubleSpinBox* m_mirrorLineX2SpinBox{ nullptr };
     QDoubleSpinBox* m_mirrorLineY2SpinBox{ nullptr };
     QLabel* m_statusLabel{ nullptr };
+
+    // 对话框按钮
+    QPushButton* m_okBtn{ nullptr };
+    QPushButton* m_cancelBtn{ nullptr };
+    QPushButton* m_applyBtn{ nullptr };
 };

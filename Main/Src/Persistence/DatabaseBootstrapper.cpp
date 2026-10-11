@@ -131,20 +131,23 @@ int DatabaseBootstrapper::schemaVersion() const
         return 0;
     }
 
-    std::string version = m_database.get("app_meta", "value", "key = 'schema_version'");
-    if (version.empty())
-    {
-        return 0;
-    }
-
     try
     {
+        std::string version = m_database.get("app_meta", "value", "key = 'schema_version'");
+        if (version.empty())
+        {
+            return 0;
+        }
+
         return std::stoi(version);
+    }
+    catch (const std::exception& e)
+    {
+        // Table might not exist yet (first run) - treat as v0
+        return 0;
     }
     catch (...)
     {
-        SY_WARNF("[DatabaseBootstrapper] schemaVersion: failed to parse version string '%s', treating as v0",
-            version.c_str());
         return 0;
     }
 }
@@ -161,8 +164,20 @@ std::string DatabaseBootstrapper::databaseAppVersion() const
         return {};
     }
 
-    std::string version = m_database.get("app_meta", "value", "key = 'app_version'");
-    return version;
+    try
+    {
+        std::string version = m_database.get("app_meta", "value", "key = 'app_version'");
+        return version;
+    }
+    catch (const std::exception&)
+    {
+        // Table might not exist yet (first run)
+        return {};
+    }
+    catch (...)
+    {
+        return {};
+    }
 }
 
 const std::string& DatabaseBootstrapper::lastError() const
