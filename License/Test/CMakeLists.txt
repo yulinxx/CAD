@@ -24,7 +24,7 @@ target_link_libraries(LicenseTests PRIVATE
     GTest::gtest_main
 )
 
-gtest_discover_tests(LicenseTests)
+gtest_discover_tests(LicenseTests DISCOVERY_TIMEOUT 120)
 
 set_property(TARGET LicenseTests PROPERTY FOLDER "Tests")
 
