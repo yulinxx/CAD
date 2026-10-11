@@ -37,14 +37,14 @@ protected:
 
         // 创建 Bridge 并注册为观察者
         m_bridge = std::make_unique<QtLayerManagerBridge>();
-        m_layerManager->registerObserver(m_bridge.get());
+        m_layerManager->addObserver(m_bridge.get());
     }
 
     void TearDown() override
     {
         if (m_layerManager && m_bridge)
         {
-            m_layerManager->unregisterObserver(m_bridge.get());
+            m_layerManager->removeObserver(m_bridge.get());
         }
         m_bridge.reset();
         m_layerManager.reset();
@@ -251,7 +251,7 @@ TEST_F(QtLayerManagerBridgeTest, UnregisterObserver_StopsSignals)
     QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerAdded);
 
     // 注销观察者
-    m_layerManager->unregisterObserver(m_bridge.get());
+    m_layerManager->removeObserver(m_bridge.get());
 
     // 创建图层 - 不应发射信号
     m_layerManager->createLayer("AfterUnregister");
@@ -262,10 +262,10 @@ TEST_F(QtLayerManagerBridgeTest, UnregisterObserver_StopsSignals)
 TEST_F(QtLayerManagerBridgeTest, ReRegisterObserver_ResumesSignals)
 {
     // 注销
-    m_layerManager->unregisterObserver(m_bridge.get());
+    m_layerManager->removeObserver(m_bridge.get());
 
     // 重新注册
-    m_layerManager->registerObserver(m_bridge.get());
+    m_layerManager->addObserver(m_bridge.get());
 
     QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerAdded);
 
@@ -281,7 +281,7 @@ TEST_F(QtLayerManagerBridgeTest, DoubleRegister_IsIdempotent)
     QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerAdded);
 
     // 重复注册
-    m_layerManager->registerObserver(m_bridge.get());
+    m_layerManager->addObserver(m_bridge.get());
 
     m_layerManager->createLayer("Test");
 

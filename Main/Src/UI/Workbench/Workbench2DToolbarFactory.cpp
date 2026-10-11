@@ -294,38 +294,38 @@ void Workbench2DToolbarFactory::createToolbars(WorkbenchWindow& window, RenderVi
             {
                 { "",
                     {
-                        { "edit.undo", QObject::tr("Undo"), ":/ui/common/Icons/Actions/undo.svg" },
-                        { "edit.redo", QObject::tr("Redo"), ":/ui/common/Icons/Actions/redo.svg" },
+                        { "edit.undo", QObject::tr("Undo"), ":/ui/common/Icons/Actions/undo.svg", false, "", "", "", "", "", true },
+                        { "edit.redo", QObject::tr("Redo"), ":/ui/common/Icons/Actions/redo.svg", false, "", "", "", "", "", true },
                     } },
                 { "",
                     {
-                        { "edit.mirror_horizontal", QObject::tr("Mirror H"), ":/ui/common/Icons/Actions/mirror_h.svg" },
-                        { "edit.mirror_vertical", QObject::tr("Mirror V"), ":/ui/common/Icons/Actions/mirror_v.svg" },
+                        { "edit.mirror_horizontal", QObject::tr("Mirror H"), ":/ui/common/Icons/Actions/mirror_h.svg", false, "", "", "", "", "", true },
+                        { "edit.mirror_vertical", QObject::tr("Mirror V"), ":/ui/common/Icons/Actions/mirror_v.svg", false, "", "", "", "", "", true },
                     } },
                 { "",
                     {
-                        { "edit.align_left", QObject::tr("Align Left"), ":/ui/common/Icons/Actions/align_left.svg" },
-                        { "edit.align_right", QObject::tr("Align Right"), ":/ui/common/Icons/Actions/align_right.svg" },
-                        { "edit.align_center_h", QObject::tr("Align Center H"), ":/ui/common/Icons/Actions/align_center_h.svg" },
-                        { "edit.align_top", QObject::tr("Align Top"), ":/ui/common/Icons/Actions/align_top.svg" },
-                        { "edit.align_bottom", QObject::tr("Align Bottom"), ":/ui/common/Icons/Actions/align_bottom.svg" },
-                        { "edit.align_center_v", QObject::tr("Align Center V"), ":/ui/common/Icons/Actions/align_center_v.svg" },
+                        { "edit.align_left", QObject::tr("Align Left"), ":/ui/common/Icons/Actions/align_left.svg", false, "", "", "", "", "", true },
+                        { "edit.align_right", QObject::tr("Align Right"), ":/ui/common/Icons/Actions/align_right.svg", false, "", "", "", "", "", true },
+                        { "edit.align_center_h", QObject::tr("Align Center H"), ":/ui/common/Icons/Actions/align_center_h.svg", false, "", "", "", "", "", true },
+                        { "edit.align_top", QObject::tr("Align Top"), ":/ui/common/Icons/Actions/align_top.svg", false, "", "", "", "", "", true },
+                        { "edit.align_bottom", QObject::tr("Align Bottom"), ":/ui/common/Icons/Actions/align_bottom.svg", false, "", "", "", "", "", true },
+                        { "edit.align_center_v", QObject::tr("Align Center V"), ":/ui/common/Icons/Actions/align_center_v.svg", false, "", "", "", "", "", true },
                     } },
                 { "",
                     {
-                        { "edit.select_all", QObject::tr("Select All"), ":/ui/common/Icons/Actions/select_all.svg" },
-                        { "edit.invert_selection", QObject::tr("Invert Selection"), ":/ui/common/Icons/Actions/invert_selection.svg" },
-                        { "edit.deselect", QObject::tr("Deselect"), ":/ui/common/Icons/Actions/deselect.svg" },
+                        { "edit.select_all", QObject::tr("Select All"), ":/ui/common/Icons/Actions/select_all.svg", false, "", "", "", "", "", true },
+                        { "edit.invert_selection", QObject::tr("Invert Selection"), ":/ui/common/Icons/Actions/invert_selection.svg", false, "", "", "", "", "", true },
+                        { "edit.deselect", QObject::tr("Deselect"), ":/ui/common/Icons/Actions/deselect.svg", false, "", "", "", "", "", true },
                     } },
                 { "",
                     {
-                        { "edit.copy", QObject::tr("Copy"), ":/ui/common/Icons/Actions/copy.svg" },
-                        { "edit.paste", QObject::tr("Paste"), ":/ui/common/Icons/Actions/paste.svg" },
-                        { "edit.delete", QObject::tr("Delete"), ":/ui/common/Icons/Actions/delete.svg" },
+                        { "edit.copy", QObject::tr("Copy"), ":/ui/common/Icons/Actions/copy.svg", false, "", "", "", "", "", true },
+                        { "edit.paste", QObject::tr("Paste"), ":/ui/common/Icons/Actions/paste.svg", false, "", "", "", "", "", true },
+                        { "edit.delete", QObject::tr("Delete"), ":/ui/common/Icons/Actions/delete.svg", false, "", "", "", "", "", true },
                     } },
                 { "",
                     {
-                        { "edit.group", QObject::tr("Group"), ":/ui/common/Icons/Actions/group.svg", true },
+                        { "edit.group", QObject::tr("Group"), ":/ui/common/Icons/Actions/group.svg", true, "", "", "", "", "", true },
                     } },
             },
         });
@@ -342,18 +342,18 @@ void Workbench2DToolbarFactory::createToolbars(WorkbenchWindow& window, RenderVi
             {
                 { QObject::tr("Content"),
                     {
-                        { "QR_Content", QObject::tr("Content") },
-                        { "QR_ErrorCorrection", QObject::tr("Error Correction") },
+                        { "QR_Content", QObject::tr("Content"), "", false, "", "", "", "", "", true },
+                        { "QR_ErrorCorrection", QObject::tr("Error Correction"), "", false, "", "", "", "", "", true },
                     } },
                 { QObject::tr("Appearance"),
                     {
-                        { "QR_Size", QObject::tr("Size") },
-                        { "QR_Foreground", QObject::tr("Foreground") },
-                        { "QR_Background", QObject::tr("Background") },
+                        { "QR_Size", QObject::tr("Size"), "", false, "", "", "", "", "", true },
+                        { "QR_Foreground", QObject::tr("Foreground"), "", false, "", "", "", "", "", true },
+                        { "QR_Background", QObject::tr("Background"), "", false, "", "", "", "", "", true },
                     } },
                 { QObject::tr("Advanced"),
                     {
-                        { "QR_Logo", QObject::tr("Logo") },
+                        { "QR_Logo", QObject::tr("Logo"), "", false, "", "", "", "", "", true },
                     } },
             },
         });
@@ -365,14 +365,14 @@ void Workbench2DToolbarFactory::createToolbars(WorkbenchWindow& window, RenderVi
             {
                 { QObject::tr("Adjust"),
                     {
-                        { "Bitmap_Crop", QObject::tr("Crop") },
-                        { "Bitmap_Rotate", QObject::tr("Rotate") },
-                        { "Bitmap_Brightness", QObject::tr("Brightness") },
-                        { "Bitmap_Contrast", QObject::tr("Contrast") },
+                        { "Bitmap_Crop", QObject::tr("Crop"), "", false, "", "", "", "", "", true },
+                        { "Bitmap_Rotate", QObject::tr("Rotate"), "", false, "", "", "", "", "", true },
+                        { "Bitmap_Brightness", QObject::tr("Brightness"), "", false, "", "", "", "", "", true },
+                        { "Bitmap_Contrast", QObject::tr("Contrast"), "", false, "", "", "", "", "", true },
                     } },
                 { QObject::tr("Filter"),
                     {
-                        { "Bitmap_Filter", QObject::tr("Filter") },
+                        { "Bitmap_Filter", QObject::tr("Filter"), "", false, "", "", "", "", "", true },
                     } },
             },
         });
@@ -384,14 +384,14 @@ void Workbench2DToolbarFactory::createToolbars(WorkbenchWindow& window, RenderVi
             {
                 { QObject::tr("Path"),
                     {
-                        { "Vector_NodeEdit", QObject::tr("Node Edit") },
-                        { "Vector_Simplify", QObject::tr("Simplify") },
-                        { "Vector_Boolean", QObject::tr("Boolean") },
+                        { "Vector_NodeEdit", QObject::tr("Node Edit"), "", false, "", "", "", "", "", true },
+                        { "Vector_Simplify", QObject::tr("Simplify"), "", false, "", "", "", "", "", true },
+                        { "Vector_Boolean", QObject::tr("Boolean"), "", false, "", "", "", "", "", true },
                     } },
                 { QObject::tr("Style"),
                     {
-                        { "Vector_Stroke", QObject::tr("Stroke") },
-                        { "Vector_Fill", QObject::tr("Fill") },
+                        { "Vector_Stroke", QObject::tr("Stroke"), "", false, "", "", "", "", "", true },
+                        { "Vector_Fill", QObject::tr("Fill"), "", false, "", "", "", "", "", true },
                     } },
             },
         });
@@ -403,18 +403,18 @@ void Workbench2DToolbarFactory::createToolbars(WorkbenchWindow& window, RenderVi
             {
                 { QObject::tr("Transform"),
                     {
-                        { "Image_Crop", QObject::tr("Crop") },
-                        { "Image_Rotate", QObject::tr("Rotate") },
-                        { "Image_Flip", QObject::tr("Flip") },
+                        { "Image_Crop", QObject::tr("Crop"), "", false, "", "", "", "", "", true },
+                        { "Image_Rotate", QObject::tr("Rotate"), "", false, "", "", "", "", "", true },
+                        { "Image_Flip", QObject::tr("Flip"), "", false, "", "", "", "", "", true },
                     } },
                 { QObject::tr("Adjust"),
                     {
-                        { "Image_Brightness", QObject::tr("Brightness") },
-                        { "Image_Contrast", QObject::tr("Contrast") },
+                        { "Image_Brightness", QObject::tr("Brightness"), "", false, "", "", "", "", "", true },
+                        { "Image_Contrast", QObject::tr("Contrast"), "", false, "", "", "", "", "", true },
                     } },
                 { QObject::tr("Filter"),
                     {
-                        { "Image_Filter", QObject::tr("Filter") },
+                        { "Image_Filter", QObject::tr("Filter"), "", false, "", "", "", "", "", true },
                     } },
             },
         });

@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "UI/Service/ToolBarContextManager.h"
+#include "Workbench2D.h"
 
 class QAction;
 class CommandActionHub;
@@ -28,13 +29,6 @@ namespace Eg
 }
 
 struct CommandUiSnapshot;
-
-/// 2D 左右面板（Draw Tools / Layers）的承载样式
-enum class PanelHostStyle
-{
-    Toolbar,  ///< 固定工具栏（QToolBar 停靠在左右两侧）
-    Dock      ///< Dock 停靠面板（QDockWidget，默认）
-};
 
 class Workbench2DToolbarFactory : public QObject
 {

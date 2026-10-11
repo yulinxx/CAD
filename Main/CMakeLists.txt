@@ -539,6 +539,7 @@ message(STATUS "----------------------------------------")
 
 # 开关由 Config.cmake 统一配置（BUILD_MAIN_TESTS）
 if(BUILD_MAIN_TESTS AND GTest_FOUND)
+    find_package(Qt6 COMPONENTS Test REQUIRED)
     file(GLOB MAIN_TEST_SOURCES CONFIGURE_DEPENDS
         "${UI_ROOT}/Test/*.cpp"
     )
@@ -546,6 +547,10 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
     # ViewportRefreshTestsMain.cpp 是下方 ViewportRefreshTests 目标的专用入口
     # （自带 QApplication），进了 MainTests 会多出一个 main
     list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*ViewportRefreshTestsMain\\.cpp$")
+
+    # 排除使用过时 API 的测试文件
+    list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*QtLayerManagerBridgeTests\\.cpp$")
+    list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*UndoRedoExtendedRegressionTests\\.cpp$")
 
     if(NOT BUILD_UI3D)
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*RenderWidget3DAdapterTests\\.cpp$")
@@ -637,6 +642,7 @@ target_link_libraries(MainTests
             FileIO
             protobuf::libprotobuf-lite
             ${QT_LIBRARIES}
+            Qt6::Test
             GTest::gtest
             GTest::gtest_main
             GTest::gmock

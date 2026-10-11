@@ -660,6 +660,29 @@ void WorkbenchLayoutManager::setSceneDockVisible(bool visible)
     }
 }
 
+void WorkbenchLayoutManager::setPropertiesDockVisible(bool visible)
+{
+    // 查找 PropertiesDock
+    QDockWidget* propertiesDock = m_panelState.rightDock.data();
+    if (!propertiesDock)
+    {
+        for (auto* dock : m_registeredDocks)
+        {
+            if (dock && dock->objectName() == UiDockIds::Properties)
+            {
+                propertiesDock = dock;
+                m_panelState.rightDock = dock;
+                break;
+            }
+        }
+    }
+
+    if (propertiesDock)
+    {
+        propertiesDock->setVisible(visible);
+    }
+}
+
 void WorkbenchLayoutManager::applyDockPolicy(bool requiresSkeleton, const QString& workbenchId)
 {
     // 1. 骨架 Dock（左/右通用侧栏）按 requiresSkeleton 控制
