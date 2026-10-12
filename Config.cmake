@@ -14,7 +14,8 @@
 #  [1] Qt6 路径（根据操作系统自动选择）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if(WIN32)
-    set(Qt_INSTALL_DIR "C:/Qt/6.11.0/msvc2022_64/" CACHE PATH "Qt6 Windows")
+    # set(Qt_INSTALL_DIR "C:/Qt/6.11.0/msvc2022_64/" CACHE PATH "Qt6 Windows")
+    set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.11.2/msvc2022_64/" CACHE PATH "Qt6 Windows")
 elseif(APPLE)
     set(Qt_INSTALL_DIR "$ENV{HOME}/Qt/6.11.1/macos/" CACHE PATH "Qt6 macOS")
 elseif(UNIX)
@@ -25,7 +26,8 @@ endif()
 #  [2] vcpkg 路径（根据操作系统自动选择）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if(WIN32)
-    set(VCPKG_DIR "C:/vcpkg/" CACHE PATH "vcpkg Windows")
+    # set(VCPKG_DIR "C:/vcpkg/" CACHE PATH "vcpkg Windows")
+    set(VCPKG_DIR "C:/Users/xx/vcpkg/" CACHE PATH "vcpkg Windows")
 elseif(APPLE)
     set(VCPKG_DIR "$ENV{HOME}/vcpkg/" CACHE PATH "vcpkg macOS")
 elseif(UNIX)
