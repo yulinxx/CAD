@@ -64,9 +64,12 @@ private:
 
     PanModeCallback m_panModeToggleCallback;
     IsPanModeCallback m_isPanModeCallback;
-    QToolButton* m_selectButton = nullptr;
+    // 按钮由 rebuildButtons 销毁重建，与 m_selectAction 同因：旧按钮 deleteLater 生效前，
+    // 本控件仍可能收到 updateHighlight（LanguageChange / 工具切换），裸指针会解引用已删对象。
+    QPointer<QToolButton> m_selectButton;
     // 中枢托管，工作台切换（2D→3D）时会先于本控件销毁；用 QPointer 自动置空，
     // 避免本控件在 LanguageChange 等事件里解引用已释放的 QAction。
     QPointer<QAction> m_selectAction;
+    // 合成本控件自持（parent=this），不随 rebuildButtons 重建，只建一次
     QAction* m_panAction = nullptr;
 };

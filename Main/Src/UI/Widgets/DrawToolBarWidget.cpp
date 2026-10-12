@@ -132,6 +132,11 @@ void DrawToolBarWidget::updateHighlight()
 void DrawToolBarWidget::rebuildButtons()
 {
     // 清除旧按钮，重建布局。按钮只是 QAction 的展示壳，QAction 归中枢所有，此处不销毁它们。
+    // 旧按钮是 deleteLater 异步销毁：先把成员指针摘掉，否则本函数返回后、删除事件派发前，
+    // 任何一次 updateHighlight（工具切换、LanguageChange）都会解引用已摘除的按钮。
+    m_selectButton = nullptr;
+    m_selectAction = nullptr;
+
     if (QLayout* old = layout())
     {
         QLayoutItem* item = nullptr;
@@ -180,10 +185,14 @@ void DrawToolBarWidget::rebuildButtons()
             // 保存 Select 模式的 QAction
             m_selectAction = action;
 
-            // 创建 Pan 模式的虚拟 QAction（用于切换）
-            // 使用 this 作为父对象，由 DrawToolBarWidget 统一管理生命周期
-            m_panAction = new QAction(this);
-            m_panAction->setCheckable(true);
+            // 创建 Pan 模式的虚拟 QAction（用于切换）。
+            // 用 this 作父对象由本控件管理生命周期，且只建一次：rebuildButtons 会反复执行，
+            // 若每轮都 new，旧的既没人引用也不会被释放，随本控件存活期持续累积。
+            if (!m_panAction)
+            {
+                m_panAction = new QAction(this);
+                m_panAction->setCheckable(true);
+            }
             // Pan 图标和提示在 updateHighlight 中设置
 
             // 初始状态更新
