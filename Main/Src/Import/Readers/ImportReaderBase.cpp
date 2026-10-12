@@ -12,9 +12,12 @@
 #include <vector>
 
 #include "FileIO/FileIOManager.h"
+#include "FileIO/UnitTransform.h"
 #include "Engine3D/Import/FioEntityConverter.h"
 #include "Log/SyLogger.h"
 #include "Engine/SyEntity/SyEntity.h"
+
+#include <cmath>
 
 ImportReaderBase::ImportReaderBase(
     Fio::FileFormat format, QStringList extensions, QString formatName, ImportDimension dim)
@@ -158,6 +161,49 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
             decorateError(*errMsg, context);
         }
         return false;
+    }
+
+    // ---- 单位换算 ----
+    // 源文件声明的单位（DXF 的 $INSUNITS → ir.sourceUnit）与目标单位不一致时，
+    // 对 IR 统一缩放，否则英制图纸导入到毫米文档会整体小 25.4 倍。
+    // 目标单位取 context.unit（显式指定）；为空时取应用基准单位 mm（与 UI 层
+    // UnitManager 的毫米基准一致）。源未声明单位（sourceUnit 为空）保持原样；
+    // context.scaleFactor 为额外显式倍率，恒与换算比相乘。
+    // scaleParseResult 必须在「解析返回之后、下一次解析之前」的同线程调用，
+    // 这里正处于解析线程上，满足内存契约。
+    double importScale = context.scaleFactor;
+    if (!std::isfinite(importScale) || importScale <= 0.0)
+    {
+        SY_WARNF("[ImportReader:%s] Ignoring invalid ImportContext::scaleFactor", tag.constData());
+        importScale = 1.0;
+    }
+    const QByteArray targetUnit =
+        context.unit.isEmpty() ? QByteArrayLiteral("mm") : context.unit.toUtf8();
+    if (ir.sourceUnit[0] != '\0')
+    {
+        importScale *= Fio::unitScaleRatio(ir.sourceUnit, targetUnit.constData());
+    }
+    if (std::fabs(importScale - 1.0) > 1e-12 && !Fio::scaleParseResult(&ir, importScale))
+    {
+        SY_ERRORF("[ImportReader:%s] Unit scale failed (scale=%f, sourceUnit='%s', target='%s')",
+            tag.constData(),
+            importScale,
+            ir.sourceUnit,
+            targetUnit.constData());
+        if (errMsg)
+        {
+            *errMsg = QStringLiteral("Unit conversion failed for this file");
+            decorateError(*errMsg, context);
+        }
+        return false;
+    }
+    if (std::fabs(importScale - 1.0) > 1e-12)
+    {
+        SY_INFOF("[ImportReader:%s] Applied import scale=%f (sourceUnit='%s', target='%s')",
+            tag.constData(),
+            importScale,
+            ir.sourceUnit,
+            targetUnit.constData());
     }
 
     SY_DEBUGF("[ImportReader:%s] IR parsed in %lld ms: entities=%u, layers=%u, groups=%u, warnings=%u, unit='%s', "

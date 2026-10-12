@@ -16,6 +16,7 @@ PltImportReader::PltImportReader()
 
 ImportResult PltImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
 {
-    // PltParser 仅实现 IR 路径（PLT 逻辑简单，无需旧路径回退）
-    return readViaIR(context, Fio::FileFormat::PLT, outEntities, false);
+    // PltParser 仅实现 IR 路径（PLT 逻辑简单，无需旧路径回退）；
+    // collectLayers=true：把 SP 笔号图层（"Pen n"）还原到 ImportService。
+    return readViaIR(context, Fio::FileFormat::PLT, outEntities, true);
 }
