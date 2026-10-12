@@ -1181,42 +1181,39 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         m_uiState.stateCenter->setMetadata(meta);
     }
 
-    // 单击色块 → 若已选中未锁定图元则将其移动到该图层（可撤销），并设为当前图层
+    // 单击色块 → 立即切换当前图层（轻量，不受锁定限制）；「选中该图层全部图元」或
+    // 「把选中图元移动到该图层」延迟到双击窗口结束后执行：双击会在 doubleClickInterval
+    // 内到达，届时取消挂起的延迟动作，否则双击打开图层管理时
+    // 第一次点击的选择/改层副作用已经生效
     QObject::connect(m_rightToolBar, &RightToolBar::sigLayerSelected, this, [this](int layerId) {
-        // 「移动选中图元到图层」等价于 edit.move_to_layer，规则是 RequiresUnlockedSelection。
-        // 右侧色块是 QPushButton 而非 QAction，无法靠 enableRule 灰显，
-        // 因此在这里按同一份快照做前置判定 —— 否则点色块可以绕过锁定改动被锁图元。
-        // 注意：「设为当前图层」不受锁定影响，必须始终执行，故只 gate 前半段。
-        const bool selectionLocked = m_commandHub && m_commandHub->currentSnapshot().anyLocked();
-        if (!selectionLocked && m_scene.selectionService && m_scene.layerEditService)
-        {
-            std::vector<Eg::EntityId> selectedIds;
-            m_scene.selectionService->visitSelectedIds(&collectSelectedIds, &selectedIds);
-            if (!selectedIds.empty())
-            {
-                m_scene.layerEditService->assignEntitiesToLayer(selectedIds, layerId, "Move selected to layer");
-            }
-        }
         if (m_scene.layerManager)
         {
             m_scene.layerManager->setCurrentLayer(layerId);
         }
         // 图层变更后刷新视图和动作状态
         refreshCommandUiState();
-        if (m_viewport)
-        {
-            m_viewport->requestFullRefresh();
-        }
+
+        const int sequence = ++m_layerClickSequence;
+        QTimer::singleShot(QApplication::doubleClickInterval(), this, [this, layerId, sequence]() {
+            if (sequence != m_layerClickSequence)
+            {
+                return;  // 已被后续单击或双击取代
+            }
+            applyLayerClick(layerId);
+        });
     });
 
-    // 双击色块 → 打开图层管理对话框（其中设置当前图层会通过 sigCurrentLayerChanged 同步回右侧色块）
-    QObject::connect(m_rightToolBar, &RightToolBar::sigLayerDoubleClicked, this, [this](int /*layerId*/) {
-        if (m_scene.layerEditService)
+    // 双击色块 → 取消挂起的延迟动作，打开图层管理对话框
+    // （其中设置当前图层会通过 sigCurrentLayerChanged 同步回右侧色块）
+    QObject::connect(m_rightToolBar, &RightToolBar::sigLayerDoubleClicked, this, [this](int layerId) {
+        if (!m_scene.layerEditService)
         {
-            LayerManagerDialog::showDialog(m_scene.layerEditService,
-                m_commandHub ? m_commandHub->mainWindow() : nullptr,
-                m_scene.layerManagerBridge);
+            return;
         }
+        ++m_layerClickSequence;  // 取消本次单击挂起的延迟动作
+        LayerManagerDialog::showDialog(m_scene.layerEditService,
+            m_commandHub ? m_commandHub->mainWindow() : nullptr,
+            m_scene.layerManagerBridge);
     });
 
     // 撤销/重做会恢复/移除/重建图元（场景拓扑变化），增量刷新可能遗漏，
@@ -1288,6 +1285,54 @@ ToolBarContext Workbench2D::determineContextFromSelection(const CommandUiSnapsho
         return ToolBarContext::VectorEditing;
 
     return ToolBarContext::Default;
+}
+
+void Workbench2D::applyLayerClick(int layerId)
+{
+    if (!m_scene.layerManager)
+    {
+        return;
+    }
+
+    // 按点击时点的选中状态分流（延迟执行期间选择可能已变化，以执行时快照为准）
+    std::vector<Eg::EntityId> selectedIds;
+    if (m_scene.selectionService)
+    {
+        m_scene.selectionService->visitSelectedIds(&collectSelectedIds, &selectedIds);
+    }
+
+    if (selectedIds.empty())
+    {
+        // 没有选中图元：选中该图层上的全部图元（selectEntities 为整批替换语义，发一次选择通知）
+        Eg::SceneManager* scene = m_scene.sceneEditService ? m_scene.sceneEditService->sceneManager() : nullptr;
+        if (scene)
+        {
+            const auto layerEntities = m_scene.layerManager->getLayerEntities(layerId);
+            if (!layerEntities.empty())
+            {
+                scene->selectEntities(layerEntities);
+            }
+        }
+        return;
+    }
+
+    // 有选中图元：「移动选中图元到图层」等价于 edit.move_to_layer，规则是 RequiresUnlockedSelection。
+    // 右侧色块是 QPushButton 而非 QAction，无法靠 enableRule 灰显，
+    // 因此按同一份快照做前置判定 —— 否则点色块可以绕过锁定改动被锁图元
+    const bool selectionLocked = m_commandHub && m_commandHub->currentSnapshot().anyLocked();
+    if (selectionLocked || !m_scene.layerEditService)
+    {
+        return;
+    }
+    if (m_scene.layerEditService->assignEntitiesToLayer(selectedIds, layerId, "Move selected to layer"))
+    {
+        // 图元归属变化会影响按图层取色的填充几何，走一次全量刷新
+        refreshCommandUiState();
+        if (m_viewport)
+        {
+            m_viewport->requestFullRefresh();
+        }
+    }
 }
 
 void Workbench2D::setupSceneTree(WorkbenchWindow& window)
