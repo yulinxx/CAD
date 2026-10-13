@@ -73,7 +73,6 @@ void Workbench2DSceneTreeManager::setup(WorkbenchWindow& window, RenderViewport2
         {
             dock->setObjectName(UiDockIds::sceneQString());
             dock->setMinimumWidth(180);
-            dock->setMaximumWidth(300);
         }
         m_panel = panel;
     }

@@ -105,6 +105,11 @@ public:
     /// @param y 世界坐标 Y（毫米）
     void updatePositionLabel(double x, double y);
 
+    /// 按当前单位与最近一次鼠标坐标重绘状态栏坐标文本。
+    /// 坐标文案由本类用 tr() 拼接（译文），状态栏无从自行重译 ——
+    /// 单位切换与语言切换都靠它重画一次。
+    void refreshPositionLabel();
+
     /// 注册停靠面板
     /// @param title 面板标题
     /// @param widget 面板内容部件
@@ -145,7 +150,12 @@ public:
     void saveLayoutSnapshot(const QString& workbenchId);
     /// 恢复布局快照
     /// @param workbenchId 工作台 ID
-    void restoreLayoutSnapshot(const QString& workbenchId);
+    /// @return true 表示已应用保存的布局；false 表示无快照（保留默认布局）
+    bool restoreLayoutSnapshot(const QString& workbenchId);
+    /// 启动期恢复指定工作台的布局快照。
+    /// 先应用该工作台的默认面板显隐策略作初值，再用快照覆盖 —— 快照（用户状态）优先。
+    /// @param workbenchId 工作台 ID
+    void restoreInitialLayout(const QString& workbenchId);
     /// 重新设置所有注册的 dock widget 的标题
     void restoreDockWidgetTitles();
     /// 设置骨架停靠面板的可见性（SceneDock / PropertiesDock）
@@ -170,8 +180,6 @@ public:
     }
 
 private:
-    /// 更新状态栏鼠标坐标显示
-    void refreshPositionLabel();
     /// 创建窗口初始占位内容
     QWidget* createInitialCentralWidget();
     /// 创建工具栏基础骨架
@@ -216,6 +224,9 @@ private:
     void clearSelectionState();
     /// 统一写入工作台切换上下文
     void setWorkbenchSwitchContext(const QString& workbenchId, const QString& switchContextText);
+    /// 按当前工作台应用**默认**面板显隐策略（2D 显示骨架面板；3D 单独显示 Scene/Properties）。
+    /// 只是初值：restoreLayoutSnapshot 里保存的用户状态（含手动关闭的面板）必须在它之后应用。
+    void applyDefaultDockVisibility();
 
 private:
     UiStateCenter* m_stateCenter{ nullptr };

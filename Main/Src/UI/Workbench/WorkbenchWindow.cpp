@@ -623,6 +623,15 @@ void WorkbenchWindow::closeEvent(QCloseEvent* event)
             }
         }
     }
+
+    // 关闭前把当前工作台的布局快照落盘（面板宽度/显隐）。
+    // 否则用户在**最后一个**工作台里拖出来的宽度不会被持久化 ——
+    // 快照原本只在切换工作台时保存，退出时保存一次才能让下次启动恢复同一布局。
+    if (m_workbench)
+    {
+        saveLayoutSnapshot(m_workbench->id());
+    }
+
     event->accept();
 }
 
@@ -674,23 +683,27 @@ void WorkbenchWindow::updatePositionLabel(double x, double y)
 
 void WorkbenchWindow::refreshPositionLabel()
 {
-    if (!m_activeStatusBar || !m_hasMousePosition)
+    if (!m_activeStatusBar)
     {
         return;
     }
 
+    // 只送原始数据（换算后的坐标 + 单位符号），文案由 PositionIndicator 自行用 tr() 拼。
+    // 单位切换、语言切换都靠指示器按缓存的原始值重拼，这里不再拼任何译文。
+    if (!m_hasMousePosition)
+    {
+        m_activeStatusBar->setPositionValues(0.0, 0.0, QStringLiteral("mm"), false);
+        return;
+    }
     if (m_unitManager)
     {
         const UnitManager::Unit unit = m_unitManager->displayUnit();
-        const double dx = m_unitManager->fromBaseUnit(m_lastMouseX, unit);
-        const double dy = m_unitManager->fromBaseUnit(m_lastMouseY, unit);
-        m_activeStatusBar->setPositionText(
-            tr("Position: (%1, %2) %3").arg(dx, 0, 'f', 2).arg(dy, 0, 'f', 2).arg(UnitManager::unitSymbol(unit)));
+        m_activeStatusBar->setPositionValues(m_unitManager->fromBaseUnit(m_lastMouseX, unit),
+            m_unitManager->fromBaseUnit(m_lastMouseY, unit), UnitManager::unitSymbol(unit), true);
     }
     else
     {
-        m_activeStatusBar->setPositionText(
-            tr("Position: (%1, %2) mm").arg(m_lastMouseX, 0, 'f', 2).arg(m_lastMouseY, 0, 'f', 2));
+        m_activeStatusBar->setPositionValues(m_lastMouseX, m_lastMouseY, QStringLiteral("mm"), true);
     }
 }
 
@@ -856,13 +869,45 @@ void WorkbenchWindow::saveLayoutSnapshot(const QString& workbenchId)
 
 /// 恢复布局快照
 /// @param workbenchId 工作台 ID
-void WorkbenchWindow::restoreLayoutSnapshot(const QString& workbenchId)
+/// @return true 表示已应用保存的布局；false 表示无快照（保留默认布局）
+bool WorkbenchWindow::restoreLayoutSnapshot(const QString& workbenchId)
 {
     // 布局恢复只还原窗口外观，不在这里恢复业务状态，避免状态源不统一
     const auto start = std::chrono::steady_clock::now();
-    m_layoutManager->restoreLayoutSnapshot(workbenchId);
+    const bool restored = m_layoutManager->restoreLayoutSnapshot(workbenchId);
     recordPerformance(QStringLiteral("WorkbenchWindow::restoreLayoutSnapshot"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+    return restored;
+}
+
+/// 启动期恢复布局：默认面板策略只作初值，随后被保存的用户快照覆盖
+void WorkbenchWindow::restoreInitialLayout(const QString& workbenchId)
+{
+    applyDefaultDockVisibility();
+    restoreLayoutSnapshot(workbenchId);
+}
+
+/// 按当前工作台应用默认面板显隐策略（仅作初值，不覆盖用户保存的状态）
+void WorkbenchWindow::applyDefaultDockVisibility()
+{
+    if (!m_workbench)
+    {
+        return;
+    }
+
+    // 新工作台自行决定是否需要骨架停靠面板
+    setSkeletonDocksVisible(m_workbench->requiresSkeletonDocks());
+
+    // 3D 模式下 Scene / Properties 面板需要始终显示（即使 requiresSkeletonDocks() 为 false）
+    // 因为 SceneTreePanel / PropertiesPanel 是工作台自己的面板，不是 skeleton 的面板
+    if (!m_workbench->requiresSkeletonDocks())
+    {
+        if (auto* layoutMgr = m_layoutManager.get())
+        {
+            layoutMgr->setSceneDockVisible(true);
+            layoutMgr->setPropertiesDockVisible(true);
+        }
+    }
 }
 
 /// 重新设置所有注册的 dock widget 的标题
@@ -1131,7 +1176,12 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.attach"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 
-    // 8: 恢复新工作台布局快照
+    // 7b: 先按工作台应用**默认**面板显隐策略 —— 仅作初值。
+    // 必须在恢复快照**之前**：快照保存的是用户的真实状态（包括手动关闭的面板），
+    // 若放在恢复之后，会把用户关掉的面板又强行显示出来，切换一次就「恢复原样」。
+    applyDefaultDockVisibility();
+
+    // 8: 恢复新工作台布局快照（面板宽度 + 显隐，用户手动调整的状态优先于默认策略）
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: restoring layout");
     restoreLayoutSnapshot(workbenchId);
     recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.restoreLayout"),
@@ -1151,19 +1201,8 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     }
     // 工作台级状态栏 widget（坐标/选择/消息）由各 Workbench 在 attachToWindow 中
     // 创建并通过 mountStatusBar 挂载；配置驱动的框架级槽位已在第 6d 步重建。
-    // 新工作台自行决定是否需要骨架停靠面板
-    setSkeletonDocksVisible(m_workbench->requiresSkeletonDocks());
-
-    // 3D 模式下 Scene / Properties 面板需要始终显示（即使 requiresSkeletonDocks() 为 false）
-    // 因为 SceneTreePanel / PropertiesPanel 是工作台自己的面板，不是 skeleton 的面板
-    if (!m_workbench->requiresSkeletonDocks())
-    {
-        if (auto* layoutMgr = m_layoutManager.get())
-        {
-            layoutMgr->setSceneDockVisible(true);
-            layoutMgr->setPropertiesDockVisible(true);
-        }
-    }
+    // 面板显隐默认策略已在第 7b 步应用、第 8 步被用户快照覆盖，这里不再重复强制显示，
+    // 否则用户手动关闭的面板会在每次切换后被顶回来。
 
     // 业务状态只经 UiStateCenter 写入；windowState 是镜像，由 sync 从状态中心拉取
     // （避免两边各自演化的双写路径 —— 见《耦合性分析.md》D.1 双状态源收口）

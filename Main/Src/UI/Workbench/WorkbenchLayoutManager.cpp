@@ -228,16 +228,14 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
         }
     }
 
-    // 初始面板宽度：默认窄一些，不挤压中间视图；不限制最大宽度，用户可手动拖宽。
-    // 右侧面板 (PropertiesDock) 适中宽度，兼顾属性行和图层面板。
-    // 同时设置最小宽度，防止拖拽时过窄导致内容不可见
+    // 初始面板宽度：只作为「尚无已保存快照」时的默认值，
+    // restoreLayoutSnapshot 成功后会被用户上次的真实宽度覆盖。
+    // 只设最小宽度防拖拽过窄；不设最大宽度 —— 用户可能手动拉宽面板，
+    // 固定上限会在工作台切换后把宽度强行截断，表现为「没操作宽度却变了」。
     if (m_panelState.leftDock && m_panelState.rightDock)
     {
         m_panelState.leftDock->setMinimumWidth(160);
-        m_panelState.leftDock->setMaximumWidth(400);
-
         m_panelState.rightDock->setMinimumWidth(200);
-        m_panelState.rightDock->setMaximumWidth(500);
 
         m_parent->resizeDocks(
             { m_panelState.leftDock.data(), m_panelState.rightDock.data() }, { 180, 240 }, Qt::Horizontal);
@@ -532,63 +530,106 @@ void WorkbenchLayoutManager::saveLayoutSnapshot(const QString& workbenchId)
         return;
     }
 
-    // 优先使用数据库持久化，失败时回退到 QSettings
+    const QString savedAt = QDateTime::currentDateTime().toString(Qt::ISODate);
+
+    // 数据库与 QSettings 同时落盘（恢复时按时间戳取较新的一份），
+    // 避免某一次写入失败后，另一侧的旧数据在恢复时被当成最新布局。
     if (m_persistenceService && m_persistenceService->isOpen() && m_persistenceService->workspaceSnapshots())
     {
         WorkspaceSnapshotRecord rec;
         rec.workbenchId = workbenchId.toStdString();
         rec.geometry = m_parent->saveGeometry().toBase64().toStdString();
         rec.windowState = m_parent->saveState().toBase64().toStdString();
-        rec.updatedAt = QDateTime::currentDateTime().toString(Qt::ISODate).toStdString();
+        rec.updatedAt = savedAt.toStdString();
         m_persistenceService->workspaceSnapshots()->save(rec);
         SY_DEBUGF("[WorkbenchLayoutManager] Saved layout snapshot to database: %s", rec.workbenchId.c_str());
     }
 
-    // QSettings 兜底
+    // QSettings 兜底（同时也是时间戳的载体）
     QSettings settings;
     settings.beginGroup(QStringLiteral("LayoutSnapshots"));
     settings.setValue(workbenchId + QStringLiteral("/geometry"), m_parent->saveGeometry());
     settings.setValue(workbenchId + QStringLiteral("/windowState"), m_parent->saveState());
+    settings.setValue(workbenchId + QStringLiteral("/savedAt"), savedAt);
     settings.endGroup();
 }
 
-void WorkbenchLayoutManager::restoreLayoutSnapshot(const QString& workbenchId)
+bool WorkbenchLayoutManager::restoreLayoutSnapshot(const QString& workbenchId)
 {
     // 布局恢复只还原窗口外观，不在这里恢复业务状态，避免状态源不统一
     // 注意：不恢复窗口几何尺寸（geometry），保持当前窗口位置和大小不变
     if (workbenchId.isEmpty())
     {
-        return;
+        return false;
     }
 
-    // 优先从数据库加载
-    QByteArray state;
+    const auto parseTime = [](const QString& text) {
+        // 时间戳缺失/解析失败视为「最旧」，保证比较结果确定
+        if (text.isEmpty())
+        {
+            return QDateTime::fromMSecsSinceEpoch(0);
+        }
+        const QDateTime parsed = QDateTime::fromString(text, Qt::ISODate);
+        return parsed.isValid() ? parsed : QDateTime::fromMSecsSinceEpoch(0);
+    };
+
+    // 1: 数据库
+    QByteArray dbState;
+    QDateTime dbTime = QDateTime::fromMSecsSinceEpoch(0);
     if (m_persistenceService && m_persistenceService->isOpen() && m_persistenceService->workspaceSnapshots())
     {
         auto rec = m_persistenceService->workspaceSnapshots()->load(workbenchId.toStdString());
         if (!rec.windowState.empty())
         {
-            state = QByteArray::fromBase64(QByteArray::fromStdString(rec.windowState));
+            dbState = QByteArray::fromBase64(QByteArray::fromStdString(rec.windowState));
+            dbTime = parseTime(QString::fromStdString(rec.updatedAt));
             SY_DEBUGF("[WorkbenchLayoutManager] Loaded layout snapshot from database: %s", rec.workbenchId.c_str());
         }
     }
 
-    // 数据库未命中时从 QSettings 兜底
-    if (state.isEmpty())
+    // 2: QSettings
+    QByteArray localState;
+    QDateTime localTime = QDateTime::fromMSecsSinceEpoch(0);
     {
         QSettings settings;
         settings.beginGroup(QStringLiteral("LayoutSnapshots"));
-        state = settings.value(workbenchId + QStringLiteral("/windowState")).toByteArray();
+        localState = settings.value(workbenchId + QStringLiteral("/windowState")).toByteArray();
+        localTime = parseTime(settings.value(workbenchId + QStringLiteral("/savedAt")).toString());
         settings.endGroup();
     }
 
-    if (!state.isEmpty())
+    // 3: 两份都存在时取写入时间较新的一份（DB 可能因某次写入失败而落后于 QSettings）
+    QByteArray state;
+    if (localState.isEmpty())
     {
-        m_parent->restoreState(state);
+        state = dbState;
+    }
+    else if (dbState.isEmpty())
+    {
+        state = localState;
+    }
+    else
+    {
+        state = (localTime >= dbTime) ? localState : dbState;
+    }
+
+    if (state.isEmpty())
+    {
+        // 无快照：保留构建期的默认宽度与 JSON 初始显隐
+        restoreDockWidgetTitles();
+        return false;
+    }
+
+    if (!m_parent->restoreState(state))
+    {
+        SY_WARN("[WorkbenchLayoutManager] Layout snapshot restore failed, keeping built-in defaults");
+        restoreDockWidgetTitles();
+        return false;
     }
 
     // restoreState() 会覆盖 dock widget 的标题，需要重新设置为当前工作台的标题
     restoreDockWidgetTitles();
+    return true;
 }
 
 void WorkbenchLayoutManager::restoreDockWidgetTitles()
@@ -653,9 +694,8 @@ void WorkbenchLayoutManager::setSceneDockVisible(bool visible)
 
     if (sceneDock)
     {
-        // 设置宽度限制（与 2D 模式一致）
+        // 与 2D 一致的最小宽度；不设最大宽度，允许用户手动拉宽（快照会记住该宽度）
         sceneDock->setMinimumWidth(180);
-        sceneDock->setMaximumWidth(300);
         sceneDock->setVisible(visible);
     }
 }
@@ -712,7 +752,6 @@ void WorkbenchLayoutManager::applyDockPolicy(bool requiresSkeleton, const QStrin
         if (sceneDock)
         {
             sceneDock->setMinimumWidth(180);
-            sceneDock->setMaximumWidth(300);
             sceneDock->setVisible(true);
         }
 

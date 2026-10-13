@@ -102,6 +102,11 @@ void UiShellHost::initializeAndShow()
     SY_DEBUG("[UiShellHost] activating workbench");
     m_workbench->activate();
 
+    // 恢复上次会话保存的布局快照（面板宽度/显隐）。
+    // 必须在 show() 之前：否则窗口先按构建期默认宽度渲染，
+    // 且切换工作台时若旧快照从未被启动期应用过，会被默认值覆盖丢失。
+    m_mainWindow->restoreInitialLayout(m_workbench->id());
+
     m_mainWindow->setWorkbenchFactory([this](const QString& id) -> UiWorkbench* {
         return resolveWorkbench(id);
     });

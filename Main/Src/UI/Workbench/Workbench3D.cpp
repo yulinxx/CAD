@@ -695,29 +695,29 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     }
     window.mountStatusBar(m_statusBar3D);
 
-    // 将光标世界坐标信号直接连接到 StatusBar3D 的位置标签
+    // 光标世界坐标：只把原始浮点数交给状态栏，坐标文案由 PositionIndicator
+    // 自行用 tr() 拼并缓存原始值（语言切换时它自己重拼，这里不用管）
     if (m_services3D.renderWidget)
     {
         connect(m_services3D.renderWidget,
             &RenderWidget3D::sigCursorWorldPosition,
             m_statusBar3D,
             [sb3d = m_statusBar3D](float x, float y, float z, bool valid) {
-                if (valid)
+                if (sb3d)
                 {
-                    sb3d->setPositionText(
-                        QObject::tr("Position: (%1, %2, %3) mm").arg(x, 0, 'f', 2).arg(y, 0, 'f', 2).arg(z, 0, 'f', 2));
-                }
-                else
-                {
-                    sb3d->setPositionText(QObject::tr("Position: -"));
+                    sb3d->setCursorPosition(x, y, z, valid);
                 }
             });
 
-        // 将选中变化信号直接连接到 StatusBar3D 的选择/模型标签
+        // 选中变化：数量 → 选择区，模型名/三角面数 → 信息区，都只送原始数据
         connect(m_services3D.renderWidget,
             &RenderWidget3D::sigSelectionChanged,
             m_statusBar3D,
             [sb3d = m_statusBar3D](const Eg::SyMeshEntity** entities, int count) {
+                if (!sb3d)
+                {
+                    return;
+                }
                 QString modelName;
                 if (count > 0 && entities && entities[0])
                 {
@@ -750,7 +750,6 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
         {
             sceneDock->setObjectName(UiDockIds::sceneQString());
             sceneDock->setMinimumWidth(180);
-            sceneDock->setMaximumWidth(300);
         }
         m_scenePanel3D = sharedPanel;
     }

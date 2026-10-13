@@ -159,6 +159,7 @@ private:
     uint64_t m_lastSceneTreeTopologyRevision{ 0 };
     QPointer<StatusBar> m_statusBar2D;  ///< 2D 状态栏 widget
 
+
     /// 2D 设置协调器
     std::unique_ptr<SettingsUiCoordinator2D> m_settingsCoordinator;
 

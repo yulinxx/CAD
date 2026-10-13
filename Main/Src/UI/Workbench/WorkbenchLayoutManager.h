@@ -105,10 +105,11 @@ public:
     /// 设置持久化服务（用于数据库级布局快照存储）
     void setPersistenceService(PersistenceService* ps);
 
-    /// 保存布局快照
+    /// 保存布局快照（面板宽度 + 显隐 + 工具栏状态）
     void saveLayoutSnapshot(const QString& workbenchId);
     /// 恢复布局快照
-    void restoreLayoutSnapshot(const QString& workbenchId);
+    /// @return true 表示找到并成功应用了快照；false 表示无快照（保持构建期默认值）
+    bool restoreLayoutSnapshot(const QString& workbenchId);
     /// 重新设置 dock 标题
     void restoreDockWidgetTitles();
     /// 语言切换后重新翻译 Dock 标题栏（依据构建期保存的 JSON 英文源标题）

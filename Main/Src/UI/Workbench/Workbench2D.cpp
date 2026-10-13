@@ -321,6 +321,8 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
         SY_DEBUG("[Workbench2D] StatusBar created");
     }
     window.mountStatusBar(m_statusBar2D);
+    // 语言切换不需要这里做任何事：坐标/选择文案由状态栏内各指示器按缓存的原始值
+    // 自行用 tr() 重拼（见 StatusBarBase 类注释），不存在「生产方重推」这一环。
 
     // 命令 UI 刷新触发源集中挂载（选择/图层锁/场景变化含图元锁/撤销栈/操作完成）。
     // 放在最后：此时视口、工具栏、场景树、状态栏均已就绪，install 内的首次刷新可覆盖全部 UI。
@@ -1349,9 +1351,8 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
         if (dock)
         {
             dock->setObjectName(UiDockIds::sceneQString());
-            // 限制 Scene 面板宽度：最小 180、最大 300
+            // Scene 面板最小宽度 180；不设上限，用户可自行拉宽（宽度由布局快照记住）
             dock->setMinimumWidth(180);
-            dock->setMaximumWidth(300);
         }
         m_scenePanel2D = panel;
     }
@@ -1963,11 +1964,11 @@ void Workbench2D::applySelectionContext(const CommandUiSnapshot& snapshot)
     // 选择变化下叠出 N 个并行回调，与注释宣称的「只执行一次」不符。
     schedulePropertiesPanelRefresh();
 
-    // 状态栏选择指示器：直接用快照里的 selectionCount，不再二次遍历场景
+    // 状态栏选择指示器：只送数量，"Selected: N" 文案由指示器自行用 tr() 拼；
+    // 直接用快照里的 selectionCount，不再二次遍历场景
     if (m_statusBar2D)
     {
-        const int n = snapshot.selectionCount;
-        m_statusBar2D->setSelectionInfo(n, tr("Selected: %1").arg(n));
+        m_statusBar2D->setSelectionCount(snapshot.selectionCount);
     }
 
     // 场景树右键菜单：与视口右键菜单共用同一份 hasSelection / anyLocked 判定，消除规则漂移。
