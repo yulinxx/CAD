@@ -118,6 +118,8 @@ private:
     void refreshSceneTreeRowsForSelection2D();
     /// 应用选择上下文到各 UI 组件
     void applySelectionContext(const CommandUiSnapshot& snapshot);
+    /// 单击图层色块的延迟业务动作：无选中则选中该图层全部图元，有选中则把选中图元移到该图层
+    void applyLayerClick(int layerId);
 
 private:
     /// 命令动作中枢
@@ -130,6 +132,8 @@ private:
     QToolBar* m_textFontToolBar{ nullptr };           ///< 文字编辑字体工具栏
     TextFontToolBar* m_textFontToolBarWidget{ nullptr };
     RightToolBar* m_rightToolBar{ nullptr };          ///< 右侧工具栏
+    /// 图层色块单击序号：每次单击自增，双击时再自增以取消挂起的延迟动作
+    int m_layerClickSequence{ 0 };
     PanelHostStyle m_panelHostStyle{ PanelHostStyle::Toolbar };  ///< 左右面板承载样式
     RenderViewport2D* m_viewport{ nullptr };         ///< 2D 渲染视口
     SceneTreePanel* m_scenePanel2D{ nullptr };        ///< 2D 场景树面板

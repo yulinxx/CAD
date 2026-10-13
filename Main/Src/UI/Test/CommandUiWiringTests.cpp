@@ -16,6 +16,9 @@
 
 #include "UI2D/Operation/CommandActionHub.h"
 #include "UI2D/Operation/CommandCatalog.h"
+#include "UI2D/DrawTools/ToolManager.h"
+#include "UI2D/ViewWidget/ToolInitializer.h"
+#include "Engine2D/Core/SceneManager.h"
 #include "UI/Menu/MenuActionId.h"
 #include "UI/ClientConfig/UiClientConfigBase.h"
 #include "UI/ClientConfig/UiConfigLoader.h"
@@ -870,6 +873,38 @@ TEST(DrawToolBarWidgetTest, ToolActionsCarryCatalogCommandId)
         ASSERT_NE(entry->shortcutId, nullptr) << entry->toolName;
         // commandId 是跨入口的统一标识：快照刷新、日志、配置契约测试都靠它认人
         EXPECT_EQ(action->property("commandId").toString(), QString::fromUtf8(entry->shortcutId));
+    }
+}
+
+TEST(DrawToolBarWidgetTest, LeftToolbarEntriesResolveToRegisteredTools)
+{
+    // 背景（回归防护）：左侧栏只展示目录里带 LeftToolbar 面的条目，点击后经 OperationBus
+    // 转到 ToolManager::setActiveTool(toolName)。toolName 与已注册工具对不上时，ToolManager
+    // 只打一行 "Unknown tool" 警告——按钮照常显示、点击无任何反应，从现象完全看不出根因。
+    // 这里把「目录声明」与 ToolInitializer 的「工具注册」钉在一起：
+    // 只在 kCommands 里加条目、忘了注册同名工具（或拼错名字）会直接红。
+    ToolManager tm;
+    ToolInitializer::registerAllTools(tm);
+
+    // registerTool 只登记工厂，initializeTools 才把工具真正 new 出来（且 ctx.sceneContext
+    // 为空时会直接 return），所以这里给一个裸 SceneManager，让全部工具实体化后再查。
+    Eg::SceneManager scene;
+    ToolContext2D ctx;
+    ctx.sceneContext = &scene;
+    tm.initializeTools(ctx);
+    ASSERT_TRUE(tm.isInitialized());
+
+    const QVector<const CommandEntry2D*> entries = leftToolbarEntries();
+    ASSERT_FALSE(entries.isEmpty());
+
+    for (const CommandEntry2D* entry : entries)
+    {
+        ASSERT_NE(entry->toolName, nullptr) << "LeftToolbar 面的条目必须声明 toolName，否则会被静默跳过";
+        EXPECT_NE(entry->operationId, OperationId::None) << entry->toolName;
+
+        const QString toolName = QString::fromUtf8(entry->toolName);
+        EXPECT_TRUE(tm.getTool(toolName) != nullptr)
+            << "目录声明了 LeftToolbar 面，ToolInitializer 却没注册同名工具: " << toolName.toStdString();
     }
 }
 

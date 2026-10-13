@@ -76,11 +76,12 @@ void UiShellHost::setWorkbench(UiWorkbench* workbench)
 /// 初始化并显示主窗口
 ///
 /// 执行以下初始化步骤：
-/// 1. 附加工作台到主窗口并激活
-/// 2. 初始化状态中心默认值
-/// 3. 设置主题切换回调
-/// 4. 注册工作台切换工厂
-/// 5. 显示主窗口
+/// 1. 设置工作台到主窗口（注入命令目录、重建菜单/工具栏）
+/// 2. 附加工作台到主窗口并激活
+/// 3. 初始化状态中心默认值
+/// 4. 设置主题切换回调
+/// 5. 注册工作台切换工厂
+/// 6. 显示主窗口
 void UiShellHost::initializeAndShow()
 {
     SY_INFO("[UiShellHost] initializeAndShow: starting UI shell initialization");
@@ -92,17 +93,14 @@ void UiShellHost::initializeAndShow()
         return;
     }
 
+    // 关键：必须先 setWorkbench，将工作台注入菜单管理器/布局管理器，
+    // 使命令目录可用，菜单/工具栏才能正确构建。
+    m_mainWindow->setWorkbench(m_workbench);
+
     SY_DEBUG("[UiShellHost] attaching workbench to main window");
     m_workbench->attachToWindow(*m_mainWindow);
     SY_DEBUG("[UiShellHost] activating workbench");
     m_workbench->activate();
-
-    // 关键：工作台 attachToWindow 后命令中枢才就绪，必须在此重建菜单，
-    // 否则菜单构建时 commandAvailable 会因 m_commandDispatcher 为空而全量过滤。
-    if (m_mainWindow && m_mainWindow->menuManager())
-    {
-        m_mainWindow->menuManager()->rebuildAllMenus();
-    }
 
     m_mainWindow->setWorkbenchFactory([this](const QString& id) -> UiWorkbench* {
         return resolveWorkbench(id);

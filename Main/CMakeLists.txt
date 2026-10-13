@@ -576,8 +576,14 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
     # 标记为生成文件，避免 CMake 配置阶段检查文件是否存在（实际由 FileIO 的 protobuf_generate 在构建期产出）
     set_source_files_properties(${PROTO_GEN_SRC} PROPERTIES GENERATED TRUE)
 
+<<<<<<< HEAD
     # P5 测试扩展: 添加 BaseTool.cpp（非导出类，UI2D 库不导出其符号）
     set(BASE_TOOL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Src/UI/DrawTools/BaseTool.cpp")
+=======
+    # 原「P5 测试扩展: 添加 BaseTool.cpp」已撤销：BaseTool 现为 UI2D_API 导出类
+    # （UI2D/Include/UI2D/DrawTools/BaseTool.h），UI2D.lib 已含其全部非内联符号。
+    # 测试目标再编一份会与 UI2D.lib 撞符号，链接报 LNK2005（BaseTool::onMouseMove）。
+>>>>>>> c5b5a5f3e04673db535b4b94100bc1414e1d370e
 
     find_package(protobuf CONFIG REQUIRED)
 
@@ -585,7 +591,6 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
         ${MAIN_TEST_SOURCES}
         ${MAIN_TEST_DEP_SOURCES}
         ${PROTO_GEN_SRC}
-        ${BASE_TOOL_SRC}
         ${SRC_ROOT}/UI/ClientConfig/ExampleCustomPanel.h
         ${SRC_ROOT}/UI/ClientConfig/configs.qrc
     )
