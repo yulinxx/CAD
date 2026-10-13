@@ -281,7 +281,7 @@ static std::string GetMacAddress()
 #elif defined(__linux__)
 // Linux: getifaddrs + AF_PACKET + sockaddr_ll
 
-    #include <net/if_packet.h>
+    #include <netpacket/packet.h>
     #include <sys/ioctl.h>
 
 static std::string GetMacAddress()

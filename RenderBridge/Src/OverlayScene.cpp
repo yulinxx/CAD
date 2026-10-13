@@ -68,7 +68,8 @@ namespace
         if (!scene.allocTransient(bytes, a) || a.cpuPtr == nullptr)
         {
             SY_DEBUGF("[OverlayScene] allocTransient failed: bytes=%llu, a.buffer=%llu, a.cpuPtr=%p",
-                bytes, a.buffer.value, static_cast<void*>(a.cpuPtr));
+                static_cast<unsigned long long>(bytes), static_cast<unsigned long long>(a.buffer.value),
+                static_cast<void*>(a.cpuPtr));
             return;
         }
         std::memcpy(a.cpuPtr, verts.data(), static_cast<size_t>(bytes));
