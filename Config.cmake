@@ -331,7 +331,7 @@ endif()
 # 依赖库查找配置
 # --------------------------------------------------------------------
 
-# 渲染后端选择逻辑
+# 渲染后端选择逻辑（OpenGL 查找已延迟至 CMakeLists.txt project() 之后）
 if(SANYI_DEFAULT_RENDER_BACKEND STREQUAL "METAL")
     if(APPLE)
         # Metal 是 macOS 系统框架，不需要 find_package
@@ -347,12 +347,12 @@ elseif(SANYI_DEFAULT_RENDER_BACKEND STREQUAL "VULKAN")
         message(FATAL_ERROR "[Render] Vulkan support disabled (SANYI_ENABLE_VULKAN=OFF)")
     endif()
 else()
-    # OpenGL 在 macOS 上已被废弃，使用 Metal 作为默认后端
+    # OpenGL：不在此处 find_package，改而在 CMakeLists.txt project() 之后调用
+    # 参见 CMakeLists.txt 中在 project() 后的 openGL 初始化
     if(APPLE)
         message(STATUS "[Render] Backend: Metal (fallback from OpenGL on macOS)")
     else()
-        find_package(OpenGL REQUIRED)
-        message(STATUS "[Render] Backend: OpenGL")
+        message(STATUS "[Render] Backend: OpenGL (will be found after project())")
     endif()
 endif()
 

@@ -600,7 +600,34 @@ void ViewportInputRouter::handleContextMenu(QContextMenuEvent* event)
 {
     // 交互分发器的 begin/submit/cancel 当前无生产调用方，hasActiveCommand() 恒 false。
     // 取消语义已在各工具层 (SelectionTool/DrawTools) 的 onMousePress/onMouseMove 中实现。
+    // 注：RenderWidget 是原生窗口，本过滤器吞掉其 ContextMenu 后，NSEvent 仍会沿
+    // NSView 响应链落到父控件 RenderViewport2D::contextMenuEvent —— 菜单实际由那条
+    // 路径弹出，是否抑制由 consumeContextMenuSuppression() 联动裁决。
     event->ignore();
+}
+
+bool ViewportInputRouter::consumeContextMenuSuppression()
+{
+    const bool suppressedByPress = m_contextMenuSuppressed;
+    m_contextMenuSuppressed = false;
+    if (suppressedByPress)
+    {
+        return true;
+    }
+
+    // 兜底：若 contextMenuEvent 先于本次右键的 MousePress 到达（平台时序差异），
+    // 闩锁尚未置上；此时活动工具仍是绘图工具（非选择工具）时，右键语义同样是
+    // 取消/退出，不弹菜单。调用方仅对 reason()==QContextMenuEvent::Mouse 的事件
+    // 进入本函数——键盘 Menu 键的语义是「为当前选中弹菜单」，与工具态无关，直接放行。
+    if (m_toolManager)
+    {
+        const QString activeTool = m_toolManager->getActiveToolName();
+        if (!activeTool.isEmpty() && activeTool != QStringLiteral("SelectTool"))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 
@@ -696,6 +723,10 @@ bool ViewportInputRouter::dispatchMousePressToInput(const QPointF& worldPos, QMo
 // 文档约定（绘图交互 §4.4/§5.5）：右键 = Esc；双击/空格/Enter = 确认；Backspace = 回退。
 bool ViewportInputRouter::dispatchRightButtonPressToInput(const QPointF& worldPos, QMouseEvent* event)
 {
+    // 闩锁按本次按下重算：上一次右键若未被 contextMenuEvent 消费（时序/平台差异），
+    // 不允许残留到下一次右键误抑菜单。
+    m_contextMenuSuppressed = false;
+
     if (m_panModeEnabled)
     {
         return false;
@@ -712,6 +743,7 @@ bool ViewportInputRouter::dispatchRightButtonPressToInput(const QPointF& worldPo
             // 绘制态：BaseTool::onMousePress 处理右键取消当前图元，返回 true 表示已消费
             if (tool->onMousePress(worldPos, event))
             {
+                m_contextMenuSuppressed = true;
                 event->accept();
                 return true;
             }
@@ -725,6 +757,7 @@ bool ViewportInputRouter::dispatchRightButtonPressToInput(const QPointF& worldPo
                 {
                     m_operationBus->run(OperationId::Tool_Select, {}, OperationSource::ContextMenu);
                 }
+                m_contextMenuSuppressed = true;
                 event->accept();
                 return true;
             }

@@ -66,14 +66,35 @@ namespace
             {
                 return;
             }
-            m_outType = bClosed ? Render::PrimitiveType::LineLoop : Render::PrimitiveType::LineStrip;
+
+            // 第二段及以后的折线（如二维码多轮廓环）：LineStrip/LineLoop 单拓扑无法表达
+            // 多段互不连通的折线（会把相邻环用伪连线串起来），把已写内容与后续折线
+            // 统一转为线段对（Lines，每两顶点一条独立线段）。
+            if (m_polylineGroup && m_outType != Render::PrimitiveType::Lines)
+            {
+                expandWrittenPolylineToLinePairs();
+            }
+
             float rgba[4];
             colorToRGBA(color, rgba);
-            for (size_t i = 0; i < count; ++i)
+
+            if (!m_polylineGroup)
             {
-                addVertex(points[i].x(), points[i].y(), rgba);
+                // 首条折线：直写，保持 LineStrip/LineLoop 快路径（绝大多数图元只有一条折线）
+                m_outType = bClosed ? Render::PrimitiveType::LineLoop : Render::PrimitiveType::LineStrip;
+                m_polylineGroup = true;
+                m_polyStart = m_vertices.size();
+                m_polyClosed = bClosed;
+                for (size_t i = 0; i < count; ++i)
+                {
+                    addVertex(points[i].x(), points[i].y(), rgba);
+                }
+                m_emitted = true;
+                return;
             }
-            m_emitted = true;
+
+            // 已处于 Lines 模式：新折线按线段对追加
+            appendPolylineAsLinePairs(points, count, bClosed, rgba);
         }
 
         void emitPoint(const Ut::Vec2d& position, const Ut::Color& color) override
@@ -236,6 +257,50 @@ namespace
         }
 
     private:
+        // 把已直写的首条折线（[m_polyStart, 顶点数)）就地展开为线段对：
+        // 相邻点两两成对，闭合折线补一段 (尾→首)。随后统一 Lines 拓扑。
+        void expandWrittenPolylineToLinePairs()
+        {
+            const size_t first = m_polyStart;
+            const size_t n = m_vertices.size() - first;
+            if (n < 2)
+            {
+                m_vertices.resize(first);
+                m_outType = Render::PrimitiveType::Lines;
+                return;
+            }
+            std::vector<Render::VertexP3C3> ring(m_vertices.begin() + first, m_vertices.end());
+            m_vertices.resize(first);
+            m_vertices.reserve(first + (n + (m_polyClosed ? 1 : 0) - 1) * 2);
+            for (size_t i = 0; i + 1 < n; ++i)
+            {
+                m_vertices.push_back(ring[i]);
+                m_vertices.push_back(ring[i + 1]);
+            }
+            if (m_polyClosed)
+            {
+                m_vertices.push_back(ring.back());
+                m_vertices.push_back(ring.front());
+            }
+            m_outType = Render::PrimitiveType::Lines;
+        }
+
+        // 新折线（Lines 模式下）按线段对追加
+        void appendPolylineAsLinePairs(const Ut::Vec2d* points, size_t count, bool bClosed, const float rgba[4])
+        {
+            for (size_t i = 0; i + 1 < count; ++i)
+            {
+                addVertex(points[i].x(), points[i].y(), rgba);
+                addVertex(points[i + 1].x(), points[i + 1].y(), rgba);
+            }
+            if (bClosed && count >= 2)
+            {
+                addVertex(points[count - 1].x(), points[count - 1].y(), rgba);
+                addVertex(points[0].x(), points[0].y(), rgba);
+            }
+            m_emitted = true;
+        }
+
         void addVertex(double x, double y, const float rgba[4])
         {
             Render::VertexP3C3 v;
@@ -262,6 +327,10 @@ namespace
         double m_worldToScreenScale = 1.0;
         double m_chordErrorPixels = Render::tess::kLodChordErrorPixels;
         bool m_emitted = false;
+        // 多折线（QR 多轮廓环）追踪：首条折线直写，第二条起转线段对
+        bool m_polylineGroup = false;
+        bool m_polyClosed = false;
+        size_t m_polyStart = 0;
     };
 }  // namespace
 

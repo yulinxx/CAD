@@ -857,8 +857,18 @@ void RenderViewport2D::keyPressEvent(QKeyEvent* event)
 
 void RenderViewport2D::contextMenuEvent(QContextMenuEvent* event)
 {
-    // 交互分发器的 begin/submit/cancel 当前无生产调用方，hasActiveCommand() 恒 false。
-    // 直接通知上层基于命令中枢构建并弹出右键菜单。
+    // 右键在绘图工具激活时语义 = Esc（取消当前图元/退出工具，由 ViewportInputRouter
+    // 在 MousePress 中消费）。RenderWidget 是原生窗口：其 ContextMenu 事件被路由的
+    // 事件过滤器吞掉后，NSEvent 仍沿 NSView 响应链落到本控件（同 RenderWidget3D
+    // 构造注释所述平台差异），两条路径互相独立 —— 若不在这里联动拦截，取消绘图的
+    // 右键会额外弹出菜单，其 Cut 首项会吃掉用户下一次本想继续绘图/拾取的点击，
+    // 表现为「图形莫名消失」。键盘 Menu 键不受影响（reason 非 Mouse，直接放行）。
+    if (m_inputRouter && event && event->reason() == QContextMenuEvent::Mouse
+        && m_inputRouter->consumeContextMenuSuppression())
+    {
+        event->accept();
+        return;
+    }
     emit contextMenuRequested(event);
 }
 

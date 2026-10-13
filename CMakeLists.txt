@@ -1,15 +1,10 @@
 cmake_minimum_required(VERSION 4.3)
 
 # ============ CMake 策略设置 ============
-# CMP0167: FindBoost 模块从 CMake 3.25 开始已被移除，必须使用 CONFIG 模式
 if(POLICY CMP0167)
     cmake_policy(SET CMP0167 NEW)
 endif()
 
-# 包含全局配置文件：路径（VCPKG_DIR / Qt_INSTALL_DIR / 工具链 / 输出目录）与测试开关
-# 全部在 Config.cmake 中定义，本文件不再重复定义任何同名项。
-# 必须早于 project() —— Config.cmake 里设置的 CMAKE_TOOLCHAIN_FILE 只有早于
-# project() 才会被采用。
 include(Config.cmake)
 
 # 项目基本信息
@@ -19,44 +14,13 @@ project(SanYiCAD
     LANGUAGES CXX
 )
 
-# 编译器特定配置（MSVC / GCC / Clang 的警告与运行时开关）。
-#
-# **必须**在 project() 之后：Config.cmake 早于 project() 被 include（它设置
-# CMAKE_TOOLCHAIN_FILE），而 CMAKE_CXX_COMPILER_ID 是 project() 才设置的。
-# 这段判断原先留在 Config.cmake 里，因此永远不成立 —— 六条 -Wno-unused-*
-# 与 macOS 的 -Wno-deprecated-declarations 从未生效（实测 build.ninja 里 0 处）。
-#
-# 位置也要早于任何 add_subdirectory：add_compile_options 只作用于之后定义的 target。
-include("${CMAKE_CURRENT_SOURCE_DIR}/CMake/CompilerOptions.cmake")
+find_package(OpenGL REQUIRED)
+
 
 set(SANYI_ROOT "${PROJECT_SOURCE_DIR}" CACHE INTERNAL "SanYi CAD project root")
 include("${SANYI_ROOT}/CMake/SanYiPaths.cmake")
 include("${SANYI_ROOT}/CMake/Utils.cmake")
 
-# Qt 调试输出控制：非 Debug 构建下禁用 qDebug/qWarning 等调试日志
-# 定义 QT_NO_DEBUG_OUTPUT 后，Qt 的调试宏将变为空操作，不输出任何内容
-# 注意：此处仅做声明，实际定义在 Main 应用构建时通过生成器表达式动态设置
-# 这样可以兼容多配置生成器（Visual Studio, Xcode）
-
-# 注意: C++标准、编译器设置、输出目录等已在 Config.cmake 中配置
-
-# ---------------------------------------------------------------------------
-# MSVC 静态分析：补上 printf 格式串校验（默认关闭，CI 专用）
-#
-# SY_*F 宏（Log/Log/Include/Log/SyLogger.h:194-199）是 C 可变参数，格式串靠标注校验：
-#   GCC/Clang —— __attribute__((format(printf,...)))，-Wformat 默认开启即生效；
-#   MSVC      —— SAL 的 _Printf_format_string_，**只在 /analyze 下才被检查**。
-# 于是「%d 打 qsizetype」这类错误在 Mac/Linux 报警告，在 Windows 一声不响，
-# 直到 32 位目标上变成读错栈、后续实参全部错位。本开关把两边拉平。
-#
-# 为什么不是 /analyze:only —— 它跳过代码生成，不产出 .obj，链接必然失败；
-# 要用它得另建构建目录并容忍链接错误，靠翻日志判定结果。/analyze 是
-# 「分析 + 正常编译」，能直接复用现有 target 列表，代价是编译变慢（约 2~3x），
-# 所以只在独立的 CI 作业里开，本地与发布构建不受影响。
-#
-# /analyze:external- + /external:* 把 Qt/vcpkg 头排除在分析之外，否则三方头的
-# 噪声会把自己代码的告警彻底埋掉。
-#
 # 只把格式串相关的分析告警提为错误（其余 /analyze 告警保持告警，避免一次性引入
 # 大量非本议题的失败）：
 #   C6271 多余实参        C6272 应为浮点   C6273 应为整型   C6274 应为字符
@@ -85,10 +49,8 @@ endif()
 # ---------------------------------------------------------------------------
 # 测试基础设施
 # ---------------------------------------------------------------------------
-# 测试开关本身全部定义在 Config.cmake（唯一配置处），这里只做两件事：
 #   1. 探测 GTest 并接入 GoogleTest；
 #   2. GTest 不可用时，把 Config.cmake 里的全部测试开关统一降级为 OFF。
-# 这里是唯一的降级点 —— 各模块不得再自行 FORCE 改写测试开关。
 find_package(GTest CONFIG QUIET)
 if(GTest_FOUND)
     include(GoogleTest)
@@ -114,10 +76,10 @@ if(BUILD_CRASHHANDLER)
     add_subdirectory(CrashHandler/CrashHandler)
 endif()
 
-# 2. Log 层 - 日志库（Engine 层依赖，License 也依赖）
+# 2. Log 层 - 日志库
 add_subdirectory(Log/Log)
 
-# 1.6 License 层 - 软件注册与许可校验（依赖 Log）
+# 1.6 License 层 - 软件注册与许可校验
 add_subdirectory(License/License)
 
 # 3. Engine 层 - 引擎核心
@@ -133,7 +95,7 @@ sanyi_define_ui_engine_access()
 # 4.5 渲染抽象层（业务级类型和接口，零RenderX依赖）
 add_subdirectory(RenderAbstraction)
 
-# 4. Render 层 - 渲染引擎（Renderx C API）；开关由 Config.cmake 定义
+# 4. Render 层 - 渲染引擎（Renderx C API）
 if(BUILD_RENDERX)
     add_subdirectory(Renderx)
     # RenderBridge：宿主与渲染 DLL 之间的桥接层（会话生命周期、宿主回调）
@@ -242,20 +204,20 @@ else()
     message(STATUS "  PyBindCore: DISABLED")
 endif()
 
-# 7.5 KeygenTool - 离线注册码生成工具（开关由 Config.cmake 统一定义，此处不重复定义）
+# 7.5 KeygenTool - 离线注册码生成工具
 if(BUILD_KEYGEN_TOOL)
     add_subdirectory(Tools/KeygenTool)
     message(STATUS "  KeygenTool: ENABLED")
 endif()
 
-# 7.55 百万级图元性能基准（开关由 Config.cmake 统一定义）
+# 7.55 百万级图元性能基准）
 # 建立可重复运行的性能基线，供优化前后对比。
 if(BUILD_PERF_BENCHMARK)
     add_subdirectory(Tools/PerfBenchmark)
     message(STATUS "  PerfBenchmark: ENABLED")
 endif()
 
-# 7.56 渲染帧路径基准（开关由 Config.cmake 统一定义）
+# 7.56 渲染帧路径基准
 # 走 RenderX 的 Null 后端，无 GPU / 无窗口依赖，测帧路径的 CPU 侧耗时。
 if(BUILD_RENDER_BENCHMARK)
     add_subdirectory(Tools/RenderBenchmark)

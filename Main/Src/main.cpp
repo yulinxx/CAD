@@ -40,6 +40,7 @@ int main(int argc, char** argv)
     format.setStencilBufferSize(8);
     format.setSamples(0);
     format.setSwapInterval(1);
+    format.setRenderableType(QSurfaceFormat::OpenGL);
     QSurfaceFormat::setDefaultFormat(format);
 
     return runCADApplication(argc, argv);
