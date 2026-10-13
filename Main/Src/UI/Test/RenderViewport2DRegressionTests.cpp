@@ -33,6 +33,10 @@
 #include "RenderWidget.h"
 #include "UI/Widgets/ViewportSelector.h"
 #include "UI/Services/ISelectionService.h"
+#include "UI2D/DrawTools/BaseTool.h"
+#include "UI2D/DrawTools/SelectTool.h"
+#include "UI2D/DrawTools/ToolContext.h"
+#include "UI2D/DrawTools/ToolManager.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyCircle.h"
@@ -1375,6 +1379,91 @@ TEST(RenderViewport2DRegressionTest, InputRouter_ContextMenuNullDispatcher)
     // 无命令分发器时不崩溃
     router.handleContextMenu(&contextEvent);
     SUCCEED();
+}
+
+// ==================== 右键菜单抑制（右键=Esc 与右键菜单互斥） ====================
+//
+// 背景：RenderWidget 是原生窗口，其 ContextMenu 事件被路由事件过滤器吞掉后，
+// NSEvent 仍沿 NSView 响应链落到父控件 RenderViewport2D::contextMenuEvent ——
+// 两条路径互相独立。右键被消费为「取消绘制/退出工具」时，菜单必须同步抑制，
+// 否则取消绘图的右键会额外弹出菜单，其 Cut 首项会吃掉用户下一次点击。
+
+namespace {
+// 仅用于制造「非选择工具激活」状态的最小绘图工具（走 BaseTool 默认实现）
+class ContextMenuSuppressionProbeTool : public BaseTool
+{
+public:
+    ContextMenuSuppressionProbeTool()
+        : BaseTool("ContextMenuSuppressionProbeTool")
+    {
+    }
+};
+}  // namespace
+
+TEST(RenderViewport2DRegressionTest, InputRouter_ConsumeContextMenuSuppression_NoToolAllowsMenu)
+{
+    ViewportInputRouter router;
+    // 未设置工具管理器：右键菜单不受抑制
+    EXPECT_FALSE(router.consumeContextMenuSuppression());
+}
+
+TEST(RenderViewport2DRegressionTest, InputRouter_ConsumeContextMenuSuppression_SelectToolAllowsMenu)
+{
+    Eg::SceneManager scene;
+    ToolContext2D ctx;
+    ctx.sceneContext = &scene;
+
+    ToolManager tm;
+    tm.registerTool<SelectTool>("SelectTool");
+    tm.initializeTools(ctx);
+    ASSERT_TRUE(tm.isInitialized());
+
+    ViewportInputRouter router;
+    router.setToolManager(&tm);
+    // 选择工具空闲态右键 = 弹菜单（既有正常行为保持）
+    EXPECT_FALSE(router.consumeContextMenuSuppression());
+}
+
+TEST(RenderViewport2DRegressionTest, InputRouter_ConsumeContextMenuSuppression_NonSelectToolSuppresses)
+{
+    // 兜底路径：contextMenuEvent 先于本次右键 MousePress 到达（平台时序差异）时，
+    // 闩锁尚未置上，按「活动工具仍是绘图工具」判定抑制。
+    Eg::SceneManager scene;
+    ToolContext2D ctx;
+    ctx.sceneContext = &scene;
+
+    ToolManager tm;
+    tm.registerTool<SelectTool>("SelectTool");
+    tm.registerTool<ContextMenuSuppressionProbeTool>("ContextMenuSuppressionProbeTool");
+    tm.initializeTools(ctx);
+    ASSERT_TRUE(tm.isInitialized());
+    ASSERT_TRUE(tm.setActiveTool("ContextMenuSuppressionProbeTool"));
+
+    ViewportInputRouter router;
+    router.setToolManager(&tm);
+    EXPECT_TRUE(router.consumeContextMenuSuppression());
+}
+
+TEST(RenderViewport2DRegressionTest, InputRouter_ConsumeContextMenuSuppression_NonSelectToolStaysSuppressedUntilSelectTool)
+{
+    Eg::SceneManager scene;
+    ToolContext2D ctx;
+    ctx.sceneContext = &scene;
+
+    ToolManager tm;
+    tm.registerTool<SelectTool>("SelectTool");
+    tm.registerTool<ContextMenuSuppressionProbeTool>("ContextMenuSuppressionProbeTool");
+    tm.initializeTools(ctx);
+    ASSERT_TRUE(tm.setActiveTool("ContextMenuSuppressionProbeTool"));
+
+    ViewportInputRouter router;
+    router.setToolManager(&tm);
+    EXPECT_TRUE(router.consumeContextMenuSuppression());
+    // 绘图工具仍激活：兜底判定持续抑制（右键语义仍是取消/退出，闩锁一次性、兜底不是）
+    EXPECT_TRUE(router.consumeContextMenuSuppression());
+    // 退出绘图工具回到选择工具后，菜单恢复弹出
+    ASSERT_TRUE(tm.setActiveTool("SelectTool"));
+    EXPECT_FALSE(router.consumeContextMenuSuppression());
 }
 
 // ==================== 刷新协调器与输入路由器联动测试 ====================

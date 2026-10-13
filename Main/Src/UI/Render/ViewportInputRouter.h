@@ -144,8 +144,22 @@ public:
      */
     bool handleTextUndoRequest(bool redo);
 
-
-    /// 是否存在正在进行的编辑/绘制命令（视口右键时用于决定是否取消当前命令而非弹菜单）
+    /**
+     * @brief 右键是否应被抑制为「取消/退出工具」而非弹出右键菜单
+     *
+     * 两级判定：
+     *  1) 闩锁（一次性）：dispatchRightButtonPressToInput 消费了本次右键
+     *     （绘制态取消当前图元 / 退出绘图工具，语义 = Esc）时置位，消费即清；
+     *  2) 工具态兜底（持续）：活动工具仍是非选择工具时返回 true —— 覆盖
+     *     contextMenuEvent 先于 MousePress 到达的平台时序，直到工具切回
+     *     SelectTool 才恢复弹菜单。
+     *
+     * macOS 实测：RenderWidget 是原生窗口，其 ContextMenu 事件被本路由的事件过滤器
+     * 吞掉后，NSEvent 仍沿 NSView 响应链落到父控件 RenderViewport2D 的 contextMenuEvent
+     * （同 RenderWidget3D 构造注释所述平台差异）。两条路径互相独立，必须由本方法联动，
+     * 否则「取消绘图的右键」会额外弹出菜单，其 Cut 首项会吃掉用户下一次点击。
+     */
+    bool consumeContextMenuSuppression();
 
     // ==================== 输入法（IME） ====================
 
@@ -274,6 +288,9 @@ private:
     // 最近一次鼠标世界坐标（粘贴锚点）
     QPointF m_lastCursorWorldPos{ 0.0, 0.0 };
     bool m_hasCursorPos{ false };
+    // 右键已被消费为「取消/退出工具」：本次右键对应的 contextMenuEvent 不再弹菜单。
+    // 每次右键 press 重新计算，contextMenuEvent 消费后即清（见 consumeContextMenuSuppression）。
+    bool m_contextMenuSuppressed{ false };
 
     // 回调
     std::function<void(double, double)> m_positionCallback;
