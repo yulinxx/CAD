@@ -287,7 +287,7 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
                 refreshSceneTreeRowsForSelection2D();
             });
         });
-        m_workbenchConnections.push_back(conn);
+        m_connections.add(conn);
     }
 
     // 视口动作中枢：注入当前视口，供菜单 Zoom 子菜单与右键菜单 View_* 操作统一分发。
@@ -888,7 +888,9 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
 
     if (m_panelHostStyle == PanelHostStyle::Dock)
     {
-        window.registerDockWidget(QObject::tr("Draw Tools"), drawWidget, Qt::LeftDockWidgetArea);
+        // stableId 是布局快照键，不能用 tr() 生成的 title（换语言后快照失配）
+        window.registerDockWidget(QObject::tr("Draw Tools"), drawWidget, Qt::LeftDockWidgetArea,
+            QStringLiteral("DrawToolsDock"));
     }
     else
     {
@@ -1164,7 +1166,9 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     m_rightToolBar->setProperty("uiSource", QStringLiteral("CommandCatalog + LayerManager"));
     if (m_panelHostStyle == PanelHostStyle::Dock)
     {
-        window.registerDockWidget(QObject::tr("Layers"), m_rightToolBar, Qt::RightDockWidgetArea);
+        // stableId 是布局快照键，不能用 tr() 生成的 title（换语言后快照失配）
+        window.registerDockWidget(QObject::tr("Layers"), m_rightToolBar, Qt::RightDockWidgetArea,
+            QStringLiteral("LayersDock"));
     }
     else
     {
@@ -1999,25 +2003,6 @@ void Workbench2D::applySelectionContext(const CommandUiSnapshot& snapshot)
     }
 }
 
-void Workbench2D::schedulePropertiesPanelRefresh()
-{
-    if (!m_propertiesRefreshTimer)
-    {
-        m_propertiesRefreshTimer = new QTimer(this);
-        m_propertiesRefreshTimer->setSingleShot(true);
-        m_propertiesRefreshTimer->setInterval(WorkbenchTiming::kPropertiesDebounceMs);
-        connect(m_propertiesRefreshTimer, &QTimer::timeout, this, [this]() {
-            refreshPropertiesPanel();
-        });
-    }
-    // 已在等待窗口内 → 不重启也不新起：尾包语义，窗口结束只跑一次最新状态
-    if (m_propertiesRefreshTimer->isActive())
-    {
-        return;
-    }
-    m_propertiesRefreshTimer->start();
-}
-
 void Workbench2D::refreshPropertiesPanel()
 {
     // 属性面板是可选的 UI：配置驱动时可能不存在，因此先探测再绑定。
@@ -2111,24 +2096,14 @@ void Workbench2D::deactivate()
 {
     m_savedState = currentSnapshot();
 
-    // 断开 metadataChanged 连接，防止切换工作台后悬空视口指针回调
     if (m_gridVisibilityMetadataConn)
     {
         QObject::disconnect(m_gridVisibilityMetadataConn);
         m_gridVisibilityMetadataConn = {};
     }
 
-    // 断开长命对象到本工作台的所有连接。
-    // operationBus / layerManagerBridge 跨工作台存活，而 Workbench2D 实例被 UiShellHost
-    // 缓存复用、切换时不销毁 —— Qt 不会自动断开，attachToWindow 每次又重新 connect 一遍。
-    // 不断的后果不是崩溃而是叠加：N 次 2D↔3D 往返后，一次 2D 操作会触发 N 份场景树重建
-    // 与 N 份命令状态刷新。这些连接全部在 attach 期建立（含 UiStateBridge2D::install），
-    // 因此按"发送者 + 接收者"整体断开是安全的，下次 attach 会重新装。
-    for (auto& conn : m_workbenchConnections)
-    {
-        disconnect(conn);
-    }
-    m_workbenchConnections.clear();
+    m_connections.disconnectAll();
+
     if (m_commands.operationBus)
     {
         QObject::disconnect(m_commands.operationBus, nullptr, this, nullptr);
@@ -2138,9 +2113,6 @@ void Workbench2D::deactivate()
         QObject::disconnect(m_scene.layerManagerBridge, nullptr, this, nullptr);
     }
 
-    // 清除 ImportService 中持有的视口回调，防止切换后悬空指针
-
-    // ImportService 生命周期长于工作台，不清理会导致 use-after-free
     if (m_persistence.importService)
     {
         m_persistence.importService->setViewportFitCallback(nullptr);
@@ -2149,9 +2121,6 @@ void Workbench2D::deactivate()
         m_persistence.importService->setDisplayRefreshCallback(nullptr);
     }
 
-    // 同理：FileDropHandler 由 WorkbenchWindow 持有（跨切换永生），它的
-    // 屏幕→世界换算回调按值捕获了 RenderViewport2D*。装的是 application 级事件
-    // 过滤器，所以切到 3D 之后往窗口拖一张图片同样会走进来 → 解引用已析构的视口。
     if (m_workbenchWindow)
     {
         if (auto* fdh = m_workbenchWindow->fileDropHandler())

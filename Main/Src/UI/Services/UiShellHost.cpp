@@ -111,11 +111,6 @@ void UiShellHost::initializeAndShow()
         return resolveWorkbench(id);
     });
 
-    if (m_stateCenter)
-    {
-        m_stateCenter->popBusy();
-    }
-
     m_mainWindow->show();
 }
 
@@ -146,40 +141,6 @@ UiWorkbench* UiShellHost::resolveWorkbench(const QString& workbenchId)
 
     SY_WARNF("Unknown workbench id '%s', falling back to 2D", workbenchId.toUtf8().constData());
     return m_workbench;
-}
-
-void UiShellHost::switchWorkbench(const QString& workbenchId)
-{
-    UiWorkbench* target = resolveWorkbench(workbenchId);
-    if (target)
-    {
-        switchWorkbench(target);
-    }
-}
-
-void UiShellHost::switchWorkbench(UiWorkbench* workbench)
-{
-    if (!workbench || !m_mainWindow)
-    {
-        SY_WARN("[UiShellHost] switchWorkbench refused: workbench or mainWindow is null");
-        return;
-    }
-
-    if (m_workbench == workbench)
-    {
-        SY_DEBUG("[UiShellHost] switchWorkbench: same workbench, no-op");
-        return;
-    }
-
-    // 更新宿主层的工作台引用
-    m_workbench = workbench;
-
-    // 统一走 triggerWorkbench 处理完整的切换生命周期:
-    //   保存旧状态 → 停用旧工作台 → 清理 UI → 创建新工作台 → 附加 → 激活
-    // 不在这里单独调用 deactivate() 或 setWorkbench()，
-    // 避免 triggerWorkbench 内部看到的是已被替换的新工作台
-    m_mainWindow->triggerWorkbench(workbench->id());
-    m_mainWindow->syncWorkbenchStateFromStateCenter();
 }
 
 void UiShellHost::shutdown()

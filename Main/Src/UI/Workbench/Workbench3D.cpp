@@ -296,10 +296,10 @@ void Workbench3D::setup3DViewportAndSignals(WorkbenchWindow& window)
     m_mainWindow3D = std::make_unique<MainWindow3D>(m_services3D, &window);
     SY_DEBUG("[Workbench3D] MainWindow3D created");
 
-    connect(m_mainWindow3D.get(), &MainWindow3D::sigSwitchTo2D, &window, [&window]() {
-        SY_DEBUG("[Workbench3D] sigSwitchTo2D triggered, switching to 2D workbench");
-        window.triggerWorkbench(QStringLiteral("2D"));
-    });
+    // sigSwitchTo2D / sigSwitchTo3D 的连接统一在 attachToWindow 中建立
+    // （QueuedConnection，避免信号发出方还在调用栈上时重入 triggerWorkbench）；
+    // 此处不再单独 connect，否则每次 attach 会对 sigSwitchTo2D 形成双连接、
+    // 一次点击触发两次工作台切换。
 
     // 创建视口并设置渲染器
     create3DViewport(window);
@@ -393,7 +393,7 @@ void Workbench3D::bind3DSelectionSignal()
             }
             schedulePropertiesPanelRefresh3D();
         });
-    m_workbenchConnections.push_back(conn);
+    m_connections.add(conn);
 }
 
 /// 创建全局删除快捷键
@@ -805,11 +805,13 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
     }
 
     // 3D 导入完成后显式刷新一次树（导入会触发 markDataChanged → SceneMonitor ，
-    // 此处 importFinished 作为兜底与显式接入点，二者叠加安全）
+    // 此处 importFinished 作为兜底与显式接入点，二者叠加安全）。
+    // 纳入 m_connections：ImportService 是跨工作台长寿服务，接收方本对象同样长寿，
+    // 若不显式管理，每次 re-attach 会叠加一条连接（一次导入触发 N 次刷新）。
     if (m_persistence.importService)
     {
-        connect(
-            m_persistence.importService, &ImportService::importFinished, this, &Workbench3D::refreshSceneTree3DIfNeeded);
+        m_connections.add(QObject::connect(
+            m_persistence.importService, &ImportService::importFinished, this, &Workbench3D::refreshSceneTree3DIfNeeded));
     }
 
     // 初始填充
@@ -836,7 +838,7 @@ void Workbench3D::setupProperties3D(WorkbenchWindow& window)
             refreshSceneTreeRowsForSelection3D();
         });
     });
-    m_workbenchConnections.push_back(conn);
+    m_connections.add(conn);
 
     refreshPropertiesPanel3D();
 }
@@ -1394,11 +1396,7 @@ void Workbench3D::deactivate()
     m_scenePanel3D = nullptr;
 
     // 本工作台建立的连接整批断开（属性面板编辑回刷等），避免切台后回调命中悬空对象
-    for (auto& conn : m_workbenchConnections)
-    {
-        disconnect(conn);
-    }
-    m_workbenchConnections.clear();
+    m_connections.disconnectAll();
 
     // 属性面板节流定时器：切台后 propertiesDock 已销毁，挂起的回调必须取消
     if (m_propertiesRefreshTimer3D)

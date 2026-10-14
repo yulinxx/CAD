@@ -84,36 +84,14 @@ public:
     /// 获取当前工作台 ID
     QString currentWorkbenchId() const;
 
-
-
     /// 获取当前图层 ID
     QString currentLayerId() const;
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     /// 是否有未保存更改
     bool dirty() const;
 
     /// 获取当前任务进度 (-1 表示无任务)
     int progress() const;
-
-
-
-
-
-
-
 
     /// 获取元数据
     QVariantMap metadata() const;
@@ -135,8 +113,6 @@ public slots:
     /// @param layerId 图层 ID
     void setCurrentLayerId(const QString& layerId);
 
-
-
     /// 设置当前文档 ID
     /// @param documentId 文档 ID
     void setCurrentDocumentId(const QString& documentId);
@@ -157,8 +133,6 @@ public slots:
     /// @param type 命令类型
     void setCurrentCommandType(const QString& type);
 
-
-
     /// 设置当前选择文本
     /// @param text 选择文本
     void setCurrentSelectionText(const QString& text);
@@ -168,7 +142,6 @@ public slots:
     /// @param text 选择文本
     void setSelectionContext(const QString& source, const QString& text);
 
-
     /// 计数式繁忙：pushBusy/popBusy 配对使用，仅 0↔1 时触发信号
     void pushBusy();
     void popBusy();
@@ -176,9 +149,6 @@ public slots:
     /// 设置脏状态
     /// @param dirty 是否有未保存更改
     void setDirty(bool dirty);
-
-
-
 
     /// 设置元数据（合并语义：单键更新，保留其它键）
     /// @param key 键
@@ -196,7 +166,6 @@ public slots:
     /// 设置当前状态提示
     /// @param prompt 状态提示内容
     void setStatusPrompt(const QString& prompt);
-
 
     /// 设置当前激活工具 ID
     /// @param toolId 工具 ID
@@ -216,26 +185,14 @@ signals:
     /// 主题变更信号
     void currentThemeChanged(const QString& id);
 
-
-
-
-
-
-
-
-
     /// 繁忙状态变更信号
     void busyChanged(bool busy);
 
     /// 脏状态变更信号
     void dirtyChanged(bool dirty);
 
-
-
     /// 元数据变更信号
     void metadataChanged();
-
-
 
 private:
     /// ===== 分组状态（P1-5）=====

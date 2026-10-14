@@ -49,13 +49,6 @@ public:
     /// 初始化并显示主窗口
     void initializeAndShow();
 
-    /// 切换工作台（按 ID）
-    /// 惰性创建 3D 工作台
-    void switchWorkbench(const QString& workbenchId);
-
-    /// 切换工作台（直接传入实例）
-    void switchWorkbench(UiWorkbench* workbench);
-
     /// 获取主窗口指针
     WorkbenchWindow* mainWindow();
 

@@ -322,11 +322,14 @@ QWidget* WorkbenchLayoutManager::createInitialCentralWidget()
 
 // ==================== 注册与清理 ====================
 
-QDockWidget* WorkbenchLayoutManager::registerDockWidget(const QString& title, QWidget* widget, Qt::DockWidgetArea area)
+QDockWidget* WorkbenchLayoutManager::registerDockWidget(
+    const QString& title, QWidget* widget, Qt::DockWidgetArea area, const QString& stableId)
 {
     // 注册停靠面板只负责把面板挂到指定区域，不在这里注入业务行为
 
-    // 根据 widget 类型推断 dock id
+    // dock id = objectName，是布局快照（saveState/restoreState）识别面板的唯一键。
+    // 必须是语言无关的稳定字符串：tr() 生成的 title 会随界面语言变化，
+    // 用它当 id 会导致切换语言后旧快照静默失配、用户布局丢失。
     QString dockId;
     if (qobject_cast<SceneTreePanel*>(widget))
     {
@@ -336,8 +339,13 @@ QDockWidget* WorkbenchLayoutManager::registerDockWidget(const QString& title, QW
     {
         dockId = UiDockIds::propertiesQString();
     }
+    else if (!stableId.isEmpty())
+    {
+        dockId = stableId;
+    }
     else
     {
+        // 兜底：无稳定 id 时退回 title（仅限无翻译需求的内部面板）
         dockId = title;
     }
 
@@ -401,19 +409,14 @@ QDockWidget* WorkbenchLayoutManager::registerDockWidget(const QString& title, QW
     return dock;
 }
 
-QToolBar* WorkbenchLayoutManager::registerToolBar(const QString& title)
-{
-    // 注册工具栏只负责挂载承载容器，不在这里填入具体动作
-    auto* toolBar = m_parent->addToolBar(title);
-    toolBar->setObjectName(title);
-    m_registeredToolBars.push_back(toolBar);
-    return toolBar;
-}
-
 void WorkbenchLayoutManager::clearLayoutContent(const UiWorkbench* oldWorkbench)
 {
-    // 1: 清理所有工具栏（包括通过 addToolBar 直接添加而未注册的工具栏，如3D左侧工具栏）
-    // 先收集所有工具栏指针，避免遍历过程中容器被修改
+    // 1: 清理所有工具栏。
+    // 必须用 findChildren 全量扫描：3D 工作台的左/顶/右工具栏由
+    // Workbench3D::attachToWindow 直接 window.addToolBar() reparent 挂载，
+    // 未经过 registerToolBar，不在 m_registeredToolBars 里；
+    // 只遍历注册表会在 3D→2D 切换时把这些工具栏留在 QMainWindow 上（泄漏 + 残留可见）。
+    // 先收集再删，避免遍历过程中容器被修改。
     const auto allToolBars = m_parent->findChildren<QToolBar*>();
     for (auto* toolBar : allToolBars)
     {
@@ -538,17 +541,14 @@ void WorkbenchLayoutManager::saveLayoutSnapshot(const QString& workbenchId)
     {
         WorkspaceSnapshotRecord rec;
         rec.workbenchId = workbenchId.toStdString();
-        rec.geometry = m_parent->saveGeometry().toBase64().toStdString();
         rec.windowState = m_parent->saveState().toBase64().toStdString();
         rec.updatedAt = savedAt.toStdString();
         m_persistenceService->workspaceSnapshots()->save(rec);
         SY_DEBUGF("[WorkbenchLayoutManager] Saved layout snapshot to database: %s", rec.workbenchId.c_str());
     }
 
-    // QSettings 兜底（同时也是时间戳的载体）
     QSettings settings;
     settings.beginGroup(QStringLiteral("LayoutSnapshots"));
-    settings.setValue(workbenchId + QStringLiteral("/geometry"), m_parent->saveGeometry());
     settings.setValue(workbenchId + QStringLiteral("/windowState"), m_parent->saveState());
     settings.setValue(workbenchId + QStringLiteral("/savedAt"), savedAt);
     settings.endGroup();
@@ -720,55 +720,6 @@ void WorkbenchLayoutManager::setPropertiesDockVisible(bool visible)
     if (propertiesDock)
     {
         propertiesDock->setVisible(visible);
-    }
-}
-
-void WorkbenchLayoutManager::applyDockPolicy(bool requiresSkeleton, const QString& workbenchId)
-{
-    // 1. 骨架 Dock（左/右通用侧栏）按 requiresSkeleton 控制
-    if (m_panelState.leftDock)
-    {
-        m_panelState.leftDock->setVisible(requiresSkeleton);
-    }
-    if (m_panelState.rightDock)
-    {
-        m_panelState.rightDock->setVisible(requiresSkeleton);
-    }
-
-    // 2. 3D 专属策略：Scene / Properties 即使在 requiresSkeleton=false 时也要显示
-    //    2D 下由 requiresSkeleton 控制（已在上方处理）
-    if (workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0)
-    {
-        // Scene Dock
-        QDockWidget* sceneDock = nullptr;
-        for (auto* dock : m_registeredDocks)
-        {
-            if (dock && dock->objectName() == UiDockIds::Scene)
-            {
-                sceneDock = dock;
-                break;
-            }
-        }
-        if (sceneDock)
-        {
-            sceneDock->setMinimumWidth(180);
-            sceneDock->setVisible(true);
-        }
-
-        // Properties Dock
-        QDockWidget* propsDock = nullptr;
-        for (auto* dock : m_registeredDocks)
-        {
-            if (dock && dock->objectName() == UiDockIds::Properties)
-            {
-                propsDock = dock;
-                break;
-            }
-        }
-        if (propsDock)
-        {
-            propsDock->setVisible(true);
-        }
     }
 }
 

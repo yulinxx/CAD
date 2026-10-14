@@ -1,6 +1,6 @@
 #pragma once
 
-#include "UiWorkbench.h"
+#include "WorkbenchBase.h"
 
 #if BUILD_UI3D
 class QShortcut;
@@ -29,7 +29,7 @@ class BRepModelService3D;
  * @brief 3D 工作台实现
  * 使用 MainWindow3D 架构（服务经 ServicePack3D 直接传递，无全局定位器）
  */
-class Workbench3D final : public UiWorkbench
+class Workbench3D final : public WorkbenchBase
 {
     Q_OBJECT
 
@@ -154,7 +154,5 @@ private:
     bool m_sceneTree3DIncrementalBusy{ false };
     /// 属性面板重建节流定时器：active 期间多次请求合并为窗口末尾一次（与 2D 同语义）
     QTimer* m_propertiesRefreshTimer3D{ nullptr };
-    /// 本工作台在 attach 期间建立的 Qt 连接，deactivate 时整批 disconnect（RAII 批量回收）
-    std::vector<QMetaObject::Connection> m_workbenchConnections;
 };
 #endif

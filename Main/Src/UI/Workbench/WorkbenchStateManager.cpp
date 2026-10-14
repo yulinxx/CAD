@@ -266,7 +266,7 @@ void WorkbenchStateManager::clearSelectionState()
     // 清空选择相关状态，避免工作台切换后沿用旧选择文本
     m_stateCenter->setCurrentSelectionText(QString());
     m_stateCenter->setSelectionContext(QStringLiteral("none"), QString());
-    m_stateCenter->setMetadata({ { QStringLiteral("selectionSource"), QStringLiteral("none") },
+    m_stateCenter->updateMetadata({ { QStringLiteral("selectionSource"), QStringLiteral("none") },
         { QStringLiteral("selectionText"), QString() },
         { QStringLiteral("selectionType"), QStringLiteral("none") } });
 }
@@ -289,14 +289,12 @@ void WorkbenchStateManager::setWorkbenchSwitchContext(const QString& workbenchId
     m_stateCenter->setSelectionContext(QStringLiteral("Workbench-Switch"), switchContextText);
     m_stateCenter->setStatusPrompt(switchContextText);
 
-    // metadata 采用读-改-写，避免整体替换丢掉 statusPrompt/workbenchId/switchContext 等既有键
-    QVariantMap meta = m_stateCenter->metadata();
-    meta.insert(QStringLiteral("workbenchId"), workbenchId);
-    meta.insert(QStringLiteral("switchContext"), switchContextText);
-    meta.insert(QStringLiteral("selectionSource"), QStringLiteral("Workbench-Switch"));
-    meta.insert(QStringLiteral("selectionText"), switchContextText);
-    meta.insert(QStringLiteral("selectionType"), QStringLiteral("none"));
-    m_stateCenter->setMetadata(meta);
+    // metadata 只写切换相关键，不整体替换（避免丢掉 statusPrompt/workbenchId 等既有键）
+    m_stateCenter->updateMetadata({ { QStringLiteral("workbenchId"), workbenchId },
+        { QStringLiteral("switchContext"), switchContextText },
+        { QStringLiteral("selectionSource"), QStringLiteral("Workbench-Switch") },
+        { QStringLiteral("selectionText"), switchContextText },
+        { QStringLiteral("selectionType"), QStringLiteral("none") } });
 }
 
 void WorkbenchStateManager::setWorkbenchTransitionState(const QString& phase, const QString& status)
@@ -309,10 +307,8 @@ void WorkbenchStateManager::setWorkbenchTransitionState(const QString& phase, co
     // 工作台切换阶段只更新少量明确字段，避免把过渡态扩散到 metadata 的其他用途里
     m_stateCenter->setStatusPrompt(status);
 
-    QVariantMap meta = m_stateCenter->metadata();
-    meta.insert(QStringLiteral("workbenchTransitionPhase"), phase);
-    meta.insert(QStringLiteral("workbenchTransitionStatus"), status);
-    m_stateCenter->setMetadata(meta);
+    m_stateCenter->updateMetadata({ { QStringLiteral("workbenchTransitionPhase"), phase },
+        { QStringLiteral("workbenchTransitionStatus"), status } });
 }
 
 void WorkbenchStateManager::resetWorkbenchTransientState()
@@ -322,22 +318,20 @@ void WorkbenchStateManager::resetWorkbenchTransientState()
     if (m_stateCenter)
     {
         // 工作台切换收尾只做"清空/归零"，不在这里引入新的状态来源
-        m_stateCenter->popBusy();
+        // 注意：busy 计数由 triggerWorkbench 的 pushBusy/popBusy 配对管理，
+        // 本函数不碰 popBusy（否则与 triggerWorkbench 末尾的 popBusy 双重弹出）
         resetCommandStateToIdle();
         setWorkbenchTransitionState(QStringLiteral("reset"), QStringLiteral("Idle"));
-        // metadata 采用读-改-写，保留 statusPrompt 等既有键
-        QVariantMap meta = m_stateCenter->metadata();
-        meta.insert(QStringLiteral("workbenchId"), QStringLiteral("none"));
-        meta.insert(QStringLiteral("commandType"), QStringLiteral("none"));
-        meta.insert(QStringLiteral("commandState"), QStringLiteral("idle"));
-        meta.insert(QStringLiteral("selectionSource"), QStringLiteral("none"));
-        meta.insert(QStringLiteral("selectionText"), QString());
-        meta.insert(QStringLiteral("selectionType"), QStringLiteral("none"));
-        meta.insert(QStringLiteral("viewportStatus"), QStringLiteral("Idle"));
-        meta.insert(QStringLiteral("rightPanelSource"), QStringLiteral("none"));
-        meta.insert(QStringLiteral("drawToolSource"), QStringLiteral("none"));
-        meta.insert(QStringLiteral("activeToolId"), QString());
-        m_stateCenter->setMetadata(meta);
+        m_stateCenter->updateMetadata({ { QStringLiteral("workbenchId"), QStringLiteral("none") },
+            { QStringLiteral("commandType"), QStringLiteral("none") },
+            { QStringLiteral("commandState"), QStringLiteral("idle") },
+            { QStringLiteral("selectionSource"), QStringLiteral("none") },
+            { QStringLiteral("selectionText"), QString() },
+            { QStringLiteral("selectionType"), QStringLiteral("none") },
+            { QStringLiteral("viewportStatus"), QStringLiteral("Idle") },
+            { QStringLiteral("rightPanelSource"), QStringLiteral("none") },
+            { QStringLiteral("drawToolSource"), QStringLiteral("none") },
+            { QStringLiteral("activeToolId"), QString() } });
         clearSelectionState();
         // 保留 dirty 标记：切换工作台不应清除"未保存"状态
         // 业务状态只写状态中心；本地镜像在下方统一从状态中心拉取

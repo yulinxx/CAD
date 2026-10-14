@@ -445,11 +445,6 @@ void WorkbenchWindow::initializeToolBarSkeleton()
     m_layoutManager->initializeToolBarSkeleton();
 }
 
-void WorkbenchWindow::buildToolBars()
-{
-    m_layoutManager->buildToolBars();
-}
-
 void WorkbenchWindow::initializeDockAreaSkeleton()
 {
     m_layoutManager->initializeDockAreaSkeleton();
@@ -464,11 +459,6 @@ void WorkbenchWindow::buildDockAreas()
 void WorkbenchWindow::initializeStatusBarSkeleton()
 {
     m_layoutManager->initializeStatusBarSkeleton();
-}
-
-void WorkbenchWindow::buildStatusBar()
-{
-    m_layoutManager->buildStatusBar();
 }
 
 // ==================== 状态栏挂载/卸载 ====================
@@ -717,16 +707,10 @@ void WorkbenchWindow::refreshPositionLabel()
 /// @param title 面板标题
 /// @param widget 面板内容部件
 /// @param area 停靠区域
-QDockWidget* WorkbenchWindow::registerDockWidget(const QString& title, QWidget* widget, Qt::DockWidgetArea area)
+QDockWidget* WorkbenchWindow::registerDockWidget(
+    const QString& title, QWidget* widget, Qt::DockWidgetArea area, const QString& stableId)
 {
-    return m_layoutManager->registerDockWidget(title, widget, area);
-}
-
-/// 注册工具栏
-/// @param title 工具栏标题
-QToolBar* WorkbenchWindow::registerToolBar(const QString& title)
-{
-    return m_layoutManager->registerToolBar(title);
+    return m_layoutManager->registerDockWidget(title, widget, area, stableId);
 }
 
 /// 清空工作台内容（移除所有注册的面板和工具栏）
@@ -895,18 +879,12 @@ void WorkbenchWindow::applyDefaultDockVisibility()
         return;
     }
 
-    // 新工作台自行决定是否需要骨架停靠面板
     setSkeletonDocksVisible(m_workbench->requiresSkeletonDocks());
 
-    // 3D 模式下 Scene / Properties 面板需要始终显示（即使 requiresSkeletonDocks() 为 false）
-    // 因为 SceneTreePanel / PropertiesPanel 是工作台自己的面板，不是 skeleton 的面板
     if (!m_workbench->requiresSkeletonDocks())
     {
-        if (auto* layoutMgr = m_layoutManager.get())
-        {
-            layoutMgr->setSceneDockVisible(true);
-            layoutMgr->setPropertiesDockVisible(true);
-        }
+        m_layoutManager->setSceneDockVisible(true);
+        m_layoutManager->setPropertiesDockVisible(true);
     }
 }
 
@@ -1064,10 +1042,8 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         }
         // 菜单不需要在这里刷新：配置驱动菜单会随状态中心的 currentWorkbenchChanged
         // 自行重建与同步（rebuildAllMenus / refreshConfiguredMenuState）。
+        // refreshFromState 内部已统一调用 refreshStatusText + updateWindowTitle
         refreshFromState();
-
-        refreshStatusText();
-        updateWindowTitle();
         recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.noWorkbench"),
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
         return;
@@ -1084,8 +1060,45 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         return;
     }
 
-    // 设置切换中标志，防止重复触发
+    // 设置切换中标志，防止重复触发。
+    // 用 RAII 守卫：中途任何早退（异常/提前 return）都必须复位，
+    // 否则标志卡 true 会永久拒绝后续所有工作台切换。
     m_switchingWorkbench = true;
+    struct SwitchingGuard
+    {
+        bool& flag;
+        explicit SwitchingGuard(bool& f)
+            : flag(f)
+        {
+        }
+        ~SwitchingGuard()
+        {
+            flag = false;
+        }
+    } switchingGuard(m_switchingWorkbench);
+
+    // 0: 先经工厂解析目标工作台实例。
+    // 必须在停用旧工作台之前：3D 初始化失败时工厂会回退到当前 2D 实例，
+    // 若此时旧工作台已被停用/清空，回退实例无法继续提供服务，且后续流程
+    // 会把 currentWorkbenchId 错写成目标 id（界面显示 3D 实际跑 2D）。
+    // 解析失败（工厂缺失或回退到当前实例）则中止切换，旧工作台保持原状。
+    UiWorkbench* targetWorkbench = m_workbench;
+    if (m_workbenchFactory)
+    {
+        targetWorkbench = m_workbenchFactory(workbenchId);
+    }
+    if (!targetWorkbench || targetWorkbench == m_workbench)
+    {
+        SY_WARNF("[WorkbenchWindow] triggerWorkbench: factory could not provide a distinct workbench for %s, "
+                 "switch aborted (current workbench unchanged)",
+            workbenchId.toUtf8().constData());
+        reportFrameworkError(QStringLiteral("workbench.switch_unavailable"),
+            QStringLiteral("Requested workbench is unavailable: %1").arg(workbenchId),
+            QStringLiteral("WorkbenchWindow::triggerWorkbench"));
+        recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.unavailable"),
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+        return;
+    }
 
     const auto previousWorkbenchId =
         m_stateManager ? m_stateManager->windowState().currentWorkbenchId : QStringLiteral("default");
@@ -1100,7 +1113,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     {
         saveLayoutSnapshot(previousWorkbenchId);
         m_stateCenter->pushBusy();
-        m_stateCenter->setMetadata({ { QStringLiteral("viewportStatus"), QStringLiteral("Switching") } });
+        m_stateCenter->updateMetadata({ { QStringLiteral("viewportStatus"), QStringLiteral("Switching") } });
     }
 
     // 2: 停用旧工作台（释放资源、清理快捷键等）
@@ -1130,16 +1143,12 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     // 5: 设置新工作台上下文（在 attach 之前，确保新工作台能看到正确的状态）
     setWorkbenchSwitchContext(workbenchId, switchContextText);
 
-    // 6: 通过工厂获取或创建新工作台实例
-    if (m_workbenchFactory)
+    // 6: 切换到预解析的新工作台实例（已在步骤 0 经工厂解析并校验）
+    if (targetWorkbench != m_workbench)
     {
-        auto* target = m_workbenchFactory(workbenchId);
-        if (target && target != m_workbench)
-        {
-            SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: factory created new workbench %s",
-                workbenchId.toUtf8().constData());
-            m_workbench = target;
-        }
+        SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: switching to new workbench %s",
+            workbenchId.toUtf8().constData());
+        m_workbench = targetWorkbench;
     }
 
     // 6b: 菜单管理器必须跟着换工作台。
@@ -1216,9 +1225,9 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         m_stateManager->syncWindowStateFromStateCenter();
     }
 
+    // refreshFromState 内部已统一调用 refreshStatusText + updateWindowTitle，
+    // 不再在外面重复调用（重复调用只会多做两次无意义的 snapshot 拷贝）
     refreshFromState();
-    refreshStatusText();
-    updateWindowTitle();
 
     // 更新 FileDropHandler 的工作台 ID，确保拖放过滤使用正确的扩展名
     if (m_fileDropHandler)
@@ -1226,17 +1235,11 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         m_fileDropHandler->setCurrentWorkbenchId(workbenchId);
     }
 
-    // 确保工具栏和状态栏槽位在工作台切换后完整恢复
-    if (m_layoutManager)
-    {
-        m_layoutManager->buildToolBars();
-        m_layoutManager->buildStatusBar();
-    }
+    // 注意：配置驱动的工具栏/状态栏槽位已在第 6d 步（buildStatusBar）重建完毕；
+    // buildToolBars 有 m_configDrivenLayoutBuilt 幂等守卫，这里不再重复调用
+    // （重复 buildStatusBar 会 clearStatusBarSlots + 重建，导致槽位顺序翻转两次）。
 
     SY_DEBUGF("[WorkbenchWindow] workbench state committed: id=%s busy=0", workbenchId.toUtf8().constData());
-
-    // 取消切换中标志，允许下次切换
-    m_switchingWorkbench = false;
 
     SY_INFOF("[WorkbenchWindow] triggerWorkbench: switch completed to %s", workbenchId.toUtf8().constData());
     recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.switch"),

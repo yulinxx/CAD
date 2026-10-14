@@ -153,7 +153,8 @@ public:
     virtual bool requiresSkeletonDocks() const;
 
     /// 是否自行管理菜单（跳过 WorkbenchMenuManager 的菜单重建）
-    /// 2D 工作台返回 false（默认），3D 工作台返回 true
+    /// 当前 2D/3D 均返回 false：菜单统一由 WorkbenchMenuManager 从客户 JSON 构建
+    /// （Workbench3D 的硬编码 MenuManager3D 路径已移除）。
     virtual bool managesOwnMenus() const;
 
     /// 显示设置对话框（Help → Settings），由活动工作台接管

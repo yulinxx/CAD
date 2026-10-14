@@ -1,6 +1,6 @@
 #pragma once
 
-#include "UiWorkbench.h"
+#include "WorkbenchBase.h"
 
 class QAction;
 class QMenu;
@@ -32,7 +32,7 @@ enum class PanelHostStyle
  *
  * 提供 2D 绘图功能，包括线条绘制、测量、选择等操作。
  */
-class Workbench2D final : public UiWorkbench
+class Workbench2D final : public WorkbenchBase
 {
 public:
     Workbench2D();
@@ -77,7 +77,7 @@ public:
     void refreshSceneTreeIfNeeded(const char* src = nullptr);
 
     /// 增量刷新场景树
-    void applySceneTreeIncremental(const char* src = nullptr);
+    void applySceneTreeIncremental(const char* src = nullptr) override;
 
 private:
     /// 创建中央视口
@@ -113,7 +113,7 @@ private:
     /// 从场景树批量设置锁定（整数 id）
     void setSceneTreeLock(const QVector<qint64>& ids, bool locked);
     /// 刷新属性面板
-    void refreshPropertiesPanel();
+    void refreshPropertiesPanel() override;
     /// 属性面板编辑后刷新场景树选中行（Name 等不推进结构签名）
     void refreshSceneTreeRowsForSelection2D();
     /// 应用选择上下文到各 UI 组件
@@ -122,56 +122,29 @@ private:
     void applyLayerClick(int layerId);
 
 private:
-    /// 命令动作中枢
     std::unique_ptr<CommandActionHub> m_commandHub;
-    /// 视口右键菜单请求
     void onViewportContextMenu(QContextMenuEvent* event);
-    /// 按客户配置构建 2D 右键菜单
     QMenu* buildConfiguredContextMenu(const QString& contextMenuId, bool hasSelection);
-    TopToolBar* m_topToolBar{ nullptr };              ///< 顶部编辑工具栏
-    QToolBar* m_textFontToolBar{ nullptr };           ///< 文字编辑字体工具栏
+    TopToolBar* m_topToolBar{ nullptr };
+    QToolBar* m_textFontToolBar{ nullptr };
     TextFontToolBar* m_textFontToolBarWidget{ nullptr };
-    RightToolBar* m_rightToolBar{ nullptr };          ///< 右侧工具栏
-    /// 图层色块单击序号：每次单击自增，双击时再自增以取消挂起的延迟动作
+    RightToolBar* m_rightToolBar{ nullptr };
     int m_layerClickSequence{ 0 };
-    PanelHostStyle m_panelHostStyle{ PanelHostStyle::Toolbar };  ///< 左右面板承载样式
-    RenderViewport2D* m_viewport{ nullptr };         ///< 2D 渲染视口
-    SceneTreePanel* m_scenePanel2D{ nullptr };        ///< 2D 场景树面板
+    PanelHostStyle m_panelHostStyle{ PanelHostStyle::Toolbar };
+    RenderViewport2D* m_viewport{ nullptr };
+    SceneTreePanel* m_scenePanel2D{ nullptr };
     std::unique_ptr<SceneTreeSceneObserver2D> m_sceneTreeObserver;
     SceneMonitor* m_sceneMonitor{ nullptr };
-    QPointer<QObject> m_uiStateConnections;                ///< 命令 UI 刷新连线句柄
-    QTimer* m_sceneTreeRefreshTimer{ nullptr };      ///< 场景树重建防抖定时器
-    const char* m_sceneTreeRefreshSource{ nullptr };        ///< 场景树重建触发来源
-    uint64_t m_sceneTreeCursor{ 0 };                       ///< 场景树增量游标
-    bool m_sceneTreeForceRefresh{ false };                  ///< 强制全量刷新标志
-    /// applySceneTreeIncremental 重入标志：分类/追加期间会触发嵌套的场景通知，
-    /// 嵌套调用读到的游标还是外层尚未推进的旧值，会把同一批变更整表再扫一遍。
-    bool m_sceneTreeIncrementalBusy{ false };
-    /// 场景树延迟重建标记（setData 回调链中 scheduleTreeRefresh 合并，避免 delete this）
+    QPointer<QObject> m_uiStateConnections;
+    const char* m_sceneTreeRefreshSource{ nullptr };
+    bool m_sceneTreeForceRefresh{ false };
     bool m_treeRefreshPending{ false };
-    /// 属性面板重建节流定时器：active 期间的多次请求合并为窗口末尾一次
-    QTimer* m_propertiesRefreshTimer{ nullptr };
-    /// 请求一次属性面板重建（节流合并，非每请求一个 singleShot）
-    void schedulePropertiesPanelRefresh();
-    /// 场景树结构签名
-    std::size_t m_lastSceneTreeEntityCount{ 0 };
-    uint64_t m_lastSceneTreeStructureRevision{ 0 };
     uint64_t m_lastSceneTreeTopologyRevision{ 0 };
-    QPointer<StatusBar> m_statusBar2D;  ///< 2D 状态栏 widget
+    QPointer<StatusBar> m_statusBar2D;
 
-
-    /// 2D 设置协调器
     std::unique_ptr<SettingsUiCoordinator2D> m_settingsCoordinator;
-
-    /// 工具栏上下文管理器
     std::unique_ptr<ToolBarContextManager> m_contextManager;
-
-    /// 网格显隐 metadata 连接
     QMetaObject::Connection m_gridVisibilityMetadataConn;
 
-    /// 本工作台在 attach 期间建立的 Qt 连接，deactivate 时整批 disconnect（RAII 批量回收）
-    std::vector<QMetaObject::Connection> m_workbenchConnections;
-
-    /// 由选择上下文快照推导应切换到的工具栏上下文
     ToolBarContext determineContextFromSelection(const CommandUiSnapshot& snapshot) const;
 };

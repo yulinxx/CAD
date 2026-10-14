@@ -111,13 +111,12 @@ public:
     void refreshPositionLabel();
 
     /// 注册停靠面板
-    /// @param title 面板标题
+    /// @param title 面板标题（可翻译）
     /// @param widget 面板内容部件
     /// @param area 停靠区域
-    QDockWidget* registerDockWidget(const QString& title, QWidget* widget, Qt::DockWidgetArea area);
-    /// 注册工具栏
-    /// @param title 工具栏标题
-    QToolBar* registerToolBar(const QString& title);
+    /// @param stableId 语言无关的稳定 objectName（布局快照键），见 LayoutManager 同名参数
+    QDockWidget* registerDockWidget(
+        const QString& title, QWidget* widget, Qt::DockWidgetArea area, const QString& stableId = QString());
     /// 清空工作台内容
     void clearWorkbenchContent();
 
@@ -190,12 +189,8 @@ private:
     void initializeStatusBarSkeleton();
     /// 重新翻译所有 UI 文字
     void retranslateUi();
-    /// 构建工具栏
-    void buildToolBars();
     /// 构建停靠区域
     void buildDockAreas();
-    /// 构建状态栏
-    void buildStatusBar();
     /// 绑定状态中心信号
     void bindStateSignals();
     /// 解除状态中心信号绑定

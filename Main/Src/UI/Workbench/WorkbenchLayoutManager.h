@@ -90,10 +90,11 @@ public:
     // ==================== 注册与清理 ====================
 
     /// 注册停靠面板
-    QDockWidget* registerDockWidget(const QString& title, QWidget* widget, Qt::DockWidgetArea area);
-    /// 注册工具栏
-    QToolBar* registerToolBar(const QString& title);
-    /// 清空工作台内容（移除所有注册的面板和工具栏）
+    /// @param stableId 语言无关的稳定 objectName（布局快照键）。为空时按 widget 类型
+    ///        推断（SceneTreePanel/PropertiesPanelWidget），再退化为 title（仅限内部面板）。
+    QDockWidget* registerDockWidget(
+        const QString& title, QWidget* widget, Qt::DockWidgetArea area, const QString& stableId = QString());
+    /// 清空工作台内容（移除所有工具栏、菜单与已注册的停靠面板）
     /// 使用 deleteLater() 延迟删除，避免 QOpenGLWidget 析构时崩溃
     /// @param oldWorkbench 被替换掉的工作台。中央视口的 GL 资源释放委托给它的
     ///        releaseCentralWidgetGLResources —— 布局管理器不认识 2D/3D 视口的具体类型。
@@ -120,11 +121,6 @@ public:
     void setSceneDockVisible(bool visible);
     /// 设置属性面板可见性（3D 模式下需要单独显示）
     void setPropertiesDockVisible(bool visible);
-
-    /// 统一应用 Dock 显隐策略（单一入口，消除三个 setter 打架）
-    /// @param requiresSkeleton 工作台是否需要骨架 Dock（2D=true, 3D=false）
-    /// @param workbenchId 工作台 ID（"2D"/"3D"），用于精细策略
-    void applyDockPolicy(bool requiresSkeleton, const QString& workbenchId = QString());
 
     // ==================== 繁忙指示器 ====================
 

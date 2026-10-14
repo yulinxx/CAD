@@ -94,7 +94,7 @@ void WorkbenchActionManager::reportFrameworkError(
     }
     else if (m_stateCenter)
     {
-        m_stateCenter->setMetadata({ { QStringLiteral("lastErrorCode"), errorCode },
+        m_stateCenter->updateMetadata({ { QStringLiteral("lastErrorCode"), errorCode },
             { QStringLiteral("lastErrorMessage"), message },
             { QStringLiteral("lastErrorContext"), context } });
     }
