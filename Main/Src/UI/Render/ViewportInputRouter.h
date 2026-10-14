@@ -219,6 +219,10 @@ public:
 
     // ==================== 坐标转换（P5 收口: RenderViewport2D 也委托至此，消除重复） ====================
 
+    /// widgetLocal → 世界。失败（相机/控件未就绪）返回 false；成功时 out 有效，
+    /// 且 out == (0,0) 是完全合法的结果 —— 调用方不得再用 isNull() 判断失败。
+    bool tryWidgetToWorld(QPointF widgetLocalPos, QPointF& worldPos) const;
+    /// 兼容包装：失败时返回 (0,0)。新代码请优先用 tryWidgetToWorld。
     QPointF widgetToWorld(QPointF widgetLocalPos) const;
     QSizeF physicalViewportSize() const;
 

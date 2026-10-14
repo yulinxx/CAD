@@ -198,19 +198,38 @@ float ViewportNavigation2D::physicalHeight() const
     return static_cast<float>(physicalViewportSize().height());
 }
 
+bool ViewportNavigation2D::tryPhysicalToWorld(const QPoint& physPos, QPointF& out) const
+{
+    if (!m_camera)
+    {
+        return false;
+    }
+    const QSizeF phys = physicalViewportSize();
+    out = m_camera->screenToWorld(physPos, static_cast<float>(phys.width()), static_cast<float>(phys.height()));
+    return true;
+}
+
 QPointF ViewportNavigation2D::physicalToWorld(const QPoint& physPos) const
 {
-    const QSizeF phys = physicalViewportSize();
-    return m_camera->screenToWorld(physPos, static_cast<float>(phys.width()), static_cast<float>(phys.height()));
+    QPointF out;
+    tryPhysicalToWorld(physPos, out);
+    return out;
+}
+
+bool ViewportNavigation2D::tryWidgetToWorld(const QPointF& widgetLocalPos, QPointF& out) const
+{
+    if (!m_renderWidget || !m_camera)
+    {
+        return false;
+    }
+    const float dpr = m_renderWidget->devicePixelRatio();
+    const QPoint physPos(static_cast<int>(widgetLocalPos.x() * dpr), static_cast<int>(widgetLocalPos.y() * dpr));
+    return tryPhysicalToWorld(physPos, out);
 }
 
 QPointF ViewportNavigation2D::widgetToWorld(const QPointF& widgetLocalPos) const
 {
-    if (!m_renderWidget)
-    {
-        return QPointF();
-    }
-    const float dpr = m_renderWidget->devicePixelRatio();
-    const QPoint physPos(static_cast<int>(widgetLocalPos.x() * dpr), static_cast<int>(widgetLocalPos.y() * dpr));
-    return physicalToWorld(physPos);
+    QPointF out;
+    tryWidgetToWorld(widgetLocalPos, out);
+    return out;
 }

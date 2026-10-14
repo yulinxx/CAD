@@ -71,13 +71,13 @@ struct ToolpathJobSpec
     /// 空移速度
     double rapidSpeedMmPerSec = 300.0;
 
-    /// 曲线离散的弦高容差（mm）。合法区间 (0, 1.0]，超界由编译器直接报错。
+    /// 曲线离散的弦高容差（mm）。合法区间 (0, 1.0]，超界由编译器直接报错
+    /// （上界是防单位填错的合理性检查，见 MotionPlanCompiler::compile）。
     ///
-    /// 注意当前 Engine2D 的实际行为：圆 / 圆弧 / 椭圆的离散**不看这个值**，
-    /// 一律按固定 32 个采样点走（BezierAlgorithms::discretizeEntity 的 default 分支
-    /// 把该参数当成采样点个数，且 <2 时回落到 32）。只有 Bezier / Spline 真正按容差细分。
-    /// 也就是说：调小它对圆弧没有任何效果 —— 想要更精细的圆弧，
-    /// 要么让卡走 ArcTo（emitArcs = true），要么先把 Engine2D 的离散接口补上真正的弦高细分。
+    /// Engine2D 的实际行为：Bezier / Spline 按此容差自适应细分；圆 / 圆弧 / 椭圆按
+    /// 弦高公式取段数（CircleAlgorithms::sampleCountForTolerance，sagitta = R(1-cos(Δ/2))），
+    /// 调小它 → 段数变多、折线更贴合真实曲线。
+    /// 想完全不离散圆弧，仍可用 emitArcs = true 让卡直接走 ArcTo。
     double chordToleranceMm = 0.01;
 
     /// true 时圆弧直接编译成 ArcTo；false 时一律离散为直线。

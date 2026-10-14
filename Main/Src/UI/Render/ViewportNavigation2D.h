@@ -67,6 +67,14 @@ public:
 
     // ---- 坐标换算（物理像素 ⇄ 世界） ----
 
+    /// widgetLocal → 世界。失败（相机/控件未就绪）返回 false；成功时 out 有效，
+    /// 且 out == (0,0) 是完全合法的结果 —— 调用方不得再用 isNull() 判断失败。
+    bool tryWidgetToWorld(const QPointF& widgetLocalPos, QPointF& out) const;
+    /// physPixel → 世界。语义同 tryWidgetToWorld。
+    bool tryPhysicalToWorld(const QPoint& physPos, QPointF& out) const;
+
+    /// 兼容包装：失败时返回 (0,0)。新代码请优先用 try* 版本，
+    /// 因为合法的原点结果无法与失败区分。
     QPointF widgetToWorld(const QPointF& widgetLocalPos) const;
     QPointF physicalToWorld(const QPoint& physPos) const;
     QSizeF physicalViewportSize() const;

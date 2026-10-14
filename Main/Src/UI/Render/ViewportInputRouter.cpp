@@ -353,8 +353,8 @@ void ViewportInputRouter::handleMouseDoubleClick(QMouseEvent* event)
         return;
     }
 
-    QPointF worldPos = widgetToWorld(event->pos().toPointF());
-    if (worldPos.isNull())
+    QPointF worldPos;
+    if (!tryWidgetToWorld(event->pos().toPointF(), worldPos))
     {
         return;
     }
@@ -640,11 +640,18 @@ QSizeF ViewportInputRouter::physicalViewportSize() const
 
 QPointF ViewportInputRouter::widgetToWorld(QPointF widgetLocalPos) const
 {
+    QPointF worldPos;
+    tryWidgetToWorld(widgetLocalPos, worldPos);
+    return worldPos;
+}
+
+bool ViewportInputRouter::tryWidgetToWorld(QPointF widgetLocalPos, QPointF& worldPos) const
+{
     if (!m_renderWidget || !m_camera)
     {
-        return QPointF();
+        return false;
     }
-    return m_navigation.widgetToWorld(widgetLocalPos);
+    return m_navigation.tryWidgetToWorld(widgetLocalPos, worldPos);
 }
 
 bool ViewportInputRouter::mouseEventToWorld(
@@ -656,10 +663,12 @@ bool ViewportInputRouter::mouseEventToWorld(
     }
 
     widgetPos = event->pos();
-    const float dpr = static_cast<float>(m_renderWidget->devicePixelRatio());
-    physWidgetPos = QPoint(static_cast<int>(widgetPos.x() * dpr), static_cast<int>(widgetPos.y() * dpr));
-    worldPos = m_navigation.physicalToWorld(physWidgetPos);
-    return !worldPos.isNull();
+    // 一次换算：event->position() 是浮点逻辑像素，乘 DPR 后只截断一次。
+    // 旧写法先 int(widgetPos) 再乘 DPR，HiDPI 下最多偏 1 物理像素。
+    const QPointF physF = event->position() * m_renderWidget->devicePixelRatio();
+    physWidgetPos = QPoint(static_cast<int>(physF.x()), static_cast<int>(physF.y()));
+    // (0,0) 是合法世界坐标（例如把原点平移到光标下），不能用 isNull() 当失败。
+    return m_navigation.tryPhysicalToWorld(physWidgetPos, worldPos);
 }
 
 // ==================== 鼠标事件分发 ====================

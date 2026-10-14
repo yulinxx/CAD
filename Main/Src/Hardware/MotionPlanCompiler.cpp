@@ -26,7 +26,7 @@
 namespace
 {
     /// 弦高容差上界（mm）。见 compile() 里拒绝逻辑处的说明 ——
-    /// 这是为绕开 Engine2D 把容差当采样数用的实现陷阱而设的硬上界，不是精度偏好。
+    /// 这是防「单位填错」（mm 当 m 填）的合理性上界，不是实现陷阱的绕行。
     constexpr double kMaxChordToleranceMm = 1.0;
 
     /// 一个图层的编译任务：图层 ID + 该图层的图元 + 工艺参数。
@@ -193,11 +193,12 @@ namespace MotionPlanCompiler
                                .arg(spec.chordToleranceMm);  // 弦高容差必须为正数
             return result;
         }
-        // 上界不是「精度够用就行」的经验值，而是躲开 Engine2D 的一个实现陷阱：
-        // BezierAlgorithms::discretizeEntity 对 圆 / 圆弧 / 椭圆 走的是 default 分支，
-        // 那里把 param（即这里的 dDiscretize）当成**采样点个数**用，且 <2 时回落到 32。
-        // 于是 [0,2) 的任何容差都得到 32 点，而 5.0 会静默变成 5 点 —— 一个圆被切成五边形，
-        // 却照样返回成功。宁可在入口拒绝，也不能把这种结果送去出光。
+        // 合理性上界：弦高容差超过 1mm 对激光加工没有合理场景，几乎必然是
+        // 单位填错（把 m 当 mm 填，或把米制容差 0.01 直接当毫米用）。
+        // 注意：Engine2D 侧已实现真正的弦高细分
+        // （BezierAlgorithms::discretizeEntity 的 CIRCLE/ARC/ELLIPSE 分支按
+        // CircleAlgorithms::sampleCountForTolerance 取段数），大容差现在会诚实地
+        // 产出粗折线而不是报错 —— 所以这里拦的是「数量级错误」，不是精度偏好。
         if (spec.chordToleranceMm > kMaxChordToleranceMm)
         {
             result.error = QStringLiteral("Chord tolerance %1mm exceeds maximum %2mm")

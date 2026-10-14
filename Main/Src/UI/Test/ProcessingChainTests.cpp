@@ -272,7 +272,9 @@ namespace
         Hw::MotionPlanBuilder builder;
         const ToolpathCompileResult r = MotionPlanCompiler::compile(scene, nullptr, spec, builder);
         EXPECT_FALSE(r.ok);
-        EXPECT_TRUE(r.error.contains(QStringLiteral("图层")));
+        // 消息体在 c2460970（Hardware 中文日志英文化）后是英文，测试此前
+        // 因 BUILD_HARDWARE=OFF 从未被编译执行，未能跟上这次英文化。
+        EXPECT_TRUE(r.error.contains(QStringLiteral("layer")));
     }
 
     TEST(MotionPlanCompilerTest, NonPositiveChordToleranceIsRejected)
@@ -383,14 +385,13 @@ namespace
         EXPECT_GT(countOp(view, Hw::MotionOp::LineTo), 8u);
     }
 
-    /// 圆的离散**不受弦高容差影响** —— 这是 Engine2D 当前的实现事实，不是期望行为。
+    /// 圆的离散**随弦高容差收紧而变密** —— 真正的弦高细分
+    /// （CircleAlgorithms::sampleCountForTolerance，sagitta = R(1-cos(Δ/2))）。
     ///
-    /// BezierAlgorithms::discretizeEntity 对 CIRCLE/ARC/ELLIPSE 走 default 分支，
-    /// 那里把 param（GeometryContext::dDiscretize）当成采样点个数，且 <2 时回落到 32。
-    /// 所以 0.5 与 0.005 两个容差都得到同样的 32 点 / 31 段。
-    /// 这条断言是**留痕的守卫**：哪天 Engine2D 补上了真正的弦高细分，它会失败，
-    /// 那时应当把它改回「收紧容差 → 段数变多」，并同步删掉 ToolpathJobSpec.h 上的限制说明。
-    TEST(MotionPlanCompilerTest, CircleFlatteningIgnoresToleranceToday)
+    /// 历史：本用例曾叫 CircleFlatteningIgnoresToleranceToday，钉住的是旧缺陷
+    /// （param 被当采样点个数，0.5 与 0.005 都得到 31 段）。Engine2D 补上容差细分后
+    /// 按当时注释的约定翻转为「收紧容差 → 段数变多」。
+    TEST(MotionPlanCompilerTest, CircleFlatteningRespectsTolerance)
     {
         Eg::SceneManager scene;
         addCircle(scene, 0.0, 0.0, 20.0);
@@ -408,14 +409,20 @@ namespace
         ASSERT_TRUE(MotionPlanCompiler::compile(scene, nullptr, coarse, coarseBuilder).ok);
         ASSERT_TRUE(MotionPlanCompiler::compile(scene, nullptr, fine, fineBuilder).ok);
 
-        EXPECT_EQ(countOp(coarseBuilder.view(), Hw::MotionOp::LineTo),
-            countOp(fineBuilder.view(), Hw::MotionOp::LineTo));
+        const auto coarseLines = countOp(coarseBuilder.view(), Hw::MotionOp::LineTo);
+        const auto fineLines = countOp(fineBuilder.view(), Hw::MotionOp::LineTo);
+
+        // 收紧容差（100 倍）必须产生更多段 —— 旧行为是两者完全相等
+        EXPECT_GT(fineLines, coarseLines);
+        // R=20mm 圆、0.5mm 容差的理论段数约 15，不应退回旧的固定 31 段
+        EXPECT_GT(coarseLines, 8u);
+        // R=20mm 圆、0.005mm 容差的理论段数约 141，远多于旧的固定 31 段
+        EXPECT_GT(fineLines, 100u);
     }
 
-    /// 过大的容差必须在入口被拒。
-    ///
-    /// 因为它会被 Engine2D 当成采样点个数：5.0 → 5 个点，一个圆变成五边形，
-    /// 而编译照样返回成功。这种计划一旦送去出光就是废料，所以宁可拒绝执行。
+    /// 过大的容差必须在入口被拒 —— 上界是防「单位填错」的合理性检查
+    /// （把 m 当 mm 填、或米制容差直接当毫米用），不是绕开实现陷阱的补丁：
+    /// Engine2D 现在会诚实地按容差产出粗折线，但 5mm 弦高对激光加工没有合理场景。
     TEST(MotionPlanCompilerTest, AbsurdlyLargeToleranceIsRejected)
     {
         Eg::SceneManager scene;

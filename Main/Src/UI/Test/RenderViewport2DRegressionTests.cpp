@@ -1215,6 +1215,55 @@ TEST(RenderViewport2DRegressionTest, InputRouter_WidgetToWorldNullWidget)
     EXPECT_TRUE(worldPos.isNull());
 }
 
+// ---- tryWidgetToWorld：(0,0) 是合法结果，不得与失败混淆 ----
+// 历史缺陷：mouseEventToWorld 用 !worldPos.isNull() 判断成功，
+// 相机把世界原点平移到光标下时（worldPos==(0,0)）被误判为失败，
+// 该次 mouse 事件被整体丢弃 —— 表现为「原点附近点不动/选不中」。
+
+TEST(RenderViewport2DRegressionTest, InputRouter_TryWidgetToWorld_WorldOriginIsValidResult)
+{
+    WheelRig rig;
+    // 默认相机（zoom=1, pan=0）下，视口中心恒映射到世界原点，且与 DPR 无关：
+    // 中心物理像素 (400D, 300D) 在 NDC 下为 (0,0)，减零偏移后就是 (0,0)。
+    QPointF world;
+    ASSERT_TRUE(rig.router.tryWidgetToWorld(QPointF(400, 300), world));
+    EXPECT_NEAR(world.x(), 0.0, 1e-9);
+    EXPECT_NEAR(world.y(), 0.0, 1e-9);
+}
+
+TEST(RenderViewport2DRegressionTest, InputRouter_TryWidgetToWorld_PannedOriginUnderCursor)
+{
+    WheelRig rig;
+    // 平移 (50, 30)：视口中心处的世界坐标应为 (-50, -30)
+    // （screenToWorld: w = n/scale - panOffset，中心 n=0）。
+    // 该断言与 DPR 无关；反向含义是世界原点被移到中心之外的某像素下。
+    rig.camera.pan(50.0, 30.0);
+    QPointF world;
+    ASSERT_TRUE(rig.router.tryWidgetToWorld(QPointF(400, 300), world));
+    EXPECT_NEAR(world.x(), -50.0, 1e-6);
+    EXPECT_NEAR(world.y(), -30.0, 1e-6);
+}
+
+TEST(RenderViewport2DRegressionTest, InputRouter_TryWidgetToWorld_NullCameraFails)
+{
+    ViewportInputRouter router;
+    RenderWidget widget;
+    widget.resize(800, 600);
+    router.setRenderWidget(&widget);
+    // 未注入相机 → 必须返回 false，而不是静默给出 (0,0)
+    QPointF world;
+    EXPECT_FALSE(router.tryWidgetToWorld(QPointF(100, 100), world));
+}
+
+TEST(RenderViewport2DRegressionTest, InputRouter_TryWidgetToWorld_NullWidgetFails)
+{
+    ViewportInputRouter router;
+    Camera2D camera;
+    router.setCamera(&camera);
+    QPointF world;
+    EXPECT_FALSE(router.tryWidgetToWorld(QPointF(100, 100), world));
+}
+
 // ==================== ViewportInputRouter 事件过滤器测试 ====================
 
 TEST(RenderViewport2DRegressionTest, InputRouter_EventFilterNullObject)
