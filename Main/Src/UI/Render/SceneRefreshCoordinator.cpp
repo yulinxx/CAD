@@ -109,6 +109,10 @@ void SceneRefreshCoordinator::setRenderWidget(RenderWidget* widget)
         m_renderWidget->setRefreshScheduler(nullptr);
     }
     m_renderWidget = widget;
+    // 拆分出的三个辅助类各自持有 widget 指针，同步更新
+    m_bitmapReconciler.setRenderWidget(widget);
+    m_textReconciler.setRenderWidget(widget);
+    m_curveLodManager.setRenderWidget(widget);
     // 反向注入：视口内部的覆盖层 / 位图 / 文字 / 视图矩阵这几类刷新
     // 原来是裸调 update() 完全绕过调度器的，注入后统一经 requestRepaint() 汇入。
     // 这是「所有 2D 刷新来源都能从 pendingLevel() 推理」的前提。
@@ -128,6 +132,7 @@ void SceneRefreshCoordinator::setSceneContext(Eg::ISceneContext* ctx)
         m_sceneManager->removeObserver(this);
     }
     m_sceneManager = static_cast<Eg::SceneManager*>(ctx);
+    m_curveLodManager.setSceneManager(m_sceneManager);
     if (m_sceneManager)
     {
         // 同步游标到当前修订号，避免程序启动后立即触发 FullRefresh
@@ -324,165 +329,24 @@ void SceneRefreshCoordinator::ensureCurveLodPump()
 // LOD 定时器 slot：执行一批，队列未空则自动续跑
 void SceneRefreshCoordinator::onCurveLodTimer()
 {
-    if (m_curveLodQueue.empty() || m_curveLodCursor >= m_curveLodQueue.size())
+    if (m_curveLodManager.empty())
     {
-        finishCurveLodQueue();
+        m_curveLodManager.finishQueue();
         return;
     }
 
     processCurveLodBatch();
-    // processCurveLodBatch 内部会在有剩余时调用 ensureCurveLodPump 续跑，无需在此重复
 }
 
 void SceneRefreshCoordinator::finishCurveLodQueue()
 {
-    m_curveLodQueue.clear();
-    m_curveLodCursor = 0;
-
-    // 本轮队列还没消费完时相机可能又变了（连续缩放/平移）：那时 requestCurveLodRefresh
-    // 只记了待办、没打断进行中的批次。这里排空后立刻按当时的状态重新评估一次，
-    // 否则「平移出上次收集区域」的新视野会一直停在旧精度（视口裁剪必须配这一步）。
-    if (m_curveLodRecollectPending)
+    m_curveLodManager.finishQueue();
+    // finishQueue 内部会处理「排队期间又要求重新收集」的待办（含重收集 + 续跑判断），
+    // 这里只需在重收集出队列后把泵拉起来。
+    if (!m_curveLodManager.empty())
     {
-        m_curveLodRecollectPending = false;
-        refillCurveLodQueueIfStale();
-        if (!m_curveLodQueue.empty())
-        {
-            ensureCurveLodPump();
-        }
+        ensureCurveLodPump();
     }
-}
-
-void SceneRefreshCoordinator::refillCurveLodQueueIfStale()
-{
-    if (!m_sceneManager || !m_renderWidget)
-    {
-        return;
-    }
-
-    const float pixelToWorld = m_renderWidget->pixelToWorldScale();
-    if (!(pixelToWorld > 0.0f))
-    {
-        return;
-    }
-    const double worldToScreenScale = 1.0 / static_cast<double>(pixelToWorld);
-
-    // 可视世界矩形（含 1.25 倍余量）。曲线 LOD 的精度只对看得见的图元有意义 ——
-    // 为了恢复视野内几十/几百个图元的精度去重算整份场景（29 万图元）既慢又白做。
-    // 余量是为了减少平移/微缩放时反复重新收集的边缘抖动。
-    // 矩阵退化（visibleWorldBounds 返回 false）时退化为不裁剪，与旧行为一致。
-    Ut::BBox2d collectBox;
-    Ut::BBox2d visibleBox;
-    bool hasVisibleBox = false;
-    {
-        float bounds[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        if (m_renderWidget->visibleWorldBounds(bounds))
-        {
-            const double minX = static_cast<double>(bounds[0]);
-            const double minY = static_cast<double>(bounds[1]);
-            const double maxX = static_cast<double>(bounds[2]);
-            const double maxY = static_cast<double>(bounds[3]);
-            visibleBox = Ut::BBox2d(minX, minY, maxX, maxY);
-
-            constexpr double kVisibleMargin = 1.25;
-            const double centerX = 0.5 * (minX + maxX);
-            const double centerY = 0.5 * (minY + maxY);
-            const double halfW = 0.5 * (maxX - minX) * kVisibleMargin;
-            const double halfH = 0.5 * (maxY - minY) * kVisibleMargin;
-            collectBox = Ut::BBox2d(centerX - halfW, centerY - halfH, centerX + halfW, centerY + halfH);
-            hasVisibleBox = true;
-        }
-    }
-
-    // 过期判据：
-    //   缩放滞后（放大到 1.3 倍就升级、缩小到 2 倍以下才降级，中间留死区避免抖动），或
-    //   可视区域越出上次收集覆盖的矩形（平移）。
-    // 降级阈值从 3.0 调整为 2.0：原先 3 倍死区导致缩小时图元长期携带高精度顶点，
-    // GPU 绘制不必要的大量顶点（例如 256 段圆只需 8 段时的冗余是 32 倍）。
-    // 2.0 在抖动和冗余顶点之间取得更好的平衡：
-    //   - 视口裁剪（1.25 倍余量）已保证平移时小幅缩小不触发重收集
-    //   - 配合容差公式修复（max(1e-6)），每次降级的重建代价本身也更小
-    constexpr double kCurveLodUpgradeRatio = 1.3;
-    constexpr double kCurveLodDowngradeRatio = 2.0;
-    const bool firstTime = m_curveLodScaleAtBuild <= 0.0;
-    const bool needsUpgrade = firstTime || worldToScreenScale > m_curveLodScaleAtBuild * kCurveLodUpgradeRatio;
-    const bool needsDowngrade = !firstTime && worldToScreenScale * kCurveLodDowngradeRatio < m_curveLodScaleAtBuild;
-    const bool regionMoved =
-        hasVisibleBox && m_curveLodCollectedBoxValid && !m_curveLodCollectedBox.contains(visibleBox);
-    if (!needsUpgrade && !needsDowngrade && !regionMoved)
-    {
-        return;
-    }
-
-    m_curveLodScaleAtBuild = worldToScreenScale;
-    m_curveLodCollectedBox = collectBox;
-    m_curveLodCollectedBoxValid = hasVisibleBox;
-
-    // 收集曲线类图元 ID：只有它们的离散化段数/顶点数随缩放变化。
-    // 必须覆盖所有「按 worldToScreenScale 自适应离散化/简化」的类型（见
-    // EntityGeometryEmitter::emitEntityGeometry），否则放大后图元不会重建、精度停留低档。
-    //   - CIRCLE/ARC/ELLIPSE：GPU 原生，弦误差随 zoom 变化
-    //   - BEZIER2/BEZIER/SPLINE/NURBS/SMARTLINE：BezierAlgorithms 自适应离散化
-    //   - POLYGON：zoom out 时 Douglas-Peucker 简化，zoom in 要恢复原始顶点
-    const Eg::EType curveTypes[] = { Eg::EType::CIRCLE,
-        Eg::EType::ARC,
-        Eg::EType::ELLIPSE,
-        Eg::EType::BEZIER2,
-        Eg::EType::BEZIER,
-        Eg::EType::SPLINE,
-        Eg::EType::NURBS,
-        Eg::EType::SMARTLINE,
-        Eg::EType::POLYGON };
-
-    m_curveLodQueue.clear();
-    m_curveLodCursor = 0;
-
-    // 诊断：统计各类型入队数量，定位「放大不恢复精度」时是哪些类型没被覆盖；
-    // polyInvariantSkipped 记「顶点数不超过简化阈值、随缩放不会变化，因而被跳过」的多边形数。
-    // 这类多边形在每个缩放下都原样发射顶点（重新离散得到相同结果），纳入 LOD 队列
-    // 只会白做一遍顶点解码 + GPU 重传（抽稀图纸里 29 万图元中绝大多数属此类）。
-    size_t perTypeCounts[sizeof(curveTypes) / sizeof(curveTypes[0])] = { 0 };
-    size_t polygonInvariantSkipped = 0;
-    for (size_t t = 0; t < sizeof(curveTypes) / sizeof(curveTypes[0]); ++t)
-    {
-        size_t& typeCount = perTypeCounts[t];
-        const bool isPolygon = (curveTypes[t] == Eg::EType::POLYGON);
-        // forEachEntityByType 走类型索引，O(k) 且不拷贝整份指针数组
-        // （getEntitiesByType 按值返回，POLYGON 那 29 万个指针会白拷 2.3MB）。
-        m_sceneManager->forEachEntityByType(curveTypes[t], [&](Eg::SyEntity* entity) {
-            if (!entity)
-            {
-                return;
-            }
-            // POLYGON 只有顶点数 > kPolygonSimplifyMinVertices 时才走 Douglas-Peucker 简化
-            // （见 EntityGeometryEmitter emitEntityGeometry 的 POLYGON 分支）。
-            // 顶点数不超过阈值的多边形在任意缩放下离散结果都相同，入 LOD 队列纯浪费。
-            if (isPolygon)
-            {
-                const auto* polygon = static_cast<const Eg::SyPolygon*>(entity);
-                if (polygon->vertices().size() <= Eg::kPolygonSimplifyMinVertices)
-                {
-                    ++polygonInvariantSkipped;
-                    return;
-                }
-            }
-            if (hasVisibleBox)
-            {
-                // 包围盒命中缓存（且导入时已由文件里的 cached_bbox 播种），这里是 O(1) 判断
-                const Ut::BBox2d box = entity->getBbox();
-                if (!box.isValid() || !box.intersects(collectBox))
-                {
-                    return;
-                }
-            }
-            m_curveLodQueue.push_back(static_cast<uint64_t>(entity->id));
-            ++typeCount;
-        });
-    }
-
-    // 全场景类型总览（含不在 LOD 队列里的类型），一次性看清图元构成
-    size_t totalEntities = m_sceneManager->getEntityCount();
-    (void)totalEntities;  // 预留调试用
 }
 
 void SceneRefreshCoordinator::requestCurveLodRefresh()
@@ -492,22 +356,10 @@ void SceneRefreshCoordinator::requestCurveLodRefresh()
         return;
     }
 
-    // 队列还有未完成的重建（cursor 未到末尾）：不重置、不重新收集。
-    // processCurveLodBatch 每帧从 renderWidget 读最新 worldToScreenScale，继续重建会
-    // 自然用最新缩放。否则缩放连续触发时（滚轮/拖拽每帧都变），每次都 clear 队列 +
-    // 重新收集 + 归零 cursor，重建进度永远被重置，放大后精度就一直停留在低档
-    // （正是「放大后曲线仍糊」的根因）。
-    // 但相机确实又变了，记一笔待办：队列排空时由 finishCurveLodQueue 重新评估
-    // （否则平移出上次收集区域后，新进视野的图元会一直停在旧精度）。
-    if (m_curveLodCursor < m_curveLodQueue.size())
-    {
-        m_curveLodRecollectPending = true;
-        ensureCurveLodPump();
-        return;
-    }
-
-    refillCurveLodQueueIfStale();
-    if (!m_curveLodQueue.empty())
+    // 过期判据与队列收集的语义已整体移交 CurveLodManager。
+    // 队列未排空时它只记待办不打断批次；排空后由 finishCurveLodQueue 重新评估。
+    m_curveLodManager.requestRefresh();
+    if (!m_curveLodManager.empty())
     {
         ensureCurveLodPump();
     }
@@ -737,7 +589,7 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     const std::unordered_set<uint64_t>& selectedIds = m_cachedSelectedIds;
 
     // 纯选择变更优化：脏集合、删除集合、选中差集都为空时，场景几何未变，
-    // 无需创建 BatchGuard（GL 上下文切换）、无需 reconcileBitmaps/Texts。
+    // 无需创建 BatchGuard（GL 上下文切换）、无需 BitmapReconciler/TextReconciler 对账。
     // 选择轮廓/手柄已由 onSelectionChanged → syncSelectionToolState 直接更新到 GPU，
     // 此处只需触发一次 repaint 即可。
     if (m_pendingDirtyIds.empty() && m_pendingDeletedIds.empty() && m_selectionHideIds.empty() &&
@@ -795,7 +647,7 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     m_selectionHideIds.clear();
 
     // 本轮脏集合里是否出现过位图 / 文字图元。下面用它决定要不要跑 reconcile*：
-    // reconcileBitmaps/reconcileTexts 现在使用 getEntitiesByType 按类型索引获取，
+    // BitmapReconciler/TextReconciler 现在使用 getEntitiesByType 按类型索引获取，
     // 避免全场景扫描。标志在这个循环里顺手收集，不额外多做一次 findEntityById。
     bool touchedImage = false;
     bool touchedText = false;
@@ -846,14 +698,14 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             continue;
         }
 
-        // 位图（SyImage）不走折线/线框顶点路径，统一由 reconcileBitmaps 处理
+        // 位图（SyImage）不走折线/线框顶点路径，统一由 BitmapReconciler 处理
         if (snapshot->type == Eg::EType::IMAGE)
         {
             touchedImage = true;
             continue;
         }
 
-        // 文本（SyText）同理：字形四边形由 reconcileTexts 一路处理。
+        // 文本（SyText）同理：字形四边形由 TextReconciler 一路处理。
         if (snapshot->type == Eg::EType::TEXT)
         {
             touchedText = true;
@@ -1044,15 +896,17 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     //   - 账本非空：图元或图层转为不可见**不会**进脏集合（LayerManager::setLayerVisible
     //     只改标志位），只能靠这里的全量对账发现。账本非空时跳过就会留下残影。
     // 两者都不成立时（账本空 && 本轮没碰位图）对账必然是空转，可以安全跳过。
-    if (touchedImage || !m_bitmapImageIds.empty())
+    if (touchedImage || !m_bitmapReconciler.empty())
     {
-        reconcileBitmaps(sm, /*fullReconcile=*/false);
+        m_bitmapReconciler.reconcile(sm, /*fullReconcile=*/false, m_cachedSelectedIds, hideSelected,
+            m_pendingDirtyIds);
     }
 
     // 世界文字层协调：同上。文本自己一路后，增量刷新不再因文本升级为全量。
-    if (touchedText || !m_worldTextIds.empty())
+    if (touchedText || !m_textReconciler.empty())
     {
-        reconcileTexts(sm, /*fullReconcile=*/false);
+        m_textReconciler.reconcile(sm, /*fullReconcile=*/false, m_cachedSelectedIds, hideSelected,
+            m_pendingDirtyIds);
     }
 
     // 位图/文字协调完成后不需要额外 update() ——
@@ -1061,79 +915,9 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
 
 void SceneRefreshCoordinator::processCurveLodBatch()
 {
-    if (!m_renderWidget || !m_sceneManager)
-    {
-        return;
-    }
-
-    if (m_curveLodCursor >= m_curveLodQueue.size())
-    {
-        finishCurveLodQueue();
-        return;
-    }
-
-    const QPointF cam = m_renderWidget->cameraCenter();
-    const double cameraCenter[2] = { cam.x(), cam.y() };
-    const float pixelToWorld = m_renderWidget->pixelToWorldScale();
-    const double worldToScreenScale = pixelToWorld > 0.0f ? 1.0 / static_cast<double>(pixelToWorld) : 1.0;
-    const double chordErrorPixels = m_renderWidget->lodChordErrorPixels();
-
-    // 每帧预算：串行重建 2000 个曲线图元，亚毫秒级。zoom 期间场景不变，
-    // 直接在主线程读活对象（SceneManager 契约），无需 clone 快照。
-    constexpr size_t kBatchSize = 2000;
-    const size_t end = (std::min)(m_curveLodCursor + kBatchSize, m_curveLodQueue.size());
-
-    // 整批只切一次 GL 上下文、只请求一次重绘（与 applyLightRefresh 同策略）
-    m_renderWidget->beginBatchUpload();
-
-    for (size_t i = m_curveLodCursor; i < end; ++i)
-    {
-        const uint64_t uid = m_curveLodQueue[i];
-        Eg::SyEntity* entity = m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid));
-        if (!entity)
-        {
-            continue;
-        }
-
-        std::vector<Render::VertexP3C3> vertices;
-        Render::PrimitiveType primType;
-        if (!entityToVertices(entity, vertices, primType, cameraCenter, worldToScreenScale, chordErrorPixels))
-        {
-            continue;
-        }
-
-        if (m_renderedEntityIds.count(uid))
-        {
-            m_renderWidget->modifyRenderEntity(uid,
-                vertices.data(),
-                static_cast<uint32_t>(vertices.size()),
-                primType,
-                layerIndexOfEntity(m_sceneManager, entity->id));
-        }
-        else
-        {
-            m_renderWidget->addRenderEntity(uid,
-                vertices.data(),
-                static_cast<uint32_t>(vertices.size()),
-                primType,
-                layerIndexOfEntity(m_sceneManager, entity->id));
-            m_renderedEntityIds.insert(uid);
-        }
-    }
-
-    m_renderWidget->endBatchUpload();
-
-    m_curveLodCursor = end;
-
-    if (m_curveLodCursor < m_curveLodQueue.size())
-    {
-        // 还有剩余，下一帧继续（不提升 RefreshLevel，仍是纯后台分批）
-        ensureCurveLodPump();
-    }
-    else
-    {
-        finishCurveLodQueue();
-    }
+    // 批量重建 + GL 上下文管理 + 账本写回的语义已整体移交 CurveLodManager。
+    // 它内部会在有剩余时通过 ensureCurveLodPump 续跑独立定时器。
+    m_curveLodManager.processBatch(m_renderedEntityIds);
 }
 
 void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
@@ -1242,200 +1026,22 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     // 全量重建还把整份场景按当前缩放重新离散了一遍，曲线 LOD 的「已收集区域」记录
     // 就此作废：重新锚定缩放基准（否则下一帧拿旧基准比较会白白重收集一次），
     // 并把区域记录置为无效 —— 全场景都已是当前精度，平移不需要再补收集。
-    m_curveLodQueue.clear();
-    m_curveLodCursor = 0;
-    m_curveLodRecollectPending = false;
     const float pxToWorldNow = m_renderWidget->pixelToWorldScale();
-    m_curveLodScaleAtBuild = pxToWorldNow > 0.0f ? 1.0 / static_cast<double>(pxToWorldNow) : 0.0;
-    m_curveLodCollectedBoxValid = false;
+    m_curveLodManager.clearAfterFullRefresh(
+        pxToWorldNow > 0.0f ? 1.0 / static_cast<double>(pxToWorldNow) : 0.0);
 
     // 位图层全量协调：submitSceneFromDataSource 内部 renderBeginScene 已清空 GPU 位图，
     // 这里以场景为真源整体重建，保证与场景生命周期完全一致
-    reconcileBitmaps(sm, /*fullReconcile=*/true);
+    m_bitmapReconciler.reconcile(sm, /*fullReconcile=*/true, m_cachedSelectedIds, hideSelected, {});
 
     // 世界文字层全量协调：同上
-    reconcileTexts(sm, /*fullReconcile=*/true);
-}
-
-void SceneRefreshCoordinator::reconcileBitmaps(Eg::SceneManager* sm, bool fullReconcile)
-{
-    if (!m_renderWidget || !sm)
-    {
-        return;
-    }
-
-    if (fullReconcile)
-    {
-        // 全量重建：GPU 位图已被 renderBeginScene 清空，重置本地账本后整体重传
-        m_renderWidget->clearBitmaps();
-        m_bitmapImageIds.clear();
-    }
-
-    // 获取"选中时隐藏原图"的**有效**设置（开关 + 虚线画得出来），见 hideSelectedEffective()
-    const bool hideSelected = hideSelectedEffective();
-
-    // 如果启用隐藏选中实体，使用缓存的选中 ID 集合
-    const std::unordered_set<uint64_t>& selectedIds = m_cachedSelectedIds;
-
-    // 期望集合：场景中所有可见 SyImage（可见 = 图元可见 && 图层可见）
-    std::unordered_set<uint64_t> desired;
-    // 使用类型索引避免全场景扫描
-    auto imageEntities = sm->getEntitiesByType(Eg::EType::IMAGE);
-    for (auto* e : imageEntities)
-    {
-        if (!e || !e->visible())
-        {
-            continue;
-        }
-        if (e->layer() && !e->layer()->isVisible())
-        {
-            continue;
-        }
-        auto uid = static_cast<uint64_t>(e->id);
-        // 如果启用了"选中时隐藏原图"且实体被选中，跳过
-        if (hideSelected && selectedIds.count(uid))
-        {
-            continue;
-        }
-        desired.insert(uid);
-    }
-
-    // 移除：本地账本中存在但场景已不期望（删除 / 隐藏 / 图层隐藏）
-    for (auto it = m_bitmapImageIds.begin(); it != m_bitmapImageIds.end();)
-    {
-        if (!desired.count(*it))
-        {
-            m_renderWidget->removeBitmapImage(*it);
-            it = m_bitmapImageIds.erase(it);
-        }
-        else
-        {
-            ++it;
-        }
-    }
-
-    // 新增/更新：期望但尚未上传 → 上传；已上传但本轮 dirty（内容/几何变化）→ 重新上传。
-    // 图层显隐切换由上面的"移除逻辑"间接驱动：隐藏时从账本去除 → 重新显示时 isNew=true。
-    for (auto id : desired)
-    {
-        const bool isNew = m_bitmapImageIds.count(id) == 0;
-        const bool isDirty = m_pendingDirtyIds.count(id) > 0;
-        if (!isNew && !isDirty)
-        {
-            continue;
-        }
-
-        auto* e = sm->findEntityById(static_cast<Eg::EntityId>(id));
-        if (!e)
-        {
-            continue;
-        }
-
-        // 无像素数据的 SyImage 不纳入位图层（移除残留，且不记入账本）
-        const auto* image = static_cast<const Eg::SyImage*>(e);
-        if (!image->pixelData() || image->nWidth <= 0 || image->nHeight <= 0)
-        {
-            m_renderWidget->removeBitmapImage(id);
-            m_bitmapImageIds.erase(id);
-            continue;
-        }
-
-        m_renderWidget->setBitmapImage(id, image);
-        m_bitmapImageIds.insert(id);
-    }
-}
-
-void SceneRefreshCoordinator::reconcileTexts(Eg::SceneManager* sm, bool fullReconcile)
-{
-    if (!m_renderWidget || !sm)
-    {
-        return;
-    }
-
-    if (fullReconcile)
-    {
-        // 全量重建：重置本地账本与渲染侧账本后整体重传
-        m_renderWidget->clearWorldTexts();
-        m_worldTextIds.clear();
-    }
-
-    // 获取"选中时隐藏原图"的**有效**设置（开关 + 虚线画得出来），见 hideSelectedEffective()
-    const bool hideSelected = hideSelectedEffective();
-
-    // 如果启用隐藏选中实体，使用缓存的选中 ID 集合
-    const std::unordered_set<uint64_t>& selectedIds = m_cachedSelectedIds;
-
-    // 期望集合：场景中所有可见 SyText（可见 = 图元可见 && 图层可见）
-    std::unordered_set<uint64_t> desired;
-    // 使用类型索引避免全场景扫描
-    auto textEntities = sm->getEntitiesByType(Eg::EType::TEXT);
-    for (auto* e : textEntities)
-    {
-        if (!e || !e->visible())
-        {
-            continue;
-        }
-        if (e->layer() && !e->layer()->isVisible())
-        {
-            continue;
-        }
-        auto uid = static_cast<uint64_t>(e->id);
-        // 如果启用了"选中时隐藏原图"且实体被选中，跳过
-        if (hideSelected && selectedIds.count(uid))
-        {
-            continue;
-        }
-        desired.insert(uid);
-    }
-
-    // 移除：本地账本中存在但场景已不期望（删除 / 隐藏 / 图层隐藏）
-    for (auto it = m_worldTextIds.begin(); it != m_worldTextIds.end();)
-    {
-        if (!desired.count(*it))
-        {
-            m_renderWidget->removeWorldText(*it);
-            it = m_worldTextIds.erase(it);
-        }
-        else
-        {
-            ++it;
-        }
-    }
-
-    // 新增/更新：期望但尚未登记 → 登记；已登记但本轮 dirty（内容/位置/字高变化）→ 重登记
-    for (auto id : desired)
-    {
-        const bool isNew = m_worldTextIds.count(id) == 0;
-        const bool isDirty = m_pendingDirtyIds.count(static_cast<Eg::EntityId>(id)) > 0;
-        if (!isNew && !isDirty)
-        {
-            continue;
-        }
-
-        auto* e = sm->findEntityById(static_cast<Eg::EntityId>(id));
-        if (!e)
-        {
-            continue;
-        }
-
-        // 空串或非正字高画不出任何东西，不纳入账本（移除残留）
-        const auto* text = static_cast<const Eg::SyText*>(e);
-        if (text->text()[0] == '\0' || text->dHeight <= 0.0)
-        {
-            m_renderWidget->removeWorldText(id);
-            m_worldTextIds.erase(id);
-            continue;
-        }
-
-        m_renderWidget->setWorldText(id, text);
-        m_worldTextIds.insert(id);
-    }
+    m_textReconciler.reconcile(sm, /*fullReconcile=*/true, m_cachedSelectedIds, hideSelected, {});
 }
 
 // 渲染刷新分发：按 RefreshLevel 级别选择刷新策略
 void SceneRefreshCoordinator::updateSceneRender()
 {
-    if (!m_renderWidget || (m_refreshLevel == RefreshLevel::None && m_curveLodQueue.empty()))
+    if (!m_renderWidget || (m_refreshLevel == RefreshLevel::None && m_curveLodManager.empty()))
     {
         return;
     }
@@ -1465,11 +1071,12 @@ void SceneRefreshCoordinator::updateSceneRender()
     // 此时 LOD 队列里的旧任务确实已过期。
     // 增量刷新（LightUpdate / Selection / Repaint）只更新脏图元，未变更的曲线图元
     // 仍保持旧 LOD 精度，需要保留队列继续分批重建。否则会出现"部分曲线永久低精度"——
-    // 因为 m_curveLodScaleAtBuild 已被更新为新缩放值，后续不会再触发 LOD 重建。
-    if (m_refreshLevel == RefreshLevel::FullRefresh && !m_curveLodQueue.empty())
+    // 因为 CurveLodManager 的缩放基准已被更新为新缩放值，后续不会再触发 LOD 重建。
+    // 注意：applyFullRefresh 内部已按当前缩放重新锚定基准，这里只需在未走到全量
+    // 路径时兜底清空（例如全量被 isInitialized 提前返回的那一帧）。
+    if (m_refreshLevel == RefreshLevel::FullRefresh && !m_curveLodManager.empty())
     {
-        m_curveLodQueue.clear();
-        m_curveLodCursor = 0;
+        m_curveLodManager.clearQueue();
     }
 
     RefreshLevel level = m_refreshLevel;
@@ -1479,7 +1086,7 @@ void SceneRefreshCoordinator::updateSceneRender()
     {
         applyRepaintRefresh();
         // 场景刷新帧顺带推进 LOD 一次，独立定时器负责持续续跑
-        if (!m_curveLodQueue.empty())
+        if (!m_curveLodManager.empty())
         {
             processCurveLodBatch();
         }
@@ -1527,7 +1134,7 @@ void SceneRefreshCoordinator::updateSceneRender()
     // 这里额外推进一次是为了利用"场景刷新已经切过 GL 上下文"的时机，
     // 减少单独触发时的上下文切换开销。processCurveLodBatch 内部有剩余时
     // 会自行调用 ensureCurveLodPump 续跑独立定时器。
-    if (!m_curveLodQueue.empty())
+    if (!m_curveLodManager.empty())
     {
         processCurveLodBatch();
     }

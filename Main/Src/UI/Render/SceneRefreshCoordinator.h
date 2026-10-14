@@ -30,6 +30,9 @@
 #include "Engine2D/Core/SceneNotifier.h"
 #include "UI/Render/ISceneRefreshScheduler.h"
 #include "Ut/BBox2d.h"
+#include "BitmapReconciler.h"
+#include "TextReconciler.h"
+#include "CurveLodManager.h"
 
 class FrameTimer;
 
@@ -78,7 +81,7 @@ public:
      *   - 可视区域越出了上次收集覆盖的矩形（平移）
      * 两者都不成立时它只做几次比较就返回。
      *
-     * 收集到的 ID 放进 m_curveLodQueue，由 processCurveLodBatch 每帧消费一批，
+     * 收集到的 ID 放进 CurveLodManager 的队列，由 processCurveLodBatch 每帧消费一批，
      * 跨多帧完成，避免一次性重 tessellate 上万个曲线造成单帧卡顿。
      */
     void requestCurveLodRefresh();
@@ -151,9 +154,6 @@ private:
     /// 队列排空后的收尾：清队列 + 处理「排队期间又要求重新收集」的待办
     void finishCurveLodQueue();
 
-    /// 按当前缩放/可视区域判断曲线 LOD 是否过期；过期就重新收集整个队列
-    void refillCurveLodQueueIfStale();
-
     /// 「隐藏选中本体」是否有效：设置开启且虚线轮廓能绘制
     bool hideSelectedEffective() const;
 
@@ -191,22 +191,6 @@ private:
     // 按批次累积，刷完由 updateSceneRender 清空。
     Eg::SceneSnapshot m_pendingSnapshot;
 
-    // 曲线 LOD 分批重建队列：相机变化时按「缩放滞后 + 可视区域」收集需要重建精度的
-    // 曲线图元 ID（requestCurveLodRefresh），每帧由 processCurveLodBatch 重建一批。
-    // 游标记录已处理到的位置。
-    std::vector<uint64_t> m_curveLodQueue;
-    size_t m_curveLodCursor = 0;
-
-    /// 上次收集队列时的 worldToScreenScale（缩放滞后判据的基准）。
-    /// <= 0 表示还没收集过。
-    double m_curveLodScaleAtBuild{ 0.0 };
-    /// 上次收集队列时覆盖的世界矩形（含余量）。可视区域一旦越出它就必须重新收集，
-    /// 否则平移后新进视野的图元会一直停在旧精度。
-    Ut::BBox2d m_curveLodCollectedBox;
-    bool m_curveLodCollectedBoxValid{ false };
-    /// 队列尚在消费期间又出现了新的收集请求：排空后立即按当时的状态重新评估
-    bool m_curveLodRecollectPending{ false };
-
     // 上一帧已同步的选中集合：用于在选择变更时计算“发生选中态翻转”的图元，
     // 将其加入待处理脏集合，驱动增量路径正确增删（见 onSelectionChanged）。
     std::unordered_set<uint64_t> m_lastSelectedIds;
@@ -223,22 +207,15 @@ private:
     mutable std::unordered_set<uint64_t> m_cachedSelectedIds;
     mutable bool m_selectedIdsCacheValid{ false };
 
-    // 当前已同步到位图渲染层的 SyImage 图元 ID 集合（多图支持，本地账本）
-    std::unordered_set<uint64_t> m_bitmapImageIds;
-
-    // 位图层协调（单源真值 = 场景中可见 SyImage 集合）：
-    // 统一处理 新增/修改/删除/图层显隐/全量重建，增量与全量路径收敛于此。
-    //   fullReconcile=true：先清空位图层（renderBeginScene 已清 GPU 位图），整体重传
-    //   fullReconcile=false：仅按 dirty/新增增量上传，并移除场景中已不存在的位图
-    void reconcileBitmaps(Eg::SceneManager* sm, bool fullReconcile);
-
-    // 当前已同步到世界文字层的 SyText 图元 ID 集合（本地账本）
-    std::unordered_set<uint64_t> m_worldTextIds;
-
-    // 世界文字层协调：与 reconcileBitmaps 同一形状、同一真源规则。
-    // 文本没有可复用的顶点块（字形四边形要随字体图集重排），因此不走
-    // entityToVertices 那条增量顶点路径，而是自己一路。
-    void reconcileTexts(Eg::SceneManager* sm, bool fullReconcile);
+    // ==================== 拆分出去的职责（辅助类） ====================
+    //
+    // 位图层 / 世界文字层 / 曲线 LOD 分批原是本类的三段私有实现 + 一份账本成员。
+    // 三者各自满足「独立状态 + 独立真源规则」的拆分条件，独立为策略类后：
+    //   - 本类只保留刷新级别调度与变更流消费，代码量减半
+    //   - 各协调器的账本不再暴露给调度逻辑，状态归属清晰
+    BitmapReconciler m_bitmapReconciler{ nullptr };
+    TextReconciler m_textReconciler{ nullptr };
+    CurveLodManager m_curveLodManager{ nullptr };
 
     // 帧耗时追踪器（性能监控基础设施）
     std::unique_ptr<FrameTimer> m_frameTimer;

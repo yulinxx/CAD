@@ -719,6 +719,9 @@ if(BUILD_VIEWPORT_REFRESH_TESTS AND GTest_FOUND)
         "${UI_ROOT}/Test/ViewportRefreshTestsMain.cpp"   # 自带 QApplication 的入口
         "${UI_ROOT}/Render/SceneRefreshCoordinator.cpp"
         "${UI_ROOT}/Render/EntityToVertices.cpp"
+        "${UI_ROOT}/Render/BitmapReconciler.cpp"
+        "${UI_ROOT}/Render/TextReconciler.cpp"
+        "${UI_ROOT}/Render/CurveLodManager.cpp"
     )
     target_compile_features(ViewportRefreshTests PRIVATE cxx_std_17)
     # SceneRefreshCoordinator 有 Q_OBJECT：moc 产物必须为这个目标单独生成一次

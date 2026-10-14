@@ -67,9 +67,10 @@ TEST(SyEntitySerializerTest, LineRoundTrip)
     ASSERT_NE(deserialized, nullptr);
     EXPECT_EQ(deserialized->eType, Eg::EType::LINE);
     EXPECT_EQ(deserialized->id, 42u);
-    expectVec2dEqual(deserialized->basePoint, Ut::Vec2d(10.0, 20.0));
-    EXPECT_FALSE(deserialized->bClosed);
-    EXPECT_TRUE(deserialized->bCCW);
+    auto* lineRt = static_cast<Eg::SyLine*>(deserialized.get());
+    expectVec2dEqual(lineRt->basePoint, Ut::Vec2d(10.0, 20.0));
+    EXPECT_FALSE(lineRt->bClosed);
+    EXPECT_TRUE(lineRt->bCCW);
 
     auto* line = static_cast<Eg::SyLine*>(deserialized.get());
     ASSERT_EQ(line->pointRef().size(), 2u);
@@ -149,7 +150,7 @@ TEST(SyEntitySerializerTest, PointRoundTrip)
     auto [deserialized, proto] = roundTrip<Eg::SyPoint>(original);
     ASSERT_NE(deserialized, nullptr);
     EXPECT_EQ(deserialized->eType, Eg::EType::POINT);
-    expectVec2dEqual(deserialized->basePoint, Ut::Vec2d(42.0, 99.0));
+    expectVec2dEqual(static_cast<Eg::SyPoint*>(deserialized.get())->basePoint, Ut::Vec2d(42.0, 99.0));
 }
 
 // ==================== 多段线序列化循环（显式端点） ====================
@@ -168,8 +169,8 @@ TEST(SyEntitySerializerTest, PolygonRoundTrip)
     auto [deserialized, proto] = roundTrip<Eg::SyPolygon>(original);
     ASSERT_NE(deserialized, nullptr);
     EXPECT_EQ(deserialized->eType, Eg::EType::POLYGON);
-    EXPECT_TRUE(deserialized->bClosed);
-    EXPECT_FALSE(deserialized->bCCW);
+    EXPECT_TRUE(static_cast<Eg::SyPolygon*>(deserialized.get())->bClosed);
+    EXPECT_FALSE(static_cast<Eg::SyPolygon*>(deserialized.get())->bCCW);
 
     auto* poly = static_cast<Eg::SyPolygon*>(deserialized.get());
     const auto& resultVerts = poly->vertices();
@@ -439,9 +440,10 @@ TEST(SyEntitySerializerTest, CommonPropertiesRoundTrip)
     auto [deserialized, proto] = roundTrip<Eg::SyCircle>(original);
     ASSERT_NE(deserialized, nullptr);
     EXPECT_EQ(deserialized->id, 12345u);
-    expectVec2dEqual(deserialized->basePoint, Ut::Vec2d(-100.0, 200.0));
-    EXPECT_TRUE(deserialized->bClosed);
-    EXPECT_TRUE(deserialized->bCCW);
+    auto* circleCommon = static_cast<Eg::SyCircle*>(deserialized.get());
+    expectVec2dEqual(circleCommon->basePoint, Ut::Vec2d(-100.0, 200.0));
+    EXPECT_TRUE(circleCommon->bClosed);
+    EXPECT_TRUE(circleCommon->bCCW);
 }
 
 TEST(SyEntitySerializerTest, NameRoundTrip)
