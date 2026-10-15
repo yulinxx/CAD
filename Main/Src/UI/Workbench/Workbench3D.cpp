@@ -336,6 +336,7 @@ void Workbench3D::create3DViewport(WorkbenchWindow& window)
     if (auto* r3dAdapter = dynamic_cast<RenderWidget3DAdapter*>(viewport->renderer()))
     {
         m_services3D.renderWidget = r3dAdapter->widget();
+        m_renderWidget3D = r3dAdapter->widget();
         SY_DEBUGF("[Workbench3D] RenderWidget3D registered to ServicePack3D: %p", static_cast<void*>(m_services3D.renderWidget));
         if (m_services3D.sceneEditService && m_services3D.renderWidget)
         {
@@ -364,7 +365,7 @@ void Workbench3D::bind3DRenderSignals(ServiceOwner& own)
     bind3DSelectionSignal();
 
     // 右键菜单请求：交给命令中枢基于统一快照构建并弹出（与 2D 视口一致）
-    connect(m_services3D.renderWidget,
+    connect(m_renderWidget3D,
         &RenderWidget3D::sigContextMenuRequested,
         this,
         &Workbench3D::on3DContextMenuRequested);
@@ -374,9 +375,8 @@ void Workbench3D::bind3DRenderSignals(ServiceOwner& own)
 /// 不再往 metadata 写 positionText / 3d_selCount / 3d_modelName 等无消费者的镜像。
 void Workbench3D::bind3DSelectionSignal()
 {
-    auto* renderWidget = m_services3D.renderWidget;
     // 跨 DLL 安全：信号参数改为 POD 指针数组
-    auto conn = connect(renderWidget,
+    auto conn = connect(m_renderWidget3D,
         &RenderWidget3D::sigSelectionChanged,
         [this, stateCenter = m_uiState.stateCenter](const Eg::SyMeshEntity** entities, int count) {
             if (stateCenter)
@@ -495,7 +495,7 @@ QMenu* Workbench3D::buildConfiguredContextMenu(const QString& contextMenuId)
     // triggered 闭包，而菜单是在调用方 exec() 的 —— 局部对象出栈即悬垂。
     auto* dispatcher = m_workbenchWindow ? m_workbenchWindow->menuManager()->commandDispatcher()
                                          : static_cast<IUiCommandDispatcher*>(this);
-    return UiContextMenuService::instance().buildMenu(config, contextMenuId, dispatcher, m_services3D.renderWidget);
+    return UiContextMenuService::instance().buildMenu(config, contextMenuId, dispatcher, m_renderWidget3D);
 }
 
 /// 步骤三：创建 CommandActionHub3D、注册命令、初始化菜单管理器和快捷键
@@ -518,7 +518,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
         // 启动时从数据库加载并应用已保存的 3D 专属设置（渲染/相机/光照）
         if (m_mainWindow3D)
         {
-            own.settingsCoordinator->loadAndApplySettings(m_mainWindow3D->renderWidget());
+            own.settingsCoordinator->loadAndApplySettings(m_mainWindow3D->renderWidgetDisplay());
         }
     }
 
@@ -695,9 +695,9 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
 
     // 光标世界坐标：只把原始浮点数交给状态栏，坐标文案由 PositionIndicator
     // 自行用 tr() 拼并缓存原始值（语言切换时它自己重拼，这里不用管）
-    if (m_services3D.renderWidget)
+    if (m_renderWidget3D)
     {
-        connect(m_services3D.renderWidget,
+        connect(m_renderWidget3D,
             &RenderWidget3D::sigCursorWorldPosition,
             m_statusBar3D,
             [sb3d = m_statusBar3D](float x, float y, float z, bool valid) {
@@ -708,7 +708,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
             });
 
         // 选中变化：数量 → 选择区，模型名/三角面数 → 信息区，都只送原始数据
-        connect(m_services3D.renderWidget,
+        connect(m_renderWidget3D,
             &RenderWidget3D::sigSelectionChanged,
             m_statusBar3D,
             [sb3d = m_statusBar3D](const Eg::SyMeshEntity** entities, int count) {
@@ -773,7 +773,7 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
     // 引擎/场景（业务）→ 面板（UI）：变化后刷新展示与选中高亮
     if (m_services3D.renderWidget)
     {
-        connect(m_services3D.renderWidget,
+        connect(m_renderWidget3D,
             &RenderWidget3D::sigSelectionChanged,
             this,
             [this](const Eg::SyMeshEntity** /*entities*/, int /*count*/) {
@@ -1383,13 +1383,14 @@ void Workbench3D::deactivate()
     // 1.5) 先断开 RenderWidget3D 的所有信号连接，避免窗口销毁过程中信号回调命中悬空引用
     if (m_services3D.renderWidget)
     {
-        disconnect(m_services3D.renderWidget, nullptr, nullptr, nullptr);
+        disconnect(m_renderWidget3D, nullptr, nullptr, nullptr);
         // sceneEditService 与 renderWidget 是两个独立指针，不能靠外层判空推断它非空
         if (m_services3D.sceneEditService)
         {
             m_services3D.sceneEditService->bindRenderWidget(nullptr);
         }
         m_services3D.renderWidget = nullptr;
+        m_renderWidget3D = nullptr;
     }
 
     // 场景树面板随窗口销毁，清空引用避免悬空
@@ -1485,7 +1486,7 @@ bool Workbench3D::showSettingsDialog(QWidget* /*parent*/)
         ? m_workbenchWindow->menuManager()->shortcutSettingsModel()
         : nullptr;
 
-    if (!own.settingsCoordinator->showSettingsDialog(m_mainWindow3D->renderWidget(), shortcutModel))
+    if (!own.settingsCoordinator->showSettingsDialog(m_mainWindow3D->renderWidgetDisplay(), m_mainWindow3D.get(), shortcutModel))
     {
         return false;
     }
@@ -1500,6 +1501,6 @@ void Workbench3D::saveCurrentSettings()
     {
         return;
     }
-    m_serviceOwner->settingsCoordinator->saveCurrentSettings(m_mainWindow3D->renderWidget());
+    m_serviceOwner->settingsCoordinator->saveCurrentSettings(m_mainWindow3D->renderWidgetDisplay());
 }
 #endif

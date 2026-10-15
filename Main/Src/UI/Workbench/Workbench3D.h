@@ -19,6 +19,7 @@ class CameraController3D;
 class SettingsUiCoordinator3D;
 class CommandActionHub3D;
 class AlgorithmRunner3D;
+class RenderWidget3D;
 struct CommandUiSnapshot3D;
     #ifdef ENABLE_GEOMODELCORE
 class BRepModelService3D;
@@ -129,6 +130,10 @@ private:
     struct ServicePack3D m_services3D{};
 
     std::unique_ptr<MainWindow3D> m_mainWindow3D;
+
+    /// 具体视口（Main 层是视口的创建者与信号连接方，需要具体类型连 Qt 信号）。
+    /// 业务代码仍通过 m_services3D.renderWidget（窄接口）访问。
+    RenderWidget3D* m_renderWidget3D{ nullptr };
 
     /// 3D 状态栏 widget。所有权与复用规则同 m_statusBar2D（见那里的注释）。
     /// deactivate() 里刻意**不**清空它：清空等于每次切回 3D 都新建一个，
