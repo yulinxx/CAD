@@ -711,14 +711,13 @@ endif()
 # 视口刷新契约测试（独立于 BUILD_MAIN_TESTS 的独立目标）
 # ============================================================================
 # 单独开一个目标的原因：MainTests 会把整个 Main 应用源码拖进编译，而这批刷新
-# 契约用例只依赖 SceneRefreshCoordinator / EntityToVertices 两个实现文件。
+# 契约用例只依赖 SceneRefreshCoordinator 等几个实现文件。
 # 开关由 Config.cmake 统一配置（BUILD_VIEWPORT_REFRESH_TESTS）。
 if(BUILD_VIEWPORT_REFRESH_TESTS AND GTest_FOUND)
     add_executable(ViewportRefreshTests
         "${UI_ROOT}/Test/ViewportRefreshRegressionTests.cpp"
         "${UI_ROOT}/Test/ViewportRefreshTestsMain.cpp"   # 自带 QApplication 的入口
         "${UI_ROOT}/Render/SceneRefreshCoordinator.cpp"
-        "${UI_ROOT}/Render/EntityToVertices.cpp"
         "${UI_ROOT}/Render/BitmapReconciler.cpp"
         "${UI_ROOT}/Render/TextReconciler.cpp"
         "${UI_ROOT}/Render/CurveLodManager.cpp"
@@ -728,7 +727,6 @@ if(BUILD_VIEWPORT_REFRESH_TESTS AND GTest_FOUND)
     set_target_properties(ViewportRefreshTests PROPERTIES AUTOMOC ON)
     target_include_directories(ViewportRefreshTests PRIVATE
         "${SRC_ROOT}"                    # "UI/Render/SceneRefreshCoordinator.h"
-        "${UI_ROOT}/Render"              # "EntityToVertices.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/2D/Include"    # "RenderWidget.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Common/Include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../Engine/Common/Include"

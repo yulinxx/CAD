@@ -1,14 +1,12 @@
 #include "CurveLodManager.h"
 
 #include "RenderWidget.h"
-#include "EntityToVertices.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine/SyEntity/SyEntity.h"
 #include "Engine/SyEntity/EType.h"
 #include "Engine2D/SyEntity/SyPolygon.h"
 #include "Engine2D/Geometry/EntityGeometryEmitter.h"
 
-#include <QPointF>
 
 namespace
 {
@@ -74,57 +72,29 @@ void CurveLodManager::processBatch(std::unordered_set<uint64_t>& renderedIds)
         return;
     }
 
-    const QPointF cam = m_renderWidget->cameraCenter();
-    const double cameraCenter[2] = { cam.x(), cam.y() };
-    const float pixelToWorld = m_renderWidget->pixelToWorldScale();
-    const double worldToScreenScale = pixelToWorld > 0.0f ? 1.0 / static_cast<double>(pixelToWorld) : 1.0;
-    const double chordErrorPixels = m_renderWidget->lodChordErrorPixels();
-
     // 每帧预算：串行重建 2000 个曲线图元，亚毫秒级。zoom 期间场景不变，
     // 直接在主线程读活对象（SceneManager 契约），无需 clone 快照。
     constexpr size_t kBatchSize = 2000;
     const size_t end = (std::min)(m_cursor + kBatchSize, m_queue.size());
 
-    // 整批只切一次 GL 上下文、只请求一次重绘
-    m_renderWidget->beginBatchUpload();
-
-    for (size_t i = m_cursor; i < end; ++i)
+    // 整批一次装配：离散化与内容比对都在 RenderSceneBuilder 内完成
+    // （与全量路径同一份公式），上下文只切一次、重绘只请求一次。
+    std::vector<uint64_t> batch(m_queue.begin() + static_cast<ptrdiff_t>(m_cursor),
+        m_queue.begin() + static_cast<ptrdiff_t>(end));
+    if (!batch.empty())
     {
-        const uint64_t uid = m_queue[i];
-        Eg::SyEntity* entity = m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid));
-        if (!entity)
+        m_renderWidget->upsertRenderEntities(batch,
+            [this](uint64_t uid) -> const Eg::SyEntity* {
+                return m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid));
+            },
+            [this](uint64_t uid) -> uint32_t {
+                return layerIndexOfEntity(m_sceneManager, static_cast<Eg::EntityId>(uid));
+            });
+        for (uint64_t uid : batch)
         {
-            continue;
-        }
-
-        std::vector<Render::VertexP3C3> vertices;
-        Render::PrimitiveType primType;
-        if (!entityToVertices(entity, vertices, primType, cameraCenter, worldToScreenScale, chordErrorPixels))
-        {
-            continue;
-        }
-
-        const uint32_t layerOrder = layerIndexOfEntity(m_sceneManager, entity->id);
-        if (renderedIds.count(uid))
-        {
-            m_renderWidget->modifyRenderEntity(uid,
-                vertices.data(),
-                static_cast<uint32_t>(vertices.size()),
-                primType,
-                layerOrder);
-        }
-        else
-        {
-            m_renderWidget->addRenderEntity(uid,
-                vertices.data(),
-                static_cast<uint32_t>(vertices.size()),
-                primType,
-                layerOrder);
             renderedIds.insert(uid);
         }
     }
-
-    m_renderWidget->endBatchUpload();
 
     m_cursor = end;
 

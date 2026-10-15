@@ -5,7 +5,6 @@
  */
 #include "SceneRefreshCoordinator.h"
 #include "RenderWidget.h"
-#include "EntityToVertices.h"
 
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine/SyEntity/SyEntity.h"
@@ -599,52 +598,14 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         return;
     }
 
-    // 整批只切一次 GL 上下文、只请求一次重绘。addRenderEntity 单次调用自带一对
-    // makeCurrent/doneCurrent 与一次 update()，而一次批量编辑（拖动/对齐上万个
-    // 图元）会把它们全部压进脏集合，逐个做上下文切换是秒级开销。
-    // 用 RAII 收口，保证中途 return 或抛异常也不会把批量状态漏在开启态。
-    struct BatchGuard
-    {
-        RenderWidget* w;
-
-        explicit BatchGuard(RenderWidget* widget)
-            : w(widget)
-        {
-            w->beginBatchUpload();
-        }
-
-        ~BatchGuard()
-        {
-            w->endBatchUpload();
-        }
-    } batchGuard(m_renderWidget);
-
-    for (auto id : m_pendingDeletedIds)
-
-    {
-        auto uid = static_cast<uint64_t>(id);
-        m_renderWidget->removeRenderEntity(uid);
-        m_renderedEntityIds.erase(uid);
-    }
-
-    // 「隐藏选中本体」新选中的那批：直接从世界层摘掉本体。
-    // 与删除走同一条形状 —— 摘本体不需要任何离散化，只要账本跟着改。
-    // 这里再按「此刻该不该摘」复核一次：差集是上一轮选择变化记下的，这一轮之间
-    // 选择集或有效隐藏状态还可能再翻（例如连续两次选择变化），过期条目在这里被过滤，
-    // 保证最终状态只由**当前**的 hideSelected + selectedIds 决定。
-    for (uint64_t uid : m_selectionHideIds)
-    {
-        if (!hideSelected || !selectedIds.count(uid))
-        {
-            continue;
-        }
-        if (m_renderedEntityIds.count(uid))
-        {
-            m_renderWidget->removeRenderEntity(uid);
-            m_renderedEntityIds.erase(uid);
-        }
-    }
-    m_selectionHideIds.clear();
+    // 增量装配：调用方只给「哪些图元变了」，离散化与内容比对都在
+    // RenderSceneBuilder 内完成（与全量路径同一份公式），不再由本类
+    // 逐图元算出顶点数组后往几何仓里塞。
+    //
+    // 图元来源是主线程 clone 好的快照：entityFor 只在主线程调用，
+    // builder 内部的 emit* 回调同步完成离散化，不涉及其它线程。
+    std::vector<uint64_t> entityIdsToProcess;
+    entityIdsToProcess.reserve(m_pendingDirtyIds.size() + m_selectionRestoreIds.size());
 
     // 本轮脏集合里是否出现过位图 / 文字图元。下面用它决定要不要跑 reconcile*：
     // BitmapReconciler/TextReconciler 现在使用 getEntitiesByType 按类型索引获取，
@@ -652,19 +613,9 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     bool touchedImage = false;
     bool touchedText = false;
 
-    // 优化：收集需要处理的图元ID（可见的、非 IMAGE/TEXT 的）
-    // 用于后续的并行处理
-    std::vector<uint64_t> entityIdsToProcess;
-    entityIdsToProcess.reserve(m_pendingDirtyIds.size());
-
-    // 与 entityIdsToProcess 同下标的图层绘制序号。必须在这条主线程循环里取好：
-    // 下面那条并行分支在工作线程里离散化，工作线程不允许访问 SceneManager。
-    std::vector<uint32_t> entityLayerOrders;
-    entityLayerOrders.reserve(m_pendingDirtyIds.size());
-
     for (auto id : m_pendingDirtyIds)
     {
-        // 读快照而不是活对象：下面那条并行分支会在工作线程里离散化
+        // 读快照而不是活对象：快照副本是主线程 clone 好的
         const Eg::RenderEntitySnapshot* snapshot = m_pendingSnapshot.find(id);
         if (snapshot == nullptr || snapshot->entity() == nullptr)
         {
@@ -674,13 +625,13 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         auto uid = static_cast<uint64_t>(id);
 
         // 图元可见性 = 自身可见 且 所在图层可见。图层指针不随 clone 复制，
-        // 但这个判断仍在主线程上做，工作线程只负责顶点离散化。
+        // 这个判断在主线程上做。
         if (!snapshot->effectiveVisible())
         {
             // 图元不可见：从渲染中移除（如果之前有渲染的话）
             if (m_renderedEntityIds.count(uid))
             {
-                m_renderWidget->removeRenderEntity(uid);
+                m_renderWidget->removeRenderEntities({ uid });
                 m_renderedEntityIds.erase(uid);
             }
             continue;
@@ -692,7 +643,7 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             // 从渲染中移除（如果之前有渲染的话）
             if (m_renderedEntityIds.count(uid))
             {
-                m_renderWidget->removeRenderEntity(uid);
+                m_renderWidget->removeRenderEntities({ uid });
                 m_renderedEntityIds.erase(uid);
             }
             continue;
@@ -712,135 +663,18 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             continue;
         }
 
-        // 收集需要处理的图元 ID 与其图层绘制序号（两向量同下标）
         entityIdsToProcess.push_back(uid);
-        entityLayerOrders.push_back(layerIndexOfEntity(sm, static_cast<Eg::EntityId>(uid)));
-    }
-
-    // 如果需要处理的图元数量大于阈值，使用并行处理
-    // 否则使用串行处理（减少线程调度开销）
-    constexpr size_t kParallelThreshold = 100;
-    const QPointF cam = m_renderWidget->cameraCenter();
-    const double cameraCenter[2] = { cam.x(), cam.y() };
-    // 世界单位 → 屏幕像素 = 1 / 每像素世界单位。曲线离散化按此自适应段数，
-    // 与全量路径 RenderSceneBuilder 的 setWorldToScreenScale 用同一个来源。
-    const float pixelToWorld = m_renderWidget->pixelToWorldScale();
-    const double worldToScreenScale = pixelToWorld > 0.0f ? 1.0 / static_cast<double>(pixelToWorld) : 1.0;
-    // 曲线 LOD 目标弦高误差（用户可在设置里调节），与全量路径取同一个来源
-    const double chordErrorPixels = m_renderWidget->lodChordErrorPixels();
-
-    if (entityIdsToProcess.size() >= kParallelThreshold && Eg::EngineParallel::isEnabled())
-    {
-        // 并行处理：转换顶点
-        struct RenderJob
-        {
-            uint64_t uid;
-            std::vector<Render::VertexP3C3> vertices;
-            Render::PrimitiveType primType;
-            /// 图层绘制序号（0 = 最上层）。主线程已取好，工作线程只做搬运
-            uint32_t layerOrder = 0;
-            bool valid = false;
-        };
-
-        const size_t count = entityIdsToProcess.size();
-        std::vector<RenderJob> jobs(count);
-
-        Eg::EngineParallel::parallelForIndex(count, [&](size_t index) {
-            auto id = entityIdsToProcess[index];
-            // 只读快照：副本是主线程 clone 好的，工作线程不再触碰场景数据
-            const Eg::RenderEntitySnapshot* snapshot = m_pendingSnapshot.find(static_cast<Eg::EntityId>(id));
-            if (snapshot == nullptr || snapshot->entity() == nullptr)
-            {
-                return;
-            }
-
-            RenderJob& job = jobs[index];
-            job.uid = id;
-            job.layerOrder = entityLayerOrders[index];
-
-            if (entityToVertices(
-                    snapshot->entity(), job.vertices, job.primType, cameraCenter, worldToScreenScale, chordErrorPixels))
-            {
-                job.valid = true;
-            }
-        });
-
-        // 串行提交到 GPU（保证顺序）
-        for (size_t i = 0; i < count; ++i)
-        {
-            const auto& job = jobs[i];
-            if (!job.valid)
-            {
-                continue;
-            }
-
-            if (m_renderedEntityIds.count(job.uid))
-            {
-                m_renderWidget->modifyRenderEntity(job.uid,
-                    job.vertices.data(),
-                    static_cast<uint32_t>(job.vertices.size()),
-                    job.primType,
-                    job.layerOrder);
-            }
-            else
-            {
-                m_renderWidget->addRenderEntity(job.uid,
-                    job.vertices.data(),
-                    static_cast<uint32_t>(job.vertices.size()),
-                    job.primType,
-                    job.layerOrder);
-                m_renderedEntityIds.insert(job.uid);
-            }
-        }
-    }
-    else
-    {
-        // 串行处理（小批量时更高效）
-        for (size_t index = 0; index < entityIdsToProcess.size(); ++index)
-        {
-            const uint64_t uid = entityIdsToProcess[index];
-            const Eg::RenderEntitySnapshot* snapshot = m_pendingSnapshot.find(static_cast<Eg::EntityId>(uid));
-            if (snapshot == nullptr || snapshot->entity() == nullptr)
-            {
-                continue;
-            }
-
-            std::vector<Render::VertexP3C3> vertices;
-            Render::PrimitiveType primType;
-            // 图元无法增量转换为顶点，已跳过
-            if (!entityToVertices(
-                    snapshot->entity(), vertices, primType, cameraCenter, worldToScreenScale, chordErrorPixels))
-            {
-                SY_WARNF("[SceneRefreshCoordinator] Entity %llu (eType=%d) cannot be incrementally converted to "
-                         "vertices, skipped",
-                    static_cast<unsigned long long>(uid),
-                    static_cast<int>(snapshot->type));
-                continue;
-            }
-
-            if (m_renderedEntityIds.count(uid))
-            {
-                m_renderWidget->modifyRenderEntity(
-                    uid, vertices.data(), static_cast<uint32_t>(vertices.size()), primType, entityLayerOrders[index]);
-            }
-            else
-            {
-                m_renderWidget->addRenderEntity(
-                    uid, vertices.data(), static_cast<uint32_t>(vertices.size()), primType, entityLayerOrders[index]);
-                m_renderedEntityIds.insert(uid);
-            }
-        }
     }
 
     // 「隐藏选中本体」取消选中的那批：把本体重新加回世界层。
-    // 没有快照可用（选择变更不进变更流），这里在主线程直接读活对象 —— 与
-    // applyFullRefresh 同源、同一条 entityToVertices 口径，结果与全量重建一致。
+    // 没有快照可用（选择变更不进变更流），这里在主线程直接读活对象 ——
+    // 装配入口与上面完全同一条（都走 sink），结果与全量重建一致。
     // 位图/文字不走这条顶点路径，交给下面的 reconcile*。
     if (!m_selectionRestoreIds.empty())
     {
         for (uint64_t uid : m_selectionRestoreIds)
         {
-            // 此刻仍该被摘的（仍然被选中且隐藏有效）不动它 —— 与上面 hide 侧同一个判据，
+            // 此刻仍该被摘的（仍然被选中且隐藏有效）不动它 —— 与 hide 侧同一个判据，
             // 两边对称，连续两次选择变化时过期的差集条目不会把本体错误地放回去。
             if (hideSelected && selectedIds.count(uid))
             {
@@ -875,18 +709,35 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
                 continue;
             }
 
-            std::vector<Render::VertexP3C3> vertices;
-            Render::PrimitiveType primType;
-            if (!entityToVertices(e, vertices, primType, cameraCenter, worldToScreenScale, chordErrorPixels))
-            {
-                continue;
-            }
-
-            m_renderWidget->addRenderEntity(
-                uid, vertices.data(), static_cast<uint32_t>(vertices.size()), primType, layerIndexOfEntity(sm, e->id));
-            m_renderedEntityIds.insert(uid);
+            entityIdsToProcess.push_back(uid);
         }
         m_selectionRestoreIds.clear();
+    }
+
+    // 一次装配全部脏图元：上下文只切一次，重绘只请求一次
+    // （对比旧实现逐图元一对 makeCurrent/update）。
+    if (!entityIdsToProcess.empty())
+    {
+        m_renderWidget->upsertRenderEntities(entityIdsToProcess,
+            [this, sm](uint64_t uid) -> const Eg::SyEntity* {
+                // 先查本轮快照（clone 副本，主线程可读）；不在快照里再查活对象
+                // （恢复本体的那批没有快照）。
+                const Eg::RenderEntitySnapshot* snapshot = m_pendingSnapshot.find(
+                    static_cast<Eg::EntityId>(uid));
+                if (snapshot != nullptr && snapshot->entity() != nullptr)
+                {
+                    return snapshot->entity();
+                }
+                return sm->findEntityById(static_cast<Eg::EntityId>(uid));
+            },
+            [this, sm](uint64_t uid) -> uint32_t {
+                return layerIndexOfEntity(sm, static_cast<Eg::EntityId>(uid));
+            });
+
+        for (uint64_t uid : entityIdsToProcess)
+        {
+            m_renderedEntityIds.insert(uid);
+        }
     }
 
     // 位图层协调：以场景为真源，增量处理新增/修改/删除/图层显隐。
@@ -908,9 +759,6 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         m_textReconciler.reconcile(sm, /*fullReconcile=*/false, m_cachedSelectedIds, hideSelected,
             m_pendingDirtyIds);
     }
-
-    // 位图/文字协调完成后不需要额外 update() ——
-    // BatchGuard 析构时 endBatchUpload() 已调用一次 QOpenGLWidget::update()。
 }
 
 void SceneRefreshCoordinator::processCurveLodBatch()
@@ -1012,10 +860,8 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     // GPU 与账本因此保持一致。
     if (hideSelected)
     {
-        for (uint64_t uid : selectedIds)
-        {
-            m_renderWidget->removeRenderEntity(uid);
-        }
+        std::vector<uint64_t> toRemove(selectedIds.begin(), selectedIds.end());
+        m_renderWidget->removeRenderEntities(toRemove);
     }
 
     // 全量重建已按当前选中集把本体的增删做到位，待处理的选中差集就此过期：
@@ -1108,7 +954,7 @@ void SceneRefreshCoordinator::updateSceneRender()
     // LightUpdate / Selection 增量刷新：
     // 删除图元（m_pendingDeletedIds）必须被处理，否则会从渲染世界中被永久遗漏
     // （典型症状：删除后视图不更新）。Selection 级别的样式变更同样由 applyLightRefresh
-    // 覆盖——其内部已对脏图元调用 modifyRenderEntity。
+    // 覆盖——其内部已对脏图元走一遍 sink 装配。
     // 注意：onSelectionChanged 会先把 m_refreshLevel 提升为 Selection(3)，若紧随其后发生场景删除
     // （onSceneChanged），scheduleSceneUpdate 不会将其降级回 LightUpdate(2)，因此这里必须显式包含
     // Selection 级别，否则待删除图元会在 Selection 分支中被跳过。
