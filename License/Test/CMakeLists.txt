@@ -24,7 +24,9 @@ target_link_libraries(LicenseTests PRIVATE
     GTest::gtest_main
 )
 
-gtest_discover_tests(LicenseTests DISCOVERY_TIMEOUT 120)
+# PRE_TEST：LicenseTests 经 Log 间接依赖 Qt DLL，构建环境 PATH 缺 Qt 时
+# 构建后立即发现会 0xc0000135 失败；推迟到 ctest 运行时（与 UI/PythonHost 一致）。
+gtest_discover_tests(LicenseTests DISCOVERY_MODE PRE_TEST DISCOVERY_TIMEOUT 120)
 
 set_property(TARGET LicenseTests PROPERTY FOLDER "Tests")
 

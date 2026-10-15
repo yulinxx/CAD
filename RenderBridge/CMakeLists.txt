@@ -1,5 +1,27 @@
 cmake_minimum_required(VERSION 4.3)
 
+# ============================================================================
+# RenderBridge —— 单层结构（库本体 + 独立构建入口同一文件）
+# ============================================================================
+# 与 Log / FileIO 等双层模块不同，RenderBridge 保持单文件兼两角：
+#   集成构建：根 CMakeLists.txt → add_subdirectory(RenderBridge)（本文件）。
+#   独立构建：cmake -S RenderBridge -B RenderBridge/build（本文件提供 project()）。
+# 本文件内部自带 project()，两种构建方式走同一份逻辑；状态输出格式与其它
+# 模块的独立入口保持一致（见文件末尾摘要方框）。
+#
+# 注意：独立构建本文件需要 RenderX / Utility / Log / RenderAbstraction 等目标
+# 已存在（通常经 UI 独立工程或根工程拉入），因此不作为日常独立开发入口。
+#
+# 用法：
+#   cmake -S RenderBridge -B RenderBridge/build   # 依赖目标已由上层拉入时
+# ============================================================================
+
+project(SanYiRenderBridge
+    VERSION 1.0.0
+    DESCRIPTION "SanYi CAD Host-side RenderX session bridge"
+    LANGUAGES CXX
+)
+
 # --- 模块元信息 ---
 set(LIB_NAME "RenderBridge")
 set(LIB_FOLDER "UI")
@@ -10,7 +32,6 @@ set(LIB_EXPORT_MACRO "RENDERBRIDGE_EXPORTS")
 set(VERSION_MAJOR 1)
 set(VERSION_MINOR 0)
 set(VERSION_PATCH 0)
-set(PROJECT_VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
 
 # --- 路径 ---
 if(NOT SANYI_ROOT)
@@ -84,7 +105,15 @@ sanyi_export_imported_target(${LIB_NAME}
         # RenderX 不在这里：它已是本模块的 PRIVATE 依赖，下游拿不到也不该拿
 )
 
-message(STATUS "----------------------------------------")
+# --- 状态输出 ---------------------------------------------------------------
+message(STATUS "")
+message(STATUS "========================================")
+message(STATUS "  [Single-layer: ${PROJECT_NAME}]")
+message(STATUS "========================================")
+message(STATUS "  Version:     ${PROJECT_VERSION}")
+message(STATUS "  Output:      ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+message(STATUS "========================================")
+message(STATUS "")
 
 # ============================================================================
 # 宿主侧几何仓契约测试（独立目标）
