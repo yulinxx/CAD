@@ -230,3 +230,89 @@ thresholds_new.pnm
 .env
 .env.local
 .comate/plugins/软件开发团队/agents/qa-engineer.md
+
+
+# Build directories
+build/
+build*/
+Depends/
+Debug/
+Release/
+memory/
+x64/
+x86/
+x86_64/
+Win32/
+ios/
+android-*/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake/
+compile_commands.json
+CTestTestfile.cmake
+CMakeLists.txt.user
+
+# Qt
+*.pro.user
+*.pro.user.*
+*.autosave
+.qmake.stash
+.qmake.cache
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+
+# Visual Studio
+.vs/
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+*.suo
+*.user
+*.useross
+*.sdf
+*.opensdf
+ipch/
+
+# Xcode / macOS
+.DS_Store
+*.xcuserstate
+*.xcuserdatad
+*.xcworkspace
+project.xcworkspace/
+xcuserdata/
+DerivedData/
+
+# Compiled files
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.so.*
+*.a
+*.lib
+*.dylib
+*.pdb
+*.ilk
+*.exp
+
+# Logs and temp
+*.log
+*.tmp
+*.temp
+*~
+*.bak
+*.swp
+*.swo
+*#
+
+# Qt Creator
+qtcreator/
+qtcreator.xml
