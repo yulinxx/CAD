@@ -280,6 +280,11 @@ public:
             Render::RT::rxMaterialUpdate(m_runtime, static_cast<uint16_t>(material), &raw));
     }
 
+    bool destroyMaterial(uint32_t material) override {
+        return checkRx("rxMaterialRemove",
+            Render::RT::rxMaterialRemove(m_runtime, static_cast<uint16_t>(material)));
+    }
+
     // ---------- 字体 ----------
 
     RenderAbstraction::FontHandle createFont(const RenderAbstraction::FontDesc& desc) override {

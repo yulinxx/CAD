@@ -62,6 +62,11 @@ public:
     virtual uint32_t createMaterial(const MaterialDesc& desc) = 0;
     /// 原地更新材质。每次都 Add 会把材质表撑成「图元数 × 编辑次数」
     virtual bool updateMaterial(uint32_t material, const MaterialDesc& desc) = 0;
+    /// 销毁材质，编号可被后续 createMaterial 复用。
+    ///
+    /// 调用方必须先确保没有绘制命令再引用该编号（把命令的 materialIndex
+    /// 改成 0）：命令是按值存进绘制列表的，事后改这里影响不到已提交的那份。
+    virtual bool destroyMaterial(uint32_t material) = 0;
 
     // ---------- 字体 ----------
 

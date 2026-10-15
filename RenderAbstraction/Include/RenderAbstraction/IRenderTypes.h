@@ -248,6 +248,12 @@ struct DrawInstruction {
     float pointSize = 0.0f;
     TextureHandle texture;
     uint64_t sortKey = 0;
+    /// 调用方自定义的伴随值，渲染层原样带回（DrawStatistics 之类尚未消费它）。
+    ///
+    /// **不要依赖它在合批后仍然等于写入值**：保留式绘制列表把相邻同伴合并成
+    /// 一次绘制时，批次里只保留一个 userData（其余归零，语义上「归属变得
+    /// 不明确」）。因此它只适合做诊断/调试标记，不能当业务键用 ——
+    /// 需要按图元 ID 回溯时用槽号（调用方自己分配的那个 uint32）。
     uint64_t userData = 0;
 };
 
