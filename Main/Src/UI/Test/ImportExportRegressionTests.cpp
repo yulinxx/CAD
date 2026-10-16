@@ -40,7 +40,7 @@
 // 应用里由 ApplicationCompositionRoot 在启动时注册；测试在此补一次。
 namespace
 {
-    const bool kFio2DFactoryRegistered = []() {
+    const bool kFio2DFactoryRegisteredInImportExport = []() {
         Eg::FioEntityConverter::set2DEntityFactory(&Eg::convertFio2DEntity);
         return true;
     }();
