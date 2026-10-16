@@ -1,5 +1,20 @@
 cmake_minimum_required(VERSION 4.3)
 
+# ============ MSVC 头文件依赖扫描（Ninja）============
+# ninja 用 rules.ninja 里的 msvc_deps_prefix 逐字节匹配 cl.exe 的 /showIncludes
+# 输出，两者编码必须一致，否则一条头文件依赖都记不下来（#deps 0）：改头文件不触发
+# 重编 → 新旧 obj 混链 → 报 LNK2005（重复定义）/ LNK2019（找不到符号）。
+# 规律（中文 Windows，ANSI=936）：
+#   cl 有控制台 → 按控制台代码页输出；无控制台 → 按 ANSI 代码页（936/GBK）输出
+#   CMake 写 rules.ninja → 有控制台按控制台代码页转码；无控制台写原始 UTF-8
+# 这里在 project() 之前把控制台切到 65001，使「有控制台」的 configure 也写出 UTF-8
+# 前缀（与无控制台时一致），并要求构建侧同样使用 UTF-8 控制台（VS Code 内置终端
+# 默认即 65001；老式 cmd/PowerShell 里先执行 chcp 65001）。
+# 症状自查：构建日志大段刷「注意: 包含文件:」即依赖匹配失败。
+if(WIN32)
+    execute_process(COMMAND chcp.com 65001 OUTPUT_QUIET ERROR_QUIET)
+endif()
+
 # ============ CMake 策略设置 ============
 if(POLICY CMP0167)
     cmake_policy(SET CMP0167 NEW)
