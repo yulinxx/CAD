@@ -15,7 +15,7 @@ namespace
     /// 增量路径的图元快照是 clone，**不复制图层指针**，所以只能查活对象。
     /// 只在主线程调用（SceneManager 的契约是只有主线程可以访问）；
     /// 并行离散化那条路径必须提前在主线程把本值取好带进 job。
-    uint32_t layerIndexOfEntity(Eg::SceneManager* sm, Eg::EntityId id)
+    uint32_t layerIndexOfEntityForLod(Eg::SceneManager* sm, Eg::EntityId id)
     {
         if (sm == nullptr)
         {
@@ -88,7 +88,7 @@ void CurveLodManager::processBatch(std::unordered_set<uint64_t>& renderedIds)
                 return m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid));
             },
             [this](uint64_t uid) -> uint32_t {
-                return layerIndexOfEntity(m_sceneManager, static_cast<Eg::EntityId>(uid));
+                return layerIndexOfEntityForLod(m_sceneManager, static_cast<Eg::EntityId>(uid));
             });
         for (uint64_t uid : batch)
         {

@@ -24,7 +24,7 @@
 // 否则 2D 图元会因未注册工厂而被丢弃。
 namespace
 {
-    const bool kFio2DFactoryRegistered = []() {
+    const bool kFio2DFooRegistered = []() {
         Eg::FioEntityConverter::set2DEntityFactory(&Eg::convertFio2DEntity);
         return true;
     }();

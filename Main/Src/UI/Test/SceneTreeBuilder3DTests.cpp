@@ -22,7 +22,7 @@
 namespace
 {
     // 构造一个带单个三角形（合法网格）的图元，满足 SceneManager3D::addEntity 的 isValid() 约束
-    std::unique_ptr<Eg::SyMeshEntity> makeTriangleMesh(const char* name = nullptr)
+    std::unique_ptr<Eg::SyMeshEntity> makeTriangleMeshForTree(const char* name = nullptr)
     {
         auto mesh = std::make_unique<Eg::SyMeshEntity>(name ? name : "");
         mesh->vertices = { { 0.f, 0.f, 0.f }, { 1.f, 0.f, 0.f }, { 0.f, 1.f, 0.f } };
@@ -50,11 +50,11 @@ TEST(SceneTreeBuilder3DTest, Build_WithEmptyScene_ReturnsEmptyModel)
 TEST(SceneTreeBuilder3DTest, Build_PopulatesMeshNodes)
 {
     Eg::SceneManager3D scene;
-    auto first = makeTriangleMesh("Body");
+    auto first = makeTriangleMeshForTree("Body");
     const Eg::EntityId firstId = first->id;
     scene.addEntity(first.release());
 
-    auto second = makeTriangleMesh();
+    auto second = makeTriangleMeshForTree();
     scene.addEntity(second.release());
 
     const SceneTreeModel3D model = SceneTreeBuilder3D::build(&scene);
@@ -75,7 +75,7 @@ TEST(SceneTreeBuilder3DTest, Build_PopulatesMeshNodes)
 TEST(SceneTreeBuilder3DTest, Build_FallsBackToTypeNameWhenNameless)
 {
     Eg::SceneManager3D scene;
-    scene.addEntity(makeTriangleMesh().release());
+    scene.addEntity(makeTriangleMeshForTree().release());
 
     const SceneTreeModel3D model = SceneTreeBuilder3D::build(&scene);
     ASSERT_EQ(1, model.nodes.size());
@@ -85,8 +85,8 @@ TEST(SceneTreeBuilder3DTest, Build_FallsBackToTypeNameWhenNameless)
 TEST(SceneTreeBuilder3DTest, Build_CountsSelectedMeshes)
 {
     Eg::SceneManager3D scene;
-    auto a = makeTriangleMesh("A");
-    auto b = makeTriangleMesh("B");
+    auto a = makeTriangleMeshForTree("A");
+    auto b = makeTriangleMeshForTree("B");
     auto* bRaw = b.get();
     scene.addEntity(a.release());
     scene.addEntity(b.release());
@@ -107,8 +107,8 @@ TEST(SceneTreeBuilder3DTest, Build_CountsSelectedMeshes)
 TEST(SceneTreeBuilder3DTest, SelectedIds_ReturnsSelectedMeshIds)
 {
     Eg::SceneManager3D scene;
-    auto a = makeTriangleMesh("A");
-    auto b = makeTriangleMesh("B");
+    auto a = makeTriangleMeshForTree("A");
+    auto b = makeTriangleMeshForTree("B");
     auto* bRaw = b.get();
     scene.addEntity(a.release());
     scene.addEntity(b.release());

@@ -33,7 +33,7 @@
 namespace
 {
     /// 取出某个图元的变更记录，不存在返回 nullptr
-    const Eg::SceneChange* findChange(const Eg::SceneChangeSet& set, Eg::EntityId id)
+    const Eg::SceneChange* findChangeInViewport(const Eg::SceneChangeSet& set, Eg::EntityId id)
     {
         for (const Eg::SceneChange& change : set.changes)
         {
@@ -47,7 +47,7 @@ namespace
 }  // namespace
 
 // 记录一帧，并保证两次时钟读取间隔非零（避免高精度时钟落在同一 tick 导致 avg==0 的抖动失败）
-static void recordOneFrame(FrameTimer& timer)
+static void recordOneFrameInViewport(FrameTimer& timer)
 {
     timer.beginFrame();
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -653,7 +653,7 @@ TEST(RefreshDirtyTrackingTest, DeleteEntity_AddsToDeletedIds)
 
     scene.deleteEntity(scene.findSyEntityById(lineId));
     ASSERT_TRUE(scene.readChanges(cursor, changes));
-    const Eg::SceneChange* change = findChange(changes, lineId);
+    const Eg::SceneChange* change = findChangeInViewport(changes, lineId);
     ASSERT_NE(change, nullptr);
     EXPECT_TRUE(Eg::hasSceneChangeKind(change->kinds, Eg::SceneChangeKind::Removed));
 }
@@ -718,7 +718,7 @@ TEST(FrameTimerRegressionTest, MultipleFrames_AverageIsStable)
 
     for (int i = 0; i < 50; ++i)
     {
-        recordOneFrame(timer);
+        recordOneFrameInViewport(timer);
     }
 
     double avg1 = timer.avgFrameMs();
@@ -726,7 +726,7 @@ TEST(FrameTimerRegressionTest, MultipleFrames_AverageIsStable)
 
     for (int i = 0; i < 50; ++i)
     {
-        recordOneFrame(timer);
+        recordOneFrameInViewport(timer);
     }
 
     double avg2 = timer.avgFrameMs();
