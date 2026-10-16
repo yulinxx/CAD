@@ -54,6 +54,7 @@ void AlgorithmOperationRegistry::registerAll()
     registerAlgoOp(OperationId::Algo_BooleanIntersection);
     registerAlgoOp(OperationId::Algo_BooleanDifference);
     registerAlgoOp(OperationId::Algo_BooleanXor);
+    registerAlgoOp(OperationId::Algo_GenerateTestShapes);
 
     Ops::declare(reg, OperationId::Algo_ReliefEngravingFromImage, [parentWidget = m_parentWidget] {
             ReliefEngravingOperation2D::run(parentWidget);
