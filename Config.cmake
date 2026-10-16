@@ -136,11 +136,10 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 # --------------------------------------------------------------------
 option(SANYI_UNITY_BUILD "Enable unity build (faster compilation)" ON)
 if(SANYI_UNITY_BUILD)
-    # 不再全局开启 CMAKE_UNITY_BUILD，改为各模块通过 sanyi_add_shared_library 的
-    # UNITY_BUILD 参数显式开启。全局开启会导致 Renderx 等包含复杂命名空间的模块
-    # 在 unity build 下出现命名空间泄漏问题。
-    # set(CMAKE_UNITY_BUILD ON)
-    # set(CMAKE_UNITY_BUILD_BATCH_SIZE 16)
+    # 不全局开启 CMAKE_UNITY_BUILD，改由 sanyi_add_shared_library 对每个 target
+    # 施加 UNITY_BUILD ON（见 CMake/Utils.cmake）：全局开启会把测试等所有 target
+    # 一并卷入，导致 Renderx 等复杂命名空间模块出现命名空间泄漏。
+    # 个别模块如需关闭可传 NO_UNITY_BUILD（或 configure 时 -DSANYI_UNITY_BUILD=OFF）。
     # 注意：.mm 不得进 unity batch —— 各模块对 .mm 设 SKIP_UNITY_BUILD_INCLUSION
     # （见 UI/Common、Main、Renderx 的 CMakeLists），勿用无效的 *_EXCLUDED_* 变量。
 endif()

@@ -200,7 +200,7 @@ function(sanyi_find_qt)
 endfunction()
 
 function(sanyi_add_shared_library target)
-    set(options AUTOMOC AUTOUIC AUTORCC UNITY_BUILD)
+    set(options AUTOMOC AUTOUIC AUTORCC UNITY_BUILD NO_UNITY_BUILD)
     set(oneValueArgs FOLDER DESCRIPTION EXPORT_MACRO VERSION_MAJOR VERSION_MINOR VERSION_PATCH)
     set(multiValueArgs SOURCES HEADERS PUBLIC_INCLUDE_DIRS PRIVATE_INCLUDE_DIRS 
                        COMPILE_DEFINITIONS COMPILE_OPTIONS LINK_LIBRARIES QT_COMPONENTS)
@@ -316,7 +316,12 @@ function(sanyi_add_shared_library target)
     if(SANYI_SHLIB_AUTORCC)
         list(APPEND _target_properties AUTORCC ON)
     endif()
-    if(SANYI_SHLIB_UNITY_BUILD)
+    # UnityBuild：默认遵循全局 option SANYI_UNITY_BUILD（开启时每个 target 设
+    # UNITY_BUILD ON）；显式 UNITY_BUILD 强制开启，NO_UNITY_BUILD 供个别模块
+    # （如存在命名空间泄漏/符号冲突）单独关闭。
+    if(SANYI_SHLIB_NO_UNITY_BUILD)
+        list(APPEND _target_properties UNITY_BUILD OFF)
+    elseif(SANYI_SHLIB_UNITY_BUILD OR SANYI_UNITY_BUILD)
         list(APPEND _target_properties UNITY_BUILD ON)
     endif()
 
