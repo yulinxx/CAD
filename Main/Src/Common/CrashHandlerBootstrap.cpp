@@ -13,10 +13,12 @@
 #include <QDir>
 #include <QFileInfo>
 #include <cstdio>
+#include <set>
 
 #ifdef _WIN32
     // dbghelp 必须在 windows.h 之后
     #include <windows.h>
+    #include <tlhelp32.h>
 
     #include <dbghelp.h>
 #endif
@@ -28,78 +30,144 @@ namespace
     std::string g_appVersion;
 
 #ifdef _WIN32
-    /// 把当前线程的调用栈符号化后打到 stderr。
-    ///
-    /// 为什么要自己走一遍 dbghelp：现场与开发机上都不一定装得下 WinDbg/cdb，
-    /// 只留一个 .dmp 等于没有线索 —— 崩溃排查会退化成猜。Debug 构建的 PDB 就在
-    /// DLL 旁边，SymFromAddr/SymGetLineFromAddr64 能直接给出函数名与行号。
-    ///
-    /// 本函数在 breakpad 的回调里调用，此时仍在出错线程上，异常帧还在栈上，
-    /// 所以 CaptureStackBackTrace 拿到的是「本函数 → breakpad → 系统派发 → 真正出错的帧」。
-    /// 前几帧是噪声，往下看即可。
-    void printSymbolizedBacktrace()
+    /// 单线程符号化栈打印（被 printAllThreadBacktraces 调）
+    void printThreadBacktrace(HANDLE process, HANDLE threadHandle, DWORD threadId)
     {
-        const HANDLE process = GetCurrentProcess();
-        SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
-        if (!SymInitialize(process, nullptr, TRUE))
+        CONTEXT ctx = {};
+        ctx.ContextFlags = CONTEXT_AMD64;
+        if (!GetThreadContext(threadHandle, &ctx))
         {
-            std::fprintf(stderr, "  [CrashHandler] SymInitialize failed (err=%lu), no backtrace\n", GetLastError());
+            std::fprintf(stderr, "    thread %u: cannot get context (err=%lu)\n", threadId, GetLastError());
             return;
         }
 
-        void* frames[64] = {};
-        const USHORT captured = CaptureStackBackTrace(0, 64, frames, nullptr);
-        std::fprintf(stderr, "  [CrashHandler] backtrace (%u frames, innermost first):\n", captured);
+        STACKFRAME64 frame = {};
+        frame.AddrPC.Mode = AddrModeFlat;
+        frame.AddrPC.Offset = ctx.Rip;
+        frame.AddrStack.Mode = AddrModeFlat;
+        frame.AddrStack.Offset = ctx.Rsp;
+        frame.AddrFrame.Mode = AddrModeFlat;
+        frame.AddrFrame.Offset = ctx.Rbp;
 
-        // SYMBOL_INFO 后面紧跟名字缓冲，必须按 sizeof(SYMBOL_INFO)+MaxNameLen 分配
+        std::fprintf(stderr, "    === Thread %u ===\n", threadId);
+
+        IMAGEHLP_LINE64 line = {};
+        line.SizeOfStruct = sizeof(line);
+        DWORD lineDisplacement = 0;
+
+        const WORD type = IMAGE_FILE_MACHINE_AMD64;
+
         alignas(SYMBOL_INFO) char symbolBuffer[sizeof(SYMBOL_INFO) + 1024] = {};
         auto* symbol = reinterpret_cast<SYMBOL_INFO*>(symbolBuffer);
         symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
         symbol->MaxNameLen = 1023;
 
-        for (USHORT i = 0; i < captured; ++i)
+        for (int i = 0; i < 32; ++i)
         {
-            const DWORD64 address = reinterpret_cast<DWORD64>(frames[i]);
-
-            IMAGEHLP_MODULE64 moduleInfo = {};
-            moduleInfo.SizeOfStruct = sizeof(moduleInfo);
-            const char* moduleName = SymGetModuleInfo64(process, address, &moduleInfo) ? moduleInfo.ModuleName : "?";
+            if (!StackWalk64(type, process, threadHandle, &frame, &ctx, nullptr, SymFunctionTableAccess64, SymGetModuleBase64, nullptr))
+            {
+                break;
+            }
+            if (frame.AddrPC.Offset == 0)
+            {
+                break;
+            }
 
             DWORD64 displacement = 0;
-            const bool haveSymbol = SymFromAddr(process, address, &displacement, symbol) != FALSE;
-
-            IMAGEHLP_LINE64 line = {};
-            line.SizeOfStruct = sizeof(line);
-            DWORD lineDisplacement = 0;
-            const bool haveLine = SymGetLineFromAddr64(process, address, &lineDisplacement, &line) != FALSE;
+            const bool haveSymbol = SymFromAddr(process, frame.AddrPC.Offset, &displacement, symbol) != FALSE;
+            const bool haveLine = SymGetLineFromAddr64(process, frame.AddrPC.Offset, &lineDisplacement, &line) != FALSE;
 
             if (haveSymbol && haveLine)
             {
-                std::fprintf(stderr,
-                    "    #%02u %s!%s + 0x%llx  (%s:%lu)\n",
-                    i,
-                    moduleName,
-                    symbol->Name,
+                std::fprintf(stderr, "      #%02d %s + 0x%llx  (%s:%lu)\n",
+                    i, symbol->Name,
                     static_cast<unsigned long long>(displacement),
-                    line.FileName,
-                    line.LineNumber);
+                    line.FileName, line.LineNumber);
             }
             else if (haveSymbol)
             {
-                std::fprintf(stderr,
-                    "    #%02u %s!%s + 0x%llx\n",
-                    i,
-                    moduleName,
-                    symbol->Name,
+                std::fprintf(stderr, "      #%02d %s + 0x%llx\n",
+                    i, symbol->Name,
                     static_cast<unsigned long long>(displacement));
             }
             else
             {
-                std::fprintf(stderr, "    #%02u %s!0x%llx\n", i, moduleName, static_cast<unsigned long long>(address));
+                std::fprintf(stderr, "      #%02d 0x%llx\n",
+                    i, static_cast<unsigned long long>(frame.AddrPC.Offset));
             }
         }
+    }
 
+    /// 枚举当前进程所有线程，逐个打印栈。
+    /// Breakpad 在独立线程里写 minidump，CaptureStackBackTrace 拿到的是异常
+    /// 处理线程的栈，而非真正出错线程的栈。这里用 ToolHelp 枚举 + StackWalk64
+    /// 把所有线程的栈都打出来，崩溃线程会夹在中间。
+    /// 注意：崩溃处理期间绝不做堆分配——否则堆损坏场景下 handler 自己会崩。
+    void printAllThreadBacktraces()
+    {
+        const HANDLE process = GetCurrentProcess();
+        SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
+        if (!SymInitialize(process, nullptr, TRUE))
+        {
+            std::fprintf(stderr, "  [CrashHandler] SymInitialize failed (err=%lu)\n", GetLastError());
+            return;
+        }
+
+        const HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+        if (snap == INVALID_HANDLE_VALUE)
+        {
+            std::fprintf(stderr, "  [CrashHandler] CreateToolhelp32Snapshot failed\n");
+            SymCleanup(process);
+            return;
+        }
+
+        THREADENTRY32 te = {};
+        te.dwSize = sizeof(te);
+
+        std::fprintf(stderr, "  [CrashHandler] all thread backtraces:\n");
+
+        // 固定数组避免崩溃处理期间做堆分配
+        DWORD visited[256] = {};
+        int visitedCount = 0;
+
+        if (Thread32First(snap, &te))
+        {
+            do
+            {
+                bool skip = false;
+                for (int v = 0; v < visitedCount; ++v)
+                {
+                    if (visited[v] == te.th32ThreadID)
+                    {
+                        skip = true;
+                        break;
+                    }
+                }
+                if (!skip && visitedCount < 256)
+                {
+                    visited[visitedCount++] = te.th32ThreadID;
+                    HANDLE hThread = OpenThread(THREAD_ALL_ACCESS, FALSE, te.th32ThreadID);
+                    if (hThread)
+                    {
+                        printThreadBacktrace(process, hThread, te.th32ThreadID);
+                        CloseHandle(hThread);
+                    }
+                    else
+                    {
+                        std::fprintf(stderr, "    === Thread %u === (cannot open, err=%lu)\n", te.th32ThreadID, GetLastError());
+                    }
+                }
+            } while (Thread32Next(snap, &te));
+        }
+
+        CloseHandle(snap);
         SymCleanup(process);
+    }
+
+    /// 旧版：只打当前线程（breakpad 异常处理线程）的栈 —— 保留作兜底
+    void printSymbolizedBacktrace()
+    {
+        printAllThreadBacktraces();
     }
 #endif  // _WIN32
 
