@@ -37,3 +37,34 @@ Font ready: pixelHeight=36.0                       (第二次 addText → batchF
 ## 下一步
 用户运行新版本 SanYiCAD → 若再次崩溃，改进后的 CrashHandler 会打印**所有线程**的栈，
 从中识别出真正崩溃线程（含业务栈），即可精确定位根因。
+
+---
+
+## 最终结论（2026-10-16 晚）
+
+### 根因
+崩溃点为 `rxSession.cpp:866` 的 `runtime->device->gpuMemoryUsageBytes()` 虚调用。
+VEH 抓到崩溃指令 `call qword ptr [rdx+0D8h]`（vtable slot 27），但通过探针确认：
+
+- 磁盘 RenderX.dll 的 `GlDevice` vtable 只有 27 个槽（slot 0..26），slot 27 处
+  实际是字符串字面量 `"PushConstants..."` 的字节；
+- 活内存与磁盘文件一致 → 加载镜像本身没问题；
+- **加载的 RenderX.dll 是混编产物**：部分 .obj（rxSession）按旧版
+  `rhiGpuDevice.h`（`gpuMemoryUsageBytes` 在 slot 27）编译，另一部分
+  （glDevice）按更早版本编译（vtable 无该槽）。虚调用越过 vtable 末尾，
+  取到非法目标后崩溃。
+
+混编成因：git bisect 切换 Renderx 子模块 commit（跨越 ba6b538 新增
+`readTexture` 虚函数的头文件变更）时，增量构建产生了跨版本混合的 DLL。
+
+### 修复
+删除 `build/Renderx/CMakeFiles/RenderX.dir` 全部对象文件，强制 RenderX 全量
+重编 → 虚表与调用点布局一致 → 应用正常启动（test-startup.ps1 验证 ALIVE）。
+
+### 教训
+- 切换子模块 commit（尤其涉及虚函数表布局的头文件变更）后，增量构建不可信；
+  需删除对应库的全部 .obj 强制重编，或直接 clean build。
+- VEH 崩溃处理器（异常码 + AV 读写目标 + 崩溃线程栈）保留在主工程中，
+  是定位本问题的关键工具，不回退。
+- 试用弹窗（LicensingBootstrap 模态框）会阻塞首帧渲染，本地复现崩溃需先
+  点掉弹窗（test-startup.ps1 已自动化）。

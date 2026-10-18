@@ -598,6 +598,28 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         return;
     }
 
+    // 删除图元：必须先从渲染世界摘掉本体，否则删除后残影常驻
+    // （upsertEntities 对查不到的 id 只跳过、不回收旧段，删除必须显式表达）。
+    // 台账同步抹除：不论此前是否入账，它都已不在场景里，之后不该再被当成"已渲染"。
+    if (!m_pendingDeletedIds.empty())
+    {
+        std::vector<uint64_t> deletedToRemove;
+        deletedToRemove.reserve(m_pendingDeletedIds.size());
+        for (auto id : m_pendingDeletedIds)
+        {
+            const auto uid = static_cast<uint64_t>(id);
+            if (m_renderedEntityIds.count(uid))
+            {
+                deletedToRemove.push_back(uid);
+            }
+            m_renderedEntityIds.erase(uid);
+        }
+        if (!deletedToRemove.empty())
+        {
+            m_renderWidget->removeRenderEntities(deletedToRemove);
+        }
+    }
+
     // 增量装配：调用方只给「哪些图元变了」，离散化与内容比对都在
     // RenderSceneBuilder 内完成（与全量路径同一份公式），不再由本类
     // 逐图元算出顶点数组后往几何仓里塞。
@@ -738,6 +760,36 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         {
             m_renderedEntityIds.insert(uid);
         }
+    }
+
+    // 「隐藏选中本体」新选中的那批：从世界层摘掉本体。
+    // 与删除同一条形态 —— 摘本体不需要离散化，只要 GPU 与台账同步。
+    // 必须放在脏图元装配**之后**：同一图元既被变换（脏）又被摘除时，摘除应当是终态，
+    // 否则本体刚被重新装配上去就留在画面上，虚线轮廓被实线本体盖住（视觉上"选中没反馈"）。
+    // 这里再按「此刻该不该摘」复核一次：差集是上一轮选择变化记下的，这一轮之前
+    // 选择集或有效隐藏状态还可能再翻（例如连续两次选择变化），过期条目在这里被过滤，
+    // 保证终态只由**当前**的 hideSelected + selectedIds 决定。
+    if (!m_selectionHideIds.empty())
+    {
+        std::vector<uint64_t> hiddenToRemove;
+        hiddenToRemove.reserve(m_selectionHideIds.size());
+        for (uint64_t uid : m_selectionHideIds)
+        {
+            if (!hideSelected || !selectedIds.count(uid))
+            {
+                continue;
+            }
+            if (m_renderedEntityIds.count(uid))
+            {
+                hiddenToRemove.push_back(uid);
+                m_renderedEntityIds.erase(uid);
+            }
+        }
+        if (!hiddenToRemove.empty())
+        {
+            m_renderWidget->removeRenderEntities(hiddenToRemove);
+        }
+        m_selectionHideIds.clear();
     }
 
     // 位图层协调：以场景为真源，增量处理新增/修改/删除/图层显隐。

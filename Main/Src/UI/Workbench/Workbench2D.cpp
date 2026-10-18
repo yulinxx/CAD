@@ -1678,12 +1678,6 @@ void Workbench2D::applySceneTreeIncremental(const char* src)
     m_lastSceneTreeEntityCount = scene->getEntityCount();
     m_lastSceneTreeStructureRevision = scene->structureRevision();
     m_lastSceneTreeTopologyRevision = scene->groupManager().topologyRevision();
-
-    SY_DEBUGF("[Workbench2D] scene tree incremental src=%s: +%lld rows entities=%zu structRev=%llu",
-        src ? src : "misc",
-        added.size(),
-        m_lastSceneTreeEntityCount,
-        static_cast<unsigned long long>(m_lastSceneTreeStructureRevision));
 }
 
 void Workbench2D::syncSceneTreeSelection()
