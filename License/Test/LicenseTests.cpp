@@ -11,6 +11,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <thread>
 
 namespace
 {
@@ -46,6 +47,7 @@ namespace
         {
 #ifdef LICENSE_TEST_HOOKS
             LicenseTest_ClearPublicKeyPem();
+            LicenseTest_ResetThrottleConfig();
 #endif
         }
     };
@@ -440,3 +442,83 @@ TEST_F(LicenseFixture, KeygenGenerateRegCodeFormat)
     ASSERT_FALSE(regCode.empty());
     EXPECT_NE(regCode.find('.'), std::string::npos);
 }
+
+// ========== 激活失败节流 ==========
+
+#ifdef LICENSE_TEST_HOOKS
+
+TEST_F(LicenseFixture, ActivateRateLimitedAfterFreeAttempts)
+{
+    // 默认策略：前 3 次失败不惩罚，第 4 次进入退避期被拒绝
+    LicenseContext* ctx = CreateContext();
+    ASSERT_NE(ctx, nullptr);
+
+    for (int i = 0; i < 3; ++i)
+    {
+        EXPECT_EQ(License_Activate(ctx, "garbage-code"), LICENSE_ERR_VERIFY_FAILED);
+    }
+
+    EXPECT_EQ(License_Activate(ctx, "garbage-code"), LICENSE_ERR_LOCKED);
+
+    LicenseInfo info{};
+    info.structSize = sizeof(LicenseInfo);
+    ASSERT_EQ(License_GetInfo(ctx, &info), LICENSE_OK);
+    EXPECT_NE(std::strlen(info.errorMessage), 0u);
+
+    License_Destroy(ctx);
+}
+
+TEST_F(LicenseFixture, ThrottleStatePersistsAcrossContexts)
+{
+    ASSERT_EQ(LicenseTest_SetThrottleConfig(1, 0, 0, 3, 3600), LICENSE_OK);
+
+    LicenseContext* ctx1 = CreateContext();
+    ASSERT_NE(ctx1, nullptr);
+    for (int i = 0; i < 3; ++i)
+    {
+        EXPECT_EQ(License_Activate(ctx1, "bad-code"), LICENSE_ERR_VERIFY_FAILED);
+    }
+    EXPECT_EQ(License_Activate(ctx1, "bad-code"), LICENSE_ERR_LOCKED);
+    License_Destroy(ctx1);
+
+    // 重建上下文（模拟进程重启），硬锁定状态应从持久化文件恢复
+    LicenseContext* ctx2 = CreateContext();
+    ASSERT_NE(ctx2, nullptr);
+    EXPECT_EQ(License_Activate(ctx2, "bad-code"), LICENSE_ERR_LOCKED);
+    License_Destroy(ctx2);
+}
+
+TEST_F(LicenseFixture, HardLockExpiresAndSuccessResetsCount)
+{
+    ASSERT_TRUE(SetupTestKeyPair());
+    ASSERT_EQ(LicenseTest_SetThrottleConfig(0, 0, 0, 3, 1), LICENSE_OK);
+
+    LicenseContext* ctx = CreateContext();
+    ASSERT_NE(ctx, nullptr);
+
+    char machineCode[128] = {};
+    ASSERT_EQ(License_GetMachineCode(ctx, machineCode, sizeof(machineCode)), LICENSE_OK);
+    const std::string validCode = GenerateRegCodeForMachine(machineCode, "2099-12-31");
+    ASSERT_FALSE(validCode.empty());
+
+    for (int i = 0; i < 3; ++i)
+    {
+        EXPECT_EQ(License_Activate(ctx, "bad-code"), LICENSE_ERR_VERIFY_FAILED);
+    }
+    EXPECT_EQ(License_Activate(ctx, "bad-code"), LICENSE_ERR_LOCKED);
+
+    // 等待 1 秒硬锁定过期后，有效注册码应能正常激活
+    std::this_thread::sleep_for(std::chrono::milliseconds(1200));
+    EXPECT_EQ(License_Activate(ctx, validCode.c_str()), LICENSE_OK);
+
+    // 成功后计数清零：再次连续失败 3 次才触发硬锁定
+    for (int i = 0; i < 3; ++i)
+    {
+        EXPECT_EQ(License_Activate(ctx, "bad-code"), LICENSE_ERR_VERIFY_FAILED);
+    }
+    EXPECT_EQ(License_Activate(ctx, "bad-code"), LICENSE_ERR_LOCKED);
+
+    License_Destroy(ctx);
+}
+
+#endif  // LICENSE_TEST_HOOKS

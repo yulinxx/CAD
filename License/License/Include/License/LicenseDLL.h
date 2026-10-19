@@ -46,6 +46,8 @@ extern "C"
         LICENSE_ERR_EXPIRED = -7,
         LICENSE_ERR_VERSION_MISMATCH = -8,
         LICENSE_ERR_OUT_OF_RANGE = -9,
+        // 激活失败次数超过阈值，处于退避等待或硬锁定状态
+        LICENSE_ERR_LOCKED = -10,
         LICENSE_ERR_INTERNAL = -99
     } LicenseResult;
 

@@ -31,6 +31,14 @@ struct LicenseInfoData
     std::string errorMsg;
 };
 
+// 激活结果：区分校验失败与节流拒绝，供 C API 映射不同错误码
+enum class ActivationResult
+{
+    Success,
+    Failed,
+    Locked
+};
+
 class LicenseManager
 {
 public:
@@ -38,7 +46,7 @@ public:
     ~LicenseManager();
 
     bool CheckLicense();
-    bool Activate(const std::string& regCode);
+    ActivationResult Activate(const std::string& regCode);
     std::string GetMachineCode() const;
     LicenseInfoData GetLicenseInfo() const;
     void ClearLicense();
