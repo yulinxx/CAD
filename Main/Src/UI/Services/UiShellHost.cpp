@@ -12,6 +12,7 @@
 #include "WorkbenchWindow.h"
 #include "WorkbenchMenuManager.h"
 #include "UI2D/Operation/OperationBus.h"
+#include "UI/Interaction/UiInteractionGate.h"
 
 #if BUILD_UI3D
 #include "Workbench3D.h"
@@ -110,6 +111,9 @@ void UiShellHost::initializeAndShow()
     m_mainWindow->setWorkbenchFactory([this](const QString& id) -> UiWorkbench* {
         return resolveWorkbench(id);
     });
+
+    // 注册主窗口为交互总开关的根部件，以便长时算法期间锁定界面
+    UiInteractionGate::instance().setRootWidget(m_mainWindow.get());
 
     m_mainWindow->show();
 }

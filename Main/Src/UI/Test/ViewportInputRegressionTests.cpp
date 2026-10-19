@@ -740,8 +740,8 @@ TEST(FrameTimerRegressionTest, ResetAfterUse_ClearsAll)
 {
     FrameTimer timer;
 
-    recordOneFrame(timer);
-    recordOneFrame(timer);
+    recordOneFrameInViewport(timer);
+    recordOneFrameInViewport(timer);
 
     EXPECT_GT(timer.frameCount(), 0u);
     EXPECT_GT(timer.avgFrameMs(), 0.0);

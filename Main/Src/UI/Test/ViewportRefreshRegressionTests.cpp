@@ -26,7 +26,7 @@
 namespace
 {
     /// 取出某个图元的变更记录，不存在返回 nullptr
-    const Eg::SceneChange* findChange(const Eg::SceneChangeSet& set, Eg::EntityId id)
+    const Eg::SceneChange* findChangeInRefresh(const Eg::SceneChangeSet& set, Eg::EntityId id)
     {
         for (const Eg::SceneChange& change : set.changes)
         {
@@ -235,7 +235,7 @@ TEST(ViewportRefreshRegressionTest, SceneManager_DeletedEntityIds)
     // 删除图元后应有删除变更
     scene.deleteEntity(scene.findSyEntityById(entityId));
     ASSERT_TRUE(scene.readChanges(cursor, changes));
-    const Eg::SceneChange* change = findChange(changes, entityId);
+    const Eg::SceneChange* change = findChangeInRefresh(changes, entityId);
     ASSERT_NE(change, nullptr);
     EXPECT_TRUE(Eg::hasSceneChangeKind(change->kinds, Eg::SceneChangeKind::Removed));
 }
@@ -402,7 +402,7 @@ TEST(RefreshChainRegressionTest, SceneChanged_CollectsDeletedIds)
 
     scene.deleteEntity(scene.findSyEntityById(lineId));
     ASSERT_TRUE(scene.readChanges(cursor, changes));
-    const Eg::SceneChange* change = findChange(changes, lineId);
+    const Eg::SceneChange* change = findChangeInRefresh(changes, lineId);
     ASSERT_NE(change, nullptr);
     EXPECT_TRUE(Eg::hasSceneChangeKind(change->kinds, Eg::SceneChangeKind::Removed));
 
@@ -696,7 +696,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_OnSceneChangedWithDeletedEntitie
     scene.selectEntity(entity);
     scene.deleteSelected();
     ASSERT_TRUE(scene.readChanges(cursor, changes));
-    const Eg::SceneChange* change = findChange(changes, lineId);
+    const Eg::SceneChange* change = findChangeInRefresh(changes, lineId);
     ASSERT_NE(change, nullptr);
     EXPECT_TRUE(Eg::hasSceneChangeKind(change->kinds, Eg::SceneChangeKind::Removed));
 
