@@ -17,7 +17,7 @@ public:
         int freeAttempts = 3;       // 前几次连续失败不施加退避惩罚
         int baseDelaySec = 30;      // 退避基础等待（秒），超出免费次数后逐次翻倍
         int maxDelaySec = 3600;     // 单次退避延迟上限（秒）
-        int hardLockFailures = 10;  // 连续失败达到该次数触发硬锁定
+        int hardLockFailures = 20;  // 连续失败达到该次数触发硬锁定（配合锁定过期重置，每周期最多尝试 20 次）
         int hardLockSec = 86400;    // 硬锁定持续时长（秒，默认 24 小时）
     };
 

@@ -488,10 +488,33 @@ TEST_F(LicenseFixture, ThrottleStatePersistsAcrossContexts)
     License_Destroy(ctx2);
 }
 
+TEST_F(LicenseFixture, HardLockExpiryStartsNewAttemptCycle)
+{
+    // 锁定过期后计数从零开始：每个锁定周期恰好允许 hardLockFailures 次尝试
+    // 锁定秒数取 2 并留足余量，规避 time() 秒级截断导致的过期竞态
+    ASSERT_EQ(LicenseTest_SetThrottleConfig(0, 0, 0, 2, 2), LICENSE_OK);
+
+    LicenseContext* ctx = CreateContext();
+    ASSERT_NE(ctx, nullptr);
+
+    EXPECT_EQ(License_Activate(ctx, "bad-code"), LICENSE_ERR_VERIFY_FAILED);
+    EXPECT_EQ(License_Activate(ctx, "bad-code"), LICENSE_ERR_VERIFY_FAILED);
+    EXPECT_EQ(License_Activate(ctx, "bad-code"), LICENSE_ERR_LOCKED);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(2500));
+
+    // 新一轮周期：再次允许 2 次失败尝试，第 3 次重新触发锁定
+    EXPECT_EQ(License_Activate(ctx, "bad-code"), LICENSE_ERR_VERIFY_FAILED);
+    EXPECT_EQ(License_Activate(ctx, "bad-code"), LICENSE_ERR_VERIFY_FAILED);
+    EXPECT_EQ(License_Activate(ctx, "bad-code"), LICENSE_ERR_LOCKED);
+
+    License_Destroy(ctx);
+}
+
 TEST_F(LicenseFixture, HardLockExpiresAndSuccessResetsCount)
 {
     ASSERT_TRUE(SetupTestKeyPair());
-    ASSERT_EQ(LicenseTest_SetThrottleConfig(0, 0, 0, 3, 1), LICENSE_OK);
+    ASSERT_EQ(LicenseTest_SetThrottleConfig(0, 0, 0, 3, 2), LICENSE_OK);
 
     LicenseContext* ctx = CreateContext();
     ASSERT_NE(ctx, nullptr);
@@ -507,8 +530,8 @@ TEST_F(LicenseFixture, HardLockExpiresAndSuccessResetsCount)
     }
     EXPECT_EQ(License_Activate(ctx, "bad-code"), LICENSE_ERR_LOCKED);
 
-    // 等待 1 秒硬锁定过期后，有效注册码应能正常激活
-    std::this_thread::sleep_for(std::chrono::milliseconds(1200));
+    // 等待硬锁定过期后，有效注册码应能正常激活
+    std::this_thread::sleep_for(std::chrono::milliseconds(2500));
     EXPECT_EQ(License_Activate(ctx, validCode.c_str()), LICENSE_OK);
 
     // 成功后计数清零：再次连续失败 3 次才触发硬锁定

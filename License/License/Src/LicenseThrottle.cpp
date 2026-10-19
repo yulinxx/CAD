@@ -183,6 +183,12 @@ void LicenseThrottle::RecordFailure()
 
     const int64_t now = WallNowUnix();
 
+    // 硬锁定已过期：新一轮锁定周期从零计数，保证每个锁定时长内最多尝试 hardLockFailures 次
+    if (s.lockUntilUnix > 0 && now >= s.lockUntilUnix)
+    {
+        s = State{};
+    }
+
     // 距上次失败超过硬锁定时长则计数衰减归零，容忍正常用户偶发输错
     if (s.lastAttemptUnix > 0 && now - s.lastAttemptUnix > cfg.hardLockSec)
     {
