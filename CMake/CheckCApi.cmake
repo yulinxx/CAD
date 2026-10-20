@@ -13,7 +13,7 @@
 function(sanyi_check_c_api_version)
     set(_c_api_headers
         "${SANYI_ROOT}/CrashHandler/CrashHandler/Include/CrashHandler/CrashHandlerDLL.h"
-        "${SANYI_ROOT}/License/License/Include/License/LicenseDLL.h"
+        "${SANYI_ROOT}/Licensing/License/Include/License/LicenseDLL.h"
         "${SANYI_LOG_DIR}/Include/Log/SyLogger.h"
         "${SANYI_ROOT}/Engraving/Engraving/Include/Engraving/EngravingCAPI.h"
         "${SANYI_ROOT}/GeoModelCore/GeoModelCore/Include/GeoModelCore/GeoModelDLL.h"

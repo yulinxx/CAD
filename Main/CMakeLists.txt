@@ -41,7 +41,7 @@ set(SHARED_PROJECT_INCLUDE_DIRS
     "${UI_ROOT}/Widgets"
     "${UI_ROOT}/Workbench"
     "${PROJECT_ROOT}/Utility/Utility/Include"
-    "${PROJECT_ROOT}/License/License/Include"
+    "${PROJECT_ROOT}/Licensing/License/Include"
     "${PROJECT_ROOT}/Engine/Common/Include"
     "${PROJECT_ROOT}/Engine/2D/Include"
     "${PROJECT_ROOT}/Engine/3D/Include"

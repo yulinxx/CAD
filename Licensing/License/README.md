@@ -200,7 +200,7 @@ typedef enum LicenseResult {
 ## 目录结构
 
 ```
-License/
+Licensing/
 ├── License/
 │   ├── Include/
 │   │   ├── LicenseAPI.h              # 导出宏定义

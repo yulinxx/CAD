@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 4.3)
 # ============================================================================
 # License —— 独立构建入口
 # ============================================================================
-# 集成构建：根 CMakeLists.txt → add_subdirectory(License/License)（内层）。
+# 集成构建：根 CMakeLists.txt → add_subdirectory(Licensing/License)（内层）。
 # 独立构建：本文件提供 project() 与环境配置，把 License 单独拉出来开发 / 跑测试。
 #
 # 三条设计约束同时成立：
@@ -16,15 +16,15 @@ cmake_minimum_required(VERSION 4.3)
 #   2) 可脱离主程序单独编译：依赖的兄弟 DLL（Log）由本工程按需 add_subdirectory
 #      拉进来构建，Main / UI / Engine 一概不参与。
 #
-#   3) 测试由内层 License/License/CMakeLists.txt 在 BUILD_LICENSE_TESTS=ON 时挂载，
+#   3) 测试由内层 Licensing/License/CMakeLists.txt 在 BUILD_LICENSE_TESTS=ON 时挂载，
 #      本文件不得重复 add_subdirectory(Test)，否则 target 重定义。
 #
 # 用法：
-#   cmake -S License -B License/build
-#   cmake --build License/build --config Release
-#   ctest --test-dir License/build -C Release
-#   cmake -S License -B License/build -DBUILD_LICENSE_TESTS=OFF   # 只编库、不编测试
-#   cmake -S License -B License/build -DBUILD_LICENSE_EXAMPLE=OFF # 不编示例
+#   cmake -S Licensing -B Licensing/build
+#   cmake --build Licensing/build --config Release
+#   ctest --test-dir Licensing/build -C Release
+#   cmake -S Licensing -B Licensing/build -DBUILD_LICENSE_TESTS=OFF   # 只编库、不编测试
+#   cmake -S Licensing -B Licensing/build -DBUILD_LICENSE_EXAMPLE=OFF # 不编示例
 # ============================================================================
 
 include(${CMAKE_CURRENT_LIST_DIR}/../Config.cmake)

@@ -95,7 +95,7 @@ endif()
 add_subdirectory(Log/Log)
 
 # 1.6 License 层 - 软件注册与许可校验
-add_subdirectory(License/License)
+add_subdirectory(Licensing/License)
 
 # 3. Engine 层 - 引擎核心
 add_subdirectory(Engine/Common)
