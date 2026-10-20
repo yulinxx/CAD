@@ -38,14 +38,34 @@ namespace
     std::string g_appName;
     std::string g_appVersion;
 
-#ifdef _WIN32
-    static PVOID g_vehHandle = nullptr;
-    static std::terminate_handler g_oldTerminate = nullptr;
+    bool ensureCrashDumpDirectory(const QString& path)
+    {
+        QDir dir(path);
+        if (dir.exists())
+        {
+            return true;
+        }
+        return dir.mkpath(QStringLiteral("."));
+    }
+}  // namespace
 
-    /// Vectored Exception Handler：SEH 异常分发最早期被调用。
-    /// 此时崩溃线程仍在运行（未被 breakpad suspend），CaptureStackBackTrace
-    /// 直接在崩溃线程上抓栈，拿到的就是真正的业务栈。
-    LONG WINAPI vectoredExceptionHandler(EXCEPTION_POINTERS* pExInfo)
+// File-scope statics for WIN32-specific symbols (internal linkage) — avoid anonymous namespace issues in unity builds
+#ifdef _WIN32
+static PVOID g_vehHandle = nullptr;
+static std::terminate_handler g_oldTerminate = nullptr;
+#else
+// Non-WIN32 stubs
+static void* g_vehHandle = nullptr;
+static std::terminate_handler g_oldTerminate = nullptr;
+inline void crashTerminateHandler() {}
+inline long vectoredExceptionHandler(void*) { return 0; }
+#endif
+
+#ifdef _WIN32
+/// Vectored Exception Handler：SEH 异常分发最早期被调用。
+/// 此时崩溃线程仍在运行（未被 breakpad suspend），CaptureStackBackTrace
+/// 直接在崩溃线程上抓栈，拿到的就是真正的业务栈。
+LONG WINAPI vectoredExceptionHandler(EXCEPTION_POINTERS* pExInfo)
     {
         const DWORD code = pExInfo->ExceptionRecord->ExceptionCode;
 
@@ -365,17 +385,6 @@ namespace
         std::fflush(stderr);
         return succeeded;
     }
-
-    bool ensureCrashDumpDirectory(const QString& path)
-    {
-        QDir dir(path);
-        if (dir.exists())
-        {
-            return true;
-        }
-        return dir.mkpath(QStringLiteral("."));
-    }
-}  // namespace
 
 bool CrashHandlerBootstrap::initialize(const std::string& appName, const std::string& appVersion)
 {
