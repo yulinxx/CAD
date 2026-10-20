@@ -26,6 +26,7 @@
 #include <functional>
 
 #include "Composition/ApplicationCompositionRoot.h"
+#include "UI/Algorithm/AlgorithmApplicationService.h"
 #include "SceneDocument2D.h"
 #include "UiServices.h"
 #include "UiStateCenter.h"
@@ -267,6 +268,21 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
         m_viewport = vp;
         setupViewportServices(vp, window);
         vp->initializeTools();
+        // 注入交互控制回调：算法运行时禁用工具交互，防止误操作
+        if (auto* appRoot = ApplicationCompositionRoot::instance())
+        {
+            if (auto* algoService = appRoot->algorithmService())
+            {
+                algoService->setInteractionControlCallback(
+                    [vp](bool enabled) {
+                        if (auto* tm = vp->toolManager())
+                        {
+                            tm->setInteractionEnabled(enabled);
+                        }
+                    });
+                SY_INFO("[Workbench2D] interaction control callback registered");
+            }
+        }
         // LOD 参数调用链收敛：设置面板经 ViewRenderCoordinator 读写曲线精度
         // （initializeTools 之后 coordinator 才创建）
         if (m_settingsCoordinator)
@@ -1678,12 +1694,6 @@ void Workbench2D::applySceneTreeIncremental(const char* src)
     m_lastSceneTreeEntityCount = scene->getEntityCount();
     m_lastSceneTreeStructureRevision = scene->structureRevision();
     m_lastSceneTreeTopologyRevision = scene->groupManager().topologyRevision();
-
-    SY_DEBUGF("[Workbench2D] scene tree incremental src=%s: +%lld rows entities=%zu structRev=%llu",
-        src ? src : "misc",
-        added.size(),
-        m_lastSceneTreeEntityCount,
-        static_cast<unsigned long long>(m_lastSceneTreeStructureRevision));
 }
 
 void Workbench2D::syncSceneTreeSelection()

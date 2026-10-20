@@ -196,6 +196,8 @@ $RECYCLE.BIN/
 .Trash-*
 
 # ---- 临时 / 日志 / 备份文件 ----
+# CrashHandler 落地的崩溃日志，仅本地调试用，禁止入库
+crash-*.txt
 *.tmp
 *.temp
 *.swp

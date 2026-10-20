@@ -244,7 +244,17 @@ extern "C"
                 return LICENSE_ERR_INVALID_ARG;
             }
 
-            if (!manager->Activate(regCode))
+            const ActivationResult result = manager->Activate(regCode);
+            if (result == ActivationResult::Locked)
+            {
+                // 节流拒绝：不计入失败次数，直接返回剩余等待提示
+                SY_WARNF("[LicenseDLL] License_Activate: activation throttled: %s",
+                    manager->GetLicenseInfo().errorMsg.c_str());
+                setLastError(manager->GetLicenseInfo().errorMsg.c_str());
+                return LICENSE_ERR_LOCKED;
+            }
+
+            if (result == ActivationResult::Failed)
             {
                 SY_WARNF("[LicenseDLL] License_Activate: license activation failed: %s",
                     manager->GetLicenseInfo().errorMsg.c_str());

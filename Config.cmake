@@ -110,11 +110,6 @@ message(STATUS "================================================================
 message(STATUS "[Config] Build Type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "======================================================================")
 
-# 注：编译器特定配置（MSVC / GCC / Clang 的警告与运行时开关）已移到
-#     CMake/CompilerOptions.cmake，由 CMakeLists.txt 在 project() **之后** include。
-#     原因见该文件头部：CMAKE_CXX_COMPILER_ID 在 project() 之前为空，
-#     留在本文件里会让整个判断块成为死代码。
-
 # --------------------------------------------------------------------
 # C++ 标准配置
 # --------------------------------------------------------------------
@@ -137,11 +132,6 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 option(SANYI_UNITY_BUILD "Enable unity build (faster compilation)" ON)
 if(SANYI_UNITY_BUILD)
     set(CMAKE_UNITY_BUILD ON)
-    # 注意：全局开启后所有 target（含测试）都会进 unity batch，
-    # 可能导致复杂命名空间模块出现命名空间泄漏。
-    # 个别模块如需关闭可传 NO_UNITY_BUILD（或 configure 时 -DSANYI_UNITY_BUILD=OFF）。
-    # 注意：.mm 不得进 unity batch —— 各模块对 .mm 设 SKIP_UNITY_BUILD_INCLUSION
-    # （见 UI/Common、Main、Renderx 的 CMakeLists），勿用无效的 *_EXCLUDED_* 变量。
 endif()
 
 # --------------------------------------------------------------------

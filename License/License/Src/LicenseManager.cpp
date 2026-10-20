@@ -1,11 +1,11 @@
 #include "LicenseManager.h"
 #include "LicenseGuard.h"
 #include "LicenseInternal.h"
+#include "LicenseThrottle.h"
 #include "MachineFingerprint.h"
 #include "StrEncrypt.h"
 
 #include <openssl/bio.h>
-#include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 
@@ -653,38 +653,50 @@ bool LicenseManager::CheckLicense()
     return true;
 }
 
-bool LicenseManager::Activate(const std::string& regCode)
+ActivationResult LicenseManager::Activate(const std::string& regCode)
 {
     if (!LicenseInternal::IsCheckEnabled())
     {
         m_info.isValid = true;
         LicenseGuard::MarkValid();
-        return true;
+        return ActivationResult::Success;
     }
 
     const std::string machineCode = GetMachineCode();
     if (machineCode.empty())
     {
         m_info.errorMsg = "Failed to generate machine code";
-        return false;
+        return ActivationResult::Failed;
+    }
+
+    // 失败节流：连续失败后指数退避，超限硬锁定，阻止脚本高频盲试
+    LicenseThrottle throttle(m_configDir, machineCode);
+    int64_t retryAfterSec = 0;
+    const auto verdict = throttle.Acquire(&retryAfterSec);
+    if (verdict != LicenseThrottle::Verdict::Allow)
+    {
+        m_info.errorMsg = LicenseThrottle::BuildRetryMessage(verdict, retryAfterSec);
+        return ActivationResult::Locked;
     }
 
     LicenseInfoData info;
     if (!VerifyRegCode(machineCode, regCode, info))
     {
         m_info = info;
-        return false;
+        throttle.RecordFailure();
+        return ActivationResult::Failed;
     }
 
     if (!SaveLicense(regCode))
     {
         m_info.errorMsg = "Failed to save license file";
-        return false;
+        return ActivationResult::Failed;
     }
 
+    throttle.RecordSuccess();
     m_info = info;
     LicenseGuard::MarkValid();
-    return true;
+    return ActivationResult::Success;
 }
 
 std::string LicenseManager::GetMachineCode() const
@@ -763,10 +775,14 @@ bool LicenseManager::LoadAndVerify()
 bool LicenseManager::VerifyRegCode(
     const std::string& machineCode, const std::string& regCode, LicenseInfoData& outInfo) const
 {
+    // 验签前的所有格式/解码/签名失败统一返回同一提示，
+    // 避免脚本通过差异化的错误信息探测注册码结构
+    const char* const kInvalidRegCode = "Invalid registration code";
+
     const auto dotPos = regCode.find('.');
     if (dotPos == std::string::npos)
     {
-        outInfo.errorMsg = "Invalid registration code format (missing separator)";
+        outInfo.errorMsg = kInvalidRegCode;
         return false;
     }
 
@@ -781,7 +797,7 @@ bool LicenseManager::VerifyRegCode(
 
     if (payloadBytes.empty() || sigBytes.empty())
     {
-        outInfo.errorMsg = "Failed to decode registration code";
+        outInfo.errorMsg = kInvalidRegCode;
         return false;
     }
 
@@ -820,18 +836,14 @@ bool LicenseManager::VerifyRegCode(
 
     if (ok != 1)
     {
-        unsigned long err = ERR_get_error();
-        char errBuf[256];
-        ERR_error_string_n(err, errBuf, sizeof(errBuf));
-        outInfo.errorMsg = "Signature verification failed: ";
-        outInfo.errorMsg += errBuf;
+        outInfo.errorMsg = kInvalidRegCode;
         return false;
     }
 
     const auto fields = SplitString(payload, '|');
     if (fields.size() < 5)
     {
-        outInfo.errorMsg = "Invalid license payload format";
+        outInfo.errorMsg = kInvalidRegCode;
         return false;
     }
 
@@ -843,7 +855,7 @@ bool LicenseManager::VerifyRegCode(
 
     if (!IsValidDate(expiryDate) || !IsValidDate(issueDate))
     {
-        outInfo.errorMsg = "Invalid date format in license";
+        outInfo.errorMsg = kInvalidRegCode;
         return false;
     }
 

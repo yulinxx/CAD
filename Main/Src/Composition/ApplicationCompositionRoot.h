@@ -135,6 +135,12 @@ public:
         return m_document2D.get();
     }
 
+    /// 获取算法应用服务
+    AlgorithmApplicationService* algorithmService()
+    {
+        return m_algorithmService.get();
+    }
+
     /// 获取导出分发器
     ExportDispatcher* exportDispatcher()
     {
