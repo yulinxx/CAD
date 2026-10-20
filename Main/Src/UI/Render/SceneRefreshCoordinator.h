@@ -86,6 +86,15 @@ public:
      */
     void requestCurveLodRefresh();
 
+    /**
+     * @brief 相机变化后的视口范围检查
+     *
+     * 全量刷新按视口 1.25 倍余量裁剪上传几何。相机移动出该范围后，新进入
+     * 视野的非曲线图元（直线/点/填充等）从未上过 GPU —— 仅重绘补不出来，
+     * 必须重新全量装配。范围之内则只推进曲线 LOD（精度按缩放缓存）。
+     */
+    void requestViewportRefresh();
+
     void markEntityDirty(uint64_t entityId) override;
     void markEntityDeleted(uint64_t entityId) override;
     UI::SceneRefreshLevel pendingLevel() const override;
@@ -184,6 +193,14 @@ private:
 
     // 变更流游标（用于 readChanges 增量消费）
     Eg::ISceneChangeStream::Cursor m_lastCursor{ 0 };
+
+    // 上次全量刷新实际覆盖的世界范围（视口矩形按 gatherGeometry 同一 1.25 倍余量扩展）。
+    // 相机移出这里后，新进入视野的非曲线图元必须重新全量上传（见 requestViewportRefresh）。
+    Ut::BBox2d m_builtVisibleBox;
+
+    // 上次全量刷新没有做视口裁剪（矩阵/视口无效）：全场景都已在 GPU 上，
+    // 相机怎么移都不需要再按范围补刷。
+    bool m_builtWithoutCulling{ false };
 
     // 本轮待刷新的图元快照：在 UI 线程（onSceneChanged）按变更集 clone 出来，
     // 增量刷新 —— 含并行离散化那条工作线程路径 —— 只读这份只读副本，

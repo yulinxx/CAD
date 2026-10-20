@@ -962,7 +962,9 @@ void RenderViewport2D::applyCameraToWidget()
     // 图元会一直停在旧精度。判定状态（缩放基准、已收集矩形）都在协调器里统一维护。
     if (m_refreshCoordinator)
     {
-        m_refreshCoordinator->requestCurveLodRefresh();
+        // 视口移出上次全量上传覆盖的范围时，新进入视野的非曲线图元需要
+        // 重新全量装配；范围内只推进曲线 LOD。
+        m_refreshCoordinator->requestViewportRefresh();
     }
 }
 

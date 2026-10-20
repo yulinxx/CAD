@@ -92,6 +92,18 @@ QObject* UiStateBridge2D::install(Workbench2D* workbench,
         });
     }
 
+    // 图层显隐：LayerManager::setLayerVisible 只翻标志位并 notifySceneChanged，
+    // 不产生任何 entity change，增量路径拿不到脏 ID（applyLightRefresh 会直接
+    // 空转返回），隐藏图层的几何会留在 GPU 上。这里显式走全量重建，让几何、
+    // 位图和文字都按最新图层可见性重新装配。
+    if (layerBridge && viewport)
+    {
+        QObject::connect(layerBridge, &QtLayerManagerBridge::sigLayerVisibilityChanged, guard,
+            [viewport](int, bool) {
+                viewport->requestFullRefresh();
+            });
+    }
+
     if (bus)
     {
         // 撤销/重做栈变化（含经 LayerEditService 直接入栈的图层操作）

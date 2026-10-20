@@ -42,6 +42,15 @@ public:
     void setSceneManager(Eg::SceneManager* sm) { m_sceneManager = sm; }
     Eg::SceneManager* sceneManager() const { return m_sceneManager; }
 
+    /// 同步「选中时隐藏本体」状态：hideSelected 生效时，selectedIds 里的图元
+    /// 不允许被 LOD 批次重新提交到世界层（否则缩放后选中本体又会冒出来）。
+    /// selectedIds 由协调器持有，生命周期覆盖本管理器。
+    void setSelectionHideState(const std::unordered_set<uint64_t>* selectedIds, bool hideSelected)
+    {
+        m_selectedIds = selectedIds;
+        m_hideSelected = hideSelected;
+    }
+
     /// 队列排空后的收尾：清队列 + 处理「排队期间又要求重新收集」的待办
     void finishQueue();
 
@@ -59,8 +68,16 @@ private:
     void refillQueueIfStale();
     void ensurePump();
 
+    /// 该图元此刻是否应该出现在世界层：自身可见、所在图层可见，
+    /// 且没有被「选中时隐藏本体」过滤掉。
+    bool isRenderable(uint64_t uid, const Eg::SyEntity* entity) const;
+
     RenderWidget* m_renderWidget;
     Eg::SceneManager* m_sceneManager{ nullptr };
+
+    /// 「选中时隐藏本体」的过滤条件，由 SceneRefreshCoordinator 同步
+    const std::unordered_set<uint64_t>* m_selectedIds{ nullptr };
+    bool m_hideSelected{ false };
     std::vector<uint64_t> m_queue;
     size_t m_cursor = 0;
 

@@ -1740,6 +1740,31 @@ void Workbench2D::toggleEntityVisibility(const QString& id, bool visible)
     if (auto* entity = scene->findEntityById(*eid))
     {
         entity->setVisible(visible);
+
+        // 隐藏图元时从选择集中移除（与 setSceneTreeVisibility 的批量语义一致）：
+        // 否则流水虚线轮廓和选择手柄会继续画在已经不可见的本体位置上。
+        if (!visible)
+        {
+            std::vector<Eg::SyEntity*> stillVisible;
+            bool hadHiddenSelected = false;
+            scene->forEachSelected([eid, &stillVisible, &hadHiddenSelected](Eg::SyEntity* e) {
+                if (!e)
+                {
+                    return;
+                }
+                if (e->id == *eid)
+                {
+                    hadHiddenSelected = true;
+                    return;
+                }
+                stillVisible.push_back(e);
+            });
+            if (hadHiddenSelected)
+            {
+                scene->selectEntities(stillVisible);
+            }
+        }
+
         scene->notifySceneChanged();
         // 可见性不进结构签名（不是增删/拓扑变化），且树行要显示新的显隐图标，
         // 延迟到下一事件循环重建，避免连续点击导致多次完整重建

@@ -3,6 +3,7 @@
 #include "RenderWidget.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine/SyEntity/SyEntity.h"
+#include "Engine/Layer/SyLayer.h"
 #include "Engine/SyEntity/EType.h"
 #include "Engine2D/SyEntity/SyPolygon.h"
 #include "Engine2D/Geometry/EntityGeometryEmitter.h"
@@ -34,6 +35,32 @@ namespace
 CurveLodManager::CurveLodManager(RenderWidget* widget)
     : m_renderWidget(widget)
 {
+}
+
+bool CurveLodManager::isRenderable(uint64_t uid, const Eg::SyEntity* entity) const
+{
+    if (entity == nullptr || !entity->visible())
+    {
+        return false;
+    }
+    // 与 emitEntityGeometry 的判据对齐：非法几何不会产生任何段，
+    // 不能因为「提交过」就把 id 写进已渲染账本。
+    if (!entity->isValid())
+    {
+        return false;
+    }
+    const Eg::SyLayer* layer = entity->layer();
+    if (layer != nullptr && !layer->isVisible())
+    {
+        return false;
+    }
+    // 「选中时隐藏本体」：选中集里的图元本体不能由 LOD 批次重新提交，
+    // 否则每次缩放触发 LOD 都会把刚摘掉的本体又画回来。
+    if (m_hideSelected && m_selectedIds != nullptr && m_selectedIds->count(uid) > 0)
+    {
+        return false;
+    }
+    return true;
 }
 
 void CurveLodManager::requestRefresh()
@@ -79,20 +106,43 @@ void CurveLodManager::processBatch(std::unordered_set<uint64_t>& renderedIds)
 
     // 整批一次装配：离散化与内容比对都在 RenderSceneBuilder 内完成
     // （与全量路径同一份公式），上下文只切一次、重绘只请求一次。
-    std::vector<uint64_t> batch(m_queue.begin() + static_cast<ptrdiff_t>(m_cursor),
-        m_queue.begin() + static_cast<ptrdiff_t>(end));
+    //
+    // 收集之后到消费之前，图元可能已经被删除、隐藏（自身/图层）或被
+    // 「选中时隐藏本体」过滤掉 —— LOD 的 upsert 不经过 applyLightRefresh 的
+    // 可见性判断，如果原样提交会把它们重新画回世界层。这里在提交前按活对象
+    // 再过滤一次，并只为真正提交的图元写账本。
+    std::vector<uint64_t> batch;
+    batch.reserve(end - m_cursor);
+    for (size_t i = m_cursor; i < end; ++i)
+    {
+        const uint64_t uid = m_queue[i];
+        const Eg::SyEntity* entity = m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid));
+        if (!isRenderable(uid, entity))
+        {
+            continue;
+        }
+        batch.push_back(uid);
+    }
     if (!batch.empty())
     {
-        m_renderWidget->upsertRenderEntities(batch,
+        if (m_renderWidget->upsertRenderEntities(batch,
             [this](uint64_t uid) -> const Eg::SyEntity* {
                 return m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid));
             },
             [this](uint64_t uid) -> uint32_t {
                 return layerIndexOfEntityForLod(m_sceneManager, static_cast<Eg::EntityId>(uid));
-            });
-        for (uint64_t uid : batch)
+            }))
         {
-            renderedIds.insert(uid);
+            for (uint64_t uid : batch)
+            {
+                renderedIds.insert(uid);
+            }
+        }
+        else
+        {
+            // LOD 批次提交失败：不把这些 ID 写入账本，下一批或下一帧重试
+            m_recollectPending = true;
+            ensurePump();
         }
     }
 
@@ -237,6 +287,12 @@ void CurveLodManager::refillQueueIfStale()
         // （getEntitiesByType 按值返回，POLYGON 那 29 万个指针会白拷 2.3MB）。
         m_sceneManager->forEachEntityByType(type, [&](Eg::SyEntity* entity) {
             if (!entity)
+            {
+                return;
+            }
+            // 隐藏图层 / 隐藏图元 / 「选中时隐藏本体」过滤：LOD 提交不经过
+            // applyLightRefresh 的可见性判断，队列里不能收这些图元。
+            if (!isRenderable(static_cast<uint64_t>(entity->id), entity))
             {
                 return;
             }

@@ -26,6 +26,40 @@ namespace
     // 场景更新节流时间（毫秒）— 16ms 约等于 60fps，合并短时间内的多次场景变更
     constexpr int kSceneUpdateDelay = 16;
 
+    // 视口裁剪余量：必须与 SceneManager::gatherGeometry 的 kCullMargin 一致。
+    // applyFullRefresh 用这个余量记录「上次全量上传实际覆盖的范围」，
+    // requestViewportRefresh 据此判断相机是否已经移出该范围。
+    constexpr double kViewportCullMargin = 1.25;
+
+    Ut::BBox2d expandedViewportBounds(const float bounds[4])
+    {
+        const double cx = 0.5 * (static_cast<double>(bounds[0]) + bounds[2]);
+        const double cy = 0.5 * (static_cast<double>(bounds[1]) + bounds[3]);
+        const double hw = 0.5 * (bounds[2] - bounds[0]) * kViewportCullMargin;
+        const double hh = 0.5 * (bounds[3] - bounds[1]) * kViewportCullMargin;
+        return Ut::BBox2d(cx - hw, cy - hh, cx + hw, cy + hh);
+    }
+
+    /// 该类型是否会向几何仓发射图元段。
+    ///
+    /// TEXT/IMAGE 由 Bitmap/TextReconciler 单独上传；GROUP/MESH/UNKNOWN 不发射。
+    /// 账本（m_renderedEntityIds）的语义是「几何仓里有段可画」，这些类型不能入账，
+    /// 否则删除/隐藏/选中恢复会误判它们已经存在于世界层。
+    bool emitsGeometryPiece(Eg::EType type)
+    {
+        switch (type)
+        {
+        case Eg::EType::TEXT:
+        case Eg::EType::IMAGE:
+        case Eg::EType::GROUP:
+        case Eg::EType::MESH:
+        case Eg::EType::UNKNOWN:
+            return false;
+        default:
+            return true;
+        }
+    }
+
     /// 取图元所属图层的绘制序号（0 = 最上层），供增量路径构造 z-order。
     ///
     /// 增量路径的图元快照是 clone，**不复制图层指针**，所以只能查活对象。
@@ -132,12 +166,37 @@ void SceneRefreshCoordinator::setSceneContext(Eg::ISceneContext* ctx)
     }
     m_sceneManager = static_cast<Eg::SceneManager*>(ctx);
     m_curveLodManager.setSceneManager(m_sceneManager);
+
+    // 换场景：旧场景的待办、快照、账本与选择缓存全部作废。
+    // EntityId 在新旧文档之间可能重复，留着旧 ID 会把删除/隐藏误应用到新场景的
+    // 同名 ID 上；旧账本也会让新场景的图元被误判为「已在 GPU」。
+    m_pendingDirtyIds.clear();
+    m_pendingDeletedIds.clear();
+    m_selectionHideIds.clear();
+    m_selectionRestoreIds.clear();
+    m_lastSelectedIds.clear();
+    m_cachedSelectedIds.clear();
+    m_selectedIdsCacheValid = false;
+    m_renderedEntityIds.clear();
+    m_lastHideSelectedEffective = false;
+    m_refreshLevel = RefreshLevel::None;
+    m_curveLodManager.clearQueue();
+
+    // 换场景后旧的覆盖范围不再成立：首次相机变化会强制做一次全量装配。
+    m_builtVisibleBox = Ut::BBox2d{};
+    m_builtWithoutCulling = false;
     if (m_sceneManager)
     {
         // 同步游标到当前修订号，避免程序启动后立即触发 FullRefresh
         // （场景加载后 revision 可能已经很大，但 m_lastCursor 初始为 0）
         m_lastCursor = m_sceneManager->currentRevision();
+        m_pendingSnapshot.reset(m_lastCursor);
         m_sceneManager->addObserver(this);
+    }
+    else
+    {
+        m_lastCursor = 0;
+        m_pendingSnapshot.reset(0);
     }
 }
 
@@ -355,6 +414,11 @@ void SceneRefreshCoordinator::requestCurveLodRefresh()
         return;
     }
 
+    // 同步「选中时隐藏本体」过滤：LOD 收集/提交不经过 applyLightRefresh 的
+    // 可见性判断，必须把当前选中集与生效状态带进去，否则缩放重建会把
+    // 刚摘掉的选中本体又画回世界层。
+    m_curveLodManager.setSelectionHideState(&m_cachedSelectedIds, hideSelectedEffective());
+
     // 过期判据与队列收集的语义已整体移交 CurveLodManager。
     // 队列未排空时它只记待办不打断批次；排空后由 finishCurveLodQueue 重新评估。
     m_curveLodManager.requestRefresh();
@@ -362,6 +426,32 @@ void SceneRefreshCoordinator::requestCurveLodRefresh()
     {
         ensureCurveLodPump();
     }
+}
+
+void SceneRefreshCoordinator::requestViewportRefresh()
+{
+    // 全量刷新只上传视口 1.25 倍余量内的几何（见 gatherGeometry 的视口裁剪）。
+    // 相机移出该范围后，新进入视野的直线/点/填充等非曲线图元从未上过 GPU，
+    // 仅 requestRepaint() 补不出来 —— 必须重新做一次全量装配。
+    //
+    // 范围之内仍然只推进曲线 LOD：普通图元不随缩放变化，无需重建；
+    // 曲线精度由 LOD 的缩放滞后判据单独处理。
+    if (m_sceneManager && m_renderWidget && !m_builtWithoutCulling)
+    {
+        float bounds[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        if (m_renderWidget->visibleWorldBounds(bounds))
+        {
+            const Ut::BBox2d visibleBox(static_cast<double>(bounds[0]), static_cast<double>(bounds[1]),
+                static_cast<double>(bounds[2]), static_cast<double>(bounds[3]));
+            if (!m_builtVisibleBox.isValid() || !m_builtVisibleBox.contains(visibleBox))
+            {
+                requestFullRefresh();
+                return;
+            }
+        }
+    }
+
+    requestCurveLodRefresh();
 }
 
 // 场景变更通知入口
@@ -396,10 +486,14 @@ void SceneRefreshCoordinator::onSceneChanged()
                 const bool stillInScene = m_sceneManager->findEntityById(change.entityId) != nullptr;
                 if (!stillInScene)
                 {
+                    m_pendingDirtyIds.erase(change.entityId);
                     m_pendingDeletedIds.insert(change.entityId);
                 }
                 else
                 {
+                    // 删除后又在同一节流窗口内被撤销（或替换）回来：以活对象为准
+                    // 取消待删除，否则稍后的删除处理会把刚恢复的图元再次摘掉。
+                    m_pendingDeletedIds.erase(change.entityId);
                     m_pendingDirtyIds.insert(change.entityId);
                 }
             }
@@ -584,8 +678,18 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     // 时要用它识别「有效状态翻转」（见该处的注释）
     m_lastHideSelectedEffective = hideSelected;
 
+    // LOD 提交是独立路径，不走本函数的可见性判断，这里把最新状态同步进去。
+    m_curveLodManager.setSelectionHideState(&m_cachedSelectedIds, hideSelected);
+
     // 缓存的选中 ID 集合：判断某个图元的本体此刻该不该在世界层里，只看它。
     const std::unordered_set<uint64_t>& selectedIds = m_cachedSelectedIds;
+
+    // 位图/文字不在几何账本里，删除时无法靠 removeRenderEntities 摘除；
+    // 选择差集（隐藏/恢复本体）同样要由 reconcile* 按 hideSelected 增删。
+    // 这两个标志在各自的集合被消费/清空前捕获，用来决定本轮是否需要全类型对账，
+    // 避免像以前那样「账本非空就每帧扫一遍全部位图/文字」。
+    const bool selectionDiffPending = !m_selectionHideIds.empty() || !m_selectionRestoreIds.empty();
+    const bool deletionPending = !m_pendingDeletedIds.empty();
 
     // 纯选择变更优化：脏集合、删除集合、选中差集都为空时，场景几何未变，
     // 无需创建 BatchGuard（GL 上下文切换）、无需 BitmapReconciler/TextReconciler 对账。
@@ -614,6 +718,13 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         removedIds.reserve(m_pendingDeletedIds.size());
         for (auto id : m_pendingDeletedIds)
         {
+            // 应用时刻再以活对象复核一次：删除通知之后可能已经撤销，而两批
+            // 通知恰好被同一个节流窗口合并。仍存在的图元转为脏，交给下面的装配。
+            if (sm->findEntityById(id) != nullptr)
+            {
+                m_pendingDirtyIds.insert(id);
+                continue;
+            }
             const auto uid = static_cast<uint64_t>(id);
             m_pendingDirtyIds.erase(id);
             m_selectionHideIds.erase(uid);
@@ -621,8 +732,52 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             m_renderedEntityIds.erase(uid);
             removedIds.push_back(uid);
         }
-        m_renderWidget->removeRenderEntities(removedIds);
-        m_pendingDeletedIds.clear();
+        if (m_renderWidget->removeRenderEntities(removedIds))
+        {
+            m_pendingDeletedIds.clear();
+        }
+        else
+        {
+            // 移除失败：保留待删 ID，下一轮重试
+            m_refreshLevel = RefreshLevel::LightUpdate;
+        }
+    }
+
+    // 「隐藏选中本体」新选中的那批：直接从世界层摘掉本体。
+    // 与删除走同一条形状 —— 摘本体不需要离散化，只要账本跟着改。
+    // 差集是上一轮选择变化记下的，这一轮之间选择集或有效隐藏状态还可能再翻，
+    // 所以这里按「此刻该不该摘」复核一次；过期条目直接丢弃。
+    // 位图/文字本体不在几何账本里，由下面的 reconcile* 按 hideSelected 对账。
+    if (!m_selectionHideIds.empty())
+    {
+        std::vector<uint64_t> toRemove;
+        toRemove.reserve(m_selectionHideIds.size());
+        for (uint64_t uid : m_selectionHideIds)
+        {
+            if (!hideSelected || selectedIds.count(uid) == 0)
+            {
+                continue;
+            }
+            if (m_renderedEntityIds.erase(uid) > 0)
+            {
+                toRemove.push_back(uid);
+            }
+        }
+        if (!toRemove.empty())
+        {
+            if (m_renderWidget->removeRenderEntities(toRemove))
+            {
+                m_selectionHideIds.clear();
+            }
+            else
+            {
+                m_refreshLevel = RefreshLevel::LightUpdate;
+            }
+        }
+        else
+        {
+            m_selectionHideIds.clear();
+        }
     }
 
     // 增量装配：调用方只给「哪些图元变了」，离散化与内容比对都在
@@ -642,24 +797,51 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
 
     for (auto id : m_pendingDirtyIds)
     {
-        // 读快照而不是活对象：快照副本是主线程 clone 好的
+        // 优先读快照（clone 副本）；没有快照时回退到活对象。回退是必要的：
+        // markEntityDirty() 这类公共入口只记 ID 不产生快照，以前会被静默跳过，
+        // 而待办仍会在 updateSceneRender 末尾被清掉。
         const Eg::RenderEntitySnapshot* snapshot = m_pendingSnapshot.find(id);
-        if (snapshot == nullptr || snapshot->entity() == nullptr)
+        const bool fromSnapshot = snapshot != nullptr && snapshot->entity() != nullptr;
+        const Eg::SyEntity* live = fromSnapshot ? snapshot->entity() : sm->findEntityById(id);
+        if (live == nullptr)
         {
             continue;
         }
 
         auto uid = static_cast<uint64_t>(id);
+        const Eg::EType type = fromSnapshot ? snapshot->type : live->eType;
+        const bool effectiveVisible = fromSnapshot
+            ? snapshot->effectiveVisible()
+            : (live->visible() && (live->layer() == nullptr || live->layer()->isVisible()));
 
-        // 图元可见性 = 自身可见 且 所在图层可见。图层指针不随 clone 复制，
-        // 这个判断在主线程上做。
-        if (!snapshot->effectiveVisible())
+        // 类型标志必须先收集：不可见/隐藏选中的位图与文字不会走几何装配，
+        // 但 reconcile* 仍要对账把它们从位图/文字层摘掉。若只在可见分支
+        // 才置标志，隐藏一张图片就不会触发对账，残影会一直留着。
+        const bool isImage = type == Eg::EType::IMAGE;
+        const bool isText = type == Eg::EType::TEXT;
+        if (isImage)
+        {
+            touchedImage = true;
+        }
+        if (isText)
+        {
+            touchedText = true;
+        }
+
+        // 图元可见性 = 自身可见 且 所在图层可见。
+        if (!effectiveVisible)
         {
             // 图元不可见：从渲染中移除（如果之前有渲染的话）
             if (m_renderedEntityIds.count(uid))
             {
-                m_renderWidget->removeRenderEntities({ uid });
-                m_renderedEntityIds.erase(uid);
+                if (m_renderWidget->removeRenderEntities({ uid }))
+                {
+                    m_renderedEntityIds.erase(uid);
+                }
+                else
+                {
+                    m_refreshLevel = RefreshLevel::LightUpdate;
+                }
             }
             continue;
         }
@@ -670,23 +852,27 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             // 从渲染中移除（如果之前有渲染的话）
             if (m_renderedEntityIds.count(uid))
             {
-                m_renderWidget->removeRenderEntities({ uid });
-                m_renderedEntityIds.erase(uid);
+                if (m_renderWidget->removeRenderEntities({ uid }))
+                {
+                    m_renderedEntityIds.erase(uid);
+                }
+                else
+                {
+                    m_refreshLevel = RefreshLevel::LightUpdate;
+                }
             }
             continue;
         }
 
         // 位图（SyImage）不走折线/线框顶点路径，统一由 BitmapReconciler 处理
-        if (snapshot->type == Eg::EType::IMAGE)
+        if (isImage)
         {
-            touchedImage = true;
             continue;
         }
 
         // 文本（SyText）同理：字形四边形由 TextReconciler 一路处理。
-        if (snapshot->type == Eg::EType::TEXT)
+        if (isText)
         {
-            touchedText = true;
             continue;
         }
 
@@ -745,10 +931,8 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     // （对比旧实现逐图元一对 makeCurrent/update）。
     if (!entityIdsToProcess.empty())
     {
-        m_renderWidget->upsertRenderEntities(entityIdsToProcess,
+        if (m_renderWidget->upsertRenderEntities(entityIdsToProcess,
             [this, sm](uint64_t uid) -> const Eg::SyEntity* {
-                // 先查本轮快照（clone 副本，主线程可读）；不在快照里再查活对象
-                // （恢复本体的那批没有快照）。
                 const Eg::RenderEntitySnapshot* snapshot = m_pendingSnapshot.find(
                     static_cast<Eg::EntityId>(uid));
                 if (snapshot != nullptr && snapshot->entity() != nullptr)
@@ -759,29 +943,37 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             },
             [this, sm](uint64_t uid) -> uint32_t {
                 return layerIndexOfEntity(sm, static_cast<Eg::EntityId>(uid));
-            });
-
-        for (uint64_t uid : entityIdsToProcess)
+            }))
         {
-            m_renderedEntityIds.insert(uid);
+            for (uint64_t uid : entityIdsToProcess)
+            {
+                m_renderedEntityIds.insert(uid);
+            }
+        }
+        else
+        {
+            // 增量装配失败：保留脏 ID，下一轮重试
+            m_refreshLevel = RefreshLevel::LightUpdate;
         }
     }
 
-    // 位图层协调：以场景为真源，增量处理新增/修改/删除/图层显隐。
+    // 位图层协调：以场景为真源，增量处理新增/修改/删除/可见性。
     //
-    // 两个短路条件是「或」而不是「与」，缺哪个都会漏画：
-    //   - touchedImage：本轮有位图变脏/新增，必须对账；
-    //   - 账本非空：图元或图层转为不可见**不会**进脏集合（LayerManager::setLayerVisible
-    //     只改标志位），只能靠这里的全量对账发现。账本非空时跳过就会留下残影。
-    // 两者都不成立时（账本空 && 本轮没碰位图）对账必然是空转，可以安全跳过。
-    if (touchedImage || !m_bitmapReconciler.empty())
+    // 只有这三种情况需要扫一遍位图类型：
+    //   - touchedImage：本轮有位图变脏/新增/隐藏；
+    //   - deletionPending：删除批次可能包含位图（几何账本摘不掉它们）；
+    //   - selectionDiffPending：隐藏/恢复选中本体需要按当前选择增删位图。
+    // 图层显隐由 UiStateBridge2D 直接升级为全量刷新（reconcile 的 full 分支），
+    // 因此不再需要「账本非空就每帧对账」这个低频兜底 —— 大场景里文字/图片较多时，
+    // 那条兜底会让每次增量刷新都 O(该类型总数) 扫描并分配哈希集合。
+    if (touchedImage || deletionPending || selectionDiffPending)
     {
         m_bitmapReconciler.reconcile(sm, /*fullReconcile=*/false, m_cachedSelectedIds, hideSelected,
             m_pendingDirtyIds);
     }
 
     // 世界文字层协调：同上。文本自己一路后，增量刷新不再因文本升级为全量。
-    if (touchedText || !m_textReconciler.empty())
+    if (touchedText || deletionPending || selectionDiffPending)
     {
         m_textReconciler.reconcile(sm, /*fullReconcile=*/false, m_cachedSelectedIds, hideSelected,
             m_pendingDirtyIds);
@@ -804,7 +996,12 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
 
     // 全量重建：几何与台账都由 RenderSceneBuilder 的装配轮次自行对齐
     // （本轮没出现的图元会被回收），这里不需要再做任何缓存失效
-    m_renderWidget->submitSceneFromDataSource(sm);
+    if (!m_renderWidget->submitSceneFromDataSource(sm))
+    {
+        // 全量提交失败：保留待办，下一轮重试；不清账本、不进游标
+        m_refreshLevel = RefreshLevel::FullRefresh;
+        return;
+    }
 
     // 游标必须对齐到当前修订号：全量重建走到这里通常是因为 readChanges 判定 cursor stale
     // （变更日志被 prune 截断，旧游标落在 floor 之前）。若不更新游标，之后每次
@@ -820,6 +1017,9 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     // 时要用它识别「有效状态翻转」（见该处的注释）
     m_lastHideSelectedEffective = hideSelected;
 
+    // LOD 提交是独立路径，不走本函数的过滤，这里同步最新的隐藏选中状态。
+    m_curveLodManager.setSelectionHideState(&m_cachedSelectedIds, hideSelected);
+
     // 如果启用隐藏选中实体，使用缓存的选中 ID 集合
     const std::unordered_set<uint64_t>& selectedIds = m_cachedSelectedIds;
 
@@ -833,23 +1033,26 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
         float bounds[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
         if (m_renderWidget->visibleWorldBounds(bounds))
         {
-            constexpr double kCullMargin = 1.25;
-            const double cx = 0.5 * (static_cast<double>(bounds[0]) + bounds[2]);
-            const double cy = 0.5 * (static_cast<double>(bounds[1]) + bounds[3]);
-            const double hw = 0.5 * (bounds[2] - bounds[0]) * kCullMargin;
-            const double hh = 0.5 * (bounds[3] - bounds[1]) * kCullMargin;
-            accountBox = Ut::BBox2d(cx - hw, cy - hh, cx + hw, cy + hh);
+            accountBox = expandedViewportBounds(bounds);
             hasAccountBox = true;
         }
     }
 
+    // 记录本次全量刷新实际覆盖的范围：gatherGeometry 就是用同一个余量裁剪上传的。
+    // 之后相机一旦移出这里，requestViewportRefresh 会再触发一次全量装配，把新进入
+    // 视野的非曲线图元补上。矩阵退化时没有裁剪（整份场景都在 GPU 上），记下这个事实。
+    m_builtVisibleBox = hasAccountBox ? accountBox : Ut::BBox2d{};
+    m_builtWithoutCulling = !hasAccountBox;
+
     // 过滤条件与 gatherGeometry（SceneManager::gatherGeometry）严格对齐：
-    // 几何非法 / 无图层 / 图层隐藏 / 本体隐藏 / bbox 无效 / 视口裁剪的图元都不会上 GPU，也就不入账。
-    // 旧实现「layer==null 也入账、bbox 无效也入账」会把 GPU 上不存在的图元记进账本，
-    // 增量路径对账时可能误走 modifyRenderEntity。
-    // isValid() 必须与空间索引 isIndexableEntity 一致：非法几何不在索引里，
-    // 若 GPU 仍渲染（旧 gatherGeometry 不查 isValid），queryByBox 账本会漏记。
-    auto accountEntity = [this, hideSelected, &selectedIds](Eg::SyEntity* e) {
+    // 几何非法 / 无图层 / 图层隐藏 / 本体隐藏 / bbox 无效 / 视口裁剪 / 不发射几何
+    // 的类型都不会在 GPU 上有段，也就不入账。
+    //
+    // 这里直接用活对象的 bbox 遍历，而不是 queryByBox：空间索引可能保留陈旧的
+    // AABB 条目（EntitySpatialIndex 在移除失败时故意保留旧盒），按索引结果入账会
+    // 把「索引在视口内、活几何在视口外」的图元记成已渲染。gatherGeometry 本身
+    // 就是 O(N) 全遍历 + 活 bbox 裁剪，这里同量级，换来账本与 GPU 严格一致。
+    auto accountEntity = [this, hideSelected, &selectedIds, &accountBox, hasAccountBox](Eg::SyEntity* e) {
         if (!e || !e->visible())
             return;
         if (!e->isValid())
@@ -857,7 +1060,12 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
         const Eg::SyLayer* layer = e->layer();
         if (!layer || !layer->isVisible())
             return;
-        if (!e->getBbox().isValid())
+        const Ut::BBox2d bbox = e->getBbox();
+        if (!bbox.isValid())
+            return;
+        if (hasAccountBox && !accountBox.intersects(bbox))
+            return;
+        if (!emitsGeometryPiece(e->eType))
             return;
         auto uid = static_cast<uint64_t>(e->id);
         if (hideSelected && selectedIds.count(uid))
@@ -865,22 +1073,7 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
         m_renderedEntityIds.insert(uid);
     };
 
-    if (hasAccountBox)
-    {
-        // 视口裁剪走空间索引：RTree 范围查询 O(log n + k)，避免全场景 O(N) 扫描。
-        // queryByBox 用索引缓存的 AABB 判相交（查询前 flush 待修索引），与
-        // gatherGeometry 的 getBbox()+intersects 等价；无效 bbox 图元不在索引里，天然跳过。
-        const Eg::VecSyEntityPtr candidates = sm->queryByBox(accountBox, /*containedOnly=*/false);
-        for (Eg::SyEntity* e : candidates)
-        {
-            accountEntity(e);
-        }
-    }
-    else
-    {
-        // 矩阵退化拿不到视口盒时退化为全量遍历（与 gatherGeometry 无裁剪分支一致）
-        sm->forEachEntity(accountEntity);
-    }
+    sm->forEachEntity(accountEntity);
 
     // "选中时隐藏原图"：上面的 submitSceneFromDataSource 已把全部图元（含选中）上传到 GPU，
     // 这里把选中图元的本体从 GPU 移除，使画面只剩流水虚线轮廓。账本已在上面循环中排除它们，
@@ -914,7 +1107,10 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
 // 渲染刷新分发：按 RefreshLevel 级别选择刷新策略
 void SceneRefreshCoordinator::updateSceneRender()
 {
-    if (!m_renderWidget || (m_refreshLevel == RefreshLevel::None && m_curveLodManager.empty()))
+    if (!m_renderWidget ||
+        (m_refreshLevel == RefreshLevel::None && m_curveLodManager.empty() &&
+            m_pendingDirtyIds.empty() && m_pendingDeletedIds.empty() && m_selectionHideIds.empty() &&
+            m_selectionRestoreIds.empty()))
     {
         return;
     }
@@ -955,6 +1151,15 @@ void SceneRefreshCoordinator::updateSceneRender()
     RefreshLevel level = m_refreshLevel;
     m_refreshLevel = RefreshLevel::None;
 
+    // 纯重绘请求不能把 markEntityDirty/Deleted 写入的待办晾在一边：
+    // 有待处理 ID 时升级到增量刷新，否则下面的 return 会留下永不消费的集合。
+    if (level == RefreshLevel::Repaint &&
+        (!m_pendingDirtyIds.empty() || !m_pendingDeletedIds.empty() || !m_selectionHideIds.empty() ||
+            !m_selectionRestoreIds.empty()))
+    {
+        level = RefreshLevel::LightUpdate;
+    }
+
     if (level == RefreshLevel::Repaint)
     {
         applyRepaintRefresh();
@@ -985,7 +1190,9 @@ void SceneRefreshCoordinator::updateSceneRender()
     // 注意：onSelectionChanged 会先把 m_refreshLevel 提升为 Selection(3)，若紧随其后发生场景删除
     // （onSceneChanged），scheduleSceneUpdate 不会将其降级回 LightUpdate(2)，因此这里必须显式包含
     // Selection 级别，否则待删除图元会在 Selection 分支中被跳过。
-    else if ((level == RefreshLevel::LightUpdate) || (level == RefreshLevel::Selection) || !m_pendingDeletedIds.empty())
+    else if ((level == RefreshLevel::LightUpdate) || (level == RefreshLevel::Selection) ||
+        !m_pendingDirtyIds.empty() || !m_pendingDeletedIds.empty() || !m_selectionHideIds.empty() ||
+        !m_selectionRestoreIds.empty())
     {
         applyLightRefresh(sm);
         consumed = true;
