@@ -598,6 +598,33 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         return;
     }
 
+    // 删除图元：从渲染世界与账本中摘除。
+    //
+    // 删除的图元不会出现在快照里（captureSnapshot 只抓活对象），所以不能混进
+    // 下面的脏集合装配，必须在消费快照之前按键显式移除。否则本轮的
+    // m_pendingDeletedIds 会在 updateSceneRender 末尾被清空，而 GPU 上的旧几何
+    // 从未被摘除 —— 画面会一直显示已删除的图元，直到下一次全量重建才消失
+    // （典型症状：删除后场景树已更新，视口却仍有残影）。
+    //
+    // 同一批次里既脏又删的以删除为准：先清掉脏集合/选中差集里的同 ID 条目，
+    // 避免下面的装配或「取消选中恢复本体」把已删除的图元重新提交上去。
+    if (!m_pendingDeletedIds.empty())
+    {
+        std::vector<uint64_t> removedIds;
+        removedIds.reserve(m_pendingDeletedIds.size());
+        for (auto id : m_pendingDeletedIds)
+        {
+            const auto uid = static_cast<uint64_t>(id);
+            m_pendingDirtyIds.erase(id);
+            m_selectionHideIds.erase(uid);
+            m_selectionRestoreIds.erase(uid);
+            m_renderedEntityIds.erase(uid);
+            removedIds.push_back(uid);
+        }
+        m_renderWidget->removeRenderEntities(removedIds);
+        m_pendingDeletedIds.clear();
+    }
+
     // 增量装配：调用方只给「哪些图元变了」，离散化与内容比对都在
     // RenderSceneBuilder 内完成（与全量路径同一份公式），不再由本类
     // 逐图元算出顶点数组后往几何仓里塞。
