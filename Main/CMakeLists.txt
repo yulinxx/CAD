@@ -191,6 +191,17 @@ set_target_properties(${APP_NAME} PROPERTIES
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_BINARY_DIR}/Info.plist"
 )
 
+# 安装后的运行期查找路径（与 install() 布局一致：可执行文件在 bin/，
+# 动态库也在 bin/；macOS 把 .app 放在安装前缀根目录，所以从
+# Contents/MacOS 往上三级到前缀，再进 bin/）。
+# 不设 INSTALL_RPATH 时，CMake 安装阶段会剥掉构建期的 rpath，装出来的
+# SanYiCAD.app 因为找不到 libEngine2D/libEngineCommon 等 DLL 而启动失败。
+if(APPLE)
+    set_target_properties(${APP_NAME} PROPERTIES INSTALL_RPATH "@loader_path/../../../bin")
+elseif(UNIX)
+    set_target_properties(${APP_NAME} PROPERTIES INSTALL_RPATH "$ORIGIN")
+endif()
+
 target_compile_features(${APP_NAME} PRIVATE cxx_std_17)
 
 # Renderx 运行时资源：着色器与默认字体必须位于应用可执行文件目录

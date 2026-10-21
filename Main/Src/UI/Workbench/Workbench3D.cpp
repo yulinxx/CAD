@@ -1270,10 +1270,9 @@ void Workbench3D::deleteSceneTreeSelection3D(const QStringList& ids)
         return;
     }
 
-    // 收集后一次批量删除：逐个 removeEntity 每个都是 O(场景规模) 的查找与尾部搬移，
-    // 而且每个都触发一次全场景选择同步 + 一次场景广播（M 个图元 → O(N·M) + M 次 UI 扇出）
-    std::vector<Eg::SyMeshEntity*> targets;
-    targets.reserve(static_cast<size_t>(ids.size()));
+    // 收集实体 ID
+    std::vector<Eg::EntityId> entityIds;
+    entityIds.reserve(static_cast<size_t>(ids.size()));
     for (const QString& id : ids)
     {
         const auto eid = Eg::parseEntityId(id.toStdString());
@@ -1281,18 +1280,37 @@ void Workbench3D::deleteSceneTreeSelection3D(const QStringList& ids)
         {
             continue;
         }
-        if (auto* mesh = m_sceneManager3D->findMeshById(*eid))
-        {
-            targets.push_back(mesh);
-        }
+        entityIds.push_back(*eid);
     }
-    if (targets.empty())
+    if (entityIds.empty())
     {
         return;
     }
 
-    m_sceneManager3D->deleteEntities(targets.data(), static_cast<int>(targets.size()));
-    m_sceneManager3D->markDataChanged();
+    // 走 SceneEditService3D：检查锁定、推 undo、标记脏标记、通知场景变更
+    if (m_services3D.sceneEditService)
+    {
+        m_services3D.sceneEditService->deleteEntities(entityIds);
+    }
+    else
+    {
+        // 回退：直接删除（无 undo/锁定检查）
+        std::vector<Eg::SyMeshEntity*> targets;
+        targets.reserve(entityIds.size());
+        for (Eg::EntityId id : entityIds)
+        {
+            if (auto* mesh = m_sceneManager3D->findMeshById(id))
+            {
+                targets.push_back(mesh);
+            }
+        }
+        if (!targets.empty())
+        {
+            m_sceneManager3D->deleteEntities(targets.data(), static_cast<int>(targets.size()));
+            m_sceneManager3D->markDataChanged();
+        }
+    }
+
     // 删除推进 structureRevision，走防抖重建即可
     refreshSceneTree3DIfNeeded();
 }
