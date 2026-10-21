@@ -16,11 +16,11 @@
 
 namespace
 {
-UiBrandConfig parse(const QByteArray& json)
-{
-    const QJsonDocument doc = QJsonDocument::fromJson(json);
-    return UiBrandConfig::fromJson(doc.object(), QStringLiteral("fallback_client"));
-}
+    UiBrandConfig parse(const QByteArray& json)
+    {
+        const QJsonDocument doc = QJsonDocument::fromJson(json);
+        return UiBrandConfig::fromJson(doc.object(), QStringLiteral("fallback_client"));
+    }
 }  // namespace
 
 TEST(UiBrandConfigTest, ParsesCoreFields)

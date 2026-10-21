@@ -121,4 +121,3 @@ TEST(TransformGizmo3DHitTest, RotateRingWinsOverCenterBall)
         EXPECT_NE(hit, Eg::TransformAxis::Uniform) << "ring index " << i;
     }
 }
-

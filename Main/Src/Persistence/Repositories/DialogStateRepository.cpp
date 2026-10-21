@@ -30,12 +30,12 @@ bool DialogStateRepository::save(const DialogStateRecord& record)
     }
 
     SY_DEBUGF("[DialogStateRepository] Saved dialog state: key=%s, doc=%s",
-        record.dialogKey.c_str(), record.documentId.c_str());
+        record.dialogKey.c_str(),
+        record.documentId.c_str());
     return true;
 }
 
-DialogStateRecord DialogStateRepository::load(const std::string& dialogKey,
-    const std::string& documentId)
+DialogStateRecord DialogStateRepository::load(const std::string& dialogKey, const std::string& documentId)
 {
     std::string sql = "SELECT * FROM dialog_states WHERE dialog_key = ?";
     std::vector<std::string> params = { dialogKey };
@@ -62,8 +62,7 @@ DialogStateRecord DialogStateRepository::load(const std::string& dialogKey,
     return rowToRecord(rows[0]);
 }
 
-std::vector<DialogStateRecord> DialogStateRepository::loadByDocument(
-    const std::string& documentId)
+std::vector<DialogStateRecord> DialogStateRepository::loadByDocument(const std::string& documentId)
 {
     std::vector<DialogStateRecord> result;
 
@@ -94,8 +93,7 @@ std::vector<DialogStateRecord> DialogStateRepository::loadAll()
     return result;
 }
 
-bool DialogStateRepository::remove(const std::string& dialogKey,
-    const std::string& documentId)
+bool DialogStateRepository::remove(const std::string& dialogKey, const std::string& documentId)
 {
     std::string whereClause = "dialog_key = :dialog_key";
     std::map<std::string, std::string> whereParams;
@@ -127,19 +125,16 @@ int DialogStateRepository::removeByDocument(const std::string& documentId)
 
     if (!m_database.deleteRows("dialog_states", "document_id = :document_id", whereParams))
     {
-        SY_ERRORF("[DialogStateRepository] Failed to remove dialog states for document: %s",
-            documentId.c_str());
+        SY_ERRORF("[DialogStateRepository] Failed to remove dialog states for document: %s", documentId.c_str());
         return 0;
     }
 
     int count = m_database.changes();
-    SY_DEBUGF("[DialogStateRepository] Removed %d dialog states for document: %s",
-        count, documentId.c_str());
+    SY_DEBUGF("[DialogStateRepository] Removed %d dialog states for document: %s", count, documentId.c_str());
     return count;
 }
 
-DialogStateRecord DialogStateRepository::rowToRecord(
-    const std::map<std::string, std::string>& row) const
+DialogStateRecord DialogStateRepository::rowToRecord(const std::map<std::string, std::string>& row) const
 {
     DialogStateRecord rec;
     rec.id = getInt(row, "id");
@@ -151,8 +146,7 @@ DialogStateRecord DialogStateRepository::rowToRecord(
     return rec;
 }
 
-std::map<std::string, std::string> DialogStateRepository::recordToRow(
-    const DialogStateRecord& rec) const
+std::map<std::string, std::string> DialogStateRepository::recordToRow(const DialogStateRecord& rec) const
 {
     std::map<std::string, std::string> row;
     if (rec.id > 0)

@@ -20,7 +20,6 @@
 
 #include <QString>
 
-
 #include "Hardware/DeviceHost.h"
 #include "Hardware/MachineProfile.h"
 #include "Hardware/ProcessingJobService.h"
@@ -31,10 +30,9 @@
 #include "Engine2D/SyEntity/SyCircle.h"
 #include "Engine2D/SyEntity/SyLine.h"
 
-
 #ifdef ENABLE_HARDWARE
-#include "Hardware/Device/MotionPlan.h"
-#include "Hardware/MotionPlanCompiler.h"
+    #include "Hardware/Device/MotionPlan.h"
+    #include "Hardware/MotionPlanCompiler.h"
 #endif
 
 namespace
@@ -120,7 +118,6 @@ namespace
         return all.empty() ? nullptr : all.back();
     }
 
-
     /// 统计计划里某个 opcode 出现的次数。
     size_t countOp(const Hw::MotionPlanView& view, Hw::MotionOp op)
     {
@@ -156,8 +153,7 @@ namespace
         Eg::SceneManager scene;
         Hw::MotionPlanBuilder builder;
 
-        const ToolpathCompileResult r =
-            MotionPlanCompiler::compile(scene, nullptr, ToolpathJobSpec{}, builder);
+        const ToolpathCompileResult r = MotionPlanCompiler::compile(scene, nullptr, ToolpathJobSpec{}, builder);
 
         EXPECT_FALSE(r.ok);
         EXPECT_FALSE(r.error.isEmpty());
@@ -171,8 +167,7 @@ namespace
         addLine(scene, 0.0, 0.0, 10.0, 0.0);
 
         Hw::MotionPlanBuilder builder;
-        const ToolpathCompileResult r =
-            MotionPlanCompiler::compile(scene, nullptr, ToolpathJobSpec{}, builder);
+        const ToolpathCompileResult r = MotionPlanCompiler::compile(scene, nullptr, ToolpathJobSpec{}, builder);
 
         ASSERT_TRUE(r.ok) << r.error.toStdString();
         EXPECT_EQ(1, r.layerCount);
@@ -326,7 +321,6 @@ namespace
         EXPECT_EQ(1u, countOp(builder.view(), Hw::MotionOp::LineTo));
     }
 
-
     /// 多遍加工：每遍一个 Pass 块，且 header 要如实记录总遍数。
     TEST(MotionPlanCompilerTest, MultiplePassesEmitOneBlockEachAndRecordCount)
     {
@@ -437,7 +431,6 @@ namespace
         EXPECT_FALSE(result.error.isEmpty());
     }
 
-
     TEST(MotionPlanCompilerTest, TrailingLaserOffCanBeDisabled)
     {
         Eg::SceneManager scene;
@@ -458,8 +451,7 @@ namespace
         addLine(scene, -3.0, -4.0, 12.0, 7.0);
 
         Hw::MotionPlanBuilder builder;
-        const ToolpathCompileResult r =
-            MotionPlanCompiler::compile(scene, nullptr, ToolpathJobSpec{}, builder);
+        const ToolpathCompileResult r = MotionPlanCompiler::compile(scene, nullptr, ToolpathJobSpec{}, builder);
 
         ASSERT_TRUE(r.ok) << r.error.toStdString();
         EXPECT_LE(r.boundsMinX, -3.0);
@@ -495,15 +487,13 @@ namespace
         ASSERT_TRUE(layers.setLayerVisible(layerId, false));
 
         Hw::MotionPlanBuilder builder;
-        const ToolpathCompileResult hidden =
-            MotionPlanCompiler::compile(scene, &layers, ToolpathJobSpec{}, builder);
+        const ToolpathCompileResult hidden = MotionPlanCompiler::compile(scene, &layers, ToolpathJobSpec{}, builder);
         EXPECT_FALSE(hidden.ok);
 
         ToolpathJobSpec ignoreVisibility;
         ignoreVisibility.skipHiddenLayers = false;
         Hw::MotionPlanBuilder builder2;
-        const ToolpathCompileResult shown =
-            MotionPlanCompiler::compile(scene, &layers, ignoreVisibility, builder2);
+        const ToolpathCompileResult shown = MotionPlanCompiler::compile(scene, &layers, ignoreVisibility, builder2);
         EXPECT_TRUE(shown.ok) << shown.error.toStdString();
     }
 
@@ -568,14 +558,12 @@ namespace
             else if (view.commands[i].op == Hw::MotionOp::SetLaserParams)
             {
                 const double expected = (currentLayer == cut) ? 90.0 : 20.0;
-                EXPECT_DOUBLE_EQ(expected, view.commands[i].laser.powerPercent)
-                    << "layer=" << currentLayer;
+                EXPECT_DOUBLE_EQ(expected, view.commands[i].laser.powerPercent) << "layer=" << currentLayer;
                 ++checked;
             }
         }
         EXPECT_EQ(2, checked);
     }
-
 
     // ==================== ProcessingJobService ====================
 
@@ -613,28 +601,26 @@ namespace
             m_host = std::make_unique<DeviceHost>();
             m_job = std::make_unique<ProcessingJobService>(m_host.get());
 
-            QObject::connect(m_job.get(), &ProcessingJobService::jobStarted,
-                [this](const QString& jobId, int commandCount) {
+            QObject::connect(
+                m_job.get(), &ProcessingJobService::jobStarted, [this](const QString& jobId, int commandCount) {
                     ++m_log.startedCount;
                     m_log.startedJobId = jobId;
                     m_log.startedCommandCount = commandCount;
                 });
-            QObject::connect(m_job.get(), &ProcessingJobService::jobProgress,
-                [this](double fraction, int, int) {
-                    ++m_log.progressCount;
-                    m_log.lastFraction = fraction;
-                });
-            QObject::connect(m_job.get(), &ProcessingJobService::jobFinished,
-                [this](bool success, const QString& message) {
+            QObject::connect(m_job.get(), &ProcessingJobService::jobProgress, [this](double fraction, int, int) {
+                ++m_log.progressCount;
+                m_log.lastFraction = fraction;
+            });
+            QObject::connect(
+                m_job.get(), &ProcessingJobService::jobFinished, [this](bool success, const QString& message) {
                     ++m_log.finishedCount;
                     m_log.finishedSuccess = success;
                     m_log.finishedMessage = message;
                 });
-            QObject::connect(m_job.get(), &ProcessingJobService::jobStateChanged,
-                [this](int state, const QString&) {
-                    ++m_log.stateChangedCount;
-                    m_log.lastState = state;
-                });
+            QObject::connect(m_job.get(), &ProcessingJobService::jobStateChanged, [this](int state, const QString&) {
+                ++m_log.stateChangedCount;
+                m_log.lastState = state;
+            });
         }
 
         void TearDown() override
@@ -647,7 +633,6 @@ namespace
             m_host.reset();
         }
 
-
         /// 启动模拟机并把安全链路推到「允许开工」。
         ///
         /// 为什么要推**两拍**：兜底档案里安全门点位 debounceMs = 20，而
@@ -658,8 +643,7 @@ namespace
         void startSimulatedDevice()
         {
             QString error;
-            ASSERT_TRUE(m_host->start(MachineProfileLoader::builtinSimulatedProfile(), error))
-                << error.toStdString();
+            ASSERT_TRUE(m_host->start(MachineProfileLoader::builtinSimulatedProfile(), error)) << error.toStdString();
             m_host->tick(20);
             m_host->tick(20);
             ASSERT_TRUE(m_host->canStartProcessing()) << m_host->safetyViolations().join(';').toStdString();
@@ -695,7 +679,6 @@ namespace
         SignalLog m_log;
     };
 
-
     /// 设备没起来时必须拒绝，并给出可展示原因。
     TEST_F(ProcessingJobServiceTest, RefusesWhenDeviceIsNotStarted)
     {
@@ -724,8 +707,7 @@ namespace
         buildSimplePlan();
 
         QString error;
-        ASSERT_TRUE(m_job->startPlan(m_builder.view(), QStringLiteral("test-job"), error))
-            << error.toStdString();
+        ASSERT_TRUE(m_job->startPlan(m_builder.view(), QStringLiteral("test-job"), error)) << error.toStdString();
 
         EXPECT_TRUE(m_job->isRunning());
         EXPECT_FALSE(m_job->isPaused());
@@ -734,7 +716,6 @@ namespace
         EXPECT_EQ(QStringLiteral("test-job"), m_log.startedJobId);
         EXPECT_GT(m_log.startedCommandCount, 0);
     }
-
 
     /// 已有作业在跑时再次开工必须被拒绝，且不影响正在跑的那份。
     TEST_F(ProcessingJobServiceTest, SecondStartIsRefusedWhileRunning)
@@ -770,7 +751,6 @@ namespace
         EXPECT_DOUBLE_EQ(1.0, m_job->progressFraction());
     }
 
-
     /// 作业跑完之后必须能再开下一份 —— 状态要收干净。
     TEST_F(ProcessingJobServiceTest, CanStartAgainAfterCompletion)
     {
@@ -782,8 +762,7 @@ namespace
         runUntilFinished();
         ASSERT_FALSE(m_job->isRunning());
 
-        EXPECT_TRUE(m_job->startPlan(m_builder.view(), QStringLiteral("second"), error))
-            << error.toStdString();
+        EXPECT_TRUE(m_job->startPlan(m_builder.view(), QStringLiteral("second"), error)) << error.toStdString();
         EXPECT_EQ(QStringLiteral("second"), m_job->currentJobId());
     }
 
@@ -841,7 +820,6 @@ namespace
         EXPECT_FALSE(m_log.finishedSuccess);
     }
 
-
     /// 没有作业时 pause/resume/abort 都必须明确失败，而不是静默成功。
     TEST_F(ProcessingJobServiceTest, ControlCommandsFailWithoutActiveJob)
     {
@@ -897,9 +875,7 @@ namespace
 
         // 直接发出裁决变化信号：这里验证的是「宿主 → 作业服务」这条接线，
         // 而不是 SafetyMonitor 自身的判定逻辑（后者由 HardwareTests 覆盖）
-        emit m_host->safetyVerdictChanged(
-            false, QStringLiteral("安全门被打开"), QStringLiteral("safety.door_closed"));
-
+        emit m_host->safetyVerdictChanged(false, QStringLiteral("安全门被打开"), QStringLiteral("safety.door_closed"));
 
         EXPECT_TRUE(m_job->isPaused());
         EXPECT_FALSE(m_job->isRunning());
@@ -951,7 +927,6 @@ namespace
         EXPECT_FALSE(m_log.finishedSuccess);
     }
 
-
     /// startJob（走几何编译）与 startPlan 走同一条门控与执行路径。
     TEST_F(ProcessingJobServiceTest, StartJobCompilesSceneAndRuns)
     {
@@ -999,4 +974,4 @@ namespace
     }
 
 #endif  // ENABLE_HARDWARE
-}
+}  // namespace

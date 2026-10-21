@@ -350,7 +350,8 @@ void RenderViewport2D::syncSelectionToolState()
 
 void RenderViewport2D::setDocument(SceneDocument2D* document)
 {
-    SY_DEBUGF("[RenderViewport2D] Setting document: %p -> %p", static_cast<void*>(m_document), static_cast<void*>(document));
+    SY_DEBUGF(
+        "[RenderViewport2D] Setting document: %p -> %p", static_cast<void*>(m_document), static_cast<void*>(document));
     m_document = document;
 
     // 缓存 SceneManager 指针，避免析构时通过 m_document 访问已释放内存
@@ -863,8 +864,8 @@ void RenderViewport2D::contextMenuEvent(QContextMenuEvent* event)
     // 构造注释所述平台差异），两条路径互相独立 —— 若不在这里联动拦截，取消绘图的
     // 右键会额外弹出菜单，其 Cut 首项会吃掉用户下一次本想继续绘图/拾取的点击，
     // 表现为「图形莫名消失」。键盘 Menu 键不受影响（reason 非 Mouse，直接放行）。
-    if (m_inputRouter && event && event->reason() == QContextMenuEvent::Mouse
-        && m_inputRouter->consumeContextMenuSuppression())
+    if (m_inputRouter && event && event->reason() == QContextMenuEvent::Mouse &&
+        m_inputRouter->consumeContextMenuSuppression())
     {
         event->accept();
         return;

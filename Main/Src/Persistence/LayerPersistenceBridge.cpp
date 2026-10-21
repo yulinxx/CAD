@@ -191,31 +191,34 @@ void LayerPersistenceBridge::syncLayerToDb(int nLayerId)
     // 写入数据库（带重试机制，处理 database is locked 情况）
     static constexpr int kMaxRetries = 3;
     static constexpr int kRetryDelayMs = 50;
-    
+
     for (int retry = 0; retry < kMaxRetries; ++retry)
     {
         if (m_layerRepository->save(record))
         {
             return;  // 成功
         }
-        
+
         const std::string& error = m_layerRepository->lastError();
         // 检查是否是锁定错误
         if (error.find("database is locked") == std::string::npos)
         {
             // 非锁定错误，不再重试
-            SY_ERRORF("[LayerPersistenceBridge] Failed to sync layer %d to database: %s",
-                nLayerId, error.c_str());
+            SY_ERRORF("[LayerPersistenceBridge] Failed to sync layer %d to database: %s", nLayerId, error.c_str());
             return;
         }
-        
+
         // 锁定错误，等待后重试
         SY_DEBUGF("[LayerPersistenceBridge] Database locked, retrying (%d/%d) for layer %d...",
-            retry + 1, kMaxRetries, nLayerId);
+            retry + 1,
+            kMaxRetries,
+            nLayerId);
         QThread::msleep(kRetryDelayMs);
     }
-    
+
     // 重试次数用尽
     SY_ERRORF("[LayerPersistenceBridge] Failed to sync layer %d to database after %d retries: %s",
-        nLayerId, kMaxRetries, m_layerRepository->lastError().c_str());
+        nLayerId,
+        kMaxRetries,
+        m_layerRepository->lastError().c_str());
 }

@@ -1292,7 +1292,9 @@ namespace
         ToolContext2D ctx;
         ctx.sceneContext = &scene;
         ctx.sceneEditService = &edit;
-        ctx.pixelToWorld = []() -> double { return 0.05; };
+        ctx.pixelToWorld = []() -> double {
+            return 0.05;
+        };
         tool.initialize(ctx);
     }
 }  // namespace

@@ -204,8 +204,8 @@ std::optional<UiConfigData> UiConfigLoader::loadWithInheritance(const QString& p
             if (QFile::exists(embedded))
             {
                 SY_INFOF("[UiConfigLoader] Parent '%s' not found next to client config, using embedded '%s'",
-                         qPrintable(parentPath),
-                         qPrintable(embedded));
+                    qPrintable(parentPath),
+                    qPrintable(embedded));
                 parentPath = embedded;
             }
         }

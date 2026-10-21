@@ -38,7 +38,7 @@ namespace
             return s_configDir;
         }
 
-    #ifdef _WIN32
+#ifdef _WIN32
         wchar_t* appData = nullptr;
         if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &appData)))
         {
@@ -52,19 +52,19 @@ namespace
             result += "\\SanYiCAD";
             return result;
         }
-    #elif defined(__APPLE__)
+#elif defined(__APPLE__)
         const char* home = getenv("HOME");
         if (home)
         {
             return std::string(home) + "/Library/Application Support/SanYiCAD";
         }
-    #else  // Linux
+#else  // Linux
         const char* home = getenv("HOME");
         if (home)
         {
             return std::string(home) + "/.config/sanyicad";
         }
-    #endif
+#endif
         return ".";
     }
 
@@ -120,7 +120,9 @@ extern "C"
 
                 // 调试输出
                 SY_DEBUGF("[Trial] check: status=%d, startDate='%s', trialDays=%d",
-                    static_cast<int>(status), mgr.startDate().c_str(), mgr.trialDays());
+                    static_cast<int>(status),
+                    mgr.startDate().c_str(),
+                    mgr.trialDays());
 
                 // 只有明确过期的才返回 -1，其他情况（包括出错）都允许继续
                 if (status == TrialManager::Status::Expired)
@@ -160,10 +162,10 @@ extern "C"
         std::filesystem::path trialFile = std::filesystem::path(getConfigDir()) / "trial.info";
         std::filesystem::remove(trialFile, ec);
 
-    #ifdef _WIN32
+#ifdef _WIN32
         // 删除注册表
         RegDeleteTreeW(HKEY_CURRENT_USER, L"Software\\SanYiCAD\\Trial");
-    #endif
+#endif
     }
 
 #ifdef __cplusplus
@@ -227,13 +229,13 @@ void TrialManager::init()
         loaded = loadFromFile(configDir);
     }
 
-    // Windows: 再检查注册表
-    #ifdef _WIN32
+// Windows: 再检查注册表
+#ifdef _WIN32
     if (!loaded)
     {
         loaded = loadFromRegistry();
     }
-    #endif
+#endif
 
     if (loaded)
     {
@@ -271,9 +273,9 @@ void TrialManager::init()
     // 保存
     saveToFile(configDir);
 
-    #ifdef _WIN32
+#ifdef _WIN32
     saveToRegistry();
-    #endif
+#endif
 
     m_status = Status::Active;
 }
@@ -360,8 +362,9 @@ bool TrialManager::loadFromFile(const std::string& configDir)
 bool TrialManager::saveToRegistry() const
 {
     HKEY hKey;
-    if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\SanYiCAD\\Trial",
-        0, nullptr, 0, KEY_WRITE, nullptr, &hKey, nullptr) != ERROR_SUCCESS)
+    if (RegCreateKeyExW(
+            HKEY_CURRENT_USER, L"Software\\SanYiCAD\\Trial", 0, nullptr, 0, KEY_WRITE, nullptr, &hKey, nullptr) !=
+        ERROR_SUCCESS)
     {
         return false;
     }
@@ -372,7 +375,10 @@ bool TrialManager::saveToRegistry() const
     {
         date += wchar_t(c);
     }
-    RegSetValueExW(hKey, L"start_date", 0, REG_SZ,
+    RegSetValueExW(hKey,
+        L"start_date",
+        0,
+        REG_SZ,
         reinterpret_cast<const BYTE*>(date.c_str()),
         static_cast<DWORD>((date.size() + 1) * sizeof(wchar_t)));
 
@@ -382,14 +388,16 @@ bool TrialManager::saveToRegistry() const
     {
         hash += wchar_t(c);
     }
-    RegSetValueExW(hKey, L"machine_hash", 0, REG_SZ,
+    RegSetValueExW(hKey,
+        L"machine_hash",
+        0,
+        REG_SZ,
         reinterpret_cast<const BYTE*>(hash.c_str()),
         static_cast<DWORD>((hash.size() + 1) * sizeof(wchar_t)));
 
     // trial_days
     DWORD days = static_cast<DWORD>(m_trialDays);
-    RegSetValueExW(hKey, L"trial_days", 0, REG_DWORD,
-        reinterpret_cast<const BYTE*>(&days), sizeof(days));
+    RegSetValueExW(hKey, L"trial_days", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&days), sizeof(days));
 
     RegCloseKey(hKey);
     return true;
@@ -398,8 +406,7 @@ bool TrialManager::saveToRegistry() const
 bool TrialManager::loadFromRegistry()
 {
     HKEY hKey;
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\SanYiCAD\\Trial",
-        0, KEY_READ, &hKey) != ERROR_SUCCESS)
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\SanYiCAD\\Trial", 0, KEY_READ, &hKey) != ERROR_SUCCESS)
     {
         return false;
     }
@@ -407,8 +414,8 @@ bool TrialManager::loadFromRegistry()
     // 读取 start_date
     wchar_t dateBuf[64] = {};
     DWORD dateSize = sizeof(dateBuf);
-    if (RegQueryValueExW(hKey, L"start_date", nullptr, nullptr,
-        reinterpret_cast<LPBYTE>(dateBuf), &dateSize) == ERROR_SUCCESS)
+    if (RegQueryValueExW(hKey, L"start_date", nullptr, nullptr, reinterpret_cast<LPBYTE>(dateBuf), &dateSize) ==
+        ERROR_SUCCESS)
     {
         char dateBufA[64] = {};
         WideCharToMultiByte(CP_UTF8, 0, dateBuf, -1, dateBufA, sizeof(dateBufA), nullptr, nullptr);
@@ -418,8 +425,8 @@ bool TrialManager::loadFromRegistry()
     // 读取 machine_hash
     wchar_t hashBuf[128] = {};
     DWORD hashSize = sizeof(hashBuf);
-    if (RegQueryValueExW(hKey, L"machine_hash", nullptr, nullptr,
-        reinterpret_cast<LPBYTE>(hashBuf), &hashSize) == ERROR_SUCCESS)
+    if (RegQueryValueExW(hKey, L"machine_hash", nullptr, nullptr, reinterpret_cast<LPBYTE>(hashBuf), &hashSize) ==
+        ERROR_SUCCESS)
     {
         char hashBufA[128] = {};
         WideCharToMultiByte(CP_UTF8, 0, hashBuf, -1, hashBufA, sizeof(hashBufA), nullptr, nullptr);
@@ -429,8 +436,8 @@ bool TrialManager::loadFromRegistry()
     // 读取 trial_days
     DWORD days = 0;
     DWORD daysSize = sizeof(days);
-    if (RegQueryValueExW(hKey, L"trial_days", nullptr, nullptr,
-        reinterpret_cast<LPBYTE>(&days), &daysSize) == ERROR_SUCCESS)
+    if (RegQueryValueExW(hKey, L"trial_days", nullptr, nullptr, reinterpret_cast<LPBYTE>(&days), &daysSize) ==
+        ERROR_SUCCESS)
     {
         m_trialDays = static_cast<int>(days);
     }
@@ -486,33 +493,36 @@ int TrialManager::daysBetween(const std::string& start, const std::string& end)
     endTm.tm_mon = em - 1;
     endTm.tm_mday = ed;
     endTm.tm_hour = 12;
-    endTm.tm_isdst = 0;    // 禁用夏令时
+    endTm.tm_isdst = 0;  // 禁用夏令时
 
     // 保存原时区并设置为 UTC
     const char* oldTz = std::getenv("TZ");
-    #ifdef _WIN32
-        _putenv_s("TZ", "UTC");
-    #else
-        setenv("TZ", "UTC", 1);
-    #endif
+#ifdef _WIN32
+    _putenv_s("TZ", "UTC");
+#else
+    setenv("TZ", "UTC", 1);
+#endif
     tzset();
 
     time_t startTime = std::mktime(&startTm);
     time_t endTime = std::mktime(&endTm);
 
     // 恢复原时区
-    if (oldTz) {
-    #ifdef _WIN32
+    if (oldTz)
+    {
+#ifdef _WIN32
         _putenv_s("TZ", oldTz);
-    #else
+#else
         setenv("TZ", oldTz, 1);
-    #endif
-    } else {
-    #ifdef _WIN32
+#endif
+    }
+    else
+    {
+#ifdef _WIN32
         _putenv_s("TZ", "");
-    #else
+#else
         unsetenv("TZ");
-    #endif
+#endif
     }
     tzset();
 

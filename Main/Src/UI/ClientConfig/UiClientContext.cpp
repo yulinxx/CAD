@@ -35,7 +35,8 @@ void UiClientContext::setClientIdOverride(const QString& clientId)
 
 QString UiClientContext::readClientIdFile(const QString& appDir)
 {
-    const QString dir = appDir.isEmpty() && QCoreApplication::instance() ? QCoreApplication::applicationDirPath() : appDir;
+    const QString dir =
+        appDir.isEmpty() && QCoreApplication::instance() ? QCoreApplication::applicationDirPath() : appDir;
     if (dir.isEmpty())
     {
         return {};
@@ -169,8 +170,7 @@ QString UiClientContext::configResourcePath() const
     // 客户 ID 拼写错误或配置未随包发布时，回退到默认客户配置。
     // 这里不能直接失败：UI 构建已无硬编码回退路径，加载失败会导致空窗口。
     const QString fallback = configResourcePathFor(QString::fromUtf8(kDefaultClientId));
-    SY_WARNF(
-        "[UiClientContext] Client config not found for '%s' (last candidate: '%s'), falling back to '%s'",
+    SY_WARNF("[UiClientContext] Client config not found for '%s' (last candidate: '%s'), falling back to '%s'",
         qPrintable(client),
         qPrintable(path),
         qPrintable(fallback));

@@ -68,7 +68,8 @@ namespace
         if (!scene.allocTransient(bytes, a) || a.cpuPtr == nullptr)
         {
             SY_DEBUGF("[OverlayScene] allocTransient failed: bytes=%llu, a.buffer=%llu, a.cpuPtr=%p",
-                static_cast<unsigned long long>(bytes), static_cast<unsigned long long>(a.buffer.value),
+                static_cast<unsigned long long>(bytes),
+                static_cast<unsigned long long>(a.buffer.value),
                 static_cast<void*>(a.cpuPtr));
             return;
         }
@@ -683,12 +684,12 @@ namespace RenderBridge
             const float p2w = m_frameParams.pixelToWorld > 0.0f ? m_frameParams.pixelToWorld : 1.0f;
             constexpr float kMinSizePx = 8.0f;  // 最小 8 屏幕像素
             const float minSizeWorld = kMinSizePx * p2w;
-            
+
             float minX = static_cast<float>(box.minPt.x());
             float minY = static_cast<float>(box.minPt.y());
             float maxX = static_cast<float>(box.maxPt.x());
             float maxY = static_cast<float>(box.maxPt.y());
-            
+
             // X方向太窄（垂直线）
             if (maxX - minX < minSizeWorld)
             {

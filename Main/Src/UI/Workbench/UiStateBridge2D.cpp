@@ -98,10 +98,9 @@ QObject* UiStateBridge2D::install(Workbench2D* workbench,
     // 位图和文字都按最新图层可见性重新装配。
     if (layerBridge && viewport)
     {
-        QObject::connect(layerBridge, &QtLayerManagerBridge::sigLayerVisibilityChanged, guard,
-            [viewport](int, bool) {
-                viewport->requestFullRefresh();
-            });
+        QObject::connect(layerBridge, &QtLayerManagerBridge::sigLayerVisibilityChanged, guard, [viewport](int, bool) {
+            viewport->requestFullRefresh();
+        });
     }
 
     if (bus)
@@ -113,13 +112,12 @@ QObject* UiStateBridge2D::install(Workbench2D* workbench,
 
         // 任意操作成功完成后刷新一次：替代原来仅监听特定操作的白名单，
         // 新增写剪贴板或改变选择的操作无需再回来改这里
-        QObject::connect(bus, &OperationBus::operationCompleted, guard,
-            [requestRefresh](OperationId, bool success) {
-                if (success)
-                {
-                    requestRefresh();
-                }
-            });
+        QObject::connect(bus, &OperationBus::operationCompleted, guard, [requestRefresh](OperationId, bool success) {
+            if (success)
+            {
+                requestRefresh();
+            }
+        });
     }
 
     // 场景变化：图元级 setLocked / setVisible 等只发 notifySceneChanged、不改图元数量、

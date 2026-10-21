@@ -30,9 +30,9 @@
     #include "UiStateCenter.h"
     #include "UiViewport3D.h"
     #include "SceneBuilder3D.h"
-#include "WorkbenchMenuManager.h"
-#include "WorkbenchWindow.h"
-#include "UiDockIds.h"
+    #include "WorkbenchMenuManager.h"
+    #include "WorkbenchWindow.h"
+    #include "UiDockIds.h"
 
     #include "ClientConfig/UiClientConfigBase.h"
     #include "ClientConfig/UiConfigurationManager.h"
@@ -176,8 +176,7 @@ bool Workbench3D::initialize(const WorkbenchServices& services)
 
     if (!services.uiState.stateCenter)
     {
-        SY_ERRORF("[Workbench3D] initialize failed: stateCenter=%p",
-            static_cast<void*>(services.uiState.stateCenter));
+        SY_ERRORF("[Workbench3D] initialize failed: stateCenter=%p", static_cast<void*>(services.uiState.stateCenter));
         return false;
     }
     m_uiState = services.uiState;
@@ -329,7 +328,8 @@ void Workbench3D::create3DViewport(WorkbenchWindow& window)
 
     viewport->setRenderer(std::move(renderer));
     viewport->setSceneDocument(m_serviceOwner->sceneDocument.get());
-    SY_DEBUGF("[Workbench3D] SceneDocument3D set to Viewport3D: %p", static_cast<void*>(m_serviceOwner->sceneDocument.get()));
+    SY_DEBUGF(
+        "[Workbench3D] SceneDocument3D set to Viewport3D: %p", static_cast<void*>(m_serviceOwner->sceneDocument.get()));
 
     // 从适配器中取出内部 RenderWidget3D 指针，注册到 ServicePack3D
     // 这样新号绑定、SceneEditService3D、操作注册等都能访问到实际的渲染控件
@@ -337,7 +337,8 @@ void Workbench3D::create3DViewport(WorkbenchWindow& window)
     {
         m_services3D.renderWidget = r3dAdapter->widget();
         m_renderWidget3D = r3dAdapter->widget();
-        SY_DEBUGF("[Workbench3D] RenderWidget3D registered to ServicePack3D: %p", static_cast<void*>(m_services3D.renderWidget));
+        SY_DEBUGF("[Workbench3D] RenderWidget3D registered to ServicePack3D: %p",
+            static_cast<void*>(m_services3D.renderWidget));
         if (m_services3D.sceneEditService && m_services3D.renderWidget)
         {
             m_services3D.sceneEditService->bindRenderWidget(m_services3D.renderWidget);
@@ -365,10 +366,7 @@ void Workbench3D::bind3DRenderSignals(ServiceOwner& own)
     bind3DSelectionSignal();
 
     // 右键菜单请求：交给命令中枢基于统一快照构建并弹出（与 2D 视口一致）
-    connect(m_renderWidget3D,
-        &RenderWidget3D::sigContextMenuRequested,
-        this,
-        &Workbench3D::on3DContextMenuRequested);
+    connect(m_renderWidget3D, &RenderWidget3D::sigContextMenuRequested, this, &Workbench3D::on3DContextMenuRequested);
 }
 
 /// 绑定选中变化信号
@@ -997,18 +995,26 @@ void Workbench3D::applySceneTreeIncremental3D(const char* src)
     // 会把同一批变更再扫一遍。外层正在消费这批，嵌套延后到下一轮事件循环重跑。
     if (m_sceneTree3DIncrementalBusy)
     {
-        QTimer::singleShot(0, this, [this]() { applySceneTreeIncremental3D("deferred"); });
+        QTimer::singleShot(0, this, [this]() {
+            applySceneTreeIncremental3D("deferred");
+        });
         return;
     }
+
     struct BusyGuard
     {
         bool& flag;
+
         explicit BusyGuard(bool& f)
             : flag(f)
         {
             flag = true;
         }
-        ~BusyGuard() { flag = false; }
+
+        ~BusyGuard()
+        {
+            flag = false;
+        }
     } busyGuard(m_sceneTree3DIncrementalBusy);
 
     Eg::SceneChangeSet set;
@@ -1486,7 +1492,8 @@ bool Workbench3D::showSettingsDialog(QWidget* /*parent*/)
         ? m_workbenchWindow->menuManager()->shortcutSettingsModel()
         : nullptr;
 
-    if (!own.settingsCoordinator->showSettingsDialog(m_mainWindow3D->renderWidgetDisplay(), m_mainWindow3D.get(), shortcutModel))
+    if (!own.settingsCoordinator->showSettingsDialog(
+            m_mainWindow3D->renderWidgetDisplay(), m_mainWindow3D.get(), shortcutModel))
     {
         return false;
     }

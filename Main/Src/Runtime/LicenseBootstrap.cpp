@@ -36,8 +36,12 @@ int LicenseBootstrap::run(const QString& configDir, QWidget* parentWidget)
             parentWidget);
         QPushButton* regBtn = expiredBox.addButton(QString::fromUtf8("Register Now"), QMessageBox::AcceptRole);
         QPushButton* exitBtn = expiredBox.addButton(QString::fromUtf8("Exit"), QMessageBox::RejectRole);
-        QObject::connect(regBtn, &QPushButton::clicked, [&expiredChoice]() { expiredChoice = 0; });
-        QObject::connect(exitBtn, &QPushButton::clicked, [&expiredChoice]() { expiredChoice = 1; });
+        QObject::connect(regBtn, &QPushButton::clicked, [&expiredChoice]() {
+            expiredChoice = 0;
+        });
+        QObject::connect(exitBtn, &QPushButton::clicked, [&expiredChoice]() {
+            expiredChoice = 1;
+        });
         expiredBox.exec();
 
         if (expiredChoice != 0)
@@ -64,20 +68,21 @@ int LicenseBootstrap::run(const QString& configDir, QWidget* parentWidget)
         };
 
         QString trialMsg = tr("Trial Version\n\n"
-            "You have %1 day(s) remaining in your trial period.\n\n"
-            "You can continue using the trial version or activate a license now.")
-            .arg(remainingDays);
+                              "You have %1 day(s) remaining in your trial period.\n\n"
+                              "You can continue using the trial version or activate a license now.")
+                               .arg(remainingDays);
 
         int trialChoice = -1;
-        QMessageBox trialBox(QMessageBox::Information,
-            tr("Trial Period"),
-            trialMsg,
-            QMessageBox::NoButton,
-            parentWidget);
+        QMessageBox trialBox(
+            QMessageBox::Information, tr("Trial Period"), trialMsg, QMessageBox::NoButton, parentWidget);
         QPushButton* regBtn = trialBox.addButton(tr("Register Now"), QMessageBox::AcceptRole);
         QPushButton* contBtn = trialBox.addButton(tr("Continue Trial"), QMessageBox::RejectRole);
-        QObject::connect(regBtn, &QPushButton::clicked, [&trialChoice]() { trialChoice = 0; });
-        QObject::connect(contBtn, &QPushButton::clicked, [&trialChoice]() { trialChoice = 1; });
+        QObject::connect(regBtn, &QPushButton::clicked, [&trialChoice]() {
+            trialChoice = 0;
+        });
+        QObject::connect(contBtn, &QPushButton::clicked, [&trialChoice]() {
+            trialChoice = 1;
+        });
         trialBox.exec();
 
         SY_DEBUGF("[LicenseBootstrap] Trial dialog choice=%d", trialChoice);

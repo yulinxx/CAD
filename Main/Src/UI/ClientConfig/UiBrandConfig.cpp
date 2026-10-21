@@ -7,10 +7,10 @@
 
 namespace
 {
-QString readString(const QJsonObject& root, const char* key)
-{
-    return root.value(QLatin1String(key)).toString().trimmed();
-}
+    QString readString(const QJsonObject& root, const char* key)
+    {
+        return root.value(QLatin1String(key)).toString().trimmed();
+    }
 }  // namespace
 
 UiBrandConfig UiBrandConfig::fromJson(const QJsonObject& root, const QString& fallbackClientId)

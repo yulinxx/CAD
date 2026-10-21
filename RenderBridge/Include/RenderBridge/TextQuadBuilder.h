@@ -40,10 +40,11 @@
 #include <memory>
 #include <vector>
 
-namespace RenderAbstraction {
+namespace RenderAbstraction
+{
     class IRenderDevice;
     class IRenderScene;
-}
+}  // namespace RenderAbstraction
 
 namespace Render
 {
@@ -98,8 +99,9 @@ namespace Render
          * 顺便把各字体图集的脏区上传——必须在提交引用该图集的命令之前完成，
          * 否则本帧新出现的字符会采样到空白。
          */
-        void flush(
-            RenderAbstraction::IRenderScene& scene, uint8_t layer, uint16_t& seq,
+        void flush(RenderAbstraction::IRenderScene& scene,
+            uint8_t layer,
+            uint16_t& seq,
             std::vector<RenderAbstraction::DrawInstruction>& out);
 
     private:

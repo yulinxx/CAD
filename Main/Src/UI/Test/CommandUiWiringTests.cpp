@@ -27,12 +27,10 @@
 
 #include "UI/Workbench/WorkbenchMenuManager.h"
 
-
 #if BUILD_UI3D
-#include "UI3D/Operation/CommandActionHub3D.h"
-#include "UI3D/Operation/CommandCatalog3D.h"
+    #include "UI3D/Operation/CommandActionHub3D.h"
+    #include "UI3D/Operation/CommandCatalog3D.h"
 #endif
-
 
 #include <QAction>
 #include <QMainWindow>
@@ -41,9 +39,6 @@
 #include <QStringList>
 #include <QToolButton>
 #include <QVector>
-
-
-
 
 namespace
 {
@@ -78,8 +73,7 @@ TEST(CommandUiWiringTest, DefaultToolBarContextIdsAllResolveToMenuActionId)
     {
         const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(commandId);
         EXPECT_NE(static_cast<int>(menuId), 0)
-            << "顶部工具栏命令 id 无法解析，按钮将退化为非托管 QAction（启用状态不再联动）: "
-            << commandId.toStdString();
+            << "顶部工具栏命令 id 无法解析，按钮将退化为非托管 QAction（启用状态不再联动）: " << commandId.toStdString();
     }
 }
 
@@ -112,8 +106,7 @@ TEST(CommandUiWiringTest, AlignCommandsRequireUnlockedMultiSelection)
         const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(commandId);
         const CommandEntry2D* entry = CommandCatalog::findByMenuId(menuId);
         ASSERT_NE(entry, nullptr) << commandId.toStdString();
-        EXPECT_EQ(entry->enableRule, Cmd::RequiresUnlockedMultiSelection)
-            << commandId.toStdString();
+        EXPECT_EQ(entry->enableRule, Cmd::RequiresUnlockedMultiSelection) << commandId.toStdString();
     }
 }
 
@@ -146,10 +139,8 @@ TEST(CommandUiWiringTest, PathModifyCommandsResolveAndRequireTwoUnlocked)
 
         const CommandEntry2D* entry = CommandCatalog::findByMenuId(menuId);
         ASSERT_NE(entry, nullptr) << commandId.toStdString();
-        EXPECT_EQ(entry->enableRule, Cmd::RequiresUnlockedMultiSelection)
-            << commandId.toStdString();
-        EXPECT_NE(CommandCatalog::operationForCommandId(commandId), OperationId::None)
-            << commandId.toStdString();
+        EXPECT_EQ(entry->enableRule, Cmd::RequiresUnlockedMultiSelection) << commandId.toStdString();
+        EXPECT_NE(CommandCatalog::operationForCommandId(commandId), OperationId::None) << commandId.toStdString();
     }
 }
 
@@ -172,8 +163,7 @@ TEST(CommandUiWiringTest, LegacyTwoDPrefixAliasesForEditCommandsAreGone)
 
     for (const QString& commandId : retiredIds)
     {
-        EXPECT_EQ(CommandCatalog::operationForCommandId(commandId), OperationId::None)
-            << commandId.toStdString();
+        EXPECT_EQ(CommandCatalog::operationForCommandId(commandId), OperationId::None) << commandId.toStdString();
     }
 }
 
@@ -239,8 +229,7 @@ TEST(CommandUiWiringTest, MenuBarEditCommandsResolveAndCarryExpectedRules)
         const QString commandId = QString::fromUtf8(expectation.commandId);
         const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(commandId);
         ASSERT_NE(static_cast<int>(menuId), 0)
-            << "菜单项 commandId 解析落空，菜单栏刷新会跳过它（恢复永远可点）: "
-            << commandId.toStdString();
+            << "菜单项 commandId 解析落空，菜单栏刷新会跳过它（恢复永远可点）: " << commandId.toStdString();
 
         const CommandEntry2D* entry = CommandCatalog::findByMenuId(menuId);
         ASSERT_NE(entry, nullptr) << commandId.toStdString();
@@ -258,8 +247,7 @@ TEST(CommandUiWiringTest, MenuBarEditCommandRulesAreNotAlways)
         const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(commandId);
         const CommandEntry2D* entry = CommandCatalog::findByMenuId(menuId);
         ASSERT_NE(entry, nullptr) << commandId.toStdString();
-        EXPECT_NE(entry->enableRule, Cmd::Always)
-            << "规则为 Always 会被菜单栏刷新跳过: " << commandId.toStdString();
+        EXPECT_NE(entry->enableRule, Cmd::Always) << "规则为 Always 会被菜单栏刷新跳过: " << commandId.toStdString();
     }
 }
 
@@ -448,7 +436,6 @@ TEST(CommandUiWiringTest, Switch3D_ApplySnapshotToMenuGatesEditCommandsBySelecti
     EXPECT_TRUE(clearSel->isEnabled());
 }
 
-
 TEST(CommandUiWiringTest, Switch_TwoDimensionalOnlyCommandsDoNotResolveIn3DCatalog)
 {
     // 2D 独有命令在 3D 目录里必须解析落空，否则 3D 快照会去改 2D 菜单项的启用态
@@ -495,7 +482,6 @@ TEST(CommandUiWiringTest, Switch_CrossWorkbenchSnapshotIsNoOpOnForeignMenu)
     translate->setEnabled(false);
     CommandActionHub::applySnapshotToMenu(&threeDMenu, makeSnapshot(2, false, true));
     EXPECT_FALSE(translate->isEnabled());
-
 }
 
 TEST(CommandUiWiringTest, Switch_SharedCommandIdsCarrySameRuleInBothCatalogs)
@@ -509,8 +495,7 @@ TEST(CommandUiWiringTest, Switch_SharedCommandIdsCarrySameRuleInBothCatalogs)
     };
     for (const QString& commandId : sharedIds)
     {
-        const CommandEntry2D* entry2D =
-            CommandCatalog::findByMenuId(CommandCatalog::menuIdForCommandId(commandId));
+        const CommandEntry2D* entry2D = CommandCatalog::findByMenuId(CommandCatalog::menuIdForCommandId(commandId));
         const CommandEntry3D* entry3D =
             CommandCatalog3D::findByOperation(CommandCatalog3D::operationForCommandId(commandId));
         ASSERT_NE(entry2D, nullptr) << commandId.toStdString();
@@ -521,7 +506,6 @@ TEST(CommandUiWiringTest, Switch_SharedCommandIdsCarrySameRuleInBothCatalogs)
 }
 
 #endif  // BUILD_UI3D
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 契约校验：客户 JSON 里出现的每个 commandId，都必须能在其所属工作台的命令目录里解析。
@@ -538,13 +522,11 @@ namespace
     /// 遍历，否则"测试过了但运行期自检漏报"这种偏差会重新长出来。
     using ConfigCommandRef = UiConfigCommandRef;
 
-
     /// 收集一份配置里全部命令引用（菜单 + 工具栏 + 右键菜单 + 快捷键）
     QVector<ConfigCommandRef> collectAllCommandRefs(const UiConfigData& config)
     {
         return UiConfigSelfCheck::collectCommandRefs(config);
     }
-
 
     bool resolvableIn2D(const QString& commandId)
     {
@@ -590,7 +572,6 @@ namespace
         return false;
 #endif
     }
-
 
     /// 返回该引用未满足契约的原因；满足则返回空串
     QString contractViolation(const ConfigCommandRef& ref)
@@ -657,17 +638,18 @@ TEST(CommandConfigContractTest, EveryConfiguredCommandIdResolvesInItsWorkbenchCa
                 violations << QStringLiteral("%1  %2  [%3]  %4")
                                   .arg(config->meta.clientId,
                                       ref.commandId,
-                                      ref.workbenches.isEmpty() ? QStringLiteral("-") : ref.workbenches.join(QLatin1Char('|')),
-                                      reason)
-                              + QStringLiteral("  @ ") + ref.path;
+                                      ref.workbenches.isEmpty() ? QStringLiteral("-")
+                                                                : ref.workbenches.join(QLatin1Char('|')),
+                                      reason) +
+                        QStringLiteral("  @ ") + ref.path;
             }
         }
     }
 
     EXPECT_GT(checked, 0) << "一个命令引用都没收集到，说明遍历逻辑或配置加载失效";
-    EXPECT_TRUE(violations.isEmpty())
-        << "以下配置项的 commandId 无法解析，按钮会永久点不动（共 " << violations.size() << " 条）:\n"
-        << violations.join(QLatin1Char('\n')).toStdString();
+    EXPECT_TRUE(violations.isEmpty()) << "以下配置项的 commandId 无法解析，按钮会永久点不动（共 " << violations.size()
+                                      << " 条）:\n"
+                                      << violations.join(QLatin1Char('\n')).toStdString();
 }
 
 // ============================================================
@@ -737,11 +719,9 @@ TEST(UiConfigSelfCheckTest, EveryFeatureUsedInConfigsHasABuildSwitchMapping)
 
     // 没有映射的 feature 自检对它完全无感：授权放行但模块没编译时不会有任何提示。
     // 新增授权功能时必须同步 UiConfigSelfCheck::isFeatureCompiledIn 里的对应表。
-    EXPECT_TRUE(unmapped.isEmpty())
-        << "以下 feature 在 JSON 里被引用，但没有登记编译开关映射：\n"
-        << unmapped.join(QLatin1Char('\n')).toStdString();
+    EXPECT_TRUE(unmapped.isEmpty()) << "以下 feature 在 JSON 里被引用，但没有登记编译开关映射：\n"
+                                    << unmapped.join(QLatin1Char('\n')).toStdString();
 }
-
 
 // ============================================================
 // 左侧绘图工具栏 ↔ 命令中枢
@@ -820,7 +800,9 @@ TEST(DrawToolBarWidgetTest, ButtonClickTriggersHubActionAndReportsLeftToolbarSou
     ASSERT_EQ(buttons.size(), 1);
 
     int triggered = 0;
-    QObject::connect(lineAction, &QAction::triggered, [&triggered]() { ++triggered; });
+    QObject::connect(lineAction, &QAction::triggered, [&triggered]() {
+        ++triggered;
+    });
     buttons[0]->click();
 
     EXPECT_EQ(triggered, 1) << "点击按钮必须触发中枢 QAction，而不是走展示层自己的派发";
@@ -907,7 +889,3 @@ TEST(DrawToolBarWidgetTest, LeftToolbarEntriesResolveToRegisteredTools)
             << "目录声明了 LeftToolbar 面，ToolInitializer 却没注册同名工具: " << toolName.toStdString();
     }
 }
-
-
-
-

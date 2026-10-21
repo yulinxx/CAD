@@ -12,8 +12,10 @@ BitmapReconciler::BitmapReconciler(RenderWidget* widget)
 {
 }
 
-void BitmapReconciler::reconcile(Eg::SceneManager* sm, bool fullReconcile,
-    const std::unordered_set<uint64_t>& selectedIds, bool hideSelected,
+void BitmapReconciler::reconcile(Eg::SceneManager* sm,
+    bool fullReconcile,
+    const std::unordered_set<uint64_t>& selectedIds,
+    bool hideSelected,
     const std::unordered_set<Eg::EntityId>& dirtyIds)
 {
     if (!m_renderWidget || !sm)

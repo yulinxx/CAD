@@ -41,9 +41,9 @@ CADApplicationRuntime::CADApplicationRuntime(std::unique_ptr<QApplication> app, 
     }
     // organizationName/Domain/窗口图标/默认主题 已在 CADApplicationEntry 中应用品牌层
     SY_INFOF("[CADApplicationRuntime] Brand identity: product='%s' company='%s' client='%s'",
-             qPrintable(brand.productName()),
-             qPrintable(brand.companyName()),
-             qPrintable(brand.clientId()));
+        qPrintable(brand.productName()),
+        qPrintable(brand.companyName()),
+        qPrintable(brand.clientId()));
 
     // 设置当前工作目录到应用根目录
     if (!m_appPaths.appRootPath.empty())
@@ -104,8 +104,8 @@ int CADApplicationRuntime::run()
     {
         SY_DEBUG("[CADApplicationRuntime] CrashHandler disabled");
     }
-    else if (!CrashHandlerBootstrap::initialize(brand.productName().toStdString(),
-                                                QString::fromStdString(MainApp::appVersion()).toStdString()))
+    else if (!CrashHandlerBootstrap::initialize(
+                 brand.productName().toStdString(), QString::fromStdString(MainApp::appVersion()).toStdString()))
     {
         SY_WARN("[CADApplicationRuntime] CrashHandler initialization failed, continuing without crash capture");
     }

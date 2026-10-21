@@ -13,46 +13,46 @@
 
 namespace
 {
-using CreateCommandPluginFn = ICommandPlugin* (*)();
-using DestroyCommandPluginFn = void (*)(ICommandPlugin*);
+    using CreateCommandPluginFn = ICommandPlugin* (*)();
+    using DestroyCommandPluginFn = void (*)(ICommandPlugin*);
 
-bool isPluginLibrary(const QString& fileName)
-{
+    bool isPluginLibrary(const QString& fileName)
+    {
 #if defined(Q_OS_WIN)
-    return fileName.endsWith(QLatin1String(".dll"), Qt::CaseInsensitive);
+        return fileName.endsWith(QLatin1String(".dll"), Qt::CaseInsensitive);
 #elif defined(Q_OS_MACOS)
-    return fileName.endsWith(QLatin1String(".dylib")) || fileName.endsWith(QLatin1String(".so"));
+        return fileName.endsWith(QLatin1String(".dylib")) || fileName.endsWith(QLatin1String(".so"));
 #else
-    return fileName.endsWith(QLatin1String(".so"));
+        return fileName.endsWith(QLatin1String(".so"));
 #endif
-}
-
-class RegistrySink final : public UiPanelRegisterSink
-{
-public:
-    explicit RegistrySink(UiPanelRegistry& registry)
-        : m_registry(registry)
-    {
     }
 
-    void registerPanel(const QString& id, std::function<QWidget*(QWidget* parent)> factory) override
+    class RegistrySink final : public UiPanelRegisterSink
     {
-        if (id.trimmed().isEmpty() || !factory)
+    public:
+        explicit RegistrySink(UiPanelRegistry& registry)
+            : m_registry(registry)
         {
-            SY_WARNF("[UiClientPlugin] Ignored invalid panel registration: '%s'", qPrintable(id));
-            return;
         }
-        if (m_registry.isPanelRegistered(id))
-        {
-            SY_WARNF("[UiClientPlugin] Panel '%s' already registered, plugin entry ignored", qPrintable(id));
-            return;
-        }
-        m_registry.registerPanel(id, std::move(factory));
-    }
 
-private:
-    UiPanelRegistry& m_registry;
-};
+        void registerPanel(const QString& id, std::function<QWidget*(QWidget* parent)> factory) override
+        {
+            if (id.trimmed().isEmpty() || !factory)
+            {
+                SY_WARNF("[UiClientPlugin] Ignored invalid panel registration: '%s'", qPrintable(id));
+                return;
+            }
+            if (m_registry.isPanelRegistered(id))
+            {
+                SY_WARNF("[UiClientPlugin] Panel '%s' already registered, plugin entry ignored", qPrintable(id));
+                return;
+            }
+            m_registry.registerPanel(id, std::move(factory));
+        }
+
+    private:
+        UiPanelRegistry& m_registry;
+    };
 }  // namespace
 
 UiClientPluginHost& UiClientPluginHost::instance()
@@ -127,9 +127,8 @@ bool UiClientPluginHost::loadLibrary(const QString& libraryPath, const QString& 
     auto library = std::make_unique<QLibrary>(libraryPath);
     if (!library->load())
     {
-        SY_WARNF("[UiClientPlugin] Failed to load '%s': %s",
-                 qPrintable(libraryPath),
-                 qPrintable(library->errorString()));
+        SY_WARNF(
+            "[UiClientPlugin] Failed to load '%s': %s", qPrintable(libraryPath), qPrintable(library->errorString()));
         return false;
     }
 
@@ -149,16 +148,15 @@ bool UiClientPluginHost::loadLibrary(const QString& libraryPath, const QString& 
                 uiPlugin = plugin;
                 uiDestroy = reinterpret_cast<DestroyClientUiPluginFn>(library->resolve("destroyClientUiPlugin"));
                 registeredSomething = true;
-                SY_INFOF("[UiClientPlugin] Loaded UI plugin '%s' (%s)",
-                         qPrintable(plugin->id()),
-                         qPrintable(libraryPath));
+                SY_INFOF(
+                    "[UiClientPlugin] Loaded UI plugin '%s' (%s)", qPrintable(plugin->id()), qPrintable(libraryPath));
             }
             else
             {
                 SY_INFOF("[UiClientPlugin] Skip '%s': belongs to client '%s', active '%s'",
-                         qPrintable(libraryPath),
-                         qPrintable(owner),
-                         qPrintable(clientId));
+                    qPrintable(libraryPath),
+                    qPrintable(owner),
+                    qPrintable(clientId));
                 if (auto destroy = reinterpret_cast<DestroyClientUiPluginFn>(library->resolve("destroyClientUiPlugin")))
                 {
                     destroy(plugin);
@@ -182,11 +180,13 @@ bool UiClientPluginHost::loadLibrary(const QString& libraryPath, const QString& 
         if (plugin)
         {
             auto destroy = reinterpret_cast<DestroyCommandPluginFn>(library->resolve("destroyCommandPlugin"));
-            commandPluginRegistryRegister(plugin, destroy ? destroy : [](ICommandPlugin* p) { delete p; });
+            commandPluginRegistryRegister(
+                plugin, destroy ? destroy : [](ICommandPlugin* p) {
+                    delete p;
+                });
             registeredSomething = true;
-            SY_INFOF("[UiClientPlugin] Loaded command plugin '%s' (%s)",
-                     qPrintable(plugin->id()),
-                     qPrintable(libraryPath));
+            SY_INFOF(
+                "[UiClientPlugin] Loaded command plugin '%s' (%s)", qPrintable(plugin->id()), qPrintable(libraryPath));
         }
     }
 

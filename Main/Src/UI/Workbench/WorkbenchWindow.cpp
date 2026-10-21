@@ -690,7 +690,9 @@ void WorkbenchWindow::refreshPositionLabel()
     {
         const UnitManager::Unit unit = m_unitManager->displayUnit();
         m_activeStatusBar->setPositionValues(m_unitManager->fromBaseUnit(m_lastMouseX, unit),
-            m_unitManager->fromBaseUnit(m_lastMouseY, unit), UnitManager::unitSymbol(unit), true);
+            m_unitManager->fromBaseUnit(m_lastMouseY, unit),
+            UnitManager::unitSymbol(unit),
+            true);
     }
     else
     {
@@ -1065,13 +1067,16 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     // 用 RAII 守卫：中途任何早退（异常/提前 return）都必须复位，
     // 否则标志卡 true 会永久拒绝后续所有工作台切换。
     m_switchingWorkbench = true;
+
     struct SwitchingGuard
     {
         bool& flag;
+
         explicit SwitchingGuard(bool& f)
             : flag(f)
         {
         }
+
         ~SwitchingGuard()
         {
             flag = false;
@@ -1147,8 +1152,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     // 6: 切换到预解析的新工作台实例（已在步骤 0 经工厂解析并校验）
     if (targetWorkbench != m_workbench)
     {
-        SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: switching to new workbench %s",
-            workbenchId.toUtf8().constData());
+        SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: switching to new workbench %s", workbenchId.toUtf8().constData());
         m_workbench = targetWorkbench;
     }
 

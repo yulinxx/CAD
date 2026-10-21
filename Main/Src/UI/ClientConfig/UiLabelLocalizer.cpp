@@ -6,11 +6,11 @@
 // 翻译上下文优先级表（按查找顺序）
 static const char* TRANSLATION_CONTEXTS[] = {
     "WorkbenchMenuManager",  // 菜单和Dock标题
-    "MainWindow",           // 2D命令
-    "MainWindow3D",         // 3D命令
-    "UiLayoutBuilder",      // UI布局（历史兼容）
+    "MainWindow",            // 2D命令
+    "MainWindow3D",          // 3D命令
+    "UiLayoutBuilder",       // UI布局（历史兼容）
     "Navigation3D",          // 导航模式
-    "Shortcuts"             // 快捷键
+    "Shortcuts"              // 快捷键
 };
 static constexpr int NUM_CONTEXTS = sizeof(TRANSLATION_CONTEXTS) / sizeof(TRANSLATION_CONTEXTS[0]);
 

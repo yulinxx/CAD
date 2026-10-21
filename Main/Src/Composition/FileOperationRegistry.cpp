@@ -194,8 +194,7 @@ bool FileOperationRegistry::doOpenFile(const QString& filePath)
     };
 
     // 使用异步导入 + 进度对话框，避免大文件阻塞主界面
-    const ImportResult result =
-        ImportProgressRunner::run(m_importService, context, opts, m_parentWidget);
+    const ImportResult result = ImportProgressRunner::run(m_importService, context, opts, m_parentWidget);
     if (!result.success)
     {
         showFileError(QObject::tr("Import Error"), result.message);
@@ -403,8 +402,8 @@ void FileOperationRegistry::registerFileOpenOps()
     });
 
     Ops::declareParam(reg, OperationId::File_OpenRecent, [this](const QVariantMap& params) {
-            doOpenFile(params.value(QStringLiteral("filePath")).toString());
-        });
+        doOpenFile(params.value(QStringLiteral("filePath")).toString());
+    });
 }
 
 void FileOperationRegistry::registerFileSaveOps()
@@ -459,8 +458,8 @@ void FileOperationRegistry::registerImportOps()
 
     // 导入图片（特殊处理，不走格式映射；支持拖放 filePath 参数或弹文件对话框）
     Ops::declareParam(reg, OperationId::File_ImportImage, [this](const QVariantMap& params) {
-            doImportImage(params.value(QStringLiteral("filePath")).toString());
-        });
+        doImportImage(params.value(QStringLiteral("filePath")).toString());
+    });
 
     // “All Supported...”：弹出所有支持格式的对话框，按扩展名自动路由到对应导入器
     Ops::declare(reg, OperationId::File_ImportAll, [this] {

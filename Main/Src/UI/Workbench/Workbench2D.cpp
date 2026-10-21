@@ -38,7 +38,6 @@
 #include "SceneTreeModel2D.h"
 #include "SceneTreeBuilder2D.h"
 
-
 #include "UiPropertiesPanel.h"
 #include "RenderViewport2D.h"
 #include "FileDropHandler.h"
@@ -150,7 +149,6 @@ private:
     Callback m_cb;
 };
 
-
 // ============================================================
 // Workbench2D 实现
 QString Workbench2D::id() const
@@ -226,8 +224,7 @@ bool Workbench2D::initialize(const WorkbenchServices& services)
 
     if (!services.uiState.stateCenter)
     {
-        SY_ERRORF("[Workbench2D] initialize failed: stateCenter=%p",
-            static_cast<void*>(services.uiState.stateCenter));
+        SY_ERRORF("[Workbench2D] initialize failed: stateCenter=%p", static_cast<void*>(services.uiState.stateCenter));
         return false;
     }
     m_uiState = services.uiState;
@@ -273,13 +270,12 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
         {
             if (auto* algoService = appRoot->algorithmService())
             {
-                algoService->setInteractionControlCallback(
-                    [vp](bool enabled) {
-                        if (auto* tm = vp->toolManager())
-                        {
-                            tm->setInteractionEnabled(enabled);
-                        }
-                    });
+                algoService->setInteractionControlCallback([vp](bool enabled) {
+                    if (auto* tm = vp->toolManager())
+                    {
+                        tm->setInteractionEnabled(enabled);
+                    }
+                });
                 SY_INFO("[Workbench2D] interaction control callback registered");
             }
         }
@@ -344,8 +340,8 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
     // 放在最后：此时视口、工具栏、场景树、状态栏均已就绪，install 内的首次刷新可覆盖全部 UI。
     // 返回的句柄必须留到 deactivate 销毁：bus / layerBridge 跨工作台长寿，
     // 连线两端都不死时 Qt 不会自动回收，往返切换 N 次就会刷 N 次。
-    m_uiStateConnections = UiStateBridge2D::install(
-        this, m_viewport, m_commands.operationBus, m_scene.layerManagerBridge, m_sceneMonitor);
+    m_uiStateConnections =
+        UiStateBridge2D::install(this, m_viewport, m_commands.operationBus, m_scene.layerManagerBridge, m_sceneMonitor);
 }
 
 bool Workbench2D::showSettingsDialog(QWidget* /*parent*/)
@@ -905,8 +901,8 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     if (m_panelHostStyle == PanelHostStyle::Dock)
     {
         // stableId 是布局快照键，不能用 tr() 生成的 title（换语言后快照失配）
-        window.registerDockWidget(QObject::tr("Draw Tools"), drawWidget, Qt::LeftDockWidgetArea,
-            QStringLiteral("DrawToolsDock"));
+        window.registerDockWidget(
+            QObject::tr("Draw Tools"), drawWidget, Qt::LeftDockWidgetArea, QStringLiteral("DrawToolsDock"));
     }
     else
     {
@@ -927,7 +923,8 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     m_commandHub->setActiveToolAction(m_viewport->activeToolName());
 
     // 工具切换时同步 DrawToolBarWidget 的高亮状态
-    QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged, drawWidget, &DrawToolBarWidget::setCurrentToolName);
+    QObject::connect(
+        m_viewport, &RenderViewport2D::activeToolChanged, drawWidget, &DrawToolBarWidget::setCurrentToolName);
 
     // 文字编辑工具栏绑定：工具切换到 TextEditTool 时，绑定到 TextFontToolBar
     // 以便在进入编辑时自动刷新字体面板信息
@@ -1005,22 +1002,112 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
                     } },
                 { "",
                     {
-                        { "edit.mirror_horizontal", tr("Mirror H"), ":/ui/common/Icons/Actions/mirror_h.svg", false, "", "", "", "", "", true },
-                        { "edit.mirror_vertical", tr("Mirror V"), ":/ui/common/Icons/Actions/mirror_v.svg", false, "", "", "", "", "", true },
+                        { "edit.mirror_horizontal",
+                            tr("Mirror H"),
+                            ":/ui/common/Icons/Actions/mirror_h.svg",
+                            false,
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            true },
+                        { "edit.mirror_vertical",
+                            tr("Mirror V"),
+                            ":/ui/common/Icons/Actions/mirror_v.svg",
+                            false,
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            true },
                     } },
                 { "",
                     {
-                        { "edit.align_left", tr("Align Left"), ":/ui/common/Icons/Actions/align_left.svg", false, "", "", "", "", "", true },
-                        { "edit.align_right", tr("Align Right"), ":/ui/common/Icons/Actions/align_right.svg", false, "", "", "", "", "", true },
-                        { "edit.align_center_h", tr("Align Center H"), ":/ui/common/Icons/Actions/align_center_h.svg", false, "", "", "", "", "", true },
-                        { "edit.align_top", tr("Align Top"), ":/ui/common/Icons/Actions/align_top.svg", false, "", "", "", "", "", true },
-                        { "edit.align_bottom", tr("Align Bottom"), ":/ui/common/Icons/Actions/align_bottom.svg", false, "", "", "", "", "", true },
-                        { "edit.align_center_v", tr("Align Center V"), ":/ui/common/Icons/Actions/align_center_v.svg", false, "", "", "", "", "", true },
+                        { "edit.align_left",
+                            tr("Align Left"),
+                            ":/ui/common/Icons/Actions/align_left.svg",
+                            false,
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            true },
+                        { "edit.align_right",
+                            tr("Align Right"),
+                            ":/ui/common/Icons/Actions/align_right.svg",
+                            false,
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            true },
+                        { "edit.align_center_h",
+                            tr("Align Center H"),
+                            ":/ui/common/Icons/Actions/align_center_h.svg",
+                            false,
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            true },
+                        { "edit.align_top",
+                            tr("Align Top"),
+                            ":/ui/common/Icons/Actions/align_top.svg",
+                            false,
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            true },
+                        { "edit.align_bottom",
+                            tr("Align Bottom"),
+                            ":/ui/common/Icons/Actions/align_bottom.svg",
+                            false,
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            true },
+                        { "edit.align_center_v",
+                            tr("Align Center V"),
+                            ":/ui/common/Icons/Actions/align_center_v.svg",
+                            false,
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            true },
                     } },
                 { "",
                     {
-                        { "edit.select_all", tr("Select All"), ":/ui/common/Icons/Actions/select_all.svg", false, "", "", "", "", "", true },
-                        { "edit.invert_selection", tr("Invert Selection"), ":/ui/common/Icons/Actions/invert_selection.svg", false, "", "", "", "", "", true },
+                        { "edit.select_all",
+                            tr("Select All"),
+                            ":/ui/common/Icons/Actions/select_all.svg",
+                            false,
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            true },
+                        { "edit.invert_selection",
+                            tr("Invert Selection"),
+                            ":/ui/common/Icons/Actions/invert_selection.svg",
+                            false,
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            true },
                         { "edit.deselect", tr("Deselect"), ":/ui/common/Icons/Actions/deselect.svg", false, "", "", "", "", "", true },
                     } },
                 { "",
@@ -1183,8 +1270,8 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     if (m_panelHostStyle == PanelHostStyle::Dock)
     {
         // stableId 是布局快照键，不能用 tr() 生成的 title（换语言后快照失配）
-        window.registerDockWidget(QObject::tr("Layers"), m_rightToolBar, Qt::RightDockWidgetArea,
-            QStringLiteral("LayersDock"));
+        window.registerDockWidget(
+            QObject::tr("Layers"), m_rightToolBar, Qt::RightDockWidgetArea, QStringLiteral("LayersDock"));
     }
     else
     {
@@ -1233,9 +1320,8 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
             return;
         }
         ++m_layerClickSequence;  // 取消本次单击挂起的延迟动作
-        LayerManagerDialog::showDialog(m_scene.layerEditService,
-            m_commandHub ? m_commandHub->mainWindow() : nullptr,
-            m_scene.layerManagerBridge);
+        LayerManagerDialog::showDialog(
+            m_scene.layerEditService, m_commandHub ? m_commandHub->mainWindow() : nullptr, m_scene.layerManagerBridge);
     });
 
     // 撤销/重做会恢复/移除/重建图元（场景拓扑变化），增量刷新可能遗漏，
@@ -1415,7 +1501,9 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
             // 白做功；删除/粘贴/成组等结构变化签名不同，才会走防抖重建。
             // 选中高亮由 syncSceneTreeSelection 单独维护，不依赖重建。
             // 改名等「不入结构签名但要刷新行文本」的操作由上方 undoStateChanged 兜底。
-            QTimer::singleShot(0, this, [this]() { refreshSceneTreeIfNeeded("opCompleted"); });
+            QTimer::singleShot(0, this, [this]() {
+                refreshSceneTreeIfNeeded("opCompleted");
+            });
         });
     }
 
@@ -1556,7 +1644,9 @@ void Workbench2D::applySceneTreeIncremental(const char* src)
     // 那时只会读到真正的新变更。收敛性：重跑若读到空变更且签名一致会直接返回，不再投递。
     if (m_sceneTreeIncrementalBusy)
     {
-        QTimer::singleShot(0, this, [this]() { applySceneTreeIncremental("deferred"); });
+        QTimer::singleShot(0, this, [this]() {
+            applySceneTreeIncremental("deferred");
+        });
         return;
     }
 
@@ -1564,12 +1654,17 @@ void Workbench2D::applySceneTreeIncremental(const char* src)
     struct BusyGuard
     {
         bool& flag;
+
         explicit BusyGuard(bool& f)
             : flag(f)
         {
             flag = true;
         }
-        ~BusyGuard() { flag = false; }
+
+        ~BusyGuard()
+        {
+            flag = false;
+        }
     } busyGuard(m_sceneTreeIncrementalBusy);
 
     Eg::SceneManager* scene = m_scene.sceneEditService->sceneManager();
@@ -1778,7 +1873,9 @@ void Workbench2D::toggleEntityVisibility(const QString& id, bool visible)
         scene->notifySceneChanged();
         // 可见性不进结构签名（不是增删/拓扑变化），且树行要显示新的显隐图标，
         // 延迟到下一事件循环重建，避免连续点击导致多次完整重建
-        QTimer::singleShot(0, this, [this]() { refreshSceneTree(); });
+        QTimer::singleShot(0, this, [this]() {
+            refreshSceneTree();
+        });
     }
 }
 
@@ -2097,13 +2194,12 @@ void Workbench2D::refreshSceneTreeRowsForSelection2D()
     }
 
     QVector<qint64> ids;
-    scene->forEachSelected(
-        [&ids](Eg::SyEntity* e) {
-            if (e)
-            {
-                ids.push_back(static_cast<qint64>(e->id));
-            }
-        });
+    scene->forEachSelected([&ids](Eg::SyEntity* e) {
+        if (e)
+        {
+            ids.push_back(static_cast<qint64>(e->id));
+        }
+    });
     if (!ids.isEmpty())
     {
         m_scenePanel2D->refreshRows(ids);
@@ -2252,4 +2348,3 @@ void Workbench2D::releaseCentralWidgetGLResources(QWidget* centralWidget) const
         vp->releaseGLResources();
     }
 }
-

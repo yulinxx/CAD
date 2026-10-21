@@ -95,39 +95,38 @@ void ViewOperationRegistry::registerAll()
     });
 
     Ops::declareParam(reg, OperationId::View_SetDisplayUnit, [unitManager](const QVariantMap& params) {
-            if (!unitManager)
-                return;
-            const int unit =
-                params.value(QStringLiteral("unit"), static_cast<int>(UnitManager::Unit::Millimeter)).toInt();
-            unitManager->setDisplayUnit(static_cast<UnitManager::Unit>(unit));
-        });
+        if (!unitManager)
+            return;
+        const int unit = params.value(QStringLiteral("unit"), static_cast<int>(UnitManager::Unit::Millimeter)).toInt();
+        unitManager->setDisplayUnit(static_cast<UnitManager::Unit>(unit));
+    });
 
     Ops::declare(reg, OperationId::View_Capture, [captureService = m_captureService, hub] {
-            if (!captureService || !hub)
-                return;
-            if (auto* vp = hub->viewport())
+        if (!captureService || !hub)
+            return;
+        if (auto* vp = hub->viewport())
+        {
+            if (auto* widget = vp->renderWidget())
             {
-                if (auto* widget = vp->renderWidget())
+                Ui::CaptureRequest req;
+                req.scope = Ui::CaptureScope::CurrentView;
+                req.framing = Ui::FramingKind::UseCurrent;
+                req.autoSave = true;
+                QImage img = captureService->capture2D(widget, req);
+                if (!img.isNull())
                 {
-                    Ui::CaptureRequest req;
-                    req.scope = Ui::CaptureScope::CurrentView;
-                    req.framing = Ui::FramingKind::UseCurrent;
-                    req.autoSave = true;
-                    QImage img = captureService->capture2D(widget, req);
-                    if (!img.isNull())
+                    QString path = captureService->saveImage(img, req, false);
+                    if (!path.isEmpty())
                     {
-                        QString path = captureService->saveImage(img, req, false);
-                        if (!path.isEmpty())
-                        {
-                            SY_DEBUGF("[View_Capture] Saved to %s", path.toStdString().c_str());
-                            // 保存成功后打开图片所在目录
-                            QString dir = QFileInfo(path).absolutePath();
-                            QDesktopServices::openUrl(QUrl::fromLocalFile(dir));
-                        }
+                        SY_DEBUGF("[View_Capture] Saved to %s", path.toStdString().c_str());
+                        // 保存成功后打开图片所在目录
+                        QString dir = QFileInfo(path).absolutePath();
+                        QDesktopServices::openUrl(QUrl::fromLocalFile(dir));
                     }
                 }
             }
-        });
+        }
+    });
 
     Ops::declare(reg, OperationId::View_TestView, [hub, parentWidget] {
         if (!hub)

@@ -80,7 +80,9 @@ void PersistenceService::shutdown()
     {
         std::unique_lock<std::mutex> lock(m_activeOpMutex);
         m_shuttingDown = true;
-        m_activeOpCv.wait(lock, [this] { return m_activeOperations.load() == 0; });
+        m_activeOpCv.wait(lock, [this] {
+            return m_activeOperations.load() == 0;
+        });
     }
 
     // 清理注册表中的仓储
@@ -98,7 +100,6 @@ void PersistenceService::shutdown()
 
     SY_DEBUG("[PersistenceService] Shutdown complete");
     // SY_DEBUG("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n\n");
-
 }
 
 int PersistenceService::activeOperationCount() const

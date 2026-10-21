@@ -355,15 +355,25 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
 
     // 导入进度 → 状态中心
     connectStartToBusy(m_importService.get(), &ImportService::importStarted);
-    connectFinishToBusy(m_importService.get(), &ImportService::importFinished,
-        [](const ImportResult& r) { return r.entityCount; },
-        QString("Import complete: %1 entities"), QString("Import failed: %1"));
+    connectFinishToBusy(
+        m_importService.get(),
+        &ImportService::importFinished,
+        [](const ImportResult& r) {
+            return r.entityCount;
+        },
+        QString("Import complete: %1 entities"),
+        QString("Import failed: %1"));
 
     // 导出进度 → 状态中心
     connectStartToBusy(m_exportService.get(), &ExportService::exportStarted);
-    connectFinishToBusy(m_exportService.get(), &ExportService::exportFinished,
-        [](const ExportResult& r) { return r.exportedEntityCount; },
-        QString("Export complete: %1 entities"), QString("Export failed: %1"));
+    connectFinishToBusy(
+        m_exportService.get(),
+        &ExportService::exportFinished,
+        [](const ExportResult& r) {
+            return r.exportedEntityCount;
+        },
+        QString("Export complete: %1 entities"),
+        QString("Export failed: %1"));
 }
 
 void ApplicationCompositionRoot::setupDialogServices()

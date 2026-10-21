@@ -21,54 +21,54 @@
 
 namespace
 {
-QString normalizedPath(const QString& path)
-{
-    return QDir::cleanPath(path);
-}
+    QString normalizedPath(const QString& path)
+    {
+        return QDir::cleanPath(path);
+    }
 
-QString joinPath(const QString& dir, const QString& relative)
-{
-    if (dir.isEmpty() || relative.isEmpty())
+    QString joinPath(const QString& dir, const QString& relative)
     {
-        return relative;
+        if (dir.isEmpty() || relative.isEmpty())
+        {
+            return relative;
+        }
+        if (dir.endsWith(QChar('/')))
+        {
+            return dir + relative;
+        }
+        return dir + QStringLiteral("/") + relative;
     }
-    if (dir.endsWith(QChar('/')))
-    {
-        return dir + relative;
-    }
-    return dir + QStringLiteral("/") + relative;
-}
 
-QString resourceDirectory(const QString& filePath)
-{
-    const int slash = filePath.lastIndexOf(QChar('/'));
-    return slash > 0 ? filePath.left(slash) : QString();
-}
+    QString resourceDirectory(const QString& filePath)
+    {
+        const int slash = filePath.lastIndexOf(QChar('/'));
+        return slash > 0 ? filePath.left(slash) : QString();
+    }
 
-AppTheme themeFromName(const QString& name)
-{
-    if (name == QLatin1String("dark"))
+    AppTheme themeFromName(const QString& name)
     {
-        return AppTheme::Dark;
+        if (name == QLatin1String("dark"))
+        {
+            return AppTheme::Dark;
+        }
+        if (name == QLatin1String("blue"))
+        {
+            return AppTheme::Blue;
+        }
+        if (name == QLatin1String("slate"))
+        {
+            return AppTheme::Slate;
+        }
+        if (name == QLatin1String("high_contrast"))
+        {
+            return AppTheme::HighContrast;
+        }
+        if (name == QLatin1String("system"))
+        {
+            return AppTheme::System;
+        }
+        return AppTheme::Light;
     }
-    if (name == QLatin1String("blue"))
-    {
-        return AppTheme::Blue;
-    }
-    if (name == QLatin1String("slate"))
-    {
-        return AppTheme::Slate;
-    }
-    if (name == QLatin1String("high_contrast"))
-    {
-        return AppTheme::HighContrast;
-    }
-    if (name == QLatin1String("system"))
-    {
-        return AppTheme::System;
-    }
-    return AppTheme::Light;
-}
 }  // namespace
 
 UiBrandManager& UiBrandManager::instance()
@@ -177,10 +177,9 @@ bool UiBrandManager::loadForProcess(int argc, char** argv)
 
 bool UiBrandManager::loadForClient(const QString& clientId, const QString& explicitBrandDir)
 {
-    const QString id = clientId.trimmed().isEmpty() ? QString::fromUtf8(UiClientContext::kDefaultClientId)
-                                                    : clientId.trimmed();
-    if (!explicitBrandDir.isEmpty() &&
-        loadFromFile(joinPath(explicitBrandDir, QStringLiteral("brand.json")), id))
+    const QString id =
+        clientId.trimmed().isEmpty() ? QString::fromUtf8(UiClientContext::kDefaultClientId) : clientId.trimmed();
+    if (!explicitBrandDir.isEmpty() && loadFromFile(joinPath(explicitBrandDir, QStringLiteral("brand.json")), id))
     {
         return true;
     }
@@ -318,11 +317,11 @@ void UiBrandManager::applyApplicationIdentity() const
 {
     QCoreApplication::setOrganizationName(companyName());
     QCoreApplication::setOrganizationDomain(m_config.organizationDomain.isEmpty()
-                                                ? QString::fromStdString(MainApp::organizationDomain())
-                                                : m_config.organizationDomain);
+            ? QString::fromStdString(MainApp::organizationDomain())
+            : m_config.organizationDomain);
     QCoreApplication::setApplicationName(m_config.effectiveAppId());
-    QCoreApplication::setApplicationVersion(m_config.version.isEmpty() ? QString::fromStdString(MainApp::appVersion())
-                                                                       : m_config.version);
+    QCoreApplication::setApplicationVersion(
+        m_config.version.isEmpty() ? QString::fromStdString(MainApp::appVersion()) : m_config.version);
 }
 
 void UiBrandManager::applyApplicationProperties() const

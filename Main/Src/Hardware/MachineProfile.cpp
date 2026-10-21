@@ -249,11 +249,10 @@ namespace MachineProfileLoader
         const QString path = resolvePath(configDir);
         if (path.isEmpty())
         {
-            warningOut =
-                QCoreApplication::translate(
-                    "MachineProfile", "Machine profile not found (%1 or %2); falling back to simulated device mode.")
-                    .arg(QString::fromLatin1(kProfileEnvKey))
-                    .arg(QDir(configDir).filePath(QString::fromLatin1(kProfileFileName)));
+            warningOut = QCoreApplication::translate(
+                "MachineProfile", "Machine profile not found (%1 or %2); falling back to simulated device mode.")
+                             .arg(QString::fromLatin1(kProfileEnvKey))
+                             .arg(QDir(configDir).filePath(QString::fromLatin1(kProfileFileName)));
             // 日志走英文：warningOut 是给界面看的中文提示，而日志会流向控制台与
             // 现场日志文件，那里的编码不受我们控制，中文常出现 mojibake。
             SY_WARNF("[MachineProfile] no machine profile found (env %s or file %s), "

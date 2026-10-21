@@ -123,7 +123,7 @@ void EditOperationRegistry::registerAll()
         {
             auto* scene = editService->sceneManager();
             // 直接遍历容器收集可见图元，避免 getAllEntities() 对全场景指针的整份拷贝
-            //（百万级场景下一次全选就是数 MB 的无谓分配）。
+            // （百万级场景下一次全选就是数 MB 的无谓分配）。
             Eg::VecSyEntityPtr visibleEntities;
             scene->forEachEntity([&visibleEntities](Eg::SyEntity* entity) {
                 if (!entity || !entity->visible())
@@ -154,52 +154,52 @@ void EditOperationRegistry::registerAll()
     });
 
     Ops::declareParam(reg, OperationId::Edit_Nudge, [editService](const QVariantMap& params) {
-            if (!editService)
-                return;
-            const double dx = params.value(QStringLiteral("dx")).toDouble();
-            const double dy = params.value(QStringLiteral("dy")).toDouble();
-            if (dx == 0.0 && dy == 0.0)
-                return;
-            editService->nudgeSelected(dx, dy, "Nudge");
-        });
+        if (!editService)
+            return;
+        const double dx = params.value(QStringLiteral("dx")).toDouble();
+        const double dy = params.value(QStringLiteral("dy")).toDouble();
+        if (dx == 0.0 && dy == 0.0)
+            return;
+        editService->nudgeSelected(dx, dy, "Nudge");
+    });
 
     Ops::declareParam(reg, OperationId::Edit_Fillet, [editService](const QVariantMap& params) {
-            double radius = params.value("radius", -1.0).toDouble();
-            if (radius < 0.0)
-            {
-                auto* scene = editService->sceneManager();
-                if (!scene)
-                    return;
-                auto selected = scene->getSelectedEntities();
-                if (selected.size() < 2)
-                    return;
-                bool ok = false;
-                radius = HelpDialogService::getDouble(
-                    nullptr, QObject::tr("Fillet Radius"), QObject::tr("Radius:"), 5.0, 0.1, 10000.0, 2, &ok);
-                if (!ok || radius < 0.1)
-                    return;
-            }
-            Eg::FilletChamfer::applyFillet(*editService, radius);
-        });
+        double radius = params.value("radius", -1.0).toDouble();
+        if (radius < 0.0)
+        {
+            auto* scene = editService->sceneManager();
+            if (!scene)
+                return;
+            auto selected = scene->getSelectedEntities();
+            if (selected.size() < 2)
+                return;
+            bool ok = false;
+            radius = HelpDialogService::getDouble(
+                nullptr, QObject::tr("Fillet Radius"), QObject::tr("Radius:"), 5.0, 0.1, 10000.0, 2, &ok);
+            if (!ok || radius < 0.1)
+                return;
+        }
+        Eg::FilletChamfer::applyFillet(*editService, radius);
+    });
 
     Ops::declareParam(reg, OperationId::Edit_Chamfer, [editService](const QVariantMap& params) {
-            double distance = params.value("distance", -1.0).toDouble();
-            if (distance < 0.0)
-            {
-                auto* scene = editService->sceneManager();
-                if (!scene)
-                    return;
-                auto selected = scene->getSelectedEntities();
-                if (selected.size() < 2)
-                    return;
-                bool ok = false;
-                distance = HelpDialogService::getDouble(
-                    nullptr, QObject::tr("Chamfer Distance"), QObject::tr("Distance:"), 5.0, 0.1, 10000.0, 2, &ok);
-                if (!ok || distance < 0.1)
-                    return;
-            }
-            Eg::FilletChamfer::applyChamfer(*editService, distance);
-        });
+        double distance = params.value("distance", -1.0).toDouble();
+        if (distance < 0.0)
+        {
+            auto* scene = editService->sceneManager();
+            if (!scene)
+                return;
+            auto selected = scene->getSelectedEntities();
+            if (selected.size() < 2)
+                return;
+            bool ok = false;
+            distance = HelpDialogService::getDouble(
+                nullptr, QObject::tr("Chamfer Distance"), QObject::tr("Distance:"), 5.0, 0.1, 10000.0, 2, &ok);
+            if (!ok || distance < 0.1)
+                return;
+        }
+        Eg::FilletChamfer::applyChamfer(*editService, distance);
+    });
 
     registerClipboardOps();
     registerTransformOps();
@@ -327,34 +327,34 @@ void EditOperationRegistry::registerClipboardOps()
     });
 
     Ops::declare(reg, OperationId::Edit_Paste, [editService, clipboard, pasteAnchor, pasteText, pasteImage] {
-            if (!editService)
+        if (!editService)
+            return;
+        auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
+        if (clipboard && clipboard->hasContent())
+        {
+            const Ut::Vec2d pastePos = pasteAnchor();
+            auto pasted = clipboard->paste(pastePos);
+            if (pasted.empty())
                 return;
-            auto* scene = editService->sceneManager();
-            if (!scene)
-                return;
-            if (clipboard && clipboard->hasContent())
+            scene->clearSelection();
+            const std::vector<Eg::EntityId> insertedIds = editService->addEntities(std::move(pasted), "Paste");
+            Eg::VecSyEntityPtr pastedEntities;
+            pastedEntities.reserve(insertedIds.size());
+            for (Eg::EntityId id : insertedIds)
             {
-                const Ut::Vec2d pastePos = pasteAnchor();
-                auto pasted = clipboard->paste(pastePos);
-                if (pasted.empty())
-                    return;
-                scene->clearSelection();
-                const std::vector<Eg::EntityId> insertedIds = editService->addEntities(std::move(pasted), "Paste");
-                Eg::VecSyEntityPtr pastedEntities;
-                pastedEntities.reserve(insertedIds.size());
-                for (Eg::EntityId id : insertedIds)
-                {
-                    if (auto* ent = scene->findEntityById(id))
-                        pastedEntities.push_back(ent);
-                }
-                if (!pastedEntities.empty())
-                    scene->selectEntities(pastedEntities);
-                return;
+                if (auto* ent = scene->findEntityById(id))
+                    pastedEntities.push_back(ent);
             }
-            if (pasteText(true))
-                return;
-            pasteImage(true);
-        });
+            if (!pastedEntities.empty())
+                scene->selectEntities(pastedEntities);
+            return;
+        }
+        if (pasteText(true))
+            return;
+        pasteImage(true);
+    });
 
     Ops::declare(reg, OperationId::Edit_PasteText, [pasteText] {
         pasteText(true);
@@ -365,62 +365,62 @@ void EditOperationRegistry::registerClipboardOps()
     });
 
     Ops::declareParam(reg, OperationId::Edit_Duplicate, [=](const QVariantMap& params) {
-            if (!editService)
-                return;
-            auto* scene = editService->sceneManager();
-            if (!scene)
-                return;
-            auto selected = scene->getSelectedEntities();
-            if (selected.empty())
-                return;
+        if (!editService)
+            return;
+        auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
+        auto selected = scene->getSelectedEntities();
+        if (selected.empty())
+            return;
 
-            TransformParameters tp;
-            if (params.contains(QStringLiteral("moveX")))
+        TransformParameters tp;
+        if (params.contains(QStringLiteral("moveX")))
+        {
+            tp.type = TransformType::Copy;
+            tp.copyCount = params.value(QStringLiteral("copyCount"), 2).toInt();
+            tp.moveX = params.value(QStringLiteral("moveX")).toDouble();
+            tp.moveY = params.value(QStringLiteral("moveY")).toDouble();
+        }
+        else
+        {
+            tp = OpRegistryHelpers::collectDialogParams(TransformType::Copy, m_parentWidget);
+        }
+        if (tp.type != TransformType::Copy)
+            return;
+
+        const int copyCount = tp.copyCount >= 1 ? tp.copyCount : 2;
+        const double dx = tp.moveX;
+        const double dy = tp.moveY;
+
+        std::vector<const Eg::SyEntity*> sources;
+        sources.reserve(selected.size());
+        for (Eg::SyEntity* e : selected)
+        {
+            if (e)
+                sources.push_back(e);
+        }
+
+        std::vector<std::unique_ptr<Eg::SyEntity>> added;
+        for (int i = 1; i < copyCount; ++i)
+        {
+            const double offX = dx * static_cast<double>(i);
+            const double offY = dy * static_cast<double>(i);
+            for (const Eg::SyEntity* src : sources)
             {
-                tp.type = TransformType::Copy;
-                tp.copyCount = params.value(QStringLiteral("copyCount"), 2).toInt();
-                tp.moveX = params.value(QStringLiteral("moveX")).toDouble();
-                tp.moveY = params.value(QStringLiteral("moveY")).toDouble();
+                auto snap = std::unique_ptr<Eg::SyEntity>(src->clone());
+                if (!snap)
+                    continue;
+                snap->transform(Ut::Mat3d::translate(offX, offY));
+                snap->id = 0;
+                snap->setModified();
+                added.emplace_back(std::move(snap));
             }
-            else
-            {
-                tp = OpRegistryHelpers::collectDialogParams(TransformType::Copy, m_parentWidget);
-            }
-            if (tp.type != TransformType::Copy)
-                return;
+        }
 
-            const int copyCount = tp.copyCount >= 1 ? tp.copyCount : 2;
-            const double dx = tp.moveX;
-            const double dy = tp.moveY;
-
-            std::vector<const Eg::SyEntity*> sources;
-            sources.reserve(selected.size());
-            for (Eg::SyEntity* e : selected)
-            {
-                if (e)
-                    sources.push_back(e);
-            }
-
-            std::vector<std::unique_ptr<Eg::SyEntity>> added;
-            for (int i = 1; i < copyCount; ++i)
-            {
-                const double offX = dx * static_cast<double>(i);
-                const double offY = dy * static_cast<double>(i);
-                for (const Eg::SyEntity* src : sources)
-                {
-                    auto snap = std::unique_ptr<Eg::SyEntity>(src->clone());
-                    if (!snap)
-                        continue;
-                    snap->transform(Ut::Mat3d::translate(offX, offY));
-                    snap->id = 0;
-                    snap->setModified();
-                    added.emplace_back(std::move(snap));
-                }
-            }
-
-            if (!added.empty())
-                editService->addEntities(std::move(added), "Duplicate");
-        });
+        if (!added.empty())
+            editService->addEntities(std::move(added), "Duplicate");
+    });
 }
 
 void EditOperationRegistry::registerTransformOps()
@@ -433,59 +433,79 @@ void EditOperationRegistry::registerTransformOps()
     auto* undoManager = m_undoManager;
 
     Ops::declareParamMutating(reg, OperationId::Edit_Move, [=](const QVariantMap& params) {
-            if (!editService)
-                return;
-            auto* scene = editService->sceneManager();
-            if (!scene)
-                return;
-            auto selected = scene->getSelectedEntities();
-            if (selected.empty())
-                return;
+        if (!editService)
+            return;
+        auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
+        auto selected = scene->getSelectedEntities();
+        if (selected.empty())
+            return;
 
-            TransformParameters tp;
-            if (params.contains(QStringLiteral("moveX")))
+        TransformParameters tp;
+        if (params.contains(QStringLiteral("moveX")))
+        {
+            tp.type = TransformType::Move;
+            tp.moveX = params.value(QStringLiteral("moveX")).toDouble();
+            tp.moveY = params.value(QStringLiteral("moveY")).toDouble();
+        }
+        else
+        {
+            tp = OpRegistryHelpers::collectDialogParams(TransformType::Move, m_parentWidget);
+        }
+        if (tp.type != TransformType::Move)
+            return;
+
+        const auto ids = OpRegistryHelpers::collectIds(selected);
+        editService->transformEntities(
+            ids,
+            [&]() {
+                EntityTransform transform(scene);
+                transform.moveByIds(ids, tp.moveX, tp.moveY);
+            },
+            "Move",
+            false);
+    });
+
+    Ops::declareParamMutating(reg, OperationId::Edit_Rotate, [=](const QVariantMap& params) {
+        if (!editService)
+            return;
+        auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
+        auto selected = scene->getSelectedEntities();
+        if (selected.empty())
+            return;
+
+        const auto ids = OpRegistryHelpers::collectIds(selected);
+        double angleRad = 0.0;
+        double centerX = 0.0;
+        double centerY = 0.0;
+
+        if (params.contains(QStringLiteral("angle")))
+        {
+            const double angleDeg = params.value(QStringLiteral("angle")).toDouble();
+            angleRad = Ut::GeomMath::degToRad(-angleDeg);
+            double minX, minY, maxX, maxY;
+            if (OpRegistryHelpers::calcCombinedBounds(selected, minX, minY, maxX, maxY))
             {
-                tp.type = TransformType::Move;
-                tp.moveX = params.value(QStringLiteral("moveX")).toDouble();
-                tp.moveY = params.value(QStringLiteral("moveY")).toDouble();
+                centerX = (minX + maxX) * 0.5;
+                centerY = (minY + maxY) * 0.5;
+            }
+        }
+        else
+        {
+            const TransformParameters tp = OpRegistryHelpers::collectDialogParams(TransformType::Rotate, m_parentWidget);
+            if (tp.type != TransformType::Rotate || tp.rotateAngle == 0.0)
+                return;
+            angleRad = Ut::GeomMath::degToRad(tp.rotateAngle);
+            if (tp.hasAnchor)
+            {
+                centerX = tp.anchorX;
+                centerY = tp.anchorY;
             }
             else
             {
-                tp = OpRegistryHelpers::collectDialogParams(TransformType::Move, m_parentWidget);
-            }
-            if (tp.type != TransformType::Move)
-                return;
-
-            const auto ids = OpRegistryHelpers::collectIds(selected);
-            editService->transformEntities(
-                ids,
-                [&]() {
-                    EntityTransform transform(scene);
-                    transform.moveByIds(ids, tp.moveX, tp.moveY);
-                },
-                "Move",
-                false);
-        });
-
-    Ops::declareParamMutating(reg, OperationId::Edit_Rotate, [=](const QVariantMap& params) {
-            if (!editService)
-                return;
-            auto* scene = editService->sceneManager();
-            if (!scene)
-                return;
-            auto selected = scene->getSelectedEntities();
-            if (selected.empty())
-                return;
-
-            const auto ids = OpRegistryHelpers::collectIds(selected);
-            double angleRad = 0.0;
-            double centerX = 0.0;
-            double centerY = 0.0;
-
-            if (params.contains(QStringLiteral("angle")))
-            {
-                const double angleDeg = params.value(QStringLiteral("angle")).toDouble();
-                angleRad = Ut::GeomMath::degToRad(-angleDeg);
                 double minX, minY, maxX, maxY;
                 if (OpRegistryHelpers::calcCombinedBounds(selected, minX, minY, maxX, maxY))
                 {
@@ -493,101 +513,79 @@ void EditOperationRegistry::registerTransformOps()
                     centerY = (minY + maxY) * 0.5;
                 }
             }
-            else
-            {
-                const TransformParameters tp =
-                    OpRegistryHelpers::collectDialogParams(TransformType::Rotate, m_parentWidget);
-                if (tp.type != TransformType::Rotate || tp.rotateAngle == 0.0)
-                    return;
-                angleRad = Ut::GeomMath::degToRad(tp.rotateAngle);
-                if (tp.hasAnchor)
-                {
-                    centerX = tp.anchorX;
-                    centerY = tp.anchorY;
-                }
-                else
-                {
-                    double minX, minY, maxX, maxY;
-                    if (OpRegistryHelpers::calcCombinedBounds(selected, minX, minY, maxX, maxY))
-                    {
-                        centerX = (minX + maxX) * 0.5;
-                        centerY = (minY + maxY) * 0.5;
-                    }
-                }
-            }
+        }
 
-            editService->transformEntities(
-                ids,
-                [&]() {
-                    EntityTransform transform(scene);
-                    transform.rotateByIds(ids, angleRad, centerX, centerY);
-                },
-                "Rotate",
-                false);
-        });
+        editService->transformEntities(
+            ids,
+            [&]() {
+                EntityTransform transform(scene);
+                transform.rotateByIds(ids, angleRad, centerX, centerY);
+            },
+            "Rotate",
+            false);
+    });
 
     Ops::declareParamMutating(reg, OperationId::Edit_Mirror, [=](const QVariantMap& params) {
-            if (!editService)
-                return;
-            auto* scene = editService->sceneManager();
-            if (!scene)
-                return;
-            auto selected = scene->getSelectedEntities();
-            if (selected.empty())
-                return;
+        if (!editService)
+            return;
+        auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
+        auto selected = scene->getSelectedEntities();
+        if (selected.empty())
+            return;
 
-            const auto ids = OpRegistryHelpers::collectIds(selected);
-            int axis = 0;
-            double centerX = 0.0;
-            double centerY = 0.0;
-            bool useLine = false;
-            double lineX1 = 0.0, lineY1 = 0.0, lineX2 = 0.0, lineY2 = 0.0;
+        const auto ids = OpRegistryHelpers::collectIds(selected);
+        int axis = 0;
+        double centerX = 0.0;
+        double centerY = 0.0;
+        bool useLine = false;
+        double lineX1 = 0.0, lineY1 = 0.0, lineX2 = 0.0, lineY2 = 0.0;
 
-            if (params.contains(QStringLiteral("mirrorAxis")))
+        if (params.contains(QStringLiteral("mirrorAxis")))
+        {
+            axis = params.value(QStringLiteral("mirrorAxis")).toInt();
+            centerX = params.value(QStringLiteral("mirrorCenterX")).toDouble();
+            centerY = params.value(QStringLiteral("mirrorCenterY")).toDouble();
+            if (axis == 2)
             {
-                axis = params.value(QStringLiteral("mirrorAxis")).toInt();
-                centerX = params.value(QStringLiteral("mirrorCenterX")).toDouble();
-                centerY = params.value(QStringLiteral("mirrorCenterY")).toDouble();
-                if (axis == 2)
-                {
-                    useLine = true;
-                    lineX1 = params.value(QStringLiteral("mirrorLineX1")).toDouble();
-                    lineY1 = params.value(QStringLiteral("mirrorLineY1")).toDouble();
-                    lineX2 = params.value(QStringLiteral("mirrorLineX2")).toDouble();
-                    lineY2 = params.value(QStringLiteral("mirrorLineY2")).toDouble();
-                }
+                useLine = true;
+                lineX1 = params.value(QStringLiteral("mirrorLineX1")).toDouble();
+                lineY1 = params.value(QStringLiteral("mirrorLineY1")).toDouble();
+                lineX2 = params.value(QStringLiteral("mirrorLineX2")).toDouble();
+                lineY2 = params.value(QStringLiteral("mirrorLineY2")).toDouble();
             }
-            else
+        }
+        else
+        {
+            const TransformParameters tp = OpRegistryHelpers::collectDialogParams(TransformType::Mirror, m_parentWidget);
+            if (tp.type != TransformType::Mirror)
+                return;
+            axis = tp.mirrorAxis;
+            centerX = tp.mirrorCenterX;
+            centerY = tp.mirrorCenterY;
+            if (axis == 2)
             {
-                const TransformParameters tp =
-                    OpRegistryHelpers::collectDialogParams(TransformType::Mirror, m_parentWidget);
-                if (tp.type != TransformType::Mirror)
-                    return;
-                axis = tp.mirrorAxis;
-                centerX = tp.mirrorCenterX;
-                centerY = tp.mirrorCenterY;
-                if (axis == 2)
-                {
-                    useLine = true;
-                    lineX1 = tp.mirrorLineX1;
-                    lineY1 = tp.mirrorLineY1;
-                    lineX2 = tp.mirrorLineX2;
-                    lineY2 = tp.mirrorLineY2;
-                }
+                useLine = true;
+                lineX1 = tp.mirrorLineX1;
+                lineY1 = tp.mirrorLineY1;
+                lineX2 = tp.mirrorLineX2;
+                lineY2 = tp.mirrorLineY2;
             }
+        }
 
-            editService->transformEntities(
-                ids,
-                [&]() {
-                    EntityTransform transform(scene);
-                    if (useLine)
-                        transform.mirrorByLineIds(ids, lineX1, lineY1, lineX2, lineY2);
-                    else
-                        transform.mirrorByIds(ids, axis, centerX, centerY);
-                },
-                "Mirror",
-                false);
-        });
+        editService->transformEntities(
+            ids,
+            [&]() {
+                EntityTransform transform(scene);
+                if (useLine)
+                    transform.mirrorByLineIds(ids, lineX1, lineY1, lineX2, lineY2);
+                else
+                    transform.mirrorByIds(ids, axis, centerX, centerY);
+            },
+            "Mirror",
+            false);
+    });
 
     Ops::declareMutating(reg, OperationId::Edit_MirrorH, [editService] {
         if (!editService)
@@ -636,25 +634,25 @@ void EditOperationRegistry::registerTransformOps()
     });
 
     Ops::declareParamMutating(reg, OperationId::Edit_Align, [editService](const QVariantMap& params) {
-            if (!editService)
-                return;
-            auto* scene = editService->sceneManager();
-            if (!scene)
-                return;
-            auto selected = scene->getSelectedEntities();
-            if (selected.empty())
-                return;
-            const int mode = params.value(QStringLiteral("mode"), 0).toInt();
-            const auto ids = OpRegistryHelpers::collectIds(selected);
-            editService->transformEntities(
-                ids,
-                [&]() {
-                    EntityTransform transform(scene);
-                    transform.alignByIds(ids, OpRegistryHelpers::toEntityAlign(mode));
-                },
-                "Align",
-                false);
-        });
+        if (!editService)
+            return;
+        auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
+        auto selected = scene->getSelectedEntities();
+        if (selected.empty())
+            return;
+        const int mode = params.value(QStringLiteral("mode"), 0).toInt();
+        const auto ids = OpRegistryHelpers::collectIds(selected);
+        editService->transformEntities(
+            ids,
+            [&]() {
+                EntityTransform transform(scene);
+                transform.alignByIds(ids, OpRegistryHelpers::toEntityAlign(mode));
+            },
+            "Align",
+            false);
+    });
 }
 
 void EditOperationRegistry::registerGroupOps()
@@ -710,127 +708,124 @@ void EditOperationRegistry::registerTrimExtendOps()
     auto* editService = m_editService;
 
     Ops::declareParamMutating(reg, OperationId::Edit_Trim, [editService](const QVariantMap& params) {
-            if (!editService)
-                return;
-            auto* scene = editService->sceneManager();
-            if (!scene)
-                return;
-            TransformParameters tp =
-                TransformParameters::createTrim(params.value(QStringLiteral("targetId")).toULongLong(),
-                    params.value(QStringLiteral("boundaryId")).toULongLong());
-            Eg::SyEntity* target = nullptr;
-            Eg::SyEntity* boundary = nullptr;
-            if (!OpRegistryHelpers::resolveTargetAndBoundary(editService, tp, target, boundary))
-                return;
+        if (!editService)
+            return;
+        auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
+        TransformParameters tp = TransformParameters::createTrim(params.value(QStringLiteral("targetId")).toULongLong(),
+            params.value(QStringLiteral("boundaryId")).toULongLong());
+        Eg::SyEntity* target = nullptr;
+        Eg::SyEntity* boundary = nullptr;
+        if (!OpRegistryHelpers::resolveTargetAndBoundary(editService, tp, target, boundary))
+            return;
 
-            OpRegistryHelpers::LineSegment2D targetSeg, boundarySeg;
-            if (!OpRegistryHelpers::extractLineSegment(target, targetSeg) || !extractLineSegment(boundary, boundarySeg))
-                return;
+        OpRegistryHelpers::LineSegment2D targetSeg, boundarySeg;
+        if (!OpRegistryHelpers::extractLineSegment(target, targetSeg) || !extractLineSegment(boundary, boundarySeg))
+            return;
 
-            double hitX = 0.0, hitY = 0.0;
-            if (!OpRegistryHelpers::segmentIntersection(targetSeg, boundarySeg, hitX, hitY))
-                return;
+        double hitX = 0.0, hitY = 0.0;
+        if (!OpRegistryHelpers::segmentIntersection(targetSeg, boundarySeg, hitX, hitY))
+            return;
 
-            const double d1 =
-                (hitX - targetSeg.x1) * (hitX - targetSeg.x1) + (hitY - targetSeg.y1) * (hitY - targetSeg.y1);
-            const double d2 =
-                (hitX - targetSeg.x2) * (hitX - targetSeg.x2) + (hitY - targetSeg.y2) * (hitY - targetSeg.y2);
-            const double newX1 = (d1 <= d2) ? hitX : targetSeg.x1;
-            const double newY1 = (d1 <= d2) ? hitY : targetSeg.y1;
-            const double newX2 = (d1 <= d2) ? targetSeg.x2 : hitX;
-            const double newY2 = (d1 <= d2) ? targetSeg.y2 : hitY;
-            const double newLenSq = (newX2 - newX1) * (newX2 - newX1) + (newY2 - newY1) * (newY2 - newY1);
-            if (newLenSq < 1e-12)
-                return;
+        const double d1 = (hitX - targetSeg.x1) * (hitX - targetSeg.x1) + (hitY - targetSeg.y1) * (hitY - targetSeg.y1);
+        const double d2 = (hitX - targetSeg.x2) * (hitX - targetSeg.x2) + (hitY - targetSeg.y2) * (hitY - targetSeg.y2);
+        const double newX1 = (d1 <= d2) ? hitX : targetSeg.x1;
+        const double newY1 = (d1 <= d2) ? hitY : targetSeg.y1;
+        const double newX2 = (d1 <= d2) ? targetSeg.x2 : hitX;
+        const double newY2 = (d1 <= d2) ? targetSeg.y2 : hitY;
+        const double newLenSq = (newX2 - newX1) * (newX2 - newX1) + (newY2 - newY1) * (newY2 - newY1);
+        if (newLenSq < 1e-12)
+            return;
 
-            const std::vector<Eg::EntityId> ids{ target->id };
-            editService->transformEntities(
-                ids,
-                [&]() {
-                    auto* line = static_cast<Eg::SyLine*>(target);
-                    line->setPointAt(0, Ut::Vec2d(newX1, newY1));
-                    line->setPointAt(1, Ut::Vec2d(newX2, newY2));
-                    line->basePoint = line->pointRef()[0];
-                },
-                "Trim",
-                false);
-        });
+        const std::vector<Eg::EntityId> ids{ target->id };
+        editService->transformEntities(
+            ids,
+            [&]() {
+                auto* line = static_cast<Eg::SyLine*>(target);
+                line->setPointAt(0, Ut::Vec2d(newX1, newY1));
+                line->setPointAt(1, Ut::Vec2d(newX2, newY2));
+                line->basePoint = line->pointRef()[0];
+            },
+            "Trim",
+            false);
+    });
 
     Ops::declareParamMutating(reg, OperationId::Edit_Extend, [editService](const QVariantMap& params) {
-            if (!editService)
-                return;
-            auto* scene = editService->sceneManager();
-            if (!scene)
-                return;
-            TransformParameters tp =
-                TransformParameters::createExtend(params.value(QStringLiteral("targetId")).toULongLong(),
-                    params.value(QStringLiteral("boundaryId")).toULongLong());
-            Eg::SyEntity* target = nullptr;
-            Eg::SyEntity* boundary = nullptr;
-            if (!OpRegistryHelpers::resolveTargetAndBoundary(editService, tp, target, boundary))
-                return;
+        if (!editService)
+            return;
+        auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
+        TransformParameters tp =
+            TransformParameters::createExtend(params.value(QStringLiteral("targetId")).toULongLong(),
+                params.value(QStringLiteral("boundaryId")).toULongLong());
+        Eg::SyEntity* target = nullptr;
+        Eg::SyEntity* boundary = nullptr;
+        if (!OpRegistryHelpers::resolveTargetAndBoundary(editService, tp, target, boundary))
+            return;
 
-            OpRegistryHelpers::LineSegment2D targetSeg, boundarySeg;
-            if (!OpRegistryHelpers::extractLineSegment(target, targetSeg) || !extractLineSegment(boundary, boundarySeg))
-                return;
+        OpRegistryHelpers::LineSegment2D targetSeg, boundarySeg;
+        if (!OpRegistryHelpers::extractLineSegment(target, targetSeg) || !extractLineSegment(boundary, boundarySeg))
+            return;
 
-            const double tx = targetSeg.x2 - targetSeg.x1;
-            const double ty = targetSeg.y2 - targetSeg.y1;
-            const double tlen = std::sqrt(tx * tx + ty * ty);
-            if (tlen < 1e-12)
-                return;
-            const double ux = tx / tlen, uy = ty / tlen;
-            const double ext = tlen * 100.0;
+        const double tx = targetSeg.x2 - targetSeg.x1;
+        const double ty = targetSeg.y2 - targetSeg.y1;
+        const double tlen = std::sqrt(tx * tx + ty * ty);
+        if (tlen < 1e-12)
+            return;
+        const double ux = tx / tlen, uy = ty / tlen;
+        const double ext = tlen * 100.0;
 
-            OpRegistryHelpers::LineSegment2D rayFromP1, rayFromP2;
-            rayFromP1.x1 = targetSeg.x1 - ux * ext;
-            rayFromP1.y1 = targetSeg.y1 - uy * ext;
-            rayFromP1.x2 = targetSeg.x1;
-            rayFromP1.y2 = targetSeg.y1;
-            rayFromP2.x1 = targetSeg.x2;
-            rayFromP2.y1 = targetSeg.y2;
-            rayFromP2.x2 = targetSeg.x2 + ux * ext;
-            rayFromP2.y2 = targetSeg.y2 + uy * ext;
+        OpRegistryHelpers::LineSegment2D rayFromP1, rayFromP2;
+        rayFromP1.x1 = targetSeg.x1 - ux * ext;
+        rayFromP1.y1 = targetSeg.y1 - uy * ext;
+        rayFromP1.x2 = targetSeg.x1;
+        rayFromP1.y2 = targetSeg.y1;
+        rayFromP2.x1 = targetSeg.x2;
+        rayFromP2.y1 = targetSeg.y2;
+        rayFromP2.x2 = targetSeg.x2 + ux * ext;
+        rayFromP2.y2 = targetSeg.y2 + uy * ext;
 
-            double hitX1 = 0.0, hitY1 = 0.0, hitX2 = 0.0, hitY2 = 0.0;
-            const bool ok1 = segmentIntersection(rayFromP1, boundarySeg, hitX1, hitY1);
-            const bool ok2 = segmentIntersection(rayFromP2, boundarySeg, hitX2, hitY2);
-            if (!ok1 && !ok2)
-                return;
+        double hitX1 = 0.0, hitY1 = 0.0, hitX2 = 0.0, hitY2 = 0.0;
+        const bool ok1 = segmentIntersection(rayFromP1, boundarySeg, hitX1, hitY1);
+        const bool ok2 = segmentIntersection(rayFromP2, boundarySeg, hitX2, hitY2);
+        if (!ok1 && !ok2)
+            return;
 
-            const double d1 =
-                (hitX1 - targetSeg.x1) * (hitX1 - targetSeg.x1) + (hitY1 - targetSeg.y1) * (hitY1 - targetSeg.y1);
-            const double d2 =
-                (hitX2 - targetSeg.x2) * (hitX2 - targetSeg.x2) + (hitY2 - targetSeg.y2) * (hitY2 - targetSeg.y2);
-            double newX1 = targetSeg.x1, newY1 = targetSeg.y1;
-            double newX2 = targetSeg.x2, newY2 = targetSeg.y2;
-            if (ok1 && (!ok2 || d1 >= d2))
-            {
-                newX1 = hitX1;
-                newY1 = hitY1;
-            }
-            else if (ok2)
-            {
-                newX2 = hitX2;
-                newY2 = hitY2;
-            }
+        const double d1 =
+            (hitX1 - targetSeg.x1) * (hitX1 - targetSeg.x1) + (hitY1 - targetSeg.y1) * (hitY1 - targetSeg.y1);
+        const double d2 =
+            (hitX2 - targetSeg.x2) * (hitX2 - targetSeg.x2) + (hitY2 - targetSeg.y2) * (hitY2 - targetSeg.y2);
+        double newX1 = targetSeg.x1, newY1 = targetSeg.y1;
+        double newX2 = targetSeg.x2, newY2 = targetSeg.y2;
+        if (ok1 && (!ok2 || d1 >= d2))
+        {
+            newX1 = hitX1;
+            newY1 = hitY1;
+        }
+        else if (ok2)
+        {
+            newX2 = hitX2;
+            newY2 = hitY2;
+        }
 
-            const double newLenSq = (newX2 - newX1) * (newX2 - newX1) + (newY2 - newY1) * (newY2 - newY1);
-            if (newLenSq <= tlen * tlen)
-                return;
+        const double newLenSq = (newX2 - newX1) * (newX2 - newX1) + (newY2 - newY1) * (newY2 - newY1);
+        if (newLenSq <= tlen * tlen)
+            return;
 
-            const std::vector<Eg::EntityId> ids{ target->id };
-            editService->transformEntities(
-                ids,
-                [&]() {
-                    auto* line = static_cast<Eg::SyLine*>(target);
-                    line->setPointAt(0, Ut::Vec2d(newX1, newY1));
-                    line->setPointAt(1, Ut::Vec2d(newX2, newY2));
-                    line->basePoint = line->pointRef()[0];
-                },
-                "Extend",
-                false);
-        });
+        const std::vector<Eg::EntityId> ids{ target->id };
+        editService->transformEntities(
+            ids,
+            [&]() {
+                auto* line = static_cast<Eg::SyLine*>(target);
+                line->setPointAt(0, Ut::Vec2d(newX1, newY1));
+                line->setPointAt(1, Ut::Vec2d(newX2, newY2));
+                line->basePoint = line->pointRef()[0];
+            },
+            "Extend",
+            false);
+    });
 }
 
 void EditOperationRegistry::registerBboxOps()
@@ -913,34 +908,34 @@ void EditOperationRegistry::registerBezierOps()
     });
 
     Ops::declareParam(reg, OperationId::Edit_SplitBezier, [editService](const QVariantMap& params) {
-            if (!editService)
-                return;
-            auto* scene = editService->sceneManager();
-            if (!scene)
-                return;
-            const double dT = params.value(QStringLiteral("t"), 0.5).toDouble();
-            if (dT <= 0.0 || dT >= 1.0)
-                return;
-            const auto selected = scene->getSelectedEntities();
-            if (selected.empty())
-                return;
+        if (!editService)
+            return;
+        auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
+        const double dT = params.value(QStringLiteral("t"), 0.5).toDouble();
+        if (dT <= 0.0 || dT >= 1.0)
+            return;
+        const auto selected = scene->getSelectedEntities();
+        if (selected.empty())
+            return;
 
-            SceneEditBatch batch;
-            int nSplit = 0;
-            for (Eg::SyEntity* e : selected)
-            {
-                if (!e || e->eType != Eg::EType::BEZIER)
-                    continue;
-                auto* bezier = static_cast<Eg::SyBezier*>(e);
-                auto pair = Eg::BezierAlgorithms::splitBezier(bezier, dT);
-                batch.toRemove.push_back(e->id);
-                batch.toAdd.push_back(std::make_unique<Eg::SyBezier>(pair.first));
-                batch.toAdd.push_back(std::make_unique<Eg::SyBezier>(pair.second));
-                ++nSplit;
-            }
-            if (nSplit > 0)
-                editService->applyEditBatch(std::move(batch), "Split Bezier");
-        });
+        SceneEditBatch batch;
+        int nSplit = 0;
+        for (Eg::SyEntity* e : selected)
+        {
+            if (!e || e->eType != Eg::EType::BEZIER)
+                continue;
+            auto* bezier = static_cast<Eg::SyBezier*>(e);
+            auto pair = Eg::BezierAlgorithms::splitBezier(bezier, dT);
+            batch.toRemove.push_back(e->id);
+            batch.toAdd.push_back(std::make_unique<Eg::SyBezier>(pair.first));
+            batch.toAdd.push_back(std::make_unique<Eg::SyBezier>(pair.second));
+            ++nSplit;
+        }
+        if (nSplit > 0)
+            editService->applyEditBatch(std::move(batch), "Split Bezier");
+    });
 
     Ops::declare(reg, OperationId::Edit_MergeBezier, [editService] {
         if (!editService)
@@ -988,11 +983,11 @@ void EditOperationRegistry::registerArrayOp()
 {
     auto& reg = m_bus->registry();
     Ops::declare(reg, OperationId::Edit_Array, [m_algorithmRunner = m_algorithmRunner] {
-            if (!m_algorithmRunner)
-                return;
-            OperationRequest req;
-            req.id = OperationId::Algo_Array;
-            req.source = OperationSource::Menu;
-            m_algorithmRunner->runForOperation(OperationId::Algo_Array, req);
-        });
+        if (!m_algorithmRunner)
+            return;
+        OperationRequest req;
+        req.id = OperationId::Algo_Array;
+        req.source = OperationSource::Menu;
+        m_algorithmRunner->runForOperation(OperationId::Algo_Array, req);
+    });
 }

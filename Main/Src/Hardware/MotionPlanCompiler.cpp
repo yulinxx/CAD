@@ -388,8 +388,7 @@ namespace MotionPlanCompiler
         if (out.commandCount() == 0 || result.layerCount == 0)
         {
             result.error = QCoreApplication::translate(
-                               "MotionPlanCompiler",
-                               "No processable entities (total %1, %2 skipped as hidden/locked/no path)")
+                "MotionPlanCompiler", "No processable entities (total %1, %2 skipped as hidden/locked/no path)")
                                .arg(all.size())
                                .arg(result.skippedEntityCount);
             out.clear();

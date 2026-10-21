@@ -22,7 +22,8 @@ extern "C"
         LicenseInternal::ClearTestPublicKeyOverride();
     }
 
-    int LicenseTest_SetThrottleConfig(int freeAttempts, int baseDelaySec, int maxDelaySec, int hardLockFailures, int hardLockSec)
+    int LicenseTest_SetThrottleConfig(
+        int freeAttempts, int baseDelaySec, int maxDelaySec, int hardLockFailures, int hardLockSec)
     {
         // 参数合法性校验，防止测试传入自相矛盾的节流策略
         if (freeAttempts < 0 || baseDelaySec < 0 || maxDelaySec < baseDelaySec || hardLockFailures <= freeAttempts ||

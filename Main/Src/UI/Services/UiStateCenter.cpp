@@ -302,7 +302,6 @@ void UiStateCenter::setMetadata(const QVariantMap& metadata)
     emit stateChanged();
 }
 
-
 void UiStateCenter::setActiveToolId(const QString& toolId)
 {
     if (m_workspace.activeToolId == toolId)

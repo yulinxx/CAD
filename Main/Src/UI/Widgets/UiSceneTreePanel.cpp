@@ -696,8 +696,8 @@ SceneTreePanel::SceneTreePanel(QWidget* parent)
     m_view->sortByColumn(1, Qt::AscendingOrder);
     m_view->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_view->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::EditKeyPressed);
-    m_view->setToolTip(tr(
-        "Scene hierarchy. Double-click to rename; right-click for Show/Hide, Lock, Delete and selection tools."));
+    m_view->setToolTip(
+        tr("Scene hierarchy. Double-click to rename; right-click for Show/Hide, Lock, Delete and selection tools."));
     m_view->header()->setToolTip(tr("Click a column header to sort the tree"));
     layout->addWidget(m_view);
 

@@ -12,357 +12,432 @@
 
 #include <cstring>
 
-namespace RenderBridge {
-namespace RenderXConversion {
+namespace RenderBridge
+{
+    namespace RenderXConversion
+    {
+        using namespace RenderAbstraction;
 
-using namespace RenderAbstraction;
+        // ==================== RenderAbstraction → RenderX ====================
 
-// ==================== RenderAbstraction → RenderX ====================
+        Render::RT::VertexFormat toRenderXFormat(VertexFormat fmt)
+        {
+            switch (fmt)
+            {
+            case VertexFormat::PositionColor:
+                return Render::RT::VertexFormat::P3C3;
+            case VertexFormat::PositionColorAlpha:
+                return Render::RT::VertexFormat::P3C4;
+            case VertexFormat::PositionNormal:
+                return Render::RT::VertexFormat::P3N3;
+            case VertexFormat::PositionUVColor:
+                return Render::RT::VertexFormat::P2T2C4;
+            case VertexFormat::WorldPosUVColor:
+                return Render::RT::VertexFormat::P3T2C4;
+            // 定尺寸标记专用：世界锚点 + 像素偏移，配 RenderSpace::WorldPinned
+            case VertexFormat::WorldAnchorOffsetColor:
+                return Render::RT::VertexFormat::P3O2C4;
+            // 世界空间贴图与 WorldPosUVColor 是同一份布局（P3T2C4），只是语义不同
+            case VertexFormat::WorldPosTexColor:
+                return Render::RT::VertexFormat::P3T2C4;
+            }
+            return Render::RT::VertexFormat::P3C3;
+        }
 
-Render::RT::VertexFormat toRenderXFormat(VertexFormat fmt) {
-    switch (fmt) {
-    case VertexFormat::PositionColor:          return Render::RT::VertexFormat::P3C3;
-    case VertexFormat::PositionColorAlpha:     return Render::RT::VertexFormat::P3C4;
-    case VertexFormat::PositionNormal:         return Render::RT::VertexFormat::P3N3;
-    case VertexFormat::PositionUVColor:        return Render::RT::VertexFormat::P2T2C4;
-    case VertexFormat::WorldPosUVColor:        return Render::RT::VertexFormat::P3T2C4;
-    // 定尺寸标记专用：世界锚点 + 像素偏移，配 RenderSpace::WorldPinned
-    case VertexFormat::WorldAnchorOffsetColor: return Render::RT::VertexFormat::P3O2C4;
-    // 世界空间贴图与 WorldPosUVColor 是同一份布局（P3T2C4），只是语义不同
-    case VertexFormat::WorldPosTexColor:       return Render::RT::VertexFormat::P3T2C4;
-    }
-    return Render::RT::VertexFormat::P3C3;
-}
+        Render::RT::RenderSpace toRenderXSpace(RenderSpace space)
+        {
+            // RenderX 只有 World / Screen；WorldPinned 由顶点格式 P3O2C4 表达
+            return space == RenderSpace::Screen ? Render::RT::RenderSpace::Screen : Render::RT::RenderSpace::World;
+        }
 
-Render::RT::RenderSpace toRenderXSpace(RenderSpace space) {
-    // RenderX 只有 World / Screen；WorldPinned 由顶点格式 P3O2C4 表达
-    return space == RenderSpace::Screen
-        ? Render::RT::RenderSpace::Screen : Render::RT::RenderSpace::World;
-}
+        Render::RT::PrimitiveTopology toRenderXPrimitive(PrimitiveType type)
+        {
+            switch (type)
+            {
+            case PrimitiveType::Points:
+                return Render::RT::PrimitiveTopology::Points;
+            case PrimitiveType::Lines:
+                return Render::RT::PrimitiveTopology::Lines;
+            case PrimitiveType::Triangles:
+                return Render::RT::PrimitiveTopology::Triangles;
+            // RenderX 的公共拓扑枚举里没有 Strip/Loop。这两个值属于「调用方应先自行
+            // 展开成 Lines/Triangles」的输入（UI 层画折线时就是这么做的），这里只做
+            // 同类退化 —— 旧实现让它们静默落到兜底的 Triangles，连类别都错了。
+            case PrimitiveType::LineStrip:
+                return Render::RT::PrimitiveTopology::Lines;
+            case PrimitiveType::LineLoop:
+                return Render::RT::PrimitiveTopology::Lines;
+            case PrimitiveType::TriangleStrip:
+                return Render::RT::PrimitiveTopology::Triangles;
+            }
+            return Render::RT::PrimitiveTopology::Triangles;
+        }
 
-Render::RT::PrimitiveTopology toRenderXPrimitive(PrimitiveType type) {
-    switch (type) {
-    case PrimitiveType::Points:    return Render::RT::PrimitiveTopology::Points;
-    case PrimitiveType::Lines:     return Render::RT::PrimitiveTopology::Lines;
-    case PrimitiveType::Triangles: return Render::RT::PrimitiveTopology::Triangles;
-    // RenderX 的公共拓扑枚举里没有 Strip/Loop。这两个值属于「调用方应先自行
-    // 展开成 Lines/Triangles」的输入（UI 层画折线时就是这么做的），这里只做
-    // 同类退化 —— 旧实现让它们静默落到兜底的 Triangles，连类别都错了。
-    case PrimitiveType::LineStrip:     return Render::RT::PrimitiveTopology::Lines;
-    case PrimitiveType::LineLoop:      return Render::RT::PrimitiveTopology::Lines;
-    case PrimitiveType::TriangleStrip: return Render::RT::PrimitiveTopology::Triangles;
-    }
-    return Render::RT::PrimitiveTopology::Triangles;
-}
+        Render::RT::BlendFactor toRenderXBlend(BlendFactor bf)
+        {
+            switch (bf)
+            {
+            case BlendFactor::Zero:
+                return Render::RT::BlendFactor::Zero;
+            case BlendFactor::One:
+                return Render::RT::BlendFactor::One;
+            case BlendFactor::SrcAlpha:
+                return Render::RT::BlendFactor::SrcAlpha;
+            case BlendFactor::OneMinusSrcAlpha:
+                return Render::RT::BlendFactor::OneMinusSrcAlpha;
+            }
+            return Render::RT::BlendFactor::SrcAlpha;
+        }
 
-Render::RT::BlendFactor toRenderXBlend(BlendFactor bf) {
-    switch (bf) {
-    case BlendFactor::Zero:             return Render::RT::BlendFactor::Zero;
-    case BlendFactor::One:              return Render::RT::BlendFactor::One;
-    case BlendFactor::SrcAlpha:         return Render::RT::BlendFactor::SrcAlpha;
-    case BlendFactor::OneMinusSrcAlpha: return Render::RT::BlendFactor::OneMinusSrcAlpha;
-    }
-    return Render::RT::BlendFactor::SrcAlpha;
-}
+        Render::RT::DepthFunc toRenderXDepthFunc(DepthFunc df)
+        {
+            switch (df)
+            {
+            case DepthFunc::Always:
+                return Render::RT::DepthFunc::Always;
+            case DepthFunc::Less:
+                return Render::RT::DepthFunc::Less;
+            case DepthFunc::LessEqual:
+                return Render::RT::DepthFunc::LessEqual;
+            case DepthFunc::Greater:
+                return Render::RT::DepthFunc::Greater;
+            }
+            return Render::RT::DepthFunc::LessEqual;
+        }
 
-Render::RT::DepthFunc toRenderXDepthFunc(DepthFunc df) {
-    switch (df) {
-    case DepthFunc::Always:    return Render::RT::DepthFunc::Always;
-    case DepthFunc::Less:      return Render::RT::DepthFunc::Less;
-    case DepthFunc::LessEqual: return Render::RT::DepthFunc::LessEqual;
-    case DepthFunc::Greater:   return Render::RT::DepthFunc::Greater;
-    }
-    return Render::RT::DepthFunc::LessEqual;
-}
+        Render::RT::FillMode toRenderXFillMode(FillMode fm)
+        {
+            return fm == FillMode::Wireframe ? Render::RT::FillMode::Wireframe : Render::RT::FillMode::Solid;
+        }
 
-Render::RT::FillMode toRenderXFillMode(FillMode fm) {
-    return fm == FillMode::Wireframe
-        ? Render::RT::FillMode::Wireframe : Render::RT::FillMode::Solid;
-}
+        Render::RT::DefaultPipeline toRenderXDefaultPipeline(PipelineKind kind)
+        {
+            switch (kind)
+            {
+            case PipelineKind::WorldTri:
+                return Render::RT::DefaultPipeline::WorldTri;
+            case PipelineKind::WorldTextured:
+                return Render::RT::DefaultPipeline::WorldTextured;
+            case PipelineKind::ScreenTextured:
+                return Render::RT::DefaultPipeline::ScreenTextured;
+            case PipelineKind::ScreenGlyph:
+                return Render::RT::DefaultPipeline::ScreenGlyph;
+            case PipelineKind::WorldGlyphSdf:
+                return Render::RT::DefaultPipeline::WorldGlyphSdf;
+            case PipelineKind::Mesh3D:
+                return Render::RT::DefaultPipeline::Mesh3D;
+            case PipelineKind::Mesh3DWire:
+                return Render::RT::DefaultPipeline::Mesh3DWire;
+            case PipelineKind::Highlight3D:
+                return Render::RT::DefaultPipeline::Highlight3D;
+            case PipelineKind::Gizmo3D:
+                return Render::RT::DefaultPipeline::Gizmo3D;
+            }
+            return Render::RT::DefaultPipeline::WorldTri;
+        }
 
-Render::RT::DefaultPipeline toRenderXDefaultPipeline(PipelineKind kind) {
-    switch (kind) {
-    case PipelineKind::WorldTri:       return Render::RT::DefaultPipeline::WorldTri;
-    case PipelineKind::WorldTextured:  return Render::RT::DefaultPipeline::WorldTextured;
-    case PipelineKind::ScreenTextured: return Render::RT::DefaultPipeline::ScreenTextured;
-    case PipelineKind::ScreenGlyph:    return Render::RT::DefaultPipeline::ScreenGlyph;
-    case PipelineKind::WorldGlyphSdf:  return Render::RT::DefaultPipeline::WorldGlyphSdf;
-    case PipelineKind::Mesh3D:         return Render::RT::DefaultPipeline::Mesh3D;
-    case PipelineKind::Mesh3DWire:     return Render::RT::DefaultPipeline::Mesh3DWire;
-    case PipelineKind::Highlight3D:    return Render::RT::DefaultPipeline::Highlight3D;
-    case PipelineKind::Gizmo3D:        return Render::RT::DefaultPipeline::Gizmo3D;
-    }
-    return Render::RT::DefaultPipeline::WorldTri;
-}
+        Render::RT::PipelineDesc toRenderXPipelineDesc(const PipelineDesc& desc)
+        {
+            Render::RT::PipelineDesc out{};
+            out.topology = toRenderXPrimitive(desc.topology);
+            out.vertexFormat = toRenderXFormat(desc.format);
+            out.depthTest = desc.depthTest ? 1 : 0;
+            out.depthWrite = desc.depthWrite ? 1 : 0;
+            out.blendEnable = desc.blendEnable ? 1 : 0;
+            out.srcBlend = toRenderXBlend(desc.srcBlend);
+            out.dstBlend = toRenderXBlend(desc.dstBlend);
+            out.depthFunc = toRenderXDepthFunc(desc.depthFunc);
+            out.fillMode = toRenderXFillMode(desc.fillMode);
+            out._pad0[0] = 0;
+            out._pad0[1] = 0;
+            out._pad0[2] = 0;
+            out.depthBiasConstant = desc.depthBiasConstant;
+            out.depthBiasSlope = desc.depthBiasSlope;
+            // 自定义 shader 名尚未进入抽象层：nullptr 表示按 vertexFormat + space
+            // 使用后端的默认 shader，正是当前调用方需要的行为
+            out.shaderName = nullptr;
+            return out;
+        }
 
-Render::RT::PipelineDesc toRenderXPipelineDesc(const PipelineDesc& desc) {
-    Render::RT::PipelineDesc out{};
-    out.topology = toRenderXPrimitive(desc.topology);
-    out.vertexFormat = toRenderXFormat(desc.format);
-    out.depthTest = desc.depthTest ? 1 : 0;
-    out.depthWrite = desc.depthWrite ? 1 : 0;
-    out.blendEnable = desc.blendEnable ? 1 : 0;
-    out.srcBlend = toRenderXBlend(desc.srcBlend);
-    out.dstBlend = toRenderXBlend(desc.dstBlend);
-    out.depthFunc = toRenderXDepthFunc(desc.depthFunc);
-    out.fillMode = toRenderXFillMode(desc.fillMode);
-    out._pad0[0] = 0;
-    out._pad0[1] = 0;
-    out._pad0[2] = 0;
-    out.depthBiasConstant = desc.depthBiasConstant;
-    out.depthBiasSlope = desc.depthBiasSlope;
-    // 自定义 shader 名尚未进入抽象层：nullptr 表示按 vertexFormat + space
-    // 使用后端的默认 shader，正是当前调用方需要的行为
-    out.shaderName = nullptr;
-    return out;
-}
+        Render::RT::DrawCommand toRenderXDrawCommand(const DrawInstruction& cmd)
+        {
+            Render::RT::DrawCommand out{};
+            // 句柄：本层的包装结构 → RenderX 的 enum class
+            out.vertexBuffer = static_cast<Render::RT::BufferHandle>(cmd.vertexBuffer.value);
+            // 本层不带索引缓冲（索引化绘制尚未进入抽象层）
+            out.indexBuffer = Render::RT::BufferHandle::Invalid;
+            out.texture = static_cast<Render::RT::TextureHandle>(cmd.texture.value);
+            out.sortKey = cmd.sortKey;
+            out.userData = cmd.userData;
+            out.vertexOffset = cmd.vertexOffset;
+            out.vertexCount = cmd.vertexCount;
+            out.indexOffset = cmd.indexOffset;
+            out.indexCount = cmd.indexCount;
+            out.instanceCount = cmd.instanceCount;
+            out.firstInstance = 0;
+            out.topology = toRenderXPrimitive(cmd.topology);
+            out.space = toRenderXSpace(cmd.space);
+            out.vertexFormat = toRenderXFormat(cmd.format);
+            out.indexType = Render::RT::IndexType::None;
+            // 本层用 uint32 承载管线/材质编号以留扩展余地；实际值来自
+            // rxPipelineCreate / rxMaterialAdd 的 uint16 索引，不会溢出
+            out.pipelineIndex = static_cast<uint16_t>(cmd.pipelineIndex);
+            out.materialIndex = static_cast<uint16_t>(cmd.materialIndex);
+            out.lineWidth = cmd.lineWidth;
+            out.pointSize = cmd.pointSize;
+            return out;
+        }
 
-Render::RT::DrawCommand toRenderXDrawCommand(const DrawInstruction& cmd) {
-    Render::RT::DrawCommand out{};
-    // 句柄：本层的包装结构 → RenderX 的 enum class
-    out.vertexBuffer = static_cast<Render::RT::BufferHandle>(cmd.vertexBuffer.value);
-    // 本层不带索引缓冲（索引化绘制尚未进入抽象层）
-    out.indexBuffer = Render::RT::BufferHandle::Invalid;
-    out.texture = static_cast<Render::RT::TextureHandle>(cmd.texture.value);
-    out.sortKey = cmd.sortKey;
-    out.userData = cmd.userData;
-    out.vertexOffset = cmd.vertexOffset;
-    out.vertexCount = cmd.vertexCount;
-    out.indexOffset = cmd.indexOffset;
-    out.indexCount = cmd.indexCount;
-    out.instanceCount = cmd.instanceCount;
-    out.firstInstance = 0;
-    out.topology = toRenderXPrimitive(cmd.topology);
-    out.space = toRenderXSpace(cmd.space);
-    out.vertexFormat = toRenderXFormat(cmd.format);
-    out.indexType = Render::RT::IndexType::None;
-    // 本层用 uint32 承载管线/材质编号以留扩展余地；实际值来自
-    // rxPipelineCreate / rxMaterialAdd 的 uint16 索引，不会溢出
-    out.pipelineIndex = static_cast<uint16_t>(cmd.pipelineIndex);
-    out.materialIndex = static_cast<uint16_t>(cmd.materialIndex);
-    out.lineWidth = cmd.lineWidth;
-    out.pointSize = cmd.pointSize;
-    return out;
-}
+        Render::RT::Lighting3DDesc toRenderXLighting(const LightingDesc& lighting)
+        {
+            Render::RT::Lighting3DDesc out{};
+            out.ambientColor[0] = lighting.ambientColor.r;
+            out.ambientColor[1] = lighting.ambientColor.g;
+            out.ambientColor[2] = lighting.ambientColor.b;
+            out.ambientIntensity = lighting.ambientIntensity;
+            out.ambientEnabled = lighting.ambientEnabled ? 1 : 0;
+            out.doubleSided = lighting.doubleSided ? 1 : 0;
+            out.specularEnabled = lighting.specularEnabled ? 1 : 0;
+            out.specularIntensity = lighting.specularIntensity;
 
-Render::RT::Lighting3DDesc toRenderXLighting(const LightingDesc& lighting) {
-    Render::RT::Lighting3DDesc out{};
-    out.ambientColor[0] = lighting.ambientColor.r;
-    out.ambientColor[1] = lighting.ambientColor.g;
-    out.ambientColor[2] = lighting.ambientColor.b;
-    out.ambientIntensity = lighting.ambientIntensity;
-    out.ambientEnabled = lighting.ambientEnabled ? 1 : 0;
-    out.doubleSided = lighting.doubleSided ? 1 : 0;
-    out.specularEnabled = lighting.specularEnabled ? 1 : 0;
-    out.specularIntensity = lighting.specularIntensity;
+            // 三盏灯的填法一致，逐字段搬；enabled 由 intensity 推导（本层没有该开关）
+            const auto fillLight = [](Render::RT::DirectionalLight3D& dst, const DirectionalLight& src) {
+                dst.enabled = src.intensity > 0.0f ? 1 : 0;
+                dst.direction[0] = src.direction.x;
+                dst.direction[1] = src.direction.y;
+                dst.direction[2] = src.direction.z;
+                dst.color[0] = src.color.r;
+                dst.color[1] = src.color.g;
+                dst.color[2] = src.color.b;
+                dst.intensity = src.intensity;
+            };
+            fillLight(out.key, lighting.key);
+            fillLight(out.fill, lighting.fill);
+            fillLight(out.rim, lighting.rim);
 
-    // 三盏灯的填法一致，逐字段搬；enabled 由 intensity 推导（本层没有该开关）
-    const auto fillLight = [](Render::RT::DirectionalLight3D& dst, const DirectionalLight& src) {
-        dst.enabled = src.intensity > 0.0f ? 1 : 0;
-        dst.direction[0] = src.direction.x;
-        dst.direction[1] = src.direction.y;
-        dst.direction[2] = src.direction.z;
-        dst.color[0] = src.color.r;
-        dst.color[1] = src.color.g;
-        dst.color[2] = src.color.b;
-        dst.intensity = src.intensity;
-    };
-    fillLight(out.key, lighting.key);
-    fillLight(out.fill, lighting.fill);
-    fillLight(out.rim, lighting.rim);
+            out.viewPos[0] = lighting.viewPos.x;
+            out.viewPos[1] = lighting.viewPos.y;
+            out.viewPos[2] = lighting.viewPos.z;
+            out.minBrightness = lighting.minBrightness;
+            out.exposure = lighting.exposure;
+            out.shininess = lighting.shininess;
+            return out;
+        }
 
-    out.viewPos[0] = lighting.viewPos.x;
-    out.viewPos[1] = lighting.viewPos.y;
-    out.viewPos[2] = lighting.viewPos.z;
-    out.minBrightness = lighting.minBrightness;
-    out.exposure = lighting.exposure;
-    out.shininess = lighting.shininess;
-    return out;
-}
+        Render::RT::FontDesc toRenderXFontDesc(const FontDesc& desc)
+        {
+            Render::RT::FontDesc out{};
+            out.data = desc.data;
+            out.dataBytes = desc.dataBytes;
+            out.pixelHeight = desc.pixelHeight;
+            out.atlasWidth = desc.atlasWidth;
+            out.atlasHeight = desc.atlasHeight;
+            out.sdfPadding = desc.sdfPadding;
+            return out;
+        }
 
-Render::RT::FontDesc toRenderXFontDesc(const FontDesc& desc) {
-    Render::RT::FontDesc out{};
-    out.data = desc.data;
-    out.dataBytes = desc.dataBytes;
-    out.pixelHeight = desc.pixelHeight;
-    out.atlasWidth = desc.atlasWidth;
-    out.atlasHeight = desc.atlasHeight;
-    out.sdfPadding = desc.sdfPadding;
-    return out;
-}
+        Render::RT::MaterialDesc toRenderXMaterial(const MaterialDesc& desc)
+        {
+            Render::RT::MaterialDesc out{};
+            out.lineWidth = desc.lineWidth;
+            out.pointSize = desc.pointSize;
+            out.color[0] = desc.color[0];
+            out.color[1] = desc.color[1];
+            out.color[2] = desc.color[2];
+            out.color[3] = desc.color[3];
+            out.flags = desc.flags;
+            out.ambient[0] = desc.ambient[0];
+            out.ambient[1] = desc.ambient[1];
+            out.ambient[2] = desc.ambient[2];
+            out.specular[0] = desc.specular[0];
+            out.specular[1] = desc.specular[1];
+            out.specular[2] = desc.specular[2];
+            out.shininess = desc.shininess;
+            return out;
+        }
 
-Render::RT::MaterialDesc toRenderXMaterial(const MaterialDesc& desc) {
-    Render::RT::MaterialDesc out{};
-    out.lineWidth = desc.lineWidth;
-    out.pointSize = desc.pointSize;
-    out.color[0] = desc.color[0];
-    out.color[1] = desc.color[1];
-    out.color[2] = desc.color[2];
-    out.color[3] = desc.color[3];
-    out.flags = desc.flags;
-    out.ambient[0] = desc.ambient[0];
-    out.ambient[1] = desc.ambient[1];
-    out.ambient[2] = desc.ambient[2];
-    out.specular[0] = desc.specular[0];
-    out.specular[1] = desc.specular[1];
-    out.specular[2] = desc.specular[2];
-    out.shininess = desc.shininess;
-    return out;
-}
+        void toRenderXViewMatrix(const Matrix4x4& view, float out[16])
+        {
+            // 两侧都是 16 个连续的 float（列主序），直接搬
+            std::memcpy(out, view.m, 16 * sizeof(float));
+        }
 
-void toRenderXViewMatrix(const Matrix4x4& view, float out[16]) {
-    // 两侧都是 16 个连续的 float（列主序），直接搬
-    std::memcpy(out, view.m, 16 * sizeof(float));
-}
+        Render::RT::DrawListDesc toRenderXDrawListDesc(const DrawListDesc& desc)
+        {
+            Render::RT::DrawListDesc out{};
+            out.initialCapacity = desc.initialCapacity;
+            out.enableMerging = desc.enableMerging ? 1 : 0;
+            out.enableCulling = desc.enableCulling ? 1 : 0;
+            // desc.type 是抽象层的可见范围类型，RenderX 侧由调用哪个 upsert /
+            // submit 决定，不落在 DrawListDesc 里，因此适配器另存一份
+            out._pad0[0] = 0;
+            out._pad0[1] = 0;
+            return out;
+        }
 
-Render::RT::DrawListDesc toRenderXDrawListDesc(const DrawListDesc& desc) {
-    Render::RT::DrawListDesc out{};
-    out.initialCapacity = desc.initialCapacity;
-    out.enableMerging = desc.enableMerging ? 1 : 0;
-    out.enableCulling = desc.enableCulling ? 1 : 0;
-    // desc.type 是抽象层的可见范围类型，RenderX 侧由调用哪个 upsert /
-    // submit 决定，不落在 DrawListDesc 里，因此适配器另存一份
-    out._pad0[0] = 0;
-    out._pad0[1] = 0;
-    return out;
-}
+        Render::RT::GeometryStoreDesc toRenderXGeometryStoreDesc(const GeometryStoreDesc& desc)
+        {
+            Render::RT::GeometryStoreDesc out{};
+            out.initialBytes = desc.initialBytes;
+            out.maxBytes = desc.maxBytes;
+            out.granularity = desc.granularity;
+            out.forIndices = desc.forIndices ? 1 : 0;
+            return out;
+        }
 
-Render::RT::GeometryStoreDesc toRenderXGeometryStoreDesc(const GeometryStoreDesc& desc) {
-    Render::RT::GeometryStoreDesc out{};
-    out.initialBytes = desc.initialBytes;
-    out.maxBytes = desc.maxBytes;
-    out.granularity = desc.granularity;
-    out.forIndices = desc.forIndices ? 1 : 0;
-    return out;
-}
+        GeometryBlock fromRenderXGeometryBlock(const Render::RT::GeometryBlock& block)
+        {
+            GeometryBlock out{};
+            out.buffer = BufferHandle{ static_cast<uint64_t>(block.buffer) };
+            out.id = block.id;
+            out.offset = block.offset;
+            out.sizeBytes = block.sizeBytes;
+            return out;
+        }
 
-GeometryBlock fromRenderXGeometryBlock(const Render::RT::GeometryBlock& block) {
-    GeometryBlock out{};
-    out.buffer = BufferHandle{ static_cast<uint64_t>(block.buffer) };
-    out.id = block.id;
-    out.offset = block.offset;
-    out.sizeBytes = block.sizeBytes;
-    return out;
-}
+        GeometryAllocResult fromRenderXGeometryAlloc(Render::RT::RxResult result)
+        {
+            switch (result)
+            {
+            case Render::RT::RxResult::Ok:
+            case Render::RT::RxResult::ErrorGeometryStoreGrown:
+                // 扩容成功也算成功：块已经分配好了
+                return GeometryAllocResult::Ok;
+            case Render::RT::RxResult::ErrorOutOfMemory:
+                // 本仓到顶，调用方换仓后重试
+                return GeometryAllocResult::StoreFull;
+            default:
+                return GeometryAllocResult::Failed;
+            }
+        }
 
-GeometryAllocResult fromRenderXGeometryAlloc(Render::RT::RxResult result) {
-    switch (result) {
-    case Render::RT::RxResult::Ok:
-    case Render::RT::RxResult::ErrorGeometryStoreGrown:
-        // 扩容成功也算成功：块已经分配好了
-        return GeometryAllocResult::Ok;
-    case Render::RT::RxResult::ErrorOutOfMemory:
-        // 本仓到顶，调用方换仓后重试
-        return GeometryAllocResult::StoreFull;
-    default:
-        return GeometryAllocResult::Failed;
-    }
-}
+        GeometryStoreStats fromRenderXGeometryStats(const Render::RT::GeometryStoreStats& stats)
+        {
+            GeometryStoreStats out{};
+            out.capacityBytes = stats.capacityBytes;
+            out.usedBytes = stats.usedBytes;
+            out.largestFreeBytes = stats.largestFreeBytes;
+            out.blockCount = stats.blockCount;
+            out.freeRangeCount = stats.freeRangeCount;
+            out.dirtyBytesThisFrame = stats.dirtyBytesThisFrame;
+            out.growCount = stats.growCount;
+            return out;
+        }
 
-GeometryStoreStats fromRenderXGeometryStats(const Render::RT::GeometryStoreStats& stats) {
-    GeometryStoreStats out{};
-    out.capacityBytes = stats.capacityBytes;
-    out.usedBytes = stats.usedBytes;
-    out.largestFreeBytes = stats.largestFreeBytes;
-    out.blockCount = stats.blockCount;
-    out.freeRangeCount = stats.freeRangeCount;
-    out.dirtyBytesThisFrame = stats.dirtyBytesThisFrame;
-    out.growCount = stats.growCount;
-    return out;
-}
+        void toRenderXViewBounds(const Aabb3& box, float out[4])
+        {
+            out[0] = box.minX;
+            out[1] = box.minY;
+            out[2] = box.maxX;
+            out[3] = box.maxY;
+        }
 
-void toRenderXViewBounds(const Aabb3& box, float out[4]) {
-    out[0] = box.minX;
-    out[1] = box.minY;
-    out[2] = box.maxX;
-    out[3] = box.maxY;
-}
+        Render::RT::RxAabb3 toRenderXAabb3(const Aabb3& box)
+        {
+            Render::RT::RxAabb3 out{};
+            out.minX = box.minX;
+            out.minY = box.minY;
+            out.minZ = box.minZ;
+            out.maxX = box.maxX;
+            out.maxY = box.maxY;
+            out.maxZ = box.maxZ;
+            return out;
+        }
 
-Render::RT::RxAabb3 toRenderXAabb3(const Aabb3& box) {
-    Render::RT::RxAabb3 out{};
-    out.minX = box.minX;
-    out.minY = box.minY;
-    out.minZ = box.minZ;
-    out.maxX = box.maxX;
-    out.maxY = box.maxY;
-    out.maxZ = box.maxZ;
-    return out;
-}
+        Render::RT::RxFrustum toRenderXFrustum(const Frustum& frustum)
+        {
+            // 两侧都是 planes[6][4]，布局一致
+            Render::RT::RxFrustum out{};
+            std::memcpy(out.planes, frustum.planes, sizeof(out.planes));
+            return out;
+        }
 
-Render::RT::RxFrustum toRenderXFrustum(const Frustum& frustum) {
-    // 两侧都是 planes[6][4]，布局一致
-    Render::RT::RxFrustum out{};
-    std::memcpy(out.planes, frustum.planes, sizeof(out.planes));
-    return out;
-}
+        // ==================== RenderX → RenderAbstraction ====================
 
-// ==================== RenderX → RenderAbstraction ====================
+        VertexFormat fromRenderXFormat(Render::RT::VertexFormat fmt)
+        {
+            switch (fmt)
+            {
+            case Render::RT::VertexFormat::P3C3:
+                return VertexFormat::PositionColor;
+            case Render::RT::VertexFormat::P3C4:
+                return VertexFormat::PositionColorAlpha;
+            case Render::RT::VertexFormat::P3N3:
+                return VertexFormat::PositionNormal;
+            case Render::RT::VertexFormat::P2T2C4:
+                return VertexFormat::PositionUVColor;
+            case Render::RT::VertexFormat::P3O2C4:
+                return VertexFormat::WorldAnchorOffsetColor;
+            case Render::RT::VertexFormat::P3T2C4:
+                return VertexFormat::WorldPosUVColor;
+            }
+            return VertexFormat::PositionColor;
+        }
 
-VertexFormat fromRenderXFormat(Render::RT::VertexFormat fmt) {
-    switch (fmt) {
-    case Render::RT::VertexFormat::P3C3:   return VertexFormat::PositionColor;
-    case Render::RT::VertexFormat::P3C4:   return VertexFormat::PositionColorAlpha;
-    case Render::RT::VertexFormat::P3N3:   return VertexFormat::PositionNormal;
-    case Render::RT::VertexFormat::P2T2C4: return VertexFormat::PositionUVColor;
-    case Render::RT::VertexFormat::P3O2C4: return VertexFormat::WorldAnchorOffsetColor;
-    case Render::RT::VertexFormat::P3T2C4: return VertexFormat::WorldPosUVColor;
-    }
-    return VertexFormat::PositionColor;
-}
+        RenderSpace fromRenderXSpace(Render::RT::RenderSpace space)
+        {
+            return space == Render::RT::RenderSpace::Screen ? RenderSpace::Screen : RenderSpace::World;
+        }
 
-RenderSpace fromRenderXSpace(Render::RT::RenderSpace space) {
-    return space == Render::RT::RenderSpace::Screen ? RenderSpace::Screen : RenderSpace::World;
-}
+        PrimitiveType fromRenderXPrimitive(Render::RT::PrimitiveTopology topo)
+        {
+            switch (topo)
+            {
+            case Render::RT::PrimitiveTopology::Points:
+                return PrimitiveType::Points;
+            case Render::RT::PrimitiveTopology::Lines:
+                return PrimitiveType::Lines;
+            case Render::RT::PrimitiveTopology::LineStrip:
+                return PrimitiveType::Lines;
+            case Render::RT::PrimitiveTopology::LineLoop:
+                return PrimitiveType::Lines;
+            case Render::RT::PrimitiveTopology::Triangles:
+                return PrimitiveType::Triangles;
+            case Render::RT::PrimitiveTopology::TriangleStrip:
+                return PrimitiveType::Triangles;
+            }
+            return PrimitiveType::Triangles;
+        }
 
-PrimitiveType fromRenderXPrimitive(Render::RT::PrimitiveTopology topo) {
-    switch (topo) {
-    case Render::RT::PrimitiveTopology::Points:    return PrimitiveType::Points;
-    case Render::RT::PrimitiveTopology::Lines:     return PrimitiveType::Lines;
-    case Render::RT::PrimitiveTopology::LineStrip: return PrimitiveType::Lines;
-    case Render::RT::PrimitiveTopology::LineLoop: return PrimitiveType::Lines;
-    case Render::RT::PrimitiveTopology::Triangles: return PrimitiveType::Triangles;
-    case Render::RT::PrimitiveTopology::TriangleStrip: return PrimitiveType::Triangles;
-    }
-    return PrimitiveType::Triangles;
-}
+        FrameStatistics fromRenderXStats(const Render::RT::FrameStats& stats)
+        {
+            FrameStatistics out{};
+            out.drawCallCount = stats.drawCallCount;
+            out.triangleCount = stats.triangleCount;
+            out.lineCount = stats.lineCount;
+            out.pointCount = stats.pointCount;
+            out.pipelineSwitches = stats.pipelineSwitches;
+            out.culledCommandCount = stats.culledCommandCount;
+            out.mergedDrawCount = stats.mergedDrawCount;
+            out.transientBytesUsed = stats.transientBytesUsed;
+            out.geometryUploadBytes = stats.geometryUploadBytes;
+            out.gpuMemoryBytes = stats.gpuMemoryBytes;
+            return out;
+        }
 
-FrameStatistics fromRenderXStats(const Render::RT::FrameStats& stats) {
-    FrameStatistics out{};
-    out.drawCallCount = stats.drawCallCount;
-    out.triangleCount = stats.triangleCount;
-    out.lineCount = stats.lineCount;
-    out.pointCount = stats.pointCount;
-    out.pipelineSwitches = stats.pipelineSwitches;
-    out.culledCommandCount = stats.culledCommandCount;
-    out.mergedDrawCount = stats.mergedDrawCount;
-    out.transientBytesUsed = stats.transientBytesUsed;
-    out.geometryUploadBytes = stats.geometryUploadBytes;
-    out.gpuMemoryBytes = stats.gpuMemoryBytes;
-    return out;
-}
+        FontMetrics fromRenderXFontMetrics(const Render::RT::FontMetrics& metrics)
+        {
+            FontMetrics out{};
+            out.ascent = metrics.ascent;
+            out.descent = metrics.descent;
+            out.lineGap = metrics.lineGap;
+            out.pixelHeight = metrics.pixelHeight;
+            return out;
+        }
 
-FontMetrics fromRenderXFontMetrics(const Render::RT::FontMetrics& metrics) {
-    FontMetrics out{};
-    out.ascent = metrics.ascent;
-    out.descent = metrics.descent;
-    out.lineGap = metrics.lineGap;
-    out.pixelHeight = metrics.pixelHeight;
-    return out;
-}
-
-GlyphInfo fromRenderXGlyphInfo(const Render::RT::GlyphInfo& glyph) {
-    GlyphInfo out{};
-    out.u0 = glyph.u0;
-    out.v0 = glyph.v0;
-    out.u1 = glyph.u1;
-    out.v1 = glyph.v1;
-    out.bearingX = glyph.bearingX;
-    out.bearingY = glyph.bearingY;
-    out.width = glyph.width;
-    out.height = glyph.height;
-    out.advance = glyph.advance;
-    return out;
-}
-
-} // namespace RenderXConversion
-} // namespace RenderBridge
+        GlyphInfo fromRenderXGlyphInfo(const Render::RT::GlyphInfo& glyph)
+        {
+            GlyphInfo out{};
+            out.u0 = glyph.u0;
+            out.v0 = glyph.v0;
+            out.u1 = glyph.u1;
+            out.v1 = glyph.v1;
+            out.bearingX = glyph.bearingX;
+            out.bearingY = glyph.bearingY;
+            out.width = glyph.width;
+            out.height = glyph.height;
+            out.advance = glyph.advance;
+            return out;
+        }
+    }  // namespace RenderXConversion
+}  // namespace RenderBridge

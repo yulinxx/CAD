@@ -20,7 +20,6 @@
 
 namespace RenderBridge
 {
-
     class RENDERBRIDGE_API RenderXAdapter
     {
     public:
@@ -36,5 +35,4 @@ namespace RenderBridge
         RenderXAdapter() = delete;
         RenderXAdapter(const RenderXAdapter&) = delete;
     };
-
 }  // namespace RenderBridge

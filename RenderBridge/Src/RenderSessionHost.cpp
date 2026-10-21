@@ -72,14 +72,17 @@ namespace
     {
         return static_cast<Render::RT::RuntimeHandle>(v);
     }
+
     inline Render::RT::SurfaceHandle toSurface(uint64_t v)
     {
         return static_cast<Render::RT::SurfaceHandle>(v);
     }
+
     inline Render::RT::SessionHandle toSession(uint64_t v)
     {
         return static_cast<Render::RT::SessionHandle>(v);
     }
+
     inline bool isValid(uint64_t v)
     {
         return Render::RT::rxValid(toRuntime(v)) != 0;
@@ -198,7 +201,7 @@ namespace
             SY_INFOF("[SharedRuntime] Created process-level Metal runtime"
                      " (transient=%llu bytes; app-level lifetime, shared by 2D/3D, survives viewport recreation)",
                 static_cast<unsigned long long>(m_transientBytes));
-                
+
             return m_runtime;
         }
 
@@ -218,7 +221,8 @@ namespace
                 destroy("应用已请求退出，且最后一个视口已拆除");
                 return;
             }
-            SY_INFOF("[SharedRuntime] Viewport released (current holders: %u; runtime preserved for next viewport)", m_holders);
+            SY_INFOF("[SharedRuntime] Viewport released (current holders: %u; runtime preserved for next viewport)",
+                m_holders);
         }
 
         /// 应用退出：只置标志。真正销毁交给最后一个视口的 release()（见类注释）
@@ -409,7 +413,8 @@ namespace RenderBridge
 
     bool RenderSessionHost::isReady() const
     {
-        return isValid(m_runtime) && Render::RT::rxValid(toSurface(m_surface)) && Render::RT::rxValid(toSession(m_session));
+        return isValid(m_runtime) && Render::RT::rxValid(toSurface(m_surface)) &&
+            Render::RT::rxValid(toSession(m_session));
     }
 
     void RenderSessionHost::logCapabilities(const char* tag) const

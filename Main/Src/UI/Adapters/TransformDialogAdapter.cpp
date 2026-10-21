@@ -182,8 +182,8 @@ QDialog* TransformDialogAdapter::createDialog()
     UiDialogLayoutHelper::setupSecondaryButton(m_applyBtn);
     m_applyBtn->setObjectName("applyBtn");
 
-    QHBoxLayout* btnLayout = UiDialogLayoutHelper::createButtonLayout(
-        dialog, m_okBtn, m_cancelBtn, QList<QPushButton*>{m_applyBtn});
+    QHBoxLayout* btnLayout =
+        UiDialogLayoutHelper::createButtonLayout(dialog, m_okBtn, m_cancelBtn, QList<QPushButton*>{ m_applyBtn });
     mainLayout->addLayout(btnLayout);
 
     // 连接信号
@@ -212,18 +212,26 @@ QDialog* TransformDialogAdapter::createDialog()
     switch (m_transformType)
     {
     case TransformType::Move:
-        if (m_moveXSpinBox) tabOrder.addWidget(m_moveXSpinBox, 1, "MoveX");
-        if (m_moveYSpinBox) tabOrder.addWidget(m_moveYSpinBox, 2, "MoveY");
+        if (m_moveXSpinBox)
+            tabOrder.addWidget(m_moveXSpinBox, 1, "MoveX");
+        if (m_moveYSpinBox)
+            tabOrder.addWidget(m_moveYSpinBox, 2, "MoveY");
         break;
     case TransformType::Copy:
-        if (m_copyCountSpinBox) tabOrder.addWidget(m_copyCountSpinBox, 1, "CopyCount");
-        if (m_copySpacingXSpinBox) tabOrder.addWidget(m_copySpacingXSpinBox, 2, "CopySpacingX");
-        if (m_copySpacingYSpinBox) tabOrder.addWidget(m_copySpacingYSpinBox, 3, "CopySpacingY");
+        if (m_copyCountSpinBox)
+            tabOrder.addWidget(m_copyCountSpinBox, 1, "CopyCount");
+        if (m_copySpacingXSpinBox)
+            tabOrder.addWidget(m_copySpacingXSpinBox, 2, "CopySpacingX");
+        if (m_copySpacingYSpinBox)
+            tabOrder.addWidget(m_copySpacingYSpinBox, 3, "CopySpacingY");
         break;
     case TransformType::Rotate:
-        if (m_rotateAngleSpinBox) tabOrder.addWidget(m_rotateAngleSpinBox, 1, "RotateAngle");
-        if (m_rotateCenterXSpinBox) tabOrder.addWidget(m_rotateCenterXSpinBox, 2, "RotateCenterX");
-        if (m_rotateCenterYSpinBox) tabOrder.addWidget(m_rotateCenterYSpinBox, 3, "RotateCenterY");
+        if (m_rotateAngleSpinBox)
+            tabOrder.addWidget(m_rotateAngleSpinBox, 1, "RotateAngle");
+        if (m_rotateCenterXSpinBox)
+            tabOrder.addWidget(m_rotateCenterXSpinBox, 2, "RotateCenterX");
+        if (m_rotateCenterYSpinBox)
+            tabOrder.addWidget(m_rotateCenterYSpinBox, 3, "RotateCenterY");
         break;
     case TransformType::Mirror:
         // Radio buttons 和 spin boxes 会在 addMirrorInputs 中处理
@@ -231,9 +239,7 @@ QDialog* TransformDialogAdapter::createDialog()
     default:
         break;
     }
-    tabOrder.addWidget(m_okBtn, 10, "OK")
-            .addWidget(m_applyBtn, 11, "Apply")
-            .addWidget(m_cancelBtn, 12, "Cancel");
+    tabOrder.addWidget(m_okBtn, 10, "OK").addWidget(m_applyBtn, 11, "Apply").addWidget(m_cancelBtn, 12, "Cancel");
     tabOrder.apply();
 
     // 自适应尺寸与居中

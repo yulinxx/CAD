@@ -217,8 +217,7 @@ namespace RenderBridge
          * 必须由视口在 beginFrame / endFrame 之间调用。
          * 环容量不足时丢弃该批，宁可这一帧少画一笔，也不画出错位几何。
          */
-        void submit(RenderAbstraction::IRenderScene& scene,
-            std::vector<RenderAbstraction::DrawInstruction>& out) const;
+        void submit(RenderAbstraction::IRenderScene& scene, std::vector<RenderAbstraction::DrawInstruction>& out) const;
 
     private:
         struct SelectionBoxLayer
