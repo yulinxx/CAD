@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, master, develop]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test-windows:
     runs-on: windows-latest
@@ -146,3 +150,25 @@ jobs:
             -DBUILD_GEOMODELCORE_TESTS=ON
           cmake --build build-gmc --parallel
           ctest --test-dir build-gmc -C Release --output-on-failure --parallel
+
+  # ---------------------------------------------------------------------------
+  # 文档链接与过期检查
+  #
+  # 检查：
+  #   - Markdown 相对链接/图片是否指向存在的文件
+  #   - 文档是否被 README 或 Docs/00-索引与总览/ 下的索引文档链接
+  #   - 最后修改时间是否超过 365 天（默认）或状态说明日期超过 180 天
+  #   - 可选检查锚点 --check-anchors
+  #
+  # 只在 PR/推送时运行，不阻塞主构建的并行度。
+  # ---------------------------------------------------------------------------
+  docs-check:
+    name: Docs check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 需要完整历史做 git log 过期检查
+      - name: Check docs links & freshness
+        run: python3 Tools/docs_check.py --fail-on-stale --max-age-days 365 --review-max-age-days 180

@@ -214,9 +214,9 @@ SanYiCAD/
 
 | 平台 | 要求 |
 |------|------|
-| Windows | Windows 10+, MSVC 2022+, CMake 3.20+ |
-| Linux | Ubuntu 20.04+, GCC 11+, CMake 3.20+ |
-| macOS | macOS 12+, Clang 14+, CMake 3.20+ |
+| Windows | Windows 10+, MSVC 2022+, CMake 4.3+ |
+| Linux | Ubuntu 20.04+, GCC 11+, CMake 4.3+ |
+| macOS | macOS 12+, Clang 14+, CMake 4.3+ |
 
 ### 外部依赖
 
@@ -224,8 +224,11 @@ SanYiCAD/
 
 | 版本 | 说明 |
 |------|------|
-| Qt 5.15 | LTS 版本，稳定可靠 |
-| Qt 6.x | 最新版本，支持更好的 OpenGL/Vulkan |
+| Qt 6.x | 当前唯一支持的 Qt 主版本 |
+
+> 根 `CMakeLists.txt` 要求 **CMake 4.3+**；`Config.cmake` 只查找 **Qt6**
+> （`Qt6Config.cmake`），不再支持 Qt 5。使用 Qt 5 的旧构建配置会在 configure
+> 阶段直接失败。
 
 **Qt 组件**：Core, Gui, Widgets, OpenGLWidgets
 
@@ -262,7 +265,7 @@ vcpkg install pybind11:x64-windows
 # vcpkg 路径
 set(VCPKG_DIR "C:/Users/xx/vcpkg/" CACHE PATH "VCPKG installation directory")
 
-# Qt 版本（5 或 6）
+# Qt 主版本（当前工程固定为 6；不支持 Qt 5）
 set(QT_VERSION_MAJOR 6 CACHE STRING "Major version of Qt")
 
 # Qt 安装路径
@@ -326,7 +329,7 @@ open SanYiCAD.app
 
 基于 RSA-2048 非对称加密 + 机器指纹绑定的离线注册码系统。
 
-详细文档：[`Main/Src/License/LicenseManager.md`](Main/Src/License/LicenseManager.md)
+详细文档：[`Licensing/License/README.md`](Licensing/License/README.md)
 
 ### 架构概览
 
@@ -425,7 +428,7 @@ void OnSave() {
 - [渲染管线](Docs/03-渲染主链/渲染管线.md)
 - [GPU 渲染边界](Docs/03-渲染主链/gpu-renderer-boundary.md)
 - [3D 架构现状与约束](Docs/03-渲染主链/3D%20架构现状与约束.md)
-- [许可证模块文档](Main/Src/License/LicenseManager.md)
+- [许可证模块文档](Licensing/License/README.md)
 
 ---
 

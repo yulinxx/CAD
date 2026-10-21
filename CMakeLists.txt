@@ -328,6 +328,7 @@ install(TARGETS SanYiCAD
 # 安装所有项目动态库
 set(SANYI_PROJECT_LIBS
     Utility Log License
+    EngineCommon Engine2D
 )
 if(BUILD_CRASHHANDLER)
     list(APPEND SANYI_PROJECT_LIBS CrashHandler)

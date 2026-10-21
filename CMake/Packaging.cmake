@@ -49,6 +49,9 @@ if(WIN32)
 
     # NSIS 专用设置
     set(CPACK_NSIS_DISPLAY_NAME "SanYi CAD")
+
+    # 升级时先调用旧版本的 uninstall.exe，再安装新版本，避免残留旧 DLL。
+    set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
     set(CPACK_NSIS_PACKAGE_NAME "SanYiCAD")
     set(CPACK_NSIS_MANUFACTURER "SanYi Technology")
     set(CPACK_NSIS_HELP_LINK "https://www.sanyi-cad.com/support")
@@ -137,29 +140,17 @@ else()
 endif()
 
 # ============================================================================
-# 基于组件的打包（可选）
+# 组件策略
 # ============================================================================
-set(CPACK_COMPONENTS_ALL Runtime Libraries Translations Resources Python)
-
-set(CPACK_COMPONENT_RUNTIME_DISPLAY_NAME "SanYi CAD 应用程序")
-set(CPACK_COMPONENT_RUNTIME_DESCRIPTION "主程序可执行文件和核心动态库")
-set(CPACK_COMPONENT_RUNTIME_GROUP "Runtime")
-
-set(CPACK_COMPONENT_LIBRARIES_DISPLAY_NAME "库文件")
-set(CPACK_COMPONENT_LIBRARIES_DESCRIPTION "动态库和插件")
-set(CPACK_COMPONENT_LIBRARIES_GROUP "Runtime")
-
-set(CPACK_COMPONENT_TRANSLATIONS_DISPLAY_NAME "翻译文件")
-set(CPACK_COMPONENT_TRANSLATIONS_DESCRIPTION "语言翻译文件")
-set(CPACK_COMPONENT_TRANSLATIONS_GROUP "Resources")
-
-set(CPACK_COMPONENT_RESOURCES_DISPLAY_NAME "资源文件")
-set(CPACK_COMPONENT_RESOURCES_DESCRIPTION "应用程序资源和样式")
-set(CPACK_COMPONENT_RESOURCES_GROUP "Resources")
-
-set(CPACK_COMPONENT_PYTHON_DISPLAY_NAME "Python 集成")
-set(CPACK_COMPONENT_PYTHON_DESCRIPTION "Python 脚本和插件支持")
-set(CPACK_COMPONENT_PYTHON_GROUP "Runtime")
+# 这里刻意不设置 CPACK_COMPONENTS_ALL：
+#   install(TARGETS SanYiCAD ...) 没有写 COMPONENT，会被归入 "Unspecified"。
+#   一旦设置 CPACK_COMPONENTS_ALL 却漏掉 Unspecified，CPack 会“成功”打出一个
+#   不含主程序/核心 DLL 的安装包。当前安装包按单组件整体交付，先保持全量打包，
+#   等真正需要可选组件时再逐项补齐组件归属。
+#
+# 安装目录必须稳定（不能随版本号变化），否则 NSIS 升级会装成并存的两个目录，
+# 而不是覆盖升级。
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "SanYiCAD")
 
 # ============================================================================
 # CPack 变量
