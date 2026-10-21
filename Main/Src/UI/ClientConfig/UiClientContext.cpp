@@ -2,8 +2,12 @@
 
 #include "Log/SyLogger.h"
 
+#include <QCoreApplication>
+#include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QSettings>
+#include <QStandardPaths>
 
 const char* const UiClientContext::kDefaultClientId = "san_yi";
 
@@ -29,6 +33,28 @@ void UiClientContext::setClientIdOverride(const QString& clientId)
     }
 }
 
+QString UiClientContext::readClientIdFile(const QString& appDir)
+{
+    const QString dir = appDir.isEmpty() && QCoreApplication::instance() ? QCoreApplication::applicationDirPath() : appDir;
+    if (dir.isEmpty())
+    {
+        return {};
+    }
+
+    QFile file(QDir(dir).filePath(QStringLiteral("client.id")));
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        return {};
+    }
+
+    const QString firstLine = QString::fromUtf8(file.readLine()).trimmed();
+    if (firstLine.startsWith(QChar(0xFEFF)))
+    {
+        return firstLine.mid(1).trimmed();
+    }
+    return firstLine;
+}
+
 QString UiClientContext::resolveClientId(QString& sourceOut)
 {
     // 优先级 2：环境变量，供 CI 与现场排查临时切换客户
@@ -42,16 +68,27 @@ QString UiClientContext::resolveClientId(QString& sourceOut)
         }
     }
 
-    // 优先级 3：用户设置，安装包在部署时写入客户标识
-    QSettings settings;
-    const QString fromSettings = settings.value(QStringLiteral("Client/Id")).toString().trimmed();
-    if (!fromSettings.isEmpty())
+    // 优先级 3：交付包内置的 client.id，是现场部署唯一需要改写的文件
+    const QString fromFile = readClientIdFile();
+    if (!fromFile.isEmpty())
     {
-        sourceOut = QStringLiteral("QSettings Client/Id");
-        return fromSettings;
+        sourceOut = QStringLiteral("client.id next to executable");
+        return fromFile;
     }
 
-    // 优先级 4：内置默认
+    // 优先级 4：用户设置，兼容旧安装包写入的客户标识
+    if (QCoreApplication::instance())
+    {
+        QSettings settings;
+        const QString fromSettings = settings.value(QStringLiteral("Client/Id")).toString().trimmed();
+        if (!fromSettings.isEmpty())
+        {
+            sourceOut = QStringLiteral("QSettings Client/Id");
+            return fromSettings;
+        }
+    }
+
+    // 优先级 5：内置默认
     sourceOut = QStringLiteral("built-in default");
     return QString::fromUtf8(kDefaultClientId);
 }
@@ -80,15 +117,51 @@ const QString& UiClientContext::clientId() const
     return m_cachedClientId;
 }
 
+QStringList UiClientContext::configCandidatePaths(const QString& clientId)
+{
+    QStringList paths;
+    if (clientId.trimmed().isEmpty())
+    {
+        return paths;
+    }
+
+    // 1. 用户配置目录：运维可在不改安装包的情况下热修单个客户
+    const QString userConfigDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    if (!userConfigDir.isEmpty())
+    {
+        paths << QDir(userConfigDir + QStringLiteral("/ui")).filePath(clientId + QStringLiteral(".json"));
+    }
+
+    // 2. 交付包目录：exe 同级的 configs/<id>.json
+    if (QCoreApplication::instance())
+    {
+        paths << QDir(QCoreApplication::applicationDirPath() + QStringLiteral("/configs"))
+                     .filePath(clientId + QStringLiteral(".json"));
+    }
+
+    // 3. 内置资源：随 qrc 编入
+    paths << QStringLiteral(":/configs/%1.json").arg(clientId);
+    return paths;
+}
+
 QString UiClientContext::configResourcePathFor(const QString& clientId)
 {
-    return QStringLiteral(":/configs/%1.json").arg(clientId);
+    const QStringList candidates = configCandidatePaths(clientId);
+    for (const QString& path : candidates)
+    {
+        if (QFile::exists(path))
+        {
+            return path;
+        }
+    }
+    return candidates.isEmpty() ? QString() : candidates.constLast();
 }
 
 QString UiClientContext::configResourcePath() const
 {
-    const QString path = configResourcePathFor(clientId());
-    if (QFile::exists(path))
+    const QString client = clientId();
+    const QString path = configResourcePathFor(client);
+    if (!path.isEmpty() && QFile::exists(path))
     {
         return path;
     }
@@ -97,7 +170,10 @@ QString UiClientContext::configResourcePath() const
     // 这里不能直接失败：UI 构建已无硬编码回退路径，加载失败会导致空窗口。
     const QString fallback = configResourcePathFor(QString::fromUtf8(kDefaultClientId));
     SY_WARNF(
-        "[UiClientContext] Client config not found: '%s', falling back to '%s'", qPrintable(path), qPrintable(fallback));
+        "[UiClientContext] Client config not found for '%s' (last candidate: '%s'), falling back to '%s'",
+        qPrintable(client),
+        qPrintable(path),
+        qPrintable(fallback));
     return fallback;
 }
 

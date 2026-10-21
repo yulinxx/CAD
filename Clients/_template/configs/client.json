@@ -1,0 +1,17 @@
+{
+  "meta": {
+    "clientId": "__CLIENT_ID__",
+    "clientName": "__PRODUCT_NAME__",
+    "version": "1",
+    "extends": "base"
+  },
+  "docks": [
+    {
+      "id": "__CLIENT_ID__.welcomeDock",
+      "title": "__PRODUCT_NAME__",
+      "position": "left",
+      "widgetType": "__CLIENT_ID__.welcome",
+      "visible": true
+    }
+  ]
+}

@@ -7,6 +7,7 @@
 #include <string>
 
 #include "Log/SyLogger.h"
+#include "UI/ClientConfig/UiBrandManager.h"
 #include "Ut/BundleResources.h"
 #include "VersionInfo.h"
 
@@ -33,6 +34,9 @@ static void setupNativeMenuBar()
 // 返回值：>=0 表示退出（返回值为 exit code），<0 表示继续启动 GUI
 static int handleCliFlags(int argc, char** argv)
 {
+    const std::string productName = UiBrandManager::instance().productName().toStdString();
+    const std::string companyName = UiBrandManager::instance().companyName().toStdString();
+
     // 遍历命令行参数
     for (int i = 1; i < argc; ++i)
     {
@@ -41,11 +45,12 @@ static int handleCliFlags(int argc, char** argv)
         // --help / -h / -?
         if (arg == "--help" || arg == "-h" || arg == "-?")
         {
-            std::printf("Usage: %s [options] [file]\n", MainApp::appName().c_str());
+            std::printf("Usage: %s [options] [file]\n", productName.c_str());
             std::printf("\n");
             std::printf("Options:\n");
             std::printf("  -v, --version           Show version information\n");
             std::printf("  -h, --help              Show this help message\n");
+            std::printf("  --client=<id>           Start with the specified client profile\n");
             std::printf("\n");
             std::printf("File Options:\n");
             std::printf("  [file]                 Open specified file on startup\n");
@@ -57,8 +62,8 @@ static int handleCliFlags(int argc, char** argv)
         // --version / -v / --version-long
         if (arg == "--version" || arg == "-v" || arg == "--version-long")
         {
-            std::printf("%s %s\n", MainApp::appName().c_str(), MainApp::appVersion().c_str());
-            std::printf("Copyright (C) 2026 %s\n", MainApp::organizationName().c_str());
+            std::printf("%s %s\n", productName.c_str(), QCoreApplication::applicationVersion().toStdString().c_str());
+            std::printf("%s\n", UiBrandManager::instance().copyright().toStdString().c_str());
             std::printf("License: Proprietary\n");
             return 0;
         }
@@ -66,14 +71,10 @@ static int handleCliFlags(int argc, char** argv)
         // --version-full: 详细版本信息
         if (arg == "--version-full")
         {
-            std::printf("%s %d.%d.%d\n",
-                MainApp::appName().c_str(),
-                MainApp::versionMajor(),
-                MainApp::versionMinor(),
-                MainApp::versionPatch());
+            std::printf("%s %s\n", productName.c_str(), QCoreApplication::applicationVersion().toStdString().c_str());
             std::printf("\n");
-            std::printf("Organization: %s\n", MainApp::organizationName().c_str());
-            std::printf("Domain: %s\n", MainApp::organizationDomain().c_str());
+            std::printf("Organization: %s\n", companyName.c_str());
+            std::printf("Domain: %s\n", QCoreApplication::organizationDomain().toStdString().c_str());
             std::printf("\n");
             std::printf("This is proprietary software. All rights reserved.\n");
             return 0;
@@ -82,31 +83,27 @@ static int handleCliFlags(int argc, char** argv)
         // --version-all: 最详细版本信息（含构建信息）
         if (arg == "--version-all")
         {
-            std::printf("%s %d.%d.%d\n",
-                MainApp::appName().c_str(),
-                MainApp::versionMajor(),
-                MainApp::versionMinor(),
-                MainApp::versionPatch());
+            std::printf("%s %s\n", productName.c_str(), QCoreApplication::applicationVersion().toStdString().c_str());
             std::printf("\n");
-            std::printf("Application: %s\n", MainApp::appName().c_str());
-            std::printf("Version: %s\n", MainApp::appVersion().c_str());
-            std::printf("Organization: %s\n", MainApp::organizationName().c_str());
-            std::printf("Organization Domain: %s\n", MainApp::organizationDomain().c_str());
+            std::printf("Application: %s\n", productName.c_str());
+            std::printf("Version: %s\n", QCoreApplication::applicationVersion().toStdString().c_str());
+            std::printf("Organization: %s\n", companyName.c_str());
+            std::printf("Organization Domain: %s\n", QCoreApplication::organizationDomain().toStdString().c_str());
             std::printf("\n");
             std::printf("Build Information:\n");
             std::printf("  Build Date: %s\n", MainApp::buildDate().c_str());
             std::printf("  Build Time: %s (UTC)\n", MainApp::buildTime().c_str());
             std::printf("  Build Type: %s\n", MainApp::buildType().c_str());
             std::printf("\n");
-            std::printf("Copyright (C) 2026 %s. All rights reserved.\n", MainApp::organizationName().c_str());
+            std::printf("%s\n", UiBrandManager::instance().copyright().toStdString().c_str());
             return 0;
         }
 
         // --authors: 显示作者/贡献者信息
         if (arg == "--authors")
         {
-            std::printf("%s\n", MainApp::appName().c_str());
-            std::printf("Copyright (C) 2026 %s\n", MainApp::organizationName().c_str());
+            std::printf("%s\n", productName.c_str());
+            std::printf("%s\n", UiBrandManager::instance().copyright().toStdString().c_str());
             std::printf("\n");
             std::printf("Authors:\n");
             std::printf("  SanYi Development Team <dev@sanyi-cad.com>\n");
@@ -116,9 +113,9 @@ static int handleCliFlags(int argc, char** argv)
         // --license: 显示许可证信息
         if (arg == "--license")
         {
-            std::printf("%s - License Information\n", MainApp::appName().c_str());
+            std::printf("%s - License Information\n", productName.c_str());
             std::printf("\n");
-            std::printf("Copyright (C) 2026 %s\n", MainApp::organizationName().c_str());
+            std::printf("%s\n", UiBrandManager::instance().copyright().toStdString().c_str());
             std::printf("\n");
             std::printf("This software is proprietary and confidential. Unauthorized copying,\n");
             std::printf("distribution, or use of this software, via any medium, is strictly\n");
@@ -140,18 +137,18 @@ int runCADApplication(int argc, char** argv)
     setupHighDpiScaling();
     setupNativeMenuBar();
 
+    // 品牌必须在 QApplication 与任何路径解析之前加载：只依赖 argv / 环境变量 / client.id，
+    // 这样 organizationName / applicationName 从第一天就是客户身份。
+    auto& brandManager = UiBrandManager::instance();
+    brandManager.loadForProcess(argc, argv);
+    brandManager.applyApplicationIdentity();
+
     // 命令行标志优先处理：--version/-v、--help/-h 命中即退出，不启动 GUI
     const int cliResult = handleCliFlags(argc, argv);
     if (cliResult >= 0)
     {
         return cliResult;
     }
-
-    // 必须在 QApplication 创建前设置组织名和应用名，确保 Qt 内部组件（如字体缓存）
-    // 使用正确的路径，避免出现 AppData/Roaming/SanYi 等错误路径
-    QCoreApplication::setOrganizationName(QString::fromStdString(MainApp::organizationName()));
-    QCoreApplication::setOrganizationDomain(QString::fromStdString(MainApp::organizationDomain()));
-    QCoreApplication::setApplicationName(QString::fromStdString(MainApp::appName()));
 
     // QApplication 必须在 buildAppPaths() 之前创建，否则 AppPathManager 在解析路径时
     // 调用 QCoreApplication::applicationDirPath() 会因 QApplication 尚未存在而告警。
@@ -161,7 +158,10 @@ int runCADApplication(int argc, char** argv)
     // 必须在 QApplication 创建后调用，以确保 QCoreApplication::applicationDirPath() 可用
     Ut::BundleResources::initialize();
 
-    auto appPaths = MainApp::buildAppPaths(MainApp::appName());
+    // 品牌运行期资源：窗口图标、默认主题、图标目录、品牌 QSS
+    brandManager.applyRuntimeIdentity();
+
+    auto appPaths = MainApp::buildAppPaths(brandManager.productName().toStdString());
     if (appPaths.appRootPath.empty())
     {
 #ifdef _WIN32

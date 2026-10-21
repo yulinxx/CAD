@@ -588,6 +588,7 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
         ${PROTO_GEN_SRC}
         ${SRC_ROOT}/UI/ClientConfig/ExampleCustomPanel.h
         ${SRC_ROOT}/UI/ClientConfig/configs.qrc
+        ${SRC_ROOT}/UI/ClientConfig/branding/branding.qrc
     )
 
     target_compile_features(MainTests PRIVATE cxx_std_17)

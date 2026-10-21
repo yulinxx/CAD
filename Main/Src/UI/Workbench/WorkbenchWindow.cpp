@@ -130,6 +130,7 @@
 #include "UI/ThemeManager.h"
 #include "UI/Settings/SettingsService.h"
 #include "UI/Interaction/UiInteractionGate.h"
+#include "UI/ClientConfig/UiBrandManager.h"
 #include "UI/ClientConfig/UiLabelLocalizer.h"
 
 #include <QCloseEvent>
@@ -145,7 +146,7 @@ WorkbenchWindow::WorkbenchWindow(QWidget* parent)
 {
     SY_DEBUG("[WorkbenchWindow] Creating main window");
 
-    setWindowTitle(QString::fromStdString(MainApp::appName()));
+    setWindowTitle(UiBrandManager::instance().windowTitle());
     resize(1440, 900);
     // 启用文件拖放，2D/3D 工作台共用统一 FileDropHandler
     setAcceptDrops(true);
@@ -195,7 +196,7 @@ void WorkbenchWindow::retranslateUi()
     // 清除 UI 布局缓存（语言切换时必须，否则会返回旧语言的缓存翻译）
     clearTranslationCache();
 
-    setWindowTitle(QString::fromStdString(MainApp::appName()));
+    setWindowTitle(UiBrandManager::instance().windowTitle());
 
     // 语言切换时重建菜单文案。
     // 配置驱动是唯一路径，菜单统一由 WorkbenchMenuManager 从客户 JSON 生成，

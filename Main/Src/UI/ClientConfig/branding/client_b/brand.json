@@ -1,0 +1,14 @@
+{
+  "clientId": "client_b",
+  "productName": "OrionCAD",
+  "companyName": "Orion Systems",
+  "appId": "OrionCAD",
+  "organizationDomain": "orion.example",
+  "windowTitle": "OrionCAD",
+  "tagline": "Precision Design for Orion",
+  "copyright": "Copyright (C) 2026 Orion Systems. All rights reserved.",
+  "website": "https://orion.example",
+  "supportEmail": "support@orion.example",
+  "theme": "blue",
+  "splashDurationMs": 800
+}

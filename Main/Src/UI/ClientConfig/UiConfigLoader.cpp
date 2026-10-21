@@ -192,6 +192,24 @@ std::optional<UiConfigData> UiConfigLoader::loadWithInheritance(const QString& p
             parentPath += QStringLiteral(".json");
         }
 
+        // 外置客户配置（<exe>/configs/<id>.json）只需带自己的差异文件；
+        // 父配置缺失时回退到内置资源，避免整个 UI 因少拷 base.json 而回落为空。
+        if (!QFile::exists(parentPath) && !extends.contains(QChar('/')))
+        {
+            QString embedded = QStringLiteral(":/configs/%1").arg(extends);
+            if (!embedded.endsWith(QStringLiteral(".json"), Qt::CaseInsensitive))
+            {
+                embedded += QStringLiteral(".json");
+            }
+            if (QFile::exists(embedded))
+            {
+                SY_INFOF("[UiConfigLoader] Parent '%s' not found next to client config, using embedded '%s'",
+                         qPrintable(parentPath),
+                         qPrintable(embedded));
+                parentPath = embedded;
+            }
+        }
+
         auto parent = loadWithInheritance(parentPath);
         if (!parent)
         {

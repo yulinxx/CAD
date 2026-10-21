@@ -306,6 +306,15 @@ void SceneRefreshCoordinator::requestLightRefresh()
 
 void SceneRefreshCoordinator::requestFullRefresh()
 {
+    // 追踪：谁在反复调用 requestFullRefresh
+    static std::chrono::steady_clock::time_point s_lastLog;
+    auto now = std::chrono::steady_clock::now();
+    if (now - s_lastLog >= std::chrono::milliseconds(1000))
+    {
+        s_lastLog = now;
+        SY_DEBUGF("[SceneRefreshCoordinator] requestFullRefresh called (prevLevel=%d)", static_cast<int>(m_refreshLevel));
+    }
+
     // 全量刷新：重建所有渲染数据
     m_refreshLevel = RefreshLevel::FullRefresh;
     scheduleFullRefresh();
@@ -395,6 +404,17 @@ void SceneRefreshCoordinator::requestViewportRefresh()
 // 收集脏/删除图元 ID，升级到 LightUpdate 级别
 void SceneRefreshCoordinator::onSceneChanged()
 {
+    // 追踪：每次场景变更都打一下，看看空场景下谁在反复触发
+    static std::chrono::steady_clock::time_point s_lastLog;
+    auto now = std::chrono::steady_clock::now();
+    if (now - s_lastLog >= std::chrono::milliseconds(1000))
+    {
+        s_lastLog = now;
+        SY_DEBUGF("[SceneRefreshCoordinator] onSceneChanged: lastCursor=%llu revision=%llu",
+            static_cast<unsigned long long>(m_lastCursor),
+            m_sceneManager ? static_cast<unsigned long long>(m_sceneManager->currentRevision()) : 0);
+    }
+
     if (m_sceneManager)
     {
         Eg::SceneChangeSet changes;
@@ -851,6 +871,18 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     if (!m_renderWidget || !sm)
     {
         return;
+    }
+
+    // 追踪 FullRefresh 触发原因与游标状态，定位空场景下的循环触发源头
+    static std::chrono::steady_clock::time_point s_lastFullRefreshLog;
+    auto now = std::chrono::steady_clock::now();
+    if (now - s_lastFullRefreshLog >= std::chrono::milliseconds(1000))
+    {
+        s_lastFullRefreshLog = now;
+        SY_DEBUGF("[SceneRefreshCoordinator] applyFullRefresh: lastCursor=%llu revision=%llu pendingDirty=%zu pendingDeleted=%zu",
+            static_cast<unsigned long long>(m_lastCursor),
+            static_cast<unsigned long long>(sm->currentRevision()),
+            m_pendingDirtyIds.size(), m_pendingDeletedIds.size());
     }
 
     // 全量重建：几何与台账都由 RenderSceneBuilder 的装配轮次自行对齐

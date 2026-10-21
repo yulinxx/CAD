@@ -1,6 +1,7 @@
 #include "UiBuiltinPanels.h"
 
 #include "UiClientContext.h"
+#include "UiClientPluginHost.h"
 #include "UiFeatureGate.h"
 #include "UiPanelRegistry.h"
 #include "UiPropertiesPanel.h"
@@ -79,6 +80,9 @@ void registerBuiltinUiPanels(UiPanelRegistry& registry)
     registry.registerPanel(QStringLiteral("MessageLabel"), [](QWidget* parent) {
         return static_cast<QWidget*>(makeStatusLabel(parent, QString()));
     });
+
+    // 客户插件面板：只注册当前客户目录下的插件；重复 id 会被宿主拒绝
+    UiClientPluginHost::instance().applyPanels(registry);
 
     SY_DEBUGF("[UiBuiltinPanels] Registered %d builtin panel/slot factories: %s",
         static_cast<int>(registry.registeredPanelIds().size()),
