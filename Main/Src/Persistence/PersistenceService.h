@@ -2,9 +2,6 @@
 
 #include <memory>
 #include <string>
-#include <mutex>
-#include <condition_variable>
-#include <atomic>
 #include <unordered_map>
 #include <typeindex>
 #include <functional>
@@ -56,14 +53,15 @@ public:
     /// @return 成功返回 true
     bool initialize(const std::string& dbPath);
 
-    /// 安全关闭数据库连接（等待所有活跃操作完成）
+    /// 安全关闭数据库连接
+    ///
+    /// 并发保护的真实来源是 Eg::Database 内部的互斥量：每个数据库操作都在锁内完成，
+    /// close() 也持同一把锁，因此不会有「操作执行到一半被关库」的情况。
+    /// 仓库层没有别的线程写库（导入、图层同步、设置写入都在 UI 线程）。
     void shutdown();
 
     /// 数据库连接是否已打开
     bool isOpen() const;
-
-    /// 获取活跃操作计数（用于调试和测试）
-    int activeOperationCount() const;
 
     /// 获取数据库引用（供仓储注册使用）
     Eg::Database& database() { return *m_database; }
@@ -121,10 +119,4 @@ private:
 
     // 状态
     std::string m_lastError;
-
-    // 线程安全：活跃操作追踪
-    mutable std::mutex m_activeOpMutex;
-    std::condition_variable m_activeOpCv;
-    std::atomic<int> m_activeOperations{ 0 };
-    bool m_shuttingDown{ false };
 };

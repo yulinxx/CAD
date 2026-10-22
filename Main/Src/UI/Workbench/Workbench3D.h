@@ -35,6 +35,13 @@ class Workbench3D final : public WorkbenchBase
     Q_OBJECT
 
 public:
+    /// 构造函数定义在 .cpp：类里有几个只前向声明的 3D 类型
+    /// （unique_ptr<UndoRedoManager3D> / <DocumentManager3D> / <MainWindow3D>），
+    /// 隐式默认构造函数会在**每个使用点**实例化，析构成员时需要完整类型 ——
+    /// 那些翻译单元并没有包含对应的 3D 头，会报
+    /// 「can't delete an incomplete type」。显式声明后，实例化只发生在 .cpp。
+    Workbench3D();
+
     ~Workbench3D() override;
 
 public:

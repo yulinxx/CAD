@@ -49,12 +49,26 @@ void SceneDocument2D::setFilePath(const char* path)
 
 bool SceneDocument2D::isModified() const
 {
-    return m_isModified;
+    // 文档的「已修改」直接取场景的脏标记：引擎层（SceneManager）是唯一事实源。
+    // 文档层以前另存了一份 m_isModified，只在 create* 里置 true，既不被读取、
+    // 也不会在保存后清除 —— 是纯粹的死状态。
+    return m_scene ? m_scene->isDirty() : false;
 }
 
 void SceneDocument2D::setModified(bool modified)
 {
-    m_isModified = modified;
+    if (!m_scene)
+    {
+        return;
+    }
+    if (modified)
+    {
+        m_scene->markDirty();
+    }
+    else
+    {
+        m_scene->clearDirty();
+    }
 }
 
 static Ut::Vec2d toVec2d(const QPointF& p)
@@ -110,7 +124,6 @@ QString SceneDocument2D::createLine(const QPointF& start, const QPointF& end)
         return {};
     }
 
-    m_isModified = true;
     return QString::number(added->id);
 }
 
@@ -139,10 +152,6 @@ QString SceneDocument2D::createPolyline(const QVector<QPointF>& points)
     }
 
     QString id = added ? QString::number(added->id) : QString();
-    if (added)
-    {
-        m_isModified = true;
-    }
     return id;
 }
 
@@ -163,10 +172,6 @@ QString SceneDocument2D::createCircle(const QPointF& center, double radius)
     }
 
     QString id = added ? QString::number(added->id) : QString();
-    if (added)
-    {
-        m_isModified = true;
-    }
     return id;
 }
 
@@ -189,10 +194,6 @@ QString SceneDocument2D::createArc(const QPointF& center, double radius, double 
     }
 
     QString id = added ? QString::number(added->id) : QString();
-    if (added)
-    {
-        m_isModified = true;
-    }
     return id;
 }
 
@@ -225,10 +226,6 @@ QString SceneDocument2D::createPolygon(const QVector<QPointF>& vertices)
     }
 
     QString id = added ? QString::number(added->id) : QString();
-    if (added)
-    {
-        m_isModified = true;
-    }
     return id;
 }
 
@@ -250,10 +247,6 @@ QString SceneDocument2D::createBezier2(const QPointF& start, const QPointF& cont
     }
 
     QString id = added ? QString::number(added->id) : QString();
-    if (added)
-    {
-        m_isModified = true;
-    }
     return id;
 }
 
@@ -277,10 +270,6 @@ QString SceneDocument2D::createBezier(
     }
 
     QString id = added ? QString::number(added->id) : QString();
-    if (added)
-    {
-        m_isModified = true;
-    }
     return id;
 }
 
@@ -310,10 +299,6 @@ QString SceneDocument2D::createNurbs(const QVector<QPointF>& controlPoints)
     }
 
     QString id = added ? QString::number(added->id) : QString();
-    if (added)
-    {
-        m_isModified = true;
-    }
     return id;
 }
 
@@ -342,10 +327,6 @@ QString SceneDocument2D::createSmartLine(const QVector<QPointF>& points)
     }
 
     QString id = added ? QString::number(added->id) : QString();
-    if (added)
-    {
-        m_isModified = true;
-    }
     return id;
 }
 
@@ -372,10 +353,6 @@ QString SceneDocument2D::createText(const QPointF& position, const QString& text
     }
 
     QString id = added ? QString::number(added->id) : QString();
-    if (added)
-    {
-        m_isModified = true;
-    }
     return id;
 }
 
@@ -405,10 +382,6 @@ QString SceneDocument2D::createSpline(const QVector<QPointF>& points)
     }
 
     QString id = added ? QString::number(added->id) : QString();
-    if (added)
-    {
-        m_isModified = true;
-    }
     return id;
 }
 
@@ -477,7 +450,6 @@ bool SceneDocument2D::tryRemoveEntity(const QString& id)
     SY_DEBUGF("[SceneDocument2D] entity removed: id=%s via=%s",
         qPrintable(id),
         m_editService ? "SceneEditService" : "SceneManager");
-    m_isModified = true;
     return true;
 }
 
@@ -516,7 +488,6 @@ void SceneDocument2D::clear()
 
     const auto count = m_scene->getAllEntities().size();
     m_scene->clearScene();
-    m_isModified = true;
     SY_DEBUGF("[SceneDocument2D] document cleared: entities=%lld", static_cast<long long>(count));
 }
 

@@ -199,6 +199,15 @@ public:
     void requestLightRefresh();
     /// 全量刷新 — 完整 gather + submit（导入、大批量修改、文档加载后）
     void requestFullRefresh();
+    /**
+     * @brief 图层显隐变化
+     *
+     * 图层显隐不是「某个图元内容变了」，而是「整层图元要不要上 GPU」：
+     * 隐藏走增量摘除（只清该层当前在 GPU 上的几何），显示走全量重建
+     * （要重新上传，且全量路径带视口裁剪）。曾经两侧都走全量重建，
+     * 几十万图元时点一下图层眼睛要十几秒。
+     */
+    void applyLayerVisibilityChanged(int layerId, bool visible);
     void setPanModeEnabled(bool enabled);
     bool isPanModeEnabled() const;
     void setDrawingEnabled(bool enabled);

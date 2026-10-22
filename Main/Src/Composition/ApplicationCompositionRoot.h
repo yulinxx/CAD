@@ -71,7 +71,10 @@ public:
     ApplicationCompositionRoot();
     ~ApplicationCompositionRoot();
 
-    /// 获取应用共享 SettingsService singleton
+    /// 获取应用共享的 SettingsService
+    ///
+    /// 正常路径返回组合根持有的实例（生命周期随组合根）。
+    /// 组合根尚未创建时（极早期启动路径）返回一份进程级兜底实例。
     static SettingsService* getSettingsService();
 
     /// 获取 ApplicationCompositionRoot 单例实例（由 AppBootstrapper 创建时设置）
@@ -310,6 +313,9 @@ private:
 
     /// UI 状态中心
     std::unique_ptr<UiStateCenter> m_stateCenter;
+
+    /// 设置服务（自持数据库连接；与业务库同一个文件，见 AppPathManager::databasePath）
+    std::unique_ptr<SettingsService> m_settingsService;
 
     /// 布局服务
     std::unique_ptr<UiLayoutService> m_layoutService;

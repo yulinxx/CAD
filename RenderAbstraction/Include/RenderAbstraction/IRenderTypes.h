@@ -368,8 +368,21 @@ enum class RenderBackend : int32_t {
 };
 
 // ==================== 排序键 ====================
+//
+// 位布局（共 64 位，从高到低）：
+//   [63:56] layer      —— 图层组（场景 / 覆盖层 / 网格 / HUD …）
+//   [55:48] transparent —— 是否半透明
+//   [47:32] depth      —— z-order 深度
+//   [31:0]  seq        —— 同层内的绘制顺序
+//
+// depth 必须是 16 位：图层深度值由「图层绘制序号」反算而来（0xFFFF - layerIndex），
+// 而图层数量上限是 1024，用 8 位承载会截断 —— 图层 0 与图层 256 会得到同一个深度，
+// z 序在第 256 层之后不再单调。
+//
+// seq 必须是 32 位：同一次全量重建里每个图元都要占一个序号，几十万图元时
+// 16 位会回绕，回绕点之后的图元与前面的图元拿到相同序号，绘制顺序不再确定。
 
-inline uint64_t makeSortKey(uint8_t layer, uint8_t transparent, uint8_t depth, uint16_t seq) {
+inline uint64_t makeSortKey(uint8_t layer, uint8_t transparent, uint16_t depth, uint32_t seq) {
     return (static_cast<uint64_t>(layer) << 56)
          | (static_cast<uint64_t>(transparent) << 48)
          | (static_cast<uint64_t>(depth) << 32)

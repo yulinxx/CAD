@@ -169,6 +169,13 @@ QString Workbench3D::commandText(const QString& commandId) const
     return entry && entry->text ? QString::fromUtf8(entry->text) : QString();
 }
 
+// 构造函数放这里（而不是隐式生成）：类的成员里有几个只前向声明的 3D 类型
+// （unique_ptr<UndoRedoManager3D> / <DocumentManager3D> / <MainWindow3D>），
+// 隐式默认构造函数会在每个使用点实例化，析构成员时需要完整类型 ——
+// 那些翻译单元并没有包含对应的 3D 头，会报「can't delete an incomplete type」。
+// 显式定义后，实例化只发生在这个文件里（这里有全部完整类型）。
+Workbench3D::Workbench3D() = default;
+
 // 1 — 初始化，存储服务引用
 bool Workbench3D::initialize(const WorkbenchServices& services)
 {

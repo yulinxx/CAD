@@ -6,8 +6,6 @@
  */
 #include "PersistenceService.h"
 
-#include <thread>
-#include <chrono>
 #include <typeindex>
 
 #include "DatabaseBootstrapper.h"
@@ -76,14 +74,11 @@ void PersistenceService::shutdown()
 
     // SY_DEBUG("[PersistenceService] Shutting down");
 
-    // P1修复：用条件变量替代 sleep，等待所有活跃数据库操作完成
-    {
-        std::unique_lock<std::mutex> lock(m_activeOpMutex);
-        m_shuttingDown = true;
-        m_activeOpCv.wait(lock, [this] {
-            return m_activeOperations.load() == 0;
-        });
-    }
+    // 这里原本有一段「等待活跃操作归零」的条件变量等待，但活跃操作计数从来没有被
+    // 加过（没有任何 RAII 守卫去 increment），等待条件恒为真 —— 是一段看起来能
+    // 保护并发、实际什么都没做的假保护。真正的并发保护在 Eg::Database 内部：
+    // 每个操作都持互斥量，close() 也持同一把锁，不会出现「操作做一半被关库」。
+    // 仓库层的写入（导入、图层同步、设置）都在 UI 线程，没有后台写库。
 
     // 清理注册表中的仓储
     m_repositories.clear();
@@ -100,11 +95,6 @@ void PersistenceService::shutdown()
 
     SY_DEBUG("[PersistenceService] Shutdown complete");
     // SY_DEBUG("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n\n");
-}
-
-int PersistenceService::activeOperationCount() const
-{
-    return m_activeOperations.load();
 }
 
 bool PersistenceService::isOpen() const

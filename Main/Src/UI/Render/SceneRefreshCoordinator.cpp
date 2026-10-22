@@ -321,6 +321,60 @@ void SceneRefreshCoordinator::requestFullRefresh()
     scheduleFullRefresh();
 }
 
+void SceneRefreshCoordinator::applyLayerVisibilityChanged(int layerId, bool visible)
+{
+    if (!m_renderWidget || !m_sceneManager)
+    {
+        return;
+    }
+
+    if (visible)
+    {
+        // 重新显示：要把该图层重新上传。全量路径带视口裁剪（只上传视口 1.25 倍余量内的
+        // 几何），增量路径没有裁剪 —— 直接增量会把视口外的图元也塞进 GPU。
+        requestFullRefresh();
+        return;
+    }
+
+    // 隐藏：只摘掉该层当前在 GPU 上的几何。
+    // 逐条 removeRenderEntities 每次都要切一次渲染上下文，隐藏一个大图层就是十万次调用；
+    // 这里收集后一次批量提交。
+    std::vector<uint64_t> toRemove;
+    m_sceneManager->forEachEntity([layerId, &toRemove, this](Eg::SyEntity* entity) {
+        if (!entity || entity->layerId() != layerId)
+        {
+            return;
+        }
+        const uint64_t uid = static_cast<uint64_t>(entity->id);
+        if (m_renderedEntityIds.count(uid) != 0)
+        {
+            toRemove.push_back(uid);
+        }
+    });
+
+    if (!toRemove.empty())
+    {
+        for (uint64_t uid : toRemove)
+        {
+            m_renderedEntityIds.erase(uid);
+        }
+        m_renderWidget->removeRenderEntities(toRemove);
+    }
+
+    // 位图 / 文字：它们的世界层条目由各自的 reconciler 维护，期望集合已排除隐藏图层，
+    // 这里对账一次即可把该层的位图与文字摘掉。
+    const bool hideSelected = hideSelectedEffective();
+    const std::unordered_set<Eg::EntityId> noDirty;
+    m_bitmapReconciler.reconcile(m_sceneManager, false, m_cachedSelectedIds, hideSelected, noDirty);
+    m_textReconciler.reconcile(m_sceneManager, false, m_cachedSelectedIds, hideSelected, noDirty);
+
+    // 隐藏图层的曲线不再参与 LOD 收集：CurveLodManager 的 isRenderable 已按图层可见性过滤，
+    // 队列里残留的条目在消费时会被跳过，这里不需要额外清理队列（清了反而会让下一次
+    // 收集从头扫一遍）。
+
+    m_renderWidget->update();
+}
+
 // 曲线 LOD 消费泵：启动独立的 LOD 定时器，与场景更新定时器完全解耦。
 // 场景操作频繁时两个定时器互不干扰，LOD 分批能稳定每 32ms 推进一次。
 void SceneRefreshCoordinator::ensureCurveLodPump()
@@ -684,6 +738,12 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     bool touchedImage = false;
     bool touchedText = false;
 
+    // 本轮要从 GPU 摘掉的图元（不可见 / 隐藏选中本体）。
+    // 统一收集后一次 removeRenderEntities：逐条调用每次都要切一次渲染上下文，
+    // 隐藏一个大图层时是十万次调用 —— 批量之后只是一次。
+    std::vector<uint64_t> invisibleToRemove;
+    invisibleToRemove.reserve(m_pendingDirtyIds.size());
+
     for (auto id : m_pendingDirtyIds)
     {
         // 读快照而不是活对象：快照副本是主线程 clone 好的
@@ -695,14 +755,14 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
 
         auto uid = static_cast<uint64_t>(id);
 
-        // 图元可见性 = 自身可见 且 所在图层可见。图层指针不随 clone 复制，
-        // 这个判断在主线程上做。
+        // 图元可见性 = 自身可见 且 所在图层可见。快照 clone 复制了图层指针，
+        // 因此这里读到的是图层**当前**的可见性。
         if (!snapshot->effectiveVisible())
         {
             // 图元不可见：从渲染中移除（如果之前有渲染的话）
             if (m_renderedEntityIds.count(uid))
             {
-                m_renderWidget->removeRenderEntities({ uid });
+                invisibleToRemove.push_back(uid);
                 m_renderedEntityIds.erase(uid);
             }
             continue;
@@ -714,7 +774,7 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             // 从渲染中移除（如果之前有渲染的话）
             if (m_renderedEntityIds.count(uid))
             {
-                m_renderWidget->removeRenderEntities({ uid });
+                invisibleToRemove.push_back(uid);
                 m_renderedEntityIds.erase(uid);
             }
             continue;
@@ -735,6 +795,12 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         }
 
         entityIdsToProcess.push_back(uid);
+    }
+
+    // 摘除不可见图元：一次批量提交（逐条提交在隐藏大图层时是十万次上下文切换）
+    if (!invisibleToRemove.empty())
+    {
+        m_renderWidget->removeRenderEntities(invisibleToRemove);
     }
 
     // 「隐藏选中本体」取消选中的那批：把本体重新加回世界层。

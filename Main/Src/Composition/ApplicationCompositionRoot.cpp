@@ -205,6 +205,14 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
 {
     // 设置静态实例指针
     s_instance = this;
+
+    // 设置服务由组合根持有：它有自己的数据库连接与生命周期，跟组合根一起析构。
+    // 以前是 getSettingsService() 里的函数内 static，既不随组合根销毁，
+    // 也让 6 处 UI 通过「组合根的静态方法」反向依赖组合根 —— 组合根是装配入口，
+    // 不该同时充当全局注册表。
+    m_settingsService = std::make_unique<SettingsService>(nullptr);
+    m_settingsService->init();
+
     // 装配顺序：UI 服务 → 导入导出 → 对话框 → 脏状态 → 操作注册
     UiServices uiServices = assembleUiServices();
     setupImportExportServices(uiServices);
@@ -531,13 +539,20 @@ PersistenceService* ApplicationCompositionRoot::persistenceService()
 
 SettingsService* ApplicationCompositionRoot::getSettingsService()
 {
-    static std::unique_ptr<SettingsService> s;
-    if (!s)
+    // 组合根已存在：返回它持有的实例（生命周期跟组合根走）
+    if (s_instance && s_instance->m_settingsService)
     {
-        s = std::make_unique<SettingsService>(nullptr);
-        s->init();
+        return s_instance->m_settingsService.get();
     }
-    return s.get();
+
+    // 组合根还没建（极早期启动路径）：临时持有一份，进程结束时回收
+    static std::unique_ptr<SettingsService> s_fallback;
+    if (!s_fallback)
+    {
+        s_fallback = std::make_unique<SettingsService>(nullptr);
+        s_fallback->init();
+    }
+    return s_fallback.get();
 }
 
 ApplicationCompositionRoot* ApplicationCompositionRoot::instance()
