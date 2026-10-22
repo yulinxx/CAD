@@ -182,6 +182,15 @@ private:
     /// @return 成功创建的群组数量
     int restoreImportedGroups(const ImportResult& parseResult, const std::unordered_map<int64_t, int64_t>& idRemap);
 
+    /**
+     * @brief 载入完成后把 EntityIdGenerator 推进到 2D/3D 场景最大 id 之后
+     *
+     * 导入保留文件里的 id，而生成器是进程级计数器且重启后从 1 开始。不同步就会
+     * 出现「打开文件后新画的图元拿到已被占用的 id、被静默拒绝」。幂等，代价是一次
+     * O(N) 遍历（相对导入本身的代价可忽略）。
+     */
+    void syncIdGeneratorWithScenes();
+
 private:
     /// 更新进度：转发给 context.progressCallback（可跨线程安全消费，如进度对话框的 tracker），
     /// 并发出 importProgress 信号。

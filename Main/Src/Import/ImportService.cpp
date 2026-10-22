@@ -767,10 +767,50 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     SY_DEBUGF("[ImportService] Document built: %d entities (%d mesh + %d flat)", entityCount, meshAdded, flatAdded);
     updateProgress(context, ImportPhase::BuildDocument, 1.0f);
 
+    // 载入的图元**保留文件里的 id**，而 EntityIdGenerator 是进程级计数器且重启后从 1 开始。
+    // 不同步的话，打开文档后新画的图元会拿到文件里已被占用的 id，被 insertEntityPreserveId
+    // 静默拒绝（症状：打开文件后画的东西不出现）。这里把生成器推到两侧场景的最大 id 之后。
+    syncIdGeneratorWithScenes();
+
     // 根据图元类型设置目标工作台 ID
     auto result = ImportResult::ok(tr("Imported %1 entities successfully").arg(entityCount), entityCount);
     result.usedWorkbenchId = hasMeshEntities ? QStringLiteral("3D") : QStringLiteral("2D");
     return result;
+}
+
+// ===== 载入后同步 id 生成器 =====
+void ImportService::syncIdGeneratorWithScenes()
+{
+    Eg::EntityId maxSeen = 0;
+
+    // 无捕获 lambda 可直接转成 Eg::EntityIdVisitor（bool (*)(EntityId, void*)）
+    auto collectMax = [](Eg::EntityId id, void* ctx) -> bool {
+        auto* maxValue = static_cast<Eg::EntityId*>(ctx);
+        if (id > *maxValue)
+        {
+            *maxValue = id;
+        }
+        return true;
+    };
+
+    if (m_sceneManager)
+    {
+        m_sceneManager->forEachEntityId(collectMax, &maxSeen);
+    }
+    if (m_sceneManager3D)
+    {
+        m_sceneManager3D->forEachEntityId(collectMax, &maxSeen);
+    }
+
+    if (maxSeen <= 0)
+    {
+        return;
+    }
+
+    // setMaxId 内部是 CAS 推进：只在当前值 ≤ maxSeen 时才抬高，重复调用是幂等的
+    Eg::EntityIdGenerator::instance().setMaxId(maxSeen);
+    SY_DEBUGF("[ImportService] id generator advanced past loaded entities: maxId=%lld",
+        static_cast<long long>(maxSeen));
 }
 
 // ===== 4：刷新显示 =====

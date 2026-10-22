@@ -1612,14 +1612,19 @@ TEST(ImportExportRegressionTest, IrPipeline_RealDxf_LwPolylineKeepsVertices)
 
 TEST(ImportExportRegressionTest, IrPipeline_RealDxf_SplineKeepsControlPoints)
 {
-    // 最小 DXF：一条 3 阶、3 个控制点的 SPLINE。
+    // 最小 DXF：一条 3 阶、4 个控制点的 SPLINE。
     // 回归：旧实现输出 EntityType::Spline（转换层未处理）+ 扩展数据布局不匹配 → 图元丢失。
+    //
+    // 控制点必须是「次数+1」个：3 阶样条至少要 4 个控制点（节点数 = 控制点数 + 次数 + 1 = 8）。
+    // 早先这里写的是 3 个控制点 + 7 个节点 —— 那是数学上非法的退化样条，
+    // libdxfrw 的结构校验会整条拒掉（旧实现直接中止 ENTITIES 段，表现为「整份图纸读不出来」）。
     std::string dxf = "0\nSECTION\n2\nENTITIES\n"
-                      "0\nSPLINE\n8\n0\n70\n0\n71\n3\n72\n7\n73\n3\n"
-                      "40\n0.0\n40\n0.0\n40\n0.0\n40\n0.5\n40\n1.0\n40\n1.0\n40\n1.0\n"
+                      "0\nSPLINE\n8\n0\n70\n0\n71\n3\n72\n8\n73\n4\n"
+                      "40\n0.0\n40\n0.0\n40\n0.0\n40\n0.0\n40\n1.0\n40\n1.0\n40\n1.0\n40\n1.0\n"
                       "10\n0.0\n20\n0.0\n"
                       "10\n5.0\n20\n10.0\n"
                       "10\n10.0\n20\n0.0\n"
+                      "10\n15.0\n20\n10.0\n"
                       "0\nENDSEC\n0\nEOF\n";
 
     std::string path = writeTempFile("dxf", dxf);
@@ -1638,11 +1643,40 @@ TEST(ImportExportRegressionTest, IrPipeline_RealDxf_SplineKeepsControlPoints)
 
     auto* nurbs = static_cast<Eg::SyNurbs*>(entities[0].get());
     EXPECT_EQ(nurbs->nDegree, 3);
-    EXPECT_EQ(nurbs->controlPointCount(), 3u);
-    EXPECT_EQ(nurbs->knotCount(), 7u);
+    EXPECT_EQ(nurbs->controlPointCount(), 4u);
+    EXPECT_EQ(nurbs->knotCount(), 8u);
     EXPECT_DOUBLE_EQ(nurbs->controlPointAt(1).x(), 5.0);
     EXPECT_DOUBLE_EQ(nurbs->controlPointAt(1).y(), 10.0);
     EXPECT_TRUE(entities[0]->isValid());
+}
+
+TEST(ImportExportRegressionTest, IrPipeline_RealDxf_DegenerateSplineKeepsRestOfFile)
+{
+    // 退化样条（控制点数 < 次数+1）只该丢自己那一条，不该让整份图纸读不出来。
+    // 早先 libdxfrw 遇到结构非法的实体会直接中止 ENTITIES 段：
+    // 一条坏样条 = 后面所有图元全丢，而且界面上没有任何提示。
+    std::string dxf = "0\nSECTION\n2\nENTITIES\n"
+                      "0\nSPLINE\n8\n0\n70\n0\n71\n3\n72\n7\n73\n3\n"
+                      "40\n0.0\n40\n0.0\n40\n0.0\n40\n0.5\n40\n1.0\n40\n1.0\n40\n1.0\n"
+                      "10\n0.0\n20\n0.0\n"
+                      "10\n5.0\n20\n10.0\n"
+                      "10\n10.0\n20\n0.0\n"
+                      "0\nLINE\n8\n0\n10\n0.0\n20\n0.0\n30\n0.0\n11\n10.0\n21\n0.0\n31\n0.0\n"
+                      "0\nENDSEC\n0\nEOF\n";
+
+    std::string path = writeTempFile("dxf", dxf);
+    Fio::FileIOManager fileIO;
+    Fio::FioParseResult ir;
+    char errBuf[1024] = { 0 };
+    bool ok = fileIO.importToIR(path.c_str(), Fio::FileFormat::DXF, &ir, errBuf, sizeof(errBuf));
+    std::filesystem::remove(path);
+
+    ASSERT_TRUE(ok) << errBuf;
+    // 坏样条被跳过，后面那条直线必须还在
+    ASSERT_EQ(ir.entityCount, 1u);
+    EXPECT_EQ(ir.entities[0].type, Fio::EntityType::Line);
+    // 且必须留痕：用户要能看到「图纸里有内容没导入」
+    EXPECT_GE(ir.warningCount, 1u);
 }
 
 TEST(ImportExportRegressionTest, IrPipeline_ConvertAll_PassesExtensionBlob)

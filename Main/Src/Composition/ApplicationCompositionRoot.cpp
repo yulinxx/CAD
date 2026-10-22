@@ -431,6 +431,8 @@ void ApplicationCompositionRoot::registerAllOperations()
     fileConfig.layerPersistence = m_layerPersistenceBridge.get();
     fileConfig.persistence = persistenceService();
     fileConfig.parentWidget = m_shellHost ? m_shellHost->mainWindow() : nullptr;
+    // 新建/打开时清空撤销栈：跨文档撤销会把上一份文档的图元插回新文档
+    fileConfig.undoRedoManager = undoRedoManager();
 
     m_fileOperationRegistry = std::make_unique<FileOperationRegistry>(fileConfig);
     m_fileOperationRegistry->registerAll();

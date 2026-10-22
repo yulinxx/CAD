@@ -19,6 +19,7 @@
 #include "UI/Services/HelpDialogService.h"
 
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine/Edit/IUndoRedoManager.h"
 #include "Engine2D/SyEntity/SyImage.h"
 #include "Engine2D/Interaction/LayerManager.h"
 #include "Engine/EntityIdGenerator.h"
@@ -94,7 +95,9 @@ FileOperationRegistry::FileOperationRegistry(const FileOperationConfig& config)
     , m_layerPersistence(config.layerPersistence)
     , m_persistence(config.persistence)
     , m_parentWidget(config.parentWidget)
+    , m_undoRedoManager(config.undoRedoManager)
 {
+    m_currentFilePath = std::make_shared<std::string>();
 }
 
 // ==================== 公共辅助方法 ====================
@@ -131,6 +134,35 @@ void FileOperationRegistry::saveDocumentRecord(const std::string& filePath, int 
     DocumentPersistenceHelper::recordExport(m_persistence, filePath, entityCount);
 }
 
+void FileOperationRegistry::resetDocumentState()
+{
+    // 当前文件路径：新建之后必须回到「未命名」，否则 File_Save 会直接覆盖上一个文件
+    if (m_currentFilePath)
+    {
+        m_currentFilePath->clear();
+    }
+
+    // 撤销栈：跨文档的撤销命令持有的是上一份文档的图元与 id，
+    // 在新文档上重放会把旧图元按 id 插回来（渲染层因为没有图层指针而画不出来，
+    // 只能靠场景树才看得见），必须在这里清空。
+    if (m_undoRedoManager)
+    {
+        m_undoRedoManager->clear();
+    }
+
+    // 引擎层的脏标记：clearScene() 内部会 notifySceneChanged()，那会把场景标脏。
+    // 新文档是干净的，这里必须显式清掉，否则「未保存」提示与引擎状态会打架。
+    if (m_sceneManager)
+    {
+        m_sceneManager->clearDirty();
+    }
+
+    if (m_stateCenter)
+    {
+        m_stateCenter->setCurrentDocumentId(QString());
+    }
+}
+
 bool FileOperationRegistry::doExport(const std::string& filePath)
 {
     if (!m_exportService)
@@ -148,6 +180,12 @@ bool FileOperationRegistry::doExport(const std::string& filePath)
 
     *m_currentFilePath = filePath;
     saveDocumentRecord(filePath, result.exportedEntityCount);
+
+    // 存盘成功 → 文档不再脏（引擎层脏标记是事实源，UI 状态是它的镜像）
+    if (m_sceneManager)
+    {
+        m_sceneManager->clearDirty();
+    }
 
     if (m_stateCenter)
     {
@@ -204,6 +242,19 @@ bool FileOperationRegistry::doOpenFile(const QString& filePath)
     if (m_layerPersistence)
     {
         m_layerPersistence->setDocumentId(filePath.toStdString());
+    }
+
+    // 打开即换文档：上一份文档残留在撤销栈里的命令必须清掉。
+    // 导入阶段走 CommitMode::Direct 不入栈，此处清空不会丢掉「本次导入」的撤销能力。
+    if (m_undoRedoManager)
+    {
+        m_undoRedoManager->clear();
+    }
+
+    // 打开后文档是「已保存」状态：导入过程会 notifySceneChanged 把场景标脏，这里清掉
+    if (m_sceneManager)
+    {
+        m_sceneManager->clearDirty();
     }
 
     return true;
@@ -293,11 +344,37 @@ void FileOperationRegistry::doImportImage(const QString& filePath)
         imgEntity->bottomLeft = Ut::Vec2d(-halfW, -halfH);
         imgEntity->bottomRight = Ut::Vec2d(halfW, -halfH);
 
-        // 显式获取持久 ID，避免 insertEntityPreserveId 替换临时 ID 导致查找失败
-        const Eg::EntityId persistentId = Eg::EntityIdGenerator::instance().getNextPersistentId();
-        auto snap = std::unique_ptr<Eg::SyEntity>(imgEntity->clone());
-        snap->id = persistentId;
-        m_sceneManager->insertEntityPreserveId(std::move(snap));
+        // 直接交出所有权：SyImage::clone() 会把像素缓冲再拷一份，导入大图时是纯浪费
+        auto owned = std::unique_ptr<Eg::SyEntity>(imgEntity);
+
+        if (!m_sceneManager)
+        {
+            SY_ERROR("[FileOperation] Import image failed: sceneManager is null");
+            return;
+        }
+
+        // 取一个场景里没用过的持久 id：撞号时 insertEntityPreserveId 会静默拒绝，
+        // 表现是「导入成功但图上什么也没有」，且下方图层分配会查到同 id 的旧图元。
+        Eg::EntityId persistentId = 0;
+        for (size_t attempt = 0; attempt < 1000000 && persistentId == 0; ++attempt)
+        {
+            const Eg::EntityId candidate = Eg::EntityIdGenerator::instance().getNextPersistentId();
+            if (!m_sceneManager->findSyEntityById(candidate))
+            {
+                persistentId = candidate;
+            }
+        }
+        owned->id = persistentId;
+
+        if (persistentId == 0 || !m_sceneManager->insertEntityPreserveId(std::move(owned)))
+        {
+            SY_ERRORF("[FileOperation] Import image failed: insert rejected (id=%lld path=%s)",
+                static_cast<long long>(persistentId),
+                path.toUtf8().constData());
+            QMessageBox::warning(
+                m_parentWidget, QObject::tr("Import Image"), QObject::tr("Failed to add the image to the scene."));
+            return;
+        }
 
         // 分配到位图图层
         if (m_layerManager && m_sceneManager)
@@ -322,8 +399,6 @@ void FileOperationRegistry::doImportImage(const QString& filePath)
                 }
             }
         }
-
-        delete imgEntity;
 
         SY_DEBUGF("[FileOperation] Imported image: %s (%dx%d)", path.toUtf8().constData(), rgba.width(), rgba.height());
     });
@@ -371,6 +446,9 @@ void FileOperationRegistry::registerFileNewOps()
             }
         }
         scene->clearScene();
+
+        // 换文档：清路径 + 清撤销栈（缺一项就会串文档，见 resetDocumentState 注释）
+        resetDocumentState();
         if (m_stateCenter)
         {
             m_stateCenter->setDirty(false);
@@ -491,8 +569,11 @@ void FileOperationRegistry::registerAll()
         return;
     }
 
-    // 初始化共享文件路径状态
-    m_currentFilePath = std::make_shared<std::string>();
+    // 共享文件路径状态在构造期已创建；这里不再重建，避免重新注册时把当前文档路径丢掉
+    if (!m_currentFilePath)
+    {
+        m_currentFilePath = std::make_shared<std::string>();
+    }
 
     registerFileNewOps();
     registerFileOpenOps();
