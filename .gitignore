@@ -229,6 +229,8 @@ Tools/*
 !Tools/package-client.sh
 !Tools/PackageClient.ps1
 !Tools/NewClient.ps1
+!Tools/git-hooks/
+!Tools/Install-GitHooks.ps1
 # [A7 修复] .github/ 工作流必须入库，删除此忽略规则
 
 # ---- 测试运行产生的落地文件 ----

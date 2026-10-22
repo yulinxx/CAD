@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# 防止修改第三方库源码的 pre-commit 钩子
+# ThirdParty 子模块中的所有源码均为上游第三方库，禁止本地修改。
+# 如需调整行为，请在我方业务代码（Engine/UI/FileIO 等）中处理。
+
+set -euo pipefail
+
+# 需要保护的第三方库子模块列表（相对仓库根目录）
+PROTECTED_SUBMODULES=("ThirdParty")
+
+# 仓库根目录（由 git 传入，兼容子目录提交）
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+HAS_VIOLATION=0
+
+for sub in "${PROTECTED_SUBMODULES[@]}"; do
+    sub_path="${REPO_ROOT}/${sub}"
+    if [[ ! -d "${sub_path}/.git" && ! -f "${sub_path}/.git" ]]; then
+        # 子模块尚未 checkout，跳过
+        continue
+    fi
+
+    # 检查子模块工作区是否有未提交的修改
+    # 注意：git 调用 hook 时会设置 GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE 指向父仓库，
+    # 必须用 env -u 清除，否则 git -C 子模块会误用父仓库的 git 目录导致状态错乱。
+    changes="$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE \
+        git -C "${sub_path}" status --porcelain 2>/dev/null || true)"
+    if [[ -n "${changes}" ]]; then
+        HAS_VIOLATION=1
+        echo ""
+        echo "================================================================"
+        echo "  ERROR: 检测到第三方库子模块 [${sub}] 存在本地修改"
+        echo "================================================================"
+        echo "  ${sub} 中的所有文件均来自上游第三方库，禁止直接修改。"
+        echo "  如确实需要调整，请在我方业务代码中处理，而不是改第三方库源码。"
+        echo ""
+        echo "  被修改的文件："
+        echo "${changes}" | sed 's/^/    /'
+        echo ""
+        echo "  恢复方法："
+        echo "    git -C ${sub} checkout -- .   # 丢弃所有未提交修改"
+        echo ""
+        echo "  如你清楚自己在做什么，可用 --no-verify 跳过此检查。"
+        echo "================================================================"
+        echo ""
+    fi
+done
+
+if [[ ${HAS_VIOLATION} -ne 0 ]]; then
+    exit 1
+fi
+
+exit 0
