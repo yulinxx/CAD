@@ -75,7 +75,7 @@ namespace
      * @brief 运行指标：fn 内部须自带「测量前准备 + 测量后回滚」，以便重复。
      * @param repeats 重复次数；读多写少的项给 5，会改状态的项给 1~3
      */
-    template <typename Fn>
+    template<typename Fn>
     void measure(const char* name, const char* unit, int repeats, Fn&& fn, const char* note = "")
     {
         std::vector<double> samples;
@@ -98,11 +98,8 @@ namespace
         r.note = note;
         g_results.push_back(r);
 
-        std::printf("  %-28s best=%10.2f ms  median=%10.2f ms  %s\n",
-            r.name.c_str(),
-            r.bestMs,
-            r.medianMs,
-            r.note.c_str());
+        std::printf(
+            "  %-28s best=%10.2f ms  median=%10.2f ms  %s\n", r.name.c_str(), r.bestMs, r.medianMs, r.note.c_str());
         std::fflush(stdout);
     }
 
@@ -183,7 +180,7 @@ int main(int argc, char** argv)
         entityCount = 200000;
     }
 
-    constexpr double kExtent = 100000.0;   // 世界范围，便于框选按比例取子区域
+    constexpr double kExtent = 100000.0;  // 世界范围，便于框选按比例取子区域
     const size_t kTransformCount = entityCount / 10;
     const size_t kDeleteCount = std::min<size_t>(1000, entityCount / 100);
 
@@ -266,20 +263,28 @@ int main(int argc, char** argv)
 
     // ---------- 2. 全选 ----------
     std::printf("\n[selection]\n");
-    measure("select_all", "ms", 5, [&]() { scene.selectAll(); });
-    measure("selected_readback", "ms", 5, [&]() { g_sink += scene.getSelectedEntities().size(); });
+    measure("select_all", "ms", 5, [&]() {
+        scene.selectAll();
+    });
+    measure("selected_readback", "ms", 5, [&]() {
+        g_sink += scene.getSelectedEntities().size();
+    });
     scene.clearSelection();
 
     // ---------- 3. 框选（覆盖约 10% 面积）----------
     std::printf("\n[query]\n");
     const Ut::BBox2d box10(Ut::Vec2d(0.0, 0.0), Ut::Vec2d(kExtent * 0.32, kExtent * 0.32));
     size_t boxHits = 0;
-    measure("query_box_10pct", "ms", 5, [&]() { boxHits = scene.queryByBox(box10, false).size(); });
+    measure("query_box_10pct", "ms", 5, [&]() {
+        boxHits = scene.queryByBox(box10, false).size();
+    });
     std::printf("  %-28s hits=%zu\n", "query_box_10pct ->", boxHits);
 
     const Ut::BBox2d box1(Ut::Vec2d(0.0, 0.0), Ut::Vec2d(kExtent * 0.1, kExtent * 0.1));
     size_t boxHits1 = 0;
-    measure("query_box_1pct", "ms", 5, [&]() { boxHits1 = scene.queryByBox(box1, false).size(); });
+    measure("query_box_1pct", "ms", 5, [&]() {
+        boxHits1 = scene.queryByBox(box1, false).size();
+    });
     std::printf("  %-28s hits=%zu\n", "query_box_1pct ->", boxHits1);
 
     // 点拾取：取一批实际存在的点，避免全部落空导致路径不等价
@@ -296,30 +301,40 @@ int main(int argc, char** argv)
         }
     }
     size_t pointHits = 0;
-    measure("query_point_x1000", "ms", 3, [&]() {
-        size_t hits = 0;
-        for (const Ut::Vec2d& p : probePoints)
-        {
-            hits += scene.queryByPoint(p, 1.0).size();
-        }
-        pointHits = hits;
-    }, "1000 次点拾取");
+    measure(
+        "query_point_x1000",
+        "ms",
+        3,
+        [&]() {
+            size_t hits = 0;
+            for (const Ut::Vec2d& p : probePoints)
+            {
+                hits += scene.queryByPoint(p, 1.0).size();
+            }
+            pointHits = hits;
+        },
+        "1000 次点拾取");
     std::printf("  %-28s hits=%zu\n", "query_point ->", pointHits);
 
     // ---------- 4. 快照捕获 ----------
     std::printf("\n[undo data (P0 相关路径)]\n");
     const size_t snapshotCount = std::min(kTransformCount, allIds.size());
     std::vector<Eg::EntityId> transformIds(allIds.begin(), allIds.begin() + static_cast<ptrdiff_t>(snapshotCount));
-    measure("snapshot_capture_10pct", "ms", 3, [&]() {
-        std::vector<Eg::SyEntity*> snaps(transformIds.size(), nullptr);
-        const size_t written =
-            Eg::captureEntitySnapshots(&scene, transformIds.data(), transformIds.size(), snaps.data(), snaps.size());
-        for (Eg::SyEntity* s : snaps)
-        {
-            delete s;
-        }
-        (void)written;
-    }, "captureEntitySnapshots（含克隆）");
+    measure(
+        "snapshot_capture_10pct",
+        "ms",
+        3,
+        [&]() {
+            std::vector<Eg::SyEntity*> snaps(transformIds.size(), nullptr);
+            const size_t written = Eg::captureEntitySnapshots(
+                &scene, transformIds.data(), transformIds.size(), snaps.data(), snaps.size());
+            for (Eg::SyEntity* s : snaps)
+            {
+                delete s;
+            }
+            (void)written;
+        },
+        "captureEntitySnapshots（含克隆）");
 
     // ---------- 5. 批量移动 + 撤销/重做 ----------
     const Ut::Mat3d moveMat = Ut::Mat3d::translate(1.0, 1.0);
@@ -334,29 +349,44 @@ int main(int argc, char** argv)
     };
 
     // 纯变换：只跑 mutator 循环（不建快照、不入撤销栈、不动索引），作为对照基准
-    measure("transform_apply_only", "ms", 3, [&]() {
-        for (Eg::EntityId id : transformIds)
-        {
-            if (Eg::SyEntity* e = scene.findSyEntityById(id))
+    measure(
+        "transform_apply_only",
+        "ms",
+        3,
+        [&]() {
+            for (Eg::EntityId id : transformIds)
             {
-                e->transform(moveMat);
-                e->transform(Ut::Mat3d::translate(-1.0, -1.0));   // 原地抵消，保持状态不变
+                if (Eg::SyEntity* e = scene.findSyEntityById(id))
+                {
+                    e->transform(moveMat);
+                    e->transform(Ut::Mat3d::translate(-1.0, -1.0));  // 原地抵消，保持状态不变
+                }
             }
-        }
-    }, "仅矩阵变换（无快照/索引/撤销）");
+        },
+        "仅矩阵变换（无快照/索引/撤销）");
 
     // 批量移动：整条链路（快照捕获 + 变换 + 通知 + 批量索引 + 入栈）
-    measure("transform_10pct", "ms", 3, [&]() {
-        edit.transformEntities(transformIds, applyMove, "BenchMove", false);
-        undoMgr.undo();
-    }, "全链路，测后回滚");
+    measure(
+        "transform_10pct",
+        "ms",
+        3,
+        [&]() {
+            edit.transformEntities(transformIds, applyMove, "BenchMove", false);
+            undoMgr.undo();
+        },
+        "全链路，测后回滚");
 
     // 撤销/重做：命令与场景的状态交换（零克隆路径）
     edit.transformEntities(transformIds, applyMove, "BenchMove", false);
-    measure("undo_redo_10pct", "ms", 3, [&]() {
-        undoMgr.undo();
-        undoMgr.redo();
-    }, "一次 undo + 一次 redo");
+    measure(
+        "undo_redo_10pct",
+        "ms",
+        3,
+        [&]() {
+            undoMgr.undo();
+            undoMgr.redo();
+        },
+        "一次 undo + 一次 redo");
     // 收尾回滚：让场景回到移动前，后面的指标口径一致，也避免继续持有已被换出的对象
     undoMgr.undo();
 
@@ -376,7 +406,7 @@ int main(int argc, char** argv)
             samples.push_back(elapsedMs(t, Clock::now()));
 
             const Clock::time_point tr = Clock::now();
-            undoMgr.undo();   // 仅用于复原，不计入 apply
+            undoMgr.undo();  // 仅用于复原，不计入 apply
             restoreMs += elapsedMs(tr, Clock::now());
         }
         std::sort(samples.begin(), samples.end());
@@ -387,10 +417,12 @@ int main(int argc, char** argv)
         r.medianMs = samples[samples.size() / 2];
         r.note = "一次批量移动（不含撤销）";
         g_results.push_back(r);
-        std::printf("  %-28s best=%10.2f ms  median=%10.2f ms  %s\n",
-            r.name.c_str(), r.bestMs, r.medianMs, r.note.c_str());
-        std::printf("  %-28s %10.2f ms  %s\n", "transform_restore_10pct",
-            restoreMs / static_cast<double>(kApplyRounds), "复原用撤销（不计入 apply，仅参考）");
+        std::printf(
+            "  %-28s best=%10.2f ms  median=%10.2f ms  %s\n", r.name.c_str(), r.bestMs, r.medianMs, r.note.c_str());
+        std::printf("  %-28s %10.2f ms  %s\n",
+            "transform_restore_10pct",
+            restoreMs / static_cast<double>(kApplyRounds),
+            "复原用撤销（不计入 apply，仅参考）");
         std::fflush(stdout);
     }
 
@@ -474,8 +506,8 @@ int main(int argc, char** argv)
             r.medianMs = samples[samples.size() / 2];
             r.note = note;
             g_results.push_back(r);
-            std::printf("  %-28s best=%10.2f ms  median=%10.2f ms  %s\n",
-                r.name.c_str(), r.bestMs, r.medianMs, r.note.c_str());
+            std::printf(
+                "  %-28s best=%10.2f ms  median=%10.2f ms  %s\n", r.name.c_str(), r.bestMs, r.medianMs, r.note.c_str());
         };
 
         reportPhase("swap_phase_capture", captureSamples, "1/6 捕获 before 快照（含克隆）");
@@ -486,8 +518,7 @@ int main(int argc, char** argv)
         reportPhase("swap_phase_redo", redoSamples, "6/6 重做 = 状态换入");
 
         const double roundMs = totalMs / static_cast<double>(kSwapRounds);
-        std::printf("  %-28s %10.2f ms  %s\n", "swap_round_total", roundMs,
-            "上述六相位之和（含一次 undo + 一次 redo）");
+        std::printf("  %-28s %10.2f ms  %s\n", "swap_round_total", roundMs, "上述六相位之和（含一次 undo + 一次 redo）");
         std::fflush(stdout);
     }
 
@@ -536,28 +567,33 @@ int main(int argc, char** argv)
         r.medianMs = samples[samples.size() / 2];
         r.note = "10 万图元确实移动后的索引 remove+insert";
         g_results.push_back(r);
-        std::printf("  %-28s best=%10.2f ms  median=%10.2f ms  %s\n",
-            r.name.c_str(), r.bestMs, r.medianMs, r.note.c_str());
+        std::printf(
+            "  %-28s best=%10.2f ms  median=%10.2f ms  %s\n", r.name.c_str(), r.bestMs, r.medianMs, r.note.c_str());
         std::fflush(stdout);
     }
 
     // ---------- 7. 逐条删除 ----------
     std::printf("\n[delete]\n");
-    measure("delete_single_xN", "ms", 1, [&]() {
-        std::vector<Eg::SyEntity*> victims;
-        victims.reserve(kDeleteCount);
-        for (size_t i = 0; i < kDeleteCount && i < allIds.size(); ++i)
-        {
-            if (Eg::SyEntity* e = scene.findSyEntityById(allIds[i]))
+    measure(
+        "delete_single_xN",
+        "ms",
+        1,
+        [&]() {
+            std::vector<Eg::SyEntity*> victims;
+            victims.reserve(kDeleteCount);
+            for (size_t i = 0; i < kDeleteCount && i < allIds.size(); ++i)
             {
-                victims.push_back(e);
+                if (Eg::SyEntity* e = scene.findSyEntityById(allIds[i]))
+                {
+                    victims.push_back(e);
+                }
             }
-        }
-        for (Eg::SyEntity* e : victims)
-        {
-            scene.deleteEntity(e);
-        }
-    }, "逐条删除，只测一次（测后场景少 N 个图元）");
+            for (Eg::SyEntity* e : victims)
+            {
+                scene.deleteEntity(e);
+            }
+        },
+        "逐条删除，只测一次（测后场景少 N 个图元）");
     std::printf("  %-28s %10zu\n", "scene_count_after_delete", scene.getEntityCount());
 
     // ---------- 汇总 ----------
@@ -596,8 +632,7 @@ int main(int argc, char** argv)
 #endif
                 std::strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", &local);
                 const std::string label = runLabel.empty() ? std::string("unlabeled") : runLabel;
-                out << "# run=" << label << " entities=" << entityCount
-                    << " at=" << stamp << '\n';
+                out << "# run=" << label << " entities=" << entityCount << " at=" << stamp << '\n';
             }
             for (const Result& r : g_results)
             {

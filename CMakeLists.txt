@@ -249,6 +249,12 @@ endif()
 # 8. 应用入口
 add_subdirectory(Main)
 
+# 9. 客户 UI 插件（Clients/<clientId> 独立仓库 / submodule）
+option(SANYI_BUILD_CLIENT_PLUGINS "Build per-client UI plugins from Clients/*" ON)
+if(SANYI_BUILD_CLIENT_PLUGINS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Clients/CMakeLists.txt")
+    add_subdirectory(Clients)
+endif()
+
 # ============================================================================
 # 视口后端编译期开关
 # ============================================================================

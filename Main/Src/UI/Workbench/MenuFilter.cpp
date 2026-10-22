@@ -37,8 +37,7 @@ namespace
     }
 }  // namespace
 
-std::vector<MenuDef> MenuFilter::filterMenusForWorkbench(
-    const std::vector<MenuDef>& menus,
+std::vector<MenuDef> MenuFilter::filterMenusForWorkbench(const std::vector<MenuDef>& menus,
     const QString& workbenchId,
     const std::function<bool(const QString&)>& commandAvailable,
     const QString& workbenchKind)
@@ -46,30 +45,27 @@ std::vector<MenuDef> MenuFilter::filterMenusForWorkbench(
     // 分隔符归一化：JSON 里的分隔符是按"全部菜单项都在"排版的，
     // 过滤掉不属于当前工作台的动作后会留下开头/结尾/连续的空分隔线，
     // 这会让 3D 菜单看起来像一堆断裂的空行。这里在数据层收敛，构建层无需关心。
-    const auto normalizeSeparators =
-        [](std::vector<std::variant<MenuActionDef, SubMenuDef, MenuItemType>>& items) {
-            const auto isSeparator =
-                [](const std::variant<MenuActionDef, SubMenuDef, MenuItemType>& item) {
-                    return std::holds_alternative<MenuItemType>(item) &&
-                        std::get<MenuItemType>(item) == MenuItemType::Separator;
-                };
-            std::vector<std::variant<MenuActionDef, SubMenuDef, MenuItemType>> normalized;
-
-            normalized.reserve(items.size());
-            for (const auto& item : items)
-            {
-                if (isSeparator(item) && (normalized.empty() || isSeparator(normalized.back())))
-                {
-                    continue;
-                }
-                normalized.push_back(item);
-            }
-            while (!normalized.empty() && isSeparator(normalized.back()))
-            {
-                normalized.pop_back();
-            }
-            items.swap(normalized);
+    const auto normalizeSeparators = [](std::vector<std::variant<MenuActionDef, SubMenuDef, MenuItemType>>& items) {
+        const auto isSeparator = [](const std::variant<MenuActionDef, SubMenuDef, MenuItemType>& item) {
+            return std::holds_alternative<MenuItemType>(item) && std::get<MenuItemType>(item) == MenuItemType::Separator;
         };
+        std::vector<std::variant<MenuActionDef, SubMenuDef, MenuItemType>> normalized;
+
+        normalized.reserve(items.size());
+        for (const auto& item : items)
+        {
+            if (isSeparator(item) && (normalized.empty() || isSeparator(normalized.back())))
+            {
+                continue;
+            }
+            normalized.push_back(item);
+        }
+        while (!normalized.empty() && isSeparator(normalized.back()))
+        {
+            normalized.pop_back();
+        }
+        items.swap(normalized);
+    };
 
     const auto visibilityAllowed = [&](const QString& scope) {
         if (scope.isEmpty())
@@ -85,8 +81,8 @@ std::vector<MenuDef> MenuFilter::filterMenusForWorkbench(
             scope.compare(QStringLiteral("shared"), Qt::CaseInsensitive) == 0;
     };
 
-    std::function<bool(const MenuActionDef&, MenuActionDef&)> filterAction =
-        [&](const MenuActionDef& action, MenuActionDef& outAction) -> bool {
+    std::function<bool(const MenuActionDef&, MenuActionDef&)> filterAction = [&](const MenuActionDef& action,
+                                                                                 MenuActionDef& outAction) -> bool {
         if (!action.visible || !commandEnabledForWorkbench(action.workbenches, workbenchId))
         {
             return false;
@@ -104,8 +100,8 @@ std::vector<MenuDef> MenuFilter::filterMenusForWorkbench(
         return true;
     };
 
-    std::function<bool(const SubMenuDef&, SubMenuDef&)> filterSubMenu =
-        [&](const SubMenuDef& sub, SubMenuDef& outSub) -> bool {
+    std::function<bool(const SubMenuDef&, SubMenuDef&)> filterSubMenu = [&](const SubMenuDef& sub,
+                                                                            SubMenuDef& outSub) -> bool {
         if (!sub.visible || !commandEnabledForWorkbench(sub.workbenches, workbenchId))
         {
             return false;
@@ -192,8 +188,7 @@ std::vector<MenuDef> MenuFilter::filterMenusForWorkbench(
     return filteredMenus;
 }
 
-bool MenuFilter::isVisibleForWorkbench(const MenuDef& menu, const QString& workbenchId,
-                                       const QString& workbenchKind)
+bool MenuFilter::isVisibleForWorkbench(const MenuDef& menu, const QString& workbenchId, const QString& workbenchKind)
 {
     if (!menu.visible)
     {
@@ -214,7 +209,7 @@ bool MenuFilter::isVisibleForWorkbench(const MenuDef& menu, const QString& workb
             }
         }
         else if (!(menu.visibilityScope.compare(QStringLiteral("2D"), Qt::CaseInsensitive) == 0 ||
-                      menu.visibilityScope.compare(QStringLiteral("shared"), Qt::CaseInsensitive) == 0))
+                     menu.visibilityScope.compare(QStringLiteral("shared"), Qt::CaseInsensitive) == 0))
         {
             return false;
         }
@@ -222,8 +217,8 @@ bool MenuFilter::isVisibleForWorkbench(const MenuDef& menu, const QString& workb
     return true;
 }
 
-bool MenuFilter::isActionVisibleForWorkbench(const MenuActionDef& action, const QString& workbenchId,
-                                             const QString& workbenchKind)
+bool MenuFilter::isActionVisibleForWorkbench(
+    const MenuActionDef& action, const QString& workbenchId, const QString& workbenchKind)
 {
     if (!action.visible)
     {
@@ -244,7 +239,7 @@ bool MenuFilter::isActionVisibleForWorkbench(const MenuActionDef& action, const 
             }
         }
         else if (!(action.visibilityScope.compare(QStringLiteral("2D"), Qt::CaseInsensitive) == 0 ||
-                      action.visibilityScope.compare(QStringLiteral("shared"), Qt::CaseInsensitive) == 0))
+                     action.visibilityScope.compare(QStringLiteral("shared"), Qt::CaseInsensitive) == 0))
         {
             return false;
         }
@@ -263,8 +258,7 @@ void MenuFilter::normalizeSeparators(std::vector<MenuDef>& menus)
 void MenuFilter::normalizeSeparators(MenuDef& menu)
 {
     const auto isSeparator = [](const std::variant<MenuActionDef, SubMenuDef, MenuItemType>& item) {
-        return std::holds_alternative<MenuItemType>(item) &&
-            std::get<MenuItemType>(item) == MenuItemType::Separator;
+        return std::holds_alternative<MenuItemType>(item) && std::get<MenuItemType>(item) == MenuItemType::Separator;
     };
     std::vector<std::variant<MenuActionDef, SubMenuDef, MenuItemType>> normalized;
 

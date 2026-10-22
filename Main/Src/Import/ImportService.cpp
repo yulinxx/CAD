@@ -80,7 +80,7 @@ namespace
                 if (m_result.success)
                 {
                     promptCb(QCoreApplication::translate("ImportService", "Import completed: %1 entities")
-                                 .arg(m_result.entityCount));
+                            .arg(m_result.entityCount));
                 }
                 else
                 {
@@ -369,8 +369,7 @@ void ImportService::importAsync(
         if (safeSelf->isCanceled(mutableCtx))
         {
             SY_INFO("[ImportService] Async import canceled after Phase 1");
-            finishOnMainThread(ImportResult::fail(
-                ImportService::tr("Import canceled"), ImportErrorType::Canceled));
+            finishOnMainThread(ImportResult::fail(ImportService::tr("Import canceled"), ImportErrorType::Canceled));
             return;
         }
 
@@ -386,8 +385,7 @@ void ImportService::importAsync(
         if (safeSelf->isCanceled(mutableCtx))
         {
             SY_INFO("[ImportService] Async import canceled after Phase 2");
-            finishOnMainThread(ImportResult::fail(
-                ImportService::tr("Import canceled"), ImportErrorType::Canceled));
+            finishOnMainThread(ImportResult::fail(ImportService::tr("Import canceled"), ImportErrorType::Canceled));
             return;
         }
 
@@ -403,8 +401,8 @@ void ImportService::importAsync(
                 if (safeSelf->isCanceled(mainCtx))
                 {
                     SY_INFO("[ImportService] Async import canceled before Phase 3");
-                    finishOnMainThread(ImportResult::fail(
-                        ImportService::tr("Import canceled"), ImportErrorType::Canceled));
+                    finishOnMainThread(
+                        ImportResult::fail(ImportService::tr("Import canceled"), ImportErrorType::Canceled));
                     return;
                 }
 
@@ -894,9 +892,8 @@ void ImportService::phaseWriteBackState(const ImportContext& context, const Impo
     // 更新状态栏（使用成员变量回调，全局配置）
     if (m_statusPromptCallback)
     {
-        QString statusMsg = tr("Imported %1 entities from %2")
-                                .arg(result.entityCount)
-                                .arg(QFileInfo(context.sourcePath).fileName());
+        QString statusMsg =
+            tr("Imported %1 entities from %2").arg(result.entityCount).arg(QFileInfo(context.sourcePath).fileName());
         m_statusPromptCallback(statusMsg);
     }
 

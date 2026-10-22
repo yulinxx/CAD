@@ -20,7 +20,6 @@
 #include <memory>
 #include <QGuiApplication>
 
-
 // ==================== SceneManager3D 基础测试 ====================
 
 namespace
@@ -302,5 +301,3 @@ TEST(SceneRefreshCoordinator3DTest, StopClearsPendingWork)
     scheduler.requestFullRefresh();
     EXPECT_EQ(scheduler.pendingLevel(), UI::SceneRefreshLevel::None);
 }
-
-

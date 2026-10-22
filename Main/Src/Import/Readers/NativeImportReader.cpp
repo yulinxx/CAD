@@ -47,11 +47,13 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEn
     if (!parseResult.success)
     {
         SY_ERRORF("[NativeImportReader] parseDocument failed: %s", parseResult.errorMessage.c_str());
-        return ImportResult::fail(QString::fromStdString(parseResult.errorMessage), ImportErrorType::ParseFailed, QStringList{});
+        return ImportResult::fail(
+            QString::fromStdString(parseResult.errorMessage), ImportErrorType::ParseFailed, QStringList{});
     }
 
     // 准备 ImportResult
-    ImportResult result = ImportResult::ok(successMessage(format), static_cast<int>(doc.entityCount()), static_cast<int>(doc.layerCount()), {});
+    ImportResult result = ImportResult::ok(
+        successMessage(format), static_cast<int>(doc.entityCount()), static_cast<int>(doc.layerCount()), {});
 
     // 1. 提取图层
     result.importedLayers.reserve(doc.layerCount());
@@ -136,7 +138,8 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEn
         result.addWarning(QString::fromStdString(warn));
     }
 
-    SY_DEBUGF("[NativeImportReader] Imported via new pipeline: entities=%zu, layers=%zu, groups=%zu, layerMap=%zu, groupMap=%zu",
+    SY_DEBUGF("[NativeImportReader] Imported via new pipeline: entities=%zu, layers=%zu, groups=%zu, layerMap=%zu, "
+              "groupMap=%zu",
         outEntities.size(),
         result.importedLayers.size(),
         result.importedGroups.size(),

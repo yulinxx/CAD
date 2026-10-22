@@ -1,0 +1,13 @@
+{
+  "clientId": "san_yi",
+  "productName": "SanYi CAD",
+  "companyName": "SanYi Technology",
+  "appId": "SanYiCAD",
+  "organizationDomain": "sanyi-cad.com",
+  "windowTitle": "SanYi CAD",
+  "tagline": "Computer-Aided Design Software",
+  "copyright": "Copyright (C) 2026 SanYi Technology. All rights reserved.",
+  "website": "https://sanyi-cad.com",
+  "supportEmail": "support@sanyi-cad.com",
+  "theme": "light"
+}

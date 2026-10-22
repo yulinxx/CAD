@@ -1437,16 +1437,17 @@ TEST(RenderViewport2DRegressionTest, InputRouter_ContextMenuNullDispatcher)
 // 两条路径互相独立。右键被消费为「取消绘制/退出工具」时，菜单必须同步抑制，
 // 否则取消绘图的右键会额外弹出菜单，其 Cut 首项会吃掉用户下一次点击。
 
-namespace {
-// 仅用于制造「非选择工具激活」状态的最小绘图工具（走 BaseTool 默认实现）
-class ContextMenuSuppressionProbeTool : public BaseTool
+namespace
 {
-public:
-    ContextMenuSuppressionProbeTool()
-        : BaseTool("ContextMenuSuppressionProbeTool")
+    // 仅用于制造「非选择工具激活」状态的最小绘图工具（走 BaseTool 默认实现）
+    class ContextMenuSuppressionProbeTool : public BaseTool
     {
-    }
-};
+    public:
+        ContextMenuSuppressionProbeTool()
+            : BaseTool("ContextMenuSuppressionProbeTool")
+        {
+        }
+    };
 }  // namespace
 
 TEST(RenderViewport2DRegressionTest, InputRouter_ConsumeContextMenuSuppression_NoToolAllowsMenu)
@@ -1493,7 +1494,8 @@ TEST(RenderViewport2DRegressionTest, InputRouter_ConsumeContextMenuSuppression_N
     EXPECT_TRUE(router.consumeContextMenuSuppression());
 }
 
-TEST(RenderViewport2DRegressionTest, InputRouter_ConsumeContextMenuSuppression_NonSelectToolStaysSuppressedUntilSelectTool)
+TEST(RenderViewport2DRegressionTest,
+    InputRouter_ConsumeContextMenuSuppression_NonSelectToolStaysSuppressedUntilSelectTool)
 {
     Eg::SceneManager scene;
     ToolContext2D ctx;

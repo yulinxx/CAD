@@ -225,8 +225,7 @@ TEST(UndoRedoRegressionTest, EntitySnapshotsCommand_RoundTrip)
 
     // 执行快照命令。修改在这里已经生效，场景当前状态即「修改后」态，
     // 因此只需传 before 一份快照（命令靠与场景整体交换完成撤销/重做）。
-    undoMgr.executeCommand(
-        Eg::createEntitySnapshotsCommand(&scene, beforeSnap, beforeCount, "Modify line and circle"));
+    undoMgr.executeCommand(Eg::createEntitySnapshotsCommand(&scene, beforeSnap, beforeCount, "Modify line and circle"));
 
     // 验证修改生效
     auto* modifiedLine = scene.findSyEntityById(lineId);

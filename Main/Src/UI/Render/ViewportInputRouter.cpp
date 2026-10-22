@@ -630,7 +630,6 @@ bool ViewportInputRouter::consumeContextMenuSuppression()
     return false;
 }
 
-
 // ==================== 坐标转换 ====================
 
 QSizeF ViewportInputRouter::physicalViewportSize() const

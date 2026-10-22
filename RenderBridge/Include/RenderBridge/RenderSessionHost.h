@@ -70,7 +70,7 @@ namespace RenderAbstraction
     class IRenderDevice;
     class IRenderSurface;
     class IRenderScene;
-}
+}  // namespace RenderAbstraction
 
 namespace RenderBridge
 {
@@ -157,9 +157,20 @@ namespace RenderBridge
         // 对象**不拥有**句柄，销毁仍由本类负责（见 initialize / shutdown 的顺序）。
         // isReady() 为假时三个访问器都返回 nullptr。
 
-        RenderAbstraction::IRenderDevice* device() const { return m_deviceObj.get(); }
-        RenderAbstraction::IRenderSurface* surface() const { return m_surfaceObj.get(); }
-        RenderAbstraction::IRenderScene* scene() const { return m_sceneObj.get(); }
+        RenderAbstraction::IRenderDevice* device() const
+        {
+            return m_deviceObj.get();
+        }
+
+        RenderAbstraction::IRenderSurface* surface() const
+        {
+            return m_surfaceObj.get();
+        }
+
+        RenderAbstraction::IRenderScene* scene() const
+        {
+            return m_sceneObj.get();
+        }
 
         /// 把后端能力打一条日志；tag 是调用方前缀（两个视口前缀不同）
         void logCapabilities(const char* tag) const;

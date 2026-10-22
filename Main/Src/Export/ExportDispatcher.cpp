@@ -32,8 +32,8 @@ ExportResult ExportDispatcher::dispatch(const ExportContext& context, const Fio:
 
     if (fmt == Fio::FileFormat::Unknown)
     {
-        QString msg = QCoreApplication::translate("ExportDispatcher", "Cannot detect format for: %1")
-                          .arg(context.targetPath);
+        QString msg =
+            QCoreApplication::translate("ExportDispatcher", "Cannot detect format for: %1").arg(context.targetPath);
         SY_ERRORF("[ExportDispatcher] %s", msg.toUtf8().constData());
         return ExportResult::fail(msg);
     }

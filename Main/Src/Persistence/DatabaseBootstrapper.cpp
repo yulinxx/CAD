@@ -35,21 +35,28 @@ static void registerSchemaWhiteList()
     Eg::Database::registerTableName("settings");
     Eg::Database::registerTableName("dialog_states");
 
-    Eg::Database::registerColumnNames("app_meta", {"id", "key", "value", "updated_at"});
-    Eg::Database::registerColumnNames("recent_files",
-        {"id", "file_path", "title", "format", "last_opened_at"});
-    Eg::Database::registerColumnNames("workspace_snapshots",
-        {"id", "workbench_id", "geometry", "window_state", "updated_at"});
+    Eg::Database::registerColumnNames("app_meta", { "id", "key", "value", "updated_at" });
+    Eg::Database::registerColumnNames("recent_files", { "id", "file_path", "title", "format", "last_opened_at" });
+    Eg::Database::registerColumnNames(
+        "workspace_snapshots", { "id", "workbench_id", "geometry", "window_state", "updated_at" });
     Eg::Database::registerColumnNames("layers",
-        {"id", "document_id", "layer_id", "name", "color", "visible", "locked",
-         "fill", "fill_color", "layer_type", "order_index", "updated_at"});
+        { "id",
+            "document_id",
+            "layer_id",
+            "name",
+            "color",
+            "visible",
+            "locked",
+            "fill",
+            "fill_color",
+            "layer_type",
+            "order_index",
+            "updated_at" });
     Eg::Database::registerColumnNames("documents",
-        {"id", "file_path", "title", "format", "entity_count", "file_size",
-         "last_opened_at", "last_saved_at", "created_at"});
-    Eg::Database::registerColumnNames("settings",
-        {"id", "group_name", "key", "value", "data_type", "updated_at"});
-    Eg::Database::registerColumnNames("dialog_states",
-        {"id", "dialog_key", "document_id", "state_json", "created_at", "updated_at"});
+        { "id", "file_path", "title", "format", "entity_count", "file_size", "last_opened_at", "last_saved_at", "created_at" });
+    Eg::Database::registerColumnNames("settings", { "id", "group_name", "key", "value", "data_type", "updated_at" });
+    Eg::Database::registerColumnNames(
+        "dialog_states", { "id", "dialog_key", "document_id", "state_json", "created_at", "updated_at" });
 }
 
 DatabaseBootstrapper::DatabaseBootstrapper(Eg::Database& database)
@@ -469,7 +476,7 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
             // 为 layers 表创建 (document_id, layer_id) 唯一索引，确保图层数据唯一性
             // 使用 IF NOT EXISTS 保证幂等性，旧数据库若存在重复数据会跳过
             if (!m_database.execute(
-                "CREATE UNIQUE INDEX IF NOT EXISTS idx_layers_doc_layer ON layers(document_id, layer_id)"))
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_layers_doc_layer ON layers(document_id, layer_id)"))
             {
                 // 旧数据可能有重复，此处忽略错误，后续 createIndices() 会创建普通索引兜底
                 SY_WARNF("[DatabaseBootstrapper] Could not create unique index on layers(document_id, layer_id): %s",
@@ -530,8 +537,7 @@ bool DatabaseBootstrapper::createIndices()
 {
     // 为 layers 表的 document_id 字段创建索引，加速按文档查询
     // 使用 IF NOT EXISTS 保证幂等性
-    if (!m_database.execute(
-        "CREATE INDEX IF NOT EXISTS idx_layers_document_id ON layers(document_id)"))
+    if (!m_database.execute("CREATE INDEX IF NOT EXISTS idx_layers_document_id ON layers(document_id)"))
     {
         m_lastError = "Failed to create index idx_layers_document_id: " + m_database.lastError();
         SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
@@ -541,8 +547,7 @@ bool DatabaseBootstrapper::createIndices()
     // 为 layers 表的 (document_id, layer_id) 组合创建唯一索引
     // 确保同一文档下的图层ID唯一，支持 INSERT OR REPLACE 语义
     // 旧数据库中若存在重复数据，此语句会跳过（IF NOT EXISTS 不会覆盖已有非唯一索引）
-    if (!m_database.execute(
-        "CREATE INDEX IF NOT EXISTS idx_layers_doc_layer ON layers(document_id, layer_id)"))
+    if (!m_database.execute("CREATE INDEX IF NOT EXISTS idx_layers_doc_layer ON layers(document_id, layer_id)"))
     {
         m_lastError = "Failed to create index idx_layers_doc_layer: " + m_database.lastError();
         SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
@@ -551,7 +556,7 @@ bool DatabaseBootstrapper::createIndices()
 
     // 为 recent_files 表的 last_opened_at 字段创建索引，加速按时间排序查询
     if (!m_database.execute(
-        "CREATE INDEX IF NOT EXISTS idx_recent_files_opened_at ON recent_files(last_opened_at DESC)"))
+            "CREATE INDEX IF NOT EXISTS idx_recent_files_opened_at ON recent_files(last_opened_at DESC)"))
     {
         m_lastError = "Failed to create index idx_recent_files_opened_at: " + m_database.lastError();
         SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
@@ -559,8 +564,7 @@ bool DatabaseBootstrapper::createIndices()
     }
 
     // 为 dialog_states 表的 document_id 字段创建索引，加速按文档查询
-    if (!m_database.execute(
-        "CREATE INDEX IF NOT EXISTS idx_dialog_states_doc_id ON dialog_states(document_id)"))
+    if (!m_database.execute("CREATE INDEX IF NOT EXISTS idx_dialog_states_doc_id ON dialog_states(document_id)"))
     {
         m_lastError = "Failed to create index idx_dialog_states_doc_id: " + m_database.lastError();
         SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
@@ -568,8 +572,7 @@ bool DatabaseBootstrapper::createIndices()
     }
 
     // 为 dialog_states 表的 dialog_key 字段创建索引，加速按对话框标识查询
-    if (!m_database.execute(
-        "CREATE INDEX IF NOT EXISTS idx_dialog_states_key ON dialog_states(dialog_key)"))
+    if (!m_database.execute("CREATE INDEX IF NOT EXISTS idx_dialog_states_key ON dialog_states(dialog_key)"))
     {
         m_lastError = "Failed to create index idx_dialog_states_key: " + m_database.lastError();
         SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());

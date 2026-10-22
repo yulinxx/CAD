@@ -46,8 +46,7 @@ void MenuDispatcher::setStateCenter(UiStateCenter* stateCenter)
 
 bool MenuDispatcher::isWorkbenchSwitchCommand(const QString& commandId)
 {
-    return commandId == QLatin1String("view.switch_to_2d") ||
-        commandId == QLatin1String("view.switch_to_3d");
+    return commandId == QLatin1String("view.switch_to_2d") || commandId == QLatin1String("view.switch_to_3d");
 }
 
 bool MenuDispatcher::isThemeCommand(const QString& commandId)
@@ -67,8 +66,8 @@ bool MenuDispatcher::isWindowLevelCommand(const QString& commandId)
     // 「按钮是否可点」（isCommandRegistered）、「过滤是否放行」
     // （rebuildMenusFromConfig 的 commandAvailable）与「契约测试/自检是否跳过
     // 目录校验」（CommandUiWiringTests、UiConfigSelfCheck）。不要再开第二份名单。
-    return isWorkbenchSwitchCommand(commandId) || isThemeCommand(commandId) ||
-        isLanguageCommand(commandId) || commandId == QLatin1String("help.about");
+    return isWorkbenchSwitchCommand(commandId) || isThemeCommand(commandId) || isLanguageCommand(commandId) ||
+        commandId == QLatin1String("help.about");
 }
 
 bool MenuDispatcher::isCommandRegistered(const QString& commandId) const
@@ -134,7 +133,7 @@ void MenuDispatcher::dispatch(const QString& commandId, const QVariantMap& param
     }
 
     // 关于对话框：help.about 是窗口级动作，在进命令总线前短路
-    //（目录里保留条目仅供历史兼容，不作为分发路径）。
+    // （目录里保留条目仅供历史兼容，不作为分发路径）。
     // 模式必须取当前工作台 —— 硬编码 Mode2D 会让 3D 下打开 2D 版 About。
     if (commandId == QLatin1String("help.about") && m_self && m_self->workbenchWindow())
     {

@@ -45,8 +45,12 @@ int LicensingBootstrap::runGate(const QString& configDir)
             nullptr);
         QPushButton* regBtn = expiredBox.addButton(QString::fromUtf8("Register Now"), QMessageBox::AcceptRole);
         QPushButton* exitBtn = expiredBox.addButton(QString::fromUtf8("Exit"), QMessageBox::RejectRole);
-        QObject::connect(regBtn, &QPushButton::clicked, [&expiredChoice]() { expiredChoice = 0; });
-        QObject::connect(exitBtn, &QPushButton::clicked, [&expiredChoice]() { expiredChoice = 1; });
+        QObject::connect(regBtn, &QPushButton::clicked, [&expiredChoice]() {
+            expiredChoice = 0;
+        });
+        QObject::connect(exitBtn, &QPushButton::clicked, [&expiredChoice]() {
+            expiredChoice = 1;
+        });
         expiredBox.exec();
 
         if (expiredChoice != 0)
@@ -83,15 +87,15 @@ int LicensingBootstrap::runGate(const QString& configDir)
                                .arg(remainingDays);
 
         int trialChoice = -1;  // 0=Register, 1=Continue
-        QMessageBox trialBox(QMessageBox::Information,
-            tr("Trial Period"),
-            trialMsg,
-            QMessageBox::NoButton,
-            nullptr);
+        QMessageBox trialBox(QMessageBox::Information, tr("Trial Period"), trialMsg, QMessageBox::NoButton, nullptr);
         QPushButton* regBtn = trialBox.addButton(tr("Register Now"), QMessageBox::AcceptRole);
         QPushButton* contBtn = trialBox.addButton(tr("Continue Trial"), QMessageBox::RejectRole);
-        QObject::connect(regBtn, &QPushButton::clicked, [&trialChoice]() { trialChoice = 0; });
-        QObject::connect(contBtn, &QPushButton::clicked, [&trialChoice]() { trialChoice = 1; });
+        QObject::connect(regBtn, &QPushButton::clicked, [&trialChoice]() {
+            trialChoice = 0;
+        });
+        QObject::connect(contBtn, &QPushButton::clicked, [&trialChoice]() {
+            trialChoice = 1;
+        });
         trialBox.exec();
 
         SY_DEBUGF("[LicensingBootstrap] Trial dialog choice=%d", trialChoice);

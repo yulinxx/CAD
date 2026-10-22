@@ -382,7 +382,6 @@ TEST(ClientConfigLayoutBuilderTest, ActionStillDispatchesAfterBuilderDestroyed)
     delete action;
 }
 
-
 TEST(ClientConfigLayoutBuilderTest, CheckableActionRespectsInitialState)
 {
     FakeDispatcher dispatcher;
@@ -550,8 +549,7 @@ TEST(ClientConfigLoaderTest, ThreeDMenuFilterDropsUnregisteredCommands)
 TEST(ClientConfigLoaderTest, ThreeDMenuKeepsIndustryGroupsWhenCommandRegistered)
 {
     auto commandAvailable = [](const QString& commandId) {
-        return commandId == QStringLiteral("laser.connect") ||
-            commandId == QStringLiteral("vision.test_shape_detect");
+        return commandId == QStringLiteral("laser.connect") || commandId == QStringLiteral("vision.test_shape_detect");
     };
 
     MenuDef laserMenu;
@@ -565,7 +563,6 @@ TEST(ClientConfigLoaderTest, ThreeDMenuKeepsIndustryGroupsWhenCommandRegistered)
     laserConnect.commandId = QStringLiteral("laser.connect");
     laserConnect.workbenches = { QStringLiteral("2D"), QStringLiteral("3D") };
     laserMenu.items.push_back(laserConnect);
-
 
     MenuDef visionMenu;
     visionMenu.id = QStringLiteral("vision");
@@ -591,7 +588,9 @@ TEST(ClientConfigLoaderTest, ThreeDMenuKeepsIndustryGroupsWhenCommandRegistered)
 /// 否则 3D 菜单会出现开头就是分隔线、或成片空分隔线的排版。
 TEST(ClientConfigLoaderTest, FilterCollapsesDanglingSeparators)
 {
-    auto commandAvailable = [](const QString&) { return true; };
+    auto commandAvailable = [](const QString&) {
+        return true;
+    };
 
     MenuDef drawMenu;
     drawMenu.id = QStringLiteral("draw");
@@ -1038,8 +1037,10 @@ TEST(ClientConfigLoaderTest, FilterKeepsSubMenuWithOnlyDynamicSections)
     trulyEmpty.workbenches = QStringList{ QStringLiteral("2D") };
     menu.items.push_back(trulyEmpty);
 
-    const auto filtered = WorkbenchMenuManager::filterMenusForWorkbench(
-        { menu }, QStringLiteral("2D"), [](const QString&) { return true; });
+    const auto filtered =
+        WorkbenchMenuManager::filterMenusForWorkbench({ menu }, QStringLiteral("2D"), [](const QString&) {
+            return true;
+        });
 
     ASSERT_EQ(filtered.size(), 1u);
     ASSERT_EQ(filtered[0].items.size(), 1u);
@@ -1053,13 +1054,12 @@ TEST(ClientConfigLayoutBuilderTest, SubMenuDynamicSectionFilledAtBuildAndRefille
 
     // 段内容随外部数据变化，模拟最近文件列表
     QStringList data{ QStringLiteral("a.sy") };
-    UiContextMenuService::instance().registerDynamicSection(
-        QStringLiteral("test.section"), [&data](QMenu* menu) {
-            for (const QString& item : data)
-            {
-                menu->addAction(item);
-            }
-        });
+    UiContextMenuService::instance().registerDynamicSection(QStringLiteral("test.section"), [&data](QMenu* menu) {
+        for (const QString& item : data)
+        {
+            menu->addAction(item);
+        }
+    });
 
     MenuDef menu;
     menu.id = QStringLiteral("file");
@@ -1097,11 +1097,10 @@ TEST(ClientConfigLayoutBuilderTest, SubMenuStaticItemsSurviveDynamicRefill)
     UiContextMenuService::instance().resetForTest();
 
     int fillCount = 0;
-    UiContextMenuService::instance().registerDynamicSection(
-        QStringLiteral("test.section"), [&fillCount](QMenu* menu) {
-            ++fillCount;
-            menu->addAction(QStringLiteral("dynamic"));
-        });
+    UiContextMenuService::instance().registerDynamicSection(QStringLiteral("test.section"), [&fillCount](QMenu* menu) {
+        ++fillCount;
+        menu->addAction(QStringLiteral("dynamic"));
+    });
 
     MenuDef menu;
     menu.id = QStringLiteral("file");
@@ -1142,5 +1141,3 @@ TEST(ClientConfigLayoutBuilderTest, SubMenuStaticItemsSurviveDynamicRefill)
 
     UiContextMenuService::instance().resetForTest();
 }
-
-

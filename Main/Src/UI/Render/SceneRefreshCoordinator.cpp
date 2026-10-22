@@ -306,6 +306,16 @@ void SceneRefreshCoordinator::requestLightRefresh()
 
 void SceneRefreshCoordinator::requestFullRefresh()
 {
+    // 追踪：谁在反复调用 requestFullRefresh
+    static std::chrono::steady_clock::time_point s_lastLog;
+    auto now = std::chrono::steady_clock::now();
+    if (now - s_lastLog >= std::chrono::milliseconds(1000))
+    {
+        s_lastLog = now;
+        SY_DEBUGF(
+            "[SceneRefreshCoordinator] requestFullRefresh called (prevLevel=%d)", static_cast<int>(m_refreshLevel));
+    }
+
     // 全量刷新：重建所有渲染数据
     m_refreshLevel = RefreshLevel::FullRefresh;
     scheduleFullRefresh();
@@ -377,8 +387,10 @@ void SceneRefreshCoordinator::requestViewportRefresh()
         float bounds[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
         if (m_renderWidget->visibleWorldBounds(bounds))
         {
-            const Ut::BBox2d visibleBox(static_cast<double>(bounds[0]), static_cast<double>(bounds[1]),
-                static_cast<double>(bounds[2]), static_cast<double>(bounds[3]));
+            const Ut::BBox2d visibleBox(static_cast<double>(bounds[0]),
+                static_cast<double>(bounds[1]),
+                static_cast<double>(bounds[2]),
+                static_cast<double>(bounds[3]));
             if (!m_builtVisibleBox.isValid() || !m_builtVisibleBox.contains(visibleBox))
             {
                 requestFullRefresh();
@@ -395,6 +407,17 @@ void SceneRefreshCoordinator::requestViewportRefresh()
 // 收集脏/删除图元 ID，升级到 LightUpdate 级别
 void SceneRefreshCoordinator::onSceneChanged()
 {
+    // 追踪：每次场景变更都打一下，看看空场景下谁在反复触发
+    static std::chrono::steady_clock::time_point s_lastLog;
+    auto now = std::chrono::steady_clock::now();
+    if (now - s_lastLog >= std::chrono::milliseconds(1000))
+    {
+        s_lastLog = now;
+        SY_DEBUGF("[SceneRefreshCoordinator] onSceneChanged: lastCursor=%llu revision=%llu",
+            static_cast<unsigned long long>(m_lastCursor),
+            m_sceneManager ? static_cast<unsigned long long>(m_sceneManager->currentRevision()) : 0);
+    }
+
     if (m_sceneManager)
     {
         Eg::SceneChangeSet changes;
@@ -766,12 +789,12 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     // （对比旧实现逐图元一对 makeCurrent/update）。
     if (!entityIdsToProcess.empty())
     {
-        m_renderWidget->upsertRenderEntities(entityIdsToProcess,
+        m_renderWidget->upsertRenderEntities(
+            entityIdsToProcess,
             [this, sm](uint64_t uid) -> const Eg::SyEntity* {
                 // 先查本轮快照（clone 副本，主线程可读）；不在快照里再查活对象
                 // （恢复本体的那批没有快照）。
-                const Eg::RenderEntitySnapshot* snapshot = m_pendingSnapshot.find(
-                    static_cast<Eg::EntityId>(uid));
+                const Eg::RenderEntitySnapshot* snapshot = m_pendingSnapshot.find(static_cast<Eg::EntityId>(uid));
                 if (snapshot != nullptr && snapshot->entity() != nullptr)
                 {
                     return snapshot->entity();
@@ -827,15 +850,13 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     // 两者都不成立时（账本空 && 本轮没碰位图）对账必然是空转，可以安全跳过。
     if (touchedImage || !m_bitmapReconciler.empty())
     {
-        m_bitmapReconciler.reconcile(sm, /*fullReconcile=*/false, m_cachedSelectedIds, hideSelected,
-            m_pendingDirtyIds);
+        m_bitmapReconciler.reconcile(sm, /*fullReconcile=*/false, m_cachedSelectedIds, hideSelected, m_pendingDirtyIds);
     }
 
     // 世界文字层协调：同上。文本自己一路后，增量刷新不再因文本升级为全量。
     if (touchedText || !m_textReconciler.empty())
     {
-        m_textReconciler.reconcile(sm, /*fullReconcile=*/false, m_cachedSelectedIds, hideSelected,
-            m_pendingDirtyIds);
+        m_textReconciler.reconcile(sm, /*fullReconcile=*/false, m_cachedSelectedIds, hideSelected, m_pendingDirtyIds);
     }
 }
 
@@ -851,6 +872,20 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     if (!m_renderWidget || !sm)
     {
         return;
+    }
+
+    // 追踪 FullRefresh 触发原因与游标状态，定位空场景下的循环触发源头
+    static std::chrono::steady_clock::time_point s_lastFullRefreshLog;
+    auto now = std::chrono::steady_clock::now();
+    if (now - s_lastFullRefreshLog >= std::chrono::milliseconds(1000))
+    {
+        s_lastFullRefreshLog = now;
+        SY_DEBUGF("[SceneRefreshCoordinator] applyFullRefresh: lastCursor=%llu revision=%llu pendingDirty=%zu "
+                  "pendingDeleted=%zu",
+            static_cast<unsigned long long>(m_lastCursor),
+            static_cast<unsigned long long>(sm->currentRevision()),
+            m_pendingDirtyIds.size(),
+            m_pendingDeletedIds.size());
     }
 
     // 全量重建：几何与台账都由 RenderSceneBuilder 的装配轮次自行对齐
@@ -951,8 +986,7 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     // 就此作废：重新锚定缩放基准（否则下一帧拿旧基准比较会白白重收集一次），
     // 并把区域记录置为无效 —— 全场景都已是当前精度，平移不需要再补收集。
     const float pxToWorldNow = m_renderWidget->pixelToWorldScale();
-    m_curveLodManager.clearAfterFullRefresh(
-        pxToWorldNow > 0.0f ? 1.0 / static_cast<double>(pxToWorldNow) : 0.0);
+    m_curveLodManager.clearAfterFullRefresh(pxToWorldNow > 0.0f ? 1.0 / static_cast<double>(pxToWorldNow) : 0.0);
 
     // 位图层全量协调：submitSceneFromDataSource 内部 renderBeginScene 已清空 GPU 位图，
     // 这里以场景为真源整体重建，保证与场景生命周期完全一致

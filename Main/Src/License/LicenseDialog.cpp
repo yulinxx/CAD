@@ -70,8 +70,8 @@ LicenseDialog::LicenseDialog(const QString& configDir, QWidget* parent)
     // 标准 Tab 顺序
     UiDialog::DialogTabOrder tabOrder(this);
     tabOrder.addWidget(m_regCodeEdit, 1, "RegCodeEdit")
-            .addWidget(m_activateBtn, 10, "ActivateBtn")
-            .addWidget(m_exitBtn, 11, "ExitBtn");
+        .addWidget(m_activateBtn, 10, "ActivateBtn")
+        .addWidget(m_exitBtn, 11, "ExitBtn");
     if (m_machineCodeLabel)
     {
         tabOrder.addWidget(m_machineCodeLabel, 0, "MachineCodeLabel");

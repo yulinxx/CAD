@@ -408,5 +408,4 @@ namespace RenderBridge
         uint64_t m_syntheticId = 0;
         uint64_t m_currentEntityId = 0;
     };
-
 }  // namespace RenderBridge

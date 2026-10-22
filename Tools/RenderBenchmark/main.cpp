@@ -56,7 +56,7 @@ namespace
 
     constexpr uint32_t kSurfaceWidth = 1280;
     constexpr uint32_t kSurfaceHeight = 720;
-    constexpr uint32_t kVertexStride = 24;   // VertexFormat::P3C3
+    constexpr uint32_t kVertexStride = 24;  // VertexFormat::P3C3
     constexpr uint32_t kVerticesPerEntity = 2;
     constexpr uint32_t kBlockBytes = kVertexStride * kVerticesPerEntity;
     constexpr int kWarmupFrames = 20;
@@ -122,7 +122,7 @@ namespace
      * @brief 跑一个用例：预热若干帧后逐帧计时，输出 p50/p95/min
      * @param perFrame 每帧要执行的全部动作（begin → 提交 → end）
      */
-    template <typename Fn>
+    template<typename Fn>
     void runCase(const char* name, const char* note, Fn&& perFrame)
     {
         for (int i = 0; i < kWarmupFrames; ++i)
@@ -397,6 +397,7 @@ int main(int argc, char** argv)
 
     // ---------- 1~3. 缩放档位：同一份列表，不同视野 ----------
     std::printf("[zoom levels]（列表不变，只换视野矩形：看剔除是否生效、绘制量如何变化）\n");
+
     struct ZoomCase
     {
         const char* name;
@@ -422,7 +423,9 @@ int main(int argc, char** argv)
 
     for (const ZoomCase& zc : zoomCases)
     {
-        runCase(zc.name, zc.note, [&](int) { submitListFrame(session, list, zc.view); });
+        runCase(zc.name, zc.note, [&](int) {
+            submitListFrame(session, list, zc.view);
+        });
 
         DrawListStats stats{};
         rxDrawListGetStats(runtime, list, &stats);
@@ -434,8 +437,7 @@ int main(int argc, char** argv)
         drawFit = stats.drawCallCount;
     }
 
-    std::printf("  %-24s visible=%u lines=%u draws=%u\n",
-        "zoom_fit_counters ->", visibleFit, lineFit, drawFit);
+    std::printf("  %-24s visible=%u lines=%u draws=%u\n", "zoom_fit_counters ->", visibleFit, lineFit, drawFit);
     std::printf("  %-24s visible=%u lines=%u\n", "zoom_10pct_counters ->", visible10, line10);
     std::printf("  %-24s visible=%u lines=%u\n", "zoom_1pct_counters ->", visible1, line1);
     printDrawListStats("drawlist_after_zoom", runtime, list);
@@ -461,8 +463,9 @@ int main(int argc, char** argv)
                 rxDrawListUpsert(runtime, noCullList, static_cast<uint32_t>(i), &commands[i], &aabbs[i * 4]);
             }
 
-            runCase("frame_fit_nocull", "全场景视野但关闭剔除（纯线性路径，对照）",
-                [&](int) { submitListFrame(session, noCullList, viewFit); });
+            runCase("frame_fit_nocull", "全场景视野但关闭剔除（纯线性路径，对照）", [&](int) {
+                submitListFrame(session, noCullList, viewFit);
+            });
 
             // 与 frame_zoom_fit 逐项对比：两者视野相同、命令相同，只差是否经网格
             const Result* fitWithCull = nullptr;
@@ -657,13 +660,12 @@ int main(int argc, char** argv)
 #endif
                 std::strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", &local);
                 const std::string label = runLabel.empty() ? std::string("unlabeled") : runLabel;
-                out << "# run=" << label << " entities=" << entityCount
-                    << " at=" << stamp << " backend=Null\n";
+                out << "# run=" << label << " entities=" << entityCount << " at=" << stamp << " backend=Null\n";
             }
             for (const Result& r : g_results)
             {
-                out << entityCount << ',' << r.name << ',' << r.unit << ',' << r.medianMs << ",p95=" <<
-                    formatDouble(r.p95Ms) << ' ' << r.note << '\n';
+                out << entityCount << ',' << r.name << ',' << r.unit << ',' << r.medianMs
+                    << ",p95=" << formatDouble(r.p95Ms) << ' ' << r.note << '\n';
             }
             out.flush();
             std::printf("\n[CSV] appended to %s\n", csvPath.c_str());

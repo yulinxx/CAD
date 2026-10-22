@@ -38,7 +38,6 @@ namespace Render
             // 屏幕空间 y 向下，NDC y 向上，故取反
             outY = (0.5f - ndcY * 0.5f) * static_cast<float>(vpHeight);
         }
-
     }  // namespace
 
     TextQuadBuilder::~TextQuadBuilder()
@@ -59,8 +58,7 @@ namespace Render
         return true;
     }
 
-    bool TextQuadBuilder::initialize(
-        RenderAbstraction::IRenderDevice& device, const uint8_t* fontData, size_t bytes)
+    bool TextQuadBuilder::initialize(RenderAbstraction::IRenderDevice& device, const uint8_t* fontData, size_t bytes)
     {
         if (!fontData || bytes == 0)
         {
@@ -123,8 +121,7 @@ namespace Render
             {
                 m_warnedFontFailure = true;
                 // 字号 %d 的字体创建失败，具体原因已由适配层打印
-                SY_ERRORF("TextQuadBuilder: font creation failed for size %d, text will not be displayed",
-                    pixelHeight);
+                SY_ERRORF("TextQuadBuilder: font creation failed for size %d, text will not be displayed", pixelHeight);
             }
             // 仍然登记这一项：否则每帧每条文本都会重试一次创建。
             m_batches.push_back(Batch{ pixelHeight, {}, {} });
@@ -261,8 +258,9 @@ namespace Render
         }
     }
 
-    void TextQuadBuilder::flush(
-        RenderAbstraction::IRenderScene& scene, uint8_t layer, uint16_t& seq,
+    void TextQuadBuilder::flush(RenderAbstraction::IRenderScene& scene,
+        uint8_t layer,
+        uint16_t& seq,
         std::vector<RenderAbstraction::DrawInstruction>& out)
     {
         if (!valid())
@@ -270,8 +268,7 @@ namespace Render
             return;
         }
 
-        const uint32_t glyphPipeline =
-            m_device->defaultPipeline(RenderAbstraction::PipelineKind::ScreenGlyph);
+        const uint32_t glyphPipeline = m_device->defaultPipeline(RenderAbstraction::PipelineKind::ScreenGlyph);
 
         for (Batch& batch : m_batches)
         {

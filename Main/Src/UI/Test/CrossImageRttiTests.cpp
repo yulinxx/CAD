@@ -60,15 +60,26 @@ namespace
 
         MinimalMeshIr()
         {
-            blobBytes = {
-                // 顶点
-                0.0f, 0.0f, 0.0f,
-                1.0f, 0.0f, 0.0f,
-                0.0f, 1.0f, 0.0f,
+            blobBytes = { // 顶点
+                0.0f,
+                0.0f,
+                0.0f,
+                1.0f,
+                0.0f,
+                0.0f,
+                0.0f,
+                1.0f,
+                0.0f,
                 // 法线
-                0.0f, 0.0f, 1.0f,
-                0.0f, 0.0f, 1.0f,
-                0.0f, 0.0f, 1.0f
+                0.0f,
+                0.0f,
+                1.0f,
+                0.0f,
+                0.0f,
+                1.0f,
+                0.0f,
+                0.0f,
+                1.0f
             };
 
             info.type = Fio::EntityType::Mesh3D;

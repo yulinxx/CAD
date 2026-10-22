@@ -57,8 +57,13 @@ static std::terminate_handler g_oldTerminate = nullptr;
 // Non-WIN32 stubs
 static void* g_vehHandle = nullptr;
 static std::terminate_handler g_oldTerminate = nullptr;
+
 inline void crashTerminateHandler() {}
-inline long vectoredExceptionHandler(void*) { return 0; }
+
+inline long vectoredExceptionHandler(void*)
+{
+    return 0;
+}
 #endif
 
 #ifdef _WIN32
@@ -66,325 +71,327 @@ inline long vectoredExceptionHandler(void*) { return 0; }
 /// 此时崩溃线程仍在运行（未被 breakpad suspend），CaptureStackBackTrace
 /// 直接在崩溃线程上抓栈，拿到的就是真正的业务栈。
 LONG WINAPI vectoredExceptionHandler(EXCEPTION_POINTERS* pExInfo)
+{
+    const DWORD code = pExInfo->ExceptionRecord->ExceptionCode;
+
+    // 过滤 Qt/Windows 内部正常流转的异常码，只打印真正的崩溃。
+    // 0xe06d7363 = C++ EH（Qt 字体回退等内部大量使用）
+    // 0x8001010d = RPC 代理通知；0x40010004/0x406D1388 = 调试器约定消息
+    if (code == 0xe06d7363 || code == 0x8001010d || code == 0x40010004 || code == 0x406D1388)
     {
-        const DWORD code = pExInfo->ExceptionRecord->ExceptionCode;
-
-        // 过滤 Qt/Windows 内部正常流转的异常码，只打印真正的崩溃。
-        // 0xe06d7363 = C++ EH（Qt 字体回退等内部大量使用）
-        // 0x8001010d = RPC 代理通知；0x40010004/0x406D1388 = 调试器约定消息
-        if (code == 0xe06d7363 || code == 0x8001010d ||
-            code == 0x40010004 || code == 0x406D1388)
-        {
-            return EXCEPTION_CONTINUE_SEARCH;
-        }
-
-        // 第一时间刷日志队列
-        SyLogger::GetInstance().Flush();
-
-        const HANDLE process = GetCurrentProcess();
-        SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
-        SymInitialize(process, nullptr, TRUE);
-
-        void* frames[64] = {};
-        const USHORT captured = CaptureStackBackTrace(0, 64, frames, nullptr);
-
-        // AV 异常：ExceptionInformation[0]=操作(0读/1写/8执行)，[1]=目标地址。
-        // 目标地址能直接区分「空指针+成员偏移」和「野指针/已释放内存」。
-        const bool isAv = code == EXCEPTION_ACCESS_VIOLATION &&
-                          pExInfo->ExceptionRecord->NumberParameters >= 2;
-        const ULONG_PTR avOp = isAv ? pExInfo->ExceptionRecord->ExceptionInformation[0] : 0;
-        const ULONG_PTR avTarget = isAv ? pExInfo->ExceptionRecord->ExceptionInformation[1] : 0;
-
-        std::fprintf(stderr,
-            "\n"
-            "--------------------------------------------------------------------------\n"
-            "  [CrashHandler] VEH: exception code=0x%08lx thread=%u address=0x%llx\n",
-            code,
-            GetCurrentThreadId(),
-            reinterpret_cast<unsigned long long>(pExInfo->ExceptionRecord->ExceptionAddress));
-        if (isAv)
-        {
-            const char* opName = (avOp == 0) ? "READ" : (avOp == 1) ? "WRITE" : (avOp == 8) ? "EXECUTE" : "OTHER";
-            std::fprintf(stderr,
-                "  [CrashHandler] VEH: AV %s of target address 0x%llx\n",
-                opName, static_cast<unsigned long long>(avTarget));
-        }
-
-        std::fprintf(stderr,
-            "--------------------------------------------------------------------------\n");
-
-        alignas(SYMBOL_INFO) char symbolBuffer[sizeof(SYMBOL_INFO) + 1024] = {};
-        auto* symbol = reinterpret_cast<SYMBOL_INFO*>(symbolBuffer);
-        symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
-        symbol->MaxNameLen = 1023;
-
-        IMAGEHLP_LINE64 line = {};
-        line.SizeOfStruct = sizeof(line);
-        DWORD lineDisplacement = 0;
-
-        for (USHORT i = 0; i < captured; ++i)
-        {
-            const DWORD64 address = reinterpret_cast<DWORD64>(frames[i]);
-
-            DWORD64 displacement = 0;
-            const bool haveSymbol = SymFromAddr(process, address, &displacement, symbol) != FALSE;
-            const bool haveLine = SymGetLineFromAddr64(process, address, &lineDisplacement, &line) != FALSE;
-
-            if (haveSymbol && haveLine)
-            {
-                std::fprintf(stderr,
-                    "    #%02u %s + 0x%llx  (%s:%lu)\n",
-                    i, symbol->Name,
-                    static_cast<unsigned long long>(displacement),
-                    line.FileName, line.LineNumber);
-            }
-            else if (haveSymbol)
-            {
-                std::fprintf(stderr,
-                    "    #%02u %s + 0x%llx\n",
-                    i, symbol->Name,
-                    static_cast<unsigned long long>(displacement));
-            }
-            else
-            {
-                std::fprintf(stderr, "    #%02u 0x%llx\n", i, static_cast<unsigned long long>(address));
-            }
-        }
-        std::fprintf(stderr, "--------------------------------------------------------------------------\n\n");
-        std::fflush(stderr);
-
-        SymCleanup(process);
-
-        // 让异常继续分发——breakpad 仍能接到并写 minidump
         return EXCEPTION_CONTINUE_SEARCH;
     }
 
-    /// C++ terminate handler：捕获未处理 C++ 异常、纯虚函数调用、堆栈展开期间
-    /// 抛异常等。这类崩溃不走 SEH，VEH 不会被调。
-    void crashTerminateHandler()
+    // 第一时间刷日志队列
+    SyLogger::GetInstance().Flush();
+
+    const HANDLE process = GetCurrentProcess();
+    SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
+    SymInitialize(process, nullptr, TRUE);
+
+    void* frames[64] = {};
+    const USHORT captured = CaptureStackBackTrace(0, 64, frames, nullptr);
+
+    // AV 异常：ExceptionInformation[0]=操作(0读/1写/8执行)，[1]=目标地址。
+    // 目标地址能直接区分「空指针+成员偏移」和「野指针/已释放内存」。
+    const bool isAv = code == EXCEPTION_ACCESS_VIOLATION && pExInfo->ExceptionRecord->NumberParameters >= 2;
+    const ULONG_PTR avOp = isAv ? pExInfo->ExceptionRecord->ExceptionInformation[0] : 0;
+    const ULONG_PTR avTarget = isAv ? pExInfo->ExceptionRecord->ExceptionInformation[1] : 0;
+
+    std::fprintf(stderr,
+        "\n"
+        "--------------------------------------------------------------------------\n"
+        "  [CrashHandler] VEH: exception code=0x%08lx thread=%u address=0x%llx\n",
+        code,
+        GetCurrentThreadId(),
+        reinterpret_cast<unsigned long long>(pExInfo->ExceptionRecord->ExceptionAddress));
+    if (isAv)
     {
-        SyLogger::GetInstance().Flush();
-
-        const HANDLE process = GetCurrentProcess();
-        SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
-        SymInitialize(process, nullptr, TRUE);
-
-        void* frames[64] = {};
-        const USHORT captured = CaptureStackBackTrace(0, 64, frames, nullptr);
-
+        const char* opName = (avOp == 0) ? "READ" : (avOp == 1) ? "WRITE" : (avOp == 8) ? "EXECUTE" : "OTHER";
         std::fprintf(stderr,
-            "\n"
-            "--------------------------------------------------------------------------\n"
-            "  [CrashHandler] std::terminate called! thread=%u\n"
-            "--------------------------------------------------------------------------\n",
-            GetCurrentThreadId());
-
-        alignas(SYMBOL_INFO) char symbolBuffer[sizeof(SYMBOL_INFO) + 1024] = {};
-        auto* symbol = reinterpret_cast<SYMBOL_INFO*>(symbolBuffer);
-        symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
-        symbol->MaxNameLen = 1023;
-
-        IMAGEHLP_LINE64 line = {};
-        line.SizeOfStruct = sizeof(line);
-        DWORD lineDisplacement = 0;
-
-        for (USHORT i = 0; i < captured; ++i)
-        {
-            const DWORD64 address = reinterpret_cast<DWORD64>(frames[i]);
-
-            DWORD64 displacement = 0;
-            const bool haveSymbol = SymFromAddr(process, address, &displacement, symbol) != FALSE;
-            const bool haveLine = SymGetLineFromAddr64(process, address, &lineDisplacement, &line) != FALSE;
-
-            if (haveSymbol && haveLine)
-            {
-                std::fprintf(stderr,
-                    "    #%02u %s + 0x%llx  (%s:%lu)\n",
-                    i, symbol->Name,
-                    static_cast<unsigned long long>(displacement),
-                    line.FileName, line.LineNumber);
-            }
-            else if (haveSymbol)
-            {
-                std::fprintf(stderr,
-                    "    #%02u %s + 0x%llx\n",
-                    i, symbol->Name,
-                    static_cast<unsigned long long>(displacement));
-            }
-            else
-            {
-                std::fprintf(stderr, "    #%02u 0x%llx\n", i, static_cast<unsigned long long>(address));
-            }
-        }
-        std::fprintf(stderr, "--------------------------------------------------------------------------\n\n");
-        std::fflush(stderr);
-
-        SymCleanup(process);
-        std::abort();
+            "  [CrashHandler] VEH: AV %s of target address 0x%llx\n",
+            opName,
+            static_cast<unsigned long long>(avTarget));
     }
 
-    /// 工具：符号化指定线程（OpenThread 成功时可用）
-    void printThreadBacktrace(HANDLE process, HANDLE threadHandle, DWORD threadId)
+    std::fprintf(stderr, "--------------------------------------------------------------------------\n");
+
+    alignas(SYMBOL_INFO) char symbolBuffer[sizeof(SYMBOL_INFO) + 1024] = {};
+    auto* symbol = reinterpret_cast<SYMBOL_INFO*>(symbolBuffer);
+    symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+    symbol->MaxNameLen = 1023;
+
+    IMAGEHLP_LINE64 line = {};
+    line.SizeOfStruct = sizeof(line);
+    DWORD lineDisplacement = 0;
+
+    for (USHORT i = 0; i < captured; ++i)
     {
-        CONTEXT ctx = {};
-        ctx.ContextFlags = CONTEXT_AMD64;
-        if (!GetThreadContext(threadHandle, &ctx))
+        const DWORD64 address = reinterpret_cast<DWORD64>(frames[i]);
+
+        DWORD64 displacement = 0;
+        const bool haveSymbol = SymFromAddr(process, address, &displacement, symbol) != FALSE;
+        const bool haveLine = SymGetLineFromAddr64(process, address, &lineDisplacement, &line) != FALSE;
+
+        if (haveSymbol && haveLine)
         {
-            std::fprintf(stderr, "    thread %u: cannot get context (err=%lu)\n", threadId, GetLastError());
-            return;
+            std::fprintf(stderr,
+                "    #%02u %s + 0x%llx  (%s:%lu)\n",
+                i,
+                symbol->Name,
+                static_cast<unsigned long long>(displacement),
+                line.FileName,
+                line.LineNumber);
         }
-
-        STACKFRAME64 frame = {};
-        frame.AddrPC.Mode = AddrModeFlat;
-        frame.AddrPC.Offset = ctx.Rip;
-        frame.AddrStack.Mode = AddrModeFlat;
-        frame.AddrStack.Offset = ctx.Rsp;
-        frame.AddrFrame.Mode = AddrModeFlat;
-        frame.AddrFrame.Offset = ctx.Rbp;
-
-        std::fprintf(stderr, "    === Thread %u ===\n", threadId);
-
-        IMAGEHLP_LINE64 line = {};
-        line.SizeOfStruct = sizeof(line);
-        DWORD lineDisplacement = 0;
-        const WORD type = IMAGE_FILE_MACHINE_AMD64;
-
-        alignas(SYMBOL_INFO) char symbolBuffer[sizeof(SYMBOL_INFO) + 1024] = {};
-        auto* symbol = reinterpret_cast<SYMBOL_INFO*>(symbolBuffer);
-        symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
-        symbol->MaxNameLen = 1023;
-
-        for (int i = 0; i < 32; ++i)
+        else if (haveSymbol)
         {
-            if (!StackWalk64(type, process, threadHandle, &frame, &ctx, nullptr,
-                    SymFunctionTableAccess64, SymGetModuleBase64, nullptr))
-            {
-                break;
-            }
-            if (frame.AddrPC.Offset == 0)
-            {
-                break;
-            }
-
-            DWORD64 displacement = 0;
-            const bool haveSymbol = SymFromAddr(process, frame.AddrPC.Offset, &displacement, symbol) != FALSE;
-            const bool haveLine = SymGetLineFromAddr64(process, frame.AddrPC.Offset, &lineDisplacement, &line) != FALSE;
-
-            if (haveSymbol && haveLine)
-            {
-                std::fprintf(stderr, "      #%02d %s + 0x%llx  (%s:%lu)\n",
-                    i, symbol->Name,
-                    static_cast<unsigned long long>(displacement),
-                    line.FileName, line.LineNumber);
-            }
-            else if (haveSymbol)
-            {
-                std::fprintf(stderr, "      #%02d %s + 0x%llx\n",
-                    i, symbol->Name,
-                    static_cast<unsigned long long>(displacement));
-            }
-            else
-            {
-                std::fprintf(stderr, "      #%02d 0x%llx\n", i, static_cast<unsigned long long>(frame.AddrPC.Offset));
-            }
-        }
-    }
-
-    /// onCrashCallback 里的兜底：枚举所有线程尝试打印栈。
-    /// 注意：breakpad 在独立线程里回调，此时其他线程已被 suspend/terminate，
-    /// OpenThread THREAD_ALL_ACCESS 会返回 err=87 (ERROR_INVALID_PARAMETER)。
-    /// 所以这个函数大概率只能枚举到自己的线程，真正的崩溃栈已经由 VEH 先打印了。
-    void tryPrintAllThreadBacktraces()
-    {
-        const HANDLE process = GetCurrentProcess();
-        SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
-        if (!SymInitialize(process, nullptr, TRUE))
-        {
-            return;
-        }
-
-        const HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
-        if (snap == INVALID_HANDLE_VALUE)
-        {
-            SymCleanup(process);
-            return;
-        }
-
-        std::fprintf(stderr, "  [CrashHandler] (fallback) attempting all-thread dump...\n");
-
-        THREADENTRY32 te = {};
-        te.dwSize = sizeof(te);
-        DWORD visited[256] = {};
-        int visitedCount = 0;
-
-        if (Thread32First(snap, &te))
-        {
-            do
-            {
-                bool skip = false;
-                for (int v = 0; v < visitedCount; ++v)
-                {
-                    if (visited[v] == te.th32ThreadID)
-                    {
-                        skip = true;
-                        break;
-                    }
-                }
-                if (!skip && visitedCount < 256)
-                {
-                    visited[visitedCount++] = te.th32ThreadID;
-                    HANDLE hThread = OpenThread(THREAD_ALL_ACCESS, FALSE, te.th32ThreadID);
-                    if (hThread)
-                    {
-                        printThreadBacktrace(process, hThread, te.th32ThreadID);
-                        CloseHandle(hThread);
-                    }
-                    else
-                    {
-                        std::fprintf(stderr, "    thread %u: OpenThread failed (err=%lu, expected after breakpad suspends threads)\n",
-                            te.th32ThreadID, GetLastError());
-                    }
-                }
-            } while (Thread32Next(snap, &te));
-        }
-
-        CloseHandle(snap);
-        SymCleanup(process);
-    }
-#endif  // _WIN32
-
-    int onCrashCallback(const char* dumpPath, int succeeded, void* /*userData*/)
-    {
-        // VEH 已经在 SEH 最早阶段刷过日志 + 打了崩溃线程的栈。
-        // 这里是 breakpad 写 minidump 后的回调，此时其他线程已被 suspend/terminate。
-        SyLogger::GetInstance().Flush();
-
-        std::fprintf(stderr,
-            "\n"
-            "==========================================================================\n"
-            "  *** SanYiCAD CRASH ***  The application has crashed!\n"
-            "==========================================================================\n");
-        if (succeeded && dumpPath && dumpPath[0] != '\0')
-        {
-            std::fprintf(stderr, "  [CrashHandler] minidump saved: %s\n", dumpPath);
+            std::fprintf(
+                stderr, "    #%02u %s + 0x%llx\n", i, symbol->Name, static_cast<unsigned long long>(displacement));
         }
         else
         {
-            std::fprintf(stderr, "  [CrashHandler] failed to write minidump\n");
+            std::fprintf(stderr, "    #%02u 0x%llx\n", i, static_cast<unsigned long long>(address));
+        }
+    }
+    std::fprintf(stderr, "--------------------------------------------------------------------------\n\n");
+    std::fflush(stderr);
+
+    SymCleanup(process);
+
+    // 让异常继续分发——breakpad 仍能接到并写 minidump
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+/// C++ terminate handler：捕获未处理 C++ 异常、纯虚函数调用、堆栈展开期间
+/// 抛异常等。这类崩溃不走 SEH，VEH 不会被调。
+void crashTerminateHandler()
+{
+    SyLogger::GetInstance().Flush();
+
+    const HANDLE process = GetCurrentProcess();
+    SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
+    SymInitialize(process, nullptr, TRUE);
+
+    void* frames[64] = {};
+    const USHORT captured = CaptureStackBackTrace(0, 64, frames, nullptr);
+
+    std::fprintf(stderr,
+        "\n"
+        "--------------------------------------------------------------------------\n"
+        "  [CrashHandler] std::terminate called! thread=%u\n"
+        "--------------------------------------------------------------------------\n",
+        GetCurrentThreadId());
+
+    alignas(SYMBOL_INFO) char symbolBuffer[sizeof(SYMBOL_INFO) + 1024] = {};
+    auto* symbol = reinterpret_cast<SYMBOL_INFO*>(symbolBuffer);
+    symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+    symbol->MaxNameLen = 1023;
+
+    IMAGEHLP_LINE64 line = {};
+    line.SizeOfStruct = sizeof(line);
+    DWORD lineDisplacement = 0;
+
+    for (USHORT i = 0; i < captured; ++i)
+    {
+        const DWORD64 address = reinterpret_cast<DWORD64>(frames[i]);
+
+        DWORD64 displacement = 0;
+        const bool haveSymbol = SymFromAddr(process, address, &displacement, symbol) != FALSE;
+        const bool haveLine = SymGetLineFromAddr64(process, address, &lineDisplacement, &line) != FALSE;
+
+        if (haveSymbol && haveLine)
+        {
+            std::fprintf(stderr,
+                "    #%02u %s + 0x%llx  (%s:%lu)\n",
+                i,
+                symbol->Name,
+                static_cast<unsigned long long>(displacement),
+                line.FileName,
+                line.LineNumber);
+        }
+        else if (haveSymbol)
+        {
+            std::fprintf(
+                stderr, "    #%02u %s + 0x%llx\n", i, symbol->Name, static_cast<unsigned long long>(displacement));
+        }
+        else
+        {
+            std::fprintf(stderr, "    #%02u 0x%llx\n", i, static_cast<unsigned long long>(address));
+        }
+    }
+    std::fprintf(stderr, "--------------------------------------------------------------------------\n\n");
+    std::fflush(stderr);
+
+    SymCleanup(process);
+    std::abort();
+}
+
+/// 工具：符号化指定线程（OpenThread 成功时可用）
+void printThreadBacktrace(HANDLE process, HANDLE threadHandle, DWORD threadId)
+{
+    CONTEXT ctx = {};
+    ctx.ContextFlags = CONTEXT_AMD64;
+    if (!GetThreadContext(threadHandle, &ctx))
+    {
+        std::fprintf(stderr, "    thread %u: cannot get context (err=%lu)\n", threadId, GetLastError());
+        return;
+    }
+
+    STACKFRAME64 frame = {};
+    frame.AddrPC.Mode = AddrModeFlat;
+    frame.AddrPC.Offset = ctx.Rip;
+    frame.AddrStack.Mode = AddrModeFlat;
+    frame.AddrStack.Offset = ctx.Rsp;
+    frame.AddrFrame.Mode = AddrModeFlat;
+    frame.AddrFrame.Offset = ctx.Rbp;
+
+    std::fprintf(stderr, "    === Thread %u ===\n", threadId);
+
+    IMAGEHLP_LINE64 line = {};
+    line.SizeOfStruct = sizeof(line);
+    DWORD lineDisplacement = 0;
+    const WORD type = IMAGE_FILE_MACHINE_AMD64;
+
+    alignas(SYMBOL_INFO) char symbolBuffer[sizeof(SYMBOL_INFO) + 1024] = {};
+    auto* symbol = reinterpret_cast<SYMBOL_INFO*>(symbolBuffer);
+    symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+    symbol->MaxNameLen = 1023;
+
+    for (int i = 0; i < 32; ++i)
+    {
+        if (!StackWalk64(
+                type, process, threadHandle, &frame, &ctx, nullptr, SymFunctionTableAccess64, SymGetModuleBase64, nullptr))
+        {
+            break;
+        }
+        if (frame.AddrPC.Offset == 0)
+        {
+            break;
         }
 
+        DWORD64 displacement = 0;
+        const bool haveSymbol = SymFromAddr(process, frame.AddrPC.Offset, &displacement, symbol) != FALSE;
+        const bool haveLine = SymGetLineFromAddr64(process, frame.AddrPC.Offset, &lineDisplacement, &line) != FALSE;
+
+        if (haveSymbol && haveLine)
+        {
+            std::fprintf(stderr,
+                "      #%02d %s + 0x%llx  (%s:%lu)\n",
+                i,
+                symbol->Name,
+                static_cast<unsigned long long>(displacement),
+                line.FileName,
+                line.LineNumber);
+        }
+        else if (haveSymbol)
+        {
+            std::fprintf(
+                stderr, "      #%02d %s + 0x%llx\n", i, symbol->Name, static_cast<unsigned long long>(displacement));
+        }
+        else
+        {
+            std::fprintf(stderr, "      #%02d 0x%llx\n", i, static_cast<unsigned long long>(frame.AddrPC.Offset));
+        }
+    }
+}
+
+/// onCrashCallback 里的兜底：枚举所有线程尝试打印栈。
+/// 注意：breakpad 在独立线程里回调，此时其他线程已被 suspend/terminate，
+/// OpenThread THREAD_ALL_ACCESS 会返回 err=87 (ERROR_INVALID_PARAMETER)。
+/// 所以这个函数大概率只能枚举到自己的线程，真正的崩溃栈已经由 VEH 先打印了。
+void tryPrintAllThreadBacktraces()
+{
+    const HANDLE process = GetCurrentProcess();
+    SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
+    if (!SymInitialize(process, nullptr, TRUE))
+    {
+        return;
+    }
+
+    const HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+    if (snap == INVALID_HANDLE_VALUE)
+    {
+        SymCleanup(process);
+        return;
+    }
+
+    std::fprintf(stderr, "  [CrashHandler] (fallback) attempting all-thread dump...\n");
+
+    THREADENTRY32 te = {};
+    te.dwSize = sizeof(te);
+    DWORD visited[256] = {};
+    int visitedCount = 0;
+
+    if (Thread32First(snap, &te))
+    {
+        do
+        {
+            bool skip = false;
+            for (int v = 0; v < visitedCount; ++v)
+            {
+                if (visited[v] == te.th32ThreadID)
+                {
+                    skip = true;
+                    break;
+                }
+            }
+            if (!skip && visitedCount < 256)
+            {
+                visited[visitedCount++] = te.th32ThreadID;
+                HANDLE hThread = OpenThread(THREAD_ALL_ACCESS, FALSE, te.th32ThreadID);
+                if (hThread)
+                {
+                    printThreadBacktrace(process, hThread, te.th32ThreadID);
+                    CloseHandle(hThread);
+                }
+                else
+                {
+                    std::fprintf(stderr,
+                        "    thread %u: OpenThread failed (err=%lu, expected after breakpad suspends threads)\n",
+                        te.th32ThreadID,
+                        GetLastError());
+                }
+            }
+        } while (Thread32Next(snap, &te));
+    }
+
+    CloseHandle(snap);
+    SymCleanup(process);
+}
+#endif  // _WIN32
+
+int onCrashCallback(const char* dumpPath, int succeeded, void* /*userData*/)
+{
+    // VEH 已经在 SEH 最早阶段刷过日志 + 打了崩溃线程的栈。
+    // 这里是 breakpad 写 minidump 后的回调，此时其他线程已被 suspend/terminate。
+    SyLogger::GetInstance().Flush();
+
+    std::fprintf(stderr,
+        "\n"
+        "==========================================================================\n"
+        "  *** SanYiCAD CRASH ***  The application has crashed!\n"
+        "==========================================================================\n");
+    if (succeeded && dumpPath && dumpPath[0] != '\0')
+    {
+        std::fprintf(stderr, "  [CrashHandler] minidump saved: %s\n", dumpPath);
+    }
+    else
+    {
+        std::fprintf(stderr, "  [CrashHandler] failed to write minidump\n");
+    }
+
 #ifdef _WIN32
-        // 兜底枚举（大概率拿不到其他线程，因为 breakpad 已 suspend）
-        tryPrintAllThreadBacktraces();
+    // 兜底枚举（大概率拿不到其他线程，因为 breakpad 已 suspend）
+    tryPrintAllThreadBacktraces();
 #endif
 
-        std::fprintf(stderr,
-            "==========================================================================\n"
-            "  Please report the above info and the .dmp file to technical support.\n"
-            "==========================================================================\n\n");
-        std::fflush(stderr);
-        return succeeded;
-    }
+    std::fprintf(stderr,
+        "==========================================================================\n"
+        "  Please report the above info and the .dmp file to technical support.\n"
+        "==========================================================================\n\n");
+    std::fflush(stderr);
+    return succeeded;
+}
 
 bool CrashHandlerBootstrap::initialize(const std::string& appName, const std::string& appVersion)
 {

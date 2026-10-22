@@ -49,7 +49,6 @@ void AppInitializer::initialize()
 {
     SyLogger::SetLogPathCallback(&appLogPathThunk, nullptr);
 
-
     SyLogger::GetInstance().Initialize(MainApp::appName().c_str(), SyLogLevel::Debug, true, true);
 
     // 检测应用名称是否正确配置（CMake 模板替换失败时 appName() 为空）
@@ -60,7 +59,9 @@ void AppInitializer::initialize()
     }
 
     SY_INFO("==============================================================");
-    SY_INFOF("================== Starting %s v%s ==================", MainApp::appName().c_str(), MainApp::appVersion().c_str());
+    SY_INFOF("================== Starting %s v%s ==================",
+        MainApp::appName().c_str(),
+        MainApp::appVersion().c_str());
     SY_INFO("==============================================================\n\n");
 
     // 这里只能声明「本构建把视口编译成了哪个后端」——那是编译期事实，启动瞬间即可知。

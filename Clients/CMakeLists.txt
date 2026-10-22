@@ -1,0 +1,12 @@
+file(GLOB _client_dirs LIST_DIRECTORIES true "${CMAKE_CURRENT_SOURCE_DIR}/*")
+
+foreach(_dir IN LISTS _client_dirs)
+    get_filename_component(_name "${_dir}" NAME)
+    if(_name STREQUAL "_template")
+        continue()
+    endif()
+    if(IS_DIRECTORY "${_dir}" AND EXISTS "${_dir}/CMakeLists.txt")
+        message(STATUS "[Clients] Adding client plugin: ${_name}")
+        add_subdirectory("${_dir}")
+    endif()
+endforeach()

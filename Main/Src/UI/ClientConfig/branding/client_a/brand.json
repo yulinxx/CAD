@@ -1,0 +1,15 @@
+{
+  "clientId": "client_a",
+  "productName": "AcmeCut",
+  "companyName": "Acme Technologies",
+  "appId": "AcmeCut",
+  "organizationDomain": "acme.example",
+  "windowTitle": "AcmeCut - Professional Cutting Suite",
+  "tagline": "Professional Cutting and Engraving Suite",
+  "copyright": "Copyright (C) 2026 Acme Technologies. All rights reserved.",
+  "website": "https://acme.example",
+  "supportEmail": "support@acme.example",
+  "aboutText": "AcmeCut is a customized edition powered by SanYi CAD.",
+  "theme": "dark",
+  "splashDurationMs": 800
+}

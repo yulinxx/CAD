@@ -67,8 +67,7 @@ namespace RenderBridge
         shutdown();
     }
 
-    bool PersistentGeometryStore::initialize(
-        IRenderDevice& device, IRenderScene* scene, const Config& config)
+    bool PersistentGeometryStore::initialize(IRenderDevice& device, IRenderScene* scene, const Config& config)
     {
         shutdown();
         m_device = &device;
@@ -215,8 +214,7 @@ namespace RenderBridge
         m_freeSlots.push_back(slot);
     }
 
-    bool PersistentGeometryStore::upsertDrawItem(
-        uint32_t slot, const DrawInstruction& command, const Aabb3* bounds)
+    bool PersistentGeometryStore::upsertDrawItem(uint32_t slot, const DrawInstruction& command, const Aabb3* bounds)
     {
         if (m_scene == nullptr || !isValid(m_drawList))
         {

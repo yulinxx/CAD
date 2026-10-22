@@ -225,7 +225,8 @@ void RenderWidget3DAdapter::setCamera(CameraController3D* controller)
     // 将 CameraController3D 连接到 RenderWidget3D 的 Camera3D
     // 这样控制器就能真正操作相机，实现视图控制
     controller->setCamera(&m_renderWidget->camera());
-    SY_DEBUGF("[RenderWidget3DAdapter] CameraController3D connected to Camera3D at %p", static_cast<void*>(&m_renderWidget->camera()));
+    SY_DEBUGF("[RenderWidget3DAdapter] CameraController3D connected to Camera3D at %p",
+        static_cast<void*>(&m_renderWidget->camera()));
 }
 
 void RenderWidget3DAdapter::resize(int width, int height)

@@ -421,3 +421,84 @@ endif()
     message(STATUS "[Export] ${_lib_name}Config.cmake -> ${_config_dir}")
 endfunction()
 
+# 客户 UI 插件：每个客户一个共享库，输出到 <bin>/plugins/clients/<clientId>，
+# 并把客户仓库里的 configs/ 与 branding/ 复制到运行目录，便于本地直接调试。
+function(sanyi_add_client_plugin target)
+    cmake_parse_arguments(ARG "" "CLIENT_ID" "SOURCES;INCLUDE_DIRS;LINK_LIBRARIES" ${ARGN})
+
+    if(NOT ARG_CLIENT_ID)
+        message(FATAL_ERROR "sanyi_add_client_plugin(${target}) requires CLIENT_ID")
+    endif()
+    if(NOT ARG_SOURCES)
+        message(FATAL_ERROR "sanyi_add_client_plugin(${target}) requires SOURCES")
+    endif()
+
+    add_library(${target} SHARED ${ARG_SOURCES})
+    set_target_properties(${target} PROPERTIES
+        AUTOMOC ON
+        AUTOUIC ON
+        AUTORCC ON
+        CXX_VISIBILITY_PRESET default
+    )
+
+    target_include_directories(${target} PRIVATE
+        "${SANYI_ROOT}/Main/Src"
+        "${SANYI_ROOT}/UI/Common/Include"
+        ${ARG_INCLUDE_DIRS}
+    )
+    target_link_libraries(${target} PRIVATE
+        UICommon
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Widgets
+        ${ARG_LINK_LIBRARIES}
+    )
+    target_compile_definitions(${target} PRIVATE
+        SANYI_CLIENT_ID="${ARG_CLIENT_ID}"
+        SANYI_CLIENT_PLUGIN_ABI=1
+    )
+
+    set(_plugin_bin "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/plugins/clients/${ARG_CLIENT_ID}")
+    set(_plugin_lib "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/plugins/clients/${ARG_CLIENT_ID}")
+    set_target_properties(${target} PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${_plugin_bin}"
+        LIBRARY_OUTPUT_DIRECTORY "${_plugin_bin}"
+        ARCHIVE_OUTPUT_DIRECTORY "${_plugin_lib}"
+    )
+    foreach(_cfg DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
+        if(DEFINED CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_cfg})
+            set(_bin "${CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_cfg}}")
+        else()
+            set(_bin "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+        endif()
+        if(DEFINED CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${_cfg})
+            set(_lib "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${_cfg}}")
+        else()
+            set(_lib "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}")
+        endif()
+        set_target_properties(${target} PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY_${_cfg} "${_bin}/plugins/clients/${ARG_CLIENT_ID}"
+            LIBRARY_OUTPUT_DIRECTORY_${_cfg} "${_bin}/plugins/clients/${ARG_CLIENT_ID}"
+            ARCHIVE_OUTPUT_DIRECTORY_${_cfg} "${_lib}/plugins/clients/${ARG_CLIENT_ID}"
+        )
+    endforeach()
+
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/configs")
+        add_custom_command(TARGET ${target} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/configs"
+                "$<TARGET_FILE_DIR:${target}>/../../../configs"
+            COMMENT "Copy ${ARG_CLIENT_ID} configs to runtime")
+    endif()
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/branding")
+        add_custom_command(TARGET ${target} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/branding"
+                "$<TARGET_FILE_DIR:${target}>/../../../branding/${ARG_CLIENT_ID}"
+            COMMENT "Copy ${ARG_CLIENT_ID} branding to runtime")
+    endif()
+
+    file(GENERATE OUTPUT "$<TARGET_FILE_DIR:${target}>/abi.txt"
+        CONTENT "abi=1\nqt=${Qt6_VERSION}\ncompiler=${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}\narch=${CMAKE_SYSTEM_PROCESSOR}\n")
+endfunction()
+

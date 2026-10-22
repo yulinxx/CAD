@@ -15,14 +15,22 @@
  * 本类把客户 ID 收敛为**运行时单一事实源**，解析优先级由高到低：
  *   1. 显式覆盖         —— setClientIdOverride()，供命令行 --client=xxx 与单元测试使用
  *   2. 环境变量         —— SANYI_CLIENT_ID，供 CI / 现场排查临时切换
- *   3. 用户设置         —— QSettings 键 Client/Id，供安装包写入客户标识
- *   4. 内置默认         —— kDefaultClientId（san_yi）
+ *   3. 部署文件         —— <exe 目录>/client.id，交付包写入的唯一真源
+ *   4. 用户设置         —— QSettings 键 Client/Id，兼容旧安装
+ *   5. 内置默认         —— kDefaultClientId（san_yi）
+ *
+ * 配置查找顺序（外置优先，内置兜底）：
+ *   1. 用户配置目录      —— AppConfigLocation/ui/<id>.json，供现场热修
+ *   2. 交付包目录        —— <exe 目录>/configs/<id>.json
+ *   3. 内置资源          —— :/configs/<id>.json
+ *   4. 默认客户内置配置  —— :/configs/san_yi.json
  *
  * 解析结果会缓存，保证同一进程内菜单、工具栏、Dock、状态栏、右键菜单
  * 全部命中同一份配置资源。
  */
 
 #include <QString>
+#include <QStringList>
 
 /// 客户上下文（进程级单例）
 class UiClientContext
@@ -48,8 +56,15 @@ public:
     /// 避免因客户 ID 拼写错误导致整个 UI 构建失败（空窗口）。
     QString configResourcePath() const;
 
-    /// 指定客户 ID 对应的配置资源路径（不做存在性回退，供加载器解析 extends 链使用）
+    /// 指定客户 ID 对应的配置路径（不做存在性回退，按外置优先顺序返回第一个可用路径）。
+    /// 供加载器解析 extends 链与测试使用。
     static QString configResourcePathFor(const QString& clientId);
+
+    /// 客户 ID 对应的全部候选配置路径（按优先级：用户目录 / exe 目录 / 内置资源）
+    static QStringList configCandidatePaths(const QString& clientId);
+
+    /// 读取 exe 同目录下的 client.id（首行，去 BOM 与空白）；不存在或为空返回空串
+    static QString readClientIdFile(const QString& appDir = QString());
 
     /// 重置缓存（仅测试使用：切换环境变量后需要重新解析）
     void resetCacheForTest();

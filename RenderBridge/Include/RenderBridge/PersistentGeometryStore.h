@@ -41,7 +41,7 @@ namespace RenderAbstraction
 {
     class IRenderDevice;
     class IRenderScene;
-}
+}  // namespace RenderAbstraction
 
 // 物理内存查询只用于推荐几何仓上限，按平台各取最轻量的 API。
 #if defined(__APPLE__)
@@ -128,9 +128,8 @@ namespace RenderBridge
          *              只需要设备，契约测试用不上绘制列表，此时 drawList() 返回
          *              无效句柄，槽位操作退化为空操作。
          */
-        bool initialize(RenderAbstraction::IRenderDevice& device,
-                        RenderAbstraction::IRenderScene* scene,
-                        const Config& config);
+        bool initialize(
+            RenderAbstraction::IRenderDevice& device, RenderAbstraction::IRenderScene* scene, const Config& config);
 
         /**
          * @brief 销毁全部几何仓与绘制列表；幂等
@@ -143,7 +142,11 @@ namespace RenderBridge
         bool valid() const;
 
         /// 绘制列表句柄。initialize 未给 scene 时无效
-        RenderAbstraction::DrawListHandle drawList() const { return m_drawList; }
+        RenderAbstraction::DrawListHandle drawList() const
+        {
+            return m_drawList;
+        }
+
         /// 块所在仓的句柄。分片之后块可能落在任一仓，没有「当前仓」这种东西
         RenderAbstraction::GeometryStoreHandle storeForBlock(uint64_t blockId) const;
         uint32_t storeCount() const;
@@ -171,8 +174,8 @@ namespace RenderBridge
          * @param bounds 世界空间包围盒，按 Config::drawListViewType 解读；
          *               传 nullptr 表示该条目永不剔除
          */
-        bool upsertDrawItem(uint32_t slot, const RenderAbstraction::DrawInstruction& command,
-                            const RenderAbstraction::Aabb3* bounds);
+        bool upsertDrawItem(
+            uint32_t slot, const RenderAbstraction::DrawInstruction& command, const RenderAbstraction::Aabb3* bounds);
 
         /// 摘掉某个槽位上的绘制命令，但保留槽号归属（例如临时隐藏某条命令）
         void removeCommand(uint32_t slot);
@@ -230,8 +233,8 @@ namespace RenderBridge
         RenderAbstraction::IRenderScene* m_scene = nullptr;
 
         std::vector<RenderAbstraction::GeometryStoreHandle> m_stores;  // 下标 0 是主仓
-        std::unordered_map<uint64_t, uint32_t> m_blockStore;  // 块id → 仓下标（只登记分片块）
-        uint64_t m_storeDescBytes = 0;     // storeMaxBytes 原始值
+        std::unordered_map<uint64_t, uint32_t> m_blockStore;           // 块id → 仓下标（只登记分片块）
+        uint64_t m_storeDescBytes = 0;                                 // storeMaxBytes 原始值
         uint64_t m_storeInitialBytes = 0;
         uint32_t m_storeGranularity = 0;
         uint32_t m_maxStores = 8;

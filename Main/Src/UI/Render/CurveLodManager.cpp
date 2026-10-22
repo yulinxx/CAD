@@ -8,7 +8,6 @@
 #include "Engine2D/SyEntity/SyPolygon.h"
 #include "Engine2D/Geometry/EntityGeometryEmitter.h"
 
-
 namespace
 {
     /// 取图元所属图层的绘制序号（0 = 最上层），供增量路径构造 z-order。
@@ -125,13 +124,14 @@ void CurveLodManager::processBatch(std::unordered_set<uint64_t>& renderedIds)
     }
     if (!batch.empty())
     {
-        if (m_renderWidget->upsertRenderEntities(batch,
-            [this](uint64_t uid) -> const Eg::SyEntity* {
-                return m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid));
-            },
-            [this](uint64_t uid) -> uint32_t {
-                return layerIndexOfEntityForLod(m_sceneManager, static_cast<Eg::EntityId>(uid));
-            }))
+        if (m_renderWidget->upsertRenderEntities(
+                batch,
+                [this](uint64_t uid) -> const Eg::SyEntity* {
+                    return m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid));
+                },
+                [this](uint64_t uid) -> uint32_t {
+                    return layerIndexOfEntityForLod(m_sceneManager, static_cast<Eg::EntityId>(uid));
+                }))
         {
             for (uint64_t uid : batch)
             {
@@ -250,8 +250,7 @@ void CurveLodManager::refillQueueIfStale()
     const bool firstTime = m_scaleAtBuild <= 0.0;
     const bool needsUpgrade = firstTime || worldToScreenScale > m_scaleAtBuild * kCurveLodUpgradeRatio;
     const bool needsDowngrade = !firstTime && worldToScreenScale * kCurveLodDowngradeRatio < m_scaleAtBuild;
-    const bool regionMoved =
-        hasVisibleBox && m_collectedBoxValid && !m_collectedBox.contains(visibleBox);
+    const bool regionMoved = hasVisibleBox && m_collectedBoxValid && !m_collectedBox.contains(visibleBox);
     if (!needsUpgrade && !needsDowngrade && !regionMoved)
     {
         return;

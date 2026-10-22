@@ -177,8 +177,7 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
         SY_WARNF("[ImportReader:%s] Ignoring invalid ImportContext::scaleFactor", tag.constData());
         importScale = 1.0;
     }
-    const QByteArray targetUnit =
-        context.unit.isEmpty() ? QByteArrayLiteral("mm") : context.unit.toUtf8();
+    const QByteArray targetUnit = context.unit.isEmpty() ? QByteArrayLiteral("mm") : context.unit.toUtf8();
     if (ir.sourceUnit[0] != '\0')
     {
         importScale *= Fio::unitScaleRatio(ir.sourceUnit, targetUnit.constData());
@@ -322,11 +321,15 @@ ImportResult ImportReaderBase::readViaLegacy(
         char irErrBuf[1024] = { 0 };
         Fio::FioParseResult ir;
 
-        if (fileIO.importToIR(pathStr.c_str(), format, &ir, irErrBuf, sizeof(irErrBuf), nullptr, nullptr)
-            && ir.entityCount > 0)
+        if (fileIO.importToIR(pathStr.c_str(), format, &ir, irErrBuf, sizeof(irErrBuf), nullptr, nullptr) &&
+            ir.entityCount > 0)
         {
-            SY_DEBUGF("[ImportReader:%s] readViaLegacy: IR path succeeded as fallback, entities=%u, layers=%u, groups=%u",
-                tag.constData(), ir.entityCount, ir.layerCount, ir.groupCount);
+            SY_DEBUGF(
+                "[ImportReader:%s] readViaLegacy: IR path succeeded as fallback, entities=%u, layers=%u, groups=%u",
+                tag.constData(),
+                ir.entityCount,
+                ir.layerCount,
+                ir.groupCount);
 
             // 转换图元 + 收集图层/群组映射
             std::unordered_map<int64_t, uint32_t> entityLayerMap;
@@ -340,14 +343,16 @@ ImportResult ImportReaderBase::readViaLegacy(
                 outEntities.emplace_back(std::move(e));
             }
 
-            ImportResult result = ImportResult::ok(
-                successMessage(format), static_cast<int>(outEntities.size()), static_cast<int>(ir.layerCount), QStringList{});
+            ImportResult result = ImportResult::ok(successMessage(format),
+                static_cast<int>(outEntities.size()),
+                static_cast<int>(ir.layerCount),
+                QStringList{});
 
             if (ir.warningCount > 0)
             {
                 result.addWarning(QStringLiteral("%1 parser reported %2 warning(s) via fallback IR path")
-                    .arg(m_formatName)
-                    .arg(ir.warningCount));
+                        .arg(m_formatName)
+                        .arg(ir.warningCount));
             }
 
             result.importedLayers = Eg::FioEntityConverter::extractLayers(ir);
@@ -356,13 +361,17 @@ ImportResult ImportReaderBase::readViaLegacy(
             result.entityGroupMap = std::move(entityGroupMap);
 
             SY_INFOF("[ImportReader:%s] readViaLegacy: fallback IR path complete, %zu entities, %zu layers, %zu groups",
-                tag.constData(), outEntities.size(), result.importedLayers.size(), result.importedGroups.size());
+                tag.constData(),
+                outEntities.size(),
+                result.importedLayers.size(),
+                result.importedGroups.size());
 
             return result;
         }
 
         SY_DEBUGF("[ImportReader:%s] readViaLegacy: IR fallback failed (%s), falling back to legacy importFile",
-            tag.constData(), irErrBuf[0] ? irErrBuf : "no error");
+            tag.constData(),
+            irErrBuf[0] ? irErrBuf : "no error");
     }
 
     // ===== IR 路径失败，走旧版 importFile 路径（不携带图层/群组信息） =====

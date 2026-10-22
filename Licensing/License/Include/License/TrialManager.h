@@ -39,7 +39,7 @@ extern "C"
 // C++ 接口
 #ifdef __cplusplus
 
-#include <memory>
+    #include <memory>
 
 class TrialManager
 {

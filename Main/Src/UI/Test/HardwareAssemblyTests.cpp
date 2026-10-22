@@ -74,7 +74,6 @@ namespace
         EXPECT_TRUE(found);
     }
 
-
     /// 找不到档案时回退，并且必须给出可展示的警告文案（不能静默把模拟当真机）。
     TEST(MachineProfileTest, MissingProfileFallsBackWithWarning)
     {
@@ -212,8 +211,7 @@ namespace
     {
         QTemporaryDir dir;
         ASSERT_TRUE(dir.isValid());
-        const QString path = writeProfile(
-            dir, R"({"deviceId":"simulated_composite","tickIntervalMs":100000})");
+        const QString path = writeProfile(dir, R"({"deviceId":"simulated_composite","tickIntervalMs":100000})");
         ASSERT_FALSE(path.isEmpty());
 
         MachineProfile p;
@@ -284,8 +282,7 @@ namespace
     {
         DeviceHost host;
         QString error;
-        ASSERT_TRUE(host.start(MachineProfileLoader::builtinSimulatedProfile(), error))
-            << error.toStdString();
+        ASSERT_TRUE(host.start(MachineProfileLoader::builtinSimulatedProfile(), error)) << error.toStdString();
 
         // 第一拍之前裁决是 fail-safe 的 Blocked，必须先让安全评估跑一次
         EXPECT_FALSE(host.canStartProcessing());
@@ -356,8 +353,8 @@ namespace
         // ruida_rdc 只提供 IMotionCard + ILaserSource，没有 IIoModule
         profile.deviceId = QStringLiteral("ruida_rdc");
         profile.openParams.insert(QStringLiteral("transport"), QStringLiteral("file"));
-        profile.openParams.insert(QStringLiteral("output_path"),
-            QDir::temp().filePath(QStringLiteral("hw_assembly_test.rd")));
+        profile.openParams.insert(
+            QStringLiteral("output_path"), QDir::temp().filePath(QStringLiteral("hw_assembly_test.rd")));
 
         MachineIoPointConfig pt;
         pt.name = QStringLiteral("safety.estop");
@@ -387,4 +384,4 @@ namespace
     }
 
 #endif
-}
+}  // namespace

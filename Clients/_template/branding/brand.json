@@ -1,0 +1,14 @@
+{
+  "clientId": "__CLIENT_ID__",
+  "productName": "__PRODUCT_NAME__",
+  "companyName": "__COMPANY_NAME__",
+  "appId": "__APP_ID__",
+  "organizationDomain": "__ORGANIZATION_DOMAIN__",
+  "windowTitle": "__PRODUCT_NAME__",
+  "tagline": "__PRODUCT_NAME__ customized edition",
+  "copyright": "Copyright (C) 2026 __COMPANY_NAME__. All rights reserved.",
+  "website": "__WEBSITE__",
+  "supportEmail": "__SUPPORT_EMAIL__",
+  "theme": "light",
+  "splashDurationMs": 800
+}

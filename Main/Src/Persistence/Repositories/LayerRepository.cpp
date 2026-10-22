@@ -105,7 +105,8 @@ bool LayerRepository::rename(const std::string& documentId, int layerId, const s
     {
         return fail("LayerRepository", "Failed to rename layer");
     }
-    SY_DEBUGF("[LayerRepository] Renamed layer: doc=%s, layer=%d, name=%s", documentId.c_str(), layerId, newName.c_str());
+    SY_DEBUGF(
+        "[LayerRepository] Renamed layer: doc=%s, layer=%d, name=%s", documentId.c_str(), layerId, newName.c_str());
     return true;
 }
 
@@ -121,7 +122,10 @@ bool LayerRepository::updateVisibility(const std::string& documentId, int layerI
     {
         return fail("LayerRepository", "Failed to update layer visibility");
     }
-    SY_DEBUGF("[LayerRepository] Updated layer visibility: doc=%s, layer=%d, visible=%d", documentId.c_str(), layerId, visible ? 1 : 0);
+    SY_DEBUGF("[LayerRepository] Updated layer visibility: doc=%s, layer=%d, visible=%d",
+        documentId.c_str(),
+        layerId,
+        visible ? 1 : 0);
     return true;
 }
 
@@ -137,7 +141,8 @@ bool LayerRepository::updateLocked(const std::string& documentId, int layerId, b
     {
         return fail("LayerRepository", "Failed to update layer lock");
     }
-    SY_DEBUGF("[LayerRepository] Updated layer lock: doc=%s, layer=%d, locked=%d", documentId.c_str(), layerId, locked ? 1 : 0);
+    SY_DEBUGF(
+        "[LayerRepository] Updated layer lock: doc=%s, layer=%d, locked=%d", documentId.c_str(), layerId, locked ? 1 : 0);
     return true;
 }
 
@@ -153,7 +158,8 @@ bool LayerRepository::updateFill(const std::string& documentId, int layerId, boo
     {
         return fail("LayerRepository", "Failed to update layer fill");
     }
-    SY_DEBUGF("[LayerRepository] Updated layer fill: doc=%s, layer=%d, fill=%d", documentId.c_str(), layerId, fill ? 1 : 0);
+    SY_DEBUGF(
+        "[LayerRepository] Updated layer fill: doc=%s, layer=%d, fill=%d", documentId.c_str(), layerId, fill ? 1 : 0);
     return true;
 }
 
@@ -169,7 +175,8 @@ bool LayerRepository::updateColor(const std::string& documentId, int layerId, co
     {
         return fail("LayerRepository", "Failed to update layer color");
     }
-    SY_DEBUGF("[LayerRepository] Updated layer color: doc=%s, layer=%d, color=%s", documentId.c_str(), layerId, color.c_str());
+    SY_DEBUGF(
+        "[LayerRepository] Updated layer color: doc=%s, layer=%d, color=%s", documentId.c_str(), layerId, color.c_str());
     return true;
 }
 
