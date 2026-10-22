@@ -180,6 +180,38 @@ namespace MachineProfileLoader
             profile.tickIntervalMs = 20;
         }
         profile.autoOpen = root.value("autoOpen").toBool(true);
+
+        // === 机器坐标系（台面尺寸 + 原点角点）===
+        // 缺省即恒等（左下原点 + 台面尺寸），不配也能用 —— 但那样镜像机台会烧错位置。
+        {
+            const QJsonObject frame = root.value("machineFrame").toObject();
+            Eg::MachineFrameConfig cfg;
+            cfg.enabled = frame.value("enabled").toBool(true);
+
+            const QString corner = frame.value("originCorner").toString(QStringLiteral("BottomLeft"));
+            if (corner == QLatin1String("BottomRight"))
+            {
+                cfg.corner = Eg::MachineOriginCorner::BottomRight;
+            }
+            else if (corner == QLatin1String("TopLeft"))
+            {
+                cfg.corner = Eg::MachineOriginCorner::TopLeft;
+            }
+            else if (corner == QLatin1String("TopRight"))
+            {
+                cfg.corner = Eg::MachineOriginCorner::TopRight;
+            }
+            else if (corner != QLatin1String("BottomLeft"))
+            {
+                SY_WARNF("[MachineProfile] Unknown machineFrame.originCorner='%s', using BottomLeft",
+                    corner.toUtf8().constData());
+            }
+
+            cfg.tableW = static_cast<float>(frame.value("tableWidthMm").toDouble(1200.0));
+            cfg.tableH = static_cast<float>(frame.value("tableHeightMm").toDouble(800.0));
+            profile.machineFrame = cfg;
+        }
+
         profile.sourcePath = path;
         profile.fromFallback = false;
 

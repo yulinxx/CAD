@@ -115,7 +115,10 @@ extern "C"
 
         std::memset(config, 0, sizeof(LicenseConfig));
         config->structSize = sizeof(LicenseConfig);
-        config->enableCheck = 1;
+        // -1 = 不覆盖运行期开关（沿用编译期 SANYI_ENABLE_LICENSE 的默认值）。
+        // 默认值若是 1，任何一次 License_Create()（例如打开注册对话框）都会把
+        // 开发构建的全局校验开关从「关闭」翻成「开启」，属于隐式副作用。
+        config->enableCheck = -1;
     }
 
     int License_IsCheckEnabled(void)

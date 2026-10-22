@@ -15,6 +15,59 @@
 #include "Log/SyLogger.h"
 #include "UI/ClientConfig/UiFeatureGate.h"
 
+namespace
+{
+    struct LicenseProbe
+    {
+        bool checkEnabled = false;
+        bool valid = false;
+        bool hasInfo = false;
+        LicenseInfo info{};
+    };
+
+    // 只读探测：不写任何持久化状态，上下文在本函数内创建并销毁
+    LicenseProbe probeLicense(const LicenseConfig& config)
+    {
+        LicenseProbe probe;
+        probe.info.structSize = sizeof(LicenseInfo);
+        probe.checkEnabled = License_IsCheckEnabled() != 0;
+        if (!probe.checkEnabled)
+        {
+            return probe;
+        }
+
+        LicenseContext* ctx = License_Create(&config);
+        if (!ctx)
+        {
+            SY_WARN("[LicensingBootstrap] License_Create failed, treating as unlicensed");
+            return probe;
+        }
+
+        probe.valid = (License_Check(ctx) == LICENSE_OK);
+        if (probe.valid)
+        {
+            probe.hasInfo = (License_GetInfo(ctx, &probe.info) == LICENSE_OK);
+        }
+        License_Destroy(ctx);
+        return probe;
+    }
+
+    void applyLicensedFeatures(const LicenseProbe& probe)
+    {
+        if (!probe.hasInfo)
+        {
+            SY_WARN("[LicensingBootstrap] License_GetInfo failed, feature gate stays unrestricted");
+            UiFeatureGate::instance().setUnrestricted(true);
+            return;
+        }
+
+        UiFeatureGate::instance().loadFromLicenseString(QString::fromUtf8(probe.info.features));
+        SY_INFOF("[LicensingBootstrap] License features applied: customer='%s' expiry='%s'",
+            probe.info.customerName,
+            probe.info.expiryDate);
+    }
+}  // namespace
+
 int LicensingBootstrap::runGate(const QString& configDir)
 {
     LicenseConfig config{};
@@ -22,10 +75,26 @@ int LicensingBootstrap::runGate(const QString& configDir)
     const QByteArray configDirUtf8 = configDir.toUtf8();
     config.configDir = configDirUtf8.constData();
 
-    // 通过编译期宏 SANYI_ENABLE_LICENSE 显式启用许可校验
-    // 生产构建应在 CMakeLists.txt 中 add_compile_definitions(SANYI_ENABLE_LICENSE)
+    // === Phase 0: 许可证预检 ===
+    // 有效许可证或未启用校验的构建直接返回：Trial_Check() 首次调用在无记录时
+    // 会写入 trial.info（Windows 还写注册表），有授权时不应产生这份状态。
+    const LicenseProbe license = probeLicense(config);
 
-    // === Phase 1: 试用期检查 ===
+    if (!license.checkEnabled)
+    {
+        SY_INFO("[LicensingBootstrap] License check disabled: unrestricted");
+        UiFeatureGate::instance().setUnrestricted(true);
+        return 0;
+    }
+
+    if (license.valid)
+    {
+        SY_INFO("[LicensingBootstrap] Valid license found, skipping trial checks");
+        applyLicensedFeatures(license);
+        return 0;
+    }
+
+    // === Phase 1: 试用期检查（仅无有效许可证时执行） ===
     Trial_SetConfigDir(configDirUtf8.constData());
 
     int remainingDays = 0;
@@ -129,68 +198,34 @@ int LicensingBootstrap::runGate(const QString& configDir)
         UiFeatureGate::instance().setUnrestricted(true);
     }
 
-    // === Phase 2: License 检查（仅在用户未处于试用模式时执行） ===
-    if (!inTrialMode && License_IsCheckEnabled())
+    // === Phase 2: 许可证复核（仅处理试用流程中用户点了注册的场景） ===
+    if (inTrialMode)
     {
-        LicenseContext* licenseCtx = License_Create(&config);
-        const bool licenseOk = licenseCtx && License_Check(licenseCtx) == LICENSE_OK;
-
-        if (licenseOk && licenseCtx)
-        {
-            // 有效许可证 → 应用 features
-            LicenseInfo info{};
-            info.structSize = sizeof(LicenseInfo);
-            if (License_GetInfo(licenseCtx, &info) == LICENSE_OK)
-            {
-                UiFeatureGate::instance().loadFromLicenseString(QString::fromUtf8(info.features));
-                SY_INFOF("[LicensingBootstrap] License features applied: customer='%s' expiry='%s'",
-                    info.customerName,
-                    info.expiryDate);
-            }
-            else
-            {
-                SY_WARN("[LicensingBootstrap] License_GetInfo failed, feature gate stays unrestricted");
-                UiFeatureGate::instance().setUnrestricted(true);
-            }
-        }
-
-        if (licenseCtx)
-        {
-            License_Destroy(licenseCtx);
-        }
-
-        if (!licenseOk)
-        {
-            // 没有有效许可证且用户未在试用期流程中注册 → 弹出激活对话框
-            SY_DEBUG("[LicensingBootstrap] License check failed, showing license dialog");
-            LicenseDialog dlg(configDir);
-            if (dlg.exec() != QDialog::Accepted)
-            {
-                SY_WARN("[LicensingBootstrap] License check rejected by user");
-                return -3;
-            }
-            SY_DEBUG("[LicensingBootstrap] License accepted by user");
-
-            // 激活成功，重新读取 features
-            LicenseContext* activatedCtx = License_Create(&config);
-            if (activatedCtx)
-            {
-                LicenseInfo info{};
-                info.structSize = sizeof(LicenseInfo);
-                if (License_Check(activatedCtx) == LICENSE_OK && License_GetInfo(activatedCtx, &info) == LICENSE_OK)
-                {
-                    UiFeatureGate::instance().loadFromLicenseString(QString::fromUtf8(info.features));
-                    SY_INFOF("[LicensingBootstrap] License features applied after activation: customer='%s'",
-                        info.customerName);
-                }
-                License_Destroy(activatedCtx);
-            }
-        }
+        return 0;
     }
-    else if (!inTrialMode)
+
+    const LicenseProbe fresh = probeLicense(config);
+    if (fresh.valid)
     {
-        // 许可校验未启用（开发构建）：授权闸门保持无限制
-        UiFeatureGate::instance().setUnrestricted(true);
+        applyLicensedFeatures(fresh);
+        return 0;
+    }
+
+    // 没有有效许可证且用户未在试用期流程中注册 → 弹出激活对话框
+    SY_DEBUG("[LicensingBootstrap] License check failed, showing license dialog");
+    LicenseDialog dlg(configDir);
+    if (dlg.exec() != QDialog::Accepted)
+    {
+        SY_WARN("[LicensingBootstrap] License check rejected by user");
+        return -3;
+    }
+    SY_DEBUG("[LicensingBootstrap] License accepted by user");
+
+    // 激活成功后重新探测并应用 features
+    const LicenseProbe activated = probeLicense(config);
+    if (activated.valid)
+    {
+        applyLicensedFeatures(activated);
     }
 
     return 0;

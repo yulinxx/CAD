@@ -115,6 +115,12 @@ xcuserdata/
 *.swiftpm/
 .*/
 
+# .github 是 CI 门禁的唯一入口，必须可提交：上面的 `.*/ ` 会连它一起忽略，
+# 逐层重新包含（父目录被忽略时，里面的文件不再参与扫描）。
+!.github/
+!.github/workflows/
+!.github/workflows/*.yml
+
 # ---- IDE: CLion / JetBrains ----
 .idea/
 *.iml

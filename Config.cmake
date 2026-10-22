@@ -82,9 +82,14 @@ if(VCPKG_DIR STREQUAL "" OR NOT EXISTS "${VCPKG_DIR}/scripts/buildsystems/vcpkg.
         "  Set environment variable VCPKG_DIR, or pass -DVCPKG_DIR=<path> to cmake.")
 endif()
 if(Qt_INSTALL_DIR STREQUAL "" OR NOT EXISTS "${Qt_INSTALL_DIR}/lib/cmake/Qt6/Qt6Config.cmake")
-    message(FATAL_ERROR
-        "[Config] Qt_INSTALL_DIR not found or invalid: '${Qt_INSTALL_DIR}'\n"
-        "  Set environment variable Qt_INSTALL_DIR, or pass -DQt_INSTALL_DIR=<path> to cmake.")
+    # 纯算法模块（如 Nesting）不链接 Qt：它的独立入口会在 include 本文件之前设
+    # SANYI_ALLOW_MISSING_QT=ON，从而在没有 Qt 的机器/CI 上也能配置。
+    # 默认关闭该旁路，其他模块的报错与行为保持原样。
+    if(NOT SANYI_ALLOW_MISSING_QT)
+        message(FATAL_ERROR
+            "[Config] Qt_INSTALL_DIR not found or invalid: '${Qt_INSTALL_DIR}'\n"
+            "  Set environment variable Qt_INSTALL_DIR, or pass -DQt_INSTALL_DIR=<path> to cmake.")
+    endif()
 endif()
 
 # --------------------------------------------------------------------
@@ -224,6 +229,7 @@ option(BUILD_NESTING "Build Nesting module (2D/3D nesting/arrangement algorithm)
 # ===== 可选功能模块 =====
 # 按需启用
 option(BUILD_VISION "Build Vision module (image processing, computer vision)" OFF)
+option(BUILD_RASTER "Build Raster module (OpenCV bitmap processing for laser engraving/cutting)" OFF)
 option(BUILD_NETWORK "Build Network module (HTTP, WebSocket, cloud sync)" OFF)
 option(BUILD_HARDWARE "Build Hardware module (laser control, material database)" OFF)
 option(BUILD_ENGRAVING "Build Engraving module (3D laser engraving)" ON)
@@ -257,6 +263,7 @@ set(BUILD_ALL_TESTS OFF CACHE BOOL "打开全部模块测试（便捷总开关�
 # ---- 逐模块测试开关（核心模块默认启用，建立测试保护网）----
 set(BUILD_UTILITY_TESTS          ON  CACHE BOOL "Utility 单元测试" FORCE)
 set(BUILD_LOG_TESTS              ON  CACHE BOOL "Log 单元测试" FORCE)
+set(BUILD_ENGINECOMMON_TESTS     ON  CACHE BOOL "EngineCommon 单元测试" FORCE)
 set(BUILD_ENGINE2D_TESTS         ON  CACHE BOOL "Engine2D 单元测试" FORCE)
 set(BUILD_ENGINE3D_TESTS         ON  CACHE BOOL "Engine3D 单元测试" FORCE)
 set(BUILD_GEOMODELCORE_TESTS     ON  CACHE BOOL "GeoModelCore 单元测试" FORCE)
@@ -266,6 +273,7 @@ set(BUILD_NESTING_TESTS          ON  CACHE BOOL "Nesting 单元测试" FORCE)
 set(BUILD_ENGRAVING_TESTS        ON  CACHE BOOL "Engraving 单元测试" FORCE)
 set(BUILD_HARDWARE_TESTS         ON  CACHE BOOL "Hardware 单元测试" FORCE)
 set(BUILD_VISION_TESTS           ON  CACHE BOOL "Vision 单元测试" FORCE)
+set(BUILD_RASTER_TESTS           ON  CACHE BOOL "Raster 单元测试" FORCE)
 set(BUILD_PYTHONHOST_TESTS       ON  CACHE BOOL "PythonHost 单元测试" FORCE)
 set(BUILD_CRASHHANDLER_TESTS     ON  CACHE BOOL "CrashHandler 单元测试" FORCE)
 set(BUILD_RENDERX_TESTS          ON  CACHE BOOL "Renderx 单元测试" FORCE)
@@ -281,6 +289,7 @@ set(BUILD_SCENE_EDIT_TESTS       ON  CACHE BOOL "场景编辑集成回归测试�
 set(SANYI_TEST_SWITCHES
     BUILD_UTILITY_TESTS
     BUILD_LOG_TESTS
+    BUILD_ENGINECOMMON_TESTS
     BUILD_ENGINE2D_TESTS
     BUILD_ENGINE3D_TESTS
     BUILD_GEOMODELCORE_TESTS
@@ -290,6 +299,7 @@ set(SANYI_TEST_SWITCHES
     BUILD_ENGRAVING_TESTS
     BUILD_HARDWARE_TESTS
     BUILD_VISION_TESTS
+    BUILD_RASTER_TESTS
     BUILD_PYTHONHOST_TESTS
     BUILD_CRASHHANDLER_TESTS
     BUILD_RENDERX_TESTS
@@ -369,6 +379,7 @@ message(STATUS "  RenderX:        ${BUILD_RENDERX}")
 message(STATUS "  UI2D:           ${BUILD_UI2D}")
 message(STATUS "  UI3D:           ${BUILD_UI3D}")
 message(STATUS "  Vision:         ${BUILD_VISION}")
+message(STATUS "  Raster:         ${BUILD_RASTER}")
 message(STATUS "  Network:        ${BUILD_NETWORK}")
 message(STATUS "  Hardware:       ${BUILD_HARDWARE}")
 message(STATUS "  Engraving:      ${BUILD_ENGRAVING}")

@@ -2,7 +2,10 @@
  * @file MotionPlanCompiler.cpp
  * @brief 运动规划编译器实现
  *
- * 将几何数据编译为运动轨迹。
+ * 将 2D 文档的几何编译为运动轨迹。
+ *
+ * 几何来源唯一：`Eg::Cam::GeometryExtractor`（Engine2D/Cam/）。
+ * 坐标换算唯一：编译器发射指令时的 `Eg::MachineFrame`。
  */
 #include "MotionPlanCompiler.h"
 
@@ -16,10 +19,10 @@
     #include <QCoreApplication>
 
     #include "Engine/SyEntity/SyEntity.h"
+    #include "Engine2D/Cam/GeometryExtractor.h"
+    #include "Engine2D/Cam/ToolpathGeometry.h"
     #include "Engine2D/Edit/LayerSnapshot.h"
     #include "Engine2D/Geo/GeometryContext.h"
-    #include "Engine2D/Geometry/Geo2DPath.h"
-    #include "Engine2D/Geometry/Geo2DTypes.h"
 
     #include "Log/SyLogger.h"
 
@@ -28,6 +31,9 @@ namespace
     /// 弦高容差上界（mm）。见 compile() 里拒绝逻辑处的说明 ——
     /// 这是防「单位填错」（mm 当 m 填）的合理性上界，不是实现陷阱的绕行。
     constexpr double kMaxChordToleranceMm = 1.0;
+
+    /// 无法加工图元的清单最多展示多少条（界面可读性；总数仍然准确）
+    constexpr int kMaxUnmachinableDetails = 8;
 
     /// 一个图层的编译任务：图层 ID + 该图层的图元 + 工艺参数。
     struct LayerBucket
@@ -53,35 +59,148 @@ namespace
     }
 
     /**
+     * @brief 坐标换算器：用户空间 → 机器空间。
+     *
+     * 换算**只在这里发生一次**（编译器发射指令的那一刻）。
+     * 适配器与作业服务都不再换算。
+     *
+     * 之前的状态是「UI2D 的旧链路在服务层换算、新 HAL 链路完全不换算」——
+     * 两套坐标语义并存，同一份文档走不同路径会烧到不同位置。
+     *
+     * 镜像会反转圆弧的绕向：X 镜像把 CCW 变成 CW。
+     * 只改端点不改绕向，圆弧会走反边（90° 小弧变 270° 大弧）。
+     */
+    class FrameTransform
+    {
+    public:
+        explicit FrameTransform(const Eg::MachineFrame& frame)
+            : m_frame(frame)
+        {
+        }
+
+        Ut::Vec2d point(const Ut::Vec2d& user) const
+        {
+            return m_frame.toMachine(user);
+        }
+
+        /// 圆弧的绕向：镜像时反转
+        bool arcDirection(bool counterClockwise) const
+        {
+            if (m_frame.isReflected())
+            {
+                return !counterClockwise;
+            }
+            return counterClockwise;
+        }
+
+    private:
+        const Eg::MachineFrame& m_frame;
+    };
+
+    /**
      * @brief 把一条折线编译进计划。
      * @return 是否产出了至少一段有效运动
      *
      * 首点用空移（laser off）过去，其余点才出光。这一点不能省：
      * 若第一段就带出光，激光会从上一个轮廓的终点一路烧到本轮廓起点。
      */
-    bool emitPolyline(const std::vector<Ut::Vec2d>& pts, Hw::MotionPlanBuilder& out)
+    bool emitPolyline(const std::vector<Ut::Vec2d>& pts, const FrameTransform& frame, Hw::MotionPlanBuilder& out)
     {
         if (pts.size() < 2)
         {
             return false;
         }
-        out.emitRapidTo(pts.front().x(), pts.front().y());
+        const Ut::Vec2d start = frame.point(pts.front());
+        out.emitRapidTo(start.x(), start.y());
         for (size_t i = 1; i < pts.size(); ++i)
         {
-            out.emitLineTo(pts[i].x(), pts[i].y(), true);
+            const Ut::Vec2d p = frame.point(pts[i]);
+            out.emitLineTo(p.x(), p.y(), true);
+        }
+        return true;
+    }
+
+    /**
+     * @brief 把一个加工轮廓编译进计划。
+     *
+     * 轮廓的段只有 Line 与 Arc 两种（Cam 层的统一约定，见 ToolpathTypes.h）。
+     *
+     * @param preferArcs true = 圆弧直接编译成 ArcTo；false = 按弦高容差离散成直线
+     * @param degraded    出参：该轮廓因弧被离散而整体降级时置 true
+     *
+     * 首点必须空移过去：若第一段就带出光，激光会从上一个轮廓的终点一路烧过来。
+     */
+    bool emitContour(const Eg::Cam::Contour& contour,
+        bool preferArcs,
+        double chordToleranceMm,
+        const FrameTransform& frame,
+        Hw::MotionPlanBuilder& out,
+        bool& degraded)
+    {
+        degraded = false;
+        if (contour.segments.empty())
+        {
+            return false;
+        }
+
+        // 轮廓起点：第一个段的 ptStart
+        const Ut::Vec2d start = frame.point(contour.segments.front().ptStart);
+        out.emitRapidTo(start.x(), start.y());
+
+        for (const Eg::Cam::PathSegment& seg : contour.segments)
+        {
+            if (seg.type == Eg::Cam::PathSegment::Type::Line)
+            {
+                const Ut::Vec2d end = frame.point(seg.ptEnd);
+                out.emitLineTo(end.x(), end.y(), true);
+                continue;
+            }
+
+            // 圆弧
+            if (preferArcs)
+            {
+                // counterClockwise 来自 Cam 层：它记录的是**用户画的那段弧**的行进方向，
+                // 不是靠「dStart→dEnd 是 CCW」推断的。
+                // 恒传 true 会让用户逆时针画的弧走反边（90° 小弧变 270° 大弧），
+                // 那是烧废一整块料的量级。
+                const Ut::Vec2d end = frame.point(seg.ptEnd);
+                const Ut::Vec2d center = frame.point(seg.ptCenter);
+                out.emitArcTo(end.x(),
+                    end.y(),
+                    center.x(),
+                    center.y(),
+                    frame.arcDirection(seg.counterClockwise),
+                    true);
+                continue;
+            }
+
+            // 弧 → 折线（按弦高容差）
+            degraded = true;
+            const std::vector<Ut::Vec2d> pts = Eg::Cam::flattenArcSegment(seg, chordToleranceMm);
+            for (size_t i = 1; i < pts.size(); ++i)
+            {
+                const Ut::Vec2d p = frame.point(pts[i]);
+                out.emitLineTo(p.x(), p.y(), true);
+            }
         }
         return true;
     }
 
     /**
      * @brief 把一个图元编译进计划。
-     * @param degraded 出参：该图元因段类型不支持而被整体离散时置 true
+     *
+     * 几何来自 Eg::Cam::GeometryExtractor —— 加工链路的**唯一**几何入口。
+     * 提取器对「这类图元暂时无法加工」会给出明确的 kind 与原因，
+     * 这里把它转成编译结果里的诊断信息，而不是静默跳过。
      */
     bool emitEntity(const Eg::SyEntity* entity,
-        const Eg::GeometryContext& ctx,
+        const Eg::Cam::ExtractOptions& options,
         bool preferArcs,
+        double chordToleranceMm,
+        const FrameTransform& frame,
         Hw::MotionPlanBuilder& out,
-        bool& degraded)
+        bool& degraded,
+        ToolpathCompileResult& result)
     {
         degraded = false;
         if (!entity)
@@ -89,75 +208,59 @@ namespace
             return false;
         }
 
-        if (!preferArcs)
+        const Eg::Cam::ExtractResult extracted = Eg::Cam::GeometryExtractor::extract(entity, options);
+
+        switch (extracted.kind)
         {
-            return emitPolyline(Eg::Geo2DPath::toPolyline(entity, ctx), out);
+        case Eg::Cam::GeometryKind::Contour:
+            break;
+
+        case Eg::Cam::GeometryKind::Point:
+            // 单点图元：一次「原地打点」。当前 IR 没有专门的 mark 指令，
+            // 用零长度的出光移动表达；卡片若不接受零长度移动会忽略它。
+            // 这一点在真机联调时需要复核（见 Docs/05-硬件与设备 的待办）。
+        {
+            const Ut::Vec2d p = frame.point(extracted.point);
+            out.emitRapidTo(p.x(), p.y());
+            out.emitLineTo(p.x(), p.y(), true);
+            return true;
         }
 
-        const std::vector<Eg::PathSegment> segments = Eg::Geo2DPath::decompose(entity, ctx);
-        if (segments.empty())
+        case Eg::Cam::GeometryKind::Container:
+            // 群组本身没有几何，成员是场景里的独立图元，各自被提取。
+            return false;
+
+        case Eg::Cam::GeometryKind::Fillable:
+        case Eg::Cam::GeometryKind::Raster:
+        case Eg::Cam::GeometryKind::Unsupported:
+        default:
         {
-            // 分解不出任何段：文字（未转轮廓）、图片、点等没有可加工路径的图元走这里
+            ++result.unmachinableEntityCount;
+            if (result.unmachinableDetails.size() < kMaxUnmachinableDetails)
+            {
+                result.unmachinableDetails.append(QStringLiteral("%1 x %2 (%3)")
+                                                     .arg(1)
+                                                     .arg(QString::fromUtf8(Eg::Cam::geometryKindName(extracted.kind)))
+                                                     .arg(QString::fromUtf8(extracted.reason ? extracted.reason : "")));
+            }
             return false;
         }
+        }
 
-        // 先检查是否存在无法原样表达的段（椭圆、以及没带近似点的其他段）。
-        // 一旦存在就整体走折线：把「一半圆弧、一半折线」混在一个轮廓里，
-        // 接缝处的容差差异会在工件上留下可见台阶。
-        bool needsFallback = false;
-        for (const Eg::PathSegment& seg : segments)
+        bool anyEmitted = false;
+        for (const Eg::Cam::Contour& contour : extracted.contours)
         {
-            const bool expressible = seg.eType == Eg::EPathSegmentType::Line || seg.eType == Eg::EPathSegmentType::Arc ||
-                (seg.eType == Eg::EPathSegmentType::PolylineApprox && seg.vApproxPoints.size() >= 2);
-            if (!expressible)
+            bool contourDegraded = false;
+            if (emitContour(contour, preferArcs, chordToleranceMm, frame, out, contourDegraded))
             {
-                needsFallback = true;
-                break;
-            }
-        }
-        if (needsFallback)
-        {
-            degraded = true;
-            return emitPolyline(Eg::Geo2DPath::toPolyline(entity, ctx), out);
-        }
-
-        if (segments.empty())
-        {
-            degraded = true;
-            return emitPolyline(Eg::Geo2DPath::toPolyline(entity, ctx), out);
-        }
-
-        out.emitRapidTo(segments.front().ptStart.x(), segments.front().ptStart.y());
-        for (const Eg::PathSegment& seg : segments)
-        {
-            switch (seg.eType)
-            {
-            case Eg::EPathSegmentType::Line:
-                out.emitLineTo(seg.ptEnd.x(), seg.ptEnd.y(), true);
-                break;
-
-            case Eg::EPathSegmentType::Arc:
-                // Geo2DPath 约定分解出的圆弧一律为 CCW 扫掠（见 Geo2DTypes.h 的注释），
-                // 因此这里恒传 true；若哪天该约定变了，工件上的表现是圆弧走反向长边
-                out.emitArcTo(seg.ptEnd.x(), seg.ptEnd.y(), seg.ptCenter.x(), seg.ptCenter.y(), true, true);
-                break;
-
-            case Eg::EPathSegmentType::PolylineApprox:
-                for (size_t i = 1; i < seg.vApproxPoints.size(); ++i)
+                anyEmitted = true;
+                if (contourDegraded)
                 {
-                    out.emitLineTo(seg.vApproxPoints[i].x(), seg.vApproxPoints[i].y(), true);
+                    degraded = true;
                 }
-                break;
-
-            default:
-                // 上面的 needsFallback 已经拦掉了，走到这里说明段类型枚举扩展了而这里没跟上
-                SY_ERRORF("[MotionPlanCompiler] Unhandled path segment type %d on entity %lld",
-                    static_cast<int>(seg.eType),
-                    static_cast<long long>(entity->id));
-                return false;
             }
         }
-        return true;
+        return anyEmitted;
     }
 }  // namespace
 
@@ -302,6 +405,12 @@ namespace MotionPlanCompiler
 
         // ---- 逐图层编译 ----
         const Eg::GeometryContext ctx = makeContext(spec);
+        Eg::Cam::ExtractOptions extractOptions;
+        extractOptions.geometry = ctx;
+
+        Eg::MachineFrame frame(spec.machineFrame);
+        const FrameTransform transform(frame);
+
         int32_t maxPasses = 1;
 
         for (const LayerBucket& bucket : buckets)
@@ -320,7 +429,14 @@ namespace MotionPlanCompiler
                 result.skippedEntityCount += static_cast<int32_t>(bucket.entities.size());
                 continue;
             }
-            if (layers && spec.skipLockedLayers && layers->isLayerLocked(bucket.layerId))
+            if (layers && spec.skipLockedLayers && !layers->isLayerLocked(bucket.layerId))
+            {
+                result.skippedEntityCount += static_cast<int32_t>(bucket.entities.size());
+                continue;
+            }
+            // 图层「不参与加工输出」：与「不可见」「锁定」并列的第三种跳过理由。
+            // 三者的区别：不可见 = 只是不显示；不输出 = 不送机器（尺寸标注、参考底图）。
+            if (layers && !layers->isLayerOutput(bucket.layerId))
             {
                 result.skippedEntityCount += static_cast<int32_t>(bucket.entities.size());
                 continue;
@@ -339,16 +455,22 @@ namespace MotionPlanCompiler
             out.emitSetFeedRate(bucket.params.speedMmPerSec);
             out.emitSetRapidRate(spec.rapidSpeedMmPerSec);
 
-            maxPasses = std::max(maxPasses, bucket.params.passes);
-
             int32_t emittedInLayer = 0;
             for (int32_t pass = 0; pass < bucket.params.passes; ++pass)
             {
                 out.emitBeginPass(pass);
+
                 for (const Eg::SyEntity* entity : bucket.entities)
                 {
                     bool degraded = false;
-                    if (emitEntity(entity, ctx, spec.emitArcs, out, degraded))
+                    if (emitEntity(entity,
+                            extractOptions,
+                            spec.emitArcs,
+                            spec.chordToleranceMm,
+                            transform,
+                            out,
+                            degraded,
+                            result))
                     {
                         ++emittedInLayer;
                         if (degraded)
@@ -385,6 +507,16 @@ namespace MotionPlanCompiler
             result.entityCount += emittedInLayer / std::max<int32_t>(1, bucket.params.passes);
         }
 
+        // ---- 无法加工的图元：按策略决定是整份作业失败还是跳过 ----
+        if (result.unmachinableEntityCount > 0 && spec.failOnUnmachinableEntity)
+        {
+            result.error = QStringLiteral("%1 entity/entities cannot be machined yet: %2")
+                               .arg(result.unmachinableEntityCount)
+                               .arg(result.unmachinableDetails.join(QStringLiteral("; ")));
+            out.clear();
+            return result;
+        }
+
         if (out.commandCount() == 0 || result.layerCount == 0)
         {
             result.error = QCoreApplication::translate(
@@ -411,7 +543,7 @@ namespace MotionPlanCompiler
         result.boundsMaxY = finalHeader.boundsMaxY;
 
         SY_DEBUGF("[MotionPlanCompiler] '%s': %d layer(s), %d entity(ies), %lld command(s), "
-                  "bounds [%.3f,%.3f]-[%.3f,%.3f], skipped=%d degraded=%d",
+                  "bounds [%.3f, %.3f]-[%.3f, %.3f], skipped=%d degraded=%d unmachinable=%d",
             spec.jobId.toUtf8().constData(),
             result.layerCount,
             result.entityCount,
@@ -421,9 +553,10 @@ namespace MotionPlanCompiler
             result.boundsMaxX,
             result.boundsMaxY,
             result.skippedEntityCount,
-            result.degradedEntityCount);
+            result.degradedEntityCount,
+            result.unmachinableEntityCount);
         return result;
     }
-}  // namespace MotionPlanCompiler
+}
 
 #endif  // ENABLE_HARDWARE

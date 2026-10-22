@@ -1,0 +1,83 @@
+name: Nesting SDK
+
+# 守护 Nesting 模块的**交付契约**，而不是它算得对不对（那由 ctest 负责）：
+#   - 独立构建能产出 include/ + lib/ + bin/ 的 SDK；
+#   - 导出表与 NestingApi.h 的声明完全一致（没有 C++ 装饰名、没有未声明的符号）；
+#   - 运行时只依赖 MSVC 运行库（Clipper2/Log/spdlog/Qt 一旦漏成动态依赖就直接失败）；
+#   - 仓库外的 C 与 C++ 两个消费方都能编译并通过冒烟。
+#
+# 触发范围刻意收窄到 Nesting 子模块指针与本文件：这是交付面的门禁，
+# 不该给每次普通改动都加一份 Windows 构建。
+on:
+  push:
+    branches: [main, master, develop]
+    paths:
+      - Nesting
+      - .github/workflows/nesting-sdk.yml
+  pull_request:
+    paths:
+      - Nesting
+      - .github/workflows/nesting-sdk.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-sdk-contract:
+    name: SDK contract (windows x64)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # 与 core-libs-macos-linux 作业同样的思路：vcpkg 按三元组缓存，
+      # 键尾版本号手工 bump 以强制刷新。
+      - name: Cache vcpkg
+        id: cache-vcpkg
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.workspace }}/vcpkg
+          key: vcpkg-x64-windows-${{ runner.os }}-${{ runner.arch }}-nesting-sdk-v1
+
+      - name: Set up vcpkg
+        run: |
+          $vcpkgRoot = Join-Path "${{ runner.workspace }}" "vcpkg"
+          if (-not (Test-Path (Join-Path $vcpkgRoot "vcpkg.exe"))) {
+            Remove-Item -Recurse -Force $vcpkgRoot -ErrorAction SilentlyContinue
+            git clone --depth 1 https://github.com/microsoft/vcpkg.git $vcpkgRoot
+            & (Join-Path $vcpkgRoot "bootstrap-vcpkg.bat") -disableMetrics
+          }
+          "VCPKG_ROOT=$vcpkgRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      # Clipper2 是 Nesting 唯一的编译期三方依赖；thread-pool 是 header-only
+      # 端口（不带 CMake config 包，模块用 find_path 探测）。GTest 不是本条
+      # 门禁的必需品，留着只是为了与 core-libs 作业保持同一套依赖集合。
+      - name: Install dependencies
+        run: |
+          & (Join-Path $env:VCPKG_ROOT "vcpkg.exe") install `
+            clipper2 bshoshany-thread-pool gtest `
+            --triplet x64-windows --clean-after-build
+
+      # 只 build Nesting 目标，不 build 单测：本门禁关心的是产物形态与外部可消费性。
+      - name: Verify SDK contract
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass `
+            -File Nesting/Tools/VerifySdk.ps1 -VcpkgDir "$env:VCPKG_ROOT"
+
+      - name: Upload SDK artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nesting-sdk-x64-windows
+          path: |
+            build/nesting-sdk-verify/sdk
+            build/nesting-sdk-verify/bin_Qt6/Release/Nesting.pdb
+          if-no-files-found: warn
+          retention-days: 7

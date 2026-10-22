@@ -66,6 +66,8 @@ extern "C"
     {
         uint32_t structSize;
         const char* configDir;
+        // 运行期开关覆盖值：-1 = 不覆盖（License_ConfigInit 默认，沿用编译期
+        // SANYI_ENABLE_LICENSE 的默认值）；0 = 关闭校验；1 = 开启校验。
         int32_t enableCheck;
         uint32_t reserved0;
         uint32_t reserved1;

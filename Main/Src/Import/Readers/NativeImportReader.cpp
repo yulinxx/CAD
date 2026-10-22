@@ -68,7 +68,19 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEn
             irLayer.color = layerInfo.color;
             irLayer.visible = layerInfo.visible;
             irLayer.locked = layerInfo.locked;
+            // 加工语义（output / defaultProcessId）**不在 IrLayerInfo 里** ——
+            // 那是冻结的跨 DLL POD（裸指针数组，步长即 ABI），
+            // 且 DXF/SVG/PLT 这些外来格式根本没有这个概念。
+            // 原生 .sy 的加工语义通过 ImportResult 的独立通道传递（见 ImportResult）。
             result.importedLayers.push_back(irLayer);
+
+            // 加工语义走独立通道（ImportResult::LayerMachining）——
+            // IrLayerInfo 是冻结的跨 DLL POD，不能加字段。
+            ImportResult::LayerMachining machining;
+            machining.sourceId = layerInfo.id;
+            machining.output = layerInfo.output;
+            machining.defaultProcessId = layerInfo.defaultProcessId;
+            result.importedLayerMachining.push_back(machining);
         }
     }
 

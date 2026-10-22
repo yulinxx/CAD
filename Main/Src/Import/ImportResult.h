@@ -44,6 +44,25 @@ struct ImportResult
 
     /// 源文件图层表（DXF 等支持图层的格式解析结果，供构建文档阶段重建图层）
     std::vector<Fio::IrLayerInfo> importedLayers;
+
+    /// 图元的**加工语义**（与显示语义严格分离）
+    ///
+    /// 为什么不放在 `Fio::IrLayerInfo` 里：
+    ///   - 它是冻结的跨 DLL POD（`FioParseResult::layers` 是指向 DLL 内部内存的
+    ///     裸指针，步长即 ABI），加字段会改 sizeof；
+    ///   - 而且 DXF / SVG / PLT 这些外来格式根本没有「是否输出」「默认工艺」的概念，
+    ///     把它塞进通用导入 IR 是为一两种格式的便利污染所有格式的公共契约。
+    ///
+    /// 只有原生 .sy 有加工语义，所以它走这条独立通道。
+    /// `sourceId` 对应 `importedLayers[i].sourceId`。
+    struct LayerMachining
+    {
+        uint32_t sourceId = 0;
+        bool output = true;             // 是否参与加工输出
+        uint32_t defaultProcessId = 0;  // 默认工艺 ID，0 = 未指定
+    };
+    std::vector<LayerMachining> importedLayerMachining;
+
     /// 图元图层归属映射：转换后图元的 EntityId(int64) → 源图层 sourceId
     /// 与 importedLayers 配合，在构建文档阶段将图元还原到对应图层
     std::unordered_map<int64_t, uint32_t> entityLayerMap;

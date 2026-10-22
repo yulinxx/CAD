@@ -26,7 +26,10 @@ include(Config.cmake)
 project(SanYiCAD
     VERSION 1.0.0
     DESCRIPTION "SanYi CAD System"
-    LANGUAGES CXX
+    # C 语言：Raster 模块有一项"公开头必须是纯 C 头"的编译期契约测试，
+    # 需要一个真正的 C 编译器来验证。enable_language() 按 CMake 官方要求
+    # 必须在**顶层**目录调用才生效，所以在 project() 里一并启用。
+    LANGUAGES CXX C
 )
 
 find_package(OpenGL REQUIRED)
@@ -186,6 +189,15 @@ if(BUILD_VISION)
     message(STATUS "  Vision: ENABLED")
 else()
     message(STATUS "  Vision: DISABLED")
+endif()
+
+# 6.6 Raster 模块 - 位图处理（OpenCV），面向激光雕刻/切割工艺
+# 独立 DLL，公开头只暴露纯 C ABI（POD + 句柄），消费方不需要 OpenCV 头文件。
+if(BUILD_RASTER)
+    add_subdirectory(Raster/Raster)
+    message(STATUS "  Raster: ENABLED")
+else()
+    message(STATUS "  Raster: DISABLED")
 endif()
 
 message(STATUS "----------------------------------------")
@@ -377,6 +389,10 @@ endif()
 
 if(BUILD_VISION)
     list(APPEND SANYI_PROJECT_LIBS Vision)
+endif()
+
+if(BUILD_RASTER)
+    list(APPEND SANYI_PROJECT_LIBS Raster)
 endif()
 
 if(SANYI_PYTHON_HOST)

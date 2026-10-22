@@ -961,11 +961,22 @@ int ImportService::restoreImportedLayers(
         return 0;
     }
 
+    // 查找某源图层的加工语义（只有原生 .sy 有这个概念）
+    const auto findMachining = [&parseResult](uint32_t sourceId) -> const ImportResult::LayerMachining* {
+        for (const auto& m : parseResult.importedLayerMachining)
+        {
+            if (m.sourceId == sourceId)
+            {
+                return &m;
+            }
+        }
+        return nullptr;
+    };
+
     // 源图层 sourceId → 运行时 LayerManager 图层 ID
     std::unordered_map<uint32_t, int> sourceToLayerId;
     int createdCount = 0;
     int reusedCount = 0;
-
     // 逐个记住来源图层的落地结果，供下面按层输出日志（每层只输出一次）
     struct ResolvedSourceLayer
     {
@@ -1010,6 +1021,19 @@ int ImportService::restoreImportedLayers(
                 m_layerManager->setLayerColor(layerId, Ut::Color::fromRGB255(r, g, b));
                 m_layerManager->setLayerVisible(layerId, src.visible);
                 m_layerManager->setLayerLocked(layerId, src.locked);
+                // 加工语义：输出开关与默认工艺 ID 跟着图层一起还原。
+                // 少了这一步，打开 .sy 后「这一层要加工」的信息就丢了 ——
+                // 表现是图纸明明设了输出，机器却不烧这一层。
+                // 数据来自独立的 machining 通道（IrLayerInfo 是冻结的跨 DLL POD）。
+                const auto machining = findMachining(src.sourceId);
+                if (machining)
+                {
+                    m_layerManager->setLayerOutput(layerId, machining->output);
+                    if (machining->defaultProcessId != 0)
+                    {
+                        m_layerManager->setLayerDefaultProcessId(layerId, machining->defaultProcessId);
+                    }
+                }
             }
             else
             {

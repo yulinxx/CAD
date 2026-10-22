@@ -169,6 +169,11 @@ bool ApplicationCompositionRoot::startHardware(const QString& configDir, QString
     return true;
 }
 
+Eg::MachineFrameConfig ApplicationCompositionRoot::machineFrameConfig() const
+{
+    return m_deviceHost ? m_deviceHost->machineFrameConfig() : Eg::MachineFrameConfig{};
+}
+
 ISelectionService* ApplicationCompositionRoot::selectionService()
 {
     return m_selectionService.get();
@@ -456,6 +461,16 @@ void ApplicationCompositionRoot::registerAllOperations()
         // 加工失败必须让操作员看见：只写日志的话，
         // 现场表现是「按了开始加工什么都没发生」
         QMessageBox::warning(m_shellHost ? m_shellHost->mainWindow() : nullptr, QObject::tr("Processing"), message);
+    };
+    // 作业规格：把**机器坐标系**从设备档案注入。
+    //
+    // 换算只在编译器的最后一步发生（MotionPlanCompiler），配置必须从这里一路传下去。
+    // 之前这条链路是断的：UI2D 旧链路在服务层换算，新 HAL 链路完全不换算 ——
+    // 同一份文档走不同路径会烧到不同位置。
+    laserConfig.specProvider = [this] {
+        ToolpathJobSpec spec;
+        spec.machineFrame = m_deviceHost ? m_deviceHost->machineFrameConfig() : Eg::MachineFrameConfig{};
+        return spec;
     };
 
     m_laserOperationRegistry = std::make_unique<LaserOperationRegistry>(laserConfig);

@@ -480,6 +480,11 @@ bool DeviceHost::isSimulated() const
     return m_impl->simClock != nullptr;
 }
 
+Eg::MachineFrameConfig DeviceHost::machineFrameConfig() const
+{
+    return m_impl->profile.machineFrame;
+}
+
 bool DeviceHost::canStartProcessing() const
 {
     return m_impl->device != nullptr && m_impl->lastCanStart;
@@ -657,6 +662,11 @@ QString DeviceHost::deviceDisplayName() const
 bool DeviceHost::isSimulated() const
 {
     return false;
+}
+
+Eg::MachineFrameConfig DeviceHost::machineFrameConfig() const
+{
+    return Eg::MachineFrameConfig{};  // 未启用硬件模块 → 恒等变换
 }
 
 /// fail-safe：没有硬件支持就不允许开工，而不是「没有约束所以放行」。

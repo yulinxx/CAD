@@ -35,13 +35,6 @@ class Workbench3D final : public WorkbenchBase
     Q_OBJECT
 
 public:
-    /// 构造函数定义在 .cpp：类里有几个只前向声明的 3D 类型
-    /// （unique_ptr<UndoRedoManager3D> / <DocumentManager3D> / <MainWindow3D>），
-    /// 隐式默认构造函数会在**每个使用点**实例化，析构成员时需要完整类型 ——
-    /// 那些翻译单元并没有包含对应的 3D 头，会报
-    /// 「can't delete an incomplete type」。显式声明后，实例化只发生在 .cpp。
-    Workbench3D();
-
     ~Workbench3D() override;
 
 public:
@@ -68,6 +61,10 @@ public:
 
     void saveCurrentSettings() override;
 
+    /// 3D 撤销/重做栈（跨工作台切换存活的长寿命对象）。
+    /// 供回归测试断言「切台不丢撤销历史」，也供框架层查询撤销能力。
+    UndoRedoManager3D* undoRedoManager3D() const;
+
 private:
     // ServiceOwner 定义在 .cpp 中（PIMPL 模式，避免头文件引入 20+ 3D 依赖）
     struct ServiceOwner;
@@ -85,6 +82,10 @@ private:
     void create3DViewport(WorkbenchWindow& window);
     void bind3DRenderSignals(ServiceOwner& own);
     void bind3DSelectionSignal();
+    /// 把当前选择集重新推给 3D 状态栏（切回 3D 时用）。
+    /// 新建的 RenderWidget3D 不会补发 sigSelectionChanged，
+    /// 而 unmountStatusBar 的 clearAll() 已清空选择/信息区 → 状态栏空白。
+    void refreshStatusBarSelection3D();
     void setup3DDeleteShortcuts(WorkbenchWindow& window);
     /// 3D 视口右键菜单请求：基于命令中枢快照构建并弹出（与 2D 统一的单一事实来源）
     void on3DContextMenuRequested(const QPoint& globalPos);
@@ -151,6 +152,23 @@ private:
     SceneTreePanel* m_scenePanel3D{ nullptr };
 
     Eg::SceneManager3D* m_sceneManager3D{ nullptr };
+
+    /// 3D 撤销/重做栈与文档管理器（跨工作台切换存活）。
+    ///
+    /// 刻意不放进 ServiceOwner：ServiceOwner 随 deactivate() 一起销毁
+    /// （m_serviceOwner.reset()），而工作台实例本身跨切换存活。
+    /// 放在这里，3D 的撤销栈才能跨「2D → 3D → 2D → 3D」往返保留 ——
+    /// 否则每次切走再切回来，3D 里做的修改就再也 Ctrl+Z 不回去了。
+    ///
+    /// PIMPL：完整定义在 .cpp（自定义删除器同理）。不能直接写
+    /// unique_ptr<UndoRedoManager3D> 这类成员 —— 头文件里它们只是前向声明，
+    /// 会让别的 TU 在实例化 Workbench3D 隐式默认构造/析构时报「不完整类型」。
+    struct SessionState;
+    struct SessionStateDeleter
+    {
+        void operator()(SessionState*) const;
+    };
+    std::unique_ptr<SessionState, SessionStateDeleter> m_sessionState;
 
     QShortcut* m_deleteShortcut{ nullptr };
     QShortcut* m_backspaceShortcut{ nullptr };

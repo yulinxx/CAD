@@ -50,7 +50,7 @@ namespace
     }
 
     /// 造一条直线并直接入场景，返回其 id
-    Eg::EntityId addLine(Eg::SceneManager& scene, double x0, double y0, double x1, double y1)
+    Eg::EntityId createLine(Eg::SceneManager& scene, double x0, double y0, double x1, double y1)
     {
         auto line = std::make_unique<Eg::SyLine>();
         line->setPointVector({ Ut::Vec2d(x0, y0), Ut::Vec2d(x1, y1) });
@@ -70,8 +70,8 @@ TEST(SceneEditIntegrationTest, TransformEntities_RoundTrip)
     UndoRedoManager undoMgr(&scene);
     SceneEditService edit(&scene, &undoMgr);
 
-    const Eg::EntityId a = addLine(scene, 0, 0, 10, 0);
-    const Eg::EntityId b = addLine(scene, 0, 5, 10, 5);
+    const Eg::EntityId a = createLine(scene, 0, 0, 10, 0);
+    const Eg::EntityId b = createLine(scene, 0, 5, 10, 5);
     EXPECT_TRUE(scene.getEntityCount() == 2) << "scene has 2 entities";
     EXPECT_TRUE(nearly(bboxMinX(scene, a), 0.0)) << "line A starts at x=0";
 
@@ -115,7 +115,7 @@ TEST(SceneEditIntegrationTest, TransformEntities_MergeableNudgeMerges)
     UndoRedoManager undoMgr(&scene);
     SceneEditService edit(&scene, &undoMgr);
 
-    const Eg::EntityId a = addLine(scene, 0, 0, 10, 0);
+    const Eg::EntityId a = createLine(scene, 0, 0, 10, 0);
 
     auto nudge = [&](double dx) {
         edit.transformEntities(
@@ -143,7 +143,7 @@ TEST(SceneEditIntegrationTest, TransformEntities_NonMergeableKeepsSeparateRecord
     UndoRedoManager undoMgr(&scene);
     SceneEditService edit(&scene, &undoMgr);
 
-    const Eg::EntityId a = addLine(scene, 0, 0, 10, 0);
+    const Eg::EntityId a = createLine(scene, 0, 0, 10, 0);
 
     auto move = [&](double dx) {
         edit.transformEntities(
@@ -174,7 +174,7 @@ TEST(SceneEditIntegrationTest, InteractiveDrag_Commit)
     UndoRedoManager undoMgr(&scene);
     SceneEditService edit(&scene, &undoMgr);
 
-    const Eg::EntityId a = addLine(scene, 0, 0, 10, 0);
+    const Eg::EntityId a = createLine(scene, 0, 0, 10, 0);
     std::vector<Eg::SyEntity*> targets{ scene.findSyEntityById(a) };
 
     SceneEditService::InteractiveSession session = edit.beginInteractive(targets);
@@ -208,7 +208,7 @@ TEST(SceneEditIntegrationTest, InteractiveDrag_CancelRestoresWithoutUndoRecord)
     UndoRedoManager undoMgr(&scene);
     SceneEditService edit(&scene, &undoMgr);
 
-    const Eg::EntityId a = addLine(scene, 0, 0, 10, 0);
+    const Eg::EntityId a = createLine(scene, 0, 0, 10, 0);
     std::vector<Eg::SyEntity*> targets{ scene.findSyEntityById(a) };
 
     SceneEditService::InteractiveSession session = edit.beginInteractive(targets);
@@ -233,8 +233,8 @@ TEST(SceneEditIntegrationTest, PushExecutedChange_PropertyPanelPath)
     UndoRedoManager undoMgr(&scene);
     SceneEditService edit(&scene, &undoMgr);
 
-    const Eg::EntityId a = addLine(scene, 0, 0, 10, 0);
-    const Eg::EntityId b = addLine(scene, 0, 5, 10, 5);
+    const Eg::EntityId a = createLine(scene, 0, 0, 10, 0);
+    const Eg::EntityId b = createLine(scene, 0, 5, 10, 5);
 
     auto before = edit.captureAllSnapshots();
     EXPECT_TRUE(before.size() == 2) << "captured full-scene before snapshots";
@@ -263,8 +263,8 @@ TEST(SceneEditIntegrationTest, GroupMembership_SurvivesStateSwap)
     UndoRedoManager undoMgr(&scene);
     SceneEditService edit(&scene, &undoMgr);
 
-    const Eg::EntityId a = addLine(scene, 0, 0, 10, 0);
-    const Eg::EntityId b = addLine(scene, 0, 5, 10, 5);
+    const Eg::EntityId a = createLine(scene, 0, 0, 10, 0);
+    const Eg::EntityId b = createLine(scene, 0, 5, 10, 5);
 
     edit.groupEntities({ a, b }, "G1");
     EXPECT_TRUE(scene.findSyEntityById(a)->group() != nullptr) << "entity A belongs to a group";
@@ -294,9 +294,9 @@ TEST(SceneEditIntegrationTest, WholeSceneSnapshot_RestoresEntityRemovedInsideAlg
     UndoRedoManager undoMgr(&scene);
     SceneEditService edit(&scene, &undoMgr);
 
-    const Eg::EntityId a = addLine(scene, 0, 0, 10, 0);
-    const Eg::EntityId b = addLine(scene, 0, 5, 10, 5);
-    const Eg::EntityId c = addLine(scene, 0, 9, 10, 9);
+    const Eg::EntityId a = createLine(scene, 0, 0, 10, 0);
+    const Eg::EntityId b = createLine(scene, 0, 5, 10, 5);
+    const Eg::EntityId c = createLine(scene, 0, 9, 10, 9);
 
     auto before = edit.captureAllSnapshots();
     EXPECT_TRUE(before.size() == 3) << "captured 3 before snapshots";
@@ -330,7 +330,7 @@ TEST(SceneEditIntegrationTest, DocumentTransaction_CommitUndoRedo)
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
-    const Eg::EntityId a = addLine(scene, 0, 0, 10, 0);
+    const Eg::EntityId a = createLine(scene, 0, 0, 10, 0);
 
     Eg::DocumentTransaction txn(scene, &undoMgr);
     txn.setDescription("Replace line");
@@ -369,9 +369,9 @@ TEST(SceneEditIntegrationTest, SubsetScope_LeavesUnrelatedEntitiesAlone)
     UndoRedoManager undoMgr(&scene);
     SceneEditService edit(&scene, &undoMgr);
 
-    const Eg::EntityId a = addLine(scene, 0, 0, 10, 0);
-    const Eg::EntityId b = addLine(scene, 0, 5, 10, 5);
-    const Eg::EntityId untouched = addLine(scene, 0, 9, 10, 9);
+    const Eg::EntityId a = createLine(scene, 0, 0, 10, 0);
+    const Eg::EntityId b = createLine(scene, 0, 5, 10, 5);
+    const Eg::EntityId untouched = createLine(scene, 0, 9, 10, 9);
 
     // 只对 a、b 取快照，untouched 不在本次操作范围内
     auto before = edit.captureSnapshots({ a, b });

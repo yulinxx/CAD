@@ -12,6 +12,7 @@
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Core/EntityClipboard.h"
 #include "Engine2D/Edit/UndoRedoManager.h"
+#include "Engine2D/Machine/MachineFrame.h"
 #include "Engine/Edit/IUndoRedoManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Edit/LayerEditService.h"
@@ -230,6 +231,16 @@ public:
      * 但失败必须可见 —— warningOut 里的文案设计成可以直接显示在状态栏/提示条上。
      */
     bool startHardware(const QString& configDir, QString& warningOut);
+
+    /**
+     * @brief 当前机器档案里的机器坐标系（台面尺寸 + 原点角点）
+     *
+     * 供加工链路使用：**坐标换算只在编译器的最后一步发生**，
+     * 配置由这里注入到 `ToolpathJobSpec::machineFrame`。
+     *
+     * 设备未启动时返回默认配置（恒等变换）。
+     */
+    Eg::MachineFrameConfig machineFrameConfig() const;
 
 
 private:

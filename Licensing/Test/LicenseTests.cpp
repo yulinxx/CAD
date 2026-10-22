@@ -145,7 +145,27 @@ TEST_F(LicenseApiTest, ConfigInitDefaults)
     LicenseConfig config{};
     License_ConfigInit(&config);
     EXPECT_EQ(config.structSize, sizeof(LicenseConfig));
-    EXPECT_EQ(config.enableCheck, 1);
+    // -1 = 不覆盖运行期开关；由编译期 SANYI_ENABLE_LICENSE 决定默认值
+    EXPECT_EQ(config.enableCheck, -1);
+}
+
+TEST_F(LicenseApiTest, ConfigInitDoesNotOverrideRuntimeGate)
+{
+    LicenseConfig config{};
+    License_ConfigInit(&config);
+    config.configDir = ".";
+
+    License_SetCheckEnabled(0);
+    LicenseContext* disabledCtx = License_Create(&config);
+    ASSERT_NE(disabledCtx, nullptr);
+    EXPECT_EQ(License_IsCheckEnabled(), 0);
+    License_Destroy(disabledCtx);
+
+    License_SetCheckEnabled(1);
+    LicenseContext* enabledCtx = License_Create(&config);
+    ASSERT_NE(enabledCtx, nullptr);
+    EXPECT_EQ(License_IsCheckEnabled(), 1);
+    License_Destroy(enabledCtx);
 }
 
 TEST_F(LicenseApiTest, CreateRejectsNullConfig)
