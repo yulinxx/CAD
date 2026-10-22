@@ -144,12 +144,9 @@ else()
 endif()
 
 # 6.5 CAM 模块 - 激光切割工艺路径生成
-if(BUILD_CAM)
-    add_subdirectory(CAM/CAM)
-    message(STATUS "  CAM: ENABLED")
-else()
-    message(STATUS "  CAM: DISABLED")
-endif()
+# 仓库里暂时没有 CAM 模块目录，因此不再提供 BUILD_CAM 开关：
+# 开关在但目录不在，打开就是 configure 直接失败（add_subdirectory 指向不存在的路径）。
+# CAM 模块落地后，把下面这段与 Config.cmake 里的 option 一起加回。
 
 # 5. UI 层 - 用户界面
 # UICommon 必需；UI2D 全应用必需（Main 有数百处 UI2D 引用且无桩回退）；
@@ -347,10 +344,6 @@ list(APPEND SANYI_PROJECT_LIBS
 )
 if(BUILD_NESTING)
     list(APPEND SANYI_PROJECT_LIBS Nesting)
-endif()
-
-if(BUILD_CAM)
-    list(APPEND SANYI_PROJECT_LIBS CAM)
 endif()
 
 if(BUILD_UI3D)

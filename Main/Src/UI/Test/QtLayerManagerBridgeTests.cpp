@@ -2,42 +2,81 @@
  * @file QtLayerManagerBridgeTests.cpp
  * @brief QtLayerManagerBridge 回归测试 — 图层 UI 刷新机制
  *
- * 背景 (2026-09-12):
- * 修复填充图层 UI 刷新问题 - LayerManagerDialog 在打开时能自动刷新图层列表，
- * 以及添加图层动态刷新机制。本测试验证 QtLayerManagerBridge 的信号机制正确工作。
+ * 验证 QtLayerManagerBridge 把 LayerManager 的观察者回调转成 Qt 信号：
+ * 图层增删、改名/改色、当前层切换、显隐切换、顺序变化都要发对应信号；
+ * 注销观察者后不再发，重新注册后恢复。
  *
- * 测试覆盖:
- * - 信号发射：onLayerAdded / onLayerRemoved / onLayerChanged
- * - 信号发射：onCurrentLayerChanged / onLayerVisibilityChanged / onLayerOrderChanged
- * - 信号参数正确性
+ * 信号记录方式：用普通 connect 记一份，而不是 QSignalSpy ——
+ * MainTests 没有链接 Qt Test 模块（ProcessingChainTests 出于同样原因如此）。
  */
-
 #include <gtest/gtest.h>
 
-#include <QCoreApplication>
-#include <QSignalSpy>
-#include <QDebug>
+#include <QString>
+#include <vector>
 
 #include "UI2D/Edit/QtLayerManagerBridge.h"
 #include "Engine2D/Interaction/LayerManager.h"
-#include "Engine2D/Core/SceneManager.h"
-
-#include <memory>
-
-// ==================== 测试夹具 ====================
 
 class QtLayerManagerBridgeTest : public ::testing::Test
 {
 protected:
+    /// 图层桥接信号的记录（次数 + 最后一次参数）
+    struct SignalLog
+    {
+        int addedCount = 0;
+        int lastAddedId = -1;
+        QString lastAddedName;
+
+        int removedCount = 0;
+        int lastRemovedId = -1;
+
+        int changedCount = 0;
+        int lastChangedId = -1;
+
+        int currentChangedCount = 0;
+        int lastCurrentChangedId = -1;
+
+        int visibilityChangedCount = 0;
+        int lastVisibilityChangedId = -1;
+        bool lastVisibilityVisible = true;
+
+        int orderChangedCount = 0;
+    };
+
     void SetUp() override
     {
         // 创建 SceneManager 和 LayerManager
         m_sceneManager = std::make_unique<Eg::SceneManager>();
         m_layerManager = std::make_unique<LayerManager>(m_sceneManager.get());
 
-        // 创建 Bridge 并注册为观察者
         m_bridge = std::make_unique<QtLayerManagerBridge>();
         m_layerManager->addObserver(m_bridge.get());
+
+        QObject::connect(m_bridge.get(), &QtLayerManagerBridge::sigLayerAdded, [this](int id, const QString& name) {
+            ++m_log.addedCount;
+            m_log.lastAddedId = id;
+            m_log.lastAddedName = name;
+        });
+        QObject::connect(m_bridge.get(), &QtLayerManagerBridge::sigLayerRemoved, [this](int id) {
+            ++m_log.removedCount;
+            m_log.lastRemovedId = id;
+        });
+        QObject::connect(m_bridge.get(), &QtLayerManagerBridge::sigLayerChanged, [this](int id) {
+            ++m_log.changedCount;
+            m_log.lastChangedId = id;
+        });
+        QObject::connect(m_bridge.get(), &QtLayerManagerBridge::sigCurrentLayerChanged, [this](int id) {
+            ++m_log.currentChangedCount;
+            m_log.lastCurrentChangedId = id;
+        });
+        QObject::connect(m_bridge.get(), &QtLayerManagerBridge::sigLayerVisibilityChanged, [this](int id, bool visible) {
+            ++m_log.visibilityChangedCount;
+            m_log.lastVisibilityChangedId = id;
+            m_log.lastVisibilityVisible = visible;
+        });
+        QObject::connect(m_bridge.get(), &QtLayerManagerBridge::sigLayerOrderChanged, [this]() {
+            ++m_log.orderChangedCount;
+        });
     }
 
     void TearDown() override
@@ -54,51 +93,46 @@ protected:
     std::unique_ptr<Eg::SceneManager> m_sceneManager;
     std::unique_ptr<LayerManager> m_layerManager;
     std::unique_ptr<QtLayerManagerBridge> m_bridge;
+    SignalLog m_log;
 };
 
 // ==================== onLayerAdded 信号测试 ====================
 
 TEST_F(QtLayerManagerBridgeTest, OnLayerAdded_EmitsSignal)
 {
-    QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerAdded);
-
     // 通过 LayerManager 创建图层
     int layerId = m_layerManager->createLayer("TestLayer");
     ASSERT_GT(layerId, 0);
 
     // 验证信号发射
-    EXPECT_EQ(spy.count(), 1);
+    EXPECT_EQ(m_log.addedCount, 1);
 
     // 验证信号参数
-    QList<QVariant> args = spy.takeFirst();
-    EXPECT_EQ(args.at(0).toInt(), layerId);
-    EXPECT_EQ(args.at(1).toString(), QString::fromUtf8("TestLayer"));
+    EXPECT_EQ(m_log.lastAddedId, layerId);
+    EXPECT_EQ(m_log.lastAddedName, QString::fromUtf8("TestLayer"));
 }
 
 TEST_F(QtLayerManagerBridgeTest, OnLayerAdded_MultipleLayers)
 {
-    QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerAdded);
-
     // 创建多个图层
     m_layerManager->createLayer("Layer1");
     m_layerManager->createLayer("Layer2");
     m_layerManager->createLayer("Layer3");
 
     // 验证信号发射次数
-    EXPECT_EQ(spy.count(), 3);
+    EXPECT_EQ(m_log.addedCount, 3);
 }
 
-TEST_F(QtLayerManagerBridgeTest, OnLayerAdded_EmptyName)
+TEST_F(QtLayerManagerBridgeTest, OnLayerAdded_EmptyName_UsesGeneratedName)
 {
-    QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerAdded);
-
-    // 创建空名称图层
+    // 创建空名称图层：LayerManager 会自动补一个名字（"Layer N"），
+    // 桥接层要转发的是**实际生效**的名字，而不是空串。
     int layerId = m_layerManager->createLayer("");
     ASSERT_GT(layerId, 0);
 
-    EXPECT_EQ(spy.count(), 1);
-    QList<QVariant> args = spy.takeFirst();
-    EXPECT_EQ(args.at(1).toString(), QString::fromUtf8(""));
+    EXPECT_EQ(m_log.addedCount, 1);
+    EXPECT_EQ(m_log.lastAddedId, layerId);
+    EXPECT_EQ(m_log.lastAddedName, QString::fromUtf8(m_layerManager->layerName(layerId).c_str()));
 }
 
 // ==================== onLayerRemoved 信号测试 ====================
@@ -109,17 +143,14 @@ TEST_F(QtLayerManagerBridgeTest, OnLayerRemoved_EmitsSignal)
     int layerId = m_layerManager->createLayer("ToDelete");
     ASSERT_GT(layerId, 0);
 
-    QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerRemoved);
-
     // 删除图层
     ASSERT_TRUE(m_layerManager->deleteLayer(layerId));
 
     // 验证信号发射
-    EXPECT_EQ(spy.count(), 1);
+    EXPECT_EQ(m_log.removedCount, 1);
 
     // 验证信号参数
-    QList<QVariant> args = spy.takeFirst();
-    EXPECT_EQ(args.at(0).toInt(), layerId);
+    EXPECT_EQ(m_log.lastRemovedId, layerId);
 }
 
 TEST_F(QtLayerManagerBridgeTest, OnLayerRemoved_MultipleLayers)
@@ -127,12 +158,10 @@ TEST_F(QtLayerManagerBridgeTest, OnLayerRemoved_MultipleLayers)
     int id1 = m_layerManager->createLayer("L1");
     int id2 = m_layerManager->createLayer("L2");
 
-    QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerRemoved);
-
     m_layerManager->deleteLayer(id1);
     m_layerManager->deleteLayer(id2);
 
-    EXPECT_EQ(spy.count(), 2);
+    EXPECT_EQ(m_log.removedCount, 2);
 }
 
 // ==================== onLayerChanged 信号测试 ====================
@@ -141,43 +170,49 @@ TEST_F(QtLayerManagerBridgeTest, OnLayerChanged_RenameEmitsSignal)
 {
     int layerId = m_layerManager->createLayer("Original");
 
-    QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerChanged);
-
     // 重命名图层
     m_layerManager->renameLayer(layerId, "Renamed");
 
-    EXPECT_EQ(spy.count(), 1);
+    EXPECT_EQ(m_log.changedCount, 1);
 
-    QList<QVariant> args = spy.takeFirst();
-    EXPECT_EQ(args.at(0).toInt(), layerId);
+    EXPECT_EQ(m_log.lastChangedId, layerId);
 }
 
 TEST_F(QtLayerManagerBridgeTest, OnLayerChanged_ColorChangeEmitsSignal)
 {
     int layerId = m_layerManager->createLayer("ColorLayer");
 
-    QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerChanged);
+    // 改色：LayerManager 会拒绝与其它图层重复的颜色（默认图层已占用红/绿/蓝等），
+    // 这里用一个未被占用的颜色，并断言这次修改确实生效。
+    const Ut::Color newColor(0.25f, 0.5f, 0.75f);
+    ASSERT_TRUE(m_layerManager->setLayerColor(layerId, newColor));
 
-    // 修改颜色
-    m_layerManager->setLayerColor(layerId, Ut::Color(1.0f, 0.0f, 0.0f));
+    EXPECT_EQ(m_log.changedCount, 1);
+    EXPECT_EQ(m_log.lastChangedId, layerId);
+}
 
-    EXPECT_EQ(spy.count(), 1);
+TEST_F(QtLayerManagerBridgeTest, OnLayerChanged_DuplicateColorRejected_NoSignal)
+{
+    int layerId = m_layerManager->createLayer("ColorLayer");
+
+    // 与已有图层重复的颜色会被拒绝，且不应发出变更信号
+    const Ut::Color defaultRed(1.0f, 0.0f, 0.0f);
+    EXPECT_FALSE(m_layerManager->setLayerColor(layerId, defaultRed));
+
+    EXPECT_EQ(m_log.changedCount, 0);
 }
 
 // ==================== onCurrentLayerChanged 信号测试 ====================
 
 TEST_F(QtLayerManagerBridgeTest, OnCurrentLayerChanged_EmitsSignal)
 {
-    QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigCurrentLayerChanged);
-
     // 设置当前图层
     int layerId = m_layerManager->createLayer("Current");
     m_layerManager->setCurrentLayer(layerId);
 
-    EXPECT_EQ(spy.count(), 1);
+    EXPECT_EQ(m_log.currentChangedCount, 1);
 
-    QList<QVariant> args = spy.takeFirst();
-    EXPECT_EQ(args.at(0).toInt(), layerId);
+    EXPECT_EQ(m_log.lastCurrentChangedId, layerId);
 }
 
 // ==================== onLayerVisibilityChanged 信号测试 ====================
@@ -186,16 +221,13 @@ TEST_F(QtLayerManagerBridgeTest, OnLayerVisibilityChanged_HideEmitsSignal)
 {
     int layerId = m_layerManager->createLayer("VisibleLayer");
 
-    QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerVisibilityChanged);
-
     // 隐藏图层
     m_layerManager->setLayerVisible(layerId, false);
 
-    EXPECT_EQ(spy.count(), 1);
+    EXPECT_EQ(m_log.visibilityChangedCount, 1);
 
-    QList<QVariant> args = spy.takeFirst();
-    EXPECT_EQ(args.at(0).toInt(), layerId);
-    EXPECT_FALSE(args.at(1).toBool());
+    EXPECT_EQ(m_log.lastVisibilityChangedId, layerId);
+    EXPECT_FALSE(m_log.lastVisibilityVisible);
 }
 
 TEST_F(QtLayerManagerBridgeTest, OnLayerVisibilityChanged_ShowEmitsSignal)
@@ -205,16 +237,13 @@ TEST_F(QtLayerManagerBridgeTest, OnLayerVisibilityChanged_ShowEmitsSignal)
     // 先隐藏
     m_layerManager->setLayerVisible(layerId, false);
 
-    QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerVisibilityChanged);
-
     // 显示图层
     m_layerManager->setLayerVisible(layerId, true);
 
-    EXPECT_EQ(spy.count(), 1);
+    EXPECT_EQ(m_log.visibilityChangedCount, 2);
 
-    QList<QVariant> args = spy.takeFirst();
-    EXPECT_EQ(args.at(0).toInt(), layerId);
-    EXPECT_TRUE(args.at(1).toBool());
+    EXPECT_EQ(m_log.lastVisibilityChangedId, layerId);
+    EXPECT_TRUE(m_log.lastVisibilityVisible);
 }
 
 // ==================== onLayerOrderChanged 信号测试 ====================
@@ -223,40 +252,36 @@ TEST_F(QtLayerManagerBridgeTest, OnLayerOrderChanged_MoveToTopEmitsSignal)
 {
     int id1 = m_layerManager->createLayer("A");
     int id2 = m_layerManager->createLayer("B");
-
-    QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerOrderChanged);
+    (void)id1;
 
     // 移动图层顺序
     m_layerManager->moveLayerToTop(id2);
 
-    EXPECT_EQ(spy.count(), 1);
+    EXPECT_EQ(m_log.orderChangedCount, 1);
 }
 
 TEST_F(QtLayerManagerBridgeTest, OnLayerOrderChanged_MoveUpEmitsSignal)
 {
     int id1 = m_layerManager->createLayer("A");
     int id2 = m_layerManager->createLayer("B");
-
-    QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerOrderChanged);
+    (void)id1;
 
     m_layerManager->moveLayerUp(id2);
 
-    EXPECT_EQ(spy.count(), 1);
+    EXPECT_EQ(m_log.orderChangedCount, 1);
 }
 
 // ==================== 注册/注销观察者测试 ====================
 
 TEST_F(QtLayerManagerBridgeTest, UnregisterObserver_StopsSignals)
 {
-    QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerAdded);
-
     // 注销观察者
     m_layerManager->removeObserver(m_bridge.get());
 
     // 创建图层 - 不应发射信号
     m_layerManager->createLayer("AfterUnregister");
 
-    EXPECT_EQ(spy.count(), 0);
+    EXPECT_EQ(m_log.addedCount, 0);
 }
 
 TEST_F(QtLayerManagerBridgeTest, ReRegisterObserver_ResumesSignals)
@@ -267,75 +292,57 @@ TEST_F(QtLayerManagerBridgeTest, ReRegisterObserver_ResumesSignals)
     // 重新注册
     m_layerManager->addObserver(m_bridge.get());
 
-    QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerAdded);
-
     m_layerManager->createLayer("AfterReregister");
 
-    EXPECT_EQ(spy.count(), 1);
+    EXPECT_EQ(m_log.addedCount, 1);
 }
 
 // ==================== 边界条件测试 ====================
 
 TEST_F(QtLayerManagerBridgeTest, DoubleRegister_IsIdempotent)
 {
-    QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerAdded);
-
     // 重复注册
     m_layerManager->addObserver(m_bridge.get());
 
     m_layerManager->createLayer("Test");
 
     // 只应发射一次信号
-    EXPECT_EQ(spy.count(), 1);
+    EXPECT_EQ(m_log.addedCount, 1);
 }
 
 TEST_F(QtLayerManagerBridgeTest, DeleteNonExistentLayer_NoSignal)
 {
-    QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerRemoved);
-
     // 删除不存在的图层
     m_layerManager->deleteLayer(9999);
 
     // 不应发射信号
-    EXPECT_EQ(spy.count(), 0);
+    EXPECT_EQ(m_log.removedCount, 0);
 }
 
 TEST_F(QtLayerManagerBridgeTest, RenameNonExistentLayer_NoSignal)
 {
-    QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerChanged);
-
     // 重命名不存在的图层
     m_layerManager->renameLayer(9999, "NewName");
 
-    EXPECT_EQ(spy.count(), 0);
+    EXPECT_EQ(m_log.changedCount, 0);
 }
 
 // ==================== 填充图层相关测试 ====================
 
 TEST_F(QtLayerManagerBridgeTest, OnLayerFillChanged_EmitsSignal)
 {
-    // 测试填充图层相关的信号
-    // 注意：需要查看 LayerManager 是否有 setLayerFill 方法
-
     int layerId = m_layerManager->createLayer("FillLayer");
-
-    // 这里测试基本的信号机制
-    // 如果 LayerManager 有专门的 fill 变更接口，可以添加更多测试
-    QSignalSpy spy(m_bridge.get(), &QtLayerManagerBridge::sigLayerChanged);
 
     // 任何图层变更都应该触发信号
     m_layerManager->renameLayer(layerId, "RenamedFillLayer");
 
-    EXPECT_EQ(spy.count(), 1);
+    EXPECT_EQ(m_log.changedCount, 1);
 }
 
 // ==================== 压力测试 ====================
 
 TEST_F(QtLayerManagerBridgeTest, ManyLayers_SignalsCorrect)
 {
-    QSignalSpy addSpy(m_bridge.get(), &QtLayerManagerBridge::sigLayerAdded);
-    QSignalSpy removeSpy(m_bridge.get(), &QtLayerManagerBridge::sigLayerRemoved);
-
     constexpr int kCount = 100;
     std::vector<int> layerIds;
 
@@ -347,7 +354,7 @@ TEST_F(QtLayerManagerBridgeTest, ManyLayers_SignalsCorrect)
         layerIds.push_back(id);
     }
 
-    EXPECT_EQ(addSpy.count(), kCount);
+    EXPECT_EQ(m_log.addedCount, kCount);
 
     // 删除一半
     for (int i = 0; i < kCount / 2; ++i)
@@ -355,5 +362,5 @@ TEST_F(QtLayerManagerBridgeTest, ManyLayers_SignalsCorrect)
         m_layerManager->deleteLayer(layerIds[i]);
     }
 
-    EXPECT_EQ(removeSpy.count(), kCount / 2);
+    EXPECT_EQ(m_log.removedCount, kCount / 2);
 }
