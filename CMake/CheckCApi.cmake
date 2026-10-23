@@ -18,6 +18,7 @@ function(sanyi_check_c_api_version)
         "${SANYI_ROOT}/Engraving/Engraving/Include/Engraving/EngravingCAPI.h"
         "${SANYI_ROOT}/GeoModelCore/GeoModelCore/Include/GeoModelCore/GeoModelDLL.h"
         "${SANYI_VISION_DIR}/Include/Vision/VisionAPI.h"
+        "${SANYI_RASTER_DIR}/Include/Raster/RasterApi.h"
         "${SANYI_NESTING_DIR}/Include/Nesting/NestingApi.h"
         "${SANYI_RENDERX_DIR}/include/render/renderx.h"
     )

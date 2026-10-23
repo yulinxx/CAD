@@ -302,6 +302,12 @@ UiConfigSelfCheckReport UiConfigSelfCheck::run(const UiConfigData& config)
     const QVector<UiConfigFeatureRef> featureRefs = collectFeatureRefs(config);
     report.checkedFeatureCount = static_cast<int>(featureRefs.size());
     const UiFeatureGate& gate = UiFeatureGate::instance();
+    // 授权侧只有在**真的加载了许可证**时才有意义。
+    // 未授权（unrestricted）模式下 isAllowed 对任何 feature 都返回 true，
+    // 于是「本构建没编进来的可选模块」（Vision / Hardware / Engraving…）会被
+    // 逐条报成「授权放行却没编译进来」—— 那是构建选项的问题，不是配置的问题，
+    // 而且与本机有没有许可证无关。
+    const bool licenseSideMeaningful = !gate.isUnrestricted();
     for (const UiConfigFeatureRef& ref : featureRefs)
     {
         bool known = false;
@@ -309,6 +315,13 @@ UiConfigSelfCheckReport UiConfigSelfCheck::run(const UiConfigData& config)
         if (!known)
         {
             // 没有对应构建开关的 feature（纯授权控制项）无法核对，跳过
+            continue;
+        }
+        if (!licenseSideMeaningful)
+        {
+            // 没有许可证可比：授权侧无从谈起，这一对关系整体跳过。
+            // 「配置引用了本构建没编进来的可选模块」是构建裁剪的事，
+            // 由 gatedOutByBuild 那一侧的命令裁剪结果去覆盖。
             continue;
         }
         const bool licensed = gate.isAllowed(ref.featureId);

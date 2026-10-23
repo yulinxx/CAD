@@ -379,11 +379,25 @@ bool FileDropHandler::importImage(const QString& filePath, const QPointF& anchor
     imgEntity->bottomLeft = Ut::Vec2d(cx - halfW, cy - halfH);
     imgEntity->bottomRight = Ut::Vec2d(cx + halfW, cy - halfH);
 
-    // 显式获取持久 ID，避免 insertEntityPreserveId 替换临时 ID 导致查找失败
-    const Eg::EntityId persistentId = Eg::EntityIdGenerator::instance().getNextPersistentId();
+    // 取一个场景里没用过的持久 id：撞号时 insertEntityPreserveId 会静默拒绝，
+    // 表现是「拖放成功但图上什么也没有」，且下方图层分配会查到同 id 的旧图元。
+    Eg::EntityId persistentId = 0;
+    for (size_t attempt = 0; attempt < 1000000 && persistentId == 0 && m_sceneManager; ++attempt)
+    {
+        const Eg::EntityId candidate = Eg::EntityIdGenerator::instance().getNextPersistentId();
+        if (!m_sceneManager->findSyEntityById(candidate))
+        {
+            persistentId = candidate;
+        }
+    }
     imgEntity->id = persistentId;
+
     auto snap = std::unique_ptr<Eg::SyEntity>(imgEntity);
-    m_sceneManager->insertEntityPreserveId(std::move(snap));
+    if (persistentId == 0 || !m_sceneManager || !m_sceneManager->insertEntityPreserveId(std::move(snap)))
+    {
+        SY_ERRORF("[FileDrop] Image insert rejected (id=%lld)", static_cast<long long>(persistentId));
+        return false;
+    }
 
     // 分配到位图图层
     if (m_layerManager && m_sceneManager)

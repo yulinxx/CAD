@@ -767,10 +767,50 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     SY_DEBUGF("[ImportService] Document built: %d entities (%d mesh + %d flat)", entityCount, meshAdded, flatAdded);
     updateProgress(context, ImportPhase::BuildDocument, 1.0f);
 
+    // 载入的图元**保留文件里的 id**，而 EntityIdGenerator 是进程级计数器且重启后从 1 开始。
+    // 不同步的话，打开文档后新画的图元会拿到文件里已被占用的 id，被 insertEntityPreserveId
+    // 静默拒绝（症状：打开文件后画的东西不出现）。这里把生成器推到两侧场景的最大 id 之后。
+    syncIdGeneratorWithScenes();
+
     // 根据图元类型设置目标工作台 ID
     auto result = ImportResult::ok(tr("Imported %1 entities successfully").arg(entityCount), entityCount);
     result.usedWorkbenchId = hasMeshEntities ? QStringLiteral("3D") : QStringLiteral("2D");
     return result;
+}
+
+// ===== 载入后同步 id 生成器 =====
+void ImportService::syncIdGeneratorWithScenes()
+{
+    Eg::EntityId maxSeen = 0;
+
+    // 无捕获 lambda 可直接转成 Eg::EntityIdVisitor（bool (*)(EntityId, void*)）
+    auto collectMax = [](Eg::EntityId id, void* ctx) -> bool {
+        auto* maxValue = static_cast<Eg::EntityId*>(ctx);
+        if (id > *maxValue)
+        {
+            *maxValue = id;
+        }
+        return true;
+    };
+
+    if (m_sceneManager)
+    {
+        m_sceneManager->forEachEntityId(collectMax, &maxSeen);
+    }
+    if (m_sceneManager3D)
+    {
+        m_sceneManager3D->forEachEntityId(collectMax, &maxSeen);
+    }
+
+    if (maxSeen <= 0)
+    {
+        return;
+    }
+
+    // setMaxId 内部是 CAS 推进：只在当前值 ≤ maxSeen 时才抬高，重复调用是幂等的
+    Eg::EntityIdGenerator::instance().setMaxId(maxSeen);
+    SY_DEBUGF("[ImportService] id generator advanced past loaded entities: maxId=%lld",
+        static_cast<long long>(maxSeen));
 }
 
 // ===== 4：刷新显示 =====
@@ -921,11 +961,22 @@ int ImportService::restoreImportedLayers(
         return 0;
     }
 
+    // 查找某源图层的加工语义（只有原生 .sy 有这个概念）
+    const auto findMachining = [&parseResult](uint32_t sourceId) -> const ImportResult::LayerMachining* {
+        for (const auto& m : parseResult.importedLayerMachining)
+        {
+            if (m.sourceId == sourceId)
+            {
+                return &m;
+            }
+        }
+        return nullptr;
+    };
+
     // 源图层 sourceId → 运行时 LayerManager 图层 ID
     std::unordered_map<uint32_t, int> sourceToLayerId;
     int createdCount = 0;
     int reusedCount = 0;
-
     // 逐个记住来源图层的落地结果，供下面按层输出日志（每层只输出一次）
     struct ResolvedSourceLayer
     {
@@ -970,6 +1021,19 @@ int ImportService::restoreImportedLayers(
                 m_layerManager->setLayerColor(layerId, Ut::Color::fromRGB255(r, g, b));
                 m_layerManager->setLayerVisible(layerId, src.visible);
                 m_layerManager->setLayerLocked(layerId, src.locked);
+                // 加工语义：输出开关与默认工艺 ID 跟着图层一起还原。
+                // 少了这一步，打开 .sy 后「这一层要加工」的信息就丢了 ——
+                // 表现是图纸明明设了输出，机器却不烧这一层。
+                // 数据来自独立的 machining 通道（IrLayerInfo 是冻结的跨 DLL POD）。
+                const auto machining = findMachining(src.sourceId);
+                if (machining)
+                {
+                    m_layerManager->setLayerOutput(layerId, machining->output);
+                    if (machining->defaultProcessId != 0)
+                    {
+                        m_layerManager->setLayerDefaultProcessId(layerId, machining->defaultProcessId);
+                    }
+                }
             }
             else
             {

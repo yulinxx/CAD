@@ -55,11 +55,10 @@ ExportResult NativeExportWriter::write(const ExportContext& context, const Fio::
 
         // 直接使用 NativeWriter 写入（NativeWriter 内部通过 MetadataFiller 填充元数据）
         Fio::NativeWriter writer(fmt);
-        char pathBuf[1024] = { 0 };
-        auto pathStr = context.targetPath.toUtf8();
-        std::memcpy(pathBuf, pathStr.constData(), std::min(static_cast<size_t>(pathStr.size()), sizeof(pathBuf) - 1));
-
-        auto result = writer.writeDocument(pathBuf, doc);
+        // 路径按 UTF-8 全量传递：旧实现先 memcpy 进 char[1024]，中文长路径会被静默
+        // 截断到 1023 字节，结果是写到一个错路径或者直接失败，且没有任何提示。
+        const QByteArray targetPathUtf8 = context.targetPath.toUtf8();
+        auto result = writer.writeDocument(targetPathUtf8.constData(), doc);
         if (!result.success)
         {
             QString msg = QString::fromUtf8(result.errorMessage);

@@ -560,8 +560,8 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
     list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*ViewportRefreshTestsMain\\.cpp$")
 
     # 排除使用过时 API 的测试文件
-    list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*QtLayerManagerBridgeTests\\.cpp$")
-    list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*UndoRedoExtendedRegressionTests\\.cpp$")
+    # （历史遗留：这两个文件曾因 API 变更不再编译而被排除，实际等于测试被悄悄关掉。
+    #   已改为适配当前 API 并重新纳入构建。）
 
     if(NOT BUILD_UI3D)
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*RenderWidget3DAdapterTests\\.cpp$")

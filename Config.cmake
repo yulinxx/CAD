@@ -52,20 +52,13 @@ endif()
 
 # ============================================================================
 #                         📌 模块开关（按需启用）
+#
+# 模块开关的唯一声明处在下方「核心功能模块」一节（约 200 行处）。
+# 之前这里还有一份重复的 option() 列表，且 BUILD_GEOMODELCORE 两处默认值相反
+# （此处 ON、下方 OFF）—— option() 对已存在的缓存项是空操作，于是「默认开还是关」
+# 取决于构建目录的历史，干净机器上会默认开启 GeoModelCore 并要求 OpenCASCADE。
+# 重复声明已删除，模块开关只保留一份。
 # ============================================================================
-# 核心模块（默认开启）
-option(BUILD_RENDERX "渲染引擎" ON)
-option(BUILD_UI2D "2D 用户界面" ON)
-option(BUILD_NESTING "排样模块" ON)
-option(BUILD_CRASHHANDLER "崩溃捕获" ON)
-
-# 可选模块（默认关闭）
-option(BUILD_VISION "视觉模块" OFF)
-option(BUILD_NETWORK "网络模块" OFF)
-option(BUILD_HARDWARE "硬件模块" OFF)
-option(BUILD_ENGRAVING "雕刻模块" ON)
-option(BUILD_GEOMODELCORE "几何建模" ON)
-option(BUILD_PYTHON "Python 集成" OFF)
 
 # 测试开关
 option(BUILD_ALL_TESTS "开启全部测试" OFF)
@@ -89,9 +82,14 @@ if(VCPKG_DIR STREQUAL "" OR NOT EXISTS "${VCPKG_DIR}/scripts/buildsystems/vcpkg.
         "  Set environment variable VCPKG_DIR, or pass -DVCPKG_DIR=<path> to cmake.")
 endif()
 if(Qt_INSTALL_DIR STREQUAL "" OR NOT EXISTS "${Qt_INSTALL_DIR}/lib/cmake/Qt6/Qt6Config.cmake")
-    message(FATAL_ERROR
-        "[Config] Qt_INSTALL_DIR not found or invalid: '${Qt_INSTALL_DIR}'\n"
-        "  Set environment variable Qt_INSTALL_DIR, or pass -DQt_INSTALL_DIR=<path> to cmake.")
+    # 纯算法模块（如 Nesting）不链接 Qt：它的独立入口会在 include 本文件之前设
+    # SANYI_ALLOW_MISSING_QT=ON，从而在没有 Qt 的机器/CI 上也能配置。
+    # 默认关闭该旁路，其他模块的报错与行为保持原样。
+    if(NOT SANYI_ALLOW_MISSING_QT)
+        message(FATAL_ERROR
+            "[Config] Qt_INSTALL_DIR not found or invalid: '${Qt_INSTALL_DIR}'\n"
+            "  Set environment variable Qt_INSTALL_DIR, or pass -DQt_INSTALL_DIR=<path> to cmake.")
+    endif()
 endif()
 
 # --------------------------------------------------------------------
@@ -224,11 +222,14 @@ else()
 endif()
 
 option(BUILD_NESTING "Build Nesting module (2D/3D nesting/arrangement algorithm)" ON)
-option(BUILD_CAM "Build CAM module (laser cutting toolpath generation)" OFF)
+# BUILD_CAM 已移除：仓库里没有 CAM 模块（根 CMakeLists 的 add_subdirectory(CAM/CAM)
+# 指向一个不存在的目录，开关一旦打开就是 configure 直接失败）。
+# 需要 CAM 时，先把 CAM/CAM 模块落地，再把开关加回这里。
 
 # ===== 可选功能模块 =====
 # 按需启用
 option(BUILD_VISION "Build Vision module (image processing, computer vision)" OFF)
+option(BUILD_RASTER "Build Raster module (OpenCV bitmap processing for laser engraving/cutting)" OFF)
 option(BUILD_NETWORK "Build Network module (HTTP, WebSocket, cloud sync)" OFF)
 option(BUILD_HARDWARE "Build Hardware module (laser control, material database)" OFF)
 option(BUILD_ENGRAVING "Build Engraving module (3D laser engraving)" ON)
@@ -262,16 +263,17 @@ set(BUILD_ALL_TESTS OFF CACHE BOOL "打开全部模块测试（便捷总开关�
 # ---- 逐模块测试开关（核心模块默认启用，建立测试保护网）----
 set(BUILD_UTILITY_TESTS          ON  CACHE BOOL "Utility 单元测试" FORCE)
 set(BUILD_LOG_TESTS              ON  CACHE BOOL "Log 单元测试" FORCE)
+set(BUILD_ENGINECOMMON_TESTS     ON  CACHE BOOL "EngineCommon 单元测试" FORCE)
 set(BUILD_ENGINE2D_TESTS         ON  CACHE BOOL "Engine2D 单元测试" FORCE)
 set(BUILD_ENGINE3D_TESTS         ON  CACHE BOOL "Engine3D 单元测试" FORCE)
 set(BUILD_GEOMODELCORE_TESTS     ON  CACHE BOOL "GeoModelCore 单元测试" FORCE)
 set(BUILD_FILEIO_TESTS           ON  CACHE BOOL "FileIO 单元测试" FORCE)
 set(BUILD_LICENSE_TESTS          ON  CACHE BOOL "License 单元测试" FORCE)
 set(BUILD_NESTING_TESTS          ON  CACHE BOOL "Nesting 单元测试" FORCE)
-set(BUILD_CAM_TESTS              ON  CACHE BOOL "CAM 单元测试" FORCE)
 set(BUILD_ENGRAVING_TESTS        ON  CACHE BOOL "Engraving 单元测试" FORCE)
 set(BUILD_HARDWARE_TESTS         ON  CACHE BOOL "Hardware 单元测试" FORCE)
 set(BUILD_VISION_TESTS           ON  CACHE BOOL "Vision 单元测试" FORCE)
+set(BUILD_RASTER_TESTS           ON  CACHE BOOL "Raster 单元测试" FORCE)
 set(BUILD_PYTHONHOST_TESTS       ON  CACHE BOOL "PythonHost 单元测试" FORCE)
 set(BUILD_CRASHHANDLER_TESTS     ON  CACHE BOOL "CrashHandler 单元测试" FORCE)
 set(BUILD_RENDERX_TESTS          ON  CACHE BOOL "Renderx 单元测试" FORCE)
@@ -287,16 +289,17 @@ set(BUILD_SCENE_EDIT_TESTS       ON  CACHE BOOL "场景编辑集成回归测试�
 set(SANYI_TEST_SWITCHES
     BUILD_UTILITY_TESTS
     BUILD_LOG_TESTS
+    BUILD_ENGINECOMMON_TESTS
     BUILD_ENGINE2D_TESTS
     BUILD_ENGINE3D_TESTS
     BUILD_GEOMODELCORE_TESTS
     BUILD_FILEIO_TESTS
     BUILD_LICENSE_TESTS
     BUILD_NESTING_TESTS
-    BUILD_CAM_TESTS
     BUILD_ENGRAVING_TESTS
     BUILD_HARDWARE_TESTS
     BUILD_VISION_TESTS
+    BUILD_RASTER_TESTS
     BUILD_PYTHONHOST_TESTS
     BUILD_CRASHHANDLER_TESTS
     BUILD_RENDERX_TESTS
@@ -320,6 +323,12 @@ endif()
 # 依赖库查找配置
 # --------------------------------------------------------------------
 
+# Vulkan 支持开关。
+# 必须在这里（读取它的分支之前）声明：option() 只在首次读取时生效，
+# 声明在使用之后会让「首次 configure」与「二次 configure」行为不同 ——
+# 干净构建目录里变量未定义，VULKAN 分支会误报「已禁用」。
+option(SANYI_ENABLE_VULKAN "Enable Vulkan rendering support (not implemented yet)" ON)
+
 # 渲染后端选择逻辑（OpenGL 查找已延迟至 CMakeLists.txt project() 之后）
 if(SANYI_DEFAULT_RENDER_BACKEND STREQUAL "METAL")
     if(APPLE)
@@ -329,12 +338,12 @@ if(SANYI_DEFAULT_RENDER_BACKEND STREQUAL "METAL")
         message(FATAL_ERROR "[Render] Metal backend only supported on macOS")
     endif()
 elseif(SANYI_DEFAULT_RENDER_BACKEND STREQUAL "VULKAN")
-    if(SANYI_ENABLE_VULKAN)
-        find_package(Vulkan REQUIRED)
-        message(STATUS "[Render] Backend: Vulkan")
-    else()
-        message(FATAL_ERROR "[Render] Vulkan support disabled (SANYI_ENABLE_VULKAN=OFF)")
-    endif()
+    # 渲染层当前只有 GL / Metal / Null 三套 RHI 实现（Renderx/src/rhi），
+    # 没有 Vulkan 后端。开关保留是为了让「选 Vulkan」得到一个明确的失败，
+    # 而不是配到一半才在运行时找不到后端。
+    message(FATAL_ERROR
+        "[Render] Vulkan backend is not implemented yet (available: OPENGL, METAL). "
+        "Renderx/src/rhi has gl/ metal/ null only.")
 else()
     # OpenGL：不在此处 find_package，改而在 CMakeLists.txt project() 之后调用
     # 参见 CMakeLists.txt 中在 project() 后的 openGL 初始化
@@ -344,9 +353,6 @@ else()
         message(STATUS "[Render] Backend: OpenGL (will be found after project())")
     endif()
 endif()
-
-# Vulkan 支持 (可选)
-option(SANYI_ENABLE_VULKAN "Enable Vulkan rendering support (optional)" ON)
 
 # OpenCASCADE 配置 (GeoModelCore 需要)
 if(BUILD_GEOMODELCORE)
@@ -373,11 +379,11 @@ message(STATUS "  RenderX:        ${BUILD_RENDERX}")
 message(STATUS "  UI2D:           ${BUILD_UI2D}")
 message(STATUS "  UI3D:           ${BUILD_UI3D}")
 message(STATUS "  Vision:         ${BUILD_VISION}")
+message(STATUS "  Raster:         ${BUILD_RASTER}")
 message(STATUS "  Network:        ${BUILD_NETWORK}")
 message(STATUS "  Hardware:       ${BUILD_HARDWARE}")
 message(STATUS "  Engraving:      ${BUILD_ENGRAVING}")
 message(STATUS "  Nesting:        ${BUILD_NESTING}")
-message(STATUS "  CAM:            ${BUILD_CAM}")
 message(STATUS "  GeoModelCore:   ${BUILD_GEOMODELCORE}")
 message(STATUS "  CrashHandler:   ${BUILD_CRASHHANDLER}")
 message(STATUS "  Python:         ${BUILD_PYTHON}")

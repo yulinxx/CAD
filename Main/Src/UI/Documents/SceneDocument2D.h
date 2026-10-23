@@ -108,5 +108,4 @@ private:
 
     std::string m_documentName;
     std::string m_filePath;
-    bool m_isModified{ false };
 };

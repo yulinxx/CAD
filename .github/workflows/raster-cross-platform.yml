@@ -1,0 +1,114 @@
+﻿name: Raster cross-platform
+
+# 跨平台可移植性门禁。
+#
+# 单元测试只能证明"在 Windows 上算得对"，证明不了"在 Linux / macOS 上能编过、
+# 能装成 SDK、能被外部工程消费"。这一条专门补上后面这三件事：
+#
+#   1. 独立构建 + 单元测试在 Linux / macOS 上通过；
+#   2. 能装出 SDK（include/ + lib/ + cmake config）；
+#   3. **仓库外**的 C++ 消费方能只靠装好的 SDK 编译并运行 ——
+#      这一条最有价值：它验证了公开头在非 Windows 编译器下也是干净的，
+#      并且 CMake 包配置里的 include 目录、RPATH、库名后缀都正确。
+#
+# 触发范围收窄到 Raster 目录与本文件。
+on:
+  push:
+    branches: [main, master, develop]
+    paths:
+      - Raster
+      - .github/workflows/raster-cross-platform.yml
+  pull_request:
+    paths:
+      - Raster
+      - .github/workflows/raster-cross-platform.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  raster-portability:
+    name: portability (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    # OpenCV 从源码构建很慢（macOS arm64 尤其），给足超时。
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            triplet: x64-linux
+          - os: macos-14
+            triplet: arm64-osx
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Cache vcpkg
+        id: cache-vcpkg
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.workspace }}/vcpkg
+          key: vcpkg-${{ matrix.triplet }}-${{ runner.os }}-${{ runner.arch }}-raster-v1
+
+      - name: Set up vcpkg
+        run: |
+          if [ ! -x "$GITHUB_WORKSPACE/vcpkg/vcpkg" ]; then
+            rm -rf "$GITHUB_WORKSPACE/vcpkg"
+            git clone --depth 1 https://github.com/microsoft/vcpkg.git "$GITHUB_WORKSPACE/vcpkg"
+            "$GITHUB_WORKSPACE/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+          echo "VCPKG_ROOT=$GITHUB_WORKSPACE/vcpkg" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: |
+          "$VCPKG_ROOT/vcpkg" install opencv4 gtest --triplet "${{ matrix.triplet }}"
+
+      - name: Configure & test
+        run: |
+          cmake -S Raster/ci -B build-raster \
+            -DVCPKG_DIR="$VCPKG_ROOT" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_RASTER_TESTS=ON \
+            -DBUILD_RASTER_EXAMPLES=OFF \
+            -DBUILD_RASTER_BENCHMARK=OFF
+          cmake --build build-raster --parallel
+          ctest --test-dir build-raster -C Release --output-on-failure --parallel
+
+      - name: Install the SDK
+        run: |
+          cmake -S Raster/ci -B build-raster-install \
+            -DVCPKG_DIR="$VCPKG_ROOT" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_RASTER_TESTS=OFF \
+            -DBUILD_RASTER_EXAMPLES=OFF \
+            -DBUILD_RASTER_BENCHMARK=OFF \
+            -DRASTER_SDK_INSTALL=ON
+          cmake --build build-raster-install --parallel
+          cmake --install build-raster-install --prefix "$PWD/sdk"
+
+      - name: Consume the installed SDK (out of tree)
+        run: |
+          cmake -S Raster/Tools/sdk-consumer-cpp -B build-consumer \
+            -DCMAKE_PREFIX_PATH="$PWD/sdk" \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-consumer --parallel
+          # Linux 下 .so 需要能找到同目录的依赖；消费方已把它们拷到 exe 旁边。
+          LD_LIBRARY_PATH="$PWD/build-consumer:$LD_LIBRARY_PATH" \
+            DYLD_LIBRARY_PATH="$PWD/build-consumer:$DYLD_LIBRARY_PATH" \
+            ./build-consumer/consumer_cpp
+
+      - name: Upload the SDK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raster-sdk-${{ matrix.triplet }}
+          path: sdk
+          if-no-files-found: warn
+          retention-days: 7

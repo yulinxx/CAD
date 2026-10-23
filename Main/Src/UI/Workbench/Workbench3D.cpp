@@ -71,8 +71,9 @@
 struct Workbench3D::ServiceOwner
 {
     std::unique_ptr<OperationBus3D> operationBus;
-    std::unique_ptr<DocumentManager3D> documentManager;
-    std::unique_ptr<UndoRedoManager3D> undoRedoManager;
+    // 注意：DocumentManager3D / UndoRedoManager3D **不在**这里 ——
+    // 它们是 Workbench3D 的直接成员，跨 deactivate() 存活（见头文件注释）：
+    // 放进 ServiceOwner 会让 3D 的撤销历史在每次切台后清空。
     std::unique_ptr<SceneEditService3D> sceneEditService;
     std::unique_ptr<SceneMonitor3D> sceneMonitor;
     std::unique_ptr<SceneDocument3D> sceneDocument;
@@ -93,6 +94,20 @@ struct Workbench3D::ServiceOwner
 
 // 自定义删除器定义（ServiceOwner 在此处已完整定义）
 void Workbench3D::ServiceOwnerDeleter::operator()(ServiceOwner* p) const
+{
+    delete p;
+}
+
+// Workbench3D::SessionState 定义（PIMPL）
+// 撤销栈与文档管理器放这里，而不是 ServiceOwner：ServiceOwner 每次 deactivate
+// 都会被销毁，那样 3D 的撤销历史在每次工作台切换后就没了。
+struct Workbench3D::SessionState
+{
+    std::unique_ptr<UndoRedoManager3D> undoRedoManager;
+    std::unique_ptr<DocumentManager3D> documentManager;
+};
+
+void Workbench3D::SessionStateDeleter::operator()(SessionState* p) const
 {
     delete p;
 }
@@ -198,6 +213,22 @@ bool Workbench3D::initialize(const WorkbenchServices& services)
         return false;
     }
 
+    // 3D 撤销栈与文档管理器：生命周期与工作台实例一致（跨工作台切换存活）。
+    // 放在 SessionState 而不是 ServiceOwner，是因为 ServiceOwner 每次 deactivate 都会
+    // 被销毁 —— 那样 3D 的撤销栈会在每次切台后清空。
+    if (!m_sessionState)
+    {
+        m_sessionState.reset(new SessionState());
+    }
+    if (!m_sessionState->undoRedoManager)
+    {
+        m_sessionState->undoRedoManager = std::make_unique<UndoRedoManager3D>();
+    }
+    if (!m_sessionState->documentManager)
+    {
+        m_sessionState->documentManager = std::make_unique<DocumentManager3D>();
+    }
+
     m_savedState = UiStateSnapshot{};
     m_initialState = UiStateSnapshot{};
     SY_DEBUG("[Workbench3D] initialize: 3D workbench initialized successfully");
@@ -241,10 +272,22 @@ void Workbench3D::create3DServices()
     auto& own = *m_serviceOwner;
 
     own.operationBus = std::make_unique<OperationBus3D>(nullptr);
-    own.documentManager = std::make_unique<DocumentManager3D>(nullptr);
-    own.undoRedoManager = std::make_unique<UndoRedoManager3D>(nullptr);
-    own.sceneEditService =
-        std::make_unique<SceneEditService3D>(m_sceneManager3D, own.undoRedoManager.get(), own.documentManager.get());
+    // 撤销栈/文档管理器是工作台级长寿命对象（initialize() 里建、shutdown() 里释放），
+    // 不随本次 attach 的 ServiceOwner 一起销毁 —— 3D 的撤销历史要跨工作台切换保留。
+    if (!m_sessionState)
+    {
+        m_sessionState.reset(new SessionState());
+    }
+    if (!m_sessionState->undoRedoManager)
+    {
+        m_sessionState->undoRedoManager = std::make_unique<UndoRedoManager3D>();
+    }
+    if (!m_sessionState->documentManager)
+    {
+        m_sessionState->documentManager = std::make_unique<DocumentManager3D>();
+    }
+    own.sceneEditService = std::make_unique<SceneEditService3D>(
+        m_sceneManager3D, m_sessionState->undoRedoManager.get(), m_sessionState->documentManager.get());
     own.sceneMonitor = std::make_unique<SceneMonitor3D>(nullptr);
     // 3D 唯一文档入口：SceneDocument3D 自持引擎场景、UI 树与选择集
     own.sceneDocument = std::make_unique<SceneDocument3D>(m_sceneManager3D);
@@ -268,8 +311,8 @@ void Workbench3D::create3DServices()
 
     m_services3D.sceneManager = m_sceneManager3D;
     m_services3D.operationBus = own.operationBus.get();
-    m_services3D.documentManager = own.documentManager.get();
-    m_services3D.undoRedoManager = own.undoRedoManager.get();
+    m_services3D.documentManager = m_sessionState->documentManager.get();
+    m_services3D.undoRedoManager = m_sessionState->undoRedoManager.get();
     m_services3D.sceneEditService = own.sceneEditService.get();
     m_services3D.sceneMonitor = own.sceneMonitor.get();
     m_services3D.sceneDocument = own.sceneDocument.get();
@@ -690,6 +733,14 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
         SY_DEBUG("[Workbench3D] StatusBar3D created for WorkbenchWindow");
     }
     window.mountStatusBar(m_statusBar3D);
+
+    // 把状态栏交给 MainWindow3D：切回 3D 时由它重推一次选择/图元数。
+    // unmountStatusBar 的 clearAll() 会清空选择/信息区，而新建的 RenderWidget3D
+    // 不会补发 sigSelectionChanged —— 不重推的话，3D 状态栏会一直空白到用户重新点选。
+    if (m_mainWindow3D)
+    {
+        m_mainWindow3D->bindStatusBar(m_statusBar3D);
+    }
 
     // 光标世界坐标：只把原始浮点数交给状态栏，坐标文案由 PositionIndicator
     // 自行用 tr() 拼并缓存原始值（语言切换时它自己重拼，这里不用管）
@@ -1372,6 +1423,9 @@ void Workbench3D::activate()
             {
                 m_mainWindow3D->refreshCommandUiState();
                 m_mainWindow3D->syncViewDisplayUi();
+                // 切回 3D 时重推一次选择/图元数：新 RenderWidget3D 不会补发
+                // sigSelectionChanged，而卸载时的 clearAll() 已清空状态栏。
+                refreshStatusBarSelection3D();
             }
         });
     }
@@ -1380,6 +1434,50 @@ void Workbench3D::activate()
     if (m_services3D.commandActionHub && m_services3D.undoRedoManager)
     {
         // 3D 命令中枢在 attachToWindow 中已创建，此处刷新其 UI 状态
+    }
+}
+
+UndoRedoManager3D* Workbench3D::undoRedoManager3D() const
+{
+    return m_sessionState ? m_sessionState->undoRedoManager.get() : nullptr;
+}
+
+/// 把当前选择集重新推给 3D 状态栏。
+/// 切回 3D 时必须主动推一次：新 RenderWidget3D 不会补发 sigSelectionChanged，
+/// 而 unmountStatusBar() 的 clearAll() 已经把选择/信息区清空 —— 不推就是空白。
+void Workbench3D::refreshStatusBarSelection3D()
+{
+    if (!m_statusBar3D || !m_renderWidget3D)
+    {
+        return;
+    }
+
+    const auto& selected = m_renderWidget3D->selectionManager().getSelectedEntities();
+    const int count = static_cast<int>(selected.size());
+
+    QString modelName;
+    int triangles = 0;
+    if (count == 1 && selected.front())
+    {
+        modelName = QString::fromUtf8(selected.front()->name());
+        triangles = static_cast<int>(selected.front()->triangleCount());
+    }
+    else if (count > 1)
+    {
+        modelName = tr("%1 entities").arg(count);  // %1 个图元
+        for (const Eg::SyMeshEntity* entity : selected)
+        {
+            if (entity)
+            {
+                triangles += static_cast<int>(entity->triangleCount());
+            }
+        }
+    }
+
+    m_statusBar3D->setSelectionInfo(count, modelName, triangles);
+    if (m_sceneManager3D)
+    {
+        m_statusBar3D->setEntityCount(m_sceneManager3D->getEntityCount());
     }
 }
 
@@ -1466,6 +1564,10 @@ void Workbench3D::shutdown()
     m_scene = {};
     m_persistence = {};
     m_view = {};
+
+    // 撤销栈与文档管理器随工作台实例一起结束（这里才释放）。
+    // 注意：不能放在 deactivate() 里 —— 那会让 3D 的撤销历史在每次切台时清空。
+    m_sessionState.reset();
 }
 
 void Workbench3D::releaseCentralWidgetGLResources(QWidget* centralWidget) const

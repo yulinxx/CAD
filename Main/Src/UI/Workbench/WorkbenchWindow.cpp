@@ -515,6 +515,17 @@ void WorkbenchWindow::unmountStatusBar()
     // 卸载时清空旧状态栏内容，避免切换 2D/3D 后残留上一次的显示
     m_activeStatusBar->clearAll();
 
+    // 显式隐藏：removeWidget 只是取消 QStatusBar 的托管，控件仍存活。
+    // 是否隐藏曾完全依赖 QStatusBar::removeWidget 的隐式行为 —— 那是 Qt 版本的
+    // 内部细节，一旦它不隐藏，卸载掉的 2D 状态栏就会留在 3D 状态栏旁边显示
+    // （正是「切到 3D 后状态栏还残留 2D」这类现象）。这里显式收口。
+    m_activeStatusBar->hide();
+
+    // 鼠标位置是窗口级状态，跨工作台共享：2D 的最后一次坐标留在窗口里，
+    // 切到 3D 后再触发一次单位切换就会把这组 2D 坐标推给 3D 状态栏。
+    // 卸载即清零，坐标只在新工作台重新收到鼠标移动后才有值。
+    m_hasMousePosition = false;
+
     // 不在这里 delete：状态栏 widget 的所有权在 Qt 父子关系里。
     // QStatusBar::addWidget 已把它 reparent 到 QStatusBar，而 QStatusBar 跨工作台
     // 切换一直存在，所以卸载后对象仍然活着，下次 attach 由工作台复用同一个实例。
@@ -1204,6 +1215,16 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     // 9: 激活新工作台（应用初始状态）
     SY_DEBUG("[WorkbenchWindow] triggerWorkbench: activating new workbench");
     m_workbench->activate();
+
+    // 9.5: 清掉切换期的临时提示文案。
+    // setWorkbenchSwitchContext 把 statusPrompt 写成了「Switching to 3D」，
+    // 而状态栏消息区显示的就是它。3D 侧没有任何后续推送（3D 视口不回调
+    // setStatusCallback），于是切到 3D 后状态栏中间那栏会一直停在切换提示上。
+    // 置空 → 第 10 步 refreshFromState 回落到 tr("Ready")。
+    if (m_stateCenter)
+    {
+        m_stateCenter->setStatusPrompt(QString());
+    }
     recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.activate"),
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 

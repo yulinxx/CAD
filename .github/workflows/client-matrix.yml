@@ -1,0 +1,189 @@
+name: Client Matrix Build & Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      clients:
+        description: 'Comma-separated client IDs (empty = all Clients/*)'
+        required: false
+        type: string
+      build_type:
+        description: 'CMake build type'
+        required: true
+        default: 'Release'
+        type: choice
+        options: [Release, RelWithDebInfo, Debug]
+      skip_package:
+        description: 'Skip packaging step'
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches: [main, develop]
+    paths:
+      - 'Clients/**'
+      - 'Main/Src/UI/ClientConfig/**'
+      - 'CMake/Utils.cmake'
+      - 'Tools/package-client.ps1'
+      - 'Tools/package-client.sh'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'Clients/**'
+      - 'Main/Src/UI/ClientConfig/**'
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  QT_VERSION: 6.11.2
+  CMAKE_PRESET: default
+  BUILD_TYPE: ${{ github.event.inputs.build_type || 'Release' }}
+
+jobs:
+  discover-clients:
+    name: Discover Clients
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: List client directories
+        id: list-clients
+        run: |
+          shopt -s nullglob
+          clients=()
+          for d in Clients/*/; do
+            name=$(basename "$d")
+            [[ "$name" == "_template" ]] && continue
+            [[ -f "$d/configs/$name.json" ]] || continue
+            [[ -f "$d/branding/$name/brand.json" ]] || continue
+            clients+=("$name")
+          done
+          if [[ -n "${{ github.event.inputs.clients }}" ]]; then
+            IFS=',' read -ra input_clients <<< "${{ github.event.inputs.clients }}"
+            filtered=()
+            for c in "${input_clients[@]}"; do
+              c=$(echo "$c" | xargs)
+              for existing in "${clients[@]}"; do
+                [[ "$existing" == "$c" ]] && filtered+=("$c")
+              done
+            done
+            clients=("${filtered[@]}")
+          fi
+          echo "clients=${clients[*]}" >> "$GITHUB_OUTPUT"
+          echo "Found clients: ${clients[*]}"
+      - name: Build matrix JSON
+        id: set-matrix
+        run: |
+          clients_str="${{ steps.list-clients.outputs.clients }}"
+          IFS=' ' read -ra arr <<< "$clients_str"
+          json=$(printf '"%s",' "${arr[@]}" | sed 's/,$//')
+          echo "matrix={\"include\":[$(printf '{"client":"%s"},\n' "${arr[@]}" | sed '$s/,$//')]}" >> "$GITHUB_OUTPUT"
+
+  build-client:
+    name: Build & Test (${{ matrix.client }})
+    needs: discover-clients
+    if: needs.discover-clients.outputs.matrix != '{"include":[]}'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.discover-clients.outputs.matrix) }}
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    timeout-minutes: 60
+    steps:
+      - name: Checkout with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Qt (Linux/macOS)
+        if: runner.os != 'Windows'
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: ${{ env.QT_VERSION }}
+          target: desktop
+          cache: true
+
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          architecture: x64
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq patchelf desktop-file-utils
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install jq
+
+      - name: Configure CMake
+        run: |
+          cmake --preset=${{ env.CMAKE_PRESET }} \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DSANYI_BUILD_CLIENT_PLUGINS=ON
+
+      - name: Build all (includes client plugins)
+        run: cmake --build build --config ${{ env.BUILD_TYPE }} --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+
+      - name: Run ClientConfig tests
+        run: |
+          cd build
+          ctest --output-on-failure -R "ClientConfig|BrandConfig" -C ${{ env.BUILD_TYPE }}
+
+      - name: Package client
+        if: github.event.inputs.skip_package != 'true'
+        env:
+          CLIENT_ID: ${{ matrix.client }}
+        run: |
+          case "${{ runner.os }}" in
+            Windows)
+              ./Tools/PackageClient.ps1 -ClientId "$env:CLIENT_ID" -BuildDir "build/bin_Qt6/${{ env.BUILD_TYPE }}" -NoZip
+              ;;
+            *)
+              chmod +x Tools/package-client.sh
+              ./Tools/package-client.sh -c "$CLIENT_ID" -b "build/bin_Qt6/${{ env.BUILD_TYPE }}" --no-zip
+              ;;
+          esac
+
+      - name: Verify package
+        env:
+          CLIENT_ID: ${{ matrix.client }}
+        run: |
+          DIST_DIR="${{ github.workspace }}/dist/$CLIENT_ID"
+          [[ -f "$DIST_DIR/client.id" ]] || { echo "Missing client.id"; exit 1; }
+          [[ -f "$DIST_DIR/configs/$CLIENT_ID.json" ]] || { echo "Missing config"; exit 1; }
+          [[ -f "$DIST_DIR/branding/$CLIENT_ID/brand.json" ]] || { echo "Missing brand"; exit 1; }
+          echo "Package verification passed"
+
+      - name: Upload package artifact
+        if: github.event.inputs.skip_package != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.client }}-${{ runner.os }}-${{ env.BUILD_TYPE }}
+          path: dist/${{ matrix.client }}/
+          retention-days: 7
+
+  summary:
+    name: Matrix Summary
+    needs: [discover-clients, build-client]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summarize results
+        run: |
+          echo "## Client Matrix Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Client | OS | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|----|--------|" >> $GITHUB_STEP_SUMMARY
+          # GitHub automatically populates job status; we just note completion
+          echo "All matrix jobs completed (see job details)." >> $GITHUB_STEP_SUMMARY

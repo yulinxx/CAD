@@ -169,6 +169,11 @@ bool ApplicationCompositionRoot::startHardware(const QString& configDir, QString
     return true;
 }
 
+Eg::MachineFrameConfig ApplicationCompositionRoot::machineFrameConfig() const
+{
+    return m_deviceHost ? m_deviceHost->machineFrameConfig() : Eg::MachineFrameConfig{};
+}
+
 ISelectionService* ApplicationCompositionRoot::selectionService()
 {
     return m_selectionService.get();
@@ -205,6 +210,14 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
 {
     // 设置静态实例指针
     s_instance = this;
+
+    // 设置服务由组合根持有：它有自己的数据库连接与生命周期，跟组合根一起析构。
+    // 以前是 getSettingsService() 里的函数内 static，既不随组合根销毁，
+    // 也让 6 处 UI 通过「组合根的静态方法」反向依赖组合根 —— 组合根是装配入口，
+    // 不该同时充当全局注册表。
+    m_settingsService = std::make_unique<SettingsService>(nullptr);
+    m_settingsService->init();
+
     // 装配顺序：UI 服务 → 导入导出 → 对话框 → 脏状态 → 操作注册
     UiServices uiServices = assembleUiServices();
     setupImportExportServices(uiServices);
@@ -431,6 +444,8 @@ void ApplicationCompositionRoot::registerAllOperations()
     fileConfig.layerPersistence = m_layerPersistenceBridge.get();
     fileConfig.persistence = persistenceService();
     fileConfig.parentWidget = m_shellHost ? m_shellHost->mainWindow() : nullptr;
+    // 新建/打开时清空撤销栈：跨文档撤销会把上一份文档的图元插回新文档
+    fileConfig.undoRedoManager = undoRedoManager();
 
     m_fileOperationRegistry = std::make_unique<FileOperationRegistry>(fileConfig);
     m_fileOperationRegistry->registerAll();
@@ -446,6 +461,16 @@ void ApplicationCompositionRoot::registerAllOperations()
         // 加工失败必须让操作员看见：只写日志的话，
         // 现场表现是「按了开始加工什么都没发生」
         QMessageBox::warning(m_shellHost ? m_shellHost->mainWindow() : nullptr, QObject::tr("Processing"), message);
+    };
+    // 作业规格：把**机器坐标系**从设备档案注入。
+    //
+    // 换算只在编译器的最后一步发生（MotionPlanCompiler），配置必须从这里一路传下去。
+    // 之前这条链路是断的：UI2D 旧链路在服务层换算，新 HAL 链路完全不换算 ——
+    // 同一份文档走不同路径会烧到不同位置。
+    laserConfig.specProvider = [this] {
+        ToolpathJobSpec spec;
+        spec.machineFrame = m_deviceHost ? m_deviceHost->machineFrameConfig() : Eg::MachineFrameConfig{};
+        return spec;
     };
 
     m_laserOperationRegistry = std::make_unique<LaserOperationRegistry>(laserConfig);
@@ -529,13 +554,20 @@ PersistenceService* ApplicationCompositionRoot::persistenceService()
 
 SettingsService* ApplicationCompositionRoot::getSettingsService()
 {
-    static std::unique_ptr<SettingsService> s;
-    if (!s)
+    // 组合根已存在：返回它持有的实例（生命周期跟组合根走）
+    if (s_instance && s_instance->m_settingsService)
     {
-        s = std::make_unique<SettingsService>(nullptr);
-        s->init();
+        return s_instance->m_settingsService.get();
     }
-    return s.get();
+
+    // 组合根还没建（极早期启动路径）：临时持有一份，进程结束时回收
+    static std::unique_ptr<SettingsService> s_fallback;
+    if (!s_fallback)
+    {
+        s_fallback = std::make_unique<SettingsService>(nullptr);
+        s_fallback->init();
+    }
+    return s_fallback.get();
 }
 
 ApplicationCompositionRoot* ApplicationCompositionRoot::instance()

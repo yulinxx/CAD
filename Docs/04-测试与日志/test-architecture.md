@@ -25,9 +25,14 @@
 
 **关键文件**：
 - `Renderx/Test/RhiCoreTests.cpp`、`SlotMapTests.cpp`、`ArenaTests.cpp`、`RxRuntimeTests.cpp`
-- `Utility/Utility/Test/VecTests.cpp`、`BBox2dTests.cpp`、`GeomMathTests.cpp`
+- `Utility/Utility/Test/VecTests.cpp`、`BBox2dTests.cpp`、`BBox3Tests.cpp`、`GeomMathTests.cpp`
 - `Engine/2D/Test/Geo2DPrimitivesTests.cpp`、`Geo2DConstructAlgorithmsTests.cpp`
+- `Engine/2D/Test/Geo2DBooleanTests.cpp`、`Geo2DOffsetTests.cpp`（布尔/偏移内核数值口径）
+- `Engine/2D/Test/FillAlgorithmNumericTests.cpp`（填充扫描线数值口径）
+- `Engine/2D/Test/EntityAlgorithmPipelineTests.cpp`（图元→轮廓→算法流水线）
 - `Engine/3D/Test/Geo3DPrimitivesExtendedTests.cpp`
+- `Engine/3D/Test/MeshAlgorithmsTests.cpp`（3D 图元语义入口全量）
+- `Engraving/Engraving/Test/HeightMapTests.cpp`、`VolumeProcessingTests.cpp`、`ToolpathExporterTests.cpp`、`LaserStrategyTests.cpp`
 - `UI/2D/Test/BaseToolTests.cpp`
 - `UI/2D/Test/TransformParametersTests.cpp`
 - `UI/Common/Test/CommandKernelTests.cpp`
@@ -233,6 +238,11 @@ Renderx/Test/
 Engine/2D/Test/
 ├── Geo2D*Tests.cpp          # 2D 几何算法
 ├── GeometryComputationTests.cpp
+├── GeometryContextTests.cpp # 容差上下文 / 查询 / 路径度量
+├── Geo2DBooleanTests.cpp    # 布尔内核（面积口径：并/交/差/XOR、孔洞、退化轮廓）
+├── Geo2DOffsetTests.cpp     # 偏移内核（外扩/内缩/孔洞符号/圆角/倒角）
+├── EntityAlgorithmPipelineTests.cpp # 图元→轮廓→偏移流水线（EntityDiscretizer / EntityOffset）
+├── FillAlgorithmNumericTests.cpp    # 填充数值口径（扫描线朝向、面积/间距、凹口与孔洞、交叉填充）
 ├── SceneManagerTests.cpp    # 场景管理测试
 ├── SceneNotifierTests.cpp   # 场景通知器测试
 ├── SelectionSemanticsTests.cpp
@@ -240,13 +250,23 @@ Engine/2D/Test/
 ├── TessellatorTests.cpp     # 细分器测试
 ├── PathOptimizerTests.cpp   # 路径优化测试
 ├── ArrayAlgorithmTests.cpp  # 阵列算法测试
-├── OffsetAlgorithmTests.cpp # 偏移算法测试
+├── OffsetAlgorithmTests.cpp # 偏移算法测试（参数层）
 └── RegressionTests.cpp      # 2D 回归
 
 Engine/3D/Test/
 ├── Geo3D*Tests.cpp          # 3D 几何算法
-├── GeometryContext3DTests.cpp
+├── MeshAlgorithmsTests.cpp  # 网格图元语义入口（度量/查询/拓扑/采样/编辑全入口）
+├── GeometryContext3DTests.cpp # 容差上下文 + Plane3f/Segment3f/Line3f/Sphere3f/Ray3f 边界
 └── TransformerTests.cpp
+
+Engraving/Engraving/Test/
+├── MeshSlicerTests.cpp              # 网格切片
+├── LayeredProcessingTests.cpp       # 分层处理
+├── EngravingCAPITests.cpp           # C API 边界
+├── HeightMapTests.cpp               # 高度场（灰度/深度加载、双线性、物理坐标、平滑、统计）
+├── VolumeProcessingTests.cpp        # 3D 体加工（分层中截面、层内轮廓闭合、空输入兜底）
+├── ToolpathExporterTests.cpp        # G-code 导出（头尾指令、功率换算、F 值单位、多路径切换）
+└── LaserStrategyTests.cpp           # 层数/线间距/材料修正系数
 
 FileIO/FileIO/Test/
 ├── FileImportTests.cpp
@@ -263,8 +283,35 @@ PythonHost/PythonHost/Test/
 Utility/Utility/Test/
 ├── VecTests.cpp
 ├── BBox2dTests.cpp
+├── BBox3Tests.cpp           # 3D 包围盒（空盒语义、贴面相交、expand、按值相等）
+├── ColorTests.cpp
 └── GeomMathTests.cpp
 ```
+
+### 3.1.1 算法层覆盖矩阵
+
+「覆盖全面」在算法层的具体含义：每个**算法入口**都有测试，且断言落在可计算的
+数值口径上（面积 / 条数 / 闭合性 / 坐标），而不是「返回非空」。下表按模块列出
+入口与断言口径；新增算法入口时必须往这张表里补一行，否则视为未覆盖。
+
+| 模块 | 算法入口 | 测试文件 | 断言口径 |
+|------|----------|----------|----------|
+| Utility | `Ut::BBox3`（3D 粗筛基础） | `BBox3Tests.cpp` | 空盒 invalid、贴面算相交、expand 对称性、按值相等 |
+| Engine2D 容差 | `GeometryContext` / `toTolerance` | `GeometryContextTests.cpp` | 字段映射、旧容差往返、默认值 |
+| Engine2D 布尔 | `Geo2DBoolean`（Clipper2） | `Geo2DBooleanTests.cpp` | 并/交/差/XOR 面积、孔洞带符号面积、退化轮廓过滤 |
+| Engine2D 偏移 | `Geo2DOffset` | `Geo2DOffsetTests.cpp` | 外扩/内缩面积、孔洞收缩方向、内缩塌缩为空、切点/圆心坐标 |
+| Engine2D 图元流水线 | `EntityDiscretizer` / `EntityOffset::computeOffsetEntities` | `EntityAlgorithmPipelineTests.cpp` | 轮廓条数与闭合性、纯计算不改源图元、失败语义 |
+| Engine2D 填充 | `EntityFill` / `EntityFiller::computeFill` | `FillAlgorithmNumericTests.cpp` | 扫描线朝向、总长≈面积/间距、凹口不越界、孔洞不被填充 |
+| Engine2D 多边形 | `PolygonAlgorithms` / `Geo2DPrimitives` | `PolygonAlgorithms*Tests.cpp`、`Geo2DPrimitivesTests.cpp` | 内外判定、凸性、三角剖分、自交检测 |
+| Engine2D 曲线 | `LineAlgorithms` / `CircleAlgorithms` / `BezierAlgorithms` / `SplineAlgorithms` | `*Algorithms*Tests.cpp` | 求交、切线、离散化误差 |
+| Engine3D 图元入口 | `MeshAlgorithms`（全部 24 个入口） | `MeshAlgorithmsTests.cpp` | 度量/拓扑/连通/采样/编辑的转发语义与兜底 |
+| Engine3D 内核 | `Geo3DAnalysis` / `Geo3DQuery` / `Geo3DSampling` / `Geo3DEdit` | `Geo3D*Tests.cpp` | 面积/体积/水密/最近点/射线/采样 |
+| Engine3D 加速结构 | `BVH3D` / `SpatialIndex3D` | `BVH3DTests.cpp`、`SpatialIndex3DTests.cpp` | 命中集合一致性、包围盒更新 |
+| Engraving 高度场 | `HeightMap` | `HeightMapTests.cpp` | 取值范围、双线性、物理坐标与原点、平滑能量守恒 |
+| Engraving 体加工 | `VolumeProcessing` | `VolumeProcessingTests.cpp` | 分层中截面高度、层内轮廓闭合与 Z 一致、空输入兜底 |
+| Engraving 输出 | `ToolpathExporter` | `ToolpathExporterTests.cpp` | 具体指令串（G21/G90/M3 S/F 换算/M2）、开关时序 |
+| Engraving 策略 | `LaserStrategy` / `DefaultStrategy` | `LaserStrategyTests.cpp` | 层数取整、线间距、材料修正钳制 |
+| Nesting | `Geometry` / `NoFitPolygon` / `Solver` / `Model` / `Api` | `Nesting/Test/*` | 面积、NFP 轮廓、排样全部落板且不重叠 |
 
 ### 3.2 测试命名规范
 
@@ -329,19 +376,36 @@ Utility/Utility/Test/
 
 ### 4.2 测试执行策略
 
-**本地开发**：
+**本地开发**
 ```bash
-# 运行单个测试套件
+# 单个用例 / 单个套件
 ./MainTests --gtest_filter=RenderTypesTest*
 
-# 运行所有测试
-./MainTests
+# 算法层四件套（不依赖 GUI，秒级）
+./UtilityTests
+./Engine2DTests
+./Engine3DTests
+./EngravingLaserStrategyTests      # 另有 HeightMap / VolumeProcessing / ToolpathExporter 三个目标
+```
+
+**算法层冒烟**（改动几何/offset/fill/engraving 后先跑这一组，任一失败即停）
+```bash
+./UtilityTests        --gtest_filter=BBox3Test*:Vec*:GeomMath*
+./Engine2DTests       --gtest_filter=Geo2DBooleanTest*:Geo2DOffsetTest*:EntityFillTest*:EntityFillerComputeTest*:EntityDiscretizerTest*:EntityOffsetPipelineTest*
+./Engine3DTests       --gtest_filter=MeshAlgorithmsTest*:Geo3DAnalysisTest*:Geo3DQueryTest*
+./EngravingLaserStrategyTests
+./EngravingToolpathExporterTests
 ```
 
 **CI/CD**：
 - 每次提交自动运行单元测试
 - 每日构建运行集成测试
 - 每周运行回归测试和 E2E 测试
+
+> 构建侧注意：Engine2D/Engine3D/Utility 的测试目标用 `GLOB CONFIGURE_DEPENDS` 收集源文件，
+> 新增 `.cpp` 后第一次构建只会「重新 glob」，**文件要到第二次构建才真正编译进目标**。
+> 新增测试文件后请连跑两次 `cmake --build ... --target xxxTests`，否则会看到
+> 「过滤到 0 个用例」的假象。Engraving 的算法测试目标是显式文件列表，无此问题。
 
 ### 4.3 失败分类
 

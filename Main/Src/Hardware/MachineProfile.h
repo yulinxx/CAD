@@ -29,6 +29,8 @@
 #include <QVector>
 #include <QMap>
 
+#include "Engine2D/Machine/MachineFrame.h"
+
 /**
  * @brief 一个逻辑 IO 点位的配置（对应 Hw::IoPointDef）。
  *
@@ -77,6 +79,20 @@ struct MachineProfile
 
     /// 启动时是否自动 open 设备。现场排查接线时可以设 false，先只启动软件。
     bool autoOpen = true;
+
+    /**
+     * @brief 机器坐标系（用户空间 → 机器空间）
+     *
+     * 描述这台机器的**台面尺寸**与**原点角点**。
+     *
+     * 为什么在机器档案里而不是文档里：台面尺寸与原点角点是**这台机器的物理事实**，
+     * 换一台机器就变。文档里存它会造成「同一份图纸在不同机器上烧到不同位置」，
+     * 而且无法从文件判断它是为哪台机器出的。
+     *
+     * 换算在**编译器的最后一步**发生（`MotionPlanCompiler`），只此一处。
+     * 适配器与作业服务都不再换算。
+     */
+    Eg::MachineFrameConfig machineFrame;
 
     // --- 以下由加载器填写，不出现在 JSON 里 ---
 

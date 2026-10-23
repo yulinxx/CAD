@@ -86,6 +86,16 @@ public:
     /// 当前跑的是否为模拟设备。界面上必须能明确区分，避免把模拟当真机。
     bool isSimulated() const;
 
+    /**
+     * @brief 当前机器档案里的机器坐标系（台面尺寸 + 原点角点）
+     *
+     * 加工链路的**唯一坐标换算**依赖它：换算在 `MotionPlanCompiler` 的最后一步发生，
+     * 配置由这里 → `ToolpathJobSpec::machineFrame` → 编译器一路传下去。
+     *
+     * 未启动设备时返回默认配置（恒等变换）。
+     */
+    Eg::MachineFrameConfig machineFrameConfig() const;
+
     /// 最近一次安全评估是否允许开工。未启动时为 false（fail-safe）。
     bool canStartProcessing() const;
 

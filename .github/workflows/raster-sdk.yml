@@ -1,0 +1,88 @@
+﻿name: Raster SDK
+
+# 守护 Raster 模块的**交付契约**，而不是它算得对不对（那由 ctest 负责）：
+#   - 独立构建能产出 include/ + lib/ + bin/ 的 SDK；
+#   - 导出表与 RasterApi.h 的声明完全一致（没有 C++ 装饰名、没有未声明的符号）；
+#   - 运行时只依赖 MSVC 运行库与 OpenCV（Qt/spdlog 一旦漏成动态依赖就直接失败）；
+#   - SDK 是**自包含**的：OpenCV 运行时（含传递依赖）随包交付；
+#   - 仓库外的 C 与 C++ 两个消费方都能编译并通过冒烟。
+#
+# 最后一条是这里最值钱的一条：它是唯一能证明"客户拿到这个包就能跑"的检查。
+# 少装一个 OpenCV 的传递依赖（DNN -> protobuf -> abseil 这类），
+# 消费程序会以 STATUS_DLL_NOT_FOUND 起不来，而这种故障在开发机上根本不会出现。
+#
+# 触发范围刻意收窄到 Raster 目录与本文件：这是交付面的门禁，
+# 不该给每次普通改动都加一份 Windows 构建。
+on:
+  push:
+    branches: [main, master, develop]
+    paths:
+      - Raster
+      - .github/workflows/raster-sdk.yml
+  pull_request:
+    paths:
+      - Raster
+      - .github/workflows/raster-sdk.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-sdk-contract:
+    name: SDK contract (windows x64)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # vcpkg 按三元组缓存，键尾版本号手工 bump 以强制刷新。
+      - name: Cache vcpkg
+        id: cache-vcpkg
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.workspace }}/vcpkg
+          key: vcpkg-x64-windows-${{ runner.os }}-${{ runner.arch }}-raster-sdk-v1
+
+      - name: Set up vcpkg
+        run: |
+          $vcpkgRoot = Join-Path "${{ runner.workspace }}" "vcpkg"
+          if (-not (Test-Path (Join-Path $vcpkgRoot "vcpkg.exe"))) {
+            Remove-Item -Recurse -Force $vcpkgRoot -ErrorAction SilentlyContinue
+            git clone --depth 1 https://github.com/microsoft/vcpkg.git $vcpkgRoot
+            & (Join-Path $vcpkgRoot "bootstrap-vcpkg.bat") -disableMetrics
+          }
+          "VCPKG_ROOT=$vcpkgRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      # OpenCV 是 Raster 唯一的编译期三方依赖；GTest 不是本条门禁的必需品，
+      # 留着只是为了与其它作业保持同一套依赖集合。
+      - name: Install dependencies
+        run: |
+          & (Join-Path $env:VCPKG_ROOT "vcpkg.exe") install `
+            opencv4 gtest `
+            --triplet x64-windows --clean-after-build
+
+      # 只 build Raster 目标，不 build 单测：本门禁关心的是产物形态与外部可消费性。
+      # -Package 会在校验通过后额外产出交付压缩包（自带 MANIFEST/VERSION）。
+      - name: Verify SDK contract
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass `
+            -File Raster/Tools/VerifySdk.ps1 -VcpkgDir "$env:VCPKG_ROOT" -Package
+
+      - name: Upload the deliverable archive
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raster-sdk-x64-windows
+          path: |
+            build/raster-sdk-verify/Raster-*.zip
+            build/raster-sdk-verify/sdk
+            build/raster-sdk-verify/bin_Qt6/Release/Raster.pdb
+          if-no-files-found: warn
+          retention-days: 7

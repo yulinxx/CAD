@@ -94,13 +94,15 @@ QObject* UiStateBridge2D::install(Workbench2D* workbench,
 
     // 图层显隐：LayerManager::setLayerVisible 只翻标志位并 notifySceneChanged，
     // 不产生任何 entity change，增量路径拿不到脏 ID（applyLightRefresh 会直接
-    // 空转返回），隐藏图层的几何会留在 GPU 上。这里显式走全量重建，让几何、
-    // 位图和文字都按最新图层可见性重新装配。
+    // 空转返回），隐藏图层的几何会留在 GPU 上。这里走专门的通道：
+    // 隐藏 = 增量摘除该层在 GPU 上的几何（便宜），显示 = 全量重建（要重新上传，
+    // 且全量路径带视口裁剪）。两侧都走全量时，几十万图元点一下图层眼睛要十几秒。
     if (layerBridge && viewport)
     {
-        QObject::connect(layerBridge, &QtLayerManagerBridge::sigLayerVisibilityChanged, guard, [viewport](int, bool) {
-            viewport->requestFullRefresh();
-        });
+        QObject::connect(layerBridge, &QtLayerManagerBridge::sigLayerVisibilityChanged, guard,
+            [viewport](int layerId, bool visible) {
+                viewport->applyLayerVisibilityChanged(layerId, visible);
+            });
     }
 
     if (bus)

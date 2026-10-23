@@ -103,7 +103,7 @@ void AppInitializer::initialize()
     // 数据库文件存放在 AppPathManager::dataDir() 下，确保目录存在
     const QString dataDir = AppPathManager::dataDir();
     QDir().mkpath(dataDir);
-    const QString dbPath = dataDir + QStringLiteral("/cad_database.sqlite");
+    const QString dbPath = AppPathManager::databasePath();
     auto persistenceService = std::make_shared<PersistenceService>();
 
     if (persistenceService->initialize(dbPath.toStdString()))

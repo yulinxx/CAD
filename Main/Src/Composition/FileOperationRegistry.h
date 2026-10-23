@@ -17,6 +17,7 @@ class ImportService;
 class ExportService;
 class IRecentFileService;
 class HelpDialogService;
+class IUndoRedoManager;
 
 namespace Eg
 {
@@ -44,6 +45,10 @@ struct FileOperationConfig
     LayerPersistenceBridge* layerPersistence = nullptr;
     PersistenceService* persistence = nullptr;
     QWidget* parentWidget = nullptr;
+
+    /// 撤销/重做管理器（可选）：新建 / 打开文档时必须清空，否则跨文档的撤销命令
+    /// 会把上一份文档的图元按 id 塞回新文档（见 FileOperationRegistry::resetDocumentState）
+    IUndoRedoManager* undoRedoManager = nullptr;
 };
 
 /**
@@ -80,6 +85,15 @@ private:
     /// 执行导出流程（按格式选文件 → 调用导出服务 → 异常保护）
     void doExportByFormat(Fio::FileFormat fmt);
 
+    /**
+     * @brief 切换到一份新文档后的状态复位
+     *
+     * 两件事必须同时做，缺一件就会串文档：
+     *   - 清空当前文件路径：否则「新建 → 保存」会静默覆盖上一个文件；
+     *   - 清空撤销栈：否则「新建/打开 → Ctrl+Z」会把上一份文档的图元按 id 塞回来。
+     */
+    void resetDocumentState();
+
     // ==================== 公共辅助方法 ====================
 
     /// 统一显示文件操作错误对话框
@@ -110,4 +124,5 @@ private:
     LayerPersistenceBridge* m_layerPersistence;
     PersistenceService* m_persistence;
     QWidget* m_parentWidget;
+    IUndoRedoManager* m_undoRedoManager;
 };

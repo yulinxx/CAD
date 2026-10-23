@@ -6,48 +6,44 @@
  *
  * ==================== 为什么参数由调用方给，而不是编译器自己去查 ====================
  *
- * 仓库里目前有四套互不相通的工艺参数：
+ * 仓库里此前有四套互不相通的工艺参数：
  *   - `HardwareProfile`（Engine2D，按图层绑定）—— 但 `HardwareProfileManager`
  *     全仓库没有任何实例化点，且 `hardwareProfileId` 不写入 .sy 文档；
  *   - `Eg::ProcessParams`（SQLite 预设，与图层/图元无绑定）；
  *   - `Eg::MaterialInfo` / `MaterialDatabase::MaterialInfo`（材料推荐值，两份）；
+ *   - 本文件里的 `LayerProcessParams`（第四份）。
  *
- * 也就是说「按图层取工艺参数」这条链路当前是断的（详见
- * Docs/05-硬件与设备/硬件抽象层架构.md 的已知待办）。
+ * v2 起统一为**一份**：`Eg::ProcessParams`（Engine/Common/Include/Engine/Process/）。
+ * 它被三方同时看见：FileIO（写进 .sy）、Engine2D/Cam（生成刀路）、UI（工艺面板）。
+ * 放在 Engine/Common 是因为 FileIO 只依赖 EngineCommon，Engine2D 也依赖 EngineCommon ——
+ * 放这里三方都能用，且不产生任何新的模块依赖。
  *
- * 因此本结构刻意把参数做成**显式入参**：编译器不去猜、不去查那张还没接通的表，
- * 由调用方（命令处理器）负责决定参数来源——今天可以是默认值 + 图层覆盖，
- * 将来 HardwareProfileManager 接通后换成从它读取，编译器一行都不用改。
+ * 本文件里的 `LayerProcessParams` 保留为**类型别名**（不是第二份定义），
+ * 让既有调用点（编译器、作业服务、测试）不必大改，语义却已经收成一份。
+ *
+ * ==================== 工艺参数的来源 ====================
+ *
+ * 接下来由调用方（命令处理器）负责决定参数来源 ——
+ * 今天可以是默认值 + 图层覆盖，将来接通工艺库（ProcessLibrary）后从那里读，
+ * 编译器一行都不用改。
  */
 
 #include <QMap>
 #include <QString>
+#include <QStringList>
 #include <QVector>
 
 #include <cstdint>
 
+#include "Engine/Process/ProcessParams.h"
+#include "Engine2D/Machine/MachineFrame.h"
+
 /**
  * @brief 一个图层（或作业默认）的工艺参数。
+ *
+ * **类型别名**，不是第二份定义 —— 参数只有一份，见文件头说明。
  */
-struct LayerProcessParams
-{
-    double powerPercent = 50.0;      ///< 出光功率百分比 0–100
-    double speedMmPerSec = 100.0;    ///< 加工速度
-    double frequencyHz = 20000.0;    ///< 脉冲频率
-    double pulseWidthUs = 0.0;       ///< 脉宽；CW 激光器填 0
-    int32_t waveformIndex = 0;       ///< 波形序号（MOPA）
-    int32_t passes = 1;              ///< 加工遍数
-    bool enabled = true;             ///< false 表示该图层不参与本次加工
-
-    bool valid() const
-    {
-        return powerPercent >= 0.0 && powerPercent <= 100.0
-            && speedMmPerSec > 0.0
-            && frequencyHz >= 0.0
-            && pulseWidthUs >= 0.0
-            && passes >= 1;
-    }
-};
+using LayerProcessParams = Eg::ProcessParams;
 
 /**
  * @brief 一次加工作业的完整规格。
@@ -91,6 +87,28 @@ struct ToolpathJobSpec
 
     /// 每遍结束后是否补一条显式关光指令
     bool emitTrailingLaserOff = true;
+
+    /// 遇到「这类图元暂时无法加工」时（位图光栅未实现、条码无模块几何等），
+    /// 是整份作业失败（true，默认），还是跳过并在结果里报告（false）。
+    ///
+    /// 默认 true 是**故意的**：跳过意味着「用户以为烧了、其实没烧」——
+    /// 在激光加工里这等于废件。宁可拒绝开工并说清楚是哪一类图元，
+    /// 也不要默默少烧一块。
+    ///
+    /// 界面后续可以提供「忽略这些图元继续」的显式开关（那时才置 false），
+    /// 前提是它把被跳过的清单完整展示给操作者。
+    bool failOnUnmachinableEntity = true;
+
+    /**
+     * @brief 机器坐标系（用户空间 → 机器空间）
+     *
+     * 默认与用户空间一致（左下角原点、恒等变换），即零影响。
+     *
+     * 换算**只在这里发生一次**（编译器的最后一步），适配器与作业服务都不再换算。
+     * 之前的新 HAL 链路根本没做换算，而旧的 UI2D 链路在服务层换算 ——
+     * 两套坐标语义并存，是「同一份数据在不同路径下烧出不同位置」的根因。
+     */
+    Eg::MachineFrameConfig machineFrame;
 };
 
 /**
@@ -110,4 +128,12 @@ struct ToolpathCompileResult
     double boundsMinY = 0.0;
     double boundsMaxX = 0.0;
     double boundsMaxY = 0.0;
+
+    /// 无法加工的图元数量（位图 / 条码 / 3D 网格等）。
+    /// failOnUnmachinableEntity = false 时，这些图元被跳过而其余照常加工。
+    int32_t unmachinableEntityCount = 0;
+
+    /// 无法加工图元的可读清单（最多若干条，用于界面展示）。
+    /// 形如 "3 x IMAGE (raster engraving engine not implemented yet)"。
+    QStringList unmachinableDetails;
 };

@@ -26,7 +26,10 @@ include(Config.cmake)
 project(SanYiCAD
     VERSION 1.0.0
     DESCRIPTION "SanYi CAD System"
-    LANGUAGES CXX
+    # C 语言：Raster 模块有一项"公开头必须是纯 C 头"的编译期契约测试，
+    # 需要一个真正的 C 编译器来验证。enable_language() 按 CMake 官方要求
+    # 必须在**顶层**目录调用才生效，所以在 project() 里一并启用。
+    LANGUAGES CXX C
 )
 
 find_package(OpenGL REQUIRED)
@@ -144,12 +147,9 @@ else()
 endif()
 
 # 6.5 CAM 模块 - 激光切割工艺路径生成
-if(BUILD_CAM)
-    add_subdirectory(CAM/CAM)
-    message(STATUS "  CAM: ENABLED")
-else()
-    message(STATUS "  CAM: DISABLED")
-endif()
+# 仓库里暂时没有 CAM 模块目录，因此不再提供 BUILD_CAM 开关：
+# 开关在但目录不在，打开就是 configure 直接失败（add_subdirectory 指向不存在的路径）。
+# CAM 模块落地后，把下面这段与 Config.cmake 里的 option 一起加回。
 
 # 5. UI 层 - 用户界面
 # UICommon 必需；UI2D 全应用必需（Main 有数百处 UI2D 引用且无桩回退）；
@@ -189,6 +189,15 @@ if(BUILD_VISION)
     message(STATUS "  Vision: ENABLED")
 else()
     message(STATUS "  Vision: DISABLED")
+endif()
+
+# 6.6 Raster 模块 - 位图处理（OpenCV），面向激光雕刻/切割工艺
+# 独立 DLL，公开头只暴露纯 C ABI（POD + 句柄），消费方不需要 OpenCV 头文件。
+if(BUILD_RASTER)
+    add_subdirectory(Raster/Raster)
+    message(STATUS "  Raster: ENABLED")
+else()
+    message(STATUS "  Raster: DISABLED")
 endif()
 
 message(STATUS "----------------------------------------")
@@ -349,10 +358,6 @@ if(BUILD_NESTING)
     list(APPEND SANYI_PROJECT_LIBS Nesting)
 endif()
 
-if(BUILD_CAM)
-    list(APPEND SANYI_PROJECT_LIBS CAM)
-endif()
-
 if(BUILD_UI3D)
     list(APPEND SANYI_PROJECT_LIBS Engine3D UI3D)
 endif()
@@ -384,6 +389,10 @@ endif()
 
 if(BUILD_VISION)
     list(APPEND SANYI_PROJECT_LIBS Vision)
+endif()
+
+if(BUILD_RASTER)
+    list(APPEND SANYI_PROJECT_LIBS Raster)
 endif()
 
 if(SANYI_PYTHON_HOST)

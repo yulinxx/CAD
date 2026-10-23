@@ -998,6 +998,14 @@ void RenderViewport2D::requestFullRefresh()
     }
 }
 
+void RenderViewport2D::applyLayerVisibilityChanged(int layerId, bool visible)
+{
+    if (m_refreshCoordinator)
+    {
+        m_refreshCoordinator->applyLayerVisibilityChanged(layerId, visible);
+    }
+}
+
 // P5: onSceneChanged / onSelectionChanged 已收敛到 SceneRefreshCoordinator（IObserver）
 // 视口不再直接实现 IObserver，通过 selectionChanged 信号同步工具状态
 

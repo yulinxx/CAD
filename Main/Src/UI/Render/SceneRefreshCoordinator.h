@@ -72,6 +72,20 @@ public:
     void requestFullRefresh() override;
 
     /**
+     * @brief 图层显隐变化
+     *
+     * 图层显隐不进变更流：它影响的是「整层图元是否上 GPU」，不是某个图元的内容变了。
+     * 逐图元记 VisibilityChanged 会让增量路径去 clone 十万个图元、场景树去重建
+     * 十万个条目 —— 比全量重建还贵。
+     *
+     * 隐藏：只把该层当前在 GPU 上的几何摘掉（一次批量提交），位图与文字交给各自的
+     *       reconciler 对账（它们的期望集合已排除隐藏图层）。
+     * 显示：走全量重建 —— 需要重新上传该层几何，且全量路径带视口裁剪，
+     *       不会把视口外的图元也塞进 GPU。
+     */
+    void applyLayerVisibilityChanged(int layerId, bool visible);
+
+    /**
      * @brief 曲线 LOD 分批重建 — 按缩放与可视区域判断是否需要（重新）收集
      *
      * 收集范围只覆盖当前可视区域（含少量余量）：曲线精度只对看得见的图元有意义，

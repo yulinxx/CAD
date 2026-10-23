@@ -12,6 +12,7 @@
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Core/EntityClipboard.h"
 #include "Engine2D/Edit/UndoRedoManager.h"
+#include "Engine2D/Machine/MachineFrame.h"
 #include "Engine/Edit/IUndoRedoManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Edit/LayerEditService.h"
@@ -71,7 +72,10 @@ public:
     ApplicationCompositionRoot();
     ~ApplicationCompositionRoot();
 
-    /// 获取应用共享 SettingsService singleton
+    /// 获取应用共享的 SettingsService
+    ///
+    /// 正常路径返回组合根持有的实例（生命周期随组合根）。
+    /// 组合根尚未创建时（极早期启动路径）返回一份进程级兜底实例。
     static SettingsService* getSettingsService();
 
     /// 获取 ApplicationCompositionRoot 单例实例（由 AppBootstrapper 创建时设置）
@@ -228,6 +232,16 @@ public:
      */
     bool startHardware(const QString& configDir, QString& warningOut);
 
+    /**
+     * @brief 当前机器档案里的机器坐标系（台面尺寸 + 原点角点）
+     *
+     * 供加工链路使用：**坐标换算只在编译器的最后一步发生**，
+     * 配置由这里注入到 `ToolpathJobSpec::machineFrame`。
+     *
+     * 设备未启动时返回默认配置（恒等变换）。
+     */
+    Eg::MachineFrameConfig machineFrameConfig() const;
+
 
 private:
     // ---- 构造函数拆分（P5 结构性优化）----
@@ -310,6 +324,9 @@ private:
 
     /// UI 状态中心
     std::unique_ptr<UiStateCenter> m_stateCenter;
+
+    /// 设置服务（自持数据库连接；与业务库同一个文件，见 AppPathManager::databasePath）
+    std::unique_ptr<SettingsService> m_settingsService;
 
     /// 布局服务
     std::unique_ptr<UiLayoutService> m_layoutService;
