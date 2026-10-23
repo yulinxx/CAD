@@ -69,19 +69,17 @@ jobs:
             --triplet x64-windows --clean-after-build
 
       # 只 build Raster 目标，不 build 单测：本门禁关心的是产物形态与外部可消费性。
-      # -Package 会在校验通过后额外产出交付压缩包（自带 MANIFEST/VERSION）。
       - name: Verify SDK contract
         run: |
           powershell -NoProfile -ExecutionPolicy Bypass `
-            -File Raster/Tools/VerifySdk.ps1 -VcpkgDir "$env:VCPKG_ROOT" -Package
+            -File Raster/Tools/VerifySdk.ps1 -VcpkgDir "$env:VCPKG_ROOT"
 
-      - name: Upload the deliverable archive
+      - name: Upload SDK artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: raster-sdk-x64-windows
           path: |
-            build/raster-sdk-verify/Raster-*.zip
             build/raster-sdk-verify/sdk
             build/raster-sdk-verify/bin_Qt6/Release/Raster.pdb
           if-no-files-found: warn
