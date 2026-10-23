@@ -192,6 +192,18 @@ public:
     void zoomToSelection();
     void zoomIn();
     void zoomOut();
+
+    /// 当前相机状态（缩放 + 平移）。
+    /// 视口每次工作台切换都会重建，相机初值是硬编码的默认台面视图；
+    /// 宿主（Workbench2D）在 deactivate 时抄出来、attach 时写回，视图才不会复位。
+    Camera2D cameraState() const
+    {
+        return m_camera;
+    }
+
+    /// 覆盖相机状态。视口尺寸尚为 0 时只记录状态，待 resizeEvent 再应用。
+    void setCameraState(const Camera2D& camera);
+
     // 刷新 API（P5 语义统一：三级刷新，语义明确）
     /// 轻量重绘 — 纯视觉刷新，不触碰渲染数据（选择变化、光标移动等）
     void requestRepaint();

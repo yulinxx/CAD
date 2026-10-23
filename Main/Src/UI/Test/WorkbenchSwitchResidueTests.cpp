@@ -18,6 +18,10 @@
  *      （状态栏消息区显示的就是它 → 切到 3D 后那栏一直停在「切换到 3D」）
  *   5. 3D 撤销栈跨 deactivate 存活
  *      （切走再切回来仍能撤销；否则 3D 里做的修改再也 Ctrl+Z 不回去）
+ *   6. 切换完成后状态栏消息区回到 "Ready"，不停在切换提示
+ *   7. 2D 相机（缩放 + 平移）跨视口重建存活
+ *      （RenderViewport2D 每次 attach 新建，不抄状态就重置回默认台面视图）
+ *   8. 切换不累积工具栏（配置驱动工具栏需先清后建）
  *
  * 环境说明
  * --------
@@ -29,6 +33,7 @@
 
 #include <QApplication>
 #include <QString>
+#include <QToolBar>
 #include <QVariantMap>
 
 #include <memory>
@@ -39,6 +44,9 @@
 #include "UI/StatusIndicators.h"
 #include "UI/Workbench/UiWorkbench.h"
 #include "UI/Workbench/WorkbenchWindow.h"
+
+#include "RenderViewport2D.h"
+#include "UI/Render/Camera2D.h"
 
 #if BUILD_UI3D
     #include "Engine/Edit/IUndoRedoCommand.h"
@@ -69,7 +77,8 @@ namespace
     class ProbeStatusBar : public StatusBarBase
     {
     public:
-        ProbeStatusBar()
+        explicit ProbeStatusBar(QWidget* parent = nullptr)
+            : StatusBarBase(parent)
         {
             setupStandardIndicators(200, 120, 200, /*infoBeforeMessage=*/true);
         }
@@ -77,11 +86,14 @@ namespace
 
     /// 假工作台：只提供身份与空实现，用来驱动 WorkbenchWindow 的切换流程。
     /// 不用真工作台是为了避开 OpenGL 视口 —— 测试环境没有 GL 上下文。
+    /// 可选的状态栏用来验证「切换完成后状态栏消息区显示什么」，
+    /// 真实工作台同样是在 attachToWindow 里 mountStatusBar 的。
     class FakeWorkbench : public UiWorkbench
     {
     public:
-        explicit FakeWorkbench(QString workbenchId)
+        explicit FakeWorkbench(QString workbenchId, StatusBarBase* statusBar = nullptr)
             : m_id(std::move(workbenchId))
+            , m_statusBar(statusBar)
         {
         }
 
@@ -100,8 +112,12 @@ namespace
             return true;
         }
 
-        void attachToWindow(WorkbenchWindow&) override
+        void attachToWindow(WorkbenchWindow& window) override
         {
+            if (m_statusBar)
+            {
+                window.mountStatusBar(m_statusBar);
+            }
         }
 
         void activate() override
@@ -127,6 +143,7 @@ namespace
 
     private:
         QString m_id;
+        StatusBarBase* m_statusBar{ nullptr };
     };
 
 #if BUILD_UI3D
@@ -270,7 +287,9 @@ TEST(WorkbenchSwitchResidueTest, ThreeDimensionalUndoStackSurvivesWorkbenchDeact
     ImportService importService;
     importService.setSceneManager3D(&scene3D);
 
+    UiStateCenter stateCenter;
     WorkbenchServices services;
+    services.uiState.stateCenter = &stateCenter;
     services.persistence.importService = &importService;
 
     Workbench3D workbench;
@@ -294,3 +313,100 @@ TEST(WorkbenchSwitchResidueTest, ThreeDimensionalUndoStackSurvivesWorkbenchDeact
     EXPECT_TRUE(afterDeactivate->canUndo());
 }
 #endif
+
+// ==================== 切换完成后状态栏不得停在切换提示上 ====================
+
+TEST(WorkbenchSwitchResidueTest, MountedStatusBarShowsReadyAfterSwitch)
+{
+    ensureApplication();
+
+    UiStateCenter stateCenter;
+    WorkbenchWindow window;
+    window.setUiStateCenter(&stateCenter);
+
+    auto* bar2D = new ProbeStatusBar(&window);
+    auto* bar3D = new ProbeStatusBar(&window);
+
+    FakeWorkbench workbench2D(QStringLiteral("2D"), bar2D);
+    FakeWorkbench workbench3D(QStringLiteral("3D"), bar3D);
+
+    window.setWorkbench(&workbench2D);
+    window.setWorkbenchFactory([&](const QString& id) -> UiWorkbench* {
+        return (id == QStringLiteral("3D")) ? static_cast<UiWorkbench*>(&workbench3D)
+                                            : static_cast<UiWorkbench*>(&workbench2D);
+    });
+    workbench2D.attachToWindow(window);
+    workbench2D.activate();
+
+    window.triggerWorkbench(QStringLiteral("3D"));
+
+    // 新工作台接管状态栏后，消息区应由 refreshFromState 写回 "Ready"。
+    // 之前的 bug 是提示清不掉，这一栏会永久停在 "Switching to 3D"。
+    ASSERT_EQ(window.activeStatusBar(), bar3D);
+    const QString text = bar3D->messageIndicatorText();
+    EXPECT_FALSE(text.contains(QStringLiteral("Switching"))) << text.toStdString();
+    EXPECT_FALSE(text.isEmpty()) << text.toStdString();
+}
+
+// ==================== 2D 相机跨视口重建存活 ====================
+
+TEST(WorkbenchSwitchResidueTest, TwoDimensionalCameraStateSurvivesViewportRecreation)
+{
+    ensureApplication();
+
+    // 模拟切走前：用户在 2D 里缩放 + 平移
+    RenderViewport2D first;
+    Camera2D camera = first.cameraState();
+    camera.zoomX = 3.5f;
+    camera.zoomY = 2.5f;
+    camera.panOffset = QPointF(-123.0, -456.0);
+    first.setCameraState(camera);
+
+    // Workbench2D::deactivate() 在视口销毁前抄出状态
+    const Camera2D saved = first.cameraState();
+
+    // 切回来：RenderViewport2D 是新建的，构造函数的相机是硬编码默认台面视图
+    RenderViewport2D second;
+    EXPECT_NE(second.cameraState().panOffset, saved.panOffset);
+
+    // Workbench2D::attachToWindow() 恢复
+    second.setCameraState(saved);
+
+    const Camera2D restored = second.cameraState();
+    EXPECT_FLOAT_EQ(restored.zoomX, 3.5f);
+    EXPECT_FLOAT_EQ(restored.zoomY, 2.5f);
+    EXPECT_DOUBLE_EQ(restored.panOffset.x(), -123.0);
+    EXPECT_DOUBLE_EQ(restored.panOffset.y(), -456.0);
+}
+
+// ==================== 切换不得累积工具栏 ====================
+
+TEST(WorkbenchSwitchResidueTest, SwitchingWorkbenchDoesNotAccumulateToolBars)
+{
+    ensureApplication();
+
+    UiStateCenter stateCenter;
+    WorkbenchWindow window;
+    window.setUiStateCenter(&stateCenter);
+
+    FakeWorkbench workbench2D(QStringLiteral("2D"));
+    FakeWorkbench workbench3D(QStringLiteral("3D"));
+
+    window.setWorkbench(&workbench2D);
+    window.setWorkbenchFactory([&](const QString& id) -> UiWorkbench* {
+        return (id == QStringLiteral("3D")) ? static_cast<UiWorkbench*>(&workbench3D)
+                                            : static_cast<UiWorkbench*>(&workbench2D);
+    });
+    workbench2D.attachToWindow(window);
+    workbench2D.activate();
+
+    window.triggerWorkbench(QStringLiteral("3D"));
+    const int afterFirstSwitch = window.findChildren<QToolBar*>().size();
+
+    window.triggerWorkbench(QStringLiteral("2D"));
+    const int afterSecondSwitch = window.findChildren<QToolBar*>().size();
+
+    // 6b.1 新增的 buildToolBars() 走的是 clearLayoutContent 重建路径，
+    // 每个切换周期都必须先清后建；只建不清会让工具栏一轮轮叠加。
+    EXPECT_EQ(afterSecondSwitch, afterFirstSwitch);
+}

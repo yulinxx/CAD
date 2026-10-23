@@ -143,6 +143,20 @@ private:
     /// 业务代码仍通过 m_services3D.renderWidget（窄接口）访问。
     RenderWidget3D* m_renderWidget3D{ nullptr };
 
+    /// 3D 相机位姿快照（值类型，跨 deactivate 存活）。
+    /// RenderWidget3D 每次 attach 都重建，Camera3D 是它的成员 → 位姿随之回到默认值
+    /// （eye 150/150/150、center 原点）；不抄出来，切回 3D 时视角就复位。
+    /// 用裸 float 而不是 Camera3D：本头文件里 Camera3D 没有完整定义。
+    struct CameraPose
+    {
+        float eye[3]{ 0.0f, 0.0f, 0.0f };
+        float center[3]{ 0.0f, 0.0f, 0.0f };
+        float up[3]{ 0.0f, 1.0f, 0.0f };
+        bool valid{ false };
+    };
+
+    CameraPose m_savedCameraPose;
+
     /// 3D 状态栏 widget。所有权与复用规则同 m_statusBar2D（见那里的注释）。
     /// deactivate() 里刻意**不**清空它：清空等于每次切回 3D 都新建一个，
     /// 而旧的仍挂在 QStatusBar 上没人删。

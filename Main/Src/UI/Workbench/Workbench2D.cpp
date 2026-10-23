@@ -287,6 +287,14 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
         }
         setupImportCallbacks(vp, window);
         vp->setActiveTool(QStringLiteral("SelectTool"));
+
+        // 恢复上次切走时的缩放/平移。必须在 initializeTools / import 回调都装好之后：
+        // 那些步骤不改相机，但视口此时通常还没完成布局（物理尺寸为 0），
+        // setCameraState 只记录状态，真正的矩阵提交在首次 resizeEvent 里发生。
+        if (m_hasSavedCamera)
+        {
+            vp->setCameraState(m_savedCamera);
+        }
     }
 
     // 属性被编辑后（已入撤销栈）延迟重建模型，避免在内联编辑器提交过程中重入。
@@ -921,6 +929,17 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     QObject::connect(
         m_viewport, &RenderViewport2D::activeToolChanged, m_commandHub.get(), &CommandActionHub::setActiveToolAction);
     m_commandHub->setActiveToolAction(m_viewport->activeToolName());
+
+    // 记录当前工具到状态中心，供 deactivate() 的快照带走。
+    // 此前 setActiveToolId() 只有 restoreFromSnapshot() 一个写入点、没有任何生产方，
+    // 于是快照里的 activeToolId 永远是空串：画了一半的线切到 3D 再切回来，
+    // 工具已经退回 SelectTool（attachToWindow 硬设），撤销也回不到绘制中状态。
+    QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged, this, [this](const QString& toolName) {
+        if (m_uiState.stateCenter)
+        {
+            m_uiState.stateCenter->setActiveToolId(toolName);
+        }
+    });
 
     // 工具切换时同步 DrawToolBarWidget 的高亮状态
     QObject::connect(
@@ -2226,6 +2245,15 @@ void Workbench2D::activate()
 void Workbench2D::deactivate()
 {
     m_savedState = currentSnapshot();
+
+    // 相机必须在 m_viewport 置空（以及视口被 clearWorkbenchContent 销毁）之前抄出来：
+    // RenderViewport2D 是每次 attach 新建的，相机初值硬编码为默认台面视图，
+    // 不保存就等于每次往返切换都把用户的缩放/平移重置一次。
+    if (m_viewport)
+    {
+        m_savedCamera = m_viewport->cameraState();
+        m_hasSavedCamera = true;
+    }
 
     if (m_gridVisibilityMetadataConn)
     {

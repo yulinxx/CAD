@@ -382,6 +382,18 @@ void Workbench3D::create3DViewport(WorkbenchWindow& window)
         m_renderWidget3D = r3dAdapter->widget();
         SY_DEBUGF("[Workbench3D] RenderWidget3D registered to ServicePack3D: %p",
             static_cast<void*>(m_services3D.renderWidget));
+
+        // 恢复上次切走时的相机位姿：RenderWidget3D 是每次 attach 新建的，
+        // 其 Camera3D 成员会回到默认值 —— 不复位这里，2D→3D 往返一次视角就跳回初始。
+        if (m_savedCameraPose.valid && m_renderWidget3D)
+        {
+            Camera3D& cam = m_renderWidget3D->camera();
+            cam.setEyePosition(m_savedCameraPose.eye[0], m_savedCameraPose.eye[1], m_savedCameraPose.eye[2]);
+            cam.setCenter(m_savedCameraPose.center[0], m_savedCameraPose.center[1], m_savedCameraPose.center[2]);
+            cam.setUp(m_savedCameraPose.up[0], m_savedCameraPose.up[1], m_savedCameraPose.up[2]);
+            SY_DEBUG("[Workbench3D] Restored saved camera pose");
+        }
+
         if (m_services3D.sceneEditService && m_services3D.renderWidget)
         {
             m_services3D.sceneEditService->bindRenderWidget(m_services3D.renderWidget);
@@ -1500,6 +1512,23 @@ void Workbench3D::deactivate()
     {
         disconnect(m_backspaceShortcut, nullptr, this, nullptr);
         m_backspaceShortcut = nullptr;
+    }
+
+    // 1.4) 保存相机位姿：RenderWidget3D 稍后会被 clearWorkbenchContent 销毁，
+    //      Camera3D 是它的成员 → 不抄出来就随控件一起消失，切回来视角归零。
+    if (m_renderWidget3D)
+    {
+        const Camera3D& cam = m_renderWidget3D->camera();
+        m_savedCameraPose.eye[0] = cam.eyeX();
+        m_savedCameraPose.eye[1] = cam.eyeY();
+        m_savedCameraPose.eye[2] = cam.eyeZ();
+        m_savedCameraPose.center[0] = cam.centerX();
+        m_savedCameraPose.center[1] = cam.centerY();
+        m_savedCameraPose.center[2] = cam.centerZ();
+        m_savedCameraPose.up[0] = cam.upX();
+        m_savedCameraPose.up[1] = cam.upY();
+        m_savedCameraPose.up[2] = cam.upZ();
+        m_savedCameraPose.valid = true;
     }
 
     // 1.5) 先断开 RenderWidget3D 的所有信号连接，避免窗口销毁过程中信号回调命中悬空引用

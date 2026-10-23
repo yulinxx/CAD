@@ -602,6 +602,15 @@ void RenderViewport2D::resetView()
     updateStatus(tr("2D view reset"));
 }
 
+void RenderViewport2D::setCameraState(const Camera2D& camera)
+{
+    // 只恢复状态，不触发 fit / reset 之类的副作用。
+    // 视口刚 attach 时物理尺寸通常还是 0（布局尚未发生），applyCameraToWidget
+    // 会直接返回 —— 状态留在 m_camera 里，等 resizeEvent → updateViewMatrix 再应用。
+    m_camera = camera;
+    applyCameraToWidget();
+}
+
 void RenderViewport2D::zoomToFit()
 {
     // 无文档或空场景时回退到默认视图

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "WorkbenchBase.h"
+#include "UI/Render/Camera2D.h"
 
 class QAction;
 class QMenu;
@@ -132,6 +133,11 @@ private:
     int m_layerClickSequence{ 0 };
     PanelHostStyle m_panelHostStyle{ PanelHostStyle::Toolbar };
     RenderViewport2D* m_viewport{ nullptr };
+    /// 上次 deactivate 时的相机（缩放 + 平移）。
+    /// RenderViewport2D 每次 attach 都新建，构造函数把相机硬编码成默认台面视图
+    /// （panOffset = (-600,-400)）；不抄出来，2D↔3D 往返一次用户的缩放/平移就没了。
+    Camera2D m_savedCamera;
+    bool m_hasSavedCamera{ false };
     SceneTreePanel* m_scenePanel2D{ nullptr };
     std::unique_ptr<SceneTreeSceneObserver2D> m_sceneTreeObserver;
     SceneMonitor* m_sceneMonitor{ nullptr };

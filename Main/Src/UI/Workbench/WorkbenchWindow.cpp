@@ -1177,13 +1177,24 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         m_menuManager->setWorkbench(m_workbench);
     }
 
+    // 6b.1: 重建配置驱动的工具栏。
+    // clearLayoutContent() 已 delete 全部 QToolBar 并把 m_configDrivenLayoutBuilt
+    // 复位为 false，但此前没有任何入口在切换后回来调 buildToolBars()（它只挂在
+    // 启动路径 setWorkbench 上）→ 客户 JSON 一旦声明了 "toolbars"，第一次切换后
+    // 就永久消失且无任何报错；当前 base + 三份客户配置的 "toolbars" 恰好都是空数组
+    // （example_client 连这个键都没有），问题被掩盖了。
+    // 必须放在 6b 之后：UiLayoutBuilder::bindAction 在构建期按 isCommandRegistered()
+    // 一次性决定「连信号」还是「永久禁用」，而分发器要等 setWorkbench 之后才指向新工作台。
+    // buildToolBars 自带 m_configDrivenLayoutBuilt 幂等守卫，重复调用安全。
+    if (m_layoutManager)
+    {
+        m_layoutManager->buildToolBars();
+    }
+
     // 6c: 重建骨架停靠面板。
     // clearWorkbenchContent() 已经 delete 了全部 Dock（含 SceneDock / PropertiesDock），
     // 切换工作台后需要重建。属性面板在 2D→3D→2D 之后需要重新创建。
-    // 注：工具栏没有对等的重建调用 —— 切换工作台后 buildToolBars() 不会再跑。这不是缺陷，
-    // 因为工具栏的唯一归属已收归 C++ 目录驱动路径（Workbench2D::createToolbars），四份
-    // 客户端 JSON 的 "toolbars" 一律为空数组；配置驱动那条只剩兜底能力，无内容可重建。
-    // 必须放在 attachToWindow 之前：工作台是往既有 Dock 里注册面板的。
+    // 须放在 attachToWindow 之前：工作台是往既有 Dock 里注册面板的。
     buildDockAreas();
 
     // 6d: 重建配置驱动的状态栏槽位。
@@ -1261,9 +1272,9 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         m_fileDropHandler->setCurrentWorkbenchId(workbenchId);
     }
 
-    // 注意：配置驱动的工具栏/状态栏槽位已在第 6d 步（buildStatusBar）重建完毕；
-    // buildToolBars 有 m_configDrivenLayoutBuilt 幂等守卫，这里不再重复调用
-    // （重复 buildStatusBar 会 clearStatusBarSlots + 重建，导致槽位顺序翻转两次）。
+    // 注意：配置驱动的工具栏已在 6b.1 重建、状态栏槽位已在第 6d 步（buildStatusBar）重建；
+    // 这里不再重复调用 —— 重复 buildStatusBar 会 clearStatusBarSlots + 重建，
+    // 导致槽位顺序翻转两次。
 
     SY_DEBUGF("[WorkbenchWindow] workbench state committed: id=%s busy=0", workbenchId.toUtf8().constData());
 
