@@ -415,6 +415,13 @@ if(NOT TARGET ${_target_name})
         INTERFACE_LINK_LIBRARIES \"${_deps}\"
     )
 endif()
+
+# Also provide an alias without namespace for backward compatibility
+# (e.g., Engine3D -> Engine3D::Engine3D) so both parent build and
+# standalone find_package() can use the same target name.
+if(NOT TARGET ${_lib_name} AND TARGET ${_target_name})
+    add_library(${_lib_name} ALIAS ${_target_name})
+endif()
 ")
     file(WRITE "${_config_dir}/${_lib_name}Config.cmake" "${_config_content}")
 
