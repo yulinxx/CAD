@@ -33,98 +33,101 @@ namespace
 
         return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
     }
-
-    class LicenseApiTest : public ::testing::Test
-    {
-    protected:
-        void SetUp() override
-        {
-            License_SetCheckEnabled(1);
-            License_GuardMarkInvalid();
-        }
-
-        void TearDown() override
-        {
-#ifdef LICENSE_TEST_HOOKS
-            LicenseTest_ClearPublicKeyPem();
-            LicenseTest_ResetThrottleConfig();
-#endif
-        }
-    };
-
-    class LicenseFixture : public LicenseApiTest
-    {
-    protected:
-        void SetUp() override
-        {
-            LicenseApiTest::SetUp();
-            m_tempDir = UniqueTempDir("sanyi_license_test");
-            std::filesystem::create_directories(m_tempDir);
-        }
-
-        void TearDown() override
-        {
-            LicenseApiTest::TearDown();
-            std::error_code ec;
-            std::filesystem::remove_all(m_tempDir, ec);
-        }
-
-        LicenseContext* CreateContext() const
-        {
-            LicenseConfig config{};
-            License_ConfigInit(&config);
-            std::string configDirStr = m_tempDir.string();
-            config.configDir = configDirStr.c_str();
-            return License_Create(&config);
-        }
-
-        bool SetupTestKeyPair()
-        {
-            const auto privateKeyPath = m_tempDir / "private.pem";
-            const auto publicKeyPath = m_tempDir / "public.pem";
-
-            if (LicenseKeygen_GenerateKeyPair(privateKeyPath.string().c_str(), publicKeyPath.string().c_str()) !=
-                LICENSE_OK)
-            {
-                return false;
-            }
-
-#ifdef LICENSE_TEST_HOOKS
-            const std::string publicPem = ReadFileText(publicKeyPath);
-            if (publicPem.empty())
-            {
-                return false;
-            }
-            return LicenseTest_SetPublicKeyPem(publicPem.c_str()) == LICENSE_OK;
-#else
-            return false;
-#endif
-        }
-
-        std::string GenerateRegCodeForMachine(
-            const std::string& machineCode, const std::string& expiryDate, const std::string& issueDate = "2026-01-01")
-        {
-            const auto privateKeyPath = m_tempDir / "private.pem";
-            char regCode[4096] = {};
-            const int result = LicenseKeygen_GenerateRegCode(machineCode.c_str(),
-                expiryDate.c_str(),
-                "all",
-                issueDate.c_str(),
-                "TestCustomer",
-                privateKeyPath.string().c_str(),
-                regCode,
-                sizeof(regCode));
-
-            if (result != LICENSE_OK)
-            {
-                return {};
-            }
-            return regCode;
-        }
-
-        std::filesystem::path m_tempDir;
-    };
 }  // namespace
+
+// Fixture classes must live outside any anonymous namespace so that TEST_F-generated
+// test classes (which have external linkage) can inherit from them without
+// -Wsubobject-linkage warnings.
+class LicenseApiTest : public ::testing::Test
+{
+protected:
+    void SetUp() override
+    {
+        License_SetCheckEnabled(1);
+        License_GuardMarkInvalid();
+    }
+
+    void TearDown() override
+    {
+#ifdef LICENSE_TEST_HOOKS
+        LicenseTest_ClearPublicKeyPem();
+        LicenseTest_ResetThrottleConfig();
+#endif
+    }
+};
+
+class LicenseFixture : public LicenseApiTest
+{
+protected:
+    void SetUp() override
+    {
+        LicenseApiTest::SetUp();
+        m_tempDir = UniqueTempDir("sanyi_license_test");
+        std::filesystem::create_directories(m_tempDir);
+    }
+
+    void TearDown() override
+    {
+        LicenseApiTest::TearDown();
+        std::error_code ec;
+        std::filesystem::remove_all(m_tempDir, ec);
+    }
+
+    LicenseContext* CreateContext() const
+    {
+        LicenseConfig config{};
+        License_ConfigInit(&config);
+        std::string configDirStr = m_tempDir.string();
+        config.configDir = configDirStr.c_str();
+        return License_Create(&config);
+    }
+
+    bool SetupTestKeyPair()
+    {
+        const auto privateKeyPath = m_tempDir / "private.pem";
+        const auto publicKeyPath = m_tempDir / "public.pem";
+
+        if (LicenseKeygen_GenerateKeyPair(privateKeyPath.string().c_str(), publicKeyPath.string().c_str()) !=
+            LICENSE_OK)
+        {
+            return false;
+        }
+
+#ifdef LICENSE_TEST_HOOKS
+        const std::string publicPem = ReadFileText(publicKeyPath);
+        if (publicPem.empty())
+        {
+            return false;
+        }
+        return LicenseTest_SetPublicKeyPem(publicPem.c_str()) == LICENSE_OK;
+#else
+        return false;
+#endif
+    }
+
+    std::string GenerateRegCodeForMachine(
+        const std::string& machineCode, const std::string& expiryDate, const std::string& issueDate = "2026-01-01")
+    {
+        const auto privateKeyPath = m_tempDir / "private.pem";
+        char regCode[4096] = {};
+        const int result = LicenseKeygen_GenerateRegCode(machineCode.c_str(),
+            expiryDate.c_str(),
+            "all",
+            issueDate.c_str(),
+            "TestCustomer",
+            privateKeyPath.string().c_str(),
+            regCode,
+            sizeof(regCode));
+
+        if (result != LICENSE_OK)
+        {
+            return {};
+        }
+        return regCode;
+    }
+
+    std::filesystem::path m_tempDir;
+};
 
 // ========== C API 基础契约 ==========
 
