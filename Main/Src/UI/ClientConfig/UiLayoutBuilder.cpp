@@ -6,13 +6,13 @@
 #include "UiShortcutRegistry.h"
 
 #include "UI2D/Operation/CommandCatalog.h"
+#include "UI/IconHelper.h"
 #include "Log/SyLogger.h"
 
 #include <QAction>
 #include <QActionGroup>
 #include <QCoreApplication>
 #include <QDockWidget>
-#include <QIcon>
 #include <QKeySequence>
 #include <QMainWindow>
 #include <QMenu>
@@ -183,7 +183,11 @@ void UiLayoutBuilder::bindAction(QAction* action,
     }
     if (!resolvedIcon.isEmpty())
     {
-        action->setIcon(QIcon(resolvedIcon));
+        // 主题化图标：SVG 按 ThemeManager 配色重渲染。
+        // 不能用 QIcon(svg) 裸加载 —— SVG 用 stroke="currentColor"，
+        // QtSvg 把它渲染成黑色；macOS 深色模式下原生菜单背景是深色，
+        // 黑色图标直接隐身，表现为"菜单没有图标"。
+        IconHelper::setThemedIcon(action, resolvedIcon);
     }
     if (!workbenchId.isEmpty())
     {
@@ -256,7 +260,7 @@ void UiLayoutBuilder::buildMenus(const std::vector<MenuDef>& menus)
         qMenu->setObjectName(menu.id);
         if (!menu.iconName.isEmpty())
         {
-            qMenu->menuAction()->setIcon(QIcon(menu.iconName));
+            IconHelper::setThemedIcon(qMenu->menuAction(), menu.iconName);
         }
         qMenu->setProperty("workbenches", menu.workbenches);
         for (const auto& item : menu.items)
@@ -304,7 +308,7 @@ void UiLayoutBuilder::buildMenuItem(
         subMenu->setObjectName(sub.id);
         if (!sub.iconName.isEmpty())
         {
-            subMenu->menuAction()->setIcon(QIcon(sub.iconName));
+            IconHelper::setThemedIcon(subMenu->menuAction(), sub.iconName);
         }
         subMenu->setProperty("workbenchId", sub.workbenches.join(QStringLiteral(",")));
         subMenu->setProperty("checkable", sub.checkable);
@@ -493,7 +497,7 @@ void UiLayoutBuilder::buildToolBars(const std::vector<ToolBarDef>& toolBars)
             }
             if (!actionDef.iconName.isEmpty())
             {
-                action->setIcon(QIcon(actionDef.iconName));
+                IconHelper::setThemedIcon(action, actionDef.iconName);
             }
             if (!actionDef.tooltip.isEmpty())
             {
