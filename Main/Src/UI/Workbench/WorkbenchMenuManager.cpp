@@ -356,6 +356,14 @@ void WorkbenchMenuManager::buildMenus()
 {
     rebuildMenusFromConfig();
     bindConfiguredMenuState();
+
+    // macOS 原生菜单栏收尾，与 rebuildAllMenus 末尾的处理保持一致：
+    // 本路径（initializeWorkbenchShell 在 setWorkbench 之前就持有工作台时命中）
+    // 此前漏掉了延迟收尾，导致该次构建出的原生菜单没有做系统项清理与图标可见性设置。
+    QTimer::singleShot(0, m_window, [] {
+        cleanupMacEditMenuSystemItems();
+        ensureMacMenuImagesVisible();
+    });
 }
 
 void WorkbenchMenuManager::clearGlobalShortcuts()

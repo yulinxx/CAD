@@ -48,18 +48,17 @@ static NSMenu* findSubMenuByTitle(NSMenu* menu, NSString* title)
     return nil;
 }
 
-/// 递归设置菜单树中带图片项的图片可见性（macOS 27+）
+/// 递归设置菜单树中所有项的图片可见性（macOS 27+）。
+/// 注意：不对 [item image] 做条件判断 —— Qt 把 QIcon 同步到 NSMenuItem.image 是
+/// 延迟的，扫描时 image 可能还没挂上；只对"当前有图"的项设置会漏掉这些项，
+/// 表现为图标时有时无。对无图项设置可见性是无害的。
 static void setVisibleRecursively(NSMenu* menu)
 {
     for (NSMenuItem* item in [menu itemArray])
     {
-        if ([item image])
+        if (@available(macOS 27.0, *))
         {
-            // 仅 macOS 27+ 存在此属性；旧系统上调用会崩溃，必须用 available 判定
-            if (@available(macOS 27.0, *))
-            {
-                item.preferredImageVisibility = NSMenuItemImageVisibilityVisible;
-            }
+            item.preferredImageVisibility = NSMenuItemImageVisibilityVisible;
         }
         if ([item submenu])
         {
@@ -68,18 +67,75 @@ static void setVisibleRecursively(NSMenu* menu)
     }
 }
 
+// ---- 菜单变更监听 ----
+// Qt 在启动、菜单重建、动态区块（最近文件等）填充时都会增量同步 NSMenu，
+// 任何时点都可能插入"可见性仍为 Automatic"的新 NSMenuItem。
+// 只在重建后扫一次无法覆盖所有时序，这里监听菜单变更通知自动补设置。
+
+/// 防递归：我们自己设置 preferredImageVisibility 也可能触发变更通知
+static BOOL g_applyingVisibility = NO;
+/// singleShot 合并标记：把同一事件循环轮内的通知风暴合并为一次全树扫描
+static BOOL g_rescanScheduled = NO;
+/// 监听器只装一次
+static BOOL g_menuChangeObserverInstalled = NO;
+
+static void applyImageVisibilityToMainMenu()
+{
+    NSMenu* mainMenu = [NSApp mainMenu];
+    if (!mainMenu)
+    {
+        return;
+    }
+    g_applyingVisibility = YES;
+    setVisibleRecursively(mainMenu);
+    g_applyingVisibility = NO;
+}
+
+/// NSMenuDidChangeItemNotification 回调：菜单项增删/变更后重新应用可见性。
+/// object 为发生变化的 NSMenu（含 Qt 延迟同步、动态区块填充等一切来源），
+/// 这里不做对象过滤、直接对主菜单树全量重扫 —— 菜单树很小，开销可忽略。
+static void handleMenuDidChangeItems(NSNotification* note)
+{
+    if (g_applyingVisibility || ![note.name isEqualToString:NSMenuDidChangeItemNotification])
+    {
+        return;
+    }
+    if (g_rescanScheduled)
+    {
+        return;
+    }
+    g_rescanScheduled = YES;
+    // 延后到本轮通知风暴结束后统一扫一次
+    dispatch_async(dispatch_get_main_queue(), ^
+    {
+        g_rescanScheduled = NO;
+        if (@available(macOS 27.0, *))
+        {
+            applyImageVisibilityToMainMenu();
+        }
+    });
+}
+
 void ensureMacMenuImagesVisible()
 {
     // macOS 27 起 AppKit 默认隐藏菜单项图片（preferredImageVisibility 默认 Automatic），
     // Qt 不感知这个新开关 —— 图标同步正常却不显示。这里显式声明"始终显示"。
     if (@available(macOS 27.0, *))
     {
-        NSMenu* mainMenu = [NSApp mainMenu];
-        if (!mainMenu)
+        applyImageVisibilityToMainMenu();
+
+        // 首次调用时装监听器，此后菜单树任何变化都会自动补设置，
+        // 不再依赖调用点记得在每次重建后调用本函数。
+        if (!g_menuChangeObserverInstalled)
         {
-            return;
+            g_menuChangeObserverInstalled = YES;
+            [[NSNotificationCenter defaultCenter] addObserverForName:NSMenuDidChangeItemNotification
+                                                             object:nil
+                                                              queue:NSOperationQueue.mainQueue
+                                                         usingBlock:^(NSNotification* notification) {
+                                                             handleMenuDidChangeItems(notification);
+                                                         }];
         }
-        setVisibleRecursively(mainMenu);
     }
 }
 

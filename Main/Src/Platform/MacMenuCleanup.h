@@ -41,9 +41,11 @@ void cleanupMacEditMenuSystemItems();
  * 见 SDK 的 NSMenuItem.h 注释）。Qt 只负责把 QIcon 同步成 NSMenuItem.image，
  * 不感知这个新开关，于是菜单项带图却不显示 —— 表现为"菜单没有图标"。
  *
- * 本函数递归遍历原生菜单树，对每个带图片的项显式设置
- * NSMenuItemImageVisibilityVisible。菜单每次重建后 NSMenu 都是全新对象，
- * 因此需与 cleanupMacEditMenuSystemItems() 一样，在每次重建后调用。
+ * 本函数递归遍历原生菜单树，对所有项显式设置 NSMenuItemImageVisibilityVisible
+ * （不区分当前是否带图 —— Qt 同步 QIcon 到 NSMenuItem.image 是延迟的）。
+ * 同时会安装 NSMenuDidChangeItemsNotification 监听器：菜单树任何增删/变更后
+ * 自动重新应用可见性，覆盖 Qt 延迟同步、动态区块（最近文件等）填充等一切时序，
+ * 因此不要求在每次菜单重建后调用；启动后调用一次即可。
  *
  * macOS 27 以下没有该 API，直接返回。
  */
