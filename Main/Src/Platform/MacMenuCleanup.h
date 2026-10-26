@@ -33,10 +33,31 @@
  */
 void cleanupMacEditMenuSystemItems();
 
+/**
+ * @brief 让 macOS 原生菜单显示菜单项图标
+ *
+ * macOS 27 起，AppKit 默认隐藏 NSMenuItem 的图片
+ * （preferredImageVisibility 默认为 Automatic，"typically hide images"，
+ * 见 SDK 的 NSMenuItem.h 注释）。Qt 只负责把 QIcon 同步成 NSMenuItem.image，
+ * 不感知这个新开关，于是菜单项带图却不显示 —— 表现为"菜单没有图标"。
+ *
+ * 本函数递归遍历原生菜单树，对每个带图片的项显式设置
+ * NSMenuItemImageVisibilityVisible。菜单每次重建后 NSMenu 都是全新对象，
+ * 因此需与 cleanupMacEditMenuSystemItems() 一样，在每次重建后调用。
+ *
+ * macOS 27 以下没有该 API，直接返回。
+ */
+void ensureMacMenuImagesVisible();
+
 #else
 
 /// 非 macOS 平台无系统注入项，内联空实现使调用点保持无条件。
 inline void cleanupMacEditMenuSystemItems()
+{
+}
+
+/// 非 macOS 平台菜单图标本来就显示，内联空实现使调用点保持无条件。
+inline void ensureMacMenuImagesVisible()
 {
 }
 

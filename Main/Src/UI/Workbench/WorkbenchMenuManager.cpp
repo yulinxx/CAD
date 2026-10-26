@@ -173,6 +173,8 @@ void WorkbenchMenuManager::rebuildAllMenus()
     // 非 macOS 平台该函数是头文件里的内联空实现，无需在调用点做条件编译。
     QTimer::singleShot(0, m_window, [] {
         cleanupMacEditMenuSystemItems();
+        // macOS 27+ AppKit 默认隐藏菜单项图片，必须显式声明显示
+        ensureMacMenuImagesVisible();
     });
 }
 

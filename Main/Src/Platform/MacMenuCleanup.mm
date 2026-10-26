@@ -48,6 +48,41 @@ static NSMenu* findSubMenuByTitle(NSMenu* menu, NSString* title)
     return nil;
 }
 
+/// 递归设置菜单树中带图片项的图片可见性（macOS 27+）
+static void setVisibleRecursively(NSMenu* menu)
+{
+    for (NSMenuItem* item in [menu itemArray])
+    {
+        if ([item image])
+        {
+            // 仅 macOS 27+ 存在此属性；旧系统上调用会崩溃，必须用 available 判定
+            if (@available(macOS 27.0, *))
+            {
+                item.preferredImageVisibility = NSMenuItemImageVisibilityVisible;
+            }
+        }
+        if ([item submenu])
+        {
+            setVisibleRecursively([item submenu]);
+        }
+    }
+}
+
+void ensureMacMenuImagesVisible()
+{
+    // macOS 27 起 AppKit 默认隐藏菜单项图片（preferredImageVisibility 默认 Automatic），
+    // Qt 不感知这个新开关 —— 图标同步正常却不显示。这里显式声明"始终显示"。
+    if (@available(macOS 27.0, *))
+    {
+        NSMenu* mainMenu = [NSApp mainMenu];
+        if (!mainMenu)
+        {
+            return;
+        }
+        setVisibleRecursively(mainMenu);
+    }
+}
+
 void cleanupMacEditMenuSystemItems()
 {
     NSMenu* mainMenu = [NSApp mainMenu];
