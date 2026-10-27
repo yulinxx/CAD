@@ -139,6 +139,10 @@ void SceneRefreshCoordinator::setSceneContext(Eg::ISceneContext* ctx)
         m_lastCursor = m_sceneManager->currentRevision();
         m_sceneManager->addObserver(this);
     }
+
+    // 换场景后旧的覆盖范围不再成立：首次相机变化会强制做一次全量装配。
+    m_builtVisibleBox = Ut::BBox2d{};
+    m_builtWithoutCulling = false;
 }
 
 std::unordered_set<uint64_t> SceneRefreshCoordinator::takePendingDirtyIds()
@@ -1022,6 +1026,7 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
         // 视口裁剪走空间索引：RTree 范围查询 O(log n + k)，避免全场景 O(N) 扫描。
         // queryByBox 用索引缓存的 AABB 判相交（查询前 flush 待修索引），与
         // gatherGeometry 的 getBbox()+intersects 等价；无效 bbox 图元不在索引里，天然跳过。
+        m_builtVisibleBox = accountBox;
         const Eg::VecSyEntityPtr candidates = sm->queryByBox(accountBox, /*containedOnly=*/false);
         for (Eg::SyEntity* e : candidates)
         {
@@ -1032,6 +1037,8 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     {
         // 矩阵退化拿不到视口盒时退化为全量遍历（与 gatherGeometry 无裁剪分支一致）
         sm->forEachEntity(accountEntity);
+        // 矩阵退化时没有裁剪范围，重置账本无效
+        m_builtVisibleBox = Ut::BBox2d{};
     }
 
     // "选中时隐藏原图"：上面的 submitSceneFromDataSource 已把全部图元（含选中）上传到 GPU，
