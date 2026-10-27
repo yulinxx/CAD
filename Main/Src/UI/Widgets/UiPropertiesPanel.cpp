@@ -229,7 +229,7 @@ namespace
             // 设置焦点策略，确保 Tab 键可以切换焦点（macOS 默认行为不同）
             setFocusPolicy(Qt::StrongFocus);
 
-            setWindowTitle(tr("Edit %1").arg(m_item.name));
+            setWindowTitle(tr("Edit %1").arg(m_item.name));  // 编辑 %1
             setMinimumWidth(360);
 
             auto* layout = new QVBoxLayout(this);
@@ -245,7 +245,7 @@ namespace
             {
                 m_point = new PointCoordEditor(this);
                 m_point->setPoint(m_target ? m_target->pointAt(m_item, 0) : QPointF());
-                form->addRow(tr("Coordinates:"), m_point);
+                form->addRow(tr("Coordinates:"), m_point);  // 坐标
                 break;
             }
             case PropertyEditType::PointList:
@@ -254,13 +254,13 @@ namespace
                 const QVariantMap data = m_item.editData.toMap();
                 const int count = data.value(QStringLiteral("count"), 0).toInt();
                 const int current = data.value(QStringLiteral("currentIndex"), 0).toInt();
-                const QString label = data.value(QStringLiteral("label"), tr("Point")).toString();
+                const QString label = data.value(QStringLiteral("label"), tr("Point")).toString();  // 点
                 m_list->setup(count, current, label);
                 m_list->setPointProvider([target = this->m_target, item = this->m_item](int idx) -> QPointF {
                     return target ? target->pointAt(item, idx) : QPointF();
                 });
                 m_list->setPoint(m_target ? m_target->pointAt(m_item, current) : QPointF());
-                form->addRow(tr("Vertices:"), m_list);
+                form->addRow(tr("Vertices:"), m_list);  // 顶点
                 break;
             }
             case PropertyEditType::Color:
@@ -268,7 +268,7 @@ namespace
                 m_color = new ColorEditor(this);
                 QColor c(m_item.value);
                 m_color->setColor(c.isValid() ? c : QColor(Qt::white));
-                form->addRow(tr("Color:"), m_color);
+                form->addRow(tr("Color:"), m_color);  // 颜色
                 break;
             }
             default:
@@ -284,7 +284,7 @@ namespace
                 }
                 else
                 {
-                    QMessageBox::warning(this, tr("Edit"), tr("Invalid value, change was not applied."));
+                    QMessageBox::warning(this, tr("Edit"), tr("Invalid value, change was not applied."));  // 编辑, 无效值，更改未应用
                 }
             });
             connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
@@ -376,7 +376,7 @@ public:
         case PropertyEditType::CheckBox:
         {
             auto* combo = new QComboBox(parent);
-            combo->addItems({ tr("No"), tr("Yes") });
+            combo->addItems({ tr("No"), tr("Yes") });  // 否 / 是
             return combo;
         }
         case PropertyEditType::Point2d:
@@ -502,7 +502,7 @@ PropertiesPanelWidget::PropertiesPanelWidget(QWidget* parent)
     m_tree->setStyleSheet(QStringLiteral("QTreeWidget::item { min-height: 26px; }"));
     m_tree->setUniformRowHeights(false);
     m_tree->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_tree->setToolTip(tr("Entity properties. Double-click a value cell to edit it when editable."));
+    m_tree->setToolTip(tr("Entity properties. Double-click a value cell to edit it when editable."));  // 实体属性。可编辑时双击数值单元格进行修改。
     // Interactive 模式允许用户拖动调整列宽，stretchLastSection 使最后一列填满窗口
     m_tree->header()->setStretchLastSection(true);
     m_tree->header()->setSectionResizeMode(0, QHeaderView::Interactive);
@@ -552,7 +552,7 @@ void PropertiesPanelWidget::changeEvent(QEvent* event)
     {
         if (m_tree)
         {
-            m_tree->setHeaderLabels({ tr("Field"), tr("Value") });
+            m_tree->setHeaderLabels({ tr("Field"), tr("Value") });  // 字段 / 值  // 字段 / 值
         }
         // 属性项显示名是生成时本地化的，语言切换后必须重建树才能刷新
         refresh();
@@ -645,13 +645,13 @@ void PropertiesPanelWidget::renderPropertyModel()
     if (!m_model.hasSelection)
     {
         // 无选中对象：展示空态
-        new QTreeWidgetItem(m_tree, { tr("Selection"), tr("No selection") });
+        new QTreeWidgetItem(m_tree, { tr("Selection"), tr("No selection") });  // 选择 / 未选择
         return;
     }
 
     if (!m_model.typeName.isEmpty())
     {
-        new QTreeWidgetItem(m_tree, { tr("Object"), m_model.typeName });
+        new QTreeWidgetItem(m_tree, { tr("Object"), m_model.typeName });  // 对象
     }
 
     const bool editable = static_cast<bool>(m_editTarget);
@@ -669,7 +669,7 @@ void PropertiesPanelWidget::renderPropertyModel()
         if (!parent)
         {
             parent = new QTreeWidgetItem(m_tree);
-            parent->setText(0, item.category.isEmpty() ? tr("General") : item.category);
+            parent->setText(0, item.category.isEmpty() ? tr("General") : item.category);  // 常规
             parent->setFlags(parent->flags() & ~Qt::ItemIsEditable);
             groups.insert(item.category, parent);
         }
@@ -704,11 +704,11 @@ void PropertiesPanelWidget::renderInfoText()
 
     if (!m_data.documentType.isEmpty())
     {
-        new QTreeWidgetItem(m_tree, { tr("Document"), m_data.documentType });
+        new QTreeWidgetItem(m_tree, { tr("Document"), m_data.documentType });  // 文档
     }
     if (!m_data.documentStatus.isEmpty())
     {
-        new QTreeWidgetItem(m_tree, { tr("Status"), m_data.documentStatus });
+        new QTreeWidgetItem(m_tree, { tr("Status"), m_data.documentStatus });  // 状态
     }
 
     for (const QString& field : m_data.modeSpecificFields)
@@ -720,7 +720,7 @@ void PropertiesPanelWidget::renderInfoText()
         }
         else
         {
-            new QTreeWidgetItem(m_tree, { tr("Detail"), field });
+            new QTreeWidgetItem(m_tree, { tr("Detail"), field });  // 详细
         }
     }
 

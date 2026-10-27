@@ -697,8 +697,8 @@ SceneTreePanel::SceneTreePanel(QWidget* parent)
     m_view->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_view->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::EditKeyPressed);
     m_view->setToolTip(
-        tr("Scene hierarchy. Double-click to rename; right-click for Show/Hide, Lock, Delete and selection tools."));
-    m_view->header()->setToolTip(tr("Click a column header to sort the tree"));
+        tr("Scene hierarchy. Double-click to rename; right-click for Show/Hide, Lock, Delete and selection tools."));  // 场景层级。双击重命名；右键显示/隐藏、锁定、删除和选择工具。
+    m_view->header()->setToolTip(tr("Click a column header to sort the tree"));  // 点击列标题对树进行排序
     layout->addWidget(m_view);
 
     // 注意：QItemSelectionModel 的 connect 延迟到 setMode2D/setMode3D 中执行，
@@ -716,27 +716,27 @@ SceneTreePanel::SceneTreePanel(QWidget* parent)
     connect(m_view, &QTreeView::customContextMenuRequested, this, &SceneTreePanel::showContextMenu);
     m_contextMenu = new QMenu(this);
     m_contextMenu->setToolTipsVisible(true);
-    auto* actShow = m_contextMenu->addAction(tr("Show"));
+    auto* actShow = m_contextMenu->addAction(tr("Show"));  // 显示
     actShow->setObjectName(QStringLiteral("ctxShow"));
-    actShow->setToolTip(tr("Make the selected entities visible"));
-    auto* actHide = m_contextMenu->addAction(tr("Hide"));
+    actShow->setToolTip(tr("Make the selected entities visible"));  // 使选定实体可见
+    auto* actHide = m_contextMenu->addAction(tr("Hide"));  // 隐藏
     actHide->setObjectName(QStringLiteral("ctxHide"));
-    actHide->setToolTip(tr("Hide the selected entities from the canvas"));
+    actHide->setToolTip(tr("Hide the selected entities from the canvas"));  // 从画布隐藏选定的实体
     m_contextMenu->addSeparator();
-    auto* actLock = m_contextMenu->addAction(tr("Lock"));
+    auto* actLock = m_contextMenu->addAction(tr("Lock"));  // 锁定
     actLock->setObjectName(QStringLiteral("ctxLock"));
-    actLock->setToolTip(tr("Prevent the selected entities from being edited"));
-    auto* actUnlock = m_contextMenu->addAction(tr("Unlock"));
+    actLock->setToolTip(tr("Prevent the selected entities from being edited"));  // 阻止选定的实体被编辑
+    auto* actUnlock = m_contextMenu->addAction(tr("Unlock"));  // 解锁
     actUnlock->setObjectName(QStringLiteral("ctxUnlock"));
-    actUnlock->setToolTip(tr("Allow the selected entities to be edited again"));
+    actUnlock->setToolTip(tr("Allow the selected entities to be edited again"));  // 允许再次编辑选定的实体
     m_contextMenu->addSeparator();
-    auto* actDelete = m_contextMenu->addAction(tr("Delete"));
+    auto* actDelete = m_contextMenu->addAction(tr("Delete"));  // 删除
     actDelete->setObjectName(QStringLiteral("ctxDelete"));
-    actDelete->setToolTip(tr("Remove the selected entities from the document"));
+    actDelete->setToolTip(tr("Remove the selected entities from the document"));  // 从文档中删除选定的实体
     m_contextMenu->addSeparator();
-    auto* actSelectAll = m_contextMenu->addAction(tr("Select All"));
+    auto* actSelectAll = m_contextMenu->addAction(tr("Select All"));  // 全选
     actSelectAll->setObjectName(QStringLiteral("ctxSelectAll"));
-    actSelectAll->setToolTip(tr("Select every entity in the scene"));
+    actSelectAll->setToolTip(tr("Select every entity in the scene"));  // 选择场景中的每个实体
     auto* actClear = m_contextMenu->addAction(tr("Clear Selection"));
     actClear->setObjectName(QStringLiteral("ctxClear"));
     actClear->setToolTip(tr("Deselect all currently selected entities"));
@@ -767,7 +767,7 @@ SceneTreePanel::SceneTreePanel(QWidget* parent)
     });
 
     // Ctrl+A 快捷键
-    auto* shortcut = new QShortcut(QKeySequence(tr("Ctrl+A")), this);
+    auto* shortcut = new QShortcut(QKeySequence(tr("Ctrl+A")), this);  // Ctrl+A
     shortcut->setContext(Qt::WidgetShortcut);
     connect(shortcut, &QShortcut::activated, this, &SceneTreePanel::selectAllRows);
 
@@ -1313,10 +1313,10 @@ void SceneTreePanel::retranslateMenu()
     if (m_view)
     {
         m_view->setToolTip(tr(
-            "Scene hierarchy. Double-click to rename; right-click for Show/Hide, Lock, Delete and selection tools."));
+            "Scene hierarchy. Double-click to rename; right-click for Show/Hide, Lock, Delete and selection tools."));  // 场景层级。双击重命名；右键显示/隐藏、锁定、删除和选择工具。
         if (m_view->header())
         {
-            m_view->header()->setToolTip(tr("Click a column header to sort the tree"));
+            m_view->header()->setToolTip(tr("Click a column header to sort the tree"));  // 点击列标题对树进行排序
         }
     }
     if (!m_contextMenu)
@@ -1328,38 +1328,38 @@ void SceneTreePanel::retranslateMenu()
         const QString on = act->objectName();
         if (on == QStringLiteral("ctxShow"))
         {
-            act->setText(tr("Show"));
-            act->setToolTip(tr("Make the selected entities visible"));
+            act->setText(tr("Show"));  // 显示
+            act->setToolTip(tr("Make the selected entities visible"));  // 使选定实体可见
         }
         else if (on == QStringLiteral("ctxHide"))
         {
-            act->setText(tr("Hide"));
-            act->setToolTip(tr("Hide the selected entities from the canvas"));
+            act->setText(tr("Hide"));  // 隐藏
+            act->setToolTip(tr("Hide the selected entities from the canvas"));  // 从画布隐藏选定的实体
         }
         else if (on == QStringLiteral("ctxLock"))
         {
-            act->setText(tr("Lock"));
-            act->setToolTip(tr("Prevent the selected entities from being edited"));
+            act->setText(tr("Lock"));  // 锁定
+            act->setToolTip(tr("Prevent the selected entities from being edited"));  // 阻止选定的实体被编辑
         }
         else if (on == QStringLiteral("ctxUnlock"))
         {
-            act->setText(tr("Unlock"));
-            act->setToolTip(tr("Allow the selected entities to be edited again"));
+            act->setText(tr("Unlock"));  // 解锁
+            act->setToolTip(tr("Allow the selected entities to be edited again"));  // 允许再次编辑选定的实体
         }
         else if (on == QStringLiteral("ctxDelete"))
         {
-            act->setText(tr("Delete"));
-            act->setToolTip(tr("Remove the selected entities from the document"));
+            act->setText(tr("Delete"));  // 删除
+            act->setToolTip(tr("Remove the selected entities from the document"));  // 从文档中删除选定的实体
         }
         else if (on == QStringLiteral("ctxSelectAll"))
         {
-            act->setText(tr("Select All"));
-            act->setToolTip(tr("Select every entity in the scene"));
+            act->setText(tr("Select All"));  // 全选
+            act->setToolTip(tr("Select every entity in the scene"));  // 选择场景中的每个实体
         }
         else if (on == QStringLiteral("ctxClear"))
         {
-            act->setText(tr("Clear Selection"));
-            act->setToolTip(tr("Deselect all currently selected entities"));
+            act->setText(tr("Clear Selection"));  // 清除选择
+            act->setToolTip(tr("Deselect all currently selected entities"));  // 取消选择当前所有选中的实体
         }
     }
 }

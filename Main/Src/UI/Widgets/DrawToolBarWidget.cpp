@@ -111,13 +111,13 @@ void DrawToolBarWidget::updateHighlight()
     {
         m_selectButton->setDefaultAction(m_panAction);
         IconHelper::setThemedIcon(m_selectButton, kPanIconPath);
-        m_selectButton->setToolTip(tr("Pan (Click to Select)"));
+        m_selectButton->setToolTip(tr("Pan (Click to Select)"));  // 平移（点击选择）
     }
     else
     {
         m_selectButton->setDefaultAction(m_selectAction);
         IconHelper::setThemedIcon(m_selectButton, kSelectIconPath);
-        m_selectButton->setToolTip(tr("Select (Click to Pan)"));
+        m_selectButton->setToolTip(tr("Select (Click to Pan)"));  // 选择（点击平移）
     }
 
     // 高亮逻辑：
