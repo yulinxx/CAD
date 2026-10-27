@@ -43,13 +43,13 @@ SceneTreeNode3D SceneTreeBuilder3D::buildMeshNode(const Eg::SyMeshEntity* mesh, 
     }
 
     node.id = QString::number(mesh->id);
-    node.typeName = QObject::tr("Mesh");
+    node.typeName = QObject::tr("Mesh");  // 网格
     const char* rawName = mesh->name();
     node.displayName = (rawName && *rawName) ? QString::fromUtf8(rawName) : node.typeName;
     node.selected = selected;
     node.visible = mesh->visible();
     node.locked = mesh->locked();
-    node.info = QObject::tr("%1 tris").arg(static_cast<int>(mesh->triangleCount()));
+    node.info = QObject::tr("%1 tris").arg(static_cast<int>(mesh->triangleCount()));  // %1 个三角形
     return node;
 }
 

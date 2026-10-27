@@ -43,7 +43,7 @@ namespace
         const QString name = QString::fromUtf8(rawName ? rawName : "");
         if (name.startsWith(QStringLiteral("Text|")) || name.startsWith(QStringLiteral("SY_TXT:")))
         {
-            return QObject::tr("Text");
+            return QObject::tr("Text");  // 文本
         }
         return name;
     }
@@ -54,42 +54,42 @@ QString SceneTreeBuilder2D::typeName(Eg::EType eType)
     switch (eType)
     {
     case Eg::EType::POINT:
-        return QObject::tr("Point");
+        return QObject::tr("Point");  // 点
     case Eg::EType::LINE:
-        return QObject::tr("Line");
+        return QObject::tr("Line");  // 直线
     case Eg::EType::POLYGON:
-        return QObject::tr("Polygon");
+        return QObject::tr("Polygon");  // 多边形
     case Eg::EType::ARC:
-        return QObject::tr("Arc");
+        return QObject::tr("Arc");  // 圆弧
     case Eg::EType::CIRCLE:
-        return QObject::tr("Circle");
+        return QObject::tr("Circle");  // 圆
     case Eg::EType::ELLIPSE:
-        return QObject::tr("Ellipse");
+        return QObject::tr("Ellipse");  // 椭圆
     case Eg::EType::BEZIER2:
-        return QObject::tr("Bezier2");
+        return QObject::tr("Bezier2");  // 二次贝塞尔
     case Eg::EType::BEZIER:
-        return QObject::tr("Bezier");
+        return QObject::tr("Bezier");  // 贝塞尔曲线
     case Eg::EType::SPLINE:
-        return QObject::tr("Spline");
+        return QObject::tr("Spline");  // 样条
     case Eg::EType::NURBS:
-        return QObject::tr("NURBS");
+        return QObject::tr("NURBS");  // NURBS
     case Eg::EType::SMARTLINE:
-        return QObject::tr("SmartLine");
+        return QObject::tr("SmartLine");  // 智能直线
     case Eg::EType::TEXT:
-        return QObject::tr("Text");
+        return QObject::tr("Text");  // 文本
     case Eg::EType::BAR_CODE:
-        return QObject::tr("BarCode");
+        return QObject::tr("BarCode");  // 条码
     case Eg::EType::QR_CODE:
-        return QObject::tr("QRCode");
+        return QObject::tr("QRCode");  // 二维码
     case Eg::EType::IMAGE:
-        return QObject::tr("Image");
+        return QObject::tr("Image");  // 图像
     case Eg::EType::MESH:
-        return QObject::tr("Mesh");
+        return QObject::tr("Mesh");  // 网格
     case Eg::EType::GROUP:
-        return QObject::tr("Group");
+        return QObject::tr("Group");  // 组
     case Eg::EType::UNKNOWN:
     default:
-        return QObject::tr("Unknown");
+        return QObject::tr("Unknown");  // 未知
     }
 }
 
