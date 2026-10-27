@@ -300,6 +300,12 @@ void Workbench3D::create3DServices()
 
     #ifdef ENABLE_GEOMODELCORE
     own.brepModelService = std::make_unique<BRepModelService3D>();
+    // B-Rep 与网格变换同步：TransformMeshCommand3D 的 undo/redo 通过该服务
+    // 应用逆/正矩阵，否则撤销后网格回位而 B-Rep 停在变换后的位置。
+    if (own.sceneEditService && own.brepModelService)
+    {
+        own.sceneEditService->bindBRepService(own.brepModelService.get());
+    }
     #endif
 
     if (own.sceneMonitor)
@@ -1373,6 +1379,9 @@ void Workbench3D::deleteSceneTreeSelection3D(const QStringList& ids)
             m_sceneManager3D->markDataChanged();
         }
     }
+
+    // 不要在这里 prune B-Rep：删除可撤销，映射需按 id 保留到撤销之后。
+    // 图元 id 单调递增不会复用，陈旧条目由文档级替换时的 clearEntityMap() 清理。
 
     // 删除推进 structureRevision，走防抖重建即可
     refreshSceneTree3DIfNeeded();
