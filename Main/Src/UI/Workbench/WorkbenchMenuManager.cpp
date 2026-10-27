@@ -176,6 +176,12 @@ void WorkbenchMenuManager::rebuildAllMenus()
         // macOS 27+ AppKit 默认隐藏菜单项图片，必须显式声明显示
         ensureMacMenuImagesVisible();
     });
+
+    // 独立自检：即使上面的修复调用以后被误删/失效，也要在日志里留下错误，
+    // 而不是让"菜单图标消失"再次变成无迹可查的问题。
+    QTimer::singleShot(3000, m_window, [] {
+        checkMacMenuImagesVisible();
+    });
 }
 
 bool WorkbenchMenuManager::isWindowLevelCommand(const QString& commandId)
