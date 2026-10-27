@@ -198,7 +198,7 @@ void LicenseDialog::OnActivateClicked()
     const QString regCode = m_regCodeEdit->text().trimmed();
     if (regCode.isEmpty())
     {
-        m_statusLabel->setText(tr("Please enter a registration code."));
+        m_statusLabel->setText(tr("Please enter a registration code."));  // 请输入注册码。
         return;
     }
 
