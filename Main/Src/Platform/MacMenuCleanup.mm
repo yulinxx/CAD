@@ -11,6 +11,8 @@
  */
 #include "Platform/MacMenuCleanup.h"
 
+#include "Log/SyLogger.h"
+
 #import <Cocoa/Cocoa.h>
 
 
@@ -67,6 +69,75 @@ static void setVisibleRecursively(NSMenu* menu)
     }
 }
 
+/// 递归统计仍会被 AppKit 隐藏的菜单图标，并收集前几个示例路径。
+static int countHiddenImageItems(NSMenu* menu, NSString* parentPath, NSMutableArray<NSString*>* samples)
+{
+    int hidden = 0;
+    for (NSMenuItem* item in [menu itemArray])
+    {
+        NSString* itemPath = parentPath.length > 0
+            ? [NSString stringWithFormat:@"%@ > %@", parentPath, [item title]]
+            : [item title];
+
+        if (@available(macOS 27.0, *))
+        {
+            // 只有带 QIcon 同步过来的图片、但可见性不是 Visible 的项才会被隐藏。
+            if ([item image] && [item preferredImageVisibility] != NSMenuItemImageVisibilityVisible)
+            {
+                ++hidden;
+                if ([samples count] < 5)
+                {
+                    [samples addObject:itemPath];
+                }
+            }
+        }
+
+        NSMenu* submenu = [item submenu];
+        if (submenu)
+        {
+            hidden += countHiddenImageItems(submenu, itemPath, samples);
+        }
+    }
+    return hidden;
+}
+
+bool checkMacMenuImagesVisible()
+{
+    if (@available(macOS 27.0, *))
+    {
+        NSMenu* mainMenu = [NSApp mainMenu];
+        if (!mainMenu)
+        {
+            // 菜单尚未同步到 NSMenu，等下一次菜单变更或自检再看。
+            return true;
+        }
+
+        NSMutableArray<NSString*>* samples = [NSMutableArray array];
+        const int hidden = countHiddenImageItems(mainMenu, @"", samples);
+
+        // 同一批隐藏项只报一次，避免菜单变更通知风暴刷屏；问题消失后再次出现会重新报。
+        static int s_lastReportedHiddenCount = 0;
+        if (hidden > 0)
+        {
+            if (hidden != s_lastReportedHiddenCount)
+            {
+                s_lastReportedHiddenCount = hidden;
+                NSString* sampleText = [samples componentsJoinedByString:@", "];
+                SY_ERRORF("[MacMenu] %d menu item(s) with icons are hidden by AppKit "
+                          "(preferredImageVisibility != Visible) on macOS %s. Menu icons will be missing. "
+                          "Sample: %s. Check ensureMacMenuImagesVisible() and Qt menu icon sync.",
+                    hidden,
+                    [[[NSProcessInfo processInfo] operatingSystemVersionString] UTF8String],
+                    [sampleText UTF8String]);
+            }
+            return false;
+        }
+
+        s_lastReportedHiddenCount = 0;
+    }
+    return true;
+}
+
 // ---- 菜单变更监听 ----
 // Qt 在启动、菜单重建、动态区块（最近文件等）填充时都会增量同步 NSMenu，
 // 任何时点都可能插入"可见性仍为 Automatic"的新 NSMenuItem。
@@ -89,6 +160,10 @@ static void applyImageVisibilityToMainMenu()
     g_applyingVisibility = YES;
     setVisibleRecursively(mainMenu);
     g_applyingVisibility = NO;
+
+    // 设置完立即自检：如果未来 AppKit 再次改变行为、或属性设置被忽略，
+    // 这里会留下错误日志，而不是又变成"图标悄悄消失、没人知道"。
+    checkMacMenuImagesVisible();
 }
 
 /// NSMenuDidChangeItemNotification 回调：菜单项增删/变更后重新应用可见性。

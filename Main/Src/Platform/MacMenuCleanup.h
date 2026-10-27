@@ -51,6 +51,20 @@ void cleanupMacEditMenuSystemItems();
  */
 void ensureMacMenuImagesVisible();
 
+/**
+ * @brief 自检：macOS 27+ 上是否还有菜单项图标处于"会被 AppKit 隐藏"的状态
+ *
+ * 扫描原生菜单树，找出"有图片但 preferredImageVisibility 不是 Visible"的项。
+ * 只要发现一个，就通过 SY_ERRORF 写错误日志（含数量、系统和示例菜单路径），
+ * 用于在 workaround 失效、调用点被误删或未来 macOS 再次改变行为时留下明确线索。
+ *
+ * 本函数只检查并记录，不修改菜单；修复仍由 ensureMacMenuImagesVisible() 负责。
+ *
+ * @return true 表示当前没有发现会被隐藏的菜单图标；false 表示发现了问题。
+ *         macOS 27 以下或主菜单尚未同步时返回 true。
+ */
+bool checkMacMenuImagesVisible();
+
 #else
 
 /// 非 macOS 平台无系统注入项，内联空实现使调用点保持无条件。
@@ -61,6 +75,12 @@ inline void cleanupMacEditMenuSystemItems()
 /// 非 macOS 平台菜单图标本来就显示，内联空实现使调用点保持无条件。
 inline void ensureMacMenuImagesVisible()
 {
+}
+
+/// 非 macOS 平台没有 NSMenuItem 可见性开关，自检恒通过。
+inline bool checkMacMenuImagesVisible()
+{
+    return true;
 }
 
 #endif
