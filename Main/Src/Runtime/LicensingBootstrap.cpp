@@ -25,6 +25,18 @@ namespace
         LicenseInfo info{};
     };
 
+    // 试用/授权对话框文案（QCoreApplication::translate 的 context 键）。
+    // QT_TRANSLATE_NOOP 仅作静态标记供 lupdate 提取，运行时经 translate 翻译。
+    constexpr auto kTrialExpiredTitle = QT_TRANSLATE_NOOP("CADApplicationRuntime", "Trial Expired");
+    constexpr auto kTrialExpiredBody =
+        QT_TRANSLATE_NOOP("CADApplicationRuntime", "Your trial period has ended.\n\nPlease register to continue using the software.");
+    constexpr auto kTrialVersionBody =
+        QT_TRANSLATE_NOOP("CADApplicationRuntime", "Trial Version\n\nYou have %1 day(s) remaining in your trial period.\n\nYou can continue using the trial version or activate a license now.");
+    constexpr auto kTrialActiveTitle = QT_TRANSLATE_NOOP("CADApplicationRuntime", "Trial Period");
+    constexpr auto kRegisterNow = QT_TRANSLATE_NOOP("CADApplicationRuntime", "Register Now");
+    constexpr auto kContinueTrial = QT_TRANSLATE_NOOP("CADApplicationRuntime", "Continue Trial");
+    constexpr auto kExit = QT_TRANSLATE_NOOP("CADApplicationRuntime", "Exit");
+
     // 只读探测：不写任何持久化状态，上下文在本函数内创建并销毁
     LicenseProbe probeLicense(const LicenseConfig& config)
     {
@@ -97,6 +109,12 @@ int LicensingBootstrap::runGate(const QString& configDir)
     // === Phase 1: 试用期检查（仅无有效许可证时执行） ===
     Trial_SetConfigDir(configDirUtf8.constData());
 
+    // 翻译上下文保持 "CADApplicationRuntime"：既有 .ts 翻译按该 context 键控，
+    // 类迁移不改变用户可见文案的翻译归属。
+    auto tr = [](const char* text) {
+        return QCoreApplication::translate("CADApplicationRuntime", text);
+    };
+
     int remainingDays = 0;
     const int trialResult = Trial_Check(&remainingDays);
     bool inTrialMode = false;  // 标记用户是否处于试用模式（未持有有效许可证）
@@ -108,12 +126,12 @@ int LicensingBootstrap::runGate(const QString& configDir)
         // 试用期已结束：必须注册或退出
         int expiredChoice = -1;  // 0=Register, 1=Exit
         QMessageBox expiredBox(QMessageBox::Warning,
-            QString::fromUtf8("Trial Expired"),
-            QString::fromUtf8("Your trial period has ended.\n\nPlease register to continue using the software."),
+            tr(kTrialExpiredTitle),
+            tr(kTrialExpiredBody),
             QMessageBox::NoButton,
             nullptr);
-        QPushButton* regBtn = expiredBox.addButton(QString::fromUtf8("Register Now"), QMessageBox::AcceptRole);
-        QPushButton* exitBtn = expiredBox.addButton(QString::fromUtf8("Exit"), QMessageBox::RejectRole);
+        QPushButton* regBtn = expiredBox.addButton(tr(kRegisterNow), QMessageBox::AcceptRole);
+        QPushButton* exitBtn = expiredBox.addButton(tr(kExit), QMessageBox::RejectRole);
         QObject::connect(regBtn, &QPushButton::clicked, [&expiredChoice]() {
             expiredChoice = 0;
         });
@@ -144,21 +162,12 @@ int LicensingBootstrap::runGate(const QString& configDir)
         UiFeatureGate::instance().setUnrestricted(true);
         SY_INFOF("[LicensingBootstrap] Trial active: %d days remaining", remainingDays);
 
-        // 翻译上下文保持 "CADApplicationRuntime"：既有 .ts 翻译按该 context 键控，
-        // 类迁移不改变用户可见文案的翻译归属。
-        auto tr = [](const char* text) {
-            return QCoreApplication::translate("CADApplicationRuntime", text);
-        };
-
-        QString trialMsg = tr("Trial Version\n\n"
-                              "You have %1 day(s) remaining in your trial period.\n\n"
-                              "You can continue using the trial version or activate a license now.")
-                               .arg(remainingDays);
+        QString trialMsg = tr(kTrialVersionBody).arg(remainingDays);
 
         int trialChoice = -1;  // 0=Register, 1=Continue
-        QMessageBox trialBox(QMessageBox::Information, tr("Trial Period"), trialMsg, QMessageBox::NoButton, nullptr);
-        QPushButton* regBtn = trialBox.addButton(tr("Register Now"), QMessageBox::AcceptRole);
-        QPushButton* contBtn = trialBox.addButton(tr("Continue Trial"), QMessageBox::RejectRole);
+        QMessageBox trialBox(QMessageBox::Information, tr(kTrialActiveTitle), trialMsg, QMessageBox::NoButton, nullptr);
+        QPushButton* regBtn = trialBox.addButton(tr(kRegisterNow), QMessageBox::AcceptRole);
+        QPushButton* contBtn = trialBox.addButton(tr(kContinueTrial), QMessageBox::RejectRole);
         QObject::connect(regBtn, &QPushButton::clicked, [&trialChoice]() {
             trialChoice = 0;
         });
