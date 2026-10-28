@@ -329,3 +329,9 @@ DerivedData/
 # Qt Creator
 qtcreator/
 qtcreator.xml
+
+# Temp test files and directories - exclude from commit
+stress_*/
+LayeredProcessingTests.cpp
+PolygonOffsetTests.cpp
+.github/workflows/package-smoke.yml
