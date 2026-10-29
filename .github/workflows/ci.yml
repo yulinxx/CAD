@@ -25,6 +25,9 @@ jobs:
       #   Engine* 不得依赖 UI*/Render*/Main；RenderX/RenderBridge 不得依赖 UI*/Main；
       #   UI* 只能经 UiEngineAccess 门面访问 Engine*。
       # 违规会让本步骤直接失败。
+      # 注意：本作业是开发构建（SANYI_ENABLE_LICENSE 默认 OFF，许可校验关闭）。
+      # 发货/Release 构建必须额外传 -DSANYI_ENABLE_LICENSE=ON（宏由 License 库的
+      # CMakeLists 编进 DLL 本身）；后续若新增 Release 作业，应断言该开关为 ON。
       - name: Configure
         run: |
           cmake -B build -G "Visual Studio 17 2022" -A x64 \

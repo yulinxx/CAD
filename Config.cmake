@@ -236,6 +236,10 @@ option(BUILD_ENGRAVING "Build Engraving module (3D laser engraving)" ON)
 option(BUILD_GEOMODELCORE "Build GeoModelCore module (OpenCASCADE-based geometry modeling)" OFF)
 option(BUILD_CRASHHANDLER "Build CrashHandler module (crash capture and reporting)" ON)
 option(BUILD_PYTHON "Build Python module (PythonHost integration framework)" OFF)
+# 许可校验开关：默认 OFF 保持开发构建行为，发货构建用 -DSANYI_ENABLE_LICENSE=ON 打开。
+# 宏编进 License 库本身（LicenseInternal.cpp 依据它决定运行期默认值），
+# Main 的 BuildConfig.h 镜像同步该取值供启动自检交叉核对。
+option(SANYI_ENABLE_LICENSE "启用许可校验（发货构建应设 ON）" OFF)
 
 # ===== 工具 =====
 option(BUILD_KEYGEN_TOOL "Build KeygenTool (offline license key generator)" OFF)
@@ -258,7 +262,9 @@ option(BUILD_RENDER_BENCHMARK "Build headless render frame-path benchmark" ON)
 #           立即生效（用 FORCE 写回缓存，避免旧缓存粘滞导致「改了文件没反应」）。
 
 # 便捷总开关：ON = 把下面全部模块测试一并打开；OFF = 保持各模块的显式取值
-set(BUILD_ALL_TESTS OFF CACHE BOOL "打开全部模块测试（便捷总开关）" FORCE)
+# 此处不得用 FORCE 写回缓存：FORCE 会把命令行 -DBUILD_ALL_TESTS=ON 静默覆盖回 OFF。
+# 该开关的缓存项由本文件开头「测试开关」一节的 option(BUILD_ALL_TESTS ... OFF) 唯一声明，
+# 默认值 OFF 保持不变，-D 传参可正常生效。
 
 # ---- 逐模块测试开关（核心模块默认启用，建立测试保护网）----
 set(BUILD_UTILITY_TESTS          ON  CACHE BOOL "Utility 单元测试" FORCE)

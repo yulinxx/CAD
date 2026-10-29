@@ -4,6 +4,7 @@
 
 #include <openssl/evp.h>
 
+#include <algorithm>
 #include <ctime>
 #include <cstdlib>
 #include <filesystem>
@@ -29,6 +30,11 @@ namespace
     {
         s_configDir = dir;
     }
+
+    // Trial_Check 结果缓存（文件级：Trial_Reset 会清除，使下一次 Check 重新读档）
+    bool s_checked = false;
+    int s_cachedResult = 0;
+    int s_cachedDays = 0;
 
     // 获取配置目录
     std::string getConfigDir()
@@ -108,15 +114,11 @@ extern "C"
     {
         try
         {
-            static bool checked = false;
-            static int cachedResult = 0;
-            static int cachedDays = 0;
-
-            if (!checked)
+            if (!s_checked)
             {
                 TrialManager& mgr = TrialManager::instance();
                 TrialManager::Status status = mgr.check();
-                checked = true;
+                s_checked = true;
 
                 // 调试输出
                 SY_DEBUGF("[Trial] check: status=%d, startDate='%s', trialDays=%d",
@@ -127,22 +129,22 @@ extern "C"
                 // 只有明确过期的才返回 -1，其他情况（包括出错）都允许继续
                 if (status == TrialManager::Status::Expired)
                 {
-                    cachedResult = -1;
+                    s_cachedResult = -1;
                 }
                 else
                 {
-                    cachedResult = 0;  // Active 或其他状态都允许继续
+                    s_cachedResult = 0;  // Active 或其他状态都允许继续
                 }
-                cachedDays = mgr.remainingDays();
-                SY_DEBUGF("[Trial] remainingDays=%d", cachedDays);
+                s_cachedDays = mgr.remainingDays();
+                SY_DEBUGF("[Trial] remainingDays=%d", s_cachedDays);
             }
 
             if (remainingDays)
             {
-                *remainingDays = cachedDays;
+                *remainingDays = s_cachedDays;
             }
 
-            return cachedResult;
+            return s_cachedResult;
         }
         catch (...)
         {
@@ -166,6 +168,12 @@ extern "C"
         // 删除注册表
         RegDeleteTreeW(HKEY_CURRENT_USER, L"Software\\SanYiCAD\\Trial");
 #endif
+
+        // 清除 Trial_Check 缓存与单例内存态，使下一次 Check 重新读档
+        s_checked = false;
+        s_cachedResult = 0;
+        s_cachedDays = 0;
+        TrialManager::instance().resetState();
     }
 
 #ifdef __cplusplus
@@ -190,6 +198,15 @@ TrialManager::Status TrialManager::check()
         m_initialized = true;
     }
     return m_status;
+}
+
+void TrialManager::resetState()
+{
+    m_initialized = false;
+    m_status = Status::NotStarted;
+    m_startDate.clear();
+    m_machineHash.clear();
+    m_trialDays = kDefaultTrialDays;
 }
 
 int TrialManager::remainingDays() const
@@ -350,7 +367,15 @@ bool TrialManager::loadFromFile(const std::string& configDir)
         }
         else if (key == "trial_days")
         {
-            m_trialDays = std::stoi(value);
+            // 防损坏/篡改：解析失败回退默认值，合法值钳制到 [0, 365]
+            try
+            {
+                m_trialDays = std::clamp(std::stoi(value), 0, 365);
+            }
+            catch (const std::exception&)
+            {
+                m_trialDays = kDefaultTrialDays;
+            }
         }
     }
 

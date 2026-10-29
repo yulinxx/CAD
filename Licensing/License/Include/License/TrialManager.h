@@ -58,6 +58,9 @@ public:
     /// 检查试用期状态
     Status check();
 
+    /// 重置内存态（供 Trial_Reset 调用，使下一次 check() 重新读档）
+    void resetState();
+
     /// 剩余试用天数（-1 表示已过期）
     int remainingDays() const;
 
