@@ -12,11 +12,13 @@
  * - 绘制命令的创建与 upsert
  * - 增量更新（新增/修改/删除图元）
  *
- * 本文件提供两个可复用组件：
- * - `GeometryManager`：封装 PersistentGeometryStore 的实体级管理
- * - `GeometryPipelineConfig`：配置参数
+ * 本文件提供：
+ * - `GeometryManager`：封装 PersistentGeometryStore 的实体级管理，
+ *   实现 `RenderAbstraction::IGeometryManager` 接口
+ * - `GeometryPipelineConfig` / `GeometryPipelineStats`：接口签名所需的类型别名
+ *   （类型本体在 RenderAbstraction，见 IGeometryManager.h）
  *
- * 两个 builder 通过组合使用 GeometryManager，
+ * 两个 builder 通过组合使用 GeometryManager（只持有 IGeometryManager 接口），
  * 各自保留特有的实体数据结构和绘制命令生成逻辑。
  *
  * ## 类型隔离
@@ -24,6 +26,7 @@
  * 本文件只依赖 RenderAbstraction 的抽象接口，不依赖 renderx.h。
  */
 
+#include "RenderAbstraction/IGeometryManager.h"
 #include "RenderAbstraction/IRenderDevice.h"
 #include "RenderAbstraction/IRenderScene.h"
 #include "RenderBridge/RenderBridgeAPI.h"
@@ -37,32 +40,15 @@
 
 namespace RenderBridge
 {
-    struct GeometryPipelineConfig
-    {
-        uint64_t storeInitialBytes = 8ull * 1024 * 1024;
-        uint64_t storeMaxBytes = 0;
-        uint32_t storeGranularity = 0;
-        uint32_t maxStores = 8;
-        uint32_t drawListInitialCapacity = 4096;
-        bool drawListMerging = true;
-        bool drawListCulling = true;
-        RenderAbstraction::ViewVolumeType drawListViewType = RenderAbstraction::ViewVolumeType::Rect2D;
-    };
+    /// 配置/统计类型本体在 RenderAbstraction（接口签名需要），保留别名兼容既有引用
+    using GeometryPipelineConfig = RenderAbstraction::GeometryPipelineConfig;
+    using GeometryPipelineStats = RenderAbstraction::GeometryPipelineStats;
 
-    struct GeometryPipelineStats
-    {
-        uint32_t entityCount = 0;
-        uint32_t storeCount = 0;
-        uint64_t usedBytes = 0;
-        uint64_t capacityBytes = 0;
-        uint32_t growCount = 0;
-    };
-
-    class GeometryManager
+    class GeometryManager : public RenderAbstraction::IGeometryManager
     {
     public:
         GeometryManager() = default;
-        virtual ~GeometryManager() = default;
+        ~GeometryManager() override = default;
 
     public:
         GeometryManager(const GeometryManager&) = delete;
@@ -70,7 +56,7 @@ namespace RenderBridge
 
         bool initialize(RenderAbstraction::IRenderDevice& device,
             RenderAbstraction::IRenderScene* scene,
-            const GeometryPipelineConfig& config = {})
+            const GeometryPipelineConfig& config = {}) override
         {
             shutdown();
 
@@ -93,7 +79,7 @@ namespace RenderBridge
             return true;
         }
 
-        void shutdown()
+        void shutdown() override
         {
             m_store.shutdown();
             m_entities.clear();
@@ -103,24 +89,24 @@ namespace RenderBridge
             m_currentEntityId = 0;
         }
 
-        bool valid() const
+        bool valid() const override
         {
             return m_store.valid();
         }
 
-        RenderAbstraction::DrawListHandle drawList() const
+        RenderAbstraction::DrawListHandle drawList() const override
         {
             return m_store.drawList();
         }
 
-        void beginRebuild()
+        void beginRebuild() override
         {
             m_seen.clear();
             m_syntheticId = 0;
             m_currentEntityId = 0;
         }
 
-        void endRebuild()
+        void endRebuild() override
         {
             std::vector<uint64_t> stale;
             for (const auto& [id, entry] : m_entities)
@@ -142,7 +128,7 @@ namespace RenderBridge
             m_currentEntityId = id;
         }
 
-        void clear()
+        void clear() override
         {
             for (auto& [id, entry] : m_entities)
             {
@@ -155,7 +141,7 @@ namespace RenderBridge
             m_syntheticId = 0;
         }
 
-        void removeEntity(uint64_t id)
+        void removeEntity(uint64_t id) override
         {
             auto it = m_entities.find(id);
             if (it == m_entities.end())
@@ -171,7 +157,7 @@ namespace RenderBridge
             return static_cast<uint32_t>(m_entities.size());
         }
 
-        void flush()
+        void flush() override
         {
             m_store.flush();
         }
@@ -188,17 +174,17 @@ namespace RenderBridge
             return result;
         }
 
-        GeometryStoreStats totalStats() const
+        GeometryStoreStats totalStats() const override
         {
             return m_store.totalStats();
         }
 
-        uint64_t reserveCapacity(uint64_t bytes)
+        uint64_t reserveCapacity(uint64_t bytes) override
         {
             return m_store.reserveCapacity(bytes);
         }
 
-        static uint64_t recommendedMaxBytes()
+        uint64_t recommendedMaxBytes() const override
         {
             return PersistentGeometryStore::recommendedMaxBytes();
         }
@@ -208,53 +194,53 @@ namespace RenderBridge
             return m_store.storeCount();
         }
 
-        void resetSlots()
+        void resetSlots() override
         {
             m_store.resetSlots();
         }
 
-        void clearDrawList()
+        void clearDrawList() override
         {
             m_store.clearDrawList();
         }
 
-        void removeCommand(uint32_t slot)
+        void removeCommand(uint32_t slot) override
         {
             m_store.removeCommand(slot);
         }
 
-        bool allocBlock(uint64_t bytes, RenderAbstraction::GeometryBlock& outBlock)
+        bool allocBlock(uint64_t bytes, RenderAbstraction::GeometryBlock& outBlock) override
         {
             return m_store.allocBlock(bytes, outBlock);
         }
 
-        bool writeBlock(uint64_t blockId, uint32_t offset, uint32_t sizeBytes, const void* data)
+        bool writeBlock(uint64_t blockId, uint32_t offset, uint32_t sizeBytes, const void* data) override
         {
             return m_store.writeBlock(blockId, offset, sizeBytes, data);
         }
 
-        void freeBlock(uint64_t blockId)
+        void freeBlock(uint64_t blockId) override
         {
             m_store.freeBlock(blockId);
         }
 
-        uint32_t acquireSlot()
+        uint32_t acquireSlot() override
         {
             return m_store.acquireSlot();
         }
 
-        void releaseSlot(uint32_t slot)
+        void releaseSlot(uint32_t slot) override
         {
             m_store.releaseSlot(slot);
         }
 
-        void removeSlot(uint32_t slot)
+        void removeSlot(uint32_t slot) override
         {
             m_store.removeSlot(slot);
         }
 
         bool upsertDrawItem(
-            uint32_t slot, const RenderAbstraction::DrawInstruction& cmd, const RenderAbstraction::Aabb3* bounds)
+            uint32_t slot, const RenderAbstraction::DrawInstruction& cmd, const RenderAbstraction::Aabb3* bounds) override
         {
             return m_store.upsertDrawItem(slot, cmd, bounds);
         }

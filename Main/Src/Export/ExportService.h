@@ -60,7 +60,8 @@ public:
     ExportResult exportWithContext(const ExportContext& context, const ExportOptions& options = ExportOptions{});
 
     /// 检查指定路径是否可导出
-    bool canExport(const QString& filePath) const;
+    /// @param reasonOut 可选，返回不可导出的具体原因（服务未初始化 / 格式不支持等），不再静默失败
+    bool canExport(const QString& filePath, QString* reasonOut = nullptr) const;
 
     /// 获取所有支持的导出扩展名列表
     QStringList supportedExtensions() const;

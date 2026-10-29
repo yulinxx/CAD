@@ -424,9 +424,19 @@ void ImportService::importAsync(
     }).detach();
 }
 
-bool ImportService::canImport(const QString& filePath) const
+bool ImportService::canImport(const QString& filePath, QString* reasonOut) const
 {
-    return m_dispatcher && m_dispatcher->canImport(filePath);
+    if (!m_dispatcher)
+    {
+        const QString reason = QStringLiteral("导入服务未初始化（分发器未注册）: %1").arg(filePath);
+        if (reasonOut)
+        {
+            *reasonOut = reason;
+        }
+        SY_DEBUGF("[ImportService] canImport=false: %s", reason.toUtf8().constData());
+        return false;
+    }
+    return m_dispatcher->canImport(filePath, reasonOut);
 }
 
 QStringList ImportService::supportedExtensions() const
@@ -446,15 +456,21 @@ QStringList ImportService::supportedExtensions(const QString& workbenchId) const
     return m_dispatcher->supportedExtensions(workbenchId);
 }
 
-bool ImportService::canImport(const QString& filePath, const QString& workbenchId) const
+bool ImportService::canImport(const QString& filePath, const QString& workbenchId, QString* reasonOut) const
 {
     if (!m_dispatcher)
     {
+        const QString reason = QStringLiteral("导入服务未初始化（分发器未注册）: %1").arg(filePath);
+        if (reasonOut)
+        {
+            *reasonOut = reason;
+        }
+        SY_DEBUGF("[ImportService] canImport=false: %s", reason.toUtf8().constData());
         return false;
     }
 
     // 直接使用 ImportDispatcher 的按工作台过滤方法
-    return m_dispatcher->canImport(filePath, workbenchId);
+    return m_dispatcher->canImport(filePath, workbenchId, reasonOut);
 }
 
 // ===== 1：识别文件格式 =====

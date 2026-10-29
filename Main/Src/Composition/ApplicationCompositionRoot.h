@@ -22,7 +22,6 @@
 #include "Engine3D/SceneManager3D.h"
 
 #include "FileIO/FileIOManager.h"
-#include "PendingOperationRegistry.h"
 
 class SettingsService;  // forward
 
@@ -34,8 +33,6 @@ class ExportDispatcher;
 class FileDialogService;
 class RecentFileService;
 class HelpDialogService;
-class FileOperationRegistry;
-class PendingOperationRegistry;
 class PersistenceService;
 
 class MachiningDataBridgeService;  // 3D → 2D 加工数据桥（数据模型 C）
@@ -51,7 +48,7 @@ class UnitManager;
 /// 但组合根也没必要为此多包含一层。
 class DeviceHost;
 class ProcessingJobService;
-class LaserOperationRegistry;
+class OperationRegistrar;
 
 
 namespace Ui
@@ -253,71 +250,18 @@ private:
     void setupDialogServices();
     // 场景变更 → 脏状态同步
     void setupDirtyStateSync();
-    // 注册各模块操作到 OperationBus
-    void registerAllOperations();
     // 惰性创建 2D 算法服务与执行器
     AlgorithmRunner* algorithmRunner();
 
-    // 共享连接：开始信号 → setBusy(true)（模板方法）
-    template<typename ServiceT>
-    void connectStartToBusy(ServiceT* service, void (ServiceT::*started)(const QString&))
-    {
-        QObject::connect(service, started, m_stateCenter.get(), [this]() {
-            if (m_stateCenter)
-            {
-                m_stateCenter->pushBusy();
-            }
-        });
-    }
-
-    // 共享回调：busy 状态 + 状态提示 → UiStateCenter（模板方法，适用于 ImportService/ExportService）
-    template<typename ServiceT>
-    void wireCommonCallbacks(ServiceT* service)
-    {
-        service->setBusyStateCallback([this](bool busy) {
-            if (m_stateCenter)
-            {
-                if (busy)
-                {
-                    m_stateCenter->pushBusy();
-                }
-                else
-                {
-                    m_stateCenter->popBusy();
-                }
-            }
-        });
-        service->setStatusPromptCallback([this](const QString& prompt) {
-            if (m_stateCenter)
-            {
-                m_stateCenter->setStatusPrompt(prompt);
-            }
-        });
-    }
-
-    // 共享连接：完成信号 → setBusy(false) + 状态提示（模板方法）
-    template<typename ServiceT, typename ResultT, typename CountT>
-    void connectFinishToBusy(ServiceT* service, void (ServiceT::*finished)(const ResultT&),
-        CountT count, const QString& completeText, const QString& failText)
-    {
-        QObject::connect(service, finished, m_stateCenter.get(),
-            [this, count, completeText, failText](const ResultT& result) {
-                if (!m_stateCenter)
-                {
-                    return;
-                }
-                m_stateCenter->popBusy();
-                m_stateCenter->setStatusPrompt(result.success
-                        ? completeText.arg(count(result))
-                        : failText.arg(result.message));
-                QVariantMap meta = m_stateCenter->metadata();
-                meta["statusPrompt"] = result.success
-                    ? completeText.arg(count(result))
-                    : failText.arg(result.message);
-                meta["notificationType"] = result.success ? "info" : "error";
-                m_stateCenter->setMetadata(meta);
-            });
-    }
+    /// 持久化服务（进程内唯一所有权源，AppInitializer 创建后移交组合根）
+    ///
+    /// 【声明位置约束】必须是第一个数据成员：成员按声明逆序析构，
+    /// 声明在最前意味着析构在最后 —— 所有持有 PersistenceService* 裸指针的
+    /// 服务（RecentFileService / LayerPersistenceBridge / ExportService /
+    /// FileOperationRegistry / UI 窗口等）都会在它之前销毁，析构期间访问
+    /// 裸指针是安全的。此前 shared_ptr 双持有 + 后置声明的组合意味着
+    /// 「谁最后释放谁决定析构时机」，存在悬空访问窗口。
+    std::unique_ptr<PersistenceService> m_persistenceService;
 
     /// UI Shell 宿主
     std::unique_ptr<UiShellHost> m_shellHost;
@@ -412,22 +356,16 @@ private:
     /// 帮助弹窗服务
     std::unique_ptr<HelpDialogService> m_helpDialogService;
 
-    /// 持久化服务（共享指针，由 AppInitializer 管理生命周期）
-    std::shared_ptr<PersistenceService> m_persistenceService;
-
-    /// 文件操作注册表
-    std::unique_ptr<FileOperationRegistry> m_fileOperationRegistry;
-
-    /// 占位操作注册表
-    std::unique_ptr<PendingOperationRegistry> m_pendingOperationRegistry;
-
     /// 硬件装配层（设备 + IO 点位 + 安全策略 + tick 驱动）
     std::unique_ptr<DeviceHost> m_deviceHost;
 
     /// 加工作业服务（编译 → loadPlan → startPlan → 进度）
     std::unique_ptr<ProcessingJobService> m_processingJobService;
 
-    /// 加工操作注册表（捕获 DeviceHost / ProcessingJobService，必须活得比 OperationBus 长）
-    std::unique_ptr<LaserOperationRegistry> m_laserOperationRegistry;
+    /// 操作注册器（核心/文件/加工/占位操作注册，持有 File/Laser 注册表）。
+    /// 注册进总线的 lambda 捕获了注册表 this（见 LaserOperationRegistry.h 的
+    /// 生命周期说明），本对象声明为最后的成员（最先析构），
+    /// 与此前两注册表位于组合根成员末位的时序一致。
+    std::unique_ptr<OperationRegistrar> m_operationRegistrar;
 };
 

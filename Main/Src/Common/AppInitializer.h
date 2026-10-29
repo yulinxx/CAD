@@ -23,5 +23,11 @@ class AppInitializer
 public:
     static void initialize();
     static void shutdown();
-    static std::shared_ptr<PersistenceService> persistenceService();
+
+    /// 取走持久化服务的唯一所有权（由 ApplicationCompositionRoot 接管）。
+    ///
+    /// 单一所有权契约：本类只负责创建，销毁时机由持有方决定。
+    /// 若应用提前退出（如许可闸门拒绝）组合根从未创建，对象留在本处，
+    /// 由 shutdown() 在进程退出时销毁，保证任何路径下都恰好析构一次。
+    static std::unique_ptr<PersistenceService> takePersistenceService();
 };

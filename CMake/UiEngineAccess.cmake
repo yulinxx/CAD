@@ -33,6 +33,14 @@ function(sanyi_define_ui_engine_access)
 
     add_library(UiEngineAccess INTERFACE)
 
+    # 门面转发头：UI 对 Engine2D 内部实现头（Geometry/Render/Algorithm）的依赖
+    # 统一收口到 UiEngineAccess/Include/UiEngineAccess/ 的转发头，
+    # UI 代码只 include "UiEngineAccess/Xxx.h"。转发头清单 = UI 允许触达的
+    # Engine2D 内部面，新增一个转发头就是一次显式的依赖面扩张决策。
+    target_include_directories(UiEngineAccess INTERFACE
+        "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../UiEngineAccess/Include"
+    )
+
     # INTERFACE 链接：把 Engine 的公共头目录与库传递给 UI 消费者
     target_link_libraries(UiEngineAccess INTERFACE
         ${_engine_targets}

@@ -83,10 +83,10 @@ ImportResult ImportDispatcher::dispatch(const ImportContext& context, Fio::VecSy
     const auto elapsedMs =
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - startTime).count();
 
-    // Reader result
+    // 读取结果
     if (result.success)
     {
-        // Import succeeded
+        // 导入成功
     }
     else
     {
@@ -151,24 +151,51 @@ QStringList ImportDispatcher::supportedExtensions(const QString& workbenchId) co
     return exts;
 }
 
-bool ImportDispatcher::canImport(const QString& filePath) const
+bool ImportDispatcher::canImport(const QString& filePath, QString* reasonOut) const
 {
     Fio::FileFormat fmt = detectFormat(filePath);
-    return findReader(fmt) != nullptr;
+    if (findReader(fmt) == nullptr)
+    {
+        const QString reason =
+            QStringLiteral("No reader available (format not supported or not registered): %1").arg(filePath);
+        if (reasonOut)
+        {
+            *reasonOut = reason;
+        }
+        SY_DEBUGF("[ImportDispatcher] canImport=false: %s", reason.toUtf8().constData());
+        return false;
+    }
+    return true;
 }
 
-bool ImportDispatcher::canImport(const QString& filePath, const QString& workbenchId) const
+bool ImportDispatcher::canImport(const QString& filePath, const QString& workbenchId, QString* reasonOut) const
 {
     // 先检查是否可以被任何读取器导入
-    if (!canImport(filePath))
+    QString reason;
+    if (!canImport(filePath, &reason))
     {
+        if (reasonOut)
+        {
+            *reasonOut = reason;
+        }
         return false;
     }
 
     // 根据工作台过滤
     const QStringList exts = supportedExtensions(workbenchId);
     const QString ext = QFileInfo(filePath).suffix().toLower();
-    return exts.contains(ext);
+    if (!exts.contains(ext))
+    {
+        const QString reason2 =
+            QStringLiteral("Workbench %1 does not support extension .%2: %3").arg(workbenchId, ext, filePath);
+        if (reasonOut)
+        {
+            *reasonOut = reason2;
+        }
+        SY_DEBUGF("[ImportDispatcher] canImport=false: %s", reason2.toUtf8().constData());
+        return false;
+    }
+    return true;
 }
 
 IImportReader* ImportDispatcher::findReader(Fio::FileFormat format) const

@@ -9,7 +9,6 @@ class ExportService;
 class ExportDispatcher;
 class SceneEditService;
 class LayerManager;
-class LayerPersistenceBridge;
 class PersistenceService;
 
 namespace Eg
@@ -25,6 +24,8 @@ namespace Ui
 
 struct UiServices;
 
+/// 导入/导出服务装配（P2-10 从组合根提取）：
+/// 读取器/写入器注册 + 服务注入 + 进度信号接线。纯装配逻辑，无自身生命周期。
 class ImportExportServiceSetup
 {
 public:
@@ -37,7 +38,6 @@ public:
         Eg::SceneManager3D* sceneManager3D,
         SceneEditService* editService,
         LayerManager* layerManager,
-        LayerPersistenceBridge* layerPersistence,
         PersistenceService* persistence,
         Ui::ViewCaptureService* captureService);
 
@@ -47,7 +47,7 @@ private:
     void registerReaders();
     void registerWriters();
     void wireCallbacks();
-    void connectProgressSignals(UiServices& uiServices);
+    void connectProgressSignals();
 
     UiStateCenter* m_stateCenter;
     ImportService* m_importService;
@@ -58,7 +58,6 @@ private:
     Eg::SceneManager3D* m_sceneManager3D;
     SceneEditService* m_editService;
     LayerManager* m_layerManager;
-    LayerPersistenceBridge* m_layerPersistence;
     PersistenceService* m_persistence;
     Ui::ViewCaptureService* m_captureService;
 };

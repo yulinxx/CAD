@@ -163,7 +163,21 @@ namespace Ui
         }
         else if (req.framing == FramingKind::CustomBox)
         {
-            // 自定义 3D 范围：TODO
+            // 自定义 3D 范围：用 customBox3D 构造包围盒，等轴测机位框住该范围
+            if (req.customBox3D.isValid())
+            {
+                const Ut::BBox3f box(req.customBox3D.minX,
+                    req.customBox3D.minY,
+                    req.customBox3D.minZ,
+                    req.customBox3D.maxX,
+                    req.customBox3D.maxY,
+                    req.customBox3D.maxZ);
+                return w3d->captureIsometricOffscreen(targetSize.width(), targetSize.height(), box);
+            }
+            // 自定义范围无效，回退当前相机（与 FitAll 分支同款）
+            QMatrix4x4 view = w3d->viewMatrix();
+            QMatrix4x4 proj = w3d->projectionMatrix();
+            return w3d->captureOffscreen(targetSize.width(), targetSize.height(), view, proj);
         }
 #endif
         return QImage();

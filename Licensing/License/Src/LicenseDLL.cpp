@@ -18,6 +18,8 @@ struct LicenseContext
 
 namespace
 {
+    // thread_local 错误缓冲的跨 DLL 内存契约（CrashHandler / Engraving 的 C API 同款）：
+    // 每 DLL 每线程一份，指针不出本 DLL，调用方只经 License_GetLastErrorMessage 拷贝取走。
     thread_local char g_lastError[512] = {};
 
     void setLastError(const char* message)

@@ -65,6 +65,26 @@ if(MSVC AND SANYI_MSVC_ANALYZE)
 endif()
 
 # ---------------------------------------------------------------------------
+# macOS 链接器「ignoring duplicate libraries」告警
+#
+# vcpkg 静态库经各模块 PUBLIC 链接接口传递（freetype→png/z、protobuf→absl 系、
+# SQLiteCpp→sqlite3……），可执行文件的链接行里同一静态库会出现 3~4 次。
+# 静态库链接顺序敏感，CMake 不做去重；Apple 链接器（Xcode 15+）对重复项照单
+# 全收但只取一份，并刷一条告警。用 -no_warn_duplicate_libraries 关掉这类噪音：
+# 不改链接语义。不去动各模块的链接可见性做「根治」——公共头泄漏了
+# freetype/protobuf/SQLiteCpp 的 include（TextConverter.h 等），改成 PRIVATE
+# 会牵连 include 传递与 Windows 符号导入，收益配不上风险。
+# ---------------------------------------------------------------------------
+if(APPLE)
+    include(CheckLinkerFlag)
+    check_linker_flag(CXX "LINKER:-no_warn_duplicate_libraries" SANYI_LINKER_NO_WARN_DUP_LIBS)
+    if(SANYI_LINKER_NO_WARN_DUP_LIBS)
+        add_link_options("LINKER:-no_warn_duplicate_libraries")
+        message(STATUS "  链接器 -no_warn_duplicate_libraries: ON（抑制重复静态库告警）")
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
 # 测试基础设施
 # ---------------------------------------------------------------------------
 #   1. 探测 GTest 并接入 GoogleTest；

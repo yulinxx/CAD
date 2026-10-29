@@ -35,7 +35,8 @@ public:
     QStringList supportedExtensions() const;
 
     /// 检查指定路径是否可导出
-    bool canExport(const QString& filePath) const;
+    /// @param reasonOut 可选，返回不可导出的具体原因（格式无法识别 / 无写入器），不再静默失败
+    bool canExport(const QString& filePath, QString* reasonOut = nullptr) const;
 
     /// 获取指定格式的默认扩展名
     QString defaultExtension(Fio::FileFormat format) const;

@@ -1,10 +1,14 @@
 #include "DocumentExportAdapter.h"
 
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine3D/SceneManager3D.h"
+#include "Engine3D/SyEntity/SyMeshEntity.h"
 #include "Log/SyLogger.h"
 
-DocumentExportAdapter::DocumentExportAdapter(Eg::SceneManager* sceneManager)
+DocumentExportAdapter::DocumentExportAdapter(Eg::SceneManager* sceneManager,
+    Eg::SceneManager3D* sceneManager3D)
     : m_sceneManager(sceneManager)
+    , m_sceneManager3D(sceneManager3D)
 {
 }
 
@@ -30,10 +34,33 @@ Fio::VecSyEntityPtr DocumentExportAdapter::collect2D()
 
 Fio::VecSyEntityPtr DocumentExportAdapter::collect3D()
 {
-    // TODO: 3D 场景收集功能未实现，当前返回空结果
-    // 需要集成 3D 场景管理器 (SceneManager3D)
-    SY_DEBUG("[DocumentExportAdapter] collect3D not implemented, returning empty");
-    return Fio::VecSyEntityPtr();
+    Fio::VecSyEntityPtr entities;
+    if (!m_sceneManager3D)
+    {
+        return entities;
+    }
+
+    struct CollectCtx
+    {
+        Fio::VecSyEntityPtr* entities;
+        size_t count;
+    };
+
+    CollectCtx ctx = { &entities, 0 };
+
+    m_sceneManager3D->forEachEntity(
+        [](Eg::SyMeshEntity* entity, void* userData) {
+            if (entity)
+            {
+                auto* ctx = static_cast<CollectCtx*>(userData);
+                ctx->entities->push_back(std::unique_ptr<Eg::SyEntity>(entity->clone()));
+                ++ctx->count;
+            }
+        },
+        &ctx);
+
+    SY_DEBUGF("[DocumentExportAdapter] Collected %d entities from 3D scene", (int)entities.size());
+    return entities;
 }
 
 Fio::VecSyEntityPtr DocumentExportAdapter::collectSelected()

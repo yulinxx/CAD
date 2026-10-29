@@ -10,10 +10,11 @@
  * 单位默认是**物理像素**（与 `uViewport` = backingSize 同一坐标系，
  * 已含 devicePixelRatio），不是逻辑像素。唯一的例外是捕捉指示器
  * `kSnapIndicatorRadiusPx`：它是逻辑像素，由 OverlayScene 乘 DPR 后再送渲染。
- * `SelectionGizmo`、`BaseEditor` 的命中容差）与渲染侧（`RenderSceneBuilder`、
- * 覆盖层构建器）。覆盖层与定尺寸标记几何都要在 RenderBridge 内落地，
- * 而 UI2D 依赖 RenderBridge，常量若留在 UI2D 就成环。因此与
- * `PinnedMarkerGeometry.h` 一起下沉到这里，**命名空间仍是 `Render::`**：
+ * `SelectionGizmo`、`BaseEditor` 的命中容差与渲染侧（`RenderSceneBuilder`、
+ * 覆盖层构建器）都要用。覆盖层与定尺寸标记几何在 RenderBridge 内落地，UI2D 也用
+ * 同一套词汇，而 UI2D 依赖 RenderBridge —— 常量放 UI2D 会成环、放 RenderBridge 会让
+ * UI include RenderBridge 内部头。因此放到双方的共同下层 RenderAbstraction
+ * （P0-1 从 RenderBridge 下沉），**命名空间仍是 `Render::`**：
  * 它是应用层绘制词汇的一部分，改名只会让几十个调用点白改一遍。
  */
 #pragma once

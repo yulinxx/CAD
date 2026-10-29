@@ -38,13 +38,15 @@ public:
     QStringList supportedExtensions(const QString& workbenchId) const;
 
     /// 检查指定路径是否可导入
-    bool canImport(const QString& filePath) const;
+    /// @param reasonOut 可选，返回不可导入的具体原因（无读取器 / 格式不支持），不再静默失败
+    bool canImport(const QString& filePath, QString* reasonOut = nullptr) const;
 
     /// 检查指定路径是否可在指定工作台导入
     /// @param filePath 文件路径
     /// @param workbenchId 工作台 ID ("2D" 或 "3D")
+    /// @param reasonOut 可选，返回不可导入的具体原因（格式不支持 / 工作台不兼容）
     /// @return 是否可以导入
-    bool canImport(const QString& filePath, const QString& workbenchId) const;
+    bool canImport(const QString& filePath, const QString& workbenchId, QString* reasonOut = nullptr) const;
 
 private:
     /// 根据格式查找对应的读取器

@@ -129,7 +129,7 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
         result.exportedEntityCount = static_cast<int>(entities.size());
         result.message = tr("Exported %1 entities to: %2").arg(result.exportedEntityCount).arg(context.targetPath);
 
-        // Export completed
+        // 导出完成，写入记录
         postExportRecord(result, context);
     }
     else
@@ -153,9 +153,20 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
     return result;
 }
 
-bool ExportService::canExport(const QString& filePath) const
+bool ExportService::canExport(const QString& filePath, QString* reasonOut) const
 {
-    return m_dispatcher && m_dispatcher->canExport(filePath);
+    if (!m_dispatcher)
+    {
+        const QString reason =
+            QStringLiteral("Export service not initialized (dispatcher not set): %1").arg(filePath);
+        if (reasonOut)
+        {
+            *reasonOut = reason;
+        }
+        SY_DEBUGF("[ExportService] canExport=false: %s", reason.toUtf8().constData());
+        return false;
+    }
+    return m_dispatcher->canExport(filePath, reasonOut);
 }
 
 QStringList ExportService::supportedExtensions() const

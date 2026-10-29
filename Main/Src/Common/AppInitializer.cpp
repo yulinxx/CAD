@@ -27,7 +27,9 @@
 
 namespace
 {
-    static std::shared_ptr<PersistenceService> s_persistenceService;
+    // 持久化服务的创建地与「兜底持有者」：正常流程中由组合根 takePersistenceService()
+    // 取走唯一所有权；应用提前退出时由 shutdown() 兜底销毁。
+    static std::unique_ptr<PersistenceService> s_persistenceService;
 
     // SyLogger 日志目录回调 thunk：C 函数指针 + void* ctx，
     // 返回静态缓冲（避免 std::function/std::string 跨 DLL 传递）
@@ -104,7 +106,7 @@ void AppInitializer::initialize()
     const QString dataDir = AppPathManager::dataDir();
     QDir().mkpath(dataDir);
     const QString dbPath = AppPathManager::databasePath();
-    auto persistenceService = std::make_shared<PersistenceService>();
+    auto persistenceService = std::make_unique<PersistenceService>();
 
     if (persistenceService->initialize(dbPath.toStdString()))
     {
@@ -121,11 +123,13 @@ void AppInitializer::initialize()
         SY_ERRORF("[AppInitializer] Failed to initialize database: %s", persistenceService->lastError().c_str());
     }
 
-    s_persistenceService = persistenceService;
+    s_persistenceService = std::move(persistenceService);
 }
 
 void AppInitializer::shutdown()
 {
+    // 正常退出路径上组合根已 takePersistenceService() 取走所有权，此处为空操作；
+    // 应用提前退出（组合根从未创建）时由这里兜底销毁。
     // 先执行清理工作，这些操作会产生日志
     s_persistenceService.reset();
 
@@ -140,7 +144,7 @@ void AppInitializer::shutdown()
     SyLogger::GetInstance().Shutdown();
 }
 
-std::shared_ptr<PersistenceService> AppInitializer::persistenceService()
+std::unique_ptr<PersistenceService> AppInitializer::takePersistenceService()
 {
-    return s_persistenceService;
+    return std::move(s_persistenceService);
 }

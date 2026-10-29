@@ -36,7 +36,7 @@
 #include <cstddef>
 #include <vector>
 
-#include "RenderBridge/ScreenConstantMetrics.h"
+#include "RenderAbstraction/ScreenConstantMetrics.h"
 
 #include "Render/RenderTypes.h"
 

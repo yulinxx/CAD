@@ -23,11 +23,12 @@ class SqliteRepositoryBase;
  * @brief 持久化服务 — 统一管理数据库连接和所有仓储对象
  *
  * 作为 UI 层访问持久化数据的唯一入口，UI 不直接拼 SQL。
- * 在 ApplicationCompositionRoot 中创建，通过 UiServices 注入到 UI 组件。
+ * 由 AppInitializer 创建、ApplicationCompositionRoot 接管唯一所有权，
+ * 通过 UiServices 注入到 UI 组件。
  *
  * 生命周期：
- *  - AppInitializer → DatabaseBootstrapper::ensureSchema()
- *  - ApplicationCompositionRoot → 创建 PersistenceService → 注入 UiServices
+ *  - AppInitializer → 创建 PersistenceService + DatabaseBootstrapper::ensureSchema()
+ *  - ApplicationCompositionRoot → takePersistenceService() 接管唯一所有权 → 注入 UiServices
  *  - WorkbenchWindow → 通过 UiServices 获取，调用各仓储方法
  *
  * 线程安全：

@@ -8,21 +8,23 @@
 namespace Eg
 {
     class SceneManager;
+    class SceneManager3D;
 }
 
 /// 文档导出适配器：从场景文档收集图元数据供导出使用
 class DocumentExportAdapter
 {
 public:
-    explicit DocumentExportAdapter(Eg::SceneManager* sceneManager);
+    explicit DocumentExportAdapter(Eg::SceneManager* sceneManager,
+        Eg::SceneManager3D* sceneManager3D = nullptr);
 
 public:
     /// 收集 2D 场景中的所有图元
     /// @return 图元列表（克隆的副本，原场景不受影响）
     Fio::VecSyEntityPtr collect2D();
 
-    /// 收集 3D 场景中的所有图元
-    /// @return 图元列表
+    /// 收集 3D 场景中的所有网格图元
+    /// @return 图元列表（克隆的副本，原场景不受影响）；无 3D 管理器时返回空
     Fio::VecSyEntityPtr collect3D();
 
     /// 收集当前选中的图元
@@ -30,6 +32,8 @@ public:
     Fio::VecSyEntityPtr collectSelected();
 
 private:
-    /// 场景管理器（非拥有指针）
+    /// 2D 场景管理器（非拥有指针）
     Eg::SceneManager* m_sceneManager{ nullptr };
+    /// 3D 场景管理器（非拥有指针；2D-only 场景可传 nullptr）
+    Eg::SceneManager3D* m_sceneManager3D{ nullptr };
 };

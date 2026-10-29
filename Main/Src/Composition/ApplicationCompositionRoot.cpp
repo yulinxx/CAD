@@ -6,11 +6,8 @@
  */
 #include "ApplicationCompositionRoot.h"
 #include "MachiningDataBridgeService.h"
-#include "FileOperationRegistry.h"
-#include "CoreOperationRegistry.h"
-#include "PendingOperationRegistry.h"
-#include "LaserOperationRegistry.h"
-#include "DocumentPersistenceHelper.h"
+#include "ImportExportServiceSetup.h"
+#include "OperationRegistrar.h"
 
 #include <QCoreApplication>
 
@@ -70,12 +67,11 @@ private:
 #include "UI/Services/FileDialogService.h"
 #include "UI/Services/RecentFileService.h"
 
+#include "Engine/Text/FontManager.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/UndoRedoManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
-#include "Engine2D/Import/Fio2DEntityConverter.h"
 #include "Engine2D/Interaction/LayerManager.h"
-#include "Engine3D/Import/FioEntityConverter.h"
 
 #include "UI/Services/SelectionService.h"
 #include "UI/Services/ISelectionService.h"
@@ -89,33 +85,16 @@ private:
 
 #include "Import/ImportService.h"
 #include "Import/ImportDispatcher.h"
-#include "Import/Readers/DxfImportReader.h"
-#include "Import/Readers/SvgImportReader.h"
-#include "Import/Readers/PdfImportReader.h"
-#include "Import/Readers/StepImportReader.h"
-#include "Import/Readers/ObjImportReader.h"
-#include "Import/Readers/StlImportReader.h"
-#include "Import/Readers/PltImportReader.h"
-#include "Import/Readers/AiImportReader.h"
-#include "Import/Readers/NativeImportReader.h"
-#include "Import/Readers/UgImportReader.h"
 
 #include "Export/ExportService.h"
 #include "Export/ExportDispatcher.h"
-#include "Export/Writers/DxfExportWriter.h"
-#include "Export/Writers/SvgExportWriter.h"
-#include "Export/Writers/PdfExportWriter.h"
-#include "Export/Writers/BmpExportWriter.h"
-#include "Export/Writers/PngExportWriter.h"
-#include "Export/Writers/ObjExportWriter.h"
-#include "Export/Writers/StepExportWriter.h"
-#include "Export/Writers/NativeExportWriter.h"
-
-#include <QMessageBox>
-#include <QWidget>
 
 // 静态实例指针，由构造函数设置，析构函数清空
 static ApplicationCompositionRoot* s_instance = nullptr;
+
+// 极早期启动路径（组合根尚未创建）的 SettingsService 兜底实例。
+// 组合根构造时会接管此实例，保证进程内只有一个 SettingsService。
+static std::unique_ptr<SettingsService> s_settingsFallback;
 
 // 应用组合根组件，负责创建和组装所有核心服务
 // 作为依赖注入的中心点，管理UI层和命令系统的生命周期
@@ -138,6 +117,11 @@ ApplicationCompositionRoot::~ApplicationCompositionRoot()
     // 进程退出时，FillGeometryUpdater（Meyers 单例）的析构晚于本组合根，
     // 若不在 SceneEditService 仍存活时解绑，其析构会访问已销毁对象导致崩溃。
     Eg::FillGeometryUpdater::instance().detach();
+
+    // FontManager 的 FT_Library 同为 Meyers 单例持有，静态析构顺序不可控。
+    // 在此显式释放，析构函数兜底保证恰好释放一次（见 FontManager::shutdown）。
+    // GmcKernel 只持 atomic 标志、无可释放资源，无需在此收口。
+    Eg::FontManager::instance().shutdown();
 }
 
 DeviceHost* ApplicationCompositionRoot::deviceHost()
@@ -211,12 +195,24 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     // 设置静态实例指针
     s_instance = this;
 
+    // 接管持久化服务的唯一所有权（AppInitializer 创建，此处移交，不做惰性获取）。
+    // 必须在任何持有 PersistenceService* 裸指针的消费方创建之前完成。
+    m_persistenceService = AppInitializer::takePersistenceService();
+
     // 设置服务由组合根持有：它有自己的数据库连接与生命周期，跟组合根一起析构。
     // 以前是 getSettingsService() 里的函数内 static，既不随组合根销毁，
     // 也让 6 处 UI 通过「组合根的静态方法」反向依赖组合根 —— 组合根是装配入口，
     // 不该同时充当全局注册表。
-    m_settingsService = std::make_unique<SettingsService>(nullptr);
-    m_settingsService->init();
+    // 极早期启动路径若已创建兜底实例则直接接管，保证进程内只有一个实例。
+    if (s_settingsFallback)
+    {
+        m_settingsService = std::move(s_settingsFallback);
+    }
+    else
+    {
+        m_settingsService = std::make_unique<SettingsService>(nullptr);
+        m_settingsService->init();
+    }
 
     // 装配顺序：UI 服务 → 导入导出 → 对话框 → 脏状态 → 操作注册
     UiServices uiServices = assembleUiServices();
@@ -234,7 +230,8 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     m_deviceHost = std::make_unique<DeviceHost>();
     m_processingJobService = std::make_unique<ProcessingJobService>(m_deviceHost.get());
 
-    registerAllOperations();
+    m_operationRegistrar = std::make_unique<OperationRegistrar>(*this, algorithmRunner());
+    m_operationRegistrar->registerAll();
 
     // 桥接 UndoRedoManager 观察者 → OperationBus::undoStateChanged
     // 当 SceneEditService 等绕过 OperationBus::run() 直接推入 undo 命令时，
@@ -304,89 +301,19 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
 
 void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiServices)
 {
-    // 注册导入读取器
-    m_importDispatcher->registerReader(std::make_unique<DxfImportReader>());
-    m_importDispatcher->registerReader(std::make_unique<SvgImportReader>());
-    m_importDispatcher->registerReader(std::make_unique<PdfImportReader>());
-    m_importDispatcher->registerReader(std::make_unique<StepImportReader>());
-    m_importDispatcher->registerReader(std::make_unique<ObjImportReader>());
-    m_importDispatcher->registerReader(std::make_unique<StlImportReader>());
-    m_importDispatcher->registerReader(std::make_unique<PltImportReader>());
-    // 新增导入格式：Adobe Illustrator (AI) 与 Unigraphics/NX (UG, 经 IGES)
-    m_importDispatcher->registerReader(std::make_unique<AiImportReader>());
-    m_importDispatcher->registerReader(std::make_unique<NativeImportReader>());
-    m_importDispatcher->registerReader(std::make_unique<UgImportReader>());
-    SY_DEBUGF("[ImportDispatcher] Registered %lld reader(s): %s",
-        static_cast<long long>(m_importDispatcher->supportedExtensions().size()),
-        m_importDispatcher->supportedExtensions().join(QLatin1String(", ")).toUtf8().constData());
-
-    // 配置导入服务
-    m_importService->setDispatcher(m_importDispatcher.get());
-    m_importService->setSceneManager(m_sceneManager.get());
-    m_importService->setSceneManager3D(m_sceneManager3D.get());
-    m_importService->setEditService(m_sceneEditService.get());
-
-    // 注册 2D 图元工厂：Engine3D 的 FioEntityConverter 只构造 Mesh3D，
-    // 2D 图元（Line/Arc/Circle/... ）委托给 Engine2D。组合根同时能看到两侧，
-    // 这是打破 Engine3D → Engine2D 依赖的唯一注册点，必须在任何导入之前完成。
-    Eg::FioEntityConverter::set2DEntityFactory(&Eg::convertFio2DEntity);
-
-    // 注入图层管理器：DXF 等导入后按源图层表还原图层结构
-    m_importService->setLayerManager(m_layerManager.get());
-    wireCommonCallbacks(m_importService.get());
-
-    m_importService->setDocumentPersistenceCallback([this](const QString& filePath, int entityCount) {
-        DocumentPersistenceHelper::recordImport(m_persistenceService.get(), filePath, entityCount);
-    });
-
-    // 注册导出写入器
-    m_exportDispatcher->registerWriter(std::make_unique<DxfExportWriter>());
-    m_exportDispatcher->registerWriter(std::make_unique<SvgExportWriter>());
-    m_exportDispatcher->registerWriter(std::make_unique<PdfExportWriter>());
-    m_exportDispatcher->registerWriter(std::make_unique<BmpExportWriter>());
-    m_exportDispatcher->registerWriter(std::make_unique<PngExportWriter>());
-    m_exportDispatcher->registerWriter(std::make_unique<ObjExportWriter>());
-    m_exportDispatcher->registerWriter(std::make_unique<StepExportWriter>());
-    m_exportDispatcher->registerWriter(std::make_unique<NativeExportWriter>());
-    SY_DEBUGF("[ExportDispatcher] Registered %lld writer(s): %s",
-        static_cast<long long>(m_exportDispatcher->supportedExtensions().size()),
-        m_exportDispatcher->supportedExtensions().join(QLatin1String(", ")).toUtf8().constData());
-
-    // 配置导出服务
-    m_exportService->setDispatcher(m_exportDispatcher.get());
-    m_exportService->setSceneManager(m_sceneManager.get());
-    m_exportService->setSceneManager3D(m_sceneManager3D.get());
-    m_exportService->setPersistenceService(persistenceService());
-    wireCommonCallbacks(m_exportService.get());
-
-    // 注入到 UI 服务集合。导出服务不进 UiServices：唯一的消费者
-    // FileOperationRegistry 走 FileOperationConfig::exportService 单独注入。
-    uiServices.importService = m_importService.get();
-    // 视图导出服务：2D 与 3D 的「导出视图」命令都要用同一个实例，
-    // 保证两次导出的落盘目录与命名规则一致。
-    uiServices.captureService = m_captureService.get();
-
-    // 导入进度 → 状态中心
-    connectStartToBusy(m_importService.get(), &ImportService::importStarted);
-    connectFinishToBusy(
+    // 读取器/写入器注册、服务注入与进度信号接线统一在 ImportExportServiceSetup
+    ImportExportServiceSetup setup(m_stateCenter.get(),
         m_importService.get(),
-        &ImportService::importFinished,
-        [](const ImportResult& r) {
-            return r.entityCount;
-        },
-        QString("Import complete: %1 entities"),
-        QString("Import failed: %1"));
-
-    // 导出进度 → 状态中心
-    connectStartToBusy(m_exportService.get(), &ExportService::exportStarted);
-    connectFinishToBusy(
+        m_importDispatcher.get(),
         m_exportService.get(),
-        &ExportService::exportFinished,
-        [](const ExportResult& r) {
-            return r.exportedEntityCount;
-        },
-        QString("Export complete: %1 entities"),
-        QString("Export failed: %1"));
+        m_exportDispatcher.get(),
+        m_sceneManager.get(),
+        m_sceneManager3D.get(),
+        m_sceneEditService.get(),
+        m_layerManager.get(),
+        m_persistenceService.get(),
+        m_captureService.get());
+    setup.setup(uiServices);
 }
 
 void ApplicationCompositionRoot::setupDialogServices()
@@ -410,75 +337,6 @@ void ApplicationCompositionRoot::setupDirtyStateSync()
             },
             this);
     }
-}
-
-void ApplicationCompositionRoot::registerAllOperations()
-{
-    SY_INFO("[ApplicationCompositionRoot] registering module operations on OperationBus");
-
-    // 核心操作（撤销/重做/删除/圆角/倒角/选择/帮助 + 编辑操作 + 算法操作 + 视图操作）
-    CoreOperationRegistry coreOps(m_operationBus.get(),
-        m_sceneEditService.get(),
-        m_undoRedoManager.get(),
-        m_clipboard.get(),
-        algorithmRunner(),
-        m_viewportActionHub.get(),
-        m_stateCenter.get(),
-        m_layerEditService.get(),
-        m_unitManager.get(),
-        m_shellHost ? m_shellHost->mainWindow() : nullptr,
-        m_captureService.get());
-
-    coreOps.registerAll();
-
-    // 文件操作（导入/导出/打开/保存）
-    FileOperationConfig fileConfig;
-    fileConfig.bus = m_operationBus.get();
-    fileConfig.sceneManager = m_sceneManager.get();
-    fileConfig.layerManager = m_layerManager.get();
-    fileConfig.importService = m_importService.get();
-    fileConfig.exportService = m_exportService.get();
-    fileConfig.recentFiles = m_recentFileService.get();
-    fileConfig.helpDialog = m_helpDialogService.get();
-    fileConfig.stateCenter = m_stateCenter.get();
-    fileConfig.layerPersistence = m_layerPersistenceBridge.get();
-    fileConfig.persistence = persistenceService();
-    fileConfig.parentWidget = m_shellHost ? m_shellHost->mainWindow() : nullptr;
-    // 新建/打开时清空撤销栈：跨文档撤销会把上一份文档的图元插回新文档
-    fileConfig.undoRedoManager = undoRedoManager();
-
-    m_fileOperationRegistry = std::make_unique<FileOperationRegistry>(fileConfig);
-    m_fileOperationRegistry->registerAll();
-
-    // 加工操作（开始/暂停/停止/急停）
-    LaserOperationConfig laserConfig;
-    laserConfig.bus = m_operationBus.get();
-    laserConfig.deviceHost = m_deviceHost.get();
-    laserConfig.jobService = m_processingJobService.get();
-    laserConfig.sceneManager = m_sceneManager.get();
-    laserConfig.layerManager = m_layerManager.get();
-    laserConfig.errorReporter = [this](const QString& message) {
-        // 加工失败必须让操作员看见：只写日志的话，
-        // 现场表现是「按了开始加工什么都没发生」
-        QMessageBox::warning(m_shellHost ? m_shellHost->mainWindow() : nullptr, QObject::tr("Processing"), message);
-    };
-    // 作业规格：把**机器坐标系**从设备档案注入。
-    //
-    // 换算只在编译器的最后一步发生（MotionPlanCompiler），配置必须从这里一路传下去。
-    // 之前这条链路是断的：UI2D 旧链路在服务层换算，新 HAL 链路完全不换算 ——
-    // 同一份文档走不同路径会烧到不同位置。
-    laserConfig.specProvider = [this] {
-        ToolpathJobSpec spec;
-        spec.machineFrame = m_deviceHost ? m_deviceHost->machineFrameConfig() : Eg::MachineFrameConfig{};
-        return spec;
-    };
-
-    m_laserOperationRegistry = std::make_unique<LaserOperationRegistry>(laserConfig);
-    m_laserOperationRegistry->registerAll();
-
-    // 占位操作（视图缩放等）由 PendingOperationRegistry 统一管理
-    PendingOperationRegistry pendingOps(m_operationBus.get());
-    pendingOps.registerAll();
 }
 
 AlgorithmRunner* ApplicationCompositionRoot::algorithmRunner()
@@ -543,12 +401,8 @@ LayerPersistenceBridge* ApplicationCompositionRoot::layerPersistenceBridge()
 
 PersistenceService* ApplicationCompositionRoot::persistenceService()
 {
-    // 从 AppInitializer 获取已初始化的持久化服务（shared_ptr 管理）
-    if (!m_persistenceService)
-    {
-        m_persistenceService = AppInitializer::persistenceService();
-    }
-
+    // 单一所有权：组合根构造时已从 AppInitializer 接管，这里只借用，不做惰性获取。
+    // 析构顺序由成员声明顺序保证（m_persistenceService 声明在最前，析构在最后）。
     return m_persistenceService.get();
 }
 
@@ -560,14 +414,13 @@ SettingsService* ApplicationCompositionRoot::getSettingsService()
         return s_instance->m_settingsService.get();
     }
 
-    // 组合根还没建（极早期启动路径）：临时持有一份，进程结束时回收
-    static std::unique_ptr<SettingsService> s_fallback;
-    if (!s_fallback)
+    // 组合根还没建（极早期启动路径）：临时持有一份，组合根构造时接管此实例
+    if (!s_settingsFallback)
     {
-        s_fallback = std::make_unique<SettingsService>(nullptr);
-        s_fallback->init();
+        s_settingsFallback = std::make_unique<SettingsService>(nullptr);
+        s_settingsFallback->init();
     }
-    return s_fallback.get();
+    return s_settingsFallback.get();
 }
 
 ApplicationCompositionRoot* ApplicationCompositionRoot::instance()

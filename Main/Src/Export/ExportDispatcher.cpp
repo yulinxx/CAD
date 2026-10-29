@@ -74,10 +74,21 @@ QStringList ExportDispatcher::supportedExtensions() const
     return exts;
 }
 
-bool ExportDispatcher::canExport(const QString& filePath) const
+bool ExportDispatcher::canExport(const QString& filePath, QString* reasonOut) const
 {
     Fio::FileFormat fmt = detectFormat(filePath);
-    return findWriter(fmt) != nullptr;
+    IExportWriter* writer = findWriter(fmt);
+    if (writer == nullptr)
+    {
+        const QString reason = QStringLiteral("格式无法识别或无可用写入器: %1").arg(filePath);
+        if (reasonOut)
+        {
+            *reasonOut = reason;
+        }
+        SY_DEBUGF("[ExportDispatcher] canExport=false: %s", reason.toUtf8().constData());
+        return false;
+    }
+    return true;
 }
 
 QString ExportDispatcher::defaultExtension(Fio::FileFormat format) const
