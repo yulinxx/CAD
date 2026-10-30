@@ -59,6 +59,7 @@ private:
 
 #include "Persistence/LayerPersistenceBridge.h"
 #include "Persistence/PersistenceService.h"
+#include "Persistence/SharedDatabaseAdapter.h"
 
 #include "Log/SyLogger.h"
 
@@ -211,6 +212,21 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     else
     {
         m_settingsService = std::make_unique<SettingsService>(nullptr);
+    }
+
+    // 设置侧改用业务库的唯一 SQLite 连接：此前 UICommon 自建第二条连接写同一个
+    // cad_database.sqlite，WAL 下双写连接互相撞 SQLITE_BUSY（导入回写期间
+    // RecentFile/Document 仓储重试全失败的 "database is locked" 即源于此）。
+    // init 之前注入则直接生效；兜底实例已 init 则重建仓库切换过去。
+    // PersistenceService 未就绪时 setExternalDatabase 无操作，保持旧行为（自建连接）。
+    if (m_persistenceService && m_persistenceService->isOpen())
+    {
+        m_settingsDbAdapter = std::make_unique<SharedDatabaseAdapter>(m_persistenceService->database());
+        m_settingsService->setExternalDatabase(m_settingsDbAdapter.get());
+    }
+
+    if (!m_settingsService->isInitialized())
+    {
         m_settingsService->init();
     }
 

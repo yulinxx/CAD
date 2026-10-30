@@ -24,6 +24,7 @@
 #include "FileIO/FileIOManager.h"
 
 class SettingsService;  // forward
+class SharedDatabaseAdapter;
 
 class LayerPersistenceBridge;
 class ImportService;
@@ -271,6 +272,12 @@ private:
 
     /// 设置服务（自持数据库连接；与业务库同一个文件，见 AppPathManager::databasePath）
     std::unique_ptr<SettingsService> m_settingsService;
+
+    /// 设置侧 → 业务库连接的适配器（UI::IDatabase over Eg::Database&）。
+    /// 让设置写入复用业务库唯一 SQLite 连接，消除同文件双写连接的锁竞争。
+    /// 【声明位置约束】必须在 m_persistenceService 之后（先于它析构）、
+    /// m_settingsService 之前（晚于它析构，仓库持有的裸指针才不悬空）。
+    std::unique_ptr<SharedDatabaseAdapter> m_settingsDbAdapter;
 
     /// 布局服务
     std::unique_ptr<UiLayoutService> m_layoutService;
