@@ -253,9 +253,28 @@ bool ExportService::postExportRecord(const ExportResult& result, const ExportCon
     const QFileInfo targetInfo(context.targetPath);
     const QString fallbackTitle = targetInfo.fileName();
 
+    // 文档历史按工作台分桶（与 recent_files 一致）：3D 格式归 "3D"，其余归 "2D"。
+    // ExportService 同时能收 2D/3D 图元，导出的是哪种格式就归哪个工作台。
+    const auto is3DFormat = [](Fio::FileFormat fmt) {
+        switch (fmt)
+        {
+        case Fio::FileFormat::STL:
+        case Fio::FileFormat::OBJ:
+        case Fio::FileFormat::STEP:
+        case Fio::FileFormat::Native3D:
+            return true;
+        default:
+            return false;
+        }
+    };
+    const QString workbenchId = is3DFormat(resolvedFormat) || targetInfo.suffix().toLower() == QStringLiteral("sy3d")
+        ? QStringLiteral("3D")
+        : QStringLiteral("2D");
+
     DocumentRecord record;
     record.filePath = context.targetPath.toStdString();
     record.title = (!context.sourceDocumentId.isEmpty() ? context.sourceDocumentId : fallbackTitle).toStdString();
+    record.workbench = workbenchId.toStdString();
     record.entityCount = static_cast<int>(result.exportedEntityCount);
     record.format = [&targetInfo](Fio::FileFormat fmt) -> std::string {
         switch (fmt)

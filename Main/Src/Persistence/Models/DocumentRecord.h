@@ -15,6 +15,7 @@ struct DocumentRecord
     std::string filePath;      // 文件完整路径
     std::string title;         // 文件标题（不含路径）
     std::string format;        // 文件格式（如 DXF, SVG, SY）
+    std::string workbench;     // 归属工作台（"2D" / "3D"），空表示迁移前的旧记录
     int entityCount{ 0 };      // 文件中图元数量
     std::string fileSize;      // 文件大小（格式化字符串）
     std::string lastOpenedAt;  // 最后打开时间（ISO 8601 格式）

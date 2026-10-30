@@ -177,7 +177,8 @@ TEST(ImportExportRegressionTest, ImportService_DocumentPersistenceCallback)
     ImportService service;
 
     bool called = false;
-    service.setDocumentPersistenceCallback([&](const QString& path, int entityCount) {
+    service.setDocumentPersistenceCallback([&](const QString& path, int entityCount, const QString& workbenchId) {
+        Q_UNUSED(workbenchId);
         called = true;
         return true;
     });
@@ -1074,7 +1075,8 @@ TEST(ImportExportRegressionTest, ImportService_MultipleFormats_MetadataConsisten
 
     // 验证回调注入不崩溃
     bool metaCallbackCalled = false;
-    service.setDocumentPersistenceCallback([&](const QString& path, int count) {
+    service.setDocumentPersistenceCallback([&](const QString& path, int count, const QString& workbenchId) {
+        Q_UNUSED(workbenchId);
         metaCallbackCalled = true;
         return true;
     });

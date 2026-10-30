@@ -12,7 +12,18 @@
 #include <QDateTime>
 #include <QFileInfo>
 
-bool DocumentPersistenceHelper::recordImport(PersistenceService* persistence, const QString& filePath, int entityCount)
+namespace
+{
+    // 工作台 ID 归一化：统一大写，空值兜底 "2D"（与 RecentFileService 保持一致）
+    QString normalizeWorkbench(const QString& workbenchId)
+    {
+        const QString trimmed = workbenchId.trimmed().toUpper();
+        return trimmed.isEmpty() ? QStringLiteral("2D") : trimmed;
+    }
+}  // namespace
+
+bool DocumentPersistenceHelper::recordImport(
+    PersistenceService* persistence, const QString& filePath, int entityCount, const QString& workbenchId)
 {
     if (!persistence || !persistence->documents())
     {
@@ -26,6 +37,7 @@ bool DocumentPersistenceHelper::recordImport(PersistenceService* persistence, co
     dr.filePath = filePath.toStdString();
     dr.title = QFileInfo(filePath).fileName().toStdString();
     dr.format = QFileInfo(filePath).suffix().toUpper().toStdString();
+    dr.workbench = normalizeWorkbench(workbenchId).toStdString();
     dr.entityCount = entityCount;
     dr.lastOpenedAt = now.toStdString();
     dr.lastSavedAt = existing.id > 0 ? existing.lastSavedAt : now.toStdString();
@@ -40,7 +52,7 @@ bool DocumentPersistenceHelper::recordImport(PersistenceService* persistence, co
 }
 
 bool DocumentPersistenceHelper::recordExport(
-    PersistenceService* persistence, const std::string& filePath, int entityCount)
+    PersistenceService* persistence, const std::string& filePath, int entityCount, const QString& workbenchId)
 {
     if (!persistence || !persistence->documents())
     {
@@ -54,6 +66,7 @@ bool DocumentPersistenceHelper::recordExport(
     dr.filePath = filePath;
     dr.title = QFileInfo(QString::fromStdString(filePath)).fileName().toStdString();
     dr.format = QFileInfo(QString::fromStdString(filePath)).suffix().toUpper().toStdString();
+    dr.workbench = normalizeWorkbench(workbenchId).toStdString();
     dr.entityCount = entityCount;
     dr.lastSavedAt = now.toStdString();
     dr.lastOpenedAt = existing.id > 0 ? existing.lastOpenedAt : now.toStdString();

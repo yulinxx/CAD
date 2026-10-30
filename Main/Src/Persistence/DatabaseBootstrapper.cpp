@@ -21,7 +21,8 @@
 // v4: layers 表新增 fill_color 列（填充色，色块填充）
 // v5: 新增 dialog_states 表和索引，为对话框数据持久化提供支持
 // v6: recent_files 表新增 workbench 列（2D/3D 最近文件分桶，互不混显）
-static constexpr int kSchemaVersion = 6;
+// v7: documents 表新增 workbench 列（2D/3D 文档历史分桶）
+static constexpr int kSchemaVersion = 7;
 
 // 应用版本使用 MainApp::appVersion() 全局定义
 
@@ -54,7 +55,7 @@ static void registerSchemaWhiteList()
             "order_index",
             "updated_at" });
     Eg::Database::registerColumnNames("documents",
-        { "id", "file_path", "title", "format", "entity_count", "file_size", "last_opened_at", "last_saved_at", "created_at" });
+        { "id", "file_path", "title", "format", "workbench", "entity_count", "file_size", "last_opened_at", "last_saved_at", "created_at" });
     Eg::Database::registerColumnNames("settings", { "id", "group_name", "key", "value", "data_type", "updated_at" });
     Eg::Database::registerColumnNames(
         "dialog_states", { "id", "dialog_key", "document_id", "state_json", "created_at", "updated_at" });
@@ -363,6 +364,7 @@ bool DatabaseBootstrapper::createDocumentsTable()
             file_path       TEXT    NOT NULL,
             title           TEXT    NOT NULL DEFAULT '',
             format          TEXT    DEFAULT '',
+            workbench       TEXT    DEFAULT '',
             entity_count    INTEGER DEFAULT 0,
             file_size       TEXT    DEFAULT '',
             last_opened_at  TEXT    DEFAULT (datetime('now')),
@@ -499,6 +501,17 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
                 return false;
             }
             SY_DEBUG("[DatabaseBootstrapper] Migration v5->v6: added recent_files.workbench column");
+        }
+        else if (v == 6)
+        {
+            // v6 -> v7: documents 表新增 workbench 列（2D/3D 文档历史分桶）
+            if (!m_database.execute("ALTER TABLE documents ADD COLUMN workbench TEXT DEFAULT ''"))
+            {
+                m_lastError = "Migration v6->v7 failed: " + m_database.lastError();
+                SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+                return false;
+            }
+            SY_DEBUG("[DatabaseBootstrapper] Migration v6->v7: added documents.workbench column");
         }
         // 后续版本迁移在此追加 else if 分支
     }

@@ -201,8 +201,8 @@ void ImportExportServiceSetup::wireCallbacks()
     wireCommonCallbacks(m_stateCenter, m_importService);
 
     m_importService->setDocumentPersistenceCallback(
-        [persistence = m_persistence](const QString& filePath, int entityCount) {
-            return DocumentPersistenceHelper::recordImport(persistence, filePath, entityCount);
+        [persistence = m_persistence](const QString& filePath, int entityCount, const QString& workbenchId) {
+            return DocumentPersistenceHelper::recordImport(persistence, filePath, entityCount, workbenchId);
         });
 
     // 配置导出服务

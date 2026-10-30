@@ -107,8 +107,9 @@ public:
     void setCurrentDocumentPathCallback(std::function<void(const QString&)> callback);
 
     /// 设置文档持久化回调（导入完成后保存文档记录）
+    /// @param callback 参数为 (文件路径, 图元数量, 归属工作台 "2D"/"3D")
     /// 返回 false 表示历史记录写入失败（文件本身已成功导入）
-    void setDocumentPersistenceCallback(std::function<bool(const QString&, int)> callback);
+    void setDocumentPersistenceCallback(std::function<bool(const QString&, int, const QString&)> callback);
 
     /// 执行文件导入
     /// @param filePath 源文件路径
@@ -244,5 +245,5 @@ private:
     /// 当前文档路径更新回调
     std::function<void(const QString&)> m_currentDocumentPathCallback;
     /// 文档持久化回调
-    std::function<bool(const QString&, int)> m_documentPersistenceCallback;
+    std::function<bool(const QString&, int, const QString&)> m_documentPersistenceCallback;
 };

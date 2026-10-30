@@ -217,7 +217,7 @@ void ImportService::setCurrentDocumentPathCallback(std::function<void(const QStr
     m_currentDocumentPathCallback = std::move(cb);
 }
 
-void ImportService::setDocumentPersistenceCallback(std::function<bool(const QString&, int)> cb)
+void ImportService::setDocumentPersistenceCallback(std::function<bool(const QString&, int, const QString&)> cb)
 {
     m_documentPersistenceCallback = std::move(cb);
 }
@@ -992,10 +992,11 @@ void ImportService::phaseWriteBackState(const ImportContext& context, ImportResu
         SY_INFO("[ImportService] Recent file list not updated: no callback registered");
     }
 
-    // 文档持久化（使用成员变量回调，全局配置）
+    // 文档持久化（使用成员变量回调，全局配置）。
+    // 工作台归属与最近文件同源：result.usedWorkbenchId（STEP 等载入为网格时归 3D）。
     if (m_documentPersistenceCallback)
     {
-        if (!m_documentPersistenceCallback(context.sourcePath, result.entityCount))
+        if (!m_documentPersistenceCallback(context.sourcePath, result.entityCount, workbenchId))
         {
             // 文件已导入成功，但历史记录写入失败：不能只报“导入完成”
             result.addWarning(QCoreApplication::translate("WorkbenchWindow", "History save failed"));

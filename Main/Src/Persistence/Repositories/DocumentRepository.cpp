@@ -132,6 +132,7 @@ DocumentRecord DocumentRepository::rowToRecord(const std::map<std::string, std::
         rec.filePath = getString(row, "file_path");
         rec.title = getString(row, "title");
         rec.format = getString(row, "format");
+        rec.workbench = getString(row, "workbench");
         rec.entityCount = getInt(row, "entity_count");
         rec.fileSize = getString(row, "file_size");
         rec.lastOpenedAt = getString(row, "last_opened_at");
@@ -156,6 +157,7 @@ std::map<std::string, std::string> DocumentRepository::recordToRow(const Documen
     row["file_path"] = rec.filePath;
     row["title"] = rec.title;
     row["format"] = rec.format;
+    row["workbench"] = rec.workbench;
     row["entity_count"] = std::to_string(rec.entityCount);
     row["file_size"] = rec.fileSize;
     row["last_opened_at"] = rec.lastOpenedAt;

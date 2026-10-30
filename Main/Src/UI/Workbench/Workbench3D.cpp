@@ -237,6 +237,17 @@ bool Workbench3D::initialize(const WorkbenchServices& services)
             m_persistence.recentFileService->addRecentFile(path, QStringLiteral("3D"));
         }
     });
+    // 3D 接入状态中心：文档路径变化（打开/保存/新建/清空）同步 currentDocumentId，
+    // 否则 3D 下保存工作台快照时会把 2D 的旧 docId 存进 3D 快照（2D/3D 状态混杂）。
+    if (auto* stateCenter = m_uiState.stateCenter)
+    {
+        DocumentManager3D* docMgr = m_sessionState->documentManager.get();
+        connect(docMgr, &DocumentManager3D::documentStateChanged, this, [this, stateCenter, docMgr]() {
+            const QString path = docMgr->currentFilePath();
+            // 空路径 = 未命名场景，对齐 UiStateCenter 的 "none" 语义
+            stateCenter->setCurrentDocumentId(path.isEmpty() ? QStringLiteral("none") : path);
+        });
+    }
 
     m_savedState = UiStateSnapshot{};
     m_initialState = UiStateSnapshot{};
