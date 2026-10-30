@@ -1,8 +1,9 @@
 #pragma once
 
+#include <cstdint>
+#include <functional>
 #include <unordered_set>
 #include <vector>
-#include <cstdint>
 
 #include "Ut/BBox2d.h"
 
@@ -42,13 +43,20 @@ public:
     void setSceneManager(Eg::SceneManager* sm) { m_sceneManager = sm; }
     Eg::SceneManager* sceneManager() const { return m_sceneManager; }
 
-    /// 同步「选中时隐藏本体」状态：hideSelected 生效时，selectedIds 里的图元
-    /// 不允许被 LOD 批次重新提交到世界层（否则缩放后选中本体又会冒出来）。
-    /// selectedIds 由协调器持有，生命周期覆盖本管理器。
-    void setSelectionHideState(const std::unordered_set<uint64_t>* selectedIds, bool hideSelected)
+    /// 注入消费泵：队列还有剩余时由协调器重启 LOD 定时器。
+    /// 本类不持有 QTimer，泵的具体实现由上层提供；未注入时队列只能靠外部驱动。
+    void setPumpCallback(std::function<void()> pump)
     {
-        m_selectedIds = selectedIds;
-        m_hideSelected = hideSelected;
+        m_pump = std::move(pump);
+    }
+
+    /// 同步「选中时隐藏本体」判定：返回 true 表示该图元本体不应由 LOD 批次
+    /// 重新提交到世界层（否则缩放后选中本体又会冒出来）。
+    /// 传入谓词而不是选中集副本，管理器每次判定都读取协调器的最新状态，
+    /// 不会因为拖动强制显示、轮廓预算翻转等路径漏同步。
+    void setSelectionHiddenPredicate(std::function<bool(uint64_t)> predicate)
+    {
+        m_isSelectionHidden = std::move(predicate);
     }
 
     /// 队列排空后的收尾：清队列 + 处理「排队期间又要求重新收集」的待办
@@ -64,6 +72,10 @@ public:
     bool empty() const { return m_queue.empty(); }
     size_t size() const { return m_queue.size(); }
 
+    /// 已执行的 LOD 批次数（诊断/回归测试用）。单调递增，不随队列清空复位，
+    /// 用于观察「单次定时器是否还在续跑」——旧缺陷下该值只会停在 1~2。
+    size_t processedBatchCount() const { return m_processedBatches; }
+
 private:
     void refillQueueIfStale();
     void ensurePump();
@@ -75,11 +87,13 @@ private:
     RenderWidget* m_renderWidget;
     Eg::SceneManager* m_sceneManager{ nullptr };
 
-    /// 「选中时隐藏本体」的过滤条件，由 SceneRefreshCoordinator 同步
-    const std::unordered_set<uint64_t>* m_selectedIds{ nullptr };
-    bool m_hideSelected{ false };
+    /// 「选中时隐藏本体」的实时判定，由 SceneRefreshCoordinator 注入
+    std::function<bool(uint64_t)> m_isSelectionHidden;
+    /// 消费泵回调，由 SceneRefreshCoordinator 注入（重启 32ms 单次 LOD 定时器）
+    std::function<void()> m_pump;
     std::vector<uint64_t> m_queue;
     size_t m_cursor = 0;
+    size_t m_processedBatches = 0;
 
     /// 上次收集队列时的 worldToScreenScale（缩放滞后判据的基准）。<= 0 表示还没收集过。
     double m_scaleAtBuild{ 0.0 };

@@ -91,6 +91,18 @@ SceneRefreshCoordinator::SceneRefreshCoordinator(QObject* parent)
     m_curveLodTimer->setSingleShot(true);
     m_curveLodTimer->setInterval(32);
     connect(m_curveLodTimer, &QTimer::timeout, this, &SceneRefreshCoordinator::onCurveLodTimer);
+
+    // 单次定时器触发完就停了：把「续跑」能力注入 CurveLodManager，
+    // 让它在批次未消费完、finishQueue 重收集等内部路径上都能真正重启定时器。
+    // 这是修复「队列 > 2000 时只消费一批就停住」的关键——旧实现里
+    // CurveLodManager::ensurePump() 是空函数，定时器永远不会被再次唤醒。
+    m_curveLodManager.setPumpCallback([this]() { ensureCurveLodPump(); });
+
+    // 「选中时隐藏本体」的判定实时求值：管理器不持有选中集/开关副本，
+    // 避免拖动强制显示、轮廓预算翻转等路径漏同步导致选中本体被 LOD 重新画回。
+    m_curveLodManager.setSelectionHiddenPredicate([this](uint64_t uid) {
+        return hideSelectedEffective() && m_cachedSelectedIds.count(uid) > 0;
+    });
 }
 
 SceneRefreshCoordinator::~SceneRefreshCoordinator()
@@ -137,8 +149,30 @@ void SceneRefreshCoordinator::setSceneContext(Eg::ISceneContext* ctx)
     }
     m_sceneManager = static_cast<Eg::SceneManager*>(ctx);
     m_curveLodManager.setSceneManager(m_sceneManager);
+    // 场景切换后旧队列里的实体 ID 已不属于当前场景，直接丢弃；
+    // 新场景由随后的全量刷新按当前缩放重新装配。
+    m_curveLodManager.clearQueue();
+
+    // 同步当前选中集缓存：场景可能带着已有选中集被 attach，后续 LOD 的
+    // 「隐藏选中本体」过滤与增量刷新都要用这份快照。不在这里建立的话，
+    // 要等到第一次选择变化才会填充，期间缩放会把选中本体重新画出来。
+    m_lastSelectedIds.clear();
+    m_cachedSelectedIds.clear();
     if (m_sceneManager)
     {
+        m_sceneManager->forEachSelected([this](Eg::SyEntity* entity) {
+            if (entity != nullptr)
+            {
+                m_cachedSelectedIds.insert(static_cast<uint64_t>(entity->id));
+            }
+        });
+        m_lastSelectedIds = m_cachedSelectedIds;
+        m_selectedIdsCacheValid = true;
+        // 同一步锚定「上次实际生效的隐藏状态」：新场景的选中集可能一 attach
+        // 就被隐藏，若这里仍保持默认 false，紧接着的取消选中不会走
+        // 「上次摘掉过 → 需要加回」分支，被隐藏的本体会留在世界层外。
+        m_lastHideSelectedEffective = hideSelectedEffective();
+
         // 同步游标到当前修订号，避免程序启动后立即触发 FullRefresh
         // （场景加载后 revision 可能已经很大，但 m_lastCursor 初始为 0）
         m_lastCursor = m_sceneManager->currentRevision();
@@ -184,6 +218,8 @@ void SceneRefreshCoordinator::stop()
     {
         m_curveLodTimer->stop();
     }
+    // 停止后不再有消费泵：残留队列必须清掉，避免下次 attach 时消费过期 ID。
+    m_curveLodManager.clearQueue();
     // 观察者注销 — 在 stop() 中统一处理，避免析构时 SceneManager 已销毁（UAF）
     if (m_sceneManager)
     {
@@ -441,6 +477,11 @@ void SceneRefreshCoordinator::applyLayerVisibilityChanged(int layerId, bool visi
 // 场景操作频繁时两个定时器互不干扰，LOD 分批能稳定每 32ms 推进一次。
 void SceneRefreshCoordinator::ensureCurveLodPump()
 {
+    // 场景/视口已解绑时旧队列已失效：不启动定时器空转。
+    if (!m_renderWidget || !m_sceneManager)
+    {
+        return;
+    }
     if (m_curveLodTimer && !m_curveLodTimer->isActive())
     {
         m_curveLodTimer->start();
@@ -451,12 +492,12 @@ void SceneRefreshCoordinator::ensureCurveLodPump()
     }
 }
 
-// LOD 定时器 slot：执行一批，队列未空则自动续跑
+// LOD 定时器 slot：执行一批；队列未空时由 CurveLodManager 的 pump 回调续跑。
 void SceneRefreshCoordinator::onCurveLodTimer()
 {
     if (m_curveLodManager.empty())
     {
-        m_curveLodManager.finishQueue();
+        finishCurveLodQueue();
         return;
     }
 
@@ -465,13 +506,9 @@ void SceneRefreshCoordinator::onCurveLodTimer()
 
 void SceneRefreshCoordinator::finishCurveLodQueue()
 {
+    // finishQueue 内部会处理「排队期间又要求重新收集」的待办；重收集出的
+    // 新队列会通过注入的 pump 回调自行重启定时器，这里无需再重复判断。
     m_curveLodManager.finishQueue();
-    // finishQueue 内部会处理「排队期间又要求重新收集」的待办（含重收集 + 续跑判断），
-    // 这里只需在重收集出队列后把泵拉起来。
-    if (!m_curveLodManager.empty())
-    {
-        ensureCurveLodPump();
-    }
 }
 
 void SceneRefreshCoordinator::requestCurveLodRefresh()
@@ -1011,8 +1048,9 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
 
 void SceneRefreshCoordinator::processCurveLodBatch()
 {
-    // 批量重建 + GL 上下文管理 + 账本写回的语义已整体移交 CurveLodManager。
-    // 它内部会在有剩余时通过 ensureCurveLodPump 续跑独立定时器。
+    // 批量重建 + GL 上下文管理 + 账本写回已整体移交 CurveLodManager。
+    // 批次未消费完时，它通过构造时注入的 pump 回调重启本类的 LOD 定时器；
+    // 单次定时器触发完不会自己续跑，续跑责任必须在管理器内部闭环。
     m_curveLodManager.processBatch(m_renderedEntityIds);
 }
 
@@ -1249,8 +1287,8 @@ void SceneRefreshCoordinator::updateSceneRender()
     // 曲线 LOD 分批：场景刷新帧顺带推进一次。
     // LOD 的持续推进主要由独立的 m_curveLodTimer（32ms）承担；
     // 这里额外推进一次是为了利用"场景刷新已经切过 GL 上下文"的时机，
-    // 减少单独触发时的上下文切换开销。processCurveLodBatch 内部有剩余时
-    // 会自行调用 ensureCurveLodPump 续跑独立定时器。
+    // 减少单独触发时的上下文切换开销。processBatch 内部有剩余时
+    // 会通过注入的 pump 回调续跑独立定时器。
     if (!m_curveLodManager.empty())
     {
         processCurveLodBatch();

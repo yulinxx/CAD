@@ -55,7 +55,8 @@ bool CurveLodManager::isRenderable(uint64_t uid, const Eg::SyEntity* entity) con
     }
     // 「选中时隐藏本体」：选中集里的图元本体不能由 LOD 批次重新提交，
     // 否则每次缩放触发 LOD 都会把刚摘掉的本体又画回来。
-    if (m_hideSelected && m_selectedIds != nullptr && m_selectedIds->count(uid) > 0)
+    // 谓词由协调器注入，每次实时读取最新开关与选中集，不持有状态副本。
+    if (m_isSelectionHidden && m_isSelectionHidden(uid))
     {
         return false;
     }
@@ -97,6 +98,8 @@ void CurveLodManager::processBatch(std::unordered_set<uint64_t>& renderedIds)
         finishQueue();
         return;
     }
+
+    ++m_processedBatches;
 
     // 每帧预算：串行重建 2000 个曲线图元，亚毫秒级。zoom 期间场景不变，
     // 直接在主线程读活对象（SceneManager 契约），无需 clone 快照。
@@ -295,12 +298,14 @@ void CurveLodManager::refillQueueIfStale()
             {
                 return;
             }
-            // POLYGON 只有顶点数 > kPolygonSimplifyMinVertices 时才走 Douglas-Peucker 简化。
-            // 顶点数不超过阈值的多边形在任意缩放下离散结果都相同，入 LOD 队列纯浪费。
+            // POLYGON 的离散结果在两种情况下随缩放变化：
+            //   1. 顶点数 > kPolygonSimplifyMinVertices → zoom out 时 Douglas-Peucker 简化；
+            //   2. 带 bulge（DXF 圆弧）→ 任何缩放都要按当前弦高容差重新展开。
+            // 其余多边形在任意缩放下输出都相同，入 LOD 队列纯浪费。
             if (isPolygon)
             {
                 const auto* polygon = static_cast<const Eg::SyPolygon*>(entity);
-                if (polygon->vertices().size() <= Eg::kPolygonSimplifyMinVertices)
+                if (!polygon->hasBulges() && polygon->vertices().size() <= Eg::kPolygonSimplifyMinVertices)
                 {
                     return;
                 }
@@ -321,7 +326,12 @@ void CurveLodManager::refillQueueIfStale()
 
 void CurveLodManager::ensurePump()
 {
-    // 泵的实际启动由 SceneRefreshCoordinator 的定时器完成（本类不持有定时器），
-    // 此处仅作为「还有剩余批次」的标记点。若 widget 不存在则无需启动。
-    (void)m_renderWidget;
+    // 本类不持有定时器：由协调器注入的回调负责启动/续跑消费泵。
+    // 队列还有剩余、或 finishQueue 重收集出新队列时，都必须真正唤醒定时器；
+    // 单次定时器触发完就停了，只留一个空标记会让剩余图元永久停在旧精度。
+    // 场景/视口解绑后不再唤醒，避免对已失效的队列空转。
+    if (m_pump && m_renderWidget && m_sceneManager)
+    {
+        m_pump();
+    }
 }

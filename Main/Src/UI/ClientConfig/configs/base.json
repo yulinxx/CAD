@@ -216,9 +216,7 @@
         { "type": "action", "id": "algo.offset", "label": "Offset...", "tooltip": "Offset multiple paths by a distance for kerf compensation", "command": "algo.offset", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"] },
         { "type": "action", "id": "algo.relief_engraving", "label": "Bitmap Relief Engraving...", "tooltip": "Convert a bitmap into a relief engraving toolpath", "command": "algo.relief_engraving", "icon": ":/ui/common/Icons/Actions/algo_relief.svg", "workbenches": ["2D"] },
         { "type": "action", "id": "algo.relief_engraving_mesh", "label": "Mesh Relief Engraving...", "tooltip": "Generate a relief engraving toolpath from a 3D mesh height field", "command": "algo.relief_engraving_mesh", "icon": ":/ui/common/Icons/Actions/algo_relief.svg", "shortcut": "Ctrl+Shift+E", "workbenches": ["3D"] },
-        { "type": "action", "id": "algo.nesting_from_mesh", "label": "Nesting from Mesh", "tooltip": "Project mesh outlines and nest them as 2D parts", "command": "algo.nesting_from_mesh", "icon": ":/ui/common/Icons/Actions/group.svg", "workbenches": ["3D"] },
-        { "type": "action", "id": "process.generate_relief_toolpath", "label": "Generate Relief Toolpath", "tooltip": "Compile the current relief into machine motion commands", "command": "process.generate_relief_toolpath", "icon": ":/ui/common/Icons/Actions/cut.svg", "shortcut": "Ctrl+Shift+G", "workbenches": ["3D"] },
-        { "type": "action", "id": "process.export_relief_toolpath", "label": "Export Relief Toolpath", "tooltip": "Write the generated relief toolpath to a file", "command": "process.export_relief_toolpath", "icon": ":/ui/common/Icons/File/save_as.svg", "workbenches": ["3D"] }
+        { "type": "action", "id": "algo.nesting_from_mesh", "label": "Nesting from Mesh", "tooltip": "Project mesh outlines and nest them as 2D parts", "command": "algo.nesting_from_mesh", "icon": ":/ui/common/Icons/Actions/group.svg", "workbenches": ["3D"] }
       ]
     },
     {

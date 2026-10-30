@@ -179,6 +179,26 @@ TEST(SyEntitySerializerTest, PolygonRoundTrip)
     expectVec2dEqual(resultVerts[3], Ut::Vec2d(0.0, 10.0));
 }
 
+TEST(SyEntitySerializerTest, BulgePolygonRoundTrip)
+{
+    Eg::SyPolygon original;
+    original.bClosed = false;
+    original.setVerticesWithBulges({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0, 0.0) }, { 1.0, 0.0 });
+
+    auto [deserialized, proto] = roundTrip<Eg::SyPolygon>(original);
+    ASSERT_NE(deserialized, nullptr);
+    ASSERT_TRUE(proto.has_polygon_data());
+    ASSERT_EQ(proto.polygon_data().bulges_size(), 2);
+
+    auto* poly = static_cast<Eg::SyPolygon*>(deserialized.get());
+    EXPECT_FALSE(poly->bClosed);
+    ASSERT_TRUE(poly->hasBulges());
+    ASSERT_EQ(poly->bulges().size(), 2u);
+    EXPECT_DOUBLE_EQ(poly->bulges()[0], 1.0);
+    EXPECT_DOUBLE_EQ(poly->bulges()[1], 0.0);
+    EXPECT_EQ(poly->vertices().size(), 2u);
+}
+
 // ==================== 多段线序列化循环（参数化） ====================
 
 TEST(SyEntitySerializerTest, ParametricPolygonRoundTrip)

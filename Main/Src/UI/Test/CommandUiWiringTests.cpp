@@ -458,7 +458,7 @@ TEST(CommandUiWiringTest, Switch_ThreeDimensionalOnlyCommandsDoNotResolveIn2DCat
         QStringLiteral("model.boolean_fuse"),
         QStringLiteral("model.split_half_x"),
         QStringLiteral("file.export_stl"),
-        QStringLiteral("process.generate_relief_toolpath"),
+        QStringLiteral("algo.relief_engraving_mesh"),
     };
     for (const QString& commandId : threeDOnlyIds)
     {

@@ -112,6 +112,19 @@ public:
     void markEntityDirty(uint64_t entityId) override;
     void markEntityDeleted(uint64_t entityId) override;
     UI::SceneRefreshLevel pendingLevel() const override;
+
+    /// 当前曲线 LOD 队列中的图元数（诊断/回归测试用；0 表示队列已排空）。
+    size_t pendingCurveLodCount() const
+    {
+        return m_curveLodManager.size();
+    }
+
+    /// 已执行的 LOD 批次数（诊断/回归测试用；用于验证单次定时器仍在续跑）。
+    size_t curveLodBatchCount() const
+    {
+        return m_curveLodManager.processedBatchCount();
+    }
+
     void flushPendingRefresh() override;
     std::unordered_set<uint64_t> takePendingDirtyIds() override;
     std::unordered_set<uint64_t> takePendingDeletedIds() override;

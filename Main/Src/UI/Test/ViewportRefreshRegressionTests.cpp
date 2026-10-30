@@ -16,12 +16,19 @@
 
 #include "UI/Render/SceneRefreshCoordinator.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/SyEntity/SyCircle.h"
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Log/SyPerfCounter.h"
+#include "RenderWidget.h"
+
+#include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QEventLoop>
 
 #include <chrono>
 #include <memory>
 #include <thread>
+#include <vector>
 
 namespace
 {
@@ -1003,4 +1010,98 @@ TEST(RefreshPathRegressionTest, RepaintAfterFullRefresh_NoDowngrade)
     coordinator.requestRepaint();
     coordinator.stop();
     SUCCEED();
+}
+
+// ==================== 曲线 LOD 消费泵回归 ====================
+
+// 背景（缺陷）：CurveLodManager 拆分后，32ms 的 LOD 定时器是单次的，
+// 而 ensurePump() 是空实现，定时器触发一次后不再续跑。
+// 队列超过单批 2000 个图元时，剩余图元永远停在低精度 ——
+// 用户看到的现象就是「超大文件放大后，曲线仍然粗糙」。
+//
+// 断言方式：不依赖真实 GPU（无渲染器时 upsert 会失败，但批次游标仍会推进），
+// 看队列是否排空、批次是否继续增长。旧实现最多被场景刷新顺手带上 2 批，
+// 修复后 32ms 定时器会持续续跑，直到 6001 个图元全部消费完。
+TEST(CurveLodPumpRegressionTest, ContinuesPastFirstBatch)
+{
+    Eg::SceneManager scene;
+
+    // 6001 个圆：单批 2000，旧实现最多被「场景刷新顺手带一次 + LOD 定时器一次」
+    // 消费 4000 个，剩下的 2001 个会永久卡在队列里。
+    constexpr int kCircleCount = 6001;
+    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    entities.reserve(kCircleCount);
+    for (int i = 0; i < kCircleCount; ++i)
+    {
+        auto circle = std::make_unique<Eg::SyCircle>();
+        circle->basePoint = Ut::Vec2d((i % 80) * 10.0 - 400.0, ((i / 80) % 60) * 10.0 - 300.0);
+        circle->dRadius = 1.0;
+        entities.push_back(std::move(circle));
+    }
+    scene.addEntities(std::move(entities));
+    ASSERT_EQ(scene.getEntityCount(), static_cast<size_t>(kCircleCount));
+
+    RenderWidget widget;
+    widget.resize(800, 600);
+
+    SceneRefreshCoordinator coordinator;
+    coordinator.setRenderWidget(&widget);
+    coordinator.setSceneContext(&scene);
+
+    coordinator.requestCurveLodRefresh();
+    // 首次收集应把所有曲线入队（视口 1.25 倍余量覆盖了测试坐标）。
+    ASSERT_EQ(coordinator.pendingCurveLodCount(), static_cast<size_t>(kCircleCount));
+
+    // 泵事件循环直到队列排空。旧实现（ensurePump 空实现）会停在剩余 2001 个。
+    QElapsedTimer elapsed;
+    elapsed.start();
+    while (coordinator.pendingCurveLodCount() != 0 && elapsed.elapsed() < 3000)
+    {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    EXPECT_EQ(coordinator.pendingCurveLodCount(), 0u)
+        << "LOD 定时器触发后未继续消费队列：ensurePump 的回调续跑链路断了";
+    // 6001 个图元完整消费需要 4 批；旧实现最多 2 批，>=3 即可区分。
+    EXPECT_GE(coordinator.curveLodBatchCount(), 3u);
+    coordinator.stop();
+}
+
+// 背景（缺陷）：旧实现靠协调器手动把「选中集 + 隐藏开关」快照同步给管理器，
+// 但这条同步从未被调用，于是「选中时隐藏本体」的图元在每次缩放触发 LOD 时
+// 都会被重新提交回世界层，表现为——选中图元隐藏后又突然冒出来。
+//
+// 修复后改为注入实时谓词：队列收集时直接读取最新开关 + 最新选中集，
+// 隐藏中的选中图元不会进队列。
+TEST(CurveLodSelectionRegressionTest, HiddenSelectedEntityNotQueued)
+{
+    Eg::SceneManager scene;
+
+    auto circle = std::make_unique<Eg::SyCircle>();
+    circle->basePoint = Ut::Vec2d(0.0, 0.0);
+    circle->dRadius = 10.0;
+    Eg::SyEntity* added = scene.addEntity(circle.get());
+    ASSERT_NE(added, nullptr);
+    // 场景先带着选中集被 attach：协调器必须在 setSceneContext 时同步选中缓存。
+    scene.selectEntity(added);
+    ASSERT_EQ(scene.getSelectedEntityCount(), 1u);
+
+    RenderWidget widget;
+    widget.resize(800, 600);
+    widget.setHideSelectedOriginal(true);
+    widget.setSelectionOutlinesActive(true);
+    ASSERT_TRUE(widget.hideSelectedOriginalEffective());
+
+    SceneRefreshCoordinator coordinator;
+    coordinator.setRenderWidget(&widget);
+    coordinator.setSceneContext(&scene);
+
+    coordinator.requestCurveLodRefresh();
+
+    // 选中本体正在被虚线轮廓替代，不该再由 LOD 提交到世界层。
+    EXPECT_EQ(coordinator.pendingCurveLodCount(), 0u)
+        << "隐藏中的选中图元被重新排进 LOD 队列，缩放后本体会重新出现";
+
+    coordinator.stop();
 }

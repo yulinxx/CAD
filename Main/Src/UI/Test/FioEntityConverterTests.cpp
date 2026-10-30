@@ -340,6 +340,64 @@ TEST(FioEntityConverterTest, ConvertPolylineWithExtensionData)
     EXPECT_DOUBLE_EQ(verts[2].y(), 10.0);
 }
 
+TEST(FioEntityConverterTest, ConvertPolylineWithBulgeMetadata)
+{
+    // 顶点块 + 独立的 bulge 块（与 DXF IR 的布局一致）。
+    double vertices[] = { 0.0, 0.0, 10.0, 0.0 };
+    double bulges[] = { 1.0, 0.0 };
+    uint8_t blobBuffer[sizeof(vertices) + sizeof(bulges)];
+    std::memcpy(blobBuffer, vertices, sizeof(vertices));
+    std::memcpy(blobBuffer + sizeof(vertices), bulges, sizeof(bulges));
+
+    Fio::BinaryBlob blob{ blobBuffer, sizeof(blobBuffer) };
+
+    Fio::EntityInfo info;
+    info.type = Fio::EntityType::Polyline;
+    info.vertexCount = 2;
+    info.extensionDataOffset = 0;
+    info.extensionDataSize = sizeof(vertices);
+    info.bulgeDataOffset = sizeof(vertices);
+    info.bulgeDataSize = sizeof(bulges);
+
+    auto entity = Eg::FioEntityConverter::convertEntity(info, blob);
+    ASSERT_NE(entity, nullptr);
+    auto* poly = static_cast<Eg::SyPolygon*>(entity.get());
+    ASSERT_TRUE(poly->hasBulges());
+    ASSERT_EQ(poly->bulges().size(), 2u);
+    EXPECT_DOUBLE_EQ(poly->bulges()[0], 1.0);
+    EXPECT_DOUBLE_EQ(poly->bulges()[1], 0.0);
+
+    // 圆弧由 outline 按需展开，控制顶点仍是 2 个。
+    EXPECT_EQ(poly->vertices().size(), 2u);
+    EXPECT_GT(poly->outline(0.01).size(), 2u);
+}
+
+TEST(FioEntityConverterTest, InvalidBulgeLengthFallsBackToStraightPolyline)
+{
+    // bulge 长度与顶点数不匹配时必须忽略，而不是丢掉整条折线或越界读取。
+    double vertices[] = { 0.0, 0.0, 10.0, 0.0, 10.0, 10.0 };
+    double bulges[] = { 1.0 };
+    uint8_t blobBuffer[sizeof(vertices) + sizeof(bulges)];
+    std::memcpy(blobBuffer, vertices, sizeof(vertices));
+    std::memcpy(blobBuffer + sizeof(vertices), bulges, sizeof(bulges));
+
+    Fio::BinaryBlob blob{ blobBuffer, sizeof(blobBuffer) };
+
+    Fio::EntityInfo info;
+    info.type = Fio::EntityType::Polyline;
+    info.vertexCount = 3;
+    info.extensionDataOffset = 0;
+    info.extensionDataSize = sizeof(vertices);
+    info.bulgeDataOffset = sizeof(vertices);
+    info.bulgeDataSize = sizeof(bulges);
+
+    auto entity = Eg::FioEntityConverter::convertEntity(info, blob);
+    ASSERT_NE(entity, nullptr);
+    auto* poly = static_cast<Eg::SyPolygon*>(entity.get());
+    EXPECT_FALSE(poly->hasBulges());
+    EXPECT_EQ(poly->vertices().size(), 3u);
+}
+
 // ==================== NURBS 转换（含扩展数据） ====================
 
 TEST(FioEntityConverterTest, ConvertNurbsWithExtensionData)
