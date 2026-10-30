@@ -629,6 +629,10 @@ void Workbench2D::setupImportCallbacks(RenderViewport2D* vp, WorkbenchWindow& wi
         });
     });
 
+    // 导入期间抑制视口刷新调度：避免进度回调泵送事件循环时对半成品场景做全量重建；
+    // 导入结束由协调器一次性补刷。协调器为空（视口未装备）时守卫退化为空操作。
+    m_persistence.importService->setRefreshCoordinator(vp ? vp->refreshCoordinator() : nullptr);
+
     // 统一显示刷新（批量刷新场景树、属性面板，避免导入后多次分离刷新回调）
     m_persistence.importService->setDisplayRefreshCallback([this]() {
         // 走结构签名门控，不要无条件全量重建。
@@ -2327,6 +2331,8 @@ void Workbench2D::deactivate()
         m_persistence.importService->setTreeRebuildCallback(nullptr);
         m_persistence.importService->setPropertyRefreshCallback(nullptr);
         m_persistence.importService->setDisplayRefreshCallback(nullptr);
+        // 刷新协调器随视口一起失效，必须先摘：否则下次导入会打到悬空指针上
+        m_persistence.importService->setRefreshCoordinator(nullptr);
     }
 
     if (m_workbenchWindow)

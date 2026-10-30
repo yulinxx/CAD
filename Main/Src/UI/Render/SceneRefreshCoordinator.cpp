@@ -26,6 +26,11 @@ namespace
     // 场景更新节流时间（毫秒）— 16ms 约等于 60fps，合并短时间内的多次场景变更
     constexpr int kSceneUpdateDelay = 16;
 
+    // 单次场景变更通知覆盖的图元数上限：超过即按批量写入处理，直接升级全量刷新。
+    // 导入/算法落库这类批量写入会一次性产生海量变更：逐图元 clone 快照 + 增量 upsert
+    // 的代价远超一次带视口裁剪的全量重建，而且增量路径没有裁剪，会把视口外图元也塞进 GPU。
+    constexpr size_t kBulkChangeThreshold = 16384;
+
     /// 取图元所属图层的绘制序号（0 = 最上层），供增量路径构造 z-order。
     ///
     /// 增量路径的图元快照是 clone，**不复制图层指针**，所以只能查活对象。
@@ -215,6 +220,47 @@ void SceneRefreshCoordinator::flushPendingRefresh()
     updateSceneRender();
 }
 
+void SceneRefreshCoordinator::beginRefreshSuppression()
+{
+    ++m_suppressionDepth;
+}
+
+void SceneRefreshCoordinator::endRefreshSuppression()
+{
+    if (m_suppressionDepth > 0)
+    {
+        --m_suppressionDepth;
+    }
+    if (m_suppressionDepth > 0)
+    {
+        return;
+    }
+
+    if (m_suppressedSceneChanged)
+    {
+        m_suppressedSceneChanged = false;
+        // 重新走一遍变更收集：游标落在压实后的日志下界之前时 readChanges 会失败，
+        // onSceneChanged 内部自动升级为全量刷新 —— 97 万图元级导入正是这种情形；
+        // 小批量导入则收集出精确脏集合，保持增量路径。
+        onSceneChanged();
+    }
+
+    // 抑制期间被压下的其它刷新意图（如视口适配触发的全量）在这里一次性补做；
+    // 没有任何待办时是廉价空转。
+    if (m_refreshLevel > RefreshLevel::None)
+    {
+        flushPendingRefresh();
+    }
+}
+
+void SceneRefreshCoordinator::prepareForBulkAdd(size_t estimatedEntityCount)
+{
+    if (m_renderWidget)
+    {
+        m_renderWidget->prepareForBulkAdd(estimatedEntityCount);
+    }
+}
+
 void SceneRefreshCoordinator::setPerfMonitorEnabled(bool enabled)
 
 {
@@ -241,6 +287,12 @@ void SceneRefreshCoordinator::scheduleSceneUpdate()
     {
         m_refreshLevel = RefreshLevel::LightUpdate;
     }
+    if (m_suppressionDepth > 0)
+    {
+        // 批量写入抑制期间：级别已记录，不启动定时器 ——
+        // 结束抑制后由 endRefreshSuppression 统一派发
+        return;
+    }
     if (m_sceneUpdateTimer && !m_sceneUpdateTimer->isActive())
     {
         m_sceneUpdateTimer->start();
@@ -262,6 +314,12 @@ void SceneRefreshCoordinator::requestRepaint()
 
 void SceneRefreshCoordinator::scheduleFullRefresh()
 {
+    if (m_suppressionDepth > 0)
+    {
+        // 批量写入抑制期间：级别保持 FullRefresh，不启动定时器，
+        // 结束抑制后由 endRefreshSuppression 统一派发
+        return;
+    }
     if (m_sceneUpdateTimer && !m_sceneUpdateTimer->isActive())
     {
         m_sceneUpdateTimer->start();
@@ -465,6 +523,16 @@ void SceneRefreshCoordinator::requestViewportRefresh()
 // 收集脏/删除图元 ID，升级到 LightUpdate 级别
 void SceneRefreshCoordinator::onSceneChanged()
 {
+    // 批量写入（导入）抑制期间：只记「有待办」就返回。
+    // 不读变更流、不 clone 快照、不启动定时器 —— 海量写入时这些每一步都是
+    // 秒级开销，而且写入中途触发的重建对象是半成品场景，注定白做。
+    // 结束抑制时 endRefreshSuppression 会重新调用本函数完成真正的收集与派发。
+    if (m_suppressionDepth > 0)
+    {
+        m_suppressedSceneChanged = true;
+        return;
+    }
+
     // 追踪：每次场景变更都打一下，看看空场景下谁在反复触发
     static std::chrono::steady_clock::time_point s_lastLog;
     auto now = std::chrono::steady_clock::now();
@@ -481,6 +549,17 @@ void SceneRefreshCoordinator::onSceneChanged()
         Eg::SceneChangeSet changes;
         if (m_sceneManager->readChanges(m_lastCursor, changes))
         {
+            // 批量写入（导入/算法落库）的单次大变更量：跳过快照与脏集合收集，直接全量。
+            // 否则会对海量图元逐个 clone 快照（秒级耗时 + 内存翻倍）、再走无裁剪的
+            // 增量 upsert —— 比一次带视口裁剪的全量重建更贵。
+            if (changes.changes.size() > kBulkChangeThreshold)
+            {
+                m_lastCursor = changes.toRevision;
+                m_refreshLevel = RefreshLevel::FullRefresh;
+                scheduleFullRefresh();
+                return;
+            }
+
             // 在这里（UI 线程）就把变更图元 clone 成只读快照：增量刷新可能在
             // 工作线程里离散化，那时再去读活对象就会和用户的编辑并发。
             if (!m_sceneManager->captureSnapshot(changes, m_pendingSnapshot))
@@ -1072,6 +1151,13 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
 // 渲染刷新分发：按 RefreshLevel 级别选择刷新策略
 void SceneRefreshCoordinator::updateSceneRender()
 {
+    if (m_suppressionDepth > 0)
+    {
+        // 抑制期间不消费级别与待办（flushPendingRefresh 可能被外部在抑制期调到）：
+        // 原样保留，结束抑制后由 endRefreshSuppression 统一派发
+        return;
+    }
+
     if (!m_renderWidget || (m_refreshLevel == RefreshLevel::None && m_curveLodManager.empty()))
     {
         return;

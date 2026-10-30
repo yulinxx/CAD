@@ -119,6 +119,26 @@ public:
     /// 停止定时器，防止析构过程中访问已释放资源
     void stop() override;
 
+    // ==================== 批量写入的刷新抑制（导入专用） ====================
+
+    /// 导入等大批量写入期间抑制刷新调度（支持嵌套，配合 RAII 守卫使用）。
+    ///
+    /// 抑制期间：场景变更只记「有待办」，不读变更流、不收集快照、刷新定时器不启动
+    /// —— 否则导入的进度回调泵送事件循环时，定时器会在写入中途触发，对半成品场景
+    /// 做全量重建（97 万图元导入耗时的大头就是这种中途重建）。
+    ///
+    /// 结束抑制（深度归零）后一次性补刷：
+    ///   - 小批量写入：重收集出精确脏集合，走增量装配；
+    ///   - 海量写入（变更量超过 kBulkChangeThreshold）：自动升级为一次全量重建
+    ///     —— 全程唯一的一次重建，且带视口裁剪。
+    void beginRefreshSuppression();
+    void endRefreshSuppression();
+
+    /// 大批量写入前按实体数预留几何仓容量（转发视口的 RenderSceneBuilder::
+    /// prepareForBulkAdd，仅在预估超出当前容量时才真正扩容，避免写入过程中
+    /// 顶点仓反复 grow-拷贝）。
+    void prepareForBulkAdd(size_t estimatedEntityCount);
+
     /// 设置拖动中是否强制显示选中图元（拖动时暂时显示原图形，拖动结束后恢复隐藏）
     void setForceShowSelectedDuringDrag(bool forceShow);
 
@@ -197,6 +217,13 @@ private:
 
     /// 拖动中强制显示选中图元（覆盖 hideSelectedEffective）
     bool m_forceShowSelectedDuringDrag{ false };
+
+    // ==================== 批量写入的刷新抑制状态 ====================
+    // 嵌套计数：两个导入的 phase 3-5 可能经进度回调泵送事件循环而嵌套执行，
+    // 深度归零才真正恢复调度并补刷。
+    int m_suppressionDepth{ 0 };
+    // 抑制期间发生过场景变更：结束时需要重新收集（读变更流 + 按需快照）再统一刷新
+    bool m_suppressedSceneChanged{ false };
 
     // 脏标记集合（增量渲染）
     std::unordered_set<Eg::EntityId> m_pendingDirtyIds;

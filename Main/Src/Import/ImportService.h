@@ -17,6 +17,7 @@ class PropertiesPanelWidget;
 class SceneEditService;
 class SceneEditService3D;
 class LayerManager;
+class SceneRefreshCoordinator;
 
 namespace Eg
 {
@@ -55,6 +56,11 @@ public:
 
     /// 设置场景编辑服务（用于将导入的图元通过事务写入文档，支持 Undo）
     void setEditService(SceneEditService* editService);
+
+    /// 设置 2D 场景刷新协调器（可选，非拥有）：导入 phase 3-5 期间抑制视口刷新调度，
+    /// 避免进度回调泵送事件循环时对半成品场景做全量重建；导入结束由协调器一次性补刷。
+    /// 3D 导入工作台不注入，抑制守卫自动退化为空操作。
+    void setRefreshCoordinator(SceneRefreshCoordinator* coordinator);
 
     /// 设置图层管理器（用于导入后还原源文件图层结构，如 DXF 图层）
     void setLayerManager(LayerManager* layerManager);
@@ -213,6 +219,8 @@ private:
     SceneEditService3D* m_sceneEditService3D{ nullptr };
     /// 场景编辑服务（非拥有指针，用于事务化添加图元）
     SceneEditService* m_editService{ nullptr };
+    /// 2D 场景刷新协调器（非拥有指针，可选）：导入期间抑制视口刷新调度
+    SceneRefreshCoordinator* m_refreshCoordinator{ nullptr };
     /// 图层管理器（非拥有指针，用于导入后还原图层结构）
     LayerManager* m_layerManager{ nullptr };
     /// 忙状态回调（替代 UiStateCenter 直接调用）

@@ -187,6 +187,13 @@ public:
         return m_renderCoordinator.get();
     }
 
+    /// 获取刷新协调器（刷新级别调度/变更收集的唯一入口）。
+    /// 供导入服务在批量写入期间抑制刷新调度，装备完成前可能为空。
+    SceneRefreshCoordinator* refreshCoordinator() const
+    {
+        return m_refreshCoordinator.get();
+    }
+
     void resetView();
     void zoomToFit();
     void zoomToSelection();

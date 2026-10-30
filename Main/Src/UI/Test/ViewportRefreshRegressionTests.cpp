@@ -300,6 +300,96 @@ TEST(ViewportRefreshRegressionTest, Coordinator_OnSceneChangedWithSceneManager)
     SUCCEED();
 }
 
+// ==================== 批量写入的刷新抑制（导入专用） ====================
+
+TEST(RefreshSuppressionTest, Suppression_DefersSceneChangeUntilEnd)
+{
+    Eg::SceneManager scene;
+    SceneRefreshCoordinator coordinator;
+    coordinator.setSceneContext(&scene);
+
+    coordinator.beginRefreshSuppression();
+
+    // 抑制期间场景变更：只记待办，不调度（级别保持 None）
+    auto line = std::make_unique<Eg::SyLine>();
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    entities.push_back(std::move(line));
+    scene.addEntities(std::move(entities));
+
+    EXPECT_EQ(coordinator.pendingLevel(), UI::SceneRefreshLevel::None);
+
+    // 结束抑制：重收集变更并调度一次刷新（小变更量 → 增量级别）
+    coordinator.endRefreshSuppression();
+    EXPECT_EQ(coordinator.pendingLevel(), UI::SceneRefreshLevel::LightUpdate);
+
+    coordinator.stop();
+}
+
+TEST(RefreshSuppressionTest, Suppression_NestedDepth)
+{
+    Eg::SceneManager scene;
+    SceneRefreshCoordinator coordinator;
+    coordinator.setSceneContext(&scene);
+
+    // 嵌套两层（如导入泵事件期间又嵌套了另一个导入的 phase 3-5）：
+    // 只有一层结束时不得恢复调度
+    coordinator.beginRefreshSuppression();
+    coordinator.beginRefreshSuppression();
+
+    auto line = std::make_unique<Eg::SyLine>();
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    entities.push_back(std::move(line));
+    scene.addEntities(std::move(entities));
+
+    coordinator.endRefreshSuppression();
+    EXPECT_EQ(coordinator.pendingLevel(), UI::SceneRefreshLevel::None)
+        << "深度未归零时不得派发刷新";
+
+    coordinator.endRefreshSuppression();
+    EXPECT_EQ(coordinator.pendingLevel(), UI::SceneRefreshLevel::LightUpdate);
+
+    coordinator.stop();
+}
+
+TEST(RefreshSuppressionTest, Suppression_BulkChangeUpgradesToFullRefresh)
+{
+    Eg::SceneManager scene;
+    SceneRefreshCoordinator coordinator;
+    coordinator.setSceneContext(&scene);
+
+    coordinator.beginRefreshSuppression();
+
+    // 超过 kBulkChangeThreshold（16384）的海量写入：结束时必须升级全量，
+    // 而不是对海量图元逐个 clone 快照 + 无裁剪增量 upsert
+    constexpr size_t kBulkCount = 17000;
+    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    entities.reserve(kBulkCount);
+    for (size_t i = 0; i < kBulkCount; ++i)
+    {
+        auto line = std::make_unique<Eg::SyLine>();
+        line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+        entities.push_back(std::move(line));
+    }
+    scene.addEntities(std::move(entities));
+
+    coordinator.endRefreshSuppression();
+    EXPECT_EQ(coordinator.pendingLevel(), UI::SceneRefreshLevel::FullRefresh);
+
+    coordinator.stop();
+}
+
+TEST(RefreshSuppressionTest, Suppression_NoSceneChangeEndsWithoutRefresh)
+{
+    SceneRefreshCoordinator coordinator;
+    coordinator.beginRefreshSuppression();
+    coordinator.endRefreshSuppression();  // 抑制期间无变更：结束应为空操作
+    EXPECT_EQ(coordinator.pendingLevel(), UI::SceneRefreshLevel::None);
+    coordinator.stop();
+}
+
+
 // ==================== 刷新级别升级测试 ====================
 
 TEST(ViewportRefreshRegressionTest, Coordinator_RefreshLevelUpgrade)

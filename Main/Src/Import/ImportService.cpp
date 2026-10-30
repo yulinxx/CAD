@@ -28,6 +28,7 @@
 #include "Engine2D/Interaction/LayerManager.h"
 #include "Engine3D/SceneManager3D.h"
 #include "Engine3D/SyEntity/SyMeshEntity.h"
+#include "UI/Render/SceneRefreshCoordinator.h"
 #if BUILD_UI3D
     #include "UI3D/Edit/SceneEditService3D.h"
 #else
@@ -98,6 +99,36 @@ namespace
         ImportService* m_svc;
         QString m_sourcePath;
         ImportResult m_result;
+    };
+
+    /// 导入 phase 3-5 的刷新抑制守卫：构造时挂起 2D 视口的定时刷新调度，
+    /// 析构时（含失败/取消路径）恢复并让协调器一次性补刷。
+    /// 协调器为空（3D 导入工作台未注入）时整体退化为空操作。
+    class ScopedRefreshSuppression
+    {
+    public:
+        explicit ScopedRefreshSuppression(SceneRefreshCoordinator* coordinator)
+            : m_coordinator(coordinator)
+        {
+            if (m_coordinator)
+            {
+                m_coordinator->beginRefreshSuppression();
+            }
+        }
+
+        ~ScopedRefreshSuppression()
+        {
+            if (m_coordinator)
+            {
+                m_coordinator->endRefreshSuppression();
+            }
+        }
+
+        ScopedRefreshSuppression(const ScopedRefreshSuppression&) = delete;
+        ScopedRefreshSuppression& operator=(const ScopedRefreshSuppression&) = delete;
+
+    private:
+        SceneRefreshCoordinator* m_coordinator;
     };
 }  // anonymous namespace
 
@@ -191,6 +222,11 @@ void ImportService::setDocumentPersistenceCallback(std::function<bool(const QStr
     m_documentPersistenceCallback = std::move(cb);
 }
 
+void ImportService::setRefreshCoordinator(SceneRefreshCoordinator* coordinator)
+{
+    m_refreshCoordinator = coordinator;
+}
+
 ImportResult ImportService::importFile(const QString& filePath, const ImportOptions& options)
 {
     ImportContext context;
@@ -260,24 +296,32 @@ ImportResult ImportService::importWithContext(const ImportContext& context, cons
         return fail(ImportResult::fail(tr("Import canceled"), ImportErrorType::Canceled));
     }
 
-    // ===== 3：构建文档 =====
-    result = phaseBuildDocument(mutableCtx, importedEntities, options, parseResult);
-    if (!result.success)
+    // ===== 3-5：构建文档 → 刷新显示 → 回写状态 =====
+    // 导入期间抑制 2D 视口刷新调度：commitProgress 会泵送事件循环，16ms 刷新定时器
+    // 若在写入中途触发，会对半成品场景做全量重建（97 万图元导入耗时的大头）。
+    // 抑制到 phase 5 结束（含失败/取消路径，RAII 兜底），由协调器一次性补刷。
     {
-        SY_ERRORF("[ImportService] Phase 3 failed: %s", result.message.toUtf8().constData());
-        return fail(result);
+        ScopedRefreshSuppression suppression(m_refreshCoordinator);
+
+        // ===== 3：构建文档 =====
+        result = phaseBuildDocument(mutableCtx, importedEntities, options, parseResult);
+        if (!result.success)
+        {
+            SY_ERRORF("[ImportService] Phase 3 failed: %s", result.message.toUtf8().constData());
+            return fail(result);
+        }
+
+        if (isCanceled(mutableCtx))
+        {
+            return fail(ImportResult::fail(tr("Import canceled"), ImportErrorType::Canceled));
+        }
+
+        // ===== 4：刷新显示 =====
+        phaseRefreshDisplay(mutableCtx, result, options);
+
+        // ===== 5：回写状态 =====
+        phaseWriteBackState(mutableCtx, result);
     }
-
-    if (isCanceled(mutableCtx))
-    {
-        return fail(ImportResult::fail(tr("Import canceled"), ImportErrorType::Canceled));
-    }
-
-    // ===== 4：刷新显示 =====
-    phaseRefreshDisplay(mutableCtx, result, options);
-
-    // ===== 5：回写状态 =====
-    phaseWriteBackState(mutableCtx, result);
 
     // RAII 守卫在析构时自动清除忙状态并写最终提示
     guard.setResult(result);
@@ -397,6 +441,9 @@ void ImportService::importAsync(
                 if (safeSelf.isNull())
                     return;
                 ImportContext mainCtx = mutableCtx;
+
+                // 导入期间抑制 2D 视口刷新调度（同 importWithContext：避免中途全量重建）
+                ScopedRefreshSuppression suppression(safeSelf->m_refreshCoordinator);
 
                 if (safeSelf->isCanceled(mainCtx))
                 {
@@ -677,6 +724,13 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     std::unordered_map<int64_t, int64_t> idRemap;
     if (!flatEntities.empty())
     {
+        // 大批量导入前按图元数预留几何仓容量：写入过程中 GPU 顶点仓不再反复 grow-拷贝
+        // （顶点仓从小容量起步倍增扩容会放大海量导入的主线程停顿）
+        if (m_refreshCoordinator)
+        {
+            m_refreshCoordinator->prepareForBulkAdd(flatEntities.size());
+        }
+
         flatAdded = static_cast<int>(flatEntities.size());
         if (m_editService)
         {
