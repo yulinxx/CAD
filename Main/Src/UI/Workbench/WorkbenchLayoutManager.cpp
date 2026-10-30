@@ -26,6 +26,8 @@
 
 #include <QDateTime>
 #include <QDockWidget>
+#include <QList>
+#include <QTimer>
 #include <QLabel>
 #include <QMenu>
 #include <QMenuBar>
@@ -534,6 +536,9 @@ void WorkbenchLayoutManager::saveLayoutSnapshot(const QString& workbenchId)
     }
 
     const QString savedAt = QDateTime::currentDateTime().toString(Qt::ISODate);
+    // saveState() 只调用一次：DB 与 QSettings 必须保存同一份字节，
+    // 否则两次调用之间工具栏/Dock 状态若有变化，恢复时会按不同快照走。
+    const QByteArray windowState = m_parent->saveState();
 
     // 数据库与 QSettings 同时落盘（恢复时按时间戳取较新的一份），
     // 避免某一次写入失败后，另一侧的旧数据在恢复时被当成最新布局。
@@ -541,16 +546,38 @@ void WorkbenchLayoutManager::saveLayoutSnapshot(const QString& workbenchId)
     {
         WorkspaceSnapshotRecord rec;
         rec.workbenchId = workbenchId.toStdString();
-        rec.windowState = m_parent->saveState().toBase64().toStdString();
+        rec.windowState = windowState.toBase64().toStdString();
         rec.updatedAt = savedAt.toStdString();
-        m_persistenceService->workspaceSnapshots()->save(rec);
-        SY_DEBUGF("[WorkbenchLayoutManager] Saved layout snapshot to database: %s", rec.workbenchId.c_str());
+        const bool saved = m_persistenceService->workspaceSnapshots()->save(rec);
+        if (saved)
+        {
+            SY_DEBUGF("[WorkbenchLayoutManager] Saved layout snapshot to database: %s", rec.workbenchId.c_str());
+        }
+        else
+        {
+            // 数据库写入可能因 WAL 锁失败（同一库文件被多条连接同时写）；
+            // QSettings 是本地文件，写入互不干扰，继续执行以保证快照至少落一份
+            SY_WARNF("[WorkbenchLayoutManager] Failed to save layout snapshot to database for workbench '%s', "
+                     "falling back to QSettings only",
+                rec.workbenchId.c_str());
+        }
     }
 
     QSettings settings;
     settings.beginGroup(QStringLiteral("LayoutSnapshots"));
-    settings.setValue(workbenchId + QStringLiteral("/windowState"), m_parent->saveState());
+    settings.setValue(workbenchId + QStringLiteral("/windowState"), windowState);
     settings.setValue(workbenchId + QStringLiteral("/savedAt"), savedAt);
+    // 单独保存左右 Dock 的宽度：QMainWindow::restoreState() 在中央控件
+    // 采用 Expanding 策略时不能稳定还原 Dock 宽度（2D/3D 切换后画布被压窄）。
+    // 显式宽度会在恢复后通过 applyDockWidths() 再应用一次。
+    const int leftWidth = (m_panelState.leftDock && m_panelState.leftDock->isVisible())
+        ? m_panelState.leftDock->width()
+        : -1;
+    const int rightWidth = (m_panelState.rightDock && m_panelState.rightDock->isVisible())
+        ? m_panelState.rightDock->width()
+        : -1;
+    settings.setValue(workbenchId + QStringLiteral("/leftDockWidth"), leftWidth);
+    settings.setValue(workbenchId + QStringLiteral("/rightDockWidth"), rightWidth);
     settings.endGroup();
 }
 
@@ -615,8 +642,11 @@ bool WorkbenchLayoutManager::restoreLayoutSnapshot(const QString& workbenchId)
 
     if (state.isEmpty())
     {
-        // 无快照：保留构建期的默认宽度与 JSON 初始显隐
+        // 无快照：保留构建期的默认宽度与 JSON 初始显隐；
+        // 但仍要应用一次默认 Dock 宽度 —— 3D 的 SceneDock 会按内容 sizeHint
+        // 把视口挤成 640px，必须先压回默认宽度。
         restoreDockWidgetTitles();
+        applyDockWidthsDeferred(workbenchId);
         return false;
     }
 
@@ -629,7 +659,76 @@ bool WorkbenchLayoutManager::restoreLayoutSnapshot(const QString& workbenchId)
 
     // restoreState() 会覆盖 dock widget 的标题，需要重新设置为当前工作台的标题
     restoreDockWidgetTitles();
+
+    // QMainWindow::restoreState() 返回成功并不代表 Dock 宽度已经稳定：
+    // 中央控件（2D 视口）是 Expanding，后续布局过程会再次重算 Dock 宽度。
+    // 这里按工作台显式保存的宽度再应用一次，并在事件循环跑完后再兜底一次。
+    applyDockWidthsDeferred(workbenchId);
     return true;
+}
+
+void WorkbenchLayoutManager::applyDockWidthsDeferred(const QString& workbenchId)
+{
+    applyDockWidths(workbenchId);
+
+    // 代次守卫：切换非常快时，旧工作台的延迟回调不能覆盖新工作台宽度
+    const quint64 token = ++m_dockWidthGeneration;
+    QTimer::singleShot(0, m_parent, [this, workbenchId, token]() {
+        if (token == m_dockWidthGeneration)
+        {
+            applyDockWidths(workbenchId);
+        }
+    });
+    QTimer::singleShot(50, m_parent, [this, workbenchId, token]() {
+        if (token == m_dockWidthGeneration)
+        {
+            applyDockWidths(workbenchId);
+        }
+    });
+}
+
+void WorkbenchLayoutManager::applyDockWidths(const QString& workbenchId)
+{
+    if (!m_parent || workbenchId.isEmpty())
+    {
+        return;
+    }
+
+    // 首次进入某工作台（无保存宽度）时的兜底宽度。2D/3D 共用同一对 Dock，
+    // 3D 的 SceneDock 若不压回默认值会按内容 sizeHint 占满整窗。
+    static constexpr int kDefaultLeftDockWidth = 280;
+    static constexpr int kDefaultRightDockWidth = 300;
+
+    QSettings settings;
+    settings.beginGroup(QStringLiteral("LayoutSnapshots"));
+    int leftWidth = settings.value(workbenchId + QStringLiteral("/leftDockWidth"), -1).toInt();
+    int rightWidth = settings.value(workbenchId + QStringLiteral("/rightDockWidth"), -1).toInt();
+    settings.endGroup();
+    if (leftWidth <= 0)
+    {
+        leftWidth = kDefaultLeftDockWidth;
+    }
+    if (rightWidth <= 0)
+    {
+        rightWidth = kDefaultRightDockWidth;
+    }
+
+    QList<QDockWidget*> docks;
+    QList<int> widths;
+    if (m_panelState.leftDock && m_panelState.leftDock->isVisible() && leftWidth > 0)
+    {
+        docks.append(m_panelState.leftDock.data());
+        widths.append(leftWidth);
+    }
+    if (m_panelState.rightDock && m_panelState.rightDock->isVisible() && rightWidth > 0)
+    {
+        docks.append(m_panelState.rightDock.data());
+        widths.append(rightWidth);
+    }
+    if (!docks.isEmpty())
+    {
+        m_parent->resizeDocks(docks, widths, Qt::Horizontal);
+    }
 }
 
 void WorkbenchLayoutManager::restoreDockWidgetTitles()

@@ -162,12 +162,22 @@ public:
     }
 
 private:
+    /// 从 QSettings 读取当前工作台保存的左右 Dock 宽度并 resizeDocks。
+    /// 没有保存值时用默认宽度（首次进入 3D 时防止 SceneDock 按内容 sizeHint 撑满）。
+    /// 仅靠 QMainWindow::restoreState() 时，中央控件（2D 视口 Expanding）
+    /// 会在后续布局中把 Dock 宽度再次挤掉，导致 2D↔3D 切换后画布被压窄。
+    void applyDockWidths(const QString& workbenchId);
+    /// 立即应用一次，并在事件循环跑完后再兜底应用两次（0ms/50ms）。
+    void applyDockWidthsDeferred(const QString& workbenchId);
+
     QMainWindow* m_parent;
     WorkbenchMenuManager* m_menuManager;
     PersistenceService* m_persistenceService{ nullptr };
 
     PanelState m_panelState;
     std::vector<QDockWidget*> m_registeredDocks;
+    /// 延迟应用 Dock 宽度的代次：切换很快时防止旧工作台的定时器覆盖新布局
+    quint64 m_dockWidthGeneration{ 0 };
     std::vector<QToolBar*> m_registeredToolBars;
     /// 由配置构建并挂入状态栏的框架级槽位控件（工作台切换时统一回收）
     std::vector<QPointer<QWidget>> m_statusBarSlots;

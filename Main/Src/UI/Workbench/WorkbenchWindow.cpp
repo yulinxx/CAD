@@ -212,6 +212,9 @@ void WorkbenchWindow::retranslateUi()
         m_layoutManager->retranslateDockTitles();
     }
 
+    // 恢复完整窗口标题（文档名 + 工作台 + 修改星号），
+    // 上面 setWindowTitle 只设了品牌名占位，这里按状态中心快照拼完整格式
+    updateWindowTitle();
     refreshStatusText();
     SY_DEBUG("[WorkbenchWindow] retranslateUi completed");
 }
@@ -1063,8 +1066,9 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         return;
     }
 
-    const QString currentWorkbenchId =
-        m_stateManager ? m_stateManager->windowState().currentWorkbenchId : QStringLiteral("default");
+    // 用 m_workbench->id() 直接取，与 previousWorkbenchId 保持同一来源，
+    // 避免 windowState 镜像滞后导致"相同工作台"检查失效
+    const QString currentWorkbenchId = m_workbench ? m_workbench->id() : QStringLiteral("default");
     if (workbenchId.compare(currentWorkbenchId, Qt::CaseInsensitive) == 0)
     {
         SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: same workbench %s, skipping", workbenchId.toUtf8().constData());
@@ -1117,8 +1121,10 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         return;
     }
 
-    const auto previousWorkbenchId =
-        m_stateManager ? m_stateManager->windowState().currentWorkbenchId : QStringLiteral("default");
+    // 用 m_workbench->id() 直接从工作台对象取 previous id，
+    // 避免 windowState 镜像的滞后/串写问题（镜像由 syncWindowStateFromStateCenter
+    // 异步拉取，时序上可能已被新值覆盖）
+    const QString previousWorkbenchId = m_workbench ? m_workbench->id() : QStringLiteral("unknown");
     const auto switchContextText = workbenchSwitchText(workbenchId);
 
     SY_DEBUGF("[WorkbenchWindow] triggerWorkbench: switching from %s to %s",
