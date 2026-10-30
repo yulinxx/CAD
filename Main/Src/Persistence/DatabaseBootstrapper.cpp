@@ -20,7 +20,8 @@
 // v3: layers 表新增 fill 列（填充图层标志，色块填充）
 // v4: layers 表新增 fill_color 列（填充色，色块填充）
 // v5: 新增 dialog_states 表和索引，为对话框数据持久化提供支持
-static constexpr int kSchemaVersion = 5;
+// v6: recent_files 表新增 workbench 列（2D/3D 最近文件分桶，互不混显）
+static constexpr int kSchemaVersion = 6;
 
 // 应用版本使用 MainApp::appVersion() 全局定义
 
@@ -36,7 +37,7 @@ static void registerSchemaWhiteList()
     Eg::Database::registerTableName("dialog_states");
 
     Eg::Database::registerColumnNames("app_meta", { "id", "key", "value", "updated_at" });
-    Eg::Database::registerColumnNames("recent_files", { "id", "file_path", "title", "format", "last_opened_at" });
+    Eg::Database::registerColumnNames("recent_files", { "id", "file_path", "title", "format", "workbench", "last_opened_at" });
     Eg::Database::registerColumnNames(
         "workspace_snapshots", { "id", "workbench_id", "geometry", "window_state", "updated_at" });
     Eg::Database::registerColumnNames("layers",
@@ -240,6 +241,7 @@ bool DatabaseBootstrapper::createBusinessTables()
             file_path       TEXT    NOT NULL,
             title           TEXT    NOT NULL,
             format          TEXT    DEFAULT '',
+            workbench       TEXT    DEFAULT '',
             last_opened_at  TEXT    DEFAULT (datetime('now')),
             UNIQUE(file_path)
         )
@@ -486,6 +488,17 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
             {
                 SY_DEBUG("[DatabaseBootstrapper] Created unique index idx_layers_doc_layer");
             }
+        }
+        else if (v == 5)
+        {
+            // v5 -> v6: recent_files 表新增 workbench 列（2D/3D 最近文件分桶）
+            if (!m_database.execute("ALTER TABLE recent_files ADD COLUMN workbench TEXT DEFAULT ''"))
+            {
+                m_lastError = "Migration v5->v6 failed: " + m_database.lastError();
+                SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+                return false;
+            }
+            SY_DEBUG("[DatabaseBootstrapper] Migration v5->v6: added recent_files.workbench column");
         }
         // 后续版本迁移在此追加 else if 分支
     }

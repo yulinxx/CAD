@@ -224,7 +224,10 @@ void WorkbenchMenuManager::registerRecentFilesSection()
         }
 
         IRecentFileService* recentFiles = m_recentFileService;
-        const QStringList files = recentFiles ? recentFiles->loadRecentFiles() : QStringList{};
+        // 动态段在每次 aboutToShow 时重填：这里按"当前工作台"取最近列表，
+        // 2D 只看 2D 记录、3D 只看 3D 记录，切换工作台后不会混显对方的文件。
+        const QStringList files =
+            recentFiles ? recentFiles->loadRecentFiles(currentWorkbenchId(m_stateCenter)) : QStringList{};
 
         // 服务缺失与列表为空给同一种反馈：一个禁用占位项。
         // 不能一条都不加 —— 空子菜单在 Qt 里点开是个空白小方块，看起来像菜单坏了。
@@ -251,8 +254,7 @@ void WorkbenchMenuManager::registerRecentFilesSection()
             action->setToolTip(filePath);
             action->setStatusTip(filePath);
             // 刻意不设 property("commandId")：启用态刷新会按 commandId 去当前工作台
-            // 命令目录反查规则，而 file.open_recent 只在 2D 目录里；3D 下会变成每次
-            // 刷新都告警一遍。这批条目本身恒可用（目录里 File_OpenRecent 也是 Always），
+            // 命令目录反查规则。file.open_recent 在 2D/3D 两个目录里都是 Always 恒可用，
             // 无需纳入启用态联动。
 
             // 路径经 dispatch 的 QVariantMap 透传：file.open_recent → OperationId::File_OpenRecent

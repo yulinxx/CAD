@@ -26,6 +26,7 @@
     #include "Composition/ApplicationCompositionRoot.h"
     #include "Import/ImportService.h"
     #include "Log/SyLogger.h"
+    #include "UI/Services/IRecentFileService.h"
     #include "UiServices.h"
     #include "UiStateCenter.h"
     #include "UiViewport3D.h"
@@ -228,6 +229,14 @@ bool Workbench3D::initialize(const WorkbenchServices& services)
     {
         m_sessionState->documentManager = std::make_unique<DocumentManager3D>();
     }
+    // 保存/打开成功的文件记入 3D 最近列表（回调按调用时解析服务指针，
+    // 避免 initialize 早于 attach 注入 PersistenceServices 时捕获到空指针）
+    m_sessionState->documentManager->setRecentFileRecorder([this](const QString& path) {
+        if (m_persistence.recentFileService)
+        {
+            m_persistence.recentFileService->addRecentFile(path, QStringLiteral("3D"));
+        }
+    });
 
     m_savedState = UiStateSnapshot{};
     m_initialState = UiStateSnapshot{};
@@ -286,6 +295,13 @@ void Workbench3D::create3DServices()
     {
         m_sessionState->documentManager = std::make_unique<DocumentManager3D>();
     }
+    // 与 initialize() 同：注入 3D 最近文件记录回调（重复注入无害，幂等覆盖）
+    m_sessionState->documentManager->setRecentFileRecorder([this](const QString& path) {
+        if (m_persistence.recentFileService)
+        {
+            m_persistence.recentFileService->addRecentFile(path, QStringLiteral("3D"));
+        }
+    });
     own.sceneEditService = std::make_unique<SceneEditService3D>(
         m_sceneManager3D, m_sessionState->undoRedoManager.get(), m_sessionState->documentManager.get());
     own.sceneMonitor = std::make_unique<SceneMonitor3D>(nullptr);

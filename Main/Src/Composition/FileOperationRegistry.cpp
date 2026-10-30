@@ -195,7 +195,7 @@ bool FileOperationRegistry::doExport(const std::string& filePath)
     }
     if (m_recentFiles)
     {
-        m_recentFiles->addRecentFile(QString::fromStdString(filePath));
+        m_recentFiles->addRecentFile(QString::fromStdString(filePath), QStringLiteral("2D"));
     }
 
     return true;
@@ -218,10 +218,10 @@ bool FileOperationRegistry::doOpenFile(const QString& filePath)
 
     ImportContext context;
     context.sourcePath = filePath;
-    context.recentFileAddCallback = [this](const QString& path) {
+    context.recentFileAddCallback = [this](const QString& path, const QString& workbenchId) {
         if (m_recentFiles)
         {
-            m_recentFiles->addRecentFile(path);
+            m_recentFiles->addRecentFile(path, workbenchId);
         }
     };
     context.currentDocumentPathCallback = [this](const QString& path) {
@@ -584,10 +584,12 @@ void FileOperationRegistry::registerAll()
     });
 
     // 启动时恢复上次打开的文档：读最近文件列表 → 找第一个仍存在的 → 延迟调 File_OpenRecent
-    // 用 QTimer::singleShot(0) 让事件循环先起来，避免 UI 未就绪就加载文件
-    if (m_recentFiles)
+    // 用 QTimer::singleShot(0) 让事件循环先起来，避免 UI 未就绪就加载文件。
+    // 只在 2D 工作台的最近列表里找：3D 文件由 3D 工作台自己负责。
+    // 先禁用
+    if (m_recentFiles && false)
     {
-        const QStringList recentFiles = m_recentFiles->loadRecentFiles();
+        const QStringList recentFiles = m_recentFiles->loadRecentFiles(QStringLiteral("2D"));
         for (const QString& path : recentFiles)
         {
             if (!path.isEmpty() && QFile::exists(path))

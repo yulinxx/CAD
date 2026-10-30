@@ -100,7 +100,8 @@ public:
     void setWorkbenchSwitchCallback(std::function<void(const QString&)> callback);
 
     /// 设置最近文件添加回调（导入完成后添加到最近文件列表）
-    void setRecentFileAddCallback(std::function<void(const QString&)> callback);
+    /// @param callback 参数为 (文件路径, 归属工作台 "2D"/"3D")
+    void setRecentFileAddCallback(std::function<void(const QString&, const QString&)> callback);
 
     /// 设置当前文档路径更新回调（导入完成后更新当前文档路径）
     void setCurrentDocumentPathCallback(std::function<void(const QString&)> callback);
@@ -239,7 +240,7 @@ private:
     /// 工作台切换回调
     std::function<void(const QString&)> m_workbenchSwitchCallback;
     /// 最近文件添加回调
-    std::function<void(const QString&)> m_recentFileAddCallback;
+    std::function<void(const QString&, const QString&)> m_recentFileAddCallback;
     /// 当前文档路径更新回调
     std::function<void(const QString&)> m_currentDocumentPathCallback;
     /// 文档持久化回调

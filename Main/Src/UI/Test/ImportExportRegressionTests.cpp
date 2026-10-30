@@ -152,8 +152,9 @@ TEST(ImportExportRegressionTest, ImportService_RecentFileCallback)
     ImportService service;
 
     QString lastPath;
-    service.setRecentFileAddCallback([&](const QString& path) {
+    service.setRecentFileAddCallback([&](const QString& path, const QString& workbenchId) {
         lastPath = path;
+        Q_UNUSED(workbenchId);
     });
 
     SUCCEED();

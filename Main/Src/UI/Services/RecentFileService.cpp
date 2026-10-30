@@ -3,6 +3,7 @@
  * @brief 最近文件服务实现
  *
  * 管理最近打开的文件列表，提供增删改查功能。
+ * 2D / 3D 工作台的最近列表相互独立：写入按 workbenchId 分桶，读取按 workbenchId 过滤。
  */
 #include "UI/Services/RecentFileService.h"
 
@@ -15,12 +16,36 @@
 #include "Persistence/Repositories/RecentFileRepository.h"
 #include "Persistence/Models/RecentFileRecord.h"
 
+namespace
+{
+    // 3D 工作台可打开的原生/模型格式；其余扩展名一律归 2D。
+    // 仅用于没有工作台归属的旧记录（迁移前的 DB 行、legacy QSettings key）。
+    const QStringList& k3DExtensions()
+    {
+        static const QStringList exts = { QStringLiteral("sy3d"), QStringLiteral("syx"), QStringLiteral("stl"),
+            QStringLiteral("obj"), QStringLiteral("step"), QStringLiteral("stp") };
+        return exts;
+    }
+}  // namespace
+
+QString RecentFileService::normalizeWorkbench(const QString& workbenchId)
+{
+    const QString trimmed = workbenchId.trimmed().toUpper();
+    return trimmed.isEmpty() ? QStringLiteral("2D") : trimmed;
+}
+
+QString RecentFileService::classifyWorkbenchByExtension(const QString& filePath)
+{
+    const QString suffix = QFileInfo(filePath).suffix().toLower();
+    return k3DExtensions().contains(suffix) ? QStringLiteral("3D") : QStringLiteral("2D");
+}
+
 RecentFileService::RecentFileService(PersistenceService* persistence)
     : m_persistence(persistence)
 {
 }
 
-void RecentFileService::addRecentFile(const QString& filePath)
+void RecentFileService::addRecentFile(const QString& filePath, const QString& workbenchId)
 {
     if (filePath.isEmpty())
     {
@@ -28,7 +53,8 @@ void RecentFileService::addRecentFile(const QString& filePath)
         return;
     }
 
-    SY_DEBUGF("[RecentFileService] Adding recent file: %s", qPrintable(filePath));
+    const QString wb = normalizeWorkbench(workbenchId);
+    SY_DEBUGF("[RecentFileService] Adding recent file to %s: %s", qPrintable(wb), qPrintable(filePath));
 
     // 数据库端写入
     if (m_persistence && m_persistence->isOpen() && m_persistence->recentFiles())
@@ -38,6 +64,7 @@ void RecentFileService::addRecentFile(const QString& filePath)
         rec.filePath = filePath.toStdString();
         rec.title = fileInfo.fileName().toStdString();
         rec.format = fileInfo.suffix().toUpper().toStdString();
+        rec.workbench = wb.toStdString();
         rec.lastOpenedTime = QDateTime::currentDateTime().toString(Qt::ISODate).toStdString();
         if (m_persistence->recentFiles()->append(rec))
         {
@@ -56,19 +83,21 @@ void RecentFileService::addRecentFile(const QString& filePath)
         SY_DEBUG("[RecentFileService] Database not available, using QSettings fallback");
     }
 
-    // QSettings 兜底双写
-    QStringList files = loadRecentFiles();
+    // QSettings 兜底双写（按工作台分 key）
+    QStringList files = loadRecentFiles(wb);
     files.removeAll(filePath);
     files.prepend(filePath);
     while (files.size() > kMaxRecentFiles)
     {
         files.removeLast();
     }
-    saveRecentFiles(files);
+    saveWorkbenchFiles(wb, files);
 }
 
-QStringList RecentFileService::loadRecentFiles() const
+QStringList RecentFileService::loadRecentFiles(const QString& workbenchId) const
 {
+    const QString wb = normalizeWorkbench(workbenchId);
+
     // 数据库优先
     if (m_persistence && m_persistence->isOpen() && m_persistence->recentFiles())
     {
@@ -80,23 +109,50 @@ QStringList RecentFileService::loadRecentFiles() const
             result.reserve(static_cast<int>(records.size()));
             for (const auto& rec : records)
             {
-                result.append(QString::fromStdString(rec.filePath));
+                // 旧记录 workbench 为空，按扩展名归类，避免 2D/3D 混显
+                const QString recWb = rec.workbench.empty()
+                    ? classifyWorkbenchByExtension(QString::fromStdString(rec.filePath))
+                    : QString::fromStdString(rec.workbench);
+                if (recWb == wb)
+                {
+                    result.append(QString::fromStdString(rec.filePath));
+                }
+                if (result.size() >= kMaxRecentFiles)
+                {
+                    break;
+                }
             }
             return result;
         }
     }
 
-    // QSettings 兜底
+    // QSettings 兜底：先读当前工作台的 key，为空再读 legacy key 按扩展名过滤
     SY_DEBUG("[RecentFileService] Database empty, falling back to QSettings");
     QSettings settings;
-    return settings.value(QStringLiteral("RecentFiles"), QStringList()).toStringList();
+    QStringList files = settings.value(QStringLiteral("RecentFiles/%1").arg(wb), QStringList()).toStringList();
+    if (files.isEmpty())
+    {
+        const QStringList legacy = settings.value(QStringLiteral("RecentFiles"), QStringList()).toStringList();
+        for (const QString& path : legacy)
+        {
+            if (classifyWorkbenchByExtension(path) == wb)
+            {
+                files.append(path);
+            }
+        }
+    }
+    while (files.size() > kMaxRecentFiles)
+    {
+        files.removeLast();
+    }
+    return files;
 }
 
-void RecentFileService::saveRecentFiles(const QStringList& files) const
+void RecentFileService::saveWorkbenchFiles(const QString& workbenchId, const QStringList& files) const
 {
-    SY_DEBUGF("[RecentFileService] Saving %lld recent files to QSettings", files.size());
+    SY_DEBUGF("[RecentFileService] Saving %lld recent files to QSettings (%s)", files.size(), qPrintable(workbenchId));
     // 数据库端由 addRecentFile 逐条写入，此处不做批量覆盖
-    // QSettings 兜底：保留旧版兼容性
+    // QSettings 兜底：按工作台分 key，互不覆盖
     QSettings settings;
-    settings.setValue(QStringLiteral("RecentFiles"), files);
+    settings.setValue(QStringLiteral("RecentFiles/%1").arg(workbenchId), files);
 }

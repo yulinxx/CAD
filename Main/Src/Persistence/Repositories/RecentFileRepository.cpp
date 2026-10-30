@@ -69,12 +69,20 @@ bool RecentFileRepository::append(const RecentFileRecord& record)
 
     SY_DEBUGF("[RecentFileRepository] Appended recent file: %s", record.filePath.c_str());
 
-    // 控制列表上限，删除超出上限的最旧记录
+    // 控制列表上限：按工作台分桶裁剪，每个工作台各自保留最近 kMaxRecentFiles 条。
+    // 2D/3D 互不挤占 —— 3D 下保存/打开不能再把 2D 的记录顶掉。
     constexpr int kMaxRecentFiles = 10;
-    std::string deleteSql = "DELETE FROM recent_files WHERE id NOT IN "
-                            "(SELECT id FROM recent_files ORDER BY last_opened_at DESC LIMIT " +
-        std::to_string(kMaxRecentFiles) + ")";
-    if (!m_database.execute(deleteSql))
+    std::map<std::string, std::string> trimParams;
+    trimParams["wb_outer"] = record.workbench;
+    trimParams["wb_inner"] = record.workbench;
+    // deleteRows 按键名字典序将 value 按位置绑定到 whereClause 中的 ?（wb_outer 先于 wb_inner），
+    // 两处 ? 绑定的是同一个工作台 ID，顺序无关。
+    // 内层 SELECT 包一层是为了兼容旧 SQLite 对 IN (SELECT ... LIMIT) 的限制。
+    if (!m_database.deleteRows("recent_files",
+            "workbench = ? AND id NOT IN (SELECT id FROM (SELECT id FROM recent_files "
+            "WHERE workbench = ? ORDER BY last_opened_at DESC LIMIT " +
+                std::to_string(kMaxRecentFiles) + "))",
+            trimParams))
     {
         // 删除超限记录失败不影响主流程，记录警告即可
         SY_WARNF("[RecentFileRepository] Failed to trim excess records: %s", m_database.lastError().c_str());
@@ -103,6 +111,7 @@ RecentFileRecord RecentFileRepository::rowToRecord(const std::map<std::string, s
     rec.filePath = getString(row, "file_path");
     rec.title = getString(row, "title");
     rec.format = getString(row, "format");
+    rec.workbench = getString(row, "workbench");
     rec.lastOpenedTime = getString(row, "last_opened_at");
     return rec;
 }
@@ -117,6 +126,7 @@ std::map<std::string, std::string> RecentFileRepository::recordToRow(const Recen
     row["file_path"] = rec.filePath;
     row["title"] = rec.title;
     row["format"] = rec.format;
+    row["workbench"] = rec.workbench;
     row["last_opened_at"] = rec.lastOpenedTime;
     return row;
 }

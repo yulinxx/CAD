@@ -207,7 +207,7 @@ void ImportService::setWorkbenchSwitchCallback(std::function<void(const QString&
     m_workbenchSwitchCallback = std::move(cb);
 }
 
-void ImportService::setRecentFileAddCallback(std::function<void(const QString&)> cb)
+void ImportService::setRecentFileAddCallback(std::function<void(const QString&, const QString&)> cb)
 {
     m_recentFileAddCallback = std::move(cb);
 }
@@ -975,14 +975,17 @@ void ImportService::phaseWriteBackState(const ImportContext& context, ImportResu
         SY_INFO("[ImportService] Current document path not updated: no callback registered");
     }
 
-    // 添加到最近文件（优先使用 context 中的回调）
+    // 添加到最近文件（优先使用 context 中的回调）。
+    // 工作台归属取自构建阶段判定的 result.usedWorkbenchId：
+    // 2D 菜单里导入的 STEP 等若载入为网格图元，实际发生在 3D，应记入 3D 的最近列表。
+    const QString workbenchId = result.usedWorkbenchId.isEmpty() ? QStringLiteral("2D") : result.usedWorkbenchId;
     if (context.recentFileAddCallback)
     {
-        context.recentFileAddCallback(context.sourcePath);
+        context.recentFileAddCallback(context.sourcePath, workbenchId);
     }
     else if (m_recentFileAddCallback)
     {
-        m_recentFileAddCallback(context.sourcePath);
+        m_recentFileAddCallback(context.sourcePath, workbenchId);
     }
     else
     {
