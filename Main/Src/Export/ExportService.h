@@ -79,7 +79,8 @@ signals:
 
 private:
     /// 导出后的状态回写
-    void postExportRecord(const ExportResult& result, const ExportContext& context);
+    /// @return false 表示导出记录（DocumentRepository）写入失败
+    bool postExportRecord(const ExportResult& result, const ExportContext& context);
 
     /// 导出分发器（非拥有指针）
     ExportDispatcher* m_dispatcher{ nullptr };

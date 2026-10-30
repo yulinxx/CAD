@@ -100,7 +100,8 @@ public:
     void setCurrentDocumentPathCallback(std::function<void(const QString&)> callback);
 
     /// 设置文档持久化回调（导入完成后保存文档记录）
-    void setDocumentPersistenceCallback(std::function<void(const QString&, int)> callback);
+    /// 返回 false 表示历史记录写入失败（文件本身已成功导入）
+    void setDocumentPersistenceCallback(std::function<bool(const QString&, int)> callback);
 
     /// 执行文件导入
     /// @param filePath 源文件路径
@@ -168,7 +169,7 @@ private:
     void phaseRefreshDisplay(const ImportContext& context, const ImportResult& result, const ImportOptions& options);
 
     /// 5：回写状态（状态栏、最近文件、文档记录）
-    void phaseWriteBackState(const ImportContext& context, const ImportResult& result);
+    void phaseWriteBackState(const ImportContext& context, ImportResult& result);
 
     /// 还原源文件图层结构（DXF 等支持图层的格式）
     /// 按源图层表在 LayerManager 中创建/匹配图层，并把图元分配到对应图层
@@ -234,5 +235,5 @@ private:
     /// 当前文档路径更新回调
     std::function<void(const QString&)> m_currentDocumentPathCallback;
     /// 文档持久化回调
-    std::function<void(const QString&, int)> m_documentPersistenceCallback;
+    std::function<bool(const QString&, int)> m_documentPersistenceCallback;
 };

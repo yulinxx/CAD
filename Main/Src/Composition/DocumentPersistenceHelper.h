@@ -15,8 +15,10 @@ class DocumentPersistenceHelper
 {
 public:
     /// 导入/打开文件后记录文档信息（更新 lastOpenedAt）
-    static void recordImport(PersistenceService* persistence, const QString& filePath, int entityCount);
+    /// @return false 表示数据库写入失败（文件本身可能已成功打开）
+    static bool recordImport(PersistenceService* persistence, const QString& filePath, int entityCount);
 
     /// 导出/保存文件后记录文档信息（更新 lastSavedAt）
-    static void recordExport(PersistenceService* persistence, const std::string& filePath, int entityCount);
+    /// @return false 表示数据库写入失败（文件本身可能已成功保存）
+    static bool recordExport(PersistenceService* persistence, const std::string& filePath, int entityCount);
 };

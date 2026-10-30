@@ -7,15 +7,16 @@
 #include "Persistence/PersistenceService.h"
 #include "Persistence/Repositories/DocumentRepository.h"
 #include "Persistence/Models/DocumentRecord.h"
+#include "Log/SyLogger.h"
 
 #include <QDateTime>
 #include <QFileInfo>
 
-void DocumentPersistenceHelper::recordImport(PersistenceService* persistence, const QString& filePath, int entityCount)
+bool DocumentPersistenceHelper::recordImport(PersistenceService* persistence, const QString& filePath, int entityCount)
 {
     if (!persistence || !persistence->documents())
     {
-        return;
+        return true;
     }
 
     auto existing = persistence->documents()->loadByPath(filePath.toStdString());
@@ -30,15 +31,20 @@ void DocumentPersistenceHelper::recordImport(PersistenceService* persistence, co
     dr.lastSavedAt = existing.id > 0 ? existing.lastSavedAt : now.toStdString();
     dr.createdAt = existing.id > 0 ? existing.createdAt : now.toStdString();
 
-    persistence->documents()->save(dr);
+    if (!persistence->documents()->save(dr))
+    {
+        SY_WARNF("[DocumentPersistenceHelper] Failed to save import metadata for: %s", filePath.toUtf8().constData());
+        return false;
+    }
+    return true;
 }
 
-void DocumentPersistenceHelper::recordExport(
+bool DocumentPersistenceHelper::recordExport(
     PersistenceService* persistence, const std::string& filePath, int entityCount)
 {
     if (!persistence || !persistence->documents())
     {
-        return;
+        return true;
     }
 
     auto existing = persistence->documents()->loadByPath(filePath);
@@ -53,5 +59,10 @@ void DocumentPersistenceHelper::recordExport(
     dr.lastOpenedAt = existing.id > 0 ? existing.lastOpenedAt : now.toStdString();
     dr.createdAt = existing.id > 0 ? existing.createdAt : now.toStdString();
 
-    persistence->documents()->save(dr);
+    if (!persistence->documents()->save(dr))
+    {
+        SY_WARNF("[DocumentPersistenceHelper] Failed to save export metadata for: %s", filePath.c_str());
+        return false;
+    }
+    return true;
 }

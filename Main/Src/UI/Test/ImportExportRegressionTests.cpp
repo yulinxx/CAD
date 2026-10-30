@@ -178,6 +178,7 @@ TEST(ImportExportRegressionTest, ImportService_DocumentPersistenceCallback)
     bool called = false;
     service.setDocumentPersistenceCallback([&](const QString& path, int entityCount) {
         called = true;
+        return true;
     });
 
     SUCCEED();
@@ -1074,6 +1075,7 @@ TEST(ImportExportRegressionTest, ImportService_MultipleFormats_MetadataConsisten
     bool metaCallbackCalled = false;
     service.setDocumentPersistenceCallback([&](const QString& path, int count) {
         metaCallbackCalled = true;
+        return true;
     });
     EXPECT_FALSE(metaCallbackCalled);  // 未触发导入，回调不应被调用
 }

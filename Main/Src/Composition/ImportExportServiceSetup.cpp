@@ -5,6 +5,8 @@
 #include "ImportExportServiceSetup.h"
 #include "DocumentPersistenceHelper.h"
 
+#include <QCoreApplication>
+
 #include "UI/Services/UiServices.h"
 #include "UI/Services/UiStateCenter.h"
 #include "UI/Service/ViewCaptureService.h"
@@ -93,9 +95,14 @@ namespace
                 return;
             }
             stateCenter->popBusy();
-            stateCenter->setStatusPrompt(result.success ? completeText.arg(count(result)) : failText.arg(result.message));
+            QString text = result.success ? completeText.arg(count(result)) : failText.arg(result.message);
+            if (!result.warnings.isEmpty())
+            {
+                text += QStringLiteral(" (") + result.warnings.join(QStringLiteral("; ")) + QStringLiteral(")");
+            }
+            stateCenter->setStatusPrompt(text);
             QVariantMap meta = stateCenter->metadata();
-            meta["statusPrompt"] = result.success ? completeText.arg(count(result)) : failText.arg(result.message);
+            meta["statusPrompt"] = text;
             meta["notificationType"] = result.success ? "info" : "error";
             stateCenter->setMetadata(meta);
         });
@@ -195,7 +202,7 @@ void ImportExportServiceSetup::wireCallbacks()
 
     m_importService->setDocumentPersistenceCallback(
         [persistence = m_persistence](const QString& filePath, int entityCount) {
-            DocumentPersistenceHelper::recordImport(persistence, filePath, entityCount);
+            return DocumentPersistenceHelper::recordImport(persistence, filePath, entityCount);
         });
 
     // 配置导出服务
@@ -217,8 +224,8 @@ void ImportExportServiceSetup::connectProgressSignals()
         [](const ImportResult& r) {
             return r.entityCount;
         },
-        QString("Import complete: %1 entities"),
-        QString("Import failed: %1"));
+        QCoreApplication::translate("ImportService", "Import completed: %1 entities"),
+        QCoreApplication::translate("ImportService", "Import failed: %1"));
 
     // 导出进度 → 状态中心
     connectStartToBusy(m_stateCenter, m_exportService, &ExportService::exportStarted);
@@ -229,6 +236,6 @@ void ImportExportServiceSetup::connectProgressSignals()
         [](const ExportResult& r) {
             return r.exportedEntityCount;
         },
-        QString("Export complete: %1 entities"),
-        QString("Export failed: %1"));
+        QCoreApplication::translate("ExportService", "Export completed: %1 entities"),
+        QCoreApplication::translate("ExportService", "Export failed: %1"));
 }

@@ -186,7 +186,7 @@ void ImportService::setCurrentDocumentPathCallback(std::function<void(const QStr
     m_currentDocumentPathCallback = std::move(cb);
 }
 
-void ImportService::setDocumentPersistenceCallback(std::function<void(const QString&, int)> cb)
+void ImportService::setDocumentPersistenceCallback(std::function<bool(const QString&, int)> cb)
 {
     m_documentPersistenceCallback = std::move(cb);
 }
@@ -900,7 +900,7 @@ void ImportService::phaseRefreshDisplay(
 }
 
 // ===== Write back state =====
-void ImportService::phaseWriteBackState(const ImportContext& context, const ImportResult& result)
+void ImportService::phaseWriteBackState(const ImportContext& context, ImportResult& result)
 {
     updateProgress(context, ImportPhase::WriteBackState, 0.0f);
     emit importPhaseChanged(ImportPhase::WriteBackState);
@@ -938,7 +938,11 @@ void ImportService::phaseWriteBackState(const ImportContext& context, const Impo
     // 文档持久化（使用成员变量回调，全局配置）
     if (m_documentPersistenceCallback)
     {
-        m_documentPersistenceCallback(context.sourcePath, result.entityCount);
+        if (!m_documentPersistenceCallback(context.sourcePath, result.entityCount))
+        {
+            // 文件已导入成功，但历史记录写入失败：不能只报“导入完成”
+            result.addWarning(QCoreApplication::translate("WorkbenchWindow", "History save failed"));
+        }
     }
     else
     {
@@ -950,6 +954,10 @@ void ImportService::phaseWriteBackState(const ImportContext& context, const Impo
     {
         QString statusMsg =
             tr("Imported %1 entities from %2").arg(result.entityCount).arg(QFileInfo(context.sourcePath).fileName());
+        if (!result.warnings.isEmpty())
+        {
+            statusMsg += QStringLiteral(" (") + result.warnings.join(QStringLiteral("; ")) + QStringLiteral(")");
+        }
         m_statusPromptCallback(statusMsg);
     }
 

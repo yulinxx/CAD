@@ -6,7 +6,6 @@
  */
 #include "FileOperationRegistry.h"
 #include "OpRegistryTypes.h"
-#include "DocumentPersistenceHelper.h"
 
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
@@ -33,6 +32,8 @@
 #include "Log/SyLogger.h"
 
 #include <QFileInfo>
+#include <QFile>
+#include <QTimer>
 #include <QDateTime>
 #include <QMessageBox>
 #include <QImage>
@@ -129,11 +130,6 @@ void FileOperationRegistry::executeWithExceptionGuard(const char* operationName,
 
 // ==================== 公共模板方法 ====================
 
-void FileOperationRegistry::saveDocumentRecord(const std::string& filePath, int entityCount)
-{
-    DocumentPersistenceHelper::recordExport(m_persistence, filePath, entityCount);
-}
-
 void FileOperationRegistry::resetDocumentState()
 {
     // 当前文件路径：新建之后必须回到「未命名」，否则 File_Save 会直接覆盖上一个文件
@@ -179,7 +175,8 @@ bool FileOperationRegistry::doExport(const std::string& filePath)
     }
 
     *m_currentFilePath = filePath;
-    saveDocumentRecord(filePath, result.exportedEntityCount);
+    // 文档记录由 ExportService::postExportRecord 统一写入；
+    // 这里不再重复写一次，避免同一行被两条连接同时写造成 database is locked。
 
     // 存盘成功 → 文档不再脏（引擎层脏标记是事实源，UI 状态是它的镜像）
     if (m_sceneManager)
@@ -585,4 +582,29 @@ void FileOperationRegistry::registerAll()
     Ops::declare(m_bus->registry(), OperationId::File_Exit, [this] {
         FileOperationUtils::exitApplication(m_parentWidget);
     });
+
+    // 启动时恢复上次打开的文档：读最近文件列表 → 找第一个仍存在的 → 延迟调 File_OpenRecent
+    // 用 QTimer::singleShot(0) 让事件循环先起来，避免 UI 未就绪就加载文件
+    if (m_recentFiles)
+    {
+        const QStringList recentFiles = m_recentFiles->loadRecentFiles();
+        for (const QString& path : recentFiles)
+        {
+            if (!path.isEmpty() && QFile::exists(path))
+            {
+                SY_INFOF("[FileOperation] Auto-restoring last document: %s", qPrintable(path));
+                // capture by value 安全：operationBus 比 FileOperationRegistry 长寿（全局单例）
+                auto* bus = m_bus;
+                QTimer::singleShot(0, [bus, path]() {
+                    if (bus)
+                    {
+                        QVariantMap params;
+                        params.insert(QStringLiteral("filePath"), path);
+                        bus->run(OperationId::File_OpenRecent, params);
+                    }
+                });
+                break;  // 只恢复第一个存在的
+            }
+        }
+    }
 }

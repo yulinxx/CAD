@@ -39,8 +39,17 @@ void RecentFileService::addRecentFile(const QString& filePath)
         rec.title = fileInfo.fileName().toStdString();
         rec.format = fileInfo.suffix().toUpper().toStdString();
         rec.lastOpenedTime = QDateTime::currentDateTime().toString(Qt::ISODate).toStdString();
-        m_persistence->recentFiles()->append(rec);
-        SY_DEBUG("[RecentFileService] File added to database");
+        if (m_persistence->recentFiles()->append(rec))
+        {
+            SY_DEBUG("[RecentFileService] File added to database");
+        }
+        else
+        {
+            // 最近文件不是关键数据：数据库失败时 QSettings 兜底仍然写入，
+            // 但不能像旧代码那样继续打印“已添加”。
+            SY_WARNF("[RecentFileService] Failed to add recent file to database: %s (QSettings fallback still updated)",
+                qPrintable(filePath));
+        }
     }
     else
     {

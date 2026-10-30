@@ -16,6 +16,9 @@
 #include "Persistence/Repositories/DocumentRepository.h"
 #include "FileIO/FileFormat.h"
 
+#include <QCoreApplication>
+#include <QFileInfo>
+
 void ExportService::setPersistenceService(PersistenceService* service)
 {
     m_persistenceService = service;
@@ -129,8 +132,12 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
         result.exportedEntityCount = static_cast<int>(entities.size());
         result.message = tr("Exported %1 entities to: %2").arg(result.exportedEntityCount).arg(context.targetPath);
 
-        // 导出完成，写入记录
-        postExportRecord(result, context);
+        // 导出完成，写入记录。文件已成功导出，但历史记录写入失败时
+        // 必须在结果里带 warning，避免上层状态栏只报"导出完成"。
+        if (!postExportRecord(result, context))
+        {
+            result.addWarning(QCoreApplication::translate("WorkbenchWindow", "History save failed"));
+        }
     }
     else
     {
@@ -146,6 +153,10 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
     {
         QString prompt = result.success ? tr("Export completed: %1 entities").arg(result.exportedEntityCount)
                                         : tr("Export failed: %1").arg(result.message);
+        if (!result.warnings.isEmpty())
+        {
+            prompt += QStringLiteral(" (") + result.warnings.join(QStringLiteral("; ")) + QStringLiteral(")");
+        }
         m_statusPromptCallback(prompt);
     }
 
@@ -219,23 +230,34 @@ Fio::VecSyEntityPtr ExportService::collectAllEntities() const
     return entities;
 }
 
-void ExportService::postExportRecord(const ExportResult& result, const ExportContext& context)
+bool ExportService::postExportRecord(const ExportResult& result, const ExportContext& context)
 {
     if (!result.success || !m_persistenceService || !m_persistenceService->isOpen())
     {
-        return;
+        return true;
     }
     auto* repo = m_persistenceService->documents();
     if (!repo)
     {
-        return;
+        return true;
     }
+
+    // 菜单导出路径的 context.format 可能是 Unknown（由 ExportDispatcher 在
+    // dispatch() 内部才检测），不能直接把 Unknown 写进记录。这里按目标路径
+    // 再检测一次；title 为空时用文件名兜底。
+    Fio::FileFormat resolvedFormat = context.format;
+    if (resolvedFormat == Fio::FileFormat::Unknown)
+    {
+        resolvedFormat = ExportDispatcher::detectFormat(context.targetPath);
+    }
+    const QFileInfo targetInfo(context.targetPath);
+    const QString fallbackTitle = targetInfo.fileName();
 
     DocumentRecord record;
     record.filePath = context.targetPath.toStdString();
-    record.title = context.sourceDocumentId.toStdString();
+    record.title = (!context.sourceDocumentId.isEmpty() ? context.sourceDocumentId : fallbackTitle).toStdString();
     record.entityCount = static_cast<int>(result.exportedEntityCount);
-    record.format = [](Fio::FileFormat fmt) -> std::string {
+    record.format = [&targetInfo](Fio::FileFormat fmt) -> std::string {
         switch (fmt)
         {
         case Fio::FileFormat::DXF:
@@ -255,13 +277,24 @@ void ExportService::postExportRecord(const ExportResult& result, const ExportCon
         case Fio::FileFormat::Native3D:
             return "SYX";
         default:
-            return "Unknown";
+            // 兜底用扩展名，避免 PLT/AI/PNG 等格式被记成 Unknown
+            {
+                const QString suffix = targetInfo.suffix().toUpper();
+                return suffix.isEmpty() ? std::string("Unknown") : suffix.toStdString();
+            }
         }
-    }(context.format);
+    }(resolvedFormat);
     record.lastSavedAt = std::to_string(std::time(nullptr));
 
-    repo->save(record);
+    if (!repo->save(record))
+    {
+        SY_WARNF("[ExportService] Failed to save export record: %s (%d entities)",
+            context.targetPath.toUtf8().constData(),
+            result.exportedEntityCount);
+        return false;
+    }
     SY_DEBUGF("[ExportService] Export record saved: %s (%d entities)",
         context.targetPath.toUtf8().constData(),
         result.exportedEntityCount);
+    return true;
 }

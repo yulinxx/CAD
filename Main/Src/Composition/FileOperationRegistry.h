@@ -67,9 +67,6 @@ public:
 private:
     // ==================== 公共模板方法 ====================
 
-    /// 保存文档记录到持久化层
-    void saveDocumentRecord(const std::string& filePath, int entityCount);
-
     /// 执行导出流程（收集图元 → 分发写入 → 状态回写）
     bool doExport(const std::string& filePath);
 
