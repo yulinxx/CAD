@@ -148,6 +148,14 @@ private:
     uint64_t m_lastSceneTreeTopologyRevision{ 0 };
     QPointer<StatusBar> m_statusBar2D;
 
+    /// 交互提示刷新定时器：200ms 刷一次当前活动工具的 interactionHint()
+    /// 覆盖所有状态变化（切换工具、进入绘制、取消、完成），不需要在事件分发器里插钩子
+    QTimer* m_interactionHintTimer{ nullptr };
+    /// 上一次真正写入状态栏的交互提示：只在提示变化时更新，
+    /// 避免 200ms 定时器把导入/导出/保存等临时状态消息冲掉。
+    QString m_lastInteractionHint;
+    bool m_interactionHintInitialized{ false };
+
     std::unique_ptr<SettingsUiCoordinator2D> m_settingsCoordinator;
     std::unique_ptr<ToolBarContextManager> m_contextManager;
     QMetaObject::Connection m_gridVisibilityMetadataConn;

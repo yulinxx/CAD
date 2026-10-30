@@ -507,6 +507,11 @@ PropertiesPanelWidget::PropertiesPanelWidget(QWidget* parent)
     m_tree->header()->setStretchLastSection(true);
     m_tree->header()->setSectionResizeMode(0, QHeaderView::Interactive);
     m_tree->header()->setSectionResizeMode(1, QHeaderView::Interactive);
+    // 给字段名列设置合理的初始宽度，避免字段名被挤压成 N…/T…/C… 难以识别。
+    // 树形层级缩进会吃掉列宽，所以宽度要大于纯文本所需，并同步收紧缩进；
+    // 同时右侧属性 Dock 的默认宽度在布局管理器里调到 300，给值列留出空间。
+    m_tree->setIndentation(10);
+    m_tree->setColumnWidth(0, 150);
     layout->addWidget(m_tree);
 
     // 值列使用内联编辑代理；未设置编辑目标时不会进入编辑态

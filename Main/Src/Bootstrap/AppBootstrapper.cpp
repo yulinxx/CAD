@@ -8,6 +8,7 @@
 
 #include <QDir>
 #include <QString>
+#include <QTimer>
 
 #include "Log/SyLogger.h"
 
@@ -18,6 +19,7 @@
 #if BUILD_UI3D
     #include "UI/Workbench/Workbench3D.h"
 #endif
+#include "UI/Services/IRecentFileService.h"
 #include "UI/Workbench/WorkbenchWindow.h"
 #include "UI/Services/UiFrameworkServices.h"
 
@@ -142,8 +144,18 @@ bool AppBootstrapper::initialize()
         }
         else
         {
-            SY_ERRORF("[AppBootstrapper] error code=bootstrap.hardware_start_failed message=%s",
-                hardwareWarning.toUtf8().constData());
+            // 硬件模块未编入（BUILD_HARDWARE=OFF）时静默降级为 INFO —— 开发构建常态，
+            // 不该以 ERROR 级别污染日志。真正的硬件"已编进但启动失败"才是 ERROR
+            if (DeviceHost::isHardwareSupportCompiled())
+            {
+                SY_ERRORF("[AppBootstrapper] error code=bootstrap.hardware_start_failed message=%s",
+                    hardwareWarning.toUtf8().constData());
+            }
+            else
+            {
+                SY_INFO("[AppBootstrapper] Hardware module not compiled in (BUILD_HARDWARE=OFF), skipping hardware start — "
+                        "laser processing features will be unavailable, but drawing and editing work as usual");
+            }
         }
     }
 

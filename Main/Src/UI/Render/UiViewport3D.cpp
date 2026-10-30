@@ -13,6 +13,7 @@
 #include <QPainter>
 #include <QPaintEvent>
 #include <QResizeEvent>
+#include <QSizePolicy>
 #include <QWheelEvent>
 #include "Log/SyLogger.h"
 
@@ -20,6 +21,9 @@ Viewport3D::Viewport3D(QWidget* parent)
     : QWidget(parent)
 {
     setMinimumSize(640, 480);
+    // 与 2D 视口保持一致：中央控件必须 Expanding，否则 QMainWindow 会把
+    // 多余空间分给左右 Dock，3D 视口被挤成 640px 宽的竖条。
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     setAutoFillBackground(false);
     // QOpenGLWidget 子控件在 Windows 上需要父控件也启用鼠标追踪，
     // 否则无按键按下时 mouseMoveEvent 不会被触发

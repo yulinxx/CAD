@@ -344,6 +344,40 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
     // 语言切换不需要这里做任何事：坐标/选择文案由状态栏内各指示器按缓存的原始值
     // 自行用 tr() 重拼（见 StatusBarBase 类注释），不存在「生产方重推」这一环。
 
+    // 交互提示刷新定时器：每 200ms 刷一次当前活动工具的 interactionHint()
+    // 覆盖所有状态变化（切换工具、进入绘制、取消、完成），不需要在事件分发器里插钩子
+    m_interactionHintTimer = new QTimer(this);
+    m_interactionHintTimer->setInterval(200);
+    connect(m_interactionHintTimer, &QTimer::timeout, this, [this]() {
+        if (!m_statusBar2D || !m_viewport)
+        {
+            return;
+        }
+        if (auto* tm = m_viewport->toolManager())
+        {
+            if (auto* tool = tm->getActiveTool())
+            {
+                // interactionHint 根据 isDrawingActive() 返回不同文案，
+                // 只有真正变了才 setMessageText，避免无谓 repaint。
+                // 另外：如果状态栏当前显示的是导入/导出/保存等临时消息，
+                // 不要用定时提示覆盖它 —— 否则 P1-2 的失败警告一闪而过。
+                const QString current = m_statusBar2D->messageIndicatorText();
+                if (!m_interactionHintInitialized)
+                {
+                    m_lastInteractionHint = current;
+                    m_interactionHintInitialized = true;
+                }
+                const QString hint = tool->interactionHint();
+                if (hint != m_lastInteractionHint && current == m_lastInteractionHint)
+                {
+                    m_lastInteractionHint = hint;
+                    m_statusBar2D->setMessageText(hint);
+                }
+            }
+        }
+    });
+    m_interactionHintTimer->start();
+
     // 命令 UI 刷新触发源集中挂载（选择/图层锁/场景变化含图元锁/撤销栈/操作完成）。
     // 放在最后：此时视口、工具栏、场景树、状态栏均已就绪，install 内的首次刷新可覆盖全部 UI。
     // 返回的句柄必须留到 deactivate 销毁：bus / layerBridge 跨工作台长寿，
@@ -938,6 +972,21 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         if (m_uiState.stateCenter)
         {
             m_uiState.stateCenter->setActiveToolId(toolName);
+        }
+        // 状态栏交互提示：从当前活动工具取 interactionHint() 塞进状态栏消息区
+        // 为空字符串表示"不需要提示"（如 SelectTool），由 InteractionHint() 自行决定
+        if (auto* tm = m_viewport->toolManager())
+        {
+            if (auto* tool = tm->getActiveTool())
+            {
+                if (m_statusBar2D)
+                {
+                    const QString hint = tool->interactionHint();
+                    m_lastInteractionHint = hint;
+                    m_interactionHintInitialized = true;
+                    m_statusBar2D->setMessageText(hint);
+                }
+            }
         }
     });
 

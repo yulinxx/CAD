@@ -521,10 +521,22 @@ namespace RenderBridge
         {
             if (!RenderAbstraction::isValid(list))
             {
+                SY_WARNF("[RenderXAdapter] removeDrawItem: invalid draw list handle, slot=%u", slot);
                 return false;
             }
-            return checkRx("rxDrawListRemove",
-                Render::RT::rxDrawListRemove(m_runtime, static_cast<Render::RT::DrawListHandle>(list.value), slot));
+            const auto result = Render::RT::rxDrawListRemove(
+                m_runtime, static_cast<Render::RT::DrawListHandle>(list.value), slot);
+            if (result != Render::RT::RxResult::Ok)
+            {
+                // 加 slot + handle 上下文，便于定位"哪个实体的渲染槽位删失败了"
+                // 下次复现时查这条日志的 slot 号，可以反推是哪一步的 upsert 漏了或重复了
+                SY_ERRORF("[RenderXAdapter] rxDrawListRemove failed: %s, slot=%u, handle=%llu",
+                    Render::RT::rxResultName(result),
+                    slot,
+                    static_cast<unsigned long long>(list.value));
+                return false;
+            }
+            return true;
         }
 
         bool submitDrawList(DrawListHandle list, const ViewVolume* view) override
