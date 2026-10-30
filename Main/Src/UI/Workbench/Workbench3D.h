@@ -42,6 +42,8 @@ public:
     QString displayName() const override;
     bool isCommandRegistered(const QString& commandId) const override;
     void dispatchCommand(const QString& commandId, const QVariantMap& params) override;
+    Cmd::OperationResultBase dispatchCommandForResult(const QString& commandId, const QVariantMap& params) override;
+    bool hasUnsavedChanges() const override;
     QString commandText(const QString& commandId) const override;
     bool initialize(const WorkbenchServices& services) override;
     void attachToWindow(WorkbenchWindow& window) override;

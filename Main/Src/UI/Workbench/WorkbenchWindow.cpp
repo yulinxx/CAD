@@ -607,23 +607,70 @@ void WorkbenchWindow::closeEvent(QCloseEvent* event)
         }
         if (result == QMessageBox::Save)
         {
-            if (m_operationBus)
+            // 提示按 dirty=任一 弹出，保存就必须覆盖**所有**脏工作台的文档：
+            // 只派发到活跃台会静默丢弃另一台的未存更改（切台后关闭即触发）
+            QStringList dirtyIds = m_stateCenter->dirtyWorkbenchIds();
+            if (dirtyIds.isEmpty() && m_workbench)
             {
-                // 同步等待保存完成，避免窗口关闭时数据未保存
-                OperationResult saveResult = m_operationBus->run(OperationId::File_Save, {});
+                // 该工作台未注册探针：退回旧行为，至少保存活跃台
+                dirtyIds.append(m_workbench->id());
+            }
+
+            for (const QString& workbenchId : dirtyIds)
+            {
+                // 同步等待保存完成，避免窗口关闭时数据未保存。
+                // 每台各自 dispatch 到自己的 file.save：2D 走 2D 总线、3D 走 3D 总线，
+                // 不切台也能保存非活跃台（工厂对已创建的工作台返回缓存实例）
+                UiWorkbench* targetWorkbench = nullptr;
+                if (m_workbench && workbenchId == m_workbench->id())
+                {
+                    targetWorkbench = m_workbench;
+                }
+                else if (m_workbenchFactory)
+                {
+                    targetWorkbench = m_workbenchFactory(workbenchId);
+                }
+
+                Cmd::OperationResultBase saveResult;
+                if (targetWorkbench)
+                {
+                    saveResult = targetWorkbench->dispatchCommandForResult(QStringLiteral("file.save"), {});
+                }
+                else if (!m_workbench && m_operationBus)
+                {
+                    // 工作台尚未注入时的兜底：只可能保存 2D 文档
+                    saveResult = m_operationBus->run(OperationId::File_Save, {});
+                }
+                else
+                {
+                    SY_WARNF("[WorkbenchWindow] closeEvent: dirty workbench '%s' has no instance, cannot save",
+                        qPrintable(workbenchId));
+                    saveResult.message = tr("Workbench instance not available");
+                }
+
+                if (saveResult.canceled())
+                {
+                    // 用户在保存对话框里点了取消：中止关闭（与提示框选 Cancel 同语义），
+                    // 而不是当成"保存失败"弹重试
+                    event->ignore();
+                    return;
+                }
                 if (!saveResult.success)
                 {
-                    // 保存失败：弹对话框让用户选择重试/放弃
+                    // 保存失败：弹对话框让用户选择重试/放弃。
+                    // 文案兜底：3D 取消路径曾返回空 message，拼出"Failed to save: （空）"
+                    const QString detail =
+                        saveResult.message.isEmpty() ? tr("unknown error") : saveResult.message;
                     auto retryResult = QMessageBox::warning(this,
                         tr("Save Failed"),
-                        tr("Failed to save: %1\nDo you want to retry?").arg(saveResult.message),
+                        tr("Failed to save: %1\nDo you want to retry?").arg(detail),
                         QMessageBox::Retry | QMessageBox::Discard);
                     if (retryResult == QMessageBox::Retry)
                     {
                         event->ignore();
                         return;  // 用户选择重试，不关闭
                     }
-                    // 用户选择放弃，继续关闭
+                    // 用户选择放弃这一份，继续保存其余仍脏的工作台
                 }
             }
         }

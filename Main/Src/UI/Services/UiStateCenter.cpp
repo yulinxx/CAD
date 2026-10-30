@@ -35,6 +35,7 @@ UiStateSnapshot UiStateCenter::snapshot() const
 
     state.busy = m_command.busyCount > 0;
     state.dirty = m_command.dirty;
+    state.activeDocDirty = m_command.activeDocDirty;
     state.progress = m_command.progress;
     state.statusPrompt = m_command.statusPrompt;
     state.metadata = m_view.metadata;
@@ -60,6 +61,27 @@ QString UiStateCenter::currentLayerId() const
 bool UiStateCenter::dirty() const
 {
     return m_command.dirty;
+}
+
+bool UiStateCenter::activeDocDirty() const
+{
+    return m_command.activeDocDirty;
+}
+
+QStringList UiStateCenter::dirtyWorkbenchIds() const
+{
+    // 逐台实时回读探针（不读缓存的 dirty 标志）：关闭流程要的是"此刻谁还脏"，
+    // 缓存可能落后于最近一次编辑。QHash 迭代序不稳定，但关闭保存与顺序无关。
+    QStringList ids;
+    for (auto it = m_dirtyProbes.constBegin(); it != m_dirtyProbes.constEnd(); ++it)
+    {
+        const auto probe = it.value();
+        if (probe && probe())
+        {
+            ids.append(it.key());
+        }
+    }
+    return ids;
 }
 
 int UiStateCenter::progress() const
@@ -95,6 +117,8 @@ void UiStateCenter::setCurrentWorkbenchId(const QString& id)
     }
 
     m_workspace.workbenchId = id;
+    // activeDocDirty 属于工作台域：切台即跟随目标工作台的文档重算
+    refreshDirty();
     emit currentWorkbenchChanged(id);
     emit stateChanged();
 }
@@ -245,16 +269,50 @@ void UiStateCenter::popBusy()
     }
 }
 
-void UiStateCenter::setDirty(bool dirty)
+void UiStateCenter::refreshDirty()
 {
-    if (m_command.dirty == dirty)
+    bool anyDirty = false;
+    bool hasActiveProbe = false;
+    bool activeDirty = false;
+    for (auto it = m_dirtyProbes.constBegin(); it != m_dirtyProbes.constEnd(); ++it)
+    {
+        const auto probe = it.value();
+        const bool value = probe && probe();
+        anyDirty = anyDirty || value;
+        if (it.key() == m_workspace.workbenchId)
+        {
+            hasActiveProbe = true;
+            activeDirty = value;
+        }
+    }
+    // 当前工作台尚无探针时退回「任一脏」：宁可标题多带 * 也不漏提示未保存
+    const bool newActiveDirty = hasActiveProbe ? activeDirty : anyDirty;
+
+    const bool anyChanged = (m_command.dirty != anyDirty);
+    const bool activeChanged = (m_command.activeDocDirty != newActiveDirty);
+    if (!anyChanged && !activeChanged)
     {
         return;
     }
 
-    m_command.dirty = dirty;
-    emit dirtyChanged(dirty);
+    m_command.dirty = anyDirty;
+    m_command.activeDocDirty = newActiveDirty;
+    if (anyChanged)
+    {
+        emit dirtyChanged(anyDirty);
+    }
     emit stateChanged();
+}
+
+void UiStateCenter::registerDirtyProbe(const QString& workbenchId, std::function<bool()> probe)
+{
+    if (workbenchId.isEmpty() || !probe)
+    {
+        return;
+    }
+    m_dirtyProbes.insert(workbenchId, std::move(probe));
+    // 立即吸收注册前已经存在的脏状态（如 3D 首次创建时文档已是脏的）
+    refreshDirty();
 }
 
 void UiStateCenter::updateMetadata(const QString& key, const QVariant& value)

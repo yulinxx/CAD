@@ -128,6 +128,38 @@ void FileOperationRegistry::executeWithExceptionGuard(const char* operationName,
     }
 }
 
+bool FileOperationRegistry::confirmDiscardCurrentDocument()
+{
+    // 只问当前工作台的脏标记：另一工作台的未存改动不该在打开/新建时被顺手保存
+    // （关闭提示才用 dirty=任一，见 WorkbenchWindow::closeEvent）
+    if (!m_stateCenter || !m_stateCenter->activeDocDirty())
+    {
+        return true;
+    }
+
+    const int answer = HelpDialogService::showQuestion(m_parentWidget,
+        QObject::tr("Unsaved Changes"),
+        QObject::tr("Do you want to save the current file?"));
+    if (answer == QMessageBox::Cancel)
+    {
+        return false;
+    }
+    if (answer == QMessageBox::No)
+    {
+        return true;  // 用户明确丢弃
+    }
+
+    // 保存必须校验真实结果：取消另存对话框 / 保存失败时绝不能继续清空文档
+    const OperationResult saveResult = m_bus->run(OperationId::File_Save, {});
+    if (!saveResult.success)
+    {
+        return false;
+    }
+    // 保存后复查脏标记（doExport 成功路径会 refreshDirty）：
+    // 仍脏说明没真存上，按失败处理，杜绝数据丢失
+    return !m_stateCenter->activeDocDirty();
+}
+
 // ==================== 公共模板方法 ====================
 
 void FileOperationRegistry::resetDocumentState()
@@ -186,7 +218,9 @@ bool FileOperationRegistry::doExport(const std::string& filePath)
 
     if (m_stateCenter)
     {
-        m_stateCenter->setDirty(false);
+        // 引擎脏标记已清，探针重算：2D 变干净 → 标题 "*" 消失；
+        // 若另一工作台仍有未存文档，dirty(任一) 保持 true，关闭提示不丢
+        m_stateCenter->refreshDirty();
         m_stateCenter->setCurrentDocumentId(QString::fromStdString(filePath));
     }
     if (m_layerPersistence)
@@ -208,6 +242,14 @@ bool FileOperationRegistry::doOpenFile(const QString& filePath)
         SY_WARNF("[FileOperation] doOpenFile failed: filePath=%s importService=%s",
             filePath.isEmpty() ? "(empty)" : filePath.toUtf8().constData(),
             m_importService ? "ok" : "null");
+        return false;
+    }
+
+    // 打开会替换当前文档（importAsNewDocument=true → clearScene）：
+    // 未保存处置不通过就绝不往下走，否则未存更改被静默清掉
+    if (!confirmDiscardCurrentDocument())
+    {
+        SY_DEBUG("[FileOperation] doOpenFile aborted: user cancelled unsaved-changes prompt");
         return false;
     }
 
@@ -254,6 +296,15 @@ bool FileOperationRegistry::doOpenFile(const QString& filePath)
         m_sceneManager->clearDirty();
     }
 
+    // 引擎脏标记清完之后再写状态中心（顺序不能反，探针读的是引擎脏标记）：
+    // 不写 docId，标题文件名会停在上一个文件名（Save/SaveAs 已由 doExport 写入）；
+    // 不 refreshDirty，打开干净文件后标题会挂着上一份文档的 "*"
+    if (m_stateCenter)
+    {
+        m_stateCenter->setCurrentDocumentId(filePath);
+        m_stateCenter->refreshDirty();
+    }
+
     return true;
 }
 
@@ -262,7 +313,7 @@ void FileOperationRegistry::doImportByFormat(Fio::FileFormat fmt)
     executeWithExceptionGuard("Import", [this, fmt] {
         QString filePath = FileDialogService::getOpenFileName(
             m_parentWidget, QObject::tr("Import File"), FileDialogService::importFilterForFormat(fmt));
-        if (filePath.isEmpty() || !m_importService)
+        if (filePath.isEmpty())
         {
             return;
         }
@@ -271,21 +322,32 @@ void FileOperationRegistry::doImportByFormat(Fio::FileFormat fmt)
             static_cast<int>(fmt),
             filePath.toUtf8().constData());
 
-        ImportOptions opts;
-        opts.importAsNewDocument = false;
-        opts.autoFit = true;
-
-        ImportContext context;
-        context.sourcePath = filePath;
-
-        // 使用异步导入 + 进度对话框，避免大文件阻塞主界面
-        ImportResult result = ImportProgressRunner::run(m_importService, context, opts, m_parentWidget);
-        if (!result.success)
-        {
-            showFileError(QObject::tr("Import Error"), result.message);
-            SY_ERRORF("[FileOperation] Import failed: %s", result.message.toUtf8().constData());
-        }
+        doImportFilePath(filePath);
     });
+}
+
+void FileOperationRegistry::doImportFilePath(const QString& filePath)
+{
+    if (filePath.isEmpty() || !m_importService)
+    {
+        return;
+    }
+
+    // 追加语义：导入不替换当前文档（与 doOpenFile 的替换语义相对）
+    ImportOptions opts;
+    opts.importAsNewDocument = false;
+    opts.autoFit = true;
+
+    ImportContext context;
+    context.sourcePath = filePath;
+
+    // 使用异步导入 + 进度对话框，避免大文件阻塞主界面
+    ImportResult result = ImportProgressRunner::run(m_importService, context, opts, m_parentWidget);
+    if (!result.success)
+    {
+        showFileError(QObject::tr("Import Error"), result.message);
+        SY_ERRORF("[FileOperation] Import failed: %s", result.message.toUtf8().constData());
+    }
 }
 
 void FileOperationRegistry::doImportImage(const QString& filePath)
@@ -428,27 +490,26 @@ void FileOperationRegistry::registerFileNewOps()
     auto* scene = m_sceneManager;
 
     Ops::declare(reg, OperationId::File_New, [this, scene] {
-        bool needsSave = (m_stateCenter && m_stateCenter->dirty());
-        if (needsSave)
+        // 新建只替换当前工作台的文档：提示/保存/取消全部由 confirmDiscardCurrentDocument 收口。
+        // 返回 false（用户取消、保存失败或取消另存、保存后仍脏）时必须中止 ——
+        // 原实现跑完 File_Save 就无条件 clearScene，会把没存上的内容直接抹掉
+        if (!confirmDiscardCurrentDocument())
         {
-            auto result = HelpDialogService::showQuestion(
-                m_parentWidget, QObject::tr("Unsaved Changes"), QObject::tr("Do you want to save the current file?"));
-            if (result == QMessageBox::Cancel)
-            {
-                return;
-            }
-            if (result == QMessageBox::Yes)
-            {
-                m_bus->run(OperationId::File_Save, {});
-            }
+            return;
         }
         scene->clearScene();
 
         // 换文档：清路径 + 清撤销栈（缺一项就会串文档，见 resetDocumentState 注释）
         resetDocumentState();
+        if (scene)
+        {
+            // 新文档即为干净态（与打开/保存一致）：不清的话探针会一直读到上一份文档的脏，
+            // 标题 "*" 不消失
+            scene->clearDirty();
+        }
         if (m_stateCenter)
         {
-            m_stateCenter->setDirty(false);
+            m_stateCenter->refreshDirty();
         }
     });
 }
@@ -485,40 +546,58 @@ void FileOperationRegistry::registerFileSaveOps()
 {
     auto& reg = m_bus->registry();
 
-    Ops::declare(reg, OperationId::File_Save, [this] {
-        if (m_currentFilePath->empty())
+    // 保存类命令必须如实上报结果：closeEvent/新建/打开的后续动作都靠
+    // success 与 OpFlagCanceled 判分支。经 void lambda 包装会恒 success=true，
+    // 用户取消另存对话框也会被当成"保存成功"继续关窗口（数据丢失）。
+    Ops::declareWithResult(reg, OperationId::File_Save, [this]() -> OperationResult {
+        OperationResult result;
+        QString filePath = QString::fromStdString(*m_currentFilePath);
+        const bool canSaveInPlace = !filePath.isEmpty() &&
+            filePath.endsWith(QLatin1String(".sy"), Qt::CaseInsensitive);
+        if (!canSaveInPlace)
         {
-            QString filePath = FileDialogService::getSaveFileName(
+            // 未命名文档、或当前路径不是 .sy（历史遗留的非原生路径）：必须另存为
+            filePath = FileDialogService::getSaveFileName(
                 m_parentWidget, QObject::tr("Save"), FileDialogService::saveFileFilter());
             if (filePath.isEmpty())
             {
-                return;
+                result.message = QObject::tr("Save was cancelled.");
+                result.flags |= Cmd::OpFlagCanceled;
+                return result;
             }
-            doExport(filePath.toStdString());
         }
-        else if (QString::fromStdString(*m_currentFilePath).endsWith(QLatin1String(".sy"), Qt::CaseInsensitive))
+
+        if (doExport(filePath.toStdString()))
         {
-            doExport(*m_currentFilePath);
+            result.success = true;
         }
         else
         {
-            QString filePath = FileDialogService::getSaveFileName(
-                m_parentWidget, QObject::tr("Save"), FileDialogService::saveFileFilter());
-            if (filePath.isEmpty())
-            {
-                return;
-            }
-            doExport(filePath.toStdString());
+            // doExport 内部已弹错误对话框，这里只需带上文案给关闭流程展示
+            result.message = QObject::tr("Failed to save the document.");
         }
+        return result;
     });
 
-    Ops::declare(reg, OperationId::File_SaveAs, [this] {
-        QString filePath = FileDialogService::getSaveFileName(
+    Ops::declareWithResult(reg, OperationId::File_SaveAs, [this]() -> OperationResult {
+        OperationResult result;
+        const QString filePath = FileDialogService::getSaveFileName(
             m_parentWidget, QObject::tr("Save As"), FileDialogService::saveFileFilter());
-        if (!filePath.isEmpty())
+        if (filePath.isEmpty())
         {
-            doExport(filePath.toStdString());
+            result.message = QObject::tr("Save was cancelled.");
+            result.flags |= Cmd::OpFlagCanceled;
+            return result;
         }
+        if (doExport(filePath.toStdString()))
+        {
+            result.success = true;
+        }
+        else
+        {
+            result.message = QObject::tr("Failed to save the document.");
+        }
+        return result;
     });
 }
 
@@ -536,7 +615,10 @@ void FileOperationRegistry::registerImportOps()
         doImportImage(params.value(QStringLiteral("filePath")).toString());
     });
 
-    // “All Supported...”：弹出所有支持格式的对话框，按扩展名自动路由到对应导入器
+    // “All Supported...”：弹出所有支持格式的对话框，按扩展名自动路由到对应导入器。
+    // 与其它 Import 一致为**追加**语义（importAsNewDocument=false）——
+    // 原实现走 doOpenFile 会清空当前文档且不弹未保存提示，与注释和菜单语义都不符；
+    // 要替换当前文档请用 File ▸ Open（仅 .sy）
     Ops::declare(reg, OperationId::File_ImportAll, [this] {
         QString filePath = FileDialogService::getOpenFileName(
             m_parentWidget, QObject::tr("Import File"), FileDialogService::allSupportedFilter());
@@ -544,7 +626,9 @@ void FileOperationRegistry::registerImportOps()
         {
             return;
         }
-        doOpenFile(filePath);
+        executeWithExceptionGuard("Import", [this, filePath] {
+            doImportFilePath(filePath);
+        });
     });
 }
 

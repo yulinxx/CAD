@@ -76,6 +76,10 @@ private:
     /// 执行导入流程（按格式选文件 → 调用导入服务 → 异常保护）
     void doImportByFormat(Fio::FileFormat fmt);
 
+    /// 对指定路径执行**追加**导入（importAsNewDocument=false，不清空当前文档）
+    /// File_ImportAll 与各格式导入共用；要替换文档请走 doOpenFile
+    void doImportFilePath(const QString& filePath);
+
     /// 执行导入图片流程（filePath 可为空：为空则弹文件对话框）
     void doImportImage(const QString& filePath);
 
@@ -95,6 +99,16 @@ private:
 
     /// 统一显示文件操作错误对话框
     void showFileError(const QString& title, const QString& message);
+
+    /**
+     * @brief 新建/打开前的未保存处置：提示保存，返回是否可以继续替换当前文档
+     *
+     * 只问当前工作台的脏标记（activeDocDirty）。返回值语义：
+     *   - true  文档干净，或用户选择"不保存" → 调用方可以继续清空/替换；
+     *   - false 用户取消，或保存失败/取消另存，或保存后文档仍脏 → 调用方必须中止，
+     *           否则 clearScene() 会把未保存内容直接抹掉（数据丢失）。
+     */
+    bool confirmDiscardCurrentDocument();
 
     /// 统一异常保护包装器：执行操作并在异常时显示错误对话框
     void executeWithExceptionGuard(const char* operationName, std::function<void()> action);

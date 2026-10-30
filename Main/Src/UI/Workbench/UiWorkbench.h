@@ -10,6 +10,7 @@
 
 #include "UiServiceGroups.h"
 #include "UI/Service/ToolBarContextManager.h"
+#include "UI/Command/OperationTypes.h"  // Cmd::OperationResultBase（带返回值的命令分发）
 #include "Services/UiStateCenter.h"
 #include "ClientConfig/UiLayoutBuilder.h"  // IUiCommandDispatcher：工作台直接实现该接口
 
@@ -97,6 +98,18 @@ public:
     /// 菜单层只传递 commandId 与参数，不直接依赖具体 OperationBus 类型。
     /// @param params 调用方参数（如动态最近文件项的 path），透传到操作总线
     virtual void dispatchCommand(const QString& commandId, const QVariantMap& params);
+
+    /// 带返回值的命令分发：关闭前保存等需要成败结果的场景使用。
+    /// 返回两个 Operation 结果类型的公共基类，避免框架层依赖 2D/3D 具体类型。
+    /// 默认实现返回 success=false（未接入）；子类按各自命令目录同步执行。
+    virtual Cmd::OperationResultBase dispatchCommandForResult(const QString& commandId, const QVariantMap& params);
+
+    /// 本工作台文档是否存在未保存更改
+    /// 状态中心 dirty 探针的事实源之一：2D 读 SceneDocument2D，3D 读 DocumentManager3D。
+    virtual bool hasUnsavedChanges() const
+    {
+        return false;
+    }
 
     /// IUiCommandDispatcher 入口。
     /// 工作台自身就是分发器，避免为右键菜单/布局构建器另建适配器对象导致悬空指针。

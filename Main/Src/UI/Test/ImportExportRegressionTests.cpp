@@ -28,6 +28,16 @@
 #include "Engine2D/SyEntity/SyPolygon.h"
 #include "Engine2D/SyEntity/SyNurbs.h"
 
+#include "Persistence/PersistenceService.h"
+#include "Persistence/Models/RecentFileRecord.h"
+#include "Persistence/Repositories/RecentFileRepository.h"
+#include "UI/Services/RecentFileService.h"
+
+#include <QCoreApplication>
+#include <QSettings>
+#include <QStringList>
+#include <QTemporaryDir>
+
 #include <cstring>
 #include <memory>
 #include <string>
@@ -205,6 +215,106 @@ TEST(ImportExportRegressionTest, ImportService_ImportFileUnconfigured)
     ImportResult result = service.importFile("nonexistent.dxf");
     // 未配置分发器时应返回失败
     EXPECT_FALSE(result.success);
+}
+
+// ==================== RecentFileService：legacy 行迁移与 QSettings 兜底 ====================
+
+namespace
+{
+    /// 迁移前的 DB 行：workbench 列为空字符串（v5→v6 加列时的旧数据）
+    RecentFileRecord makeLegacyRecentRecord(const std::string& filePath)
+    {
+        RecentFileRecord rec;
+        rec.filePath = filePath;
+        rec.title = filePath.substr(filePath.find_last_of('/') + 1);
+        rec.format = "sy";
+        rec.workbench = "";
+        rec.lastOpenedTime = "2026-01-01T00:00:00";
+        return rec;
+    }
+}  // namespace
+
+TEST(RecentFileServiceRegressionTest, LoadMigratesLegacyEmptyWorkbenchRows)
+{
+    QTemporaryDir dbDir;
+    ASSERT_TRUE(dbDir.isValid());
+
+    PersistenceService persistence;
+    ASSERT_TRUE(persistence.initialize(dbDir.filePath(QStringLiteral("recent.sqlite")).toStdString()));
+    ASSERT_NE(persistence.recentFiles(), nullptr);
+    ASSERT_TRUE(persistence.recentFiles()->append(makeLegacyRecentRecord("/tmp/legacy_doc.sy")));
+
+    RecentFileService service(&persistence);
+    const QStringList files = service.loadRecentFiles(QStringLiteral("2D"));
+
+    // 归类后应出现在 2D 列表（.sy → 2D）
+    ASSERT_EQ(files.size(), 1);
+    EXPECT_EQ(files.front(), QStringLiteral("/tmp/legacy_doc.sy"));
+
+    // 关键断言：load 必须把 workbench='' 回写成归类结果 ——
+    // 否则该行不属于任何工作台桶，append 的按桶裁剪永远裁不到它，库里会无限累积
+    bool found = false;
+    for (const auto& rec : persistence.recentFiles()->loadAll())
+    {
+        if (rec.filePath == "/tmp/legacy_doc.sy")
+        {
+            found = true;
+            EXPECT_EQ(rec.workbench, "2D");
+        }
+    }
+    EXPECT_TRUE(found);
+
+    persistence.shutdown();
+}
+
+TEST(RecentFileServiceRegressionTest, FallsBackToQSettingsWhenDbHasNoRowsForCurrentWorkbench)
+{
+    // QSettings 全程指到临时 ini：不污染真实用户配置，且与进程内其它用例隔离。
+    // 路径进程级生效无法还原，目录用 static 保持存活到进程结束。
+    static QTemporaryDir settingsDir;
+    ASSERT_TRUE(settingsDir.isValid());
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settingsDir.path());
+    if (QCoreApplication::organizationName().isEmpty())
+    {
+        QCoreApplication::setOrganizationName(QStringLiteral("SanYiCADTests"));
+    }
+    if (QCoreApplication::applicationName().isEmpty())
+    {
+        QCoreApplication::setApplicationName(QStringLiteral("RecentFileRegression"));
+    }
+
+    QTemporaryDir dbDir;
+    ASSERT_TRUE(dbDir.isValid());
+    PersistenceService persistence;
+    ASSERT_TRUE(persistence.initialize(dbDir.filePath(QStringLiteral("recent.sqlite")).toStdString()));
+    ASSERT_NE(persistence.recentFiles(), nullptr);
+
+    // DB 里只有 3D 的记录
+    RecentFileRecord only3D;
+    only3D.filePath = "/tmp/model.stl";
+    only3D.title = "model.stl";
+    only3D.format = "stl";
+    only3D.workbench = "3D";
+    only3D.lastOpenedTime = "2026-01-01T00:00:00";
+    ASSERT_TRUE(persistence.recentFiles()->append(only3D));
+
+    // QSettings 兜底里有一条 2D 记录
+    QSettings seed;
+    seed.setValue(QStringLiteral("RecentFiles/2D"), QStringList{ QStringLiteral("/tmp/settings_only.sy") });
+    seed.sync();
+
+    RecentFileService service(&persistence);
+    const QStringList files = service.loadRecentFiles(QStringLiteral("2D"));
+
+    // 回归防护：DB 有数据但没有 2D 条目时，不能直接返回空 —— 老版本写在
+    // QSettings 的兜底数据会被整体吞掉（修复前本断言失败）
+    EXPECT_TRUE(files.contains(QStringLiteral("/tmp/settings_only.sy")));
+    // 3D 的行也不能漏进 2D 桶
+    EXPECT_FALSE(files.contains(QStringLiteral("/tmp/model.stl")));
+
+    QSettings().remove(QStringLiteral("RecentFiles/2D"));
+    persistence.shutdown();
 }
 
 // ==================== ExportService 基础流程测试 ====================

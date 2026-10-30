@@ -106,23 +106,40 @@ QStringList RecentFileService::loadRecentFiles(const QString& workbenchId) const
         {
             // SY_DEBUGF("[RecentFileService] Loaded %zu recent files from database", records.size());
             QStringList result;
+            std::vector<RecentFileRecord> legacyFixups;
             result.reserve(static_cast<int>(records.size()));
             for (const auto& rec : records)
             {
-                // 旧记录 workbench 为空，按扩展名归类，避免 2D/3D 混显
-                const QString recWb = rec.workbench.empty()
+                // 旧记录 workbench 为空（迁移前的 DB 行），按扩展名归类，避免 2D/3D 混显
+                const bool legacyRow = rec.workbench.empty();
+                const QString recWb = legacyRow
                     ? classifyWorkbenchByExtension(QString::fromStdString(rec.filePath))
                     : QString::fromStdString(rec.workbench);
-                if (recWb == wb)
+                if (legacyRow)
+                {
+                    // 回写归类结果：workbench='' 的行不属于任何桶，
+                    // append 的按桶裁剪永远裁不到它 —— 不修就会在库里无限累积
+                    RecentFileRecord fixed = rec;
+                    fixed.workbench = recWb.toStdString();
+                    legacyFixups.push_back(std::move(fixed));
+                }
+                if (recWb == wb && result.size() < kMaxRecentFiles)
                 {
                     result.append(QString::fromStdString(rec.filePath));
                 }
-                if (result.size() >= kMaxRecentFiles)
-                {
-                    break;
-                }
             }
-            return result;
+            for (const auto& fix : legacyFixups)
+            {
+                m_persistence->recentFiles()->append(fix);
+            }
+
+            if (!result.empty())
+            {
+                return result;
+            }
+            // DB 里有数据但没有**当前工作台**的条目：不能直接返回空列表 ——
+            // 老版本写在 QSettings 里的 RecentFiles/<wb> 兜底数据会被整体吞掉。
+            // 落到下方 QSettings 分支继续读。
         }
     }
 

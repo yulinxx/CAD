@@ -226,8 +226,22 @@ void WorkbenchMenuManager::registerRecentFilesSection()
         IRecentFileService* recentFiles = m_recentFileService;
         // 动态段在每次 aboutToShow 时重填：这里按"当前工作台"取最近列表，
         // 2D 只看 2D 记录、3D 只看 3D 记录，切换工作台后不会混显对方的文件。
-        const QStringList files =
+        QStringList files =
             recentFiles ? recentFiles->loadRecentFiles(currentWorkbenchId(m_stateCenter)) : QStringList{};
+
+        // 文件可能已被移动/删除：指向不存在文件的菜单项点了必然失败，
+        // 在入口就滤掉让下一条顶上（列表在打开期间也可能过期，所以每次 aboutToShow 都过滤）
+        for (auto it = files.begin(); it != files.end();)
+        {
+            if (it->isEmpty() || !QFileInfo::exists(*it))
+            {
+                it = files.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
 
         // 服务缺失与列表为空给同一种反馈：一个禁用占位项。
         // 不能一条都不加 —— 空子菜单在 Qt 里点开是个空白小方块，看起来像菜单坏了。

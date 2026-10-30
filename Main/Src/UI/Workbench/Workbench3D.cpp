@@ -185,6 +185,38 @@ QString Workbench3D::commandText(const QString& commandId) const
     return entry && entry->text ? QString::fromUtf8(entry->text) : QString();
 }
 
+Cmd::OperationResultBase Workbench3D::dispatchCommandForResult(const QString& commandId, const QVariantMap& params)
+{
+    Cmd::OperationResultBase result;
+    if (!m_services3D.operationBus)
+    {
+        SY_WARNF("[Workbench3D] Cannot dispatch command without OperationBus3D: %s", qPrintable(commandId));
+        result.message = QStringLiteral("No OperationBus3D for %1").arg(commandId);
+        return result;
+    }
+
+    const OperationId3D operation = CommandCatalog3D::operationForCommandId(commandId);
+    if (operation == OperationId3D::None)
+    {
+        SY_WARNF("[Workbench3D] Unknown command: %s", qPrintable(commandId));
+        result.message = QStringLiteral("Unknown command: %1").arg(commandId);
+        return result;
+    }
+
+    SY_DEBUGF("[Workbench3D] Dispatch command with result='%s'", qPrintable(commandId));
+    OperationRequest3D req;
+    req.id = operation;
+    req.source = OperationSource3D::Menu;
+    req.params = params;
+    // 同步执行；OperationResult3D 与 2D 结果同源于 Cmd::OperationResultBase，按值切片返回
+    return m_services3D.operationBus->run(req);
+}
+
+bool Workbench3D::hasUnsavedChanges() const
+{
+    return m_sessionState && m_sessionState->documentManager ? m_sessionState->documentManager->isModified() : false;
+}
+
 // 1 — 初始化，存储服务引用
 bool Workbench3D::initialize(const WorkbenchServices& services)
 {
@@ -246,6 +278,14 @@ bool Workbench3D::initialize(const WorkbenchServices& services)
             const QString path = docMgr->currentFilePath();
             // 空路径 = 未命名场景，对齐 UiStateCenter 的 "none" 语义
             stateCenter->setCurrentDocumentId(path.isEmpty() ? QStringLiteral("none") : path);
+            // 脏标记同样只在这里回写状态中心：dirty(任一) 喂关闭提示，activeDocDirty 喂标题 "*"
+            stateCenter->refreshDirty();
+        });
+        // 3D 文档脏标记探针（懒创建，故在 3D 首次初始化时注册）
+        // QPointer 防止状态中心在工作台销毁后仍回调
+        QPointer<Workbench3D> self(this);
+        stateCenter->registerDirtyProbe(QStringLiteral("3D"), [self]() {
+            return self && self->hasUnsavedChanges();
         });
     }
 
