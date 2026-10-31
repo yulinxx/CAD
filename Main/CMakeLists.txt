@@ -732,7 +732,7 @@ if(BUILD_VIEWPORT_REFRESH_TESTS AND GTest_FOUND)
         "${UI_ROOT}/Render/SceneRefreshCoordinator.cpp"
         "${UI_ROOT}/Render/BitmapReconciler.cpp"
         "${UI_ROOT}/Render/TextReconciler.cpp"
-        "${UI_ROOT}/Render/CurveLodManager.cpp"
+        "${UI_ROOT}/Render/RenderSubmitScheduler.cpp"
     )
     target_compile_features(ViewportRefreshTests PRIVATE cxx_std_17)
     # SceneRefreshCoordinator 有 Q_OBJECT：moc 产物必须为这个目标单独生成一次

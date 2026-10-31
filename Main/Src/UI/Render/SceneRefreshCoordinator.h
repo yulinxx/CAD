@@ -32,7 +32,7 @@
 #include "Ut/BBox2d.h"
 #include "BitmapReconciler.h"
 #include "TextReconciler.h"
-#include "CurveLodManager.h"
+#include "RenderSubmitScheduler.h"
 
 class FrameTimer;
 
@@ -95,7 +95,7 @@ public:
      *   - 可视区域越出了上次收集覆盖的矩形（平移）
      * 两者都不成立时它只做几次比较就返回。
      *
-     * 收集到的 ID 放进 CurveLodManager 的队列，由 processCurveLodBatch 每帧消费一批，
+     * 收集到的 ID 放进 RenderSubmitScheduler 的队列，由 processCurveLodBatch 每帧消费一批，
      * 跨多帧完成，避免一次性重 tessellate 上万个曲线造成单帧卡顿。
      */
     void requestCurveLodRefresh();
@@ -116,13 +116,13 @@ public:
     /// 当前曲线 LOD 队列中的图元数（诊断/回归测试用；0 表示队列已排空）。
     size_t pendingCurveLodCount() const
     {
-        return m_curveLodManager.size();
+        return m_submitScheduler.size();
     }
 
     /// 已执行的 LOD 批次数（诊断/回归测试用；用于验证单次定时器仍在续跑）。
     size_t curveLodBatchCount() const
     {
-        return m_curveLodManager.processedBatchCount();
+        return m_submitScheduler.processedBatchCount();
     }
 
     void flushPendingRefresh() override;
@@ -203,6 +203,29 @@ private:
     void applyLightRefresh(Eg::SceneManager* sm);
     void applyFullRefresh(Eg::SceneManager* sm);
     void processCurveLodBatch();
+
+    /// 相机移出已装配范围时的增量补入 + 回收：queryByBox 求新可见集，与已渲染
+    /// 账本做差，只补新进视野的（入扩展队列跨帧消费）、只回收移出视野的
+    /// （removeRenderEntities 释放 GPU 几何）—— 替代原先整场景全量重建。
+    void requestViewportExtension();
+
+    // ==================== 「谁该在几何 GPU 层」的唯一真源 ====================
+    //
+    // 全量重建的账本收集与视口增量对账曾各写一份「可见性过滤 + 视口外扩」——
+    // 改一漏一就会出现「缩放后某类图元消失/残留」的漂移 bug。收敛为下面三个
+    // 共享助手：可见性规则只改 isDesiredOnGeometryLayer 一处。
+
+    /// 该图元此刻是否应出现在几何 GPU 层：自身可见 且 几何合法 且 图层可见
+    /// 且 bbox 有效，且未被「选中时隐藏本体」过滤。判据与 gatherGeometry 严格对齐。
+    bool isDesiredOnGeometryLayer(const Eg::SyEntity* e, bool hideSelected) const;
+
+    /// 当前可视世界盒按 cull 余量（1.25×）外扩；矩阵退化时返回无效盒，
+    /// 调用方据此退化为「不裁剪 / 全量」。
+    Ut::BBox2d expandedVisibleBox() const;
+
+    /// 收集 box 内所有应上几何层的图元 ID（RTree queryByBox + 统一判据），写入 out。
+    void collectDesiredGeometryIds(const Ut::BBox2d& box, bool hideSelected,
+        std::unordered_set<uint64_t>& out) const;
 
     /// 确保曲线 LOD 的消费泵（节流定时器）在跑
     void ensureCurveLodPump();
@@ -286,7 +309,7 @@ private:
     //   - 各协调器的账本不再暴露给调度逻辑，状态归属清晰
     BitmapReconciler m_bitmapReconciler{ nullptr };
     TextReconciler m_textReconciler{ nullptr };
-    CurveLodManager m_curveLodManager{ nullptr };
+    RenderSubmitScheduler m_submitScheduler{ nullptr };
 
     // 帧耗时追踪器（性能监控基础设施）
     std::unique_ptr<FrameTimer> m_frameTimer;

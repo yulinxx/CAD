@@ -43,11 +43,14 @@ flowchart LR
 
 zoom 是连续高频操作，做法：
 
-* **连续缩放比例 + 滞后阈值**：
-  * 记录 `m_curveLodScaleAtBuild` = 上次构建时的 `worldToScreenScale`
-  * **升级阈值**：`worldToScreenScale > m_curveLodScaleAtBuild * 1.3`（放大 1.3 倍以上）
-  * **降级阈值**：`worldToScreenScale * 2.0 < m_curveLodScaleAtBuild`（缩小 2 倍以上）
+* **连续缩放比例 + 滞后阈值**（判据收敛为纯函数 `RenderSubmitScheduler::isScaleStale`，可直测）：
+  * 记录 `m_scaleAtBuild` = 上次收集队列时的 `worldToScreenScale`
+  * **升级阈值**：`worldToScreenScale > m_scaleAtBuild * kLodUpgradeRatio`（放大 1.3 倍以上）
+  * **降级阈值**：`worldToScreenScale * kLodDowngradeRatio < m_scaleAtBuild`（缩小 2 倍以上）
   * 死区：1.3x ~ 2.0x 之间不触发，避免抖动
+* 阈值常量（`kLodUpgradeRatio = 1.3`、`kLodDowngradeRatio = 2.0`）与收集余量
+  `kCollectBoxMargin = 1.25`、批次预算 `kBatchBudgetMs` 等调参值**全部收敛在
+  `RenderSubmitScheduler` 的 public static constexpr**，测试与文档引用同一份。
 
 ### D3 状态管理
 
@@ -67,31 +70,43 @@ class RenderSceneBuilder {
 
 ### D4 触发通道
 
-`SceneRefreshCoordinator` 在缩放变化时检测是否需要 LOD 重建：
+触发判据**整体位于 `RenderSubmitScheduler`**（`requestRefresh` → `refillQueueIfStale`）。
+`SceneRefreshCoordinator` 只持有 32ms 消费泵（`kPumpIntervalMs`）与已渲染账本，
+相机变化时调用 `requestRefresh()`，判据与收集都在调度器内部完成：
 
 ```mermaid
 flowchart TD
-    A[缩放变化] --> B{计算比例}
-    B --> C{worldToScreenScale<br/>vs<br/>m_curveLodScaleAtBuild}
-    C -->|放大 > 1.3x| D[needsUpgrade = true]
-    C -->|缩小 > 2.0x| E[needsDowngrade = true]
-    C -->|1.3x~2.0x| F[死区 - 不触发]
-    D --> G{needsUpgrade<br/>or<br/>needsDowngrade<br/>or<br/>regionMoved?}
+    A[缩放/平移变化<br/>协调器调用 requestRefresh] --> B[RenderSubmitScheduler<br/>refillQueueIfStale]
+    B --> C{isScaleStale<br/>worldToScreenScale vs m_scaleAtBuild}
+    C -->|放大 > kLodUpgradeRatio| D[过期 - 升级]
+    C -->|缩小 > kLodDowngradeRatio| E[过期 - 降级]
+    C -->|死区| F[不过期]
+    D --> G{scaleStale<br/>or<br/>regionMoved?}
     E --> G
     F --> G
-    G -->|是| H[requestCurveLodRefresh]
+    G -->|是| H[按可视盒+余量重新收集 LOD 队列]
     G -->|否| I[跳过]
     H --> J[32ms 定时器<br/>分批执行]
 ```
 
-* 缩放连续变化时不重置队列，继续用最新比例重建
-* 跨越阈值时由独立定时器（32ms）分批执行
+* 缩放连续变化时不重置队列（队列未消费完只记 `m_recollectPending`，排空后重新评估），继续用最新比例重建
+* 跨越阈值时由协调器持有的独立定时器（32ms，`kPumpIntervalMs`）分批执行
 
 ### D5 代价管理
 
-* **只重建曲线类图元**：CIRCLE, ARC, ELLIPSE, BEZIER2, BEZIER, SPLINE, NURBS, SMARTLINE, POLYGON
-* **按预算分批**：每帧 2000 个图元，跨多帧完成
-* **视口裁剪**：只重建视口内（+ 1.25x 余量）曲线图元
+* **只重建曲线类图元**：类型清单的单一来源是 `Eg::tess::lodCurveTypes()`（[TessParams.h](../../Engine/Common/Include/Engine/Render/TessParams.h)），
+  当前为 CIRCLE, ARC, ELLIPSE, BEZIER2, BEZIER, SPLINE, NURBS, SMARTLINE, POLYGON；
+  队列收集的谓词 `Eg::tess::isLodCurveType()` 由该清单派生。POLYGON 仅在
+  `hasBulges() || 顶点数 > kPolygonSimplifyMinVertices` 时入队（其余多边形离散结果与缩放无关）。
+* **按预算分批（自适应）**：单批目标耗时 `kBatchBudgetMs = 6ms`，
+  批量在 `kMinBatchSize = 128 ~ kMaxBatchSize = 8192` 间按上一批实测耗时反馈调节
+  （超预算减半、余量充足 ×1.5），跨多帧完成
+* **视口裁剪**：只重建视口内（+ `kCollectBoxMargin = 1.25` 倍余量）曲线图元
+* **双队列**：LOD 精度队列之外还有**视口扩展队列**（相机移出已装配范围时，
+  新进视野但从未上 GPU 的图元增量补传，替代「可视盒越界 → 整场景全量重建」）。
+  消费时**扩展优先**（画面缺块比精度更新紧急），两条队列共用批次预算与提交链路；
+  `markViewportReconciled` 在对账完成后清掉已作废的 LOD 队列，
+  但**不动缩放基准 `m_scaleAtBuild`**（扩展只补新图元，不重刷已在 GPU 上的曲线精度）。
 
 ***
 
@@ -100,7 +115,8 @@ flowchart TD
 ```mermaid
 flowchart TB
     subgraph 视图层
-        A[SceneRefreshCoordinator<br/>缩放检测 + 分批调度]
+        A[SceneRefreshCoordinator<br/>32ms 消费泵 + 已渲染账本]
+        S[RenderSubmitScheduler<br/>触发判据 + 双队列 + 自适应批次<br/>（原 CurveLodManager，已更名）]
     end
 
     subgraph 装配层
@@ -108,14 +124,15 @@ flowchart TB
     end
 
     subgraph 离散化层
-        C[Eg::Tessellator<br/>tess::*ForScreen<br/>根据屏幕误差计算段数]
+        C[Eg::Tessellator<br/>tess::*ForScreen<br/>根据屏幕误差计算段数<br/>类型清单 tess::lodCurveTypes]
     end
 
     subgraph 渲染层
         D[RenderX<br/>GeometryStore + DrawList]
     end
 
-    A -->|setWorldToScreenScale| B
+    A -->|requestRefresh/processBatch| S
+    S -->|upsertRenderEntities| B
     B -->|emit* 调用| C
     C -->|离散化后折线| D
 ```
@@ -126,11 +143,12 @@ flowchart TB
 
 | 难点 | 对策 |
 | --- | --- |
-| zoom 不改业务图元 | 比较 `worldToScreenScale` vs `m_curveLodScaleAtBuild` 比例判断 |
-| 大量曲线重建 | 分批限流（2000个/帧，32ms 定时器） |
-| 阈值抖动 | 滞后区间：升级 1.3x < 降级 2.0x |
+| zoom 不改业务图元 | `isScaleStale` 比较 `worldToScreenScale` vs `m_scaleAtBuild` 比例判断 |
+| 大量曲线重建 | 分批限流（`kBatchBudgetMs = 6ms` 预算自适应批量，32ms 定时器） |
+| 阈值抖动 | 滞后区间：升级 `kLodUpgradeRatio = 1.3x` < 降级 `kLodDowngradeRatio = 2.0x` |
 | 连续缩放 | 不重置队列，用最新比例继续重建 |
-| 视口外图元 | 只重建视口内（+ 1.25x 余量） |
+| 视口外图元 | 只重建视口内（+ `kCollectBoxMargin = 1.25x` 余量） |
+| 相机移出已装配范围 | 视口扩展队列增量补传/回收，替代整场景全量重建 |
 
 ***
 
@@ -146,5 +164,7 @@ flowchart TB
 ## 6. 范围外
 
 * 不做 3D LOD（3D 已有 `DisplayCache3D`）
-* 不做折线 Douglas-Peucker 抽稀
 * 不改 RenderX 公共 ABI
+
+> 注：「不做折线 Douglas-Peucker 抽稀」已不成立 —— POLYGON 在 zoom out 时
+> 走 Douglas-Peucker 简化、带 bulge 的多段线按弦高容差展开（见 D5 的 POLYGON 入队判据）。

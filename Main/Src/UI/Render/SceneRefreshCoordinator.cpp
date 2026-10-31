@@ -89,18 +89,18 @@ SceneRefreshCoordinator::SceneRefreshCoordinator(QObject* parent)
     // 与 m_sceneUpdateTimer 解耦，确保场景操作密集时 LOD 分批仍能稳定推进。
     m_curveLodTimer = new QTimer(this);
     m_curveLodTimer->setSingleShot(true);
-    m_curveLodTimer->setInterval(32);
+    m_curveLodTimer->setInterval(RenderSubmitScheduler::kPumpIntervalMs);
     connect(m_curveLodTimer, &QTimer::timeout, this, &SceneRefreshCoordinator::onCurveLodTimer);
 
-    // 单次定时器触发完就停了：把「续跑」能力注入 CurveLodManager，
+    // 单次定时器触发完就停了：把「续跑」能力注入 RenderSubmitScheduler，
     // 让它在批次未消费完、finishQueue 重收集等内部路径上都能真正重启定时器。
     // 这是修复「队列 > 2000 时只消费一批就停住」的关键——旧实现里
-    // CurveLodManager::ensurePump() 是空函数，定时器永远不会被再次唤醒。
-    m_curveLodManager.setPumpCallback([this]() { ensureCurveLodPump(); });
+    // RenderSubmitScheduler::ensurePump() 是空函数，定时器永远不会被再次唤醒。
+    m_submitScheduler.setPumpCallback([this]() { ensureCurveLodPump(); });
 
     // 「选中时隐藏本体」的判定实时求值：管理器不持有选中集/开关副本，
     // 避免拖动强制显示、轮廓预算翻转等路径漏同步导致选中本体被 LOD 重新画回。
-    m_curveLodManager.setSelectionHiddenPredicate([this](uint64_t uid) {
+    m_submitScheduler.setSelectionHiddenPredicate([this](uint64_t uid) {
         return hideSelectedEffective() && m_cachedSelectedIds.count(uid) > 0;
     });
 }
@@ -128,7 +128,7 @@ void SceneRefreshCoordinator::setRenderWidget(RenderWidget* widget)
     // 拆分出的三个辅助类各自持有 widget 指针，同步更新
     m_bitmapReconciler.setRenderWidget(widget);
     m_textReconciler.setRenderWidget(widget);
-    m_curveLodManager.setRenderWidget(widget);
+    m_submitScheduler.setRenderWidget(widget);
     // 反向注入：视口内部的覆盖层 / 位图 / 文字 / 视图矩阵这几类刷新
     // 原来是裸调 update() 完全绕过调度器的，注入后统一经 requestRepaint() 汇入。
     // 这是「所有 2D 刷新来源都能从 pendingLevel() 推理」的前提。
@@ -148,10 +148,10 @@ void SceneRefreshCoordinator::setSceneContext(Eg::ISceneContext* ctx)
         m_sceneManager->removeObserver(this);
     }
     m_sceneManager = static_cast<Eg::SceneManager*>(ctx);
-    m_curveLodManager.setSceneManager(m_sceneManager);
+    m_submitScheduler.setSceneManager(m_sceneManager);
     // 场景切换后旧队列里的实体 ID 已不属于当前场景，直接丢弃；
     // 新场景由随后的全量刷新按当前缩放重新装配。
-    m_curveLodManager.clearQueue();
+    m_submitScheduler.clearQueue();
 
     // 同步当前选中集缓存：场景可能带着已有选中集被 attach，后续 LOD 的
     // 「隐藏选中本体」过滤与增量刷新都要用这份快照。不在这里建立的话，
@@ -219,7 +219,7 @@ void SceneRefreshCoordinator::stop()
         m_curveLodTimer->stop();
     }
     // 停止后不再有消费泵：残留队列必须清掉，避免下次 attach 时消费过期 ID。
-    m_curveLodManager.clearQueue();
+    m_submitScheduler.clearQueue();
     // 观察者注销 — 在 stop() 中统一处理，避免析构时 SceneManager 已销毁（UAF）
     if (m_sceneManager)
     {
@@ -466,7 +466,7 @@ void SceneRefreshCoordinator::applyLayerVisibilityChanged(int layerId, bool visi
     m_bitmapReconciler.reconcile(m_sceneManager, false, m_cachedSelectedIds, hideSelected, noDirty);
     m_textReconciler.reconcile(m_sceneManager, false, m_cachedSelectedIds, hideSelected, noDirty);
 
-    // 隐藏图层的曲线不再参与 LOD 收集：CurveLodManager 的 isRenderable 已按图层可见性过滤，
+    // 隐藏图层的曲线不再参与 LOD 收集：RenderSubmitScheduler 的 isRenderable 已按图层可见性过滤，
     // 队列里残留的条目在消费时会被跳过，这里不需要额外清理队列（清了反而会让下一次
     // 收集从头扫一遍）。
 
@@ -492,10 +492,10 @@ void SceneRefreshCoordinator::ensureCurveLodPump()
     }
 }
 
-// LOD 定时器 slot：执行一批；队列未空时由 CurveLodManager 的 pump 回调续跑。
+// LOD 定时器 slot：执行一批；队列未空时由 RenderSubmitScheduler 的 pump 回调续跑。
 void SceneRefreshCoordinator::onCurveLodTimer()
 {
-    if (m_curveLodManager.empty())
+    if (m_submitScheduler.empty())
     {
         finishCurveLodQueue();
         return;
@@ -508,7 +508,7 @@ void SceneRefreshCoordinator::finishCurveLodQueue()
 {
     // finishQueue 内部会处理「排队期间又要求重新收集」的待办；重收集出的
     // 新队列会通过注入的 pump 回调自行重启定时器，这里无需再重复判断。
-    m_curveLodManager.finishQueue();
+    m_submitScheduler.finishQueue();
 }
 
 void SceneRefreshCoordinator::requestCurveLodRefresh()
@@ -518,10 +518,10 @@ void SceneRefreshCoordinator::requestCurveLodRefresh()
         return;
     }
 
-    // 过期判据与队列收集的语义已整体移交 CurveLodManager。
+    // 过期判据与队列收集的语义已整体移交 RenderSubmitScheduler。
     // 队列未排空时它只记待办不打断批次；排空后由 finishCurveLodQueue 重新评估。
-    m_curveLodManager.requestRefresh();
-    if (!m_curveLodManager.empty())
+    m_submitScheduler.requestRefresh();
+    if (!m_submitScheduler.empty())
     {
         ensureCurveLodPump();
     }
@@ -544,15 +544,161 @@ void SceneRefreshCoordinator::requestViewportRefresh()
                 static_cast<double>(bounds[1]),
                 static_cast<double>(bounds[2]),
                 static_cast<double>(bounds[3]));
-            if (!m_builtVisibleBox.isValid() || !m_builtVisibleBox.contains(visibleBox))
+            if (!m_builtVisibleBox.isValid())
             {
+                // 尚未装配过（首载 / 换场景后）：无账本可做差分，走全量重建建立初始覆盖
                 requestFullRefresh();
+                return;
+            }
+            if (!m_builtVisibleBox.contains(visibleBox))
+            {
+                // 已装配过但相机移出覆盖范围（平移 / 缩小）：增量补入 + 回收，
+                // 替代原先「移出即整场景全量重建」—— 这是缩放卡顿的主因。
+                requestViewportExtension();
                 return;
             }
         }
     }
 
     requestCurveLodRefresh();
+}
+
+// 相机移出已装配范围时的增量对账：以新可视盒（含 1.25 倍余量）为准，
+// 与已渲染账本做差分 —— 补新进视野的图元、回收移出视野的图元，
+// 跨多帧由扩展队列消费，避免一次性同步重建整份场景（消除缩放卡顿）。
+void SceneRefreshCoordinator::requestViewportExtension()
+{
+    if (!m_sceneManager || !m_renderWidget)
+    {
+        return;
+    }
+
+    const Ut::BBox2d newBox = expandedVisibleBox();
+    if (!newBox.isValid())
+    {
+        // 矩阵退化拿不到可视盒：无法做范围差分，退回全量重建兜底
+        requestFullRefresh();
+        return;
+    }
+
+    // 目标可见集：与全量账本收集共用同一判据（collectDesiredGeometryIds → isDesiredOnGeometryLayer）
+    const bool hideSelected = hideSelectedEffective();
+    std::unordered_set<uint64_t> inBox;
+    collectDesiredGeometryIds(newBox, hideSelected, inBox);
+
+    // 回收：账本里已不在新覆盖盒内的图元（平移/缩小移出视野）。增量补入只增不减，
+    // 若不回收，长时间平移会让 GPU 几何无限增长 —— 这是替代全量重建必须补上的一环。
+    std::vector<uint64_t> toRemove;
+    for (uint64_t uid : m_renderedEntityIds)
+    {
+        if (inBox.find(uid) == inBox.end())
+        {
+            toRemove.push_back(uid);
+        }
+    }
+    if (!toRemove.empty())
+    {
+        m_renderWidget->removeRenderEntities(toRemove);
+        for (uint64_t uid : toRemove)
+        {
+            m_renderedEntityIds.erase(uid);
+        }
+    }
+
+    // 补入：在新覆盖盒内但尚未上 GPU 的图元 —— 交给扩展队列按批跨帧消费
+    std::vector<uint64_t> toAdd;
+    toAdd.reserve(inBox.size());
+    for (uint64_t uid : inBox)
+    {
+        if (m_renderedEntityIds.find(uid) == m_renderedEntityIds.end())
+        {
+            toAdd.push_back(uid);
+        }
+    }
+
+    // 每轮对账按当前账本/覆盖盒重算扩展队列：清掉上一轮未消费的过期 ID，
+    // 避免快速缩放时队列反复累积重复项。
+    m_submitScheduler.clearExtensionQueue();
+
+    // 记录新的已覆盖盒并清掉作废的旧 LOD 队列（缩放基准不动，见方法说明）
+    m_submitScheduler.markViewportReconciled(newBox);
+
+    // 覆盖盒前移到本轮对账目标：期间相机若再移出会重新触发对账（安全：重算差分即可）
+    m_builtVisibleBox = newBox;
+
+    if (!toAdd.empty())
+    {
+        m_submitScheduler.enqueueViewportExtension(toAdd);
+        ensureCurveLodPump();
+    }
+}
+
+// 「谁该在几何 GPU 层」的唯一判据 —— 全量账本收集与视口增量对账共用。
+// 判据与 gatherGeometry（SceneManager::gatherGeometry）严格对齐：
+//   几何非法 / 无图层 / 图层隐藏 / 本体隐藏 / bbox 无效 都不上 GPU。
+// isValid() 必须与空间索引 isIndexableEntity 一致：非法几何不在索引里，
+// 若 GPU 仍渲染，queryByBox 账本会漏记。旧实现「layer==null 也入账、bbox 无效也入账」
+// 会把 GPU 上不存在的图元记进账本，增量路径对账时可能误走 modifyRenderEntity。
+bool SceneRefreshCoordinator::isDesiredOnGeometryLayer(const Eg::SyEntity* e, bool hideSelected) const
+{
+    if (!e || !e->visible() || !e->isValid())
+    {
+        return false;
+    }
+    const Eg::SyLayer* layer = e->layer();
+    if (!layer || !layer->isVisible())
+    {
+        return false;
+    }
+    if (!e->getBbox().isValid())
+    {
+        return false;
+    }
+    // 「选中时隐藏本体」：选中集里的本体不入几何层（由虚线轮廓覆盖层表达）
+    if (hideSelected && m_cachedSelectedIds.count(static_cast<uint64_t>(e->id)))
+    {
+        return false;
+    }
+    return true;
+}
+
+// 当前可视世界盒按 cull 余量外扩；矩阵退化（拿不到可视盒）返回无效盒。
+Ut::BBox2d SceneRefreshCoordinator::expandedVisibleBox() const
+{
+    if (!m_renderWidget)
+    {
+        return Ut::BBox2d{};
+    }
+    float bounds[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    if (!m_renderWidget->visibleWorldBounds(bounds))
+    {
+        return Ut::BBox2d{};
+    }
+    constexpr double kCullMargin = 1.25;
+    const double cx = 0.5 * (static_cast<double>(bounds[0]) + bounds[2]);
+    const double cy = 0.5 * (static_cast<double>(bounds[1]) + bounds[3]);
+    const double hw = 0.5 * (bounds[2] - bounds[0]) * kCullMargin;
+    const double hh = 0.5 * (bounds[3] - bounds[1]) * kCullMargin;
+    return Ut::BBox2d(cx - hw, cy - hh, cx + hw, cy + hh);
+}
+
+// 收集 box 内所有应上几何层的图元 ID：RTree 范围查询 O(log n + k) + 统一判据。
+void SceneRefreshCoordinator::collectDesiredGeometryIds(const Ut::BBox2d& box, bool hideSelected,
+    std::unordered_set<uint64_t>& out) const
+{
+    if (!m_sceneManager)
+    {
+        return;
+    }
+    const Eg::VecSyEntityPtr candidates = m_sceneManager->queryByBox(box, /*containedOnly=*/false);
+    out.reserve(out.size() + candidates.size());
+    for (Eg::SyEntity* e : candidates)
+    {
+        if (isDesiredOnGeometryLayer(e, hideSelected))
+        {
+            out.insert(static_cast<uint64_t>(e->id));
+        }
+    }
 }
 
 // 场景变更通知入口
@@ -1048,10 +1194,10 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
 
 void SceneRefreshCoordinator::processCurveLodBatch()
 {
-    // 批量重建 + GL 上下文管理 + 账本写回已整体移交 CurveLodManager。
+    // 批量重建 + GL 上下文管理 + 账本写回已整体移交 RenderSubmitScheduler。
     // 批次未消费完时，它通过构造时注入的 pump 回调重启本类的 LOD 定时器；
     // 单次定时器触发完不会自己续跑，续跑责任必须在管理器内部闭环。
-    m_curveLodManager.processBatch(m_renderedEntityIds);
+    m_submitScheduler.processBatch(m_renderedEntityIds);
 }
 
 void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
@@ -1100,60 +1246,26 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     // 视口内图元；视口外图元已被 RenderSceneBuilder::endRebuild 回收。
     // 因此账本只记视口内已提交的图元：视口外图元不入账，下次它们出现在脏集合时，
     // 增量路径会走 addRenderEntity 补传，而不是误用 modifyRenderEntity（找不到 GPU 块）。
-    Ut::BBox2d accountBox;
-    bool hasAccountBox = false;
-    {
-        float bounds[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        if (m_renderWidget->visibleWorldBounds(bounds))
-        {
-            constexpr double kCullMargin = 1.25;
-            const double cx = 0.5 * (static_cast<double>(bounds[0]) + bounds[2]);
-            const double cy = 0.5 * (static_cast<double>(bounds[1]) + bounds[3]);
-            const double hw = 0.5 * (bounds[2] - bounds[0]) * kCullMargin;
-            const double hh = 0.5 * (bounds[3] - bounds[1]) * kCullMargin;
-            accountBox = Ut::BBox2d(cx - hw, cy - hh, cx + hw, cy + hh);
-            hasAccountBox = true;
-        }
-    }
+    const Ut::BBox2d accountBox = expandedVisibleBox();
+    const bool hasAccountBox = accountBox.isValid();
 
-    // 过滤条件与 gatherGeometry（SceneManager::gatherGeometry）严格对齐：
-    // 几何非法 / 无图层 / 图层隐藏 / 本体隐藏 / bbox 无效 / 视口裁剪的图元都不会上 GPU，也就不入账。
-    // 旧实现「layer==null 也入账、bbox 无效也入账」会把 GPU 上不存在的图元记进账本，
-    // 增量路径对账时可能误走 modifyRenderEntity。
-    // isValid() 必须与空间索引 isIndexableEntity 一致：非法几何不在索引里，
-    // 若 GPU 仍渲染（旧 gatherGeometry 不查 isValid），queryByBox 账本会漏记。
-    auto accountEntity = [this, hideSelected, &selectedIds](Eg::SyEntity* e) {
-        if (!e || !e->visible())
-            return;
-        if (!e->isValid())
-            return;
-        const Eg::SyLayer* layer = e->layer();
-        if (!layer || !layer->isVisible())
-            return;
-        if (!e->getBbox().isValid())
-            return;
-        auto uid = static_cast<uint64_t>(e->id);
-        if (hideSelected && selectedIds.count(uid))
-            return;  // 隐藏选中图元已从 GPU 移除，不入账
-        m_renderedEntityIds.insert(uid);
-    };
-
+    // 目标账本集合 = 当前可见盒内所有应上几何层的图元，判据与 gatherGeometry 严格对齐
+    //（统一收敛到 collectDesiredGeometryIds → isDesiredOnGeometryLayer）。
     if (hasAccountBox)
     {
-        // 视口裁剪走空间索引：RTree 范围查询 O(log n + k)，避免全场景 O(N) 扫描。
-        // queryByBox 用索引缓存的 AABB 判相交（查询前 flush 待修索引），与
-        // gatherGeometry 的 getBbox()+intersects 等价；无效 bbox 图元不在索引里，天然跳过。
         m_builtVisibleBox = accountBox;
-        const Eg::VecSyEntityPtr candidates = sm->queryByBox(accountBox, /*containedOnly=*/false);
-        for (Eg::SyEntity* e : candidates)
-        {
-            accountEntity(e);
-        }
+        collectDesiredGeometryIds(accountBox, hideSelected, m_renderedEntityIds);
     }
     else
     {
-        // 矩阵退化拿不到视口盒时退化为全量遍历（与 gatherGeometry 无裁剪分支一致）
-        sm->forEachEntity(accountEntity);
+        // 矩阵退化拿不到视口盒时退化为全量遍历（与 gatherGeometry 无裁剪分支一致）。
+        // 逐图元判据与 collectDesiredGeometryIds 同源。
+        sm->forEachEntity([this, hideSelected](Eg::SyEntity* e) {
+            if (isDesiredOnGeometryLayer(e, hideSelected))
+            {
+                m_renderedEntityIds.insert(static_cast<uint64_t>(e->id));
+            }
+        });
         // 矩阵退化时没有裁剪范围，重置账本无效
         m_builtVisibleBox = Ut::BBox2d{};
     }
@@ -1176,7 +1288,7 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     // 就此作废：重新锚定缩放基准（否则下一帧拿旧基准比较会白白重收集一次），
     // 并把区域记录置为无效 —— 全场景都已是当前精度，平移不需要再补收集。
     const float pxToWorldNow = m_renderWidget->pixelToWorldScale();
-    m_curveLodManager.clearAfterFullRefresh(pxToWorldNow > 0.0f ? 1.0 / static_cast<double>(pxToWorldNow) : 0.0);
+    m_submitScheduler.clearAfterFullRefresh(pxToWorldNow > 0.0f ? 1.0 / static_cast<double>(pxToWorldNow) : 0.0);
 
     // 位图层全量协调：submitSceneFromDataSource 内部 renderBeginScene 已清空 GPU 位图，
     // 这里以场景为真源整体重建，保证与场景生命周期完全一致
@@ -1196,7 +1308,7 @@ void SceneRefreshCoordinator::updateSceneRender()
         return;
     }
 
-    if (!m_renderWidget || (m_refreshLevel == RefreshLevel::None && m_curveLodManager.empty()))
+    if (!m_renderWidget || (m_refreshLevel == RefreshLevel::None && m_submitScheduler.empty()))
     {
         return;
     }
@@ -1226,12 +1338,12 @@ void SceneRefreshCoordinator::updateSceneRender()
     // 此时 LOD 队列里的旧任务确实已过期。
     // 增量刷新（LightUpdate / Selection / Repaint）只更新脏图元，未变更的曲线图元
     // 仍保持旧 LOD 精度，需要保留队列继续分批重建。否则会出现"部分曲线永久低精度"——
-    // 因为 CurveLodManager 的缩放基准已被更新为新缩放值，后续不会再触发 LOD 重建。
+    // 因为 RenderSubmitScheduler 的缩放基准已被更新为新缩放值，后续不会再触发 LOD 重建。
     // 注意：applyFullRefresh 内部已按当前缩放重新锚定基准，这里只需在未走到全量
     // 路径时兜底清空（例如全量被 isInitialized 提前返回的那一帧）。
-    if (m_refreshLevel == RefreshLevel::FullRefresh && !m_curveLodManager.empty())
+    if (m_refreshLevel == RefreshLevel::FullRefresh && !m_submitScheduler.empty())
     {
-        m_curveLodManager.clearQueue();
+        m_submitScheduler.clearQueue();
     }
 
     RefreshLevel level = m_refreshLevel;
@@ -1241,7 +1353,7 @@ void SceneRefreshCoordinator::updateSceneRender()
     {
         applyRepaintRefresh();
         // 场景刷新帧顺带推进 LOD 一次，独立定时器负责持续续跑
-        if (!m_curveLodManager.empty())
+        if (!m_submitScheduler.empty())
         {
             processCurveLodBatch();
         }
@@ -1289,7 +1401,7 @@ void SceneRefreshCoordinator::updateSceneRender()
     // 这里额外推进一次是为了利用"场景刷新已经切过 GL 上下文"的时机，
     // 减少单独触发时的上下文切换开销。processBatch 内部有剩余时
     // 会通过注入的 pump 回调续跑独立定时器。
-    if (!m_curveLodManager.empty())
+    if (!m_submitScheduler.empty())
     {
         processCurveLodBatch();
     }

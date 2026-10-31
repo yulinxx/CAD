@@ -357,7 +357,8 @@ void setVisible(bool visible) override {
 **问题**：场景更新定时器（16ms）同时用于 LOD 消费时，Repaint 级别会占用该定时器，
 导致 LOD 队列永久搁浅。
 
-**方案**：新增独立的 `m_curveLodTimer`（32ms 单次触发），与场景更新定时器完全解耦：
+**方案**：新增独立的 `m_curveLodTimer`（单次触发，间隔 = `RenderSubmitScheduler::kPumpIntervalMs` = 32ms），
+与场景更新定时器完全解耦：
 
 - 场景操作密集时两个定时器互不干扰，LOD 分批能稳定每 32ms 推进一次；
 - `ensureCurveLodPump()` 启动独立的 LOD 定时器；
@@ -368,12 +369,12 @@ void setVisible(bool visible) override {
 **问题**：降级阈值过大时，缩小视图会让图元长期携带高精度顶点，GPU 绘制冗余大量顶点
 （例如 256 段圆只需 8 段时的冗余是 32 倍）。
 
-**方案**：降级阈值取 2.0：
+**方案**：降级阈值取 2.0（常量收敛在 `RenderSubmitScheduler`，判据为其纯函数 `isScaleStale`）：
 
-- 放大升级阈值保持 1.3 倍；
-- 缩小降级阈值调整为 2.0 倍；
+- 放大升级阈值保持 1.3 倍（`kLodUpgradeRatio`）；
+- 缩小降级阈值调整为 2.0 倍（`kLodDowngradeRatio`）；
 - 2.0 在抖动和冗余顶点之间取得更好的平衡：
-  - 视口裁剪（1.25 倍余量）已保证平移时小幅缩小不触发重收集；
+  - 视口裁剪（`kCollectBoxMargin = 1.25` 倍余量）已保证平移时小幅缩小不触发重收集；
   - 配合容差公式修复（max(1e-6)），每次降级的重建代价本身也更小。
 
 ### 5.7 视口裁剪优化

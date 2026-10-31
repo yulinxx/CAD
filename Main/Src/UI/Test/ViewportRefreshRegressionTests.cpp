@@ -15,6 +15,7 @@
 #include <gtest/gtest.h>
 
 #include "UI/Render/SceneRefreshCoordinator.h"
+#include "UI/Render/RenderSubmitScheduler.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/SyEntity/SyCircle.h"
 #include "Engine2D/SyEntity/SyLine.h"
@@ -1014,7 +1015,7 @@ TEST(RefreshPathRegressionTest, RepaintAfterFullRefresh_NoDowngrade)
 
 // ==================== 曲线 LOD 消费泵回归 ====================
 
-// 背景（缺陷）：CurveLodManager 拆分后，32ms 的 LOD 定时器是单次的，
+// 背景（缺陷）：RenderSubmitScheduler 拆分后，32ms 的 LOD 定时器是单次的，
 // 而 ensurePump() 是空实现，定时器触发一次后不再续跑。
 // 队列超过单批 2000 个图元时，剩余图元永远停在低精度 ——
 // 用户看到的现象就是「超大文件放大后，曲线仍然粗糙」。
@@ -1104,4 +1105,177 @@ TEST(CurveLodSelectionRegressionTest, HiddenSelectedEntityNotQueued)
         << "隐藏中的选中图元被重新排进 LOD 队列，缩放后本体会重新出现";
 
     coordinator.stop();
+}
+
+// ==================== RenderSubmitScheduler 行为回归 ====================
+//
+// 调参常量与缩放滞后判据已收敛到 RenderSubmitScheduler：
+// isScaleStale 是纯函数，队列行为通过 setSubmitBatchCallback 缝隙无 GL 直测。
+
+// 缩放滞后判据：首次必过期；放大 > kLodUpgradeRatio 或缩小 > kLodDowngradeRatio
+// 才过期，两个阈值之间是防抖死区（避免滚轮微操反复重收集）。
+TEST(RenderSubmitSchedulerTest, ScaleHysteresis)
+{
+    // 首次（还没有缩放基准）必过期
+    EXPECT_TRUE(RenderSubmitScheduler::isScaleStale(1.0, 0.0));
+    // 放大 1.2 倍：未到升级阈值，死区内不过期
+    EXPECT_FALSE(RenderSubmitScheduler::isScaleStale(1.2, 1.0));
+    // 放大 1.31 倍：超过升级阈值，过期
+    EXPECT_TRUE(RenderSubmitScheduler::isScaleStale(1.31, 1.0));
+    // 缩小到 0.6 倍：未到降级阈值（2 倍），死区内不过期
+    EXPECT_FALSE(RenderSubmitScheduler::isScaleStale(0.6, 1.0));
+    // 缩小到 0.49 倍：超过降级阈值，过期
+    EXPECT_TRUE(RenderSubmitScheduler::isScaleStale(0.49, 1.0));
+}
+
+// 缩放连续触发（滚轮/拖拽每帧都变）时，requestRefresh 不得重置队列进度：
+// 队列未消费完只记 recollectPending，第二批必须恰好是剩余部分，
+// 而不是被重新收集后从头再提交（旧根因：放大后精度一直停留低档）。
+TEST(RenderSubmitSchedulerTest, ContinuousRequestKeepsQueueProgress)
+{
+    Eg::SceneManager scene;
+
+    // 2501 个圆：首批 2000（默认自适应批量），余 501 个必须由第二批原样续上
+    constexpr int kCircleCount = 2501;
+    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    entities.reserve(kCircleCount);
+    for (int i = 0; i < kCircleCount; ++i)
+    {
+        auto circle = std::make_unique<Eg::SyCircle>();
+        circle->basePoint = Ut::Vec2d((i % 80) * 10.0 - 400.0, ((i / 80) % 60) * 10.0 - 300.0);
+        circle->dRadius = 1.0;
+        entities.push_back(std::move(circle));
+    }
+    scene.addEntities(std::move(entities));
+    ASSERT_EQ(scene.getEntityCount(), static_cast<size_t>(kCircleCount));
+
+    RenderWidget widget;
+    widget.resize(800, 600);
+
+    RenderSubmitScheduler scheduler(&widget);
+    scheduler.setSceneManager(&scene);
+    scheduler.setPumpCallback([]() {});
+
+    std::vector<std::vector<uint64_t>> batches;
+    scheduler.setSubmitBatchCallback([&batches](const std::vector<uint64_t>& batch) {
+        batches.push_back(batch);
+        return true;
+    });
+
+    std::unordered_set<uint64_t> renderedIds;
+
+    // 首次收集：视口 1.25 倍余量覆盖测试坐标，全部曲线入队
+    scheduler.requestRefresh();
+    ASSERT_EQ(scheduler.size(), static_cast<size_t>(kCircleCount));
+
+    scheduler.processBatch(renderedIds);
+    ASSERT_EQ(batches.size(), 1u);
+    EXPECT_EQ(batches[0].size(), 2000u);
+
+    // 连续缩放事件：队列未消费完时再次请求
+    scheduler.requestRefresh();
+    // 若错误地清队列重新收集，size 会回到 kCircleCount 而不是剩余量
+    EXPECT_EQ(scheduler.size(), static_cast<size_t>(kCircleCount));
+
+    scheduler.processBatch(renderedIds);
+    ASSERT_EQ(batches.size(), 2u);
+    // 恰为剩余 501 个：进度未被重置、未重新收集
+    EXPECT_EQ(batches[1].size(), 501u) << "第二批不是剩余部分，队列进度被重置或重新收集了";
+    // 两批无重叠：ID 不会被重复提交
+    const std::unordered_set<uint64_t> firstBatch(batches[0].begin(), batches[0].end());
+    for (uint64_t uid : batches[1])
+    {
+        EXPECT_EQ(firstBatch.count(uid), 0u) << "第二批重复提交了首批的图元";
+    }
+    EXPECT_EQ(scheduler.processedBatchCount(), 2u);
+    EXPECT_TRUE(scheduler.empty());
+    EXPECT_EQ(renderedIds.size(), static_cast<size_t>(kCircleCount));
+}
+
+// 双队列消费顺序：视口扩展队列（画面缺块）优先于 LOD 队列（精度更新）。
+// LINE 不是 LOD 类型，只能从扩展队列进；圆走 LOD 队列。
+TEST(RenderSubmitSchedulerTest, ExtensionQueueConsumedBeforeLodQueue)
+{
+    Eg::SceneManager scene;
+
+    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    for (int i = 0; i < 3; ++i)
+    {
+        auto line = std::make_unique<Eg::SyLine>();
+        line->setPointVector({ Ut::Vec2d(-30.0 + 10.0 * i, -20.0), Ut::Vec2d(-30.0 + 10.0 * i, 20.0) });
+        entities.push_back(std::move(line));
+    }
+    for (int i = 0; i < 3; ++i)
+    {
+        auto circle = std::make_unique<Eg::SyCircle>();
+        circle->basePoint = Ut::Vec2d(-30.0 + 30.0 * i, 0.0);
+        circle->dRadius = 5.0;
+        entities.push_back(std::move(circle));
+    }
+    scene.addEntities(std::move(entities));
+    ASSERT_EQ(scene.getEntityCount(), 6u);
+
+    // 从场景取持久 id：LINE 与 CIRCLE 各 3 个
+    std::vector<uint64_t> lineIds;
+    std::vector<uint64_t> circleIds;
+    for (const Eg::SyEntity* entity : scene.getAllEntities())
+    {
+        if (entity->eType == Eg::EType::LINE)
+        {
+            lineIds.push_back(static_cast<uint64_t>(entity->id));
+        }
+        else
+        {
+            circleIds.push_back(static_cast<uint64_t>(entity->id));
+        }
+    }
+    ASSERT_EQ(lineIds.size(), 3u);
+    ASSERT_EQ(circleIds.size(), 3u);
+
+    RenderWidget widget;
+    widget.resize(800, 600);
+
+    RenderSubmitScheduler scheduler(&widget);
+    scheduler.setSceneManager(&scene);
+    scheduler.setPumpCallback([]() {});
+
+    std::vector<std::vector<uint64_t>> batches;
+    scheduler.setSubmitBatchCallback([&batches](const std::vector<uint64_t>& batch) {
+        batches.push_back(batch);
+        return true;
+    });
+
+    // 直线先进扩展队列（新进视野、从未上 GPU）；圆由 LOD 收集进精度队列
+    scheduler.enqueueViewportExtension(lineIds);
+    scheduler.requestRefresh();
+    ASSERT_EQ(scheduler.size(), 6u);
+
+    std::unordered_set<uint64_t> renderedIds;
+    scheduler.processBatch(renderedIds);
+
+    // 批次小（6 个），一次 processBatch 应全部消费
+    ASSERT_EQ(batches.size(), 1u);
+    const std::vector<uint64_t>& batch = batches[0];
+    ASSERT_EQ(batch.size(), 6u);
+    // 前 3 个是扩展队列的直线（保持入队顺序）：扩展优先
+    for (size_t i = 0; i < lineIds.size(); ++i)
+    {
+        EXPECT_EQ(batch[i], lineIds[i]) << "扩展队列未优先消费，画面缺块会晚于精度更新";
+    }
+    // 后 3 个是 LOD 队列的圆（收集顺序不保证，按集合比较）
+    const std::unordered_set<uint64_t> circleBatch(batch.begin() + 3, batch.end());
+    for (uint64_t uid : circleIds)
+    {
+        EXPECT_EQ(circleBatch.count(uid), 1u);
+    }
+    // 账本包含全部 6 个
+    for (uint64_t uid : lineIds)
+    {
+        EXPECT_EQ(renderedIds.count(uid), 1u);
+    }
+    for (uint64_t uid : circleIds)
+    {
+        EXPECT_EQ(renderedIds.count(uid), 1u);
+    }
+    EXPECT_TRUE(scheduler.empty());
 }
