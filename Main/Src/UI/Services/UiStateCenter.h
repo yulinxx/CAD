@@ -2,7 +2,11 @@
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QVariantMap>
+#include <QHash>
+
+#include <functional>
 
 /**
  * @file UiStateCenter.h
@@ -46,8 +50,11 @@ struct UiStateSnapshot
     QString currentSelectionType{ QStringLiteral("none") };
     /// 是否繁忙
     bool busy{ false };
-    /// 是否有未保存更改
+    /// 是否有未保存更改（任一文档，用于关闭/新建前的提示）
     bool dirty{ false };
+    /// 当前工作台文档是否已修改（用于标题 "*"）
+    /// 两值由 refreshDirty() 依据各工作台探针一并重算
+    bool activeDocDirty{ false };
     /// 当前任务进度 (0-100)，-1 表示无进行中的任务
     int progress{ -1 };
     /// 当前状态提示（用于命令引导、导入导出提示等展示文本）
@@ -87,8 +94,24 @@ public:
     /// 获取当前图层 ID
     QString currentLayerId() const;
 
-    /// 是否有未保存更改
+    /// 是否有未保存更改（任一文档）
     bool dirty() const;
+
+    /// 当前工作台文档是否已修改
+    bool activeDocDirty() const;
+
+    /// 当前**存在未保存更改**的工作台 ID 列表（逐台回读探针，结果实时非缓存）。
+    /// 关闭窗口时用它逐台保存 —— 只保存活跃台会静默丢弃另一台的未存更改。
+    QStringList dirtyWorkbenchIds() const;
+
+    /// 依据已注册的探针重算 dirty（任一文档）与 activeDocDirty（当前工作台文档）。
+    /// 文档脏状态变化后调用；两值均无变化时不发信号。
+    void refreshDirty();
+
+    /// 注册某工作台的文档脏标记探针（由装配处注入）
+    /// @param workbenchId 工作台 ID，与 setCurrentWorkbenchId 的取值一致
+    /// @param probe 返回该工作台文档是否有未保存更改
+    void registerDirtyProbe(const QString& workbenchId, std::function<bool()> probe);
 
     /// 获取当前任务进度 (-1 表示无任务)
     int progress() const;
@@ -145,10 +168,6 @@ public slots:
     /// 计数式繁忙：pushBusy/popBusy 配对使用，仅 0↔1 时触发信号
     void pushBusy();
     void popBusy();
-
-    /// 设置脏状态
-    /// @param dirty 是否有未保存更改
-    void setDirty(bool dirty);
 
     /// 设置元数据（合并语义：单键更新，保留其它键）
     /// @param key 键
@@ -219,6 +238,7 @@ private:
         QString commandType{ QStringLiteral("none") };
         int busyCount{ 0 };  ///< 计数式繁忙：0=空闲，>0=繁忙
         bool dirty{ false };
+        bool activeDocDirty{ false };  ///< 当前工作台文档脏（标题 "*"）；dirty 为任一文档
         int progress{ -1 };  ///< (0-100)，-1 表示无进行中的任务
         QString statusPrompt;
     };
@@ -243,4 +263,7 @@ private:
     CommandState m_command;
     ViewState m_view;
     SelectionState m_selection;
+
+    /// 各工作台文档脏标记探针（key=工作台 ID）；由装配处注入
+    QHash<QString, std::function<bool()>> m_dirtyProbes;
 };

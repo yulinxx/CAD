@@ -210,6 +210,34 @@ QString Workbench2D::commandText(const QString& commandId) const
     return entry && entry->text ? QString::fromUtf8(entry->text) : QString();
 }
 
+Cmd::OperationResultBase Workbench2D::dispatchCommandForResult(const QString& commandId, const QVariantMap& params)
+{
+    Cmd::OperationResultBase result;
+    if (!m_commands.operationBus)
+    {
+        SY_WARNF("[Workbench2D] Cannot dispatch command without OperationBus: %s", qPrintable(commandId));
+        result.message = QStringLiteral("No OperationBus for %1").arg(commandId);
+        return result;
+    }
+
+    const OperationId operation = CommandCatalog::operationForCommandId(commandId);
+    if (operation == OperationId::None)
+    {
+        SY_WARNF("[Workbench2D] Unknown command: %s", qPrintable(commandId));
+        result.message = QStringLiteral("Unknown command: %1").arg(commandId);
+        return result;
+    }
+
+    SY_DEBUGF("[Workbench2D] Dispatch command with result='%s'", qPrintable(commandId));
+    return m_commands.operationBus->run(operation, params, OperationSource::Menu);
+}
+
+bool Workbench2D::hasUnsavedChanges() const
+{
+    // 引擎 SceneManager 是 2D 文档脏标记的唯一事实源（SceneDocument2D::isModified 也回读它）
+    return m_scene.document2D ? m_scene.document2D->isModified() : false;
+}
+
 Workbench2D::Workbench2D() = default;
 Workbench2D::~Workbench2D() = default;
 

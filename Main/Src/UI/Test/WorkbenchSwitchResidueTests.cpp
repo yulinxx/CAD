@@ -45,6 +45,9 @@
 #include "UI/Workbench/UiWorkbench.h"
 #include "UI/Workbench/WorkbenchWindow.h"
 
+#include "Composition/OpRegistryTypes.h"
+#include "UI2D/Operation/OperationBus.h"
+
 #include "RenderViewport2D.h"
 #include "UI/Render/Camera2D.h"
 
@@ -377,6 +380,170 @@ TEST(WorkbenchSwitchResidueTest, TwoDimensionalCameraStateSurvivesViewportRecrea
     EXPECT_FLOAT_EQ(restored.zoomY, 2.5f);
     EXPECT_DOUBLE_EQ(restored.panOffset.x(), -123.0);
     EXPECT_DOUBLE_EQ(restored.panOffset.y(), -456.0);
+}
+
+// ==================== 脏标记：dirty(任一) 与 activeDocDirty(当前台) 分离 ====================
+
+TEST(WorkbenchSwitchResidueTest, DirtyProbeSeparatesAnyDirtyFromActiveWorkbenchDirty)
+{
+    ensureApplication();
+
+    UiStateCenter stateCenter;
+    bool dirty2D = false;
+    bool dirty3D = false;
+    stateCenter.registerDirtyProbe(QStringLiteral("2D"), [&] { return dirty2D; });
+    stateCenter.registerDirtyProbe(QStringLiteral("3D"), [&] { return dirty3D; });
+    stateCenter.setCurrentWorkbenchId(QStringLiteral("2D"));
+
+    // 两台都干净
+    stateCenter.refreshDirty();
+    EXPECT_FALSE(stateCenter.dirty());
+    EXPECT_FALSE(stateCenter.activeDocDirty());
+
+    // 只有 3D 脏：关闭提示要看到它（dirty=任一），但 2D 标题不能挂 *
+    dirty3D = true;
+    stateCenter.refreshDirty();
+    EXPECT_TRUE(stateCenter.dirty());
+    EXPECT_FALSE(stateCenter.activeDocDirty());
+
+    // 当前台也脏：标题才带 *
+    dirty2D = true;
+    stateCenter.refreshDirty();
+    EXPECT_TRUE(stateCenter.dirty());
+    EXPECT_TRUE(stateCenter.activeDocDirty());
+
+    // 当前台存盘、另一台仍脏：* 消失，关闭提示保留
+    dirty2D = false;
+    stateCenter.refreshDirty();
+    EXPECT_TRUE(stateCenter.dirty());
+    EXPECT_FALSE(stateCenter.activeDocDirty());
+}
+
+TEST(WorkbenchSwitchResidueTest, ActiveDocDirtyFollowsCurrentWorkbench)
+{
+    ensureApplication();
+
+    UiStateCenter stateCenter;
+    bool dirty2D = false;
+    bool dirty3D = false;
+    stateCenter.registerDirtyProbe(QStringLiteral("2D"), [&] { return dirty2D; });
+    stateCenter.registerDirtyProbe(QStringLiteral("3D"), [&] { return dirty3D; });
+
+    dirty3D = true;
+    stateCenter.setCurrentWorkbenchId(QStringLiteral("2D"));
+    EXPECT_FALSE(stateCenter.activeDocDirty());
+    EXPECT_TRUE(stateCenter.dirty());
+
+    // 切到 3D：标题 * 跟随目标工作台（setCurrentWorkbenchId 内部会重算）
+    stateCenter.setCurrentWorkbenchId(QStringLiteral("3D"));
+    EXPECT_TRUE(stateCenter.activeDocDirty());
+    EXPECT_TRUE(stateCenter.dirty());
+}
+
+TEST(WorkbenchSwitchResidueTest, RegisterDirtyProbeAbsorbsExistingDirtyState)
+{
+    ensureApplication();
+
+    UiStateCenter stateCenter;
+    bool dirty = true;  // 注册前文档就已经脏了
+    stateCenter.registerDirtyProbe(QStringLiteral("2D"), [&] { return dirty; });
+    stateCenter.setCurrentWorkbenchId(QStringLiteral("2D"));
+
+    // 注册即吸收：不能要求调用方记得再 refreshDirty 一次
+    EXPECT_TRUE(stateCenter.dirty());
+    EXPECT_TRUE(stateCenter.activeDocDirty());
+}
+
+TEST(WorkbenchSwitchResidueTest, ActiveWorkbenchWithoutProbeFallsBackToAnyDirty)
+{
+    ensureApplication();
+
+    UiStateCenter stateCenter;
+    bool dirty3D = true;
+    stateCenter.registerDirtyProbe(QStringLiteral("3D"), [&] { return dirty3D; });
+    // 当前工作台（2D）还没注册探针（2D 尚未初始化）：
+    // 退回「任一脏」—— 宁可标题多带 * 也不漏掉未保存提示
+    stateCenter.setCurrentWorkbenchId(QStringLiteral("2D"));
+
+    EXPECT_TRUE(stateCenter.dirty());
+    EXPECT_TRUE(stateCenter.activeDocDirty());
+}
+
+TEST(WorkbenchSwitchResidueTest, DirtyWorkbenchIdsListsOnlyDirtyWorkbenches)
+{
+    ensureApplication();
+
+    UiStateCenter stateCenter;
+    bool dirty2D = false;
+    bool dirty3D = false;
+    stateCenter.registerDirtyProbe(QStringLiteral("2D"), [&] { return dirty2D; });
+    stateCenter.registerDirtyProbe(QStringLiteral("3D"), [&] { return dirty3D; });
+    stateCenter.setCurrentWorkbenchId(QStringLiteral("2D"));
+
+    // 关闭流程按这份列表逐台保存（closeEvent 只保存活跃台会丢另一台的未存更改）
+    EXPECT_TRUE(stateCenter.dirtyWorkbenchIds().isEmpty());
+
+    dirty3D = true;
+    EXPECT_EQ(stateCenter.dirtyWorkbenchIds(), QStringList{ QStringLiteral("3D") });
+
+    dirty2D = true;
+    const QStringList both = stateCenter.dirtyWorkbenchIds();
+    EXPECT_EQ(both.size(), 2);
+    EXPECT_TRUE(both.contains(QStringLiteral("2D")));
+    EXPECT_TRUE(both.contains(QStringLiteral("3D")));
+
+    dirty3D = false;
+    EXPECT_EQ(stateCenter.dirtyWorkbenchIds(), QStringList{ QStringLiteral("2D") });
+}
+
+// ==================== 保存命令必须返回真实结果（File_Save 恒 success=true 的回归防护） ====================
+
+TEST(WorkbenchSwitchResidueTest, VoidLambdaAlwaysReportsSuccess_documentingWhyFileSaveNeededDeclareWithResult)
+{
+    ensureApplication();
+
+    // 对照组（旧行为）：void 闭包经 Ops::declare 包装后 execute 无条件 success=true ——
+    // 这正是 closeEvent / 新建流程曾经永远走不到"保存失败或取消"分支的根源
+    OperationBus bus;
+    Ops::declare(bus.registry(), OperationId::File_New, [] {});
+    const OperationResult result = bus.run(OperationId::File_New, QVariantMap{});
+    EXPECT_TRUE(result.success);
+}
+
+TEST(WorkbenchSwitchResidueTest, ResultOperationPropagatesCancelThroughBus)
+{
+    ensureApplication();
+
+    // declareWithResult 必须把取消标记原样透传：closeEvent 据此中止关闭而不是弹"保存失败，重试？"
+    OperationBus bus;
+    Ops::declareWithResult(bus.registry(), OperationId::File_Save, [] {
+        OperationResult r;
+        r.message = QStringLiteral("Save was cancelled.");
+        r.flags |= Cmd::OpFlagCanceled;
+        return r;
+    });
+
+    const OperationResult result = bus.run(OperationId::File_Save, QVariantMap{});
+    EXPECT_FALSE(result.success);
+    EXPECT_TRUE(result.canceled());
+    EXPECT_EQ(result.message, QStringLiteral("Save was cancelled."));
+}
+
+TEST(WorkbenchSwitchResidueTest, ResultOperationPropagatesPlainFailureThroughBus)
+{
+    ensureApplication();
+
+    OperationBus bus;
+    Ops::declareWithResult(bus.registry(), OperationId::File_SaveAs, [] {
+        OperationResult r;
+        r.message = QStringLiteral("disk full");
+        return r;
+    });
+
+    const OperationResult result = bus.run(OperationId::File_SaveAs, QVariantMap{});
+    EXPECT_FALSE(result.success);
+    EXPECT_FALSE(result.canceled());
+    EXPECT_EQ(result.message, QStringLiteral("disk full"));
 }
 
 // ==================== 切换不得累积工具栏 ====================

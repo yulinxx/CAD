@@ -89,6 +89,50 @@ public:
     bool isUndoable() const override { return true; }
 };
 
+/**
+ * @brief 返回真实结果的 Lambda 操作
+ *
+ * LambdaOperation::execute 跑完 void 闭包后无条件置 success=true，
+ * 会让调用方（如 WorkbenchWindow::closeEvent 的保存分支）永远走不到失败/取消路径。
+ * 需要如实上报"成功 / 失败 / 用户取消"的命令（File_Save / File_SaveAs）用这个类型。
+ */
+class ResultLambdaOperation : public IOperation
+{
+    // 不声明 Q_OBJECT：本头文件无对应 .cpp，moc 不会生成元对象（与同文件其它包装类一致）
+public:
+    using Fn = std::function<OperationResult()>;
+    using CanExecFn = std::function<bool()>;
+
+    ResultLambdaOperation(
+        OperationId id,
+        Fn fn,
+        CanExecFn canExec = [] { return true; })
+        : m_id(id)
+        , m_fn(std::move(fn))
+        , m_canExec(std::move(canExec))
+    {
+    }
+
+    OperationId id() const override { return m_id; }
+    bool canExecute() const override { return m_canExec(); }
+
+    OperationResult execute(const OperationRequest&) override
+    {
+        if (!m_fn)
+        {
+            return OperationResult{};
+        }
+        return m_fn();
+    }
+
+    bool isUndoable() const override { return false; }
+
+private:
+    OperationId m_id;
+    Fn m_fn;
+    CanExecFn m_canExec;
+};
+
 // ==================== 声明式注册入口（P2-2.5） ====================
 // 统一 8 个 *OperationRegistry 的注册形态，把
 //   reg.registerOperation(std::make_unique<LambdaOperation>(id, fn));
@@ -137,6 +181,14 @@ namespace Ops
     {
         reg.registerOperation(
             std::make_unique<ParamSceneMutatingLambdaOperation>(id, std::move(fn), std::move(canExec)));
+    }
+
+    /// 需要如实返回成功/失败/取消的命令（保存类）：闭包直接返回 OperationResult，
+    /// 不经 LambdaOperation 的"无条件 success=true"包装
+    inline void declareWithResult(OperationRegistry& reg, OperationId id, ResultLambdaOperation::Fn fn,
+        ResultLambdaOperation::CanExecFn canExec = [] { return true; })
+    {
+        reg.registerOperation(std::make_unique<ResultLambdaOperation>(id, std::move(fn), std::move(canExec)));
     }
 }  // namespace Ops
 

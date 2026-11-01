@@ -66,6 +66,7 @@ private:
 #include "UI/Settings/SettingsService.h"
 
 #include "UI/Services/FileDialogService.h"
+#include "UI/Services/IRecentFileService.h"
 #include "UI/Services/RecentFileService.h"
 
 #include "Engine/Text/FontManager.h"
@@ -330,6 +331,18 @@ void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiService
         m_persistenceService.get(),
         m_captureService.get());
     setup.setup(uiServices);
+
+    // 最近文件的服务级兜底回调：ImportContext 只有 FileOperationRegistry 的打开路径
+    // 才带 recentFileAddCallback，普通导入（各格式菜单项、拖放）的 context 是空的，
+    // 回写阶段会走这里 —— 否则导入过的文件永远进不了"最近文件"列表。
+    if (m_importService && uiServices.recentFileService)
+    {
+        IRecentFileService* recentFiles = uiServices.recentFileService;
+        m_importService->setRecentFileAddCallback(
+            [recentFiles](const QString& path, const QString& workbenchId) {
+                recentFiles->addRecentFile(path, workbenchId);
+            });
+    }
 }
 
 void ApplicationCompositionRoot::setupDialogServices()
@@ -340,15 +353,24 @@ void ApplicationCompositionRoot::setupDialogServices()
 
 void ApplicationCompositionRoot::setupDirtyStateSync()
 {
-    // 场景变更 → 标记为未保存
+    // 2D 文档脏标记探针：状态中心据此重算 dirty（任一文档，供关闭/提示）与
+    // activeDocDirty（当前工作台文档，供标题 "*"）。3D 探针由 Workbench3D 初始化时注册。
+    if (m_stateCenter)
+    {
+        m_stateCenter->registerDirtyProbe(QStringLiteral("2D"), [this]() {
+            return m_sceneManager && m_sceneManager->isDirty();
+        });
+    }
+
+    // 场景变更 → 重新计算脏状态（探针回读引擎脏标记，此处不直接写值）
     if (m_sceneManager)
     {
         m_sceneManager->setSceneChangedCallback(
             [](void* ctx) {
                 auto* self = static_cast<ApplicationCompositionRoot*>(ctx);
-                if (self->m_stateCenter && !self->m_stateCenter->dirty())
+                if (self->m_stateCenter)
                 {
-                    self->m_stateCenter->setDirty(true);
+                    self->m_stateCenter->refreshDirty();
                 }
             },
             this);

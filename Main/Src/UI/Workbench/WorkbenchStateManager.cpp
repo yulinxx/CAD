@@ -211,7 +211,7 @@ void WorkbenchStateManager::updateWindowTitle(const UiStateSnapshot& state)
                         state.currentViewMode);
     }
 
-    if (state.dirty)
+    if (state.activeDocDirty)
     {
         title.prepend(QStringLiteral("* "));
     }
