@@ -208,7 +208,7 @@ bool FileOperationRegistry::doExport(const std::string& filePath)
 
     *m_currentFilePath = filePath;
     // 文档记录由 ExportService::postExportRecord 统一写入；
-    // 这里不再重复写一次，避免同一行被两条连接同时写造成 database is locked。
+    // 这里不重复写，避免同一行被两条连接同时写造成 database is locked。
 
     // 存盘成功 → 文档不再脏（引擎层脏标记是事实源，UI 状态是它的镜像）
     if (m_sceneManager)
@@ -556,7 +556,7 @@ void FileOperationRegistry::registerFileSaveOps()
             filePath.endsWith(QLatin1String(".sy"), Qt::CaseInsensitive);
         if (!canSaveInPlace)
         {
-            // 未命名文档、或当前路径不是 .sy（历史遗留的非原生路径）：必须另存为
+            // 未命名文档、或当前路径不是 .sy 原生格式：必须另存为
             filePath = FileDialogService::getSaveFileName(
                 m_parentWidget, QObject::tr("Save"), FileDialogService::saveFileFilter());
             if (filePath.isEmpty())
@@ -650,7 +650,7 @@ void FileOperationRegistry::registerAll()
         return;
     }
 
-    // 共享文件路径状态在构造期已创建；这里不再重建，避免重新注册时把当前文档路径丢掉
+    // 共享文件路径状态在构造期已创建；这里不重建，避免重新注册时把当前文档路径丢掉
     if (!m_currentFilePath)
     {
         m_currentFilePath = std::make_shared<std::string>();

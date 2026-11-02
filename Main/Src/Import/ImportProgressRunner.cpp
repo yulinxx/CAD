@@ -8,6 +8,7 @@
 #include <memory>
 
 #include <QCoreApplication>
+#include <QEventLoop>
 #include <QPointer>
 #include <QWidget>
 
@@ -149,6 +150,13 @@ ImportResult ImportProgressRunner::run(
     });
 
     dialog->show();
-    dialog->exec();
+
+    // 用 QEventLoop 同步等待对话框关闭（导入完成或用户取消）。
+    // 不用 dialog->exec() — exec() 会强制 ApplicationModal，阻塞主界面交互。
+    // 用 QEventLoop 保持非模态，主界面可继续响应，同时我们在调用点同步阻塞等结果。
+    QEventLoop loop;
+    dialog->connect(dialog, &ProgressDialog::finished, &loop, &QEventLoop::quit);
+    loop.exec();
+
     return *result;
 }

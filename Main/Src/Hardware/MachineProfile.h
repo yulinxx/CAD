@@ -89,8 +89,8 @@ struct MachineProfile
      * 换一台机器就变。文档里存它会造成「同一份图纸在不同机器上烧到不同位置」，
      * 而且无法从文件判断它是为哪台机器出的。
      *
-     * 换算在**编译器的最后一步**发生（`MotionPlanCompiler`），只此一处。
-     * 适配器与作业服务都不再换算。
+     * 换算在编译器的最后一步发生（MotionPlanCompiler），只此一处。
+     * 适配器与作业服务都不换算。
      */
     Eg::MachineFrameConfig machineFrame;
 

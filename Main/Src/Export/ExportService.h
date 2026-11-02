@@ -1,9 +1,12 @@
 #pragma once
 
-#include <memory>
+#include <atomic>
 #include <functional>
+#include <memory>
+#include <thread>
 
 #include <QObject>
+#include <QPointer>
 #include <QString>
 
 #include "ExportContext.h"
@@ -59,6 +62,18 @@ public:
     /// @return 导出结果
     ExportResult exportWithContext(const ExportContext& context, const ExportOptions& options = ExportOptions{});
 
+    /// 异步导出：Phase 1（主线程）收参 + clone 场景图元 + 忙状态；
+    /// Phase 2（后台线程）序列化 + 文件写入；
+    /// Phase 3（主线程）回写记录 + 发信号 + 清忙状态。
+    /// 调用后立即返回，不会阻塞 UI；导出期间禁止再次调用 exportAsync / exportWithContext
+    /// （内部用 m_exportBusy 互斥锁保证）。
+    /// @param context 导出上下文
+    /// @param options 导出选项
+    /// @param onComplete 完成回调（主线程执行，可选）
+    void exportAsync(const ExportContext& context,
+        const ExportOptions& options = ExportOptions{},
+        std::function<void(const ExportResult&)> onComplete = nullptr);
+
     /// 检查指定路径是否可导出
     /// @param reasonOut 可选，返回不可导出的具体原因（服务未初始化 / 格式不支持等），不再静默失败
     bool canExport(const QString& filePath, QString* reasonOut = nullptr) const;
@@ -82,6 +97,12 @@ private:
     /// @return false 表示导出记录（DocumentRepository）写入失败
     bool postExportRecord(const ExportResult& result, const ExportContext& context);
 
+    /// 收掉上一条异步导出 worker：先置取消标志，再带超时等待；
+    /// 必须在主线程调用（std::thread 只能在 owner 线程 join）
+    void shutdownAsyncThread();
+
+    // ===== 成员 =====
+
     /// 导出分发器（非拥有指针）
     ExportDispatcher* m_dispatcher{ nullptr };
     /// 2D 场景管理器（非拥有指针）
@@ -94,4 +115,12 @@ private:
     std::function<void(bool)> m_busyStateCallback;
     /// 状态栏提示回调（替代 UiStateCenter 直接调用）
     std::function<void(const QString&)> m_statusPromptCallback;
+
+    // ===== 异步导出后台线程管理 =====
+    /// 异步导出的后台 worker 线程（exportAsync 启动、析构/重启时收掉）
+    std::thread m_asyncThread;
+    /// 外部请求取消标志（析构或新 exportAsync 启动前置 true）
+    std::atomic<bool> m_asyncCancelFlag{ false };
+    /// 互斥锁：同一时刻只允许一个导出在跑（同步版和异步版共享）
+    std::atomic<bool> m_exportBusy{ false };
 };

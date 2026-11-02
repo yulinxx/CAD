@@ -109,7 +109,7 @@ bool MachiningDataBridgeService::sliceAndInject(
         *outLayerCount = injected;
     }
 
-    SY_INFOF("[MachiningDataBridge] sliceAndInject: mesh=%lld layerHeight=%.3f injected %u contour(s)",
+    SY_DEBUGF("[MachiningDataBridge] sliceAndInject: mesh=%lld layerHeight=%.3f injected %u contour(s)",
         static_cast<long long>(meshId),
         layerHeight,
         injected);

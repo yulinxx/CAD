@@ -123,7 +123,6 @@ int CADApplicationRuntime::run()
     m_bootstrapper->setStartWorkbenchId(m_startWorkbenchId);
 
     // 初始化引导器
-    // SY_DEBUG("[CADApplicationRuntime] Initializing bootstrapper");
     if (!m_bootstrapper->initialize())
     {
         SY_ERROR("[CADApplicationRuntime] error code=app.bootstrap_init_failed message=AppBootstrapper initialization "

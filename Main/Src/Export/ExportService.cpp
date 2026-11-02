@@ -1,4 +1,7 @@
 #include <ctime>
+#include <chrono>
+#include <thread>
+
 /**
  * @file ExportService.cpp
  * @brief 导出服务实现
@@ -18,6 +21,7 @@
 
 #include <QCoreApplication>
 #include <QFileInfo>
+#include <QMetaObject>
 
 void ExportService::setPersistenceService(PersistenceService* service)
 {
@@ -29,7 +33,33 @@ ExportService::ExportService(QObject* parent)
 {
 }
 
-ExportService::~ExportService() = default;
+ExportService::~ExportService()
+{
+    // 析构时收掉可能仍在跑的异步导出 worker，避免后台线程访问已析构的宿主
+    shutdownAsyncThread();
+}
+
+void ExportService::shutdownAsyncThread()
+{
+    if (!m_asyncThread.joinable())
+    {
+        return;
+    }
+    // 通知 worker 尽快退出（dispatch 内部无 cancel 检查点，置 flag 后
+    // 再 joinable 也不放弃 join——joinable 的 std::thread 析构会触发 std::terminate）
+    m_asyncCancelFlag.store(true);
+    SY_INFO("[ExportService] shutdownAsyncThread: cancel flag set, waiting worker...");
+
+    // 给 worker 最多 3 秒自行退出（序列化 + 写文件为有界操作，正常毫秒级返回；
+    // 若磁盘 I/O 卡顿，超时只打 WARN 不放弃 join）
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    if (m_asyncThread.joinable())
+    {
+        SY_WARN("[ExportService] shutdownAsyncThread: worker still alive after 3s, forcing join");
+        m_asyncThread.join();
+        SY_INFO("[ExportService] shutdownAsyncThread: worker joined");
+    }
+}
 
 void ExportService::setDispatcher(ExportDispatcher* dispatcher)
 {
@@ -63,12 +93,199 @@ ExportResult ExportService::exportFile(const QString& filePath, const ExportOpti
     return exportWithContext(context, options);
 }
 
+void ExportService::exportAsync(
+    const ExportContext& context, const ExportOptions& options, std::function<void(const ExportResult&)> onComplete)
+{
+    SY_DEBUGF("[ExportService] exportAsync START: path=%s", context.targetPath.toUtf8().constData());
+
+    if (!m_dispatcher)
+    {
+        QString msg = tr("ExportDispatcher not set");
+        SY_ERRORF("[ExportService] exportAsync aborted: %s", msg.toUtf8().constData());
+        if (onComplete)
+        {
+            onComplete(ExportResult::fail(msg));
+        }
+        return;
+    }
+
+    // 同 service 不允许并发导出：收掉上一条异步 worker，且互斥锁保证
+    shutdownAsyncThread();
+    if (m_exportBusy.exchange(true))
+    {
+        // 已经有导出在跑，拒绝新请求
+        QString msg = tr("Another export is in progress");
+        SY_WARNF("[ExportService] exportAsync rejected: %s", msg.toUtf8().constData());
+        if (onComplete)
+        {
+            onComplete(ExportResult::fail(msg));
+        }
+        return;
+    }
+    // 重置取消标志：新的 exportAsync 开始，旧的 cancel 信号作废
+    m_asyncCancelFlag.store(false);
+
+    // 忙状态与开始通知都在调用线程（主线程）发出：
+    // 这些回调最终会动 UI，放到后台线程里发是跨线程访问
+    if (m_busyStateCallback)
+    {
+        m_busyStateCallback(true);
+    }
+    if (m_statusPromptCallback)
+    {
+        m_statusPromptCallback(tr("Exporting: %1").arg(context.targetPath));
+    }
+    emit exportStarted(context.targetPath);
+
+    // 构造完整上下文：注入 sceneManager 指针先用于 collectAllEntities，
+    // 之后在 dispatch 之前置 nullptr 切断 NativeExportWriter 的"借用实体"路径
+    ExportContext fullCtx = context;
+    if (!fullCtx.sceneManager)
+    {
+        fullCtx.sceneManager = m_sceneManager;
+    }
+    if (!fullCtx.sceneManager3D)
+    {
+        fullCtx.sceneManager3D = m_sceneManager3D;
+    }
+
+    // 注入进度回调，桥接 Qt 信号。后台线程 emit 跨线程信号用 Qt AutoConnection
+    // 自动升级为 QueuedConnection，是线程安全的
+    if (!fullCtx.progressCallback)
+    {
+        fullCtx.progressCallback = [this](float progress, const char* /*stage*/) {
+            emit exportProgress(progress);
+        };
+    }
+
+    // Phase 1 主线程：clone 场景图元（SceneManager 非线程安全，必须在主线程访问）
+    Fio::VecSyEntityPtr entities = collectAllEntities();
+
+    // 收集完之后切断场景指针，让 NativeExportWriter 走 clone 路径，
+    // 避免后台线程访问主线程持有的 SceneManager
+    fullCtx.sceneManager = nullptr;
+    fullCtx.sceneManager3D = nullptr;
+
+    if (entities.empty())
+    {
+        // 无图元直接走主线程收尾：不走后台线程，省一次线程启动 + 析构
+        QString msg = tr("No entities to export");
+        SY_WARNF("[ExportService] exportAsync: %s", msg.toUtf8().constData());
+        ExportResult emptyResult = ExportResult::fail(msg);
+        if (m_busyStateCallback) m_busyStateCallback(false);
+        if (m_statusPromptCallback) m_statusPromptCallback(tr("Export: no entities"));
+        emit exportFinished(emptyResult);
+        m_exportBusy.store(false);
+        if (onComplete) onComplete(emptyResult);
+        return;
+    }
+
+    // 用 shared_ptr 包装 entities（vector<unique_ptr> 不可拷贝，不能按值捕获进 lambda）
+    auto sharedEntities = std::make_shared<Fio::VecSyEntityPtr>(std::move(entities));
+
+    // 使用 QPointer 安全持有 this：若 ExportService 被销毁，
+    // QPointer 自动置空，后续所有路径安全返回，避免悬空指针访问
+    QPointer<ExportService> safeSelf = this;
+
+    // 统一收尾：清忙状态 + 最终提示 + 完成信号 + 回调，保证每条退出路径都恰好走一次，
+    // 且始终在主线程执行（后台线程失败时也会经此回到主线程）
+    auto finishOnMainThread = [safeSelf, onComplete](const ExportResult& r, const ExportContext& ctx) {
+        QMetaObject::invokeMethod(
+            qApp,
+            [safeSelf, onComplete, r, ctx]() {
+                if (safeSelf.isNull())
+                    return;
+                if (safeSelf->m_busyStateCallback)
+                {
+                    safeSelf->m_busyStateCallback(false);
+                }
+                if (safeSelf->m_statusPromptCallback)
+                {
+                    QString prompt = r.success
+                        ? ExportService::tr("Export completed: %1 entities").arg(r.exportedEntityCount)
+                        : ExportService::tr("Export failed: %1").arg(r.message);
+                    if (!r.warnings.isEmpty())
+                    {
+                        prompt += QStringLiteral(" (") + r.warnings.join(QStringLiteral("; ")) + QStringLiteral(")");
+                    }
+                    safeSelf->m_statusPromptCallback(prompt);
+                }
+                // postExportRecord 必须在主线程调（PersistenceService/SQLite 非线程安全）
+                if (r.success)
+                {
+                    if (!safeSelf->postExportRecord(r, ctx))
+                    {
+                        ExportResult warnResult = r;
+                        warnResult.addWarning(QCoreApplication::translate("WorkbenchWindow", "History save failed"));
+                        emit safeSelf->exportFinished(warnResult);
+                        if (onComplete) onComplete(warnResult);
+                    }
+                    else
+                    {
+                        emit safeSelf->exportFinished(r);
+                        if (onComplete) onComplete(r);
+                    }
+                }
+                else
+                {
+                    emit safeSelf->exportFinished(r);
+                    if (onComplete) onComplete(r);
+                }
+                safeSelf->m_exportBusy.store(false);
+                SY_DEBUGF("[ExportService] exportAsync END: success=%d, entities=%d, message=%s",
+                    r.success ? 1 : 0,
+                    r.exportedEntityCount,
+                    r.message.toUtf8().constData());
+            },
+            Qt::QueuedConnection);
+    };
+
+    // 启动后台线程执行 Phase 2（纯序列化 + 文件 I/O，不碰场景与 UI）
+    m_asyncThread = std::thread([this, safeSelf, fullCtx, sharedEntities, finishOnMainThread]() {
+        if (safeSelf.isNull())
+            return;
+
+        // 外部请求取消（析构或新 exportAsync 启动时置 true）
+        if (m_asyncCancelFlag.load())
+        {
+            SY_INFO("[ExportService] Async export canceled before dispatch");
+            ExportResult cancelResult = ExportResult::fail(ExportService::tr("Export canceled"));
+            finishOnMainThread(cancelResult, fullCtx);
+            return;
+        }
+
+        // Phase 2 后台线程：dispatch 序列化 + 文件写入（纯 CPU + I/O，不碰场景与 UI）
+        ExportResult result = safeSelf->m_dispatcher->dispatch(fullCtx, *sharedEntities);
+
+        if (result.success)
+        {
+            result.exportedEntityCount = static_cast<int>(sharedEntities->size());
+            result.message = tr("Exported %1 entities to: %2").arg(result.exportedEntityCount).arg(fullCtx.targetPath);
+        }
+        else
+        {
+            SY_ERRORF("[ExportService] Async export failed: %s", result.message.toUtf8().constData());
+        }
+
+        // Phase 3 主线程收尾：QMetaObject::invokeMethod + Qt::QueuedConnection
+        finishOnMainThread(result, fullCtx);
+    });
+}
+
 ExportResult ExportService::exportWithContext(const ExportContext& context, const ExportOptions& options)
 {
     if (!m_dispatcher)
     {
         QString msg = tr("ExportDispatcher not set");
         SY_ERRORF("[ExportService] %s", msg.toUtf8().constData());
+        return ExportResult::fail(msg);
+    }
+
+    // 互斥锁保护：同一时刻只允许一个导出在跑（与 exportAsync 共享 m_exportBusy）
+    if (m_exportBusy.exchange(true))
+    {
+        QString msg = tr("Another export is in progress");
+        SY_WARNF("[ExportService] exportWithContext rejected: %s", msg.toUtf8().constData());
         return ExportResult::fail(msg);
     }
 
@@ -84,7 +301,7 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
 
     emit exportStarted(context.targetPath);
 
-    // 构造完整上下文，注入 sceneManager 指针供 Native 格式借用实体
+    // 构造完整上下文：注入 sceneManager 指针先用于 collectAllEntities
     ExportContext fullCtx = context;
     if (!fullCtx.sceneManager)
     {
@@ -103,45 +320,44 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
         };
     }
 
-    // 收集场景图元（P5 收口: 复用 collectAllEntities 消除重复）
+    // 收集场景图元
     Fio::VecSyEntityPtr entities = collectAllEntities();
+
+    // 收集完之后切断场景指针，与 exportAsync 保持一致：
+    // NativeExportWriter 的借用路径会访问原始 SceneManager，此处统一走 clone 路径
+    fullCtx.sceneManager = nullptr;
+    fullCtx.sceneManager3D = nullptr;
+
+    ExportResult result;
 
     if (entities.empty())
     {
         QString msg = tr("No entities to export");
         SY_WARNF("[ExportService] %s", msg.toUtf8().constData());
 
-        ExportResult emptyResult = ExportResult::fail(msg);
-        if (m_busyStateCallback)
-        {
-            m_busyStateCallback(false);
-        }
-        if (m_statusPromptCallback)
-        {
-            m_statusPromptCallback(tr("Export: no entities"));
-        }
-        emit exportFinished(emptyResult);
-        return emptyResult;
-    }
-
-    // 通过分发器执行导出
-    ExportResult result = m_dispatcher->dispatch(fullCtx, entities);
-
-    if (result.success)
-    {
-        result.exportedEntityCount = static_cast<int>(entities.size());
-        result.message = tr("Exported %1 entities to: %2").arg(result.exportedEntityCount).arg(context.targetPath);
-
-        // 导出完成，写入记录。文件已成功导出，但历史记录写入失败时
-        // 必须在结果里带 warning，避免上层状态栏只报"导出完成"。
-        if (!postExportRecord(result, context))
-        {
-            result.addWarning(QCoreApplication::translate("WorkbenchWindow", "History save failed"));
-        }
+        result = ExportResult::fail(msg);
     }
     else
     {
-        SY_ERRORF("[ExportService] Export failed: %s", result.message.toUtf8().constData());
+        // 通过分发器执行导出（主线程）
+        result = m_dispatcher->dispatch(fullCtx, entities);
+
+        if (result.success)
+        {
+            result.exportedEntityCount = static_cast<int>(entities.size());
+            result.message = tr("Exported %1 entities to: %2").arg(result.exportedEntityCount).arg(context.targetPath);
+
+            // 导出完成，写入记录。文件已成功导出，但历史记录写入失败时
+            // 必须在结果里带 warning，避免上层状态栏只报"导出完成"。
+            if (!postExportRecord(result, context))
+            {
+                result.addWarning(QCoreApplication::translate("WorkbenchWindow", "History save failed"));
+            }
+        }
+        else
+        {
+            SY_ERRORF("[ExportService] Export failed: %s", result.message.toUtf8().constData());
+        }
     }
 
     // 通过回调清除忙状态（替代旧的 UiStateCenter 直接依赖）
@@ -161,6 +377,7 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
     }
 
     emit exportFinished(result);
+    m_exportBusy.store(false);
     return result;
 }
 

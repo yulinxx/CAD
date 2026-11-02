@@ -77,11 +77,10 @@ void OperationRegistrar::registerAll()
         // 现场表现是「按了开始加工什么都没发生」
         QMessageBox::warning(host ? host->mainWindow() : nullptr, QObject::tr("Processing"), message);
     };
-    // 作业规格：把**机器坐标系**从设备档案注入。
+    // 作业规格：把机器坐标系从设备档案注入。
     //
-    // 换算只在编译器的最后一步发生（MotionPlanCompiler），配置必须从这里一路传下去。
-    // 之前这条链路是断的：UI2D 旧链路在服务层换算，新 HAL 链路完全不换算 ——
-    // 同一份文档走不同路径会烧到不同位置。
+    // 换算只在编译器的最后一步发生（MotionPlanCompiler），配置必须从这里一路传下去，
+    // 避免链路中断导致不同路径下坐标换算不一致。
     laserConfig.specProvider = [dev = m_root.deviceHost()] {
         ToolpathJobSpec spec;
         spec.machineFrame = dev ? dev->machineFrameConfig() : Eg::MachineFrameConfig{};

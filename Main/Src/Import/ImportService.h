@@ -1,7 +1,9 @@
 #pragma once
 
-#include <memory>
+#include <atomic>
 #include <functional>
+#include <memory>
+#include <thread>
 
 #include <QObject>
 #include <QString>
@@ -246,4 +248,13 @@ private:
     std::function<void(const QString&)> m_currentDocumentPathCallback;
     /// 文档持久化回调
     std::function<bool(const QString&, int, const QString&)> m_documentPersistenceCallback;
+
+    // ===== async import 后台线程管理 =====
+    /// 异步导入的后台 worker 线程（importAsync 启动、析构/重启时收掉）
+    std::thread m_asyncThread;
+    /// 外部请求取消标志（析构或新 importAsync 启动前置 true，worker 每段 phase 前检查）
+    std::atomic<bool> m_asyncCancelFlag{ false };
+    /// 收掉上一条异步 worker：先置取消标志，再带超时等待；超时则放弃 join 让线程自行退出
+    /// 必须在主线程调用（std::thread 只能在 owner 线程 join）
+    void shutdownAsyncThread();
 };

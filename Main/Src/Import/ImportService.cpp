@@ -9,6 +9,7 @@
 #include "ImportResult.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <string>
 #include <unordered_map>
@@ -139,7 +140,33 @@ ImportService::ImportService(QObject* parent)
 {
 }
 
-ImportService::~ImportService() = default;
+ImportService::~ImportService()
+{
+    // 析构时收掉可能仍在跑的异步导入 worker
+    shutdownAsyncThread();
+}
+
+void ImportService::shutdownAsyncThread()
+{
+    if (!m_asyncThread.joinable())
+    {
+        return;
+    }
+    // 通知 worker 尽快退出（phase 之间会检查此 flag）
+    m_asyncCancelFlag.store(true);
+    SY_INFO("[ImportService] shutdownAsyncThread: cancel flag set, waiting worker...");
+
+    // 给 worker 最多 3 秒自行退出（phaseDetectFormat/phaseParse 均为有界计算，
+    // 正常情况毫秒级返回；若第三方解析器卡在 I/O 上，超时只打 WARN 不放弃 join——
+    // joinable 的 std::thread 析构会触发 std::terminate，必须收干净）
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    if (m_asyncThread.joinable())
+    {
+        SY_WARN("[ImportService] shutdownAsyncThread: worker still alive after 3s, forcing join");
+        m_asyncThread.join();
+        SY_INFO("[ImportService] shutdownAsyncThread: worker joined");
+    }
+}
 
 void ImportService::setDispatcher(ImportDispatcher* dispatcher)
 {
@@ -347,6 +374,11 @@ void ImportService::importAsync(
         return;
     }
 
+    // 收掉上一条可能还在跑的异步 worker（同 service 不允许并发 importAsync）
+    shutdownAsyncThread();
+    // 重置取消标志：新的 importAsync 开始，旧的 cancel 信号作废
+    m_asyncCancelFlag.store(false);
+
     // 忙状态与开始通知都在调用线程（主线程）发出：
     // 这些回调最终会动 UI，放到后台线程里发是跨线程访问
     if (m_busyStateCallback)
@@ -395,7 +427,7 @@ void ImportService::importAsync(
     };
 
     // 启动后台线程执行 Phase 1-2（纯解析，不碰 UI 与场景）
-    std::thread([safeSelf, context, options, finishOnMainThread]() {
+    m_asyncThread = std::thread([this, safeSelf, context, options, finishOnMainThread]() {
         if (safeSelf.isNull())
             return;
         ImportContext mutableCtx = context;
@@ -410,7 +442,8 @@ void ImportService::importAsync(
             return;
         }
 
-        if (safeSelf->isCanceled(mutableCtx))
+        // 外部请求取消（析构或新 importAsync 启动时置 true）
+        if (m_asyncCancelFlag.load() || safeSelf->isCanceled(mutableCtx))
         {
             SY_INFO("[ImportService] Async import canceled after Phase 1");
             finishOnMainThread(ImportResult::fail(ImportService::tr("Import canceled"), ImportErrorType::Canceled));
@@ -426,7 +459,8 @@ void ImportService::importAsync(
             return;
         }
 
-        if (safeSelf->isCanceled(mutableCtx))
+        // 外部请求取消（析构或新 importAsync 启动时置 true）
+        if (m_asyncCancelFlag.load() || safeSelf->isCanceled(mutableCtx))
         {
             SY_INFO("[ImportService] Async import canceled after Phase 2");
             finishOnMainThread(ImportResult::fail(ImportService::tr("Import canceled"), ImportErrorType::Canceled));
@@ -468,7 +502,7 @@ void ImportService::importAsync(
                 finishOnMainThread(result);
             },
             Qt::QueuedConnection);
-    }).detach();
+    });
 }
 
 bool ImportService::canImport(const QString& filePath, QString* reasonOut) const

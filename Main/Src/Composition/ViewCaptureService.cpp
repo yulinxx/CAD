@@ -93,9 +93,7 @@ namespace Ui
         }
 
         // 读回必须发生在 EndFrame 之前，所以整个「渲染一帧 + 读像素」序列都在
-        // 控件内部完成（RenderWidget::captureFrameRGBA）。此前这里持有
-        // Render::RenderDevice* 自己调 renderReadPixels，是宿主唯一一处
-        // 直接握着渲染设备句柄的地方，也是渲染 DLL 无法独立替换的原因之一。
+        // 控件内部完成（RenderWidget::captureFrameRGBA），不由宿主直接握渲染设备句柄。
         std::vector<uint8_t> rgba;
         uint32_t width = 0;
         uint32_t height = 0;
