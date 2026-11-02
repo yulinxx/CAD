@@ -28,7 +28,7 @@
 
 #include <gtest/gtest.h>
 
-#include "FioEntityConverter.h"
+#include "Engine3D/Import/FioEntityConverter.h"
 #include "Engine2D/Import/Fio2DEntityConverter.h"
 #include "Engine3D/SyEntity/SyMeshEntity.h"
 #include "Engine/SyEntity/SyEntity.h"

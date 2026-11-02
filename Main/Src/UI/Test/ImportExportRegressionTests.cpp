@@ -16,7 +16,7 @@
 
 #include "ImportService.h"
 #include "ExportService.h"
-#include "FioEntityConverter.h"
+#include "Engine3D/Import/FioEntityConverter.h"
 #include "Engine2D/Import/Fio2DEntityConverter.h"
 #include "SyEntitySerializer.h"
 #include "FileIO/FioTypes.h"

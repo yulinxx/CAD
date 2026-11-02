@@ -36,7 +36,7 @@
 #include "Export/Writers/NativeExportWriter.h"
 
 #include "Engine2D/Import/Fio2DEntityConverter.h"
-#include "FioEntityConverter.h"
+#include "Engine3D/Import/FioEntityConverter.h"
 
 #include "Log/SyLogger.h"
 

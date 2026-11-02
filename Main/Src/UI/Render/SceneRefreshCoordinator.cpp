@@ -1362,7 +1362,7 @@ void SceneRefreshCoordinator::updateSceneRender()
     {
         applyRepaintRefresh();
         // 场景刷新帧顺带推进 LOD 一次，独立定时器负责持续续跑
-        if (!m_curveLodManager.empty())
+        if (!m_submitScheduler.empty())
         {
             processCurveLodBatch();
         }
