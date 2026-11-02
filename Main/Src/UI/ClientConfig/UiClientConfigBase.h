@@ -104,6 +104,8 @@ struct ToolBarDef
     ToolBarPosition position;
     QString workbenchId;  // "2D", "3D", "global"
     QString feature;
+    /// 为 true 时 UiLayoutBuilder::buildToolBars 跳过本条目（由 Workbench2D/3D 自建）
+    bool skippedByBuilder = false;
     std::vector<std::variant<ToolBarActionDef, MenuItemType>> items;
 };
 

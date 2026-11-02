@@ -13,6 +13,8 @@
 #include <QApplication>
 #include <QToolBar>
 #include <QWidget>
+
+#include <variant>
 #include <QEvent>
 #include <QKeyEvent>
 #include <QTimer>
@@ -1089,139 +1091,52 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // 初始化工具栏上下文管理器
     m_contextManager = std::make_unique<ToolBarContextManager>();
 
-    // 注册 Default 上下文（通用编辑命令）
-    m_contextManager->registerContext(ToolBarContext::Default,
+    // 注册 Default 上下文（通用编辑命令）——从 JSON toolbars 配置读取
+    {
+        // 查找配置中 id="top.toolbar.2d.default" 的条目，按 separator 拆成 section
+        ToolBarContextConfig defaultCfg{ ToolBarContext::Default, tr("Edit"), {} };
+        const UiConfigData* config = UiConfigurationManager::shared().configData();
+        if (config)
         {
-            ToolBarContext::Default,
-            tr("Edit"),
+            for (const ToolBarDef& tb : config->toolBars)
             {
-                { "",
+                if (tb.id != QStringLiteral("top.toolbar.2d.default"))
+                {
+                    continue;
+                }
+                ToolBarSection currentSection;
+                for (const auto& item : tb.items)
+                {
+                    if (std::holds_alternative<MenuItemType>(item))
                     {
-                        { "edit.undo", tr("Undo"), ":/ui/common/Icons/Actions/undo.svg", false, "", "", "", "", "", true },
-                        { "edit.redo", tr("Redo"), ":/ui/common/Icons/Actions/redo.svg", false, "", "", "", "", "", true },
-                    } },
-                { "",
-                    {
-                        { "edit.mirror_horizontal",
-                            tr("Mirror H"),
-                            ":/ui/common/Icons/Actions/mirror_h.svg",
-                            false,
-                            "",
-                            "",
-                            "",
-                            "",
-                            "",
-                            true },
-                        { "edit.mirror_vertical",
-                            tr("Mirror V"),
-                            ":/ui/common/Icons/Actions/mirror_v.svg",
-                            false,
-                            "",
-                            "",
-                            "",
-                            "",
-                            "",
-                            true },
-                    } },
-                { "",
-                    {
-                        { "edit.align_left",
-                            tr("Align Left"),
-                            ":/ui/common/Icons/Actions/align_left.svg",
-                            false,
-                            "",
-                            "",
-                            "",
-                            "",
-                            "",
-                            true },
-                        { "edit.align_right",
-                            tr("Align Right"),
-                            ":/ui/common/Icons/Actions/align_right.svg",
-                            false,
-                            "",
-                            "",
-                            "",
-                            "",
-                            "",
-                            true },
-                        { "edit.align_center_h",
-                            tr("Align Center H"),
-                            ":/ui/common/Icons/Actions/align_center_h.svg",
-                            false,
-                            "",
-                            "",
-                            "",
-                            "",
-                            "",
-                            true },
-                        { "edit.align_top",
-                            tr("Align Top"),
-                            ":/ui/common/Icons/Actions/align_top.svg",
-                            false,
-                            "",
-                            "",
-                            "",
-                            "",
-                            "",
-                            true },
-                        { "edit.align_bottom",
-                            tr("Align Bottom"),
-                            ":/ui/common/Icons/Actions/align_bottom.svg",
-                            false,
-                            "",
-                            "",
-                            "",
-                            "",
-                            "",
-                            true },
-                        { "edit.align_center_v",
-                            tr("Align Center V"),
-                            ":/ui/common/Icons/Actions/align_center_v.svg",
-                            false,
-                            "",
-                            "",
-                            "",
-                            "",
-                            "",
-                            true },
-                    } },
-                { "",
-                    {
-                        { "edit.select_all",
-                            tr("Select All"),
-                            ":/ui/common/Icons/Actions/select_all.svg",
-                            false,
-                            "",
-                            "",
-                            "",
-                            "",
-                            "",
-                            true },
-                        { "edit.invert_selection",
-                            tr("Invert Selection"),
-                            ":/ui/common/Icons/Actions/invert_selection.svg",
-                            false,
-                            "",
-                            "",
-                            "",
-                            "",
-                            "",
-                            true },
-                        { "edit.deselect", tr("Deselect"), ":/ui/common/Icons/Actions/deselect.svg", false, "", "", "", "", "", true },
-                    } },
-                { "",
-                    {
-                        { "edit.copy", tr("Copy"), ":/ui/common/Icons/Actions/copy.svg", false, "", "", "", "", "", true },
-                        { "edit.paste", tr("Paste"), ":/ui/common/Icons/Actions/paste.svg", false, "", "", "", "", "", true },
-                        { "edit.delete", tr("Delete"), ":/ui/common/Icons/Actions/delete.svg", false, "", "", "", "", "", true },
-                    } },
-                { "",
-                    {
-                        { "edit.group", tr("Group"), ":/ui/common/Icons/Actions/group.svg", true, "", "", "", "", "", true },
-                    } },
-            },
-        });
+                        if (std::get<MenuItemType>(item) == MenuItemType::Separator)
+                        {
+                            if (!currentSection.actions.isEmpty())
+                            {
+                                defaultCfg.sections.push_back(currentSection);
+                                currentSection = {};
+                            }
+                        }
+                        continue;
+                    }
+                    const ToolBarActionDef& ad = std::get<ToolBarActionDef>(item);
+                    currentSection.actions.push_back(ToolBarAction{
+                        ad.commandId,
+                        ad.label,
+                        ad.iconName,
+                        ad.checkable,
+                        {}, {}, {}, {}, {}, true
+                    });
+                }
+                if (!currentSection.actions.isEmpty())
+                {
+                    defaultCfg.sections.push_back(currentSection);
+                }
+                break;
+            }
+        }
+        m_contextManager->registerContext(ToolBarContext::Default, defaultCfg);
+    }
 
     // 注册 TextEditing 上下文（文字编辑工具栏）
     // 注意：不注册到 TopToolBar，因为字体/字号等控件已经在 TextFontToolBar 自定义工具栏中显示
