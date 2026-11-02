@@ -35,6 +35,7 @@
 #endif
 
 #include <QAction>
+#include <QKeySequence>
 #include <QMainWindow>
 #include <QMenu>
 #include <QString>
@@ -713,6 +714,30 @@ TEST(CommandConfigContractTest, EveryConfiguredCommandIdResolvesInItsWorkbenchCa
     EXPECT_TRUE(violations.isEmpty()) << "以下配置项的 commandId 无法解析，按钮会永久点不动（共 " << violations.size()
                                       << " 条）:\n"
                                       << violations.join(QLatin1Char('\n')).toStdString();
+}
+
+TEST(CommandConfigContractTest, NoConfiguredShortcutBindsBareEscape)
+{
+    // 2D 侧 Esc 由 Workbench2D 的窗口级 QShortcut 独占（取消当前选择）。
+    // 配置再声明裸 Esc 会在 buildShortcuts 里生成第二个 ApplicationShortcut 接收者，
+    // Qt 判 ambiguous 后两边都不触发 —— Esc 取消选择静默失效。
+    // 约束来源：base.json 的 _shortcutsNote 硬约束 1)。
+    const QKeySequence bareEscape(Qt::Key_Escape);
+
+    for (const QString& path : allClientConfigPaths())
+    {
+        UiConfigLoader loader(path);
+        auto config = loader.load();
+        ASSERT_TRUE(config.has_value()) << path.toStdString();
+
+        for (const ShortcutDef& sc : config->shortcuts)
+        {
+            const QKeySequence sequence(sc.keySequence);
+            EXPECT_TRUE(sequence.isEmpty() || sequence != bareEscape)
+                << path.toStdString() << ": 命令 '" << sc.commandId.toStdString()
+                << "' 绑定了裸 Esc，会与窗口级 Esc（取消选择）冲突: '" << sc.keySequence.toStdString() << "'";
+        }
+    }
 }
 
 // ============================================================
