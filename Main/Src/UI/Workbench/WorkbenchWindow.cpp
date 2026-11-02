@@ -338,6 +338,7 @@ void WorkbenchWindow::configureServices(const UiServices& services)
         m_menuManager->setStateCenter(services.stateCenter);
         m_menuManager->setRecentFileService(services.recentFileService);
         m_menuManager->setWorkbench(m_workbench);
+        m_menuManager->setUnitManager(services.unitManager);
         if (m_workbench)
         {
             m_menuManager->rebuildAllMenus();

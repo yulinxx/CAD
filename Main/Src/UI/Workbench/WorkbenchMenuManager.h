@@ -15,6 +15,7 @@ class UiWorkbench;
 class WorkbenchWindow;
 struct UiFrameworkServices;
 class IRecentFileService;
+class UnitManager;
 struct MenuDef;
 class IUiCommandDispatcher;
 class UiConfigurationManager;
@@ -47,6 +48,8 @@ public:
     void setFrameworkServices(const UiFrameworkServices* services);
     void setRecentFileService(IRecentFileService* service);
     void setWorkbench(UiWorkbench* workbench);
+    /// 注入单位管理器（显示单位勾选态来源，与状态栏共用同一实例）
+    void setUnitManager(UnitManager* unitManager);
 
 
     void buildMenus();
@@ -148,6 +151,7 @@ private:
     UiStateCenter* m_stateCenter{ nullptr };
     const UiFrameworkServices* m_frameworkServices{ nullptr };
     IRecentFileService* m_recentFileService{ nullptr };    UiWorkbench* m_workbench{ nullptr };
+    UnitManager* m_unitManager{ nullptr };
     // 全局编辑快捷键动作（窗口级，需在切换工作台时显式清理）
 
     std::vector<QAction*> m_editShortcuts;
