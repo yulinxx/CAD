@@ -591,7 +591,7 @@ namespace
             // 未声明工作台：至少一侧能解析即可（快捷键节与 global 工具栏走这条）
             return (resolvableIn2D(ref.commandId) || resolvableIn3D(ref.commandId))
                 ? QString()
-                : QStringLiteral("两侧目录都解析不出");
+                : QStringLiteral("Cannot resolve in either catalog");
         }
 
         QStringList missing;
@@ -603,7 +603,7 @@ namespace
         {
             missing << QStringLiteral("CommandCatalog3D");
         }
-        return missing.isEmpty() ? QString() : QStringLiteral("解析不出: ") + missing.join(QLatin1String(", "));
+        return missing.isEmpty() ? QString() : QStringLiteral("Cannot resolve: ") + missing.join(QLatin1String(", "));
     }
 
     /// 客户配置资源路径列表（configs.qrc 已把它们编进测试二进制）

@@ -475,7 +475,7 @@ bool ImportService::canImport(const QString& filePath, QString* reasonOut) const
 {
     if (!m_dispatcher)
     {
-        const QString reason = QStringLiteral("导入服务未初始化（分发器未注册）: %1").arg(filePath);
+        const QString reason = tr("Import service not initialized (dispatcher not registered): %1").arg(filePath);
         if (reasonOut)
         {
             *reasonOut = reason;
@@ -507,7 +507,7 @@ bool ImportService::canImport(const QString& filePath, const QString& workbenchI
 {
     if (!m_dispatcher)
     {
-        const QString reason = QStringLiteral("导入服务未初始化（分发器未注册）: %1").arg(filePath);
+        const QString reason = tr("Import service not initialized (dispatcher not registered): %1").arg(filePath);
         if (reasonOut)
         {
             *reasonOut = reason;
