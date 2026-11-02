@@ -19,6 +19,9 @@
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/SyEntity/SyCircle.h"
 #include "Engine2D/SyEntity/SyLine.h"
+#include "Engine2D/SyEntity/SyNurbs.h"
+#include "Engine2D/Geometry/EntityGeometryEmitter.h"
+#include "Engine/Render/TessParams.h"
 #include "Log/SyPerfCounter.h"
 #include "RenderWidget.h"
 
@@ -26,7 +29,10 @@
 #include <QElapsedTimer>
 #include <QEventLoop>
 
+#include <algorithm>
 #include <chrono>
+#include <iostream>
+#include <limits>
 #include <memory>
 #include <thread>
 #include <vector>
@@ -1511,4 +1517,221 @@ TEST(RenderSubmitSchedulerTest, PersistentSubmitFailureBacksOff_WithoutDroppingE
     EXPECT_LE(attempts, 12u) << "退避失效：持续失败期间每 tick 都在空转重试";
     EXPECT_EQ(scheduler.size(), static_cast<size_t>(kCircleCount)) << "失败条目被丢弃了";
     EXPECT_TRUE(renderedIds.empty());
+}
+
+// ==================== 可选基准（DISABLED_：默认跳过，不进 CI） ====================
+//
+// 「百万级图元 zoom out」重建成本基准 —— 对应 LOD 文档 §5 的验收口径
+// （百万场景 zoom out 单帧 <10ms、误差 ≤1px）。文档把这两个数字标注为
+// 「待基准验证」；本用例提供可重复的低成本测量入口，但不覆盖 GPU 全链路。
+//
+// 手动运行（默认测试集会跳过，不拖慢 CI）：
+//   ViewportRefreshTests --gtest_also_run_disabled_tests \
+//       --gtest_filter=RenderSubmitLodBenchmark.DISABLED_MillionEntityZoomOutRebuild
+//
+// 测量口径（数字只作相对参考，勿当验收结论）：
+//  * 无 GL 环境：提交回调里用 Eg::emitEntityGeometry + 计数 sink 模拟「按当前
+//    缩放重建几何」的 CPU 侧工作量（发射/离散化正是 LOD 调参瞄准的主成本）；
+//  * 不含 GPU 上传（allocBlock/writeBlock）与圆/弧顶点展开（发生在装配层，
+//    需要渲染上下文）—— 这两块不在本基准口径内；
+//  * 耗时不设阈值断言（阈值随机器漂移只会把 CI 变成抖动源），以 stdout 报告
+//    收集耗时与逐批耗时；断言只锁正确性不变量（收集数/账本数/顶点上界/误差预算）。
+namespace
+{
+    /// 计数/捕获 sink：统计发射原语次数与折线点数上界，可选捕获最后一条折线
+    struct LodBenchmarkSink : Eg::ISceneGeometrySink
+    {
+        size_t polylineCount = 0;
+        size_t maxPolylinePoints = 0;
+        bool capture = false;
+        std::vector<Ut::Vec2d> capturedPolyline;
+
+        void emitPolyline(const Ut::Vec2d* points, size_t count, bool /*bClosed*/, const Ut::Color& /*color*/) override
+        {
+            ++polylineCount;
+            maxPolylinePoints = std::max(maxPolylinePoints, count);
+            if (capture)
+            {
+                capturedPolyline.assign(points, points + count);
+            }
+        }
+        void emitCircle(const Ut::Vec2d&, double, const Ut::Color&) override {}
+        void emitArc(const Ut::Vec2d&, double, double, double, const Ut::Color&) override {}
+        void emitEllipse(const Ut::Vec2d&, double, double, double, double, double, bool, const Ut::Color&) override {}
+        void emitText(const Ut::Vec2d&, const char*, const Ut::Color&) override {}
+        void emitImagePlaceholder(
+            const Ut::Vec2d&, const Ut::Vec2d&, const Ut::Vec2d&, const Ut::Vec2d&, const Ut::Color&) override
+        {
+        }
+        void emitTriangleSoup(const Ut::Vec3f*, size_t, const Ut::Vec3f*, size_t, const Ut::Color&) override {}
+    };
+
+    double pointSegDist(const Ut::Vec2d& p, const Ut::Vec2d& a, const Ut::Vec2d& b)
+    {
+        const Ut::Vec2d ab = b - a;
+        const double l2 = ab.lengthSquared();
+        if (l2 <= 0.0)
+        {
+            return (p - a).length();
+        }
+        double t = (p - a).dot(ab) / l2;
+        t = std::max(0.0, std::min(1.0, t));
+        return (p - (a + ab * t)).length();
+    }
+
+    /// 参考采样点到折线的最大弦高（世界单位）—— 与 SplineAlgorithmsTests 同款测量
+    double maxChordHeight(const std::vector<Ut::Vec2d>& ref, const std::vector<Ut::Vec2d>& poly)
+    {
+        double worst = 0.0;
+        for (const Ut::Vec2d& p : ref)
+        {
+            double best = std::numeric_limits<double>::max();
+            for (size_t i = 0; i + 1 < poly.size(); ++i)
+            {
+                best = std::min(best, pointSegDist(p, poly[i], poly[i + 1]));
+            }
+            worst = std::max(worst, best);
+        }
+        return worst;
+    }
+}  // namespace
+
+TEST(RenderSubmitLodBenchmark, DISABLED_MillionEntityZoomOutRebuild)
+{
+    using Clock = std::chrono::steady_clock;
+    const auto elapsedMs = [](Clock::time_point t0, Clock::time_point t1) {
+        return std::chrono::duration<double, std::milli>(t1 - t0).count();
+    };
+
+    // 100 万条 4 控制点样条：1000×1000 网格铺进默认可视盒（±400×±300）。
+    constexpr int kGridW = 1000;
+    constexpr int kGridH = 1000;
+    constexpr size_t kEntityCount = static_cast<size_t>(kGridW) * static_cast<size_t>(kGridH);
+    // zoom out 档：整个场景缩到约 1/10 屏 —— 曲线离散走「激进简化」档。
+    constexpr double kZoomOutScale = 0.1;
+    // 误差预算取 2px 宽松界：严格 1px 是 §5 的待验证验收线，
+    // 没有真机 GPU 全链路测量前不在用例里锁死。
+    constexpr double kErrorBudgetPx = 2.0;
+
+    Eg::SceneManager scene;
+
+    const Clock::time_point tSetup0 = Clock::now();
+    {
+        std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+        entities.reserve(kEntityCount);
+        for (int gy = 0; gy < kGridH; ++gy)
+        {
+            for (int gx = 0; gx < kGridW; ++gx)
+            {
+                auto spline = std::make_unique<Eg::SyNurbs>();
+                spline->nDegree = 3;
+                const double x0 = gx * 0.8 - 400.0;
+                const double y0 = gy * 0.6 - 300.0;
+                spline->setControlPointVector({ Ut::Vec2d(x0, y0),
+                    Ut::Vec2d(x0 + 0.2, y0 + 0.3),
+                    Ut::Vec2d(x0 + 0.5, y0 - 0.2),
+                    Ut::Vec2d(x0 + 0.8, y0 + 0.1) });
+                spline->updateKnots();
+                // 单位权重必须显式设置：权重向量为空时 SyNurbs::value 落入控制点
+                // 线性插值兜底，求值/离散全部失真（SplineAlgorithmsTests 同款教训）。
+                spline->setControlPointWeights(std::vector<double>(4, 1.0));
+                entities.push_back(std::move(spline));
+            }
+        }
+        scene.addEntities(std::move(entities));
+    }
+    const double setupMs = elapsedMs(tSetup0, Clock::now());
+    ASSERT_EQ(scene.getEntityCount(), kEntityCount);
+
+    RenderWidget widget;
+    widget.resize(800, 600);
+
+    RenderSubmitScheduler scheduler(&widget);
+    scheduler.setSceneManager(&scene);
+    scheduler.setPumpCallback([]() {});
+
+    LodBenchmarkSink sink;
+    scheduler.setSubmitBatchCallback([&scene, &sink](const std::vector<uint64_t>& batch) {
+        for (uint64_t uid : batch)
+        {
+            const Eg::SyEntity* entity = scene.findEntityById(static_cast<Eg::EntityId>(uid));
+            if (entity)
+            {
+                Eg::emitEntityGeometry(*entity, sink, kZoomOutScale);
+            }
+        }
+        return true;
+    });
+
+    // ① 收集耗时：RTree 范围查询 + 入队（视口 1.25 倍余量覆盖网格坐标）
+    const Clock::time_point tCollect0 = Clock::now();
+    scheduler.requestRefresh();
+    const double collectMs = elapsedMs(tCollect0, Clock::now());
+    ASSERT_EQ(scheduler.size(), kEntityCount) << "收集口径异常：不是全部曲线都入队了";
+
+    // ② 逐批重建耗时 —— 「zoom out 后逐帧重建」的无 GPU 侧代理：
+    // 每个 processBatch tick 消费一批（自适应批 128~8192），
+    // 回调里按 kZoomOutScale 重新离散并发射。
+    std::unordered_set<uint64_t> renderedIds;
+    double submitTotalMs = 0.0;
+    double submitMaxMs = 0.0;
+    size_t batchCount = 0;
+    while (!scheduler.empty() && batchCount < 10000)
+    {
+        const Clock::time_point tBatch0 = Clock::now();
+        scheduler.processBatch(renderedIds);
+        const double batchMs = elapsedMs(tBatch0, Clock::now());
+        submitTotalMs += batchMs;
+        submitMaxMs = std::max(submitMaxMs, batchMs);
+        ++batchCount;
+    }
+
+    std::cout << "[LOD基准] 构造+入库 " << setupMs << " ms | 收集 " << collectMs << " ms | 批数 " << batchCount
+              << " | 重建提交合计 " << submitTotalMs << " ms（avg "
+              << (batchCount > 0 ? submitTotalMs / batchCount : 0.0) << " ms/批，max " << submitMaxMs << " ms/批）"
+              << std::endl;
+
+    // ---- 正确性不变量（与机器速度无关）----
+    EXPECT_TRUE(scheduler.empty()) << "队列未排空：有图元被丢弃或卡死";
+    EXPECT_EQ(renderedIds.size(), kEntityCount) << "有图元未提交进账本";
+    // 每个样条恰发射一条折线
+    EXPECT_EQ(sink.polylineCount, kEntityCount);
+    // 顶点上界（钳制）在整个百万批次上全程有效
+    EXPECT_LE(sink.maxPolylinePoints, static_cast<size_t>(Eg::tess::kLodMaxCurvePoints));
+
+    // ---- ③ 误差抽检：代表性大波浪样条（与 SplineAlgorithmsTests 同形）----
+    // 误差 = 参考采样点到发射折线的最大弦高 × scale = 屏幕像素。
+    // 参考曲线必须与生产同一求值器 SyNurbs::value 密采样。
+    Eg::SyNurbs wavy;
+    wavy.setControlPointVector({ Ut::Vec2d(0, 0),
+        Ut::Vec2d(500, 2000),
+        Ut::Vec2d(1500, -1500),
+        Ut::Vec2d(2500, 2000),
+        Ut::Vec2d(3500, 0),
+        Ut::Vec2d(4500, -2000) });
+    wavy.nDegree = 3;
+    wavy.updateKnots();
+    wavy.setControlPointWeights(std::vector<double>(6, 1.0));
+
+    LodBenchmarkSink captureSink;
+    captureSink.capture = true;
+    ASSERT_TRUE(Eg::emitEntityGeometry(wavy, captureSink, kZoomOutScale));
+    ASSERT_GE(captureSink.capturedPolyline.size(), 2u);
+
+    std::vector<Ut::Vec2d> reference;
+    constexpr int kRefSamples = 8192;
+    reference.reserve(kRefSamples);
+    for (int i = 0; i < kRefSamples; ++i)
+    {
+        reference.push_back(wavy.value(static_cast<double>(i) / (kRefSamples - 1)));
+    }
+    const double errorPx = maxChordHeight(reference, captureSink.capturedPolyline) * kZoomOutScale;
+    std::cout << "[LOD基准] zoom out 档离散误差 " << errorPx << " px（预算 " << kErrorBudgetPx << " px）" << std::endl;
+    EXPECT_LE(errorPx, kErrorBudgetPx) << "zoom out 档离散误差超过预算";
+
+    // ---- ④ 超放大档钳制抽查：点数上界在发射边界同样有效 ----
+    LodBenchmarkSink zoomInSink;
+    ASSERT_TRUE(Eg::emitEntityGeometry(wavy, zoomInSink, 1000.0));
+    EXPECT_LE(zoomInSink.maxPolylinePoints, static_cast<size_t>(Eg::tess::kLodMaxCurvePoints));
+    EXPECT_GE(zoomInSink.maxPolylinePoints, 16u) << "钳制是拉平而非截断，密度不该塌掉";
 }
