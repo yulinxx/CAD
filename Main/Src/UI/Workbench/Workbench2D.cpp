@@ -11,6 +11,8 @@
 #include <QPlainTextEdit>
 #include <QLineEdit>
 #include <QApplication>
+#include <QGuiApplication>
+#include <QScreen>
 #include <QToolBar>
 #include <QWidget>
 
@@ -1472,8 +1474,14 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
         if (dock)
         {
             dock->setObjectName(UiDockIds::sceneQString());
-            // Scene 面板最小宽度 180；不设上限，用户可自行拉宽（宽度由布局快照记住）
-            dock->setMinimumWidth(180);
+            // Scene 面板最小宽度:屏幕 7.3% 自适应 + 140 保底(与 WorkbenchLayoutManager 保持一致)
+            {
+                QScreen* screen = QGuiApplication::primaryScreen();
+                const int minW = screen
+                    ? qMax(140, static_cast<int>(screen->availableGeometry().width() * 0.073))
+                    : 180;
+                dock->setMinimumWidth(minW);
+            }
         }
         m_scenePanel2D = panel;
     }

@@ -32,6 +32,7 @@ DrawToolBarWidget::DrawToolBarWidget(QWidget* parent)
     : QWidget(parent)
 {
     setObjectName(QStringLiteral("DrawToolBarWidget"));
+    // 工具栏槽位宽度:min 48/max 56 是 24×24 图标按钮 + 两侧 12-16px padding,合理约束保留
     setMinimumWidth(48);
     setMaximumWidth(56);
 }

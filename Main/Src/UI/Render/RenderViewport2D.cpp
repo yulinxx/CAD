@@ -31,6 +31,8 @@
 #include "UI/CursorManager.h"
 #include "UI/CursorRole.h"
 
+#include <QGuiApplication>
+#include <QScreen>
 #include <QVBoxLayout>
 #include <QMouseEvent>
 #include <QWheelEvent>
@@ -49,7 +51,22 @@ RenderViewport2D::RenderViewport2D(QWidget* parent)
     setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
     setAutoFillBackground(false);
-    setMinimumSize(640, 480);
+    // 视口最小尺寸保底 480×360（OpenGL 渲染可用下限），上限按屏幕 35%×40% 自适应，
+    // 避免 1366×768 小屏上 640×480 硬锁占掉大半可用区域
+    {
+        QScreen* screen = QGuiApplication::primaryScreen();
+        if (screen)
+        {
+            const QRect av = screen->availableGeometry();
+            const int minW = qMin(480, static_cast<int>(av.width() * 0.35));
+            const int minH = qMin(360, static_cast<int>(av.height() * 0.40));
+            setMinimumSize(minW, minH);
+        }
+        else
+        {
+            setMinimumSize(480, 360);
+        }
+    }
 
     initRenderWidget();
 

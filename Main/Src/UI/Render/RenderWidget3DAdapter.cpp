@@ -9,7 +9,9 @@
     #include "RenderWidget3DAdapter.h"
 
     #include <QCoreApplication>
+    #include <QGuiApplication>
     #include <QMouseEvent>
+    #include <QScreen>
     #include <QWheelEvent>
     #include <QPainter>
     #include <QVBoxLayout>
@@ -49,7 +51,22 @@ bool RenderWidget3DAdapter::ensureWidgetCreated()
     }
 
     m_renderWidget = std::make_unique<RenderWidget3D>(m_parentWidget);
-    m_renderWidget->setMinimumSize(640, 480);
+    // 视口最小尺寸保底 480×360（OpenGL 渲染可用下限），上限按屏幕 35%×40% 自适应，
+    // 避免 1366×768 小屏上 640×480 硬锁占掉大半可用区域
+    {
+        QScreen* screen = QGuiApplication::primaryScreen();
+        if (screen)
+        {
+            const QRect av = screen->availableGeometry();
+            const int minW = qMin(480, static_cast<int>(av.width() * 0.35));
+            const int minH = qMin(360, static_cast<int>(av.height() * 0.40));
+            m_renderWidget->setMinimumSize(minW, minH);
+        }
+        else
+        {
+            m_renderWidget->setMinimumSize(480, 360);
+        }
+    }
     // 使用布局管理，让 RenderWidget3D 自动跟随父控件尺寸变化
     // 避免手动 setGeometry 导致的尺寸不同步和 native window 状态不一致
     // 注意：不要显式调用 show()，QOpenGLWidget 会随父控件自动显示

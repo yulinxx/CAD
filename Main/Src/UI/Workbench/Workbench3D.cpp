@@ -8,9 +8,11 @@
     #include <QDesktopServices>
     #include <QDockWidget>
     #include <QFileInfo>
+    #include <QGuiApplication>
     #include <QLineEdit>
     #include <QMenu>
     #include <QPlainTextEdit>
+    #include <QScreen>
     #include <QShortcut>
     #include <QTextEdit>
     #include <QTimer>
@@ -990,7 +992,14 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
         if (sceneDock)
         {
             sceneDock->setObjectName(UiDockIds::sceneQString());
-            sceneDock->setMinimumWidth(180);
+            // Scene 面板最小宽度:屏幕 7.3% 自适应 + 140 保底(与 WorkbenchLayoutManager 保持一致)
+            {
+                QScreen* screen = QGuiApplication::primaryScreen();
+                const int minW = screen
+                    ? qMax(140, static_cast<int>(screen->availableGeometry().width() * 0.073))
+                    : 180;
+                sceneDock->setMinimumWidth(minW);
+            }
         }
         m_scenePanel3D = sharedPanel;
     }

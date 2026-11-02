@@ -37,6 +37,8 @@
 #include <QToolBar>
 #include <QWidget>
 #include <QPointer>
+#include <QGuiApplication>
+#include <QScreen>
 
 namespace
 {
@@ -230,17 +232,30 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
         }
     }
 
-    // 初始面板宽度：只作为「尚无已保存快照」时的默认值，
-    // restoreLayoutSnapshot 成功后会被用户上次的真实宽度覆盖。
+    // 初始面板宽度：按屏幕可用宽度比例自适应（基准值按 1920 宽 100% DPI 设计），
+    // 高 DPI 或小屏笔记本上自动缩放；restoreLayoutSnapshot 成功后会被用户上次的真实宽度覆盖。
     // 只设最小宽度防拖拽过窄；不设最大宽度 —— 用户可能手动拉宽面板，
     // 固定上限会在工作台切换后把宽度强行截断，表现为「没操作宽度却变了」。
     if (m_panelState.leftDock && m_panelState.rightDock)
     {
-        m_panelState.leftDock->setMinimumWidth(160);
-        m_panelState.rightDock->setMinimumWidth(200);
+        // 左面板（SceneTree）：屏幕 14%，下限 140
+        // 右面板（Properties）：屏幕 17%，下限 180
+        int screenW = 1920;  // 兜底
+        if (QScreen* screen = QGuiApplication::primaryScreen())
+        {
+            screenW = screen->availableGeometry().width();
+        }
+        const int leftMinW = qMax(140, static_cast<int>(screenW * 0.073));    // 1920*14%≈269
+        const int rightMinW = qMax(180, static_cast<int>(screenW * 0.094));   // 1920*17%≈326
+        const int leftInitW = qMax(160, static_cast<int>(screenW * 0.094));   // 1920*18%≈346
+        const int rightInitW = qMax(200, static_cast<int>(screenW * 0.125));  // 1920*24%≈461
+
+        m_panelState.leftDock->setMinimumWidth(leftMinW);
+        m_panelState.rightDock->setMinimumWidth(rightMinW);
 
         m_parent->resizeDocks(
-            { m_panelState.leftDock.data(), m_panelState.rightDock.data() }, { 180, 240 }, Qt::Horizontal);
+            { m_panelState.leftDock.data(), m_panelState.rightDock.data() },
+            { leftInitW, rightInitW }, Qt::Horizontal);
     }
 
     return !m_registeredDocks.empty();
@@ -793,8 +808,14 @@ void WorkbenchLayoutManager::setSceneDockVisible(bool visible)
 
     if (sceneDock)
     {
-        // 与 2D 一致的最小宽度；不设最大宽度，允许用户手动拉宽（快照会记住该宽度）
-        sceneDock->setMinimumWidth(180);
+        // SceneDock 最小宽度：按屏幕 7.3%（约 140–269px）自适应，下限 140
+        // 不设最大宽度，允许用户手动拉宽（快照会记住该宽度）
+        int screenW = 1920;
+        if (QScreen* screen = QGuiApplication::primaryScreen())
+        {
+            screenW = screen->availableGeometry().width();
+        }
+        sceneDock->setMinimumWidth(qMax(140, static_cast<int>(screenW * 0.073)));
         sceneDock->setVisible(visible);
     }
 }
@@ -839,7 +860,15 @@ void WorkbenchLayoutManager::updateBusyIndicator(bool busy)
             auto* progress = new QProgressBar(m_parent);
             progress->setObjectName(QStringLiteral("BusyProgressBar"));
             progress->setRange(0, 0);
-            progress->setMaximumWidth(140);
+            // 进度条最大宽度：屏幕 5.2%（约 100–260px）自适应，避免大屏上过宽
+            {
+                int screenW = 1920;
+                if (QScreen* screen = QGuiApplication::primaryScreen())
+                {
+                    screenW = screen->availableGeometry().width();
+                }
+                progress->setMaximumWidth(qMax(100, static_cast<int>(screenW * 0.052)));
+            }
             m_panelState.statusBar->addPermanentWidget(progress);
             m_busyProgressBar = progress;
         }

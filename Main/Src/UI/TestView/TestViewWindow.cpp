@@ -14,8 +14,10 @@
 
 #include <QCheckBox>
 #include <QEvent>
+#include <QGuiApplication>
 #include <QMouseEvent>
 #include <QNativeGestureEvent>
+#include <QScreen>
 #include <QVBoxLayout>
 #include <QWheelEvent>
 
@@ -341,7 +343,21 @@ TestViewWindow::TestViewWindow(Eg::SceneManager* scene, bool liveSync, QWidget* 
     : QMainWindow(parent)
 {
     setWindowTitle(liveSync ? tr("Test View (Live)") : tr("Test View"));
-    resize(900, 640);
+    // 测试视口尺寸:屏幕 47%×59% 自适应 + 720×512 保底
+    {
+        QScreen* screen = QGuiApplication::primaryScreen();
+        if (screen)
+        {
+            const QRect av = screen->availableGeometry();
+            const int initW = qMin(720, static_cast<int>(av.width() * 0.47));
+            const int initH = qMin(512, static_cast<int>(av.height() * 0.59));
+            resize(initW, initH);
+        }
+        else
+        {
+            resize(720, 512);
+        }
+    }
 
     auto* container = new QWidget(this);
     auto* layout = new QVBoxLayout(container);
