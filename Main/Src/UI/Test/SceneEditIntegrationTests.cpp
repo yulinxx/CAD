@@ -12,6 +12,7 @@
  *  - 7. 全场景快照 + 场景内被删图元的回插（replaceEntitiesById 的 insert 分支）
  *  - 8. DocumentTransaction 的 commit/undo/redo 往返
  *  - 9. 子集作用域不得误删无关图元（SnapshotScope::Subset 守卫）
+ *  - 10. DocumentTransaction Add/Delete 的 ID 往返（P1）与撞号换号保对象（P2）
  *
  * 这些链路此前的覆盖为空：改动若破坏「场景持有一种状态、命令持有另一种状态」
  * 的不变量，编译不会报错，只会在用户撤销时丢图元或数量翻倍，故固化为常态用例。
@@ -59,6 +60,30 @@ namespace
         vec.push_back(std::move(line));
         scene.addEntities(std::move(vec));
         return id;
+    }
+
+    /// 造一条指定 id 的直线并以保 ID 方式入场景（构造 P2 撞号场景用）
+    void createLineWithId(
+        Eg::SceneManager& scene, Eg::EntityId forcedId, const char* name, double x0, double y0, double x1, double y1)
+    {
+        auto line = std::make_unique<Eg::SyLine>();
+        line->id = forcedId;
+        line->setName(name);
+        line->setPointVector({ Ut::Vec2d(x0, y0), Ut::Vec2d(x1, y1) });
+        scene.insertEntityPreserveId(std::move(line));
+    }
+
+    /// 按名字在场景里查找图元 id，找不到返回 0（P2 测试认领换号后的恢复对象用）
+    Eg::EntityId findIdByName(Eg::SceneManager& scene, const char* name)
+    {
+        for (Eg::SyEntity* e : scene.getAllEntities())
+        {
+            if (e && std::string(e->name()) == name)
+            {
+                return e->id;
+            }
+        }
+        return 0;
     }
 }  // namespace
 
@@ -391,4 +416,190 @@ TEST(SceneEditIntegrationTest, SubsetScope_LeavesUnrelatedEntitiesAlone)
     undoMgr.redo();
     EXPECT_TRUE(scene.getEntityCount() == 3) << "subset redo keeps count stable";
     EXPECT_TRUE(std::string(scene.findSyEntityById(a)->name()) == "A2") << "subset redo re-applied A";
+}
+
+// ==================== 10. DocumentTransaction Add/Delete ID 往返（P1 回归） ====================
+// 审计 P1：Add/Delete 的 change.entityId 与落库/恢复对象 ID 错位 —— Add 撤销残留、
+// 二次执行出重复图元、Delete 撤销恢复用新 ID。以下为验收断言（含 P2 撞号用例）。
+
+TEST(SceneEditIntegrationTest, DocumentTransaction_AddUndo_ZeroResidue)
+{
+    Eg::SceneManager scene;
+    UndoRedoManager undoMgr(&scene);
+    const Eg::EntityId base = createLine(scene, 0, 0, 10, 0);
+    const size_t baseline = scene.getEntityCount();
+
+    Eg::DocumentTransaction txn(scene, &undoMgr);
+    txn.setDescription("Add two lines");
+    txn.begin();
+
+    auto l1 = std::make_unique<Eg::SyLine>();
+    l1->setPointVector({ Ut::Vec2d(0, 1), Ut::Vec2d(10, 1) });
+    const Eg::EntityId id1 = l1->id;
+    txn.addEntity(std::move(l1));
+
+    auto l2 = std::make_unique<Eg::SyLine>();
+    l2->setPointVector({ Ut::Vec2d(0, 2), Ut::Vec2d(10, 2) });
+    const Eg::EntityId id2 = l2->id;
+    txn.addEntity(std::move(l2));
+
+    EXPECT_TRUE(txn.commit()) << "transaction committed";
+    EXPECT_TRUE(scene.getEntityCount() == baseline + 2) << "commit adds exactly two entities";
+    EXPECT_TRUE(scene.findSyEntityById(id1) != nullptr) << "added entity resolvable by recorded id";
+    EXPECT_TRUE(scene.findSyEntityById(id2) != nullptr) << "second added entity resolvable by recorded id";
+
+    undoMgr.undo();
+    EXPECT_TRUE(scene.getEntityCount() == baseline) << "Add undo: scene back to baseline (zero residue)";
+    EXPECT_TRUE(scene.findSyEntityById(id1) == nullptr) << "Add undo: id1 not lingering in scene";
+    EXPECT_TRUE(scene.findSyEntityById(id2) == nullptr) << "Add undo: id2 not lingering in scene";
+    EXPECT_TRUE(scene.findSyEntityById(base) != nullptr) << "unrelated entity intact";
+}
+
+TEST(SceneEditIntegrationTest, DocumentTransaction_AddUndoRedo_IdMatchesFirstInsert)
+{
+    Eg::SceneManager scene;
+    UndoRedoManager undoMgr(&scene);
+    createLine(scene, 0, 0, 10, 0);
+    const size_t baseline = scene.getEntityCount();
+
+    Eg::DocumentTransaction txn(scene, &undoMgr);
+    txn.setDescription("Add one line");
+    txn.begin();
+    auto line = std::make_unique<Eg::SyLine>();
+    line->setPointVector({ Ut::Vec2d(0, 1), Ut::Vec2d(10, 1) });
+    const Eg::EntityId id = line->id;
+    txn.addEntity(std::move(line));
+    EXPECT_TRUE(txn.commit());
+
+    undoMgr.undo();
+    EXPECT_TRUE(scene.findSyEntityById(id) == nullptr) << "undo removes the added entity";
+    EXPECT_TRUE(scene.getEntityCount() == baseline) << "count back to baseline after undo";
+
+    undoMgr.redo();
+    EXPECT_TRUE(scene.findSyEntityById(id) != nullptr) << "redo restores the same id as first insert";
+    EXPECT_TRUE(scene.getEntityCount() == baseline + 1) << "redo adds exactly one (no duplicate entity)";
+
+    undoMgr.undo();
+    EXPECT_TRUE(scene.getEntityCount() == baseline) << "2nd undo stable";
+    undoMgr.redo();
+    EXPECT_TRUE(scene.getEntityCount() == baseline + 1) << "2nd redo stable (ping-pong)";
+    EXPECT_TRUE(scene.findSyEntityById(id) != nullptr) << "id stable across ping-pong";
+}
+
+TEST(SceneEditIntegrationTest, DocumentTransaction_DeleteUndo_RestoresOriginalId)
+{
+    Eg::SceneManager scene;
+    UndoRedoManager undoMgr(&scene);
+    const Eg::EntityId a = createLine(scene, 0, 0, 10, 0);
+    const Eg::EntityId b = createLine(scene, 0, 5, 10, 5);
+    const size_t baseline = scene.getEntityCount();
+
+    Eg::DocumentTransaction txn(scene, &undoMgr);
+    txn.setDescription("Delete line A");
+    txn.begin();
+    txn.deleteEntity(a);
+    EXPECT_TRUE(txn.commit());
+
+    EXPECT_TRUE(scene.findSyEntityById(a) == nullptr) << "deleted by commit";
+    EXPECT_TRUE(scene.getEntityCount() == baseline - 1) << "one entity removed";
+
+    undoMgr.undo();
+    EXPECT_TRUE(scene.findSyEntityById(a) != nullptr) << "Delete undo: original id restored and queryable";
+    EXPECT_TRUE(scene.getEntityCount() == baseline) << "count restored after undo";
+    EXPECT_TRUE(scene.findSyEntityById(b) != nullptr) << "unrelated entity intact";
+}
+
+TEST(SceneEditIntegrationTest, DocumentTransaction_DeleteUndoRedo_RoundTrip)
+{
+    Eg::SceneManager scene;
+    UndoRedoManager undoMgr(&scene);
+    const Eg::EntityId a = createLine(scene, 0, 0, 10, 0);
+    createLine(scene, 0, 5, 10, 5);
+    const size_t baseline = scene.getEntityCount();
+
+    Eg::DocumentTransaction txn(scene, &undoMgr);
+    txn.setDescription("Delete line A");
+    txn.begin();
+    txn.deleteEntity(a);
+    EXPECT_TRUE(txn.commit());
+    EXPECT_TRUE(scene.findSyEntityById(a) == nullptr) << "deleted by commit";
+
+    undoMgr.undo();
+    EXPECT_TRUE(scene.findSyEntityById(a) != nullptr) << "undo restores original id";
+    EXPECT_TRUE(scene.getEntityCount() == baseline) << "count restored after undo";
+
+    undoMgr.redo();
+    EXPECT_TRUE(scene.findSyEntityById(a) == nullptr) << "redo removes again";
+    EXPECT_TRUE(scene.getEntityCount() == baseline - 1) << "count reflects redo";
+
+    undoMgr.undo();
+    EXPECT_TRUE(scene.findSyEntityById(a) != nullptr) << "2nd undo restores again (ping-pong stable)";
+    EXPECT_TRUE(scene.getEntityCount() == baseline) << "count stable across ping-pong";
+}
+
+TEST(SceneEditIntegrationTest, DocumentTransaction_TxnLevelDeleteUndoRedo_KeepsOriginalId)
+{
+    // 不挂 UndoRedoManager，走事务级 undo/redo —— 覆盖 revertChanges/applyChanges 的 ID 稳定
+    Eg::SceneManager scene;
+    const Eg::EntityId a = createLine(scene, 0, 0, 10, 0);
+    createLine(scene, 0, 5, 10, 5);
+    const size_t baseline = scene.getEntityCount();
+
+    Eg::DocumentTransaction txn(scene);
+    txn.begin();
+    txn.deleteEntity(a);
+    EXPECT_TRUE(txn.commit());
+    EXPECT_TRUE(scene.findSyEntityById(a) == nullptr) << "deleted by commit";
+
+    EXPECT_TRUE(txn.undo()) << "txn-level undo";
+    EXPECT_TRUE(scene.findSyEntityById(a) != nullptr) << "txn-level undo restores original id";
+    EXPECT_TRUE(scene.getEntityCount() == baseline) << "count restored";
+
+    EXPECT_TRUE(txn.redo()) << "txn-level redo";
+    EXPECT_TRUE(scene.findSyEntityById(a) == nullptr) << "txn-level redo deletes by the same id";
+
+    EXPECT_TRUE(txn.undo()) << "second txn-level undo";
+    EXPECT_TRUE(scene.findSyEntityById(a) != nullptr) << "ping-pong stable at txn level";
+}
+
+TEST(SceneEditIntegrationTest, DocumentTransaction_DeleteUndo_IdCollision_RemapsKeepsObject)
+{
+    // P2：undo 恢复撞号时换新 ID 保对象（绝不静默丢弃），换号后 redo/undo 仍按新 ID 闭环。
+    Eg::SceneManager scene;
+    UndoRedoManager undoMgr(&scene);
+    const Eg::EntityId victim = createLine(scene, 0, 0, 10, 0);
+    createLine(scene, 0, 5, 10, 5);
+    scene.findSyEntityById(victim)->setName("Victim");
+    const size_t baseline = scene.getEntityCount();
+
+    Eg::DocumentTransaction txn(scene, &undoMgr);
+    txn.setDescription("Delete victim");
+    txn.begin();
+    txn.deleteEntity(victim);
+    EXPECT_TRUE(txn.commit());
+    EXPECT_TRUE(scene.findSyEntityById(victim) == nullptr) << "victim deleted";
+
+    // 构造撞号：删除后、撤销前，另一对象占住旧 ID（模拟导入/外部插入抢号）
+    createLineWithId(scene, victim, "Occupier", 0, 9, 10, 9);
+    EXPECT_TRUE(scene.findSyEntityById(victim) != nullptr) << "occupier holds the old id now";
+
+    undoMgr.undo();
+    EXPECT_TRUE(scene.getEntityCount() == baseline + 1) << "restored object kept alongside occupier (not dropped)";
+    Eg::SyEntity* oldIdOwner = scene.findSyEntityById(victim);
+    EXPECT_TRUE(oldIdOwner != nullptr) << "occupier still owns the old id";
+    EXPECT_TRUE(std::string(oldIdOwner->name()) == "Occupier") << "old id not hijacked from occupier";
+
+    const Eg::EntityId restoredId = findIdByName(scene, "Victim");
+    EXPECT_TRUE(restoredId != 0) << "victim object not lost: restored and queryable under a new id";
+    EXPECT_TRUE(restoredId != victim) << "id remapped because of collision";
+
+    // redo → undo：按换号后的 ID 闭环取回，对象始终不丢
+    undoMgr.redo();
+    EXPECT_TRUE(scene.findSyEntityById(restoredId) == nullptr) << "redo removes the remapped restore";
+    EXPECT_TRUE(scene.getEntityCount() == baseline) << "back to occupier + unrelated after redo";
+    EXPECT_TRUE(scene.findSyEntityById(victim) != nullptr) << "occupier untouched by redo";
+
+    undoMgr.undo();
+    EXPECT_TRUE(scene.getEntityCount() == baseline + 1) << "2nd undo restores again";
+    EXPECT_TRUE(findIdByName(scene, "Victim") != 0) << "victim recoverable after redo/undo cycle";
 }
