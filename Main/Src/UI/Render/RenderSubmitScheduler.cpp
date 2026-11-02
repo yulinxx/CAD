@@ -191,19 +191,22 @@ void RenderSubmitScheduler::processBatch(std::unordered_set<uint64_t>& renderedI
         const double elapsedMs =
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
 
-        // 耗时反馈：超预算减半（下限 kMinBatchSize），余量充足按 1.5 倍增长（上限 kMaxBatchSize）。
-        // 空批（全被过滤）不参与调节，避免误把「无可渲染项」当成「很轻」。
-        if (elapsedMs > kBatchBudgetMs)
-        {
-            m_adaptiveBatchSize = (std::max)(kMinBatchSize, m_adaptiveBatchSize / 2);
-        }
-        else if (elapsedMs * 2.0 < kBatchBudgetMs)
-        {
-            m_adaptiveBatchSize = (std::min)(kMaxBatchSize, m_adaptiveBatchSize + m_adaptiveBatchSize / 2);
-        }
-
         if (ok)
         {
+            // 耗时反馈：超预算减半（下限 kMinBatchSize），余量充足按 1.5 倍增长
+            // （上限 kMaxBatchSize）。只在成功批上反馈 —— 失败批的耗时可能被
+            // 提前失败截断、不代表整批成本，且批量变化会破坏「失败批次原样
+            // 重试」的确定性（游标回退后重试批必须与失败批完全一致）。
+            // 空批（全被过滤）不参与调节，避免误把「无可渲染项」当成「很轻」。
+            if (elapsedMs > kBatchBudgetMs)
+            {
+                m_adaptiveBatchSize = (std::max)(kMinBatchSize, m_adaptiveBatchSize / 2);
+            }
+            else if (elapsedMs * 2.0 < kBatchBudgetMs)
+            {
+                m_adaptiveBatchSize = (std::min)(kMaxBatchSize, m_adaptiveBatchSize + m_adaptiveBatchSize / 2);
+            }
+
             m_submitFailures = 0;
             m_retryBackoffTicks = 0;
             m_submitRetryPending = false;
