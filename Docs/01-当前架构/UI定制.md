@@ -10,15 +10,14 @@
 - **配置驱动是唯一的 UI 构建路径**。菜单 / 工具栏 / 停靠面板 / 状态栏 / 右键菜单
   全部由客户 JSON 生成，硬编码回退分支已删除。
 
-> **2026-08-25 起的重要变更（P0 收口）**
->
-> 1. **客户 ID 改为运行时解析**：编译期宏 `SANYI_CLIENT_ID` 已废除。
->    客户 ID 由 `UiClientContext` 在运行时解析，**一份二进制可服务多个客户**。
-> 2. **`SANYI_ENABLE_CONFIG_DRIVEN_UI` 已废弃**：配置驱动是唯一路径，
->    `WorkbenchLayoutManager` 中的 `#ifdef` 与硬编码 Dock 骨架已删除。
->    不要再新增该宏的分支。
-> 3. **状态栏、右键菜单、3D 菜单纳入同一套 JSON**：`MenuManager3D` 硬编码路径已移除。
-> 4. **License feature gating 已接线**：JSON 中的 `feature` 字段现在真正生效。
+**当前状态**：
+1. **客户 ID 运行时解析**：编译期宏 `SANYI_CLIENT_ID` 已废除。
+   客户 ID 由 `UiClientContext` 在运行时解析，**一份二进制可服务多个客户**。
+2. **`SANYI_ENABLE_CONFIG_DRIVEN_UI` 已废弃**：配置驱动是唯一路径，
+   `WorkbenchLayoutManager` 中的 `#ifdef` 与硬编码 Dock 骨架已删除。
+   不要再新增该宏的分支。
+3. **状态栏、右键菜单、3D 菜单纳入同一套 JSON**：`MenuManager3D` 硬编码路径已移除。
+4. **License feature gating 已接线**：JSON 中的 `feature` 字段真正生效。
 
 ---
 
@@ -971,7 +970,7 @@ JSON 里用到的 feature 必须都登记了映射。纯授权控制项（没有
 
 ---
 
-## 11. 皮肤链路的两个真实缺陷（2026-08-31）
+## 11. 皮肤链路的两个真实缺陷
 
 ### 11.1 深色模式下停靠面板发黑
 

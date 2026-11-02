@@ -57,7 +57,7 @@
 - `Main/Src/UI/Test/ViewportRefreshRegressionTests.cpp`
 - `Main/Src/UI/Test/ViewportInputRegressionTests.cpp`
 - `Main/Src/UI/Test/Scene3DRegressionTests.cpp`
-- `Main/Src/UI/Test/SceneEditIntegrationTests.cpp`（**2026-09-24 新增**：撤销状态交换的端到端链路，10 个用例 / 69 条断言，覆盖变换往返、拖动提交与取消、属性面板与算法包装、事务往返、群组归属存活、子集作用域守卫。独立目标 `SceneEditIntegrationTests`，开关 `BUILD_SCENE_EDIT_TESTS`）
+- `Main/Src/UI/Test/SceneEditIntegrationTests.cpp`（新增：撤销状态交换的端到端链路，10 个用例 / 69 条断言，覆盖变换往返、拖动提交与取消、属性面板与算法包装、事务往返、群组归属存活、子集作用域守卫。独立目标 `SceneEditIntegrationTests`，开关 `BUILD_SCENE_EDIT_TESTS`）
 - `Main/Src/UI/Test/CommandUiWiringTests.cpp`（顶部工具栏 actionId 与命令目录的接线一致性；左侧绘图面板与中枢工具动作的接线；客户配置里全部 commandId 的可解析性与配置可信性自检）
 - `UI/2D/Test/ToolsInteropTests.cpp`
 - `UI/3D/Test/OperationBus3DTests.cpp`
@@ -344,7 +344,7 @@ Utility/Utility/Test/
 
 切换缺陷里的 P0（`WorkbenchMenuManager::m_workbench` 未随切换同步）没有单测覆盖：它需要完整 `WorkbenchWindow` + 两个真实工作台，属集成层，当前靠手工冒烟验证（3D 下点菜单项确认走 3D 操作总线、3D 独有项可见可用）。
 
-同文件末尾的 `DrawToolBarWidgetTest`（4 例，2026-08-26 新增）锁定左侧绘图面板与命令中枢的接线：
+同文件末尾的 `DrawToolBarWidgetTest`（4 例）锁定左侧绘图面板与命令中枢的接线：
 按钮数量与顺序等于目录里 `LeftToolbar` 面的工具且每个按钮的 `defaultAction` 就是中枢那个 QAction、
 点击按钮必须触发中枢 QAction 且 `detectOperationSource()` 报 `LeftToolbar`、
 连续 `setActiveToolAction()` 后始终恰好一个 checked（`QActionGroup` 互斥不被破坏）、
@@ -416,7 +416,7 @@ Utility/Utility/Test/
 | **已知失败** | 已识别的旧架构遗留问题 | 标记并计划修复 |
 | **环境失败** | 测试环境问题 | 修复环境 |
 
-#### 4.3.1 无 QApplication 导致的"挂死"（2026-08-27 定位）
+#### 4.3.1 无 QApplication 导致的"挂死"
 
 构造 `QWidget` 前必须存在 `QApplication`，否则 Qt 直接 `qFatal`，Debug 版走
 `__debugbreak()` —— 进程停在断点上，既不退出也不打印 gtest 汇总，表现为：
@@ -434,7 +434,7 @@ Utility/Utility/Test/
 平台插件沿用默认 `windows`（`sanyi_deploy_qt_dlls` 只部署它，
 强制 `QT_QPA_PLATFORM=offscreen` 会因插件缺失直接起不来）。
 
-#### 4.3.2 缺 DLL 被误判成"超时"（2026-08-27 定位）
+#### 4.3.2 缺 DLL 被误判成"超时"
 
 `UI3DStorageTests` 长期被记为"超时挂死"，实测**不是挂死**：真实退出码是
 `0xC0000135`（STATUS_DLL_NOT_FOUND），进程在 `main` 之前就没了，

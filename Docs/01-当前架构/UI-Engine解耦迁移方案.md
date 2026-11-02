@@ -193,7 +193,7 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 
 ---
 
-### Phase 0 — 审计与止损 ✅ 已完成（2026-09）
+### Phase 0 — 审计与止损 ✅ 已完成
 
 **目标**：让"看起来怎样 = 实际怎样"，清出正确地基。
 
@@ -216,7 +216,7 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 
 ### Phase 1 — 渲染后端：以"统一开关 + 删死抽象"收口（原计划已修订）
 
-> **2026-09 实测修订**：原 Phase 1 假设"渲染后端没有抽象"，与事实不符 ——
+> **实测修订**：原 Phase 1 假设"渲染后端没有抽象"，与事实不符 ——
 > 后端**已经是运行时可选**的。因此原计划的大改造（把 widget 基类改为运行时、
 > 引入 `IRenderBackend` / `RenderBackendFactory`）**成本高、风险大、收益低**，已取消。
 > 保留的是真正存在的问题：两个后端开关互不相连 + 死抽象。
@@ -235,7 +235,7 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 1. **统一两个后端开关** ✅
    `SY_ENABLE_METAL_VIEWPORT` 的默认值改为派生自 `SANYI_DEFAULT_RENDER_BACKEND`
    （`CMakeLists.txt` 视口开关段），并加一致性 WARNING；用户仍可显式覆盖。
-   - 修复前问题：`-DSANYI_DEFAULT_RENDER_BACKEND=OPENGL`（Apple）仍会编译 Metal 视口。
+   - Phase 1 的实测修订：`-DSANYI_DEFAULT_RENDER_BACKEND=OPENGL`（Apple）仍会编译 Metal 视口。
 2. **删除死抽象 `UI::IRenderSurface`** ✅（0 实现、0 include）。
 3. **明确不做运行时基类切换**（决策）：
    唯一编译期耦合是 widget 基类（`QOpenGLWidget` vs `QWidget`），由
@@ -247,7 +247,7 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 
 ---
 
-### Phase 2 — UI→Engine 依赖收口 + 方向强制 ✅ 已完成（2026-09）
+### Phase 2 — UI→Engine 依赖收口 + 方向强制 ✅ 已完成
 
 **不做接口**，只收口依赖面。实际执行：
 
@@ -274,7 +274,7 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 
 ---
 
-### Phase 3 — 目录统一 + 维度门控 ✅ 已完成（2026-09）
+### Phase 3 — 目录统一 + 维度门控 ✅ 已完成
 
 **1. 2D/3D 目录骨架 — 实测已对齐，无需搬迁**
 
@@ -295,8 +295,7 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 **2. 根工程 `BUILD_UI_DIMENSION` 门控 — 已实现**
 
 `Config.cmake` 新增唯一权威开关 `BUILD_UI_DIMENSION`（`2D|3D|BOTH`，默认 `BOTH`），
-派生 `BUILD_UI3D` 与 `SANYI_DEFAULT_UI_DIMENSION`（`FORCE` 写回缓存，修复 2D→BOTH
-粘滞）。非法取值 `FATAL_ERROR`。
+派生 `BUILD_UI3D` 与 `SANYI_DEFAULT_UI_DIMENSION`（`FORCE` 写回缓存，避免 2D→BOTH 粘滞）。非法取值 `FATAL_ERROR`。
 
 | 取值 | UI2D | UI3D | 运行时默认 |
 |---|---|---|---|
@@ -309,7 +308,7 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 
 **验收（已验证）**：
 - `cmake -DBUILD_UI_DIMENSION=2D` → `UI3D: DISABLED`，`SanYiCAD.slnx` 中 UI3D 引用 = **0**。
-- `BOTH` → UI3D 重新 ON（粘滞已修复）。
+- `BOTH` → UI3D 重新 ON。
 - 非法值 → 配置期 `FATAL_ERROR`。
 
 ---

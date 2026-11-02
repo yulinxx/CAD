@@ -168,7 +168,7 @@ writeBlock / upsertDrawItem 写入失败、检查时可用提交时失败的 TOC
 flowchart TB
     subgraph 视图层
         A[SceneRefreshCoordinator<br/>32ms 消费泵 + 已渲染账本]
-        S[RenderSubmitScheduler<br/>触发判据 + 双队列 + 自适应批次<br/>（原 CurveLodManager，已更名）]
+        S[RenderSubmitScheduler<br/>触发判据 + 双队列 + 自适应批次]
     end
 
     subgraph 装配层

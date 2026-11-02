@@ -322,6 +322,8 @@ SyLogger::setFile("app.log");
 
 ### 6.3 导入一个文件失败/结果不对时怎么查
 
+> 该流程正在整改（Import 异步化），本节待代码落地后同步。
+
 导入链路跨了三层（Main → FileIO DLL → 具体 parser），日志按层分前缀，从外到内逐层收敛：
 
 ```
@@ -371,7 +373,7 @@ SyLogger::setFile("app.log");
 
 > **"日志最后一行"不等于崩溃位置。** 最后一行之后通常还有若干条已产生但未写出的记录。
 
-**已缓解（2026-08-26）**：新增 `SyLogger::Flush()`，崩溃回调
+**已缓解**：新增 `SyLogger::Flush()`，崩溃回调
 （`Main/Src/Common/CrashHandlerBootstrap.cpp`）**第一件事**就是调它，把队列冲出去。
 该函数**刻意不加锁** —— 崩溃时其他线程可能正持着 logger 的互斥量且永远不会再释放
 （比如崩在临界区里），加锁等于把崩溃现场变成死锁；`spdlog::logger::flush()` 自身线程安全，
