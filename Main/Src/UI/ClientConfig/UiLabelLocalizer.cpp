@@ -8,7 +8,7 @@ static const char* TRANSLATION_CONTEXTS[] = {
     "WorkbenchMenuManager",  // 菜单和Dock标题
     "MainWindow",            // 2D命令
     "MainWindow3D",          // 3D命令
-    "UiLayoutBuilder",       // UI布局（历史兼容）
+    "UiLayoutBuilder",       // UI布局
     "Navigation3D",          // 导航模式
     "Shortcuts"              // 快捷键
 };

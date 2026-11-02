@@ -87,9 +87,8 @@ void WorkbenchLayoutManager::initializeToolBarSkeleton()
 
 void WorkbenchLayoutManager::buildToolBars()
 {
-    // 配置驱动是唯一路径：不再保留硬编码回退分支。
-    // 保留两条路径的代价是硬编码分支会持续接收新功能，而配置分支永远追不上，
-    // 最终两边行为分叉——这是需要消除的核心风险。
+    // 配置驱动是唯一路径，保留两条路径会导致硬编码分支持续接收新功能，
+    // 而配置分支永远追不上，最终两边行为分叉——这是需要消除的核心风险。
     if (!ensureConfigLoaded())
     {
         SY_ERROR("[WorkbenchLayoutManager] Toolbar build aborted: client config unavailable");

@@ -160,20 +160,6 @@ bool FileDropHandler::eventFilter(QObject* watched, QEvent* event)
     return QObject::eventFilter(watched, event);
 }
 
-// void FileDropHandler::installAppEventFilter()
-// {
-//     if (m_appFilterInstalled)
-//     {
-//         return;
-//     }
-//     if (QCoreApplication* app = QApplication::instance())
-//     {
-//         app->installEventFilter(this);
-//         m_appFilterInstalled = true;
-//         SY_INFO("[FileDropHandler] App-level event filter installed for drag-drop");
-//     }
-// }
-
 QStringList FileDropHandler::supportedExtensions() const
 {
     QStringList exts = imageExtensions();

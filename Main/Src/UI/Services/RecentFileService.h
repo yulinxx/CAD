@@ -8,9 +8,7 @@ class PersistenceService;
  * @class RecentFileService
  * @brief IRecentFileService 的唯一实现 —— 数据库 + QSettings 双写，按工作台（2D/3D）分桶
  *
- * 全仓最近文件读写只走这一条路。曾经并存的三套（WorkbenchWindow 自带一份、
- * UI2D ConfigManager 写 "Files/RecentFiles"、UI2D FileManager 纯内存）已删除。
- * 内部优先使用数据库持久化（recent_files.workbench 列区分工作台），
+ * 全仓最近文件读写只走这一条路。内部优先使用数据库持久化（recent_files.workbench 列区分工作台），
  * QSettings 按工作台分 key 兜底（RecentFiles/2D、RecentFiles/3D）。
  */
 class RecentFileService : public IRecentFileService

@@ -24,7 +24,7 @@ public:
 
     // ---- SceneBuilderBase 接口 ----
 
-    // SceneBuilderBase override — 返回裸指针，由 caller 管理生命周期
+    // SceneBuilderBase 重写 —— 返回裸指针，由调用方管理生命周期
     // 内部委托给静态 createDefaultScene(QString&) 完成实际构建
     UI::SceneDocumentBase* createDefaultScene() override;
     size_t defaultRootName(char* buffer, size_t bufferSize) const override;

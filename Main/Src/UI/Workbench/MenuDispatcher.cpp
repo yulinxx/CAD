@@ -133,7 +133,7 @@ void MenuDispatcher::dispatch(const QString& commandId, const QVariantMap& param
     }
 
     // 关于对话框：help.about 是窗口级动作，在进命令总线前短路
-    // （目录里保留条目仅供历史兼容，不作为分发路径）。
+    // （目录里保留条目仅供兼容，不作为分发路径）。
     // 模式必须取当前工作台 —— 硬编码 Mode2D 会让 3D 下打开 2D 版 About。
     if (commandId == QLatin1String("help.about") && m_self && m_self->workbenchWindow())
     {

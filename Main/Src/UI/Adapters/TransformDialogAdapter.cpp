@@ -234,7 +234,7 @@ QDialog* TransformDialogAdapter::createDialog()
             tabOrder.addWidget(m_rotateCenterYSpinBox, 3, "RotateCenterY");
         break;
     case TransformType::Mirror:
-        // Radio buttons 和 spin boxes 会在 addMirrorInputs 中处理
+        // 单选按钮和数值框会在 addMirrorInputs 中处理
         break;
     default:
         break;

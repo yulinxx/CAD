@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file SceneRefreshCoordinator.cpp
  * @brief 场景刷新协调器实现 — 四级刷新策略与增量渲染管线
  *

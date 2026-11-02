@@ -151,7 +151,7 @@ void WorkbenchMenuManager::setUnitManager(UnitManager* unitManager)
 
 void WorkbenchMenuManager::rebuildAllMenus()
 {
-    // Clear old menus and shortcuts
+    // 清除旧菜单和快捷键
     clearGlobalShortcuts();
     if (auto* mb = m_window->menuBar())
     {
@@ -430,14 +430,14 @@ void WorkbenchMenuManager::bindShortcuts()
     // 先清理旧动作，防止重复叠加
     clearGlobalShortcuts();
 
-    // 这里**不再**自建 Undo / Redo 的窗口级 QAction。
+    // 不自建 Undo / Redo 的窗口级 QAction。
     //
     // 快捷键只保留一条注册路径：客户 JSON。Edit 菜单项自带 "shortcut": "Ctrl+Z" /
     // "Ctrl+Y"（configs/base.json），UiLayoutBuilder::buildMenuItem 会把它设到菜单
     // QAction 上；shortcuts[] 节里的重复定义也已清理，并且 buildShortcuts 还有一道
     // "菜单已声明过该键序列就不再建 QShortcut" 的守卫。
     //
-    // 此前这里额外建的窗口级 QAction 用的是 QKeySequence::Undo / Redo，在 Windows 上
+    // 额外建的窗口级 QAction 用的是 QKeySequence::Undo / Redo，在 Windows 上
     // 正是 Ctrl+Z / Ctrl+Y —— 与菜单项同键、同为窗口范围，Qt 判定 ambiguous 后两个
     // 接收者都不触发，表现为"按 Ctrl+Z 有时没反应"，且只在特定焦点链下出现。
     //

@@ -13,7 +13,7 @@
  * `ViewportRendererFactory`；真正的后端工厂将来落在 RenderBridge::BackendRendererFactory。
  *
  * 目前只有一条真实链路：Compatible（RenderWidget3DAdapter → RenderWidget3D，OpenGL）。
- * 曾经存在的 Simple（软件渲染 SimpleRenderer3D）链路已删除 —— 它在产品运行时没有触发点，
+ * Simple（软件渲染 SimpleRenderer3D）链路已移除——它在产品运行时没有触发点，
  * 只有测试在用，且自带一套与 RenderWidget3D 冲突的相机键位约定。
  */
 class ViewportRendererFactory

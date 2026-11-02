@@ -144,8 +144,6 @@ WorkbenchWindow::WorkbenchWindow(QWidget* parent)
     : QMainWindow(parent)
     , m_fileDropHandler(std::make_unique<FileDropHandler>(this))
 {
-    SY_DEBUG("[WorkbenchWindow] Creating main window");
-
     setWindowTitle(UiBrandManager::instance().windowTitle());
     // 初始窗口大小按屏幕可用区域自适应：1440x900 是基准，若屏幕更小则不超过可用区的 90%
     {
@@ -214,7 +212,7 @@ void WorkbenchWindow::retranslateUi()
 
     // 语言切换时重建菜单文案。
     // 配置驱动是唯一路径，菜单统一由 WorkbenchMenuManager 从客户 JSON 生成，
-    // 因此语言切换后始终需要重建以刷新文案；不再区分「工作台自管菜单」的 legacy 分支。
+    // 因此语言切换后始终需要重建以刷新文案。
     if (m_menuManager)
     {
         m_menuManager->rebuildAllMenus();
@@ -474,7 +472,6 @@ void WorkbenchWindow::buildDockAreas()
     m_layoutManager->buildDockAreas();
 }
 
-/// 构建状态栏
 void WorkbenchWindow::initializeStatusBarSkeleton()
 {
     m_layoutManager->initializeStatusBarSkeleton();
@@ -515,7 +512,7 @@ void WorkbenchWindow::mountStatusBar(StatusBarBase* statusBarWidget)
         m_stateManager->setActiveStatusBar(m_activeStatusBar);
     }
 
-    SY_INFOF("[WorkbenchWindow] StatusBar mounted: %s", m_activeStatusBar->metaObject()->className());
+    SY_DEBUGF("[WorkbenchWindow] StatusBar mounted: %s", m_activeStatusBar->metaObject()->className());
 }
 
 void WorkbenchWindow::unmountStatusBar()
@@ -547,9 +544,7 @@ void WorkbenchWindow::unmountStatusBar()
     // 不在这里 delete：状态栏 widget 的所有权在 Qt 父子关系里。
     // QStatusBar::addWidget 已把它 reparent 到 QStatusBar，而 QStatusBar 跨工作台
     // 切换一直存在，所以卸载后对象仍然活着，下次 attach 由工作台复用同一个实例。
-    // （曾经这里写「由创建它的 Workbench 在析构时清理」，但 ~Workbench2D 是
-    // = default、~Workbench3D 也没碰它——那句描述的契约并不存在。真正的回收者
-    // 是 QStatusBar 的析构。）
+    // 真正的回收者是 QStatusBar 的析构。
     m_activeStatusBar = nullptr;
     if (m_stateManager)
     {
@@ -605,8 +600,6 @@ void WorkbenchWindow::updateWindowTitle()
     }
 }
 
-/// 应用样式表
-/// @param styleSheet 样式表内容
 void WorkbenchWindow::closeEvent(QCloseEvent* event)
 {
     if (m_stateCenter && m_stateCenter->dirty())
@@ -782,10 +775,10 @@ void WorkbenchWindow::refreshPositionLabel()
 // 属于第二套并行实现，已删除。需要读写最近文件请走 m_uiServices.recentFileService。
 
 /// 注册停靠面板
-
 /// @param title 面板标题
 /// @param widget 面板内容部件
 /// @param area 停靠区域
+/// @param stableId 面板稳定 ID（用于布局快照键）
 QDockWidget* WorkbenchWindow::registerDockWidget(
     const QString& title, QWidget* widget, Qt::DockWidgetArea area, const QString& stableId)
 {
@@ -810,10 +803,7 @@ void WorkbenchWindow::clearWorkbenchContent()
 
     // 3: 清理繁忙进度条。
     // 回收责任归创建方（布局管理器）单点持有：updateBusyIndicator(false) 内部
-    // removeWidget + deleteLater + 清 QPointer 三件一起做。此前框架在这里自己
-    // removeWidget + deleteLater 却不清 QPointer，靠下面第 5 步的 sendPostedEvents
-    // 才让指针归零——一旦那一步被挪走或改成异步，下次 updateBusyIndicator(true)
-    // 会看到非空的僵尸指针并直接 return，忙碌指示器就永久不再出现。
+    // removeWidget + deleteLater + 清 QPointer 三件一起做。
     m_layoutManager->updateBusyIndicator(false);
 
     // 4: 委托布局管理器清理工具栏/菜单栏/停靠面板/中央控件并重建占位控件
@@ -1093,7 +1083,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     // 保护：防止重复切换（快速连续点击可能导致状态混乱）
     if (m_switchingWorkbench)
     {
-        SY_INFO("[WorkbenchWindow] triggerWorkbench: already switching, ignoring request");
+        SY_DEBUG("[WorkbenchWindow] triggerWorkbench: already switching, ignoring request");
         return;
     }
 
@@ -1331,7 +1321,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     }
 
     // refreshFromState 内部已统一调用 refreshStatusText + updateWindowTitle，
-    // 不再在外面重复调用（重复调用只会多做两次无意义的 snapshot 拷贝）
+    // 不在外面重复调用（重复调用只会多做两次无意义的 snapshot 拷贝）
     refreshFromState();
 
     // 更新 FileDropHandler 的工作台 ID，确保拖放过滤使用正确的扩展名
@@ -1341,7 +1331,7 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     }
 
     // 注意：配置驱动的工具栏已在 6b.1 重建、状态栏槽位已在第 6d 步（buildStatusBar）重建；
-    // 这里不再重复调用 —— 重复 buildStatusBar 会 clearStatusBarSlots + 重建，
+    // 这里不重复调用 —— 重复 buildStatusBar 会 clearStatusBarSlots + 重建，
     // 导致槽位顺序翻转两次。
 
     SY_DEBUGF("[WorkbenchWindow] workbench state committed: id=%s busy=0", workbenchId.toUtf8().constData());

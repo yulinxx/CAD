@@ -268,10 +268,6 @@ void UiLayoutBuilder::buildMenus(const std::vector<MenuDef>& menus)
             buildMenuItem(qMenu, item);
         }
     }
-
-    // SY_DEBUGF("[UiLayoutBuilder] All menus built: total=%d topLevelMenus=%d",
-    //     static_cast<int>(menus.size()),
-    //     m_window->menuBar() ? static_cast<int>(m_window->menuBar()->actions().size()) : 0);
 }
 
 void UiLayoutBuilder::buildMenuItem(

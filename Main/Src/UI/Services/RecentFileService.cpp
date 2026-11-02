@@ -104,7 +104,6 @@ QStringList RecentFileService::loadRecentFiles(const QString& workbenchId) const
         auto records = m_persistence->recentFiles()->loadAll();
         if (!records.empty())
         {
-            // SY_DEBUGF("[RecentFileService] Loaded %zu recent files from database", records.size());
             QStringList result;
             std::vector<RecentFileRecord> legacyFixups;
             result.reserve(static_cast<int>(records.size()));

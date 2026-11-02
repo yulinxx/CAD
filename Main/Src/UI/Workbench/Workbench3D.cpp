@@ -251,7 +251,7 @@ void Workbench3D::dispatchCommand(const QString& commandId, const QVariantMap& p
         return;
     }
 
-    SY_DEBUGF("[Workbench3D] Dispatch command='%s'", qPrintable(commandId));
+    SY_TRACEF("[Workbench3D] Dispatch command='%s'", qPrintable(commandId));
     // 走完整 Request：便捷入口 run(id, source) 不带 params，会把调用方参数丢掉
     OperationRequest3D req;
     req.id = operation;
@@ -285,7 +285,7 @@ Cmd::OperationResultBase Workbench3D::dispatchCommandForResult(const QString& co
         return result;
     }
 
-    SY_DEBUGF("[Workbench3D] Dispatch command with result='%s'", qPrintable(commandId));
+    SY_TRACEF("[Workbench3D] Dispatch command with result='%s'", qPrintable(commandId));
     OperationRequest3D req;
     req.id = operation;
     req.source = OperationSource3D::Menu;
@@ -495,7 +495,7 @@ void Workbench3D::setup3DViewportAndSignals(WorkbenchWindow& window)
 
     // sigSwitchTo2D / sigSwitchTo3D 的连接统一在 attachToWindow 中建立
     // （QueuedConnection，避免信号发出方还在调用栈上时重入 triggerWorkbench）；
-    // 此处不再单独 connect，否则每次 attach 会对 sigSwitchTo2D 形成双连接、
+    // 此处不单独 connect，否则每次 attach 会对 sigSwitchTo2D 形成双连接、
     // 一次点击触发两次工作台切换。
 
     // 创建视口并设置渲染器
@@ -580,7 +580,7 @@ void Workbench3D::bind3DRenderSignals(ServiceOwner& own)
 }
 
 /// 绑定选中变化信号
-/// 不再往 metadata 写 positionText / 3d_selCount / 3d_modelName 等无消费者的镜像。
+/// 不往 metadata 写 positionText / 3d_selCount / 3d_modelName 等无消费者的镜像。
 void Workbench3D::bind3DSelectionSignal()
 {
     // 跨 DLL 安全：信号参数改为 POD 指针数组
@@ -624,7 +624,7 @@ void Workbench3D::setup3DDeleteShortcuts(WorkbenchWindow& window)
         }
         if (m_services3D.operationBus)
         {
-            SY_DEBUG("[Workbench3D] Delete shortcut activated, running Edit_Delete operation");
+            SY_TRACE("[Workbench3D] Delete shortcut activated, running Edit_Delete operation");
             m_services3D.operationBus->run(OperationId3D::Edit_Delete);
         }
     };
@@ -736,7 +736,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     // 那一层 —— Settings 需要台账模型注入，Shortcuts 需要台账渲染内容。因此统一由工作台层
     // 注册，Settings 再解析活动工作台转发给 UiWorkbench::showSettingsDialog。
     // 注册必须发生在 registerAll 之前：OperationRegistryBase 用 try_emplace，先到先得，
-    // 后注册的同名 Operation 会被忽略（HelpOperations3D 里已不再注册这两项）。
+    // 后注册的同名 Operation 会被忽略（HelpOperations3D 里不注册这两项）。
     own.operationBus->registerOperation(std::make_unique<LambdaOperation3D>(
         OperationId3D::Help_Settings, [windowPtr = &window](OperationContext3D&, const OperationRequest3D&) {
             OperationResult3D result;
@@ -921,7 +921,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     }
 
     // 6. 状态栏：创建独立的 StatusBar3D 并挂载到 WorkbenchWindow
-    //    Workbench3D 拥有 StatusBar3D 的完整生命周期，不再从 MainWindow3D reparent
+    //    Workbench3D 拥有 StatusBar3D 的完整生命周期，不从 MainWindow3D reparent
     //    MainWindow3D 保留自己的 StatusBar3D 供内部使用（如导航提示）
     if (!m_statusBar3D)
     {
@@ -977,8 +977,8 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
 
 void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
 {
-    // 3D 场景树面板使用与 2D 共享的 SceneTreePanel
-    // 不再单独创建 SceneTreePanel3D，确保 2D/3D 切换时使用同一实例
+    // 3D 场景树面板使用与 2D 共享的 SceneTreePanel，
+    // 不单独创建 SceneTreePanel3D，确保 2D/3D 切换时使用同一实例
     m_scenePanel3D = window.sceneTreeDock();
 
     // 尝试从 skeleton's dock 查找已存在的 SceneTreePanel
@@ -1174,7 +1174,7 @@ void Workbench3D::refreshSceneTreeRowsForSelection3D()
         return;
     }
 
-    // 新版场景树面板不再支持整节点替换：对既有行按 id 局部刷新即可。
+    // 场景树面板不支持整节点替换：对既有行按 id 局部刷新即可。
     // 选中高亮另由 setSelectedIds 维护，纯新增节点走 appendTopLevelNodes。
     QVector<qint64> rowIds;
     rowIds.reserve(static_cast<int>(entityIds.size()));
@@ -1789,7 +1789,7 @@ void Workbench3D::shutdown()
     m_view = {};
 
     // 撤销栈与文档管理器随工作台实例一起结束（这里才释放）。
-    // 注意：不能放在 deactivate() 里 —— 那会让 3D 的撤销历史在每次切台时清空。
+    // 不能放在 deactivate() 里 —— 那会让 3D 的撤销历史在每次切台时清空。
     m_sessionState.reset();
 }
 
@@ -1809,7 +1809,7 @@ bool Workbench3D::requiresSkeletonDocks() const
 bool Workbench3D::managesOwnMenus() const
 {
     // 菜单统一由 WorkbenchMenuManager 从客户 JSON 构建，
-    // 3D 工作台不再自行管理窗口菜单栏。硬编码的 MenuManager3D 路径已移除。
+    // 3D 工作台不自行管理窗口菜单栏。
     return false;
 }
 

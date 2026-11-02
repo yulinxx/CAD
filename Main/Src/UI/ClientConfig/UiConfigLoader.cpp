@@ -411,7 +411,7 @@ std::optional<UiConfigData> UiConfigLoader::parseConfig(const QJsonDocument& doc
     }
 
     // statusBar：整节缺省时保留默认值（可见 + 无槽位），
-    // 由 UiLayoutBuilder 构建出一个空状态栏容器，行为与历史硬编码骨架一致。
+    // 由 UiLayoutBuilder 构建出一个空状态栏容器。
     if (root.contains(QStringLiteral("statusBar")))
     {
         data.statusBar = parseStatusBar(root.value(QStringLiteral("statusBar")).toObject());

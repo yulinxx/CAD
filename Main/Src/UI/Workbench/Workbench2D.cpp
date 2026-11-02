@@ -178,7 +178,7 @@ void Workbench2D::dispatchCommand(const QString& commandId, const QVariantMap& p
     const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(commandId);
     if (menuId != static_cast<UI::MenuActionId>(0))
     {
-        SY_DEBUGF("[Workbench2D] Dispatch command='%s' menuId=%d source=Menu",
+        SY_TRACEF("[Workbench2D] Dispatch command='%s' menuId=%d source=Menu",
             qPrintable(commandId),
             static_cast<int>(menuId));
         OperationRouting::dispatch(menuId, m_commands.operationBus, OperationSource::Menu, params);
@@ -198,12 +198,12 @@ void Workbench2D::dispatchCommand(const QString& commandId, const QVariantMap& p
             SY_WARNF("[Workbench2D] Unknown command: %s", qPrintable(commandId));
             return;
         }
-        SY_DEBUGF("[Workbench2D] Dispatch tool command='%s'", qPrintable(commandId));
+        SY_TRACEF("[Workbench2D] Dispatch tool command='%s'", qPrintable(commandId));
         m_commands.operationBus->run(toolOperation, params, OperationSource::Menu);
         return;
     }
 
-    SY_DEBUGF("[Workbench2D] Dispatch command='%s'", qPrintable(commandId));
+    SY_TRACEF("[Workbench2D] Dispatch command='%s'", qPrintable(commandId));
     m_commands.operationBus->run(operation, params, OperationSource::Menu);
 }
 
@@ -232,7 +232,7 @@ Cmd::OperationResultBase Workbench2D::dispatchCommandForResult(const QString& co
         return result;
     }
 
-    SY_DEBUGF("[Workbench2D] Dispatch command with result='%s'", qPrintable(commandId));
+    SY_TRACEF("[Workbench2D] Dispatch command with result='%s'", qPrintable(commandId));
     return m_commands.operationBus->run(operation, params, OperationSource::Menu);
 }
 
@@ -524,15 +524,15 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         // （handler 见 CoreOperationRegistry::registerAll 的 Edit_Delete，落到
         // SceneEditService::deleteSelected）。3D 侧 setup3DDeleteShortcuts 也是这么做的。
         //
-        // 曾经这里直连 sceneEditService 并额外做 selectionService->clear() +
-        // requestFullRefresh()，两样都不需要且有害：
+        // 不要直连 sceneEditService 并额外做 selectionService->clear() +
+        // requestFullRefresh()：
         //   - 选择表：SceneManager::extractEntitiesById 内部已 m_selection.remove()，
         //     额外 clear 会在删除被锁定拒绝时把用户的选择一起清掉；
         //   - 全量刷新：删除会 notifySceneChanged()，视口按增量路径重建即可，
         //     菜单删除一直没有全刷也从没出现残影。
         if (m_commands.operationBus)
         {
-            SY_DEBUG("[Workbench2D] Delete shortcut activated, running Edit_Delete operation");
+            SY_TRACE("[Workbench2D] Delete shortcut activated, running Edit_Delete operation");
             m_commands.operationBus->run(OperationId::Edit_Delete, {}, OperationSource::Shortcut);
         }
     };
@@ -1033,7 +1033,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // 文字编辑工具栏绑定：工具切换到 TextEditTool 时，绑定到 TextFontToolBar
     // 以便在进入编辑时自动刷新字体面板信息
     QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged, this, [this](const QString& toolName) {
-        SY_DEBUGF("[Workbench2D] activeToolChanged: %s, m_textFontToolBarWidget=%p, m_viewport=%p",
+        SY_TRACEF("[Workbench2D] activeToolChanged: %s, m_textFontToolBarWidget=%p, m_viewport=%p",
             qPrintable(toolName),
             reinterpret_cast<void*>(m_textFontToolBarWidget),
             reinterpret_cast<void*>(m_viewport));
@@ -1045,14 +1045,14 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
                 ITool* tool = toolMgr->getTool(QStringLiteral("TextEditTool"));
                 if (tool && tool->isTextEditTool())
                 {
-                    // safe to cast since isTextEditTool() returns true
+                    // isTextEditTool() 返回 true，这里强转安全
                     auto* textEditTool = static_cast<TextEditTool*>(tool);
                     m_textFontToolBarWidget->bindTool(textEditTool);
-                    SY_DEBUGF("[Workbench2D] TextFontToolBar bound to TextEditTool");
+                    SY_TRACE("[Workbench2D] TextFontToolBar bound to TextEditTool");
 
                     // 设置编辑状态变化回调，以便在进入/退出编辑时切换工具栏上下文
                     textEditTool->setEditingStateChangedCallback([this](bool editing) {
-                        SY_DEBUGF("[Workbench2D] editingStateChanged: editing=%d, m_contextManager=%p",
+                        SY_TRACEF("[Workbench2D] editingStateChanged: editing=%d, m_contextManager=%p",
                             editing,
                             reinterpret_cast<void*>(m_contextManager.get()));
                         if (m_contextManager)
@@ -1064,7 +1064,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
                             if (m_contextManager->currentContext() != targetCtx)
                             {
                                 m_contextManager->setCurrentContext(targetCtx);
-                                SY_DEBUGF("[Workbench2D] Context switched to %d", static_cast<int>(targetCtx));
+                                SY_TRACEF("[Workbench2D] Context switched to %d", static_cast<int>(targetCtx));
                             }
                         }
                     });
@@ -1595,7 +1595,7 @@ void Workbench2D::refreshSceneTree()
     // 打点：上报本轮重建的触发来源，并立刻清零（避免后续重建误用旧标记）。
     const char* src = m_sceneTreeRefreshSource ? m_sceneTreeRefreshSource : "misc";
     m_sceneTreeRefreshSource = nullptr;
-    SY_INFOF("[Workbench2D] scene tree rebuilt src=%s: topLevel=%d entities=%zu structRev=%llu topoRev=%llu",
+    SY_DEBUGF("[Workbench2D] scene tree rebuilt src=%s: topLevel=%d entities=%zu structRev=%llu topoRev=%llu",
         src,
         static_cast<int>(topology.topLevel.size()),
         m_lastSceneTreeEntityCount,
@@ -1822,7 +1822,6 @@ void Workbench2D::syncSceneTreeSelection()
     }
     Eg::SceneManager* scene = m_scene.sceneEditService ? m_scene.sceneEditService->sceneManager() : nullptr;
     auto selected = SceneTreeBuilder2D::selectedIds(scene);
-    // SY_DEBUGF("[Workbench2D] syncSceneTreeSelection: selected count=%d", selected.size());
     m_scenePanel2D->setSelectedIds(selected);
 }
 
@@ -1935,7 +1934,7 @@ void Workbench2D::renameEntity(const QString& id, const QString& newName)
 
     // 改名不是结构变化（签名不动），但树行要显示新名字，这里显式重建一次。
     // 撤销改名同样依赖它：undoStateChanged 走的是 refreshSceneTree()（无条件）。
-    SY_DEBUGF("[Workbench2D] renameEntity: id=%lld name=%s", static_cast<long long>(*eid), name.c_str());
+    SY_TRACEF("[Workbench2D] renameEntity: id=%lld name=%s", static_cast<long long>(*eid), name.c_str());
     refreshSceneTree();
 }
 
@@ -2066,9 +2065,8 @@ void Workbench2D::onViewportContextMenu(QContextMenuEvent* event)
         CommandActionHub::applySnapshotToMenu(configured, snapshot);
 
         // 生命周期：菜单在本作用域内建、本作用域内销毁。
-        // 注：曾经这里写「因为 dispatcher 是栈对象所以不能 deleteLater」，那个前提本身是错的 ——
-        // dispatcher 早在 buildConfiguredContextMenu 返回时就没了。现在分发器是工作台本体，
-        // 菜单何时销毁都安全，仍就地 delete 只是为了不把临时 QAction 留给事件循环。
+        // 分发器是工作台本体，菜单何时销毁都安全，就地 delete 只是为了
+        // 不把临时 QAction 留给事件循环。
         configured->exec(event->globalPos());
         delete configured;
         return;
