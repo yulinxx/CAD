@@ -203,7 +203,8 @@ function(sanyi_add_shared_library target)
     set(options AUTOMOC AUTOUIC AUTORCC UNITY_BUILD NO_UNITY_BUILD)
     set(oneValueArgs FOLDER DESCRIPTION EXPORT_MACRO VERSION_MAJOR VERSION_MINOR VERSION_PATCH)
     set(multiValueArgs SOURCES HEADERS PUBLIC_INCLUDE_DIRS PRIVATE_INCLUDE_DIRS 
-                       COMPILE_DEFINITIONS COMPILE_OPTIONS LINK_LIBRARIES QT_COMPONENTS)
+                       COMPILE_DEFINITIONS COMPILE_OPTIONS LINK_LIBRARIES QT_COMPONENTS
+                       PUBLIC_LINK_LIBRARIES PRIVATE_LINK_LIBRARIES PUBLIC_QT_COMPONENTS)
     cmake_parse_arguments(SANYI_SHLIB "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
     if(SANYI_SHLIB_VERSION_MAJOR)
@@ -327,13 +328,23 @@ function(sanyi_add_shared_library target)
 
     set_target_properties(${target} PROPERTIES ${_target_properties})
 
-    if(SANYI_SHLIB_QT_COMPONENTS)
-        sanyi_find_qt(${SANYI_SHLIB_QT_COMPONENTS})
+    if(SANYI_SHLIB_QT_COMPONENTS OR SANYI_SHLIB_PUBLIC_QT_COMPONENTS)
+        if(SANYI_SHLIB_PUBLIC_QT_COMPONENTS)
+            sanyi_find_qt(${SANYI_SHLIB_PUBLIC_QT_COMPONENTS})
+        else()
+            sanyi_find_qt(${SANYI_SHLIB_QT_COMPONENTS})
+        endif()
         target_link_libraries(${target} PUBLIC ${QT_LIBRARIES})
     endif()
 
     if(SANYI_SHLIB_LINK_LIBRARIES)
         target_link_libraries(${target} PUBLIC ${SANYI_SHLIB_LINK_LIBRARIES})
+    endif()
+    if(SANYI_SHLIB_PUBLIC_LINK_LIBRARIES)
+        target_link_libraries(${target} PUBLIC ${SANYI_SHLIB_PUBLIC_LINK_LIBRARIES})
+    endif()
+    if(SANYI_SHLIB_PRIVATE_LINK_LIBRARIES)
+        target_link_libraries(${target} PRIVATE ${SANYI_SHLIB_PRIVATE_LINK_LIBRARIES})
     endif()
 
     sanyi_add_version_info(${target} "${target}" "${SANYI_SHLIB_DESCRIPTION}")
