@@ -1020,9 +1020,10 @@ TEST(RefreshPathRegressionTest, RepaintAfterFullRefresh_NoDowngrade)
 // 队列超过单批 2000 个图元时，剩余图元永远停在低精度 ——
 // 用户看到的现象就是「超大文件放大后，曲线仍然粗糙」。
 //
-// 断言方式：不依赖真实 GPU（无渲染器时 upsert 会失败，但批次游标仍会推进），
-// 看队列是否排空、批次是否继续增长。旧实现最多被场景刷新顺手带上 2 批，
-// 修复后 32ms 定时器会持续续跑，直到 6001 个图元全部消费完。
+// 断言方式：不依赖真实 GPU —— 注入成功的提交回调，验证队列排空与批次
+// 续跑语义（失败重试语义由 RenderSubmitSchedulerTest 的失败重试用例覆盖）。
+// 旧实现最多被场景刷新顺手带上 2 批，修复后 32ms 定时器会持续续跑，
+// 直到 6001 个图元全部消费完。
 TEST(CurveLodPumpRegressionTest, ContinuesPastFirstBatch)
 {
     Eg::SceneManager scene;
@@ -1048,6 +1049,9 @@ TEST(CurveLodPumpRegressionTest, ContinuesPastFirstBatch)
     SceneRefreshCoordinator coordinator;
     coordinator.setRenderWidget(&widget);
     coordinator.setSceneContext(&scene);
+    // 无渲染器（无 GL）时真实 upsert 会返回失败，批次会走重试而不是推进；
+    // 本用例验证的是泵续跑/队列排空语义，注入成功回调隔离掉 GL 依赖。
+    coordinator.setSubmitBatchCallback([](const std::vector<uint64_t>&) { return true; });
 
     coordinator.requestCurveLodRefresh();
     // 首次收集应把所有曲线入队（视口 1.25 倍余量覆盖了测试坐标）。
@@ -1278,4 +1282,232 @@ TEST(RenderSubmitSchedulerTest, ExtensionQueueConsumedBeforeLodQueue)
         EXPECT_EQ(renderedIds.count(uid), 1u);
     }
     EXPECT_TRUE(scheduler.empty());
+}
+
+// ==================== 批次提交失败的重试语义（缺陷1） ====================
+//
+// 旧缺陷：提交失败只记 recollectPending 就放游标走，而 refillQueueIfStale
+// 的 staleness 前置门让重收集空转 —— 失败图元被永久丢弃。
+// 修复后失败条目由游标回退留在原队列原位置重试，永不丢弃；
+// 「整批必然失败」（GL 上下文不可用）走前置挂起，不做无意义提交尝试。
+
+// 失败批次原样重试直至成功：前两次提交失败，第三次起成功。
+// 断言失败批次与重试批次完全一致（条目不丢、不重排），最终全部提交。
+TEST(RenderSubmitSchedulerTest, FailedBatchRetriedUntilSuccess_NoPermanentLoss)
+{
+    Eg::SceneManager scene;
+
+    constexpr int kCircleCount = 2501;
+    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    entities.reserve(kCircleCount);
+    for (int i = 0; i < kCircleCount; ++i)
+    {
+        auto circle = std::make_unique<Eg::SyCircle>();
+        circle->basePoint = Ut::Vec2d((i % 80) * 10.0 - 400.0, ((i / 80) % 60) * 10.0 - 300.0);
+        circle->dRadius = 1.0;
+        entities.push_back(std::move(circle));
+    }
+    scene.addEntities(std::move(entities));
+
+    std::unordered_set<uint64_t> expectedIds;
+    for (const Eg::SyEntity* entity : scene.getAllEntities())
+    {
+        expectedIds.insert(static_cast<uint64_t>(entity->id));
+    }
+    ASSERT_EQ(expectedIds.size(), static_cast<size_t>(kCircleCount));
+
+    RenderWidget widget;
+    widget.resize(800, 600);
+
+    RenderSubmitScheduler scheduler(&widget);
+    scheduler.setSceneManager(&scene);
+    scheduler.setPumpCallback([]() {});
+
+    std::vector<std::vector<uint64_t>> attempts;
+    scheduler.setSubmitBatchCallback([&attempts](const std::vector<uint64_t>& batch) {
+        attempts.push_back(batch);
+        return attempts.size() > 2;  // 前两次失败，第三次起成功
+    });
+
+    std::unordered_set<uint64_t> renderedIds;
+    scheduler.requestRefresh();
+    ASSERT_EQ(scheduler.size(), static_cast<size_t>(kCircleCount));
+
+    // 退避 tick 序列：失败 1 次跳 1 tick、失败 2 次跳 2 tick……30 个 tick 远够走完
+    int ticks = 0;
+    while (!scheduler.empty() && ticks < 30)
+    {
+        scheduler.processBatch(renderedIds);
+        ++ticks;
+    }
+
+    ASSERT_TRUE(scheduler.empty()) << "重试后队列仍未排空：失败条目被丢弃或重试链路断了";
+    ASSERT_GE(attempts.size(), 3u);
+    // 失败批次原样重试：游标回退保证重试的批次与失败批次完全一致
+    EXPECT_EQ(attempts[0], attempts[2]) << "重试批次与失败批次不一致：条目丢失或顺序被打乱";
+    // 无永久缺失：全部图元最终都提交进账本
+    EXPECT_EQ(renderedIds, expectedIds) << "有图元在失败后永久丢失";
+}
+
+// GL 上下文不可用（整批必然失败）：挂起队列，不做任何提交尝试；
+// 恢复可用后自动续跑并全部提交。不可用期间零尝试 = 不空转不烧 CPU。
+TEST(RenderSubmitSchedulerTest, UnavailableSubmitSuspendsWithoutPointlessRetries)
+{
+    Eg::SceneManager scene;
+
+    constexpr int kCircleCount = 100;
+    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    entities.reserve(kCircleCount);
+    for (int i = 0; i < kCircleCount; ++i)
+    {
+        auto circle = std::make_unique<Eg::SyCircle>();
+        circle->basePoint = Ut::Vec2d((i % 80) * 10.0 - 400.0, ((i / 80) % 60) * 10.0 - 300.0);
+        circle->dRadius = 1.0;
+        entities.push_back(std::move(circle));
+    }
+    scene.addEntities(std::move(entities));
+
+    RenderWidget widget;
+    widget.resize(800, 600);
+
+    RenderSubmitScheduler scheduler(&widget);
+    scheduler.setSceneManager(&scene);
+    scheduler.setPumpCallback([]() {});
+
+    bool available = false;
+    scheduler.setUploadAvailablePredicate([&available]() { return available; });
+
+    size_t attempts = 0;
+    scheduler.setSubmitBatchCallback([&attempts](const std::vector<uint64_t>&) {
+        ++attempts;
+        return true;
+    });
+
+    std::unordered_set<uint64_t> renderedIds;
+    scheduler.requestRefresh();
+    ASSERT_EQ(scheduler.size(), static_cast<size_t>(kCircleCount));
+
+    for (int i = 0; i < 20; ++i)
+    {
+        scheduler.processBatch(renderedIds);
+    }
+    // 不可用期间：零提交尝试、队列原封不动、批次数为零（挂起而非重试失败）
+    EXPECT_EQ(attempts, 0u) << "上下文不可用期间仍在做无意义的提交尝试";
+    EXPECT_EQ(scheduler.size(), static_cast<size_t>(kCircleCount)) << "挂起期间队列被动了";
+    EXPECT_EQ(scheduler.processedBatchCount(), 0u);
+    EXPECT_TRUE(renderedIds.empty());
+
+    // 上下文恢复：自动续跑，全部提交
+    available = true;
+    int ticks = 0;
+    while (!scheduler.empty() && ticks < 30)
+    {
+        scheduler.processBatch(renderedIds);
+        ++ticks;
+    }
+    EXPECT_TRUE(scheduler.empty());
+    EXPECT_EQ(attempts, 1u);
+    EXPECT_EQ(renderedIds.size(), static_cast<size_t>(kCircleCount));
+}
+
+// 扩展队列的非曲线图元（LINE 不进 LOD 收集）失败后也能补上：
+// 失败条目经游标回退留在扩展队列原位重试，与 LOD 队列同一条路径。
+TEST(RenderSubmitSchedulerTest, ExtensionQueueNonCurveEntriesRetriedAfterFailure)
+{
+    Eg::SceneManager scene;
+
+    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    for (int i = 0; i < 3; ++i)
+    {
+        auto line = std::make_unique<Eg::SyLine>();
+        line->setPointVector({ Ut::Vec2d(-30.0 + 10.0 * i, -20.0), Ut::Vec2d(-30.0 + 10.0 * i, 20.0) });
+        entities.push_back(std::move(line));
+    }
+    scene.addEntities(std::move(entities));
+
+    std::vector<uint64_t> lineIds;
+    for (const Eg::SyEntity* entity : scene.getAllEntities())
+    {
+        lineIds.push_back(static_cast<uint64_t>(entity->id));
+    }
+    ASSERT_EQ(lineIds.size(), 3u);
+
+    RenderWidget widget;
+    widget.resize(800, 600);
+
+    RenderSubmitScheduler scheduler(&widget);
+    scheduler.setSceneManager(&scene);
+    scheduler.setPumpCallback([]() {});
+
+    std::vector<std::vector<uint64_t>> attempts;
+    scheduler.setSubmitBatchCallback([&attempts](const std::vector<uint64_t>& batch) {
+        attempts.push_back(batch);
+        return attempts.size() > 1;  // 首次失败，第二次成功
+    });
+
+    scheduler.enqueueViewportExtension(lineIds);
+    ASSERT_EQ(scheduler.size(), 3u);
+
+    std::unordered_set<uint64_t> renderedIds;
+    int ticks = 0;
+    while (!scheduler.empty() && ticks < 20)
+    {
+        scheduler.processBatch(renderedIds);
+        ++ticks;
+    }
+
+    ASSERT_TRUE(scheduler.empty()) << "扩展队列失败条目没有被补上";
+    ASSERT_GE(attempts.size(), 2u);
+    EXPECT_EQ(attempts[0], attempts[1]) << "重试批次与失败批次不一致：扩展条目丢失或重排";
+    for (uint64_t uid : lineIds)
+    {
+        EXPECT_EQ(renderedIds.count(uid), 1u) << "非曲线图元在批次失败后永久丢失";
+    }
+}
+
+// 持续失败：指数退避而非每 tick 空转重试，且条目永不丢弃。
+// 退避序列 1,2,4,8,16,16,...（tick）→ 100 个 tick 内恰好 9 次尝试；
+// 断言区间 [6,12]：既证明退避生效（远小于 100），也证明没放弃重试。
+TEST(RenderSubmitSchedulerTest, PersistentSubmitFailureBacksOff_WithoutDroppingEntries)
+{
+    Eg::SceneManager scene;
+
+    constexpr int kCircleCount = 2501;
+    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    entities.reserve(kCircleCount);
+    for (int i = 0; i < kCircleCount; ++i)
+    {
+        auto circle = std::make_unique<Eg::SyCircle>();
+        circle->basePoint = Ut::Vec2d((i % 80) * 10.0 - 400.0, ((i / 80) % 60) * 10.0 - 300.0);
+        circle->dRadius = 1.0;
+        entities.push_back(std::move(circle));
+    }
+    scene.addEntities(std::move(entities));
+
+    RenderWidget widget;
+    widget.resize(800, 600);
+
+    RenderSubmitScheduler scheduler(&widget);
+    scheduler.setSceneManager(&scene);
+    scheduler.setPumpCallback([]() {});
+
+    size_t attempts = 0;
+    scheduler.setSubmitBatchCallback([&attempts](const std::vector<uint64_t>&) {
+        ++attempts;
+        return false;  // 恒失败
+    });
+
+    std::unordered_set<uint64_t> renderedIds;
+    scheduler.requestRefresh();
+    ASSERT_EQ(scheduler.size(), static_cast<size_t>(kCircleCount));
+
+    for (int i = 0; i < 100; ++i)
+    {
+        scheduler.processBatch(renderedIds);
+    }
+
+    EXPECT_GE(attempts, 6u) << "重试停了：失败条目会被永久卡死";
+    EXPECT_LE(attempts, 12u) << "退避失效：持续失败期间每 tick 都在空转重试";
+    EXPECT_EQ(scheduler.size(), static_cast<size_t>(kCircleCount)) << "失败条目被丢弃了";
+    EXPECT_TRUE(renderedIds.empty());
 }
