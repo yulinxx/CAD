@@ -19,8 +19,6 @@ public:
     /// 后端报告的设备名（如 "Apple M1 Pro"），同上
     virtual const char* deviceName() const = 0;
 
-    // 能力查询接口（需要时再加回）
-
     virtual TextureHandle createTexture(const TextureDesc& desc) = 0;
     virtual void destroyTexture(TextureHandle texture) = 0;
     virtual void updateTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height, const uint8_t* rgba) = 0;

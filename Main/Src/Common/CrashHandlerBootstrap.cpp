@@ -49,12 +49,12 @@ namespace
     }
 }  // namespace
 
-// File-scope statics for WIN32-specific symbols (internal linkage) — avoid anonymous namespace issues in unity builds
+// 文件作用域静态符号：Win32 和非 Win32 各一份，放匿名命名空间外避免 unity build 下的合并问题
 #ifdef _WIN32
 static PVOID g_vehHandle = nullptr;
 static std::terminate_handler g_oldTerminate = nullptr;
 #else
-// Non-WIN32 stubs
+// 非 Win32 平台的占位
 static void* g_vehHandle = nullptr;
 static std::terminate_handler g_oldTerminate = nullptr;
 

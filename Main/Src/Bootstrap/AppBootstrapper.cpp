@@ -75,7 +75,6 @@ AppBootstrapper::AppBootstrapper(const AppPaths& paths, const std::string& appNa
     , m_appName(appName)
     , m_version(version)
 {
-    // SY_INFOF("[AppBootstrapper] Created: name=%s, version=%s", appName.c_str(), version.c_str());
 }
 
 // 确保在销毁前执行关闭流程
@@ -131,7 +130,7 @@ bool AppBootstrapper::initialize()
         {
             if (!hardwareWarning.isEmpty())
             {
-                // 这里不再把 hardwareWarning 原文打进日志：那是给界面看的中文文案，
+                // 这里不把 hardwareWarning 原文打进日志：那是给界面看的中文文案，
                 // 落到控制台/现场日志文件里就是 mojibake。具体原因由 Hardware 侧
                 // 用英文各自记过一遍，这里只标记「带告警启动」。
                 SY_WARN("[AppBootstrapper] hardware started with a warning "
@@ -177,7 +176,6 @@ void AppBootstrapper::bootstrap()
     const UiServices& uiServices = m_compositionRoot->uiServices();
 
     const auto startWorkbenchId = m_startWorkbenchId.isEmpty() ? QStringLiteral("2D") : m_startWorkbenchId;
-    // SY_INFOF("[AppBootstrapper] Bootstrapping workbench: %s", startWorkbenchId.toUtf8().constData());
 
     if (m_compositionRoot->stateCenter())
     {

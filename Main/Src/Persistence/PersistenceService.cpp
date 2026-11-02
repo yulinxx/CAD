@@ -72,8 +72,6 @@ void PersistenceService::shutdown()
         return;
     }
 
-    // SY_DEBUG("[PersistenceService] Shutting down");
-
     // 这里原本有一段「等待活跃操作归零」的条件变量等待，但活跃操作计数从来没有被
     // 加过（没有任何 RAII 守卫去 increment），等待条件恒为真 —— 是一段看起来能
     // 保护并发、实际什么都没做的假保护。真正的并发保护在 Eg::Database 内部：
@@ -94,7 +92,6 @@ void PersistenceService::shutdown()
     m_database->close();
 
     SY_DEBUG("[PersistenceService] Shutdown complete");
-    // SY_DEBUG("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n\n");
 }
 
 bool PersistenceService::isOpen() const

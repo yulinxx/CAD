@@ -24,8 +24,6 @@
 // v7: documents 表新增 workbench 列（2D/3D 文档历史分桶）
 static constexpr int kSchemaVersion = 7;
 
-// 应用版本使用 MainApp::appVersion() 全局定义
-
 // ---- 注册所有表名和列名白名单，用于 Database 层 SQL 注入防护 ----
 static void registerSchemaWhiteList()
 {
@@ -85,9 +83,9 @@ bool DatabaseBootstrapper::ensureSchema()
         SY_WARNF("[DatabaseBootstrapper] App version mismatch: db=%s current=%s - resetting schema for re-migration",
             dbAppVersion.c_str(),
             MainApp::appVersion().c_str());
-        // P1修复：版本不匹配时不再删除所有业务数据，
-        // 而是仅重置 schema 版本号，让 runMigrations 重新执行迁移。
-        // 这样可以保留用户数据（最近文件、图层、设置等），同时确保表结构升级。
+        // 版本不匹配时保留用户数据（最近文件、图层、设置等），
+        // 仅重置 schema 版本号让 runMigrations 重新执行迁移，
+        // 确保表结构升级。
         m_database.execute("DELETE FROM app_meta WHERE key = 'schema_version'");
     }
 
@@ -152,7 +150,7 @@ int DatabaseBootstrapper::schemaVersion() const
     }
     catch (const std::exception& e)
     {
-        // Table might not exist yet (first run) - treat as v0
+        // 首次运行时表可能还不存在，按 v0 处理
         return 0;
     }
     catch (...)
@@ -180,7 +178,7 @@ std::string DatabaseBootstrapper::databaseAppVersion() const
     }
     catch (const std::exception&)
     {
-        // Table might not exist yet (first run)
+        // 首次运行时表可能还不存在
         return {};
     }
     catch (...)
@@ -605,6 +603,5 @@ bool DatabaseBootstrapper::createIndices()
         return false;
     }
 
-    // SY_DEBUG("[DatabaseBootstrapper] All indices created successfully");
     return true;
 }

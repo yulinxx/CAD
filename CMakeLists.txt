@@ -1,19 +1,31 @@
 cmake_minimum_required(VERSION 4.3)
 
-# ============ MSVC 头文件依赖扫描（Ninja）============
-# ninja 用 rules.ninja 里的 msvc_deps_prefix 逐字节匹配 cl.exe 的 /showIncludes
+# ============ MSVC 头文件依赖扫描（仅 Ninja 生成器）============
+# Ninja 用 rules.ninja 里的 msvc_deps_prefix 逐字节匹配 cl.exe 的 /showIncludes
 # 输出，两者编码必须一致，否则一条头文件依赖都记不下来（#deps 0）：改头文件不触发
 # 重编 → 新旧 obj 混链 → 报 LNK2005（重复定义）/ LNK2019（找不到符号）。
 # 规律（中文 Windows，ANSI=936）：
 #   cl 有控制台 → 按控制台代码页输出；无控制台 → 按 ANSI 代码页（936/GBK）输出
 #   CMake 写 rules.ninja → 有控制台按控制台代码页转码；无控制台写原始 UTF-8
-# 这里在 project() 之前把控制台切到 65001，使「有控制台」的 configure 也写出 UTF-8
-# 前缀（与无控制台时一致），并要求构建侧同样使用 UTF-8 控制台（VS Code 内置终端
-# 默认即 65001；老式 cmd/PowerShell 里先执行 chcp 65001）。
-# 症状自查：构建日志大段刷「注意: 包含文件:」即依赖匹配失败。
-if(WIN32)
+# 这里把控制台切到 65001，使「有控制台」的 configure 也写出 UTF-8
+# 前缀（与无控制台时一致）。
+#
+# 仅 Ninja 需要这段：Visual Studio/MSBuild 生成器有自己的 tlog 机制做依赖跟踪，
+# 不依赖 msvc_deps_prefix 匹配。在 MSBuild 生成器上执行 chcp 是无意义的
+# 全局副作用（会污染后续 PowerShell/cmd 会话的控制台代码页），因此这里
+# 用 CMAKE_GENERATOR 判定。
+if(WIN32 AND CMAKE_GENERATOR MATCHES "Ninja")
     execute_process(COMMAND chcp.com 65001 OUTPUT_QUIET ERROR_QUIET)
 endif()
+
+# ============ /showIncludes 手动开关 ============
+# 默认关闭：编译日志安静。Ninja 生成器在 chcp 匹配后即使不开 /showIncludes
+# 也能正确解析 cl.exe 输出（/showIncludes 由 CMake 自动开启）；
+# MSBuild 生成器有自己的 tlog 机制跟踪头文件，完全不依赖 /showIncludes 输出。
+#
+# 打开用于排查：强制在 cl.exe 命令行加 /showIncludes，把每层 #include 完整刷到
+# 编译日志里——但这会产生大量输出，只建议调试依赖问题时临时开启。
+option(SANYI_SHOW_INCLUDES "Enable cl.exe /showIncludes (verbose header inclusion trace)" OFF)
 
 # ============ CMake 策略设置 ============
 if(POLICY CMP0167)
@@ -62,6 +74,25 @@ if(MSVC AND SANYI_MSVC_ANALYZE)
         /we6271 /we6272 /we6273 /we6274 /we6284 /we6328 /we6340
     )
     message(STATUS "  MSVC /analyze: ON (format-string diagnostics promoted to errors)")
+endif()
+
+# /showIncludes 开关：两种生成器都支持，但语义不同
+#   Ninja：CMake 自动加 /showIncludes 给 cl.exe 做依赖跟踪，本开关仅控制
+#          是否把结果额外刷到 stdout（默认不刷）
+#   MSBuild：有自己的 tlog 机制跟踪依赖，/showIncludes 仅用于调试
+if(MSVC)
+    if(SANYI_SHOW_INCLUDES)
+        add_compile_options(/showIncludes)
+        # Ninja 生成器需要 cl.exe 的输出保持 UTF-8，与 rules.ninja 里写的
+        # msvc_deps_prefix（UTF-8 编码的中文前缀）一致，否则依赖跟踪断掉；
+        # MSBuild 不依赖 msvc_deps_prefix，也不需要这条。
+        if(CMAKE_GENERATOR MATCHES "Ninja")
+            add_compile_options(/utf-8)
+        endif()
+        message(STATUS "  cl.exe /showIncludes: ON (verbose header trace enabled)")
+    else()
+        message(STATUS "  cl.exe /showIncludes: OFF (dependency tracking preserved)")
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------

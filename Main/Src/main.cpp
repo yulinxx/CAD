@@ -26,7 +26,7 @@ int main(int argc, char** argv)
     // 所有渲染（2D Renderx、3D 视图）均使用 shader + VBO/VAO 编程。
     //
     // macOS 要求 QOpenGLWidget 与全局默认格式一致，否则 NSOpenGLContext
-    // 无法共享 framebuffer，widget 会渲染黑屏/错位。故各 widget 不再单独
+    // 无法共享 framebuffer，widget 会渲染黑屏/错位。故各 widget 不单独
     // 覆盖格式，统一沿用此处全局默认。
     QSurfaceFormat format;
 #ifdef Q_OS_MACOS

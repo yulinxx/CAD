@@ -2,13 +2,9 @@
  * @file SharedDatabaseAdapter.h
  * @brief 将 UI::IDatabase 接口适配到业务库的 Eg::Database 连接上
  *
- * 背景：cad_database.sqlite 之前被同一进程的两条连接并发写入 —— 业务数据
- * （RecentFile/Document/Layer 等）走 PersistenceService 的 Eg::Database，
- * 设置走 UICommon 自建的 DatabaseWrapper。WAL 下双写连接仍会互相撞
- * SQLITE_BUSY(5)/BUSY_SNAPSHOT(517)，导入回写期间设置/最近文件写入重试
- * 全部失败的 "database is locked" 即源于此。
- *
- * 此适配器让设置侧复用业务库的唯一连接，从根源上消除双写竞争。
+ * cad_database.sqlite 由业务侧 PersistenceService 的 Eg::Database 持有唯一连接。
+ * 设置侧通过此适配器复用该连接，避免双写连接在 WAL 下互相撞
+ * SQLITE_BUSY(5)/BUSY_SNAPSHOT(517) 导致写入失败。
  *
  * 所有权语义：只借用 Eg::Database&（由 PersistenceService 持有）。
  * open() 不开文件（连接已由业务侧打开），close() 是 no-op，
