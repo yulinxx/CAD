@@ -45,6 +45,9 @@ set(SHARED_PROJECT_INCLUDE_DIRS
     "${PROJECT_ROOT}/Engine/Common/Include"
     "${PROJECT_ROOT}/Engine/2D/Include"
     "${PROJECT_ROOT}/Engine/3D/Include"
+    # FioEntityConverter 已从 Engine3D 的 PUBLIC 头目录下沉到 Src/Import，
+    # 只有 Main 组合层能看到它（它承担跨 DLL 边界的转换职责，不对外暴露）
+    "${PROJECT_ROOT}/Engine/3D/Src/Import"
     "${PROJECT_ROOT}/Engine/Persistence/Include"
     "${PROJECT_ROOT}/UI/Common/Include"
     "${PROJECT_ROOT}/UI/2D/Include"

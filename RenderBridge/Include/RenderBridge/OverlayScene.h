@@ -33,12 +33,17 @@
  *
  * ## 类型隔离
  *
- * 本头文件不 include renderx.h：合成所需的场景对象由调用方按抽象层接口传入。
+ * 本头文件只 include Utility 的 Ut:: 数学类型和 RenderBridge 自己的
+ * RenderBridgeTypes.h，不再 include Render/RenderTypes.h —— 那是 UICommon
+ * 独有的 UI 层头，此前通过 PUBLIC include 路径泄漏给所有 RenderBridge 下游，
+ * 是本次模块边界收束的目标之一。
+ *
+ * 本头文件也不 include renderx.h：合成所需的场景对象由调用方按抽象层接口传入。
  */
 
 #include "RenderBridge/RenderBridgeAPI.h"
+#include "RenderBridge/RenderBridgeTypes.h"
 
-#include "Render/RenderTypes.h"
 #include "RenderAbstraction/IRenderTypes.h"
 
 #include <cstddef>
@@ -98,15 +103,15 @@ namespace RenderBridge
     struct OverlayMarkerGroup
     {
         /// 世界锚点
-        std::vector<Render::Vec2f> anchors;
+        std::vector<Ut::Vec2f> anchors;
         /// 锚点之上再叠加的像素偏移；为空或长度不足时按 (0,0) 处理
-        std::vector<Render::Vec2f> offsetsPx;
+        std::vector<Ut::Vec2f> offsetsPx;
         /// 方块全宽（物理像素）。传 0 会被夹到下限，而不是画出零面积几何
         float sizePx = 0.0f;
-        Render::Color fill{ 1.0f, 1.0f, 1.0f, 1.0f };
-        Render::Color border{ 0.0f, 0.0f, 0.0f, 1.0f };
-        std::vector<Render::Color> perMarkerFills;
-        std::vector<Render::Color> perMarkerBorders;
+        Ut::Color fill{ 1.0f, 1.0f, 1.0f, 1.0f };
+        Ut::Color border{ 0.0f, 0.0f, 0.0f, 1.0f };
+        std::vector<Ut::Color> perMarkerFills;
+        std::vector<Ut::Color> perMarkerBorders;
 
         bool empty() const
         {
@@ -140,7 +145,7 @@ namespace RenderBridge
         // ---------- 逐层设置：设一层只影响那一层 ----------
 
         /// 选中集总包围盒。bbox 退化（无选中）即清除本层
-        void setSelectionBox(const Render::BBox2d& box, const Render::Color& border);
+        void setSelectionBox(const Ut::BBox2d& box, const Ut::Color& border);
 
         /**
          * @brief 文字选区高亮：N 块半透明四边形
@@ -150,16 +155,16 @@ namespace RenderBridge
          * 大矩形 —— 并集会把两行之间未选中的部分一起涂上颜色。
          */
         void setSelectionHighlight(
-            const std::vector<Render::Vec2f>& quadCorners, const Render::Color& fill, const Render::Color& border);
+            const std::vector<Ut::Vec2f>& quadCorners, const Ut::Color& fill, const Ut::Color& border);
 
         /// 框选预览矩形（半透明填充 + 描边）。bbox 退化即清除本层
-        void setSelectionRect(const Render::BBox2d& rect, const Render::Color& fill, const Render::Color& border);
+        void setSelectionRect(const Ut::BBox2d& rect, const Ut::Color& fill, const Ut::Color& border);
 
         /// 流水虚线轮廓。传空即清除本层
-        void setSelectionOutlines(std::vector<Render::SelectionOutlinePath> paths);
+        void setSelectionOutlines(std::vector<RenderBridge::SelectionOutlinePath> paths);
 
         /// 虚线样式（像素基准）。样式本身不是几何，只影响轮廓层的离散化
-        void setSelectionDashStyle(const Render::SelectionDashStyle& style);
+        void setSelectionDashStyle(const RenderBridge::SelectionDashStyle& style);
 
         /// 缩放/变换手柄层。传空 group 即清除本层
         void setSelectionHandles(OverlayMarkerGroup group);
@@ -169,19 +174,19 @@ namespace RenderBridge
 
         /// 捕捉指示器。形状与颜色由调用方解析（它才认识捕捉类型）
         void setSnapIndicator(
-            const Render::Vec2f& worldPos, bool visible, SnapMarkerShape shape, const Render::Color& color);
+            const Ut::Vec2f& worldPos, bool visible, SnapMarkerShape shape, const Ut::Color& color);
 
         /// 绘制预览折线（世界坐标，相邻点连成线段）。传空即清除本层几何
-        void setToolPreview(const std::vector<Render::Vec2f>& points);
+        void setToolPreview(const std::vector<Ut::Vec2f>& points);
         /// 预览折线颜色。**与几何分开设置**：调用方只在自己携带了颜色时才覆盖它
         /// （绘制色是图层色，不是每帧必给的参数）
-        void setToolPreviewColor(const Render::Color& color);
+        void setToolPreviewColor(const Ut::Color& color);
 
         /// 辅助线（世界坐标，两两成段；切线手柄、十字准星、文字光标条）。传空即清除本层几何
-        void setControlLines(const std::vector<Render::Vec2f>& points);
+        void setControlLines(const std::vector<Ut::Vec2f>& points);
         /// 辅助线颜色。与几何分开设置，理由同预览折线；且它**不**跟随绘制色 ——
         /// 辅助线是绘制过程的参考物，必须始终看得见，所以有自己的通道
-        void setControlLinesColor(const Render::Color& color);
+        void setControlLinesColor(const Ut::Color& color);
 
         // ---------- 清除 ----------
 
@@ -223,29 +228,29 @@ namespace RenderBridge
         struct SelectionBoxLayer
         {
             bool valid = false;
-            Render::BBox2d box;
-            Render::Color border{ 1.0f, 0.55f, 0.0f, 0.86f };
+            Ut::BBox2d box;
+            Ut::Color border{ 1.0f, 0.55f, 0.0f, 0.86f };
         };
 
         struct HighlightLayer
         {
-            std::vector<Render::Vec2f> quadCorners;
-            Render::Color fill{ 0.0f, 0.47f, 1.0f, 0.27f };
-            Render::Color border{ 0.0f, 0.47f, 1.0f, 0.78f };
+            std::vector<Ut::Vec2f> quadCorners;
+            Ut::Color fill{ 0.0f, 0.47f, 1.0f, 0.27f };
+            Ut::Color border{ 0.0f, 0.47f, 1.0f, 0.78f };
         };
 
         struct SelectionRectLayer
         {
             bool valid = false;
-            Render::BBox2d rect;
-            Render::Color fill{ 0.0f, 0.6f, 1.0f, 0.15f };
-            Render::Color border{ 0.0f, 0.6f, 1.0f, 1.0f };
+            Ut::BBox2d rect;
+            Ut::Color fill{ 0.0f, 0.6f, 1.0f, 0.15f };
+            Ut::Color border{ 0.0f, 0.6f, 1.0f, 1.0f };
         };
 
         struct OutlineLayer
         {
-            std::vector<Render::SelectionOutlinePath> paths;
-            Render::SelectionDashStyle dash;
+            std::vector<RenderBridge::SelectionOutlinePath> paths;
+            RenderBridge::SelectionDashStyle dash;
         };
 
         struct MarkerLayer
@@ -256,15 +261,15 @@ namespace RenderBridge
         struct SnapLayer
         {
             bool visible = false;
-            Render::Vec2f worldPos;
+            Ut::Vec2f worldPos;
             SnapMarkerShape shape = SnapMarkerShape::Circle;
-            Render::Color color{ 0.0f, 1.0f, 0.0f, 1.0f };
+            Ut::Color color{ 0.0f, 1.0f, 0.0f, 1.0f };
         };
 
         struct LineLayer
         {
-            std::vector<Render::Vec2f> points;
-            Render::Color color{ 1.0f, 1.0f, 1.0f, 1.0f };
+            std::vector<Ut::Vec2f> points;
+            Ut::Color color{ 1.0f, 1.0f, 1.0f, 1.0f };
         };
 
         SelectionBoxLayer m_selectionBox;
@@ -274,8 +279,8 @@ namespace RenderBridge
         MarkerLayer m_selectionHandles;
         MarkerLayer m_pointMarkers;
         SnapLayer m_snap;
-        LineLayer m_toolPreview{ {}, Render::Color(0.2f, 0.2f, 1.0f, 1.0f) };
-        LineLayer m_controlLines{ {}, Render::Color(1.0f, 0.2f, 0.2f, 0.8f) };
+        LineLayer m_toolPreview{ {}, Ut::Color(0.2f, 0.2f, 1.0f, 1.0f) };
+        LineLayer m_controlLines{ {}, Ut::Color(1.0f, 0.2f, 0.2f, 0.8f) };
         OverlayFrameParams m_frameParams;
         /// 本帧控件 DPR，由 setDevicePixelRatio 注入（见该函数的说明）
         float m_devicePixelRatio = 1.0f;

@@ -55,11 +55,10 @@ sanyi_add_shared_library(${LIB_NAME}
         "${CMAKE_CURRENT_SOURCE_DIR}/Include"
     PRIVATE_INCLUDE_DIRS
         "${CMAKE_CURRENT_SOURCE_DIR}/Src"
-    LINK_LIBRARIES
-        PRIVATE
-            OpenSSL::SSL
-            OpenSSL::Crypto
-            Log
+    PRIVATE_LINK_LIBRARIES
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        Log
 )
 
 # 许可校验开关必须编进本库（LicenseInternal.cpp 依据宏决定 g_checkEnabled 默认值），

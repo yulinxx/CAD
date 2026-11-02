@@ -1,6 +1,6 @@
 /**
  * @file TextQuadBuilder.h
- * @brief 把 Eg::TextItem 翻译成字形四边形（P2T2C4 + 屏幕空间）
+ * @brief 把 RenderBridge::TextLayoutInfo 翻译成字形四边形（P2T2C4 + 屏幕空间）
  *
  * 排版归应用层，字形归 DLL：RenderX 只出「某个码点在图集哪个位置、
  * 度量是多少」（rxFontGlyph），UTF-8 解码、字距推进、水平/垂直对齐、
@@ -16,7 +16,7 @@
  * 用法（必须在 rxSessionBeginFrame / rxSessionEndFrame 之间）：
  *
  *     builder.beginFrame();
- *     for (const auto& item : envGeo.rulerTexts) { builder.addText(item, view, w, h); }
+ *     for (const auto& item : items) { builder.addText(item, view, w, h); }
  *     builder.flush(session, layer, seq, outCommands);
  *
  * 一个字号一批：同字号的所有字形共用一张图集，合成一笔 DrawCommand。
@@ -24,15 +24,16 @@
  *
  * ## 类型隔离说明
  *
- * 本头文件不 include renderx.h：设备与场景通过抽象层接口传入，
- * 句柄一律是 RenderAbstraction 的 POD 包装，后端细节不外泄。
+ * 本头文件不再 include Engine/TextItem.h 或 Render/RenderTypes.h ——
+ * 输入是 RenderBridge::TextLayoutInfo（本模块自己的中性 POD）、视图矩阵用
+ * Ut::Mat3f（Utility 的纯 POD），不再透传 EngineCommon / UICommon 的头文件。
+ * 设备与场景通过抽象层接口传入，句柄一律是 RenderAbstraction 的 POD 包装。
  */
 #pragma once
 
 #include "RenderBridge/RenderBridgeAPI.h"
+#include "RenderBridge/RenderBridgeTypes.h"
 
-#include "Engine/TextItem.h"
-#include "Render/RenderTypes.h"
 #include "RenderAbstraction/IRenderTypes.h"
 
 #include <cstddef>
@@ -53,8 +54,8 @@ namespace Render
      *
      * 原本住在 UI/2D（`Render/TextQuadBuilder.h`），迁到 RenderBridge 是因为
      * 3D 视口也要在右下角显示帧率，而 UI3D 不依赖 UI2D（模块边界）。这个类本身
-     * 与 2D 无关：输入是 `Eg::TextItem`（EngineCommon）、输出是 Screen 空间的
-     * P2T2C4 字形四边形（Renderx），不碰任何 2D 场景概念。
+     * 与 2D 无关：输入是 RenderBridge::TextLayoutInfo（中性排版描述，不再依赖
+     * EngineCommon 的 Eg::TextItem）、输出是 Screen 空间的 P2T2C4 字形四边形。
      */
     class RENDERBRIDGE_API TextQuadBuilder
     {
@@ -91,7 +92,7 @@ namespace Render
          * @param view    世界 → NDC 矩阵，仅 coordMode 为 WorldPos_PixelSize 时使用
          * @param vpWidth/vpHeight 视口**物理像素**尺寸
          */
-        void addText(const Eg::TextItem& item, const Render::Mat3f& view, uint32_t vpWidth, uint32_t vpHeight);
+        void addText(const RenderBridge::TextLayoutInfo& item, const Ut::Mat3f& view, uint32_t vpWidth, uint32_t vpHeight);
 
         /**
          * @brief 把累积的顶点写入瞬态环，每个字号产出一笔 DrawCommand

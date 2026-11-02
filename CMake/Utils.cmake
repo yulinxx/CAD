@@ -202,8 +202,16 @@ endfunction()
 function(sanyi_add_shared_library target)
     set(options AUTOMOC AUTOUIC AUTORCC UNITY_BUILD NO_UNITY_BUILD)
     set(oneValueArgs FOLDER DESCRIPTION EXPORT_MACRO VERSION_MAJOR VERSION_MINOR VERSION_PATCH)
-    set(multiValueArgs SOURCES HEADERS PUBLIC_INCLUDE_DIRS PRIVATE_INCLUDE_DIRS 
-                       COMPILE_DEFINITIONS COMPILE_OPTIONS LINK_LIBRARIES QT_COMPONENTS)
+    # 可见性分离：LINK_LIBRARIES / QT_COMPONENTS 已废弃（默认 PUBLIC 会导致
+    # Qt / 第三方依赖被下游无差别传递），改用显式的 PUBLIC_* / PRIVATE_* 变体。
+    # 新调用方必须：
+    #   - 公共头里出现的 Qt 组件 → PUBLIC_QT_COMPONENTS
+    #   - 仅实现用的 Qt / 第三方库 → PRIVATE_QT_COMPONENTS / PRIVATE_LINK_LIBRARIES
+    #   - 公共头里作为类型出现的兄弟模块依赖 → PUBLIC_LINK_LIBRARIES
+    set(multiValueArgs SOURCES HEADERS PUBLIC_INCLUDE_DIRS PRIVATE_INCLUDE_DIRS
+                       COMPILE_DEFINITIONS COMPILE_OPTIONS
+                       PUBLIC_LINK_LIBRARIES PRIVATE_LINK_LIBRARIES INTERFACE_LINK_LIBRARIES
+                       PUBLIC_QT_COMPONENTS PRIVATE_QT_COMPONENTS)
     cmake_parse_arguments(SANYI_SHLIB "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
     if(SANYI_SHLIB_VERSION_MAJOR)
@@ -327,13 +335,25 @@ function(sanyi_add_shared_library target)
 
     set_target_properties(${target} PROPERTIES ${_target_properties})
 
-    if(SANYI_SHLIB_QT_COMPONENTS)
-        sanyi_find_qt(${SANYI_SHLIB_QT_COMPONENTS})
+    if(SANYI_SHLIB_PUBLIC_QT_COMPONENTS)
+        sanyi_find_qt(${SANYI_SHLIB_PUBLIC_QT_COMPONENTS})
+        # 公共头里出现 Qt 类型（如 QObject/QWidget/QString）时必须 PUBLIC 传递
         target_link_libraries(${target} PUBLIC ${QT_LIBRARIES})
     endif()
+    if(SANYI_SHLIB_PRIVATE_QT_COMPONENTS)
+        sanyi_find_qt(${SANYI_SHLIB_PRIVATE_QT_COMPONENTS})
+        # 实现内部用的 Qt 组件一律 PRIVATE，不污染下游
+        target_link_libraries(${target} PRIVATE ${QT_LIBRARIES})
+    endif()
 
-    if(SANYI_SHLIB_LINK_LIBRARIES)
-        target_link_libraries(${target} PUBLIC ${SANYI_SHLIB_LINK_LIBRARIES})
+    if(SANYI_SHLIB_PUBLIC_LINK_LIBRARIES)
+        target_link_libraries(${target} PUBLIC ${SANYI_SHLIB_PUBLIC_LINK_LIBRARIES})
+    endif()
+    if(SANYI_SHLIB_PRIVATE_LINK_LIBRARIES)
+        target_link_libraries(${target} PRIVATE ${SANYI_SHLIB_PRIVATE_LINK_LIBRARIES})
+    endif()
+    if(SANYI_SHLIB_INTERFACE_LINK_LIBRARIES)
+        target_link_libraries(${target} INTERFACE ${SANYI_SHLIB_INTERFACE_LINK_LIBRARIES})
     endif()
 
     sanyi_add_version_info(${target} "${target}" "${SANYI_SHLIB_DESCRIPTION}")

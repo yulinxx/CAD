@@ -34,7 +34,7 @@ namespace
     static_assert(sizeof(OVertex) == RA::vertexStride(RA::VertexFormat::PositionColorAlpha),
         "OVertex must match the declared P3C4 stride");
 
-    inline OVertex vtx(float x, float y, float z, const Render::Color& c)
+    inline OVertex vtx(float x, float y, float z, const Ut::Color& c)
     {
         return { x, y, z, c.r(), c.g(), c.b(), c.a() };
     }
@@ -108,7 +108,7 @@ namespace
         emitAs(scene, out, verts, topo, RA::VertexFormat::WorldAnchorOffsetColor, RA::RenderSpace::WorldPinned, seq);
     }
 
-    void rectLineList(std::vector<OVertex>& v, const Render::BBox2d& b, const Render::Color& c)
+    void rectLineList(std::vector<OVertex>& v, const Ut::BBox2d& b, const Ut::Color& c)
     {
         const float minX = static_cast<float>(b.minPt.x());
         const float minY = static_cast<float>(b.minPt.y());
@@ -124,7 +124,7 @@ namespace
         v.push_back(vtx(minX, minY, 0, c));
     }
 
-    void filledRect(std::vector<OVertex>& v, const Render::BBox2d& b, const Render::Color& c)
+    void filledRect(std::vector<OVertex>& v, const Ut::BBox2d& b, const Ut::Color& c)
     {
         const float minX = static_cast<float>(b.minPt.x());
         const float minY = static_cast<float>(b.minPt.y());
@@ -138,7 +138,7 @@ namespace
         v.push_back(vtx(minX, maxY, 0, c));
     }
 
-    void filledQuad(std::vector<OVertex>& v, const Render::Vec2f q[4], const Render::Color& c)
+    void filledQuad(std::vector<OVertex>& v, const Ut::Vec2f q[4], const Ut::Color& c)
     {
         v.push_back(vtx(q[0].x(), q[0].y(), 0, c));
         v.push_back(vtx(q[1].x(), q[1].y(), 0, c));
@@ -185,11 +185,11 @@ namespace
      * 图元后整个软件卡死」的主因。这里改成沿弧长单调推进的游标：dash 起点只会
      * 向前走，游标绝不回退。
      */
-    void appendSelectionDash(const Render::SelectionOutlinePath& path,
+    void appendSelectionDash(const RenderBridge::SelectionOutlinePath& path,
         float dashLength,
         float gapLength,
         float offset,
-        std::vector<Render::Vec2f>& outSegments)
+        std::vector<Ut::Vec2f>& outSegments)
     {
         constexpr size_t kMaxSegmentsPerPath = 16384;
 
@@ -220,11 +220,11 @@ namespace
             }
             return i;
         };
-        auto posAt = [&](size_t i, float s) -> Render::Vec2f {
+        auto posAt = [&](size_t i, float s) -> Ut::Vec2f {
             const float a0 = vs[i].arcLength;
             const float span = vs[i + 1].arcLength - a0;
             const float t = span > 1e-6f ? std::min(std::max((s - a0) / span, 0.0f), 1.0f) : 0.0f;
-            return Render::Vec2f(vs[i].position.x() + (vs[i + 1].position.x() - vs[i].position.x()) * t,
+            return Ut::Vec2f(vs[i].position.x() + (vs[i + 1].position.x() - vs[i].position.x()) * t,
                 vs[i].position.y() + (vs[i + 1].position.y() - vs[i].position.y()) * t);
         };
 
@@ -243,7 +243,7 @@ namespace
                 }
 
                 cursor = advance(cursor, s);
-                Render::Vec2f prev = posAt(cursor, s);
+                Ut::Vec2f prev = posAt(cursor, s);
 
                 // 夹在 (s, e) 之间的原始顶点必须原样穿进去，否则虚线会把折线拐角抹平
                 size_t k = cursor + 1;
@@ -277,7 +277,7 @@ namespace
     // 每个捕捉类型对应唯一形状；颜色由调用方决定。全部走 WorldPinned，
     // 偏移量单位是物理像素（乘过 DPR 后传入）。
 
-    void pinnedMarkerPoint(std::vector<PVertex>& v, const Render::Vec2f& p, float radiusPx, const Render::Color& c)
+    void pinnedMarkerPoint(std::vector<PVertex>& v, const Ut::Vec2f& p, float radiusPx, const Ut::Color& c)
     {
         if (!std::isfinite(p.x()) || !std::isfinite(p.y()))
             return;
@@ -291,7 +291,7 @@ namespace
         }
     }
 
-    void emitSquareMarker(std::vector<PVertex>& v, const Render::Vec2f& p, const Render::Color& c, float scale)
+    void emitSquareMarker(std::vector<PVertex>& v, const Ut::Vec2f& p, const Ut::Color& c, float scale)
     {
         const float s = Render::ScreenMetrics::kSnapIndicatorRadiusPx * 0.68f * scale;
         v.push_back(Render::pinnedVertex(p, -s, -s, c));
@@ -301,7 +301,7 @@ namespace
         v.push_back(Render::pinnedVertex(p, -s, -s, c));
     }
 
-    void emitDiamondMarker(std::vector<PVertex>& v, const Render::Vec2f& p, const Render::Color& c, float scale)
+    void emitDiamondMarker(std::vector<PVertex>& v, const Ut::Vec2f& p, const Ut::Color& c, float scale)
     {
         const float s = Render::ScreenMetrics::kSnapIndicatorRadiusPx * 0.78f * scale;
         v.push_back(Render::pinnedVertex(p, 0, -s, c));
@@ -311,7 +311,7 @@ namespace
         v.push_back(Render::pinnedVertex(p, 0, -s, c));
     }
 
-    void emitCrossMarker(std::vector<PVertex>& v, const Render::Vec2f& p, const Render::Color& c, float scale)
+    void emitCrossMarker(std::vector<PVertex>& v, const Ut::Vec2f& p, const Ut::Color& c, float scale)
     {
         const float arm = Render::ScreenMetrics::kSnapIndicatorRadiusPx * 0.62f * scale;
         v.push_back(Render::pinnedVertex(p, -arm, 0, c));
@@ -320,7 +320,7 @@ namespace
         v.push_back(Render::pinnedVertex(p, 0, arm, c));
     }
 
-    void emitXMarker(std::vector<PVertex>& v, const Render::Vec2f& p, const Render::Color& c, float scale)
+    void emitXMarker(std::vector<PVertex>& v, const Ut::Vec2f& p, const Ut::Color& c, float scale)
     {
         const float arm = Render::ScreenMetrics::kSnapIndicatorRadiusPx * 0.62f * scale;
         v.push_back(Render::pinnedVertex(p, -arm, -arm, c));
@@ -329,7 +329,7 @@ namespace
         v.push_back(Render::pinnedVertex(p, -arm, arm, c));
     }
 
-    void emitTriangleMarker(std::vector<PVertex>& v, const Render::Vec2f& p, const Render::Color& c, float scale)
+    void emitTriangleMarker(std::vector<PVertex>& v, const Ut::Vec2f& p, const Ut::Color& c, float scale)
     {
         const float r = Render::ScreenMetrics::kSnapIndicatorRadiusPx * 0.70f * scale;
         const float h = r * 1.15f;
@@ -339,7 +339,7 @@ namespace
         v.push_back(Render::pinnedVertex(p, 0, -h, c));
     }
 
-    void emitArcMarker(std::vector<PVertex>& v, const Render::Vec2f& p, const Render::Color& c, float scale)
+    void emitArcMarker(std::vector<PVertex>& v, const Ut::Vec2f& p, const Ut::Color& c, float scale)
     {
         const float r = Render::ScreenMetrics::kSnapIndicatorRadiusPx * 0.66f * scale;
         constexpr int kSegments = 12;
@@ -354,7 +354,7 @@ namespace
         }
     }
 
-    void emitRightAngleMarker(std::vector<PVertex>& v, const Render::Vec2f& p, const Render::Color& c, float scale)
+    void emitRightAngleMarker(std::vector<PVertex>& v, const Ut::Vec2f& p, const Ut::Color& c, float scale)
     {
         const float s = Render::ScreenMetrics::kSnapIndicatorRadiusPx * 0.55f * scale;
         v.push_back(Render::pinnedVertex(p, -s, 0, c));
@@ -363,12 +363,12 @@ namespace
         v.push_back(Render::pinnedVertex(p, 0, s, c));
     }
 
-    void emitDotMarker(std::vector<PVertex>& v, const Render::Vec2f& p, const Render::Color& c, float scale)
+    void emitDotMarker(std::vector<PVertex>& v, const Ut::Vec2f& p, const Ut::Color& c, float scale)
     {
         pinnedMarkerPoint(v, p, Render::ScreenMetrics::kSnapIndicatorRadiusPx * 0.22f * scale, c);
     }
 
-    void emitStarMarker(std::vector<PVertex>& v, const Render::Vec2f& p, const Render::Color& c, float scale)
+    void emitStarMarker(std::vector<PVertex>& v, const Ut::Vec2f& p, const Ut::Color& c, float scale)
     {
         const float r = Render::ScreenMetrics::kSnapIndicatorRadiusPx * 0.72f * scale;
         constexpr int kPoints = 5;
@@ -380,7 +380,7 @@ namespace
         }
     }
 
-    void emitHexagonMarker(std::vector<PVertex>& v, const Render::Vec2f& p, const Render::Color& c, float scale)
+    void emitHexagonMarker(std::vector<PVertex>& v, const Ut::Vec2f& p, const Ut::Color& c, float scale)
     {
         const float r = Render::ScreenMetrics::kSnapIndicatorRadiusPx * 0.72f * scale;
         constexpr int kSegments = 6;
@@ -393,10 +393,10 @@ namespace
         }
     }
 
-    void emitHourglassMarker(std::vector<PVertex>& v, const Render::Vec2f& p, const Render::Color& c, float scale)
+    void emitHourglassMarker(std::vector<PVertex>& v, const Ut::Vec2f& p, const Ut::Color& c, float scale)
     {
         const float r = Render::ScreenMetrics::kSnapIndicatorRadiusPx * 0.72f * scale;
-        const Render::Vec2f a(-r, -r), b(r, -r), cc(-r, r), d(r, r);
+        const Ut::Vec2f a(-r, -r), b(r, -r), cc(-r, r), d(r, r);
         v.push_back(Render::pinnedVertex(p, a.x(), a.y(), c));
         v.push_back(Render::pinnedVertex(p, b.x(), b.y(), c));
         v.push_back(Render::pinnedVertex(p, b.x(), b.y(), c));
@@ -408,9 +408,9 @@ namespace
     }
 
     void emitSnapMarker(std::vector<PVertex>& v,
-        const Render::Vec2f& p,
+        const Ut::Vec2f& p,
         RenderBridge::SnapMarkerShape shape,
-        const Render::Color& color,
+        const Ut::Color& color,
         float scale)
     {
         if (!std::isfinite(p.x()) || !std::isfinite(p.y()))
@@ -472,7 +472,7 @@ namespace RenderBridge
 {
     // ==================== 逐层设置 ====================
 
-    void OverlayScene::setSelectionBox(const Render::BBox2d& box, const Render::Color& border)
+    void OverlayScene::setSelectionBox(const Ut::BBox2d& box, const Ut::Color& border)
     {
         // bbox 退化（无选中）是「清掉选择框」的意思，不需要额外的 has 标志
         m_selectionBox.valid = box.isValid();
@@ -484,7 +484,7 @@ namespace RenderBridge
     }
 
     void OverlayScene::setSelectionHighlight(
-        const std::vector<Render::Vec2f>& quadCorners, const Render::Color& fill, const Render::Color& border)
+        const std::vector<Ut::Vec2f>& quadCorners, const Ut::Color& fill, const Ut::Color& border)
     {
         if (quadCorners.empty())
         {
@@ -505,7 +505,7 @@ namespace RenderBridge
     }
 
     void OverlayScene::setSelectionRect(
-        const Render::BBox2d& rect, const Render::Color& fill, const Render::Color& border)
+        const Ut::BBox2d& rect, const Ut::Color& fill, const Ut::Color& border)
     {
         m_selectionRect.valid = rect.isValid();
         if (m_selectionRect.valid)
@@ -516,12 +516,12 @@ namespace RenderBridge
         }
     }
 
-    void OverlayScene::setSelectionOutlines(std::vector<Render::SelectionOutlinePath> paths)
+    void OverlayScene::setSelectionOutlines(std::vector<RenderBridge::SelectionOutlinePath> paths)
     {
         m_outlines.paths = std::move(paths);
     }
 
-    void OverlayScene::setSelectionDashStyle(const Render::SelectionDashStyle& style)
+    void OverlayScene::setSelectionDashStyle(const RenderBridge::SelectionDashStyle& style)
     {
         // 样式是设置项不是这一帧的内容，因此 clearLayer 不会清掉它
         m_outlines.dash = style;
@@ -538,7 +538,7 @@ namespace RenderBridge
     }
 
     void OverlayScene::setSnapIndicator(
-        const Render::Vec2f& worldPos, bool visible, SnapMarkerShape shape, const Render::Color& color)
+        const Ut::Vec2f& worldPos, bool visible, SnapMarkerShape shape, const Ut::Color& color)
     {
         m_snap.visible = visible;
         m_snap.worldPos = worldPos;
@@ -546,22 +546,22 @@ namespace RenderBridge
         m_snap.color = color;
     }
 
-    void OverlayScene::setToolPreview(const std::vector<Render::Vec2f>& points)
+    void OverlayScene::setToolPreview(const std::vector<Ut::Vec2f>& points)
     {
         m_toolPreview.points = points;
     }
 
-    void OverlayScene::setToolPreviewColor(const Render::Color& color)
+    void OverlayScene::setToolPreviewColor(const Ut::Color& color)
     {
         m_toolPreview.color = color;
     }
 
-    void OverlayScene::setControlLines(const std::vector<Render::Vec2f>& points)
+    void OverlayScene::setControlLines(const std::vector<Ut::Vec2f>& points)
     {
         m_controlLines.points = points;
     }
 
-    void OverlayScene::setControlLinesColor(const Render::Color& color)
+    void OverlayScene::setControlLinesColor(const Ut::Color& color)
     {
         m_controlLines.color = color;
     }
@@ -635,7 +635,7 @@ namespace RenderBridge
 
     bool OverlayScene::hasAnimatedSelectionOutlines() const
     {
-        const Render::SelectionDashStyle& ds = m_outlines.dash;
+        const RenderBridge::SelectionDashStyle& ds = m_outlines.dash;
         return !m_outlines.paths.empty() && ds.enabled && ds.animated && ds.speedPxPerSec > 0.0f;
     }
 
@@ -678,7 +678,7 @@ namespace RenderBridge
         if (m_selectionBox.valid)
         {
             std::vector<OVertex> v;
-            Render::BBox2d box = m_selectionBox.box;
+            Ut::BBox2d box = m_selectionBox.box;
             // 检测退化盒子（点图元）或单方向退化（水平/垂直线）：
             // 使用 pixelToWorld 转换为最小屏幕尺寸，确保选择框在屏幕上保持固定大小
             const float p2w = m_frameParams.pixelToWorld > 0.0f ? m_frameParams.pixelToWorld : 1.0f;
@@ -704,7 +704,7 @@ namespace RenderBridge
                 minY = cy - minSizeWorld * 0.5f;
                 maxY = cy + minSizeWorld * 0.5f;
             }
-            box = Render::BBox2d(minX, minY, maxX, maxY);
+            box = Ut::BBox2d(minX, minY, maxX, maxY);
             rectLineList(v, box, m_selectionBox.border);
             emitWorld(scene, out, v, RA::PrimitiveType::Lines, seq);
         }
@@ -730,11 +730,11 @@ namespace RenderBridge
                 v.reserve(quadCount * 8);
                 for (size_t q = 0; q < quadCount; ++q)
                 {
-                    const Render::Vec2f* c = &m_highlight.quadCorners[q * 4];
+                    const Ut::Vec2f* c = &m_highlight.quadCorners[q * 4];
                     for (int i = 0; i < 4; ++i)
                     {
-                        const Render::Vec2f& a = c[i];
-                        const Render::Vec2f& b = c[(i + 1) % 4];
+                        const Ut::Vec2f& a = c[i];
+                        const Ut::Vec2f& b = c[(i + 1) % 4];
                         v.push_back(vtx(a.x(), a.y(), 0, m_highlight.border));
                         v.push_back(vtx(b.x(), b.y(), 0, m_highlight.border));
                     }
@@ -760,7 +760,7 @@ namespace RenderBridge
         // 流水虚线轮廓：整个选中集合成**一条**命令（颜色是逐顶点的，路径间不必分批）
         if (!m_outlines.paths.empty())
         {
-            const Render::SelectionDashStyle& ds = m_outlines.dash;
+            const RenderBridge::SelectionDashStyle& ds = m_outlines.dash;
             const float p2w = m_frameParams.pixelToWorld > 0.0f ? m_frameParams.pixelToWorld : 1.0f;
             // 样式是像素基准，顶点是世界坐标，因此三个长度都要乘 pixelToWorld。
             // 少了这一步：虚线节距随缩放变化，且世界尺度小于 dashLengthPx 的图元
@@ -771,7 +771,7 @@ namespace RenderBridge
 
             // segs 复用同一块缓冲（clear 保留容量），避免每条路径一次堆分配
             std::vector<OVertex> v;
-            std::vector<Render::Vec2f> segs;
+            std::vector<Ut::Vec2f> segs;
             for (const auto& path : m_outlines.paths)
             {
                 segs.clear();
