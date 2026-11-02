@@ -174,9 +174,17 @@ public:
 
     // ======================== 状态查询 ========================
 
-    /// LOD 队列与视口扩展队列都已排空（扩展队列优先消费，剩余额度才给 LOD）
-    bool empty() const { return m_queue.empty() && !hasExtensionWork(); }
-    size_t size() const { return m_queue.size() + (m_extendQueue.size() - m_extendCursor); }
+    /// 两队列合计的**剩余未消费**条目数（诊断/回归测试用）：
+    /// LOD 队列与扩展队列同样扣除游标已消费的部分，随消费单调递减。
+    /// 口径统一后本值只回答「还剩多少没提交」，不代表队列总长。
+    size_t size() const
+    {
+        return (m_queue.size() - m_cursor) + (m_extendQueue.size() - m_extendCursor);
+    }
+
+    /// 无剩余未消费条目 —— 与 size() == 0 严格同义（两队列同一口径）。
+    /// 扩展队列优先消费，剩余额度才给 LOD。
+    bool empty() const { return size() == 0; }
 
     /// 已执行的批次数（诊断/回归测试用）。单调递增，不随队列清空复位，
     /// 用于观察「单次定时器是否还在续跑」——旧缺陷下该值只会停在 1~2。

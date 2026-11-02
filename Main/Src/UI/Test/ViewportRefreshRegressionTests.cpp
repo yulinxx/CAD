@@ -1178,8 +1178,9 @@ TEST(RenderSubmitSchedulerTest, ContinuousRequestKeepsQueueProgress)
 
     // 连续缩放事件：队列未消费完时再次请求
     scheduler.requestRefresh();
-    // 若错误地清队列重新收集，size 会回到 kCircleCount 而不是剩余量
-    EXPECT_EQ(scheduler.size(), static_cast<size_t>(kCircleCount));
+    // size 是「剩余未消费」口径：恰为总数 - 首批 2000。
+    // 若错误地清队列重新收集，游标归零，size 会回到 kCircleCount 而不是剩余量
+    EXPECT_EQ(scheduler.size(), static_cast<size_t>(kCircleCount - 2000));
 
     scheduler.processBatch(renderedIds);
     ASSERT_EQ(batches.size(), 2u);

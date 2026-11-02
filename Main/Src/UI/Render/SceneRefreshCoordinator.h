@@ -113,7 +113,9 @@ public:
     void markEntityDeleted(uint64_t entityId) override;
     UI::SceneRefreshLevel pendingLevel() const override;
 
-    /// 当前曲线 LOD 队列中的图元数（诊断/回归测试用；0 表示队列已排空）。
+    /// 两条队列（LOD + 扩展）合计的**剩余未消费**图元数（诊断/回归测试用）：
+    /// 与 RenderSubmitScheduler::size() 同一口径 —— 扣除游标已消费的部分，
+    /// 随批次消费递减；0 表示本轮队列已排空。
     size_t pendingCurveLodCount() const
     {
         return m_submitScheduler.size();
