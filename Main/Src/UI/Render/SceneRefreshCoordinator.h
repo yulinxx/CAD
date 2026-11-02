@@ -125,6 +125,13 @@ public:
         return m_submitScheduler.processedBatchCount();
     }
 
+    /// 测试缝隙：注入批次提交回调（转发内部 RenderSubmitScheduler），
+    /// 让回归测试无 GL 验证队列/批次/账本语义。生产路径不调用。
+    void setSubmitBatchCallback(RenderSubmitScheduler::SubmitBatchFn fn)
+    {
+        m_submitScheduler.setSubmitBatchCallback(std::move(fn));
+    }
+
     void flushPendingRefresh() override;
     std::unordered_set<uint64_t> takePendingDirtyIds() override;
     std::unordered_set<uint64_t> takePendingDeletedIds() override;

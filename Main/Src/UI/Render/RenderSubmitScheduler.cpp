@@ -103,6 +103,29 @@ void RenderSubmitScheduler::processBatch(std::unordered_set<uint64_t>& renderedI
         return;
     }
 
+    // 「整批必然失败」的前置情形（GL 上下文不可用、渲染场景无效）：
+    // 挂起队列 —— 不建批、不提交、不动游标，失败条目留在原位，恢复可用后
+    // 自动续跑。只留 kPumpIntervalMs 低频探测（每 tick 一次谓词查询），
+    // 不烧 CPU 也不会永久卡住：上下文恢复即继续；组件解绑则由 ensurePump
+    // 的 null 检查彻底静默。
+    if (!submitAvailable())
+    {
+        ensurePump();
+        return;
+    }
+
+    // 连续失败指数退避：残余失败（几何仓写入失败、检查时可用提交时失败的
+    // TOCTOU）按 2^(n-1) 个 tick 退避后原样重试，上限 kSubmitRetryBackoffMaxTicks。
+    // 退避期间不建批不提交（失败条目由下方失败分支的游标回退留在原位），
+    // 每 tick 只做一次递减，最迟约半秒后自动恢复重试 —— 既不空转烧 CPU，
+    // 也不会把条目永久卡死或丢弃。
+    if (m_retryBackoffTicks > 0)
+    {
+        --m_retryBackoffTicks;
+        ensurePump();
+        return;
+    }
+
     ++m_processedBatches;
 
     // 自适应批次预算：固定 2000 个/帧不看图元复杂度 —— 轻场景浪费帧预算，
@@ -123,6 +146,12 @@ void RenderSubmitScheduler::processBatch(std::unordered_set<uint64_t>& renderedI
 
     // 扩展队列优先：新进视野的图元从未上 GPU（画面缺块），比 LOD 精度更新紧急。
     // 两队列共用本批额度，扩展先填。
+    //
+    // 建批前的游标位置：提交失败时回退到此处，失败条目留在原队列原位置重试。
+    // 回退不经过 refillQueueIfStale 的曲线类型过滤，LOD 与扩展两队列、
+    // 曲线与非曲线图元都由同一条回退路径覆盖，不丢条目。
+    const size_t extendBegin = m_extendCursor;
+    const size_t lodBegin = m_cursor;
     for (; m_extendCursor < m_extendQueue.size() && batch.size() < m_adaptiveBatchSize; ++m_extendCursor)
     {
         const uint64_t uid = m_extendQueue[m_extendCursor];
@@ -175,6 +204,9 @@ void RenderSubmitScheduler::processBatch(std::unordered_set<uint64_t>& renderedI
 
         if (ok)
         {
+            m_submitFailures = 0;
+            m_retryBackoffTicks = 0;
+            m_submitRetryPending = false;
             for (uint64_t uid : batch)
             {
                 renderedIds.insert(uid);
@@ -182,9 +214,21 @@ void RenderSubmitScheduler::processBatch(std::unordered_set<uint64_t>& renderedI
         }
         else
         {
-            // 批次提交失败：不把这些 ID 写入账本，下一批或下一帧重试。
-            // 游标已前进，失败的图元依赖 recollectPending 触发的重收集兜底。
-            m_recollectPending = true;
+            // 批次提交失败：游标回退到建批前位置，失败条目留在原队列原位置
+            // 等待重试 —— 不写账本、不丢弃、不重置队列进度。
+            // 旧实现在这里只记 recollectPending 就放游标走：refillQueueIfStale
+            // 的「缩放/区域都没变就跳过」前置门让重收集空转，失败图元被
+            // 永久丢弃（缺陷1 根因）。整批重试是幂等的：addPiece 按内容哈希
+            // 短路，已写入的段原地跳过，不会重复上传。
+            m_extendCursor = extendBegin;
+            m_cursor = lodBegin;
+            m_submitRetryPending = true;
+            ++m_submitFailures;
+            // 2^(n-1) 个 tick 指数退避，封顶 kSubmitRetryBackoffMaxTicks。
+            // shift 先截到 8（2^8=256 > 上限）防大计数溢出。
+            const uint32_t shift = (std::min)(m_submitFailures - 1, 8u);
+            m_retryBackoffTicks =
+                (std::min)(static_cast<uint32_t>(1u << shift), kSubmitRetryBackoffMaxTicks);
             ensurePump();
         }
     }
@@ -250,6 +294,10 @@ void RenderSubmitScheduler::clearAfterFullRefresh(double worldToScreenScale)
     m_recollectPending = false;
     m_scaleAtBuild = worldToScreenScale;
     m_collectedBoxValid = false;
+    // 全量重建已把全部图元重新上传：未补交的失败条目被取代，重试状态作废
+    m_submitRetryPending = false;
+    m_submitFailures = 0;
+    m_retryBackoffTicks = 0;
 }
 
 void RenderSubmitScheduler::clearQueue()
@@ -259,6 +307,10 @@ void RenderSubmitScheduler::clearQueue()
     m_extendQueue.clear();
     m_extendCursor = 0;
     m_recollectPending = false;
+    // 队列被整体清空（全量刷新前置兜底）：重试状态一并作废
+    m_submitRetryPending = false;
+    m_submitFailures = 0;
+    m_retryBackoffTicks = 0;
 }
 
 void RenderSubmitScheduler::markViewportReconciled(const Ut::BBox2d& coveredBox)
@@ -272,6 +324,22 @@ void RenderSubmitScheduler::markViewportReconciled(const Ut::BBox2d& coveredBox)
     // 不会无谓重收集。缩放基准 m_scaleAtBuild 故意不动 —— 见头文件说明。
     m_collectedBox = coveredBox;
     m_collectedBoxValid = coveredBox.isValid();
+
+    // 失败条目兜底：上面的清队列会把还没成功补交的重试条目一并丢弃
+    // （LOD 曲线已在账本里，协调器对账的 toAdd 差分不会把它们补回来）。
+    // 若存在未补交的失败条目，强制一次重收集：m_scaleAtBuild 归零让
+    // isScaleStale 恒真，refillQueueIfStale 的「缩放/区域都没变就跳过」
+    // 前置门随之失效 —— 失败的 LOD 曲线被重新收集进队列；
+    // 扩展队列的非曲线图元由对账的账本差分 toAdd 补回（失败不写账本，
+    // 必出现在 toAdd 里），两条路径合起来覆盖全部失败条目。
+    // ensurePump 保证无需相机事件也能在下一 tick 经 finishQueue 触发重收集。
+    if (m_submitRetryPending)
+    {
+        m_submitRetryPending = false;
+        m_recollectPending = true;
+        m_scaleAtBuild = 0.0;
+        ensurePump();
+    }
 }
 
 void RenderSubmitScheduler::refillQueueIfStale()
@@ -386,6 +454,22 @@ void RenderSubmitScheduler::refillQueueIfStale()
             m_sceneManager->forEachEntityByType(type, [&](Eg::SyEntity* entity) { tryEnqueue(entity); });
         }
     }
+}
+
+bool RenderSubmitScheduler::submitAvailable() const
+{
+    // 判定优先级：注入谓词（测试/特殊视口）> 注入提交回调（测试无 GL，默认
+    // 可用）> RenderWidget::isUploadAvailable()（与 upsertRenderEntities 的
+    // 环境前置同源：场景有效 + GL 有上下文 / Metal 恒可用）。
+    if (m_uploadAvailable)
+    {
+        return m_uploadAvailable();
+    }
+    if (m_submitBatch)
+    {
+        return true;
+    }
+    return m_renderWidget != nullptr && m_renderWidget->isUploadAvailable();
 }
 
 void RenderSubmitScheduler::ensurePump()

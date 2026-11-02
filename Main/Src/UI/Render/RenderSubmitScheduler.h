@@ -54,6 +54,13 @@ public:
     /// 消费泵定时器间隔（毫秒）。定时器由协调器持有，间隔统一引用本常量
     static constexpr int kPumpIntervalMs = 32;
 
+    /// 提交失败后的重试退避上限（泵 tick 数）。残余失败（几何仓 allocBlock /
+    /// writeBlock / upsertDrawItem 写入失败、检查时可用提交时失败的 TOCTOU）
+    /// 按 2^(n-1) 个 tick 指数退避后原样重试，退避封顶 16 个 tick
+    /// （kPumpIntervalMs=32ms × 16 ≈ 512ms）：既避免每 32ms 空转重试烧 CPU，
+    /// 又保证最迟半秒内自动恢复重试，不会永久卡住。失败条目永不丢弃。
+    static constexpr uint32_t kSubmitRetryBackoffMaxTicks = 16;
+
     /// 缩放滞后判据（纯函数，供测试直测）：
     /// 首次（scaleAtBuild <= 0）必过期；此后放大超过 kLodUpgradeRatio 或
     /// 缩小超过 kLodDowngradeRatio 才过期，两者之间是防抖死区。
@@ -108,6 +115,17 @@ public:
     void setSubmitBatchCallback(SubmitBatchFn fn)
     {
         m_submitBatch = std::move(fn);
+    }
+
+    /// 注入「上传通道可用性」判定：返回 false 时 processBatch 挂起队列
+    /// （不建批、不提交、不动游标），只留 kPumpIntervalMs 低频探测，恢复后
+    /// 自动续跑。用于覆盖「整批必然失败」的前置情形（GL 上下文不可用、
+    /// 渲染场景无效），避免无意义的提交尝试与退避重试。
+    /// 未注入时走 RenderWidget::isUploadAvailable()；注入了批次提交回调
+    /// （测试）而未注入本谓词时默认可用 —— 测试环境没有 GL。
+    void setUploadAvailablePredicate(std::function<bool()> predicate)
+    {
+        m_uploadAvailable = std::move(predicate);
     }
 
     // ======================== ① 曲线精度 LOD 队列 ========================
@@ -168,6 +186,10 @@ private:
     void refillQueueIfStale();
     void ensurePump();
 
+    /// 上传通道当前是否可用（建批前查询）。不可用时 processBatch 挂起队列，
+    /// 不做任何提交尝试 —— 覆盖「整批必然失败」的前置情形。
+    bool submitAvailable() const;
+
     /// 该图元此刻是否应该出现在世界层：自身可见、所在图层可见，
     /// 且没有被「选中时隐藏本体」过滤掉。
     bool isRenderable(uint64_t uid, const Eg::SyEntity* entity) const;
@@ -181,6 +203,8 @@ private:
     std::function<void()> m_pump;
     /// 测试缝隙：批次提交回调，未注入时走 RenderWidget::upsertRenderEntities
     SubmitBatchFn m_submitBatch;
+    /// 「上传通道可用性」判定（测试缝隙），为空时走 RenderWidget::isUploadAvailable()
+    std::function<bool()> m_uploadAvailable;
 
     // ---- ① 曲线精度 LOD 队列 ----
     std::vector<uint64_t> m_queue;
@@ -207,4 +231,13 @@ private:
     /// 把单批耗时压在 kBatchBudgetMs 附近。默认 2000 与旧固定值一致，
     /// 首批实测后立即收敛。
     size_t m_adaptiveBatchSize{ 2000 };
+
+    // ---- 提交失败的重试状态（两队列共用） ----
+    /// 连续提交失败次数（成功即清零），决定退避时长
+    uint32_t m_submitFailures{ 0 };
+    /// 当前退避剩余 tick 数：> 0 时 processBatch 只递减不提交
+    uint32_t m_retryBackoffTicks{ 0 };
+    /// 出现过提交失败且失败条目尚未成功补交。视口对账丢弃未消费队列条目时，
+    /// 靠本标记强制一次重收集兜底（见 markViewportReconciled）。
+    bool m_submitRetryPending{ false };
 };
