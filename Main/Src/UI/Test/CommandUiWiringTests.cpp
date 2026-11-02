@@ -214,6 +214,8 @@ namespace
             { "edit.cut", Cmd::RequiresUnlockedSelection },
             { "edit.copy", Cmd::RequiresUnlockedSelection },
             { "edit.paste", Cmd::RequiresClipboard },
+            { "edit.paste_text", Cmd::RequiresClipboard },
+            { "edit.paste_image", Cmd::RequiresClipboard },
             { "edit.delete", Cmd::RequiresUnlockedSelection },
             { "edit.align_left", Cmd::RequiresUnlockedMultiSelection },
             { "edit.align_right", Cmd::RequiresUnlockedMultiSelection },
@@ -386,6 +388,26 @@ TEST(CommandUiWiringTest, ApplySnapshotToMenu_ClipboardOnlyGatesPaste)
 
     EXPECT_TRUE(paste->isEnabled());
     EXPECT_FALSE(del->isEnabled());
+}
+
+TEST(CommandUiWiringTest, ApplySnapshotToMenu_ClipboardGatesPasteTextAndImage)
+{
+    // 回归背景：edit.paste_text / edit.paste_image 此前只在别名表里，没有目录条目，
+    // menuIdForCommandId 返回 0，applySnapshotToAction 在 menuId==0 处早退，
+    // 两者恒 enabled —— 空剪贴板时仍可点，点了只落一行 WARN。
+    QMenu menu;
+    QAction* pasteText = addConfiguredAction(&menu, "edit.paste_text");
+    QAction* pasteImage = addConfiguredAction(&menu, "edit.paste_image");
+
+    // 剪贴板为空：两项都应灰显
+    CommandActionHub::applySnapshotToMenu(&menu, makeSnapshot(0, false, false));
+    EXPECT_FALSE(pasteText->isEnabled());
+    EXPECT_FALSE(pasteImage->isEnabled());
+
+    // 剪贴板有内容：两项都应可用
+    CommandActionHub::applySnapshotToMenu(&menu, makeSnapshot(0, false, true));
+    EXPECT_TRUE(pasteText->isEnabled());
+    EXPECT_TRUE(pasteImage->isEnabled());
 }
 
 TEST(CommandUiWiringTest, ApplySnapshotToMenu_AlignRequiresTwoUnlocked)

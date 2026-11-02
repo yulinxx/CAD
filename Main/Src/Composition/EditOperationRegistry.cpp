@@ -51,6 +51,7 @@
 #include <QObject>
 #include <QWidget>
 #include <QCursor>
+#include <QMessageBox>
 
 #include <algorithm>
 #include <cmath>
@@ -265,12 +266,12 @@ void EditOperationRegistry::registerClipboardOps()
         return true;
     };
 
-    auto pasteImage = [editService, pasteAnchor](bool selectResult) {
+    auto pasteImage = [editService, pasteAnchor](bool selectResult) -> bool {
         if (!editService)
-            return;
+            return false;
         auto* scene = editService->sceneManager();
         if (!scene)
-            return;
+            return false;
         const Ut::Vec2d anchor = pasteAnchor();
         QString err;
         Eg::SyEntity* image = ImagePasteService::pasteClipboardImage(scene, anchor, err, nullptr, editService);
@@ -278,7 +279,7 @@ void EditOperationRegistry::registerClipboardOps()
         {
             if (!err.isEmpty())
                 SY_WARNF("[PasteImage] %s", err.toStdString().c_str());
-            return;
+            return false;
         }
         SY_DEBUG("[PasteImage] Clipboard image pasted");
         if (selectResult)
@@ -288,6 +289,7 @@ void EditOperationRegistry::registerClipboardOps()
             imgSel.push_back(image);
             scene->selectEntities(imgSel);
         }
+        return true;
     };
 
     Ops::declare(reg, OperationId::Edit_Copy, [editService, clipboard] {
@@ -356,12 +358,22 @@ void EditOperationRegistry::registerClipboardOps()
         pasteImage(true);
     });
 
-    Ops::declare(reg, OperationId::Edit_PasteText, [pasteText] {
-        pasteText(true);
+    Ops::declare(reg, OperationId::Edit_PasteText, [pasteText, parent = m_parentWidget] {
+        if (!pasteText(true) && parent)
+        {
+            // 灰显已挡住「空剪贴板」这种最常见情况，这里是剪贴板内容与命令不匹配等
+            // 仍可能失败的兜底：给用户可见提示，而不是只在日志里留一条 WARN。
+            QMessageBox::warning(parent, QObject::tr("Paste as Text"),
+                QObject::tr("Clipboard does not contain text that can be pasted."));
+        }
     });
 
-    Ops::declare(reg, OperationId::Edit_PasteImage, [pasteImage] {
-        pasteImage(true);
+    Ops::declare(reg, OperationId::Edit_PasteImage, [pasteImage, parent = m_parentWidget] {
+        if (!pasteImage(true) && parent)
+        {
+            QMessageBox::warning(parent, QObject::tr("Paste as Image"),
+                QObject::tr("Clipboard does not contain an image that can be pasted."));
+        }
     });
 
     Ops::declareParam(reg, OperationId::Edit_Duplicate, [=](const QVariantMap& params) {
