@@ -276,7 +276,94 @@
       ]
     }
   ],
-  "toolbars": [],
+  "toolbars": [
+    {
+      "id": "top.toolbar.2d.default",
+      "title": "Edit",
+      "position": "top",
+      "workbench": "2D",
+      "skippedByBuilder": true,
+      "items": [
+        { "type": "action", "id": "edit.undo", "label": "Undo", "commandId": "edit.undo", "icon": ":/ui/common/Icons/Actions/undo.svg" },
+        { "type": "action", "id": "edit.redo", "label": "Redo", "commandId": "edit.redo", "icon": ":/ui/common/Icons/Actions/redo.svg" },
+        { "type": "separator" },
+        { "type": "action", "id": "edit.mirror_horizontal", "label": "Mirror H", "commandId": "edit.mirror_horizontal", "icon": ":/ui/common/Icons/Actions/mirror_h.svg" },
+        { "type": "action", "id": "edit.mirror_vertical", "label": "Mirror V", "commandId": "edit.mirror_vertical", "icon": ":/ui/common/Icons/Actions/mirror_v.svg" },
+        { "type": "separator" },
+        { "type": "action", "id": "edit.align_left", "label": "Align Left", "commandId": "edit.align_left", "icon": ":/ui/common/Icons/Actions/align_left.svg" },
+        { "type": "action", "id": "edit.align_right", "label": "Align Right", "commandId": "edit.align_right", "icon": ":/ui/common/Icons/Actions/align_right.svg" },
+        { "type": "action", "id": "edit.align_center_h", "label": "Align Center H", "commandId": "edit.align_center_h", "icon": ":/ui/common/Icons/Actions/align_center_h.svg" },
+        { "type": "action", "id": "edit.align_top", "label": "Align Top", "commandId": "edit.align_top", "icon": ":/ui/common/Icons/Actions/align_top.svg" },
+        { "type": "action", "id": "edit.align_bottom", "label": "Align Bottom", "commandId": "edit.align_bottom", "icon": ":/ui/common/Icons/Actions/align_bottom.svg" },
+        { "type": "action", "id": "edit.align_center_v", "label": "Align Center V", "commandId": "edit.align_center_v", "icon": ":/ui/common/Icons/Actions/align_center_v.svg" },
+        { "type": "separator" },
+        { "type": "action", "id": "edit.select_all", "label": "Select All", "commandId": "edit.select_all", "icon": ":/ui/common/Icons/Actions/select_all.svg" },
+        { "type": "action", "id": "edit.invert_selection", "label": "Invert Selection", "commandId": "edit.invert_selection", "icon": ":/ui/common/Icons/Actions/invert_selection.svg" },
+        { "type": "action", "id": "edit.deselect", "label": "Clear Selection", "commandId": "edit.deselect", "icon": ":/ui/common/Icons/Actions/deselect.svg" },
+        { "type": "separator" },
+        { "type": "action", "id": "edit.copy", "label": "Copy", "commandId": "edit.copy", "icon": ":/ui/common/Icons/Actions/copy.svg" },
+        { "type": "action", "id": "edit.paste", "label": "Paste", "commandId": "edit.paste", "icon": ":/ui/common/Icons/Actions/paste.svg" },
+        { "type": "action", "id": "edit.delete", "label": "Delete", "commandId": "edit.delete", "icon": ":/ui/common/Icons/Actions/delete.svg" },
+        { "type": "separator" },
+        { "type": "action", "id": "edit.group", "label": "Group", "commandId": "edit.group", "icon": ":/ui/common/Icons/Actions/group.svg", "checkable": true }
+      ]
+    },
+    {
+      "id": "left.toolbar.3d",
+      "title": "View & Model",
+      "position": "left",
+      "workbench": "3D",
+      "skippedByBuilder": true,
+      "items": [
+        { "type": "action", "id": "view.reset", "label": "Reset View", "commandId": "view.reset", "icon": ":/ui/common/Icons/View3D/reset.svg" },
+        { "type": "action", "id": "view.fit_all", "label": "Fit All", "commandId": "view.fit_all", "icon": ":/ui/common/Icons/View3D/fit.svg" },
+        { "type": "separator" },
+        { "type": "action", "id": "view.front", "label": "Front", "commandId": "view.front", "icon": ":/ui/common/Icons/View3D/view_front.svg" },
+        { "type": "action", "id": "view.back", "label": "Back", "commandId": "view.back", "icon": ":/ui/common/Icons/View3D/view_back.svg" },
+        { "type": "action", "id": "view.left", "label": "Left", "commandId": "view.left", "icon": ":/ui/common/Icons/View3D/view_left.svg" },
+        { "type": "action", "id": "view.right", "label": "Right", "commandId": "view.right", "icon": ":/ui/common/Icons/View3D/view_right.svg" },
+        { "type": "action", "id": "view.top", "label": "Top", "commandId": "view.top", "icon": ":/ui/common/Icons/View3D/view_top.svg" },
+        { "type": "action", "id": "view.bottom", "label": "Bottom", "commandId": "view.bottom", "icon": ":/ui/common/Icons/View3D/view_bottom.svg" },
+        { "type": "action", "id": "view.isometric", "label": "Isometric", "commandId": "view.isometric", "icon": ":/ui/common/Icons/View3D/view_isometric.svg" },
+        { "type": "separator" },
+        { "type": "action", "id": "model.make_box", "label": "Box", "commandId": "model.make_box", "icon": ":/ui/common/Icons/Model3D/primitive_box.svg" },
+        { "type": "action", "id": "model.make_sphere", "label": "Sphere", "commandId": "model.make_sphere", "icon": ":/ui/common/Icons/Model3D/primitive_sphere.svg" },
+        { "type": "action", "id": "model.make_cylinder", "label": "Cylinder", "commandId": "model.make_cylinder", "icon": ":/ui/common/Icons/Model3D/primitive_cylinder.svg" }
+      ]
+    },
+    {
+      "id": "top.toolbar.3d",
+      "title": "Edit",
+      "position": "top",
+      "workbench": "3D",
+      "skippedByBuilder": true,
+      "items": [
+        { "type": "action", "id": "edit.select_all", "label": "Select All", "commandId": "edit.select_all", "icon": ":/ui/common/Icons/Actions/select_all.svg" },
+        { "type": "action", "id": "edit.clear_selection", "label": "Clear Selection", "commandId": "edit.clear_selection", "icon": ":/ui/common/Icons/Actions/clear.svg" },
+        { "type": "action", "id": "edit.delete", "label": "Delete", "commandId": "edit.delete", "icon": ":/ui/common/Icons/Actions/delete.svg" }
+      ]
+    },
+    {
+      "id": "right.toolbar.3d",
+      "title": "Display & Transform",
+      "position": "right",
+      "workbench": "3D",
+      "skippedByBuilder": true,
+      "items": [
+        { "type": "action", "id": "view.wireframe", "label": "Wireframe", "commandId": "view.wireframe", "icon": ":/ui/common/Icons/View3D/wireframe.svg", "checkable": true },
+        { "type": "action", "id": "view.grid", "label": "Show Grid", "commandId": "view.grid", "icon": ":/ui/common/Icons/View3D/grid.svg", "checkable": true },
+        { "type": "action", "id": "view.bbox", "label": "Show Bounding Box", "commandId": "view.bbox", "icon": ":/ui/common/Icons/View3D/bbox.svg", "checkable": true },
+        { "type": "action", "id": "view.floor", "label": "Show Floor", "commandId": "view.floor", "icon": ":/ui/common/Icons/View3D/floor.svg", "checkable": true },
+        { "type": "separator" },
+        { "type": "action", "id": "edit.transform_translate", "label": "Translate", "commandId": "edit.transform_translate", "icon": ":/ui/common/Icons/Actions/move.svg", "checkable": true },
+        { "type": "action", "id": "edit.transform_rotate", "label": "Rotate", "commandId": "edit.transform_rotate", "icon": ":/ui/common/Icons/Actions/rotate.svg", "checkable": true },
+        { "type": "action", "id": "edit.transform_scale", "label": "Scale", "commandId": "edit.transform_scale", "icon": ":/ui/common/Icons/View3D/scale.svg", "checkable": true },
+        { "type": "separator" },
+        { "type": "action", "id": "model.boolean_fuse", "label": "Fuse", "commandId": "model.boolean_fuse", "icon": ":/ui/common/Icons/Actions/boolean_union.svg" },
+        { "type": "action", "id": "model.boolean_cut", "label": "Cut", "commandId": "model.boolean_cut", "icon": ":/ui/common/Icons/Actions/boolean_difference.svg" }
+      ]
+    }
+  ],
   "docks": [
     { "id": "SceneDock", "title": "Scene", "position": "left", "widgetType": "SceneTreePanel", "visible": true },
     { "id": "PropertiesDock", "title": "Properties", "position": "right", "widgetType": "PropertiesPanel", "visible": true }

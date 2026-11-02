@@ -1315,6 +1315,15 @@ void SceneRefreshCoordinator::updateSceneRender()
 
     if (!m_renderWidget->isInitialized())
     {
+        // 渲染控件尚未初始化时,脏集合不能被消费(GL 上下文不存在,提交也会空转)。
+        // 这里确保定时器持续运行,一旦初始化完成立刻补发。pendingDirtyIds/pendingDeletedIds
+        // 保留到下一帧——onSceneChanged 已把 m_lastCursor 推进到变更后的修订号,初始化完成后
+        // 正常执行 applyLightRefresh/applyFullRefresh 就能正确消费这批脏 ID,
+        // 不会漏刷(初始化完成时 renderWidget 的 resizeEvent/first paint 会再触发一次 updateSceneRender)。
+        // curveLodManager 清理同理:FullRefresh 时的 LOD 队列需要等到真正全量重建那一刻才能清,
+        // 提前清会让后续帧丢掉"缩放变更后需要重新离散"的那批曲线——初始化未就绪时场景缩放可能
+        // 还没锚定,提前清掉队列反而会让曲线永久停留在旧精度。故此处不做 curveLod 清理,
+        // 让 FullRefresh 的队列在 isInitialized 后的真正重建那一刻再清。
         if (m_sceneUpdateTimer && !m_sceneUpdateTimer->isActive())
         {
             m_sceneUpdateTimer->start();
@@ -1353,7 +1362,7 @@ void SceneRefreshCoordinator::updateSceneRender()
     {
         applyRepaintRefresh();
         // 场景刷新帧顺带推进 LOD 一次，独立定时器负责持续续跑
-        if (!m_submitScheduler.empty())
+        if (!m_curveLodManager.empty())
         {
             processCurveLodBatch();
         }

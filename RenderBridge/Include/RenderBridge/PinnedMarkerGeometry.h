@@ -18,7 +18,7 @@
  * 2. **易在合并中丢失**。定义与调用点相隔两百行，曾出现过定义被合并丢掉、
  *    调用留在原处的情况（C2065/C3861）。
  *
- * 拆出来之后：本头只依赖 RenderTypes + ScreenConstantMetrics，两者都是纯头，
+ * 拆出来之后：本头只依赖 Utility 的 Ut:: 数学类型与 ScreenConstantMetrics，
  * 测试目标无需链接 Renderx；`OverlayScene.cpp` 只负责把产出的顶点
  * 交给瞬态环。顶点结构与 P3O2C4 的 stride 断言仍留在 `.cpp`（那里才认识
  * `rxVertexStride`），保证布局一旦漂移立刻编译失败。
@@ -27,7 +27,8 @@
  *
  * 本头与 `ScreenConstantMetrics.h` 一并从 UI2D 下沉到 RenderBridge：
  * 覆盖层构建器要在这里落地，而 UI2D 依赖 RenderBridge，留在 UI2D 就成环。
- * 命名空间保持 `Render::`，调用点无需改动。
+ * 命名空间保持 `Render::`，调用点无需改动；数学类型直接用 `Ut::Vec2f / Ut::Color`
+ * 不再通过 RenderTypes.h 的别名间接引用。
  */
 #pragma once
 
@@ -38,7 +39,8 @@
 
 #include "RenderAbstraction/ScreenConstantMetrics.h"
 
-#include "Render/RenderTypes.h"
+#include "Ut/Color.h"
+#include "Ut/Vec.h"
 
 namespace Render
 {
@@ -53,7 +55,7 @@ namespace Render
         float x, y, z, ox, oy, r, g, b, a;
     };
 
-    inline PinnedVertex pinnedVertex(const Vec2f& anchor, float ox, float oy, const Color& c)
+    inline PinnedVertex pinnedVertex(const Ut::Vec2f& anchor, float ox, float oy, const Ut::Color& c)
     {
         return { anchor.x(), anchor.y(), 0.0f, ox, oy, c.r(), c.g(), c.b(), c.a() };
     }
@@ -71,11 +73,11 @@ namespace Render
      */
     inline void appendPinnedMarker(std::vector<PinnedVertex>& fillV,
         std::vector<PinnedVertex>& borderV,
-        const Vec2f& anchor,
-        const Vec2f& offsetPx,
+        const Ut::Vec2f& anchor,
+        const Ut::Vec2f& offsetPx,
         float sizePx,
-        const Color& fill,
-        const Color& border)
+        const Ut::Color& fill,
+        const Ut::Color& border)
     {
         if (!std::isfinite(anchor.x()) || !std::isfinite(anchor.y()))
             return;
@@ -115,16 +117,16 @@ namespace Render
     struct PinnedMarkerGroup
     {
         /// 世界锚点
-        const std::vector<Vec2f>* anchors = nullptr;
+        const std::vector<Ut::Vec2f>* anchors = nullptr;
         /// 锚点之上再叠加的像素偏移；为空或长度不足时按 (0,0) 处理
-        const std::vector<Vec2f>* offsetsPx = nullptr;
+        const std::vector<Ut::Vec2f>* offsetsPx = nullptr;
         float sizePx = 0.0f;
-        Color fill;
-        Color border;
+        Ut::Color fill;
+        Ut::Color border;
         /// 可选：每个标记单独的填充颜色数组。如果为空或长度不足则使用统一的 fill
-        const std::vector<Color>* perMarkerFills = nullptr;
+        const std::vector<Ut::Color>* perMarkerFills = nullptr;
         /// 可选：每个标记单独的边框颜色数组。如果为空或长度不足则使用统一的 border
-        const std::vector<Color>* perMarkerBorders = nullptr;
+        const std::vector<Ut::Color>* perMarkerBorders = nullptr;
     };
 
     /**
@@ -147,12 +149,12 @@ namespace Render
             const float sizePx = std::max(grp.sizePx, ScreenMetrics::kMinMarkerSizePx);
             for (size_t i = 0; i < grp.anchors->size(); ++i)
             {
-                const Vec2f offsetPx =
-                    (grp.offsetsPx && i < grp.offsetsPx->size()) ? (*grp.offsetsPx)[i] : Vec2f(0.0f, 0.0f);
+                const Ut::Vec2f offsetPx =
+                    (grp.offsetsPx && i < grp.offsetsPx->size()) ? (*grp.offsetsPx)[i] : Ut::Vec2f(0.0f, 0.0f);
                 // 使用每标记颜色（如果提供），否则使用统一颜色
-                const Color fill =
+                const Ut::Color fill =
                     (grp.perMarkerFills && i < grp.perMarkerFills->size()) ? (*grp.perMarkerFills)[i] : grp.fill;
-                const Color border =
+                const Ut::Color border =
                     (grp.perMarkerBorders && i < grp.perMarkerBorders->size()) ? (*grp.perMarkerBorders)[i] : grp.border;
                 appendPinnedMarker(fillV, borderV, (*grp.anchors)[i], offsetPx, sizePx, fill, border);
             }

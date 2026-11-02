@@ -563,6 +563,7 @@ std::optional<ToolBarDef> UiConfigLoader::parseToolBar(const QJsonObject& obj)
     tb.position = parseToolBarPosition(obj.value(QStringLiteral("position")).toString());
     tb.workbenchId = obj.value(QStringLiteral("workbench")).toString(QStringLiteral("global"));
     tb.feature = obj.value(QStringLiteral("feature")).toString();
+    tb.skippedByBuilder = obj.value(QStringLiteral("skippedByBuilder")).toBool(false);
     if (tb.id.isEmpty())
     {
         return std::nullopt;

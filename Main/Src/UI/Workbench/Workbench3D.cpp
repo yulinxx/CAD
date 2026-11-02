@@ -8,9 +8,11 @@
     #include <QDesktopServices>
     #include <QDockWidget>
     #include <QFileInfo>
+    #include <QGuiApplication>
     #include <QLineEdit>
     #include <QMenu>
     #include <QPlainTextEdit>
+    #include <QScreen>
     #include <QShortcut>
     #include <QTextEdit>
     #include <QTimer>
@@ -21,6 +23,7 @@
     #include <functional>
     #include <string>
     #include <unordered_set>
+    #include <variant>
     #include <vector>
 
     #include "Composition/ApplicationCompositionRoot.h"
@@ -92,6 +95,85 @@ struct Workbench3D::ServiceOwner
     std::unique_ptr<BRepModelService3D> brepModelService;
     #endif
 };
+
+// --- 3D 工具栏从 JSON 配置构建 Action 列表的辅助函数 ---
+namespace
+{
+    /// 从 JSON toolbars 中按 id 查找 workbenchId=="3D" 的 ToolBarDef
+    const ToolBarDef* find3DToolBarDef(const QString& id)
+    {
+        const UiConfigData* config = UiConfigurationManager::shared().configData();
+        if (!config)
+        {
+            return nullptr;
+        }
+        for (const ToolBarDef& tb : config->toolBars)
+        {
+            if (tb.id == id && tb.workbenchId.compare(QStringLiteral("3D"), Qt::CaseInsensitive) == 0)
+            {
+                return &tb;
+            }
+        }
+        return nullptr;
+    }
+
+    /// 把 ToolBarDef.items 转成 QVector<QAction*>（separator → nullptr），
+    /// 过滤未注册的 action（返回 nullptr 的）、合并连续 separator、去掉末尾 separator
+    QVector<QAction*> build3DToolBarActions(const ToolBarDef* tb, CommandActionHub3D* hub)
+    {
+        QVector<QAction*> raw;
+        if (!tb || !hub)
+        {
+            return raw;
+        }
+        for (const auto& item : tb->items)
+        {
+            if (std::holds_alternative<MenuItemType>(item))
+            {
+                if (std::get<MenuItemType>(item) == MenuItemType::Separator)
+                {
+                    raw.append(nullptr);
+                }
+                continue;
+            }
+            const ToolBarActionDef& ad = std::get<ToolBarActionDef>(item);
+            raw.append(hub->actionForCommandId(ad.commandId));
+        }
+        QVector<QAction*> filtered;
+        bool lastWasSeparator = true;  // 初始 true → 忽略开头 separator
+        for (QAction* a : raw)
+        {
+            if (a == nullptr)
+            {
+                if (lastWasSeparator) continue;
+                filtered.append(nullptr);
+                lastWasSeparator = true;
+            }
+            else
+            {
+                filtered.append(a);
+                lastWasSeparator = false;
+            }
+        }
+        while (!filtered.isEmpty() && filtered.last() == nullptr)
+        {
+            filtered.removeLast();
+        }
+        return filtered;
+    }
+
+    /// 给一组 Action 标记 surfaceSourceProp（来自哪个工具栏，用于触发日志区分来源）
+    void markSurfaceSource(const QVector<QAction*>& actions, const char* surface)
+    {
+        for (QAction* a : actions)
+        {
+            if (a)
+            {
+                a->setProperty(CommandActionHub3D::surfaceSourceProp, surface);
+            }
+        }
+    }
+}  // namespace
 
 // 自定义删除器定义（ServiceOwner 在此处已完整定义）
 void Workbench3D::ServiceOwnerDeleter::operator()(ServiceOwner* p) const
@@ -758,33 +840,62 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     SY_DEBUG("[Workbench3D] Menus are built by WorkbenchMenuManager from client config");
 
     // 5. 转移并绑定工具栏。
-    // 菜单由统一配置路径生成，3D CommandActionHub 继续负责高频工具栏动作。
+    // 菜单由统一配置路径生成，3D 工具栏也改为从 base.json toolbars 读取 commandId 顺序。
     // 注意：mainWindow3D->hide() 会隐藏所有子控件，removeToolBar 也会显式隐藏工具栏，
     // 因此 reparent 后必须显式 show() 才能恢复可见性
-    // LeftToolBar3D：reparent 到 WorkbenchWindow 后填充视角导航按钮
+    // LeftToolBar3D：reparent 到 WorkbenchWindow 后按 JSON 配置填充视角导航按钮
     if (auto* lt = mainWindow3D->leftToolBar())
     {
         lt->setParent(&window);
         window.addToolBar(Qt::LeftToolBarArea, lt);
-        own.commandActionHub->bindLeftToolBar(lt);
+        const ToolBarDef* tb = find3DToolBarDef(QStringLiteral("left.toolbar.3d"));
+        QVector<QAction*> actions = build3DToolBarActions(tb, own.commandActionHub.get());
+        for (QAction* a : actions)
+        {
+            if (a)
+            {
+                a->setProperty(CommandActionHub3D::surfaceSourceProp, static_cast<int>(OperationSource3D::LeftToolbar));
+            }
+        }
+        lt->installHubActions(actions);
+        // more views 子菜单：SE/SW/NE/NW 等轴测没有 commandId，无法 JSON 配置化，继续手工组装
+        const QList<QAction*> moreViews = {
+            own.commandActionHub->action(OperationId3D::View_Dimetric),
+            own.commandActionHub->action(OperationId3D::View_Trimetric),
+            own.commandActionHub->action(OperationId3D::View_SEIsometric),
+            own.commandActionHub->action(OperationId3D::View_SWIsometric),
+            own.commandActionHub->action(OperationId3D::View_NEIsometric),
+            own.commandActionHub->action(OperationId3D::View_NWIsometric),
+        };
+        lt->installMoreViewMenu(moreViews, QStringLiteral("More Views"));
         lt->show();
     }
-    // TopToolBar3D：从 MainWindow3D 移除后 reparent 到 WorkbenchWindow
+    // TopToolBar3D：从 MainWindow3D 移除后 reparent 到 WorkbenchWindow，按 JSON 配置填充
     if (auto* tb = mainWindow3D->topToolBar())
     {
         mainWindow3D->removeToolBar(tb);
         tb->setParent(&window);
         window.addToolBar(Qt::TopToolBarArea, tb);
-        own.commandActionHub->bindTopToolBar(tb);
+        const ToolBarDef* def = find3DToolBarDef(QStringLiteral("top.toolbar.3d"));
+        tb->installHubActions(build3DToolBarActions(def, own.commandActionHub.get()));
         tb->show();
     }
-    // RightToolBar3D：从 MainWindow3D 转移到 WorkbenchWindow
+    // RightToolBar3D：从 MainWindow3D 转移到 WorkbenchWindow，按 JSON 配置填充
     if (auto* rt = mainWindow3D->rightToolBar())
     {
         mainWindow3D->removeToolBar(rt);
         rt->setParent(&window);
         window.addToolBar(Qt::RightToolBarArea, rt);
-        own.commandActionHub->bindRightToolBar(rt);
+        const ToolBarDef* def = find3DToolBarDef(QStringLiteral("right.toolbar.3d"));
+        QVector<QAction*> actions = build3DToolBarActions(def, own.commandActionHub.get());
+        for (QAction* a : actions)
+        {
+            if (a)
+            {
+                a->setProperty(CommandActionHub3D::surfaceSourceProp, static_cast<int>(OperationSource3D::RightToolbar));
+            }
+        }
+        rt->installAllActions(actions);
         rt->show();
     }
 
@@ -881,7 +992,14 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
         if (sceneDock)
         {
             sceneDock->setObjectName(UiDockIds::sceneQString());
-            sceneDock->setMinimumWidth(180);
+            // Scene 面板最小宽度:屏幕 7.3% 自适应 + 140 保底(与 WorkbenchLayoutManager 保持一致)
+            {
+                QScreen* screen = QGuiApplication::primaryScreen();
+                const int minW = screen
+                    ? qMax(140, static_cast<int>(screen->availableGeometry().width() * 0.073))
+                    : 180;
+                sceneDock->setMinimumWidth(minW);
+            }
         }
         m_scenePanel3D = sharedPanel;
     }

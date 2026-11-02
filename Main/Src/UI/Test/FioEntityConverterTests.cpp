@@ -15,7 +15,7 @@
 #include <gtest/gtest.h>
 #include <cstring>
 
-#include "Engine3D/Import/FioEntityConverter.h"
+#include "FioEntityConverter.h"
 #include "Engine2D/Import/Fio2DEntityConverter.h"
 #include "FileIO/FioTypes.h"
 

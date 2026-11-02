@@ -846,7 +846,7 @@ namespace
         profile.deviceId = QStringLiteral("simulated_composite");
         MachineSafetyConditionConfig cond;
         cond.pointName = QStringLiteral("safety.not_wired");
-        cond.description = QStringLiteral("未接线的安全点位");
+        cond.description = QStringLiteral("Safety point not wired");
         cond.severity = QStringLiteral("blocked");
         cond.actions = QStringList{ QStringLiteral("block_start") };
         profile.safetyConditions.append(cond);
@@ -875,7 +875,7 @@ namespace
 
         // 直接发出裁决变化信号：这里验证的是「宿主 → 作业服务」这条接线，
         // 而不是 SafetyMonitor 自身的判定逻辑（后者由 HardwareTests 覆盖）
-        emit m_host->safetyVerdictChanged(false, QStringLiteral("安全门被打开"), QStringLiteral("safety.door_closed"));
+        emit m_host->safetyVerdictChanged(false, QStringLiteral("Safety door opened"), QStringLiteral("safety.door_closed"));
 
         EXPECT_TRUE(m_job->isPaused());
         EXPECT_FALSE(m_job->isRunning());

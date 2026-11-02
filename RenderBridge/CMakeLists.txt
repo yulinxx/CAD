@@ -64,30 +64,31 @@ sanyi_add_shared_library(${LIB_NAME}
     HEADERS ${LIB_HEADERS}
     PUBLIC_INCLUDE_DIRS
         "${CMAKE_CURRENT_SOURCE_DIR}/Include"
-        # 抽象层的包含路径由 link RenderAbstraction 带出来，不再重复写裸路径：
-        # 同一个依赖只表达一次，改起来才不会漏
-        "${SANYI_UTILITY_DIR}/Include"
-        "${SANYI_LOG_DIR}/Include"
-        # 覆盖层与屏幕定尺寸标记几何共用应用层绘制词汇（Render::Vec2f / Color / BBox2d）
-        "${SANYI_UI_COMMON_DIR}/Include"
-        # RenderTypes.h 里的离散化常量来自 EngineCommon（Eg::tess）
-        "${SANYI_ENGINE_COMMON_DIR}/Include"
     PRIVATE_INCLUDE_DIRS
         # renderx.h 只在 .cpp 内部可见，不传递给下游（UI2D/UI3D 自己按需配置）
         "${SANYI_RENDERX_DIR}/include"
-    LINK_LIBRARIES
-        PUBLIC
-            Utility
-            Log
-            # 抽象层是 RenderBridge 的公开契约：公共头文件里到处是它的类型，
-            # 因此以 PUBLIC 传出去，下游不必自己再找一遍包含路径
-            RenderAbstraction
-        PRIVATE
-            # 渲染后端已完全收口到本模块内部：UI 层不再调 rx* API，
-            # 因此 RenderX 只以 PRIVATE 链接，不随 RenderBridge 转发给下游。
-            # 这同时让「UI 不得经传递闭包到达 RenderX」这条校验真正成立。
-            RenderX
-    QT_COMPONENTS
+    # 链接库按 PUBLIC/PRIVATE 分层：
+    #   PUBLIC —— 公共头里被引用的依赖，必须传递给下游
+    #   PRIVATE —— 仅 .cpp 内部使用，不随 DLL 对外泄漏
+    # 此前通过 PUBLIC_INCLUDE_DIRS 硬塞 UICommon/EngineCommon 路径是错误的：
+    # 那是把上游工程的头文件路径通过链接闭包泄漏给下游，而不是模块边界。
+    # 可见性分离：
+    #   PUBLIC_LINK_LIBRARIES —— 公共头里被引用的依赖，必须传递给下游
+    #   PRIVATE_LINK_LIBRARIES —— 仅 .cpp 内部使用
+    #   PUBLIC_QT_COMPONENTS / PRIVATE_QT_COMPONENTS —— Qt 组件同理
+    # 公共头里到处是 Ut::Vec2f/Color/BBox2d/Mat3f（RenderBridgeTypes.h 是唯一类型来源），
+    # Utility 必须 PUBLIC 传出去；RenderAbstraction 同理（IRenderScene / IRenderTypes）
+    PUBLIC_LINK_LIBRARIES
+        Utility
+        RenderAbstraction
+    PRIVATE_LINK_LIBRARIES
+        # 日志只在实现内部打，不随 DLL 对外泄漏
+        Log
+        # 渲染后端已完全收口到本模块内部：UI 层不再调 rx* API，
+        # 因此 RenderX 只以 PRIVATE 链接，不随 RenderBridge 转发给下游
+        RenderX
+    PRIVATE_QT_COMPONENTS
+        # 公共头已中性化，不再 include Qt 类型，全部 Qt 组件收 PRIVATE
         Core Gui OpenGLWidgets
 )
 
@@ -96,8 +97,9 @@ sanyi_export_imported_target(${LIB_NAME}
     PUBLIC_INCLUDE_DIRS
         "${CMAKE_CURRENT_SOURCE_DIR}/Include"
         "${SANYI_ROOT}/RenderAbstraction/Include"
-        "${SANYI_UI_COMMON_DIR}/Include"
-        "${SANYI_ENGINE_COMMON_DIR}/Include"
+        # Utility 是 PUBLIC_LINK_LIBRARIES，通常其 include 由目标自动传递；
+        # 显式写出以便脱离根工程独立构建时也能找到 Ut/* 头
+        "${SANYI_ROOT}/Utility/Utility/Include"
     INTERFACE_LINK_LIBRARIES
         Utility::Utility
         Log::Log

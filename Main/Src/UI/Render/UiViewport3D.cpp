@@ -9,10 +9,12 @@
 #include "UI3D/Render3D/IRenderer3D.h"
 
 #include <QContextMenuEvent>
+#include <QGuiApplication>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPaintEvent>
 #include <QResizeEvent>
+#include <QScreen>
 #include <QSizePolicy>
 #include <QWheelEvent>
 #include "Log/SyLogger.h"
@@ -20,7 +22,22 @@
 Viewport3D::Viewport3D(QWidget* parent)
     : QWidget(parent)
 {
-    setMinimumSize(640, 480);
+    // 视口最小尺寸保底 480×360（OpenGL 渲染可用下限），上限按屏幕 35%×40% 自适应，
+    // 避免 1366×768 小屏上 640×480 硬锁占掉大半可用区域
+    {
+        QScreen* screen = QGuiApplication::primaryScreen();
+        if (screen)
+        {
+            const QRect av = screen->availableGeometry();
+            const int minW = qMin(480, static_cast<int>(av.width() * 0.35));
+            const int minH = qMin(360, static_cast<int>(av.height() * 0.40));
+            setMinimumSize(minW, minH);
+        }
+        else
+        {
+            setMinimumSize(480, 360);
+        }
+    }
     // 与 2D 视口保持一致：中央控件必须 Expanding，否则 QMainWindow 会把
     // 多余空间分给左右 Dock，3D 视口被挤成 640px 宽的竖条。
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);

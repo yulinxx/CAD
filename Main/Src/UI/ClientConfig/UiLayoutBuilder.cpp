@@ -457,6 +457,14 @@ void UiLayoutBuilder::buildToolBars(const std::vector<ToolBarDef>& toolBars)
             continue;
         }
 
+        // 标记为跳过构建的条目（由 Workbench2D/3D 自建），跳过避免重复
+        if (tb.skippedByBuilder)
+        {
+            SY_DEBUGF("[UiLayoutBuilder] Skip toolbar id='%s' — skippedByBuilder=true",
+                qPrintable(tb.id));
+            continue;
+        }
+
         QToolBar* toolBar = new QToolBar(actionLabel(tb.title, tb.id), m_window);
         toolBar->setObjectName(tb.id);
         toolBar->setMovable(true);

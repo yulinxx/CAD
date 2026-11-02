@@ -80,7 +80,7 @@ bool ExportDispatcher::canExport(const QString& filePath, QString* reasonOut) co
     IExportWriter* writer = findWriter(fmt);
     if (writer == nullptr)
     {
-        const QString reason = QStringLiteral("格式无法识别或无可用写入器: %1").arg(filePath);
+        const QString reason = QCoreApplication::translate("ExportDispatcher", "Format unrecognized or no writer available: %1").arg(filePath);
         if (reasonOut)
         {
             *reasonOut = reason;

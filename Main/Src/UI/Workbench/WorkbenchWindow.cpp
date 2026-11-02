@@ -147,7 +147,21 @@ WorkbenchWindow::WorkbenchWindow(QWidget* parent)
     SY_DEBUG("[WorkbenchWindow] Creating main window");
 
     setWindowTitle(UiBrandManager::instance().windowTitle());
-    resize(1440, 900);
+    // 初始窗口大小按屏幕可用区域自适应：1440x900 是基准，若屏幕更小则不超过可用区的 90%
+    {
+        QScreen* screen = QGuiApplication::primaryScreen();
+        if (screen)
+        {
+            const QRect available = screen->availableGeometry();
+            const int targetW = qMin(1440, static_cast<int>(available.width() * 0.9));
+            const int targetH = qMin(900, static_cast<int>(available.height() * 0.9));
+            resize(targetW, targetH);
+        }
+        else
+        {
+            resize(1440, 900);
+        }
+    }
     // 启用文件拖放，2D/3D 工作台共用统一 FileDropHandler
     setAcceptDrops(true);
     // QOpenGLWidget 在 macOS/Windows 是原生子窗口，拖放事件可能不冒泡到本窗口。

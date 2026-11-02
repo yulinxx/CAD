@@ -29,7 +29,7 @@ namespace Render
 
         /// 世界坐标 → 物理像素。view 是列主序的世界→NDC 矩阵（Ut::Mat3f）
         void worldToPixel(
-            const Render::Mat3f& view, float wx, float wy, uint32_t vpWidth, uint32_t vpHeight, float& outX, float& outY)
+            const Ut::Mat3f& view, float wx, float wy, uint32_t vpWidth, uint32_t vpHeight, float& outX, float& outY)
         {
             // 列主序：data[col * 3 + row]，与 RenderWidget::mat3ToMat4 的取法一致
             const float ndcX = view.data[0] * wx + view.data[3] * wy + view.data[6];
@@ -133,9 +133,9 @@ namespace Render
     }
 
     void TextQuadBuilder::addText(
-        const Eg::TextItem& item, const Render::Mat3f& view, uint32_t vpWidth, uint32_t vpHeight)
+        const RenderBridge::TextLayoutInfo& item, const Ut::Mat3f& view, uint32_t vpWidth, uint32_t vpHeight)
     {
-        if (!valid() || item.text[0] == '\0' || item.fontSize <= 0 || vpWidth == 0 || vpHeight == 0)
+        if (!valid() || item.utf8[0] == '\0' || item.fontSize <= 0 || vpWidth == 0 || vpHeight == 0)
         {
             return;
         }
@@ -152,14 +152,14 @@ namespace Render
             return;
         }
 
-        const size_t textLength = std::strlen(item.text);
+        const size_t textLength = std::strlen(item.utf8);
 
         // 第一遍：量总宽。对齐需要它，而 advance 只能逐字形问出来。
         float totalWidth = 0.0f;
         for (size_t i = 0; i < textLength;)
         {
             uint32_t codepoint = 0;
-            i += decodeUtf8(item.text + i, textLength - i, codepoint);
+            i += decodeUtf8(item.utf8 + i, textLength - i, codepoint);
             RenderAbstraction::GlyphInfo glyph{};
             if (!m_device->fontGlyph(batch->font, codepoint, glyph))
             {
@@ -173,23 +173,23 @@ namespace Render
         }
 
         // 锚点换算到物理像素
-        float anchorX = item.x;
-        float anchorY = item.y;
-        if (item.coordMode == Eg::UiTextCoordMode::WorldPos_PixelSize)
+        float anchorX = item.worldPos.x();
+        float anchorY = item.worldPos.y();
+        if (item.coordMode == RenderBridge::kCoordModeWorldPos)
         {
-            worldToPixel(view, item.x, item.y, vpWidth, vpHeight, anchorX, anchorY);
+            worldToPixel(view, item.worldPos.x(), item.worldPos.y(), vpWidth, vpHeight, anchorX, anchorY);
         }
 
         float penX = anchorX;
         switch (item.hAlign)
         {
-        case Eg::UiTextHAlign::Center:
+        case RenderBridge::kHAlignCenter:
             penX -= totalWidth * 0.5f;
             break;
-        case Eg::UiTextHAlign::Right:
+        case RenderBridge::kHAlignRight:
             penX -= totalWidth;
             break;
-        case Eg::UiTextHAlign::Left:
+        case RenderBridge::kHAlignLeft:
         default:
             break;
         }
@@ -199,13 +199,13 @@ namespace Render
         float baselineY = anchorY;
         switch (item.vAlign)
         {
-        case Eg::UiTextVAlign::Top:
+        case RenderBridge::kVAlignTop:
             baselineY = anchorY + metrics.ascent;
             break;
-        case Eg::UiTextVAlign::Middle:
+        case RenderBridge::kVAlignMiddle:
             baselineY = anchorY - textHeight * 0.5f + metrics.ascent;
             break;
-        case Eg::UiTextVAlign::Bottom:
+        case RenderBridge::kVAlignBottom:
             baselineY = anchorY + metrics.descent;
             break;
         default:
@@ -225,7 +225,7 @@ namespace Render
         for (size_t i = 0; i < textLength;)
         {
             uint32_t codepoint = 0;
-            i += decodeUtf8(item.text + i, textLength - i, codepoint);
+            i += decodeUtf8(item.utf8 + i, textLength - i, codepoint);
 
             RenderAbstraction::GlyphInfo glyph{};
             if (!m_device->fontGlyph(batch->font, codepoint, glyph))

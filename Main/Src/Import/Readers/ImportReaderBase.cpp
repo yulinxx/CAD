@@ -13,7 +13,7 @@
 
 #include "FileIO/FileIOManager.h"
 #include "FileIO/UnitTransform.h"
-#include "Engine3D/Import/FioEntityConverter.h"
+#include "FioEntityConverter.h"
 #include "Log/SyLogger.h"
 #include "Engine/SyEntity/SyEntity.h"
 

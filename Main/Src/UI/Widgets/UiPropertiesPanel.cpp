@@ -17,6 +17,7 @@
 #include <QDoubleSpinBox>
 #include <QEvent>
 #include <QFormLayout>
+#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
@@ -25,6 +26,7 @@
 #include <QMessageBox>
 #include <QModelIndex>
 #include <QPushButton>
+#include <QScreen>
 #include <QSpinBox>
 #include <QStyledItemDelegate>
 #include <QTreeWidget>
@@ -107,6 +109,7 @@ namespace
             indexRow->addWidget(new QLabel(QCoreApplication::translate("UiPropertiesPanel", "Index:"), this));
             m_index = new QSpinBox(this);
             m_index->setRange(0, 0);
+            // 索引 SpinBox 最小宽度 90:保证 "Index: 999" 完整可见,合理约束保留
             m_index->setMinimumWidth(90);
             m_index->setToolTip(QCoreApplication::translate(
                 "UiPropertiesPanel", "Vertex index in the point list. Type a number to jump directly."));
@@ -176,6 +179,7 @@ namespace
             auto* layout = new QHBoxLayout(this);
             layout->setContentsMargins(2, 2, 2, 2);
             m_button = new QPushButton(this);
+            // 颜色/定位按钮高度 24:与 SpinBox 默认高度对齐,合理约束保留
             m_button->setMinimumHeight(24);
             layout->addWidget(m_button);
             connect(m_button, &QPushButton::clicked, this, &ColorEditor::chooseColor);
@@ -230,7 +234,13 @@ namespace
             setFocusPolicy(Qt::StrongFocus);
 
             setWindowTitle(tr("Edit %1").arg(m_item.name));  // 编辑 %1
-            setMinimumWidth(360);
+            // 编辑对话框最小宽度:屏幕 19% 自适应 + 288 保底
+            {
+                QScreen* screen = QGuiApplication::primaryScreen();
+                setMinimumWidth(screen
+                    ? qMax(288, static_cast<int>(screen->availableGeometry().width() * 0.19))
+                    : 288);
+            }
 
             auto* layout = new QVBoxLayout(this);
             layout->setContentsMargins(12, 12, 12, 12);
