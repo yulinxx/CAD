@@ -78,7 +78,7 @@
           { "type": "action", "id": "edit.mirror_horizontal", "label": "Mirror Horizontal", "command": "edit.mirror_horizontal", "icon": ":/ui/common/Icons/Actions/mirror_h.svg", "workbenches": ["2D"] },
           { "type": "action", "id": "edit.mirror_vertical", "label": "Mirror Vertical", "command": "edit.mirror_vertical", "icon": ":/ui/common/Icons/Actions/mirror_v.svg", "workbenches": ["2D"] },
           { "type": "action", "id": "edit.scale", "label": "Scale", "command": "edit.scale", "icon": ":/ui/common/Icons/View3D/scale.svg", "workbenches": ["2D"] },
-          { "type": "action", "id": "edit.transform_translate", "label": "Translate", "command": "edit.transform_translate", "icon": ":/ui/common/Icons/Actions/move.svg", "workbenches": ["3D"] },
+          { "type": "action", "id": "edit.transform_translate", "label": "Move", "command": "edit.transform_translate", "icon": ":/ui/common/Icons/Actions/move.svg", "workbenches": ["3D"] },
           { "type": "action", "id": "edit.transform_rotate", "label": "Rotate", "command": "edit.transform_rotate", "icon": ":/ui/common/Icons/Actions/rotate.svg", "workbenches": ["3D"] },
           { "type": "action", "id": "edit.transform_scale", "label": "Scale", "command": "edit.transform_scale", "icon": ":/ui/common/Icons/View3D/scale.svg", "workbenches": ["3D"] },
           { "type": "action", "id": "edit.transform_mirror", "label": "Mirror", "command": "edit.mirror", "icon": ":/ui/common/Icons/Actions/mirror_h.svg", "workbenches": ["3D"] }
@@ -118,7 +118,7 @@
         { "type": "submenu", "id": "view.zoom", "label": "Zoom", "icon": ":/ui/common/Icons/View/zoom_in.svg", "workbenches": ["2D", "3D"], "items": [
           { "type": "action", "id": "view.zoom_in", "label": "Zoom In", "command": "view.zoom_in", "icon": ":/ui/common/Icons/View/zoom_in.svg", "shortcut": "Ctrl++", "workbenches": ["2D", "3D"] },
           { "type": "action", "id": "view.zoom_out", "label": "Zoom Out", "command": "view.zoom_out", "icon": ":/ui/common/Icons/View/zoom_out.svg", "shortcut": "Ctrl+-", "workbenches": ["2D", "3D"] },
-          { "type": "action", "id": "view.zoom_fit", "label": "Zoom to Fit", "command": "view.zoom_fit", "icon": ":/ui/common/Icons/View3D/fit.svg", "shortcut": "Ctrl+F", "workbenches": ["2D"] },
+          { "type": "action", "id": "view.zoom_fit", "label": "Fit All", "command": "view.zoom_fit", "icon": ":/ui/common/Icons/View3D/fit.svg", "shortcut": "Ctrl+F", "workbenches": ["2D"] },
           { "type": "action", "id": "view.zoom_selection", "label": "Zoom to Selection", "command": "view.zoom_selection", "icon": ":/ui/common/Icons/View/zoom_selection.svg", "shortcut": "Ctrl+Shift+F", "workbenches": ["2D"] },
           { "type": "action", "id": "view.reset", "label": "Reset View", "command": "view.reset", "icon": ":/ui/common/Icons/View3D/reset.svg", "shortcut": "Ctrl+0", "workbenches": ["2D", "3D"] }
         ] },
@@ -319,7 +319,7 @@
         { "type": "separator" },
         { "type": "action", "id": "view.zoom_in", "label": "Zoom In", "command": "view.zoom_in" },
         { "type": "action", "id": "view.zoom_out", "label": "Zoom Out", "command": "view.zoom_out" },
-        { "type": "action", "id": "view.zoom_fit", "label": "Zoom Fit", "command": "view.zoom_fit" },
+        { "type": "action", "id": "view.zoom_fit", "label": "Fit All", "command": "view.zoom_fit" },
         { "type": "action", "id": "view.reset", "label": "Reset View", "command": "view.reset" },
         { "type": "separator" },
         { "type": "action", "id": "view.layer_manager", "label": "Layer Manager", "command": "view.layer_manager" }

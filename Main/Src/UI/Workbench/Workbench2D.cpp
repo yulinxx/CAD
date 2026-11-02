@@ -1208,7 +1208,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
                             "",
                             "",
                             true },
-                        { "edit.deselect", tr("Deselect"), ":/ui/common/Icons/Actions/deselect.svg", false, "", "", "", "", "", true },
+                        { "edit.deselect", tr("Clear Selection"), ":/ui/common/Icons/Actions/deselect.svg", false, "", "", "", "", "", true },
                     } },
                 { "",
                     {

@@ -46,7 +46,7 @@
         { "type": "separator" },
         { "type": "action", "id": "algo.nesting", "label": "Nesting", "command": "algo.nesting", "feature": "nesting" },
         { "type": "separator" },
-        { "type": "action", "id": "view.zoom_fit", "label": "Zoom Fit", "command": "view.zoom_fit" }
+        { "type": "action", "id": "view.zoom_fit", "label": "Fit All", "command": "view.zoom_fit" }
       ],
       "dynamicSections": ["layer.actions"]
     }
