@@ -69,8 +69,10 @@ namespace Render
         /**
          * @brief 注入字体字节（共享引用，不拷贝）
          *
-         * 屏幕文字 / 世界文字 / 3D 帧率共用同一份 qrc 字节时，各方持
-         * shared_ptr 即可，避免 16MB 的 TTF 在堆上出现多份。
+         * 线程约束：仅 GUI 线程可调用。initialize / flush 依赖 IRenderDevice /
+         * IRenderScene（字体图集上传到 GPU、瞬态环分配），GL 上下文只能在创建
+         * 线程 makeCurrent，跨线程调用会触发未定义行为。beginFrame / addText 是
+         * 纯 CPU 计算，但与 flush 存在隐式的线程同步关系，应统一在 GUI 线程操作。
          *
          * @param device 视口的渲染设备
          * @param fontData 进程内共享的字体字节；空指针等价于加载失败

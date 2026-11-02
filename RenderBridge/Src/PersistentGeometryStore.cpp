@@ -366,8 +366,8 @@ namespace RenderBridge
     {
         if (m_stores.size() >= m_maxStores)
         {
-            SY_ERRORF("[GeomStore] 已达分片上限 %u 个仓（总容量 %llu bytes），"
-                      "无法再分配——检查是否出现了不释放的几何增长",
+            SY_ERRORF("[GeomStore] shard limit reached: %u stores (total %llu bytes), "
+                      "cannot allocate further — check for unreleased geometry growth",
                 m_maxStores,
                 static_cast<unsigned long long>(totalStats().capacityBytes));
             return false;
@@ -382,15 +382,15 @@ namespace RenderBridge
         const GeometryStoreHandle store = m_device->createGeometryStore(storeDesc);
         if (!isValid(store))
         {
-            SY_ERRORF("[GeomStore] 第 %u 个仓创建失败（单仓上限 %llu bytes）",
+            SY_ERRORF("[GeomStore] store creation failed for store #%u (per-store limit %llu bytes)",
                 static_cast<uint32_t>(m_stores.size() + 1),
                 static_cast<unsigned long long>(m_storeDescBytes));
             return false;
         }
 
         m_stores.push_back(store);
-        SY_INFOF("[GeomStore] 单仓达上限，已开第 %u 个仓（分片生效）；"
-                 "总容量 %llu bytes，此后合批只在仓内发生",
+        SY_INFOF("[GeomStore] per-store limit hit, opened store #%u (sharding active); "
+                 "total capacity %llu bytes, subsequent batching is per-store only",
             static_cast<uint32_t>(m_stores.size()),
             static_cast<unsigned long long>(totalStats().capacityBytes));
         return true;

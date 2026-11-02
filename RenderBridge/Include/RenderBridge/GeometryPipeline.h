@@ -54,6 +54,11 @@ namespace RenderBridge
         GeometryManager(const GeometryManager&) = delete;
         GeometryManager& operator=(const GeometryManager&) = delete;
 
+        /**
+         * 线程约束：仅 GUI 线程可调用。GeometryManager 内部持有 PersistentGeometryStore，
+         * 所有操作最终都调 IRenderDevice / IRenderScene，后者依赖当前 GL 上下文
+         * （QOpenGLContext 只能在创建线程 makeCurrent）。
+         */
         bool initialize(RenderAbstraction::IRenderDevice& device,
             RenderAbstraction::IRenderScene* scene,
             const GeometryPipelineConfig& config = {}) override

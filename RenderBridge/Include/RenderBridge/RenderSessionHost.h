@@ -136,6 +136,10 @@ namespace RenderBridge
         /**
          * @brief 按 runtime → surface → session 的顺序创建
          *
+         * 线程约束：仅 GUI 线程可调用。OpenGLContext 只能在创建线程 makeCurrent，
+         * RenderSessionHost 所有方法（initialize / shutdown / device / surface / scene）
+         * 都依赖 GL 上下文或 Metal 设备，跨线程调用会触发未定义行为。
+         *
          * 后端按 Config::backend 分叉（见文件头注释）：
          *   - OpenGL：调用前 GL 上下文必须已当前（surface 走 ForeignGlContext，
          *     需记录当前帧缓冲）。

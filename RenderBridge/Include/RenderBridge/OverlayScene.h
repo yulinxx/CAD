@@ -219,7 +219,11 @@ namespace RenderBridge
         /**
          * @brief 把各层合成到瞬态环并追加绘制指令
          *
-         * 必须由视口在 beginFrame / endFrame 之间调用。
+         * 线程约束：仅 GUI 线程可调用，且必须在 render frame（beginFrame / endFrame）
+         * 之间。瞬态环分配依赖当前 GL 上下文（QOpenGLContext 只能在创建线程 makeCurrent），
+         * 跨线程或 frame 外调用都会触发未定义行为。setter（setSelectionBox 等）虽然只写
+         * 数据不碰 GL，但与 submit 存在隐式的线程同步关系，应统一在 GUI 线程操作。
+         *
          * 环容量不足时丢弃该批，宁可这一帧少画一笔，也不画出错位几何。
          */
         void submit(RenderAbstraction::IRenderScene& scene, std::vector<RenderAbstraction::DrawInstruction>& out) const;

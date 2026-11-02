@@ -121,6 +121,11 @@ namespace RenderBridge
         /**
          * @brief 在给定设备上创建几何仓，在给定场景上创建绘制列表
          *
+         * 线程约束：仅 GUI 线程可调用。GeometryStore / DrawList 的后端实现依赖
+         * GL 上下文（QOpenGLContext 只能在创建线程 makeCurrent），任何跨线程访问
+         * 都会触发未定义行为。所有公共方法（initialize / shutdown / allocBlock /
+         * writeBlock / upsertDrawItem / flush 等）均受此约束。
+         *
          * 重复调用会先释放旧的。任一步失败都会回收已建好的部分并返回 false，
          * 不留半个资源。
          *

@@ -162,8 +162,8 @@ namespace
                 // 走到这里说明应用退出了、但仍有视口没被析构（正常路径下
                 // 最后一个视口的 release() 已经把 runtime 销毁了）。此时渲染 DLL
                 // 可能已卸载，去调 rxRuntimeDestroy 的风险高于让 OS 回收，因此只报。
-                SY_WARNF("[SharedRuntime] 进程退出时 runtime 仍存活：有 %u 个视口未被析构，"
-                         "未销毁（交操作系统回收）",
+                SY_WARNF("[SharedRuntime] runtime still alive on process exit: %u viewports not destructed, "
+                         "left for OS reclamation",
                     m_holders);
             }
         }
@@ -175,17 +175,15 @@ namespace
             {
                 if (desc.transientBufferBytes != m_transientBytes)
                 {
-                    // 该参数是 Runtime 级、只有首次建立那一次生效。两个视口必须声明
-                    // 同一个值，否则「谁先建谁说了算」。这里留一条 WARN，
-                    // 免得将来两边又长出分叉（本次收口之前就是 64MB 与 128MB 分叉）
-                    // 而无人察觉。
-                    SY_WARNF("[SharedRuntime] transientBufferBytes 请求 %llu 与已建 %llu 不一致，"
-                             "沿用已建值（后建者拿不到扩容）",
+                    // Runtime 级参数只在首次建立时生效；两个视口必须声明同一个值，
+                    // 否则「谁先建谁说了算」。留 WARN 避免不一致无人察觉。
+                    SY_WARNF("[SharedRuntime] transientBufferBytes requested %llu vs existing %llu, "
+                             "keeping existing (latecomer cannot expand)",
                         static_cast<unsigned long long>(desc.transientBufferBytes),
                         static_cast<unsigned long long>(m_transientBytes));
                 }
                 m_holders += 1;
-                SY_INFOF("[SharedRuntime] 复用进程级 Metal runtime（当前持有点 %u 个）", m_holders);
+                SY_INFOF("[SharedRuntime] Reusing process-level Metal runtime (current holders: %u)", m_holders);
                 return m_runtime;
             }
 
@@ -238,8 +236,8 @@ namespace
                 destroy("应用已请求退出，且当前无视口");
                 return;
             }
-            SY_INFOF("[SharedRuntime] 应用请求退出：仍有 %u 个视口未拆除，"
-                     "runtime 交给最后一次视口释放时销毁（Qt 的视口析构是延迟的）",
+            SY_INFOF("[SharedRuntime] Shutdown requested: %u viewports remain, "
+                     "runtime deferred to last viewport release (Qt viewport destructors are delayed)",
                 m_holders);
         }
 
@@ -281,7 +279,7 @@ namespace RenderBridge
         {
             // Metal 的交换链必须挂在 NSView 上；没有句柄就无法建 surface，
             // 提前失败比让 DLL 在深处报一句模糊的日志更容易定位。
-            SY_ERRORF("RenderSessionHost[%s]: Metal 后端需要 nativeWindow（NSView*）",
+            SY_ERRORF("RenderSessionHost[%s]: Metal backend requires nativeWindow (NSView*)",
                 config.applicationName ? config.applicationName : "?");
             return false;
         }
@@ -364,7 +362,7 @@ namespace RenderBridge
         m_sceneObj = RenderBridge::wrapRenderXScene(m_runtime, m_session);
         if (!m_deviceObj || !m_surfaceObj || !m_sceneObj)
         {
-            SY_ERRORF("RenderSessionHost[%s]: 抽象层对象包装失败，视口将无法使用渲染接口",
+            SY_ERRORF("RenderSessionHost[%s]: abstraction layer object wrapping failed, viewport cannot use render interface",
                 config.applicationName ? config.applicationName : "?");
         }
         return true;
