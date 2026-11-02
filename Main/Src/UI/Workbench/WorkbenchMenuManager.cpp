@@ -126,6 +126,29 @@ void WorkbenchMenuManager::setWorkbench(UiWorkbench* workbench)
     m_workbench = workbench;
 }
 
+void WorkbenchMenuManager::setUnitManager(UnitManager* unitManager)
+{
+    if (m_unitManager == unitManager)
+    {
+        return;
+    }
+    // 切换/重复注入时先断开旧连接，避免同一槽被多次触发导致刷新叠加。
+    if (m_unitManager)
+    {
+        disconnect(m_unitManager, &UnitManager::sigDisplayUnitChanged, this,
+            &WorkbenchMenuManager::refreshConfiguredMenuState);
+    }
+    m_unitManager = unitManager;
+    if (m_unitManager)
+    {
+        // 单位切换只影响勾选态；sigDisplayUnitChanged 带 Unit 参数，本槽无参，Qt 自动截断。
+        connect(m_unitManager, &UnitManager::sigDisplayUnitChanged, this,
+            &WorkbenchMenuManager::refreshConfiguredMenuState);
+    }
+    // 单位可能在菜单构建之后才注入（装配顺序），主动补一次勾选态回填。
+    refreshConfiguredMenuState();
+}
+
 void WorkbenchMenuManager::rebuildAllMenus()
 {
     // Clear old menus and shortcuts
@@ -744,7 +767,10 @@ void WorkbenchMenuManager::refreshConfiguredMenuState()
     }
 
     const auto state = m_stateCenter->snapshot();
-    const QString wbId = state.currentWorkbenchId;
+    // 单位勾选态来源是 UnitManager（不是状态中心）。displayUnit 只会在 mm/cm/inch
+    // 三者里取一，映射到命令 ID 后恰好勾中一个，杜绝此前按工作台硬编码造成的错勾。
+    const UnitManager::Unit currentUnit = m_unitManager ? m_unitManager->displayUnit() : UnitManager::Unit::Millimeter;
+    const QString currentUnitCommandId = UnitSelectionMenu::commandIdForUnit(currentUnit);
     const auto applyChecked = [](QAction* action, bool checked) {
         if (!action)
         {
@@ -783,17 +809,10 @@ void WorkbenchMenuManager::refreshConfiguredMenuState()
         {
             applyChecked(action, state.metadata.value(QStringLiteral("floor")).toBool());
         }
-        else if (cmdId == QStringLiteral("view.unit_mm"))
+        else if (cmdId == QStringLiteral("view.unit_mm") || cmdId == QStringLiteral("view.unit_cm") ||
+                 cmdId == QStringLiteral("view.unit_inch"))
         {
-            applyChecked(action, wbId.compare(QStringLiteral("2D"), Qt::CaseInsensitive) == 0);
-        }
-        else if (cmdId == QStringLiteral("view.unit_cm"))
-        {
-            applyChecked(action, false);
-        }
-        else if (cmdId == QStringLiteral("view.unit_inch"))
-        {
-            applyChecked(action, false);
+            applyChecked(action, cmdId == currentUnitCommandId);
         }
         // 语言勾选态：菜单每次重建都是全新 QAction（checked 默认 false），
         // 必须按 LanguageManager 的当前语言回填，否则 2D/3D 切换后勾选态全部消失。

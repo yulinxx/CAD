@@ -24,7 +24,10 @@
     }
   ],
   "toolbars": [],
-  "shortcuts": [
-    { "command": "tool.select", "keys": "Esc" }
+  "shortcuts": [],
+  "_shortcutsNote": [
+    "工具切换键不在此声明：tool.select 已有 Draw ▸ Select 菜单入口（base.json）与左侧 Select 工具按钮，无需额外快捷键。",
+    "裸 Esc 禁止：2D 侧 Esc 由 Workbench2D 的窗口级 QShortcut 独占（取消当前选择），再给 tool.select 声明 Esc 会生成第二个 ApplicationShortcut 接收者，",
+    "Qt 判 ambiguous 后两边都不触发，并抢走 Esc 的取消选择语义。约束来源：base.json 的 _shortcutsNote 硬约束 1)。"
   ]
 }

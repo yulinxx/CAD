@@ -16,6 +16,8 @@
 
 #include "UI2D/Operation/CommandActionHub.h"
 #include "UI2D/Operation/CommandCatalog.h"
+#include "UI2D/Manager/UnitManager.h"
+#include "UI2D/Manager/UnitSelectionMenu.h"
 #include "UI2D/DrawTools/ToolManager.h"
 #include "UI2D/ViewWidget/ToolInitializer.h"
 #include "Engine2D/Core/SceneManager.h"
@@ -33,6 +35,7 @@
 #endif
 
 #include <QAction>
+#include <QKeySequence>
 #include <QMainWindow>
 #include <QMenu>
 #include <QString>
@@ -262,6 +265,67 @@ TEST(CommandUiWiringTest, MenuBarEditCommandsDeclareMenuSurface)
         const CommandEntry2D* entry = CommandCatalog::findByMenuId(menuId);
         ASSERT_NE(entry, nullptr) << commandId.toStdString();
         EXPECT_TRUE(hasSurface(entry->surfaces, CommandSurface2DValues::Menu)) << commandId.toStdString();
+    }
+}
+
+// ============================================================
+// 单位勾选态联动（View ▸ Unit 的 mm/cm/inch 互斥回填）
+//
+// WorkbenchMenuManager::refreshConfiguredMenuState 不再按「2D 恒勾 mm」硬编码，
+// 而是按 UnitManager::displayUnit 经 UnitSelectionMenu::commandIdForUnit 映射到
+// 唯一命令 id 后回填。下面锁定这条映射与"恰好一个勾选"的行为，防止回归成
+// 之前「mm 恒勾、cm/inch 恒不勾」的错勾。
+// ============================================================
+
+TEST(UnitMenuStateTest, CommandIdForUnitMapsEverySelectableUnitUniquely)
+{
+    EXPECT_EQ(UnitSelectionMenu::commandIdForUnit(UnitManager::Unit::Millimeter),
+        QStringLiteral("view.unit_mm"));
+    EXPECT_EQ(UnitSelectionMenu::commandIdForUnit(UnitManager::Unit::Centimeter),
+        QStringLiteral("view.unit_cm"));
+    EXPECT_EQ(UnitSelectionMenu::commandIdForUnit(UnitManager::Unit::Inch),
+        QStringLiteral("view.unit_inch"));
+
+    // 未暴露为菜单项的单位应反查为空，否则 refreshConfiguredMenuState 会勾不中任何一项
+    EXPECT_TRUE(UnitSelectionMenu::commandIdForUnit(UnitManager::Unit::Meter).isEmpty());
+    EXPECT_TRUE(UnitSelectionMenu::commandIdForUnit(UnitManager::Unit::Mil).isEmpty());
+    EXPECT_TRUE(UnitSelectionMenu::commandIdForUnit(UnitManager::Unit::Pixel).isEmpty());
+}
+
+TEST(UnitMenuStateTest, PopulateChecksExactlyOneActionMatchingGivenUnit)
+{
+    using Unit = UnitManager::Unit;
+    const QList<Unit> units = { Unit::Millimeter, Unit::Centimeter, Unit::Inch };
+
+    for (const Unit unit : units)
+    {
+        QMenu menu;
+        UnitSelectionMenu::populate(&menu, unit, [](const QString&) {});
+
+        QList<QAction*> unitActions;
+        for (QAction* action : menu.actions())
+        {
+            const QString cmdId = action->property("commandId").toString();
+            if (cmdId == QStringLiteral("view.unit_mm") || cmdId == QStringLiteral("view.unit_cm") ||
+                cmdId == QStringLiteral("view.unit_inch"))
+            {
+                unitActions.append(action);
+            }
+        }
+        ASSERT_EQ(unitActions.size(), 3) << "mm/cm/inch 三个单位动作必须齐全";
+
+        const QString expectedCmd = UnitSelectionMenu::commandIdForUnit(unit);
+        int checkedCount = 0;
+        for (QAction* action : unitActions)
+        {
+            if (action->isChecked())
+            {
+                ++checkedCount;
+                EXPECT_EQ(action->property("commandId").toString(), expectedCmd)
+                    << "被勾选的单位必须与传入的 displayUnit 一致";
+            }
+        }
+        EXPECT_EQ(checkedCount, 1) << "恰好一个单位被勾选";
     }
 }
 
@@ -650,6 +714,30 @@ TEST(CommandConfigContractTest, EveryConfiguredCommandIdResolvesInItsWorkbenchCa
     EXPECT_TRUE(violations.isEmpty()) << "以下配置项的 commandId 无法解析，按钮会永久点不动（共 " << violations.size()
                                       << " 条）:\n"
                                       << violations.join(QLatin1Char('\n')).toStdString();
+}
+
+TEST(CommandConfigContractTest, NoConfiguredShortcutBindsBareEscape)
+{
+    // 2D 侧 Esc 由 Workbench2D 的窗口级 QShortcut 独占（取消当前选择）。
+    // 配置再声明裸 Esc 会在 buildShortcuts 里生成第二个 ApplicationShortcut 接收者，
+    // Qt 判 ambiguous 后两边都不触发 —— Esc 取消选择静默失效。
+    // 约束来源：base.json 的 _shortcutsNote 硬约束 1)。
+    const QKeySequence bareEscape(Qt::Key_Escape);
+
+    for (const QString& path : allClientConfigPaths())
+    {
+        UiConfigLoader loader(path);
+        auto config = loader.load();
+        ASSERT_TRUE(config.has_value()) << path.toStdString();
+
+        for (const ShortcutDef& sc : config->shortcuts)
+        {
+            const QKeySequence sequence(sc.keySequence);
+            EXPECT_TRUE(sequence.isEmpty() || sequence != bareEscape)
+                << path.toStdString() << ": 命令 '" << sc.commandId.toStdString()
+                << "' 绑定了裸 Esc，会与窗口级 Esc（取消选择）冲突: '" << sc.keySequence.toStdString() << "'";
+        }
+    }
 }
 
 // ============================================================

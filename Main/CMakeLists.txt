@@ -659,6 +659,8 @@ target_link_libraries(MainTests
             UI2D
             Log
             RenderX
+            # 合成 ID 号段隔离回归测试用 RenderBridge::RenderXAdapter 建 Null 设备 + 假场景
+            RenderBridge
             FileIO
             protobuf::libprotobuf-lite
             ${QT_LIBRARIES}
@@ -740,7 +742,7 @@ if(BUILD_VIEWPORT_REFRESH_TESTS AND GTest_FOUND)
         "${UI_ROOT}/Render/SceneRefreshCoordinator.cpp"
         "${UI_ROOT}/Render/BitmapReconciler.cpp"
         "${UI_ROOT}/Render/TextReconciler.cpp"
-        "${UI_ROOT}/Render/CurveLodManager.cpp"
+        "${UI_ROOT}/Render/RenderSubmitScheduler.cpp"
     )
     target_compile_features(ViewportRefreshTests PRIVATE cxx_std_17)
     # SceneRefreshCoordinator 有 Q_OBJECT：moc 产物必须为这个目标单独生成一次

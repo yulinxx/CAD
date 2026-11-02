@@ -46,9 +46,9 @@ public:
         m_calls.push_back("entityAdded");
     }
 
-    void onEntityRemoved(size_t index) override
+    void onEntityRemoved() override
     {
-        m_removedIndices.push_back(index);
+        ++m_removedCount;
         m_calls.push_back("entityRemoved");
     }
 
@@ -56,12 +56,12 @@ public:
     {
         m_calls.clear();
         m_addedEntities.clear();
-        m_removedIndices.clear();
+        m_removedCount = 0;
     }
 
     std::vector<std::string> m_calls;
     std::vector<Eg::SyEntity*> m_addedEntities;
-    std::vector<size_t> m_removedIndices;
+    size_t m_removedCount = 0;
 };
 
 // ============================================================================
@@ -286,10 +286,9 @@ TEST(SceneNotifierTest, NotifyEntityRemoved_SingleObserver)
     TestObserver obs;
 
     notifier.addObserver(&obs);
-    notifier.notifyEntityRemoved(42);
+    notifier.notifyEntityRemoved();
 
-    ASSERT_EQ(obs.m_removedIndices.size(), 1u);
-    EXPECT_EQ(obs.m_removedIndices[0], 42u);
+    ASSERT_EQ(obs.m_removedCount, 1u);
 }
 
 TEST(SceneNotifierTest, NotifyEntityRemoved_MultipleObservers)
@@ -299,12 +298,10 @@ TEST(SceneNotifierTest, NotifyEntityRemoved_MultipleObservers)
 
     notifier.addObserver(&obs1);
     notifier.addObserver(&obs2);
-    notifier.notifyEntityRemoved(7);
+    notifier.notifyEntityRemoved();
 
-    EXPECT_EQ(obs1.m_removedIndices.size(), 1u);
-    EXPECT_EQ(obs2.m_removedIndices.size(), 1u);
-    EXPECT_EQ(obs1.m_removedIndices[0], 7u);
-    EXPECT_EQ(obs2.m_removedIndices[0], 7u);
+    EXPECT_EQ(obs1.m_removedCount, 1u);
+    EXPECT_EQ(obs2.m_removedCount, 1u);
 }
 
 // ============================================================================
@@ -392,10 +389,9 @@ TEST(SceneNotifierTest, Batch_EntityRemovedNotDeferred)
     notifier.addObserver(&obs);
 
     notifier.beginBatch();
-    notifier.notifyEntityRemoved(99);
+    notifier.notifyEntityRemoved();
     // entityRemoved 不延迟
-    EXPECT_EQ(obs.m_removedIndices.size(), 1u);
-    EXPECT_EQ(obs.m_removedIndices[0], 99u);
+    EXPECT_EQ(obs.m_removedCount, 1u);
 
     notifier.endBatch();
     SUCCEED();
@@ -521,8 +517,8 @@ TEST(SceneNotifierTest, IndependentFromSceneManager)
     Eg::SyLine line;
     line.setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(5, 5) });
     notifier.notifyEntityAdded(&line);
-    notifier.notifyEntityRemoved(0);
+    notifier.notifyEntityRemoved();
 
     EXPECT_EQ(obs.m_calls.size(), 4u);  // sceneChanged + selectionChanged + entityAdded + entityRemoved
-    EXPECT_EQ(obs.m_removedIndices.size(), 1u);
+    EXPECT_EQ(obs.m_removedCount, 1u);
 }
