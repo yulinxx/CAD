@@ -352,6 +352,72 @@ include("${SANYI_ROOT}/CMake/CheckCApi.cmake")
 sanyi_check_c_api_version()
 
 # ============================================================================
+# ENABLE_* 宏传播一致性校验（CI 门禁）
+# 影响公共头类型布局的宏必须 PUBLIC 传播,否则不同 DLL/EXE 看到不同 sizeof,
+# 跨模块传递对象时 ABI 不一致会堆越界崩溃。
+# 校验逻辑:
+#   1) 对每个 BUILD_XXX=ON 的开关,验证源头模块已 PUBLIC 传播 ENABLE_XXX
+#   2) 同时输出 SanYiCAD 的 INTERFACE_COMPILE_DEFINITIONS(传播结果)供 CI 直观审计
+# ============================================================================
+message(STATUS "[SanYi] --- ENABLE_* macro propagation check ---")
+set(_sanyi_macro_check_failed FALSE)
+
+# (1) 验证源头模块 PUBLIC 传播(宏传播链的根因检查)
+foreach(_sanyi_pair IN ITEMS
+    "BUILD_NESTING:ENABLE_NESTING:UICommon,UI2D,UI3D"
+    "BUILD_ENGRAVING:ENABLE_ENGRAVING:UICommon,UI3D"
+    "BUILD_HARDWARE:ENABLE_HARDWARE:UI2D"
+    "BUILD_GEOMODELCORE:ENABLE_GEOMODELCORE:UI3D"
+    "BUILD_VISION:ENABLE_VISION:UI2D"
+)
+    string(REPLACE ":" ";" _sanyi_pair_list ${_sanyi_pair})
+    list(GET _sanyi_pair_list 0 _sanyi_build_opt)
+    list(GET _sanyi_pair_list 1 _sanyi_enable_macro)
+    list(GET _sanyi_pair_list 2 _sanyi_sources_raw)
+    # 逗号分隔的模块名列表:转成 CMake 分号列表
+    string(REPLACE "," ";" _sanyi_sources "${_sanyi_sources_raw}")
+
+    if(${_sanyi_build_opt})
+        foreach(_sanyi_src IN LISTS _sanyi_sources)
+            if(TARGET ${_sanyi_src})
+                # 检查源头 target 是否 PUBLIC 传播
+                get_target_property(_sanyi_iface_defs ${_sanyi_src} INTERFACE_COMPILE_DEFINITIONS)
+                if(_sanyi_iface_defs MATCHES "${_sanyi_enable_macro}")
+                    message(STATUS "[SanYi]   ✓ ${_sanyi_enable_macro}: ${_sanyi_src} PUBLIC propagates")
+                else()
+                    message(WARNING "[SanYi] ✗ ${_sanyi_enable_macro}: ${_sanyi_src} NOT PUBLIC propagating!")
+                    set(_sanyi_macro_check_failed TRUE)
+                endif()
+            endif()
+        endforeach()
+    else()
+        message(STATUS "[SanYi]   · ${_sanyi_enable_macro}: skipped (BUILD_XXX=OFF)")
+    endif()
+endforeach()
+
+# (2) BUILD_UI3D 特殊:顶层构建开关,UI 模块不 PUBLIC 传播,Main 源码自己 #if BUILD_UI3D
+if(TARGET SanYiCAD)
+    if(BUILD_UI3D)
+        get_target_property(_sanyi_private_defs SanYiCAD COMPILE_DEFINITIONS)
+        if(_sanyi_private_defs MATCHES "BUILD_UI3D=1")
+            message(STATUS "[SanYi]   ✓ BUILD_UI3D=1: SanYiCAD PRIVATE (maintained manually, correct)")
+        else()
+            message(WARNING "[SanYi] ✗ BUILD_UI3D=ON 但 SanYiCAD 未定义 BUILD_UI3D=1")
+            set(_sanyi_macro_check_failed TRUE)
+        endif()
+    endif()
+endif()
+
+if(_sanyi_macro_check_failed)
+    message(FATAL_ERROR
+        "[SanYi] ENABLE_* 宏传播校验失败:ABI 一致性风险。"
+        "请确保影响公共头类型布局的宏通过各模块 PUBLIC INTERFACE 传播。")
+else()
+    message(STATUS "[SanYi]   ENABLE_* macro propagation: OK (EXE/DLL 一致)")
+endif()
+unset(_sanyi_macro_check_failed)
+
+# ============================================================================
 # 安装规则
 # ============================================================================
 # 安装主可执行文件

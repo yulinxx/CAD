@@ -290,16 +290,18 @@ target_compile_definitions(${APP_NAME} PRIVATE SANYI_DEFAULT_CLIENT_ID="${SANYI_
 
 # Qt 调试输出控制已在 Config.cmake 中统一处理
 
-# 可选模块宏传播：保证 EXE 中与各 UI DLL 中 #ifdef 分支一致
+# 可选模块宏传播:通过 UI2D/UI3D 的 PUBLIC INTERFACE_COMPILE_DEFINITIONS 自动传播
+# Main 不再手工重复 ENABLE_NESTING / ENABLE_HARDWARE / ENABLE_GEOMODELCORE,
+# 这些宏影响公共头类型布局(SENE 必须让所有消费者看到一致的值)
+# 保留 link 语句因为 Main 自身源码也需要直接 link Nesting/Hardware/GeoModelCore 库
+
 if(BUILD_NESTING)
-    target_compile_definitions(${APP_NAME} PRIVATE ENABLE_NESTING)
     target_link_libraries(${APP_NAME} PRIVATE Nesting)
 endif()
 
-# 硬件抽象层：DeviceHost / MachineProfile 需要直接使用 Hw:: 接口装配设备。
-# 与 UI2D 用同一个 ENABLE_HARDWARE 宏名，保证两侧 #ifdef 分支一致。
+# 硬件抽象层:DeviceHost / MachineProfile 需要直接使用 Hw:: 接口装配设备。
+# ENABLE_HARDWARE 宏已通过 UI2D PUBLIC 自动传播,此处不再手工定义
 if(BUILD_HARDWARE)
-    target_compile_definitions(${APP_NAME} PRIVATE ENABLE_HARDWARE)
     target_include_directories(${APP_NAME}
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include"
@@ -310,11 +312,14 @@ endif()
 
 if(BUILD_UI3D)
     target_link_libraries(${APP_NAME} PRIVATE UI3D)
+    # BUILD_UI3D 是顶层构建开关,UI2D/UI3D 都未 PUBLIC 传播此宏
+    # (它们只是消费它来条件编译内部代码),Main 源码直接用 #if BUILD_UI3D,
+    # 因此必须在 Main 这里手工定义
     target_compile_definitions(${APP_NAME} PRIVATE BUILD_UI3D=1)
-    # 显式传播 ENABLE_GEOMODELCORE：SceneEditService3D / ServicePack3D 等导出类
-    # 含 #ifdef ENABLE_GEOMODELCORE 条件数据成员，EXE 必须与 DLL 的 sizeof 一致
+    # ENABLE_GEOMODELCORE 已通过 UI3D PUBLIC 自动传播(Main link UI3D PRIVATE),
+    # 此处不再手工重复定义宏,但仍需 link GeoModelCore 因为 Main 的 Workbench3D.cpp
+    # 里直接 include 了 GeoModelCore 头文件
     if(BUILD_GEOMODELCORE)
-        target_compile_definitions(${APP_NAME} PRIVATE ENABLE_GEOMODELCORE)
         target_link_libraries(${APP_NAME} PRIVATE GeoModelCore)
     endif()
 endif()
