@@ -314,7 +314,7 @@ private:
             }
         }
 
-        void onEntityRemoved(size_t /*index*/) override
+        void onEntityRemoved() override
         {
             if (m_self)
             {

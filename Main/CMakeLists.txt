@@ -651,6 +651,8 @@ target_link_libraries(MainTests
             UI2D
             Log
             RenderX
+            # 合成 ID 号段隔离回归测试用 RenderBridge::RenderXAdapter 建 Null 设备 + 假场景
+            RenderBridge
             FileIO
             protobuf::libprotobuf-lite
             ${QT_LIBRARIES}
