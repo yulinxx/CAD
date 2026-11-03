@@ -7,6 +7,8 @@ class AlgorithmRunner;
 class FileOperationRegistry;
 class LaserOperationRegistry;
 
+class HardwareProfileManager;
+
 /**
  * @class OperationRegistrar
  * @brief 操作注册器（P2-10 从组合根提取）：把各模块操作注册到 OperationBus。
@@ -30,6 +32,10 @@ public:
     void registerAll();
 
 private:
+    /// 图层 → 工艺 profile 映射的参数仓库；注入 LayerManager 后
+    /// layerHardwareProfile() 才能返回非空值，specProvider 才能构造 ToolpathJobSpec.layerParams
+    std::unique_ptr<HardwareProfileManager> m_hwProfileManager;
+
     ApplicationCompositionRoot& m_root;
     AlgorithmRunner* m_algorithmRunner{ nullptr };
     std::unique_ptr<FileOperationRegistry> m_fileOperationRegistry;

@@ -12,6 +12,11 @@
 
 #include "../Hardware/DeviceHost.h"
 
+// HardwareProfileManager + LayerManager：注入后 specProvider 才能读取图层工艺参数
+#include "Engine2D/Interaction/HardwareProfileManager.h"
+#include "Engine2D/Interaction/LayerManager.h"
+#include "Engine/Process/ProcessParams.h"
+
 // UiShellHost::mainWindow() 返回 WorkbenchWindow*，转 QWidget* 需要完整类型
 #include "UI/Workbench/WorkbenchWindow.h"
 
@@ -19,10 +24,36 @@
 
 #include "Log/SyLogger.h"
 
+namespace {
+
+/// @brief 把旧版 HardwareProfile 转成新版 Eg::ProcessParams，
+///        单位换算：HardwareProfile.frequency 是 kHz → ProcessParams.frequencyHz 是 Hz
+Eg::ProcessParams hwProfileToProcessParams(const HardwareProfile& hp)
+{
+    Eg::ProcessParams p;
+    p.powerPercent = hp.power;
+    p.speedMmPerSec = hp.speed;
+    p.frequencyHz = hp.frequency * 1000.0;
+    p.passes = hp.passes;
+    p.focusOffsetMm = hp.focusOffset;
+    // HardwareProfile 无填充/补偿/使能/脉宽/波形字段，保持 ProcessParams 默认值
+    return p;
+}
+
+} // namespace
+
 OperationRegistrar::OperationRegistrar(ApplicationCompositionRoot& root, AlgorithmRunner* algorithmRunner)
     : m_root(root)
     , m_algorithmRunner(algorithmRunner)
 {
+    // 实例化 HardwareProfileManager 并注入 LayerManager，使 layerHardwareProfile()
+    // 能返回非空值；不注入则 LayerManager 会返回默认 HardwareProfile，specProvider
+    // 也读不到任何用户设置的工艺参数
+    m_hwProfileManager = std::make_unique<HardwareProfileManager>();
+    if (root.layerManager())
+    {
+        root.layerManager()->setHardwareProfileManager(m_hwProfileManager.get());
+    }
 }
 
 OperationRegistrar::~OperationRegistrar() = default;
@@ -77,13 +108,29 @@ void OperationRegistrar::registerAll()
         // 现场表现是「按了开始加工什么都没发生」
         QMessageBox::warning(host ? host->mainWindow() : nullptr, QObject::tr("Processing"), message);
     };
-    // 作业规格：把机器坐标系从设备档案注入。
-    //
-    // 换算只在编译器的最后一步发生（MotionPlanCompiler），配置必须从这里一路传下去，
-    // 避免链路中断导致不同路径下坐标换算不一致。
-    laserConfig.specProvider = [dev = m_root.deviceHost()] {
+    // 作业规格：把机器坐标系从设备档案注入，同时从 LayerManager +
+    // HardwareProfileManager 读取各图层工艺参数（功率/速度/遍数），
+    // 避免用户在 UI 里设置的参数在加工时被静默忽略。
+    laserConfig.specProvider = [this, dev = m_root.deviceHost(),
+                                layerManager = m_root.layerManager()] {
         ToolpathJobSpec spec;
         spec.machineFrame = dev ? dev->machineFrameConfig() : Eg::MachineFrameConfig{};
+
+        if (layerManager)
+        {
+            const auto layerIds = layerManager->getAllLayerIds();
+            for (int layerId : layerIds)
+            {
+                const auto hp = layerManager->layerHardwareProfile(layerId);
+                spec.layerParams.insert(layerId, hwProfileToProcessParams(hp));
+            }
+        }
+
+        // defaultParams 取第一个图层的参数（如果有），否则 ProcessParams 默认值
+        if (!spec.layerParams.isEmpty())
+        {
+            spec.defaultParams = spec.layerParams.first();
+        }
         return spec;
     };
 
