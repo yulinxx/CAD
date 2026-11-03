@@ -1360,13 +1360,25 @@ void SceneRefreshCoordinator::updateSceneRender()
 
     if (level == RefreshLevel::Repaint)
     {
-        applyRepaintRefresh();
-        // 场景刷新帧顺带推进 LOD 一次，独立定时器负责持续续跑
-        if (!m_submitScheduler.empty())
+        // Repaint 只做视觉重绘；但若同时有待处理的图元变更（pendingDirtyIds/pendingDeletedIds 非空），
+        // 说明场景侧刚改完图元、视口侧先来了 repaint 请求——直接 repaint 会让这批增量永久滞留
+        // 导致刷新死锁（拖动残影 / 删除不消失）。这里升级为 LightUpdate 把变更消费掉，
+        // 继续走下面的 LightUpdate 分支，清账与 LOD 推进由后续统一处理。
+        if (!m_pendingDirtyIds.empty() || !m_pendingDeletedIds.empty())
         {
-            processCurveLodBatch();
+            level = RefreshLevel::LightUpdate;
+            // 继续走下方的增量刷新分支
         }
-        return;
+        else
+        {
+            applyRepaintRefresh();
+            // 场景刷新帧顺带推进 LOD 一次，独立定时器负责持续续跑
+            if (!m_submitScheduler.empty())
+            {
+                processCurveLodBatch();
+            }
+            return;
+        }
     }
 
     // 全量优先，且两条路径互斥。
