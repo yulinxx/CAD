@@ -772,15 +772,27 @@ namespace RenderBridge
             // segs 复用同一块缓冲（clear 保留容量），避免每条路径一次堆分配
             std::vector<OVertex> v;
             std::vector<Ut::Vec2f> segs;
+            // 先统计总顶点数，循环外一次性预留。此前在循环内按 v.size() + segs.size()
+            // 精确预留，每追加一条路径都会整段重分配并拷贝已累积的顶点，代价随路径数
+            // 呈 O(路径数²) 增长；选中几千个图元时单帧可达数十毫秒。
+            size_t totalSegs = 0;
             for (const auto& path : m_outlines.paths)
             {
                 segs.clear();
                 appendSelectionDash(path, dash, gap, offset, segs);
-                if (segs.empty())
-                    continue;
-                v.reserve(v.size() + segs.size());
+                totalSegs += segs.size();
+            }
+            v.reserve(totalSegs);
+            // 第二遍重新展开并写顶点。appendSelectionDash 是 O(V+D) 的单向游标推进，
+            // 多跑一遍的代价远低于循环内反复扩容拷贝。
+            for (const auto& path : m_outlines.paths)
+            {
+                segs.clear();
+                appendSelectionDash(path, dash, gap, offset, segs);
                 for (const auto& s : segs)
+                {
                     v.push_back(vtx(s.x(), s.y(), 0, path.color));
+                }
             }
             emitWorld(scene, out, v, RA::PrimitiveType::Lines, seq);
         }
