@@ -354,7 +354,11 @@ void setVisible(bool visible) override {
 
 ### 5.5 曲线 LOD 独立定时器
 
-曲线 LOD 消费有独立的 `m_curveLodTimer`（单次触发，间隔 = `RenderSubmitScheduler::kPumpIntervalMs` = 32ms），与场景更新定时器完全解耦：
+**问题**：场景更新定时器（16ms）同时用于 LOD 消费时，Repaint 级别会占用该定时器，
+导致 LOD 队列永久搁浅。
+
+**方案**：新增独立的 `m_curveLodTimer`（单次触发，间隔 = `RenderSubmitScheduler::kPumpIntervalMs` = 32ms），
+与场景更新定时器完全解耦：
 
 - 场景操作密集时两个定时器互不干扰，LOD 分批能稳定每 32ms 推进一次；
 - `ensureCurveLodPump()` 启动独立的 LOD 定时器；

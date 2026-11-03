@@ -1,13 +1,15 @@
-# 3D 撤销与 B-Rep 同步
+# 3D 撤销与 B-Rep 同步优化
 
-## 当前实现状态
+## 版本
+v1.0 - 2026-10-27
 
-核心功能已完成并通过编译与冒烟验证：
+## 状态
+已完成核心修复并通过编译验证：
 - 默认构建（GMC OFF）：`UI3D` + `SanYiCAD` 编译通过
 - GMC 构建（`build-gmc`，GeoModelCore ON）：`UI3D` + `SanYiCAD` 编译通过
 - 启动冒烟测试：两版应用均可正常启动、UI shell 显示、空场景刷新完成
 
-## 当前实现要点（按优先级）
+## 已修复问题 (按优先级)
 
 ### P0 - 撤销栈 UAF
 - **Open/New 前清空撤销栈**：防止旧命令持有已释放实体裸指针
@@ -37,25 +39,23 @@
 - **`Mesh3DBuilder` 分配/写入失败保留旧 block**：分配失败不删除条目，写入失败保留旧内容
 - **包围盒缓存失效同步**：实体增/改/删/可见性/锁定变化时同步 `m_sceneBBoxValid = false; m_visibleSceneBBoxValid = false`；查询改用 `find` 避免 `operator[]` 插入空条目
 
-## 已提交记录 (子模块)
+## 已提交记录 (子模块，均已推送至 main 分支)
 
-| 仓库 | 简要说明 |
-|------|----------|
-| Engine | 隐藏图元拾取过滤、可见包围盒、B-ROP 变换撤销回调 |
-| FileIO | 可见性/锁定持久化、MESH 序列化 UB 修复 |
-| UI | 撤销生命周期/保存点、B-ROP 同步、导入异常安全等 |
-| 父仓库 | 同步三个子模块指针 + `Workbench3D` 接线 |
+| 仓库 | 提交 | 简要说明 |
+|------|------|----------|
+| Engine | `6abb926` | 隐藏图元拾取过滤、可见包围盒、B-ROP 变换撤销回调 |
+| FileIO | `5faf4fe` | 可见性/锁定持久化、MESH 序列化 UB 修复 |
+| UI | `9b505d5` | 撤销生命周期/保存点、B-ROP 同步、导入异常安全等 |
+| 父仓库 | `a68b8dfc` | 同步三个子模块指针 + `Workbench3D` 接线 |
 
-## 已知限制
+## 已知限制 (Future Work)
 
 1. **B-ROP 拓扑不持久化**：保存/重开后需重新从 STEP 等源文件挂接
 2. **Open/New 撤销后 B-ROP 无法恢复**：基于整场景克隆 trade-off，接受映射在文档替换时被清理
 3. **`make test` 受 Engine2D `TextConverter.h` 预置错误阻塞**，与本任务无关
 4. **Windows/MSVC 与 Qt 6.5/6.11 的二进制兼容性**仍需单独验证
 
-## 相关子模块
-
-- Engine：`3D/Include/Engine3D/`
-- FileIO：`FileIO/Proto/SanYiDocument.proto`
-- UI：`UI/3D/Src/`
+## 联系方式 / 维护
+- 维护人员：3D 模块组
+- 相关子模块：Engine (`3D/Include/Engine3D/`)、FileIO (`FileIO/Proto/SanYiDocument.proto`)、UI (`UI/3D/Src/`)
 - 问题跟踪：见 Git Issues / 项目 Wiki

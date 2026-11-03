@@ -47,7 +47,7 @@ Document / Scene
 - `RenderWidget` / `RenderWidget3D` 负责渲染设备连接
 - `Renderx` / `RenderX` 负责最终渲染执行
 
-### 2.4 帧外上传必须自己 makeCurrent
+### 2.4 帧外上传必须自己 makeCurrent（2026-08-26 已修）
 
 `SceneRefreshCoordinator` 是在**定时器回调**里调 `RenderWidget::submitSceneFromDataSource`
 与 `addRenderEntity` 的 —— 不在 `paintGL` 内，因此没有当前 GL 上下文；而这两个入口会一路
@@ -62,7 +62,7 @@ Document / Scene
 
 ---
 
-## 3. 3D 增量渲染
+## 3. 3D 增量渲染（阶段 3，2026-09-18 完成）
 
 ### 3.1 背景
 
@@ -126,7 +126,7 @@ else if (level == Repaint)     → 仅消费脏 ID，不做几何同步
 
 ---
 
-## 5. 帧合并机制
+## 5. 帧合并机制（2026-09-16）
 
 ### 5.1 问题
 
@@ -161,7 +161,7 @@ else if (level == Repaint)     → 仅消费脏 ID，不做几何同步
 
 ---
 
-## 6. 实体显隐的刷新流
+## 6. 实体显隐的刷新流（2026-09-18）
 
 实体级显隐此前不进入刷新链：`SyEntity::setVisible()` 只 `setModified()` 标脏，
 不产生场景变更记录，`readChanges()` 读不到，渲染侧只能全量重建。现在补上：
@@ -185,7 +185,7 @@ setVisible(false/true) / setEntitiesVisible(ids, visible)
 - 图层级显隐仍走 `LayerManager::setLayerVisible` → `notifySceneChanged()`，语义不同
   （图层显隐影响整层，实体显隐只影响单图元）。
 
-### 6.1 实体锁定：不进刷新链
+### 6.1 实体锁定：不进刷新链（2026-09-20）
 
 锁定是纯元数据，**不改变任何渲染结果**，因此刻意不进刷新链：
 

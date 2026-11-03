@@ -94,7 +94,7 @@ UI/2D/
 的 `SyImage`，传进 `Engine2D` 内部再 `dynamic_cast<const SyImage*>` 会返回 `nullptr`，
 而且**不报任何错**，只是静默走进 else 分支。
 
-已知踩过的坑：`Geo2DQuery::isClosed()` 用 `dynamic_cast` 认位图，在真实
+已知踩过的坑（2026-08-30 修复）：`Geo2DQuery::isClosed()` 用 `dynamic_cast` 认位图，在真实
 进程里恒为 false，于是 `hitTest()` 跳过「点是否在图元内部」这一判据，`SelectionGizmo` 判不出
 `HandleKind::Body`，表现为「位图能缩放能旋转、就是拖不动」。同一进程里
 `Geo2DPath::isClosedContour()` 用的是 `eType` switch，一直是对的，两边结论长期不一致。
@@ -107,7 +107,7 @@ UI/2D/
 对应 `.cpp` 把虚函数锚定在 `Engine2D` 内，typeinfo 只有一份；这是巧合而不是保证——任何图元
 一旦改成纯头文件实现，就会立刻重现同一类静默失效。这批替换尚未进行。
 
-**当前统计**：
+**当前统计**（2026-09-13 审计）：
 - `Geo2DEdit.cpp`: 45 处 `dynamic_cast`
 - `SceneManager.cpp`: 2 处 `dynamic_cast`
 - `UndoRedoManager.cpp` / `SceneUndoCommands.cpp`: 4 处（命令合并场景，非图元判型）
@@ -138,7 +138,7 @@ case EType::POLYGON: {
 
 ---
 
-### 3.6 RenderBridge 类型中性化
+### 3.6 RenderBridge 类型中性化（2026-11-02 已完成）
 
 **问题**：RenderBridge 的旧公共头文件曾泄漏上层模块类型 —— `RenderTypes.h`（来自旧 RenderCommon）、`Eg::UiTextCoordMode` / `Eg::UiTextItem`（来自 EngineCommon），导致下游 include RenderBridge 公共头时被迫引入 UICommon 和 EngineCommon 的 include 路径，打破了「桥接层类型中性」的设计初衷。
 
@@ -150,7 +150,7 @@ case EType::POLYGON: {
 
 **效果**：下游（UI2D/UI3D/Main/Engine2D）不再因 include RenderBridge 公共头而被迫引入 UICommon 和 EngineCommon 的 include 路径。
 
-### 3.7 CMake 链接可见性
+### 3.7 CMake 链接可见性（2026-11-02 已改为 PRIVATE 默认）
 
 **`CMake/Utils.cmake`** 中的 `sanyi_add_shared_library()` 函数已废弃旧的 `LINK_LIBRARIES` / `QT_COMPONENTS` 参数（默认 PUBLIC 会导致 Qt / 第三方依赖被下游无差别传递），改用显式的可见性变体：
 
@@ -192,3 +192,6 @@ case EType::POLYGON: {
 ## 5. 结论
 
 本文件只作为当前 DLL / ABI 约束说明，不保留历史审计过程、阶段记录或变更时间线。后续内容只补充当下仍然有效的规则与待统一项。
+
+**文档版本**: 1.2
+**最后更新**: 2026-11-02

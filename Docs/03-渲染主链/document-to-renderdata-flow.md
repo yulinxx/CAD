@@ -80,7 +80,7 @@ User Input
 
 ---
 
-## 4. 完整刷新调用链（7 层跨 3 模块）
+## 4. 完整刷新调用链（7 层跨 3 模块，2026-11-02 确认）
 
 以下是从 Engine 变更到最终 GPU 渲染的完整调用链，横跨 UI → RenderBridge → RenderX 三个模块：
 
@@ -138,7 +138,7 @@ User Input
 
 ---
 
-## 6. 数据层深度审查结论
+## 6. 数据层深度审查结论（2026-11-12）
 
 **当前无 P0 问题**。以下为渲染主链数据层的完整审查结论，覆盖脏标记、增量/全量刷新、几何生命周期、同步点、代码重复等维度。
 
@@ -195,9 +195,9 @@ User Input
 
 结论：**当前不需要合并**，但如果未来出现 2.5D 或更多维度，应考虑模板化 Builder 基类。
 
-### 6.6 关键边界约束
+### 6.6 已修复的边界 Bug
 
-- **脏 ID 集合必须在每次刷新后清空**：`SceneRefreshCoordinator` 的 Repaint 分支检测到 `pendingDirtyIds` / `pendingDeletedIds` 非空时**升级为 LightUpdate**，正常 flush 后 clear 集合，防止脏 ID 永久滞留导致每次都走 Repaint 路径。
+- **脏 ID 永久滞留**（commit `79b83b3`）：原 `SceneRefreshCoordinator` 的 Repaint 分支在 `pendingDirtyIds` / `pendingDeletedIds` 非空时直接返回 early，导致脏 ID 集合永远不清空、每次定时器触发都走 Repaint 路径而非 LightUpdate/FullRefresh。修复后：Repaint 分支检测到脏集合非空时**升级为 LightUpdate**，正常 flush 后 clear 集合。
 
 ### 6.7 实机验证清单（需人工确认）
 
@@ -210,4 +210,5 @@ User Input
 | **LOD 切换闪烁** | 3D 侧 LOD 切换时，不同 LOD 级别的顶点数差异可能导致 DrawList 重建出现一帧黑屏 | 3D 场景中快速缩放相机，观察 LOD 切换瞬间 |
 | **kBulkChangeThreshold 最优值** | 16384 是经验值，不同硬件/场景的拐点不同 | 准备 5000/10000/16384/30000 图元四组 benchmark，测 LightUpdate vs FullRefresh 耗时交叉点 |
 
-
+**文档版本**: 1.2
+**最后更新**: 2026-11-12
