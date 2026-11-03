@@ -51,7 +51,13 @@ set(SHARED_PROJECT_INCLUDE_DIRS
     "${PROJECT_ROOT}/UI/2D/Src"
     "${PROJECT_ROOT}/Log/Log/Include"
     "${PROJECT_ROOT}/FileIO/FileIO/Include"
+    "${PROJECT_ROOT}/UiEngineAccess/Include"
 )
+
+# BUILD_RASTER 时额外加 Raster 模块 include
+if(BUILD_RASTER)
+    list(APPEND SHARED_PROJECT_INCLUDE_DIRS "${PROJECT_ROOT}/Raster/Raster/Include")
+endif()
 
 # 自动收集所有源文件（新增 .cpp/.mm 文件无需修改此处）
 file(GLOB_RECURSE MAIN_APP_SOURCES CONFIGURE_DEPENDS
@@ -294,6 +300,12 @@ target_compile_definitions(${APP_NAME} PRIVATE SANYI_DEFAULT_CLIENT_ID="${SANYI_
 
 if(BUILD_NESTING)
     target_link_libraries(${APP_NAME} PRIVATE Nesting)
+endif()
+
+# 位图导出（PNG/BMP）需要 Raster 光栅化库
+if(BUILD_RASTER)
+    target_link_libraries(${APP_NAME} PRIVATE Raster)
+    target_compile_definitions(${APP_NAME} PRIVATE ENABLE_RASTER_EXPORT_MAIN=1)
 endif()
 
 # 硬件抽象层:DeviceHost / MachineProfile 需要直接使用 Hw:: 接口装配设备。

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <QString>
 #include <QStringList>
@@ -48,4 +49,8 @@ struct ExportContext
 
     /// 进度回调（可选，导出过程中报告进度 0.0~1.0）
     std::function<void(float progress, const char* stage)> progressCallback;
+
+    /// 取消标志指针（可选，后台线程 writer 内部定期检查；nullptr 表示无法取消）
+    /// 由 ExportService::exportAsync 注入 &m_asyncCancelFlag；writer 不得释放此指针
+    std::atomic<bool>* cancelFlag{ nullptr };
 };

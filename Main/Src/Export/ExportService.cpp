@@ -158,6 +158,9 @@ void ExportService::exportAsync(
         };
     }
 
+    // 注入取消标志指针：让后台线程 writer 内部能定期检查
+    fullCtx.cancelFlag = &m_asyncCancelFlag;
+
     // Phase 1 主线程：clone 场景图元（SceneManager 非线程安全，必须在主线程访问）
     Fio::VecSyEntityPtr entities = collectAllEntities();
 
