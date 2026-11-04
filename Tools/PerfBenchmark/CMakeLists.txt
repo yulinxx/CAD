@@ -31,6 +31,16 @@ target_link_libraries(SanYiPerfBenchmark PRIVATE
     Utility
 )
 
+# BUILD_CAM 时追加 CAM 契约基准（输入构造/深拷贝/compile 耗时与内存估算）
+if(BUILD_CAM)
+    target_sources(SanYiPerfBenchmark PRIVATE CamBench.cpp)
+    target_link_libraries(SanYiPerfBenchmark PRIVATE CAM)
+    target_include_directories(SanYiPerfBenchmark PRIVATE
+        "${SANYI_ROOT}/CAM/CAM/Include"
+    )
+    target_compile_definitions(SanYiPerfBenchmark PRIVATE SANYI_CAM_BENCH)
+endif()
+
 if(MSVC)
     target_compile_options(SanYiPerfBenchmark PRIVATE /utf-8 /FS)
 endif()

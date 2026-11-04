@@ -130,6 +130,7 @@ message(STATUS "")
 if(BUILD_RENDERBRIDGE_TESTS AND GTest_FOUND)
     add_executable(RenderBridgeTests
         "${CMAKE_CURRENT_SOURCE_DIR}/Test/PersistentGeometryStoreTests.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Test/DrawListBatchMeasurementTests.cpp"
     )
     target_compile_features(RenderBridgeTests PRIVATE cxx_std_17)
     target_include_directories(RenderBridgeTests PRIVATE
@@ -146,6 +147,8 @@ if(BUILD_RENDERBRIDGE_TESTS AND GTest_FOUND)
         GTest::gtest
         GTest::gtest_main
     )
+    # 与 sanyi_add_library 的 Qt 目标保持同一套 C++17 兼容定义（见 CMake/Utils.cmake）
+    target_compile_definitions(RenderBridgeTests PRIVATE QT_NO_P0846)
     if(MSVC)
         target_compile_options(RenderBridgeTests PRIVATE /utf-8)
     endif()

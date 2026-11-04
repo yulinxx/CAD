@@ -123,6 +123,32 @@ function(sanyi_check_dependency_directions)
         endif()
     endforeach()
 
+    # 规则 4.5：CAM 不得依赖 Engine2D / UI* / Render* / Main
+    # CAM 的唯一职责是对 ToolpathJobInput（中性 POD）做工艺编译，
+    # 任何对 Engine2D/UI/Render/Hardware 头的 include 都说明耦合破了
+    if(TARGET CAM)
+        set(_cam_forbidden "^(EngineCommon|Engine2D|Engine3D|EnginePersistence|UICommon|UI2D|UI3D|RenderX|RenderBridge|RenderAbstraction|SanYiCAD|UiEngineAccess)$")
+        get_target_property(_libs CAM LINK_LIBRARIES)
+        if(_libs)
+            foreach(_dep IN LISTS _libs)
+                if(_dep MATCHES "${_cam_forbidden}")
+                    list(APPEND _violations
+                        "CAM 目标链接了上层模块 ${_dep}；CAM 只能依赖 Utility/Log/Engraving(PRIVATE)/Hardware(PRIVATE)")
+                endif()
+            endforeach()
+        endif()
+        # 检查 INTERFACE_INCLUDE_DIRS 是否泄漏上层头路径（比 LINK_LIBRARIES 更严格）
+        get_target_property(_cam_includes CAM INTERFACE_INCLUDE_DIRS)
+        if(_cam_includes)
+            foreach(_inc IN LISTS _cam_includes)
+                if(_inc MATCHES "[/\\\\](Engine2D|EngineCommon|UICommon|UI2D|UI3D|RenderX|RenderBridge|Hardware)[/\\\\]Include")
+                    list(APPEND _violations
+                        "CAM 的 INTERFACE_INCLUDE_DIRS 泄漏了上层头路径 ${_inc}")
+                endif()
+            endforeach()
+        endif()
+    endif()
+
     # 规则 5：UI 不得在自己的 include 目录里引入 RenderX 头路径。
     # 这是"UI 能直接调 rx*"的能力来源——去掉它，直调那批代码会立刻编译失败，
     # 于是耦合无法悄悄长回来。允许残留告警：收口是渐进的。

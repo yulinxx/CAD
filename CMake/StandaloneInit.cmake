@@ -70,9 +70,16 @@ endfunction()
 # 独立构建只关心本模块自己的测试：把兄弟模块的测试开关统一关闭。
 # 支持多开关（多子库模块如 Engine: BUILD_ENGINE2D_TESTS BUILD_ENGINE3D_TESTS）：
 #   sanyi_only_own_tests(<own_switch> [<own_switch2> ...])
-# 必须在 sanyi_add_sibling() 之前调用（Config.cmake 每次 configure 都会把
-# 测试开关 FORCE 为 ON，本宏在其后改写，下一回合仍生效）。
+# 必须在 sanyi_add_sibling() 之前调用：Config.cmake 只在开关未定义时写默认值 ON，
+# 本宏在其后把兄弟开关改写为 OFF，改写结果留在缓存里，下一回合仍生效。
 macro(sanyi_only_own_tests)
+    # 护栏：只有模块自身作为顶层工程（独立构建）时才允许改写测试开关。
+    # 集成构建里模块只是根工程的子目录，全部测试开关由 Config.cmake 与根
+    # CMakeLists.txt 统一管理；在这里改写会把兄弟模块（含 Main）的测试静默关掉。
+    # 注意：宏体内的 return() 只结束本宏的展开，不会中断调用方 CMakeLists 的解析。
+    if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+        return()
+    endif()
     # 注意：宏内的 foreach(IN LISTS ARGN) 拿不到参数（CMake 宏的 ARGN 只能经
     # ${ARGN} 展开），必须先落到普通变量再遍历，否则会把本模块的开关也关掉。
     set(_sanyi_own_switches ${ARGN})
@@ -89,6 +96,12 @@ endmacro()
 # GTest 探测：不可用时把 Config.cmake 定义的全部测试开关统一降级为 OFF。
 # 这是独立构建下的唯一降级点（集成构建由根 CMakeLists.txt 承担同一职责）。
 macro(sanyi_find_gtest)
+    # 护栏：同 sanyi_only_own_tests —— 集成构建的 GTest 探测与降级由根
+    # CMakeLists.txt 负责，子目录里执行会把全局测试开关改写掉。
+    # 宏内的 return() 只退出本宏。
+    if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+        return()
+    endif()
     find_package(GTest CONFIG QUIET)
     if(GTest_FOUND)
         include(GoogleTest)

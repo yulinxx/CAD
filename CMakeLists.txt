@@ -198,9 +198,7 @@ else()
 endif()
 
 # 6.5 CAM 模块 - 激光切割工艺路径生成
-# 仓库里暂时没有 CAM 模块目录，因此不再提供 BUILD_CAM 开关：
-# 开关在但目录不在，打开就是 configure 直接失败（add_subdirectory 指向不存在的路径）。
-# CAM 模块落地后，把下面这段与 Config.cmake 里的 option 一起加回。
+# CAM/CAM 已落地，由 BUILD_CAM 开关控制；下面的 6.7 负责实际 add_subdirectory。
 
 # 5. UI 层 - 用户界面
 # UICommon 必需；UI2D 全应用必需（Main 有数百处 UI2D 引用且无桩回退）；
@@ -251,6 +249,18 @@ else()
     message(STATUS "  Raster: DISABLED")
 endif()
 
+# 6.7 CAM 模块 - 工艺编译层
+# 输入 ToolpathJobInput（中性 POD），输出 CamPlan（有序工序 + 路径 + 统计）。
+# CAM 不 include Engine2D/UICommon/RenderBridge/Hardware 头；
+# Engine2D 类型 → ToolpathJobInput 的转换在 Main/Src/CAM/CamInputBridge（唯一桥接点）。
+# 依赖方向：CAM → Log + Utility（PUBLIC），将来 M1 加 Engraving（PRIVATE），M2 加 Hardware/MotionPlan（PRIVATE）。
+if(BUILD_CAM)
+    add_subdirectory(CAM/CAM)
+    message(STATUS "  CAM: ENABLED")
+else()
+    message(STATUS "  CAM: DISABLED")
+endif()
+
 message(STATUS "----------------------------------------")
 
 # 7. Python 集成
@@ -265,7 +275,10 @@ option(SANYI_PYTHON_EMBED "Enable in-process Python bridge (Phase 3)" OFF)
 set(SANYI_PYTHON_VERSION "3.11" CACHE STRING "Required Python version")
 
 if(SANYI_PYTHON_HOST)
-    add_subdirectory(PythonHost)
+    # 必须进内层目录：外层 PythonHost/CMakeLists.txt 是独立构建入口，
+    # 它会调用 sanyi_only_own_tests() 把兄弟模块的测试开关改成 OFF，
+    # 作为根工程的子目录被加入时会让 MainTests 等目标凭空消失。
+    add_subdirectory(PythonHost/PythonHost)
     message(STATUS "  PythonHost: ENABLED")
 else()
     message(STATUS "  PythonHost: DISABLED")
@@ -273,7 +286,9 @@ endif()
 
 option(SANYI_PYBIND_CORE "Build PyBindCore facade extension (_sanyi_core)" ON)
 if(SANYI_PYBIND_CORE AND SANYI_PYTHON_HOST)
-    add_subdirectory(PyBindCore)
+    # 同样必须进内层目录：外层入口会以无参 sanyi_only_own_tests() 关闭全部
+    # 兄弟测试开关（23 个），集成构建下是全局副作用。
+    add_subdirectory(PyBindCore/PyBindCore)
     message(STATUS "  PyBindCore: ENABLED")
 else()
     message(STATUS "  PyBindCore: DISABLED")
@@ -510,6 +525,11 @@ endif()
 
 if(BUILD_RASTER)
     list(APPEND SANYI_PROJECT_LIBS Raster)
+endif()
+
+# CAM 工艺编译层：未安装时装出来的应用缺少 CAM.dll，桥接层与编译入口直接起不来
+if(BUILD_CAM)
+    list(APPEND SANYI_PROJECT_LIBS CAM)
 endif()
 
 if(SANYI_PYTHON_HOST)

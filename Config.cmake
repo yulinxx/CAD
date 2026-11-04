@@ -15,7 +15,7 @@
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if(WIN32)
     # set(Qt_INSTALL_DIR "C:/Qt/6.11.0/msvc2022_64/" CACHE PATH "Qt6 Windows")
-    set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.11.2/msvc2022_64/" CACHE PATH "Qt6 Windows")
+    set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.12.0/msvc2022_64/" CACHE PATH "Qt6 Windows")
 elseif(APPLE)
     set(Qt_INSTALL_DIR "$ENV{HOME}/Qt/6.11.1/macos/" CACHE PATH "Qt6 macOS")
 elseif(UNIX)
@@ -114,9 +114,6 @@ message(STATUS "================================================================
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-# Qt 6.11+ 兼容性：禁用 P0846 (std::get_if 等 C++20 特性) 以兼容 C++17
-add_compile_definitions(QT_NO_P0846)
 
 # --------------------------------------------------------------------
 # 符号可见性控制
@@ -222,24 +219,22 @@ else()
 endif()
 
 option(BUILD_NESTING "Build Nesting module (2D/3D nesting/arrangement algorithm)" ON)
-# BUILD_CAM 已移除：仓库里没有 CAM 模块（根 CMakeLists 的 add_subdirectory(CAM/CAM)
-# 指向一个不存在的目录，开关一旦打开就是 configure 直接失败）。
-# 需要 CAM 时，先把 CAM/CAM 模块落地，再把开关加回这里。
 
 # ===== 可选功能模块 =====
 # 按需启用
-option(BUILD_VISION "Build Vision module (image processing, computer vision)" OFF)
-option(BUILD_RASTER "Build Raster module (OpenCV bitmap processing for laser engraving/cutting)" OFF)
-option(BUILD_NETWORK "Build Network module (HTTP, WebSocket, cloud sync)" OFF)
-option(BUILD_HARDWARE "Build Hardware module (laser control, material database)" OFF)
+option(BUILD_VISION "Build Vision module (image processing, computer vision)" ON)
+option(BUILD_CAM "Build CAM layer (toolpath planning, process compilation)" ON)
+option(BUILD_RASTER "Build Raster module (OpenCV bitmap processing for laser engraving/cutting)" ON)
+option(BUILD_NETWORK "Build Network module (HTTP, WebSocket, cloud sync)" ON)
+option(BUILD_HARDWARE "Build Hardware module (laser control, material database)" ON)
 option(BUILD_ENGRAVING "Build Engraving module (3D laser engraving)" ON)
-option(BUILD_GEOMODELCORE "Build GeoModelCore module (OpenCASCADE-based geometry modeling)" OFF)
+option(BUILD_GEOMODELCORE "Build GeoModelCore module (OpenCASCADE-based geometry modeling)" ON)
 option(BUILD_CRASHHANDLER "Build CrashHandler module (crash capture and reporting)" ON)
-option(BUILD_PYTHON "Build Python module (PythonHost integration framework)" OFF)
+option(BUILD_PYTHON "Build Python module (PythonHost integration framework)" ON)
 # 许可校验开关：默认 OFF 保持开发构建行为，发货构建用 -DSANYI_ENABLE_LICENSE=ON 打开。
 # 宏编进 License 库本身（LicenseInternal.cpp 依据它决定运行期默认值），
 # Main 的 BuildConfig.h 镜像同步该取值供启动自检交叉核对。
-option(SANYI_ENABLE_LICENSE "启用许可校验（发货构建应设 ON）" OFF)
+option(SANYI_ENABLE_LICENSE "启用许可校验（发货构建应设 ON）" ON)
 
 # ===== 工具 =====
 option(BUILD_KEYGEN_TOOL "Build KeygenTool (offline license key generator)" OFF)
@@ -258,8 +253,10 @@ option(BUILD_RENDER_BENCHMARK "Build headless render frame-path benchmark" ON)
 #         - 重复定义会互相覆盖，谁先定义谁生效，排查成本极高；
 #         - 普通 set() 会遮蔽同名 option()（CMP0077），使 -D 传参静默失效。
 #
-# 取值方式：下面每个开关都是**显式取值**，本文件即权威来源，改完重新 configure
-#           立即生效（用 FORCE 写回缓存，避免旧缓存粘滞导致「改了文件没反应」）。
+# 取值方式：下面每个开关只在缓存里「尚未定义」时写入默认值 ON。
+#           不得用 FORCE：FORCE 会把 -DBUILD_MAIN_TESTS=OFF 这类显式传参静默
+#           覆盖回 ON，命令行就无法关掉任何测试，门禁形同虚设。
+#           改默认值请改本文件字面量并清掉对应缓存项，或用 -D 显式指定。
 
 # 便捷总开关：ON = 把下面全部模块测试一并打开；OFF = 保持各模块的显式取值
 # 此处不得用 FORCE 写回缓存：FORCE 会把命令行 -DBUILD_ALL_TESTS=ON 静默覆盖回 OFF。
@@ -267,29 +264,37 @@ option(BUILD_RENDER_BENCHMARK "Build headless render frame-path benchmark" ON)
 # 默认值 OFF 保持不变，-D 传参可正常生效。
 
 # ---- 逐模块测试开关（核心模块默认启用，建立测试保护网）----
-set(BUILD_UTILITY_TESTS          ON  CACHE BOOL "Utility 单元测试" FORCE)
-set(BUILD_LOG_TESTS              ON  CACHE BOOL "Log 单元测试" FORCE)
-set(BUILD_ENGINECOMMON_TESTS     ON  CACHE BOOL "EngineCommon 单元测试" FORCE)
-set(BUILD_ENGINE2D_TESTS         ON  CACHE BOOL "Engine2D 单元测试" FORCE)
-set(BUILD_ENGINE3D_TESTS         ON  CACHE BOOL "Engine3D 单元测试" FORCE)
-set(BUILD_GEOMODELCORE_TESTS     ON  CACHE BOOL "GeoModelCore 单元测试" FORCE)
-set(BUILD_FILEIO_TESTS           ON  CACHE BOOL "FileIO 单元测试" FORCE)
-set(BUILD_LICENSE_TESTS          ON  CACHE BOOL "License 单元测试" FORCE)
-set(BUILD_NESTING_TESTS          ON  CACHE BOOL "Nesting 单元测试" FORCE)
-set(BUILD_ENGRAVING_TESTS        ON  CACHE BOOL "Engraving 单元测试" FORCE)
-set(BUILD_HARDWARE_TESTS         ON  CACHE BOOL "Hardware 单元测试" FORCE)
-set(BUILD_VISION_TESTS           ON  CACHE BOOL "Vision 单元测试" FORCE)
-set(BUILD_RASTER_TESTS           ON  CACHE BOOL "Raster 单元测试" FORCE)
-set(BUILD_PYTHONHOST_TESTS       ON  CACHE BOOL "PythonHost 单元测试" FORCE)
-set(BUILD_CRASHHANDLER_TESTS     ON  CACHE BOOL "CrashHandler 单元测试" FORCE)
-set(BUILD_RENDERX_TESTS          ON  CACHE BOOL "Renderx 单元测试" FORCE)
-set(BUILD_RENDERBRIDGE_TESTS     ON  CACHE BOOL "RenderBridge 契约测试" FORCE)
-set(BUILD_UI_COMMON_TESTS        ON  CACHE BOOL "UICommon 单元测试" FORCE)
-set(BUILD_UI2D_TESTS             ON  CACHE BOOL "UI2D 单元测试" FORCE)
-set(BUILD_UI3D_TESTS             ON  CACHE BOOL "UI3D 单元测试" FORCE)
-set(BUILD_MAIN_TESTS             ON  CACHE BOOL "Main 单元测试（含撤销/重做回归）" FORCE)
-set(BUILD_VIEWPORT_REFRESH_TESTS ON  CACHE BOOL "2D 视口刷新契约测试" FORCE)
-set(BUILD_SCENE_EDIT_TESTS       ON  CACHE BOOL "场景编辑集成回归测试（撤销状态交换链路）" FORCE)
+# 统一走同一个默认值入口：未定义才写 ON，已定义（含 -D 传入）一律不覆盖。
+macro(_sanyi_test_switch_default_on _name _desc)
+    if(NOT DEFINED ${_name})
+        set(${_name} ON CACHE BOOL "${_desc}")
+    endif()
+endmacro()
+
+_sanyi_test_switch_default_on(BUILD_UTILITY_TESTS          "Utility 单元测试")
+_sanyi_test_switch_default_on(BUILD_LOG_TESTS              "Log 单元测试")
+_sanyi_test_switch_default_on(BUILD_ENGINECOMMON_TESTS     "EngineCommon 单元测试")
+_sanyi_test_switch_default_on(BUILD_ENGINE2D_TESTS         "Engine2D 单元测试")
+_sanyi_test_switch_default_on(BUILD_ENGINE3D_TESTS         "Engine3D 单元测试")
+_sanyi_test_switch_default_on(BUILD_GEOMODELCORE_TESTS     "GeoModelCore 单元测试")
+_sanyi_test_switch_default_on(BUILD_FILEIO_TESTS           "FileIO 单元测试")
+_sanyi_test_switch_default_on(BUILD_LICENSE_TESTS          "License 单元测试")
+_sanyi_test_switch_default_on(BUILD_NESTING_TESTS          "Nesting 单元测试")
+_sanyi_test_switch_default_on(BUILD_ENGRAVING_TESTS        "Engraving 单元测试")
+_sanyi_test_switch_default_on(BUILD_HARDWARE_TESTS         "Hardware 单元测试")
+_sanyi_test_switch_default_on(BUILD_VISION_TESTS           "Vision 单元测试")
+_sanyi_test_switch_default_on(BUILD_RASTER_TESTS           "Raster 单元测试")
+_sanyi_test_switch_default_on(BUILD_NETWORK_TESTS          "Network 单元测试")
+_sanyi_test_switch_default_on(BUILD_PYTHONHOST_TESTS       "PythonHost 单元测试")
+_sanyi_test_switch_default_on(BUILD_CRASHHANDLER_TESTS     "CrashHandler 单元测试")
+_sanyi_test_switch_default_on(BUILD_RENDERX_TESTS          "Renderx 单元测试")
+_sanyi_test_switch_default_on(BUILD_RENDERBRIDGE_TESTS     "RenderBridge 契约测试")
+_sanyi_test_switch_default_on(BUILD_UI_COMMON_TESTS        "UICommon 单元测试")
+_sanyi_test_switch_default_on(BUILD_UI2D_TESTS             "UI2D 单元测试")
+_sanyi_test_switch_default_on(BUILD_UI3D_TESTS             "UI3D 单元测试")
+_sanyi_test_switch_default_on(BUILD_MAIN_TESTS             "Main 单元测试（含撤销/重做回归）")
+_sanyi_test_switch_default_on(BUILD_VIEWPORT_REFRESH_TESTS "2D 视口刷新契约测试")
+_sanyi_test_switch_default_on(BUILD_SCENE_EDIT_TESTS       "场景编辑集成回归测试（撤销状态交换链路）")
 
 # 全部模块测试开关清单：供总开关应用、GTest 缺失统一降级、以及状态输出使用
 set(SANYI_TEST_SWITCHES
@@ -306,6 +311,7 @@ set(SANYI_TEST_SWITCHES
     BUILD_HARDWARE_TESTS
     BUILD_VISION_TESTS
     BUILD_RASTER_TESTS
+    BUILD_NETWORK_TESTS
     BUILD_PYTHONHOST_TESTS
     BUILD_CRASHHANDLER_TESTS
     BUILD_RENDERX_TESTS

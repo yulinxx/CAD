@@ -65,8 +65,66 @@ file(GLOB_RECURSE MAIN_APP_SOURCES CONFIGURE_DEPENDS
     "${SRC_ROOT}/*.mm"
 )
 
-# 排除测试目录下的文件（这些由测试目标独立编译，不属于应用可执行文件）
-list(FILTER MAIN_APP_SOURCES EXCLUDE REGEX ".*/UI/Test/.*\.cpp$")
+# 排除所有测试源码（这些由测试目标独立编译，不属于应用可执行文件）
+# 规则按两种形态覆盖：*/Test/ 目录与 *Tests.cpp 文件。只排除 UI/Test 会漏掉
+# 其他模块的测试目录（例如 Main/Src/Hardware/Test），使 gtest 与测试所用库的
+# 符号被拉进 exe 的源集合，链接期报 LNK2019 / LNK1120。
+list(FILTER MAIN_APP_SOURCES EXCLUDE REGEX ".*/Test/.*\.cpp$")
+list(FILTER MAIN_APP_SOURCES EXCLUDE REGEX ".*Tests\.cpp$")
+
+if(NOT BUILD_RASTER)
+    # Raster 光栅化导出依赖的文件：OFF 时不编入，避免找不到 Raster 头
+    list(FILTER MAIN_APP_SOURCES EXCLUDE REGEX ".*/Export/Writers/RasterExportHelper\\.cpp")
+    list(FILTER MAIN_APP_SOURCES EXCLUDE REGEX ".*/Export/Writers/BmpExportWriter\\.cpp")
+    list(FILTER MAIN_APP_SOURCES EXCLUDE REGEX ".*/Export/Writers/PngExportWriter\\.cpp")
+endif()
+
+if(NOT BUILD_CAM)
+    # CAM 工艺编译层桥接：OFF 时排除，避免找不到 CAM 头文件
+    list(FILTER MAIN_APP_SOURCES EXCLUDE REGEX ".*/Src/CAM/CamInputBridge\\.cpp")
+endif()
+
+if(NOT BUILD_CAM OR NOT BUILD_HARDWARE)
+    # CamPlan → MotionPlan 发射器同时依赖 CAM 的 CamPlan 与 Hardware 的 MotionPlanBuilder，
+    # 任一模块关闭时都不编入，避免找不到对应头文件
+    list(FILTER MAIN_APP_SOURCES EXCLUDE REGEX ".*/Src/CAM/CamPlanEmitter\\.cpp")
+endif()
+
+# 从 Hardware 迁出的 Qt 封装实现统一编入应用层 HardwareApp，不随 exe/测试重复编译
+list(FILTER MAIN_APP_SOURCES EXCLUDE REGEX ".*/Src/Hardware/(SafetyManager|MaterialDatabase|ToolpathExecutor)\\.cpp")
+
+# --- 应用层硬件 Qt 封装（由 Hardware.dll 迁出）---
+# SafetyManager / MaterialDatabase / ToolpathExecutor 的公共声明保留在 Hardware 头，
+# 实现放到应用层并单独成 DLL：Hardware.dll 不再导出 Qt 容器与 vtable。
+# 公共头声明使用 HARDWARE_API，因此实现必须由定义了导出宏的 DLL 承载。
+if(BUILD_HARDWARE)
+    sanyi_add_shared_library(HardwareApp
+        FOLDER "Modules"
+        DESCRIPTION "Application-layer hardware Qt wrappers"
+        EXPORT_MACRO "HARDWAREAPP_EXPORTS"
+        VERSION_MAJOR 1
+        VERSION_MINOR 0
+        VERSION_PATCH 0
+        SOURCES
+            "${SRC_ROOT}/Hardware/SafetyManager.cpp"
+            "${SRC_ROOT}/Hardware/MaterialDatabase.cpp"
+            "${SRC_ROOT}/Hardware/ToolpathExecutor.cpp"
+        HEADERS
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include/Hardware/SafetyManager.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include/Hardware/MaterialDatabase.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include/Hardware/ToolpathExecutor.h"
+        AUTOMOC
+        PRIVATE_INCLUDE_DIRS
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include"
+        PUBLIC_LINK_LIBRARIES
+            Hardware
+        PRIVATE_LINK_LIBRARIES
+            Log
+            Utility
+        PUBLIC_QT_COMPONENTS
+            Core
+    )
+endif()
 
 # macOS 平台专用 Objective-C++ 文件：.mm 已被上面的 glob 自动收集。
 # 但需要排除非 macOS 平台的 .mm 文件
@@ -305,7 +363,13 @@ endif()
 # 位图导出（PNG/BMP）需要 Raster 光栅化库
 if(BUILD_RASTER)
     target_link_libraries(${APP_NAME} PRIVATE Raster)
-    target_compile_definitions(${APP_NAME} PRIVATE ENABLE_RASTER_EXPORT_MAIN=1)
+    target_compile_definitions(${APP_NAME} PRIVATE ENABLE_RASTER_EXPORT_MAIN=1 BUILD_RASTER)
+endif()
+
+# CAM 工艺编译层：桥接 Engine2D → Cam::ToolpathJobInput → Cam::compile
+if(BUILD_CAM)
+    target_link_libraries(${APP_NAME} PRIVATE CAM)
+    target_compile_definitions(${APP_NAME} PRIVATE BUILD_CAM)
 endif()
 
 # 硬件抽象层:DeviceHost / MachineProfile 需要直接使用 Hw:: 接口装配设备。
@@ -316,6 +380,17 @@ if(BUILD_HARDWARE)
             "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include"
     )
     target_link_libraries(${APP_NAME} PRIVATE Hardware)
+endif()
+
+# 视觉模块:宿主桥接层（VisionHostBridges）实现 Vis:: 的四个宿主接口，
+# 因此 Main 源码要直接 include Vision 头并链接 Vision.dll。
+# ENABLE_VISION 宏已通过 UI2D PUBLIC 自动传播,此处不再手工定义
+if(BUILD_VISION)
+    target_include_directories(${APP_NAME}
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Vision/Vision/Include"
+    )
+    target_link_libraries(${APP_NAME} PRIVATE Vision)
 endif()
 
 
@@ -580,6 +655,27 @@ if(BUILD_MAIN_TESTS AND GTest_FOUND)
     # （历史遗留：这两个文件曾因 API 变更不再编译而被排除，实际等于测试被悄悄关掉。
     #   已改为适配当前 API 并重新纳入构建。）
 
+    if(NOT BUILD_CAM)
+        # 桥接层测试依赖 CAM/CamInputBridge，关闭 CAM 时同步排除
+        list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*CamBridgeTests\\.cpp$")
+    endif()
+
+    if(BUILD_HARDWARE)
+        # 从 Hardware 模块迁出的 Qt 封装单元测试：实现已在应用层 HardwareApp，
+        # 测试随 MainTests 编译并链接 HardwareApp
+        list(APPEND MAIN_TEST_SOURCES
+            "${SRC_ROOT}/Hardware/Test/SafetyManagerTests.cpp"
+            "${SRC_ROOT}/Hardware/Test/MaterialDatabaseTests.cpp"
+        )
+    endif()
+
+    if(BUILD_CAM AND BUILD_HARDWARE)
+        # CamPlan → MotionPlan 发射器：纯数据翻译的单测，不依赖整机与设备
+        list(APPEND MAIN_TEST_SOURCES
+            "${SRC_ROOT}/CAM/Test/CamPlanEmitterTests.cpp"
+        )
+    endif()
+
     if(NOT BUILD_UI3D)
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*RenderWidget3DAdapterTests\\.cpp$")
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*Scene3DRegressionTests\\.cpp$")
@@ -660,6 +756,13 @@ if(BUILD_CRASHHANDLER)
     target_link_libraries(MainTests PRIVATE CrashHandler)
 endif()
 
+if(BUILD_VISION)
+    # MainTests 编译 Main 的全部源码，其中 VisionHostBridges 需要 Vision 的头与
+    # DLL；主应用目标已加过同一路径，测试目标此前缺失，导致开启 Vision 时链接失败
+    target_include_directories(MainTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../Vision/Vision/Include")
+    target_link_libraries(MainTests PRIVATE Vision)
+endif()
+
 target_link_libraries(MainTests
         PRIVATE
             Engine2D
@@ -679,11 +782,32 @@ target_link_libraries(MainTests
             GTest::gmock
     )
 
+    if(BUILD_HARDWARE)
+        # 迁到应用层的 Qt 封装：测试需要 Hardware 公共头路径与 HardwareApp.dll 的实现
+        target_include_directories(MainTests PRIVATE "${PROJECT_ROOT}/Hardware/Hardware/Include")
+        target_link_libraries(MainTests PRIVATE Hardware HardwareApp)
+    endif()
+
     if(WIN32)
         # MainTests 编译了全部 MAIN_APP_SOURCES，其中 CrashHandlerBootstrap.cpp 的
         # printSymbolizedBacktrace 依赖 dbghelp。主程序在上面已单独链接，测试目标必须同步，
         # 否则出现 LNK2019 __imp_SymInitialize。
         target_link_libraries(MainTests PRIVATE dbghelp)
+    endif()
+
+    if(BUILD_RASTER)
+        # MainTests 同样编入 RasterExportHelper.cpp 等位图导出源文件，
+        # 必须与主应用一样链接 Raster，否则出现 LNK2019 Raster_CreateImage 等未解析外部符号
+        target_link_libraries(MainTests PRIVATE Raster)
+        # 位图 → 扫描线刀路装配在 CamInputBridge 里按 BUILD_RASTER 条件编译，
+        # 测试目标必须拿到同一开关，否则与主应用 ABI/行为不一致
+        target_compile_definitions(MainTests PRIVATE BUILD_RASTER)
+    endif()
+
+    if(BUILD_CAM)
+        # MainTests 编入全部 MAIN_APP_SOURCES（含 CamInputBridge.cpp），必须同步链接 CAM
+        target_link_libraries(MainTests PRIVATE CAM)
+        target_compile_definitions(MainTests PRIVATE BUILD_CAM)
     endif()
 
 
@@ -709,7 +833,16 @@ target_link_libraries(MainTests
             PRIVATE
                 "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include"
         )
-        target_link_libraries(MainTests PRIVATE Hardware)
+        target_link_libraries(MainTests PRIVATE Hardware HardwareApp)
+        # 迁移后的实现位于 HardwareApp，Q_OBJECT 头必须列入目标源集合，AUTOMOC 才会生成 moc。
+        # 同一个头在 HardwareApp 与测试目标里都要 moc：测试目标需声明 HARDWAREAPP_EXPORTS，
+        # 否则 HARDWARE_API 在测试里是 dllimport，生成 staticMetaObject 定义会触发 C2491。
+        target_sources(MainTests PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include/Hardware/SafetyManager.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include/Hardware/MaterialDatabase.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include/Hardware/ToolpathExecutor.h"
+        )
+        target_compile_definitions(MainTests PRIVATE HARDWAREAPP_EXPORTS)
     endif()
 
 
@@ -737,6 +870,45 @@ target_link_libraries(MainTests
     message(STATUS "[Main Tests]")
     message(STATUS "")
 endif()
+
+# ============================================================================
+# 数据库 Schema 迁移回归测试（独立于 BUILD_MAIN_TESTS 的独立目标）
+# ============================================================================
+# 单独开一个目标的原因：这批用例只依赖 DatabaseBootstrapper 与 EnginePersistence，
+# 而 MainTests 会把整个 Main 应用源码拖进 unity 编译，容易被无关测试文件的
+# 匿名命名空间同名类型冲突阻塞。独立目标可快速、稳定地验证迁移逻辑。
+if(BUILD_MAIN_TESTS AND GTest_FOUND)
+    add_executable(DatabaseSchemaMigrationTests
+        "${UI_ROOT}/Test/DatabaseSchemaMigrationTests.cpp"
+        "${SRC_ROOT}/Persistence/DatabaseBootstrapper.cpp"
+    )
+    target_compile_features(DatabaseSchemaMigrationTests PRIVATE cxx_std_17)
+    target_include_directories(DatabaseSchemaMigrationTests PRIVATE
+        "${CMAKE_CURRENT_BINARY_DIR}"   # 配置期生成的 VersionInfo.h
+        "${SRC_ROOT}"
+        "${SRC_ROOT}/Persistence"
+        "${PROJECT_ROOT}/Engine/Persistence/Include"
+        "${PROJECT_ROOT}/Log/Log/Include"
+        "${PROJECT_ROOT}/Utility/Utility/Include"
+    )
+    target_link_libraries(DatabaseSchemaMigrationTests PRIVATE
+        EnginePersistence
+        Log
+        Utility
+        GTest::gtest
+        GTest::gtest_main
+    )
+    if(MSVC)
+        target_compile_options(DatabaseSchemaMigrationTests PRIVATE /utf-8 /FS)
+    endif()
+    gtest_discover_tests(DatabaseSchemaMigrationTests
+        DISCOVERY_MODE PRE_TEST
+        WORKING_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+    )
+    set_property(TARGET DatabaseSchemaMigrationTests PROPERTY FOLDER "Tests/Main")
+endif()
+
+# 位图导出用例由 MAIN_TEST_SOURCES 的 GLOB 自动收录，不再单独开目标
 
 # ============================================================================
 # 视口刷新契约测试（独立于 BUILD_MAIN_TESTS 的独立目标）

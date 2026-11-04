@@ -264,9 +264,12 @@ function(sanyi_add_shared_library target)
 
     target_compile_features(${target} PUBLIC cxx_std_17)
 
-    # Qt 6.11+ 兼容性：禁用 P0846 (std::get_if 等 C++20 特性) 以兼容 C++17
-    # 同时定义 QT_COMPILER_HAS_P0846=1 以避免 qcompilerdetection.h 的 fallback 分支错误
-    target_compile_definitions(${target} PRIVATE QT_NO_P0846 QT_COMPILER_HAS_P0846=1)
+    # Qt 6.12 源码中无任何 QT_NO_P0846 引用（全量扫描 0 命中），本定义不改变编译结果，
+    # 保留仅为不改变既有目标级编译定义；待构建基座统一评估后再决定去留。
+    # 不得再注入 QT_COMPILER_HAS_P0846：Qt 自身已在 qcompilerdetection.h 按
+    # __cplusplus >= 202002L && MSVC >= 19.39 判定，重复判定只会引入门槛漂移；
+    # 且在 /std:c++17 下强置 1 会让 qvariant.h:1047 报 C2760/C3878。
+    target_compile_definitions(${target} PRIVATE QT_NO_P0846)
 
     if(SANYI_SHLIB_EXPORT_MACRO)
         # CMake 标准做法：<target>_EXPORTS 用于 DLL 导出/导入
