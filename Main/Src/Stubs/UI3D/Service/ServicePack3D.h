@@ -1,2 +1,2 @@
 #pragma once
-class ServicePack3D;
+struct ServicePack3D;
