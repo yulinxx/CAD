@@ -105,7 +105,7 @@
 #include "Color/Color.hpp"
 #include "Log/SyLogger.h"
 
-// ==================== Workbench2D helpers ====================
+// ---- Workbench2D 辅助函数 ----
 
 namespace
 {
@@ -153,8 +153,7 @@ private:
     Callback m_cb;
 };
 
-// ============================================================
-// Workbench2D 实现
+// ---- Workbench2D 实现 ----
 QString Workbench2D::id() const
 {
     return QStringLiteral("2D");
@@ -512,7 +511,6 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         // 绘制中的 Delete / Backspace 先归绘图工具：撤销上一个已确定的落点。
         // 样条 / NURBS / 多段线这类要点多次的图元，点错一个不该整条重画；
         // 这也不是主 Undo 栈 —— 只退当前正在构造的图元的输入点，已提交图元不动。
-        //
         // 这一跳与 ESC 那跳同理且更硬：Delete / Backspace 是 Qt::ApplicationShortcut，
         // 按键在送达视口 widget 之前就被快捷键系统消费，BaseTool::onKeyPress 里的
         // 回退分支在绘图态根本走不到。
@@ -523,7 +521,6 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         // 统一经 OperationBus 跑 Edit_Delete，与菜单 / 工具栏 / 右键完全同一条路径
         // （handler 见 CoreOperationRegistry::registerAll 的 Edit_Delete，落到
         // SceneEditService::deleteSelected）。3D 侧 setup3DDeleteShortcuts 也是这么做的。
-        //
         // 不要直连 sceneEditService 并额外做 selectionService->clear() +
         // requestFullRefresh()：
         //   - 选择表：SceneManager::extractEntitiesById 内部已 m_selection.remove()，
@@ -545,7 +542,6 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         //   绘制中 → 丢弃当前图元、留在绘图工具；绘图工具空闲 → 退回选择工具。
         // 视口消费掉就到此为止，不要顺手再清一次选择 —— 否则「画到一半按 ESC」
         // 会连用户之前的选中集一起清掉。
-        //
         // 这一跳是必需的而不是冗余：ESC 走的是窗口级 QShortcut，Qt 的快捷键在
         // 键事件送达聚焦控件**之前**就消费掉了，视口的 ViewportInputRouter 根本
         // 拿不到 KeyPress（Delete / Backspace 的注释里描述的是同一机制）。
@@ -567,16 +563,13 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
     // clearAllShortcuts 删不到它们（它只回收登记过的）：切到 3D 后 2D 的 Delete
     // 仍然活着，一边在 3D 界面里删 2D 场景的图元，一边和 3D 注册的 Delete 同键冲突，
     // Qt 判 ambiguous 后两个都不触发。3D 侧（setup3DDeleteShortcuts）一直是这么做的。
-    //
     // Delete / Backspace 必须设 Qt::ApplicationShortcut，与 3D 侧一致：
     // 这样按键在送达视口 widget 之前就被快捷键系统消费掉，画布内的工具/输入路由
     // 不会再拿到同一次按键 —— 「一次按键删两次」在结构上就不可能发生，而不是靠
     // 各条路径自己的选中集判定去互相躲。
-    //
     // 两个键都删选中图元（macOS 上 ⌫ 发 Key_Backspace，Key_Delete 要按 Fn+⌫；
     // 只绑 Key_Delete 等于让 Mac 用户没法用最顺手的那个键）。区别只在文本编辑态：
     // forward=false 删光标前，forward=true 删光标后，判定见 deleteSelectedShapes。
-    //
     // ⚠️ 单一所有者：这两条不能与菜单项声明的键序列重复。base.json 里
     // `edit.delete` 曾带 "shortcut": "Delete"，与下面的 Key_Delete 撞成两个
     // ApplicationShortcut 接收者，Qt 判 ambiguous 后两边都不触发 —— 表现就是
@@ -626,9 +619,9 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         });
 
         // 选择变化 → 刷新命令 UI（工具栏/右键菜单/面板/状态栏）的连线统一由
-        // UiStateBridge2D::install 挂载，此处不再逐个 connect，避免触发源散落漏接。
+        // UiStateBridge2D::install 挂载，此处不逐个 connect，避免触发源散落漏接。
 
-        // 鼠标移动时实时更新状态栏位置标签（唯一通路；不再写 metadata 镜像）
+        // 鼠标移动时实时更新状态栏位置标签（唯一通路；不写 metadata 镜像）
         vp->setPositionCallback([&window](double x, double y) {
             window.updatePositionLabel(x, y);
         });
@@ -833,10 +826,9 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         {
             return result;
         }
-        // 直接遍历选中图元指针：此前走 visitSelectedIds，每个 id 都要
+        // 直接遍历选中图元指针：visitSelectedIds 需要每个 id 走
         // to_string -> parseEntityId -> findEntityById 往返，50k 选中约 21ms。
-        // forEachSelected 不拷贝选择集（与 15d939b 的免拷贝路径一致），
-        // 遍历顺序与 getSelectedEntities 完全相同，选择语义不变。
+        // forEachSelected 不拷贝选择集，遍历顺序与 getSelectedEntities 完全相同，选择语义不变。
         // 快照期间图层锁定状态不会变化：按 layerId 缓存一次，避免每个图元两次哈希查找
         std::unordered_map<int, bool> lockedLayerCache;
         scene->forEachSelected(
@@ -917,7 +909,6 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         return result;
     });
     // 注入撤销/重做状态提供器（OperationBus context 在生产路径不填充 undoManager）
-    //
     // 这里必须在接线时就把漏注入喊出来：provider 的返回值会在
     // CommandActionHub::captureSnapshot 里**覆盖** snapshot.canUndo / canRedo，
     // 捕到 nullptr 就等于把两者钉死为 false，而 edit.undo / edit.redo 的
@@ -995,15 +986,15 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     }
 
     // 视口 → UI 的勾选态回写（Esc 回到 SelectTool、工具用完自动返回等）。
-    // 勾选态由中枢的 QActionGroup 单点维护，展示层不再各自记 activeTool。
+    // 勾选态由中枢的 QActionGroup 单点维护，展示层不各自记 activeTool。
     // 配置驱动的 Draw 菜单项是不可勾选的普通动作，不参与高亮，只共用同一条派发链。
     QObject::connect(
         m_viewport, &RenderViewport2D::activeToolChanged, m_commandHub.get(), &CommandActionHub::setActiveToolAction);
     m_commandHub->setActiveToolAction(m_viewport->activeToolName());
 
     // 记录当前工具到状态中心，供 deactivate() 的快照带走。
-    // 此前 setActiveToolId() 只有 restoreFromSnapshot() 一个写入点、没有任何生产方，
-    // 于是快照里的 activeToolId 永远是空串：画了一半的线切到 3D 再切回来，
+    // 若 setActiveToolId() 只有 restoreFromSnapshot() 一个写入点、没有生产方，
+    // 快照里的 activeToolId 永远是空串：画了一半的线切到 3D 再切回来，
     // 工具已经退回 SelectTool（attachToWindow 硬设），撤销也回不到绘制中状态。
     QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged, this, [this](const QString& toolName) {
         if (m_uiState.stateCenter)
@@ -1088,6 +1079,8 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     m_textFontToolBar->setIconSize(QSize(UiMetrics::toolbarIconSizeSmall(), UiMetrics::toolbarIconSizeSmall()));
     m_textFontToolBarWidget = new TextFontToolBar(m_textFontToolBar);
     m_textFontToolBar->addWidget(m_textFontToolBarWidget);
+    // 字体条独占第二行，避免文本编辑态与主命令条并排后互相挤出溢出箭头
+    window.addToolBarBreak(Qt::TopToolBarArea);
     window.addToolBar(Qt::TopToolBarArea, m_textFontToolBar);
     m_textFontToolBar->setVisible(false);
 
@@ -1270,7 +1263,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     m_contextManager->setCurrentContext(ToolBarContext::Default);
 
     // 根据选中图元类型自动切换上下文：由 applySelectionContext 消费快照 typeMask 完成，
-    // 不再单独监听 selectionChanged（避免与快照刷新产生顺序竞争）。
+    // 不单独监听 selectionChanged（避免与快照刷新产生顺序竞争）。
     if (m_viewport)
     {
         // 右键菜单请求：交给命令中枢统一构建并弹出（含选择/锁定实时联动）
@@ -1285,6 +1278,9 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     m_rightToolBar = new RightToolBar(&window);
     m_rightToolBar->setObjectName(QStringLiteral("RightToolBar"));
     m_rightToolBar->setProperty("uiSource", QStringLiteral("CommandCatalog + LayerManager"));
+    // 色块条是固定位置的图层入口，禁止拖动与浮动，避免被拖走后右侧只剩空白
+    m_rightToolBar->setMovable(false);
+    m_rightToolBar->setFloatable(false);
     if (m_panelHostStyle == PanelHostStyle::Dock)
     {
         // stableId 是布局快照键，不能用 tr() 生成的 title（换语言后快照失配）
@@ -1561,8 +1557,8 @@ void Workbench2D::setupSceneTree(WorkbenchWindow& window)
 
 void Workbench2D::onSceneTreeSceneChanged()
 {
-    // 结构签名没变（例如只是拖了几何）就不重建：原来这里按「图元数量」判断，
-    // 但群组拓扑变化不改数量，会让新建/解散的群组在树上残留。
+    // 结构签名没变（例如只是拖了几何）就不重建：按「图元数量」判断会漏掉群组拓扑变化
+    // （数量不变），让新建/解散的群组在树上残留。
     // 增量优先：纯新增只追加顶层行；删除/群组/改名等回退全量。
     applySceneTreeIncremental("sceneObserver");
 }
@@ -1661,11 +1657,10 @@ void Workbench2D::applySceneTreeIncremental(const char* src)
     // （模型信号 → 场景写回 → SceneNotifier → onSceneTreeSceneChanged），
     // 而嵌套调用读到的 m_sceneTreeCursor 还是外层尚未推进的旧值，
     // 于是把同一批变更又整表扫一遍、还会再追加一遍行（29 万图元下即为一次完整重扫）。
-    // 外层正在消费的就是这批变更，嵌套调用不再重复处理。
-    //
+    // 外层正在消费的就是这批变更，嵌套调用不重复处理。
     // 但不能直接丢弃：嵌套期间新产生的变更若无人再通知就会漏掉。
     // 因此投递一次延后重跑，等到下一轮事件循环时外层已返回、游标已推进，
-    // 那时只会读到真正的新变更。收敛性：重跑若读到空变更且签名一致会直接返回，不再投递。
+    // 那时只会读到真正的新变更。收敛性：重跑若读到空变更且签名一致会直接返回，不投递。
     if (m_sceneTreeIncrementalBusy)
     {
         QTimer::singleShot(0, this, [this]() {
@@ -1921,7 +1916,7 @@ void Workbench2D::renameEntity(const QString& id, const QString& newName)
 
     // 走可撤销编辑路径：重命名作为独立撤销命令入栈（前后快照）。
     // 若直接写引擎，重命名不会进入撤销栈，之后撤销任何较早的操作都会用
-    // 旧快照把名字覆盖回去（表现为"撤销后名字变回原来的"）。
+    // 那一版快照把名字覆盖回去（表现为「撤销后名字变回原来的」）。
     const std::string name = newName.toStdString();
     m_scene.sceneEditService->mutateEntities(
         { *eid },
@@ -2158,7 +2153,7 @@ void Workbench2D::applySelectionContext(const CommandUiSnapshot& snapshot)
     schedulePropertiesPanelRefresh();
 
     // 状态栏选择指示器：只送数量，"Selected: N" 文案由指示器自行用 tr() 拼；
-    // 直接用快照里的 selectionCount，不再二次遍历场景
+    // 直接用快照里的 selectionCount，不二次遍历场景
     if (m_statusBar2D)
     {
         m_statusBar2D->setSelectionCount(snapshot.selectionCount);

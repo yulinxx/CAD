@@ -105,7 +105,10 @@
         { "type": "action", "id": "edit.boolean_union", "label": "Union", "tooltip": "Merge overlapping paths into one outline", "command": "edit.boolean_union", "icon": ":/ui/common/Icons/Actions/boolean_union.svg", "workbenches": ["2D"] },
         { "type": "action", "id": "edit.boolean_intersection", "label": "Intersection", "tooltip": "Keep only the region where selected paths overlap", "command": "edit.boolean_intersection", "icon": ":/ui/common/Icons/Actions/boolean_intersection.svg", "workbenches": ["2D"] },
         { "type": "action", "id": "edit.boolean_difference", "label": "Difference", "tooltip": "Subtract the top path from the bottom path", "command": "edit.boolean_difference", "icon": ":/ui/common/Icons/Actions/boolean_difference.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "edit.boolean_xor", "label": "Xor", "tooltip": "Keep non-overlapping regions of the selected paths", "command": "edit.boolean_xor", "icon": ":/ui/common/Icons/Actions/boolean_xor.svg", "workbenches": ["2D"] }
+        { "type": "action", "id": "edit.boolean_xor", "label": "Xor", "tooltip": "Keep non-overlapping regions of the selected paths", "command": "edit.boolean_xor", "icon": ":/ui/common/Icons/Actions/boolean_xor.svg", "workbenches": ["2D"] },
+        { "type": "separator" },
+        { "type": "action", "id": "algo.bitmap_process", "label": "Process Bitmap...", "tooltip": "Apply threshold / dither / halftone to the selected image for laser engraving", "command": "algo.bitmap_process", "icon": ":/ui/common/Icons/View3D/bitmap.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "algo.vectorize_bitmap", "label": "Vectorize Bitmap...", "tooltip": "Trace contours from the selected image into editable polyline entities", "command": "algo.vectorize_bitmap", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"] }
         ] }
       ]
     },
@@ -366,7 +369,8 @@
   ],
   "docks": [
     { "id": "SceneDock", "title": "Scene", "position": "left", "widgetType": "SceneTreePanel", "visible": true },
-    { "id": "PropertiesDock", "title": "Properties", "position": "right", "widgetType": "PropertiesPanel", "visible": true }
+    { "id": "PropertiesDock", "title": "Properties", "position": "right", "widgetType": "PropertiesPanel", "visible": true },
+    { "id": "DeviceDock", "title": "Device", "position": "right", "widgetType": "DevicePanel", "visible": true }
   ],
   "shortcuts": [
   ],

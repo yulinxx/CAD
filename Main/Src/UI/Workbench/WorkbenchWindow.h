@@ -31,6 +31,7 @@ class WorkbenchStateManager;
 class SceneTreePanel;
 class PropertiesPanelWidget;
 class FileDropHandler;
+class EmergencyStopOverlay;
 class QDragEnterEvent;
 class QDragMoveEvent;
 class QDragLeaveEvent;
@@ -222,6 +223,10 @@ private:
     /// 按当前工作台应用**默认**面板显隐策略（2D 显示骨架面板；3D 单独显示 Scene/Properties）。
     /// 只是初值：restoreLayoutSnapshot 里保存的用户状态（含手动关闭的面板）必须在它之后应用。
     void applyDefaultDockVisibility();
+    /// 创建常驻急停入口并绑定急停状态机；非置顶窗口，不随面板显隐
+    void initializeEmergencyStopOverlay();
+    /// 急停只读态：禁用画布与菜单/工具栏，保留置顶急停入口可操作
+    void applySafetyReadOnly(bool readOnly);
 
 private:
     UiStateCenter* m_stateCenter{ nullptr };
@@ -247,6 +252,8 @@ private:
     std::unique_ptr<WorkbenchActionManager> m_actionManager;
     /// 状态管理器：统一管理状态中心同步、窗口状态镜像、状态栏刷新
     std::unique_ptr<WorkbenchStateManager> m_stateManager;
+    /// 常驻急停入口（独立置顶窗口，不参与停靠布局）
+    std::unique_ptr<EmergencyStopOverlay> m_emergencyStopOverlay;
     /// 是否正在切换工作台（防止重复触发）
     bool m_switchingWorkbench{ false };
 

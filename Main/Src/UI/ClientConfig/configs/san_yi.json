@@ -7,7 +7,8 @@
   },
   "toolbars": [],
   "docks": [
-    { "id": "SceneDock", "title": "Scene", "position": "left", "widgetType": "SceneTreePanel", "visible": true }
+    { "id": "SceneDock", "title": "Scene", "position": "left", "widgetType": "SceneTreePanel", "visible": true },
+    { "id": "DeviceDock", "title": "Device", "position": "right", "widgetType": "DevicePanel", "visible": true }
   ],
   "shortcuts": [
   ]

@@ -132,8 +132,13 @@
 #include "UI/Interaction/UiInteractionGate.h"
 #include "UI/ClientConfig/UiBrandManager.h"
 #include "UI/ClientConfig/UiLabelLocalizer.h"
+#include "UI/Safety/EmergencyStopController.h"
+#include "UI/Widgets/EmergencyStopOverlay.h"
 
 #include <QCloseEvent>
+#include <QMenuBar>
+#include <QStatusBar>
+#include <QToolBar>
 #include <QMessageBox>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
@@ -188,6 +193,7 @@ WorkbenchWindow::WorkbenchWindow(QWidget* parent)
     // 启用鼠标追踪，确保 3D 视口中的 QOpenGLWidget 能收到无按键 mouseMoveEvent
     setMouseTracking(true);
     initializeWorkbenchShell();
+    initializeEmergencyStopOverlay();
 
     SY_INFO("[WorkbenchWindow] Main window created successfully");
 }
@@ -477,7 +483,7 @@ void WorkbenchWindow::initializeStatusBarSkeleton()
     m_layoutManager->initializeStatusBarSkeleton();
 }
 
-// ==================== 状态栏挂载/卸载 ====================
+// ---- 状态栏挂载/卸载 ----
 
 StatusBarBase* WorkbenchWindow::activeStatusBar() const
 {
@@ -574,7 +580,7 @@ void WorkbenchWindow::syncWorkbenchSelectionFromStateCenter()
 void WorkbenchWindow::refreshStatusText()
 {
     // 这里只刷新全局状态展示，不在此处拼接工作台业务流程
-    // 具体实现已下沉到 WorkbenchStateManager，本方法保留为窗口的稳定入口
+    // 具体实现在 WorkbenchStateManager，本方法保留为窗口的稳定入口
     if (m_stateManager)
     {
         m_stateManager->refreshStatusText();
@@ -585,7 +591,7 @@ void WorkbenchWindow::refreshStatusText()
 void WorkbenchWindow::refreshFromState()
 {
     // 这里是框架层的总刷新入口，不把工作台实现逻辑写进来
-    // 具体实现已下沉到 WorkbenchStateManager，本方法保留为窗口的稳定入口
+    // 具体实现在 WorkbenchStateManager，本方法保留为窗口的稳定入口
     if (m_stateManager)
     {
         m_stateManager->refreshFromState();
@@ -686,7 +692,7 @@ void WorkbenchWindow::closeEvent(QCloseEvent* event)
 
     // 关闭前把当前工作台的布局快照落盘（面板宽度/显隐）。
     // 否则用户在**最后一个**工作台里拖出来的宽度不会被持久化 ——
-    // 快照原本只在切换工作台时保存，退出时保存一次才能让下次启动恢复同一布局。
+    // 快照若只在切换工作台时保存，退出时也需要保存一次，才能让下次启动恢复同一布局。
     if (m_workbench)
     {
         saveLayoutSnapshot(m_workbench->id());
@@ -749,7 +755,7 @@ void WorkbenchWindow::refreshPositionLabel()
     }
 
     // 只送原始数据（换算后的坐标 + 单位符号），文案由 PositionIndicator 自行用 tr() 拼。
-    // 单位切换、语言切换都靠指示器按缓存的原始值重拼，这里不再拼任何译文。
+    // 单位切换、语言切换都靠指示器按缓存的原始值重拼，这里不拼任何译文。
     if (!m_hasMousePosition)
     {
         m_activeStatusBar->setPositionValues(0.0, 0.0, QStringLiteral("mm"), false);
@@ -769,10 +775,10 @@ void WorkbenchWindow::refreshPositionLabel()
     }
 }
 
-// 最近文件读写已收口到 RecentFileService（Main/Src/UI/Services/RecentFileService.h）。
-// 这里原本有一份逐字节相同的 addRecentFile/loadRecentFiles/saveRecentFiles，
-// 无任何外部调用者，且与 RecentFileService 写同一个 QSettings 键 "RecentFiles"，
-// 属于第二套并行实现，已删除。需要读写最近文件请走 m_uiServices.recentFileService。
+// 最近文件读写统一走 RecentFileService（Main/Src/UI/Services/RecentFileService.h）。
+// addRecentFile/loadRecentFiles/saveRecentFiles 不在本窗口重复实现：
+// 第二套实现会与 RecentFileService 写同一个 QSettings 键 "RecentFiles"，
+// 形成并行写入。需要读写最近文件请走 m_uiServices.recentFileService。
 
 /// 注册停靠面板
 /// @param title 面板标题
@@ -1064,6 +1070,73 @@ bool WorkbenchWindow::canExecuteCommand(const QString& commandId, const QString&
     return true;
 }
 
+void WorkbenchWindow::initializeEmergencyStopOverlay()
+{
+    auto* root = ApplicationCompositionRoot::instance();
+    auto* safety = root ? root->emergencyStopController() : nullptr;
+    OperationBus* bus = root ? root->operationBus() : nullptr;
+    if (!safety)
+    {
+        return;
+    }
+
+    // 急停入口是独立置顶窗口：不挂在任何 Dock/工具栏上，面板显隐与工作台切换都影响不到它
+    m_emergencyStopOverlay = std::make_unique<EmergencyStopOverlay>(
+        safety,
+        [bus]() {
+            if (bus)
+            {
+                bus->run(OperationId::Laser_EmergencyStop);
+            }
+        },
+        [bus]() {
+            if (bus)
+            {
+                bus->run(OperationId::Laser_StartProcess);
+            }
+        });
+    m_emergencyStopOverlay->attachToWindow(this);
+
+    connect(safety, &EmergencyStopController::stateChanged, this, [this, safety]() {
+        applySafetyReadOnly(safety->isReadOnly());
+    });
+    applySafetyReadOnly(safety->isReadOnly());
+}
+
+void WorkbenchWindow::applySafetyReadOnly(bool readOnly)
+{
+    if (auto* central = centralWidget())
+    {
+        central->setEnabled(!readOnly);
+    }
+    if (auto* bar = menuBar())
+    {
+        bar->setEnabled(!readOnly);
+    }
+    for (auto* toolBar : findChildren<QToolBar*>())
+    {
+        toolBar->setEnabled(!readOnly);
+    }
+    // 停靠面板也可能直接改动文档，急停只读态下同样禁用；
+    // 急停入口是独立置顶窗口，不受这里影响
+    for (auto* dock : findChildren<QDockWidget*>())
+    {
+        dock->setEnabled(!readOnly);
+    }
+
+    if (auto* bar = statusBar())
+    {
+        if (readOnly)
+        {
+            bar->showMessage(tr("Emergency stop active. Complete reset before editing or processing."));
+        }
+        else
+        {
+            bar->clearMessage();
+        }
+    }
+}
+
 /// 触发工作台切换
 /// @param workbenchId 工作台 ID
 namespace
@@ -1235,13 +1308,13 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         m_menuManager->setWorkbench(m_workbench);
     }
 
-    // 6b.1: 重建配置驱动的工具栏。
+    // 重建配置驱动的工具栏。
     // clearLayoutContent() 已 delete 全部 QToolBar 并把 m_configDrivenLayoutBuilt
-    // 复位为 false，但此前没有任何入口在切换后回来调 buildToolBars()（它只挂在
-    // 启动路径 setWorkbench 上）→ 客户 JSON 一旦声明了 "toolbars"，第一次切换后
-    // 就永久消失且无任何报错；当前 base + 三份客户配置的 "toolbars" 恰好都是空数组
-    // （example_client 连这个键都没有），问题被掩盖了。
-    // 必须放在 6b 之后：UiLayoutBuilder::bindAction 在构建期按 isCommandRegistered()
+    // 复位为 false，若切换后不回来调 buildToolBars()（它只挂在启动路径 setWorkbench 上），
+    // 客户 JSON 一旦声明了 "toolbars"，第一次切换后就永久消失且无任何报错；
+    // 当前 base + 三份客户配置的 "toolbars" 恰好都是空数组（example_client 连这个键都没有），
+    // 问题被掩盖。
+    // 必须放在 setWorkbench 之后：UiLayoutBuilder::bindAction 在构建期按 isCommandRegistered()
     // 一次性决定「连信号」还是「永久禁用」，而分发器要等 setWorkbench 之后才指向新工作台。
     // buildToolBars 自带 m_configDrivenLayoutBuilt 幂等守卫，重复调用安全。
     if (m_layoutManager)
@@ -1304,8 +1377,8 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
         m_menuManager->rebuildAllMenus();
     }
     // 工作台级状态栏 widget（坐标/选择/消息）由各 Workbench 在 attachToWindow 中
-    // 创建并通过 mountStatusBar 挂载；配置驱动的框架级槽位已在第 6d 步重建。
-    // 面板显隐默认策略已在第 7b 步应用、第 8 步被用户快照覆盖，这里不再重复强制显示，
+    // 创建并通过 mountStatusBar 挂载；配置驱动的框架级槽位已重建。
+    // 面板显隐默认策略先应用、再被用户快照覆盖，这里不重复强制显示，
     // 否则用户手动关闭的面板会在每次切换后被顶回来。
 
     // 业务状态只经 UiStateCenter 写入；windowState 是镜像，由 sync 从状态中心拉取

@@ -2,12 +2,11 @@
  * @file CommandUiWiringTests.cpp
  * @brief 命令 UI 接线回归测试 — 顶部工具栏 actionId ↔ 命令目录的解析一致性
  *
- * 背景（回归防护）：
- * 顶部工具栏此前用一张手写的 actionId → MenuActionId 映射表，表里漏了六个对齐命令，
- * 导致对齐按钮走"回退创建非托管 QAction"分支，enabled 恒为配置默认值 true——
- * 无论选中几个、是否锁定，对齐按钮始终可点。
+ * 回归防护：顶部工具栏若用一张手写的 actionId → MenuActionId 映射表，
+ * 漏掉六个对齐命令就会让对齐按钮走"回退创建非托管 QAction"分支，
+ * enabled 恒为配置默认值 true —— 无论选中几个、是否锁定，对齐按钮始终可点。
  *
- * 现在 actionId 统一为 CommandCatalog 的命令 id，由 CommandCatalog::menuIdForCommandId 解析。
+ * actionId 统一为 CommandCatalog 的命令 id，由 CommandCatalog::menuIdForCommandId 解析。
  * 本测试锁定这条解析链：ToolBarContext::Default 里的每个 id 都必须解析出有效 MenuActionId，
  * 且对齐命令必须携带"两个及以上且未锁定"的启用规则。
  */
@@ -187,15 +186,12 @@ TEST(CommandUiWiringTest, CatalogShortcutIdsResolveBackToOwnMenuId)
     }
 }
 
-// ============================================================
-// 菜单栏启用态接线
-//
+// ---- 菜单栏启用态接线 ----
 // 菜单项（config-driven 由 UiLayoutBuilder 建、legacy 由 addMenuAction 建）是独立于
 // 命令中枢的 QAction，中枢的 refreshActionStates 触达不到。
 // WorkbenchMenuManager::refreshCommandStates 按 property("commandId") →
 // menuIdForCommandId → findByMenuId → enableRule 的链路统一刷新，
 // 因此这条链路上任一环断裂都会让菜单项恢复"永远可点"。
-// ============================================================
 
 namespace
 {
@@ -270,14 +266,11 @@ TEST(CommandUiWiringTest, MenuBarEditCommandsDeclareMenuSurface)
     }
 }
 
-// ============================================================
-// 单位勾选态联动（View ▸ Unit 的 mm/cm/inch 互斥回填）
-//
-// WorkbenchMenuManager::refreshConfiguredMenuState 不再按「2D 恒勾 mm」硬编码，
-// 而是按 UnitManager::displayUnit 经 UnitSelectionMenu::commandIdForUnit 映射到
-// 唯一命令 id 后回填。下面锁定这条映射与"恰好一个勾选"的行为，防止回归成
-// 之前「mm 恒勾、cm/inch 恒不勾」的错勾。
-// ============================================================
+// ---- 单位勾选态联动（View ▸ Unit 的 mm/cm/inch 互斥回填） ----
+// WorkbenchMenuManager::refreshConfiguredMenuState 按 UnitManager::displayUnit 经
+// UnitSelectionMenu::commandIdForUnit 映射到唯一命令 id 后回填，而不是按「2D 恒勾 mm」硬编码。
+// 下面锁定这条映射与「恰好一个勾选」的行为，防止回归成
+// 「mm 恒勾、cm/inch 恒不勾」的错勾。
 
 TEST(UnitMenuStateTest, CommandIdForUnitMapsEverySelectableUnitUniquely)
 {
@@ -331,14 +324,11 @@ TEST(UnitMenuStateTest, PopulateChecksExactlyOneActionMatchingGivenUnit)
     }
 }
 
-// ============================================================
-// 外部构建 QAction 树的启用态应用（配置化菜单栏 / 配置化右键菜单）
-//
-// 回归背景：视口右键菜单在客户配置声明了 contextMenus["canvas.2d"] 时走
+// ---- 外部构建 QAction 树的启用态应用（配置化菜单栏 / 配置化右键菜单） ----
+// 视口右键菜单在客户配置声明了 contextMenus["canvas.2d"] 时走
 // UiLayoutBuilder 构建的临时 QAction，不在中枢的动作表里，也不在菜单栏遍历范围内。
-// 曾导致空选 / 选中锁定图元时右键的 Cut / Copy / Delete / Paste 仍是亮态，
+// 若不做启用态应用，空选 / 选中锁定图元时右键的 Cut / Copy / Delete / Paste 仍是亮态，
 // 与同名工具栏按钮的灰显直接矛盾。
-// ============================================================
 
 namespace
 {
@@ -392,7 +382,7 @@ TEST(CommandUiWiringTest, ApplySnapshotToMenu_ClipboardOnlyGatesPaste)
 
 TEST(CommandUiWiringTest, ApplySnapshotToMenu_ClipboardGatesPasteTextAndImage)
 {
-    // 回归背景：edit.paste_text / edit.paste_image 此前只在别名表里，没有目录条目，
+    // 回归背景：edit.paste_text / edit.paste_image 若只在别名表里、没有目录条目，
     // menuIdForCommandId 返回 0，applySnapshotToAction 在 menuId==0 处早退，
     // 两者恒 enabled —— 空剪贴板时仍可点，点了只落一行 WARN。
     QMenu menu;
@@ -465,22 +455,16 @@ TEST(CommandUiWiringTest, ApplySnapshotToMenu_LeavesUnrelatedActionsUntouched)
 
 #if BUILD_UI3D
 
-// ============================================================
-// 2D / 3D 工作台切换 — 启用态不得残留、不得串台
-//
-// 回归背景：
-// 1) 切换工作台时 WorkbenchMenuManager::m_workbench 未同步（WorkbenchWindow 只换了
-//    m_workbench），菜单派发目标、commandAvailable 判定、workbenchKind 过滤全部停留在
-//    上一个工作台上 —— 3D 下点菜单会走 2D 操作总线。现由 triggerWorkbench 的
-//    步骤 6b 调 setWorkbench 修正。
-// 2) 3D 的配置化菜单栏此前完全没有启用态刷新（2D 侧有 refreshCommandStates，
-//    3D 侧缺失），空选时 Delete / 布尔运算仍是亮态。现由
-//    CommandActionHub3D::applySnapshotTo* + refreshCommandStates3D 覆盖。
-//
+// ---- 2D / 3D 工作台切换 — 启用态不得残留、不得串台 ----
+// 1) 切换工作台时若 WorkbenchMenuManager::m_workbench 未同步（WorkbenchWindow 只换了
+//    m_workbench），菜单派发目标、commandAvailable 判定、workbenchKind 过滤会全部停留在
+//    上一个工作台上，3D 下点菜单会走 2D 操作总线。triggerWorkbench 通过 setWorkbench 修正。
+// 2) 3D 的配置化菜单栏需要启用态刷新（与 2D 侧的 refreshCommandStates 同等），
+//    否则空选时 Delete / 布尔运算仍是亮态。
+//    CommandActionHub3D::applySnapshotTo* + refreshCommandStates3D 负责覆盖。
 // 两条链路共用 property("commandId") → 各自目录 → enableRule 的结构，因此
 // "同一 id 在对侧目录解析不到"是防串台的关键数据契约：一个 3D 快照打到 2D 菜单树上
 // 只能是 no-op，绝不能把 2D 项点亮或点灭。
-// ============================================================
 
 namespace
 {
@@ -593,13 +577,10 @@ TEST(CommandUiWiringTest, Switch_SharedCommandIdsCarrySameRuleInBothCatalogs)
 
 #endif  // BUILD_UI3D
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 契约校验：客户 JSON 里出现的每个 commandId，都必须能在其所属工作台的命令目录里解析。
-//
+// ---- 契约校验：客户 JSON 里出现的每个 commandId，都必须能在其所属工作台的命令目录里解析。 ----
 // 解析不出来的后果不是报错而是静默失效：UiLayoutBuilder::bindAction 不会接 lambda
 // （见 isCommandRegistered 门控），按钮/菜单项照常显示但永久点不动。
 // 这里把它变成编译后必跑的断言。
-// ─────────────────────────────────────────────────────────────────────────────
 namespace
 {
     /// 一条待校验的配置引用：命令 id + 定位路径 + 生效工作台
@@ -762,8 +743,7 @@ TEST(CommandConfigContractTest, NoConfiguredShortcutBindsBareEscape)
     }
 }
 
-// ============================================================
-// 配置可信性自检（CMake 开关 / JSON / License 三侧交叉）
+// ---- 配置可信性自检（CMake 开关 / JSON / License 三侧交叉） ----
 
 TEST(UiConfigSelfCheckTest, UnknownCommandIdIsReportedAsUnresolved)
 {
@@ -833,12 +813,10 @@ TEST(UiConfigSelfCheckTest, EveryFeatureUsedInConfigsHasABuildSwitchMapping)
                                     << unmapped.join(QLatin1Char('\n')).toStdString();
 }
 
-// ============================================================
-// 左侧绘图工具栏 ↔ 命令中枢
-//
-// 背景（回归防护）：左侧栏此前自建 QToolButton、自己解析 toolName → OperationId、
-// 自己记 activeTool，等于绘图工具有两套并存的派发与状态方案。现在它只是中枢 QAction
-// 的展示壳，以下测试锁定这条唯一路径。
+// ---- 左侧绘图工具栏 ↔ 命令中枢 ----
+// 背景（回归防护）：左侧栏若自建 QToolButton、自己解析 toolName → OperationId、
+// 自己记 activeTool，绘图工具就会有两套并存的派发与状态方案。
+// 它只应作为中枢 QAction 的展示壳，以下测试锁定这条唯一路径。
 
 namespace
 {
@@ -998,4 +976,24 @@ TEST(DrawToolBarWidgetTest, LeftToolbarEntriesResolveToRegisteredTools)
         EXPECT_TRUE(tm.getTool(toolName) != nullptr)
             << "目录声明了 LeftToolbar 面，ToolInitializer 却没注册同名工具: " << toolName.toStdString();
     }
+}
+
+TEST(CommandCatalogTest, BitmapAliasesResolveToMenuIds)
+{
+    // 回归防护：别名表里登记了命令、目录里却没有对应条目时，menuIdForCommandId 返回 0，
+    // 菜单构建与右键刷新会静默跳过该命令（与 Edit_PasteText / Edit_PasteImage 同类隐患）。
+    const QStringList aliasIds = {
+        QStringLiteral("algo.bitmap_process"),
+        QStringLiteral("algo.vectorize_bitmap"),
+    };
+    for (const QString& id : aliasIds)
+    {
+        EXPECT_NE(static_cast<int>(CommandCatalog::menuIdForCommandId(id)), 0)
+            << "command id 缺少目录条目: " << id.toStdString();
+        EXPECT_NE(CommandCatalog::operationForCommandId(id), OperationId::None)
+            << "command id 未登记别名: " << id.toStdString();
+    }
+    EXPECT_NE(static_cast<int>(CommandCatalog::menuIdForCommandId(QStringLiteral("algo.bitmap_process"))),
+              static_cast<int>(CommandCatalog::menuIdForCommandId(QStringLiteral("algo.vectorize_bitmap"))))
+        << "两条位图命令不能共用同一个 MenuActionId";
 }

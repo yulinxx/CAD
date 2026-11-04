@@ -15,9 +15,11 @@
 #include "UI/ThemeManager.h"
 #include "UI/LanguageManager.h"
 #include "Composition/ApplicationCompositionRoot.h"
+#include "UI/Safety/EmergencyStopController.h"
 #include "UI/Settings/SettingsService.h"
 
 #include <QCoreApplication>
+#include <QStatusBar>
 
 MenuDispatcher::MenuDispatcher(QObject* parent)
     : QObject(parent)
@@ -141,6 +143,29 @@ void MenuDispatcher::dispatch(const QString& commandId, const QVariantMap& param
         const AppMode mode = (wb && wb->id() == QLatin1String("3D")) ? AppMode::Mode3D : AppMode::Mode2D;
         AboutDialog::showDialog(mode, m_self->workbenchWindow());
         return;
+    }
+
+    // 急停只读态：除安全、视图、帮助与保存外，其余命令一律拦下并提示，
+    // 避免操作员在未完成复位流程时继续编辑或启动新的加工
+    auto* root = ApplicationCompositionRoot::instance();
+    auto* safety = root ? root->emergencyStopController() : nullptr;
+    if (safety && safety->isReadOnly())
+    {
+        const bool allowed = commandId == QLatin1String("laser.emergency_stop") ||
+            commandId == QLatin1String("laser.reset_safety") || commandId.startsWith(QLatin1String("view.")) ||
+            commandId.startsWith(QLatin1String("help.")) || commandId == QLatin1String("file.save") ||
+            commandId == QLatin1String("file.save_as");
+        if (!allowed)
+        {
+            if (m_self && m_self->workbenchWindow())
+            {
+                m_self->workbenchWindow()->statusBar()->showMessage(
+                    QCoreApplication::translate(
+                        "MenuDispatcher", "Emergency stop active. Complete reset before editing or processing."),
+                    5000);
+            }
+            return;
+        }
     }
 
     // 非窗口级命令：转发给当前工作台（isCommandRegistered 已按工作台目录裁决过

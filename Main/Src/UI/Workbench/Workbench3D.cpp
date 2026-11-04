@@ -96,7 +96,7 @@ struct Workbench3D::ServiceOwner
     #endif
 };
 
-// --- 3D 工具栏从 JSON 配置构建 Action 列表的辅助函数 ---
+// ---- 3D 工具栏从 JSON 配置构建 Action 列表的辅助函数 ----
 namespace
 {
     /// 从 JSON toolbars 中按 id 查找 workbenchId=="3D" 的 ToolBarDef
@@ -390,7 +390,6 @@ Workbench3D::~Workbench3D()
 // 2 — 构建 3D 工作台 UI
 // 核心架构：Viewport3D -> IRenderer3D -> RenderWidget3DAdapter -> RenderWidget3D
 // 通过 Viewport3D 统一视图宿主，Renderer 通过外部注入
-//
 // 内部拆分三个步骤：
 //   create3DServices()             — 创建所有 3D 服务并组装 ServicePack3D
 //   setup3DViewportAndSignals()    — 创建 MainWindow3D / Viewport3D / Renderer 并绑定信号
@@ -583,7 +582,7 @@ void Workbench3D::bind3DRenderSignals(ServiceOwner& own)
 /// 不往 metadata 写 positionText / 3d_selCount / 3d_modelName 等无消费者的镜像。
 void Workbench3D::bind3DSelectionSignal()
 {
-    // 跨 DLL 安全：信号参数改为 POD 指针数组
+    // 跨 DLL 安全：信号参数使用 POD 指针数组
     auto conn = connect(m_renderWidget3D,
         &RenderWidget3D::sigSelectionChanged,
         [this, stateCenter = m_uiState.stateCenter](const Eg::SyMeshEntity** entities, int count) {
@@ -608,10 +607,9 @@ void Workbench3D::bind3DSelectionSignal()
 void Workbench3D::setup3DDeleteShortcuts(WorkbenchWindow& window)
 {
     // Delete/Backspace 在 3D 侧只保留这一条通路（窗口级 QShortcut）。
-    // 此前还并存 RenderWidget3D::sigKeyPressed 与 Viewport3D::setInputHandler 两条，
+    // 若并存 RenderWidget3D::sigKeyPressed 与 Viewport3D::setInputHandler 两条，
     // 三者都跑 Edit_Delete：ApplicationShortcut 会在按键送达 widget 前就消费掉事件，
     // 所以那两条平时是死代码，一旦快捷键被禁用/判 ambiguous 就变成一次按键删两次。
-    //
     // 与 2D 同一套护栏：焦点在文本控件里时不拦截，否则在参数面板里按退格会删图元。
     const auto editingText = []() -> bool {
         QWidget* fw = QApplication::focusWidget();
@@ -763,12 +761,10 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
         }));
 
     // 「导出视图」：3D 侧的 View_Capture。
-    //
     // 与 2D 的 View_Capture 共用同一个 ViewCaptureService 实例（落盘目录与命名
     // 规则因此完全一致），差别只在取 3D 视口并走 capture3D 的离屏读回——
-    // capture3D / RenderWidget3D::captureOffscreen 早已实现，此前**全仓没有任何
-    // 调用者**，等于 3D 视口截不了图（F12 在 3D 工作台下也不做任何事）。
-    //
+    // capture3D / RenderWidget3D::captureOffscreen 已实现，但没有调用者时
+    // 3D 视口就截不了图（F12 在 3D 工作台下也不做任何事）。
     // 注册放在工作台层的原因与上面两条一致：ViewCaptureService 由组合根持有，
     // UI3D 库看不到它，因此不能像 View_Wireframe 那样在 ViewOperations3D 里注册。
     own.operationBus->registerOperation(std::make_unique<LambdaOperation3D>(OperationId3D::View_Capture,
@@ -810,7 +806,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     CommandRegistry3D::registerAll(mainWindow3D);
     SY_DEBUG("[Workbench3D] CommandRegistry3D::registerAll() completed");
 
-    // F12 截图（与 2D 同一条快捷键；此前只有 2D 工作台注册过它）。
+    // F12 截图（与 2D 同一条快捷键，2D 工作台已注册它）。
     // 焦点在文本控件里时不拦截，理由与 setup3DDeleteShortcuts 的护栏相同。
     auto* captureSc = new QShortcut(QKeySequence(Qt::Key_F12), &window);
     connect(captureSc, &QShortcut::activated, this, [&own]() {
@@ -834,13 +830,12 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     SY_DEBUG("[Workbench3D] CommandActionHub3D rebuilt with all actions");
 
     // 2. 菜单：统一由 WorkbenchMenuManager 从客户 JSON 生成
-    //
     // 2D / 3D 走同一条 JSON 链路：菜单项在客户配置里按 workbenches: ["3D"] 声明，
     // 命令 ID 经 Workbench3D::dispatchCommand 落到 OperationBus3D。
     SY_DEBUG("[Workbench3D] Menus are built by WorkbenchMenuManager from client config");
 
     // 5. 转移并绑定工具栏。
-    // 菜单由统一配置路径生成，3D 工具栏也改为从 base.json toolbars 读取 commandId 顺序。
+    // 菜单由统一配置路径生成，3D 工具栏从 base.json toolbars 读取 commandId 顺序。
     // 注意：mainWindow3D->hide() 会隐藏所有子控件，removeToolBar 也会显式隐藏工具栏，
     // 因此 reparent 后必须显式 show() 才能恢复可见性
     // LeftToolBar3D：reparent 到 WorkbenchWindow 后按 JSON 配置填充视角导航按钮
@@ -868,9 +863,12 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
             own.commandActionHub->action(OperationId3D::View_NWIsometric),
         };
         lt->installMoreViewMenu(moreViews, QStringLiteral("More Views"));
+        // 视角导轨固定在左侧，禁止拖动与浮动，避免被拖走后视角入口消失
+        lt->setMovable(false);
+        lt->setFloatable(false);
         lt->show();
     }
-    // TopToolBar3D：从 MainWindow3D 移除后 reparent 到 WorkbenchWindow，按 JSON 配置填充
+    // TopToolBar3D：从 MainWindow3D 取出后 reparent 到 WorkbenchWindow，按 JSON 配置填充
     if (auto* tb = mainWindow3D->topToolBar())
     {
         mainWindow3D->removeToolBar(tb);
@@ -878,6 +876,9 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
         window.addToolBar(Qt::TopToolBarArea, tb);
         const ToolBarDef* def = find3DToolBarDef(QStringLiteral("top.toolbar.3d"));
         tb->installHubActions(build3DToolBarActions(def, own.commandActionHub.get()));
+        // 3D 顶部条只承载视角/显示命令，与左右导轨构成固定布局，同样禁止拖动与浮动
+        tb->setMovable(false);
+        tb->setFloatable(false);
         tb->show();
     }
     // RightToolBar3D：从 MainWindow3D 转移到 WorkbenchWindow，按 JSON 配置填充
@@ -896,6 +897,9 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
             }
         }
         rt->installAllActions(actions);
+        // 右侧导轨固定在右侧，禁止拖动与浮动，避免与属性面板挤在同一区域
+        rt->setMovable(false);
+        rt->setFloatable(false);
         rt->show();
     }
 
@@ -973,7 +977,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     SY_DEBUG("[Workbench3D] 3D workbench UI build completed");
 }
 
-// ==================== 3D 场景树（数据/算法/UI 分离） ====================
+// ---- 3D 场景树（数据/算法/UI 分离） ----
 
 void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
 {

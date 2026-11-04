@@ -504,6 +504,9 @@ PropertiesPanelWidget::PropertiesPanelWidget(QWidget* parent)
     : QWidget(parent)
 {
     auto* layout = new QVBoxLayout(this);
+    // 与场景树面板保持一致：内容贴边，避免左右两侧面板的内缩距离不同
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
     m_tree = new QTreeWidget(this);
     m_tree->setHeaderLabels({ tr("Field"), tr("Value") });
     m_tree->setColumnCount(2);
@@ -520,8 +523,9 @@ PropertiesPanelWidget::PropertiesPanelWidget(QWidget* parent)
     // 给字段名列设置合理的初始宽度，避免字段名被挤压成 N…/T…/C… 难以识别。
     // 树形层级缩进会吃掉列宽，所以宽度要大于纯文本所需，并同步收紧缩进；
     // 同时右侧属性 Dock 的默认宽度在布局管理器里调到 300，给值列留出空间。
+    // 字段名普遍较短，这里收窄到 132：Dock 被拖到最小宽度时值列仍留有可读空间。
     m_tree->setIndentation(10);
-    m_tree->setColumnWidth(0, 150);
+    m_tree->setColumnWidth(0, 132);
     layout->addWidget(m_tree);
 
     // 值列使用内联编辑代理；未设置编辑目标时不会进入编辑态

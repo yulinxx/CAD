@@ -310,6 +310,60 @@ TEST(ClientConfigLayoutBuilderTest, BuildsDocksFromConfig)
     EXPECT_EQ(window.findChildren<QDockWidget*>().size(), 1);
 }
 
+// 配置 Dock 不允许关闭（工程内没有视图菜单的显隐入口，误关即无法找回），
+// 且只能在同一轴线上换边，避免被拖到上下边后把主视口挤成一条
+TEST(ClientConfigLayoutBuilderTest, DocksAreNotClosableAndStayOnAxisAlignedAreas)
+{
+    UiPanelRegistry registry;
+    registry.registerPanel(QStringLiteral("PanelX"), [](QWidget* parent) {
+        return new QWidget(parent);
+    });
+
+    FakeDispatcher dispatcher;
+    QMainWindow window;
+    UiLayoutBuilder builder(&window, &dispatcher, &registry);
+
+    DockDef leftDock;
+    leftDock.id = QStringLiteral("left");
+    leftDock.title = QStringLiteral("Left");
+    leftDock.position = DockPosition::Left;
+    leftDock.widgetType = QStringLiteral("PanelX");
+    leftDock.visible = true;
+
+    DockDef rightDock;
+    rightDock.id = QStringLiteral("right");
+    rightDock.title = QStringLiteral("Right");
+    rightDock.position = DockPosition::Right;
+    rightDock.widgetType = QStringLiteral("PanelX");
+    rightDock.visible = true;
+
+    builder.buildDocks({ leftDock, rightDock });
+    ASSERT_EQ(builder.builtDocks().size(), 2u);
+
+    for (QWidget* widget : builder.builtDocks())
+    {
+        QDockWidget* dock = qobject_cast<QDockWidget*>(widget);
+        ASSERT_NE(dock, nullptr);
+        EXPECT_FALSE(dock->features() & QDockWidget::DockWidgetClosable);
+        EXPECT_TRUE(dock->features() & QDockWidget::DockWidgetMovable);
+        EXPECT_TRUE(dock->features() & QDockWidget::DockWidgetFloatable);
+        EXPECT_EQ(dock->allowedAreas(), Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+    }
+
+    // Qt 只在 DockWidgetClosable 生效时把标题栏关闭按钮显式显示：
+    // 浮动按钮此刻被 show()，关闭按钮被 hide()，说明限制来自 feature 而非 qss 图标样式
+    QDockWidget* dock = qobject_cast<QDockWidget*>(builder.builtDocks().back());
+    ASSERT_NE(dock, nullptr);
+    QWidget* floatButton = dock->findChild<QWidget*>(QStringLiteral("qt_dockwidget_floatbutton"));
+    ASSERT_NE(floatButton, nullptr);
+    EXPECT_FALSE(floatButton->isHidden());
+    QWidget* closeButton = dock->findChild<QWidget*>(QStringLiteral("qt_dockwidget_closebutton"));
+    if (closeButton)
+    {
+        EXPECT_TRUE(closeButton->isHidden());
+    }
+}
+
 TEST(ClientConfigLayoutBuilderTest, UnknownPanelFallsBackToPlaceholder)
 {
     UiPanelRegistry emptyRegistry;

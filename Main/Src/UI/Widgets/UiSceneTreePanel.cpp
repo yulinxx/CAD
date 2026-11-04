@@ -34,9 +34,7 @@ namespace
     constexpr int kIsGroupRole = Qt::UserRole + 3;
 }  // namespace
 
-// ============================================================
-// 2D 模型：懒加载模型（从 UiSceneTreePanel2D.cpp 提取）
-// ============================================================
+// ---- 2D 模型：懒加载模型（从 UiSceneTreePanel2D.cpp 提取） ----
 
 class SceneTreeTableModel2D : public QAbstractItemModel
 {
@@ -398,8 +396,8 @@ public:
             return createIndex(it.value(), 0, static_cast<quintptr>(id));
         }
 
-        // 群组成员：直接查 id → 行号。旧实现是把所有**已展开群组**的成员逐个线性
-        // 扫一遍找 id，选中一个大群组时是 O(选中数 × 全体已加载成员数)。
+        // 群组成员：直接查 id → 行号。逐个线性扫描所有**已展开群组**的成员来找 id，
+        // 选中一个大群组时是 O(选中数 × 全体已加载成员数)。
         auto rowIt = m_childRowById.constFind(id);
         if (rowIt == m_childRowById.constEnd())
         {
@@ -480,9 +478,7 @@ private:
     friend class SceneTreePanel;
 };
 
-// ============================================================
-// 3D 模型：使用 QStandardItemModel
-// ============================================================
+// ---- 3D 模型：使用 QStandardItemModel ----
 
 class SceneTreeTableModel3D : public QStandardItemModel
 {
@@ -677,9 +673,7 @@ private:
     friend class SceneTreePanel;
 };
 
-// ============================================================
-// SceneTreePanel 实现
-// ============================================================
+// ---- SceneTreePanel 实现 ----
 
 SceneTreePanel::SceneTreePanel(QWidget* parent)
     : QWidget(parent)
@@ -791,6 +785,11 @@ void SceneTreePanel::setMode2D(
     m_metaProvider2D = std::move(metaProvider);
     m_childrenProvider2D = std::move(childrenProvider);
 
+    // 换模型会让 QHeaderView 重建列、列宽回落默认值：先记下用户当前的列宽，建完写回
+    const bool hasOldColumnWidths = m_view->model() != nullptr;
+    const int visColumnWidth = hasOldColumnWidths ? m_view->columnWidth(0) : 70;
+    const int typeColumnWidth = hasOldColumnWidths ? m_view->columnWidth(2) : 80;
+
     // 先清除旧模型（可能是 3D 模式下的 SceneTreeTableModel3D）。
     // 必须延迟销毁：本方法会在树行回调（勾选可见性 / 改名）中被同步调用，此时视图
     // 正在派发该模型的事件，立即 delete 会让回调返回后的 setData 与 Qt 委托代码访问
@@ -808,15 +807,21 @@ void SceneTreePanel::setMode2D(
     connect(
         m_view->selectionModel(), &QItemSelectionModel::selectionChanged, this, &SceneTreePanel::onModelSelectionChanged);
 
-    // 所有列都设置为 Interactive 模式，允许用户拖动调整列宽
+    // 复选框列与类型列设为 Interactive 模式，允许用户拖动调整列宽；名称列占满剩余宽度，
+    // 面板变宽时名称列跟随放大（右侧不留空白带），变窄时先压缩名称列，避免横向滚动条
     m_view->header()->setStretchLastSection(false);
     m_view->header()->setSectionResizeMode(0, QHeaderView::Interactive);
-    m_view->header()->setSectionResizeMode(1, QHeaderView::Interactive);
+    m_view->header()->setSectionResizeMode(1, QHeaderView::Stretch);
     m_view->header()->setSectionResizeMode(2, QHeaderView::Interactive);
-    // 设置合理的默认列宽，复选框列宽一些以便完整显示
-    m_view->setColumnWidth(0, 70);
-    m_view->setColumnWidth(1, 100);
-    m_view->setColumnWidth(2, 80);
+    // 设置合理的默认列宽，复选框列宽一些以便完整显示；写回的是用户上一次拖出的宽度
+    if (visColumnWidth > 0)
+    {
+        m_view->setColumnWidth(0, visColumnWidth);
+    }
+    if (typeColumnWidth > 0)
+    {
+        m_view->setColumnWidth(2, typeColumnWidth);
+    }
 
     // 使用回调而非信号
     model->setVisibilityCallback([this](qint64 id, bool visible) {
@@ -855,6 +860,11 @@ void SceneTreePanel::setMode3D(const SceneTreeModel3D& model)
 {
     m_mode = Mode::Mode3D;
 
+    // 换模型会让 QHeaderView 重建列、列宽回落默认值：先记下用户当前的列宽，建完写回
+    const bool hasOldColumnWidths = m_view->model() != nullptr;
+    const int visColumnWidth = hasOldColumnWidths ? m_view->columnWidth(0) : 90;
+    const int typeColumnWidth = hasOldColumnWidths ? m_view->columnWidth(2) : 80;
+
     // 先清除旧模型（可能是 2D 模式下的 SceneTreeTableModel2D）。
     // 必须延迟销毁：勾选可见性 / 改名会经回调同步走到这里，此时视图正在派发该模型的事件，
     // 立即 delete 会让回调返回后的 setData（3D 侧还要再调一次 QStandardItemModel::setData）
@@ -886,14 +896,21 @@ void SceneTreePanel::setMode3D(const SceneTreeModel3D& model)
         return;
     }
 
-    // 所有列都设置为 Interactive 模式，允许用户拖动调整列宽
+    // 复选框列与类型列设为 Interactive 模式，允许用户拖动调整列宽；名称列占满剩余宽度，
+    // 面板变宽时名称列跟随放大（右侧不留空白带），变窄时先压缩名称列，避免横向滚动条
     header->setStretchLastSection(false);
     header->setSectionResizeMode(0, QHeaderView::Interactive);
-    header->setSectionResizeMode(1, QHeaderView::Interactive);
+    header->setSectionResizeMode(1, QHeaderView::Stretch);
     header->setSectionResizeMode(2, QHeaderView::Interactive);
-    m_view->setColumnWidth(0, 90);
-    m_view->setColumnWidth(1, 100);
-    m_view->setColumnWidth(2, 80);
+    // 与 2D 共用同一面板实例，写回的是用户上一次拖出的宽度
+    if (visColumnWidth > 0)
+    {
+        m_view->setColumnWidth(0, visColumnWidth);
+    }
+    if (typeColumnWidth > 0)
+    {
+        m_view->setColumnWidth(2, typeColumnWidth);
+    }
 
     // 首次加载时展开所有节点
     m_view->expandAll();
@@ -1011,9 +1028,9 @@ void SceneTreePanel::setSelectedIds(const QSet<QString>& ids)
         auto* model2d = dynamic_cast<SceneTreeTableModel2D*>(m_model);
         if (model2d)
         {
-            // 优化2: 批量选择。先把选中行号收集起来排序，再把连续行号合并成区间一次性 select。
-            // 旧实现对每个 id 各调一次 QItemSelection::select()，那是 range 插入合并、
-            // 选中项多时是超线性的（全选 31.7 万图元时就在这 O(N²) 卡死）。
+            // 批量选择：先把选中行号收集起来排序，再把连续行号合并成区间一次性 select。
+            // 逐个调用 QItemSelection::select() 是 range 插入合并，选中项多时超线性
+            // （全选 31.7 万图元时会 O(N²) 卡死）。
             std::vector<int> rows;
             rows.reserve(idSet2D.size());
             for (qint64 id : idSet2D)

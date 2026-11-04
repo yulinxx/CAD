@@ -86,6 +86,21 @@ namespace
         }
     }
 
+    Qt::DockWidgetAreas toDockAllowedAreas(DockPosition position)
+    {
+        // 只允许在同一轴线上换边：左右面板不能拖到上下边，否则主视口会被挤成一条
+        switch (position)
+        {
+        case DockPosition::Top:
+        case DockPosition::Bottom:
+            return Qt::TopDockWidgetArea | Qt::BottomDockWidgetArea;
+        case DockPosition::Left:
+        case DockPosition::Right:
+        default:
+            return Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea;
+        }
+    }
+
     // 实现已提升为 UiLayoutBuilder::localizedLabel() 静态方法，
     // 供本文件构建菜单/Dock 与布局管理器在语言切换时复用同一条查询链。
     QString actionLabel(const QString& label, const QString& id)
@@ -549,6 +564,12 @@ void UiLayoutBuilder::buildDocks(const std::vector<DockDef>& docks)
         dockWidget->setWidget(panel);
         dockWidget->setVisible(dock.visible);
         dockWidget->setProperty("widgetType", dock.widgetType);
+        // 面板不允许关闭：工程内没有视图菜单的显隐入口，误关即无法找回；仍保留拖动换边与浮动
+        dockWidget->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+        // 停靠范围限制在配置初始位置所在轴线，避免被拖到另一条边后挤扁主视口
+        dockWidget->setAllowedAreas(toDockAllowedAreas(dock.position));
+        // 记录配置声明的可见性：布局恢复时据此抵消旧快照遗留的隐藏位
+        dockWidget->setProperty("_workbench_dock_declared_visible", dock.visible);
         // 保存 JSON 英文源标题，语言切换时布局管理器据此重新翻译，
         // 不能只靠 windowTitle()——那时它已经是旧语言的译文了。
         dockWidget->setProperty("_workbench_dock_source_title", dock.title);

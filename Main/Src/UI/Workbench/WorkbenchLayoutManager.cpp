@@ -245,7 +245,7 @@ bool WorkbenchLayoutManager::buildDockAreasFromConfig()
             screenW = screen->availableGeometry().width();
         }
         const int leftMinW = qMax(140, static_cast<int>(screenW * 0.073));    // 1920*14%≈269
-        const int rightMinW = qMax(180, static_cast<int>(screenW * 0.094));   // 1920*17%≈326
+        const int rightMinW = qMax(220, static_cast<int>(screenW * 0.115));  // 1920*11.5%≈220，保证值列可读
         const int leftInitW = qMax(160, static_cast<int>(screenW * 0.094));   // 1920*18%≈346
         const int rightInitW = qMax(200, static_cast<int>(screenW * 0.125));  // 1920*24%≈461
 
@@ -674,6 +674,20 @@ bool WorkbenchLayoutManager::restoreLayoutSnapshot(const QString& workbenchId)
     // restoreState() 会覆盖 dock widget 的标题，需要重新设置为当前工作台的标题
     restoreDockWidgetTitles();
 
+    // 配置 Dock 已去掉关闭能力，旧快照里遗留的隐藏位不应把面板永久隐藏：
+    // 对 JSON 声明为可见的 Dock 在恢复后强制显示，保证面板始终找得回来
+    for (auto* dock : m_registeredDocks)
+    {
+        if (!dock || !dock->property("_workbench_dock_declared_visible").isValid())
+        {
+            continue;
+        }
+        if (dock->property("_workbench_dock_declared_visible").toBool() && !dock->isVisible())
+        {
+            dock->show();
+        }
+    }
+
     // QMainWindow::restoreState() 返回成功并不代表 Dock 宽度已经稳定：
     // 中央控件（2D 视口）是 Expanding，后续布局过程会再次重算 Dock 宽度。
     // 这里按工作台显式保存的宽度再应用一次，并在事件循环跑完后再兜底一次。
@@ -713,6 +727,16 @@ void WorkbenchLayoutManager::applyDockWidths(const QString& workbenchId)
     static constexpr int kDefaultLeftDockWidth = 280;
     static constexpr int kDefaultRightDockWidth = 300;
 
+    // 兜底宽度按窗口宽度收口：窄窗口（笔记本 / 分屏）沿用固定 280/300 会把中央视口
+    // 压到最小宽度，这里只在窗口变窄时等比收窄，宽窗口仍保持原默认值。
+    static constexpr double kLeftDockWidthRatio = 0.20;
+    static constexpr double kRightDockWidthRatio = 0.22;
+    const int windowWidth = m_parent->width() > 0 ? m_parent->width() : 1280;
+    const int fallbackLeftWidth =
+        qBound(200, static_cast<int>(windowWidth * kLeftDockWidthRatio), kDefaultLeftDockWidth);
+    const int fallbackRightWidth =
+        qBound(220, static_cast<int>(windowWidth * kRightDockWidthRatio), kDefaultRightDockWidth);
+
     QSettings settings;
     settings.beginGroup(QStringLiteral("LayoutSnapshots"));
     int leftWidth = settings.value(workbenchId + QStringLiteral("/leftDockWidth"), -1).toInt();
@@ -720,11 +744,11 @@ void WorkbenchLayoutManager::applyDockWidths(const QString& workbenchId)
     settings.endGroup();
     if (leftWidth <= 0)
     {
-        leftWidth = kDefaultLeftDockWidth;
+        leftWidth = fallbackLeftWidth;
     }
     if (rightWidth <= 0)
     {
-        rightWidth = kDefaultRightDockWidth;
+        rightWidth = fallbackRightWidth;
     }
 
     QList<QDockWidget*> docks;

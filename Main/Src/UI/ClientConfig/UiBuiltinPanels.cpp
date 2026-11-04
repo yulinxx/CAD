@@ -7,6 +7,8 @@
 #include "UiPropertiesPanel.h"
 #include "UiSceneTreePanel.h"
 
+#include "UI/Widgets/DevicePanel.h"
+
 #include "Log/SyLogger.h"
 
 #include <QCoreApplication>
@@ -34,6 +36,10 @@ void registerBuiltinUiPanels(UiPanelRegistry& registry)
     });
     registry.registerPanel(QStringLiteral("PropertiesPanel"), [](QWidget* parent) {
         return static_cast<QWidget*>(new PropertiesPanelWidget(parent));
+    });
+    // 设备面板：硬件模块未编入时也照常创建，由面板自身显示禁用提示
+    registry.registerPanel(QStringLiteral("DevicePanel"), [](QWidget* parent) {
+        return static_cast<QWidget*>(new DevicePanel(parent));
     });
 
     // ==================== 状态栏槽位 ====================
