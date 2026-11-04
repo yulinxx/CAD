@@ -81,6 +81,16 @@ struct MachineProfile
     bool autoOpen = true;
 
     /**
+     * @brief 双通道安全输入（逻辑点位名）。
+     *
+     * 同一安全功能的两路独立触点 + 一路关光执行反馈。
+     * 三个名字都为空时本层不启用；只做监测与关光请求，安全功能由硬回路承担。
+     */
+    QString safetyChannelAPoint;
+    QString safetyChannelBPoint;
+    QString safetyFeedbackPoint;
+
+    /**
      * @brief 机器坐标系（用户空间 → 机器空间）
      *
      * 描述这台机器的**台面尺寸**与**原点角点**。

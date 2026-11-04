@@ -427,7 +427,8 @@ namespace MotionPlanCompiler
                 result.skippedEntityCount += static_cast<int32_t>(bucket.entities.size());
                 continue;
             }
-            if (layers && spec.skipLockedLayers && !layers->isLayerLocked(bucket.layerId))
+            // isLayerLocked 返回 true 表示图层已锁定；开启跳过时要跳过的正是这些图层
+            if (layers && spec.skipLockedLayers && layers->isLayerLocked(bucket.layerId))
             {
                 result.skippedEntityCount += static_cast<int32_t>(bucket.entities.size());
                 continue;
@@ -500,6 +501,10 @@ namespace MotionPlanCompiler
                 out.truncateTo(commandsBeforeLayer);
                 continue;
             }
+
+            // header 的总遍数是计划级元信息：各图层遍数可以不同，这里取最大值
+            // （即单件最多会被重复加工的遍数），不能按块累加，否则会把它读成「串行做了几遍」
+            maxPasses = std::max(maxPasses, std::max<int32_t>(1, bucket.params.passes));
 
             ++result.layerCount;
             result.entityCount += emittedInLayer / std::max<int32_t>(1, bucket.params.passes);

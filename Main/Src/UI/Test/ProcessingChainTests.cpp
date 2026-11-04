@@ -31,6 +31,16 @@
 #include "Engine2D/SyEntity/SyLine.h"
 
 #ifdef ENABLE_HARDWARE
+    #include <QMutex>
+    #include <QThread>
+    #include <QElapsedTimer>
+
+    #include <atomic>
+
+    #include "Hardware/Device/DeviceBase.h"
+    #include "Hardware/Device/DeviceRegistry.h"
+    #include "Hardware/Device/ILaserSource.h"
+    #include "Hardware/Device/IMotionCard.h"
     #include "Hardware/Device/MotionPlan.h"
     #include "Hardware/MotionPlanCompiler.h"
 #endif
@@ -343,6 +353,91 @@ namespace
         EXPECT_EQ(1, r.entityCount);
     }
 
+    /// 单遍加工：header 记录 1 遍，Pass 块也只有 1 个。
+    TEST(MotionPlanCompilerTest, SinglePassRecordsOnePassCount)
+    {
+        Eg::SceneManager scene;
+        LayerManager layers(&scene);
+
+        const int layerId = layers.createLayer("Cut");
+        Eg::SyEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        ASSERT_NE(nullptr, line);
+        ASSERT_TRUE(layers.assignEntityToLayer(line, layerId));
+
+        Hw::MotionPlanBuilder builder;
+        const ToolpathCompileResult r = MotionPlanCompiler::compile(scene, &layers, ToolpathJobSpec{}, builder);
+
+        ASSERT_TRUE(r.ok) << r.error.toStdString();
+        const Hw::MotionPlanView view = builder.view();
+        EXPECT_EQ(1, view.header.passCount);
+        EXPECT_EQ(1u, countOp(view, Hw::MotionOp::BeginPass));
+    }
+
+    /// 同图层 3 遍（走图层参数覆盖路径）：header 记录 3，Pass 块 3 个，图元数不按遍数乘大。
+    TEST(MotionPlanCompilerTest, SameLayerThreePassesRecordsPassCount)
+    {
+        Eg::SceneManager scene;
+        LayerManager layers(&scene);
+
+        const int layerId = layers.createLayer("Cut");
+        Eg::SyEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        ASSERT_NE(nullptr, line);
+        ASSERT_TRUE(layers.assignEntityToLayer(line, layerId));
+
+        ToolpathJobSpec spec;
+        LayerProcessParams params;
+        params.passes = 3;
+        spec.layerParams.insert(layerId, params);
+
+        Hw::MotionPlanBuilder builder;
+        const ToolpathCompileResult r = MotionPlanCompiler::compile(scene, &layers, spec, builder);
+
+        ASSERT_TRUE(r.ok) << r.error.toStdString();
+        const Hw::MotionPlanView view = builder.view();
+        EXPECT_EQ(3, view.header.passCount);
+        EXPECT_EQ(3u, countOp(view, Hw::MotionOp::BeginPass));
+        EXPECT_EQ(1, r.entityCount);
+    }
+
+    /// 两图层遍数不同：header 取最大值（单件最多重复 5 遍），
+    /// Pass 块总数仍是各图层之和（7 个块），两者语义不能混为一谈。
+    TEST(MotionPlanCompilerTest, TwoLayersDifferentPassesHeaderTakesMax)
+    {
+        Eg::SceneManager scene;
+        LayerManager layers(&scene);
+
+        const int slow = layers.createLayer("Slow");
+        const int fast = layers.createLayer("Fast");
+
+        Eg::SyEntity* a = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        ASSERT_NE(nullptr, a);
+        ASSERT_TRUE(layers.assignEntityToLayer(a, slow));
+
+        Eg::SyEntity* b = addLine(scene, 0.0, 5.0, 10.0, 5.0);
+        ASSERT_NE(nullptr, b);
+        ASSERT_TRUE(layers.assignEntityToLayer(b, fast));
+
+        ToolpathJobSpec spec;
+        LayerProcessParams slowParams;
+        slowParams.passes = 2;
+        LayerProcessParams fastParams;
+        fastParams.passes = 5;
+        spec.layerParams.insert(slow, slowParams);
+        spec.layerParams.insert(fast, fastParams);
+
+        Hw::MotionPlanBuilder builder;
+        const ToolpathCompileResult r = MotionPlanCompiler::compile(scene, &layers, spec, builder);
+
+        ASSERT_TRUE(r.ok) << r.error.toStdString();
+        EXPECT_EQ(2, r.layerCount);
+        EXPECT_EQ(2, r.entityCount);
+
+        const Hw::MotionPlanView view = builder.view();
+        EXPECT_EQ(5, view.header.passCount);
+        EXPECT_EQ(7u, countOp(view, Hw::MotionOp::BeginPass));
+        EXPECT_EQ(7u, countOp(view, Hw::MotionOp::LineTo));
+    }
+
     /// 图层被禁用（enabled=false）后没有任何内容可加工，必须失败而不是产出空计划。
     TEST(MotionPlanCompilerTest, DisabledLayerLeavesNothingAndFails)
     {
@@ -511,6 +606,125 @@ namespace
 
         Hw::MotionPlanBuilder builder;
         EXPECT_FALSE(MotionPlanCompiler::compile(scene, &layers, ToolpathJobSpec{}, builder).ok);
+    }
+
+    /// 锁定图层跳过时，该图层的图元必须完全不出现在计划里（不是「计划失败就算过」：
+    /// 还可能因为别的理由失败，这里直接查指令条数与跳过计数）。
+    TEST(MotionPlanCompilerTest, LockedLayerEntitiesNeverEnterPlan)
+    {
+        Eg::SceneManager scene;
+        LayerManager layers(&scene);
+
+        const int layerId = layers.createLayer("Locked");
+        Eg::SyEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        ASSERT_NE(nullptr, line);
+        ASSERT_TRUE(layers.assignEntityToLayer(line, layerId));
+        ASSERT_TRUE(layers.setLayerLocked(layerId, true));
+
+        Hw::MotionPlanBuilder builder;
+        const ToolpathCompileResult r = MotionPlanCompiler::compile(scene, &layers, ToolpathJobSpec{}, builder);
+
+        EXPECT_FALSE(r.ok);
+        EXPECT_EQ(0u, builder.commandCount());
+        EXPECT_EQ(1, r.skippedEntityCount);
+    }
+
+    /// 锁定图层 + skipLockedLayers=false：锁定只表示「不许编辑」，
+    /// 显式关掉跳过开关后必须照常加工。
+    TEST(MotionPlanCompilerTest, LockedLayerIsCompiledWhenSkipDisabled)
+    {
+        Eg::SceneManager scene;
+        LayerManager layers(&scene);
+
+        const int layerId = layers.createLayer("Locked");
+        Eg::SyEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        ASSERT_NE(nullptr, line);
+        ASSERT_TRUE(layers.assignEntityToLayer(line, layerId));
+        ASSERT_TRUE(layers.setLayerLocked(layerId, true));
+
+        ToolpathJobSpec spec;
+        spec.skipLockedLayers = false;
+
+        Hw::MotionPlanBuilder builder;
+        const ToolpathCompileResult r = MotionPlanCompiler::compile(scene, &layers, spec, builder);
+
+        ASSERT_TRUE(r.ok) << r.error.toStdString();
+        EXPECT_EQ(1, r.layerCount);
+        EXPECT_EQ(1, r.entityCount);
+        EXPECT_GT(countOp(builder.view(), Hw::MotionOp::LineTo), 0u);
+    }
+
+    /// 未锁定图层 + skipLockedLayers=true 必须保留。
+    /// 旧实现的锁定判定写成了 !isLayerLocked，会把这里正常该加工的图元整批跳过，
+    /// 本用例就是能直接暴露该反向逻辑的关键一条。
+    TEST(MotionPlanCompilerTest, UnlockedLayerSurvivesSkipLockedLayers)
+    {
+        Eg::SceneManager scene;
+        LayerManager layers(&scene);
+
+        const int layerId = layers.createLayer("Cut");
+        Eg::SyEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        ASSERT_NE(nullptr, line);
+        ASSERT_TRUE(layers.assignEntityToLayer(line, layerId));
+
+        ToolpathJobSpec spec;
+        spec.skipLockedLayers = true;
+
+        Hw::MotionPlanBuilder builder;
+        const ToolpathCompileResult r = MotionPlanCompiler::compile(scene, &layers, spec, builder);
+
+        ASSERT_TRUE(r.ok) << r.error.toStdString();
+        EXPECT_EQ(1, r.layerCount);
+        EXPECT_EQ(1, r.entityCount);
+        EXPECT_EQ(0, r.skippedEntityCount);
+        EXPECT_GT(countOp(builder.view(), Hw::MotionOp::LineTo), 0u);
+    }
+
+    /// 可见图层 + skipHiddenLayers=true 必须保留（与锁定分支对称）。
+    TEST(MotionPlanCompilerTest, VisibleLayerSurvivesSkipHiddenLayers)
+    {
+        Eg::SceneManager scene;
+        LayerManager layers(&scene);
+
+        const int layerId = layers.createLayer("Cut");
+        Eg::SyEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        ASSERT_NE(nullptr, line);
+        ASSERT_TRUE(layers.assignEntityToLayer(line, layerId));
+
+        ToolpathJobSpec spec;
+        spec.skipHiddenLayers = true;
+
+        Hw::MotionPlanBuilder builder;
+        const ToolpathCompileResult r = MotionPlanCompiler::compile(scene, &layers, spec, builder);
+
+        ASSERT_TRUE(r.ok) << r.error.toStdString();
+        EXPECT_EQ(1, r.layerCount);
+        EXPECT_EQ(1, r.entityCount);
+        EXPECT_GT(countOp(builder.view(), Hw::MotionOp::LineTo), 0u);
+    }
+
+    /// 隐藏图层 + skipHiddenLayers=false：显式要求加工隐藏图层时照常产出。
+    TEST(MotionPlanCompilerTest, HiddenLayerIsCompiledWhenSkipDisabled)
+    {
+        Eg::SceneManager scene;
+        LayerManager layers(&scene);
+
+        const int layerId = layers.createLayer("Hidden");
+        Eg::SyEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        ASSERT_NE(nullptr, line);
+        ASSERT_TRUE(layers.assignEntityToLayer(line, layerId));
+        ASSERT_TRUE(layers.setLayerVisible(layerId, false));
+
+        ToolpathJobSpec spec;
+        spec.skipHiddenLayers = false;
+
+        Hw::MotionPlanBuilder builder;
+        const ToolpathCompileResult r = MotionPlanCompiler::compile(scene, &layers, spec, builder);
+
+        ASSERT_TRUE(r.ok) << r.error.toStdString();
+        EXPECT_EQ(1, r.layerCount);
+        EXPECT_EQ(1, r.entityCount);
+        EXPECT_GT(countOp(builder.view(), Hw::MotionOp::LineTo), 0u);
     }
 
     /// 多图层各自带独立参数：BeginLayer 的图层号与 SetLaserParams 的功率必须一一对应。
@@ -973,5 +1187,562 @@ namespace
         EXPECT_TRUE(m_job->lastCompileResult().error.isEmpty());
     }
 
+// ==================== Hardware 批 1：开工/停光/下发/报警链路 ====================
+//
+// 这一组用例覆盖的是「机器能不能开工、能不能停下」，
+// 因此刻意使用一个**只有运动卡 + 激光器面**的替身设备：
+// SimulatedDevice 同时带振镜面，PlanRunner 会优先走振镜，
+// 验证不到「运动卡机型的功率参数会不会被静默丢弃」这条缺陷。
+
+    /**
+     * @brief 运动卡机型替身：只暴露 IMotionCard + ILaserSource。
+     *
+     * 三处刻意的可注入行为：
+     *   - loadDelayMs：让下发变慢，用来验证下发已离开主线程；
+     *   - axisAlarm：让轴状态报警，用来验证报警 → 停光闭环；
+     *   - 记录 setParams / setEmissionEnabled 的调用次数与参数。
+     */
+    class FakeMotionCardDevice final : public Hw::DeviceBase, public Hw::IMotionCard, public Hw::ILaserSource
+    {
+    public:
+        explicit FakeMotionCardDevice(int loadDelayMs)
+            : m_loadDelayMs(loadDelayMs)
+        {
+            Hw::DeviceDescriptor& d = mutableDescriptor();
+            Hw::hwCopyText(d.deviceId, sizeof(d.deviceId), "fake_motion_card");
+            Hw::hwCopyText(d.displayName, sizeof(d.displayName), "Fake motion card");
+            Hw::hwCopyText(d.vendor, sizeof(d.vendor), "TEST");
+            d.kind = Hw::DeviceKind::MotionCard;
+            d.capabilities = Hw::CapLinearInterp | Hw::CapHoming | Hw::CapSoftLimit;
+            d.axisCount = 2;
+            m_axes[0].pulsePerUnit = 1000.0;
+            m_axes[1].pulsePerUnit = 1000.0;
+        }
+
+        // --- 测试观察点 ---
+        std::atomic<int> emissionEnableCalls{ 0 };
+        std::atomic<int> emissionDisableCalls{ 0 };
+        std::atomic<int> setParamsCalls{ 0 };
+        std::atomic<int> loadPlanCalls{ 0 };
+        std::atomic<bool> emissionEnabled{ false };
+        std::atomic<bool> axisAlarm{ false };
+        std::atomic<bool> planStarted{ false };
+        std::atomic<bool> planAborted{ false };
+
+        QString loadThreadName() const
+        {
+            QMutexLocker lock(&m_mutex);
+            return m_loadThreadName;
+        }
+
+        Hw::LaserParams lastLaserParams() const
+        {
+            QMutexLocker lock(&m_mutex);
+            return m_lastParams;
+        }
+
+        // --- IMotionCard ---
+        int32_t axisCount() const override { return 2; }
+        const Hw::AxisConfig* axisConfig(Hw::AxisIndex axis) const override
+        {
+            return axis >= 0 && axis < 2 ? &m_axes[axis] : nullptr;
+        }
+        Hw::HwResult setAxisConfig(Hw::AxisIndex axis, const Hw::AxisConfig& config) override
+        {
+            if (axis < 0 || axis >= 2)
+            {
+                return Hw::hwFail(Hw::HwError::AxisOutOfRange, "axis out of range");
+            }
+            m_axes[axis] = config;
+            return Hw::hwOk();
+        }
+        Hw::HwResult enableAxis(Hw::AxisIndex, bool) override { return Hw::hwOk(); }
+        Hw::HwResult readAxisStatus(Hw::AxisIndex axis, Hw::AxisStatus& statusOut) const override
+        {
+            if (axis < 0 || axis >= 2)
+            {
+                return Hw::hwFail(Hw::HwError::AxisOutOfRange, "axis out of range");
+            }
+            statusOut = Hw::AxisStatus{};
+            statusOut.homed = true;
+            statusOut.alarm = axisAlarm.load();
+            return Hw::hwOk();
+        }
+        Hw::HwResult readPositions(Hw::AxisVector& positionsOut) const override
+        {
+            positionsOut = Hw::AxisVector{};
+            return Hw::hwOk();
+        }
+        Hw::HwResult startHoming(uint32_t) override
+        {
+            m_homing = true;
+            return Hw::hwOk();
+        }
+        bool isHoming() const override { return m_homing; }
+        Hw::HwResult moveAbsolute(Hw::AxisIndex, double, double) override { return Hw::hwOk(); }
+        Hw::HwResult moveRelative(Hw::AxisIndex, double, double) override { return Hw::hwOk(); }
+        Hw::HwResult jog(Hw::AxisIndex, double) override { return Hw::hwOk(); }
+        Hw::HwResult stopAxis(Hw::AxisIndex) override { return Hw::hwOk(); }
+        Hw::HwResult emergencyStop() override { return Hw::hwOk(); }
+
+        Hw::HwResult loadPlan(const Hw::MotionPlanView& view) override
+        {
+            ++loadPlanCalls;
+            {
+                QMutexLocker lock(&m_mutex);
+                m_loadThreadName = QThread::currentThread()->objectName();
+            }
+            // 模拟运动卡「整段缓冲下发」的真实耗时
+            if (m_loadDelayMs > 0)
+            {
+                QThread::msleep(static_cast<unsigned long>(m_loadDelayMs));
+            }
+            m_commandCount = view.commandCount;
+            return Hw::hwOk();
+        }
+        Hw::HwResult startPlan() override
+        {
+            planStarted.store(true);
+            planAborted.store(false);
+            m_elapsed.start();
+            return Hw::hwOk();
+        }
+        Hw::HwResult pausePlan() override
+        {
+            m_paused = true;
+            return Hw::hwOk();
+        }
+        Hw::HwResult resumePlan() override
+        {
+            m_paused = false;
+            return Hw::hwOk();
+        }
+        Hw::HwResult abortPlan() override
+        {
+            planAborted.store(true);
+            planStarted.store(false);
+            return Hw::hwOk();
+        }
+        Hw::PlanProgress planProgress() const override
+        {
+            Hw::PlanProgress p{};
+            p.commandCount = m_commandCount;
+            if (!planStarted.load())
+            {
+                p.state = planAborted.load() ? Hw::PlanState::Aborted : Hw::PlanState::Idle;
+                return p;
+            }
+            if (m_paused)
+            {
+                p.state = Hw::PlanState::Paused;
+                p.fraction = 0.5;
+                return p;
+            }
+            const double elapsedMs = static_cast<double>(m_elapsed.elapsed());
+            p.fraction = elapsedMs / kRunDurationMs;
+            p.fraction = p.fraction > 1.0 ? 1.0 : p.fraction;
+            p.state = p.fraction >= 1.0 ? Hw::PlanState::Completed : Hw::PlanState::Running;
+            p.commandIndex = static_cast<size_t>(p.fraction * static_cast<double>(m_commandCount));
+            return p;
+        }
+        Hw::HwResult setWorkOffset(const Hw::AxisVector& offset) override
+        {
+            m_workOffset = offset;
+            return Hw::hwOk();
+        }
+        Hw::HwResult workOffset(Hw::AxisVector& offsetOut) const override
+        {
+            offsetOut = m_workOffset;
+            return Hw::hwOk();
+        }
+
+        // --- ILaserSource ---
+        const Hw::LaserSourceSpec& spec() const override { return m_spec; }
+        Hw::HwResult setEmissionEnabled(bool enable) override
+        {
+            // 使能=开光。关光一律允许；开光在报警时拒绝，与真机联锁一致
+            if (enable)
+            {
+                if (axisAlarm.load())
+                {
+                    return Hw::hwFail(Hw::HwError::Interlock, "interlock open");
+                }
+                ++emissionEnableCalls;
+            }
+            else
+            {
+                ++emissionDisableCalls;
+            }
+            emissionEnabled.store(enable);
+            return Hw::hwOk();
+        }
+        bool isEmissionEnabled() const override { return emissionEnabled.load(); }
+        Hw::HwResult setParams(const Hw::LaserParams& params) override
+        {
+            {
+                QMutexLocker lock(&m_mutex);
+                m_lastParams = params;
+            }
+            ++setParamsCalls;
+            return Hw::hwOk();
+        }
+        const Hw::LaserParams& params() const override
+        {
+            QMutexLocker lock(&m_mutex);
+            return m_lastParams;
+        }
+        Hw::HwResult setPowerPercent(double percent) override
+        {
+            QMutexLocker lock(&m_mutex);
+            m_lastParams.powerPercent = percent;
+            ++setParamsCalls;
+            return Hw::hwOk();
+        }
+        Hw::HwResult readStatus(Hw::LaserSourceStatus& statusOut) const override
+        {
+            statusOut = Hw::LaserSourceStatus{};
+            statusOut.emissionEnabled = emissionEnabled.load();
+            statusOut.ready = true;
+            return Hw::hwOk();
+        }
+        Hw::HwResult clearFault() override { return Hw::hwOk(); }
+        Hw::HwResult testFire(double, int32_t) override { return Hw::hwOk(); }
+        Hw::HwResult stopTestFire() override { return Hw::hwOk(); }
+        Hw::HwResult setGuideLaserEnabled(bool) override { return Hw::hwOk(); }
+
+        // --- IDevice 扩展 ---
+        void* queryInterface(Hw::InterfaceId id) override
+        {
+            if (id == Hw::InterfaceId::MotionCard)
+            {
+                return static_cast<Hw::IMotionCard*>(this);
+            }
+            if (id == Hw::InterfaceId::LaserSource)
+            {
+                return static_cast<Hw::ILaserSource*>(this);
+            }
+            return Hw::DeviceBase::queryInterface(id);
+        }
+
+    protected:
+        Hw::HwResult doOpen(const Hw::ParamSet&) override { return Hw::hwOk(); }
+        Hw::HwResult doClose() override { return Hw::hwOk(); }
+
+    private:
+        static constexpr double kRunDurationMs = 100.0;
+
+        int m_loadDelayMs = 0;
+        size_t m_commandCount = 0;
+        bool m_homing = false;
+        bool m_paused = false;
+        Hw::AxisConfig m_axes[2];
+        Hw::AxisVector m_workOffset{};
+        Hw::LaserSourceSpec m_spec{};
+
+        mutable QMutex m_mutex;
+        QString m_loadThreadName;
+        Hw::LaserParams m_lastParams{};
+        QElapsedTimer m_elapsed;
+    };
+
+    Hw::IDevice* createFakeMotionCard()
+    {
+        return new FakeMotionCardDevice(0);
+    }
+
+    Hw::IDevice* createSlowFakeMotionCard()
+    {
+        // 150ms 的下发耗时远超主线程等待预算（30ms），必然走工作线程快照路径
+        return new FakeMotionCardDevice(150);
+    }
+
+    /// 只有运动卡 + 激光器面的机型档案。没有安全条件，避免用例卡在门上。
+    MachineProfile fakeMotionProfile()
+    {
+        MachineProfile profile;
+        profile.deviceId = QStringLiteral("fake_motion_card");
+        profile.autoOpen = true;
+        return profile;
+    }
+
+    /// 文件传输型机型档案（Ruida）。只用于验证「暂停不被假支持」这条声明。 
+    MachineProfile fakeFileModeProfile()
+    {
+        MachineProfile profile = fakeMotionProfile();
+        profile.deviceId = QStringLiteral("fake_file_mode_card");
+        // 文件传输模式下计划只能离线生成，运行中没有控制通道
+        profile.openParams.insert(QStringLiteral("transport"), QStringLiteral("file"));
+        return profile;
+    }
+
+    class ProcessingChainHardwareTest : public ::testing::Test
+    {
+    protected:
+        void SetUp() override
+        {
+            Hw::DeviceRegistry::instance().registerDevice(
+                makePrototype("fake_motion_card"), &createFakeMotionCard);
+            Hw::DeviceRegistry::instance().registerDevice(
+                makePrototype("fake_motion_card_slow"), &createSlowFakeMotionCard);
+            // 文件传输机型用独立 id：内置 Ruida 驱动已在同一进程注册，
+            // 重复 id 会被注册表拒绝，替身就无法被打开
+            Hw::DeviceRegistry::instance().registerDevice(
+                makePrototype("fake_file_mode_card"), &createFakeMotionCard);
+
+            m_host = std::make_unique<DeviceHost>();
+            m_job = std::make_unique<ProcessingJobService>(m_host.get());
+            QObject::connect(m_job.get(), &ProcessingJobService::jobFinished, [this](bool ok, const QString& msg) {
+                ++m_finishedCount;
+                m_finishedOk = ok;
+                m_finishedMessage = msg;
+            });
+            QObject::connect(m_job.get(), &ProcessingJobService::jobWarning, [this](const QString& msg) {
+                m_warnings.append(msg);
+            });
+            QObject::connect(m_host.get(), &DeviceHost::alarmRaised,
+                [this](int source, int axis, int code, const QString& msg) {
+                    ++m_alarmCount;
+                    m_lastAlarmSource = source;
+                    m_lastAlarmAxis = axis;
+                    m_lastAlarmCode = code;
+                    m_lastAlarmMessage = msg;
+                });
+        }
+
+        void TearDown() override
+        {
+            m_job.reset();
+            if (m_host)
+            {
+                m_host->stop();
+            }
+            m_host.reset();
+        }
+
+        static Hw::DeviceDescriptor makePrototype(const char* id)
+        {
+            Hw::DeviceDescriptor d;
+            Hw::hwCopyText(d.deviceId, sizeof(d.deviceId), id);
+            Hw::hwCopyText(d.displayName, sizeof(d.displayName), "Fake motion card");
+            Hw::hwCopyText(d.vendor, sizeof(d.vendor), "TEST");
+            d.kind = Hw::DeviceKind::MotionCard;
+            d.capabilities = Hw::CapLinearInterp | Hw::CapSoftLimit;
+            d.axisCount = 2;
+            return d;
+        }
+
+        bool startMachine(const MachineProfile& profile, QString& error)
+        {
+            if (!m_host->start(profile, error))
+            {
+                return false;
+            }
+            m_host->tick(20);
+            m_host->tick(20);
+            return true;
+        }
+
+        /// 一份带激光参数的最小计划。
+        void buildPlanWithLaserParams(double powerPercent, double frequencyHz, double pulseWidthUs)
+        {
+            Hw::LaserParams params;
+            params.powerPercent = powerPercent;
+            params.frequencyHz = frequencyHz;
+            params.pulseWidthUs = pulseWidthUs;
+            m_builder.emitSetLaserParams(params);
+            m_builder.emitLaserOn();
+            m_builder.emitLineTo(0.0, 0.0, true);
+            m_builder.emitLineTo(10.0, 0.0, true);
+            m_builder.emitLaserOff();
+            m_builder.recomputeBounds();
+        }
+
+        /// 推进到结束（主线程手动 tick + poll）。
+        bool runUntilFinished(int maxTicks = 400)
+        {
+            for (int i = 0; i < maxTicks; ++i)
+            {
+                if (!m_job->isRunning() && !m_job->isPaused())
+                {
+                    return true;
+                }
+                m_host->tick(20);
+                m_job->pollProgress();
+                QThread::msleep(2);
+            }
+            return false;
+        }
+
+        std::unique_ptr<DeviceHost> m_host;
+        std::unique_ptr<ProcessingJobService> m_job;
+        Hw::MotionPlanBuilder m_builder;
+
+        int m_finishedCount = 0;
+        bool m_finishedOk = false;
+        QString m_finishedMessage;
+        QStringList m_warnings;
+
+        int m_alarmCount = 0;
+        int m_lastAlarmSource = -1;
+        int m_lastAlarmAxis = -1;
+        int m_lastAlarmCode = 0;
+        QString m_lastAlarmMessage;
+    };
+
+    /// 断言 ①：开工前后出光使能的固定次序 + 收工必须关光。
+    TEST_F(ProcessingChainHardwareTest, EmissionFollowsFixedOrderOnBeginAndEnd)
+    {
+        QString error;
+        ASSERT_TRUE(startMachine(fakeMotionProfile(), error)) << error.toStdString();
+
+        auto* laser = m_host->routedLaserSource();
+        ASSERT_NE(nullptr, laser);
+        EXPECT_EQ(QStringLiteral("device"), m_host->routedLaserOrigin());
+        ASSERT_EQ(EmissionState::Off, m_host->emissionGuard().state());
+
+        buildPlanWithLaserParams(80.0, 20000.0, 20.0);
+        ASSERT_TRUE(m_job->startPlan(m_builder.view(), QStringLiteral("order-job"), error)) << error.toStdString();
+
+        // 开工：Off -> Armed -> Enabled，且硬件真的被置真
+        EXPECT_EQ(EmissionState::Enabled, m_host->emissionGuard().state());
+        EXPECT_TRUE(laser->isEmissionEnabled());
+        const QStringList beginLog = m_host->emissionGuard().transitionLog();
+        ASSERT_GE(beginLog.size(), 2);
+        EXPECT_EQ(QStringLiteral("Off>Armed:beginJob"), beginLog.at(0));
+        EXPECT_EQ(QStringLiteral("Armed>Enabled:enableApplied"), beginLog.at(1));
+
+        ASSERT_TRUE(runUntilFinished());
+
+        // 收工：Enabled -> Off，且硬件真的被关掉
+        EXPECT_EQ(EmissionState::Off, m_host->emissionGuard().state());
+        EXPECT_FALSE(laser->isEmissionEnabled());
+        EXPECT_EQ(1, m_finishedCount);
+        EXPECT_TRUE(m_finishedOk);
+        EXPECT_EQ(QStringLiteral("Enabled>Off:endJob"), m_host->emissionGuard().transitionLog().last());
+    }
+
+    /// 断言 ②：只有运动卡面的机型的功率/频率/脉宽必须真的投递到激光器。
+    TEST_F(ProcessingChainHardwareTest, MotionCardMachineReceivesLaserParams)
+    {
+        QString error;
+        ASSERT_TRUE(startMachine(fakeMotionProfile(), error)) << error.toStdString();
+
+        auto* fake = static_cast<FakeMotionCardDevice*>(m_host->device());
+        ASSERT_NE(nullptr, fake);
+
+        buildPlanWithLaserParams(55.0, 50000.0, 8.0);
+        QString startError;
+        ASSERT_TRUE(m_job->startPlan(m_builder.view(), QStringLiteral("params-job"), startError))
+            << startError.toStdString();
+
+        // 关键断言：参数不再是「只记录不生效」，而是真的写到了激光器
+        EXPECT_GE(fake->setParamsCalls.load(), 1);
+        const Hw::LaserParams applied = fake->lastLaserParams();
+        EXPECT_DOUBLE_EQ(55.0, applied.powerPercent);
+        EXPECT_DOUBLE_EQ(50000.0, applied.frequencyHz);
+        EXPECT_DOUBLE_EQ(8.0, applied.pulseWidthUs);
+
+        EXPECT_GE(fake->loadPlanCalls.load(), 1);
+        ASSERT_TRUE(runUntilFinished());
+    }
+
+    /// 断言 ③：下发期间主线程不被占用 —— 慢下发必须离开主线程。
+    TEST_F(ProcessingChainHardwareTest, SlowDispatchDoesNotOccupyMainThread)
+    {
+        MachineProfile profile = fakeMotionProfile();
+        profile.deviceId = QStringLiteral("fake_motion_card_slow");
+
+        QString error;
+        ASSERT_TRUE(startMachine(profile, error)) << error.toStdString();
+
+        auto* fake = static_cast<FakeMotionCardDevice*>(m_host->device());
+        ASSERT_NE(nullptr, fake);
+
+        buildPlanWithLaserParams(50.0, 20000.0, 10.0);
+
+        QElapsedTimer wall;
+        wall.start();
+        QString startError;
+        ASSERT_TRUE(m_job->startPlan(m_builder.view(), QStringLiteral("slow-job"), startError))
+            << startError.toStdString();
+        const qint64 returnMs = wall.elapsed();
+
+        // 下发本身耗时 150ms，主线程必须在远小于它的时间内返回
+        EXPECT_LT(returnMs, 120) << "main thread was blocked by dispatch";
+        EXPECT_EQ(QStringLiteral("ProcessingJobDispatch"), m_job->dispatchThreadName());
+        EXPECT_TRUE(m_job->isRunning());
+
+        ASSERT_TRUE(runUntilFinished());
+        EXPECT_EQ(1, m_finishedCount);
+        EXPECT_TRUE(m_finishedOk);
+    }
+
+    /// 断言 ④：报警触发后立即停光，且不得自动恢复。
+    TEST_F(ProcessingChainHardwareTest, AlarmStopsEmissionAndDoesNotAutoRecover)
+    {
+        QString error;
+        ASSERT_TRUE(startMachine(fakeMotionProfile(), error)) << error.toStdString();
+
+        auto* fake = static_cast<FakeMotionCardDevice*>(m_host->device());
+        ASSERT_NE(nullptr, fake);
+
+        buildPlanWithLaserParams(60.0, 20000.0, 10.0);
+        QString startError;
+        ASSERT_TRUE(m_job->startPlan(m_builder.view(), QStringLiteral("alarm-job"), startError))
+            << startError.toStdString();
+        ASSERT_EQ(EmissionState::Enabled, m_host->emissionGuard().state());
+
+        // 轴报警出现
+        fake->axisAlarm.store(true);
+        for (int i = 0; i < 4; ++i)
+        {
+            m_host->tick(20);
+        }
+
+        EXPECT_GE(m_alarmCount, 1);
+        EXPECT_EQ(static_cast<int>(AlarmSource::Motion), m_lastAlarmSource);
+        EXPECT_EQ(1001, m_lastAlarmCode);
+        EXPECT_EQ(MachineState::Alarm, m_host->machineState());
+
+        // 停光：先进入闭锁，硬件使能必须已经关掉
+        EXPECT_EQ(EmissionState::Latched, m_host->emissionGuard().state());
+        EXPECT_FALSE(fake->isEmissionEnabled());
+
+        // 不得自动恢复：报警消失后仍然闭锁
+        fake->axisAlarm.store(false);
+        for (int i = 0; i < 6; ++i)
+        {
+            m_host->tick(20);
+        }
+        EXPECT_EQ(EmissionState::Latched, m_host->emissionGuard().state());
+        EXPECT_FALSE(fake->isEmissionEnabled());
+        EXPECT_FALSE(m_job->resumeJob(error));
+        EXPECT_FALSE(error.isEmpty());
+
+        // 只有显式确认才允许再次开光
+        ASSERT_TRUE(m_job->acknowledgeSafetyCutoff(error)) << error.toStdString();
+        EXPECT_EQ(EmissionState::Off, m_host->emissionGuard().state());
+    }
+
+    /// 文件传输型机型必须明确拒绝暂停，而不是假装暂停后继续出光。
+    TEST_F(ProcessingChainHardwareTest, FileModeMachineRefusesPauseExplicitly)
+    {
+        QString error;
+        ASSERT_TRUE(startMachine(fakeFileModeProfile(), error)) << error.toStdString();
+
+        EXPECT_FALSE(m_host->supportsRuntimePause());
+        EXPECT_FALSE(m_job->isPauseSupported());
+
+        buildPlanWithLaserParams(50.0, 20000.0, 10.0);
+        QString startError;
+        ASSERT_TRUE(m_job->startPlan(m_builder.view(), QStringLiteral("file-job"), startError))
+            << startError.toStdString();
+
+        EXPECT_FALSE(m_job->pauseJob(error));
+        EXPECT_FALSE(error.isEmpty());
+        EXPECT_TRUE(m_job->isRunning());
+    }
+
 #endif  // ENABLE_HARDWARE
+
 }  // namespace

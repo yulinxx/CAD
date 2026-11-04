@@ -7,6 +7,8 @@
 #include "DeviceHost.h"
 
 #include <QElapsedTimer>
+#include <QHash>
+#include <QList>
 #include <QMetaObject>
 #include <QTimer>
 
@@ -110,10 +112,8 @@ struct DeviceHost::Impl
 
         void onLaserOff() override
         {
-            if (owner->laser)
-            {
-                owner->laser->setEmissionEnabled(false);
-            }
+            // 安全链关光必须闭锁：关光后禁止自动恢复，只有操作员显式确认才可再次开光
+            owner->emission.safetyCutoff(QStringLiteral("safetyChainLaserOff"));
             if (owner->galvo)
             {
                 owner->galvo->abortMark();
@@ -148,10 +148,7 @@ struct DeviceHost::Impl
         {
             // 顺序刻意如此：先关光再停机械。
             // 反过来的话，机械已停但激光还亮着的那几毫秒足够烧穿工件。
-            if (owner->laser)
-            {
-                owner->laser->setEmissionEnabled(false);
-            }
+            owner->emission.emergencyStop(QStringLiteral("safetyChainEmergency"));
             if (owner->galvo)
             {
                 owner->galvo->abortMark();
@@ -212,6 +209,18 @@ struct DeviceHost::Impl
     Hw::IIoModule* io = nullptr;
     Hw::ISimulationClock* simClock = nullptr;
 
+    /// 由 attachLaser 接入的独立激光器（运动卡机型用），不归本类所有
+    Hw::ILaserSource* attachedLaser = nullptr;
+
+    EmissionGuard emission;
+    SafetyInputMonitor safetyInputs;
+    SafetyInputMonitor::State safetyInputState = SafetyInputMonitor::State::NotConfigured;
+
+    /// 当前生效的报警，key 为 "source:axis:code"
+    QHash<QString, AlarmEvent> activeAlarmEvents;
+    MachineState machineState = MachineState::Offline;
+    qint64 lastAlarmPollMs = -1;
+
     Hw::IoPointMap pointMap;
     Hw::SafetyMonitor monitor;
     Actuator actuator;
@@ -224,6 +233,9 @@ struct DeviceHost::Impl
     /// 累加的时间基准（毫秒），供 IO 去抖与安全评估使用
     qint64 nowMs = 0;
 
+    /// 报警聚合轮询周期。比 tick 慢一倍：状态查询是 SDK 往返，不需要 20ms 一次。
+    static constexpr qint64 kAlarmPollIntervalMs = 40;
+
     MachineProfile profile;
     QString displayName;
 
@@ -233,9 +245,155 @@ struct DeviceHost::Impl
     QStringList violations;
     int lastDeviceState = -1;
 
+    /// 实际承担出光的激光器：接入的独立激光器优先，否则用设备自带的激光面
+    Hw::ILaserSource* routedLaser() const
+    {
+        return attachedLaser ? attachedLaser : laser;
+    }
+
+    QString routedLaserOriginText() const
+    {
+        return attachedLaser ? QStringLiteral("attached") : (laser ? QStringLiteral("device") : QStringLiteral("none"));
+    }
+
+    /**
+     * @brief 采集一轮报警，并把当前生效的报警集合做差。
+     * @param newOut 本轮新出现的报警（已恢复的不会出现在这里）
+     * @return 本轮是否执行了采集
+     */
+    bool pollAlarms(qint64 now, QList<AlarmEvent>& newOut)
+    {
+        if (lastAlarmPollMs >= 0 && now - lastAlarmPollMs < kAlarmPollIntervalMs)
+        {
+            return false;
+        }
+        lastAlarmPollMs = now;
+
+        QHash<QString, AlarmEvent> current;
+
+        // --- 轴报警与限位 ---
+        if (motion)
+        {
+            const int32_t axes = motion->axisCount();
+            for (int32_t i = 0; i < axes; ++i)
+            {
+                Hw::AxisStatus st;
+                if (motion->readAxisStatus(i, st).failed())
+                {
+                    continue;
+                }
+                const auto keyOf = [i](int code) { return QStringLiteral("0:%1:%2").arg(i).arg(code); };
+                if (st.alarm)
+                {
+                    current.insert(keyOf(1001),
+                        AlarmEvent{ AlarmSource::Motion, i, 1001,
+                            QStringLiteral("Axis %1 drive alarm").arg(i) });
+                }
+                if (st.positiveLimit)
+                {
+                    current.insert(keyOf(1002),
+                        AlarmEvent{ AlarmSource::Motion, i, 1002,
+                            QStringLiteral("Axis %1 positive limit triggered").arg(i) });
+                }
+                if (st.negativeLimit)
+                {
+                    current.insert(keyOf(1003),
+                        AlarmEvent{ AlarmSource::Motion, i, 1003,
+                            QStringLiteral("Axis %1 negative limit triggered").arg(i) });
+                }
+            }
+        }
+
+        // --- 激光器故障位 ---
+        if (Hw::ILaserSource* src = routedLaser())
+        {
+            Hw::LaserSourceStatus ls;
+            if (src->readStatus(ls).ok())
+            {
+                const auto put = [&current](int code, bool on, const QString& text) {
+                    if (on)
+                    {
+                        current.insert(QStringLiteral("1:-1:%1").arg(code),
+                            AlarmEvent{ AlarmSource::Laser, -1, code, text });
+                    }
+                };
+                put(2001, ls.overTemperature, QStringLiteral("Laser over temperature"));
+                put(2002, ls.overCurrent, QStringLiteral("Laser over current"));
+                put(2003, ls.waterFlowLow, QStringLiteral("Laser water flow low"));
+                put(2004, ls.interlockOpen, QStringLiteral("Laser interlock open"));
+                put(2005, ls.fault, QStringLiteral("Laser reports fault"));
+            }
+        }
+
+        // --- 双通道安全输入 ---
+        if (safetyInputs.isConfigured())
+        {
+            // 读不到点位时按「安全需求成立」处理（fail-safe），不能按「一切正常」
+            const bool a = pointMap.isActive(profile.safetyChannelAPoint.toUtf8().constData(), true);
+            const bool b = pointMap.isActive(profile.safetyChannelBPoint.toUtf8().constData(), true);
+            const bool fb = !profile.safetyFeedbackPoint.isEmpty()
+                && pointMap.isActive(profile.safetyFeedbackPoint.toUtf8().constData(), true);
+
+            safetyInputState = safetyInputs.evaluate(a, b, fb, now);
+            switch (safetyInputState)
+            {
+            case SafetyInputMonitor::State::CrossCheckFault:
+                current.insert(QStringLiteral("2:-1:3001"),
+                    AlarmEvent{ AlarmSource::Safety, -1, 3001, safetyInputs.lastReason() });
+                break;
+            case SafetyInputMonitor::State::FeedbackFault:
+                current.insert(QStringLiteral("2:-1:3003"),
+                    AlarmEvent{ AlarmSource::Safety, -1, 3003, safetyInputs.lastReason() });
+                break;
+            case SafetyInputMonitor::State::DemandActive:
+                current.insert(QStringLiteral("2:-1:3002"),
+                    AlarmEvent{ AlarmSource::Safety, -1, 3002, safetyInputs.lastReason() });
+                break;
+            default:
+                break;
+            }
+        }
+
+        for (auto it = current.constBegin(); it != current.constEnd(); ++it)
+        {
+            if (!activeAlarmEvents.contains(it.key()))
+            {
+                newOut.append(it.value());
+            }
+        }
+        activeAlarmEvents = current;
+        return true;
+    }
+
+    MachineState computeMachineState() const
+    {
+        if (!device)
+        {
+            return MachineState::Offline;
+        }
+        if (!timer.isActive())
+        {
+            return MachineState::Opening;
+        }
+        if (device->state() == Hw::DeviceState::Fault || !activeAlarmEvents.isEmpty())
+        {
+            return MachineState::Alarm;
+        }
+        if (motion && motion->isHoming())
+        {
+            return MachineState::Homing;
+        }
+        return MachineState::Ready;
+    }
+
     /// 销毁设备。必须走 destroy()：new 在 Hardware.dll 里，delete 也得在那边。
     void destroyDevice()
     {
+        // 设备正在被销毁：出光守卫与外部激光器指针都必须先解绑，
+        // 否则后台线程或下一次开工还会打到已释放的对象
+        emission.attachLaser(nullptr);
+        attachedLaser = nullptr;
+
         pointMap.attachModule(nullptr);
         monitor.attach(nullptr, nullptr);
         if (device)
@@ -348,6 +506,19 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
     m_impl->io = Hw::hwQuery<Hw::IIoModule>(device);
     m_impl->simClock = Hw::hwQuery<Hw::ISimulationClock>(device);
 
+    // 出光守卫指向实际承担出光的一方（独立激光器优先）
+    m_impl->emission.attachLaser(m_impl->routedLaser());
+
+    // 双通道安全输入：只监测与请求，安全功能由硬回路承担
+    m_impl->safetyInputs.configure(
+        profile.safetyChannelAPoint, profile.safetyChannelBPoint, profile.safetyFeedbackPoint);
+    m_impl->safetyInputState = m_impl->safetyInputs.isConfigured() ? SafetyInputMonitor::State::Normal
+                                                                  : SafetyInputMonitor::State::NotConfigured;
+
+    m_impl->activeAlarmEvents.clear();
+    m_impl->lastAlarmPollMs = -1;
+    m_impl->machineState = MachineState::Opening;
+
     SY_DEBUGF("[DeviceHost] Opened '%s' (%s) caps: motion=%d galvo=%d laser=%d io=%d sim=%d",
         idUtf8.constData(),
         m_impl->displayName.toUtf8().constData(),
@@ -445,11 +616,22 @@ void DeviceHost::stop()
     }
 
     m_impl->timer.stop();
+
+    // 设备即将销毁：所有持有设备指针的后台线程（加工作业下发线程）
+    // 必须在这里同步收到并退出，否则会拿着已释放的指针继续调 SDK
+    emit deviceStopping();
+
     if (m_impl->device)
     {
         SY_DEBUGF("[DeviceHost] Stopping '%s'", m_impl->profile.deviceId.toUtf8().constData());
     }
     m_impl->destroyDevice();
+    m_impl->emission.reset();
+    m_impl->safetyInputs.reset();
+    m_impl->safetyInputState = SafetyInputMonitor::State::NotConfigured;
+    m_impl->activeAlarmEvents.clear();
+    m_impl->lastAlarmPollMs = -1;
+    m_impl->machineState = MachineState::Offline;
     m_impl->monitor.clearConditions();
     m_impl->pointMap.clearPoints();
     m_impl->lastCanStart = false;
@@ -480,6 +662,71 @@ bool DeviceHost::isSimulated() const
     return m_impl->simClock != nullptr;
 }
 
+MachineState DeviceHost::machineState() const
+{
+    return m_impl->machineState;
+}
+
+QString DeviceHost::machineStateName() const
+{
+    switch (m_impl->machineState)
+    {
+    case MachineState::Offline: return QStringLiteral("Offline");
+    case MachineState::Opening: return QStringLiteral("Opening");
+    case MachineState::Homing:  return QStringLiteral("Homing");
+    case MachineState::Ready:   return QStringLiteral("Ready");
+    case MachineState::Alarm:   return QStringLiteral("Alarm");
+    }
+    return QStringLiteral("Unknown");
+}
+
+QStringList DeviceHost::activeAlarms() const
+{
+    QStringList out;
+    out.reserve(m_impl->activeAlarmEvents.size());
+    for (const AlarmEvent& ev : m_impl->activeAlarmEvents)
+    {
+        out.append(ev.message);
+    }
+    out.sort();
+    return out;
+}
+
+bool DeviceHost::supportsRuntimePause() const
+{
+    if (!m_impl->device)
+    {
+        return false;
+    }
+    // 文件传输型设备只能把计划生成成离线文件，运行中没有任何控制通道：
+    // 点了暂停也只会继续出光。这里显式声明，供 UI 置灰，不做假支持。
+    const QString transport = m_impl->profile.openParams.value(QStringLiteral("transport"));
+    if (transport.compare(QStringLiteral("file"), Qt::CaseInsensitive) == 0)
+    {
+        return false;
+    }
+    if (m_impl->profile.deviceId == QStringLiteral("ruida_rdc"))
+    {
+        return false;
+    }
+    return m_impl->motion != nullptr || m_impl->galvo != nullptr;
+}
+
+EmissionGuard& DeviceHost::emissionGuard()
+{
+    return m_impl->emission;
+}
+
+SafetyInputMonitor::State DeviceHost::safetyInputState() const
+{
+    return m_impl->safetyInputState;
+}
+
+bool DeviceHost::acknowledgeEmissionLatch(QString& errorOut)
+{
+    return m_impl->emission.confirmRearm(errorOut);
+}
+
 Eg::MachineFrameConfig DeviceHost::machineFrameConfig() const
 {
     return m_impl->profile.machineFrame;
@@ -493,6 +740,33 @@ bool DeviceHost::canStartProcessing() const
 QStringList DeviceHost::safetyViolations() const
 {
     return m_impl->violations;
+}
+
+bool DeviceHost::isEmergencyStopInputActive() const
+{
+    if (!m_impl->device)
+    {
+        // 未启动设备时读不到硬输入，按未复位处理，避免误判为可以复位
+        return true;
+    }
+
+    // 点位未配置或读数无效时同样返回 true（fail-safe）
+    return m_impl->pointMap.isActive(Hw::IoPoints::kEmergencyStop, true);
+}
+
+bool DeviceHost::isSoftwareEmergencyActive() const
+{
+    return m_impl->monitor.isSoftwareEmergency();
+}
+
+void DeviceHost::clearSoftwareEmergencyStop()
+{
+    if (!m_impl->device)
+    {
+        return;
+    }
+
+    m_impl->monitor.clearSoftwareEmergency();
 }
 
 Hw::IDevice* DeviceHost::device() const
@@ -518,6 +792,28 @@ Hw::ILaserSource* DeviceHost::laserSource() const
 Hw::IIoModule* DeviceHost::ioModule() const
 {
     return m_impl->io;
+}
+
+void DeviceHost::attachLaser(Hw::ILaserSource* laser)
+{
+    if (m_impl->attachedLaser == laser)
+    {
+        return;
+    }
+    m_impl->attachedLaser = laser;
+    // 出光守卫必须跟着路由一起换，否则会继续去写已经不再承担出光的那一方
+    m_impl->emission.attachLaser(m_impl->routedLaser());
+    SY_INFOF("[DeviceHost] Laser route attached: %s", m_impl->routedLaserOriginText().toUtf8().constData());
+}
+
+Hw::ILaserSource* DeviceHost::routedLaserSource() const
+{
+    return m_impl->routedLaser();
+}
+
+QString DeviceHost::routedLaserOrigin() const
+{
+    return m_impl->routedLaserOriginText();
 }
 
 void DeviceHost::requestEmergencyStop()
@@ -599,6 +895,41 @@ void DeviceHost::tick(qint64 elapsedMs)
         m_impl->lastDeviceState = state;
         emit deviceStateChanged(state, QString::fromUtf8(Hw::deviceStateName(m_impl->device->state())));
     }
+
+    // === 报警/限位轮询闭环 ===
+    // 真机没有事件推送：轴报警、限位、激光故障位只能主动轮询。
+    // 40ms 一轮，比 tick 慢一倍，避免把 SDK 状态查询打成总线拥堵。
+    QList<AlarmEvent> newAlarms;
+    m_impl->pollAlarms(now, newAlarms);
+    for (const AlarmEvent& ev : newAlarms)
+    {
+        SY_ERRORF("[DeviceHost] Alarm raised: source=%d axis=%d code=%d %s", static_cast<int>(ev.source), ev.axis, ev.code,
+            ev.message.toUtf8().constData());
+        emit alarmRaised(static_cast<int>(ev.source), ev.axis, ev.code, ev.message);
+    }
+    if (!newAlarms.isEmpty())
+    {
+        // 报警即停光，且走闭锁路径：报警往往会重复出现，
+        // 自动恢复会让激光在报警期间反复亮起
+        m_impl->emission.fault(newAlarms.first().message);
+        if (m_impl->galvo)
+        {
+            m_impl->galvo->abortMark();
+        }
+    }
+
+    // 双通道安全输入：本层只做监测与请求，安全切断由硬回路承担
+    if (m_impl->safetyInputs.isConfigured() && m_impl->safetyInputs.laserOffRequested())
+    {
+        m_impl->emission.safetyCutoff(m_impl->safetyInputs.lastReason());
+    }
+
+    const MachineState machineState = m_impl->computeMachineState();
+    if (machineState != m_impl->machineState)
+    {
+        m_impl->machineState = machineState;
+        emit machineStateChanged(static_cast<int>(machineState), machineStateName());
+    }
 }
 
 void DeviceHost::onDeviceEventQueued(int eventType, int channel, double value, const QString& message)
@@ -618,6 +949,7 @@ void DeviceHost::onDeviceEventQueued(int eventType, int channel, double value, c
 struct DeviceHost::Impl
 {
     QTimer timer;  ///< 仅为让构造函数中的 connect 有对象可连，不会启动
+    EmissionGuard emission;
 };
 
 DeviceHost::DeviceHost(QObject* parent)
@@ -635,10 +967,13 @@ bool DeviceHost::isHardwareSupportCompiled()
 
 bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
 {
-    errorOut =
-        QStringLiteral("Hardware module not enabled (BUILD_HARDWARE=OFF), cannot start device %1").arg(profile.deviceId);
-    SY_WARNF("[DeviceHost] %s",
-        errorOut.toUtf8().constData());  // 本次构建未启用硬件模块（BUILD_HARDWARE=OFF），无法启动设备
+    // 本构建未编入硬件模块，模拟设备同样不可用（模拟实现位于 Hardware.dll）。
+    // 这是构建配置的结果而非故障：用 INFO 而不是 WARN，避免与 MachineProfile
+    // 的「无真机配置」告警叠在一起、被误读成一串启动错误。
+    errorOut = QStringLiteral(
+        "Device simulation is not available in this build (BUILD_HARDWARE=OFF); device %1 skipped")
+                   .arg(profile.deviceId);
+    SY_INFOF("[DeviceHost] %s", errorOut.toUtf8().constData());
     return false;
 }
 
@@ -680,6 +1015,19 @@ QStringList DeviceHost::safetyViolations() const
     return QStringList{ QStringLiteral("Hardware module not enabled") };  // 未启用硬件模块
 }
 
+bool DeviceHost::isEmergencyStopInputActive() const
+{
+    // 无硬件支持时不存在可观测的硬输入，按未复位处理
+    return true;
+}
+
+bool DeviceHost::isSoftwareEmergencyActive() const
+{
+    return false;
+}
+
+void DeviceHost::clearSoftwareEmergencyStop() {}
+
 void DeviceHost::requestEmergencyStop()
 {
     SY_WARNF("[DeviceHost] Emergency stop requested but hardware support is not compiled in");
@@ -690,6 +1038,42 @@ void DeviceHost::onTick() {}
 void DeviceHost::tick(qint64 elapsedMs)
 {
     Q_UNUSED(elapsedMs);
+}
+
+MachineState DeviceHost::machineState() const
+{
+    return MachineState::Offline;
+}
+
+QString DeviceHost::machineStateName() const
+{
+    return QStringLiteral("Offline");
+}
+
+QStringList DeviceHost::activeAlarms() const
+{
+    return QStringList();
+}
+
+bool DeviceHost::supportsRuntimePause() const
+{
+    return false;
+}
+
+EmissionGuard& DeviceHost::emissionGuard()
+{
+    return m_impl->emission;
+}
+
+SafetyInputMonitor::State DeviceHost::safetyInputState() const
+{
+    return SafetyInputMonitor::State::NotConfigured;
+}
+
+bool DeviceHost::acknowledgeEmissionLatch(QString& errorOut)
+{
+    errorOut = QStringLiteral("Hardware support is not compiled in (BUILD_HARDWARE=OFF)");
+    return false;
 }
 
 void DeviceHost::onDeviceEventQueued(int eventType, int channel, double value, const QString& message)

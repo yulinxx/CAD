@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file ProcessingJobService.cpp
  * @brief 加工作业服务实现
  *
@@ -6,9 +6,17 @@
  */
 #include "ProcessingJobService.h"
 
+#include <QMutex>
+#include <QMutexLocker>
+#include <QSemaphore>
+#include <QThread>
 #include <QTimer>
 
+#include <atomic>
+
 #include "DeviceHost.h"
+#include "EmissionGuard.h"
+#include "LaserRoute.h"
 #include "Log/SyLogger.h"
 
 #ifdef ENABLE_HARDWARE
@@ -23,6 +31,17 @@ namespace
 {
     /// 进度轮询周期。100ms 对进度条足够，也不会把 SDK 的状态查询打满。
     constexpr int kPollIntervalMs = 100;
+
+    /**
+     * @brief 主线程等待「下发完成」的预算。
+     *
+     * 30ms 足够瞬时下发的机型走完 load + start，又短到用户完全感觉不到卡顿。
+     * 超过即判定该卡是阻塞式下发，转由工作线程驱动。
+     */
+    constexpr int kDispatchWaitMs = 30;
+
+    /// 阻塞式下发时工作线程发布进度快照的周期
+    constexpr int kSnapshotIntervalMs = 20;
 
     /**
      * @brief 运动卡 / 振镜卡的执行 API 收口。
@@ -102,6 +121,189 @@ namespace
             .arg(QString::fromUtf8(Hw::hwErrorName(result.error)))
             .arg(QString::fromUtf8(result.message));
     }
+
+    bool isTerminalState(Hw::PlanState state)
+    {
+        return state == Hw::PlanState::Completed || state == Hw::PlanState::Aborted
+            || state == Hw::PlanState::Error;
+    }
+
+    /**
+     * @brief 下发线程。
+     *
+     * ==================== 为什么必须有它 ====================
+     *
+     * 金橙子 MarkEzd 的 startMark 是同步阻塞循环：每条 markTo 都等振镜走完，
+     * 一次打标几十分钟非常正常。而 startPlan 是被命令 lambda 在 UI 线程里
+     * 同步调用的 —— 于是整个加工期间窗口无响应，暂停/停止按钮根本点不动，
+     * 循环里也没有任何取消检查点。
+     *
+     * ==================== 主线程如何不被打住 ====================
+     *
+     * 主线程只在一开始等一个很短的预算（kDispatchWaitMs）：
+     *   - 等到了：这块卡的下发是瞬时的（运动卡、Scanlab、模拟设备），
+     *     主线程按原路径自己轮询进度，语义与改造前完全一致；
+     *   - 没等到：卡已经陷在阻塞调用里，主线程从此只读本线程发布的快照，
+     *     不再碰设备指针，也就不会与工作线程并发调 SDK。
+     */
+    class JobDispatchThread : public QThread
+    {
+    public:
+        JobDispatchThread(const PlanRunner& runner, const Hw::MotionPlanView& view)
+            : m_runner(runner)
+            , m_view(view)
+        {
+            setObjectName(QStringLiteral("ProcessingJobDispatch"));
+        }
+
+        QSemaphore& startSignal() { return m_startSignal; }
+
+        bool startFinished() const { return m_startFinished.load(); }
+
+        /// 主线程放弃等待，本线程继续驱动进度快照直到终态
+        void enterSnapshotMode() { m_snapshotMode.store(true); }
+
+        /// 停止请求。主线程置位，循环内检查
+        void requestCancel() { m_cancel.store(true); }
+
+        /// 下发结果（主线程 acquire 之后读，或 pollProgress 在快照模式下读）
+        bool loadSucceeded() const;
+        bool startSucceeded() const;
+        QString errorText() const;
+
+        /// 已发布的进度快照
+        Hw::PlanProgress snapshot() const;
+
+    protected:
+        void run() override;
+
+    private:
+        void publish(const Hw::PlanProgress& p);
+        void publishError(const QString& text, Hw::HwError error = Hw::HwError::Unknown);
+
+        PlanRunner m_runner;
+        Hw::MotionPlanView m_view;
+
+        QSemaphore m_startSignal;
+        std::atomic<bool> m_startFinished{ false };
+        std::atomic<bool> m_loadOk{ false };
+        std::atomic<bool> m_startOk{ false };
+        std::atomic<bool> m_snapshotMode{ false };
+        std::atomic<bool> m_cancel{ false };
+
+        mutable QMutex m_resultMutex;
+        QString m_errorText;
+        Hw::HwError m_errorCode = Hw::HwError::Unknown;
+
+        std::atomic<int> m_state{ static_cast<int>(Hw::PlanState::Idle) };
+        std::atomic<size_t> m_index{ 0 };
+        std::atomic<size_t> m_count{ 0 };
+        std::atomic<double> m_fraction{ 0.0 };
+    };
+
+    bool JobDispatchThread::loadSucceeded() const
+    {
+        return m_loadOk.load();
+    }
+
+    bool JobDispatchThread::startSucceeded() const
+    {
+        return m_startOk.load();
+    }
+
+    QString JobDispatchThread::errorText() const
+    {
+        QMutexLocker lock(&m_resultMutex);
+        return m_errorText;
+    }
+
+    Hw::PlanProgress JobDispatchThread::snapshot() const
+    {
+        Hw::PlanProgress p{};
+        p.state = static_cast<Hw::PlanState>(m_state.load());
+        p.commandIndex = m_index.load();
+        p.commandCount = m_count.load();
+        p.fraction = m_fraction.load();
+        p.error = m_errorCode;
+        return p;
+    }
+
+    void JobDispatchThread::publishError(const QString& text, Hw::HwError error)
+    {
+        QMutexLocker lock(&m_resultMutex);
+        m_errorText = text;
+        m_errorCode = error;
+        m_state.store(static_cast<int>(Hw::PlanState::Error));
+    }
+
+    void JobDispatchThread::publish(const Hw::PlanProgress& p)
+    {
+        m_state.store(static_cast<int>(p.state));
+        m_index.store(p.commandIndex);
+        m_count.store(p.commandCount);
+        m_fraction.store(p.fraction);
+        if (p.state == Hw::PlanState::Error)
+        {
+            m_errorCode = p.error;
+        }
+    }
+
+    void JobDispatchThread::run()
+    {
+        const Hw::HwResult loaded = m_runner.load(m_view);
+        if (loaded.failed())
+        {
+            publishError(describe(ProcessingJobService::tr("Load processing plan"), loaded), loaded.error);
+            m_startFinished.store(true);
+            m_startSignal.release();
+            return;
+        }
+        m_loadOk.store(true);
+
+        // 下发前的取消检查点：排队期间用户已经点了停止
+        if (m_cancel.load())
+        {
+            publishError(ProcessingJobService::tr("Job cancelled before dispatch"), Hw::HwError::EmergencyStop);
+            m_startFinished.store(true);
+            m_startSignal.release();
+            return;
+        }
+
+        const Hw::HwResult started = m_runner.start();  // 阻塞型适配器会在这里停很久
+        if (started.failed())
+        {
+            publishError(describe(ProcessingJobService::tr("Start processing"), started), started.error);
+            m_startFinished.store(true);
+            m_startSignal.release();
+            return;
+        }
+        m_startOk.store(true);
+        m_startFinished.store(true);
+        m_startSignal.release();
+
+        // 主线程在预算内等到了：它接管轮询，本线程退出
+        if (!m_snapshotMode.load())
+        {
+            return;
+        }
+
+        // 阻塞型下发：由本线程推进度快照，并处理停止请求
+        while (true)
+        {
+            if (m_cancel.load())
+            {
+                m_cancel.store(false);
+                m_runner.abort();
+            }
+            const Hw::PlanProgress p = m_runner.progress();
+            publish(p);
+            if (isTerminalState(p.state))
+            {
+                break;
+            }
+            msleep(kSnapshotIntervalMs);
+        }
+    }
 }  // namespace
 
 struct ProcessingJobService::Impl
@@ -125,9 +327,42 @@ struct ProcessingJobService::Impl
     /// 是否有一份作业已下发且尚未结束（Completed / Aborted / Error 之前）
     bool active = false;
 
+    /**
+     * @brief 下发线程。为空表示没有阻塞式下发在跑。
+     *
+     * 主线程在快照模式下只读它的 snapshot()，不碰设备指针。
+     */
+    std::unique_ptr<JobDispatchThread> worker;
+
+    /// 主线程是否已切换到「只读快照」模式
+    bool snapshotMode = false;
+
+    /// 最近一次下发所在线程名，用于诊断
+    QString dispatchThread;
+
     Hw::PlanState lastState = Hw::PlanState::Idle;
     size_t lastIndex = 0;
     double lastFraction = 0.0;
+
+    /// 收尾：停掉轮询、释放工作线程（必要时 join）
+    void finishJob()
+    {
+        active = false;
+        snapshotMode = false;
+        pollTimer.stop();
+        if (worker)
+        {
+            worker->requestCancel();
+            if (!worker->wait(2000))
+            {
+                // 到点还没退出说明适配器卡在 SDK 调用里：
+                // 只能等，绝不能 detach —— 线程会拿着即将销毁的设备继续跑
+                SY_ERROR("[ProcessingJob] Dispatch thread did not stop in 2s, waiting for it");
+                worker->wait();
+            }
+            worker.reset();
+        }
+    }
 
     /// 开工前的统一门控。通过返回 true，否则 errorOut 已填好可展示原因。
     bool checkGate(QString& errorOut) const
@@ -170,6 +405,7 @@ ProcessingJobService::ProcessingJobService(DeviceHost* host, QObject* parent)
     if (host)
     {
         connect(host, &DeviceHost::safetyVerdictChanged, this, &ProcessingJobService::onSafetyVerdictChanged);
+        connect(host, &DeviceHost::deviceStopping, this, &ProcessingJobService::onDeviceStopping);
     }
     else
     {
@@ -184,11 +420,14 @@ ProcessingJobService::~ProcessingJobService()
         // 析构时还在加工：不能就这么走。设备侧的缓冲还在跑，
         // 进程退出后没人再收进度，机器会把整份计划走完 —— 无人看管的出光。
         SY_WARNF("[ProcessingJob] Destroyed while job '%s' was active, aborting it", m_impl->jobId.toUtf8().constData());
+        m_impl->host->emissionGuard().abort(QStringLiteral("serviceDestroyed"));
         const PlanRunner runner = PlanRunner::resolve(m_impl->host);
         if (runner.valid())
         {
             runner.abort();
         }
+        // 工作线程必须在析构完成前退出：线程里持有 host 与设备指针
+        m_impl->finishJob();
     }
     m_impl->pollTimer.stop();
 }
@@ -240,21 +479,61 @@ bool ProcessingJobService::startPlan(const Hw::MotionPlanView& view, const QStri
         return false;
     }
 
-    const Hw::HwResult loaded = runner.load(view);
-    if (loaded.failed())
+    // === 激光参数路由 ===
+    // 运动卡机型的功率/频率/脉宽只能靠宿主主动投递，否则会被静默丢弃
+    LaserRoute::ApplyReport laserReport;
+    const LaserRoute::Route laserRoute = LaserRoute::resolve(m_impl->host);
+    if (!LaserRoute::applyFromPlan(laserRoute, view, laserReport, errorOut))
     {
-        // loadPlan 里通常是软限位/幅面预检失败，错误信息带具体越界轴，直接透出
-        errorOut = describe(tr("Load processing plan"), loaded);
         SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
         return false;
     }
-
-    const Hw::HwResult started = runner.start();
-    if (started.failed())
+    if (!laserReport.warning.isEmpty())
     {
-        errorOut = describe(tr("Start processing"), started);
-        SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
+        // 部分生效必须让操作员看到，不能算成功
+        emit jobWarning(laserReport.warning);
+    }
+
+    // === 出光使能 ===
+    // 必须在下发之前打开：振镜卡的 startMark/startPlan 会直接拒绝未开光的调用
+    if (!m_impl->host->emissionGuard().beginJob(errorOut))
+    {
+        SY_ERRORF("[ProcessingJob] Emission enable refused: %s", errorOut.toUtf8().constData());
         return false;
+    }
+
+    std::unique_ptr<JobDispatchThread> worker = std::make_unique<JobDispatchThread>(runner, view);
+    m_impl->dispatchThread = worker->objectName();
+    worker->start();
+
+    // 主线程只等一个很短的预算：等到了说明下发是瞬时的，等不到说明卡在阻塞调用里
+    bool blocked = false;
+    if (!worker->startSignal().tryAcquire(1, kDispatchWaitMs))
+    {
+        worker->enterSnapshotMode();
+        blocked = !worker->startFinished();
+    }
+
+    if (!blocked)
+    {
+        worker->startSignal().tryAcquire(1);  // 消费掉可能刚到的那一次释放
+        if (!worker->loadSucceeded() || !worker->startSucceeded())
+        {
+            errorOut = worker->errorText();
+            worker->wait();
+            // 下发没成功就必须关光：不能把激光留在使能状态等下一次操作
+            m_impl->host->emissionGuard().endJob();
+            SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
+            return false;
+        }
+        worker->wait();  // start 已返回，线程正在退出
+    }
+    else
+    {
+        // 阻塞式下发（金橙子 MarkEzd 的同步打标循环）：
+        // 设备从此归工作线程所有，主线程只读快照
+        m_impl->worker = std::move(worker);
+        m_impl->snapshotMode = true;
     }
 
     m_impl->jobId = jobId.isEmpty() ? QStringLiteral("job") : jobId;
@@ -264,14 +543,12 @@ bool ProcessingJobService::startPlan(const Hw::MotionPlanView& view, const QStri
     m_impl->lastFraction = 0.0;
     m_impl->pollTimer.start();
 
-    SY_DEBUGF("[ProcessingJob] Started '%s' on %s: %lld command(s), bounds [%.3f %.3f]-[%.3f %.3f]",
+    SY_DEBUGF("[ProcessingJob] Started '%s' on %s: %lld command(s), emission=on, dispatch=%s, laserParams=%zu",
         m_impl->jobId.toUtf8().constData(),
         runner.kindName(),
         static_cast<long long>(view.commandCount),
-        view.header.boundsMinX,
-        view.header.boundsMinY,
-        view.header.boundsMaxX,
-        view.header.boundsMaxY);
+        blocked ? "worker(blocking)" : "worker(instant)",
+        laserReport.paramCount);
 
     emit jobStateChanged(
         static_cast<int>(Hw::PlanState::Running), QString::fromUtf8(Hw::planStateName(Hw::PlanState::Running)));
@@ -284,6 +561,13 @@ bool ProcessingJobService::pauseJob(QString& errorOut)
     if (!m_impl->active)
     {
         errorOut = tr("No processing job is currently running");
+        SY_WARNF("[ProcessingJob] pauseJob refused: %s", errorOut.toUtf8().constData());
+        return false;
+    }
+    if (!isPauseSupported())
+    {
+        // 明确拒绝而不是走适配器再失败：这类设备的暂停按钮应当直接置灰
+        errorOut = tr("Current machine does not support pausing a running job");
         SY_WARNF("[ProcessingJob] pauseJob refused: %s", errorOut.toUtf8().constData());
         return false;
     }
@@ -326,6 +610,20 @@ bool ProcessingJobService::resumeJob(QString& errorOut)
         SY_WARNF("[ProcessingJob] resumeJob refused: %s", errorOut.toUtf8().constData());
         return false;
     }
+
+    // 安全链关光后出光被闭锁：禁止自动恢复，必须由操作员显式确认
+    EmissionGuard& emission = m_impl->host->emissionGuard();
+    if (emission.state() == EmissionState::Latched)
+    {
+        errorOut = tr("Emission is latched off by the safety chain, explicit acknowledgement is required first");
+        SY_WARNF("[ProcessingJob] resumeJob refused: %s", errorOut.toUtf8().constData());
+        return false;
+    }
+    if (emission.state() == EmissionState::Off && !emission.beginJob(errorOut))
+    {
+        SY_WARNF("[ProcessingJob] resumeJob refused: %s", errorOut.toUtf8().constData());
+        return false;
+    }
     const PlanRunner runner = PlanRunner::resolve(m_impl->host);
     if (!runner.valid())
     {
@@ -353,12 +651,20 @@ bool ProcessingJobService::abortJob(QString& errorOut)
         SY_WARN("[ProcessingJob] abortJob refused: no active job");
         return false;
     }
+
+    // 先关光再停机械：反过来的话，机械已经停了但激光还亮着的那几毫秒足够烧穿工件。
+    // abort 不闭锁 —— 用户主动停止之后应当允许立刻重新开工。
+    m_impl->host->emissionGuard().abort(QStringLiteral("userAbort"));
+    if (m_impl->worker)
+    {
+        m_impl->worker->requestCancel();
+    }
+
     const PlanRunner runner = PlanRunner::resolve(m_impl->host);
     if (!runner.valid())
     {
         // 设备都没了，本地状态必须收干净，否则永远显示「加工中」
-        m_impl->active = false;
-        m_impl->pollTimer.stop();
+        m_impl->finishJob();
         SY_ERROR("[ProcessingJob] abortJob: device disappeared during active job, cleaning up local state");
         emit jobFinished(false, tr("Device disconnected, job aborted"));
         errorOut = tr("Device disconnected");
@@ -384,6 +690,31 @@ bool ProcessingJobService::isRunning() const
 bool ProcessingJobService::isPaused() const
 {
     return m_impl->active && m_impl->lastState == Hw::PlanState::Paused;
+}
+
+bool ProcessingJobService::isPauseSupported() const
+{
+    return m_impl->host ? m_impl->host->supportsRuntimePause() : false;
+}
+
+bool ProcessingJobService::acknowledgeSafetyCutoff(QString& errorOut)
+{
+    if (!m_impl->host)
+    {
+        errorOut = tr("Device host not configured");
+        return false;
+    }
+    if (!m_impl->host->acknowledgeEmissionLatch(errorOut))
+    {
+        return false;
+    }
+    SY_INFO("[ProcessingJob] Safety cutoff acknowledged by operator");
+    return true;
+}
+
+QString ProcessingJobService::dispatchThreadName() const
+{
+    return m_impl->dispatchThread;
 }
 
 QString ProcessingJobService::currentJobId() const
@@ -418,17 +749,42 @@ void ProcessingJobService::pollProgress()
         return;
     }
 
-    const PlanRunner runner = PlanRunner::resolve(m_impl->host);
-    if (!runner.valid())
+    Hw::PlanProgress p{};
+    bool deviceDisappeared = false;
+
+    if (m_impl->snapshotMode && m_impl->worker)
+    {
+        // 阻塞式下发：设备归工作线程所有，主线程只读快照。
+        // 这里绝不能再调 runner.progress()：那等于和 SDK 抢同一个句柄。
+        p = m_impl->worker->snapshot();
+        // 工作线程还陷在 start() 里时快照仍是 Idle，但作业已经开始下发；
+        // 这一段必须对外报 Running，否则界面会在按下开始后显示"空闲"。
+        if (!m_impl->worker->startFinished() && p.state == Hw::PlanState::Idle)
+        {
+            p.state = Hw::PlanState::Running;
+        }
+    }
+    else
+    {
+        const PlanRunner runner = PlanRunner::resolve(m_impl->host);
+        if (!runner.valid())
+        {
+            deviceDisappeared = true;
+        }
+        else
+        {
+            p = runner.progress();
+        }
+    }
+
+    if (deviceDisappeared)
     {
         SY_ERRORF("[ProcessingJob] Device disappeared while job '%s' was active", m_impl->jobId.toUtf8().constData());
-        m_impl->active = false;
-        m_impl->pollTimer.stop();
+        m_impl->host->emissionGuard().abort(QStringLiteral("deviceDisconnected"));
+        m_impl->finishJob();
         emit jobFinished(false, tr("Device disconnected during processing"));
         return;
     }
-
-    const Hw::PlanProgress p = runner.progress();
 
     if (p.state != m_impl->lastState)
     {
@@ -443,24 +799,28 @@ void ProcessingJobService::pollProgress()
         emit jobProgress(p.fraction, static_cast<int>(p.commandIndex), static_cast<int>(p.commandCount));
     }
 
+    if (!isTerminalState(p.state))
+    {
+        return;
+    }
+
+    // 终态：先关光，再收尾。关光必须在这里做，而不是等析构 ——
+    // 作业已经结束但激光还使能着，等于把一把上了膛的枪放在桌上。
+    m_impl->host->emissionGuard().endJob();
+    m_impl->finishJob();
+
     switch (p.state)
     {
     case Hw::PlanState::Completed:
-        m_impl->active = false;
-        m_impl->pollTimer.stop();
         SY_DEBUGF("[ProcessingJob] Finished '%s'", m_impl->jobId.toUtf8().constData());
         emit jobFinished(true, tr("Processing completed: %1").arg(m_impl->jobId));
         break;
 
     case Hw::PlanState::Aborted:
-        m_impl->active = false;
-        m_impl->pollTimer.stop();
         emit jobFinished(false, tr("Processing aborted: %1").arg(m_impl->jobId));
         break;
 
     case Hw::PlanState::Error:
-        m_impl->active = false;
-        m_impl->pollTimer.stop();
         SY_ERRORF("[ProcessingJob] Job '%s' failed: %s", m_impl->jobId.toUtf8().constData(), Hw::hwErrorName(p.error));
         emit jobFinished(false, tr("Processing error: [%1]").arg(QString::fromUtf8(Hw::hwErrorName(p.error))));
         break;
@@ -482,16 +842,35 @@ void ProcessingJobService::onSafetyVerdictChanged(
     // 安全条件在加工中途被破坏（开门、踩安全光栅）。
     // 这里主动暂停，不依赖安全条件是否配了 pause 动作 ——
     // 「裁决已经不允许开工，却还在继续出光」在任何配置下都不可接受。
+    // 同时闭锁出光：安全条件恢复后也不得自动恢复，必须由操作员显式确认。
+    m_impl->host->emissionGuard().safetyCutoff(QStringLiteral("safetyVerdict:%1").arg(firstViolationPoint));
+
     const PlanRunner runner = PlanRunner::resolve(m_impl->host);
     if (!runner.valid())
     {
         return;
     }
-    SY_ERRORF("[ProcessingJob] Safety violated during job '%s' (point=%s), pausing",
+    SY_ERRORF("[ProcessingJob] Safety violated during job '%s' (point=%s), pausing and latching emission off",
         m_impl->jobId.toUtf8().constData(),
         firstViolationPoint.toUtf8().constData());
     runner.pause();
     pollProgress();
+}
+
+void ProcessingJobService::onDeviceStopping()
+{
+    if (!m_impl->active)
+    {
+        return;
+    }
+
+    // 设备即将销毁：工作线程还在用设备指针的话，必须在这里把它停掉。
+    // 这一步不能延后 —— destroyDevice 之后指针就悬空了。
+    SY_WARNF("[ProcessingJob] Device stopping while job '%s' is active, aborting it",
+        m_impl->jobId.toUtf8().constData());
+    m_impl->host->emissionGuard().abort(QStringLiteral("deviceStopping"));
+    m_impl->finishJob();
+    emit jobFinished(false, tr("Device stopped, job aborted"));
 }
 
 #else  // !ENABLE_HARDWARE
@@ -567,6 +946,22 @@ bool ProcessingJobService::isPaused() const
     return false;
 }
 
+bool ProcessingJobService::isPauseSupported() const
+{
+    return false;
+}
+
+bool ProcessingJobService::acknowledgeSafetyCutoff(QString& errorOut)
+{
+    errorOut = noHardwareReason();
+    return false;
+}
+
+QString ProcessingJobService::dispatchThreadName() const
+{
+    return QString();
+}
+
 QString ProcessingJobService::currentJobId() const
 {
     return m_impl->jobId;
@@ -602,5 +997,7 @@ void ProcessingJobService::onSafetyVerdictChanged(
     Q_UNUSED(firstViolation);
     Q_UNUSED(firstViolationPoint);
 }
+
+void ProcessingJobService::onDeviceStopping() {}
 
 #endif  // ENABLE_HARDWARE

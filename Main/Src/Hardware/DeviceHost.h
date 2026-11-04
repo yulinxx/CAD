@@ -36,6 +36,8 @@
 #include <QStringList>
 
 #include "MachineProfile.h"
+#include "EmissionGuard.h"
+#include "SafetyInputMonitor.h"
 
 #ifdef ENABLE_HARDWARE
 // 只前向声明，不包含 Hardware 头：本文件在 BUILD_HARDWARE=OFF 时同样要能编译，
@@ -49,6 +51,33 @@ namespace Hw
     class IIoModule;
 }
 #endif
+
+/// 报警来源。聚合后交给上层，避免 UI 去区分厂商细节。
+enum class AlarmSource
+{
+    Motion = 0,  ///< 轴报警/限位
+    Laser = 1,   ///< 激光器故障位
+    Safety = 2,  ///< 双通道安全输入
+};
+
+/// 一条聚合后的报警事件（宿主侧 POD，不跨模块边界）。
+struct AlarmEvent
+{
+    AlarmSource source = AlarmSource::Motion;
+    int axis = -1;      ///< 轴号，不适用时 -1
+    int code = 0;       ///< 机器可读码，日志/遥测用它而不是文案
+    QString message;    ///< 给现场看的原因
+};
+
+/// 机器级状态。HAL 的 DeviceState 只有开/关/故障，宿主还需要表达「回零中/可开工」。
+enum class MachineState
+{
+    Offline = 0,
+    Opening = 1,
+    Homing = 2,
+    Ready = 3,
+    Alarm = 4,
+};
 
 
 class DeviceHost : public QObject
@@ -86,6 +115,35 @@ public:
     /// 当前跑的是否为模拟设备。界面上必须能明确区分，避免把模拟当真机。
     bool isSimulated() const;
 
+    /// 机器级状态（由宿主聚合轴/激光/安全输入得到）。
+    MachineState machineState() const;
+    QString machineStateName() const;
+
+    /// 当前生效的报警列表（文案形式），供状态栏与排障面板使用。
+    QStringList activeAlarms() const;
+
+    /**
+     * @brief 当前设备是否支持运行中暂停。
+     *
+     * 文件传输型设备（Ruida 生成 .rd 后离线执行）没有运行中控制通道，
+     * 暂停按钮必须置灰而不是点了继续出光。这里给出明确声明，
+     * UI 不得自行猜测。
+     */
+    bool supportsRuntimePause() const;
+
+    /// 出光使能守卫。作业服务通过它落实开工/收工/关光次序。
+    EmissionGuard& emissionGuard();
+
+    /// 双通道安全输入的最近一次判定（只读，供状态栏展示）。
+    SafetyInputMonitor::State safetyInputState() const;
+
+    /**
+     * @brief 显式确认解除出光闭锁。
+     *
+     * 安全链关光后必须由操作员确认才能再次开光；本函数只解闭锁，不开光。
+     */
+    bool acknowledgeEmissionLatch(QString& errorOut);
+
     /**
      * @brief 当前机器档案里的机器坐标系（台面尺寸 + 原点角点）
      *
@@ -101,6 +159,20 @@ public:
 
     /// 最近一次评估中被违反的条件描述列表。
     QStringList safetyViolations() const;
+
+    /**
+     * @brief 急停硬输入当前是否处于按下态。
+     *
+     * 未启动设备或点位不可读时返回 true（fail-safe），
+     * 调用方据此判断物理复位是否已完成，不得把「读不到」当成「已复位」。
+     */
+    bool isEmergencyStopInputActive() const;
+
+    /// 软件侧急停闭锁是否仍生效。软件闭锁只用于提示与状态展示，不承担安全职能。
+    bool isSoftwareEmergencyActive() const;
+
+    /// 清除软件侧急停闭锁。物理急停未释放时安全判定仍会禁止开工。
+    void clearSoftwareEmergencyStop();
 
     /**
      * @brief 手动推进一拍：推进模拟时钟 → 轮询 IO → 评估安全 → 按需发信号。
@@ -136,6 +208,21 @@ public:
     Hw::ILaserSource* laserSource() const;
     Hw::IIoModule* ioModule() const;
     ///@}
+
+    /**
+     * @brief 把一台独立激光器接入本机的设备组。
+     *
+     * 运动卡机型没有 ILaserSource 面，功率/频率/脉宽必须投递到独立的激光器设备上，
+     * 否则这些参数会被静默丢弃。指针归调用方所有，本类不接管生命周期；
+     * 传 nullptr 解除接入。
+     */
+    void attachLaser(Hw::ILaserSource* laser);
+
+    /// 实际承担出光的激光器：接入的独立激光器优先，否则用设备自带的激光面。
+    Hw::ILaserSource* routedLaserSource() const;
+
+    /// 上述激光器的来源描述："attached" / "device" / "none"，仅用于日志。
+    QString routedLaserOrigin() const;
 #endif
 
 
@@ -165,6 +252,23 @@ signals:
 
     /// 设备连接状态变化（Hw::DeviceState 的整数值 + 可读名）。
     void deviceStateChanged(int state, const QString& stateName);
+
+    /// 机器级状态变化（MachineState 的整数值 + 可读名），只在变化时发出。
+    void machineStateChanged(int state, const QString& stateName);
+
+    /**
+     * @brief 新出现的报警。已恢复的报警不会重复上报。
+     * @param source AlarmSource 的整数值
+     */
+    void alarmRaised(int source, int axis, int code, const QString& message);
+
+    /**
+     * @brief 设备即将停止（在销毁设备之前同步发出）。
+     *
+     * 后台下发线程必须在设备销毁前收到这个信号并退出，
+     * 否则会拿着已释放的设备指针继续调用 SDK。
+     */
+    void deviceStopping();
 
 private slots:
     /// tick 定时器：推进模拟时钟 → 轮询 IO → 评估安全。

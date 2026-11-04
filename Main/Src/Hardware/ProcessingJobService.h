@@ -94,6 +94,24 @@ public:
     bool isRunning() const;
     bool isPaused() const;
 
+    /**
+     * @brief 当前机型是否支持运行中暂停。
+     *
+     * UI 必须用它置灰暂停按钮。文件传输型设备（Ruida）生成离线文件后
+     * 没有任何运行中控制通道，假支持会让用户以为停了、其实还在出光。
+     */
+    bool isPauseSupported() const;
+
+    /**
+     * @brief 显式确认安全链关光后的闭锁。
+     *
+     * 安全链关光后出光被闭锁，禁止自动恢复；确认只解闭锁，不恢复作业。
+     */
+    bool acknowledgeSafetyCutoff(QString& errorOut);
+
+    /// 最近一次下发(load + start)所在线程的名称，用于诊断「下发是否离开主线程」。
+    QString dispatchThreadName() const;
+
     /// 当前（或最近一次）作业标识
     QString currentJobId() const;
 
@@ -140,11 +158,22 @@ signals:
     /// Hw::PlanState 变化
     void jobStateChanged(int state, const QString& stateName);
 
+    /**
+     * @brief 作业可继续执行，但有需要操作员知道的信息。
+     *
+     * 典型场景：运动卡机型只能落实首段激光参数，其余参数组不会生效。
+     * 这种「部分生效」必须显式提示，不能算成功。
+     */
+    void jobWarning(const QString& message);
+
 private slots:
     /// 安全裁决变为「不允许开工」时，正在跑的作业必须立刻暂停。
     /// firstViolationPoint 是机器可读的点位 id，日志只用它（firstViolation 是本地化文案）。
     void onSafetyVerdictChanged(
         bool canStartProcessing, const QString& firstViolation, const QString& firstViolationPoint);
+
+    /// 设备即将销毁：后台下发线程必须在设备消失之前退出。
+    void onDeviceStopping();
 
 
 private:

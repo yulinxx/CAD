@@ -181,6 +181,22 @@ namespace MachineProfileLoader
         }
         profile.autoOpen = root.value("autoOpen").toBool(true);
 
+        // === 双通道安全输入（可选）===
+        // 未配置时本层不介入，保持原有「只有安全条件」的判定链路
+        {
+            const QJsonObject dual = root.value("dualChannelSafety").toObject();
+            profile.safetyChannelAPoint = dual.value("channelAPoint").toString();
+            profile.safetyChannelBPoint = dual.value("channelBPoint").toString();
+            profile.safetyFeedbackPoint = dual.value("feedbackPoint").toString();
+            if (profile.safetyChannelAPoint.isEmpty() != profile.safetyChannelBPoint.isEmpty())
+            {
+                SY_WARNF("[MachineProfile] dualChannelSafety requires both channelAPoint and channelBPoint, disabled");
+                profile.safetyChannelAPoint.clear();
+                profile.safetyChannelBPoint.clear();
+                profile.safetyFeedbackPoint.clear();
+            }
+        }
+
         // === 机器坐标系（台面尺寸 + 原点角点）===
         // 缺省即恒等（左下原点 + 台面尺寸），不配也能用 —— 但那样镜像机台会烧错位置。
         {
