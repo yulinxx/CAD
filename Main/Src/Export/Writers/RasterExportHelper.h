@@ -20,7 +20,7 @@ public:
      *
      * @param context     导出上下文（含 targetPath / scaleFactor / progressCallback / cancelFlag）
      * @param entities    要导出的图元列表（主线程已 clone 好的快照，后台线程只读）
-     * @param formatName  格式名称（仅用于日志和成功消息）
+     * @param formatName  格式名称（用于日志、成功消息，同时决定落盘临时文件扩展名以选择编码器）
      * @return 导出结果（success / message / exportedEntityCount）
      */
     static ExportResult rasterizeExport(const ExportContext& context,
