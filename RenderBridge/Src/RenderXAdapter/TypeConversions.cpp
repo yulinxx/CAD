@@ -132,6 +132,8 @@ namespace RenderBridge
                 return Render::RT::DefaultPipeline::Highlight3D;
             case PipelineKind::Gizmo3D:
                 return Render::RT::DefaultPipeline::Gizmo3D;
+            case PipelineKind::Mesh3DTransparent:
+                return Render::RT::DefaultPipeline::Mesh3DTransparent;
             }
             return Render::RT::DefaultPipeline::WorldTri;
         }

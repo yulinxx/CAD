@@ -153,7 +153,9 @@ enum class PipelineKind : uint8_t {
     /// 3D 选中高亮：三角面按线框填充，测深不写深
     Highlight3D,
     /// 3D 变换手柄：实心填充 + 深度偏移，压住模型表面不 z-fighting
-    Gizmo3D
+    Gizmo3D,
+    /// 3D 网格半透明：P3N3 + 内建光照，开混合、不写深度，按调用方排序键绘制
+    Mesh3DTransparent
 };
 
 // ==================== 数学类型 ====================
