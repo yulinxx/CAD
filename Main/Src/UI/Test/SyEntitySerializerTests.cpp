@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file SyEntitySerializerTests.cpp
  * @brief SyEntitySerializer 往返测试 — SyEntity ↔ Protobuf 序列化封装
  * 覆盖：
@@ -43,7 +43,7 @@ namespace
         return { std::move(deserialized), std::move(protoData) };
     }
 
-    /// 杈呭姪锛氶獙璇佷袱涓?Vec2d 鐩哥瓑
+    /// 辅助：验证两个 Vec2d 相等
     void expectVec2dEqual(const Ut::Vec2d& a, const Ut::Vec2d& b)
     {
         EXPECT_DOUBLE_EQ(a.x(), b.x());
@@ -51,7 +51,7 @@ namespace
     }
 }  // namespace
 
-// ==================== 绾挎搴忓垪鍖栭棴鐜?====================
+// ---- 线段序列化闭环 ----
 
 TEST(SyEntitySerializerTest, LineRoundTrip)
 {
@@ -78,7 +78,7 @@ TEST(SyEntitySerializerTest, LineRoundTrip)
     expectVec2dEqual(line->pointRef()[1], Ut::Vec2d(100.0, 200.0));
 }
 
-// ==================== 鍦嗗簭鍒楀寲闂幆 ====================
+// ---- 圆序列化闭环 ----
 
 TEST(SyEntitySerializerTest, CircleRoundTrip)
 {
@@ -97,7 +97,7 @@ TEST(SyEntitySerializerTest, CircleRoundTrip)
     EXPECT_DOUBLE_EQ(circle->dRadius, 25.0);
 }
 
-// ==================== 鍦嗗姬搴忓垪鍖栭棴鐜?====================
+// ---- 圆弧序列化闭环 ----
 
 TEST(SyEntitySerializerTest, ArcRoundTrip)
 {
@@ -118,7 +118,7 @@ TEST(SyEntitySerializerTest, ArcRoundTrip)
     EXPECT_DOUBLE_EQ(arc->dEndAngle, 1.5708);
 }
 
-// ==================== 妞渾搴忓垪鍖栭棴鐜?====================
+// ---- 椭圆序列化闭环 ----
 
 TEST(SyEntitySerializerTest, EllipseRoundTrip)
 {
@@ -139,7 +139,7 @@ TEST(SyEntitySerializerTest, EllipseRoundTrip)
     EXPECT_DOUBLE_EQ(ell->dRotation, 0.5);
 }
 
-// ==================== 鐐瑰簭鍒楀寲闂幆 ====================
+// ---- 点序列化闭环 ----
 
 TEST(SyEntitySerializerTest, PointRoundTrip)
 {
@@ -153,7 +153,7 @@ TEST(SyEntitySerializerTest, PointRoundTrip)
     expectVec2dEqual(static_cast<Eg::SyPoint*>(deserialized.get())->basePoint, Ut::Vec2d(42.0, 99.0));
 }
 
-// ==================== 多段线序列化循环（显式端点） ====================
+// ---- 多段线序列化循环（显式端点） ----
 
 TEST(SyEntitySerializerTest, PolygonRoundTrip)
 {
@@ -199,11 +199,11 @@ TEST(SyEntitySerializerTest, BulgePolygonRoundTrip)
     EXPECT_EQ(poly->vertices().size(), 2u);
 }
 
-// ==================== 多段线序列化循环（参数化） ====================
+// ---- 多段线序列化循环（参数化） ----
 
 TEST(SyEntitySerializerTest, ParametricPolygonRoundTrip)
 {
-    // 浠呬娇鐢ㄥ弬鏁板寲瀹氫箟锛坣Sides + dCircumRadius锛夛紝涓嶈缃樉寮忛《鐐?
+    // 仅使用参数化定义（nSides + dCircumRadius），不设置显式顶点
     Eg::SyPolygon original;
     original.id = 11;
     original.basePoint = Ut::Vec2d(50.0, 50.0);
@@ -222,7 +222,7 @@ TEST(SyEntitySerializerTest, ParametricPolygonRoundTrip)
     EXPECT_EQ(resultVerts.size(), 6u);
 }
 
-// ==================== 涓夋璐濆灏斿簭鍒楀寲闂幆 ====================
+// ---- 三次贝塞尔序列化闭环 ----
 
 TEST(SyEntitySerializerTest, BezierRoundTrip)
 {
@@ -243,7 +243,7 @@ TEST(SyEntitySerializerTest, BezierRoundTrip)
     expectVec2dEqual(bz->ptEnd, Ut::Vec2d(150.0, 0.0));
 }
 
-// ==================== 浜屾璐濆灏斿簭鍒楀寲闂幆 ====================
+// ---- 二次贝塞尔序列化闭环 ----
 
 TEST(SyEntitySerializerTest, Bezier2RoundTrip)
 {
@@ -262,7 +262,7 @@ TEST(SyEntitySerializerTest, Bezier2RoundTrip)
     expectVec2dEqual(bz->ptEnd, Ut::Vec2d(100.0, 0.0));
 }
 
-// ==================== 鏂囨湰搴忓垪鍖栭棴鐜?====================
+// ---- 文本序列化闭环 ----
 
 TEST(SyEntitySerializerTest, TextRoundTrip)
 {
@@ -293,7 +293,7 @@ TEST(SyEntitySerializerTest, TextRoundTrip)
     EXPECT_FALSE(txt->bItalic);
 }
 
-// ==================== 鏉″舰鐮佸簭鍒楀寲闂幆 ====================
+// ---- 条形码序列化闭环 ----
 
 TEST(SyEntitySerializerTest, BarCodeRoundTrip)
 {
@@ -314,7 +314,7 @@ TEST(SyEntitySerializerTest, BarCodeRoundTrip)
     EXPECT_DOUBLE_EQ(bc->dHeight, 30.0);
 }
 
-// ==================== 浜岀淮鐮佸簭鍒楀寲闂幆 ====================
+// ---- 二维码序列化闭环 ----
 
 TEST(SyEntitySerializerTest, QRCodeRoundTrip)
 {
@@ -362,7 +362,7 @@ TEST(SyEntitySerializerTest, QRCodeLegacyDefaults)
     EXPECT_EQ(qr->borderSize(), 4);
 }
 
-// ==================== NURBS 搴忓垪鍖栭棴鐜?====================
+// ---- NURBS 序列化闭环 ----
 
 TEST(SyEntitySerializerTest, SplineRoundTrip)
 {
@@ -397,7 +397,7 @@ TEST(SyEntitySerializerTest, SplineRoundTrip)
     EXPECT_DOUBLE_EQ(spl->weightAt(0), 1.0);
 }
 
-// ==================== 鍥惧儚搴忓垪鍖栭棴鐜?====================
+// ---- 图像序列化闭环 ----
 
 TEST(SyEntitySerializerTest, ImageRoundTrip)
 {
@@ -429,11 +429,11 @@ TEST(SyEntitySerializerTest, ImageRoundTrip)
     expectVec2dEqual(img->bottomRight, Ut::Vec2d(100.0, 200.0));
 }
 
-// ==================== 绌哄疄浣撳簭鍒楀寲 ====================
+// ---- 空实体序列化 ----
 
 TEST(SyEntitySerializerTest, EmptyLineRoundTrip)
 {
-    // 绌虹嚎娈碉紙鏃犻《鐐癸級搴忓垪鍖栧悗搴旀湁 0 涓《鐐?
+    // 空线段（无顶点）序列化后应有 0 个顶点
     Eg::SyLine original;
     original.id = 99;
 
@@ -445,11 +445,11 @@ TEST(SyEntitySerializerTest, EmptyLineRoundTrip)
     EXPECT_TRUE(line->pointRef().empty());
 }
 
-// ==================== 搴忓垪鍖栭€氱敤灞炴€ч獙璇?====================
+// ---- 序列化通用属性验证 ----
 
 TEST(SyEntitySerializerTest, CommonPropertiesRoundTrip)
 {
-    // 楠岃瘉 id, basePoint, bClosed, bCCW 绛夐€氱敤灞炴€ф纭簭鍒楀寲
+    // 验证 id, basePoint, bClosed, bCCW 等通用属性正确序列化
     Eg::SyCircle original;
     original.id = 12345;
     original.basePoint = Ut::Vec2d(-100.0, 200.0);
@@ -480,12 +480,12 @@ TEST(SyEntitySerializerTest, NameRoundTrip)
     EXPECT_STREQ(deserialized->name(), "LayeredCircle");
 }
 
-// ==================== 澶?ID 鍊煎簭鍒楀寲 ====================
+// ---- 大 ID 值序列化 ----
 
 TEST(SyEntitySerializerTest, LargeIdRoundTrip)
 {
     Eg::SyPoint original;
-    original.id = 0xFFFFFFFFFFFFFFFFULL;  // 鏈€澶?uint64_t
+    original.id = 0xFFFFFFFFFFFFFFFFULL;  // 最大 uint64_t
     original.basePoint = Ut::Vec2d(0.0, 0.0);
 
     auto [deserialized, proto] = roundTrip<Eg::SyPoint>(original);
@@ -493,7 +493,7 @@ TEST(SyEntitySerializerTest, LargeIdRoundTrip)
     EXPECT_EQ(deserialized->id, 0xFFFFFFFFFFFFFFFFULL);
 }
 
-// ==================== 顶点精度验证 ====================
+// ---- 顶点精度验证 ----
 
 TEST(SyEntitySerializerTest, DoublePrecisionRoundTrip)
 {
@@ -512,21 +512,21 @@ TEST(SyEntitySerializerTest, DoublePrecisionRoundTrip)
     EXPECT_DOUBLE_EQ(circle->dRadius, 3.14159265358979);
 }
 
-// ==================== 涓枃鏂囨湰搴忓垪鍖?====================
+// ---- 中文文本序列化 ----
 
 TEST(SyEntitySerializerTest, ChineseTextRoundTrip)
 {
     Eg::SyText original;
     original.id = 40;
     original.basePoint = Ut::Vec2d(0.0, 0.0);
-    original.setText("浣犲ソ涓栫晫");
-    original.setFontName("瀹嬩綋");
+    original.setText("你好世界");
+    original.setFontName("宋体");
     original.dHeight = 16.0;
 
     auto [deserialized, proto] = roundTrip<Eg::SyText>(original);
     ASSERT_NE(deserialized, nullptr);
 
     auto* txt = static_cast<Eg::SyText*>(deserialized.get());
-    EXPECT_EQ(txt->textStr(), "浣犲ソ涓栫晫");
-    EXPECT_EQ(txt->fontNameStr(), "瀹嬩綋");
+    EXPECT_EQ(txt->textStr(), "你好世界");
+    EXPECT_EQ(txt->fontNameStr(), "宋体");
 }

@@ -10,9 +10,9 @@
  *  - SavePoint 保存点
  *  - 历史上限（按 maxHistorySize 自适应，不写死数值）
  *
- * 注：原先针对 MoveEntityCommand 的用例随该类一并移除 —— 平移现在统一走
- *     SceneEditService + EntitySnapshotsCommand，其「连续微调合并成一条」的
- *     语义由 EntitySnapshots_MergeTwoCommands / _MergeIsSymmetric 覆盖。
+ * 注：平移统一走 SceneEditService + EntitySnapshotsCommand（没有 MoveEntityCommand），
+ *     「连续微调合并成一条」的语义由 EntitySnapshots_MergeTwoCommands /
+ *     _MergeIsSymmetric 覆盖。
  */
 
 #include <gtest/gtest.h>
@@ -44,7 +44,7 @@ namespace
     }
 }  // namespace
 
-// ==================== 基础命令测试 ====================
+// ---- 基础命令测试 ----
 
 TEST(UndoRedoRegressionTest, AddEntitiesCommand_ExecuteAndUndo)
 {
@@ -180,7 +180,7 @@ TEST(UndoRedoRegressionTest, LambdaCommand)
     EXPECT_EQ(counter, 1);
 }
 
-// ==================== 快照命令测试 ====================
+// ---- 快照命令测试 ----
 
 TEST(UndoRedoRegressionTest, EntitySnapshotsCommand_RoundTrip)
 {
@@ -259,7 +259,7 @@ TEST(UndoRedoRegressionTest, EntitySnapshotsCommand_RoundTrip)
     EXPECT_DOUBLE_EQ(redoneCircle->dRadius, 5.0);
 }
 
-// ==================== 批量事务测试 ====================
+// ---- 批量事务测试 ----
 
 TEST(UndoRedoRegressionTest, BatchTransaction_GroupedUndo)
 {
@@ -309,7 +309,7 @@ TEST(UndoRedoRegressionTest, BatchTransaction_Description)
     EXPECT_STREQ(undoMgr.undoText(), "Create 2 entities + delete 1");
 }
 
-// ==================== 保存点测试 ====================
+// ---- 保存点测试 ----
 
 TEST(UndoRedoRegressionTest, SavePoint_DetectDirty)
 {
@@ -331,7 +331,7 @@ TEST(UndoRedoRegressionTest, SavePoint_DetectDirty)
     EXPECT_TRUE(undoMgr.isAtSavePoint());
 }
 
-// ==================== 历史上限测试 ====================
+// ---- 历史上限测试 ----
 
 TEST(UndoRedoRegressionTest, HistoryLimit_TrimsExcess)
 {
@@ -351,7 +351,7 @@ TEST(UndoRedoRegressionTest, HistoryLimit_TrimsExcess)
     EXPECT_EQ(undoMgr.undoCount(), limit);
 }
 
-// ==================== 清除测试 ====================
+// ---- 清除测试 ----
 
 TEST(UndoRedoRegressionTest, Clear_ResetsAll)
 {
@@ -372,7 +372,7 @@ TEST(UndoRedoRegressionTest, Clear_ResetsAll)
     EXPECT_EQ(undoMgr.redoCount(), 0u);
 }
 
-// ==================== 描述文本测试 ====================
+// ---- 描述文本测试 ----
 
 TEST(UndoRedoRegressionTest, DescriptionText)
 {
@@ -391,7 +391,7 @@ TEST(UndoRedoRegressionTest, DescriptionText)
     EXPECT_FALSE(undoMgr.redoText()[0] == '\0');
 }
 
-// ==================== 空状态测试 ====================
+// ---- 空状态测试 ----
 
 TEST(UndoRedoRegressionTest, CannotUndoRedoWhenEmpty)
 {
@@ -409,7 +409,7 @@ TEST(UndoRedoRegressionTest, CannotUndoRedoWhenEmpty)
     EXPECT_FALSE(undoMgr.canRedo());
 }
 
-// ==================== 嵌套批量事务测试 ====================
+// ---- 嵌套批量事务测试 ----
 
 TEST(UndoRedoRegressionTest, NestedBatchTransaction)
 {
@@ -436,7 +436,7 @@ TEST(UndoRedoRegressionTest, NestedBatchTransaction)
     EXPECT_EQ(scene.getEntityCount(), 0u);
 }
 
-// ==================== Observer 通知测试 ====================
+// ---- Observer 通知测试 ----
 
 class MockUndoObserver : public IUndoRedoObserver
 {
@@ -546,7 +546,7 @@ TEST(UndoRedoRegressionTest, AddEntitiesCommand_BatchAddAndUndo)
     EXPECT_EQ(scene.getEntityCount(), 0u);
 }
 
-// ==================== 保存点边界测试 ====================
+// ---- 保存点边界测试 ----
 
 TEST(UndoRedoRegressionTest, SavePoint_AfterMultipleUndo)
 {
@@ -585,11 +585,11 @@ TEST(UndoRedoRegressionTest, SavePoint_AfterClear)
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
 
     undoMgr.clear();
-    // after clear, stack is empty and save point index resets to default, so isAtSavePoint() returns true
+    // 清空后栈为空、保存点索引复位，因此 isAtSavePoint() 返回 true
     EXPECT_TRUE(undoMgr.isAtSavePoint());
 }
 
-// ==================== 历史上限边界测试 ====================
+// ---- 历史上限边界测试 ----
 
 TEST(UndoRedoRegressionTest, HistoryLimit_ExactlyAtLimit)
 {
@@ -610,7 +610,7 @@ TEST(UndoRedoRegressionTest, HistoryLimit_ExactlyAtLimit)
     EXPECT_EQ(scene.getEntityCount(), limit);
 }
 
-// ==================== 空 Batch 边界测试 ====================
+// ---- 空 Batch 边界测试 ----
 
 TEST(UndoRedoRegressionTest, Batch_EmptyBatchNoCrash)
 {
@@ -656,7 +656,7 @@ TEST(UndoRedoRegressionTest, Batch_UndoRedoStackState)
     EXPECT_FALSE(undoMgr.canRedo());
 }
 
-// ==================== EntitySnapshotsCommand 合并测试 ====================
+// ---- EntitySnapshotsCommand 合并测试 ----
 
 TEST(UndoRedoRegressionTest, EntitySnapshots_MergeTwoCommands)
 {
@@ -794,7 +794,7 @@ TEST(UndoRedoRegressionTest, EntitySnapshots_MergeIsSymmetric)
     EXPECT_TRUE(undoMgr.canUndo());
 }
 
-// ==================== 图元属性变更测试 ====================
+// ---- 图元属性变更测试 ----
 
 TEST(UndoRedoRegressionTest, PropertyChange_Visibility)
 {
@@ -898,7 +898,7 @@ TEST(UndoRedoRegressionTest, PropertyChange_SelectionState)
     EXPECT_TRUE(rawLine->selected());
 }
 
-// ==================== 混合图元类型批量测试 ====================
+// ---- 混合图元类型批量测试 ----
 
 TEST(UndoRedoRegressionTest, Batch_MixedEntityTypes)
 {

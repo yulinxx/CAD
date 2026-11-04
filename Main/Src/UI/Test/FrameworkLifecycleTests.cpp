@@ -82,7 +82,7 @@ TEST(FrameworkLifecycleTest, UiStateSnapshot_DefaultsAreStable)
     EXPECT_EQ(snapshot.currentSelectionType, QStringLiteral("none"));
 }
 
-// ==================== P0 回归测试 ====================
+// ---- 回归测试 ----
 
 TEST(FrameworkRegressionTest, UiStateSnapshot_AllFieldsHaveDefaults)
 {
@@ -206,7 +206,7 @@ TEST(FrameworkRegressionTest, ISceneDataSource_DefaultImplementations)
         &visited);
     EXPECT_FALSE(visited);  // 默认实现不遍历任何图元
 
-    // ABI 收口：entityName 改为 buffer 模式，默认实现返回空字符串
+    // ABI 收口：entityName 使用 buffer 模式，默认实现返回空字符串
     char nameBuf[64] = {};
     EXPECT_EQ(ds.entityName(42, nameBuf, sizeof(nameBuf)), 0u);
     EXPECT_STREQ(nameBuf, "");
@@ -241,7 +241,7 @@ TEST(FrameworkRegressionTest, ISceneGeometrySink_EmitBBoxDefaultIsNoop)
     SUCCEED();
 }
 
-// ==================== 场景序列化往返测试 ====================
+// ---- 场景序列化往返测试 ----
 
 TEST(FrameworkRegressionTest, SerializationRoundtrip_EntityCountAndTypes)
 {
@@ -351,7 +351,7 @@ TEST(FrameworkRegressionTest, SerializationRoundtrip_EntityProperties)
     EXPECT_TRUE(loadedPolygon->bClosed);
 }
 
-// ==================== 2D/3D 视口切换回归测试 ====================
+// ---- 2D/3D 视口切换回归测试 ----
 
 TEST(FrameworkRegressionTest, ViewportSwitch_WorkbenchSnapshotPreservesState)
 {
@@ -462,7 +462,7 @@ TEST(FrameworkRegressionTest, ViewportSwitch_ViewportStatePerViewport)
         saved3D.metadata.value(QStringLiteral("viewportStatus")));
 }
 
-// ==================== 渲染快照一致性测试 ====================
+// ---- 渲染快照一致性测试 ----
 
 TEST(FrameworkRegressionTest, SceneGeometryCollector_DeterministicOutput)
 {
@@ -523,7 +523,7 @@ TEST(FrameworkRegressionTest, ISceneDataSource_GatherGeometryDeterministic)
             sink.emitBBox(Ut::BBox3f(Ut::Vec3f(-1, -1, -1), Ut::Vec3f(1, 1, 1)));
 
             sink.setCurrentEntityId(20);
-            // ABI 收口：emitTriangleSoup 参数改为原始指针
+            // ABI 收口：emitTriangleSoup 参数使用原始指针
             Ut::Vec3f verts[] = { Ut::Vec3f(0, 0, 0), Ut::Vec3f(2, 0, 0), Ut::Vec3f(0, 2, 0) };
             Ut::Vec3f norms[] = { Ut::Vec3f(0, 0, 1), Ut::Vec3f(0, 0, 1), Ut::Vec3f(0, 0, 1) };
             sink.emitTriangleSoup(verts, 3, norms, 3, Ut::Color());
@@ -606,7 +606,7 @@ TEST(FrameworkRegressionTest, SceneGeometryCollector_ConsistentAcrossMultipleCal
     EXPECT_EQ(collector.meshCount(), 0u);
 }
 
-// ==================== 撤销/重做回归测试 ====================
+// ---- 撤销/重做回归测试 ----
 
 TEST(FrameworkRegressionTest, UndoRedo_CreateUndoEntityRemoved)
 {

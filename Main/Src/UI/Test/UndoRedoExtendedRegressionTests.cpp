@@ -25,7 +25,7 @@
 #include <memory>
 #include <vector>
 
-// ==================== 删除后撤销测试（含属性完整性验证） ====================
+// ---- 删除后撤销测试（含属性完整性验证） ----
 
 TEST(UndoRedoExtendedRegressionTest, DeleteUndo_RestoresAllProperties)
 {
@@ -154,7 +154,7 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_CircleAttributes)
     EXPECT_DOUBLE_EQ(restoredCircle->dRadius, 25.0);
 }
 
-// ==================== 绘图后撤销测试 ====================
+// ---- 绘图后撤销测试 ----
 
 TEST(UndoRedoExtendedRegressionTest, DrawUndo_EntityRemoved)
 {
@@ -186,7 +186,7 @@ TEST(UndoRedoExtendedRegressionTest, DrawUndo_EntityRemoved)
     EXPECT_NE(scene.findSyEntityById(lineId), nullptr);
 }
 
-// ==================== 导入（批量）后撤销测试 ====================
+// ---- 导入（批量）后撤销测试 ----
 
 TEST(UndoRedoExtendedRegressionTest, ImportBatch_UndoRemovesAll)
 {
@@ -222,7 +222,7 @@ TEST(UndoRedoExtendedRegressionTest, ImportBatch_UndoRemovesAll)
     EXPECT_EQ(scene.getEntityCount(), 3u);
 }
 
-// ==================== 选中状态在 undo/redo 后的恢复 ====================
+// ---- 选中状态在 undo/redo 后的恢复 ----
 
 TEST(UndoRedoExtendedRegressionTest, SelectionState_DrawUndoSelectionCleared)
 {
@@ -298,7 +298,7 @@ TEST(UndoRedoExtendedRegressionTest, SelectionState_MultipleSelectAfterUndo)
     EXPECT_EQ(scene.getSelectedEntityCount(), 0u);
 }
 
-// ==================== 脏标记状态测试 ====================
+// ---- 脏标记状态测试 ----
 
 TEST(UndoRedoExtendedRegressionTest, DirtyState_AfterUndoRedo)
 {
@@ -329,7 +329,7 @@ TEST(UndoRedoExtendedRegressionTest, DirtyState_AfterUndoRedo)
     EXPECT_EQ(scene.getEntityCount(), 0u);
 }
 
-// ==================== 批量导入后多次 undo/redo 测试 ====================
+// ---- 批量导入后多次 undo/redo 测试 ----
 
 TEST(UndoRedoExtendedRegressionTest, BatchImport_MultiRoundUndoRedo)
 {
@@ -381,7 +381,7 @@ TEST(UndoRedoExtendedRegressionTest, BatchImport_MultiRoundUndoRedo)
     EXPECT_EQ(scene.getEntityCount(), 2u);
 }
 
-// ==================== 属性修改撤销测试 ====================
+// ---- 属性修改撤销测试 ----
 
 TEST(UndoRedoExtendedRegressionTest, DrawAfterUndo_EntityCountCorrect)
 {
@@ -583,7 +583,7 @@ TEST(UndoRedoExtendedRegressionTest, RedoStackClearedOnNewCommand)
     EXPECT_FALSE(undoMgr.canRedo());
 }
 
-// ==================== P5 补充：批量操作嵌套测试 ====================
+// ---- 批量操作嵌套测试 ----
 
 TEST(UndoRedoExtendedRegressionTest, Batch_NestedBatchNotAllowed)
 {
@@ -612,7 +612,7 @@ TEST(UndoRedoExtendedRegressionTest, Batch_EmptyBatch)
     EXPECT_EQ(undoMgr.undoCount(), 0u);
 }
 
-// ==================== P5 补充：删除后选中状态恢复 ====================
+// ---- 删除后选中状态恢复 ----
 
 TEST(UndoRedoExtendedRegressionTest, DeleteUndo_SelectionViaSceneManager)
 {
@@ -643,7 +643,7 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_SelectionViaSceneManager)
     EXPECT_EQ(scene.getSelectedEntityCount(), 0u);
 }
 
-// ==================== P5 补测试: 导入后撤销/重做选中状态恢复 ====================
+// ---- 导入后撤销/重做选中状态恢复 ----
 
 TEST(UndoRedoExtendedRegressionTest, UndoRedo_ImportEntitySelectionRestore)
 {

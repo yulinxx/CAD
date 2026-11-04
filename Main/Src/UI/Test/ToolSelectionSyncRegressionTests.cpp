@@ -52,7 +52,7 @@ namespace
     }
 }  // namespace
 
-// ==================== ToolManager 构造与生命周期 ====================
+// ---- ToolManager 构造与生命周期 ----
 
 TEST(ToolSelectionSyncRegressionTest, ToolManager_DefaultConstruction)
 {
@@ -71,7 +71,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_DestructorWithoutInit)
     SUCCEED();
 }
 
-// ==================== ToolManager 工具注册 ====================
+// ---- ToolManager 工具注册 ----
 
 TEST(ToolSelectionSyncRegressionTest, ToolManager_RegisterSelectTool)
 {
@@ -88,7 +88,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_RegisterMultipleTools)
     SUCCEED();
 }
 
-// ==================== ToolManager 初始化 ====================
+// ---- ToolManager 初始化 ----
 
 TEST(ToolSelectionSyncRegressionTest, ToolManager_InitializeTools)
 {
@@ -132,7 +132,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_DoubleInitialize)
     EXPECT_TRUE(tm.isInitialized());
 }
 
-// ==================== ToolManager 工具切换 ====================
+// ---- ToolManager 工具切换 ----
 
 TEST(ToolSelectionSyncRegressionTest, ToolManager_SetActiveTool)
 {
@@ -217,7 +217,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_CancelCurrentTool_NoActive)
     SUCCEED();
 }
 
-// ==================== ToolManager 回调链 ====================
+// ---- ToolManager 回调链 ----
 
 TEST(ToolSelectionSyncRegressionTest, ToolManager_EntityCallback)
 {
@@ -274,7 +274,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_NullCallbackSet)
     SUCCEED();
 }
 
-// ==================== SelectTool 生命周期 ====================
+// ---- SelectTool 生命周期 ----
 
 TEST(SelectToolRegressionTest, Construction)
 {
@@ -326,7 +326,7 @@ TEST(SelectToolRegressionTest, Cancel)
     EXPECT_FALSE(tool.hasSelectedEntities());
 }
 
-// ==================== SelectTool 选择同步 ====================
+// ---- SelectTool 选择同步 ----
 
 TEST(SelectToolRegressionTest, SyncSelectionFromScene_Empty)
 {
@@ -363,7 +363,7 @@ TEST(SelectToolRegressionTest, SyncSelectionFromScene_WithEntities)
     EXPECT_TRUE(tool.hasSelectedEntities());
 }
 
-// ==================== 选择状态在增删图元后的同步 ====================
+// ---- 选择状态在增删图元后的同步 ----
 
 TEST(SelectionSyncExtendedTest, AddEntity_SelectionStateUnchanged)
 {
@@ -464,7 +464,7 @@ TEST(SelectionSyncExtendedTest, SelectAllThenDeselectOne)
     EXPECT_EQ(scene.getSelectedEntityCount(), 2u);
 }
 
-// ==================== 删除后无悬空选中状态 ====================
+// ---- 删除后无悬空选中状态 ----
 
 TEST(SelectionSyncExtendedTest, DeleteAllEntities_ClearsSelection)
 {
@@ -503,7 +503,7 @@ TEST(SelectionSyncExtendedTest, ClearSceneThenSelect_NoCrash)
     SUCCEED();
 }
 
-// ==================== 混合图元类型选择 ====================
+// ---- 混合图元类型选择 ----
 
 TEST(SelectionSyncExtendedTest, SelectMixedEntityTypes)
 {
@@ -564,7 +564,7 @@ TEST(SelectionSyncExtendedTest, SelectMixedTypes_DeleteOne_CheckOthers)
     EXPECT_EQ(scene.findSyEntityById(lineId), nullptr);
 }
 
-// ==================== 悬空选中与工具状态一致性 ====================
+// ---- 悬空选中与工具状态一致性 ----
 
 TEST(SelectionSyncExtendedTest, DeleteSelectedViaDeleteEntity_ClearsSelection)
 {
@@ -647,7 +647,7 @@ TEST(SelectionSyncExtendedTest, DeleteEntity_CheckDirtyAndDeleted)
     EXPECT_EQ(scene.getSelectedEntityCount(), 0u);
 }
 
-// ==================== SelectTool 与场景一致性测试 ====================
+// ---- SelectTool 与场景一致性测试 ----
 
 TEST(SelectToolRegressionTest, SyncFromScene_AfterExternalDelete)
 {
@@ -735,7 +735,7 @@ TEST(SelectToolRegressionTest, SyncFromScene_AfterExternalSelectChange)
     EXPECT_TRUE(tool.hasSelectedEntities());
 }
 
-// ==================== ToolManager 空指针安全测试 ====================
+// ---- ToolManager 空指针安全测试 ----
 
 TEST(ToolSelectionSyncRegressionTest, ToolManager_SetActiveTool_BeforeInit)
 {
@@ -786,7 +786,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_GetToolCount_BeforeInit)
     EXPECT_EQ(tm.getToolCount(), 0u);
 }
 
-// ==================== 工具回调链完整性测试 ====================
+// ---- 工具回调链完整性测试 ----
 
 TEST(ToolSelectionSyncRegressionTest, ToolManager_AllToolsReceiveEntityCallback)
 {
@@ -808,7 +808,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_AllToolsReceiveEntityCallback)
     SUCCEED();
 }
 
-// ==================== P5 补充：工具与选择状态深度同步测试 ====================
+// ---- 工具与选择状态深度同步测试 ----
 
 TEST(SelectToolRegressionTest, HasSelectedEntities_AfterSyncFromEmpty)
 {
@@ -883,7 +883,7 @@ TEST(SelectToolRegressionTest, Deactivate_DoesNotAffectSelection)
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 }
 
-// ==================== P5 补充：ToolManager 工具切换与选择同步 ====================
+// ---- ToolManager 工具切换与选择同步 ----
 
 TEST(ToolSelectionSyncRegressionTest, ToolManager_CancelActiveToolDuringOperation)
 {
@@ -928,7 +928,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_RepeatedActivateDeactivate)
     }
 }
 
-// ==================== P5 补充：选择状态在场景变更后的一致性 ====================
+// ---- 选择状态在场景变更后的一致性 ----
 
 TEST(SelectionSyncExtendedTest, ClearSceneAfterSelect_NoCrash)
 {
@@ -1055,7 +1055,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_AllToolsReceiveSwitchCallback)
     SUCCEED();
 }
 
-// ==================== P5 补测试: 外部修改选择状态同步 ====================
+// ---- 外部修改选择状态同步 ----
 
 TEST(ToolSelectionSyncRegressionTest, ExternalModify_SyncAfterSceneDelete)
 {
@@ -1165,7 +1165,7 @@ TEST(ToolSelectionSyncRegressionTest, SelectTool_ConsistencyWithScene)
     EXPECT_FALSE(svc.isSelected(idStr.c_str()));
 }
 
-// ==================== P5 补测试: 无悬空选中状态 ====================
+// ---- 无悬空选中状态 ----
 
 TEST(ToolSelectionSyncRegressionTest, NoDangling_DeleteAllEntitiesOneByOne)
 {
@@ -1245,13 +1245,10 @@ TEST(ToolSelectionSyncRegressionTest, NoDangling_DeleteMixedTypes)
     EXPECT_EQ(scene.findSyEntityById(idCircle), nullptr);
 }
 
-// ==================== 本体拖动平移 + 变换撤销（Gizmo 全链路） ====================
-//
-// 这一组补的是集成缺口：原先只有 EntitySnapshotsCommand 的单元测试，
-// 「SelectionGizmo::onMousePress/Move/Release → InteractiveEditSession → 撤销栈」
-// 这一整条没有任何覆盖。wireGizmo() 里的 `if (m_sceneEdit)` 一旦因注入顺序变化
-// 落空，变换就静默失去撤销，而旧测试全部照绿。
-//
+// ---- 本体拖动平移 + 变换撤销（Gizmo 全链路） ----
+// 这一组覆盖集成链路：SelectionGizmo::onMousePress/Move/Release → InteractiveEditSession → 撤销栈。
+// wireGizmo() 里的 `if (m_sceneEdit)` 一旦因注入顺序变化落空，变换就静默失去撤销，
+// 因此必须端到端验证撤销登记，而不能只测 EntitySnapshotsCommand 单元。
 // 平移的判据是 HandleKind::Body —— 名字里有 Handle，但它不是手柄：
 // 它表示"按在图元本体上"，由 hitsSelectedGeometry() → Geo2DQuery::hitTest 判定，
 // 缩放/旋转手柄在它之前就已判完并返回。所以「点在图元上按住左键拖」和

@@ -367,8 +367,67 @@ TEST_F(LayerPersistenceBridgeTest, MultipleLayers_ChangeColor)
 
     auto record = findLayerInDb("doc_001", layerId);
     ASSERT_TRUE(record.has_value());
-    // 颜色应被更新（0.25/0.5/0.75 → 63/127/191 → #3f7fbf，toHexRGB 返回小写十六进制）
-    EXPECT_EQ(record->color, "#3f7fbf");
+    // 颜色应被更新（0.25/0.5/0.75/1.0 → 63/127/191/255 → #3f7fbfff，
+    // toHexRGBA 返回小写十六进制并带 alpha）
+    EXPECT_EQ(record->color, "#3f7fbfff");
+}
+
+// ==================== 颜色 alpha 持久化 ====================
+
+/// 图层色 alpha 写入数据库后可按 #RRGGBBAA 原样回读
+TEST_F(LayerPersistenceBridgeTest, LayerColorAlpha_PersistsAndRoundTrips)
+{
+    m_bridge->setDocumentId("doc_alpha");
+    m_bridge->attach();
+
+    // 用未被默认图层占用的颜色；alpha=128 验证非不透明值也会被保留
+    int layerId = m_layerManager->createLayer("AlphaColorLayer");
+    ASSERT_GT(layerId, 0);
+    ASSERT_TRUE(m_layerManager->setLayerColor(layerId, Ut::Color::fromRGB255(10, 20, 30, 128)));
+
+    auto record = findLayerInDb("doc_alpha", layerId);
+    ASSERT_TRUE(record.has_value());
+    EXPECT_EQ(record->color, "#0a141e80");
+
+    Ut::Color restored = Ut::Color::fromHex(record->color);
+    EXPECT_EQ(restored.red255(), 10);
+    EXPECT_EQ(restored.green255(), 20);
+    EXPECT_EQ(restored.blue255(), 30);
+    EXPECT_EQ(restored.alpha255(), 128);
+}
+
+/// 图层填充色 alpha 同样完整落库
+TEST_F(LayerPersistenceBridgeTest, LayerFillColorAlpha_PersistsAndRoundTrips)
+{
+    m_bridge->setDocumentId("doc_fill_alpha");
+    m_bridge->attach();
+
+    int layerId = m_layerManager->createLayer("AlphaFillLayer");
+    ASSERT_GT(layerId, 0);
+    ASSERT_TRUE(m_layerManager->setLayerColor(layerId, Ut::Color::fromRGB255(90, 40, 200)));
+    ASSERT_TRUE(m_layerManager->setLayerFill(layerId, true));
+    ASSERT_TRUE(m_layerManager->setLayerFillColor(layerId, Ut::Color::fromRGB255(200, 40, 10, 64)));
+
+    auto record = findLayerInDb("doc_fill_alpha", layerId);
+    ASSERT_TRUE(record.has_value());
+    EXPECT_EQ(record->fillColor, "#c8280a40");
+    EXPECT_EQ(Ut::Color::fromHex(record->fillColor).alpha255(), 64);
+}
+
+/// 历史 6 位十六进制记录（无 alpha）解析后必须为不透明
+TEST_F(LayerPersistenceBridgeTest, LegacySixDigitColor_ReadsOpaque)
+{
+    ASSERT_TRUE(m_database->execute(
+        "INSERT INTO layers (document_id, layer_id, name, color) VALUES ('doc_legacy', 3, 'Legacy', '#3f7fbf')"));
+
+    auto layers = m_layerRepository->loadByDocument("doc_legacy");
+    ASSERT_EQ(layers.size(), 1u);
+    EXPECT_EQ(layers[0].color, "#3f7fbf");
+    Ut::Color restored = Ut::Color::fromHex(layers[0].color);
+    EXPECT_EQ(restored.red255(), 63);
+    EXPECT_EQ(restored.green255(), 127);
+    EXPECT_EQ(restored.blue255(), 191);
+    EXPECT_EQ(restored.alpha255(), 255);
 }
 
 // ==================== 空指针安全性测试 ====================

@@ -23,9 +23,7 @@
 #include <vector>
 #include <string>
 
-// ============================================================================
-// 测试用观察者 — 记录所有收到的通知
-// ============================================================================
+// ---- 测试用观察者 — 记录所有收到的通知 ----
 
 class TestObserver : public Eg::SceneNotifier::IObserver
 {
@@ -64,9 +62,7 @@ public:
     size_t m_removedCount = 0;
 };
 
-// ============================================================================
-// 观察者注册与移除
-// ============================================================================
+// ---- 观察者注册与移除 ----
 
 TEST(SceneNotifierTest, AddObserver_NullIgnored)
 {
@@ -119,7 +115,7 @@ TEST(SceneNotifierTest, AddRemoveObserver_Multiple)
     notifier.notifySceneChanged();
 
     EXPECT_EQ(obs1.m_calls.size(), 1u);
-    EXPECT_TRUE(obs2.m_calls.empty());  // 已移除，不应收到
+    EXPECT_TRUE(obs2.m_calls.empty());  // 已注销，不应再收到通知
     EXPECT_EQ(obs3.m_calls.size(), 1u);
 }
 
@@ -136,9 +132,7 @@ TEST(SceneNotifierTest, AddObserver_DuplicateOk)
     EXPECT_GE(obs.m_calls.size(), 1u);
 }
 
-// ============================================================================
-// 场景变更通知
-// ============================================================================
+// ---- 场景变更通知 ----
 
 TEST(SceneNotifierTest, NotifySceneChanged_SingleObserver)
 {
@@ -188,9 +182,7 @@ TEST(SceneNotifierTest, NotifySceneChanged_MultipleCalls)
     EXPECT_EQ(obs.m_calls.size(), 3u);
 }
 
-// ============================================================================
-// 选择变更通知
-// ============================================================================
+// ---- 选择变更通知 ----
 
 TEST(SceneNotifierTest, NotifySelectionChanged_SingleObserver)
 {
@@ -224,9 +216,7 @@ TEST(SceneNotifierTest, NotifySelectionChanged_NoObservers)
     SUCCEED();
 }
 
-// ============================================================================
-// 图元添加通知
-// ============================================================================
+// ---- 图元添加通知 ----
 
 TEST(SceneNotifierTest, NotifyEntityAdded_SingleObserver)
 {
@@ -276,9 +266,7 @@ TEST(SceneNotifierTest, NotifyEntityAdded_MultipleEntities)
     EXPECT_EQ(obs.m_addedEntities[2], &line3);
 }
 
-// ============================================================================
-// 图元移除通知
-// ============================================================================
+// ---- 图元移除通知 ----
 
 TEST(SceneNotifierTest, NotifyEntityRemoved_SingleObserver)
 {
@@ -304,9 +292,7 @@ TEST(SceneNotifierTest, NotifyEntityRemoved_MultipleObservers)
     EXPECT_EQ(obs2.m_removedCount, 1u);
 }
 
-// ============================================================================
-// 批量更新与延迟通知
-// ============================================================================
+// ---- 批量更新与延迟通知 ----
 
 TEST(SceneNotifierTest, Batch_BeginEndEmpty)
 {
@@ -456,9 +442,7 @@ TEST(SceneNotifierTest, Batch_EndBatchDepthUnderflow)
     SUCCEED();
 }
 
-// ============================================================================
-// 混合通知顺序
-// ============================================================================
+// ---- 混合通知顺序 ----
 
 TEST(SceneNotifierTest, MixedNotifications_Order)
 {
@@ -477,9 +461,7 @@ TEST(SceneNotifierTest, MixedNotifications_Order)
     EXPECT_EQ(obs.m_calls[2], "sceneChanged");
 }
 
-// ============================================================================
-// 默认构造与析构
-// ============================================================================
+// ---- 默认构造与析构 ----
 
 TEST(SceneNotifierTest, DefaultConstruction)
 {
@@ -498,9 +480,7 @@ TEST(SceneNotifierTest, DestructorWithObservers)
     SUCCEED();
 }
 
-// ============================================================================
-// 不与 SceneManager 耦合的独立性测试
-// ============================================================================
+// ---- 不与 SceneManager 耦合的独立性测试 ----
 
 TEST(SceneNotifierTest, IndependentFromSceneManager)
 {

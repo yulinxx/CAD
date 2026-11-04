@@ -56,7 +56,7 @@ namespace
     }();
 }  // namespace
 
-// ==================== ImportService 基础流程测试 ====================
+// ---- ImportService 基础流程测试 ----
 
 TEST(ImportExportRegressionTest, ImportService_DefaultConstruction)
 {
@@ -217,7 +217,7 @@ TEST(ImportExportRegressionTest, ImportService_ImportFileUnconfigured)
     EXPECT_FALSE(result.success);
 }
 
-// ==================== RecentFileService：legacy 行迁移与 QSettings 兜底 ====================
+// ---- RecentFileService：legacy 行迁移与 QSettings 兜底 ----
 
 namespace
 {
@@ -317,7 +317,7 @@ TEST(RecentFileServiceRegressionTest, FallsBackToQSettingsWhenDbHasNoRowsForCurr
     persistence.shutdown();
 }
 
-// ==================== ExportService 基础流程测试 ====================
+// ---- ExportService 基础流程测试 ----
 
 TEST(ImportExportRegressionTest, ExportService_DefaultConstruction)
 {
@@ -402,7 +402,7 @@ TEST(ImportExportRegressionTest, ExportService_CollectAllEntitiesWithData)
     EXPECT_EQ(entities.size(), 1u);
 }
 
-// ==================== FioEntityConverter 扩展测试 ====================
+// ---- FioEntityConverter 扩展测试 ----
 
 // 元数据转换测试
 TEST(ImportExportRegressionTest, FioEntityConverter_MetadataTransfer)
@@ -589,7 +589,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_SourceFormatPreserved)
     EXPECT_EQ(result[0]->eType, Eg::EType::LINE);
 }
 
-// ==================== 导入导出链路一致性测试 ====================
+// ---- 导入导出链路一致性测试 ----
 
 TEST(ImportExportRegressionTest, Chain_EntityCountAfterImport)
 {
@@ -692,7 +692,7 @@ TEST(ImportExportRegressionTest, Chain_CollectAfterDelete)
     EXPECT_TRUE(collected.empty());
 }
 
-// ==================== 图层链一致性测试 ====================
+// ---- 图层链一致性测试 ----
 
 TEST(ImportExportRegressionTest, LayerChain_ExtractAndVerify)
 {
@@ -737,7 +737,7 @@ TEST(ImportExportRegressionTest, LayerChain_ExtractAndVerify)
     EXPECT_TRUE(result[2].locked);
 }
 
-// ==================== 服务信号测试 ====================
+// ---- 服务信号测试 ----
 
 TEST(ImportExportRegressionTest, ImportService_Signals)
 {
@@ -774,7 +774,7 @@ TEST(ImportExportRegressionTest, ExportService_Signals)
     SUCCEED();
 }
 
-// ==================== 3D SceneManager 注入测试 ====================
+// ---- 3D SceneManager 注入测试 ----
 
 TEST(ImportExportRegressionTest, ImportService_SetSceneManager3D)
 {
@@ -786,7 +786,7 @@ TEST(ImportExportRegressionTest, ImportService_SetSceneManager3D)
     SUCCEED();
 }
 
-// ==================== 边界条件测试 ====================
+// ---- 边界条件测试 ----
 
 TEST(ImportExportRegressionTest, ImportService_ImportFileWithNullSceneManager)
 {
@@ -815,7 +815,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_ConvertNullEntityInfo)
     EXPECT_TRUE(result.empty());
 }
 
-// ==================== FioEntityConverter 深度测试 ====================
+// ---- FioEntityConverter 深度测试 ----
 
 TEST(ImportExportRegressionTest, FioEntityConverter_ConvertLineEntity)
 {
@@ -931,7 +931,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_EntityInfoWithLayerId)
     // 图层信息应通过 layerSourceId 传递
 }
 
-// ==================== SyEntitySerializer 深度测试 ====================
+// ---- SyEntitySerializer 深度测试 ----
 
 TEST(ImportExportRegressionTest, SyEntitySerializer_LineRoundTripWithLayer)
 {
@@ -1000,7 +1000,7 @@ TEST(ImportExportRegressionTest, SyEntitySerializer_ArcRoundTripWithLayer)
     EXPECT_STREQ(restored->name(), "LayerArc");
 }
 
-// ==================== P5 补充：导入后图元数/图层/名称一致性 ====================
+// ---- 导入后图元数/图层/名称一致性 ----
 
 TEST(ImportExportRegressionTest, ImportService_EntityCountAfterImport)
 {
@@ -1135,7 +1135,7 @@ TEST(ImportExportRegressionTest, ImportService_SupportedExtensions)
     EXPECT_TRUE(extensions.isEmpty());
 }
 
-// ==================== P5 补充：多格式导入导出选择态一致性 ====================
+// ---- 多格式导入导出选择态一致性 ----
 
 TEST(ImportExportRegressionTest, SelectionState_PreservedAfterImport)
 {
@@ -1193,7 +1193,7 @@ TEST(ImportExportRegressionTest, ImportService_MultipleFormats_MetadataConsisten
     EXPECT_FALSE(metaCallbackCalled);  // 未触发导入，回调不应被调用
 }
 
-// ==================== P5 补充：导入导出多格式深度测试 ====================
+// ---- 导入导出多格式深度测试 ----
 
 TEST(ImportExportRegressionTest, FioEntityConverter_AllSupportedTypes)
 {
@@ -1411,7 +1411,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_ExtractLayersWithNullData)
     EXPECT_TRUE(layers.empty());
 }
 
-// ==================== P5 补测试: 多格式批量转换一致性 ====================
+// ---- 多格式批量转换一致性 ----
 
 TEST(ImportExportRegressionTest, FioEntityConverter_BatchConsistency_AllFormats)
 {
@@ -1513,7 +1513,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_LayerIdPreservedInBatch)
     EXPECT_EQ(result[1]->eType, Eg::EType::CIRCLE);
 }
 
-// ==================== P5 补测试: 导入导出图元数与状态一致性 ====================
+// ---- 导入导出图元数与状态一致性 ----
 
 TEST(ImportExportRegressionTest, ExportService_EntityCountAfterExport)
 {
@@ -1562,7 +1562,7 @@ TEST(ImportExportRegressionTest, ExportService_CollectAfterSelectionChange)
     EXPECT_EQ(collected.size(), 3u);
 }
 
-// ==================== P5 补测试: 序列化往返后选择态保持 ====================
+// ---- 序列化往返后选择态保持 ----
 
 TEST(ImportExportRegressionTest, SyEntitySerializer_SelectionStateAfterRoundTrip)
 {
@@ -1609,7 +1609,7 @@ TEST(ImportExportRegressionTest, SyEntitySerializer_DeserializeEmptyData)
     EXPECT_EQ(entity, nullptr);
 }
 
-// ==================== P5 补测试: 边界条件 ====================
+// ---- 边界条件 ----
 
 TEST(ImportExportRegressionTest, ExportService_CollectWithNoSceneManager)
 {
@@ -1640,7 +1640,7 @@ TEST(ImportExportRegressionTest, ImportService_CanImportVariousExtensionsEmpty)
     EXPECT_FALSE(service.canImport("test.pdf"));
 }
 
-// ==================== IR 主链路回归测试 ====================
+// ---- IR 主链路回归测试 ----
 // 覆盖：FileIOManager::importToIR → Eg::FioEntityConverter::convertAll 端到端管线，
 // 验证真实 DXF 文件通过中立 IR 路径导入后图元完整。
 
@@ -1728,11 +1728,10 @@ TEST(ImportExportRegressionTest, IrPipeline_RealDxf_LwPolylineKeepsVertices)
 TEST(ImportExportRegressionTest, IrPipeline_RealDxf_SplineKeepsControlPoints)
 {
     // 最小 DXF：一条 3 阶、4 个控制点的 SPLINE。
-    // 回归：旧实现输出 EntityType::Spline（转换层未处理）+ 扩展数据布局不匹配 → 图元丢失。
-    //
+    // 回归：SPLINE 必须输出受支持的 EntityType 且扩展数据布局匹配，否则图元丢失。
     // 控制点必须是「次数+1」个：3 阶样条至少要 4 个控制点（节点数 = 控制点数 + 次数 + 1 = 8）。
-    // 早先这里写的是 3 个控制点 + 7 个节点 —— 那是数学上非法的退化样条，
-    // libdxfrw 的结构校验会整条拒掉（旧实现直接中止 ENTITIES 段，表现为「整份图纸读不出来」）。
+    // 3 个控制点 + 7 个节点是数学上非法的退化样条，libdxfrw 的结构校验会整条拒掉，
+    // 并中止 ENTITIES 段，表现为「整份图纸读不出来」。
     std::string dxf = "0\nSECTION\n2\nENTITIES\n"
                       "0\nSPLINE\n8\n0\n70\n0\n71\n3\n72\n8\n73\n4\n"
                       "40\n0.0\n40\n0.0\n40\n0.0\n40\n0.0\n40\n1.0\n40\n1.0\n40\n1.0\n40\n1.0\n"
@@ -1822,8 +1821,8 @@ TEST(ImportExportRegressionTest, IrPipeline_ConvertAll_PassesExtensionBlob)
 }
 
 // 回归：DXF 图层 sourceId 必须 1-based。
-// 旧实现 sourceId 从 0 开始，与 EntityInfo.layerSourceId 的「0=无图层」哨兵冲突，
-// 导致首个图层（DXF 默认图层 "0"）上的图元被 convertAll 过滤掉 → 导入后场景不显示图层颜色。
+// sourceId 从 0 开始会与 EntityInfo.layerSourceId 的「0=无图层」哨兵冲突，
+// 导致首个图层（DXF 默认图层 "0"）上的图元被 convertAll 过滤掉，导入后场景不显示图层颜色。
 TEST(ImportExportRegressionTest, IrPipeline_RealDxf_FirstLayerSourceIdIsOneBased)
 {
     // 最小 DXF：TABLES 中定义图层 "0"（红色），ENTITIES 中一条 LINE 位于该图层。

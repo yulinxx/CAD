@@ -45,7 +45,7 @@ namespace
 #include "Engine2D/SyEntity/SyBarCode.h"
 #include "Engine2D/SyEntity/SyQRCode.h"
 
-// ==================== 线段转换 ====================
+// ---- 线段转换 ----
 
 TEST(FioEntityConverterTest, ConvertLineEntity)
 {
@@ -68,7 +68,7 @@ TEST(FioEntityConverterTest, ConvertLineEntity)
     EXPECT_DOUBLE_EQ(line->pointRef()[1].y(), 200.0);
 }
 
-// ==================== 圆转换 ====================
+// ---- 圆转换 ----
 
 TEST(FioEntityConverterTest, ConvertCircleEntity)
 {
@@ -88,7 +88,7 @@ TEST(FioEntityConverterTest, ConvertCircleEntity)
     EXPECT_DOUBLE_EQ(circle->dRadius, 25.0);
 }
 
-// ==================== 圆弧转换 ====================
+// ---- 圆弧转换 ----
 
 TEST(FioEntityConverterTest, ConvertArcEntity)
 {
@@ -112,7 +112,7 @@ TEST(FioEntityConverterTest, ConvertArcEntity)
     EXPECT_DOUBLE_EQ(arc->dEndAngle, 1.5708);
 }
 
-// ==================== 椭圆转换 ====================
+// ---- 椭圆转换 ----
 
 TEST(FioEntityConverterTest, ConvertEllipseEntity)
 {
@@ -138,7 +138,7 @@ TEST(FioEntityConverterTest, ConvertEllipseEntity)
     EXPECT_DOUBLE_EQ(ell->dRotation, 0.5);
 }
 
-// ==================== 点转换 ====================
+// ---- 点转换 ----
 
 TEST(FioEntityConverterTest, ConvertPointEntity)
 {
@@ -156,7 +156,7 @@ TEST(FioEntityConverterTest, ConvertPointEntity)
     EXPECT_DOUBLE_EQ(pt->basePoint.y(), 99.0);
 }
 
-// ==================== 三次贝塞尔转换 ====================
+// ---- 三次贝塞尔转换 ----
 
 TEST(FioEntityConverterTest, ConvertBezierEntity)
 {
@@ -185,7 +185,7 @@ TEST(FioEntityConverterTest, ConvertBezierEntity)
     EXPECT_DOUBLE_EQ(bz->ptEnd.y(), 0.0);
 }
 
-// ==================== 二次贝塞尔转换 ====================
+// ---- 二次贝塞尔转换 ----
 
 TEST(FioEntityConverterTest, ConvertBezier2Entity)
 {
@@ -210,7 +210,7 @@ TEST(FioEntityConverterTest, ConvertBezier2Entity)
     EXPECT_DOUBLE_EQ(bz->ptEnd.y(), 0.0);
 }
 
-// ==================== 文本转换 ====================
+// ---- 文本转换 ----
 
 TEST(FioEntityConverterTest, ConvertTextEntity)
 {
@@ -234,7 +234,7 @@ TEST(FioEntityConverterTest, ConvertTextEntity)
     EXPECT_DOUBLE_EQ(txt->dRotation, 0.5);
 }
 
-// ==================== 条形码转换 ====================
+// ---- 条形码转换 ----
 
 TEST(FioEntityConverterTest, ConvertBarCodeEntity)
 {
@@ -258,7 +258,7 @@ TEST(FioEntityConverterTest, ConvertBarCodeEntity)
     EXPECT_DOUBLE_EQ(bc->basePoint.y(), 20.0);
 }
 
-// ==================== 二维码转换 ====================
+// ---- 二维码转换 ----
 
 TEST(FioEntityConverterTest, ConvertQRCodeEntity)
 {
@@ -280,7 +280,7 @@ TEST(FioEntityConverterTest, ConvertQRCodeEntity)
     EXPECT_DOUBLE_EQ(qr->basePoint.y(), 5.0);
 }
 
-// ==================== 多边形转换（含扩展数据） ====================
+// ---- 多边形转换（含扩展数据） ----
 
 TEST(FioEntityConverterTest, ConvertPolygonWithExtensionData)
 {
@@ -311,7 +311,7 @@ TEST(FioEntityConverterTest, ConvertPolygonWithExtensionData)
     EXPECT_DOUBLE_EQ(verts[3].y(), 10.0);
 }
 
-// ==================== 折线转换（含扩展数据） ====================
+// ---- 折线转换（含扩展数据） ----
 
 TEST(FioEntityConverterTest, ConvertPolylineWithExtensionData)
 {
@@ -398,7 +398,7 @@ TEST(FioEntityConverterTest, InvalidBulgeLengthFallsBackToStraightPolyline)
     EXPECT_EQ(poly->vertices().size(), 3u);
 }
 
-// ==================== NURBS 转换（含扩展数据） ====================
+// ---- NURBS 转换（含扩展数据） ----
 
 TEST(FioEntityConverterTest, ConvertNurbsWithExtensionData)
 {
@@ -448,7 +448,7 @@ TEST(FioEntityConverterTest, ConvertNurbsWithExtensionData)
     EXPECT_DOUBLE_EQ(nurbs->weightAt(0), 1.0);
 }
 
-// ==================== 图像转换（含扩展数据） ====================
+// ---- 图像转换（含扩展数据） ----
 
 TEST(FioEntityConverterTest, ConvertImageWithExtensionData)
 {
@@ -478,7 +478,7 @@ TEST(FioEntityConverterTest, ConvertImageWithExtensionData)
     EXPECT_EQ(img->pixelData()[0], 0xFF);
 }
 
-// ==================== 未知类型 ====================
+// ---- 未知类型 ----
 
 TEST(FioEntityConverterTest, ConvertUnknownTypeReturnsNull)
 {
@@ -489,7 +489,7 @@ TEST(FioEntityConverterTest, ConvertUnknownTypeReturnsNull)
     EXPECT_EQ(entity, nullptr);
 }
 
-// ==================== 批量转换 ====================
+// ---- 批量转换 ----
 
 TEST(FioEntityConverterTest, ConvertAllBatch)
 {
@@ -522,7 +522,7 @@ TEST(FioEntityConverterTest, ConvertAllBatch)
     EXPECT_EQ(result[1]->eType, Eg::EType::CIRCLE);
 }
 
-// ==================== 空批量转换 ====================
+// ---- 空批量转换 ----
 
 TEST(FioEntityConverterTest, ConvertAllEmptyInput)
 {
@@ -534,7 +534,7 @@ TEST(FioEntityConverterTest, ConvertAllEmptyInput)
     EXPECT_TRUE(result.empty());
 }
 
-// ==================== 图层提取 ====================
+// ---- 图层提取 ----
 
 TEST(FioEntityConverterTest, ExtractLayers)
 {
@@ -569,7 +569,7 @@ TEST(FioEntityConverterTest, ExtractLayers)
     EXPECT_TRUE(result[1].locked);
 }
 
-// ==================== 空图层提取 ====================
+// ---- 空图层提取 ----
 
 TEST(FioEntityConverterTest, ExtractLayersEmptyInput)
 {
@@ -581,7 +581,7 @@ TEST(FioEntityConverterTest, ExtractLayersEmptyInput)
     EXPECT_TRUE(result.empty());
 }
 
-// ==================== 多边形空扩展数据 ====================
+// ---- 多边形空扩展数据 ----
 
 TEST(FioEntityConverterTest, ConvertPolygonWithEmptyExtensionData)
 {
@@ -600,7 +600,7 @@ TEST(FioEntityConverterTest, ConvertPolygonWithEmptyExtensionData)
     EXPECT_TRUE(poly->vertices().empty());
 }
 
-// ==================== 验证 EntityInfo 结构体大小（跨 DLL 安全） ====================
+// ---- 验证 EntityInfo 结构体大小（跨 DLL 安全） ----
 
 TEST(FioEntityConverterTest, EntityInfoLayoutIsStable)
 {
