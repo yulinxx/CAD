@@ -121,6 +121,13 @@ bool DatabaseBootstrapper::ensureSchema()
         }
     }
 
+    // 无论走哪条路径都做一次列兜底：
+    // 版本号被重置（app 版本变化触发的重新迁移）后可能走「首次建表」分支，
+    // 此时表已存在，CREATE TABLE IF NOT EXISTS 不会补列，版本号却被写成最新，
+    // 下次启动直接跳过迁移，缺列就永远补不上。这里无条件补列，保证幂等修复。
+    ensureRecentFileWorkbenchColumn();
+    ensureDocumentWorkbenchColumn();
+
     // 为常用查询字段创建索引，提升查询性能
     if (!createIndices())
     {
@@ -211,21 +218,18 @@ bool DatabaseBootstrapper::createMetaTable()
         return false;
     }
 
-    // 写入当前 schema 版本号
-    std::string versionStr = std::to_string(kSchemaVersion);
-    if (!m_database.set("app_meta", "value", versionStr, "key = 'schema_version'"))
+    // 写入当前 schema 版本号。
+    // 必须用 INSERT OR REPLACE：Database::set() 底层是 UPDATE，影响 0 行时仍返回成功，
+    // 表刚创建或版本号被重新迁移流程删除时不会插入任何行，导致版本号永远缺失、
+    // 每次启动都退化成「首次建表」分支（旧表因此永远拿不到新列）。
+    std::map<std::string, std::string> values;
+    values["key"] = "schema_version";
+    values["value"] = std::to_string(kSchemaVersion);
+    if (!m_database.insertOrReplace("app_meta", values))
     {
-        // 如果 set 失败（表刚创建，可能没有行），尝试 insert
-        std::map<std::string, std::string> values;
-        values["key"] = "schema_version";
-        values["value"] = versionStr;
-        m_database.execute("DELETE FROM app_meta WHERE key = 'schema_version'");
-        if (!m_database.insert("app_meta", values))
-        {
-            m_lastError = "Failed to insert schema version: " + m_database.lastError();
-            SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
-            return false;
-        }
+        m_lastError = "Failed to write schema version: " + m_database.lastError();
+        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        return false;
     }
 
     return true;
@@ -252,6 +256,10 @@ bool DatabaseBootstrapper::createBusinessTables()
         SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
         return false;
     }
+
+    // 兼容已存在的旧格式 recent_files 表：CREATE TABLE IF NOT EXISTS 不会为其补列，
+    // 缺 workbench 时写最近文件会报 "no column named workbench"。
+    ensureRecentFileWorkbenchColumn();
 
     // 工作台布局快照表
     std::string sqlWorkspaceSnapshots = R"(
@@ -378,35 +386,62 @@ bool DatabaseBootstrapper::createDocumentsTable()
         SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
         return false;
     }
+
+    // 同上：旧库的 documents 表可能缺 workbench 列，这里幂等补齐
+    ensureDocumentWorkbenchColumn();
+    return true;
+}
+
+bool DatabaseBootstrapper::ensureColumn(
+    const std::string& table, const std::string& column, const std::string& definition, bool fatal)
+{
+    auto columns = m_database.query("PRAGMA table_info(" + table + ")");
+    // 表不存在时无需补列，由调用方负责建表
+    if (columns.empty())
+    {
+        return true;
+    }
+
+    for (const auto& row : columns)
+    {
+        if (row.at("name") == column)
+        {
+            return true;
+        }
+    }
+
+    std::string sql = "ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition;
+    if (!m_database.execute(sql))
+    {
+        std::string message =
+            "Failed to add " + table + "." + column + " column: " + m_database.lastError();
+        if (fatal)
+        {
+            m_lastError = message;
+            SY_ERRORF("[DatabaseBootstrapper] %s", message.c_str());
+            return false;
+        }
+        // 补列失败只降级告警：缺列会让对应功能不可用，但不应阻塞应用启动
+        SY_WARNF("[DatabaseBootstrapper] %s (degraded: continuing startup)", message.c_str());
+        return true;
+    }
+    SY_DEBUGF("[DatabaseBootstrapper] Added missing %s.%s column", table.c_str(), column.c_str());
     return true;
 }
 
 bool DatabaseBootstrapper::ensureLayerColumn(const std::string& column, const std::string& definition)
 {
-    bool exists = false;
-    for (const auto& row : m_database.query("PRAGMA table_info(layers)"))
-    {
-        if (row.at("name") == column)
-        {
-            exists = true;
-            break;
-        }
-    }
+    return ensureColumn("layers", column, definition, true);
+}
 
-    if (exists)
-    {
-        return true;
-    }
+bool DatabaseBootstrapper::ensureRecentFileWorkbenchColumn()
+{
+    return ensureColumn("recent_files", "workbench", "TEXT DEFAULT ''", false);
+}
 
-    std::string sql = "ALTER TABLE layers ADD COLUMN " + column + " " + definition;
-    if (!m_database.execute(sql))
-    {
-        m_lastError = "Failed to add layers." + column + " column: " + m_database.lastError();
-        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
-        return false;
-    }
-    SY_DEBUGF("[DatabaseBootstrapper] Added missing layers.%s column", column.c_str());
-    return true;
+bool DatabaseBootstrapper::ensureDocumentWorkbenchColumn()
+{
+    return ensureColumn("documents", "workbench", "TEXT DEFAULT ''", false);
 }
 
 bool DatabaseBootstrapper::ensureLayerFillColumn()
@@ -492,24 +527,15 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
         else if (v == 5)
         {
             // v5 -> v6: recent_files 表新增 workbench 列（2D/3D 最近文件分桶）
-            if (!m_database.execute("ALTER TABLE recent_files ADD COLUMN workbench TEXT DEFAULT ''"))
-            {
-                m_lastError = "Migration v5->v6 failed: " + m_database.lastError();
-                SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
-                return false;
-            }
-            SY_DEBUG("[DatabaseBootstrapper] Migration v5->v6: added recent_files.workbench column");
+            // 走幂等补列：版本号被重置导致重复迁移时，列已存在也不会 ALTER 失败
+            ensureRecentFileWorkbenchColumn();
+            SY_DEBUG("[DatabaseBootstrapper] Migration v5->v6: recent_files.workbench column ensured");
         }
         else if (v == 6)
         {
             // v6 -> v7: documents 表新增 workbench 列（2D/3D 文档历史分桶）
-            if (!m_database.execute("ALTER TABLE documents ADD COLUMN workbench TEXT DEFAULT ''"))
-            {
-                m_lastError = "Migration v6->v7 failed: " + m_database.lastError();
-                SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
-                return false;
-            }
-            SY_DEBUG("[DatabaseBootstrapper] Migration v6->v7: added documents.workbench column");
+            ensureDocumentWorkbenchColumn();
+            SY_DEBUG("[DatabaseBootstrapper] Migration v6->v7: documents.workbench column ensured");
         }
         // 后续版本迁移在此追加 else if 分支
     }

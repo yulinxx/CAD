@@ -179,11 +179,12 @@ void LayerPersistenceBridge::syncLayerToDb(int nLayerId)
     record.documentId = m_documentId;
     record.layerId = nLayerId;
     record.name = name;
-    record.color = layerClr.toHexRGB();
+    // 存 #RRGGBBAA，保留图层色/填充色 alpha；6 位历史记录读取时按不透明处理
+    record.color = layerClr.toHexRGBA();
     record.visible = visible;
     record.locked = locked;
     record.fill = fill;
-    record.fillColor = fillClr.toHexRGB();
+    record.fillColor = fillClr.toHexRGBA();
     record.layerType = static_cast<int>(type);
     record.orderIndex = orderIndex;
     record.updatedAt = QDateTime::currentDateTime().toString(Qt::ISODate).toStdString();

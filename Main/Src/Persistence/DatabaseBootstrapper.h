@@ -51,8 +51,20 @@ private:
     /// 创建 documents 表（幂等；初始建表与 v1->v2 迁移共用同一 DDL）
     bool createDocumentsTable();
 
+    /// 幂等新增列：PRAGMA 检查缺失后 ALTER TABLE ADD COLUMN
+    /// @param fatal 为 true 时补列失败会记录 lastError 并返回 false；
+    ///              为 false 时只记警告并继续，避免缺列导致应用无法启动
+    bool ensureColumn(
+        const std::string& table, const std::string& column, const std::string& definition, bool fatal);
+
     /// 幂等新增 layers 列：PRAGMA 检查缺失后 ALTER TABLE ADD COLUMN
     bool ensureLayerColumn(const std::string& column, const std::string& definition);
+
+    /// 确保 recent_files.workbench 列存在（历史库补列，失败不阻塞启动）
+    bool ensureRecentFileWorkbenchColumn();
+
+    /// 确保 documents.workbench 列存在（历史库补列，失败不阻塞启动）
+    bool ensureDocumentWorkbenchColumn();
 
     /// 确保 layers.fill 列存在（初始建表与 v2->v3 迁移共用）
     bool ensureLayerFillColumn();

@@ -14,11 +14,11 @@ struct LayerRecord
     std::string documentId;  // 所属文档 ID
     int layerId{ -1 };       // Engine 层图层 ID（LayerManager::createLayer 返回）
     std::string name;        // 图层名称
-    std::string color;       // 图层颜色（hex 格式，如 "#FF0000"）
+    std::string color;       // 图层颜色（hex 格式，如 "#FF0000" 或带 alpha 的 "#FF000080"）
     bool visible{ true };    // 是否可见
     bool locked{ false };    // 是否锁定
     bool fill{ false };      // 是否填充图层（色块填充）
-    std::string fillColor;   // 填充色（hex 格式，如 "#FF0000"；色块填充使用）
+    std::string fillColor;   // 填充色（hex 格式，如 "#FF0000" 或带 alpha 的 "#FF000080"；色块填充使用）
     int layerType{ 0 };      // 图层类型（0=矢量 VECTOR，1=位图 BITMAP）
     int orderIndex{ 0 };     // 图层排序序号
     std::string updatedAt;   // 最近更新时间（ISO 8601 格式）
