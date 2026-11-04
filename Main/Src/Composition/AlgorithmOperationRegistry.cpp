@@ -13,11 +13,15 @@
 #include "UI2D/Operation/AlgorithmRunner.h"
 
 #include "Operation/ReliefEngravingOperation2D.h"
+#ifdef BUILD_RASTER
+#include "Operation/RasterProcessOperation2D.h"
+#endif
 
 AlgorithmOperationRegistry::AlgorithmOperationRegistry(
-    OperationBus* bus, AlgorithmRunner* algorithmRunner, QWidget* parentWidget)
+    OperationBus* bus, AlgorithmRunner* algorithmRunner, SceneEditService* sceneEdit, QWidget* parentWidget)
     : m_bus(bus)
     , m_algorithmRunner(algorithmRunner)
+    , m_sceneEdit(sceneEdit)
     , m_parentWidget(parentWidget)
 {
 }
@@ -59,4 +63,20 @@ void AlgorithmOperationRegistry::registerAll()
     Ops::declare(reg, OperationId::Algo_ReliefEngravingFromImage, [parentWidget = m_parentWidget] {
         ReliefEngravingOperation2D::run(parentWidget);
     });
+
+#ifdef BUILD_RASTER
+    // 位图工艺处理：弹对话框 → Raster 处理 → SyImage 入场景 → Undo 压栈
+    if (m_sceneEdit)
+    {
+        Ops::declare(reg, OperationId::Algo_BitmapProcess,
+            [sceneEdit = m_sceneEdit, parentWidget = m_parentWidget] {
+                RasterProcessOperation2D::runProcess(sceneEdit, parentWidget);
+            });
+
+        Ops::declare(reg, OperationId::Algo_VectorizeBitmap,
+            [sceneEdit = m_sceneEdit, parentWidget = m_parentWidget] {
+                RasterProcessOperation2D::runVectorize(sceneEdit, parentWidget);
+            });
+    }
+#endif
 }

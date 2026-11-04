@@ -29,8 +29,10 @@
 #include "Export/Writers/DxfExportWriter.h"
 #include "Export/Writers/SvgExportWriter.h"
 #include "Export/Writers/PdfExportWriter.h"
-#include "Export/Writers/BmpExportWriter.h"
-#include "Export/Writers/PngExportWriter.h"
+#ifdef BUILD_RASTER
+    #include "Export/Writers/BmpExportWriter.h"
+    #include "Export/Writers/PngExportWriter.h"
+#endif
 #include "Export/Writers/ObjExportWriter.h"
 #include "Export/Writers/StepExportWriter.h"
 #include "Export/Writers/NativeExportWriter.h"
@@ -173,8 +175,10 @@ void ImportExportServiceSetup::registerWriters()
     m_exportDispatcher->registerWriter(std::make_unique<DxfExportWriter>());
     m_exportDispatcher->registerWriter(std::make_unique<SvgExportWriter>());
     m_exportDispatcher->registerWriter(std::make_unique<PdfExportWriter>());
+#ifdef BUILD_RASTER
     m_exportDispatcher->registerWriter(std::make_unique<BmpExportWriter>());
     m_exportDispatcher->registerWriter(std::make_unique<PngExportWriter>());
+#endif
     m_exportDispatcher->registerWriter(std::make_unique<ObjExportWriter>());
     m_exportDispatcher->registerWriter(std::make_unique<StepExportWriter>());
     m_exportDispatcher->registerWriter(std::make_unique<NativeExportWriter>());

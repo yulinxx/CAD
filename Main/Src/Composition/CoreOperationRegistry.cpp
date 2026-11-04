@@ -57,7 +57,7 @@ void CoreOperationRegistry::registerAll()
         m_bus, m_viewportActionHub, m_stateCenter, m_layerEditService, m_unitManager, m_captureService, m_parentWidget);
     viewRegistry.registerAll();
 
-    AlgorithmOperationRegistry algoRegistry(m_bus, m_algorithmRunner, m_parentWidget);
+    AlgorithmOperationRegistry algoRegistry(m_bus, m_algorithmRunner, m_editService, m_parentWidget);
     algoRegistry.registerAll();
 
     HelpOperationRegistry helpRegistry(m_bus, m_parentWidget);

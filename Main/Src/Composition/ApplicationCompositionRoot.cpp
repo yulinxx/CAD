@@ -21,6 +21,7 @@
 #include "UI/Workbench/UiWorkbench.h"
 #include "UI/Services/UiStateCenter.h"
 #include "UI/Services/HelpDialogService.h"
+#include "UI/Safety/EmergencyStopController.h"
 
 #include "UI2D/Edit/QtLayerManagerBridge.h"
 
@@ -29,6 +30,14 @@
 #include "../Hardware/ProcessingJobService.h"
 
 #include "Common/AppInitializer.h"
+
+#ifdef ENABLE_VISION
+#include "../Vision/VisionHostBridges.h"
+// Vision 的 C++ 门面不导出符号，宿主只能经 C ABI 初始化与注册桥接表。
+#include "Vision/Core/VisionTypes.h"
+#include "Vision/Service/VisionHostC.h"
+#include "Vision/Service/VisionServiceC.h"
+#endif
 
 // UndoRedoManager → OperationBus 桥接观察者
 // 当 SceneEditService 等绕过 OperationBus::run() 直接推入 undo 命令时，
@@ -109,6 +118,28 @@ ApplicationCompositionRoot::~ApplicationCompositionRoot()
     // 而 abort 需要设备还活着。反过来先停设备，作业就无处可停了。
     m_processingJobService.reset();
 
+#ifdef ENABLE_VISION
+    // 位姿采样读运动卡，必须在设备停止之前停掉；否则最后一拍可能踩到已关闭的设备。
+    if (m_stagePoseProvider)
+    {
+        m_stagePoseProvider->stop();
+    }
+
+    // 先解除门面对宿主桥的引用，再销毁桥对象 —— 门面是进程级单例，
+    // 它的注入槽不清空就会在下一个使用者手里变成悬空指针。
+    VisHost::unregisterBridges();
+    if (m_visionInitialized)
+    {
+        Vision_Shutdown();
+    }
+
+    m_workpieceTransformSink.reset();
+    m_lightController.reset();
+    m_galvoController.reset();
+    m_stageController.reset();
+    m_stagePoseProvider.reset();
+#endif
+
     // 硬件必须最先停：定时器停掉、设备 close（关光 + 输出置安全态）之后，
     // 其他服务才可以安全销毁。反过来的话，tick 里可能访问到已销毁的对象。
     if (m_deviceHost)
@@ -136,6 +167,11 @@ ProcessingJobService* ApplicationCompositionRoot::processingJobService()
     return m_processingJobService.get();
 }
 
+EmergencyStopController* ApplicationCompositionRoot::emergencyStopController()
+{
+    return m_emergencyStopController.get();
+}
+
 bool ApplicationCompositionRoot::startHardware(const QString& configDir, QString& warningOut)
 {
     QString loadWarning;
@@ -149,6 +185,14 @@ bool ApplicationCompositionRoot::startHardware(const QString& configDir, QString
         return false;
     }
 
+#ifdef ENABLE_VISION
+    // 设备真的起来了才开始采样：启动失败时读运动卡只会得到一串无效点。
+    if (m_stagePoseProvider)
+    {
+        m_stagePoseProvider->start();
+    }
+#endif
+
     // 档案层的提示（例如「没有档案，已用模拟设备」）要继续往上传：
     // 设备确实起来了，但用户必须知道起来的是模拟设备而不是真机
     warningOut = loadWarning;
@@ -159,6 +203,39 @@ Eg::MachineFrameConfig ApplicationCompositionRoot::machineFrameConfig() const
 {
     return m_deviceHost ? m_deviceHost->machineFrameConfig() : Eg::MachineFrameConfig{};
 }
+
+#ifdef ENABLE_VISION
+void ApplicationCompositionRoot::setupVisionHostBridges()
+{
+    // 门面是进程级单例：UI 侧适配层可能已经先初始化过（返回 AlreadyOpen），
+    // 那种情况下保留已有配置，只补注入槽，不重复 initialize。
+    const int32_t initCode = Vision_Initialize(nullptr);
+    if (initCode == 0)
+    {
+        m_visionInitialized = true;
+    }
+    else if (initCode != static_cast<int32_t>(Vis::VisError::AlreadyOpen))
+    {
+        SY_WARNF("[ApplicationCompositionRoot] vision service init failed: code=%d", initCode);
+        return;
+    }
+
+    m_stagePoseProvider = std::make_unique<VisHost::StagePoseProvider>(m_deviceHost.get());
+    m_stageController = std::make_unique<VisHost::StageController>(m_deviceHost.get());
+    m_galvoController = std::make_unique<VisHost::GalvoController>(m_deviceHost.get());
+    m_lightController = std::make_unique<VisHost::LightController>(m_deviceHost.get());
+    m_workpieceTransformSink =
+        std::make_unique<VisHost::WorkpieceTransformSink>(m_sceneManager.get(), m_sceneEditService.get());
+
+    if (!VisHost::registerBridges(m_stagePoseProvider.get(), m_stageController.get(),
+                                  m_galvoController.get(), m_lightController.get(),
+                                  m_workpieceTransformSink.get()))
+    {
+        SY_WARN("[ApplicationCompositionRoot] vision host bridges were rejected by the service");
+    }
+}
+#endif
+
 
 ISelectionService* ApplicationCompositionRoot::selectionService()
 {
@@ -246,6 +323,16 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     // 加工命令会明确报「设备未启动」，而不是空指针。
     m_deviceHost = std::make_unique<DeviceHost>();
     m_processingJobService = std::make_unique<ProcessingJobService>(m_deviceHost.get());
+
+    // 急停状态机与设备宿主同生命周期，注册加工命令前先建立，保证命令与界面共享同一状态
+    m_emergencyStopController = std::make_unique<EmergencyStopController>();
+    m_emergencyStopController->attachDeviceHost(m_deviceHost.get());
+
+#ifdef ENABLE_VISION
+    // 视觉门面在设备装配完成后立刻注入宿主能力：标定向导与飞拍在设备
+    // 启动前就要能回答"有没有这个能力"，不能等到第一次调用才去补指针。
+    setupVisionHostBridges();
+#endif
 
     m_operationRegistrar = std::make_unique<OperationRegistrar>(*this, algorithmRunner());
     m_operationRegistrar->registerAll();

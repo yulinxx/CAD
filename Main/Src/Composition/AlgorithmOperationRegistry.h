@@ -5,6 +5,7 @@
 class OperationBus;
 class AlgorithmRunner;
 class QWidget;
+class SceneEditService;
 
 /**
  * @class AlgorithmOperationRegistry
@@ -15,12 +16,13 @@ class QWidget;
 class AlgorithmOperationRegistry
 {
 public:
-    AlgorithmOperationRegistry(OperationBus* bus, AlgorithmRunner* algorithmRunner, QWidget* parentWidget);
+    AlgorithmOperationRegistry(OperationBus* bus, AlgorithmRunner* algorithmRunner, SceneEditService* sceneEdit, QWidget* parentWidget);
 
     void registerAll();
 
 private:
     OperationBus* m_bus;
     AlgorithmRunner* m_algorithmRunner;
+    SceneEditService* m_sceneEdit{ nullptr };
     QWidget* m_parentWidget;
 };

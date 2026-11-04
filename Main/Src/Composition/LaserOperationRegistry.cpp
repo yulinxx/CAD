@@ -9,8 +9,25 @@
 
 #include "Log/SyLogger.h"
 
+#include "UI/Safety/EmergencyStopController.h"
+
 #include "../Hardware/DeviceHost.h"
 #include "../Hardware/ProcessingJobService.h"
+
+namespace
+{
+QString hardwareUnavailableMessage()
+{
+    return QCoreApplication::translate("LaserOperationRegistry",
+        "Hardware module is not enabled in this build (BUILD_HARDWARE=OFF). This command is disabled.");
+}
+
+/// 未编入硬件支持时，命令保持可点击，点击后给出明确提示，而不是灰掉后毫无反应。
+bool hardwareSupportMissing()
+{
+    return !DeviceHost::isHardwareSupportCompiled();
+}
+}  // namespace
 
 LaserOperationRegistry::LaserOperationRegistry(const LaserOperationConfig& config)
     : m_config(config)
@@ -55,6 +72,11 @@ void LaserOperationRegistry::registerAll()
         reg,
         OperationId::Laser_StartProcess,
         [this, job] {
+            if (hardwareSupportMissing())
+            {
+                reportError("StartProcess", hardwareUnavailableMessage());
+                return;
+            }
             if (!job || !m_config.sceneManager)
             {
                 reportError("StartProcess",
@@ -68,12 +90,18 @@ void LaserOperationRegistry::registerAll()
                 reportError("StartProcess", error);
             }
         },
-        [job, host] {
+        [job, host, safety = m_config.safetyController] {
+            // 急停态与 BUILD_HARDWARE=OFF 之外的判断保持原有语义；
+            // OFF 时保持可点击，由 execute 给出明确的禁用提示
+            if (hardwareSupportMissing())
+            {
+                return true;
+            }
             // canExec 决定菜单/工具栏的可用态：设备没起来、安全门没关、
             // 或者已经在加工时，「开始加工」必须是灰的 ——
             // 让操作员点了之后才看到报错，是最容易被投诉的交互
             return job && host && host->isRunning() && host->canStartProcessing() && !job->isRunning() &&
-                !job->isPaused();
+                !job->isPaused() && (!safety || !safety->isReadOnly());
         });
 
     // --- 暂停 / 恢复（同一个命令来回切） ---
@@ -81,6 +109,11 @@ void LaserOperationRegistry::registerAll()
         reg,
         OperationId::Laser_PauseProcess,
         [this, job] {
+            if (hardwareSupportMissing())
+            {
+                reportError("PauseProcess", hardwareUnavailableMessage());
+                return;
+            }
             if (!job)
             {
                 reportError("PauseProcess",
@@ -98,6 +131,10 @@ void LaserOperationRegistry::registerAll()
             }
         },
         [job] {
+            if (hardwareSupportMissing())
+            {
+                return true;
+            }
             return job && (job->isRunning() || job->isPaused());
         });
 
@@ -106,6 +143,11 @@ void LaserOperationRegistry::registerAll()
         reg,
         OperationId::Laser_StopProcess,
         [this, job] {
+            if (hardwareSupportMissing())
+            {
+                reportError("StopProcess", hardwareUnavailableMessage());
+                return;
+            }
             if (!job)
             {
                 reportError("StopProcess",
@@ -119,6 +161,10 @@ void LaserOperationRegistry::registerAll()
             }
         },
         [job] {
+            if (hardwareSupportMissing())
+            {
+                return true;
+            }
             return job && (job->isRunning() || job->isPaused());
         });
 
@@ -145,5 +191,25 @@ void LaserOperationRegistry::registerAll()
             return true;
         });
 
-    SY_INFO("[LaserOperation] registered: StartProcess / PauseProcess / StopProcess / EmergencyStop");
+    // --- 复位确认（与开光分离，只清闭锁不开光） ---
+    Ops::declareChecked(
+        reg,
+        OperationId::Laser_ResetSafety,
+        [this, safety = m_config.safetyController] {
+            if (!safety)
+            {
+                reportError("ResetSafety",
+                    QCoreApplication::translate("LaserOperationRegistry", "Safety controller not configured"));
+                return;
+            }
+            if (!safety->confirmReset())
+            {
+                reportError("ResetSafety",
+                    QCoreApplication::translate(
+                        "LaserOperationRegistry", "Confirm Reset is not available until the emergency stop is reset"));
+            }
+        },
+        [safety = m_config.safetyController] { return safety && safety->canConfirmReset(); });
+
+    SY_INFO("[LaserOperation] registered: StartProcess / PauseProcess / StopProcess / EmergencyStop / ResetSafety");
 }

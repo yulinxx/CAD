@@ -1134,7 +1134,11 @@ int ImportService::restoreImportedLayers(
                 const uint8_t r = static_cast<uint8_t>((src.color >> 16) & 0xFF);
                 const uint8_t g = static_cast<uint8_t>((src.color >> 8) & 0xFF);
                 const uint8_t b = static_cast<uint8_t>(src.color & 0xFF);
-                m_layerManager->setLayerColor(layerId, Ut::Color::fromRGB255(r, g, b));
+                // 高 8 位为 alpha；历史文件 alpha 位为 0 时按不透明处理，
+                // 否则旧工程加载后整层会变透明
+                const uint8_t a = static_cast<uint8_t>((src.color >> 24) & 0xFF);
+                const int alpha = (a == 0) ? 255 : static_cast<int>(a);
+                m_layerManager->setLayerColor(layerId, Ut::Color::fromRGB255(r, g, b, alpha));
                 m_layerManager->setLayerVisible(layerId, src.visible);
                 m_layerManager->setLayerLocked(layerId, src.locked);
                 // 加工语义：输出开关与默认工艺 ID 跟着图层一起还原。

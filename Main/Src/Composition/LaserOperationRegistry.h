@@ -33,6 +33,7 @@
 class OperationBus;
 class DeviceHost;
 class ProcessingJobService;
+class EmergencyStopController;
 class LayerManager;
 
 namespace Eg
@@ -48,6 +49,7 @@ struct LaserOperationConfig
     OperationBus* bus = nullptr;
     DeviceHost* deviceHost = nullptr;
     ProcessingJobService* jobService = nullptr;
+    EmergencyStopController* safetyController = nullptr;
     Eg::SceneManager* sceneManager = nullptr;
     LayerManager* layerManager = nullptr;
 

@@ -49,7 +49,19 @@ class UnitManager;
 /// 但组合根也没必要为此多包含一层。
 class DeviceHost;
 class ProcessingJobService;
+class EmergencyStopController;
 class OperationRegistrar;
+
+#ifdef ENABLE_VISION
+namespace VisHost
+{
+    class StagePoseProvider;
+    class StageController;
+    class GalvoController;
+    class LightController;
+    class WorkpieceTransformSink;
+}
+#endif
 
 
 namespace Ui
@@ -218,6 +230,9 @@ public:
     /// 获取加工作业服务。始终非空；设备未启动时所有加工请求都会被明确拒绝。
     ProcessingJobService* processingJobService();
 
+    /// 获取急停界面状态机。始终非空；只负责提示与请求编排，不承担安全功能。
+    EmergencyStopController* emergencyStopController();
+
 
     /**
      * @brief 读取机器档案并启动硬件。
@@ -253,6 +268,16 @@ private:
     void setupDirtyStateSync();
     // 惰性创建 2D 算法服务与执行器
     AlgorithmRunner* algorithmRunner();
+
+#ifdef ENABLE_VISION
+    /**
+     * @brief 把宿主能力注入视觉门面。
+     *
+     * 生命周期跟随组合根：设备指针是 DeviceHost 的出口，桥对象必须在
+     * DeviceHost 之后销毁，因此声明顺序排在它之后。
+     */
+    void setupVisionHostBridges();
+#endif
 
     /// 持久化服务（进程内唯一所有权源，AppInitializer 创建后移交组合根）
     ///
@@ -368,6 +393,22 @@ private:
 
     /// 加工作业服务（编译 → loadPlan → startPlan → 进度）
     std::unique_ptr<ProcessingJobService> m_processingJobService;
+
+    /// 急停界面状态机（触发、物理复位校验、复位确认与只读态）
+    std::unique_ptr<EmergencyStopController> m_emergencyStopController;
+
+#ifdef ENABLE_VISION
+    /// 宿主桥对象：把 DeviceHost 的硬件出口包成 Vis:: 的四个接口。
+    /// 声明在 m_deviceHost 之后、在操作注册器之前：逆序析构保证桥先于设备释放。
+    std::unique_ptr<VisHost::StagePoseProvider> m_stagePoseProvider;
+    std::unique_ptr<VisHost::StageController> m_stageController;
+    std::unique_ptr<VisHost::GalvoController> m_galvoController;
+    std::unique_ptr<VisHost::LightController> m_lightController;
+    std::unique_ptr<VisHost::WorkpieceTransformSink> m_workpieceTransformSink;
+
+    /// 视觉门面是否由本组合根初始化；只有自己初始化的才在析构里关闭。
+    bool m_visionInitialized = false;
+#endif
 
     /// 操作注册器（核心/文件/加工/占位操作注册，持有 File/Laser 注册表）。
     /// 注册进总线的 lambda 捕获了注册表 this（见 LaserOperationRegistry.h 的

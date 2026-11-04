@@ -101,6 +101,7 @@ void OperationRegistrar::registerAll()
     laserConfig.bus = m_root.operationBus();
     laserConfig.deviceHost = m_root.deviceHost();
     laserConfig.jobService = m_root.processingJobService();
+    laserConfig.safetyController = m_root.emergencyStopController();
     laserConfig.sceneManager = m_root.sceneManager();
     laserConfig.layerManager = m_root.layerManager();
     laserConfig.errorReporter = [host = m_root.shellHost()](const QString& message) {
