@@ -121,6 +121,8 @@ private:
     void refreshSceneTreeRowsForSelection2D();
     /// 应用选择上下文到各 UI 组件
     void applySelectionContext(const CommandUiSnapshot& snapshot);
+    /// 抓取并广播命令快照（refreshCommandUiState 的实际动作，供尾随刷新复用）
+    void applyCommandUiSnapshot();
     /// 单击图层色块的延迟业务动作：无选中则选中该图层全部图元，有选中则把选中图元移到该图层
     void applyLayerClick(int layerId);
 
@@ -153,6 +155,10 @@ private:
     /// 交互提示刷新定时器：200ms 刷一次当前活动工具的 interactionHint()
     /// 覆盖所有状态变化（切换工具、进入绘制、取消、完成），不需要在事件分发器里插钩子
     QTimer* m_interactionHintTimer{ nullptr };
+    /// 命令快照尾随去重窗口（24ms）：窗口内连续变化只保留最后一次，
+    /// 窗口外的首个变化仍立即刷新，避免改变 UI 可见的通知时机。
+    QTimer* m_commandRefreshTimer{ nullptr };
+    bool m_commandRefreshPending{ false };
     /// 上一次真正写入状态栏的交互提示：只在提示变化时更新，
     /// 避免 200ms 定时器把导入/导出/保存等临时状态消息冲掉。
     QString m_lastInteractionHint;

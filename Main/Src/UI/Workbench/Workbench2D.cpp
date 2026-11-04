@@ -821,11 +821,10 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     m_commandHub->setOperationBus(m_commands.operationBus);
     // 单一数据源：一次遍历选中的图元集合，统一算出 count / 锁定(图层+图元) / 可编辑 /
     // 类型直方图 / 分组 / 贝塞尔，注入给命令中枢
-    m_commandHub->setSelectionContextProvider([selectionService = m_scene.selectionService,
-                                                  layerManager = m_scene.layerManager,
+    m_commandHub->setSelectionContextProvider([layerManager = m_scene.layerManager,
                                                   sceneEditService = m_scene.sceneEditService]() -> SelectionContext {
         SelectionContext result;
-        if (!selectionService || !layerManager || !sceneEditService)
+        if (!layerManager || !sceneEditService)
         {
             return result;
         }
@@ -834,56 +833,59 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         {
             return result;
         }
-        struct Ctx
-        {
-            Eg::SceneManager* scene;
-            LayerManager* layers;
-            SelectionContext* out;
-        };
-        Ctx ctx{ scene, layerManager, &result };
-        selectionService->visitSelectedIds(
-            [](const char* id, void* v) {
-                auto* c = static_cast<Ctx*>(v);
-                auto eid = Eg::parseEntityId(std::string(id));
-                if (!eid)
-                {
-                    return;
-                }
-                Eg::SyEntity* e = c->scene->findEntityById(*eid);
+        // 直接遍历选中图元指针：此前走 visitSelectedIds，每个 id 都要
+        // to_string -> parseEntityId -> findEntityById 往返，50k 选中约 21ms。
+        // forEachSelected 不拷贝选择集（与 15d939b 的免拷贝路径一致），
+        // 遍历顺序与 getSelectedEntities 完全相同，选择语义不变。
+        // 快照期间图层锁定状态不会变化：按 layerId 缓存一次，避免每个图元两次哈希查找
+        std::unordered_map<int, bool> lockedLayerCache;
+        scene->forEachSelected(
+            [&result, layerManager, &lockedLayerCache](Eg::SyEntity* e) {
                 if (!e)
                 {
                     return;
                 }
-                c->out->selectionCount++;
-                const bool layerLocked = c->layers->isLayerLocked(c->layers->getEntityLayer(e));
+                result.selectionCount++;
+                const int layerId = layerManager->getEntityLayer(e);
+                bool layerLocked = false;
+                auto cached = lockedLayerCache.find(layerId);
+                if (cached == lockedLayerCache.end())
+                {
+                    layerLocked = layerManager->isLayerLocked(layerId);
+                    lockedLayerCache.emplace(layerId, layerLocked);
+                }
+                else
+                {
+                    layerLocked = cached->second;
+                }
                 const bool entityLocked = e->locked();
                 if (layerLocked)
                 {
-                    c->out->anyLockedLayer = true;
+                    result.anyLockedLayer = true;
                 }
                 if (entityLocked)
                 {
-                    c->out->anyLockedEntity = true;
+                    result.anyLockedEntity = true;
                 }
                 if (!layerLocked && !entityLocked)
                 {
-                    c->out->anyEditable = true;
+                    result.anyEditable = true;
                 }
                 // 检查隐藏状态
                 if (!e->visible())
                 {
-                    c->out->anyHidden = true;
+                    result.anyHidden = true;
                 }
                 switch (e->eType)
                 {
                 case Eg::EType::TEXT:
-                    c->out->typeMask |= static_cast<uint32_t>(SelectionTypeBit::Text);
+                    result.typeMask |= static_cast<uint32_t>(SelectionTypeBit::Text);
                     break;
                 case Eg::EType::QR_CODE:
-                    c->out->typeMask |= static_cast<uint32_t>(SelectionTypeBit::Qr);
+                    result.typeMask |= static_cast<uint32_t>(SelectionTypeBit::Qr);
                     break;
                 case Eg::EType::IMAGE:
-                    c->out->typeMask |= static_cast<uint32_t>(SelectionTypeBit::Bitmap);
+                    result.typeMask |= static_cast<uint32_t>(SelectionTypeBit::Bitmap);
                     break;
                 case Eg::EType::LINE:
                 case Eg::EType::ARC:
@@ -894,18 +896,17 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
                 case Eg::EType::SPLINE:
                 case Eg::EType::BEZIER:
                 case Eg::EType::BEZIER2:
-                    c->out->typeMask |= static_cast<uint32_t>(SelectionTypeBit::Vector);
+                    result.typeMask |= static_cast<uint32_t>(SelectionTypeBit::Vector);
                     break;
                 default:
-                    c->out->typeMask |= static_cast<uint32_t>(SelectionTypeBit::Other);
+                    result.typeMask |= static_cast<uint32_t>(SelectionTypeBit::Other);
                     break;
                 }
                 if (e->group())
                 {
-                    c->out->groupOn = true;
+                    result.groupOn = true;
                 }
-            },
-            &ctx);
+            });
         result.hasSelection = result.selectionCount > 0;
         // 分组按钮：需有选中图元 且 未命中任意锁定（图层锁或图元锁）且 未隐藏，
         // 与 RequiresUnlockedSelection 的双锁语义保持一致。
@@ -2099,6 +2100,41 @@ QMenu* Workbench2D::buildConfiguredContextMenu(const QString& contextMenuId, boo
 }
 
 void Workbench2D::refreshCommandUiState()
+{
+    if (!m_commandHub)
+    {
+        return;
+    }
+
+    // 尾随去重（24ms 窗口）：
+    // - 窗口外的首个变化立即抓取并广播，保持原有通知时机；
+    // - 窗口内再次变化只标记"有待刷新"，窗口结束时统一抓取最后一次状态，
+    //   既不丢最终态，也不会对连续选择变化的每个中间态都做一次全量快照。
+    if (!m_commandRefreshTimer)
+    {
+        m_commandRefreshTimer = new QTimer(this);
+        m_commandRefreshTimer->setSingleShot(true);
+        m_commandRefreshTimer->setInterval(24);
+        connect(m_commandRefreshTimer, &QTimer::timeout, this, [this]() {
+            if (m_commandRefreshPending)
+            {
+                m_commandRefreshPending = false;
+                applyCommandUiSnapshot();
+            }
+        });
+    }
+
+    if (m_commandRefreshTimer->isActive())
+    {
+        m_commandRefreshPending = true;
+        return;
+    }
+
+    applyCommandUiSnapshot();
+    m_commandRefreshTimer->start();
+}
+
+void Workbench2D::applyCommandUiSnapshot()
 {
     if (!m_commandHub)
     {
