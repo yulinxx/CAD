@@ -8,6 +8,7 @@
 #include <QSettings>
 #include <QSplashScreen>
 #include <QThread>
+#include <QTimer>
 #include <QCoreApplication>
 
 #include <cstdio>
@@ -167,6 +168,13 @@ int CADApplicationRuntime::run()
         ApplicationCompositionRoot::saveCurrentWorkbenchSettings();
     });
 
+    // 启动冒烟开关：仅在显式传入 --smoke-exit-ms=N 时生效，走标准退出路径（aboutToQuit 仍会保存设置）
+    if (m_smokeExitMs > 0)
+    {
+        SY_INFOF("[Smoke] auto exit scheduled in %d ms", m_smokeExitMs);
+        QTimer::singleShot(m_smokeExitMs, m_app.get(), &QCoreApplication::quit);
+    }
+
     const int exitCode = m_app->exec();
     SY_INFOF("[CADApplicationRuntime] Application exited with code %d", exitCode);
     return exitCode;
@@ -175,4 +183,9 @@ int CADApplicationRuntime::run()
 void CADApplicationRuntime::setStartWorkbenchId(const QString& workbenchId)
 {
     m_startWorkbenchId = workbenchId;
+}
+
+void CADApplicationRuntime::setSmokeExitMs(int ms)
+{
+    m_smokeExitMs = ms;
 }

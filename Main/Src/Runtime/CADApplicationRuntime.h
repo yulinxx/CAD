@@ -18,6 +18,7 @@ public:
 public:
     int run();
     void setStartWorkbenchId(const QString& workbenchId);  // 设置启动时使用的工作台ID
+    void setSmokeExitMs(int ms);  // 启动冒烟：毫秒后自动退出，0 表示禁用
 
 private:
     std::unique_ptr<QApplication> m_app;
@@ -26,4 +27,5 @@ private:
     AppPaths m_appPaths;
 
     QString m_startWorkbenchId{ QStringLiteral("2D") };
+    int m_smokeExitMs = 0;
 };

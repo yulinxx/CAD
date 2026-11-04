@@ -31,8 +31,9 @@ static void setupNativeMenuBar()
 }
 
 // 命令行标志处理：--version/-v、--help/-h 命中即退出
+// smokeExitMs: 输出参数，--smoke-exit-ms=N 的解析结果，0 表示禁用自动退出
 // 返回值：>=0 表示退出（返回值为 exit code），<0 表示继续启动 GUI
-static int handleCliFlags(int argc, char** argv)
+static int handleCliFlags(int argc, char** argv, int& smokeExitMs)
 {
     const std::string productName = UiBrandManager::instance().productName().toStdString();
     const std::string companyName = UiBrandManager::instance().companyName().toStdString();
@@ -51,6 +52,7 @@ static int handleCliFlags(int argc, char** argv)
             std::printf("  -v, --version           Show version information\n");
             std::printf("  -h, --help              Show this help message\n");
             std::printf("  --client=<id>           Start with the specified client profile\n");
+            std::printf("  --smoke-exit-ms=<ms>    Quit automatically after the given startup delay\n");
             std::printf("\n");
             std::printf("File Options:\n");
             std::printf("  [file]                 Open specified file on startup\n");
@@ -125,6 +127,37 @@ static int handleCliFlags(int argc, char** argv)
             std::printf("you agree to the terms and conditions of the license agreement.\n");
             return 0;
         }
+
+        // --smoke-exit-ms=N：启动冒烟专用，显式传入时才在启动后自动退出；非法值告警后忽略
+        static const std::string smokePrefix = "--smoke-exit-ms=";
+        if (arg.rfind(smokePrefix, 0) == 0)
+        {
+            const std::string value = arg.substr(smokePrefix.size());
+            bool valid = !value.empty() && value.size() <= 9;
+
+            // 只接受纯数字，避免把 "--smoke-exit-ms=abc" 当成 0 静默通过
+            int parsed = 0;
+            for (size_t i = 0; valid && i < value.size(); ++i)
+            {
+                const char ch = value[i];
+                if (ch < '0' || ch > '9')
+                {
+                    valid = false;
+                    break;
+                }
+                parsed = parsed * 10 + (ch - '0');
+            }
+
+            // 上限 600000 ms，防止误传导致进程长时间驻留
+            if (valid && parsed > 0 && parsed <= 600000)
+            {
+                smokeExitMs = parsed;
+            }
+            else
+            {
+                std::fprintf(stderr, "[smoke] warning: ignored invalid %s (expected 1..600000)\n", arg.c_str());
+            }
+        }
     }
 
     // 无命令行标志，继续启动 GUI
@@ -144,7 +177,9 @@ int runCADApplication(int argc, char** argv)
     brandManager.applyApplicationIdentity();
 
     // 命令行标志优先处理：--version/-v、--help/-h 命中即退出，不启动 GUI
-    const int cliResult = handleCliFlags(argc, argv);
+    // 冒烟开关的毫秒值通过输出参数带回，仅在显式传参时非 0
+    int smokeExitMs = 0;
+    const int cliResult = handleCliFlags(argc, argv, smokeExitMs);
     if (cliResult >= 0)
     {
         return cliResult;
@@ -188,5 +223,6 @@ int runCADApplication(int argc, char** argv)
 
     CADApplicationRuntime runtime(std::move(app), appPaths);
     runtime.setStartWorkbenchId(QStringLiteral("2D"));
+    runtime.setSmokeExitMs(smokeExitMs);
     return runtime.run();
 }
