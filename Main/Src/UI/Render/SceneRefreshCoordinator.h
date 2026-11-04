@@ -127,6 +127,11 @@ public:
         return m_submitScheduler.processedBatchCount();
     }
 
+    /// 诊断/回归：当前选中集里真正会被「隐藏本体」摘出世界层的图元 ID。
+    /// 只包含虚线轮廓能表达的类型；位图/色块/文字等没有轮廓替代视觉，不在其中，
+    /// 选中后本体仍留在世界层（见 canHideSelectedBody）。
+    std::unordered_set<uint64_t> selectedBodyHideIds() const;
+
     /// 测试缝隙：注入批次提交回调（转发内部 RenderSubmitScheduler），
     /// 让回归测试无 GL 验证队列/批次/账本语义。生产路径不调用。
     void setSubmitBatchCallback(RenderSubmitScheduler::SubmitBatchFn fn)
@@ -244,6 +249,10 @@ private:
 
     /// 「隐藏选中本体」是否有效：设置开启且虚线轮廓能绘制
     bool hideSelectedEffective() const;
+
+    /// 「隐藏选中本体」的类型门槛：只有选择轮廓能表达的类型才允许隐藏本体。
+    /// 位图/色块/文字等没有轮廓替代视觉，隐藏后会在画面上整片消失。
+    static bool canHideSelectedBody(const Eg::SyEntity* entity);
 
     RenderWidget* m_renderWidget{ nullptr };
     Eg::SceneManager* m_sceneManager{ nullptr };

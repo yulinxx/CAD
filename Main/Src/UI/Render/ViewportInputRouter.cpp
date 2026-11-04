@@ -34,7 +34,7 @@
 #include <cmath>
 #include "Log/SyLogger.h"
 
-// ==================== ViewportInputRouter 实现 ====================
+// ---- ViewportInputRouter 实现 ----
 
 ViewportInputRouter::ViewportInputRouter(QObject* parent)
     : QObject(parent)
@@ -43,7 +43,7 @@ ViewportInputRouter::ViewportInputRouter(QObject* parent)
 
 ViewportInputRouter::~ViewportInputRouter() = default;
 
-// ==================== 依赖注入 ====================
+// ---- 依赖注入 ----
 
 void ViewportInputRouter::setRenderWidget(RenderWidget* widget)
 {
@@ -166,7 +166,7 @@ void ViewportInputRouter::setCameraChangedCallback(std::function<void()> callbac
     m_navigation.setCameraChangedCallback(std::move(callback));
 }
 
-// ==================== 事件过滤器 ====================
+// ---- 事件过滤器 ----
 
 bool ViewportInputRouter::eventFilter(QObject* obj, QEvent* event)
 {
@@ -257,7 +257,7 @@ bool ViewportInputRouter::eventFilter(QObject* obj, QEvent* event)
     return QObject::eventFilter(obj, event);
 }
 
-// ==================== 事件处理器 ====================
+// ---- 事件处理器 ----
 
 void ViewportInputRouter::handleMousePress(QMouseEvent* event)
 {
@@ -534,7 +534,7 @@ void ViewportInputRouter::handleKeyRelease(QKeyEvent* event)
     }
 }
 
-// ==================== 输入法（IME） ====================
+// ---- 输入法（IME） ----
 
 bool ViewportInputRouter::handleInputMethodEvent(QInputMethodEvent* event)
 {
@@ -630,7 +630,7 @@ bool ViewportInputRouter::consumeContextMenuSuppression()
     return false;
 }
 
-// ==================== 坐标转换 ====================
+// ---- 坐标转换 ----
 
 QSizeF ViewportInputRouter::physicalViewportSize() const
 {
@@ -670,7 +670,7 @@ bool ViewportInputRouter::mouseEventToWorld(
     return m_navigation.tryPhysicalToWorld(physWidgetPos, worldPos);
 }
 
-// ==================== 鼠标事件分发 ====================
+// ---- 鼠标事件分发 ----
 
 bool ViewportInputRouter::dispatchToActiveTool(
     const QPointF& worldPos, QMouseEvent* event, bool (ITool::*handler)(const QPointF&, QMouseEvent*))
@@ -803,7 +803,7 @@ bool ViewportInputRouter::dispatchMouseReleaseToInput(const QPointF& worldPos, Q
     return false;
 }
 
-// ==================== 平移处理 ====================
+// ---- 平移处理 ----
 
 bool ViewportInputRouter::handlePanMousePress(const QPoint& physWidgetPos, QMouseEvent* event)
 {
@@ -850,7 +850,7 @@ bool ViewportInputRouter::handlePanMouseRelease(QMouseEvent* event)
     return false;
 }
 
-// ==================== 键盘事件分发 ====================
+// ---- 键盘事件分发 ----
 
 bool ViewportInputRouter::handleToolKeyPress(QKeyEvent* event)
 {

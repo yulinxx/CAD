@@ -54,7 +54,7 @@ public:
     explicit ViewportInputRouter(QObject* parent = nullptr);
     ~ViewportInputRouter() override;
 
-    // ==================== 依赖注入 ====================
+    // ---- 依赖注入 ----
 
     void setRenderWidget(RenderWidget* widget);
     void setCamera(Camera2D* camera);
@@ -64,7 +64,7 @@ public:
     void setDocument(SceneDocument2D* document);
     void setRefreshCoordinator(SceneRefreshCoordinator* coordinator);
 
-    // ==================== 回调注入 ====================
+    // ---- 回调注入 ----
 
     void setPositionCallback(std::function<void(double, double)> callback);
     void setStatusCallback(std::function<void(const QString&)> callback);
@@ -78,11 +78,11 @@ public:
     // 缩放到选中图元回调
     void setZoomToSelectionCallback(std::function<void()> callback);
 
-    // ==================== 事件过滤器（转发 RenderWidget 事件到视口） ====================
+    // ---- 事件过滤器（转发 RenderWidget 事件到视口） ----
 
     bool eventFilter(QObject* obj, QEvent* event) override;
 
-    // ==================== 事件处理器（由 RenderViewport2D 委托） ====================
+    // ---- 事件处理器（由 RenderViewport2D 委托） ----
 
     void handleMousePress(QMouseEvent* event);
     void handleMouseMove(QMouseEvent* event);
@@ -161,7 +161,7 @@ public:
      */
     bool consumeContextMenuSuppression();
 
-    // ==================== 输入法（IME） ====================
+    // ---- 输入法（IME） ----
 
     /// 输入法事件转发给活动工具（返回是否被消费）
     bool handleInputMethodEvent(QInputMethodEvent* event);
@@ -169,7 +169,7 @@ public:
     /// 输入法光标屏幕矩形（由活动工具的光标世界矩形经相机换算）
     QRectF inputMethodCursorRect() const;
 
-    // ==================== 交互状态 ====================
+    // ---- 交互状态 ----
 
     // 滚轮/触控板手势分类结果：Zoom(缩放)、Pan(平移)、HorizontalPan(水平平移)
     enum class WheelGestureType
@@ -217,7 +217,7 @@ public:
         return m_spaceHeld;
     }
 
-    // ==================== 坐标转换（P5 收口: RenderViewport2D 也委托至此，消除重复） ====================
+    // ---- 坐标转换（RenderViewport2D 也委托至此，消除重复） ----
 
     /// widgetLocal → 世界。失败（相机/控件未就绪）返回 false；成功时 out 有效，
     /// 且 out == (0,0) 是完全合法的结果 —— 调用方不得再用 isNull() 判断失败。
@@ -238,16 +238,16 @@ public:
     }
 
 private:
-    // ==================== 坐标转换辅助 ====================
+    // ---- 坐标转换辅助 ----
 
     bool mouseEventToWorld(QMouseEvent* event, QPointF& worldPos, QPoint& widgetPos, QPoint& physWidgetPos) const;
 
-    // ==================== 捕捉辅助 ====================
+    // ---- 捕捉辅助 ----
 
     /// 对世界坐标统一应用吸附（图元/网格/起点）。无回调或未命中时返回原坐标。
     QPointF applySnap(const QPointF& worldPos) const;
 
-    // ==================== 鼠标事件分发 ====================
+    // ---- 鼠标事件分发 ----
 
     bool dispatchMousePressToInput(const QPointF& worldPos, QMouseEvent* event);
     bool dispatchRightButtonPressToInput(const QPointF& worldPos, QMouseEvent* event);
@@ -256,19 +256,19 @@ private:
     bool dispatchToActiveTool(
         const QPointF& worldPos, QMouseEvent* event, bool (ITool::*handler)(const QPointF&, QMouseEvent*));
 
-    // ==================== 平移处理 ====================
+    // ---- 平移处理 ----
 
     bool handlePanMousePress(const QPoint& physWidgetPos, QMouseEvent* event);
     bool handlePanMouseMove(const QPoint& physWidgetPos, QMouseEvent* event);
     bool handlePanMouseRelease(QMouseEvent* event);
 
-    // ==================== 键盘事件分发 ====================
+    // ---- 键盘事件分发 ----
 
     bool handleKeyPressDispatch(QKeyEvent* event);
     bool handleToolKeyPress(QKeyEvent* event);
     bool handleEscapeKeyPress(QKeyEvent* event);
 
-    // ==================== 内部状态 ====================
+    // ---- 内部状态 ----
 
     RenderWidget* m_renderWidget{ nullptr };
     Camera2D* m_camera{ nullptr };
@@ -278,7 +278,7 @@ private:
     SceneDocument2D* m_document{ nullptr };
     SceneRefreshCoordinator* m_refreshCoordinator{ nullptr };
 
-    // 交互状态
+    // ---- 交互状态 ----
     bool m_panning{ false };
     bool m_panModeEnabled{ false };
     QPoint m_lastMousePos;
@@ -292,7 +292,7 @@ private:
     // 最近一次鼠标世界坐标（粘贴锚点）
     QPointF m_lastCursorWorldPos{ 0.0, 0.0 };
     bool m_hasCursorPos{ false };
-    // 右键已被消费为「取消/退出工具」：本次右键对应的 contextMenuEvent 不再弹菜单。
+    // 右键已被消费为「取消/退出工具」：本次右键对应的 contextMenuEvent 不弹菜单。
     // 每次右键 press 重新计算，contextMenuEvent 消费后即清（见 consumeContextMenuSuppression）。
     bool m_contextMenuSuppressed{ false };
 

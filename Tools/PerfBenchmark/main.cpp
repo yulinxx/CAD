@@ -48,6 +48,10 @@
 #include <unordered_set>
 #include <vector>
 
+#ifdef SANYI_CAM_BENCH
+void runCamBench();
+#endif
+
 namespace
 {
     using Clock = std::chrono::steady_clock;
@@ -595,6 +599,11 @@ int main(int argc, char** argv)
         },
         "逐条删除，只测一次（测后场景少 N 个图元）");
     std::printf("  %-28s %10zu\n", "scene_count_after_delete", scene.getEntityCount());
+
+    // ---------- CAM 契约基准（BUILD_CAM 时启用）----------
+#ifdef SANYI_CAM_BENCH
+    runCamBench();
+#endif
 
     // ---------- 汇总 ----------
     std::printf("\n===============================================================\n");

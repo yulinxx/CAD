@@ -9,7 +9,7 @@
  *  - PerfMonitor 启用/禁用
  *
  * 注意：需要 QTimer::start() 的测试（onSceneChanged / requestLightRefresh 等）
- * 需要 QApplication 实例，当前版本跳过这些测试。
+ * 依赖 QApplication 实例，缺少时跳过。
  */
 
 #include <gtest/gtest.h>
@@ -61,7 +61,7 @@ static void recordOneFrame(FrameTimer& timer)
     timer.endFrame();
 }
 
-// ==================== 构造与析构 ====================
+// ---- 构造与析构 ----
 
 TEST(ViewportRefreshRegressionTest, Coordinator_DefaultConstruction)
 {
@@ -84,7 +84,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_StopWithoutRenderWidget)
     SUCCEED();
 }
 
-// ==================== 刷新 API 安全调用（无 Widget） ====================
+// ---- 刷新 API 安全调用（无 Widget） ----
 
 TEST(ViewportRefreshRegressionTest, Coordinator_RequestRepaintWithoutWidget)
 {
@@ -100,7 +100,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_OnSelectionChangedWithoutWidget)
     SUCCEED();
 }
 
-// ==================== 性能监控 ====================
+// ---- 性能监控 ----
 
 TEST(ViewportRefreshRegressionTest, Coordinator_PerfMonitorDisabledByDefault)
 {
@@ -131,7 +131,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_TogglePerfMonitor)
     EXPECT_NE(coordinator.frameTimer(), nullptr);
 }
 
-// ==================== FrameTimer 基础行为 ====================
+// ---- FrameTimer 基础行为 ----
 
 TEST(ViewportRefreshRegressionTest, FrameTimer_DefaultState)
 {
@@ -176,7 +176,7 @@ TEST(ViewportRefreshRegressionTest, FrameTimer_CurrentFrameMs)
     timer.endFrame();
 }
 
-// ==================== SceneManager 脏标记联动 ====================
+// ---- SceneManager 脏标记联动 ----
 
 TEST(ViewportRefreshRegressionTest, SceneManager_DirtyTracking)
 {
@@ -254,7 +254,7 @@ TEST(ViewportRefreshRegressionTest, SceneManager_DeletedEntityIds)
     EXPECT_TRUE(Eg::hasSceneChangeKind(change->kinds, Eg::SceneChangeKind::Removed));
 }
 
-// ==================== 刷新协调器生命周期 ====================
+// ---- 刷新协调器生命周期 ----
 
 TEST(ViewportRefreshRegressionTest, Coordinator_StopClearsPendingState)
 {
@@ -282,7 +282,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_SetSceneManager)
     SUCCEED();
 }
 
-// ==================== 刷新 API 安全调用（无 Widget / 无 SceneManager） ====================
+// ---- 刷新 API 安全调用（无 Widget / 无 SceneManager） ----
 
 TEST(ViewportRefreshRegressionTest, Coordinator_RequestLightRefreshWithoutWidget)
 {
@@ -314,7 +314,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_OnSceneChangedWithSceneManager)
     SUCCEED();
 }
 
-// ==================== 批量写入的刷新抑制（导入专用） ====================
+// ---- 批量写入的刷新抑制（导入专用） ----
 
 TEST(RefreshSuppressionTest, Suppression_DefersSceneChangeUntilEnd)
 {
@@ -404,7 +404,7 @@ TEST(RefreshSuppressionTest, Suppression_NoSceneChangeEndsWithoutRefresh)
 }
 
 
-// ==================== 刷新级别升级测试 ====================
+// ---- 刷新级别升级测试 ----
 
 TEST(ViewportRefreshRegressionTest, Coordinator_RefreshLevelUpgrade)
 {
@@ -439,7 +439,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_AllRefreshLevelsSequence)
     SUCCEED();
 }
 
-// ==================== 场景变更→刷新调度→渲染更新链路测试 ====================
+// ---- 场景变更→刷新调度→渲染更新链路测试 ----
 // 刷新链路：sceneChanged → scheduleSceneUpdate → updateSceneRender
 // 三条刷新路径：Repaint / LightUpdate / FullRefresh
 
@@ -526,7 +526,7 @@ TEST(RefreshChainRegressionTest, SceneChanged_EmptyScene)
     SUCCEED();
 }
 
-// ==================== 三条刷新路径正确性测试 ====================
+// ---- 三条刷新路径正确性测试 ----
 
 TEST(RefreshPathRegressionTest, RepaintPath_DoesNotNeedSceneManager)
 {
@@ -597,7 +597,7 @@ TEST(RefreshPathRegressionTest, FullRefreshPath_MarksSceneClean)
     SUCCEED();
 }
 
-// ==================== 增量渲染与全量渲染切换测试 ====================
+// ---- 增量渲染与全量渲染切换测试 ----
 
 TEST(RefreshPathRegressionTest, IncrementalToFull_Switch)
 {
@@ -658,7 +658,7 @@ TEST(RefreshPathRegressionTest, MultipleIncrementalUpdates)
     SUCCEED();
 }
 
-// ==================== 刷新协调器标记清理测试 ====================
+// ---- 刷新协调器标记清理测试 ----
 
 TEST(RefreshCleanupRegressionTest, MarkClean_AfterUpdateSceneRender)
 {
@@ -703,7 +703,7 @@ TEST(RefreshCleanupRegressionTest, PendingIds_ClearedAfterFullRefresh)
     SUCCEED();
 }
 
-// ==================== 大尺寸图元刷新测试 ====================
+// ---- 大尺寸图元刷新测试 ----
 
 TEST(RefreshStressRegressionTest, BulkEntities_SceneChanged)
 {
@@ -750,7 +750,7 @@ TEST(RefreshStressRegressionTest, BulkEntities_FullRefresh)
     SUCCEED();
 }
 
-// ==================== 刷新协调器与场景联动测试 ====================
+// ---- 刷新协调器与场景联动测试 ----
 
 TEST(ViewportRefreshRegressionTest, Coordinator_OnSceneChangedWithDirtyEntities)
 {
@@ -874,7 +874,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_LightRefreshThenRepaintNoDowngra
     SUCCEED();
 }
 
-// ==================== FrameTimer 扩展测试 ====================
+// ---- FrameTimer 扩展测试 ----
 
 TEST(ViewportRefreshRegressionTest, FrameTimer_RecordMultipleFrames)
 {
@@ -929,7 +929,7 @@ TEST(ViewportRefreshRegressionTest, FrameTimer_AvgFrameMsCalculated)
     EXPECT_GT(timer.frameCount(), 0u);
 }
 
-// ==================== P5 补充：增量/全量渲染切换稳定性 ====================
+// ---- 增量/全量渲染切换稳定性 ----
 
 TEST(RefreshPathRegressionTest, IncrementalToFull_BackToIncremental)
 {
@@ -1019,23 +1019,20 @@ TEST(RefreshPathRegressionTest, RepaintAfterFullRefresh_NoDowngrade)
     SUCCEED();
 }
 
-// ==================== 曲线 LOD 消费泵回归 ====================
+// ---- 曲线 LOD 消费泵回归 ----
 
-// 背景（缺陷）：RenderSubmitScheduler 拆分后，32ms 的 LOD 定时器是单次的，
-// 而 ensurePump() 是空实现，定时器触发一次后不再续跑。
-// 队列超过单批 2000 个图元时，剩余图元永远停在低精度 ——
-// 用户看到的现象就是「超大文件放大后，曲线仍然粗糙」。
-//
+// 32ms 的 LOD 定时器必须能持续续跑：ensurePump() 若为空实现，定时器触发一次
+// 后不会继续触发，队列超过单批 2000 个图元时剩余图元会停在低精度，
+// 现象是「超大文件放大后，曲线仍然粗糙」。
 // 断言方式：不依赖真实 GPU —— 注入成功的提交回调，验证队列排空与批次
-// 续跑语义（失败重试语义由 RenderSubmitSchedulerTest 的失败重试用例覆盖）。
-// 旧实现最多被场景刷新顺手带上 2 批，修复后 32ms 定时器会持续续跑，
-// 直到 6001 个图元全部消费完。
+// 续跑语义（失败重试语义由 RenderSubmitSchedulerTest 的失败重试用例覆盖）；
+// 6001 个图元需要 4 批才能全部消费完。
 TEST(CurveLodPumpRegressionTest, ContinuesPastFirstBatch)
 {
     Eg::SceneManager scene;
 
-    // 6001 个圆：单批 2000，旧实现最多被「场景刷新顺手带一次 + LOD 定时器一次」
-    // 消费 4000 个，剩下的 2001 个会永久卡在队列里。
+    // 6001 个圆：单批 2000，若无续跑最多消费「场景刷新顺手带一次 + LOD 定时器一次」
+    // 共 4000 个，剩下的 2001 个会永久卡在队列里。
     constexpr int kCircleCount = 6001;
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.reserve(kCircleCount);
@@ -1063,7 +1060,7 @@ TEST(CurveLodPumpRegressionTest, ContinuesPastFirstBatch)
     // 首次收集应把所有曲线入队（视口 1.25 倍余量覆盖了测试坐标）。
     ASSERT_EQ(coordinator.pendingCurveLodCount(), static_cast<size_t>(kCircleCount));
 
-    // 泵事件循环直到队列排空。旧实现（ensurePump 空实现）会停在剩余 2001 个。
+    // 泵事件循环直到队列排空。ensurePump 为空实现时会停在剩余 2001 个。
     QElapsedTimer elapsed;
     elapsed.start();
     while (coordinator.pendingCurveLodCount() != 0 && elapsed.elapsed() < 3000)
@@ -1074,17 +1071,15 @@ TEST(CurveLodPumpRegressionTest, ContinuesPastFirstBatch)
 
     EXPECT_EQ(coordinator.pendingCurveLodCount(), 0u)
         << "LOD 定时器触发后未继续消费队列：ensurePump 的回调续跑链路断了";
-    // 6001 个图元完整消费需要 4 批；旧实现最多 2 批，>=3 即可区分。
+    // 6001 个图元完整消费需要 4 批；中断的泵最多 2 批，>=3 即可区分。
     EXPECT_GE(coordinator.curveLodBatchCount(), 3u);
     coordinator.stop();
 }
 
-// 背景（缺陷）：旧实现靠协调器手动把「选中集 + 隐藏开关」快照同步给管理器，
-// 但这条同步从未被调用，于是「选中时隐藏本体」的图元在每次缩放触发 LOD 时
-// 都会被重新提交回世界层，表现为——选中图元隐藏后又突然冒出来。
-//
-// 修复后改为注入实时谓词：队列收集时直接读取最新开关 + 最新选中集，
-// 隐藏中的选中图元不会进队列。
+// 选中时隐藏本体的契约：快照式同步（协调器手动把「选中集 + 隐藏开关」发给管理器）
+// 一旦漏调用，「选中时隐藏本体」的图元会在每次缩放触发 LOD 时被重新提交回世界层，
+// 表现为选中图元隐藏后又冒出来。
+// 因此队列收集必须注入实时谓词：直接读取最新开关 + 最新选中集，隐藏中的选中图元不入队。
 TEST(CurveLodSelectionRegressionTest, HiddenSelectedEntityNotQueued)
 {
     Eg::SceneManager scene;
@@ -1117,9 +1112,8 @@ TEST(CurveLodSelectionRegressionTest, HiddenSelectedEntityNotQueued)
     coordinator.stop();
 }
 
-// ==================== RenderSubmitScheduler 行为回归 ====================
-//
-// 调参常量与缩放滞后判据已收敛到 RenderSubmitScheduler：
+// ---- RenderSubmitScheduler 行为回归 ----
+// 调参常量与缩放滞后判据都在 RenderSubmitScheduler：
 // isScaleStale 是纯函数，队列行为通过 setSubmitBatchCallback 缝隙无 GL 直测。
 
 // 缩放滞后判据：首次必过期；放大 > kLodUpgradeRatio 或缩小 > kLodDowngradeRatio
@@ -1140,7 +1134,7 @@ TEST(RenderSubmitSchedulerTest, ScaleHysteresis)
 
 // 缩放连续触发（滚轮/拖拽每帧都变）时，requestRefresh 不得重置队列进度：
 // 队列未消费完只记 recollectPending，第二批必须恰好是剩余部分，
-// 而不是被重新收集后从头再提交（旧根因：放大后精度一直停留低档）。
+// 而不是被重新收集后从头再提交，否则放大后精度会一直停留低档。
 TEST(RenderSubmitSchedulerTest, ContinuousRequestKeepsQueueProgress)
 {
     Eg::SceneManager scene;
@@ -1291,11 +1285,10 @@ TEST(RenderSubmitSchedulerTest, ExtensionQueueConsumedBeforeLodQueue)
     EXPECT_TRUE(scheduler.empty());
 }
 
-// ==================== 批次提交失败的重试语义（缺陷1） ====================
-//
-// 旧缺陷：提交失败只记 recollectPending 就放游标走，而 refillQueueIfStale
-// 的 staleness 前置门让重收集空转 —— 失败图元被永久丢弃。
-// 修复后失败条目由游标回退留在原队列原位置重试，永不丢弃；
+// ---- 批次提交失败的重试语义 ----
+// 提交失败若只记 recollectPending 就放游标走，refillQueueIfStale 的 staleness
+// 前置门会让重收集空转，失败图元被永久丢弃。
+// 失败条目必须由游标回退留在原队列原位置重试，永不丢弃；
 // 「整批必然失败」（GL 上下文不可用）走前置挂起，不做无意义提交尝试。
 
 // 失败批次原样重试直至成功：前两次提交失败，第三次起成功。
@@ -1519,23 +1512,20 @@ TEST(RenderSubmitSchedulerTest, PersistentSubmitFailureBacksOff_WithoutDroppingE
     EXPECT_TRUE(renderedIds.empty());
 }
 
-// ==================== 可选基准（DISABLED_：默认跳过，不进 CI） ====================
-//
+// ---- 可选基准（DISABLED_：默认跳过，不进 CI） ----
 // 「百万级图元 zoom out」重建成本基准 —— 对应 LOD 文档 §5 的验收口径
 // （百万场景 zoom out 单帧 <10ms、误差 ≤1px）。文档把这两个数字标注为
 // 「待基准验证」；本用例提供可重复的低成本测量入口，但不覆盖 GPU 全链路。
-//
 // 手动运行（默认测试集会跳过，不拖慢 CI）：
 //   ViewportRefreshTests --gtest_also_run_disabled_tests \
 //       --gtest_filter=RenderSubmitLodBenchmark.DISABLED_MillionEntityZoomOutRebuild
-//
 // 测量口径（数字只作相对参考，勿当验收结论）：
-//  * 无 GL 环境：提交回调里用 Eg::emitEntityGeometry + 计数 sink 模拟「按当前
-//    缩放重建几何」的 CPU 侧工作量（发射/离散化正是 LOD 调参瞄准的主成本）；
-//  * 不含 GPU 上传（allocBlock/writeBlock）与圆/弧顶点展开（发生在装配层，
-//    需要渲染上下文）—— 这两块不在本基准口径内；
-//  * 耗时不设阈值断言（阈值随机器漂移只会把 CI 变成抖动源），以 stdout 报告
-//    收集耗时与逐批耗时；断言只锁正确性不变量（收集数/账本数/顶点上界/误差预算）。
+// 无 GL 环境：提交回调里用 Eg::emitEntityGeometry + 计数 sink 模拟「按当前
+// 缩放重建几何」的 CPU 侧工作量（发射/离散化正是 LOD 调参瞄准的主成本）；
+// 不含 GPU 上传（allocBlock/writeBlock）与圆/弧顶点展开（发生在装配层，
+// 需要渲染上下文），这两块不在本基准口径内；
+// 耗时不设阈值断言（阈值随机器漂移只会把 CI 变成抖动源），以 stdout 报告
+// 收集耗时与逐批耗时；断言只锁正确性不变量（收集数/账本数/顶点上界/误差预算）。
 namespace
 {
     /// 计数/捕获 sink：统计发射原语次数与折线点数上界，可选捕获最后一条折线
@@ -1663,13 +1653,13 @@ TEST(RenderSubmitLodBenchmark, DISABLED_MillionEntityZoomOutRebuild)
         return true;
     });
 
-    // ① 收集耗时：RTree 范围查询 + 入队（视口 1.25 倍余量覆盖网格坐标）
+    // 收集耗时：RTree 范围查询 + 入队（视口 1.25 倍余量覆盖网格坐标）
     const Clock::time_point tCollect0 = Clock::now();
     scheduler.requestRefresh();
     const double collectMs = elapsedMs(tCollect0, Clock::now());
     ASSERT_EQ(scheduler.size(), kEntityCount) << "收集口径异常：不是全部曲线都入队了";
 
-    // ② 逐批重建耗时 —— 「zoom out 后逐帧重建」的无 GPU 侧代理：
+    // 逐批重建耗时 —— 「zoom out 后逐帧重建」的无 GPU 侧代理：
     // 每个 processBatch tick 消费一批（自适应批 128~8192），
     // 回调里按 kZoomOutScale 重新离散并发射。
     std::unordered_set<uint64_t> renderedIds;
@@ -1691,7 +1681,7 @@ TEST(RenderSubmitLodBenchmark, DISABLED_MillionEntityZoomOutRebuild)
               << (batchCount > 0 ? submitTotalMs / batchCount : 0.0) << " ms/批，max " << submitMaxMs << " ms/批）"
               << std::endl;
 
-    // ---- 正确性不变量（与机器速度无关）----
+    // ---- 正确性不变量（与机器速度无关） ----
     EXPECT_TRUE(scheduler.empty()) << "队列未排空：有图元被丢弃或卡死";
     EXPECT_EQ(renderedIds.size(), kEntityCount) << "有图元未提交进账本";
     // 每个样条恰发射一条折线
@@ -1699,7 +1689,7 @@ TEST(RenderSubmitLodBenchmark, DISABLED_MillionEntityZoomOutRebuild)
     // 顶点上界（钳制）在整个百万批次上全程有效
     EXPECT_LE(sink.maxPolylinePoints, static_cast<size_t>(Eg::tess::kLodMaxCurvePoints));
 
-    // ---- ③ 误差抽检：代表性大波浪样条（与 SplineAlgorithmsTests 同形）----
+    // ---- 误差抽检：代表性大波浪样条（与 SplineAlgorithmsTests 同形） ----
     // 误差 = 参考采样点到发射折线的最大弦高 × scale = 屏幕像素。
     // 参考曲线必须与生产同一求值器 SyNurbs::value 密采样。
     Eg::SyNurbs wavy;
@@ -1729,7 +1719,7 @@ TEST(RenderSubmitLodBenchmark, DISABLED_MillionEntityZoomOutRebuild)
     std::cout << "[LOD基准] zoom out 档离散误差 " << errorPx << " px（预算 " << kErrorBudgetPx << " px）" << std::endl;
     EXPECT_LE(errorPx, kErrorBudgetPx) << "zoom out 档离散误差超过预算";
 
-    // ---- ④ 超放大档钳制抽查：点数上界在发射边界同样有效 ----
+    // ---- 超放大档钳制抽查：点数上界在发射边界同样有效 ----
     LodBenchmarkSink zoomInSink;
     ASSERT_TRUE(Eg::emitEntityGeometry(wavy, zoomInSink, 1000.0));
     EXPECT_LE(zoomInSink.maxPolylinePoints, static_cast<size_t>(Eg::tess::kLodMaxCurvePoints));

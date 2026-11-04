@@ -57,10 +57,21 @@ public:
     // ---------- 材质 ----------
 
     /// 创建材质，返回其编号（0 表示失败）。该编号填 DrawInstruction::materialIndex
+    ///
+    /// 描述内容相同的多次调用共享同一个编号（引用计数 +1）：materialIndex 是
+    /// 绘制列表的合批判据之一，逐个图元各建一份会让合批永远不成立。
+    /// 消失配对：每个 createMaterial 都必须配一次 destroyMaterial。
     virtual uint32_t createMaterial(const MaterialDesc& desc) = 0;
     /// 原地更新材质。每次都 Add 会把材质表撑成「图元数 × 编辑次数」
+    ///
+    /// 若该编号被多个 createMaterial 共享（引用计数 > 1），原地改写会连带改掉
+    /// 其他引用方的外观，因此实现应返回 false；调用方随后按「destroy + create」
+    /// 做写时复制。独占材质原地更新成功返回 true。
     virtual bool updateMaterial(uint32_t material, const MaterialDesc& desc) = 0;
     /// 销毁材质，编号可被后续 createMaterial 复用。
+    ///
+    /// 只释放本次 createMaterial 占用的那一个引用；引用计数归零后才真正销毁
+    /// 后端条目。每次 createMaterial 必须配一次本调用，否则材质表只增不减。
     ///
     /// 调用方必须先确保没有绘制命令再引用该编号（把命令的 materialIndex
     /// 改成 0）：命令是按值存进绘制列表的，事后改这里影响不到已提交的那份。

@@ -43,7 +43,7 @@
 #include "Log/SyLogger.h"
 #include <QTimer>
 
-// ==================== RenderViewport2D 实现 ====================
+// ---- RenderViewport2D 实现 ----
 
 RenderViewport2D::RenderViewport2D(QWidget* parent)
     : QWidget(parent)
@@ -140,12 +140,11 @@ void RenderViewport2D::releaseGLResources()
 
     // 释放后 m_session 已失效，RenderWidget::renderFrame 会在入口直接返回，
     // 因此后续 setCentralWidget(nullptr) → hide() 触发的绘制事件都是空操作。
-    //
-    // 这里刻意**不**做 layout()->removeWidget() + setParent(nullptr)：
-    // 那是为了规避「hide() 期间访问失效 native handle」而加的手法，但那次崩溃的
-    // 真因是 GL 删除没有当前上下文（已在 RenderWidget 内修正）。把子控件摘成
-    // 孤立顶层反而有两个副作用：本视口析构时不再级联删除它（每次工作台切换泄漏
-    // 一个 RenderWidget），且这个孤立控件仍会继续收到定时器与绘制事件。
+    // 这里刻意不做 layout()->removeWidget() + setParent(nullptr)：
+    // 该手法是为规避「hide() 期间访问失效 native handle」而加的，但真因是
+    // GL 删除没有当前上下文（已由 RenderWidget 内部修正）。把子控件摘成
+    // 孤立顶层有两个副作用：本视口析构时不会级联删除它（每次工作台切换泄漏
+    // 一个 RenderWidget），且该孤立控件仍会继续收到定时器与绘制事件。
 }
 
 void RenderViewport2D::wireInputRouter()
@@ -310,7 +309,7 @@ void RenderViewport2D::syncCursorRole() const
     m_cursorManager->setHidden(m_snapCursorHidden && !panning);
 }
 
-// ==================== 外部接口实现 ====================
+// ---- 外部接口实现 ----
 
 void RenderViewport2D::setStatusCallback(std::function<void(const QString&)> callback)
 {
@@ -372,7 +371,7 @@ void RenderViewport2D::setDocument(SceneDocument2D* document)
     m_document = document;
 
     // 缓存 SceneManager 指针，避免析构时通过 m_document 访问已释放内存
-    // SceneDocument2D 不再暴露 sceneManager()，渲染桥接层通过
+    // SceneDocument2D 不暴露 sceneManager()，渲染桥接层通过
     // 编辑服务外观获取场景对象
     if (m_document && m_document->editService())
     {
@@ -744,7 +743,7 @@ void RenderViewport2D::setMeasureMode(bool enabled)
     syncStatusMode(enabled ? tr("2D measure mode") : tr("2D select mode"));
 }
 
-// ==================== 选择状态广播 ====================
+// ---- 选择状态广播 ----
 
 void RenderViewport2D::syncSelectionDetails()
 {
@@ -775,7 +774,7 @@ QPointF RenderViewport2D::mapGlobalToScene(const QPoint& globalPos) const
     return widgetToWorld(local);
 }
 
-// ==================== 事件处理（委托给 ViewportInputRouter） ====================
+// ---- 事件处理（委托给 ViewportInputRouter） ----
 
 void RenderViewport2D::showEvent(QShowEvent* event)
 {
@@ -899,17 +898,17 @@ void RenderViewport2D::contextMenuEvent(QContextMenuEvent* event)
     emit contextMenuRequested(event);
 }
 
-// ==================== 内部方法 ====================
+// ---- 内部方法 ----
 
 QSizeF RenderViewport2D::physicalViewportSize() const
 {
-    // P5 收口: 委托给 ViewportInputRouter，消除与 ViewportInputRouter 的重复实现
+    // 委托给 ViewportInputRouter，消除重复实现
     return m_inputRouter ? m_inputRouter->physicalViewportSize() : QSizeF(0, 0);
 }
 
 QPointF RenderViewport2D::widgetToWorld(QPoint widgetLocalPos) const
 {
-    // P5 收口: 委托给 ViewportInputRouter，消除与 ViewportInputRouter 的重复实现
+    // 委托给 ViewportInputRouter，消除重复实现
     return m_inputRouter ? m_inputRouter->widgetToWorld(widgetLocalPos) : QPointF();
 }
 
@@ -995,7 +994,7 @@ void RenderViewport2D::applyCameraToWidget()
     }
 }
 
-// ==================== 刷新策略委托（→ SceneRefreshCoordinator） ====================
+// ---- 刷新策略委托（→ SceneRefreshCoordinator） ----
 
 void RenderViewport2D::requestRepaint()
 {
@@ -1032,8 +1031,8 @@ void RenderViewport2D::applyLayerVisibilityChanged(int layerId, bool visible)
     }
 }
 
-// P5: onSceneChanged / onSelectionChanged 已收敛到 SceneRefreshCoordinator（IObserver）
-// 视口不再直接实现 IObserver，通过 selectionChanged 信号同步工具状态
+// onSceneChanged / onSelectionChanged 统一由 SceneRefreshCoordinator（IObserver）处理
+// 视口不直接实现 IObserver，通过 selectionChanged 信号同步工具状态
 
 void RenderViewport2D::updateStatus(const QString& text)
 {

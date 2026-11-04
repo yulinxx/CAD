@@ -11,7 +11,7 @@
 #include <gtest/gtest.h>
 #include "UI/Render/RenderWidget3DAdapter.h"
 
-// ==================== 生命周期测试 ====================
+// ---- 生命周期测试 ----
 
 TEST(RenderWidget3DAdapterTest, Construction)
 {
@@ -35,7 +35,7 @@ TEST(RenderWidget3DAdapterTest, ShutdownWithoutInit)
     EXPECT_FALSE(adapter.isReady());
 }
 
-// ==================== 状态查询测试 ====================
+// ---- 状态查询测试 ----
 
 TEST(RenderWidget3DAdapterTest, RenderLoopNotRunningWithoutInit)
 {
@@ -53,7 +53,7 @@ TEST(RenderWidget3DAdapterTest, SelectedNodeId_DefaultEmpty)
     EXPECT_TRUE(adapter.selectedPathNames().isEmpty());
 }
 
-// ==================== 场景与相机绑定测试 ====================
+// ---- 场景与相机绑定测试 ----
 
 TEST(RenderWidget3DAdapterTest, SetScene_NullIsSafe)
 {
@@ -69,7 +69,7 @@ TEST(RenderWidget3DAdapterTest, SetCamera_NullIsSafe)
     SUCCEED();
 }
 
-// ==================== 视图控制测试 ====================
+// ---- 视图控制测试 ----
 
 TEST(RenderWidget3DAdapterTest, ResetView_WithoutInit)
 {
@@ -86,7 +86,7 @@ TEST(RenderWidget3DAdapterTest, Resize_WithoutInit)
     SUCCEED();
 }
 
-// ==================== 回调测试 ====================
+// ---- 回调测试 ----
 
 TEST(RenderWidget3DAdapterTest, StatusCallback_NullIsSafe)
 {
@@ -120,7 +120,7 @@ TEST(RenderWidget3DAdapterTest, StatusCallback_IsStored)
     SUCCEED();
 }
 
-// ==================== 选中节点测试 ====================
+// ---- 选中节点测试 ----
 
 TEST(RenderWidget3DAdapterTest, SelectNodeById_WithoutInit)
 {
@@ -129,7 +129,7 @@ TEST(RenderWidget3DAdapterTest, SelectNodeById_WithoutInit)
     SUCCEED();
 }
 
-// ==================== Widget 访问测试 ====================
+// ---- Widget 访问测试 ----
 
 TEST(RenderWidget3DAdapterTest, Widget_ReturnsNullWithoutInit)
 {
@@ -137,7 +137,7 @@ TEST(RenderWidget3DAdapterTest, Widget_ReturnsNullWithoutInit)
     EXPECT_EQ(adapter.widget(), nullptr);
 }
 
-// ==================== 渲染循环控制测试 ====================
+// ---- 渲染循环控制测试 ----
 
 TEST(RenderWidget3DAdapterTest, RenderLoop_ToggleWithoutInit)
 {
@@ -148,7 +148,7 @@ TEST(RenderWidget3DAdapterTest, RenderLoop_ToggleWithoutInit)
     EXPECT_FALSE(adapter.isRenderLoopRunning());
 }
 
-// ==================== 多次 shutdown 测试 ====================
+// ---- 多次 shutdown 测试 ----
 
 TEST(RenderWidget3DAdapterTest, DoubleShutdown)
 {
@@ -158,7 +158,7 @@ TEST(RenderWidget3DAdapterTest, DoubleShutdown)
     EXPECT_FALSE(adapter.isReady());
 }
 
-// ==================== 空路径选择测试 ====================
+// ---- 空路径选择测试 ----
 
 TEST(RenderWidget3DAdapterTest, SelectedPathNames_DefaultEmpty)
 {
@@ -166,7 +166,7 @@ TEST(RenderWidget3DAdapterTest, SelectedPathNames_DefaultEmpty)
     EXPECT_TRUE(adapter.selectedPathNames().isEmpty());
 }
 
-// ==================== 回调生命周期测试 ====================
+// ---- 回调生命周期测试 ----
 
 TEST(RenderWidget3DAdapterTest, Callbacks_AllThreeCanBeSet)
 {

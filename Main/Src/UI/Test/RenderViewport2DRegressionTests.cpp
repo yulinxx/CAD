@@ -12,9 +12,7 @@
  *  - 大批量图元刷新压力
  *
  * 注意：需要 QWidget 的测试（RenderViewport2D 事件分发）需要 QApplication 实例，
- * 当前版本以 SceneRefreshCoordinator / SceneManager 的组件级测试为主。
- *
- * P5 测试覆盖扩展 (2026-07-30)
+ * 本文件以 SceneRefreshCoordinator / SceneManager 的组件级测试为主。
  */
 
 #include <gtest/gtest.h>
@@ -49,7 +47,7 @@
 #include <algorithm>
 #include <cstring>
 
-// ==================== SceneRefreshCoordinator 完整生命周期测试 ====================
+// ---- SceneRefreshCoordinator 完整生命周期测试 ----
 
 TEST(RenderViewport2DRegressionTest, RefreshCoordinator_ConstructWithoutWidget)
 {
@@ -91,7 +89,7 @@ TEST(RenderViewport2DRegressionTest, RefreshCoordinator_StopTwice)
     SUCCEED();
 }
 
-// ==================== 刷新级别升级规则测试 ====================
+// ---- 刷新级别升级规则测试 ----
 
 TEST(RenderViewport2DRegressionTest, RefreshLevel_RepaintUpgradesToLightUpdate)
 {
@@ -146,7 +144,7 @@ TEST(RenderViewport2DRegressionTest, RefreshLevel_AllFourLevelsSequence)
     SUCCEED();
 }
 
-// P5 刷新语义统一：requestLightRefresh 专项测试
+// requestLightRefresh 专项测试
 
 TEST(RenderViewport2DRegressionTest, RefreshLevel_RepaintUpgradesToLightRefresh)
 {
@@ -196,7 +194,7 @@ TEST(RenderViewport2DRegressionTest, RefreshLevel_LightRefreshNullWidgetNoCrash)
     SUCCEED();
 }
 
-// ==================== 脏标记传播测试 ====================
+// ---- 脏标记传播测试 ----
 
 TEST(RenderViewport2DRegressionTest, DirtyFlag_AddEntityTriggersSceneChanged)
 {
@@ -250,7 +248,7 @@ TEST(RenderViewport2DRegressionTest, DirtyFlag_DeleteEntityTriggersDirty)
     // 删除后应有脏标记
 }
 
-// ==================== 选择变更触发重绘测试 ====================
+// ---- 选择变更触发重绘测试 ----
 
 TEST(RenderViewport2DRegressionTest, SelectionChange_TriggersRepaint)
 {
@@ -317,7 +315,7 @@ TEST(RenderViewport2DRegressionTest, SelectionChange_DeleteSelectedClearsSelecti
     EXPECT_EQ(scene.getEntityCount(), 0u);
 }
 
-// ==================== 刷新协调器与场景管理器联动测试 ====================
+// ---- 刷新协调器与场景管理器联动测试 ----
 
 TEST(RenderViewport2DRegressionTest, Coordinator_SceneChangeRefreshesWithEntities)
 {
@@ -393,7 +391,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_MixedTypeEntities)
     SUCCEED();
 }
 
-// ==================== 帧计时器与性能监控测试 ====================
+// ---- 帧计时器与性能监控测试 ----
 
 TEST(RenderViewport2DRegressionTest, FrameTimer_DefaultConstruction)
 {
@@ -513,7 +511,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_PerfMonitorDoubleToggle)
     SUCCEED();
 }
 
-// ==================== 大批量图元刷新压力测试 ====================
+// ---- 大批量图元刷新压力测试 ----
 
 TEST(RenderViewport2DRegressionTest, Stress_LargeBatchEntityAdd)
 {
@@ -588,7 +586,7 @@ TEST(RenderViewport2DRegressionTest, Stress_RapidRefreshSequence)
     SUCCEED();
 }
 
-// ==================== Camera2D 与视口联动测试 ====================
+// ---- Camera2D 与视口联动测试 ----
 
 TEST(RenderViewport2DRegressionTest, Camera2D_ViewMatrixAfterPan)
 {
@@ -648,7 +646,7 @@ TEST(RenderViewport2DRegressionTest, Camera2D_NegativeZoomToFit)
     SUCCEED();
 }
 
-// ==================== 图元属性变更后刷新测试 ====================
+// ---- 图元属性变更后刷新测试 ----
 
 TEST(RenderViewport2DRegressionTest, EntityPropertyChange_VisibilityToggle)
 {
@@ -699,7 +697,7 @@ TEST(RenderViewport2DRegressionTest, EntityPropertyChange_LockToggle)
     SUCCEED();
 }
 
-// ==================== 选择同步链端到端测试 ====================
+// ---- 选择同步链端到端测试 ----
 
 TEST(RenderViewport2DRegressionTest, SelectionChain_SelectDeselectReselect)
 {
@@ -796,7 +794,7 @@ TEST(RenderViewport2DRegressionTest, SelectionChain_MultipleSelectWithMixedTypes
     EXPECT_EQ(scene.getSelectedEntityCount(), 2u);
 }
 
-// ==================== 删除图元后无悬空选中测试 ====================
+// ---- 删除图元后无悬空选中测试 ----
 
 TEST(RenderViewport2DRegressionTest, NoDanglingSelection_DeleteAllSelected)
 {
@@ -848,7 +846,7 @@ TEST(RenderViewport2DRegressionTest, NoDanglingSelection_DeleteIndividualEntity)
     EXPECT_NE(scene.findSyEntityById(id2), nullptr);
 }
 
-// ==================== 刷新协调器与场景通知联动测试 ====================
+// ---- 刷新协调器与场景通知联动测试 ----
 
 TEST(RenderViewport2DRegressionTest, Coordinator_SceneChangeAfterClear)
 {
@@ -899,7 +897,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_SelectionChangeSequence)
     SUCCEED();
 }
 
-// ==================== ViewportInputRouter 构造与依赖注入测试 ====================
+// ---- ViewportInputRouter 构造与依赖注入测试 ----
 
 TEST(RenderViewport2DRegressionTest, InputRouter_DefaultConstruction)
 {
@@ -976,7 +974,7 @@ TEST(RenderViewport2DRegressionTest, InputRouter_FullDependencyInjection)
     SUCCEED();
 }
 
-// ==================== ViewportInputRouter 平移模式测试 ====================
+// ---- ViewportInputRouter 平移模式测试 ----
 
 TEST(RenderViewport2DRegressionTest, InputRouter_PanModeDefaultOff)
 {
@@ -994,7 +992,7 @@ TEST(RenderViewport2DRegressionTest, InputRouter_PanModeToggle)
     EXPECT_FALSE(router.isPanModeEnabled());
 }
 
-// ==================== 空格临时平移（跨平台触控板/鼠标导航） ====================
+// ---- 空格临时平移（跨平台触控板/鼠标导航） ----
 
 TEST(RenderViewport2DRegressionTest, InputRouter_SpaceKeyEntersTemporaryPanState)
 {
@@ -1028,7 +1026,7 @@ TEST(RenderViewport2DRegressionTest, InputRouter_SpaceAutoRepeatDoesNotToggle)
     EXPECT_FALSE(router.isSpaceHeld());
 }
 
-// ==================== 视口滚轮/触控板实际行为测试（真实 RenderWidget + Camera2D） ====================
+// ---- 视口滚轮/触控板实际行为测试（真实 RenderWidget + Camera2D） ----
 
 namespace
 {
@@ -1091,7 +1089,7 @@ TEST(RenderViewport2DRegressionTest, WheelGesture_MouseWheelZoomsCamera)
 TEST(RenderViewport2DRegressionTest, WheelGesture_MouseWheelShiftStillZooms)
 {
     WheelRig rig;
-    // 鼠标滚轮带 Shift：应保持缩放（锚定缩放会合法地移动 panOffset），不改为平移
+    // 鼠标滚轮带 Shift：应保持缩放（锚定缩放会合法地移动 panOffset），不判为平移
     QWheelEvent ev(QPointF(600, 400),
         QPointF(600, 400),
         QPoint(),
@@ -1170,7 +1168,7 @@ TEST(RenderViewport2DRegressionTest, SpaceKey_FingerMovePansCamera)
     EXPECT_NEAR(rig.camera.panOffset.y(), -10.0 * dpr, 1e-3);
 }
 
-// ==================== ViewportInputRouter 回调注入测试 ====================
+// ---- ViewportInputRouter 回调注入测试 ----
 
 TEST(RenderViewport2DRegressionTest, InputRouter_PositionCallback)
 {
@@ -1197,7 +1195,7 @@ TEST(RenderViewport2DRegressionTest, InputRouter_StatusCallback)
     SUCCEED();
 }
 
-// ==================== ViewportInputRouter 坐标转换测试 ====================
+// ---- ViewportInputRouter 坐标转换测试 ----
 
 TEST(RenderViewport2DRegressionTest, InputRouter_PhysicalViewportSizeNullWidget)
 {
@@ -1216,9 +1214,8 @@ TEST(RenderViewport2DRegressionTest, InputRouter_WidgetToWorldNullWidget)
 }
 
 // ---- tryWidgetToWorld：(0,0) 是合法结果，不得与失败混淆 ----
-// 历史缺陷：mouseEventToWorld 用 !worldPos.isNull() 判断成功，
-// 相机把世界原点平移到光标下时（worldPos==(0,0)）被误判为失败，
-// 该次 mouse 事件被整体丢弃 —— 表现为「原点附近点不动/选不中」。
+// 不能用 !worldPos.isNull() 判断成功：相机把世界原点平移到光标下时（worldPos==(0,0)）
+// 会被误判为失败，该次 mouse 事件整体丢弃，表现为「原点附近点不动/选不中」。
 
 TEST(RenderViewport2DRegressionTest, InputRouter_TryWidgetToWorld_WorldOriginIsValidResult)
 {
@@ -1264,7 +1261,7 @@ TEST(RenderViewport2DRegressionTest, InputRouter_TryWidgetToWorld_NullWidgetFail
     EXPECT_FALSE(router.tryWidgetToWorld(QPointF(100, 100), world));
 }
 
-// ==================== ViewportInputRouter 事件过滤器测试 ====================
+// ---- ViewportInputRouter 事件过滤器测试 ----
 
 TEST(RenderViewport2DRegressionTest, InputRouter_EventFilterNullObject)
 {
@@ -1286,11 +1283,11 @@ TEST(RenderViewport2DRegressionTest, InputRouter_EventFilterNonRenderWidget)
     EXPECT_FALSE(result);
 }
 
-// ==================== 键盘路由优先级测试 ====================
+// ---- 键盘路由优先级测试 ----
 
 TEST(RenderViewport2DRegressionTest, InputRouter_KeyboardPriority_EscapeKey)
 {
-    // 键盘路由优先级：tool → Delete（交互命令分发器已移除）
+    // 键盘路由优先级：tool → Delete（路由链中不含交互命令分发器）
     ViewportInputRouter router;
     // 验证路由链存在，不崩溃
     QKeyEvent escEvent(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
@@ -1314,7 +1311,7 @@ TEST(RenderViewport2DRegressionTest, InputRouter_KeyboardPriority_EnterKey)
     SUCCEED();
 }
 
-// ==================== 鼠标事件路由优先级测试 ====================
+// ---- 鼠标事件路由优先级测试 ----
 
 TEST(RenderViewport2DRegressionTest, InputRouter_MousePressNullRenderWidget)
 {
@@ -1366,7 +1363,7 @@ TEST(RenderViewport2DRegressionTest, InputRouter_WheelNullRenderWidget)
     SUCCEED();
 }
 
-// ==================== 滚轮/触控板手势分类测试（跨平台） ====================
+// ---- 滚轮/触控板手势分类测试（跨平台） ----
 
 TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyPinchAsZoom)
 {
@@ -1390,7 +1387,7 @@ TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyTrackpadDragAsPan)
 
 TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyMouseWheelAsZoom)
 {
-    // 普通鼠标滚轮：无滚动阶段 → 缩放（保持既有行为）
+    // 普通鼠标滚轮：无滚动阶段 → 缩放
     EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 120), QPointF(), Qt::NoModifier, Qt::NoScrollPhase),
         ViewportInputRouter::WheelGestureType::Zoom);
     EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, -120), QPointF(), Qt::NoModifier, Qt::NoScrollPhase),
@@ -1402,7 +1399,7 @@ TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyMouseWheelAsZoom)
 
 TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyMouseWheelModifiersStillZoom)
 {
-    // 鼠标滚轮带 Ctrl/Shift 修饰键 → 仍缩放（不改变鼠标既有操作）
+    // 鼠标滚轮带 Ctrl/Shift 修饰键 → 仍缩放，鼠标滚轮语义不变
     EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 120), QPointF(), Qt::ControlModifier, Qt::NoScrollPhase),
         ViewportInputRouter::WheelGestureType::Zoom);
     EXPECT_EQ(ViewportInputRouter::classifyWheel(QPoint(0, 120), QPointF(), Qt::ShiftModifier, Qt::NoScrollPhase),
@@ -1419,7 +1416,7 @@ TEST(RenderViewport2DRegressionTest, WheelGesture_ClassifyTrackpadShiftScrollAsH
         ViewportInputRouter::WheelGestureType::HorizontalPan);
 }
 
-// ==================== 上下文菜单测试 ====================
+// ---- 上下文菜单测试 ----
 
 TEST(RenderViewport2DRegressionTest, InputRouter_ContextMenuNullDispatcher)
 {
@@ -1430,10 +1427,9 @@ TEST(RenderViewport2DRegressionTest, InputRouter_ContextMenuNullDispatcher)
     SUCCEED();
 }
 
-// ==================== 右键菜单抑制（右键=Esc 与右键菜单互斥） ====================
-//
-// 背景：RenderWidget 是原生窗口，其 ContextMenu 事件被路由事件过滤器吞掉后，
-// NSEvent 仍沿 NSView 响应链落到父控件 RenderViewport2D::contextMenuEvent ——
+// ---- 右键菜单抑制（右键=Esc 与右键菜单互斥） ----
+// RenderWidget 是原生窗口，其 ContextMenu 事件被路由事件过滤器吞掉后，
+// NSEvent 仍沿 NSView 响应链落到父控件 RenderViewport2D::contextMenuEvent，
 // 两条路径互相独立。右键被消费为「取消绘制/退出工具」时，菜单必须同步抑制，
 // 否则取消绘图的右键会额外弹出菜单，其 Cut 首项会吃掉用户下一次点击。
 
@@ -1470,7 +1466,7 @@ TEST(RenderViewport2DRegressionTest, InputRouter_ConsumeContextMenuSuppression_S
 
     ViewportInputRouter router;
     router.setToolManager(&tm);
-    // 选择工具空闲态右键 = 弹菜单（既有正常行为保持）
+    // 选择工具空闲态右键 = 弹菜单
     EXPECT_FALSE(router.consumeContextMenuSuppression());
 }
 
@@ -1517,7 +1513,7 @@ TEST(RenderViewport2DRegressionTest,
     EXPECT_FALSE(router.consumeContextMenuSuppression());
 }
 
-// ==================== 刷新协调器与输入路由器联动测试 ====================
+// ---- 刷新协调器与输入路由器联动测试 ----
 
 TEST(RenderViewport2DRegressionTest, InputRouter_DeleteKeyTriggersRefreshCoordinator)
 {
@@ -1547,7 +1543,7 @@ TEST(RenderViewport2DRegressionTest, InputRouter_PanModeBlocksToolDispatch)
     SUCCEED();
 }
 
-// ==================== Camera2D 新增方法测试（P5 视口瘦身） ====================
+// ---- Camera2D viewMatrix / zoomToBBox / resetToDefault 测试 ----
 
 TEST(RenderViewport2DRegressionTest, Camera2D_ViewMatrixReturnsMat3f)
 {
@@ -1690,9 +1686,9 @@ TEST(RenderViewport2DRegressionTest, Camera2D_ZoomToBBoxMatchesZoomToFitPlusPan)
     EXPECT_NEAR(camera1.panOffset.y(), camera2.panOffset.y(), 1e-4f);
 }
 
-// ==================== ViewportSelector::selectionBBox 测试 ====================
-// ViewportSelector 只剩这一件事：把选中 ID 集合翻译成世界坐标包围盒（zoom_selection 用）。
-// 点选/框选归 SelectTool，选择读写归 ISelectionService，此处不再覆盖。
+// ---- ViewportSelector::selectionBBox 测试 ----
+// ViewportSelector 只负责这一件事：把选中 ID 集合翻译成世界坐标包围盒（zoom_selection 用）。
+// 点选/框选归 SelectTool，选择读写归 ISelectionService，不在本文件覆盖。
 
 namespace
 {

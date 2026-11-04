@@ -13,6 +13,7 @@
 #include "Engine2D/SyEntity/SyText.h"
 #include "Engine2D/SyEntity/SyPolygon.h"
 #include "Engine2D/Geometry/EntityGeometryEmitter.h"
+#include "Engine2D/Render/SelectionOutlineBuilder.h"
 #include "Engine/SyEntity/EType.h"
 #include "Engine/Parallel/EngineParallel.h"
 
@@ -100,8 +101,15 @@ SceneRefreshCoordinator::SceneRefreshCoordinator(QObject* parent)
 
     // 「选中时隐藏本体」的判定实时求值：管理器不持有选中集/开关副本，
     // 避免拖动强制显示、轮廓预算翻转等路径漏同步导致选中本体被 LOD 重新画回。
+    // 类型门槛同 canHideSelectedBody：位图/色块/文字没有轮廓替代视觉，不能隐藏本体。
     m_submitScheduler.setSelectionHiddenPredicate([this](uint64_t uid) {
-        return hideSelectedEffective() && m_cachedSelectedIds.count(uid) > 0;
+        if (!hideSelectedEffective() || m_cachedSelectedIds.count(uid) == 0)
+        {
+            return false;
+        }
+        const Eg::SyEntity* entity =
+            m_sceneManager != nullptr ? m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid)) : nullptr;
+        return canHideSelectedBody(entity);
     });
 }
 
@@ -378,6 +386,32 @@ bool SceneRefreshCoordinator::hideSelectedEffective() const
     return m_renderWidget != nullptr && m_renderWidget->hideSelectedOriginalEffective();
 }
 
+bool SceneRefreshCoordinator::canHideSelectedBody(const Eg::SyEntity* entity)
+{
+    // 位图/色块/文字等离散不出轮廓路径：隐藏本体后没有任何替代视觉，等于把图元抹掉
+    return Eg::SelectionOutlineBuilder::supportsSelectionOutline(entity);
+}
+
+std::unordered_set<uint64_t> SceneRefreshCoordinator::selectedBodyHideIds() const
+{
+    std::unordered_set<uint64_t> ids;
+    if (!hideSelectedEffective() || m_sceneManager == nullptr)
+    {
+        return ids;
+    }
+
+    ids.reserve(m_cachedSelectedIds.size());
+    for (uint64_t uid : m_cachedSelectedIds)
+    {
+        const Eg::SyEntity* entity = m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid));
+        if (canHideSelectedBody(entity))
+        {
+            ids.insert(uid);
+        }
+    }
+    return ids;
+}
+
 void SceneRefreshCoordinator::setForceShowSelectedDuringDrag(bool forceShow)
 {
     if (m_forceShowSelectedDuringDrag != forceShow)
@@ -461,10 +495,10 @@ void SceneRefreshCoordinator::applyLayerVisibilityChanged(int layerId, bool visi
 
     // 位图 / 文字：它们的世界层条目由各自的 reconciler 维护，期望集合已排除隐藏图层，
     // 这里对账一次即可把该层的位图与文字摘掉。
-    const bool hideSelected = hideSelectedEffective();
+    // hideSelected 固定传 false：位图/文字没有轮廓替代视觉，选中时本体必须保持显示。
     const std::unordered_set<Eg::EntityId> noDirty;
-    m_bitmapReconciler.reconcile(m_sceneManager, false, m_cachedSelectedIds, hideSelected, noDirty);
-    m_textReconciler.reconcile(m_sceneManager, false, m_cachedSelectedIds, hideSelected, noDirty);
+    m_bitmapReconciler.reconcile(m_sceneManager, false, m_cachedSelectedIds, false, noDirty);
+    m_textReconciler.reconcile(m_sceneManager, false, m_cachedSelectedIds, false, noDirty);
 
     // 隐藏图层的曲线不再参与 LOD 收集：RenderSubmitScheduler 的 isRenderable 已按图层可见性过滤，
     // 队列里残留的条目在消费时会被跳过，这里不需要额外清理队列（清了反而会让下一次
@@ -654,10 +688,11 @@ bool SceneRefreshCoordinator::isDesiredOnGeometryLayer(const Eg::SyEntity* e, bo
     {
         return false;
     }
-    // 「选中时隐藏本体」：选中集里的本体不入几何层（由虚线轮廓覆盖层表达）
+    // 「选中时隐藏本体」：选中集里的本体不入几何层（由虚线轮廓覆盖层表达）。
+    // 只有能离散出轮廓的类型才允许隐藏；位图/色块/文字没有替代视觉，本体必须留在世界层。
     if (hideSelected && m_cachedSelectedIds.count(static_cast<uint64_t>(e->id)))
     {
-        return false;
+        return !canHideSelectedBody(e);
     }
     return true;
 }
@@ -1034,8 +1069,9 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             continue;
         }
 
-        // 如果启用了"选中时隐藏原图"且实体被选中，则跳过渲染
-        if (hideSelected && selectedIds.count(uid))
+        // 如果启用了"选中时隐藏原图"且实体被选中，则跳过渲染。
+        // 仅对能画出虚线轮廓的类型生效：位图/色块/文字隐藏后没有替代视觉，必须继续渲染本体。
+        if (hideSelected && selectedIds.count(uid) && canHideSelectedBody(snapshot->entity()))
         {
             // 从渲染中移除（如果之前有渲染的话）
             if (m_renderedEntityIds.count(uid))
@@ -1077,9 +1113,15 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     {
         for (uint64_t uid : m_selectionRestoreIds)
         {
-            // 此刻仍该被摘的（仍然被选中且隐藏有效）不动它 —— 与 hide 侧同一个判据，
+            const Eg::SyEntity* e = sm->findEntityById(static_cast<Eg::EntityId>(uid));
+            if (e == nullptr || !e->visible())
+            {
+                continue;
+            }
+
+            // 此刻仍该被摘的（仍然被选中且隐藏有效且类型能画轮廓）不动它 —— 与 hide 侧同一个判据，
             // 两边对称，连续两次选择变化时过期的差集条目不会把本体错误地放回去。
-            if (hideSelected && selectedIds.count(uid))
+            if (hideSelected && selectedIds.count(uid) && canHideSelectedBody(e))
             {
                 continue;
             }
@@ -1090,11 +1132,6 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
                 continue;
             }
 
-            const Eg::SyEntity* e = sm->findEntityById(static_cast<Eg::EntityId>(uid));
-            if (e == nullptr || !e->visible())
-            {
-                continue;
-            }
             const Eg::SyLayer* layer = e->layer();
             if (layer != nullptr && !layer->isVisible())
             {
@@ -1160,6 +1197,12 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             {
                 continue;
             }
+            // 位图/色块/文字等没有轮廓替代视觉，本体必须留在世界层
+            const Eg::SyEntity* hiddenEntity = sm->findEntityById(static_cast<Eg::EntityId>(uid));
+            if (!canHideSelectedBody(hiddenEntity))
+            {
+                continue;
+            }
             if (m_renderedEntityIds.count(uid))
             {
                 hiddenToRemove.push_back(uid);
@@ -1182,13 +1225,16 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     // 两者都不成立时（账本空 && 本轮没碰位图）对账必然是空转，可以安全跳过。
     if (touchedImage || !m_bitmapReconciler.empty())
     {
-        m_bitmapReconciler.reconcile(sm, /*fullReconcile=*/false, m_cachedSelectedIds, hideSelected, m_pendingDirtyIds);
+        // 位图没有可离散的选择轮廓：hideSelected 固定传 false，选中时本体保持显示，
+        // 否则图像会在选中后整片消失（选中态只剩一个选框）。
+        m_bitmapReconciler.reconcile(sm, /*fullReconcile=*/false, m_cachedSelectedIds, false, m_pendingDirtyIds);
     }
 
     // 世界文字层协调：同上。文本自己一路后，增量刷新不再因文本升级为全量。
     if (touchedText || !m_textReconciler.empty())
     {
-        m_textReconciler.reconcile(sm, /*fullReconcile=*/false, m_cachedSelectedIds, hideSelected, m_pendingDirtyIds);
+        // 文字同理没有轮廓替代视觉，选中时保留本体
+        m_textReconciler.reconcile(sm, /*fullReconcile=*/false, m_cachedSelectedIds, false, m_pendingDirtyIds);
     }
 }
 
@@ -1275,8 +1321,21 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     // GPU 与账本因此保持一致。
     if (hideSelected)
     {
-        std::vector<uint64_t> toRemove(selectedIds.begin(), selectedIds.end());
-        m_renderWidget->removeRenderEntities(toRemove);
+        // 只摘能画出虚线轮廓的选中本体；位图/色块/文字没有替代视觉，必须留在 GPU 上
+        std::vector<uint64_t> toRemove;
+        toRemove.reserve(selectedIds.size());
+        for (uint64_t uid : selectedIds)
+        {
+            const Eg::SyEntity* selectedEntity = sm->findEntityById(static_cast<Eg::EntityId>(uid));
+            if (canHideSelectedBody(selectedEntity))
+            {
+                toRemove.push_back(uid);
+            }
+        }
+        if (!toRemove.empty())
+        {
+            m_renderWidget->removeRenderEntities(toRemove);
+        }
     }
 
     // 全量重建已按当前选中集把本体的增删做到位，待处理的选中差集就此过期：
@@ -1291,11 +1350,12 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     m_submitScheduler.clearAfterFullRefresh(pxToWorldNow > 0.0f ? 1.0 / static_cast<double>(pxToWorldNow) : 0.0);
 
     // 位图层全量协调：submitSceneFromDataSource 内部 renderBeginScene 已清空 GPU 位图，
-    // 这里以场景为真源整体重建，保证与场景生命周期完全一致
-    m_bitmapReconciler.reconcile(sm, /*fullReconcile=*/true, m_cachedSelectedIds, hideSelected, {});
+    // 这里以场景为真源整体重建，保证与场景生命周期完全一致。
+    // hideSelected 固定传 false：位图没有轮廓替代视觉，选中时仍保持图像显示。
+    m_bitmapReconciler.reconcile(sm, /*fullReconcile=*/true, m_cachedSelectedIds, false, {});
 
     // 世界文字层全量协调：同上
-    m_textReconciler.reconcile(sm, /*fullReconcile=*/true, m_cachedSelectedIds, hideSelected, {});
+    m_textReconciler.reconcile(sm, /*fullReconcile=*/true, m_cachedSelectedIds, false, {});
 }
 
 // 渲染刷新分发：按 RefreshLevel 级别选择刷新策略

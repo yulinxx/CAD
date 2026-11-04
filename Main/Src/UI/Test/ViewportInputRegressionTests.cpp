@@ -54,7 +54,7 @@ static void recordOneFrameInViewport(FrameTimer& timer)
     timer.endFrame();
 }
 
-// ==================== Camera2D 坐标转换测试 ====================
+// ---- Camera2D 坐标转换测试 ----
 
 TEST(ViewportInputRegressionTest, Camera2D_DefaultState)
 {
@@ -178,7 +178,7 @@ TEST(ViewportInputRegressionTest, Camera2D_SetViewExtent_PreservesAspect)
     EXPECT_GT(camera.zoomY, 0.0f);
 }
 
-// ==================== 刷新级别切换测试 ====================
+// ---- 刷新级别切换测试 ----
 
 TEST(ViewportInputRegressionTest, RefreshLevel_SceneChangeTriggersFullRefresh)
 {
@@ -268,7 +268,7 @@ TEST(ViewportInputRegressionTest, RefreshLevel_RepeatedSceneChange_Idempotent)
     SUCCEED();
 }
 
-// ==================== 选择同步链测试 ====================
+// ---- 选择同步链测试 ----
 
 // 轻量 mock 实现 ISelectionService，用于测试选择同步
 class MockSelectionService : public ISelectionService
@@ -523,7 +523,7 @@ TEST(SelectionSyncRegressionTest, MockSelectionService_SelectMultipleClearsPrevi
     EXPECT_TRUE(selSvc.isSelected("new_b"));
 }
 
-// ==================== 键盘事件路由优先级测试 ====================
+// ---- 键盘事件路由优先级测试 ----
 
 // 模拟键盘事件路由的两级优先级：
 // 1. ActiveTool (工具特定快捷键)
@@ -576,7 +576,7 @@ TEST(KeyRoutingRegressionTest, EnterKey_ShouldNotCrash)
     SUCCEED();
 }
 
-// ==================== 刷新与脏标记联动测试 ====================
+// ---- 刷新与脏标记联动测试 ----
 
 TEST(RefreshDirtyTrackingTest, AddEntity_MarksDirty)
 {
@@ -710,7 +710,7 @@ TEST(RefreshDirtyTrackingTest, BulkAddEntities_DirtyTracking)
     EXPECT_TRUE(changes.changes.empty());
 }
 
-// ==================== 帧计时器扩展测试 ====================
+// ---- 帧计时器扩展测试 ----
 
 TEST(FrameTimerRegressionTest, MultipleFrames_AverageIsStable)
 {
@@ -764,7 +764,7 @@ TEST(FrameTimerRegressionTest, UnpairedBeginEnd_IsSafe)
     EXPECT_GT(timer.frameCount(), 0u);
 }
 
-// ==================== 场景刷新协调器与 SceneManager 集成测试 ====================
+// ---- 场景刷新协调器与 SceneManager 集成测试 ----
 
 TEST(RefreshIntegrationTest, Coordinator_ReceivesDirtyEntities)
 {
@@ -816,7 +816,7 @@ TEST(RefreshIntegrationTest, Coordinator_StopAfterSceneChange)
     SUCCEED();
 }
 
-// ==================== 键盘路由优先级链测试 ====================
+// ---- 键盘路由优先级链测试 ----
 // 键盘事件路由优先级（从 handleKeyPress 实现）：
 // 1. ActiveTool (工具特定快捷键，如空格确认) — 优先级最高
 // 2. Delete (删除选中图元) — 最低优先级
@@ -875,7 +875,7 @@ TEST(KeyRoutingRegressionTest, PriorityChain_EnterConfirmsTool)
     SUCCEED();
 }
 
-// ==================== 鼠标事件分发优先级链测试 ====================
+// ---- 鼠标事件分发优先级链测试 ----
 // 鼠标事件分发优先级（从 dispatchMousePressToInput 实现）：
 // 1. 中键/平移模式 — 最高优先级（handlePanMousePress）
 // 2. ActiveTool (onMousePress/onMouseMove/onMouseRelease) — 最低优先级，也是唯一兜底
@@ -897,7 +897,7 @@ TEST(MouseDispatchRegressionTest, PriorityChain_ToolIsFallback)
     SUCCEED();
 }
 
-// ==================== showEvent 初始刷新逻辑测试 ====================
+// ---- showEvent 初始刷新逻辑测试 ----
 
 TEST(ShowEventRegressionTest, RefreshCoordinator_StopBeforeFullRefresh)
 {
@@ -928,7 +928,7 @@ TEST(ShowEventRegressionTest, RefreshCoordinator_WithSceneManager)
     SUCCEED();
 }
 
-// ==================== setDocument 刷新逻辑测试 ====================
+// ---- setDocument 刷新逻辑测试 ----
 
 TEST(SetDocumentRegressionTest, NullDocument_NoCrash)
 {
@@ -979,7 +979,7 @@ TEST(SetDocumentRegressionTest, AddObserver_ReceiveSceneChange)
     coordinator.stop();
 }
 
-// ==================== 刷新级别转换规则测试 ====================
+// ---- 刷新级别转换规则测试 ----
 // 升级规则：Repaint → LightUpdate → FullRefresh（不降级）
 
 TEST(ViewportInputRegressionTest, RefreshLevel_RepaintToLightUpdate_Upgrades)
@@ -1051,7 +1051,7 @@ TEST(ViewportInputRegressionTest, RefreshLevel_OnSceneChangedCollectsDirtyIds)
     coordinator.stop();
 }
 
-// ==================== 场景管理器删除与选中联动测试 ====================
+// ---- 场景管理器删除与选中联动测试 ----
 
 TEST(ViewportInputRegressionTest, SceneManager_DeleteClearsSelection)
 {
@@ -1143,7 +1143,7 @@ TEST(ViewportInputRegressionTest, SceneManager_ClearSelection)
     EXPECT_EQ(scene.getSelectedEntityCount(), 0u);
 }
 
-// ==================== 多图元类型脏标记与刷新联动测试 ====================
+// ---- 多图元类型脏标记与刷新联动测试 ----
 
 TEST(ViewportInputRegressionTest, DirtyTracking_MultipleEntityTypes)
 {

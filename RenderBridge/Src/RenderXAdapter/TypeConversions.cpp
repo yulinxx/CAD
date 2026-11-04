@@ -10,6 +10,9 @@
  */
 #include "TypeConversions.h"
 
+#include "Log/SyLogger.h"
+
+#include <atomic>
 #include <cstring>
 
 namespace RenderBridge
@@ -17,6 +20,27 @@ namespace RenderBridge
     namespace RenderXConversion
     {
         using namespace RenderAbstraction;
+
+        namespace
+        {
+            /// 抽象层的管线/材质编号用 uint32 承载（留扩展余地），后端只认 uint16。
+            /// 越界值不能静默截断：截断后可能恰好指向另一个合法材质，画面错乱且
+            /// 无从追查来源。这里归零（材质 0 = 无材质/默认，管线 0 = 后端自行解析）
+            /// 并只告警一次，避免逐命令刷日志。
+            uint16_t toIndex16(uint32_t value, const char* what)
+            {
+                if (value <= 0xFFFFu)
+                {
+                    return static_cast<uint16_t>(value);
+                }
+                static std::atomic<bool> warned{ false };
+                if (!warned.exchange(true))
+                {
+                    SY_ERRORF("[RenderXAdapter] %s index %u exceeds uint16 range, clamped to 0", what, value);
+                }
+                return 0;
+            }
+        }  // namespace
 
         // ==================== RenderAbstraction → RenderX ====================
 
@@ -182,9 +206,10 @@ namespace RenderBridge
             out.vertexFormat = toRenderXFormat(cmd.format);
             out.indexType = Render::RT::IndexType::None;
             // 本层用 uint32 承载管线/材质编号以留扩展余地；实际值来自
-            // rxPipelineCreate / rxMaterialAdd 的 uint16 索引，不会溢出
-            out.pipelineIndex = static_cast<uint16_t>(cmd.pipelineIndex);
-            out.materialIndex = static_cast<uint16_t>(cmd.materialIndex);
+            // rxPipelineCreate / rxMaterialAdd 的 uint16 索引。这里仍做越界收口，
+            // 宽度变了不至于静默截断到别人的编号（见 toIndex16 的说明）
+            out.pipelineIndex = toIndex16(cmd.pipelineIndex, "pipeline");
+            out.materialIndex = toIndex16(cmd.materialIndex, "material");
             out.lineWidth = cmd.lineWidth;
             out.pointSize = cmd.pointSize;
             return out;

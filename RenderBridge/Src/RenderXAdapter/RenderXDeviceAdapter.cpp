@@ -116,6 +116,87 @@ namespace RenderBridge
                 checkStride(pair);
             }
         }
+
+        /// 材质去重键：MaterialDesc 的全部字段（均为 4 字节，无填充）
+        ///
+        /// 去重的目的只有一个：让内容相同的材质拿到同一个 uint16 编号。
+        /// 绘制列表的合批判据是「materialIndex 相等」（见 rxIncremental 的
+        /// canBatchSharedState），逐个图元各建一份材质会让合批永远不成立。
+        struct MaterialKey
+        {
+            float lineWidth = 0.0f;
+            float pointSize = 0.0f;
+            float color[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+            uint32_t flags = 0;
+            float ambient[3] = { 0.0f, 0.0f, 0.0f };
+            float specular[3] = { 0.0f, 0.0f, 0.0f };
+            float shininess = 0.0f;
+        };
+
+        MaterialKey makeMaterialKey(const RenderAbstraction::MaterialDesc& desc)
+        {
+            MaterialKey key;
+            key.lineWidth = desc.lineWidth;
+            key.pointSize = desc.pointSize;
+            key.color[0] = desc.color[0];
+            key.color[1] = desc.color[1];
+            key.color[2] = desc.color[2];
+            key.color[3] = desc.color[3];
+            key.flags = desc.flags;
+            key.ambient[0] = desc.ambient[0];
+            key.ambient[1] = desc.ambient[1];
+            key.ambient[2] = desc.ambient[2];
+            key.specular[0] = desc.specular[0];
+            key.specular[1] = desc.specular[1];
+            key.specular[2] = desc.specular[2];
+            key.shininess = desc.shininess;
+            return key;
+        }
+
+        bool materialKeyEqual(const MaterialKey& a, const MaterialKey& b)
+        {
+            return a.lineWidth == b.lineWidth && a.pointSize == b.pointSize && a.color[0] == b.color[0] &&
+                a.color[1] == b.color[1] && a.color[2] == b.color[2] && a.color[3] == b.color[3] &&
+                a.flags == b.flags && a.ambient[0] == b.ambient[0] && a.ambient[1] == b.ambient[1] &&
+                a.ambient[2] == b.ambient[2] && a.specular[0] == b.specular[0] && a.specular[1] == b.specular[1] &&
+                a.specular[2] == b.specular[2] && a.shininess == b.shininess;
+        }
+
+        /// 逐字段按位混合的 FNV-1a：浮点按位参与哈希，避免 -0.0 / NaN 走不同分支
+        uint64_t hashMaterialKey(const MaterialKey& key)
+        {
+            uint64_t h = 0xcbf29ce484222325ull;
+            const float values[] = { key.lineWidth,
+                key.pointSize,
+                key.color[0],
+                key.color[1],
+                key.color[2],
+                key.color[3],
+                key.ambient[0],
+                key.ambient[1],
+                key.ambient[2],
+                key.specular[0],
+                key.specular[1],
+                key.specular[2],
+                key.shininess };
+            for (const float value : values)
+            {
+                uint32_t bits = 0;
+                std::memcpy(&bits, &value, sizeof(bits));
+                h ^= static_cast<uint64_t>(bits);
+                h *= 0x100000001b3ull;
+            }
+            h ^= static_cast<uint64_t>(key.flags);
+            h *= 0x100000001b3ull;
+            return h;
+        }
+
+        /// 一个材质槽的去重台账：内容键 + 引用计数
+        struct MaterialSlot
+        {
+            MaterialKey key;
+            uint32_t refs = 0;
+        };
     }  // namespace
 
     class RenderXDeviceAdapter : public RenderAbstraction::IRenderDevice
@@ -324,20 +405,109 @@ namespace RenderBridge
 
         uint32_t createMaterial(const RenderAbstraction::MaterialDesc& desc) override
         {
+            const MaterialKey key = makeMaterialKey(desc);
+            const uint64_t hash = hashMaterialKey(key);
+            const auto cached = m_materialLookup.find(hash);
+            if (cached != m_materialLookup.end())
+            {
+                const auto slot = m_materialSlots.find(cached->second);
+                // 哈希碰撞时不能用别人的槽：内容不相等就继续往下新建
+                if (slot != m_materialSlots.end() && materialKeyEqual(slot->second.key, key))
+                {
+                    ++slot->second.refs;
+                    return static_cast<uint32_t>(cached->second);
+                }
+            }
+
             const Render::RT::MaterialDesc raw = toRenderXMaterial(desc);
-            return static_cast<uint32_t>(Render::RT::rxMaterialAdd(m_runtime, &raw));
+            const uint16_t index = Render::RT::rxMaterialAdd(m_runtime, &raw);
+            if (index == 0)
+            {
+                // 上限收口：后端材质表满（uint16 上限）或创建失败时返回 0，
+                // 调用方会把 0 当成「无材质」回落到默认材质。这里必须留一条
+                // 带在用数量的错误日志，否则表现只是「模型突然变白」。
+                SY_ERRORF("[RenderXAdapter] rxMaterialAdd failed (distinct materials=%u, limit=65535)",
+                    static_cast<unsigned>(m_materialSlots.size()));
+                return 0;
+            }
+            m_materialSlots.emplace(index, MaterialSlot{ key, 1 });
+            m_materialLookup[hash] = index;
+            return static_cast<uint32_t>(index);
         }
 
         bool updateMaterial(uint32_t material, const RenderAbstraction::MaterialDesc& desc) override
         {
+            if (material > 0xFFFFu)
+            {
+                SY_ERRORF("[RenderXAdapter] updateMaterial: index %u exceeds uint16 range", material);
+                return false;
+            }
+            const uint16_t index = static_cast<uint16_t>(material);
+            const auto cached = m_materialSlots.find(index);
+            if (cached == m_materialSlots.end())
+            {
+                // 不走去重表创建的材质（或已被销毁）：保持原语义直接下发
+                const Render::RT::MaterialDesc raw = toRenderXMaterial(desc);
+                return checkRx("rxMaterialUpdate", Render::RT::rxMaterialUpdate(m_runtime, index, &raw));
+            }
+
+            const MaterialKey key = makeMaterialKey(desc);
+            if (materialKeyEqual(cached->second.key, key))
+            {
+                // 内容没变：不必触碰后端，也不必重新挂哈希表
+                return true;
+            }
+            if (cached->second.refs > 1)
+            {
+                // 该编号被多个图元共享，原地改写会连带改掉别人的外观。
+                // 返回 false 让调用方走「释放旧引用 + 按新描述重新创建」的写时复制。
+                return false;
+            }
+
             const Render::RT::MaterialDesc raw = toRenderXMaterial(desc);
-            return checkRx(
-                "rxMaterialUpdate", Render::RT::rxMaterialUpdate(m_runtime, static_cast<uint16_t>(material), &raw));
+            if (!checkRx("rxMaterialUpdate", Render::RT::rxMaterialUpdate(m_runtime, index, &raw)))
+            {
+                return false;
+            }
+            // 独占材质原地更新成功：去重表里的内容键跟着换
+            const uint64_t oldHash = hashMaterialKey(cached->second.key);
+            const auto oldLookup = m_materialLookup.find(oldHash);
+            if (oldLookup != m_materialLookup.end() && oldLookup->second == index)
+            {
+                m_materialLookup.erase(oldLookup);
+            }
+            cached->second.key = key;
+            m_materialLookup[hashMaterialKey(key)] = index;
+            return true;
         }
 
         bool destroyMaterial(uint32_t material) override
         {
-            return checkRx("rxMaterialRemove", Render::RT::rxMaterialRemove(m_runtime, static_cast<uint16_t>(material)));
+            if (material > 0xFFFFu)
+            {
+                SY_ERRORF("[RenderXAdapter] destroyMaterial: index %u exceeds uint16 range", material);
+                return false;
+            }
+            const uint16_t index = static_cast<uint16_t>(material);
+            const auto cached = m_materialSlots.find(index);
+            if (cached == m_materialSlots.end())
+            {
+                return checkRx("rxMaterialRemove", Render::RT::rxMaterialRemove(m_runtime, index));
+            }
+            if (cached->second.refs > 1)
+            {
+                // 还有别的图元在引用：只减计数，后端条目保持有效
+                --cached->second.refs;
+                return true;
+            }
+            const uint64_t hash = hashMaterialKey(cached->second.key);
+            const auto lookup = m_materialLookup.find(hash);
+            if (lookup != m_materialLookup.end() && lookup->second == index)
+            {
+                m_materialLookup.erase(lookup);
+            }
+            m_materialSlots.erase(cached);
+            return checkRx("rxMaterialRemove", Render::RT::rxMaterialRemove(m_runtime, index));
         }
 
         // ---------- 字体 ----------
@@ -402,6 +572,14 @@ namespace RenderBridge
         /// 后端名，指向 rxBackendName 的静态字符串，生命周期不随本对象
         const char* m_backendName = "";
         bool m_ownsRuntime = false;
+
+        /// 材质去重台账：编号 → 内容键 + 引用计数
+        ///
+        /// 材质编号是绘制列表的合批键之一（materialIndex 相等才可能共批），
+        /// 因此内容相同的材质必须在 Runtime 里只占一个编号。
+        std::unordered_map<uint16_t, MaterialSlot> m_materialSlots;
+        /// 内容键哈希 → 材质编号。碰撞时以 m_materialSlots 里的完整键复核
+        std::unordered_map<uint64_t, uint16_t> m_materialLookup;
 
         friend class RenderXFactory;
     };
