@@ -426,7 +426,7 @@ void OnSave() {
 - [架构文档地图](Docs/00-索引与总览/架构文档地图.md)
 - [新渲染架构](Docs/03-渲染主链/新渲染架构.md)
 - [渲染管线](Docs/03-渲染主链/渲染管线.md)
-- [GPU 渲染边界](Docs/03-渲染主链/gpu-renderer-boundary.md)
+- [GPU 渲染边界](Docs/03-渲染主链/图形处理器渲染器边界.md)
 - [3D 架构现状与约束](Docs/03-渲染主链/3D%20架构现状与约束.md)
 - [许可证模块文档](Licensing/License/README.md)
 
