@@ -74,14 +74,28 @@ LONG WINAPI vectoredExceptionHandler(EXCEPTION_POINTERS* pExInfo)
 {
     const DWORD code = pExInfo->ExceptionRecord->ExceptionCode;
 
-    // 过滤 Qt/Windows 内部正常流转的异常码，只打印真正的崩溃。
+    // 调试输出通道异常码，取值来自 Windows SDK 的 winnt.h（DBG_PRINTEXCEPTION_C / DBG_PRINTEXCEPTION_WIDE_C）。
+    // OutputDebugStringA/W 内部会 RaiseException 投递调试字符串，任何模块（Qt 图像插件、libtiff 等）
+    // 都可能随时触发；这不是崩溃。
+    // 这里必须返回 EXCEPTION_CONTINUE_EXECUTION 让调用方继续执行（调试器也是这么处理的），
+    // 并且不打印、不记档、不弹框——否则每次调试输出都会刷一遍栈，把真崩溃的日志淹没。
+    constexpr DWORD kDbgPrintExceptionC = 0x40010006;
+    constexpr DWORD kDbgPrintExceptionWideC = 0x4001000A;
+    if (code == kDbgPrintExceptionC || code == kDbgPrintExceptionWideC)
+    {
+        return EXCEPTION_CONTINUE_EXECUTION;
+    }
+
+    // 其余已知的非崩溃异常继续向下分发，交给 C++ 运行时/系统处理。
+    // 这些码不能改成 CONTINUE_EXECUTION，否则会破坏 C++ EH（0xe06d7363）、
+    // RPC 代理通知（0x8001010d）等既有语义。
     // 0xe06d7363 = C++ EH（Qt 字体回退等内部大量使用）
     // 0x8001010d = RPC 代理通知
     // 0x40010004 = 调试器约定消息（STATUS_WAKE_SYSTEM_DEBUGGER 的一种变体）
-    // 0x40010006 = OutputDebugStringW 内部 RaiseException，SHELL32/COM 初始化
-    //              时高频触发，本质是 STATUS_SUCCESS，Severity=0
     // 0x406D1388 = 调试器约定消息
-    if (code == 0xe06d7363 || code == 0x8001010d || code == 0x40010004 || code == 0x40010006 || code == 0x406D1388)
+    // 注意：0x40010005 / 0x40010008（Ctrl+C / Ctrl+Break）属于用户主动控制事件，
+    // 不做静音处理，保持它们在控制台语义下的原有终止行为。
+    if (code == 0xe06d7363 || code == 0x8001010d || code == 0x40010004 || code == 0x406D1388)
     {
         return EXCEPTION_CONTINUE_SEARCH;
     }
