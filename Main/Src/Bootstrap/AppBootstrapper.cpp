@@ -69,11 +69,9 @@ AppPaths MainApp::buildAppPaths(const std::string& appName)
     return paths;
 }
 
-// 初始化应用引导器，保存应用路径和版本信息
-AppBootstrapper::AppBootstrapper(const AppPaths& paths, const std::string& appName, const std::string& version)
+// 初始化应用引导器，保存应用路径
+AppBootstrapper::AppBootstrapper(const AppPaths& paths)
     : m_paths(paths)
-    , m_appName(appName)
-    , m_version(version)
 {
 }
 
@@ -248,22 +246,10 @@ void AppBootstrapper::shutdown()
     SY_DEBUG("[AppBootstrapper] Shutdown complete");
 }
 
-// 获取启动工作台ID
-QString AppBootstrapper::startWorkbenchId() const
-{
-    return m_startWorkbenchId;
-}
-
 // 获取应用组合根组件指针
 ApplicationCompositionRoot* AppBootstrapper::compositionRoot()
 {
     return m_compositionRoot.get();
-}
-
-// 获取应用路径集合的常量引用
-const AppPaths& AppBootstrapper::appPaths() const
-{
-    return m_paths;
 }
 
 // 设置启动时使用的工作台ID

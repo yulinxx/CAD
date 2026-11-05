@@ -39,7 +39,7 @@ namespace MainApp
 class AppBootstrapper
 {
 public:
-    AppBootstrapper(const AppPaths& paths, const std::string& appName, const std::string& version);
+    AppBootstrapper(const AppPaths& paths);
     ~AppBootstrapper();
 
 public:
@@ -50,14 +50,10 @@ public:
     void shutdown();
 
     ApplicationCompositionRoot* compositionRoot();
-    const AppPaths& appPaths() const;
     void setStartWorkbenchId(const QString& workbenchId);
-    QString startWorkbenchId() const;
 
 private:
     AppPaths m_paths;
-    std::string m_appName;
-    std::string m_version;
     std::unique_ptr<ApplicationCompositionRoot> m_compositionRoot;
     std::unique_ptr<UiWorkbench> m_workbench;
     QString m_startWorkbenchId{ QStringLiteral("2D") };

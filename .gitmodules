@@ -53,3 +53,7 @@
 	path = Raster
 	url = git@github.com:yulinxx/Raster.git
 	branch = main
+[submodule "CAM"]
+	path = CAM
+	url = git@github.com:yulinxx/CAM.git
+	branch = main

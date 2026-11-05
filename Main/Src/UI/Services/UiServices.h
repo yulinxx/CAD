@@ -3,7 +3,6 @@
 #include <functional>
 #include <memory>
 
-#include "IUiServices.h"
 #include "UiServiceGroups.h"
 
 class UiStateCenter;
@@ -31,7 +30,7 @@ namespace Eg
 
 /**
  * @struct UiServices
- * @brief UI 服务集合（具体类型聚合，实现 IUIServices 接口）
+ * @brief UI 服务集合（具体类型聚合）
  *
  * 聚合了 UI 层所需的服务。本结构是**组合根的装配容器**：由
  * ApplicationCompositionRoot 填充，再以聚焦分组 / 接口的形式交付消费者；
@@ -50,7 +49,7 @@ namespace Eg
  *  - 工作台接口 UiWorkbench::initialize 收 WorkbenchServices bundle
  * 本聚合仅由 ApplicationCompositionRoot 填充，作为**装配容器**使用。
  */
-struct UiServices : public IUIServices
+struct UiServices
 {
     /// UI 状态中心
     UiStateCenter* stateCenter{ nullptr };
@@ -132,9 +131,4 @@ struct UiServices : public IUIServices
     {
         return { uiState(), commands(), scene(), persistence(), view() };
     }
-
-    // ---- IUIServices 接口实现 ----
-
-    ISelectionService* getSelectionService() const override { return selectionService; }
-    IUndoRedoManager* getUndoManager() const override { return undoManager; }
 };

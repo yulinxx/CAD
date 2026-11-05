@@ -50,6 +50,4 @@ public:
 private:
     WorkbenchMenuManager* m_self{ nullptr };
     class UiWorkbench* m_workbench{ nullptr };
-    WorkbenchWindow* m_workbenchWindow{ nullptr };
-    class UiStateCenter* m_stateCenter{ nullptr };
 };

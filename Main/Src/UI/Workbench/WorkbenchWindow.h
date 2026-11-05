@@ -210,8 +210,6 @@ private:
     void recordPerformance(const QString& scope, qint64 elapsedMs);
     /// 上报框架错误
     void reportFrameworkError(const QString& errorCode, const QString& message, const QString& context);
-    /// 命令执行前的统一权限检查
-    bool canExecuteCommand(const QString& commandId, const QString& context) const;
     /// 归零命令状态
     void resetCommandStateToIdle();
     /// 归零工作台相关的本地镜像状态

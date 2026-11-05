@@ -13,7 +13,6 @@ class OperationBus;
 class UiStateCenter;
 class UiWorkbench;
 class WorkbenchWindow;
-struct UiFrameworkServices;
 class IRecentFileService;
 class UnitManager;
 struct MenuDef;
@@ -45,7 +44,6 @@ public:
 
     void setOperationBus(OperationBus* bus);
     void setStateCenter(UiStateCenter* stateCenter);
-    void setFrameworkServices(const UiFrameworkServices* services);
     void setRecentFileService(IRecentFileService* service);
     void setWorkbench(UiWorkbench* workbench);
     /// 注入单位管理器（显示单位勾选态来源，与状态栏共用同一实例）
@@ -149,7 +147,6 @@ private:
 
     OperationBus* m_operationBus{ nullptr };
     UiStateCenter* m_stateCenter{ nullptr };
-    const UiFrameworkServices* m_frameworkServices{ nullptr };
     IRecentFileService* m_recentFileService{ nullptr };    UiWorkbench* m_workbench{ nullptr };
     UnitManager* m_unitManager{ nullptr };
     // 全局编辑快捷键动作（窗口级，需在切换工作台时显式清理）

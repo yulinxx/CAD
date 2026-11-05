@@ -49,12 +49,6 @@ void WorkbenchStateManager::setUiStateCenter(UiStateCenter* stateCenter)
     SY_DEBUGF("[WorkbenchStateManager] State center set: %p", static_cast<void*>(stateCenter));
 }
 
-void WorkbenchStateManager::setFrameworkServices(const UiFrameworkServices& services)
-{
-    // 框架级能力统一从这里注入，后续错误、权限、性能都必须走同一条框架路径
-    m_frameworkServices = services;
-}
-
 void WorkbenchStateManager::setActiveStatusBar(StatusBarBase* statusBarWidget)
 {
     m_activeStatusBar = statusBarWidget;
@@ -175,7 +169,9 @@ void WorkbenchStateManager::doRefreshFromState()
         QString prompt = state.statusPrompt;
         if (prompt.isEmpty())
         {
-            prompt = m_parent->tr("Ready");
+            // 用 QObject::tr 替代 m_parent->tr：lupdate 无法识别指针->tr() 模式，
+            // 会跳过翻译字符串提取；QObject::tr 是静态方法，lupdate 能正确识别
+            prompt = QObject::tr("Ready");
         }
         m_activeStatusBar->setMessageText(prompt);
     }

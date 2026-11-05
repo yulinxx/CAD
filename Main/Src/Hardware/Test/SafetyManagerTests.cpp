@@ -12,6 +12,14 @@
 #include <gtest/gtest.h>
 #include "Hardware/SafetyManager.h"
 
+// 本测试文件仍然构造已标记弃用的 SafetyManager，用于回归其行为。
+// 该类仓库内零构造点，保留仅为 ABI 兼容；如确认无仓库外消费者，可连同这些用例一起删除。
+// 此处仅在本文件范围内压制 C4996，不影响工程级警告策略，也不去掉符号上的弃用标记。
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable : 4996)
+#endif
+
 // 测试默认安全状态
 TEST(SafetyManagerTest, DefaultState_IsSafe)
 {
@@ -144,3 +152,7 @@ TEST(SafetyManagerTest, PerformSelfCheck_ReturnsResults)
     // 自检应该返回结果
     EXPECT_GE(checkResults.size(), 0);
 }
+
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
