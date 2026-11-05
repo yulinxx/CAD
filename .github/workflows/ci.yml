@@ -13,6 +13,11 @@ concurrency:
 jobs:
   build-and-test-windows:
     runs-on: windows-latest
+    # 统一编译器消息语言：cl 的 "包含文件:" 前缀必须与 ninja 的 msvc_deps_prefix 对齐，
+    # 否则本地化前缀漂移会让 ninja 解析 deps 失败（#deps 0），改 .cpp 不再触发重编。
+    # 本作业当前用 VS 生成器（依赖跟踪走 .tlog），Configure 与 Build 同时生效，为未来切 Ninja 预先对齐。
+    env:
+      VSLANG: "1033"
     defaults:
       run:
         shell: bash
@@ -48,6 +53,13 @@ jobs:
             FileIOTests NestingTests CAMTests \
             RenderxTests RenderBridgeTests \
             UICommonTests UI2DTests UI3DTests MainTests
+
+      # unity 依赖盲区体检（只读）：Ninja 下校验每个 unity 分块的 deps 记录是否覆盖
+      # 它 #include 的全部 .cpp（#deps 0 会让改动静默不重编）。只跑 ninja -t deps，不构建。
+      # 当前作业用 VS/MSBuild 生成器（依赖跟踪走 .tlog），本步会识别"无 .ninja_deps"并跳过；
+      # 若本作业切到 Ninja 生成器，该步即成为真实门禁。放在 Build 之后，因为它依赖构建产物与 deps 库。
+      - name: Audit unity dependency coverage
+        run: python Tools/check_unity_deps.py --build-dir build
 
       - name: Test
         run: ctest --test-dir build -C Debug --output-on-failure --parallel
