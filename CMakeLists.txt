@@ -118,18 +118,19 @@ endif()
 # ---------------------------------------------------------------------------
 # 测试基础设施
 # ---------------------------------------------------------------------------
-#   1. 探测 GTest 并接入 GoogleTest；
-#   2. GTest 不可用时，把 Config.cmake 里的全部测试开关统一降级为 OFF。
-find_package(GTest CONFIG QUIET)
-if(GTest_FOUND)
-    include(GoogleTest)
-    enable_testing()
-    message(STATUS "  Google Test: Found, unit tests enabled")
-else()
-    message(STATUS "  Google Test: Not found, unit tests disabled")
-    foreach(_sanyi_test IN LISTS SANYI_TEST_SWITCHES)
-        set(${_sanyi_test} OFF CACHE BOOL "disabled: GTest not found" FORCE)
-    endforeach()
+#   1. BUILD_TESTS=ON 时探测 GTest 并接入 GoogleTest；
+#   2. GTest 不可用时把唯一总开关 BUILD_TESTS 降级为 OFF（写回缓存并记录原因），
+#      降级发生在任何 add_subdirectory 之前，所有模块都只看最终值。
+if(BUILD_TESTS)
+    find_package(GTest CONFIG QUIET)
+    if(GTest_FOUND)
+        include(GoogleTest)
+        enable_testing()
+        message(STATUS "  Google Test: Found, unit tests enabled")
+    else()
+        message(STATUS "  Google Test: Not found, unit tests disabled")
+        sanyi_force_tests_off("GTest not found")
+    endif()
 endif()
 
 # 输出目录、USE_FOLDERS 等由 Config.cmake 统一配置（唯一配置处）
@@ -276,8 +277,8 @@ set(SANYI_PYTHON_VERSION "3.11" CACHE STRING "Required Python version")
 
 if(SANYI_PYTHON_HOST)
     # 必须进内层目录：外层 PythonHost/CMakeLists.txt 是独立构建入口，
-    # 它会调用 sanyi_only_own_tests() 把兄弟模块的测试开关改成 OFF，
-    # 作为根工程的子目录被加入时会让 MainTests 等目标凭空消失。
+    # 其中声明的测试范围只对独立构建生效；作为根工程子目录加入时走内层目录，
+    # 避免入口逻辑参与集成构建。
     add_subdirectory(PythonHost/PythonHost)
     message(STATUS "  PythonHost: ENABLED")
 else()
@@ -286,8 +287,8 @@ endif()
 
 option(SANYI_PYBIND_CORE "Build PyBindCore facade extension (_sanyi_core)" ON)
 if(SANYI_PYBIND_CORE AND SANYI_PYTHON_HOST)
-    # 同样必须进内层目录：外层入口会以无参 sanyi_only_own_tests() 关闭全部
-    # 兄弟测试开关（23 个），集成构建下是全局副作用。
+    # 同样必须进内层目录：外层入口带无参 sanyi_only_own_tests()（空 = 全部不放行），
+    # 那是独立构建语义，不应参与集成构建。
     add_subdirectory(PyBindCore/PyBindCore)
     message(STATUS "  PyBindCore: ENABLED")
 else()
@@ -603,3 +604,6 @@ endif()
 # CPack 配置
 # ============================================================================
 include(CMake/Packaging.cmake)
+
+# 全部模块与降级动作都已完成后，再打印最终测试状态（唯一打印点）
+sanyi_print_test_status()

@@ -2,7 +2,7 @@
 
 /**
  * @file LicenseTestHooks.h
- * @brief 仅供单元测试使用的公钥注入接口（BUILD_LICENSE_TESTS 时编译进 DLL）
+ * @brief 仅供单元测试使用的公钥注入接口（BUILD_TESTS=ON 时编译进 DLL）
  *
  * 允许测试用临时 RSA 密钥对完成激活闭环，不影响 Release 默认构建。
  */

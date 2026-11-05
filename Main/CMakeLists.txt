@@ -647,8 +647,9 @@ message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "")
 message(STATUS "----------------------------------------")
 
-# 开关由 Config.cmake 统一配置（BUILD_MAIN_TESTS）
-if(BUILD_MAIN_TESTS AND GTest_FOUND)
+# 由唯一总开关 BUILD_TESTS 与 MAIN 模块键控制
+sanyi_module_tests_enabled(MAIN _main_tests)
+if(_main_tests AND GTest_FOUND)
     find_package(Qt6 COMPONENTS Test REQUIRED)
     file(GLOB MAIN_TEST_SOURCES CONFIGURE_DEPENDS
         "${UI_ROOT}/Test/*.cpp"
@@ -879,12 +880,12 @@ target_link_libraries(MainTests
 endif()
 
 # ============================================================================
-# 数据库 Schema 迁移回归测试（独立于 BUILD_MAIN_TESTS 的独立目标）
+# 数据库 Schema 迁移回归测试（与 MainTests 共用 MAIN 模块键的独立目标）
 # ============================================================================
 # 单独开一个目标的原因：这批用例只依赖 DatabaseBootstrapper 与 EnginePersistence，
 # 而 MainTests 会把整个 Main 应用源码拖进 unity 编译，容易被无关测试文件的
 # 匿名命名空间同名类型冲突阻塞。独立目标可快速、稳定地验证迁移逻辑。
-if(BUILD_MAIN_TESTS AND GTest_FOUND)
+if(_main_tests AND GTest_FOUND)
     add_executable(DatabaseSchemaMigrationTests
         "${UI_ROOT}/Test/DatabaseSchemaMigrationTests.cpp"
         "${SRC_ROOT}/Persistence/DatabaseBootstrapper.cpp"
@@ -918,12 +919,13 @@ endif()
 # 位图导出用例由 MAIN_TEST_SOURCES 的 GLOB 自动收录，不再单独开目标
 
 # ============================================================================
-# 视口刷新契约测试（独立于 BUILD_MAIN_TESTS 的独立目标）
+# 视口刷新契约测试（使用 VIEWPORT_REFRESH 模块键的独立目标）
 # ============================================================================
 # 单独开一个目标的原因：MainTests 会把整个 Main 应用源码拖进编译，而这批刷新
 # 契约用例只依赖 SceneRefreshCoordinator 等几个实现文件。
-# 开关由 Config.cmake 统一配置（BUILD_VIEWPORT_REFRESH_TESTS）。
-if(BUILD_VIEWPORT_REFRESH_TESTS AND GTest_FOUND)
+# 由唯一总开关 BUILD_TESTS 与 VIEWPORT_REFRESH 模块键控制。
+sanyi_module_tests_enabled(VIEWPORT_REFRESH _viewport_tests)
+if(_viewport_tests AND GTest_FOUND)
     add_executable(ViewportRefreshTests
         "${UI_ROOT}/Test/ViewportRefreshRegressionTests.cpp"
         "${UI_ROOT}/Test/ViewportRefreshTestsMain.cpp"   # 自带 QApplication 的入口
@@ -966,15 +968,16 @@ if(BUILD_VIEWPORT_REFRESH_TESTS AND GTest_FOUND)
 endif()
 
 # ============================================================================
-# 场景编辑集成回归测试（独立于 BUILD_MAIN_TESTS 的独立目标）
+# 场景编辑集成回归测试（使用 SCENE_EDIT 模块键的独立目标）
 # ============================================================================
 # 单独开一个目标的原因：这批用例只走 Engine2D 的公开接口（SceneEditService /
 # UndoRedoManager / DocumentTransaction），完全不依赖 Qt，而 MainTests 会把整个
 # Main 应用源码拖进编译。独立目标既能秒级迭代，又不引入 Qt 依赖。
-# 开关由 Config.cmake 统一配置（BUILD_SCENE_EDIT_TESTS）。
-# 注：本文件同样会被 MainTests 的 Test/*.cpp 通配收录，开启 BUILD_MAIN_TESTS 时
+# 由唯一总开关 BUILD_TESTS 与 SCENE_EDIT 模块键控制。
+# 注：本文件同样会被 MainTests 的 Test/*.cpp 通配收录，MAIN 模块键放行时
 #     两处都会跑到，这是本工程既有约定（ViewportRefreshRegressionTests.cpp 亦然）。
-if(BUILD_SCENE_EDIT_TESTS AND GTest_FOUND)
+sanyi_module_tests_enabled(SCENE_EDIT _scene_edit_tests)
+if(_scene_edit_tests AND GTest_FOUND)
     add_executable(SceneEditIntegrationTests
         "${UI_ROOT}/Test/SceneEditIntegrationTests.cpp"
     )

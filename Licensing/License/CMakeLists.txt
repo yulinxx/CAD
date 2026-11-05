@@ -78,7 +78,10 @@ elseif(APPLE)
     endif()
 endif()
 
-if(BUILD_LICENSE_TESTS)
+# 测试注入钩子：仅在构建测试时编入 License DLL，会额外导出测试专用接口。
+# 出货构建必须 BUILD_TESTS=OFF，否则这些测试注入接口会一起进入发布产物。
+sanyi_module_tests_enabled(LICENSE _license_tests)
+if(_license_tests)
     target_compile_definitions(${LIB_NAME} PRIVATE LICENSE_TEST_HOOKS)
     enable_testing()
     find_package(GTest CONFIG REQUIRED)
@@ -90,11 +93,6 @@ message(STATUS "[${LIB_NAME}]")
 message(STATUS "  Version: ${PROJECT_VERSION}")
 message(STATUS "  Platform: ${CMAKE_SYSTEM_NAME}(${CMAKE_SYSTEM_PROCESSOR})")
 message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
-if(BUILD_LICENSE_TESTS)
-    message(STATUS "  Tests: ENABLED")
-else()
-    message(STATUS "  Tests: DISABLED")
-endif()
 message(STATUS "----------------------------------------")
 
 sanyi_export_imported_target(${LIB_NAME}

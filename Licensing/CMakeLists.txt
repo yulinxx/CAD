@@ -16,14 +16,14 @@ cmake_minimum_required(VERSION 4.3)
 #   2) 可脱离主程序单独编译：依赖的兄弟 DLL（Log）由本工程按需 add_subdirectory
 #      拉进来构建，Main / UI / Engine 一概不参与。
 #
-#   3) 测试由内层 Licensing/License/CMakeLists.txt 在 BUILD_LICENSE_TESTS=ON 时挂载，
+#   3) 测试由内层 Licensing/License/CMakeLists.txt 在 BUILD_TESTS=ON 时挂载，
 #      本文件不得重复 add_subdirectory(Test)，否则 target 重定义。
 #
 # 用法：
 #   cmake -S Licensing -B Licensing/build
 #   cmake --build Licensing/build --config Release
 #   ctest --test-dir Licensing/build -C Release
-#   cmake -S Licensing -B Licensing/build -DBUILD_LICENSE_TESTS=OFF   # 只编库、不编测试
+#   cmake -S Licensing -B Licensing/build -DBUILD_TESTS=OFF   # 只编库、不编测试
 #   cmake -S Licensing -B Licensing/build -DBUILD_LICENSE_EXAMPLE=OFF # 不编示例
 # ============================================================================
 
@@ -43,13 +43,11 @@ sanyi_setup_compiler_options()
 option(BUILD_LICENSE_EXAMPLE "Build License usage example" ON)
 
 # --- 测试与兄弟模块 ---------------------------------------------------------
-# 先关兄弟测试、再探测 GTest（缺失时把测试开关统一降级为 OFF），
+# 先声明本构建树的测试模块范围、再探测 GTest（缺失时把唯一总开关降级为 OFF），
 # 两步都必须发生在拉入兄弟模块之前，否则兄弟内层的 find_package(GTest REQUIRED)
 # 会在降级前硬失败。
-sanyi_only_own_tests(BUILD_LICENSE_TESTS)
-if(BUILD_LICENSE_TESTS)
-    sanyi_find_gtest()
-endif()
+sanyi_only_own_tests(LICENSE)
+sanyi_finalize_tests()
 
 # License 只依赖 Log（诊断输出）；OpenSSL 走 vcpkg，不涉及源码模块。
 sanyi_add_sibling(Log "${SANYI_LOG_DIR}")
@@ -68,7 +66,6 @@ message(STATUS "========================================")
 message(STATUS "  [Standalone: ${PROJECT_NAME}]")
 message(STATUS "========================================")
 message(STATUS "  Version:        ${PROJECT_VERSION}")
-message(STATUS "  Build Tests:    ${BUILD_LICENSE_TESTS}")
 message(STATUS "  Build Example:  ${BUILD_LICENSE_EXAMPLE}")
 message(STATUS "  Output:         ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 message(STATUS "========================================")

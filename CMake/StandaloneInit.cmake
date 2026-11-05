@@ -67,33 +67,29 @@ function(sanyi_add_sibling _tgt _dir)
     endif()
 endfunction()
 
-# 独立构建只关心本模块自己的测试：把兄弟模块的测试开关统一关闭。
-# 支持多开关（多子库模块如 Engine: BUILD_ENGINE2D_TESTS BUILD_ENGINE3D_TESTS）：
-#   sanyi_only_own_tests(<own_switch> [<own_switch2> ...])
-# 必须在 sanyi_add_sibling() 之前调用：Config.cmake 只在开关未定义时写默认值 ON，
-# 本宏在其后把兄弟开关改写为 OFF，改写结果留在缓存里，下一回合仍生效。
+# 独立构建只关心本模块自己的测试：声明本构建树允许构建测试的模块键。
+# 用法：sanyi_only_own_tests(<模块键> [<模块键2> ...])
+# 模块键取自 Config.cmake 的 SANYI_TEST_MODULES，例如
+#   sanyi_only_own_tests(ENGINE2D ENGINE3D)
+# 空参数表示「本树任何模块都不构建测试」，PyBindCore/CMakeLists.txt 依赖该语义，
+# 因此这里必须显式写入空字符串，不能靠「未定义」来表达。
+# 必须在 sanyi_add_sibling() 与任何内层 add_subdirectory() 之前调用：
+# 内层模块通过 sanyi_module_tests_enabled(<键>) 读取本变量决定是否挂测试。
 macro(sanyi_only_own_tests)
-    # 护栏：只有模块自身作为顶层工程（独立构建）时才允许改写测试开关。
-    # 集成构建里模块只是根工程的子目录，全部测试开关由 Config.cmake 与根
-    # CMakeLists.txt 统一管理；在这里改写会把兄弟模块（含 Main）的测试静默关掉。
+    # 护栏：只有模块自身作为顶层工程（独立构建）时才声明测试范围。
+    # 集成构建里模块只是根工程子目录，测试范围由根 CMakeLists.txt 统一管理，
+    # 在这里声明会把兄弟模块（含 Main）的测试静默关掉。
     # 注意：宏体内的 return() 只结束本宏的展开，不会中断调用方 CMakeLists 的解析。
     if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
         return()
     endif()
     # 注意：宏内的 foreach(IN LISTS ARGN) 拿不到参数（CMake 宏的 ARGN 只能经
-    # ${ARGN} 展开），必须先落到普通变量再遍历，否则会把本模块的开关也关掉。
-    set(_sanyi_own_switches ${ARGN})
-    foreach(_sanyi_sib_tests IN LISTS SANYI_TEST_SWITCHES)
-        list(FIND _sanyi_own_switches "${_sanyi_sib_tests}" _sanyi_idx)
-        if(_sanyi_idx EQUAL -1)
-            set(${_sanyi_sib_tests} OFF CACHE BOOL "standalone: sibling tests off" FORCE)
-        endif()
-    endforeach()
-    unset(_sanyi_own_switches)
-    unset(_sanyi_idx)
+    # ${ARGN} 展开），这里整体落到普通变量，允许为空。
+    set(SANYI_STANDALONE_OWN_MODULES "${ARGN}")
+    message(STATUS "[Standalone] Test modules: ${SANYI_STANDALONE_OWN_MODULES}")
 endmacro()
 
-# GTest 探测：不可用时把 Config.cmake 定义的全部测试开关统一降级为 OFF。
+# GTest 探测：不可用时把唯一总开关 BUILD_TESTS 降级为 OFF。
 # 这是独立构建下的唯一降级点（集成构建由根 CMakeLists.txt 承担同一职责）。
 macro(sanyi_find_gtest)
     # 护栏：同 sanyi_only_own_tests —— 集成构建的 GTest 探测与降级由根
@@ -109,10 +105,18 @@ macro(sanyi_find_gtest)
         message(STATUS "[Standalone] Google Test: found")
     else()
         message(STATUS "[Standalone] Google Test: not found, tests disabled")
-        foreach(_sanyi_test IN LISTS SANYI_TEST_SWITCHES)
-            set(${_sanyi_test} OFF CACHE BOOL "disabled: GTest not found" FORCE)
-        endforeach()
+        sanyi_force_tests_off("GTest not found")
     endif()
+endmacro()
+
+# 独立构建入口统一收口：先按需探测 GTest 并完成降级，再打印最终测试状态。
+# 所有独立入口都只调用它一次，状态输出逻辑集中在 Config.cmake 的
+# sanyi_print_test_status()，避免每个入口各写一份。
+macro(sanyi_finalize_tests)
+    if(BUILD_TESTS)
+        sanyi_find_gtest()
+    endif()
+    sanyi_print_test_status()
 endmacro()
 
 message(STATUS "[Standalone] Root: ${SANYI_ROOT}")

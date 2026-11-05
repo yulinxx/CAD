@@ -55,6 +55,7 @@ sanyi_add_shared_library(${LIB_NAME}
 # ============================================================================
 #  测试
 # ============================================================================
-if(BUILD_ALL_TESTS)
+sanyi_module_tests_enabled(CAM _cam_tests)
+if(_cam_tests)
     add_subdirectory(Test)
 endif()

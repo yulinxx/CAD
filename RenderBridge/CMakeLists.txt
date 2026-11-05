@@ -127,7 +127,8 @@ message(STATUS "")
 # 用 Null 后端 Runtime：几何仓的分配/写入/释放只需要 Runtime，不需要 GPU，
 # 因此这些用例在没有显卡的机器上也能跑（与 Renderx 自己的 RxRuntimeTests 同一套用法）。
 #
-if(BUILD_RENDERBRIDGE_TESTS AND GTest_FOUND)
+sanyi_module_tests_enabled(RENDERBRIDGE _renderbridge_tests)
+if(_renderbridge_tests AND GTest_FOUND)
     add_executable(RenderBridgeTests
         "${CMAKE_CURRENT_SOURCE_DIR}/Test/PersistentGeometryStoreTests.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/Test/DrawListBatchMeasurementTests.cpp"
@@ -156,6 +157,6 @@ if(BUILD_RENDERBRIDGE_TESTS AND GTest_FOUND)
         DISCOVERY_TIMEOUT 30
     )
     set_property(TARGET RenderBridgeTests PROPERTY FOLDER "Tests")
-elseif(NOT BUILD_RENDERBRIDGE_TESTS)
+elseif(NOT _renderbridge_tests)
     message(STATUS "[RenderBridge] tests disabled")
 endif()

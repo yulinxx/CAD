@@ -75,7 +75,7 @@ jobs:
           cmake -S Raster/ci -B build-raster \
             -DVCPKG_DIR="$VCPKG_ROOT" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_RASTER_TESTS=ON \
+            -DBUILD_TESTS=ON \
             -DBUILD_RASTER_EXAMPLES=OFF \
             -DBUILD_RASTER_BENCHMARK=OFF
           cmake --build build-raster --parallel
@@ -86,7 +86,7 @@ jobs:
           cmake -S Raster/ci -B build-raster-install \
             -DVCPKG_DIR="$VCPKG_ROOT" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_RASTER_TESTS=OFF \
+            -DBUILD_TESTS=OFF \
             -DBUILD_RASTER_EXAMPLES=OFF \
             -DBUILD_RASTER_BENCHMARK=OFF \
             -DRASTER_SDK_INSTALL=ON

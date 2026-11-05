@@ -60,8 +60,10 @@ endif()
 # 重复声明已删除，模块开关只保留一份。
 # ============================================================================
 
-# 测试开关
-option(BUILD_ALL_TESTS "开启全部测试" OFF)
+# 测试总开关：全工程唯一开关。
+# ON  = 按各模块是否具备测试源码正常构建（GTest 缺失时自动降级为 OFF）
+# OFF = 任何模块都不生成测试目标
+option(BUILD_TESTS "构建全部模块测试" ON)
 
 # ============================================================================
 
@@ -248,56 +250,14 @@ option(BUILD_RENDER_BENCHMARK "Build headless render frame-path benchmark" ON)
 # --------------------------------------------------------------------
 # 测试开关（本项目测试开关的唯一配置处）
 # --------------------------------------------------------------------
-# 规则：所有 BUILD_*_TESTS 只在本文件定义。其它 CMakeLists.txt 一律不得再
-#       用 option() / set() 定义同名开关，因为：
-#         - 重复定义会互相覆盖，谁先定义谁生效，排查成本极高；
-#         - 普通 set() 会遮蔽同名 option()（CMP0077），使 -D 传参静默失效。
-#
-# 取值方式：下面每个开关只在缓存里「尚未定义」时写入默认值 ON。
-#           不得用 FORCE：FORCE 会把 -DBUILD_MAIN_TESTS=OFF 这类显式传参静默
-#           覆盖回 ON，命令行就无法关掉任何测试，门禁形同虚设。
-#           改默认值请改本文件字面量并清掉对应缓存项，或用 -D 显式指定。
+# 唯一总开关 BUILD_TESTS 在本文件开头「测试开关」一节声明，默认 ON。
+# 旧的 BUILD_ALL_TESTS 与逐模块 BUILD_*_TESTS 已全部废弃，任何模块都不得再
+# 定义同名开关。是否生成测试目标只看 BUILD_TESTS 与当前构建范围
+# （集成构建 = 全部模块；独立构建 = sanyi_only_own_tests 声明的模块键）。
 
-# 便捷总开关：ON = 把下面全部模块测试一并打开；OFF = 保持各模块的显式取值
-# 此处不得用 FORCE 写回缓存：FORCE 会把命令行 -DBUILD_ALL_TESTS=ON 静默覆盖回 OFF。
-# 该开关的缓存项由本文件开头「测试开关」一节的 option(BUILD_ALL_TESTS ... OFF) 唯一声明，
-# 默认值 OFF 保持不变，-D 传参可正常生效。
-
-# ---- 逐模块测试开关（核心模块默认启用，建立测试保护网）----
-# 统一走同一个默认值入口：未定义才写 ON，已定义（含 -D 传入）一律不覆盖。
-macro(_sanyi_test_switch_default_on _name _desc)
-    if(NOT DEFINED ${_name})
-        set(${_name} ON CACHE BOOL "${_desc}")
-    endif()
-endmacro()
-
-_sanyi_test_switch_default_on(BUILD_UTILITY_TESTS          "Utility 单元测试")
-_sanyi_test_switch_default_on(BUILD_LOG_TESTS              "Log 单元测试")
-_sanyi_test_switch_default_on(BUILD_ENGINECOMMON_TESTS     "EngineCommon 单元测试")
-_sanyi_test_switch_default_on(BUILD_ENGINE2D_TESTS         "Engine2D 单元测试")
-_sanyi_test_switch_default_on(BUILD_ENGINE3D_TESTS         "Engine3D 单元测试")
-_sanyi_test_switch_default_on(BUILD_GEOMODELCORE_TESTS     "GeoModelCore 单元测试")
-_sanyi_test_switch_default_on(BUILD_FILEIO_TESTS           "FileIO 单元测试")
-_sanyi_test_switch_default_on(BUILD_LICENSE_TESTS          "License 单元测试")
-_sanyi_test_switch_default_on(BUILD_NESTING_TESTS          "Nesting 单元测试")
-_sanyi_test_switch_default_on(BUILD_ENGRAVING_TESTS        "Engraving 单元测试")
-_sanyi_test_switch_default_on(BUILD_HARDWARE_TESTS         "Hardware 单元测试")
-_sanyi_test_switch_default_on(BUILD_VISION_TESTS           "Vision 单元测试")
-_sanyi_test_switch_default_on(BUILD_RASTER_TESTS           "Raster 单元测试")
-_sanyi_test_switch_default_on(BUILD_NETWORK_TESTS          "Network 单元测试")
-_sanyi_test_switch_default_on(BUILD_PYTHONHOST_TESTS       "PythonHost 单元测试")
-_sanyi_test_switch_default_on(BUILD_CRASHHANDLER_TESTS     "CrashHandler 单元测试")
-_sanyi_test_switch_default_on(BUILD_RENDERX_TESTS          "Renderx 单元测试")
-_sanyi_test_switch_default_on(BUILD_RENDERBRIDGE_TESTS     "RenderBridge 契约测试")
-_sanyi_test_switch_default_on(BUILD_UI_COMMON_TESTS        "UICommon 单元测试")
-_sanyi_test_switch_default_on(BUILD_UI2D_TESTS             "UI2D 单元测试")
-_sanyi_test_switch_default_on(BUILD_UI3D_TESTS             "UI3D 单元测试")
-_sanyi_test_switch_default_on(BUILD_MAIN_TESTS             "Main 单元测试（含撤销/重做回归）")
-_sanyi_test_switch_default_on(BUILD_VIEWPORT_REFRESH_TESTS "2D 视口刷新契约测试")
-_sanyi_test_switch_default_on(BUILD_SCENE_EDIT_TESTS       "场景编辑集成回归测试（撤销状态交换链路）")
-
-# 全部模块测试开关清单：供总开关应用、GTest 缺失统一降级、以及状态输出使用
-set(SANYI_TEST_SWITCHES
+# 已废弃的旧开关清单：只用于迁移告警，不参与任何新判断。
+set(SANYI_LEGACY_TEST_SWITCHES
+    BUILD_ALL_TESTS
     BUILD_UTILITY_TESTS
     BUILD_LOG_TESTS
     BUILD_ENGINECOMMON_TESTS
@@ -322,14 +282,105 @@ set(SANYI_TEST_SWITCHES
     BUILD_MAIN_TESTS
     BUILD_VIEWPORT_REFRESH_TESTS
     BUILD_SCENE_EDIT_TESTS
-    CACHE INTERNAL "全部单元测试开关")
+    CACHE INTERNAL "已废弃的旧测试开关清单")
 
-# 总开关为 ON 时覆盖上面所有逐模块取值
-if(BUILD_ALL_TESTS)
-    foreach(_sanyi_test IN LISTS SANYI_TEST_SWITCHES)
-        set(${_sanyi_test} ON CACHE BOOL "opened by BUILD_ALL_TESTS" FORCE)
-    endforeach()
+# 模块键清单：独立构建裁剪与状态输出使用。键名必须与内层
+# sanyi_module_tests_enabled(<键>) 的调用一致。
+set(SANYI_TEST_MODULES
+    UTILITY
+    LOG
+    ENGINECOMMON
+    ENGINE2D
+    ENGINE3D
+    GEOMODELCORE
+    FILEIO
+    LICENSE
+    NESTING
+    ENGRAVING
+    HARDWARE
+    VISION
+    RASTER
+    NETWORK
+    PYTHONHOST
+    CRASHHANDLER
+    RENDERX
+    RENDERBRIDGE
+    UI_COMMON
+    UI2D
+    UI3D
+    MAIN
+    VIEWPORT_REFRESH
+    SCENE_EDIT
+    CAM
+    CACHE INTERNAL "测试模块键清单")
+
+# 旧开关迁移告警：缓存里残留旧变量时明确提示，旧值不得影响新行为。
+# 每次 configure 都检查，直到用户删除缓存项或换全新构建目录。
+set(_sanyi_legacy_found "")
+foreach(_sanyi_legacy IN LISTS SANYI_LEGACY_TEST_SWITCHES)
+    if(DEFINED ${_sanyi_legacy})
+        list(APPEND _sanyi_legacy_found "${_sanyi_legacy}=${${_sanyi_legacy}}")
+    endif()
+endforeach()
+if(_sanyi_legacy_found)
+    message(WARNING
+        "[Tests] 检测到已废弃的测试开关：${_sanyi_legacy_found}\n"
+        "  BUILD_ALL_TESTS 与 BUILD_*_TESTS 已废弃并被忽略，当前只认 BUILD_TESTS。\n"
+        "  请删除对应缓存项（cmake -U <变量名> ...）或使用全新构建目录重新 configure。")
 endif()
+unset(_sanyi_legacy_found)
+unset(_sanyi_legacy)
+
+# 判定单个模块是否构建测试：BUILD_TESTS 与独立构建允许范围同时成立。
+# 用法：sanyi_module_tests_enabled(VISION _vision_tests)
+# SANYI_STANDALONE_OWN_MODULES 未定义 = 集成构建，默认全部模块放行；
+# 已定义（含空字符串）= 独立构建，只有列表中的模块键放行。
+macro(sanyi_module_tests_enabled _module _out_var)
+    set(${_out_var} OFF)
+    if(BUILD_TESTS)
+        if(NOT DEFINED SANYI_STANDALONE_OWN_MODULES)
+            set(${_out_var} ON)
+        elseif("${_module}" IN_LIST SANYI_STANDALONE_OWN_MODULES)
+            set(${_out_var} ON)
+        endif()
+    endif()
+endmacro()
+
+# 测试不可用时统一降级：写回缓存并记录原因，供状态输出使用。
+# 必须同时更新当前作用域的普通变量：option() 会创建同名普通变量，
+# CMP0126 NEW 下 set(... CACHE) 不会清除它，只改缓存会让 if(BUILD_TESTS) 仍看到 ON。
+macro(sanyi_force_tests_off _reason)
+    set(BUILD_TESTS OFF CACHE BOOL "BUILD_TESTS forced OFF: ${_reason}" FORCE)
+    set(BUILD_TESTS OFF)
+    set(SANYI_TESTS_DISABLED_REASON "${_reason}")
+endmacro()
+
+# 测试状态输出：必须在全部降级动作之后调用，展示最终生效值。
+# 只在顶层工程打印，避免集成构建里被各模块重复调用。
+function(sanyi_print_test_status)
+    if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+        return()
+    endif()
+    message(STATUS "[Tests]")
+    if(BUILD_TESTS)
+        message(STATUS "  BUILD_TESTS: ON (final)")
+    else()
+        set(_reason "${SANYI_TESTS_DISABLED_REASON}")
+        if(NOT _reason)
+            set(_reason "disabled by user")
+        endif()
+        message(STATUS "  BUILD_TESTS: OFF (final, reason: ${_reason})")
+    endif()
+    if(DEFINED SANYI_STANDALONE_OWN_MODULES)
+        if(SANYI_STANDALONE_OWN_MODULES)
+            message(STATUS "  Scope: standalone (${SANYI_STANDALONE_OWN_MODULES})")
+        else()
+            message(STATUS "  Scope: standalone (none)")
+        endif()
+    else()
+        message(STATUS "  Scope: all modules")
+    endif()
+endfunction()
 
 # --------------------------------------------------------------------
 # 依赖库查找配置
@@ -399,17 +450,7 @@ message(STATUS "  Nesting:        ${BUILD_NESTING}")
 message(STATUS "  GeoModelCore:   ${BUILD_GEOMODELCORE}")
 message(STATUS "  CrashHandler:   ${BUILD_CRASHHANDLER}")
 message(STATUS "  Python:         ${BUILD_PYTHON}")
-message(STATUS "[Tests]")
-message(STATUS "  Master switch (BUILD_ALL_TESTS): ${BUILD_ALL_TESTS}")
-set(_sanyi_enabled_tests "")
-foreach(_sanyi_test IN LISTS SANYI_TEST_SWITCHES)
-    if(${_sanyi_test})
-        list(APPEND _sanyi_enabled_tests "${_sanyi_test}")
-    endif()
-endforeach()
-if(_sanyi_enabled_tests)
-    message(STATUS "  Enabled: ${_sanyi_enabled_tests}")
-else()
-    message(STATUS "  Enabled: none")
-endif()
+# [Tests] 状态块已移除：include 时刻的取值不是最终值（GTest 降级发生在
+# 根 CMakeLists.txt / sanyi_find_gtest 之后）。最终状态统一由
+# sanyi_print_test_status() 在降级完成后打印。
 message(STATUS "")
