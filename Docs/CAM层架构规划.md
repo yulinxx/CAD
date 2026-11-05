@@ -764,7 +764,7 @@ CAM/CAM/Test/
 
 ```cmake
 # CAM/CAM/Test/CMakeLists.txt
-if(BUILD_ALL_TESTS OR BUILD_CAM)
+if(BUILD_TESTS)
     add_executable(CAMTests
         # 所有测试 .cpp
     )

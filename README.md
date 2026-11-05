@@ -295,10 +295,9 @@ set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.11.1/msvc2022_64" CACHE PATH "Qt installati
 | `BUILD_KEYGEN_TOOL` | OFF | 注册码生成工具 |
 | `BUILD_PERF_BENCHMARK` | ON | 百万图元性能基准 |
 | `BUILD_RENDER_BENCHMARK` | ON | 渲染帧路径基准 |
-| `BUILD_ALL_TESTS` | OFF | 测试总开关；ON 时强制打开全部逐模块测试开关 |
-| `BUILD_MAIN_TESTS` | ON | 主应用集成测试；未找到 GTest 时由根脚本强制置 OFF |
+| `BUILD_TESTS` | ON | 全工程唯一测试开关；ON 按模块正常构建测试，OFF 不生成任何测试目标 |
 
-逐模块测试开关（`BUILD_*_TESTS`，共 24 个）默认 ON，由 `Config.cmake` 的 `_sanyi_test_switch_default_on` 在缓存未定义时写入。以上默认值均以 `Config.cmake` 的 `option(...)` 为准。
+全工程只有一个测试开关 `BUILD_TESTS`，不再有逐模块开关。独立构建入口（如 `cmake -S Vision -B ...`）只生成该入口声明归属的模块测试，兄弟模块零测试目标；GTest 缺失时自动降级为 OFF。以上默认值均以 `Config.cmake` 的 `option(...)` 为准。
 
 ### 编译
 
@@ -310,7 +309,7 @@ mkdir build && cd build
 cmake ..
 
 # 配置 CMake（带编译选项）
-cmake .. -DBUILD_KEYGEN_TOOL=ON -DBUILD_ALL_TESTS=ON
+cmake .. -DBUILD_KEYGEN_TOOL=ON -DBUILD_TESTS=OFF
 
 # 编译
 cmake --build . --config Release

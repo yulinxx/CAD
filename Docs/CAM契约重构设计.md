@@ -704,7 +704,7 @@ struct CamResult
 ### 8.2 D8 已实施落点
 
 **D8（`BUILD_CAM` 默认开启）**
-- 开关与接入：`Config.cmake:226` 为 `option(BUILD_CAM ... ON)`；根脚本 `CMakeLists.txt:257-262` 按该开关接入 `CAM/CAM`。CI 预设只显式设置 `BUILD_CAM_TESTS`（`CMakePresets.json:34`、`:67`），未覆盖 `BUILD_CAM` 默认值。
+- 开关与接入：`Config.cmake` 中 `option(BUILD_CAM ... ON)`；根脚本按该开关接入 `CAM/CAM`。CI 预设通过全工程唯一测试开关 `BUILD_TESTS` 控制测试，未覆盖 `BUILD_CAM` 默认值。
 - 前置条件 1（桥接层可编译，原附 2）：`CamInputBridge.cpp:80-107` 已改用 `Cam::Contour`/`Cam::PathSegment`，不再引用不存在的嵌套类型。
 - 前置条件 2（D1 ABI 契约与自检）：`CAMExport.h:8-18` 写明同工具链前提，`Cam::camAbiInfo()` 实现见 `CamCore.cpp:48-58`，桥接层在 `CamInputBridge.cpp:48-68` 打印一次 ABI 自检（首次调用 `:307`）。
 - 前置条件 3（D5 坐标收口）：CAM 全程用户坐标，机器坐标变换只留在 Main 发射器（`CamPlan.h:19-22`、`ToolpathJobInput.h:24-26`）。

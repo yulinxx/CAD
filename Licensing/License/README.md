@@ -105,8 +105,12 @@ target_link_libraries(YourTarget PRIVATE License)
 
 | 选项 | 默认值 | 说明 |
 |---|---|---|
-| `BUILD_LICENSE_TESTS` | ON | 启用单元测试（自动定义 `LICENSE_TEST_HOOKS` 宏；GTest 缺失时自动置 OFF） |
+| `BUILD_TESTS` | ON | 全工程唯一测试开关；ON 时构建单元测试（自动定义 `LICENSE_TEST_HOOKS` 宏；GTest 缺失时自动降级 OFF） |
 | `SANYI_LICENSE_SYMBOLS` | ON | 生成调试符号（PDB/DWARF） |
+
+> **出货约束**：构建带测试的 License DLL 会多出测试注入接口（`LicenseTest_SetPublicKeyPem` /
+> `LicenseTest_ClearPublicKeyPem`），这些接口不可出货。发布/交付构建必须使用
+> `-DBUILD_TESTS=OFF`，否则测试注入接口会一起编进 License DLL。
 
 ### 版本信息
 
@@ -152,7 +156,7 @@ target_link_libraries(YourTarget PRIVATE License)
 | `LicenseKeygen_GenerateKeyPair` | 生成 RSA 公钥/私钥对 |
 | `LicenseKeygen_GenerateRegCode` | 根据机器码 + 有效期 + 功能 + 客户名生成签名注册码 |
 
-### 测试钩子（2 个，仅 `BUILD_LICENSE_TESTS` 时可用）
+### 测试钩子（2 个，仅 `BUILD_TESTS=ON` 时可用）
 
 | 函数 | 说明 |
 |---|---|
