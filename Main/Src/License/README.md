@@ -267,7 +267,7 @@ C ABI 包装 `Trial_Check(int* remainingDays)`：
 | 机器指纹绑定 | `MachineFingerprint` | 已接入许可证与试用 |
 | 散射态守卫 | `LicenseGuard`：tokenA/B、crossSum、timestamp，`License_Check` 成功时 `MarkValid` | 内存态已维护；**应用未调用 `License_GuardCheck`**（保存/导出/渲染前的二次校验尚未接线） |
 | 激活节流 | `LicenseThrottle`：前 3 次免费，之后指数退避 30s→3600s，连续 20 次失败硬锁定 24h，成功清零 | 已接入 `License_Activate` |
-| 编译期开关 | `SANYI_ENABLE_LICENSE` → `LicenseInternal::g_checkEnabled` | **仓库内无任何 CMake 定义**，即当前所有构建的许可校验都是关闭状态 |
+| 编译期开关 | `SANYI_ENABLE_LICENSE` → `LicenseInternal::g_checkEnabled` | `Config.cmake:237` 已定义 `option(... ON)` 并默认开启（`LicenseInternal.cpp:12-15`：定义宏时初值 true）；运行期仍可由 `LicenseConfig::enableCheck` 覆盖 |
 | 运行期覆盖 | `LicenseConfig::enableCheck`：`-1` 不覆盖（`License_ConfigInit` 默认）、`0` 关闭、`1` 开启 | 已接入，`License_Create` 只在 `>= 0` 时改写全局开关 |
 
 之所以把默认值定为 `-1`：若默认是 `1`，任何一次 `License_Create`（例如打开注册对话框）

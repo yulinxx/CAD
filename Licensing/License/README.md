@@ -105,7 +105,7 @@ target_link_libraries(YourTarget PRIVATE License)
 
 | 选项 | 默认值 | 说明 |
 |---|---|---|
-| `BUILD_LICENSE_TESTS` | OFF | 启用单元测试（自动定义 `LICENSE_TEST_HOOKS` 宏） |
+| `BUILD_LICENSE_TESTS` | ON | 启用单元测试（自动定义 `LICENSE_TEST_HOOKS` 宏；GTest 缺失时自动置 OFF） |
 | `SANYI_LICENSE_SYMBOLS` | ON | 生成调试符号（PDB/DWARF） |
 
 ### 版本信息

@@ -584,10 +584,11 @@ ProcessingJobService（进度轮询 + 信号）
 
 编译 CAM 计划在后台线程执行。复用现有 ImportService/ExportService 的**五段式异步模式**（主线程收集快照 → 后台编译 → 主线程回写结果），但 CAM 编译通常只需几百毫秒（非十万图元），可以先做同步路径，后续根据实际耗时再升级。
 
-进度机制：`Progress` 结构体 + 阶段回调。M0 阶段只在关键阶段更新 fraction：
+进度机制：`Progress` 结构体 + 阶段回调。当前 M0 只在已实现阶段更新 fraction：
 ```
-编译流程 → Extract几何（0%~20%）→ 工艺变换（20%~60%）→ 排序优化（60%~80%）→ 验证与预估（80%~100%）
+Validating input（0%）→ Compiling layers（10%~90%，按层线性推进）→ Computing bounds and statistics（90%）→ Done（100%）
 ```
+工艺变换（引线/穿孔）、最近邻排序与时间预估的细分进度区间预留给 M1。
 
 ### 5.4 错误呈现
 
@@ -671,20 +672,18 @@ M0 阶段先同步执行（主线程等 1~2s 是可接受的），如果实测�
 
 ## 8. 分阶段落地路线
 
-### M0 —— 几何预处理 + CamPlan 输出（核心骨架，2~3 周）
+### M0 —— CamPlan 输出骨架（核心骨架，2~3 周）
 
 | 范围 | 可验证产出 | 验收标准 |
 |------|-----------|----------|
 | CAM/CAM 模块骨架（CMake + 导出宏 + ToolpathJobInput.h） | 模块能 add_subdirectory，BUILD_CAM=ON/OFF 切换无错 | configure + build 成功 |
 | CamBridge::buildJobInput（桥接层） | SceneManager + GeometryExtractor → ToolpathJobInput | 构造简单场景，断言 jobInput.layers.size > 0 |
 | CamCore::compile（pipeline 骨架） | 输入 JobInput → 输出 CamPlan（只走 Extract + LayerOrder + Emit 骨架） | 单元测试：给定 ToolpathJobInput → 断言 CamPlan.layers.size > 0 |
-| KerfCompensator（割缝补偿） | 调 Engraving::PolygonOffset | 单元测试：正方形轮廓外扩 2mm → 断言边长增长 4mm |
-| LeadInOut（引入引出线） | 调 Engraving::LeadInOut | 单元测试：轮廓起点前插入切线引线 |
-| PiercePlanner（穿孔点） | 在 contour 起点前加 Rapid + Dwell | 单元测试：断言 contour 有 pierce point |
-| ContourSorter（排序） | 调 Engraving::ToolpathOrder（最近邻 + 先内后外） | 黄金文件比对 |
+| 割缝补偿（桥接层，M0 已落地） | `Main/Src/CAM/CamInputBridge.cpp:467-548` 调 `Eg::Cam::KerfCompensator::apply`；CAM 内部 `KerfParams` 显式关闭（`:517`） | 单元测试：正方形轮廓外扩 2mm → 断言边长增长 4mm |
+| 轮廓排序（M0 骨架） | `CamCore` 按 `sourceEntityId` 升序（`CamCore.cpp:361-372`），不调 Engraving | 单元测试：输出顺序稳定 |
 | MotionPlanEmitter | CamPlan → MotionPlanBuilder | motionPlanToText() 文本导出，人工核对 opcode |
 
-**依赖前置**：无。只依赖 Engine2D（GeometryExtractor 类型）、Engraving（偏移/引线/排序算法）、Hardware（MotionPlan IR）、Log。
+**依赖前置**：M0 只依赖 Engine2D（GeometryExtractor 类型）、Hardware（MotionPlan IR）、Log；桥接层的割缝补偿额外使用 Engine2D 的 `Eg::Cam::KerfCompensator`。M0 不使用 Engraving 的引线/排序算法——`CamCore.cpp:8-10` 的"M0 不做"指 CAM 内部不做这些几何变换，几何割缝已由桥接层在 M0 完成。
 
 ### M1 —— 工艺深度 + 完整编译链 + 时间预估（3~4 周）
 
@@ -695,6 +694,9 @@ M0 阶段先同步执行（主线程等 1~2s 是可接受的），如果实测�
 | PassExpander（分层渐进切割） | 单元测试：3 层渐进 → 每个 contour 重复 3 次，速度递减 |
 | PowerCurveEvaluator（功率曲线） | 单元测试：speed=300 → 根据曲线插值 power=45% |
 | RampDownPlanner（斜坡下降） | 在 RapidTo 前插入 ramp 段（逐步提速） |
+| LeadInOut（引入引出线） | 单元测试：轮廓起点前插入切线引线 |
+| PiercePlanner（穿孔点） | 在 contour 起点前加 Rapid + Dwell；单元测试：断言 contour 有 pierce point |
+| ContourSorter（排序优化） | 调 `Engraving::ToolpathOrder`（最近邻 + 先内后外）；黄金文件比对 |
 | HoleFirstResolver（内孔先于外轮廓） | 单元测试：含孔洞的轮廓对，hole 的 contour 排在 outer 前面 |
 | TimeEstimator（时间预估） | 手算 expectedSeconds，误差 < 5% |
 | BoundsValidator（用户坐标预检） | 给超出可选台面范围的 contour → ok=false + error；变换后的机器坐标越界由发射器复检 |

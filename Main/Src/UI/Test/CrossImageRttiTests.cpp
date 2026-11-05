@@ -23,7 +23,8 @@
  * 本测试的有效性依赖一个前提：MainTests 与 Engine3D 是**两个镜像**
  *   （MainTests 链接 libEngine3D.dylib）。所以这里的 dynamic_cast 走的正是
  *   当年出事的那条跨镜像路径。放在 MainTests 而不是 Engine3DTests，是因为
- *   BUILD_ENGINE3D_TESTS 默认关闭 —— 守卫必须待在默认会构建的目标里。
+ *   MainTests 是默认必建的主集成测试目标（BUILD_MAIN_TESTS 默认 ON）——
+ *   守卫必须待在默认会构建的目标里。
  */
 
 #include <gtest/gtest.h>

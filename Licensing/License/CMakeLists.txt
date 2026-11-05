@@ -62,7 +62,7 @@ sanyi_add_shared_library(${LIB_NAME}
 )
 
 # 许可校验开关必须编进本库（LicenseInternal.cpp 依据宏决定 g_checkEnabled 默认值），
-# 只加在 Main 上不会生效。SANYI_ENABLE_LICENSE 在 Config.cmake 声明，默认 OFF。
+# 只加在 Main 上不会生效。SANYI_ENABLE_LICENSE 在 Config.cmake 声明，默认 ON。
 target_compile_definitions(${LIB_NAME} PRIVATE $<$<BOOL:${SANYI_ENABLE_LICENSE}>:SANYI_ENABLE_LICENSE>)
 
 if(WIN32)

@@ -276,15 +276,29 @@ set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.11.1/msvc2022_64" CACHE PATH "Qt installati
 
 | 选项 | 默认值 | 说明 |
 |------|--------|------|
+| `BUILD_RENDERX` | ON | 3D 渲染引擎（Renderx） |
+| `BUILD_UI2D` | ON | 2D 用户界面；关闭会直接触发 configure 失败 |
+| `BUILD_UI_DIMENSION` | `BOTH` | UI 维度门控：`2D` / `3D` / `BOTH`，派生 `BUILD_UI3D` 与默认视口 |
+| `BUILD_NESTING` | ON | 套料/排版算法 |
+| `BUILD_VISION` | ON | 视觉模块 |
+| `BUILD_CAM` | ON | CAM 工艺编译层（路径规划） |
+| `BUILD_RASTER` | ON | 位图处理（OpenCV） |
+| `BUILD_NETWORK` | ON | 网络同步模块 |
 | `BUILD_HARDWARE` | ON | 激光硬件控制模块 |
 | `BUILD_ENGRAVING` | ON | 雕刻工艺模块 |
 | `BUILD_GEOMODELCORE` | ON | OpenCASCADE 几何建模 |
-| `BUILD_VISION` | OFF | 视觉模块 |
-| `BUILD_NETWORK` | OFF | 网络同步模块 |
-| `BUILD_SANYI_RENDER` | ON | 独立渲染 DLL |
+| `BUILD_CRASHHANDLER` | ON | 崩溃捕获与上报 |
+| `BUILD_PYTHON` | ON | Python 集成框架 |
+| `SANYI_UNITY_BUILD` | ON | Unity Build，加速编译 |
+| `SANYI_ENABLE_LICENSE` | ON | 许可校验（默认已开启；运行期默认值由 License 库内部宏决定） |
+| `SANYI_ENABLE_VULKAN` | ON | Vulkan 支持标记；后端尚未实现，选 Vulkan 会明确失败 |
 | `BUILD_KEYGEN_TOOL` | OFF | 注册码生成工具 |
-| `BUILD_MAIN_TESTS` | OFF | 主应用集成测试 |
-| `BUILD_ALL_TESTS` | OFF | 所有单元测试 |
+| `BUILD_PERF_BENCHMARK` | ON | 百万图元性能基准 |
+| `BUILD_RENDER_BENCHMARK` | ON | 渲染帧路径基准 |
+| `BUILD_ALL_TESTS` | OFF | 测试总开关；ON 时强制打开全部逐模块测试开关 |
+| `BUILD_MAIN_TESTS` | ON | 主应用集成测试；未找到 GTest 时由根脚本强制置 OFF |
+
+逐模块测试开关（`BUILD_*_TESTS`，共 24 个）默认 ON，由 `Config.cmake` 的 `_sanyi_test_switch_default_on` 在缓存未定义时写入。以上默认值均以 `Config.cmake` 的 `option(...)` 为准。
 
 ### 编译
 

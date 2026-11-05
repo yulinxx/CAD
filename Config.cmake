@@ -231,7 +231,7 @@ option(BUILD_ENGRAVING "Build Engraving module (3D laser engraving)" ON)
 option(BUILD_GEOMODELCORE "Build GeoModelCore module (OpenCASCADE-based geometry modeling)" ON)
 option(BUILD_CRASHHANDLER "Build CrashHandler module (crash capture and reporting)" ON)
 option(BUILD_PYTHON "Build Python module (PythonHost integration framework)" ON)
-# 许可校验开关：默认 OFF 保持开发构建行为，发货构建用 -DSANYI_ENABLE_LICENSE=ON 打开。
+# 许可校验开关：默认 ON；开发构建如需关闭，用 -DSANYI_ENABLE_LICENSE=OFF。
 # 宏编进 License 库本身（LicenseInternal.cpp 依据它决定运行期默认值），
 # Main 的 BuildConfig.h 镜像同步该取值供启动自检交叉核对。
 option(SANYI_ENABLE_LICENSE "启用许可校验（发货构建应设 ON）" ON)

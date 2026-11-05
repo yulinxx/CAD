@@ -18,7 +18,7 @@
 | 6 | 深拷贝与固定开销 | 属实，**已实测** | 已补 `CamBench`：深拷贝占链路 45%~48%，据此把"统一类型 + move"列为 D2 优先项，池化按数据再定 |
 | 7 | 文档与实现漂移 | 属实，并补充 8 条；"CMake/Config 注释陈旧"这一子项不成立 | 钉死 **CAM 全程用户坐标，变换只在 Main 发射器一步完成**；给出完整对照表 |
 | 附 1 | 角度单位矛盾（新发现） | 属实 | 抽取器写弧度、`CamCore` 按度算长度，圆弧长度差约 57.3 倍；测试用度构造掩盖 |
-| 附 2 | `BUILD_CAM=ON` 时桥接层无法编译（新发现） | 属实 | 桥接层引用不存在的嵌套类型；默认 `BUILD_CAM=OFF` 未暴露 |
+| 附 2 | `BUILD_CAM=ON` 时桥接层无法编译（新发现） | 当时属实，**已修复** | 桥接层已改用 `Cam::Contour`/`Cam::PathSegment`（`CamInputBridge.cpp:80-96`）；`BUILD_CAM` 现已默认 ON（`Config.cmake:226`） |
 
 ---
 
@@ -643,7 +643,7 @@ struct CamResult
 | 22 | `Docs/CAM层架构规划.md:867` | "失败时静默跳过图元"是必须避免的反模式 | 桥接层有 4 处 `continue` 丢弃（`CamInputBridge.cpp:168`、`:224-226`、`:227-239`、`:219-223`） | 见第 5 条 |
 | 23 | `CAM/CAM/Include/CAM/ToolpathJobInput.h:6`、`:147` | 称"中性 C++ 值类型，自持有数据""与 Engine ProcessParams 无关" | 结构仍含 `std::vector`/`std::string`，字段与 `Eg` 仍漂移 | ABI 表述已修正，参数单一来源见第 2 条 |
 
-**复核修正**：审查意见中"根 `CMakeLists.txt` / `Config.cmake` 有陈旧 BUILD_CAM 注释""CAM CMakeLists 文档路径错误"不成立——`CMakeLists.txt:200-201`、`:252-262`、`Config.cmake:229`、`CAM/CAM/CMakeLists.txt:10` 均与现状一致。
+**复核修正**：审查意见中"根 `CMakeLists.txt` / `Config.cmake` 有陈旧 BUILD_CAM 注释""CAM CMakeLists 文档路径错误"不成立——`CMakeLists.txt:200-201`、`:252-262`、`Config.cmake:226`、`CAM/CAM/CMakeLists.txt:10` 均与现状一致。
 
 ### 7.3 改动范围
 
@@ -678,7 +678,7 @@ struct CamResult
 | D5 | 坐标变换层 | ① 仅 Main 发射器（CAM 全程用户坐标）<br>② CAM 内部变换 | **①** | **已实施**（契约与字段已收口；M2 发射器变换待接入） | 桥接、发射器、文档 |
 | D6 | 不可加工清单形式 | ① `std::vector<CamIssue>`（内部 C++ ABI）<br>② 固定数组 + 计数（可 POD 化） | **①**，字段设计保留 POD 化可能 | 待实施 | `CamResult`、UI 展示 |
 | D7 | 性能优化顺序 | ① 先 bench → 统一类型+move → 按数据决定池化<br>② 直接上池化/SoA | **①** | **已实施（仅 bench，零优化）** | bench、桥接、结构 |
-| D8 | `BUILD_CAM` 何时可默认开启 | ① 桥接层修复 + 契约重构落地后<br>② 立即开启并接受编译失败 | **①** | 待实施 | 根 CMake、CI |
+| D8 | `BUILD_CAM` 何时可默认开启 | ① 桥接层修复 + 契约重构落地后<br>② 立即开启并接受编译失败 | **①** | **已实施**（D2/D3/D4/D6 不阻塞默认开启） | 根 CMake、CI |
 
 ### 8.1 D1/D5/D7 已实施落点
 
@@ -687,7 +687,7 @@ struct CamResult
 - `CAMExport.h:34` 定义 `CAM_ABI_VERSION = 1`；`:39-51` 定义 `Cam::CamAbiInfo` 与 `Cam::camAbiInfo()`（6 个关键结构 `sizeof`），实现见 `CamCore.cpp:48-58`。
 - 公开结构 `structSize` 删除 21 处（`ToolpathJobInput.h` 15、`CamPlan.h` 4、`CamContext.h` 2），实现侧 `CamCore.cpp` 7 处、`CamInputBridge.cpp` 7 处赋值同步删除。
 - 原 `PodStructSizeGuards` 是空断言，已换成 `AbiSelfCheck_MatchesPublicStructSizes`（`CamCoreTests.cpp:126-139`，校验版本号与每个 `sizeof`）与 `PublicStructs_DefaultConstructToEmpty`（`:89-120`）；CAMTests 20 → 21。
-- 自检日志：`CamInputBridge.cpp:36-56` 的 `logAbiSelfCheck()`，在 `buildJobInput` 首次构造输入时（`:133`）打印一次。
+- 自检日志：`CamInputBridge.cpp:48-68` 的 `logAbiSelfCheck()`，在 `buildJobInput` 首次构造输入时（`:307`）打印一次。
 
 **D5（坐标收口）**
 - `MachineFrameSnapshot` 与 `ToolpathJobInput::machineFrame` 整体删除；全仓检索确认无生产读取。
@@ -700,6 +700,16 @@ struct CamResult
 - 结论：深拷贝占链路约 45%~48%，是 D2（统一类型 + move）的依据。
 
 **验证**：`BUILD_CAM=ON`（`build-cam-contract`）全部目标构建成功，CAMTests 21/21、MainTests 832/832；`BUILD_CAM=OFF` configure 通过且 `CamBench.cpp` 未参与编译；零新增告警。
+
+### 8.2 D8 已实施落点
+
+**D8（`BUILD_CAM` 默认开启）**
+- 开关与接入：`Config.cmake:226` 为 `option(BUILD_CAM ... ON)`；根脚本 `CMakeLists.txt:257-262` 按该开关接入 `CAM/CAM`。CI 预设只显式设置 `BUILD_CAM_TESTS`（`CMakePresets.json:34`、`:67`），未覆盖 `BUILD_CAM` 默认值。
+- 前置条件 1（桥接层可编译，原附 2）：`CamInputBridge.cpp:80-107` 已改用 `Cam::Contour`/`Cam::PathSegment`，不再引用不存在的嵌套类型。
+- 前置条件 2（D1 ABI 契约与自检）：`CAMExport.h:8-18` 写明同工具链前提，`Cam::camAbiInfo()` 实现见 `CamCore.cpp:48-58`，桥接层在 `CamInputBridge.cpp:48-68` 打印一次 ABI 自检（首次调用 `:307`）。
+- 前置条件 3（D5 坐标收口）：CAM 全程用户坐标，机器坐标变换只留在 Main 发射器（`CamPlan.h:19-22`、`ToolpathJobInput.h:24-26`）。
+- 构建验证：见上节 8.1 末尾的 `BUILD_CAM=ON` 全目标构建记录。
+- 不阻塞默认开启、仍待实施的项：D2（工艺参数单一来源）、D3（`CamPlan` 有序 op 流）、D4（段规范表示）、D6（不可加工清单形式）。
 
 ---
 
