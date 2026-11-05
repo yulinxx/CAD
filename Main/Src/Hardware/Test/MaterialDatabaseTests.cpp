@@ -13,6 +13,14 @@
 #include <memory>
 #include "Hardware/MaterialDatabase.h"
 
+// 本测试文件仍然构造已标记弃用的 MaterialDatabase，用于回归其行为。
+// 该类仓库内零生产调用，保留仅为 ABI 兼容；如确认无仓库外消费者，可连同这些用例一起删除。
+// 此处仅在本文件范围内压制 C4996，不影响工程级警告策略，也不去掉符号上的弃用标记。
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable : 4996)
+#endif
+
 /**
  * @brief 材料库测试夹具。
  *
@@ -217,3 +225,7 @@ TEST_F(MaterialDatabaseTest, GetRecommendedSettings_ReturnsSettings)
     EXPECT_DOUBLE_EQ(settings.recommendPower, 50.0);
     EXPECT_DOUBLE_EQ(settings.recommendSpeed, 100.0);
 }
+
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
