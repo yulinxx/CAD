@@ -496,13 +496,20 @@ endif()
 file(GLOB TRANSLATION_QM_FILES CONFIGURE_DEPENDS "${TRANSLATIONS_SRC_DIR}/*.qm")
 
 if(TRANSLATION_QM_FILES)
-    add_custom_command(TARGET ${APP_NAME} POST_BUILD
+    # 翻译拷贝独立成目标，避免 exe 未重新链接时 POST_BUILD 不执行导致 bin 下 qm 陈旧
+    set(TRANSLATIONS_COPY_STAMP "${CMAKE_CURRENT_BINARY_DIR}/translations_copy.stamp")
+    add_custom_command(
+        OUTPUT ${TRANSLATIONS_COPY_STAMP}
         COMMAND ${CMAKE_COMMAND} -E make_directory "${TRANSLATIONS_DST_DIR}"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             ${TRANSLATION_QM_FILES}
             "${TRANSLATIONS_DST_DIR}/"
+        COMMAND ${CMAKE_COMMAND} -E touch ${TRANSLATIONS_COPY_STAMP}
+        DEPENDS ${TRANSLATION_QM_FILES} ${TRANSLATIONS_SRC_DIR}/.lupdate.stamp
         COMMENT "Copying translation .qm files to ${TRANSLATIONS_DST_DIR}"
     )
+    add_custom_target(${APP_NAME}_translations_copy ALL DEPENDS ${TRANSLATIONS_COPY_STAMP})
+    add_dependencies(${APP_NAME} ${APP_NAME}_translations_copy)
 endif()
 
 set(RESOURCES_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")

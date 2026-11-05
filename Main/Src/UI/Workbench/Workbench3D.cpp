@@ -786,13 +786,13 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
             const QImage img = captureService->capture3D(ctx.renderWidget, req);
             if (img.isNull())
             {
-                SY_WARNF("[Workbench3D] View_Capture: capture3D 返回空图（离屏渲染失败）");
+                SY_WARNF("[Workbench3D] View_Capture: capture3D returned an empty image (off-screen render failed)");
                 return result;
             }
             const QString path = captureService->saveImage(img, req, true);
             if (path.isEmpty())
             {
-                SY_WARNF("[Workbench3D] View_Capture: 截图保存失败");
+                SY_WARNF("[Workbench3D] View_Capture: failed to save the screenshot");
                 return result;
             }
             SY_INFOF("[View_Capture] Saved to %s (3D %dx%d)", path.toStdString().c_str(), img.width(), img.height());

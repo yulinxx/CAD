@@ -89,8 +89,8 @@ namespace RenderBridge
             {
                 return true;
             }
-            SY_ERRORF("[RenderXAdapter] vertexStride(%s) 声明 %u 与实际 %u 不一致："
-                      "所有用该格式的几何都会错位，请同步 IRenderTypes.h",
+            SY_ERRORF("[RenderXAdapter] vertexStride(%s) declared %u but actual %u mismatch: "
+                      "all geometry using this format will be misaligned, please sync IRenderTypes.h",
                 pair.name,
                 declared,
                 actual);

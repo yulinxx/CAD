@@ -216,7 +216,7 @@ namespace
             }
             if (m_shutdownRequested && m_holders == 0)
             {
-                destroy("应用已请求退出，且最后一个视口已拆除");
+                destroy("app exit requested and the last viewport has been torn down");
                 return;
             }
             SY_INFOF("[SharedRuntime] Viewport released (current holders: %u; runtime preserved for next viewport)",
@@ -233,7 +233,7 @@ namespace
             m_shutdownRequested = true;
             if (m_holders == 0)
             {
-                destroy("应用已请求退出，且当前无视口");
+                destroy("app exit requested and no viewport is currently open");
                 return;
             }
             SY_INFOF("[SharedRuntime] Shutdown requested: %u viewports remain, "

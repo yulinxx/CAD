@@ -117,7 +117,7 @@ namespace Render
         };
 
         // GVertex stride 与 DLL 的 P2T2C4 一致（类内才能访问 private）
-        static_assert(sizeof(GVertex) == 32, "GVertex 必须与 DLL 的 P2T2C4 步长一致");
+        static_assert(sizeof(GVertex) == 32, "GVertex must match the DLL P2T2C4 stride");
 
         struct Batch
         {
