@@ -82,7 +82,7 @@ endif()
 #   MSBuild：有自己的 tlog 机制跟踪依赖，/showIncludes 仅用于调试
 if(MSVC)
     if(SANYI_SHOW_INCLUDES)
-        add_compile_options(/showIncludes)
+        # add_compile_options(/showIncludes)
         # Ninja 生成器需要 cl.exe 的输出保持 UTF-8，与 rules.ninja 里写的
         # msvc_deps_prefix（UTF-8 编码的中文前缀）一致，否则依赖跟踪断掉；
         # MSBuild 不依赖 msvc_deps_prefix，也不需要这条。
