@@ -4,7 +4,6 @@
 #include <QPointer>
 #include <QTimer>
 
-#include "Services/UiFrameworkServices.h"
 #include "Services/UiStateCenter.h"
 
 class QMainWindow;
@@ -32,8 +31,6 @@ public:
 
     /// 设置状态中心
     void setUiStateCenter(UiStateCenter* stateCenter);
-    /// 设置框架级服务
-    void setFrameworkServices(const UiFrameworkServices& services);
     /// 设置当前挂载的工作台状态栏 widget（由 WorkbenchWindow 在 mount/unmount 时同步）
     /// 定义在 .cpp：QPointer 的赋值/访问需要 StatusBarBase 完整类型
     void setActiveStatusBar(StatusBarBase* statusBarWidget);
@@ -96,12 +93,6 @@ public:
         return m_stateCenter;
     }
 
-    /// 获取框架级服务引用
-    const UiFrameworkServices& frameworkServices() const
-    {
-        return m_frameworkServices;
-    }
-
 private:
     /// 统一写入工作台切换阶段，避免直接操作 metadata
     void setWorkbenchTransitionState(const QString& phase, const QString& status);
@@ -115,8 +106,6 @@ private:
 
     /// UI 状态中心
     UiStateCenter* m_stateCenter{ nullptr };
-    /// 框架级服务桥接
-    UiFrameworkServices m_frameworkServices;
 
     /// 窗口状态镜像
     UiStateSnapshot m_windowState;

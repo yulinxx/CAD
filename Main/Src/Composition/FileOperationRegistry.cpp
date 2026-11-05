@@ -33,7 +33,6 @@
 
 #include <QFileInfo>
 #include <QFile>
-#include <QTimer>
 #include <QDateTime>
 #include <QMessageBox>
 #include <QImage>
@@ -666,31 +665,4 @@ void FileOperationRegistry::registerAll()
     Ops::declare(m_bus->registry(), OperationId::File_Exit, [this] {
         FileOperationUtils::exitApplication(m_parentWidget);
     });
-
-    // 启动时恢复上次打开的文档：读最近文件列表 → 找第一个仍存在的 → 延迟调 File_OpenRecent
-    // 用 QTimer::singleShot(0) 让事件循环先起来，避免 UI 未就绪就加载文件。
-    // 只在 2D 工作台的最近列表里找：3D 文件由 3D 工作台自己负责。
-    // 先禁用
-    if (m_recentFiles && false)
-    {
-        const QStringList recentFiles = m_recentFiles->loadRecentFiles(QStringLiteral("2D"));
-        for (const QString& path : recentFiles)
-        {
-            if (!path.isEmpty() && QFile::exists(path))
-            {
-                SY_INFOF("[FileOperation] Auto-restoring last document: %s", qPrintable(path));
-                // capture by value 安全：operationBus 比 FileOperationRegistry 长寿（全局单例）
-                auto* bus = m_bus;
-                QTimer::singleShot(0, [bus, path]() {
-                    if (bus)
-                    {
-                        QVariantMap params;
-                        params.insert(QStringLiteral("filePath"), path);
-                        bus->run(OperationId::File_OpenRecent, params);
-                    }
-                });
-                break;  // 只恢复第一个存在的
-            }
-        }
-    }
 }

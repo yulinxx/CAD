@@ -76,8 +76,12 @@ LONG WINAPI vectoredExceptionHandler(EXCEPTION_POINTERS* pExInfo)
 
     // 过滤 Qt/Windows 内部正常流转的异常码，只打印真正的崩溃。
     // 0xe06d7363 = C++ EH（Qt 字体回退等内部大量使用）
-    // 0x8001010d = RPC 代理通知；0x40010004/0x406D1388 = 调试器约定消息
-    if (code == 0xe06d7363 || code == 0x8001010d || code == 0x40010004 || code == 0x406D1388)
+    // 0x8001010d = RPC 代理通知
+    // 0x40010004 = 调试器约定消息（STATUS_WAKE_SYSTEM_DEBUGGER 的一种变体）
+    // 0x40010006 = OutputDebugStringW 内部 RaiseException，SHELL32/COM 初始化
+    //              时高频触发，本质是 STATUS_SUCCESS，Severity=0
+    // 0x406D1388 = 调试器约定消息
+    if (code == 0xe06d7363 || code == 0x8001010d || code == 0x40010004 || code == 0x40010006 || code == 0x406D1388)
     {
         return EXCEPTION_CONTINUE_SEARCH;
     }

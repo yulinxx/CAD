@@ -35,6 +35,18 @@ void AlgorithmOperationRegistry::registerAll()
     auto& reg = m_bus->registry();
 
     AlgorithmRunner* runner = m_algorithmRunner;
+    // 算法是异步执行的：OperationBus 在 dispatch 返回时只看到"已受理"，
+    // 真实完成后再由 declareParam 注册的闭包链路补发 operationCompleted，
+    // 让状态栏/场景树等统一刷新，无需 AlgorithmRunner 手工调用 notifySceneChanged。
+    if (runner)
+    {
+        runner->setCompletionCallback([bus = m_bus](OperationId id, bool success, const QString& message) {
+            if (bus)
+            {
+                bus->notifyOperationCompleted(id, success, message);
+            }
+        });
+    }
     const auto registerAlgoOp = [&reg, runner](OperationId id) {
         Ops::declareParam(reg, id, [id, runner](const QVariantMap& params) {
             if (!runner)

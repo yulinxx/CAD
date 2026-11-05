@@ -272,10 +272,6 @@ void WorkbenchWindow::setFrameworkServices(const UiFrameworkServices& services)
     {
         m_actionManager->setFrameworkServices(services);
     }
-    if (m_stateManager)
-    {
-        m_stateManager->setFrameworkServices(services);
-    }
     // 框架服务更新后不做自动回放，避免入口函数产生隐式副作用
 }
 
@@ -1054,22 +1050,6 @@ void WorkbenchWindow::reportFrameworkError(const QString& errorCode, const QStri
     }
 }
 
-bool WorkbenchWindow::canExecuteCommand(const QString& commandId, const QString& context) const
-{
-    if (m_actionManager)
-    {
-        if (!m_actionManager->canExecuteCommand(commandId, context))
-        {
-            SY_DEBUGF(
-                "[WorkbenchWindow] Command denied: commandId=%s context=%s", qPrintable(commandId), qPrintable(context));
-            return false;
-        }
-        return true;
-    }
-
-    return true;
-}
-
 void WorkbenchWindow::initializeEmergencyStopOverlay()
 {
     auto* root = ApplicationCompositionRoot::instance();
@@ -1157,18 +1137,6 @@ void WorkbenchWindow::triggerWorkbench(const QString& workbenchId)
     if (m_switchingWorkbench)
     {
         SY_DEBUG("[WorkbenchWindow] triggerWorkbench: already switching, ignoring request");
-        return;
-    }
-
-    if (!canExecuteCommand(QStringLiteral("workbench.switch.%1").arg(workbenchId),
-            QStringLiteral("WorkbenchWindow::triggerWorkbench")))
-    {
-        reportFrameworkError(QStringLiteral("workbench.switch_denied"),
-            QStringLiteral("Workbench switch denied: %1").arg(workbenchId),
-            QStringLiteral("WorkbenchWindow::triggerWorkbench"));
-
-        recordPerformance(QStringLiteral("WorkbenchWindow::triggerWorkbench.denied"),
-            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
         return;
     }
 

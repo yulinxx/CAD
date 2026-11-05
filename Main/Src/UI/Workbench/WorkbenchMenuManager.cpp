@@ -111,11 +111,6 @@ void WorkbenchMenuManager::setStateCenter(UiStateCenter* stateCenter)
     m_stateCenter = stateCenter;
 }
 
-void WorkbenchMenuManager::setFrameworkServices(const UiFrameworkServices* services)
-{
-    m_frameworkServices = services;
-}
-
 void WorkbenchMenuManager::setRecentFileService(IRecentFileService* service)
 {
     m_recentFileService = service;

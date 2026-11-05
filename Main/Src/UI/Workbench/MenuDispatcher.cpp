@@ -38,12 +38,12 @@ void MenuDispatcher::setWorkbench(UiWorkbench* workbench)
 
 void MenuDispatcher::setWorkbenchWindow(WorkbenchWindow* window)
 {
-    m_workbenchWindow = window;
+    Q_UNUSED(window);
 }
 
 void MenuDispatcher::setStateCenter(UiStateCenter* stateCenter)
 {
-    m_stateCenter = stateCenter;
+    Q_UNUSED(stateCenter);
 }
 
 bool MenuDispatcher::isWorkbenchSwitchCommand(const QString& commandId)

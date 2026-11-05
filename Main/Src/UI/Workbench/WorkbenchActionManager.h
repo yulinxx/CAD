@@ -38,11 +38,6 @@ public:
     /// 清理所有注册的快捷键
     void clearAllShortcuts();
 
-    // ==================== 命令执行 ====================
-
-    /// 命令执行前的统一权限检查
-    bool canExecuteCommand(const QString& commandId, const QString& context) const;
-
     // ==================== 框架通道 ====================
 
     /// 记录性能耗时并统一走框架级入口

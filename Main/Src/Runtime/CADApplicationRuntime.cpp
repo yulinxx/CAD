@@ -119,8 +119,7 @@ int CADApplicationRuntime::run()
     }
 
     // 创建应用引导器并设置启动工作台
-    m_bootstrapper = std::make_unique<AppBootstrapper>(
-        m_appPaths, brand.productName().toStdString(), QCoreApplication::applicationVersion().toStdString());
+    m_bootstrapper = std::make_unique<AppBootstrapper>(m_appPaths);
     m_bootstrapper->setStartWorkbenchId(m_startWorkbenchId);
 
     // 初始化引导器

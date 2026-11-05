@@ -34,7 +34,6 @@ UiShellHost::~UiShellHost()
 void UiShellHost::setStateCenter(UiStateCenter* stateCenter)
 {
     // 宿主只转发状态中心引用，不在这里做额外初始化
-    m_stateCenter = stateCenter;
     m_mainWindow->setUiStateCenter(stateCenter);
 }
 
@@ -42,7 +41,6 @@ void UiShellHost::setStateCenter(UiStateCenter* stateCenter)
 /// @param bus 操作总线
 void UiShellHost::setOperationBus(OperationBus* bus)
 {
-    m_operationBus = bus;
     m_mainWindow->setOperationBus(bus);
 }
 

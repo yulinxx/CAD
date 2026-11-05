@@ -10,7 +10,7 @@
  *   - `HardwareProfile`（Engine2D，按图层绑定）—— 但 `HardwareProfileManager`
  *     全仓库没有任何实例化点，且 `hardwareProfileId` 不写入 .sy 文档；
  *   - `Eg::ProcessParams`（SQLite 预设，与图层/图元无绑定）；
- *   - `Eg::MaterialInfo` / `MaterialDatabase::MaterialInfo`（材料推荐值，两份）；
+ *   - `Eg::MaterialInfo`（材料推荐值）与 `MaterialDatabase::MaterialInfo`（后者已随 `MaterialDatabase` 弃用退场，仅保留 ABI 兼容）；
  *   - 本文件里的 `LayerProcessParams`（第四份）。
  *
  * v2 起统一为**一份**：`Eg::ProcessParams`（Engine/Common/Include/Engine/Process/）。

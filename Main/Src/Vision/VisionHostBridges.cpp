@@ -509,7 +509,6 @@ namespace VisHost
         header.boundsMaxX = maxX;
         header.boundsMinY = minY;
         header.boundsMaxY = maxY;
-        header.estimatedSeconds = static_cast<double>(count) * 0.01;
 
         Hw::MotionPlanView view;
         view.header = header;

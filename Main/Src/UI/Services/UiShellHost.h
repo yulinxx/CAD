@@ -64,10 +64,6 @@ private:
 
     /// 主窗口
     std::unique_ptr<WorkbenchWindow> m_mainWindow;
-    /// UI 状态中心引用
-    UiStateCenter* m_stateCenter{ nullptr };
-    /// 操作总线
-    OperationBus* m_operationBus{ nullptr };
     /// UI 服务集合
     UiServices m_services;
     /// 当前工作台引用

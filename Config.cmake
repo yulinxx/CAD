@@ -167,17 +167,6 @@ if(WIN32 AND EXISTS "${Qt_INSTALL_DIR}")
     set(QT_PLUGIN_PATH "${Qt_INSTALL_DIR}/plugins" CACHE PATH "Qt plugins directory")
 endif()
 
-# --------------------------------------------------------------------
-# 模块编译开关配置
-# --------------------------------------------------------------------
-# 默认值: 可选模块默认开启，核心模块默认关闭
-if(NOT DEFINED SANYI_DEFAULT_OPTIONAL)
-    set(SANYI_DEFAULT_OPTIONAL ON)
-endif()
-if(NOT DEFINED SANYI_DEFAULT_CORE)
-    set(SANYI_DEFAULT_CORE OFF)
-endif()
-
 # ===== 渲染后端配置 =====
 set(SANYI_RENDER_BACKENDS "OPENGL;METAL;VULKAN" CACHE STRING "Available render backends")
 if(APPLE)

@@ -59,20 +59,6 @@ void WorkbenchActionManager::clearAllShortcuts()
     m_registeredShortcuts.clear();
 }
 
-// ==================== 命令执行 ====================
-
-bool WorkbenchActionManager::canExecuteCommand(const QString& commandId, const QString& context) const
-{
-    // 权限检查只做判定，不在这里扩展额外策略或副作用
-    if (m_frameworkServices.canExecuteCommand)
-    {
-        return m_frameworkServices.canExecuteCommand(commandId, context);
-    }
-
-    // 没有权限回调时默认放行，保持框架的最小可用性
-    return true;
-}
-
 // ==================== 框架通道 ====================
 
 void WorkbenchActionManager::recordPerformance(const QString& scope, qint64 elapsedMs)

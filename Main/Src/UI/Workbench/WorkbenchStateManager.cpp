@@ -49,12 +49,6 @@ void WorkbenchStateManager::setUiStateCenter(UiStateCenter* stateCenter)
     SY_DEBUGF("[WorkbenchStateManager] State center set: %p", static_cast<void*>(stateCenter));
 }
 
-void WorkbenchStateManager::setFrameworkServices(const UiFrameworkServices& services)
-{
-    // 框架级能力统一从这里注入，后续错误、权限、性能都必须走同一条框架路径
-    m_frameworkServices = services;
-}
-
 void WorkbenchStateManager::setActiveStatusBar(StatusBarBase* statusBarWidget)
 {
     m_activeStatusBar = statusBarWidget;
