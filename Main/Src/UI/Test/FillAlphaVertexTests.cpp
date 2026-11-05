@@ -681,13 +681,9 @@ TEST(FillAlphaVertexTest, AssemblyMicroBenchmark)
 // 因此这里对真实顶点流做软件光栅化；顶点色就是 GPU 管线消费的颜色通道。
 TEST(FillColorPixelTest, SpiralFillFollowsSourceLayerColor)
 {
-    // 取一个已知位于外圈环底边上的世界坐标点（矩形 (0,0)-(40,24)，首层内缩 2mm）
+    // 采样图幅：世界坐标 (0,0)-(96,96) 一比一映射到像素
     const int nImageW = 96;
     const int nImageH = 96;
-    const double dSampleX = 20.0;
-    const double dSampleY = 2.0;
-    const int nPixelX = static_cast<int>(dSampleX);
-    const int nPixelY = nImageH - static_cast<int>(dSampleY);
 
     // 用真实的填充链路生成结果图元，并返回“渲染后”的像素 RGB
     auto sampleFilledPixel = [&](const Ut::Color& layerColor) -> std::array<uint8_t, 3> {
@@ -716,6 +712,12 @@ TEST(FillColorPixelTest, SpiralFillFollowsSourceLayerColor)
         params.nMaxLayers = 3;
         params.dMinArea = 0.0;
 
+        // 采样参考点：矩形底边上方 2mm，旧实现的首层闭合环底边恰好经过这里。
+        // 螺旋改为蚊香状后，首圈沿整圈向第二圈过渡，同一点不再落在路径上，
+        // 因此取路径上离参考点最近的顶点作为实际采样像素，采样意图（外圈底部附近）不变
+        const double dRefX = 20.0;
+        const double dRefY = 2.0;
+
         std::vector<std::vector<Ut::Vec2d>> paths;
         double totalLength = 0.0;
         int nJumps = 0;
@@ -729,6 +731,28 @@ TEST(FillColorPixelTest, SpiralFillFollowsSourceLayerColor)
         if (filler.writeSpiralPathsToScene(paths, srcPtr) <= 0)
         {
             ADD_FAILURE() << "spiral fill must write result entities";
+            return std::array<uint8_t, 3>{ 0, 0, 0 };
+        }
+
+        // 采样像素位置：在第一条螺旋路径上取离参考点最近的顶点
+        double dBestDist = 1e18;
+        double dSamplePtX = dRefX;
+        double dSamplePtY = dRefY;
+        for (const auto& p : paths.front())
+        {
+            const double d = std::hypot(p.x() - dRefX, p.y() - dRefY);
+            if (d < dBestDist)
+            {
+                dBestDist = d;
+                dSamplePtX = p.x();
+                dSamplePtY = p.y();
+            }
+        }
+        const int nPixelX = static_cast<int>(std::lround(dSamplePtX));
+        const int nPixelY = nImageH - static_cast<int>(std::lround(dSamplePtY));
+        if (nPixelX < 0 || nPixelX >= nImageW || nPixelY < 0 || nPixelY >= nImageH)
+        {
+            ADD_FAILURE() << "sample pixel outside test image";
             return std::array<uint8_t, 3>{ 0, 0, 0 };
         }
 
