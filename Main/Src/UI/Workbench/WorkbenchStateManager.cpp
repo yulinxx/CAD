@@ -169,7 +169,9 @@ void WorkbenchStateManager::doRefreshFromState()
         QString prompt = state.statusPrompt;
         if (prompt.isEmpty())
         {
-            prompt = m_parent->tr("Ready");
+            // 用 QObject::tr 替代 m_parent->tr：lupdate 无法识别指针->tr() 模式，
+            // 会跳过翻译字符串提取；QObject::tr 是静态方法，lupdate 能正确识别
+            prompt = QObject::tr("Ready");
         }
         m_activeStatusBar->setMessageText(prompt);
     }
