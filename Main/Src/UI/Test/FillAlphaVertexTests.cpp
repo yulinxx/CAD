@@ -14,6 +14,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -22,8 +23,13 @@
 #include <unordered_map>
 #include <vector>
 
+#include "Engine2D/Algorithm/EntityColorFiller.h"
+#include "Engine2D/Algorithm/EntityContourFiller.h"
+#include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Interaction/LayerManager.h"
 #include "Engine2D/Geometry/EntityGeometryEmitter.h"
 #include "Engine2D/SyEntity/SyFillRegion.h"
+#include "Engine2D/SyEntity/SyPolygon.h"
 
 #include "Render/RenderSceneBuilder.h"
 #include "RenderAbstraction/IRenderDevice.h"
@@ -665,4 +671,304 @@ TEST(FillAlphaVertexTest, AssemblyMicroBenchmark)
 
     EXPECT_EQ(emitted, vertexCount);
     EXPECT_GT(fixture.device.writeCount(), 0u);
+}
+
+// 端到端填充色验收：真实走「螺旋填充计算 → 写场景 → RenderSceneBuilder 顶点装配」，
+// 再用顶点流做 CPU 光栅化并采样像素 RGB。
+// 取色口径：螺旋/同心环不使用对话框的显式颜色，填充色 = 源图形所属图层的颜色，
+// 因此这里只改图层色，断言像素跟着变；同时断言结果图元落回源图层。
+// 说明：RenderX 的 Null 后端离屏渲染不落像素，GPU 离屏回读在本机测试环境不可用，
+// 因此这里对真实顶点流做软件光栅化；顶点色就是 GPU 管线消费的颜色通道。
+TEST(FillColorPixelTest, SpiralFillFollowsSourceLayerColor)
+{
+    // 取一个已知位于外圈环底边上的世界坐标点（矩形 (0,0)-(40,24)，首层内缩 2mm）
+    const int nImageW = 96;
+    const int nImageH = 96;
+    const double dSampleX = 20.0;
+    const double dSampleY = 2.0;
+    const int nPixelX = static_cast<int>(dSampleX);
+    const int nPixelY = nImageH - static_cast<int>(dSampleY);
+
+    // 用真实的填充链路生成结果图元，并返回“渲染后”的像素 RGB
+    auto sampleFilledPixel = [&](const Ut::Color& layerColor) -> std::array<uint8_t, 3> {
+        Eg::SceneManager scene;
+        LayerManager layerManager(&scene);
+        const int nLayerId = layerManager.createLayer("FillLayer");
+        if (nLayerId <= 0 || !layerManager.setLayerColor(nLayerId, layerColor))
+        {
+            ADD_FAILURE() << "test layer must be created with the requested color";
+            return std::array<uint8_t, 3>{ 0, 0, 0 };
+        }
+
+        auto src = std::make_unique<Eg::SyPolygon>();
+        src->setVertices({ Ut::Vec2d(0, 0), Ut::Vec2d(40, 0), Ut::Vec2d(40, 24), Ut::Vec2d(0, 24) });
+        src->bClosed = true;
+        Eg::SyEntity* srcPtr = src.get();
+        std::vector<std::unique_ptr<Eg::SyEntity>> srcBatch;
+        srcBatch.push_back(std::move(src));
+        scene.addEntities(std::move(srcBatch));
+        // 源图形必须真正属于该图层，填充才会跟随它的颜色并落回同层
+        layerManager.assignEntityToLayer(srcPtr, nLayerId);
+
+        Eg::ContourFillParameters params;
+        params.dOffsetDistance = 2.0;
+        params.bAutoMaxLayers = false;
+        params.nMaxLayers = 3;
+        params.dMinArea = 0.0;
+
+        std::vector<std::vector<Ut::Vec2d>> paths;
+        double totalLength = 0.0;
+        int nJumps = 0;
+        Eg::EntityContourFiller filler(&scene);
+        // 注意：lambda 有返回值，内部不能用 ASSERT_*（会展开成无值 return）
+        if (!Eg::EntityContourFiller::computeSpiralPaths({ srcPtr }, params, paths, totalLength, nJumps))
+        {
+            ADD_FAILURE() << "spiral fill must produce paths for the test rectangle";
+            return std::array<uint8_t, 3>{ 0, 0, 0 };
+        }
+        if (filler.writeSpiralPathsToScene(paths, srcPtr) <= 0)
+        {
+            ADD_FAILURE() << "spiral fill must write result entities";
+            return std::array<uint8_t, 3>{ 0, 0, 0 };
+        }
+
+        // 取色口径：不设覆盖色，结果色回落到源图形所属图层色，且结果落回同一图层
+        int nFillLayerId = -1;
+        for (Eg::SyEntity* e : scene.getAllEntities())
+        {
+            if (e == srcPtr)
+            {
+                continue;
+            }
+            EXPECT_EQ(e->getColor().red255(), layerColor.red255());
+            EXPECT_EQ(e->getColor().green255(), layerColor.green255());
+            EXPECT_EQ(e->getColor().blue255(), layerColor.blue255());
+            EXPECT_EQ(e->layerId(), nLayerId) << "fill must land on the source layer";
+            nFillLayerId = e->layerId();
+        }
+        std::cout << "[layer] sourceLayer=" << nLayerId << " spiralFillLayer=" << nFillLayerId << std::endl;
+
+        // 把结果图元送进真实渲染装配链路，取回实际顶点字节
+        FillFixture fixture;
+        fixture.builder.beginRebuild();
+        for (Eg::SyEntity* e : scene.getAllEntities())
+        {
+            if (e != srcPtr)
+            {
+                Eg::emitEntityGeometry(*e, fixture.builder);
+            }
+        }
+        fixture.builder.endRebuild();
+        if (fixture.scene.commands().empty())
+        {
+            ADD_FAILURE() << "render scene builder must emit draw commands";
+            return std::array<uint8_t, 3>{ 0, 0, 0 };
+        }
+
+        // 软件光栅化：按世界坐标直线画出顶点流里的每一段，颜色取顶点色
+        std::vector<std::array<uint8_t, 3>> image(
+            static_cast<size_t>(nImageW) * nImageH, std::array<uint8_t, 3>{ 255, 255, 255 });
+        auto plot = [&](int x, int y, const std::array<uint8_t, 3>& c) {
+            if (x < 0 || y < 0 || x >= nImageW || y >= nImageH)
+            {
+                return;
+            }
+            image[static_cast<size_t>(y) * nImageW + x] = c;
+        };
+        for (const auto& entry : fixture.scene.commands())
+        {
+            const RA::DrawInstruction& cmd = entry.second;
+            const bool bLoop = cmd.topology == RA::PrimitiveType::LineLoop;
+            if (cmd.topology != RA::PrimitiveType::Lines && cmd.topology != RA::PrimitiveType::LineStrip && !bLoop)
+            {
+                continue;
+            }
+            const uint8_t* raw = fixture.device.bytesAt(cmd.vertexBuffer, cmd.vertexOffset);
+            if (raw == nullptr)
+            {
+                ADD_FAILURE() << "vertex buffer readback returned null";
+                continue;
+            }
+            if (cmd.format != RA::VertexFormat::PositionColorAlpha)
+            {
+                continue;
+            }
+            const Ut::VertexP3C4* verts = reinterpret_cast<const Ut::VertexP3C4*>(raw);
+            for (uint32_t i = 1; i < cmd.vertexCount; ++i)
+            {
+                const std::array<uint8_t, 3> c{ static_cast<uint8_t>(verts[i - 1].cr * 255.0f),
+                    static_cast<uint8_t>(verts[i - 1].cg * 255.0f),
+                    static_cast<uint8_t>(verts[i - 1].cb * 255.0f) };
+                const double x0 = verts[i - 1].px;
+                const double y0 = verts[i - 1].py;
+                const double x1 = verts[i].px;
+                const double y1 = verts[i].py;
+                const int nSteps = static_cast<int>((std::max)(std::abs(x1 - x0), std::abs(y1 - y0))) + 1;
+                for (int s = 0; s <= nSteps; ++s)
+                {
+                    const double t = static_cast<double>(s) / nSteps;
+                    plot(static_cast<int>(std::lround(x0 + (x1 - x0) * t)),
+                        nImageH - static_cast<int>(std::lround(y0 + (y1 - y0) * t)),
+                        c);
+                }
+            }
+            // LineLoop 由硬件自动补最后一段闭合边，软件光栅化要显式补上
+            if (bLoop && cmd.vertexCount > 2)
+            {
+                const Ut::VertexP3C4& first = verts[0];
+                const Ut::VertexP3C4& last = verts[cmd.vertexCount - 1];
+                const int nSteps = static_cast<int>((std::max)(std::abs(first.px - last.px), std::abs(first.py - last.py))) + 1;
+                const std::array<uint8_t, 3> c{ static_cast<uint8_t>(last.cr * 255.0f),
+                    static_cast<uint8_t>(last.cg * 255.0f),
+                    static_cast<uint8_t>(last.cb * 255.0f) };
+                for (int s = 0; s <= nSteps; ++s)
+                {
+                    const double t = static_cast<double>(s) / nSteps;
+                    plot(static_cast<int>(std::lround(last.px + (first.px - last.px) * t)),
+                        nImageH - static_cast<int>(std::lround(last.py + (first.py - last.py) * t)),
+                        c);
+                }
+            }
+        }
+
+        return image[static_cast<size_t>(nPixelY) * nImageW + nPixelX];
+    };
+
+    const std::array<uint8_t, 3> redPixel = sampleFilledPixel(Ut::Color(1.0f, 0.0f, 0.0f, 1.0f));
+    const std::array<uint8_t, 3> bluePixel = sampleFilledPixel(Ut::Color(0.0f, 0.0f, 1.0f, 1.0f));
+
+    std::cout << "[pixel] layerColor=#FF0000 sampled=" << static_cast<int>(redPixel[0]) << ","
+              << static_cast<int>(redPixel[1]) << "," << static_cast<int>(redPixel[2])
+              << " layerColor=#0000FF sampled=" << static_cast<int>(bluePixel[0]) << ","
+              << static_cast<int>(bluePixel[1]) << "," << static_cast<int>(bluePixel[2]) << std::endl;
+
+    EXPECT_EQ(redPixel[0], 255);
+    EXPECT_EQ(redPixel[1], 0);
+    EXPECT_EQ(redPixel[2], 0);
+    EXPECT_EQ(bluePixel[0], 0);
+    EXPECT_EQ(bluePixel[1], 0);
+    EXPECT_EQ(bluePixel[2], 255);
+    EXPECT_NE(redPixel, bluePixel) << "two different fill colors must render to different pixels";
+}
+
+// 颜色填充（ColorFill 页）语义不变：仍使用对话框里的显式颜色。
+// 这里走真实的色块填充链路（三角剖分 → 写场景 → 顶点装配），
+// 用重心坐标判定采样点是否落在某个三角形内，取该三角形顶点色作为“渲染结果”。
+TEST(FillColorPixelTest, ColorFillExplicitColorReachesRenderedPixel)
+{
+    const double dSampleX = 20.0;
+    const double dSampleY = 12.0;
+
+    // 点在三角形内判定（三次叉积同号，含边界）
+    auto pointInTriangle = [](double px, double py, const Ut::VertexP3C4& a, const Ut::VertexP3C4& b,
+                               const Ut::VertexP3C4& c) {
+        const double d1 = (px - b.px) * (a.py - b.py) - (a.px - b.px) * (py - b.py);
+        const double d2 = (px - c.px) * (b.py - c.py) - (b.px - c.px) * (py - c.py);
+        const double d3 = (px - a.px) * (c.py - a.py) - (c.px - a.px) * (py - a.py);
+        const bool bNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+        const bool bPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+        return !(bNeg && bPos);
+    };
+
+    auto sampleFilledPixel = [&](const Ut::Color& fillColor) -> std::array<uint8_t, 3> {
+        Eg::SceneManager scene;
+        auto src = std::make_unique<Eg::SyPolygon>();
+        src->setVertices({ Ut::Vec2d(0, 0), Ut::Vec2d(40, 0), Ut::Vec2d(40, 24), Ut::Vec2d(0, 24) });
+        src->bClosed = true;
+        Eg::SyEntity* srcPtr = src.get();
+        std::vector<std::unique_ptr<Eg::SyEntity>> srcBatch;
+        srcBatch.push_back(std::move(src));
+        scene.addEntities(std::move(srcBatch));
+
+        // 色块填充写入需要图层管理器：这里给它一个独立图层，颜色仍由显式参数决定
+        LayerManager layerManager(&scene);
+        const int nLayerId = layerManager.createLayer("ColorFillLayer");
+        if (nLayerId <= 0)
+        {
+            ADD_FAILURE() << "color fill test layer must be created";
+            return std::array<uint8_t, 3>{ 0, 0, 0 };
+        }
+
+        Eg::ColorFillParameters params;
+        Eg::FillRegionList regions;
+        // 注意：lambda 有返回值，内部不能用 ASSERT_*（会展开成无值 return）
+        if (!Eg::EntityColorFiller::computeRegions({ srcPtr }, params, regions))
+        {
+            ADD_FAILURE() << "color fill must triangulate the test rectangle";
+            return std::array<uint8_t, 3>{ 0, 0, 0 };
+        }
+        Eg::EntityColorFiller filler(&scene, &layerManager);
+        if (filler.writeRegionsToScene(regions, nLayerId, fillColor) <= 0)
+        {
+            ADD_FAILURE() << "color fill must write fill region entities";
+            return std::array<uint8_t, 3>{ 0, 0, 0 };
+        }
+
+        // 颜色填充的语义：显式颜色写到结果图元的覆盖色上
+        for (Eg::SyEntity* e : scene.getAllEntities())
+        {
+            if (e == srcPtr)
+            {
+                continue;
+            }
+            EXPECT_EQ(e->getColor().red255(), fillColor.red255());
+            EXPECT_EQ(e->getColor().green255(), fillColor.green255());
+            EXPECT_EQ(e->getColor().blue255(), fillColor.blue255());
+        }
+
+        FillFixture fixture;
+        fixture.builder.beginRebuild();
+        for (Eg::SyEntity* e : scene.getAllEntities())
+        {
+            if (e != srcPtr)
+            {
+                Eg::emitEntityGeometry(*e, fixture.builder);
+            }
+        }
+        fixture.builder.endRebuild();
+
+        // 色块填充以三角形集渲染：找到覆盖采样点的三角形，取其顶点色
+        for (const auto& entry : fixture.scene.commands())
+        {
+            const RA::DrawInstruction& cmd = entry.second;
+            if (cmd.topology != RA::PrimitiveType::Triangles ||
+                cmd.format != RA::VertexFormat::PositionColorAlpha)
+            {
+                continue;
+            }
+            const uint8_t* raw = fixture.device.bytesAt(cmd.vertexBuffer, cmd.vertexOffset);
+            if (raw == nullptr)
+            {
+                continue;
+            }
+            const Ut::VertexP3C4* verts = reinterpret_cast<const Ut::VertexP3C4*>(raw);
+            for (uint32_t i = 0; i + 2 < cmd.vertexCount; i += 3)
+            {
+                if (pointInTriangle(dSampleX, dSampleY, verts[i], verts[i + 1], verts[i + 2]))
+                {
+                    return std::array<uint8_t, 3>{ static_cast<uint8_t>(verts[i].cr * 255.0f),
+                        static_cast<uint8_t>(verts[i].cg * 255.0f),
+                        static_cast<uint8_t>(verts[i].cb * 255.0f) };
+                }
+            }
+        }
+        ADD_FAILURE() << "sample point is not covered by any fill triangle";
+        return std::array<uint8_t, 3>{ 255, 255, 255 };
+    };
+
+    const std::array<uint8_t, 3> redPixel = sampleFilledPixel(Ut::Color(1.0f, 0.0f, 0.0f, 1.0f));
+    const std::array<uint8_t, 3> bluePixel = sampleFilledPixel(Ut::Color(0.0f, 0.0f, 1.0f, 1.0f));
+
+    std::cout << "[pixel] colorFill=#FF0000 sampled=" << static_cast<int>(redPixel[0]) << ","
+              << static_cast<int>(redPixel[1]) << "," << static_cast<int>(redPixel[2])
+              << " colorFill=#0000FF sampled=" << static_cast<int>(bluePixel[0]) << ","
+              << static_cast<int>(bluePixel[1]) << "," << static_cast<int>(bluePixel[2]) << std::endl;
+
+    EXPECT_EQ(redPixel[0], 255);
+    EXPECT_EQ(redPixel[1], 0);
+    EXPECT_EQ(redPixel[2], 0);
+    EXPECT_EQ(bluePixel[0], 0);
+    EXPECT_EQ(bluePixel[1], 0);
+    EXPECT_EQ(bluePixel[2], 255);
+    EXPECT_NE(redPixel, bluePixel) << "two different fill colors must render to different pixels";
 }
