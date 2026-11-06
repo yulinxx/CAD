@@ -51,6 +51,12 @@ set(SANYI_ROOT "${PROJECT_SOURCE_DIR}" CACHE INTERNAL "SanYi CAD project root")
 include("${SANYI_ROOT}/CMake/SanYiPaths.cmake")
 include("${SANYI_ROOT}/CMake/Utils.cmake")
 
+# ============ 必需第三方依赖预检（vcpkg）============
+# 进入各模块之前一次性检查必需 vcpkg 端口（含纯头文件端口），缺失时汇总输出
+# 安装命令并让 configure 明确失败。端口清单维护在 CMake/VcpkgPreflight.cmake。
+include("${SANYI_ROOT}/CMake/VcpkgPreflight.cmake")
+sanyi_check_vcpkg_dependencies()
+
 # 只把格式串相关的分析告警提为错误（其余 /analyze 告警保持告警，避免一次性引入
 # 大量非本议题的失败）：
 #   C6271 多余实参        C6272 应为浮点   C6273 应为整型   C6274 应为字符
