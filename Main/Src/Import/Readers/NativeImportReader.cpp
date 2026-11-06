@@ -14,7 +14,7 @@
 
 NativeImportReader::NativeImportReader()
     : ImportReaderBase(Fio::FileFormat::Native,
-          { QStringLiteral("sy"), QStringLiteral("syx") },
+          { QStringLiteral("sy"), QStringLiteral("syx"), QStringLiteral("sy3d") },
           QStringLiteral("SanYi Native"),
           ImportDimension::Both)
 {
@@ -30,13 +30,14 @@ ImportDimension NativeImportReader::dimension() const
 
 ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
 {
-    // 检测是否为 3D 格式 (.syx)
+    // 检测是否为 3D 格式（.sy3d 为 UI 默认后缀，.syx 为历史后缀）
     QFileInfo fi(context.sourcePath);
-    bool is3D = (fi.suffix().toLower() == QStringLiteral("syx"));
+    const QString suffix = fi.suffix().toLower();
+    bool is3D = (suffix == QStringLiteral("syx") || suffix == QStringLiteral("sy3d"));
     Fio::FileFormat format = is3D ? Fio::FileFormat::Native3D : Fio::FileFormat::Native;
 
     SY_DEBUGF("[NativeImportReader] Importing native format: %s (format=%d)",
-        is3D ? "3D (.syx)" : "2D (.sy)",
+        is3D ? "3D (.syx/.sy3d)" : "2D (.sy)",
         static_cast<int>(format));
 
     // 使用新管线：parseDocument 获取完整 SyDocument，通过公开 API 提取图层/群组信息
