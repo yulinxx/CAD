@@ -417,7 +417,15 @@ Fio::VecSyEntityPtr ExportService::collectAllEntities() const
         for (auto* e : allEntities)
         {
             // ABI: clone 在 Engine2D 分配，跨 DLL delete 安全（需保证所有模块使用相同堆）
-            entities.push_back(std::unique_ptr<Eg::SyEntity>(e->clone()));
+            auto* copy = e->clone();
+            // clone() 会分配新 ID，但导出必须保留场景中的持久 ID：
+            // 否则 FillRegion.source_ids、群组/图层引用在重新打开后会指向不存在的实体。
+            // 合成 ID（渲染/临时用途）为负数或 0，不写回；持久 ID 从 1 开始且场景内唯一。
+            if (copy && e->id > 0)
+            {
+                copy->id = e->id;
+            }
+            entities.push_back(std::unique_ptr<Eg::SyEntity>(copy));
         }
     }
 
@@ -440,7 +448,13 @@ Fio::VecSyEntityPtr ExportService::collectAllEntities() const
                     auto* ctx = static_cast<CollectCtx*>(userData);
                     // SyMeshEntity 继承 SyEntity，clone() 返回 SyEntity*
                     // 包装为 unique_ptr<SyEntity> 保持多态正确释放
-                    ctx->entities->push_back(std::unique_ptr<Eg::SyEntity>(entity->clone()));
+                    auto* copy = entity->clone();
+                    // 与 2D 一致：保留持久 ID，避免每次保存后 ID 漂移
+                    if (copy && entity->id > 0)
+                    {
+                        copy->id = entity->id;
+                    }
+                    ctx->entities->push_back(std::unique_ptr<Eg::SyEntity>(copy));
                     ++ctx->count;
                 }
             },
