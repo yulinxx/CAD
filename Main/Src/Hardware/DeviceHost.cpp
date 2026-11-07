@@ -761,11 +761,10 @@ bool DeviceHost::isSoftwareEmergencyActive() const
 
 void DeviceHost::clearSoftwareEmergencyStop()
 {
-    if (!m_impl->device)
-    {
-        return;
-    }
-
+    // 不能以「设备是否在运行」作前置条件：离线按下急停后 softwareEmergency
+    // 同样会被置位，若这里提前返回，闭锁永远清不掉，现场最省事的「修复」
+    // 就会变成把急停逻辑注释掉。UI 的 EmergencyStopController::confirmReset
+    // 走的正是这条路径。
     m_impl->monitor.clearSoftwareEmergency();
 }
 
@@ -818,16 +817,29 @@ QString DeviceHost::routedLaserOrigin() const
 
 void DeviceHost::requestEmergencyStop()
 {
+    SY_ERRORF("[DeviceHost] Emergency stop requested by application");
     if (!m_impl->device)
     {
-        SY_WARNF("[DeviceHost] Emergency stop requested but no device is running");
-        return;
+        // 不能再 early-return：设备没启动 / autoOpen=false 时 SafetyMonitor
+        // 还没有 attach 执行器，triggerSoftwareEmergency 只会置标志位，
+        // 走不到 Actuator::onEmergencyStop()，出光守卫不会被闭锁。
+        // 后果是「离线按急停 → 开机 → 无需操作员确认即可出光」。
+        SY_WARNF("[DeviceHost] No device is running; emission is still latched off");
     }
-    SY_ERRORF("[DeviceHost] Emergency stop requested by application");
-    // 只走 triggerSoftwareEmergency：它内部已经立即调用同一个执行器
-    // （见 SafetyMonitor::triggerSoftwareEmergency 的注释）并置上闭锁。
-    // 这里再直接调一次 actuator.onEmergencyStop()，一次按下就会关光/停机两遍，
-    // 日志也翻倍。
+
+    // 出光闭锁无条件执行：emergencyStop() 再落一次硬件关光并进入 Latched
+    // （已闭锁时 cutoff 直接返回，不会重复记日志）。即便随后执行器又调了一次，
+    // 也只是重复「关光」这一安全动作，不会出现「一次急停停两遍机械」。
+    m_impl->emission.emergencyStop(QStringLiteral("applicationEStop"));
+
+    // canStartProcessing() 读的是上一拍 tick 的缓存 lastCanStart。
+    // 不等下一拍：否则按下急停后最多 20ms 内 checkGate 仍会放行，
+    // 而这段时间里出光守卫刚闭锁、机械却还没被判定为「禁止开工」。
+    m_impl->lastCanStart = false;
+
+    // 软件急停覆盖一切：后续每次 evaluate 都禁止开工，直到操作员走
+    // confirmReset → clearSoftwareEmergencyStop()。设备后来才启动时，
+    // 首拍 evaluate 会因 softwareEmergency 重新触发一次执行器急停。
     m_impl->monitor.triggerSoftwareEmergency("Emergency stop requested by application");
 }
 
@@ -950,6 +962,9 @@ struct DeviceHost::Impl
 {
     QTimer timer;  ///< 仅为让构造函数中的 connect 有对象可连，不会启动
     EmissionGuard emission;
+    /// 与 ENABLE_HARDWARE 分支保持同一语义：急停是人工事件，
+    /// 即使本构建没有硬件也必须能被查询、闭锁与显式复位。
+    bool softwareEmergency = false;
 };
 
 DeviceHost::DeviceHost(QObject* parent)
@@ -1023,14 +1038,20 @@ bool DeviceHost::isEmergencyStopInputActive() const
 
 bool DeviceHost::isSoftwareEmergencyActive() const
 {
-    return false;
+    return m_impl->softwareEmergency;
 }
 
-void DeviceHost::clearSoftwareEmergencyStop() {}
+void DeviceHost::clearSoftwareEmergencyStop()
+{
+    m_impl->softwareEmergency = false;
+}
 
 void DeviceHost::requestEmergencyStop()
 {
-    SY_WARNF("[DeviceHost] Emergency stop requested but hardware support is not compiled in");
+    SY_ERRORF("[DeviceHost] Emergency stop requested by application");
+    SY_WARNF("[DeviceHost] Hardware support is not compiled in; latching emission off anyway");
+    m_impl->softwareEmergency = true;
+    m_impl->emission.emergencyStop(QStringLiteral("applicationEStop"));
 }
 
 void DeviceHost::onTick() {}
@@ -1072,8 +1093,9 @@ SafetyInputMonitor::State DeviceHost::safetyInputState() const
 
 bool DeviceHost::acknowledgeEmissionLatch(QString& errorOut)
 {
-    errorOut = QStringLiteral("Hardware support is not compiled in (BUILD_HARDWARE=OFF)");
-    return false;
+    // 与 requestEmergencyStop 成对：既然无硬件构建也会闭锁出光，
+    // 就必须允许操作员显式解除，否则闭锁永远清不掉。
+    return m_impl->emission.confirmRearm(errorOut);
 }
 
 void DeviceHost::onDeviceEventQueued(int eventType, int channel, double value, const QString& message)

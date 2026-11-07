@@ -169,9 +169,11 @@ public:
     bool isEmergencyStopInputActive() const;
 
     /// 软件侧急停闭锁是否仍生效。软件闭锁只用于提示与状态展示，不承担安全职能。
+    /// 设备未启动时按下急停同样会置位（供 UI 显示「仍处闭锁」）。
     bool isSoftwareEmergencyActive() const;
 
     /// 清除软件侧急停闭锁。物理急停未释放时安全判定仍会禁止开工。
+    /// 无前置条件：离线急停也必须能被显式复位，否则闭锁永远清不掉。
     void clearSoftwareEmergencyStop();
 
     /**
@@ -230,8 +232,9 @@ public slots:
     /**
      * @brief 请求急停。
      *
-     * 无前置状态检查：未启动也可调用（此时只记日志）。
-     * 急停路径上任何「先判断再执行」都是隐患。
+     * 无前置状态检查：未启动也可调用。无论设备是否运行，都会立即关光、
+     * 把出光守卫置为 Latched（须经 acknowledgeEmissionLatch 显式确认），
+     * 并置上软件急停闭锁。急停路径上任何「先判断再执行」都是隐患。
      */
     void requestEmergencyStop();
 

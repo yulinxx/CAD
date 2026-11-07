@@ -84,12 +84,15 @@ SanYiCAD/
 
 | 模块 | 职责 | 技术栈 | 依赖 |
 |------|------|--------|------|
-| **RenderX** | 唯一渲染 DLL（纯 C API + POD 契约，无 Engine / Qt 依赖） | C API + OpenGL | 无 |
+| **RenderX** | 唯一渲染 DLL（纯 C API + POD 契约，无 Engine / Qt 依赖） | C API + OpenGL / Metal / Null | 无 |
 
-> 后端现状：只有 **OpenGL** 与 **Null**（无头/单测）两个后端已实现。
-> `renderx.h` 的 `Backend` 枚举里保留了 `Metal`（Phase 7）与 `Vulkan`（Phase 8）取值，
-> 但 `isBackendAvailable` 对二者显式返回 false，`createDevice` 直接报错返回 nullptr，
-> **不做静默回退**。请勿把枚举取值当作可用后端。
+> 后端现状：`Renderx/src/rhi/` 下已实现 **OpenGL**、**Metal**（仅 Apple 编译）、
+> **Null**（无头/单测）三套 RHI；`Config.cmake` 在 macOS 默认 `METAL`，其余平台默认 `OPENGL`。
+> `renderx.h` 的 `Backend` 枚举里 `Vulkan`（Phase 8）仍是占位取值，
+> `isBackendAvailable` 对它返回 false，`createDevice` 报错返回 nullptr；
+> 在非 Apple 平台选 Metal 同样会明确失败。**不做静默回退**，请勿把枚举取值当作可用后端。
+> Metal 的设计与落地记录见 `Docs/03-渲染主链/Metal后端实施设计.md`
+> 与 `Metal后端Mac开发指南.md`。
 >
 > 已删除的旧模块：`RenderCommon` / `Render2D` / `Render3D` / `Render/Core` / `UiRenderCore`。
 > 它们的职责已分别落到 RenderX（GPU 侧）与 `Main/Src/UI/Render`（宿主侧场景刷新与离散化）。
@@ -148,7 +151,7 @@ SanYiCAD/
            │                             │                             │
            ▼                             ▼                             │
    ┌───────────────┐             ┌───────────────┐                     │
-   │   UICommon    │◄────────────│    RenderX    │                     │
+   │   UICommon    │             │    RenderX    │                     │
    │  通用 UI 组件 │             │ 渲染 DLL(C API)│                     │
    └───────┬───────┘             └───────────────┘                     │
            │                                                           │
@@ -205,6 +208,12 @@ SanYiCAD/
             │   通用工具库   │
             └───────────────┘
 ```
+
+> 图中箭头读作「A 依赖 B」。RenderX 是纯 C ABI 渲染 DLL，**不依赖任何
+> UI / Engine / Qt 模块**；UI2D/UI3D 也不直接调用 RenderX，而是经
+> `RenderAbstraction` → `RenderBridge` → `RenderX` 访问，图中把中间两层折叠了。
+> 原先「RenderX → UICommon」的横向箭头与代码不符，已删除；依赖方向由
+> `CMake/CheckDependencies.cmake` 在 configure 阶段校验。
 
 ---
 
@@ -422,13 +431,14 @@ void OnSave() {
 
 | 后端类型 | 说明 | 状态 |
 |----------|------|------|
-| OpenGL | 跨平台硬件加速，当前唯一的生产后端 | 已实现（默认） |
+| OpenGL | 跨平台硬件加速 | 已实现；非 Apple 平台默认 |
+| Metal | Apple 平台硬件加速 | 已实现（仅 Apple 编译）；macOS 默认 |
 | Null | 不产生任何 GPU 调用，用于单测与无头环境 | 已实现 |
-| Metal | Apple 平台硬件加速 | 未实现（Phase 7，枚举占位） |
 | Vulkan | 新一代图形 API | 未实现（Phase 8，枚举占位） |
 
-选择未实现的后端时，`rxRuntimeCreate` / `createDevice` 会通过 `logCallback`
-报明原因并返回 nullptr，不会退化成 Null 后端画出一片黑屏。
+选择未实现（Vulkan）或当前平台不可用（非 Apple 上的 Metal）的后端时，
+`rxRuntimeCreate` / `createDevice` 会通过 `logCallback` 报明原因并返回 nullptr，
+不会退化成 Null 后端画出一片黑屏；`Backend::Auto` 只在已实现的后端里挑选。
 
 ---
 
@@ -482,4 +492,4 @@ void OnSave() {
 | UI 层 | ✅ 稳定 | 2D/3D 工作台功能完整 |
 | 功能模块 | ✅ 稳定 | FileIO/Nesting/Hardware/Engraving |
 | Python | ⚠️ 开发中 | PythonHost 基础框架完成 |
-| 渲染后端 | ⚠️ 开发中 | 仅 OpenGL 与 Null 已实现；Vulkan/Metal 只是枚举占位，选中即报错 |
+| 渲染后端 | ✅ 稳定 | OpenGL / Metal(Apple) / Null 已实现；仅 Vulkan 为枚举占位，选中即报错 |

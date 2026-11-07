@@ -28,6 +28,12 @@
 option(SANYI_STRICT_RENDER_ISOLATION
     "把 UI 直连 RenderX 的隔离告警升级为 configure 失败" ON)
 
+# ON 时「应被校验的目标不存在」也算失败，供 CI 全模块构建使用。
+# 本地按 BUILD_xxx 关掉部分模块时保持 OFF：目标不存在是正常的，
+# 但结果里必须如实说明有哪些规则被跳过了（见函数末尾）。
+option(SANYI_STRICT_DEPENDENCY_AUDIT
+    "依赖方向校验所需目标缺失时升级为 configure 失败" OFF)
+
 # 收集某目标**对下游可见**的可达依赖（含传递闭包），结果写入 ${_out_var}。
 #
 # 关键点：判据是 INTERFACE_LINK_LIBRARIES，不是 LINK_LIBRARIES。
@@ -66,6 +72,22 @@ function(sanyi_check_dependency_directions)
     set(_abstraction_targets RenderAbstraction)
 
     set(_violations "")
+
+    # 每条规则都被 if(TARGET ...) 包着：模块被 BUILD_xxx=OFF 关掉时，
+    # 整条规则会静默跳过。旧实现末尾无条件打印「OK」，等于只跑了半套规则
+    # 却宣称全绿。这里先把本轮没参与校验的目标如实记录下来。
+    set(_all_checked_targets
+        ${_engine_targets} ${_render_targets} ${_ui_targets}
+        ${_app_targets} ${_abstraction_targets} CAM)
+    set(_missing_targets "")
+    foreach(_t IN LISTS _all_checked_targets)
+        if(NOT TARGET ${_t})
+            list(APPEND _missing_targets "${_t}")
+        endif()
+    endforeach()
+    if(_missing_targets)
+        list(REMOVE_DUPLICATES _missing_targets)
+    endif()
 
     # 规则 1：Engine 不得依赖上层
     set(_engine_forbidden "^(UICommon|UI2D|UI3D|RenderX|RenderBridge|SanYiCAD|UiEngineAccess)$")
@@ -195,6 +217,16 @@ function(sanyi_check_dependency_directions)
         endif()
     endif()
 
+    set(_skip_note "")
+    if(_missing_targets)
+        string(REPLACE ";" ", " _missing_msg "${_missing_targets}")
+        set(_skip_note "；未参与校验的目标: ${_missing_msg}")
+        if(SANYI_STRICT_DEPENDENCY_AUDIT)
+            list(APPEND _violations
+                "依赖方向校验所需目标缺失（SANYI_STRICT_DEPENDENCY_AUDIT=ON）：${_missing_msg}")
+        endif()
+    endif()
+
     if(_violations)
         string(REPLACE ";" "\n    - " _msg "${_violations}")
         message(FATAL_ERROR
@@ -204,9 +236,9 @@ function(sanyi_check_dependency_directions)
 
     if(_advisory)
         # 分层规则都过了，但 UI 仍能直调 RenderX —— 不谎报"完全解耦"
-        message(STATUS "[SanYi] 依赖方向校验: OK（分层规则通过；UI/RenderX 隔离未收口，见上方告警）")
+        message(STATUS "[SanYi] 依赖方向校验: OK（分层规则通过；UI/RenderX 隔离未收口，见上方告警${_skip_note}）")
     else()
         message(STATUS "[SanYi] 依赖方向校验: OK "
-            "(Engine 不依赖 UI/Render；Render 不依赖 UI；UI 经 UiEngineAccess 访问 Engine；UI 通过 RenderAbstraction 访问渲染)")
+            "(Engine 不依赖 UI/Render；Render 不依赖 UI；UI 经 UiEngineAccess 访问 Engine；UI 通过 RenderAbstraction 访问渲染${_skip_note})")
     endif()
 endfunction()

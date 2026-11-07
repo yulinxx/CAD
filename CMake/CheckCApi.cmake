@@ -66,7 +66,18 @@ function(sanyi_check_c_api_version)
         if(NOT _content MATCHES "GetVersionString")
             list(APPEND _problems "${_h}: 缺 *_GetVersionString()")
         endif()
-        if(NOT _content MATCHES "GetVersion|GetAbiVersion")
+
+        # 旧判断是 `GetVersion|GetAbiVersion`：`GetVersion` 是 `GetVersionString`
+        # 的子串，因此只要第一个检查过了，第二个恒为真 —— 门禁永远不会触发。
+        # 先把 *_GetVersionString 这个名字整个抹掉，再只认真正的函数声明
+        # `GetVersion(` / `GetAbiVersion(`，避免子串再次冒充。
+        string(REPLACE "GetVersionString" "" _content_wo_version_string "${_content}")
+        set(_has_version_query FALSE)
+        if(_content_wo_version_string MATCHES "GetVersion[ \t\r\n]*\\("
+            OR _content_wo_version_string MATCHES "GetAbiVersion[ \t\r\n]*\\(")
+            set(_has_version_query TRUE)
+        endif()
+        if(NOT _has_version_query)
             list(APPEND _problems "${_h}: 缺 *_GetVersion() / *_GetAbiVersion()")
         endif()
     endforeach()

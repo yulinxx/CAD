@@ -38,9 +38,17 @@
 #include "Export/Writers/NativeExportWriter.h"
 
 #include "Engine2D/Import/Fio2DEntityConverter.h"
+#include "Engine2D/Interaction/LayerManager.h"
+#include "Engine2D/Interaction/HardwareProfileManager.h"
 #include "Engine3D/Import/FioEntityConverter.h"
+#include "Color/Color.hpp"
 
 #include "Log/SyLogger.h"
+
+#include <algorithm>
+#include <cstring>
+#include <string>
+#include <vector>
 
 namespace
 {
@@ -79,6 +87,82 @@ namespace
                 stateCenter->setStatusPrompt(prompt);
             }
         });
+    }
+
+    // Ut::Color(0..1) → ARGB uint32（高 8 位 alpha）。FileIO 的 proto 用这个格式存图层色。
+    uint32_t sanyiSetupColorToArgb(const Ut::Color& c)
+    {
+        return (static_cast<uint32_t>(c.alpha255() & 0xFF) << 24) |
+            (static_cast<uint32_t>(c.red255() & 0xFF) << 16) |
+            (static_cast<uint32_t>(c.green255() & 0xFF) << 8) |
+            (static_cast<uint32_t>(c.blue255() & 0xFF));
+    }
+
+    // 原生 .sy 的加工语义快照：图层表 + 硬件 Profile 值集。
+    //
+    // 只在主线程被 ExportService 调用（导出 Phase 1）。这里读的是 LayerManager
+    // 的管理态字段，不是 SyLayer 的镜像副本：hardwareProfileId / fillHardwareProfileId
+    // / output / defaultProcessId 只存在于前者，从 SyLayer 取会漏掉加工语义。
+    // 结果全部是 FileIO 的跨 DLL POD，可安全按值交给后台线程。
+    NativeDocumentSnapshot sanyiSetupCaptureMachiningSnapshot(LayerManager* layerManager)
+    {
+        NativeDocumentSnapshot snapshot;
+        if (!layerManager)
+        {
+            return snapshot;
+        }
+
+        std::vector<int> layerIds = layerManager->getAllLayerIds();
+        snapshot.layers.reserve(layerIds.size());
+        for (int id : layerIds)
+        {
+            Fio::SyLayerDetailInfo info;
+            info.id = static_cast<uint32_t>(id);
+            const std::string name = layerManager->layerName(id);
+            std::strncpy(info.name, name.c_str(), sizeof(info.name) - 1);
+            info.name[sizeof(info.name) - 1] = '\0';
+            info.color = sanyiSetupColorToArgb(layerManager->layerColor(id));
+            info.visible = layerManager->isLayerVisible(id);
+            info.locked = layerManager->isLayerLocked(id);
+            info.output = layerManager->isLayerOutput(id);
+            info.defaultProcessId = layerManager->layerDefaultProcessId(id);
+            info.layerType = static_cast<uint32_t>(layerManager->layerType(id));
+            info.fill = layerManager->isLayerFill(id);
+            info.fillColor = sanyiSetupColorToArgb(layerManager->layerFillColor(id));
+            info.hardwareProfileId = layerManager->layerHardwareProfileId(id);
+            info.fillHardwareProfileId = layerManager->layerFillHardwareProfileId(id);
+            snapshot.layers.push_back(info);
+        }
+
+        // Profile 管理器由 OperationRegistrar 在启动稍后阶段才注入 LayerManager，
+        // 所以必须每次现取，不能在 setup() 时把指针缓存下来（那时还是 nullptr）。
+        HardwareProfileManager* profiles = layerManager->hardwareProfileManager();
+        if (!profiles)
+        {
+            return snapshot;
+        }
+        std::vector<int> profileIds = profiles->allProfileIds();
+        std::sort(profileIds.begin(), profileIds.end());  // 保证同一次文档产出字节稳定
+        snapshot.profiles.reserve(profileIds.size());
+        for (int pid : profileIds)
+        {
+            if (pid < 0)
+            {
+                continue;
+            }
+            const HardwareProfile hp = profiles->profile(pid);
+            Fio::SyHardwareProfileInfo info;
+            info.id = pid;
+            std::strncpy(info.name, hp.name.c_str(), sizeof(info.name) - 1);
+            info.name[sizeof(info.name) - 1] = '\0';
+            info.power = hp.power;
+            info.speed = hp.speed;
+            info.frequency = hp.frequency;  // kHz，与 Eg::ProcessParams 的 Hz 不同
+            info.focusOffset = hp.focusOffset;
+            info.passes = hp.passes;
+            snapshot.profiles.push_back(info);
+        }
+        return snapshot;
     }
 
     // 共享连接：完成信号 → setBusy(false) + 状态提示
@@ -214,6 +298,10 @@ void ImportExportServiceSetup::wireCallbacks()
     m_exportService->setSceneManager(m_sceneManager);
     m_exportService->setSceneManager3D(m_sceneManager3D);
     m_exportService->setPersistenceService(m_persistence);
+    // .sy 保存必须带走图层表与硬件 Profile 值集；provider 每次在主线程现场读取，
+    // 因为 HardwareProfileManager 是在本 setup() 之后才由 OperationRegistrar 注入的。
+    m_exportService->setNativeMachiningSnapshotProvider(
+        [layerManager = m_layerManager]() { return sanyiSetupCaptureMachiningSnapshot(layerManager); });
     wireCommonCallbacks(m_stateCenter, m_exportService);
 }
 

@@ -47,4 +47,4 @@ jobs:
           & $exe.FullName
 
       - name: CTest
-        run: ctest --test-dir build-ci -C Release --output-on-failure
+        run: ctest --test-dir build-ci -C Release --output-on-failure --no-tests=error

@@ -45,6 +45,12 @@ public:
     /// 设置持久化服务（用于导出记录回写）
     void setPersistenceService(PersistenceService* service);
 
+    /// 设置「原生 .sy 加工语义快照」提供器。
+    /// 由组合根注入，回调只在**主线程**的导出 Phase 1 调用：读取 LayerManager /
+    /// HardwareProfileManager 生成值快照，随 ExportContext 传到后台线程写盘。
+    /// 不注入时 hasMachiningSnapshot 保持 false，导出结果会带显式 warning。
+    void setNativeMachiningSnapshotProvider(std::function<NativeDocumentSnapshot()> provider);
+
     /// 设置忙状态回调（替代旧的 UiStateCenter 直接依赖）
     void setBusyStateCallback(std::function<void(bool)> callback);
     /// 设置状态栏提示回调（替代旧的 UiStateCenter 直接依赖）
@@ -101,6 +107,9 @@ private:
     /// 必须在主线程调用（std::thread 只能在 owner 线程 join）
     void shutdownAsyncThread();
 
+    /// 主线程采集加工语义快照并写进上下文。异步路径也必须在启动 worker 之前调用。
+    void captureMachiningSnapshot(ExportContext& context) const;
+
     // ===== 成员 =====
 
     /// 导出分发器（非拥有指针）
@@ -111,6 +120,8 @@ private:
     Eg::SceneManager3D* m_sceneManager3D{ nullptr };
     /// 持久化服务（非拥有指针，用于导出记录回写）
     class PersistenceService* m_persistenceService{ nullptr };
+    /// 原生 .sy 加工语义快照提供器（主线程调用，结果按值传给后台线程）
+    std::function<NativeDocumentSnapshot()> m_machiningSnapshotProvider;
     /// 忙状态回调（替代 UiStateCenter 直接调用）
     std::function<void(bool)> m_busyStateCallback;
     /// 状态栏提示回调（替代 UiStateCenter 直接调用）

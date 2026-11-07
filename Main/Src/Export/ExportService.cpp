@@ -1,6 +1,8 @@
 #include <ctime>
 #include <chrono>
+#include <exception>
 #include <thread>
+#include <utility>
 
 /**
  * @file ExportService.cpp
@@ -26,6 +28,35 @@
 void ExportService::setPersistenceService(PersistenceService* service)
 {
     m_persistenceService = service;
+}
+
+void ExportService::setNativeMachiningSnapshotProvider(std::function<NativeDocumentSnapshot()> provider)
+{
+    m_machiningSnapshotProvider = std::move(provider);
+}
+
+void ExportService::captureMachiningSnapshot(ExportContext& context) const
+{
+    // 只在主线程调用：provider 会读 LayerManager / HardwareProfileManager，
+    // 两者都不是线程安全的。采集结果是纯 POD 值，可以安全地交给后台 writer。
+    if (!m_machiningSnapshotProvider)
+    {
+        context.hasMachiningSnapshot = false;
+        return;
+    }
+    try
+    {
+        context.machiningSnapshot = m_machiningSnapshotProvider();
+        context.hasMachiningSnapshot = true;
+    }
+    catch (const std::exception& e)
+    {
+        // 快照失败不能把整次导出变成「已保存全部参数」：保持 false，
+        // NativeExportWriter 会给出显式 warning，操作员不会误判。
+        context.machiningSnapshot = NativeDocumentSnapshot();
+        context.hasMachiningSnapshot = false;
+        SY_ERRORF("[ExportService] Machining snapshot failed: %s", e.what());
+    }
 }
 
 ExportService::ExportService(QObject* parent)
@@ -160,6 +191,10 @@ void ExportService::exportAsync(
 
     // 注入取消标志指针：让后台线程 writer 内部能定期检查
     fullCtx.cancelFlag = &m_asyncCancelFlag;
+
+    // Phase 1 主线程：采集 .sy 加工语义快照（图层表 + Profile 值集）。
+    // 必须在启动 worker 之前完成：后台线程只拿到值，不碰 Manager 指针。
+    captureMachiningSnapshot(fullCtx);
 
     // Phase 1 主线程：clone 场景图元（SceneManager 非线程安全，必须在主线程访问）
     Fio::VecSyEntityPtr entities = collectAllEntities();
@@ -322,6 +357,9 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
             emit exportProgress(progress);
         };
     }
+
+    // 采集 .sy 加工语义快照：与异步路径一致，取的是主线程上的值快照
+    captureMachiningSnapshot(fullCtx);
 
     // 收集场景图元
     Fio::VecSyEntityPtr entities = collectAllEntities();

@@ -28,15 +28,42 @@ namespace {
 
 /// @brief 把旧版 HardwareProfile 转成新版 Eg::ProcessParams，
 ///        单位换算：HardwareProfile.frequency 是 kHz → ProcessParams.frequencyHz 是 Hz
+///
+/// 旧模型只有 5 个字段，Eg::ProcessParams 有 14 个。这里把另外 9 个**逐项显式**
+/// 写成保守默认值，而不是依赖「默认构造碰巧如此」：以后有人调整 ProcessParams
+/// 的默认值时，不会在毫无提示的情况下改变旧档案的加工行为。
+/// 要用满 14 个字段必须走 .sy v2 的 ProcessData，不是往 HardwareProfile 里塞字段。
 Eg::ProcessParams hwProfileToProcessParams(const HardwareProfile& hp)
 {
     Eg::ProcessParams p;
+
+    // ---- 旧模型能表达的 5 项 ----
     p.powerPercent = hp.power;
     p.speedMmPerSec = hp.speed;
     p.frequencyHz = hp.frequency * 1000.0;
     p.passes = hp.passes;
     p.focusOffsetMm = hp.focusOffset;
-    // HardwareProfile 无填充/补偿/使能/脉宽/波形字段，保持 ProcessParams 默认值
+
+    // ---- 旧模型没有对应项的 9 项：显式固定为保守默认值 ----
+    p.pulseWidthUs = 0.0;
+    p.waveformIndex = 0;
+    p.rapidSpeedMmPerSec = 0.0;   // 0 = 使用工程默认空移速度
+    p.fillEnabled = false;
+    p.fillIntervalMm = 0.1;
+    p.fillAngleDeg = 0.0;
+    p.fillMode = Eg::FillMode::Zigzag;
+    p.kerfMm = 0.0;
+    p.enabled = true;
+
+    // HardwareProfileManager::setSpeed 会把 <= 0 静默钳到 0.01，但直接构造或
+    // 反序列化出来的 profile 仍可能带 0；ProcessParams 把速度 0 判为非法
+    // （原地出光会烧穿工件）。这里回退到保守默认，不把非法值送进编译器。
+    if (!(p.speedMmPerSec > 0.0))
+    {
+        SY_WARNF("[OperationRegistrar] hardware profile %d has invalid speed %.3f; "
+                 "falling back to 100.0 mm/s", hp.id, hp.speed);
+        p.speedMmPerSec = 100.0;
+    }
     return p;
 }
 

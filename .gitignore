@@ -229,9 +229,15 @@ Tools/*
 !Tools/package-client.sh
 !Tools/PackageClient.ps1
 !Tools/NewClient.ps1
-# 依赖盲区体检脚本是 CI 门禁的一部分（防止 #deps 0 导致静默不重编），属长期资产
+# 以下脚本被 .github/workflows/ 里的 CI 门禁直接调用，属长期资产，必须入库：
+#   check_unity_deps.py   —— unity 依赖盲区体检（防止 #deps 0 静默不重编）
+#   docs_check.py         —— 文档链接与过期检查（ci.yml 的 docs-check 作业）
+#   package_smoke_test.py —— 安装包冒烟测试（package-smoke.yml）
 !Tools/check_unity_deps.py
-# [A7 修复] .github/ 工作流必须入库，删除此忽略规则
+!Tools/docs_check.py
+!Tools/package_smoke_test.py
+# .github/workflows/ 下的工作流一律入库（含 package-smoke.yml），不要再单独忽略；
+# 文件末尾曾残留一条针对 package-smoke.yml 的反向规则，已删除。
 
 # ---- 测试运行产生的落地文件 ----
 # Tesseract/Leptonica 在 CWD 写的二值化调试图，跑 OCR 相关测试就会出现
@@ -336,4 +342,3 @@ qtcreator.xml
 stress_*/
 LayeredProcessingTests.cpp
 PolygonOffsetTests.cpp
-.github/workflows/package-smoke.yml

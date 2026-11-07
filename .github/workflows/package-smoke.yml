@@ -1,0 +1,82 @@
+name: Package Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  smoke-windows:
+    name: Package Smoke (Windows NSIS)
+    runs-on: windows-latest
+    timeout-minutes: 180
+    env:
+      QT_VERSION: "6.8.1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Qt
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: win64_msvc2022_64
+          modules: qtbase
+          cache: true
+
+      # vcpkg
+      - name: Setup vcpkg
+        run: |
+          git clone --depth 1 https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP/vcpkg"
+          & "$env:RUNNER_TEMP/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
+          echo "VCPKG_ROOT=$env:RUNNER_TEMP/vcpkg" >> $env:GITHUB_ENV
+      - name: Install vcpkg dependencies
+        run: |
+          $deps = @('openssl','freetype','boost','clipper2','sqlitecpp','gtest','protobuf','spdlog','nanosvg','stb','libwebp','tiff','zlib','breakpad')
+          & "$env:VCPKG_ROOT/vcpkg.exe" install $deps --triplet x64-windows
+
+      # NSIS
+      - name: Install NSIS
+        run: choco install nsis -y
+
+      # Configure (minimal feature set for faster build)
+      - name: Configure
+        run: |
+          $qtDir = (Get-ChildItem "$env:USERPROFILE/Qt/${env:QT_VERSION}/msvc2022_64" -Directory | Select-Object -First 1).FullName
+          if (-not $qtDir) { Write-Error "Qt not found"; exit 1 }
+          cmake -B build-pkg -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DVCPKG_DIR=$env:VCPKG_ROOT `
+            -DQt_INSTALL_DIR=$qtDir `
+            -DBUILD_ENGRAVING=OFF -DBUILD_GEOMODELCORE=OFF -DBUILD_VISION=OFF `
+            -DBUILD_HARDWARE=OFF -DBUILD_PYTHON=OFF -DSANYI_PYBIND_CORE=OFF `
+            -DBUILD_CAM=OFF -DBUILD_NESTING=OFF `
+            -DBUILD_UI_DIMENSION=2D `
+            -DBUILD_ALL_TESTS=OFF `
+            -DBUILD_MAIN_TESTS=OFF
+
+      # Build
+      - name: Build
+        run: cmake --build build-pkg --config Release --target SanYiCAD --parallel
+
+      # Package (NSIS)
+      - name: Package (NSIS)
+        run: cpack --config build-pkg/CPackConfig.cmake -C Release -G NSIS -B build-pkg/package
+
+      # Smoke test
+      - name: Smoke test (install / upgrade / uninstall)
+        run: |
+          $exe = Get-ChildItem build-pkg/package -Filter *.exe | Select-Object -First 1
+          if (-not $exe) { Write-Error "NSIS installer not found"; exit 1 }
+          python Tools/package_smoke_test.py --installer $exe.FullName --expected-version 1.0.0 --timeout 300
+
+      # Upload installer artifact
+      - name: Upload installer
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SanYiCAD-installer
+          path: build-pkg/package/*.exe
+          retention-days: 7

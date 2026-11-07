@@ -492,13 +492,16 @@ list(APPEND SANYI_PROJECT_LIBS
     UICommon UI2D
     FileIO
     EnginePersistence
+    # Engine3D 由 Main 无条件链接（Main/CMakeLists.txt 的 target_link_libraries），
+    # 与 BUILD_UI3D 无关。2D-only 安装也必须带上它，否则装出来的 bin/ 缺 DLL 起不来。
+    Engine3D
 )
 if(BUILD_NESTING)
     list(APPEND SANYI_PROJECT_LIBS Nesting)
 endif()
 
 if(BUILD_UI3D)
-    list(APPEND SANYI_PROJECT_LIBS Engine3D UI3D)
+    list(APPEND SANYI_PROJECT_LIBS UI3D)
 endif()
 
 if(BUILD_RENDERX)
@@ -565,6 +568,9 @@ if(WIN32)
     install(DIRECTORY "$<TARGET_FILE_DIR:SanYiCAD>/"
         DESTINATION bin
         COMPONENT Runtime
+        # 没有 FILES_MATCHING 时，正向 PATTERN 只影响匹配文件的权限，不参与筛选，
+        # 结果整个输出目录（含测试 exe、pdb、临时文件）都被装进 bin/。
+        FILES_MATCHING
         PATTERN "*.dll"
         PATTERN "*.pyd"
         PATTERN "*.exe" EXCLUDE
@@ -577,6 +583,7 @@ elseif(UNIX AND NOT APPLE)
     install(DIRECTORY "$<TARGET_FILE_DIR:SanYiCAD>/"
         DESTINATION bin
         COMPONENT Libraries
+        FILES_MATCHING
         PATTERN "*.so"
         PATTERN "*.so.*"
     )

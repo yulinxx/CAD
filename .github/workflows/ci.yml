@@ -62,7 +62,7 @@ jobs:
         run: python Tools/check_unity_deps.py --build-dir build
 
       - name: Test
-        run: ctest --test-dir build -C Debug --output-on-failure --parallel
+        run: ctest --test-dir build -C Debug --output-on-failure --no-tests=error --parallel
 
   # /analyze 补上 MSVC 侧缺失的 printf 格式串校验（SAL 标注只在 /analyze 下生效，
   # 详见根 CMakeLists.txt 里 SANYI_MSVC_ANALYZE 的注释）。
@@ -153,7 +153,7 @@ jobs:
             -DBUILD_TESTS=ON \
             -DNESTING_WITH_LOG=OFF
           cmake --build build-nesting --parallel
-          ctest --test-dir build-nesting -C Release --output-on-failure --parallel
+          ctest --test-dir build-nesting -C Release --output-on-failure --no-tests=error --parallel
 
       - name: Configure & test GeoModelCore
         run: |
@@ -162,7 +162,7 @@ jobs:
             -DBUILD_GEOMODELCORE_EXAMPLE=OFF \
             -DBUILD_TESTS=ON
           cmake --build build-gmc --parallel
-          ctest --test-dir build-gmc -C Release --output-on-failure --parallel
+          ctest --test-dir build-gmc -C Release --output-on-failure --no-tests=error --parallel
 
   # ---------------------------------------------------------------------------
   # 文档链接与过期检查

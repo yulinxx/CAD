@@ -668,6 +668,14 @@ if(_main_tests AND GTest_FOUND)
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*CamBridgeTests\\.cpp$")
     endif()
 
+    if(NOT BUILD_RASTER)
+        # RasterExportDpiTests 调用 RasterExportHelper::rasterizeExport，而该实现
+        # 在 BUILD_RASTER=OFF 时已从 MAIN_APP_SOURCES 里排除（见文件开头）。
+        # 测试文件却由上面的 GLOB 无条件收进来，链接期必然报未解析符号，
+        # MainTests 根本产不出来 —— 等于整套 Main 单测在 Raster 关闭的配置下全废。
+        list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*RasterExportDpiTests\\.cpp$")
+    endif()
+
     if(BUILD_HARDWARE)
         # 从 Hardware 模块迁出的 Qt 封装单元测试：实现已在应用层 HardwareApp，
         # 测试随 MainTests 编译并链接 HardwareApp

@@ -16,6 +16,15 @@
 
 #include "ImportService.h"
 #include "ExportService.h"
+#include "Import/ImportDispatcher.h"
+#include "Import/Readers/NativeImportReader.h"
+#include "Export/ExportContext.h"
+#include "Export/Writers/NativeExportWriter.h"
+#include "Engine2D/Interaction/LayerManager.h"
+#include "Engine2D/Interaction/HardwareProfileManager.h"
+#include "FileIO/Parsers/NativeParser.h"
+#include "FileIO/Writers/NativeWriter.h"
+#include "FileIO/SyDocument.h"
 #include "Engine3D/Import/FioEntityConverter.h"
 #include "Engine2D/Import/Fio2DEntityConverter.h"
 #include "SyEntitySerializer.h"
@@ -1857,4 +1866,325 @@ TEST(ImportExportRegressionTest, IrPipeline_RealDxf_FirstLayerSourceIdIsOneBased
     const auto it = entityLayerMap.find(entities[0]->id);
     ASSERT_NE(it, entityLayerMap.end());
     EXPECT_EQ(it->second, layer0->sourceId);
+}
+
+// ==================== 原生 .sy 加工语义端到端闭环 ====================
+//
+// 历史问题：SanYiDocument.proto 有 output / default_process_id /
+// hardware_profile_id / fill_hardware_profile_id，SySerializer 也能读写；但生产
+// 导出路径只把图元放进新建的 SyDocument，从不填图层表与 Profile 值集。保存提示
+// 照常出现，重开后功率/速度/遍数静默退回默认 —— 属加工事故级数据丢失。
+//
+// 现在闭环是：ExportContext 值快照 → NativeExportWriter 写入 SyDocument →
+// NativeImportReader 读出图层绑定 + Profile 值集 → ImportService 还原进
+// LayerManager / HardwareProfileManager。下面分别覆盖每一段，并守住
+// 「组合根没注入快照时仍必须显式告警」这条兜底。
+namespace
+{
+    // MainTests 开 unity build：多个 .cpp 会拼进同一个 TU，匿名命名空间里的
+    // 同名辅助函数会互相重定义，所以统一加 sanyiSyPersist 前缀。
+    Fio::SyLayerDetailInfo sanyiSyPersistSampleLayer()
+    {
+        Fio::SyLayerDetailInfo layer;
+        layer.id = 7;
+        std::strncpy(layer.name, "Cut-7", sizeof(layer.name) - 1);
+        layer.color = 0xFF00A0FF;
+        layer.visible = false;
+        layer.locked = true;
+        layer.output = false;
+        layer.defaultProcessId = 11;
+        layer.layerType = 1;
+        layer.fill = true;
+        layer.fillColor = 0xFF112233;
+        layer.hardwareProfileId = 3;
+        layer.fillHardwareProfileId = 4;
+        return layer;
+    }
+
+    Fio::SyHardwareProfileInfo sanyiSyPersistSampleProfile(
+        int id, const char* name, double power, double speed)
+    {
+        Fio::SyHardwareProfileInfo p;
+        p.id = id;
+        std::strncpy(p.name, name, sizeof(p.name) - 1);
+        p.power = power;
+        p.speed = speed;
+        p.frequency = 31.5;  // kHz
+        p.focusOffset = -0.75;
+        p.passes = 3;
+        return p;
+    }
+
+    /// 造一份 .sy。viaClonePath 对应生产环境真实走的路径（ExportService 在派发前
+    /// 会把 context.sceneManager 置空）；false 对应借用实体路径。两条路径都必须
+    /// 把快照写进去，否则加工语义会因导出路径不同而随机丢失。
+    ExportResult sanyiSyPersistWriteSample(const QString& path, bool withSnapshot, bool viaClonePath)
+    {
+        Eg::SceneManager scene;
+        auto line = std::make_unique<Eg::SyLine>();
+        line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+        std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+        vec.push_back(std::move(line));
+        scene.addEntities(std::move(vec));
+
+        ExportContext context;
+        context.targetPath = path;
+        context.format = Fio::FileFormat::Native;
+        context.sceneManager = viaClonePath ? nullptr : &scene;
+
+        Fio::VecSyEntityPtr cloned;
+        if (viaClonePath)
+        {
+            for (auto* e : scene.getAllEntities())
+            {
+                if (e)
+                {
+                    cloned.emplace_back(e->clone());
+                }
+            }
+        }
+
+        if (withSnapshot)
+        {
+            context.hasMachiningSnapshot = true;
+            context.machiningSnapshot.layers.push_back(sanyiSyPersistSampleLayer());
+            context.machiningSnapshot.profiles.push_back(sanyiSyPersistSampleProfile(0, "Default", 100.0, 1000.0));
+            context.machiningSnapshot.profiles.push_back(sanyiSyPersistSampleProfile(3, "Steel-3mm", 77.5, 245.25));
+            context.machiningSnapshot.profiles.push_back(sanyiSyPersistSampleProfile(4, "Fill", 42.0, 320.0));
+        }
+
+        NativeExportWriter writer;
+        return writer.write(context, cloned);
+    }
+
+    void sanyiSyPersistVerifyDocument(const QString& path)
+    {
+        Fio::NativeParser parser(Fio::FileFormat::Native);
+        Fio::SyDocument doc;
+        const auto parseResult = parser.parseDocument(path.toUtf8().constData(), doc);
+        ASSERT_TRUE(parseResult.success) << parseResult.errorMessage;
+
+        ASSERT_EQ(doc.layerCount(), 1u);
+        Fio::SyLayerDetailInfo layer;
+        ASSERT_TRUE(doc.getLayerDetailAt(0, layer));
+        EXPECT_EQ(layer.id, 7u);
+        EXPECT_STREQ(layer.name, "Cut-7");
+        EXPECT_FALSE(layer.output);
+        EXPECT_EQ(layer.defaultProcessId, 11u);
+        EXPECT_EQ(layer.layerType, 1u);
+        EXPECT_TRUE(layer.fill);
+        EXPECT_EQ(layer.hardwareProfileId, 3);
+        EXPECT_EQ(layer.fillHardwareProfileId, 4);
+
+        ASSERT_EQ(doc.hardwareProfileCount(), 3u);
+        bool foundSteel = false;
+        for (size_t i = 0; i < doc.hardwareProfileCount(); ++i)
+        {
+            Fio::SyHardwareProfileInfo p;
+            ASSERT_TRUE(doc.getHardwareProfileAt(i, p));
+            if (p.id == 3)
+            {
+                foundSteel = true;
+                EXPECT_STREQ(p.name, "Steel-3mm");
+                EXPECT_DOUBLE_EQ(p.power, 77.5);
+                EXPECT_DOUBLE_EQ(p.speed, 245.25);
+                EXPECT_DOUBLE_EQ(p.frequency, 31.5);
+                EXPECT_DOUBLE_EQ(p.focusOffset, -0.75);
+                EXPECT_EQ(p.passes, 3);
+            }
+        }
+        EXPECT_TRUE(foundSteel);
+    }
+}  // namespace
+
+TEST(ImportExportRegressionTest, NativeExportStillWarnsWhenMachiningSnapshotIsMissing)
+{
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+
+    const ExportResult result = sanyiSyPersistWriteSample(dir.filePath(QStringLiteral("gap.sy")), false, true);
+    ASSERT_TRUE(result.success) << result.message.toStdString();
+    ASSERT_FALSE(result.warnings.isEmpty());
+    // 组合根没注入 provider / 快照采集抛异常时，绝不能让操作员以为参数已落盘
+    EXPECT_TRUE(result.warnings.join(QStringLiteral(" ")).contains(QStringLiteral("not captured")))
+        << result.warnings.join(QStringLiteral(" ")).toStdString();
+}
+
+TEST(ImportExportRegressionTest, NativeExportPersistsMachiningSnapshotViaBorrowedPath)
+{
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("borrowed.sy"));
+
+    const ExportResult result = sanyiSyPersistWriteSample(path, true, false);
+    ASSERT_TRUE(result.success) << result.message.toStdString();
+    EXPECT_TRUE(result.warnings.isEmpty()) << result.warnings.join(QStringLiteral(" ")).toStdString();
+    sanyiSyPersistVerifyDocument(path);
+}
+
+TEST(ImportExportRegressionTest, NativeExportPersistsMachiningSnapshotViaClonePath)
+{
+    // 生产路径：ExportService 派发前把 sceneManager 置空，只能拿到克隆图元。
+    // 老实现在这条分支走 ExportWriterBase → FileIOManager::exportFile，
+    // 只传裸图元数组，快照根本没有入口写进 SyDocument。
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("clone.sy"));
+
+    const ExportResult result = sanyiSyPersistWriteSample(path, true, true);
+    ASSERT_TRUE(result.success) << result.message.toStdString();
+    EXPECT_TRUE(result.warnings.isEmpty()) << result.warnings.join(QStringLiteral(" ")).toStdString();
+    sanyiSyPersistVerifyDocument(path);
+}
+
+TEST(ImportExportRegressionTest, NativeExportWritesDocumentMetadataOnBothPaths)
+{
+    // 回归：把借用 / 克隆两条路径统一到 writeDocument() 后，若忘记补元数据，
+    // .sy 的软件版本、创建时间、OS 溯源信息会整片写空 —— 文件照样能打开，
+    // 所以没有告警、极难察觉。老降级路径经 NativeWriter::write() 原本是有元数据的，
+    // 不能为了闭合加工参数而把溯源信息弄丢。
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+
+    for (const bool viaClonePath : { false, true })
+    {
+        const QString path = dir.filePath(viaClonePath
+            ? QStringLiteral("metadata-clone.sy")
+            : QStringLiteral("metadata-borrowed.sy"));
+        const ExportResult result = sanyiSyPersistWriteSample(path, true, viaClonePath);
+        ASSERT_TRUE(result.success) << result.message.toStdString();
+
+        Fio::NativeParser parser(Fio::FileFormat::Native);
+        Fio::SyDocument doc;
+        const auto parseResult = parser.parseDocument(path.toUtf8().constData(), doc);
+        ASSERT_TRUE(parseResult.success) << parseResult.errorMessage;
+
+        const char* const branch = viaClonePath ? "clone" : "borrowed";
+        EXPECT_EQ(doc.metadataVersion(), 1) << branch;
+        EXPECT_EQ(doc.metadataFileVersion(), 1) << branch;
+        EXPECT_NE(doc.softwareName()[0], '\0') << branch;
+        EXPECT_NE(doc.softwareVersion()[0], '\0') << branch;
+        EXPECT_NE(doc.createdTime()[0], '\0') << branch;
+        EXPECT_NE(doc.modifiedTime()[0], '\0') << branch;
+        EXPECT_NE(doc.operatingSystem()[0], '\0') << branch;
+    }
+}
+
+TEST(ImportExportRegressionTest, NativeImportReaderCarriesProfileBindingsAndValueSet)
+{
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("reader.sy"));
+    ASSERT_TRUE(sanyiSyPersistWriteSample(path, true, true).success);
+
+    ImportContext context;
+    context.sourcePath = path;
+    context.format = Fio::FileFormat::Native;
+    NativeImportReader reader;
+    Fio::VecSyEntityPtr outEntities;
+    const ImportResult result = reader.read(context, outEntities);
+    ASSERT_TRUE(result.success) << result.message.toStdString();
+
+    ASSERT_EQ(result.importedLayers.size(), 1u);
+    ASSERT_EQ(result.importedLayerMachining.size(), 1u);
+    EXPECT_EQ(result.importedLayerMachining[0].sourceId, 7u);
+    EXPECT_FALSE(result.importedLayerMachining[0].output);
+    EXPECT_EQ(result.importedLayerMachining[0].defaultProcessId, 11u);
+    EXPECT_EQ(result.importedLayerMachining[0].hardwareProfileId, 3);
+    EXPECT_EQ(result.importedLayerMachining[0].fillHardwareProfileId, 4);
+    EXPECT_TRUE(result.importedLayerMachining[0].hasDisplayExtension);
+    EXPECT_EQ(result.importedLayerMachining[0].layerType, 1u);
+    EXPECT_TRUE(result.importedLayerMachining[0].fill);
+
+    EXPECT_TRUE(result.hasNativeMachiningSnapshot);
+    ASSERT_EQ(result.importedHardwareProfiles.size(), 3u);
+    EXPECT_TRUE(result.warnings.isEmpty()) << result.warnings.join(QStringLiteral(" ")).toStdString();
+}
+
+TEST(ImportExportRegressionTest, ImportServiceRestoresSyProfileValueSetAndLayerBindings)
+{
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("roundtrip.sy"));
+    ASSERT_TRUE(sanyiSyPersistWriteSample(path, true, true).success);
+
+    Eg::SceneManager scene;
+    LayerManager layers(&scene);
+    HardwareProfileManager profiles;
+    layers.setHardwareProfileManager(&profiles);
+    // 制造运行时脏 Profile，验证打开文档时确实按文件值集整体替换
+    const int stale = profiles.createProfile("Stale");
+    ASSERT_GE(stale, 1);
+
+    ImportDispatcher dispatcher;
+    dispatcher.registerReader(std::make_unique<NativeImportReader>());
+
+    ImportService service;
+    service.setDispatcher(&dispatcher);
+    service.setSceneManager(&scene);
+    service.setLayerManager(&layers);
+
+    ImportContext context;
+    context.sourcePath = path;
+    context.preserveLayers = true;
+    ImportOptions options;
+    options.autoFit = false;
+    options.autoCenter = false;
+    options.autoSwitchWorkbench = false;
+
+    const ImportResult result = service.importWithContext(context, options);
+    ASSERT_TRUE(result.success) << result.message.toStdString();
+
+    const int layerId = layers.findLayerByName("Cut-7");
+    ASSERT_GE(layerId, 0) << "图层表没还原";
+    EXPECT_FALSE(layers.isLayerOutput(layerId));
+    EXPECT_EQ(layers.layerDefaultProcessId(layerId), 11u);
+    EXPECT_EQ(layers.layerHardwareProfileId(layerId), 3);
+    EXPECT_EQ(layers.layerFillHardwareProfileId(layerId), 4);
+    EXPECT_EQ(layers.layerType(layerId), Eg::LayerType::BITMAP);
+    EXPECT_TRUE(layers.isLayerFill(layerId));
+
+    // 值集必须连原始 id 一起还原，否则图层绑定会指到另一组功率/速度上
+    EXPECT_FALSE(profiles.setPower(stale, 1.0)) << "旧运行时 Profile 必须已被文档值集替换";
+    EXPECT_STREQ(profiles.profile(3).name.c_str(), "Steel-3mm");
+    EXPECT_DOUBLE_EQ(profiles.profile(3).power, 77.5);
+    EXPECT_DOUBLE_EQ(profiles.profile(3).speed, 245.25);
+    EXPECT_DOUBLE_EQ(profiles.profile(3).frequency, 31.5);
+    EXPECT_DOUBLE_EQ(profiles.profile(3).focusOffset, -0.75);
+    EXPECT_EQ(profiles.profile(3).passes, 3);
+
+    // layerHardwareProfile() 是 specProvider 真正读取的入口：端到端走通才算闭环
+    const HardwareProfile effective = layers.layerHardwareProfile(layerId);
+    EXPECT_DOUBLE_EQ(effective.power, 77.5);
+    EXPECT_DOUBLE_EQ(effective.speed, 245.25);
+}
+
+TEST(ImportExportRegressionTest, LegacySyWithoutProfileValueSetKeepsRuntimeProfiles)
+{
+    // 旧文件只有图层绑定、没有值集：读端不得清空用户当前 Profile，
+    // 且必须给出降级提示，不能把「参数可能不对」伪装成一次干净的打开。
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("legacy.sy"));
+
+    // 故意只写图层表、不放任何 Profile 值集，模拟 v2 之前的老文件
+    Fio::NativeWriter writer(Fio::FileFormat::Native);
+    Fio::SyDocument doc;
+    doc.addLayerDetail(sanyiSyPersistSampleLayer());
+    ASSERT_TRUE(writer.writeDocument(path.toUtf8().constData(), doc).success);
+
+    HardwareProfileManager profiles;
+    const int existing = profiles.createProfile("KeepMe");
+    ASSERT_GE(existing, 1);
+
+    ImportContext importCtx;
+    importCtx.sourcePath = path;
+    NativeImportReader reader;
+    Fio::VecSyEntityPtr outEntities;
+    const ImportResult readResult = reader.read(importCtx, outEntities);
+    ASSERT_TRUE(readResult.success) << readResult.message.toStdString();
+    EXPECT_FALSE(readResult.hasNativeMachiningSnapshot);
+    EXPECT_TRUE(readResult.importedHardwareProfiles.empty());
+    EXPECT_FALSE(readResult.warnings.isEmpty()) << "悬空绑定必须提醒操作员";
+    EXPECT_EQ(profiles.profile(existing).name, "KeepMe") << "读端不得动运行时 Profile";
 }

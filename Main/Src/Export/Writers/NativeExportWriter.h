@@ -8,7 +8,9 @@ class NativeExportWriter : public ExportWriterBase
 public:
     NativeExportWriter();
 
-    /// 覆写 write：当 context.sceneManager 可用时，使用借用实体避免深拷贝
+    /// 覆写 write：借用实体（sceneManager 可用时）或复用已克隆图元，统一构造
+    /// SyDocument 后交给 NativeWriter 落盘，并写入 ExportContext 里的加工语义快照
+    /// （图层表 + 硬件 Profile 值集）。快照缺失时才在 ExportResult 上挂告警。
     ExportResult write(const ExportContext& context, const Fio::VecSyEntityPtr& entities) override;
 
 protected:

@@ -79,7 +79,7 @@ jobs:
             -DBUILD_RASTER_EXAMPLES=OFF \
             -DBUILD_RASTER_BENCHMARK=OFF
           cmake --build build-raster --parallel
-          ctest --test-dir build-raster -C Release --output-on-failure --parallel
+          ctest --test-dir build-raster -C Release --output-on-failure --no-tests=error --parallel
 
       - name: Install the SDK
         run: |

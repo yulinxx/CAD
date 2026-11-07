@@ -38,6 +38,13 @@ private:
     void runPauseResume();
     void runStop();
 
+    /// 加工告警/失败原因的常驻展示位。jobWarning 与 jobFinished(false)
+    /// 此前只有日志（生产代码里没有任何监听者），现场表现是「参数只落实了一部分
+    /// 却显示加工成功」。这里改成面板上一条不会被 refreshState 覆盖的醒目文本。
+    void clearJobWarning();
+    void onJobWarning(const QString& message);
+    void onJobFinished(bool success, const QString& message);
+
     DeviceHost* m_host{ nullptr };
     ProcessingJobService* m_jobService{ nullptr };
     OperationBus* m_bus{ nullptr };
@@ -46,6 +53,7 @@ private:
     QLabel* m_statusLabel{ nullptr };
     QLabel* m_safetyLabel{ nullptr };
     QLabel* m_hintLabel{ nullptr };
+    QLabel* m_warningLabel{ nullptr };
     QPushButton* m_startButton{ nullptr };
     QPushButton* m_pauseButton{ nullptr };
     QPushButton* m_stopButton{ nullptr };

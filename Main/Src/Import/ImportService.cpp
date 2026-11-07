@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <QCoreApplication>
@@ -27,6 +28,7 @@
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Interaction/LayerManager.h"
+#include "Engine2D/Interaction/HardwareProfileManager.h"
 #include "Engine3D/SceneManager3D.h"
 #include "Engine3D/SyEntity/SyMeshEntity.h"
 #include "UI/Render/SceneRefreshCoordinator.h"
@@ -131,6 +133,113 @@ namespace
     private:
         SceneRefreshCoordinator* m_coordinator;
     };
+
+    // ---- 原生 .sy 加工语义还原 ----
+
+    /// 把 .sy 的硬件 Profile **值集**整体还原进 HardwareProfileManager。
+    ///
+    /// 必须在图层绑定之前执行：LayerManager::setLayerHardwareProfileId 会校验
+    /// id 是否存在，值集没落地时所有绑定都会被拒，表现仍是「参数全丢」。
+    /// restoreProfiles 保留文件里的原始 id —— 重新分配 id 会让图层指向错误的
+    /// 功率/速度，属加工事故而不是普通显示错误。
+    ///
+    /// @return false = 还原失败，调用方必须跳过图层绑定还原；true = 无需还原或已成功
+    bool restoreNativeProfileValueSet(LayerManager* layerManager, const ImportResult& parseResult)
+    {
+        if (!parseResult.hasNativeMachiningSnapshot)
+        {
+            // 旧文件没有值集：保持运行时现有 Profile，绝不清空用户参数
+            return true;
+        }
+
+        HardwareProfileManager* profiles =
+            layerManager ? layerManager->hardwareProfileManager() : nullptr;
+        if (!profiles)
+        {
+            SY_ERRORF("[ImportService] .sy carries %zu profile(s) but HardwareProfileManager is not "
+                      "injected; profile bindings cannot be restored",
+                parseResult.importedHardwareProfiles.size());
+            return false;
+        }
+
+        std::vector<HardwareProfile> batch;
+        batch.reserve(parseResult.importedHardwareProfiles.size());
+        for (const auto& p : parseResult.importedHardwareProfiles)
+        {
+            HardwareProfile hp;
+            hp.id = p.id;
+            hp.name = p.name;            // char[128]，构造 std::string 时按 NUL 截断
+            hp.power = p.power;
+            hp.speed = p.speed;
+            hp.frequency = p.frequency;  // kHz；Eg::ProcessParams 用 Hz，别混
+            hp.focusOffset = p.focusOffset;
+            hp.passes = p.passes;
+            batch.push_back(std::move(hp));
+        }
+
+        if (!profiles->restoreProfiles(batch))
+        {
+            SY_ERRORF("[ImportService] .sy profile value set rejected (%zu entr(y/ies)); keeping runtime "
+                      "profiles and skipping layer bindings",
+                batch.size());
+            return false;
+        }
+        SY_DEBUGF("[ImportService] Restored %zu hardware profile(s) from .sy", batch.size());
+        return true;
+    }
+
+    /// 把一条图层的加工语义落到运行时图层上。
+    /// @param bindingsRestorable 值集是否成功还原；false 时不能套用 profile id
+    ///        （旧文件可能只有悬空引用，套到运行时 Profile 上会串层）
+    void applyLayerMachining(LayerManager* layerManager,
+        int layerId,
+        const ImportResult::LayerMachining& machining,
+        bool bindingsRestorable)
+    {
+        layerManager->setLayerOutput(layerId, machining.output);
+        if (machining.defaultProcessId != 0)
+        {
+            layerManager->setLayerDefaultProcessId(layerId, machining.defaultProcessId);
+        }
+        if (!bindingsRestorable)
+        {
+            return;
+        }
+        if (!layerManager->setLayerHardwareProfileId(layerId, machining.hardwareProfileId))
+        {
+            SY_WARNF("[ImportService] Layer %d: hardware profile id %d from .sy not found, binding skipped",
+                layerId,
+                machining.hardwareProfileId);
+        }
+        if (!layerManager->setLayerFillHardwareProfileId(layerId, machining.fillHardwareProfileId))
+        {
+            SY_WARNF("[ImportService] Layer %d: fill hardware profile id %d from .sy not found, binding skipped",
+                layerId,
+                machining.fillHardwareProfileId);
+        }
+    }
+
+    /// 图层显示扩展（矢量/位图、填充开关、填充色）。IrLayerInfo 是冻结的跨 DLL
+    /// POD 装不下这些字段，只有原生 .sy 走这条补充通道。
+    void applyLayerDisplayExtension(
+        LayerManager* layerManager, int layerId, const ImportResult::LayerMachining& machining)
+    {
+        if (!machining.hasDisplayExtension)
+        {
+            return;
+        }
+        layerManager->setLayerType(layerId, static_cast<Eg::LayerType>(machining.layerType));
+        layerManager->setLayerFill(layerId, machining.fill);
+        const uint32_t fillColor = machining.fillColor;
+        const int alphaBits = static_cast<int>((fillColor >> 24) & 0xFF);
+        // 历史零 alpha 位代表「旧版本没这个概念」，不是真的全透明
+        const int alpha = (alphaBits == 0) ? 255 : alphaBits;
+        layerManager->setLayerFillColor(layerId,
+            Ut::Color::fromRGB255(static_cast<int>((fillColor >> 16) & 0xFF),
+                static_cast<int>((fillColor >> 8) & 0xFF),
+                static_cast<int>(fillColor & 0xFF),
+                alpha));
+    }
 }  // anonymous namespace
 
 // ==================== ImportService 实现 ====================
@@ -879,6 +988,12 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     // 根据图元类型设置目标工作台 ID
     auto result = ImportResult::ok(tr("Imported %1 entities successfully").arg(entityCount), entityCount);
     result.usedWorkbenchId = hasMeshEntities ? QStringLiteral("3D") : QStringLiteral("2D");
+    // phaseParse 的告警（例如旧 .sy 只有图层 Profile 绑定、没有值集）必须带进
+    // 最终结果，否则在构建阶段被整个吞掉，状态栏只显示「导入成功」。
+    for (const auto& warn : parseResult.warnings)
+    {
+        result.addWarning(warn);
+    }
     return result;
 }
 
@@ -1089,6 +1204,11 @@ int ImportService::restoreImportedLayers(
         return nullptr;
     };
 
+    // 值集必须**先于**图层绑定落地：setLayerHardwareProfileId 会校验 id 存在。
+    // 返回值 false 时跳过绑定还原，避免把悬空 id 套到运行时 Profile 上串层。
+    const bool bindingsRestorable = restoreNativeProfileValueSet(m_layerManager, parseResult);
+    const bool isNativeSnapshot = parseResult.hasNativeMachiningSnapshot && bindingsRestorable;
+
     // 源图层 sourceId → 运行时 LayerManager 图层 ID
     std::unordered_map<uint32_t, int> sourceToLayerId;
     int createdCount = 0;
@@ -1118,8 +1238,21 @@ int ImportService::restoreImportedLayers(
         if (layerId >= 0)
         {
             // 同名图层视为同一个工艺层：保留用户已有的颜色/可见性/锁定设置，
-            // 不用源文件属性覆盖，避免重复导入污染既有图层
+            // 不用源文件属性覆盖，避免重复导入污染既有图层。
+            //
+            // 但**带完整加工语义快照的 .sy 是例外**：那是一次「打开文档」，
+            // 文件里的加工语义必须是权威的，否则重建的图层会沿用上一份文档的
+            // 输出开关/工艺/Profile 绑定，参数看似存下来了实则没还原。
+            // 显示属性仍按上面的规则保留，只覆盖加工语义。
             ++reusedCount;
+            if (isNativeSnapshot)
+            {
+                const auto machining = findMachining(src.sourceId);
+                if (machining)
+                {
+                    applyLayerMachining(m_layerManager, layerId, *machining, true);
+                }
+            }
         }
         else
         {
@@ -1141,18 +1274,16 @@ int ImportService::restoreImportedLayers(
                 m_layerManager->setLayerColor(layerId, Ut::Color::fromRGB255(r, g, b, alpha));
                 m_layerManager->setLayerVisible(layerId, src.visible);
                 m_layerManager->setLayerLocked(layerId, src.locked);
-                // 加工语义：输出开关与默认工艺 ID 跟着图层一起还原。
-                // 少了这一步，打开 .sy 后「这一层要加工」的信息就丢了 ——
-                // 表现是图纸明明设了输出，机器却不烧这一层。
-                // 数据来自独立的 machining 通道（IrLayerInfo 是冻结的跨 DLL POD）。
+                // 加工语义：输出开关、默认工艺、硬件 Profile 绑定跟着图层一起还原。
+                // 少了这一步，打开 .sy 后「这一层要加工 / 用哪组功率速度」的信息
+                // 就丢了 —— 表现是图纸明明设了输出，机器却不烧这一层，或者用
+                // 默认参数把工件打坏。数据走独立 machining 通道（IrLayerInfo
+                // 是冻结的跨 DLL POD，装不下这些字段）。
                 const auto machining = findMachining(src.sourceId);
                 if (machining)
                 {
-                    m_layerManager->setLayerOutput(layerId, machining->output);
-                    if (machining->defaultProcessId != 0)
-                    {
-                        m_layerManager->setLayerDefaultProcessId(layerId, machining->defaultProcessId);
-                    }
+                    applyLayerMachining(m_layerManager, layerId, *machining, isNativeSnapshot);
+                    applyLayerDisplayExtension(m_layerManager, layerId, *machining);
                 }
             }
             else

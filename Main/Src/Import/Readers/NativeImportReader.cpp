@@ -81,7 +81,51 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEn
             machining.sourceId = layerInfo.id;
             machining.output = layerInfo.output;
             machining.defaultProcessId = layerInfo.defaultProcessId;
+
+            // 旧 POD 只有 6 个字段；硬件 Profile 绑定与填充/图层类型走新增的
+            // SyLayerDetailInfo（另一个 POD，不动 SyLayerInfo 的 sizeof/ABI）。
+            Fio::SyLayerDetailInfo detail;
+            if (doc.getLayerDetailAt(i, detail))
+            {
+                machining.hardwareProfileId = detail.hardwareProfileId;
+                machining.fillHardwareProfileId = detail.fillHardwareProfileId;
+                machining.hasDisplayExtension = true;
+                machining.layerType = detail.layerType;
+                machining.fill = detail.fill;
+                machining.fillColor = detail.fillColor;
+            }
             result.importedLayerMachining.push_back(machining);
+        }
+    }
+
+    // 1b. 提取硬件 Profile 值集。
+    // LayerData.hardware_profile_id 只是引用，没有这组值就等于功率/速度/频率没存。
+    // 旧文件（v2 之前）没有本字段 → 空值集；读端据此保持运行时现有 Profile，
+    // 绝不静默清空用户参数。
+    result.importedHardwareProfiles.reserve(doc.hardwareProfileCount());
+    for (size_t i = 0; i < doc.hardwareProfileCount(); ++i)
+    {
+        Fio::SyHardwareProfileInfo profile;
+        if (doc.getHardwareProfileAt(i, profile))
+        {
+            result.importedHardwareProfiles.push_back(profile);
+        }
+    }
+    result.hasNativeMachiningSnapshot = !result.importedHardwareProfiles.empty();
+
+    // 老版本写过图层 profile id 但没写值集：这些绑定是悬空的。
+    // 只在确实引用了非默认 Profile 时提醒，避免每次打开旧文件都刷告警。
+    if (!result.hasNativeMachiningSnapshot)
+    {
+        for (const auto& machining : result.importedLayerMachining)
+        {
+            if (machining.hardwareProfileId > 0 || machining.fillHardwareProfileId >= 0)
+            {
+                result.addWarning(QStringLiteral(
+                    "This .sy file has layer profile bindings but no profile value set; "
+                    "existing runtime profiles are kept and machining parameters may differ."));
+                break;
+            }
         }
     }
 

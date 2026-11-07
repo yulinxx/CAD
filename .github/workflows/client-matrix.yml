@@ -138,7 +138,7 @@ jobs:
       - name: Run ClientConfig tests
         run: |
           cd build
-          ctest --output-on-failure -R "ClientConfig|BrandConfig" -C ${{ env.BUILD_TYPE }}
+          ctest --output-on-failure --no-tests=error -R "ClientConfig|BrandConfig" -C ${{ env.BUILD_TYPE }}
 
       - name: Package client
         if: github.event.inputs.skip_package != 'true'

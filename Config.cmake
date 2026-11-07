@@ -179,9 +179,39 @@ endif()
 set(SANYI_UI_DIMENSIONS "2D;3D" CACHE STRING "Available UI dimensions")
 set(SANYI_DEFAULT_UI_DIMENSION "2D" CACHE STRING "Default UI dimension: 2D|3D")
 
+# ===== 可选模块开关：默认值按「子模块是否已检出」自适应 =====
+# 干净 clone 里没跑 `git submodule update --init` 时子模块目录是空的，
+# 而这些 BUILD_xxx 原本一律默认 ON，根 CMakeLists 随即
+# `add_subdirectory(<空目录>)` → configure 直接失败；连根本不需要该模块的
+# 2D-only 构建也被拖垮。约定：
+#   - 目录已检出 → 默认 ON（保持原行为）
+#   - 目录缺失   → 默认 OFF，并打印原因
+#   - 用户显式 -DBUILD_XXX=ON 但目录缺失 → 明确报错并给出初始化命令，
+#     不静默改写用户意图，也不让它落到 CMake 那句看不懂的报错上。
+# option() 不覆盖命令行 / cache 里已有的值，显式设置始终被尊重。
+# 注意：本文件在顶层 project() 之前被 include，用 CMAKE_CURRENT_LIST_DIR
+# 捕获源码根，别依赖 PROJECT_SOURCE_DIR。
+# ============================================================================
+set(SANYI_CONFIG_ROOT "${CMAKE_CURRENT_LIST_DIR}")
+function(sanyi_module_option _name _dir _doc)
+    set(_cmakelists "${SANYI_CONFIG_ROOT}/${_dir}/CMakeLists.txt")
+    if(EXISTS "${_cmakelists}")
+        option(${_name} "${_doc}" ON)
+    else()
+        option(${_name} "${_doc}" OFF)
+        message(STATUS "[SanYi] ${_name}: 默认 OFF（子模块 ${_dir}/ 未检出）")
+    endif()
+    if(${_name} AND NOT EXISTS "${_cmakelists}")
+        message(FATAL_ERROR
+            "[SanYi] ${_name}=ON 但子模块 ${_dir}/ 未检出（缺 ${_cmakelists}）。\n"
+            "  请先执行: git submodule update --init ${_dir}\n"
+            "  或改用:   -D${_name}=OFF")
+    endif()
+endfunction()
+
 # ===== 核心功能模块 =====
 # 建议保持默认开启状态
-option(BUILD_RENDERX "Build Renderx rendering engine (3D rendering core)" ON)
+sanyi_module_option(BUILD_RENDERX "Renderx" "Build Renderx rendering engine (3D rendering core)")
 option(BUILD_UI2D "Build UI2D module (2D user interface, always ON)" ON)
 
 # ---- UI 维度门控（唯一权威开关）----
@@ -209,19 +239,19 @@ else()
         "[SanYi] BUILD_UI_DIMENSION 取值非法: '${BUILD_UI_DIMENSION}'（应为 2D|3D|BOTH）")
 endif()
 
-option(BUILD_NESTING "Build Nesting module (2D/3D nesting/arrangement algorithm)" ON)
+sanyi_module_option(BUILD_NESTING "Nesting/Nesting" "Build Nesting module (2D/3D nesting/arrangement algorithm)")
 
 # ===== 可选功能模块 =====
-# 按需启用
-option(BUILD_VISION "Build Vision module (image processing, computer vision)" ON)
-option(BUILD_CAM "Build CAM layer (toolpath planning, process compilation)" ON)
-option(BUILD_RASTER "Build Raster module (OpenCV bitmap processing for laser engraving/cutting)" ON)
-option(BUILD_NETWORK "Build Network module (HTTP, WebSocket, cloud sync)" ON)
-option(BUILD_HARDWARE "Build Hardware module (laser control, material database)" ON)
-option(BUILD_ENGRAVING "Build Engraving module (3D laser engraving)" ON)
-option(BUILD_GEOMODELCORE "Build GeoModelCore module (OpenCASCADE-based geometry modeling)" ON)
-option(BUILD_CRASHHANDLER "Build CrashHandler module (crash capture and reporting)" ON)
-option(BUILD_PYTHON "Build Python module (PythonHost integration framework)" ON)
+# 按需启用（默认值见上方 sanyi_module_option：子模块未检出时自动 OFF）
+sanyi_module_option(BUILD_VISION "Vision/Vision" "Build Vision module (image processing, computer vision)")
+sanyi_module_option(BUILD_CAM "CAM/CAM" "Build CAM layer (toolpath planning, process compilation)")
+sanyi_module_option(BUILD_RASTER "Raster/Raster" "Build Raster module (OpenCV bitmap processing for laser engraving/cutting)")
+sanyi_module_option(BUILD_NETWORK "Network/Network" "Build Network module (HTTP, WebSocket, cloud sync)")
+sanyi_module_option(BUILD_HARDWARE "Hardware/Hardware" "Build Hardware module (laser control, material database)")
+sanyi_module_option(BUILD_ENGRAVING "Engraving/Engraving" "Build Engraving module (3D laser engraving)")
+sanyi_module_option(BUILD_GEOMODELCORE "GeoModelCore/GeoModelCore" "Build GeoModelCore module (OpenCASCADE-based geometry modeling)")
+sanyi_module_option(BUILD_CRASHHANDLER "CrashHandler/CrashHandler" "Build CrashHandler module (crash capture and reporting)")
+sanyi_module_option(BUILD_PYTHON "PythonHost/PythonHost" "Build Python module (PythonHost integration framework)")
 # 许可校验开关：默认 ON；开发构建如需关闭，用 -DSANYI_ENABLE_LICENSE=OFF。
 # 宏编进 License 库本身（LicenseInternal.cpp 依据它决定运行期默认值），
 # Main 的 BuildConfig.h 镜像同步该取值供启动自检交叉核对。

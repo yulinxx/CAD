@@ -175,6 +175,12 @@ TEST(CamBridgeTests, EntityVisibleAndLocked_ArePassedThrough)
 
 TEST(CamBridgeTests, RasterEntity_AssembledToScanlines)
 {
+#ifndef BUILD_RASTER
+    // 位图 → 扫描线的装配在 CamInputBridge 里按 BUILD_RASTER 条件编译。
+    // Raster 子模块未初始化时该装配不参与构建，图元只会落到哨兵尺寸，
+    // 这里必须显式跳过，而不是伪装成一次「装配失败」。
+    GTEST_SKIP() << "requires BUILD_RASTER=ON";
+#endif
     Eg::SceneManager scene;
     ASSERT_NE(addGradientImage(scene, 96), nullptr);
 
@@ -230,6 +236,9 @@ TEST(CamBridgeTests, RasterEntity_AssembledToScanlines)
 
 TEST(CamBridgeTests, RasterEntity_SamePhysicalSizeAt96And300Dpi)
 {
+#ifndef BUILD_RASTER
+    GTEST_SKIP() << "requires BUILD_RASTER=ON";
+#endif
     auto buildForDpi = [](int pixels, Cam::ToolpathJobInput& input) {
         Eg::SceneManager scene;
         if (addGradientImage(scene, pixels) == nullptr) {
