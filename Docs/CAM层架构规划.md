@@ -3,6 +3,11 @@
 > 状态：规划阶段 | 起草日期：2026-11-03
 > 前置文档：[激光加工软件功能缺口梳理.md](./激光加工软件功能缺口梳理.md)
 > 目标：填补"几何处理→实际加工"之间的工艺编译层，对标 LightBurn / EZCAD 级别的 2D 切割/雕刻能力
+>
+> 2026-11-10 复核：本文第 4 章的目录树是**目标态**，不是现状。当前 `CAM/CAM/Include/CAM/`
+> 只有 M0 骨架（`CamCore.h`、`CamPlan.h`、`ToolpathJobInput.h`、`CamContext.h`、`CAMExport.h`），
+> `Src/{Emit,Estimate,GeometryTransform,Order,Process,Validate}` 均只有 `.gitkeep`；
+> 进度/取消上下文已落地在 `CamContext.h` 的 `Cam::Progress` 与 `Cam::CamError`，未拆成独立的 `Progress.h`。
 
 ---
 

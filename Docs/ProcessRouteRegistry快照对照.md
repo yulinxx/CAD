@@ -12,7 +12,7 @@
 | blob | `5ff4121149ed2e80459ac7d403ec6c6ef9bc6687` |
 | 路径 | `2D/Src/ProcessRouteRegistry.cpp`（相对 `UI/` 子仓根） |
 | 原版规模 | 12651 字节 / 331 行 |
-| 当前规模 | 21853 字节 / 552 行（功能超集重建） |
+| 当前规模 | 30207 字节 / 636 行（2026-11-10 复测；功能超集重建后又经多次增量提交，不再是 21853 字节 / 552 行） |
 
 未被收录的 ref（已核对为空）：`refs/heads/sync/ui-rebased-20261104`、`refs/remotes/origin/ui-sync-20261102`、`refs/stash`。
 

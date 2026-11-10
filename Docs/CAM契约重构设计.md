@@ -3,6 +3,11 @@
 > 范围：`CAM/CAM/` 公开契约、`Main/Src/CAM/` 桥接层、`FileIO` 工艺参数持久化、`CMake/CheckDependencies.cmake` 规则 4.5
 > 性质：设计文档，不含任何代码改动
 > 证据：以当前工作区代码为准，格式为 `文件:行号`
+>
+> 2026-11-10 复核：第 1 项（ABI 定位）已实施，`CAM/CAM/Include/CAM/CAMExport.h` 已写明「C++ 内部 ABI」；
+> 第 2 项的中立契约目标 `Engine/ProcessContract/` **尚未创建**，`Eg::ProcessParams`（`Engine/Common/Include/Engine/Process/ProcessParams.h`）、
+> `Cam::ProcessParams`（`CAM/CAM/Include/CAM/ToolpathJobInput.h`）、`FileIO::AprProcessParamsInfo`
+> （`FileIO/FileIO/Include/FileIO/AprDocument.h`）三份定义仍并存。
 
 ---
 
@@ -181,7 +186,7 @@ CAM ──▶ Utility（PUBLIC）、Log（PRIVATE）（不变）
 
 - 新增 `Engine/ProcessContract/CMakeLists.txt` 与 `Include/Process/ProcessParams.h`
 - `Engine/Common/CMakeLists.txt`、`ProcessParams.h` 改为别名
-- `FileIO/FileIO/AprDocument.h`、`Src/AprDocument.cpp`
+- `FileIO/FileIO/Include/FileIO/AprDocument.h`、`FileIO/FileIO/Src/AprDocument.cpp`
 - `CAM/CAM/Include/CAM/ToolpathJobInput.h`
 - `Main/Src/CAM/CamInputBridge.cpp`
 - `CMake/CheckDependencies.cmake`（仅注释）

@@ -1,8 +1,24 @@
 # GeoModelCore 三条致命缺口修复方案
 
-> 状态：**设计文档，未实施**。本轮只写文档，不改源码、不改 CMake、不 commit。
+> 状态：**设计文档，方案已全部落地（2026-11-10 复核）**。原撰写时只写文档、不改源码；后续提交已按本方案实施，
+> 落地对照见 §0.3。历史正文保留，作为方案依据与取舍记录。
 > 依据：《GeoModelCore 功能完备性审查》中 G-01 / G-02 / G-03 / G-04 / G-06。
-> 日期：2026-11-04。
+> 日期：2026-11-04（撰写）/ 2026-11-10（复核）。
+
+---
+
+## 0.3 落地对照（2026-11-10 按代码核对）
+
+| 缺口 | 原方案要点 | 当前代码 | 状态 |
+|---|---|---|---|
+| G-01 切割轮廓 | 新建平面面环抽取，`ShapeAnalysis_FreeBounds` 重组闭环，内外环分类，double 精度 | `GeoModelCore/GeoModelCore/Include/GeoModelCore/GmcCutContour.h`（`GmcCutContour::extract` / `extractSilhouette`，POD `GmcContourLoop` / `GmcContourPlane` / `GmcContourResult`，带 `structSize`/`abiVersion` 布局守卫）+ `Source/GmcCutContour.cpp` | 已落地 |
+| G-02 割缝 | 不在 GeoModelCore 造，落在 Engine2D + CAM 桥接，按外/内环分符号偏置 | `Engine/2D/Include/Engine2D/Cam/KerfCompensator.h`（`Eg::Cam::KerfOptions` / `KerfSide` / `KerfResult`）；`Main/Src/CAM/CamInputBridge.cpp:499-532` 按 `kerfMm` 正负映射内外侧，并关闭 CAM 侧二次偏置 | 已落地 |
+| G-03 装配/颜色/名称 | 补 TKXCAF/TKCAF/TKDESTEP，导入保留零件名、颜色与层级 | `GeoModelCore/GeoModelCore/Include/GeoModelCore/GmcStepAssembly.h`（零件名 UTF-8、`hasColor`、`ColorMissing` 状态位）；实现 `Source/GmcAssemblyImpl.cpp` | 已落地 |
+| G-04 布尔可信度 | 布尔结果做有效性判定，失败重试/修复 | `GeoModelCore/GeoModelCore/Include/GeoModelCore/GmcShapeHealing.h`（`validate` / `repair` / `sew` / `unifyTolerances`），`Source/GmcShapeHealing.cpp`；`GmcCoreTests.cpp` 覆盖 `GmcShapeHealing::validate` | 已落地 |
+| G-06 isValid | 提供真正的有效性判定 | `GmcShapeHealing::validate(const TopoShape&, std::string*)` + `TopoShape::isValid()` | 已落地 |
+
+> 仍需注意：`GmcCutContour` 文档明确「v1 只保证板厚方向为 Z 的板件轮廓」，任意剖面 `GmcSectionFrame` 仅为预留；
+> 弦高按曲率自适应未实现，需要更高精度时下调 `GmcContourOptions::deflection`。
 
 ---
 
@@ -269,6 +285,9 @@ namespace GeoModelCore
 ### 3.3 内部实现步骤（G-01A）
 
 新增私有实现：`Private/GmcCutContourImpl.cpp`（与公开头分离）。
+
+> 落地形态（2026-11-10 复核）：实现放在 `GeoModelCore/GeoModelCore/Source/GmcCutContour.cpp`，
+> 未单独拆出 `Private/GmcCutContourImpl.cpp`；行为与下面调用序列一致。
 
 调用序列：
 
@@ -655,7 +674,7 @@ if (kerfParams.enabled && kerfParams.widthMm > 0.0)
 
 ### 4.2 API 设计
 
-新增公开头：`GeoModelCore/Include/GeoModelCore/GmcAssembly.h`
+新增公开头：`GeoModelCore/Include/GeoModelCore/GmcAssembly.h`（落地文件名为 `GmcStepAssembly.h`）
 
 ```cpp
 #pragma once

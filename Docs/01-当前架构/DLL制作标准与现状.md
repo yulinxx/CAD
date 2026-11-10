@@ -59,8 +59,11 @@
 
 - 生产渲染目标名为 `RenderX`。
 - 代码目录位于 `Renderx/`。
-- 对外头文件以 `Renderx/include/render/render.h` 为准。
-- 当前主接口围绕 `RenderDevice*`、`renderCreateDevice()`、`renderSubmitGeometry()`、`renderFrame()` 展开。
+- 对外头文件以 `Renderx/include/render/renderx.h` 为准（唯一公共 ABI 头，`namespace Render::RT`）。
+- 当前主接口围绕 `RuntimeHandle` / `SessionHandle` / `DrawListHandle` 展开：
+  `rxRuntimeCreate()`、`rxSessionCreate()`、`rxSessionBeginFrame()`、`rxSessionSubmitDrawList()`、
+  `rxDrawListUpsert()`、`rxSessionEndFrame()`。旧的 `RenderDevice*` / `renderCreateDevice()` /
+  `renderSubmitGeometry()` / `renderFrame()` 系列已删除。
 
 ### 3.4 头文件与源文件的目录归位
 
@@ -80,7 +83,9 @@ UI/2D/
 
 这样做的目的是**交付时能整目录打包**：对外只需给 `Include/` + `.lib` + `.dll`，不必从 `Src/` 的层层子目录里逐个挑头文件；同时 `Include/` 本身就是这个 DLL 的公共 API 清单，一眼可见边界。
 
-反例（当前 UI2D 的实际状态，属于待整理项）：`Src/UI/RightToolBar/RightToolBar.h` 带 `UI2D_API` 却留在 `Src/` 下，只在 `Include/UI2D/ToolBar/ToolBarBase.h` 放了个 `#include "UI/ToolBarBase/ToolBarBase.h"` 的转发头。转发头是权宜之计，不是目标形态——它让 `Include/` 无法独立交付，因为真正的声明还在 `Src/` 里。
+反例（历史状态，2026-11-10 复核已整改）：整改前 `Src/UI/RightToolBar/RightToolBar.h` 带 `UI2D_API` 却留在 `Src/` 下，只在 `Include/UI2D/ToolBar/ToolBarBase.h` 放了个 `#include "UI/ToolBarBase/ToolBarBase.h"` 的转发头。转发头是权宜之计，不是目标形态——它让 `Include/` 无法独立交付，因为真正的声明还在 `Src/` 里。
+
+2026-11-10 实测：在 `UI/2D/Src` 下递归检索带 `UI2D_API` 的 `*.h`，命中 **0**；导出头已全部归位到 `Include/`，`Src/UI/ToolBar/` 也不再存在。剩余待办只是撤掉历史转发头。
 
 ### 3.5 跨库判型：禁止 `dynamic_cast`，一律用 `eType`
 
@@ -180,7 +185,7 @@ case EType::POLYGON: {
 3. 继续压缩跨 DLL 的 public STL 用法。
 4. 继续把渲染相关的旧命名统一替换为 `Renderx` / `RenderX`。
 5. 继续保持 UI 与引擎、渲染的职责分离。
-6. 继续按 §3.4 归位导出头：把 `Src/` 下带导出宏的头文件迁入 `Include/`，并逐步撤掉转发头。UI2D 目前尚有 19 个此类头文件留在 `Src/`。
+6. 继续按 §3.4 归位导出头：把 `Src/` 下带导出宏的头文件迁入 `Include/`，并逐步撤掉转发头。2026-11-10 复核：`UI/2D/Src` 下带 `UI2D_API` 的头文件已为 **0**，该项完成。
 7. 继续统一 `Include` / `Src` 的目录名大小写（多数模块用 `Include` / `Src`，`Renderx` 用 `include` / `src`）。
 8. 继续把 `Engine/2D/Src/Algorithm/` 下残留的 `dynamic_cast` 判型替换为 `eType`（见 §3.5）。
 9. `UiServices` 仍暴露具体类型（20 个字段里仅 4 个是接口指针），未完成收口 —— 见 [`耦合性分析.md`](耦合性分析.md) §2.2 C。

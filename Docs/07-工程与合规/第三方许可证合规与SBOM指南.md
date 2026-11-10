@@ -8,6 +8,9 @@
 >
 > 当前阶段先**只记录、不整改**：不改代码、不改打包、不替换第三方库。等法务结论明确后，
 > 再按本文第 9 节的路线推进。
+>
+> 2026-11-10 复核：依赖清单中的路径与模块名已按当前仓库修正（libdxfrw 位于
+> `ThirdParty/libdxfrw`；License 模块目录已改名为 `Licensing/`），许可证风险判断不变。
 
 ---
 
@@ -144,14 +147,14 @@ AGPL-3.0 在 GPL 基础上增加了“网络交互”条款：如果用户通过
 
 | 组件 | 位置/使用方式 | 许可证 | 分发形态 | 当前判断 |
 |------|----------------|--------|----------|----------|
-| **libdxfrw** | `ThirdParty/libdxfrw`，源码通过 `FileIO/FileIO/CMakeLists.txt` 的源文件列表直接编进 `FileIO` | **GPL-2.0-or-later**（`COPYING` 为 GPLv2 文本，源码头为 or-later） | 编进闭源 DLL | **高风险，需法务评审** |
+| **libdxfrw** | `${APR_THIRDPARTY_DIR}/libdxfrw`（即 `ThirdParty/libdxfrw`），源码通过 `FileIO/FileIO/CMakeLists.txt` 的源文件列表直接编进 `FileIO` | **GPL-2.0-or-later**（`COPYING` 为 GPLv2 文本，源码头为 or-later） | 编进闭源 DLL | **高风险，需法务评审** |
 | Qt 6 | 本地 Qt 安装，`windeployqt` 复制 DLL/插件 | **LGPL-3.0 / GPL-3.0 / 商业许可**（按实际授权） | 动态链接 + 随包 DLL | 中风险，需确认授权方式与 LGPL 合规 |
 | OpenCASCADE | vcpkg，`GeoModelCore` 使用 | **LGPL-2.1 + 例外条款** | 动态链接 | 中风险，需声明/源码提供方式 |
 | Clipper2 | vcpkg，Nesting/几何运算 | **BSL-1.0** | 动态/静态链接 | 低风险，保留声明 |
 | SQLiteCpp | vcpkg，UICommon 等 | **MIT** | 链接 | 低风险，保留声明 |
 | NanoSVG | vcpkg，FileIO | **Zlib** | 编进库 | 低风险，保留声明 |
 | stb | vcpkg，图像/字体 | **MIT / Public Domain** | 编进库 | 低风险，保留声明 |
-| OpenSSL | vcpkg，License/Network | **Apache-2.0** | 动态链接 | 低风险，保留 LICENSE/NOTICE |
+| OpenSSL | vcpkg，Licensing（目录由早年的 `License/` 改名）/Network | **Apache-2.0** | 动态链接 | 低风险，保留 LICENSE/NOTICE |
 | protobuf | vcpkg，持久化 | **BSD-3-Clause** | 动态/静态链接 | 低风险，保留声明 |
 | spdlog | vcpkg，Log | **MIT** | 链接 | 低风险，保留声明 |
 | Boost | vcpkg，几何/工具 | **BSL-1.0** | 头文件/链接 | 低风险，保留声明 |

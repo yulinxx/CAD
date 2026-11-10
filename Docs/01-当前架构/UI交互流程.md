@@ -7,7 +7,10 @@
 > **核心约定（贯穿全文）**：所有 UI 入口（菜单 / 工具栏 / 右键 / 快捷键 / Gizmo / 面板）最终都汇合到
 > `CommandCatalog / CommandCatalog3D → OperationBus::run(OperationId)`，UI 层只负责「入口、交互、状态同步」，不承载业务真相。
 >
-> 相关细节文档：`菜单架构.md`、`UI定制.md`、`命令与状态流.md`、`顶部工具栏架构定义.md`、`左侧工具栏架构定义.md`、`状态栏架构定义.md`、`属性面板架构定义.md`、`场景树架构定义.md`。
+> 相关细节文档：`UI定制.md`、`命令与状态流.md`、`顶部工具栏架构定义.md`、`左侧工具栏架构定义.md`、`右侧工具栏架构定义.md`、`状态栏架构定义.md`、`属性面板架构定义.md`、`场景树架构定义.md`。
+>
+> 菜单没有独立文档：菜单由配置驱动构建，入口是 `Main/Src/UI/Workbench/WorkbenchMenuManager`，
+> 点击后经同目录的 `MenuDispatcher` 转成 `OperationId`，再交给 `OperationBus`。
 
 ---
 
@@ -487,7 +490,7 @@ flowchart LR
     Catalog --> Bus["OperationBus::run(OperationId)"]
     Bus --> Handler["对应 Operation 处理器<br/>（FileOperationRegistry / FileOperations3D 等）"]
     Handler --> Dialog["QFileDialog 按格式过滤"]
-    Handler --> Import["按扩展名路由到导入器<br/>（DXF→DxfImporter / OBJ→ObjLoader ...）"]
+    Handler --> Import["按扩展名路由到导入器<br/>（DXF→DxfParser / OBJ→ObjParser / STL→StlParser ...）"]
     Import --> Scene["SceneManager 落库 + 撤销栈 + 渲染刷新"]
 ```
 

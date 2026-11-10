@@ -8,6 +8,14 @@
 >
 > 范围：仅 Metal 后端。CPU 空间索引（分层哈希网格）已由
 > 《百万级矢量剔除-空间索引设计》完成，本设计不重复。
+>
+> **2026-11-10 复核**：本文是设计提案，其中两处命名已与当前 ABI 不同，阅读时请换算：
+> ① `Session::submitDrawCommands` 现为 C ABI 的 `rxSessionSubmit`（逐帧命令）/
+> `rxSessionSubmitDrawList`（2D 常驻命令）/ `rxSessionSubmitDrawList3D`（3D 常驻命令）；
+> ② `RuntimeDesc::enableIndirectDraw`、`RuntimeDesc::gpuBudgetBytes` **尚未落地**——
+> `RuntimeDesc` 只有 `abiVersion` / `backend` / `enableValidation` / `transientBufferBytes` /
+> `logCallback` / `logUserData` / `applicationName` / `glGetProcAddress`，
+> 间接绘制能力查询走 `Capabilities::indirectDraw`（只读）。
 
 ---
 

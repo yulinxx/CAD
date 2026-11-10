@@ -2,6 +2,15 @@
 
 > 记录 macOS 平台 2D/3D 渲染相关问题的根因、修复方案与平台差异。Windows/Linux 如遇类似症状可参考对照。
 > 最后更新：2026-08-14
+>
+> **2026-11-10 复核提示**：文中 §6「RenderWidget3D 现代 OpenGL 迁移」描述的是当年的 Qt OpenGL 实现。
+> 该实现已被重写：`UI/3D/Include/UI3D/Render3D/RenderWidget3D.h` 现在按后端切换基类 ——
+> `APR_ENABLE_METAL_VIEWPORT` 打开时基类是普通 `QWidget`（原生句柄 `winId()` 即 `NSView*`，挂 `CAMetalLayer`），
+> 否则才是 `QOpenGLWidget`；绘制统一经 `RenderAbstraction`（`IRenderDevice` / `IRenderSurface` / `IRenderScene`）
+> 与 `RenderBridge::RenderSessionHost`，不再有 `initPrograms()` / `QOpenGLFunctions_3_3_Core` 直连。
+> 文中 `rhigl.cpp` 现为 `Renderx/src/rhi/gl/glDevice.cpp` + `glCommandList.cpp`，
+> `pipeline_state_manager.h` / `command_encoder.cpp` 已由 `Renderx/src/rhi/rhiGpuDevice.h`、
+> `Renderx/src/rhi/rhiCommandList.h` 与各后端实现取代。
 
 ---
 
@@ -221,7 +230,7 @@ F9 临时转储（`glGetBooleanv`）显示按键时刻 `DEPTH_TEST=0, BLEND=1`�
 5. **顶点着色器 `layout(location = 0/1)`**：mesh（aPos/aNormal）与 line（aPos/aColor）均显式声明。
 6. `initializeGL`：`glDisable(GL_CULL_FACE)` 双面渲染（替代原先的 enable）。
 
-`Engine/3D/Src/Loader/ObjLoader.cpp`（数据层加固，与平台无关）：
+`FileIO/FileIO/Src/Parsers/ObjParser.cpp`（原 `Engine/3D/Src/Loader/ObjLoader.cpp`，已迁到 FileIO；数据层加固，与平台无关）：
 
 - 负索引 `vn` 支持（`f v/vt/vn` 中 vn 可为负数，从末尾倒数）；
 - 退化三角形（零面积）跳过：`cr.length() < 1e-12f` 时 `continue`；
