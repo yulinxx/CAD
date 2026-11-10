@@ -36,6 +36,7 @@
 #include "UI2D/DrawTools/ToolContext.h"
 #include "UI2D/DrawTools/ToolManager.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/SceneWriteGateway.h"
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyCircle.h"
 #include "Engine2D/SyEntity/SyPolygon.h"
@@ -205,7 +206,7 @@ TEST(RenderViewport2DRegressionTest, DirtyFlag_AddEntityTriggersSceneChanged)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     EXPECT_EQ(scene.getEntityCount(), 1u);
     // 添加图元后场景管理器应有脏标记
@@ -222,7 +223,7 @@ TEST(RenderViewport2DRegressionTest, DirtyFlag_ModifyEntityTriggersDirty)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 修改图元属性
     auto* entity = scene.findSyEntityById(lineId);
@@ -241,9 +242,9 @@ TEST(RenderViewport2DRegressionTest, DirtyFlag_DeleteEntityTriggersDirty)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
-    scene.deleteEntity(scene.findSyEntityById(lineId));
+    Eg::SceneWriteGateway::deleteEntity(scene, scene.findSyEntityById(lineId));
     EXPECT_EQ(scene.getEntityCount(), 0u);
     // 删除后应有脏标记
 }
@@ -262,7 +263,7 @@ TEST(RenderViewport2DRegressionTest, SelectionChange_TriggersRepaint)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 选中图元
     scene.selectEntity(scene.findSyEntityById(lineId));
@@ -286,7 +287,7 @@ TEST(RenderViewport2DRegressionTest, SelectionChange_ClearSelectionTriggersRepai
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     scene.selectEntity(scene.findSyEntityById(lineId));
     scene.clearSelection();
@@ -307,7 +308,7 @@ TEST(RenderViewport2DRegressionTest, SelectionChange_DeleteSelectedClearsSelecti
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     scene.selectEntity(scene.findSyEntityById(lineId));
     scene.deleteSelected();
@@ -329,7 +330,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_SceneChangeRefreshesWithEntitie
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 场景变更通知
     coordinator.onSceneChanged();
@@ -351,7 +352,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_SceneChangeWithMultipleEntities
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i * 10, 10.0 + i * 10) });
         entities.push_back(std::move(line));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     EXPECT_EQ(scene.getEntityCount(), 5u);
 
     coordinator.onSceneChanged();
@@ -383,7 +384,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_MixedTypeEntities)
         poly->setVertices({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 0), Ut::Vec2d(10, 10) });
         entities.push_back(std::move(poly));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     EXPECT_EQ(scene.getEntityCount(), 3u);
 
     coordinator.onSceneChanged();
@@ -527,7 +528,7 @@ TEST(RenderViewport2DRegressionTest, Stress_LargeBatchEntityAdd)
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i * 0.1, 10.0 + i * 0.1) });
         entities.push_back(std::move(line));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     EXPECT_EQ(scene.getEntityCount(), 100u);
 
     coordinator.onSceneChanged();
@@ -553,12 +554,12 @@ TEST(RenderViewport2DRegressionTest, Stress_RepeatedAddAndDelete)
             ids.push_back(line->id);
             entities.push_back(std::move(line));
         }
-        scene.addEntities(std::move(entities));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
         coordinator.onSceneChanged();
 
         for (auto& id : ids)
         {
-            scene.deleteEntity(scene.findSyEntityById(id));
+            Eg::SceneWriteGateway::deleteEntity(scene, scene.findSyEntityById(id));
         }
         coordinator.onSceneChanged();
     }
@@ -660,7 +661,7 @@ TEST(RenderViewport2DRegressionTest, EntityPropertyChange_VisibilityToggle)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 切换可见性
     auto* entity = scene.findSyEntityById(lineId);
@@ -685,7 +686,7 @@ TEST(RenderViewport2DRegressionTest, EntityPropertyChange_LockToggle)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     auto* entity = scene.findSyEntityById(lineId);
     ASSERT_NE(entity, nullptr);
@@ -709,7 +710,7 @@ TEST(RenderViewport2DRegressionTest, SelectionChain_SelectDeselectReselect)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 选中
     scene.selectEntity(scene.findSyEntityById(lineId));
@@ -734,7 +735,7 @@ TEST(RenderViewport2DRegressionTest, SelectionChain_SelectAllInvertClear)
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         std::vector<std::unique_ptr<Eg::SyEntity>> entities;
         entities.push_back(std::move(line));
-        scene.addEntities(std::move(entities));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     }
 
     // 全选
@@ -780,7 +781,7 @@ TEST(RenderViewport2DRegressionTest, SelectionChain_MultipleSelectWithMixedTypes
         idPoly = poly->id;
         entities.push_back(std::move(poly));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 逐个选中（单选语义：selectEntity 会替换当前选择，多选走批量入口 selectEntities）
     std::vector<Eg::SyEntity*> toSelect = {
@@ -806,7 +807,7 @@ TEST(RenderViewport2DRegressionTest, NoDanglingSelection_DeleteAllSelected)
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         std::vector<std::unique_ptr<Eg::SyEntity>> entities;
         entities.push_back(std::move(line));
-        scene.addEntities(std::move(entities));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     }
 
     scene.selectAll();
@@ -832,7 +833,7 @@ TEST(RenderViewport2DRegressionTest, NoDanglingSelection_DeleteIndividualEntity)
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line1));
     entities.push_back(std::move(line2));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 批量选中两个（selectEntity 为单选替换语义，多选走批量入口）
     std::vector<Eg::SyEntity*> toSelect = { scene.findSyEntityById(id1), scene.findSyEntityById(id2) };
@@ -840,7 +841,7 @@ TEST(RenderViewport2DRegressionTest, NoDanglingSelection_DeleteIndividualEntity)
     EXPECT_EQ(scene.getSelectedEntityCount(), 2u);
 
     // 删除一个
-    scene.deleteEntity(scene.findSyEntityById(id1));
+    Eg::SceneWriteGateway::deleteEntity(scene, scene.findSyEntityById(id1));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
     EXPECT_EQ(scene.findSyEntityById(id1), nullptr);
     EXPECT_NE(scene.findSyEntityById(id2), nullptr);
@@ -859,7 +860,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_SceneChangeAfterClear)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     coordinator.onSceneChanged();
 
@@ -884,7 +885,7 @@ TEST(RenderViewport2DRegressionTest, Coordinator_SelectionChangeSequence)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 选中 → 通知 → 取消选中 → 通知
     scene.selectEntity(scene.findSyEntityById(lineId));
@@ -1812,7 +1813,7 @@ TEST(RenderViewport2DRegressionTest, ViewportSelector_SelectionBBoxMergesSelecte
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line1));
     entities.push_back(std::move(line2));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     StubSelectionService svc;
     svc.selectedIds = { std::to_string(id1), std::to_string(id2) };

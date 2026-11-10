@@ -17,6 +17,7 @@
 #include "UI/Services/SelectionService.h"
 #include "UI/Services/ISelectionService.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/SceneWriteGateway.h"
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyCircle.h"
 #include "Engine2D/SyEntity/SyPolygon.h"
@@ -54,7 +55,7 @@ TEST(SelectionServiceTest, SelectSingle)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     std::string idStr = std::to_string(lineId);
     svc.select(idStr.c_str());
@@ -72,7 +73,7 @@ TEST(SelectionServiceTest, Deselect)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     std::string idStr = std::to_string(lineId);
     svc.select(idStr.c_str());
@@ -93,7 +94,7 @@ TEST(SelectionServiceTest, Clear)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     std::string idStr = std::to_string(lineId);
     svc.select(idStr.c_str());
@@ -112,7 +113,7 @@ TEST(SelectionServiceTest, Toggle)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     std::string idStr = std::to_string(lineId);
 
@@ -140,7 +141,7 @@ TEST(SelectionServiceTest, SelectMultiple)
         ids[i] = std::to_string(line->id);
         entities.push_back(std::move(line));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     const char* idPtrs[] = { ids[0].c_str(), ids[1].c_str(), ids[2].c_str() };
     svc.selectMultiple(idPtrs, 3);
@@ -162,7 +163,7 @@ TEST(SelectionServiceTest, SelectMultipleClearsPrevious)
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         entities.push_back(std::move(line));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 先选中一个
     auto allIds = std::vector<Eg::EntityId>{};
@@ -200,7 +201,7 @@ TEST(SelectionServiceTest, VisitSelectedIds)
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         entities.push_back(std::move(line));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     auto allIds = std::vector<Eg::EntityId>{};
     scene.forEachEntityId(
@@ -253,7 +254,7 @@ TEST(SelectionServiceTest, VisitSelectedIds_AfterSelect)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     std::string idStr = std::to_string(lineId);
     svc.select(idStr.c_str());
@@ -292,7 +293,7 @@ TEST(SelectionServiceTest, Qt_SelectedIdsQ_WithSelection)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     std::string idStr = std::to_string(lineId);
     svc.select(idStr.c_str());
@@ -312,7 +313,7 @@ TEST(SelectionServiceTest, Qt_SelectEntity)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     std::string idStr = std::to_string(lineId);
     svc.selectEntity(QString::fromStdString(idStr));
@@ -337,7 +338,7 @@ TEST(SelectionServiceTest, Qt_SetSelectedEntityId)
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line1));
     entities.push_back(std::move(line2));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 设置唯一选中
     svc.setSelectedEntityId(QString::fromStdString(std::to_string(id1)));
@@ -364,7 +365,7 @@ TEST(SelectionServiceTest, Qt_SetSelectedEntityIds)
         ids.append(QString::fromStdString(std::to_string(line->id)));
         entities.push_back(std::move(line));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     svc.setSelectedEntityIds(ids);
     auto result = svc.selectedIdsQ();
@@ -391,7 +392,7 @@ TEST(SelectionServiceTest, Qt_EntityIdAt_WithEntity)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 点查询在图元附近
     auto id = svc.entityIdAt(QPointF(5, 5), 10.0);
@@ -411,7 +412,7 @@ TEST(SelectionServiceTest, Integration_AddEntityDoesNotSelect)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 添加图元后不应自动选中
     auto ids = svc.selectedIdsQ();
@@ -429,14 +430,14 @@ TEST(SelectionServiceTest, Integration_DeleteEntityClearsSelection)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     std::string idStr = std::to_string(lineId);
     svc.select(idStr.c_str());
     EXPECT_TRUE(svc.isSelected(idStr.c_str()));
 
     // 删除选中图元后选择应被清除
-    scene.deleteEntity(scene.findSyEntityById(lineId));
+    Eg::SceneWriteGateway::deleteEntity(scene, scene.findSyEntityById(lineId));
     EXPECT_FALSE(svc.isSelected(idStr.c_str()));
 }
 
@@ -467,7 +468,7 @@ TEST(SelectionServiceTest, Integration_SelectMultipleMixedTypes)
         idPoly = std::to_string(poly->id);
         entities.push_back(std::move(poly));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     const char* idPtrs[] = { idLine.c_str(), idCircle.c_str(), idPoly.c_str() };
     svc.selectMultiple(idPtrs, 3);
@@ -552,7 +553,7 @@ TEST(SelectionServiceTest, Boundary_QuickToggleSequence)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     std::string idStr = std::to_string(lineId);
 
@@ -595,7 +596,7 @@ TEST(SelectionServiceTest, SceneManager_SelectReflectsInScene)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     std::string idStr = std::to_string(lineId);
     svc.select(idStr.c_str());
@@ -615,7 +616,7 @@ TEST(SelectionServiceTest, SceneManager_ClearReflectsInScene)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     std::string idStr = std::to_string(lineId);
     svc.select(idStr.c_str());

@@ -7,6 +7,7 @@
 #include "Log/SyLogger.h"
 
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/SyEntity/SyImage.h"
 #include "Engine2D/Interaction/LayerManager.h"
 #include "Engine/EntityIdGenerator.h"
@@ -379,7 +380,8 @@ bool FileDropHandler::importImage(const QString& filePath, const QPointF& anchor
     imgEntity->id = persistentId;
 
     auto snap = std::unique_ptr<Eg::SyEntity>(imgEntity);
-    if (persistentId == 0 || !m_sceneManager || !m_sceneManager->insertEntityPreserveId(std::move(snap)))
+    SceneEditService directEdit(m_sceneManager, nullptr);
+    if (persistentId == 0 || !m_sceneManager || !directEdit.insertEntityPreserveId(std::move(snap)))
     {
         SY_ERRORF("[FileDrop] Image insert rejected (id=%lld)", static_cast<long long>(persistentId));
         return false;

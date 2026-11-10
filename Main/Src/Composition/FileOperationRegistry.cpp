@@ -18,6 +18,7 @@
 #include "UI/Services/HelpDialogService.h"
 
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Edit/SceneEditService.h"
 #include "Engine/Edit/IUndoRedoManager.h"
 #include "Engine2D/SyEntity/SyImage.h"
 #include "Engine2D/Interaction/LayerManager.h"
@@ -424,7 +425,8 @@ void FileOperationRegistry::doImportImage(const QString& filePath)
         }
         owned->id = persistentId;
 
-        if (persistentId == 0 || !m_sceneManager->insertEntityPreserveId(std::move(owned)))
+        SceneEditService directEdit(m_sceneManager, nullptr);
+        if (persistentId == 0 || !directEdit.insertEntityPreserveId(std::move(owned)))
         {
             SY_ERRORF("[FileOperation] Import image failed: insert rejected (id=%lld path=%s)",
                 static_cast<long long>(persistentId),

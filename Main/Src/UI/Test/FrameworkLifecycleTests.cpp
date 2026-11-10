@@ -32,6 +32,7 @@
 #include "Engine/Scene/SceneGeometryCollector.h"
 #include "Engine/Scene/SceneRenderContract.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/SceneWriteGateway.h"
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyCircle.h"
 #include "Engine2D/SyEntity/SyPolygon.h"
@@ -620,11 +621,11 @@ TEST(FrameworkRegressionTest, UndoRedo_CreateUndoEntityRemoved)
     // 创建（添加图元）
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
     // 撤销（提取图元，模拟 undo）
-    auto extracted = scene.extractEntityById(entityId);
+    auto extracted = Eg::SceneWriteGateway::extractEntityById(scene, entityId);
     EXPECT_NE(extracted, nullptr);
     EXPECT_EQ(scene.getEntityCount(), 0u);
     EXPECT_EQ(extracted->id, entityId);
@@ -650,16 +651,16 @@ TEST(FrameworkRegressionTest, UndoRedo_RedoEntityRestoredWithProperties)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
     // 撤销
-    auto extracted = scene.extractEntityById(entityId);
+    auto extracted = Eg::SceneWriteGateway::extractEntityById(scene, entityId);
     ASSERT_NE(extracted, nullptr);
     EXPECT_EQ(scene.getEntityCount(), 0u);
 
     // 重做
-    bool inserted = scene.insertEntityPreserveId(std::move(extracted));
+    bool inserted = Eg::SceneWriteGateway::insertEntityPreserveId(scene, std::move(extracted));
     EXPECT_TRUE(inserted);
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
@@ -691,11 +692,11 @@ TEST(FrameworkRegressionTest, UndoRedo_MultipleUndoRedoSequence)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
     // 步骤2: 修改（通过 extract + insert 模拟替换）
-    auto oldState = scene.extractEntityById(entityId);
+    auto oldState = Eg::SceneWriteGateway::extractEntityById(scene, entityId);
     ASSERT_NE(oldState, nullptr);
     EXPECT_STREQ(oldState->name(), "Original");
 
@@ -704,56 +705,56 @@ TEST(FrameworkRegressionTest, UndoRedo_MultipleUndoRedoSequence)
     modified->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(20, 20) });
     modified->setName("Modified");
 
-    scene.insertEntityPreserveId(std::move(modified));
+    Eg::SceneWriteGateway::insertEntityPreserveId(scene, std::move(modified));
 
     auto* current = scene.findSyEntityById(entityId);
     ASSERT_NE(current, nullptr);
     EXPECT_STREQ(current->name(), "Modified");
 
     // 步骤3: 删除
-    auto deletedState = scene.extractEntityById(entityId);
+    auto deletedState = Eg::SceneWriteGateway::extractEntityById(scene, entityId);
     ASSERT_NE(deletedState, nullptr);
     EXPECT_EQ(scene.getEntityCount(), 0u);
 
     // Undo 1: 恢复删除
-    scene.insertEntityPreserveId(std::move(deletedState));
+    Eg::SceneWriteGateway::insertEntityPreserveId(scene, std::move(deletedState));
     EXPECT_EQ(scene.getEntityCount(), 1u);
     current = scene.findSyEntityById(entityId);
     ASSERT_NE(current, nullptr);
     EXPECT_STREQ(current->name(), "Modified");
 
     // Undo 2: 恢复修改（还原为原始状态）
-    auto modifiedState = scene.extractEntityById(entityId);
+    auto modifiedState = Eg::SceneWriteGateway::extractEntityById(scene, entityId);
     ASSERT_NE(modifiedState, nullptr);
-    scene.insertEntityPreserveId(std::move(oldState));
+    Eg::SceneWriteGateway::insertEntityPreserveId(scene, std::move(oldState));
     EXPECT_EQ(scene.getEntityCount(), 1u);
     current = scene.findSyEntityById(entityId);
     ASSERT_NE(current, nullptr);
     EXPECT_STREQ(current->name(), "Original");
 
     // Undo 3: 恢复创建（移除图元）
-    auto originalState = scene.extractEntityById(entityId);
+    auto originalState = Eg::SceneWriteGateway::extractEntityById(scene, entityId);
     ASSERT_NE(originalState, nullptr);
     EXPECT_EQ(scene.getEntityCount(), 0u);
 
     // Redo 1: 重建创建
-    scene.insertEntityPreserveId(std::move(originalState));
+    Eg::SceneWriteGateway::insertEntityPreserveId(scene, std::move(originalState));
     EXPECT_EQ(scene.getEntityCount(), 1u);
     current = scene.findSyEntityById(entityId);
     ASSERT_NE(current, nullptr);
     EXPECT_STREQ(current->name(), "Original");
 
     // Redo 2: 重建修改
-    auto origForRedo = scene.extractEntityById(entityId);
+    auto origForRedo = Eg::SceneWriteGateway::extractEntityById(scene, entityId);
     ASSERT_NE(origForRedo, nullptr);
-    scene.insertEntityPreserveId(std::move(modifiedState));
+    Eg::SceneWriteGateway::insertEntityPreserveId(scene, std::move(modifiedState));
     EXPECT_EQ(scene.getEntityCount(), 1u);
     current = scene.findSyEntityById(entityId);
     ASSERT_NE(current, nullptr);
     EXPECT_STREQ(current->name(), "Modified");
 
     // Redo 3: 重建删除
-    auto finalDeleted = scene.extractEntityById(entityId);
+    auto finalDeleted = Eg::SceneWriteGateway::extractEntityById(scene, entityId);
     ASSERT_NE(finalDeleted, nullptr);
     EXPECT_EQ(scene.getEntityCount(), 0u);
 }

@@ -4,6 +4,7 @@
 #include "Engine3D/SceneManager3D.h"
 #include "Engine3D/SyEntity/SyMeshEntity.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/SyEntity/SyPolygon.h"
 
 #include "Log/SyLogger.h"
@@ -90,7 +91,9 @@ bool MachiningDataBridgeService::sliceAndInject(
         // 加工数据用统一颜色标识，便于与设计图元区分
         polygon.setOverrideColor(Ut::Color::fromRGB255(255, 140, 0));
 
-        if (Eg::SyEntity* added = m_scene2D->addEntity(&polygon))
+        SceneEditService directEdit(m_scene2D, nullptr);
+        std::unique_ptr<Eg::SyEntity> owned(polygon.clone());
+        if (Eg::SyEntity* added = directEdit.addEntity(std::move(owned), "Machining", CommitMode::Direct))
         {
             m_injectedIds.push_back(added->id);
             ++injected;

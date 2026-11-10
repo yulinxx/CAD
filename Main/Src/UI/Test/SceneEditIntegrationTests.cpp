@@ -23,6 +23,7 @@
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Edit/UndoRedoManager.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/SceneWriteGateway.h"
 #include "Engine2D/Core/DocumentTransaction.h"
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyCircle.h"
@@ -58,7 +59,7 @@ namespace
         const Eg::EntityId id = line->id;
         std::vector<std::unique_ptr<Eg::SyEntity>> vec;
         vec.push_back(std::move(line));
-        scene.addEntities(std::move(vec));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
         return id;
     }
 
@@ -70,7 +71,7 @@ namespace
         line->id = forcedId;
         line->setName(name);
         line->setPointVector({ Ut::Vec2d(x0, y0), Ut::Vec2d(x1, y1) });
-        scene.insertEntityPreserveId(std::move(line));
+        Eg::SceneWriteGateway::insertEntityPreserveId(scene, std::move(line));
     }
 
     /// 按名字在场景里查找图元 id，找不到返回 0（P2 测试认领换号后的恢复对象用）
@@ -327,7 +328,7 @@ TEST(SceneEditIntegrationTest, WholeSceneSnapshot_RestoresEntityRemovedInsideAlg
     EXPECT_TRUE(before.size() == 3) << "captured 3 before snapshots";
 
     // 模拟算法在场景内部直接删掉一个图元（偏移/布尔等就会这么做）
-    scene.extractEntitiesById({ b });
+    Eg::SceneWriteGateway::extractEntitiesById(scene, { b });
     EXPECT_TRUE(scene.getEntityCount() == 2) << "algorithm removed one entity";
 
     edit.pushExecutedChange(std::move(before), "Algorithm offset", false, Eg::SnapshotScope::WholeScene);

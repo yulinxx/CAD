@@ -24,6 +24,7 @@
  */
 
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/SceneWriteGateway.h"
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Edit/SceneUndoCommands.h"
 #include "Engine2D/Edit/UndoRedoManager.h"
@@ -219,7 +220,7 @@ int main(int argc, char** argv)
     double addMs = 0.0;
     {
         const Clock::time_point begin = Clock::now();
-        scene.addEntities(std::move(entities));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
         addMs = elapsedMs(begin, Clock::now());
     }
     std::printf("  %-28s %10.2f ms  %s\n", "scene_add", addMs, "入场景 + 建索引");
@@ -236,7 +237,7 @@ int main(int argc, char** argv)
             Eg::SceneManager probe;
             auto batch = makeEntities(abCount, kExtent);
             const Clock::time_point begin = Clock::now();
-            probe.addEntities(std::move(batch));
+            Eg::SceneWriteGateway::addEntities(probe, std::move(batch));
             const double ms = elapsedMs(begin, Clock::now());
             std::printf("  %-28s %10.2f ms  %s\n", "addEntities", ms, "普通添加");
             g_results.push_back({ "insert_addEntities", "ms", ms, ms, "普通添加" });
@@ -245,7 +246,7 @@ int main(int argc, char** argv)
             Eg::SceneManager probe;
             auto batch = makeEntities(abCount, kExtent);
             const Clock::time_point begin = Clock::now();
-            probe.insertEntitiesPreserveId(std::move(batch));
+            Eg::SceneWriteGateway::insertEntitiesPreserveId(probe, std::move(batch));
             const double ms = elapsedMs(begin, Clock::now());
             std::printf("  %-28s %10.2f ms  %s\n", "insertEntitiesPreserveId", ms, "批量保留 id（撤销回插路径）");
             g_results.push_back({ "insert_preserveId", "ms", ms, ms, "批量保留 id" });
@@ -594,7 +595,7 @@ int main(int argc, char** argv)
             }
             for (Eg::SyEntity* e : victims)
             {
-                scene.deleteEntity(e);
+                Eg::SceneWriteGateway::deleteEntity(scene, e);
             }
         },
         "逐条删除，只测一次（测后场景少 N 个图元）");

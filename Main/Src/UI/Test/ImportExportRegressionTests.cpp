@@ -31,6 +31,7 @@
 #include "FileIO/FioTypes.h"
 #include "FileIO/FileIOManager.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/SceneWriteGateway.h"
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyCircle.h"
 #include "Engine2D/SyEntity/SyArc.h"
@@ -403,7 +404,7 @@ TEST(ImportExportRegressionTest, ExportService_CollectAllEntitiesWithData)
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     service.setSceneManager(&scene);
 
@@ -617,7 +618,7 @@ TEST(ImportExportRegressionTest, Chain_EntityCountAfterImport)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(entity));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     EXPECT_EQ(scene.getEntityCount(), 1u);
 }
@@ -656,7 +657,7 @@ TEST(ImportExportRegressionTest, Chain_ExportCollectMatchesImport)
     {
         moveVec.push_back(std::move(e));
     }
-    scene.addEntities(std::move(moveVec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(moveVec));
 
     EXPECT_EQ(scene.getEntityCount(), 3u);
 
@@ -687,12 +688,12 @@ TEST(ImportExportRegressionTest, Chain_CollectAfterDelete)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
     // 删除后导出应收集 0 个图元
-    scene.deleteEntity(scene.findSyEntityById(lineId));
+    Eg::SceneWriteGateway::deleteEntity(scene, scene.findSyEntityById(lineId));
     EXPECT_EQ(scene.getEntityCount(), 0u);
 
     ExportService service;
@@ -1020,7 +1021,7 @@ TEST(ImportExportRegressionTest, ImportService_EntityCountAfterImport)
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId originalId = line->id;
-    scene.addEntity(line.release());
+    Eg::SceneWriteGateway::addEntity(scene, line.release());
 
     service.setSceneManager(&scene);
 
@@ -1036,7 +1037,7 @@ TEST(ImportExportRegressionTest, ExportService_EntityCountAfterCollect)
 
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
-    scene.addEntity(line.release());
+    Eg::SceneWriteGateway::addEntity(scene, line.release());
 
     service.setSceneManager(&scene);
 
@@ -1152,7 +1153,7 @@ TEST(ImportExportRegressionTest, SelectionState_PreservedAfterImport)
     Eg::SceneManager scene;
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
-    scene.addEntity(line.release());
+    Eg::SceneWriteGateway::addEntity(scene, line.release());
 
     auto allIds = std::vector<Eg::EntityId>{};
     scene.forEachEntityId(
@@ -1171,7 +1172,7 @@ TEST(ImportExportRegressionTest, SelectionState_ClearAfterImport)
     Eg::SceneManager scene;
     auto line = std::make_unique<Eg::SyLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
-    scene.addEntity(line.release());
+    Eg::SceneWriteGateway::addEntity(scene, line.release());
 
     auto allIds = std::vector<Eg::EntityId>{};
     scene.forEachEntityId(
@@ -1344,7 +1345,7 @@ TEST(ImportExportRegressionTest, ExportService_CollectWithSelectedEntities)
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line1));
     entities.push_back(std::move(line2));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 选中一个
     scene.selectEntity(scene.findSyEntityById(id1));
@@ -1534,7 +1535,7 @@ TEST(ImportExportRegressionTest, ExportService_EntityCountAfterExport)
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     service.setSceneManager(&scene);
     EXPECT_EQ(scene.getEntityCount(), 1u);
@@ -1558,7 +1559,7 @@ TEST(ImportExportRegressionTest, ExportService_CollectAfterSelectionChange)
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         entities.push_back(std::move(line));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     EXPECT_EQ(scene.getEntityCount(), 3u);
 
     // 选中一些图元
@@ -1586,7 +1587,7 @@ TEST(ImportExportRegressionTest, SyEntitySerializer_SelectionStateAfterRoundTrip
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     // 选中图元
     scene.selectEntity(scene.findSyEntityById(lineId));
@@ -1925,7 +1926,7 @@ namespace
         line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
         std::vector<std::unique_ptr<Eg::SyEntity>> vec;
         vec.push_back(std::move(line));
-        scene.addEntities(std::move(vec));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
         ExportContext context;
         context.targetPath = path;

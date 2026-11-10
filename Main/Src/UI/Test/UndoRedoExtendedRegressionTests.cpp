@@ -18,6 +18,7 @@
 #include "Engine2D/Edit/UndoRedoManager.h"
 #include "Engine2D/Edit/SceneUndoCommands.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/SceneWriteGateway.h"
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyCircle.h"
 #include "Engine2D/SyEntity/SyPolygon.h"
@@ -42,7 +43,7 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_RestoresAllProperties)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
@@ -90,7 +91,7 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_PolygonAttributes)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(poly));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     // 删除
     auto* entityInScene = scene.findSyEntityById(polyId);
@@ -129,7 +130,7 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_CircleAttributes)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(circle));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     // 删除
     auto* entityInScene = scene.findSyEntityById(circleId);
@@ -235,7 +236,7 @@ TEST(UndoRedoExtendedRegressionTest, SelectionState_DrawUndoSelectionCleared)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     // 选中
     scene.selectEntity(scene.findSyEntityById(lineId));
@@ -269,14 +270,14 @@ TEST(UndoRedoExtendedRegressionTest, SelectionState_MultipleSelectAfterUndo)
     Eg::EntityId id1 = line1->id;
     std::vector<std::unique_ptr<Eg::SyEntity>> vec1;
     vec1.push_back(std::move(line1));
-    scene.addEntities(std::move(vec1));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec1));
 
     auto line2 = std::make_unique<Eg::SyLine>();
     line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
     Eg::EntityId id2 = line2->id;
     std::vector<std::unique_ptr<Eg::SyEntity>> vec2;
     vec2.push_back(std::move(line2));
-    scene.addEntities(std::move(vec2));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec2));
 
     // 选中两个（selectEntity 为单选，第二次覆盖第一次）
     scene.selectEntity(scene.findSyEntityById(id1));
@@ -311,7 +312,7 @@ TEST(UndoRedoExtendedRegressionTest, DirtyState_AfterUndoRedo)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     // 删除
     auto* entityInScene = scene.findSyEntityById(lineId);
@@ -427,7 +428,7 @@ TEST(UndoRedoExtendedRegressionTest, ModifyVisible_UndoRedo)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     auto* entity = scene.findSyEntityById(lineId);
     ASSERT_NE(entity, nullptr);
@@ -468,7 +469,7 @@ TEST(UndoRedoExtendedRegressionTest, ModifyLocked_UndoRedo)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     auto* entity = scene.findSyEntityById(lineId);
     ASSERT_NE(entity, nullptr);
@@ -509,7 +510,7 @@ TEST(UndoRedoExtendedRegressionTest, ModifyName_UndoRedo)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     auto* entity = scene.findSyEntityById(lineId);
     ASSERT_NE(entity, nullptr);
@@ -549,7 +550,7 @@ TEST(UndoRedoExtendedRegressionTest, RedoStackClearedOnNewCommand)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     // 第一个操作：删除
     auto* entity = scene.findSyEntityById(lineId);
@@ -625,7 +626,7 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_SelectionViaSceneManager)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     scene.selectEntity(scene.findSyEntityById(lineId));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
@@ -657,7 +658,7 @@ TEST(UndoRedoExtendedRegressionTest, UndoRedo_ImportEntitySelectionRestore)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
     // 选中图元
@@ -712,7 +713,7 @@ TEST(UndoRedoExtendedRegressionTest, UndoRedo_TransactionBoundary_NestedBatch)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     // 嵌套批量
     undoMgr.beginBatch("outer");
@@ -745,7 +746,7 @@ TEST(UndoRedoExtendedRegressionTest, UndoRedo_MultipleUndoRedoCycles)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     // 删除
     auto* entity = scene.findSyEntityById(lineId);

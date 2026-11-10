@@ -26,6 +26,7 @@
 #include "Hardware/ToolpathJobSpec.h"
 
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/SceneWriteGateway.h"
 #include "Engine2D/Interaction/LayerManager.h"
 #include "Engine2D/SyEntity/SyCircle.h"
 #include "Engine2D/SyEntity/SyLine.h"
@@ -109,7 +110,7 @@ namespace
     {
         Eg::SyLine line;
         line.setPointVector({ Ut::Vec2d(x1, y1), Ut::Vec2d(x2, y2) });
-        scene.addEntity(&line);
+        Eg::SceneWriteGateway::addEntity(scene, &line);
 
         const std::vector<Eg::SyEntity*> all = scene.getAllEntities();
         return all.empty() ? nullptr : all.back();
@@ -122,7 +123,7 @@ namespace
         circle.basePoint = Ut::Vec2d(cx, cy);
         circle.dRadius = r;
         circle.bClosed = true;
-        scene.addEntity(&circle);
+        Eg::SceneWriteGateway::addEntity(scene, &circle);
 
         const std::vector<Eg::SyEntity*> all = scene.getAllEntities();
         return all.empty() ? nullptr : all.back();

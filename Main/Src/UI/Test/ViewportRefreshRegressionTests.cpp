@@ -17,6 +17,7 @@
 #include "UI/Render/SceneRefreshCoordinator.h"
 #include "UI/Render/RenderSubmitScheduler.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/SceneWriteGateway.h"
 #include "Engine2D/SyEntity/SyCircle.h"
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyNurbs.h"
@@ -187,7 +188,7 @@ TEST(ViewportRefreshRegressionTest, SceneManager_DirtyTracking)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 添加图元后应有变更记录
     uint64_t cursor = 0;
@@ -211,7 +212,7 @@ TEST(ViewportRefreshRegressionTest, SceneManager_MultipleAddsDirtyTracking)
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         std::vector<std::unique_ptr<Eg::SyEntity>> entities;
         entities.push_back(std::move(line));
-        scene.addEntities(std::move(entities));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     }
 
     EXPECT_EQ(scene.getEntityCount(), 5u);
@@ -238,7 +239,7 @@ TEST(ViewportRefreshRegressionTest, SceneManager_DeletedEntityIds)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 记下当前变更游标，只关心此后的变更
     uint64_t cursor = 0;
@@ -247,7 +248,7 @@ TEST(ViewportRefreshRegressionTest, SceneManager_DeletedEntityIds)
     cursor = changes.toRevision;
 
     // 删除图元后应有删除变更
-    scene.deleteEntity(scene.findSyEntityById(entityId));
+    Eg::SceneWriteGateway::deleteEntity(scene, scene.findSyEntityById(entityId));
     ASSERT_TRUE(scene.readChanges(cursor, changes));
     const Eg::SceneChange* change = findChangeInRefresh(changes, entityId);
     ASSERT_NE(change, nullptr);
@@ -329,7 +330,7 @@ TEST(RefreshSuppressionTest, Suppression_DefersSceneChangeUntilEnd)
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     EXPECT_EQ(coordinator.pendingLevel(), UI::SceneRefreshLevel::None);
 
@@ -355,7 +356,7 @@ TEST(RefreshSuppressionTest, Suppression_NestedDepth)
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     coordinator.endRefreshSuppression();
     EXPECT_EQ(coordinator.pendingLevel(), UI::SceneRefreshLevel::None)
@@ -386,7 +387,7 @@ TEST(RefreshSuppressionTest, Suppression_BulkChangeUpgradesToFullRefresh)
         line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
         entities.push_back(std::move(line));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     coordinator.endRefreshSuppression();
     EXPECT_EQ(coordinator.pendingLevel(), UI::SceneRefreshLevel::FullRefresh);
@@ -454,7 +455,7 @@ TEST(RefreshChainRegressionTest, SceneChanged_SchedulesSceneUpdate)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // onSceneChanged 收集脏 ID 并调度更新
     coordinator.onSceneChanged();
@@ -473,7 +474,7 @@ TEST(RefreshChainRegressionTest, SceneChanged_CollectsDirtyIds)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     Eg::SceneChangeSet changes;
     ASSERT_TRUE(scene.readChanges(0, changes));
@@ -496,7 +497,7 @@ TEST(RefreshChainRegressionTest, SceneChanged_CollectsDeletedIds)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 记下当前变更游标，只关心此后的变更
     uint64_t cursor = 0;
@@ -504,7 +505,7 @@ TEST(RefreshChainRegressionTest, SceneChanged_CollectsDeletedIds)
     ASSERT_TRUE(scene.readChanges(cursor, changes));
     cursor = changes.toRevision;
 
-    scene.deleteEntity(scene.findSyEntityById(lineId));
+    Eg::SceneWriteGateway::deleteEntity(scene, scene.findSyEntityById(lineId));
     ASSERT_TRUE(scene.readChanges(cursor, changes));
     const Eg::SceneChange* change = findChangeInRefresh(changes, lineId);
     ASSERT_NE(change, nullptr);
@@ -549,7 +550,7 @@ TEST(RefreshPathRegressionTest, LightUpdatePath_RequiresSceneManager)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     coordinator.onSceneChanged();
     coordinator.stop();
@@ -568,7 +569,7 @@ TEST(RefreshPathRegressionTest, FullRefreshPath_RequiresSceneManager)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     coordinator.requestFullRefresh();
     coordinator.stop();
@@ -586,7 +587,7 @@ TEST(RefreshPathRegressionTest, FullRefreshPath_MarksSceneClean)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     Eg::SceneChangeSet changes;
     ASSERT_TRUE(scene.readChanges(0, changes));
@@ -651,7 +652,7 @@ TEST(RefreshPathRegressionTest, MultipleIncrementalUpdates)
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         std::vector<std::unique_ptr<Eg::SyEntity>> entities;
         entities.push_back(std::move(line));
-        scene.addEntities(std::move(entities));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
         coordinator.onSceneChanged();
     }
     coordinator.stop();
@@ -671,7 +672,7 @@ TEST(RefreshCleanupRegressionTest, MarkClean_AfterUpdateSceneRender)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     Eg::SceneChangeSet changes;
     ASSERT_TRUE(scene.readChanges(0, changes));
@@ -695,9 +696,9 @@ TEST(RefreshCleanupRegressionTest, PendingIds_ClearedAfterFullRefresh)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
-    scene.deleteEntity(scene.findSyEntityById(lineId));
+    Eg::SceneWriteGateway::deleteEntity(scene, scene.findSyEntityById(lineId));
     coordinator.onSceneChanged();
     coordinator.stop();
     SUCCEED();
@@ -718,7 +719,7 @@ TEST(RefreshStressRegressionTest, BulkEntities_SceneChanged)
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         entities.push_back(std::move(line));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     EXPECT_EQ(scene.getEntityCount(), 50u);
     Eg::SceneChangeSet changes;
@@ -743,7 +744,7 @@ TEST(RefreshStressRegressionTest, BulkEntities_FullRefresh)
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         entities.push_back(std::move(line));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     coordinator.requestFullRefresh();
     coordinator.stop();
@@ -762,7 +763,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_OnSceneChangedWithDirtyEntities)
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 添加图元后应有变更记录
     Eg::SceneChangeSet changes;
@@ -786,7 +787,7 @@ TEST(ViewportRefreshRegressionTest, Coordinator_OnSceneChangedWithDeletedEntitie
 
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 记下当前变更游标，只关心此后的变更
     uint64_t cursor = 0;
@@ -942,7 +943,7 @@ TEST(RefreshPathRegressionTest, IncrementalToFull_BackToIncremental)
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 增量刷新
     coordinator.requestLightRefresh();
@@ -971,7 +972,7 @@ TEST(RefreshPathRegressionTest, MultipleIncrementalUpdates_NoDataLoss)
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         std::vector<std::unique_ptr<Eg::SyEntity>> entities;
         entities.push_back(std::move(line));
-        scene.addEntities(std::move(entities));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
         coordinator.onSceneChanged();
         coordinator.requestLightRefresh();
@@ -993,7 +994,7 @@ TEST(RefreshPathRegressionTest, FullRefreshAfterSeriesOfIncremental)
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         std::vector<std::unique_ptr<Eg::SyEntity>> entities;
         entities.push_back(std::move(line));
-        scene.addEntities(std::move(entities));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
         coordinator.onSceneChanged();
         coordinator.requestLightRefresh();
@@ -1043,7 +1044,7 @@ TEST(CurveLodPumpRegressionTest, ContinuesPastFirstBatch)
         circle->dRadius = 1.0;
         entities.push_back(std::move(circle));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     ASSERT_EQ(scene.getEntityCount(), static_cast<size_t>(kCircleCount));
 
     RenderWidget widget;
@@ -1087,7 +1088,7 @@ TEST(CurveLodSelectionRegressionTest, HiddenSelectedEntityNotQueued)
     auto circle = std::make_unique<Eg::SyCircle>();
     circle->basePoint = Ut::Vec2d(0.0, 0.0);
     circle->dRadius = 10.0;
-    Eg::SyEntity* added = scene.addEntity(circle.get());
+    Eg::SyEntity* added = Eg::SceneWriteGateway::addEntity(scene, circle.get());
     ASSERT_NE(added, nullptr);
     // 场景先带着选中集被 attach：协调器必须在 setSceneContext 时同步选中缓存。
     scene.selectEntity(added);
@@ -1150,7 +1151,7 @@ TEST(RenderSubmitSchedulerTest, ContinuousRequestKeepsQueueProgress)
         circle->dRadius = 1.0;
         entities.push_back(std::move(circle));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     ASSERT_EQ(scene.getEntityCount(), static_cast<size_t>(kCircleCount));
 
     RenderWidget widget;
@@ -1217,7 +1218,7 @@ TEST(RenderSubmitSchedulerTest, ExtensionQueueConsumedBeforeLodQueue)
         circle->dRadius = 5.0;
         entities.push_back(std::move(circle));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     ASSERT_EQ(scene.getEntityCount(), 6u);
 
     // 从场景取持久 id：LINE 与 CIRCLE 各 3 个
@@ -1307,7 +1308,7 @@ TEST(RenderSubmitSchedulerTest, FailedBatchRetriedUntilSuccess_NoPermanentLoss)
         circle->dRadius = 1.0;
         entities.push_back(std::move(circle));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     std::unordered_set<uint64_t> expectedIds;
     for (const Eg::SyEntity* entity : scene.getAllEntities())
@@ -1365,7 +1366,7 @@ TEST(RenderSubmitSchedulerTest, UnavailableSubmitSuspendsWithoutPointlessRetries
         circle->dRadius = 1.0;
         entities.push_back(std::move(circle));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     RenderWidget widget;
     widget.resize(800, 600);
@@ -1423,7 +1424,7 @@ TEST(RenderSubmitSchedulerTest, ExtensionQueueNonCurveEntriesRetriedAfterFailure
         line->setPointVector({ Ut::Vec2d(-30.0 + 10.0 * i, -20.0), Ut::Vec2d(-30.0 + 10.0 * i, 20.0) });
         entities.push_back(std::move(line));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     std::vector<uint64_t> lineIds;
     for (const Eg::SyEntity* entity : scene.getAllEntities())
@@ -1482,7 +1483,7 @@ TEST(RenderSubmitSchedulerTest, PersistentSubmitFailureBacksOff_WithoutDroppingE
         circle->dRadius = 1.0;
         entities.push_back(std::move(circle));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     RenderWidget widget;
     widget.resize(800, 600);
@@ -1628,7 +1629,7 @@ TEST(RenderSubmitLodBenchmark, DISABLED_MillionEntityZoomOutRebuild)
                 entities.push_back(std::move(spline));
             }
         }
-        scene.addEntities(std::move(entities));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     }
     const double setupMs = elapsedMs(tSetup0, Clock::now());
     ASSERT_EQ(scene.getEntityCount(), kEntityCount);

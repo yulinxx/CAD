@@ -14,6 +14,7 @@
 
 #include "CAM/CamInputBridge.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/SceneWriteGateway.h"
 #include "Engine2D/SyEntity/SyArc.h"
 #include "Engine2D/SyEntity/SyImage.h"
 #include "Engine2D/SyEntity/SyLine.h"
@@ -30,7 +31,7 @@ namespace
     {
         Eg::SyLine line;
         line.setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0, 0.0), Ut::Vec2d(10.0, 10.0) });
-        scene.addEntity(&line);
+        Eg::SceneWriteGateway::addEntity(scene, &line);
 
         const std::vector<Eg::SyEntity*> all = scene.getAllEntities();
         return all.empty() ? nullptr : all.back();
@@ -56,7 +57,7 @@ namespace
             }
         }
         image.setPixelDataVector(data);
-        scene.addEntity(&image);
+        Eg::SceneWriteGateway::addEntity(scene, &image);
 
         const std::vector<Eg::SyEntity*> all = scene.getAllEntities();
         return all.empty() ? nullptr : all.back();
@@ -117,7 +118,7 @@ TEST(CamBridgeTests, ArcAngles_ConvertedFromRadiansToDegrees)
     // 几何层角度单位是弧度：四分之一圆弧
     arc.dStartAngle = 0.0;
     arc.dEndAngle = kPi * 0.5;
-    scene.addEntity(&arc);
+    Eg::SceneWriteGateway::addEntity(scene, &arc);
 
     ToolpathJobSpec spec;
     Cam::ToolpathJobInput input = CamBridge::buildJobInput(scene, nullptr, spec);

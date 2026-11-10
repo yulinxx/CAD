@@ -21,6 +21,7 @@
 #include "Engine2D/Edit/UndoRedoManager.h"
 #include "Engine2D/Edit/SceneUndoCommands.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/SceneWriteGateway.h"
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SyCircle.h"
 
@@ -94,7 +95,7 @@ TEST(UndoRedoRegressionTest, DeleteEntitiesCommand_ExecuteAndUndo)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
@@ -125,7 +126,7 @@ TEST(UndoRedoRegressionTest, ModifyEntityCommand_CustomApply)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     auto* rawLine = dynamic_cast<Eg::SyLine*>(scene.findSyEntityById(entityId));
     ASSERT_NE(rawLine, nullptr);
@@ -204,7 +205,7 @@ TEST(UndoRedoRegressionTest, EntitySnapshotsCommand_RoundTrip)
     std::vector<std::unique_ptr<Eg::SyEntity>> entities;
     entities.push_back(std::move(line));
     entities.push_back(std::move(circle));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     EXPECT_EQ(scene.getEntityCount(), 2u);
 
@@ -671,7 +672,7 @@ TEST(UndoRedoRegressionTest, EntitySnapshots_MergeTwoCommands)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     // 快照 V1 → V2
     Eg::EntityId snapId[1] = { lineId };
@@ -717,7 +718,7 @@ TEST(UndoRedoRegressionTest, EntitySnapshots_NonMergeableKeepsSeparateRecords)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     Eg::EntityId snapId[1] = { lineId };
 
@@ -766,7 +767,7 @@ TEST(UndoRedoRegressionTest, EntitySnapshots_MergeIsSymmetric)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     Eg::EntityId snapId[1] = { lineId };
 
@@ -808,7 +809,7 @@ TEST(UndoRedoRegressionTest, PropertyChange_Visibility)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     auto cmd = std::make_unique<UndoRedoManager::ModifyEntityCommand>(
         &scene,
@@ -842,7 +843,7 @@ TEST(UndoRedoRegressionTest, PropertyChange_LockedState)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     auto cmd = std::make_unique<UndoRedoManager::ModifyEntityCommand>(
         &scene,
@@ -876,7 +877,7 @@ TEST(UndoRedoRegressionTest, PropertyChange_SelectionState)
 
     std::vector<std::unique_ptr<Eg::SyEntity>> vec;
     vec.push_back(std::move(line));
-    scene.addEntities(std::move(vec));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     auto cmd = std::make_unique<UndoRedoManager::ModifyEntityCommand>(
         &scene,

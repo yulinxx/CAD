@@ -929,11 +929,12 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
         {
             // 回退：无 SceneEditService 时直写 SceneManager，无 Undo 支持
             SY_WARNF("[ImportService] SceneEditService not set, adding %d entity(ies) without undo support", flatAdded);
+            SceneEditService directEdit(m_sceneManager, nullptr);
             for (auto& entity : flatEntities)
             {
                 if (entity)
                 {
-                    m_sceneManager->addEntity(entity.release());
+                    directEdit.addEntity(std::move(entity), "Import", CommitMode::Direct);
                 }
             }
         }

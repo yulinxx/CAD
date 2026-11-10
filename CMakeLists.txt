@@ -406,6 +406,13 @@ include("${SANYI_ROOT}/CMake/UiEngineAccessRatchet.cmake")
 sanyi_check_ui_engine_include_ratchet()
 
 # ============================================================================
+# 2D 场景写面门禁 — SceneEditService 是唯一写入口
+# 说明见 CMake/SceneWriteSurface.cmake 文件头。
+# ============================================================================
+include("${SANYI_ROOT}/CMake/SceneWriteSurface.cmake")
+sanyi_check_scene_write_surface()
+
+# ============================================================================
 # C ABI 版本查询校验（CI 门禁）— 约定见 Docs/01-当前架构/C-ABI风格约定.md
 # ============================================================================
 include("${SANYI_ROOT}/CMake/CheckCApi.cmake")

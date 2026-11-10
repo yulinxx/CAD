@@ -26,6 +26,7 @@
 #include "Engine2D/Algorithm/EntityColorFiller.h"
 #include "Engine2D/Algorithm/EntityContourFiller.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/SceneWriteGateway.h"
 #include "Engine2D/Interaction/LayerManager.h"
 #include "Engine2D/Geometry/EntityGeometryEmitter.h"
 #include "Engine2D/SyEntity/SyFillRegion.h"
@@ -702,7 +703,7 @@ TEST(FillColorPixelTest, SpiralFillFollowsSourceLayerColor)
         Eg::SyEntity* srcPtr = src.get();
         std::vector<std::unique_ptr<Eg::SyEntity>> srcBatch;
         srcBatch.push_back(std::move(src));
-        scene.addEntities(std::move(srcBatch));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(srcBatch));
         // 源图形必须真正属于该图层，填充才会跟随它的颜色并落回同层
         layerManager.assignEntityToLayer(srcPtr, nLayerId);
 
@@ -902,7 +903,7 @@ TEST(FillColorPixelTest, ColorFillExplicitColorReachesRenderedPixel)
         Eg::SyEntity* srcPtr = src.get();
         std::vector<std::unique_ptr<Eg::SyEntity>> srcBatch;
         srcBatch.push_back(std::move(src));
-        scene.addEntities(std::move(srcBatch));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(srcBatch));
 
         // 色块填充写入需要图层管理器：这里给它一个独立图层，颜色仍由显式参数决定
         LayerManager layerManager(&scene);

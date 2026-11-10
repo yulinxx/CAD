@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/SceneWriteGateway.h"
 #include "Engine2D/Geometry/EntityGeometryEmitter.h"
 #include "Engine2D/Render/SelectionOutlineBuilder.h"
 #include "Engine2D/SyEntity/SyFillRegion.h"
@@ -70,9 +71,9 @@ namespace
     /// 把样本加入场景并记录持久 ID，再把三类一起选中
     void addAndSelectAll(Eg::SceneManager& scene, MixedSceneSample& sample)
     {
-        Eg::SyEntity* line = scene.addEntity(&sample.line);
-        Eg::SyEntity* fill = scene.addEntity(&sample.fill);
-        Eg::SyEntity* image = scene.addEntity(&sample.image);
+        Eg::SyEntity* line = Eg::SceneWriteGateway::addEntity(scene, &sample.line);
+        Eg::SyEntity* fill = Eg::SceneWriteGateway::addEntity(scene, &sample.fill);
+        Eg::SyEntity* image = Eg::SceneWriteGateway::addEntity(scene, &sample.image);
         EXPECT_NE(line, nullptr);
         EXPECT_NE(fill, nullptr);
         EXPECT_NE(image, nullptr);
