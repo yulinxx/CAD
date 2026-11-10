@@ -15,6 +15,8 @@
 #include "Engine2D/Geometry/EntityGeometryEmitter.h"
 #include "Engine2D/Render/SelectionOutlineBuilder.h"
 #include "Engine/SyEntity/EType.h"
+
+#include "Option/TextEdit/TextMetaCodec.h"
 #include "Engine/Parallel/EngineParallel.h"
 
 #include "Ut/BBox2d.h"
@@ -76,6 +78,23 @@ namespace
     private:
         FrameTimer* m_timer;
     };
+
+    /// 图元是否属于某个文字块（顶层群组名带 Text 元数据，或用旧版纯 "Text" 命名）。
+    /// 文字块内部是 "Text > Char > SmartLine" 的多层群组，只认叶子往上找到最外层。
+    /// 只在选中判定里调用（数量等于选中图元数），不会遍历整场景。
+    bool isInsideTextGroup(const Eg::SyEntity* entity)
+    {
+        const Eg::SyGroup* group = entity != nullptr ? entity->group() : nullptr;
+        if (group == nullptr)
+        {
+            return false;
+        }
+        while (group->parentGroup() != nullptr)
+        {
+            group = group->parentGroup();
+        }
+        return TextMetaCodec::isTextGroupName(QString::fromStdString(group->nameStr()));
+    }
 }  // namespace
 
 SceneRefreshCoordinator::SceneRefreshCoordinator(QObject* parent)
@@ -388,7 +407,20 @@ bool SceneRefreshCoordinator::hideSelectedEffective() const
 
 bool SceneRefreshCoordinator::canHideSelectedBody(const Eg::SyEntity* entity)
 {
-    // 位图/色块/文字等离散不出轮廓路径：隐藏本体后没有任何替代视觉，等于把图元抹掉
+    if (!entity)
+    {
+        return false;
+    }
+
+    // 文字块虽然是 SMARTLINE（类型门槛放行），但一整块的视觉就是这些轮廓折线本身：
+    // 本体摘掉后只剩 1px 虚线，字号一正常看过去就是「文字消失了」。文字必须留在世界层，
+    // 与头文件里「位图/色块/文字没有替代视觉」的约定保持一致。
+    if (isInsideTextGroup(entity))
+    {
+        return false;
+    }
+
+    // 位图/色块等离散不出轮廓路径：隐藏本体后没有任何替代视觉，等于把图元抹掉
     return Eg::SelectionOutlineBuilder::supportsSelectionOutline(entity);
 }
 

@@ -19,13 +19,19 @@
 #include <unordered_set>
 #include <vector>
 
+#include "Engine2D/Core/GroupManager.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Core/SceneWriteGateway.h"
 #include "Engine2D/Geometry/EntityGeometryEmitter.h"
 #include "Engine2D/Render/SelectionOutlineBuilder.h"
 #include "Engine2D/SyEntity/SyFillRegion.h"
+#include "Engine2D/SyEntity/SyGroup.h"
 #include "Engine2D/SyEntity/SyImage.h"
 #include "Engine2D/SyEntity/SyLine.h"
+#include "Engine2D/SyEntity/SySmartLine.h"
+
+#include "Option/TextEdit/TextMeta.h"
+#include "Option/TextEdit/TextMetaCodec.h"
 
 #include "Render/RenderSceneBuilder.h"
 #include "RenderAbstraction/IRenderFactory.h"
@@ -278,4 +284,81 @@ TEST(MixedSelectionRenderTest, SelectedBitmapStaysInBitmapLedger)
     const std::unordered_set<uint64_t> selected{ sample.imageId, sample.fillId, sample.lineId };
     reconciler.reconcile(&scene, /*fullReconcile=*/false, selected, /*hideSelected=*/false, {});
     EXPECT_TRUE(reconciler.has(sample.imageId));
+}
+
+// 文字块内部是 "Text > Char > SmartLine"：类型门槛虽放行，但把本体摘掉后只剩 1px 虚线，
+// 字号正常时看起来就是「文字消失」。文字必须始终留在世界层，普通矢量仍按开关隐藏。
+TEST(MixedSelectionRenderTest, SelectedTextGlyphBodiesAreNeverHidden)
+{
+    Eg::SceneManager scene;
+
+    // 闭合的「字形」轮廓：四条首尾相接的直线段，与 TextConverter 产出的轮廓同构
+    const auto buildGlyph = [](Eg::SySmartLine& glyph, double dOffsetX) {
+        const Ut::Vec2d pts[4] = {
+            Ut::Vec2d(dOffsetX, 0.0),
+            Ut::Vec2d(dOffsetX + 10.0, 0.0),
+            Ut::Vec2d(dOffsetX + 10.0, 10.0),
+            Ut::Vec2d(dOffsetX, 10.0),
+        };
+        for (int i = 0; i < 4; ++i)
+        {
+            auto seg = std::make_unique<Eg::SyLine>();
+            seg->setPointVector({ pts[i], pts[(i + 1) % 4] });
+            glyph.addSegmentUnique(std::move(seg), false);
+        }
+    };
+    Eg::SySmartLine modernGlyph;
+    Eg::SySmartLine legacyGlyph;
+    buildGlyph(modernGlyph, 0.0);
+    buildGlyph(legacyGlyph, 20.0);
+
+    Eg::SyEntity* modernLeaf = Eg::SceneWriteGateway::addEntity(scene, &modernGlyph);
+    Eg::SyEntity* legacyLeaf = Eg::SceneWriteGateway::addEntity(scene, &legacyGlyph);
+    Eg::SyLine plainLine;
+    plainLine.setPointVector({ Ut::Vec2d(0.0, 40.0), Ut::Vec2d(10.0, 50.0) });
+    Eg::SyEntity* plainEntity = Eg::SceneWriteGateway::addEntity(scene, &plainLine);
+    ASSERT_NE(modernLeaf, nullptr);
+    ASSERT_NE(legacyLeaf, nullptr);
+    ASSERT_NE(plainEntity, nullptr);
+
+    // 新版文字块：顶层群组名带 Text 元数据；旧版：纯 "Text"。两种都必须识别
+    Eg::SyGroup* modernChar = scene.groupManager().createGroup({ modernLeaf }, "Char");
+    ASSERT_NE(modernChar, nullptr);
+    Eg::SyGroup* modernText = scene.groupManager().createGroup("Text");
+    ASSERT_NE(modernText, nullptr);
+    modernText->addSubGroup(modernChar);
+    const QString encoded = TextMetaCodec::encodeToGroupName(
+        QStringLiteral("3"), TextCharStyle{}, Ut::Vec2d(0.0, 0.0), 0, 0.0);
+    ASSERT_FALSE(encoded.isEmpty());
+    modernText->setNameStr(encoded.toStdString());
+
+    Eg::SyGroup* legacyChar = scene.groupManager().createGroup({ legacyLeaf }, "Char");
+    ASSERT_NE(legacyChar, nullptr);
+    Eg::SyGroup* legacyText = scene.groupManager().createGroup("Text");
+    ASSERT_NE(legacyText, nullptr);
+    legacyText->addSubGroup(legacyChar);
+
+    Eg::VecSyEntityPtr selection{ modernLeaf, legacyLeaf, plainEntity };
+    scene.selectEntities(selection);
+
+    RenderWidget widget;
+    widget.resize(800, 600);
+    widget.setHideSelectedOriginal(true);
+    widget.setSelectionOutlinesActive(true);
+
+    SceneRefreshCoordinator coordinator;
+    coordinator.setRenderWidget(&widget);
+    coordinator.setSceneContext(&scene);
+
+    // 类型门槛本身没变：字形折线仍属于「能离散出轮廓」的矢量
+    EXPECT_TRUE(Eg::SelectionOutlineBuilder::supportsSelectionOutline(modernLeaf));
+
+    ASSERT_TRUE(widget.hideSelectedOriginalEffective());
+    const std::unordered_set<uint64_t> hidden = coordinator.selectedBodyHideIds();
+    EXPECT_EQ(hidden.count(static_cast<uint64_t>(modernLeaf->id)), 0u);
+    EXPECT_EQ(hidden.count(static_cast<uint64_t>(legacyLeaf->id)), 0u);
+    // 普通矢量仍按开关隐藏，说明不是把「隐藏本体」整体关掉
+    EXPECT_TRUE(hidden.count(static_cast<uint64_t>(plainEntity->id)) > 0);
+
+    coordinator.stop();
 }
