@@ -8,7 +8,7 @@
  *   - 输入：Eg::SceneManager + LayerManager + ToolpathJobSpec
  *   - 输出：Cam::ToolpathJobInput（中性 C++ 值类型，属 CAM 的 C++ 内部 ABI）
  *
- * CAM 模块本身（CAM/CAM/Include/CAM/*.h）不得 include Engine2D 头 ——
+ * CAM 模块本身（CAM/CAM/Include/CAM/ 下的头文件）不得 include Engine2D 头 ——
  * 所有 Engine2D → CAM 的类型转换工作必须在此文件完成。
  *
  * 条件编译：仅在 BUILD_CAM=ON 时编进 Main。
