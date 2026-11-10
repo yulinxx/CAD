@@ -31,7 +31,7 @@ SanYiCAD 安装包冒烟测试。
         --expected-version 1.0.1 --previous-version 1.0.0
 
     # 4) macOS 构建树 staged 测试：把 Qt 框架路径显式传给程序
-    python3 Tools/package_smoke_test.py --build-dir build --qt-dir "$HOME/Qt/6.11.1/macos"
+    python3 Tools/package_smoke_test.py --build-dir build --qt-dir "$HOME/Qt/6.12.0/macos"
 """
 
 from __future__ import annotations

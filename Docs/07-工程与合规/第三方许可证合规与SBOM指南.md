@@ -301,7 +301,7 @@ SBOM 不等于许可证合规，也不等于安全扫描。它解决的是“**�
     {
       "type": "library",
       "name": "Qt",
-      "version": "6.11.1",
+      "version": "6.12.0",
       "licenses": [{ "license": { "id": "LGPL-3.0-only" } }],
       "properties": [
         { "name": "sanyi:usage", "value": "dynamic-link" }

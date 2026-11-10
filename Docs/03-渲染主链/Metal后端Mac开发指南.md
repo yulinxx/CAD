@@ -96,7 +96,7 @@ elseif(APPLE)
 如果你的 Mac 用户名不是 `ms`，或者 vcpkg 不在这个位置，**必须显式传**
 `-DVCPKG_DIR=/你的路径/vcpkg`，否则后面 `stb_truetype.h` 找不到会直接
 `FATAL_ERROR`。同样的道理，`Config.cmake` 里 `Qt_INSTALL_DIR` 的 macOS 默认值
-是 `/Users/ms/Qt/6.11.1/macos`，跑 `Renderx` 独立构建时用不到 Qt，
+是 `/Users/ms/Qt/6.12.0/macos`，跑 `Renderx` 独立构建时用不到 Qt，
 但如果你以后要构建宿主，这个也要一起改。
 
 vcpkg 需要装好的包（Renderx 独立构建相关）：
