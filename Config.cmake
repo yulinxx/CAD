@@ -111,6 +111,13 @@ set(CMAKE_TOOLCHAIN_FILE "${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake"
 set(VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_LIST_DIR}/CMake/vcpkg-overlays"
     CACHE STRING "vcpkg overlay ports (repo-local)")
 
+# Python 绑定依赖（仅 SANYI_PYBIND_CORE=ON 时需要，header-only）：
+#   python3.11 -m pip install "pybind11>=2.11"
+# 不要使用 vcpkg 的 pybind11 port：它依赖 vcpkg python3，并会通过 cmake wrapper
+# 强制接管 FindPython，把扩展 ABI 从工程固定的 Python ${SANYI_PYTHON_VERSION} 改掉。
+# PyBindCore 在找不到 pybind11 时会依次从工具链 config、Python 解释器推导，
+# 仍失败才给出可复制的安装命令。
+
 # --------------------------------------------------------------------
 # 构建类型：唯一默认值定义在上面的「构建类型」小节（见 set(CMAKE_BUILD_TYPE ...)）。
 # 这里只做状态输出。原先此处还有一份重复的 `if(NOT CMAKE_BUILD_TYPE)` 兜底，

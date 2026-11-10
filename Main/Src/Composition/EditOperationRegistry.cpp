@@ -31,7 +31,7 @@
 #include "UI2D/Operation/AlgorithmRunner.h"
 #include "Option/TextPasteService.h"
 #include "Option/ImagePasteService.h"
-#include "Option/TextInputSettingsStore.h"
+#include "UI2D/Option/TextInputSettingsStore.h"
 #include "Operation/ReliefEngravingOperation2D.h"
 #include "UI/Services/ViewportActionHub.h"
 #include "UI/Services/UiStateCenter.h"
