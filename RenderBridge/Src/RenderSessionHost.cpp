@@ -9,7 +9,7 @@
 // renderx.h 只在 .cpp 内部可见，头文件不再直接暴露它
 #include "render/renderx.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <QOpenGLContext>
 
@@ -30,14 +30,20 @@ namespace
         switch (static_cast<RenderAbstraction::LogLevel>(level))
         {
         case RenderAbstraction::LogLevel::Debug:
+            // DLL 的 Debug 是排障细节（如逐条管线创建），不能提升成 INFO：
+            // 此前 Debug 与 Info 共用一个分支，导致启动时 23 条
+            // "pipeline created" 全部以 [I] 刷屏。降到 DEBUG 后默认
+            // Info 级别不输出，需要时调日志级别即可看到全量。
+            APR_DEBUGF("[Renderx] %s", message);
+            break;
         case RenderAbstraction::LogLevel::Info:
-            SY_INFOF("[Renderx] %s", message);
+            APR_INFOF("[Renderx] %s", message);
             break;
         case RenderAbstraction::LogLevel::Warn:
-            SY_WARNF("[Renderx] %s", message);
+            APR_WARNF("[Renderx] %s", message);
             break;
         case RenderAbstraction::LogLevel::Error:
-            SY_ERRORF("[Renderx] %s", message);
+            APR_ERRORF("[Renderx] %s", message);
             break;
         }
     }
@@ -162,7 +168,7 @@ namespace
                 // 走到这里说明应用退出了、但仍有视口没被析构（正常路径下
                 // 最后一个视口的 release() 已经把 runtime 销毁了）。此时渲染 DLL
                 // 可能已卸载，去调 rxRuntimeDestroy 的风险高于让 OS 回收，因此只报。
-                SY_WARNF("[SharedRuntime] runtime still alive on process exit: %u viewports not destructed, "
+                APR_WARNF("[SharedRuntime] runtime still alive on process exit: %u viewports not destructed, "
                          "left for OS reclamation",
                     m_holders);
             }
@@ -177,13 +183,13 @@ namespace
                 {
                     // Runtime 级参数只在首次建立时生效；两个视口必须声明同一个值，
                     // 否则「谁先建谁说了算」。留 WARN 避免不一致无人察觉。
-                    SY_WARNF("[SharedRuntime] transientBufferBytes requested %llu vs existing %llu, "
+                    APR_WARNF("[SharedRuntime] transientBufferBytes requested %llu vs existing %llu, "
                              "keeping existing (latecomer cannot expand)",
                         static_cast<unsigned long long>(desc.transientBufferBytes),
                         static_cast<unsigned long long>(m_transientBytes));
                 }
                 m_holders += 1;
-                SY_INFOF("[SharedRuntime] Reusing process-level Metal runtime (current holders: %u)", m_holders);
+                APR_INFOF("[SharedRuntime] Reusing process-level Metal runtime (current holders: %u)", m_holders);
                 return m_runtime;
             }
 
@@ -196,7 +202,7 @@ namespace
             m_holders = 1;
             m_shutdownRequested = false;
 
-            SY_INFOF("[SharedRuntime] Created process-level Metal runtime"
+            APR_INFOF("[SharedRuntime] Created process-level Metal runtime"
                      " (transient=%llu bytes; app-level lifetime, shared by 2D/3D, survives viewport recreation)",
                 static_cast<unsigned long long>(m_transientBytes));
 
@@ -219,7 +225,7 @@ namespace
                 destroy("app exit requested and the last viewport has been torn down");
                 return;
             }
-            SY_INFOF("[SharedRuntime] Viewport released (current holders: %u; runtime preserved for next viewport)",
+            APR_INFOF("[SharedRuntime] Viewport released (current holders: %u; runtime preserved for next viewport)",
                 m_holders);
         }
 
@@ -236,7 +242,7 @@ namespace
                 destroy("app exit requested and no viewport is currently open");
                 return;
             }
-            SY_INFOF("[SharedRuntime] Shutdown requested: %u viewports remain, "
+            APR_INFOF("[SharedRuntime] Shutdown requested: %u viewports remain, "
                      "runtime deferred to last viewport release (Qt viewport destructors are delayed)",
                 m_holders);
         }
@@ -245,7 +251,7 @@ namespace
         void destroy(const char* reason)
         {
             m_shutdownRequested = false;
-            SY_INFOF("[SharedRuntime] Destroying process-level Metal runtime (%s)", reason ? reason : "?");
+            APR_INFOF("[SharedRuntime] Destroying process-level Metal runtime (%s)", reason ? reason : "?");
             Render::RT::rxRuntimeDestroy(m_runtime);
             m_runtime = Render::RT::RuntimeHandle::Invalid;
             m_transientBytes = 0;
@@ -279,7 +285,7 @@ namespace RenderBridge
         {
             // Metal 的交换链必须挂在 NSView 上；没有句柄就无法建 surface，
             // 提前失败比让 DLL 在深处报一句模糊的日志更容易定位。
-            SY_ERRORF("RenderSessionHost[%s]: Metal backend requires nativeWindow (NSView*)",
+            APR_ERRORF("RenderSessionHost[%s]: Metal backend requires nativeWindow (NSView*)",
                 config.applicationName ? config.applicationName : "?");
             return false;
         }
@@ -362,7 +368,7 @@ namespace RenderBridge
         m_sceneObj = RenderBridge::wrapRenderXScene(m_runtime, m_session);
         if (!m_deviceObj || !m_surfaceObj || !m_sceneObj)
         {
-            SY_ERRORF("RenderSessionHost[%s]: abstraction layer object wrapping failed, viewport cannot use render interface",
+            APR_ERRORF("RenderSessionHost[%s]: abstraction layer object wrapping failed, viewport cannot use render interface",
                 config.applicationName ? config.applicationName : "?");
         }
         return true;
@@ -422,7 +428,7 @@ namespace RenderBridge
         {
             return;
         }
-        SY_INFOF("%s: backend=%s device=%s maxLineWidth=%.1f",
+        APR_INFOF("%s: backend=%s device=%s maxLineWidth=%.1f",
             tag ? tag : "RenderSessionHost",
             Render::RT::rxBackendName(caps.backend),
             caps.deviceName,

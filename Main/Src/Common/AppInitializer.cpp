@@ -9,7 +9,7 @@
 #include "CrashHandlerBootstrap.h"
 #include "VersionInfo.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "UI/LanguageManager.h"
 #include "UI/FontManager.h"
 #include "Persistence/PersistenceService.h"
@@ -31,7 +31,7 @@ namespace
     // 取走唯一所有权；应用提前退出时由 shutdown() 兜底销毁。
     static std::unique_ptr<PersistenceService> s_persistenceService;
 
-    // SyLogger 日志目录回调 thunk：C 函数指针 + void* ctx，
+    // AprLogger 日志目录回调 thunk：C 函数指针 + void* ctx，
     // 返回静态缓冲（避免 std::function/std::string 跨 DLL 传递）
     static char s_logPathBuffer[1024];
 
@@ -49,34 +49,34 @@ namespace
 
 void AppInitializer::initialize()
 {
-    SyLogger::SetLogPathCallback(&appLogPathThunk, nullptr);
+    AprLogger::SetLogPathCallback(&appLogPathThunk, nullptr);
 
-    SyLogger::GetInstance().Initialize(MainApp::appName().c_str(), SyLogLevel::Debug, true, true);
+    AprLogger::GetInstance().Initialize(MainApp::appName().c_str(), AprLogLevel::Info, true, true);
 
     // 检测应用名称是否正确配置（CMake 模板替换失败时 appName() 为空）
     if (MainApp::appName().empty())
     {
-        SY_WARN("[AppInitializer] APP_NAME is empty! Please check CMake configuration: "
+        APR_WARN("[AppInitializer] APP_NAME is empty! Please check CMake configuration: "
                 "VersionInfo.h.in and Info.plist.in templates must use @APP_NAME@ (not @app_name@)");
     }
 
-    SY_INFO("==============================================================");
-    SY_INFOF("================== Starting %s v%s ==================",
+    APR_INFO("==============================================================");
+    APR_INFOF("================== Starting %s v%s ==================",
         MainApp::appName().c_str(),
         MainApp::appVersion().c_str());
-    SY_INFO("==============================================================\n\n");
+    APR_INFO("==============================================================\n\n");
 
     // 这里只能声明「本构建把视口编译成了哪个后端」——那是编译期事实，启动瞬间即可知。
     // 真实生效的后端与设备名要等视口建 Surface 后由
     // RenderSessionHost::logCapabilities 打印（只有那里拿得到 caps）。
     // 后端名这里直接写字面量：它只描述「本构建选了哪个后端」，
     // 不必为一个字符串去引渲染后端的头文件（应用层与后端零耦合）。
-#ifdef SY_ENABLE_METAL_VIEWPORT
+#ifdef APR_ENABLE_METAL_VIEWPORT
     const char* configuredBackendName = "Metal";
 #else
     const char* configuredBackendName = "OpenGL";
 #endif
-    SY_INFOF("[Render] Viewport backend (compile-time): %s", configuredBackendName);
+    APR_INFOF("[Render] Viewport backend (compile-time): %s", configuredBackendName);
 
     CrashHandlerBootstrap::logPendingDumps();
 
@@ -96,7 +96,7 @@ void AppInitializer::initialize()
     FontConfig fontConfig;
     fontConfig.fontSize = 9;
     FontManager::apply(fontConfig);
-    SY_INFOF("Language set to: %s (dir: %s)",
+    APR_INFOF("Language set to: %s (dir: %s)",
         languageManager->currentLanguageName().toUtf8().constData(),
         translationsDir.toUtf8().constData());
 
@@ -104,22 +104,17 @@ void AppInitializer::initialize()
     // 数据库文件存放在 AppPathManager::dataDir() 下，确保目录存在
     const QString dataDir = AppPathManager::dataDir();
     QDir().mkpath(dataDir);
+    APR_INFOF("[AppInitializer] Data directory: %s", dataDir.toUtf8().constData());
     const QString dbPath = AppPathManager::databasePath();
     auto persistenceService = std::make_unique<PersistenceService>();
 
     if (persistenceService->initialize(dbPath.toStdString()))
     {
-        SY_INFOF("[AppInitializer] Database initialized: %s", dbPath.toUtf8().constData());
-
-        auto* settingsRepo = persistenceService->settings();
-        if (settingsRepo)
-        {
-            SyLogger::GetInstance().SetLevel(SyLogLevel::Info);
-        }
+        APR_INFOF("[AppInitializer] Database initialized: %s", dbPath.toUtf8().constData());
     }
     else
     {
-        SY_ERRORF("[AppInitializer] Failed to initialize database: %s", persistenceService->lastError().c_str());
+        APR_ERRORF("[AppInitializer] Failed to initialize database: %s", persistenceService->lastError().c_str());
     }
 
     s_persistenceService = std::move(persistenceService);
@@ -133,14 +128,14 @@ void AppInitializer::shutdown()
     s_persistenceService.reset();
 
     // 等待前面的日志写入完成
-    SyLogger::GetInstance().Flush();
+    AprLogger::GetInstance().Flush();
 
     // 最后打印 shutdown 日志
-    SY_INFO("==============================================================");
-    SY_INFO("Application shutting down");
-    SY_INFO("==============================================================\n\n");
+    APR_INFO("==============================================================");
+    APR_INFO("Application shutting down");
+    APR_INFO("==============================================================\n\n");
 
-    SyLogger::GetInstance().Shutdown();
+    AprLogger::GetInstance().Shutdown();
 }
 
 std::unique_ptr<PersistenceService> AppInitializer::takePersistenceService()

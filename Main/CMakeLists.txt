@@ -98,7 +98,7 @@ list(FILTER MAIN_APP_SOURCES EXCLUDE REGEX ".*/Src/Hardware/(SafetyManager|Mater
 # 实现放到应用层并单独成 DLL：Hardware.dll 不再导出 Qt 容器与 vtable。
 # 公共头声明使用 HARDWARE_API，因此实现必须由定义了导出宏的 DLL 承载。
 if(BUILD_HARDWARE)
-    sanyi_add_shared_library(HardwareApp
+    apr_add_shared_library(HardwareApp
         FOLDER "Modules"
         DESCRIPTION "Application-layer hardware Qt wrappers"
         EXPORT_MACRO "HARDWAREAPP_EXPORTS"
@@ -158,10 +158,10 @@ file(GLOB_RECURSE MAIN_RESOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.qrc"
 )
 
-set(APP_NAME "SanYiCAD")
+set(APP_NAME "April")
 
-set(APP_ORGANIZATION_NAME "SanYi")
-set(APP_ORGANIZATION_DOMAIN "sanyi-cad.com")
+set(APP_ORGANIZATION_NAME "April")
+set(APP_ORGANIZATION_DOMAIN "april-cad.com")
 
 # 构建时间（用于版本信息显示）
 string(TIMESTAMP APP_BUILD_TIME "%Y-%m-%d %H:%M:%S" UTC)
@@ -180,7 +180,7 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/VersionInfo.h" "${_version_info_configur
 # ---------------------------------------------------------------------------
 foreach(_bc_opt
         BUILD_UI3D BUILD_NESTING BUILD_HARDWARE BUILD_VISION BUILD_ENGRAVING
-        BUILD_GEOMODELCORE BUILD_RENDERX SANYI_PYTHON_HOST BUILD_PYTHON SANYI_ENABLE_LICENSE)
+        BUILD_GEOMODELCORE BUILD_RENDERX APR_PYTHON_HOST BUILD_PYTHON APR_ENABLE_LICENSE)
     if(${_bc_opt})
         set(_bc_${_bc_opt} "true")
     else()
@@ -196,7 +196,7 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/BuildConfig.h" "${_build_config_configur
 # qrc 陈旧护栏
 #
 # configs/ 下新增了客户 JSON 但忘了登记进 configs.qrc 时，构建出的二进制里根本
-# 没有这份配置：运行期只会静默回退到 san_yi，既不报错也看不出少了什么。
+# 没有这份配置：运行期只会静默回退到 april，既不报错也看不出少了什么。
 # 反方向（qrc 里登记了已删除的文件）rcc 自己会报错，不需要额外护栏。
 # ---------------------------------------------------------------------------
 file(GLOB _client_config_json CONFIGURE_DEPENDS RELATIVE "${SRC_ROOT}/UI/ClientConfig"
@@ -249,7 +249,7 @@ set_target_properties(${APP_NAME} PROPERTIES
     CXX_VISIBILITY_PRESET default
     MACOSX_BUNDLE TRUE
     MACOSX_BUNDLE_BUNDLE_NAME "${APP_NAME}"
-    MACOSX_BUNDLE_GUI_IDENTIFIER "com.sanyi.${APP_NAME}"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "com.april.${APP_NAME}"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0.0"
     MACOSX_BUNDLE_BUNDLE_VERSION "1.0.0"
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_BINARY_DIR}/Info.plist"
@@ -259,11 +259,35 @@ set_target_properties(${APP_NAME} PROPERTIES
 # 动态库也在 bin/；macOS 把 .app 放在安装前缀根目录，所以从
 # Contents/MacOS 往上三级到前缀，再进 bin/）。
 # 不设 INSTALL_RPATH 时，CMake 安装阶段会剥掉构建期的 rpath，装出来的
-# SanYiCAD.app 因为找不到 libEngine2D/libEngineCommon 等 DLL 而启动失败。
+# April.app 因为找不到 libEngine2D/libEngineCommon 等 DLL 而启动失败。
 if(APPLE)
     set_target_properties(${APP_NAME} PROPERTIES INSTALL_RPATH "@loader_path/../../../bin")
 elseif(UNIX)
     set_target_properties(${APP_NAME} PROPERTIES INSTALL_RPATH "$ORIGIN")
+endif()
+
+# 运行时翻译文件部署：macOS 放进 bundle 的 Resources/translations（与 install 规则一致），
+# 其它平台放在可执行文件旁 translations/。缺少这一步时发布版永远回退英文。
+if(APR_TRANSLATIONS_QM_FILES)
+    if(APPLE)
+        add_custom_command(TARGET ${APP_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_BUNDLE_CONTENT_DIR:${APP_NAME}>/Resources/translations"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${APR_TRANSLATIONS_QM_FILES}
+                "$<TARGET_BUNDLE_CONTENT_DIR:${APP_NAME}>/Resources/translations"
+            COMMENT "Deploying translations into app bundle"
+            VERBATIM
+        )
+    else()
+        add_custom_command(TARGET ${APP_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:${APP_NAME}>/translations"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${APR_TRANSLATIONS_QM_FILES}
+                "$<TARGET_FILE_DIR:${APP_NAME}>/translations"
+            COMMENT "Deploying translations next to executable"
+            VERBATIM
+        )
+    endif()
 endif()
 
 target_compile_features(${APP_NAME} PRIVATE cxx_std_17)
@@ -271,12 +295,12 @@ target_compile_features(${APP_NAME} PRIVATE cxx_std_17)
 # Renderx 运行时资源：着色器与默认字体必须位于应用可执行文件目录
 # （applicationDirPath()）。Renderx 自身只复制到其 dylib 输出目录，
 # macOS bundle 化后应用二进制位于 Contents/MacOS，需额外复制一份。
-if(SANYI_RENDERX_DIR AND EXISTS "${SANYI_RENDERX_DIR}/src/shader")
+if(APR_RENDERX_DIR AND EXISTS "${APR_RENDERX_DIR}/src/shader")
     file(GLOB _renderx_shader_files CONFIGURE_DEPENDS
-        "${SANYI_RENDERX_DIR}/src/shader/*.vert"
-        "${SANYI_RENDERX_DIR}/src/shader/*.frag"
-        "${SANYI_RENDERX_DIR}/src/shader/*.comp")
-    file(GLOB _renderx_font_files CONFIGURE_DEPENDS "${SANYI_RENDERX_DIR}/src/res/*.ttf")
+        "${APR_RENDERX_DIR}/src/shader/*.vert"
+        "${APR_RENDERX_DIR}/src/shader/*.frag"
+        "${APR_RENDERX_DIR}/src/shader/*.comp")
+    file(GLOB _renderx_font_files CONFIGURE_DEPENDS "${APR_RENDERX_DIR}/src/res/*.ttf")
     add_custom_command(TARGET ${APP_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${APP_NAME}>"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${_renderx_shader_files} "$<TARGET_FILE_DIR:${APP_NAME}>/"
@@ -289,7 +313,7 @@ endif()
 target_include_directories(${APP_NAME}
     PRIVATE
         ${SHARED_PROJECT_INCLUDE_DIRS}
-        "${SANYI_RENDERX_DIR}/include"
+        "${APR_RENDERX_DIR}/include"
 )
 if(BUILD_CRASHHANDLER)
     target_include_directories(${APP_NAME} PRIVATE
@@ -344,10 +368,10 @@ target_link_libraries(${APP_NAME}
 )
 
 # 客户化 UI 配置
-# 注意：SANYI_CLIENT_ID 已不再作为编译期宏注入。
+# 注意：APR_CLIENT_ID 已不再作为编译期宏注入。
 # 客户 ID 现由 UiClientContext 在运行时解析（环境变量 / QSettings / 默认值），
 # 同一份二进制可服务多个客户。这里只把默认客户 ID 传给安装包脚本使用。
-target_compile_definitions(${APP_NAME} PRIVATE SANYI_DEFAULT_CLIENT_ID="${SANYI_DEFAULT_CLIENT_ID}")
+target_compile_definitions(${APP_NAME} PRIVATE APR_DEFAULT_CLIENT_ID="${APR_DEFAULT_CLIENT_ID}")
 
 # Qt 调试输出控制已在 Config.cmake 中统一处理
 
@@ -408,11 +432,11 @@ if(BUILD_UI3D)
     endif()
 endif()
 # Engine3D 始终链接：Main 模块的 ImportService / SceneBuilder3D 等核心
-# 代码无条件依赖 Engine3D（SceneManager3D、SyMeshEntity），与 BUILD_UI3D 无关
+# 代码无条件依赖 Engine3D（SceneManager3D、AprMeshEntity），与 BUILD_UI3D 无关
 target_link_libraries(${APP_NAME} PRIVATE Engine3D)
 
-if(SANYI_PYTHON_HOST)
-    target_compile_definitions(${APP_NAME} PRIVATE SANYI_PYTHON_HOST=1)
+if(APR_PYTHON_HOST)
+    target_compile_definitions(${APP_NAME} PRIVATE APR_PYTHON_HOST=1)
     target_compile_definitions(${APP_NAME} PRIVATE "CMAKE_SOURCE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/..\"")
     target_include_directories(${APP_NAME}
         PRIVATE
@@ -429,8 +453,8 @@ if(SANYI_PYTHON_HOST)
     )
 endif()
 
-if(SANYI_PYBIND_CORE AND SANYI_PYTHON_HOST)
-    add_dependencies(${APP_NAME} SanYiPyBindCore)
+if(APR_PYBIND_CORE AND APR_PYTHON_HOST)
+    add_dependencies(${APP_NAME} AprPyBindCore)
 endif()
 
 if(MSVC)
@@ -539,7 +563,7 @@ endif()
 #   - Windows: dll 和 exe 都在 bin/，直接全部复制到输出目录
 #   - Linux/macOS: bin/ 放可执行文件，lib/ 放依赖库；
 #                  调用 PdfToSvgConverter 运行时会自动设置 LD_LIBRARY_PATH / DYLD_LIBRARY_PATH
-set(SANYI_THIRDPARTY_TOOLS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../ThirdParty")
+set(APR_THIRDPARTY_TOOLS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../ThirdParty")
 
 if(WIN32)
     set(_tools_platform "windows")
@@ -570,7 +594,7 @@ endif()
 set(_deploy_tools "poppler" "ghostscript")
 
 foreach(_tool ${_deploy_tools})
-    set(_tool_root_dir "${SANYI_THIRDPARTY_TOOLS_DIR}/${_tool}/${_tools_platform}/${_tools_arch}")
+    set(_tool_root_dir "${APR_THIRDPARTY_TOOLS_DIR}/${_tool}/${_tools_platform}/${_tools_arch}")
     set(_tool_bin_dir "${_tool_root_dir}/bin")
     set(_tool_lib_dir "${_tool_root_dir}/lib")
 
@@ -632,11 +656,11 @@ endforeach()
 
 deploy_qt_libraries(${APP_NAME} ${QT_VERSION_MAJOR})
 
-sanyi_add_version_info(${APP_NAME} "${APP_NAME}" "SanYi CAD Application")
+apr_add_version_info(${APP_NAME} "${APP_NAME}" "April CAD Application")
 
-option(SANYI_GENERATE_SYMBOLS "Generate debug symbols for crash analysis" ON)
-if(SANYI_GENERATE_SYMBOLS)
-    sanyi_add_debug_symbols(${APP_NAME})
+option(APR_GENERATE_SYMBOLS "Generate debug symbols for crash analysis" ON)
+if(APR_GENERATE_SYMBOLS)
+    apr_add_debug_symbols(${APP_NAME})
 endif()
 
 message(STATUS "[Main]")
@@ -648,7 +672,7 @@ message(STATUS "")
 message(STATUS "----------------------------------------")
 
 # 由唯一总开关 BUILD_TESTS 与 MAIN 模块键控制
-sanyi_module_tests_enabled(MAIN _main_tests)
+apr_module_tests_enabled(MAIN _main_tests)
 if(_main_tests AND GTest_FOUND)
     find_package(Qt6 COMPONENTS Test REQUIRED)
     file(GLOB MAIN_TEST_SOURCES CONFIGURE_DEPENDS
@@ -706,13 +730,13 @@ if(_main_tests AND GTest_FOUND)
         # （否则 gtest 发现阶段会真正启动 GUI 应用并卡死，导致构建超时失败）。
         list(FILTER MAIN_TEST_DEP_SOURCES EXCLUDE REGEX ".*/main\\.cpp$")
 
-    # P2 测试扩展: 添加 protobuf 生成的源文件以支持 SyEntitySerializer 测试
-    # 生成目录由 FileIO target 通过 INTERFACE_SANYI_PROTO_GEN_DIR 属性暴露，位于构建树中
-    get_target_property(_proto_gen_dir FileIO INTERFACE_SANYI_PROTO_GEN_DIR)
+    # P2 测试扩展: 添加 protobuf 生成的源文件以支持 AprEntitySerializer 测试
+    # 生成目录由 FileIO target 通过 INTERFACE_APR_PROTO_GEN_DIR 属性暴露，位于构建树中
+    get_target_property(_proto_gen_dir FileIO INTERFACE_APR_PROTO_GEN_DIR)
     if(NOT _proto_gen_dir)
-        message(FATAL_ERROR "FileIO target does not expose INTERFACE_SANYI_PROTO_GEN_DIR property, cannot locate protobuf generated sources")
+        message(FATAL_ERROR "FileIO target does not expose INTERFACE_APR_PROTO_GEN_DIR property, cannot locate protobuf generated sources")
     endif()
-    set(PROTO_GEN_SRC "${_proto_gen_dir}/SanYiDocument.pb.cc")
+    set(PROTO_GEN_SRC "${_proto_gen_dir}/AprDocument.pb.cc")
     # 标记为生成文件，避免 CMake 配置阶段检查文件是否存在（实际由 FileIO 的 protobuf_generate 在构建期产出）
     set_source_files_properties(${PROTO_GEN_SRC} PROPERTIES GENERATED TRUE)
 
@@ -864,7 +888,7 @@ target_link_libraries(MainTests
 
     # 客户化 UI 配置（测试目标同样需要访问资源）
     # 客户 ID 在运行时解析，测试可通过 UiClientContext::setClientIdOverride() 指定
-    target_compile_definitions(MainTests PRIVATE SANYI_DEFAULT_CLIENT_ID="${SANYI_DEFAULT_CLIENT_ID}")
+    target_compile_definitions(MainTests PRIVATE APR_DEFAULT_CLIENT_ID="${APR_DEFAULT_CLIENT_ID}")
 
     set_target_properties(MainTests PROPERTIES
         AUTOMOC ON
@@ -932,7 +956,7 @@ endif()
 # 单独开一个目标的原因：MainTests 会把整个 Main 应用源码拖进编译，而这批刷新
 # 契约用例只依赖 SceneRefreshCoordinator 等几个实现文件。
 # 由唯一总开关 BUILD_TESTS 与 VIEWPORT_REFRESH 模块键控制。
-sanyi_module_tests_enabled(VIEWPORT_REFRESH _viewport_tests)
+apr_module_tests_enabled(VIEWPORT_REFRESH _viewport_tests)
 if(_viewport_tests AND GTest_FOUND)
     add_executable(ViewportRefreshTests
         "${UI_ROOT}/Test/ViewportRefreshRegressionTests.cpp"
@@ -967,7 +991,7 @@ if(_viewport_tests AND GTest_FOUND)
     if(MSVC)
         target_compile_options(ViewportRefreshTests PRIVATE /utf-8 /FS)
     endif()
-    sanyi_deploy_qt_dlls(ViewportRefreshTests)
+    apr_deploy_qt_dlls(ViewportRefreshTests)
     gtest_discover_tests(ViewportRefreshTests
         DISCOVERY_MODE PRE_TEST
         WORKING_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
@@ -984,7 +1008,7 @@ endif()
 # 由唯一总开关 BUILD_TESTS 与 SCENE_EDIT 模块键控制。
 # 注：本文件同样会被 MainTests 的 Test/*.cpp 通配收录，MAIN 模块键放行时
 #     两处都会跑到，这是本工程既有约定（ViewportRefreshRegressionTests.cpp 亦然）。
-sanyi_module_tests_enabled(SCENE_EDIT _scene_edit_tests)
+apr_module_tests_enabled(SCENE_EDIT _scene_edit_tests)
 if(_scene_edit_tests AND GTest_FOUND)
     add_executable(SceneEditIntegrationTests
         "${UI_ROOT}/Test/SceneEditIntegrationTests.cpp"
@@ -1007,7 +1031,7 @@ if(_scene_edit_tests AND GTest_FOUND)
     if(MSVC)
         target_compile_options(SceneEditIntegrationTests PRIVATE /utf-8 /FS)
     endif()
-    sanyi_deploy_qt_dlls(SceneEditIntegrationTests)
+    apr_deploy_qt_dlls(SceneEditIntegrationTests)
     gtest_discover_tests(SceneEditIntegrationTests
         DISCOVERY_MODE PRE_TEST
         WORKING_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
