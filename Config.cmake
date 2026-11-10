@@ -17,9 +17,9 @@ if(WIN32)
     # set(Qt_INSTALL_DIR "C:/Qt/6.11.0/msvc2022_64/" CACHE PATH "Qt6 Windows")
     set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.12.0/msvc2022_64/" CACHE PATH "Qt6 Windows")
 elseif(APPLE)
-    set(Qt_INSTALL_DIR "$ENV{HOME}/Qt/6.11.1/macos/" CACHE PATH "Qt6 macOS")
+    set(Qt_INSTALL_DIR "$ENV{HOME}/Qt/6.12.0/macos/" CACHE PATH "Qt6 macOS")
 elseif(UNIX)
-    set(Qt_INSTALL_DIR "$ENV{HOME}/Install/Qt/6.11.1/gcc_64/" CACHE PATH "Qt6 Linux")
+    set(Qt_INSTALL_DIR "$ENV{HOME}/Install/Qt/6.12.0/gcc_64/" CACHE PATH "Qt6 Linux")
 endif()
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -101,6 +101,15 @@ endif()
 # 各模块不得再自行 set(CMAKE_TOOLCHAIN_FILE ...)。
 set(CMAKE_TOOLCHAIN_FILE "${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake"
     CACHE STRING "Vcpkg toolchain file")
+
+# 仓库内 vcpkg overlay ports（不修改 ~/vcpkg/ports，避免 vcpkg 升级时被覆盖）。
+# 当前仅 breakpad：官方 port 在 macOS 上未把 src/common/dwarf/*.cc 编入
+# libbreakpad_client，导致 google_breakpad::GetSectionByName 未定义。
+# 重建该依赖时必须显式带上 overlay，例如：
+#   vcpkg install breakpad:arm64-osx --classic \
+#       --overlay-ports=<repo>/CMake/vcpkg-overlays
+set(VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_LIST_DIR}/CMake/vcpkg-overlays"
+    CACHE STRING "vcpkg overlay ports (repo-local)")
 
 # --------------------------------------------------------------------
 # 构建类型：唯一默认值定义在上面的「构建类型」小节（见 set(CMAKE_BUILD_TYPE ...)）。
