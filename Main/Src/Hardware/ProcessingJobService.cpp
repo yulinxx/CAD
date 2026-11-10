@@ -27,7 +27,7 @@
 
     #include "MotionPlanCompiler.h"
 
-namespace
+namespace ProcessingJobDetail
 {
     /// 进度轮询周期。100ms 对进度条足够，也不会把 SDK 的状态查询打满。
     constexpr int kPollIntervalMs = 100;
@@ -304,7 +304,9 @@ namespace
             msleep(kSnapshotIntervalMs);
         }
     }
-}  // namespace
+}  // namespace ProcessingJobDetail
+
+using namespace ProcessingJobDetail;
 
 struct ProcessingJobService::Impl
 {

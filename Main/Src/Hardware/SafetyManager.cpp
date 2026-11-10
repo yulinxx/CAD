@@ -12,6 +12,13 @@
 #include <QDir>
 #include <QDateTime>
 #include <QCryptographicHash>
+
+// 本文件实现刻意保留（ABI 兼容）的弃用类型 SafetyManager，定义自身成员时
+// 必然要写出该类型名。调用方仍会收到弃用告警，因此这里只在本文件范围内压制。
+#if defined(__GNUC__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
 #include <algorithm>
 
 SafetyManager::SafetyManager(QObject* parent)
@@ -527,3 +534,7 @@ void SafetyManager::saveUsersToConfig() const
         out << it.key() << "=" << it.value() << "\n";
     }
 }
+
+#if defined(__GNUC__)
+#  pragma GCC diagnostic pop
+#endif

@@ -13,6 +13,13 @@
 #include <QDir>
 #include "Log/SyLogger.h"
 
+// 本文件实现刻意保留（ABI 兼容）的弃用类型 MaterialDatabase，定义自身成员时
+// 必然要写出该类型名。调用方仍会收到弃用告警，因此这里只在本文件范围内压制。
+#if defined(__GNUC__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
 MaterialDatabase::MaterialDatabase(QObject* parent)
     : QObject(parent)
 {
@@ -311,3 +318,7 @@ void MaterialDatabase::addLeatherMaterials()
     info.recommendPasses = 1;
     addMaterial(info);
 }
+
+#if defined(__GNUC__)
+#  pragma GCC diagnostic pop
+#endif
