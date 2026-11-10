@@ -53,10 +53,10 @@ extern "C" typedef IClientUiPlugin* (*CreateClientUiPluginFn)();
 extern "C" typedef void (*DestroyClientUiPluginFn)(IClientUiPlugin*);
 
 #if defined(_WIN32)
-    #define SANYI_CLIENT_PLUGIN_EXPORT extern "C" __declspec(dllexport)
+    #define APR_CLIENT_PLUGIN_EXPORT extern "C" __declspec(dllexport)
 #else
-    #define SANYI_CLIENT_PLUGIN_EXPORT extern "C" __attribute__((visibility("default")))
+    #define APR_CLIENT_PLUGIN_EXPORT extern "C" __attribute__((visibility("default")))
 #endif
 
 /// ABI 版本：接口发生破坏性变更时递增，打包脚本写入 abi.txt 供宿主校验
-#define SANYI_CLIENT_UI_PLUGIN_ABI 1
+#define APR_CLIENT_UI_PLUGIN_ABI 1

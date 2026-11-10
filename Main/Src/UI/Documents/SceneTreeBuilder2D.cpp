@@ -9,15 +9,15 @@
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Core/GroupManager.h"
 #include "Engine2D/Interaction/LayerManager.h"
-#include "Engine2D/SyEntity/SyGroup.h"
-#include "Engine/SyEntity/SyEntity.h"
-#include "Engine/SyEntity/EType.h"
+#include "Engine2D/AprEntity/AprGroup.h"
+#include "Engine/AprEntity/AprEntity.h"
+#include "Engine/AprEntity/EType.h"
 
 #include <QObject>
 
 namespace
 {
-    void visitGroupMembers(const Eg::SyGroup* group, QSet<qint64>& out)
+    void visitGroupMembers(const Eg::AprGroup* group, QSet<qint64>& out)
     {
         if (!group)
         {
@@ -36,12 +36,12 @@ namespace
         }
     }
 
-    // 文字群组名承载编辑元数据（"Text|SY_TXT:v1:<base64>"），直接展示是乱码。
+    // 文字群组名承载编辑元数据（"Text|APR_TXT:v1:<base64>"），直接展示是乱码。
     // 面板只显示友好名 "Text"；其余群组名照常展示。
     QString friendlyGroupName(const char* rawName)
     {
         const QString name = QString::fromUtf8(rawName ? rawName : "");
-        if (name.startsWith(QStringLiteral("Text|")) || name.startsWith(QStringLiteral("SY_TXT:")))
+        if (name.startsWith(QStringLiteral("Text|")) || name.startsWith(QStringLiteral("APR_TXT:")))
         {
             return QObject::tr("Text");  // 文本
         }
@@ -102,7 +102,7 @@ SceneTreeTopology2D SceneTreeBuilder2D::buildTopology(Eg::SceneManager* scene)
     }
 
     // 顶层群组只查一次：旧实现对 getTopLevelGroups() 连查三次（每次都分配一个 vector）
-    const std::vector<Eg::SyGroup*> topLevelGroups = scene->groupManager().getTopLevelGroups();
+    const std::vector<Eg::AprGroup*> topLevelGroups = scene->groupManager().getTopLevelGroups();
 
     // 无群组快速路径：直接将所有图元作为顶层行，
     // 省去 QSet 构建 + 29 万次 contains 查找 + 递归遍历群组的开销。
@@ -111,7 +111,7 @@ SceneTreeTopology2D SceneTreeBuilder2D::buildTopology(Eg::SceneManager* scene)
     {
         const size_t total = scene->entityCount();
         topo.topLevel.reserve(static_cast<int>(total));
-        scene->forEachEntity([&topo](Eg::SyEntity* entity) {
+        scene->forEachEntity([&topo](Eg::AprEntity* entity) {
             if (entity)
             {
                 topo.topLevel.push_back({ static_cast<qint64>(entity->id), false });
@@ -141,7 +141,7 @@ SceneTreeTopology2D SceneTreeBuilder2D::buildTopology(Eg::SceneManager* scene)
     // 未入群组的图元作为顶层行。
     // 直接遍历容器，不走 getAllEntities()：后者会先拷贝一份全部图元指针的 vector，
     // 万级场景下这次拷贝比遍历本身还贵。
-    scene->forEachEntity([&topo, &groupedIds](Eg::SyEntity* entity) {
+    scene->forEachEntity([&topo, &groupedIds](Eg::AprEntity* entity) {
         if (!entity || groupedIds.contains(static_cast<qint64>(entity->id)))
         {
             return;

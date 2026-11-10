@@ -25,7 +25,7 @@ endif()
 #
 # 打开用于排查：强制在 cl.exe 命令行加 /showIncludes，把每层 #include 完整刷到
 # 编译日志里——但这会产生大量输出，只建议调试依赖问题时临时开启。
-option(SANYI_SHOW_INCLUDES "Enable cl.exe /showIncludes (verbose header inclusion trace)" OFF)
+option(APR_SHOW_INCLUDES "Enable cl.exe /showIncludes (verbose header inclusion trace)" OFF)
 
 # ============ CMake 策略设置 ============
 if(POLICY CMP0167)
@@ -35,9 +35,9 @@ endif()
 include(Config.cmake)
 
 # 项目基本信息
-project(SanYiCAD
+project(April
     VERSION 1.0.0
-    DESCRIPTION "SanYi CAD System"
+    DESCRIPTION "April CAD System"
     # C 语言：Raster 模块有一项"公开头必须是纯 C 头"的编译期契约测试，
     # 需要一个真正的 C 编译器来验证。enable_language() 按 CMake 官方要求
     # 必须在**顶层**目录调用才生效，所以在 project() 里一并启用。
@@ -47,9 +47,15 @@ project(SanYiCAD
 find_package(OpenGL REQUIRED)
 
 
-set(SANYI_ROOT "${PROJECT_SOURCE_DIR}" CACHE INTERNAL "SanYi CAD project root")
-include("${SANYI_ROOT}/CMake/SanYiPaths.cmake")
-include("${SANYI_ROOT}/CMake/Utils.cmake")
+set(APR_ROOT "${PROJECT_SOURCE_DIR}" CACHE INTERNAL "April CAD project root")
+include("${APR_ROOT}/CMake/AprPaths.cmake")
+include("${APR_ROOT}/CMake/Utils.cmake")
+
+# ============ 必需第三方依赖预检（vcpkg）============
+# 进入各模块之前一次性检查必需 vcpkg 端口（含纯头文件端口），缺失时汇总输出
+# 安装命令并让 configure 明确失败。端口清单维护在 CMake/VcpkgPreflight.cmake。
+include("${APR_ROOT}/CMake/VcpkgPreflight.cmake")
+apr_check_vcpkg_dependencies()
 
 # 只把格式串相关的分析告警提为错误（其余 /analyze 告警保持告警，避免一次性引入
 # 大量非本议题的失败）：
@@ -57,12 +63,12 @@ include("${SANYI_ROOT}/CMake/Utils.cmake")
 #   C6284 传了对象而非字符串              C6328 类型/宽度不匹配（本次 macOS 报的那类）
 #   C6340 有无符号不匹配
 # ---------------------------------------------------------------------------
-option(SANYI_MSVC_ANALYZE "Enable MSVC /analyze (SAL printf format-string checking); CI only" OFF)
+option(APR_MSVC_ANALYZE "Enable MSVC /analyze (SAL printf format-string checking); CI only" OFF)
 
-if(MSVC AND SANYI_MSVC_ANALYZE)
+if(MSVC AND APR_MSVC_ANALYZE)
     if(MSVC_VERSION LESS 1929)
         message(FATAL_ERROR
-            "[Analyze] SANYI_MSVC_ANALYZE requires VS2019 16.10+ (MSVC_VERSION >= 1929) "
+            "[Analyze] APR_MSVC_ANALYZE requires VS2019 16.10+ (MSVC_VERSION >= 1929) "
             "for /analyze:external-; current MSVC_VERSION=${MSVC_VERSION}")
     endif()
 
@@ -81,7 +87,7 @@ endif()
 #          是否把结果额外刷到 stdout（默认不刷）
 #   MSBuild：有自己的 tlog 机制跟踪依赖，/showIncludes 仅用于调试
 if(MSVC)
-    if(SANYI_SHOW_INCLUDES)
+    if(APR_SHOW_INCLUDES)
         # add_compile_options(/showIncludes)
         # Ninja 生成器需要 cl.exe 的输出保持 UTF-8，与 rules.ninja 里写的
         # msvc_deps_prefix（UTF-8 编码的中文前缀）一致，否则依赖跟踪断掉；
@@ -108,8 +114,8 @@ endif()
 # ---------------------------------------------------------------------------
 if(APPLE)
     include(CheckLinkerFlag)
-    check_linker_flag(CXX "LINKER:-no_warn_duplicate_libraries" SANYI_LINKER_NO_WARN_DUP_LIBS)
-    if(SANYI_LINKER_NO_WARN_DUP_LIBS)
+    check_linker_flag(CXX "LINKER:-no_warn_duplicate_libraries" APR_LINKER_NO_WARN_DUP_LIBS)
+    if(APR_LINKER_NO_WARN_DUP_LIBS)
         add_link_options("LINKER:-no_warn_duplicate_libraries")
         message(STATUS "  链接器 -no_warn_duplicate_libraries: ON（抑制重复静态库告警）")
     endif()
@@ -129,7 +135,7 @@ if(BUILD_TESTS)
         message(STATUS "  Google Test: Found, unit tests enabled")
     else()
         message(STATUS "  Google Test: Not found, unit tests disabled")
-        sanyi_force_tests_off("GTest not found")
+        apr_force_tests_off("GTest not found")
     endif()
 endif()
 
@@ -159,8 +165,8 @@ add_subdirectory(Engine/3D)
 add_subdirectory(Engine/Persistence)
 
 # UI → Engine 唯一访问门面（必须在 Engine 目标之后、UI 模块之前定义）
-include("${SANYI_ROOT}/CMake/UiEngineAccess.cmake")
-sanyi_define_ui_engine_access()
+include("${APR_ROOT}/CMake/UiEngineAccess.cmake")
+apr_define_ui_engine_access()
 
 # 4.5 渲染抽象层（业务级类型和接口，零RenderX依赖）
 add_subdirectory(RenderAbstraction)
@@ -245,6 +251,26 @@ endif()
 # 独立 DLL，公开头只暴露纯 C ABI（POD + 句柄），消费方不需要 OpenCV 头文件。
 if(BUILD_RASTER)
     add_subdirectory(Raster/Raster)
+
+    # Raster 是独立仓库的子模块（.gitmodules: git@github.com:yulinxx/Raster.git），
+    # 不在本仓维护范围内，因此不直接改它的源码。
+    #
+    # 其纯 C 契约测试 c_api_compat.c 调用 memset 但未 include <string.h>；
+    # C99 起隐式函数声明是错误（-Wimplicit-function-declaration），会中断构建。
+    # 这里只对该目标、只在 C 语言下注入头文件，属于构建层修补：
+    # 不解禁告警、不降级标准，也不影响任何 C++ 目标。
+    # 上游修复后可直接删除本段。
+    if(TARGET RasterCApiCompatTest)
+        if(MSVC)
+            target_compile_options(RasterCApiCompatTest PRIVATE
+                $<$<COMPILE_LANGUAGE:C>:/FIstring.h>)
+        else()
+            target_compile_options(RasterCApiCompatTest PRIVATE
+                $<$<COMPILE_LANGUAGE:C>:-include>
+                $<$<COMPILE_LANGUAGE:C>:string.h>)
+        endif()
+    endif()
+
     message(STATUS "  Raster: ENABLED")
 else()
     message(STATUS "  Raster: DISABLED")
@@ -265,17 +291,18 @@ endif()
 message(STATUS "----------------------------------------")
 
 # 7. Python 集成
-# SANYI_PYTHON_HOST 依赖于 BUILD_PYTHON 开关
+# APR_PYTHON_HOST 依赖于 BUILD_PYTHON 开关
 if(NOT BUILD_PYTHON)
-    set(SANYI_PYTHON_HOST_DEFAULT OFF)
+    set(APR_PYTHON_HOST_DEFAULT OFF)
 else()
-    set(SANYI_PYTHON_HOST_DEFAULT ON)
+    set(APR_PYTHON_HOST_DEFAULT ON)
 endif()
-option(SANYI_PYTHON_HOST "Enable PythonHost integration framework" ${SANYI_PYTHON_HOST_DEFAULT})
-option(SANYI_PYTHON_EMBED "Enable in-process Python bridge (Phase 3)" OFF)
-set(SANYI_PYTHON_VERSION "3.11" CACHE STRING "Required Python version")
 
-if(SANYI_PYTHON_HOST)
+option(APR_PYTHON_HOST "Enable PythonHost integration framework" ${APR_PYTHON_HOST_DEFAULT})
+option(APR_PYTHON_EMBED "Enable in-process Python bridge (Phase 3)" OFF)
+set(APR_PYTHON_VERSION "3.11" CACHE STRING "Required Python version")
+
+if(APR_PYTHON_HOST)
     # 必须进内层目录：外层 PythonHost/CMakeLists.txt 是独立构建入口，
     # 其中声明的测试范围只对独立构建生效；作为根工程子目录加入时走内层目录，
     # 避免入口逻辑参与集成构建。
@@ -285,9 +312,9 @@ else()
     message(STATUS "  PythonHost: DISABLED")
 endif()
 
-option(SANYI_PYBIND_CORE "Build PyBindCore facade extension (_sanyi_core)" ON)
-if(SANYI_PYBIND_CORE AND SANYI_PYTHON_HOST)
-    # 同样必须进内层目录：外层入口带无参 sanyi_only_own_tests()（空 = 全部不放行），
+option(APR_PYBIND_CORE "Build PyBindCore facade extension (_apr_core)" ON)
+if(APR_PYBIND_CORE AND APR_PYTHON_HOST)
+    # 同样必须进内层目录：外层入口带无参 apr_only_own_tests()（空 = 全部不放行），
     # 那是独立构建语义，不应参与集成构建。
     add_subdirectory(PyBindCore/PyBindCore)
     message(STATUS "  PyBindCore: ENABLED")
@@ -326,8 +353,8 @@ endif()
 add_subdirectory(Main)
 
 # 9. 客户 UI 插件（Clients/<clientId> 独立仓库 / submodule）
-option(SANYI_BUILD_CLIENT_PLUGINS "Build per-client UI plugins from Clients/*" ON)
-if(SANYI_BUILD_CLIENT_PLUGINS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Clients/CMakeLists.txt")
+option(APR_BUILD_CLIENT_PLUGINS "Build per-client UI plugins from Clients/*" ON)
+if(APR_BUILD_CLIENT_PLUGINS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Clients/CMakeLists.txt")
     add_subdirectory(Clients)
 endif()
 
@@ -340,34 +367,34 @@ endif()
 # 关闭此开关 = 根本不编译 Metal 视口代码路径，退回到 OpenGL；这不是运行时回退
 # ——Metal 初始化失败属于错误，不做静默降级。
 #
-# 后端开关统一（2026）：SY_ENABLE_METAL_VIEWPORT 的默认值派生自
-# SANYI_DEFAULT_RENDER_BACKEND（Config.cmake 已在上方 include），不再各自为政，
-# 避免「SANYI_DEFAULT_RENDER_BACKEND=OPENGL 却仍编译 Metal 视口」的错配。
+# 后端开关统一（2026）：APR_ENABLE_METAL_VIEWPORT 的默认值派生自
+# APR_DEFAULT_RENDER_BACKEND（Config.cmake 已在上方 include），不再各自为政，
+# 避免「APR_DEFAULT_RENDER_BACKEND=OPENGL 却仍编译 Metal 视口」的错配。
 # 用户仍可显式 -DSY_ENABLE_METAL_VIEWPORT=ON/OFF 覆盖默认。
-if(SANYI_DEFAULT_RENDER_BACKEND STREQUAL "METAL")
+if(APR_DEFAULT_RENDER_BACKEND STREQUAL "METAL")
     set(_sy_metal_viewport_default ON)
 else()
     set(_sy_metal_viewport_default OFF)
 endif()
-option(SY_ENABLE_METAL_VIEWPORT
-    "Use Metal-backed viewports on Apple platforms (default derived from SANYI_DEFAULT_RENDER_BACKEND)"
+option(APR_ENABLE_METAL_VIEWPORT
+    "Use Metal-backed viewports on Apple platforms (default derived from APR_DEFAULT_RENDER_BACKEND)"
     ${_sy_metal_viewport_default})
 unset(_sy_metal_viewport_default)
 if(NOT APPLE)
     # 非 Apple 平台没有 Metal 后端，强制关闭并覆盖缓存值，
     # 免得被误设成 ON 后到处出现无法解析的后端分支。
-    set(SY_ENABLE_METAL_VIEWPORT OFF CACHE BOOL
+    set(APR_ENABLE_METAL_VIEWPORT OFF CACHE BOOL
         "Use Metal-backed viewports on Apple platforms" FORCE)
 endif()
-if(SY_ENABLE_METAL_VIEWPORT AND NOT SANYI_DEFAULT_RENDER_BACKEND STREQUAL "METAL")
+if(APR_ENABLE_METAL_VIEWPORT AND NOT APR_DEFAULT_RENDER_BACKEND STREQUAL "METAL")
     message(WARNING
-        "[SanYi] SY_ENABLE_METAL_VIEWPORT=ON 但 SANYI_DEFAULT_RENDER_BACKEND="
-        "${SANYI_DEFAULT_RENDER_BACKEND}；视口将编译 Metal 路径，默认后端却不是 METAL。")
+        "[April] APR_ENABLE_METAL_VIEWPORT=ON 但 APR_DEFAULT_RENDER_BACKEND="
+        "${APR_DEFAULT_RENDER_BACKEND}；视口将编译 Metal 路径，默认后端却不是 METAL。")
 endif()
-if(SY_ENABLE_METAL_VIEWPORT)
-    message(STATUS "[SanYi] viewport backend: Metal")
+if(APR_ENABLE_METAL_VIEWPORT)
+    message(STATUS "[April] viewport backend: Metal")
 else()
-    message(STATUS "[SanYi] viewport backend: OpenGL")
+    message(STATUS "[April] viewport backend: OpenGL")
 endif()
 
 # 编译定义的**唯一**出处：各目标不得自行判断 APPLE 或重复定义开关，
@@ -376,27 +403,41 @@ endif()
 #
 # 必须是 PUBLIC：视口的公共头（RenderWidget.h / RenderWidget3D.h）里这个宏会
 # 改变**类定义本身**（基类不同），任何 include 这些头或继承这些类的目标
-# （SanYiCAD、MainTests…）都必须拿到同一个取值——否则同一份头在不同 TU 里
+# （April、MainTests…）都必须拿到同一个取值——否则同一份头在不同 TU 里
 # 被解析成不同的类，链接期以 ODR 冲突的形式爆炸。用 PUBLIC 让定义随
 # target_link_libraries 自动传播，而不是逐个目标手工补。
 set(SY_VIEWPORT_BACKEND_TARGETS UI2D UI3D)
 foreach(_sy_viewport_target IN LISTS SY_VIEWPORT_BACKEND_TARGETS)
-    if(TARGET ${_sy_viewport_target} AND SY_ENABLE_METAL_VIEWPORT)
-        target_compile_definitions(${_sy_viewport_target} PUBLIC SY_ENABLE_METAL_VIEWPORT=1)
+    if(TARGET ${_sy_viewport_target} AND APR_ENABLE_METAL_VIEWPORT)
+        target_compile_definitions(${_sy_viewport_target} PUBLIC APR_ENABLE_METAL_VIEWPORT=1)
     endif()
 endforeach()
 
 # ============================================================================
 # 依赖方向校验（CI 门禁）— 所有目标已创建后执行
 # ============================================================================
-include("${SANYI_ROOT}/CMake/CheckDependencies.cmake")
-sanyi_check_dependency_directions()
+include("${APR_ROOT}/CMake/CheckDependencies.cmake")
+apr_check_dependency_directions()
+
+# ============================================================================
+# UI→Engine include 层棘轮校验 — 只冻结存量、禁止增长
+# 说明见 CMake/UiEngineAccessRatchet.cmake 文件头。
+# ============================================================================
+include("${APR_ROOT}/CMake/UiEngineAccessRatchet.cmake")
+apr_check_ui_engine_include_ratchet()
+
+# ============================================================================
+# 2D 场景写面门禁 — SceneEditService 是唯一写入口
+# 说明见 CMake/SceneWriteSurface.cmake 文件头。
+# ============================================================================
+include("${APR_ROOT}/CMake/SceneWriteSurface.cmake")
+apr_check_scene_write_surface()
 
 # ============================================================================
 # C ABI 版本查询校验（CI 门禁）— 约定见 Docs/01-当前架构/C-ABI风格约定.md
 # ============================================================================
-include("${SANYI_ROOT}/CMake/CheckCApi.cmake")
-sanyi_check_c_api_version()
+include("${APR_ROOT}/CMake/CheckCApi.cmake")
+apr_check_c_api_version()
 
 # ============================================================================
 # ENABLE_* 宏传播一致性校验（CI 门禁）
@@ -404,149 +445,152 @@ sanyi_check_c_api_version()
 # 跨模块传递对象时 ABI 不一致会堆越界崩溃。
 # 校验逻辑:
 #   1) 对每个 BUILD_XXX=ON 的开关,验证源头模块已 PUBLIC 传播 ENABLE_XXX
-#   2) 同时输出 SanYiCAD 的 INTERFACE_COMPILE_DEFINITIONS(传播结果)供 CI 直观审计
+#   2) 同时输出 April 的 INTERFACE_COMPILE_DEFINITIONS(传播结果)供 CI 直观审计
 # ============================================================================
-message(STATUS "[SanYi] --- ENABLE_* macro propagation check ---")
-set(_sanyi_macro_check_failed FALSE)
+message(STATUS "[April] --- ENABLE_* macro propagation check ---")
+set(_apr_macro_check_failed FALSE)
 
 # (1) 验证源头模块 PUBLIC 传播(宏传播链的根因检查)
-foreach(_sanyi_pair IN ITEMS
+foreach(_apr_pair IN ITEMS
     "BUILD_NESTING:ENABLE_NESTING:UICommon,UI2D,UI3D"
     "BUILD_ENGRAVING:ENABLE_ENGRAVING:UICommon,UI3D"
     "BUILD_HARDWARE:ENABLE_HARDWARE:UI2D"
     "BUILD_GEOMODELCORE:ENABLE_GEOMODELCORE:UI3D"
     "BUILD_VISION:ENABLE_VISION:UI2D"
 )
-    string(REPLACE ":" ";" _sanyi_pair_list ${_sanyi_pair})
-    list(GET _sanyi_pair_list 0 _sanyi_build_opt)
-    list(GET _sanyi_pair_list 1 _sanyi_enable_macro)
-    list(GET _sanyi_pair_list 2 _sanyi_sources_raw)
+    string(REPLACE ":" ";" _apr_pair_list ${_apr_pair})
+    list(GET _apr_pair_list 0 _apr_build_opt)
+    list(GET _apr_pair_list 1 _apr_enable_macro)
+    list(GET _apr_pair_list 2 _apr_sources_raw)
     # 逗号分隔的模块名列表:转成 CMake 分号列表
-    string(REPLACE "," ";" _sanyi_sources "${_sanyi_sources_raw}")
+    string(REPLACE "," ";" _apr_sources "${_apr_sources_raw}")
 
-    if(${_sanyi_build_opt})
-        foreach(_sanyi_src IN LISTS _sanyi_sources)
-            if(TARGET ${_sanyi_src})
+    if(${_apr_build_opt})
+        foreach(_apr_src IN LISTS _apr_sources)
+            if(TARGET ${_apr_src})
                 # 检查源头 target 是否 PUBLIC 传播
-                get_target_property(_sanyi_iface_defs ${_sanyi_src} INTERFACE_COMPILE_DEFINITIONS)
-                if(_sanyi_iface_defs MATCHES "${_sanyi_enable_macro}")
-                    message(STATUS "[SanYi]   ✓ ${_sanyi_enable_macro}: ${_sanyi_src} PUBLIC propagates")
+                get_target_property(_apr_iface_defs ${_apr_src} INTERFACE_COMPILE_DEFINITIONS)
+                if(_apr_iface_defs MATCHES "${_apr_enable_macro}")
+                    message(STATUS "[April]   ✓ ${_apr_enable_macro}: ${_apr_src} PUBLIC propagates")
                 else()
-                    message(WARNING "[SanYi] ✗ ${_sanyi_enable_macro}: ${_sanyi_src} NOT PUBLIC propagating!")
-                    set(_sanyi_macro_check_failed TRUE)
+                    message(WARNING "[April] ✗ ${_apr_enable_macro}: ${_apr_src} NOT PUBLIC propagating!")
+                    set(_apr_macro_check_failed TRUE)
                 endif()
             endif()
         endforeach()
     else()
-        message(STATUS "[SanYi]   · ${_sanyi_enable_macro}: skipped (BUILD_XXX=OFF)")
+        message(STATUS "[April]   · ${_apr_enable_macro}: skipped (BUILD_XXX=OFF)")
     endif()
 endforeach()
 
 # (2) BUILD_UI3D 特殊:顶层构建开关,UI 模块不 PUBLIC 传播,Main 源码自己 #if BUILD_UI3D
-if(TARGET SanYiCAD)
+if(TARGET April)
     if(BUILD_UI3D)
-        get_target_property(_sanyi_private_defs SanYiCAD COMPILE_DEFINITIONS)
-        if(_sanyi_private_defs MATCHES "BUILD_UI3D=1")
-            message(STATUS "[SanYi]   ✓ BUILD_UI3D=1: SanYiCAD PRIVATE (maintained manually, correct)")
+        get_target_property(_apr_private_defs April COMPILE_DEFINITIONS)
+        if(_apr_private_defs MATCHES "BUILD_UI3D=1")
+            message(STATUS "[April]   ✓ BUILD_UI3D=1: April PRIVATE (maintained manually, correct)")
         else()
-            message(WARNING "[SanYi] ✗ BUILD_UI3D=ON 但 SanYiCAD 未定义 BUILD_UI3D=1")
-            set(_sanyi_macro_check_failed TRUE)
+            message(WARNING "[April] ✗ BUILD_UI3D=ON 但 April 未定义 BUILD_UI3D=1")
+            set(_apr_macro_check_failed TRUE)
         endif()
     endif()
 endif()
 
-if(_sanyi_macro_check_failed)
+if(_apr_macro_check_failed)
     message(FATAL_ERROR
-        "[SanYi] ENABLE_* 宏传播校验失败:ABI 一致性风险。"
+        "[April] ENABLE_* 宏传播校验失败:ABI 一致性风险。"
         "请确保影响公共头类型布局的宏通过各模块 PUBLIC INTERFACE 传播。")
 else()
-    message(STATUS "[SanYi]   ENABLE_* macro propagation: OK (EXE/DLL 一致)")
+    message(STATUS "[April]   ENABLE_* macro propagation: OK (EXE/DLL 一致)")
 endif()
-unset(_sanyi_macro_check_failed)
+unset(_apr_macro_check_failed)
 
 # ============================================================================
 # 安装规则
 # ============================================================================
 # 安装主可执行文件
-install(TARGETS SanYiCAD
+install(TARGETS April
     RUNTIME DESTINATION bin
     BUNDLE DESTINATION .
 )
 
 # 安装所有项目动态库
-set(SANYI_PROJECT_LIBS
+set(APR_PROJECT_LIBS
     Utility Log License
     EngineCommon Engine2D
 )
 if(BUILD_CRASHHANDLER)
-    list(APPEND SANYI_PROJECT_LIBS CrashHandler)
+    list(APPEND APR_PROJECT_LIBS CrashHandler)
 endif()
 
-list(APPEND SANYI_PROJECT_LIBS
+list(APPEND APR_PROJECT_LIBS
     UICommon UI2D
     FileIO
     EnginePersistence
+    # Engine3D 由 Main 无条件链接（Main/CMakeLists.txt 的 target_link_libraries），
+    # 与 BUILD_UI3D 无关。2D-only 安装也必须带上它，否则装出来的 bin/ 缺 DLL 起不来。
+    Engine3D
 )
 if(BUILD_NESTING)
-    list(APPEND SANYI_PROJECT_LIBS Nesting)
+    list(APPEND APR_PROJECT_LIBS Nesting)
 endif()
 
 if(BUILD_UI3D)
-    list(APPEND SANYI_PROJECT_LIBS Engine3D UI3D)
+    list(APPEND APR_PROJECT_LIBS UI3D)
 endif()
 
 if(BUILD_RENDERX)
-    list(APPEND SANYI_PROJECT_LIBS RenderX)
+    list(APPEND APR_PROJECT_LIBS RenderX)
     # RenderBridge 是 shared lib 且被 Main 链接（见 Main/CMakeLists.txt）。
     # 此前它只 add_subdirectory 而没进任何 install(TARGETS)，
-    # 于是 `cmake --install` 产出的 bin/ 里有 SanYiCAD 与其余 DLL，唯独缺它
+    # 于是 `cmake --install` 产出的 bin/ 里有 April 与其余 DLL，唯独缺它
     # —— 装出来的应用根本起不来。与 RenderX 同开关，因此一起 append。
-    list(APPEND SANYI_PROJECT_LIBS RenderBridge)
+    list(APPEND APR_PROJECT_LIBS RenderBridge)
 endif()
 
 if(BUILD_HARDWARE)
-    list(APPEND SANYI_PROJECT_LIBS Hardware)
+    list(APPEND APR_PROJECT_LIBS Hardware)
 endif()
 
 if(BUILD_ENGRAVING)
-    list(APPEND SANYI_PROJECT_LIBS Engraving)
+    list(APPEND APR_PROJECT_LIBS Engraving)
 endif()
 
 if(BUILD_GEOMODELCORE)
-    list(APPEND SANYI_PROJECT_LIBS GeoModelCore)
+    list(APPEND APR_PROJECT_LIBS GeoModelCore)
 endif()
 
 if(BUILD_NETWORK)
-    list(APPEND SANYI_PROJECT_LIBS Network)
+    list(APPEND APR_PROJECT_LIBS Network)
 endif()
 
 if(BUILD_VISION)
-    list(APPEND SANYI_PROJECT_LIBS Vision)
+    list(APPEND APR_PROJECT_LIBS Vision)
 endif()
 
 if(BUILD_RASTER)
-    list(APPEND SANYI_PROJECT_LIBS Raster)
+    list(APPEND APR_PROJECT_LIBS Raster)
 endif()
 
 # CAM 工艺编译层：未安装时装出来的应用缺少 CAM.dll，桥接层与编译入口直接起不来
 if(BUILD_CAM)
-    list(APPEND SANYI_PROJECT_LIBS CAM)
+    list(APPEND APR_PROJECT_LIBS CAM)
 endif()
 
-if(SANYI_PYTHON_HOST)
-    list(APPEND SANYI_PROJECT_LIBS PythonHost)
+if(APR_PYTHON_HOST)
+    list(APPEND APR_PROJECT_LIBS PythonHost)
 endif()
 
 # 安装所有项目 DLL/SO 文件
-install(TARGETS ${SANYI_PROJECT_LIBS}
+install(TARGETS ${APR_PROJECT_LIBS}
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION bin
     ARCHIVE DESTINATION lib
 )
 
 # 安装 PyBindCore 模块
-if(SANYI_PYBIND_CORE AND SANYI_PYTHON_HOST)
-    install(TARGETS SanYiPyBindCore
+if(APR_PYBIND_CORE AND APR_PYTHON_HOST)
+    install(TARGETS AprPyBindCore
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION bin
     )
@@ -556,9 +600,12 @@ endif()
 # windeployqt 已将所有内容放置在输出目录中
 # 我们只需从输出目录复制所有 .dll、.pyd 文件
 if(WIN32)
-    install(DIRECTORY "$<TARGET_FILE_DIR:SanYiCAD>/"
+    install(DIRECTORY "$<TARGET_FILE_DIR:April>/"
         DESTINATION bin
         COMPONENT Runtime
+        # 没有 FILES_MATCHING 时，正向 PATTERN 只影响匹配文件的权限，不参与筛选，
+        # 结果整个输出目录（含测试 exe、pdb、临时文件）都被装进 bin/。
+        FILES_MATCHING
         PATTERN "*.dll"
         PATTERN "*.pyd"
         PATTERN "*.exe" EXCLUDE
@@ -568,20 +615,30 @@ if(WIN32)
         PATTERN "*Benchmark*" EXCLUDE
     )
 elseif(UNIX AND NOT APPLE)
-    install(DIRECTORY "$<TARGET_FILE_DIR:SanYiCAD>/"
+    install(DIRECTORY "$<TARGET_FILE_DIR:April>/"
         DESTINATION bin
         COMPONENT Libraries
+        FILES_MATCHING
         PATTERN "*.so"
         PATTERN "*.so.*"
     )
 endif()
 
 # 安装翻译文件
-install(DIRECTORY "${CMAKE_BINARY_DIR}/translations"
-    DESTINATION bin
-    COMPONENT Translations
-    OPTIONAL
-)
+# macOS 必须放进 bundle 的 Resources/translations，否则发布版永远找不到 .qm
+if(APPLE)
+    install(DIRECTORY "${CMAKE_BINARY_DIR}/translations"
+        DESTINATION "${PROJECT_NAME}.app/Contents/Resources"
+        COMPONENT Translations
+        OPTIONAL
+    )
+else()
+    install(DIRECTORY "${CMAKE_BINARY_DIR}/translations"
+        DESTINATION bin
+        COMPONENT Translations
+        OPTIONAL
+    )
+endif()
 
 # 安装资源文件
 install(DIRECTORY "${CMAKE_BINARY_DIR}/resources"
@@ -591,7 +648,7 @@ install(DIRECTORY "${CMAKE_BINARY_DIR}/resources"
 )
 
 # 安装 Python 目录
-if(SANYI_PYTHON_HOST)
+if(APR_PYTHON_HOST)
     install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/Python"
         DESTINATION bin
         COMPONENT Python
@@ -606,4 +663,4 @@ endif()
 include(CMake/Packaging.cmake)
 
 # 全部模块与降级动作都已完成后，再打印最终测试状态（唯一打印点）
-sanyi_print_test_status()
+apr_print_test_status()

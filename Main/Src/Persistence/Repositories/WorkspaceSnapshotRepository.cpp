@@ -5,7 +5,7 @@
 #include "WorkspaceSnapshotRepository.h"
 
 #include "Engine/Persistence/Database.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 WorkspaceSnapshotRepository::WorkspaceSnapshotRepository(Eg::Database& database)
     : SqliteRepositoryBase(database)

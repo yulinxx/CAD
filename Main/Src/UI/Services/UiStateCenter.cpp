@@ -5,7 +5,7 @@
  * 集中管理全局 UI 状态（主题、视图模式、工作台等）。
  */
 #include "UiStateCenter.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 /// @param parent 父对象
 UiStateCenter::UiStateCenter(QObject* parent)
@@ -258,7 +258,7 @@ void UiStateCenter::popBusy()
 {
     if (m_command.busyCount <= 0)
     {
-        SY_WARN("[UiStateCenter] popBusy without matching pushBusy, ignored");
+        APR_WARN("[UiStateCenter] popBusy without matching pushBusy, ignored");
         return;
     }
     --m_command.busyCount;

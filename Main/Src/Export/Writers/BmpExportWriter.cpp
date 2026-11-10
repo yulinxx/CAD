@@ -15,7 +15,7 @@ BmpExportWriter::BmpExportWriter()
 {
 }
 
-ExportResult BmpExportWriter::write(const ExportContext& context, const Fio::VecSyEntityPtr& entities)
+ExportResult BmpExportWriter::write(const ExportContext& context, const Fio::VecAprEntityPtr& entities)
 {
     return RasterExportHelper::rasterizeExport(context, entities, "BMP");
 }

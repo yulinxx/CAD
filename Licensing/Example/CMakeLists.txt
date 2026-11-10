@@ -1,17 +1,17 @@
-add_executable(SyLicenseExample
+add_executable(AprLicenseExample
     main.cpp
 )
 
-target_compile_features(SyLicenseExample PRIVATE cxx_std_17)
+target_compile_features(AprLicenseExample PRIVATE cxx_std_17)
 
-target_link_libraries(SyLicenseExample PRIVATE
+target_link_libraries(AprLicenseExample PRIVATE
     License
 )
 
 if(MSVC)
-    target_compile_options(SyLicenseExample PRIVATE /utf-8)
+    target_compile_options(AprLicenseExample PRIVATE /utf-8)
 endif()
 
-set_target_properties(SyLicenseExample PROPERTIES FOLDER "Examples")
+set_target_properties(AprLicenseExample PROPERTIES FOLDER "Examples")
 
-message(STATUS "  Example: SyLicenseExample")
+message(STATUS "  Example: AprLicenseExample")

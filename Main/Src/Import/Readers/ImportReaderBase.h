@@ -20,7 +20,7 @@ protected:
     /// @param collectLayers 是否收集图层表与图元→图层映射
     bool tryImportViaIR(const ImportContext& context,
                         Fio::FileFormat format,
-                        Fio::VecSyEntityPtr& outEntities,
+                        Fio::VecAprEntityPtr& outEntities,
                         bool collectLayers,
                         ImportResult* result,
                         QString* errMsg) const;
@@ -28,13 +28,13 @@ protected:
     /// 纯 IR 读取：成功返回 ok 结果；失败返回 fail 结果（含错误分类）
     ImportResult readViaIR(const ImportContext& context,
                            Fio::FileFormat format,
-                           Fio::VecSyEntityPtr& outEntities,
+                           Fio::VecAprEntityPtr& outEntities,
                            bool collectLayers) const;
 
     /// 旧路径读取：importFile → 构建结果（含错误分类与警告收集）
     ImportResult readViaLegacy(const ImportContext& context,
                                Fio::FileFormat format,
-                               Fio::VecSyEntityPtr& outEntities) const;
+                               Fio::VecAprEntityPtr& outEntities) const;
 
     /// 错误分类：根据错误信息判断 ImportErrorType
     static ImportErrorType classifyError(const QString& msg);

@@ -1,6 +1,6 @@
 # KeygenTool — 离线注册码生成器
 
-SanYiCAD License 模块的配套工具,用于为指定机器生成 RSA 签名的离线注册码。
+April License 模块的配套工具,用于为指定机器生成 RSA 签名的离线注册码。
 
 ## 工作原理
 
@@ -126,12 +126,12 @@ $sb.ToString()
 ### 3. 重新编译并部署客户端
 
 ```powershell
-cmake --build build --config Release --target License SanYiCAD
+cmake --build build --config Release --target License April
 ```
 
 常见坑:
 
-- **LNK1104:无法打开 License.dll** — SanYiCAD.exe 还在运行,占着 DLL。先完全关闭 CAD 再编译。
+- **LNK1104:无法打开 License.dll** — April.exe 还在运行,占着 DLL。先完全关闭 CAD 再编译。
 - **客户端激活仍失败** — 检查是不是用了旧公钥编译的旧 DLL 被部署到了运行目录。确认 `build/bin_Qt6/Release/License.dll` 的修改时间是刚才。
 
 ## 错误码参考
@@ -192,7 +192,7 @@ KeygenTool **是开发/运维内部工具,严禁随主程序或安装包分发�
 #    (见上方「公钥内嵌客户端」一节的 PowerShell 脚本)
 
 # 3) 重编并发布新版客户端
-cmake --build build --config Release --target License SanYiCAD
+cmake --build build --config Release --target License April
 
 # 4) 用新私钥重新给所有已激活客户签发注册码(旧注册码在新版客户端里会失效)
 

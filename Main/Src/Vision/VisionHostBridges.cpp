@@ -19,6 +19,7 @@
 #include <thread>
 #include <vector>
 
+#include <QByteArray>
 #include <QTimer>
 
 #include "../Hardware/DeviceHost.h"
@@ -55,6 +56,61 @@ namespace
     }
 
 #ifdef ENABLE_HARDWARE
+    /**
+     * @brief 标定打点期间的出光租约。
+     *
+     * markPoints 有 7 条 return（loadPlan / startMark / 完成 / 中止 / 超时…），
+     * 任何一条漏掉收工都会把出光使能一直挂在 Enabled —— 标定结束后机器停在
+     * 「允许出光」状态。把释放绑到作用域，而不是指望每个 return 都记得 endJob。
+     * 正常完成走 commit()（endJob），其余路径由析构走 abort()。
+     */
+    class EmissionLease
+    {
+    public:
+        explicit EmissionLease(EmissionGuard& guard)
+            : m_guard(guard)
+        {
+        }
+
+        ~EmissionLease()
+        {
+            if (!m_committed)
+            {
+                m_guard.abort(QStringLiteral("visionCalibrationMarkAborted"));
+            }
+        }
+
+        EmissionLease(const EmissionLease&) = delete;
+        EmissionLease& operator=(const EmissionLease&) = delete;
+
+        void commit()
+        {
+            if (!m_committed)
+            {
+                m_committed = true;
+                m_guard.endJob();
+            }
+        }
+
+    private:
+        EmissionGuard& m_guard;
+        bool m_committed = false;
+    };
+
+    /// 安全门拒绝：把宿主的违规明细拼进 message，现场不必再翻日志找原因。
+    Vis::VisResult safetyRefused(DeviceHost* host, const char* what)
+    {
+        std::string reason(what);
+        const QStringList violations = host->safetyViolations();
+        if (!violations.isEmpty())
+        {
+            const QByteArray detail = violations.join(QStringLiteral("; ")).toUtf8();
+            reason += ": ";
+            reason += detail.constData();
+        }
+        return Vis::visFail(Vis::VisError::InvalidState, reason.c_str());
+    }
+
     Vis::VisError toVisError(Hw::HwError error)
     {
         switch (error)
@@ -461,6 +517,18 @@ namespace VisHost
             }
         }
 
+        // === 安全门（与正式加工同一条链）===
+        // 视觉标定的打点是真实出光：RapidTo -> LaserOn -> Dwell -> LaserOff
+        // 会原样下发到振镜卡。过去这里直接 loadPlan/startMark，绕过了
+        // DeviceHost 的安全裁决与 EmissionGuard 的开工/收工生命周期，
+        // 门开着、急停已按下时照样能打点。
+        // 先门控再编译，与 ProcessingJobService::startJob 保持同一策略。
+        if (!m_host->canStartProcessing())
+        {
+            return safetyRefused(m_host,
+                "GalvoController: marking refused, safety chain does not permit emission");
+        }
+
         // 每个点一条 RapidTo -> LaserOn -> Dwell -> LaserOff，合成一份计划下发：
         // 逐点 loadPlan/startMark 会让振镜在点与点之间反复起停，标定节拍不可接受。
         constexpr int64_t kMarkDwellUs = 2000;
@@ -515,6 +583,31 @@ namespace VisHost
         view.commands = commands.data();
         view.commandCount = commands.size();
 
+        // 出光使能必须由守卫显式受理：Latched（安全链/急停关过光）时要求
+        // 操作员先确认，本层不得自行重开。lease 把收工绑到作用域，
+        // 下面每条 return 都不会把使能留在 Enabled。
+        QString emissionError;
+        if (!m_host->emissionGuard().beginJob(emissionError))
+        {
+            const std::string detail =
+                std::string("GalvoController: emission enable refused: ") + emissionError.toUtf8().constData();
+            return Vis::visFail(Vis::VisError::InvalidState, detail.c_str());
+        }
+        EmissionLease lease(m_host->emissionGuard());
+
+        // 计划组装期间 tick 可能已把安全裁决翻转（门被打开、急停被按下）。
+        // 下发前复查：安全裁决与出光守卫必须同时处于允许态。
+        if (!m_host->canStartProcessing())
+        {
+            return safetyRefused(m_host,
+                "GalvoController: marking aborted, safety chain revoked permission");
+        }
+        if (!m_host->emissionGuard().isEmissionPermitted())
+        {
+            return Vis::visFail(Vis::VisError::InvalidState,
+                "GalvoController: marking aborted, emission guard is no longer permitting emission");
+        }
+
         Hw::HwError error = card->loadPlan(view).error;
         if (error != Hw::HwError::Ok)
         {
@@ -533,6 +626,7 @@ namespace VisHost
             const Hw::PlanProgress progress = card->markProgress();
             if (progress.state == Hw::PlanState::Completed || progress.state == Hw::PlanState::Idle)
             {
+                lease.commit();
                 return Vis::visOk();
             }
             if (progress.state == Hw::PlanState::Aborted)
@@ -703,9 +797,9 @@ namespace VisHost
         }
 
         std::vector<Eg::EntityId> ids;
-        const Eg::VecSyEntityPtr entities = m_sceneManager->getAllEntities();
+        const Eg::VecAprEntityPtr entities = m_sceneManager->getAllEntities();
         ids.reserve(entities.size());
-        for (Eg::SyEntity* entity : entities)
+        for (Eg::AprEntity* entity : entities)
         {
             if (entity)
             {
@@ -759,9 +853,9 @@ namespace VisHost
         const double ty = -(s * m_lastApplied.tx + c * m_lastApplied.ty) * inverseScale;
 
         std::vector<Eg::EntityId> ids;
-        const Eg::VecSyEntityPtr entities = m_sceneManager->getAllEntities();
+        const Eg::VecAprEntityPtr entities = m_sceneManager->getAllEntities();
         ids.reserve(entities.size());
-        for (Eg::SyEntity* entity : entities)
+        for (Eg::AprEntity* entity : entities)
         {
             if (entity)
             {

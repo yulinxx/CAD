@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file CamInputBridge.cpp
  * @brief Engine2D 类型 → CAM ToolpathJobInput 的唯一桥接点。
  *
@@ -12,7 +12,7 @@
 #include "CAM/ToolpathJobInput.h"
 
 #include "Engine/Process/ProcessParams.h"
-#include "Engine/SyEntity/SyEntity.h"
+#include "Engine/AprEntity/AprEntity.h"
 #include "Engine2D/Cam/ContourContainment.h"
 #include "Engine2D/Cam/GeometryExtractor.h"
 #include "Engine2D/Cam/KerfCompensator.h"
@@ -20,12 +20,13 @@
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/LayerSnapshot.h"
 #include "Engine2D/Interaction/LayerManager.h"
-#include "Engine2D/SyEntity/SyImage.h"
+#include "Engine2D/AprEntity/AprImage.h"
 
 #include "Hardware/ToolpathJobSpec.h"
 
 #ifdef BUILD_RASTER
-#include "CAM/RasterScanlineBridge.h"
+#include "Raster/RasterApi.h"
+#include "Raster/RasterTypes.h"
 #endif
 
 #include <QDebug>
@@ -33,7 +34,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -136,42 +136,158 @@ namespace CamBridge
     //  CAM 只消费换算后的毫米坐标，不重新读取位图
     // ============================================================
 
-    /// 把位图实体装配为 CAM 扫描线段；单位换算与像素读取统一由 RasterScanlineBridge 负责
-    static void fillRasterScanlines(const Eg::SyImage& image,
+    /// 像素坐标 → 用户坐标（双线性四点映射，兼容旋转/斜切）
+    static Ut::Vec2d mapImagePixel(const Eg::AprImage& image, double u, double v)
+    {
+        const double fu = image.nWidth > 0 ? u / static_cast<double>(image.nWidth) : 0.0;
+        const double fv = image.nHeight > 0 ? v / static_cast<double>(image.nHeight) : 0.0;
+        const Ut::Vec2d axisU = image.topRight - image.topLeft;
+        const Ut::Vec2d axisV = image.bottomLeft - image.topLeft;
+        return Ut::Vec2d(image.topLeft.x() + axisU.x() * fu + axisV.x() * fv,
+                         image.topLeft.y() + axisU.y() * fu + axisV.y() * fv);
+    }
+
+    /// Eg::ProcessParams → RasterScanlineParams；线距按像素当量换算成像素
+    static RasterScanlineParams makeScanlineParams(const Eg::AprImage& image,
+                                                   const Eg::ProcessParams& process)
+    {
+        const double pitchX = image.pixelPitchMmX();
+        const double pitchY = image.pixelPitchMmY();
+        const double pitch = pitchX > 0.0 ? pitchX : pitchY;
+
+        RasterScanlineParams params{};
+        params.structSize = sizeof(RasterScanlineParams);
+        const double spacingMm = process.fillIntervalMm > 0.0 ? process.fillIntervalMm : 0.1;
+        params.lineSpacing = pitch > 0.0 ? spacingMm / pitch : spacingMm;
+        params.angleDeg = process.fillAngleDeg;
+        params.passes = process.passes > 0 ? process.passes : 1;
+        params.speed = process.speedMmPerSec;
+        params.powerMin = 0.0;
+        params.powerMax = process.powerPercent / 100.0;
+        params.bidirectional = process.fillMode == Eg::FillMode::Zigzag ? 1 : 0;
+        params.overscan = 0.0;
+        params.pixelPitchMm = pitch;
+        return params;
+    }
+
+    /// AprImage 像素 → 8 位灰度：RGB24 按 R,G,B 解释，RGBA32 先按白底合成 alpha
+    static bool imageToGray8(const Eg::AprImage& image, std::vector<uint8_t>& gray)
+    {
+        gray.clear();
+        const size_t pixelCount =
+            static_cast<size_t>(image.nWidth) * static_cast<size_t>(image.nHeight);
+        if (pixelCount == 0 || image.pixelDataSize() < pixelCount)
+        {
+            return false;
+        }
+        const size_t bytesPerPixel = image.pixelDataSize() / pixelCount;
+        const uint8_t* src = image.pixelData();
+        if (src == nullptr)
+        {
+            return false;
+        }
+
+        // 与 OpenCV RGB2GRAY 同权重，保证同一张图在这里与 Raster 内部得到同一灰度
+        const double weightR = 0.299;
+        const double weightG = 0.587;
+        const double weightB = 0.114;
+        auto clampByte = [](double value)
+        {
+            if (value <= 0.0) return static_cast<uint8_t>(0);
+            if (value >= 255.0) return static_cast<uint8_t>(255);
+            return static_cast<uint8_t>(value + 0.5);
+        };
+
+        gray.resize(pixelCount);
+        for (size_t i = 0; i < pixelCount; ++i)
+        {
+            const uint8_t* p = src + i * bytesPerPixel;
+            switch (image.ePixelFormat)
+            {
+            case Eg::AprPixelFormat::Gray8:
+                gray[i] = p[0];
+                break;
+            case Eg::AprPixelFormat::RGB24:
+                gray[i] = clampByte(weightR * p[0] + weightG * p[1] + weightB * p[2]);
+                break;
+            case Eg::AprPixelFormat::RGBA32:
+            {
+                // 透明区域按白纸处理，避免全透明像素被当成纯黑而出光
+                const double alpha = static_cast<double>(p[3]) / 255.0;
+                const double r = p[0] * alpha + 255.0 * (1.0 - alpha);
+                const double g = p[1] * alpha + 255.0 * (1.0 - alpha);
+                const double b = p[2] * alpha + 255.0 * (1.0 - alpha);
+                gray[i] = clampByte(weightR * r + weightG * g + weightB * b);
+                break;
+            }
+            default:
+                gray.clear();
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// 把位图实体装配为 CAM 扫描线段（像素坐标在冲压前换算成 mm）
+    static void fillRasterScanlines(const Eg::AprImage& image,
                                     const Eg::ProcessParams& process,
                                     Cam::EntitySnapshot& snapshot)
     {
-        RasterScanlineRequest request;
-        request.lineSpacingMm = process.fillIntervalMm > 0.0 ? process.fillIntervalMm : 0.1;
-        // CamCore 路径不暴露过扫；真机路径的过扫由 MotionPlanCompiler 传入
-        request.overscanMm = 0.0;
-        request.angleDeg = process.fillAngleDeg;
-        request.bidirectional = process.fillMode == Eg::FillMode::Zigzag;
-        request.passes = process.passes > 0 ? process.passes : 1;
-        request.powerPercent = process.powerPercent;
-        request.speedMmPerSec = process.speedMmPerSec;
-
-        std::vector<RasterRun> runs;
-        std::string defect;
-        if (!buildRasterRuns(image, request, runs, defect))
+        std::vector<uint8_t> gray;
+        if (!imageToGray8(image, gray))
         {
-            snapshot.unmachinableReason = defect;
+            snapshot.unmachinableReason = "unsupported raster pixel format";
             return;
         }
 
-        snapshot.scanlines.reserve(runs.size());
-        for (const RasterRun& run : runs)
+        RasterImageView view{};
+        view.structSize = sizeof(RasterImageView);
+        view.width = image.nWidth;
+        view.height = image.nHeight;
+        view.channels = 1;
+        view.format = RASTER_FORMAT_GRAY8;
+        view.data = gray.data();
+        view.stride = 0;
+
+        RasterImage rasterImage = nullptr;
+        const RasterStatus createStatus = Raster_CreateImageFromView(&view, &rasterImage);
+        if (createStatus != RASTER_OK || rasterImage == nullptr)
         {
+            snapshot.unmachinableReason = Raster_StatusText(createStatus);
+            return;
+        }
+
+        const RasterScanlineParams params = makeScanlineParams(image, process);
+        RasterJobList jobs = nullptr;
+        const RasterStatus status = Raster_ScanlineJobs(rasterImage, &params, &jobs);
+        Raster_DestroyImage(rasterImage);
+        if (status != RASTER_OK || jobs == nullptr)
+        {
+            snapshot.unmachinableReason = Raster_StatusText(status);
+            return;
+        }
+
+        int32_t count = 0;
+        Raster_JobListCount(jobs, &count);
+        snapshot.scanlines.reserve(static_cast<size_t>(count));
+        for (int32_t i = 0; i < count; ++i)
+        {
+            RasterScanlineSegment seg{};
+            if (Raster_JobListGet(jobs, i, &seg) != RASTER_OK)
+            {
+                break;
+            }
             Cam::ScanlineSegment line;
-            line.ptStart = run.start;
-            line.ptEnd = run.end;
-            line.powerPercent = run.powerPercent;
-            line.speedMmPerSec = run.speedMmPerSec;
-            line.passIndex = run.pass;
-            line.dir = run.dir;
-            line.laserOn = run.laserOn;
+            line.ptStart = mapImagePixel(image, seg.x0, seg.y);
+            line.ptEnd = mapImagePixel(image, seg.x1, seg.y1);
+            line.powerPercent = seg.laserOn != 0 ? seg.power * 100.0 : 0.0;
+            line.speedMmPerSec = seg.speed;
+            line.passIndex = seg.pass;
+            line.dir = seg.dir;
+            line.laserOn = seg.laserOn != 0;
             snapshot.scanlines.push_back(line);
         }
+        Raster_DestroyJobList(jobs);
         snapshot.unmachinableReason.clear();
     }
 #endif
@@ -317,7 +433,7 @@ namespace CamBridge
                 // 位图实体：主程序负责取图/配方/换算，Raster 出段，CAM 只编排运动
                 if (entity != nullptr && entity->eType == Eg::EType::IMAGE)
                 {
-                    const Eg::SyImage* image = static_cast<const Eg::SyImage*>(entity);
+                    const Eg::AprImage* image = static_cast<const Eg::AprImage*>(entity);
                     auto it = spec.layerParams.constFind(layerId);
                     const Eg::ProcessParams& process =
                         (it != spec.layerParams.constEnd())
@@ -327,7 +443,7 @@ namespace CamBridge
                 }
                 else
                 {
-                    snapshot.unmachinableReason = "raster entity is not SyImage";
+                    snapshot.unmachinableReason = "raster entity is not AprImage";
                 }
 #else
                 snapshot.unmachinableReason = "raster scanline assembly requires BUILD_RASTER";

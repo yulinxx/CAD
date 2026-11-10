@@ -678,7 +678,7 @@ namespace
     {
         return {
             QStringLiteral(":/configs/base.json"),
-            QStringLiteral(":/configs/san_yi.json"),
+            QStringLiteral(":/configs/april.json"),
             QStringLiteral(":/configs/client_a.json"),
             QStringLiteral(":/configs/client_b.json"),
         };

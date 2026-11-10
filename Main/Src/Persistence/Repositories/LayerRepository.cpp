@@ -5,7 +5,7 @@
 #include "LayerRepository.h"
 
 #include "Engine/Persistence/Database.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 LayerRepository::LayerRepository(Eg::Database& database)
     : SqliteRepositoryBase(database)
@@ -44,7 +44,7 @@ bool LayerRepository::save(const LayerRecord& record)
 
     if (m_database.changes() > 0)
     {
-        SY_DEBUGF("[LayerRepository] Updated layer: doc=%s, layer=%d", record.documentId.c_str(), record.layerId);
+        APR_DEBUGF("[LayerRepository] Updated layer: doc=%s, layer=%d", record.documentId.c_str(), record.layerId);
         return true;
     }
 
@@ -54,7 +54,7 @@ bool LayerRepository::save(const LayerRecord& record)
         return fail("LayerRepository", "Failed to save layer");
     }
 
-    SY_DEBUGF("[LayerRepository] Inserted layer: doc=%s, layer=%d", record.documentId.c_str(), record.layerId);
+    APR_DEBUGF("[LayerRepository] Inserted layer: doc=%s, layer=%d", record.documentId.c_str(), record.layerId);
     return true;
 }
 
@@ -69,7 +69,7 @@ bool LayerRepository::remove(const std::string& documentId, int layerId)
         return fail("LayerRepository", "Failed to remove layer");
     }
 
-    SY_DEBUGF("[LayerRepository] Removed layer: doc=%s, layer=%d", documentId.c_str(), layerId);
+    APR_DEBUGF("[LayerRepository] Removed layer: doc=%s, layer=%d", documentId.c_str(), layerId);
     return true;
 }
 
@@ -105,7 +105,7 @@ bool LayerRepository::rename(const std::string& documentId, int layerId, const s
     {
         return fail("LayerRepository", "Failed to rename layer");
     }
-    SY_DEBUGF(
+    APR_DEBUGF(
         "[LayerRepository] Renamed layer: doc=%s, layer=%d, name=%s", documentId.c_str(), layerId, newName.c_str());
     return true;
 }
@@ -122,7 +122,7 @@ bool LayerRepository::updateVisibility(const std::string& documentId, int layerI
     {
         return fail("LayerRepository", "Failed to update layer visibility");
     }
-    SY_DEBUGF("[LayerRepository] Updated layer visibility: doc=%s, layer=%d, visible=%d",
+    APR_DEBUGF("[LayerRepository] Updated layer visibility: doc=%s, layer=%d, visible=%d",
         documentId.c_str(),
         layerId,
         visible ? 1 : 0);
@@ -141,7 +141,7 @@ bool LayerRepository::updateLocked(const std::string& documentId, int layerId, b
     {
         return fail("LayerRepository", "Failed to update layer lock");
     }
-    SY_DEBUGF(
+    APR_DEBUGF(
         "[LayerRepository] Updated layer lock: doc=%s, layer=%d, locked=%d", documentId.c_str(), layerId, locked ? 1 : 0);
     return true;
 }
@@ -158,7 +158,7 @@ bool LayerRepository::updateFill(const std::string& documentId, int layerId, boo
     {
         return fail("LayerRepository", "Failed to update layer fill");
     }
-    SY_DEBUGF(
+    APR_DEBUGF(
         "[LayerRepository] Updated layer fill: doc=%s, layer=%d, fill=%d", documentId.c_str(), layerId, fill ? 1 : 0);
     return true;
 }
@@ -175,7 +175,7 @@ bool LayerRepository::updateColor(const std::string& documentId, int layerId, co
     {
         return fail("LayerRepository", "Failed to update layer color");
     }
-    SY_DEBUGF(
+    APR_DEBUGF(
         "[LayerRepository] Updated layer color: doc=%s, layer=%d, color=%s", documentId.c_str(), layerId, color.c_str());
     return true;
 }
@@ -192,7 +192,7 @@ bool LayerRepository::updateLayerType(const std::string& documentId, int layerId
     {
         return fail("LayerRepository", "Failed to update layer type");
     }
-    SY_DEBUGF("[LayerRepository] Updated layer type: doc=%s, layer=%d, type=%d", documentId.c_str(), layerId, layerType);
+    APR_DEBUGF("[LayerRepository] Updated layer type: doc=%s, layer=%d, type=%d", documentId.c_str(), layerId, layerType);
     return true;
 }
 
@@ -219,7 +219,7 @@ bool LayerRepository::batchUpdateOrder(
         return fail("LayerRepository", "Failed to commit batch order update");
     }
 
-    SY_DEBUGF("[LayerRepository] Batch updated order for %zu layers", layerIdAndOrders.size());
+    APR_DEBUGF("[LayerRepository] Batch updated order for %zu layers", layerIdAndOrders.size());
     return true;
 }
 

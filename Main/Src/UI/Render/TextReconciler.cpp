@@ -2,10 +2,10 @@
 
 #include "RenderWidget.h"
 #include "Engine2D/Core/SceneManager.h"
-#include "Engine/SyEntity/SyEntity.h"
-#include "Engine/Layer/SyLayer.h"
-#include "Engine2D/SyEntity/SyText.h"
-#include "Engine/SyEntity/EType.h"
+#include "Engine/AprEntity/AprEntity.h"
+#include "Engine/Layer/AprLayer.h"
+#include "Engine2D/AprEntity/AprText.h"
+#include "Engine/AprEntity/EType.h"
 
 TextReconciler::TextReconciler(RenderWidget* widget)
     : m_renderWidget(widget)
@@ -30,7 +30,7 @@ void TextReconciler::reconcile(Eg::SceneManager* sm,
         m_worldTextIds.clear();
     }
 
-    // 期望集合：场景中所有可见 SyText（可见 = 图元可见 && 图层可见）
+    // 期望集合：场景中所有可见 AprText（可见 = 图元可见 && 图层可见）
     std::unordered_set<uint64_t> desired;
     // 使用类型索引避免全场景扫描
     auto textEntities = sm->getEntitiesByType(Eg::EType::TEXT);
@@ -84,7 +84,7 @@ void TextReconciler::reconcile(Eg::SceneManager* sm,
         }
 
         // 空串或非正字高画不出任何东西，不纳入账本（移除残留）
-        const auto* text = static_cast<const Eg::SyText*>(e);
+        const auto* text = static_cast<const Eg::AprText*>(e);
         if (text->text()[0] == '\0' || text->dHeight <= 0.0)
         {
             m_renderWidget->removeWorldText(id);

@@ -7,5 +7,5 @@ class StepImportReader : public ImportReaderBase
 {
 public:
     StepImportReader();
-    ImportResult read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities) override;
+    ImportResult read(const ImportContext& context, Fio::VecAprEntityPtr& outEntities) override;
 };

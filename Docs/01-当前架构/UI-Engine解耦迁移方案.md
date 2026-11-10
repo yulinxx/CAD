@@ -39,7 +39,7 @@
 UI 实际直接使用：
 
 - 场景：`Engine2D/Core/SceneManager.h`、`Engine3D/SceneManager3D.h`
-- 具体实体：`SyLine` / `SyCircle` / `SyArc` / `SyPolygon` / `SyBezier` / `SyText` / `SyGroup` / `SyMeshEntity`
+- 具体实体：`AprLine` / `AprCircle` / `AprArc` / `AprPolygon` / `AprBezier` / `AprText` / `AprGroup` / `AprMeshEntity`
 - 选择 / 图层 / 吸附：`SelectionManager3D`、`LayerManager`、`GridSnapManager`
 - 编辑 / 撤销：`SceneEditService`、`SceneUndoCommands3D`、`Engine/Edit/IUndoRedoCommand.h`
 - 渲染桥：`Tessellator`、`SceneRenderContract`、`RenderBridge/*`
@@ -75,8 +75,8 @@ CAD 的 UI 与模型**天然共享文档模型**（OCCT 等内核亦然）。强
 ### 1.4 真正可移植性的瓶颈在渲染，不在算法
 
 - `RenderWidget : QOpenGLWidget`、`RenderWidget3D : QOpenGLWidget` —— 硬编码 OpenGL。
-- `SANYI_DEFAULT_RENDER_BACKEND` 只在 `Config.cmake` 里 `find_package`，UI 模块并不消费它做后端切换。
-- `SY_ENABLE_METAL_VIEWPORT` 有开关无实现。
+- `APR_DEFAULT_RENDER_BACKEND` 只在 `Config.cmake` 里 `find_package`，UI 模块并不消费它做后端切换。
+- `APR_ENABLE_METAL_VIEWPORT` 有开关无实现。
 
 原方案 B（把后端选择写进 Config）**单独做没有意义**：widget 仍然写死 GL。
 
@@ -117,23 +117,23 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 | 次数 | 头文件 |
 |---:|---|
 | 37 | `Engine2D/Core/SceneManager.h` |
-| 24 | `Engine3D/SyEntity/SyMeshEntity.h` |
+| 24 | `Engine3D/AprEntity/AprMeshEntity.h` |
 | 20 | `Engine3D/SceneManager3D.h` |
 | 20 | `Engine2D/Edit/SceneEditService.h` |
-| 14 | `Engine/SyEntity/SyEntity.h` |
+| 14 | `Engine/AprEntity/AprEntity.h` |
 | 14 | `Engine2D/Interaction/LayerManager.h` |
-| 14 | `Engine2D/SyEntity/SyLine.h` |
+| 14 | `Engine2D/AprEntity/AprLine.h` |
 | 12 | `Engine3D/Selection/SelectionManager3D.h` |
-| 8 | `Engine2D/SyEntity/SyPolygon.h` |
-| 8 | `Engine2D/SyEntity/SyGroup.h` |
+| 8 | `Engine2D/AprEntity/AprPolygon.h` |
+| 8 | `Engine2D/AprEntity/AprGroup.h` |
 | 8 | `Engine2D/Render/EntityTessellateUtil.h` |
 | 7 | `Engine2D/Interaction/GridSnapManager.h` |
 | 6 | `Engine3D/Geometry/Geo3DTypes.h` |
-| 6 | `Engine2D/SyEntity/SyBezier.h` |
-| 6 | `Engine2D/SyEntity/SyCircle.h` |
-| 6 | `Engine2D/SyEntity/SySmartLine.h` |
+| 6 | `Engine2D/AprEntity/AprBezier.h` |
+| 6 | `Engine2D/AprEntity/AprCircle.h` |
+| 6 | `Engine2D/AprEntity/AprSmartLine.h` |
 | 6 | `Engine/EntityIdGenerator.h` |
-| 6 | `Engine2D/SyEntity/SyArc.h` |
+| 6 | `Engine2D/AprEntity/AprArc.h` |
 | 5 | `Engine2D/Algorithm/ArrayParams.h` |
 | 5 | `Engine3D/Edit/SceneUndoCommands3D.h` |
 
@@ -156,8 +156,8 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 | `Core::ICommand` / `ICommandCatalog` / `ICommandRegistry` | 业务层引用 0（Core 内自引用 40） | 与 `UI::Plugin::ICommandPlugin` + `OperationBus` 二选一 |
 | `Core::IApplication` | 业务层引用 0 | 与 `ApplicationCompositionRoot` 二选一 |
 | `Core::IDrawTool` | 业务层引用 0 | 删除或接线 |
-| `sanyi_declare_module` | 定义 0 使用；24 个模块全走 `sanyi_add_shared_library` | 全量迁移或删除 |
-| `SANYI_DEFAULT_RENDER_BACKEND` | 仅 `find_package`，UI 不消费 | Phase 1 接线 |
+| `apr_declare_module` | 定义 0 使用；24 个模块全走 `apr_add_shared_library` | 全量迁移或删除 |
+| `APR_DEFAULT_RENDER_BACKEND` | 仅 `find_package`，UI 不消费 | Phase 1 接线 |
 | `BUILD_UI_DIMENSION` | 仅 `UI/CMakeLists.txt`（独立工程）互斥；根工程不 gate | Phase 3 补根工程门控 |
 
 ### 2.5 已经正确、不要动的部分
@@ -174,7 +174,7 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 1. **渲染后端是假的**：widget 写死 `QOpenGLWidget`，Metal/Vulkan 不可切换。
 2. **UI→Engine 依赖面失控**：365 处直接 include，无单一收口点；其中 66 处在公共头。
 3. **死抽象误导人**：`EngineAdapter`、`Core::IViewWidget/IRenderer` 看起来"已解耦"，实则 0 引用。
-4. **CMake 抽象未落地**：`sanyi_declare_module` 0 使用。
+4. **CMake 抽象未落地**：`apr_declare_module` 0 使用。
 5. **维度门控半生效**：根工程 `BUILD_UI2D`/`BUILD_UI3D` 默认都 ON。
 
 ---
@@ -203,14 +203,14 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 |---|---|---|
 | `EngineAdapter` 整层 | **目录删除** + 从根/UI CMake 移除 | 全仓引用 0 |
 | `UI/Core` 整层 | **目录删除** + 从根/UI CMake 移除 | 业务层 `#include "Core/*.h"` = 0 |
-| `sanyi_declare_module` | 删除（0 引用） | 24 模块统一走 `sanyi_add_shared_library` |
-| `sanyi_export_module` | 删除（0 引用，顺带发现） | — |
-| `sanyi_add_module_sources` | 删除（0 引用） | — |
+| `apr_declare_module` | 删除（0 引用） | 24 模块统一走 `apr_add_shared_library` |
+| `apr_export_module` | 删除（0 引用，顺带发现） | — |
+| `apr_add_module_sources` | 删除（0 引用） | — |
 | `UI::IRenderSurface` | 删除（0 实现、0 include） | — |
-| `SANYI_UICORE_DIR` / `SANYI_ENGINEADAPTER_DIR` | 从 `CMake/SanYiPaths.cmake` 删除 | — |
+| `APR_UICORE_DIR` / `APR_ENGINEADAPTER_DIR` | 从 `CMake/AprPaths.cmake` 删除 | — |
 | `BUILD_UICORE` / `BUILD_ENGINEADAPTER` 选项 | 从 `Config.cmake` 删除 | — |
 
-**验收**：`git grep` 中不存在"业务层 0 引用"的接口/宏；`SanYiCAD.exe` 构建通过。
+**验收**：`git grep` 中不存在"业务层 0 引用"的接口/宏；`April.exe` 构建通过。
 
 ---
 
@@ -233,17 +233,17 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 **实际执行**：
 
 1. **统一两个后端开关** ✅
-   `SY_ENABLE_METAL_VIEWPORT` 的默认值改为派生自 `SANYI_DEFAULT_RENDER_BACKEND`
+   `APR_ENABLE_METAL_VIEWPORT` 的默认值改为派生自 `APR_DEFAULT_RENDER_BACKEND`
    （`CMakeLists.txt` 视口开关段），并加一致性 WARNING；用户仍可显式覆盖。
-   - 修复前问题：`-DSANYI_DEFAULT_RENDER_BACKEND=OPENGL`（Apple）仍会编译 Metal 视口。
+   - 修复前问题：`-DAPR_DEFAULT_RENDER_BACKEND=OPENGL`（Apple）仍会编译 Metal 视口。
 2. **删除死抽象 `UI::IRenderSurface`** ✅（0 实现、0 include）。
 3. **明确不做运行时基类切换**（决策）：
    唯一编译期耦合是 widget 基类（`QOpenGLWidget` vs `QWidget`），由
-   `SY_ENABLE_METAL_VIEWPORT` 切换。该宏改变类定义，必须 PUBLIC 否则 ODR 冲突
+   `APR_ENABLE_METAL_VIEWPORT` 切换。该宏改变类定义，必须 PUBLIC 否则 ODR 冲突
    （`CMakeLists.txt:330-338`）。改成运行时需在裸 `QWidget` 上自管 GL 上下文，
    高风险且无实际收益——同一平台构建一次即可，**不做**。
 
-**验收**：单一后端开关（`SANYI_DEFAULT_RENDER_BACKEND`）驱动；无 0 引用渲染抽象。
+**验收**：单一后端开关（`APR_DEFAULT_RENDER_BACKEND`）驱动；无 0 引用渲染抽象。
 
 ---
 
@@ -257,20 +257,31 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 2. **UI 模块改链门面** — `UI/Common`、`UI/2D`、`UI/3D` 的
    `target_link_libraries` 由 Engine 目标改为 `UiEngineAccess`，并删除各自重复的
    Engine 包含路径（改为从门面传递）。
-   - 365 处 `#include "Engine*/..."` **未改动**；依赖从"散落各处"变为单一收口点。
+   - **链接层**：依赖从"散落各处"变为单一收口点。
+   - **include 层**：**没有收口**。转发头只覆盖 Engine2D 的算法 / 填充 / 离散化
+     子集；场景 / 实体 / 选择 / 编辑等头仍由 UI 直接 `#include "Engine2D/..."` /
+     `"Engine3D/..."` / `"Engine/..."`（2026-11 依赖面：UICommon 13、UI2D 45、
+     UI3D 17 个去重后的 Engine 头，不含 `Test/`）。这是"共享领域模型"的既定取舍：
+     公共头已经暴露 Engine 类型，隐藏它们属于公共 API 治理，不在本方案范围。
+   - **防止重新长回来**：include 层不做存量迁移，但由
+     `CMake/UiEngineAccessRatchet.cmake` 在 configure 阶段做**依赖面白名单**校验
+     —— 出现白名单外的 Engine 头即失败，逼新代码走转发头；确需扩张时必须同步
+     加入白名单，使依赖面扩张成为一次显式决策。按「去重头文件」而非「include
+     次数」统计，纯代码拆分不会误报。
    - 对外导出的 imported target 仍用 `EngineCommon::EngineCommon` 等（门面是构建内的）。
-3. **`CMake/CheckDependencies.cmake`** — `sanyi_check_dependency_directions()`，
+3. **`CMake/CheckDependencies.cmake`** — `apr_check_dependency_directions()`，
    在根 `CMakeLists.txt` 所有目标创建后执行；违规 `FATAL_ERROR`：
    - `Engine*` 不得链 `UI*` / `Render*` / `Main` / `UiEngineAccess`
    - `RenderX` / `RenderBridge` 不得链 `UI*` / `Main`
    - `UI*` 不得直接链 `EngineCommon/Engine2D/Engine3D/EnginePersistence`（只能经门面）
+   - include 层另有棘轮：`apr_check_ui_engine_include_ratchet()` 冻结存量、禁止增长
 4. **CI**：`.github/workflows/ci.yml` 的 Configure 步骤自动触发该检查，违规即失败。
 
 **验收（已验证）**：
-- 配置输出：`[UiEngineAccess] ... 已定义` + `[SanYi] 依赖方向校验: OK`。
+- 配置输出：`[UiEngineAccess] ... 已定义` + `[April] 依赖方向校验: OK`。
 - 注入违规（给 `UICommon` 加 `Engine2D` 直链）→ configure 立即 `FATAL_ERROR`
   （`CheckDependencies.cmake:67`）；移除后恢复通过。
-- Debug 全量构建通过，`SanYiCAD.exe` 生成。
+- Debug 全量构建通过，`April.exe` 生成。
 
 ---
 
@@ -295,7 +306,7 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 **2. 根工程 `BUILD_UI_DIMENSION` 门控 — 已实现**
 
 `Config.cmake` 新增唯一权威开关 `BUILD_UI_DIMENSION`（`2D|3D|BOTH`，默认 `BOTH`），
-派生 `BUILD_UI3D` 与 `SANYI_DEFAULT_UI_DIMENSION`（`FORCE` 写回缓存，修复 2D→BOTH
+派生 `BUILD_UI3D` 与 `APR_DEFAULT_UI_DIMENSION`（`FORCE` 写回缓存，修复 2D→BOTH
 粘滞）。非法取值 `FATAL_ERROR`。
 
 | 取值 | UI2D | UI3D | 运行时默认 |
@@ -308,7 +319,7 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 > 根 `CMakeLists.txt` 对 `BUILD_UI2D=OFF` 直接 `FATAL_ERROR`。
 
 **验收（已验证）**：
-- `cmake -DBUILD_UI_DIMENSION=2D` → `UI3D: DISABLED`，`SanYiCAD.slnx` 中 UI3D 引用 = **0**。
+- `cmake -DBUILD_UI_DIMENSION=2D` → `UI3D: DISABLED`，`April.slnx` 中 UI3D 引用 = **0**。
 - `BOTH` → UI3D 重新 ON（粘滞已修复）。
 - 非法值 → 配置期 `FATAL_ERROR`。
 
@@ -320,11 +331,11 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 |---|---|---|
 | UI 继承 `Core::IViewWidget` | ❌ 不做 → 统一到 `UI::IViewportHost` | 与 Qt 基类打架，且已有可用抽象 |
 | UI 通过 `IGeometry2D` 调算法 | ❌ 不做 → `UiEngineAccess` 门面收口 | 边界错、且是空壳 |
-| OpenGL/Metal 选择进 Config | ✅ **已完成**（统一为 `SANYI_DEFAULT_RENDER_BACKEND` 单一开关） | 后端本就是运行时可选，缺的是开关统一 |
+| OpenGL/Metal 选择进 Config | ✅ **已完成**（统一为 `APR_DEFAULT_RENDER_BACKEND` 单一开关） | 后端本就是运行时可选，缺的是开关统一 |
 | 引入 `IRenderBackend` / `RenderBackendFactory` | ❌ 取消 | `RenderSessionHost` 已承担该职责，重复 |
 | 运行时切换 widget 基类 | ❌ 不做 | 需裸 `QWidget` 自管 GL 上下文，高风险无收益 |
 | 统一 2D/3D 目录 | ✅ 保留（Phase 3） | 低风险、可读性收益 |
-| `sanyi_declare_module` | ✅ 已删除（0 引用） | 0 引用即技术债 |
+| `apr_declare_module` | ✅ 已删除（0 引用） | 0 引用即技术债 |
 | `BUILD_UI_DIMENSION` | ✅ 保留，补根工程门控 | 半生效 |
 
 ---
@@ -348,13 +359,13 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 |---|---|---|
 | `Engine/Adapter/**`（`IEngineAdapter.h` / `IGeometry2D.h` / `IGeometry3D.h` / `Src/*.cpp`） | 外部引用 0 | 从 `CMakeLists.txt` 移除 `add_subdirectory`；目录保留并加 `experimental/` 说明 |
 | `UI/Core/**`（整层） | 业务层 `#include "Core/*.h"` = **0**；仅 Core 内部自引用 | **二选一**：① 整层删除（推荐，`UI/Common` 已有等价且被采用的抽象）；② 若保留则必须接线，并删除 `UI/Common` 的重复项（`IViewportHost` / `ICameraController` 等） |
-| `CMake/Utils.cmake` 中 `sanyi_declare_module()` | 0 使用 | 全量迁移或删除 |
+| `CMake/Utils.cmake` 中 `apr_declare_module()` | 0 使用 | 全量迁移或删除 |
 
 ### 7.2 需保留但必须接线
 
 | 路径 | 现状 | 接线目标 |
 |---|---|---|
-| `SANYI_DEFAULT_RENDER_BACKEND` | 仅 `find_package` | Phase 1 的 `RenderBackendFactory` |
+| `APR_DEFAULT_RENDER_BACKEND` | 仅 `find_package` | Phase 1 的 `RenderBackendFactory` |
 | `BUILD_UI_DIMENSION` | 仅独立 UI 工程 | Phase 3 根工程门控 |
 
 > `UI/Core` 若选择"保留并接线"（§7.1 方案②），则 `Core::ICommand` 需与 `UI::Plugin::ICommandPlugin` + `OperationBus` 统一，并同步删除 `UI/Common` 的重复抽象。
@@ -363,7 +374,7 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 
 - `Engine*` → 不依赖 UI/Render（已验证，锁死即可）。
 - `RenderX` / `RenderBridge` → 不依赖 UI（已验证，锁死即可）。
-- 领域模型（`SceneManager` / `SyEntity` 族 / `SelectionManager`）→ 保持共享库，不加接口。
+- 领域模型（`SceneManager` / `AprEntity` 族 / `SelectionManager`）→ 保持共享库，不加接口。
 
 ---
 
@@ -378,7 +389,8 @@ Phase 3  目录统一 + 维度门控                  ✅ 已完成（骨架本�
 
 > 四个 Phase 全部完成。全程未改动业务逻辑语义：
 > - 消除了"假解耦"（UI/Core、EngineAdapter、IRenderSurface、4 个死 CMake 宏）；
-> - 后端开关统一为 `SANYI_DEFAULT_RENDER_BACKEND`；
-> - UI→Engine 依赖收口到 `UiEngineAccess` 门面，并由 `CheckDependencies.cmake`
->   在 configure 阶段强制方向（CI 门禁）；
+> - 后端开关统一为 `APR_DEFAULT_RENDER_BACKEND`；
+> - UI→Engine 依赖在**链接层**收口到 `UiEngineAccess` 门面，并由 `CheckDependencies.cmake`
+>   在 configure 阶段强制方向（CI 门禁）；include 层保持现状，由
+>   `UiEngineAccessRatchet.cmake` 冻结存量、禁止增长；
 > - 根工程新增 `BUILD_UI_DIMENSION=2D|3D|BOTH` 门控。

@@ -28,7 +28,7 @@
 
     #include "Composition/ApplicationCompositionRoot.h"
     #include "Import/ImportService.h"
-    #include "Log/SyLogger.h"
+    #include "Log/AprLogger.h"
     #include "UI/Services/IRecentFileService.h"
     #include "UiServices.h"
     #include "UiStateCenter.h"
@@ -240,18 +240,18 @@ void Workbench3D::dispatchCommand(const QString& commandId, const QVariantMap& p
 {
     if (!m_services3D.operationBus)
     {
-        SY_WARNF("[Workbench3D] Cannot dispatch command without OperationBus3D: %s", qPrintable(commandId));
+        APR_WARNF("[Workbench3D] Cannot dispatch command without OperationBus3D: %s", qPrintable(commandId));
         return;
     }
 
     const OperationId3D operation = CommandCatalog3D::operationForCommandId(commandId);
     if (operation == OperationId3D::None)
     {
-        SY_WARNF("[Workbench3D] Unknown command: %s", qPrintable(commandId));
+        APR_WARNF("[Workbench3D] Unknown command: %s", qPrintable(commandId));
         return;
     }
 
-    SY_TRACEF("[Workbench3D] Dispatch command='%s'", qPrintable(commandId));
+    APR_TRACEF("[Workbench3D] Dispatch command='%s'", qPrintable(commandId));
     // 走完整 Request：便捷入口 run(id, source) 不带 params，会把调用方参数丢掉
     OperationRequest3D req;
     req.id = operation;
@@ -272,7 +272,7 @@ Cmd::OperationResultBase Workbench3D::dispatchCommandForResult(const QString& co
     Cmd::OperationResultBase result;
     if (!m_services3D.operationBus)
     {
-        SY_WARNF("[Workbench3D] Cannot dispatch command without OperationBus3D: %s", qPrintable(commandId));
+        APR_WARNF("[Workbench3D] Cannot dispatch command without OperationBus3D: %s", qPrintable(commandId));
         result.message = QStringLiteral("No OperationBus3D for %1").arg(commandId);
         return result;
     }
@@ -280,12 +280,12 @@ Cmd::OperationResultBase Workbench3D::dispatchCommandForResult(const QString& co
     const OperationId3D operation = CommandCatalog3D::operationForCommandId(commandId);
     if (operation == OperationId3D::None)
     {
-        SY_WARNF("[Workbench3D] Unknown command: %s", qPrintable(commandId));
+        APR_WARNF("[Workbench3D] Unknown command: %s", qPrintable(commandId));
         result.message = QStringLiteral("Unknown command: %1").arg(commandId);
         return result;
     }
 
-    SY_TRACEF("[Workbench3D] Dispatch command with result='%s'", qPrintable(commandId));
+    APR_TRACEF("[Workbench3D] Dispatch command with result='%s'", qPrintable(commandId));
     OperationRequest3D req;
     req.id = operation;
     req.source = OperationSource3D::Menu;
@@ -302,11 +302,11 @@ bool Workbench3D::hasUnsavedChanges() const
 // 1 — 初始化，存储服务引用
 bool Workbench3D::initialize(const WorkbenchServices& services)
 {
-    SY_INFO("[Workbench3D] initialize: starting 3D workbench initialization");
+    APR_INFO("[Workbench3D] initialize: starting 3D workbench initialization");
 
     if (!services.uiState.stateCenter)
     {
-        SY_ERRORF("[Workbench3D] initialize failed: stateCenter=%p", static_cast<void*>(services.uiState.stateCenter));
+        APR_ERRORF("[Workbench3D] initialize failed: stateCenter=%p", static_cast<void*>(services.uiState.stateCenter));
         return false;
     }
     m_uiState = services.uiState;
@@ -320,11 +320,11 @@ bool Workbench3D::initialize(const WorkbenchServices& services)
     if (services.persistence.importService && services.persistence.importService->sceneManager3D())
     {
         m_sceneManager3D = services.persistence.importService->sceneManager3D();
-        SY_DEBUG("[Workbench3D] Using shared SceneManager3D from ImportService");
+        APR_DEBUG("[Workbench3D] Using shared SceneManager3D from ImportService");
     }
     else
     {
-        SY_ERROR("[Workbench3D] No shared SceneManager3D available from ImportService");
+        APR_ERROR("[Workbench3D] No shared SceneManager3D available from ImportService");
         return false;
     }
 
@@ -373,7 +373,7 @@ bool Workbench3D::initialize(const WorkbenchServices& services)
 
     m_savedState = UiStateSnapshot{};
     m_initialState = UiStateSnapshot{};
-    SY_DEBUG("[Workbench3D] initialize: 3D workbench initialized successfully");
+    APR_DEBUG("[Workbench3D] initialize: 3D workbench initialized successfully");
     return true;
 }
 
@@ -408,7 +408,7 @@ void Workbench3D::build3DWorkbenchUi(WorkbenchWindow& window)
 /// 步骤一：创建所有 3D 服务并组装 ServicePack3D
 void Workbench3D::create3DServices()
 {
-    SY_DEBUG("[Workbench3D] Creating 3D services...");
+    APR_DEBUG("[Workbench3D] Creating 3D services...");
     m_serviceOwner = std::unique_ptr<ServiceOwner, ServiceOwnerDeleter>(new ServiceOwner());
     auto& own = *m_serviceOwner;
 
@@ -480,7 +480,7 @@ void Workbench3D::create3DServices()
     m_services3D.brepModelService = own.brepModelService.get();
     #endif
 
-    SY_DEBUG("[Workbench3D] 3D services created");
+    APR_DEBUG("[Workbench3D] 3D services created");
 }
 
 /// 步骤二：创建 MainWindow3D、Viewport3D 和渲染链，绑定视口信号
@@ -488,9 +488,9 @@ void Workbench3D::setup3DViewportAndSignals(WorkbenchWindow& window)
 {
     auto& own = *m_serviceOwner;
 
-    SY_DEBUG("[Workbench3D] Creating MainWindow3D wrapper...");
+    APR_DEBUG("[Workbench3D] Creating MainWindow3D wrapper...");
     m_mainWindow3D = std::make_unique<MainWindow3D>(m_services3D, &window);
-    SY_DEBUG("[Workbench3D] MainWindow3D created");
+    APR_DEBUG("[Workbench3D] MainWindow3D created");
 
     // sigSwitchTo2D / sigSwitchTo3D 的连接统一在 attachToWindow 中建立
     // （QueuedConnection，避免信号发出方还在调用栈上时重入 triggerWorkbench）；
@@ -508,24 +508,24 @@ void Workbench3D::setup3DViewportAndSignals(WorkbenchWindow& window)
 /// 创建 Viewport3D 并设置渲染链
 void Workbench3D::create3DViewport(WorkbenchWindow& window)
 {
-    SY_DEBUG("[Workbench3D] Creating Viewport3D...");
+    APR_DEBUG("[Workbench3D] Creating Viewport3D...");
     auto* viewport = new Viewport3D(&window);
-    SY_DEBUGF("[Workbench3D] Viewport3D created: %p", static_cast<void*>(viewport));
+    APR_DEBUGF("[Workbench3D] Viewport3D created: %p", static_cast<void*>(viewport));
 
     // 先设为中心控件，确保 Viewport3D 有正确的尺寸和窗口状态
     // 必须在 setRenderer 之前执行，否则 RenderWidget3DAdapter 初始化时
     // Viewport3D rect 为 (0,0,0,0)，QOpenGLWidget 以零尺寸创建 native window
     // 后续 resize 会导致 Qt 内部 native window 状态不一致，引发访问冲突崩溃
     window.setCentralWidget(viewport);
-    SY_DEBUG("[Workbench3D] Viewport3D set as central widget");
+    APR_DEBUG("[Workbench3D] Viewport3D set as central widget");
 
-    SY_DEBUG("[Workbench3D] Creating renderer via ViewportRendererFactory...");
+    APR_DEBUG("[Workbench3D] Creating renderer via ViewportRendererFactory...");
     auto renderer = ViewportRendererFactory::createDefault();
-    SY_DEBUG("[Workbench3D] Renderer created via factory");
+    APR_DEBUG("[Workbench3D] Renderer created via factory");
 
     viewport->setRenderer(std::move(renderer));
     viewport->setSceneDocument(m_serviceOwner->sceneDocument.get());
-    SY_DEBUGF(
+    APR_DEBUGF(
         "[Workbench3D] SceneDocument3D set to Viewport3D: %p", static_cast<void*>(m_serviceOwner->sceneDocument.get()));
 
     // 从适配器中取出内部 RenderWidget3D 指针，注册到 ServicePack3D
@@ -534,7 +534,7 @@ void Workbench3D::create3DViewport(WorkbenchWindow& window)
     {
         m_services3D.renderWidget = r3dAdapter->widget();
         m_renderWidget3D = r3dAdapter->widget();
-        SY_DEBUGF("[Workbench3D] RenderWidget3D registered to ServicePack3D: %p",
+        APR_DEBUGF("[Workbench3D] RenderWidget3D registered to ServicePack3D: %p",
             static_cast<void*>(m_services3D.renderWidget));
 
         // 恢复上次切走时的相机位姿：RenderWidget3D 是每次 attach 新建的，
@@ -545,7 +545,7 @@ void Workbench3D::create3DViewport(WorkbenchWindow& window)
             cam.setEyePosition(m_savedCameraPose.eye[0], m_savedCameraPose.eye[1], m_savedCameraPose.eye[2]);
             cam.setCenter(m_savedCameraPose.center[0], m_savedCameraPose.center[1], m_savedCameraPose.center[2]);
             cam.setUp(m_savedCameraPose.up[0], m_savedCameraPose.up[1], m_savedCameraPose.up[2]);
-            SY_DEBUG("[Workbench3D] Restored saved camera pose");
+            APR_DEBUG("[Workbench3D] Restored saved camera pose");
         }
 
         if (m_services3D.sceneEditService && m_services3D.renderWidget)
@@ -555,11 +555,11 @@ void Workbench3D::create3DViewport(WorkbenchWindow& window)
     }
     else
     {
-        SY_WARN("[Workbench3D] Renderer is not RenderWidget3DAdapter, renderWidget will be null");
+        APR_WARN("[Workbench3D] Renderer is not RenderWidget3DAdapter, renderWidget will be null");
     }
 
     viewport->setCameraController(m_serviceOwner->cameraController.get());
-    SY_DEBUG("[Workbench3D] CameraController3D set to Viewport3D");
+    APR_DEBUG("[Workbench3D] CameraController3D set to Viewport3D");
 }
 
 /// 绑定 3D 渲染器信号到状态中心和操作总线
@@ -568,7 +568,7 @@ void Workbench3D::bind3DRenderSignals(ServiceOwner& own)
     // 通过 m_services3D.renderWidget 获取已在 create3DViewport 中注册的 widget
     if (!m_services3D.renderWidget)
     {
-        SY_ERROR("[Workbench3D] RenderWidget3D not available in ServicePack3D");
+        APR_ERROR("[Workbench3D] RenderWidget3D not available in ServicePack3D");
         return;
     }
 
@@ -585,7 +585,7 @@ void Workbench3D::bind3DSelectionSignal()
     // 跨 DLL 安全：信号参数使用 POD 指针数组
     auto conn = connect(m_renderWidget3D,
         &RenderWidget3D::sigSelectionChanged,
-        [this, stateCenter = m_uiState.stateCenter](const Eg::SyMeshEntity** entities, int count) {
+        [this, stateCenter = m_uiState.stateCenter](const Eg::AprMeshEntity** entities, int count) {
             if (stateCenter)
             {
                 if (count > 0)
@@ -622,7 +622,7 @@ void Workbench3D::setup3DDeleteShortcuts(WorkbenchWindow& window)
         }
         if (m_services3D.operationBus)
         {
-            SY_TRACE("[Workbench3D] Delete shortcut activated, running Edit_Delete operation");
+            APR_TRACE("[Workbench3D] Delete shortcut activated, running Edit_Delete operation");
             m_services3D.operationBus->run(OperationId3D::Edit_Delete);
         }
     };
@@ -656,7 +656,7 @@ void Workbench3D::on3DContextMenuRequested(const QPoint& globalPos)
     snapshot.hasSelection = !selected.empty();
     snapshot.selectionCount = static_cast<int>(selected.size());
     // 统一锁定判定：任一选中图元被锁定则视为有锁（与 2D 语义一致）
-    for (const Eg::SyMeshEntity* e : selected)
+    for (const Eg::AprMeshEntity* e : selected)
     {
         if (e && e->locked())
         {
@@ -728,7 +728,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
         }
     }
 
-    SY_DEBUG("[Workbench3D] Calling CommandRegistry3D::registerAll()...");
+    APR_DEBUG("[Workbench3D] Calling CommandRegistry3D::registerAll()...");
     // Help_Settings / Help_Shortcut 由工作台层注册（需要框架层快捷键台账）
     // 快捷键台账（配置驱动菜单建出的 QAction/QShortcut + 用户覆盖），而 UI3D 库看不到
     // 那一层 —— Settings 需要台账模型注入，Shortcuts 需要台账渲染内容。因此统一由工作台层
@@ -742,7 +742,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
             result.success = activeWb && activeWb->showSettingsDialog(windowPtr);
             if (!result.success)
             {
-                SY_WARNF("[Workbench3D] Help_Settings: no active workbench");
+                APR_WARNF("[Workbench3D] Help_Settings: no active workbench");
             }
             return result;
         }));
@@ -754,7 +754,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
                 windowPtr->menuManager() ? windowPtr->menuManager()->shortcutSettingsModel() : nullptr;
             if (!shortcutModel)
             {
-                SY_WARNF("[Workbench3D] Help_Shortcut: shortcut ledger unavailable");
+                APR_WARNF("[Workbench3D] Help_Shortcut: shortcut ledger unavailable");
             }
             HelpDialogService::showShortcutsDialog(windowPtr, shortcutModel);
             return result;
@@ -772,7 +772,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
             OperationResult3D result;
             if (!captureService || !ctx.renderWidget)
             {
-                SY_WARNF("[Workbench3D] View_Capture: captureService=%s renderWidget=%s",
+                APR_WARNF("[Workbench3D] View_Capture: captureService=%s renderWidget=%s",
                     captureService ? "ok" : "null",
                     ctx.renderWidget ? "ok" : "null");
                 return result;
@@ -786,16 +786,16 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
             const QImage img = captureService->capture3D(ctx.renderWidget, req);
             if (img.isNull())
             {
-                SY_WARNF("[Workbench3D] View_Capture: capture3D returned an empty image (off-screen render failed)");
+                APR_WARNF("[Workbench3D] View_Capture: capture3D returned an empty image (off-screen render failed)");
                 return result;
             }
             const QString path = captureService->saveImage(img, req, true);
             if (path.isEmpty())
             {
-                SY_WARNF("[Workbench3D] View_Capture: failed to save the screenshot");
+                APR_WARNF("[Workbench3D] View_Capture: failed to save the screenshot");
                 return result;
             }
-            SY_INFOF("[View_Capture] Saved to %s (3D %dx%d)", path.toStdString().c_str(), img.width(), img.height());
+            APR_INFOF("[View_Capture] Saved to %s (3D %dx%d)", path.toStdString().c_str(), img.width(), img.height());
             // 保存成功后打开图片所在目录
             QString dir = QFileInfo(path).absolutePath();
             QDesktopServices::openUrl(QUrl::fromLocalFile(dir));
@@ -804,7 +804,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
         }));
 
     CommandRegistry3D::registerAll(mainWindow3D);
-    SY_DEBUG("[Workbench3D] CommandRegistry3D::registerAll() completed");
+    APR_DEBUG("[Workbench3D] CommandRegistry3D::registerAll() completed");
 
     // F12 截图（与 2D 同一条快捷键，2D 工作台已注册它）。
     // 焦点在文本控件里时不拦截，理由与 setup3DDeleteShortcuts 的护栏相同。
@@ -827,12 +827,12 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     // 1. 先创建所有 Action（bindXxx 依赖 action() 返回有效指针）
     own.commandActionHub->setOperationBus(own.operationBus.get());
     own.commandActionHub->rebuildAll();
-    SY_DEBUG("[Workbench3D] CommandActionHub3D rebuilt with all actions");
+    APR_DEBUG("[Workbench3D] CommandActionHub3D rebuilt with all actions");
 
     // 2. 菜单：统一由 WorkbenchMenuManager 从客户 JSON 生成
     // 2D / 3D 走同一条 JSON 链路：菜单项在客户配置里按 workbenches: ["3D"] 声明，
     // 命令 ID 经 Workbench3D::dispatchCommand 落到 OperationBus3D。
-    SY_DEBUG("[Workbench3D] Menus are built by WorkbenchMenuManager from client config");
+    APR_DEBUG("[Workbench3D] Menus are built by WorkbenchMenuManager from client config");
 
     // 5. 转移并绑定工具栏。
     // 菜单由统一配置路径生成，3D 工具栏从 base.json toolbars 读取 commandId 顺序。
@@ -930,7 +930,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     if (!m_statusBar3D)
     {
         m_statusBar3D = new StatusBar3D(&window);
-        SY_DEBUG("[Workbench3D] StatusBar3D created for WorkbenchWindow");
+        APR_DEBUG("[Workbench3D] StatusBar3D created for WorkbenchWindow");
     }
     window.mountStatusBar(m_statusBar3D);
 
@@ -960,7 +960,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
         connect(m_renderWidget3D,
             &RenderWidget3D::sigSelectionChanged,
             m_statusBar3D,
-            [sb3d = m_statusBar3D](const Eg::SyMeshEntity** entities, int count) {
+            [sb3d = m_statusBar3D](const Eg::AprMeshEntity** entities, int count) {
                 if (!sb3d)
                 {
                     return;
@@ -974,7 +974,7 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
             });
     }
 
-    SY_DEBUG("[Workbench3D] 3D workbench UI build completed");
+    APR_DEBUG("[Workbench3D] 3D workbench UI build completed");
 }
 
 // ---- 3D 场景树（数据/算法/UI 分离） ----
@@ -1032,13 +1032,13 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
         connect(m_renderWidget3D,
             &RenderWidget3D::sigSelectionChanged,
             this,
-            [this](const Eg::SyMeshEntity** /*entities*/, int /*count*/) {
+            [this](const Eg::AprMeshEntity** /*entities*/, int /*count*/) {
                 syncSceneTreeSelection3D();
             });
     }
     else
     {
-        SY_ERROR("[Workbench3D] setupSceneTree3D: m_services3D.renderWidget is null!");
+        APR_ERROR("[Workbench3D] setupSceneTree3D: m_services3D.renderWidget is null!");
     }
     if (m_services3D.sceneMonitor)
     {
@@ -1136,7 +1136,7 @@ void Workbench3D::refreshPropertiesPanel3D()
     {
         const auto& selected = m_sceneManager3D->selectionManager().getSelectedEntities();
         entityIds.reserve(selected.size());
-        for (const Eg::SyMeshEntity* e : selected)
+        for (const Eg::AprMeshEntity* e : selected)
         {
             if (e)
             {
@@ -1165,7 +1165,7 @@ void Workbench3D::refreshSceneTreeRowsForSelection3D()
     {
         const auto& selected = m_sceneManager3D->selectionManager().getSelectedEntities();
         entityIds.reserve(selected.size());
-        for (const Eg::SyMeshEntity* e : selected)
+        for (const Eg::AprMeshEntity* e : selected)
         {
             if (e)
             {
@@ -1365,7 +1365,7 @@ void Workbench3D::applySceneTreeIncremental3D(const char* src)
     m_lastSceneTree3DEntityCount = m_sceneManager3D->getEntityCount();
     m_lastSceneTree3DStructureRevision = m_sceneManager3D->structureRevision();
 
-    SY_DEBUGF("[Workbench3D] scene tree incremental src=%s: +%lld nodes entities=%zu structRev=%llu",
+    APR_DEBUGF("[Workbench3D] scene tree incremental src=%s: +%lld nodes entities=%zu structRev=%llu",
         src ? src : "misc",
         static_cast<long long>(added.size()),
         m_lastSceneTree3DEntityCount,
@@ -1553,7 +1553,7 @@ void Workbench3D::deleteSceneTreeSelection3D(const QStringList& ids)
     else
     {
         // 回退：直接删除（无 undo/锁定检查）
-        std::vector<Eg::SyMeshEntity*> targets;
+        std::vector<Eg::AprMeshEntity*> targets;
         targets.reserve(entityIds.size());
         for (Eg::EntityId id : entityIds)
         {
@@ -1675,7 +1675,7 @@ void Workbench3D::refreshStatusBarSelection3D()
     else if (count > 1)
     {
         modelName = tr("%1 entities").arg(count);  // %1 个图元
-        for (const Eg::SyMeshEntity* entity : selected)
+        for (const Eg::AprMeshEntity* entity : selected)
         {
             if (entity)
             {
@@ -1698,7 +1698,7 @@ void Workbench3D::deactivate()
 
     // 先释放与窗口/快捷键绑定的 Qt 对象，再释放共享服务。
     // 这样可以避免 QMainWindow / 菜单 / 快捷键 在析构链中继续访问已销毁的 3D 服务。
-    SY_DEBUG("[Workbench3D] Deactivating, tearing down UI objects first...");
+    APR_DEBUG("[Workbench3D] Deactivating, tearing down UI objects first...");
 
     // 1) 先断开快捷键信号并置空，避免 clearWorkbenchContent 之前快捷键仍触发 3D 命令
     if (m_deleteShortcut)
@@ -1770,16 +1770,16 @@ void Workbench3D::deactivate()
 
     // 2) 先销毁 3D 主窗口包装对象。
     //    它会持有大量 QAction / signal-slot / UI 状态引用，必须先于服务释放。
-    SY_DEBUG("[Workbench3D] Destroying MainWindow3D...");
+    APR_DEBUG("[Workbench3D] Destroying MainWindow3D...");
     m_mainWindow3D.reset();
-    SY_DEBUG("[Workbench3D] MainWindow3D destroyed");
+    APR_DEBUG("[Workbench3D] MainWindow3D destroyed");
 
     // 3) 再释放共享服务对象。
     //    注意：窗口销毁已经完成，这里再 shutdown 服务，可减少 Qt 析构阶段访问悬空对象的风险。
-    SY_DEBUG("[Workbench3D] Releasing 3D services...");
+    APR_DEBUG("[Workbench3D] Releasing 3D services...");
     m_services3D = ServicePack3D{};
     m_serviceOwner.reset();
-    SY_DEBUG("[Workbench3D] Service released");
+    APR_DEBUG("[Workbench3D] Service released");
 }
 
 // 6 — 关闭工作台，清理所有资源
@@ -1821,14 +1821,14 @@ bool Workbench3D::showSettingsDialog(QWidget* /*parent*/)
 {
     if (!m_mainWindow3D)
     {
-        SY_WARN("[Workbench3D] showSettingsDialog: MainWindow3D is null");
+        APR_WARN("[Workbench3D] showSettingsDialog: MainWindow3D is null");
         return false;
     }
 
     auto& own = *m_serviceOwner;
     if (!own.settingsCoordinator)
     {
-        SY_WARN("[Workbench3D] showSettingsDialog: settings coordinator is null");
+        APR_WARN("[Workbench3D] showSettingsDialog: settings coordinator is null");
         return false;
     }
 

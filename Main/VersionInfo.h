@@ -2,10 +2,10 @@
 
 #include <string>
 
-#define APP_NAME "SanYiCAD"
+#define APP_NAME "April"
 #define APP_VERSION "1.0.0"
-#define APP_ORGANIZATION_NAME "SanYi"
-#define APP_ORGANIZATION_DOMAIN "sanyi-cad.com"
+#define APP_ORGANIZATION_NAME "April"
+#define APP_ORGANIZATION_DOMAIN "april-cad.com"
 
 #define VERSION_MAJOR 1
 #define VERSION_MINOR 0

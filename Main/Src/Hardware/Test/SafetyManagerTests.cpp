@@ -19,6 +19,10 @@
 #  pragma warning(push)
 #  pragma warning(disable : 4996)
 #endif
+#if defined(__GNUC__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
 
 // 测试默认安全状态
 TEST(SafetyManagerTest, DefaultState_IsSafe)
@@ -153,6 +157,9 @@ TEST(SafetyManagerTest, PerformSelfCheck_ReturnsResults)
     EXPECT_GE(checkResults.size(), 0);
 }
 
+#if defined(__GNUC__)
+#  pragma GCC diagnostic pop
+#endif
 #if defined(_MSC_VER)
 #  pragma warning(pop)
 #endif

@@ -6,7 +6,7 @@
 #include "UI2D/Operation/CommandCatalog.h"
 #include "UI2D/Operation/IOperation.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <memory>
 
@@ -20,7 +20,7 @@ void DrawToolSwitchRegistry::registerAll()
 {
     if (!m_bus || !m_viewportPtr || !*m_viewportPtr)
     {
-        SY_WARNF("[DrawToolSwitchRegistry] skip registration: bus=%s viewport=%s",
+        APR_WARNF("[DrawToolSwitchRegistry] skip registration: bus=%s viewport=%s",
             m_bus ? "ok" : "null",
             (m_viewportPtr && *m_viewportPtr) ? "ok" : "null");
         return;
@@ -59,5 +59,5 @@ void DrawToolSwitchRegistry::registerAll()
         ++registered;
     }
 
-    SY_DEBUGF("[DrawToolSwitchRegistry] registered %d draw tool switch operations", registered);
+    APR_DEBUGF("[DrawToolSwitchRegistry] registered %d draw tool switch operations", registered);
 }

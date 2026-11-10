@@ -2,7 +2,7 @@
 
 ## 功能描述
 
-许可证验证库，为 SanYi CAD 项目提供软件授权管理能力。主要功能包括：
+许可证验证库，为 April CAD 项目提供软件授权管理能力。主要功能包括：
 
 - **机器码生成** —— 基于硬件指纹生成唯一机器码
 - **许可证激活** —— 通过注册码激活软件许可证
@@ -24,7 +24,7 @@ License_ConfigInit  →  License_Create  →  License_Check / License_Activate  
 // 1. 初始化配置
 LicenseConfig config;
 License_ConfigInit(&config);
-config.configDir = "C:/ProgramData/SanYiCAD";
+config.configDir = "C:/ProgramData/April";
 
 // 2. 创建上下文
 LicenseContext* ctx = License_Create(&config);
@@ -106,7 +106,7 @@ target_link_libraries(YourTarget PRIVATE License)
 | 选项 | 默认值 | 说明 |
 |---|---|---|
 | `BUILD_TESTS` | ON | 全工程唯一测试开关；ON 时构建单元测试（自动定义 `LICENSE_TEST_HOOKS` 宏；GTest 缺失时自动降级 OFF） |
-| `SANYI_LICENSE_SYMBOLS` | ON | 生成调试符号（PDB/DWARF） |
+| `APR_LICENSE_SYMBOLS` | ON | 生成调试符号（PDB/DWARF） |
 
 > **出货约束**：构建带测试的 License DLL 会多出测试注入接口（`LicenseTest_SetPublicKeyPem` /
 > `LicenseTest_ClearPublicKeyPem`），这些接口不可出货。发布/交付构建必须使用

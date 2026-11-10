@@ -16,7 +16,7 @@ namespace Eg
 {
     class ISceneContext;
     class SceneManager;
-    struct SyEntity;
+    struct AprEntity;
 }  // namespace Eg
 
 /**

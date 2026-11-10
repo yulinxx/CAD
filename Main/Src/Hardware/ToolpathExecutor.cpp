@@ -1,7 +1,7 @@
 #include "Hardware/ToolpathExecutor.h"
 
 #include "Hardware/IProcessingTarget.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <QString>
 
@@ -23,21 +23,21 @@ bool ToolpathExecutor::loadToolpath(const HardwareToolpathPoint* points, size_t 
 {
     if (m_running)
     {
-        SY_WARN("[ToolpathExecutor] loadToolpath rejected: execution in progress");
+        APR_WARN("[ToolpathExecutor] loadToolpath rejected: execution in progress");
         return false;
     }
 
     // 参数校验：空指针或零长度视为无效
     if (!points || count == 0)
     {
-        SY_WARN("[ToolpathExecutor] loadToolpath rejected: null points or zero count");
+        APR_WARN("[ToolpathExecutor] loadToolpath rejected: null points or zero count");
         return false;
     }
 
     // 内部拷贝到 std::vector，STL 仅存在于 DLL 内部
     m_points.assign(points, points + count);
     m_index = 0;
-    SY_INFOF("[ToolpathExecutor] Toolpath loaded: %zu points", count);
+    APR_INFOF("[ToolpathExecutor] Toolpath loaded: %zu points", count);
     return true;
 }
 
@@ -75,7 +75,7 @@ bool ToolpathExecutor::start(QString* errorOut)
     m_target->startProcessing();
     m_stepTimer.start();
     emit sigProgressUpdated(0.0);
-    SY_INFO("[ToolpathExecutor] Started toolpath execution");
+    APR_INFO("[ToolpathExecutor] Started toolpath execution");
     return true;
 }
 
@@ -154,5 +154,5 @@ void ToolpathExecutor::finish(bool success)
 
     emit sigProgressUpdated(success ? 100.0 : progress());
     emit sigFinished(success);
-    SY_INFOF("[ToolpathExecutor] Finished (success=%d)", success ? 1 : 0);
+    APR_INFOF("[ToolpathExecutor] Finished (success=%d)", success ? 1 : 0);
 }

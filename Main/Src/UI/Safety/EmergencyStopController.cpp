@@ -12,13 +12,13 @@ const int kPollIntervalMs = 100;
 
 bool loadLatchFromSettings()
 {
-    QSettings settings(QSettings::IniFormat, QSettings::UserScope, QStringLiteral("SanYiCAD"), QStringLiteral("SanYiCAD"));
+    QSettings settings(QSettings::IniFormat, QSettings::UserScope, QStringLiteral("April"), QStringLiteral("April"));
     return settings.value(kLatchKey, false).toBool();
 }
 
 void saveLatchToSettings(bool latched)
 {
-    QSettings settings(QSettings::IniFormat, QSettings::UserScope, QStringLiteral("SanYiCAD"), QStringLiteral("SanYiCAD"));
+    QSettings settings(QSettings::IniFormat, QSettings::UserScope, QStringLiteral("April"), QStringLiteral("April"));
     settings.setValue(kLatchKey, latched);
     settings.sync();
 }

@@ -2,10 +2,10 @@
 
 #include "RenderWidget.h"
 #include "Engine2D/Core/SceneManager.h"
-#include "Engine/SyEntity/SyEntity.h"
-#include "Engine/Layer/SyLayer.h"
-#include "Engine2D/SyEntity/SyImage.h"
-#include "Engine/SyEntity/EType.h"
+#include "Engine/AprEntity/AprEntity.h"
+#include "Engine/Layer/AprLayer.h"
+#include "Engine2D/AprEntity/AprImage.h"
+#include "Engine/AprEntity/EType.h"
 
 BitmapReconciler::BitmapReconciler(RenderWidget* widget)
     : m_renderWidget(widget)
@@ -30,7 +30,7 @@ void BitmapReconciler::reconcile(Eg::SceneManager* sm,
         m_bitmapImageIds.clear();
     }
 
-    // 期望集合：场景中所有可见 SyImage（可见 = 图元可见 && 图层可见）
+    // 期望集合：场景中所有可见 AprImage（可见 = 图元可见 && 图层可见）
     std::unordered_set<uint64_t> desired;
     // 使用类型索引避免全场景扫描
     auto imageEntities = sm->getEntitiesByType(Eg::EType::IMAGE);
@@ -84,8 +84,8 @@ void BitmapReconciler::reconcile(Eg::SceneManager* sm,
             continue;
         }
 
-        // 无像素数据的 SyImage 不纳入位图层（移除残留，且不记入账本）
-        const auto* image = static_cast<const Eg::SyImage*>(e);
+        // 无像素数据的 AprImage 不纳入位图层（移除残留，且不记入账本）
+        const auto* image = static_cast<const Eg::AprImage*>(e);
         if (!image->pixelData() || image->nWidth <= 0 || image->nHeight <= 0)
         {
             m_renderWidget->removeBitmapImage(id);

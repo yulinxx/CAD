@@ -5,15 +5,15 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>zh_CN</string>
     <key>CFBundleExecutable</key>
-    <string>SanYiCAD</string>
+    <string>April</string>
     <key>CFBundleIdentifier</key>
-    <string>com.sanyi.SanYiCAD</string>
+    <string>com.apr.April</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>SanYiCAD</string>
+    <string>April</string>
     <key>CFBundleDisplayName</key>
-    <string>SanYiCAD</string>
+    <string>April</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

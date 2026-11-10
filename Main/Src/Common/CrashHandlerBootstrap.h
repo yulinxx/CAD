@@ -4,7 +4,7 @@
 
 /**
  * @file CrashHandlerBootstrap.h
- * @brief SanYiCAD 崩溃捕获引导器（封装 CrashHandler C API）
+ * @brief April 崩溃捕获引导器（封装 CrashHandler C API）
  */
 class CrashHandlerBootstrap
 {

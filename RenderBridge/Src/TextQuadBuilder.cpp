@@ -9,7 +9,7 @@
 #include "RenderAbstraction/IRenderDevice.h"
 #include "RenderAbstraction/IRenderScene.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "RenderBridge/TextLayoutUtf8.h"
 
 #include <cmath>
@@ -121,7 +121,7 @@ namespace Render
             {
                 m_warnedFontFailure = true;
                 // 字号 %d 的字体创建失败，具体原因已由适配层打印
-                SY_ERRORF("TextQuadBuilder: font creation failed for size %d, text will not be displayed", pixelHeight);
+                APR_ERRORF("TextQuadBuilder: font creation failed for size %d, text will not be displayed", pixelHeight);
             }
             // 仍然登记这一项：否则每帧每条文本都会重试一次创建。
             m_batches.push_back(Batch{ pixelHeight, {}, {} });

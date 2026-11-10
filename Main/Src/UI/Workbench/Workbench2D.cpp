@@ -97,13 +97,13 @@
 #include "Engine/Edit/IUndoRedoManager.h"
 
 #include "Engine/EntityIdUtils.h"
-#include "Engine/SyEntity/SyEntity.h"
+#include "Engine/AprEntity/AprEntity.h"
 
 #include "UiStateCenter.h"
 
 #include "Import/ImportService.h"
 #include "Color/Color.hpp"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 // ---- Workbench2D 辅助函数 ----
 
@@ -168,7 +168,7 @@ void Workbench2D::dispatchCommand(const QString& commandId, const QVariantMap& p
 {
     if (!m_commands.operationBus)
     {
-        SY_WARNF("[Workbench2D] Cannot dispatch command without OperationBus: %s", qPrintable(commandId));
+        APR_WARNF("[Workbench2D] Cannot dispatch command without OperationBus: %s", qPrintable(commandId));
         return;
     }
 
@@ -177,7 +177,7 @@ void Workbench2D::dispatchCommand(const QString& commandId, const QVariantMap& p
     const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(commandId);
     if (menuId != static_cast<UI::MenuActionId>(0))
     {
-        SY_TRACEF("[Workbench2D] Dispatch command='%s' menuId=%d source=Menu",
+        APR_TRACEF("[Workbench2D] Dispatch command='%s' menuId=%d source=Menu",
             qPrintable(commandId),
             static_cast<int>(menuId));
         OperationRouting::dispatch(menuId, m_commands.operationBus, OperationSource::Menu, params);
@@ -194,15 +194,15 @@ void Workbench2D::dispatchCommand(const QString& commandId, const QVariantMap& p
         const OperationId toolOperation = CommandCatalog::operationForToolName(commandId);
         if (toolOperation == OperationId::None)
         {
-            SY_WARNF("[Workbench2D] Unknown command: %s", qPrintable(commandId));
+            APR_WARNF("[Workbench2D] Unknown command: %s", qPrintable(commandId));
             return;
         }
-        SY_TRACEF("[Workbench2D] Dispatch tool command='%s'", qPrintable(commandId));
+        APR_TRACEF("[Workbench2D] Dispatch tool command='%s'", qPrintable(commandId));
         m_commands.operationBus->run(toolOperation, params, OperationSource::Menu);
         return;
     }
 
-    SY_TRACEF("[Workbench2D] Dispatch command='%s'", qPrintable(commandId));
+    APR_TRACEF("[Workbench2D] Dispatch command='%s'", qPrintable(commandId));
     m_commands.operationBus->run(operation, params, OperationSource::Menu);
 }
 
@@ -218,7 +218,7 @@ Cmd::OperationResultBase Workbench2D::dispatchCommandForResult(const QString& co
     Cmd::OperationResultBase result;
     if (!m_commands.operationBus)
     {
-        SY_WARNF("[Workbench2D] Cannot dispatch command without OperationBus: %s", qPrintable(commandId));
+        APR_WARNF("[Workbench2D] Cannot dispatch command without OperationBus: %s", qPrintable(commandId));
         result.message = QStringLiteral("No OperationBus for %1").arg(commandId);
         return result;
     }
@@ -226,12 +226,12 @@ Cmd::OperationResultBase Workbench2D::dispatchCommandForResult(const QString& co
     const OperationId operation = CommandCatalog::operationForCommandId(commandId);
     if (operation == OperationId::None)
     {
-        SY_WARNF("[Workbench2D] Unknown command: %s", qPrintable(commandId));
+        APR_WARNF("[Workbench2D] Unknown command: %s", qPrintable(commandId));
         result.message = QStringLiteral("Unknown command: %1").arg(commandId);
         return result;
     }
 
-    SY_TRACEF("[Workbench2D] Dispatch command with result='%s'", qPrintable(commandId));
+    APR_TRACEF("[Workbench2D] Dispatch command with result='%s'", qPrintable(commandId));
     return m_commands.operationBus->run(operation, params, OperationSource::Menu);
 }
 
@@ -251,11 +251,11 @@ QString Workbench2D::displayName() const
 
 bool Workbench2D::initialize(const WorkbenchServices& services)
 {
-    SY_INFO("[Workbench2D] initialize: starting 2D workbench initialization");
+    APR_INFO("[Workbench2D] initialize: starting 2D workbench initialization");
 
     if (!services.uiState.stateCenter)
     {
-        SY_ERRORF("[Workbench2D] initialize failed: stateCenter=%p", static_cast<void*>(services.uiState.stateCenter));
+        APR_ERRORF("[Workbench2D] initialize failed: stateCenter=%p", static_cast<void*>(services.uiState.stateCenter));
         return false;
     }
     m_uiState = services.uiState;
@@ -273,7 +273,7 @@ bool Workbench2D::initialize(const WorkbenchServices& services)
         m_settingsCoordinator->init();
     }
 
-    SY_DEBUG("[Workbench2D] initialize: 2D workbench initialized successfully");
+    APR_DEBUG("[Workbench2D] initialize: 2D workbench initialized successfully");
     return true;
 }
 
@@ -284,7 +284,7 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
     auto* viewport = createCentralViewport(window, nullptr);
     if (!viewport)
     {
-        SY_ERROR("[Workbench2D] attachToWindow failed: createCentralViewport returned null");
+        APR_ERROR("[Workbench2D] attachToWindow failed: createCentralViewport returned null");
         return;
     }
 
@@ -307,7 +307,7 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
                         tm->setInteractionEnabled(enabled);
                     }
                 });
-                SY_INFO("[Workbench2D] interaction control callback registered");
+                APR_INFO("[Workbench2D] interaction control callback registered");
             }
         }
         // LOD 参数调用链收敛：设置面板经 ViewRenderCoordinator 读写曲线精度
@@ -369,7 +369,7 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
         connect(m_statusBar2D, &StatusBar::sigUnitCommandRequested, this, [this](const QString& commandId) {
             dispatchCommand(commandId, QVariantMap{});
         });
-        SY_DEBUG("[Workbench2D] StatusBar created");
+        APR_DEBUG("[Workbench2D] StatusBar created");
     }
     window.mountStatusBar(m_statusBar2D);
     // 语言切换不需要这里做任何事：坐标/选择文案由状态栏内各指示器按缓存的原始值
@@ -419,13 +419,13 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
 
 bool Workbench2D::showSettingsDialog(QWidget* /*parent*/)
 {
-    SY_DEBUGF("[Workbench2D] showSettingsDialog: m_settingsCoordinator=%p m_viewport=%p",
+    APR_DEBUGF("[Workbench2D] showSettingsDialog: m_settingsCoordinator=%p m_viewport=%p",
         static_cast<void*>(m_settingsCoordinator.get()),
         static_cast<void*>(m_viewport));
 
     if (!m_settingsCoordinator || !m_viewport)
     {
-        SY_WARNF("[Workbench2D] showSettingsDialog: failed - coordinator or viewport is null");
+        APR_WARNF("[Workbench2D] showSettingsDialog: failed - coordinator or viewport is null");
         return false;
     }
 
@@ -468,7 +468,7 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
     if (m_scene.sceneEditService)
     {
         QObject::connect(
-            vp, &RenderViewport2D::entitySubmitRequested, [service = m_scene.sceneEditService](Eg::SyEntity* e) {
+            vp, &RenderViewport2D::entitySubmitRequested, [service = m_scene.sceneEditService](Eg::AprEntity* e) {
                 if (e)
                 {
                     service->addEntityFromPointer(e, "Draw");
@@ -529,7 +529,7 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         //     菜单删除一直没有全刷也从没出现残影。
         if (m_commands.operationBus)
         {
-            SY_TRACE("[Workbench2D] Delete shortcut activated, running Edit_Delete operation");
+            APR_TRACE("[Workbench2D] Delete shortcut activated, running Edit_Delete operation");
             m_commands.operationBus->run(OperationId::Edit_Delete, {}, OperationSource::Shortcut);
         }
     };
@@ -549,13 +549,13 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         {
             return;
         }
+        // 清选择只需通知选中集：SceneManager::clearSelection() → notifySelectionChanged()
+        // → SceneRefreshCoordinator::onSelectionChanged() 会按增量（Selection/LightUpdate）
+        // 刷新。这里再补一次 requestFullRefresh() 等于把整份场景（日志里 311 图元）重建
+        // 一遍，和 Delete 分支注释里强调的「不要 clear + 全量刷新」是同一个错误。
         if (m_scene.selectionService)
         {
             m_scene.selectionService->clear();
-        }
-        if (m_viewport)
-        {
-            m_viewport->requestFullRefresh();
         }
     };
 
@@ -703,7 +703,7 @@ namespace
             }
             else
             {
-                SY_WARNF("[Workbench2D] left toolbar entry has no hub action: %s", qPrintable(toolName));
+                APR_WARNF("[Workbench2D] left toolbar entry has no hub action: %s", qPrintable(toolName));
             }
         }
         return actions;
@@ -832,7 +832,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         // 快照期间图层锁定状态不会变化：按 layerId 缓存一次，避免每个图元两次哈希查找
         std::unordered_map<int, bool> lockedLayerCache;
         scene->forEachSelected(
-            [&result, layerManager, &lockedLayerCache](Eg::SyEntity* e) {
+            [&result, layerManager, &lockedLayerCache](Eg::AprEntity* e) {
                 if (!e)
                 {
                     return;
@@ -918,7 +918,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // ApplicationCompositionRoot::assembleUiServices 漏了这一项）。
     if (!m_commands.undoManager)
     {
-        SY_WARN("[Workbench2D] UiServices::undoManager is null, Undo/Redo actions will stay disabled");
+        APR_WARN("[Workbench2D] UiServices::undoManager is null, Undo/Redo actions will stay disabled");
     }
     m_commandHub->setUndoRedoProvider([undoManager = m_commands.undoManager]() -> UndoRedoState {
         UndoRedoState state;
@@ -964,7 +964,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
         connect(m_viewport, &RenderViewport2D::panModeChanged, drawWidget, &DrawToolBarWidget::setPanMode);
     }
 
-    SY_DEBUGF("[Workbench2D] Draw tool panel built: tools=%d host=%s",
+    APR_DEBUGF("[Workbench2D] Draw tool panel built: tools=%d host=%s",
         static_cast<int>(drawToolActions.size()),
         m_panelHostStyle == PanelHostStyle::Dock ? "Dock" : "ToolBar");
 
@@ -1025,7 +1025,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // 文字编辑工具栏绑定：工具切换到 TextEditTool 时，绑定到 TextFontToolBar
     // 以便在进入编辑时自动刷新字体面板信息
     QObject::connect(m_viewport, &RenderViewport2D::activeToolChanged, this, [this](const QString& toolName) {
-        SY_TRACEF("[Workbench2D] activeToolChanged: %s, m_textFontToolBarWidget=%p, m_viewport=%p",
+        APR_TRACEF("[Workbench2D] activeToolChanged: %s, m_textFontToolBarWidget=%p, m_viewport=%p",
             qPrintable(toolName),
             reinterpret_cast<void*>(m_textFontToolBarWidget),
             reinterpret_cast<void*>(m_viewport));
@@ -1040,11 +1040,11 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
                     // isTextEditTool() 返回 true，这里强转安全
                     auto* textEditTool = static_cast<TextEditTool*>(tool);
                     m_textFontToolBarWidget->bindTool(textEditTool);
-                    SY_TRACE("[Workbench2D] TextFontToolBar bound to TextEditTool");
+                    APR_TRACE("[Workbench2D] TextFontToolBar bound to TextEditTool");
 
                     // 设置编辑状态变化回调，以便在进入/退出编辑时切换工具栏上下文
                     textEditTool->setEditingStateChangedCallback([this](bool editing) {
-                        SY_TRACEF("[Workbench2D] editingStateChanged: editing=%d, m_contextManager=%p",
+                        APR_TRACEF("[Workbench2D] editingStateChanged: editing=%d, m_contextManager=%p",
                             editing,
                             reinterpret_cast<void*>(m_contextManager.get()));
                         if (m_contextManager)
@@ -1056,7 +1056,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
                             if (m_contextManager->currentContext() != targetCtx)
                             {
                                 m_contextManager->setCurrentContext(targetCtx);
-                                SY_TRACEF("[Workbench2D] Context switched to %d", static_cast<int>(targetCtx));
+                                APR_TRACEF("[Workbench2D] Context switched to %d", static_cast<int>(targetCtx));
                             }
                         }
                     });
@@ -1229,7 +1229,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
             },
         });
 
-    SY_DEBUGF("[ToolBarContextManager] Registered %d context(s)", m_contextManager->contextCount());
+    APR_DEBUGF("[ToolBarContextManager] Registered %d context(s)", m_contextManager->contextCount());
 
     // 注册自定义文字编辑工具栏
     m_contextManager->registerCustomToolBar(ToolBarContext::TextEditing, m_textFontToolBarWidget, false);
@@ -1271,7 +1271,7 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     }
     else
     {
-        SY_DEBUGF("[Workbench2D] m_viewport is null when setting up selectionChanged connection!");
+        APR_DEBUGF("[Workbench2D] m_viewport is null when setting up selectionChanged connection!");
     }
 
     // 右侧图层面板（颜色/图层），依据承载样式创建
@@ -1592,7 +1592,7 @@ void Workbench2D::refreshSceneTree()
     // 打点：上报本轮重建的触发来源，并立刻清零（避免后续重建误用旧标记）。
     const char* src = m_sceneTreeRefreshSource ? m_sceneTreeRefreshSource : "misc";
     m_sceneTreeRefreshSource = nullptr;
-    SY_DEBUGF("[Workbench2D] scene tree rebuilt src=%s: topLevel=%d entities=%zu structRev=%llu topoRev=%llu",
+    APR_DEBUGF("[Workbench2D] scene tree rebuilt src=%s: topLevel=%d entities=%zu structRev=%llu topoRev=%llu",
         src,
         static_cast<int>(topology.topLevel.size()),
         m_lastSceneTreeEntityCount,
@@ -1868,9 +1868,9 @@ void Workbench2D::toggleEntityVisibility(const QString& id, bool visible)
         // 否则流水虚线轮廓和选择手柄会继续画在已经不可见的本体位置上。
         if (!visible)
         {
-            std::vector<Eg::SyEntity*> stillVisible;
+            std::vector<Eg::AprEntity*> stillVisible;
             bool hadHiddenSelected = false;
-            scene->forEachSelected([eid, &stillVisible, &hadHiddenSelected](Eg::SyEntity* e) {
+            scene->forEachSelected([eid, &stillVisible, &hadHiddenSelected](Eg::AprEntity* e) {
                 if (!e)
                 {
                     return;
@@ -1921,7 +1921,7 @@ void Workbench2D::renameEntity(const QString& id, const QString& newName)
     m_scene.sceneEditService->mutateEntities(
         { *eid },
         [scene, entityId = *eid, name]() {
-            if (auto* entity = scene->findSyEntityById(entityId))
+            if (auto* entity = scene->findAprEntityById(entityId))
             {
                 entity->setName(name.c_str());
             }
@@ -1930,7 +1930,7 @@ void Workbench2D::renameEntity(const QString& id, const QString& newName)
 
     // 改名不是结构变化（签名不动），但树行要显示新名字，这里显式重建一次。
     // 撤销改名同样依赖它：undoStateChanged 走的是 refreshSceneTree()（无条件）。
-    SY_TRACEF("[Workbench2D] renameEntity: id=%lld name=%s", static_cast<long long>(*eid), name.c_str());
+    APR_TRACEF("[Workbench2D] renameEntity: id=%lld name=%s", static_cast<long long>(*eid), name.c_str());
     refreshSceneTree();
 }
 
@@ -1981,9 +1981,9 @@ void Workbench2D::setSceneTreeVisibility(const QVector<qint64>& ids, bool visibl
     // 隐藏图元时从选择集中移除：重建为「仅保留仍可见的」
     if (!visible)
     {
-        std::vector<Eg::SyEntity*> stillVisible;
+        std::vector<Eg::AprEntity*> stillVisible;
         bool hadHiddenSelected = false;
-        scene->forEachSelected([&stillVisible, &hadHiddenSelected](Eg::SyEntity* e) {
+        scene->forEachSelected([&stillVisible, &hadHiddenSelected](Eg::AprEntity* e) {
             if (!e)
             {
                 return;
@@ -2206,7 +2206,7 @@ void Workbench2D::refreshPropertiesPanel()
     {
         if (auto* scene = m_scene.sceneEditService->sceneManager())
         {
-            for (Eg::SyEntity* e : scene->getSelectedEntities())
+            for (Eg::AprEntity* e : scene->getSelectedEntities())
             {
                 if (e)
                 {
@@ -2246,7 +2246,7 @@ void Workbench2D::refreshSceneTreeRowsForSelection2D()
     }
 
     QVector<qint64> ids;
-    scene->forEachSelected([&ids](Eg::SyEntity* e) {
+    scene->forEachSelected([&ids](Eg::AprEntity* e) {
         if (e)
         {
             ids.push_back(static_cast<qint64>(e->id));
@@ -2268,7 +2268,7 @@ void Workbench2D::activate()
     if (m_viewport && !snapshot.activeToolId.isEmpty())
     {
         m_viewport->setActiveTool(snapshot.activeToolId);
-        SY_DEBUGF("[Workbench2D] Restored tool: %s", qPrintable(snapshot.activeToolId));
+        APR_DEBUGF("[Workbench2D] Restored tool: %s", qPrintable(snapshot.activeToolId));
     }
 
     // 激活时刷新一次动作状态（撤销/重做可用性 + 选中项驱动的启用态）

@@ -16,7 +16,7 @@ class UiPanelRegistry;
  * @brief 客户 UI 插件宿主（进程级）
  *
  * 只从以下目录加载：
- *   1. SANYI_CLIENT_PLUGIN_DIR
+ *   1. APR_CLIENT_PLUGIN_DIR
  *   2. <AppDir>/plugins/clients/<clientId>
  *
  * 插件若同时导出 createCommandPlugin，复用同一个 QLibrary 句柄注册到

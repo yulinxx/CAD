@@ -17,13 +17,13 @@ BEGIN
     BEGIN
         BLOCK "080404b0"
         BEGIN
-            VALUE "CompanyName", "@SANYI_COMPANY_NAME@"
+            VALUE "CompanyName", "@APR_COMPANY_NAME@"
             VALUE "FileDescription", "@_FILE_DESCRIPTION@"
             VALUE "FileVersion", "@PROJECT_VERSION@"
             VALUE "InternalName", "@_INTERNAL_NAME@"
-            VALUE "LegalCopyright", "@SANYI_LEGAL_COPYRIGHT@"
+            VALUE "LegalCopyright", "@APR_LEGAL_COPYRIGHT@"
             VALUE "OriginalFilename", "@_ORIGINAL_FILENAME@"
-            VALUE "ProductName", "@SANYI_PRODUCT_NAME@"
+            VALUE "ProductName", "@APR_PRODUCT_NAME@"
             VALUE "ProductVersion", "@PROJECT_VERSION@"
         END
     END

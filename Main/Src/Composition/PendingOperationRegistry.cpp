@@ -10,7 +10,7 @@
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
 #include "UI2D/Operation/IOperation.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <cstddef>
 
@@ -38,18 +38,18 @@ void PendingOperationRegistry::registerAll()
             if (!reg.has(ops[i]))
             {
                 Ops::declare(reg, ops[i], [opId = ops[i], category] {
-                    SY_WARNF("[PendingOp] %s: OperationId=%d not yet implemented", category, static_cast<int>(opId));
+                    APR_WARNF("[PendingOp] %s: OperationId=%d not yet implemented", category, static_cast<int>(opId));
                 });
                 ++registered;
             }
         }
         if (registered > 0)
         {
-            SY_DEBUGF("[Composition] Registered %d placeholder operations for %s", registered, category);
+            APR_DEBUGF("[Composition] Registered %d placeholder operations for %s", registered, category);
             totalRegistered += registered;
         }
     };
 
     // 当前无待占位操作；后续新增未接入操作时在此追加数组并调用 registerPlaceholders
-    SY_DEBUGF("[Composition] Total %d placeholder operations registered across all categories", totalRegistered);
+    APR_DEBUGF("[Composition] Total %d placeholder operations registered across all categories", totalRegistered);
 }

@@ -14,9 +14,10 @@
 
 #include "Engine/Persistence/SceneManagerSerializer.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/SceneWriteGateway.h"
 #include "Engine2D/Interaction/LayerManager.h"
-#include "Engine2D/SyEntity/SyFillRegion.h"
-#include "Engine2D/SyEntity/SyPolygon.h"
+#include "Engine2D/AprEntity/AprFillRegion.h"
+#include "Engine2D/AprEntity/AprPolygon.h"
 #include "Ut/Color.h"
 
 #include <memory>
@@ -131,12 +132,12 @@ TEST_F(SceneSerializerAlphaTest, LegacyZeroAlphaFallsBackOpaque)
 
 TEST_F(SceneSerializerAlphaTest, EntityOverrideColorAlphaRoundTrip)
 {
-    auto fill = std::make_unique<Eg::SyFillRegion>();
+    auto fill = std::make_unique<Eg::AprFillRegion>();
     fill->id = 2001;
     const Ut::Vec2d tri[] = { Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0, 0.0), Ut::Vec2d(10.0, 10.0) };
     fill->setVertices(tri, 3);
     fill->setOverrideColor(Ut::Color::fromRGB255(90, 160, 220, 96));
-    ASSERT_TRUE(m_scene->insertEntityPreserveId(std::move(fill)));
+    ASSERT_TRUE(Eg::SceneWriteGateway::insertEntityPreserveId(*m_scene, std::move(fill)));
 
     const auto data = serializeScene();
     ASSERT_FALSE(data.empty());
@@ -148,7 +149,7 @@ TEST_F(SceneSerializerAlphaTest, EntityOverrideColorAlphaRoundTrip)
     const auto entities = restoredScene.getAllEntities();
     ASSERT_EQ(entities.size(), 1u);
     ASSERT_EQ(entities[0]->eType, Eg::EType::FILL_REGION);
-    EXPECT_EQ(static_cast<const Eg::SyFillRegion*>(entities[0])->vertexCount(), 3u);
+    EXPECT_EQ(static_cast<const Eg::AprFillRegion*>(entities[0])->vertexCount(), 3u);
     const auto overrideColor = entities[0]->overrideColor();
     ASSERT_TRUE(overrideColor.has_value());
     EXPECT_EQ(overrideColor->red255(), 90);
@@ -160,10 +161,10 @@ TEST_F(SceneSerializerAlphaTest, EntityOverrideColorAlphaRoundTrip)
 
 TEST_F(SceneSerializerAlphaTest, EntityWithoutOverrideColorStaysFollowingLayer)
 {
-    auto poly = std::make_unique<Eg::SyPolygon>();
+    auto poly = std::make_unique<Eg::AprPolygon>();
     poly->id = 2002;
     poly->setVertices({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0, 0.0), Ut::Vec2d(10.0, 10.0) });
-    ASSERT_TRUE(m_scene->insertEntityPreserveId(std::move(poly)));
+    ASSERT_TRUE(Eg::SceneWriteGateway::insertEntityPreserveId(*m_scene, std::move(poly)));
 
     const auto data = serializeScene();
     ASSERT_FALSE(data.empty());

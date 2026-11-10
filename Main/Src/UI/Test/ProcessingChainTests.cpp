@@ -26,9 +26,10 @@
 #include "Hardware/ToolpathJobSpec.h"
 
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/SceneWriteGateway.h"
 #include "Engine2D/Interaction/LayerManager.h"
-#include "Engine2D/SyEntity/SyCircle.h"
-#include "Engine2D/SyEntity/SyLine.h"
+#include "Engine2D/AprEntity/AprCircle.h"
+#include "Engine2D/AprEntity/AprLine.h"
 
 #ifdef ENABLE_HARDWARE
     #include <QMutex>
@@ -100,31 +101,31 @@ namespace
     /**
      * @brief 往场景里加一条线段，返回**场景内那一份**图元。
      *
-     * 必须回读：`SceneManager::addEntity(const SyEntity*)` 不接管所有权，它 clone 一份，
-     * 而 `SyEntity` 的拷贝构造刻意重新分配 id（SyEntity.h）。
+     * 必须回读：`SceneManager::addEntity(const AprEntity*)` 不接管所有权，它 clone 一份，
+     * 而 `AprEntity` 的拷贝构造刻意重新分配 id（AprEntity.h）。
      * 因此「构造时记下的 id」和「传进去的指针」在 add 之后都指不到场景里的那个对象 ——
      * 拿它们去做图层绑定或选集匹配会全部落空，且不报任何错。
      */
-    Eg::SyEntity* addLine(Eg::SceneManager& scene, double x1, double y1, double x2, double y2)
+    Eg::AprEntity* addLine(Eg::SceneManager& scene, double x1, double y1, double x2, double y2)
     {
-        Eg::SyLine line;
+        Eg::AprLine line;
         line.setPointVector({ Ut::Vec2d(x1, y1), Ut::Vec2d(x2, y2) });
-        scene.addEntity(&line);
+        Eg::SceneWriteGateway::addEntity(scene, &line);
 
-        const std::vector<Eg::SyEntity*> all = scene.getAllEntities();
+        const std::vector<Eg::AprEntity*> all = scene.getAllEntities();
         return all.empty() ? nullptr : all.back();
     }
 
     /// 往场景里加一个圆，返回场景内那一份图元。理由同 addLine。
-    Eg::SyEntity* addCircle(Eg::SceneManager& scene, double cx, double cy, double r)
+    Eg::AprEntity* addCircle(Eg::SceneManager& scene, double cx, double cy, double r)
     {
-        Eg::SyCircle circle;
+        Eg::AprCircle circle;
         circle.basePoint = Ut::Vec2d(cx, cy);
         circle.dRadius = r;
         circle.bClosed = true;
-        scene.addEntity(&circle);
+        Eg::SceneWriteGateway::addEntity(scene, &circle);
 
-        const std::vector<Eg::SyEntity*> all = scene.getAllEntities();
+        const std::vector<Eg::AprEntity*> all = scene.getAllEntities();
         return all.empty() ? nullptr : all.back();
     }
 
@@ -314,7 +315,7 @@ namespace
     TEST(MotionPlanCompilerTest, SelectionOnlyCompilesOnlySelectedEntities)
     {
         Eg::SceneManager scene;
-        Eg::SyEntity* keep = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        Eg::AprEntity* keep = addLine(scene, 0.0, 0.0, 10.0, 0.0);
         ASSERT_NE(nullptr, keep);
         addLine(scene, 0.0, 5.0, 10.0, 5.0);
         addLine(scene, 0.0, 9.0, 10.0, 9.0);
@@ -360,7 +361,7 @@ namespace
         LayerManager layers(&scene);
 
         const int layerId = layers.createLayer("Cut");
-        Eg::SyEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        Eg::AprEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
         ASSERT_NE(nullptr, line);
         ASSERT_TRUE(layers.assignEntityToLayer(line, layerId));
 
@@ -380,7 +381,7 @@ namespace
         LayerManager layers(&scene);
 
         const int layerId = layers.createLayer("Cut");
-        Eg::SyEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        Eg::AprEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
         ASSERT_NE(nullptr, line);
         ASSERT_TRUE(layers.assignEntityToLayer(line, layerId));
 
@@ -409,11 +410,11 @@ namespace
         const int slow = layers.createLayer("Slow");
         const int fast = layers.createLayer("Fast");
 
-        Eg::SyEntity* a = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        Eg::AprEntity* a = addLine(scene, 0.0, 0.0, 10.0, 0.0);
         ASSERT_NE(nullptr, a);
         ASSERT_TRUE(layers.assignEntityToLayer(a, slow));
 
-        Eg::SyEntity* b = addLine(scene, 0.0, 5.0, 10.0, 5.0);
+        Eg::AprEntity* b = addLine(scene, 0.0, 5.0, 10.0, 5.0);
         ASSERT_NE(nullptr, b);
         ASSERT_TRUE(layers.assignEntityToLayer(b, fast));
 
@@ -576,7 +577,7 @@ namespace
         LayerManager layers(&scene);
 
         const int layerId = layers.createLayer("Cut");
-        Eg::SyEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        Eg::AprEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
         ASSERT_NE(nullptr, line);
         ASSERT_TRUE(layers.assignEntityToLayer(line, layerId));
         ASSERT_TRUE(layers.setLayerVisible(layerId, false));
@@ -599,7 +600,7 @@ namespace
         LayerManager layers(&scene);
 
         const int layerId = layers.createLayer("Locked");
-        Eg::SyEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        Eg::AprEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
         ASSERT_NE(nullptr, line);
         ASSERT_TRUE(layers.assignEntityToLayer(line, layerId));
         ASSERT_TRUE(layers.setLayerLocked(layerId, true));
@@ -616,7 +617,7 @@ namespace
         LayerManager layers(&scene);
 
         const int layerId = layers.createLayer("Locked");
-        Eg::SyEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        Eg::AprEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
         ASSERT_NE(nullptr, line);
         ASSERT_TRUE(layers.assignEntityToLayer(line, layerId));
         ASSERT_TRUE(layers.setLayerLocked(layerId, true));
@@ -637,7 +638,7 @@ namespace
         LayerManager layers(&scene);
 
         const int layerId = layers.createLayer("Locked");
-        Eg::SyEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        Eg::AprEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
         ASSERT_NE(nullptr, line);
         ASSERT_TRUE(layers.assignEntityToLayer(line, layerId));
         ASSERT_TRUE(layers.setLayerLocked(layerId, true));
@@ -663,7 +664,7 @@ namespace
         LayerManager layers(&scene);
 
         const int layerId = layers.createLayer("Cut");
-        Eg::SyEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        Eg::AprEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
         ASSERT_NE(nullptr, line);
         ASSERT_TRUE(layers.assignEntityToLayer(line, layerId));
 
@@ -687,7 +688,7 @@ namespace
         LayerManager layers(&scene);
 
         const int layerId = layers.createLayer("Cut");
-        Eg::SyEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        Eg::AprEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
         ASSERT_NE(nullptr, line);
         ASSERT_TRUE(layers.assignEntityToLayer(line, layerId));
 
@@ -710,7 +711,7 @@ namespace
         LayerManager layers(&scene);
 
         const int layerId = layers.createLayer("Hidden");
-        Eg::SyEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        Eg::AprEntity* line = addLine(scene, 0.0, 0.0, 10.0, 0.0);
         ASSERT_NE(nullptr, line);
         ASSERT_TRUE(layers.assignEntityToLayer(line, layerId));
         ASSERT_TRUE(layers.setLayerVisible(layerId, false));
@@ -736,11 +737,11 @@ namespace
         const int cut = layers.createLayer("Cut");
         const int engrave = layers.createLayer("Engrave");
 
-        Eg::SyEntity* a = addLine(scene, 0.0, 0.0, 10.0, 0.0);
+        Eg::AprEntity* a = addLine(scene, 0.0, 0.0, 10.0, 0.0);
         ASSERT_NE(nullptr, a);
         ASSERT_TRUE(layers.assignEntityToLayer(a, cut));
 
-        Eg::SyEntity* b = addLine(scene, 0.0, 5.0, 10.0, 5.0);
+        Eg::AprEntity* b = addLine(scene, 0.0, 5.0, 10.0, 5.0);
         ASSERT_NE(nullptr, b);
         ASSERT_TRUE(layers.assignEntityToLayer(b, engrave));
 

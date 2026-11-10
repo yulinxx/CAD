@@ -4,7 +4,9 @@
  */
 #include "LicensingBootstrap.h"
 
+#include <QApplication>
 #include <QCoreApplication>
+#include <QFontInfo>
 #include <QMessageBox>
 #include <QObject>
 #include <QPushButton>
@@ -12,7 +14,7 @@
 #include "License/LicenseDialog.h"
 #include "License/LicenseDLL.h"
 #include "License/TrialManager.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "UI/ClientConfig/UiFeatureGate.h"
 
 namespace
@@ -37,6 +39,27 @@ namespace
     constexpr auto kContinueTrial = QT_TRANSLATE_NOOP("CADApplicationRuntime", "Continue Trial");
     constexpr auto kExit = QT_TRANSLATE_NOOP("CADApplicationRuntime", "Exit");
 
+    // 授权闸门提示出现在主题/字号配置加载之前，不能接全局主题字体链路。
+    // 以当前应用默认字体为基线放大两档：只影响这两个启动早期提示，
+    // 其余对话框仍随主题字号。用点值而非像素，高 DPI/缩放由 Qt 负责。
+    void applyEarlyDialogFont(QMessageBox& box)
+    {
+        QFont font = QApplication::font();
+        int pointSize = font.pointSize();
+        if (pointSize <= 0)
+        {
+            pointSize = QFontInfo(font).pointSize();
+        }
+        if (pointSize <= 0)
+        {
+            // 字体以像素设置时取不到点值，保持原样比猜一个数字安全
+            return;
+        }
+        font.setPointSize(pointSize + 2);
+        box.setFont(font);
+        APR_DEBUGF("[LicensingBootstrap] early dialog font: base=%dpt applied=%dpt", pointSize, font.pointSize());
+    }
+
     // 只读探测：不写任何持久化状态，上下文在本函数内创建并销毁
     LicenseProbe probeLicense(const LicenseConfig& config)
     {
@@ -51,7 +74,7 @@ namespace
         LicenseContext* ctx = License_Create(&config);
         if (!ctx)
         {
-            SY_WARN("[LicensingBootstrap] License_Create failed, treating as unlicensed");
+            APR_WARN("[LicensingBootstrap] License_Create failed, treating as unlicensed");
             return probe;
         }
 
@@ -68,13 +91,13 @@ namespace
     {
         if (!probe.hasInfo)
         {
-            SY_WARN("[LicensingBootstrap] License_GetInfo failed, feature gate stays unrestricted");
+            APR_WARN("[LicensingBootstrap] License_GetInfo failed, feature gate stays unrestricted");
             UiFeatureGate::instance().setUnrestricted(true);
             return;
         }
 
         UiFeatureGate::instance().loadFromLicenseString(QString::fromUtf8(probe.info.features));
-        SY_INFOF("[LicensingBootstrap] License features applied: customer='%s' expiry='%s'",
+        APR_INFOF("[LicensingBootstrap] License features applied: customer='%s' expiry='%s'",
             probe.info.customerName,
             probe.info.expiryDate);
     }
@@ -94,14 +117,14 @@ int LicensingBootstrap::runGate(const QString& configDir)
 
     if (!license.checkEnabled)
     {
-        SY_INFO("[LicensingBootstrap] License check disabled: unrestricted");
+        APR_INFO("[LicensingBootstrap] License check disabled: unrestricted");
         UiFeatureGate::instance().setUnrestricted(true);
         return 0;
     }
 
     if (license.valid)
     {
-        SY_INFO("[LicensingBootstrap] Valid license found, skipping trial checks");
+        APR_INFO("[LicensingBootstrap] Valid license found, skipping trial checks");
         applyLicensedFeatures(license);
         return 0;
     }
@@ -119,7 +142,7 @@ int LicensingBootstrap::runGate(const QString& configDir)
     const int trialResult = Trial_Check(&remainingDays);
     bool inTrialMode = false;  // 标记用户是否处于试用模式（未持有有效许可证）
 
-    SY_DEBUGF("[LicensingBootstrap] Trial check: result=%d, remainingDays=%d", trialResult, remainingDays);
+    APR_DEBUGF("[LicensingBootstrap] Trial check: result=%d, remainingDays=%d", trialResult, remainingDays);
 
     if (trialResult == -1)
     {
@@ -130,6 +153,7 @@ int LicensingBootstrap::runGate(const QString& configDir)
             tr(kTrialExpiredBody),
             QMessageBox::NoButton,
             nullptr);
+        applyEarlyDialogFont(expiredBox);
         QPushButton* regBtn = expiredBox.addButton(tr(kRegisterNow), QMessageBox::AcceptRole);
         QPushButton* exitBtn = expiredBox.addButton(tr(kExit), QMessageBox::RejectRole);
         QObject::connect(regBtn, &QPushButton::clicked, [&expiredChoice]() {
@@ -142,7 +166,7 @@ int LicensingBootstrap::runGate(const QString& configDir)
 
         if (expiredChoice != 0)
         {
-            SY_INFO("[LicensingBootstrap] Trial expired: user chose to exit");
+            APR_INFO("[LicensingBootstrap] Trial expired: user chose to exit");
             return -1;
         }
 
@@ -150,22 +174,23 @@ int LicensingBootstrap::runGate(const QString& configDir)
         LicenseDialog dlg(configDir);
         if (dlg.exec() != QDialog::Accepted)
         {
-            SY_WARN("[LicensingBootstrap] Trial expired: user cancelled activation, exiting");
+            APR_WARN("[LicensingBootstrap] Trial expired: user cancelled activation, exiting");
             return -1;
         }
-        SY_INFO("[LicensingBootstrap] Trial expired: user activated license successfully");
+        APR_INFO("[LicensingBootstrap] Trial expired: user activated license successfully");
         // 激活成功，继续执行下面的 License 检查来加载 features
     }
     else if (trialResult == 0 && remainingDays > 0)
     {
         // 试用期活跃：提示剩余天数，可选择注册或继续试用
         UiFeatureGate::instance().setUnrestricted(true);
-        SY_INFOF("[LicensingBootstrap] Trial active: %d days remaining", remainingDays);
+        APR_INFOF("[LicensingBootstrap] Trial active: %d days remaining", remainingDays);
 
         QString trialMsg = tr(kTrialVersionBody).arg(remainingDays);
 
         int trialChoice = -1;  // 0=Register, 1=Continue
         QMessageBox trialBox(QMessageBox::Information, tr(kTrialActiveTitle), trialMsg, QMessageBox::NoButton, nullptr);
+        applyEarlyDialogFont(trialBox);
         QPushButton* regBtn = trialBox.addButton(tr(kRegisterNow), QMessageBox::AcceptRole);
         QPushButton* contBtn = trialBox.addButton(tr(kContinueTrial), QMessageBox::RejectRole);
         QObject::connect(regBtn, &QPushButton::clicked, [&trialChoice]() {
@@ -176,7 +201,7 @@ int LicensingBootstrap::runGate(const QString& configDir)
         });
         trialBox.exec();
 
-        SY_DEBUGF("[LicensingBootstrap] Trial dialog choice=%d", trialChoice);
+        APR_DEBUGF("[LicensingBootstrap] Trial dialog choice=%d", trialChoice);
 
         if (trialChoice == 0)
         {
@@ -184,25 +209,25 @@ int LicensingBootstrap::runGate(const QString& configDir)
             LicenseDialog dlg(configDir);
             if (dlg.exec() == QDialog::Accepted)
             {
-                SY_INFO("[LicensingBootstrap] Trial active: user activated license, upgrading to licensed mode");
+                APR_INFO("[LicensingBootstrap] Trial active: user activated license, upgrading to licensed mode");
                 // 激活成功，继续执行下面的 License 检查来加载 features
             }
             else
             {
-                SY_INFO("[LicensingBootstrap] Trial active: user cancelled activation, continuing in trial mode");
+                APR_INFO("[LicensingBootstrap] Trial active: user cancelled activation, continuing in trial mode");
                 inTrialMode = true;
             }
         }
         else
         {
-            SY_INFO("[LicensingBootstrap] Trial active: user chose to continue trial");
+            APR_INFO("[LicensingBootstrap] Trial active: user chose to continue trial");
             inTrialMode = true;
         }
     }
     else
     {
         // 试用期异常状态（天数为0但未过期）：按试用模式处理
-        SY_WARN("[LicensingBootstrap] Trial check unexpected state, falling back to trial mode");
+        APR_WARN("[LicensingBootstrap] Trial check unexpected state, falling back to trial mode");
         inTrialMode = true;
         UiFeatureGate::instance().setUnrestricted(true);
     }
@@ -221,14 +246,14 @@ int LicensingBootstrap::runGate(const QString& configDir)
     }
 
     // 没有有效许可证且用户未在试用期流程中注册 → 弹出激活对话框
-    SY_DEBUG("[LicensingBootstrap] License check failed, showing license dialog");
+    APR_DEBUG("[LicensingBootstrap] License check failed, showing license dialog");
     LicenseDialog dlg(configDir);
     if (dlg.exec() != QDialog::Accepted)
     {
-        SY_WARN("[LicensingBootstrap] License check rejected by user");
+        APR_WARN("[LicensingBootstrap] License check rejected by user");
         return -3;
     }
-    SY_DEBUG("[LicensingBootstrap] License accepted by user");
+    APR_DEBUG("[LicensingBootstrap] License accepted by user");
 
     // 激活成功后重新探测并应用 features
     const LicenseProbe activated = probeLicense(config);

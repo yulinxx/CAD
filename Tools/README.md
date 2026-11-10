@@ -1,6 +1,6 @@
 # Tools 目录说明
 
-本目录包含 SanYi CAD 白标交付与客户管理的自动化工具。
+本目录包含 April CAD 白标交付与客户管理的自动化工具。
 
 ---
 
@@ -45,7 +45,7 @@
 ### 生成内容
 ```
 Clients/acme/
-├── CMakeLists.txt              # sanyi_add_client_plugin(...)
+├── CMakeLists.txt              # apr_add_client_plugin(...)
 ├── configs/acme.json           # 菜单/面板/状态栏差异 (extends base)
 ├── branding/acme/brand.json    # 产品名/公司/图标/主题/版权
 ├── src/ClientPlugin.cpp        # 面板插件 (注册 __CLIENT_ID__.welcome 面板)
@@ -100,7 +100,7 @@ git submodule add <acme-repo-url> Clients/acme
 ### 产出结构
 ```
 dist/acme/
-├── SanYiCAD.exe                    # 主程序
+├── April.exe                    # 主程序
 ├── client.id                       # 部署真源
 ├── configs/
 │   ├── base.json
@@ -110,7 +110,7 @@ dist/acme/
 │   ├── app.ico / logo.svg / splash.png ...
 │   └── icons/
 ├── plugins/clients/acme/
-│   └── SanYiClientAcme.dll         # 面板插件
+│   └── AprClientAcme.dll         # 面板插件
 ├── <Qt runtime dlls...>
 ├── AcmeCut.lnk / AcmeCut.desktop / AcmeCut.app  # 平台快捷方式
 └── acme-20261021.tar.gz / .zip     # 归档 (可选)

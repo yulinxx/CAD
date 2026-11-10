@@ -10,16 +10,16 @@
  *
  * 解析优先级由高到低：
  *   1. 显式覆盖         —— setClientIdOverride()，供命令行 --client=xxx 与单元测试使用
- *   2. 环境变量         —— SANYI_CLIENT_ID，供 CI / 现场排查临时切换
+ *   2. 环境变量         —— APR_CLIENT_ID，供 CI / 现场排查临时切换
  *   3. 部署文件         —— <exe 目录>/client.id，交付包写入的唯一真源
  *   4. 用户设置         —— QSettings 键 Client/Id，兼容旧安装
- *   5. 内置默认         —— kDefaultClientId（san_yi）
+ *   5. 内置默认         —— kDefaultClientId（april）
  *
  * 配置查找顺序（外置优先，内置兜底）：
  *   1. 用户配置目录      —— AppConfigLocation/ui/<id>.json，供现场热修
  *   2. 交付包目录        —— <exe 目录>/configs/<id>.json
  *   3. 内置资源          —— :/configs/<id>.json
- *   4. 默认客户内置配置  —— :/configs/san_yi.json
+ *   4. 默认客户内置配置  —— :/configs/april.json
  *
  * 解析结果会缓存，保证同一进程内菜单、工具栏、Dock、状态栏、右键菜单
  * 全部命中同一份配置资源。

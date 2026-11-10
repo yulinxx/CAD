@@ -196,7 +196,7 @@
  * }
  *
  * 运行时分客户加载:
- * - 环境变量: SANYI_CLIENT_ID=client_a
+ * - 环境变量: APR_CLIENT_ID=client_a
  * - 命令行: --client=client_a
  * - QSettings: Client/Id
  */

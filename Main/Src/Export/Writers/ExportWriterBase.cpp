@@ -10,8 +10,8 @@
 #include <vector>
 
 #include "FileIO/FileIOManager.h"
-#include "Log/SyLogger.h"
-#include "Engine/SyEntity/SyEntity.h"
+#include "Log/AprLogger.h"
+#include "Engine/AprEntity/AprEntity.h"
 
 ExportWriterBase::ExportWriterBase(
     Fio::FileFormat format, QStringList extensions, QString formatName, QString defaultExtension)
@@ -42,7 +42,7 @@ QString ExportWriterBase::defaultExtension() const
     return m_defaultExtension;
 }
 
-Fio::FileFormat ExportWriterBase::resolveFormat(const Fio::VecSyEntityPtr& /*entities*/) const
+Fio::FileFormat ExportWriterBase::resolveFormat(const Fio::VecAprEntityPtr& /*entities*/) const
 {
     return m_format;
 }
@@ -52,11 +52,11 @@ QString ExportWriterBase::successMessage() const
     return QStringLiteral("%1 export successful").arg(m_formatName);
 }
 
-ExportResult ExportWriterBase::write(const ExportContext& context, const Fio::VecSyEntityPtr& entities)
+ExportResult ExportWriterBase::write(const ExportContext& context, const Fio::VecAprEntityPtr& entities)
 {
     Fio::FileIOManager fileIO;
 
-    std::vector<const Eg::SyEntity*> raw;
+    std::vector<const Eg::AprEntity*> raw;
     raw.reserve(entities.size());
     for (const auto& entity : entities)
     {
@@ -72,7 +72,7 @@ ExportResult ExportWriterBase::write(const ExportContext& context, const Fio::Ve
     if (!ok)
     {
         QString msg = QString::fromUtf8(errBuf);
-        SY_ERRORF("[%s] Failed: %s", m_formatName.toUtf8().constData(), msg.toUtf8().constData());
+        APR_ERRORF("[%s] Failed: %s", m_formatName.toUtf8().constData(), msg.toUtf8().constData());
         return ExportResult::fail(msg);
     }
 

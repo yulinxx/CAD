@@ -18,8 +18,9 @@
 #include "UI/Services/HelpDialogService.h"
 
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Edit/SceneEditService.h"
 #include "Engine/Edit/IUndoRedoManager.h"
-#include "Engine2D/SyEntity/SyImage.h"
+#include "Engine2D/AprEntity/AprImage.h"
 #include "Engine2D/Interaction/LayerManager.h"
 #include "Engine/EntityIdGenerator.h"
 #include "Import/ImportService.h"
@@ -29,7 +30,7 @@
 #include "Persistence/LayerPersistenceBridge.h"
 #include "FileIO/FileIOManager.h"
 #include "FileIO/ImageUtils.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <QFileInfo>
 #include <QFile>
@@ -115,13 +116,13 @@ void FileOperationRegistry::executeWithExceptionGuard(const char* operationName,
     }
     catch (const std::exception& e)
     {
-        SY_ERRORF("[FileOperation] %s exception: %s", operationName, e.what());
+        APR_ERRORF("[FileOperation] %s exception: %s", operationName, e.what());
         showFileError(QObject::tr("%1 Error").arg(QString::fromLatin1(operationName)),
             QObject::tr("%1 failed: %2").arg(QString::fromLatin1(operationName), e.what()));
     }
     catch (...)
     {
-        SY_ERRORF("[FileOperation] %s unknown exception", operationName);
+        APR_ERRORF("[FileOperation] %s unknown exception", operationName);
         showFileError(QObject::tr("%1 Error").arg(QString::fromLatin1(operationName)),
             QObject::tr("%1 failed with unknown exception").arg(QString::fromLatin1(operationName)));
     }
@@ -194,7 +195,7 @@ bool FileOperationRegistry::doExport(const std::string& filePath)
 {
     if (!m_exportService)
     {
-        SY_ERROR("[FileOperation] doExport failed: exportService is null");
+        APR_ERROR("[FileOperation] doExport failed: exportService is null");
         return false;
     }
 
@@ -238,7 +239,7 @@ bool FileOperationRegistry::doOpenFile(const QString& filePath)
 {
     if (filePath.isEmpty() || !m_importService)
     {
-        SY_WARNF("[FileOperation] doOpenFile failed: filePath=%s importService=%s",
+        APR_WARNF("[FileOperation] doOpenFile failed: filePath=%s importService=%s",
             filePath.isEmpty() ? "(empty)" : filePath.toUtf8().constData(),
             m_importService ? "ok" : "null");
         return false;
@@ -248,7 +249,7 @@ bool FileOperationRegistry::doOpenFile(const QString& filePath)
     // 未保存处置不通过就绝不往下走，否则未存更改被静默清掉
     if (!confirmDiscardCurrentDocument())
     {
-        SY_DEBUG("[FileOperation] doOpenFile aborted: user cancelled unsaved-changes prompt");
+        APR_DEBUG("[FileOperation] doOpenFile aborted: user cancelled unsaved-changes prompt");
         return false;
     }
 
@@ -317,7 +318,7 @@ void FileOperationRegistry::doImportByFormat(Fio::FileFormat fmt)
             return;
         }
 
-        SY_DEBUGF("[FileOperation] Importing via ImportService: format=%d, path=%s",
+        APR_DEBUGF("[FileOperation] Importing via ImportService: format=%d, path=%s",
             static_cast<int>(fmt),
             filePath.toUtf8().constData());
 
@@ -345,7 +346,7 @@ void FileOperationRegistry::doImportFilePath(const QString& filePath)
     if (!result.success)
     {
         showFileError(QObject::tr("Import Error"), result.message);
-        SY_ERRORF("[FileOperation] Import failed: %s", result.message.toUtf8().constData());
+        APR_ERRORF("[FileOperation] Import failed: %s", result.message.toUtf8().constData());
     }
 }
 
@@ -388,10 +389,10 @@ void FileOperationRegistry::doImportImage(const QString& filePath)
         const float worldW = Fio::pixelsToUnit(rgba.width(), info.dpiX, Fio::UnitType::Millimeter);
         const float worldH = Fio::pixelsToUnit(rgba.height(), info.dpiY, Fio::UnitType::Millimeter);
 
-        auto* imgEntity = new Eg::SyImage();
+        auto* imgEntity = new Eg::AprImage();
         imgEntity->nWidth = rgba.width();
         imgEntity->nHeight = rgba.height();
-        imgEntity->ePixelFormat = Eg::SyPixelFormat::RGBA32;
+        imgEntity->ePixelFormat = Eg::AprPixelFormat::RGBA32;
         imgEntity->setPixelData(rgba.constBits(), static_cast<size_t>(rgba.sizeInBytes()));
 
         const double halfW = worldW / 2.0;
@@ -402,12 +403,12 @@ void FileOperationRegistry::doImportImage(const QString& filePath)
         imgEntity->bottomLeft = Ut::Vec2d(-halfW, -halfH);
         imgEntity->bottomRight = Ut::Vec2d(halfW, -halfH);
 
-        // 直接交出所有权：SyImage::clone() 会把像素缓冲再拷一份，导入大图时是纯浪费
-        auto owned = std::unique_ptr<Eg::SyEntity>(imgEntity);
+        // 直接交出所有权：AprImage::clone() 会把像素缓冲再拷一份，导入大图时是纯浪费
+        auto owned = std::unique_ptr<Eg::AprEntity>(imgEntity);
 
         if (!m_sceneManager)
         {
-            SY_ERROR("[FileOperation] Import image failed: sceneManager is null");
+            APR_ERROR("[FileOperation] Import image failed: sceneManager is null");
             return;
         }
 
@@ -417,16 +418,17 @@ void FileOperationRegistry::doImportImage(const QString& filePath)
         for (size_t attempt = 0; attempt < 1000000 && persistentId == 0; ++attempt)
         {
             const Eg::EntityId candidate = Eg::EntityIdGenerator::instance().getNextPersistentId();
-            if (!m_sceneManager->findSyEntityById(candidate))
+            if (!m_sceneManager->findAprEntityById(candidate))
             {
                 persistentId = candidate;
             }
         }
         owned->id = persistentId;
 
-        if (persistentId == 0 || !m_sceneManager->insertEntityPreserveId(std::move(owned)))
+        SceneEditService directEdit(m_sceneManager, nullptr);
+        if (persistentId == 0 || !directEdit.insertEntityPreserveId(std::move(owned)))
         {
-            SY_ERRORF("[FileOperation] Import image failed: insert rejected (id=%lld path=%s)",
+            APR_ERRORF("[FileOperation] Import image failed: insert rejected (id=%lld path=%s)",
                 static_cast<long long>(persistentId),
                 path.toUtf8().constData());
             QMessageBox::warning(
@@ -437,7 +439,7 @@ void FileOperationRegistry::doImportImage(const QString& filePath)
         // 分配到位图图层
         if (m_layerManager && m_sceneManager)
         {
-            Eg::SyEntity* added = m_sceneManager->findSyEntityById(persistentId);
+            Eg::AprEntity* added = m_sceneManager->findAprEntityById(persistentId);
             if (added)
             {
                 const int curId = m_layerManager->currentLayerId();
@@ -458,7 +460,7 @@ void FileOperationRegistry::doImportImage(const QString& filePath)
             }
         }
 
-        SY_DEBUGF("[FileOperation] Imported image: %s (%dx%d)", path.toUtf8().constData(), rgba.width(), rgba.height());
+        APR_DEBUGF("[FileOperation] Imported image: %s (%dx%d)", path.toUtf8().constData(), rgba.width(), rgba.height());
     });
 }
 
@@ -476,7 +478,7 @@ void FileOperationRegistry::doExportByFormat(Fio::FileFormat fmt)
         if (!result.success)
         {
             showFileError(QObject::tr("Export Error"), result.message);
-            SY_ERRORF("[FileOperation] Export failed: %s", result.message.toUtf8().constData());
+            APR_ERRORF("[FileOperation] Export failed: %s", result.message.toUtf8().constData());
         }
     });
 }
@@ -524,12 +526,12 @@ void FileOperationRegistry::registerFileOpenOps()
         {
             return;
         }
-        // 2D 的“打开”仅允许自定义 2D 文档（.sy），其它格式走“导入”
-        if (!filePath.toLower().endsWith(QStringLiteral(".sy")))
+        // 2D 的“打开”仅允许自定义 2D 文档（.apr），其它格式走“导入”
+        if (!filePath.toLower().endsWith(QStringLiteral(".apr")))
         {
             QMessageBox::warning(m_parentWidget,
                 QObject::tr("Open Error"),
-                QObject::tr("Only SanYi 2D files (*.sy) can be opened here.\n"
+                QObject::tr("Only April 2D files (*.apr) can be opened here.\n"
                             "Use File ▸ Import for other formats."));
             return;
         }
@@ -552,10 +554,10 @@ void FileOperationRegistry::registerFileSaveOps()
         OperationResult result;
         QString filePath = QString::fromStdString(*m_currentFilePath);
         const bool canSaveInPlace = !filePath.isEmpty() &&
-            filePath.endsWith(QLatin1String(".sy"), Qt::CaseInsensitive);
+            filePath.endsWith(QLatin1String(".apr"), Qt::CaseInsensitive);
         if (!canSaveInPlace)
         {
-            // 未命名文档、或当前路径不是 .sy 原生格式：必须另存为
+            // 未命名文档、或当前路径不是 .apr 原生格式：必须另存为
             filePath = FileDialogService::getSaveFileName(
                 m_parentWidget, QObject::tr("Save"), FileDialogService::saveFileFilter());
             if (filePath.isEmpty())
@@ -617,7 +619,7 @@ void FileOperationRegistry::registerImportOps()
     // “All Supported...”：弹出所有支持格式的对话框，按扩展名自动路由到对应导入器。
     // 与其它 Import 一致为**追加**语义（importAsNewDocument=false）——
     // 原实现走 doOpenFile 会清空当前文档且不弹未保存提示，与注释和菜单语义都不符；
-    // 要替换当前文档请用 File ▸ Open（仅 .sy）
+    // 要替换当前文档请用 File ▸ Open（仅 .apr）
     Ops::declare(reg, OperationId::File_ImportAll, [this] {
         QString filePath = FileDialogService::getOpenFileName(
             m_parentWidget, QObject::tr("Import File"), FileDialogService::allSupportedFilter());
@@ -645,7 +647,7 @@ void FileOperationRegistry::registerAll()
 {
     if (!m_bus || !m_sceneManager)
     {
-        SY_ERROR("[FileOperation] registerAll failed: bus or sceneManager is null");
+        APR_ERROR("[FileOperation] registerAll failed: bus or sceneManager is null");
         return;
     }
 

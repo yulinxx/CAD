@@ -35,7 +35,7 @@ else()
     return()
 endif()
 
-sanyi_find_qt(Widgets)
+apr_find_qt(Widgets)
 
 add_executable(MetalViewportProto main.cpp)
 

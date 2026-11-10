@@ -12,6 +12,7 @@
 #include "UI/Command/OperationId.h"
 #include "UI/Safety/EmergencyStopController.h"
 #include "UI2D/Operation/OperationBus.h"
+#include "Log/AprLogger.h"
 
 namespace
 {
@@ -68,6 +69,15 @@ void DevicePanel::buildUi()
     m_safetyLabel->setWordWrap(true);
     layout->addWidget(m_safetyLabel);
 
+    // 加工告警常驻位：默认隐藏，只在 jobWarning / jobFinished(false) 时出现。
+    // 不用 QMessageBox 是为了不打断正在进行的加工，也不会在自动化里弹模态框。
+    m_warningLabel = new QLabel(this);
+    m_warningLabel->setObjectName(QStringLiteral("devicePanelWarning"));
+    m_warningLabel->setWordWrap(true);
+    m_warningLabel->setVisible(false);
+    m_warningLabel->setStyleSheet(QStringLiteral("QLabel { font-weight: bold; }"));
+    layout->addWidget(m_warningLabel);
+
     m_hintLabel = new QLabel(tr("Hardware module is not enabled in this build (BUILD_HARDWARE=OFF). "
                                 "The panel is shown for reference only."), this);
     m_hintLabel->setObjectName(QStringLiteral("devicePanelHint"));
@@ -106,15 +116,62 @@ void DevicePanel::connectSignals()
 
     if (m_jobService)
     {
+        connect(m_jobService, &ProcessingJobService::jobStarted, this, &DevicePanel::clearJobWarning);
         connect(m_jobService, &ProcessingJobService::jobStarted, this, &DevicePanel::refreshState);
+        connect(m_jobService, &ProcessingJobService::jobFinished, this, &DevicePanel::onJobFinished);
         connect(m_jobService, &ProcessingJobService::jobFinished, this, &DevicePanel::refreshState);
         connect(m_jobService, &ProcessingJobService::jobStateChanged, this, &DevicePanel::refreshState);
+        // 生产代码里唯一一条把 jobWarning 送到操作员眼前的连线。
+        // ProcessingJobService 在 LaserRoute 报告「只有首段激光参数被落实」时发此信号，
+        // 之前全仓只有单测监听它，现场会把它当成一次成功的加工。
+        connect(m_jobService, &ProcessingJobService::jobWarning, this, &DevicePanel::onJobWarning);
     }
 
     if (m_safety)
     {
         connect(m_safety, &EmergencyStopController::stateChanged, this, &DevicePanel::refreshState);
     }
+}
+
+void DevicePanel::clearJobWarning()
+{
+    if (m_warningLabel)
+    {
+        m_warningLabel->clear();
+        m_warningLabel->setVisible(false);
+    }
+}
+
+void DevicePanel::onJobWarning(const QString& message)
+{
+    if (message.isEmpty())
+    {
+        return;
+    }
+    APR_WARNF("[DevicePanel] Job warning: %s", message.toUtf8().constData());
+    if (!m_warningLabel)
+    {
+        return;
+    }
+    m_warningLabel->setText(tr("Warning: %1").arg(message));
+    m_warningLabel->setVisible(true);
+}
+
+void DevicePanel::onJobFinished(bool success, const QString& message)
+{
+    if (success)
+    {
+        return;
+    }
+    APR_ERRORF("[DevicePanel] Job failed: %s", message.toUtf8().constData());
+    if (!m_warningLabel)
+    {
+        return;
+    }
+    m_warningLabel->setText(message.isEmpty()
+        ? tr("Processing failed")
+        : tr("Processing failed: %1").arg(message));
+    m_warningLabel->setVisible(true);
 }
 
 void DevicePanel::refreshState()

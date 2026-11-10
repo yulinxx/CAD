@@ -113,14 +113,14 @@
 |---|---|---|
 | `Eg::ProcessParams` | `Engine/Common/Include/Engine/Process/ProcessParams.h:59-145` | 基准：power 50 / freq 20000 / pulseWidth 0 / waveform 0（`:62-65`）、speed 100（`:68`）、rapid 0（`:69`）、passes 1（`:70`）、fillEnabled/fillInterval/fillAngle/fillMode（`:73-76`）、kerfMm（`:82`）、focusOffsetMm（`:84`）、enabled（`:87`）；无 `chordToleranceMm`；校验走 `valid()`→`invalidReason()`（`:95-138`） |
 | `Cam::ProcessParams` | `CAM/CAM/Include/CAM/ToolpathJobInput.h:151-186` | power 50 / freq 20000 / pulseWidth 10 / waveform 0（`:156-159`）、speed 200（`:162`）、rapid 300（`:165`）、passes 1（`:168`）、**额外 `chordToleranceMm`**（`:171`）、enabled（`:175`）；**缺** fill 四项、`kerfMm`、`focusOffsetMm`；`valid()` 只查 power/speed/rapid/passes/chord（`:178-185`） |
-| `FileIO::SyProcessParamsInfo` | `FileIO/FileIO/Include/FileIO/SyDocument.h:58-73` | **缺** `focusOffsetMm`、`chordToleranceMm`；`fillMode` 为 `int32_t`（`:70`）；字段顺序不同；注释声称"与 `Eg::ProcessParams` 一一对应"（`:56`） |
+| `FileIO::AprProcessParamsInfo` | `FileIO/FileIO/Include/FileIO/AprDocument.h:58-73` | **缺** `focusOffsetMm`、`chordToleranceMm`；`fillMode` 为 `int32_t`（`:70`）；字段顺序不同；注释声称"与 `Eg::ProcessParams` 一一对应"（`:56`） |
 | `Cam::FillRegion` | `ToolpathJobInput.h:104-111` | 自带 `scanAngleDeg`（`:109`）/`lineSpacing`（`:110`），与 `Eg` 的 `fillAngleDeg`/`fillIntervalMm` 平行 |
 | `Cam::KerfParams` | `ToolpathJobInput.h:190-196` | 自带 `widthMm`/`enabled`/`side`（`:193-195`），与 `Eg` 的 `kerfMm`（`:82`）平行 |
 
 漂移已在代码里发生：
 - 桥接层只转换 9 个字段：`Main/Src/CAM/CamInputBridge.cpp:64-87`（power/freq/pulseWidth/waveform/speed/rapid/passes/enabled/chord），**fill 四项、kerf、focus 全部丢失**，且无任何提示。
 - `Cam::ProcessParams::valid()`（`ToolpathJobInput.h:178-185`）不校验 fillInterval，而 `Eg::ProcessParams::invalidReason()`（`ProcessParams.h:107-138`）会校验——同一份参数在两套规则下可能"Engine 判非法、CAM 判合法"。
-- FileIO 逐字段手抄：读 `SyDocument.cpp:300-313`、写 `:330-343`；`focusOffsetMm` 两个方向都不存在。
+- FileIO 逐字段手抄：读 `AprDocument.cpp:300-313`、写 `:330-343`；`focusOffsetMm` 两个方向都不存在。
 - 覆盖关系未定义：`LayerBucket` 同时持有 `params` 与 `kerf`/`leadInOut`/`pierce`/`corner`/`powerCurve`/`passStrategy`（`ToolpathJobInput.h:270-278`），但"`kerf.enabled=true` 与 `params.kerfMm` 谁覆盖谁"没有规则。
 
 **复核修正**：审查意见中"`Cam::ProcessParams` 缺 `enabled`"不成立——它在 `ToolpathJobInput.h:175`，桥接层 `CamInputBridge.cpp:82` 已转换，`CamCore.cpp:144` 已按它跳过图层。
@@ -138,7 +138,7 @@
 
 - 新目标 `Engine/ProcessContract/`（`INTERFACE` 库，无源文件、无 DLL、无 Qt），头文件 `Include/Process/ProcessParams.h`，类型放 `Proc::` 命名空间，字段与 `Eg::ProcessParams` 完全一致。
 - `Engine/Common/.../ProcessParams.h` 改为 `#include "Process/ProcessParams.h"` + `namespace Eg { using ProcessParams = Proc::ProcessParams; }`，现有 `Eg::ProcessParams` 调用点零改动。
-- `FileIO` 直接用 `Proc::ProcessParams` 替换 `SyProcessParamsInfo` 字面字段（DTO 退化为别名），删除 `SyDocument.cpp:300-313`、`:330-343` 手抄。
+- `FileIO` 直接用 `Proc::ProcessParams` 替换 `AprProcessParamsInfo` 字面字段（DTO 退化为别名），删除 `AprDocument.cpp:300-313`、`:330-343` 手抄。
 - `CAM` 公开输入使用 `Proc::ProcessParams`，删除 `Cam::ProcessParams`；`cam.kerf` 删除，割缝由 `ProcessParams.kerfMm` + 轮廓绕向决定；`FillRegion` 只保留边界环，扫描参数取 `fillAngleDeg`/`fillIntervalMm`。
 - `chordToleranceMm` 不属于工艺参数，移到 `ToolpathJobInput` 的全局设置（它当前是 CAM 单方面新增字段，`ProcessParams.h` 没有）。
 - M1 专属的 `LeadInOutParams`/`PierceParams`/`CornerParams`/`PowerCurve`/`PassStrategy` 合并为 `ProcessTransformParams` 一个聚合结构，避免与基础参数平行散落。
@@ -160,7 +160,7 @@ CAM ──▶ Utility（PUBLIC）、Log（PRIVATE）（不变）
 
 优点：类型唯一；无 DLL 依赖；调用点零改动（别名）；规则 4.5 无需改逻辑。
 
-代价：新增一个 CMake 目标并在 4 个模块加 include 依赖；类型真实命名空间从 `Eg` 变为 `Proc`，所有 DLL 需全量重编（符号名变化）；`.sy` 文件布局不变。
+代价：新增一个 CMake 目标并在 4 个模块加 include 依赖；类型真实命名空间从 `Eg` 变为 `Proc`，所有 DLL 需全量重编（符号名变化）；`.apr` 文件布局不变。
 
 #### 方案 2：放进 `Utility`
 
@@ -181,7 +181,7 @@ CAM ──▶ Utility（PUBLIC）、Log（PRIVATE）（不变）
 
 - 新增 `Engine/ProcessContract/CMakeLists.txt` 与 `Include/Process/ProcessParams.h`
 - `Engine/Common/CMakeLists.txt`、`ProcessParams.h` 改为别名
-- `FileIO/FileIO/SyDocument.h`、`Src/SyDocument.cpp`
+- `FileIO/FileIO/AprDocument.h`、`Src/AprDocument.cpp`
 - `CAM/CAM/Include/CAM/ToolpathJobInput.h`
 - `Main/Src/CAM/CamInputBridge.cpp`
 - `CMake/CheckDependencies.cmake`（仅注释）
@@ -193,7 +193,7 @@ CAM ──▶ Utility（PUBLIC）、Log（PRIVATE）（不变）
 3. `FileIO` 用同一类型替换 DTO，删除两份手抄。
 4. `CAM` 输入改用 `Proc::ProcessParams`，删除 `KerfParams`，`FillRegion` 瘦身，`chordToleranceMm` 移到全局设置。
 5. 桥接层删除参数转换函数。
-6. 加测试：`Eg::ProcessParams` → `.sy` 往返 → `Proc::ProcessParams` 全字段相等（含 `focusOffsetMm`）。
+6. 加测试：`Eg::ProcessParams` → `.apr` 往返 → `Proc::ProcessParams` 全字段相等（含 `focusOffsetMm`）。
 7. 加门禁测试：显式 `visitFields` 遍历全部字段，防止新增字段后 `FileIO` 漏映射。
 
 ### 2.6 风险
@@ -201,7 +201,7 @@ CAM ──▶ Utility（PUBLIC）、Log（PRIVATE）（不变）
 | 风险 | 说明 | 缓解 |
 |---|---|---|
 | 类型身份变化导致全量重编 | 别名后真实命名空间变化，mangled name 变化 | 一次性全量重建，不做增量发布 |
-| `FileIO` 公开头变化 | 若有外部 `.sy` 插件 | 当前无外部插件，文档记录 |
+| `FileIO` 公开头变化 | 若有外部 `.apr` 插件 | 当前无外部插件，文档记录 |
 | `FillRegion` 瘦身影响 M0 测试 | `CamCoreTests.cpp` 未使用填充参数 | 低风险，测试同步 |
 | 校验规则合并后行为变化 | `Eg::invalidReason` 比 `Cam::valid` 严格 | 统一以 `Eg` 规则为准，UI 与 CAM 共用 |
 
@@ -332,7 +332,7 @@ struct CamPlan
 **角度单位矛盾（新发现，已造成实际缺陷）**：
 - CAM 的段注释写"度"：`ToolpathJobInput.h:66-67`。
 - 抽取器实际按**弧度**存储：`GeometryExtractor.cpp:140-147` 直接把角度喂给 `cos`/`sin`；整圆用 `M_PI`/`kTwoPi`（`:157-167`）；圆弧提取传入 `arc->dStartAngle`（`:453`）。
-- `SyArc` 的角度也是弧度：`SyArc.cpp:99-100`（用 `2π` 判整圆）。
+- `AprArc` 的角度也是弧度：`AprArc.cpp:99-100`（用 `2π` 判整圆）。
 - `CamCore.cpp:63-72`（以及 `:82-91` 的另一重载）按**度**计算圆弧长度：`dRadius * delta * (M_PI / 180.0)`。
 - 抽取器自己的 `contourLength` 按弧度计算：`GeometryExtractor.cpp:171-180`。
 - 测试用"度"构造圆弧（`CamCoreTests.cpp:230-236`），因此测试通过；真实桥接数据是弧度，长度差约 57.3 倍。
@@ -539,7 +539,7 @@ struct CamResult
 
 - 桥接层对全部几何深拷贝：`CamInputBridge.cpp:43-59`（`reserve` + 逐段构造 + `push_back`），且 `convertContour` 返回值再 `push_back`（`:199`、`:215`、`:233`），产生额外移动/拷贝。
 - `EntitySnapshot` 无论类型都带两个容器与一个填充结构：`ToolpathJobInput.h:132`、`:135`、`:138`（`std::vector<Contour>`、`Ut::Vec2d`、`FillRegion`）。空 `std::vector` 不分配堆内存，但每个占 24 字节；`FillRegion` 内嵌再占约 48 字节（估算）。
-- 已有场景/选择链路基准（`Tools/PerfBenchmark/main.cpp:1-24`，默认 20 万），并已新增 CAM 专项基准 `Tools/PerfBenchmark/CamBench.cpp`（`BUILD_CAM` 时编入，`SANYI_CAM_BENCH_1M=1` 才跑 1M 档）。
+- 已有场景/选择链路基准（`Tools/PerfBenchmark/main.cpp:1-24`，默认 20 万），并已新增 CAM 专项基准 `Tools/PerfBenchmark/CamBench.cpp`（`BUILD_CAM` 时编入，`APR_CAM_BENCH_1M=1` 才跑 1M 档）。
 
 ### 6.2 已实施基线（D7：只补 bench、零优化）
 
@@ -629,7 +629,7 @@ struct CamResult
 | 8 | `Docs/CAM层架构规划.md:299-331` | 输入结构无 `structSize`、无 `emitTrailingLaserOff` | 代码无 `structSize`；有 `emitTrailingLaserOff`（`ToolpathJobInput.h:282`） | 补 `emitTrailingLaserOff` |
 | 9 | `Docs/CAM层架构规划.md:416-418` | `CamBridge::extractEntity` | 不存在（桥接层只有 `buildJobInput`） | 删除或实现 |
 | 10 | `Docs/CAM层架构规划.md:437`、`:496`、`:554` | `Progress.h` 文件 | 实际在 `CamContext.h:39-56` | 改文档 |
-| 11 | `Docs/CAM层架构规划.md:69-90` | CMake 示例用 `sanyi_add_shared_library(... TARGET ... DIRECTORY ...)` 与 `PRIVATE_LINK_LIBRARIES Engine2D` | 实际签名 `sanyi_add_shared_library(target)`（`CMake/Utils.cmake:202-212`）；实际链 `Utility`(PUBLIC)+`Log`(PRIVATE)（`CAM/CAM/CMakeLists.txt:47-51`）；链 `Engine2D` 会被规则 4.5 判违规 | 改文档示例 |
+| 11 | `Docs/CAM层架构规划.md:69-90` | CMake 示例用 `apr_add_shared_library(... TARGET ... DIRECTORY ...)` 与 `PRIVATE_LINK_LIBRARIES Engine2D` | 实际签名 `apr_add_shared_library(target)`（`CMake/Utils.cmake:202-212`）；实际链 `Utility`(PUBLIC)+`Log`(PRIVATE)（`CAM/CAM/CMakeLists.txt:47-51`）；链 `Engine2D` 会被规则 4.5 判违规 | 改文档示例 |
 | 12 | `Docs/CAM层架构规划.md:776`、`:802-820` | `CAMTests` 链接 Engine2D/Engraving/Hardware | 实际只链 `CAM` + gtest（`CAM/CAM/Test/CMakeLists.txt:14-19`） | 改文档 |
 | 13 | `Docs/CAM层架构规划.md:874` | 明确"ToolpathJobInput 必须定义自己的 Contour/PathSegment 副本" | 与第 2/4 条单一来源方案冲突 | 改为共享契约类型 |
 | 14 | `Docs/CAM层架构规划.md:511-513` | 已定案 C++ 内部 ABI，对外 C ABI 已否决 | `CAMExport.h:8-18` 同口径 | 已统一（本轮同步） |
@@ -694,7 +694,7 @@ struct CamResult
 - `CamPlan.h:19-22` 与 `ToolpathJobInput.h:24-26` 写实"CAM 全程用户坐标，用户坐标 → 机器坐标由 Main 侧发射器在 M2 一步完成"。
 
 **D7（只补 bench、零优化）**
-- `Tools/PerfBenchmark/CamBench.cpp` 在 `BUILD_CAM` 时编入（`Tools/PerfBenchmark/CMakeLists.txt:36`），`SANYI_CAM_BENCH_1M=1` 才跑 1M 档。
+- `Tools/PerfBenchmark/CamBench.cpp` 在 `BUILD_CAM` 时编入（`Tools/PerfBenchmark/CMakeLists.txt:36`），`APR_CAM_BENCH_1M=1` 才跑 1M 档。
 - Release 实测 best：10k → `input_build` 2.10 / `input_copy_ctor` 1.38 / `cam_compile` 4.86 ms，`deep_copy_share` 44.6%；100k → 26.20 / 27.08 / 53.40 ms，48.4%；1M → 349.13 / 439.18 / 896.70 ms，46.7%。
 - 内存容量估算：10k 输入 3.75 MB / 计划 4.13 MB；100k 37.54 / 42.87 MB；1M 375.37 / 398.24 MB，另有一次同量级临时拷贝，估算峰值约 1.1~1.2 GB（估算值，进程实际峰值未测）。
 - 结论：深拷贝占链路约 45%~48%，是 D2（统一类型 + move）的依据。

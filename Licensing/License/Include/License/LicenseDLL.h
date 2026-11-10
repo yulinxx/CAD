@@ -67,7 +67,7 @@ extern "C"
         uint32_t structSize;
         const char* configDir;
         // 运行期开关覆盖值：-1 = 不覆盖（License_ConfigInit 默认，沿用编译期
-        // SANYI_ENABLE_LICENSE 的默认值）；0 = 关闭校验；1 = 开启校验。
+        // APR_ENABLE_LICENSE 的默认值）；0 = 关闭校验；1 = 开启校验。
         int32_t enableCheck;
         uint32_t reserved0;
         uint32_t reserved1;
@@ -96,7 +96,7 @@ extern "C"
     LICENSE_C_API LICENSE_API int License_IsCheckEnabled(void);
 
     // License_SetCheckEnabled 已从公开导出表移除。
-    // 许可开关应通过编译期宏 SANYI_ENABLE_LICENSE 控制，而非运行时公开 API。
+    // 许可开关应通过编译期宏 APR_ENABLE_LICENSE 控制，而非运行时公开 API。
     // 内部测试仍可通过 LicenseInternal::SetCheckEnabled() 调用。
 #ifdef LICENSE_TEST_HOOKS
     LICENSE_C_API LICENSE_API void License_SetCheckEnabled(int enabled);

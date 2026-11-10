@@ -1,6 +1,6 @@
 #include "LicenseThrottle.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
@@ -16,7 +16,7 @@
 namespace
 {
     // 固定盐值与机器码拼接后作为状态文件的 HMAC 密钥
-    const char kHmacSalt[] = "sanyi-license-throttle-v1";
+    const char kHmacSalt[] = "apr-license-throttle-v1";
     constexpr char kStateFileName[] = "license.throttle";
 
     // 全局节流参数：默认值即生产策略，测试钩子可临时覆盖
@@ -258,7 +258,7 @@ bool LicenseThrottle::Load(State& out) const
     const auto dotPos = content.find('.');
     if (dotPos == std::string::npos)
     {
-        SY_WARN("[LicenseThrottle] throttle state file malformed, resetting counters");
+        APR_WARN("[LicenseThrottle] throttle state file malformed, resetting counters");
         return false;
     }
 
@@ -268,7 +268,7 @@ bool LicenseThrottle::Load(State& out) const
 
     if (payload.empty() || storedMac.empty() || storedMac != expectedMac)
     {
-        SY_WARN("[LicenseThrottle] throttle state HMAC mismatch (tampered?), resetting counters");
+        APR_WARN("[LicenseThrottle] throttle state HMAC mismatch (tampered?), resetting counters");
         return false;
     }
 
@@ -278,7 +278,7 @@ bool LicenseThrottle::Load(State& out) const
     const int matched = std::sscanf(payload.c_str(), "%lld|%lld|%lld", &failures, &lastAttempt, &lockUntil);
     if (matched != 3 || failures < 0)
     {
-        SY_WARN("[LicenseThrottle] throttle state parse failed, resetting counters");
+        APR_WARN("[LicenseThrottle] throttle state parse failed, resetting counters");
         out = State{};
         return false;
     }
@@ -318,7 +318,7 @@ bool LicenseThrottle::Save(const State& state) const
     std::ofstream file(StateFilePath(), std::ios::out | std::ios::trunc);
     if (!file)
     {
-        SY_WARN("[LicenseThrottle] failed to persist throttle state");
+        APR_WARN("[LicenseThrottle] failed to persist throttle state");
         return false;
     }
     file << encoded;

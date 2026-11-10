@@ -1,6 +1,8 @@
 #include <ctime>
 #include <chrono>
+#include <exception>
 #include <thread>
+#include <utility>
 
 /**
  * @file ExportService.cpp
@@ -11,7 +13,7 @@
 #include "ExportService.h"
 #include "ExportDispatcher.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine3D/SceneManager3D.h"
 #include "Persistence/PersistenceService.h"
@@ -26,6 +28,35 @@
 void ExportService::setPersistenceService(PersistenceService* service)
 {
     m_persistenceService = service;
+}
+
+void ExportService::setNativeMachiningSnapshotProvider(std::function<NativeDocumentSnapshot()> provider)
+{
+    m_machiningSnapshotProvider = std::move(provider);
+}
+
+void ExportService::captureMachiningSnapshot(ExportContext& context) const
+{
+    // 只在主线程调用：provider 会读 LayerManager / HardwareProfileManager，
+    // 两者都不是线程安全的。采集结果是纯 POD 值，可以安全地交给后台 writer。
+    if (!m_machiningSnapshotProvider)
+    {
+        context.hasMachiningSnapshot = false;
+        return;
+    }
+    try
+    {
+        context.machiningSnapshot = m_machiningSnapshotProvider();
+        context.hasMachiningSnapshot = true;
+    }
+    catch (const std::exception& e)
+    {
+        // 快照失败不能把整次导出变成「已保存全部参数」：保持 false，
+        // NativeExportWriter 会给出显式 warning，操作员不会误判。
+        context.machiningSnapshot = NativeDocumentSnapshot();
+        context.hasMachiningSnapshot = false;
+        APR_ERRORF("[ExportService] Machining snapshot failed: %s", e.what());
+    }
 }
 
 ExportService::ExportService(QObject* parent)
@@ -48,16 +79,16 @@ void ExportService::shutdownAsyncThread()
     // 通知 worker 尽快退出（dispatch 内部无 cancel 检查点，置 flag 后
     // 再 joinable 也不放弃 join——joinable 的 std::thread 析构会触发 std::terminate）
     m_asyncCancelFlag.store(true);
-    SY_INFO("[ExportService] shutdownAsyncThread: cancel flag set, waiting worker...");
+    APR_INFO("[ExportService] shutdownAsyncThread: cancel flag set, waiting worker...");
 
     // 给 worker 最多 3 秒自行退出（序列化 + 写文件为有界操作，正常毫秒级返回；
     // 若磁盘 I/O 卡顿，超时只打 WARN 不放弃 join）
     std::this_thread::sleep_for(std::chrono::seconds(3));
     if (m_asyncThread.joinable())
     {
-        SY_WARN("[ExportService] shutdownAsyncThread: worker still alive after 3s, forcing join");
+        APR_WARN("[ExportService] shutdownAsyncThread: worker still alive after 3s, forcing join");
         m_asyncThread.join();
-        SY_INFO("[ExportService] shutdownAsyncThread: worker joined");
+        APR_INFO("[ExportService] shutdownAsyncThread: worker joined");
     }
 }
 
@@ -96,12 +127,12 @@ ExportResult ExportService::exportFile(const QString& filePath, const ExportOpti
 void ExportService::exportAsync(
     const ExportContext& context, const ExportOptions& options, std::function<void(const ExportResult&)> onComplete)
 {
-    SY_DEBUGF("[ExportService] exportAsync START: path=%s", context.targetPath.toUtf8().constData());
+    APR_DEBUGF("[ExportService] exportAsync START: path=%s", context.targetPath.toUtf8().constData());
 
     if (!m_dispatcher)
     {
         QString msg = tr("ExportDispatcher not set");
-        SY_ERRORF("[ExportService] exportAsync aborted: %s", msg.toUtf8().constData());
+        APR_ERRORF("[ExportService] exportAsync aborted: %s", msg.toUtf8().constData());
         if (onComplete)
         {
             onComplete(ExportResult::fail(msg));
@@ -115,7 +146,7 @@ void ExportService::exportAsync(
     {
         // 已经有导出在跑，拒绝新请求
         QString msg = tr("Another export is in progress");
-        SY_WARNF("[ExportService] exportAsync rejected: %s", msg.toUtf8().constData());
+        APR_WARNF("[ExportService] exportAsync rejected: %s", msg.toUtf8().constData());
         if (onComplete)
         {
             onComplete(ExportResult::fail(msg));
@@ -161,8 +192,12 @@ void ExportService::exportAsync(
     // 注入取消标志指针：让后台线程 writer 内部能定期检查
     fullCtx.cancelFlag = &m_asyncCancelFlag;
 
+    // Phase 1 主线程：采集 .apr 加工语义快照（图层表 + Profile 值集）。
+    // 必须在启动 worker 之前完成：后台线程只拿到值，不碰 Manager 指针。
+    captureMachiningSnapshot(fullCtx);
+
     // Phase 1 主线程：clone 场景图元（SceneManager 非线程安全，必须在主线程访问）
-    Fio::VecSyEntityPtr entities = collectAllEntities();
+    Fio::VecAprEntityPtr entities = collectAllEntities();
 
     // 收集完之后切断场景指针，让 NativeExportWriter 走 clone 路径，
     // 避免后台线程访问主线程持有的 SceneManager
@@ -173,7 +208,7 @@ void ExportService::exportAsync(
     {
         // 无图元直接走主线程收尾：不走后台线程，省一次线程启动 + 析构
         QString msg = tr("No entities to export");
-        SY_WARNF("[ExportService] exportAsync: %s", msg.toUtf8().constData());
+        APR_WARNF("[ExportService] exportAsync: %s", msg.toUtf8().constData());
         ExportResult emptyResult = ExportResult::fail(msg);
         if (m_busyStateCallback) m_busyStateCallback(false);
         if (m_statusPromptCallback) m_statusPromptCallback(tr("Export: no entities"));
@@ -184,7 +219,7 @@ void ExportService::exportAsync(
     }
 
     // 用 shared_ptr 包装 entities（vector<unique_ptr> 不可拷贝，不能按值捕获进 lambda）
-    auto sharedEntities = std::make_shared<Fio::VecSyEntityPtr>(std::move(entities));
+    auto sharedEntities = std::make_shared<Fio::VecAprEntityPtr>(std::move(entities));
 
     // 使用 QPointer 安全持有 this：若 ExportService 被销毁，
     // QPointer 自动置空，后续所有路径安全返回，避免悬空指针访问
@@ -235,7 +270,7 @@ void ExportService::exportAsync(
                     if (onComplete) onComplete(r);
                 }
                 safeSelf->m_exportBusy.store(false);
-                SY_DEBUGF("[ExportService] exportAsync END: success=%d, entities=%d, message=%s",
+                APR_DEBUGF("[ExportService] exportAsync END: success=%d, entities=%d, message=%s",
                     r.success ? 1 : 0,
                     r.exportedEntityCount,
                     r.message.toUtf8().constData());
@@ -251,7 +286,7 @@ void ExportService::exportAsync(
         // 外部请求取消（析构或新 exportAsync 启动时置 true）
         if (m_asyncCancelFlag.load())
         {
-            SY_INFO("[ExportService] Async export canceled before dispatch");
+            APR_INFO("[ExportService] Async export canceled before dispatch");
             ExportResult cancelResult = ExportResult::fail(ExportService::tr("Export canceled"));
             finishOnMainThread(cancelResult, fullCtx);
             return;
@@ -267,7 +302,7 @@ void ExportService::exportAsync(
         }
         else
         {
-            SY_ERRORF("[ExportService] Async export failed: %s", result.message.toUtf8().constData());
+            APR_ERRORF("[ExportService] Async export failed: %s", result.message.toUtf8().constData());
         }
 
         // Phase 3 主线程收尾：QMetaObject::invokeMethod + Qt::QueuedConnection
@@ -280,7 +315,7 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
     if (!m_dispatcher)
     {
         QString msg = tr("ExportDispatcher not set");
-        SY_ERRORF("[ExportService] %s", msg.toUtf8().constData());
+        APR_ERRORF("[ExportService] %s", msg.toUtf8().constData());
         return ExportResult::fail(msg);
     }
 
@@ -288,7 +323,7 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
     if (m_exportBusy.exchange(true))
     {
         QString msg = tr("Another export is in progress");
-        SY_WARNF("[ExportService] exportWithContext rejected: %s", msg.toUtf8().constData());
+        APR_WARNF("[ExportService] exportWithContext rejected: %s", msg.toUtf8().constData());
         return ExportResult::fail(msg);
     }
 
@@ -323,8 +358,11 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
         };
     }
 
+    // 采集 .apr 加工语义快照：与异步路径一致，取的是主线程上的值快照
+    captureMachiningSnapshot(fullCtx);
+
     // 收集场景图元
-    Fio::VecSyEntityPtr entities = collectAllEntities();
+    Fio::VecAprEntityPtr entities = collectAllEntities();
 
     // 收集完之后切断场景指针，与 exportAsync 保持一致：
     // NativeExportWriter 的借用路径会访问原始 SceneManager，此处统一走 clone 路径
@@ -336,7 +374,7 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
     if (entities.empty())
     {
         QString msg = tr("No entities to export");
-        SY_WARNF("[ExportService] %s", msg.toUtf8().constData());
+        APR_WARNF("[ExportService] %s", msg.toUtf8().constData());
 
         result = ExportResult::fail(msg);
     }
@@ -359,7 +397,7 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
         }
         else
         {
-            SY_ERRORF("[ExportService] Export failed: %s", result.message.toUtf8().constData());
+            APR_ERRORF("[ExportService] Export failed: %s", result.message.toUtf8().constData());
         }
     }
 
@@ -394,7 +432,7 @@ bool ExportService::canExport(const QString& filePath, QString* reasonOut) const
         {
             *reasonOut = reason;
         }
-        SY_DEBUGF("[ExportService] canExport=false: %s", reason.toUtf8().constData());
+        APR_DEBUGF("[ExportService] canExport=false: %s", reason.toUtf8().constData());
         return false;
     }
     return m_dispatcher->canExport(filePath, reasonOut);
@@ -405,9 +443,9 @@ QStringList ExportService::supportedExtensions() const
     return m_dispatcher ? m_dispatcher->supportedExtensions() : QStringList();
 }
 
-Fio::VecSyEntityPtr ExportService::collectAllEntities() const
+Fio::VecAprEntityPtr ExportService::collectAllEntities() const
 {
-    Fio::VecSyEntityPtr entities;
+    Fio::VecAprEntityPtr entities;
 
     // 收集 2D 图元
     if (m_sceneManager)
@@ -417,7 +455,15 @@ Fio::VecSyEntityPtr ExportService::collectAllEntities() const
         for (auto* e : allEntities)
         {
             // ABI: clone 在 Engine2D 分配，跨 DLL delete 安全（需保证所有模块使用相同堆）
-            entities.push_back(std::unique_ptr<Eg::SyEntity>(e->clone()));
+            auto* copy = e->clone();
+            // clone() 会分配新 ID，但导出必须保留场景中的持久 ID：
+            // 否则 FillRegion.source_ids、群组/图层引用在重新打开后会指向不存在的实体。
+            // 合成 ID（渲染/临时用途）为负数或 0，不写回；持久 ID 从 1 开始且场景内唯一。
+            if (copy && e->id > 0)
+            {
+                copy->id = e->id;
+            }
+            entities.push_back(std::unique_ptr<Eg::AprEntity>(copy));
         }
     }
 
@@ -427,20 +473,26 @@ Fio::VecSyEntityPtr ExportService::collectAllEntities() const
         // 使用 C 风格回调收集 3D 图元（SceneManager3D 接口约束）
         struct CollectCtx
         {
-            Fio::VecSyEntityPtr* entities;
+            Fio::VecAprEntityPtr* entities;
             size_t count;
         };
 
         CollectCtx ctx = { &entities, 0 };
 
         m_sceneManager3D->forEachEntity(
-            [](Eg::SyMeshEntity* entity, void* userData) {
+            [](Eg::AprMeshEntity* entity, void* userData) {
                 if (entity)
                 {
                     auto* ctx = static_cast<CollectCtx*>(userData);
-                    // SyMeshEntity 继承 SyEntity，clone() 返回 SyEntity*
-                    // 包装为 unique_ptr<SyEntity> 保持多态正确释放
-                    ctx->entities->push_back(std::unique_ptr<Eg::SyEntity>(entity->clone()));
+                    // AprMeshEntity 继承 AprEntity，clone() 返回 AprEntity*
+                    // 包装为 unique_ptr<AprEntity> 保持多态正确释放
+                    auto* copy = entity->clone();
+                    // 与 2D 一致：保留持久 ID，避免每次保存后 ID 漂移
+                    if (copy && entity->id > 0)
+                    {
+                        copy->id = entity->id;
+                    }
+                    ctx->entities->push_back(std::unique_ptr<Eg::AprEntity>(copy));
                     ++ctx->count;
                 }
             },
@@ -487,7 +539,7 @@ bool ExportService::postExportRecord(const ExportResult& result, const ExportCon
             return false;
         }
     };
-    const QString workbenchId = is3DFormat(resolvedFormat) || targetInfo.suffix().toLower() == QStringLiteral("sy3d")
+    const QString workbenchId = is3DFormat(resolvedFormat) || targetInfo.suffix().toLower() == QStringLiteral("apr3d")
         ? QStringLiteral("3D")
         : QStringLiteral("2D");
 
@@ -527,12 +579,12 @@ bool ExportService::postExportRecord(const ExportResult& result, const ExportCon
 
     if (!repo->save(record))
     {
-        SY_WARNF("[ExportService] Failed to save export record: %s (%d entities)",
+        APR_WARNF("[ExportService] Failed to save export record: %s (%d entities)",
             context.targetPath.toUtf8().constData(),
             result.exportedEntityCount);
         return false;
     }
-    SY_DEBUGF("[ExportService] Export record saved: %s (%d entities)",
+    APR_DEBUGF("[ExportService] Export record saved: %s (%d entities)",
         context.targetPath.toUtf8().constData(),
         result.exportedEntityCount);
     return true;

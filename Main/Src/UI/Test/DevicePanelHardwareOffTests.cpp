@@ -20,7 +20,7 @@
 
 namespace
 {
-QApplication* ensureApplication()
+QApplication* ensureDevicePanelApplication()
 {
     if (qApp)
     {
@@ -37,7 +37,7 @@ QApplication* ensureApplication()
 
 TEST(DevicePanelHardwareOffTests, PanelStaysVisibleAndAllControlsDisabled)
 {
-    ensureApplication();
+    ensureDevicePanelApplication();
 
     if (DeviceHost::isHardwareSupportCompiled())
     {
@@ -66,7 +66,7 @@ TEST(DevicePanelHardwareOffTests, PanelStaysVisibleAndAllControlsDisabled)
 
 TEST(DevicePanelHardwareOffTests, NullDeviceHostDoesNotCrash)
 {
-    ensureApplication();
+    ensureDevicePanelApplication();
 
     if (DeviceHost::isHardwareSupportCompiled())
     {
@@ -84,7 +84,7 @@ TEST(DevicePanelHardwareOffTests, NullDeviceHostDoesNotCrash)
 
 TEST(DevicePanelHardwareOffTests, LaserCommandsStayClickableAndReportDisabledMessage)
 {
-    ensureApplication();
+    ensureDevicePanelApplication();
 
     if (DeviceHost::isHardwareSupportCompiled())
     {

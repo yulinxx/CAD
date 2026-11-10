@@ -9,7 +9,7 @@
  */
 #include "DrawToolBarWidget.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include <QAction>
 #include <QEvent>
 #include <QToolButton>
@@ -99,7 +99,7 @@ void DrawToolBarWidget::updateHighlight()
     // 检查线程亲和性：确保 action 和 button 在同一线程
     if (m_selectAction->thread() != m_selectButton->thread() || m_panAction->thread() != m_selectButton->thread())
     {
-        SY_WARNF("[DrawToolBarWidget] Action and button are in different threads, skipping updateHighlight");
+        APR_WARNF("[DrawToolBarWidget] Action and button are in different threads, skipping updateHighlight");
         return;
     }
 

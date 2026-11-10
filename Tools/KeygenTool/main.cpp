@@ -6,7 +6,7 @@
 void PrintUsage()
 {
     std::cout
-        << "SanYiCAD License Key Generator\n"
+        << "April License Key Generator\n"
         << "Usage:\n"
         << "  Generate key pair:\n"
         << "    KeygenTool genkey <private.pem> <public.pem>\n\n"

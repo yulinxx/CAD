@@ -22,7 +22,7 @@
 
 #include "render/renderx.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <cstring>
 #include <unordered_map>
@@ -50,7 +50,7 @@ namespace RenderBridge
          */
         void logRxFailure(const char* what, Render::RT::RxResult result)
         {
-            SY_ERRORF("[RenderXAdapter] %s failed: %s", what ? what : "?", Render::RT::rxResultName(result));
+            APR_ERRORF("[RenderXAdapter] %s failed: %s", what ? what : "?", Render::RT::rxResultName(result));
         }
 
         /// 只记结果的辅助：成功返回 true，失败按 what 打日志后返回 false
@@ -89,7 +89,7 @@ namespace RenderBridge
             {
                 return true;
             }
-            SY_ERRORF("[RenderXAdapter] vertexStride(%s) declared %u but actual %u mismatch: "
+            APR_ERRORF("[RenderXAdapter] vertexStride(%s) declared %u but actual %u mismatch: "
                       "all geometry using this format will be misaligned, please sync IRenderTypes.h",
                 pair.name,
                 declared,
@@ -117,6 +117,14 @@ namespace RenderBridge
             }
         }
 
+    }  // namespace
+
+    /// 材质去重台账的类型。
+    ///
+    /// 必须放在具名命名空间而不是上面的匿名命名空间：RenderXDeviceAdapter 具有
+    /// 外部链接，它的成员类型若带内部链接会触发 -Wsubobject-linkage。
+    namespace MaterialCache
+    {
         /// 材质去重键：MaterialDesc 的全部字段（均为 4 字节，无填充）
         ///
         /// 去重的目的只有一个：让内容相同的材质拿到同一个 uint16 编号。
@@ -133,6 +141,19 @@ namespace RenderBridge
             float shininess = 0.0f;
         };
 
+        /// 一个材质槽的去重台账：内容键 + 引用计数
+        struct MaterialSlot
+        {
+            MaterialKey key;
+            uint32_t refs = 0;
+        };
+    }  // namespace MaterialCache
+
+    using MaterialCache::MaterialKey;
+    using MaterialCache::MaterialSlot;
+
+    namespace
+    {
         MaterialKey makeMaterialKey(const RenderAbstraction::MaterialDesc& desc)
         {
             MaterialKey key;
@@ -190,13 +211,6 @@ namespace RenderBridge
             h *= 0x100000001b3ull;
             return h;
         }
-
-        /// 一个材质槽的去重台账：内容键 + 引用计数
-        struct MaterialSlot
-        {
-            MaterialKey key;
-            uint32_t refs = 0;
-        };
     }  // namespace
 
     class RenderXDeviceAdapter : public RenderAbstraction::IRenderDevice
@@ -286,7 +300,7 @@ namespace RenderBridge
             const Render::RT::GeometryStoreHandle store = Render::RT::rxGeometryStoreCreate(m_runtime, &raw);
             if (!Render::RT::rxValid(store))
             {
-                SY_ERRORF("[RenderXAdapter] rxGeometryStoreCreate failed (initial=%llu max=%llu granularity=%u)",
+                APR_ERRORF("[RenderXAdapter] rxGeometryStoreCreate failed (initial=%llu max=%llu granularity=%u)",
                     static_cast<unsigned long long>(raw.initialBytes),
                     static_cast<unsigned long long>(raw.maxBytes),
                     raw.granularity);
@@ -393,7 +407,7 @@ namespace RenderBridge
             const uint16_t index = Render::RT::rxPipelineCreate(m_runtime, &raw);
             if (index == 0)
             {
-                SY_ERRORF("[RenderXAdapter] rxPipelineCreate failed (topology=%u format=%u fillMode=%u)",
+                APR_ERRORF("[RenderXAdapter] rxPipelineCreate failed (topology=%u format=%u fillMode=%u)",
                     static_cast<unsigned>(raw.topology),
                     static_cast<unsigned>(raw.vertexFormat),
                     static_cast<unsigned>(raw.fillMode));
@@ -426,7 +440,7 @@ namespace RenderBridge
                 // 上限收口：后端材质表满（uint16 上限）或创建失败时返回 0，
                 // 调用方会把 0 当成「无材质」回落到默认材质。这里必须留一条
                 // 带在用数量的错误日志，否则表现只是「模型突然变白」。
-                SY_ERRORF("[RenderXAdapter] rxMaterialAdd failed (distinct materials=%u, limit=65535)",
+                APR_ERRORF("[RenderXAdapter] rxMaterialAdd failed (distinct materials=%u, limit=65535)",
                     static_cast<unsigned>(m_materialSlots.size()));
                 return 0;
             }
@@ -439,7 +453,7 @@ namespace RenderBridge
         {
             if (material > 0xFFFFu)
             {
-                SY_ERRORF("[RenderXAdapter] updateMaterial: index %u exceeds uint16 range", material);
+                APR_ERRORF("[RenderXAdapter] updateMaterial: index %u exceeds uint16 range", material);
                 return false;
             }
             const uint16_t index = static_cast<uint16_t>(material);
@@ -485,7 +499,7 @@ namespace RenderBridge
         {
             if (material > 0xFFFFu)
             {
-                SY_ERRORF("[RenderXAdapter] destroyMaterial: index %u exceeds uint16 range", material);
+                APR_ERRORF("[RenderXAdapter] destroyMaterial: index %u exceeds uint16 range", material);
                 return false;
             }
             const uint16_t index = static_cast<uint16_t>(material);
@@ -699,7 +713,7 @@ namespace RenderBridge
         {
             if (!RenderAbstraction::isValid(list))
             {
-                SY_WARNF("[RenderXAdapter] removeDrawItem: invalid draw list handle, slot=%u", slot);
+                APR_WARNF("[RenderXAdapter] removeDrawItem: invalid draw list handle, slot=%u", slot);
                 return false;
             }
             const auto result = Render::RT::rxDrawListRemove(
@@ -708,7 +722,7 @@ namespace RenderBridge
             {
                 // 加 slot + handle 上下文，便于定位"哪个实体的渲染槽位删失败了"
                 // 下次复现时查这条日志的 slot 号，可以反推是哪一步的 upsert 漏了或重复了
-                SY_ERRORF("[RenderXAdapter] rxDrawListRemove failed: %s, slot=%u, handle=%llu",
+                APR_ERRORF("[RenderXAdapter] rxDrawListRemove failed: %s, slot=%u, handle=%llu",
                     Render::RT::rxResultName(result),
                     slot,
                     static_cast<unsigned long long>(list.value));

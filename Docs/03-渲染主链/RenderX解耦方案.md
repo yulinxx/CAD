@@ -15,8 +15,8 @@
 > | 校验规则 | 规则 4 | 规则 4 + **5（include 路径）+ 6（传递闭包）**，默认硬失败 |
 >
 > 校验命令：`cmake -S . -B build`，输出应为
-> `[SanYi] 依赖方向校验: OK（…; UI 通过 RenderAbstraction 访问渲染）`。
-> 临时放行需显式传 `-DSANYI_STRICT_RENDER_ISOLATION=OFF`。
+> `[April] 依赖方向校验: OK（…; UI 通过 RenderAbstraction 访问渲染）`。
+> 临时放行需显式传 `-DAPR_STRICT_RENDER_ISOLATION=OFF`。
 >
 > ### 被取代的设计（本文后续章节仍按原样保留，作规划记录）
 >

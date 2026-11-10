@@ -7,7 +7,7 @@
 #include "Persistence/PersistenceService.h"
 #include "Persistence/Repositories/DocumentRepository.h"
 #include "Persistence/Models/DocumentRecord.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <QDateTime>
 #include <QFileInfo>
@@ -45,7 +45,7 @@ bool DocumentPersistenceHelper::recordImport(
 
     if (!persistence->documents()->save(dr))
     {
-        SY_WARNF("[DocumentPersistenceHelper] Failed to save import metadata for: %s", filePath.toUtf8().constData());
+        APR_WARNF("[DocumentPersistenceHelper] Failed to save import metadata for: %s", filePath.toUtf8().constData());
         return false;
     }
     return true;
@@ -74,7 +74,7 @@ bool DocumentPersistenceHelper::recordExport(
 
     if (!persistence->documents()->save(dr))
     {
-        SY_WARNF("[DocumentPersistenceHelper] Failed to save export metadata for: %s", filePath.c_str());
+        APR_WARNF("[DocumentPersistenceHelper] Failed to save export metadata for: %s", filePath.c_str());
         return false;
     }
     return true;

@@ -167,11 +167,11 @@ private:
     ImportResult phaseDetectFormat(ImportContext& context);
 
     /// 2：解析文件
-    ImportResult phaseParse(const ImportContext& context, Fio::VecSyEntityPtr& outEntities);
+    ImportResult phaseParse(const ImportContext& context, Fio::VecAprEntityPtr& outEntities);
 
     /// 3：构建文档（将图元添加到场景）
     ImportResult phaseBuildDocument(const ImportContext& context,
-        Fio::VecSyEntityPtr& entities,
+        Fio::VecAprEntityPtr& entities,
         const ImportOptions& options,
         const ImportResult& parseResult);
 

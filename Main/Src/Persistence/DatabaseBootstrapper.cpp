@@ -7,7 +7,7 @@
 #include "DatabaseBootstrapper.h"
 
 #include "Engine/Persistence/Database.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "VersionInfo.h"
 
 #include <sstream>
@@ -69,18 +69,25 @@ bool DatabaseBootstrapper::ensureSchema()
     if (!m_database.isOpen())
     {
         m_lastError = "Database is not open";
-        SY_ERROR("[DatabaseBootstrapper] Database is not open");
+        APR_ERROR("[DatabaseBootstrapper] Database is not open");
         return false;
     }
 
     // 注册表名/列名白名单，用于 Database 层 SQL 注入防护
     registerSchemaWhiteList();
 
+    // 先建元数据表，再查询版本：全新数据库上若先查后建，
+    // 日志里会出现 "no such table: app_meta" 的假错误（查询本身被 catch 吞掉）。
+    if (!ensureMetaTable())
+    {
+        return false;
+    }
+
     // 检查应用版本兼容性
     std::string dbAppVersion = databaseAppVersion();
     if (!dbAppVersion.empty() && dbAppVersion != MainApp::appVersion().c_str())
     {
-        SY_WARNF("[DatabaseBootstrapper] App version mismatch: db=%s current=%s - resetting schema for re-migration",
+        APR_WARNF("[DatabaseBootstrapper] App version mismatch: db=%s current=%s - resetting schema for re-migration",
             dbAppVersion.c_str(),
             MainApp::appVersion().c_str());
         // 版本不匹配时保留用户数据（最近文件、图层、设置等），
@@ -114,7 +121,7 @@ bool DatabaseBootstrapper::ensureSchema()
     else if (currentVersion < kSchemaVersion)
     {
         // 需要迁移
-        SY_DEBUGF("[DatabaseBootstrapper] Migrating schema from v%d to v%d", currentVersion, kSchemaVersion);
+        APR_DEBUGF("[DatabaseBootstrapper] Migrating schema from v%d to v%d", currentVersion, kSchemaVersion);
         if (!runMigrations(currentVersion, kSchemaVersion))
         {
             return false;
@@ -131,7 +138,7 @@ bool DatabaseBootstrapper::ensureSchema()
     // 为常用查询字段创建索引，提升查询性能
     if (!createIndices())
     {
-        SY_ERRORF("[DatabaseBootstrapper] Failed to create indices: %s", m_lastError.c_str());
+        APR_ERRORF("[DatabaseBootstrapper] Failed to create indices: %s", m_lastError.c_str());
         return false;
     }
 
@@ -199,7 +206,7 @@ const std::string& DatabaseBootstrapper::lastError() const
     return m_lastError;
 }
 
-bool DatabaseBootstrapper::createMetaTable()
+bool DatabaseBootstrapper::ensureMetaTable()
 {
     // 创建元数据表，存储 db_version 等信息
     std::string sql = R"(
@@ -214,7 +221,17 @@ bool DatabaseBootstrapper::createMetaTable()
     if (!m_database.execute(sql))
     {
         m_lastError = "Failed to create app_meta table: " + m_database.lastError();
-        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        return false;
+    }
+
+    return true;
+}
+
+bool DatabaseBootstrapper::createMetaTable()
+{
+    if (!ensureMetaTable())
+    {
         return false;
     }
 
@@ -228,7 +245,7 @@ bool DatabaseBootstrapper::createMetaTable()
     if (!m_database.insertOrReplace("app_meta", values))
     {
         m_lastError = "Failed to write schema version: " + m_database.lastError();
-        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
         return false;
     }
 
@@ -253,7 +270,7 @@ bool DatabaseBootstrapper::createBusinessTables()
     if (!m_database.execute(sqlRecentFiles))
     {
         m_lastError = "Failed to create recent_files table: " + m_database.lastError();
-        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
         return false;
     }
 
@@ -275,7 +292,7 @@ bool DatabaseBootstrapper::createBusinessTables()
     if (!m_database.execute(sqlWorkspaceSnapshots))
     {
         m_lastError = "Failed to create workspace_snapshots table: " + m_database.lastError();
-        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
         return false;
     }
 
@@ -300,7 +317,7 @@ bool DatabaseBootstrapper::createBusinessTables()
     if (!m_database.execute(sqlLayers))
     {
         m_lastError = "Failed to create layers table: " + m_database.lastError();
-        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
         return false;
     }
 
@@ -333,7 +350,7 @@ bool DatabaseBootstrapper::createBusinessTables()
     if (!m_database.execute(sqlSettings))
     {
         m_lastError = "Failed to create settings table: " + m_database.lastError();
-        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
         return false;
     }
 
@@ -383,7 +400,7 @@ bool DatabaseBootstrapper::createDocumentsTable()
     if (!m_database.execute(sqlDocuments))
     {
         m_lastError = "Failed to create documents table: " + m_database.lastError();
-        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
         return false;
     }
 
@@ -418,14 +435,14 @@ bool DatabaseBootstrapper::ensureColumn(
         if (fatal)
         {
             m_lastError = message;
-            SY_ERRORF("[DatabaseBootstrapper] %s", message.c_str());
+            APR_ERRORF("[DatabaseBootstrapper] %s", message.c_str());
             return false;
         }
         // 补列失败只降级告警：缺列会让对应功能不可用，但不应阻塞应用启动
-        SY_WARNF("[DatabaseBootstrapper] %s (degraded: continuing startup)", message.c_str());
+        APR_WARNF("[DatabaseBootstrapper] %s (degraded: continuing startup)", message.c_str());
         return true;
     }
-    SY_DEBUGF("[DatabaseBootstrapper] Added missing %s.%s column", table.c_str(), column.c_str());
+    APR_DEBUGF("[DatabaseBootstrapper] Added missing %s.%s column", table.c_str(), column.c_str());
     return true;
 }
 
@@ -464,7 +481,7 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
     // 逐版本递增执行迁移，保证幂等性和可追溯性
     for (int v = currentVersion; v < targetVersion; ++v)
     {
-        SY_DEBUGF("[DatabaseBootstrapper] Running migration v%d -> v%d", v, v + 1);
+        APR_DEBUGF("[DatabaseBootstrapper] Running migration v%d -> v%d", v, v + 1);
 
         if (v == 1)
         {
@@ -472,10 +489,10 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
             if (!createDocumentsTable())
             {
                 m_lastError = "Migration v1->v2 failed: " + m_database.lastError();
-                SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+                APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
                 return false;
             }
-            SY_DEBUG("[DatabaseBootstrapper] Migration v1->v2: created documents table");
+            APR_DEBUG("[DatabaseBootstrapper] Migration v1->v2: created documents table");
         }
         else if (v == 2)
         {
@@ -483,10 +500,10 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
             if (!ensureLayerFillColumn())
             {
                 m_lastError = "Migration v2->v3 failed: " + m_database.lastError();
-                SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+                APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
                 return false;
             }
-            SY_DEBUG("[DatabaseBootstrapper] Migration v2->v3: added layers.fill column");
+            APR_DEBUG("[DatabaseBootstrapper] Migration v2->v3: added layers.fill column");
         }
         else if (v == 3)
         {
@@ -494,10 +511,10 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
             if (!ensureLayerFillColorColumn())
             {
                 m_lastError = "Migration v3->v4 failed: " + m_database.lastError();
-                SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+                APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
                 return false;
             }
-            SY_DEBUG("[DatabaseBootstrapper] Migration v3->v4: added layers.fill_color column");
+            APR_DEBUG("[DatabaseBootstrapper] Migration v3->v4: added layers.fill_color column");
         }
         else if (v == 4)
         {
@@ -505,10 +522,10 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
             if (!createDialogStateTable())
             {
                 m_lastError = "Migration v4->v5 failed: " + m_database.lastError();
-                SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+                APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
                 return false;
             }
-            SY_DEBUG("[DatabaseBootstrapper] Migration v4->v5: created dialog_states table");
+            APR_DEBUG("[DatabaseBootstrapper] Migration v4->v5: created dialog_states table");
 
             // 为 layers 表创建 (document_id, layer_id) 唯一索引，确保图层数据唯一性
             // 使用 IF NOT EXISTS 保证幂等性，旧数据库若存在重复数据会跳过
@@ -516,12 +533,12 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
                     "CREATE UNIQUE INDEX IF NOT EXISTS idx_layers_doc_layer ON layers(document_id, layer_id)"))
             {
                 // 旧数据可能有重复，此处忽略错误，后续 createIndices() 会创建普通索引兜底
-                SY_WARNF("[DatabaseBootstrapper] Could not create unique index on layers(document_id, layer_id): %s",
+                APR_WARNF("[DatabaseBootstrapper] Could not create unique index on layers(document_id, layer_id): %s",
                     m_database.lastError().c_str());
             }
             else
             {
-                SY_DEBUG("[DatabaseBootstrapper] Created unique index idx_layers_doc_layer");
+                APR_DEBUG("[DatabaseBootstrapper] Created unique index idx_layers_doc_layer");
             }
         }
         else if (v == 5)
@@ -529,13 +546,13 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
             // v5 -> v6: recent_files 表新增 workbench 列（2D/3D 最近文件分桶）
             // 走幂等补列：版本号被重置导致重复迁移时，列已存在也不会 ALTER 失败
             ensureRecentFileWorkbenchColumn();
-            SY_DEBUG("[DatabaseBootstrapper] Migration v5->v6: recent_files.workbench column ensured");
+            APR_DEBUG("[DatabaseBootstrapper] Migration v5->v6: recent_files.workbench column ensured");
         }
         else if (v == 6)
         {
             // v6 -> v7: documents 表新增 workbench 列（2D/3D 文档历史分桶）
             ensureDocumentWorkbenchColumn();
-            SY_DEBUG("[DatabaseBootstrapper] Migration v6->v7: documents.workbench column ensured");
+            APR_DEBUG("[DatabaseBootstrapper] Migration v6->v7: documents.workbench column ensured");
         }
         // 后续版本迁移在此追加 else if 分支
     }
@@ -549,11 +566,11 @@ bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
     if (!m_database.insert("app_meta", values))
     {
         m_lastError = "Failed to update schema version after migration";
-        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
         return false;
     }
 
-    SY_DEBUGF("[DatabaseBootstrapper] Schema migrated to v%d", targetVersion);
+    APR_DEBUGF("[DatabaseBootstrapper] Schema migrated to v%d", targetVersion);
     return true;
 }
 
@@ -576,7 +593,7 @@ bool DatabaseBootstrapper::createDialogStateTable()
     if (!m_database.execute(sql))
     {
         m_lastError = "Failed to create dialog_states table: " + m_database.lastError();
-        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
         return false;
     }
 
@@ -590,7 +607,7 @@ bool DatabaseBootstrapper::createIndices()
     if (!m_database.execute("CREATE INDEX IF NOT EXISTS idx_layers_document_id ON layers(document_id)"))
     {
         m_lastError = "Failed to create index idx_layers_document_id: " + m_database.lastError();
-        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
         return false;
     }
 
@@ -600,7 +617,7 @@ bool DatabaseBootstrapper::createIndices()
     if (!m_database.execute("CREATE INDEX IF NOT EXISTS idx_layers_doc_layer ON layers(document_id, layer_id)"))
     {
         m_lastError = "Failed to create index idx_layers_doc_layer: " + m_database.lastError();
-        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
         return false;
     }
 
@@ -609,7 +626,7 @@ bool DatabaseBootstrapper::createIndices()
             "CREATE INDEX IF NOT EXISTS idx_recent_files_opened_at ON recent_files(last_opened_at DESC)"))
     {
         m_lastError = "Failed to create index idx_recent_files_opened_at: " + m_database.lastError();
-        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
         return false;
     }
 
@@ -617,7 +634,7 @@ bool DatabaseBootstrapper::createIndices()
     if (!m_database.execute("CREATE INDEX IF NOT EXISTS idx_dialog_states_doc_id ON dialog_states(document_id)"))
     {
         m_lastError = "Failed to create index idx_dialog_states_doc_id: " + m_database.lastError();
-        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
         return false;
     }
 
@@ -625,7 +642,7 @@ bool DatabaseBootstrapper::createIndices()
     if (!m_database.execute("CREATE INDEX IF NOT EXISTS idx_dialog_states_key ON dialog_states(dialog_key)"))
     {
         m_lastError = "Failed to create index idx_dialog_states_key: " + m_database.lastError();
-        SY_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
+        APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
         return false;
     }
 

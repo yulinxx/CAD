@@ -13,7 +13,7 @@
 
 ## 1. 为什么这件事和 CAD 工程有关
 
-SanYi CAD 是一个**闭源商业软件**：
+April CAD 是一个**闭源商业软件**：
 
 - 根目录 `LICENSE.md` 写明 `Proprietary License`，禁止未经授权的复制、修改、分发；
 - 工程包含 LicenseManager、KeygenTool 等商业授权机制；
@@ -198,7 +198,7 @@ AGPL-3.0 在 GPL 基础上增加了“网络交互”条款：如果用户通过
 ### 5.1 为什么 libdxfrw 是最高优先级
 
 - 它不是“独立进程调用”，而是源码直接参与 `FileIO` 编译；
-- `FileIO` 是主程序依赖的核心模块，最终进入 `SanYiCAD` 安装包；
+- `FileIO` 是主程序依赖的核心模块，最终进入 `April` 安装包；
 - GPL-2.0-or-later 要求分发衍生作品时提供完整对应源码；
 - 项目是 Proprietary，和 GPL 的 copyleft 目标直接冲突；
 - 除非能证明它只是“聚合”且不构成衍生作品，否则风险很高；这个判断必须由法务做。
@@ -283,7 +283,7 @@ SBOM 不等于许可证合规，也不等于安全扫描。它解决的是“**�
     "timestamp": "2026-10-21T00:00:00Z",
     "component": {
       "type": "application",
-      "name": "SanYiCAD",
+      "name": "April",
       "version": "1.0.0"
     }
   },
@@ -295,16 +295,16 @@ SBOM 不等于许可证合规，也不等于安全扫描。它解决的是“**�
       "licenses": [{ "license": { "id": "GPL-2.0-or-later" } }],
       "purl": "pkg:github/LibreCAD/libdxfrw@2.0.0",
       "properties": [
-        { "name": "sanyi:usage", "value": "compiled-into-FileIO" }
+        { "name": "apr:usage", "value": "compiled-into-FileIO" }
       ]
     },
     {
       "type": "library",
       "name": "Qt",
-      "version": "6.11.1",
+      "version": "6.12.0",
       "licenses": [{ "license": { "id": "LGPL-3.0-only" } }],
       "properties": [
-        { "name": "sanyi:usage", "value": "dynamic-link" }
+        { "name": "apr:usage", "value": "dynamic-link" }
       ]
     }
   ]
@@ -331,7 +331,7 @@ SBOM 不等于许可证合规，也不等于安全扫描。它解决的是“**�
 
 ```text
 安装目录/
-├─ SanYiCAD.exe
+├─ April.exe
 ├─ LICENSE.md                      # 项目自身许可
 ├─ THIRD-PARTY-NOTICES.txt         # 第三方组件清单 + 声明
 └─ licenses/
@@ -348,7 +348,7 @@ SBOM 不等于许可证合规，也不等于安全扫描。它解决的是“**�
 当前 `CMake/Packaging.cmake` 只设置了：
 
 ```cmake
-set(CPACK_RESOURCE_FILE_LICENSE "${SANYI_ROOT}/LICENSE.md")
+set(CPACK_RESOURCE_FILE_LICENSE "${APR_ROOT}/LICENSE.md")
 ```
 
 后续整改时应在 `install()` 中增加第三方 NOTICE 和 `licenses/` 目录，并确保它们进入

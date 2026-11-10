@@ -3,8 +3,8 @@
     "clientId": "example_client",
     "clientName": "示例客户定制版",
     "version": "2.0",
-    "inherits": "san_yi",
-    "_note": "此文件展示如何通过配置定制 UI，基于 san_yi 扩展"
+    "inherits": "april",
+    "_note": "此文件展示如何通过配置定制 UI，基于 april 扩展"
   },
 
   "_customizationExamples": {

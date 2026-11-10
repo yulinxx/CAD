@@ -11,7 +11,7 @@
 #include <QFileInfo>
 #include <QSettings>
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "Persistence/PersistenceService.h"
 #include "Persistence/Repositories/RecentFileRepository.h"
 #include "Persistence/Models/RecentFileRecord.h"
@@ -22,7 +22,7 @@ namespace
     // 仅用于没有工作台归属的旧记录（迁移前的 DB 行、legacy QSettings key）。
     const QStringList& k3DExtensions()
     {
-        static const QStringList exts = { QStringLiteral("sy3d"), QStringLiteral("syx"), QStringLiteral("stl"),
+        static const QStringList exts = { QStringLiteral("apr3d"), QStringLiteral("stl"),
             QStringLiteral("obj"), QStringLiteral("step"), QStringLiteral("stp") };
         return exts;
     }
@@ -49,12 +49,12 @@ void RecentFileService::addRecentFile(const QString& filePath, const QString& wo
 {
     if (filePath.isEmpty())
     {
-        SY_DEBUGF("[RecentFileService] addRecentFile: empty path, ignored");
+        APR_DEBUGF("[RecentFileService] addRecentFile: empty path, ignored");
         return;
     }
 
     const QString wb = normalizeWorkbench(workbenchId);
-    SY_DEBUGF("[RecentFileService] Adding recent file to %s: %s", qPrintable(wb), qPrintable(filePath));
+    APR_DEBUGF("[RecentFileService] Adding recent file to %s: %s", qPrintable(wb), qPrintable(filePath));
 
     // 数据库端写入
     if (m_persistence && m_persistence->isOpen() && m_persistence->recentFiles())
@@ -68,19 +68,19 @@ void RecentFileService::addRecentFile(const QString& filePath, const QString& wo
         rec.lastOpenedTime = QDateTime::currentDateTime().toString(Qt::ISODate).toStdString();
         if (m_persistence->recentFiles()->append(rec))
         {
-            SY_DEBUG("[RecentFileService] File added to database");
+            APR_DEBUG("[RecentFileService] File added to database");
         }
         else
         {
             // 最近文件不是关键数据：数据库失败时 QSettings 兜底仍然写入，
             // 但不能像旧代码那样继续打印“已添加”。
-            SY_WARNF("[RecentFileService] Failed to add recent file to database: %s (QSettings fallback still updated)",
+            APR_WARNF("[RecentFileService] Failed to add recent file to database: %s (QSettings fallback still updated)",
                 qPrintable(filePath));
         }
     }
     else
     {
-        SY_DEBUG("[RecentFileService] Database not available, using QSettings fallback");
+        APR_DEBUG("[RecentFileService] Database not available, using QSettings fallback");
     }
 
     // QSettings 兜底双写（按工作台分 key）
@@ -143,7 +143,7 @@ QStringList RecentFileService::loadRecentFiles(const QString& workbenchId) const
     }
 
     // QSettings 兜底：先读当前工作台的 key，为空再读 legacy key 按扩展名过滤
-    SY_DEBUG("[RecentFileService] Database empty, falling back to QSettings");
+    APR_DEBUG("[RecentFileService] Database empty, falling back to QSettings");
     QSettings settings;
     QStringList files = settings.value(QStringLiteral("RecentFiles/%1").arg(wb), QStringList()).toStringList();
     if (files.isEmpty())
@@ -166,7 +166,7 @@ QStringList RecentFileService::loadRecentFiles(const QString& workbenchId) const
 
 void RecentFileService::saveWorkbenchFiles(const QString& workbenchId, const QStringList& files) const
 {
-    SY_DEBUGF("[RecentFileService] Saving %lld recent files to QSettings (%s)", files.size(), qPrintable(workbenchId));
+    APR_DEBUGF("[RecentFileService] Saving %lld recent files to QSettings (%s)", files.size(), qPrintable(workbenchId));
     // 数据库端由 addRecentFile 逐条写入，此处不做批量覆盖
     // QSettings 兜底：按工作台分 key，互不覆盖
     QSettings settings;

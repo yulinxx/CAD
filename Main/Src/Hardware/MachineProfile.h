@@ -14,8 +14,8 @@
  * 若塞进 qrc，等于每装一台机器就要重新编译一次可执行文件。
  *
  * 所以机器档案是**磁盘上的可写文件**，查找顺序：
- *   1. 环境变量 `SANYI_MACHINE_PROFILE` 指定的路径（现场调试/多机切换用，
- *      与 UiClientContext 的 `SANYI_CLIENT_ID` 同一套思路）；
+ *   1. 环境变量 `APR_MACHINE_PROFILE` 指定的路径（现场调试/多机切换用，
+ *      与 UiClientContext 的 `APR_CLIENT_ID` 同一套思路）；
  *   2. `<configDir>/machine.json`；
  *   3. 都没有 → 内置的模拟设备档案（见 builtinSimulatedProfile）。
  *

@@ -1,4 +1,4 @@
-# SanYi CAD
+# April CAD
 
 工业级激光加工 CAD/CAM 软件，支持雕刻 / 切割 / 打标工艺。
 
@@ -12,7 +12,7 @@
 ## 目录结构
 
 ```
-SanYiCAD/
+April/
 ├── Main/                     # 应用入口
 │   ├── Src/
 │   │   ├── Runtime/          # CADApplicationRuntime（启动 + 许可校验）
@@ -84,12 +84,15 @@ SanYiCAD/
 
 | 模块 | 职责 | 技术栈 | 依赖 |
 |------|------|--------|------|
-| **RenderX** | 唯一渲染 DLL（纯 C API + POD 契约，无 Engine / Qt 依赖） | C API + OpenGL | 无 |
+| **RenderX** | 唯一渲染 DLL（纯 C API + POD 契约，无 Engine / Qt 依赖） | C API + OpenGL / Metal / Null | 无 |
 
-> 后端现状：只有 **OpenGL** 与 **Null**（无头/单测）两个后端已实现。
-> `renderx.h` 的 `Backend` 枚举里保留了 `Metal`（Phase 7）与 `Vulkan`（Phase 8）取值，
-> 但 `isBackendAvailable` 对二者显式返回 false，`createDevice` 直接报错返回 nullptr，
-> **不做静默回退**。请勿把枚举取值当作可用后端。
+> 后端现状：`Renderx/src/rhi/` 下已实现 **OpenGL**、**Metal**（仅 Apple 编译）、
+> **Null**（无头/单测）三套 RHI；`Config.cmake` 在 macOS 默认 `METAL`，其余平台默认 `OPENGL`。
+> `renderx.h` 的 `Backend` 枚举里 `Vulkan`（Phase 8）仍是占位取值，
+> `isBackendAvailable` 对它返回 false，`createDevice` 报错返回 nullptr；
+> 在非 Apple 平台选 Metal 同样会明确失败。**不做静默回退**，请勿把枚举取值当作可用后端。
+> Metal 的设计与落地记录见 `Docs/03-渲染主链/Metal后端实施设计.md`
+> 与 `Metal后端Mac开发指南.md`。
 >
 > 已删除的旧模块：`RenderCommon` / `Render2D` / `Render3D` / `Render/Core` / `UiRenderCore`。
 > 它们的职责已分别落到 RenderX（GPU 侧）与 `Main/Src/UI/Render`（宿主侧场景刷新与离散化）。
@@ -98,9 +101,9 @@ SanYiCAD/
 
 | 模块 | 职责 | 技术栈 | 依赖 |
 |------|------|--------|------|
-| **UICommon** | 通用 UI 组件、状态中心、命令系统 | Qt Widgets | EngineCommon |
-| **UI2D** | 2D 工作台：主窗口、工具栏、属性面板、视口 | Qt Widgets | UICommon, Engine2D |
-| **UI3D** | 3D 工作台：场景树、设置对话框、3D 视口 | Qt Widgets | UICommon, Engine3D, GeoModelCore |
+| **UICommon** | 通用 UI 组件、状态中心、命令系统 | Qt Widgets | UiEngineAccess（链接层门面） |
+| **UI2D** | 2D 工作台：主窗口、工具栏、属性面板、视口 | Qt Widgets | UICommon, UiEngineAccess |
+| **UI3D** | 3D 工作台：场景树、设置对话框、3D 视口 | Qt Widgets | UICommon, UiEngineAccess, GeoModelCore |
 
 ### 功能模块
 
@@ -109,7 +112,7 @@ SanYiCAD/
 | **FileIO** | 文件导入导出（DXF、PLT、SVG、STL、NC） | C++17 | Engine2D, Engine3D |
 | **Nesting** | 排样算法（矩形/不规则嵌套） | C++17 | Engine2D |
 | **Nesting v2 核心能力** | QUALITY 策略(GA+退火) / 24向旋转(15°) / 镜像翻转 / 共边切割 / 孔内套排 / GROUP嵌套展开 / 10种2D图元类型 / 局部坐标变换 / 进度回调与取消 | - | - |
-| **Hardware** | 激光硬件控制、材质数据库、工艺参数 | Qt SerialPort | UICommon |
+| **Hardware** | 激光硬件控制、材质数据库、工艺参数 | Qt6 Core | Log, Utility（均 PRIVATE） |
 | **Engraving** | 浮雕生成、刀具路径计算、雕刻预览 | OpenCASCADE | Engine3D, GeoModelCore |
 | **GeoModelCore** | OpenCASCADE 几何建模集成 | OpenCASCADE | Engine3D |
 | **Network** | HTTP 请求、WebSocket、云端同步（可选） | Qt Network | UICommon |
@@ -134,7 +137,7 @@ SanYiCAD/
 
 ```
                               ┌─────────────────────────┐
-                              │     Main (SanYiCAD)     │
+                              │     Main (April)     │
                               │   应用入口 + 许可校验    │
                               └───────────┬─────────────┘
                                           │
@@ -148,10 +151,18 @@ SanYiCAD/
            │                             │                             │
            ▼                             ▼                             │
    ┌───────────────┐             ┌───────────────┐                     │
-   │   UICommon    │◄────────────│    RenderX    │                     │
-   │  通用 UI 组件 │             │ 渲染 DLL(C API)│                     │
-   └───────┬───────┘             └───────────────┘                     │
-           │                                                           │
+   │   UICommon    │             │ Render-       │                     │
+   │  通用 UI 组件 │             │ Abstraction   │                     │
+   └───────┬───────┘             └───────┬───────┘                     │
+           │                             ▼                             │
+           │                     ┌───────────────┐                     │
+           │                     │  RenderBridge │                     │
+           │                     └───────┬───────┘                     │
+           │                             ▼                             │
+           │                     ┌───────────────┐                     │
+           │                     │    RenderX    │                     │
+           │                     │ 渲染 DLL(C API)│                     │
+           │                     └───────────────┘                     │
            ▼                                                           │
    ┌───────────────┐             ┌───────────────┐                     │
    │   Engine2D    │             │   Engine3D    │                     │
@@ -205,6 +216,18 @@ SanYiCAD/
             │   通用工具库   │
             └───────────────┘
 ```
+
+> 图中箭头读作「A 依赖 B」。RenderX 是纯 C ABI 渲染 DLL，**不依赖任何
+> UI / Engine / Qt 模块**；UI2D/UI3D 也不直接调用 RenderX，链路是
+> `RenderAbstraction` → `RenderBridge` → `RenderX`（图中已展开这三层，不再折叠）。
+> 「原先 RenderX → UICommon 的横向箭头」与代码不符，已删除；依赖方向由
+> `CMake/CheckDependencies.cmake` 在 configure 阶段校验。
+>
+> UI 与 Engine 的关系分两层：**链接层**经 `UiEngineAccess` 门面（图中 UICommon →
+> Engine2D/Engine3D 即为该门面下的链接），**include 层**未收口——场景/实体/
+> 选择/编辑头仍由 UI 直接 include，由 `CMake/UiEngineAccessRatchet.cmake`
+> 冻结存量、禁止增长。`Hardware` 只链 `Log` / `Utility`（PRIVATE）与 `Qt6::Core`，
+> 不依赖任何 UI 模块。
 
 ---
 
@@ -269,7 +292,7 @@ set(VCPKG_DIR "C:/Users/xx/vcpkg/" CACHE PATH "VCPKG installation directory")
 set(QT_VERSION_MAJOR 6 CACHE STRING "Major version of Qt")
 
 # Qt 安装路径
-set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.11.1/msvc2022_64" CACHE PATH "Qt installation directory")
+set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.12.0/msvc2022_64" CACHE PATH "Qt installation directory")
 ```
 
 2. 编译选项配置：
@@ -289,9 +312,9 @@ set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.11.1/msvc2022_64" CACHE PATH "Qt installati
 | `BUILD_GEOMODELCORE` | ON | OpenCASCADE 几何建模 |
 | `BUILD_CRASHHANDLER` | ON | 崩溃捕获与上报 |
 | `BUILD_PYTHON` | ON | Python 集成框架 |
-| `SANYI_UNITY_BUILD` | ON | Unity Build，加速编译 |
-| `SANYI_ENABLE_LICENSE` | ON | 许可校验（默认已开启；运行期默认值由 License 库内部宏决定） |
-| `SANYI_ENABLE_VULKAN` | ON | Vulkan 支持标记；后端尚未实现，选 Vulkan 会明确失败 |
+| `APR_UNITY_BUILD` | ON | Unity Build，加速编译 |
+| `APR_ENABLE_LICENSE` | ON | 许可校验（默认已开启；运行期默认值由 License 库内部宏决定） |
+| `APR_ENABLE_VULKAN` | ON | Vulkan 支持标记；后端尚未实现，选 Vulkan 会明确失败 |
 | `BUILD_KEYGEN_TOOL` | OFF | 注册码生成工具 |
 | `BUILD_PERF_BENCHMARK` | ON | 百万图元性能基准 |
 | `BUILD_RENDER_BENCHMARK` | ON | 渲染帧路径基准 |
@@ -315,7 +338,7 @@ cmake .. -DBUILD_KEYGEN_TOOL=ON -DBUILD_TESTS=OFF
 cmake --build . --config Release
 
 # 编译特定目标
-cmake --build . --target SanYiCAD
+cmake --build . --target April
 cmake --build . --target MainTests
 cmake --build . --target KeygenTool
 ```
@@ -325,15 +348,15 @@ cmake --build . --target KeygenTool
 ```bash
 # Windows
 cd bin_Qt6/Release
-SanYiCAD.exe
+April.exe
 
 # Linux
 cd bin_Qt6/Release
-./SanYiCAD
+./April
 
 # macOS
 cd bin_Qt6/Release
-open SanYiCAD.app
+open April.app
 ```
 
 ---
@@ -422,13 +445,14 @@ void OnSave() {
 
 | 后端类型 | 说明 | 状态 |
 |----------|------|------|
-| OpenGL | 跨平台硬件加速，当前唯一的生产后端 | 已实现（默认） |
+| OpenGL | 跨平台硬件加速 | 已实现；非 Apple 平台默认 |
+| Metal | Apple 平台硬件加速 | 已实现（仅 Apple 编译）；macOS 默认 |
 | Null | 不产生任何 GPU 调用，用于单测与无头环境 | 已实现 |
-| Metal | Apple 平台硬件加速 | 未实现（Phase 7，枚举占位） |
 | Vulkan | 新一代图形 API | 未实现（Phase 8，枚举占位） |
 
-选择未实现的后端时，`rxRuntimeCreate` / `createDevice` 会通过 `logCallback`
-报明原因并返回 nullptr，不会退化成 Null 后端画出一片黑屏。
+选择未实现（Vulkan）或当前平台不可用（非 Apple 上的 Metal）的后端时，
+`rxRuntimeCreate` / `createDevice` 会通过 `logCallback` 报明原因并返回 nullptr，
+不会退化成 Null 后端画出一片黑屏；`Backend::Auto` 只在已实现的后端里挑选。
 
 ---
 
@@ -482,4 +506,4 @@ void OnSave() {
 | UI 层 | ✅ 稳定 | 2D/3D 工作台功能完整 |
 | 功能模块 | ✅ 稳定 | FileIO/Nesting/Hardware/Engraving |
 | Python | ⚠️ 开发中 | PythonHost 基础框架完成 |
-| 渲染后端 | ⚠️ 开发中 | 仅 OpenGL 与 Null 已实现；Vulkan/Metal 只是枚举占位，选中即报错 |
+| 渲染后端 | ✅ 稳定 | OpenGL / Metal(Apple) / Null 已实现；仅 Vulkan 为枚举占位，选中即报错 |

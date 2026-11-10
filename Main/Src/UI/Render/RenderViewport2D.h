@@ -55,7 +55,7 @@ namespace Eg
 {
     class ISceneContext;
     class SceneManager;
-    struct SyEntity;
+    struct AprEntity;
 }  // namespace Eg
 
 /**
@@ -252,7 +252,7 @@ public:
 signals:
     void sceneChanged();
     // P1: 视口不直接持有编辑服务，通过信号通知上层
-    void entitySubmitRequested(Eg::SyEntity* entity);
+    void entitySubmitRequested(Eg::AprEntity* entity);
     // 活动工具切换成功时发出，供工具栏等上层同步按钮高亮状态
     void activeToolChanged(const QString& toolName);
     // 场景选择状态变化（含绘制后自动选中、点选/框选、撤销等所有路径），供上层刷新命令可用性

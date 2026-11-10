@@ -19,7 +19,7 @@
  *
  * 语义约定：
  *   - featureId 为空       → 放行（绝大多数基础功能不做授权限制）
- *   - unrestricted 模式    → 放行全部。许可校验未启用（未定义 SANYI_ENABLE_LICENSE）
+ *   - unrestricted 模式    → 放行全部。许可校验未启用（未定义 APR_ENABLE_LICENSE）
  *                            时的默认状态，保证开发构建不被授权拦住。
  *   - 授权集已加载         → 仅放行集合内的 featureId
  *

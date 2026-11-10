@@ -9,7 +9,7 @@
 #if BUILD_UI3D
     #include "RenderWidget3DAdapter.h"
 #endif
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 std::unique_ptr<IRenderer3D> ViewportRendererFactory::create(RendererType type)
 {
@@ -17,23 +17,23 @@ std::unique_ptr<IRenderer3D> ViewportRendererFactory::create(RendererType type)
     {
     case RendererType::Compatible:
 #if BUILD_UI3D
-        SY_INFO("[ViewportRendererFactory] Creating RenderWidget3DAdapter (compatible chain)");
+        APR_INFO("[ViewportRendererFactory] Creating RenderWidget3DAdapter (compatible chain)");
         return std::make_unique<RenderWidget3DAdapter>();
 #else
-        SY_DEBUG("[ViewportRendererFactory] UI3D disabled, returning null renderer");
+        APR_DEBUG("[ViewportRendererFactory] UI3D disabled, returning null renderer");
         return nullptr;
 #endif
 
     case RendererType::None:
     default:
-        SY_DEBUG("[ViewportRendererFactory] Creating null renderer");
+        APR_DEBUG("[ViewportRendererFactory] Creating null renderer");
         return nullptr;
     }
 }
 
 std::unique_ptr<IRenderer3D> ViewportRendererFactory::createDefault()
 {
-    SY_INFO("[ViewportRendererFactory] Creating default renderer: Compatible chain");
+    APR_INFO("[ViewportRendererFactory] Creating default renderer: Compatible chain");
     return create(RendererType::Compatible);
 }
 
@@ -48,7 +48,7 @@ ViewportRendererFactory::RendererType ViewportRendererFactory::fromString(const 
         return RendererType::None;
     }
 
-    SY_WARNF("[ViewportRendererFactory] Unknown renderer type: %s, using default", name.c_str());
+    APR_WARNF("[ViewportRendererFactory] Unknown renderer type: %s, using default", name.c_str());
     return RendererType::Compatible;
 }
 

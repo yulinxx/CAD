@@ -16,9 +16,9 @@ cmake_minimum_required(VERSION 4.3)
 #   cmake -S RenderBridge -B RenderBridge/build   # 依赖目标已由上层拉入时
 # ============================================================================
 
-project(SanYiRenderBridge
+project(AprRenderBridge
     VERSION 1.0.0
-    DESCRIPTION "SanYi CAD Host-side RenderX session bridge"
+    DESCRIPTION "April CAD Host-side RenderX session bridge"
     LANGUAGES CXX
 )
 
@@ -34,26 +34,26 @@ set(VERSION_MINOR 0)
 set(VERSION_PATCH 0)
 
 # --- 路径 ---
-if(NOT SANYI_ROOT)
-    get_filename_component(SANYI_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+if(NOT APR_ROOT)
+    get_filename_component(APR_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
 endif()
-include("${SANYI_ROOT}/CMake/SanYiPaths.cmake")
-include("${SANYI_ROOT}/CMake/Utils.cmake")
+include("${APR_ROOT}/CMake/AprPaths.cmake")
+include("${APR_ROOT}/CMake/Utils.cmake")
 
 # --- 源文件收集（自动发现，新增文件无需修改此文件）---
-sanyi_glob_sources(LIB_SOURCES BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Src"
+apr_glob_sources(LIB_SOURCES BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Src"
     DIRS
         "."
         "RenderXAdapter"
 )
 
-sanyi_glob_headers(LIB_HEADERS BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Include"
+apr_glob_headers(LIB_HEADERS BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Include"
     DIRS
         "RenderBridge"
 )
 
 # --- 统一入口创建 DLL ---
-sanyi_add_shared_library(${LIB_NAME}
+apr_add_shared_library(${LIB_NAME}
     FOLDER "${LIB_FOLDER}"
     DESCRIPTION "${LIB_DESCRIPTION}"
     EXPORT_MACRO "${LIB_EXPORT_MACRO}"
@@ -66,7 +66,7 @@ sanyi_add_shared_library(${LIB_NAME}
         "${CMAKE_CURRENT_SOURCE_DIR}/Include"
     PRIVATE_INCLUDE_DIRS
         # renderx.h 只在 .cpp 内部可见，不传递给下游（UI2D/UI3D 自己按需配置）
-        "${SANYI_RENDERX_DIR}/include"
+        "${APR_RENDERX_DIR}/include"
     # 链接库按 PUBLIC/PRIVATE 分层：
     #   PUBLIC —— 公共头里被引用的依赖，必须传递给下游
     #   PRIVATE —— 仅 .cpp 内部使用，不随 DLL 对外泄漏
@@ -92,14 +92,14 @@ sanyi_add_shared_library(${LIB_NAME}
         Core Gui OpenGLWidgets
 )
 
-sanyi_export_imported_target(${LIB_NAME}
+apr_export_imported_target(${LIB_NAME}
     LIB_NAME "${LIB_NAME}"
     PUBLIC_INCLUDE_DIRS
         "${CMAKE_CURRENT_SOURCE_DIR}/Include"
-        "${SANYI_ROOT}/RenderAbstraction/Include"
+        "${APR_ROOT}/RenderAbstraction/Include"
         # Utility 是 PUBLIC_LINK_LIBRARIES，通常其 include 由目标自动传递；
         # 显式写出以便脱离根工程独立构建时也能找到 Ut/* 头
-        "${SANYI_ROOT}/Utility/Utility/Include"
+        "${APR_ROOT}/Utility/Utility/Include"
     INTERFACE_LINK_LIBRARIES
         Utility::Utility
         Log::Log
@@ -127,7 +127,7 @@ message(STATUS "")
 # 用 Null 后端 Runtime：几何仓的分配/写入/释放只需要 Runtime，不需要 GPU，
 # 因此这些用例在没有显卡的机器上也能跑（与 Renderx 自己的 RxRuntimeTests 同一套用法）。
 #
-sanyi_module_tests_enabled(RENDERBRIDGE _renderbridge_tests)
+apr_module_tests_enabled(RENDERBRIDGE _renderbridge_tests)
 if(_renderbridge_tests AND GTest_FOUND)
     add_executable(RenderBridgeTests
         "${CMAKE_CURRENT_SOURCE_DIR}/Test/PersistentGeometryStoreTests.cpp"
@@ -136,8 +136,8 @@ if(_renderbridge_tests AND GTest_FOUND)
     target_compile_features(RenderBridgeTests PRIVATE cxx_std_17)
     target_include_directories(RenderBridgeTests PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/Include"
-        "${SANYI_RENDERX_DIR}/include"
-        "${SANYI_LOG_DIR}/Include"
+        "${APR_RENDERX_DIR}/include"
+        "${APR_LOG_DIR}/Include"
     )
     # 被测类的实现已从容头文件移到 RenderBridge 源码里（类型隔离改造），
     # 因此测试需要链 RenderBridge 这个 DLL，不能再只依赖头文件
@@ -148,7 +148,7 @@ if(_renderbridge_tests AND GTest_FOUND)
         GTest::gtest
         GTest::gtest_main
     )
-    # 与 sanyi_add_library 的 Qt 目标保持同一套 C++17 兼容定义（见 CMake/Utils.cmake）
+    # 与 apr_add_library 的 Qt 目标保持同一套 C++17 兼容定义（见 CMake/Utils.cmake）
     target_compile_definitions(RenderBridgeTests PRIVATE QT_NO_P0846)
     if(MSVC)
         target_compile_options(RenderBridgeTests PRIVATE /utf-8)

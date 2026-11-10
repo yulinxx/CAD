@@ -10,9 +10,9 @@
 #include "Engine/Edit/IUndoRedoManager.h"
 #include "Engine2D/Algorithm/EntityTransform.h"
 #include "Engine2D/Geometry/BezierAlgorithms.h"
-#include "Engine2D/SyEntity/SyLine.h"
-#include "Engine2D/SyEntity/SyBezier.h"
-#include "Engine2D/SyEntity/SyBezier2.h"
+#include "Engine2D/AprEntity/AprLine.h"
+#include "Engine2D/AprEntity/AprBezier.h"
+#include "Engine2D/AprEntity/AprBezier2.h"
 
 #include "UI/Services/ViewportActionHub.h"
 #include "UI/Services/UiStateCenter.h"
@@ -37,7 +37,7 @@
 namespace Eg
 {
     class SceneManager;
-    struct SyEntity;
+    struct AprEntity;
     class EntityClipboard;
 }
 
@@ -196,11 +196,11 @@ namespace Ops
 
 namespace OpRegistryHelpers
 {
-    inline std::vector<Eg::EntityId> collectIds(const Eg::VecSyEntityPtr& selected)
+    inline std::vector<Eg::EntityId> collectIds(const Eg::VecAprEntityPtr& selected)
     {
         std::vector<Eg::EntityId> ids;
         ids.reserve(selected.size());
-        for (Eg::SyEntity* e : selected)
+        for (Eg::AprEntity* e : selected)
         {
             if (e)
                 ids.push_back(e->id);
@@ -209,7 +209,7 @@ namespace OpRegistryHelpers
     }
 
     inline bool calcCombinedBounds(
-        const Eg::VecSyEntityPtr& entities, double& outMinX, double& outMinY, double& outMaxX, double& outMaxY)
+        const Eg::VecAprEntityPtr& entities, double& outMinX, double& outMinY, double& outMaxX, double& outMaxY)
     {
         if (entities.empty())
             return false;
@@ -218,7 +218,7 @@ namespace OpRegistryHelpers
         double maxX = -(std::numeric_limits<double>::max)();
         double maxY = -(std::numeric_limits<double>::max)();
         bool valid = false;
-        for (Eg::SyEntity* e : entities)
+        for (Eg::AprEntity* e : entities)
         {
             if (!e)
                 continue;
@@ -269,11 +269,11 @@ namespace OpRegistryHelpers
         double y2{ 0.0 };
     };
 
-    inline bool extractLineSegment(Eg::SyEntity* entity, LineSegment2D& outSeg)
+    inline bool extractLineSegment(Eg::AprEntity* entity, LineSegment2D& outSeg)
     {
         if (!entity || entity->eType != Eg::EType::LINE)
             return false;
-        auto* line = static_cast<Eg::SyLine*>(entity);
+        auto* line = static_cast<Eg::AprLine*>(entity);
         if (line->pointRef().size() < 2)
             return false;
         outSeg.x1 = line->pointRef()[0].x();
@@ -301,8 +301,8 @@ namespace OpRegistryHelpers
 
     inline bool resolveTargetAndBoundary(SceneEditService* editService,
         const TransformParameters& params,
-        Eg::SyEntity*& outTarget,
-        Eg::SyEntity*& outBoundary)
+        Eg::AprEntity*& outTarget,
+        Eg::AprEntity*& outBoundary)
     {
         outTarget = nullptr;
         outBoundary = nullptr;
@@ -316,7 +316,7 @@ namespace OpRegistryHelpers
             outBoundary = scene->findEntityById(params.trimBoundaryId);
         if (!outTarget || !outBoundary)
         {
-            for (Eg::SyEntity* e : selected)
+            for (Eg::AprEntity* e : selected)
             {
                 if (!e)
                     continue;
@@ -334,7 +334,7 @@ namespace OpRegistryHelpers
         if (!scene)
             return 0;
         int count = 0;
-        for (Eg::SyEntity* e : scene->getSelectedEntities())
+        for (Eg::AprEntity* e : scene->getSelectedEntities())
         {
             if (e && (e->eType == Eg::EType::BEZIER || e->eType == Eg::EType::BEZIER2))
                 ++count;
@@ -348,7 +348,7 @@ namespace OpRegistryHelpers
             return false;
         int cubicCount = 0;
         int quadCount = 0;
-        for (Eg::SyEntity* e : scene->getSelectedEntities())
+        for (Eg::AprEntity* e : scene->getSelectedEntities())
         {
             if (!e)
                 continue;
@@ -361,13 +361,13 @@ namespace OpRegistryHelpers
     }
 
     inline void collectBezierCandidates(
-        Eg::SceneManager* scene, std::vector<Eg::SyEntity*>& outCubic, std::vector<Eg::SyEntity*>& outQuad)
+        Eg::SceneManager* scene, std::vector<Eg::AprEntity*>& outCubic, std::vector<Eg::AprEntity*>& outQuad)
     {
         if (!scene)
             return;
         const auto selected = scene->getSelectedEntities();
         const auto& source = selected.empty() ? scene->getAllEntities() : selected;
-        for (Eg::SyEntity* e : source)
+        for (Eg::AprEntity* e : source)
         {
             if (!e)
                 continue;

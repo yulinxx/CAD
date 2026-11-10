@@ -1,6 +1,6 @@
 #include "UiConfigLoader.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <QFile>
 #include <QFileInfo>
@@ -136,7 +136,7 @@ std::optional<UiConfigData> UiConfigLoader::loadWithInheritance(const QString& p
     if (raw.isEmpty())
     {
         m_lastError = QStringLiteral("Failed to read config file: %1").arg(path);
-        SY_ERRORF("[UiConfigLoader] %s", qPrintable(m_lastError));
+        APR_ERRORF("[UiConfigLoader] %s", qPrintable(m_lastError));
         return std::nullopt;
     }
 
@@ -145,7 +145,7 @@ std::optional<UiConfigData> UiConfigLoader::loadWithInheritance(const QString& p
     if (parseError.error != QJsonParseError::NoError || !doc.isObject())
     {
         m_lastError = QStringLiteral("Invalid JSON in %1: %2").arg(path, parseError.errorString());
-        SY_ERRORF("[UiConfigLoader] %s", qPrintable(m_lastError));
+        APR_ERRORF("[UiConfigLoader] %s", qPrintable(m_lastError));
         return std::nullopt;
     }
 
@@ -203,7 +203,7 @@ std::optional<UiConfigData> UiConfigLoader::loadWithInheritance(const QString& p
             }
             if (QFile::exists(embedded))
             {
-                SY_INFOF("[UiConfigLoader] Parent '%s' not found next to client config, using embedded '%s'",
+                APR_INFOF("[UiConfigLoader] Parent '%s' not found next to client config, using embedded '%s'",
                     qPrintable(parentPath),
                     qPrintable(embedded));
                 parentPath = embedded;
@@ -214,7 +214,7 @@ std::optional<UiConfigData> UiConfigLoader::loadWithInheritance(const QString& p
         if (!parent)
         {
             m_lastError = QStringLiteral("Failed to load parent config '%1' referenced by %2").arg(extends, path);
-            SY_ERRORF("[UiConfigLoader] %s", qPrintable(m_lastError));
+            APR_ERRORF("[UiConfigLoader] %s", qPrintable(m_lastError));
             return std::nullopt;
         }
 
@@ -661,7 +661,7 @@ StatusBarDef UiConfigLoader::parseStatusBar(const QJsonObject& obj)
         }
     }
 
-    SY_DEBUGF("[UiConfigLoader] StatusBar parsed: visible=%d slots=%d",
+    APR_DEBUGF("[UiConfigLoader] StatusBar parsed: visible=%d slots=%d",
         bar.visible ? 1 : 0,
         static_cast<int>(bar.items.size()));
     return bar;
@@ -681,7 +681,7 @@ std::optional<StatusBarSlotDef> UiConfigLoader::parseStatusBarSlot(const QJsonOb
     // widgetType 是槽位的唯一必填字段：没有它就无法从面板工厂取到控件
     if (slot.widgetType.isEmpty())
     {
-        SY_WARNF("[UiConfigLoader] StatusBar slot id='%s' has no widgetType, skipped", qPrintable(slot.id));
+        APR_WARNF("[UiConfigLoader] StatusBar slot id='%s' has no widgetType, skipped", qPrintable(slot.id));
         return std::nullopt;
     }
     if (slot.id.isEmpty())
@@ -700,18 +700,18 @@ std::optional<ContextMenuDef> UiConfigLoader::parseContextMenu(const QJsonObject
     cm.dynamicSections = obj.value(QStringLiteral("dynamicSections")).toVariant().toStringList();
     if (cm.id.isEmpty())
     {
-        SY_WARN("[UiConfigLoader] Context menu without id, skipped");
+        APR_WARN("[UiConfigLoader] Context menu without id, skipped");
         return std::nullopt;
     }
 
     // 复用菜单条目解析：右键菜单与主菜单共享 action/submenu/separator 语义与 feature 门控
     if (!parseMenuItems(obj.value(QStringLiteral("items")).toArray(), cm.items))
     {
-        SY_WARNF("[UiConfigLoader] Context menu id='%s' has invalid items, skipped", qPrintable(cm.id));
+        APR_WARNF("[UiConfigLoader] Context menu id='%s' has invalid items, skipped", qPrintable(cm.id));
         return std::nullopt;
     }
 
-    SY_DEBUGF("[UiConfigLoader] ContextMenu parsed id='%s' workbench='%s' items=%d",
+    APR_DEBUGF("[UiConfigLoader] ContextMenu parsed id='%s' workbench='%s' items=%d",
         qPrintable(cm.id),
         qPrintable(cm.workbenchId),
         static_cast<int>(cm.items.size()));

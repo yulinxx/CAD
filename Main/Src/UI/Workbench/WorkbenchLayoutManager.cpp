@@ -13,7 +13,7 @@
 #include "Persistence/Repositories/WorkspaceSnapshotRepository.h"
 #include "Persistence/Models/WorkspaceSnapshotRecord.h"
 #include "UiWorkbench.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include "ClientConfig/UiBuiltinPanels.h"
 #include "ClientConfig/UiClientContext.h"
@@ -91,7 +91,7 @@ void WorkbenchLayoutManager::buildToolBars()
     // 而配置分支永远追不上，最终两边行为分叉——这是需要消除的核心风险。
     if (!ensureConfigLoaded())
     {
-        SY_ERROR("[WorkbenchLayoutManager] Toolbar build aborted: client config unavailable");
+        APR_ERROR("[WorkbenchLayoutManager] Toolbar build aborted: client config unavailable");
         return;
     }
 
@@ -106,14 +106,14 @@ void WorkbenchLayoutManager::buildToolBars()
     // WorkbenchWindow::setWorkbench 注入分发器后会再调一次本函数。
     if (!m_commandDispatcher)
     {
-        SY_DEBUG("[WorkbenchLayoutManager] Toolbar build deferred: command dispatcher not injected yet");
+        APR_DEBUG("[WorkbenchLayoutManager] Toolbar build deferred: command dispatcher not injected yet");
         return;
     }
 
     const UiConfigData* config = m_configManager->configData();
     if (!config)
     {
-        SY_ERROR("[WorkbenchLayoutManager] Toolbar build aborted: config data is null");
+        APR_ERROR("[WorkbenchLayoutManager] Toolbar build aborted: config data is null");
         return;
     }
 
@@ -128,7 +128,7 @@ void WorkbenchLayoutManager::buildToolBars()
         }
     }
     m_configDrivenLayoutBuilt = true;
-    SY_DEBUGF("[WorkbenchLayoutManager] Tool bars built from client config: count=%lld",
+    APR_DEBUGF("[WorkbenchLayoutManager] Tool bars built from client config: count=%lld",
         static_cast<long long>(m_registeredToolBars.size()));
 }
 
@@ -145,12 +145,12 @@ void WorkbenchLayoutManager::buildDockAreas()
     // 属于打包缺失级别的问题，必须以 ERROR 暴露而不是静默降级。
     if (buildDockAreasFromConfig())
     {
-        SY_DEBUGF("[WorkbenchLayoutManager] Dock areas built from client config: count=%lld",
+        APR_DEBUGF("[WorkbenchLayoutManager] Dock areas built from client config: count=%lld",
             static_cast<long long>(m_registeredDocks.size()));
         return;
     }
 
-    SY_ERROR("[WorkbenchLayoutManager] error code=ui.dock_config_build_failed message=Failed to build dock areas from "
+    APR_ERROR("[WorkbenchLayoutManager] error code=ui.dock_config_build_failed message=Failed to build dock areas from "
              "client config; check that configs.qrc is packaged and the client JSON declares 'docks'");
 }
 
@@ -172,12 +172,12 @@ bool WorkbenchLayoutManager::ensureConfigLoaded()
 
     if (!m_configManager->configData())
     {
-        SY_ERRORF("[WorkbenchLayoutManager] Shared client config unavailable (client='%s')",
+        APR_ERRORF("[WorkbenchLayoutManager] Shared client config unavailable (client='%s')",
             qPrintable(UiClientContext::instance().clientId()));
         return false;
     }
 
-    SY_DEBUGF("[WorkbenchLayoutManager] Client config ready: client='%s'",
+    APR_DEBUGF("[WorkbenchLayoutManager] Client config ready: client='%s'",
         qPrintable(UiClientContext::instance().clientId()));
     return true;
 }
@@ -276,7 +276,7 @@ void WorkbenchLayoutManager::buildStatusBar()
 
     if (!ensureConfigLoaded())
     {
-        SY_WARN("[WorkbenchLayoutManager] Status bar slots skipped: client config unavailable");
+        APR_WARN("[WorkbenchLayoutManager] Status bar slots skipped: client config unavailable");
         return;
     }
 
@@ -511,7 +511,7 @@ void WorkbenchLayoutManager::clearLayoutContent(const UiWorkbench* oldWorkbench)
     auto* oldCentral = m_parent->centralWidget();
     if (oldCentral)
     {
-        SY_DEBUG("[clearLayoutContent] Step A: releasing GL resources");
+        APR_DEBUG("[clearLayoutContent] Step A: releasing GL resources");
         if (oldWorkbench)
         {
             oldWorkbench->releaseCentralWidgetGLResources(oldCentral);
@@ -519,19 +519,19 @@ void WorkbenchLayoutManager::clearLayoutContent(const UiWorkbench* oldWorkbench)
         else
         {
             // 旧工作台为空，跳过中央视口 GL 释放
-            SY_DEBUG("[clearLayoutContent] Old workbench is null, skip central viewport GL release");
+            APR_DEBUG("[clearLayoutContent] Old workbench is null, skip central viewport GL release");
         }
 
-        SY_DEBUG("[clearLayoutContent] Step B: setCentralWidget(nullptr)");
+        APR_DEBUG("[clearLayoutContent] Step B: setCentralWidget(nullptr)");
         m_parent->setCentralWidget(nullptr);
 
-        SY_DEBUG("[clearLayoutContent] Step C: hide + deleteLater");
+        APR_DEBUG("[clearLayoutContent] Step C: hide + deleteLater");
         oldCentral->hide();
         oldCentral->deleteLater();
     }
-    SY_DEBUG("[clearLayoutContent] Step D: creating placeholder");
+    APR_DEBUG("[clearLayoutContent] Step D: creating placeholder");
     m_parent->setCentralWidget(createInitialCentralWidget());
-    SY_DEBUG("[clearLayoutContent] Step E: done");
+    APR_DEBUG("[clearLayoutContent] Step E: done");
 }
 
 // ==================== 布局快照 ====================
@@ -565,13 +565,13 @@ void WorkbenchLayoutManager::saveLayoutSnapshot(const QString& workbenchId)
         const bool saved = m_persistenceService->workspaceSnapshots()->save(rec);
         if (saved)
         {
-            SY_DEBUGF("[WorkbenchLayoutManager] Saved layout snapshot to database: %s", rec.workbenchId.c_str());
+            APR_DEBUGF("[WorkbenchLayoutManager] Saved layout snapshot to database: %s", rec.workbenchId.c_str());
         }
         else
         {
             // 数据库写入可能因 WAL 锁失败（同一库文件被多条连接同时写）；
             // QSettings 是本地文件，写入互不干扰，继续执行以保证快照至少落一份
-            SY_WARNF("[WorkbenchLayoutManager] Failed to save layout snapshot to database for workbench '%s', "
+            APR_WARNF("[WorkbenchLayoutManager] Failed to save layout snapshot to database for workbench '%s', "
                      "falling back to QSettings only",
                 rec.workbenchId.c_str());
         }
@@ -624,7 +624,7 @@ bool WorkbenchLayoutManager::restoreLayoutSnapshot(const QString& workbenchId)
         {
             dbState = QByteArray::fromBase64(QByteArray::fromStdString(rec.windowState));
             dbTime = parseTime(QString::fromStdString(rec.updatedAt));
-            SY_DEBUGF("[WorkbenchLayoutManager] Loaded layout snapshot from database: %s", rec.workbenchId.c_str());
+            APR_DEBUGF("[WorkbenchLayoutManager] Loaded layout snapshot from database: %s", rec.workbenchId.c_str());
         }
     }
 
@@ -666,7 +666,7 @@ bool WorkbenchLayoutManager::restoreLayoutSnapshot(const QString& workbenchId)
 
     if (!m_parent->restoreState(state))
     {
-        SY_WARN("[WorkbenchLayoutManager] Layout snapshot restore failed, keeping built-in defaults");
+        APR_WARN("[WorkbenchLayoutManager] Layout snapshot restore failed, keeping built-in defaults");
         restoreDockWidgetTitles();
         return false;
     }

@@ -12,7 +12,7 @@
 #include "UiStateCenter.h"
 #include "UiPropertiesPanel.h"
 #include "Services/UiFrameworkServices.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "UI/StatusBarBase.h"
 #include "VersionInfo.h"
 
@@ -46,7 +46,7 @@ void WorkbenchStateManager::setUiStateCenter(UiStateCenter* stateCenter)
     unbindStateSignals();
     m_stateCenter = stateCenter;
     bindStateSignals();
-    SY_DEBUGF("[WorkbenchStateManager] State center set: %p", static_cast<void*>(stateCenter));
+    APR_DEBUGF("[WorkbenchStateManager] State center set: %p", static_cast<void*>(stateCenter));
 }
 
 void WorkbenchStateManager::setActiveStatusBar(StatusBarBase* statusBarWidget)
@@ -61,11 +61,11 @@ void WorkbenchStateManager::bindStateSignals()
     // 只绑定状态中心信号，不在这里做任何状态初始化或业务编排
     if (!m_stateCenter)
     {
-        SY_DEBUG("[WorkbenchStateManager] bindStateSignals: stateCenter is null, skip binding");
+        APR_DEBUG("[WorkbenchStateManager] bindStateSignals: stateCenter is null, skip binding");
         return;
     }
 
-    SY_DEBUG("[WorkbenchStateManager] Binding state center signals");
+    APR_DEBUG("[WorkbenchStateManager] Binding state center signals");
     // 信号连接只用于刷新入口，不在这里插入额外的状态派生逻辑
     // 使用 m_parent 作为连接上下文，解绑时可精确断开本管理器挂到状态中心上的连接，
     // 不会误伤其他组件（如 UiWorkbench）对状态中心的监听
@@ -89,7 +89,7 @@ void WorkbenchStateManager::unbindStateSignals()
         return;
     }
 
-    SY_DEBUG("[WorkbenchStateManager] Unbinding state center signals");
+    APR_DEBUG("[WorkbenchStateManager] Unbinding state center signals");
     QObject::disconnect(m_stateCenter, nullptr, m_parent, nullptr);
 }
 
@@ -269,12 +269,12 @@ void WorkbenchStateManager::setWorkbenchSwitchContext(const QString& workbenchId
 {
     if (!m_stateCenter)
     {
-        SY_DEBUGF("[WorkbenchStateManager] setWorkbenchSwitchContext: stateCenter is null, workbenchId=%s",
+        APR_DEBUGF("[WorkbenchStateManager] setWorkbenchSwitchContext: stateCenter is null, workbenchId=%s",
             qPrintable(workbenchId));
         return;
     }
 
-    SY_DEBUGF("[WorkbenchStateManager] Setting workbench switch context: %s, text=%s",
+    APR_DEBUGF("[WorkbenchStateManager] Setting workbench switch context: %s, text=%s",
         qPrintable(workbenchId),
         qPrintable(switchContextText));
     // 工作台切换上下文统一在这里写入，避免 triggerWorkbench 里散落重复设置
@@ -307,7 +307,7 @@ void WorkbenchStateManager::setWorkbenchTransitionState(const QString& phase, co
 
 void WorkbenchStateManager::resetWorkbenchTransientState()
 {
-    SY_DEBUG("[WorkbenchStateManager] Resetting transient workbench state");
+    APR_DEBUG("[WorkbenchStateManager] Resetting transient workbench state");
 
     if (m_stateCenter)
     {

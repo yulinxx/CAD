@@ -14,7 +14,7 @@ class RenderWidget;
 
 /// @brief 世界文字层协调器 —— 从 SceneRefreshCoordinator 拆分
 ///
-/// 与 BitmapReconciler 同一形状、同一真源规则（场景中可见 SyText 集合）。
+/// 与 BitmapReconciler 同一形状、同一真源规则（场景中可见 AprText 集合）。
 /// 文本没有可复用的顶点块（字形四边形要随字体图集重排），因此不走
 /// entityToVertices 那条增量顶点路径，由本类独立维护账本。
 class TextReconciler
@@ -39,5 +39,5 @@ public:
 
 private:
     RenderWidget* m_renderWidget;
-    std::unordered_set<uint64_t> m_worldTextIds;  ///< 已同步到 GPU 的 SyText 账本
+    std::unordered_set<uint64_t> m_worldTextIds;  ///< 已同步到 GPU 的 AprText 账本
 };

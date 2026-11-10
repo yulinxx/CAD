@@ -7,7 +7,7 @@
 #include "EditOperationRegistry.h"
 #include "OpRegistryTypes.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
 #include "UI2D/Operation/IOperation.h"
@@ -21,9 +21,9 @@
 #include "Engine2D/Algorithm/Discretizer/EntityDiscretizer.h"
 #include "Engine2D/Geometry/BezierAlgorithms.h"
 #include "Engine2D/Core/SceneEditBatch.h"
-#include "Engine2D/SyEntity/SyLine.h"
-#include "Engine2D/SyEntity/SyBezier.h"
-#include "Engine2D/SyEntity/SyBezier2.h"
+#include "Engine2D/AprEntity/AprLine.h"
+#include "Engine2D/AprEntity/AprBezier.h"
+#include "Engine2D/AprEntity/AprBezier2.h"
 
 #include "UI/Services/HelpDialogService.h"
 #include "UI/Adapters/TransformDialogAdapter.h"
@@ -31,7 +31,7 @@
 #include "UI2D/Operation/AlgorithmRunner.h"
 #include "Option/TextPasteService.h"
 #include "Option/ImagePasteService.h"
-#include "Option/TextInputSettingsStore.h"
+#include "UI2D/Option/TextInputSettingsStore.h"
 #include "Operation/ReliefEngravingOperation2D.h"
 #include "UI/Services/ViewportActionHub.h"
 #include "UI/Services/UiStateCenter.h"
@@ -42,7 +42,7 @@
 #include "Ut/GeomMath.h"
 #include "Ut/Mat.h"
 #include "Ut/Vec.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "UI/Service/ViewCaptureService.h"
 #include "UI/Workbench/WorkbenchWindow.h"
 #include "UI/Workbench/UiWorkbench.h"
@@ -98,7 +98,7 @@ void EditOperationRegistry::registerAll()
 
     // ---- 撤销/重做/删除/全选/清除/反选 ----
     Ops::declare(reg, OperationId::Edit_Undo, [undoManager, hub] {
-        SY_DEBUG("[EditOperationRegistry] Undo operation triggered");
+        APR_DEBUG("[EditOperationRegistry] Undo operation triggered");
         if (hub && hub->viewport() && hub->viewport()->handleTextUndoRequest(false))
             return;
         if (undoManager && undoManager->canUndo())
@@ -106,7 +106,7 @@ void EditOperationRegistry::registerAll()
     });
 
     Ops::declare(reg, OperationId::Edit_Redo, [undoManager, hub] {
-        SY_DEBUG("[EditOperationRegistry] Redo operation triggered");
+        APR_DEBUG("[EditOperationRegistry] Redo operation triggered");
         if (hub && hub->viewport() && hub->viewport()->handleTextUndoRequest(true))
             return;
         if (undoManager && undoManager->canRedo())
@@ -114,7 +114,7 @@ void EditOperationRegistry::registerAll()
     });
 
     Ops::declare(reg, OperationId::Edit_Delete, [editService] {
-        SY_DEBUG("[EditOperationRegistry] Delete operation triggered");
+        APR_DEBUG("[EditOperationRegistry] Delete operation triggered");
         if (editService)
             editService->deleteSelected("Delete");
     });
@@ -125,8 +125,8 @@ void EditOperationRegistry::registerAll()
             auto* scene = editService->sceneManager();
             // 直接遍历容器收集可见图元，避免 getAllEntities() 对全场景指针的整份拷贝
             // （百万级场景下一次全选就是数 MB 的无谓分配）。
-            Eg::VecSyEntityPtr visibleEntities;
-            scene->forEachEntity([&visibleEntities](Eg::SyEntity* entity) {
+            Eg::VecAprEntityPtr visibleEntities;
+            scene->forEachEntity([&visibleEntities](Eg::AprEntity* entity) {
                 if (!entity || !entity->visible())
                 {
                     return;
@@ -249,17 +249,17 @@ void EditOperationRegistry::registerClipboardOps()
             return false;
         const Ut::Vec2d anchor = pasteAnchor();
         QString err;
-        Eg::SyGroup* group = TextPasteService::pasteClipboardText(scene, anchor, err, editService);
+        Eg::AprGroup* group = TextPasteService::pasteClipboardText(scene, anchor, err, editService);
         if (!group)
         {
             if (!err.isEmpty())
-                SY_WARNF("[PasteText] %s", err.toStdString().c_str());
+                APR_WARNF("[PasteText] %s", err.toStdString().c_str());
             return false;
         }
         if (selectResult)
         {
             scene->clearSelection();
-            std::vector<Eg::SyEntity*> leaves = group->flatten();
+            std::vector<Eg::AprEntity*> leaves = group->flatten();
             if (!leaves.empty())
                 scene->selectEntities(leaves);
         }
@@ -274,18 +274,18 @@ void EditOperationRegistry::registerClipboardOps()
             return false;
         const Ut::Vec2d anchor = pasteAnchor();
         QString err;
-        Eg::SyEntity* image = ImagePasteService::pasteClipboardImage(scene, anchor, err, nullptr, editService);
+        Eg::AprEntity* image = ImagePasteService::pasteClipboardImage(scene, anchor, err, nullptr, editService);
         if (!image)
         {
             if (!err.isEmpty())
-                SY_WARNF("[PasteImage] %s", err.toStdString().c_str());
+                APR_WARNF("[PasteImage] %s", err.toStdString().c_str());
             return false;
         }
-        SY_DEBUG("[PasteImage] Clipboard image pasted");
+        APR_DEBUG("[PasteImage] Clipboard image pasted");
         if (selectResult)
         {
             scene->clearSelection();
-            Eg::VecSyEntityPtr imgSel;
+            Eg::VecAprEntityPtr imgSel;
             imgSel.push_back(image);
             scene->selectEntities(imgSel);
         }
@@ -301,9 +301,9 @@ void EditOperationRegistry::registerClipboardOps()
         auto selected = scene->getSelectedEntities();
         if (selected.empty())
             return;
-        std::vector<const Eg::SyEntity*> sources;
+        std::vector<const Eg::AprEntity*> sources;
         sources.reserve(selected.size());
-        for (Eg::SyEntity* e : selected)
+        for (Eg::AprEntity* e : selected)
         {
             if (e)
                 sources.push_back(e);
@@ -320,9 +320,9 @@ void EditOperationRegistry::registerClipboardOps()
         auto selected = scene->getSelectedEntities();
         if (selected.empty())
             return;
-        std::vector<const Eg::SyEntity*> sources;
+        std::vector<const Eg::AprEntity*> sources;
         sources.reserve(selected.size());
-        for (Eg::SyEntity* e : selected)
+        for (Eg::AprEntity* e : selected)
             sources.push_back(e);
         clipboard->copy(sources);
         editService->deleteSelected("Cut");
@@ -342,7 +342,7 @@ void EditOperationRegistry::registerClipboardOps()
                 return;
             scene->clearSelection();
             const std::vector<Eg::EntityId> insertedIds = editService->addEntities(std::move(pasted), "Paste");
-            Eg::VecSyEntityPtr pastedEntities;
+            Eg::VecAprEntityPtr pastedEntities;
             pastedEntities.reserve(insertedIds.size());
             for (Eg::EntityId id : insertedIds)
             {
@@ -405,22 +405,22 @@ void EditOperationRegistry::registerClipboardOps()
         const double dx = tp.moveX;
         const double dy = tp.moveY;
 
-        std::vector<const Eg::SyEntity*> sources;
+        std::vector<const Eg::AprEntity*> sources;
         sources.reserve(selected.size());
-        for (Eg::SyEntity* e : selected)
+        for (Eg::AprEntity* e : selected)
         {
             if (e)
                 sources.push_back(e);
         }
 
-        std::vector<std::unique_ptr<Eg::SyEntity>> added;
+        std::vector<std::unique_ptr<Eg::AprEntity>> added;
         for (int i = 1; i < copyCount; ++i)
         {
             const double offX = dx * static_cast<double>(i);
             const double offY = dy * static_cast<double>(i);
-            for (const Eg::SyEntity* src : sources)
+            for (const Eg::AprEntity* src : sources)
             {
-                auto snap = std::unique_ptr<Eg::SyEntity>(src->clone());
+                auto snap = std::unique_ptr<Eg::AprEntity>(src->clone());
                 if (!snap)
                     continue;
                 snap->transform(Ut::Mat3d::translate(offX, offY));
@@ -680,7 +680,7 @@ void EditOperationRegistry::registerGroupOps()
         if (!scene)
             return;
         bool hasGroup = false;
-        for (Eg::SyEntity* e : scene->getSelectedEntities())
+        for (Eg::AprEntity* e : scene->getSelectedEntities())
         {
             if (e && e->group())
             {
@@ -697,7 +697,7 @@ void EditOperationRegistry::registerGroupOps()
             {
                 std::vector<Eg::EntityId> ids;
                 ids.reserve(selected.size());
-                for (Eg::SyEntity* e : selected)
+                for (Eg::AprEntity* e : selected)
                 {
                     if (e)
                         ids.push_back(e->id);
@@ -727,8 +727,8 @@ void EditOperationRegistry::registerTrimExtendOps()
             return;
         TransformParameters tp = TransformParameters::createTrim(params.value(QStringLiteral("targetId")).toULongLong(),
             params.value(QStringLiteral("boundaryId")).toULongLong());
-        Eg::SyEntity* target = nullptr;
-        Eg::SyEntity* boundary = nullptr;
+        Eg::AprEntity* target = nullptr;
+        Eg::AprEntity* boundary = nullptr;
         if (!OpRegistryHelpers::resolveTargetAndBoundary(editService, tp, target, boundary))
             return;
 
@@ -754,7 +754,7 @@ void EditOperationRegistry::registerTrimExtendOps()
         editService->transformEntities(
             ids,
             [&]() {
-                auto* line = static_cast<Eg::SyLine*>(target);
+                auto* line = static_cast<Eg::AprLine*>(target);
                 line->setPointAt(0, Ut::Vec2d(newX1, newY1));
                 line->setPointAt(1, Ut::Vec2d(newX2, newY2));
                 line->basePoint = line->pointRef()[0];
@@ -772,8 +772,8 @@ void EditOperationRegistry::registerTrimExtendOps()
         TransformParameters tp =
             TransformParameters::createExtend(params.value(QStringLiteral("targetId")).toULongLong(),
                 params.value(QStringLiteral("boundaryId")).toULongLong());
-        Eg::SyEntity* target = nullptr;
-        Eg::SyEntity* boundary = nullptr;
+        Eg::AprEntity* target = nullptr;
+        Eg::AprEntity* boundary = nullptr;
         if (!OpRegistryHelpers::resolveTargetAndBoundary(editService, tp, target, boundary))
             return;
 
@@ -830,7 +830,7 @@ void EditOperationRegistry::registerTrimExtendOps()
         editService->transformEntities(
             ids,
             [&]() {
-                auto* line = static_cast<Eg::SyLine*>(target);
+                auto* line = static_cast<Eg::AprLine*>(target);
                 line->setPointAt(0, Ut::Vec2d(newX1, newY1));
                 line->setPointAt(1, Ut::Vec2d(newX2, newY2));
                 line->basePoint = line->pointRef()[0];
@@ -851,11 +851,11 @@ void EditOperationRegistry::registerBboxOps()
         auto* scene = editService->sceneManager();
         if (!scene)
             return;
-        Eg::SyEntity* entity = scene->getSelectedEntity();
+        Eg::AprEntity* entity = scene->getSelectedEntity();
         if (!entity)
             return;
         const Ut::BBox2d bbox = entity->getBbox();
-        SY_DEBUGF("[GetBbox] entity=%llu bbox=(%.3f, %.3f)-(%.3f, %.3f)",
+        APR_DEBUGF("[GetBbox] entity=%llu bbox=(%.3f, %.3f)-(%.3f, %.3f)",
             static_cast<unsigned long long>(entity->id),
             bbox.minPt.x(),
             bbox.minPt.y(),
@@ -875,7 +875,7 @@ void EditOperationRegistry::registerDiscretizeOp()
         auto* scene = editService->sceneManager();
         if (!scene)
             return;
-        Eg::SyEntity* entity = scene->getSelectedEntity();
+        Eg::AprEntity* entity = scene->getSelectedEntity();
         if (!entity)
         {
             auto all = scene->getAllEntities();
@@ -895,7 +895,7 @@ void EditOperationRegistry::registerDiscretizeOp()
         {
             if (line.size() < 2)
                 continue;
-            batch.toAdd.push_back(std::make_unique<Eg::SyLine>(line));
+            batch.toAdd.push_back(std::make_unique<Eg::AprLine>(line));
         }
         if (!batch.toAdd.empty())
             editService->applyEditBatch(std::move(batch), "Discretize");
@@ -934,15 +934,15 @@ void EditOperationRegistry::registerBezierOps()
 
         SceneEditBatch batch;
         int nSplit = 0;
-        for (Eg::SyEntity* e : selected)
+        for (Eg::AprEntity* e : selected)
         {
             if (!e || e->eType != Eg::EType::BEZIER)
                 continue;
-            auto* bezier = static_cast<Eg::SyBezier*>(e);
+            auto* bezier = static_cast<Eg::AprBezier*>(e);
             auto pair = Eg::BezierAlgorithms::splitBezier(bezier, dT);
             batch.toRemove.push_back(e->id);
-            batch.toAdd.push_back(std::make_unique<Eg::SyBezier>(pair.first));
-            batch.toAdd.push_back(std::make_unique<Eg::SyBezier>(pair.second));
+            batch.toAdd.push_back(std::make_unique<Eg::AprBezier>(pair.first));
+            batch.toAdd.push_back(std::make_unique<Eg::AprBezier>(pair.second));
             ++nSplit;
         }
         if (nSplit > 0)
@@ -957,33 +957,33 @@ void EditOperationRegistry::registerBezierOps()
         if (!scene)
             return;
 
-        std::vector<Eg::SyEntity*> vCubic;
-        std::vector<Eg::SyEntity*> vQuad;
+        std::vector<Eg::AprEntity*> vCubic;
+        std::vector<Eg::AprEntity*> vQuad;
         OpRegistryHelpers::collectBezierCandidates(scene, vCubic, vQuad);
 
         SceneEditBatch batch;
         if (vCubic.size() == 2)
         {
-            auto* b1 = static_cast<Eg::SyBezier*>(vCubic[0]);
-            auto* b2 = static_cast<Eg::SyBezier*>(vCubic[1]);
+            auto* b1 = static_cast<Eg::AprBezier*>(vCubic[0]);
+            auto* b2 = static_cast<Eg::AprBezier*>(vCubic[1]);
             auto merged = Eg::BezierAlgorithms::mergeBeziers(b1, b2);
             if (merged)
             {
                 batch.toRemove.push_back(vCubic[0]->id);
                 batch.toRemove.push_back(vCubic[1]->id);
-                batch.toAdd.push_back(std::make_unique<Eg::SyBezier>(*merged));
+                batch.toAdd.push_back(std::make_unique<Eg::AprBezier>(*merged));
             }
         }
         else if (vQuad.size() == 2)
         {
-            auto* b1 = static_cast<Eg::SyBezier2*>(vQuad[0]);
-            auto* b2 = static_cast<Eg::SyBezier2*>(vQuad[1]);
+            auto* b1 = static_cast<Eg::AprBezier2*>(vQuad[0]);
+            auto* b2 = static_cast<Eg::AprBezier2*>(vQuad[1]);
             auto merged = Eg::BezierAlgorithms::mergeBeziers(b1, b2);
             if (merged)
             {
                 batch.toRemove.push_back(vQuad[0]->id);
                 batch.toRemove.push_back(vQuad[1]->id);
-                batch.toAdd.push_back(std::make_unique<Eg::SyBezier2>(*merged));
+                batch.toAdd.push_back(std::make_unique<Eg::AprBezier2>(*merged));
             }
         }
         if (!batch.empty())

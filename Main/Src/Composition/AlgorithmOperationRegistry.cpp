@@ -77,7 +77,7 @@ void AlgorithmOperationRegistry::registerAll()
     });
 
 #ifdef BUILD_RASTER
-    // 位图工艺处理：弹对话框 → Raster 处理 → SyImage 入场景 → Undo 压栈
+    // 位图工艺处理：弹对话框 → Raster 处理 → AprImage 入场景 → Undo 压栈
     if (m_sceneEdit)
     {
         Ops::declare(reg, OperationId::Algo_BitmapProcess,

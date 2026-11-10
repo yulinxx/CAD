@@ -20,7 +20,7 @@ class UiConfigLoader
 {
 public:
     /// 构造函数
-    /// @param resourcePath 配置路径（Qt 资源路径如 ":/configs/san_yi.json"，或文件路径）
+    /// @param resourcePath 配置路径（Qt 资源路径如 ":/configs/april.json"，或文件路径）
     explicit UiConfigLoader(const QString& resourcePath);
 
     /// 加载并解析配置（含 extends 继承合并）

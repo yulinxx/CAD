@@ -14,7 +14,7 @@
 #include "SceneTreeModel3D.h"
 
 #include "Engine3D/SceneManager3D.h"
-#include "Engine3D/SyEntity/SyMeshEntity.h"
+#include "Engine3D/AprEntity/AprMeshEntity.h"
 
 #include <memory>
 #include <QSet>
@@ -22,9 +22,9 @@
 namespace
 {
     // 构造一个带单个三角形（合法网格）的图元，满足 SceneManager3D::addEntity 的 isValid() 约束
-    std::unique_ptr<Eg::SyMeshEntity> makeTriangleMeshForTree(const char* name = nullptr)
+    std::unique_ptr<Eg::AprMeshEntity> makeTriangleMeshForTree(const char* name = nullptr)
     {
-        auto mesh = std::make_unique<Eg::SyMeshEntity>(name ? name : "");
+        auto mesh = std::make_unique<Eg::AprMeshEntity>(name ? name : "");
         mesh->vertices = { { 0.f, 0.f, 0.f }, { 1.f, 0.f, 0.f }, { 0.f, 1.f, 0.f } };
         mesh->normals = mesh->vertices;
         return mesh;

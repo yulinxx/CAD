@@ -347,7 +347,7 @@ STEP 文件
   │                 └─ 失败/空 → 回退旧 GmcProjection::projectTopView（可开关）
   │                        │
   │                        ▼
-  │                  2D 场景（SyPolygon）──► DXF 导出（已有）
+  │                  2D 场景（AprPolygon）──► DXF 导出（已有）
   │
   └─[B] G-03 loadStepAssembly ──► GmcPart[] ──► 3D 场景（分件）
 
@@ -411,7 +411,7 @@ else
 }
 ```
 
-- 灰度开关：编译期宏 `GMC_CONTOUR_V2`（默认 ON），运行期可用环境变量 `SANYI_STEP_CONTOUR=0` 回退，便于现场对比。
+- 灰度开关：编译期宏 `GMC_CONTOUR_V2`（默认 ON），运行期可用环境变量 `APR_STEP_CONTOUR=0` 回退，便于现场对比。
 - 不新增 IR 字段；`hole` 不落到 IR（原因见 1.1：IR 无该字段，且 2D 侧统一由 `ContainmentResolver` 重算）。
 
 ### 3.7 G-02：kerf 偏置（Engine2D + Main 桥接）

@@ -36,7 +36,7 @@
 
 ### 2.3 命名与编码
 
-- `<Module>` = 该 DLL 既有的导出符号前缀（如 `CrashHandler` / `License` / `SyLog` / `Nesting` / `rx`）。
+- `<Module>` = 该 DLL 既有的导出符号前缀（如 `CrashHandler` / `License` / `AprLog` / `Nesting` / `rx`）。
   **同一 DLL 内前缀必须唯一且固定**，不混用（例如 `rx` 与 `RenderX_` 二选一）。
 - packed 编码统一为 `(major<<16)|(minor<<8)|patch`（与 `LICENSE_MAKE_VERSION` / `CRASHHANDLER_MAKE_VERSION` 一致）。
 - 建议每个模块提供 `#define <MODULE>_MAKE_VERSION(major,minor,patch)` 与 `<MODULE>_VERSION` 宏。
@@ -47,7 +47,7 @@
 |---|:---:|:---:|:---:|---|
 | CrashHandler | ✅ | ✅ | — | 缺 `_GetAbiVersion`（可选） |
 | License | ✅ | ✅ | — | 同上 |
-| Log (`SyLog_`) | ✅ | ✅ | — | 同上 |
+| Log (`AprLog_`) | ✅ | ✅ | — | 同上 |
 | Engraving | ✅ | ✅ | — | 同上 |
 | GeoModelCore | ✅ | ✅ | — | 同上 |
 | Vision | ✅ | ✅ | — | 同上 |

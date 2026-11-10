@@ -1,9 +1,9 @@
-SanYi CAD - Proprietary License
+April CAD - Proprietary License
 
-Copyright (c) 2026 SanYi CAD. All rights reserved.
+Copyright (c) 2026 April CAD. All rights reserved.
 
 This software and associated documentation files (the "Software") are the
-proprietary property of SanYi CAD. Unauthorized copying, modification,
+proprietary property of April CAD. Unauthorized copying, modification,
 distribution, or use of the Software, via any medium, is strictly prohibited
 without prior written permission from the copyright holder.
 

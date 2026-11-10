@@ -32,16 +32,17 @@
 #include "Engine/Scene/SceneGeometryCollector.h"
 #include "Engine/Scene/SceneRenderContract.h"
 #include "Engine2D/Core/SceneManager.h"
-#include "Engine2D/SyEntity/SyLine.h"
-#include "Engine2D/SyEntity/SyCircle.h"
-#include "Engine2D/SyEntity/SyPolygon.h"
-#include "FileIO/SySerializer.h"
-#include "FileIO/SyDocument.h"
+#include "Engine2D/Core/SceneWriteGateway.h"
+#include "Engine2D/AprEntity/AprLine.h"
+#include "Engine2D/AprEntity/AprCircle.h"
+#include "Engine2D/AprEntity/AprPolygon.h"
+#include "FileIO/AprSerializer.h"
+#include "FileIO/AprDocument.h"
 
 namespace
 {
     // 序列化辅助：查询大小 → 分配 → 写入，返回完整数据（C3 blob 化接口适配）
-    Fio::SerializeResult serializeDoc(Fio::SySerializer& s, const Fio::SyDocument& doc, std::vector<uint8_t>& out)
+    Fio::SerializeResult serializeDoc(Fio::AprSerializer& s, const Fio::AprDocument& doc, std::vector<uint8_t>& out)
     {
         Fio::BinaryBlobOut query;
         auto r = s.serializeToMemory(doc, &query);
@@ -54,7 +55,7 @@ namespace
         return s.serializeToMemory(doc, &blobOut);
     }
 
-    Fio::SerializeResult deserializeDoc(Fio::SySerializer& s, const std::vector<uint8_t>& data, Fio::SyDocument& doc)
+    Fio::SerializeResult deserializeDoc(Fio::AprSerializer& s, const std::vector<uint8_t>& data, Fio::AprDocument& doc)
     {
         Fio::BinaryBlob in{ const_cast<uint8_t*>(data.data()), data.size() };
         return s.deserializeFromMemory(in, doc);
@@ -246,18 +247,18 @@ TEST(FrameworkRegressionTest, ISceneGeometrySink_EmitBBoxDefaultIsNoop)
 TEST(FrameworkRegressionTest, SerializationRoundtrip_EntityCountAndTypes)
 {
     // 创建包含多种图元的文档，序列化到内存后反序列化，验证图元数量和类型匹配
-    Fio::SyDocument doc;
+    Fio::AprDocument doc;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     line->setName("TestLine");
 
-    auto circle = std::make_unique<Eg::SyCircle>();
+    auto circle = std::make_unique<Eg::AprCircle>();
     circle->basePoint = Ut::Vec2d(5, 5);
     circle->dRadius = 3.0;
     circle->setName("TestCircle");
 
-    auto polygon = std::make_unique<Eg::SyPolygon>();
+    auto polygon = std::make_unique<Eg::AprPolygon>();
     polygon->setVertices({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 0), Ut::Vec2d(10, 10), Ut::Vec2d(0, 10) });
     polygon->setName("TestPolygon");
 
@@ -270,14 +271,14 @@ TEST(FrameworkRegressionTest, SerializationRoundtrip_EntityCountAndTypes)
     EXPECT_EQ(doc.entityCount(), 3u);
 
     // 序列化到内存
-    Fio::SySerializer serializer;
+    Fio::AprSerializer serializer;
     std::vector<uint8_t> buffer;
     auto saveResult = serializeDoc(serializer, doc, buffer);
     ASSERT_TRUE(saveResult.success) << saveResult.errorMessage;
     EXPECT_FALSE(buffer.empty());
 
     // 反序列化
-    Fio::SyDocument loaded;
+    Fio::AprDocument loaded;
     auto loadResult = deserializeDoc(serializer, buffer, loaded);
     ASSERT_TRUE(loadResult.success) << loadResult.errorMessage;
 
@@ -291,16 +292,16 @@ TEST(FrameworkRegressionTest, SerializationRoundtrip_EntityCountAndTypes)
 TEST(FrameworkRegressionTest, SerializationRoundtrip_EntityProperties)
 {
     // 验证序列化往返后图元属性（位置、顶点、闭合标记）保持不变
-    Fio::SyDocument doc;
+    Fio::AprDocument doc;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(1.5, 2.5), Ut::Vec2d(3.5, 4.5) });
     line->setName("PropLine");
 
     line->bClosed = false;
     doc.addEntity(line.release());
 
-    auto circle = std::make_unique<Eg::SyCircle>();
+    auto circle = std::make_unique<Eg::AprCircle>();
     circle->basePoint = Ut::Vec2d(7.5, 8.5);
     circle->dRadius = 4.0;
     circle->setName("PropCircle");
@@ -308,23 +309,23 @@ TEST(FrameworkRegressionTest, SerializationRoundtrip_EntityProperties)
     circle->bClosed = true;
     doc.addEntity(circle.release());
 
-    auto polygon = std::make_unique<Eg::SyPolygon>();
+    auto polygon = std::make_unique<Eg::AprPolygon>();
     polygon->setVertices({ Ut::Vec2d(0, 0), Ut::Vec2d(5, 0), Ut::Vec2d(5, 5) });
     polygon->setName("PropPolygon");
 
     polygon->bClosed = true;
     doc.addEntity(polygon.release());
 
-    Fio::SySerializer serializer;
+    Fio::AprSerializer serializer;
     std::vector<uint8_t> buffer;
     ASSERT_TRUE(serializeDoc(serializer, doc, buffer).success);
 
-    Fio::SyDocument loaded;
+    Fio::AprDocument loaded;
     ASSERT_TRUE(deserializeDoc(serializer, buffer, loaded).success);
     ASSERT_EQ(loaded.entityCount(), 3u);
 
     // 验证线属性
-    auto* loadedLine = dynamic_cast<Eg::SyLine*>(loaded.entityAt(0));
+    auto* loadedLine = dynamic_cast<Eg::AprLine*>(loaded.entityAt(0));
     ASSERT_NE(loadedLine, nullptr);
     ASSERT_EQ(loadedLine->pointRef().size(), 2u);
     EXPECT_DOUBLE_EQ(loadedLine->pointRef()[0].x(), 1.5);
@@ -335,7 +336,7 @@ TEST(FrameworkRegressionTest, SerializationRoundtrip_EntityProperties)
     EXPECT_FALSE(loadedLine->bClosed);
 
     // 验证圆属性
-    auto* loadedCircle = dynamic_cast<Eg::SyCircle*>(loaded.entityAt(1));
+    auto* loadedCircle = dynamic_cast<Eg::AprCircle*>(loaded.entityAt(1));
     ASSERT_NE(loadedCircle, nullptr);
     EXPECT_DOUBLE_EQ(loadedCircle->basePoint.x(), 7.5);
     EXPECT_DOUBLE_EQ(loadedCircle->basePoint.y(), 8.5);
@@ -344,7 +345,7 @@ TEST(FrameworkRegressionTest, SerializationRoundtrip_EntityProperties)
     EXPECT_TRUE(loadedCircle->bClosed);
 
     // 验证多边形属性
-    auto* loadedPolygon = dynamic_cast<Eg::SyPolygon*>(loaded.entityAt(2));
+    auto* loadedPolygon = dynamic_cast<Eg::AprPolygon*>(loaded.entityAt(2));
     ASSERT_NE(loadedPolygon, nullptr);
     EXPECT_EQ(loadedPolygon->vertices().size(), 3u);
     EXPECT_STREQ(loadedPolygon->name(), "PropPolygon");
@@ -613,24 +614,24 @@ TEST(FrameworkRegressionTest, UndoRedo_CreateUndoEntityRemoved)
     // 创建图元 → 撤销 → 验证图元被移除
     Eg::SceneManager scene;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId entityId = line->id;
 
     // 创建（添加图元）
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
     // 撤销（提取图元，模拟 undo）
-    auto extracted = scene.extractEntityById(entityId);
+    auto extracted = Eg::SceneWriteGateway::extractEntityById(scene, entityId);
     EXPECT_NE(extracted, nullptr);
     EXPECT_EQ(scene.getEntityCount(), 0u);
     EXPECT_EQ(extracted->id, entityId);
 
     // 验证提取的图元属性完整
-    auto* extractedLine = dynamic_cast<Eg::SyLine*>(extracted.get());
+    auto* extractedLine = dynamic_cast<Eg::AprLine*>(extracted.get());
     ASSERT_NE(extractedLine, nullptr);
     EXPECT_EQ(extractedLine->pointRef().size(), 2u);
 }
@@ -640,7 +641,7 @@ TEST(FrameworkRegressionTest, UndoRedo_RedoEntityRestoredWithProperties)
     // 撤销后再重做，验证图元恢复且属性正确
     Eg::SceneManager scene;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(1, 2), Ut::Vec2d(3, 4) });
     line->setName("RedoLine");
 
@@ -648,27 +649,27 @@ TEST(FrameworkRegressionTest, UndoRedo_RedoEntityRestoredWithProperties)
     Ut::Vec2d pt0 = line->pointRef()[0];
     Ut::Vec2d pt1 = line->pointRef()[1];
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
     // 撤销
-    auto extracted = scene.extractEntityById(entityId);
+    auto extracted = Eg::SceneWriteGateway::extractEntityById(scene, entityId);
     ASSERT_NE(extracted, nullptr);
     EXPECT_EQ(scene.getEntityCount(), 0u);
 
     // 重做
-    bool inserted = scene.insertEntityPreserveId(std::move(extracted));
+    bool inserted = Eg::SceneWriteGateway::insertEntityPreserveId(scene, std::move(extracted));
     EXPECT_TRUE(inserted);
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
     // 验证属性恢复
-    auto* restored = scene.findSyEntityById(entityId);
+    auto* restored = scene.findAprEntityById(entityId);
     ASSERT_NE(restored, nullptr);
     EXPECT_STREQ(restored->name(), "RedoLine");
 
-    auto* restoredLine = dynamic_cast<Eg::SyLine*>(restored);
+    auto* restoredLine = dynamic_cast<Eg::AprLine*>(restored);
     ASSERT_NE(restoredLine, nullptr);
     EXPECT_EQ(restoredLine->pointRef().size(), 2u);
     EXPECT_DOUBLE_EQ(restoredLine->pointRef()[0].x(), pt0.x());
@@ -683,77 +684,77 @@ TEST(FrameworkRegressionTest, UndoRedo_MultipleUndoRedoSequence)
     Eg::SceneManager scene;
 
     // 步骤1: 创建图元
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     line->setName("Original");
 
     Eg::EntityId entityId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
     // 步骤2: 修改（通过 extract + insert 模拟替换）
-    auto oldState = scene.extractEntityById(entityId);
+    auto oldState = Eg::SceneWriteGateway::extractEntityById(scene, entityId);
     ASSERT_NE(oldState, nullptr);
     EXPECT_STREQ(oldState->name(), "Original");
 
-    auto modified = std::make_unique<Eg::SyLine>();
+    auto modified = std::make_unique<Eg::AprLine>();
     modified->id = entityId;
     modified->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(20, 20) });
     modified->setName("Modified");
 
-    scene.insertEntityPreserveId(std::move(modified));
+    Eg::SceneWriteGateway::insertEntityPreserveId(scene, std::move(modified));
 
-    auto* current = scene.findSyEntityById(entityId);
+    auto* current = scene.findAprEntityById(entityId);
     ASSERT_NE(current, nullptr);
     EXPECT_STREQ(current->name(), "Modified");
 
     // 步骤3: 删除
-    auto deletedState = scene.extractEntityById(entityId);
+    auto deletedState = Eg::SceneWriteGateway::extractEntityById(scene, entityId);
     ASSERT_NE(deletedState, nullptr);
     EXPECT_EQ(scene.getEntityCount(), 0u);
 
     // Undo 1: 恢复删除
-    scene.insertEntityPreserveId(std::move(deletedState));
+    Eg::SceneWriteGateway::insertEntityPreserveId(scene, std::move(deletedState));
     EXPECT_EQ(scene.getEntityCount(), 1u);
-    current = scene.findSyEntityById(entityId);
+    current = scene.findAprEntityById(entityId);
     ASSERT_NE(current, nullptr);
     EXPECT_STREQ(current->name(), "Modified");
 
     // Undo 2: 恢复修改（还原为原始状态）
-    auto modifiedState = scene.extractEntityById(entityId);
+    auto modifiedState = Eg::SceneWriteGateway::extractEntityById(scene, entityId);
     ASSERT_NE(modifiedState, nullptr);
-    scene.insertEntityPreserveId(std::move(oldState));
+    Eg::SceneWriteGateway::insertEntityPreserveId(scene, std::move(oldState));
     EXPECT_EQ(scene.getEntityCount(), 1u);
-    current = scene.findSyEntityById(entityId);
+    current = scene.findAprEntityById(entityId);
     ASSERT_NE(current, nullptr);
     EXPECT_STREQ(current->name(), "Original");
 
     // Undo 3: 恢复创建（移除图元）
-    auto originalState = scene.extractEntityById(entityId);
+    auto originalState = Eg::SceneWriteGateway::extractEntityById(scene, entityId);
     ASSERT_NE(originalState, nullptr);
     EXPECT_EQ(scene.getEntityCount(), 0u);
 
     // Redo 1: 重建创建
-    scene.insertEntityPreserveId(std::move(originalState));
+    Eg::SceneWriteGateway::insertEntityPreserveId(scene, std::move(originalState));
     EXPECT_EQ(scene.getEntityCount(), 1u);
-    current = scene.findSyEntityById(entityId);
+    current = scene.findAprEntityById(entityId);
     ASSERT_NE(current, nullptr);
     EXPECT_STREQ(current->name(), "Original");
 
     // Redo 2: 重建修改
-    auto origForRedo = scene.extractEntityById(entityId);
+    auto origForRedo = Eg::SceneWriteGateway::extractEntityById(scene, entityId);
     ASSERT_NE(origForRedo, nullptr);
-    scene.insertEntityPreserveId(std::move(modifiedState));
+    Eg::SceneWriteGateway::insertEntityPreserveId(scene, std::move(modifiedState));
     EXPECT_EQ(scene.getEntityCount(), 1u);
-    current = scene.findSyEntityById(entityId);
+    current = scene.findAprEntityById(entityId);
     ASSERT_NE(current, nullptr);
     EXPECT_STREQ(current->name(), "Modified");
 
     // Redo 3: 重建删除
-    auto finalDeleted = scene.extractEntityById(entityId);
+    auto finalDeleted = Eg::SceneWriteGateway::extractEntityById(scene, entityId);
     ASSERT_NE(finalDeleted, nullptr);
     EXPECT_EQ(scene.getEntityCount(), 0u);
 }

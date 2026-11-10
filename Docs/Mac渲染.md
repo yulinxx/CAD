@@ -69,7 +69,7 @@ Windows 的 DSA 路径本就正确，无行为变化。
 - `Main/Info.plist.in`：包含 `NSHighResolutionCapable = true`（关键键）。
 - `Main/CMakeLists.txt`：`MACOSX_BUNDLE TRUE` + `MACOSX_BUNDLE_INFO_PLIST`，
   配置期用 `string(CONFIGURE @ONLY)` 生成（注意 CMake 变量大小写：模板里要用 `@app_name@`）。
-- 运行方式：`open SanYiCAD.app` 或 `SanYiCAD.app/Contents/MacOS/SanYiCAD`。
+- 运行方式：`open April.app` 或 `April.app/Contents/MacOS/April`。
 
 ---
 
@@ -92,7 +92,7 @@ bundle 化后应用二进制移到 `Contents/MacOS`，文件不在那里。
 
 ### 修复
 `Main/CMakeLists.txt` 为 app 目标添加 POST_BUILD：
-把 `${SANYI_RENDERX_DIR}/src/shader/*.{vert,frag,comp}` 与
+把 `${APR_RENDERX_DIR}/src/shader/*.{vert,frag,comp}` 与
 `src/res/*.ttf` 复制到 `$<TARGET_FILE_DIR:${app_name}>`。
 
 **注意**：着色器源文件（.vert/.frag）修改后**不会**触发 CMake 重新构建/重新复制
@@ -126,7 +126,7 @@ Qt 无法创建共享 NSOpenGLContext，渲染内容错位/残留（左上角重
 - Qt 6.11 无 `QOpenGLContext::versionFunctions<T>()`，用
   `new QOpenGLFunctions_3_3_Core(); initializeOpenGLFunctions();` 获取。
 - 着色器用 `#version 330 core`（4.6/4.1 都支持）。
-- 日志宏：`SY_ERROR` 是单参数宏，带格式用 `SY_ERRORF`。
+- 日志宏：`APR_ERROR` 是单参数宏，带格式用 `APR_ERRORF`。
 
 ---
 

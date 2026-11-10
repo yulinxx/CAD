@@ -47,7 +47,7 @@ struct UiBrandConfig
     /// 版权行：copyright > "Copyright (C) <year> <companyName>"
     QString effectiveCopyright() const;
 
-    /// 应用标识：appId > 去空格的 companyName+productName > "SanYiCAD"
+    /// 应用标识：appId > 去空格的 companyName+productName > "April"
     QString effectiveAppId() const;
 
     /// 主题名是否合法（light/dark/blue/slate/high_contrast/system）

@@ -4,7 +4,7 @@
  */
 #include "ExportDispatcher.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "FileIO/FormatRegistry.h"
 
 #include <QCoreApplication>
@@ -21,7 +21,7 @@ void ExportDispatcher::registerWriter(std::unique_ptr<IExportWriter> writer)
     m_writers.push_back(std::move(writer));
 }
 
-ExportResult ExportDispatcher::dispatch(const ExportContext& context, const Fio::VecSyEntityPtr& entities)
+ExportResult ExportDispatcher::dispatch(const ExportContext& context, const Fio::VecAprEntityPtr& entities)
 {
     // 如果未指定格式，自动检测
     Fio::FileFormat fmt = context.format;
@@ -34,7 +34,7 @@ ExportResult ExportDispatcher::dispatch(const ExportContext& context, const Fio:
     {
         QString msg =
             QCoreApplication::translate("ExportDispatcher", "Cannot detect format for: %1").arg(context.targetPath);
-        SY_ERRORF("[ExportDispatcher] %s", msg.toUtf8().constData());
+        APR_ERRORF("[ExportDispatcher] %s", msg.toUtf8().constData());
         return ExportResult::fail(msg);
     }
 
@@ -43,7 +43,7 @@ ExportResult ExportDispatcher::dispatch(const ExportContext& context, const Fio:
     {
         QString msg = QCoreApplication::translate("ExportDispatcher", "No writer registered for format=%1")
                           .arg(static_cast<int>(fmt));
-        SY_ERRORF("[ExportDispatcher] %s", msg.toUtf8().constData());
+        APR_ERRORF("[ExportDispatcher] %s", msg.toUtf8().constData());
         return ExportResult::fail(msg);
     }
 
@@ -51,7 +51,7 @@ ExportResult ExportDispatcher::dispatch(const ExportContext& context, const Fio:
     ExportContext fullCtx = context;
     fullCtx.format = fmt;
 
-    SY_DEBUGF("[ExportDispatcher] Dispatching export: format=%d, path=%s",
+    APR_DEBUGF("[ExportDispatcher] Dispatching export: format=%d, path=%s",
         static_cast<int>(fmt),
         context.targetPath.toUtf8().constData());
 
@@ -85,7 +85,7 @@ bool ExportDispatcher::canExport(const QString& filePath, QString* reasonOut) co
         {
             *reasonOut = reason;
         }
-        SY_DEBUGF("[ExportDispatcher] canExport=false: %s", reason.toUtf8().constData());
+        APR_DEBUGF("[ExportDispatcher] canExport=false: %s", reason.toUtf8().constData());
         return false;
     }
     return true;

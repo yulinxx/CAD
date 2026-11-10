@@ -14,11 +14,11 @@ public:
     QString formatName() const override;
     QString defaultExtension() const override;
 
-    ExportResult write(const ExportContext& context, const Fio::VecSyEntityPtr& entities) override;
+    ExportResult write(const ExportContext& context, const Fio::VecAprEntityPtr& entities) override;
 
 protected:
     /// 选择实际导出格式（默认返回构造时传入的格式；Native 按图元类型覆写）
-    virtual Fio::FileFormat resolveFormat(const Fio::VecSyEntityPtr& entities) const;
+    virtual Fio::FileFormat resolveFormat(const Fio::VecAprEntityPtr& entities) const;
 
     /// 成功消息（子类可覆写）
     virtual QString successMessage() const;

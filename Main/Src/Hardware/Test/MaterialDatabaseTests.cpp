@@ -20,6 +20,10 @@
 #  pragma warning(push)
 #  pragma warning(disable : 4996)
 #endif
+#if defined(__GNUC__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
 
 /**
  * @brief 材料库测试夹具。
@@ -226,6 +230,9 @@ TEST_F(MaterialDatabaseTest, GetRecommendedSettings_ReturnsSettings)
     EXPECT_DOUBLE_EQ(settings.recommendSpeed, 100.0);
 }
 
+#if defined(__GNUC__)
+#  pragma GCC diagnostic pop
+#endif
 #if defined(_MSC_VER)
 #  pragma warning(pop)
 #endif

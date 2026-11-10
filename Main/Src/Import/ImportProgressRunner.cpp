@@ -13,7 +13,7 @@
 #include <QWidget>
 
 #include "Import/ImportService.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "UI/Dlg/ProgressDialog.h"
 #include "UI/Progress/ProgressTracker.h"
 

@@ -9,7 +9,7 @@
 #include "UiWorkbench.h"
 #include "UiStateCenter.h"
 #include "BuildConfig.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "UI/Dlg/AboutDialog.h"
 #include "UI/Services/HelpDialogService.h"
 #include "UI/ThemeManager.h"
@@ -19,6 +19,7 @@
 #include "UI/Settings/SettingsService.h"
 
 #include <QCoreApplication>
+#include <QMessageBox>
 #include <QStatusBar>
 
 MenuDispatcher::MenuDispatcher(QObject* parent)
@@ -120,12 +121,18 @@ void MenuDispatcher::dispatch(const QString& commandId, const QVariantMap& param
         }
         else
         {
-            SY_WARNF("[MenuDispatcher] unknown language code '%s', ignore", qPrintable(code));
+            APR_WARNF("[MenuDispatcher] unknown language code '%s', ignore", qPrintable(code));
             return;
         }
         if (auto* settings = ApplicationCompositionRoot::getSettingsService(); settings && settings->isInitialized())
         {
-            settings->setLanguage(lang);
+            if (!settings->setLanguage(lang))
+            {
+                QMessageBox::warning(
+                    m_self ? m_self->workbenchWindow() : nullptr,
+                    QObject::tr("Language"),
+                    QObject::tr("Failed to load language resources; language unchanged"));
+            }
         }
         else
         {
@@ -175,7 +182,7 @@ void MenuDispatcher::dispatch(const QString& commandId, const QVariantMap& param
     // 只留一条 unhandled 日志而毫无动作。
     if (!m_workbench)
     {
-        SY_WARNF("[MenuDispatcher] No active workbench for command='%s'", commandId.toUtf8().constData());
+        APR_WARNF("[MenuDispatcher] No active workbench for command='%s'", commandId.toUtf8().constData());
         return;
     }
     m_workbench->dispatchCommand(commandId, params);

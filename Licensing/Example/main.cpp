@@ -5,7 +5,7 @@
 
 // ============================================================
 //  License C ABI 使用示例
-//  编译后执行 SyLicenseExample.exe
+//  编译后执行 AprLicenseExample.exe
 //
 //  典型调用顺序（见 LicenseDLL.h）：
 //    License_ConfigInit -> License_Create -> License_Check / License_GetInfo
@@ -17,14 +17,14 @@
 
 int main()
 {
-    std::printf("=== SyLicenseExample ===\n");
+    std::printf("=== AprLicenseExample ===\n");
     std::printf("Version: %s (0x%08X)\n",
         License_GetVersionString(), License_GetVersion());
 
     // ---- 1. 配置初始化 ----------------------------------------------------
     LicenseConfig config;
     License_ConfigInit(&config);
-    const std::string configDir = "SyLicenseExample_Config";
+    const std::string configDir = "AprLicenseExample_Config";
     config.configDir = configDir.c_str();
     config.enableCheck = 0;  // 演示模式：不启用校验
 

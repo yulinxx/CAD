@@ -12,11 +12,11 @@
  * 保证 organizationName / applicationName 在 Qt 创建任何路径前就是客户身份。
  *
  * 查找顺序：
- *   1. SANYI_BRAND_DIR（开发/自动化测试）
+ *   1. APR_BRAND_DIR（开发/自动化测试）
  *   2. <exe 目录>/branding/<clientId>/brand.json
  *   3. :/brand/<clientId>/brand.json
  *   4. :/brand/default/brand.json
- *   5. 内置默认（当前 SanYi CAD）
+ *   5. 内置默认（当前 April CAD）
  */
 class UiBrandManager
 {

@@ -7,10 +7,10 @@
 #include "Engine/Scene/SceneRenderContract.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Core/SceneNotifier.h"
-#include "Engine2D/SyEntity/SyImage.h"
-#include "Engine/SyEntity/SyEntity.h"
-#include "Engine/SyEntity/EType.h"
-#include "Engine/Layer/SyLayer.h"
+#include "Engine2D/AprEntity/AprImage.h"
+#include "Engine/AprEntity/AprEntity.h"
+#include "Engine/AprEntity/EType.h"
+#include "Engine/Layer/AprLayer.h"
 
 #include <QCheckBox>
 #include <QEvent>
@@ -129,7 +129,7 @@ protected:
     // 帧前准备（提交场景/位图）与后端无关，只有「帧钩子叫什么」随后端变：
     // GL 是 paintGL，Metal 是 paintEvent（RenderWidget 的基类在 Metal 下是
     // 普通 QWidget，没有 paintGL）。
-#ifdef SY_ENABLE_METAL_VIEWPORT
+#ifdef APR_ENABLE_METAL_VIEWPORT
     void paintEvent(QPaintEvent* event) override
     {
         prepareSceneBeforeFrame();
@@ -244,7 +244,7 @@ private:
         }
     }
 
-    /// 上传场景中所有可见位图（SyImage）的纹理，使占位符显示为实际图像
+    /// 上传场景中所有可见位图（AprImage）的纹理，使占位符显示为实际图像
     void uploadBitmaps()
     {
         if (!m_scene)
@@ -261,7 +261,7 @@ private:
             {
                 continue;
             }
-            const auto* image = static_cast<const Eg::SyImage*>(e);
+            const auto* image = static_cast<const Eg::AprImage*>(e);
             if (!image->pixelData() || image->nWidth <= 0 || image->nHeight <= 0)
             {
                 continue;
@@ -308,7 +308,7 @@ private:
             }
         }
 
-        void onEntityAdded(Eg::SyEntity* /*entity*/) override
+        void onEntityAdded(Eg::AprEntity* /*entity*/) override
         {
             if (m_self)
             {

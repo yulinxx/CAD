@@ -11,7 +11,7 @@
  */
 #include "Platform/MacMenuCleanup.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #import <Cocoa/Cocoa.h>
 
@@ -123,7 +123,7 @@ bool checkMacMenuImagesVisible()
             {
                 s_lastReportedHiddenCount = hidden;
                 NSString* sampleText = [samples componentsJoinedByString:@", "];
-                SY_ERRORF("[MacMenu] %d menu item(s) with icons are hidden by AppKit "
+                APR_ERRORF("[MacMenu] %d menu item(s) with icons are hidden by AppKit "
                           "(preferredImageVisibility != Visible) on macOS %s. Menu icons will be missing. "
                           "Sample: %s. Check ensureMacMenuImagesVisible() and Qt menu icon sync.",
                     hidden,

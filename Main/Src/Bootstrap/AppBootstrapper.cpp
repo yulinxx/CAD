@@ -10,7 +10,7 @@
 #include <QString>
 #include <QTimer>
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include "RenderBridge/RenderSessionHost.h"
 
@@ -41,7 +41,7 @@ namespace
 
         // 错误报告回调：将错误信息输出到日志系统
         services.reportError = [](const QString& errorCode, const QString& message, const QString& context) {
-            SY_ERRORF("[Error] code=%s message=%s context=%s",
+            APR_ERRORF("[Error] code=%s message=%s context=%s",
                 errorCode.toUtf8().constData(),
                 message.toUtf8().constData(),
                 context.toUtf8().constData());
@@ -49,7 +49,7 @@ namespace
 
         // 性能记录回调：记录关键操作的耗时
         services.recordPerformance = [](const QString& scope, qint64 elapsedMs) {
-            SY_DEBUGF("[perf] %s: %lld ms", scope.toUtf8().constData(), static_cast<long long>(elapsedMs));
+            APR_DEBUGF("[perf] %s: %lld ms", scope.toUtf8().constData(), static_cast<long long>(elapsedMs));
         };
 
         return services;
@@ -85,37 +85,37 @@ AppBootstrapper::~AppBootstrapper()
 // 初始化应用组合根组件，创建并验证所有必需的服务
 bool AppBootstrapper::initialize()
 {
-    SY_DEBUG("[AppBootstrapper] Initializing composition root");
+    APR_DEBUG("[AppBootstrapper] Initializing composition root");
 
     m_compositionRoot = std::make_unique<ApplicationCompositionRoot>();
 
     if (!m_compositionRoot)
     {
-        SY_ERROR("[AppBootstrapper] error code=bootstrap.root_create_failed message=Failed to create "
+        APR_ERROR("[AppBootstrapper] error code=bootstrap.root_create_failed message=Failed to create "
                  "ApplicationCompositionRoot");
         return false;
     }
 
     if (!m_compositionRoot->stateCenter())
     {
-        SY_ERROR("[AppBootstrapper] error code=bootstrap.root_missing_service message=ApplicationCompositionRoot "
+        APR_ERROR("[AppBootstrapper] error code=bootstrap.root_missing_service message=ApplicationCompositionRoot "
                  "missing state center");
         return false;
     }
     if (!m_compositionRoot->layoutService())
     {
-        SY_ERROR("[AppBootstrapper] error code=bootstrap.root_missing_service message=ApplicationCompositionRoot "
+        APR_ERROR("[AppBootstrapper] error code=bootstrap.root_missing_service message=ApplicationCompositionRoot "
                  "missing layout service");
         return false;
     }
     if (!m_compositionRoot->shellHost())
     {
-        SY_ERROR("[AppBootstrapper] error code=bootstrap.root_missing_service message=ApplicationCompositionRoot "
+        APR_ERROR("[AppBootstrapper] error code=bootstrap.root_missing_service message=ApplicationCompositionRoot "
                  "missing shell host");
         return false;
     }
 
-    SY_DEBUG("[AppBootstrapper] ApplicationCompositionRoot initialized successfully");
+    APR_DEBUG("[AppBootstrapper] ApplicationCompositionRoot initialized successfully");
 
     // 硬件装配：读机器档案 → 创建设备 → open → 挂 IO 点位与安全条件 → 启动 tick。
     // 刻意放在 UI 起来之前：安全联锁必须在用户能点「开始加工」之前就已经在评估，
@@ -131,12 +131,12 @@ bool AppBootstrapper::initialize()
                 // 这里不把 hardwareWarning 原文打进日志：那是给界面看的中文文案，
                 // 落到控制台/现场日志文件里就是 mojibake。具体原因由 Hardware 侧
                 // 用英文各自记过一遍，这里只标记「带告警启动」。
-                SY_WARN("[AppBootstrapper] hardware started with a warning "
+                APR_WARN("[AppBootstrapper] hardware started with a warning "
                         "(see the [MachineProfile]/[DeviceHost] entries above for details)");
             }
             else
             {
-                SY_INFO("[AppBootstrapper] Hardware started successfully");
+                APR_INFO("[AppBootstrapper] Hardware started successfully");
             }
         }
         else
@@ -145,12 +145,12 @@ bool AppBootstrapper::initialize()
             // 不该以 ERROR 级别污染日志。真正的硬件"已编进但启动失败"才是 ERROR
             if (DeviceHost::isHardwareSupportCompiled())
             {
-                SY_ERRORF("[AppBootstrapper] error code=bootstrap.hardware_start_failed message=%s",
+                APR_ERRORF("[AppBootstrapper] error code=bootstrap.hardware_start_failed message=%s",
                     hardwareWarning.toUtf8().constData());
             }
             else
             {
-                SY_INFO("[AppBootstrapper] Hardware module not compiled in (BUILD_HARDWARE=OFF), skipping hardware start — "
+                APR_INFO("[AppBootstrapper] Hardware module not compiled in (BUILD_HARDWARE=OFF), skipping hardware start — "
                         "laser processing features will be unavailable, but drawing and editing work as usual");
             }
         }
@@ -162,11 +162,11 @@ bool AppBootstrapper::initialize()
 // 执行应用引导序列，组装UI服务并启动工作台
 void AppBootstrapper::bootstrap()
 {
-    SY_DEBUG("[AppBootstrapper] Starting bootstrap sequence");
+    APR_DEBUG("[AppBootstrapper] Starting bootstrap sequence");
 
     if (!m_compositionRoot)
     {
-        SY_ERROR("[AppBootstrapper] error code=bootstrap.no_root message=bootstrap() called without composition root");
+        APR_ERROR("[AppBootstrapper] error code=bootstrap.no_root message=bootstrap() called without composition root");
         return;
     }
 
@@ -191,13 +191,13 @@ void AppBootstrapper::bootstrap()
 
     if (!m_workbench->initialize(uiServices.workbench()))
     {
-        SY_ERRORF(
+        APR_ERRORF(
             "[AppBootstrapper] error code=bootstrap.workbench_init_failed message=Workbench '%s' initialization failed",
             startWorkbenchId.toUtf8().constData());
 
         return;
     }
-    SY_DEBUGF("[AppBootstrapper] Workbench '%s' initialized successfully", startWorkbenchId.toUtf8().constData());
+    APR_DEBUGF("[AppBootstrapper] Workbench '%s' initialized successfully", startWorkbenchId.toUtf8().constData());
 
     auto* shell = m_compositionRoot->shellHost();
     shell->setFrameworkServices(buildFrameworkServices(m_compositionRoot.get()));
@@ -205,7 +205,7 @@ void AppBootstrapper::bootstrap()
     shell->setWorkbench(m_workbench.get());
     shell->initializeAndShow();
 
-    SY_DEBUG("[AppBootstrapper] UI shell initialized and shown");
+    APR_DEBUG("[AppBootstrapper] UI shell initialized and shown");
 }
 
 // 关闭应用，按顺序清理UI壳和工作台资源。幂等。
@@ -217,7 +217,7 @@ void AppBootstrapper::shutdown()
     }
     m_shutdownDone = true;
 
-    SY_DEBUG("[AppBootstrapper] Starting shutdown");
+    APR_DEBUG("[AppBootstrapper] Starting shutdown");
 
     if (m_compositionRoot)
     {
@@ -243,7 +243,7 @@ void AppBootstrapper::shutdown()
     // Renderx 会报 `Runtime destroyed with N sessions still alive`。
     RenderBridge::RenderSessionHost::shutdownSharedRuntime();
 
-    SY_DEBUG("[AppBootstrapper] Shutdown complete");
+    APR_DEBUG("[AppBootstrapper] Shutdown complete");
 }
 
 // 获取应用组合根组件指针

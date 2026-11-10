@@ -7,7 +7,7 @@
 #include "SceneTreeBuilder3D.h"
 
 #include "Engine3D/SceneManager3D.h"
-#include "Engine3D/SyEntity/SyMeshEntity.h"
+#include "Engine3D/AprEntity/AprMeshEntity.h"
 
 #include <QObject>
 #include <unordered_set>
@@ -16,9 +16,9 @@
 namespace
 {
     /// 收集所有网格图元（forEachEntity 回调）
-    void collectMesh(Eg::SyMeshEntity* mesh, void* ctx)
+    void collectMesh(Eg::AprMeshEntity* mesh, void* ctx)
     {
-        auto* out = static_cast<std::vector<const Eg::SyMeshEntity*>*>(ctx);
+        auto* out = static_cast<std::vector<const Eg::AprMeshEntity*>*>(ctx);
         if (mesh)
         {
             out->push_back(mesh);
@@ -34,7 +34,7 @@ namespace
     }
 }  // namespace
 
-SceneTreeNode3D SceneTreeBuilder3D::buildMeshNode(const Eg::SyMeshEntity* mesh, bool selected)
+SceneTreeNode3D SceneTreeBuilder3D::buildMeshNode(const Eg::AprMeshEntity* mesh, bool selected)
 {
     SceneTreeNode3D node;
     if (!mesh)
@@ -66,12 +66,12 @@ SceneTreeModel3D SceneTreeBuilder3D::build(Eg::SceneManager3D* scene)
     selectedSet.reserve(scene->getSelectedEntityCount());
     scene->forEachSelectedEntityId(&collectSelectedId, &selectedSet);
 
-    std::vector<const Eg::SyMeshEntity*> meshes;
+    std::vector<const Eg::AprMeshEntity*> meshes;
     meshes.reserve(scene->getEntityCount());
     scene->forEachEntity(&collectMesh, &meshes);
 
     model.nodes.reserve(static_cast<int>(meshes.size()));
-    for (const Eg::SyMeshEntity* mesh : meshes)
+    for (const Eg::AprMeshEntity* mesh : meshes)
     {
         if (!mesh)
         {
@@ -100,9 +100,9 @@ QSet<QString> SceneTreeBuilder3D::selectedIds(Eg::SceneManager3D* scene)
         return ids;
     }
 
-    std::vector<const Eg::SyMeshEntity*> meshes;
+    std::vector<const Eg::AprMeshEntity*> meshes;
     scene->forEachSelectedMesh(&collectMesh, &meshes);
-    for (const Eg::SyMeshEntity* mesh : meshes)
+    for (const Eg::AprMeshEntity* mesh : meshes)
     {
         if (mesh)
         {

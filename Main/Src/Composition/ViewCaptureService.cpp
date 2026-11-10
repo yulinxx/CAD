@@ -13,7 +13,7 @@
 #endif
 #include "Engine2D/Environment/SceneEnvironment.h"
 #include "Engine3D/SceneManager3D.h"
-#include "Engine3D/SyEntity/SyMeshEntity.h"
+#include "Engine3D/AprEntity/AprMeshEntity.h"
 
 #include <QApplication>
 #include <QDir>
@@ -32,7 +32,7 @@ namespace Ui
     {
         // 使用 HHmmss (24小时制) 避免午夜时段文件名排序问题
         const QString ts = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss_zzz");
-        return QString("SanYiCAD_%1_%2.png").arg(is3D ? "3D" : "2D").arg(ts);
+        return QString("April_%1_%2.png").arg(is3D ? "3D" : "2D").arg(ts);
     }
 
     QString ViewCaptureService::screenshotsDir() const
@@ -43,7 +43,7 @@ namespace Ui
         {
             base = QDir::homePath();
         }
-        QString dir = QDir(base).filePath("SanYiCAD/Screenshots");
+        QString dir = QDir(base).filePath("April/Screenshots");
         QDir().mkpath(dir);
         return dir;
     }

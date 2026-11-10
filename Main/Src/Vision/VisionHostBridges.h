@@ -142,6 +142,11 @@ namespace VisHost
      *
      * 每个点编译成 RapidTo -> LaserOn -> Dwell -> LaserOff 一条计划，
      * 一组点合成一份计划下发，避免逐点起停振镜。
+     *
+     * 标定点同样会真实出光，因此与正式加工共用同一条安全链：
+     * DeviceHost::canStartProcessing() 门控 + EmissionGuard::beginJob/endJob
+     * 生命周期（见 .cpp 里的 EmissionLease）。安全裁决不满足或出光已闭锁时
+     * 返回 InvalidState，任何失败路径都不会把出光使能留在 Enabled。
      */
     class GalvoController : public Vis::IGalvoController
     {

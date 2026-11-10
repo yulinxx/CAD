@@ -10,7 +10,7 @@
 #include "RenderAbstraction/ScreenConstantMetrics.h"
 
 #include "Ut/Def.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <algorithm>
 #include <cmath>
@@ -67,7 +67,7 @@ namespace
         // 环容量不足时后端返回 false；丢弃本批而不是画出错误几何。
         if (!scene.allocTransient(bytes, a) || a.cpuPtr == nullptr)
         {
-            SY_DEBUGF("[OverlayScene] allocTransient failed: bytes=%llu, a.buffer=%llu, a.cpuPtr=%p",
+            APR_DEBUGF("[OverlayScene] allocTransient failed: bytes=%llu, a.buffer=%llu, a.cpuPtr=%p",
                 static_cast<unsigned long long>(bytes),
                 static_cast<unsigned long long>(a.buffer.value),
                 static_cast<void*>(a.cpuPtr));
@@ -495,7 +495,7 @@ namespace RenderBridge
         {
             // 每块四边形 4 个顶点，长度不是 4 的倍数说明调用方拼错了，
             // 直接拒绝而不是画出一半的几何
-            SY_ERRORF("[OverlayScene] setSelectionHighlight: quadCorners size %zu is not a multiple of 4",
+            APR_ERRORF("[OverlayScene] setSelectionHighlight: quadCorners size %zu is not a multiple of 4",
                 quadCorners.size());
             return;
         }

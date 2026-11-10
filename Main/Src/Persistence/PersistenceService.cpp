@@ -18,7 +18,7 @@
 #include "Repositories/DialogStateRepository.h"
 
 #include "Engine/Persistence/Database.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 PersistenceService::PersistenceService()
     : m_database(std::make_unique<Eg::Database>())
@@ -32,12 +32,12 @@ PersistenceService::~PersistenceService()
 
 bool PersistenceService::initialize(const std::string& dbPath)
 {
-    SY_DEBUGF("[PersistenceService] Initializing database at: %s", dbPath.c_str());
+    APR_DEBUGF("[PersistenceService] Initializing database at: %s", dbPath.c_str());
 
     if (!m_database->open(dbPath))
     {
         m_lastError = "Failed to open database: " + m_database->lastError();
-        SY_ERRORF("[PersistenceService] %s", m_lastError.c_str());
+        APR_ERRORF("[PersistenceService] %s", m_lastError.c_str());
         return false;
     }
 
@@ -46,7 +46,7 @@ bool PersistenceService::initialize(const std::string& dbPath)
     if (!m_bootstrapper->ensureSchema())
     {
         m_lastError = m_bootstrapper->lastError();
-        SY_ERRORF("[PersistenceService] %s", m_lastError.c_str());
+        APR_ERRORF("[PersistenceService] %s", m_lastError.c_str());
         return false;
     }
 
@@ -60,7 +60,7 @@ bool PersistenceService::initialize(const std::string& dbPath)
     // 创建对话框状态仓储（v5 新增）
     m_dialogStates = std::make_unique<DialogStateRepository>(*m_database);
 
-    SY_DEBUG("[PersistenceService] Initialized successfully");
+    APR_DEBUG("[PersistenceService] Initialized successfully");
     return true;
 }
 
@@ -91,7 +91,7 @@ void PersistenceService::shutdown()
     m_bootstrapper.reset();
     m_database->close();
 
-    SY_DEBUG("[PersistenceService] Shutdown complete");
+    APR_DEBUG("[PersistenceService] Shutdown complete");
 }
 
 bool PersistenceService::isOpen() const

@@ -4,14 +4,14 @@
  */
 #include "DxfImportReader.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 DxfImportReader::DxfImportReader()
     : ImportReaderBase(Fio::FileFormat::DXF, { QStringLiteral("dxf") }, QStringLiteral("DXF"), ImportDimension::Dim2D)
 {
 }
 
-ImportResult DxfImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
+ImportResult DxfImportReader::read(const ImportContext& context, Fio::VecAprEntityPtr& outEntities)
 {
     // 主链路：中立 IR 导入（parseToIR → FioEntityConverter）
     // FileIO 不再直接实例化 Engine 对象，IR 为跨 DLL 安全的 POD；
@@ -22,7 +22,7 @@ ImportResult DxfImportReader::read(const ImportContext& context, Fio::VecSyEntit
     {
         return result;
     }
-    SY_WARNF("[DxfImportReader] IR path unavailable, falling back to legacy: %s",
+    APR_WARNF("[DxfImportReader] IR path unavailable, falling back to legacy: %s",
         errMsg.isEmpty() ? "no entities" : errMsg.toUtf8().constData());
 
     // 回退路径：旧版 importFile（不携带图层表信息，图层结构无法还原，图元将归入当前图层）

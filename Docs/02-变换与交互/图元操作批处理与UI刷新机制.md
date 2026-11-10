@@ -64,12 +64,12 @@ flowchart LR
 
 ### 2.1.1 SmartLine 批量变换
 
-文件：`Engine/2D/Src/SyEntity/SySmartLine.cpp` (`transformBatch`)、`Engine/2D/Src/Algorithm/EntityTransform.cpp` (`applyMatrixToIds`)
+文件：`Engine/2D/Src/AprEntity/AprSmartLine.cpp` (`transformBatch`)、`Engine/2D/Src/Algorithm/EntityTransform.cpp` (`applyMatrixToIds`)
 
 SVG 导入的复合曲线大多以 `SmartLine` 存储（一条 SVG 子路径 = 一个 SmartLine，含数百段贝塞尔/线段）。逐段调用虚函数 `transform()` 会让每段都付出一次 vtable 查找与分发开销，**必须**走批量路径。
 
 **做法**：
-- `SySmartLine::transformBatch(const Ut::Mat3d& mat)`：预计算矩阵分量，按已知类型分发（LINE/ARC/BEZIER2/BEZIER/CIRCLE/ELLIPSE/POINT/POLYGON），内联矩阵乘法，避免虚函数分发。
+- `AprSmartLine::transformBatch(const Ut::Mat3d& mat)`：预计算矩阵分量，按已知类型分发（LINE/ARC/BEZIER2/BEZIER/CIRCLE/ELLIPSE/POINT/POLYGON），内联矩阵乘法，避免虚函数分发。
 - `EntityTransform::applyMatrixToIds()` 检测到 `EType::SMARTLINE` 时直接调用 `transformBatch()`。
 - 所有子段标记 `setModified()`，级联缓存失效，防止渲染脏读。
 
@@ -190,7 +190,7 @@ Esc 取消则用 before 快照整体还原。拖动期间
 
 选择管理器由 `SceneManager3D` 持有（单店合一），图元移除时由场景在图元仍存活的窗口内
 直接调用 `SelectionManager3D::dropFromSelection(entities, count)`。
-签名**不得**是逐图元的 `void(SyMeshEntity*)`：那样每次回调都要
+签名**不得**是逐图元的 `void(AprMeshEntity*)`：那样每次回调都要
 `forEachEntity` 把**全场景**图元塞进哈希表：
 
 ```text
@@ -222,15 +222,15 @@ Esc 取消则用 before 快照整体还原。拖动期间
 
 ### 4.4 实体可见性变更的增量记录
 
-**问题**：`SyEntity::setVisible()` 若只调 `setModified()` 标脏而**不记录场景变更**，
+**问题**：`AprEntity::setVisible()` 若只调 `setModified()` 标脏而**不记录场景变更**，
 批量隐藏/显示实体时 `readChanges()` 读不到 `VisibilityChanged`，渲染侧无法走增量
 路径，只能退回全量重建 —— 选中大量图元反复显隐时的主要卡顿来源就在这里。
 
-**方案**：给 `SyEntity` 增加可见性变更回调，由 `SceneManager` / `SceneManager3D` 在
+**方案**：给 `AprEntity` 增加可见性变更回调，由 `SceneManager` / `SceneManager3D` 在
 实体入场时注入，回调体统一 `recordChange(id, SceneChangeKind::VisibilityChanged)`：
 
 ```cpp
-// SyEntity.h
+// AprEntity.h
 void setVisible(bool visible) override {
     if (m_bVisible != visible) {
         m_bVisible = visible;
@@ -260,7 +260,7 @@ void setVisible(bool visible) override {
 
 **方案**：
 
-- 引擎加 `SceneChangeKind::LockChanged` 与 `SyEntity` 锁定变更回调（与可见性同一形状），
+- 引擎加 `SceneChangeKind::LockChanged` 与 `AprEntity` 锁定变更回调（与可见性同一形状），
   `SceneManager` / `SceneManager3D` 入场时注入并 `recordChange(LockChanged)`；
 - 新增批量接口 `setEntitiesLocked(ids|pointers, locked)`（2D/3D），**不触发
   `notifySceneChanged`**；

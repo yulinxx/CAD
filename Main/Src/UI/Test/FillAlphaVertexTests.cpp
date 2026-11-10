@@ -26,10 +26,11 @@
 #include "Engine2D/Algorithm/EntityColorFiller.h"
 #include "Engine2D/Algorithm/EntityContourFiller.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/SceneWriteGateway.h"
 #include "Engine2D/Interaction/LayerManager.h"
 #include "Engine2D/Geometry/EntityGeometryEmitter.h"
-#include "Engine2D/SyEntity/SyFillRegion.h"
-#include "Engine2D/SyEntity/SyPolygon.h"
+#include "Engine2D/AprEntity/AprFillRegion.h"
+#include "Engine2D/AprEntity/AprPolygon.h"
 
 #include "Render/RenderSceneBuilder.h"
 #include "RenderAbstraction/IRenderDevice.h"
@@ -381,7 +382,7 @@ namespace
         }
     };
 
-    void buildTriangleFill(Eg::SyFillRegion& fill, const Ut::Color& color)
+    void buildTriangleFill(Eg::AprFillRegion& fill, const Ut::Color& color)
     {
         fill.setVertexVector({
             Ut::Vec2d(20.0, 20.0),
@@ -391,7 +392,7 @@ namespace
         fill.setOverrideColor(color);
     }
 
-    void emitFill(Render::RenderSceneBuilder& builder, const Eg::SyFillRegion& fill)
+    void emitFill(Render::RenderSceneBuilder& builder, const Eg::AprFillRegion& fill)
     {
         builder.beginRebuild();
         Eg::emitEntityGeometry(fill, builder);
@@ -483,9 +484,9 @@ namespace
 TEST(FillAlphaVertexTest, AdjacentFillPiecesStayMergeable)
 {
     FillFixture fixture;
-    Eg::SyFillRegion fillA;
+    Eg::AprFillRegion fillA;
     buildTriangleFill(fillA, Ut::Color(1.0f, 0.0f, 0.0f, 0.5f));
-    Eg::SyFillRegion fillB;
+    Eg::AprFillRegion fillB;
     buildTriangleFill(fillB, Ut::Color(0.0f, 1.0f, 0.0f, 0.5f));
 
     fixture.builder.beginRebuild();
@@ -524,7 +525,7 @@ TEST(FillAlphaVertexTest, FillVerticesCarryAlpha)
     static_assert(sizeof(Ut::VertexP3C3) == 24, "P3C3 stride must be 24 bytes");
 
     FillFixture fixture;
-    Eg::SyFillRegion fill;
+    Eg::AprFillRegion fill;
     buildTriangleFill(fill, Ut::Color(1.0f, 0.0f, 0.0f, 0.5f));
     emitFill(fixture.builder, fill);
 
@@ -556,7 +557,7 @@ TEST(FillAlphaVertexTest, FillVerticesCarryAlpha)
 TEST(FillAlphaVertexTest, OpaqueFillMatchesLegacyP3C3Output)
 {
     FillFixture fixture;
-    Eg::SyFillRegion fill;
+    Eg::AprFillRegion fill;
     buildTriangleFill(fill, Ut::Color(0.25f, 0.5f, 0.75f, 1.0f));
     emitFill(fixture.builder, fill);
 
@@ -592,7 +593,7 @@ TEST(FillAlphaVertexTest, OpaqueFillMatchesLegacyP3C3Output)
 TEST(FillAlphaVertexTest, AlphaChangeRewritesGeometry)
 {
     FillFixture fixture;
-    Eg::SyFillRegion fill;
+    Eg::AprFillRegion fill;
     buildTriangleFill(fill, Ut::Color(1.0f, 0.0f, 0.0f, 0.5f));
     emitFill(fixture.builder, fill);
 
@@ -630,7 +631,7 @@ TEST(FillAlphaVertexTest, AssemblyMicroBenchmark)
     }
 
     FillFixture fixture;
-    Eg::SyFillRegion fill;
+    Eg::AprFillRegion fill;
     buildTriangleFill(fill, Ut::Color(0.2f, 0.4f, 0.9f, 0.5f));
 
     const double iterations = 3.0;
@@ -696,13 +697,13 @@ TEST(FillColorPixelTest, SpiralFillFollowsSourceLayerColor)
             return std::array<uint8_t, 3>{ 0, 0, 0 };
         }
 
-        auto src = std::make_unique<Eg::SyPolygon>();
+        auto src = std::make_unique<Eg::AprPolygon>();
         src->setVertices({ Ut::Vec2d(0, 0), Ut::Vec2d(40, 0), Ut::Vec2d(40, 24), Ut::Vec2d(0, 24) });
         src->bClosed = true;
-        Eg::SyEntity* srcPtr = src.get();
-        std::vector<std::unique_ptr<Eg::SyEntity>> srcBatch;
+        Eg::AprEntity* srcPtr = src.get();
+        std::vector<std::unique_ptr<Eg::AprEntity>> srcBatch;
         srcBatch.push_back(std::move(src));
-        scene.addEntities(std::move(srcBatch));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(srcBatch));
         // 源图形必须真正属于该图层，填充才会跟随它的颜色并落回同层
         layerManager.assignEntityToLayer(srcPtr, nLayerId);
 
@@ -758,7 +759,7 @@ TEST(FillColorPixelTest, SpiralFillFollowsSourceLayerColor)
 
         // 取色口径：不设覆盖色，结果色回落到源图形所属图层色，且结果落回同一图层
         int nFillLayerId = -1;
-        for (Eg::SyEntity* e : scene.getAllEntities())
+        for (Eg::AprEntity* e : scene.getAllEntities())
         {
             if (e == srcPtr)
             {
@@ -775,7 +776,7 @@ TEST(FillColorPixelTest, SpiralFillFollowsSourceLayerColor)
         // 把结果图元送进真实渲染装配链路，取回实际顶点字节
         FillFixture fixture;
         fixture.builder.beginRebuild();
-        for (Eg::SyEntity* e : scene.getAllEntities())
+        for (Eg::AprEntity* e : scene.getAllEntities())
         {
             if (e != srcPtr)
             {
@@ -896,13 +897,13 @@ TEST(FillColorPixelTest, ColorFillExplicitColorReachesRenderedPixel)
 
     auto sampleFilledPixel = [&](const Ut::Color& fillColor) -> std::array<uint8_t, 3> {
         Eg::SceneManager scene;
-        auto src = std::make_unique<Eg::SyPolygon>();
+        auto src = std::make_unique<Eg::AprPolygon>();
         src->setVertices({ Ut::Vec2d(0, 0), Ut::Vec2d(40, 0), Ut::Vec2d(40, 24), Ut::Vec2d(0, 24) });
         src->bClosed = true;
-        Eg::SyEntity* srcPtr = src.get();
-        std::vector<std::unique_ptr<Eg::SyEntity>> srcBatch;
+        Eg::AprEntity* srcPtr = src.get();
+        std::vector<std::unique_ptr<Eg::AprEntity>> srcBatch;
         srcBatch.push_back(std::move(src));
-        scene.addEntities(std::move(srcBatch));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(srcBatch));
 
         // 色块填充写入需要图层管理器：这里给它一个独立图层，颜色仍由显式参数决定
         LayerManager layerManager(&scene);
@@ -929,7 +930,7 @@ TEST(FillColorPixelTest, ColorFillExplicitColorReachesRenderedPixel)
         }
 
         // 颜色填充的语义：显式颜色写到结果图元的覆盖色上
-        for (Eg::SyEntity* e : scene.getAllEntities())
+        for (Eg::AprEntity* e : scene.getAllEntities())
         {
             if (e == srcPtr)
             {
@@ -942,7 +943,7 @@ TEST(FillColorPixelTest, ColorFillExplicitColorReachesRenderedPixel)
 
         FillFixture fixture;
         fixture.builder.beginRebuild();
-        for (Eg::SyEntity* e : scene.getAllEntities())
+        for (Eg::AprEntity* e : scene.getAllEntities())
         {
             if (e != srcPtr)
             {

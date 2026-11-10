@@ -4,7 +4,7 @@
  */
 #include "PltImportReader.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 PltImportReader::PltImportReader()
     : ImportReaderBase(Fio::FileFormat::PLT,
@@ -14,7 +14,7 @@ PltImportReader::PltImportReader()
 {
 }
 
-ImportResult PltImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
+ImportResult PltImportReader::read(const ImportContext& context, Fio::VecAprEntityPtr& outEntities)
 {
     // PltParser 仅实现 IR 路径（PLT 逻辑简单，无需旧路径回退）；
     // collectLayers=true：把 SP 笔号图层（"Pen n"）还原到 ImportService。

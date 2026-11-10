@@ -17,7 +17,7 @@
 
 namespace
 {
-QApplication* ensureApplication()
+QApplication* ensureEmergencyApplication()
 {
     if (qApp)
     {
@@ -48,7 +48,7 @@ public:
 
 TEST(EmergencyStopTests, PhysicalResetIsRequiredBeforeConfirmReset)
 {
-    ensureApplication();
+    ensureEmergencyApplication();
 
     FakeDeviceState device;
     auto controller = device.createController();
@@ -76,7 +76,7 @@ TEST(EmergencyStopTests, PhysicalResetIsRequiredBeforeConfirmReset)
 
 TEST(EmergencyStopTests, ConfirmResetOnlyClearsLatchAndDoesNotEnableLaser)
 {
-    ensureApplication();
+    ensureEmergencyApplication();
 
     FakeDeviceState device;
     auto controller = device.createController();
@@ -98,7 +98,7 @@ TEST(EmergencyStopTests, ConfirmResetOnlyClearsLatchAndDoesNotEnableLaser)
 
 TEST(EmergencyStopTests, PersistedLatchSurvivesRestartAsEmergencyState)
 {
-    ensureApplication();
+    ensureEmergencyApplication();
 
     FakeDeviceState device;
     device.persistedLatch = true;
@@ -113,7 +113,7 @@ TEST(EmergencyStopTests, PersistedLatchSurvivesRestartAsEmergencyState)
 
 TEST(EmergencyStopTests, OverlayTriggersImmediatelyAndKeepsTwoSeparateActions)
 {
-    ensureApplication();
+    ensureEmergencyApplication();
 
     FakeDeviceState device;
     auto controller = device.createController();
@@ -158,7 +158,7 @@ TEST(EmergencyStopTests, OverlayTriggersImmediatelyAndKeepsTwoSeparateActions)
 
 TEST(EmergencyStopTests, RestartLatchKeepsStartActionDisabled)
 {
-    ensureApplication();
+    ensureEmergencyApplication();
 
     FakeDeviceState device;
     device.persistedLatch = true;

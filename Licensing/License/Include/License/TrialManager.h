@@ -13,8 +13,8 @@
  * - 防绕过：文件 + 机器指纹双重绑定
  *
  * 存储位置：
- * - Windows: 注册表 HKEY_CURRENT_USER\Software\SanYiCAD\Trial + 文件
- * - macOS/Linux: 文件 ~/.config/sanyicad/trial.info
+ * - Windows: 注册表 HKEY_CURRENT_USER\Software\April\Trial + 文件
+ * - macOS/Linux: 文件 ~/.config/april/trial.info
  */
 
 #ifdef __cplusplus

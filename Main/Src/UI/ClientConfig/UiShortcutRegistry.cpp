@@ -6,7 +6,7 @@
 
 #include "UI/Shortcut/ShortcutOverrideStore.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <QAction>
 #include <QCoreApplication>
@@ -88,7 +88,7 @@ void UiShortcutRegistry::recordAction(QAction* action,
     if (existing >= 0)
     {
         // 同一命令出现在多处菜单：只认第一处，否则设置页会出现重复行。
-        SY_DEBUGF("[%s] Duplicated command '%s' in menus, keep the first binding", LOG_TAG, qPrintable(commandId));
+        APR_DEBUGF("[%s] Duplicated command '%s' in menus, keep the first binding", LOG_TAG, qPrintable(commandId));
         return;
     }
 
@@ -146,7 +146,7 @@ bool UiShortcutRegistry::setCurrentKey(const QString& commandId, const QKeySeque
     const int index = indexOf(commandId);
     if (index < 0)
     {
-        SY_WARNF("[%s] setCurrentKey: unknown command '%s'", LOG_TAG, qPrintable(commandId));
+        APR_WARNF("[%s] setCurrentKey: unknown command '%s'", LOG_TAG, qPrintable(commandId));
         return false;
     }
     m_bindings[index].currentKey = key;

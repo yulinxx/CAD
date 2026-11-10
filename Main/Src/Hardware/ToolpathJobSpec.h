@@ -8,13 +8,13 @@
  *
  * 仓库里此前有四套互不相通的工艺参数：
  *   - `HardwareProfile`（Engine2D，按图层绑定）—— 但 `HardwareProfileManager`
- *     全仓库没有任何实例化点，且 `hardwareProfileId` 不写入 .sy 文档；
+ *     全仓库没有任何实例化点，且 `hardwareProfileId` 不写入 .apr 文档；
  *   - `Eg::ProcessParams`（SQLite 预设，与图层/图元无绑定）；
  *   - `Eg::MaterialInfo`（材料推荐值）与 `MaterialDatabase::MaterialInfo`（后者已随 `MaterialDatabase` 弃用退场，仅保留 ABI 兼容）；
  *   - 本文件里的 `LayerProcessParams`（第四份）。
  *
  * v2 起统一为**一份**：`Eg::ProcessParams`（Engine/Common/Include/Engine/Process/）。
- * 它被三方同时看见：FileIO（写进 .sy）、Engine2D/Cam（生成刀路）、UI（工艺面板）。
+ * 它被三方同时看见：FileIO（写进 .apr）、Engine2D/Cam（生成刀路）、UI（工艺面板）。
  * 放在 Engine/Common 是因为 FileIO 只依赖 EngineCommon，Engine2D 也依赖 EngineCommon ——
  * 放这里三方都能用，且不产生任何新的模块依赖。
  *

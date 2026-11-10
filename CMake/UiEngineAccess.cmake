@@ -6,17 +6,24 @@
 #   各自直接链接 EngineCommon/Engine2D/Engine3D/EnginePersistence。
 #
 # 为什么不是"接口抽象"
-#   UI 与 Engine 共享同一套领域模型（SceneManager / SyEntity / Selection /
+#   UI 与 Engine 共享同一套领域模型（SceneManager / AprEntity / Selection /
 #   撤销命令等），无法用窄接口隔离（详见
-#   Docs/01-当前架构/UI-Engine解耦迁移方案.md §1.2）。本门面只做"依赖收口"：
-#   UI 的全部 #include "Engine*/..." 无需改动，包含目录由本目标传递。
+#   Docs/01-当前架构/UI-Engine解耦迁移方案.md §1.2）。
 #
-# 规则（由 sanyi_check_dependency_directions 强制）
-#   - UI/* 模块只允许链接 UiEngineAccess，禁止直接链接 Engine*。
+# 门面的实际覆盖范围（不要误读为"include 层已收口"）
+#   - 链接层：这是**唯一**收口点。UI/* 只链本目标，由它向下传递 Engine*。
+#   - include 层：只部分收口。UiEngineAccess/Include 下的转发头仅覆盖
+#     Engine2D 的**算法 / 填充 / 离散化**子集；场景 / 实体 / 选择 / 编辑等
+#     API 仍由 UI 直接 #include "Engine2D/..." / "Engine3D/..." / "Engine/..."。
+#     这块不做存量迁移（公共头已暴露 Engine 类型，隐藏需另立公共 API 治理），
+#     但禁止继续增长，由 CMake/UiEngineAccessRatchet.cmake 的棘轮校验拦截。
+#
+# 规则（由 apr_check_dependency_directions 强制）
+#   - UI/* 模块只允许链接 UiEngineAccess，禁止直接链接 Engine*（链接层）。
 #   - 依赖方向单向：UiEngineAccess → Engine*；Engine 不得反向依赖 UI。
 # ============================================================================
 
-function(sanyi_define_ui_engine_access)
+function(apr_define_ui_engine_access)
     if(TARGET UiEngineAccess)
         return()
     endif()
@@ -26,17 +33,18 @@ function(sanyi_define_ui_engine_access)
     foreach(_t IN LISTS _engine_targets)
         if(NOT TARGET ${_t})
             message(FATAL_ERROR
-                "[sanyi_define_ui_engine_access] 缺少目标 ${_t}；"
+                "[apr_define_ui_engine_access] 缺少目标 ${_t}；"
                 "请在 add_subdirectory(Engine/*) 之后再调用本函数。")
         endif()
     endforeach()
 
     add_library(UiEngineAccess INTERFACE)
 
-    # 门面转发头：UI 对 Engine2D 内部实现头（Geometry/Render/Algorithm）的依赖
-    # 统一收口到 UiEngineAccess/Include/UiEngineAccess/ 的转发头，
-    # UI 代码只 include "UiEngineAccess/Xxx.h"。转发头清单 = UI 允许触达的
-    # Engine2D 内部面，新增一个转发头就是一次显式的依赖面扩张决策。
+    # 门面转发头：为 UI 提供 Engine2D **算法 / 填充 / 离散化** 子集的稳定
+    # include 路径（UI 代码 include "UiEngineAccess/Xxx.h"）。
+    # 注意：这不覆盖场景 / 实体 / 选择 / 编辑 API —— 那部分 UI 仍直接
+    # include "Engine2D/..." / "Engine3D/..." / "Engine/"。转发头清单是
+    # "允许新增的 include 收口面"，不是"UI 可触达的全部 Engine 面"。
     target_include_directories(UiEngineAccess INTERFACE
         "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../UiEngineAccess/Include"
     )
@@ -51,5 +59,5 @@ function(sanyi_define_ui_engine_access)
         DESCRIPTION "Single access facade: UI -> Engine (dependency choke point)"
     )
 
-    message(STATUS "[UiEngineAccess] UI → Engine 唯一访问门面已定义")
+    message(STATUS "[UiEngineAccess] UI → Engine 唯一访问门面已定义（链接层收口）")
 endfunction()

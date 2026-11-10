@@ -1,6 +1,6 @@
 # __PRODUCT_NAME__ client plugin
 
-This repository is a per-client white-label extension for SanYi CAD.
+This repository is a per-client white-label extension for April CAD.
 
 ## Layout
 

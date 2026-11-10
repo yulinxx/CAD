@@ -2,11 +2,12 @@
 
 #include "Engine/Scene/ISceneContext.h"
 #include "Engine3D/SceneManager3D.h"
-#include "Engine3D/SyEntity/SyMeshEntity.h"
+#include "Engine3D/AprEntity/AprMeshEntity.h"
 #include "Engine2D/Core/SceneManager.h"
-#include "Engine2D/SyEntity/SyPolygon.h"
+#include "Engine2D/Edit/SceneEditService.h"
+#include "Engine2D/AprEntity/AprPolygon.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <algorithm>
 
@@ -41,26 +42,26 @@ bool MachiningDataBridgeService::sliceAndInject(
 
     if (!isAvailable())
     {
-        SY_WARN("[MachiningDataBridge] sliceAndInject: slice provider is not registered "
+        APR_WARN("[MachiningDataBridge] sliceAndInject: slice provider is not registered "
                 "(build with BUILD_ENGRAVING and register MeshSlicer to enable)");
         return false;
     }
     if (layerHeight <= 0.0)
     {
-        SY_WARNF("[MachiningDataBridge] sliceAndInject: invalid layer height %.6f", layerHeight);
+        APR_WARNF("[MachiningDataBridge] sliceAndInject: invalid layer height %.6f", layerHeight);
         return false;
     }
     // 目标 2D 场景必须显式给出：不隐式写当前场景，避免把加工数据注入到错误的文档
     if (!target2D)
     {
-        SY_WARN("[MachiningDataBridge] sliceAndInject: target 2D context is null");
+        APR_WARN("[MachiningDataBridge] sliceAndInject: target 2D context is null");
         return false;
     }
 
     // 来源网格校验：3D 场景可用时确认网格存在，避免对空 ID 做无用切片
     if (m_scene3D && !m_scene3D->findMeshById(meshId))
     {
-        SY_WARNF(
+        APR_WARNF(
             "[MachiningDataBridge] sliceAndInject: mesh %lld not found in 3D scene", static_cast<long long>(meshId));
         return false;
     }
@@ -68,7 +69,7 @@ bool MachiningDataBridgeService::sliceAndInject(
     std::vector<MachiningLayerContour> layers;
     if (!m_provider(m_providerCtx, meshId, layerHeight, layers) || layers.empty())
     {
-        SY_WARNF("[MachiningDataBridge] sliceAndInject: slicing produced no layer for mesh %lld",
+        APR_WARNF("[MachiningDataBridge] sliceAndInject: slicing produced no layer for mesh %lld",
             static_cast<long long>(meshId));
         return false;
     }
@@ -83,14 +84,16 @@ bool MachiningDataBridgeService::sliceAndInject(
 
         // 构造 2D 多边形图元；addEntity 内部会 clone 并分配持久 id，
         // 因此这里每层用局部对象即可，不需要自己管理所有权
-        Eg::SyPolygon polygon;
+        Eg::AprPolygon polygon;
         polygon.setVertices(layer.points);
         polygon.bClosed = layer.closed;
 
         // 加工数据用统一颜色标识，便于与设计图元区分
         polygon.setOverrideColor(Ut::Color::fromRGB255(255, 140, 0));
 
-        if (Eg::SyEntity* added = m_scene2D->addEntity(&polygon))
+        SceneEditService directEdit(m_scene2D, nullptr);
+        std::unique_ptr<Eg::AprEntity> owned(polygon.clone());
+        if (Eg::AprEntity* added = directEdit.addEntity(std::move(owned), "Machining", CommitMode::Direct))
         {
             m_injectedIds.push_back(added->id);
             ++injected;
@@ -99,7 +102,7 @@ bool MachiningDataBridgeService::sliceAndInject(
 
     if (injected == 0)
     {
-        SY_WARN("[MachiningDataBridge] sliceAndInject: no contour could be injected");
+        APR_WARN("[MachiningDataBridge] sliceAndInject: no contour could be injected");
         return false;
     }
 
@@ -109,7 +112,7 @@ bool MachiningDataBridgeService::sliceAndInject(
         *outLayerCount = injected;
     }
 
-    SY_DEBUGF("[MachiningDataBridge] sliceAndInject: mesh=%lld layerHeight=%.3f injected %u contour(s)",
+    APR_DEBUGF("[MachiningDataBridge] sliceAndInject: mesh=%lld layerHeight=%.3f injected %u contour(s)",
         static_cast<long long>(meshId),
         layerHeight,
         injected);

@@ -19,10 +19,11 @@
 #include "UI2D/DrawTools/ITool.h"
 #include "UI2D/DrawTools/SelectTool.h"
 #include "Engine2D/Core/SceneManager.h"
-#include "Engine2D/SyEntity/SyLine.h"
-#include "Engine2D/SyEntity/SyCircle.h"
-#include "Engine2D/SyEntity/SyPolygon.h"
-#include "Engine2D/SyEntity/SyImage.h"
+#include "Engine2D/Core/SceneWriteGateway.h"
+#include "Engine2D/AprEntity/AprLine.h"
+#include "Engine2D/AprEntity/AprCircle.h"
+#include "Engine2D/AprEntity/AprPolygon.h"
+#include "Engine2D/AprEntity/AprImage.h"
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Edit/UndoRedoManager.h"
 #include "Engine2D/Geometry/Geo2DQuery.h"
@@ -231,7 +232,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_EntityCallback)
     tm.initializeTools(ctx);
 
     bool entityCallbackSet = false;
-    tm.setEntityCallbackForAllTools([&entityCallbackSet](Eg::SyEntity*) {
+    tm.setEntityCallbackForAllTools([&entityCallbackSet](Eg::AprEntity*) {
         entityCallbackSet = true;
     });
     // 回调已设置，不应崩溃
@@ -345,15 +346,15 @@ TEST(SelectToolRegressionTest, SyncSelectionFromScene_WithEntities)
     SelectTool tool;
     Eg::SceneManager scene;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
-    scene.selectEntity(scene.findSyEntityById(lineId));
+    scene.selectEntity(scene.findAprEntityById(lineId));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
     ToolContext2D ctx;
@@ -369,53 +370,53 @@ TEST(SelectionSyncExtendedTest, AddEntity_SelectionStateUnchanged)
 {
     Eg::SceneManager scene;
 
-    auto line1 = std::make_unique<Eg::SyLine>();
+    auto line1 = std::make_unique<Eg::AprLine>();
     line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId id1 = line1->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line1));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
-    scene.selectEntity(scene.findSyEntityById(id1));
+    scene.selectEntity(scene.findAprEntityById(id1));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
     // 添加新图元不影响已有选中
-    auto line2 = std::make_unique<Eg::SyLine>();
+    auto line2 = std::make_unique<Eg::AprLine>();
     line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities2;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities2;
     entities2.push_back(std::move(line2));
-    scene.addEntities(std::move(entities2));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities2));
 
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
-    EXPECT_NE(scene.findSyEntityById(id1), nullptr);
-    EXPECT_TRUE(scene.findSyEntityById(id1)->selected());
+    EXPECT_NE(scene.findAprEntityById(id1), nullptr);
+    EXPECT_TRUE(scene.findAprEntityById(id1)->selected());
 }
 
 TEST(SelectionSyncExtendedTest, DeleteUnselectedEntity_SelectionUnchanged)
 {
     Eg::SceneManager scene;
 
-    auto line1 = std::make_unique<Eg::SyLine>();
+    auto line1 = std::make_unique<Eg::AprLine>();
     line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId id1 = line1->id;
 
-    auto line2 = std::make_unique<Eg::SyLine>();
+    auto line2 = std::make_unique<Eg::AprLine>();
     line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
     Eg::EntityId id2 = line2->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line1));
     entities.push_back(std::move(line2));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
-    scene.selectEntity(scene.findSyEntityById(id1));
+    scene.selectEntity(scene.findAprEntityById(id1));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
     // 删除未选中的图元
-    scene.deleteEntity(scene.findSyEntityById(id2));
+    Eg::SceneWriteGateway::deleteEntity(scene, scene.findAprEntityById(id2));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
-    EXPECT_TRUE(scene.findSyEntityById(id1)->selected());
+    EXPECT_TRUE(scene.findAprEntityById(id1)->selected());
 }
 
 TEST(SelectionSyncExtendedTest, InvertSelection_AllToggled)
@@ -424,11 +425,11 @@ TEST(SelectionSyncExtendedTest, InvertSelection_AllToggled)
 
     for (int i = 0; i < 3; ++i)
     {
-        auto line = std::make_unique<Eg::SyLine>();
+        auto line = std::make_unique<Eg::AprLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
-        std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+        std::vector<std::unique_ptr<Eg::AprEntity>> entities;
         entities.push_back(std::move(line));
-        scene.addEntities(std::move(entities));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     }
 
     EXPECT_EQ(scene.getSelectedEntityCount(), 0u);
@@ -449,18 +450,18 @@ TEST(SelectionSyncExtendedTest, SelectAllThenDeselectOne)
     std::vector<Eg::EntityId> ids;
     for (int i = 0; i < 3; ++i)
     {
-        auto line = std::make_unique<Eg::SyLine>();
+        auto line = std::make_unique<Eg::AprLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         ids.push_back(line->id);
-        std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+        std::vector<std::unique_ptr<Eg::AprEntity>> entities;
         entities.push_back(std::move(line));
-        scene.addEntities(std::move(entities));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     }
 
     scene.selectAll();
     EXPECT_EQ(scene.getSelectedEntityCount(), 3u);
 
-    scene.deselectEntity(scene.findSyEntityById(ids[0]));
+    scene.deselectEntity(scene.findAprEntityById(ids[0]));
     EXPECT_EQ(scene.getSelectedEntityCount(), 2u);
 }
 
@@ -470,15 +471,15 @@ TEST(SelectionSyncExtendedTest, DeleteAllEntities_ClearsSelection)
 {
     Eg::SceneManager scene;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
-    scene.selectEntity(scene.findSyEntityById(lineId));
+    scene.selectEntity(scene.findAprEntityById(lineId));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
     scene.clearScene();
@@ -490,11 +491,11 @@ TEST(SelectionSyncExtendedTest, ClearSceneThenSelect_NoCrash)
 {
     Eg::SceneManager scene;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     scene.clearScene();
     scene.selectAll();        // 空场景全选不崩溃
@@ -509,59 +510,59 @@ TEST(SelectionSyncExtendedTest, SelectMixedEntityTypes)
 {
     Eg::SceneManager scene;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    auto circle = std::make_unique<Eg::SyCircle>();
+    auto circle = std::make_unique<Eg::AprCircle>();
     circle->basePoint = Ut::Vec2d(50, 50);
     circle->dRadius = 20.0;
     Eg::EntityId circleId = circle->id;
 
-    auto poly = std::make_unique<Eg::SyPolygon>();
+    auto poly = std::make_unique<Eg::AprPolygon>();
     poly->setVertices({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId polyId = poly->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
     entities.push_back(std::move(circle));
     entities.push_back(std::move(poly));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     scene.selectAll();
     EXPECT_EQ(scene.getSelectedEntityCount(), 3u);
 
     // 验证不同类型都被选中
-    EXPECT_TRUE(scene.findSyEntityById(lineId)->selected());
-    EXPECT_TRUE(scene.findSyEntityById(circleId)->selected());
-    EXPECT_TRUE(scene.findSyEntityById(polyId)->selected());
+    EXPECT_TRUE(scene.findAprEntityById(lineId)->selected());
+    EXPECT_TRUE(scene.findAprEntityById(circleId)->selected());
+    EXPECT_TRUE(scene.findAprEntityById(polyId)->selected());
 }
 
 TEST(SelectionSyncExtendedTest, SelectMixedTypes_DeleteOne_CheckOthers)
 {
     Eg::SceneManager scene;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    auto circle = std::make_unique<Eg::SyCircle>();
+    auto circle = std::make_unique<Eg::AprCircle>();
     circle->basePoint = Ut::Vec2d(50, 50);
     circle->dRadius = 20.0;
     Eg::EntityId circleId = circle->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
     entities.push_back(std::move(circle));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     scene.selectAll();
     EXPECT_EQ(scene.getSelectedEntityCount(), 2u);
 
-    scene.deleteEntity(scene.findSyEntityById(lineId));
+    Eg::SceneWriteGateway::deleteEntity(scene, scene.findAprEntityById(lineId));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
-    EXPECT_TRUE(scene.findSyEntityById(circleId)->selected());
-    EXPECT_EQ(scene.findSyEntityById(lineId), nullptr);
+    EXPECT_TRUE(scene.findAprEntityById(circleId)->selected());
+    EXPECT_EQ(scene.findAprEntityById(lineId), nullptr);
 }
 
 // ---- 悬空选中与工具状态一致性 ----
@@ -570,21 +571,21 @@ TEST(SelectionSyncExtendedTest, DeleteSelectedViaDeleteEntity_ClearsSelection)
 {
     Eg::SceneManager scene;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
-    scene.selectEntity(scene.findSyEntityById(lineId));
+    scene.selectEntity(scene.findAprEntityById(lineId));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
     // 通过 deleteEntity 删除选中图元，选中集应自动清除
-    scene.deleteEntity(scene.findSyEntityById(lineId));
+    Eg::SceneWriteGateway::deleteEntity(scene, scene.findAprEntityById(lineId));
     EXPECT_EQ(scene.getSelectedEntityCount(), 0u);
-    EXPECT_EQ(scene.findSyEntityById(lineId), nullptr);
+    EXPECT_EQ(scene.findAprEntityById(lineId), nullptr);
 }
 
 TEST(SelectionSyncExtendedTest, DeleteAllSelected_OneByOne)
@@ -594,12 +595,12 @@ TEST(SelectionSyncExtendedTest, DeleteAllSelected_OneByOne)
     std::vector<Eg::EntityId> ids;
     for (int i = 0; i < 4; ++i)
     {
-        auto line = std::make_unique<Eg::SyLine>();
+        auto line = std::make_unique<Eg::AprLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         ids.push_back(line->id);
-        std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+        std::vector<std::unique_ptr<Eg::AprEntity>> entities;
         entities.push_back(std::move(line));
-        scene.addEntities(std::move(entities));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     }
 
     scene.selectAll();
@@ -608,9 +609,9 @@ TEST(SelectionSyncExtendedTest, DeleteAllSelected_OneByOne)
     // 逐个删除选中图元，每次删除后选中数应减少
     for (size_t i = 0; i < ids.size(); ++i)
     {
-        auto* entity = scene.findSyEntityById(ids[i]);
+        auto* entity = scene.findAprEntityById(ids[i]);
         ASSERT_NE(entity, nullptr);
-        scene.deleteEntity(entity);
+        Eg::SceneWriteGateway::deleteEntity(scene, entity);
         EXPECT_EQ(scene.getSelectedEntityCount(), ids.size() - i - 1);
     }
 
@@ -622,13 +623,13 @@ TEST(SelectionSyncExtendedTest, DeleteEntity_CheckDirtyAndDeleted)
 {
     Eg::SceneManager scene;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 记下当前变更游标，只关心此后的变更
     uint64_t cursor = 0;
@@ -636,7 +637,7 @@ TEST(SelectionSyncExtendedTest, DeleteEntity_CheckDirtyAndDeleted)
     ASSERT_TRUE(scene.readChanges(cursor, changes));
     cursor = changes.toRevision;
 
-    scene.deleteEntity(scene.findSyEntityById(lineId));
+    Eg::SceneWriteGateway::deleteEntity(scene, scene.findAprEntityById(lineId));
 
     // 删除后应有删除变更
     ASSERT_TRUE(scene.readChanges(cursor, changes));
@@ -654,15 +655,15 @@ TEST(SelectToolRegressionTest, SyncFromScene_AfterExternalDelete)
     SelectTool tool;
     Eg::SceneManager scene;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
-    scene.selectEntity(scene.findSyEntityById(lineId));
+    scene.selectEntity(scene.findAprEntityById(lineId));
 
     ToolContext2D ctx;
     ctx.sceneContext = &scene;
@@ -671,7 +672,7 @@ TEST(SelectToolRegressionTest, SyncFromScene_AfterExternalDelete)
     EXPECT_TRUE(tool.hasSelectedEntities());
 
     // 外部删除图元后，同步应清空选择
-    scene.deleteEntity(scene.findSyEntityById(lineId));
+    Eg::SceneWriteGateway::deleteEntity(scene, scene.findAprEntityById(lineId));
     tool.syncSelectionFromScene();
     EXPECT_FALSE(tool.hasSelectedEntities());
 }
@@ -681,12 +682,12 @@ TEST(SelectToolRegressionTest, SyncFromScene_AfterExternalClear)
     SelectTool tool;
     Eg::SceneManager scene;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     scene.selectAll();
 
@@ -707,20 +708,20 @@ TEST(SelectToolRegressionTest, SyncFromScene_AfterExternalSelectChange)
     SelectTool tool;
     Eg::SceneManager scene;
 
-    auto line1 = std::make_unique<Eg::SyLine>();
+    auto line1 = std::make_unique<Eg::AprLine>();
     line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId id1 = line1->id;
 
-    auto line2 = std::make_unique<Eg::SyLine>();
+    auto line2 = std::make_unique<Eg::AprLine>();
     line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
     Eg::EntityId id2 = line2->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line1));
     entities.push_back(std::move(line2));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
-    scene.selectEntity(scene.findSyEntityById(id1));
+    scene.selectEntity(scene.findAprEntityById(id1));
 
     ToolContext2D ctx;
     ctx.sceneContext = &scene;
@@ -730,7 +731,7 @@ TEST(SelectToolRegressionTest, SyncFromScene_AfterExternalSelectChange)
 
     // 外部切换选中
     scene.clearSelection();
-    scene.selectEntity(scene.findSyEntityById(id2));
+    scene.selectEntity(scene.findAprEntityById(id2));
     tool.syncSelectionFromScene();
     EXPECT_TRUE(tool.hasSelectedEntities());
 }
@@ -800,7 +801,7 @@ TEST(ToolSelectionSyncRegressionTest, ToolManager_AllToolsReceiveEntityCallback)
     tm.initializeTools(ctx);
 
     int callbackCount = 0;
-    tm.setEntityCallbackForAllTools([&callbackCount](Eg::SyEntity*) {
+    tm.setEntityCallbackForAllTools([&callbackCount](Eg::AprEntity*) {
         callbackCount++;
     });
 
@@ -827,18 +828,18 @@ TEST(SelectToolRegressionTest, HasSelectedEntities_AfterPartialDeselect)
     SelectTool tool;
     Eg::SceneManager scene;
 
-    auto line1 = std::make_unique<Eg::SyLine>();
+    auto line1 = std::make_unique<Eg::AprLine>();
     line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId id1 = line1->id;
 
-    auto line2 = std::make_unique<Eg::SyLine>();
+    auto line2 = std::make_unique<Eg::AprLine>();
     line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
     Eg::EntityId id2 = line2->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line1));
     entities.push_back(std::move(line2));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     scene.selectAll();
     EXPECT_EQ(scene.getSelectedEntityCount(), 2u);
@@ -850,7 +851,7 @@ TEST(SelectToolRegressionTest, HasSelectedEntities_AfterPartialDeselect)
     EXPECT_TRUE(tool.hasSelectedEntities());
 
     // 取消选中一个
-    scene.deselectEntity(scene.findSyEntityById(id1));
+    scene.deselectEntity(scene.findAprEntityById(id1));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
     tool.syncSelectionFromScene();
@@ -862,15 +863,15 @@ TEST(SelectToolRegressionTest, Deactivate_DoesNotAffectSelection)
     SelectTool tool;
     Eg::SceneManager scene;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
-    scene.selectEntity(scene.findSyEntityById(lineId));
+    scene.selectEntity(scene.findAprEntityById(lineId));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
     // 工具停用不应影响场景选择状态
@@ -934,15 +935,15 @@ TEST(SelectionSyncExtendedTest, ClearSceneAfterSelect_NoCrash)
 {
     Eg::SceneManager scene;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
-    scene.selectEntity(scene.findSyEntityById(lineId));
+    scene.selectEntity(scene.findAprEntityById(lineId));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
     scene.clearScene();
@@ -960,29 +961,29 @@ TEST(SelectionSyncExtendedTest, DeleteEntityThenSelectAgain)
 {
     Eg::SceneManager scene;
 
-    auto line1 = std::make_unique<Eg::SyLine>();
+    auto line1 = std::make_unique<Eg::AprLine>();
     line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId id1 = line1->id;
 
-    auto line2 = std::make_unique<Eg::SyLine>();
+    auto line2 = std::make_unique<Eg::AprLine>();
     line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
     Eg::EntityId id2 = line2->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line1));
     entities.push_back(std::move(line2));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 选中 id1
-    scene.selectEntity(scene.findSyEntityById(id1));
+    scene.selectEntity(scene.findAprEntityById(id1));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
     // 删除 id1
-    scene.deleteEntity(scene.findSyEntityById(id1));
+    Eg::SceneWriteGateway::deleteEntity(scene, scene.findAprEntityById(id1));
     EXPECT_EQ(scene.getSelectedEntityCount(), 0u);
 
     // 选中 id2
-    scene.selectEntity(scene.findSyEntityById(id2));
+    scene.selectEntity(scene.findAprEntityById(id2));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 }
 
@@ -990,26 +991,26 @@ TEST(SelectionSyncExtendedTest, AddEntityWhileSelected_SelectionUnchanged)
 {
     Eg::SceneManager scene;
 
-    auto line1 = std::make_unique<Eg::SyLine>();
+    auto line1 = std::make_unique<Eg::AprLine>();
     line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId id1 = line1->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line1));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
-    scene.selectEntity(scene.findSyEntityById(id1));
+    scene.selectEntity(scene.findAprEntityById(id1));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
     // 添加新图元不应影响已有选中
-    auto line2 = std::make_unique<Eg::SyLine>();
+    auto line2 = std::make_unique<Eg::AprLine>();
     line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities2;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities2;
     entities2.push_back(std::move(line2));
-    scene.addEntities(std::move(entities2));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities2));
 
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
-    EXPECT_TRUE(scene.findSyEntityById(id1)->selected());
+    EXPECT_TRUE(scene.findAprEntityById(id1)->selected());
 }
 
 TEST(SelectionSyncExtendedTest, DeselectAllThenSelectAll)
@@ -1018,11 +1019,11 @@ TEST(SelectionSyncExtendedTest, DeselectAllThenSelectAll)
 
     for (int i = 0; i < 5; ++i)
     {
-        auto line = std::make_unique<Eg::SyLine>();
+        auto line = std::make_unique<Eg::AprLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
-        std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+        std::vector<std::unique_ptr<Eg::AprEntity>> entities;
         entities.push_back(std::move(line));
-        scene.addEntities(std::move(entities));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
     }
 
     scene.selectAll();
@@ -1063,20 +1064,20 @@ TEST(ToolSelectionSyncRegressionTest, ExternalModify_SyncAfterSceneDelete)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     std::string idStr = std::to_string(lineId);
     svc.select(idStr.c_str());
     EXPECT_TRUE(svc.isSelected(idStr.c_str()));
 
     // 场景管理器直接删除图元
-    scene.deleteEntity(scene.findSyEntityById(lineId));
+    Eg::SceneWriteGateway::deleteEntity(scene, scene.findAprEntityById(lineId));
     EXPECT_EQ(scene.getEntityCount(), 0u);
     // 选择应自动清除
     EXPECT_FALSE(svc.isSelected(idStr.c_str()));
@@ -1088,16 +1089,16 @@ TEST(ToolSelectionSyncRegressionTest, ExternalModify_SyncAfterSceneClear)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     std::string ids[3];
     for (int i = 0; i < 3; ++i)
     {
-        auto line = std::make_unique<Eg::SyLine>();
+        auto line = std::make_unique<Eg::AprLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         ids[i] = std::to_string(line->id);
         entities.push_back(std::move(line));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     const char* idPtrs[] = { ids[0].c_str(), ids[1].c_str(), ids[2].c_str() };
     svc.selectMultiple(idPtrs, 3);
@@ -1119,16 +1120,16 @@ TEST(ToolSelectionSyncRegressionTest, ExternalModify_DeselectAllAfterSelectAll)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     std::string ids[3];
     for (int i = 0; i < 3; ++i)
     {
-        auto line = std::make_unique<Eg::SyLine>();
+        auto line = std::make_unique<Eg::AprLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         ids[i] = std::to_string(line->id);
         entities.push_back(std::move(line));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 全选
     scene.selectAll();
@@ -1145,13 +1146,13 @@ TEST(ToolSelectionSyncRegressionTest, SelectTool_ConsistencyWithScene)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 通过 SelectionService 选中
     std::string idStr = std::to_string(lineId);
@@ -1173,16 +1174,16 @@ TEST(ToolSelectionSyncRegressionTest, NoDangling_DeleteAllEntitiesOneByOne)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     std::vector<Eg::EntityId> entityIds;
     for (int i = 0; i < 5; ++i)
     {
-        auto line = std::make_unique<Eg::SyLine>();
+        auto line = std::make_unique<Eg::AprLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         entityIds.push_back(line->id);
         entities.push_back(std::move(line));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 全选
     scene.selectAll();
@@ -1191,7 +1192,7 @@ TEST(ToolSelectionSyncRegressionTest, NoDangling_DeleteAllEntitiesOneByOne)
     // 逐个删除
     for (size_t i = 0; i < entityIds.size(); ++i)
     {
-        scene.deleteEntity(scene.findSyEntityById(entityIds[i]));
+        Eg::SceneWriteGateway::deleteEntity(scene, scene.findAprEntityById(entityIds[i]));
         EXPECT_EQ(scene.getSelectedEntityCount(), 4u - i);
     }
 
@@ -1206,43 +1207,43 @@ TEST(ToolSelectionSyncRegressionTest, NoDangling_DeleteMixedTypes)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     Eg::EntityId idLine, idCircle, idPoly;
 
     {
-        auto line = std::make_unique<Eg::SyLine>();
+        auto line = std::make_unique<Eg::AprLine>();
         line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
         idLine = line->id;
         entities.push_back(std::move(line));
     }
     {
-        auto circle = std::make_unique<Eg::SyCircle>();
+        auto circle = std::make_unique<Eg::AprCircle>();
         circle->basePoint = Ut::Vec2d(5, 5);
         circle->dRadius = 3.0;
         idCircle = circle->id;
         entities.push_back(std::move(circle));
     }
     {
-        auto poly = std::make_unique<Eg::SyPolygon>();
+        auto poly = std::make_unique<Eg::AprPolygon>();
         poly->setVertices({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 0), Ut::Vec2d(10, 10) });
         idPoly = poly->id;
         entities.push_back(std::move(poly));
     }
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 选中所有
     scene.selectAll();
     EXPECT_EQ(scene.getSelectedEntityCount(), 3u);
 
     // 删除一个
-    scene.deleteEntity(scene.findSyEntityById(idCircle));
+    Eg::SceneWriteGateway::deleteEntity(scene, scene.findAprEntityById(idCircle));
     EXPECT_EQ(scene.getSelectedEntityCount(), 2u);
     EXPECT_EQ(scene.getEntityCount(), 2u);
 
     // 验证剩余选中有效
-    EXPECT_NE(scene.findSyEntityById(idLine), nullptr);
-    EXPECT_NE(scene.findSyEntityById(idPoly), nullptr);
-    EXPECT_EQ(scene.findSyEntityById(idCircle), nullptr);
+    EXPECT_NE(scene.findAprEntityById(idLine), nullptr);
+    EXPECT_NE(scene.findAprEntityById(idPoly), nullptr);
+    EXPECT_EQ(scene.findAprEntityById(idCircle), nullptr);
 }
 
 // ---- 本体拖动平移 + 变换撤销（Gizmo 全链路） ----
@@ -1302,24 +1303,24 @@ TEST(GizmoBodyDragRegressionTest, DragLineBodyTranslatesEntity)
     UndoRedoManager undoMgr(&scene);
     SceneEditService edit(&scene, &undoMgr);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
     const Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     SelectTool tool;
     initSelectToolForDrag(tool, scene, edit);
-    scene.selectEntity(scene.findSyEntityById(lineId));
+    scene.selectEntity(scene.findAprEntityById(lineId));
     tool.syncSelectionFromScene();
     ASSERT_TRUE(tool.hasSelectedEntities());
 
     // (50,50) 在线上，且离四个角点手柄都远
     EXPECT_TRUE(dragFromTo(tool, QPointF(50, 50), QPointF(60, 70)));
 
-    const Ut::BBox2d bbox = scene.findSyEntityById(lineId)->computeBBox();
+    const Ut::BBox2d bbox = scene.findAprEntityById(lineId)->computeBBox();
     EXPECT_NEAR(bbox.minPt.x(), 10.0, 1e-9);
     EXPECT_NEAR(bbox.minPt.y(), 20.0, 1e-9);
     EXPECT_NEAR(bbox.maxPt.x(), 110.0, 1e-9);
@@ -1332,10 +1333,10 @@ TEST(GizmoBodyDragRegressionTest, DragImageInteriorTranslatesEntity)
     UndoRedoManager undoMgr(&scene);
     SceneEditService edit(&scene, &undoMgr);
 
-    auto image = std::make_unique<Eg::SyImage>();
+    auto image = std::make_unique<Eg::AprImage>();
     image->nWidth = 2;
     image->nHeight = 2;
-    image->ePixelFormat = Eg::SyPixelFormat::RGBA32;
+    image->ePixelFormat = Eg::AprPixelFormat::RGBA32;
     image->setPixelDataVector(std::vector<unsigned char>(2 * 2 * 4, 0xFF));
     image->topLeft = Ut::Vec2d(0, 60);
     image->topRight = Ut::Vec2d(100, 60);
@@ -1344,24 +1345,24 @@ TEST(GizmoBodyDragRegressionTest, DragImageInteriorTranslatesEntity)
     image->basePoint = Ut::Vec2d(50, 30);
     const Eg::EntityId imageId = image->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(image));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     SelectTool tool;
     initSelectToolForDrag(tool, scene, edit);
-    scene.selectEntity(scene.findSyEntityById(imageId));
+    scene.selectEntity(scene.findAprEntityById(imageId));
     tool.syncSelectionFromScene();
 
     // 逐环定位：图元在场景里 → 选中同步进工具 → 同步进 Gizmo → 引擎层几何命中
-    ASSERT_NE(scene.findSyEntityById(imageId), nullptr);
+    ASSERT_NE(scene.findAprEntityById(imageId), nullptr);
     ASSERT_TRUE(tool.hasSelectedEntities());
     ASSERT_EQ(tool.gizmo().selection().size(), 1u);
     {
         Eg::GeometryContext probe;
         probe.dPick = 0.25;
         probe.dModeling = 1e-6;
-        EXPECT_TRUE(Eg::Geo2DQuery::hitTest(scene.findSyEntityById(imageId), Ut::Vec2d(20, 45), probe));
+        EXPECT_TRUE(Eg::Geo2DQuery::hitTest(scene.findAprEntityById(imageId), Ut::Vec2d(20, 45), probe));
     }
 
     // 位图内部任意一点都应命中本体：Geo2DPath 的 IMAGE 分支把四个角点作为闭合轮廓，
@@ -1370,7 +1371,7 @@ TEST(GizmoBodyDragRegressionTest, DragImageInteriorTranslatesEntity)
     // 于是只有缩放/旋转手柄可用，图片拖不动。
     EXPECT_TRUE(dragFromTo(tool, QPointF(20, 45), QPointF(35, 55)));
 
-    const auto* moved = static_cast<const Eg::SyImage*>(scene.findSyEntityById(imageId));
+    const auto* moved = static_cast<const Eg::AprImage*>(scene.findAprEntityById(imageId));
     ASSERT_NE(moved, nullptr);
     EXPECT_NEAR(moved->bottomLeft.x(), 15.0, 1e-9);
     EXPECT_NEAR(moved->bottomLeft.y(), 10.0, 1e-9);
@@ -1387,10 +1388,10 @@ TEST(GizmoBodyDragRegressionTest, BodyDragIsUndoable)
     UndoRedoManager undoMgr(&scene);
     SceneEditService edit(&scene, &undoMgr);
 
-    auto image = std::make_unique<Eg::SyImage>();
+    auto image = std::make_unique<Eg::AprImage>();
     image->nWidth = 1;
     image->nHeight = 1;
-    image->ePixelFormat = Eg::SyPixelFormat::RGBA32;
+    image->ePixelFormat = Eg::AprPixelFormat::RGBA32;
     image->setPixelDataVector(std::vector<unsigned char>(4, 0xFF));
     image->topLeft = Ut::Vec2d(0, 60);
     image->topRight = Ut::Vec2d(100, 60);
@@ -1399,13 +1400,13 @@ TEST(GizmoBodyDragRegressionTest, BodyDragIsUndoable)
     image->basePoint = Ut::Vec2d(50, 30);
     const Eg::EntityId imageId = image->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(image));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     SelectTool tool;
     initSelectToolForDrag(tool, scene, edit);
-    scene.selectEntity(scene.findSyEntityById(imageId));
+    scene.selectEntity(scene.findAprEntityById(imageId));
     tool.syncSelectionFromScene();
 
     ASSERT_FALSE(undoMgr.canUndo());
@@ -1418,7 +1419,7 @@ TEST(GizmoBodyDragRegressionTest, BodyDragIsUndoable)
     undoMgr.undo();
 
     // 撤销走 applyEntitySnapshots，图元按 id 被整体替换，指针必须重新解析
-    const auto* restored = static_cast<const Eg::SyImage*>(scene.findSyEntityById(imageId));
+    const auto* restored = static_cast<const Eg::AprImage*>(scene.findAprEntityById(imageId));
     ASSERT_NE(restored, nullptr);
     EXPECT_NEAR(restored->bottomLeft.x(), 0.0, 1e-9);
     EXPECT_NEAR(restored->topRight.x(), 100.0, 1e-9);
@@ -1428,7 +1429,7 @@ TEST(GizmoBodyDragRegressionTest, BodyDragIsUndoable)
 
     ASSERT_TRUE(undoMgr.canRedo());
     undoMgr.redo();
-    const auto* redone = static_cast<const Eg::SyImage*>(scene.findSyEntityById(imageId));
+    const auto* redone = static_cast<const Eg::AprImage*>(scene.findAprEntityById(imageId));
     ASSERT_NE(redone, nullptr);
     EXPECT_NEAR(redone->bottomLeft.x(), 20.0, 1e-9);
 }
@@ -1439,28 +1440,28 @@ TEST(GizmoBodyDragRegressionTest, CornerHandleScaleIsUndoable)
     UndoRedoManager undoMgr(&scene);
     SceneEditService edit(&scene, &undoMgr);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(100, 100) });
     const Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
-    scene.addEntities(std::move(entities));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     SelectTool tool;
     initSelectToolForDrag(tool, scene, edit);
-    scene.selectEntity(scene.findSyEntityById(lineId));
+    scene.selectEntity(scene.findAprEntityById(lineId));
     tool.syncSelectionFromScene();
 
     // 精确压在包围盒右上角 → TopRight 缩放手柄
     ASSERT_TRUE(dragFromTo(tool, QPointF(100, 100), QPointF(150, 150)));
 
-    const Ut::BBox2d scaled = scene.findSyEntityById(lineId)->computeBBox();
+    const Ut::BBox2d scaled = scene.findAprEntityById(lineId)->computeBBox();
     EXPECT_GT(scaled.width(), 100.0);
     EXPECT_EQ(undoMgr.undoCount(), 1u);
 
     undoMgr.undo();
-    const Ut::BBox2d back = scene.findSyEntityById(lineId)->computeBBox();
+    const Ut::BBox2d back = scene.findAprEntityById(lineId)->computeBBox();
     EXPECT_NEAR(back.width(), 100.0, 1e-9);
     EXPECT_NEAR(back.height(), 100.0, 1e-9);
 }

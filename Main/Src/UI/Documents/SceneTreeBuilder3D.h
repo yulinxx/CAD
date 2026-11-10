@@ -18,7 +18,7 @@
 namespace Eg
 {
     class SceneManager3D;
-    struct SyMeshEntity;
+    struct AprMeshEntity;
 }
 
 class SceneTreeBuilder3D
@@ -32,5 +32,5 @@ public:
     static QSet<QString> selectedIds(Eg::SceneManager3D* scene);
 
     /// 将单个网格图元转为数据节点（增量追加用；selected 由调用方按场景选择集提供）
-    static SceneTreeNode3D buildMeshNode(const struct Eg::SyMeshEntity* mesh, bool selected);
+    static SceneTreeNode3D buildMeshNode(const struct Eg::AprMeshEntity* mesh, bool selected);
 };

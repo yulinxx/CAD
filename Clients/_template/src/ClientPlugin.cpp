@@ -29,12 +29,12 @@ public:
 };
 }  // namespace
 
-SANYI_CLIENT_PLUGIN_EXPORT IClientUiPlugin* createClientUiPlugin()
+APR_CLIENT_PLUGIN_EXPORT IClientUiPlugin* createClientUiPlugin()
 {
     return new ClientUiPlugin();
 }
 
-SANYI_CLIENT_PLUGIN_EXPORT void destroyClientUiPlugin(IClientUiPlugin* plugin)
+APR_CLIENT_PLUGIN_EXPORT void destroyClientUiPlugin(IClientUiPlugin* plugin)
 {
     delete plugin;
 }

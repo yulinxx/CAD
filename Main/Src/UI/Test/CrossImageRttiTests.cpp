@@ -14,11 +14,11 @@
  *   就会**静默**返回 nullptr：编译不报错、链接不报错，只在运行时表现为
  *   某条业务链路莫名失败。
  *
- *   真实事故：UI3D 的 FileOperations3D 用 dynamic_cast<SyMeshEntity*> 判定
+ *   真实事故：UI3D 的 FileOperations3D 用 dynamic_cast<AprMeshEntity*> 判定
  *   FioEntityConverter 的产物，OBJ 菜单导入 100% 失败（日志只有
  *   "load model failed: entities=1"），而走 ImportService（按 eType 分拣）
  *   的拖拽导入完全正常。根因是 Engine3DAPI.h / EngineAPI.h 的非 Windows 分支
- *   按 EXPORTS 分叉，且 SyMeshEntity 当时全部虚函数都是 inline。
+ *   按 EXPORTS 分叉，且 AprMeshEntity 当时全部虚函数都是 inline。
  *
  * 本测试的有效性依赖一个前提：MainTests 与 Engine3D 是**两个镜像**
  *   （MainTests 链接 libEngine3D.dylib）。所以这里的 dynamic_cast 走的正是
@@ -31,8 +31,8 @@
 
 #include "Engine3D/Import/FioEntityConverter.h"
 #include "Engine2D/Import/Fio2DEntityConverter.h"
-#include "Engine3D/SyEntity/SyMeshEntity.h"
-#include "Engine/SyEntity/SyEntity.h"
+#include "Engine3D/AprEntity/AprMeshEntity.h"
+#include "Engine/AprEntity/AprEntity.h"
 #include "FileIO/FioTypes.h"
 
 #include <cstring>
@@ -97,20 +97,20 @@ namespace
 }  // namespace
 
 // 对象在 Engine3D 镜像内创建，dynamic_cast 在 MainTests 镜像内执行。
-// 失败即说明 SyMeshEntity 的 typeinfo 没有跨镜像合并。
+// 失败即说明 AprMeshEntity 的 typeinfo 没有跨镜像合并。
 TEST(CrossImageRtti, DynamicCastToMeshEntityWorksAcrossImages)
 {
     MinimalMeshIr ir;
 
-    std::unique_ptr<Eg::SyEntity> entity = Eg::FioEntityConverter::convertEntity(ir.info, ir.blob);
+    std::unique_ptr<Eg::AprEntity> entity = Eg::FioEntityConverter::convertEntity(ir.info, ir.blob);
     ASSERT_NE(entity, nullptr);
 
-    auto* mesh = dynamic_cast<Eg::SyMeshEntity*>(entity.get());
+    auto* mesh = dynamic_cast<Eg::AprMeshEntity*>(entity.get());
     ASSERT_NE(mesh, nullptr)
-        << "dynamic_cast across the module boundary returned nullptr: typeinfo for Eg::SyMeshEntity "
+        << "dynamic_cast across the module boundary returned nullptr: typeinfo for Eg::AprMeshEntity "
            "is not shared between MainTests and Engine3D. Check two things: ENGINE3D_API / ENGINE_API "
-           "must expand to visibility(\"default\") on the consumer side too, and SyMeshEntity must keep "
-           "an out-of-line key function (Engine/3D/Src/SyEntity/SyMeshEntity.cpp).";
+           "must expand to visibility(\"default\") on the consumer side too, and AprMeshEntity must keep "
+           "an out-of-line key function (Engine/3D/Src/AprEntity/AprMeshEntity.cpp).";
 
     EXPECT_EQ(mesh->vertices.size(), 3u);
     EXPECT_EQ(mesh->normals.size(), 3u);
@@ -122,9 +122,9 @@ TEST(CrossImageRtti, ETypeMatchesDynamicCastVerdict)
 {
     MinimalMeshIr ir;
 
-    std::unique_ptr<Eg::SyEntity> entity = Eg::FioEntityConverter::convertEntity(ir.info, ir.blob);
+    std::unique_ptr<Eg::AprEntity> entity = Eg::FioEntityConverter::convertEntity(ir.info, ir.blob);
     ASSERT_NE(entity, nullptr);
 
     EXPECT_EQ(entity->eType, Eg::EType::MESH);
-    EXPECT_EQ(dynamic_cast<Eg::SyMeshEntity*>(entity.get()) != nullptr, entity->eType == Eg::EType::MESH);
+    EXPECT_EQ(dynamic_cast<Eg::AprMeshEntity*>(entity.get()) != nullptr, entity->eType == Eg::EType::MESH);
 }

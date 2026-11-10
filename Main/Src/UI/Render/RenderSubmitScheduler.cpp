@@ -2,11 +2,11 @@
 
 #include "RenderWidget.h"
 #include "Engine2D/Core/SceneManager.h"
-#include "Engine/SyEntity/SyEntity.h"
-#include "Engine/Layer/SyLayer.h"
-#include "Engine/SyEntity/EType.h"
+#include "Engine/AprEntity/AprEntity.h"
+#include "Engine/Layer/AprLayer.h"
+#include "Engine/AprEntity/EType.h"
 #include "Engine/Render/TessParams.h"
-#include "Engine2D/SyEntity/SyPolygon.h"
+#include "Engine2D/AprEntity/AprPolygon.h"
 #include "Engine2D/Geometry/EntityGeometryEmitter.h"
 
 #include <algorithm>
@@ -25,8 +25,8 @@ namespace
         {
             return 0;
         }
-        const Eg::SyEntity* entity = sm->findEntityById(id);
-        const Eg::SyLayer* layer = entity != nullptr ? entity->layer() : nullptr;
+        const Eg::AprEntity* entity = sm->findEntityById(id);
+        const Eg::AprLayer* layer = entity != nullptr ? entity->layer() : nullptr;
         if (layer == nullptr || layer->getIndex() <= 0)
         {
             return 0;
@@ -40,7 +40,7 @@ RenderSubmitScheduler::RenderSubmitScheduler(RenderWidget* widget)
 {
 }
 
-bool RenderSubmitScheduler::isRenderable(uint64_t uid, const Eg::SyEntity* entity) const
+bool RenderSubmitScheduler::isRenderable(uint64_t uid, const Eg::AprEntity* entity) const
 {
     if (entity == nullptr || !entity->visible())
     {
@@ -52,7 +52,7 @@ bool RenderSubmitScheduler::isRenderable(uint64_t uid, const Eg::SyEntity* entit
     {
         return false;
     }
-    const Eg::SyLayer* layer = entity->layer();
+    const Eg::AprLayer* layer = entity->layer();
     if (layer != nullptr && !layer->isVisible())
     {
         return false;
@@ -155,7 +155,7 @@ void RenderSubmitScheduler::processBatch(std::unordered_set<uint64_t>& renderedI
     for (; m_extendCursor < m_extendQueue.size() && batch.size() < m_adaptiveBatchSize; ++m_extendCursor)
     {
         const uint64_t uid = m_extendQueue[m_extendCursor];
-        const Eg::SyEntity* entity = m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid));
+        const Eg::AprEntity* entity = m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid));
         if (!isRenderable(uid, entity))
         {
             continue;
@@ -165,7 +165,7 @@ void RenderSubmitScheduler::processBatch(std::unordered_set<uint64_t>& renderedI
     for (; m_cursor < m_queue.size() && batch.size() < m_adaptiveBatchSize; ++m_cursor)
     {
         const uint64_t uid = m_queue[m_cursor];
-        const Eg::SyEntity* entity = m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid));
+        const Eg::AprEntity* entity = m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid));
         if (!isRenderable(uid, entity))
         {
             continue;
@@ -181,7 +181,7 @@ void RenderSubmitScheduler::processBatch(std::unordered_set<uint64_t>& renderedI
         const bool ok = m_submitBatch ? m_submitBatch(batch)
                                       : m_renderWidget->upsertRenderEntities(
                                             batch,
-                                            [this](uint64_t uid) -> const Eg::SyEntity* {
+                                            [this](uint64_t uid) -> const Eg::AprEntity* {
                                                 return m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid));
                                             },
                                             [this](uint64_t uid) -> uint32_t {
@@ -411,7 +411,7 @@ void RenderSubmitScheduler::refillQueueIfStale()
     // 单个候选的入队判据（两套收集路径共用）：
     // 隐藏图层 / 隐藏图元 / 「选中时隐藏本体」过滤 —— LOD 提交不经过
     // applyLightRefresh 的可见性判断，队列里不能收这些图元。
-    const auto tryEnqueue = [&](Eg::SyEntity* entity) {
+    const auto tryEnqueue = [&](Eg::AprEntity* entity) {
         if (!entity || !Eg::tess::isLodCurveType(entity->eType))
         {
             return;
@@ -426,7 +426,7 @@ void RenderSubmitScheduler::refillQueueIfStale()
         // 其余多边形在任意缩放下输出都相同，入 LOD 队列纯浪费。
         if (entity->eType == Eg::EType::POLYGON)
         {
-            const auto* polygon = static_cast<const Eg::SyPolygon*>(entity);
+            const auto* polygon = static_cast<const Eg::AprPolygon*>(entity);
             if (!polygon->hasBulges() && polygon->vertices().size() <= Eg::kPolygonSimplifyMinVertices)
             {
                 return;
@@ -441,8 +441,8 @@ void RenderSubmitScheduler::refillQueueIfStale()
         // 每次跨滞后阈值都要扫 29 万图元（放大时主线程直接卡住数百毫秒）；
         // queryByBox 走 RTree，O(log N + k)，且查询前 flush 待修索引，
         // 与逐类型扫描 + getBbox 相交判断的结果等价（无效 bbox 不在索引里，天然跳过）。
-        const Eg::VecSyEntityPtr candidates = m_sceneManager->queryByBox(collectBox, /*containedOnly=*/false);
-        for (Eg::SyEntity* entity : candidates)
+        const Eg::VecAprEntityPtr candidates = m_sceneManager->queryByBox(collectBox, /*containedOnly=*/false);
+        for (Eg::AprEntity* entity : candidates)
         {
             tryEnqueue(entity);
         }
@@ -454,7 +454,7 @@ void RenderSubmitScheduler::refillQueueIfStale()
         // 类型清单引用单一来源 Eg::tess::lodCurveTypes()，不再本地维护副本。
         for (const Eg::EType type : Eg::tess::lodCurveTypes())
         {
-            m_sceneManager->forEachEntityByType(type, [&](Eg::SyEntity* entity) { tryEnqueue(entity); });
+            m_sceneManager->forEachEntityByType(type, [&](Eg::AprEntity* entity) { tryEnqueue(entity); });
         }
     }
 }

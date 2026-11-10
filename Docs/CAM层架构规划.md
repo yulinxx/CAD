@@ -23,7 +23,7 @@
 ### 0.2 链路断点（当前端到端缺什么）
 
 ```
-SyEntity / SceneManager
+AprEntity / SceneManager
     ↓ GeometryExtractor（✅ 有）
 Eg::Cam::Contour[] / Toolpath[]（✅ 有）
     ↓ 工艺变换（❌ 全空：割缝补偿、共边、引线、穿孔、功率曲线、排序、时间预估）
@@ -68,7 +68,7 @@ endif()
 
 CAM/CAM/CMakeLists.txt 采用与 Raster/Raster/ 相同的动态库写法（CAM 对外是 C++ 内部 ABI，不是 C ABI）：
 ```cmake
-sanyi_add_shared_library(CAM
+apr_add_shared_library(CAM
     TARGET          CAM
     DIRECTORY       CAM
     DESCRIPTION     "CAM layer: process compilation from toolpath geometry to device-independent motion plan"
@@ -135,7 +135,7 @@ sanyi_add_shared_library(CAM
 
 ### 2.2 输入契约：`ToolpathJobInput`（CAM 唯一输入）
 
-CAM 不 include Engine2D/Core/SceneManager.h，不 include Engine2D/Interaction/LayerManager.h，不 include SyEntity.h。桥接层负责做转换。
+CAM 不 include Engine2D/Core/SceneManager.h，不 include Engine2D/Interaction/LayerManager.h，不 include AprEntity.h。桥接层负责做转换。
 
 ```cpp
 // CAM/CAM/Include/CAM/ToolpathJobInput.h
@@ -185,7 +185,7 @@ namespace Cam
         double lineSpacing = 0.1;          ///< mm
     };
 
-    /// 一个图元快照：桥接层把 SyEntity 转成这个
+    /// 一个图元快照：桥接层把 AprEntity 转成这个
     struct EntitySnapshot
     {
         enum class GeometryKind : int32_t
@@ -403,7 +403,7 @@ namespace CamBridge
 
     /// 内部调 Eg::Cam::GeometryExtractor::extract()，把 ExtractResult 转成 EntitySnapshot
     Cam::EntitySnapshot extractEntity(
-        const Eg::SyEntity* entity,
+        const Eg::AprEntity* entity,
         const Eg::Cam::ExtractOptions& options);
 }
 ```
@@ -510,7 +510,7 @@ namespace Cam
 
 ### 4.2 对外 C ABI（已否决）
 
-CAM 当前只服务 SanYi CAD 主工程，公开契约定为 C++ 内部 ABI（见 `CAM/CAM/Include/CAM/CAMExport.h`）：结构体含 STL 容器，使用方必须与 CAM 同编译器、同 CRT、同 `_ITERATOR_DEBUG_LEVEL`、同运行时库构建；对外 C ABI 路线已否决。若未来出现仓库外消费方（例如 C#/Delphi 客户二次开发），需重新立项评估，不属于本文档既定路线。
+CAM 当前只服务 April CAD 主工程，公开契约定为 C++ 内部 ABI（见 `CAM/CAM/Include/CAM/CAMExport.h`）：结构体含 STL 容器，使用方必须与 CAM 同编译器、同 CRT、同 `_ITERATOR_DEBUG_LEVEL`、同运行时库构建；对外 C ABI 路线已否决。若未来出现仓库外消费方（例如 C#/Delphi 客户二次开发），需重新立项评估，不属于本文档既定路线。
 
 ### 4.3 进度/取消上下文
 
@@ -825,7 +825,7 @@ TEST(CAMTests, FullPipeline_SimulatedDevice)
 
 | # | 反模式 | 后果 | 约束写法 |
 |---|--------|------|----------|
-| 1 | **CAM 反向 include SceneManager / LayerManager / SyEntity** | CAM 变成 Engine2D 下层依赖，消费 CAM 的模块被迫间接 include Engine2D，破坏边界 | CAM 的 PUBLIC_LINK_LIBRARIES 只能有 Log；PRIVATE 可有 Engraving + Engine2D + Hardware，但 CMake/CheckDependencies.cmake 必须显式校验 CAM 的 INTERFACE_INCLUDE_DIRS 不泄漏 Engine2D/UICommon/RenderBridge 的头路径 |
+| 1 | **CAM 反向 include SceneManager / LayerManager / AprEntity** | CAM 变成 Engine2D 下层依赖，消费 CAM 的模块被迫间接 include Engine2D，破坏边界 | CAM 的 PUBLIC_LINK_LIBRARIES 只能有 Log；PRIVATE 可有 Engraving + Engine2D + Hardware，但 CMake/CheckDependencies.cmake 必须显式校验 CAM 的 INTERFACE_INCLUDE_DIRS 不泄漏 Engine2D/UICommon/RenderBridge 的头路径 |
 | 2 | **MotionPlanCompiler 继续直接从 SceneManager 编译** | ToolpathJobInput 中性边界被绕过，旧代码路径与新路径双轨维护 | M2 阶段 ProcessingJobService 必须切换到 CamBridge + Cam::compile，原 MotionPlanCompiler 标记 deprecated，两阶段后删除 |
 | 3 | **后处理器（MotionPlanEmitter）写死某款设备协议** | 新增一种设备就要改 CAM | MotionPlanEmitter **只输出** `Hw::MotionPlanBuilder`，绝不出现厂商 SDK 的任何类型或函数调用 |
 | 4 | **UI 层直接持有/调用 CAM 内部类** | UI 换前端要改 CAM | CAM 的 PUBLIC API 只有 `CamCore::compile`（C++ 内部 ABI，对外 C ABI 已否决）。UI 侧只有 Service 层（ProcessingJobService + 未来的 CamCompileService）持有 CAM 引用 |

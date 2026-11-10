@@ -9,7 +9,7 @@
 #include "WorkbenchWindow.h"
 #include "BuildConfig.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "UI2D/Manager/UnitManager.h"
 #include "UI2D/Manager/UnitSelectionMenu.h"
 #include "Platform/MacMenuCleanup.h"
@@ -295,7 +295,7 @@ void WorkbenchMenuManager::registerRecentFilesSection()
             QObject::connect(action, &QAction::triggered, action, [dispatcher, filePath]() {
                 if (!dispatcher)
                 {
-                    SY_WARN("[WorkbenchMenuManager] Recent file triggered without dispatcher");
+                    APR_WARN("[WorkbenchMenuManager] Recent file triggered without dispatcher");
                     return;
                 }
                 dispatcher->dispatch(
@@ -325,7 +325,7 @@ void WorkbenchMenuManager::rebuildMenusFromConfig()
     if (!config)
     {
         // 配置缺失时报错，菜单一栏都建不出来是装配级故障，必须显性报错
-        SY_ERRORF("[WorkbenchMenuManager] Shared client config unavailable (client='%s'), menus not built",
+        APR_ERRORF("[WorkbenchMenuManager] Shared client config unavailable (client='%s'), menus not built",
             qPrintable(clientId));
         return;
     }

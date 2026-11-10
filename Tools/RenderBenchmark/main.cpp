@@ -3,7 +3,7 @@
  * @brief 渲染帧路径基准 —— 在 Null 后端上无头测量「每帧 CPU 耗时」，并输出绘制量计数。
  *
  * 用法：
- *   SanYiRenderBenchmark [entityCount] [csvPath] [runLabel]
+ *   AprRenderBenchmark [entityCount] [csvPath] [runLabel]
  *     entityCount  场景图元数，默认 200000；百万级请显式传 1000000
  *     csvPath      可选；给出时把结果追加写入该 CSV
  *     runLabel     可选；本轮标记，写入 CSV 的 "# run=" 行
@@ -216,7 +216,7 @@ int main(int argc, char** argv)
     const uint32_t dirtyLarge = static_cast<uint32_t>(std::min<size_t>(10000, entityCount));
 
     std::printf("===============================================================\n");
-    std::printf("[SanYi Render Benchmark]\n");
+    std::printf("[April Render Benchmark]\n");
     std::printf("  backend       : Null（无 GPU，测帧路径 CPU 侧）\n");
     std::printf("  entities      : %zu\n", entityCount);
     std::printf("  surface       : %ux%u\n", kSurfaceWidth, kSurfaceHeight);
@@ -236,7 +236,7 @@ int main(int argc, char** argv)
     runtimeDesc.backend = Backend::Null;
     runtimeDesc.enableValidation = 0;
     runtimeDesc.transientBufferBytes = 128ull * 1024 * 1024;
-    runtimeDesc.applicationName = "SanYiRenderBenchmark";
+    runtimeDesc.applicationName = "AprRenderBenchmark";
 
     const RuntimeHandle runtime = rxRuntimeCreate(&runtimeDesc);
     if (!rxValid(runtime))

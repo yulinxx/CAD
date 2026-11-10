@@ -231,7 +231,7 @@ private:
 
     /// 该图元此刻是否应出现在几何 GPU 层：自身可见 且 几何合法 且 图层可见
     /// 且 bbox 有效，且未被「选中时隐藏本体」过滤。判据与 gatherGeometry 严格对齐。
-    bool isDesiredOnGeometryLayer(const Eg::SyEntity* e, bool hideSelected) const;
+    bool isDesiredOnGeometryLayer(const Eg::AprEntity* e, bool hideSelected) const;
 
     /// 当前可视世界盒按 cull 余量（1.25×）外扩；矩阵退化时返回无效盒，
     /// 调用方据此退化为「不裁剪 / 全量」。
@@ -252,7 +252,7 @@ private:
 
     /// 「隐藏选中本体」的类型门槛：只有选择轮廓能表达的类型才允许隐藏本体。
     /// 位图/色块/文字等没有轮廓替代视觉，隐藏后会在画面上整片消失。
-    static bool canHideSelectedBody(const Eg::SyEntity* entity);
+    static bool canHideSelectedBody(const Eg::AprEntity* entity);
 
     RenderWidget* m_renderWidget{ nullptr };
     Eg::SceneManager* m_sceneManager{ nullptr };

@@ -39,19 +39,19 @@ void HelpOperationRegistry::registerAll()
 
     Ops::declare(reg, OperationId::Help_Settings, [parentWidget] {
         // Help > Settings / 设置对话框入口
-        SY_DEBUGF("[HelpOperationRegistry] Help_Settings triggered, parentWidget=%p", static_cast<void*>(parentWidget));
+        APR_DEBUGF("[HelpOperationRegistry] Help_Settings triggered, parentWidget=%p", static_cast<void*>(parentWidget));
         auto* window = qobject_cast<WorkbenchWindow*>(parentWidget);
-        SY_DEBUGF("[HelpOperationRegistry] window=%p", static_cast<void*>(window));
+        APR_DEBUGF("[HelpOperationRegistry] window=%p", static_cast<void*>(window));
         UiWorkbench* activeWb = window ? window->currentWorkbench() : nullptr;
-        SY_DEBUGF("[HelpOperationRegistry] activeWb=%p", static_cast<void*>(activeWb));
+        APR_DEBUGF("[HelpOperationRegistry] activeWb=%p", static_cast<void*>(activeWb));
         if (activeWb)
         {
-            SY_DEBUGF("[HelpOperationRegistry] calling showSettingsDialog");
+            APR_DEBUGF("[HelpOperationRegistry] calling showSettingsDialog");
             activeWb->showSettingsDialog(parentWidget);
         }
         else
         {
-            SY_WARNF("[HelpOperationRegistry] Cannot show settings: no active workbench");
+            APR_WARNF("[HelpOperationRegistry] Cannot show settings: no active workbench");
         }
     });
 

@@ -17,7 +17,7 @@
 #include <QScreen>
 #include <QSizePolicy>
 #include <QWheelEvent>
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 Viewport3D::Viewport3D(QWidget* parent)
     : QWidget(parent)
@@ -45,7 +45,7 @@ Viewport3D::Viewport3D(QWidget* parent)
     // QOpenGLWidget 子控件在 Windows 上需要父控件也启用鼠标追踪，
     // 否则无按键按下时 mouseMoveEvent 不会被触发
     setMouseTracking(true);
-    SY_DEBUG("[Viewport3D] Constructed without default renderer, must be injected externally");
+    APR_DEBUG("[Viewport3D] Constructed without default renderer, must be injected externally");
 }
 
 Viewport3D::~Viewport3D()

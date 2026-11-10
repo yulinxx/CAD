@@ -7,7 +7,7 @@
 
 #include "UI2D/Operation/CommandCatalog.h"
 #include "UI/IconHelper.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -222,7 +222,7 @@ void UiLayoutBuilder::bindAction(QAction* action,
         // 触发这些 action 就会解引用已析构的 builder。
         // dispatcher 由 WorkbenchMenuManager 持有且只创建一次，寿命足够。
         QObject::connect(action, &QAction::triggered, [dispatcher = m_dispatcher, action, commandId](bool) {
-            SY_DEBUGF("[Menu] trigger text='%s' command='%s'",
+            APR_DEBUGF("[Menu] trigger text='%s' command='%s'",
                 action->text().toUtf8().constData(),
                 commandId.toUtf8().constData());
             dispatcher->dispatch(commandId);
@@ -240,7 +240,7 @@ void UiLayoutBuilder::bindAction(QAction* action,
         action->setProperty("commandUnavailable", true);
         action->setToolTip(
             QCoreApplication::translate("UiLayoutBuilder", "Feature not enabled (command: %1)").arg(commandId));
-        SY_WARNF("[UiLayoutBuilder] Unknown command id: %s", qPrintable(commandId));
+        APR_WARNF("[UiLayoutBuilder] Unknown command id: %s", qPrintable(commandId));
     }
 }
 
@@ -262,7 +262,7 @@ void UiLayoutBuilder::buildMenus(const std::vector<MenuDef>& menus)
     {
         if (menu.id.isEmpty() || !menu.visible)
         {
-            SY_DEBUGF("[UiLayoutBuilder] Skip menu id='%s' visible=%d", qPrintable(menu.id), menu.visible ? 1 : 0);
+            APR_DEBUGF("[UiLayoutBuilder] Skip menu id='%s' visible=%d", qPrintable(menu.id), menu.visible ? 1 : 0);
             continue;
         }
         QMenu* qMenu = menuBar->addMenu(actionLabel(menu.label, menu.id));
@@ -307,7 +307,7 @@ void UiLayoutBuilder::buildMenuItem(
         const SubMenuDef& sub = std::get<SubMenuDef>(item);
         if (!sub.visible)
         {
-            SY_DEBUGF("[UiLayoutBuilder] Skip submenu id='%s' visible=0", qPrintable(sub.id));
+            APR_DEBUGF("[UiLayoutBuilder] Skip submenu id='%s' visible=0", qPrintable(sub.id));
             return;
         }
         QMenu* subMenu = parent->addMenu(actionLabel(sub.label, sub.id));
@@ -388,7 +388,7 @@ void UiLayoutBuilder::buildMenuItem(
     const MenuActionDef& actionDef = std::get<MenuActionDef>(item);
     if (!actionDef.visible)
     {
-        SY_DEBUGF("[UiLayoutBuilder] Skip action id='%s' visible=0 command='%s'",
+        APR_DEBUGF("[UiLayoutBuilder] Skip action id='%s' visible=0 command='%s'",
             qPrintable(actionDef.id),
             qPrintable(actionDef.commandId));
         return;
@@ -396,7 +396,7 @@ void UiLayoutBuilder::buildMenuItem(
     // 授权门控：未授权功能不创建入口，客户看不到未购买的功能
     if (!featureAllowed(actionDef.feature))
     {
-        SY_DEBUGF("[UiLayoutBuilder] Skip action id='%s' command='%s' — feature '%s' not licensed",
+        APR_DEBUGF("[UiLayoutBuilder] Skip action id='%s' command='%s' — feature '%s' not licensed",
             qPrintable(actionDef.id),
             qPrintable(actionDef.commandId),
             qPrintable(actionDef.feature));
@@ -462,7 +462,7 @@ void UiLayoutBuilder::buildToolBars(const std::vector<ToolBarDef>& toolBars)
         // 整条工具栏级授权门控：未授权则整条不创建
         if (!featureAllowed(tb.feature))
         {
-            SY_DEBUGF("[UiLayoutBuilder] Skip toolbar id='%s' — feature '%s' not licensed",
+            APR_DEBUGF("[UiLayoutBuilder] Skip toolbar id='%s' — feature '%s' not licensed",
                 qPrintable(tb.id),
                 qPrintable(tb.feature));
             continue;
@@ -471,7 +471,7 @@ void UiLayoutBuilder::buildToolBars(const std::vector<ToolBarDef>& toolBars)
         // 标记为跳过构建的条目（由 Workbench2D/3D 自建），跳过避免重复
         if (tb.skippedByBuilder)
         {
-            SY_DEBUGF("[UiLayoutBuilder] Skip toolbar id='%s' — skippedByBuilder=true",
+            APR_DEBUGF("[UiLayoutBuilder] Skip toolbar id='%s' — skippedByBuilder=true",
                 qPrintable(tb.id));
             continue;
         }
@@ -498,7 +498,7 @@ void UiLayoutBuilder::buildToolBars(const std::vector<ToolBarDef>& toolBars)
             // 单个按钮级授权门控
             if (!featureAllowed(actionDef.feature))
             {
-                SY_DEBUGF("[UiLayoutBuilder] Skip toolbar action id='%s' — feature '%s' not licensed",
+                APR_DEBUGF("[UiLayoutBuilder] Skip toolbar action id='%s' — feature '%s' not licensed",
                     qPrintable(actionDef.id),
                     qPrintable(actionDef.feature));
                 continue;
@@ -527,14 +527,14 @@ void UiLayoutBuilder::buildToolBars(const std::vector<ToolBarDef>& toolBars)
             bindAction(action, actionDef.commandId, actionDef.label, actionDef.iconName, tb.workbenchId);
         }
 
-        SY_DEBUGF("[UiLayoutBuilder] ToolBar built id='%s' title='%s' position='%s' items=%d",
+        APR_DEBUGF("[UiLayoutBuilder] ToolBar built id='%s' title='%s' position='%s' items=%d",
             qPrintable(tb.id),
             qPrintable(actionLabel(tb.title, tb.id)),
             qPrintable(tb.workbenchId),
             static_cast<int>(toolBar->actions().size()));
     }
 
-    SY_DEBUGF("[UiLayoutBuilder] All toolbars built: total=%d", static_cast<int>(toolBars.size()));
+    APR_DEBUGF("[UiLayoutBuilder] All toolbars built: total=%d", static_cast<int>(toolBars.size()));
 }
 
 void UiLayoutBuilder::buildDocks(const std::vector<DockDef>& docks)
@@ -556,7 +556,7 @@ void UiLayoutBuilder::buildDocks(const std::vector<DockDef>& docks)
         {
             // 面板工厂未注册 → 占位提示，优雅降级
             panel = new QWidget(m_window);
-            SY_WARNF("[UiLayoutBuilder] Panel '%s' not registered, using placeholder", qPrintable(dock.widgetType));
+            APR_WARNF("[UiLayoutBuilder] Panel '%s' not registered, using placeholder", qPrintable(dock.widgetType));
         }
 
         auto* dockWidget = new QDockWidget(actionLabel(dock.title, dock.id), m_window);
@@ -580,7 +580,7 @@ void UiLayoutBuilder::buildDocks(const std::vector<DockDef>& docks)
             : dock.position == DockPosition::Top                  ? "top"
             : dock.position == DockPosition::Bottom               ? "bottom"
                                                                   : "right";
-        SY_DEBUGF("[UiLayoutBuilder] Dock built id='%s' title='%s' widget='%s' position='%s' visible=%d",
+        APR_DEBUGF("[UiLayoutBuilder] Dock built id='%s' title='%s' widget='%s' position='%s' visible=%d",
             qPrintable(dock.id),
             qPrintable(actionLabel(dock.title, dock.id)),
             qPrintable(dock.widgetType),
@@ -588,7 +588,7 @@ void UiLayoutBuilder::buildDocks(const std::vector<DockDef>& docks)
             dock.visible ? 1 : 0);
     }
 
-    SY_DEBUGF("[UiLayoutBuilder] All docks built: total=%d", static_cast<int>(docks.size()));
+    APR_DEBUGF("[UiLayoutBuilder] All docks built: total=%d", static_cast<int>(docks.size()));
 }
 
 void UiLayoutBuilder::buildShortcuts(const std::vector<ShortcutDef>& shortcuts)
@@ -619,7 +619,7 @@ void UiLayoutBuilder::buildShortcuts(const std::vector<ShortcutDef>& shortcuts)
             m_shortcutRegistry ? m_shortcutRegistry->effectiveKey(sc.commandId, configuredKey) : configuredKey;
         if (!keySequence.isEmpty() && m_menuShortcutKeys.contains(keySequence.toString()))
         {
-            SY_WARNF("[UiLayoutBuilder] Skip duplicated shortcut '%s' for command '%s' — already bound by a menu item",
+            APR_WARNF("[UiLayoutBuilder] Skip duplicated shortcut '%s' for command '%s' — already bound by a menu item",
                 qPrintable(keySequence.toString()),
                 qPrintable(sc.commandId));
             continue;
@@ -635,7 +635,7 @@ void UiLayoutBuilder::buildShortcuts(const std::vector<ShortcutDef>& shortcuts)
         shortcut->setContext(Qt::ApplicationShortcut);
         // 同 bindAction：捕获 dispatcher 而不是 this，本 builder 会被整体替换
         QObject::connect(shortcut, &QShortcut::activated, [dispatcher = m_dispatcher, commandId = sc.commandId]() {
-            SY_DEBUGF("[Menu] shortcut command='%s'", qPrintable(commandId));
+            APR_DEBUGF("[Menu] shortcut command='%s'", qPrintable(commandId));
             dispatcher->dispatch(commandId);
         });
         m_builtShortcuts.push_back(shortcut);
@@ -658,7 +658,7 @@ void UiLayoutBuilder::buildStatusBar(const StatusBarDef& statusBarDef)
     QStatusBar* bar = m_window->statusBar();
     if (!bar)
     {
-        SY_ERROR("[UiLayoutBuilder] statusBar() returned null, cannot build status bar slots");
+        APR_ERROR("[UiLayoutBuilder] statusBar() returned null, cannot build status bar slots");
         return;
     }
 
@@ -666,7 +666,7 @@ void UiLayoutBuilder::buildStatusBar(const StatusBarDef& statusBarDef)
     bar->setSizeGripEnabled(statusBarDef.sizeGripEnabled);
     if (!statusBarDef.visible)
     {
-        SY_DEBUG("[UiLayoutBuilder] StatusBar hidden by client config");
+        APR_DEBUG("[UiLayoutBuilder] StatusBar hidden by client config");
         return;
     }
 
@@ -675,13 +675,13 @@ void UiLayoutBuilder::buildStatusBar(const StatusBarDef& statusBarDef)
     {
         if (!slotDef.visible)
         {
-            SY_DEBUGF("[UiLayoutBuilder] Skip status slot id='%s' visible=0", qPrintable(slotDef.id));
+            APR_DEBUGF("[UiLayoutBuilder] Skip status slot id='%s' visible=0", qPrintable(slotDef.id));
             continue;
         }
         // 授权门控：例如「视觉定位坐标显示」这类选装功能的状态栏指示器
         if (!featureAllowed(slotDef.feature))
         {
-            SY_DEBUGF("[UiLayoutBuilder] Skip status slot id='%s' — feature '%s' not licensed",
+            APR_DEBUGF("[UiLayoutBuilder] Skip status slot id='%s' — feature '%s' not licensed",
                 qPrintable(slotDef.id),
                 qPrintable(slotDef.feature));
             continue;
@@ -692,7 +692,7 @@ void UiLayoutBuilder::buildStatusBar(const StatusBarDef& statusBarDef)
         {
             // 与 Dock 一致的优雅降级：工厂未注册时不创建占位控件，
             // 因为状态栏空间有限，空白占位比缺失更容易误导现场。
-            SY_WARNF("[UiLayoutBuilder] Status slot widget '%s' not registered, slot id='%s' skipped",
+            APR_WARNF("[UiLayoutBuilder] Status slot widget '%s' not registered, slot id='%s' skipped",
                 qPrintable(slotDef.widgetType),
                 qPrintable(slotDef.id));
             continue;
@@ -716,14 +716,14 @@ void UiLayoutBuilder::buildStatusBar(const StatusBarDef& statusBarDef)
         m_builtStatusBarSlots.push_back(widget);
         ++built;
 
-        SY_DEBUGF("[UiLayoutBuilder] Status slot built id='%s' widget='%s' align='%s' stretch=%d",
+        APR_DEBUGF("[UiLayoutBuilder] Status slot built id='%s' widget='%s' align='%s' stretch=%d",
             qPrintable(slotDef.id),
             qPrintable(slotDef.widgetType),
             slotDef.align == StatusBarSlotAlign::Permanent ? "permanent" : "left",
             slotDef.stretch);
     }
 
-    SY_DEBUGF("[UiLayoutBuilder] StatusBar built: slots=%d/%d", built, static_cast<int>(statusBarDef.items.size()));
+    APR_DEBUGF("[UiLayoutBuilder] StatusBar built: slots=%d/%d", built, static_cast<int>(statusBarDef.items.size()));
 }
 
 QMenu* UiLayoutBuilder::buildContextMenu(const ContextMenuDef& def, QWidget* parent)
@@ -731,7 +731,7 @@ QMenu* UiLayoutBuilder::buildContextMenu(const ContextMenuDef& def, QWidget* par
     // 整个右键菜单级授权门控：未授权则不弹出
     if (!featureAllowed(def.feature))
     {
-        SY_DEBUGF("[UiLayoutBuilder] Context menu id='%s' suppressed — feature '%s' not licensed",
+        APR_DEBUGF("[UiLayoutBuilder] Context menu id='%s' suppressed — feature '%s' not licensed",
             qPrintable(def.id),
             qPrintable(def.feature));
         return nullptr;
@@ -758,12 +758,12 @@ QMenu* UiLayoutBuilder::buildContextMenu(const ContextMenuDef& def, QWidget* par
     }
     if (!hasRealAction)
     {
-        SY_DEBUGF("[UiLayoutBuilder] Context menu id='%s' has no available action, not shown", qPrintable(def.id));
+        APR_DEBUGF("[UiLayoutBuilder] Context menu id='%s' has no available action, not shown", qPrintable(def.id));
         menu->deleteLater();
         return nullptr;
     }
 
-    SY_DEBUGF("[UiLayoutBuilder] Context menu built id='%s' workbench='%s' actions=%d",
+    APR_DEBUGF("[UiLayoutBuilder] Context menu built id='%s' workbench='%s' actions=%d",
         qPrintable(def.id),
         qPrintable(def.workbenchId),
         static_cast<int>(menu->actions().size()));

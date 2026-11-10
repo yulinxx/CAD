@@ -39,7 +39,11 @@ public:
     const std::string& lastError() const;
 
 private:
-    /// 创建 app_meta 元数据表（记录 schema 版本等）
+    /// 只保证 app_meta 表存在（CREATE TABLE IF NOT EXISTS，不写任何行）。
+    /// 必须在任何 app_meta 查询之前调用，否则首次启动会先查询后建表。
+    bool ensureMetaTable();
+
+    /// 创建 app_meta 元数据表并写入 schema 版本号
     bool createMetaTable();
 
     /// 创建所有业务数据表

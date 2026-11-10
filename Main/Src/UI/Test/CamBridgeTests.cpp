@@ -14,9 +14,10 @@
 
 #include "CAM/CamInputBridge.h"
 #include "Engine2D/Core/SceneManager.h"
-#include "Engine2D/SyEntity/SyArc.h"
-#include "Engine2D/SyEntity/SyImage.h"
-#include "Engine2D/SyEntity/SyLine.h"
+#include "Engine2D/Core/SceneWriteGateway.h"
+#include "Engine2D/AprEntity/AprArc.h"
+#include "Engine2D/AprEntity/AprImage.h"
+#include "Engine2D/AprEntity/AprLine.h"
 #include "Hardware/ToolpathJobSpec.h"
 
 #include <algorithm>
@@ -26,23 +27,23 @@
 namespace
 {
     /// 往场景里加一条折线，返回场景内的那一份图元
-    Eg::SyEntity* addPolyline(Eg::SceneManager& scene)
+    Eg::AprEntity* addPolyline(Eg::SceneManager& scene)
     {
-        Eg::SyLine line;
+        Eg::AprLine line;
         line.setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0, 0.0), Ut::Vec2d(10.0, 10.0) });
-        scene.addEntity(&line);
+        Eg::SceneWriteGateway::addEntity(scene, &line);
 
-        const std::vector<Eg::SyEntity*> all = scene.getAllEntities();
+        const std::vector<Eg::AprEntity*> all = scene.getAllEntities();
         return all.empty() ? nullptr : all.back();
     }
 
     /// 加一张横向灰度阶梯图：物理尺寸固定 25.4mm × 25.4mm，像素数由 DPI 决定
-    Eg::SyEntity* addGradientImage(Eg::SceneManager& scene, int pixels)
+    Eg::AprEntity* addGradientImage(Eg::SceneManager& scene, int pixels)
     {
-        Eg::SyImage image;
+        Eg::AprImage image;
         image.nWidth = pixels;
         image.nHeight = pixels;
-        image.ePixelFormat = Eg::SyPixelFormat::Gray8;
+        image.ePixelFormat = Eg::AprPixelFormat::Gray8;
         image.topLeft = Ut::Vec2d(0.0, 0.0);
         image.topRight = Ut::Vec2d(25.4, 0.0);
         image.bottomLeft = Ut::Vec2d(0.0, -25.4);
@@ -56,9 +57,9 @@ namespace
             }
         }
         image.setPixelDataVector(data);
-        scene.addEntity(&image);
+        Eg::SceneWriteGateway::addEntity(scene, &image);
 
-        const std::vector<Eg::SyEntity*> all = scene.getAllEntities();
+        const std::vector<Eg::AprEntity*> all = scene.getAllEntities();
         return all.empty() ? nullptr : all.back();
     }
 
@@ -111,13 +112,13 @@ TEST(CamBridgeTests, ArcAngles_ConvertedFromRadiansToDegrees)
     const double kPi = 3.14159265358979323846;
 
     Eg::SceneManager scene;
-    Eg::SyArc arc;
+    Eg::AprArc arc;
     arc.basePoint = Ut::Vec2d(0.0, 0.0);
     arc.dRadius = 10.0;
     // 几何层角度单位是弧度：四分之一圆弧
     arc.dStartAngle = 0.0;
     arc.dEndAngle = kPi * 0.5;
-    scene.addEntity(&arc);
+    Eg::SceneWriteGateway::addEntity(scene, &arc);
 
     ToolpathJobSpec spec;
     Cam::ToolpathJobInput input = CamBridge::buildJobInput(scene, nullptr, spec);
@@ -147,7 +148,7 @@ TEST(CamBridgeTests, ArcAngles_ConvertedFromRadiansToDegrees)
 TEST(CamBridgeTests, EntityVisibleAndLocked_ArePassedThrough)
 {
     Eg::SceneManager scene;
-    Eg::SyEntity* entity = addPolyline(scene);
+    Eg::AprEntity* entity = addPolyline(scene);
     ASSERT_NE(entity, nullptr);
 
     entity->setVisible(false);
@@ -175,6 +176,12 @@ TEST(CamBridgeTests, EntityVisibleAndLocked_ArePassedThrough)
 
 TEST(CamBridgeTests, RasterEntity_AssembledToScanlines)
 {
+#ifndef BUILD_RASTER
+    // 位图 → 扫描线的装配在 CamInputBridge 里按 BUILD_RASTER 条件编译。
+    // Raster 子模块未初始化时该装配不参与构建，图元只会落到哨兵尺寸，
+    // 这里必须显式跳过，而不是伪装成一次「装配失败」。
+    GTEST_SKIP() << "requires BUILD_RASTER=ON";
+#endif
     Eg::SceneManager scene;
     ASSERT_NE(addGradientImage(scene, 96), nullptr);
 
@@ -230,6 +237,9 @@ TEST(CamBridgeTests, RasterEntity_AssembledToScanlines)
 
 TEST(CamBridgeTests, RasterEntity_SamePhysicalSizeAt96And300Dpi)
 {
+#ifndef BUILD_RASTER
+    GTEST_SKIP() << "requires BUILD_RASTER=ON";
+#endif
     auto buildForDpi = [](int pixels, Cam::ToolpathJobInput& input) {
         Eg::SceneManager scene;
         if (addGradientImage(scene, pixels) == nullptr) {
