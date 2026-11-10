@@ -22,7 +22,7 @@
 
 #include <QMessageBox>
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 namespace {
 
@@ -32,7 +32,7 @@ namespace {
 /// 旧模型只有 5 个字段，Eg::ProcessParams 有 14 个。这里把另外 9 个**逐项显式**
 /// 写成保守默认值，而不是依赖「默认构造碰巧如此」：以后有人调整 ProcessParams
 /// 的默认值时，不会在毫无提示的情况下改变旧档案的加工行为。
-/// 要用满 14 个字段必须走 .sy v2 的 ProcessData，不是往 HardwareProfile 里塞字段。
+/// 要用满 14 个字段必须走 .apr v2 的 ProcessData，不是往 HardwareProfile 里塞字段。
 Eg::ProcessParams hwProfileToProcessParams(const HardwareProfile& hp)
 {
     Eg::ProcessParams p;
@@ -60,7 +60,7 @@ Eg::ProcessParams hwProfileToProcessParams(const HardwareProfile& hp)
     // （原地出光会烧穿工件）。这里回退到保守默认，不把非法值送进编译器。
     if (!(p.speedMmPerSec > 0.0))
     {
-        SY_WARNF("[OperationRegistrar] hardware profile %d has invalid speed %.3f; "
+        APR_WARNF("[OperationRegistrar] hardware profile %d has invalid speed %.3f; "
                  "falling back to 100.0 mm/s", hp.id, hp.speed);
         p.speedMmPerSec = 100.0;
     }
@@ -87,7 +87,7 @@ OperationRegistrar::~OperationRegistrar() = default;
 
 void OperationRegistrar::registerAll()
 {
-    SY_INFO("[OperationRegistrar] registering module operations on OperationBus");
+    APR_INFO("[OperationRegistrar] registering module operations on OperationBus");
 
     // 核心操作（撤销/重做/删除/圆角/倒角/选择/帮助 + 编辑操作 + 算法操作 + 视图操作）
     CoreOperationRegistry coreOps(m_root.operationBus(),

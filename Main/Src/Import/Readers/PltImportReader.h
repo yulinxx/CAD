@@ -7,5 +7,5 @@ class PltImportReader : public ImportReaderBase
 {
 public:
     PltImportReader();
-    ImportResult read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities) override;
+    ImportResult read(const ImportContext& context, Fio::VecAprEntityPtr& outEntities) override;
 };

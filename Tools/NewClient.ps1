@@ -89,7 +89,7 @@ Write-Host ""
 Write-Host "Created client scaffold: $target" -ForegroundColor Green
 Write-Host "  config : Clients/$ClientId/configs/$ClientId.json"
 Write-Host "  brand  : Clients/$ClientId/branding/$ClientId/brand.json"
-Write-Host "  plugin : SanYiClient$pascal -> plugins/clients/$ClientId"
+Write-Host "  plugin : AprClient$pascal -> plugins/clients/$ClientId"
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
 Write-Host "  cd `"$target`""

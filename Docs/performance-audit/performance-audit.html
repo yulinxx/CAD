@@ -890,8 +890,8 @@
           <p>
             本节数据全部来自 <code>Tools/PerfBenchmark</code> 在 <strong>Release</strong> 构建下对 100 万图元的实测，原始记录逐轮追加在 <code>Docs/performance-audit/baseline.csv</code>。复现命令：
           </p>
-          <pre><code>cmake --build build --config Release --target SanYiPerfBenchmark --parallel 1
-./build/bin_Qt6/Release/SanYiPerfBenchmark.exe 1000000 Docs/performance-audit/baseline.csv</code></pre>
+          <pre><code>cmake --build build --config Release --target AprPerfBenchmark --parallel 1
+./build/bin_Qt6/Release/AprPerfBenchmark.exe 1000000 Docs/performance-audit/baseline.csv</code></pre>
 
           <h3>8.1 改造前后对比</h3>
           <p>下表取 <code>baseline.csv</code> 中紧邻改造前后的两块记录（同一台机器、同一构建配置）。这两块记录之间代码只差两项——<strong>RTree 批量装载（STR 打包）</strong>与<strong>分裂算法 <code>rstar</code>→<code>quadratic</code></strong>，因此收益可以直接归因：<code>scene_add</code> 与批量插入两项归 STR 打包，<code>transform_10pct</code> 与 <code>undo_redo_10pct</code> 归分裂算法（批量状态交换是删除密集路径，<code>rstar</code> 的 reinsert 正是它慢的原因）。</p>
@@ -1094,8 +1094,8 @@
           <p>
             在数据层之外，本轮补上了渲染端的帧路径测量，工具是新增的 <code>Tools/RenderBenchmark</code>。它挂在 RenderX 的 <strong>Null 后端</strong>上：该后端是完整语义实现（声明支持全部可选特性，上层走真实代码路径而非降级分支），因此不依赖 GPU 与窗口系统，能无人值守复现。测的是<strong>帧路径的 CPU 侧</strong>——绘制列表 resolve → AABB 剔除 → 按需排序 → 合批 → 命令提交，这正是渲染端架构约束所在的位置。
           </p>
-          <pre><code>cmake --build build --config Release --target SanYiRenderBenchmark --parallel 1
-./build/bin_Qt6/Release/SanYiRenderBenchmark.exe 1000000 Docs/performance-audit/render-baseline.csv render-path-baseline</code></pre>
+          <pre><code>cmake --build build --config Release --target AprRenderBenchmark --parallel 1
+./build/bin_Qt6/Release/AprRenderBenchmark.exe 1000000 Docs/performance-audit/render-baseline.csv render-path-baseline</code></pre>
           <div class="table-wrap">
             <table>
               <caption>表 12：渲染帧路径 CPU 耗时基线（100 万图元场景，1280×720，Release，Null 后端）</caption>

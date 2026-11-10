@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <string>
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "UI/ClientConfig/UiBrandManager.h"
 #include "Ut/BundleResources.h"
 #include "VersionInfo.h"
@@ -108,7 +108,7 @@ static int handleCliFlags(int argc, char** argv, int& smokeExitMs)
             std::printf("%s\n", UiBrandManager::instance().copyright().toStdString().c_str());
             std::printf("\n");
             std::printf("Authors:\n");
-            std::printf("  SanYi Development Team <dev@sanyi-cad.com>\n");
+            std::printf("  April Development Team <dev@apr-cad.com>\n");
             return 0;
         }
 
@@ -215,9 +215,9 @@ int runCADApplication(int argc, char** argv)
 
     if (appPaths.appRootPath.empty())
     {
-        SyLogger::GetInstance().Initialize("SanYiCAD");
-        SY_ERROR("[main] error code=app.root_path_empty message=Application root path is empty");
-        SyLogger::GetInstance().Shutdown();
+        AprLogger::GetInstance().Initialize("April");
+        APR_ERROR("[main] error code=app.root_path_empty message=Application root path is empty");
+        AprLogger::GetInstance().Shutdown();
         return -1;
     }
 

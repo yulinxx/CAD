@@ -51,7 +51,7 @@ jobs:
             -DVCPKG_DIR=$env:VCPKG_ROOT `
             -DQt_INSTALL_DIR=$qtDir `
             -DBUILD_ENGRAVING=OFF -DBUILD_GEOMODELCORE=OFF -DBUILD_VISION=OFF `
-            -DBUILD_HARDWARE=OFF -DBUILD_PYTHON=OFF -DSANYI_PYBIND_CORE=OFF `
+            -DBUILD_HARDWARE=OFF -DBUILD_PYTHON=OFF -DAPR_PYBIND_CORE=OFF `
             -DBUILD_CAM=OFF -DBUILD_NESTING=OFF `
             -DBUILD_UI_DIMENSION=2D `
             -DBUILD_ALL_TESTS=OFF `
@@ -59,7 +59,7 @@ jobs:
 
       # Build
       - name: Build
-        run: cmake --build build-pkg --config Release --target SanYiCAD --parallel
+        run: cmake --build build-pkg --config Release --target April --parallel
 
       # Package (NSIS)
       - name: Package (NSIS)
@@ -77,6 +77,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: SanYiCAD-installer
+          name: April-installer
           path: build-pkg/package/*.exe
           retention-days: 7

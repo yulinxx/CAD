@@ -7,7 +7,7 @@
 
 #include <QCoreApplication>
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include "UI/Safety/EmergencyStopController.h"
 
@@ -36,7 +36,7 @@ LaserOperationRegistry::LaserOperationRegistry(const LaserOperationConfig& confi
 
 void LaserOperationRegistry::reportError(const char* tag, const QString& message) const
 {
-    SY_ERRORF("[LaserOperation] %s: %s", tag, message.toUtf8().constData());
+    APR_ERRORF("[LaserOperation] %s: %s", tag, message.toUtf8().constData());
     if (m_config.errorReporter)
     {
         m_config.errorReporter(message);
@@ -58,7 +58,7 @@ void LaserOperationRegistry::registerAll()
 {
     if (!m_config.bus)
     {
-        SY_WARNF("[LaserOperation] No OperationBus, laser commands are not registered");
+        APR_WARNF("[LaserOperation] No OperationBus, laser commands are not registered");
         return;
     }
 
@@ -211,5 +211,5 @@ void LaserOperationRegistry::registerAll()
         },
         [safety = m_config.safetyController] { return safety && safety->canConfirmReset(); });
 
-    SY_INFO("[LaserOperation] registered: StartProcess / PauseProcess / StopProcess / EmergencyStop / ResetSafety");
+    APR_INFO("[LaserOperation] registered: StartProcess / PauseProcess / StopProcess / EmergencyStop / ResetSafety");
 }

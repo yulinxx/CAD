@@ -14,7 +14,7 @@
 
 ```mermaid
 flowchart LR
-    A[SyEntity<br/>圆/弧/椭圆/折线] -->|gatherGeometry()| B[ISceneGeometrySink]
+    A[AprEntity<br/>圆/弧/椭圆/折线] -->|gatherGeometry()| B[ISceneGeometrySink]
     B -->|emitCircle/Arc/Ellipse| C[RenderSceneBuilder]
     C -->|自适应tessellate<br/>顶点哈希增量| D[PersistentGeometryStore]
     D --> E[RenderX<br/>GeometryStore + DrawList]

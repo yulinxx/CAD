@@ -7,7 +7,7 @@
 #include <QStringList>
 
 #include "FileIO/FileFormat.h"
-#include "FileIO/SyDocument.h"
+#include "FileIO/AprDocument.h"
 
 namespace Eg
 {
@@ -15,18 +15,18 @@ namespace Eg
     class SceneManager3D;
 }
 
-/// 原生 .sy 的「加工语义快照」。
+/// 原生 .apr 的「加工语义快照」。
 ///
 /// 为什么是值快照而不是 LayerManager/HardwareProfileManager 指针：
 ///   - 导出异步执行，后台线程不允许访问主线程持有的 Manager；
 ///   - 快照在 Phase 1（主线程）采集后随 ExportContext 按值传进后台线程，
 ///     里面只有 POD，没有指针，线程安全；
 ///   - 元素直接复用 FileIO 的跨 DLL POD，避免再定义一套重复结构体、
-///     或让 Main 去包含 FileIO 的内部头 SyDocumentData.h。
+///     或让 Main 去包含 FileIO 的内部头 AprDocumentData.h。
 struct NativeDocumentSnapshot
 {
-    std::vector<Fio::SyLayerDetailInfo> layers;
-    std::vector<Fio::SyHardwareProfileInfo> profiles;
+    std::vector<Fio::AprLayerDetailInfo> layers;
+    std::vector<Fio::AprHardwareProfileInfo> profiles;
 };
 
 /// 统一导出上下文：承载导出操作所需的所有参数和状态信息
@@ -67,7 +67,7 @@ struct ExportContext
     /// 组合根没注入快照提供器时保持 false：NativeExportWriter 必须继续给出
     /// 「图层/工艺/Profile 未保存」的 warning，不能让操作员以为参数已落盘。
     bool hasMachiningSnapshot{ false };
-    /// 图层表 + 硬件 Profile 值集的值快照（仅原生 .sy 使用）
+    /// 图层表 + 硬件 Profile 值集的值快照（仅原生 .apr 使用）
     NativeDocumentSnapshot machiningSnapshot;
 
     /// 进度回调（可选，导出过程中报告进度 0.0~1.0）

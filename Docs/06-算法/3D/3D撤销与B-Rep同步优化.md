@@ -5,8 +5,8 @@ v1.0 - 2026-10-27
 
 ## 状态
 已完成核心修复并通过编译验证：
-- 默认构建（GMC OFF）：`UI3D` + `SanYiCAD` 编译通过
-- GMC 构建（`build-gmc`，GeoModelCore ON）：`UI3D` + `SanYiCAD` 编译通过
+- 默认构建（GMC OFF）：`UI3D` + `April` 编译通过
+- GMC 构建（`build-gmc`，GeoModelCore ON）：`UI3D` + `April` 编译通过
 - 启动冒烟测试：两版应用均可正常启动、UI shell 显示、空场景刷新完成
 
 ## 已修复问题 (按优先级)
@@ -29,7 +29,7 @@ v1.0 - 2026-10-27
 
 ### P2 - 数据持久化与保存点
 - **proto 新增 `visible=50` / `locked=51`**：可选字段，兼容旧文件（缺省 `visible=true`、`locked=false`）
-- **MESH 强转 UB 修复**：序列化/反序列化时 `if (entity.eType != EType::MESH)` 分支，避免把 `SyMeshEntity` 强转 `SyEntity2D`
+- **MESH 强转 UB 修复**：序列化/反序列化时 `if (entity.eType != EType::MESH)` 分支，避免把 `AprMeshEntity` 强转 `AprEntity2D`
 - **保存点逻辑修复**：`isAtSavePoint` 支持无效哨兵；合并/新分支/裁剪时置为无效；保存成功/New/Open 后 `markSavePoint`；`OperationBus3D::postExecute` 用 `!isAtSavePoint()` 决定脏标记
 - **导入解析器/重入计数 RAII**：`ParserGuard`/`ImportDepthGuard`，解析/转换异常转为错误提示
 
@@ -57,5 +57,5 @@ v1.0 - 2026-10-27
 
 ## 联系方式 / 维护
 - 维护人员：3D 模块组
-- 相关子模块：Engine (`3D/Include/Engine3D/`)、FileIO (`FileIO/Proto/SanYiDocument.proto`)、UI (`UI/3D/Src/`)
+- 相关子模块：Engine (`3D/Include/Engine3D/`)、FileIO (`FileIO/Proto/AprDocument.proto`)、UI (`UI/3D/Src/`)
 - 问题跟踪：见 Git Issues / 项目 Wiki

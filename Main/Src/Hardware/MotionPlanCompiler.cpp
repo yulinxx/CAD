@@ -18,13 +18,13 @@
 
     #include <QCoreApplication>
 
-    #include "Engine/SyEntity/SyEntity.h"
+    #include "Engine/AprEntity/AprEntity.h"
     #include "Engine2D/Cam/GeometryExtractor.h"
     #include "Engine2D/Cam/ToolpathGeometry.h"
     #include "Engine2D/Edit/LayerSnapshot.h"
     #include "Engine2D/Geo/GeometryContext.h"
 
-    #include "Log/SyLogger.h"
+    #include "Log/AprLogger.h"
 
 namespace
 {
@@ -40,7 +40,7 @@ namespace
     {
         int layerId = 0;
         LayerProcessParams params;
-        std::vector<const Eg::SyEntity*> entities;
+        std::vector<const Eg::AprEntity*> entities;
     };
 
     /// 把作业规格里的容差装进 GeometryContext。
@@ -191,7 +191,7 @@ namespace
      * 提取器对「这类图元暂时无法加工」会给出明确的 kind 与原因，
      * 这里把它转成编译结果里的诊断信息，而不是静默跳过。
      */
-    bool emitEntity(const Eg::SyEntity* entity,
+    bool emitEntity(const Eg::AprEntity* entity,
         const Eg::Cam::ExtractOptions& options,
         bool preferArcs,
         double chordToleranceMm,
@@ -342,8 +342,8 @@ namespace MotionPlanCompiler
             return buckets.back();
         };
 
-        const std::vector<Eg::SyEntity*> all = scene.getAllEntities();
-        for (const Eg::SyEntity* entity : all)
+        const std::vector<Eg::AprEntity*> all = scene.getAllEntities();
+        for (const Eg::AprEntity* entity : all)
         {
             if (!entity || !entity->isValid())
             {
@@ -393,7 +393,7 @@ namespace MotionPlanCompiler
                 {
                     if (!b.entities.empty())
                     {
-                        SY_WARNF("[MotionPlanCompiler] Layer %d missing from layerOrder, appended last", b.layerId);
+                        APR_WARNF("[MotionPlanCompiler] Layer %d missing from layerOrder, appended last", b.layerId);
                         ordered.push_back(std::move(b));
                     }
                 }
@@ -459,7 +459,7 @@ namespace MotionPlanCompiler
             {
                 out.emitBeginPass(pass);
 
-                for (const Eg::SyEntity* entity : bucket.entities)
+                for (const Eg::AprEntity* entity : bucket.entities)
                 {
                     bool degraded = false;
                     if (emitEntity(entity,
@@ -545,7 +545,7 @@ namespace MotionPlanCompiler
         result.boundsMaxX = finalHeader.boundsMaxX;
         result.boundsMaxY = finalHeader.boundsMaxY;
 
-        SY_DEBUGF("[MotionPlanCompiler] '%s': %d layer(s), %d entity(ies), %lld command(s), "
+        APR_DEBUGF("[MotionPlanCompiler] '%s': %d layer(s), %d entity(ies), %lld command(s), "
                   "bounds [%.3f, %.3f]-[%.3f, %.3f], skipped=%d degraded=%d unmachinable=%d",
             spec.jobId.toUtf8().constData(),
             result.layerCount,

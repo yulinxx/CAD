@@ -6,7 +6,7 @@
  *
  * ==================== 它在链路里的位置 ====================
  *
- *   2D 文档（SyEntity + 图层）
+ *   2D 文档（AprEntity + 图层）
  *        ↓  Eg::Cam::GeometryExtractor（唯一几何提取入口，Engine2D/Cam/）
  *        ↓  Eg::Cam::Contour / PathSegment（加工几何）
  *        ↓  本编译器（几何 → 设备无关字节码）

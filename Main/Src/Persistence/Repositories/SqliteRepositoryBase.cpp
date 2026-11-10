@@ -6,7 +6,7 @@
  */
 #include "SqliteRepositoryBase.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <cstdlib>
 
@@ -23,14 +23,14 @@ const std::string& SqliteRepositoryBase::lastError() const
 bool SqliteRepositoryBase::fail(const char* tag, const std::string& message)
 {
     m_lastError = message + ": " + m_database.lastError();
-    SY_ERRORF("[%s] %s", tag, m_lastError.c_str());
+    APR_ERRORF("[%s] %s", tag, m_lastError.c_str());
     return false;
 }
 
 bool SqliteRepositoryBase::setError(const char* tag, const std::string& message)
 {
     m_lastError = message;
-    SY_ERRORF("[%s] %s", tag, m_lastError.c_str());
+    APR_ERRORF("[%s] %s", tag, m_lastError.c_str());
     return false;
 }
 

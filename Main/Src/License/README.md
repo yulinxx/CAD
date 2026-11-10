@@ -41,7 +41,7 @@ C ABI 契约见 [`LicenseDLL.h`](../../../Licensing/License/Include/License/Lice
 ## 2. 端到端链路
 
 ```text
-签发侧（厂商）                                客户端（SanYiCAD）
+签发侧（厂商）                                客户端（April）
 ──────────────                                ────────────────────
 机器码 ──► 注册码（RSA-2048 + SHA-256 签名） ──► 激活对话框 ──► License_Activate
                                                     │
@@ -112,7 +112,7 @@ C ABI 契约见 [`LicenseDLL.h`](../../../Licensing/License/Include/License/Lice
 
 入口：`Main/Src/Runtime/CADApplicationRuntime.cpp` 调用
 `LicensingBootstrap::runGate(configDir)`；`configDir` 来自
-`AppPathManager::configDir()`（`<AppLocalData>/SanYiCAD/config`）。
+`AppPathManager::configDir()`（`<AppLocalData>/April/config`）。
 返回 `0` 继续启动；`-1`（用户退出试用/取消激活）与 `-3`（拒绝激活）直接作为进程退出码。
 
 ### 4.1 Phase 0：许可证预检
@@ -221,20 +221,20 @@ LicenseKeygen_GenerateRegCode(machineCode, "2028-12-31", "pro,nesting",
 
 ## 6. 数据落盘
 
-所有路径都以 `configDir`（`<AppLocalData>/SanYiCAD/config`）为根，跨平台由 Qt 路径提供：
+所有路径都以 `configDir`（`<AppLocalData>/April/config`）为根，跨平台由 Qt 路径提供：
 
 | 文件 | 内容 | 说明 |
 |------|------|------|
 | `license.key` | 注册码原文（明文文本） | `License_Activate` 成功后写入；启动时读取并验签 |
 | `trial.info` | `start_date=YYYY-MM-DD` / `machine_hash=...` / `trial_days=30` | 仅「无有效许可证」的启动会创建 |
 | `license.throttle` | `Base64(failures|lastAttempt|lockUntil).Base64(HMAC-SHA256)` | 激活失败节流状态；HMAC 密钥 = 固定盐 + 机器码 |
-| Windows 注册表 | `HKCU\Software\SanYiCAD\Trial` | 与 `trial.info` 同时写入/读取，作为试用记录的冗余 |
+| Windows 注册表 | `HKCU\Software\April\Trial` | 与 `trial.info` 同时写入/读取，作为试用记录的冗余 |
 
 典型位置：
 
-- Windows：`C:\Users\<user>\AppData\Local\SanYiCAD\config\`
-- macOS：`~/Library/Application Support/SanYiCAD/config/`
-- Linux：`~/.local/share/SanYiCAD/config/`（未注入时 `TrialManager` 回退 `~/.config/sanyicad`）
+- Windows：`C:\Users\<user>\AppData\Local\April\config\`
+- macOS：`~/Library/Application Support/April/config/`
+- Linux：`~/.local/share/April/config/`（未注入时 `TrialManager` 回退 `~/.config/april`）
 
 ---
 
@@ -267,7 +267,7 @@ C ABI 包装 `Trial_Check(int* remainingDays)`：
 | 机器指纹绑定 | `MachineFingerprint` | 已接入许可证与试用 |
 | 散射态守卫 | `LicenseGuard`：tokenA/B、crossSum、timestamp，`License_Check` 成功时 `MarkValid` | 内存态已维护；**应用未调用 `License_GuardCheck`**（保存/导出/渲染前的二次校验尚未接线） |
 | 激活节流 | `LicenseThrottle`：前 3 次免费，之后指数退避 30s→3600s，连续 20 次失败硬锁定 24h，成功清零 | 已接入 `License_Activate` |
-| 编译期开关 | `SANYI_ENABLE_LICENSE` → `LicenseInternal::g_checkEnabled` | `Config.cmake:237` 已定义 `option(... ON)` 并默认开启（`LicenseInternal.cpp:12-15`：定义宏时初值 true）；运行期仍可由 `LicenseConfig::enableCheck` 覆盖 |
+| 编译期开关 | `APR_ENABLE_LICENSE` → `LicenseInternal::g_checkEnabled` | `Config.cmake:237` 已定义 `option(... ON)` 并默认开启（`LicenseInternal.cpp:12-15`：定义宏时初值 true）；运行期仍可由 `LicenseConfig::enableCheck` 覆盖 |
 | 运行期覆盖 | `LicenseConfig::enableCheck`：`-1` 不覆盖（`License_ConfigInit` 默认）、`0` 关闭、`1` 开启 | 已接入，`License_Create` 只在 `>= 0` 时改写全局开关 |
 
 之所以把默认值定为 `-1`：若默认是 `1`，任何一次 `License_Create`（例如打开注册对话框）
@@ -312,7 +312,7 @@ C ABI 包装 `Trial_Check(int* remainingDays)`：
 | 功能菜单缺失 | `[UiFeatureGate] Feature 'x' is not licensed` | features 未包含该项，或 `*`/`all` 未生效 |
 | 配置自检报告不一致 | `[ConfigSelfCheck] licensedNotCompiled / compiledNotLicensed` | License features 与 `BUILD_*` 开关、JSON 配置三者对不上 |
 
-日志文件：`<AppLocalData>/SanYiCAD/logs/SanYiCAD.log`（及 `.error.log`）。
+日志文件：`<AppLocalData>/April/logs/April.log`（及 `.error.log`）。
 
 ---
 

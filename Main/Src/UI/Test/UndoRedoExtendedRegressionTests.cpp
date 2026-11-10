@@ -19,9 +19,9 @@
 #include "Engine2D/Edit/SceneUndoCommands.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Core/SceneWriteGateway.h"
-#include "Engine2D/SyEntity/SyLine.h"
-#include "Engine2D/SyEntity/SyCircle.h"
-#include "Engine2D/SyEntity/SyPolygon.h"
+#include "Engine2D/AprEntity/AprLine.h"
+#include "Engine2D/AprEntity/AprCircle.h"
+#include "Engine2D/AprEntity/AprPolygon.h"
 
 #include <memory>
 #include <vector>
@@ -33,7 +33,7 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_RestoresAllProperties)
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setName("TestLine");
 
     line->setPointVector({ Ut::Vec2d(10, 20), Ut::Vec2d(100, 200) });
@@ -41,14 +41,14 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_RestoresAllProperties)
     line->setLocked(false);
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec;
     vec.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
     // 删除
-    auto* entityInScene = scene.findSyEntityById(lineId);
+    auto* entityInScene = scene.findAprEntityById(lineId);
     ASSERT_NE(entityInScene, nullptr);
     // DeleteEntityCommand 已被按 id 批量删除的 DeleteEntitiesCommand 取代
     const Eg::EntityId deletedId = entityInScene->id;
@@ -60,14 +60,14 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_RestoresAllProperties)
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
     // 验证所有属性恢复
-    auto* restored = scene.findSyEntityById(lineId);
+    auto* restored = scene.findAprEntityById(lineId);
     ASSERT_NE(restored, nullptr);
     EXPECT_STREQ(restored->name(), "TestLine");
     EXPECT_EQ(restored->eType, Eg::EType::LINE);
     EXPECT_TRUE(restored->visible());
     EXPECT_FALSE(restored->locked());
 
-    auto* restoredLine = dynamic_cast<Eg::SyLine*>(restored);
+    auto* restoredLine = dynamic_cast<Eg::AprLine*>(restored);
     ASSERT_NE(restoredLine, nullptr);
     EXPECT_EQ(restoredLine->pointRef().size(), 2u);
     EXPECT_DOUBLE_EQ(restoredLine->pointRef()[0].x(), 10.0);
@@ -81,7 +81,7 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_PolygonAttributes)
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
-    auto poly = std::make_unique<Eg::SyPolygon>();
+    auto poly = std::make_unique<Eg::AprPolygon>();
     poly->setName("TestPolygon");
 
     poly->setVertices({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 0), Ut::Vec2d(10, 10), Ut::Vec2d(0, 10) });
@@ -89,12 +89,12 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_PolygonAttributes)
     poly->bCCW = true;
     Eg::EntityId polyId = poly->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec;
     vec.push_back(std::move(poly));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     // 删除
-    auto* entityInScene = scene.findSyEntityById(polyId);
+    auto* entityInScene = scene.findAprEntityById(polyId);
     ASSERT_NE(entityInScene, nullptr);
     // DeleteEntityCommand 已被按 id 批量删除的 DeleteEntitiesCommand 取代
     const Eg::EntityId deletedId = entityInScene->id;
@@ -105,11 +105,11 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_PolygonAttributes)
     undoMgr.undo();
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
-    auto* restored = scene.findSyEntityById(polyId);
+    auto* restored = scene.findAprEntityById(polyId);
     ASSERT_NE(restored, nullptr);
     EXPECT_STREQ(restored->name(), "TestPolygon");
 
-    auto* restoredPoly = dynamic_cast<Eg::SyPolygon*>(restored);
+    auto* restoredPoly = dynamic_cast<Eg::AprPolygon*>(restored);
     ASSERT_NE(restoredPoly, nullptr);
     EXPECT_TRUE(restoredPoly->bClosed);
     EXPECT_TRUE(restoredPoly->bCCW);
@@ -121,19 +121,19 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_CircleAttributes)
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
-    auto circle = std::make_unique<Eg::SyCircle>();
+    auto circle = std::make_unique<Eg::AprCircle>();
     circle->setName("TestCircle");
 
     circle->basePoint = Ut::Vec2d(50, 60);
     circle->dRadius = 25.0;
     Eg::EntityId circleId = circle->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec;
     vec.push_back(std::move(circle));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     // 删除
-    auto* entityInScene = scene.findSyEntityById(circleId);
+    auto* entityInScene = scene.findAprEntityById(circleId);
     ASSERT_NE(entityInScene, nullptr);
     // DeleteEntityCommand 已被按 id 批量删除的 DeleteEntitiesCommand 取代
     const Eg::EntityId deletedId = entityInScene->id;
@@ -144,11 +144,11 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_CircleAttributes)
     undoMgr.undo();
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
-    auto* restored = scene.findSyEntityById(circleId);
+    auto* restored = scene.findAprEntityById(circleId);
     ASSERT_NE(restored, nullptr);
     EXPECT_STREQ(restored->name(), "TestCircle");
 
-    auto* restoredCircle = dynamic_cast<Eg::SyCircle*>(restored);
+    auto* restoredCircle = dynamic_cast<Eg::AprCircle*>(restored);
     ASSERT_NE(restoredCircle, nullptr);
     EXPECT_DOUBLE_EQ(restoredCircle->basePoint.x(), 50.0);
     EXPECT_DOUBLE_EQ(restoredCircle->basePoint.y(), 60.0);
@@ -162,29 +162,29 @@ TEST(UndoRedoExtendedRegressionTest, DrawUndo_EntityRemoved)
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
     // 绘图（添加图元）
     // AddEntityCommand 已被批量添加的 AddEntitiesCommand 取代（外部模块走 createAddEntitiesCommand）
     {
-        Eg::SyEntity* rawEntity = line.get();
+        Eg::AprEntity* rawEntity = line.get();
         undoMgr.executeCommand(Eg::createAddEntitiesCommand(&scene, &rawEntity, 1, "Add entity"));
         line.reset();
     }
     EXPECT_EQ(scene.getEntityCount(), 1u);
-    EXPECT_NE(scene.findSyEntityById(lineId), nullptr);
+    EXPECT_NE(scene.findAprEntityById(lineId), nullptr);
 
     // 撤销绘图
     undoMgr.undo();
     EXPECT_EQ(scene.getEntityCount(), 0u);
-    EXPECT_EQ(scene.findSyEntityById(lineId), nullptr);
+    EXPECT_EQ(scene.findAprEntityById(lineId), nullptr);
 
     // 重做绘图
     undoMgr.redo();
     EXPECT_EQ(scene.getEntityCount(), 1u);
-    EXPECT_NE(scene.findSyEntityById(lineId), nullptr);
+    EXPECT_NE(scene.findAprEntityById(lineId), nullptr);
 }
 
 // ---- 导入（批量）后撤销测试 ----
@@ -200,12 +200,12 @@ TEST(UndoRedoExtendedRegressionTest, ImportBatch_UndoRemovesAll)
     std::vector<Eg::EntityId> ids;
     for (int i = 0; i < 3; ++i)
     {
-        auto line = std::make_unique<Eg::SyLine>();
+        auto line = std::make_unique<Eg::AprLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i * 10, 10.0 + i * 10) });
         ids.push_back(line->id);
         // AddEntityCommand 已被批量添加的 AddEntitiesCommand 取代（外部模块走 createAddEntitiesCommand）
         {
-            Eg::SyEntity* rawEntity = line.get();
+            Eg::AprEntity* rawEntity = line.get();
             undoMgr.executeCommand(Eg::createAddEntitiesCommand(&scene, &rawEntity, 1, "Add entity"));
             line.reset();
         }
@@ -230,20 +230,20 @@ TEST(UndoRedoExtendedRegressionTest, SelectionState_DrawUndoSelectionCleared)
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec;
     vec.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     // 选中
-    scene.selectEntity(scene.findSyEntityById(lineId));
+    scene.selectEntity(scene.findAprEntityById(lineId));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
     // 删除
-    auto* entityInScene = scene.findSyEntityById(lineId);
+    auto* entityInScene = scene.findAprEntityById(lineId);
     ASSERT_NE(entityInScene, nullptr);
     // DeleteEntityCommand 已被按 id 批量删除的 DeleteEntitiesCommand 取代
     const Eg::EntityId deletedId = entityInScene->id;
@@ -265,28 +265,28 @@ TEST(UndoRedoExtendedRegressionTest, SelectionState_MultipleSelectAfterUndo)
     UndoRedoManager undoMgr(&scene);
 
     // 创建两个图元
-    auto line1 = std::make_unique<Eg::SyLine>();
+    auto line1 = std::make_unique<Eg::AprLine>();
     line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId id1 = line1->id;
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec1;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec1;
     vec1.push_back(std::move(line1));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec1));
 
-    auto line2 = std::make_unique<Eg::SyLine>();
+    auto line2 = std::make_unique<Eg::AprLine>();
     line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
     Eg::EntityId id2 = line2->id;
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec2;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec2;
     vec2.push_back(std::move(line2));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec2));
 
     // 选中两个（selectEntity 为单选，第二次覆盖第一次）
-    scene.selectEntity(scene.findSyEntityById(id1));
+    scene.selectEntity(scene.findAprEntityById(id1));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
-    scene.selectEntity(scene.findSyEntityById(id2));
+    scene.selectEntity(scene.findAprEntityById(id2));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
     // 删除 id2: 选中图元被删除，选择计数归零
-    auto* entity2 = scene.findSyEntityById(id2);
+    auto* entity2 = scene.findAprEntityById(id2);
     ASSERT_NE(entity2, nullptr);
     // DeleteEntityCommand 已被按 id 批量删除的 DeleteEntitiesCommand 取代
     const Eg::EntityId deletedId = entity2->id;
@@ -306,16 +306,16 @@ TEST(UndoRedoExtendedRegressionTest, DirtyState_AfterUndoRedo)
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec;
     vec.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     // 删除
-    auto* entityInScene = scene.findSyEntityById(lineId);
+    auto* entityInScene = scene.findAprEntityById(lineId);
     ASSERT_NE(entityInScene, nullptr);
     // DeleteEntityCommand 已被按 id 批量删除的 DeleteEntitiesCommand 取代
     const Eg::EntityId deletedId = entityInScene->id;
@@ -341,11 +341,11 @@ TEST(UndoRedoExtendedRegressionTest, BatchImport_MultiRoundUndoRedo)
     undoMgr.beginBatch("Import batch 1");
     for (int i = 0; i < 2; ++i)
     {
-        auto line = std::make_unique<Eg::SyLine>();
+        auto line = std::make_unique<Eg::AprLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0, 10.0) });
         // AddEntityCommand 已被批量添加的 AddEntitiesCommand 取代（外部模块走 createAddEntitiesCommand）
         {
-            Eg::SyEntity* rawEntity = line.get();
+            Eg::AprEntity* rawEntity = line.get();
             undoMgr.executeCommand(Eg::createAddEntitiesCommand(&scene, &rawEntity, 1, "Add entity"));
             line.reset();
         }
@@ -365,11 +365,11 @@ TEST(UndoRedoExtendedRegressionTest, BatchImport_MultiRoundUndoRedo)
     undoMgr.beginBatch("Import batch 2");
     for (int i = 0; i < 2; ++i)
     {
-        auto line = std::make_unique<Eg::SyLine>();
+        auto line = std::make_unique<Eg::AprLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0, 10.0) });
         // AddEntityCommand 已被批量添加的 AddEntitiesCommand 取代（外部模块走 createAddEntitiesCommand）
         {
-            Eg::SyEntity* rawEntity = line.get();
+            Eg::AprEntity* rawEntity = line.get();
             undoMgr.executeCommand(Eg::createAddEntitiesCommand(&scene, &rawEntity, 1, "Add entity"));
             line.reset();
         }
@@ -390,11 +390,11 @@ TEST(UndoRedoExtendedRegressionTest, DrawAfterUndo_EntityCountCorrect)
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
-    auto line1 = std::make_unique<Eg::SyLine>();
+    auto line1 = std::make_unique<Eg::AprLine>();
     line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     // AddEntityCommand 已被批量添加的 AddEntitiesCommand 取代（外部模块走 createAddEntitiesCommand）
     {
-        Eg::SyEntity* rawEntity = line1.get();
+        Eg::AprEntity* rawEntity = line1.get();
         undoMgr.executeCommand(Eg::createAddEntitiesCommand(&scene, &rawEntity, 1, "Add entity"));
         line1.reset();
     }
@@ -405,11 +405,11 @@ TEST(UndoRedoExtendedRegressionTest, DrawAfterUndo_EntityCountCorrect)
     EXPECT_EQ(scene.getEntityCount(), 0u);
 
     // 重新绘制
-    auto line2 = std::make_unique<Eg::SyLine>();
+    auto line2 = std::make_unique<Eg::AprLine>();
     line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
     // AddEntityCommand 已被批量添加的 AddEntitiesCommand 取代（外部模块走 createAddEntitiesCommand）
     {
-        Eg::SyEntity* rawEntity = line2.get();
+        Eg::AprEntity* rawEntity = line2.get();
         undoMgr.executeCommand(Eg::createAddEntitiesCommand(&scene, &rawEntity, 1, "Add entity"));
         line2.reset();
     }
@@ -421,16 +421,16 @@ TEST(UndoRedoExtendedRegressionTest, ModifyVisible_UndoRedo)
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     line->setVisible(true);
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec;
     vec.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
-    auto* entity = scene.findSyEntityById(lineId);
+    auto* entity = scene.findAprEntityById(lineId);
     ASSERT_NE(entity, nullptr);
     EXPECT_TRUE(entity->visible());
 
@@ -438,10 +438,10 @@ TEST(UndoRedoExtendedRegressionTest, ModifyVisible_UndoRedo)
     auto cmd = std::make_unique<UndoRedoManager::ModifyEntityCommand>(
         &scene,
         entity,
-        [](Eg::SyEntity* e) {
+        [](Eg::AprEntity* e) {
             e->setVisible(false);
         },
-        [](Eg::SyEntity* e) {
+        [](Eg::AprEntity* e) {
             e->setVisible(true);
         },
         "Toggle visibility");
@@ -462,16 +462,16 @@ TEST(UndoRedoExtendedRegressionTest, ModifyLocked_UndoRedo)
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     line->setLocked(false);
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec;
     vec.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
-    auto* entity = scene.findSyEntityById(lineId);
+    auto* entity = scene.findAprEntityById(lineId);
     ASSERT_NE(entity, nullptr);
     EXPECT_FALSE(entity->locked());
 
@@ -479,10 +479,10 @@ TEST(UndoRedoExtendedRegressionTest, ModifyLocked_UndoRedo)
     auto cmd = std::make_unique<UndoRedoManager::ModifyEntityCommand>(
         &scene,
         entity,
-        [](Eg::SyEntity* e) {
+        [](Eg::AprEntity* e) {
             e->setLocked(true);
         },
-        [](Eg::SyEntity* e) {
+        [](Eg::AprEntity* e) {
             e->setLocked(false);
         },
         "Toggle locked");
@@ -503,16 +503,16 @@ TEST(UndoRedoExtendedRegressionTest, ModifyName_UndoRedo)
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     line->setName("Original");
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec;
     vec.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
-    auto* entity = scene.findSyEntityById(lineId);
+    auto* entity = scene.findAprEntityById(lineId);
     ASSERT_NE(entity, nullptr);
     EXPECT_STREQ(entity->name(), "Original");
 
@@ -520,10 +520,10 @@ TEST(UndoRedoExtendedRegressionTest, ModifyName_UndoRedo)
     auto cmd = std::make_unique<UndoRedoManager::ModifyEntityCommand>(
         &scene,
         entity,
-        [](Eg::SyEntity* e) {
+        [](Eg::AprEntity* e) {
             e->setName("Modified");
         },
-        [](Eg::SyEntity* e) {
+        [](Eg::AprEntity* e) {
             e->setName("Original");
         },
         "Rename");
@@ -544,16 +544,16 @@ TEST(UndoRedoExtendedRegressionTest, RedoStackClearedOnNewCommand)
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec;
     vec.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     // 第一个操作：删除
-    auto* entity = scene.findSyEntityById(lineId);
+    auto* entity = scene.findAprEntityById(lineId);
     ASSERT_NE(entity, nullptr);
     // DeleteEntityCommand 已被按 id 批量删除的 DeleteEntitiesCommand 取代
     const Eg::EntityId deletedId = entity->id;
@@ -566,15 +566,15 @@ TEST(UndoRedoExtendedRegressionTest, RedoStackClearedOnNewCommand)
     EXPECT_TRUE(undoMgr.canRedo());
 
     // 第二个操作：修改属性 — Redo 栈应被清空
-    auto* restored = scene.findSyEntityById(lineId);
+    auto* restored = scene.findAprEntityById(lineId);
     ASSERT_NE(restored, nullptr);
     undoMgr.executeCommand(std::make_unique<UndoRedoManager::ModifyEntityCommand>(
         &scene,
         restored,
-        [](Eg::SyEntity* e) {
+        [](Eg::AprEntity* e) {
             e->setVisible(false);
         },
-        [](Eg::SyEntity* e) {
+        [](Eg::AprEntity* e) {
             e->setVisible(true);
         },
         "Toggle visibility")
@@ -620,18 +620,18 @@ TEST(UndoRedoExtendedRegressionTest, DeleteUndo_SelectionViaSceneManager)
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec;
     vec.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
-    scene.selectEntity(scene.findSyEntityById(lineId));
+    scene.selectEntity(scene.findAprEntityById(lineId));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
-    auto* entity = scene.findSyEntityById(lineId);
+    auto* entity = scene.findAprEntityById(lineId);
     // DeleteEntityCommand 已被按 id 批量删除的 DeleteEntitiesCommand 取代
     const Eg::EntityId deletedId = entity->id;
     undoMgr.executeCommand(Eg::createDeleteEntitiesCommand(&scene, &deletedId, 1, "Delete entity"));
@@ -652,21 +652,21 @@ TEST(UndoRedoExtendedRegressionTest, UndoRedo_ImportEntitySelectionRestore)
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec;
     vec.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
     // 选中图元
-    scene.selectEntity(scene.findSyEntityById(lineId));
+    scene.selectEntity(scene.findAprEntityById(lineId));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
     // 删除
-    auto* entity = scene.findSyEntityById(lineId);
+    auto* entity = scene.findAprEntityById(lineId);
     ASSERT_NE(entity, nullptr);
     // DeleteEntityCommand 已被按 id 批量删除的 DeleteEntitiesCommand 取代
     const Eg::EntityId deletedId = entity->id;
@@ -707,18 +707,18 @@ TEST(UndoRedoExtendedRegressionTest, UndoRedo_TransactionBoundary_NestedBatch)
     UndoRedoManager undoMgr(&scene);
 
     // 添加图元
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec;
     vec.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     // 嵌套批量
     undoMgr.beginBatch("outer");
     {
-        auto* entity = scene.findSyEntityById(lineId);
+        auto* entity = scene.findAprEntityById(lineId);
         ASSERT_NE(entity, nullptr);
         entity->setVisible(false);
         // 内部操作
@@ -738,18 +738,18 @@ TEST(UndoRedoExtendedRegressionTest, UndoRedo_MultipleUndoRedoCycles)
     Eg::SceneManager scene;
     UndoRedoManager undoMgr(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     line->setName("CycleLine");
 
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec;
     vec.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     // 删除
-    auto* entity = scene.findSyEntityById(lineId);
+    auto* entity = scene.findAprEntityById(lineId);
     ASSERT_NE(entity, nullptr);
     // DeleteEntityCommand 已被按 id 批量删除的 DeleteEntitiesCommand 取代
     const Eg::EntityId deletedId = entity->id;

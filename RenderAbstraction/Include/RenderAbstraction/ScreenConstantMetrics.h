@@ -47,7 +47,7 @@ namespace Render
         /// 后才送入 WorldPinned，从而在 Retina / 非 Retina 上屏幕视觉尺寸一致。
         constexpr float kSnapIndicatorRadiusPx = 16.0f;
 
-        /// **点图元本体**（SyPoint，已提交的图元）的直径。
+        /// **点图元本体**（AprPoint，已提交的图元）的直径。
         ///
         /// 点是唯一「图元几何本身就是屏幕定尺寸」的图元：它没有世界尺寸可言，
         /// 一个像素的点既看不见也点不中。走 DrawCommand::pointSize → gl_PointSize，

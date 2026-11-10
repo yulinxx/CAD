@@ -7,7 +7,7 @@
 #include "DocumentRepository.h"
 
 #include "Engine/Persistence/Database.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 DocumentRepository::DocumentRepository(Eg::Database& database)
     : SqliteRepositoryBase(database)
@@ -31,14 +31,14 @@ std::vector<DocumentRecord> DocumentRepository::loadAll()
             }
             catch (const std::exception& e)
             {
-                SY_WARNF("[DocumentRepository] Skipping malformed row in loadAll: %s", e.what());
+                APR_WARNF("[DocumentRepository] Skipping malformed row in loadAll: %s", e.what());
             }
         }
     }
     catch (const std::exception& e)
     {
         m_lastError = std::string("loadAll query failed: ") + e.what();
-        SY_ERRORF("[DocumentRepository] %s", m_lastError.c_str());
+        APR_ERRORF("[DocumentRepository] %s", m_lastError.c_str());
     }
 
     return result;
@@ -49,7 +49,7 @@ DocumentRecord DocumentRepository::loadByPath(const std::string& filePath)
     if (filePath.empty())
     {
         m_lastError = "loadByPath: empty filePath";
-        SY_WARNF("[DocumentRepository] %s", m_lastError.c_str());
+        APR_WARNF("[DocumentRepository] %s", m_lastError.c_str());
         return DocumentRecord();
     }
 
@@ -69,7 +69,7 @@ DocumentRecord DocumentRepository::loadByPath(const std::string& filePath)
     catch (const std::exception& e)
     {
         m_lastError = std::string("loadByPath failed: ") + e.what();
-        SY_ERRORF("[DocumentRepository] %s", m_lastError.c_str());
+        APR_ERRORF("[DocumentRepository] %s", m_lastError.c_str());
         return DocumentRecord();
     }
 }
@@ -89,7 +89,7 @@ bool DocumentRepository::save(const DocumentRecord& record)
         return fail("DocumentRepository", "Failed to save document metadata");
     }
 
-    SY_DEBUGF("[DocumentRepository] Saved document: %s", record.filePath.c_str());
+    APR_DEBUGF("[DocumentRepository] Saved document: %s", record.filePath.c_str());
     return true;
 }
 
@@ -98,7 +98,7 @@ bool DocumentRepository::remove(const std::string& filePath)
     if (filePath.empty())
     {
         m_lastError = "remove: empty filePath";
-        SY_WARNF("[DocumentRepository] %s", m_lastError.c_str());
+        APR_WARNF("[DocumentRepository] %s", m_lastError.c_str());
         return false;
     }
 
@@ -113,11 +113,11 @@ bool DocumentRepository::remove(const std::string& filePath)
     int deleted = m_database.changes();
     if (deleted == 0)
     {
-        SY_WARNF("[DocumentRepository] remove: no document found for path: %s", filePath.c_str());
+        APR_WARNF("[DocumentRepository] remove: no document found for path: %s", filePath.c_str());
     }
     else
     {
-        SY_DEBUGF("[DocumentRepository] Removed document: %s (%d row(s))", filePath.c_str(), deleted);
+        APR_DEBUGF("[DocumentRepository] Removed document: %s (%d row(s))", filePath.c_str(), deleted);
     }
 
     return true;
@@ -141,7 +141,7 @@ DocumentRecord DocumentRepository::rowToRecord(const std::map<std::string, std::
     }
     catch (const std::exception& e)
     {
-        SY_ERRORF("[DocumentRepository] rowToRecord failed: %s", e.what());
+        APR_ERRORF("[DocumentRepository] rowToRecord failed: %s", e.what());
         throw;  // 向上传播让调用方决定是否忽略本条记录
     }
     return rec;

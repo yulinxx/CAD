@@ -24,19 +24,19 @@
 #include "Engine2D/Interaction/HardwareProfileManager.h"
 #include "FileIO/Parsers/NativeParser.h"
 #include "FileIO/Writers/NativeWriter.h"
-#include "FileIO/SyDocument.h"
+#include "FileIO/AprDocument.h"
 #include "Engine3D/Import/FioEntityConverter.h"
 #include "Engine2D/Import/Fio2DEntityConverter.h"
-#include "SyEntitySerializer.h"
+#include "AprEntitySerializer.h"
 #include "FileIO/FioTypes.h"
 #include "FileIO/FileIOManager.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Core/SceneWriteGateway.h"
-#include "Engine2D/SyEntity/SyLine.h"
-#include "Engine2D/SyEntity/SyCircle.h"
-#include "Engine2D/SyEntity/SyArc.h"
-#include "Engine2D/SyEntity/SyPolygon.h"
-#include "Engine2D/SyEntity/SyNurbs.h"
+#include "Engine2D/AprEntity/AprLine.h"
+#include "Engine2D/AprEntity/AprCircle.h"
+#include "Engine2D/AprEntity/AprArc.h"
+#include "Engine2D/AprEntity/AprPolygon.h"
+#include "Engine2D/AprEntity/AprNurbs.h"
 
 #include "Persistence/PersistenceService.h"
 #include "Persistence/Models/RecentFileRecord.h"
@@ -237,7 +237,7 @@ namespace
         RecentFileRecord rec;
         rec.filePath = filePath;
         rec.title = filePath.substr(filePath.find_last_of('/') + 1);
-        rec.format = "sy";
+        rec.format = "apr";
         rec.workbench = "";
         rec.lastOpenedTime = "2026-01-01T00:00:00";
         return rec;
@@ -252,21 +252,21 @@ TEST(RecentFileServiceRegressionTest, LoadMigratesLegacyEmptyWorkbenchRows)
     PersistenceService persistence;
     ASSERT_TRUE(persistence.initialize(dbDir.filePath(QStringLiteral("recent.sqlite")).toStdString()));
     ASSERT_NE(persistence.recentFiles(), nullptr);
-    ASSERT_TRUE(persistence.recentFiles()->append(makeLegacyRecentRecord("/tmp/legacy_doc.sy")));
+    ASSERT_TRUE(persistence.recentFiles()->append(makeLegacyRecentRecord("/tmp/legacy_doc.apr")));
 
     RecentFileService service(&persistence);
     const QStringList files = service.loadRecentFiles(QStringLiteral("2D"));
 
-    // 归类后应出现在 2D 列表（.sy → 2D）
+    // 归类后应出现在 2D 列表（.apr → 2D）
     ASSERT_EQ(files.size(), 1);
-    EXPECT_EQ(files.front(), QStringLiteral("/tmp/legacy_doc.sy"));
+    EXPECT_EQ(files.front(), QStringLiteral("/tmp/legacy_doc.apr"));
 
     // 关键断言：load 必须把 workbench='' 回写成归类结果 ——
     // 否则该行不属于任何工作台桶，append 的按桶裁剪永远裁不到它，库里会无限累积
     bool found = false;
     for (const auto& rec : persistence.recentFiles()->loadAll())
     {
-        if (rec.filePath == "/tmp/legacy_doc.sy")
+        if (rec.filePath == "/tmp/legacy_doc.apr")
         {
             found = true;
             EXPECT_EQ(rec.workbench, "2D");
@@ -287,7 +287,7 @@ TEST(RecentFileServiceRegressionTest, FallsBackToQSettingsWhenDbHasNoRowsForCurr
     QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settingsDir.path());
     if (QCoreApplication::organizationName().isEmpty())
     {
-        QCoreApplication::setOrganizationName(QStringLiteral("SanYiCADTests"));
+        QCoreApplication::setOrganizationName(QStringLiteral("AprTests"));
     }
     if (QCoreApplication::applicationName().isEmpty())
     {
@@ -311,7 +311,7 @@ TEST(RecentFileServiceRegressionTest, FallsBackToQSettingsWhenDbHasNoRowsForCurr
 
     // QSettings 兜底里有一条 2D 记录
     QSettings seed;
-    seed.setValue(QStringLiteral("RecentFiles/2D"), QStringList{ QStringLiteral("/tmp/settings_only.sy") });
+    seed.setValue(QStringLiteral("RecentFiles/2D"), QStringList{ QStringLiteral("/tmp/settings_only.apr") });
     seed.sync();
 
     RecentFileService service(&persistence);
@@ -319,7 +319,7 @@ TEST(RecentFileServiceRegressionTest, FallsBackToQSettingsWhenDbHasNoRowsForCurr
 
     // 回归防护：DB 有数据但没有 2D 条目时，不能直接返回空 —— 老版本写在
     // QSettings 的兜底数据会被整体吞掉（修复前本断言失败）
-    EXPECT_TRUE(files.contains(QStringLiteral("/tmp/settings_only.sy")));
+    EXPECT_TRUE(files.contains(QStringLiteral("/tmp/settings_only.apr")));
     // 3D 的行也不能漏进 2D 桶
     EXPECT_FALSE(files.contains(QStringLiteral("/tmp/model.stl")));
 
@@ -400,9 +400,9 @@ TEST(ImportExportRegressionTest, ExportService_CollectAllEntitiesWithData)
     ExportService service;
     Eg::SceneManager scene;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec;
     vec.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
@@ -432,7 +432,7 @@ TEST(ImportExportRegressionTest, FioEntityConverter_MetadataTransfer)
     ASSERT_NE(result, nullptr);
     EXPECT_EQ(result->eType, Eg::EType::LINE);
 
-    auto* line = static_cast<Eg::SyLine*>(result.get());
+    auto* line = static_cast<Eg::AprLine*>(result.get());
     // 验证线段点数
     EXPECT_EQ(line->pointRef().size(), 2u);
 }
@@ -616,7 +616,7 @@ TEST(ImportExportRegressionTest, Chain_EntityCountAfterImport)
     auto entity = Eg::FioEntityConverter::convertEntity(info);
     ASSERT_NE(entity, nullptr);
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec;
     vec.push_back(std::move(entity));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
@@ -652,7 +652,7 @@ TEST(ImportExportRegressionTest, Chain_ExportCollectMatchesImport)
     auto entities = Eg::FioEntityConverter::convertAll(parseData);
     ASSERT_EQ(entities.size(), 3u);
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> moveVec;
+    std::vector<std::unique_ptr<Eg::AprEntity>> moveVec;
     for (auto& e : entities)
     {
         moveVec.push_back(std::move(e));
@@ -682,18 +682,18 @@ TEST(ImportExportRegressionTest, Chain_CollectAfterDelete)
 {
     Eg::SceneManager scene;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec;
     vec.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
     // 删除后导出应收集 0 个图元
-    Eg::SceneWriteGateway::deleteEntity(scene, scene.findSyEntityById(lineId));
+    Eg::SceneWriteGateway::deleteEntity(scene, scene.findAprEntityById(lineId));
     EXPECT_EQ(scene.getEntityCount(), 0u);
 
     ExportService service;
@@ -941,70 +941,70 @@ TEST(ImportExportRegressionTest, FioEntityConverter_EntityInfoWithLayerId)
     // 图层信息应通过 layerSourceId 传递
 }
 
-// ---- SyEntitySerializer 深度测试 ----
+// ---- AprEntitySerializer 深度测试 ----
 
-TEST(ImportExportRegressionTest, SyEntitySerializer_LineRoundTripWithLayer)
+TEST(ImportExportRegressionTest, AprEntitySerializer_LineRoundTripWithLayer)
 {
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(10, 20), Ut::Vec2d(100, 200) });
     line->setName("LayerLine");
 
     line->basePoint = Ut::Vec2d(50, 50);
 
-    sanyi::proto::EntityData protoData;
-    Fio::SyEntitySerializer::serializeEntity(*line, &protoData);
+    apr::proto::EntityData protoData;
+    Fio::AprEntitySerializer::serializeEntity(*line, &protoData);
 
-    auto restored = Fio::SyEntitySerializer::deserializeEntity(protoData);
+    auto restored = Fio::AprEntitySerializer::deserializeEntity(protoData);
     ASSERT_NE(restored, nullptr);
     EXPECT_EQ(restored->eType, Eg::EType::LINE);
     EXPECT_STREQ(restored->name(), "LayerLine");
 }
 
-TEST(ImportExportRegressionTest, SyEntitySerializer_CircleRoundTripWithLayer)
+TEST(ImportExportRegressionTest, AprEntitySerializer_CircleRoundTripWithLayer)
 {
-    auto circle = std::make_unique<Eg::SyCircle>();
+    auto circle = std::make_unique<Eg::AprCircle>();
     circle->dRadius = 15.0;
     circle->basePoint = Ut::Vec2d(30, 40);
     circle->setName("LayerCircle");
 
-    sanyi::proto::EntityData protoData;
-    Fio::SyEntitySerializer::serializeEntity(*circle, &protoData);
+    apr::proto::EntityData protoData;
+    Fio::AprEntitySerializer::serializeEntity(*circle, &protoData);
 
-    auto restored = Fio::SyEntitySerializer::deserializeEntity(protoData);
+    auto restored = Fio::AprEntitySerializer::deserializeEntity(protoData);
     ASSERT_NE(restored, nullptr);
     EXPECT_EQ(restored->eType, Eg::EType::CIRCLE);
     EXPECT_STREQ(restored->name(), "LayerCircle");
 }
 
-TEST(ImportExportRegressionTest, SyEntitySerializer_PolygonRoundTripWithLayer)
+TEST(ImportExportRegressionTest, AprEntitySerializer_PolygonRoundTripWithLayer)
 {
-    auto poly = std::make_unique<Eg::SyPolygon>();
+    auto poly = std::make_unique<Eg::AprPolygon>();
     poly->setVertices({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 0), Ut::Vec2d(10, 10) });
     poly->bClosed = true;
     poly->bCCW = true;
     poly->setName("LayerPoly");
 
-    sanyi::proto::EntityData protoData;
-    Fio::SyEntitySerializer::serializeEntity(*poly, &protoData);
+    apr::proto::EntityData protoData;
+    Fio::AprEntitySerializer::serializeEntity(*poly, &protoData);
 
-    auto restored = Fio::SyEntitySerializer::deserializeEntity(protoData);
+    auto restored = Fio::AprEntitySerializer::deserializeEntity(protoData);
     ASSERT_NE(restored, nullptr);
     EXPECT_EQ(restored->eType, Eg::EType::POLYGON);
     EXPECT_STREQ(restored->name(), "LayerPoly");
 }
 
-TEST(ImportExportRegressionTest, SyEntitySerializer_ArcRoundTripWithLayer)
+TEST(ImportExportRegressionTest, AprEntitySerializer_ArcRoundTripWithLayer)
 {
-    auto arc = std::make_unique<Eg::SyArc>();
+    auto arc = std::make_unique<Eg::AprArc>();
     arc->dRadius = 20.0;
     arc->dStartAngle = 30.0;
     arc->dEndAngle = 120.0;
     arc->setName("LayerArc");
 
-    sanyi::proto::EntityData protoData;
-    Fio::SyEntitySerializer::serializeEntity(*arc, &protoData);
+    apr::proto::EntityData protoData;
+    Fio::AprEntitySerializer::serializeEntity(*arc, &protoData);
 
-    auto restored = Fio::SyEntitySerializer::deserializeEntity(protoData);
+    auto restored = Fio::AprEntitySerializer::deserializeEntity(protoData);
     ASSERT_NE(restored, nullptr);
     EXPECT_EQ(restored->eType, Eg::EType::ARC);
     EXPECT_STREQ(restored->name(), "LayerArc");
@@ -1018,7 +1018,7 @@ TEST(ImportExportRegressionTest, ImportService_EntityCountAfterImport)
     ImportService service;
     Eg::SceneManager scene;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId originalId = line->id;
     Eg::SceneWriteGateway::addEntity(scene, line.release());
@@ -1035,7 +1035,7 @@ TEST(ImportExportRegressionTest, ExportService_EntityCountAfterCollect)
     ExportService service;
     Eg::SceneManager scene;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::SceneWriteGateway::addEntity(scene, line.release());
 
@@ -1151,7 +1151,7 @@ TEST(ImportExportRegressionTest, SelectionState_PreservedAfterImport)
 {
     // 验证导入后选择状态正确
     Eg::SceneManager scene;
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::SceneWriteGateway::addEntity(scene, line.release());
 
@@ -1163,14 +1163,14 @@ TEST(ImportExportRegressionTest, SelectionState_PreservedAfterImport)
         },
         &allIds);
     ASSERT_FALSE(allIds.empty());
-    scene.selectEntity(scene.findSyEntityById(allIds[0]));
+    scene.selectEntity(scene.findAprEntityById(allIds[0]));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 }
 
 TEST(ImportExportRegressionTest, SelectionState_ClearAfterImport)
 {
     Eg::SceneManager scene;
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::SceneWriteGateway::addEntity(scene, line.release());
 
@@ -1181,7 +1181,7 @@ TEST(ImportExportRegressionTest, SelectionState_ClearAfterImport)
             return true;
         },
         &allIds);
-    scene.selectEntity(scene.findSyEntityById(allIds[0]));
+    scene.selectEntity(scene.findAprEntityById(allIds[0]));
     scene.clearSelection();
     EXPECT_EQ(scene.getSelectedEntityCount(), 0u);
 }
@@ -1334,21 +1334,21 @@ TEST(ImportExportRegressionTest, ExportService_CollectWithSelectedEntities)
     Eg::SceneManager scene;
     ExportService service;
 
-    auto line1 = std::make_unique<Eg::SyLine>();
+    auto line1 = std::make_unique<Eg::AprLine>();
     line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId id1 = line1->id;
 
-    auto line2 = std::make_unique<Eg::SyLine>();
+    auto line2 = std::make_unique<Eg::AprLine>();
     line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
     Eg::EntityId id2 = line2->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line1));
     entities.push_back(std::move(line2));
     Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     // 选中一个
-    scene.selectEntity(scene.findSyEntityById(id1));
+    scene.selectEntity(scene.findAprEntityById(id1));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
     service.setSceneManager(&scene);
@@ -1382,7 +1382,7 @@ TEST(ImportExportRegressionTest, ExportService_CanExportVariousExtensions)
     EXPECT_FALSE(service.canExport(""));
 }
 
-TEST(ImportExportRegressionTest, SyEntitySerializer_SerializeNullEntity)
+TEST(ImportExportRegressionTest, AprEntitySerializer_SerializeNullEntity)
 {
     // 序列化空图元不应崩溃 — 序列化器由调用方保证非空输入
     // 此测试仅验证序列化流程不抛出异常
@@ -1531,9 +1531,9 @@ TEST(ImportExportRegressionTest, ExportService_EntityCountAfterExport)
     ExportService service;
     Eg::SceneManager scene;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec;
     vec.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
@@ -1552,10 +1552,10 @@ TEST(ImportExportRegressionTest, ExportService_CollectAfterSelectionChange)
     ExportService service;
     Eg::SceneManager scene;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     for (int i = 0; i < 3; ++i)
     {
-        auto line = std::make_unique<Eg::SyLine>();
+        auto line = std::make_unique<Eg::AprLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         entities.push_back(std::move(line));
     }
@@ -1574,48 +1574,48 @@ TEST(ImportExportRegressionTest, ExportService_CollectAfterSelectionChange)
 
 // ---- 序列化往返后选择态保持 ----
 
-TEST(ImportExportRegressionTest, SyEntitySerializer_SelectionStateAfterRoundTrip)
+TEST(ImportExportRegressionTest, AprEntitySerializer_SelectionStateAfterRoundTrip)
 {
     // 验证序列化往返后选择状态
     Eg::SceneManager scene;
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     line->setName("SelLine");
 
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec;
     vec.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
     // 选中图元
-    scene.selectEntity(scene.findSyEntityById(lineId));
+    scene.selectEntity(scene.findAprEntityById(lineId));
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 
-    // 序列化（使用 Fio::SyEntitySerializer 的 protobuf 接口）
-    auto* entity = scene.findSyEntityById(lineId);
+    // 序列化（使用 Fio::AprEntitySerializer 的 protobuf 接口）
+    auto* entity = scene.findAprEntityById(lineId);
     ASSERT_NE(entity, nullptr);
-    sanyi::proto::EntityData protoData;
-    Fio::SyEntitySerializer::serializeEntity(*entity, &protoData);
+    apr::proto::EntityData protoData;
+    Fio::AprEntitySerializer::serializeEntity(*entity, &protoData);
     // 序列化不应影响选择状态
     EXPECT_EQ(scene.getSelectedEntityCount(), 1u);
 }
 
-TEST(ImportExportRegressionTest, SyEntitySerializer_EmptyEntitySerialization)
+TEST(ImportExportRegressionTest, AprEntitySerializer_EmptyEntitySerialization)
 {
     // 空图元序列化不崩溃
-    Eg::SyLine emptyLine;
-    sanyi::proto::EntityData protoData;
-    Fio::SyEntitySerializer::serializeEntity(emptyLine, &protoData);
+    Eg::AprLine emptyLine;
+    apr::proto::EntityData protoData;
+    Fio::AprEntitySerializer::serializeEntity(emptyLine, &protoData);
     SUCCEED();
 }
 
-TEST(ImportExportRegressionTest, SyEntitySerializer_DeserializeEmptyData)
+TEST(ImportExportRegressionTest, AprEntitySerializer_DeserializeEmptyData)
 {
     // 空 protobuf 数据反序列化
-    sanyi::proto::EntityData emptyProto;
-    auto entity = Fio::SyEntitySerializer::deserializeEntity(emptyProto);
+    apr::proto::EntityData emptyProto;
+    auto entity = Fio::AprEntitySerializer::deserializeEntity(emptyProto);
     EXPECT_EQ(entity, nullptr);
 }
 
@@ -1669,7 +1669,7 @@ namespace
     {
         static std::atomic<unsigned> s_counter{ 0 };
         auto dir = std::filesystem::temp_directory_path();
-        auto path = dir / ("sanyicad_ir_test_" + std::to_string(s_counter.fetch_add(1)) + "." + ext);
+        auto path = dir / ("april_ir_test_" + std::to_string(s_counter.fetch_add(1)) + "." + ext);
         std::ofstream ofs(path, std::ios::binary);
         ofs.write(content.data(), static_cast<std::streamsize>(content.size()));
         ofs.close();
@@ -1702,7 +1702,7 @@ TEST(ImportExportRegressionTest, IrPipeline_RealDxf_ParseAndConvert)
 TEST(ImportExportRegressionTest, IrPipeline_RealDxf_LwPolylineKeepsVertices)
 {
     // 最小 DXF：一条带 3 个顶点的 LWPOLYLINE。
-    // 回归：vertexCount 未填充时转换出的 SyPolygon 顶点为空 → 无法显示。
+    // 回归：vertexCount 未填充时转换出的 AprPolygon 顶点为空 → 无法显示。
     std::string dxf = "0\nSECTION\n2\nENTITIES\n"
                       "0\nLWPOLYLINE\n8\n0\n90\n3\n70\n0\n"
                       "10\n0.0\n20\n0.0\n"
@@ -1724,7 +1724,7 @@ TEST(ImportExportRegressionTest, IrPipeline_RealDxf_LwPolylineKeepsVertices)
     ASSERT_EQ(entities.size(), 1u);
     ASSERT_EQ(entities[0]->eType, Eg::EType::POLYGON);
 
-    auto* poly = static_cast<Eg::SyPolygon*>(entities[0].get());
+    auto* poly = static_cast<Eg::AprPolygon*>(entities[0].get());
     const auto& verts = poly->vertices();
     ASSERT_EQ(verts.size(), 3u);
     EXPECT_DOUBLE_EQ(verts[0].x(), 0.0);
@@ -1765,7 +1765,7 @@ TEST(ImportExportRegressionTest, IrPipeline_RealDxf_SplineKeepsControlPoints)
     ASSERT_EQ(entities.size(), 1u);
     ASSERT_EQ(entities[0]->eType, Eg::EType::SPLINE);
 
-    auto* nurbs = static_cast<Eg::SyNurbs*>(entities[0].get());
+    auto* nurbs = static_cast<Eg::AprNurbs*>(entities[0].get());
     EXPECT_EQ(nurbs->nDegree, 3);
     EXPECT_EQ(nurbs->controlPointCount(), 4u);
     EXPECT_EQ(nurbs->knotCount(), 8u);
@@ -1824,7 +1824,7 @@ TEST(ImportExportRegressionTest, IrPipeline_ConvertAll_PassesExtensionBlob)
     auto entities = Eg::FioEntityConverter::convertAll(parseData);
     ASSERT_EQ(entities.size(), 1u);
 
-    auto* poly = static_cast<Eg::SyPolygon*>(entities[0].get());
+    auto* poly = static_cast<Eg::AprPolygon*>(entities[0].get());
     ASSERT_EQ(poly->vertices().size(), 3u);
     EXPECT_DOUBLE_EQ(poly->vertices()[0].x(), 1.0);
     EXPECT_DOUBLE_EQ(poly->vertices()[2].y(), 6.0);
@@ -1869,24 +1869,24 @@ TEST(ImportExportRegressionTest, IrPipeline_RealDxf_FirstLayerSourceIdIsOneBased
     EXPECT_EQ(it->second, layer0->sourceId);
 }
 
-// ==================== 原生 .sy 加工语义端到端闭环 ====================
+// ==================== 原生 .apr 加工语义端到端闭环 ====================
 //
-// 历史问题：SanYiDocument.proto 有 output / default_process_id /
-// hardware_profile_id / fill_hardware_profile_id，SySerializer 也能读写；但生产
-// 导出路径只把图元放进新建的 SyDocument，从不填图层表与 Profile 值集。保存提示
+// 历史问题：AprDocument.proto 有 output / default_process_id /
+// hardware_profile_id / fill_hardware_profile_id，AprSerializer 也能读写；但生产
+// 导出路径只把图元放进新建的 AprDocument，从不填图层表与 Profile 值集。保存提示
 // 照常出现，重开后功率/速度/遍数静默退回默认 —— 属加工事故级数据丢失。
 //
-// 现在闭环是：ExportContext 值快照 → NativeExportWriter 写入 SyDocument →
+// 现在闭环是：ExportContext 值快照 → NativeExportWriter 写入 AprDocument →
 // NativeImportReader 读出图层绑定 + Profile 值集 → ImportService 还原进
 // LayerManager / HardwareProfileManager。下面分别覆盖每一段，并守住
 // 「组合根没注入快照时仍必须显式告警」这条兜底。
 namespace
 {
     // MainTests 开 unity build：多个 .cpp 会拼进同一个 TU，匿名命名空间里的
-    // 同名辅助函数会互相重定义，所以统一加 sanyiSyPersist 前缀。
-    Fio::SyLayerDetailInfo sanyiSyPersistSampleLayer()
+    // 同名辅助函数会互相重定义，所以统一加 aprAprPersist 前缀。
+    Fio::AprLayerDetailInfo aprAprPersistSampleLayer()
     {
-        Fio::SyLayerDetailInfo layer;
+        Fio::AprLayerDetailInfo layer;
         layer.id = 7;
         std::strncpy(layer.name, "Cut-7", sizeof(layer.name) - 1);
         layer.color = 0xFF00A0FF;
@@ -1902,10 +1902,10 @@ namespace
         return layer;
     }
 
-    Fio::SyHardwareProfileInfo sanyiSyPersistSampleProfile(
+    Fio::AprHardwareProfileInfo aprAprPersistSampleProfile(
         int id, const char* name, double power, double speed)
     {
-        Fio::SyHardwareProfileInfo p;
+        Fio::AprHardwareProfileInfo p;
         p.id = id;
         std::strncpy(p.name, name, sizeof(p.name) - 1);
         p.power = power;
@@ -1916,15 +1916,15 @@ namespace
         return p;
     }
 
-    /// 造一份 .sy。viaClonePath 对应生产环境真实走的路径（ExportService 在派发前
+    /// 造一份 .apr。viaClonePath 对应生产环境真实走的路径（ExportService 在派发前
     /// 会把 context.sceneManager 置空）；false 对应借用实体路径。两条路径都必须
     /// 把快照写进去，否则加工语义会因导出路径不同而随机丢失。
-    ExportResult sanyiSyPersistWriteSample(const QString& path, bool withSnapshot, bool viaClonePath)
+    ExportResult aprAprPersistWriteSample(const QString& path, bool withSnapshot, bool viaClonePath)
     {
         Eg::SceneManager scene;
-        auto line = std::make_unique<Eg::SyLine>();
+        auto line = std::make_unique<Eg::AprLine>();
         line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
-        std::vector<std::unique_ptr<Eg::SyEntity>> vec;
+        std::vector<std::unique_ptr<Eg::AprEntity>> vec;
         vec.push_back(std::move(line));
         Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
 
@@ -1933,7 +1933,7 @@ namespace
         context.format = Fio::FileFormat::Native;
         context.sceneManager = viaClonePath ? nullptr : &scene;
 
-        Fio::VecSyEntityPtr cloned;
+        Fio::VecAprEntityPtr cloned;
         if (viaClonePath)
         {
             for (auto* e : scene.getAllEntities())
@@ -1948,25 +1948,25 @@ namespace
         if (withSnapshot)
         {
             context.hasMachiningSnapshot = true;
-            context.machiningSnapshot.layers.push_back(sanyiSyPersistSampleLayer());
-            context.machiningSnapshot.profiles.push_back(sanyiSyPersistSampleProfile(0, "Default", 100.0, 1000.0));
-            context.machiningSnapshot.profiles.push_back(sanyiSyPersistSampleProfile(3, "Steel-3mm", 77.5, 245.25));
-            context.machiningSnapshot.profiles.push_back(sanyiSyPersistSampleProfile(4, "Fill", 42.0, 320.0));
+            context.machiningSnapshot.layers.push_back(aprAprPersistSampleLayer());
+            context.machiningSnapshot.profiles.push_back(aprAprPersistSampleProfile(0, "Default", 100.0, 1000.0));
+            context.machiningSnapshot.profiles.push_back(aprAprPersistSampleProfile(3, "Steel-3mm", 77.5, 245.25));
+            context.machiningSnapshot.profiles.push_back(aprAprPersistSampleProfile(4, "Fill", 42.0, 320.0));
         }
 
         NativeExportWriter writer;
         return writer.write(context, cloned);
     }
 
-    void sanyiSyPersistVerifyDocument(const QString& path)
+    void aprAprPersistVerifyDocument(const QString& path)
     {
         Fio::NativeParser parser(Fio::FileFormat::Native);
-        Fio::SyDocument doc;
+        Fio::AprDocument doc;
         const auto parseResult = parser.parseDocument(path.toUtf8().constData(), doc);
         ASSERT_TRUE(parseResult.success) << parseResult.errorMessage;
 
         ASSERT_EQ(doc.layerCount(), 1u);
-        Fio::SyLayerDetailInfo layer;
+        Fio::AprLayerDetailInfo layer;
         ASSERT_TRUE(doc.getLayerDetailAt(0, layer));
         EXPECT_EQ(layer.id, 7u);
         EXPECT_STREQ(layer.name, "Cut-7");
@@ -1981,7 +1981,7 @@ namespace
         bool foundSteel = false;
         for (size_t i = 0; i < doc.hardwareProfileCount(); ++i)
         {
-            Fio::SyHardwareProfileInfo p;
+            Fio::AprHardwareProfileInfo p;
             ASSERT_TRUE(doc.getHardwareProfileAt(i, p));
             if (p.id == 3)
             {
@@ -2003,7 +2003,7 @@ TEST(ImportExportRegressionTest, NativeExportStillWarnsWhenMachiningSnapshotIsMi
     QTemporaryDir dir;
     ASSERT_TRUE(dir.isValid());
 
-    const ExportResult result = sanyiSyPersistWriteSample(dir.filePath(QStringLiteral("gap.sy")), false, true);
+    const ExportResult result = aprAprPersistWriteSample(dir.filePath(QStringLiteral("gap.apr")), false, true);
     ASSERT_TRUE(result.success) << result.message.toStdString();
     ASSERT_FALSE(result.warnings.isEmpty());
     // 组合根没注入 provider / 快照采集抛异常时，绝不能让操作员以为参数已落盘
@@ -2015,33 +2015,33 @@ TEST(ImportExportRegressionTest, NativeExportPersistsMachiningSnapshotViaBorrowe
 {
     QTemporaryDir dir;
     ASSERT_TRUE(dir.isValid());
-    const QString path = dir.filePath(QStringLiteral("borrowed.sy"));
+    const QString path = dir.filePath(QStringLiteral("borrowed.apr"));
 
-    const ExportResult result = sanyiSyPersistWriteSample(path, true, false);
+    const ExportResult result = aprAprPersistWriteSample(path, true, false);
     ASSERT_TRUE(result.success) << result.message.toStdString();
     EXPECT_TRUE(result.warnings.isEmpty()) << result.warnings.join(QStringLiteral(" ")).toStdString();
-    sanyiSyPersistVerifyDocument(path);
+    aprAprPersistVerifyDocument(path);
 }
 
 TEST(ImportExportRegressionTest, NativeExportPersistsMachiningSnapshotViaClonePath)
 {
     // 生产路径：ExportService 派发前把 sceneManager 置空，只能拿到克隆图元。
     // 老实现在这条分支走 ExportWriterBase → FileIOManager::exportFile，
-    // 只传裸图元数组，快照根本没有入口写进 SyDocument。
+    // 只传裸图元数组，快照根本没有入口写进 AprDocument。
     QTemporaryDir dir;
     ASSERT_TRUE(dir.isValid());
-    const QString path = dir.filePath(QStringLiteral("clone.sy"));
+    const QString path = dir.filePath(QStringLiteral("clone.apr"));
 
-    const ExportResult result = sanyiSyPersistWriteSample(path, true, true);
+    const ExportResult result = aprAprPersistWriteSample(path, true, true);
     ASSERT_TRUE(result.success) << result.message.toStdString();
     EXPECT_TRUE(result.warnings.isEmpty()) << result.warnings.join(QStringLiteral(" ")).toStdString();
-    sanyiSyPersistVerifyDocument(path);
+    aprAprPersistVerifyDocument(path);
 }
 
 TEST(ImportExportRegressionTest, NativeExportWritesDocumentMetadataOnBothPaths)
 {
     // 回归：把借用 / 克隆两条路径统一到 writeDocument() 后，若忘记补元数据，
-    // .sy 的软件版本、创建时间、OS 溯源信息会整片写空 —— 文件照样能打开，
+    // .apr 的软件版本、创建时间、OS 溯源信息会整片写空 —— 文件照样能打开，
     // 所以没有告警、极难察觉。老降级路径经 NativeWriter::write() 原本是有元数据的，
     // 不能为了闭合加工参数而把溯源信息弄丢。
     QTemporaryDir dir;
@@ -2050,13 +2050,13 @@ TEST(ImportExportRegressionTest, NativeExportWritesDocumentMetadataOnBothPaths)
     for (const bool viaClonePath : { false, true })
     {
         const QString path = dir.filePath(viaClonePath
-            ? QStringLiteral("metadata-clone.sy")
-            : QStringLiteral("metadata-borrowed.sy"));
-        const ExportResult result = sanyiSyPersistWriteSample(path, true, viaClonePath);
+            ? QStringLiteral("metadata-clone.apr")
+            : QStringLiteral("metadata-borrowed.apr"));
+        const ExportResult result = aprAprPersistWriteSample(path, true, viaClonePath);
         ASSERT_TRUE(result.success) << result.message.toStdString();
 
         Fio::NativeParser parser(Fio::FileFormat::Native);
-        Fio::SyDocument doc;
+        Fio::AprDocument doc;
         const auto parseResult = parser.parseDocument(path.toUtf8().constData(), doc);
         ASSERT_TRUE(parseResult.success) << parseResult.errorMessage;
 
@@ -2075,14 +2075,14 @@ TEST(ImportExportRegressionTest, NativeImportReaderCarriesProfileBindingsAndValu
 {
     QTemporaryDir dir;
     ASSERT_TRUE(dir.isValid());
-    const QString path = dir.filePath(QStringLiteral("reader.sy"));
-    ASSERT_TRUE(sanyiSyPersistWriteSample(path, true, true).success);
+    const QString path = dir.filePath(QStringLiteral("reader.apr"));
+    ASSERT_TRUE(aprAprPersistWriteSample(path, true, true).success);
 
     ImportContext context;
     context.sourcePath = path;
     context.format = Fio::FileFormat::Native;
     NativeImportReader reader;
-    Fio::VecSyEntityPtr outEntities;
+    Fio::VecAprEntityPtr outEntities;
     const ImportResult result = reader.read(context, outEntities);
     ASSERT_TRUE(result.success) << result.message.toStdString();
 
@@ -2102,12 +2102,12 @@ TEST(ImportExportRegressionTest, NativeImportReaderCarriesProfileBindingsAndValu
     EXPECT_TRUE(result.warnings.isEmpty()) << result.warnings.join(QStringLiteral(" ")).toStdString();
 }
 
-TEST(ImportExportRegressionTest, ImportServiceRestoresSyProfileValueSetAndLayerBindings)
+TEST(ImportExportRegressionTest, ImportServiceRestoresAprProfileValueSetAndLayerBindings)
 {
     QTemporaryDir dir;
     ASSERT_TRUE(dir.isValid());
-    const QString path = dir.filePath(QStringLiteral("roundtrip.sy"));
-    ASSERT_TRUE(sanyiSyPersistWriteSample(path, true, true).success);
+    const QString path = dir.filePath(QStringLiteral("roundtrip.apr"));
+    ASSERT_TRUE(aprAprPersistWriteSample(path, true, true).success);
 
     Eg::SceneManager scene;
     LayerManager layers(&scene);
@@ -2160,18 +2160,18 @@ TEST(ImportExportRegressionTest, ImportServiceRestoresSyProfileValueSetAndLayerB
     EXPECT_DOUBLE_EQ(effective.speed, 245.25);
 }
 
-TEST(ImportExportRegressionTest, LegacySyWithoutProfileValueSetKeepsRuntimeProfiles)
+TEST(ImportExportRegressionTest, LegacyAprWithoutProfileValueSetKeepsRuntimeProfiles)
 {
     // 旧文件只有图层绑定、没有值集：读端不得清空用户当前 Profile，
     // 且必须给出降级提示，不能把「参数可能不对」伪装成一次干净的打开。
     QTemporaryDir dir;
     ASSERT_TRUE(dir.isValid());
-    const QString path = dir.filePath(QStringLiteral("legacy.sy"));
+    const QString path = dir.filePath(QStringLiteral("legacy.apr"));
 
     // 故意只写图层表、不放任何 Profile 值集，模拟 v2 之前的老文件
     Fio::NativeWriter writer(Fio::FileFormat::Native);
-    Fio::SyDocument doc;
-    doc.addLayerDetail(sanyiSyPersistSampleLayer());
+    Fio::AprDocument doc;
+    doc.addLayerDetail(aprAprPersistSampleLayer());
     ASSERT_TRUE(writer.writeDocument(path.toUtf8().constData(), doc).success);
 
     HardwareProfileManager profiles;
@@ -2181,7 +2181,7 @@ TEST(ImportExportRegressionTest, LegacySyWithoutProfileValueSetKeepsRuntimeProfi
     ImportContext importCtx;
     importCtx.sourcePath = path;
     NativeImportReader reader;
-    Fio::VecSyEntityPtr outEntities;
+    Fio::VecAprEntityPtr outEntities;
     const ImportResult readResult = reader.read(importCtx, outEntities);
     ASSERT_TRUE(readResult.success) << readResult.message.toStdString();
     EXPECT_FALSE(readResult.hasNativeMachiningSnapshot);

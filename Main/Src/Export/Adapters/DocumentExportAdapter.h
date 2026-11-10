@@ -21,15 +21,15 @@ public:
 public:
     /// 收集 2D 场景中的所有图元
     /// @return 图元列表（克隆的副本，原场景不受影响）
-    Fio::VecSyEntityPtr collect2D();
+    Fio::VecAprEntityPtr collect2D();
 
     /// 收集 3D 场景中的所有网格图元
     /// @return 图元列表（克隆的副本，原场景不受影响）；无 3D 管理器时返回空
-    Fio::VecSyEntityPtr collect3D();
+    Fio::VecAprEntityPtr collect3D();
 
     /// 收集当前选中的图元
     /// @return 仅选中图元的列表
-    Fio::VecSyEntityPtr collectSelected();
+    Fio::VecAprEntityPtr collectSelected();
 
 private:
     /// 2D 场景管理器（非拥有指针）

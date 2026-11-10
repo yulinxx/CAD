@@ -7,7 +7,7 @@
 #include <QMutex>
 #include <QMutexLocker>
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #ifdef ENABLE_HARDWARE
     #include "Hardware/Device/ILaserSource.h"
@@ -58,12 +58,12 @@ struct EmissionGuard::Impl
         }
         if (state == EmissionState::Off && !latchWhenOff)
         {
-            SY_INFOF("[EmissionGuard] Laser already off, safety request is a no-op (%s)",
+            APR_INFOF("[EmissionGuard] Laser already off, safety request is a no-op (%s)",
                 reason.toUtf8().constData());
             return;
         }
         move(EmissionState::Latched, reason);
-        SY_ERRORF("[EmissionGuard] Emission latched off (%s)", reason.toUtf8().constData());
+        APR_ERRORF("[EmissionGuard] Emission latched off (%s)", reason.toUtf8().constData());
     }
 
     /// 落实硬件使能。调用方必须已持锁。
@@ -132,13 +132,13 @@ bool EmissionGuard::beginJob(QString& errorOut)
     {
         errorOut = QStringLiteral(
             "Emission is latched off by the safety chain; explicit acknowledgement is required before firing again");
-        SY_WARNF("[EmissionGuard] beginJob refused: latched (%s)", m_impl->log.last().toUtf8().constData());
+        APR_WARNF("[EmissionGuard] beginJob refused: latched (%s)", m_impl->log.last().toUtf8().constData());
         return false;
     }
     if (m_impl->state == EmissionState::Enabled || m_impl->state == EmissionState::Armed)
     {
         errorOut = QStringLiteral("Emission is already enabled for a running job");
-        SY_WARNF("[EmissionGuard] beginJob refused: %s", errorOut.toUtf8().constData());
+        APR_WARNF("[EmissionGuard] beginJob refused: %s", errorOut.toUtf8().constData());
         return false;
     }
 
@@ -146,11 +146,11 @@ bool EmissionGuard::beginJob(QString& errorOut)
     if (!m_impl->apply(true, errorOut))
     {
         m_impl->move(EmissionState::Off, QStringLiteral("enableFailed"));
-        SY_ERRORF("[EmissionGuard] beginJob failed: %s", errorOut.toUtf8().constData());
+        APR_ERRORF("[EmissionGuard] beginJob failed: %s", errorOut.toUtf8().constData());
         return false;
     }
     m_impl->move(EmissionState::Enabled, QStringLiteral("enableApplied"));
-    SY_INFO("[EmissionGuard] Emission enabled for job");
+    APR_INFO("[EmissionGuard] Emission enabled for job");
     return true;
 }
 
@@ -164,7 +164,7 @@ void EmissionGuard::endJob()
     QString ignored;
     m_impl->apply(false, ignored);
     m_impl->move(EmissionState::Off, QStringLiteral("endJob"));
-    SY_INFO("[EmissionGuard] Emission disabled: job finished");
+    APR_INFO("[EmissionGuard] Emission disabled: job finished");
 }
 
 void EmissionGuard::abort(const QString& reason)
@@ -177,7 +177,7 @@ void EmissionGuard::abort(const QString& reason)
         return;
     }
     m_impl->move(EmissionState::Off, QStringLiteral("abort:%1").arg(reason));
-    SY_WARNF("[EmissionGuard] Emission disabled: job aborted (%s)", reason.toUtf8().constData());
+    APR_WARNF("[EmissionGuard] Emission disabled: job aborted (%s)", reason.toUtf8().constData());
 }
 
 void EmissionGuard::safetyCutoff(const QString& reason)
@@ -211,7 +211,7 @@ bool EmissionGuard::confirmRearm(QString& errorOut)
         return false;
     }
     m_impl->move(EmissionState::Off, QStringLiteral("confirmedByOperator"));
-    SY_INFO("[EmissionGuard] Latch cleared by operator confirmation");
+    APR_INFO("[EmissionGuard] Latch cleared by operator confirmation");
     return true;
 }
 

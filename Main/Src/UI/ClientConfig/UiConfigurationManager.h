@@ -20,7 +20,7 @@ class QMainWindow;
 enum class ConfigFallbackPolicy
 {
     Strict,    // 加载失败直接返回失败（开发阶段）
-    Fallback,  // 加载失败回退到默认 san_yi 配置（生产阶段，推荐）
+    Fallback,  // 加载失败回退到默认 april 配置（生产阶段，推荐）
     Silent     // 加载失败使用空配置（极端情况，调用方自行降级）
 };
 

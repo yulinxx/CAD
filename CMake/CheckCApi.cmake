@@ -10,49 +10,49 @@
 # 新增 C ABI 模块时，把其函数头登记到下面的列表。
 # ============================================================================
 
-function(sanyi_check_c_api_version)
+function(apr_check_c_api_version)
     set(_c_api_headers "")
 
     # 无条件校验的模块（根 CMakeLists.txt 直接 add_subdirectory，无 BUILD_xxx 开关）
     list(APPEND _c_api_headers
-        "${SANYI_ROOT}/Licensing/License/Include/License/LicenseDLL.h"
-        "${SANYI_LOG_DIR}/Include/Log/SyLogger.h"
+        "${APR_ROOT}/Licensing/License/Include/License/LicenseDLL.h"
+        "${APR_LOG_DIR}/Include/Log/AprLogger.h"
     )
 
     # 以下均由 BUILD_<MODULE> 开关控制，只有实际构建的模块才纳入校验
     if(BUILD_CRASHHANDLER)
         list(APPEND _c_api_headers
-            "${SANYI_ROOT}/CrashHandler/CrashHandler/Include/CrashHandler/CrashHandlerDLL.h"
+            "${APR_ROOT}/CrashHandler/CrashHandler/Include/CrashHandler/CrashHandlerDLL.h"
         )
     endif()
     if(BUILD_ENGRAVING)
         list(APPEND _c_api_headers
-            "${SANYI_ROOT}/Engraving/Engraving/Include/Engraving/EngravingCAPI.h"
+            "${APR_ROOT}/Engraving/Engraving/Include/Engraving/EngravingCAPI.h"
         )
     endif()
     if(BUILD_GEOMODELCORE)
         list(APPEND _c_api_headers
-            "${SANYI_GEOMODEL_DIR}/Include/GeoModelCore/GeoModelDLL.h"
+            "${APR_GEOMODEL_DIR}/Include/GeoModelCore/GeoModelDLL.h"
         )
     endif()
     if(BUILD_VISION)
         list(APPEND _c_api_headers
-            "${SANYI_VISION_DIR}/Include/Vision/VisionAPI.h"
+            "${APR_VISION_DIR}/Include/Vision/VisionAPI.h"
         )
     endif()
     if(BUILD_RASTER)
         list(APPEND _c_api_headers
-            "${SANYI_RASTER_DIR}/Include/Raster/RasterApi.h"
+            "${APR_RASTER_DIR}/Include/Raster/RasterApi.h"
         )
     endif()
     if(BUILD_NESTING)
         list(APPEND _c_api_headers
-            "${SANYI_NESTING_DIR}/Include/Nesting/NestingApi.h"
+            "${APR_NESTING_DIR}/Include/Nesting/NestingApi.h"
         )
     endif()
     if(BUILD_RENDERX)
         list(APPEND _c_api_headers
-            "${SANYI_RENDERX_DIR}/include/render/renderx.h"
+            "${APR_RENDERX_DIR}/include/render/renderx.h"
         )
     endif()
 
@@ -85,9 +85,9 @@ function(sanyi_check_c_api_version)
     if(_problems)
         string(REPLACE ";" "\n    - " _msg "${_problems}")
         message(FATAL_ERROR
-            "[sanyi_check_c_api_version] C ABI 版本查询不合规：\n    - ${_msg}\n"
+            "[apr_check_c_api_version] C ABI 版本查询不合规：\n    - ${_msg}\n"
             "  约定见 Docs/01-当前架构/C-ABI风格约定.md")
     endif()
 
-    message(STATUS "[SanYi] C ABI 版本查询校验: OK")
+    message(STATUS "[April] C ABI 版本查询校验: OK")
 endfunction()

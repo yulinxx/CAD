@@ -16,7 +16,7 @@
 
 #include "CrashHandler/CrashHandlerDLL.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <QDir>
 #include <QFileInfo>
@@ -101,7 +101,7 @@ LONG WINAPI vectoredExceptionHandler(EXCEPTION_POINTERS* pExInfo)
     }
 
     // 第一时间刷日志队列
-    SyLogger::GetInstance().Flush();
+    AprLogger::GetInstance().Flush();
 
     const HANDLE process = GetCurrentProcess();
     SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
@@ -184,7 +184,7 @@ LONG WINAPI vectoredExceptionHandler(EXCEPTION_POINTERS* pExInfo)
 /// 抛异常等。这类崩溃不走 SEH，VEH 不会被调。
 void crashTerminateHandler()
 {
-    SyLogger::GetInstance().Flush();
+    AprLogger::GetInstance().Flush();
 
     const HANDLE process = GetCurrentProcess();
     SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
@@ -382,12 +382,12 @@ int onCrashCallback(const char* dumpPath, int succeeded, void* /*userData*/)
 {
     // VEH 已经在 SEH 最早阶段刷过日志 + 打了崩溃线程的栈。
     // 这里是 breakpad 写 minidump 后的回调，此时其他线程已被 suspend/terminate。
-    SyLogger::GetInstance().Flush();
+    AprLogger::GetInstance().Flush();
 
     std::fprintf(stderr,
         "\n"
         "==========================================================================\n"
-        "  *** SanYiCAD CRASH ***  The application has crashed!\n"
+        "  *** April CRASH ***  The application has crashed!\n"
         "==========================================================================\n");
     if (succeeded && dumpPath && dumpPath[0] != '\0')
     {
@@ -507,13 +507,13 @@ void CrashHandlerBootstrap::logPendingDumps()
     const int count = CrashHandler_GetDumpFileCount();
     if (count <= 0)
     {
-        SY_INFO("[CrashHandler] no previous crash dumps found");
+        APR_INFO("[CrashHandler] no previous crash dumps found");
         return;
     }
 
-    SY_CRITICAL("==========================================================================");
-    SY_CRITICAL("  *** SanYiCAD CRASH REPORT ***  A previous crash was detected");
-    SY_CRITICALF("[CrashHandler] found %d previous crash dump(s) in: %s", count, g_dumpPath.c_str());
+    APR_CRITICAL("==========================================================================");
+    APR_CRITICAL("  *** April CRASH REPORT ***  A previous crash was detected");
+    APR_CRITICALF("[CrashHandler] found %d previous crash dump(s) in: %s", count, g_dumpPath.c_str());
 
     for (int i = 0; i < count; ++i)
     {
@@ -521,7 +521,7 @@ void CrashHandlerBootstrap::logPendingDumps()
         if (CrashHandler_GetDumpFilePath(i, dumpPath, sizeof(dumpPath)) == CRASHHANDLER_OK)
         {
             const QFileInfo info(QString::fromUtf8(dumpPath));
-            SY_CRITICALF("[CrashHandler] dump[%d]: %s (size=%lld bytes, modified=%s)",
+            APR_CRITICALF("[CrashHandler] dump[%d]: %s (size=%lld bytes, modified=%s)",
                 i,
                 dumpPath,
                 static_cast<long long>(info.size()),
@@ -529,6 +529,6 @@ void CrashHandlerBootstrap::logPendingDumps()
         }
     }
 
-    SY_CRITICAL("  Please report the above info and the .dmp file to technical support.");
-    SY_CRITICAL("==========================================================================");
+    APR_CRITICAL("  Please report the above info and the .dmp file to technical support.");
+    APR_CRITICAL("==========================================================================");
 }

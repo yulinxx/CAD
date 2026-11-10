@@ -130,7 +130,7 @@ jobs:
         run: |
           cmake --preset=${{ env.CMAKE_PRESET }} \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DSANYI_BUILD_CLIENT_PLUGINS=ON
+            -DAPR_BUILD_CLIENT_PLUGINS=ON
 
       - name: Build all (includes client plugins)
         run: cmake --build build --config ${{ env.BUILD_TYPE }} --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)

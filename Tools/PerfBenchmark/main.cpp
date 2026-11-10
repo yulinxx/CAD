@@ -3,7 +3,7 @@
  * @brief 百万级图元性能基准 —— 建立可重复运行的基线，供优化前后对比。
  *
  * 用法：
- *   SanYiPerfBenchmark [entityCount] [csvPath] [runLabel]
+ *   AprPerfBenchmark [entityCount] [csvPath] [runLabel]
  *     entityCount  图元总数，默认 200000；百万级复测请显式传 1000000
  *                  （Debug 构建下 100 万会慢到不可用，默认值刻意取小）
  *     csvPath      可选；给出时把结果追加写入该 CSV，便于多轮对比
@@ -28,10 +28,10 @@
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Edit/SceneUndoCommands.h"
 #include "Engine2D/Edit/UndoRedoManager.h"
-#include "Engine2D/SyEntity/SyArc.h"
-#include "Engine2D/SyEntity/SyCircle.h"
-#include "Engine2D/SyEntity/SyLine.h"
-#include "Engine2D/SyEntity/SyPolygon.h"
+#include "Engine2D/AprEntity/AprArc.h"
+#include "Engine2D/AprEntity/AprCircle.h"
+#include "Engine2D/AprEntity/AprLine.h"
+#include "Engine2D/AprEntity/AprPolygon.h"
 
 #include <Ut/BBox2d.h>
 #include <Ut/Mat.h>
@@ -49,7 +49,7 @@
 #include <unordered_set>
 #include <vector>
 
-#ifdef SANYI_CAM_BENCH
+#ifdef APR_CAM_BENCH
 void runCamBench();
 #endif
 
@@ -109,9 +109,9 @@ namespace
     }
 
     /// 构造一批混合类型图元（线 60% / 圆 20% / 弧 10% / 多边形 10%）
-    std::vector<std::unique_ptr<Eg::SyEntity>> makeEntities(size_t count, double extent)
+    std::vector<std::unique_ptr<Eg::AprEntity>> makeEntities(size_t count, double extent)
     {
-        std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+        std::vector<std::unique_ptr<Eg::AprEntity>> entities;
         entities.reserve(count);
 
         const double step = extent / 1000.0;
@@ -123,20 +123,20 @@ namespace
 
             if (bucket < 6)
             {
-                auto e = std::make_unique<Eg::SyLine>();
+                auto e = std::make_unique<Eg::AprLine>();
                 e->setPointVector({ Ut::Vec2d(x, y), Ut::Vec2d(x + step * 0.8, y + step * 0.5) });
                 entities.push_back(std::move(e));
             }
             else if (bucket < 8)
             {
-                auto e = std::make_unique<Eg::SyCircle>();
+                auto e = std::make_unique<Eg::AprCircle>();
                 e->basePoint = Ut::Vec2d(x, y);
                 e->dRadius = step * 0.4;
                 entities.push_back(std::move(e));
             }
             else if (bucket < 9)
             {
-                auto e = std::make_unique<Eg::SyArc>();
+                auto e = std::make_unique<Eg::AprArc>();
                 e->basePoint = Ut::Vec2d(x, y);
                 e->dRadius = step * 0.4;
                 e->dStartAngle = 0.0;
@@ -145,7 +145,7 @@ namespace
             }
             else
             {
-                auto e = std::make_unique<Eg::SyPolygon>();
+                auto e = std::make_unique<Eg::AprPolygon>();
                 std::vector<Ut::Vec2d> verts;
                 verts.reserve(12);
                 for (int k = 0; k < 12; ++k)
@@ -190,7 +190,7 @@ int main(int argc, char** argv)
     const size_t kDeleteCount = std::min<size_t>(1000, entityCount / 100);
 
     std::printf("===============================================================\n");
-    std::printf("[SanYi Perf Benchmark]\n");
+    std::printf("[April Perf Benchmark]\n");
     std::printf("  entities      : %zu\n", entityCount);
     std::printf("  transform set : %zu\n", kTransformCount);
     std::printf("  build type    : %s\n",
@@ -208,7 +208,7 @@ int main(int argc, char** argv)
 
     // ---------- 1. 场景构建 ----------
     std::printf("[scene build]\n");
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     double allocMs = 0.0;
     {
         const Clock::time_point begin = Clock::now();
@@ -255,10 +255,10 @@ int main(int argc, char** argv)
     }
 
     // 全部 id 与指针，供后续指标复用
-    Eg::VecSyEntityPtr allEntities = scene.getAllEntities();
+    Eg::VecAprEntityPtr allEntities = scene.getAllEntities();
     std::vector<Eg::EntityId> allIds;
     allIds.reserve(allEntities.size());
-    for (Eg::SyEntity* e : allEntities)
+    for (Eg::AprEntity* e : allEntities)
     {
         if (e)
         {
@@ -330,10 +330,10 @@ int main(int argc, char** argv)
         "ms",
         3,
         [&]() {
-            std::vector<Eg::SyEntity*> snaps(transformIds.size(), nullptr);
+            std::vector<Eg::AprEntity*> snaps(transformIds.size(), nullptr);
             const size_t written = Eg::captureEntitySnapshots(
                 &scene, transformIds.data(), transformIds.size(), snaps.data(), snaps.size());
-            for (Eg::SyEntity* s : snaps)
+            for (Eg::AprEntity* s : snaps)
             {
                 delete s;
             }
@@ -346,7 +346,7 @@ int main(int argc, char** argv)
     auto applyMove = [&]() {
         for (Eg::EntityId id : transformIds)
         {
-            if (Eg::SyEntity* e = scene.findSyEntityById(id))
+            if (Eg::AprEntity* e = scene.findAprEntityById(id))
             {
                 e->transform(moveMat);
             }
@@ -361,7 +361,7 @@ int main(int argc, char** argv)
         [&]() {
             for (Eg::EntityId id : transformIds)
             {
-                if (Eg::SyEntity* e = scene.findSyEntityById(id))
+                if (Eg::AprEntity* e = scene.findAprEntityById(id))
                 {
                     e->transform(moveMat);
                     e->transform(Ut::Mat3d::translate(-1.0, -1.0));  // 原地抵消，保持状态不变
@@ -435,11 +435,11 @@ int main(int argc, char** argv)
     // 之前取到的裸指针随即失效（指向已被命令接管的旧对象），因此每次要用时
     // 都必须按 id 重新收集，不能跨一次 swap 复用。
     auto collectTargets = [&]() {
-        std::vector<Eg::SyEntity*> targets;
+        std::vector<Eg::AprEntity*> targets;
         targets.reserve(snapshotCount);
         for (Eg::EntityId id : transformIds)
         {
-            if (Eg::SyEntity* e = scene.findSyEntityById(id))
+            if (Eg::AprEntity* e = scene.findAprEntityById(id))
             {
                 targets.push_back(e);
             }
@@ -478,7 +478,7 @@ int main(int argc, char** argv)
 
             // 上一轮以 undo 结束，场景对象已换过一轮，指针必须重新收集；
             // 收集本身不计入相位耗时。
-            std::vector<Eg::SyEntity*> roundTargets = collectTargets();
+            std::vector<Eg::AprEntity*> roundTargets = collectTargets();
 
             t = Clock::now();
             scene.updateEntityBoundsBulk(roundTargets);
@@ -534,14 +534,14 @@ int main(int argc, char** argv)
     //   这里每轮先把图元真的移动一次再更新，只给更新计时，复原放在计时之外。
     std::printf("\n[spatial index]\n");
     {
-        const std::vector<Eg::SyEntity*> boundsTargets = collectTargets();
+        const std::vector<Eg::AprEntity*> boundsTargets = collectTargets();
         const Ut::Mat3d backMat = Ut::Mat3d::translate(-1.0, -1.0);
         const int kBulkRounds = 3;
         std::vector<double> samples;
         samples.reserve(kBulkRounds);
         for (int round = 0; round < kBulkRounds; ++round)
         {
-            for (Eg::SyEntity* e : boundsTargets)
+            for (Eg::AprEntity* e : boundsTargets)
             {
                 if (e)
                 {
@@ -554,7 +554,7 @@ int main(int argc, char** argv)
             samples.push_back(elapsedMs(t, Clock::now()));
 
             // 复原几何与索引，使下一轮口径一致（不计时）
-            for (Eg::SyEntity* e : boundsTargets)
+            for (Eg::AprEntity* e : boundsTargets)
             {
                 if (e)
                 {
@@ -584,16 +584,16 @@ int main(int argc, char** argv)
         "ms",
         1,
         [&]() {
-            std::vector<Eg::SyEntity*> victims;
+            std::vector<Eg::AprEntity*> victims;
             victims.reserve(kDeleteCount);
             for (size_t i = 0; i < kDeleteCount && i < allIds.size(); ++i)
             {
-                if (Eg::SyEntity* e = scene.findSyEntityById(allIds[i]))
+                if (Eg::AprEntity* e = scene.findAprEntityById(allIds[i]))
                 {
                     victims.push_back(e);
                 }
             }
-            for (Eg::SyEntity* e : victims)
+            for (Eg::AprEntity* e : victims)
             {
                 Eg::SceneWriteGateway::deleteEntity(scene, e);
             }
@@ -602,7 +602,7 @@ int main(int argc, char** argv)
     std::printf("  %-28s %10zu\n", "scene_count_after_delete", scene.getEntityCount());
 
     // ---------- CAM 契约基准（BUILD_CAM 时启用）----------
-#ifdef SANYI_CAM_BENCH
+#ifdef APR_CAM_BENCH
     runCamBench();
 #endif
 

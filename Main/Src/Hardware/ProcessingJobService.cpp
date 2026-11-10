@@ -17,7 +17,7 @@
 #include "DeviceHost.h"
 #include "EmissionGuard.h"
 #include "LaserRoute.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #ifdef ENABLE_HARDWARE
 
@@ -359,7 +359,7 @@ struct ProcessingJobService::Impl
             {
                 // 到点还没退出说明适配器卡在 SDK 调用里：
                 // 只能等，绝不能 detach —— 线程会拿着即将销毁的设备继续跑
-                SY_ERROR("[ProcessingJob] Dispatch thread did not stop in 2s, waiting for it");
+                APR_ERROR("[ProcessingJob] Dispatch thread did not stop in 2s, waiting for it");
                 worker->wait();
             }
             worker.reset();
@@ -411,7 +411,7 @@ ProcessingJobService::ProcessingJobService(DeviceHost* host, QObject* parent)
     }
     else
     {
-        SY_ERRORF("[ProcessingJob] Constructed without a DeviceHost — all jobs will be refused");
+        APR_ERRORF("[ProcessingJob] Constructed without a DeviceHost — all jobs will be refused");
     }
 }
 
@@ -421,7 +421,7 @@ ProcessingJobService::~ProcessingJobService()
     {
         // 析构时还在加工：不能就这么走。设备侧的缓冲还在跑，
         // 进程退出后没人再收进度，机器会把整份计划走完 —— 无人看管的出光。
-        SY_WARNF("[ProcessingJob] Destroyed while job '%s' was active, aborting it", m_impl->jobId.toUtf8().constData());
+        APR_WARNF("[ProcessingJob] Destroyed while job '%s' was active, aborting it", m_impl->jobId.toUtf8().constData());
         m_impl->host->emissionGuard().abort(QStringLiteral("serviceDestroyed"));
         const PlanRunner runner = PlanRunner::resolve(m_impl->host);
         if (runner.valid())
@@ -441,7 +441,7 @@ bool ProcessingJobService::startJob(
     // 门没关就先编译等于让操作员盯着卡顿的界面等一条「门没关」的提示
     if (!m_impl->checkGate(errorOut))
     {
-        SY_WARNF("[ProcessingJob] startJob refused: %s", errorOut.toUtf8().constData());
+        APR_WARNF("[ProcessingJob] startJob refused: %s", errorOut.toUtf8().constData());
         return false;
     }
 
@@ -449,7 +449,7 @@ bool ProcessingJobService::startJob(
     if (!m_impl->lastResult.ok)
     {
         errorOut = m_impl->lastResult.error;
-        SY_ERRORF("[ProcessingJob] Compile failed: %s", errorOut.toUtf8().constData());
+        APR_ERRORF("[ProcessingJob] Compile failed: %s", errorOut.toUtf8().constData());
         return false;
     }
 
@@ -460,14 +460,14 @@ bool ProcessingJobService::startPlan(const Hw::MotionPlanView& view, const QStri
 {
     if (!m_impl->checkGate(errorOut))
     {
-        SY_WARNF("[ProcessingJob] startPlan refused: %s", errorOut.toUtf8().constData());
+        APR_WARNF("[ProcessingJob] startPlan refused: %s", errorOut.toUtf8().constData());
         return false;
     }
 
     if (!view.valid())
     {
         errorOut = tr("Processing plan is empty, no executable commands");  // 加工计划为空，没有任何可执行指令
-        SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
+        APR_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
         return false;
     }
 
@@ -477,7 +477,7 @@ bool ProcessingJobService::startPlan(const Hw::MotionPlanView& view, const QStri
         // 例如只接了激光电源或纯 IO 板的机型
         errorOut = tr("Device %1 provides neither motion nor galvo capability, cannot execute plan")
                        .arg(m_impl->host->deviceId());  // 设备既不提供运动卡也不提供振镜卡能力
-        SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
+        APR_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
         return false;
     }
 
@@ -487,7 +487,7 @@ bool ProcessingJobService::startPlan(const Hw::MotionPlanView& view, const QStri
     const LaserRoute::Route laserRoute = LaserRoute::resolve(m_impl->host);
     if (!LaserRoute::applyFromPlan(laserRoute, view, laserReport, errorOut))
     {
-        SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
+        APR_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
         return false;
     }
     if (!laserReport.warning.isEmpty())
@@ -500,7 +500,7 @@ bool ProcessingJobService::startPlan(const Hw::MotionPlanView& view, const QStri
     // 必须在下发之前打开：振镜卡的 startMark/startPlan 会直接拒绝未开光的调用
     if (!m_impl->host->emissionGuard().beginJob(errorOut))
     {
-        SY_ERRORF("[ProcessingJob] Emission enable refused: %s", errorOut.toUtf8().constData());
+        APR_ERRORF("[ProcessingJob] Emission enable refused: %s", errorOut.toUtf8().constData());
         return false;
     }
 
@@ -525,7 +525,7 @@ bool ProcessingJobService::startPlan(const Hw::MotionPlanView& view, const QStri
             worker->wait();
             // 下发没成功就必须关光：不能把激光留在使能状态等下一次操作
             m_impl->host->emissionGuard().endJob();
-            SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
+            APR_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
             return false;
         }
         worker->wait();  // start 已返回，线程正在退出
@@ -545,7 +545,7 @@ bool ProcessingJobService::startPlan(const Hw::MotionPlanView& view, const QStri
     m_impl->lastFraction = 0.0;
     m_impl->pollTimer.start();
 
-    SY_DEBUGF("[ProcessingJob] Started '%s' on %s: %lld command(s), emission=on, dispatch=%s, laserParams=%zu",
+    APR_DEBUGF("[ProcessingJob] Started '%s' on %s: %lld command(s), emission=on, dispatch=%s, laserParams=%zu",
         m_impl->jobId.toUtf8().constData(),
         runner.kindName(),
         static_cast<long long>(view.commandCount),
@@ -563,31 +563,31 @@ bool ProcessingJobService::pauseJob(QString& errorOut)
     if (!m_impl->active)
     {
         errorOut = tr("No processing job is currently running");
-        SY_WARNF("[ProcessingJob] pauseJob refused: %s", errorOut.toUtf8().constData());
+        APR_WARNF("[ProcessingJob] pauseJob refused: %s", errorOut.toUtf8().constData());
         return false;
     }
     if (!isPauseSupported())
     {
         // 明确拒绝而不是走适配器再失败：这类设备的暂停按钮应当直接置灰
         errorOut = tr("Current machine does not support pausing a running job");
-        SY_WARNF("[ProcessingJob] pauseJob refused: %s", errorOut.toUtf8().constData());
+        APR_WARNF("[ProcessingJob] pauseJob refused: %s", errorOut.toUtf8().constData());
         return false;
     }
     const PlanRunner runner = PlanRunner::resolve(m_impl->host);
     if (!runner.valid())
     {
         errorOut = tr("Device disconnected");
-        SY_WARNF("[ProcessingJob] pauseJob refused: %s", errorOut.toUtf8().constData());
+        APR_WARNF("[ProcessingJob] pauseJob refused: %s", errorOut.toUtf8().constData());
         return false;
     }
     const Hw::HwResult r = runner.pause();
     if (r.failed())
     {
         errorOut = describe(tr("Pause processing"), r);
-        SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
+        APR_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
         return false;
     }
-    SY_DEBUGF("[ProcessingJob] Paused '%s'", m_impl->jobId.toUtf8().constData());
+    APR_DEBUGF("[ProcessingJob] Paused '%s'", m_impl->jobId.toUtf8().constData());
     // 不在这里改 lastState：状态一律以设备上报为准，
     // 本地先改会让「调用成功但设备没真正暂停」变成看不见的谎
     pollProgress();
@@ -599,7 +599,7 @@ bool ProcessingJobService::resumeJob(QString& errorOut)
     if (!m_impl->active)
     {
         errorOut = tr("No processing job is currently running");
-        SY_WARN("[ProcessingJob] resumeJob refused: no active job");
+        APR_WARN("[ProcessingJob] resumeJob refused: no active job");
         return false;
     }
     // 恢复也是「开始出光」，安全门必须重新过一遍：
@@ -609,7 +609,7 @@ bool ProcessingJobService::resumeJob(QString& errorOut)
         const QStringList violations = m_impl->host->safetyViolations();
         errorOut = violations.isEmpty() ? tr("Safety conditions not met, resume prohibited")
                                         : tr("Safety conditions not met, resume prohibited: %1").arg(violations.first());
-        SY_WARNF("[ProcessingJob] resumeJob refused: %s", errorOut.toUtf8().constData());
+        APR_WARNF("[ProcessingJob] resumeJob refused: %s", errorOut.toUtf8().constData());
         return false;
     }
 
@@ -618,29 +618,29 @@ bool ProcessingJobService::resumeJob(QString& errorOut)
     if (emission.state() == EmissionState::Latched)
     {
         errorOut = tr("Emission is latched off by the safety chain, explicit acknowledgement is required first");
-        SY_WARNF("[ProcessingJob] resumeJob refused: %s", errorOut.toUtf8().constData());
+        APR_WARNF("[ProcessingJob] resumeJob refused: %s", errorOut.toUtf8().constData());
         return false;
     }
     if (emission.state() == EmissionState::Off && !emission.beginJob(errorOut))
     {
-        SY_WARNF("[ProcessingJob] resumeJob refused: %s", errorOut.toUtf8().constData());
+        APR_WARNF("[ProcessingJob] resumeJob refused: %s", errorOut.toUtf8().constData());
         return false;
     }
     const PlanRunner runner = PlanRunner::resolve(m_impl->host);
     if (!runner.valid())
     {
         errorOut = tr("Device disconnected");
-        SY_ERROR("[ProcessingJob] resumeJob failed: runner invalid (device disconnected)");
+        APR_ERROR("[ProcessingJob] resumeJob failed: runner invalid (device disconnected)");
         return false;
     }
     const Hw::HwResult r = runner.resume();
     if (r.failed())
     {
         errorOut = describe(tr("Resume processing"), r);
-        SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
+        APR_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
         return false;
     }
-    SY_DEBUGF("[ProcessingJob] Resumed '%s'", m_impl->jobId.toUtf8().constData());
+    APR_DEBUGF("[ProcessingJob] Resumed '%s'", m_impl->jobId.toUtf8().constData());
     pollProgress();
     return true;
 }
@@ -650,7 +650,7 @@ bool ProcessingJobService::abortJob(QString& errorOut)
     if (!m_impl->active)
     {
         errorOut = tr("No processing job is currently running");
-        SY_WARN("[ProcessingJob] abortJob refused: no active job");
+        APR_WARN("[ProcessingJob] abortJob refused: no active job");
         return false;
     }
 
@@ -667,7 +667,7 @@ bool ProcessingJobService::abortJob(QString& errorOut)
     {
         // 设备都没了，本地状态必须收干净，否则永远显示「加工中」
         m_impl->finishJob();
-        SY_ERROR("[ProcessingJob] abortJob: device disappeared during active job, cleaning up local state");
+        APR_ERROR("[ProcessingJob] abortJob: device disappeared during active job, cleaning up local state");
         emit jobFinished(false, tr("Device disconnected, job aborted"));
         errorOut = tr("Device disconnected");
         return false;
@@ -676,10 +676,10 @@ bool ProcessingJobService::abortJob(QString& errorOut)
     if (r.failed())
     {
         errorOut = describe(tr("Abort processing"), r);
-        SY_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
+        APR_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
         return false;
     }
-    SY_WARNF("[ProcessingJob] Aborted '%s'", m_impl->jobId.toUtf8().constData());
+    APR_WARNF("[ProcessingJob] Aborted '%s'", m_impl->jobId.toUtf8().constData());
     pollProgress();
     return true;
 }
@@ -710,7 +710,7 @@ bool ProcessingJobService::acknowledgeSafetyCutoff(QString& errorOut)
     {
         return false;
     }
-    SY_INFO("[ProcessingJob] Safety cutoff acknowledged by operator");
+    APR_INFO("[ProcessingJob] Safety cutoff acknowledged by operator");
     return true;
 }
 
@@ -781,7 +781,7 @@ void ProcessingJobService::pollProgress()
 
     if (deviceDisappeared)
     {
-        SY_ERRORF("[ProcessingJob] Device disappeared while job '%s' was active", m_impl->jobId.toUtf8().constData());
+        APR_ERRORF("[ProcessingJob] Device disappeared while job '%s' was active", m_impl->jobId.toUtf8().constData());
         m_impl->host->emissionGuard().abort(QStringLiteral("deviceDisconnected"));
         m_impl->finishJob();
         emit jobFinished(false, tr("Device disconnected during processing"));
@@ -814,7 +814,7 @@ void ProcessingJobService::pollProgress()
     switch (p.state)
     {
     case Hw::PlanState::Completed:
-        SY_DEBUGF("[ProcessingJob] Finished '%s'", m_impl->jobId.toUtf8().constData());
+        APR_DEBUGF("[ProcessingJob] Finished '%s'", m_impl->jobId.toUtf8().constData());
         emit jobFinished(true, tr("Processing completed: %1").arg(m_impl->jobId));
         break;
 
@@ -823,7 +823,7 @@ void ProcessingJobService::pollProgress()
         break;
 
     case Hw::PlanState::Error:
-        SY_ERRORF("[ProcessingJob] Job '%s' failed: %s", m_impl->jobId.toUtf8().constData(), Hw::hwErrorName(p.error));
+        APR_ERRORF("[ProcessingJob] Job '%s' failed: %s", m_impl->jobId.toUtf8().constData(), Hw::hwErrorName(p.error));
         emit jobFinished(false, tr("Processing error: [%1]").arg(QString::fromUtf8(Hw::hwErrorName(p.error))));
         break;
 
@@ -852,7 +852,7 @@ void ProcessingJobService::onSafetyVerdictChanged(
     {
         return;
     }
-    SY_ERRORF("[ProcessingJob] Safety violated during job '%s' (point=%s), pausing and latching emission off",
+    APR_ERRORF("[ProcessingJob] Safety violated during job '%s' (point=%s), pausing and latching emission off",
         m_impl->jobId.toUtf8().constData(),
         firstViolationPoint.toUtf8().constData());
     runner.pause();
@@ -868,7 +868,7 @@ void ProcessingJobService::onDeviceStopping()
 
     // 设备即将销毁：工作线程还在用设备指针的话，必须在这里把它停掉。
     // 这一步不能延后 —— destroyDevice 之后指针就悬空了。
-    SY_WARNF("[ProcessingJob] Device stopping while job '%s' is active, aborting it",
+    APR_WARNF("[ProcessingJob] Device stopping while job '%s' is active, aborting it",
         m_impl->jobId.toUtf8().constData());
     m_impl->host->emissionGuard().abort(QStringLiteral("deviceStopping"));
     m_impl->finishJob();
@@ -916,7 +916,7 @@ bool ProcessingJobService::startJob(
     Q_UNUSED(layers);
     Q_UNUSED(spec);
     errorOut = noHardwareReason();
-    SY_WARNF("[ProcessingJob] %s", errorOut.toUtf8().constData());
+    APR_WARNF("[ProcessingJob] %s", errorOut.toUtf8().constData());
     return false;
 }
 

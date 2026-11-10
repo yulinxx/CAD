@@ -18,9 +18,9 @@
 #include "UI/Services/ISelectionService.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Core/SceneWriteGateway.h"
-#include "Engine2D/SyEntity/SyLine.h"
-#include "Engine2D/SyEntity/SyCircle.h"
-#include "Engine2D/SyEntity/SyPolygon.h"
+#include "Engine2D/AprEntity/AprLine.h"
+#include "Engine2D/AprEntity/AprCircle.h"
+#include "Engine2D/AprEntity/AprPolygon.h"
 
 #include <memory>
 #include <vector>
@@ -49,11 +49,11 @@ TEST(SelectionServiceTest, SelectSingle)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
@@ -67,11 +67,11 @@ TEST(SelectionServiceTest, Deselect)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
@@ -88,11 +88,11 @@ TEST(SelectionServiceTest, Clear)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
@@ -107,11 +107,11 @@ TEST(SelectionServiceTest, Toggle)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
@@ -131,12 +131,12 @@ TEST(SelectionServiceTest, SelectMultiple)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     std::string ids[3];
 
     for (int i = 0; i < 3; ++i)
     {
-        auto line = std::make_unique<Eg::SyLine>();
+        auto line = std::make_unique<Eg::AprLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         ids[i] = std::to_string(line->id);
         entities.push_back(std::move(line));
@@ -156,10 +156,10 @@ TEST(SelectionServiceTest, SelectMultipleClearsPrevious)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     for (int i = 0; i < 3; ++i)
     {
-        auto line = std::make_unique<Eg::SyLine>();
+        auto line = std::make_unique<Eg::AprLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         entities.push_back(std::move(line));
     }
@@ -194,10 +194,10 @@ TEST(SelectionServiceTest, VisitSelectedIds)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     for (int i = 0; i < 3; ++i)
     {
-        auto line = std::make_unique<Eg::SyLine>();
+        auto line = std::make_unique<Eg::AprLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         entities.push_back(std::move(line));
     }
@@ -248,18 +248,18 @@ TEST(SelectionServiceTest, VisitSelectedIds_AfterSelect)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
     std::string idStr = std::to_string(lineId);
     svc.select(idStr.c_str());
 
-    // 通过 ID 遍历验证选择已生效（ISelectionService 不再泄漏 SyEntity*）
+    // 通过 ID 遍历验证选择已生效（ISelectionService 不再泄漏 AprEntity*）
     int count = 0;
     svc.visitSelectedIds(
         [](const char* id, void* ctx) {
@@ -287,11 +287,11 @@ TEST(SelectionServiceTest, Qt_SelectedIdsQ_WithSelection)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
@@ -307,11 +307,11 @@ TEST(SelectionServiceTest, Qt_SelectEntity)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
@@ -327,15 +327,15 @@ TEST(SelectionServiceTest, Qt_SetSelectedEntityId)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    auto line1 = std::make_unique<Eg::SyLine>();
+    auto line1 = std::make_unique<Eg::AprLine>();
     line1->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId id1 = line1->id;
 
-    auto line2 = std::make_unique<Eg::SyLine>();
+    auto line2 = std::make_unique<Eg::AprLine>();
     line2->setPointVector({ Ut::Vec2d(20, 20), Ut::Vec2d(30, 30) });
     Eg::EntityId id2 = line2->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line1));
     entities.push_back(std::move(line2));
     Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
@@ -356,11 +356,11 @@ TEST(SelectionServiceTest, Qt_SetSelectedEntityIds)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     QVector<QString> ids;
     for (int i = 0; i < 3; ++i)
     {
-        auto line = std::make_unique<Eg::SyLine>();
+        auto line = std::make_unique<Eg::AprLine>();
         line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0 + i, 10.0 + i) });
         ids.append(QString::fromStdString(std::to_string(line->id)));
         entities.push_back(std::move(line));
@@ -386,11 +386,11 @@ TEST(SelectionServiceTest, Qt_EntityIdAt_WithEntity)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
@@ -407,10 +407,10 @@ TEST(SelectionServiceTest, Integration_AddEntityDoesNotSelect)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
@@ -424,11 +424,11 @@ TEST(SelectionServiceTest, Integration_DeleteEntityClearsSelection)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
@@ -437,7 +437,7 @@ TEST(SelectionServiceTest, Integration_DeleteEntityClearsSelection)
     EXPECT_TRUE(svc.isSelected(idStr.c_str()));
 
     // 删除选中图元后选择应被清除
-    Eg::SceneWriteGateway::deleteEntity(scene, scene.findSyEntityById(lineId));
+    Eg::SceneWriteGateway::deleteEntity(scene, scene.findAprEntityById(lineId));
     EXPECT_FALSE(svc.isSelected(idStr.c_str()));
 }
 
@@ -446,24 +446,24 @@ TEST(SelectionServiceTest, Integration_SelectMultipleMixedTypes)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     std::string idLine, idCircle, idPoly;
 
     {
-        auto line = std::make_unique<Eg::SyLine>();
+        auto line = std::make_unique<Eg::AprLine>();
         line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
         idLine = std::to_string(line->id);
         entities.push_back(std::move(line));
     }
     {
-        auto circle = std::make_unique<Eg::SyCircle>();
+        auto circle = std::make_unique<Eg::AprCircle>();
         circle->basePoint = Ut::Vec2d(5, 5);
         circle->dRadius = 3.0;
         idCircle = std::to_string(circle->id);
         entities.push_back(std::move(circle));
     }
     {
-        auto poly = std::make_unique<Eg::SyPolygon>();
+        auto poly = std::make_unique<Eg::AprPolygon>();
         poly->setVertices({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 0), Ut::Vec2d(10, 10) });
         idPoly = std::to_string(poly->id);
         entities.push_back(std::move(poly));
@@ -547,11 +547,11 @@ TEST(SelectionServiceTest, Boundary_QuickToggleSequence)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
@@ -590,11 +590,11 @@ TEST(SelectionServiceTest, SceneManager_SelectReflectsInScene)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 
@@ -610,11 +610,11 @@ TEST(SelectionServiceTest, SceneManager_ClearReflectsInScene)
     Eg::SceneManager scene;
     SelectionService svc(&scene);
 
-    auto line = std::make_unique<Eg::SyLine>();
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
     Eg::EntityId lineId = line->id;
 
-    std::vector<std::unique_ptr<Eg::SyEntity>> entities;
+    std::vector<std::unique_ptr<Eg::AprEntity>> entities;
     entities.push_back(std::move(line));
     Eg::SceneWriteGateway::addEntities(scene, std::move(entities));
 

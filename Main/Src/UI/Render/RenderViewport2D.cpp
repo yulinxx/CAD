@@ -40,7 +40,7 @@
 #include <QContextMenuEvent>
 #include <QCursor>
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include <QTimer>
 
 // ---- RenderViewport2D 实现 ----
@@ -366,7 +366,7 @@ void RenderViewport2D::syncSelectionToolState()
 
 void RenderViewport2D::setDocument(SceneDocument2D* document)
 {
-    SY_DEBUGF(
+    APR_DEBUGF(
         "[RenderViewport2D] Setting document: %p -> %p", static_cast<void*>(m_document), static_cast<void*>(document));
     m_document = document;
 
@@ -413,7 +413,7 @@ void RenderViewport2D::setDocument(SceneDocument2D* document)
                 // 被延后的空间索引（否则拖动期的 N 次索引操作会被拉回来）。
                 // 2D 路径唯一实现是 SceneManager；hidden visibility 下不用 dynamic_cast。
                 auto* sm = static_cast<Eg::SceneManager*>(ctx);
-                return sm ? sm->queryByBoxForSnap(box) : std::vector<Eg::SyEntity*>{};
+                return sm ? sm->queryByBoxForSnap(box) : std::vector<Eg::AprEntity*>{};
             });
         }
         else
@@ -485,7 +485,7 @@ void RenderViewport2D::initializeTools()
     ctx.onResetView = [this]() {
         zoomToFit();
     };
-    ctx.onEntityDoubleClick = [this](Eg::SyEntity* entity) {
+    ctx.onEntityDoubleClick = [this](Eg::AprEntity* entity) {
         if (entity)
         {
             // 传入 editService：对话框 Apply 走 EntityPropertyEditSession2D（与侧栏同一撤销语义）
@@ -521,7 +521,7 @@ void RenderViewport2D::initializeTools()
     ToolInitializer::registerAllTools(*m_toolManager, ctx);
 
     // P1: 通过信号通知上层提交图元，视口不直接持有编辑服务
-    m_toolManager->setEntityCallbackForAllTools([this](Eg::SyEntity* e) {
+    m_toolManager->setEntityCallbackForAllTools([this](Eg::AprEntity* e) {
         if (e)
         {
             emit entitySubmitRequested(e);
@@ -570,7 +570,7 @@ bool RenderViewport2D::setActiveTool(const QString& toolName)
     }
     else
     {
-        SY_WARNF("[RenderViewport2D] Failed to set active tool: %s", qPrintable(toolName));
+        APR_WARNF("[RenderViewport2D] Failed to set active tool: %s", qPrintable(toolName));
     }
     return ok;
 }

@@ -2,7 +2,7 @@
 
 #include "UiPanelRegistry.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "UI/Plugin/CommandPluginRegistryApi.h"
 
 #include <QCoreApplication>
@@ -39,12 +39,12 @@ namespace
         {
             if (id.trimmed().isEmpty() || !factory)
             {
-                SY_WARNF("[UiClientPlugin] Ignored invalid panel registration: '%s'", qPrintable(id));
+                APR_WARNF("[UiClientPlugin] Ignored invalid panel registration: '%s'", qPrintable(id));
                 return;
             }
             if (m_registry.isPanelRegistered(id))
             {
-                SY_WARNF("[UiClientPlugin] Panel '%s' already registered, plugin entry ignored", qPrintable(id));
+                APR_WARNF("[UiClientPlugin] Panel '%s' already registered, plugin entry ignored", qPrintable(id));
                 return;
             }
             m_registry.registerPanel(id, std::move(factory));
@@ -73,7 +73,7 @@ int UiClientPluginHost::loadForClient(const QString& clientId)
     m_loadedClientId = id;
 
     int loaded = 0;
-    const QString envDir = QString::fromLocal8Bit(qgetenv("SANYI_CLIENT_PLUGIN_DIR")).trimmed();
+    const QString envDir = QString::fromLocal8Bit(qgetenv("APR_CLIENT_PLUGIN_DIR")).trimmed();
     if (!envDir.isEmpty())
     {
         loaded += loadDirectory(envDir, id);
@@ -86,7 +86,7 @@ int UiClientPluginHost::loadForClient(const QString& clientId)
         loaded += loadDirectory(clientDir, id);
     }
 
-    SY_INFOF("[UiClientPlugin] Loaded %d client plugin(s) for '%s'", loaded, qPrintable(id));
+    APR_INFOF("[UiClientPlugin] Loaded %d client plugin(s) for '%s'", loaded, qPrintable(id));
     return loaded;
 }
 
@@ -127,7 +127,7 @@ bool UiClientPluginHost::loadLibrary(const QString& libraryPath, const QString& 
     auto library = std::make_unique<QLibrary>(libraryPath);
     if (!library->load())
     {
-        SY_WARNF(
+        APR_WARNF(
             "[UiClientPlugin] Failed to load '%s': %s", qPrintable(libraryPath), qPrintable(library->errorString()));
         return false;
     }
@@ -148,12 +148,12 @@ bool UiClientPluginHost::loadLibrary(const QString& libraryPath, const QString& 
                 uiPlugin = plugin;
                 uiDestroy = reinterpret_cast<DestroyClientUiPluginFn>(library->resolve("destroyClientUiPlugin"));
                 registeredSomething = true;
-                SY_INFOF(
+                APR_INFOF(
                     "[UiClientPlugin] Loaded UI plugin '%s' (%s)", qPrintable(plugin->id()), qPrintable(libraryPath));
             }
             else
             {
-                SY_INFOF("[UiClientPlugin] Skip '%s': belongs to client '%s', active '%s'",
+                APR_INFOF("[UiClientPlugin] Skip '%s': belongs to client '%s', active '%s'",
                     qPrintable(libraryPath),
                     qPrintable(owner),
                     qPrintable(clientId));
@@ -169,7 +169,7 @@ bool UiClientPluginHost::loadLibrary(const QString& libraryPath, const QString& 
         }
         else
         {
-            SY_WARNF("[UiClientPlugin] createClientUiPlugin() returned null: '%s'", qPrintable(libraryPath));
+            APR_WARNF("[UiClientPlugin] createClientUiPlugin() returned null: '%s'", qPrintable(libraryPath));
         }
     }
 
@@ -185,14 +185,14 @@ bool UiClientPluginHost::loadLibrary(const QString& libraryPath, const QString& 
                     delete p;
                 });
             registeredSomething = true;
-            SY_INFOF(
+            APR_INFOF(
                 "[UiClientPlugin] Loaded command plugin '%s' (%s)", qPrintable(plugin->id()), qPrintable(libraryPath));
         }
     }
 
     if (!registeredSomething)
     {
-        SY_WARNF("[UiClientPlugin] '%s' exports no supported plugin entry", qPrintable(libraryPath));
+        APR_WARNF("[UiClientPlugin] '%s' exports no supported plugin entry", qPrintable(libraryPath));
         library->unload();
         return false;
     }

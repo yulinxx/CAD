@@ -108,7 +108,7 @@ TEST(DatabaseSchemaMigrationTest, LegacyRecentFilesGetsWorkbenchColumnOnStartup)
 
     // 迁移前先插入一条历史数据，验证补列后旧行不丢、默认值为空串
     ASSERT_TRUE(db.execute("INSERT INTO recent_files (file_path, title, format) VALUES "
-                           "('/tmp/legacy.sy', 'legacy.sy', 'SY')"));
+                           "('/tmp/legacy.apr', 'legacy.apr', 'SY')"));
     ASSERT_FALSE(hasColumn(db, "recent_files", "workbench"));
 
     DatabaseBootstrapper bootstrapper(db);
@@ -117,20 +117,20 @@ TEST(DatabaseSchemaMigrationTest, LegacyRecentFilesGetsWorkbenchColumnOnStartup)
     EXPECT_TRUE(hasColumn(db, "recent_files", "workbench"));
     EXPECT_EQ(DatabaseBootstrapper::latestSchemaVersion(), bootstrapper.schemaVersion());
 
-    auto rows = db.query("SELECT * FROM recent_files WHERE file_path = '/tmp/legacy.sy'");
+    auto rows = db.query("SELECT * FROM recent_files WHERE file_path = '/tmp/legacy.apr'");
     ASSERT_EQ(rows.size(), 1u);
     EXPECT_EQ(rows.front().at("workbench"), "");
 
     // 补列后写入带 workbench 的记录必须成功（原缺陷就是这一步报 no column named workbench）
     std::map<std::string, std::string> values;
-    values["file_path"] = "/tmp/new.sy";
-    values["title"] = "new.sy";
+    values["file_path"] = "/tmp/new.apr";
+    values["title"] = "new.apr";
     values["format"] = "SY";
     values["workbench"] = "2D";
     values["last_opened_at"] = "2026-11-04T10:00:00";
     EXPECT_TRUE(db.insert("recent_files", values)) << db.lastError();
 
-    auto written = db.query("SELECT workbench FROM recent_files WHERE file_path = '/tmp/new.sy'");
+    auto written = db.query("SELECT workbench FROM recent_files WHERE file_path = '/tmp/new.apr'");
     ASSERT_EQ(written.size(), 1u);
     EXPECT_EQ(written.front().at("workbench"), "2D");
 }
@@ -182,7 +182,7 @@ TEST(DatabaseSchemaMigrationTest, MigrationIsIdempotent)
     ASSERT_TRUE(createFullSchema(db));
     ASSERT_TRUE(replaceWithLegacyRecentFiles(db));
     ASSERT_TRUE(db.execute("INSERT INTO recent_files (file_path, title, format) VALUES "
-                           "('/tmp/keep.sy', 'keep.sy', 'SY')"));
+                           "('/tmp/keep.apr', 'keep.apr', 'SY')"));
 
     DatabaseBootstrapper first(db);
     ASSERT_TRUE(first.ensureSchema()) << first.lastError();

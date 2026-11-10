@@ -1,21 +1,21 @@
 # --------------------------------------------------------------------
 # 公司 / 产品信息（从 Config.cmake 读取，未定义时使用默认值）
 # --------------------------------------------------------------------
-if(NOT DEFINED SANYI_COMPANY_NAME)
-    set(SANYI_COMPANY_NAME "SanYi Technology")
+if(NOT DEFINED APR_COMPANY_NAME)
+    set(APR_COMPANY_NAME "April Technology")
 endif()
 
-if(NOT DEFINED SANYI_PRODUCT_NAME)
-    set(SANYI_PRODUCT_NAME "SanYi CAD")
+if(NOT DEFINED APR_PRODUCT_NAME)
+    set(APR_PRODUCT_NAME "April CAD")
 endif()
 
-if(NOT DEFINED SANYI_LEGAL_COPYRIGHT)
-    set(SANYI_LEGAL_COPYRIGHT "Copyright (C) 2026 SanYi Technology. All rights reserved.")
+if(NOT DEFINED APR_LEGAL_COPYRIGHT)
+    set(APR_LEGAL_COPYRIGHT "Copyright (C) 2026 April Technology. All rights reserved.")
 endif()
 
-set(SANYI_UTILS_DIR "${CMAKE_CURRENT_LIST_DIR}" CACHE INTERNAL "Directory containing Sanyi utility modules")
+set(APR_UTILS_DIR "${CMAKE_CURRENT_LIST_DIR}" CACHE INTERNAL "Directory containing Sanyi utility modules")
 
-function(sanyi_add_version_info target target_name description)
+function(apr_add_version_info target target_name description)
     if(MSVC)
         set(_FILE_DESCRIPTION "${description}")
         set(_INTERNAL_NAME "${target_name}")
@@ -24,10 +24,10 @@ function(sanyi_add_version_info target target_name description)
         if(_target_type STREQUAL "EXECUTABLE")
             set(_ORIGINAL_FILENAME "${target_name}.exe")
         endif()
-        set(_version_rc_in "${SANYI_UTILS_DIR}/version.rc.in")
+        set(_version_rc_in "${APR_UTILS_DIR}/version.rc.in")
         set(_version_rc_out "${CMAKE_CURRENT_BINARY_DIR}/${target_name}_version.rc")
         if(NOT EXISTS "${_version_rc_in}")
-            message(FATAL_ERROR "[sanyi_add_version_info] version.rc.in NOT FOUND: ${_version_rc_in}")
+            message(FATAL_ERROR "[apr_add_version_info] version.rc.in NOT FOUND: ${_version_rc_in}")
         endif()
         file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
         # CMake 4.3 configure_file 对带 BOM 的文件可能存在问题，
@@ -41,7 +41,7 @@ function(sanyi_add_version_info target target_name description)
     endif()
 endfunction()
 
-function(sanyi_deploy_qt_dlls target)
+function(apr_deploy_qt_dlls target)
     if(WIN32 AND QT_VERSION_MAJOR)
         find_package(Qt${QT_VERSION_MAJOR} QUIET COMPONENTS Core)
         if(Qt${QT_VERSION_MAJOR}_FOUND)
@@ -92,7 +92,7 @@ function(sanyi_deploy_qt_dlls target)
     endif()
 endfunction()
 
-function(sanyi_add_debug_symbols target)
+function(apr_add_debug_symbols target)
     if(MSVC)
         # MSVC: 仅设置调试符号选项，不尝试在configure时复制PDB文件
         # PDB文件在build时间生成，configure时引用会失败
@@ -126,69 +126,69 @@ function(sanyi_add_debug_symbols target)
     endif()
 endfunction()
 
-function(sanyi_glob_sources OUT_VAR)
+function(apr_glob_sources OUT_VAR)
     set(options INCLUDE_MM)
     set(oneValueArgs BASE_DIR)
     set(multiValueArgs DIRS EXCLUDE_PATTERNS)
-    cmake_parse_arguments(SANYI_GLOB "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+    cmake_parse_arguments(APR_GLOB "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-    if(NOT SANYI_GLOB_BASE_DIR)
-        set(SANYI_GLOB_BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+    if(NOT APR_GLOB_BASE_DIR)
+        set(APR_GLOB_BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
     endif()
 
     set(_sources "")
-    foreach(dir ${SANYI_GLOB_DIRS})
-        file(GLOB _dir_files CONFIGURE_DEPENDS "${SANYI_GLOB_BASE_DIR}/${dir}/*.cpp")
+    foreach(dir ${APR_GLOB_DIRS})
+        file(GLOB _dir_files CONFIGURE_DEPENDS "${APR_GLOB_BASE_DIR}/${dir}/*.cpp")
         list(APPEND _sources ${_dir_files})
-        if(SANYI_GLOB_INCLUDE_MM)
-            file(GLOB _dir_mm_files CONFIGURE_DEPENDS "${SANYI_GLOB_BASE_DIR}/${dir}/*.mm")
+        if(APR_GLOB_INCLUDE_MM)
+            file(GLOB _dir_mm_files CONFIGURE_DEPENDS "${APR_GLOB_BASE_DIR}/${dir}/*.mm")
             list(APPEND _sources ${_dir_mm_files})
         endif()
     endforeach()
 
-    if(SANYI_GLOB_EXCLUDE_PATTERNS)
-        foreach(pattern ${SANYI_GLOB_EXCLUDE_PATTERNS})
+    if(APR_GLOB_EXCLUDE_PATTERNS)
+        foreach(pattern ${APR_GLOB_EXCLUDE_PATTERNS})
             list(FILTER _sources EXCLUDE REGEX "${pattern}")
         endforeach()
     endif()
 
-    if(DEFINED SANYI_SOURCE_EXCLUDE_REGEX)
-        list(FILTER _sources EXCLUDE REGEX "${SANYI_SOURCE_EXCLUDE_REGEX}")
+    if(DEFINED APR_SOURCE_EXCLUDE_REGEX)
+        list(FILTER _sources EXCLUDE REGEX "${APR_SOURCE_EXCLUDE_REGEX}")
     endif()
 
     set(${OUT_VAR} "${_sources}" PARENT_SCOPE)
 endfunction()
 
-function(sanyi_glob_headers OUT_VAR)
+function(apr_glob_headers OUT_VAR)
     set(options)
     set(oneValueArgs BASE_DIR)
     set(multiValueArgs DIRS EXCLUDE_PATTERNS)
-    cmake_parse_arguments(SANYI_GLOB "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+    cmake_parse_arguments(APR_GLOB "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-    if(NOT SANYI_GLOB_BASE_DIR)
-        set(SANYI_GLOB_BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+    if(NOT APR_GLOB_BASE_DIR)
+        set(APR_GLOB_BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
     endif()
 
     set(_headers "")
-    foreach(dir ${SANYI_GLOB_DIRS})
-        file(GLOB _dir_files CONFIGURE_DEPENDS "${SANYI_GLOB_BASE_DIR}/${dir}/*.h")
+    foreach(dir ${APR_GLOB_DIRS})
+        file(GLOB _dir_files CONFIGURE_DEPENDS "${APR_GLOB_BASE_DIR}/${dir}/*.h")
         list(APPEND _headers ${_dir_files})
     endforeach()
 
-    if(SANYI_GLOB_EXCLUDE_PATTERNS)
-        foreach(pattern ${SANYI_GLOB_EXCLUDE_PATTERNS})
+    if(APR_GLOB_EXCLUDE_PATTERNS)
+        foreach(pattern ${APR_GLOB_EXCLUDE_PATTERNS})
             list(FILTER _headers EXCLUDE REGEX "${pattern}")
         endforeach()
     endif()
 
-    if(DEFINED SANYI_HEADER_EXCLUDE_REGEX)
-        list(FILTER _headers EXCLUDE REGEX "${SANYI_HEADER_EXCLUDE_REGEX}")
+    if(DEFINED APR_HEADER_EXCLUDE_REGEX)
+        list(FILTER _headers EXCLUDE REGEX "${APR_HEADER_EXCLUDE_REGEX}")
     endif()
 
     set(${OUT_VAR} "${_headers}" PARENT_SCOPE)
 endfunction()
 
-function(sanyi_find_qt)
+function(apr_find_qt)
     if(Qt_INSTALL_DIR)
         list(INSERT CMAKE_PREFIX_PATH 0 "${Qt_INSTALL_DIR}")
     endif()
@@ -199,7 +199,7 @@ function(sanyi_find_qt)
     set(QT_LIBRARIES "${QT_LIBRARIES}" PARENT_SCOPE)
 endfunction()
 
-function(sanyi_add_shared_library target)
+function(apr_add_shared_library target)
     set(options AUTOMOC AUTOUIC AUTORCC UNITY_BUILD NO_UNITY_BUILD)
     set(oneValueArgs FOLDER DESCRIPTION EXPORT_MACRO VERSION_MAJOR VERSION_MINOR VERSION_PATCH)
 # 可见性分离：新关键字显式控制链接依赖的 PUBLIC / PRIVATE / INTERFACE 传递。
@@ -209,32 +209,32 @@ function(sanyi_add_shared_library target)
                        COMPILE_DEFINITIONS COMPILE_OPTIONS LINK_LIBRARIES QT_COMPONENTS
                        PUBLIC_LINK_LIBRARIES PRIVATE_LINK_LIBRARIES INTERFACE_LINK_LIBRARIES
                        PUBLIC_QT_COMPONENTS PRIVATE_QT_COMPONENTS)
-    cmake_parse_arguments(SANYI_SHLIB "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+    cmake_parse_arguments(APR_SHLIB "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-    if(SANYI_SHLIB_VERSION_MAJOR)
-        set(_version "${SANYI_SHLIB_VERSION_MAJOR}")
-        if(DEFINED SANYI_SHLIB_VERSION_MINOR)
-            set(_version "${_version}.${SANYI_SHLIB_VERSION_MINOR}")
-            if(DEFINED SANYI_SHLIB_VERSION_PATCH)
-                set(_version "${_version}.${SANYI_SHLIB_VERSION_PATCH}")
+    if(APR_SHLIB_VERSION_MAJOR)
+        set(_version "${APR_SHLIB_VERSION_MAJOR}")
+        if(DEFINED APR_SHLIB_VERSION_MINOR)
+            set(_version "${_version}.${APR_SHLIB_VERSION_MINOR}")
+            if(DEFINED APR_SHLIB_VERSION_PATCH)
+                set(_version "${_version}.${APR_SHLIB_VERSION_PATCH}")
             endif()
         endif()
         set(PROJECT_VERSION "${_version}")
         # version.rc.in 使用 @PROJECT_VERSION_MAJOR@ 等分量变量，
         # 必须同步设置，否则 FILEVERSION 会生成空的 ,,,0
-        set(PROJECT_VERSION_MAJOR "${SANYI_SHLIB_VERSION_MAJOR}")
-        set(PROJECT_VERSION_MINOR "${SANYI_SHLIB_VERSION_MINOR}")
-        set(PROJECT_VERSION_PATCH "${SANYI_SHLIB_VERSION_PATCH}")
+        set(PROJECT_VERSION_MAJOR "${APR_SHLIB_VERSION_MAJOR}")
+        set(PROJECT_VERSION_MINOR "${APR_SHLIB_VERSION_MINOR}")
+        set(PROJECT_VERSION_PATCH "${APR_SHLIB_VERSION_PATCH}")
     endif()
 
     add_library(${target} SHARED
-        ${SANYI_SHLIB_SOURCES}
-        ${SANYI_SHLIB_HEADERS}
+        ${APR_SHLIB_SOURCES}
+        ${APR_SHLIB_HEADERS}
     )
 
     set(_internal_files "")
     set(_external_files "")
-    foreach(file ${SANYI_SHLIB_SOURCES} ${SANYI_SHLIB_HEADERS})
+    foreach(file ${APR_SHLIB_SOURCES} ${APR_SHLIB_HEADERS})
         # CMake 4.x 下 file(RELATIVE_PATH) 要求 file 为绝对路径；
         # 归一化相对路径（如 Renderx 内联源列表）避免 configure 失败
         if(NOT IS_ABSOLUTE "${file}")
@@ -255,11 +255,11 @@ function(sanyi_add_shared_library target)
         source_group("External" FILES ${_external_files})
     endif()
 
-    if(SANYI_SHLIB_PUBLIC_INCLUDE_DIRS)
-        target_include_directories(${target} PUBLIC ${SANYI_SHLIB_PUBLIC_INCLUDE_DIRS})
+    if(APR_SHLIB_PUBLIC_INCLUDE_DIRS)
+        target_include_directories(${target} PUBLIC ${APR_SHLIB_PUBLIC_INCLUDE_DIRS})
     endif()
-    if(SANYI_SHLIB_PRIVATE_INCLUDE_DIRS)
-        target_include_directories(${target} PRIVATE ${SANYI_SHLIB_PRIVATE_INCLUDE_DIRS})
+    if(APR_SHLIB_PRIVATE_INCLUDE_DIRS)
+        target_include_directories(${target} PRIVATE ${APR_SHLIB_PRIVATE_INCLUDE_DIRS})
     endif()
 
     target_compile_features(${target} PUBLIC cxx_std_17)
@@ -271,20 +271,20 @@ function(sanyi_add_shared_library target)
     # 且在 /std:c++17 下强置 1 会让 qvariant.h:1047 报 C2760/C3878。
     target_compile_definitions(${target} PRIVATE QT_NO_P0846)
 
-    if(SANYI_SHLIB_EXPORT_MACRO)
+    if(APR_SHLIB_EXPORT_MACRO)
         # CMake 标准做法：<target>_EXPORTS 用于 DLL 导出/导入
         # 例如 LIB_EXPORT_MACRO="UICORE_API" 产生 UICORE_EXPORTS
         # LIB_EXPORT_MACRO="LOG_EXPORTS" 直接使用 LOG_EXPORTS
-        if(SANYI_SHLIB_EXPORT_MACRO MATCHES "_API$")
-            string(REPLACE "_API" "" _exports_target "${SANYI_SHLIB_EXPORT_MACRO}")
+        if(APR_SHLIB_EXPORT_MACRO MATCHES "_API$")
+            string(REPLACE "_API" "" _exports_target "${APR_SHLIB_EXPORT_MACRO}")
             set(_exports_macro "${_exports_target}_EXPORTS")
         else()
-            set(_exports_macro "${SANYI_SHLIB_EXPORT_MACRO}")
+            set(_exports_macro "${APR_SHLIB_EXPORT_MACRO}")
         endif()
         target_compile_definitions(${target} PRIVATE ${_exports_macro})
     endif()
-    if(SANYI_SHLIB_COMPILE_DEFINITIONS)
-        target_compile_definitions(${target} PRIVATE ${SANYI_SHLIB_COMPILE_DEFINITIONS})
+    if(APR_SHLIB_COMPILE_DEFINITIONS)
+        target_compile_definitions(${target} PRIVATE ${APR_SHLIB_COMPILE_DEFINITIONS})
     endif()
 
     if(MSVC)
@@ -292,18 +292,18 @@ function(sanyi_add_shared_library target)
     else()
         target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    if(SANYI_SHLIB_COMPILE_OPTIONS)
-        target_compile_options(${target} PRIVATE ${SANYI_SHLIB_COMPILE_OPTIONS})
+    if(APR_SHLIB_COMPILE_OPTIONS)
+        target_compile_options(${target} PRIVATE ${APR_SHLIB_COMPILE_OPTIONS})
     endif()
 
     set(_target_properties
-        FOLDER "${SANYI_SHLIB_FOLDER}"
+        FOLDER "${APR_SHLIB_FOLDER}"
         DEBUG_POSTFIX "_d"
         VERSION "${PROJECT_VERSION}"
     )
     # 未显式指定版本分量时留空，避免 SOVERSION 展开为空值导致参数奇偶错位
-    if(SANYI_SHLIB_VERSION_MAJOR)
-        list(APPEND _target_properties SOVERSION "${SANYI_SHLIB_VERSION_MAJOR}")
+    if(APR_SHLIB_VERSION_MAJOR)
+        list(APPEND _target_properties SOVERSION "${APR_SHLIB_VERSION_MAJOR}")
     endif()
 
     # MSVC 运行库：统一动态链接 CRT（/MD 发布, /MDd 调试）。
@@ -315,21 +315,21 @@ function(sanyi_add_shared_library target)
         list(APPEND _target_properties MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
     endif()
 
-    if(SANYI_SHLIB_AUTOMOC)
+    if(APR_SHLIB_AUTOMOC)
         list(APPEND _target_properties AUTOMOC ON)
     endif()
-    if(SANYI_SHLIB_AUTOUIC)
+    if(APR_SHLIB_AUTOUIC)
         list(APPEND _target_properties AUTOUIC ON)
     endif()
-    if(SANYI_SHLIB_AUTORCC)
+    if(APR_SHLIB_AUTORCC)
         list(APPEND _target_properties AUTORCC ON)
     endif()
-    # UnityBuild：默认遵循全局 option SANYI_UNITY_BUILD（开启时每个 target 设
+    # UnityBuild：默认遵循全局 option APR_UNITY_BUILD（开启时每个 target 设
     # UNITY_BUILD ON）；显式 UNITY_BUILD 强制开启，NO_UNITY_BUILD 供个别模块
     # （如存在命名空间泄漏/符号冲突）单独关闭。
-    if(SANYI_SHLIB_NO_UNITY_BUILD)
+    if(APR_SHLIB_NO_UNITY_BUILD)
         list(APPEND _target_properties UNITY_BUILD OFF)
-    elseif(SANYI_SHLIB_UNITY_BUILD OR SANYI_UNITY_BUILD)
+    elseif(APR_SHLIB_UNITY_BUILD OR APR_UNITY_BUILD)
         list(APPEND _target_properties UNITY_BUILD ON)
     endif()
 
@@ -338,39 +338,39 @@ function(sanyi_add_shared_library target)
 # 旧关键字 QT_COMPONENTS 向后兼容：历史默认按 PUBLIC 传递。
     # 新关键字 PUBLIC_QT_COMPONENTS / PRIVATE_QT_COMPONENTS 显式控制可见性，
     # 两者针对不同场景（公共头暴露 vs 实现内部）可并存。
-    if(SANYI_SHLIB_QT_COMPONENTS AND NOT SANYI_SHLIB_PUBLIC_QT_COMPONENTS)
-        set(SANYI_SHLIB_PUBLIC_QT_COMPONENTS "${SANYI_SHLIB_QT_COMPONENTS}")
+    if(APR_SHLIB_QT_COMPONENTS AND NOT APR_SHLIB_PUBLIC_QT_COMPONENTS)
+        set(APR_SHLIB_PUBLIC_QT_COMPONENTS "${APR_SHLIB_QT_COMPONENTS}")
     endif()
 
-    if(SANYI_SHLIB_PUBLIC_QT_COMPONENTS)
-        sanyi_find_qt(${SANYI_SHLIB_PUBLIC_QT_COMPONENTS})
+    if(APR_SHLIB_PUBLIC_QT_COMPONENTS)
+        apr_find_qt(${APR_SHLIB_PUBLIC_QT_COMPONENTS})
         # 公共头里出现 Qt 类型（如 QObject/QWidget/QString）时必须 PUBLIC 传递
         target_link_libraries(${target} PUBLIC ${QT_LIBRARIES})
     endif()
-    if(SANYI_SHLIB_PRIVATE_QT_COMPONENTS)
-        sanyi_find_qt(${SANYI_SHLIB_PRIVATE_QT_COMPONENTS})
+    if(APR_SHLIB_PRIVATE_QT_COMPONENTS)
+        apr_find_qt(${APR_SHLIB_PRIVATE_QT_COMPONENTS})
         # 实现内部用的 Qt 组件一律 PRIVATE，不污染下游
         target_link_libraries(${target} PRIVATE ${QT_LIBRARIES})
     endif()
 
     # 旧关键字 LINK_LIBRARIES 向后兼容：列表内可内嵌 PUBLIC/PRIVATE 作用域关键字
     # （如 LINK_LIBRARIES PUBLIC A PRIVATE B），由 target_link_libraries 原生解析。
-    if(SANYI_SHLIB_LINK_LIBRARIES)
-        target_link_libraries(${target} PUBLIC ${SANYI_SHLIB_LINK_LIBRARIES})
+    if(APR_SHLIB_LINK_LIBRARIES)
+        target_link_libraries(${target} PUBLIC ${APR_SHLIB_LINK_LIBRARIES})
     endif()
-    if(SANYI_SHLIB_PUBLIC_LINK_LIBRARIES)
-        target_link_libraries(${target} PUBLIC ${SANYI_SHLIB_PUBLIC_LINK_LIBRARIES})
+    if(APR_SHLIB_PUBLIC_LINK_LIBRARIES)
+        target_link_libraries(${target} PUBLIC ${APR_SHLIB_PUBLIC_LINK_LIBRARIES})
     endif()
-    if(SANYI_SHLIB_PRIVATE_LINK_LIBRARIES)
-        target_link_libraries(${target} PRIVATE ${SANYI_SHLIB_PRIVATE_LINK_LIBRARIES})
+    if(APR_SHLIB_PRIVATE_LINK_LIBRARIES)
+        target_link_libraries(${target} PRIVATE ${APR_SHLIB_PRIVATE_LINK_LIBRARIES})
     endif()
-    if(SANYI_SHLIB_INTERFACE_LINK_LIBRARIES)
-        target_link_libraries(${target} INTERFACE ${SANYI_SHLIB_INTERFACE_LINK_LIBRARIES})
+    if(APR_SHLIB_INTERFACE_LINK_LIBRARIES)
+        target_link_libraries(${target} INTERFACE ${APR_SHLIB_INTERFACE_LINK_LIBRARIES})
     endif()
 
-    sanyi_add_version_info(${target} "${target}" "${SANYI_SHLIB_DESCRIPTION}")
+    apr_add_version_info(${target} "${target}" "${APR_SHLIB_DESCRIPTION}")
 
-    sanyi_add_debug_symbols(${target})
+    apr_add_debug_symbols(${target})
 
     message(STATUS "[${target}]")
     message(STATUS "  Version: ${PROJECT_VERSION}")
@@ -379,25 +379,25 @@ function(sanyi_add_shared_library target)
     message(STATUS "----------------------------------------")
 endfunction()
 
-function(sanyi_export_imported_target target)
+function(apr_export_imported_target target)
     set(options)
     set(oneValueArgs LIB_NAME)
     set(multiValueArgs PUBLIC_INCLUDE_DIRS INTERFACE_LINK_LIBRARIES)
-    cmake_parse_arguments(SANYI_EIT "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+    cmake_parse_arguments(APR_EIT "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-    if(NOT SANYI_EIT_LIB_NAME)
-        message(FATAL_ERROR "[sanyi_export_imported_target] LIB_NAME required")
+    if(NOT APR_EIT_LIB_NAME)
+        message(FATAL_ERROR "[apr_export_imported_target] LIB_NAME required")
     endif()
 
     set(_config_dir "${CMAKE_BINARY_DIR}/cmake")
     file(MAKE_DIRECTORY "${_config_dir}")
 
-    set(_lib_name "${SANYI_EIT_LIB_NAME}")
+    set(_lib_name "${APR_EIT_LIB_NAME}")
     set(_target_name "${_lib_name}::${_lib_name}")
 
     set(_includes "")
-    if(SANYI_EIT_PUBLIC_INCLUDE_DIRS)
-        foreach(inc IN LISTS SANYI_EIT_PUBLIC_INCLUDE_DIRS)
+    if(APR_EIT_PUBLIC_INCLUDE_DIRS)
+        foreach(inc IN LISTS APR_EIT_PUBLIC_INCLUDE_DIRS)
             # 仅相对化项目树内的 include：生成的 Config.cmake 用
             # ${CMAKE_CURRENT_LIST_DIR}/<rel> 还原，避免把本机绝对路径
             # 烤进仓库里的生成物。项目外依赖（vcpkg/Qt 等）保持原样。
@@ -417,8 +417,8 @@ function(sanyi_export_imported_target target)
     endif()
 
     set(_deps "")
-    if(SANYI_EIT_INTERFACE_LINK_LIBRARIES)
-        foreach(dep IN LISTS SANYI_EIT_INTERFACE_LINK_LIBRARIES)
+    if(APR_EIT_INTERFACE_LINK_LIBRARIES)
+        foreach(dep IN LISTS APR_EIT_INTERFACE_LINK_LIBRARIES)
             list(APPEND _deps "${dep}")
         endforeach()
     endif()
@@ -435,7 +435,7 @@ function(sanyi_export_imported_target target)
         set(_location_genex "\$<TARGET_FILE:${_lib_name}>")
     endif()
 
-    set(_config_content "# Generated by sanyi_export_imported_target for ${_lib_name}
+    set(_config_content "# Generated by apr_export_imported_target for ${_lib_name}
 # DO NOT EDIT
 
 if(NOT TARGET ${_target_name})
@@ -462,14 +462,14 @@ endfunction()
 
 # 客户 UI 插件：每个客户一个共享库，输出到 <bin>/plugins/clients/<clientId>，
 # 并把客户仓库里的 configs/ 与 branding/ 复制到运行目录，便于本地直接调试。
-function(sanyi_add_client_plugin target)
+function(apr_add_client_plugin target)
     cmake_parse_arguments(ARG "" "CLIENT_ID" "SOURCES;INCLUDE_DIRS;LINK_LIBRARIES" ${ARGN})
 
     if(NOT ARG_CLIENT_ID)
-        message(FATAL_ERROR "sanyi_add_client_plugin(${target}) requires CLIENT_ID")
+        message(FATAL_ERROR "apr_add_client_plugin(${target}) requires CLIENT_ID")
     endif()
     if(NOT ARG_SOURCES)
-        message(FATAL_ERROR "sanyi_add_client_plugin(${target}) requires SOURCES")
+        message(FATAL_ERROR "apr_add_client_plugin(${target}) requires SOURCES")
     endif()
 
     add_library(${target} SHARED ${ARG_SOURCES})
@@ -481,8 +481,8 @@ function(sanyi_add_client_plugin target)
     )
 
     target_include_directories(${target} PRIVATE
-        "${SANYI_ROOT}/Main/Src"
-        "${SANYI_ROOT}/UI/Common/Include"
+        "${APR_ROOT}/Main/Src"
+        "${APR_ROOT}/UI/Common/Include"
         ${ARG_INCLUDE_DIRS}
     )
     target_link_libraries(${target} PRIVATE
@@ -493,8 +493,8 @@ function(sanyi_add_client_plugin target)
         ${ARG_LINK_LIBRARIES}
     )
     target_compile_definitions(${target} PRIVATE
-        SANYI_CLIENT_ID="${ARG_CLIENT_ID}"
-        SANYI_CLIENT_PLUGIN_ABI=1
+        APR_CLIENT_ID="${ARG_CLIENT_ID}"
+        APR_CLIENT_PLUGIN_ABI=1
     )
 
     set(_plugin_bin "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/plugins/clients/${ARG_CLIENT_ID}")

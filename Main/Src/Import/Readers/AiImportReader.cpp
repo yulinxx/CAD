@@ -4,7 +4,7 @@
  */
 #include "AiImportReader.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 AiImportReader::AiImportReader()
     : ImportReaderBase(
@@ -33,7 +33,7 @@ void AiImportReader::decorateError(QString& msg, const ImportContext& /*context*
     }
 }
 
-ImportResult AiImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
+ImportResult AiImportReader::read(const ImportContext& context, Fio::VecAprEntityPtr& outEntities)
 {
     // 走 FileIO 的 AiParser：内部将 PDF/PostScript 基 AI 转换为 SVG 后解析为中立 IR
     return readViaIR(context, Fio::FileFormat::AI, outEntities, true);

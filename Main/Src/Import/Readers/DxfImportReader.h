@@ -7,5 +7,5 @@ class DxfImportReader : public ImportReaderBase
 {
 public:
     DxfImportReader();
-    ImportResult read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities) override;
+    ImportResult read(const ImportContext& context, Fio::VecAprEntityPtr& outEntities) override;
 };

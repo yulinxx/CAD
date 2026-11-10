@@ -84,14 +84,14 @@ UI/2D/
 
 ### 3.5 跨库判型：禁止 `dynamic_cast`，一律用 `eType`
 
-`SyEntity` 派生体的判型必须走 `entity->eType`（`EType` 枚举）+ `static_cast`，**不得**用
+`AprEntity` 派生体的判型必须走 `entity->eType`（`EType` 枚举）+ `static_cast`，**不得**用
 `dynamic_cast`。
 
-原因是 RTTI 在多动态库进程里不可靠：`SyImage`、`SyFillRegion` 这类图元整体定义在头文件中，
+原因是 RTTI 在多动态库进程里不可靠：`AprImage`、`AprFillRegion` 这类图元整体定义在头文件中，
 没有任何 out-of-line 的虚函数把 vtable / typeinfo 锚定进 `Engine2D`，于是每个包含该头的库
 都会各自生成一份弱符号 typeinfo；工程按 `-fvisibility=hidden` 编译，这些符号不导出，链接器
 无法合并。结果是「谁创建的对象」决定了 `dynamic_cast` 能不能成功——`Main`/`UI2D` 里 new 出来
-的 `SyImage`，传进 `Engine2D` 内部再 `dynamic_cast<const SyImage*>` 会返回 `nullptr`，
+的 `AprImage`，传进 `Engine2D` 内部再 `dynamic_cast<const AprImage*>` 会返回 `nullptr`，
 而且**不报任何错**，只是静默走进 else 分支。
 
 已知踩过的坑（2026-08-30 修复）：`Geo2DQuery::isClosed()` 用 `dynamic_cast` 认位图，在真实
@@ -103,7 +103,7 @@ UI/2D/
 测试全绿。要复现必须在多库进程里跑（`MainTests` 这种链全部 dylib 的目标）。
 
 `Engine/2D/Src/Algorithm/` 下的 `Geo2DSampling` / `Geo2DAnalysis` / `Geo2DEdit` 仍有上百处
-`dynamic_cast<const SyLine*>` 之类的写法。它们目前"能用"是因为 `SyLine`、`SyPolygon` 等有
+`dynamic_cast<const AprLine*>` 之类的写法。它们目前"能用"是因为 `AprLine`、`AprPolygon` 等有
 对应 `.cpp` 把虚函数锚定在 `Engine2D` 内，typeinfo 只有一份；这是巧合而不是保证——任何图元
 一旦改成纯头文件实现，就会立刻重现同一类静默失效。这批替换尚未进行。
 
@@ -116,19 +116,19 @@ UI/2D/
 
 ```cpp
 // ❌ 错误：跨 DLL dynamic_cast 不可靠
-if (auto* line = dynamic_cast<const SyLine*>(entity)) {
+if (auto* line = dynamic_cast<const AprLine*>(entity)) {
     // ...
 }
 
 // ✅ 正确：使用 eType 枚举判型
 switch (entity->eType) {
 case EType::LINE: {
-    const auto* line = static_cast<const SyLine*>(entity);
+    const auto* line = static_cast<const AprLine*>(entity);
     // ...
     break;
 }
 case EType::POLYGON: {
-    const auto* poly = static_cast<const SyPolygon*>(entity);
+    const auto* poly = static_cast<const AprPolygon*>(entity);
     // ...
     break;
 }
@@ -152,7 +152,7 @@ case EType::POLYGON: {
 
 ### 3.7 CMake 链接可见性（2026-11-02 已改为 PRIVATE 默认）
 
-**`CMake/Utils.cmake`** 中的 `sanyi_add_shared_library()` 函数已废弃旧的 `LINK_LIBRARIES` / `QT_COMPONENTS` 参数（默认 PUBLIC 会导致 Qt / 第三方依赖被下游无差别传递），改用显式的可见性变体：
+**`CMake/Utils.cmake`** 中的 `apr_add_shared_library()` 函数已废弃旧的 `LINK_LIBRARIES` / `QT_COMPONENTS` 参数（默认 PUBLIC 会导致 Qt / 第三方依赖被下游无差别传递），改用显式的可见性变体：
 
 | 参数 | 语义 | 适用场景 |
 |------|------|----------|
@@ -165,11 +165,11 @@ case EType::POLYGON: {
 
 **导出体系现状（两套并存）**：
 - **标准 `install(EXPORT)`**：Nesting、Raster、GeoModelCore 等独立可复用模块（可单独 `find_package()`）
-- **手搓 Config**：UI*、Engine*、RenderBridge、RenderX 等非独立模块（通过 `sanyi_export_imported_target()` 生成 `<Target>Config.cmake`，供集成构建内部使用）
+- **手搓 Config**：UI*、Engine*、RenderBridge、RenderX 等非独立模块（通过 `apr_export_imported_target()` 生成 `<Target>Config.cmake`，供集成构建内部使用）
 
 **当前已知问题**：
 - Nesting SDK 的 install 目录在集成构建中被重复执行两次（集成构建和独立构建各自生成一份）
-- `SANYI_PROJECT_LIBS` 手工列表维护模块依赖，新增模块时需手动更新
+- `APR_PROJECT_LIBS` 手工列表维护模块依赖，新增模块时需手动更新
 
 ---
 

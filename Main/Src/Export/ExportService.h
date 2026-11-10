@@ -45,7 +45,7 @@ public:
     /// 设置持久化服务（用于导出记录回写）
     void setPersistenceService(PersistenceService* service);
 
-    /// 设置「原生 .sy 加工语义快照」提供器。
+    /// 设置「原生 .apr 加工语义快照」提供器。
     /// 由组合根注入，回调只在**主线程**的导出 Phase 1 调用：读取 LayerManager /
     /// HardwareProfileManager 生成值快照，随 ExportContext 传到后台线程写盘。
     /// 不注入时 hasMachiningSnapshot 保持 false，导出结果会带显式 warning。
@@ -88,7 +88,7 @@ public:
     QStringList supportedExtensions() const;
 
     /// 获取场景中所有图元（用于导出前预览或收集）
-    Fio::VecSyEntityPtr collectAllEntities() const;
+    Fio::VecAprEntityPtr collectAllEntities() const;
 
 signals:
     /// 导出开始信号
@@ -120,7 +120,7 @@ private:
     Eg::SceneManager3D* m_sceneManager3D{ nullptr };
     /// 持久化服务（非拥有指针，用于导出记录回写）
     class PersistenceService* m_persistenceService{ nullptr };
-    /// 原生 .sy 加工语义快照提供器（主线程调用，结果按值传给后台线程）
+    /// 原生 .apr 加工语义快照提供器（主线程调用，结果按值传给后台线程）
     std::function<NativeDocumentSnapshot()> m_machiningSnapshotProvider;
     /// 忙状态回调（替代 UiStateCenter 直接调用）
     std::function<void(bool)> m_busyStateCallback;

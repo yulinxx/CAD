@@ -6,7 +6,7 @@
  */
 #include "UiShellHost.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "UiStateCenter.h"
 #include "UiWorkbench.h"
 #include "WorkbenchWindow.h"
@@ -83,11 +83,11 @@ void UiShellHost::setWorkbench(UiWorkbench* workbench)
 /// 6. 显示主窗口
 void UiShellHost::initializeAndShow()
 {
-    SY_INFO("[UiShellHost] initializeAndShow: starting UI shell initialization");
+    APR_INFO("[UiShellHost] initializeAndShow: starting UI shell initialization");
 
     if (!m_mainWindow || !m_workbench)
     {
-        SY_ERROR("[UiShellHost] error code=shell.init_failed message=initializeAndShow called without main window or "
+        APR_ERROR("[UiShellHost] error code=shell.init_failed message=initializeAndShow called without main window or "
                  "workbench");
         return;
     }
@@ -96,9 +96,9 @@ void UiShellHost::initializeAndShow()
     // 使命令目录可用，菜单/工具栏才能正确构建。
     m_mainWindow->setWorkbench(m_workbench);
 
-    SY_DEBUG("[UiShellHost] attaching workbench to main window");
+    APR_DEBUG("[UiShellHost] attaching workbench to main window");
     m_workbench->attachToWindow(*m_mainWindow);
-    SY_DEBUG("[UiShellHost] activating workbench");
+    APR_DEBUG("[UiShellHost] activating workbench");
     m_workbench->activate();
 
     // 恢复上次会话保存的布局快照（面板宽度/显隐）。
@@ -132,7 +132,7 @@ UiWorkbench* UiShellHost::resolveWorkbench(const QString& workbenchId)
             auto wb3d = std::make_unique<Workbench3D>();
             if (!wb3d->initialize(m_services.workbench()))
             {
-                SY_WARN("Workbench3D initialization failed, falling back to 2D");
+                APR_WARN("Workbench3D initialization failed, falling back to 2D");
                 return m_workbench;
             }
             m_workbench3D = std::move(wb3d);
@@ -141,7 +141,7 @@ UiWorkbench* UiShellHost::resolveWorkbench(const QString& workbenchId)
     }
 #endif
 
-    SY_WARNF("Unknown workbench id '%s', falling back to 2D", workbenchId.toUtf8().constData());
+    APR_WARNF("Unknown workbench id '%s', falling back to 2D", workbenchId.toUtf8().constData());
     return m_workbench;
 }
 

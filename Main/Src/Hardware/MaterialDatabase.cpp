@@ -11,7 +11,7 @@
 #include <QJsonObject>
 #include <QStandardPaths>
 #include <QDir>
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 // 本文件实现刻意保留（ABI 兼容）的弃用类型 MaterialDatabase，定义自身成员时
 // 必然要写出该类型名。调用方仍会收到弃用告警，因此这里只在本文件范围内压制。
@@ -147,7 +147,7 @@ bool MaterialDatabase::saveToFile(const QString& strFilePath)
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly))
     {
-        SY_WARNF("[MaterialDatabase] Failed to save database: %s", path.toStdString().c_str());
+        APR_WARNF("[MaterialDatabase] Failed to save database: %s", path.toStdString().c_str());
         return false;
     }
 
@@ -193,7 +193,7 @@ bool MaterialDatabase::loadFromFile(const QString& strFilePath)
         m_mMaterials[makeKey(info.name, info.thickness)] = info;
     }
 
-    SY_DEBUGF("[MaterialDatabase] Loaded %lld materials", static_cast<long long>(m_mMaterials.size()));
+    APR_DEBUGF("[MaterialDatabase] Loaded %lld materials", static_cast<long long>(m_mMaterials.size()));
     return true;
 }
 

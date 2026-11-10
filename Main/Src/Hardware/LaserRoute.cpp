@@ -9,7 +9,7 @@
     #include <QStringList>
 
     #include "DeviceHost.h"
-    #include "Log/SyLogger.h"
+    #include "Log/AprLogger.h"
 
     #include "Hardware/Device/IGalvoCard.h"
     #include "Hardware/Device/ILaserSource.h"
@@ -37,7 +37,7 @@ namespace LaserRoute
         {
             // 没有激光器面不等于失败：运动卡机型可能由 IO 控光，
             // 功率由激光器面板手动给定。这种情况必须留痕，不能静默。
-            SY_WARNF("[LaserRoute] No laser source on this machine (%s), laser params dropped",
+            APR_WARNF("[LaserRoute] No laser source on this machine (%s), laser params dropped",
                 route.laserOrigin.toUtf8().constData());
             return true;
         }
@@ -48,11 +48,11 @@ namespace LaserRoute
             errorOut = QStringLiteral("SetLaserParams failed: [%1] %2")
                            .arg(QString::fromUtf8(Hw::hwErrorName(r.error)))
                            .arg(QString::fromUtf8(r.message));
-            SY_ERRORF("[LaserRoute] %s", errorOut.toUtf8().constData());
+            APR_ERRORF("[LaserRoute] %s", errorOut.toUtf8().constData());
             return false;
         }
 
-        SY_INFOF("[LaserRoute] Laser params applied (%s): power=%.2f%% freq=%.1fHz pulse=%.1fus",
+        APR_INFOF("[LaserRoute] Laser params applied (%s): power=%.2f%% freq=%.1fHz pulse=%.1fus",
             route.laserOrigin.toUtf8().constData(), params.powerPercent, params.frequencyHz, params.pulseWidthUs);
         return true;
     }
@@ -95,7 +95,7 @@ namespace LaserRoute
             reportOut.warning = QStringLiteral(
                 "Machine provides no laser source; %1 laser parameter group(s) are not applied by the host")
                 .arg(reportOut.paramCount);
-            SY_WARNF("[LaserRoute] %s", reportOut.warning.toUtf8().constData());
+            APR_WARNF("[LaserRoute] %s", reportOut.warning.toUtf8().constData());
             return true;
         }
         reportOut.appliedToLaser = true;
@@ -115,7 +115,7 @@ namespace LaserRoute
                     QStringLiteral("Plan contains %1 laser parameter groups; the motion card buffers the whole "
                                    "stream, so only the first group is applied to the laser source")
                         .arg(reportOut.paramCount);
-                SY_WARNF("[LaserRoute] %s", reportOut.warning.toUtf8().constData());
+                APR_WARNF("[LaserRoute] %s", reportOut.warning.toUtf8().constData());
             }
         }
         return true;

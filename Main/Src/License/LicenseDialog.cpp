@@ -81,7 +81,7 @@ LicenseDialog::LicenseDialog(const QString& configDir, QWidget* parent)
 
 void LicenseDialog::SetupUi()
 {
-    setWindowTitle(tr("Software Activation - SanYiCAD"));
+    setWindowTitle(tr("Software Activation - April"));
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
     // 使用辅助工具创建标准主布局
@@ -148,7 +148,7 @@ void LicenseDialog::SetupUi()
 
 void LicenseDialog::retranslateUi()
 {
-    setWindowTitle(tr("Software Activation - SanYiCAD"));
+    setWindowTitle(tr("Software Activation - April"));
 
     if (auto* titleLabel = findChild<QLabel*>("titleLabel"))
     {

@@ -81,7 +81,7 @@ QString UiBrandConfig::effectiveAppId() const
     QString generated = companyName + productName;
     generated.remove(QChar(' '));
     generated.remove(QChar('-'));
-    return generated.isEmpty() ? QStringLiteral("SanYiCAD") : generated;
+    return generated.isEmpty() ? QStringLiteral("April") : generated;
 }
 
 bool UiBrandConfig::isValidThemeName(const QString& theme)

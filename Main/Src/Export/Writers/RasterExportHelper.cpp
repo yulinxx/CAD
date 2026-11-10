@@ -24,7 +24,7 @@
 
 #include <Raster/RasterApi.h>
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <QCoreApplication>
 #include <QByteArray>
@@ -53,7 +53,7 @@ namespace
     }
 
     /** @brief 计算实体的世界坐标 BBox。 */
-    void computeWorldBBox(const Fio::VecSyEntityPtr& entities,
+    void computeWorldBBox(const Fio::VecAprEntityPtr& entities,
                           double& minX, double& minY, double& maxX, double& maxY)
     {
         minX = std::numeric_limits<double>::max();
@@ -204,7 +204,7 @@ namespace
 }  // namespace
 
 ExportResult RasterExportHelper::rasterizeExport(const ExportContext& context,
-                                                  const Fio::VecSyEntityPtr& entities,
+                                                  const Fio::VecAprEntityPtr& entities,
                                                   const char* formatName)
 {
     if (entities.empty()) {

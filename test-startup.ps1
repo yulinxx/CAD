@@ -1,4 +1,4 @@
-# Launch SanYiCAD, auto-click trial dialog, check survival
+# Launch April, auto-click trial dialog, check survival
 # Chinese strings built from code points (PS5 reads ps1 as ANSI)
 param([int]$WaitSeconds = 15)
 
@@ -10,7 +10,7 @@ $titleZh = [string]([char]0x8BD5) + [char]0x7528 + [char]0x671F
 # "ji xu shi yong" (continue trial)
 $btnZh = [string]([char]0x7EE7) + [char]0x7EED + [char]0x8BD5 + [char]0x7528
 
-$exe = "c:\Users\xx\Documents\Cpp\CAD\build\bin_Qt6\Release\SanYiCAD.exe"
+$exe = "c:\Users\xx\Documents\Cpp\CAD\build\bin_Qt6\Release\April.exe"
 $outFile = "c:\Users\xx\Documents\Cpp\CAD\crash-stderr.txt"
 if (Test-Path $outFile) { Remove-Item $outFile -Force }
 
@@ -50,7 +50,7 @@ for ($i = 0; $i -lt 25; $i++) {
 if (-not $clicked) { Write-Host "WARNING: trial dialog not found/clicked" }
 
 Start-Sleep -Seconds $WaitSeconds
-$p = Get-Process "SanYiCAD" -ErrorAction SilentlyContinue
+$p = Get-Process "April" -ErrorAction SilentlyContinue
 if ($p) {
     Write-Host "RESULT: ALIVE PID=$($p.Id)"
     $p.Kill()

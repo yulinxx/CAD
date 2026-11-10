@@ -20,13 +20,13 @@
 #   结果是跨 DLL 的 dynamic_cast **静默**返回 nullptr —— 编译链接全绿，
 #   只在运行时表现为「某条业务链路莫名失败」。
 #
-#   真实事故：Engine3D 造出的 SyMeshEntity 在 UI3D 里 dynamic_cast 失败，
+#   真实事故：Engine3D 造出的 AprMeshEntity 在 UI3D 里 dynamic_cast 失败，
 #   OBJ 菜单导入 100% 报 "load model failed"，而按 eType 分拣的拖拽导入正常。
 #   代码审查抓不住这种问题，必须由构建系统拦。
 #
 # 适用范围（刻意不是全仓库）：
 #   只覆盖「以 C++ 类形态跨 DLL 共享对象模型」的模块 —— 目前是
-#   EngineCommon / Engine2D / Engine3D 这套 SyEntity 体系。
+#   EngineCommon / Engine2D / Engine3D 这套 AprEntity 体系。
 #   Vision、RenderX 这类**刻意**只暴露 C ABI / 纯虚接口的模块不在此列：
 #   它们要的正是「符号全隐藏」，把宏改成一律 default 反而破坏其设计。
 #   新模块若开始跨 DLL 传递 C++ 对象并做 downcast，再往调用处的列表里加。
@@ -34,14 +34,14 @@
 # 输出消息一律英文：这是构建日志，会进 CI 与现场排查记录。
 # =============================================================================
 
-function(sanyi_check_export_macro_visibility)
+function(apr_check_export_macro_visibility)
     set(options "")
     set(oneValueArgs "")
     set(multiValueArgs HEADERS)
     cmake_parse_arguments(ARG "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
     if(NOT ARG_HEADERS)
-        message(FATAL_ERROR "sanyi_check_export_macro_visibility: HEADERS is required")
+        message(FATAL_ERROR "apr_check_export_macro_visibility: HEADERS is required")
     endif()
 
     set(_violations "")

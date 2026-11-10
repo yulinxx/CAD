@@ -7,5 +7,5 @@ class StlImportReader : public ImportReaderBase
 {
 public:
     StlImportReader();
-    ImportResult read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities) override;
+    ImportResult read(const ImportContext& context, Fio::VecAprEntityPtr& outEntities) override;
 };

@@ -62,7 +62,7 @@ protected:
     void SetUp() override
     {
         LicenseApiTest::SetUp();
-        m_tempDir = UniqueTempDir("sanyi_license_test");
+        m_tempDir = UniqueTempDir("apr_license_test");
         std::filesystem::create_directories(m_tempDir);
     }
 
@@ -148,7 +148,7 @@ TEST_F(LicenseApiTest, ConfigInitDefaults)
     LicenseConfig config{};
     License_ConfigInit(&config);
     EXPECT_EQ(config.structSize, sizeof(LicenseConfig));
-    // -1 = 不覆盖运行期开关；由编译期 SANYI_ENABLE_LICENSE 决定默认值
+    // -1 = 不覆盖运行期开关；由编译期 APR_ENABLE_LICENSE 决定默认值
     EXPECT_EQ(config.enableCheck, -1);
 }
 

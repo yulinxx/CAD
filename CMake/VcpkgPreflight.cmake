@@ -14,7 +14,7 @@
 #        header  —— find_path(<头文件名>)，只用于"纯头文件端口"（无 CMake config）
 #   3. 只探测、不重复加载：命中的包在后面模块里的 find_package 会直接走缓存；
 #      未命中则汇总后 FATAL_ERROR，configure 明确失败（不降级、不改可选）。
-#   4. 与 CMake/Utils.cmake 的 sanyi_require_vcpkg_package 的关系：预检是全局
+#   4. 与 CMake/Utils.cmake 的 apr_require_vcpkg_package 的关系：预检是全局
 #      权威门禁，正常整仓 configure 时先失败，模块级提示不会出现；后者保留为
 #      模块单独 configure / 新增依赖漏登记时的兜底，两者文案口径一致。
 #
@@ -24,13 +24,13 @@
 #
 # 条件必须写成单个变量名（例如 BUILD_TESTS、_need_clipper2），不能写
 # "A OR B" 这类表达式：if() 不会对变量展开出来的多词表达式再次解析。
-# 需要的组合条件在 sanyi_check_vcpkg_dependencies 里先折算成门控变量。
+# 需要的组合条件在 apr_check_vcpkg_dependencies 里先折算成门控变量。
 # ============================================================================
 
 # 取当前构建对应的 vcpkg triplet，仅用于提示文案。
 # vcpkg 工具链加载后会定义 VCPKG_TARGET_TRIPLET（未显式 -D 时也由工具链推导），
 # 未加载工具链时按平台/架构近似推导 vcpkg 默认 triplet。
-function(_sanyi_vcpkg_current_triplet _out_var)
+function(_apr_vcpkg_current_triplet _out_var)
     if(VCPKG_TARGET_TRIPLET)
         set(${_out_var} "${VCPKG_TARGET_TRIPLET}" PARENT_SCOPE)
         return()
@@ -70,7 +70,7 @@ function(_sanyi_vcpkg_current_triplet _out_var)
 endfunction()
 
 # 计算 vcpkg 头文件根目录（纯头文件端口用），取不到时返回空。
-function(_sanyi_vcpkg_include_root _out_var)
+function(_apr_vcpkg_include_root _out_var)
     set(_root "")
     if(VCPKG_INSTALLED_DIR AND VCPKG_TARGET_TRIPLET)
         set(_root "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include")
@@ -82,7 +82,7 @@ function(_sanyi_vcpkg_include_root _out_var)
 endfunction()
 
 # 清单：模块实际用到的必需 vcpkg 端口（新增依赖时在这里登记）
-function(_sanyi_vcpkg_required_dependencies _out_var)
+function(_apr_vcpkg_required_dependencies _out_var)
     set(_deps
         # EngineCommon：几何算法与字体
         "package|Boost|boost|CONFIG|"
@@ -112,7 +112,7 @@ function(_sanyi_vcpkg_required_dependencies _out_var)
     set(${_out_var} "${_deps}" PARENT_SCOPE)
 endfunction()
 
-function(sanyi_check_vcpkg_dependencies)
+function(apr_check_vcpkg_dependencies)
     # 条件必须是"单个变量名"（if() 不会对展开出来的多词表达式再次解析，
     # 所以像 "A OR B" 这样的表达式必须先折算成下面的门控变量）
     set(_need_clipper2 FALSE)
@@ -124,10 +124,10 @@ function(sanyi_check_vcpkg_dependencies)
         set(_need_opencv TRUE)
     endif()
 
-    _sanyi_vcpkg_current_triplet(_triplet)
-    _sanyi_vcpkg_include_root(_vcpkg_include_root)
+    _apr_vcpkg_current_triplet(_triplet)
+    _apr_vcpkg_include_root(_vcpkg_include_root)
 
-    _sanyi_vcpkg_required_dependencies(_deps)
+    _apr_vcpkg_required_dependencies(_deps)
     set(_missing "")
     set(_missing_ports "")
     set(_checked 0)
@@ -154,13 +154,13 @@ function(sanyi_check_vcpkg_dependencies)
             if(_vcpkg_include_root AND EXISTS "${_vcpkg_include_root}/${_probe}")
                 continue()
             endif()
-            find_path(_sanyi_header_dir "${_probe}")
-            if(_sanyi_header_dir)
+            find_path(_apr_header_dir "${_probe}")
+            if(_apr_header_dir)
                 continue()
             endif()
             list(APPEND _missing "    - ${_port} (header \"${_probe}\" not found)")
             list(APPEND _missing_ports "${_port}")
-            unset(_sanyi_header_dir CACHE)
+            unset(_apr_header_dir CACHE)
         else()
             if(_mode)
                 find_package(${_probe} ${_mode} QUIET)
@@ -176,7 +176,7 @@ function(sanyi_check_vcpkg_dependencies)
     endforeach()
 
     if(NOT _missing)
-        message(STATUS "[SanYi] vcpkg dependency preflight: OK (${_checked} required ports available for triplet ${_triplet})")
+        message(STATUS "[April] vcpkg dependency preflight: OK (${_checked} required ports available for triplet ${_triplet})")
         return()
     endif()
 
@@ -214,7 +214,7 @@ function(sanyi_check_vcpkg_dependencies)
     string(REPLACE ";" "\n" _missing_lines "${_missing}")
 
     set(_msg "")
-    string(APPEND _msg "\n[SanYi] vcpkg dependency preflight failed: ${_checked} required port(s) checked, some are missing.\n\n")
+    string(APPEND _msg "\n[April] vcpkg dependency preflight failed: ${_checked} required port(s) checked, some are missing.\n\n")
     string(APPEND _msg "  Missing dependencies:\n")
     string(APPEND _msg "${_missing_lines}\n\n")
     string(APPEND _msg "  Install all missing ports with:\n\n")
@@ -237,5 +237,5 @@ function(sanyi_check_vcpkg_dependencies)
 
     message(STATUS "${_msg}")
     message(FATAL_ERROR
-        "[SanYi] configure failed: missing vcpkg dependencies (install command is printed above)")
+        "[April] configure failed: missing vcpkg dependencies (install command is printed above)")
 endfunction()

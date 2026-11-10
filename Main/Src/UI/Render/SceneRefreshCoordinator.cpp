@@ -7,22 +7,22 @@
 #include "RenderWidget.h"
 
 #include "Engine2D/Core/SceneManager.h"
-#include "Engine/SyEntity/SyEntity.h"
-#include "Engine/Layer/SyLayer.h"
-#include "Engine2D/SyEntity/SyImage.h"
-#include "Engine2D/SyEntity/SyText.h"
-#include "Engine2D/SyEntity/SyPolygon.h"
+#include "Engine/AprEntity/AprEntity.h"
+#include "Engine/Layer/AprLayer.h"
+#include "Engine2D/AprEntity/AprImage.h"
+#include "Engine2D/AprEntity/AprText.h"
+#include "Engine2D/AprEntity/AprPolygon.h"
 #include "Engine2D/Geometry/EntityGeometryEmitter.h"
 #include "Engine2D/Render/SelectionOutlineBuilder.h"
-#include "Engine/SyEntity/EType.h"
+#include "Engine/AprEntity/EType.h"
 
 #include "UI2D/Option/TextGroupNaming.h"
 #include "Engine/Parallel/EngineParallel.h"
 
 #include "Ut/BBox2d.h"
 
-#include "Log/SyLogger.h"
-#include "Log/SyPerfCounter.h"
+#include "Log/AprLogger.h"
+#include "Log/AprPerfCounter.h"
 
 namespace
 {
@@ -45,8 +45,8 @@ namespace
         {
             return 0;
         }
-        const Eg::SyEntity* entity = sm->findEntityById(id);
-        const Eg::SyLayer* layer = entity != nullptr ? entity->layer() : nullptr;
+        const Eg::AprEntity* entity = sm->findEntityById(id);
+        const Eg::AprLayer* layer = entity != nullptr ? entity->layer() : nullptr;
         if (layer == nullptr || layer->getIndex() <= 0)
         {
             return 0;
@@ -82,9 +82,9 @@ namespace
     /// 图元是否属于某个文字块（顶层群组名带 Text 元数据，或用旧版纯 "Text" 命名）。
     /// 文字块内部是 "Text > Char > SmartLine" 的多层群组，只认叶子往上找到最外层。
     /// 只在选中判定里调用（数量等于选中图元数），不会遍历整场景。
-    bool isInsideTextGroup(const Eg::SyEntity* entity)
+    bool isInsideTextGroup(const Eg::AprEntity* entity)
     {
-        const Eg::SyGroup* group = entity != nullptr ? entity->group() : nullptr;
+        const Eg::AprGroup* group = entity != nullptr ? entity->group() : nullptr;
         if (group == nullptr)
         {
             return false;
@@ -126,7 +126,7 @@ SceneRefreshCoordinator::SceneRefreshCoordinator(QObject* parent)
         {
             return false;
         }
-        const Eg::SyEntity* entity =
+        const Eg::AprEntity* entity =
             m_sceneManager != nullptr ? m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid)) : nullptr;
         return canHideSelectedBody(entity);
     });
@@ -187,7 +187,7 @@ void SceneRefreshCoordinator::setSceneContext(Eg::ISceneContext* ctx)
     m_cachedSelectedIds.clear();
     if (m_sceneManager)
     {
-        m_sceneManager->forEachSelected([this](Eg::SyEntity* entity) {
+        m_sceneManager->forEachSelected([this](Eg::AprEntity* entity) {
             if (entity != nullptr)
             {
                 m_cachedSelectedIds.insert(static_cast<uint64_t>(entity->id));
@@ -330,7 +330,7 @@ void SceneRefreshCoordinator::setPerfMonitorEnabled(bool enabled)
     if (enabled && !m_frameTimer)
     {
         m_frameTimer = std::make_unique<FrameTimer>();
-        SY_DEBUG("[SceneRefreshCoordinator] Frame performance monitoring enabled");
+        APR_DEBUG("[SceneRefreshCoordinator] Frame performance monitoring enabled");
     }
     else if (!enabled && m_frameTimer)
     {
@@ -339,7 +339,7 @@ void SceneRefreshCoordinator::setPerfMonitorEnabled(bool enabled)
             m_frameTimer->report();
         }
         m_frameTimer.reset();
-        SY_DEBUG("[SceneRefreshCoordinator] Frame performance monitoring disabled");
+        APR_DEBUG("[SceneRefreshCoordinator] Frame performance monitoring disabled");
     }
 }
 
@@ -405,7 +405,7 @@ bool SceneRefreshCoordinator::hideSelectedEffective() const
     return m_renderWidget != nullptr && m_renderWidget->hideSelectedOriginalEffective();
 }
 
-bool SceneRefreshCoordinator::canHideSelectedBody(const Eg::SyEntity* entity)
+bool SceneRefreshCoordinator::canHideSelectedBody(const Eg::AprEntity* entity)
 {
     if (!entity)
     {
@@ -435,7 +435,7 @@ std::unordered_set<uint64_t> SceneRefreshCoordinator::selectedBodyHideIds() cons
     ids.reserve(m_cachedSelectedIds.size());
     for (uint64_t uid : m_cachedSelectedIds)
     {
-        const Eg::SyEntity* entity = m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid));
+        const Eg::AprEntity* entity = m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid));
         if (canHideSelectedBody(entity))
         {
             ids.insert(uid);
@@ -476,7 +476,7 @@ void SceneRefreshCoordinator::requestFullRefresh()
     if (now - s_lastLog >= std::chrono::milliseconds(1000))
     {
         s_lastLog = now;
-        SY_DEBUGF(
+        APR_DEBUGF(
             "[SceneRefreshCoordinator] requestFullRefresh called (prevLevel=%d)", static_cast<int>(m_refreshLevel));
     }
 
@@ -504,7 +504,7 @@ void SceneRefreshCoordinator::applyLayerVisibilityChanged(int layerId, bool visi
     // 逐条 removeRenderEntities 每次都要切一次渲染上下文，隐藏一个大图层就是十万次调用；
     // 这里收集后一次批量提交。
     std::vector<uint64_t> toRemove;
-    m_sceneManager->forEachEntity([layerId, &toRemove, this](Eg::SyEntity* entity) {
+    m_sceneManager->forEachEntity([layerId, &toRemove, this](Eg::AprEntity* entity) {
         if (!entity || entity->layerId() != layerId)
         {
             return;
@@ -705,13 +705,13 @@ void SceneRefreshCoordinator::requestViewportExtension()
 // isValid() 必须与空间索引 isIndexableEntity 一致：非法几何不在索引里，
 // 若 GPU 仍渲染，queryByBox 账本会漏记。旧实现「layer==null 也入账、bbox 无效也入账」
 // 会把 GPU 上不存在的图元记进账本，增量路径对账时可能误走 modifyRenderEntity。
-bool SceneRefreshCoordinator::isDesiredOnGeometryLayer(const Eg::SyEntity* e, bool hideSelected) const
+bool SceneRefreshCoordinator::isDesiredOnGeometryLayer(const Eg::AprEntity* e, bool hideSelected) const
 {
     if (!e || !e->visible() || !e->isValid())
     {
         return false;
     }
-    const Eg::SyLayer* layer = e->layer();
+    const Eg::AprLayer* layer = e->layer();
     if (!layer || !layer->isVisible())
     {
         return false;
@@ -757,9 +757,9 @@ void SceneRefreshCoordinator::collectDesiredGeometryIds(const Ut::BBox2d& box, b
     {
         return;
     }
-    const Eg::VecSyEntityPtr candidates = m_sceneManager->queryByBox(box, /*containedOnly=*/false);
+    const Eg::VecAprEntityPtr candidates = m_sceneManager->queryByBox(box, /*containedOnly=*/false);
     out.reserve(out.size() + candidates.size());
-    for (Eg::SyEntity* e : candidates)
+    for (Eg::AprEntity* e : candidates)
     {
         if (isDesiredOnGeometryLayer(e, hideSelected))
         {
@@ -789,7 +789,7 @@ void SceneRefreshCoordinator::onSceneChanged()
     if (now - s_lastLog >= std::chrono::milliseconds(1000))
     {
         s_lastLog = now;
-        SY_DEBUGF("[SceneRefreshCoordinator] onSceneChanged: lastCursor=%llu revision=%llu",
+        APR_DEBUGF("[SceneRefreshCoordinator] onSceneChanged: lastCursor=%llu revision=%llu",
             static_cast<unsigned long long>(m_lastCursor),
             m_sceneManager ? static_cast<unsigned long long>(m_sceneManager->currentRevision()) : 0);
     }
@@ -882,7 +882,7 @@ void SceneRefreshCoordinator::onSelectionChanged()
     if (m_sceneManager)
     {
         std::unordered_set<uint64_t> currentSelected;
-        m_sceneManager->forEachSelected([&currentSelected](Eg::SyEntity* e) {
+        m_sceneManager->forEachSelected([&currentSelected](Eg::AprEntity* e) {
             currentSelected.insert(static_cast<uint64_t>(e->id));
         });
 
@@ -1114,14 +1114,14 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
             continue;
         }
 
-        // 位图（SyImage）不走折线/线框顶点路径，统一由 BitmapReconciler 处理
+        // 位图（AprImage）不走折线/线框顶点路径，统一由 BitmapReconciler 处理
         if (snapshot->type == Eg::EType::IMAGE)
         {
             touchedImage = true;
             continue;
         }
 
-        // 文本（SyText）同理：字形四边形由 TextReconciler 一路处理。
+        // 文本（AprText）同理：字形四边形由 TextReconciler 一路处理。
         if (snapshot->type == Eg::EType::TEXT)
         {
             touchedText = true;
@@ -1145,7 +1145,7 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     {
         for (uint64_t uid : m_selectionRestoreIds)
         {
-            const Eg::SyEntity* e = sm->findEntityById(static_cast<Eg::EntityId>(uid));
+            const Eg::AprEntity* e = sm->findEntityById(static_cast<Eg::EntityId>(uid));
             if (e == nullptr || !e->visible())
             {
                 continue;
@@ -1164,7 +1164,7 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
                 continue;
             }
 
-            const Eg::SyLayer* layer = e->layer();
+            const Eg::AprLayer* layer = e->layer();
             if (layer != nullptr && !layer->isVisible())
             {
                 continue;
@@ -1192,7 +1192,7 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     {
         m_renderWidget->upsertRenderEntities(
             entityIdsToProcess,
-            [this, sm](uint64_t uid) -> const Eg::SyEntity* {
+            [this, sm](uint64_t uid) -> const Eg::AprEntity* {
                 // 先查本轮快照（clone 副本，主线程可读）；不在快照里再查活对象
                 // （恢复本体的那批没有快照）。
                 const Eg::RenderEntitySnapshot* snapshot = m_pendingSnapshot.find(static_cast<Eg::EntityId>(uid));
@@ -1230,7 +1230,7 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
                 continue;
             }
             // 位图/色块/文字等没有轮廓替代视觉，本体必须留在世界层
-            const Eg::SyEntity* hiddenEntity = sm->findEntityById(static_cast<Eg::EntityId>(uid));
+            const Eg::AprEntity* hiddenEntity = sm->findEntityById(static_cast<Eg::EntityId>(uid));
             if (!canHideSelectedBody(hiddenEntity))
             {
                 continue;
@@ -1291,7 +1291,7 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     if (now - s_lastFullRefreshLog >= std::chrono::milliseconds(1000))
     {
         s_lastFullRefreshLog = now;
-        SY_DEBUGF("[SceneRefreshCoordinator] applyFullRefresh: lastCursor=%llu revision=%llu pendingDirty=%zu "
+        APR_DEBUGF("[SceneRefreshCoordinator] applyFullRefresh: lastCursor=%llu revision=%llu pendingDirty=%zu "
                   "pendingDeleted=%zu",
             static_cast<unsigned long long>(m_lastCursor),
             static_cast<unsigned long long>(sm->currentRevision()),
@@ -1338,7 +1338,7 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     {
         // 矩阵退化拿不到视口盒时退化为全量遍历（与 gatherGeometry 无裁剪分支一致）。
         // 逐图元判据与 collectDesiredGeometryIds 同源。
-        sm->forEachEntity([this, hideSelected](Eg::SyEntity* e) {
+        sm->forEachEntity([this, hideSelected](Eg::AprEntity* e) {
             if (isDesiredOnGeometryLayer(e, hideSelected))
             {
                 m_renderedEntityIds.insert(static_cast<uint64_t>(e->id));
@@ -1358,7 +1358,7 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
         toRemove.reserve(selectedIds.size());
         for (uint64_t uid : selectedIds)
         {
-            const Eg::SyEntity* selectedEntity = sm->findEntityById(static_cast<Eg::EntityId>(uid));
+            const Eg::AprEntity* selectedEntity = sm->findEntityById(static_cast<Eg::EntityId>(uid));
             if (canHideSelectedBody(selectedEntity))
             {
                 toRemove.push_back(uid);

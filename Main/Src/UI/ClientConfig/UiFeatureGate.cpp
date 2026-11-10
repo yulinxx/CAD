@@ -1,6 +1,6 @@
 #include "UiFeatureGate.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <QRegularExpression>
 #include <algorithm>
@@ -44,12 +44,12 @@ void UiFeatureGate::setLicensedFeatures(const QStringList& features)
 
     if (m_unrestricted)
     {
-        SY_DEBUG("[UiFeatureGate] Wildcard license detected, all features unlocked");
+        APR_DEBUG("[UiFeatureGate] Wildcard license detected, all features unlocked");
         return;
     }
 
     // 该日志是排查「某菜单项为什么不出现」的关键线索，务必保留
-    SY_DEBUGF("[UiFeatureGate] Licensed features loaded (%d): %s",
+    APR_DEBUGF("[UiFeatureGate] Licensed features loaded (%d): %s",
         static_cast<int>(m_features.size()),
         qPrintable(licensedFeatures().join(QLatin1Char(','))));
 }
@@ -57,7 +57,7 @@ void UiFeatureGate::setLicensedFeatures(const QStringList& features)
 void UiFeatureGate::setUnrestricted(bool unrestricted)
 {
     m_unrestricted = unrestricted;
-    SY_DEBUGF("[UiFeatureGate] Unrestricted mode %s", unrestricted ? "ON" : "OFF");
+    APR_DEBUGF("[UiFeatureGate] Unrestricted mode %s", unrestricted ? "ON" : "OFF");
 }
 
 bool UiFeatureGate::isAllowed(const QString& featureId) const
@@ -75,7 +75,7 @@ bool UiFeatureGate::isAllowed(const QString& featureId) const
     const bool allowed = m_features.contains(featureId.trimmed().toLower());
     if (!allowed)
     {
-        SY_DEBUGF("[UiFeatureGate] Feature '%s' is not licensed, UI item will be hidden", qPrintable(featureId));
+        APR_DEBUGF("[UiFeatureGate] Feature '%s' is not licensed, UI item will be hidden", qPrintable(featureId));
     }
     return allowed;
 }

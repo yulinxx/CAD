@@ -12,7 +12,7 @@
 #include <QMetaObject>
 #include <QTimer>
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #ifdef ENABLE_HARDWARE
 
@@ -45,7 +45,7 @@ namespace
         if (text.compare(QStringLiteral("blocked"), Qt::CaseInsensitive) != 0)
         {
             // 拼错的 severity 按最严处理：安全等级上「猜宽松」是不能接受的
-            SY_WARNF("[DeviceHost] Unknown safety severity '%s', treating as Emergency", text.toUtf8().constData());
+            APR_WARNF("[DeviceHost] Unknown safety severity '%s', treating as Emergency", text.toUtf8().constData());
             return Hw::SafetyState::Emergency;
         }
         return Hw::SafetyState::Blocked;
@@ -79,7 +79,7 @@ namespace
             }
             else
             {
-                SY_WARNF("[DeviceHost] Unknown safety action '%s' ignored", a.toUtf8().constData());
+                APR_WARNF("[DeviceHost] Unknown safety action '%s' ignored", a.toUtf8().constData());
             }
         }
         if (mask == Hw::SafetyActionNone)
@@ -167,7 +167,7 @@ struct DeviceHost::Impl
         {
             // 只记日志：信号的发出统一由 onTick 做（那里能保证在主线程）。
             // 打点位名而不是 firstViolation —— 后者是给界面看的本地化文案。
-            SY_WARNF("[DeviceHost] Safety state -> %s (violations=%d, first=%s)",
+            APR_WARNF("[DeviceHost] Safety state -> %s (violations=%d, first=%s)",
                 Hw::safetyStateName(verdict.state),
                 verdict.violationCount,
                 verdict.firstViolationPoint);
@@ -436,7 +436,7 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
     if (m_impl->device)
     {
         errorOut = QStringLiteral("Device already started, call stop() first");  // 设备已经启动，请先 stop()
-        SY_WARNF("[DeviceHost] start() refused: %s", errorOut.toUtf8().constData());
+        APR_WARNF("[DeviceHost] start() refused: %s", errorOut.toUtf8().constData());
         return false;
     }
 
@@ -449,7 +449,7 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
     {
         errorOut =
             QStringLiteral("Unknown device ID: %1 (see log for available IDs)").arg(profile.deviceId);  // 未知设备 ID
-        SY_ERRORF("[DeviceHost] %s", errorOut.toUtf8().constData());
+        APR_ERRORF("[DeviceHost] %s", errorOut.toUtf8().constData());
         return false;
     }
     m_impl->device = device;
@@ -467,7 +467,7 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
     {
         // 现场排查接线时的模式：软件起来了但不碰硬件。
         // 这不是失败，但必须让日志说清楚，否则会被当成「设备连不上」
-        SY_WARNF("[DeviceHost] autoOpen=false, device '%s' created but NOT opened", idUtf8.constData());
+        APR_WARNF("[DeviceHost] autoOpen=false, device '%s' created but NOT opened", idUtf8.constData());
         return true;
     }
 
@@ -478,7 +478,7 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
     {
         if (params.count >= static_cast<int32_t>(Hw::kMaxParams))
         {
-            SY_ERRORF("[DeviceHost] Too many open params (>%zu), '%s' and the rest are dropped",
+            APR_ERRORF("[DeviceHost] Too many open params (>%zu), '%s' and the rest are dropped",
                 Hw::kMaxParams,
                 it.key().toUtf8().constData());
             break;
@@ -495,7 +495,7 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
                        .arg(profile.deviceId)
                        .arg(QString::fromUtf8(Hw::hwErrorName(opened.error)))
                        .arg(QString::fromUtf8(opened.message));  // 打开设备失败
-        SY_ERRORF("[DeviceHost] %s", errorOut.toUtf8().constData());
+        APR_ERRORF("[DeviceHost] %s", errorOut.toUtf8().constData());
         m_impl->destroyDevice();
         return false;
     }
@@ -519,7 +519,7 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
     m_impl->lastAlarmPollMs = -1;
     m_impl->machineState = MachineState::Opening;
 
-    SY_DEBUGF("[DeviceHost] Opened '%s' (%s) caps: motion=%d galvo=%d laser=%d io=%d sim=%d",
+    APR_DEBUGF("[DeviceHost] Opened '%s' (%s) caps: motion=%d galvo=%d laser=%d io=%d sim=%d",
         idUtf8.constData(),
         m_impl->displayName.toUtf8().constData(),
         m_impl->motion ? 1 : 0,
@@ -539,7 +539,7 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
             errorOut = QStringLiteral("Profile configured %1 IO points, but device %2 does not provide IO capability")
                            .arg(profile.ioPoints.size())
                            .arg(profile.deviceId);  // 档案配置了 IO 点位，但设备不提供 IO 能力
-            SY_ERRORF("[DeviceHost] %s", errorOut.toUtf8().constData());
+            APR_ERRORF("[DeviceHost] %s", errorOut.toUtf8().constData());
             m_impl->destroyDevice();
             return false;
         }
@@ -560,7 +560,7 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
 
             if (!m_impl->pointMap.definePoint(def))
             {
-                SY_ERRORF("[DeviceHost] definePoint failed: '%s' ch=%d", pc.name.toUtf8().constData(), pc.channel);
+                APR_ERRORF("[DeviceHost] definePoint failed: '%s' ch=%d", pc.name.toUtf8().constData(), pc.channel);
             }
         }
     }
@@ -579,7 +579,7 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
 
         if (!m_impl->monitor.addCondition(cond))
         {
-            SY_ERRORF("[DeviceHost] addCondition failed for point '%s'", cc.pointName.toUtf8().constData());
+            APR_ERRORF("[DeviceHost] addCondition failed for point '%s'", cc.pointName.toUtf8().constData());
         }
     }
 
@@ -587,7 +587,7 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
     {
         // 没有任何安全条件时 SafetyMonitor 会一路放行。
         // 这在演示/模拟场景合理，在真机上是重大隐患，必须留痕
-        SY_WARNF("[DeviceHost] No safety conditions configured — "
+        APR_WARNF("[DeviceHost] No safety conditions configured — "
                  "processing will never be blocked by interlocks");
     }
 
@@ -596,7 +596,7 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
     m_impl->lastTickMs = 0;
     m_impl->timer.start(profile.tickIntervalMs);
 
-    SY_DEBUGF("[DeviceHost] Started: tick=%dms, %lld IO point(s), %d safety condition(s)%s",
+    APR_DEBUGF("[DeviceHost] Started: tick=%dms, %lld IO point(s), %d safety condition(s)%s",
         profile.tickIntervalMs,
         static_cast<long long>(m_impl->pointMap.pointCount()),
         m_impl->monitor.conditionCount(),
@@ -623,7 +623,7 @@ void DeviceHost::stop()
 
     if (m_impl->device)
     {
-        SY_DEBUGF("[DeviceHost] Stopping '%s'", m_impl->profile.deviceId.toUtf8().constData());
+        APR_DEBUGF("[DeviceHost] Stopping '%s'", m_impl->profile.deviceId.toUtf8().constData());
     }
     m_impl->destroyDevice();
     m_impl->emission.reset();
@@ -802,7 +802,7 @@ void DeviceHost::attachLaser(Hw::ILaserSource* laser)
     m_impl->attachedLaser = laser;
     // 出光守卫必须跟着路由一起换，否则会继续去写已经不再承担出光的那一方
     m_impl->emission.attachLaser(m_impl->routedLaser());
-    SY_INFOF("[DeviceHost] Laser route attached: %s", m_impl->routedLaserOriginText().toUtf8().constData());
+    APR_INFOF("[DeviceHost] Laser route attached: %s", m_impl->routedLaserOriginText().toUtf8().constData());
 }
 
 Hw::ILaserSource* DeviceHost::routedLaserSource() const
@@ -817,14 +817,14 @@ QString DeviceHost::routedLaserOrigin() const
 
 void DeviceHost::requestEmergencyStop()
 {
-    SY_ERRORF("[DeviceHost] Emergency stop requested by application");
+    APR_ERRORF("[DeviceHost] Emergency stop requested by application");
     if (!m_impl->device)
     {
         // 不能再 early-return：设备没启动 / autoOpen=false 时 SafetyMonitor
         // 还没有 attach 执行器，triggerSoftwareEmergency 只会置标志位，
         // 走不到 Actuator::onEmergencyStop()，出光守卫不会被闭锁。
         // 后果是「离线按急停 → 开机 → 无需操作员确认即可出光」。
-        SY_WARNF("[DeviceHost] No device is running; emission is still latched off");
+        APR_WARNF("[DeviceHost] No device is running; emission is still latched off");
     }
 
     // 出光闭锁无条件执行：emergencyStop() 再落一次硬件关光并进入 Latched
@@ -915,7 +915,7 @@ void DeviceHost::tick(qint64 elapsedMs)
     m_impl->pollAlarms(now, newAlarms);
     for (const AlarmEvent& ev : newAlarms)
     {
-        SY_ERRORF("[DeviceHost] Alarm raised: source=%d axis=%d code=%d %s", static_cast<int>(ev.source), ev.axis, ev.code,
+        APR_ERRORF("[DeviceHost] Alarm raised: source=%d axis=%d code=%d %s", static_cast<int>(ev.source), ev.axis, ev.code,
             ev.message.toUtf8().constData());
         emit alarmRaised(static_cast<int>(ev.source), ev.axis, ev.code, ev.message);
     }
@@ -988,7 +988,7 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
     errorOut = QStringLiteral(
         "Device simulation is not available in this build (BUILD_HARDWARE=OFF); device %1 skipped")
                    .arg(profile.deviceId);
-    SY_INFOF("[DeviceHost] %s", errorOut.toUtf8().constData());
+    APR_INFOF("[DeviceHost] %s", errorOut.toUtf8().constData());
     return false;
 }
 
@@ -1048,8 +1048,8 @@ void DeviceHost::clearSoftwareEmergencyStop()
 
 void DeviceHost::requestEmergencyStop()
 {
-    SY_ERRORF("[DeviceHost] Emergency stop requested by application");
-    SY_WARNF("[DeviceHost] Hardware support is not compiled in; latching emission off anyway");
+    APR_ERRORF("[DeviceHost] Emergency stop requested by application");
+    APR_WARNF("[DeviceHost] Hardware support is not compiled in; latching emission off anyway");
     m_impl->softwareEmergency = true;
     m_impl->emission.emergencyStop(QStringLiteral("applicationEStop"));
 }

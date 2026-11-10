@@ -70,7 +70,7 @@ private:
 #include "Persistence/PersistenceService.h"
 #include "Persistence/SharedDatabaseAdapter.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include "UI/Settings/SettingsService.h"
 
@@ -216,7 +216,7 @@ void ApplicationCompositionRoot::setupVisionHostBridges()
     }
     else if (initCode != static_cast<int32_t>(Vis::VisError::AlreadyOpen))
     {
-        SY_WARNF("[ApplicationCompositionRoot] vision service init failed: code=%d", initCode);
+        APR_WARNF("[ApplicationCompositionRoot] vision service init failed: code=%d", initCode);
         return;
     }
 
@@ -231,7 +231,7 @@ void ApplicationCompositionRoot::setupVisionHostBridges()
                                   m_galvoController.get(), m_lightController.get(),
                                   m_workpieceTransformSink.get()))
     {
-        SY_WARN("[ApplicationCompositionRoot] vision host bridges were rejected by the service");
+        APR_WARN("[ApplicationCompositionRoot] vision host bridges were rejected by the service");
     }
 }
 #endif
@@ -343,7 +343,7 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     m_undoRedoObserver = std::make_unique<UndoRedoObserverBridge>(m_operationBus.get());
     m_undoRedoManager->addObserver(m_undoRedoObserver.get());
 
-    SY_INFO("[ApplicationCompositionRoot] initialized with module-based operation registration");
+    APR_INFO("[ApplicationCompositionRoot] initialized with module-based operation registration");
 }
 
 // ==================== 构造函数拆分子方法（P5 结构性优化） ====================

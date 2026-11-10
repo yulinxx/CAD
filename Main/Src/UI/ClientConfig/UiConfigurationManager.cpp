@@ -8,7 +8,7 @@
 
 #include "UiClientContext.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 UiConfigurationManager::UiConfigurationManager() = default;
 
@@ -25,7 +25,7 @@ UiConfigurationManager& UiConfigurationManager::shared()
         const QString resourcePath = UiClientContext::instance().configResourcePath();
         if (!manager.applyConfiguration(resourcePath, ConfigFallbackPolicy::Fallback))
         {
-            SY_ERRORF("[UiConfigurationManager] Shared config unavailable, resource=%s", qPrintable(resourcePath));
+            APR_ERRORF("[UiConfigurationManager] Shared config unavailable, resource=%s", qPrintable(resourcePath));
         }
     }
     return manager;
@@ -38,7 +38,7 @@ bool UiConfigurationManager::applyConfiguration(const QString& resourcePath, Con
     if (config)
     {
         m_configData = std::make_unique<UiConfigData>(std::move(*config));
-        SY_DEBUGF("[UiConfigurationManager] Config loaded: %s (menus=%lld, toolbars=%lld, docks=%lld)",
+        APR_DEBUGF("[UiConfigurationManager] Config loaded: %s (menus=%lld, toolbars=%lld, docks=%lld)",
             qPrintable(resourcePath),
             static_cast<long long>(m_configData->menus.size()),
             static_cast<long long>(m_configData->toolBars.size()),
@@ -47,10 +47,10 @@ bool UiConfigurationManager::applyConfiguration(const QString& resourcePath, Con
     }
 
     // 加载失败，按策略处理
-    if (fallback == ConfigFallbackPolicy::Fallback && !resourcePath.endsWith(QStringLiteral("/san_yi.json")))
+    if (fallback == ConfigFallbackPolicy::Fallback && !resourcePath.endsWith(QStringLiteral("/april.json")))
     {
-        SY_WARNF("[UiConfigurationManager] Loading '%s' failed, falling back to san_yi.json", qPrintable(resourcePath));
-        UiConfigLoader fallbackLoader(QStringLiteral(":/configs/san_yi.json"));
+        APR_WARNF("[UiConfigurationManager] Loading '%s' failed, falling back to april.json", qPrintable(resourcePath));
+        UiConfigLoader fallbackLoader(QStringLiteral(":/configs/april.json"));
         auto fallbackConfig = fallbackLoader.load();
         if (fallbackConfig)
         {
@@ -59,7 +59,7 @@ bool UiConfigurationManager::applyConfiguration(const QString& resourcePath, Con
         }
     }
 
-    SY_ERRORF("[UiConfigurationManager] Failed to load config: %s (%s)",
+    APR_ERRORF("[UiConfigurationManager] Failed to load config: %s (%s)",
         qPrintable(resourcePath),
         qPrintable(loader.lastError()));
     m_configData.reset();
@@ -68,7 +68,7 @@ bool UiConfigurationManager::applyConfiguration(const QString& resourcePath, Con
 
 void UiConfigurationManager::reset()
 {
-    SY_DEBUG("[UiConfigurationManager] Resetting configuration");
+    APR_DEBUG("[UiConfigurationManager] Resetting configuration");
     m_configData.reset();
     m_panelRegistry.reset();
 }

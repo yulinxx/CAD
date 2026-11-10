@@ -4,7 +4,7 @@
 #include <QVariantMap>
 
 #include "Services/UiStateCenter.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 UiStateSnapshot UiWorkbench::currentSnapshot() const
 {
@@ -53,7 +53,7 @@ bool UiWorkbench::isCommandRegistered(const QString& /*commandId*/) const
 
 void UiWorkbench::dispatchCommand(const QString& /*commandId*/, const QVariantMap& /*params*/)
 {
-    SY_WARN("[UiWorkbench] Command dispatch requested without a workbench adapter");
+    APR_WARN("[UiWorkbench] Command dispatch requested without a workbench adapter");
 }
 
 Cmd::OperationResultBase UiWorkbench::dispatchCommandForResult(
@@ -61,7 +61,7 @@ Cmd::OperationResultBase UiWorkbench::dispatchCommandForResult(
 {
     Cmd::OperationResultBase result;
     result.message = QStringLiteral("Command dispatch without a workbench adapter: %1").arg(commandId);
-    SY_WARNF("[UiWorkbench] Command dispatch with result requested without an adapter: %s", qPrintable(commandId));
+    APR_WARNF("[UiWorkbench] Command dispatch with result requested without an adapter: %s", qPrintable(commandId));
     return result;
 }
 

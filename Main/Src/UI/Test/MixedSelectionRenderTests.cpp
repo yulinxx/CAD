@@ -4,7 +4,7 @@
  *
  * 缺陷：开启「选中时隐藏本体」后把三类图元一起选中，色块与位图会从画面上消失，
  * 只剩矢量（虚线轮廓）。根因是隐藏本体只该作用于「能离散出虚线轮廓」的矢量类型：
- * SyImage / SyFillRegion 的 value() 退回基点，SelectionOutlineBuilder 产不出轮廓，
+ * AprImage / AprFillRegion 的 value() 退回基点，SelectionOutlineBuilder 产不出轮廓，
  * 本体被摘掉后没有任何替代视觉。
  *
  * 本测试不依赖 GPU / 真实窗口：
@@ -24,11 +24,11 @@
 #include "Engine2D/Core/SceneWriteGateway.h"
 #include "Engine2D/Geometry/EntityGeometryEmitter.h"
 #include "Engine2D/Render/SelectionOutlineBuilder.h"
-#include "Engine2D/SyEntity/SyFillRegion.h"
-#include "Engine2D/SyEntity/SyGroup.h"
-#include "Engine2D/SyEntity/SyImage.h"
-#include "Engine2D/SyEntity/SyLine.h"
-#include "Engine2D/SyEntity/SySmartLine.h"
+#include "Engine2D/AprEntity/AprFillRegion.h"
+#include "Engine2D/AprEntity/AprGroup.h"
+#include "Engine2D/AprEntity/AprImage.h"
+#include "Engine2D/AprEntity/AprLine.h"
+#include "Engine2D/AprEntity/AprSmartLine.h"
 
 #include "UI2D/Option/TextGroupNaming.h"
 
@@ -45,9 +45,9 @@ namespace
     /// 三类图元的公共样本：矢量线 + 三角色块 + 带像素数据的位图
     struct MixedSceneSample
     {
-        Eg::SyLine line;
-        Eg::SyFillRegion fill;
-        Eg::SyImage image;
+        Eg::AprLine line;
+        Eg::AprFillRegion fill;
+        Eg::AprImage image;
         uint64_t lineId{ 0 };
         uint64_t fillId{ 0 };
         uint64_t imageId{ 0 };
@@ -65,7 +65,7 @@ namespace
 
         sample.image.nWidth = 2;
         sample.image.nHeight = 2;
-        sample.image.ePixelFormat = Eg::SyPixelFormat::Gray8;
+        sample.image.ePixelFormat = Eg::AprPixelFormat::Gray8;
         sample.image.setPixelDataVector(std::vector<unsigned char>(4, 0x80));
         sample.image.topLeft = Ut::Vec2d(40.0, 40.0);
         sample.image.topRight = Ut::Vec2d(60.0, 40.0);
@@ -76,9 +76,9 @@ namespace
     /// 把样本加入场景并记录持久 ID，再把三类一起选中
     void addAndSelectAll(Eg::SceneManager& scene, MixedSceneSample& sample)
     {
-        Eg::SyEntity* line = Eg::SceneWriteGateway::addEntity(scene, &sample.line);
-        Eg::SyEntity* fill = Eg::SceneWriteGateway::addEntity(scene, &sample.fill);
-        Eg::SyEntity* image = Eg::SceneWriteGateway::addEntity(scene, &sample.image);
+        Eg::AprEntity* line = Eg::SceneWriteGateway::addEntity(scene, &sample.line);
+        Eg::AprEntity* fill = Eg::SceneWriteGateway::addEntity(scene, &sample.fill);
+        Eg::AprEntity* image = Eg::SceneWriteGateway::addEntity(scene, &sample.image);
         EXPECT_NE(line, nullptr);
         EXPECT_NE(fill, nullptr);
         EXPECT_NE(image, nullptr);
@@ -86,7 +86,7 @@ namespace
         sample.fillId = static_cast<uint64_t>(fill->id);
         sample.imageId = static_cast<uint64_t>(image->id);
 
-        Eg::VecSyEntityPtr selection;
+        Eg::VecAprEntityPtr selection;
         selection.push_back(line);
         selection.push_back(fill);
         selection.push_back(image);
@@ -292,7 +292,7 @@ TEST(MixedSelectionRenderTest, SelectedTextGlyphBodiesAreNeverHidden)
     Eg::SceneManager scene;
 
     // 闭合的「字形」轮廓：四条首尾相接的直线段，与 TextConverter 产出的轮廓同构
-    const auto buildGlyph = [](Eg::SySmartLine& glyph, double dOffsetX) {
+    const auto buildGlyph = [](Eg::AprSmartLine& glyph, double dOffsetX) {
         const Ut::Vec2d pts[4] = {
             Ut::Vec2d(dOffsetX, 0.0),
             Ut::Vec2d(dOffsetX + 10.0, 0.0),
@@ -301,42 +301,42 @@ TEST(MixedSelectionRenderTest, SelectedTextGlyphBodiesAreNeverHidden)
         };
         for (int i = 0; i < 4; ++i)
         {
-            auto seg = std::make_unique<Eg::SyLine>();
+            auto seg = std::make_unique<Eg::AprLine>();
             seg->setPointVector({ pts[i], pts[(i + 1) % 4] });
             glyph.addSegmentUnique(std::move(seg), false);
         }
     };
-    Eg::SySmartLine modernGlyph;
-    Eg::SySmartLine legacyGlyph;
+    Eg::AprSmartLine modernGlyph;
+    Eg::AprSmartLine legacyGlyph;
     buildGlyph(modernGlyph, 0.0);
     buildGlyph(legacyGlyph, 20.0);
 
-    Eg::SyEntity* modernLeaf = Eg::SceneWriteGateway::addEntity(scene, &modernGlyph);
-    Eg::SyEntity* legacyLeaf = Eg::SceneWriteGateway::addEntity(scene, &legacyGlyph);
-    Eg::SyLine plainLine;
+    Eg::AprEntity* modernLeaf = Eg::SceneWriteGateway::addEntity(scene, &modernGlyph);
+    Eg::AprEntity* legacyLeaf = Eg::SceneWriteGateway::addEntity(scene, &legacyGlyph);
+    Eg::AprLine plainLine;
     plainLine.setPointVector({ Ut::Vec2d(0.0, 40.0), Ut::Vec2d(10.0, 50.0) });
-    Eg::SyEntity* plainEntity = Eg::SceneWriteGateway::addEntity(scene, &plainLine);
+    Eg::AprEntity* plainEntity = Eg::SceneWriteGateway::addEntity(scene, &plainLine);
     ASSERT_NE(modernLeaf, nullptr);
     ASSERT_NE(legacyLeaf, nullptr);
     ASSERT_NE(plainEntity, nullptr);
 
     // 新版文字块：顶层群组名带 Text 元数据；旧版：纯 "Text"。两种都必须识别
-    Eg::SyGroup* modernChar = scene.groupManager().createGroup({ modernLeaf }, "Char");
+    Eg::AprGroup* modernChar = scene.groupManager().createGroup({ modernLeaf }, "Char");
     ASSERT_NE(modernChar, nullptr);
-    Eg::SyGroup* modernText = scene.groupManager().createGroup("Text");
+    Eg::AprGroup* modernText = scene.groupManager().createGroup("Text");
     ASSERT_NE(modernText, nullptr);
     modernText->addSubGroup(modernChar);
     const QString encoded = UiText::makeTextGroupName(QStringLiteral("3"));
     ASSERT_FALSE(encoded.isEmpty());
     modernText->setNameStr(encoded.toStdString());
 
-    Eg::SyGroup* legacyChar = scene.groupManager().createGroup({ legacyLeaf }, "Char");
+    Eg::AprGroup* legacyChar = scene.groupManager().createGroup({ legacyLeaf }, "Char");
     ASSERT_NE(legacyChar, nullptr);
-    Eg::SyGroup* legacyText = scene.groupManager().createGroup("Text");
+    Eg::AprGroup* legacyText = scene.groupManager().createGroup("Text");
     ASSERT_NE(legacyText, nullptr);
     legacyText->addSubGroup(legacyChar);
 
-    Eg::VecSyEntityPtr selection{ modernLeaf, legacyLeaf, plainEntity };
+    Eg::VecAprEntityPtr selection{ modernLeaf, legacyLeaf, plainEntity };
     scene.selectEntities(selection);
 
     RenderWidget widget;

@@ -14,12 +14,12 @@
 #   - 需要直写场景的内部实现请放在 Engine/2D/Src（已在门禁范围外）。
 #
 # 为什么不用正则扫 `->addEntity(`：
-#   同名方法在 `SyGroup` / `SyLayer` / `DocumentTransaction` 上也存在，
+#   同名方法在 `AprGroup` / `AprLayer` / `DocumentTransaction` 上也存在，
 #   文本匹配会大面积误报；include 白名单是唯一无歧义的判据。
 # ============================================================================
 
-function(sanyi_check_scene_write_surface)
-    set(_root "${SANYI_ROOT}")
+function(apr_check_scene_write_surface)
+    set(_root "${APR_ROOT}")
     set(_scan_dirs
         "${_root}/UI/2D/Src"
         "${_root}/UI/Common/Src"

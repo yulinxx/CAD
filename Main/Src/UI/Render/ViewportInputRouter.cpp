@@ -32,7 +32,7 @@
 #include <QApplication>
 #include <QElapsedTimer>
 #include <cmath>
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 // ---- ViewportInputRouter 实现 ----
 
@@ -550,7 +550,7 @@ bool ViewportInputRouter::handleInputMethodEvent(QInputMethodEvent* event)
     const bool consumed = tool->onInputMethodEvent(event);
     if (consumed)
     {
-        SY_DEBUG("[ViewportInputRouter] IME event consumed by active tool");
+        APR_DEBUG("[ViewportInputRouter] IME event consumed by active tool");
     }
     return consumed;
 }

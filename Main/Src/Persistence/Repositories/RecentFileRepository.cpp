@@ -5,7 +5,7 @@
 #include "RecentFileRepository.h"
 
 #include "Engine/Persistence/Database.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <sstream>
 
@@ -30,7 +30,7 @@ std::vector<RecentFileRecord> RecentFileRepository::loadAll()
 
 bool RecentFileRepository::saveAll(const std::vector<RecentFileRecord>& records)
 {
-    SY_DEBUGF("[RecentFileRepository] Saving %zu recent files", records.size());
+    APR_DEBUGF("[RecentFileRepository] Saving %zu recent files", records.size());
     Eg::Database::Transaction txn(m_database);
 
     // 清空现有数据
@@ -53,7 +53,7 @@ bool RecentFileRepository::saveAll(const std::vector<RecentFileRecord>& records)
     {
         return fail("RecentFileRepository", "Failed to commit transaction");
     }
-    SY_DEBUGF("[RecentFileRepository] Saved %zu recent files", records.size());
+    APR_DEBUGF("[RecentFileRepository] Saved %zu recent files", records.size());
     return true;
 }
 
@@ -67,7 +67,7 @@ bool RecentFileRepository::append(const RecentFileRecord& record)
         return fail("RecentFileRepository", "Failed to append recent file");
     }
 
-    SY_DEBUGF("[RecentFileRepository] Appended recent file: %s", record.filePath.c_str());
+    APR_DEBUGF("[RecentFileRepository] Appended recent file: %s", record.filePath.c_str());
 
     // 控制列表上限：按工作台分桶裁剪，每个工作台各自保留最近 kMaxRecentFiles 条。
     // 2D/3D 互不挤占 —— 3D 下保存/打开不能再把 2D 的记录顶掉。
@@ -85,7 +85,7 @@ bool RecentFileRepository::append(const RecentFileRecord& record)
             trimParams))
     {
         // 删除超限记录失败不影响主流程，记录警告即可
-        SY_WARNF("[RecentFileRepository] Failed to trim excess records: %s", m_database.lastError().c_str());
+        APR_WARNF("[RecentFileRepository] Failed to trim excess records: %s", m_database.lastError().c_str());
     }
 
     return true;

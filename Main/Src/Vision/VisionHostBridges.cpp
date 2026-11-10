@@ -797,9 +797,9 @@ namespace VisHost
         }
 
         std::vector<Eg::EntityId> ids;
-        const Eg::VecSyEntityPtr entities = m_sceneManager->getAllEntities();
+        const Eg::VecAprEntityPtr entities = m_sceneManager->getAllEntities();
         ids.reserve(entities.size());
-        for (Eg::SyEntity* entity : entities)
+        for (Eg::AprEntity* entity : entities)
         {
             if (entity)
             {
@@ -853,9 +853,9 @@ namespace VisHost
         const double ty = -(s * m_lastApplied.tx + c * m_lastApplied.ty) * inverseScale;
 
         std::vector<Eg::EntityId> ids;
-        const Eg::VecSyEntityPtr entities = m_sceneManager->getAllEntities();
+        const Eg::VecAprEntityPtr entities = m_sceneManager->getAllEntities();
         ids.reserve(entities.size());
-        for (Eg::SyEntity* entity : entities)
+        for (Eg::AprEntity* entity : entities)
         {
             if (entity)
             {

@@ -135,7 +135,7 @@ inline LONG WINAPI ExceptionFilter(EXCEPTION_POINTERS* ep) {
     fullMsg += L"\n\n";
     fullMsg += g_dumpPath.wstring();
 
-    MessageBoxW(NULL, fullMsg.c_str(), L"SanYiCAD - Crash",  // SanYiCAD - 崩溃
+    MessageBoxW(NULL, fullMsg.c_str(), L"April - Crash",  // April - 崩溃
         MB_OK | MB_ICONERROR | MB_TOPMOST);
 
     return EXCEPTION_EXECUTE_HANDLER;

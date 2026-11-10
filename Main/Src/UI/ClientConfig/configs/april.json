@@ -1,7 +1,7 @@
 {
   "meta": {
-    "clientId": "san_yi",
-    "clientName": "三义标准版",
+    "clientId": "april",
+    "clientName": "April Standard",
     "version": "2.0",
     "inherits": "base"
   },

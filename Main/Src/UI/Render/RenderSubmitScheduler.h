@@ -10,7 +10,7 @@
 namespace Eg
 {
     class SceneManager;
-    struct SyEntity;
+    struct AprEntity;
 }
 
 class RenderWidget;
@@ -200,7 +200,7 @@ private:
 
     /// 该图元此刻是否应该出现在世界层：自身可见、所在图层可见，
     /// 且没有被「选中时隐藏本体」过滤掉。
-    bool isRenderable(uint64_t uid, const Eg::SyEntity* entity) const;
+    bool isRenderable(uint64_t uid, const Eg::AprEntity* entity) const;
 
     RenderWidget* m_renderWidget;
     Eg::SceneManager* m_sceneManager{ nullptr };

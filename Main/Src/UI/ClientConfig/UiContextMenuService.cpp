@@ -4,7 +4,7 @@
 #include "UiLayoutBuilder.h"
 #include "UiPanelRegistry.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <QAction>
 #include <QMenu>
@@ -55,7 +55,7 @@ void UiContextMenuService::registerDynamicSection(const QString& sectionId, UiMe
 {
     if (sectionId.isEmpty() || !filler)
     {
-        SY_WARN("[UiContextMenuService] registerDynamicSection called with empty id or null filler, ignored");
+        APR_WARN("[UiContextMenuService] registerDynamicSection called with empty id or null filler, ignored");
         return;
     }
     const bool replaced = m_sections.contains(sectionId);
@@ -64,7 +64,7 @@ void UiContextMenuService::registerDynamicSection(const QString& sectionId, UiMe
 
 void UiContextMenuService::unregisterDynamicSection(const QString& sectionId)
 {
-    SY_DEBUGF("[UiContextMenuService] Unregistering dynamic section: %s", qPrintable(sectionId));
+    APR_DEBUGF("[UiContextMenuService] Unregistering dynamic section: %s", qPrintable(sectionId));
     m_sections.remove(sectionId);
 }
 
@@ -82,7 +82,7 @@ int UiContextMenuService::fillDynamicSections(QMenu* menu, const QStringList& se
         auto it = m_sections.constFind(sectionId);
         if (it == m_sections.cend())
         {
-            SY_WARNF("[UiContextMenuService] Menu id='%s' references unregistered dynamic section '%s'",
+            APR_WARNF("[UiContextMenuService] Menu id='%s' references unregistered dynamic section '%s'",
                 qPrintable(ownerId),
                 qPrintable(sectionId));
             continue;
@@ -108,7 +108,7 @@ QMenu* UiContextMenuService::buildMenu(
     {
         // 未配置不是错误：调用方会回退到内建路径。用 DEBUG 级别避免刷日志，
         // 因为右键操作可能非常频繁。
-        SY_DEBUGF("[UiContextMenuService] No config for context menu id='%s'", qPrintable(contextMenuId));
+        APR_DEBUGF("[UiContextMenuService] No config for context menu id='%s'", qPrintable(contextMenuId));
         return nullptr;
     }
 
@@ -134,12 +134,12 @@ QMenu* UiContextMenuService::buildMenu(
 
     if (!hasRealAction(menu))
     {
-        SY_DEBUGF("[UiContextMenuService] Context menu id='%s' resolved to empty, not shown", qPrintable(def->id));
+        APR_DEBUGF("[UiContextMenuService] Context menu id='%s' resolved to empty, not shown", qPrintable(def->id));
         menu->deleteLater();
         return nullptr;
     }
 
-    SY_DEBUGF("[UiContextMenuService] Context menu built from config id='%s' actions=%d dynamicSections=%d",
+    APR_DEBUGF("[UiContextMenuService] Context menu built from config id='%s' actions=%d dynamicSections=%d",
         qPrintable(def->id),
         static_cast<int>(menu->actions().size()),
         static_cast<int>(def->dynamicSections.size()));

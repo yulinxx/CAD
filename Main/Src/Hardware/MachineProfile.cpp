@@ -10,15 +10,15 @@
 #include <QJsonParseError>
 #include <QProcessEnvironment>
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 namespace
 {
     /// 档案文件的固定名字。放在应用配置目录下。
     const char* kProfileFileName = "machine.json";
 
-    /// 现场调试/多机切换用的路径覆盖，与 SANYI_CLIENT_ID 同一套约定。
-    const char* kProfileEnvKey = "SANYI_MACHINE_PROFILE";
+    /// 现场调试/多机切换用的路径覆盖，与 APR_CLIENT_ID 同一套约定。
+    const char* kProfileEnvKey = "APR_MACHINE_PROFILE";
 
     /// 兜底档案使用的模拟设备 ID（与 Hw::kSimulatedDeviceId 一致）。
     const char* kSimulatedDeviceId = "simulated_composite";
@@ -71,7 +71,7 @@ namespace MachineProfileLoader
             }
             // 显式指定了却不存在必须报出来：这几乎总是打错了路径，
             // 静默退回默认位置会让人以为环境变量生效了
-            SY_WARNF("[MachineProfile] %s points to a missing file: %s", kProfileEnvKey, envPath.toUtf8().constData());
+            APR_WARNF("[MachineProfile] %s points to a missing file: %s", kProfileEnvKey, envPath.toUtf8().constData());
         }
 
         if (!configDir.isEmpty())
@@ -153,7 +153,7 @@ namespace MachineProfileLoader
                 // 少一个点位会让依赖它的安全条件判定为 invalid，
                 // 而 violateWhenInvalid 默认为 true，最终表现为「无法开工」——
                 // 这条日志就是把「无法开工」和「配置写错」连起来的唯一线索
-                SY_WARNF("[MachineProfile] Skipped invalid IO point: name='%s' channel=%d",
+                APR_WARNF("[MachineProfile] Skipped invalid IO point: name='%s' channel=%d",
                     p.name.toUtf8().constData(),
                     p.channel);
                 continue;
@@ -167,7 +167,7 @@ namespace MachineProfileLoader
             const MachineSafetyConditionConfig c = parseSafetyCondition(v.toObject());
             if (c.pointName.isEmpty())
             {
-                SY_WARNF("[MachineProfile] Skipped safety condition without point name");
+                APR_WARNF("[MachineProfile] Skipped safety condition without point name");
                 continue;
             }
             profile.safetyConditions.append(c);
@@ -176,7 +176,7 @@ namespace MachineProfileLoader
         profile.tickIntervalMs = root.value("tickIntervalMs").toInt(20);
         if (profile.tickIntervalMs < 1 || profile.tickIntervalMs > 1000)
         {
-            SY_WARNF("[MachineProfile] tickIntervalMs=%d out of range, using 20ms", profile.tickIntervalMs);
+            APR_WARNF("[MachineProfile] tickIntervalMs=%d out of range, using 20ms", profile.tickIntervalMs);
             profile.tickIntervalMs = 20;
         }
         profile.autoOpen = root.value("autoOpen").toBool(true);
@@ -190,7 +190,7 @@ namespace MachineProfileLoader
             profile.safetyFeedbackPoint = dual.value("feedbackPoint").toString();
             if (profile.safetyChannelAPoint.isEmpty() != profile.safetyChannelBPoint.isEmpty())
             {
-                SY_WARNF("[MachineProfile] dualChannelSafety requires both channelAPoint and channelBPoint, disabled");
+                APR_WARNF("[MachineProfile] dualChannelSafety requires both channelAPoint and channelBPoint, disabled");
                 profile.safetyChannelAPoint.clear();
                 profile.safetyChannelBPoint.clear();
                 profile.safetyFeedbackPoint.clear();
@@ -219,7 +219,7 @@ namespace MachineProfileLoader
             }
             else if (corner != QLatin1String("BottomLeft"))
             {
-                SY_WARNF("[MachineProfile] Unknown machineFrame.originCorner='%s', using BottomLeft",
+                APR_WARNF("[MachineProfile] Unknown machineFrame.originCorner='%s', using BottomLeft",
                     corner.toUtf8().constData());
             }
 
@@ -303,7 +303,7 @@ namespace MachineProfileLoader
                              .arg(QDir(configDir).filePath(QString::fromLatin1(kProfileFileName)));
             // 日志走英文：warningOut 是给界面看的中文提示，而日志会流向控制台与
             // 现场日志文件，那里的编码不受我们控制，中文常出现 mojibake。
-            SY_WARNF("[MachineProfile] no machine profile found (env %s or file %s), "
+            APR_WARNF("[MachineProfile] no machine profile found (env %s or file %s), "
                      "falling back to simulated device mode: no real hardware will be driven",
                 kProfileEnvKey,
                 QDir(configDir).filePath(QString::fromLatin1(kProfileFileName)).toUtf8().constData());
@@ -318,11 +318,11 @@ namespace MachineProfileLoader
             // 「配置写错了」和「这台机器没配硬件」是两件事，日志必须区分
             warningOut = QCoreApplication::translate("MachineProfile", "%1; temporarily using simulated device.")
                              .arg(error);  // 已临时进入模拟设备模式
-            SY_WARNF("[MachineProfile] %s", warningOut.toUtf8().constData());
+            APR_WARNF("[MachineProfile] %s", warningOut.toUtf8().constData());
             return builtinSimulatedProfile();
         }
 
-        SY_INFOF("[MachineProfile] Loaded '%s' from %s (%lld IO point(s), %lld safety condition(s))",
+        APR_INFOF("[MachineProfile] Loaded '%s' from %s (%lld IO point(s), %lld safety condition(s))",
             profile.deviceId.toUtf8().constData(),
             path.toUtf8().constData(),
             static_cast<long long>(profile.ioPoints.size()),

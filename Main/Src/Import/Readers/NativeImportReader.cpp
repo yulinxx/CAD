@@ -7,47 +7,47 @@
 #include <QFileInfo>
 
 #include "FileIO/Parsers/NativeParser.h"
-#include "FileIO/SyDocument.h"
-#include "Engine/SyEntity/SyEntity.h"
+#include "FileIO/AprDocument.h"
+#include "Engine/AprEntity/AprEntity.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 NativeImportReader::NativeImportReader()
     : ImportReaderBase(Fio::FileFormat::Native,
-          { QStringLiteral("sy"), QStringLiteral("syx"), QStringLiteral("sy3d") },
-          QStringLiteral("SanYi Native"),
+          { QStringLiteral("apr"), QStringLiteral("apr3d") },
+          QStringLiteral("April Native"),
           ImportDimension::Both)
 {
 }
 
 ImportDimension NativeImportReader::dimension() const
 {
-    // NativeImportReader 同时支持 .sy (2D) 和 .syx (3D)
+    // NativeImportReader 同时支持 .apr (2D) 和 .apr3d (3D)
     // 由于无法在构造时预知会读取哪个文件，这里返回 Both
     // 实际过滤由调用方在读取时根据文件后缀判断
     return ImportDimension::Both;
 }
 
-ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
+ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecAprEntityPtr& outEntities)
 {
-    // 检测是否为 3D 格式（.sy3d 为 UI 默认后缀，.syx 为历史后缀）
+    // 检测是否为 3D 格式（.apr3d）
     QFileInfo fi(context.sourcePath);
     const QString suffix = fi.suffix().toLower();
-    bool is3D = (suffix == QStringLiteral("syx") || suffix == QStringLiteral("sy3d"));
+    bool is3D = (suffix == QStringLiteral("apr3d"));
     Fio::FileFormat format = is3D ? Fio::FileFormat::Native3D : Fio::FileFormat::Native;
 
-    SY_DEBUGF("[NativeImportReader] Importing native format: %s (format=%d)",
-        is3D ? "3D (.syx/.sy3d)" : "2D (.sy)",
+    APR_DEBUGF("[NativeImportReader] Importing native format: %s (format=%d)",
+        is3D ? "3D (.apr3d)" : "2D (.apr)",
         static_cast<int>(format));
 
-    // 使用新管线：parseDocument 获取完整 SyDocument，通过公开 API 提取图层/群组信息
+    // 使用新管线：parseDocument 获取完整 AprDocument，通过公开 API 提取图层/群组信息
     Fio::NativeParser parser(format);
-    Fio::SyDocument doc;
+    Fio::AprDocument doc;
     auto parseResult = parser.parseDocument(context.sourcePath.toUtf8().constData(), doc);
 
     if (!parseResult.success)
     {
-        SY_ERRORF("[NativeImportReader] parseDocument failed: %s", parseResult.errorMessage.c_str());
+        APR_ERRORF("[NativeImportReader] parseDocument failed: %s", parseResult.errorMessage.c_str());
         return ImportResult::fail(
             QString::fromStdString(parseResult.errorMessage), ImportErrorType::ParseFailed, QStringList{});
     }
@@ -60,7 +60,7 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEn
     result.importedLayers.reserve(doc.layerCount());
     for (size_t i = 0; i < doc.layerCount(); ++i)
     {
-        Fio::SyLayerInfo layerInfo;
+        Fio::AprLayerInfo layerInfo;
         if (doc.getLayerAt(i, layerInfo))
         {
             Fio::IrLayerInfo irLayer;
@@ -72,7 +72,7 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEn
             // 加工语义（output / defaultProcessId）**不在 IrLayerInfo 里** ——
             // 那是冻结的跨 DLL POD（裸指针数组，步长即 ABI），
             // 且 DXF/SVG/PLT 这些外来格式根本没有这个概念。
-            // 原生 .sy 的加工语义通过 ImportResult 的独立通道传递（见 ImportResult）。
+            // 原生 .apr 的加工语义通过 ImportResult 的独立通道传递（见 ImportResult）。
             result.importedLayers.push_back(irLayer);
 
             // 加工语义走独立通道（ImportResult::LayerMachining）——
@@ -83,8 +83,8 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEn
             machining.defaultProcessId = layerInfo.defaultProcessId;
 
             // 旧 POD 只有 6 个字段；硬件 Profile 绑定与填充/图层类型走新增的
-            // SyLayerDetailInfo（另一个 POD，不动 SyLayerInfo 的 sizeof/ABI）。
-            Fio::SyLayerDetailInfo detail;
+            // AprLayerDetailInfo（另一个 POD，不动 AprLayerInfo 的 sizeof/ABI）。
+            Fio::AprLayerDetailInfo detail;
             if (doc.getLayerDetailAt(i, detail))
             {
                 machining.hardwareProfileId = detail.hardwareProfileId;
@@ -105,7 +105,7 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEn
     result.importedHardwareProfiles.reserve(doc.hardwareProfileCount());
     for (size_t i = 0; i < doc.hardwareProfileCount(); ++i)
     {
-        Fio::SyHardwareProfileInfo profile;
+        Fio::AprHardwareProfileInfo profile;
         if (doc.getHardwareProfileAt(i, profile))
         {
             result.importedHardwareProfiles.push_back(profile);
@@ -122,7 +122,7 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEn
             if (machining.hardwareProfileId > 0 || machining.fillHardwareProfileId >= 0)
             {
                 result.addWarning(QStringLiteral(
-                    "This .sy file has layer profile bindings but no profile value set; "
+                    "This .apr file has layer profile bindings but no profile value set; "
                     "existing runtime profiles are kept and machining parameters may differ."));
                 break;
             }
@@ -133,7 +133,7 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEn
     result.importedGroups.reserve(doc.groupCount());
     for (size_t i = 0; i < doc.groupCount(); ++i)
     {
-        Fio::SyGroupInfo groupInfo;
+        Fio::AprGroupInfo groupInfo;
         if (doc.getGroupAt(i, groupInfo))
         {
             Fio::IrGroupInfo irGroup;
@@ -148,7 +148,7 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEn
     result.entityLayerMap.reserve(doc.entityCount());
     for (size_t i = 0; i < doc.entityCount(); ++i)
     {
-        Eg::SyEntity* entity = doc.entityAt(i);
+        Eg::AprEntity* entity = doc.entityAt(i);
         if (entity)
         {
             uint32_t layerId = doc.entityLayerId(entity->id);
@@ -162,7 +162,7 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEn
     // 4. 建立图元 -> 群组映射
     for (size_t i = 0; i < doc.entityCount(); ++i)
     {
-        Eg::SyEntity* entity = doc.entityAt(i);
+        Eg::AprEntity* entity = doc.entityAt(i);
         if (entity)
         {
             uint64_t groupId = doc.entityGroupId(entity->id);
@@ -180,9 +180,9 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEn
     {
         // 这里无法直接移动，因为 entityAt 返回借用指针
         // 需要通过反序列化时已经存入文档的 unique_ptr
-        // 但 SyDocument 公开 API 不支持移动所有权
+        // 但 AprDocument 公开 API 不支持移动所有权
         // 因此这里使用 clone
-        Eg::SyEntity* entity = doc.entityAt(i);
+        Eg::AprEntity* entity = doc.entityAt(i);
         if (entity)
         {
             outEntities.emplace_back(entity->clone());
@@ -195,7 +195,7 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEn
         result.addWarning(QString::fromStdString(warn));
     }
 
-    SY_DEBUGF("[NativeImportReader] Imported via new pipeline: entities=%zu, layers=%zu, groups=%zu, layerMap=%zu, "
+    APR_DEBUGF("[NativeImportReader] Imported via new pipeline: entities=%zu, layers=%zu, groups=%zu, layerMap=%zu, "
               "groupMap=%zu",
         outEntities.size(),
         result.importedLayers.size(),
@@ -208,6 +208,6 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecSyEn
 
 QString NativeImportReader::successMessage(Fio::FileFormat format) const
 {
-    return format == Fio::FileFormat::Native3D ? QStringLiteral("SanYi 3D Native import successful")
-                                               : QStringLiteral("SanYi 2D Native import successful");
+    return format == Fio::FileFormat::Native3D ? QStringLiteral("April 3D Native import successful")
+                                               : QStringLiteral("April 2D Native import successful");
 }

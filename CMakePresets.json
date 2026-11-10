@@ -42,7 +42,7 @@
         "BUILD_ENGRAVING": "OFF",
         "BUILD_GEOMODELCORE": "OFF",
         "BUILD_PYTHON": "OFF",
-        "SANYI_PYBIND_CORE": "OFF"
+        "APR_PYBIND_CORE": "OFF"
       }
     },
     {
@@ -59,7 +59,7 @@
         "BUILD_ENGRAVING": "OFF",
         "BUILD_GEOMODELCORE": "OFF",
         "BUILD_PYTHON": "OFF",
-        "SANYI_PYBIND_CORE": "OFF"
+        "APR_PYBIND_CORE": "OFF"
       }
     }
   ],

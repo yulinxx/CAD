@@ -5,7 +5,7 @@
 #include "Hardware/SafetyManager.h"
 #include "Hardware/IProcessingTarget.h"
 #include "AppPathManager.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <QFile>
 #include <QTextStream>
@@ -58,7 +58,7 @@ void SafetyManager::emergencyStop()
     emit sigEmergencyStopped();
     emit sigProcessingAllowed(false);
 
-    SY_ERROR("[SafetyManager] EMERGENCY STOP activated!");
+    APR_ERROR("[SafetyManager] EMERGENCY STOP activated!");
 }
 
 void SafetyManager::resetEmergencyStop()
@@ -75,7 +75,7 @@ void SafetyManager::resetEmergencyStop()
         emit sigProcessingAllowed(true);
     }
 
-    SY_INFO("[SafetyManager] Emergency stop reset");
+    APR_INFO("[SafetyManager] Emergency stop reset");
 }
 
 bool SafetyManager::isEmergencyStopped() const
@@ -148,7 +148,7 @@ void SafetyManager::updateTemperature(double temperature)
             setSafetyLevel(SafetyLevel::Critical);
             emit sigTemperatureWarning(temperature);
             emit sigProcessingAllowed(false);
-            SY_ERRORF("[SafetyManager] Over temperature: %.1f°C (limit: %.1f°C)", temperature, m_dTemperatureLimit);
+            APR_ERRORF("[SafetyManager] Over temperature: %.1f°C (limit: %.1f°C)", temperature, m_dTemperatureLimit);
         }
     }
     else if (temperature < m_dTemperatureLimit - 5.0)  // 5度回差
@@ -218,7 +218,7 @@ bool SafetyManager::exportLog(const QString& strFilePath)
     QString path = strFilePath;
     if (path.isEmpty())
     {
-        path = AppPathManager::logsDir() + "/sanyi_safety_log.txt";
+        path = AppPathManager::logsDir() + "/apr_safety_log.txt";
     }
 
     QFile file(path);
@@ -228,7 +228,7 @@ bool SafetyManager::exportLog(const QString& strFilePath)
     }
 
     QTextStream stream(&file);
-    stream << "=== SanYi Safety Log ===\n";
+    stream << "=== April Safety Log ===\n";
     stream << "Generated: " << QDateTime::currentDateTime().toString() << "\n\n";
 
     for (const auto& entry : m_eventLog)
@@ -249,15 +249,15 @@ bool SafetyManager::login(const QString& username, const QString& password)
     // 使用加盐哈希比较密码，而非明文比较。
     if (!m_mUsers.contains(username))
     {
-        SY_WARNF("[SafetyManager] Login attempt with unknown user: %s", username.toStdString().c_str());
+        APR_WARNF("[SafetyManager] Login attempt with unknown user: %s", username.toStdString().c_str());
         return false;
     }
 
     // 使用固定盐值进行哈希比较（生产环境应使用每用户独立盐值）
-    QString inputHash = hashPassword(password, "sanyi_salt_v1");
+    QString inputHash = hashPassword(password, "apr_salt_v1");
     if (m_mUsers[username] != inputHash)
     {
-        SY_WARNF("[SafetyManager] Login failed for user '%s': password mismatch", username.toStdString().c_str());
+        APR_WARNF("[SafetyManager] Login failed for user '%s': password mismatch", username.toStdString().c_str());
         return false;
     }
 
@@ -271,7 +271,7 @@ bool SafetyManager::login(const QString& username, const QString& password)
     }
 
     logEvent(SafetyEvent::UserStop, QString("User '%1' logged in").arg(username));
-    SY_INFOF("[SafetyManager] User '%s' logged in successfully", username.toStdString().c_str());
+    APR_INFOF("[SafetyManager] User '%s' logged in successfully", username.toStdString().c_str());
     return true;
 }
 
@@ -306,7 +306,7 @@ bool SafetyManager::hasPermission(const QString& operation) const
             operation.contains("SystemConfig", Qt::CaseInsensitive) ||
             operation.contains("SafetyOverride", Qt::CaseInsensitive))
         {
-            SY_WARNF(
+            APR_WARNF(
                 "[SafetyManager] Permission denied: technician cannot perform '%s'", operation.toStdString().c_str());
             return false;
         }
@@ -323,7 +323,7 @@ bool SafetyManager::hasPermission(const QString& operation) const
             operation.contains("SafetyOverride", Qt::CaseInsensitive) ||
             operation.contains("Calibration", Qt::CaseInsensitive))
         {
-            SY_WARNF("[SafetyManager] Permission denied: operator cannot perform '%s'", operation.toStdString().c_str());
+            APR_WARNF("[SafetyManager] Permission denied: operator cannot perform '%s'", operation.toStdString().c_str());
             return false;
         }
         return true;
@@ -484,16 +484,16 @@ void SafetyManager::loadUsersFromConfig()
     if (!file.exists())
     {
         // 首次运行：创建默认配置文件（含加盐哈希的默认用户）
-        SY_INFO("[SafetyManager] No user config found, creating default with admin/operator accounts");
-        m_mUsers["admin"] = hashPassword("admin123", "sanyi_salt_v1");
-        m_mUsers["operator"] = hashPassword("operator123", "sanyi_salt_v1");
+        APR_INFO("[SafetyManager] No user config found, creating default with admin/operator accounts");
+        m_mUsers["admin"] = hashPassword("admin123", "apr_salt_v1");
+        m_mUsers["operator"] = hashPassword("operator123", "apr_salt_v1");
         saveUsersToConfig();
         return;
     }
 
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
     {
-        SY_ERRORF("[SafetyManager] Failed to open user config: %s", filePath.toStdString().c_str());
+        APR_ERRORF("[SafetyManager] Failed to open user config: %s", filePath.toStdString().c_str());
         return;
     }
 
@@ -511,7 +511,7 @@ void SafetyManager::loadUsersFromConfig()
             m_mUsers[parts[0].trimmed()] = parts[1].trimmed();
         }
     }
-    SY_INFOF("[SafetyManager] Loaded %lld user accounts from config", static_cast<long long>(m_mUsers.size()));
+    APR_INFOF("[SafetyManager] Loaded %lld user accounts from config", static_cast<long long>(m_mUsers.size()));
 }
 
 void SafetyManager::saveUsersToConfig() const
@@ -521,7 +521,7 @@ void SafetyManager::saveUsersToConfig() const
 
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
     {
-        SY_ERRORF("[SafetyManager] Failed to save user config: %s", filePath.toStdString().c_str());
+        APR_ERRORF("[SafetyManager] Failed to save user config: %s", filePath.toStdString().c_str());
         return;
     }
 

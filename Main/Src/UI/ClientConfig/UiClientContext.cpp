@@ -1,6 +1,6 @@
 #include "UiClientContext.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -9,7 +9,7 @@
 #include <QSettings>
 #include <QStandardPaths>
 
-const char* const UiClientContext::kDefaultClientId = "san_yi";
+const char* const UiClientContext::kDefaultClientId = "april";
 
 UiClientContext& UiClientContext::instance()
 {
@@ -25,11 +25,11 @@ void UiClientContext::setClientIdOverride(const QString& clientId)
     m_cachedClientId.clear();
     if (!m_override.isEmpty())
     {
-        SY_DEBUGF("[UiClientContext] Client id override set: '%s'", qPrintable(m_override));
+        APR_DEBUGF("[UiClientContext] Client id override set: '%s'", qPrintable(m_override));
     }
     else
     {
-        SY_DEBUG("[UiClientContext] Client id override cleared");
+        APR_DEBUG("[UiClientContext] Client id override cleared");
     }
 }
 
@@ -59,12 +59,12 @@ QString UiClientContext::readClientIdFile(const QString& appDir)
 QString UiClientContext::resolveClientId(QString& sourceOut)
 {
     // 优先级 2：环境变量，供 CI 与现场排查临时切换客户
-    if (qEnvironmentVariableIsSet("SANYI_CLIENT_ID"))
+    if (qEnvironmentVariableIsSet("APR_CLIENT_ID"))
     {
-        const QString fromEnv = QString::fromUtf8(qgetenv("SANYI_CLIENT_ID")).trimmed();
+        const QString fromEnv = QString::fromUtf8(qgetenv("APR_CLIENT_ID")).trimmed();
         if (!fromEnv.isEmpty())
         {
-            sourceOut = QStringLiteral("environment SANYI_CLIENT_ID");
+            sourceOut = QStringLiteral("environment APR_CLIENT_ID");
             return fromEnv;
         }
     }
@@ -114,7 +114,7 @@ const QString& UiClientContext::clientId() const
 
     m_resolved = true;
     // 该日志是排查「客户配置为什么没生效」的第一现场，务必保留
-    SY_DEBUGF("[UiClientContext] Active client id='%s' (source: %s)", qPrintable(m_cachedClientId), qPrintable(source));
+    APR_DEBUGF("[UiClientContext] Active client id='%s' (source: %s)", qPrintable(m_cachedClientId), qPrintable(source));
     return m_cachedClientId;
 }
 
@@ -170,7 +170,7 @@ QString UiClientContext::configResourcePath() const
     // 客户 ID 拼写错误或配置未随包发布时，回退到默认客户配置。
     // 这里不能直接失败：UI 构建已无硬编码回退路径，加载失败会导致空窗口。
     const QString fallback = configResourcePathFor(QString::fromUtf8(kDefaultClientId));
-    SY_WARNF("[UiClientContext] Client config not found for '%s' (last candidate: '%s'), falling back to '%s'",
+    APR_WARNF("[UiClientContext] Client config not found for '%s' (last candidate: '%s'), falling back to '%s'",
         qPrintable(client),
         qPrintable(path),
         qPrintable(fallback));

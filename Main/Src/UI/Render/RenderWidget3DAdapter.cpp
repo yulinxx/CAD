@@ -17,12 +17,12 @@
     #include <QVBoxLayout>
 
     #include "UI3D/Render3D/RenderWidget3D.h"
-    #include "Engine3D/SyEntity/SyMeshEntity.h"
+    #include "Engine3D/AprEntity/AprMeshEntity.h"
     #include "Engine3D/SceneManager3D.h"
     #include "Engine3D/Selection/SelectionManager3D.h"
     #include "UI3D/Service/SceneDocument3D.h"
     #include "UI3D/Service/CameraController3D.h"
-    #include "Log/SyLogger.h"
+    #include "Log/AprLogger.h"
 
 RenderWidget3DAdapter::RenderWidget3DAdapter() = default;
 
@@ -40,13 +40,13 @@ bool RenderWidget3DAdapter::ensureWidgetCreated()
 
     if (!m_parentWidget)
     {
-        SY_WARN("[RenderWidget3DAdapter] ensureWidgetCreated called without a valid QWidget parent");
+        APR_WARN("[RenderWidget3DAdapter] ensureWidgetCreated called without a valid QWidget parent");
         return false;
     }
 
     if (!m_parentWidget->isWidgetType())
     {
-        SY_ERROR("[RenderWidget3DAdapter] Parent object is not a QWidget, refusing to create RenderWidget3D");
+        APR_ERROR("[RenderWidget3DAdapter] Parent object is not a QWidget, refusing to create RenderWidget3D");
         return false;
     }
 
@@ -76,7 +76,7 @@ bool RenderWidget3DAdapter::ensureWidgetCreated()
     layout->setContentsMargins(0, 0, 0, 0);
     layout->addWidget(m_renderWidget.get());
     bindWidgetSignals();
-    SY_DEBUG("[RenderWidget3DAdapter] RenderWidget3D created as child widget");
+    APR_DEBUG("[RenderWidget3DAdapter] RenderWidget3D created as child widget");
     return true;
 }
 
@@ -90,7 +90,7 @@ void RenderWidget3DAdapter::bindWidgetSignals()
     // 场景选择变化只同步到适配器，再由适配器回调上层。
     // 跨 DLL 安全：信号参数改为 POD 指针数组
     QObject::connect(
-        m_renderWidget.get(), &RenderWidget3D::sigSelectionChanged, [this](const Eg::SyMeshEntity** entities, int count) {
+        m_renderWidget.get(), &RenderWidget3D::sigSelectionChanged, [this](const Eg::AprMeshEntity** entities, int count) {
             if (count > 0 && entities && entities[0])
             {
                 m_selectedNodeId = QString::number(entities[0]->id);
@@ -149,7 +149,7 @@ bool RenderWidget3DAdapter::initialize(void* windowHandle)
     m_parentWidget = static_cast<QWidget*>(windowHandle);
     if (!m_parentWidget)
     {
-        SY_WARN("[RenderWidget3DAdapter] initialize called with null windowHandle");
+        APR_WARN("[RenderWidget3DAdapter] initialize called with null windowHandle");
         m_ready = false;
         return false;
     }
@@ -227,7 +227,7 @@ void RenderWidget3DAdapter::setScene(SceneDocument3D* document)
     {
         m_sceneManager = sceneManager;
         m_renderWidget->setSceneManager(sceneManager);
-        SY_DEBUGF("[RenderWidget3DAdapter] SceneManager3D set: %p", static_cast<void*>(sceneManager));
+        APR_DEBUGF("[RenderWidget3DAdapter] SceneManager3D set: %p", static_cast<void*>(sceneManager));
         emitStatus(QObject::tr("Scene loaded"));
     }
 }
@@ -242,7 +242,7 @@ void RenderWidget3DAdapter::setCamera(CameraController3D* controller)
     // 将 CameraController3D 连接到 RenderWidget3D 的 Camera3D
     // 这样控制器就能真正操作相机，实现视图控制
     controller->setCamera(&m_renderWidget->camera());
-    SY_DEBUGF("[RenderWidget3DAdapter] CameraController3D connected to Camera3D at %p",
+    APR_DEBUGF("[RenderWidget3DAdapter] CameraController3D connected to Camera3D at %p",
         static_cast<void*>(&m_renderWidget->camera()));
 }
 
@@ -285,7 +285,7 @@ void RenderWidget3DAdapter::selectNodeById(const QString& nodeId)
     }
 
     // 通过 SceneManager3D 查找图元
-    Eg::SyMeshEntity* entity = m_sceneManager->findEntityById(entityId);
+    Eg::AprMeshEntity* entity = m_sceneManager->findEntityById(entityId);
     if (!entity)
     {
         return;

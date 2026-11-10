@@ -8,7 +8,7 @@
 #include "ClientConfig/UiContextMenuService.h"
 #include "ClientConfig/UiConfigurationManager.h"
 #include "ClientConfig/UiClientConfigBase.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <QMenu>
 #include <QTimer>

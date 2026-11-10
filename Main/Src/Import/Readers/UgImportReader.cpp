@@ -1,6 +1,6 @@
 #include "UgImportReader.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 UgImportReader::UgImportReader()
     : ImportReaderBase(Fio::FileFormat::UG,
@@ -30,7 +30,7 @@ void UgImportReader::decorateError(QString& msg, const ImportContext& context) c
     }
 }
 
-ImportResult UgImportReader::read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
+ImportResult UgImportReader::read(const ImportContext& context, Fio::VecAprEntityPtr& outEntities)
 {
     // 走 FileIO 的 UgParser（IGES 子集解析），将 IGES 图元转换为中立 IR
     return readViaIR(context, Fio::FileFormat::UG, outEntities, true);

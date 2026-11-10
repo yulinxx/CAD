@@ -1,5 +1,5 @@
 # ============================================================================
-# Config.cmake - SanYi CAD 全局构建配置
+# Config.cmake - April CAD 全局构建配置
 # ============================================================================
 #
 # 使用方法：
@@ -69,10 +69,10 @@ option(BUILD_TESTS "构建全部模块测试" ON)
 
 # 本文件是路径配置与测试开关的**唯一配置处**
 # 重复 include 保护
-if(SANYI_CONFIG_INCLUDED)
+if(APR_CONFIG_INCLUDED)
     return()
 endif()
-set(SANYI_CONFIG_INCLUDED TRUE)
+set(APR_CONFIG_INCLUDED TRUE)
 
 # Qt 主版本号
 set(QT_VERSION_MAJOR 6)
@@ -85,9 +85,9 @@ if(VCPKG_DIR STREQUAL "" OR NOT EXISTS "${VCPKG_DIR}/scripts/buildsystems/vcpkg.
 endif()
 if(Qt_INSTALL_DIR STREQUAL "" OR NOT EXISTS "${Qt_INSTALL_DIR}/lib/cmake/Qt6/Qt6Config.cmake")
     # 纯算法模块（如 Nesting）不链接 Qt：它的独立入口会在 include 本文件之前设
-    # SANYI_ALLOW_MISSING_QT=ON，从而在没有 Qt 的机器/CI 上也能配置。
+    # APR_ALLOW_MISSING_QT=ON，从而在没有 Qt 的机器/CI 上也能配置。
     # 默认关闭该旁路，其他模块的报错与行为保持原样。
-    if(NOT SANYI_ALLOW_MISSING_QT)
+    if(NOT APR_ALLOW_MISSING_QT)
         message(FATAL_ERROR
             "[Config] Qt_INSTALL_DIR not found or invalid: '${Qt_INSTALL_DIR}'\n"
             "  Set environment variable Qt_INSTALL_DIR, or pass -DQt_INSTALL_DIR=<path> to cmake.")
@@ -111,11 +111,12 @@ set(CMAKE_TOOLCHAIN_FILE "${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake"
 set(VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_LIST_DIR}/CMake/vcpkg-overlays"
     CACHE STRING "vcpkg overlay ports (repo-local)")
 
-# Python 绑定依赖（仅 SANYI_PYBIND_CORE=ON 时需要，header-only）：
-#   python3 -m pip install "pybind11>=2.11"
+
+# Python 绑定依赖（仅 APR_PYBIND_CORE=ON 时需要，header-only）：
+#   python3.11 -m pip install "pybind11>=2.11"
 # 不要使用 vcpkg 的 pybind11 port：它依赖 vcpkg python3，并会通过 cmake wrapper
-# 强制接管 FindPython，把扩展 ABI 从当前选中的解释器换成 vcpkg 自带的那一个
-# （SANYI_PYTHON_VERSION 只约束最低版本，默认 3.11）。
+# 强制接管 FindPython，把扩展 ABI 从工程固定的 Python ${APR_PYTHON_VERSION} 改掉。
+
 # PyBindCore 在找不到 pybind11 时会依次从工具链 config、Python 解释器推导，
 # 仍失败才给出可复制的安装命令。
 
@@ -143,8 +144,8 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 # --------------------------------------------------------------------
 # Unity Build 配置 (可加速编译)
 # --------------------------------------------------------------------
-option(SANYI_UNITY_BUILD "Enable unity build (faster compilation)" ON)
-if(SANYI_UNITY_BUILD)
+option(APR_UNITY_BUILD "Enable unity build (faster compilation)" ON)
+if(APR_UNITY_BUILD)
     set(CMAKE_UNITY_BUILD ON)
 endif()
 
@@ -153,19 +154,19 @@ endif()
 # --------------------------------------------------------------------
 # 统一带 Qt 版本后缀，避免同机多 Qt 版本的产物互相覆盖。
 # 这是本项目输出目录的唯一配置处：各模块不得再自行 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ...)。
-set(_SANYI_BIN_DIR "${CMAKE_BINARY_DIR}/bin_Qt${QT_VERSION_MAJOR}")
-set(_SANYI_LIB_DIR "${CMAKE_BINARY_DIR}/lib_Qt${QT_VERSION_MAJOR}")
+set(_APR_BIN_DIR "${CMAKE_BINARY_DIR}/bin_Qt${QT_VERSION_MAJOR}")
+set(_APR_LIB_DIR "${CMAKE_BINARY_DIR}/lib_Qt${QT_VERSION_MAJOR}")
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${_SANYI_BIN_DIR}" CACHE PATH "Runtime output directory")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${_SANYI_BIN_DIR}" CACHE PATH "Library output directory")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${_SANYI_LIB_DIR}" CACHE PATH "Archive output directory")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${_APR_BIN_DIR}" CACHE PATH "Runtime output directory")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${_APR_BIN_DIR}" CACHE PATH "Library output directory")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${_APR_LIB_DIR}" CACHE PATH "Archive output directory")
 
 # 多配置生成器（Visual Studio / Xcode）需要再按配置分子目录
-foreach(_sanyi_cfg Debug Release RelWithDebInfo MinSizeRel)
-    string(TOUPPER "${_sanyi_cfg}" _sanyi_cfg_u)
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_sanyi_cfg_u} "${_SANYI_BIN_DIR}/${_sanyi_cfg}")
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${_sanyi_cfg_u} "${_SANYI_BIN_DIR}/${_sanyi_cfg}")
-    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${_sanyi_cfg_u} "${_SANYI_LIB_DIR}/${_sanyi_cfg}")
+foreach(_apr_cfg Debug Release RelWithDebInfo MinSizeRel)
+    string(TOUPPER "${_apr_cfg}" _apr_cfg_u)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_apr_cfg_u} "${_APR_BIN_DIR}/${_apr_cfg}")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${_apr_cfg_u} "${_APR_BIN_DIR}/${_apr_cfg}")
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${_apr_cfg_u} "${_APR_LIB_DIR}/${_apr_cfg}")
 endforeach()
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -178,23 +179,23 @@ list(INSERT CMAKE_PREFIX_PATH 0 "${Qt_INSTALL_DIR}")
 
 # Windows: 配置 PATH 以包含 Qt 和 vcpkg 二进制目录
 if(WIN32 AND EXISTS "${Qt_INSTALL_DIR}")
-    set(_SANYI_QT_BIN "${Qt_INSTALL_DIR}/bin")
-    set(_SANYI_VCPKG_BIN "${VCPKG_DIR}/installed/x64-windows/bin")
-    set(ENV{PATH} "${_SANYI_QT_BIN};${_SANYI_VCPKG_BIN};$ENV{PATH}")
+    set(_APR_QT_BIN "${Qt_INSTALL_DIR}/bin")
+    set(_APR_VCPKG_BIN "${VCPKG_DIR}/installed/x64-windows/bin")
+    set(ENV{PATH} "${_APR_QT_BIN};${_APR_VCPKG_BIN};$ENV{PATH}")
     set(QT_PLUGIN_PATH "${Qt_INSTALL_DIR}/plugins" CACHE PATH "Qt plugins directory")
 endif()
 
 # ===== 渲染后端配置 =====
-set(SANYI_RENDER_BACKENDS "OPENGL;METAL;VULKAN" CACHE STRING "Available render backends")
+set(APR_RENDER_BACKENDS "OPENGL;METAL;VULKAN" CACHE STRING "Available render backends")
 if(APPLE)
-    set(SANYI_DEFAULT_RENDER_BACKEND "METAL" CACHE STRING "Default render backend: OPENGL|METAL|VULKAN")
+    set(APR_DEFAULT_RENDER_BACKEND "METAL" CACHE STRING "Default render backend: OPENGL|METAL|VULKAN")
 else()
-    set(SANYI_DEFAULT_RENDER_BACKEND "OPENGL" CACHE STRING "Default render backend: OPENGL|METAL|VULKAN")
+    set(APR_DEFAULT_RENDER_BACKEND "OPENGL" CACHE STRING "Default render backend: OPENGL|METAL|VULKAN")
 endif()
 
 # ===== UI 维度配置 =====
-set(SANYI_UI_DIMENSIONS "2D;3D" CACHE STRING "Available UI dimensions")
-set(SANYI_DEFAULT_UI_DIMENSION "2D" CACHE STRING "Default UI dimension: 2D|3D")
+set(APR_UI_DIMENSIONS "2D;3D" CACHE STRING "Available UI dimensions")
+set(APR_DEFAULT_UI_DIMENSION "2D" CACHE STRING "Default UI dimension: 2D|3D")
 
 # ===== 可选模块开关：默认值按「子模块是否已检出」自适应 =====
 # 干净 clone 里没跑 `git submodule update --init` 时子模块目录是空的，
@@ -209,18 +210,18 @@ set(SANYI_DEFAULT_UI_DIMENSION "2D" CACHE STRING "Default UI dimension: 2D|3D")
 # 注意：本文件在顶层 project() 之前被 include，用 CMAKE_CURRENT_LIST_DIR
 # 捕获源码根，别依赖 PROJECT_SOURCE_DIR。
 # ============================================================================
-set(SANYI_CONFIG_ROOT "${CMAKE_CURRENT_LIST_DIR}")
-function(sanyi_module_option _name _dir _doc)
-    set(_cmakelists "${SANYI_CONFIG_ROOT}/${_dir}/CMakeLists.txt")
+set(APR_CONFIG_ROOT "${CMAKE_CURRENT_LIST_DIR}")
+function(apr_module_option _name _dir _doc)
+    set(_cmakelists "${APR_CONFIG_ROOT}/${_dir}/CMakeLists.txt")
     if(EXISTS "${_cmakelists}")
         option(${_name} "${_doc}" ON)
     else()
         option(${_name} "${_doc}" OFF)
-        message(STATUS "[SanYi] ${_name}: 默认 OFF（子模块 ${_dir}/ 未检出）")
+        message(STATUS "[April] ${_name}: 默认 OFF（子模块 ${_dir}/ 未检出）")
     endif()
     if(${_name} AND NOT EXISTS "${_cmakelists}")
         message(FATAL_ERROR
-            "[SanYi] ${_name}=ON 但子模块 ${_dir}/ 未检出（缺 ${_cmakelists}）。\n"
+            "[April] ${_name}=ON 但子模块 ${_dir}/ 未检出（缺 ${_cmakelists}）。\n"
             "  请先执行: git submodule update --init ${_dir}\n"
             "  或改用:   -D${_name}=OFF")
     endif()
@@ -228,7 +229,7 @@ endfunction()
 
 # ===== 核心功能模块 =====
 # 建议保持默认开启状态
-sanyi_module_option(BUILD_RENDERX "Renderx" "Build Renderx rendering engine (3D rendering core)")
+apr_module_option(BUILD_RENDERX "Renderx" "Build Renderx rendering engine (3D rendering core)")
 option(BUILD_UI2D "Build UI2D module (2D user interface, always ON)" ON)
 
 # ---- UI 维度门控（唯一权威开关）----
@@ -238,41 +239,41 @@ option(BUILD_UI2D "Build UI2D module (2D user interface, always ON)" ON)
 #   3D          ：构建 UI3D，并把运行时默认视口设为 3D
 # 注意：UI2D 是全应用必需（Main 有数百处 UI2D 引用），任何取值都不会关闭它；
 #       因此 "3D" 表示"启用 3D 且默认 3D"，而非"仅 3D"。
-# BUILD_UI3D / SANYI_DEFAULT_UI_DIMENSION 均由本开关派生（FORCE 写回缓存，
+# BUILD_UI3D / APR_DEFAULT_UI_DIMENSION 均由本开关派生（FORCE 写回缓存，
 # 避免 2D→BOTH 切换时缓存粘滞）。
 set(BUILD_UI_DIMENSION "BOTH" CACHE STRING "UI build dimension gate: 2D|3D|BOTH")
 set_property(CACHE BUILD_UI_DIMENSION PROPERTY STRINGS 2D 3D BOTH)
 if(BUILD_UI_DIMENSION STREQUAL "2D")
     set(BUILD_UI3D OFF CACHE BOOL "Build UI3D module (derived from BUILD_UI_DIMENSION)" FORCE)
-    set(SANYI_DEFAULT_UI_DIMENSION "2D" CACHE STRING "Default UI dimension (derived)" FORCE)
+    set(APR_DEFAULT_UI_DIMENSION "2D" CACHE STRING "Default UI dimension (derived)" FORCE)
 elseif(BUILD_UI_DIMENSION STREQUAL "3D")
     set(BUILD_UI3D ON CACHE BOOL "Build UI3D module (derived from BUILD_UI_DIMENSION)" FORCE)
-    set(SANYI_DEFAULT_UI_DIMENSION "3D" CACHE STRING "Default UI dimension (derived)" FORCE)
+    set(APR_DEFAULT_UI_DIMENSION "3D" CACHE STRING "Default UI dimension (derived)" FORCE)
 elseif(BUILD_UI_DIMENSION STREQUAL "BOTH")
     set(BUILD_UI3D ON CACHE BOOL "Build UI3D module (derived from BUILD_UI_DIMENSION)" FORCE)
-    set(SANYI_DEFAULT_UI_DIMENSION "2D" CACHE STRING "Default UI dimension (derived)" FORCE)
+    set(APR_DEFAULT_UI_DIMENSION "2D" CACHE STRING "Default UI dimension (derived)" FORCE)
 else()
     message(FATAL_ERROR
-        "[SanYi] BUILD_UI_DIMENSION 取值非法: '${BUILD_UI_DIMENSION}'（应为 2D|3D|BOTH）")
+        "[April] BUILD_UI_DIMENSION 取值非法: '${BUILD_UI_DIMENSION}'（应为 2D|3D|BOTH）")
 endif()
 
-sanyi_module_option(BUILD_NESTING "Nesting/Nesting" "Build Nesting module (2D/3D nesting/arrangement algorithm)")
+apr_module_option(BUILD_NESTING "Nesting/Nesting" "Build Nesting module (2D/3D nesting/arrangement algorithm)")
 
 # ===== 可选功能模块 =====
-# 按需启用（默认值见上方 sanyi_module_option：子模块未检出时自动 OFF）
-sanyi_module_option(BUILD_VISION "Vision/Vision" "Build Vision module (image processing, computer vision)")
-sanyi_module_option(BUILD_CAM "CAM/CAM" "Build CAM layer (toolpath planning, process compilation)")
-sanyi_module_option(BUILD_RASTER "Raster/Raster" "Build Raster module (OpenCV bitmap processing for laser engraving/cutting)")
-sanyi_module_option(BUILD_NETWORK "Network/Network" "Build Network module (HTTP, WebSocket, cloud sync)")
-sanyi_module_option(BUILD_HARDWARE "Hardware/Hardware" "Build Hardware module (laser control, material database)")
-sanyi_module_option(BUILD_ENGRAVING "Engraving/Engraving" "Build Engraving module (3D laser engraving)")
-sanyi_module_option(BUILD_GEOMODELCORE "GeoModelCore/GeoModelCore" "Build GeoModelCore module (OpenCASCADE-based geometry modeling)")
-sanyi_module_option(BUILD_CRASHHANDLER "CrashHandler/CrashHandler" "Build CrashHandler module (crash capture and reporting)")
-sanyi_module_option(BUILD_PYTHON "PythonHost/PythonHost" "Build Python module (PythonHost integration framework)")
-# 许可校验开关：默认 ON；开发构建如需关闭，用 -DSANYI_ENABLE_LICENSE=OFF。
+# 按需启用（默认值见上方 apr_module_option：子模块未检出时自动 OFF）
+apr_module_option(BUILD_VISION "Vision/Vision" "Build Vision module (image processing, computer vision)")
+apr_module_option(BUILD_CAM "CAM/CAM" "Build CAM layer (toolpath planning, process compilation)")
+apr_module_option(BUILD_RASTER "Raster/Raster" "Build Raster module (OpenCV bitmap processing for laser engraving/cutting)")
+apr_module_option(BUILD_NETWORK "Network/Network" "Build Network module (HTTP, WebSocket, cloud sync)")
+apr_module_option(BUILD_HARDWARE "Hardware/Hardware" "Build Hardware module (laser control, material database)")
+apr_module_option(BUILD_ENGRAVING "Engraving/Engraving" "Build Engraving module (3D laser engraving)")
+apr_module_option(BUILD_GEOMODELCORE "GeoModelCore/GeoModelCore" "Build GeoModelCore module (OpenCASCADE-based geometry modeling)")
+apr_module_option(BUILD_CRASHHANDLER "CrashHandler/CrashHandler" "Build CrashHandler module (crash capture and reporting)")
+apr_module_option(BUILD_PYTHON "PythonHost/PythonHost" "Build Python module (PythonHost integration framework)")
+# 许可校验开关：默认 ON；开发构建如需关闭，用 -DAPR_ENABLE_LICENSE=OFF。
 # 宏编进 License 库本身（LicenseInternal.cpp 依据它决定运行期默认值），
 # Main 的 BuildConfig.h 镜像同步该取值供启动自检交叉核对。
-option(SANYI_ENABLE_LICENSE "启用许可校验（发货构建应设 ON）" ON)
+option(APR_ENABLE_LICENSE "启用许可校验（发货构建应设 ON）" ON)
 
 # ===== 工具 =====
 option(BUILD_KEYGEN_TOOL "Build KeygenTool (offline license key generator)" OFF)
@@ -289,10 +290,10 @@ option(BUILD_RENDER_BENCHMARK "Build headless render frame-path benchmark" ON)
 # 唯一总开关 BUILD_TESTS 在本文件开头「测试开关」一节声明，默认 ON。
 # 旧的 BUILD_ALL_TESTS 与逐模块 BUILD_*_TESTS 已全部废弃，任何模块都不得再
 # 定义同名开关。是否生成测试目标只看 BUILD_TESTS 与当前构建范围
-# （集成构建 = 全部模块；独立构建 = sanyi_only_own_tests 声明的模块键）。
+# （集成构建 = 全部模块；独立构建 = apr_only_own_tests 声明的模块键）。
 
 # 已废弃的旧开关清单：只用于迁移告警，不参与任何新判断。
-set(SANYI_LEGACY_TEST_SWITCHES
+set(APR_LEGACY_TEST_SWITCHES
     BUILD_ALL_TESTS
     BUILD_UTILITY_TESTS
     BUILD_LOG_TESTS
@@ -321,8 +322,8 @@ set(SANYI_LEGACY_TEST_SWITCHES
     CACHE INTERNAL "已废弃的旧测试开关清单")
 
 # 模块键清单：独立构建裁剪与状态输出使用。键名必须与内层
-# sanyi_module_tests_enabled(<键>) 的调用一致。
-set(SANYI_TEST_MODULES
+# apr_module_tests_enabled(<键>) 的调用一致。
+set(APR_TEST_MODULES
     UTILITY
     LOG
     ENGINECOMMON
@@ -352,31 +353,31 @@ set(SANYI_TEST_MODULES
 
 # 旧开关迁移告警：缓存里残留旧变量时明确提示，旧值不得影响新行为。
 # 每次 configure 都检查，直到用户删除缓存项或换全新构建目录。
-set(_sanyi_legacy_found "")
-foreach(_sanyi_legacy IN LISTS SANYI_LEGACY_TEST_SWITCHES)
-    if(DEFINED ${_sanyi_legacy})
-        list(APPEND _sanyi_legacy_found "${_sanyi_legacy}=${${_sanyi_legacy}}")
+set(_apr_legacy_found "")
+foreach(_apr_legacy IN LISTS APR_LEGACY_TEST_SWITCHES)
+    if(DEFINED ${_apr_legacy})
+        list(APPEND _apr_legacy_found "${_apr_legacy}=${${_apr_legacy}}")
     endif()
 endforeach()
-if(_sanyi_legacy_found)
+if(_apr_legacy_found)
     message(WARNING
-        "[Tests] 检测到已废弃的测试开关：${_sanyi_legacy_found}\n"
+        "[Tests] 检测到已废弃的测试开关：${_apr_legacy_found}\n"
         "  BUILD_ALL_TESTS 与 BUILD_*_TESTS 已废弃并被忽略，当前只认 BUILD_TESTS。\n"
         "  请删除对应缓存项（cmake -U <变量名> ...）或使用全新构建目录重新 configure。")
 endif()
-unset(_sanyi_legacy_found)
-unset(_sanyi_legacy)
+unset(_apr_legacy_found)
+unset(_apr_legacy)
 
 # 判定单个模块是否构建测试：BUILD_TESTS 与独立构建允许范围同时成立。
-# 用法：sanyi_module_tests_enabled(VISION _vision_tests)
-# SANYI_STANDALONE_OWN_MODULES 未定义 = 集成构建，默认全部模块放行；
+# 用法：apr_module_tests_enabled(VISION _vision_tests)
+# APR_STANDALONE_OWN_MODULES 未定义 = 集成构建，默认全部模块放行；
 # 已定义（含空字符串）= 独立构建，只有列表中的模块键放行。
-macro(sanyi_module_tests_enabled _module _out_var)
+macro(apr_module_tests_enabled _module _out_var)
     set(${_out_var} OFF)
     if(BUILD_TESTS)
-        if(NOT DEFINED SANYI_STANDALONE_OWN_MODULES)
+        if(NOT DEFINED APR_STANDALONE_OWN_MODULES)
             set(${_out_var} ON)
-        elseif("${_module}" IN_LIST SANYI_STANDALONE_OWN_MODULES)
+        elseif("${_module}" IN_LIST APR_STANDALONE_OWN_MODULES)
             set(${_out_var} ON)
         endif()
     endif()
@@ -385,15 +386,15 @@ endmacro()
 # 测试不可用时统一降级：写回缓存并记录原因，供状态输出使用。
 # 必须同时更新当前作用域的普通变量：option() 会创建同名普通变量，
 # CMP0126 NEW 下 set(... CACHE) 不会清除它，只改缓存会让 if(BUILD_TESTS) 仍看到 ON。
-macro(sanyi_force_tests_off _reason)
+macro(apr_force_tests_off _reason)
     set(BUILD_TESTS OFF CACHE BOOL "BUILD_TESTS forced OFF: ${_reason}" FORCE)
     set(BUILD_TESTS OFF)
-    set(SANYI_TESTS_DISABLED_REASON "${_reason}")
+    set(APR_TESTS_DISABLED_REASON "${_reason}")
 endmacro()
 
 # 测试状态输出：必须在全部降级动作之后调用，展示最终生效值。
 # 只在顶层工程打印，避免集成构建里被各模块重复调用。
-function(sanyi_print_test_status)
+function(apr_print_test_status)
     if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
         return()
     endif()
@@ -401,15 +402,15 @@ function(sanyi_print_test_status)
     if(BUILD_TESTS)
         message(STATUS "  BUILD_TESTS: ON (final)")
     else()
-        set(_reason "${SANYI_TESTS_DISABLED_REASON}")
+        set(_reason "${APR_TESTS_DISABLED_REASON}")
         if(NOT _reason)
             set(_reason "disabled by user")
         endif()
         message(STATUS "  BUILD_TESTS: OFF (final, reason: ${_reason})")
     endif()
-    if(DEFINED SANYI_STANDALONE_OWN_MODULES)
-        if(SANYI_STANDALONE_OWN_MODULES)
-            message(STATUS "  Scope: standalone (${SANYI_STANDALONE_OWN_MODULES})")
+    if(DEFINED APR_STANDALONE_OWN_MODULES)
+        if(APR_STANDALONE_OWN_MODULES)
+            message(STATUS "  Scope: standalone (${APR_STANDALONE_OWN_MODULES})")
         else()
             message(STATUS "  Scope: standalone (none)")
         endif()
@@ -426,17 +427,17 @@ endfunction()
 # 必须在这里（读取它的分支之前）声明：option() 只在首次读取时生效，
 # 声明在使用之后会让「首次 configure」与「二次 configure」行为不同 ——
 # 干净构建目录里变量未定义，VULKAN 分支会误报「已禁用」。
-option(SANYI_ENABLE_VULKAN "Enable Vulkan rendering support (not implemented yet)" ON)
+option(APR_ENABLE_VULKAN "Enable Vulkan rendering support (not implemented yet)" ON)
 
 # 渲染后端选择逻辑（OpenGL 查找已延迟至 CMakeLists.txt project() 之后）
-if(SANYI_DEFAULT_RENDER_BACKEND STREQUAL "METAL")
+if(APR_DEFAULT_RENDER_BACKEND STREQUAL "METAL")
     if(APPLE)
         # Metal 是 macOS 系统框架，不需要 find_package
         message(STATUS "[Render] Backend: Metal (Apple)")
     else()
         message(FATAL_ERROR "[Render] Metal backend only supported on macOS")
     endif()
-elseif(SANYI_DEFAULT_RENDER_BACKEND STREQUAL "VULKAN")
+elseif(APR_DEFAULT_RENDER_BACKEND STREQUAL "VULKAN")
     # 渲染层当前只有 GL / Metal / Null 三套 RHI 实现（Renderx/src/rhi），
     # 没有 Vulkan 后端。开关保留是为了让「选 Vulkan」得到一个明确的失败，
     # 而不是配到一半才在运行时找不到后端。
@@ -470,9 +471,9 @@ message(STATUS "  Config Directory: ${Qt6_DIR}")
 message(STATUS "[vcpkg]")
 message(STATUS "  VCPKG_DIR: ${VCPKG_DIR}")
 message(STATUS "[Render Backend]")
-message(STATUS "  Default: ${SANYI_DEFAULT_RENDER_BACKEND}")
+message(STATUS "  Default: ${APR_DEFAULT_RENDER_BACKEND}")
 message(STATUS "[UI Dimension]")
-message(STATUS "  Default: ${SANYI_DEFAULT_UI_DIMENSION}")
+message(STATUS "  Default: ${APR_DEFAULT_UI_DIMENSION}")
 message(STATUS "[Modules]")
 message(STATUS "  RenderX:        ${BUILD_RENDERX}")
 message(STATUS "  UI2D:           ${BUILD_UI2D}")
@@ -487,6 +488,6 @@ message(STATUS "  GeoModelCore:   ${BUILD_GEOMODELCORE}")
 message(STATUS "  CrashHandler:   ${BUILD_CRASHHANDLER}")
 message(STATUS "  Python:         ${BUILD_PYTHON}")
 # [Tests] 状态块已移除：include 时刻的取值不是最终值（GTest 降级发生在
-# 根 CMakeLists.txt / sanyi_find_gtest 之后）。最终状态统一由
-# sanyi_print_test_status() 在降级完成后打印。
+# 根 CMakeLists.txt / apr_find_gtest 之后）。最终状态统一由
+# apr_print_test_status() 在降级完成后打印。
 message(STATUS "")

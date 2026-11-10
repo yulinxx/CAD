@@ -11,7 +11,7 @@ class UgImportReader : public ImportReaderBase
 {
 public:
     UgImportReader();
-    ImportResult read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities) override;
+    ImportResult read(const ImportContext& context, Fio::VecAprEntityPtr& outEntities) override;
 
 protected:
     QString successMessage(Fio::FileFormat format) const override;

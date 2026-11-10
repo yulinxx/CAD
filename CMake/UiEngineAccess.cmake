@@ -6,7 +6,7 @@
 #   各自直接链接 EngineCommon/Engine2D/Engine3D/EnginePersistence。
 #
 # 为什么不是"接口抽象"
-#   UI 与 Engine 共享同一套领域模型（SceneManager / SyEntity / Selection /
+#   UI 与 Engine 共享同一套领域模型（SceneManager / AprEntity / Selection /
 #   撤销命令等），无法用窄接口隔离（详见
 #   Docs/01-当前架构/UI-Engine解耦迁移方案.md §1.2）。
 #
@@ -18,12 +18,12 @@
 #     这块不做存量迁移（公共头已暴露 Engine 类型，隐藏需另立公共 API 治理），
 #     但禁止继续增长，由 CMake/UiEngineAccessRatchet.cmake 的棘轮校验拦截。
 #
-# 规则（由 sanyi_check_dependency_directions 强制）
+# 规则（由 apr_check_dependency_directions 强制）
 #   - UI/* 模块只允许链接 UiEngineAccess，禁止直接链接 Engine*（链接层）。
 #   - 依赖方向单向：UiEngineAccess → Engine*；Engine 不得反向依赖 UI。
 # ============================================================================
 
-function(sanyi_define_ui_engine_access)
+function(apr_define_ui_engine_access)
     if(TARGET UiEngineAccess)
         return()
     endif()
@@ -33,7 +33,7 @@ function(sanyi_define_ui_engine_access)
     foreach(_t IN LISTS _engine_targets)
         if(NOT TARGET ${_t})
             message(FATAL_ERROR
-                "[sanyi_define_ui_engine_access] 缺少目标 ${_t}；"
+                "[apr_define_ui_engine_access] 缺少目标 ${_t}；"
                 "请在 add_subdirectory(Engine/*) 之后再调用本函数。")
         endif()
     endforeach()

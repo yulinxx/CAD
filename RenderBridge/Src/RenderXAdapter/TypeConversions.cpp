@@ -10,7 +10,7 @@
  */
 #include "TypeConversions.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <atomic>
 #include <cstring>
@@ -36,7 +36,7 @@ namespace RenderBridge
                 static std::atomic<bool> warned{ false };
                 if (!warned.exchange(true))
                 {
-                    SY_ERRORF("[RenderXAdapter] %s index %u exceeds uint16 range, clamped to 0", what, value);
+                    APR_ERRORF("[RenderXAdapter] %s index %u exceeds uint16 range, clamped to 0", what, value);
                 }
                 return 0;
             }

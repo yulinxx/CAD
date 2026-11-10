@@ -29,7 +29,7 @@
 现在链路是：
 
 ```
-SyEntity ──Extract──▶ Cam::Contour ──Build/Transform/Order──▶ Cam::Toolpath
+AprEntity ──Extract──▶ Cam::Contour ──Build/Transform/Order──▶ Cam::Toolpath
                      （加工几何）                              （加工几何）
                                                                       │
                                                                       ▼
@@ -78,7 +78,7 @@ SyEntity ──Extract──▶ Cam::Contour ──Build/Transform/Order──�
 | 遍次展开 | pass 循环（当前仍在编译器里，见 §5 待收敛项） |
 | 指令编排 | BeginLayer / SetLaserParams / RapidTo / LineTo / ArcTo / LaserOff … |
 
-**它不认识几何**：输入是 `Cam::Contour`，不是 `SyEntity`。
+**它不认识几何**：输入是 `Cam::Contour`，不是 `AprEntity`。
 
 ### 2.3 设备适配层（`Hardware/Hardware/Src/Device/`）
 
@@ -113,7 +113,7 @@ SyEntity ──Extract──▶ Cam::Contour ──Build/Transform/Order──�
    绝不静默产出空几何 —— 静默跳过在激光加工里等于废件。
 
 5. **派生数据不落盘**
-   `Cam::Toolpath` 是派生结果，不写进 `.sy`。文档里只存**意图**（工艺对象、图层输出开关、单位声明）。
+   `Cam::Toolpath` 是派生结果，不写进 `.apr`。文档里只存**意图**（工艺对象、图层输出开关、单位声明）。
 
 ---
 

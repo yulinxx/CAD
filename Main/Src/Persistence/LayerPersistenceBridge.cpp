@@ -7,8 +7,8 @@
 #include "Repositories/LayerRepository.h"
 #include "Engine2D/Interaction/LayerManager.h"
 #include "Engine/EngineAPI.h"
-#include "Engine/Layer/SyLayer.h"
-#include "Log/SyLogger.h"
+#include "Engine/Layer/AprLayer.h"
+#include "Log/AprLogger.h"
 
 #include <QDateTime>
 #include <QThread>
@@ -53,7 +53,7 @@ void LayerPersistenceBridge::detach()
     m_layerManager->removeObserver(this);
     m_attached = false;
     m_orderCache.clear();
-    SY_INFO("[LayerPersistenceBridge] Detached from LayerManager");
+    APR_INFO("[LayerPersistenceBridge] Detached from LayerManager");
 }
 
 /// 图层新增时同步写入数据库
@@ -67,12 +67,12 @@ void LayerPersistenceBridge::onLayerAdded(int nLayerId, const char* name)
 /// 图层删除时同步从数据库移除
 void LayerPersistenceBridge::onLayerRemoved(int nLayerId)
 {
-    SY_DEBUGF("[LayerPersistenceBridge] Layer removed: id=%d", nLayerId);
+    APR_DEBUGF("[LayerPersistenceBridge] Layer removed: id=%d", nLayerId);
     if (m_layerRepository)
     {
         if (!m_layerRepository->remove(m_documentId, nLayerId))
         {
-            SY_ERRORF("[LayerPersistenceBridge] Failed to remove layer %d from database: %s",
+            APR_ERRORF("[LayerPersistenceBridge] Failed to remove layer %d from database: %s",
                 nLayerId,
                 m_layerRepository->lastError().c_str());
         }
@@ -97,7 +97,7 @@ void LayerPersistenceBridge::onLayerVisibilityChanged(int nLayerId, bool bVisibl
     {
         if (!m_layerRepository->updateVisibility(m_documentId, nLayerId, bVisible))
         {
-            SY_ERRORF("[LayerPersistenceBridge] Failed to update visibility for layer %d: %s",
+            APR_ERRORF("[LayerPersistenceBridge] Failed to update visibility for layer %d: %s",
                 nLayerId,
                 m_layerRepository->lastError().c_str());
         }
@@ -107,7 +107,7 @@ void LayerPersistenceBridge::onLayerVisibilityChanged(int nLayerId, bool bVisibl
 /// 图层顺序变更时批量写入所有图层顺序
 void LayerPersistenceBridge::onLayerOrderChanged()
 {
-    SY_DEBUG("[LayerPersistenceBridge] Layer order changed, batch updating all layers");
+    APR_DEBUG("[LayerPersistenceBridge] Layer order changed, batch updating all layers");
     if (!m_layerManager || !m_layerRepository)
     {
         return;
@@ -126,7 +126,7 @@ void LayerPersistenceBridge::onLayerOrderChanged()
 
     if (!m_layerRepository->batchUpdateOrder(m_documentId, layerIdAndOrders))
     {
-        SY_ERRORF(
+        APR_ERRORF(
             "[LayerPersistenceBridge] Failed to batch update layer order: %s", m_layerRepository->lastError().c_str());
     }
 }
@@ -205,12 +205,12 @@ void LayerPersistenceBridge::syncLayerToDb(int nLayerId)
         if (error.find("database is locked") == std::string::npos)
         {
             // 非锁定错误，不再重试
-            SY_ERRORF("[LayerPersistenceBridge] Failed to sync layer %d to database: %s", nLayerId, error.c_str());
+            APR_ERRORF("[LayerPersistenceBridge] Failed to sync layer %d to database: %s", nLayerId, error.c_str());
             return;
         }
 
         // 锁定错误，等待后重试
-        SY_DEBUGF("[LayerPersistenceBridge] Database locked, retrying (%d/%d) for layer %d...",
+        APR_DEBUGF("[LayerPersistenceBridge] Database locked, retrying (%d/%d) for layer %d...",
             retry + 1,
             kMaxRetries,
             nLayerId);
@@ -218,7 +218,7 @@ void LayerPersistenceBridge::syncLayerToDb(int nLayerId)
     }
 
     // 重试次数用尽
-    SY_ERRORF("[LayerPersistenceBridge] Failed to sync layer %d to database after %d retries: %s",
+    APR_ERRORF("[LayerPersistenceBridge] Failed to sync layer %d to database after %d retries: %s",
         nLayerId,
         kMaxRetries,
         m_layerRepository->lastError().c_str());

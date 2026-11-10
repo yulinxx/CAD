@@ -138,8 +138,8 @@ GLOB 有问题——这会导致 `metalDevice.mm` / `metalCommandList.mm` **静�
 **必须整仓 clone，不能只拷 `Renderx/`**。原因写在 `Renderx/CMakeLists.txt` 里：
 
 - 第 5 行 `include(${CMAKE_CURRENT_SOURCE_DIR}/../Config.cmake)` —— 依赖上一级
-- `include("${SANYI_ROOT}/CMake/SanYiPaths.cmake")` 与 `Utils.cmake` —— 统一入口
-  `sanyi_add_shared_library` 在这里
+- `include("${APR_ROOT}/CMake/AprPaths.cmake")` 与 `Utils.cmake` —— 统一入口
+  `apr_add_shared_library` 在这里
 - 第 267 行会尝试 `add_subdirectory(../Log/...)` 提供 `Log` 目标
 
 拿到 Mac 后按 §1.3 用 `-S Renderx` 指到子目录即可（`PROJECT_IS_TOP_LEVEL` 为真，
@@ -343,7 +343,7 @@ export MTL_SHADER_VALIDATION=1
 
 ### 5.3 Xcode Metal Frame Debugger
 
-把 `SanYiCAD`（或一个最小测试宿主）在 Xcode 里跑起来，用
+把 `April`（或一个最小测试宿主）在 Xcode 里跑起来，用
 **Debug → Capture GPU Frame**：能看到每个 RenderPass 的附件、每次 draw 的
 管线状态、`setVertexBuffer` 实际绑了哪个缓冲、pushConstant 的实际字节。
 排查「图像不对」比读日志快得多。

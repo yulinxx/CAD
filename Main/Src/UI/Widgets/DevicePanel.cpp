@@ -12,7 +12,7 @@
 #include "UI/Command/OperationId.h"
 #include "UI/Safety/EmergencyStopController.h"
 #include "UI2D/Operation/OperationBus.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 namespace
 {
@@ -148,7 +148,7 @@ void DevicePanel::onJobWarning(const QString& message)
     {
         return;
     }
-    SY_WARNF("[DevicePanel] Job warning: %s", message.toUtf8().constData());
+    APR_WARNF("[DevicePanel] Job warning: %s", message.toUtf8().constData());
     if (!m_warningLabel)
     {
         return;
@@ -163,7 +163,7 @@ void DevicePanel::onJobFinished(bool success, const QString& message)
     {
         return;
     }
-    SY_ERRORF("[DevicePanel] Job failed: %s", message.toUtf8().constData());
+    APR_ERRORF("[DevicePanel] Job failed: %s", message.toUtf8().constData());
     if (!m_warningLabel)
     {
         return;

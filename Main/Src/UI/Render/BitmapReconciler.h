@@ -14,7 +14,7 @@ class RenderWidget;
 
 /// @brief 位图层协调器 —— 从 SceneRefreshCoordinator 拆分
 ///
-/// 单源真值 = 场景中可见 SyImage 集合。统一处理 新增/删除/图层显隐/全量重建：
+/// 单源真值 = 场景中可见 AprImage 集合。统一处理 新增/删除/图层显隐/全量重建：
 ///   fullReconcile=true：先清空位图层（renderBeginScene 已清 GPU 位图），整体重传
 ///   fullReconcile=false：按账本增量对账，并移除场景中已不存在的位图
 class BitmapReconciler
@@ -40,5 +40,5 @@ public:
 
 private:
     RenderWidget* m_renderWidget;
-    std::unordered_set<uint64_t> m_bitmapImageIds;  ///< 已同步到 GPU 的 SyImage 账本
+    std::unordered_set<uint64_t> m_bitmapImageIds;  ///< 已同步到 GPU 的 AprImage 账本
 };

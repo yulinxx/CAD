@@ -4,11 +4,11 @@
 #include "Import/ImportOptions.h"
 #include "Import/ImportResult.h"
 #include "Import/ImportProgressRunner.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
-#include "Engine2D/SyEntity/SyImage.h"
+#include "Engine2D/AprEntity/AprImage.h"
 #include "Engine2D/Interaction/LayerManager.h"
 #include "Engine/EntityIdGenerator.h"
 #include "FileIO/ImageUtils.h"
@@ -110,7 +110,7 @@ void FileDropHandler::installAppEventFilter()
     {
         app->installEventFilter(this);
         m_appFilterInstalled = true;
-        SY_DEBUG("[FileDropHandler] App-level event filter installed for drag-drop");
+        APR_DEBUG("[FileDropHandler] App-level event filter installed for drag-drop");
     }
 }
 
@@ -270,7 +270,7 @@ bool FileDropHandler::handleDrop(QDropEvent* event)
             if (!m_sceneManager)
             {
                 ++failedCount;
-                SY_ERROR("[FileDropHandler] SceneManager not available for image import");
+                APR_ERROR("[FileDropHandler] SceneManager not available for image import");
                 emit sigFileImported(filePath, false);
                 continue;
             }
@@ -283,7 +283,7 @@ bool FileDropHandler::handleDrop(QDropEvent* event)
             else
             {
                 ++failedCount;
-                SY_WARNF("[FileDropHandler] Image import failed: %s", filePath.toUtf8().constData());
+                APR_WARNF("[FileDropHandler] Image import failed: %s", filePath.toUtf8().constData());
             }
 
             emit sigFileImported(filePath, ok);
@@ -314,7 +314,7 @@ bool FileDropHandler::handleDrop(QDropEvent* event)
         else
         {
             ++failedCount;
-            SY_WARNF("[FileDropHandler] Import failed: %s", result.message.toUtf8().constData());
+            APR_WARNF("[FileDropHandler] Import failed: %s", result.message.toUtf8().constData());
         }
 
         emit sigFileImported(filePath, result.success);
@@ -323,7 +323,7 @@ bool FileDropHandler::handleDrop(QDropEvent* event)
     event->acceptProposedAction();
     if (successCount + failedCount > 1)
     {
-        SY_DEBUGF("[FileDropHandler] Drop completed: %d succeeded, %d failed", successCount, failedCount);
+        APR_DEBUGF("[FileDropHandler] Drop completed: %d succeeded, %d failed", successCount, failedCount);
     }
     emit sigDropFinished(successCount, failedCount);
     return successCount > 0;
@@ -333,14 +333,14 @@ bool FileDropHandler::importImage(const QString& filePath, const QPointF& anchor
 {
     if (filePath.isEmpty())
     {
-        SY_WARN("[FileDropHandler] importImage: filePath is empty");
+        APR_WARN("[FileDropHandler] importImage: filePath is empty");
         return false;
     }
 
     QImage rgba;
     if (!loadRgbaImage(filePath, rgba))
     {
-        SY_WARNF("[FileDropHandler] importImage: failed to load image: %s", filePath.toUtf8().constData());
+        APR_WARNF("[FileDropHandler] importImage: failed to load image: %s", filePath.toUtf8().constData());
         return false;
     }
 
@@ -348,11 +348,11 @@ bool FileDropHandler::importImage(const QString& filePath, const QPointF& anchor
     const float worldW = Fio::pixelsToUnit(rgba.width(), info.dpiX, Fio::UnitType::Millimeter);
     const float worldH = Fio::pixelsToUnit(rgba.height(), info.dpiY, Fio::UnitType::Millimeter);
 
-    // 直接创建 SyImage 并设置属性
-    auto* imgEntity = new Eg::SyImage();
+    // 直接创建 AprImage 并设置属性
+    auto* imgEntity = new Eg::AprImage();
     imgEntity->nWidth = rgba.width();
     imgEntity->nHeight = rgba.height();
-    imgEntity->ePixelFormat = Eg::SyPixelFormat::RGBA32;
+    imgEntity->ePixelFormat = Eg::AprPixelFormat::RGBA32;
     imgEntity->setPixelData(rgba.constBits(), static_cast<size_t>(rgba.sizeInBytes()));
 
     // 图片以中心点为世界锚点，锚点即鼠标松开处的世界坐标
@@ -372,25 +372,25 @@ bool FileDropHandler::importImage(const QString& filePath, const QPointF& anchor
     for (size_t attempt = 0; attempt < 1000000 && persistentId == 0 && m_sceneManager; ++attempt)
     {
         const Eg::EntityId candidate = Eg::EntityIdGenerator::instance().getNextPersistentId();
-        if (!m_sceneManager->findSyEntityById(candidate))
+        if (!m_sceneManager->findAprEntityById(candidate))
         {
             persistentId = candidate;
         }
     }
     imgEntity->id = persistentId;
 
-    auto snap = std::unique_ptr<Eg::SyEntity>(imgEntity);
+    auto snap = std::unique_ptr<Eg::AprEntity>(imgEntity);
     SceneEditService directEdit(m_sceneManager, nullptr);
     if (persistentId == 0 || !m_sceneManager || !directEdit.insertEntityPreserveId(std::move(snap)))
     {
-        SY_ERRORF("[FileDrop] Image insert rejected (id=%lld)", static_cast<long long>(persistentId));
+        APR_ERRORF("[FileDrop] Image insert rejected (id=%lld)", static_cast<long long>(persistentId));
         return false;
     }
 
     // 分配到位图图层
     if (m_layerManager && m_sceneManager)
     {
-        Eg::SyEntity* added = m_sceneManager->findSyEntityById(persistentId);
+        Eg::AprEntity* added = m_sceneManager->findAprEntityById(persistentId);
         if (added)
         {
             const int curId = m_layerManager->currentLayerId();

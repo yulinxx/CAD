@@ -12,7 +12,7 @@
 #include "CAM/ToolpathJobInput.h"
 
 #include "Engine/Process/ProcessParams.h"
-#include "Engine/SyEntity/SyEntity.h"
+#include "Engine/AprEntity/AprEntity.h"
 #include "Engine2D/Cam/ContourContainment.h"
 #include "Engine2D/Cam/GeometryExtractor.h"
 #include "Engine2D/Cam/KerfCompensator.h"
@@ -20,7 +20,7 @@
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/LayerSnapshot.h"
 #include "Engine2D/Interaction/LayerManager.h"
-#include "Engine2D/SyEntity/SyImage.h"
+#include "Engine2D/AprEntity/AprImage.h"
 
 #include "Hardware/ToolpathJobSpec.h"
 
@@ -137,7 +137,7 @@ namespace CamBridge
     // ============================================================
 
     /// 像素坐标 → 用户坐标（双线性四点映射，兼容旋转/斜切）
-    static Ut::Vec2d mapImagePixel(const Eg::SyImage& image, double u, double v)
+    static Ut::Vec2d mapImagePixel(const Eg::AprImage& image, double u, double v)
     {
         const double fu = image.nWidth > 0 ? u / static_cast<double>(image.nWidth) : 0.0;
         const double fv = image.nHeight > 0 ? v / static_cast<double>(image.nHeight) : 0.0;
@@ -148,7 +148,7 @@ namespace CamBridge
     }
 
     /// Eg::ProcessParams → RasterScanlineParams；线距按像素当量换算成像素
-    static RasterScanlineParams makeScanlineParams(const Eg::SyImage& image,
+    static RasterScanlineParams makeScanlineParams(const Eg::AprImage& image,
                                                    const Eg::ProcessParams& process)
     {
         const double pitchX = image.pixelPitchMmX();
@@ -170,8 +170,8 @@ namespace CamBridge
         return params;
     }
 
-    /// SyImage 像素 → 8 位灰度：RGB24 按 R,G,B 解释，RGBA32 先按白底合成 alpha
-    static bool imageToGray8(const Eg::SyImage& image, std::vector<uint8_t>& gray)
+    /// AprImage 像素 → 8 位灰度：RGB24 按 R,G,B 解释，RGBA32 先按白底合成 alpha
+    static bool imageToGray8(const Eg::AprImage& image, std::vector<uint8_t>& gray)
     {
         gray.clear();
         const size_t pixelCount =
@@ -204,13 +204,13 @@ namespace CamBridge
             const uint8_t* p = src + i * bytesPerPixel;
             switch (image.ePixelFormat)
             {
-            case Eg::SyPixelFormat::Gray8:
+            case Eg::AprPixelFormat::Gray8:
                 gray[i] = p[0];
                 break;
-            case Eg::SyPixelFormat::RGB24:
+            case Eg::AprPixelFormat::RGB24:
                 gray[i] = clampByte(weightR * p[0] + weightG * p[1] + weightB * p[2]);
                 break;
-            case Eg::SyPixelFormat::RGBA32:
+            case Eg::AprPixelFormat::RGBA32:
             {
                 // 透明区域按白纸处理，避免全透明像素被当成纯黑而出光
                 const double alpha = static_cast<double>(p[3]) / 255.0;
@@ -229,7 +229,7 @@ namespace CamBridge
     }
 
     /// 把位图实体装配为 CAM 扫描线段（像素坐标在冲压前换算成 mm）
-    static void fillRasterScanlines(const Eg::SyImage& image,
+    static void fillRasterScanlines(const Eg::AprImage& image,
                                     const Eg::ProcessParams& process,
                                     Cam::EntitySnapshot& snapshot)
     {
@@ -433,7 +433,7 @@ namespace CamBridge
                 // 位图实体：主程序负责取图/配方/换算，Raster 出段，CAM 只编排运动
                 if (entity != nullptr && entity->eType == Eg::EType::IMAGE)
                 {
-                    const Eg::SyImage* image = static_cast<const Eg::SyImage*>(entity);
+                    const Eg::AprImage* image = static_cast<const Eg::AprImage*>(entity);
                     auto it = spec.layerParams.constFind(layerId);
                     const Eg::ProcessParams& process =
                         (it != spec.layerParams.constEnd())
@@ -443,7 +443,7 @@ namespace CamBridge
                 }
                 else
                 {
-                    snapshot.unmachinableReason = "raster entity is not SyImage";
+                    snapshot.unmachinableReason = "raster entity is not AprImage";
                 }
 #else
                 snapshot.unmachinableReason = "raster scanline assembly requires BUILD_RASTER";

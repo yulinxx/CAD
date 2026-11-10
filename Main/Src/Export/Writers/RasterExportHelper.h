@@ -24,6 +24,6 @@ public:
      * @return 导出结果（success / message / exportedEntityCount）
      */
     static ExportResult rasterizeExport(const ExportContext& context,
-                                        const Fio::VecSyEntityPtr& entities,
+                                        const Fio::VecAprEntityPtr& entities,
                                         const char* formatName);
 };

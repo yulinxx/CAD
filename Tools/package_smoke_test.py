@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 r"""
-SanYiCAD 安装包冒烟测试。
+April 安装包冒烟测试。
 
 覆盖三条路径：
   1. staged：用 `cmake --install` 安装到临时前缀，验证文件布局、运行 --version、
@@ -22,12 +22,12 @@ SanYiCAD 安装包冒烟测试。
     python3 Tools/package_smoke_test.py --build-dir build
 
     # 2) 对 Windows NSIS 安装包做真实安装/升级/卸载
-    python3 Tools/package_smoke_test.py --installer build/SanYiCAD-1.0.0-win64.exe
+    python3 Tools/package_smoke_test.py --installer build/April-1.0.0-win64.exe
 
     # 3) 用上一版安装包验证跨版本升级
     python3 Tools/package_smoke_test.py \
-        --installer build-new/SanYiCAD-1.0.1-win64.exe \
-        --previous-installer build-old/SanYiCAD-1.0.0-win64.exe \
+        --installer build-new/April-1.0.1-win64.exe \
+        --previous-installer build-old/April-1.0.0-win64.exe \
         --expected-version 1.0.1 --previous-version 1.0.0
 
     # 4) macOS 构建树 staged 测试：把 Qt 框架路径显式传给程序
@@ -49,7 +49,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence
 
 
-APP_NAME = "SanYiCAD"
+APP_NAME = "April"
 
 
 class SmokeError(RuntimeError):
@@ -187,7 +187,7 @@ def check_layout(install_dir: Path, mode: str) -> Path:
     if is_macos():
         app = find_app_bundle(install_dir)
         if app is None:
-            raise SmokeError("找不到 SanYiCAD.app")
+            raise SmokeError("找不到 April.app")
         plist = app / "Contents" / "Info.plist"
         if not plist.is_file():
             raise SmokeError(f"macOS bundle 缺少 Info.plist: {plist}")
@@ -535,7 +535,7 @@ def detect_mode(args: argparse.Namespace) -> str:
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="SanYiCAD 安装/卸载/升级冒烟测试")
+    parser = argparse.ArgumentParser(description="April 安装/卸载/升级冒烟测试")
     parser.add_argument("--mode", choices=["auto", "staged", "nsis", "dmg", "deb"], default="auto")
     parser.add_argument("--build-dir", type=Path, help="CMake 构建目录（staged 模式）")
     parser.add_argument("--previous-build-dir", type=Path, help="上一版 CMake 构建目录（跨版本升级）")
@@ -562,7 +562,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         work_dir.mkdir(parents=True, exist_ok=True)
         cleanup = False
     else:
-        work_dir = Path(tempfile.mkdtemp(prefix="sanyi-package-smoke-"))
+        work_dir = Path(tempfile.mkdtemp(prefix="april-package-smoke-"))
         cleanup = not args.keep
 
     context = Context(

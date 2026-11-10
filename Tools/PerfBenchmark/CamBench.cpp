@@ -271,15 +271,15 @@ void runCamBench()
         camRunOneSize(size, repeats);
     }
 
-    // 1M 需要约 GB 级内存和更长时间，按需开启：设置 SANYI_CAM_BENCH_1M=1
-    const char* include1M = std::getenv("SANYI_CAM_BENCH_1M");
+    // 1M 需要约 GB 级内存和更长时间，按需开启：设置 APR_CAM_BENCH_1M=1
+    const char* include1M = std::getenv("APR_CAM_BENCH_1M");
     if (include1M && std::strcmp(include1M, "1") == 0)
     {
         camRunOneSize(1000000, 3);
     }
     else
     {
-        std::printf("\n  (1M skipped; set SANYI_CAM_BENCH_1M=1 to enable)\n");
+        std::printf("\n  (1M skipped; set APR_CAM_BENCH_1M=1 to enable)\n");
     }
 
     std::printf("===============================================================\n");

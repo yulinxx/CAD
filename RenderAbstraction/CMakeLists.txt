@@ -16,9 +16,9 @@ cmake_minimum_required(VERSION 4.3)
 #   cmake -S RenderAbstraction -B RenderAbstraction/build
 # ============================================================================
 
-project(SanYiRenderAbstraction
+project(AprRenderAbstraction
     VERSION 1.0.0
-    DESCRIPTION "SanYi CAD Rendering Abstraction Layer (header-only interfaces)"
+    DESCRIPTION "April CAD Rendering Abstraction Layer (header-only interfaces)"
     LANGUAGES CXX
 )
 
@@ -29,14 +29,14 @@ set(LIB_DESCRIPTION "Rendering abstraction layer - business-level types and inte
 set(LIB_EXPORT_MACRO "RENDERABSTRACTION_EXPORTS")
 
 # --- 路径 ---
-if(NOT SANYI_ROOT)
-    get_filename_component(SANYI_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+if(NOT APR_ROOT)
+    get_filename_component(APR_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
 endif()
-include("${SANYI_ROOT}/CMake/SanYiPaths.cmake")
-include("${SANYI_ROOT}/CMake/Utils.cmake")
+include("${APR_ROOT}/CMake/AprPaths.cmake")
+include("${APR_ROOT}/CMake/Utils.cmake")
 
 # --- 源文件收集 ---
-sanyi_glob_headers(LIB_HEADERS BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Include"
+apr_glob_headers(LIB_HEADERS BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Include"
     DIRS
         "RenderAbstraction"
 )
@@ -56,7 +56,7 @@ set_target_properties(${LIB_NAME} PROPERTIES
     FOLDER "Render"
 )
 
-sanyi_export_imported_target(${LIB_NAME}
+apr_export_imported_target(${LIB_NAME}
     LIB_NAME "${LIB_NAME}"
     PUBLIC_INCLUDE_DIRS
         "${CMAKE_CURRENT_SOURCE_DIR}/Include"

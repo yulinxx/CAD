@@ -7,7 +7,7 @@
 #include "SelectionService.h"
 
 #include "Engine2D/Core/SceneManager.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "Engine/EntityIdUtils.h"
 #include "Ut/Vec.h"
 
@@ -24,7 +24,7 @@ void SelectionService::visitSelectedIds(SelectedIdVisitor visitor, void* context
 {
     if (!m_sceneManager || !visitor)
     {
-        SY_DEBUG("[SelectionService] visitSelectedIds: sceneManager or visitor is null");
+        APR_DEBUG("[SelectionService] visitSelectedIds: sceneManager or visitor is null");
         return;
     }
 
@@ -41,7 +41,7 @@ bool SelectionService::isSelected(const char* id) const
 {
     if (!m_sceneManager || !id)
     {
-        SY_DEBUG("[SelectionService] isSelected: sceneManager or id is null");
+        APR_DEBUG("[SelectionService] isSelected: sceneManager or id is null");
         return false;
     }
 
@@ -76,7 +76,7 @@ void SelectionService::select(const char* id)
 {
     if (!m_sceneManager || !id)
     {
-        SY_DEBUG("[SelectionService] select: sceneManager or id is null");
+        APR_DEBUG("[SelectionService] select: sceneManager or id is null");
         return;
     }
 
@@ -97,7 +97,7 @@ void SelectionService::selectMultiple(const char* const* ids, size_t count)
 {
     if (!m_sceneManager || !ids || count == 0)
     {
-        SY_DEBUG("[SelectionService] selectMultiple: sceneManager, ids, or count is invalid");
+        APR_DEBUG("[SelectionService] selectMultiple: sceneManager, ids, or count is invalid");
         return;
     }
 
@@ -131,18 +131,18 @@ void SelectionService::deselect(const char* id)
 {
     if (!m_sceneManager || !id)
     {
-        SY_DEBUGF("[SelectionService] deselect: sceneManager or id is null, id=%s", id ? id : "(null)");
+        APR_DEBUGF("[SelectionService] deselect: sceneManager or id is null, id=%s", id ? id : "(null)");
         return;
     }
 
     auto eid = Eg::parseEntityId(std::string(id));
     if (!eid)
     {
-        SY_DEBUGF("[SelectionService] deselect: failed to parse entity id: %s", id);
+        APR_DEBUGF("[SelectionService] deselect: failed to parse entity id: %s", id);
         return;
     }
 
-    SY_DEBUGF("[SelectionService] Deselect entity: %s", id);
+    APR_DEBUGF("[SelectionService] Deselect entity: %s", id);
     m_sceneManager->deselectEntity(*eid);
 }
 
@@ -150,14 +150,14 @@ void SelectionService::clear()
 {
     if (m_sceneManager)
     {
-        SY_DEBUG("[SelectionService] Clearing selection");
+        APR_DEBUG("[SelectionService] Clearing selection");
         m_sceneManager->clearSelection();
     }
 }
 
 void SelectionService::toggle(const char* id)
 {
-    SY_DEBUGF("[SelectionService] Toggle selection for: %s", id ? id : "(null)");
+    APR_DEBUGF("[SelectionService] Toggle selection for: %s", id ? id : "(null)");
     if (isSelected(id))
     {
         deselect(id);

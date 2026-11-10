@@ -17,7 +17,7 @@
     #include "UI3D/Operation/CommandCatalog3D.h"
 #endif
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <variant>
 
@@ -352,7 +352,7 @@ UiConfigSelfCheckReport UiConfigSelfCheck::run(const UiConfigData& config)
 
 void UiConfigSelfCheck::logReport(const UiConfigSelfCheckReport& report, const QString& clientId)
 {
-    SY_INFOF("[ConfigSelfCheck] client='%s' commands=%d features=%d "
+    APR_INFOF("[ConfigSelfCheck] client='%s' commands=%d features=%d "
              "unresolved=%d gatedOut=%d licensedNotCompiled=%d compiledNotLicensed=%d workbenchGaps=%d",
         clientId.toUtf8().constData(),
         report.checkedCommandCount,
@@ -367,30 +367,30 @@ void UiConfigSelfCheck::logReport(const UiConfigSelfCheckReport& report, const Q
     // 只给个计数等于没说。条数天然很少（正常构建应为 0）。
     for (const QString& item : report.unresolvedCommands)
     {
-        SY_ERRORF("[ConfigSelfCheck] command not in catalog, button will never respond: %s", item.toUtf8().constData());
+        APR_ERRORF("[ConfigSelfCheck] command not in catalog, button will never respond: %s", item.toUtf8().constData());
     }
     for (const QString& item : report.licensedButNotCompiled)
     {
-        SY_ERRORF("[ConfigSelfCheck] feature licensed but not compiled into this build: %s", item.toUtf8().constData());
+        APR_ERRORF("[ConfigSelfCheck] feature licensed but not compiled into this build: %s", item.toUtf8().constData());
     }
     for (const QString& item : report.workbenchNotCompiled)
     {
-        SY_WARNF("[ConfigSelfCheck] workbench declared in config but not compiled: %s", item.toUtf8().constData());
+        APR_WARNF("[ConfigSelfCheck] workbench declared in config but not compiled: %s", item.toUtf8().constData());
     }
     if (!report.gatedOutByBuild.isEmpty())
     {
-        SY_DEBUGF("[ConfigSelfCheck] %lld command(s) absent because module not compiled (expected trim)",
+        APR_DEBUGF("[ConfigSelfCheck] %lld command(s) absent because module not compiled (expected trim)",
             static_cast<long long>(report.gatedOutByBuild.size()));
     }
 
     for (const QString& item : report.compiledButNotLicensed)
     {
-        SY_INFOF("[ConfigSelfCheck] feature compiled but not licensed (hidden by gate): %s", item.toUtf8().constData());
+        APR_INFOF("[ConfigSelfCheck] feature compiled but not licensed (hidden by gate): %s", item.toUtf8().constData());
     }
 
     if (!report.hasBlockingIssue())
     {
-        SY_INFO("[ConfigSelfCheck] Config trust check passed: CMake switches, JSON config and license agree");
+        APR_INFO("[ConfigSelfCheck] Config trust check passed: CMake switches, JSON config and license agree");
     }
 }
 
@@ -402,7 +402,7 @@ void UiConfigSelfCheck::runAndLogForCurrentClient()
     const UiConfigData* config = manager.configData();
     if (!config)
     {
-        SY_ERROR("[ConfigSelfCheck] No client config loaded, self-check skipped "
+        APR_ERROR("[ConfigSelfCheck] No client config loaded, self-check skipped "
                  "(menus/toolbars will fall back to empty)");
         return;
     }

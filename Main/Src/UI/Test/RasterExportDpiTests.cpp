@@ -9,12 +9,12 @@
 #include "Export/Writers/RasterExportHelper.h"
 #include "Export/ExportContext.h"
 
-#include "Engine2D/SyEntity/SyLine.h"
-#include "Engine2D/SyEntity/SyPoint.h"
-#include "Engine2D/SyEntity/SyCircle.h"
-#include "Engine2D/SyEntity/SyArc.h"
-#include "Engine2D/SyEntity/SyPolygon.h"
-#include "Engine2D/SyEntity/SyFillRegion.h"
+#include "Engine2D/AprEntity/AprLine.h"
+#include "Engine2D/AprEntity/AprPoint.h"
+#include "Engine2D/AprEntity/AprCircle.h"
+#include "Engine2D/AprEntity/AprArc.h"
+#include "Engine2D/AprEntity/AprPolygon.h"
+#include "Engine2D/AprEntity/AprFillRegion.h"
 
 #include <gtest/gtest.h>
 
@@ -192,8 +192,8 @@ TEST(RasterExportDpi, FiftyMillimeterLineIs591PixelsAt300Dpi)
     ASSERT_TRUE(tempDir.isValid());
     const QString target = tempDir.filePath(QStringLiteral("line_300dpi.png"));
 
-    Fio::VecSyEntityPtr entities;
-    auto line = std::make_unique<Eg::SyLine>();
+    Fio::VecAprEntityPtr entities;
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(50.0, 0.0) });
     entities.push_back(std::move(line));
 
@@ -229,8 +229,8 @@ TEST(RasterExportDpi, CircleBoundingBoxMatchesDpi)
     ASSERT_TRUE(tempDir.isValid());
     const QString target = tempDir.filePath(QStringLiteral("circle_300dpi.png"));
 
-    Fio::VecSyEntityPtr entities;
-    auto circle = std::make_unique<Eg::SyCircle>();
+    Fio::VecAprEntityPtr entities;
+    auto circle = std::make_unique<Eg::AprCircle>();
     circle->basePoint = Ut::Vec2d(10.0, 10.0);
     circle->dRadius = 10.0;
     entities.push_back(std::move(circle));
@@ -266,8 +266,8 @@ TEST(RasterExportDpi, QuarterArcCoversRadiusBoxAndLeavesCenterEmpty)
     ASSERT_TRUE(tempDir.isValid());
     const QString target = tempDir.filePath(QStringLiteral("arc_300dpi.png"));
 
-    Fio::VecSyEntityPtr entities;
-    auto arc = std::make_unique<Eg::SyArc>();
+    Fio::VecAprEntityPtr entities;
+    auto arc = std::make_unique<Eg::AprArc>();
     arc->basePoint = Ut::Vec2d(10.0, 10.0);
     arc->dRadius = 10.0;
     arc->dStartAngle = 0.0;
@@ -333,8 +333,8 @@ TEST(RasterExportDpi, ClosedQuadHonoursFillRule)
     context.scaleFactor = 1.0;
 
     // FILL_NONE：闭合多边形（LineLoop）只描边
-    Fio::VecSyEntityPtr outlineEntities;
-    auto polygon = std::make_unique<Eg::SyPolygon>();
+    Fio::VecAprEntityPtr outlineEntities;
+    auto polygon = std::make_unique<Eg::AprPolygon>();
     polygon->setVertices({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(20.0, 0.0),
                            Ut::Vec2d(20.0, 10.0), Ut::Vec2d(0.0, 10.0) });
     outlineEntities.push_back(std::move(polygon));
@@ -343,8 +343,8 @@ TEST(RasterExportDpi, ClosedQuadHonoursFillRule)
     ASSERT_TRUE(outlineResult.success) << outlineResult.message.toStdString();
 
     // FILL_WINDING：实心区域（Triangles）按绕数填充
-    Fio::VecSyEntityPtr filledEntities;
-    auto region = std::make_unique<Eg::SyFillRegion>();
+    Fio::VecAprEntityPtr filledEntities;
+    auto region = std::make_unique<Eg::AprFillRegion>();
     region->setVertexVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(20.0, 0.0),
                               Ut::Vec2d(20.0, 10.0), Ut::Vec2d(0.0, 10.0) });
     filledEntities.push_back(std::move(region));
@@ -404,8 +404,8 @@ TEST(RasterExportDpi, PngAndJpegRoundTripSmoke)
     const QString pngPath = tempDir.filePath(QStringLiteral("smoke.png"));
     const QString jpegPath = tempDir.filePath(QStringLiteral("smoke.jpg"));
 
-    Fio::VecSyEntityPtr entities;
-    auto line = std::make_unique<Eg::SyLine>();
+    Fio::VecAprEntityPtr entities;
+    auto line = std::make_unique<Eg::AprLine>();
     line->setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(50.0, 0.0) });
     entities.push_back(std::move(line));
 

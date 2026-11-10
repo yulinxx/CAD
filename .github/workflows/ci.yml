@@ -30,9 +30,9 @@ jobs:
       #   Engine* 不得依赖 UI*/Render*/Main；RenderX/RenderBridge 不得依赖 UI*/Main；
       #   UI* 只能经 UiEngineAccess 门面访问 Engine*。
       # 违规会让本步骤直接失败。
-      # 注意：本作业是开发构建，未显式关闭许可校验；SANYI_ENABLE_LICENSE 默认 ON
+      # 注意：本作业是开发构建，未显式关闭许可校验；APR_ENABLE_LICENSE 默认 ON
       # （Config.cmake:237），因此本作业的许可校验为开启状态。如需开发构建关闭，
-      # 显式传 -DSANYI_ENABLE_LICENSE=OFF（宏由 License 库的 CMakeLists 编进 DLL 本身）；
+      # 显式传 -DAPR_ENABLE_LICENSE=OFF（宏由 License 库的 CMakeLists 编进 DLL 本身）；
       # 发货/Release 构建应断言该开关为 ON。
       - name: Configure
         run: |
@@ -43,12 +43,12 @@ jobs:
             -DBUILD_ENGRAVING=OFF \
             -DBUILD_GEOMODELCORE=OFF \
             -DBUILD_PYTHON=OFF \
-            -DSANYI_PYBIND_CORE=OFF
+            -DAPR_PYBIND_CORE=OFF
 
       - name: Build
         run: |
           cmake --build build --config Debug --parallel \
-            --target UICommon UI2D UI3D SanYiCAD \
+            --target UICommon UI2D UI3D April \
             UtilityTests LogTests Engine2DTests Engine3DTests \
             FileIOTests NestingTests CAMTests \
             RenderxTests RenderBridgeTests \
@@ -65,7 +65,7 @@ jobs:
         run: ctest --test-dir build -C Debug --output-on-failure --no-tests=error --parallel
 
   # /analyze 补上 MSVC 侧缺失的 printf 格式串校验（SAL 标注只在 /analyze 下生效，
-  # 详见根 CMakeLists.txt 里 SANYI_MSVC_ANALYZE 的注释）。
+  # 详见根 CMakeLists.txt 里 APR_MSVC_ANALYZE 的注释）。
   # 单独成一个作业而不是并进上面：/analyze 会让编译慢 2~3 倍，不该拖慢主构建与测试。
   # 该作业现在是阻塞门禁（2025 起已跑绿，不再继续放行告警）。
   static-analysis-windows:
@@ -81,16 +81,16 @@ jobs:
       - name: Configure (analyze)
         run: |
           cmake -B build-analyze -G "Visual Studio 17 2022" -A x64 \
-            -DSANYI_MSVC_ANALYZE=ON \
+            -DAPR_MSVC_ANALYZE=ON \
             -DBUILD_TESTS=OFF \
             -DBUILD_HARDWARE=ON \
             -DBUILD_VISION=OFF \
-            -DSANYI_PYBIND_CORE=OFF
+            -DAPR_PYBIND_CORE=OFF
 
       - name: Analyze
         run: |
           cmake --build build-analyze --config Debug --parallel \
-            --target UICommon UI2D UI3D SanYiCAD
+            --target UICommon UI2D UI3D April
 
   # ---------------------------------------------------------------------------
   # macOS / Linux 跨平台核心库验证（Nesting + GeoModelCore 独立构建）。

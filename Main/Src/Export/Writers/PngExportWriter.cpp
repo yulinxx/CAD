@@ -14,7 +14,7 @@ PngExportWriter::PngExportWriter()
 {
 }
 
-ExportResult PngExportWriter::write(const ExportContext& context, const Fio::VecSyEntityPtr& entities)
+ExportResult PngExportWriter::write(const ExportContext& context, const Fio::VecAprEntityPtr& entities)
 {
     return RasterExportHelper::rasterizeExport(context, entities, "PNG");
 }

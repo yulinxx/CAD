@@ -125,10 +125,10 @@ TEST(ClientConfigLoaderTest, ParsesMinimalConfig)
 TEST(ClientConfigLoaderTest, LoadsFromQtResource)
 {
     // configs.qrc 嵌入所有客户配置，经 AUTORCC 编译进测试二进制
-    UiConfigLoader loader(QStringLiteral(":/configs/san_yi.json"));
+    UiConfigLoader loader(QStringLiteral(":/configs/april.json"));
     auto config = loader.load();
     ASSERT_TRUE(config.has_value()) << loader.lastError().toStdString();
-    EXPECT_EQ(config->meta.clientId, QStringLiteral("san_yi"));
+    EXPECT_EQ(config->meta.clientId, QStringLiteral("april"));
     EXPECT_FALSE(config->menus.empty());
     EXPECT_FALSE(config->docks.empty());
 }
@@ -1107,7 +1107,7 @@ TEST(ClientConfigLayoutBuilderTest, SubMenuDynamicSectionFilledAtBuildAndRefille
     UiContextMenuService::instance().resetForTest();
 
     // 段内容随外部数据变化，模拟最近文件列表
-    QStringList data{ QStringLiteral("a.sy") };
+    QStringList data{ QStringLiteral("a.apr") };
     UiContextMenuService::instance().registerDynamicSection(QStringLiteral("test.section"), [&data](QMenu* menu) {
         for (const QString& item : data)
         {
@@ -1134,14 +1134,14 @@ TEST(ClientConfigLayoutBuilderTest, SubMenuDynamicSectionFilledAtBuildAndRefille
     ASSERT_NE(built, nullptr);
     // 建菜单时就填了一次，不必等用户点开
     ASSERT_EQ(built->actions().size(), 1);
-    EXPECT_EQ(built->actions().at(0)->text(), QStringLiteral("a.sy"));
+    EXPECT_EQ(built->actions().at(0)->text(), QStringLiteral("a.apr"));
 
     // 数据变了但菜单没重建：aboutToShow 必须重填，且不得叠加旧条目
-    data = QStringList{ QStringLiteral("b.sy"), QStringLiteral("c.sy") };
+    data = QStringList{ QStringLiteral("b.apr"), QStringLiteral("c.apr") };
     emit built->aboutToShow();
     ASSERT_EQ(built->actions().size(), 2);
-    EXPECT_EQ(built->actions().at(0)->text(), QStringLiteral("b.sy"));
-    EXPECT_EQ(built->actions().at(1)->text(), QStringLiteral("c.sy"));
+    EXPECT_EQ(built->actions().at(0)->text(), QStringLiteral("b.apr"));
+    EXPECT_EQ(built->actions().at(1)->text(), QStringLiteral("c.apr"));
 
     UiContextMenuService::instance().resetForTest();
 }

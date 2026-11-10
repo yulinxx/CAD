@@ -5,7 +5,7 @@
 
 #include "Engine/Persistence/Database.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <cstring>
 #include <map>
@@ -51,7 +51,7 @@ bool SharedDatabaseAdapter::open(const char* dbPath)
     if (!m_db.isOpen())
     {
         m_lastErrorCache = "Shared database connection is not open";
-        SY_ERRORF("[SharedDatabaseAdapter] open(%s) rejected: shared connection not open", dbPath);
+        APR_ERRORF("[SharedDatabaseAdapter] open(%s) rejected: shared connection not open", dbPath);
         return false;
     }
     m_lastErrorCache.clear();
@@ -61,7 +61,7 @@ bool SharedDatabaseAdapter::open(const char* dbPath)
 void SharedDatabaseAdapter::close()
 {
     // no-op：连接生命周期归 PersistenceService 管
-    SY_DEBUG("[SharedDatabaseAdapter] close() ignored on shared connection");
+    APR_DEBUG("[SharedDatabaseAdapter] close() ignored on shared connection");
 }
 
 bool SharedDatabaseAdapter::isOpen() const

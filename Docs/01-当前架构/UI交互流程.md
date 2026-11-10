@@ -89,9 +89,9 @@ sequenceDiagram
 **关键点**
 1. 菜单「顺序 / 分组 / 文案」全部来自 JSON 配置，代码不重建菜单树。
 2. 配置驱动是**唯一**路径：菜单 / 工具栏 / Dock / 状态栏 / 右键菜单全部由 JSON 生成，
-   硬编码 Dock 骨架与 `SANYI_ENABLE_CONFIG_DRIVEN_UI` 宏已删除。
+   硬编码 Dock 骨架与 `APR_ENABLE_CONFIG_DRIVEN_UI` 宏已删除。
 3. 客户 ID 由 `UiClientContext` **运行时**解析
-   （override > `SANYI_CLIENT_ID` 环境变量 > `QSettings Client/Id` > `san_yi`），
+   （override > `APR_CLIENT_ID` 环境变量 > `QSettings Client/Id` > `april`），
    换客户不需要重新编译，一份二进制服务全部客户。
 4. JSON 里带 `feature` 的项会先过 `UiFeatureGate`（注册码 `features` 授权），
    未授权项**不创建**。
@@ -106,10 +106,10 @@ sequenceDiagram
 flowchart TD
     Start["应用启动 / 工作台切换"] --> Build["WorkbenchMenuManager::buildMenus()"]
     Build --> Rebuild["rebuildMenusFromConfig()"]
-    Rebuild --> Resolve["确定 clientId<br/>（UiClientContext 运行时解析，缺省 san_yi）"]
+    Rebuild --> Resolve["确定 clientId<br/>（UiClientContext 运行时解析，缺省 april）"]
     Resolve --> Apply["UiConfigurationManager::shared()<br/>加载 :/configs/&lt;clientId&gt;.json"]
     Apply --> Inherit{"配置声明 extends ?"}
-    Inherit -- "是（如 san_yi → base）" --> Parent["递归先加载父配置 base.json"]
+    Inherit -- "是（如 april → base）" --> Parent["递归先加载父配置 base.json"]
     Parent --> Merge["按 id 合并：子覆盖父同名，新 id 追加"]
     Inherit -- "否" --> Direct["直接使用当前配置"]
     Merge --> Filter["filterMenusForWorkbench()<br/>按『当前工作台 + 命令是否注册』双重过滤"]
@@ -124,7 +124,7 @@ flowchart TD
 ```
 
 **关键点**
-- 配置驱动是唯一路径。连 `san_yi.json` 都加载失败时只打一条 `SY_ERRORF`
+- 配置驱动是唯一路径。连 `april.json` 都加载失败时只打一条 `APR_ERRORF`
   并**不建任何菜单**；原来的 `buildLegacyMenus()` 静态兜底已于 2026-08-26 删除。
 - 命令未注册的菜单项仍保留在菜单上（禁用态），避免结构与文档漂移。
 - 带 `feature` 且未授权的项**不创建**（与「禁用态」不同）。
@@ -142,7 +142,7 @@ flowchart LR
     Switch -- "是" --> WB["主窗口直接处理<br/>（见第 6 节工作台切换）"]
     Switch -- "否" --> HasWB{"存在当前工作台 ?"}
     HasWB -- "是" --> WB2["workbench->dispatchCommand(commandId)"]
-    HasWB -- "否" --> Warn["SY_WARNF 告警，命令不执行"]
+    HasWB -- "否" --> Warn["APR_WARNF 告警，命令不执行"]
     WB2 --> Catalog["2D: CommandCatalog / 3D: CommandCatalog3D<br/>commandId → OperationId"]
     Catalog --> Enrich["OperationRouting::enrichParams<br/>补 angle / mode / unit 等参数"]
     Enrich --> Run["OperationBus::run(OperationId, params, source)"]
@@ -290,7 +290,7 @@ flowchart TD
     Data --> Signal["面板发出选择/可见性/重命名信号<br/>业务逻辑不感知 UI"]
 ```
 
-> 未注册的 `widgetType` 会降级为占位 `QWidget` 并 `SY_WARNF` 告警（不会崩）。
+> 未注册的 `widgetType` 会降级为占位 `QWidget` 并 `APR_WARNF` 告警（不会崩）。
 
 ### 5.2 属性面板编辑交互（用户改属性 → 入撤销栈）
 
@@ -365,7 +365,7 @@ flowchart TD
     D --> Cat["CommandCatalog(2D) / CommandCatalog3D(3D)<br/>commandId → OperationId"]
     Cat --> Bus["OperationBus::run(OperationId, params, source)"]
     Bus --> Reg{"操作已注册？"}
-    Reg -- "否" --> Warn["SY_WARNF 告警，命令不执行"]
+    Reg -- "否" --> Warn["APR_WARNF 告警，命令不执行"]
     Reg -- "是" --> Exec["LambdaOperation / ParamLambdaOperation<br/>调用捕获的业务服务"]
     Exec --> Phase["canExecute → execute<br/>preview → commit → cancel"]
     Phase --> Undo["SceneEditService 入撤销栈"]
@@ -407,7 +407,7 @@ flowchart TD
 | 菜单管理 / 重建 / 工作台切换 | `Main/Src/UI/Workbench/WorkbenchMenuManager.cpp` |
 | 菜单/工具栏/Dock/快捷键构建 | `Main/Src/UI/ClientConfig/UiLayoutBuilder.cpp` |
 | 客户配置加载与回退 | `Main/Src/UI/ClientConfig/UiConfigurationManager.cpp` |
-| 客户配置 JSON | `Main/Src/UI/ClientConfig/configs/{base,san_yi,client_a}.json` |
+| 客户配置 JSON | `Main/Src/UI/ClientConfig/configs/{base,april,client_a}.json` |
 | 2D 命令目录 | `UI/2D/Src/Operation/CommandCatalog.cpp` |
 | 3D 命令目录 | `UI/3D/Src/Operation/CommandCatalog3D.cpp` |
 | 统一命令调度 | `UI/2D/Include/UI2D/Operation/OperationBus.h` |
@@ -430,7 +430,7 @@ flowchart TD
 flowchart TD
     Json["configs/&lt;clientId&gt;.json<br/>（继承 base.json）"] --> Load["UiConfigLoader::load()<br/>JSON → UiClientConfigBase 数据模型"]
     Load --> Validate["配置校验<br/>语法 / Schema / 命令 ID 注册检查"]
-    Validate -- "失败" --> Fallback["回退默认配置（san_yi）<br/>并记录警告"]
+    Validate -- "失败" --> Fallback["回退默认配置（april）<br/>并记录警告"]
     Validate -- "成功" --> Manager["UiConfigurationManager::applyConfiguration()<br/>持有当前生效配置"]
     Manager --> Workbench["WorkbenchMenuManager::rebuildMenusFromConfig()"]
     Workbench --> Filter["filterMenusForWorkbench()<br/>按 workbenches 字段过滤 2D/3D"]
@@ -466,7 +466,7 @@ flowchart TD
 
 | 菜单项 | 2D 工作台 | 3D 工作台 |
 |--------|-----------|-----------|
-| Open | 仅 `.sy` | 仅 `.sy3d` / `.syx` |
+| Open | 仅 `.apr` | 仅 `.apr3d` / `.apr3d` |
 | Import ▸ All Supported... | 2D 全部支持格式集合 | 3D 全部支持格式集合 |
 | Import ▸ 具体格式 | DXF / PLT / SVG / PDF / AI / UG / Image / STEP | OBJ / STL / STEP |
 | Export ▸ 具体格式 | DXF / SVG / PLT / BMP / PNG | OBJ / STL / STEP |
@@ -521,7 +521,7 @@ flowchart LR
         然后 cmake -S . -B build && cmake --build build --config Debug
 
 第 4 步：运行时切到该客户（不需要重新编译换客户）
-        $env:SANYI_CLIENT_ID = "client_x"; .\SanYiCAD.exe
+        $env:APR_CLIENT_ID = "client_x"; .\April.exe
 
 第 5 步：CI 校验
         validate_configs.py（命令 ID 检查）+ 快照回归
@@ -538,7 +538,7 @@ flowchart LR
 | 配置管理与回退 | `Main/Src/UI/ClientConfig/UiConfigurationManager.cpp` |
 | 布局构建（模型 → Qt 菜单） | `Main/Src/UI/ClientConfig/UiLayoutBuilder.cpp` |
 | 面板工厂注册 | `Main/Src/UI/ClientConfig/UiPanelRegistry.cpp` |
-| 客户配置 JSON | `Main/Src/UI/ClientConfig/configs/{base,san_yi,client_a}.json` |
+| 客户配置 JSON | `Main/Src/UI/ClientConfig/configs/{base,april,client_a}.json` |
 | 2D 文件操作处理器 | `Main/Src/Composition/FileOperationRegistry.cpp` |
 | 3D 文件操作处理器 | `UI/3D/Src/Operation/FileOperations3D.cpp` |
 | 2D 命令目录 | `UI/2D/Src/Operation/CommandCatalog.cpp` |

@@ -13,7 +13,7 @@
 
 #include <cstdio>
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "VersionInfo.h"
 #include "Common/AppInitializer.h"
 #include "Common/CrashHandlerBootstrap.h"
@@ -37,11 +37,11 @@ CADApplicationRuntime::CADApplicationRuntime(std::unique_ptr<QApplication> app, 
     // 检测应用名称是否正确配置
     if (QCoreApplication::applicationName().isEmpty())
     {
-        SY_WARN("[CADApplicationRuntime] Application name is empty! "
+        APR_WARN("[CADApplicationRuntime] Application name is empty! "
                 "Check CMake configuration: APP_NAME may not be properly propagated to templates.");
     }
     // organizationName/Domain/窗口图标/默认主题 已在 CADApplicationEntry 中应用品牌层
-    SY_INFOF("[CADApplicationRuntime] Brand identity: product='%s' company='%s' client='%s'",
+    APR_INFOF("[CADApplicationRuntime] Brand identity: product='%s' company='%s' client='%s'",
         qPrintable(brand.productName()),
         qPrintable(brand.companyName()),
         qPrintable(brand.clientId()));
@@ -67,7 +67,7 @@ CADApplicationRuntime::~CADApplicationRuntime()
     m_app.reset();
     AppInitializer::shutdown();
 
-    SY_INFO("[CADApplicationRuntime] Application shutdown complete");
+    APR_INFO("[CADApplicationRuntime] Application shutdown complete");
 }
 
 // 运行应用主循环，执行初始化、许可证检查、引导和事件循环
@@ -98,17 +98,17 @@ int CADApplicationRuntime::run()
 
     // 初始化崩溃处理
     //
-    // SANYI_DISABLE_CRASH_HANDLER=1 时跳过：Breakpad 在 macOS 上抢的是 Mach 异常端口，
+    // APR_DISABLE_CRASH_HANDLER=1 时跳过：Breakpad 在 macOS 上抢的是 Mach 异常端口，
     // 优先级高于 AddressSanitizer 的信号处理，装上它 ASan 就永远打不出 free 栈/use 栈，
     // 只剩一个 minidump。排查内存问题（ASan / Valgrind）时必须让它让位。
-    if (qEnvironmentVariableIntValue("SANYI_DISABLE_CRASH_HANDLER") != 0)
+    if (qEnvironmentVariableIntValue("APR_DISABLE_CRASH_HANDLER") != 0)
     {
-        SY_DEBUG("[CADApplicationRuntime] CrashHandler disabled");
+        APR_DEBUG("[CADApplicationRuntime] CrashHandler disabled");
     }
     else if (!CrashHandlerBootstrap::initialize(
                  brand.productName().toStdString(), QString::fromStdString(MainApp::appVersion()).toStdString()))
     {
-        SY_WARN("[CADApplicationRuntime] CrashHandler initialization failed, continuing without crash capture");
+        APR_WARN("[CADApplicationRuntime] CrashHandler initialization failed, continuing without crash capture");
     }
 
     // 授权闸门（试用期/许可 UI 流程）：独立单元，见 LicensingBootstrap
@@ -125,7 +125,7 @@ int CADApplicationRuntime::run()
     // 初始化引导器
     if (!m_bootstrapper->initialize())
     {
-        SY_ERROR("[CADApplicationRuntime] error code=app.bootstrap_init_failed message=AppBootstrapper initialization "
+        APR_ERROR("[CADApplicationRuntime] error code=app.bootstrap_init_failed message=AppBootstrapper initialization "
                  "failed");
         return -2;
     }
@@ -136,7 +136,7 @@ int CADApplicationRuntime::run()
     // 验证引导结果
     if (!m_bootstrapper->compositionRoot())
     {
-        SY_ERROR("[CADApplicationRuntime] error code=app.bootstrap_no_root message=Bootstrap completed without a valid "
+        APR_ERROR("[CADApplicationRuntime] error code=app.bootstrap_no_root message=Bootstrap completed without a valid "
                  "composition root");
         return -2;
     }
@@ -170,12 +170,12 @@ int CADApplicationRuntime::run()
     // 启动冒烟开关：仅在显式传入 --smoke-exit-ms=N 时生效，走标准退出路径（aboutToQuit 仍会保存设置）
     if (m_smokeExitMs > 0)
     {
-        SY_INFOF("[Smoke] auto exit scheduled in %d ms", m_smokeExitMs);
+        APR_INFOF("[Smoke] auto exit scheduled in %d ms", m_smokeExitMs);
         QTimer::singleShot(m_smokeExitMs, m_app.get(), &QCoreApplication::quit);
     }
 
     const int exitCode = m_app->exec();
-    SY_INFOF("[CADApplicationRuntime] Application exited with code %d", exitCode);
+    APR_INFOF("[CADApplicationRuntime] Application exited with code %d", exitCode);
     return exitCode;
 }
 

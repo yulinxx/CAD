@@ -3,7 +3,7 @@
 #include "UI/Services/ISelectionService.h"
 
 #include "Engine/Scene/ISceneContext.h"
-#include "Engine/SyEntity/SyEntity.h"
+#include "Engine/AprEntity/AprEntity.h"
 #include "Engine/EntityIdUtils.h"
 
 ViewportSelector::ViewportSelector(Eg::ISceneContext* sceneContext, ISelectionService* selectionService)
@@ -20,7 +20,7 @@ std::optional<Ut::BBox2d> ViewportSelector::selectionBBox() const
     }
 
     // 通过 ID 遍历选中项，再用 SceneContext 查询图元指针合并 BBox
-    // 这样 ISelectionService 保持纯 ID 接口，不泄漏 SyEntity*
+    // 这样 ISelectionService 保持纯 ID 接口，不泄漏 AprEntity*
     struct BBoxContext
     {
         Ut::BBox2d combined;
@@ -44,8 +44,8 @@ std::optional<Ut::BBox2d> ViewportSelector::selectionBBox() const
                 return;
             }
             Eg::IEntity* entity = bc->sceneContext->findEntityById(*eid);
-            // 2D 路径图元均为 SyEntity；hidden visibility 下不用 dynamic_cast
-            auto* syEntity = static_cast<Eg::SyEntity*>(entity);
+            // 2D 路径图元均为 AprEntity；hidden visibility 下不用 dynamic_cast
+            auto* syEntity = static_cast<Eg::AprEntity*>(entity);
             if (!syEntity)
             {
                 return;

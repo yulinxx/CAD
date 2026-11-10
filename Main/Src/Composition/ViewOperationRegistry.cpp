@@ -118,7 +118,7 @@ void ViewOperationRegistry::registerAll()
                     QString path = captureService->saveImage(img, req, false);
                     if (!path.isEmpty())
                     {
-                        SY_DEBUGF("[View_Capture] Saved to %s", path.toStdString().c_str());
+                        APR_DEBUGF("[View_Capture] Saved to %s", path.toStdString().c_str());
                         // 保存成功后打开图片所在目录
                         QString dir = QFileInfo(path).absolutePath();
                         QDesktopServices::openUrl(QUrl::fromLocalFile(dir));

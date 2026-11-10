@@ -43,7 +43,7 @@
 #include "Engine3D/Import/FioEntityConverter.h"
 #include "Color/Color.hpp"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <algorithm>
 #include <cstring>
@@ -90,7 +90,7 @@ namespace
     }
 
     // Ut::Color(0..1) → ARGB uint32（高 8 位 alpha）。FileIO 的 proto 用这个格式存图层色。
-    uint32_t sanyiSetupColorToArgb(const Ut::Color& c)
+    uint32_t aprSetupColorToArgb(const Ut::Color& c)
     {
         return (static_cast<uint32_t>(c.alpha255() & 0xFF) << 24) |
             (static_cast<uint32_t>(c.red255() & 0xFF) << 16) |
@@ -98,13 +98,13 @@ namespace
             (static_cast<uint32_t>(c.blue255() & 0xFF));
     }
 
-    // 原生 .sy 的加工语义快照：图层表 + 硬件 Profile 值集。
+    // 原生 .apr 的加工语义快照：图层表 + 硬件 Profile 值集。
     //
     // 只在主线程被 ExportService 调用（导出 Phase 1）。这里读的是 LayerManager
-    // 的管理态字段，不是 SyLayer 的镜像副本：hardwareProfileId / fillHardwareProfileId
-    // / output / defaultProcessId 只存在于前者，从 SyLayer 取会漏掉加工语义。
+    // 的管理态字段，不是 AprLayer 的镜像副本：hardwareProfileId / fillHardwareProfileId
+    // / output / defaultProcessId 只存在于前者，从 AprLayer 取会漏掉加工语义。
     // 结果全部是 FileIO 的跨 DLL POD，可安全按值交给后台线程。
-    NativeDocumentSnapshot sanyiSetupCaptureMachiningSnapshot(LayerManager* layerManager)
+    NativeDocumentSnapshot aprSetupCaptureMachiningSnapshot(LayerManager* layerManager)
     {
         NativeDocumentSnapshot snapshot;
         if (!layerManager)
@@ -116,19 +116,19 @@ namespace
         snapshot.layers.reserve(layerIds.size());
         for (int id : layerIds)
         {
-            Fio::SyLayerDetailInfo info;
+            Fio::AprLayerDetailInfo info;
             info.id = static_cast<uint32_t>(id);
             const std::string name = layerManager->layerName(id);
             std::strncpy(info.name, name.c_str(), sizeof(info.name) - 1);
             info.name[sizeof(info.name) - 1] = '\0';
-            info.color = sanyiSetupColorToArgb(layerManager->layerColor(id));
+            info.color = aprSetupColorToArgb(layerManager->layerColor(id));
             info.visible = layerManager->isLayerVisible(id);
             info.locked = layerManager->isLayerLocked(id);
             info.output = layerManager->isLayerOutput(id);
             info.defaultProcessId = layerManager->layerDefaultProcessId(id);
             info.layerType = static_cast<uint32_t>(layerManager->layerType(id));
             info.fill = layerManager->isLayerFill(id);
-            info.fillColor = sanyiSetupColorToArgb(layerManager->layerFillColor(id));
+            info.fillColor = aprSetupColorToArgb(layerManager->layerFillColor(id));
             info.hardwareProfileId = layerManager->layerHardwareProfileId(id);
             info.fillHardwareProfileId = layerManager->layerFillHardwareProfileId(id);
             snapshot.layers.push_back(info);
@@ -151,7 +151,7 @@ namespace
                 continue;
             }
             const HardwareProfile hp = profiles->profile(pid);
-            Fio::SyHardwareProfileInfo info;
+            Fio::AprHardwareProfileInfo info;
             info.id = pid;
             std::strncpy(info.name, hp.name.c_str(), sizeof(info.name) - 1);
             info.name[sizeof(info.name) - 1] = '\0';
@@ -249,7 +249,7 @@ void ImportExportServiceSetup::registerReaders()
     m_importDispatcher->registerReader(std::make_unique<AiImportReader>());
     m_importDispatcher->registerReader(std::make_unique<NativeImportReader>());
     m_importDispatcher->registerReader(std::make_unique<UgImportReader>());
-    SY_DEBUGF("[ImportDispatcher] Registered %lld reader(s): %s",
+    APR_DEBUGF("[ImportDispatcher] Registered %lld reader(s): %s",
         static_cast<long long>(m_importDispatcher->supportedExtensions().size()),
         m_importDispatcher->supportedExtensions().join(QLatin1String(", ")).toUtf8().constData());
 }
@@ -266,7 +266,7 @@ void ImportExportServiceSetup::registerWriters()
     m_exportDispatcher->registerWriter(std::make_unique<ObjExportWriter>());
     m_exportDispatcher->registerWriter(std::make_unique<StepExportWriter>());
     m_exportDispatcher->registerWriter(std::make_unique<NativeExportWriter>());
-    SY_DEBUGF("[ExportDispatcher] Registered %lld writer(s): %s",
+    APR_DEBUGF("[ExportDispatcher] Registered %lld writer(s): %s",
         static_cast<long long>(m_exportDispatcher->supportedExtensions().size()),
         m_exportDispatcher->supportedExtensions().join(QLatin1String(", ")).toUtf8().constData());
 }
@@ -298,10 +298,10 @@ void ImportExportServiceSetup::wireCallbacks()
     m_exportService->setSceneManager(m_sceneManager);
     m_exportService->setSceneManager3D(m_sceneManager3D);
     m_exportService->setPersistenceService(m_persistence);
-    // .sy 保存必须带走图层表与硬件 Profile 值集；provider 每次在主线程现场读取，
+    // .apr 保存必须带走图层表与硬件 Profile 值集；provider 每次在主线程现场读取，
     // 因为 HardwareProfileManager 是在本 setup() 之后才由 OperationRegistrar 注入的。
     m_exportService->setNativeMachiningSnapshotProvider(
-        [layerManager = m_layerManager]() { return sanyiSetupCaptureMachiningSnapshot(layerManager); });
+        [layerManager = m_layerManager]() { return aprSetupCaptureMachiningSnapshot(layerManager); });
     wireCommonCallbacks(m_stateCenter, m_exportService);
 }
 

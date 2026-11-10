@@ -17,7 +17,7 @@
 #include <gtest/gtest.h>
 
 #include "Engine2D/Core/SceneNotifier.h"
-#include "Engine2D/SyEntity/SyLine.h"
+#include "Engine2D/AprEntity/AprLine.h"
 
 #include <memory>
 #include <vector>
@@ -38,7 +38,7 @@ public:
         m_calls.push_back("selectionChanged");
     }
 
-    void onEntityAdded(Eg::SyEntity* entity) override
+    void onEntityAdded(Eg::AprEntity* entity) override
     {
         m_addedEntities.push_back(entity);
         m_calls.push_back("entityAdded");
@@ -58,7 +58,7 @@ public:
     }
 
     std::vector<std::string> m_calls;
-    std::vector<Eg::SyEntity*> m_addedEntities;
+    std::vector<Eg::AprEntity*> m_addedEntities;
     size_t m_removedCount = 0;
 };
 
@@ -223,7 +223,7 @@ TEST(SceneNotifierTest, NotifyEntityAdded_SingleObserver)
     Eg::SceneNotifier notifier;
     TestObserver obs;
 
-    Eg::SyLine line;
+    Eg::AprLine line;
     line.setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
 
     notifier.addObserver(&obs);
@@ -250,7 +250,7 @@ TEST(SceneNotifierTest, NotifyEntityAdded_MultipleEntities)
     Eg::SceneNotifier notifier;
     TestObserver obs;
 
-    Eg::SyLine line1, line2, line3;
+    Eg::AprLine line1, line2, line3;
     line1.setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(1, 1) });
     line2.setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(2, 2) });
     line3.setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(3, 3) });
@@ -352,7 +352,7 @@ TEST(SceneNotifierTest, Batch_EntityAddedDeferred)
     Eg::SceneNotifier notifier;
     TestObserver obs;
 
-    Eg::SyLine line;
+    Eg::AprLine line;
     line.setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
 
     notifier.addObserver(&obs);
@@ -388,7 +388,7 @@ TEST(SceneNotifierTest, Batch_MultipleNotificationsDeferred)
     Eg::SceneNotifier notifier;
     TestObserver obs;
 
-    Eg::SyLine line1, line2;
+    Eg::AprLine line1, line2;
     line1.setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(1, 1) });
     line2.setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(2, 2) });
 
@@ -494,7 +494,7 @@ TEST(SceneNotifierTest, IndependentFromSceneManager)
     notifier.notifySceneChanged();
     notifier.notifySelectionChanged();
 
-    Eg::SyLine line;
+    Eg::AprLine line;
     line.setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(5, 5) });
     notifier.notifyEntityAdded(&line);
     notifier.notifyEntityRemoved();

@@ -1,6 +1,6 @@
 #include "License/TrialManager.h"
 #include "MachineFingerprint.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <openssl/evp.h>
 
@@ -55,20 +55,20 @@ namespace
             std::string result;
             result.resize(len - 1);
             WideCharToMultiByte(CP_UTF8, 0, path.c_str(), -1, &result[0], len, nullptr, nullptr);
-            result += "\\SanYiCAD";
+            result += "\\April";
             return result;
         }
 #elif defined(__APPLE__)
         const char* home = getenv("HOME");
         if (home)
         {
-            return std::string(home) + "/Library/Application Support/SanYiCAD";
+            return std::string(home) + "/Library/Application Support/April";
         }
 #else  // Linux
         const char* home = getenv("HOME");
         if (home)
         {
-            return std::string(home) + "/.config/sanyicad";
+            return std::string(home) + "/.config/april";
         }
 #endif
         return ".";
@@ -121,7 +121,7 @@ extern "C"
                 s_checked = true;
 
                 // 调试输出
-                SY_DEBUGF("[Trial] check: status=%d, startDate='%s', trialDays=%d",
+                APR_DEBUGF("[Trial] check: status=%d, startDate='%s', trialDays=%d",
                     static_cast<int>(status),
                     mgr.startDate().c_str(),
                     mgr.trialDays());
@@ -136,7 +136,7 @@ extern "C"
                     s_cachedResult = 0;  // Active 或其他状态都允许继续
                 }
                 s_cachedDays = mgr.remainingDays();
-                SY_DEBUGF("[Trial] remainingDays=%d", s_cachedDays);
+                APR_DEBUGF("[Trial] remainingDays=%d", s_cachedDays);
             }
 
             if (remainingDays)
@@ -166,7 +166,7 @@ extern "C"
 
 #ifdef _WIN32
         // 删除注册表
-        RegDeleteTreeW(HKEY_CURRENT_USER, L"Software\\SanYiCAD\\Trial");
+        RegDeleteTreeW(HKEY_CURRENT_USER, L"Software\\April\\Trial");
 #endif
 
         // 清除 Trial_Check 缓存与单例内存态，使下一次 Check 重新读档
@@ -257,11 +257,11 @@ void TrialManager::init()
     if (loaded)
     {
         // 验证有效性
-        SY_DEBUG("[Trial] loaded=true, validating...");
+        APR_DEBUG("[Trial] loaded=true, validating...");
         if (validate())
         {
             const int remaining = remainingDays();
-            SY_DEBUGF("[Trial] validate ok, remaining=%d", remaining);
+            APR_DEBUGF("[Trial] validate ok, remaining=%d", remaining);
             if (remaining <= 0)
             {
                 m_status = Status::Expired;
@@ -274,7 +274,7 @@ void TrialManager::init()
         }
         else
         {
-            SY_DEBUG("[Trial] validate FAILED, will create new trial");
+            APR_DEBUG("[Trial] validate FAILED, will create new trial");
         }
     }
 
@@ -388,7 +388,7 @@ bool TrialManager::saveToRegistry() const
 {
     HKEY hKey;
     if (RegCreateKeyExW(
-            HKEY_CURRENT_USER, L"Software\\SanYiCAD\\Trial", 0, nullptr, 0, KEY_WRITE, nullptr, &hKey, nullptr) !=
+            HKEY_CURRENT_USER, L"Software\\April\\Trial", 0, nullptr, 0, KEY_WRITE, nullptr, &hKey, nullptr) !=
         ERROR_SUCCESS)
     {
         return false;
@@ -431,7 +431,7 @@ bool TrialManager::saveToRegistry() const
 bool TrialManager::loadFromRegistry()
 {
     HKEY hKey;
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\SanYiCAD\\Trial", 0, KEY_READ, &hKey) != ERROR_SUCCESS)
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\April\\Trial", 0, KEY_READ, &hKey) != ERROR_SUCCESS)
     {
         return false;
     }

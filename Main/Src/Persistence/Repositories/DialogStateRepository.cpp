@@ -7,7 +7,7 @@
 #include "DialogStateRepository.h"
 
 #include "Engine/Persistence/Database.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <sstream>
 
@@ -29,7 +29,7 @@ bool DialogStateRepository::save(const DialogStateRecord& record)
         return fail("DialogStateRepository", "Failed to save dialog state");
     }
 
-    SY_DEBUGF("[DialogStateRepository] Saved dialog state: key=%s, doc=%s",
+    APR_DEBUGF("[DialogStateRepository] Saved dialog state: key=%s, doc=%s",
         record.dialogKey.c_str(),
         record.documentId.c_str());
     return true;
@@ -114,7 +114,7 @@ bool DialogStateRepository::remove(const std::string& dialogKey, const std::stri
         return fail("DialogStateRepository", "Failed to remove dialog state");
     }
 
-    SY_DEBUGF("[DialogStateRepository] Removed dialog state: key=%s", dialogKey.c_str());
+    APR_DEBUGF("[DialogStateRepository] Removed dialog state: key=%s", dialogKey.c_str());
     return true;
 }
 
@@ -125,12 +125,12 @@ int DialogStateRepository::removeByDocument(const std::string& documentId)
 
     if (!m_database.deleteRows("dialog_states", "document_id = :document_id", whereParams))
     {
-        SY_ERRORF("[DialogStateRepository] Failed to remove dialog states for document: %s", documentId.c_str());
+        APR_ERRORF("[DialogStateRepository] Failed to remove dialog states for document: %s", documentId.c_str());
         return 0;
     }
 
     int count = m_database.changes();
-    SY_DEBUGF("[DialogStateRepository] Removed %d dialog states for document: %s", count, documentId.c_str());
+    APR_DEBUGF("[DialogStateRepository] Removed %d dialog states for document: %s", count, documentId.c_str());
     return count;
 }
 

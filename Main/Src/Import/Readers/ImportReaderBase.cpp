@@ -14,8 +14,8 @@
 #include "FileIO/FileIOManager.h"
 #include "FileIO/UnitTransform.h"
 #include "Engine3D/Import/FioEntityConverter.h"
-#include "Log/SyLogger.h"
-#include "Engine/SyEntity/SyEntity.h"
+#include "Log/AprLogger.h"
+#include "Engine/AprEntity/AprEntity.h"
 
 #include <cmath>
 
@@ -85,7 +85,7 @@ void ImportReaderBase::decorateError(QString& /*msg*/, const ImportContext& /*co
 
 bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
     Fio::FileFormat format,
-    Fio::VecSyEntityPtr& outEntities,
+    Fio::VecAprEntityPtr& outEntities,
     bool collectLayers,
     ImportResult* result,
     QString* errMsg) const
@@ -127,7 +127,7 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
     // 解析失败与"解析成功但零图元"必须分开报：前者是文件/环境问题，后者多是内容为空或全部图元不受支持
     if (!ok)
     {
-        SY_ERRORF("[ImportReader:%s] IR parse failed after %lld ms: %s",
+        APR_ERRORF("[ImportReader:%s] IR parse failed after %lld ms: %s",
             tag.constData(),
             static_cast<long long>(parseMs),
             errBuf[0] ? errBuf : "no error detail from FileIO");
@@ -145,7 +145,7 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
 
     if (ir.entityCount == 0)
     {
-        SY_WARNF("[ImportReader:%s] IR parse produced no entity after %lld ms: layers=%u, groups=%u, warnings=%u",
+        APR_WARNF("[ImportReader:%s] IR parse produced no entity after %lld ms: layers=%u, groups=%u, warnings=%u",
             tag.constData(),
             static_cast<long long>(parseMs),
             ir.layerCount,
@@ -174,7 +174,7 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
     double importScale = context.scaleFactor;
     if (!std::isfinite(importScale) || importScale <= 0.0)
     {
-        SY_WARNF("[ImportReader:%s] Ignoring invalid ImportContext::scaleFactor", tag.constData());
+        APR_WARNF("[ImportReader:%s] Ignoring invalid ImportContext::scaleFactor", tag.constData());
         importScale = 1.0;
     }
     const QByteArray targetUnit = context.unit.isEmpty() ? QByteArrayLiteral("mm") : context.unit.toUtf8();
@@ -184,7 +184,7 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
     }
     if (std::fabs(importScale - 1.0) > 1e-12 && !Fio::scaleParseResult(&ir, importScale))
     {
-        SY_ERRORF("[ImportReader:%s] Unit scale failed (scale=%f, sourceUnit='%s', target='%s')",
+        APR_ERRORF("[ImportReader:%s] Unit scale failed (scale=%f, sourceUnit='%s', target='%s')",
             tag.constData(),
             importScale,
             ir.sourceUnit,
@@ -198,14 +198,14 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
     }
     if (std::fabs(importScale - 1.0) > 1e-12)
     {
-        SY_INFOF("[ImportReader:%s] Applied import scale=%f (sourceUnit='%s', target='%s')",
+        APR_INFOF("[ImportReader:%s] Applied import scale=%f (sourceUnit='%s', target='%s')",
             tag.constData(),
             importScale,
             ir.sourceUnit,
             targetUnit.constData());
     }
 
-    SY_DEBUGF("[ImportReader:%s] IR parsed in %lld ms: entities=%u, layers=%u, groups=%u, warnings=%u, unit='%s', "
+    APR_DEBUGF("[ImportReader:%s] IR parsed in %lld ms: entities=%u, layers=%u, groups=%u, warnings=%u, unit='%s', "
               "sourceFormat='%s'",
         tag.constData(),
         static_cast<long long>(parseMs),
@@ -232,7 +232,7 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
     // 转换层会跳过自己不认识的图元类型；数量对不上时必须点明差额，否则表现为"导入少了东西"却无迹可查
     if (outEntities.size() != static_cast<size_t>(ir.entityCount))
     {
-        SY_WARNF("[ImportReader:%s] Converter dropped %zu of %u IR entity(ies): unsupported type or invalid geometry",
+        APR_WARNF("[ImportReader:%s] Converter dropped %zu of %u IR entity(ies): unsupported type or invalid geometry",
             tag.constData(),
             static_cast<size_t>(ir.entityCount) - outEntities.size(),
             ir.entityCount);
@@ -258,17 +258,17 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
     }
     else if (ir.layerCount > 0)
     {
-        SY_DEBUGF("[ImportReader:%s] IR carried %u layer(s) but layer collection is off for this format",
+        APR_DEBUGF("[ImportReader:%s] IR carried %u layer(s) but layer collection is off for this format",
             tag.constData(),
             ir.layerCount);
     }
 
     if (ir.groupCount > 0)
     {
-        // 提取源文件群组表（名称 + 父子关系），随导入结果带回，供 ImportService 重建 SyGroup
+        // 提取源文件群组表（名称 + 父子关系），随导入结果带回，供 ImportService 重建 AprGroup
         res.importedGroups = Eg::FioEntityConverter::extractGroups(ir);
         res.entityGroupMap = std::move(entityGroupMap);
-        SY_DEBUGF("[ImportReader:%s] IR carried %u group(s), %zu entity-group assignment(s)",
+        APR_DEBUGF("[ImportReader:%s] IR carried %u group(s), %zu entity-group assignment(s)",
             tag.constData(),
             ir.groupCount,
             res.entityGroupMap.size());
@@ -282,7 +282,7 @@ bool ImportReaderBase::tryImportViaIR(const ImportContext& context,
 }
 
 ImportResult ImportReaderBase::readViaIR(
-    const ImportContext& context, Fio::FileFormat format, Fio::VecSyEntityPtr& outEntities, bool collectLayers) const
+    const ImportContext& context, Fio::FileFormat format, Fio::VecAprEntityPtr& outEntities, bool collectLayers) const
 {
     const QByteArray tag = m_formatName.toUtf8();
 
@@ -290,7 +290,7 @@ ImportResult ImportReaderBase::readViaIR(
     QString errMsg;
     if (tryImportViaIR(context, format, outEntities, collectLayers, &result, &errMsg))
     {
-        SY_DEBUGF("[ImportReader:%s] read END: success, entities=%d, layers=%zu, layerMapped=%zu, groups=%zu",
+        APR_DEBUGF("[ImportReader:%s] read END: success, entities=%d, layers=%zu, layerMapped=%zu, groups=%zu",
             tag.constData(),
             result.entityCount,
             result.importedLayers.size(),
@@ -300,7 +300,7 @@ ImportResult ImportReaderBase::readViaIR(
     }
 
     const ImportErrorType errorType = classifyError(errMsg);
-    SY_ERRORF("[ImportReader:%s] read END: failed, errorType=%d, message=%s",
+    APR_ERRORF("[ImportReader:%s] read END: failed, errorType=%d, message=%s",
         tag.constData(),
         static_cast<int>(errorType),
         errMsg.toUtf8().constData());
@@ -308,7 +308,7 @@ ImportResult ImportReaderBase::readViaIR(
 }
 
 ImportResult ImportReaderBase::readViaLegacy(
-    const ImportContext& context, Fio::FileFormat format, Fio::VecSyEntityPtr& outEntities) const
+    const ImportContext& context, Fio::FileFormat format, Fio::VecAprEntityPtr& outEntities) const
 {
     const QByteArray tag = m_formatName.toUtf8();
     const std::string pathStr = context.sourcePath.toUtf8().toStdString();
@@ -324,7 +324,7 @@ ImportResult ImportReaderBase::readViaLegacy(
         if (fileIO.importToIR(pathStr.c_str(), format, &ir, irErrBuf, sizeof(irErrBuf), nullptr, nullptr) &&
             ir.entityCount > 0)
         {
-            SY_DEBUGF(
+            APR_DEBUGF(
                 "[ImportReader:%s] readViaLegacy: IR path succeeded as fallback, entities=%u, layers=%u, groups=%u",
                 tag.constData(),
                 ir.entityCount,
@@ -360,7 +360,7 @@ ImportResult ImportReaderBase::readViaLegacy(
             result.importedGroups = Eg::FioEntityConverter::extractGroups(ir);
             result.entityGroupMap = std::move(entityGroupMap);
 
-            SY_INFOF("[ImportReader:%s] readViaLegacy: fallback IR path complete, %zu entities, %zu layers, %zu groups",
+            APR_INFOF("[ImportReader:%s] readViaLegacy: fallback IR path complete, %zu entities, %zu layers, %zu groups",
                 tag.constData(),
                 outEntities.size(),
                 result.importedLayers.size(),
@@ -369,13 +369,13 @@ ImportResult ImportReaderBase::readViaLegacy(
             return result;
         }
 
-        SY_DEBUGF("[ImportReader:%s] readViaLegacy: IR fallback failed (%s), falling back to legacy importFile",
+        APR_DEBUGF("[ImportReader:%s] readViaLegacy: IR fallback failed (%s), falling back to legacy importFile",
             tag.constData(),
             irErrBuf[0] ? irErrBuf : "no error");
     }
 
     // ===== IR 路径失败，走旧版 importFile 路径（不携带图层/群组信息） =====
-    SY_WARNF("[ImportReader:%s] Falling back to legacy importFile path (no layer/group restore)", tag.constData());
+    APR_WARNF("[ImportReader:%s] Falling back to legacy importFile path (no layer/group restore)", tag.constData());
 
     Fio::FileIOManager fileIO;
     QStringList warns;
@@ -383,7 +383,7 @@ ImportResult ImportReaderBase::readViaLegacy(
         static_cast<QStringList*>(ctx)->append(QString::fromUtf8(warning));
     };
 
-    Eg::SyEntity** raw = nullptr;
+    Eg::AprEntity** raw = nullptr;
     size_t count = 0;
     size_t layerCount = 0;
     char errBuf[1024] = { 0 };
@@ -398,7 +398,7 @@ ImportResult ImportReaderBase::readViaLegacy(
     {
         QString msg = QString::fromUtf8(errBuf);
         decorateError(msg, context);
-        SY_ERRORF("[ImportReader:%s] Legacy import failed after %lld ms: %s",
+        APR_ERRORF("[ImportReader:%s] Legacy import failed after %lld ms: %s",
             tag.constData(),
             static_cast<long long>(elapsedMs),
             msg.toUtf8().constData());
@@ -415,11 +415,11 @@ ImportResult ImportReaderBase::readViaLegacy(
 
     if (!warns.isEmpty())
     {
-        SY_WARNF(
+        APR_WARNF(
             "[ImportReader:%s] Legacy parser produced %d warning(s)", tag.constData(), static_cast<int>(warns.size()));
     }
 
-    SY_DEBUGF("[ImportReader:%s] read END (legacy): success, entities=%zu, layers=%zu, warnings=%zu, %lld ms",
+    APR_DEBUGF("[ImportReader:%s] read END (legacy): success, entities=%zu, layers=%zu, warnings=%zu, %lld ms",
         tag.constData(),
         count,
         layerCount,

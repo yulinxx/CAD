@@ -5,7 +5,7 @@
 #include "SettingsRepository.h"
 
 #include "Engine/Persistence/Database.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 SettingsRepository::SettingsRepository(Eg::Database& database)
     : SqliteRepositoryBase(database)

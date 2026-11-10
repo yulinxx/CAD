@@ -3,7 +3,7 @@
  * @brief 导入调度器实现
  */
 #include "ImportDispatcher.h"
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "FileIO/FormatRegistry.h"
 
 #include <chrono>
@@ -15,7 +15,7 @@ void ImportDispatcher::registerReader(std::unique_ptr<IImportReader> reader)
 {
     if (!reader)
     {
-        SY_WARN("[ImportDispatcher] registerReader ignored: null reader");
+        APR_WARN("[ImportDispatcher] registerReader ignored: null reader");
         return;
     }
 
@@ -26,7 +26,7 @@ void ImportDispatcher::registerReader(std::unique_ptr<IImportReader> reader)
     auto existing = m_formatMap.find(fmt);
     if (existing != m_formatMap.end())
     {
-        SY_WARNF("[ImportDispatcher] Reader for format=%d already registered ('%s'), overriding with '%s'",
+        APR_WARNF("[ImportDispatcher] Reader for format=%d already registered ('%s'), overriding with '%s'",
             static_cast<int>(fmt),
             existing->second->formatName().toUtf8().constData(),
             formatName.toUtf8().constData());
@@ -36,14 +36,14 @@ void ImportDispatcher::registerReader(std::unique_ptr<IImportReader> reader)
     m_readers.push_back(std::move(reader));
 }
 
-ImportResult ImportDispatcher::dispatch(const ImportContext& context, Fio::VecSyEntityPtr& outEntities)
+ImportResult ImportDispatcher::dispatch(const ImportContext& context, Fio::VecAprEntityPtr& outEntities)
 {
     // 文件存在性检查
     QFileInfo fi(context.sourcePath);
     if (!fi.exists())
     {
         QString msg = QCoreApplication::translate("ImportDispatcher", "File not found: %1").arg(context.sourcePath);
-        SY_ERRORF("[ImportDispatcher] %s", msg.toUtf8().constData());
+        APR_ERRORF("[ImportDispatcher] %s", msg.toUtf8().constData());
         return ImportResult::fail(msg, ImportErrorType::FileNotFound);
     }
 
@@ -58,7 +58,7 @@ ImportResult ImportDispatcher::dispatch(const ImportContext& context, Fio::VecSy
     {
         QString msg =
             QCoreApplication::translate("ImportDispatcher", "Unsupported file format: %1").arg(fi.suffix().toUpper());
-        SY_ERRORF("[ImportDispatcher] %s", msg.toUtf8().constData());
+        APR_ERRORF("[ImportDispatcher] %s", msg.toUtf8().constData());
         return ImportResult::fail(msg, ImportErrorType::FormatNotSupported);
     }
 
@@ -67,7 +67,7 @@ ImportResult ImportDispatcher::dispatch(const ImportContext& context, Fio::VecSy
     {
         QString msg = QCoreApplication::translate("ImportDispatcher", "No reader registered for format=%1")
                           .arg(static_cast<int>(fmt));
-        SY_ERRORF("[ImportDispatcher] %s (suffix='%s', %zu reader(s) registered)",
+        APR_ERRORF("[ImportDispatcher] %s (suffix='%s', %zu reader(s) registered)",
             msg.toUtf8().constData(),
             fi.suffix().toUtf8().constData(),
             m_readers.size());
@@ -90,7 +90,7 @@ ImportResult ImportDispatcher::dispatch(const ImportContext& context, Fio::VecSy
     }
     else
     {
-        SY_ERRORF("[ImportDispatcher] Reader '%s' failed after %lld ms: errorType=%d, message=%s",
+        APR_ERRORF("[ImportDispatcher] Reader '%s' failed after %lld ms: errorType=%d, message=%s",
             reader->formatName().toUtf8().constData(),
             static_cast<long long>(elapsedMs),
             static_cast<int>(result.errorType),
@@ -162,7 +162,7 @@ bool ImportDispatcher::canImport(const QString& filePath, QString* reasonOut) co
         {
             *reasonOut = reason;
         }
-        SY_DEBUGF("[ImportDispatcher] canImport=false: %s", reason.toUtf8().constData());
+        APR_DEBUGF("[ImportDispatcher] canImport=false: %s", reason.toUtf8().constData());
         return false;
     }
     return true;
@@ -192,7 +192,7 @@ bool ImportDispatcher::canImport(const QString& filePath, const QString& workben
         {
             *reasonOut = reason2;
         }
-        SY_DEBUGF("[ImportDispatcher] canImport=false: %s", reason2.toUtf8().constData());
+        APR_DEBUGF("[ImportDispatcher] canImport=false: %s", reason2.toUtf8().constData());
         return false;
     }
     return true;

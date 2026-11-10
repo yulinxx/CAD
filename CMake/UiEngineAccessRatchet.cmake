@@ -4,7 +4,7 @@
 # 为什么需要这道校验
 #   UiEngineAccess 是**链接层**的单一收口点（规则 3 强制，见 CheckDependencies.cmake）。
 #   include 层从未收口：UI 大量直接 #include "Engine2D/..." / "Engine3D/..." /
-#   "Engine/..."，因为 UI 与 Engine 共享同一套领域模型（SceneManager / SyEntity /
+#   "Engine/..."，因为 UI 与 Engine 共享同一套领域模型（SceneManager / AprEntity /
 #   Selection / 编辑服务），公共头也已经暴露 Engine 类型。把这块迁进转发头是
 #   一次公共 API 治理，成本高、收益低，本仓库明确不做存量迁移。
 #
@@ -32,7 +32,7 @@
 #   - 本校验：只查**源码 include 的头文件集合**，不改变任何调用方，只阻止依赖面扩张。
 # ============================================================================
 
-function(sanyi_check_ui_engine_include_ratchet)
+function(apr_check_ui_engine_include_ratchet)
     set(_root "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/..")
 
     # 基线 = 2026-11 存量快照（去重后的 Engine 头文件）。只允许删除，不允许新增。
@@ -40,7 +40,7 @@ function(sanyi_check_ui_engine_include_ratchet)
         "Engine/Edit/GeometryEditResult.h"
         "Engine/Parallel/EngineParallel.h"
         "Engine/Render/TessParams.h"
-        "Engine/SyEntity/SyEntity.h"
+        "Engine/AprEntity/AprEntity.h"
         "Engine/Text/FontParameters.h"
         "Engine/Tool/IToolModel.h"
         "Engine2D/Core/GroupManager.h"
@@ -49,16 +49,16 @@ function(sanyi_check_ui_engine_include_ratchet)
         "Engine2D/Geo/GeometryContext.h"
         "Engine2D/Geometry/Geo2DBoolean.h"
         "Engine2D/Geometry/PolygonAlgorithms.h"
-        "Engine2D/SyEntity/SyGroup.h"
+        "Engine2D/AprEntity/AprGroup.h"
     )
     set(_allow_UI_2D
         "Engine/Edit/IUndoRedoManager.h"
         "Engine/EntityIdGenerator.h"
-        "Engine/Layer/SyLayer.h"
+        "Engine/Layer/AprLayer.h"
         "Engine/Scene/ISceneContext.h"
         "Engine/Scene/SceneRenderContract.h"
-        "Engine/SyEntity/EType.h"
-        "Engine/SyEntity/SyEntity.h"
+        "Engine/AprEntity/EType.h"
+        "Engine/AprEntity/AprEntity.h"
         "Engine/Text/FontManager.h"
         "Engine/Text/FontParameters.h"
         "Engine/TextItem.h"
@@ -81,20 +81,20 @@ function(sanyi_check_ui_engine_include_ratchet)
         "Engine2D/Interaction/LayerManager.h"
         "Engine2D/Interaction/SnapEngine.h"
         "Engine2D/Machine/MachineFrame.h"
-        "Engine2D/SyEntity/SyArc.h"
-        "Engine2D/SyEntity/SyBezier.h"
-        "Engine2D/SyEntity/SyBezier2.h"
-        "Engine2D/SyEntity/SyCircle.h"
-        "Engine2D/SyEntity/SyEllipse.h"
-        "Engine2D/SyEntity/SyGroup.h"
-        "Engine2D/SyEntity/SyImage.h"
-        "Engine2D/SyEntity/SyLine.h"
-        "Engine2D/SyEntity/SyNurbs.h"
-        "Engine2D/SyEntity/SyPoint.h"
-        "Engine2D/SyEntity/SyPolygon.h"
-        "Engine2D/SyEntity/SyQRCode.h"
-        "Engine2D/SyEntity/SySmartLine.h"
-        "Engine2D/SyEntity/SyText.h"
+        "Engine2D/AprEntity/AprArc.h"
+        "Engine2D/AprEntity/AprBezier.h"
+        "Engine2D/AprEntity/AprBezier2.h"
+        "Engine2D/AprEntity/AprCircle.h"
+        "Engine2D/AprEntity/AprEllipse.h"
+        "Engine2D/AprEntity/AprGroup.h"
+        "Engine2D/AprEntity/AprImage.h"
+        "Engine2D/AprEntity/AprLine.h"
+        "Engine2D/AprEntity/AprNurbs.h"
+        "Engine2D/AprEntity/AprPoint.h"
+        "Engine2D/AprEntity/AprPolygon.h"
+        "Engine2D/AprEntity/AprQRCode.h"
+        "Engine2D/AprEntity/AprSmartLine.h"
+        "Engine2D/AprEntity/AprText.h"
         "Engine2D/Text/TextConverter.h"
         "Engine2D/Text/TextGroupSnapshot.h"
     )
@@ -114,7 +114,7 @@ function(sanyi_check_ui_engine_include_ratchet)
         "Engine3D/Import/FioEntityConverter.h"
         "Engine3D/SceneManager3D.h"
         "Engine3D/Selection/SelectionManager3D.h"
-        "Engine3D/SyEntity/SyMeshEntity.h"
+        "Engine3D/AprEntity/AprMeshEntity.h"
         "Engine3D/Transform/ITransformer.h"
     )
 
@@ -196,7 +196,7 @@ function(sanyi_check_ui_engine_include_ratchet)
     if(_violations)
         string(REPLACE ";" "\n    - " _msg "${_violations}")
         message(FATAL_ERROR
-            "[sanyi_check_ui_engine_include_ratchet] UI→Engine include 依赖面被扩张：\n    - ${_msg}\n"
+            "[apr_check_ui_engine_include_ratchet] UI→Engine include 依赖面被扩张：\n    - ${_msg}\n"
             "  处理方式（二选一）：\n"
             "    1) 改用 UiEngineAccess/Include/UiEngineAccess/ 下的转发头"
             "（新增转发头 = 一次显式的依赖面扩张决策）；\n"
@@ -205,5 +205,5 @@ function(sanyi_check_ui_engine_include_ratchet)
             "  当前统计：${_summary_text}")
     endif()
 
-    message(STATUS "[SanYi] UI→Engine include 棘轮: OK (${_summary_text}；依赖面白名单制，只减不增)")
+    message(STATUS "[April] UI→Engine include 棘轮: OK (${_summary_text}；依赖面白名单制，只减不增)")
 endfunction()

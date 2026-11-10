@@ -1,4 +1,4 @@
-# SanYi CAD
+# April CAD
 
 工业级激光加工 CAD/CAM 软件，支持雕刻 / 切割 / 打标工艺。
 
@@ -12,7 +12,7 @@
 ## 目录结构
 
 ```
-SanYiCAD/
+April/
 ├── Main/                     # 应用入口
 │   ├── Src/
 │   │   ├── Runtime/          # CADApplicationRuntime（启动 + 许可校验）
@@ -137,7 +137,7 @@ SanYiCAD/
 
 ```
                               ┌─────────────────────────┐
-                              │     Main (SanYiCAD)     │
+                              │     Main (April)     │
                               │   应用入口 + 许可校验    │
                               └───────────┬─────────────┘
                                           │
@@ -312,9 +312,9 @@ set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.12.0/msvc2022_64" CACHE PATH "Qt installati
 | `BUILD_GEOMODELCORE` | ON | OpenCASCADE 几何建模 |
 | `BUILD_CRASHHANDLER` | ON | 崩溃捕获与上报 |
 | `BUILD_PYTHON` | ON | Python 集成框架 |
-| `SANYI_UNITY_BUILD` | ON | Unity Build，加速编译 |
-| `SANYI_ENABLE_LICENSE` | ON | 许可校验（默认已开启；运行期默认值由 License 库内部宏决定） |
-| `SANYI_ENABLE_VULKAN` | ON | Vulkan 支持标记；后端尚未实现，选 Vulkan 会明确失败 |
+| `APR_UNITY_BUILD` | ON | Unity Build，加速编译 |
+| `APR_ENABLE_LICENSE` | ON | 许可校验（默认已开启；运行期默认值由 License 库内部宏决定） |
+| `APR_ENABLE_VULKAN` | ON | Vulkan 支持标记；后端尚未实现，选 Vulkan 会明确失败 |
 | `BUILD_KEYGEN_TOOL` | OFF | 注册码生成工具 |
 | `BUILD_PERF_BENCHMARK` | ON | 百万图元性能基准 |
 | `BUILD_RENDER_BENCHMARK` | ON | 渲染帧路径基准 |
@@ -338,7 +338,7 @@ cmake .. -DBUILD_KEYGEN_TOOL=ON -DBUILD_TESTS=OFF
 cmake --build . --config Release
 
 # 编译特定目标
-cmake --build . --target SanYiCAD
+cmake --build . --target April
 cmake --build . --target MainTests
 cmake --build . --target KeygenTool
 ```
@@ -348,15 +348,15 @@ cmake --build . --target KeygenTool
 ```bash
 # Windows
 cd bin_Qt6/Release
-SanYiCAD.exe
+April.exe
 
 # Linux
 cd bin_Qt6/Release
-./SanYiCAD
+./April
 
 # macOS
 cd bin_Qt6/Release
-open SanYiCAD.app
+open April.app
 ```
 
 ---

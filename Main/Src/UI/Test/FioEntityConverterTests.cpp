@@ -1,6 +1,6 @@
 /**
  * @file FioEntityConverterTests.cpp
- * @brief FioEntityConverter 回归测试 — 中立 IR → Engine SyEntity 转换
+ * @brief FioEntityConverter 回归测试 — 中立 IR → Engine AprEntity 转换
  *
  * 覆盖：
  *   - 所有图元类型的 convertEntity() 转换
@@ -31,19 +31,19 @@ namespace
 }  // namespace
 
 // Engine2D 图元类型
-#include "Engine2D/SyEntity/SyLine.h"
-#include "Engine2D/SyEntity/SyArc.h"
-#include "Engine2D/SyEntity/SyCircle.h"
-#include "Engine2D/SyEntity/SyEllipse.h"
-#include "Engine2D/SyEntity/SyPoint.h"
-#include "Engine2D/SyEntity/SyPolygon.h"
-#include "Engine2D/SyEntity/SyBezier.h"
-#include "Engine2D/SyEntity/SyBezier2.h"
-#include "Engine2D/SyEntity/SyNurbs.h"
-#include "Engine2D/SyEntity/SyText.h"
-#include "Engine2D/SyEntity/SyImage.h"
-#include "Engine2D/SyEntity/SyBarCode.h"
-#include "Engine2D/SyEntity/SyQRCode.h"
+#include "Engine2D/AprEntity/AprLine.h"
+#include "Engine2D/AprEntity/AprArc.h"
+#include "Engine2D/AprEntity/AprCircle.h"
+#include "Engine2D/AprEntity/AprEllipse.h"
+#include "Engine2D/AprEntity/AprPoint.h"
+#include "Engine2D/AprEntity/AprPolygon.h"
+#include "Engine2D/AprEntity/AprBezier.h"
+#include "Engine2D/AprEntity/AprBezier2.h"
+#include "Engine2D/AprEntity/AprNurbs.h"
+#include "Engine2D/AprEntity/AprText.h"
+#include "Engine2D/AprEntity/AprImage.h"
+#include "Engine2D/AprEntity/AprBarCode.h"
+#include "Engine2D/AprEntity/AprQRCode.h"
 
 // ---- 线段转换 ----
 
@@ -60,7 +60,7 @@ TEST(FioEntityConverterTest, ConvertLineEntity)
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::LINE);
 
-    auto* line = static_cast<Eg::SyLine*>(entity.get());
+    auto* line = static_cast<Eg::AprLine*>(entity.get());
     ASSERT_EQ(line->pointRef().size(), 2u);
     EXPECT_DOUBLE_EQ(line->pointRef()[0].x(), 10.0);
     EXPECT_DOUBLE_EQ(line->pointRef()[0].y(), 20.0);
@@ -82,7 +82,7 @@ TEST(FioEntityConverterTest, ConvertCircleEntity)
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::CIRCLE);
 
-    auto* circle = static_cast<Eg::SyCircle*>(entity.get());
+    auto* circle = static_cast<Eg::AprCircle*>(entity.get());
     EXPECT_DOUBLE_EQ(circle->basePoint.x(), 50.0);
     EXPECT_DOUBLE_EQ(circle->basePoint.y(), 60.0);
     EXPECT_DOUBLE_EQ(circle->dRadius, 25.0);
@@ -104,7 +104,7 @@ TEST(FioEntityConverterTest, ConvertArcEntity)
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::ARC);
 
-    auto* arc = static_cast<Eg::SyArc*>(entity.get());
+    auto* arc = static_cast<Eg::AprArc*>(entity.get());
     EXPECT_DOUBLE_EQ(arc->basePoint.x(), 10.0);
     EXPECT_DOUBLE_EQ(arc->basePoint.y(), 20.0);
     EXPECT_DOUBLE_EQ(arc->dRadius, 30.0);
@@ -130,7 +130,7 @@ TEST(FioEntityConverterTest, ConvertEllipseEntity)
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::ELLIPSE);
 
-    auto* ell = static_cast<Eg::SyEllipse*>(entity.get());
+    auto* ell = static_cast<Eg::AprEllipse*>(entity.get());
     EXPECT_DOUBLE_EQ(ell->basePoint.x(), 0.0);
     EXPECT_DOUBLE_EQ(ell->basePoint.y(), 0.0);
     EXPECT_DOUBLE_EQ(ell->dRadiusX, 50.0);
@@ -151,7 +151,7 @@ TEST(FioEntityConverterTest, ConvertPointEntity)
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::POINT);
 
-    auto* pt = static_cast<Eg::SyPoint*>(entity.get());
+    auto* pt = static_cast<Eg::AprPoint*>(entity.get());
     EXPECT_DOUBLE_EQ(pt->basePoint.x(), 42.0);
     EXPECT_DOUBLE_EQ(pt->basePoint.y(), 99.0);
 }
@@ -175,7 +175,7 @@ TEST(FioEntityConverterTest, ConvertBezierEntity)
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::BEZIER);
 
-    auto* bz = static_cast<Eg::SyBezier*>(entity.get());
+    auto* bz = static_cast<Eg::AprBezier*>(entity.get());
     EXPECT_DOUBLE_EQ(bz->basePoint.x(), 0.0);  // P0
     EXPECT_DOUBLE_EQ(bz->ptCtrl0.x(), 50.0);
     EXPECT_DOUBLE_EQ(bz->ptCtrl0.y(), 100.0);
@@ -202,7 +202,7 @@ TEST(FioEntityConverterTest, ConvertBezier2Entity)
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::BEZIER2);
 
-    auto* bz = static_cast<Eg::SyBezier2*>(entity.get());
+    auto* bz = static_cast<Eg::AprBezier2*>(entity.get());
     EXPECT_DOUBLE_EQ(bz->basePoint.x(), 0.0);  // P0
     EXPECT_DOUBLE_EQ(bz->ptCtrl.x(), 50.0);
     EXPECT_DOUBLE_EQ(bz->ptCtrl.y(), 100.0);
@@ -226,7 +226,7 @@ TEST(FioEntityConverterTest, ConvertTextEntity)
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::TEXT);
 
-    auto* txt = static_cast<Eg::SyText*>(entity.get());
+    auto* txt = static_cast<Eg::AprText*>(entity.get());
     EXPECT_DOUBLE_EQ(txt->basePoint.x(), 100.0);
     EXPECT_DOUBLE_EQ(txt->basePoint.y(), 200.0);
     EXPECT_EQ(txt->textStr(), "Hello World");
@@ -250,7 +250,7 @@ TEST(FioEntityConverterTest, ConvertBarCodeEntity)
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::BAR_CODE);
 
-    auto* bc = static_cast<Eg::SyBarCode*>(entity.get());
+    auto* bc = static_cast<Eg::AprBarCode*>(entity.get());
     EXPECT_EQ(bc->dataStr(), "1234567890");
     EXPECT_DOUBLE_EQ(bc->dWidth, 50.0);
     EXPECT_DOUBLE_EQ(bc->dHeight, 30.0);
@@ -273,7 +273,7 @@ TEST(FioEntityConverterTest, ConvertQRCodeEntity)
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::QR_CODE);
 
-    auto* qr = static_cast<Eg::SyQRCode*>(entity.get());
+    auto* qr = static_cast<Eg::AprQRCode*>(entity.get());
     EXPECT_EQ(qr->dataStr(), "QR_DATA");
     EXPECT_DOUBLE_EQ(qr->dModuleSize, 10.0);
     EXPECT_DOUBLE_EQ(qr->basePoint.x(), 5.0);
@@ -301,7 +301,7 @@ TEST(FioEntityConverterTest, ConvertPolygonWithExtensionData)
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::POLYGON);
 
-    auto* poly = static_cast<Eg::SyPolygon*>(entity.get());
+    auto* poly = static_cast<Eg::AprPolygon*>(entity.get());
     EXPECT_TRUE(poly->bClosed);
     const auto& verts = poly->vertices();
     ASSERT_EQ(verts.size(), 4u);
@@ -332,7 +332,7 @@ TEST(FioEntityConverterTest, ConvertPolylineWithExtensionData)
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::POLYGON);
 
-    auto* poly = static_cast<Eg::SyPolygon*>(entity.get());
+    auto* poly = static_cast<Eg::AprPolygon*>(entity.get());
     EXPECT_FALSE(poly->bClosed);  // 折线不闭合
     const auto& verts = poly->vertices();
     ASSERT_EQ(verts.size(), 3u);
@@ -361,7 +361,7 @@ TEST(FioEntityConverterTest, ConvertPolylineWithBulgeMetadata)
 
     auto entity = Eg::FioEntityConverter::convertEntity(info, blob);
     ASSERT_NE(entity, nullptr);
-    auto* poly = static_cast<Eg::SyPolygon*>(entity.get());
+    auto* poly = static_cast<Eg::AprPolygon*>(entity.get());
     ASSERT_TRUE(poly->hasBulges());
     ASSERT_EQ(poly->bulges().size(), 2u);
     EXPECT_DOUBLE_EQ(poly->bulges()[0], 1.0);
@@ -393,7 +393,7 @@ TEST(FioEntityConverterTest, InvalidBulgeLengthFallsBackToStraightPolyline)
 
     auto entity = Eg::FioEntityConverter::convertEntity(info, blob);
     ASSERT_NE(entity, nullptr);
-    auto* poly = static_cast<Eg::SyPolygon*>(entity.get());
+    auto* poly = static_cast<Eg::AprPolygon*>(entity.get());
     EXPECT_FALSE(poly->hasBulges());
     EXPECT_EQ(poly->vertices().size(), 3u);
 }
@@ -437,7 +437,7 @@ TEST(FioEntityConverterTest, ConvertNurbsWithExtensionData)
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::SPLINE);
 
-    auto* nurbs = static_cast<Eg::SyNurbs*>(entity.get());
+    auto* nurbs = static_cast<Eg::AprNurbs*>(entity.get());
     EXPECT_EQ(nurbs->nDegree, 3);
     EXPECT_EQ(nurbs->controlPointCount(), 3u);
     EXPECT_EQ(nurbs->knotCount(), 5u);
@@ -471,7 +471,7 @@ TEST(FioEntityConverterTest, ConvertImageWithExtensionData)
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::IMAGE);
 
-    auto* img = static_cast<Eg::SyImage*>(entity.get());
+    auto* img = static_cast<Eg::AprImage*>(entity.get());
     EXPECT_EQ(img->nWidth, 2);
     EXPECT_EQ(img->nHeight, 1);
     EXPECT_EQ(img->pixelDataSize(), sizeof(pixelData));
@@ -595,7 +595,7 @@ TEST(FioEntityConverterTest, ConvertPolygonWithEmptyExtensionData)
     ASSERT_NE(entity, nullptr);
     EXPECT_EQ(entity->eType, Eg::EType::POLYGON);
 
-    auto* poly = static_cast<Eg::SyPolygon*>(entity.get());
+    auto* poly = static_cast<Eg::AprPolygon*>(entity.get());
     EXPECT_TRUE(poly->bClosed);
     EXPECT_TRUE(poly->vertices().empty());
 }

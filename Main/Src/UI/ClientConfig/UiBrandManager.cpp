@@ -2,7 +2,7 @@
 
 #include "UiClientContext.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 #include "UI/IconHelper.h"
 #include "UI/ThemeManager.h"
 #include "VersionInfo.h"
@@ -118,9 +118,9 @@ QString UiBrandManager::resolveClientIdFromProcess(int argc, char** argv)
         }
     }
 
-    if (qEnvironmentVariableIsSet("SANYI_CLIENT_ID"))
+    if (qEnvironmentVariableIsSet("APR_CLIENT_ID"))
     {
-        const QString fromEnv = QString::fromUtf8(qgetenv("SANYI_CLIENT_ID")).trimmed();
+        const QString fromEnv = QString::fromUtf8(qgetenv("APR_CLIENT_ID")).trimmed();
         if (!fromEnv.isEmpty())
         {
             return fromEnv;
@@ -145,29 +145,29 @@ bool UiBrandManager::loadForProcess(int argc, char** argv)
     const QString clientId = resolveClientIdFromProcess(argc, argv);
     const QString appDir = executableDirectory(argc, argv);
 
-    const QString envDir = QString::fromLocal8Bit(qgetenv("SANYI_BRAND_DIR")).trimmed();
+    const QString envDir = QString::fromLocal8Bit(qgetenv("APR_BRAND_DIR")).trimmed();
     if (!envDir.isEmpty() && loadFromFile(joinPath(envDir, QStringLiteral("brand.json")), clientId))
     {
-        SY_INFOF("[UiBrand] Loaded brand from SANYI_BRAND_DIR: %s", qPrintable(m_brandDirectory));
+        APR_INFOF("[UiBrand] Loaded brand from APR_BRAND_DIR: %s", qPrintable(m_brandDirectory));
         return true;
     }
 
     if (!appDir.isEmpty() &&
         loadFromFile(joinPath(appDir, QStringLiteral("branding/%1/brand.json").arg(clientId)), clientId))
     {
-        SY_INFOF("[UiBrand] Loaded external brand for client '%s'", qPrintable(clientId));
+        APR_INFOF("[UiBrand] Loaded external brand for client '%s'", qPrintable(clientId));
         return true;
     }
 
     if (loadFromFile(QStringLiteral(":/brand/%1/brand.json").arg(clientId), clientId))
     {
-        SY_INFOF("[UiBrand] Loaded embedded brand for client '%s'", qPrintable(clientId));
+        APR_INFOF("[UiBrand] Loaded embedded brand for client '%s'", qPrintable(clientId));
         return true;
     }
 
     if (loadFromFile(QStringLiteral(":/brand/default/brand.json"), clientId))
     {
-        SY_INFO("[UiBrand] Client brand missing, using embedded default brand");
+        APR_INFO("[UiBrand] Client brand missing, using embedded default brand");
         return true;
     }
 
@@ -208,7 +208,7 @@ bool UiBrandManager::loadFromFile(const QString& filePath, const QString& client
     const QJsonDocument doc = QJsonDocument::fromJson(payload, &error);
     if (error.error != QJsonParseError::NoError || !doc.isObject())
     {
-        SY_WARNF("[UiBrand] Invalid brand json '%s': %s", qPrintable(filePath), qPrintable(error.errorString()));
+        APR_WARNF("[UiBrand] Invalid brand json '%s': %s", qPrintable(filePath), qPrintable(error.errorString()));
         return false;
     }
 
@@ -216,7 +216,7 @@ bool UiBrandManager::loadFromFile(const QString& filePath, const QString& client
     config.clientId = clientId;
     if (!config.isValid())
     {
-        SY_WARNF("[UiBrand] Brand json '%s' has empty productName, ignored", qPrintable(filePath));
+        APR_WARNF("[UiBrand] Brand json '%s' has empty productName, ignored", qPrintable(filePath));
         return false;
     }
 
@@ -240,7 +240,7 @@ void UiBrandManager::applyFallback(const QString& clientId)
     m_brandDirectory.clear();
     m_hasBrandFile = false;
     UiClientContext::instance().setClientIdOverride(clientId);
-    SY_INFOF("[UiBrand] No brand json for client '%s', using built-in identity", qPrintable(clientId));
+    APR_INFOF("[UiBrand] No brand json for client '%s', using built-in identity", qPrintable(clientId));
 }
 
 QString UiBrandManager::productName() const
@@ -332,16 +332,16 @@ void UiBrandManager::applyApplicationProperties() const
         return;
     }
 
-    app->setProperty("sanyi.brand.clientId", m_config.clientId);
-    app->setProperty("sanyi.brand.productName", productName());
-    app->setProperty("sanyi.brand.companyName", companyName());
-    app->setProperty("sanyi.brand.copyright", copyright());
-    app->setProperty("sanyi.brand.website", m_config.website);
-    app->setProperty("sanyi.brand.supportEmail", m_config.supportEmail);
-    app->setProperty("sanyi.brand.tagline", m_config.tagline);
-    app->setProperty("sanyi.brand.aboutText", m_config.aboutText);
-    app->setProperty("sanyi.brand.logo", assetPath(m_config.logo));
-    app->setProperty("sanyi.brand.aboutLogo", assetPath(m_config.aboutLogo));
+    app->setProperty("apr.brand.clientId", m_config.clientId);
+    app->setProperty("apr.brand.productName", productName());
+    app->setProperty("apr.brand.companyName", companyName());
+    app->setProperty("apr.brand.copyright", copyright());
+    app->setProperty("apr.brand.website", m_config.website);
+    app->setProperty("apr.brand.supportEmail", m_config.supportEmail);
+    app->setProperty("apr.brand.tagline", m_config.tagline);
+    app->setProperty("apr.brand.aboutText", m_config.aboutText);
+    app->setProperty("apr.brand.logo", assetPath(m_config.logo));
+    app->setProperty("apr.brand.aboutLogo", assetPath(m_config.aboutLogo));
 }
 
 void UiBrandManager::applyRuntimeIdentity() const
@@ -383,7 +383,7 @@ void UiBrandManager::applyRuntimeIdentity() const
         }
         else
         {
-            SY_WARNF("[UiBrand] Brand stylesheet not found: '%s'", qPrintable(m_config.styleSheet));
+            APR_WARNF("[UiBrand] Brand stylesheet not found: '%s'", qPrintable(m_config.styleSheet));
         }
     }
 }

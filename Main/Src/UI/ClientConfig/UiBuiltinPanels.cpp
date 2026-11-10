@@ -9,7 +9,7 @@
 
 #include "UI/Widgets/DevicePanel.h"
 
-#include "Log/SyLogger.h"
+#include "Log/AprLogger.h"
 
 #include <QCoreApplication>
 #include <QLabel>
@@ -90,7 +90,7 @@ void registerBuiltinUiPanels(UiPanelRegistry& registry)
     // 客户插件面板：只注册当前客户目录下的插件；重复 id 会被宿主拒绝
     UiClientPluginHost::instance().applyPanels(registry);
 
-    SY_DEBUGF("[UiBuiltinPanels] Registered %d builtin panel/slot factories: %s",
+    APR_DEBUGF("[UiBuiltinPanels] Registered %d builtin panel/slot factories: %s",
         static_cast<int>(registry.registeredPanelIds().size()),
         qPrintable(registry.registeredPanelIds().join(QLatin1Char(','))));
 }

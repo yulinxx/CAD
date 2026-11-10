@@ -12,5 +12,5 @@ class BmpExportWriter : public ExportWriterBase
 public:
     BmpExportWriter();
 
-    ExportResult write(const ExportContext& context, const Fio::VecSyEntityPtr& entities) override;
+    ExportResult write(const ExportContext& context, const Fio::VecAprEntityPtr& entities) override;
 };

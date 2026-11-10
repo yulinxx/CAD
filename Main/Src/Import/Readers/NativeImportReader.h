@@ -2,16 +2,16 @@
 
 #include "ImportReaderBase.h"
 
-/// Native (.sy / .syx) 格式导入读取器
-/// 支持 SanYi CAD 原生 2D 格式 (.sy) 和 3D 格式 (.syx)
+/// Native (.apr / .apr3d) 格式导入读取器
+/// 支持 April CAD 原生 2D 格式 (.apr) 和 3D 格式 (.apr3d)
 class NativeImportReader : public ImportReaderBase
 {
 public:
     NativeImportReader();
 
-    ImportResult read(const ImportContext& context, Fio::VecSyEntityPtr& outEntities) override;
+    ImportResult read(const ImportContext& context, Fio::VecAprEntityPtr& outEntities) override;
 
-    /// 重写 dimension()，因为 .sy 是 2D，.syx 是 3D，需要在读取时动态判断
+    /// 重写 dimension()，因为 .apr 是 2D，.apr3d 是 3D，需要在读取时动态判断
     ImportDimension dimension() const override;
 
 protected:

@@ -12,9 +12,9 @@
 
 > **2026-08-25 起的重要变更（P0 收口）**
 >
-> 1. **客户 ID 改为运行时解析**：编译期宏 `SANYI_CLIENT_ID` 已废除。
+> 1. **客户 ID 改为运行时解析**：编译期宏 `APR_CLIENT_ID` 已废除。
 >    客户 ID 由 `UiClientContext` 在运行时解析，**一份二进制可服务多个客户**。
-> 2. **`SANYI_ENABLE_CONFIG_DRIVEN_UI` 已废弃**：配置驱动是唯一路径，
+> 2. **`APR_ENABLE_CONFIG_DRIVEN_UI` 已废弃**：配置驱动是唯一路径，
 >    `WorkbenchLayoutManager` 中的 `#ifdef` 与硬编码 Dock 骨架已删除。
 >    不要再新增该宏的分支。
 > 3. **状态栏、右键菜单、3D 菜单纳入同一套 JSON**：`MenuManager3D` 硬编码路径已移除。
@@ -27,7 +27,7 @@
 ### 1.1 可以定制的
 | 维度 | 机制 | 示例 |
 |------|------|------|
-| 客户版本选择 | **运行时** `UiClientContext`（环境变量 / QSettings） | `san_yi` / `client_a` / `client_b` |
+| 客户版本选择 | **运行时** `UiClientContext`（环境变量 / QSettings） | `april` / `client_a` / `client_b` |
 | 顶层菜单 / 子菜单 | `configs/<client>.json` → `menus[]` | 增删/排序/改名/换图标 |
 | 工具栏 | `configs/<client>.json` → `toolbars[]` | 顶/左/右/底工具栏及其按钮 |
 | 停靠面板骨架 | `configs/<client>.json` → `docks[]` | 增删/换位 Scene/Properties |
@@ -40,7 +40,7 @@
 | 回退策略 | `ConfigFallbackPolicy` | Strict / Fallback / Silent |
 
 ### 1.2 原则上不可定制的（触碰需经过架构评审）
-- `SyEntity` / `SceneManager` / `SceneEditService`（算法内核）
+- `AprEntity` / `SceneManager` / `SceneEditService`（算法内核）
 - `OperationBus` 注册的 `OperationId` 枚举与其实现
 - 渲染契约 `SceneRenderContract.h`
 
@@ -65,7 +65,7 @@ Main/Src/UI/ClientConfig/
 └── configs/
     ├── configs.qrc           Qt 资源：:/configs/*.json
     ├── base.json             公共基线（其它客户继承）
-    ├── san_yi.json           标准版布局
+    ├── april.json           标准版布局
     ├── client_a.json         示例：extends base，精简菜单/工具栏
     └── client_b.json         示例：extends base，授权分级 + 状态栏/右键菜单定制
 ```
@@ -86,24 +86,24 @@ Main/Src/UI/ClientConfig/
 | 优先级 | 来源 | 用途 |
 |--------|------|------|
 | 1 | `UiClientContext::setClientIdOverride()` | 命令行 `--client=xxx`、单元测试 |
-| 2 | 环境变量 `SANYI_CLIENT_ID` | CI、现场临时切换排查 |
+| 2 | 环境变量 `APR_CLIENT_ID` | CI、现场临时切换排查 |
 | 3 | `QSettings` 键 `Client/Id` | 安装包部署时写入客户标识 |
-| 4 | 内置默认 `san_yi` | 兜底 |
+| 4 | 内置默认 `april` | 兜底 |
 
 ```powershell
 # 现场切换客户，无需重新编译
-$env:SANYI_CLIENT_ID = "client_b"; .\SanYiCAD.exe
+$env:APR_CLIENT_ID = "client_b"; .\April.exe
 ```
 
-CMake 侧只剩一个 `SANYI_DEFAULT_CLIENT_ID`，**仅用于安装包写入默认设置**，
+CMake 侧只剩一个 `APR_DEFAULT_CLIENT_ID`，**仅用于安装包写入默认设置**，
 不再作为编译期宏影响代码分支：
 
 ```cmake
-set(SANYI_DEFAULT_CLIENT_ID "san_yi" CACHE STRING "Default UI client ID written to installer settings")
+set(APR_DEFAULT_CLIENT_ID "april" CACHE STRING "Default UI client ID written to installer settings")
 ```
 
 配置资源不存在时（客户 ID 拼错 / 配置未随包发布），
-`UiClientContext::configResourcePath()` 会打 WARN 并回退到 `san_yi.json` ——
+`UiClientContext::configResourcePath()` 会打 WARN 并回退到 `april.json` ——
 因为已无硬编码回退路径，加载失败会直接导致空窗口。
 
 > **换客户不改代码、不重编译，只改环境变量或安装包设置。**
@@ -112,7 +112,7 @@ set(SANYI_DEFAULT_CLIENT_ID "san_yi" CACHE STRING "Default UI client ID written 
 
 ### 3.2 编写/修改 JSON 布局
 
-以 `configs/san_yi.json` 为模板，新增 `configs/client_a.json`：
+以 `configs/april.json` 为模板，新增 `configs/client_a.json`：
 
 ```json
 {
@@ -143,7 +143,7 @@ set(SANYI_DEFAULT_CLIENT_ID "san_yi" CACHE STRING "Default UI client ID written 
 - 新 `id` → **追加**；
 - 未出现在子配置中的字段 → **继承自父**。
 
-> 调试技巧：`UiConfigLoader::lastError()` 返回失败原因。加载失败且策略为 `Fallback` 时自动回退到 `:/configs/san_yi.json`。
+> 调试技巧：`UiConfigLoader::lastError()` 返回失败原因。加载失败且策略为 `Fallback` 时自动回退到 `:/configs/april.json`。
 
 ### 3.3 注册/替换面板
 
@@ -171,7 +171,7 @@ void registerBuiltinUiPanels(UiPanelRegistry& registry) {
    `registry.registerPanel("MyPanel", [](QWidget* p){ return new MyCustomPanel(p); });`；
 3. 在 JSON 的 `docks[].widgetType`（或 `statusBar.items[].widgetType`）写 `"MyPanel"`。
 
-> 注意：`UiLayoutBuilder::buildDocks` 遇到 **未注册** `widgetType` 会降级为占位 `QWidget` 并 `SY_WARNF` 告警 —— 不会崩溃。
+> 注意：`UiLayoutBuilder::buildDocks` 遇到 **未注册** `widgetType` 会降级为占位 `QWidget` 并 `APR_WARNF` 告警 —— 不会崩溃。
 
 **左侧绘图面板不在这套注册表里**：`DrawToolBarWidget` 由 `Workbench2D::createToolbars()` 直接创建，
 挂在左侧 `QToolBar`（objectName `DrawToolBar`）或左侧 Dock 上，按 `PanelHostStyle` 决定。
@@ -306,7 +306,7 @@ IconHelper::setUserIconDirectory("C:/myIcons");   // 传空串清除定制
 
 **日志输出：**
 
-所有检测和变化事件均通过 `SY_INFO`/`SY_DEBUG` 记录，格式为 `[SystemThemeDetector] ...`，便于问题排查。
+所有检测和变化事件均通过 `APR_INFO`/`APR_DEBUG` 记录，格式为 `[SystemThemeDetector] ...`，便于问题排查。
 
 #### 3.4.7 刷新与缓存
 
@@ -317,7 +317,7 @@ IconHelper::setUserIconDirectory("C:/myIcons");   // 传空串清除定制
 
 ### 3.5 点击日志
 
-约定：所有菜单/工具栏 action 的触发，最终走 `OperationBus::run(OperationId)`。在 `OperationBus` 处集中记录日志即可（例如 `SY_INFOF("[Cmd] %s", Cmd::operationIdToString(id))`），而非每个 action 打一份。已实现的 `UiLayoutBuilder::bindAction` 会在 **命令未注册**时 `SY_WARNF` 告警。
+约定：所有菜单/工具栏 action 的触发，最终走 `OperationBus::run(OperationId)`。在 `OperationBus` 处集中记录日志即可（例如 `APR_INFOF("[Cmd] %s", Cmd::operationIdToString(id))`），而非每个 action 打一份。已实现的 `UiLayoutBuilder::bindAction` 会在 **命令未注册**时 `APR_WARNF` 告警。
 
 ### 3.6 菜单也可以配置化
 
@@ -605,24 +605,24 @@ License_GetInfo() 成功
 配置驱动是唯一路径，**没有硬编码骨架兜底**，因此回退全部发生在「取哪份 JSON」这一层：
 
 ```
-UiClientContext::clientId()                       // 覆盖 > 环境变量 > QSettings > san_yi
+UiClientContext::clientId()                       // 覆盖 > 环境变量 > QSettings > april
   → UiClientContext::configResourcePath()
         ├─ :/configs/<client>.json 存在 → 用它
-        └─ 不存在 → SY_WARN + 回退 :/configs/san_yi.json
+        └─ 不存在 → APR_WARN + 回退 :/configs/april.json
   → UiConfigurationManager::shared()              // 进程级唯一，ConfigFallbackPolicy::Fallback
         ├─ 解析成功 → UiConfigData
-        └─ 解析失败 → 再回退 :/configs/san_yi.json
+        └─ 解析失败 → 再回退 :/configs/april.json
   → 三个消费方共用同一份 UiConfigData：
         ├─ WorkbenchMenuManager      菜单 + 快捷键
         ├─ WorkbenchLayoutManager    工具栏 + Dock + 状态栏
         └─ Workbench2D/3D            右键菜单
-  → Dock 构建彻底失败 → SY_ERROR，错误码 ui.dock_config_build_failed
+  → Dock 构建彻底失败 → APR_ERROR，错误码 ui.dock_config_build_failed
 ```
 
 `ConfigFallbackPolicy`：
 
 - `Strict` — 失败即失败（**开发调试用**，能第一时间暴露 JSON 错误）；
-- `Fallback` — 失败时用 `:/configs/san_yi.json`（**当前 `shared()` 采用**）；
+- `Fallback` — 失败时用 `:/configs/april.json`（**当前 `shared()` 采用**）；
 - `Silent` — 失败则空配置。
 
 > 关键日志（排查「客户配置为什么没生效」按这个顺序看）：
@@ -631,7 +631,7 @@ UiClientContext::clientId()                       // 覆盖 > 环境变量 > QSe
 > 3. `UiConfigLoader::lastError()` 对应的解析错误
 > 4. `ui.dock_config_build_failed`
 
-> **不要再新增 `#ifdef SANYI_ENABLE_CONFIG_DRIVEN_UI` 分支。**
+> **不要再新增 `#ifdef APR_ENABLE_CONFIG_DRIVEN_UI` 分支。**
 > 该宏留在 CMake 里仅为兼容旧脚本，代码里已无引用。
 > 历史教训：这个宏曾长期默认 OFF，而 ON 分支里的 `NullDispatcher`
 > 定义在 `buildDockAreasFromConfig()` 内部却被 `buildToolBars()` 引用 ——
@@ -685,7 +685,7 @@ QAction::triggered
 2. 写 configs/client_a.json：docks[].widgetType = "MyPanel"
 3. configs.qrc 加入 client_a.json（新客户才需要）
 4. cmake -S . -B build && cmake --build build --config Debug   ← 新增 .cpp 必须先 reconfigure
-5. 运行：$env:SANYI_CLIENT_ID = "client_a"; .\SanYiCAD.exe      ← 不改 CMake、不改客户宏
+5. 运行：$env:APR_CLIENT_ID = "client_a"; .\April.exe      ← 不改 CMake、不改客户宏
 ```
 
 ### 6.2 目标：“新增一个菜单命令”
@@ -710,7 +710,7 @@ QAction::triggered
   `widgetType` 是否在 `registerBuiltinUiPanels()` 注册过、图标路径是否以 `:/ui/common/` 开头。
 - **某个菜单项/按钮整个消失了**：先看它有没有 `feature` 字段 —— 未授权项是**不创建**的。
   确认 `UiFeatureGate::licensedFeatures()` 里有没有对应条目。
-- **换了 `SANYI_CLIENT_ID` 环境变量但界面没变**：看启动日志
+- **换了 `APR_CLIENT_ID` 环境变量但界面没变**：看启动日志
   `[UiClientContext] Active client id=...`。若 source 不是 `env`，说明有更高优先级的
   override 生效；若 id 对但界面没变，检查该 JSON 是否已加入 `configs.qrc`。
 - **JSON 修改后不生效**：资源通过 AUTORCC 编译进二进制，改 JSON 后需 **重新 CMake+编译**（不能单纯刷新运行）。
@@ -741,7 +741,7 @@ QAction::triggered
 ```
 Main/Src/UI/ClientConfig/configs/
 ├── base.json              公共基线（菜单/工具栏/Dock/快捷键的默认结构）
-├── san_yi.json            extends base  三义标准版（默认）
+├── april.json            extends base  April 标准版（默认）
 ├── client_a.json          extends base  客户 A（覆盖差异项）
 ├── client_b.json          extends base  客户 B
 ├── ...                    （数十个客户，每个一个 JSON）
@@ -780,7 +780,7 @@ Main/Src/UI/ClientConfig/configs/
 Main/Src/UI/ClientConfig/
 ├── configs/                    # 所有客户 JSON（纯数据，非 C++ 人员可维护）
 │   ├── base.json
-│   ├── san_yi.json
+│   ├── april.json
 │   └── client_*.json
 ├── custom/                     # 客户专属 C++（按客户分目录，全部参与编译）
 │   ├── client_a/
@@ -805,9 +805,9 @@ if (clientId == QLatin1String("client_a")) {
 ### 8.5 版本管理与发布
 
 - **配置校验**：为 JSON 写单元测试（加载 → 解析 → 字段完整性 → 命令 ID 是否在 CommandCatalog 中注册），
-  未注册命令的菜单项在运行期自动禁用并 `SY_WARNF`，避免“菜单点了没反应”。
+  未注册命令的菜单项在运行期自动禁用并 `APR_WARNF`，避免“菜单点了没反应”。
 - **回归策略**：每个客户配置都能正常加载；`ClientConfigTests` 全量通过。
-- **发布矩阵**：**一份构建产物服务全部客户**。客户差异由运行期 `SANYI_CLIENT_ID`
+- **发布矩阵**：**一份构建产物服务全部客户**。客户差异由运行期 `APR_CLIENT_ID`
   环境变量 / `QSettings Client/Id` 决定，安装包写入默认值即可。
   CI 只需构建一次，然后对每个客户 ID 起一次进程做冒烟测试。
 - **配置变更评审**：客户 JSON 的 `meta.version` 递增，diff 走代码评审，避免客户配置漂移。
@@ -847,8 +847,8 @@ if (clientId == QLatin1String("client_a")) {
 
 ## 9. 回归检查清单
 
-- [ ] `:/configs/san_yi.json` / `client_a.json` / `client_b.json` 均能正常加载；
-- [ ] `SANYI_CLIENT_ID` 指向**不存在**的客户时，回退到 `san_yi.json` 且日志有 WARN，界面不空白；
+- [ ] `:/configs/april.json` / `client_a.json` / `client_b.json` 均能正常加载；
+- [ ] `APR_CLIENT_ID` 指向**不存在**的客户时，回退到 `april.json` 且日志有 WARN，界面不空白；
 - [ ] 启动日志中 `[UiClientContext] Active client id=...` 与预期客户一致；
 - [ ] Dock 能从 JSON 构建，`m_panelState.sceneTreeDock/propertiesDock/leftDock/rightDock` 仍被正确填充（供 `WorkbenchWindow::sceneTreeDock()`/`setSkeletonDocksVisible()` 使用）；
 - [ ] 状态栏槽位按 JSON 生成，`permanent` 槽位不被 `showMessage()` 覆盖；
@@ -925,7 +925,7 @@ if (clientId == QLatin1String("client_a")) {
 出问题时第一时间能定位到是三侧里哪一侧配错了。汇总行形如：
 
 ```
-[ConfigSelfCheck] client='san_yi' commands=N features=M unresolved=0 gatedOut=0 \
+[ConfigSelfCheck] client='april' commands=N features=M unresolved=0 gatedOut=0 \
     licensedNotCompiled=0 compiledNotLicensed=0 workbenchGaps=0
 ```
 
