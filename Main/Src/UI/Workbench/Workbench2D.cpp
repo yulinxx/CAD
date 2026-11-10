@@ -549,13 +549,13 @@ void Workbench2D::setupViewportServices(RenderViewport2D* vp, WorkbenchWindow& w
         {
             return;
         }
+        // 清选择只需通知选中集：SceneManager::clearSelection() → notifySelectionChanged()
+        // → SceneRefreshCoordinator::onSelectionChanged() 会按增量（Selection/LightUpdate）
+        // 刷新。这里再补一次 requestFullRefresh() 等于把整份场景（日志里 311 图元）重建
+        // 一遍，和 Delete 分支注释里强调的「不要 clear + 全量刷新」是同一个错误。
         if (m_scene.selectionService)
         {
             m_scene.selectionService->clear();
-        }
-        if (m_viewport)
-        {
-            m_viewport->requestFullRefresh();
         }
     };
 
