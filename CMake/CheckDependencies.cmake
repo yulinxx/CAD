@@ -4,12 +4,24 @@
 # 强制分层规则，防止"假解耦"重新长出来：
 #   1. Engine*  不得依赖 UI* / Render* / Main / UiEngineAccess
 #   2. RenderX / RenderBridge 不得依赖 UI* / Main
-#   3. UI* 不得直接依赖 Engine*（只能经 UiEngineAccess 门面）
+#   3. UI* 不得直接**链接** Engine*（链接层只能经 UiEngineAccess 门面）
 #   4. UI* 不得直接依赖 RenderX（只能通过 RenderAbstraction 接口）
 #   5. UI* 的 include 目录不得引入 RenderX 头路径（直调 rx* 的能力来源）
 #   6. UI* 不得经**传递闭包**到达 RenderX
 #
 # 规则 1~4 只查**直接**链接（LINK_LIBRARIES）：直接依赖才是人为写错的地方。
+#
+# ⚠ 规则 3 的边界（务必读清，避免误解为"include 层已收口"）：
+#   UiEngineAccess 是**链接层**的单一收口点。include 层并未收口：
+#   - 转发头（UiEngineAccess/Include/UiEngineAccess/*.h）只覆盖 Engine2D 的
+#     算法 / 填充 / 离散化子集；
+#   - 场景 / 实体 / 选择 / 编辑等 API 仍由 UI 直接
+#     #include "Engine2D/..." / "Engine3D/..." / "Engine/..."；
+#   - UI 的公共头也直接暴露 Engine 类型（见 Docs/01-当前架构/
+#     UI-Engine解耦迁移方案.md §2.1），这是"共享领域模型"的既定取舍，
+#     不是待修缺陷。
+#   include 层不做存量迁移，但禁止依赖面继续扩张：见
+#   CMake/UiEngineAccessRatchet.cmake（按"去重后的 Engine 头文件"白名单校验）。
 #
 # 规则 5~6 是针对"假解耦"的补漏。规则 4 只管直接链接，于是出现了一条绕过路径：
 # UI 只链 RenderBridge → RenderBridge 用 PUBLIC 转发 RenderX → UI 照样拿到
@@ -117,7 +129,10 @@ function(sanyi_check_dependency_directions)
         endif()
     endforeach()
 
-    # 规则 3：UI 不得绕过门面直接依赖 Engine
+    # 规则 3：UI 不得直接**链接** Engine（链接层必经 UiEngineAccess 门面）。
+    # 注意：本规则不检查 include 层。UI 仍有大量 #include "Engine*/..." 直引
+    # 场景/实体/编辑头，这是既定取舍；include 层只靠棘轮禁止增长
+    # （CMake/UiEngineAccessRatchet.cmake），不要求存量迁移。
     set(_engine_direct "^(EngineCommon|Engine2D|Engine3D|EnginePersistence)$")
     foreach(_t IN LISTS _ui_targets)
         if(TARGET ${_t})
@@ -125,7 +140,7 @@ function(sanyi_check_dependency_directions)
             foreach(_dep IN LISTS _libs)
                 if(_dep MATCHES "${_engine_direct}")
                     list(APPEND _violations
-                        "UI 目标 ${_t} 直接链接了 ${_dep}；应改为链接 UiEngineAccess")
+                        "UI 目标 ${_t} 直接链接了 ${_dep}；链接层应改为链接 UiEngineAccess")
                 endif()
             endforeach()
         endif()
@@ -239,6 +254,8 @@ function(sanyi_check_dependency_directions)
         message(STATUS "[SanYi] 依赖方向校验: OK（分层规则通过；UI/RenderX 隔离未收口，见上方告警${_skip_note}）")
     else()
         message(STATUS "[SanYi] 依赖方向校验: OK "
-            "(Engine 不依赖 UI/Render；Render 不依赖 UI；UI 经 UiEngineAccess 访问 Engine；UI 通过 RenderAbstraction 访问渲染${_skip_note})")
+            "(Engine 不依赖 UI/Render；Render 不依赖 UI；"
+            "UI 仅在链接层经 UiEngineAccess 访问 Engine（include 层未收口，另有棘轮校验）；"
+            "UI 通过 RenderAbstraction 访问渲染${_skip_note})")
     endif()
 endfunction()

@@ -399,6 +399,13 @@ include("${SANYI_ROOT}/CMake/CheckDependencies.cmake")
 sanyi_check_dependency_directions()
 
 # ============================================================================
+# UI→Engine include 层棘轮校验 — 只冻结存量、禁止增长
+# 说明见 CMake/UiEngineAccessRatchet.cmake 文件头。
+# ============================================================================
+include("${SANYI_ROOT}/CMake/UiEngineAccessRatchet.cmake")
+sanyi_check_ui_engine_include_ratchet()
+
+# ============================================================================
 # C ABI 版本查询校验（CI 门禁）— 约定见 Docs/01-当前架构/C-ABI风格约定.md
 # ============================================================================
 include("${SANYI_ROOT}/CMake/CheckCApi.cmake")

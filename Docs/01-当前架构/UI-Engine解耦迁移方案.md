@@ -257,13 +257,24 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 2. **UI 模块改链门面** — `UI/Common`、`UI/2D`、`UI/3D` 的
    `target_link_libraries` 由 Engine 目标改为 `UiEngineAccess`，并删除各自重复的
    Engine 包含路径（改为从门面传递）。
-   - 365 处 `#include "Engine*/..."` **未改动**；依赖从"散落各处"变为单一收口点。
+   - **链接层**：依赖从"散落各处"变为单一收口点。
+   - **include 层**：**没有收口**。转发头只覆盖 Engine2D 的算法 / 填充 / 离散化
+     子集；场景 / 实体 / 选择 / 编辑等头仍由 UI 直接 `#include "Engine2D/..."` /
+     `"Engine3D/..."` / `"Engine/..."`（2026-11 依赖面：UICommon 13、UI2D 45、
+     UI3D 17 个去重后的 Engine 头，不含 `Test/`）。这是"共享领域模型"的既定取舍：
+     公共头已经暴露 Engine 类型，隐藏它们属于公共 API 治理，不在本方案范围。
+   - **防止重新长回来**：include 层不做存量迁移，但由
+     `CMake/UiEngineAccessRatchet.cmake` 在 configure 阶段做**依赖面白名单**校验
+     —— 出现白名单外的 Engine 头即失败，逼新代码走转发头；确需扩张时必须同步
+     加入白名单，使依赖面扩张成为一次显式决策。按「去重头文件」而非「include
+     次数」统计，纯代码拆分不会误报。
    - 对外导出的 imported target 仍用 `EngineCommon::EngineCommon` 等（门面是构建内的）。
 3. **`CMake/CheckDependencies.cmake`** — `sanyi_check_dependency_directions()`，
    在根 `CMakeLists.txt` 所有目标创建后执行；违规 `FATAL_ERROR`：
    - `Engine*` 不得链 `UI*` / `Render*` / `Main` / `UiEngineAccess`
    - `RenderX` / `RenderBridge` 不得链 `UI*` / `Main`
    - `UI*` 不得直接链 `EngineCommon/Engine2D/Engine3D/EnginePersistence`（只能经门面）
+   - include 层另有棘轮：`sanyi_check_ui_engine_include_ratchet()` 冻结存量、禁止增长
 4. **CI**：`.github/workflows/ci.yml` 的 Configure 步骤自动触发该检查，违规即失败。
 
 **验收（已验证）**：
@@ -379,6 +390,7 @@ Phase 3  目录统一 + 维度门控                  ✅ 已完成（骨架本�
 > 四个 Phase 全部完成。全程未改动业务逻辑语义：
 > - 消除了"假解耦"（UI/Core、EngineAdapter、IRenderSurface、4 个死 CMake 宏）；
 > - 后端开关统一为 `SANYI_DEFAULT_RENDER_BACKEND`；
-> - UI→Engine 依赖收口到 `UiEngineAccess` 门面，并由 `CheckDependencies.cmake`
->   在 configure 阶段强制方向（CI 门禁）；
+> - UI→Engine 依赖在**链接层**收口到 `UiEngineAccess` 门面，并由 `CheckDependencies.cmake`
+>   在 configure 阶段强制方向（CI 门禁）；include 层保持现状，由
+>   `UiEngineAccessRatchet.cmake` 冻结存量、禁止增长；
 > - 根工程新增 `BUILD_UI_DIMENSION=2D|3D|BOTH` 门控。
