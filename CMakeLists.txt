@@ -299,7 +299,7 @@ else()
 endif()
 option(SANYI_PYTHON_HOST "Enable PythonHost integration framework" ${SANYI_PYTHON_HOST_DEFAULT})
 option(SANYI_PYTHON_EMBED "Enable in-process Python bridge (Phase 3)" OFF)
-set(SANYI_PYTHON_VERSION "3.11" CACHE STRING "Required Python version")
+set(SANYI_PYTHON_VERSION "3.11" CACHE STRING "Minimum Python version (3.11+)")
 
 if(SANYI_PYTHON_HOST)
     # 必须进内层目录：外层 PythonHost/CMakeLists.txt 是独立构建入口，
