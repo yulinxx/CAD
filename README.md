@@ -101,9 +101,9 @@ SanYiCAD/
 
 | 模块 | 职责 | 技术栈 | 依赖 |
 |------|------|--------|------|
-| **UICommon** | 通用 UI 组件、状态中心、命令系统 | Qt Widgets | EngineCommon |
-| **UI2D** | 2D 工作台：主窗口、工具栏、属性面板、视口 | Qt Widgets | UICommon, Engine2D |
-| **UI3D** | 3D 工作台：场景树、设置对话框、3D 视口 | Qt Widgets | UICommon, Engine3D, GeoModelCore |
+| **UICommon** | 通用 UI 组件、状态中心、命令系统 | Qt Widgets | UiEngineAccess（链接层门面） |
+| **UI2D** | 2D 工作台：主窗口、工具栏、属性面板、视口 | Qt Widgets | UICommon, UiEngineAccess |
+| **UI3D** | 3D 工作台：场景树、设置对话框、3D 视口 | Qt Widgets | UICommon, UiEngineAccess, GeoModelCore |
 
 ### 功能模块
 
@@ -112,7 +112,7 @@ SanYiCAD/
 | **FileIO** | 文件导入导出（DXF、PLT、SVG、STL、NC） | C++17 | Engine2D, Engine3D |
 | **Nesting** | 排样算法（矩形/不规则嵌套） | C++17 | Engine2D |
 | **Nesting v2 核心能力** | QUALITY 策略(GA+退火) / 24向旋转(15°) / 镜像翻转 / 共边切割 / 孔内套排 / GROUP嵌套展开 / 10种2D图元类型 / 局部坐标变换 / 进度回调与取消 | - | - |
-| **Hardware** | 激光硬件控制、材质数据库、工艺参数 | Qt SerialPort | UICommon |
+| **Hardware** | 激光硬件控制、材质数据库、工艺参数 | Qt6 Core | Log, Utility（均 PRIVATE） |
 | **Engraving** | 浮雕生成、刀具路径计算、雕刻预览 | OpenCASCADE | Engine3D, GeoModelCore |
 | **GeoModelCore** | OpenCASCADE 几何建模集成 | OpenCASCADE | Engine3D |
 | **Network** | HTTP 请求、WebSocket、云端同步（可选） | Qt Network | UICommon |
@@ -151,10 +151,18 @@ SanYiCAD/
            │                             │                             │
            ▼                             ▼                             │
    ┌───────────────┐             ┌───────────────┐                     │
-   │   UICommon    │             │    RenderX    │                     │
-   │  通用 UI 组件 │             │ 渲染 DLL(C API)│                     │
-   └───────┬───────┘             └───────────────┘                     │
-           │                                                           │
+   │   UICommon    │             │ Render-       │                     │
+   │  通用 UI 组件 │             │ Abstraction   │                     │
+   └───────┬───────┘             └───────┬───────┘                     │
+           │                             ▼                             │
+           │                     ┌───────────────┐                     │
+           │                     │  RenderBridge │                     │
+           │                     └───────┬───────┘                     │
+           │                             ▼                             │
+           │                     ┌───────────────┐                     │
+           │                     │    RenderX    │                     │
+           │                     │ 渲染 DLL(C API)│                     │
+           │                     └───────────────┘                     │
            ▼                                                           │
    ┌───────────────┐             ┌───────────────┐                     │
    │   Engine2D    │             │   Engine3D    │                     │
@@ -210,10 +218,16 @@ SanYiCAD/
 ```
 
 > 图中箭头读作「A 依赖 B」。RenderX 是纯 C ABI 渲染 DLL，**不依赖任何
-> UI / Engine / Qt 模块**；UI2D/UI3D 也不直接调用 RenderX，而是经
-> `RenderAbstraction` → `RenderBridge` → `RenderX` 访问，图中把中间两层折叠了。
-> 原先「RenderX → UICommon」的横向箭头与代码不符，已删除；依赖方向由
+> UI / Engine / Qt 模块**；UI2D/UI3D 也不直接调用 RenderX，链路是
+> `RenderAbstraction` → `RenderBridge` → `RenderX`（图中已展开这三层，不再折叠）。
+> 「原先 RenderX → UICommon 的横向箭头」与代码不符，已删除；依赖方向由
 > `CMake/CheckDependencies.cmake` 在 configure 阶段校验。
+>
+> UI 与 Engine 的关系分两层：**链接层**经 `UiEngineAccess` 门面（图中 UICommon →
+> Engine2D/Engine3D 即为该门面下的链接），**include 层**未收口——场景/实体/
+> 选择/编辑头仍由 UI 直接 include，由 `CMake/UiEngineAccessRatchet.cmake`
+> 冻结存量、禁止增长。`Hardware` 只链 `Log` / `Utility`（PRIVATE）与 `Qt6::Core`，
+> 不依赖任何 UI 模块。
 
 ---
 
