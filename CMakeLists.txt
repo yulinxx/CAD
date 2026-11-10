@@ -251,6 +251,26 @@ endif()
 # 独立 DLL，公开头只暴露纯 C ABI（POD + 句柄），消费方不需要 OpenCV 头文件。
 if(BUILD_RASTER)
     add_subdirectory(Raster/Raster)
+
+    # Raster 是独立仓库的子模块（.gitmodules: git@github.com:yulinxx/Raster.git），
+    # 不在本仓维护范围内，因此不直接改它的源码。
+    #
+    # 其纯 C 契约测试 c_api_compat.c 调用 memset 但未 include <string.h>；
+    # C99 起隐式函数声明是错误（-Wimplicit-function-declaration），会中断构建。
+    # 这里只对该目标、只在 C 语言下注入头文件，属于构建层修补：
+    # 不解禁告警、不降级标准，也不影响任何 C++ 目标。
+    # 上游修复后可直接删除本段。
+    if(TARGET RasterCApiCompatTest)
+        if(MSVC)
+            target_compile_options(RasterCApiCompatTest PRIVATE
+                $<$<COMPILE_LANGUAGE:C>:/FIstring.h>)
+        else()
+            target_compile_options(RasterCApiCompatTest PRIVATE
+                $<$<COMPILE_LANGUAGE:C>:-include>
+                $<$<COMPILE_LANGUAGE:C>:string.h>)
+        endif()
+    endif()
+
     message(STATUS "  Raster: ENABLED")
 else()
     message(STATUS "  Raster: DISABLED")
