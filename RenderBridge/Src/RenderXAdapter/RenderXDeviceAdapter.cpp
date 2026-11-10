@@ -117,6 +117,14 @@ namespace RenderBridge
             }
         }
 
+    }  // namespace
+
+    /// 材质去重台账的类型。
+    ///
+    /// 必须放在具名命名空间而不是上面的匿名命名空间：RenderXDeviceAdapter 具有
+    /// 外部链接，它的成员类型若带内部链接会触发 -Wsubobject-linkage。
+    namespace MaterialCache
+    {
         /// 材质去重键：MaterialDesc 的全部字段（均为 4 字节，无填充）
         ///
         /// 去重的目的只有一个：让内容相同的材质拿到同一个 uint16 编号。
@@ -133,6 +141,19 @@ namespace RenderBridge
             float shininess = 0.0f;
         };
 
+        /// 一个材质槽的去重台账：内容键 + 引用计数
+        struct MaterialSlot
+        {
+            MaterialKey key;
+            uint32_t refs = 0;
+        };
+    }  // namespace MaterialCache
+
+    using MaterialCache::MaterialKey;
+    using MaterialCache::MaterialSlot;
+
+    namespace
+    {
         MaterialKey makeMaterialKey(const RenderAbstraction::MaterialDesc& desc)
         {
             MaterialKey key;
@@ -190,13 +211,6 @@ namespace RenderBridge
             h *= 0x100000001b3ull;
             return h;
         }
-
-        /// 一个材质槽的去重台账：内容键 + 引用计数
-        struct MaterialSlot
-        {
-            MaterialKey key;
-            uint32_t refs = 0;
-        };
     }  // namespace
 
     class RenderXDeviceAdapter : public RenderAbstraction::IRenderDevice
