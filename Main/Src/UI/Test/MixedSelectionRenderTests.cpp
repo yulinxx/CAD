@@ -30,8 +30,7 @@
 #include "Engine2D/SyEntity/SyLine.h"
 #include "Engine2D/SyEntity/SySmartLine.h"
 
-#include "Option/TextEdit/TextMeta.h"
-#include "Option/TextEdit/TextMetaCodec.h"
+#include "UI2D/Option/TextGroupNaming.h"
 
 #include "Render/RenderSceneBuilder.h"
 #include "RenderAbstraction/IRenderFactory.h"
@@ -327,8 +326,7 @@ TEST(MixedSelectionRenderTest, SelectedTextGlyphBodiesAreNeverHidden)
     Eg::SyGroup* modernText = scene.groupManager().createGroup("Text");
     ASSERT_NE(modernText, nullptr);
     modernText->addSubGroup(modernChar);
-    const QString encoded = TextMetaCodec::encodeToGroupName(
-        QStringLiteral("3"), TextCharStyle{}, Ut::Vec2d(0.0, 0.0), 0, 0.0);
+    const QString encoded = UiText::makeTextGroupName(QStringLiteral("3"));
     ASSERT_FALSE(encoded.isEmpty());
     modernText->setNameStr(encoded.toStdString());
 

@@ -16,7 +16,7 @@
 #include "Engine2D/Render/SelectionOutlineBuilder.h"
 #include "Engine/SyEntity/EType.h"
 
-#include "Option/TextEdit/TextMetaCodec.h"
+#include "UI2D/Option/TextGroupNaming.h"
 #include "Engine/Parallel/EngineParallel.h"
 
 #include "Ut/BBox2d.h"
@@ -93,7 +93,7 @@ namespace
         {
             group = group->parentGroup();
         }
-        return TextMetaCodec::isTextGroupName(QString::fromStdString(group->nameStr()));
+        return UiText::isTextGroupName(QString::fromStdString(group->nameStr()));
     }
 }  // namespace
 
