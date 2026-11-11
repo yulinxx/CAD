@@ -1,6 +1,6 @@
 # 3D 撤销与 B-Rep 同步优化
 
-> 状态说明（2026-11-10）　状态：现行　维护：架构组
+> 状态说明（2026-11-11）　状态：现行　维护：架构组
 
 ## 版本
 v1.0 - 2026-10-27
@@ -22,6 +22,14 @@ v1.0 - 2026-10-27
 - **隐藏图元过滤**：`raycast/raycastFirst/raycastHitFirst/queryByPoint/queryByBox/selectAll/invertSelection` 统一跳过 `entity->visible() == false` 的图元
 - **锁定图元拒绝变换/删除**：`beginTransform/applyTransform`、`keyPressEvent` nudge、`deleteEntity` 均检查锁定标志
 - **场景树删除统一走 `deleteEntities`**：`deleteSelected` 复用该逻辑
+
+### 属性编辑命令化（2026-11-11）
+- **新增字段级 `MeshPropertyCommand3D`**（`Engine/3D/Include|Src/Edit/SceneUndoCommands3D.*`）：字段枚举 `MeshPropertyField3D { Name, Visible, Locked }`，一条命令只改一个图元的一个字段，内部状态 PIMPL 收口，不跨 DLL 泄漏 STL
+- **`SceneEditService3D` 新增属性接口**：`renameEntity` / `setEntitiesVisible` / `setEntitiesLocked`，走 `executeCommand` 先执行后入栈以推进 savePoint；值未变化直接返回不入栈；批量用 `beginBatch` / `endBatch` 合并为一条撤销记录
+- **6 个入口统一走服务层**：`Workbench3D` 的 `renameEntity3D` / `toggleEntityVisibility3D` / `setSceneTreeVisibility3D` / `setSceneTreeLock3D`，以及 `EntityPropertyEditSession3D` 的 Name / Visible / Locked（无服务直接拒绝写入，不留直写回退）
+- **撤销/重做后的 UI 同步**：`Workbench3D` 监听 `UndoRedoManager3D::stateChanged`，只在识别到历史回放时重建场景树并刷新属性面板；`refreshSceneTreeRowsForSelection3D` 已删除
+- **行为变化**：`setEntitiesLocked` 现在会 `notifySceneModified()` 标脏（旧实现锁定时不标脏，但 locked 本就会写存档）；3D 隐藏图元后改用 `dropHiddenFromSelection3D` 精确剔除被隐藏项，与 2D 一致
+- **序列化**：`mesh_data.name` 写入保留，反序列化优先取非空值、为空回落公共 `name`；存档格式未变
 
 ### B-Rep - 变换同步
 - **`TransformMeshCommand3D` 新增正/逆矩阵回调**：undo 应用逆矩阵，redo 应用正矩阵；奇异矩阵退化为仅还原网格
@@ -56,6 +64,7 @@ v1.0 - 2026-10-27
 2. **Open/New 撤销后 B-ROP 无法恢复**：基于整场景克隆 trade-off，接受映射在文档替换时被清理
 3. **`make test` 受 Engine2D `TextConverter.h` 预置错误阻塞**，与本任务无关
 4. **Windows/MSVC 与 Qt 6.5/6.11 的二进制兼容性**仍需单独验证
+5. **撤销回放期间的入栈守卫（`isReplaying`）未实现**：当前无可复现的入栈路径，仅在 `EntityPropertyCommand2D.h` 留 TODO 注释
 
 ## 联系方式 / 维护
 - 维护人员：3D 模块组

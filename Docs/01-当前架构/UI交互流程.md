@@ -453,6 +453,7 @@ flowchart TD
 | `label` | 显示文本 | `DXF...` |
 | `command` | 绑定的命令 ID | `file.import_dxf` |
 | `icon` | 图标资源路径 | `:/ui/common/Icons/File/import.svg` |
+| `tooltip` | 悬停提示（与 `label` 同一翻译链路，`WorkbenchMenuManager` 上下文） | `Import DXF` |
 | `workbenches` | 可见工作台 | `["2D"]` / `["2D","3D"]` |
 | `items` | 子节点（submenu） | `[...]` |
 

@@ -413,6 +413,17 @@ IconHelper::setUserIconDirectory("C:/myIcons");   // 传空串清除定制
 - `enabled`：是否启用
 - `checked`：是否勾选
 - `workbenches`：仅在特定工作台显示
+- `tooltip`：鼠标悬停提示（与 `label` 同一条翻译链路）
+
+#### 文案与翻译
+
+`label` 与 `tooltip` 都是英文源文案，运行时经 `UiLayoutBuilder::localizedLabel` /
+`localizedTooltip` → `uiLocalizedLabel()` 按 `WorkbenchMenuManager` 上下文查 `.ts`，
+未命中时回退英文。新增或修改文案时必须同步
+`UI/Common/Src/MenuLayoutTranslationStrings.cpp` 的 `QT_TRANSLATE_NOOP` 声明，
+否则下一次 `lupdate` 会把条目当过期项删除。
+
+自检命令与检查项见 [i18n 文案与自检门禁](../04-测试与日志/i18n文案与自检门禁.md)。
 
 ### 3.9 菜单定制可以怎么做
 

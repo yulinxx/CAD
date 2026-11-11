@@ -428,10 +428,10 @@ pending 标志，超时补一次尾包。属性面板展示端点/半径等几�
 | 对话框移动/旋转/镜像/对齐 | `EditOperationRegistry` → `transformEntities` | 矩阵合并一次，整批一次索引同步 | 入栈后一次通知；结构签名不变不重建树 |
 | 方向键 Nudge | `Edit_Nudge` → `nudgeSelected` | 同上；撤销命令可合并 | 同上 |
 | 删除 | `DeleteEntitiesCommand` | `removeRange` 批量摘除 | 一次选择+场景通知；结构签名变化 → 树防抖重建 |
-| 批量显隐 | `SceneManager::setEntitiesVisible` | 循环 `setVisible` → 回调 `recordChange(VisibilityChanged)` | 进入增量路径；16ms 合帧；结构签名不变，树按行 `dataChanged` 增量刷新 |
-| 批量锁定 | `SceneManager::setEntitiesLocked` | 循环 `setLocked` → 回调 `recordChange(LockChanged)` | **不触发渲染刷新**；只刷命令状态；不重建树 |
+| 批量显隐 | `SceneEditService::setEntitiesVisible` → `EntityPropertyCommand2D` | 批量合并为一条撤销记录；循环 `setVisible` → 回调 `recordChange(VisibilityChanged)` | 进入增量路径；16ms 合帧；结构签名不变，树按行 `dataChanged` 增量刷新 |
+| 批量锁定 | `SceneEditService::setEntitiesLocked` → `EntityPropertyCommand2D` | 批量合并为一条撤销记录；循环 `setLocked` → 回调 `recordChange(LockChanged)`，并 `notifySceneModified()` 标脏 | **不触发渲染刷新**；只刷命令状态；不重建树 |
 | 粘贴 / 复制 | `addEntities` 批量落库 | 批量建索引（带进度分段） | 一次通知；结构签名变化 → 树重建 |
-| 撤销 / 重做 | `EntitySnapshotsCommand` | 快照整批替换/恢复 | 命令末尾一次通知 |
+| 撤销 / 重做 | `EntitySnapshotsCommand` / `MeshPropertyCommand3D` | 2D 整体交换并按字段白名单保留现值；3D 单字段命令 | 命令末尾一次通知；3D 历史回放时重建树并刷新属性面板 |
 | 3D 框选 | `RenderWidget3D::selectByScreenRect` | 逐图元投影求交（屏幕空间） | 一次 `selectMany`，只刷新一次属性面板 |
 | 3D 拖动变换 | `SelectionManager3D::applyTransform` | 一次矩阵烘焙顶点（≥100 图元并行），只更新选中图元索引 | 一次 `markDataChanged`；`structureRevision` 不变，树不重建 |
 | 3D 删除 | `SceneEditService3D::deleteSelected` | 一次 `extractEntities`（一趟压缩） | 一次移除通知 + 一次场景通知；树经防抖重建一次 |
@@ -456,11 +456,11 @@ pending 标志，超时补一次尾包。属性面板展示端点/半径等几�
 - ✅ 3D 批量变换后只对本批图元 `updateEntitiesBounds`，禁止全量 `rebuildSpatialIndex`；
 - ✅ 3D 大选集（≥100 图元）顶点变换走 `EngineParallel::parallelForIndex`，
   每个图元独占自己的顶点数组、矩阵只读，禁止在并行体内触碰共享状态；
-- ✅ 实体显隐统一走 `setEntitiesVisible`（或直接 `setVisible`，由回调记录），
-  禁止绕过 SceneManager 直接改标志位——那样不会产生 `VisibilityChanged`，
-  渲染侧收不到变更、只能全量重建；
-- ✅ 实体锁定统一走 `setEntitiesLocked`（或直接 `setLocked`，由回调记录）；
-  锁定不影响渲染，**禁止**为锁定调用 `notifySceneChanged()`；
+- ✅ 实体显隐统一走 `SceneEditService::setEntitiesVisible` / `SceneEditService3D::setEntitiesVisible`
+  （最终由 `setVisible` 回调记录），禁止绕过 SceneManager 直接改标志位——那样不会产生
+  `VisibilityChanged`，渲染侧收不到变更、只能全量重建；
+- ✅ 实体锁定统一走 `SceneEditService::setEntitiesLocked` / `SceneEditService3D::setEntitiesLocked`；
+  锁定不影响渲染，只 `notifySceneModified()` 标脏，**禁止**为锁定触发渲染刷新；
 - ✅ 场景树批量信号传整数 ID（`QVector<qint64>`），禁止用 `QStringList` 传递大量
   id；行内容变化（显隐）用 `refreshRows()` 增量刷新，禁止全量重建拓扑；
 - ✅ 场景树按 id 定位行走哈希表：`SceneTreeTableModel2D::indexForId` 的群组成员
