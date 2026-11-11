@@ -25,6 +25,7 @@
 #include "UI/ClientConfig/UiConfigLoader.h"
 #include "UI/ClientConfig/UiConfigSelfCheck.h"
 #include "UI/Widgets/DrawToolBarWidget.h"
+#include "RenderWidget.h"
 
 #include "UI/Workbench/WorkbenchMenuManager.h"
 
@@ -1042,4 +1043,56 @@ TEST(CommandUiWiringTest, ToolpathXrayDefaultsOffAndShowsStateBadge)
     EXPECT_TRUE(badge->isHidden());
 }
 
+TEST(CommandUiWiringTest, RenderErrorBadgeShowsReasonAndClears3D)
+{
+    RenderWidget3D widget;
+
+    // 正常状态：不创建角标，也不占用任何可见面积
+    EXPECT_TRUE(widget.renderError().isEmpty());
+    EXPECT_EQ(widget.findChild<QLabel*>(QStringLiteral("renderErrorBadge")), nullptr)
+        << "没有失败时不应创建错误角标";
+
+    // 失败必须可感知：文本直接带原因，而不是留一块与空场景无法区分的背景
+    widget.reportRenderError(QStringLiteral("frame acquisition failed (device lost)"));
+    EXPECT_EQ(widget.renderError(), QStringLiteral("frame acquisition failed (device lost)"));
+    auto* badge = widget.findChild<QLabel*>(QStringLiteral("renderErrorBadge"));
+    ASSERT_NE(badge, nullptr);
+    EXPECT_FALSE(badge->isHidden());
+    EXPECT_TRUE(badge->text().startsWith(QStringLiteral("Render error:")));
+    EXPECT_TRUE(badge->text().contains(QStringLiteral("frame acquisition failed (device lost)")));
+    // 角标只做提示，不能吃掉视口的框选/平移
+    EXPECT_TRUE(badge->testAttribute(Qt::WA_TransparentForMouseEvents));
+
+    // 恢复后必须撤掉提示，否则用户会以为画面仍然不可用
+    widget.clearRenderError();
+    EXPECT_TRUE(widget.renderError().isEmpty());
+    EXPECT_TRUE(badge->isHidden());
+}
+
 #endif  // BUILD_UI3D
+
+TEST(CommandUiWiringTest, RenderErrorBadgeShowsReasonAndClears2D)
+{
+    RenderWidget widget;
+
+    // 正常状态：不创建角标，也不占用任何可见面积
+    EXPECT_TRUE(widget.renderError().isEmpty());
+    EXPECT_EQ(widget.findChild<QLabel*>(QStringLiteral("renderErrorBadge")), nullptr)
+        << "没有失败时不应创建错误角标";
+
+    // 失败必须可感知：文本直接带原因，而不是留一块与空图纸无法区分的白底
+    widget.reportRenderError(QStringLiteral("renderer initialization failed (see application log)"));
+    EXPECT_EQ(widget.renderError(), QStringLiteral("renderer initialization failed (see application log)"));
+    auto* badge = widget.findChild<QLabel*>(QStringLiteral("renderErrorBadge"));
+    ASSERT_NE(badge, nullptr);
+    EXPECT_FALSE(badge->isHidden());
+    EXPECT_TRUE(badge->text().startsWith(QStringLiteral("Render error:")));
+    EXPECT_TRUE(badge->text().contains(QStringLiteral("renderer initialization failed")));
+    // 角标只做提示，不能吃掉视口的框选/平移
+    EXPECT_TRUE(badge->testAttribute(Qt::WA_TransparentForMouseEvents));
+
+    // 恢复后必须撤掉提示，否则用户会以为画面仍然不可用
+    widget.clearRenderError();
+    EXPECT_TRUE(widget.renderError().isEmpty());
+    EXPECT_TRUE(badge->isHidden());
+}
