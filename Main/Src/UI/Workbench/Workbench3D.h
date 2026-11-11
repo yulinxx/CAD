@@ -20,6 +20,7 @@ class SettingsUiCoordinator3D;
 class CommandActionHub3D;
 class AlgorithmRunner3D;
 class RenderWidget3D;
+class DocumentRecoveryController;
 struct CommandUiSnapshot3D;
     #ifdef ENABLE_GEOMODELCORE
 class BRepModelService3D;
@@ -82,6 +83,8 @@ private:
     void setup3DViewportAndSignals(WorkbenchWindow& window);
     void setup3DMenuAndShortcuts(WorkbenchWindow& window);
     void create3DViewport(WorkbenchWindow& window);
+    /// 3D 自动保存 / 崩溃恢复：创建协调器并启动
+    void setupDocumentRecovery();
     void bind3DRenderSignals(ServiceOwner& own);
     void bind3DSelectionSignal();
     /// 把当前选择集重新推给 3D 状态栏（切回 3D 时用）。
@@ -202,5 +205,13 @@ private:
     bool m_sceneTree3DIncrementalBusy{ false };
     /// 属性面板重建节流定时器：active 期间多次请求合并为窗口末尾一次（与 2D 同语义）
     QTimer* m_propertiesRefreshTimer3D{ nullptr };
+
+    /// 3D 自动保存 / 崩溃恢复协调器（完整定义在 .cpp；自定义删除器避免
+    /// 在头文件里实例化不完整类型的 unique_ptr 析构）
+    struct RecoveryControllerDeleter
+    {
+        void operator()(DocumentRecoveryController* controller) const;
+    };
+    std::unique_ptr<DocumentRecoveryController, RecoveryControllerDeleter> m_recoveryController;
 };
 #endif

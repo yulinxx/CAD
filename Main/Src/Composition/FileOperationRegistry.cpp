@@ -6,6 +6,7 @@
  */
 #include "FileOperationRegistry.h"
 #include "OpRegistryTypes.h"
+#include "DocumentRecoveryController.h"
 
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
@@ -100,6 +101,9 @@ FileOperationRegistry::FileOperationRegistry(const FileOperationConfig& config)
 {
     m_currentFilePath = std::make_shared<std::string>();
 }
+
+// 析构放在 cpp：DocumentRecoveryController 在头文件中只有前向声明
+FileOperationRegistry::~FileOperationRegistry() = default;
 
 // ==================== 公共辅助方法 ====================
 
@@ -667,4 +671,95 @@ void FileOperationRegistry::registerAll()
     Ops::declare(m_bus->registry(), OperationId::File_Exit, [this] {
         FileOperationUtils::exitApplication(m_parentWidget);
     });
+
+    setupDataSafety();
+}
+
+void FileOperationRegistry::setupDataSafety()
+{
+    if (m_recoveryController)
+    {
+        return;
+    }
+
+    m_recoveryController = std::make_unique<DocumentRecoveryController>(QStringLiteral("2D"), false);
+    m_recoveryController->setDialogParent(m_parentWidget);
+    m_recoveryController->setDocumentKeyProvider([this]() {
+        return m_currentFilePath ? QString::fromStdString(*m_currentFilePath) : QString();
+    });
+    m_recoveryController->setDirtyProbe([this]() {
+        return m_sceneManager != nullptr && m_sceneManager->isDirty();
+    });
+    m_recoveryController->setSnapshotWriter([this](const QString& recoveryPath, QString& error) {
+        if (m_exportService == nullptr)
+        {
+            error = QStringLiteral("Export service is not available");
+            return false;
+        }
+        return m_exportService->exportRecoverySnapshot(recoveryPath, error);
+    });
+    m_recoveryController->setRestoreHandler(
+        [this](const QString& recoveryPath, const QString& originalPath, QString& error) {
+            return restoreRecoveryFile(recoveryPath, originalPath, error);
+        });
+    m_recoveryController->start();
+}
+
+bool FileOperationRegistry::restoreRecoveryFile(
+    const QString& recoveryPath, const QString& originalPath, QString& error)
+{
+    if (m_importService == nullptr)
+    {
+        error = QStringLiteral("Import service is not available");
+        return false;
+    }
+    if (recoveryPath.isEmpty())
+    {
+        error = QStringLiteral("Empty recovery file path");
+        return false;
+    }
+
+    // 恢复是「用恢复文件替换当前内存文档」，不写最近文件、不自动写回原文档。
+    ImportOptions opts;
+    opts.importAsNewDocument = true;
+    opts.autoFit = true;
+    opts.autoSwitchWorkbench = false;
+
+    ImportContext context;
+    context.sourcePath = recoveryPath;
+
+    const ImportResult result = ImportProgressRunner::run(m_importService, context, opts, m_parentWidget);
+    if (!result.success)
+    {
+        error = result.message;
+        return false;
+    }
+
+    const bool untitled = originalPath.isEmpty() || originalPath.startsWith(QStringLiteral("untitled://"));
+    const std::string restoredPath = untitled ? std::string() : originalPath.toStdString();
+    if (m_currentFilePath)
+    {
+        *m_currentFilePath = restoredPath;
+    }
+    if (m_layerPersistence)
+    {
+        m_layerPersistence->setDocumentId(restoredPath);
+    }
+    if (m_undoRedoManager)
+    {
+        m_undoRedoManager->clear();
+    }
+    // 恢复内容尚未写入原文档：必须保持脏标记，关闭时才会提示保存；
+    // 原文档文件保持原样，绝不在恢复过程中覆盖。
+    if (m_sceneManager)
+    {
+        m_sceneManager->markDirty();
+    }
+    if (m_stateCenter)
+    {
+        m_stateCenter->setCurrentDocumentId(untitled ? QString() : originalPath);
+        m_stateCenter->refreshDirty();
+    }
+    APR_INFOF("[FileOperation] Restored autosaved content from: %s", recoveryPath.toUtf8().constData());
+    return true;
 }

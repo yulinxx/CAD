@@ -69,6 +69,11 @@ public:
     /// @return 导出结果
     ExportResult exportWithContext(const ExportContext& context, const ExportOptions& options = ExportOptions{});
 
+    /// 自动保存专用：把当前场景按正式保存同一套快照写成恢复文件。
+    /// 不写导出记录、不推忙状态/状态栏、不发信号、不弹错误框；
+    /// 失败经返回值与 error 明确上报（自动保存不允许静默吞错）。
+    bool exportRecoverySnapshot(const QString& filePath, QString& error);
+
     /// 异步导出：Phase 1（主线程）收参 + clone 场景图元 + 忙状态；
     /// Phase 2（后台线程）序列化 + 文件写入；
     /// Phase 3（主线程）回写记录 + 发信号 + 清忙状态。

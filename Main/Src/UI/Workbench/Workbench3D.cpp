@@ -27,6 +27,7 @@
     #include <vector>
 
     #include "Composition/ApplicationCompositionRoot.h"
+    #include "Composition/DocumentRecoveryController.h"
     #include "Import/ImportService.h"
     #include "Log/AprLogger.h"
     #include "UI/Services/IRecentFileService.h"
@@ -42,6 +43,7 @@
     #include "ClientConfig/UiConfigurationManager.h"
     #include "ClientConfig/UiContextMenuService.h"
     #include "ClientConfig/UiLayoutBuilder.h"
+    #include "UI3D/Storage/SceneDocumentIO3D.h"
 
     #include "UI/Services/HelpDialogService.h"
     #include "UI/Service/ViewCaptureService.h"
@@ -373,8 +375,65 @@ bool Workbench3D::initialize(const WorkbenchServices& services)
 
     m_savedState = UiStateSnapshot{};
     m_initialState = UiStateSnapshot{};
+    setupDocumentRecovery();
     APR_DEBUG("[Workbench3D] initialize: 3D workbench initialized successfully");
     return true;
+}
+
+void Workbench3D::RecoveryControllerDeleter::operator()(DocumentRecoveryController* controller) const
+{
+    delete controller;
+}
+
+void Workbench3D::setupDocumentRecovery()
+{
+    if (m_recoveryController || m_sceneManager3D == nullptr)
+    {
+        return;
+    }
+
+    m_recoveryController.reset(new DocumentRecoveryController(QStringLiteral("3D"), true));
+    m_recoveryController->setDocumentKeyProvider([this]() {
+        return (m_sessionState && m_sessionState->documentManager)
+            ? m_sessionState->documentManager->currentFilePath()
+            : QString();
+    });
+    m_recoveryController->setDirtyProbe([this]() {
+        return m_sessionState && m_sessionState->documentManager &&
+            m_sessionState->documentManager->isModified();
+    });
+    m_recoveryController->setSnapshotWriter([this](const QString& recoveryPath, QString& error) {
+        if (m_sceneManager3D == nullptr)
+        {
+            error = QStringLiteral("3D scene is not available");
+            return false;
+        }
+        return SceneDocumentIO3D::saveScene(m_sceneManager3D, recoveryPath, error);
+    });
+    m_recoveryController->setRestoreHandler(
+        [this](const QString& recoveryPath, const QString& originalPath, QString& error) {
+            if (m_sceneManager3D == nullptr)
+            {
+                error = QStringLiteral("3D scene is not available");
+                return false;
+            }
+            if (!SceneDocumentIO3D::loadScene(m_sceneManager3D, recoveryPath, error))
+            {
+                return false;
+            }
+            if (m_sessionState && m_sessionState->documentManager)
+            {
+                const bool untitled =
+                    originalPath.isEmpty() || originalPath.startsWith(QStringLiteral("untitled://"));
+                m_sessionState->documentManager->setCurrentFilePath(untitled ? QString() : originalPath);
+                // 恢复内容尚未写回原文档：保持修改标记，关闭时才会提示保存；
+                // 原文档文件保持原样。
+                m_sessionState->documentManager->setModified(true);
+            }
+            APR_INFOF("[Workbench3D] Restored autosaved content from: %s", recoveryPath.toUtf8().constData());
+            return true;
+        });
+    m_recoveryController->start();
 }
 
 // 防御性析构：若 deactivate() 未被调用（如异常路径或上层遗漏 shutdown），
@@ -1658,6 +1717,12 @@ void Workbench3D::activate()
         m_uiState.stateCenter->setCurrentWorkbenchId(id());
     }
 
+    // 自动保存/崩溃恢复提示框以 3D 主窗口为父窗口（此时窗口已挂载完成）
+    if (m_recoveryController && m_mainWindow3D)
+    {
+        m_recoveryController->setDialogParent(m_mainWindow3D.get());
+    }
+
     if (m_mainWindow3D)
     {
         QTimer::singleShot(0, m_mainWindow3D.get(), [this]() {
@@ -1818,6 +1883,14 @@ void Workbench3D::deactivate()
 void Workbench3D::shutdown()
 {
     deactivate();
+
+    // 停止自动保存定时器，并释放协调器（恢复文件保留，供下次启动检测）
+    if (m_recoveryController)
+    {
+        m_recoveryController->stop();
+        m_recoveryController.reset();
+    }
+
     m_uiState = {};
     m_commands = {};
     m_scene = {};

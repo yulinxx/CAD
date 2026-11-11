@@ -468,6 +468,43 @@ ExportResult ExportService::exportWithContext(const ExportContext& context, cons
     return result;
 }
 
+bool ExportService::exportRecoverySnapshot(const QString& filePath, QString& error)
+{
+    if (!m_dispatcher)
+    {
+        error = tr("Export service not initialized (dispatcher not set)");
+        return false;
+    }
+    if (m_exportBusy.exchange(true))
+    {
+        error = tr("Another export is in progress");
+        return false;
+    }
+
+    // 与正式导出完全同源：同一套加工语义快照 + 图元克隆，
+    // 但不写导出记录、不推忙状态/状态栏、不发信号、不弹错误框。
+    ExportContext fullCtx;
+    fullCtx.targetPath = filePath;
+    fullCtx.sceneManager = m_sceneManager;
+    fullCtx.sceneManager3D = m_sceneManager3D;
+    captureMachiningSnapshot(fullCtx);
+
+    Fio::VecAprEntityPtr entities = collectAllEntities();
+    fullCtx.sceneManager = nullptr;
+    fullCtx.sceneManager3D = nullptr;
+
+    const ExportResult result = m_dispatcher->dispatch(fullCtx, entities);
+    m_exportBusy.store(false);
+
+    if (!result.success)
+    {
+        error = result.message;
+        APR_WARNF("[ExportService] Recovery snapshot failed: %s", error.toUtf8().constData());
+        return false;
+    }
+    return true;
+}
+
 bool ExportService::canExport(const QString& filePath, QString* reasonOut) const
 {
     if (!m_dispatcher)

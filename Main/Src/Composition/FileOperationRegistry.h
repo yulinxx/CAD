@@ -18,6 +18,7 @@ class ExportService;
 class IRecentFileService;
 class HelpDialogService;
 class IUndoRedoManager;
+class DocumentRecoveryController;
 
 namespace Eg
 {
@@ -61,6 +62,7 @@ class FileOperationRegistry
 {
 public:
     explicit FileOperationRegistry(const FileOperationConfig& config);
+    ~FileOperationRegistry();
 
     void registerAll();
 
@@ -113,6 +115,13 @@ private:
     /// 统一异常保护包装器：执行操作并在异常时显示错误对话框
     void executeWithExceptionGuard(const char* operationName, std::function<void()> action);
 
+    /// 2D 自动保存 / 崩溃恢复：创建协调器并启动（registerAll 末尾调用）
+    void setupDataSafety();
+
+    /// 崩溃恢复：把恢复文件载入当前文档（替换当前内容），
+    /// 当前路径指向原文档但绝不写回原文档；原文件保持原样
+    bool restoreRecoveryFile(const QString& recoveryPath, const QString& originalPath, QString& error);
+
     // ==================== 操作注册子方法 ====================
 
     void registerFileNewOps();
@@ -136,4 +145,7 @@ private:
     PersistenceService* m_persistence;
     QWidget* m_parentWidget;
     IUndoRedoManager* m_undoRedoManager;
+
+    /// 2D 自动保存 / 崩溃恢复协调器（非 QObject 所有者，随注册表销毁）
+    std::unique_ptr<DocumentRecoveryController> m_recoveryController;
 };
