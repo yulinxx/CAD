@@ -342,3 +342,7 @@ qtcreator.xml
 stress_*/
 LayeredProcessingTests.cpp
 PolygonOffsetTests.cpp
+
+# ---- 审查输出目录 ----
+# 按日期命名的审查产物目录，每轮审查生成，不入库
+20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]/
