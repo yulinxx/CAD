@@ -13,6 +13,8 @@
 
 #include <QOpenGLContext>
 
+#include <cstddef>
+
 namespace
 {
     /**
@@ -188,6 +190,15 @@ namespace
                         static_cast<unsigned long long>(desc.transientBufferBytes),
                         static_cast<unsigned long long>(m_transientBytes));
                 }
+                if (desc.sampleCount != m_sampleCount)
+                {
+                    // 管线采样数在建 Runtime 时就固定了；后到的视口改采样数
+                    // 会让 MTLRenderPipelineState 与附件不匹配（整帧空白）。
+                    APR_WARNF("[SharedRuntime] sampleCount requested %u vs existing %u, "
+                             "keeping existing (latecomer cannot change MSAA)",
+                        static_cast<unsigned>(desc.sampleCount),
+                        static_cast<unsigned>(m_sampleCount));
+                }
                 m_holders += 1;
                 APR_INFOF("[SharedRuntime] Reusing process-level Metal runtime (current holders: %u)", m_holders);
                 return m_runtime;
@@ -199,6 +210,7 @@ namespace
                 return Render::RT::RuntimeHandle::Invalid;
             }
             m_transientBytes = desc.transientBufferBytes;
+            m_sampleCount = desc.sampleCount;
             m_holders = 1;
             m_shutdownRequested = false;
 
@@ -255,11 +267,14 @@ namespace
             Render::RT::rxRuntimeDestroy(m_runtime);
             m_runtime = Render::RT::RuntimeHandle::Invalid;
             m_transientBytes = 0;
+            m_sampleCount = 0;
         }
 
         Render::RT::RuntimeHandle m_runtime{ Render::RT::RuntimeHandle::Invalid };
         /// 已建 Runtime 实际采用的瞬态环预算，用于对后续请求做一致性告警
         uint64_t m_transientBytes = 0;
+        /// 已建 Runtime 的采样数，用于对后续请求做一致性告警
+        uint32_t m_sampleCount = 0;
         /// 当前持有点数量：只用于日志与「是否已拆完」的判断
         uint32_t m_holders = 0;
         /// 应用是否已请求退出（决定 release 到 0 时是销毁还是保留）
@@ -276,8 +291,21 @@ namespace RenderBridge
 
     bool RenderSessionHost::initialize(const Config& config)
     {
+        // 旧签名的行为必须与引入 SurfaceOptions 之前完全一致：不请求 MSAA。
+        SurfaceOptions options{};
+        return initialize(config, options);
+    }
+
+    bool RenderSessionHost::initialize(const Config& config, const SurfaceOptions& options)
+    {
         // 复用同一个宿主重建时，先把上一次的运行时收干净
         shutdown();
+
+        // structSize 协商：只有调用方声明的大小覆盖到 msaaSamples 时才读取该字段。
+        // 旧调用方（或未来只认识前几个字段的调用方）在这里拿到 0，即关闭 MSAA。
+        const uint32_t requestedMsaa =
+            options.structSize >= offsetof(SurfaceOptions, msaaSamples) + sizeof(uint32_t) ? options.msaaSamples : 0;
+        m_msaaSamples = requestedMsaa;
 
         const auto backend = toBackend(config.backend);
         const bool metal = backend == Render::RT::Backend::Metal;
@@ -298,6 +326,9 @@ namespace RenderBridge
         rd.logCallback = reinterpret_cast<Render::RT::rxLogCallback>(&rxLogBridge);
         rd.logUserData = nullptr;
         rd.applicationName = config.applicationName;
+        // MSAA 是 Runtime 级设置：Metal 的管线对象在 Runtime 内共享，
+        // 采样数必须与管线、所有附件一致（见 RuntimeDesc::sampleCount 注释）。
+        rd.sampleCount = requestedMsaa;
         if (!metal)
         {
             // 交给 DLL 用 Qt 的符号解析，而不是平台默认路径（见 qtGlGetProcAddress 注释）。
@@ -325,6 +356,8 @@ namespace RenderBridge
         sd.width = config.width;
         sd.height = config.height;
         sd.enableDepth = config.enableDepth ? 1 : 0;
+        // 表面采样数必须与 Runtime 一致；不一致时 DLL 会告警并沿用 Runtime 值
+        sd.sampleCount = requestedMsaa;
         sd.handleB = nullptr;
         if (metal)
         {
@@ -428,10 +461,11 @@ namespace RenderBridge
         {
             return;
         }
-        APR_INFOF("%s: backend=%s device=%s maxLineWidth=%.1f",
+        APR_INFOF("%s: backend=%s device=%s maxLineWidth=%.1f maxSamples=%u",
             tag ? tag : "RenderSessionHost",
             Render::RT::rxBackendName(caps.backend),
             caps.deviceName,
-            caps.maxLineWidth);
+            caps.maxLineWidth,
+            static_cast<unsigned>(caps.maxSampleCount));
     }
 }  // namespace RenderBridge

@@ -127,6 +127,27 @@ namespace RenderBridge
             void* nativeWindow = nullptr;
         };
 
+        /**
+         * @brief 表面选项：不改变 Config 布局的版本化扩展入口
+         *
+         * 为什么不给 Config 直接追加字段：Config 以 const& 跨 DLL 传递，
+         * 旧调用方编译时已按旧布局分配对象，实现在尾部读取新字段等于读越界。
+         * 按 ABI 约定采用「structSize 协商」：调用方把 structSize 填成自己
+         * 认识的 sizeof，实现方据此判断哪些字段有效；新字段只能追加在尾部。
+         *
+         * 旧调用方继续使用 initialize(const Config&)，行为完全不变。
+         */
+        struct SurfaceOptions
+        {
+            /// 必须由调用方填写：sizeof(SurfaceOptions) 或更小的已知版本
+            uint32_t structSize = sizeof(SurfaceOptions);
+            /**
+             * MSAA 采样数：0/1 = 关闭（默认，保持引入前行为）；2/4/8 开启。
+             * 后端不支持时降级并告警，不会让渲染失败。
+             */
+            uint32_t msaaSamples = 0;
+        };
+
         RenderSessionHost() = default;
         ~RenderSessionHost();
 
@@ -150,10 +171,22 @@ namespace RenderBridge
          */
         bool initialize(const Config& config);
 
+        /**
+         * @brief 带表面选项的初始化（MSAA 等）
+         *
+         * 新增重载而不是改 initialize(const Config&) 的签名：旧符号与其
+         * 调用点保持原样，插件侧二进制不受影响。options.structSize 小于
+         * 对应字段偏移时，该字段按默认值（关闭）处理。
+         */
+        bool initialize(const Config& config, const SurfaceOptions& options);
+
         /// 逆序销毁 session → surface → runtime；幂等，可重复调用
         void shutdown();
 
         bool isReady() const;
+
+        /// 请求的 MSAA 采样数（0/1 = 关闭）。实际生效值受后端能力限制，见 logCapabilities。
+        uint32_t msaaSamples() const { return m_msaaSamples; }
 
         // ---------- 渲染接口视图 ----------
         //
@@ -222,5 +255,7 @@ namespace RenderBridge
          * 共享 Runtime 被提前销毁（其它视口的 Surface 全部失效）或泄漏。
          */
         bool m_runtimeShared = false;
+        /// 本次 initialize 请求的采样数（0/1 = 关闭），仅用于查询与日志
+        uint32_t m_msaaSamples = 0;
     };
 }  // namespace RenderBridge

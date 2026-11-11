@@ -246,6 +246,8 @@ struct DrawInstruction {
     RenderSpace space = RenderSpace::World;
     uint32_t pipelineIndex = 0;
     uint32_t materialIndex = 0;
+    /// 线宽，单位：**设备像素**。顶点已按 devicePixelRatio 缩放时，线宽也要
+    /// 同步缩放，否则 Retina 下 1pt 会退化成 1 个物理像素（等效半个点）。
     float lineWidth = 0.0f;
     float pointSize = 0.0f;
     TextureHandle texture;
@@ -465,7 +467,8 @@ struct GlyphInfo {
 
 /// 材质描述。2D 管线只消费 lineWidth / pointSize，3D 网格靠 color / ambient / specular
 struct MaterialDesc {
-    /// 线宽（像素）。各后端上限不同，请以设备能力为准
+    /// 线宽，单位：**设备像素**（不是 pt）。各后端上限不同（macOS 的 GL 与
+    /// Metal 均为 1.0），请以设备能力为准；超限时需调用方自行三角化。
     float lineWidth = 0.0f;
     float pointSize = 0.0f;
     /// 漫反射色（RGBA）。2D 管线不消费此值——2D 的颜色在顶点里
