@@ -297,10 +297,6 @@ private:
     // 相机移出这里后，新进入视野的非曲线图元必须重新全量上传（见 requestViewportRefresh）。
     Ut::BBox2d m_builtVisibleBox;
 
-    // 上次全量刷新没有做视口裁剪（矩阵/视口无效）：全场景都已在 GPU 上，
-    // 相机怎么移都不需要再按范围补刷。
-    bool m_builtWithoutCulling{ false };
-
     // 本轮待刷新的图元快照：在 UI 线程（onSceneChanged）按变更集 clone 出来，
     // 增量刷新 —— 含并行离散化那条工作线程路径 —— 只读这份只读副本，
     // 不再去碰场景里的活对象（SceneManager 的契约是只有主线程可以访问）。

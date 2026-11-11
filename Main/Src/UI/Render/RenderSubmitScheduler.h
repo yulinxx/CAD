@@ -173,12 +173,6 @@ public:
         m_extendCursor = 0;
     }
 
-    /// 视口增量扩展（对账）完成后调用：清空已作废的 LOD 队列（其收集范围随
-    /// 视口移动失效）并记录新的已覆盖盒。**不动缩放基准 m_scaleAtBuild** ——
-    /// 留待下一次 requestRefresh 按真实缩放差判断是否需要对已在 GPU 上的
-    /// 曲线做精度升/降级（扩展队列只补新进视野的图元，不重刷已在 GPU 上的曲线精度）。
-    void markViewportReconciled(const Ut::BBox2d& coveredBox);
-
     // ======================== 状态查询 ========================
 
     /// 两队列合计的**剩余未消费**条目数（诊断/回归测试用）：
@@ -252,7 +246,4 @@ private:
     uint32_t m_submitFailures{ 0 };
     /// 当前退避剩余 tick 数：> 0 时 processBatch 只递减不提交
     uint32_t m_retryBackoffTicks{ 0 };
-    /// 出现过提交失败且失败条目尚未成功补交。视口对账丢弃未消费队列条目时，
-    /// 靠本标记强制一次重收集兜底（见 markViewportReconciled）。
-    bool m_submitRetryPending{ false };
 };

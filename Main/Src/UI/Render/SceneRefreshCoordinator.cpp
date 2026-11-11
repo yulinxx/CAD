@@ -208,7 +208,6 @@ void SceneRefreshCoordinator::setSceneContext(Eg::ISceneContext* ctx)
 
     // 换场景后旧的覆盖范围不再成立：首次相机变化会强制做一次全量装配。
     m_builtVisibleBox = Ut::BBox2d{};
-    m_builtWithoutCulling = false;
 }
 
 std::unordered_set<uint64_t> SceneRefreshCoordinator::takePendingDirtyIds()
@@ -601,7 +600,7 @@ void SceneRefreshCoordinator::requestViewportRefresh()
     //
     // 范围之内仍然只推进曲线 LOD：普通图元不随缩放变化，无需重建；
     // 曲线精度由 LOD 的缩放滞后判据单独处理。
-    if (m_sceneManager && m_renderWidget && !m_builtWithoutCulling)
+    if (m_sceneManager && m_renderWidget)
     {
         float bounds[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
         if (m_renderWidget->visibleWorldBounds(bounds))
@@ -734,8 +733,11 @@ void SceneRefreshCoordinator::requestViewportExtension()
     // 前缘会反复缺块。
     m_submitScheduler.compactExtensionQueue();
 
-    // 记录新的已覆盖盒并清掉作废的旧 LOD 队列（缩放基准不动，见方法说明）
-    m_submitScheduler.markViewportReconciled(newBox);
+    // 对账完成：不重置 LOD 队列（未消费的升级进度继续有效），也不推进已收集盒 ——
+    // 对账只补入/回收 GPU 图元，不代表这块区域做过曲线精度收集。
+    // 随即按「缩放滞后 + 已收集范围」重新评估一次：移出视野期间错过的升级
+    // （放大后再平移回来）在这里补上，新进视野的曲线也按需追加进队列。
+    requestCurveLodRefresh();
 
     // 覆盖盒前移到本轮对账目标：期间相机若再移出会重新触发对账（安全：重算差分即可）
     m_builtVisibleBox = newBox;
@@ -1106,10 +1108,13 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
     if (!m_pendingDeletedIds.empty())
     {
         std::vector<uint64_t> deletedToRemove;
+        std::vector<uint64_t> deletedIds;
         deletedToRemove.reserve(m_pendingDeletedIds.size());
+        deletedIds.reserve(m_pendingDeletedIds.size());
         for (auto id : m_pendingDeletedIds)
         {
             const auto uid = static_cast<uint64_t>(id);
+            deletedIds.push_back(uid);
             if (m_renderedEntityIds.count(uid))
             {
                 deletedToRemove.push_back(uid);
@@ -1120,6 +1125,10 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         {
             m_renderWidget->removeRenderEntities(deletedToRemove);
         }
+        // 收缩稳定文档序：这是唯一确认「图元真的从文档删掉」的入口。
+        // 视口回收（平移移出视野）不能走这里，否则存活图元的位次会被清掉，
+        // 平移回来会重新排到最上层。
+        m_renderWidget->forgetEntityDocOrder(deletedIds);
     }
 
     // 增量装配：调用方只给「哪些图元变了」，离散化与内容比对都在

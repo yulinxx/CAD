@@ -209,7 +209,6 @@ void RenderSubmitScheduler::processBatch(std::unordered_set<uint64_t>& renderedI
 
             m_submitFailures = 0;
             m_retryBackoffTicks = 0;
-            m_submitRetryPending = false;
             for (uint64_t uid : batch)
             {
                 renderedIds.insert(uid);
@@ -225,7 +224,6 @@ void RenderSubmitScheduler::processBatch(std::unordered_set<uint64_t>& renderedI
             // 短路，已写入的段原地跳过，不会重复上传。
             m_extendCursor = extendBegin;
             m_cursor = lodBegin;
-            m_submitRetryPending = true;
             ++m_submitFailures;
             // 2^(n-1) 个 tick 指数退避，封顶 kSubmitRetryBackoffMaxTicks。
             // shift 先截到 8（2^8=256 > 上限）防大计数溢出。
@@ -307,8 +305,7 @@ void RenderSubmitScheduler::clearAfterFullRefresh(double worldToScreenScale)
     m_recollectPending = false;
     m_scaleAtBuild = worldToScreenScale;
     m_collectedBoxValid = false;
-    // 全量重建已把全部图元重新上传：未补交的失败条目被取代，重试状态作废
-    m_submitRetryPending = false;
+    // 全量重建已把全部图元重新上传：重试退避状态作废
     m_submitFailures = 0;
     m_retryBackoffTicks = 0;
 }
@@ -320,39 +317,9 @@ void RenderSubmitScheduler::clearQueue()
     m_extendQueue.clear();
     m_extendCursor = 0;
     m_recollectPending = false;
-    // 队列被整体清空（全量刷新前置兜底）：重试状态一并作废
-    m_submitRetryPending = false;
+    // 队列被整体清空（全量刷新前置兜底）：重试退避状态一并作废
     m_submitFailures = 0;
     m_retryBackoffTicks = 0;
-}
-
-void RenderSubmitScheduler::markViewportReconciled(const Ut::BBox2d& coveredBox)
-{
-    // 视口范围已增量对账：旧 LOD 队列是按上一个可视盒收集的，其条目可能已被
-    // 对账回收（removeRenderEntities），留着会被 processBatch 重新上传 —— 必须清掉。
-    m_queue.clear();
-    m_cursor = 0;
-    m_recollectPending = false;
-    // 记录新的已覆盖盒：平移回该盒内时 refillQueueIfStale 的 regionMoved 判据为假，
-    // 不会无谓重收集。缩放基准 m_scaleAtBuild 故意不动 —— 见头文件说明。
-    m_collectedBox = coveredBox;
-    m_collectedBoxValid = coveredBox.isValid();
-
-    // 失败条目兜底：上面的清队列会把还没成功补交的重试条目一并丢弃
-    // （LOD 曲线已在账本里，协调器对账的 toAdd 差分不会把它们补回来）。
-    // 若存在未补交的失败条目，强制一次重收集：m_scaleAtBuild 归零让
-    // isScaleStale 恒真，refillQueueIfStale 的「缩放/区域都没变就跳过」
-    // 前置门随之失效 —— 失败的 LOD 曲线被重新收集进队列；
-    // 扩展队列的非曲线图元由对账的账本差分 toAdd 补回（失败不写账本，
-    // 必出现在 toAdd 里），两条路径合起来覆盖全部失败条目。
-    // ensurePump 保证无需相机事件也能在下一 tick 经 finishQueue 触发重收集。
-    if (m_submitRetryPending)
-    {
-        m_submitRetryPending = false;
-        m_recollectPending = true;
-        m_scaleAtBuild = 0.0;
-        ensurePump();
-    }
 }
 
 void RenderSubmitScheduler::refillQueueIfStale()
@@ -415,8 +382,19 @@ void RenderSubmitScheduler::refillQueueIfStale()
     m_collectedBox = collectBox;
     m_collectedBoxValid = hasVisibleBox;
 
-    m_queue.clear();
-    m_cursor = 0;
+    // 只有缩放跨过滞后阈值才需要整队重来：所有曲线的目标精度都变了。
+    // 仅仅是视口平移时保留未消费的升级进度，只把「还没收集过」的新进曲线追加进来 ——
+    // 否则每轮平移都从第一条重新升级，而且已收集盒一前移，移出视野又回来的曲线
+    // 就再也收不到升级。收集盒只在这里（真正收集时）推进，视口对账不推进它。
+    const bool restartQueue = scaleStale || !hasVisibleBox;
+    if (restartQueue)
+    {
+        m_queue.clear();
+        m_cursor = 0;
+    }
+
+    // 去重集合：队列里已有的条目（含已消费的，它们已按当前缩放升级过）不再入队。
+    std::unordered_set<uint64_t> collected(m_queue.begin(), m_queue.end());
 
     // 单个候选的入队判据（两套收集路径共用）：
     // 隐藏图层 / 隐藏图元 / 「选中时隐藏本体」过滤 —— LOD 提交不经过
@@ -441,6 +419,11 @@ void RenderSubmitScheduler::refillQueueIfStale()
             {
                 return;
             }
+        }
+        if (!collected.insert(static_cast<uint64_t>(entity->id)).second)
+        {
+            // 已收集过：要么还在队列里等消费，要么已按当前缩放升级完毕，都不重复入队
+            return;
         }
         m_queue.push_back(static_cast<uint64_t>(entity->id));
     };
