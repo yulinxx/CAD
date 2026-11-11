@@ -701,7 +701,16 @@ QMenu* Workbench3D::buildConfiguredContextMenu(const QString& contextMenuId)
     // triggered 闭包，而菜单是在调用方 exec() 的 —— 局部对象出栈即悬垂。
     auto* dispatcher = m_workbenchWindow ? m_workbenchWindow->menuManager()->commandDispatcher()
                                          : static_cast<IUiCommandDispatcher*>(this);
-    return UiContextMenuService::instance().buildMenu(config, contextMenuId, dispatcher, m_renderWidget3D);
+    // 菜单 parent 必须是顶层窗口：传视口子控件时，QMenu popup 的 transient parent
+    // 解析到 RenderWidget3D 的子原生窗口，macOS 上 Qt 报
+    // "QWidgetWindow ... must be a top level window"，菜单静默不弹（构建与信号均正常）。
+    // 与 2D 传 m_commandHub->mainWindow() 同口径；兜底用视口所在窗口。
+    QWidget* menuParent = m_workbenchWindow;
+    if (!menuParent && m_renderWidget3D)
+    {
+        menuParent = m_renderWidget3D->window();
+    }
+    return UiContextMenuService::instance().buildMenu(config, contextMenuId, dispatcher, menuParent);
 }
 
 /// 步骤三：创建 CommandActionHub3D、注册命令、初始化菜单管理器和快捷键

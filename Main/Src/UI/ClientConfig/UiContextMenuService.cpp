@@ -112,6 +112,15 @@ QMenu* UiContextMenuService::buildMenu(
         return nullptr;
     }
 
+    // 菜单 parent 归一化为顶层窗口：传子控件（例如 3D 视口）时，QMenu popup 的
+    // transient parent 会解析到该子控件的原生窗口，macOS 上 Qt 报
+    // "QWidgetWindow ... must be a top level window" 后菜单静默不弹。
+    // 在服务层统一兜底，调用点传错也不会让右键菜单整块消失（3D 曾回归过一次）。
+    if (parent != nullptr && !parent->isWindow())
+    {
+        parent = parent->window();
+    }
+
     // 静态条目由 UiLayoutBuilder 构建：命令绑定、图标解析、授权门控与主菜单完全一致。
     // panelRegistry 传 nullptr —— 右键菜单不含 Dock/状态栏槽位。
     UiLayoutBuilder builder(nullptr, dispatcher, nullptr);

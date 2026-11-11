@@ -1195,3 +1195,44 @@ TEST(ClientConfigLayoutBuilderTest, SubMenuStaticItemsSurviveDynamicRefill)
 
     UiContextMenuService::instance().resetForTest();
 }
+
+// ==================== UiContextMenuService：菜单 parent ====================
+
+/// 回归用例：3D 视口子控件作 QMenu parent 时，macOS 上 Qt 会把 popup 的
+/// transient parent 解析到子原生窗口，报 "QWidgetWindow ... must be a top level window"
+/// 后菜单静默不弹（菜单构建成功、action 数量正常，只有弹出失败）。
+/// 契约由服务层兜底：调用点传视口子控件或顶层窗口，菜单 parent 都必须落到顶层窗口。
+/// 若去掉 buildMenu 的归一化，本用例在 macOS 上与其它平台都会失败。
+TEST(ClientConfigContextMenuTest, ParentNormalizedToTopLevelWindow)
+{
+    UiContextMenuService::instance().resetForTest();
+
+    UiConfigData config;
+    ContextMenuDef def;
+    def.id = QStringLiteral("canvas.3d");
+    def.workbenchId = QStringLiteral("3D");
+    MenuActionDef action;
+    action.id = QStringLiteral("act.delete");
+    action.label = QStringLiteral("Delete");
+    action.commandId = QStringLiteral("cmd.delete3d");
+    def.items.push_back(action);
+    config.contextMenus.push_back(def);
+
+    FakeDispatcher dispatcher;
+    dispatcher.registered.insert(QStringLiteral("cmd.delete3d"));
+
+    QMainWindow window;
+    auto* viewport = new QWidget(&window);
+    // 与 RenderWidget3D 一致：视口子控件自身持有原生窗口
+    viewport->setAttribute(Qt::WA_NativeWindow, true);
+    viewport->resize(320, 240);
+
+    QMenu* menu = UiContextMenuService::instance().buildMenu(&config, def.id, &dispatcher, viewport);
+    ASSERT_NE(menu, nullptr);
+    ASSERT_NE(menu->parentWidget(), nullptr);
+    EXPECT_TRUE(menu->parentWidget()->isWindow());
+    EXPECT_EQ(menu->parentWidget(), static_cast<QWidget*>(&window));
+
+    delete menu;
+    UiContextMenuService::instance().resetForTest();
+}
