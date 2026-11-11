@@ -300,7 +300,7 @@ endif()
 
 option(APR_PYTHON_HOST "Enable PythonHost integration framework" ${APR_PYTHON_HOST_DEFAULT})
 option(APR_PYTHON_EMBED "Enable in-process Python bridge (Phase 3)" OFF)
-set(APR_PYTHON_VERSION "3.11" CACHE STRING "Required Python version")
+set(APR_PYTHON_VERSION "" CACHE STRING "Python version override（留空 = 自动匹配 vcpkg pybind11 自带的版本）")
 
 if(APR_PYTHON_HOST)
     # 必须进内层目录：外层 PythonHost/CMakeLists.txt 是独立构建入口，

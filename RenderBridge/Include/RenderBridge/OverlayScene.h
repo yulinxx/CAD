@@ -53,6 +53,7 @@
 namespace RenderAbstraction
 {
     class IRenderScene;
+    class IRenderDevice;
 }
 
 namespace RenderBridge
@@ -126,6 +127,10 @@ namespace RenderBridge
         float pixelToWorld = 1.0f;
         /// 流水虚线相位（像素），由视口的动画定时器推进
         float dashOffsetPx = 0.0f;
+        /// 当前可见的世界包围盒：供 WorldPinned 偏移做视口裁剪
+        Ut::BBox2d visibleWorld;
+        /// 原始世界是否可见：供装饰层在视口外时跳过绘制
+        bool originalVisible = true;
     };
 
     /**
@@ -162,6 +167,9 @@ namespace RenderBridge
 
         /// 流水虚线轮廓。传空即清除本层
         void setSelectionOutlines(std::vector<RenderBridge::SelectionOutlinePath> paths);
+
+        /// 设置本帧需要从虚线轮廓中排除的图元 id（隐藏图层时被剔除的图元）
+        void setSelectionOutlinesSuppressedEntities(const std::vector<uint64_t>& entityIds);
 
         /// 虚线样式（像素基准）。样式本身不是几何，只影响轮廓层的离散化
         void setSelectionDashStyle(const RenderBridge::SelectionDashStyle& style);
@@ -228,6 +236,13 @@ namespace RenderBridge
          */
         void submit(RenderAbstraction::IRenderScene& scene, std::vector<RenderAbstraction::DrawInstruction>& out) const;
 
+        /// 带 device 的 submit 重载（UI 层兼容路径）。device 暂未使用，保留签名供未来扩展
+        void submit(RenderAbstraction::IRenderScene& scene, RenderAbstraction::IRenderDevice& device,
+            std::vector<RenderAbstraction::DrawInstruction>& out) const;
+
+        /// 释放与 device 绑定的 GPU 资源（当前 OverlayScene 不分配 GL 资源，空实现）
+        void releaseGpuResources(RenderAbstraction::IRenderDevice& device);
+
     private:
         struct SelectionBoxLayer
         {
@@ -280,6 +295,8 @@ namespace RenderBridge
         HighlightLayer m_highlight;
         SelectionRectLayer m_selectionRect;
         OutlineLayer m_outlines;
+        /// 本帧需要从虚线轮廓中排除的图元 id（隐藏图层时被剔除）
+        std::vector<uint64_t> m_suppressedOutlineEntities;
         MarkerLayer m_selectionHandles;
         MarkerLayer m_pointMarkers;
         SnapLayer m_snap;

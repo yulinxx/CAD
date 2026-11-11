@@ -50,6 +50,10 @@ namespace RenderBridge
     {
         std::vector<SelectionOutlineVertex> vertices;
         Ut::Color color{ 1.0f, 0.55f, 0.0f, 0.86f };
+        /// 触发本路径的图元 id：供截断日志定位，以及隐藏图层时判定该路径是否可见
+        uint64_t entityId = 0;
+        /// 折线的世界坐标包围盒：一次性在离散时算好，避免每帧重扫顶点
+        Ut::BBox2d bounds;
     };
 
     /// 流水虚线的样式参数（全部像素基准，OverlayScene::setSelectionDashStyle 设置）

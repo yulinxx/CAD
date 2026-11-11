@@ -521,6 +521,22 @@ namespace RenderBridge
         m_outlines.paths = std::move(paths);
     }
 
+    void OverlayScene::setSelectionOutlinesSuppressedEntities(const std::vector<uint64_t>& entityIds)
+    {
+        m_suppressedOutlineEntities = entityIds;
+    }
+
+    void OverlayScene::submit(RA::IRenderScene& scene, RA::IRenderDevice& /*device*/,
+        std::vector<RA::DrawInstruction>& out) const
+    {
+        submit(scene, out);
+    }
+
+    void OverlayScene::releaseGpuResources(RA::IRenderDevice& /*device*/)
+    {
+        // 当前 OverlayScene 不分配 GL 资源（所有顶点数据走瞬态环），空实现
+    }
+
     void OverlayScene::setSelectionDashStyle(const RenderBridge::SelectionDashStyle& style)
     {
         // 样式是设置项不是这一帧的内容，因此 clearLayer 不会清掉它
