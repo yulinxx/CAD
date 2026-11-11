@@ -15,7 +15,6 @@
 #include "Engine/AprEntity/AprEntity.h"
 #include "Engine2D/Cam/ContourContainment.h"
 #include "Engine2D/Cam/GeometryExtractor.h"
-#include "Engine2D/Cam/KerfCompensator.h"
 #include "Engine2D/Cam/ToolpathTypes.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/LayerSnapshot.h"
@@ -512,8 +511,9 @@ namespace CamBridge
                 }
             }
 
-            // 2) 割缝补偿：kerfMm 是单边补偿值（不是缝宽），正负映射到下刀内外侧；
-            //    KerfOptions.kerfWidth 取两倍只是本层内部换算，用于等距偏置
+            // 2) 割缝参数下传：真正的等距偏置由 CAM 内完成（割缝是 CAM M1 的职责）。
+            //    Engine 的 kerfMm 是单边补偿量，CAM 契约为总缝宽，因此 width = 2*|kerfMm|；
+            //    正负号映射为 Outside/Inside，保持既有语义
             const Eg::ProcessParams& egParams = [&]() -> const Eg::ProcessParams& {
                 auto it = spec.layerParams.constFind(bucket.layerId);
                 return (it != spec.layerParams.constEnd())
@@ -521,46 +521,13 @@ namespace CamBridge
                     : static_cast<const Eg::ProcessParams&>(spec.defaultParams);
             }();
             const double kerfHalf = std::fabs(egParams.kerfMm);
-            if (kerfHalf > 0.0)
+            bucket.kerf.enabled = kerfHalf > 0.0;
+            bucket.kerf.widthMm = kerfHalf * 2.0;
+            bucket.kerf.side = egParams.kerfMm >= 0.0 ? 0 : 1;
+            if (bucket.kerf.enabled)
             {
-                Eg::Cam::KerfOptions kerfOptions;
-                kerfOptions.kerfWidth = kerfHalf * 2.0;
-                kerfOptions.side = egParams.kerfMm >= 0.0
-                    ? Eg::Cam::KerfSide::Outside
-                    : Eg::Cam::KerfSide::Inside;
-                // 偏置只在一处发生：轮廓已在下面就地补偿完成，
-                // CAM 侧不得再按 KerfParams 二次偏置，否则会叠加成两倍补偿
-                bucket.kerf.enabled = false;
-
-                int dropped = 0;
-                int split = 0;
-                for (auto& snapshot : bucket.entities)
-                {
-                    if (snapshot.kind != Cam::EntitySnapshot::GeometryKind::Contour)
-                    {
-                        continue;
-                    }
-                    auto it = egContoursByEntity.find(snapshot.entityId);
-                    if (it == egContoursByEntity.end())
-                    {
-                        continue;
-                    }
-                    const Eg::Cam::KerfResult kerfResult =
-                        Eg::Cam::KerfCompensator::apply(it->second, kerfOptions);
-                    it->second = kerfResult.contours;
-                    dropped += kerfResult.droppedLoopCount;
-                    split += kerfResult.splitLoopCount;
-                    if (kerfResult.status != 0)
-                    {
-                        qWarning("[CAM] kerf compensation failed: layer=%d entity=%llu status=%d",
-                            bucket.layerId,
-                            static_cast<unsigned long long>(snapshot.entityId),
-                            kerfResult.status);
-                    }
-                }
-                qInfo("[CAM] kerf compensation: layer=%d width=%.3fmm side=%d dropped=%d split=%d",
-                    bucket.layerId, kerfOptions.kerfWidth,
-                    static_cast<int>(kerfOptions.side), dropped, split);
+                qInfo("[CAM] kerf params transferred: layer=%d width=%.3fmm side=%d",
+                    bucket.layerId, bucket.kerf.widthMm, bucket.kerf.side);
             }
 
             // 3) 定型为 CAM 轮廓
