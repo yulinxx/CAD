@@ -448,6 +448,20 @@ namespace RenderBridge
         SharedMetalRuntime::instance().requestShutdown();
     }
 
+    uint64_t RenderSessionHost::lastGpuFrameTimeNs() const
+    {
+        if (!isValid(m_session))
+        {
+            return 0;
+        }
+        uint64_t ns = 0;
+        if (Render::RT::rxSessionGetGpuFrameTimeNs(toSession(m_session), &ns) != Render::RT::RxResult::Ok)
+        {
+            return 0;
+        }
+        return ns;
+    }
+
     bool RenderSessionHost::isReady() const
     {
         return isValid(m_runtime) && Render::RT::rxValid(toSurface(m_surface)) &&

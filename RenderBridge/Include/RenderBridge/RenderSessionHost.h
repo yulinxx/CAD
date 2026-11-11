@@ -188,6 +188,14 @@ namespace RenderBridge
         /// 请求的 MSAA 采样数（0/1 = 关闭）。实际生效值受后端能力限制，见 logCapabilities。
         uint32_t msaaSamples() const { return m_msaaSamples; }
 
+        /**
+         * @brief 最近一帧的 GPU 耗时（纳秒）
+         *
+         * 非虚新增成员，不改类布局。只返回已经可用的样本，不会阻塞等待 GPU；
+         * 后端不支持计时（含尚未出帧）时返回 0。仅供诊断显示，不要拿它做节流。
+         */
+        uint64_t lastGpuFrameTimeNs() const;
+
         // ---------- 渲染接口视图 ----------
         //
         // 由本类持有的句柄包出来，视口用它调用渲染接口，不必知道后端的名字。
