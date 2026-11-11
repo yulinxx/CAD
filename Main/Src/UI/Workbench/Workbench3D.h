@@ -113,8 +113,6 @@ private:
     void refreshPropertiesPanel3D();
     /// 请求一次属性面板重建（100ms 尾包合并，与 2D 同语义）
     void schedulePropertiesPanelRefresh3D();
-    /// 属性面板编辑后把选中图元的 Name/Visible 写回场景树行（结构签名未变，不能走全量）
-    void refreshSceneTreeRowsForSelection3D();
 
     /// 只在结构签名变化时重建场景树（批量操作防抖）
     void refreshSceneTree3DIfNeeded();
@@ -196,6 +194,10 @@ private:
     uint64_t m_lastSceneTree3DStructureRevision{ 0 };
     /// 场景树增量游标（ISceneChangeStream；与 2D 同语义）
     uint64_t m_sceneTree3DCursor{ 0 };
+    /// 上一次看到的撤销/重做栈深度：仅用于识别「历史回放」（undo/redo），
+    /// 普通入栈由各编辑入口自行刷新，避免每次编辑都 O(N) 重建场景树
+    std::size_t m_lastUndoCount3D{ 0 };
+    std::size_t m_lastRedoCount3D{ 0 };
     /// applySceneTreeIncremental3D 重入标志（分类/追加期间可能触发嵌套场景通知）
     bool m_sceneTree3DIncrementalBusy{ false };
     /// 属性面板重建节流定时器：active 期间多次请求合并为窗口末尾一次（与 2D 同语义）

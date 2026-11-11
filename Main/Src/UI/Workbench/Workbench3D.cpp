@@ -1049,6 +1049,37 @@ void Workbench3D::setupSceneTree3D(WorkbenchWindow& window)
             m_services3D.sceneMonitor, &SceneMonitor3D::sceneChanged, this, &Workbench3D::refreshSceneTree3DIfNeeded);
     }
 
+    // 撤销/重做会改写图元属性（改名/显隐/锁定），但不推进结构签名，场景树不会自动重读。
+    // 只在历史回放（undo 栈减少或 redo 栈减少）时重建整树；普通入栈路径由各入口自行刷新，
+    // 避免每次编辑都付出一次 O(N) 重建。
+    if (m_services3D.undoRedoManager)
+    {
+        m_lastUndoCount3D = m_services3D.undoRedoManager->undoCount();
+        m_lastRedoCount3D = m_services3D.undoRedoManager->redoCount();
+        m_connections.add(
+            QObject::connect(m_services3D.undoRedoManager, &UndoRedoManager3D::stateChanged, this, [this]() {
+                auto* undoMgr = m_services3D.undoRedoManager;
+                if (!undoMgr)
+                {
+                    return;
+                }
+                const std::size_t undoCount = undoMgr->undoCount();
+                const std::size_t redoCount = undoMgr->redoCount();
+                const bool rewound = undoCount < m_lastUndoCount3D || redoCount < m_lastRedoCount3D;
+                m_lastUndoCount3D = undoCount;
+                m_lastRedoCount3D = redoCount;
+                if (!rewound)
+                {
+                    return;
+                }
+                // 延后到事件循环下一轮：一次历史回放可能连续发出多次 stateChanged
+                QTimer::singleShot(0, this, [this]() {
+                    refreshSceneTree3D();
+                    refreshPropertiesPanel3D();
+                });
+            }));
+    }
+
     // 初始化防抖定时器
     if (!m_sceneTree3DRefreshTimer)
     {
@@ -1086,12 +1117,12 @@ void Workbench3D::setupProperties3D(WorkbenchWindow& window)
     props->setWorkbenchMode(PropertiesPanelWidget::WorkbenchMode::ThreeD);
 
     // 属性被编辑后延迟重建模型，避免在内联编辑器提交过程中重入（与 2D 同语义）。
-    // 同时把 Name/Visible 写回场景树选中行：属性编辑不推进 structureRevision，
-    // refreshSceneTree3DIfNeeded 会 early-return，树不会自动跟上。
+    // 属性面板的写入经编辑服务落到引擎，而场景树行是模型快照（文本/复选框），
+    // 只能整树重读引擎；属性编辑是离散操作，O(N) 重建可接受。
     auto conn = QObject::connect(props, &PropertiesPanelWidget::sigPropertyEdited, this, [this]() {
         QTimer::singleShot(0, this, [this]() {
+            refreshSceneTree3D();
             refreshPropertiesPanel3D();
-            refreshSceneTreeRowsForSelection3D();
         });
     });
     m_connections.add(conn);
@@ -1145,51 +1176,13 @@ void Workbench3D::refreshPropertiesPanel3D()
         }
     }
 
-    // 创建编辑会话（算法层）：持有图元 id，负责按需解析图元、应用修改
-    auto session = std::make_shared<EntityPropertyEditSession3D>(m_sceneManager3D, std::move(entityIds));
+    // 创建编辑会话（算法层）：持有图元 id，负责按需解析图元；属性写入统一经编辑服务
+    auto session = std::make_shared<EntityPropertyEditSession3D>(
+        m_sceneManager3D, std::move(entityIds), m_services3D.sceneEditService);
 
     // 数据/算法产物推送给 UI 层：模型用于展示，会话作为编辑目标。
     props->setEditTarget(session);
     props->setPropertyModel(session->buildModel());
-}
-
-void Workbench3D::refreshSceneTreeRowsForSelection3D()
-{
-    if (!m_scenePanel3D || !m_sceneManager3D)
-    {
-        return;
-    }
-
-    std::vector<Eg::EntityId> entityIds;
-    if (m_sceneManager3D)
-    {
-        const auto& selected = m_sceneManager3D->selectionManager().getSelectedEntities();
-        entityIds.reserve(selected.size());
-        for (const Eg::AprMeshEntity* e : selected)
-        {
-            if (e)
-            {
-                entityIds.push_back(e->id);
-            }
-        }
-    }
-    if (entityIds.empty())
-    {
-        return;
-    }
-
-    // 场景树面板不支持整节点替换：对既有行按 id 局部刷新即可。
-    // 选中高亮另由 setSelectedIds 维护，纯新增节点走 appendTopLevelNodes。
-    QVector<qint64> rowIds;
-    rowIds.reserve(static_cast<int>(entityIds.size()));
-    for (Eg::EntityId id : entityIds)
-    {
-        rowIds.append(static_cast<qint64>(id));
-    }
-    if (!rowIds.isEmpty())
-    {
-        m_scenePanel3D->refreshRows(rowIds);
-    }
 }
 
 void Workbench3D::refreshSceneTree3D()
@@ -1419,9 +1412,38 @@ void Workbench3D::applySceneTreeSelection3D(const QStringList& ids)
     schedulePropertiesPanelRefresh3D();
 }
 
+namespace
+{
+    /// 隐藏图元时只移出「被隐藏且已选中」的图元（与 2D 语义一致）。
+    /// 不能整批 clear：在场景树勾掉一个模型不该丢掉其余全部选择。
+    void dropHiddenFromSelection3D(Eg::SceneManager3D* scene, const std::vector<Eg::EntityId>& ids)
+    {
+        if (!scene || ids.empty())
+        {
+            return;
+        }
+
+        const std::unordered_set<Eg::EntityId> hiddenIds(ids.begin(), ids.end());
+        std::vector<Eg::AprMeshEntity*> hiddenSelected;
+        hiddenSelected.reserve(hiddenIds.size());
+        for (Eg::AprMeshEntity* mesh : scene->selectionManager().getSelectedEntities())
+        {
+            if (mesh && hiddenIds.count(mesh->id) > 0)
+            {
+                hiddenSelected.push_back(mesh);
+            }
+        }
+        // 批量剔除，只触发一次选择变更扇出
+        if (!hiddenSelected.empty())
+        {
+            scene->selectionManager().dropFromSelection(hiddenSelected.data(), hiddenSelected.size());
+        }
+    }
+}  // namespace
+
 void Workbench3D::toggleEntityVisibility3D(const QString& id, bool visible)
 {
-    if (!m_sceneManager3D)
+    if (!m_sceneManager3D || !m_services3D.sceneEditService)
     {
         return;
     }
@@ -1432,8 +1454,13 @@ void Workbench3D::toggleEntityVisibility3D(const QString& id, bool visible)
     }
     if (auto* mesh = m_sceneManager3D->findMeshById(*eid))
     {
-        mesh->setVisible(visible);
-        m_sceneManager3D->markDataChanged();
+        // 经编辑服务写入并生成属性撤销命令（不再直写引擎）
+        m_services3D.sceneEditService->setEntitiesVisible({ mesh->id }, visible);
+        // 单行勾选与批量勾选统一语义：隐藏即把该图元移出选择集
+        if (!visible)
+        {
+            dropHiddenFromSelection3D(m_sceneManager3D, { mesh->id });
+        }
         // 勾选路径：模型 setData 已先改写本行复选框，再进本回调；
         // 可见性不推进 structureRevision，无需 O(N) 树重建，只发一次 dataChanged 兜底
         if (m_scenePanel3D)
@@ -1446,7 +1473,7 @@ void Workbench3D::toggleEntityVisibility3D(const QString& id, bool visible)
 
 void Workbench3D::renameEntity3D(const QString& id, const QString& newName)
 {
-    if (!m_sceneManager3D || newName.isEmpty())
+    if (!m_sceneManager3D || !m_services3D.sceneEditService || newName.isEmpty())
     {
         return;
     }
@@ -1457,9 +1484,8 @@ void Workbench3D::renameEntity3D(const QString& id, const QString& newName)
     }
     if (auto* mesh = m_sceneManager3D->findMeshById(*eid))
     {
-        const QByteArray utf8 = newName.toUtf8();
-        mesh->setName(utf8.constData());
-        m_sceneManager3D->markDataChanged();
+        // 经编辑服务写入并生成属性撤销命令（不再直写引擎）
+        m_services3D.sceneEditService->renameEntity(*eid, newName.toUtf8().constData());
         // 改名：回调先于模型 setData 落盘，行文本由 setData 更新；
         // 不推进 structureRevision，不重建整树
         if (m_scenePanel3D)
@@ -1472,28 +1498,25 @@ void Workbench3D::renameEntity3D(const QString& id, const QString& newName)
 
 void Workbench3D::setSceneTreeVisibility3D(const QVector<qint64>& ids, bool visible)
 {
-    if (!m_sceneManager3D || ids.isEmpty())
+    if (!m_sceneManager3D || !m_services3D.sceneEditService || ids.isEmpty())
     {
         return;
     }
 
-    // 整数 id 直接转 uint64_t，批量设置（内部经回调记录 VisibilityChanged）
-    std::vector<uint64_t> entityIds;
+    std::vector<Eg::EntityId> entityIds;
     entityIds.reserve(static_cast<size_t>(ids.size()));
     for (qint64 id : ids)
     {
-        entityIds.push_back(static_cast<uint64_t>(id));
+        entityIds.push_back(static_cast<Eg::EntityId>(id));
     }
-    m_sceneManager3D->setEntitiesVisible(entityIds, visible);
+    // 服务内部按「一次用户操作一条命令」生成撤销记录（多选走批处理）
+    m_services3D.sceneEditService->setEntitiesVisible(entityIds, visible);
 
-    // 隐藏图元时清除选择（3D 目前只支持清空全部选择）
-    if (!visible && m_services3D.selectionService)
+    // 隐藏图元时只剔除被隐藏项（与 2D 一致），保留其余选择
+    if (!visible)
     {
-        m_services3D.selectionService->clear();
+        dropHiddenFromSelection3D(m_sceneManager3D, entityIds);
     }
-
-    // 可见性影响渲染，标记数据变更（经调度器节流）
-    m_sceneManager3D->markDataChanged();
 
     // 场景树增量刷新受影响行（复选框态 + 发 dataChanged），不重建拓扑
     if (m_scenePanel3D)
@@ -1504,19 +1527,19 @@ void Workbench3D::setSceneTreeVisibility3D(const QVector<qint64>& ids, bool visi
 
 void Workbench3D::setSceneTreeLock3D(const QVector<qint64>& ids, bool locked)
 {
-    if (!m_sceneManager3D || ids.isEmpty())
+    if (!m_sceneManager3D || !m_services3D.sceneEditService || ids.isEmpty())
     {
         return;
     }
 
-    // 批量锁定（内部经回调记录 LockChanged）。锁定不影响渲染，不调 markDataChanged()。
-    std::vector<uint64_t> entityIds;
+    std::vector<Eg::EntityId> entityIds;
     entityIds.reserve(static_cast<size_t>(ids.size()));
     for (qint64 id : ids)
     {
-        entityIds.push_back(static_cast<uint64_t>(id));
+        entityIds.push_back(static_cast<Eg::EntityId>(id));
     }
-    m_sceneManager3D->setEntitiesLocked(entityIds, locked);
+    // 服务内部按「一次用户操作一条命令」生成撤销记录（多选走批处理）
+    m_services3D.sceneEditService->setEntitiesLocked(entityIds, locked);
 
     // 锁定态当前不在场景树中可视化，无需刷新树；命令状态由选择上下文刷新兜底。
 }
