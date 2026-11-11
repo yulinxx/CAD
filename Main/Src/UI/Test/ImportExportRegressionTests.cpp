@@ -16,6 +16,7 @@
 
 #include "ImportService.h"
 #include "ExportService.h"
+#include "Export/ExportDispatcher.h"
 #include "Import/ImportDispatcher.h"
 #include "Import/Readers/NativeImportReader.h"
 #include "Export/ExportContext.h"
@@ -54,6 +55,8 @@
 #include <fstream>
 #include <filesystem>
 #include <atomic>
+#include <chrono>
+#include <thread>
 #include <unordered_map>
 
 // Engine3D 的转换器只构造 Mesh3D，2D 图元由 Engine2D 的工厂提供。
@@ -812,6 +815,64 @@ TEST(ImportExportRegressionTest, ExportService_ExportFileWithNullSceneManager)
     // 未设置 SceneManager 时导出应安全返回失败
     ExportResult result = service.exportFile("output.dxf");
     EXPECT_FALSE(result.success);
+}
+
+// ---- 异步 worker 收尾不再固定阻塞 ----
+
+// 回归：旧实现 shutdownAsyncThread 只要线程对象 joinable 就固定 sleep 3 秒，
+// 从第二次导入开始每次操作都白等 3 秒。这里连续启动两次异步导入，
+// 只测第二次调用的耗时（第一次 worker 在文件检查处已快速失败退出）。
+TEST(ImportExportRegressionTest, ImportService_RepeatedAsyncStartDoesNotBlock)
+{
+    ImportDispatcher dispatcher;  // 不注册读取器：phase 1 在文件存在性检查处快速失败
+    ImportService service;
+    service.setDispatcher(&dispatcher);
+
+    ImportContext context;
+    context.sourcePath = QStringLiteral("missing_regression_input.dxf");
+
+    service.importAsync(context);
+    // 让第一次 worker 走完，把它本身的执行时间排除在第二次调用的测量区间之外
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    const auto begin = std::chrono::steady_clock::now();
+    service.importAsync(context);
+    const auto elapsedMs =
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - begin).count();
+
+    // 旧实现这里是 3000ms；新实现只等完成信号，应毫秒级返回
+    EXPECT_LT(elapsedMs, 1500) << "second importAsync blocked " << elapsedMs << " ms on the main thread";
+}
+
+// 回归：导出侧同一缺陷。第二次 exportAsync 可能因上一条仍未收尾而被拒绝，
+// 但拒绝之前已经走过 shutdownAsyncThread，耗时仍可用来判定是否还在固定阻塞。
+TEST(ImportExportRegressionTest, ExportService_RepeatedAsyncStartDoesNotBlock)
+{
+    ExportDispatcher dispatcher;  // 不注册写入器：worker 在 dispatch 内快速失败
+    Eg::SceneManager scene;
+
+    auto line = std::make_unique<Eg::AprLine>();
+    line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+    std::vector<std::unique_ptr<Eg::AprEntity>> vec;
+    vec.push_back(std::move(line));
+    Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
+
+    ExportService service;
+    service.setSceneManager(&scene);
+    service.setDispatcher(&dispatcher);
+
+    ExportContext context;
+    context.targetPath = QStringLiteral("no_writer_regression_output.dxf");
+
+    service.exportAsync(context);
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    const auto begin = std::chrono::steady_clock::now();
+    service.exportAsync(context);
+    const auto elapsedMs =
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - begin).count();
+
+    EXPECT_LT(elapsedMs, 1500) << "second exportAsync blocked " << elapsedMs << " ms on the main thread";
 }
 
 TEST(ImportExportRegressionTest, FioEntityConverter_ConvertNullEntityInfo)

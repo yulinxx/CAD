@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <functional>
+#include <future>
 #include <memory>
 #include <thread>
 
@@ -254,7 +255,10 @@ private:
     std::thread m_asyncThread;
     /// 外部请求取消标志（析构或新 importAsync 启动前置 true，worker 每段 phase 前检查）
     std::atomic<bool> m_asyncCancelFlag{ false };
-    /// 收掉上一条异步 worker：先置取消标志，再带超时等待；超时则放弃 join 让线程自行退出
+    /// 当前 worker 的完成信号：worker 在所有返回路径上置位，shutdownAsyncThread
+    /// 先等它就绪再 join，替代旧实现里固定的 3 秒 sleep
+    std::shared_future<void> m_asyncDone;
+    /// 收掉上一条异步 worker：先置取消标志，等完成信号（正常立即返回）后 join
     /// 必须在主线程调用（std::thread 只能在 owner 线程 join）
     void shutdownAsyncThread();
 };

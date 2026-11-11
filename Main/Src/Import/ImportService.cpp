@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <future>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -45,6 +47,40 @@ class SceneEditService3D;
 // 解决五阶段流程中 goto cleanup 的代码可读性和维护性问题
 namespace
 {
+    /// worker 退出时置完成位（所有返回路径都会析构到它）。
+    /// 用 promise 而不是固定时长 sleep：只有线程真正结束才置位，
+    /// 等待方据此立即返回，避免每次导入都白等一段固定时间。
+    class WorkerCompletionGuard
+    {
+    public:
+        explicit WorkerCompletionGuard(std::shared_ptr<std::promise<void>> done)
+            : m_done(std::move(done))
+        {
+        }
+
+        ~WorkerCompletionGuard()
+        {
+            if (!m_done)
+            {
+                return;
+            }
+            // set_value 只在重复置位时抛异常，单次守卫不会走到；仍兜底避免析构抛
+            try
+            {
+                m_done->set_value();
+            }
+            catch (...)
+            {
+            }
+        }
+
+        WorkerCompletionGuard(const WorkerCompletionGuard&) = delete;
+        WorkerCompletionGuard& operator=(const WorkerCompletionGuard&) = delete;
+
+    private:
+        std::shared_ptr<std::promise<void>> m_done;
+    };
+
     class ScopedImportGuard
     {
     public:
@@ -265,16 +301,17 @@ void ImportService::shutdownAsyncThread()
     m_asyncCancelFlag.store(true);
     APR_INFO("[ImportService] shutdownAsyncThread: cancel flag set, waiting worker...");
 
-    // 给 worker 最多 3 秒自行退出（phaseDetectFormat/phaseParse 均为有界计算，
-    // 正常情况毫秒级返回；若第三方解析器卡在 I/O 上，超时只打 WARN 不放弃 join——
-    // joinable 的 std::thread 析构会触发 std::terminate，必须收干净）
-    std::this_thread::sleep_for(std::chrono::seconds(3));
-    if (m_asyncThread.joinable())
+    // 等 worker 真正结束的完成信号：上一次导入早已收尾时信号已置位，这里立即返回，
+    // 不再像旧实现那样每次操作都无条件 sleep 3 秒。3 秒只作为诊断阈值——超时说明
+    // worker 卡在第三方 I/O 上，此时仍必须 join：joinable 的 std::thread 析构会
+    // 触发 std::terminate，而停不下来的解析只能等它自己返回。
+    if (m_asyncDone.valid() &&
+        m_asyncDone.wait_for(std::chrono::milliseconds(3000)) != std::future_status::ready)
     {
-        APR_WARN("[ImportService] shutdownAsyncThread: worker still alive after 3s, forcing join");
-        m_asyncThread.join();
-        APR_INFO("[ImportService] shutdownAsyncThread: worker joined");
+        APR_WARN("[ImportService] shutdownAsyncThread: worker still running after 3s, waiting for it to finish");
     }
+    m_asyncThread.join();
+    APR_INFO("[ImportService] shutdownAsyncThread: worker joined");
 }
 
 void ImportService::setDispatcher(ImportDispatcher* dispatcher)
@@ -535,8 +572,14 @@ void ImportService::importAsync(
             Qt::QueuedConnection);
     };
 
+    // 为本次 worker 建立完成信号：worker 尾部置位，shutdownAsyncThread 靠它判断
+    // 线程是否真的结束，不再用固定时长 sleep 推测
+    auto donePromise = std::make_shared<std::promise<void>>();
+    m_asyncDone = donePromise->get_future().share();
+
     // 启动后台线程执行 Phase 1-2（纯解析，不碰 UI 与场景）
-    m_asyncThread = std::thread([this, safeSelf, context, options, finishOnMainThread]() {
+    m_asyncThread = std::thread([this, safeSelf, context, options, finishOnMainThread, donePromise]() {
+        WorkerCompletionGuard doneGuard(donePromise);
         if (safeSelf.isNull())
             return;
         ImportContext mutableCtx = context;

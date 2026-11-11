@@ -1,6 +1,8 @@
 #include <ctime>
 #include <chrono>
 #include <exception>
+#include <future>
+#include <memory>
 #include <thread>
 #include <utility>
 
@@ -24,6 +26,43 @@
 #include <QCoreApplication>
 #include <QFileInfo>
 #include <QMetaObject>
+
+namespace
+{
+    /// worker 退出时置完成位（所有返回路径都会析构到它）。
+    /// 用 promise 而不是固定时长 sleep：只有线程真正结束才置位，
+    /// 等待方据此立即返回，避免每次导出都白等一段固定时间。
+    class WorkerCompletionGuard
+    {
+    public:
+        explicit WorkerCompletionGuard(std::shared_ptr<std::promise<void>> done)
+            : m_done(std::move(done))
+        {
+        }
+
+        ~WorkerCompletionGuard()
+        {
+            if (!m_done)
+            {
+                return;
+            }
+            // set_value 只在重复置位时抛异常，单次守卫不会走到；仍兜底避免析构抛
+            try
+            {
+                m_done->set_value();
+            }
+            catch (...)
+            {
+            }
+        }
+
+        WorkerCompletionGuard(const WorkerCompletionGuard&) = delete;
+        WorkerCompletionGuard& operator=(const WorkerCompletionGuard&) = delete;
+
+    private:
+        std::shared_ptr<std::promise<void>> m_done;
+    };
+}  // namespace
 
 void ExportService::setPersistenceService(PersistenceService* service)
 {
@@ -76,20 +115,21 @@ void ExportService::shutdownAsyncThread()
     {
         return;
     }
-    // 通知 worker 尽快退出（dispatch 内部无 cancel 检查点，置 flag 后
-    // 再 joinable 也不放弃 join——joinable 的 std::thread 析构会触发 std::terminate）
+    // 通知 worker 尽快退出（dispatch 内部无 cancel 检查点）
     m_asyncCancelFlag.store(true);
     APR_INFO("[ExportService] shutdownAsyncThread: cancel flag set, waiting worker...");
 
-    // 给 worker 最多 3 秒自行退出（序列化 + 写文件为有界操作，正常毫秒级返回；
-    // 若磁盘 I/O 卡顿，超时只打 WARN 不放弃 join）
-    std::this_thread::sleep_for(std::chrono::seconds(3));
-    if (m_asyncThread.joinable())
+    // 等 worker 真正结束的完成信号：上一次导出早已收尾时信号已置位，这里立即返回，
+    // 不再像旧实现那样每次操作都无条件 sleep 3 秒。3 秒只作为诊断阈值——超时说明
+    // worker 卡在磁盘 I/O 上，此时仍必须 join：joinable 的 std::thread 析构会
+    // 触发 std::terminate，而写盘无法中断，只能等它自己返回。
+    if (m_asyncDone.valid() &&
+        m_asyncDone.wait_for(std::chrono::milliseconds(3000)) != std::future_status::ready)
     {
-        APR_WARN("[ExportService] shutdownAsyncThread: worker still alive after 3s, forcing join");
-        m_asyncThread.join();
-        APR_INFO("[ExportService] shutdownAsyncThread: worker joined");
+        APR_WARN("[ExportService] shutdownAsyncThread: worker still running after 3s, waiting for it to finish");
     }
+    m_asyncThread.join();
+    APR_INFO("[ExportService] shutdownAsyncThread: worker joined");
 }
 
 void ExportService::setDispatcher(ExportDispatcher* dispatcher)
@@ -278,8 +318,14 @@ void ExportService::exportAsync(
             Qt::QueuedConnection);
     };
 
+    // 为本次 worker 建立完成信号：worker 尾部置位，shutdownAsyncThread 靠它判断
+    // 线程是否真的结束，不再用固定时长 sleep 推测
+    auto donePromise = std::make_shared<std::promise<void>>();
+    m_asyncDone = donePromise->get_future().share();
+
     // 启动后台线程执行 Phase 2（纯序列化 + 文件 I/O，不碰场景与 UI）
-    m_asyncThread = std::thread([this, safeSelf, fullCtx, sharedEntities, finishOnMainThread]() {
+    m_asyncThread = std::thread([this, safeSelf, fullCtx, sharedEntities, finishOnMainThread, donePromise]() {
+        WorkerCompletionGuard doneGuard(donePromise);
         if (safeSelf.isNull())
             return;
 
