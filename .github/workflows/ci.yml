@@ -101,7 +101,7 @@ jobs:
   # 网格 float 管线。两者均无 Qt/UI 依赖，独立入口（各自根 CMakeLists.txt）沿用
   # 仓库统一的 Config.cmake + StandaloneInit.cmake，配 vcpkg 即可编译测试。
   #
-  # 全应用（Qt + 全套 vcpkg 依赖）的 mac/Linux 构建目前太重，留待后续单独开作业。
+  # 全应用（Qt + 全套 vcpkg 依赖）的 mac/Linux 构建见下方 full-app-macos-linux。
   # ---------------------------------------------------------------------------
   core-libs-macos-linux:
     name: core libs (${{ matrix.os }})
@@ -163,6 +163,139 @@ jobs:
             -DBUILD_TESTS=ON
           cmake --build build-gmc --parallel
           ctest --test-dir build-gmc -C Release --output-on-failure --no-tests=error --parallel
+
+  # ---------------------------------------------------------------------------
+  # 全应用（Qt + vcpkg 依赖）macOS / Linux 构建与测试。
+  #
+  # 覆盖矩阵：macos-14 / Debug 与 ubuntu-22.04 / Release，满足「Debug 与 Release
+  # 至少各一种」。依赖全部在作业内获取，不依赖 runner 预装：
+  #   Qt 6.12.0   —— jurplel/install-qt-action
+  #   Python 3.11 —— actions/setup-python
+  #   pybind11    —— pip（刻意不用 vcpkg 的 pybind11：它会接管 FindPython，
+  #                  把扩展 ABI 换到 vcpkg python3，见 Config.cmake 注释）
+  #   vcpkg       —— 按 VCPKG_BASELINE 固定提交检出并 bootstrap
+  #
+  # 模块范围与 Windows 主作业一致（GeoModelCore / Vision / Engraving / Hardware
+  # 关闭），避免 OCCT / OpenCV 编译时间叠加到每次提交；启用可选模块时按
+  # vcpkg.json 的 feature 安装对应端口。
+  # ---------------------------------------------------------------------------
+  full-app-macos-linux:
+    name: full app (${{ matrix.os }}, ${{ matrix.build_type }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            build_type: Debug
+            triplet: arm64-osx
+            qt_arch: clang_64
+          - os: ubuntu-22.04
+            build_type: Release
+            triplet: x64-linux
+            qt_arch: linux_gcc_64
+    env:
+      VCPKG_BASELINE: 2ec0f1747d8186a5c9babe276e2ad57cd2b12d2a
+      QT_VERSION: "6.12.0"
+      VCPKG_TRIPLET: ${{ matrix.triplet }}
+      # Linux 无显示服务器：GUI 测试统一走 Qt offscreen 平台。
+      QT_QPA_PLATFORM: offscreen
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install system packages (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libgl1-mesa-dev libegl1-mesa-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev libfontconfig1-dev \
+            libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xkb-dev libxcb-xinerama0 libdbus-1-3 patchelf
+
+      - name: Install Qt ${{ env.QT_VERSION }}
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: ${{ runner.os == 'macOS' && 'mac' || 'linux' }}
+          target: desktop
+          arch: ${{ matrix.qt_arch }}
+          modules: qtbase
+          cache: true
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pybind11
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install "pybind11>=2.11"
+          echo "PYBIND11_DIR=$(python3 -m pybind11 --cmakedir)" >> "$GITHUB_ENV"
+
+      # vcpkg 二进制缓存：按 baseline + triplet 失效，避免 OCCT/OpenCV 每次重编。
+      - name: Cache vcpkg binary packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/vcpkg/archives
+          key: vcpkg-bincache-${{ runner.os }}-${{ matrix.triplet }}-${{ env.VCPKG_BASELINE }}
+
+      - name: Setup vcpkg (pinned baseline)
+        run: |
+          git init "$GITHUB_WORKSPACE/vcpkg"
+          git -C "$GITHUB_WORKSPACE/vcpkg" remote add origin https://github.com/microsoft/vcpkg.git
+          git -C "$GITHUB_WORKSPACE/vcpkg" fetch --depth 1 origin "$VCPKG_BASELINE"
+          git -C "$GITHUB_WORKSPACE/vcpkg" checkout --detach FETCH_HEAD
+          "$GITHUB_WORKSPACE/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=$GITHUB_WORKSPACE/vcpkg" >> "$GITHUB_ENV"
+          echo "VCPKG_BINARY_SOURCES=clear;files,$HOME/.cache/vcpkg/archives,readwrite" >> "$GITHUB_ENV"
+
+      - name: Install vcpkg dependencies
+        run: |
+          "$VCPKG_ROOT/vcpkg" install \
+            boost boost-geometry bshoshany-thread-pool breakpad clipper2 freetype \
+            gtest libwebp nanosvg openssl protobuf spdlog sqlitecpp stb tiff zlib \
+            --triplet "$VCPKG_TRIPLET" --clean-after-build
+
+      - name: Configure
+        run: |
+          cmake -S . -B build-ci -G Ninja \
+            -DCMAKE_BUILD_TYPE="${{ matrix.build_type }}" \
+            -DQt_INSTALL_DIR="$QT_ROOT_DIR" \
+            -DVCPKG_DIR="$VCPKG_ROOT" \
+            -DVCPKG_TARGET_TRIPLET="$VCPKG_TRIPLET" \
+            -DPython_EXECUTABLE="$(command -v python3)" \
+            -Dpybind11_DIR="$PYBIND11_DIR" \
+            -DBUILD_TESTS=ON \
+            -DBUILD_HARDWARE=OFF \
+            -DBUILD_VISION=OFF \
+            -DBUILD_ENGRAVING=OFF \
+            -DBUILD_GEOMODELCORE=OFF \
+            -DBUILD_PYTHON=ON \
+            -DAPR_PYBIND_CORE=ON \
+            -DAPR_BUILD_CLIENT_PLUGINS=OFF \
+            -DBUILD_PERF_BENCHMARK=OFF \
+            -DBUILD_RENDER_BENCHMARK=OFF
+
+      - name: Build
+        run: |
+          cmake --build build-ci --config "${{ matrix.build_type }}" --parallel \
+            --target UICommon UI2D UI3D April PythonHost AprPyBindCore \
+            UtilityTests LogTests EngineCommonTests Engine2DTests Engine3DTests \
+            FileIOTests NestingTests CAMTests RenderxTests RenderBridgeTests \
+            LicenseTests CrashHandlerTests PythonHostTests \
+            UICommonTests UI2DTests UI3DTests MainTests
+
+      - name: Test
+        run: |
+          ctest --test-dir build-ci -C "${{ matrix.build_type }}" \
+            --output-on-failure --no-tests=error --parallel
 
   # ---------------------------------------------------------------------------
   # 文档链接与过期检查
