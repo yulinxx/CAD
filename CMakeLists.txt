@@ -214,8 +214,8 @@ add_subdirectory(UI/Common)
 
 if(NOT BUILD_UI2D)
     message(FATAL_ERROR
-        "BUILD_UI2D=OFF 不受支持：Main 硬依赖 UI2D（无桩回退）。"
-        "如需仅 3D，请构建 UI 独立工程。")
+        "BUILD_UI2D=OFF is not supported: Main hard-depends on UI2D (no stub fallback). "
+        "For a 3D-only build, configure the standalone UI project instead.")
 endif()
 add_subdirectory(UI/2D)
 
@@ -415,6 +415,9 @@ endforeach()
 
 # ============================================================================
 # 依赖方向校验（CI 门禁）— 所有目标已创建后执行
+# 入口说明：根工程直接 add_subdirectory(UI/Common|2D|3D)，不会 include
+# UI/CMakeLists.txt；那份文件只用于 `cmake -S UI` 独立配置。因此单次
+# configure 只执行一次依赖方向校验，不存在重复调用。
 # ============================================================================
 include("${APR_ROOT}/CMake/CheckDependencies.cmake")
 apr_check_dependency_directions()
@@ -471,9 +474,9 @@ foreach(_apr_pair IN ITEMS
                 # 检查源头 target 是否 PUBLIC 传播
                 get_target_property(_apr_iface_defs ${_apr_src} INTERFACE_COMPILE_DEFINITIONS)
                 if(_apr_iface_defs MATCHES "${_apr_enable_macro}")
-                    message(STATUS "[April]   ✓ ${_apr_enable_macro}: ${_apr_src} PUBLIC propagates")
+                    message(STATUS "[April]   OK ${_apr_enable_macro}: ${_apr_src} PUBLIC propagates")
                 else()
-                    message(WARNING "[April] ✗ ${_apr_enable_macro}: ${_apr_src} NOT PUBLIC propagating!")
+                    message(WARNING "[April] FAIL ${_apr_enable_macro}: ${_apr_src} NOT PUBLIC propagating!")
                     set(_apr_macro_check_failed TRUE)
                 endif()
             endif()
@@ -488,9 +491,9 @@ if(TARGET April)
     if(BUILD_UI3D)
         get_target_property(_apr_private_defs April COMPILE_DEFINITIONS)
         if(_apr_private_defs MATCHES "BUILD_UI3D=1")
-            message(STATUS "[April]   ✓ BUILD_UI3D=1: April PRIVATE (maintained manually, correct)")
+            message(STATUS "[April]   OK BUILD_UI3D=1: April PRIVATE (maintained manually, correct)")
         else()
-            message(WARNING "[April] ✗ BUILD_UI3D=ON 但 April 未定义 BUILD_UI3D=1")
+            message(WARNING "[April] FAIL BUILD_UI3D=ON but April does not define BUILD_UI3D=1")
             set(_apr_macro_check_failed TRUE)
         endif()
     endif()
@@ -498,10 +501,10 @@ endif()
 
 if(_apr_macro_check_failed)
     message(FATAL_ERROR
-        "[April] ENABLE_* 宏传播校验失败:ABI 一致性风险。"
-        "请确保影响公共头类型布局的宏通过各模块 PUBLIC INTERFACE 传播。")
+        "[April] ENABLE_* macro propagation check failed: ABI consistency risk. "
+        "Make sure macros that affect public header type layout propagate through each module's PUBLIC INTERFACE.")
 else()
-    message(STATUS "[April]   ENABLE_* macro propagation: OK (EXE/DLL 一致)")
+    message(STATUS "[April]   ENABLE_* macro propagation: OK (EXE/DLL consistent)")
 endif()
 unset(_apr_macro_check_failed)
 

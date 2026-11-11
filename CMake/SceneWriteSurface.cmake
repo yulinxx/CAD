@@ -55,12 +55,12 @@ function(apr_check_scene_write_surface)
     if(_violations)
         string(REPLACE ";" "\n  - " _violation_text "${_violations}")
         message(FATAL_ERROR
-            "生产代码禁止使用 SceneWriteGateway（SceneEditService 是唯一写入口）。\n"
-            "违规文件：\n  - ${_violation_text}\n"
-            "处理方式：改用 SceneEditService（无撤销场景用 CommitMode::Direct，"
-            "保留 id 用 insertEntityPreserveId）。")
+            "Production code must not use SceneWriteGateway (SceneEditService is the only write entry point).\n"
+            "Violating files:\n  - ${_violation_text}\n"
+            "Fix: use SceneEditService instead (CommitMode::Direct when undo is not needed, "
+            "insertEntityPreserveId to preserve ids).")
     endif()
 
     list(LENGTH _files _file_count)
-    message(STATUS "[写面门禁] 生产代码未使用 SceneWriteGateway（扫描 ${_file_count} 个文件）")
+    message(STATUS "[scene write surface] production code does not use SceneWriteGateway (${_file_count} files scanned)")
 endfunction()

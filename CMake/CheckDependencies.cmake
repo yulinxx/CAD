@@ -38,13 +38,13 @@
 
 # 见文件头「规则 5~6」：ON 时违规升级为 configure 失败，OFF 时只告警
 option(APR_STRICT_RENDER_ISOLATION
-    "把 UI 直连 RenderX 的隔离告警升级为 configure 失败" ON)
+    "Promote UI-to-RenderX isolation warnings to configure failures" ON)
 
 # ON 时「应被校验的目标不存在」也算失败，供 CI 全模块构建使用。
 # 本地按 BUILD_xxx 关掉部分模块时保持 OFF：目标不存在是正常的，
 # 但结果里必须如实说明有哪些规则被跳过了（见函数末尾）。
 option(APR_STRICT_DEPENDENCY_AUDIT
-    "依赖方向校验所需目标缺失时升级为 configure 失败" OFF)
+    "Promote missing dependency-audit targets to configure failures" OFF)
 
 # 收集某目标**对下游可见**的可达依赖（含传递闭包），结果写入 ${_out_var}。
 #
@@ -109,7 +109,7 @@ function(apr_check_dependency_directions)
             foreach(_dep IN LISTS _libs)
                 if(_dep MATCHES "${_engine_forbidden}")
                     list(APPEND _violations
-                        "Engine 目标 ${_t} 依赖了上层 ${_dep}")
+                        "Engine target ${_t} depends on upper-layer ${_dep}")
                 endif()
             endforeach()
         endif()
@@ -123,7 +123,7 @@ function(apr_check_dependency_directions)
             foreach(_dep IN LISTS _libs)
                 if(_dep MATCHES "${_render_forbidden}")
                     list(APPEND _violations
-                        "Render 目标 ${_t} 依赖了上层 ${_dep}")
+                        "Render target ${_t} depends on upper-layer ${_dep}")
                 endif()
             endforeach()
         endif()
@@ -140,7 +140,7 @@ function(apr_check_dependency_directions)
             foreach(_dep IN LISTS _libs)
                 if(_dep MATCHES "${_engine_direct}")
                     list(APPEND _violations
-                        "UI 目标 ${_t} 直接链接了 ${_dep}；链接层应改为链接 UiEngineAccess")
+                        "UI target ${_t} links ${_dep} directly (link UiEngineAccess instead)")
                 endif()
             endforeach()
         endif()
@@ -154,7 +154,7 @@ function(apr_check_dependency_directions)
             foreach(_dep IN LISTS _libs)
                 if(_dep MATCHES "${_render_direct}")
                     list(APPEND _violations
-                        "UI 目标 ${_t} 直接链接了 ${_dep}；应改为链接 RenderAbstraction")
+                        "UI target ${_t} links ${_dep} directly (link RenderAbstraction instead)")
                 endif()
             endforeach()
         endif()
@@ -170,7 +170,7 @@ function(apr_check_dependency_directions)
             foreach(_dep IN LISTS _libs)
                 if(_dep MATCHES "${_cam_forbidden}")
                     list(APPEND _violations
-                        "CAM 目标链接了上层模块 ${_dep}；CAM 只能依赖 Utility/Log/Engraving(PRIVATE)/Hardware(PRIVATE)")
+                        "CAM target links upper-layer module ${_dep} (CAM may only depend on Utility/Log/Engraving(PRIVATE)/Hardware(PRIVATE))")
                 endif()
             endforeach()
         endif()
@@ -180,7 +180,7 @@ function(apr_check_dependency_directions)
             foreach(_inc IN LISTS _cam_includes)
                 if(_inc MATCHES "[/\\\\](Engine2D|EngineCommon|UICommon|UI2D|UI3D|RenderX|RenderBridge|Hardware)[/\\\\]Include")
                     list(APPEND _violations
-                        "CAM 的 INTERFACE_INCLUDE_DIRS 泄漏了上层头路径 ${_inc}")
+                        "CAM INTERFACE_INCLUDE_DIRS leaks upper-layer include path ${_inc}")
                 endif()
             endforeach()
         endif()
@@ -197,8 +197,8 @@ function(apr_check_dependency_directions)
                 foreach(_inc IN LISTS _incs)
                     if(_inc MATCHES "[/\\\\][Rr]enderx[/\\\\]include[/\\\\]?$")
                         list(APPEND _advisory
-                            "UI 目标 ${_t} 的 include 目录含 RenderX 头路径（${_inc}）："
-                            "其 .cpp 仍在直调 rx* API，应收口到 RenderAbstraction 接口")
+                            "UI target ${_t} has a RenderX include path (${_inc}): "
+                            "its .cpp files still call rx* APIs directly (route them through RenderAbstraction)")
                     endif()
                 endforeach()
             endif()
@@ -214,7 +214,7 @@ function(apr_check_dependency_directions)
             _apr_collect_reachable_targets(${_t} _reachable)
             if("RenderX" IN_LIST _reachable)
                 list(APPEND _advisory
-                    "UI 目标 ${_t} 经传递依赖仍可到达 RenderX（链路：${_t} → RenderBridge → RenderX）")
+                    "UI target ${_t} can still reach RenderX through transitive dependencies (chain: ${_t} -> RenderBridge -> RenderX)")
             endif()
         endif()
     endforeach()
@@ -224,38 +224,38 @@ function(apr_check_dependency_directions)
         list(REMOVE_DUPLICATES _advisory)
         string(REPLACE ";" "\n    - " _advisory_msg "${_advisory}")
         if(APR_STRICT_RENDER_ISOLATION)
-            list(APPEND _violations "UI/RenderX 隔离未收口（APR_STRICT_RENDER_ISOLATION=ON）：\n    - ${_advisory_msg}")
+            list(APPEND _violations "UI/RenderX isolation is not closed (APR_STRICT_RENDER_ISOLATION=ON):\n    - ${_advisory_msg}")
         else()
             message(WARNING
-                "[apr_check_dependency_directions] UI/RenderX 隔离尚未收口（当前只告警）：\n    - ${_advisory_msg}\n"
-                "  收口完成后可用 -DAPR_STRICT_RENDER_ISOLATION=ON 把本项升级为硬失败")
+                "[apr_check_dependency_directions] UI/RenderX isolation is not closed (warning only):\n    - ${_advisory_msg}\n"
+                "  Once closed, pass -DAPR_STRICT_RENDER_ISOLATION=ON to make this a hard failure")
         endif()
     endif()
 
     set(_skip_note "")
     if(_missing_targets)
         string(REPLACE ";" ", " _missing_msg "${_missing_targets}")
-        set(_skip_note "；未参与校验的目标: ${_missing_msg}")
+        set(_skip_note "; targets not audited: ${_missing_msg}")
         if(APR_STRICT_DEPENDENCY_AUDIT)
             list(APPEND _violations
-                "依赖方向校验所需目标缺失（APR_STRICT_DEPENDENCY_AUDIT=ON）：${_missing_msg}")
+                "Dependency-audit targets are missing (APR_STRICT_DEPENDENCY_AUDIT=ON): ${_missing_msg}")
         endif()
     endif()
 
     if(_violations)
         string(REPLACE ";" "\n    - " _msg "${_violations}")
         message(FATAL_ERROR
-            "[apr_check_dependency_directions] 依赖方向违规：\n    - ${_msg}\n"
-            "  规则见 Docs/01-当前架构/UI-Engine解耦迁移方案.md")
+            "[apr_check_dependency_directions] dependency direction violation:\n    - ${_msg}\n"
+            "  See Docs/01-当前架构/UI-Engine解耦迁移方案.md")
     endif()
 
     if(_advisory)
         # 分层规则都过了，但 UI 仍能直调 RenderX —— 不谎报"完全解耦"
-        message(STATUS "[April] 依赖方向校验: OK（分层规则通过；UI/RenderX 隔离未收口，见上方告警${_skip_note}）")
+        message(STATUS "[April] dependency directions: OK (layering rules pass; UI/RenderX isolation is still open, see warnings above${_skip_note})")
     else()
-        message(STATUS "[April] 依赖方向校验: OK "
-            "(Engine 不依赖 UI/Render；Render 不依赖 UI；"
-            "UI 仅在链接层经 UiEngineAccess 访问 Engine（include 层未收口，另有棘轮校验）；"
-            "UI 通过 RenderAbstraction 访问渲染${_skip_note})")
+        message(STATUS "[April] dependency directions: OK "
+            "(Engine does not depend on UI/Render; Render does not depend on UI; "
+            "UI reaches Engine only through UiEngineAccess at link level (includes remain open, covered by the ratchet); "
+            "UI reaches rendering through RenderAbstraction${_skip_note})")
     endif()
 endfunction()

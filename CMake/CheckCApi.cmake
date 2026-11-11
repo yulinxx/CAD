@@ -59,12 +59,12 @@ function(apr_check_c_api_version)
     set(_problems "")
     foreach(_h IN LISTS _c_api_headers)
         if(NOT EXISTS "${_h}")
-            list(APPEND _problems "找不到 C ABI 头：${_h}")
+            list(APPEND _problems "C ABI header not found: ${_h}")
             continue()
         endif()
         file(READ "${_h}" _content)
         if(NOT _content MATCHES "GetVersionString")
-            list(APPEND _problems "${_h}: 缺 *_GetVersionString()")
+            list(APPEND _problems "${_h}: missing *_GetVersionString()")
         endif()
 
         # 旧判断是 `GetVersion|GetAbiVersion`：`GetVersion` 是 `GetVersionString`
@@ -78,16 +78,16 @@ function(apr_check_c_api_version)
             set(_has_version_query TRUE)
         endif()
         if(NOT _has_version_query)
-            list(APPEND _problems "${_h}: 缺 *_GetVersion() / *_GetAbiVersion()")
+            list(APPEND _problems "${_h}: missing *_GetVersion() / *_GetAbiVersion()")
         endif()
     endforeach()
 
     if(_problems)
         string(REPLACE ";" "\n    - " _msg "${_problems}")
         message(FATAL_ERROR
-            "[apr_check_c_api_version] C ABI 版本查询不合规：\n    - ${_msg}\n"
-            "  约定见 Docs/01-当前架构/C-ABI风格约定.md")
+            "[apr_check_c_api_version] C ABI version query contract violated:\n    - ${_msg}\n"
+            "  See Docs/01-当前架构/C-ABI风格约定.md")
     endif()
 
-    message(STATUS "[April] C ABI 版本查询校验: OK")
+    message(STATUS "[April] C ABI version query check: OK")
 endfunction()
