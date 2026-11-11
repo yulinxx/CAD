@@ -10,6 +10,10 @@
 #include "OperationRegistrar.h"
 
 #include <QCoreApplication>
+#include <QTimer>
+
+#include <functional>
+#include <utility>
 
 #include "UI2D/Operation/OperationRegistry.h"
 #include "UI2D/Operation/OperationRouting.h"
@@ -395,6 +399,16 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
 
     // 填充几何更新协调器（单例）：图元移动/变换后增量重算色块填充（跟随位置）
     Eg::FillGeometryUpdater::instance().initialize(m_sceneManager.get(), m_layerManager.get(), m_sceneEditService.get());
+
+    // 注入延迟派发器：Engine 层不依赖 Qt，无法自己把重算推迟到当前调用栈之后，
+    // 由宿主提供实现（见 FillGeometryUpdater.h 文件头说明）。
+    // 用 singleShot(0)：编辑事务（拖动松开 / 变换命令）返回后、下一次事件循环迭代执行，
+    // 此时场景已不在"提交中"，重算不会重入撤销栈或场景容器迭代。
+    // 拖动只在 commitInteractive 收尾时触发一次回调（拖动过程中只标脏不动索引），
+    // 因此这里不会退化成每帧全量重算；同一轮事件循环内的多次提交由协调器按 id 合并。
+    Eg::FillGeometryUpdater::instance().setDeferredDispatcher([](std::function<void()> task) {
+        QTimer::singleShot(0, QCoreApplication::instance(), std::move(task));
+    });
 
     // 配置 ShellHost 核心依赖
     m_shellHost->setStateCenter(m_stateCenter.get());
