@@ -1,0 +1,89 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:6f1f2c1e-9b3a-4d2a-8c1f-2a5d7e9b4c31",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-11T10:14:13+08:00",
+    "tools": [
+      {
+        "vendor": "April Technology",
+        "name": "manual-sbom",
+        "version": "1"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "bom-ref": "april-cad",
+      "name": "April CAD",
+      "version": "1.0.0",
+      "description": "Laser processing CAD/CAM system"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/LibreCAD/libdxfrw@1ac1cd658dd6bcc1b1d16031419aa0fcf1572ad3",
+      "name": "libdxfrw",
+      "version": "2.0.0",
+      "description": "DXF read/write library, statically compiled into FileIO.dll",
+      "licenses": [
+        {
+          "license": {
+            "id": "GPL-2.0-or-later",
+            "name": "GNU General Public License v2.0 or later"
+          }
+        }
+      ],
+      "purl": "pkg:github/LibreCAD/libdxfrw@1ac1cd658dd6bcc1b1d16031419aa0fcf1572ad3",
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/LibreCAD/libdxfrw.git"
+        },
+        {
+          "type": "license",
+          "url": "https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt"
+        }
+      ],
+      "properties": [
+        {
+          "name": "apr:integration",
+          "value": "source-compiled-into-shared-library"
+        },
+        {
+          "name": "apr:artifact",
+          "value": "FileIO.dll"
+        },
+        {
+          "name": "apr:modified",
+          "value": "true"
+        },
+        {
+          "name": "apr:upstreamBase",
+          "value": "d68fb1ed937ad2a74a54f6208277ec10a1b031b0"
+        },
+        {
+          "name": "apr:localHead",
+          "value": "1ac1cd658dd6bcc1b1d16031419aa0fcf1572ad3"
+        },
+        {
+          "name": "apr:commitsAheadOfUpstream",
+          "value": "5"
+        },
+        {
+          "name": "apr:modificationRecord",
+          "value": "Docs/07-工程与合规/libdxfrw-modifications/README.md"
+        },
+        {
+          "name": "apr:licenseText",
+          "value": "ThirdParty/libdxfrw/COPYING"
+        },
+        {
+          "name": "apr:usageScope",
+          "value": "DXF read (DxfParser) and write (DxfFileWriter) inside FileIO"
+        }
+      ]
+    }
+  ]
+}

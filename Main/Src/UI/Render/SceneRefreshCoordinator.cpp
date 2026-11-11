@@ -671,20 +671,68 @@ void SceneRefreshCoordinator::requestViewportExtension()
         }
     }
 
-    // 补入：在新覆盖盒内但尚未上 GPU 的图元 —— 交给扩展队列按批跨帧消费
+    // 补入：在新覆盖盒内但尚未上 GPU 的图元。分两档处理：
+    //   - 可视盒内的必须**同步**补入：异步泵每 32ms 才消费一批，连续拖动时
+    //     前缘会一直空着，直到松手后队列排空 —— 这正是「拖动时渲染异常、
+    //     松手后恢复」的主因；
+    //   - 只落在 1.25 倍余量环里的继续异步预取，平移时才不会每次都卡在同步上传上。
+    const Ut::BBox2d visibleBox = visibleWorldBox();
+    std::unordered_set<uint64_t> inVisible;
+    if (visibleBox.isValid())
+    {
+        collectDesiredGeometryIds(visibleBox, hideSelected, inVisible);
+    }
+
     std::vector<uint64_t> toAdd;
+    std::vector<uint64_t> toAddNow;
     toAdd.reserve(inBox.size());
     for (uint64_t uid : inBox)
     {
-        if (m_renderedEntityIds.find(uid) == m_renderedEntityIds.end())
+        if (m_renderedEntityIds.find(uid) != m_renderedEntityIds.end())
+        {
+            continue;
+        }
+        if (inVisible.find(uid) != inVisible.end())
+        {
+            toAddNow.push_back(uid);
+        }
+        else
         {
             toAdd.push_back(uid);
         }
     }
 
-    // 每轮对账按当前账本/覆盖盒重算扩展队列：清掉上一轮未消费的过期 ID，
-    // 避免快速缩放时队列反复累积重复项。
-    m_submitScheduler.clearExtensionQueue();
+    // 可视盒内同步补入；失败（几何仓写入失败等）的条目回落到异步队列重试，
+    // 只把真正提交成功的写进账本，避免账本与 GPU 内容不一致。
+    if (!toAddNow.empty())
+    {
+        const bool ok = m_renderWidget->upsertRenderEntities(
+            toAddNow,
+            [this](uint64_t uid) -> const Eg::AprEntity* {
+                return m_sceneManager->findEntityById(static_cast<Eg::EntityId>(uid));
+            },
+            [this](uint64_t uid) -> uint32_t {
+                return layerIndexOfEntity(m_sceneManager, static_cast<Eg::EntityId>(uid));
+            });
+        if (ok)
+        {
+            for (uint64_t uid : toAddNow)
+            {
+                m_renderedEntityIds.insert(uid);
+            }
+        }
+        else
+        {
+            APR_WARNF("[Scene] viewport extension sync upsert failed: %zu entities, fallback to async",
+                toAddNow.size());
+            toAdd.insert(toAdd.end(), toAddNow.begin(), toAddNow.end());
+        }
+    }
+
+    // 每轮对账只回收扩展队列中**已消费的前缀**，未消费的剩余项保留，随后与本次
+    // 差分去重追加：旧实现整队清空，连续平移时上一轮没提交完的条目被丢弃，
+    // 前缘会反复缺块。
+    m_submitScheduler.compactExtensionQueue();
 
     // 记录新的已覆盖盒并清掉作废的旧 LOD 队列（缩放基准不动，见方法说明）
     m_submitScheduler.markViewportReconciled(newBox);
@@ -727,6 +775,24 @@ bool SceneRefreshCoordinator::isDesiredOnGeometryLayer(const Eg::AprEntity* e, b
         return !canHideSelectedBody(e);
     }
     return true;
+}
+
+// 当前可视世界盒（不加余量）；矩阵退化（拿不到可视盒）返回无效盒。
+Ut::BBox2d SceneRefreshCoordinator::visibleWorldBox() const
+{
+    if (!m_renderWidget)
+    {
+        return Ut::BBox2d{};
+    }
+    float bounds[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    if (!m_renderWidget->visibleWorldBounds(bounds))
+    {
+        return Ut::BBox2d{};
+    }
+    return Ut::BBox2d(static_cast<double>(bounds[0]),
+        static_cast<double>(bounds[1]),
+        static_cast<double>(bounds[2]),
+        static_cast<double>(bounds[3]));
 }
 
 // 当前可视世界盒按 cull 余量外扩；矩阵退化（拿不到可视盒）返回无效盒。

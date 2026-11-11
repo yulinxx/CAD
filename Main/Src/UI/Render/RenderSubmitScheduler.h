@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <unordered_set>
@@ -151,18 +152,24 @@ public:
     // ======================== ② 视口扩展队列 ========================
 
     /// 新进视野但从未上 GPU 的图元 ID 入队（增量补入，替代「可视盒越界 → 全量重建」）。
-    /// 优先于 LOD 队列消费 —— 画面缺块比精度更新紧急。ID 重复入队安全
-    /// （重复 upsert 按内容哈希短路），但由调用方按账本去重后传入。
+    /// 优先于 LOD 队列消费 —— 画面缺块比精度更新紧急。与未消费的剩余项去重：
+    /// 重复入队虽按内容哈希短路不会画错，但会白占批次额度，拖慢真正缺块的图元。
     void enqueueViewportExtension(const std::vector<uint64_t>& ids);
 
     /// 扩展队列是否还有未消费的条目
     bool hasExtensionWork() const { return m_extendCursor < m_extendQueue.size(); }
 
-    /// 仅清空视口扩展队列（LOD 队列保留）：视口范围每次重新对账前调用，
-    /// 让扩展队列按当前账本/可视盒重算，不残留上一轮未消费的过期 ID。
-    void clearExtensionQueue()
+    /// 视口范围重新对账前调用：只丢弃已消费的前缀，**保留尚未消费的剩余项**。
+    /// 旧实现整队清空，连续平移时每轮对账都会扔掉上一轮还没提交的条目，
+    /// 新进视野的边缘因此反复缺块，直到松手后队列排空才恢复。
+    void compactExtensionQueue()
     {
-        m_extendQueue.clear();
+        if (m_extendCursor == 0)
+        {
+            return;
+        }
+        m_extendQueue.erase(
+            m_extendQueue.begin(), m_extendQueue.begin() + static_cast<std::ptrdiff_t>(m_extendCursor));
         m_extendCursor = 0;
     }
 

@@ -260,7 +260,17 @@ void RenderSubmitScheduler::enqueueViewportExtension(const std::vector<uint64_t>
     {
         return;
     }
-    m_extendQueue.insert(m_extendQueue.end(), ids.begin(), ids.end());
+    // 与未消费的剩余项去重后再追加：对账时保留剩余项意味着同一 ID 可能被
+    // 下一轮差分再次列出，重复入队会让它在批次里被反复重试，挤占真正缺块的图元。
+    std::unordered_set<uint64_t> pending(m_extendQueue.begin() + static_cast<std::ptrdiff_t>(m_extendCursor),
+        m_extendQueue.end());
+    for (uint64_t uid : ids)
+    {
+        if (pending.insert(uid).second)
+        {
+            m_extendQueue.push_back(uid);
+        }
+    }
     ensurePump();
 }
 

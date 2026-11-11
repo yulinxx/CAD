@@ -233,6 +233,10 @@ private:
     /// 且 bbox 有效，且未被「选中时隐藏本体」过滤。判据与 gatherGeometry 严格对齐。
     bool isDesiredOnGeometryLayer(const Eg::AprEntity* e, bool hideSelected) const;
 
+    /// 当前可视世界盒（不含 1.25 倍余量）；矩阵退化时返回无效盒。
+    /// 用于区分「必须同步补入」与「可异步预取」两档范围。
+    Ut::BBox2d visibleWorldBox() const;
+
     /// 当前可视世界盒按 cull 余量（1.25×）外扩；矩阵退化时返回无效盒，
     /// 调用方据此退化为「不裁剪 / 全量」。
     Ut::BBox2d expandedVisibleBox() const;

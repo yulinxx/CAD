@@ -31,6 +31,31 @@ set(CPACK_RESOURCE_FILE_LICENSE "${APR_ROOT}/LICENSE.md")
 set(CPACK_RESOURCE_FILE_README "${APR_ROOT}/README.md")
 
 # ============================================================================
+# 第三方许可证随包分发
+# ============================================================================
+# libdxfrw 以 GPL-2.0-or-later 发布且被编译进 FileIO.dll，分发二进制时必须随包提供
+# 许可证全文、第三方声明清单与本地修改记录，不能只带专有的 LICENSE.md。
+set(APR_LIBDXFRW_DIR "${APR_ROOT}/ThirdParty/libdxfrw")
+set(APR_COMPLIANCE_DIR "${APR_ROOT}/Docs/07-工程与合规")
+
+install(FILES "${APR_LIBDXFRW_DIR}/COPYING"
+    DESTINATION licenses/libdxfrw
+)
+install(FILES "${APR_ROOT}/THIRD-PARTY-NOTICES.md"
+    DESTINATION licenses
+)
+install(FILES "${APR_COMPLIANCE_DIR}/sbom/april-sbom.cdx.json"
+    DESTINATION licenses
+    RENAME sbom.cdx.json
+)
+install(FILES
+    "${APR_COMPLIANCE_DIR}/libdxfrw-modifications/README.md"
+    "${APR_COMPLIANCE_DIR}/libdxfrw-modifications/changed-files-vs-upstream.txt"
+    "${APR_COMPLIANCE_DIR}/libdxfrw-modifications/uncommitted-changes.diff"
+    DESTINATION licenses/libdxfrw/modifications
+)
+
+# ============================================================================
 # 安装目标路径
 # ============================================================================
 if(WIN32)
