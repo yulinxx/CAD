@@ -271,45 +271,56 @@ April/
 
 #### vcpkg 包
 
+仓库根 `vcpkg.json` 使用 `builtin-baseline` 锁定端口版本，发布与 CI 构建应启用
+manifest 模式（开发机可继续使用已有的经典模式安装）：
+
 ```bash
-# 基础依赖
-vcpkg install openssl:x64-windows
-vcpkg install freetype:x64-windows
-vcpkg install boost:x64-windows
-vcpkg install clipper2:x64-windows
-vcpkg install sqlitecpp:x64-windows
+# 锁定版本安装（推荐；configure 阶段自动安装到 build/vcpkg_installed）
+cmake -S . -B build -DVCPKG_MANIFEST_MODE=ON
 
-# 测试依赖（可选）
-vcpkg install gtest:x64-windows
+# 或先显式安装再 configure
+vcpkg install --triplet x64-windows --x-manifest-root .
 
-# Python 绑定（可选）
-vcpkg install python3:x64-windows
-vcpkg install pybind11:x64-windows
+# 需要 GeoModelCore / Engraving 时追加可选 feature
+cmake -S . -B build -DVCPKG_MANIFEST_MODE=ON \
+  -DVCPKG_MANIFEST_FEATURES=opencascade
 ```
+
+Nesting / CAM / Raster 默认开启，因此核心依赖包含 `clipper2` 与 `opencv4`。
+Python 绑定所需的 `pybind11` 通过 pip 安装，不使用 vcpkg 的 `pybind11` / `python3`
+端口（原因见 `Config.cmake` 注释）：
+
+```bash
+python3.11 -m pip install "pybind11>=2.11"
+```
+
+**对已有构建目录的影响**：manifest 模式默认关闭，已有 `build/` 的
+`CMakeCache.txt` 中 `VCPKG_MANIFEST_MODE=OFF` 会保持不变，升级后仍可正常
+configure。显式切换为 ON 时，不需要删除构建目录，但首次 configure 会按
+`vcpkg.json` 重新解析并安装依赖（默认落到 `build/vcpkg_installed`）；离线机器
+需预先准备 vcpkg 二进制缓存。
 
 #### 可选依赖
 
 | 库 | 说明 | 安装方式 |
 |----|------|----------|
-| OpenCASCADE | 几何建模引擎 | 源码编译或通过 vcpkg |
-| OpenCV | 计算机视觉（Vision 模块） | vcpkg install opencv:x64-windows |
+| OpenCASCADE | 几何建模引擎 | `-DVCPKG_MANIFEST_FEATURES=opencascade` |
+| OpenCV | 位图/视觉（Raster、Vision） | 已包含在核心依赖 `opencv4` |
 
 ### 配置
 
-1. 编辑 `Config.cmake`，设置 `VCPKG_DIR` 和 `Qt_INSTALL_DIR`：
+不再需要手工编辑 `Config.cmake` 填绝对路径。路径优先从环境变量读取，其次回退
+到平台默认值；也可以直接通过 `-D` 覆盖：
 
-```cmake
-# vcpkg 路径
-set(VCPKG_DIR "C:/Users/xx/vcpkg/" CACHE PATH "VCPKG installation directory")
+```bash
+export VCPKG_ROOT="$HOME/vcpkg"          # 或 -DVCPKG_DIR=...
+export QT_ROOT_DIR="$HOME/Qt/6.12.0/macos" # 或 -DQt_INSTALL_DIR=...
 
 # Qt 主版本（当前工程固定为 6；不支持 Qt 5）
-set(QT_VERSION_MAJOR 6 CACHE STRING "Major version of Qt")
-
-# Qt 安装路径
-set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.12.0/msvc2022_64" CACHE PATH "Qt installation directory")
+# set(QT_VERSION_MAJOR 6 CACHE STRING "Major version of Qt")
 ```
 
-2. 编译选项配置：
+编译选项配置：
 
 | 选项 | 默认值 | 说明 |
 |------|--------|------|

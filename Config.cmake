@@ -14,20 +14,40 @@
 #  [1] Qt6 路径（根据操作系统自动选择）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if(WIN32)
-    # set(Qt_INSTALL_DIR "C:/Qt/6.11.0/msvc2022_64/" CACHE PATH "Qt6 Windows")
-    set(Qt_INSTALL_DIR "C:/Users/xx/Qt/6.12.0/msvc2022_64/" CACHE PATH "Qt6 Windows")
+    if(DEFINED ENV{QT_ROOT_DIR} AND NOT "$ENV{QT_ROOT_DIR}" STREQUAL "")
+        set(Qt_INSTALL_DIR "$ENV{QT_ROOT_DIR}" CACHE PATH "Qt6 Windows")
+    else()
+        set(Qt_INSTALL_DIR "C:/Qt/6.12.0/msvc2022_64/" CACHE PATH "Qt6 Windows")
+    endif()
 elseif(APPLE)
-    set(Qt_INSTALL_DIR "$ENV{HOME}/Qt/6.12.0/macos/" CACHE PATH "Qt6 macOS")
+    if(DEFINED ENV{QT_ROOT_DIR} AND NOT "$ENV{QT_ROOT_DIR}" STREQUAL "")
+        set(Qt_INSTALL_DIR "$ENV{QT_ROOT_DIR}" CACHE PATH "Qt6 macOS")
+    else()
+        set(Qt_INSTALL_DIR "$ENV{HOME}/Qt/6.12.0/macos/" CACHE PATH "Qt6 macOS")
+    endif()
 elseif(UNIX)
-    set(Qt_INSTALL_DIR "$ENV{HOME}/Install/Qt/6.12.0/gcc_64/" CACHE PATH "Qt6 Linux")
+    if(DEFINED ENV{QT_ROOT_DIR} AND NOT "$ENV{QT_ROOT_DIR}" STREQUAL "")
+        set(Qt_INSTALL_DIR "$ENV{QT_ROOT_DIR}" CACHE PATH "Qt6 Linux")
+    else()
+        set(Qt_INSTALL_DIR "$ENV{HOME}/Install/Qt/6.12.0/gcc_64/" CACHE PATH "Qt6 Linux")
+    endif()
 endif()
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  [2] vcpkg 路径（根据操作系统自动选择）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-if(WIN32)
-    # set(VCPKG_DIR "C:/vcpkg/" CACHE PATH "vcpkg Windows")
-    set(VCPKG_DIR "C:/Users/xx/vcpkg/" CACHE PATH "vcpkg Windows")
+# 优先读取标准环境变量 VCPKG_ROOT（vcpkg 自身也使用该变量），其次 VCPKG_DIR，
+# 最后才回退到平台默认路径。CI 与多机开发通过环境变量注入即可，不再依赖
+# 某台机器的绝对路径。
+if(DEFINED ENV{VCPKG_ROOT} AND NOT "$ENV{VCPKG_ROOT}" STREQUAL "")
+    set(VCPKG_DIR "$ENV{VCPKG_ROOT}" CACHE PATH "vcpkg root")
+elseif(DEFINED ENV{VCPKG_DIR} AND NOT "$ENV{VCPKG_DIR}" STREQUAL "")
+    set(VCPKG_DIR "$ENV{VCPKG_DIR}" CACHE PATH "vcpkg root")
+elseif(DEFINED ENV{VCPKG_INSTALLATION_ROOT} AND NOT "$ENV{VCPKG_INSTALLATION_ROOT}" STREQUAL "")
+    # GitHub Actions 的 windows-latest / ubuntu-latest 使用该变量指向预装 vcpkg。
+    set(VCPKG_DIR "$ENV{VCPKG_INSTALLATION_ROOT}" CACHE PATH "vcpkg root")
+elseif(WIN32)
+    set(VCPKG_DIR "C:/vcpkg/" CACHE PATH "vcpkg Windows")
 elseif(APPLE)
     set(VCPKG_DIR "$ENV{HOME}/vcpkg/" CACHE PATH "vcpkg macOS")
 elseif(UNIX)
@@ -110,6 +130,23 @@ set(CMAKE_TOOLCHAIN_FILE "${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake"
 #       --overlay-ports=<repo>/CMake/vcpkg-overlays
 set(VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_LIST_DIR}/CMake/vcpkg-overlays"
     CACHE STRING "vcpkg overlay ports (repo-local)")
+
+# --------------------------------------------------------------------
+# vcpkg 依赖锁定（manifest 模式）
+# --------------------------------------------------------------------
+# 仓库根的 vcpkg.json 使用 builtin-baseline 固定端口版本；manifest 模式会在
+# configure 阶段按锁定版本安装依赖。默认保持经典模式，原因：
+#   1) 已有构建目录的 CMakeCache 里 VCPKG_MANIFEST_MODE=OFF，直接升级不会被迫
+#      重建 build/vcpkg_installed；
+#   2) 离线开发机可继续复用已安装的经典模式端口。
+# 发布 / CI 构建显式启用锁定版本：
+#   cmake -S . -B build -DVCPKG_MANIFEST_MODE=ON
+# 启用 GeoModelCore / Engraving 时追加可选 feature：
+#   -DVCPKG_MANIFEST_FEATURES=opencascade
+if(NOT DEFINED VCPKG_MANIFEST_MODE)
+    set(VCPKG_MANIFEST_MODE OFF CACHE BOOL
+        "Install dependencies from vcpkg.json (locked versions) instead of classic mode")
+endif()
 
 
 # Python 绑定依赖（仅 APR_PYBIND_CORE=ON 时需要，header-only）：

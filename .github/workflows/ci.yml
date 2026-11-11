@@ -173,11 +173,14 @@ jobs:
   #   Python 3.11 —— actions/setup-python
   #   pybind11    —— pip（刻意不用 vcpkg 的 pybind11：它会接管 FindPython，
   #                  把扩展 ABI 换到 vcpkg python3，见 Config.cmake 注释）
-  #   vcpkg       —— 按 VCPKG_BASELINE 固定提交检出并 bootstrap
+  #   vcpkg       —— 从 vcpkg.json 的 builtin-baseline 读取固定提交并 bootstrap，
+  #                  configure 阶段以 manifest 模式安装锁定版本
   #
   # 模块范围与 Windows 主作业一致（GeoModelCore / Vision / Engraving / Hardware
-  # 关闭），避免 OCCT / OpenCV 编译时间叠加到每次提交；启用可选模块时按
-  # vcpkg.json 的 feature 安装对应端口。
+  # 关闭）。Nesting / CAM / Raster 默认开启，因此 manifest 的核心依赖包含
+  # clipper2 与 opencv4；启用 GeoModelCore / Engraving 时追加
+  # -DVCPKG_MANIFEST_FEATURES=opencascade。OCCT 不进入本作业，避免其编译时间
+  # 叠加到每次提交。
   # ---------------------------------------------------------------------------
   full-app-macos-linux:
     name: full app (${{ matrix.os }}, ${{ matrix.build_type }})
@@ -196,7 +199,6 @@ jobs:
             triplet: x64-linux
             qt_arch: linux_gcc_64
     env:
-      VCPKG_BASELINE: 2ec0f1747d8186a5c9babe276e2ad57cd2b12d2a
       QT_VERSION: "6.12.0"
       VCPKG_TRIPLET: ${{ matrix.triplet }}
       # Linux 无显示服务器：GUI 测试统一走 Qt offscreen 平台。
@@ -239,12 +241,19 @@ jobs:
           python3 -m pip install "pybind11>=2.11"
           echo "PYBIND11_DIR=$(python3 -m pybind11 --cmakedir)" >> "$GITHUB_ENV"
 
-      # vcpkg 二进制缓存：按 baseline + triplet 失效，避免 OCCT/OpenCV 每次重编。
-      - name: Cache vcpkg binary packages
+      # vcpkg 版本锁定的唯一来源是 vcpkg.json 的 builtin-baseline；CI 不重复写死。
+      - name: Read vcpkg baseline
+        run: |
+          echo "VCPKG_BASELINE=$(python3 -c 'import json; print(json.load(open("vcpkg.json"))["builtin-baseline"])')" >> "$GITHUB_ENV"
+
+      # vcpkg 二进制缓存 + 已安装树：按 baseline + triplet 失效，避免 OpenCV 每次重编。
+      - name: Cache vcpkg packages
         uses: actions/cache@v4
         with:
-          path: ~/.cache/vcpkg/archives
-          key: vcpkg-bincache-${{ runner.os }}-${{ matrix.triplet }}-${{ env.VCPKG_BASELINE }}
+          path: |
+            ~/.cache/vcpkg/archives
+            ${{ github.workspace }}/.vcpkg/installed
+          key: vcpkg-${{ runner.os }}-${{ matrix.triplet }}-${{ env.VCPKG_BASELINE }}
 
       - name: Setup vcpkg (pinned baseline)
         run: |
@@ -256,13 +265,6 @@ jobs:
           echo "VCPKG_ROOT=$GITHUB_WORKSPACE/vcpkg" >> "$GITHUB_ENV"
           echo "VCPKG_BINARY_SOURCES=clear;files,$HOME/.cache/vcpkg/archives,readwrite" >> "$GITHUB_ENV"
 
-      - name: Install vcpkg dependencies
-        run: |
-          "$VCPKG_ROOT/vcpkg" install \
-            boost boost-geometry bshoshany-thread-pool breakpad clipper2 freetype \
-            gtest libwebp nanosvg openssl protobuf spdlog sqlitecpp stb tiff zlib \
-            --triplet "$VCPKG_TRIPLET" --clean-after-build
-
       - name: Configure
         run: |
           cmake -S . -B build-ci -G Ninja \
@@ -270,9 +272,15 @@ jobs:
             -DQt_INSTALL_DIR="$QT_ROOT_DIR" \
             -DVCPKG_DIR="$VCPKG_ROOT" \
             -DVCPKG_TARGET_TRIPLET="$VCPKG_TRIPLET" \
+            -DVCPKG_MANIFEST_MODE=ON \
+            -DVCPKG_INSTALLED_DIR="$GITHUB_WORKSPACE/.vcpkg/installed" \
             -DPython_EXECUTABLE="$(command -v python3)" \
             -Dpybind11_DIR="$PYBIND11_DIR" \
             -DBUILD_TESTS=ON \
+            -DBUILD_NESTING=ON \
+            -DBUILD_CAM=ON \
+            -DBUILD_RASTER=ON \
+            -DBUILD_CRASHHANDLER=ON \
             -DBUILD_HARDWARE=OFF \
             -DBUILD_VISION=OFF \
             -DBUILD_ENGRAVING=OFF \

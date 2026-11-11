@@ -1,0 +1,33 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "april",
+  "version-string": "1.0.0",
+  "description": "Third-party dependencies for the April CAD desktop application.",
+  "builtin-baseline": "2ec0f1747d8186a5c9babe276e2ad57cd2b12d2a",
+  "dependencies": [
+    "boost",
+    "bshoshany-thread-pool",
+    "breakpad",
+    "clipper2",
+    "freetype",
+    "gtest",
+    "libwebp",
+    "nanosvg",
+    "opencv4",
+    "openssl",
+    "protobuf",
+    "spdlog",
+    "sqlitecpp",
+    "stb",
+    "tiff",
+    "zlib"
+  ],
+  "features": {
+    "opencascade": {
+      "description": "OpenCASCADE-based GeoModelCore and Engraving modules.",
+      "dependencies": [
+        "opencascade"
+      ]
+    }
+  }
+}

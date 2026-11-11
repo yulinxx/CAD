@@ -7,8 +7,9 @@
 # 裸报错、更不是拖到编译阶段才 fatal error（例如只有头文件的端口）。
 #
 # 设计：
-#   1. 清单只在本文件维护一份，新增依赖时在此登记即可；没有 vcpkg.json
-#      manifest，所以清单是唯一来源（与各模块 find_package 的对应关系见条目注释）。
+#   1. 端口清单在本文件维护；仓库根 vcpkg.json 负责锁定版本（manifest 模式），
+#      本文件负责按模块开关做运行时门禁（例如仅 BUILD_GEOMODELCORE=ON 才要
+#      opencascade）。新增依赖时两处都要登记。
 #   2. 探测方式：
 #        package —— find_package(<包名> [CONFIG|MODULE] QUIET)
 #        header  —— find_path(<头文件名>)，只用于"纯头文件端口"（无 CMake config）
@@ -116,7 +117,7 @@ function(apr_check_vcpkg_dependencies)
     # 条件必须是"单个变量名"（if() 不会对展开出来的多词表达式再次解析，
     # 所以像 "A OR B" 这样的表达式必须先折算成下面的门控变量）
     set(_need_clipper2 FALSE)
-    if(BUILD_ENGRAVING OR BUILD_NESTING)
+    if(BUILD_ENGRAVING OR BUILD_NESTING OR BUILD_CAM)
         set(_need_clipper2 TRUE)
     endif()
     set(_need_opencv FALSE)
