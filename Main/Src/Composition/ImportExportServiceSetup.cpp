@@ -160,6 +160,10 @@ namespace
             info.frequency = hp.frequency;  // kHz，与 Eg::ProcessParams 的 Hz 不同
             info.focusOffset = hp.focusOffset;
             info.passes = hp.passes;
+            info.kerfMm = hp.kerfMm;
+            info.leadInLengthMm = hp.leadInLengthMm;
+            info.leadInMode = hp.leadInMode;
+            info.leadInAngleDeg = hp.leadInAngleDeg;
             snapshot.profiles.push_back(info);
         }
         return snapshot;

@@ -29,10 +29,9 @@ namespace {
 /// @brief 把旧版 HardwareProfile 转成新版 Eg::ProcessParams，
 ///        单位换算：HardwareProfile.frequency 是 kHz → ProcessParams.frequencyHz 是 Hz
 ///
-/// 旧模型只有 5 个字段，Eg::ProcessParams 有 14 个。这里把另外 9 个**逐项显式**
-/// 写成保守默认值，而不是依赖「默认构造碰巧如此」：以后有人调整 ProcessParams
-/// 的默认值时，不会在毫无提示的情况下改变旧档案的加工行为。
-/// 要用满 14 个字段必须走 .apr v2 的 ProcessData，不是往 HardwareProfile 里塞字段。
+/// HardwareProfile 仍是当前运行时唯一可达的工艺参数入口（.apr v2 的 ProcessData
+/// 尚未回灌到 LayerManager）。因此割缝与引入线也在这里显式搬进 ProcessParams，
+/// 默认值保持 0/关闭 —— 不改变任何既有档案的刀路。
 Eg::ProcessParams hwProfileToProcessParams(const HardwareProfile& hp)
 {
     Eg::ProcessParams p;
@@ -44,7 +43,16 @@ Eg::ProcessParams hwProfileToProcessParams(const HardwareProfile& hp)
     p.passes = hp.passes;
     p.focusOffsetMm = hp.focusOffset;
 
-    // ---- 旧模型没有对应项的 9 项：显式固定为保守默认值 ----
+    // ---- 割缝/引入线：来自 profile 尾部追加字段，默认 0 = 不启用 ----
+    p.kerfMm = hp.kerfMm;
+    p.leadInEnabled = hp.leadInLengthMm > 0.0;
+    p.leadInLengthMm = hp.leadInLengthMm > 0.0 ? hp.leadInLengthMm : 0.0;
+    p.leadInMode = hp.leadInMode;
+    p.leadInAngleDeg = (hp.leadInAngleDeg >= 0.0 && hp.leadInAngleDeg <= 180.0)
+                           ? hp.leadInAngleDeg
+                           : 0.0;
+
+    // ---- 旧模型没有对应项的其余字段：显式固定为保守默认值 ----
     p.pulseWidthUs = 0.0;
     p.waveformIndex = 0;
     p.rapidSpeedMmPerSec = 0.0;   // 0 = 使用工程默认空移速度
@@ -52,7 +60,6 @@ Eg::ProcessParams hwProfileToProcessParams(const HardwareProfile& hp)
     p.fillIntervalMm = 0.1;
     p.fillAngleDeg = 0.0;
     p.fillMode = Eg::FillMode::Zigzag;
-    p.kerfMm = 0.0;
     p.enabled = true;
 
     // HardwareProfileManager::setSpeed 会把 <= 0 静默钳到 0.01，但直接构造或

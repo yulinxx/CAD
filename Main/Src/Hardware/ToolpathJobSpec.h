@@ -136,4 +136,11 @@ struct ToolpathCompileResult
     /// 无法加工图元的可读清单（最多若干条，用于界面展示）。
     /// 形如 "3 x IMAGE (raster engraving engine not implemented yet)"。
     QStringList unmachinableDetails;
+
+    // ---- 尾部追加（M1）：割缝补偿与引入线统计 ----
+    int32_t kerfCompensatedContourCount = 0;  ///< 补偿后输出的轮廓数（含分裂）
+    int32_t kerfDroppedContourCount = 0;      ///< 补偿后因面积过小被丢弃的环数
+    int32_t kerfSplitContourCount = 0;        ///< 补偿后拓扑分裂产生的额外环数
+    int32_t leadInAppliedContourCount = 0;    ///< 成功生成引入线的轮廓数
+    int32_t leadInSkippedContourCount = 0;    ///< 启用引入但落点校验失败/开口轮廓而跳过的数量
 };

@@ -210,6 +210,10 @@ namespace
             hp.frequency = p.frequency;  // kHz；Eg::ProcessParams 用 Hz，别混
             hp.focusOffset = p.focusOffset;
             hp.passes = p.passes;
+            hp.kerfMm = p.kerfMm;
+            hp.leadInLengthMm = p.leadInLengthMm;
+            hp.leadInMode = p.leadInMode;
+            hp.leadInAngleDeg = p.leadInAngleDeg;
             batch.push_back(std::move(hp));
         }
 

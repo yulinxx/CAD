@@ -13,13 +13,16 @@
 
     #include <algorithm>
     #include <cmath>
+    #include <unordered_map>
     #include <unordered_set>
     #include <vector>
 
     #include <QCoreApplication>
 
     #include "Engine/AprEntity/AprEntity.h"
+    #include "Engine2D/Cam/ContourContainment.h"
     #include "Engine2D/Cam/GeometryExtractor.h"
+    #include "Engine2D/Cam/KerfCompensator.h"
     #include "Engine2D/Cam/ToolpathGeometry.h"
     #include "Engine2D/Edit/LayerSnapshot.h"
     #include "Engine2D/Geo/GeometryContext.h"
@@ -95,6 +98,283 @@ namespace
         const Eg::MachineFrame& m_frame;
     };
 
+    // ============================================================
+    //  割缝补偿 / 引入线（M1）
+    // ============================================================
+
+    /// 轮廓折线化：闭合判定与引入落点检查用。圆弧按弦高容差离散。
+    std::vector<Ut::Vec2d> contourPolygon(const Eg::Cam::Contour& contour, double chordToleranceMm)
+    {
+        std::vector<Ut::Vec2d> pts;
+        if (contour.segments.empty())
+        {
+            return pts;
+        }
+        pts.push_back(contour.segments.front().ptStart);
+        for (const Eg::Cam::PathSegment& seg : contour.segments)
+        {
+            if (seg.type == Eg::Cam::PathSegment::Type::Line)
+            {
+                pts.push_back(seg.ptEnd);
+            }
+            else
+            {
+                const std::vector<Ut::Vec2d> arcPts =
+                    Eg::Cam::flattenArcSegment(seg, chordToleranceMm);
+                if (arcPts.size() > 1)
+                {
+                    pts.insert(pts.end(), arcPts.begin() + 1, arcPts.end());
+                }
+            }
+        }
+        // 闭合轮廓首尾重合：去掉末尾重复点，避免折线退化
+        if (pts.size() > 1)
+        {
+            const double dx = pts.front().x() - pts.back().x();
+            const double dy = pts.front().y() - pts.back().y();
+            if (std::hypot(dx, dy) < 1e-7)
+            {
+                pts.pop_back();
+            }
+        }
+        return pts;
+    }
+
+    double polygonSignedArea(const std::vector<Ut::Vec2d>& pts)
+    {
+        double area = 0.0;
+        const size_t n = pts.size();
+        for (size_t i = 0; i < n; ++i)
+        {
+            const Ut::Vec2d& p = pts[i];
+            const Ut::Vec2d& q = pts[(i + 1) % n];
+            area += p.x() * q.y() - q.x() * p.y();
+        }
+        return area * 0.5;
+    }
+
+    /// 点到线段的距离
+    double distanceToSegment(const Ut::Vec2d& p, const Ut::Vec2d& a, const Ut::Vec2d& b)
+    {
+        const double dx = b.x() - a.x();
+        const double dy = b.y() - a.y();
+        const double len2 = dx * dx + dy * dy;
+        if (len2 <= 1e-18)
+        {
+            return std::hypot(p.x() - a.x(), p.y() - a.y());
+        }
+        double t = ((p.x() - a.x()) * dx + (p.y() - a.y()) * dy) / len2;
+        t = std::max(0.0, std::min(1.0, t));
+        return std::hypot(p.x() - (a.x() + dx * t), p.y() - (a.y() + dy * t));
+    }
+
+    /// 点是否落在多边形内部（射线法；边界返回 true）
+    bool pointInPolygon(const Ut::Vec2d& p, const std::vector<Ut::Vec2d>& pts)
+    {
+        bool inside = false;
+        const size_t n = pts.size();
+        for (size_t i = 0, j = n - 1; i < n; j = i++)
+        {
+            const Ut::Vec2d& a = pts[i];
+            const Ut::Vec2d& b = pts[j];
+            if (((a.y() > p.y()) != (b.y() > p.y())) &&
+                (p.x() < (b.x() - a.x()) * (p.y() - a.y()) / (b.y() - a.y()) + a.x()))
+            {
+                inside = !inside;
+            }
+        }
+        return inside;
+    }
+
+    /// 引入落点是否安全落在废料侧（严格：边界视为不安全）
+    bool isScrapSide(const Ut::Vec2d& p, const std::vector<Ut::Vec2d>& polygon, bool hole)
+    {
+        const size_t n = polygon.size();
+        for (size_t i = 0; i < n; ++i)
+        {
+            if (distanceToSegment(p, polygon[i], polygon[(i + 1) % n]) <= 1e-6)
+            {
+                return false;
+            }
+        }
+        const bool inside = pointInPolygon(p, polygon);
+        // 外轮廓的废料在多边形外；孔的废料是多边形内部（孔洞空腔）
+        return hole ? inside : !inside;
+    }
+
+    /**
+     * @brief 计算引入线起点（用户空间）。
+     *
+     * 约束：落点必须在废料侧，且不能落在成品边缘上。
+     * 做法：先按配置方向取候选点，失败再取关于切线镜像的方向兜底。
+     * 开口轮廓没有内外侧语义，一律跳过（由调用方计数）。
+     */
+    bool makeLeadInPoint(const Eg::Cam::Contour& contour,
+        const LayerProcessParams& params,
+        double chordToleranceMm,
+        Ut::Vec2d& outStart)
+    {
+        if (!params.leadInEnabled || !(params.leadInLengthMm > 0.0) ||
+            !contour.closed || contour.segments.empty())
+        {
+            return false;
+        }
+
+        const Eg::Cam::PathSegment& first = contour.segments.front();
+        double tx = 0.0;
+        double ty = 0.0;
+        if (first.type == Eg::Cam::PathSegment::Type::Line)
+        {
+            tx = first.ptEnd.x() - first.ptStart.x();
+            ty = first.ptEnd.y() - first.ptStart.y();
+        }
+        else
+        {
+            const double rx = first.ptStart.x() - first.ptCenter.x();
+            const double ry = first.ptStart.y() - first.ptCenter.y();
+            tx = first.counterClockwise ? -ry : ry;
+            ty = first.counterClockwise ? rx : -rx;
+        }
+        const double tlen = std::hypot(tx, ty);
+        if (tlen <= 1e-12)
+        {
+            return false;
+        }
+        tx /= tlen;
+        ty /= tlen;
+
+        const std::vector<Ut::Vec2d> polygon = contourPolygon(contour, chordToleranceMm);
+        if (polygon.size() < 3)
+        {
+            return false;
+        }
+        const double area = polygonSignedArea(polygon);
+        if (std::fabs(area) < 1e-9)
+        {
+            return false;
+        }
+
+        // 废料侧：外轮廓取多边形外侧；孔取多边形内侧。绕向由面积符号决定。
+        const bool scrapIsLeft = contour.hole ? (area > 0.0) : (area < 0.0);
+        const double sign = scrapIsLeft ? 1.0 : -1.0;
+        const double nx = -ty * sign;  // 切线左法向 × 方向符号
+        const double ny = tx * sign;
+
+        double dx = -tx;
+        double dy = -ty;
+        if (params.leadInMode == 1)
+        {
+            dx = nx;
+            dy = ny;
+        }
+        else if (params.leadInMode == 2)
+        {
+            const double rad = params.leadInAngleDeg * (3.14159265358979323846 / 180.0);
+            dx = -tx * std::cos(rad) + nx * std::sin(rad);
+            dy = -ty * std::cos(rad) + ny * std::sin(rad);
+        }
+        const double dlen = std::hypot(dx, dy);
+        if (dlen <= 1e-12)
+        {
+            return false;
+        }
+        dx /= dlen;
+        dy /= dlen;
+
+        const Ut::Vec2d anchor = first.ptStart;
+        for (int attempt = 0; attempt < 2; ++attempt)
+        {
+            const double s = (attempt == 0) ? 1.0 : -1.0;
+            const Ut::Vec2d candidate(anchor.x() + dx * params.leadInLengthMm * s,
+                anchor.y() + dy * params.leadInLengthMm * s);
+            if (isScrapSide(candidate, polygon, contour.hole))
+            {
+                outStart = candidate;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// 一个图层的割缝预处理结果：按图元 ID 回填补偿后的轮廓。
+    struct LayerKerfResult
+    {
+        bool applied = false;
+        std::unordered_map<uint64_t, std::vector<Eg::Cam::Contour>> byEntity;
+    };
+
+    /**
+     * @brief 每图层执行一次割缝补偿。
+     *
+     * 必须先做整层包含关系解析（fillHoleFlags），否则无法区分外环与孔，
+     * 补偿方向会整体反过来。参数来自 LayerProcessParams，默认 0 时直接跳过，
+     * 保证关闭状态下刀路逐字节不变。
+     */
+    LayerKerfResult prepareKerf(const LayerBucket& bucket,
+        const Eg::Cam::ExtractOptions& options,
+        double chordToleranceMm,
+        ToolpathCompileResult& result)
+    {
+        LayerKerfResult prep;
+        const double halfWidth = std::fabs(bucket.params.kerfMm);
+        if (!(halfWidth > 0.0))
+        {
+            return prep;
+        }
+        prep.applied = true;
+
+        std::vector<Eg::Cam::Contour> allContours;
+        std::vector<uint64_t> contourEntityIds;
+        for (const Eg::AprEntity* entity : bucket.entities)
+        {
+            if (!entity)
+            {
+                continue;
+            }
+            const Eg::Cam::ExtractResult extracted =
+                Eg::Cam::GeometryExtractor::extract(entity, options);
+            if (extracted.kind != Eg::Cam::GeometryKind::Contour)
+            {
+                continue;
+            }
+            contourEntityIds.push_back(static_cast<uint64_t>(entity->id));
+            for (const Eg::Cam::Contour& contour : extracted.contours)
+            {
+                allContours.push_back(contour);
+            }
+        }
+        if (allContours.empty())
+        {
+            return prep;
+        }
+
+        Eg::Cam::ContourContainment::fillHoleFlags(allContours);
+
+        Eg::Cam::KerfOptions kerfOptions;
+        kerfOptions.kerfWidth = halfWidth * 2.0;
+        kerfOptions.side = bucket.params.kerfMm >= 0.0 ? Eg::Cam::KerfSide::Outside
+                                                       : Eg::Cam::KerfSide::Inside;
+        kerfOptions.arcTolerance = std::max(1e-3, std::min(0.05, chordToleranceMm));
+
+        const Eg::Cam::KerfResult kerfResult =
+            Eg::Cam::KerfCompensator::apply(allContours, kerfOptions);
+
+        for (const Eg::Cam::Contour& contour : kerfResult.contours)
+        {
+            prep.byEntity[contour.sourceEntityId].push_back(contour);
+        }
+        // 补偿后整条轮廓消失的图元也要有条目，发射阶段据此跳过
+        for (uint64_t id : contourEntityIds)
+        {
+            prep.byEntity.emplace(id, std::vector<Eg::Cam::Contour>{});
+        }
+
+        result.kerfCompensatedContourCount += static_cast<int32_t>(kerfResult.contours.size());
+        result.kerfDroppedContourCount += kerfResult.droppedLoopCount;
+        result.kerfSplitContourCount += kerfResult.splitLoopCount;
+        return prep;
+    }
+
     /**
      * @brief 把一条折线编译进计划。
      * @return 是否产出了至少一段有效运动
@@ -131,6 +411,7 @@ namespace
     bool emitContour(const Eg::Cam::Contour& contour,
         bool preferArcs,
         double chordToleranceMm,
+        const Ut::Vec2d* leadInStart,
         const FrameTransform& frame,
         Hw::MotionPlanBuilder& out,
         bool& degraded)
@@ -143,7 +424,17 @@ namespace
 
         // 轮廓起点：第一个段的 ptStart
         const Ut::Vec2d start = frame.point(contour.segments.front().ptStart);
-        out.emitRapidTo(start.x(), start.y());
+        if (leadInStart)
+        {
+            // 空移到引入起点，再沿引入线出光切到轮廓起点
+            const Ut::Vec2d lead = frame.point(*leadInStart);
+            out.emitRapidTo(lead.x(), lead.y());
+            out.emitLineTo(start.x(), start.y(), true);
+        }
+        else
+        {
+            out.emitRapidTo(start.x(), start.y());
+        }
 
         for (const Eg::Cam::PathSegment& seg : contour.segments)
         {
@@ -193,6 +484,9 @@ namespace
      */
     bool emitEntity(const Eg::AprEntity* entity,
         const Eg::Cam::ExtractOptions& options,
+        const std::vector<Eg::Cam::Contour>* preparedContours,
+        const LayerProcessParams& params,
+        bool countLeadStats,
         bool preferArcs,
         double chordToleranceMm,
         const FrameTransform& frame,
@@ -204,6 +498,44 @@ namespace
         if (!entity)
         {
             return false;
+        }
+
+        // 有割缝预处理结果时直接使用，不再重复提取（几何已变换完毕）
+        if (preparedContours != nullptr)
+        {
+            bool anyEmitted = false;
+            for (const Eg::Cam::Contour& contour : *preparedContours)
+            {
+                bool contourDegraded = false;
+                Ut::Vec2d leadStart;
+                const bool hasLead = makeLeadInPoint(contour, params, chordToleranceMm, leadStart);
+                if (countLeadStats)
+                {
+                    if (hasLead)
+                    {
+                        ++result.leadInAppliedContourCount;
+                    }
+                    else if (params.leadInEnabled)
+                    {
+                        ++result.leadInSkippedContourCount;
+                    }
+                }
+                if (emitContour(contour,
+                        preferArcs,
+                        chordToleranceMm,
+                        hasLead ? &leadStart : nullptr,
+                        frame,
+                        out,
+                        contourDegraded))
+                {
+                    anyEmitted = true;
+                    if (contourDegraded)
+                    {
+                        degraded = true;
+                    }
+                }
+            }
+            return anyEmitted;
         }
 
         const Eg::Cam::ExtractResult extracted = Eg::Cam::GeometryExtractor::extract(entity, options);
@@ -249,7 +581,26 @@ namespace
         for (const Eg::Cam::Contour& contour : extracted.contours)
         {
             bool contourDegraded = false;
-            if (emitContour(contour, preferArcs, chordToleranceMm, frame, out, contourDegraded))
+            Ut::Vec2d leadStart;
+            const bool hasLead = makeLeadInPoint(contour, params, chordToleranceMm, leadStart);
+            if (countLeadStats)
+            {
+                if (hasLead)
+                {
+                    ++result.leadInAppliedContourCount;
+                }
+                else if (params.leadInEnabled)
+                {
+                    ++result.leadInSkippedContourCount;
+                }
+            }
+            if (emitContour(contour,
+                    preferArcs,
+                    chordToleranceMm,
+                    hasLead ? &leadStart : nullptr,
+                    frame,
+                    out,
+                    contourDegraded))
             {
                 anyEmitted = true;
                 if (contourDegraded)
@@ -441,6 +792,10 @@ namespace MotionPlanCompiler
                 continue;
             }
 
+            // 割缝补偿：每层做一次（先解析整层包含关系，再统一偏置）
+            const LayerKerfResult kerfPrep =
+                prepareKerf(bucket, extractOptions, spec.chordToleranceMm, result);
+
             const size_t commandsBeforeLayer = out.commandCount();
 
             out.emitBeginLayer(bucket.layerId);
@@ -461,9 +816,23 @@ namespace MotionPlanCompiler
 
                 for (const Eg::AprEntity* entity : bucket.entities)
                 {
+                    const std::vector<Eg::Cam::Contour>* preparedContours = nullptr;
+                    if (kerfPrep.applied && entity)
+                    {
+                        const auto it = kerfPrep.byEntity.find(
+                            static_cast<uint64_t>(entity->id));
+                        if (it != kerfPrep.byEntity.end())
+                        {
+                            preparedContours = &it->second;
+                        }
+                    }
+
                     bool degraded = false;
                     if (emitEntity(entity,
                             extractOptions,
+                            preparedContours,
+                            bucket.params,
+                            pass == 0,
                             spec.emitArcs,
                             spec.chordToleranceMm,
                             transform,

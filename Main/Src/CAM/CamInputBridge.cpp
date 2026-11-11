@@ -530,6 +530,13 @@ namespace CamBridge
                     bucket.layerId, bucket.kerf.widthMm, bucket.kerf.side);
             }
 
+            // 引入线：与 MotionPlanCompiler 共用同一份 Eg::ProcessParams，
+            // 默认 leadInEnabled=false / 长度 0 时不改变任何既有刀路。
+            bucket.leadInOut.enabled = egParams.leadInEnabled && egParams.leadInLengthMm > 0.0;
+            bucket.leadInOut.leadInLengthMm = egParams.leadInLengthMm;
+            bucket.leadInOut.leadInMode = egParams.leadInMode;
+            bucket.leadInOut.leadInAngleDeg = egParams.leadInAngleDeg;
+
             // 3) 定型为 CAM 轮廓
             for (auto& snapshot : bucket.entities)
             {
