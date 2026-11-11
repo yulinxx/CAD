@@ -13,7 +13,9 @@
 #     - 新出现的 Engine 头依赖（新 API 面）会在 configure 阶段硬失败，
 #       逼迫新代码优先走 UiEngineAccess/Include 下的转发头；
 #     - 确需扩张时，必须在本文件同步加入白名单 —— 让依赖面扩张成为一次
-#       显式、可 review 的决策，而不是悄悄长出来。
+#       显式、可 review 的决策，而不是悄悄长出来；
+#     - 白名单条目不再被任何生产代码引用时同样 configure 失败 ——
+#       保证这张表只减不增，失效豁免不会永久沉淀。
 #
 # 为什么按「去重后的头文件」而不是「include 次数」
 #   - 依赖面由「依赖了哪些头」定义，不是由「在多少个文件里 include」定义。
@@ -31,6 +33,84 @@
 #   - 规则 3（CheckDependencies.cmake）：禁止 UI 直接**链接** Engine，查 CMake 依赖图；
 #   - 本校验：只查**源码 include 的头文件集合**，不改变任何调用方，只阻止依赖面扩张。
 # ============================================================================
+
+# 去掉注释与字面量 #if 0 分支，只保留真正参与编译的代码。
+# 反向检查不能把注释掉的 include 当成"仍在使用"，否则失效豁免永远删不掉。
+# 条件编译采取保守策略：除字面量 #if 0 外，#if/#ifdef/#ifndef 一律视为参与编译，
+# #else/#elif 会重新放行 —— 宁可漏删，也不把仍在用的条目误报成未使用。
+function(_apr_strip_dead_code _content _out_var)
+    string(REPLACE "\n" ";" _lines "${_content}")
+
+    set(_in_block_comment FALSE)
+    set(_states "")
+    set(_live_lines "")
+    foreach(_line IN LISTS _lines)
+        # 逐行剔除块注释，保留两个注释块之间的真实代码
+        set(_keep "")
+        set(_rest "${_line}")
+        while(TRUE)
+            if(_in_block_comment)
+                string(FIND "${_rest}" "*/" _comment_end)
+                if(_comment_end EQUAL -1)
+                    set(_rest "")
+                    break()
+                endif()
+                math(EXPR _comment_end "${_comment_end} + 2")
+                string(SUBSTRING "${_rest}" ${_comment_end} -1 _rest)
+                set(_in_block_comment FALSE)
+            else()
+                string(FIND "${_rest}" "/*" _comment_start)
+                if(_comment_start EQUAL -1)
+                    string(APPEND _keep "${_rest}")
+                    break()
+                endif()
+                string(SUBSTRING "${_rest}" 0 ${_comment_start} _before)
+                string(APPEND _keep "${_before}")
+                math(EXPR _comment_start "${_comment_start} + 2")
+                string(SUBSTRING "${_rest}" ${_comment_start} -1 _rest)
+                set(_in_block_comment TRUE)
+            endif()
+        endwhile()
+        string(REGEX REPLACE "//.*$" "" _line "${_keep}")
+        string(REGEX REPLACE "\r$" "" _line "${_line}")
+
+        if(_line MATCHES "^[ \t]*#[ \t]*if")
+            if(_line MATCHES "^[ \t]*#[ \t]*if[ \t]+0[ \t]*$")
+                list(APPEND _states 1)
+            else()
+                list(APPEND _states 0)
+            endif()
+        elseif(_line MATCHES "^[ \t]*#[ \t]*(else|elif)")
+            list(LENGTH _states _state_count)
+            if(_state_count GREATER 0)
+                list(GET _states -1 _state)
+                if(_state EQUAL 1)
+                    # #if 0 的 #else/#elif 分支仍然参与编译
+                    list(REMOVE_AT _states -1)
+                    list(APPEND _states 0)
+                endif()
+            endif()
+        elseif(_line MATCHES "^[ \t]*#[ \t]*endif")
+            list(LENGTH _states _state_count)
+            if(_state_count GREATER 0)
+                list(REMOVE_AT _states -1)
+            endif()
+        else()
+            set(_dead FALSE)
+            foreach(_state IN LISTS _states)
+                if(_state EQUAL 1)
+                    set(_dead TRUE)
+                endif()
+            endforeach()
+            if(NOT _dead)
+                list(APPEND _live_lines "${_line}")
+            endif()
+        endif()
+    endforeach()
+
+    string(REPLACE ";" "\n" _live "${_live_lines}")
+    set(${_out_var} "${_live}" PARENT_SCOPE)
+endfunction()
 
 function(apr_check_ui_engine_include_ratchet)
     set(_root "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/..")
@@ -146,16 +226,18 @@ function(apr_check_ui_engine_include_ratchet)
         set(_found "")
         foreach(_f IN LISTS _files)
             file(READ "${_f}" _content)
+            # 注释与 #if 0 里的 include 不算真实依赖；尖括号与引号两种写法都识别
+            _apr_strip_dead_code("${_content}" _live_content)
             string(REGEX MATCHALL
-                "#include[ \t]*\"(Engine2D|Engine3D|EngineCommon|Engine)/[^\"]+\""
-                _hits "${_content}")
+                "#include[ \t]*[\"<](Engine2D|Engine3D|EngineCommon|Engine)/[^\">]+[\">]"
+                _hits "${_live_content}")
             if(NOT _hits)
                 continue()
             endif()
             file(RELATIVE_PATH _rel "${_root}" "${_f}")
             foreach(_hit IN LISTS _hits)
-                string(REGEX REPLACE "^#include[ \t]*\"" "" _hdr "${_hit}")
-                string(REGEX REPLACE "\"$" "" _hdr "${_hdr}")
+                string(REGEX REPLACE "^#include[ \t]*[\"<]" "" _hdr "${_hit}")
+                string(REGEX REPLACE "[\">]$" "" _hdr "${_hdr}")
                 list(APPEND _found "${_hdr}|${_rel}")
             endforeach()
         endforeach()
@@ -169,7 +251,21 @@ function(apr_check_ui_engine_include_ratchet)
         endforeach()
         list(REMOVE_DUPLICATES _headers)
         list(LENGTH _headers _header_count)
-        list(APPEND _summary "${_module}=${_header_count} 个头")
+        list(APPEND _summary "${_module}=${_header_count} headers")
+
+        # 反向检查：白名单条目必须仍被本模块真实代码引用。
+        # 命中 0 次 = 依赖面已经收缩，对应豁免必须同步删除（只减不增）。
+        set(_unused "")
+        foreach(_hdr IN LISTS _allowed)
+            if(NOT _hdr IN_LIST _headers)
+                list(APPEND _unused "${_hdr}")
+            endif()
+        endforeach()
+        if(_unused)
+            string(REPLACE ";" ", " _unused_text "${_unused}")
+            list(APPEND _violations
+                "[${_module}] whitelist entries no longer used (delete them): ${_unused_text}")
+        endif()
 
         # 逐条检查：不在白名单 = 依赖面扩张
         foreach(_hdr IN LISTS _headers)
@@ -186,7 +282,7 @@ function(apr_check_ui_engine_include_ratchet)
                 list(REMOVE_DUPLICATES _where)
                 string(REPLACE ";" ", " _where_text "${_where}")
                 list(APPEND _violations
-                    "[${_module}] 新增 Engine 头依赖 \"${_hdr}\"（出现在 ${_where_text}）")
+                    "[${_module}] new Engine header dependency \"${_hdr}\" (used by ${_where_text})")
             endif()
         endforeach()
     endforeach()
@@ -196,14 +292,15 @@ function(apr_check_ui_engine_include_ratchet)
     if(_violations)
         string(REPLACE ";" "\n    - " _msg "${_violations}")
         message(FATAL_ERROR
-            "[apr_check_ui_engine_include_ratchet] UI→Engine include 依赖面被扩张：\n    - ${_msg}\n"
-            "  处理方式（二选一）：\n"
-            "    1) 改用 UiEngineAccess/Include/UiEngineAccess/ 下的转发头"
-            "（新增转发头 = 一次显式的依赖面扩张决策）；\n"
-            "    2) 确需依赖该 Engine 头时，把路径加入 CMake/UiEngineAccessRatchet.cmake"
-            " 对应模块的白名单，并在提交信息里说明理由。\n"
-            "  当前统计：${_summary_text}")
+            "[apr_check_ui_engine_include_ratchet] UI-to-Engine include surface violation:\n    - ${_msg}\n"
+            "  Fix with one of:\n"
+            "    1) Use a forwarding header under UiEngineAccess/Include/UiEngineAccess/"
+            " (adding a forwarding header is an explicit surface-expansion decision);\n"
+            "    2) If the Engine header is genuinely required, add its path to the module"
+            " whitelist in CMake/UiEngineAccessRatchet.cmake and explain why in the commit message;\n"
+            "    3) Delete whitelist entries reported as no longer used.\n"
+            "  Current stats: ${_summary_text}")
     endif()
 
-    message(STATUS "[April] UI→Engine include 棘轮: OK (${_summary_text}；依赖面白名单制，只减不增)")
+    message(STATUS "[April] UI-to-Engine include ratchet: OK (${_summary_text}; whitelist-based surface, shrink-only)")
 endfunction()
