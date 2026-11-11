@@ -125,7 +125,7 @@ target_link_libraries(YourTarget PRIVATE License)
 
 ## API 概要
 
-### 公共函数（18 个）
+### 公共函数（19 个）
 
 | 函数 | 说明 |
 |---|---|

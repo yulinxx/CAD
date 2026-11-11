@@ -21,24 +21,28 @@ April/
 │   │   │   ├── Render/       # 场景刷新协调、图元→顶点离散化
 │   │   │   ├── Services/     # UiServices 服务聚合
 │   │   │   └── Test/         # 测试目录（单元/集成/端到端测试）
-│   │   ├── Common/           # AppPathManager、AppInitializer
-│   │   ├── License/          # 许可证模块（离线注册码）
+│   │   ├── Common/           # AppInitializer（AppPathManager 已移至 Utility）
+│   │   ├── License/          # 激活对话框（LicenseDialog，核心实现见 Licensing/License）
 │   │   └── Composition/      # 依赖注入、命令注册
 │   └── CMakeLists.txt        # 主应用构建配置
 ├── Engine/                   # 图形引擎
 │   ├── Common/               # 通用几何算法、数学工具
+│   ├── Persistence/          # 引擎持久化基类
 │   ├── 2D/                   # 2D 图元定义、布尔运算、CAM 路径生成
 │   └── 3D/                   # 3D 场景管理、网格操作
 ├── Renderx/                  # 渲染 DLL（RenderX.dll，纯 C API + POD 契约）
 │   ├── include/render/       # 对外唯一公共头 renderx.h
-│   ├── src/rhi/              # RHI 抽象：目前实现 gl/ 与 null/ 两个后端
+│   ├── src/rhi/              # RHI 抽象：gl/、metal/（Apple 平台）、null/
 │   ├── src/rt/               # Runtime / Session / 增量渲染 / 字形图集
 │   └── src/shader/           # 内嵌着色器（构建期打包进 DLL）
 ├── UI/                       # UI 组件库
 │   ├── Common/               # 通用 UI 组件、状态管理、命令内核
-│   ├── 2D/                   # 2D 工作台 UI、工具面板、属性面板
+│   ├── 2D/                   # 2D 画布、绘制工具、工具栏（工作台窗口在 Main）
 │   └── 3D/                   # 3D 工作台 UI、场景树、设置对话框
-├── FileIO/                   # 文件导入导出（DXF、PLT、SVG、STL 等）
+├── RenderAbstraction/        # 渲染抽象接口
+├── RenderBridge/             # 渲染桥接（覆盖层、提交器）
+├── UiEngineAccess/           # UI → 引擎链接层门面
+├── FileIO/                   # 文件导入导出（DXF、SVG、PDF、AI、IGES、STEP、OBJ、STL 等）
 ├── Nesting/                  # 排样 / 嵌套算法
 ├── Hardware/                 # 激光硬件控制、材质数据库
 ├── Engraving/                # 雕刻工艺（浮雕生成、刀具路径）
@@ -50,10 +54,17 @@ April/
 ├── Utility/                  # 通用工具库（字符串、文件、加密）
 ├── PyBindCore/               # Python 绑定
 ├── PythonHost/               # Python 宿主（脚本扩展）
+├── Python/                   # Python 运行时脚本与模块
+├── CAM/                      # CAM 路径生成与工艺
+├── Raster/                   # 光栅化与位图导出
+├── Licensing/                # 许可证与离线注册码
+├── Clients/                  # 客户端配置模板
 ├── Tools/
 │   ├── KeygenTool/           # 离线注册码生成工具
 │   └── encrypt_string.py     # 字符串加密工具
 ├── ThirdParty/               # 第三方库
+├── Testing/                  # 跨模块测试
+├── CMake/                    # 公共 CMake 函数与工具链
 ├── Docs/                     # 架构与专题文档
 ├── CMakeLists.txt            # 根构建配置
 ├── Config.cmake                # 用户配置（vcpkg/Qt 路径、编译开关）
@@ -102,16 +113,19 @@ April/
 | 模块 | 职责 | 技术栈 | 依赖 |
 |------|------|--------|------|
 | **UICommon** | 通用 UI 组件、状态中心、命令系统 | Qt Widgets | UiEngineAccess（链接层门面） |
-| **UI2D** | 2D 工作台：主窗口、工具栏、属性面板、视口 | Qt Widgets | UICommon, UiEngineAccess |
+| **UI2D** | 2D UI 组件：工具栏、绘制工具、属性面板、视口画布（工作台窗口在 Main） | Qt Widgets | UICommon, UiEngineAccess |
 | **UI3D** | 3D 工作台：场景树、设置对话框、3D 视口 | Qt Widgets | UICommon, UiEngineAccess, GeoModelCore |
 
 ### 功能模块
 
 | 模块 | 职责 | 技术栈 | 依赖 |
 |------|------|--------|------|
-| **FileIO** | 文件导入导出（DXF、PLT、SVG、STL、NC） | C++17 | Engine2D, Engine3D |
+| **FileIO** | 文件导入导出（DXF、PLT、SVG、PDF、AI、IGES、STEP、OBJ、STL、apr/apr3d） | C++17 | Engine2D, Engine3D |
 | **Nesting** | 排样算法（矩形/不规则嵌套） | C++17 | Engine2D |
-| **Nesting v2 核心能力** | QUALITY 策略(GA+退火) / 24向旋转(15°) / 镜像翻转 / 共边切割 / 孔内套排 / GROUP嵌套展开 / 10种2D图元类型 / 局部坐标变换 / 进度回调与取消 | - | - |
+| **Nesting v2 核心能力** | QUALITY 策略(GA+退火) / 24向旋转(15°) / 镜像翻转 / 共边排布(切割侧未实现) / 孔内套排(实现完整,UI 未设许可位) / GROUP嵌套展开 / 10种2D图元类型(BEZIER/BEZIER2 分列) / 局部坐标变换 / 进度回调与取消 | - | - |
+| **CAM** | CAM 路径生成与工艺 | C++17 | Utility, Log |
+| **Raster** | 光栅化与位图导出 | OpenCV | OpenCV |
+| **Licensing** | 许可证校验与离线注册码 | OpenSSL | OpenSSL |
 | **Hardware** | 激光硬件控制、材质数据库、工艺参数 | Qt6 Core | Log, Utility（均 PRIVATE） |
 | **Engraving** | 浮雕生成、刀具路径计算、雕刻预览 | OpenCASCADE | Engine3D, GeoModelCore |
 | **GeoModelCore** | OpenCASCADE 几何建模集成 | OpenCASCADE | Engine3D |
@@ -485,7 +499,7 @@ void OnSave() {
 
 ### 符号导出
 
-- 仅通过 `RENDER_CORE_API` 等宏导出必要符号
+- 仅通过 `RENDER_API` 等模块导出宏导出必要符号
 - 默认隐藏所有符号（`CMAKE_CXX_VISIBILITY_PRESET hidden`）
 
 ### 测试

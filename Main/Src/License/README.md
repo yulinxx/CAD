@@ -213,9 +213,9 @@ LicenseKeygen_GenerateRegCode(machineCode, "2028-12-31", "pro,nesting",
 公钥以密文形式内嵌在 `LicenseManager.cpp`（`DEFINE_ENCRYPTED_STR(kPublicKey, ...)`），
 运行时解密使用；单元测试通过 `LicenseTest_SetPublicKeyPem` 注入临时公钥。
 
-> 现状提醒：`Config.cmake` 里有 `BUILD_KEYGEN_TOOL`（默认 OFF），但仓库中
-> `Tools/KeygenTool` 目录并不存在，README 里 `KeygenTool genkey/genreg` 的命令行工具
-> 当前无法构建。签发请直接调用上面的 `LicenseKeygen_*` API（或自行补 CLI main）。
+> 现状提醒：`Config.cmake` 里有 `BUILD_KEYGEN_TOOL`（默认 OFF），仓库中
+> `Tools/KeygenTool` 已存在，打开该开关即可构建 `KeygenTool genkey/genreg`。
+> 不构建 CLI 时也可直接调用上面的 `LicenseKeygen_*` API 签发。
 
 ---
 
