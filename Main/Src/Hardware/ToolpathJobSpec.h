@@ -143,4 +143,7 @@ struct ToolpathCompileResult
     int32_t kerfSplitContourCount = 0;        ///< 补偿后拓扑分裂产生的额外环数
     int32_t leadInAppliedContourCount = 0;    ///< 成功生成引入线的轮廓数
     int32_t leadInSkippedContourCount = 0;    ///< 启用引入但落点校验失败/开口轮廓而跳过的数量
+
+    // ---- 尾部追加（M1）：轮廓加工顺序 ----
+    int32_t contourOrderingAppliedLayerCount = 0;  ///< 实际按“先内后外”重排的图层数
 };

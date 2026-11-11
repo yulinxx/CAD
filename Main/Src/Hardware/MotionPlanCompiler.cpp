@@ -20,6 +20,7 @@
     #include <QCoreApplication>
 
     #include "Engine/AprEntity/AprEntity.h"
+    #include "Engine2D/Algorithm/FillColor/ContainmentResolver.h"
     #include "Engine2D/Cam/ContourContainment.h"
     #include "Engine2D/Cam/GeometryExtractor.h"
     #include "Engine2D/Cam/KerfCompensator.h"
@@ -376,6 +377,103 @@ namespace
     }
 
     /**
+     * @brief 计算每个图元在整层轮廓嵌套中的深度（0 = 最外层）。
+     *
+     * 一个图元可能带多条轮廓（外环 + 孔）：若按最深环取深度，带孔的外环会被
+     * 误判成孔。这里取该图元最外层（depth 最小）的环深度作为图元深度。
+     * 开放轮廓与非轮廓图元不参与嵌套，深度按 0 处理。
+     */
+    std::vector<int> computeEntityDepths(const std::vector<const Eg::AprEntity*>& entities,
+        const Eg::Cam::ExtractOptions& options,
+        double chordToleranceMm)
+    {
+        std::vector<Eg::ContainmentContour> contours;
+        std::vector<size_t> owners;
+        for (size_t ei = 0; ei < entities.size(); ++ei)
+        {
+            const Eg::AprEntity* entity = entities[ei];
+            if (!entity)
+            {
+                continue;
+            }
+            const Eg::Cam::ExtractResult extracted =
+                Eg::Cam::GeometryExtractor::extract(entity, options);
+            if (extracted.kind != Eg::Cam::GeometryKind::Contour)
+            {
+                continue;
+            }
+            for (const Eg::Cam::Contour& contour : extracted.contours)
+            {
+                if (!contour.closed)
+                {
+                    continue;
+                }
+                std::vector<Ut::Vec2d> polygon = contourPolygon(contour, chordToleranceMm);
+                if (polygon.size() < 3)
+                {
+                    continue;
+                }
+                Eg::ContainmentContour cc;
+                cc.points = std::move(polygon);
+                contours.push_back(std::move(cc));
+                owners.push_back(ei);
+            }
+        }
+
+        std::vector<int> depths(entities.size(), 0);
+        if (contours.empty())
+        {
+            return depths;
+        }
+
+        Eg::ContainmentResolver::resolveDepths(contours);
+
+        std::vector<bool> seen(entities.size(), false);
+        for (size_t i = 0; i < contours.size(); ++i)
+        {
+            const size_t ei = owners[i];
+            const int depth = contours[i].depth;
+            if (!seen[ei] || depth < depths[ei])
+            {
+                depths[ei] = depth;
+                seen[ei] = true;
+            }
+        }
+        return depths;
+    }
+
+    /**
+     * @brief 按“先内后外”重排图元：包含深度由深到浅，同深度保持文档顺序。
+     *
+     * 依据：外轮廓切通即释放零件，后续再切内孔/内腔时零件可能因应力释放位移。
+     * 先切最内层，最后切最外层，让零件在最后一步才被释放。
+     */
+    void orderEntitiesInnerFirst(std::vector<const Eg::AprEntity*>& entities,
+        const Eg::Cam::ExtractOptions& options,
+        double chordToleranceMm)
+    {
+        const std::vector<int> depths =
+            computeEntityDepths(entities, options, chordToleranceMm);
+
+        std::vector<size_t> order(entities.size());
+        for (size_t i = 0; i < order.size(); ++i)
+        {
+            order[i] = i;
+        }
+        // stable_sort：同深度图元保持文档顺序，避免空移与热影响的额外漂移
+        std::stable_sort(order.begin(), order.end(),
+            [&depths](size_t a, size_t b) { return depths[a] > depths[b]; });
+
+        std::vector<const Eg::AprEntity*> reordered;
+        reordered.reserve(entities.size());
+        for (size_t i : order)
+        {
+            reordered.push_back(entities[i]);
+        }
+        entities.swap(reordered);
+    }
+
+    /**
      * @brief 把一条折线编译进计划。
      * @return 是否产出了至少一段有效运动
      *
@@ -625,17 +723,20 @@ namespace MotionPlanCompiler
 
         if (!spec.defaultParams.valid())
         {
-            result.error = QStringLiteral("Invalid default process params (power %1%%, speed %2mm/s, passes %3)")
+            result.error = QStringLiteral("Invalid default process params (power %1%%, speed %2mm/s, passes %3): %4")
                                .arg(spec.defaultParams.powerPercent)
                                .arg(spec.defaultParams.speedMmPerSec)
-                               .arg(spec.defaultParams.passes);  // 默认工艺参数非法
+                               .arg(spec.defaultParams.passes)
+                               .arg(QString::fromUtf8(spec.defaultParams.invalidReason()));  // 默认工艺参数非法
             return result;
         }
         for (auto it = spec.layerParams.constBegin(); it != spec.layerParams.constEnd(); ++it)
         {
             if (!it.value().valid())
             {
-                result.error = QStringLiteral("Invalid process params for layer %1").arg(it.key());  // 图层工艺参数非法
+                result.error = QStringLiteral("Invalid process params for layer %1: %2")
+                                   .arg(it.key())
+                                   .arg(QString::fromUtf8(it.value().invalidReason()));  // 图层工艺参数非法
                 return result;
             }
         }
@@ -796,6 +897,15 @@ namespace MotionPlanCompiler
             const LayerKerfResult kerfPrep =
                 prepareKerf(bucket, extractOptions, spec.chordToleranceMm, result);
 
+            // 加工顺序：默认保持文档顺序；可选按包含深度先内后外。
+            // 重排只影响发射顺序，不改任何几何与工艺参数。
+            std::vector<const Eg::AprEntity*> orderedEntities = bucket.entities;
+            if (bucket.params.contourOrdering == 1)
+            {
+                orderEntitiesInnerFirst(orderedEntities, extractOptions, spec.chordToleranceMm);
+                ++result.contourOrderingAppliedLayerCount;
+            }
+
             const size_t commandsBeforeLayer = out.commandCount();
 
             out.emitBeginLayer(bucket.layerId);
@@ -814,7 +924,7 @@ namespace MotionPlanCompiler
             {
                 out.emitBeginPass(pass);
 
-                for (const Eg::AprEntity* entity : bucket.entities)
+                for (const Eg::AprEntity* entity : orderedEntities)
                 {
                     const std::vector<Eg::Cam::Contour>* preparedContours = nullptr;
                     if (kerfPrep.applied && entity)

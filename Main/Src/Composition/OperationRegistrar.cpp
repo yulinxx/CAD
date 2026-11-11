@@ -52,6 +52,18 @@ Eg::ProcessParams hwProfileToProcessParams(const HardwareProfile& hp)
                            ? hp.leadInAngleDeg
                            : 0.0;
 
+    // ---- 轮廓加工顺序：只接受 0/1，其余按“文档顺序”处理并告警 ----
+    if (hp.contourOrdering == 0 || hp.contourOrdering == 1)
+    {
+        p.contourOrdering = hp.contourOrdering;
+    }
+    else
+    {
+        APR_WARNF("[OperationRegistrar] hardware profile %d has invalid contourOrdering %d; "
+                 "falling back to document order", hp.id, hp.contourOrdering);
+        p.contourOrdering = 0;
+    }
+
     // ---- 旧模型没有对应项的其余字段：显式固定为保守默认值 ----
     p.pulseWidthUs = 0.0;
     p.waveformIndex = 0;
