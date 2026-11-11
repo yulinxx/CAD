@@ -73,7 +73,11 @@ DocumentRecoveryController::DocumentRecoveryController(
     connect(m_timer, &QTimer::timeout, this, &DocumentRecoveryController::onTick);
 }
 
-DocumentRecoveryController::~DocumentRecoveryController() = default;
+DocumentRecoveryController::~DocumentRecoveryController()
+{
+    // 析构 = 正常退出路径：清理本会话写出的恢复文件（崩溃不会走到这里）
+    stop();
+}
 
 void DocumentRecoveryController::setDialogParent(QWidget* parent)
 {
@@ -140,6 +144,16 @@ void DocumentRecoveryController::stop()
     if (m_timer != nullptr)
     {
         m_timer->stop();
+    }
+
+    // 正常退出（无论用户选择保存还是放弃修改）都不再需要恢复文件：
+    // 只有异常崩溃才会跳过 stop()，从而把恢复文件留给下次启动检测。
+    if (m_wroteRecovery)
+    {
+        discardRecoveryFile(m_lastRecoveryPath);
+        m_wroteRecovery = false;
+        m_lastRecoveryPath.clear();
+        m_lastWrittenKey.clear();
     }
 }
 
