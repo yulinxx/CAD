@@ -157,7 +157,8 @@
           { "type": "action", "id": "view.wireframe", "label": "Wireframe", "command": "view.wireframe", "icon": ":/ui/common/Icons/View3D/wireframe.svg", "checkable": true, "workbenches": ["3D"] },
           { "type": "action", "id": "view.grid", "label": "Show Grid", "command": "view.grid", "icon": ":/ui/common/Icons/View3D/grid.svg", "checkable": true, "workbenches": ["3D"] },
           { "type": "action", "id": "view.bbox", "label": "Show Bounding Box", "command": "view.bbox", "icon": ":/ui/common/Icons/View3D/bbox.svg", "checkable": true, "workbenches": ["3D"] },
-          { "type": "action", "id": "view.floor", "label": "Show Floor", "command": "view.floor", "icon": ":/ui/common/Icons/View3D/floor.svg", "checkable": true, "workbenches": ["3D"] }
+          { "type": "action", "id": "view.floor", "label": "Show Floor", "command": "view.floor", "icon": ":/ui/common/Icons/View3D/floor.svg", "checkable": true, "workbenches": ["3D"] },
+          { "type": "action", "id": "view.toolpath_xray", "label": "Toolpath X-Ray", "command": "view.toolpath_xray", "checkable": true, "workbenches": ["3D"] }
         ] },
         { "type": "action", "id": "view.switch_to_2d", "label": "Switch to 2D", "command": "view.switch_to_2d", "icon": ":/ui/common/Icons/View3D/switch_to_2d.svg", "shortcut": "Ctrl+Shift+2", "workbenches": ["3D"] },
         { "type": "action", "id": "view.switch_to_3d", "label": "Switch to 3D", "command": "view.switch_to_3d", "icon": ":/ui/common/Icons/View/switch_to_3d.svg", "shortcut": "Ctrl+Shift+3", "workbenches": ["2D"] }
@@ -423,7 +424,9 @@
         { "type": "action", "id": "edit.delete", "label": "Delete", "command": "edit.delete", "icon": ":/ui/common/Icons/Actions/delete.svg" },
         { "type": "separator" },
         { "type": "action", "id": "view.fit_all", "label": "Fit All", "command": "view.fit_all" },
-        { "type": "action", "id": "view.reset", "label": "Reset View", "command": "view.reset" }
+        { "type": "action", "id": "view.reset", "label": "Reset View", "command": "view.reset" },
+        { "type": "separator" },
+        { "type": "action", "id": "view.toolpath_xray", "label": "Toolpath X-Ray", "command": "view.toolpath_xray", "checkable": true }
       ]
     }
   ]

@@ -31,10 +31,12 @@
 #if BUILD_UI3D
     #include "UI3D/Operation/CommandActionHub3D.h"
     #include "UI3D/Operation/CommandCatalog3D.h"
+    #include "UI3D/Render3D/RenderWidget3D.h"
 #endif
 
 #include <QAction>
 #include <QKeySequence>
+#include <QLabel>
 #include <QMainWindow>
 #include <QMenu>
 #include <QString>
@@ -997,3 +999,47 @@ TEST(CommandCatalogTest, BitmapAliasesResolveToMenuIds)
               static_cast<int>(CommandCatalog::menuIdForCommandId(QStringLiteral("algo.vectorize_bitmap"))))
         << "两条位图命令不能共用同一个 MenuActionId";
 }
+
+#if BUILD_UI3D
+
+// ---- 刀路穿透（X-ray）显示 — 命令目录与视口开关契约 ----
+// 回归防护：穿透只是「换一条不测深的提交管线」，不能顺手改掉默认值 ——
+// 默认必须是关闭，否则所有既有视图（含截图/出图）的遮挡关系都会变。
+TEST(CommandUiWiringTest, ToolpathXrayCommandIsRegisteredAsCheckable)
+{
+    EXPECT_EQ(CommandCatalog3D::operationForCommandId(QStringLiteral("view.toolpath_xray")),
+              OperationId3D::View_ToolpathXray);
+
+    const CommandEntry3D* entry = CommandCatalog3D::findByOperation(OperationId3D::View_ToolpathXray);
+    ASSERT_NE(entry, nullptr) << "目录里没有条目时菜单项会被静默跳过，右键/菜单都看不到穿透开关";
+    EXPECT_TRUE(entry->checkable);
+    EXPECT_EQ(CommandCatalog3D::operationForMenu(UI3D::MenuActionId3D::View_ToolpathXray),
+              OperationId3D::View_ToolpathXray);
+}
+
+TEST(CommandUiWiringTest, ToolpathXrayDefaultsOffAndShowsStateBadge)
+{
+    RenderWidget3D widget;
+
+    // 默认关闭：与既有「被模型遮挡」的语义保持一致
+    EXPECT_FALSE(widget.isToolpathXrayEnabled());
+    EXPECT_EQ(widget.findChild<QLabel*>(QStringLiteral("toolpathXrayBadge")), nullptr)
+        << "未开启时不应创建角标";
+
+    widget.setToolpathXrayEnabled(true);
+    EXPECT_TRUE(widget.isToolpathXrayEnabled());
+
+    // 开启时必须有明确的状态提示，避免把穿透看到的隐藏段当成完整路径
+    auto* badge = widget.findChild<QLabel*>(QStringLiteral("toolpathXrayBadge"));
+    ASSERT_NE(badge, nullptr);
+    EXPECT_FALSE(badge->isHidden());
+    EXPECT_TRUE(badge->text().contains(QStringLiteral("X-RAY")));
+    // 提示不能抢鼠标，否则视口左下的框选/平移会被它吃掉
+    EXPECT_TRUE(badge->testAttribute(Qt::WA_TransparentForMouseEvents));
+
+    widget.setToolpathXrayEnabled(false);
+    EXPECT_FALSE(widget.isToolpathXrayEnabled());
+    EXPECT_TRUE(badge->isHidden());
+}
+
+#endif  // BUILD_UI3D
