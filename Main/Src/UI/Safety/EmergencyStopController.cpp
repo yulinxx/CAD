@@ -1,24 +1,59 @@
 #include "UI/Safety/EmergencyStopController.h"
 
+#include <QCoreApplication>
 #include <QSettings>
 #include <QTimer>
 
 #include "Hardware/DeviceHost.h"
+#include "Log/AprLogger.h"
 
 namespace
 {
 const QString kLatchKey = QStringLiteral("safety/emergencyStopLatched");
 const int kPollIntervalMs = 100;
 
+/// 设置身份统一取自 QCoreApplication（由品牌层在启动时设置），不再硬编码组织名/应用名
+QString settingsOrganization()
+{
+    const QString organization = QCoreApplication::organizationName();
+    return organization.isEmpty() ? QStringLiteral("April") : organization;
+}
+
+QString settingsApplication()
+{
+    const QString application = QCoreApplication::applicationName();
+    return application.isEmpty() ? QStringLiteral("April") : application;
+}
+
 bool loadLatchFromSettings()
 {
-    QSettings settings(QSettings::IniFormat, QSettings::UserScope, QStringLiteral("April"), QStringLiteral("April"));
-    return settings.value(kLatchKey, false).toBool();
+    QSettings settings(QSettings::IniFormat, QSettings::UserScope, settingsOrganization(),
+                       settingsApplication());
+    if (settings.contains(kLatchKey))
+    {
+        return settings.value(kLatchKey).toBool();
+    }
+
+    // 旧版本把设置身份硬编码为 April/April：升级后必须把已闭锁状态迁过来，
+    // 否则急停闭锁会被静默遗忘，属于安全风险
+    QSettings legacy(QSettings::IniFormat, QSettings::UserScope, QStringLiteral("April"),
+                     QStringLiteral("April"));
+    if (!legacy.contains(kLatchKey))
+    {
+        return false;
+    }
+
+    const bool latched = legacy.value(kLatchKey).toBool();
+    settings.setValue(kLatchKey, latched);
+    settings.sync();
+    APR_INFOF("[EmergencyStop] Latch state migrated from legacy settings: latched=%d", latched ? 1 : 0);
+    return latched;
 }
 
 void saveLatchToSettings(bool latched)
 {
-    QSettings settings(QSettings::IniFormat, QSettings::UserScope, QStringLiteral("April"), QStringLiteral("April"));
+    QSettings settings(QSettings::IniFormat, QSettings::UserScope, settingsOrganization(),
+                       settingsApplication());
     settings.setValue(kLatchKey, latched);
     settings.sync();
 }
