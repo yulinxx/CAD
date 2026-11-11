@@ -229,7 +229,8 @@ namespace CamBridge
     }
 
     /// 把位图实体装配为 CAM 扫描线段（像素坐标在冲压前换算成 mm）
-    static void fillRasterScanlines(const Eg::AprImage& image,
+    /// 返回 false 表示扫描线未完整装配，具体原因写入 snapshot.unmachinableReason
+    static bool fillRasterScanlines(const Eg::AprImage& image,
                                     const Eg::ProcessParams& process,
                                     Cam::EntitySnapshot& snapshot)
     {
@@ -237,7 +238,7 @@ namespace CamBridge
         if (!imageToGray8(image, gray))
         {
             snapshot.unmachinableReason = "unsupported raster pixel format";
-            return;
+            return false;
         }
 
         RasterImageView view{};
@@ -254,7 +255,7 @@ namespace CamBridge
         if (createStatus != RASTER_OK || rasterImage == nullptr)
         {
             snapshot.unmachinableReason = Raster_StatusText(createStatus);
-            return;
+            return false;
         }
 
         const RasterScanlineParams params = makeScanlineParams(image, process);
@@ -264,7 +265,7 @@ namespace CamBridge
         if (status != RASTER_OK || jobs == nullptr)
         {
             snapshot.unmachinableReason = Raster_StatusText(status);
-            return;
+            return false;
         }
 
         int32_t count = 0;
@@ -273,9 +274,15 @@ namespace CamBridge
         for (int32_t i = 0; i < count; ++i)
         {
             RasterScanlineSegment seg{};
-            if (Raster_JobListGet(jobs, i, &seg) != RASTER_OK)
+            const RasterStatus segmentStatus = Raster_JobListGet(jobs, i, &seg);
+            if (segmentStatus != RASTER_OK)
             {
-                break;
+                // 部分读取失败不能当成完整结果：保留已读段，同时写明失败位置与原因
+                snapshot.unmachinableReason = std::string("scanline read failed at index ") +
+                                              std::to_string(i) + "/" + std::to_string(count) + ": " +
+                                              Raster_StatusText(segmentStatus);
+                Raster_DestroyJobList(jobs);
+                return false;
             }
             Cam::ScanlineSegment line;
             line.ptStart = mapImagePixel(image, seg.x0, seg.y);
@@ -289,6 +296,7 @@ namespace CamBridge
         }
         Raster_DestroyJobList(jobs);
         snapshot.unmachinableReason.clear();
+        return true;
     }
 #endif
 
@@ -439,7 +447,15 @@ namespace CamBridge
                         (it != spec.layerParams.constEnd())
                             ? static_cast<const Eg::ProcessParams&>(it.value())
                             : static_cast<const Eg::ProcessParams&>(spec.defaultParams);
-                    fillRasterScanlines(*image, process, snapshot);
+                    if (!fillRasterScanlines(*image, process, snapshot))
+                    {
+                        // 扫描线未完整装配：显式按不可加工上抛并保留原因，
+                        // 不能把截断后的部分刀路当成完整结果
+                        snapshot.kind = Cam::EntitySnapshot::GeometryKind::Unsupported;
+                        qWarning("[CAM] raster scanline assembly failed: entity=%llu reason=%s",
+                                 static_cast<unsigned long long>(entity->id),
+                                 snapshot.unmachinableReason.c_str());
+                    }
                 }
                 else
                 {
