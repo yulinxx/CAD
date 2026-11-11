@@ -146,4 +146,8 @@ struct ToolpathCompileResult
 
     // ---- 尾部追加（M1）：轮廓加工顺序 ----
     int32_t contourOrderingAppliedLayerCount = 0;  ///< 实际按“先内后外”重排的图层数
+
+    // ---- 尾部追加（M1）：文字缺字汇总 ----
+    int32_t missingGlyphCount = 0;        ///< 因字体缺字而被跳过的字符总数
+    QStringList missingGlyphDetails;      ///< 缺字明细（字符、U+码点、原文行列、版面落点）
 };

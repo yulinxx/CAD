@@ -39,6 +39,9 @@ namespace
     /// 无法加工图元的清单最多展示多少条（界面可读性；总数仍然准确）
     constexpr int kMaxUnmachinableDetails = 8;
 
+    /// 缺字明细最多展示多少条（总数仍然准确）
+    constexpr int kMaxMissingGlyphDetails = 32;
+
     /// 一个图层的编译任务：图层 ID + 该图层的图元 + 工艺参数。
     struct LayerBucket
     {
@@ -297,6 +300,44 @@ namespace
         return false;
     }
 
+    /**
+     * @brief 汇总文字缺字：写入编译结果并告警。
+     *
+     * 缺字不会让整份作业失败（会切掉其余可切内容），但绝不能静默：
+     * 明细带原文行列与版面落点，界面/日志据此提示“哪几个字没刻”。
+     */
+    void recordMissingGlyphs(const Eg::AprEntity* entity,
+        const Eg::Cam::ExtractResult& extracted,
+        ToolpathCompileResult& result)
+    {
+        if (extracted.missingGlyphs.empty())
+        {
+            return;
+        }
+        for (const Eg::MissingGlyph& missing : extracted.missingGlyphs)
+        {
+            ++result.missingGlyphCount;
+            if (result.missingGlyphDetails.size() < kMaxMissingGlyphDetails)
+            {
+                const QString codePoint = QStringLiteral("U+%1")
+                                              .arg(missing.codePoint, 4, 16, QLatin1Char('0'))
+                                              .toUpper();
+                result.missingGlyphDetails.append(QStringLiteral("'%1' %2 at line %3 col %4 (x=%5, y=%6)")
+                                                      .arg(QString::fromUcs4(&missing.codePoint, 1))
+                                                      .arg(codePoint)
+                                                      .arg(missing.lineIndex + 1)
+                                                      .arg(missing.columnIndex + 1)
+                                                      .arg(missing.penX, 0, 'f', 2)
+                                                      .arg(missing.penY, 0, 'f', 2));
+            }
+        }
+        APR_WARNF("[MotionPlanCompiler] entity %lld: %zu missing glyph(s) skipped; first at line %d col %d",
+            static_cast<long long>(entity ? entity->id : 0),
+            extracted.missingGlyphs.size(),
+            extracted.missingGlyphs.front().lineIndex + 1,
+            extracted.missingGlyphs.front().columnIndex + 1);
+    }
+
     /// 一个图层的割缝预处理结果：按图元 ID 回填补偿后的轮廓。
     struct LayerKerfResult
     {
@@ -338,6 +379,7 @@ namespace
             {
                 continue;
             }
+            recordMissingGlyphs(entity, extracted, result);
             contourEntityIds.push_back(static_cast<uint64_t>(entity->id));
             for (const Eg::Cam::Contour& contour : extracted.contours)
             {
@@ -637,6 +679,11 @@ namespace
         }
 
         const Eg::Cam::ExtractResult extracted = Eg::Cam::GeometryExtractor::extract(entity, options);
+        if (countLeadStats)
+        {
+            // 只在第一遍汇总，多遍加工不重复计数
+            recordMissingGlyphs(entity, extracted, result);
+        }
 
         switch (extracted.kind)
         {
