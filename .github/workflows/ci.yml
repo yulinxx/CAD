@@ -122,20 +122,27 @@ jobs:
         with:
           submodules: recursive
 
-      # vcpkg 按键缓存，随 vcpkg 上游滚动或手动 bump 键尾版本号自动失效，
-      # 避免三方库每次都源码重编（OCCT 纯源码构建约 30~40 分钟）
+      # vcpkg 与仓库根 vcpkg.json 的 builtin-baseline 同提交，缓存键随 baseline
+      # 变化自动失效，避免三方库每次都源码重编（OCCT 纯源码构建约 30~40 分钟）。
+      - name: Read vcpkg baseline
+        run: |
+          echo "VCPKG_BASELINE=$(python3 -c 'import json; print(json.load(open("vcpkg.json"))["builtin-baseline"])')" >> "$GITHUB_ENV"
+
       - name: Cache vcpkg
         id: cache-vcpkg
         uses: actions/cache@v4
         with:
           path: ${{ runner.workspace }}/vcpkg
-          key: vcpkg-${{ matrix.triplet }}-${{ runner.os }}-${{ runner.arch }}-v1
+          key: vcpkg-${{ matrix.triplet }}-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_BASELINE }}
 
       - name: Set up vcpkg
         run: |
           if [ ! -x "$GITHUB_WORKSPACE/vcpkg/vcpkg" ]; then
             rm -rf "$GITHUB_WORKSPACE/vcpkg"
-            git clone --depth 1 https://github.com/microsoft/vcpkg.git "$GITHUB_WORKSPACE/vcpkg"
+            git init "$GITHUB_WORKSPACE/vcpkg"
+            git -C "$GITHUB_WORKSPACE/vcpkg" remote add origin https://github.com/microsoft/vcpkg.git
+            git -C "$GITHUB_WORKSPACE/vcpkg" fetch --depth 1 origin "$VCPKG_BASELINE"
+            git -C "$GITHUB_WORKSPACE/vcpkg" checkout --detach FETCH_HEAD
             "$GITHUB_WORKSPACE/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
           fi
           echo "VCPKG_ROOT=$GITHUB_WORKSPACE/vcpkg" >> "$GITHUB_ENV"

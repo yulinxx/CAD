@@ -42,20 +42,29 @@ jobs:
         with:
           submodules: recursive
 
-      # vcpkg 按三元组缓存，键尾版本号手工 bump 以强制刷新。
+      # vcpkg 版本只由仓库根 vcpkg.json 的 builtin-baseline 决定；缓存键随 baseline
+      # 自动失效，不再需要手工 bump 键尾版本号。
+      - name: Read vcpkg baseline
+        run: |
+          $baseline = (Get-Content vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
+          "VCPKG_BASELINE=$baseline" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Cache vcpkg
         id: cache-vcpkg
         uses: actions/cache@v4
         with:
           path: ${{ runner.workspace }}/vcpkg
-          key: vcpkg-x64-windows-${{ runner.os }}-${{ runner.arch }}-raster-sdk-v1
+          key: vcpkg-x64-windows-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_BASELINE }}
 
       - name: Set up vcpkg
         run: |
           $vcpkgRoot = Join-Path "${{ runner.workspace }}" "vcpkg"
           if (-not (Test-Path (Join-Path $vcpkgRoot "vcpkg.exe"))) {
             Remove-Item -Recurse -Force $vcpkgRoot -ErrorAction SilentlyContinue
-            git clone --depth 1 https://github.com/microsoft/vcpkg.git $vcpkgRoot
+            git init $vcpkgRoot
+            git -C $vcpkgRoot remote add origin https://github.com/microsoft/vcpkg.git
+            git -C $vcpkgRoot fetch --depth 1 origin $env:VCPKG_BASELINE
+            git -C $vcpkgRoot checkout --detach FETCH_HEAD
             & (Join-Path $vcpkgRoot "bootstrap-vcpkg.bat") -disableMetrics
           }
           "VCPKG_ROOT=$vcpkgRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8

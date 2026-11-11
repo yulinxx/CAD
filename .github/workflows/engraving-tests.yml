@@ -18,12 +18,23 @@ jobs:
         with:
           submodules: recursive
 
+      # vcpkg 版本只由仓库根 vcpkg.json 的 builtin-baseline 决定，避免上游滚动导致
+      # 同一提交在不同时间装到不同的 OpenCV/GTest。
+      - name: Read vcpkg baseline
+        run: |
+          $baseline = (Get-Content vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
+          "VCPKG_BASELINE=$baseline" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Setup vcpkg
         run: |
-          git clone https://github.com/microsoft/vcpkg.git $env:RUNNER_TEMP/vcpkg
-          & "$env:RUNNER_TEMP/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
-          echo "VCPKG_ROOT=$env:RUNNER_TEMP/vcpkg" >> $env:GITHUB_ENV
-          echo "VCPKG_DEFAULT_TRIPLET=x64-windows" >> $env:GITHUB_ENV
+          $vcpkgRoot = Join-Path $env:RUNNER_TEMP "vcpkg"
+          git init $vcpkgRoot
+          git -C $vcpkgRoot remote add origin https://github.com/microsoft/vcpkg.git
+          git -C $vcpkgRoot fetch --depth 1 origin $env:VCPKG_BASELINE
+          git -C $vcpkgRoot checkout --detach FETCH_HEAD
+          & (Join-Path $vcpkgRoot "bootstrap-vcpkg.bat") -disableMetrics
+          "VCPKG_ROOT=$vcpkgRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "VCPKG_DEFAULT_TRIPLET=x64-windows" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Install dependencies
         run: |
