@@ -149,6 +149,16 @@ if [[ -n "$APP_PATH" ]]; then
     sign_nested_code "$APP_PATH"
 fi
 
+# 分发包先签名（.dmg 可签名；zip 的签名在内部 .app 上完成），公证是否执行
+# 由后续凭据检查决定。这样 --skip-notarize / 凭据缺失时仍能产出已签名产物。
+for artifact in "${ARTIFACTS[@]:-}"; do
+    [[ -n "$artifact" ]] || continue
+    if [[ "$artifact" == *.dmg ]]; then
+        log_step "Signing disk image: $artifact"
+        codesign --force --timestamp --sign "$IDENTITY" "$artifact"
+    fi
+done
+
 # ----------------------------------------------------------------------------
 # 2. 公证凭据
 # ----------------------------------------------------------------------------
@@ -213,10 +223,6 @@ fi
 
 for artifact in "${ARTIFACTS[@]:-}"; do
     [[ -n "$artifact" ]] || continue
-    if [[ "$artifact" == *.dmg ]]; then
-        log_step "Signing disk image: $artifact"
-        codesign --force --timestamp --sign "$IDENTITY" "$artifact"
-    fi
     notarize_path "$artifact"
 done
 
