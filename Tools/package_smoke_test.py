@@ -11,6 +11,8 @@ April 安装包冒烟测试。
   3. dmg / deb：挂载/解包后验证文件布局，模拟升级（覆盖）和卸载（删除目录）。
      这两种模式不调用系统级安装器，避免 CI 权限和系统污染；真正的 OS 级卸载
      仍由人工/专项测试覆盖。
+  4. targz：解压便携 tar.gz，验证二进制、随包 .so 与 Qt 插件，并运行 --version。
+     用于 Linux 在没有 AppImage 工具链时的交付包冒烟。
 
 设计目标：
   - 只依赖 Python 标准库；
@@ -32,6 +34,11 @@ April 安装包冒烟测试。
 
     # 4) macOS 构建树 staged 测试：把 Qt 框架路径显式传给程序
     python3 Tools/package_smoke_test.py --build-dir build --qt-dir "$HOME/Qt/6.12.0/macos"
+
+    # 5) Linux 便携 tar.gz
+    python3 Tools/package_smoke_test.py \
+        --installer dist/April-1.0.0-linux-x64.tar.gz \
+        --qt-dir "$HOME/Qt/6.12.0/gcc_64"
 """
 
 from __future__ import annotations
@@ -42,6 +49,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 from dataclasses import dataclass
@@ -155,6 +163,9 @@ def find_executable(install_dir: Path) -> Optional[Path]:
                 install_dir / "bin" / APP_NAME,
                 install_dir / "opt" / APP_NAME / "bin" / APP_NAME,
                 install_dir / "usr" / "bin" / APP_NAME,
+                # 便携 tar.gz：顶层目录 April/ 内直接放可执行文件与 lib/。
+                install_dir / APP_NAME / APP_NAME,
+                install_dir / APP_NAME / "bin" / APP_NAME,
             ]
         )
 
@@ -192,8 +203,12 @@ def check_layout(install_dir: Path, mode: str) -> Path:
         if not plist.is_file():
             raise SmokeError(f"macOS bundle 缺少 Info.plist: {plist}")
         lib_dir = install_dir / "bin"
-    else:
+    elif is_windows():
         lib_dir = exe.parent
+    else:
+        # 便携 tar.gz 的随包库位于 <bin>/lib，其余模式仍在可执行文件同级。
+        bundled_lib = exe.parent / "lib"
+        lib_dir = bundled_lib if bundled_lib.is_dir() else exe.parent
 
     if is_windows():
         dlls = sorted(path.name for path in lib_dir.glob("*.dll"))
@@ -233,7 +248,12 @@ def build_runtime_env(exe: Path, qt_dir: Optional[Path]) -> Dict[str, str]:
         env["PATH"] = os.pathsep.join(path_parts + [env.get("PATH", "")])
         return env
 
+    # 便携 tar.gz 把随包库放在 <bin>/lib，Qt 插件放在 <bin>/plugins。
+    bundled_lib = exe.parent / "lib"
+    bundled_plugins = exe.parent / "plugins"
     lib_parts = [bin_dir]
+    if bundled_lib.is_dir():
+        lib_parts.insert(0, str(bundled_lib))
     if qt_dir:
         lib_parts.append(str(qt_dir / "lib"))
 
@@ -247,7 +267,9 @@ def build_runtime_env(exe: Path, qt_dir: Optional[Path]) -> Dict[str, str]:
                 env["QT_PLUGIN_PATH"] = str(plugin_dir)
     else:
         env["LD_LIBRARY_PATH"] = os.pathsep.join(lib_parts)
-        if qt_dir:
+        if bundled_plugins.is_dir():
+            env["QT_PLUGIN_PATH"] = str(bundled_plugins)
+        elif qt_dir:
             plugin_dir = qt_dir / "plugins"
             if plugin_dir.is_dir():
                 env["QT_PLUGIN_PATH"] = str(plugin_dir)
@@ -517,10 +539,63 @@ def mode_deb(args: argparse.Namespace, context: Context, expected: Optional[str]
         raise SmokeError(f"卸载后主程序仍存在: {exe}")
 
 
+def mode_targz(args: argparse.Namespace, context: Context, expected: Optional[str]) -> None:
+    if not is_linux():
+        raise SmokeError("targz 模式只能在 Linux 上运行")
+    installer = args.installer.resolve()
+    if not installer.is_file():
+        raise SmokeError(f"安装包不存在: {installer}")
+
+    install_dir = context.work_dir / "install"
+    if install_dir.exists():
+        shutil.rmtree(install_dir)
+    install_dir.mkdir(parents=True)
+
+    def clear_install_root() -> None:
+        # 便携包按顶层目录整体替换，避免新旧 .so 混杂。
+        for path in list(install_dir.iterdir()):
+            if path.is_dir() and not path.is_symlink():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+
+    def extract(package: Path) -> None:
+        clear_install_root()
+        log(f"解压: {package}")
+        with tarfile.open(package, "r:gz") as archive:
+            try:
+                archive.extractall(install_dir, filter="data")
+            except TypeError:
+                # Python < 3.11.4 没有 filter 参数。
+                archive.extractall(install_dir)
+
+    extract(installer)
+    exe = check_layout(install_dir, "targz")
+    run_version(exe, expected, context)
+
+    if args.previous_installer:
+        log("== 覆盖上一版本（升级路径） ==")
+        previous = args.previous_installer.resolve()
+        if not previous.is_file():
+            raise SmokeError(f"安装包不存在: {previous}")
+        extract(previous)
+        check_layout(install_dir, "targz")
+        run_version(exe, args.previous_version, context)
+        extract(installer)
+        exe = check_layout(install_dir, "targz")
+        run_version(exe, expected, context)
+
+    log("== 卸载（删除解压目录，模拟） ==")
+    shutil.rmtree(install_dir, ignore_errors=True)
+    if exe.exists():
+        raise SmokeError(f"卸载后主程序仍存在: {exe}")
+
+
 def detect_mode(args: argparse.Namespace) -> str:
     if args.mode != "auto":
         return args.mode
     if args.installer:
+        name = args.installer.name.lower()
         suffix = args.installer.suffix.lower()
         if suffix == ".exe":
             return "nsis"
@@ -528,6 +603,8 @@ def detect_mode(args: argparse.Namespace) -> str:
             return "dmg"
         if suffix == ".deb":
             return "deb"
+        if name.endswith(".tar.gz") or suffix == ".tgz":
+            return "targz"
         raise SmokeError(f"无法根据扩展名判断安装包类型: {args.installer}")
     if args.build_dir:
         return "staged"
@@ -536,10 +613,10 @@ def detect_mode(args: argparse.Namespace) -> str:
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="April 安装/卸载/升级冒烟测试")
-    parser.add_argument("--mode", choices=["auto", "staged", "nsis", "dmg", "deb"], default="auto")
+    parser.add_argument("--mode", choices=["auto", "staged", "nsis", "dmg", "deb", "targz"], default="auto")
     parser.add_argument("--build-dir", type=Path, help="CMake 构建目录（staged 模式）")
     parser.add_argument("--previous-build-dir", type=Path, help="上一版 CMake 构建目录（跨版本升级）")
-    parser.add_argument("--installer", type=Path, help="安装包路径（nsis/dmg/deb）")
+    parser.add_argument("--installer", type=Path, help="安装包路径（nsis/dmg/deb/targz）")
     parser.add_argument("--previous-installer", type=Path, help="上一版安装包路径（跨版本升级）")
     parser.add_argument("--config", default="Release", help="cmake --install 的配置（默认 Release）")
     parser.add_argument("--expected-version", help="期望版本号；默认从 CMakeCache/CMakeLists 读取")
@@ -589,6 +666,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             mode_dmg(args, context, expected)
         elif mode == "deb":
             mode_deb(args, context, expected)
+        elif mode == "targz":
+            mode_targz(args, context, expected)
         else:
             raise SmokeError(f"未知模式: {mode}")
     except SmokeError as exc:

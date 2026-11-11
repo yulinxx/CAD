@@ -6,19 +6,25 @@ on:
     tags:
       - 'v*'
 
+# 三平台都走 Tools/Packaging 下的真实打包脚本，再用 package_smoke_test.py
+# 对产物做冒烟；避免出现「脚本存在但 CI 从未调用」的假交付。
+#
+# 依赖版本由仓库根 vcpkg.json 的 builtin-baseline 锁定，CI 不重复写死清单。
+# 打包作业关闭 Engraving / GeoModelCore / Vision / Hardware / Python 与
+# CAM / Nesting / Raster，只保留 April 主程序所需的最小面。
+
 jobs:
   smoke-windows:
     name: Package Smoke (Windows NSIS)
     runs-on: windows-latest
     timeout-minutes: 180
     env:
-      QT_VERSION: "6.8.1"
+      QT_VERSION: "6.12.0"
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      # Qt
       - uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
@@ -26,57 +32,255 @@ jobs:
           modules: qtbase
           cache: true
 
-      # vcpkg
-      - name: Setup vcpkg
+      - name: Read vcpkg baseline
+        shell: pwsh
         run: |
-          git clone --depth 1 https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP/vcpkg"
-          & "$env:RUNNER_TEMP/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
-          echo "VCPKG_ROOT=$env:RUNNER_TEMP/vcpkg" >> $env:GITHUB_ENV
-      - name: Install vcpkg dependencies
-        run: |
-          $deps = @('openssl','freetype','boost','clipper2','sqlitecpp','gtest','protobuf','spdlog','nanosvg','stb','libwebp','tiff','zlib','breakpad')
-          & "$env:VCPKG_ROOT/vcpkg.exe" install $deps --triplet x64-windows
+          $baseline = (Get-Content vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
+          "VCPKG_BASELINE=$baseline" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-      # NSIS
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ github.workspace }}/.vcpkg/installed
+            ~/AppData/Local/vcpkg/archives
+          key: vcpkg-Windows-x64-windows-${{ env.VCPKG_BASELINE }}
+
+      - name: Setup vcpkg (pinned baseline)
+        shell: pwsh
+        run: |
+          git init "$env:RUNNER_TEMP/vcpkg"
+          git -C "$env:RUNNER_TEMP/vcpkg" remote add origin https://github.com/microsoft/vcpkg.git
+          git -C "$env:RUNNER_TEMP/vcpkg" fetch --depth 1 origin $env:VCPKG_BASELINE
+          git -C "$env:RUNNER_TEMP/vcpkg" checkout --detach FETCH_HEAD
+          & "$env:RUNNER_TEMP/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
+          "VCPKG_ROOT=$env:RUNNER_TEMP/vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "VCPKG_BINARY_SOURCES=clear;files,$env:LOCALAPPDATA\vcpkg\archives,readwrite" |
+            Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Install NSIS
         run: choco install nsis -y
 
-      # Configure (minimal feature set for faster build)
       - name: Configure
+        shell: pwsh
         run: |
-          $qtDir = (Get-ChildItem "$env:USERPROFILE/Qt/${env:QT_VERSION}/msvc2022_64" -Directory | Select-Object -First 1).FullName
-          if (-not $qtDir) { Write-Error "Qt not found"; exit 1 }
           cmake -B build-pkg -G "Visual Studio 17 2022" -A x64 `
             -DCMAKE_BUILD_TYPE=Release `
-            -DVCPKG_DIR=$env:VCPKG_ROOT `
-            -DQt_INSTALL_DIR=$qtDir `
+            -DVCPKG_DIR="$env:VCPKG_ROOT" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows `
+            -DVCPKG_MANIFEST_MODE=ON `
+            -DVCPKG_INSTALLED_DIR="$env:GITHUB_WORKSPACE/.vcpkg/installed" `
+            -DQt_INSTALL_DIR="$env:QT_ROOT_DIR" `
             -DBUILD_ENGRAVING=OFF -DBUILD_GEOMODELCORE=OFF -DBUILD_VISION=OFF `
             -DBUILD_HARDWARE=OFF -DBUILD_PYTHON=OFF -DAPR_PYBIND_CORE=OFF `
-            -DBUILD_CAM=OFF -DBUILD_NESTING=OFF `
-            -DBUILD_UI_DIMENSION=2D `
-            -DBUILD_ALL_TESTS=OFF `
-            -DBUILD_MAIN_TESTS=OFF
+            -DBUILD_CAM=OFF -DBUILD_NESTING=OFF -DBUILD_RASTER=OFF `
+            -DBUILD_UI_DIMENSION=2D -DBUILD_TESTS=OFF
 
-      # Build
-      - name: Build
-        run: cmake --build build-pkg --config Release --target April --parallel
-
-      # Package (NSIS)
-      - name: Package (NSIS)
-        run: cpack --config build-pkg/CPackConfig.cmake -C Release -G NSIS -B build-pkg/package
-
-      # Smoke test
-      - name: Smoke test (install / upgrade / uninstall)
+      - name: Package (build + windeployqt + NSIS)
+        shell: pwsh
         run: |
-          $exe = Get-ChildItem build-pkg/package -Filter *.exe | Select-Object -First 1
-          if (-not $exe) { Write-Error "NSIS installer not found"; exit 1 }
-          python Tools/package_smoke_test.py --installer $exe.FullName --expected-version 1.0.0 --timeout 300
+          .\Tools\Packaging\package-windows.ps1 `
+            -BuildDir build-pkg -OutDir dist `
+            -QtDir "$env:QT_ROOT_DIR" -MakeInstaller -Jobs 4
 
-      # Upload installer artifact
+      - name: Smoke test (install / upgrade / uninstall)
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem dist -Filter "*-setup.exe" | Select-Object -First 1
+          if (-not $installer) { throw "NSIS installer not found under dist" }
+          python Tools/package_smoke_test.py --installer "$($installer.FullName)" `
+            --expected-version 1.0.0 --timeout 300
+
       - name: Upload installer
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: April-installer
-          path: build-pkg/package/*.exe
+          name: April-installer-windows
+          path: |
+            dist/*.exe
+            dist/*.zip
+          retention-days: 7
+
+  smoke-macos:
+    name: Package Smoke (macOS DMG)
+    runs-on: macos-14
+    timeout-minutes: 180
+    env:
+      QT_VERSION: "6.12.0"
+      QT_QPA_PLATFORM: offscreen
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: mac
+          target: desktop
+          arch: clang_64
+          modules: qtbase
+          cache: true
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Read vcpkg baseline
+        run: |
+          echo "VCPKG_BASELINE=$(python3 -c 'import json; print(json.load(open("vcpkg.json"))["builtin-baseline"])')" >> "$GITHUB_ENV"
+
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ github.workspace }}/.vcpkg/installed
+            ~/.cache/vcpkg/archives
+          key: vcpkg-macOS-arm64-osx-${{ env.VCPKG_BASELINE }}
+
+      - name: Setup vcpkg (pinned baseline)
+        run: |
+          git init "$GITHUB_WORKSPACE/vcpkg"
+          git -C "$GITHUB_WORKSPACE/vcpkg" remote add origin https://github.com/microsoft/vcpkg.git
+          git -C "$GITHUB_WORKSPACE/vcpkg" fetch --depth 1 origin "$VCPKG_BASELINE"
+          git -C "$GITHUB_WORKSPACE/vcpkg" checkout --detach FETCH_HEAD
+          "$GITHUB_WORKSPACE/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=$GITHUB_WORKSPACE/vcpkg" >> "$GITHUB_ENV"
+          echo "VCPKG_BINARY_SOURCES=clear;files,$HOME/.cache/vcpkg/archives,readwrite" >> "$GITHUB_ENV"
+
+      - name: Configure
+        run: |
+          cmake -S . -B build-pkg -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DQt_INSTALL_DIR="$QT_ROOT_DIR" \
+            -DVCPKG_DIR="$VCPKG_ROOT" \
+            -DVCPKG_TARGET_TRIPLET=arm64-osx \
+            -DVCPKG_MANIFEST_MODE=ON \
+            -DVCPKG_INSTALLED_DIR="$GITHUB_WORKSPACE/.vcpkg/installed" \
+            -DBUILD_ENGRAVING=OFF -DBUILD_GEOMODELCORE=OFF -DBUILD_VISION=OFF \
+            -DBUILD_HARDWARE=OFF -DBUILD_PYTHON=OFF -DAPR_PYBIND_CORE=OFF \
+            -DBUILD_CAM=OFF -DBUILD_NESTING=OFF -DBUILD_RASTER=OFF \
+            -DBUILD_UI_DIMENSION=2D -DBUILD_TESTS=OFF
+
+      - name: Package (build + macdeployqt + DMG)
+        run: |
+          Tools/Packaging/package-macos.sh --build-dir build-pkg \
+            --qt-dir "$QT_ROOT_DIR" --out-dir dist --format dmg
+
+      - name: Smoke test (mount / run / upgrade)
+        run: |
+          installer=$(ls dist/*.dmg | head -n 1)
+          if [[ -z "$installer" ]]; then
+            echo "No DMG found under dist" >&2
+            exit 1
+          fi
+          python3 Tools/package_smoke_test.py --installer "$installer" \
+            --expected-version 1.0.0 --timeout 300
+
+      - name: Upload DMG
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: April-installer-macos
+          path: dist/*.dmg
+          retention-days: 7
+
+  smoke-linux:
+    name: Package Smoke (Linux tar.gz)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    env:
+      QT_VERSION: "6.12.0"
+      QT_QPA_PLATFORM: offscreen
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build patchelf libgl1-mesa-dev libegl1-mesa-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev libfontconfig1-dev \
+            libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xkb-dev libxcb-xinerama0 libdbus-1-3
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: linux
+          target: desktop
+          arch: linux_gcc_64
+          modules: qtbase
+          cache: true
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Read vcpkg baseline
+        run: |
+          echo "VCPKG_BASELINE=$(python3 -c 'import json; print(json.load(open("vcpkg.json"))["builtin-baseline"])')" >> "$GITHUB_ENV"
+
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ github.workspace }}/.vcpkg/installed
+            ~/.cache/vcpkg/archives
+          key: vcpkg-Linux-x64-linux-${{ env.VCPKG_BASELINE }}
+
+      - name: Setup vcpkg (pinned baseline)
+        run: |
+          git init "$GITHUB_WORKSPACE/vcpkg"
+          git -C "$GITHUB_WORKSPACE/vcpkg" remote add origin https://github.com/microsoft/vcpkg.git
+          git -C "$GITHUB_WORKSPACE/vcpkg" fetch --depth 1 origin "$VCPKG_BASELINE"
+          git -C "$GITHUB_WORKSPACE/vcpkg" checkout --detach FETCH_HEAD
+          "$GITHUB_WORKSPACE/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=$GITHUB_WORKSPACE/vcpkg" >> "$GITHUB_ENV"
+          echo "VCPKG_BINARY_SOURCES=clear;files,$HOME/.cache/vcpkg/archives,readwrite" >> "$GITHUB_ENV"
+
+      - name: Configure
+        run: |
+          cmake -S . -B build-pkg -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DQt_INSTALL_DIR="$QT_ROOT_DIR" \
+            -DVCPKG_DIR="$VCPKG_ROOT" \
+            -DVCPKG_TARGET_TRIPLET=x64-linux \
+            -DVCPKG_MANIFEST_MODE=ON \
+            -DVCPKG_INSTALLED_DIR="$GITHUB_WORKSPACE/.vcpkg/installed" \
+            -DBUILD_ENGRAVING=OFF -DBUILD_GEOMODELCORE=OFF -DBUILD_VISION=OFF \
+            -DBUILD_HARDWARE=OFF -DBUILD_PYTHON=OFF -DAPR_PYBIND_CORE=OFF \
+            -DBUILD_CAM=OFF -DBUILD_NESTING=OFF -DBUILD_RASTER=OFF \
+            -DBUILD_UI_DIMENSION=2D -DBUILD_TESTS=OFF
+
+      - name: Package (build + patchelf + tar.gz)
+        run: |
+          Tools/Packaging/package-linux.sh --build-dir build-pkg \
+            --qt-dir "$QT_ROOT_DIR" --out-dir dist --format targz --triplet x64-linux
+
+      - name: Smoke test (extract / run / upgrade)
+        run: |
+          installer=$(ls dist/*.tar.gz | head -n 1)
+          if [[ -z "$installer" ]]; then
+            echo "No tar.gz found under dist" >&2
+            exit 1
+          fi
+          python3 Tools/package_smoke_test.py --installer "$installer" \
+            --expected-version 1.0.0 --timeout 300
+
+      - name: Upload tar.gz
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: April-installer-linux
+          path: dist/*.tar.gz
           retention-days: 7
