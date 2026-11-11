@@ -280,6 +280,176 @@ namespace
                 static_cast<int>(fillColor & 0xFF),
                 alpha));
     }
+
+    // ---- 原生 .apr ProcessData → 图层工艺参数 ----
+
+    /// FileIO 的工艺参数 POD → Eg::ProcessParams。
+    /// 两边字段一一对应；focusOffsetMm 在文档 v2 的 ProcessParamsData 里没有对应字段，
+    /// 保持默认 0（与旧档案读出来的语义一致）。
+    Eg::ProcessParams aprProcessParamsToEg(const Fio::AprProcessParamsInfo& src)
+    {
+        Eg::ProcessParams p;
+        p.enabled = src.enabled;
+        p.powerPercent = src.powerPercent;
+        p.speedMmPerSec = src.speedMmPerSec;
+        p.frequencyHz = src.frequencyHz;
+        p.pulseWidthUs = src.pulseWidthUs;
+        p.waveformIndex = src.waveformIndex;
+        p.passes = src.passes;
+        p.fillEnabled = src.fillEnabled;
+        p.fillIntervalMm = src.fillIntervalMm;
+        p.fillAngleDeg = src.fillAngleDeg;
+        p.fillMode = static_cast<Eg::FillMode>(src.fillMode);
+        p.kerfMm = src.kerfMm;
+        p.rapidSpeedMmPerSec = src.rapidSpeedMmPerSec;
+        p.leadInEnabled = src.leadInEnabled;
+        p.leadInLengthMm = src.leadInLengthMm;
+        p.leadInMode = src.leadInMode;
+        p.leadInAngleDeg = src.leadInAngleDeg;
+        return p;
+    }
+
+    /// 把 .apr v2 的 ProcessData 按图层 ID 回灌到 LayerManager。
+    ///
+    /// 目标图层解析顺序与 proto 注释一致：
+    ///   1. target_layer_ids 非空 → 只作用于这些源图层（显式优先）；
+    ///   2. 否则 → 作用于 default_process_id == process.id 的源图层（图层反向绑定）。
+    ///
+    /// 幂等性：回灌前先清空本次落地图层的旧参数。否则「同名图层复用」会沿用上一份
+    /// 文档的参数，而 `setLayerProcessParams` 是整体覆盖、不做字段累加，因此
+    /// 连续打开同一文件、或「打开→保存→再打开」都不会让功率/速度漂移。
+    ///
+    /// 找不到对应图层的条目必须如实告警并计数，不能静默丢弃。
+    /// 旧档案（processCount()==0）直接跳过：保持「同名图层沿用用户设置」的旧行为。
+    /// @return 成功落到运行时图层上的（工艺, 图层）条目数
+    int restoreNativeProcesses(LayerManager* layerManager,
+        const ImportResult& parseResult,
+        const std::unordered_map<uint32_t, int>& sourceToLayerId,
+        QStringList* outWarnings)
+    {
+        if (parseResult.importedProcesses.empty())
+        {
+            return 0;
+        }
+        if (!layerManager)
+        {
+            const QString msg = QStringLiteral(
+                "This .apr file carries %1 process object(s) but no layer manager is available; "
+                "their machining parameters were not applied.")
+                                    .arg(parseResult.importedProcesses.size());
+            APR_WARNF("[ImportService] .apr carries %zu process object(s) but LayerManager is not set",
+                parseResult.importedProcesses.size());
+            if (outWarnings)
+            {
+                outWarnings->append(msg);
+            }
+            return 0;
+        }
+
+        // 先清后写：本次导入涉及的运行时图层一律从「无文档参数」开始
+        for (const auto& entry : sourceToLayerId)
+        {
+            layerManager->clearLayerProcessParams(entry.second);
+        }
+
+        // 工艺对象按 order 稳定排序：多条工艺命中同一图层时结果确定，
+        // 不会因为文件里的条目顺序变化而出现「同样的文件、不同的参数」
+        std::vector<const ImportResult::ProcessBinding*> ordered;
+        ordered.reserve(parseResult.importedProcesses.size());
+        for (const auto& binding : parseResult.importedProcesses)
+        {
+            ordered.push_back(&binding);
+        }
+        std::stable_sort(ordered.begin(), ordered.end(),
+            [](const ImportResult::ProcessBinding* a, const ImportResult::ProcessBinding* b) {
+                return a->info.order < b->info.order;
+            });
+
+        int applied = 0;
+        int missingTargetLayerCount = 0;
+        int emptyTargetProcessCount = 0;
+
+        for (const ImportResult::ProcessBinding* binding : ordered)
+        {
+            std::vector<uint32_t> targets;
+            if (!binding->targetLayerIds.empty())
+            {
+                targets = binding->targetLayerIds;
+            }
+            else
+            {
+                for (const auto& machining : parseResult.importedLayerMachining)
+                {
+                    if (machining.defaultProcessId != 0
+                        && machining.defaultProcessId == binding->info.id)
+                    {
+                        targets.push_back(machining.sourceId);
+                    }
+                }
+            }
+
+            if (targets.empty())
+            {
+                ++emptyTargetProcessCount;
+                APR_WARNF("[ImportService] Process #%u ('%s') targets no layer; its machining parameters were "
+                          "not applied",
+                    binding->info.id,
+                    binding->info.name);
+                continue;
+            }
+
+            const Eg::ProcessParams params = aprProcessParamsToEg(binding->info.params);
+            int appliedForProcess = 0;
+            for (uint32_t sourceLayerId : targets)
+            {
+                const auto it = sourceToLayerId.find(sourceLayerId);
+                if (it == sourceToLayerId.end())
+                {
+                    ++missingTargetLayerCount;
+                    continue;
+                }
+                if (layerManager->setLayerProcessParams(it->second, params))
+                {
+                    ++appliedForProcess;
+                    ++applied;
+                }
+            }
+
+            if (appliedForProcess == 0)
+            {
+                APR_WARNF("[ImportService] Process #%u ('%s') references %zu layer(s) but none exists in this "
+                          "document; parameters dropped",
+                    binding->info.id,
+                    binding->info.name,
+                    targets.size());
+            }
+        }
+
+        if (outWarnings)
+        {
+            if (missingTargetLayerCount > 0)
+            {
+                outWarnings->append(QStringLiteral(
+                    "This .apr file has %1 process target-layer reference(s) that do not exist in the "
+                    "document; their machining parameters were kept from the file but not applied.")
+                                        .arg(missingTargetLayerCount));
+            }
+            if (emptyTargetProcessCount > 0)
+            {
+                outWarnings->append(QStringLiteral(
+                    "%1 process object(s) in this .apr file target no layer; their machining parameters "
+                    "were not applied.")
+                                        .arg(emptyTargetProcessCount));
+            }
+        }
+
+        APR_DEBUGF("[ImportService] ProcessData reflow: %d applied, %d missing target layer(s), "
+                   "%d process(es) without target",
+            applied,
+            missingTargetLayerCount,
+            emptyTargetProcessCount);
+        return applied;
+    }
 }  // anonymous namespace
 
 // ==================== ImportService 实现 ====================
@@ -1003,9 +1173,13 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     // ===== 3.4 还原源文件的图层与群组结构 =====
     // 只对 2D 通道有意义：3D 网格不参与图层体系与 AprGroup 树。
     // 时序约束：必须在图元进入场景、拿到运行时 EntityId 之后，才能按映射表反查归属。
+    // 图层/工艺还原阶段的告警必须在最终结果里露出来：
+    // ProcessData 找不到目标图层属于「参数没生效」，不能只写日志。
+    QStringList layerRestoreWarnings;
     if (flatAdded > 0)
     {
-        const int createdLayers = restoreImportedLayers(context, parseResult, idRemap);
+        const int createdLayers = restoreImportedLayers(
+            context, parseResult, idRemap, &layerRestoreWarnings);
         APR_DEBUGF("[ImportService] Layer restore: %d created from %lld source layer(s), %lld entity mapping(s)",
             createdLayers,
             static_cast<long long>(parseResult.importedLayers.size()),
@@ -1042,9 +1216,12 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     {
         result.addWarning(warn);
     }
+    for (const auto& warn : layerRestoreWarnings)
+    {
+        result.addWarning(warn);
+    }
     return result;
 }
-
 // ===== 载入后同步 id 生成器 =====
 void ImportService::syncIdGeneratorWithScenes()
 {
@@ -1220,7 +1397,8 @@ void ImportService::phaseWriteBackState(const ImportContext& context, ImportResu
 }
 
 int ImportService::restoreImportedLayers(
-    const ImportContext& context, const ImportResult& parseResult, const std::unordered_map<int64_t, int64_t>& idRemap)
+    const ImportContext& context, const ImportResult& parseResult, const std::unordered_map<int64_t, int64_t>& idRemap,
+    QStringList* outWarnings)
 {
     if (parseResult.importedLayers.empty())
     {
@@ -1403,11 +1581,17 @@ int ImportService::restoreImportedLayers(
         }
     }
 
-    APR_DEBUGF("[ImportService] Layer restore: %zu total, %d created, %d reused, %zu entity assignment(s)",
+    // 工艺对象回灌必须排在图层落地之后：ProcessData 的目标是文档图层 ID，
+    // 而运行时图层 ID 可能因「按名复用」与文件里的不同，只能经 sourceToLayerId 换算。
+    const int appliedProcesses = restoreNativeProcesses(m_layerManager, parseResult, sourceToLayerId, outWarnings);
+
+    APR_DEBUGF("[ImportService] Layer restore: %zu total, %d created, %d reused, %zu entity assignment(s), "
+               "%d process assignment(s)",
         parseResult.importedLayers.size(),
         createdCount,
         reusedCount,
-        runtimeLayerMap.size());
+        runtimeLayerMap.size(),
+        appliedProcesses);
     return createdCount;
 }
 

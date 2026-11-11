@@ -156,6 +156,14 @@ void OperationRegistrar::registerAll()
             const auto layerIds = layerManager->getAllLayerIds();
             for (int layerId : layerIds)
             {
+                // 文档里带 ProcessData 的图层优先用它：这是 .apr v2 回灌进来的
+                // 完整工艺参数（含割缝/引入线/填充），比旧 HardwareProfile 全。
+                // 没有文档参数的图层仍走 Profile，旧文档与旧行为逐字节不变。
+                if (layerManager->hasLayerProcessParams(layerId))
+                {
+                    spec.layerParams.insert(layerId, layerManager->layerProcessParams(layerId));
+                    continue;
+                }
                 const auto hp = layerManager->layerHardwareProfile(layerId);
                 spec.layerParams.insert(layerId, hwProfileToProcessParams(hp));
             }

@@ -185,10 +185,12 @@ private:
     /// 还原源文件图层结构（DXF 等支持图层的格式）
     /// 按源图层表在 LayerManager 中创建/匹配图层，并把图元分配到对应图层
     /// @param idRemap 转换期 ID → 入库后最终 ID 的修正表（入库前 ID 被换过的图元才有条目）
+    /// @param outWarnings 可选：图层/工艺还原过程中需要如实告知用户的告警
     /// @return 成功创建的图层数量（仅计算新建图层）
     int restoreImportedLayers(const ImportContext& context,
         const ImportResult& parseResult,
-        const std::unordered_map<int64_t, int64_t>& idRemap);
+        const std::unordered_map<int64_t, int64_t>& idRemap,
+        QStringList* outWarnings = nullptr);
 
     /// 还原源文件群组结构（DXF 块引用 / SVG 的 g 元素 / OBJ 的 o-g-usemtl 等）
     /// 按 IR 群组表在 SceneManager::groupManager() 中新建群组，重建父子层级，并把图元挂到所属群组

@@ -84,6 +84,18 @@ struct ImportResult
     /// 元素直接复用 FileIO 的跨 DLL POD，避免 Main 侧再定义一套重复结构。
     std::vector<Fio::AprHardwareProfileInfo> importedHardwareProfiles;
 
+    /// 原生 .apr v2 的工艺对象（ProcessData）。
+    ///
+    /// 参数体不能只靠图层表还原：ProcessData 才是参数的一等载体，
+    /// 图层表里的 default_process_id 只是反向绑定。这里把参数体与显式目标图层
+    /// 一起带出来，由 ImportService 在图层落地后按图层 ID 回灌。
+    struct ProcessBinding
+    {
+        Fio::AprProcessInfo info;                  ///< id/name/order/output/params
+        std::vector<uint32_t> targetLayerIds;      ///< 显式目标图层（文档图层 ID）
+    };
+    std::vector<ProcessBinding> importedProcesses;
+
     /// 这份文件是否带了完整的原生加工语义快照（图层表 + 非空 Profile 值集）。
     /// true 时即便图层按名复用，也要用文件里的加工语义覆盖运行时设置；
     /// false 时沿用 DXF 等外来格式「同名图层保留用户设置」的旧行为。

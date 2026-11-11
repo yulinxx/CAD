@@ -113,6 +113,35 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecAprE
     }
     result.hasNativeMachiningSnapshot = !result.importedHardwareProfiles.empty();
 
+    // 1c. 提取工艺对象（ProcessData）。
+    //
+    // 图层表只存 default_process_id 这个引用，真正的参数体在 ProcessData 里。
+    // 旧文件 processCount()==0 → 空列表，读端保持现有运行时参数不动（与旧行为一致）。
+    result.importedProcesses.reserve(doc.processCount());
+    for (size_t i = 0; i < doc.processCount(); ++i)
+    {
+        Fio::AprProcessInfo info;
+        if (!doc.getProcessAt(i, info))
+        {
+            continue;
+        }
+
+        ImportResult::ProcessBinding binding;
+        binding.info = info;
+
+        // 目标图层是变长数组，AprProcessInfo 是冻结 POD 装不下；
+        // 先探长度再按长度取，避免固定容量截断导致「部分图层静默丢参数」。
+        size_t targetCount = 0;
+        if (doc.getProcessTargetLayers(info.id, nullptr, 0, &targetCount) && targetCount > 0)
+        {
+            binding.targetLayerIds.resize(targetCount);
+            size_t written = 0;
+            doc.getProcessTargetLayers(info.id, binding.targetLayerIds.data(), targetCount, &written);
+            binding.targetLayerIds.resize(written);
+        }
+        result.importedProcesses.push_back(std::move(binding));
+    }
+
     // 老版本写过图层 profile id 但没写值集：这些绑定是悬空的。
     // 只在确实引用了非默认 Profile 时提醒，避免每次打开旧文件都刷告警。
     if (!result.hasNativeMachiningSnapshot)

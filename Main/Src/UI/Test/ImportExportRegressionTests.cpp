@@ -16,6 +16,7 @@
 
 #include "ImportService.h"
 #include "ExportService.h"
+#include "Composition/ImportExportServiceSetup.h"
 #include "Export/ExportDispatcher.h"
 #include "Import/ImportDispatcher.h"
 #include "Import/Readers/NativeImportReader.h"
@@ -49,6 +50,7 @@
 #include <QStringList>
 #include <QTemporaryDir>
 
+#include <algorithm>
 #include <cstring>
 #include <memory>
 #include <string>
@@ -2219,6 +2221,270 @@ TEST(ImportExportRegressionTest, ImportServiceRestoresAprProfileValueSetAndLayer
     const HardwareProfile effective = layers.layerHardwareProfile(layerId);
     EXPECT_DOUBLE_EQ(effective.power, 77.5);
     EXPECT_DOUBLE_EQ(effective.speed, 245.25);
+}
+
+// ---- ProcessData 图层回灌（.apr v2）----
+//
+// 背景：ProcessData 是工艺参数的一等载体，图层表的 default_process_id 只是引用。
+// 保存侧只写图层表、打开侧不回灌 ProcessData，会让「参数体」整段丢失。
+// 下面用真实采集入口（LayerManager → NativeDocumentSnapshot）与真实导入链
+// （NativeImportReader → ImportService）守三方：往返一致、二次打开不漂移、
+// 目标图层缺失必须告警。
+namespace
+{
+    Eg::ProcessParams aprProcReferenceParams()
+    {
+        Eg::ProcessParams p;
+        p.powerPercent = 66.5;
+        p.speedMmPerSec = 123.25;
+        p.frequencyHz = 25000.0;
+        p.pulseWidthUs = 120.0;
+        p.waveformIndex = 2;
+        p.passes = 3;
+        p.fillEnabled = true;
+        p.fillIntervalMm = 0.12;
+        p.fillAngleDeg = 37.0;
+        p.fillMode = Eg::FillMode::Raster;
+        p.kerfMm = 0.25;
+        p.rapidSpeedMmPerSec = 900.0;
+        p.leadInEnabled = true;
+        p.leadInLengthMm = 3.0;
+        p.leadInMode = 1;
+        p.leadInAngleDeg = 45.0;
+        return p;
+    }
+
+    void aprProcExpectParamsEqual(const Eg::ProcessParams& got, const Eg::ProcessParams& want)
+    {
+        EXPECT_DOUBLE_EQ(got.powerPercent, want.powerPercent);
+        EXPECT_DOUBLE_EQ(got.speedMmPerSec, want.speedMmPerSec);
+        EXPECT_DOUBLE_EQ(got.frequencyHz, want.frequencyHz);
+        EXPECT_DOUBLE_EQ(got.pulseWidthUs, want.pulseWidthUs);
+        EXPECT_EQ(got.waveformIndex, want.waveformIndex);
+        EXPECT_EQ(got.passes, want.passes);
+        EXPECT_EQ(got.fillEnabled, want.fillEnabled);
+        EXPECT_DOUBLE_EQ(got.fillIntervalMm, want.fillIntervalMm);
+        EXPECT_DOUBLE_EQ(got.fillAngleDeg, want.fillAngleDeg);
+        EXPECT_EQ(got.fillMode, want.fillMode);
+        EXPECT_DOUBLE_EQ(got.kerfMm, want.kerfMm);
+        EXPECT_DOUBLE_EQ(got.rapidSpeedMmPerSec, want.rapidSpeedMmPerSec);
+        EXPECT_EQ(got.leadInEnabled, want.leadInEnabled);
+        EXPECT_DOUBLE_EQ(got.leadInLengthMm, want.leadInLengthMm);
+        EXPECT_EQ(got.leadInMode, want.leadInMode);
+        EXPECT_DOUBLE_EQ(got.leadInAngleDeg, want.leadInAngleDeg);
+    }
+
+    /// 造一份带 ProcessData 的 .apr；用于覆盖保存侧采集 + 写入。
+    ExportResult aprProcWriteSample(const QString& path, const NativeDocumentSnapshot& snapshot)
+    {
+        Eg::SceneManager scene;
+        auto line = std::make_unique<Eg::AprLine>();
+        line->setPointVector({ Ut::Vec2d(0, 0), Ut::Vec2d(10, 10) });
+        std::vector<std::unique_ptr<Eg::AprEntity>> vec;
+        vec.push_back(std::move(line));
+        Eg::SceneWriteGateway::addEntities(scene, std::move(vec));
+
+        ExportContext context;
+        context.targetPath = path;
+        context.format = Fio::FileFormat::Native;
+        context.sceneManager = &scene;
+        context.hasMachiningSnapshot = true;
+        context.machiningSnapshot = snapshot;
+
+        NativeExportWriter writer;
+        return writer.write(context, {});
+    }
+
+    Fio::AprLayerDetailInfo aprProcSampleLayer(uint32_t id, const char* name)
+    {
+        Fio::AprLayerDetailInfo layer;
+        layer.id = id;
+        std::strncpy(layer.name, name, sizeof(layer.name) - 1);
+        layer.color = 0xFFFFFFFF;
+        layer.visible = true;
+        layer.locked = false;
+        layer.output = true;
+        return layer;
+    }
+}  // namespace
+
+TEST(ImportExportRegressionTest, AprProcessDataRoundTripReflowsLayerParams)
+{
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("process.apr"));
+
+    // ---- 保存侧：真实采集入口 ----
+    Eg::SceneManager saveScene;
+    LayerManager saveLayers(&saveScene);
+    const int layerId = saveLayers.createLayer("ProcessLayer");
+    ASSERT_GE(layerId, 0);
+    const Eg::ProcessParams expected = aprProcReferenceParams();
+    ASSERT_TRUE(saveLayers.setLayerProcessParams(layerId, expected));
+
+    NativeDocumentSnapshot snapshot = aprSetupCaptureMachiningSnapshot(&saveLayers);
+    ASSERT_EQ(snapshot.processes.size(), 1u);
+    // 补一条默认 Profile，避免导入时出现「图层表存了但值集为空」的无关告警
+    {
+        Fio::AprHardwareProfileInfo profile;
+        profile.id = 0;
+        std::strncpy(profile.name, "Default", sizeof(profile.name) - 1);
+        profile.power = 100.0;
+        profile.speed = 1000.0;
+        snapshot.profiles.push_back(profile);
+    }
+    EXPECT_EQ(snapshot.processes[0].info.id, static_cast<uint32_t>(layerId) + 1u);
+    EXPECT_EQ(snapshot.processes[0].info.order, 0);
+    ASSERT_EQ(snapshot.processes[0].targetLayerIds.size(), 1u);
+    EXPECT_EQ(snapshot.processes[0].targetLayerIds[0], static_cast<uint32_t>(layerId));
+    const auto layerDetail = std::find_if(snapshot.layers.begin(), snapshot.layers.end(),
+        [layerId](const Fio::AprLayerDetailInfo& layer) {
+            return layer.id == static_cast<uint32_t>(layerId);
+        });
+    ASSERT_NE(layerDetail, snapshot.layers.end());
+    EXPECT_EQ(layerDetail->defaultProcessId, static_cast<uint32_t>(layerId) + 1u);
+
+    ASSERT_TRUE(aprProcWriteSample(path, snapshot).success);
+
+    // ---- 文件层：ProcessData 与 target_layer_ids 都真的落盘 ----
+    {
+        Fio::NativeParser parser(Fio::FileFormat::Native);
+        Fio::AprDocument doc;
+        ASSERT_TRUE(parser.parseDocument(path.toUtf8().constData(), doc).success);
+        ASSERT_EQ(doc.processCount(), 1u);
+
+        Fio::AprProcessInfo info;
+        ASSERT_TRUE(doc.getProcessAt(0, info));
+        EXPECT_EQ(info.id, static_cast<uint32_t>(layerId) + 1u);
+        EXPECT_DOUBLE_EQ(info.params.kerfMm, expected.kerfMm);
+        EXPECT_TRUE(info.params.leadInEnabled);
+        EXPECT_DOUBLE_EQ(info.params.leadInLengthMm, expected.leadInLengthMm);
+        EXPECT_EQ(info.params.leadInMode, expected.leadInMode);
+        EXPECT_DOUBLE_EQ(info.params.leadInAngleDeg, expected.leadInAngleDeg);
+
+        uint32_t target = 0;
+        size_t written = 0;
+        ASSERT_TRUE(doc.getProcessTargetLayers(info.id, &target, 1, &written));
+        ASSERT_EQ(written, 1u);
+        EXPECT_EQ(target, static_cast<uint32_t>(layerId));
+    }
+
+    // ---- 读端：真实导入链回灌 LayerManager ----
+    ImportDispatcher dispatcher;
+    dispatcher.registerReader(std::make_unique<NativeImportReader>());
+    Eg::SceneManager loadScene;
+    LayerManager loadLayers(&loadScene);
+    ImportService service;
+    service.setDispatcher(&dispatcher);
+    service.setSceneManager(&loadScene);
+    service.setLayerManager(&loadLayers);
+
+    ImportContext context;
+    context.sourcePath = path;
+    context.preserveLayers = true;
+    ImportOptions options;
+    options.autoFit = false;
+    options.autoCenter = false;
+    options.autoSwitchWorkbench = false;
+
+    ImportResult first = service.importWithContext(context, options);
+    ASSERT_TRUE(first.success) << first.message.toStdString();
+    EXPECT_TRUE(first.warnings.isEmpty()) << first.warnings.join(QStringLiteral(" ")).toStdString();
+
+    const int restoredId = loadLayers.findLayerByName("ProcessLayer");
+    ASSERT_GE(restoredId, 0);
+    ASSERT_TRUE(loadLayers.hasLayerProcessParams(restoredId));
+    aprProcExpectParamsEqual(loadLayers.layerProcessParams(restoredId), expected);
+
+    // ---- 幂等：连续打开两次，参数不得漂移 ----
+    ImportResult second = service.importWithContext(context, options);
+    ASSERT_TRUE(second.success) << second.message.toStdString();
+    ASSERT_TRUE(loadLayers.hasLayerProcessParams(restoredId));
+    aprProcExpectParamsEqual(loadLayers.layerProcessParams(restoredId), expected);
+
+    // ---- 打开 → 保存 → 再打开：保存侧必须从图层参数重建 ProcessData ----
+    const NativeDocumentSnapshot resaved = aprSetupCaptureMachiningSnapshot(&loadLayers);
+    ASSERT_EQ(resaved.processes.size(), 1u);
+    const QString secondPath = dir.filePath(QStringLiteral("process-resaved.apr"));
+    ASSERT_TRUE(aprProcWriteSample(secondPath, resaved).success);
+
+    Eg::SceneManager reopenScene;
+    LayerManager reopenLayers(&reopenScene);
+    ImportService reopenService;
+    reopenService.setDispatcher(&dispatcher);
+    reopenService.setSceneManager(&reopenScene);
+    reopenService.setLayerManager(&reopenLayers);
+
+    ImportContext reopenContext;
+    reopenContext.sourcePath = secondPath;
+    reopenContext.preserveLayers = true;
+    const ImportResult reopened = reopenService.importWithContext(reopenContext, options);
+    ASSERT_TRUE(reopened.success) << reopened.message.toStdString();
+
+    const int reopenLayerId = reopenLayers.findLayerByName("ProcessLayer");
+    ASSERT_GE(reopenLayerId, 0);
+    ASSERT_TRUE(reopenLayers.hasLayerProcessParams(reopenLayerId));
+    aprProcExpectParamsEqual(reopenLayers.layerProcessParams(reopenLayerId), expected);
+}
+
+TEST(ImportExportRegressionTest, AprProcessDataMissingTargetLayerIsReported)
+{
+    // 工艺对象指向不存在的图层，或压根没有目标图层：参数不可能生效。
+    // 必须告警并计数，不能把「参数没回灌」伪装成一次干净的打开。
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("missing-target.apr"));
+
+    // 文档里只有 7 号图层；11 号工艺指向 99 号（不存在），12 号工艺没有目标
+    NativeDocumentSnapshot snapshot;
+    snapshot.layers.push_back(aprProcSampleLayer(7, "Ghost-7"));
+    snapshot.processes.push_back({ [] {
+                                      Fio::AprProcessInfo info;
+                                      info.id = 11;
+                                      std::strncpy(info.name, "Orphan", sizeof(info.name) - 1);
+                                      info.order = 0;
+                                      return info;
+                                  }(),
+        { 99 } });
+    snapshot.processes.push_back({ [] {
+                                      Fio::AprProcessInfo info;
+                                      info.id = 12;
+                                      std::strncpy(info.name, "NoTarget", sizeof(info.name) - 1);
+                                      info.order = 1;
+                                      return info;
+                                  }(),
+        {} });
+
+    ASSERT_TRUE(aprProcWriteSample(path, snapshot).success);
+
+    ImportDispatcher dispatcher;
+    dispatcher.registerReader(std::make_unique<NativeImportReader>());
+    Eg::SceneManager scene;
+    LayerManager layers(&scene);
+    ImportService service;
+    service.setDispatcher(&dispatcher);
+    service.setSceneManager(&scene);
+    service.setLayerManager(&layers);
+
+    ImportContext context;
+    context.sourcePath = path;
+    context.preserveLayers = true;
+    ImportOptions options;
+    options.autoFit = false;
+    options.autoCenter = false;
+    options.autoSwitchWorkbench = false;
+
+    const ImportResult result = service.importWithContext(context, options);
+    ASSERT_TRUE(result.success) << result.message.toStdString();
+
+    const int layerId = layers.findLayerByName("Ghost-7");
+    ASSERT_GE(layerId, 0);
+    EXPECT_FALSE(layers.hasLayerProcessParams(layerId))
+        << "找不到目标图层的工艺对象不能悄悄套到别的图层上";
+
+    const QString warnings = result.warnings.join(QStringLiteral(" | "));
+    EXPECT_NE(warnings.indexOf(QStringLiteral("do not exist")), -1) << warnings.toStdString();
+    EXPECT_NE(warnings.indexOf(QStringLiteral("target no layer")), -1) << warnings.toStdString();
 }
 
 TEST(ImportExportRegressionTest, LegacyAprWithoutProfileValueSetKeepsRuntimeProfiles)

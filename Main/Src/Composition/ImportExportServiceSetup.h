@@ -23,6 +23,11 @@ namespace Ui
 }
 
 struct UiServices;
+struct NativeDocumentSnapshot;
+
+/// 采集原生 .apr 的加工语义快照：图层表、硬件 Profile 值集、每层工艺对象
+/// （ProcessData）。导出与回归测试共用同一入口，避免测试里另写一份采集逻辑。
+NativeDocumentSnapshot aprSetupCaptureMachiningSnapshot(LayerManager* layerManager);
 
 /// 导入/导出服务装配（P2-10 从组合根提取）：
 /// 读取器/写入器注册 + 服务注入 + 进度信号接线。纯装配逻辑，无自身生命周期。

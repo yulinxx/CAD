@@ -71,6 +71,15 @@ static void applyMachiningSnapshot(
     {
         doc.addHardwareProfile(profile);
     }
+    for (const auto& process : context.machiningSnapshot.processes)
+    {
+        doc.addProcess(process.info);
+        // 显式目标图层走独立 API：AprProcessInfo 是冻结 POD，装不下变长数组
+        for (uint32_t layerId : process.targetLayerIds)
+        {
+            doc.addProcessTargetLayer(process.info.id, layerId);
+        }
+    }
 
     layersWritten = !context.machiningSnapshot.layers.empty();
     profilesWritten = !context.machiningSnapshot.profiles.empty();
@@ -153,9 +162,10 @@ ExportResult NativeExportWriter::write(const ExportContext& context, const Fio::
     {
         exportResult.addWarning(nativeProfileValueSetMissingWarning());
     }
-    APR_DEBUGF("[NativeExportWriter] .apr saved: %zu layer(s), %zu profile(s), %d entit(y/ies)",
+    APR_DEBUGF("[NativeExportWriter] .apr saved: %zu layer(s), %zu profile(s), %zu process(es), %d entit(y/ies)",
         context.machiningSnapshot.layers.size(),
         context.machiningSnapshot.profiles.size(),
+        context.machiningSnapshot.processes.size(),
         static_cast<int>(entities.size()));
     return exportResult;
 }

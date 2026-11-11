@@ -25,8 +25,19 @@ namespace Eg
 ///     或让 Main 去包含 FileIO 的内部头 AprDocumentData.h。
 struct NativeDocumentSnapshot
 {
+    /// 一条工艺对象快照：参数体 + 显式目标图层。
+    /// 目标图层要单独带，是因为 `Fio::AprProcessInfo` 是冻结 POD，装不下变长数组。
+    struct ProcessEntry
+    {
+        Fio::AprProcessInfo info;
+        std::vector<uint32_t> targetLayerIds;
+    };
+
     std::vector<Fio::AprLayerDetailInfo> layers;
     std::vector<Fio::AprHardwareProfileInfo> profiles;
+    /// .apr v2 的 ProcessData（参数的一等载体）。
+    /// 图层表里的 default_process_id 只是引用，没这一组等于参数体没存。
+    std::vector<ProcessEntry> processes;
 };
 
 /// 统一导出上下文：承载导出操作所需的所有参数和状态信息

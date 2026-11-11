@@ -98,13 +98,35 @@ namespace
             (static_cast<uint32_t>(c.blue255() & 0xFF));
     }
 
-    // 原生 .apr 的加工语义快照：图层表 + 硬件 Profile 值集。
+    // Eg::ProcessParams → FileIO 工艺参数 POD（单位不换算：两边都是 mm/mm/s/Hz/度）
+    void aprSetupProcessParamsToApr(const Eg::ProcessParams& src, Fio::AprProcessParamsInfo& out)
+    {
+        out.enabled = src.enabled;
+        out.powerPercent = src.powerPercent;
+        out.speedMmPerSec = src.speedMmPerSec;
+        out.frequencyHz = src.frequencyHz;
+        out.pulseWidthUs = src.pulseWidthUs;
+        out.waveformIndex = src.waveformIndex;
+        out.passes = src.passes;
+        out.fillEnabled = src.fillEnabled;
+        out.fillIntervalMm = src.fillIntervalMm;
+        out.fillAngleDeg = src.fillAngleDeg;
+        out.fillMode = static_cast<int32_t>(src.fillMode);
+        out.kerfMm = src.kerfMm;
+        out.rapidSpeedMmPerSec = src.rapidSpeedMmPerSec;
+        out.leadInEnabled = src.leadInEnabled;
+        out.leadInLengthMm = src.leadInLengthMm;
+        out.leadInMode = src.leadInMode;
+        out.leadInAngleDeg = src.leadInAngleDeg;
+    }
+
+    // 原生 .apr 的加工语义快照：图层表 + 硬件 Profile 值集 + ProcessData。
     //
     // 只在主线程被 ExportService 调用（导出 Phase 1）。这里读的是 LayerManager
     // 的管理态字段，不是 AprLayer 的镜像副本：hardwareProfileId / fillHardwareProfileId
     // / output / defaultProcessId 只存在于前者，从 AprLayer 取会漏掉加工语义。
     // 结果全部是 FileIO 的跨 DLL POD，可安全按值交给后台线程。
-    NativeDocumentSnapshot aprSetupCaptureMachiningSnapshot(LayerManager* layerManager)
+    NativeDocumentSnapshot aprSetupCaptureSnapshotImpl(LayerManager* layerManager)
     {
         NativeDocumentSnapshot snapshot;
         if (!layerManager)
@@ -114,6 +136,8 @@ namespace
 
         std::vector<int> layerIds = layerManager->getAllLayerIds();
         snapshot.layers.reserve(layerIds.size());
+        snapshot.processes.reserve(layerIds.size());
+        int order = 0;
         for (int id : layerIds)
         {
             Fio::AprLayerDetailInfo info;
@@ -131,6 +155,25 @@ namespace
             info.fillColor = aprSetupColorToArgb(layerManager->layerFillColor(id));
             info.hardwareProfileId = layerManager->layerHardwareProfileId(id);
             info.fillHardwareProfileId = layerManager->layerFillHardwareProfileId(id);
+
+            // 图层带文档工艺参数（.apr v2 ProcessData 回灌的）时，才写 ProcessData。
+            // 工艺 ID 用「图层 ID + 1」：文档要求 >= 1，且同一文档内唯一；
+            // 图层表里的 default_process_id 同步指向它，形成双向绑定。
+            // 旧文档（只有 HardwareProfile）不会生成本组数据，保存结果与之前一致。
+            if (layerManager->hasLayerProcessParams(id))
+            {
+                NativeDocumentSnapshot::ProcessEntry entry;
+                entry.info.id = static_cast<uint32_t>(id) + 1u;
+                std::strncpy(entry.info.name, name.c_str(), sizeof(entry.info.name) - 1);
+                entry.info.name[sizeof(entry.info.name) - 1] = '\0';
+                entry.info.order = order++;
+                entry.info.output = info.output;
+                aprSetupProcessParamsToApr(layerManager->layerProcessParams(id), entry.info.params);
+                entry.targetLayerIds.push_back(static_cast<uint32_t>(id));
+                snapshot.processes.push_back(std::move(entry));
+                info.defaultProcessId = static_cast<uint32_t>(id) + 1u;
+            }
+
             snapshot.layers.push_back(info);
         }
 
@@ -198,6 +241,13 @@ namespace
         });
     }
 }  // namespace
+
+// 对外入口：模块级函数（而非匿名命名空间）是为了让回归测试复用同一份采集逻辑，
+// 直接验证「图层工艺参数 → 文档 ProcessData」这一段对称性。
+NativeDocumentSnapshot aprSetupCaptureMachiningSnapshot(LayerManager* layerManager)
+{
+    return aprSetupCaptureSnapshotImpl(layerManager);
+}
 
 ImportExportServiceSetup::ImportExportServiceSetup(UiStateCenter* stateCenter,
     ImportService* importService,
