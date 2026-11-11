@@ -50,4 +50,11 @@ if [[ ${HAS_VIOLATION} -ne 0 ]]; then
     exit 1
 fi
 
+# 子模块指针校验：暂存的 gitlink 必须能在对应子模块远端解析到，
+# 否则干净克隆执行 submodule update --init 会失败。
+POINTER_GUARD="${REPO_ROOT}/Tools/submodule-pointers.sh"
+if [[ -f "${POINTER_GUARD}" ]]; then
+    bash "${POINTER_GUARD}" check
+fi
+
 exit 0
