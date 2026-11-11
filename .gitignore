@@ -346,6 +346,12 @@ stress_*/
 LayeredProcessingTests.cpp
 PolygonOffsetTests.cpp
 
+# CTest 运行产物（每次执行测试重新生成）
+Testing/Temporary/
+
+# 覆盖率采集原始数据
+*.profraw
+
 # ---- 审查输出目录 ----
 # 按日期命名的审查产物目录，每轮审查生成，不入库
 20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]/
