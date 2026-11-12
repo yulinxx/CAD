@@ -456,10 +456,18 @@ bool DeviceHost::start(const MachineProfile& profile, QString& errorOut)
     m_impl->profile = profile;
 
     const Hw::DeviceDescriptor& desc = device->descriptor();
-    m_impl->displayName = QStringLiteral("%1 %2")
-                              .arg(QString::fromUtf8(desc.vendor).trimmed())
-                              .arg(QString::fromUtf8(desc.displayName).trimmed())
-                              .trimmed();
+    const QString vendorName = QString::fromUtf8(desc.vendor).trimmed();
+    const QString modelName = QString::fromUtf8(desc.displayName).trimmed();
+    // 部分驱动的 displayName 已自带品牌（如 Leadshine motion control card），
+    // 再拼 vendor 会得到 "Leadshine Leadshine ..."，这里只在缺品牌时补前缀。
+    if (vendorName.isEmpty() || modelName.contains(vendorName, Qt::CaseInsensitive))
+    {
+        m_impl->displayName = modelName;
+    }
+    else
+    {
+        m_impl->displayName = QStringLiteral("%1 %2").arg(vendorName, modelName).trimmed();
+    }
 
     device->setEventSink(&m_impl->sink);
 

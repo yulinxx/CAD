@@ -31,9 +31,14 @@ public:
     /// 供测试直接刷新状态。
     void refreshState();
 
+protected:
+    void changeEvent(QEvent* event) override;
+    void showEvent(QShowEvent* event) override;
+
 private:
     void buildUi();
     void connectSignals();
+    void bindServicesIfNeeded();
     void runStart();
     void runPauseResume();
     void runStop();
@@ -49,6 +54,8 @@ private:
     ProcessingJobService* m_jobService{ nullptr };
     OperationBus* m_bus{ nullptr };
     EmergencyStopController* m_safety{ nullptr };
+    /// 依赖是否已确定（默认构造时组合根可能尚未装配完，留待 showEvent 补绑）。
+    bool m_bound{ false };
 
     QLabel* m_statusLabel{ nullptr };
     QLabel* m_safetyLabel{ nullptr };
