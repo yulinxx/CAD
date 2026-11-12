@@ -14,6 +14,7 @@
 #include "SceneTreeModel3D.h"
 
 #include "Engine3D/SceneManager3D.h"
+#include "Engine3D/Edit/SceneWriteGateway3D.h"
 #include "Engine3D/AprEntity/AprMeshEntity.h"
 
 #include <memory>
@@ -52,10 +53,10 @@ TEST(SceneTreeBuilder3DTest, Build_PopulatesMeshNodes)
     Eg::SceneManager3D scene;
     auto first = makeTriangleMeshForTree("Body");
     const Eg::EntityId firstId = first->id;
-    scene.addEntity(first.release());
+    Eg::SceneWriteGateway3D::addEntity(scene, first.release());
 
     auto second = makeTriangleMeshForTree();
-    scene.addEntity(second.release());
+    Eg::SceneWriteGateway3D::addEntity(scene, second.release());
 
     const SceneTreeModel3D model = SceneTreeBuilder3D::build(&scene);
     ASSERT_EQ(2, model.nodes.size());
@@ -75,7 +76,7 @@ TEST(SceneTreeBuilder3DTest, Build_PopulatesMeshNodes)
 TEST(SceneTreeBuilder3DTest, Build_FallsBackToTypeNameWhenNameless)
 {
     Eg::SceneManager3D scene;
-    scene.addEntity(makeTriangleMeshForTree().release());
+    Eg::SceneWriteGateway3D::addEntity(scene, makeTriangleMeshForTree().release());
 
     const SceneTreeModel3D model = SceneTreeBuilder3D::build(&scene);
     ASSERT_EQ(1, model.nodes.size());
@@ -88,8 +89,8 @@ TEST(SceneTreeBuilder3DTest, Build_CountsSelectedMeshes)
     auto a = makeTriangleMeshForTree("A");
     auto b = makeTriangleMeshForTree("B");
     auto* bRaw = b.get();
-    scene.addEntity(a.release());
-    scene.addEntity(b.release());
+    Eg::SceneWriteGateway3D::addEntity(scene, a.release());
+    Eg::SceneWriteGateway3D::addEntity(scene, b.release());
 
     // 通过场景选择管理选中第二个图元
     scene.selectEntity(bRaw);
@@ -110,8 +111,8 @@ TEST(SceneTreeBuilder3DTest, SelectedIds_ReturnsSelectedMeshIds)
     auto a = makeTriangleMeshForTree("A");
     auto b = makeTriangleMeshForTree("B");
     auto* bRaw = b.get();
-    scene.addEntity(a.release());
-    scene.addEntity(b.release());
+    Eg::SceneWriteGateway3D::addEntity(scene, a.release());
+    Eg::SceneWriteGateway3D::addEntity(scene, b.release());
 
     scene.selectEntity(bRaw);
 

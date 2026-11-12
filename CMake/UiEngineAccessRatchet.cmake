@@ -190,6 +190,9 @@ function(apr_check_ui_engine_include_ratchet)
         "Engine/Tool/IToolStateMachine.h"
         "Engine3D/Algorithm/Geo3DEdit.h"
         "Engine3D/Edit/SceneUndoCommands3D.h"
+        # 3D 结构写网关：SceneManager3D 只 friend 它，UI3D 的编辑服务必须经它写；
+        # 这是引擎内通道在 UI 侧的唯一合法引用（见 CMake/SceneWriteSurface.cmake 白名单）。
+        "Engine3D/Edit/SceneWriteGateway3D.h"
         "Engine3D/Geometry/Geo3DTypes.h"
         "Engine3D/Import/FioEntityConverter.h"
         "Engine3D/SceneManager3D.h"

@@ -14,6 +14,7 @@
 #include "UI/Render/RenderWidget3DAdapter.h"
 #include "UI3D/Render3D/SceneRefreshCoordinator3D.h"
 #include "Engine3D/SceneManager3D.h"
+#include "Engine3D/Edit/SceneWriteGateway3D.h"
 
 #include "Engine3D/AprEntity/AprMeshEntity.h"
 
@@ -47,7 +48,7 @@ TEST(Scene3DRegressionTest, SceneManager3D_AddMeshEntity)
     auto mesh = makeTriangleMesh("TestMesh");
 
     Eg::EntityId meshId = mesh->id;
-    scene.addEntity(mesh.release());
+    Eg::SceneWriteGateway3D::addEntity(scene, mesh.release());
 
     EXPECT_EQ(scene.getEntityCount(), 1u);
     auto* found = scene.findEntityById(meshId);
@@ -61,8 +62,8 @@ TEST(Scene3DRegressionTest, SceneManager3D_ClearScene)
 
     auto mesh1 = makeTriangleMesh();
     auto mesh2 = makeTriangleMesh();
-    scene.addEntity(mesh1.release());
-    scene.addEntity(mesh2.release());
+    Eg::SceneWriteGateway3D::addEntity(scene, mesh1.release());
+    Eg::SceneWriteGateway3D::addEntity(scene, mesh2.release());
 
     EXPECT_EQ(scene.getEntityCount(), 2u);
 
@@ -78,7 +79,7 @@ TEST(Scene3DRegressionTest, SceneManager3D_AddMultipleEntities)
     {
         auto mesh = makeTriangleMesh(("Mesh_" + std::to_string(i)).c_str());
 
-        scene.addEntity(mesh.release());
+        Eg::SceneWriteGateway3D::addEntity(scene, mesh.release());
     }
 
     EXPECT_EQ(scene.getEntityCount(), 10u);
@@ -89,14 +90,14 @@ TEST(Scene3DRegressionTest, SceneManager3D_ClearAndReAdd)
     Eg::SceneManager3D scene;
 
     auto mesh = makeTriangleMesh();
-    scene.addEntity(mesh.release());
+    Eg::SceneWriteGateway3D::addEntity(scene, mesh.release());
     EXPECT_EQ(scene.getEntityCount(), 1u);
 
     scene.clearScene();
     EXPECT_EQ(scene.getEntityCount(), 0u);
 
     auto mesh2 = makeTriangleMesh();
-    scene.addEntity(mesh2.release());
+    Eg::SceneWriteGateway3D::addEntity(scene, mesh2.release());
     EXPECT_EQ(scene.getEntityCount(), 1u);
 }
 
@@ -107,7 +108,7 @@ TEST(Scene3DRegressionTest, SceneManager3D_SelectEntity)
     auto mesh = makeTriangleMesh("SelectableMesh");
 
     auto* rawPtr = mesh.get();
-    scene.addEntity(mesh.release());
+    Eg::SceneWriteGateway3D::addEntity(scene, mesh.release());
 
     scene.selectEntity(rawPtr);
     size_t selCount = 0;
@@ -127,7 +128,7 @@ TEST(Scene3DRegressionTest, SceneManager3D_ClearSelection)
 
     auto mesh = makeTriangleMesh();
     auto* rawPtr = mesh.get();
-    scene.addEntity(mesh.release());
+    Eg::SceneWriteGateway3D::addEntity(scene, mesh.release());
 
     scene.selectEntity(rawPtr);
     size_t selCount1 = 0;
@@ -156,7 +157,7 @@ TEST(Scene3DRegressionTest, SceneManager3D_DeleteSelected)
 
     auto mesh = makeTriangleMesh();
     auto* rawPtr = mesh.get();
-    scene.addEntity(mesh.release());
+    Eg::SceneWriteGateway3D::addEntity(scene, mesh.release());
 
     scene.selectEntity(rawPtr);
     EXPECT_EQ(scene.getEntityCount(), 1u);

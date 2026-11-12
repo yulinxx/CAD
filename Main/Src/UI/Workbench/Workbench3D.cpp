@@ -1655,7 +1655,8 @@ void Workbench3D::deleteSceneTreeSelection3D(const QStringList& ids)
         }
         if (!targets.empty())
         {
-            m_sceneManager3D->deleteEntities(targets.data(), static_cast<int>(targets.size()));
+            SceneEditService3D::deleteEntitiesDirect(
+                m_sceneManager3D, targets.data(), static_cast<int>(targets.size()));
             m_sceneManager3D->markDataChanged();
         }
     }
