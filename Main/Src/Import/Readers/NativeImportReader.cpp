@@ -6,6 +6,9 @@
 
 #include <QFileInfo>
 
+#include <unordered_set>
+#include <vector>
+
 #include "FileIO/Parsers/NativeParser.h"
 #include "FileIO/AprDocument.h"
 #include "FileIO/ProcessModelSnapshot.h"
@@ -181,7 +184,34 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecAprE
         }
     }
 
-    // 3. 建立图元 -> 图层映射
+    // 3. 计算导入侧 ID：直接沿用文档持久 ID，让 entityLayerMap / entityGroupMap
+    //    的键与入库前的图元 ID 天然对齐。clone() 会生成新 ID（id 是身份不是状态），
+    //    不还原就会让整批换层映射查不到图元，表现为「导入后全部落在默认图层」。
+    //    缺失（<=0）或档案内重复的 ID 用批次内唯一的负数占位：SceneEditService
+    //    遇到 <=0 会重新分配，并按「旧 ID -> 新 ID」修正映射，归属仍能落到正确图层。
+    std::unordered_set<Eg::EntityId> usedIds;
+    usedIds.reserve(doc.entityCount());
+    std::vector<Eg::EntityId> importIds(doc.entityCount(), 0);
+    for (size_t i = 0; i < doc.entityCount(); ++i)
+    {
+        Eg::AprEntity* entity = doc.entityAt(i);
+        if (!entity)
+        {
+            continue;
+        }
+        Eg::EntityId id = entity->id;
+        if (id <= 0 || !usedIds.insert(id).second)
+        {
+            id = -static_cast<Eg::EntityId>(i) - 1;
+            while (!usedIds.insert(id).second)
+            {
+                --id;
+            }
+        }
+        importIds[i] = id;
+    }
+
+    // 4. 建立图元 -> 图层映射
     result.entityLayerMap.reserve(doc.entityCount());
     for (size_t i = 0; i < doc.entityCount(); ++i)
     {
@@ -191,12 +221,12 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecAprE
             uint32_t layerId = doc.entityLayerId(entity->id);
             if (layerId != 0)
             {
-                result.entityLayerMap[static_cast<int64_t>(entity->id)] = layerId;
+                result.entityLayerMap[static_cast<int64_t>(importIds[i])] = layerId;
             }
         }
     }
 
-    // 4. 建立图元 -> 群组映射
+    // 5. 建立图元 -> 群组映射
     for (size_t i = 0; i < doc.entityCount(); ++i)
     {
         Eg::AprEntity* entity = doc.entityAt(i);
@@ -205,12 +235,12 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecAprE
             uint64_t groupId = doc.entityGroupId(entity->id);
             if (groupId != 0)
             {
-                result.entityGroupMap[static_cast<int64_t>(entity->id)] = groupId;
+                result.entityGroupMap[static_cast<int64_t>(importIds[i])] = groupId;
             }
         }
     }
 
-    // 5. 移动图元到输出
+    // 6. 移动图元到输出
     outEntities.clear();
     outEntities.reserve(doc.entityCount());
     for (size_t i = 0; i < doc.entityCount(); ++i)
@@ -222,7 +252,9 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecAprE
         Eg::AprEntity* entity = doc.entityAt(i);
         if (entity)
         {
-            outEntities.emplace_back(entity->clone());
+            Eg::AprEntity* copy = entity->clone();
+            copy->id = importIds[i];
+            outEntities.emplace_back(copy);
         }
     }
 

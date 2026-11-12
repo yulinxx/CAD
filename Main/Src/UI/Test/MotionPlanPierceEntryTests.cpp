@@ -145,19 +145,6 @@ namespace PierceEntry
         return result;
     }
 
-    /// 读取器把文档图元 clone 出来时丢了持久 ID，入库后会被重新分配，
-    /// 导致 ImportService 的「文档 ID → 新 ID」换层映射对不上（读取器既有行为，
-    /// 不在本次范围）。按图层名把导入图元放回目标图层，便于从真实入口编译刀路。
-    void placeEntityOnLayer(Eg::SceneManager& scene, LayerManager& layers, const char* layerName)
-    {
-        const int layerId = layers.findLayerByName(layerName);
-        ASSERT_GE(layerId, 0) << layerName;
-        ASSERT_FALSE(scene.getAllEntities().empty());
-        Eg::AprEntity* entity = scene.getAllEntities().front();
-        layers.applyEntityLayerMap({ { entity->id, layerId } });
-        ASSERT_EQ(layerId, layers.getEntityLayer(entity));
-    }
-
     Eg::PierceSpec pierceFixture()
     {
         Eg::PierceSpec pierce;
@@ -226,7 +213,8 @@ TEST(MotionPlanPierceEntryTest, ProcessDetailPierceReachesMotionPlan)
 
     const int layerId = layers.findLayerByName("Pierce");
     ASSERT_GE(layerId, 0);
-    placeEntityOnLayer(scene, layers, "Pierce");
+    ASSERT_FALSE(scene.getAllEntities().empty());
+    ASSERT_EQ(layerId, layers.getEntityLayer(scene.getAllEntities().front()));
 
     // ---- OperationRegistrar 的真实取参路径 ----
     const ToolpathJobSpec spec = buildToolpathJobSpec(&layers, Eg::MachineFrameConfig{});
@@ -334,7 +322,8 @@ TEST(MotionPlanPierceEntryTest, UnsupportedDetailsReportedOncePerCompile)
     // 取值方式直接注入，验证编译器对它的告警。
     const int layerId = layers.findLayerByName("Pierce");
     ASSERT_GE(layerId, 0);
-    placeEntityOnLayer(scene, layers, "Pierce");
+    ASSERT_FALSE(scene.getAllEntities().empty());
+    ASSERT_EQ(layerId, layers.getEntityLayer(scene.getAllEntities().front()));
     ASSERT_TRUE(spec.layerParams.contains(layerId));
     spec.layerParams[layerId].focusOffsetMm = 0.5;
 
