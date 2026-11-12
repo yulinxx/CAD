@@ -90,10 +90,42 @@ function(apr_check_dependency_directions)
     # 却宣称全绿。这里先把本轮没参与校验的目标如实记录下来。
     set(_all_checked_targets
         ${_engine_targets} ${_render_targets} ${_ui_targets}
-        ${_app_targets} ${_abstraction_targets} CAM)
+        ${_app_targets} ${_abstraction_targets}
+        CAM Utility Log License CrashHandler Network Hardware Vision Nesting
+        Raster PythonHost AprPyBindCore Engraving FileIO GeoModelCore)
+
+    # 被 BUILD_xxx=OFF 主动关掉的模块不算“漏审”：比如 CI 为控制时长关掉
+    # HARDWARE/VISION/ENGRAVING/GEOMODELCORE/PYTHON，目标本就不该存在。
+    # 只有选项为 ON 却找不到目标，才是真正的审计缺口。
+    set(_audit_option_guards
+        "Hardware=BUILD_HARDWARE"
+        "Network=BUILD_NETWORK"
+        "Vision=BUILD_VISION"
+        "Nesting=BUILD_NESTING"
+        "Raster=BUILD_RASTER"
+        "PythonHost=BUILD_PYTHON"
+        "AprPyBindCore=APR_PYBIND_CORE"
+        "Engraving=BUILD_ENGRAVING"
+        "GeoModelCore=BUILD_GEOMODELCORE"
+        "CrashHandler=BUILD_CRASHHANDLER"
+        "CAM=BUILD_CAM")
+    set(_intentionally_disabled "")
+    foreach(_pair IN LISTS _audit_option_guards)
+        string(REPLACE "=" ";" _kv "${_pair}")
+        list(GET _kv 0 _guard_target)
+        list(GET _kv 1 _guard_option)
+        if(DEFINED ${_guard_option} AND NOT ${_guard_option})
+            list(APPEND _intentionally_disabled "${_guard_target}")
+        endif()
+    endforeach()
+    # PyBindCore 还要看 PythonHost 集成开关（两者同时 ON 才会生成模块目标）
+    if(DEFINED APR_PYTHON_HOST AND NOT APR_PYTHON_HOST)
+        list(APPEND _intentionally_disabled AprPyBindCore)
+    endif()
+
     set(_missing_targets "")
     foreach(_t IN LISTS _all_checked_targets)
-        if(NOT TARGET ${_t})
+        if(NOT TARGET ${_t} AND NOT _t IN_LIST _intentionally_disabled)
             list(APPEND _missing_targets "${_t}")
         endif()
     endforeach()
@@ -186,6 +218,57 @@ function(apr_check_dependency_directions)
         endif()
     endif()
 
+    # 规则 7：基础 / 服务模块不得依赖上层（UI / Render / Main / 门面）。
+    # 覆盖此前不在规则内的 14 个共享库目标。这里只禁止**向上**依赖，
+    # 不重新定义它们之间的既有向下依赖（例如 FileIO 依赖 Engine*/GeoModelCore、
+    # Engraving 依赖 Engine3D 都是既定设计，不在此处判违规）。
+    set(_base_targets
+        Utility Log License CrashHandler Network Hardware Vision Nesting
+        Raster PythonHost AprPyBindCore Engraving FileIO GeoModelCore)
+    set(_base_forbidden
+        "^(UICommon|UI2D|UI3D|RenderX|RenderBridge|RenderAbstraction|April|UiEngineAccess)$")
+    foreach(_t IN LISTS _base_targets)
+        if(TARGET ${_t})
+            get_target_property(_libs ${_t} LINK_LIBRARIES)
+            if(_libs)
+                foreach(_dep IN LISTS _libs)
+                    if(_dep MATCHES "${_base_forbidden}")
+                        list(APPEND _violations
+                            "Base/service target ${_t} depends on upper-layer ${_dep}")
+                    endif()
+                endforeach()
+            endif()
+            # 公开头路径同样不能把上层头带给下游（比 LINK_LIBRARIES 更严格）
+            get_target_property(_incs ${_t} INTERFACE_INCLUDE_DIRS)
+            if(_incs)
+                foreach(_inc IN LISTS _incs)
+                    if(_inc MATCHES "[/\\\\](UICommon|UI2D|UI3D|Renderx|RenderBridge|Main)[/\\\\](Include|include)")
+                        list(APPEND _violations
+                            "Base/service target ${_t} leaks upper-layer include path ${_inc}")
+                    endif()
+                endforeach()
+            endif()
+        endif()
+    endforeach()
+
+    # 规则 8：Engine / Render 不得反向依赖基础服务或绑定层（防止循环依赖）。
+    # Utility/Log 仍是允许的底座，不在此列。
+    set(_lower_forbidden
+        "^(FileIO|Hardware|Vision|Nesting|Raster|PythonHost|AprPyBindCore|Engraving|Network|CrashHandler|License|GeoModelCore)$")
+    foreach(_t IN LISTS _engine_targets _render_targets)
+        if(TARGET ${_t})
+            get_target_property(_libs ${_t} LINK_LIBRARIES)
+            if(_libs)
+                foreach(_dep IN LISTS _libs)
+                    if(_dep MATCHES "${_lower_forbidden}")
+                        list(APPEND _violations
+                            "Lower-layer target ${_t} depends on base/service module ${_dep} (dependency cycle risk)")
+                    endif()
+                endforeach()
+            endif()
+        endif()
+    endforeach()
+
     # 规则 5：UI 不得在自己的 include 目录里引入 RenderX 头路径。
     # 这是"UI 能直接调 rx*"的能力来源——去掉它，直调那批代码会立刻编译失败，
     # 于是耦合无法悄悄长回来。允许残留告警：收口是渐进的。
@@ -242,19 +325,27 @@ function(apr_check_dependency_directions)
         endif()
     endif()
 
+    set(_audited_count 0)
+    foreach(_t IN LISTS _all_checked_targets)
+        if(TARGET ${_t})
+            math(EXPR _audited_count "${_audited_count} + 1")
+        endif()
+    endforeach()
+
     if(_violations)
         string(REPLACE ";" "\n    - " _msg "${_violations}")
         message(FATAL_ERROR
             "[apr_check_dependency_directions] dependency direction violation:\n    - ${_msg}\n"
-            "  See Docs/01-当前架构/UI-Engine解耦迁移方案.md")
+            "  See Docs: UI-Engine decoupling migration plan (01-architecture)")
     endif()
 
     if(_advisory)
         # 分层规则都过了，但 UI 仍能直调 RenderX —— 不谎报"完全解耦"
-        message(STATUS "[April] dependency directions: OK (layering rules pass; UI/RenderX isolation is still open, see warnings above${_skip_note})")
+        message(STATUS "[April] dependency directions: OK (${_audited_count} targets audited; layering rules pass; UI/RenderX isolation is still open, see warnings above${_skip_note})")
     else()
         message(STATUS "[April] dependency directions: OK "
-            "(Engine does not depend on UI/Render; Render does not depend on UI; "
+            "(${_audited_count} targets audited; "
+            "Engine does not depend on UI/Render; Render does not depend on UI; "
             "UI reaches Engine only through UiEngineAccess at link level (includes remain open, covered by the ratchet); "
             "UI reaches rendering through RenderAbstraction${_skip_note})")
     endif()

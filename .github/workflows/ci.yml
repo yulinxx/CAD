@@ -36,7 +36,11 @@ jobs:
       # 发货/Release 构建应断言该开关为 ON。
       - name: Configure
         run: |
+          # APR_STRICT_DEPENDENCY_AUDIT=ON：所有 BUILD_xxx=ON 的模块目标都必须
+          # 被 CMake/CheckDependencies.cmake 审计到；选项关掉的模块不算漏审。
+          # 依赖方向违规会在本步骤直接失败，不需要等到链接期。
           cmake -B build -G "Visual Studio 17 2022" -A x64 \
+            -DAPR_STRICT_DEPENDENCY_AUDIT=ON \
             -DBUILD_TESTS=ON \
             -DBUILD_HARDWARE=OFF \
             -DBUILD_VISION=OFF \
@@ -297,6 +301,7 @@ jobs:
             -DVCPKG_INSTALLED_DIR="$GITHUB_WORKSPACE/.vcpkg/installed" \
             -DPython_EXECUTABLE="$(command -v python3)" \
             -Dpybind11_DIR="$PYBIND11_DIR" \
+            -DAPR_STRICT_DEPENDENCY_AUDIT=ON \
             -DBUILD_TESTS=ON \
             -DBUILD_NESTING=ON \
             -DBUILD_CAM=ON \
