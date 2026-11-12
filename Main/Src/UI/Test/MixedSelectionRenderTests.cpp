@@ -35,7 +35,7 @@
 #include "Render/RenderSceneBuilder.h"
 #include "RenderAbstraction/IRenderFactory.h"
 #include "RenderAbstraction/IRenderScene.h"
-#include "RenderBridge/RenderXAdapter.h"
+#include "RenderBridge/OffscreenRenderFactory.h"
 #include "RenderWidget.h"
 #include "UI/Render/BitmapReconciler.h"
 #include "UI/Render/SceneRefreshCoordinator.h"
@@ -221,7 +221,7 @@ TEST(MixedSelectionRenderTest, MixedBatchesSurviveSelectionHiding)
     ASSERT_NE(fill, nullptr);
     ASSERT_NE(image, nullptr);
 
-    auto factory = RenderBridge::RenderXAdapter::createFactory();
+    auto factory = RenderBridge::createOffscreenRenderFactory();
     ASSERT_NE(factory, nullptr);
     RenderAbstraction::DeviceConfig config;
     config.backend = RenderAbstraction::RenderBackend::Null;

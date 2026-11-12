@@ -23,7 +23,7 @@
 #include "Render/RenderSceneBuilder.h"
 #include "RenderAbstraction/IRenderFactory.h"
 #include "RenderAbstraction/IRenderScene.h"
-#include "RenderBridge/RenderXAdapter.h"
+#include "RenderBridge/OffscreenRenderFactory.h"
 
 namespace
 {
@@ -110,7 +110,7 @@ namespace
 
 TEST(RenderSceneBuilderSyntheticIdTest, SyntheticOwnerDoesNotCollideWithRealId)
 {
-    auto factory = RenderBridge::RenderXAdapter::createFactory();
+    auto factory = RenderBridge::createOffscreenRenderFactory();
     ASSERT_NE(factory, nullptr);
 
     RenderAbstraction::DeviceConfig config;
