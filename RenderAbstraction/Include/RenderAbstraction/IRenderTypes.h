@@ -137,6 +137,7 @@ static_assert(sizeof(PipelineDesc) == 20, "PipelineDesc ABI size changed");
  */
 enum class PipelineKind : uint8_t {
     /// 世界空间通用三角（P3C3/P3C4，无贴图无光照）
+    /// 当前无调用方：宿主一律把 pipelineIndex 留 0，由后端按三元组解析。
     WorldTri,
     /// 世界空间贴图：采样 RGBA 位图（P3T2C4）
     WorldTextured,
@@ -151,6 +152,7 @@ enum class PipelineKind : uint8_t {
     /// 同 Mesh3D，填充模式为线框
     Mesh3DWire,
     /// 3D 选中高亮：三角面按线框填充，测深不写深
+    /// 当前无调用方：选中高亮线实际走 Mesh3DWire（见 Mesh3DBuilder）。
     Highlight3D,
     /// 3D 变换手柄：实心填充 + 深度偏移，压住模型表面不 z-fighting
     Gizmo3D,
