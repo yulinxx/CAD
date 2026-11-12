@@ -320,7 +320,7 @@ namespace
             if (result.missingGlyphDetails.size() < kMaxMissingGlyphDetails)
             {
                 const QString codePoint = QStringLiteral("U+%1")
-                                              .arg(missing.codePoint, 4, 16, QLatin1Char('0'))
+                                              .arg(static_cast<uint32_t>(missing.codePoint), 4, 16, QLatin1Char('0'))
                                               .toUpper();
                 result.missingGlyphDetails.append(QStringLiteral("'%1' %2 at line %3 col %4 (x=%5, y=%6)")
                                                       .arg(QString::fromUcs4(&missing.codePoint, 1))
