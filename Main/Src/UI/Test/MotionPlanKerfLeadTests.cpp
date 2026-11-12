@@ -27,6 +27,7 @@
 #ifdef ENABLE_HARDWARE
     #include "Hardware/Device/MotionPlan.h"
     #include "Hardware/MotionPlanCompiler.h"
+    #include "MotionCommandCompare.h"
 
 namespace
 {
@@ -44,36 +45,6 @@ namespace
     std::vector<Ut::Vec2d> rectPoints(double x0, double y0, double x1, double y1)
     {
         return { Ut::Vec2d(x0, y0), Ut::Vec2d(x1, y0), Ut::Vec2d(x1, y1), Ut::Vec2d(x0, y1) };
-    }
-
-    /// 逐字段比较两条 IR，避免依赖 POD 的 padding。
-    bool sameCommand(const Hw::MotionCommand& a, const Hw::MotionCommand& b)
-    {
-        if (a.op != b.op || a.laserOn != b.laserOn ||
-            a.counterClockwise != b.counterClockwise ||
-            a.durationUs != b.durationUs || a.intArg != b.intArg ||
-            a.channel != b.channel || a.level != b.level)
-        {
-            return false;
-        }
-        if (a.target.count != b.target.count ||
-            std::fabs(a.rate - b.rate) > 0.0 ||
-            std::fabs(a.centerX - b.centerX) > 0.0 ||
-            std::fabs(a.centerY - b.centerY) > 0.0)
-        {
-            return false;
-        }
-        for (int32_t i = 0; i < a.target.count; ++i)
-        {
-            if (a.target.v[i] != b.target.v[i])
-            {
-                return false;
-            }
-        }
-        return a.laser.powerPercent == b.laser.powerPercent &&
-               a.laser.frequencyHz == b.laser.frequencyHz &&
-               a.laser.pulseWidthUs == b.laser.pulseWidthUs &&
-               a.laser.waveformIndex == b.laser.waveformIndex;
     }
 
     size_t countLitLine(const Hw::MotionPlanView& view)
@@ -181,7 +152,7 @@ TEST(MotionPlanKerfLeadTest, KerfOff_IsByteIdenticalToBaseline)
     ASSERT_EQ(a.commandCount, b.commandCount);
     for (size_t i = 0; i < a.commandCount; ++i)
     {
-        EXPECT_TRUE(sameCommand(a.commands[i], b.commands[i])) << "command #" << i;
+        EXPECT_TRUE(MotionTest::sameCommand(a.commands[i], b.commands[i])) << "command #" << i;
     }
 }
 
@@ -206,7 +177,7 @@ TEST(MotionPlanKerfLeadTest, LeadInOff_IsByteIdenticalToBaseline)
     ASSERT_EQ(a.commandCount, b.commandCount);
     for (size_t i = 0; i < a.commandCount; ++i)
     {
-        EXPECT_TRUE(sameCommand(a.commands[i], b.commands[i])) << "command #" << i;
+        EXPECT_TRUE(MotionTest::sameCommand(a.commands[i], b.commands[i])) << "command #" << i;
     }
 }
 
