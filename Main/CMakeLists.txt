@@ -292,15 +292,15 @@ endif()
 
 target_compile_features(${APP_NAME} PRIVATE cxx_std_17)
 
-# Renderx 运行时资源：着色器与默认字体必须位于应用可执行文件目录
-# （applicationDirPath()）。Renderx 自身只复制到其 dylib 输出目录，
-# macOS bundle 化后应用二进制位于 Contents/MacOS，需额外复制一份。
-if(APR_RENDERX_DIR AND EXISTS "${APR_RENDERX_DIR}/src/shader")
+# Renderx 运行时资源：目录由 Renderx 自己导出，应用层不再拼渲染模块的
+# 源码树路径。macOS bundle 化后应用二进制位于 Contents/MacOS，需要在该目录
+# 再放一份。
+if(RENDERX_RUNTIME_SHADER_DIR AND RENDERX_RUNTIME_FONT_DIR)
     file(GLOB _renderx_shader_files CONFIGURE_DEPENDS
-        "${APR_RENDERX_DIR}/src/shader/*.vert"
-        "${APR_RENDERX_DIR}/src/shader/*.frag"
-        "${APR_RENDERX_DIR}/src/shader/*.comp")
-    file(GLOB _renderx_font_files CONFIGURE_DEPENDS "${APR_RENDERX_DIR}/src/res/*.ttf")
+        "${RENDERX_RUNTIME_SHADER_DIR}/*.vert"
+        "${RENDERX_RUNTIME_SHADER_DIR}/*.frag"
+        "${RENDERX_RUNTIME_SHADER_DIR}/*.comp")
+    file(GLOB _renderx_font_files CONFIGURE_DEPENDS "${RENDERX_RUNTIME_FONT_DIR}/*.ttf")
     add_custom_command(TARGET ${APP_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${APP_NAME}>"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${_renderx_shader_files} "$<TARGET_FILE_DIR:${APP_NAME}>/"
