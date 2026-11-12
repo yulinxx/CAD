@@ -8,6 +8,26 @@ class FileOperationRegistry;
 class LaserOperationRegistry;
 
 class HardwareProfileManager;
+class LayerManager;
+struct ToolpathJobSpec;
+
+namespace Eg
+{
+    struct MachineFrameConfig;
+}
+
+/**
+ * @brief 加工启动时构造作业规格的真实取参路径。
+ *
+ * 图层基础参数：文档 ProcessData（.apr v2 回灌）优先，否则回退 HardwareProfile。
+ * 穿孔等工艺细节：只存在于文档 ProcessModel 里，按图层解析后填入；
+ * 没有细节的图层不填，保持「继承/关闭」，绝不用默认值填充。
+ *
+ * 独立成函数是为了让测试能走真实取参路径 —— 只测 MotionPlanCompiler
+ * 的静态调用发现不了「入口没接线」。
+ */
+ToolpathJobSpec buildToolpathJobSpec(const LayerManager* layerManager,
+    const Eg::MachineFrameConfig& frame);
 
 /**
  * @class OperationRegistrar

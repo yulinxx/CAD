@@ -1026,6 +1026,85 @@ namespace MotionPlanCompiler
             }
         }
 
+        // ---- 本路径不支持的工艺细节：一次编译只汇总告警一条 ----
+        // 这些参数在 .apr 里可配置，但 MotionPlanCompiler 不消费；不报出来就是
+        // 「用户配了、实际没生效」的静默无效。只在参与加工的图层上检查，避免空图层噪音。
+        {
+            bool hasCommonEdge = false;
+            bool hasPowerCurve = false;
+            bool hasCorner = false;
+            bool hasPassStrategy = false;
+            bool hasFocusOffset = false;
+            for (const LayerBucket& bucket : buckets)
+            {
+                if (bucket.entities.empty())
+                {
+                    continue;
+                }
+                hasFocusOffset = hasFocusOffset || bucket.params.focusOffsetMm != 0.0;
+                if (layers == nullptr)
+                {
+                    continue;
+                }
+                Eg::ProcessDetail detail;
+                if (!layers->layerProcessDetail(bucket.layerId, detail))
+                {
+                    continue;
+                }
+                hasCommonEdge = hasCommonEdge || (detail.hasCommonEdge && detail.commonEdge.enabled);
+                hasPowerCurve = hasPowerCurve || (detail.hasPowerCurve && detail.powerCurve.enabled);
+                hasCorner = hasCorner || (detail.hasCorner && detail.corner.strategy != 0);
+                hasPassStrategy = hasPassStrategy ||
+                                  (detail.hasPassStrategy &&
+                                      (detail.passStrategy.adaptiveThickness ||
+                                          detail.passStrategy.totalDepthLayers > 1));
+            }
+
+            bool hasGlobalOverride = false;
+            if (layers != nullptr && layers->hasProcessModel())
+            {
+                const Eg::JobProcessSettings global = layers->jobProcessSettings();
+                hasGlobalOverride = global.rapidSpeedMmPerSec != spec.rapidSpeedMmPerSec ||
+                                    global.chordToleranceMm != spec.chordToleranceMm ||
+                                    global.emitArcs != spec.emitArcs ||
+                                    global.skipHiddenLayers != spec.skipHiddenLayers ||
+                                    global.skipLockedLayers != spec.skipLockedLayers ||
+                                    global.emitTrailingLaserOff != spec.emitTrailingLaserOff ||
+                                    global.failOnUnmachinable != spec.failOnUnmachinableEntity;
+            }
+
+            if (hasCommonEdge)
+            {
+                result.ignoredProcessDetails << QStringLiteral("commonEdge");
+            }
+            if (hasPowerCurve)
+            {
+                result.ignoredProcessDetails << QStringLiteral("powerCurve");
+            }
+            if (hasCorner)
+            {
+                result.ignoredProcessDetails << QStringLiteral("corner");
+            }
+            if (hasPassStrategy)
+            {
+                result.ignoredProcessDetails << QStringLiteral("passStrategy");
+            }
+            if (hasGlobalOverride)
+            {
+                result.ignoredProcessDetails << QStringLiteral("global");
+            }
+            if (hasFocusOffset)
+            {
+                result.ignoredProcessDetails << QStringLiteral("focusOffsetMm");
+            }
+
+            if (!result.ignoredProcessDetails.isEmpty())
+            {
+                APR_WARNF("[MotionPlanCompiler] process detail not applied on this path: %s",
+                    result.ignoredProcessDetails.join(QStringLiteral(", ")).toUtf8().constData());
+            }
+        }
+
         // ---- 逐图层编译 ----
         const Eg::GeometryContext ctx = makeContext(spec);
         Eg::Cam::ExtractOptions extractOptions;

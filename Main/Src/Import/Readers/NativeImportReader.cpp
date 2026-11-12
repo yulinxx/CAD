@@ -8,6 +8,7 @@
 
 #include "FileIO/Parsers/NativeParser.h"
 #include "FileIO/AprDocument.h"
+#include "FileIO/ProcessModelSnapshot.h"
 #include "Engine/AprEntity/AprEntity.h"
 
 #include "Log/AprLogger.h"
@@ -55,6 +56,13 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecAprE
     // 准备 ImportResult
     ImportResult result = ImportResult::ok(
         successMessage(format), static_cast<int>(doc.entityCount()), static_cast<int>(doc.layerCount()), {});
+
+    // 工艺细节模型（ProcessModelData）：只在原生 2D .apr 里存在。
+    // 读不到就保持 false —— 旧档案必须走「继承/关闭」，不能填默认值。
+    if (!is3D)
+    {
+        result.hasProcessModel = Fio::ReadProcessModelFromDocument(doc, result.processModel);
+    }
 
     // 1. 提取图层
     result.importedLayers.reserve(doc.layerCount());

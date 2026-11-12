@@ -162,4 +162,9 @@ struct ToolpathCompileResult
     // ---- 尾部追加（M2）：穿孔统计 ----
     int32_t pierceAppliedContourCount = 0;  ///< 实际插入穿孔延时的轮廓数
     int32_t pierceDwellSegmentCount = 0;    ///< 插入的穿孔延时指令条数
+
+    // ---- 尾部追加（M2）：本路径不支持的工艺细节（已配置但不会生效） ----
+    /// 一次编译汇总一次，元素为参数名（commonEdge/powerCurve/corner/passStrategy/global/focusOffsetMm）。
+    /// 非空时编译器会打一条 APR_WARN；界面据此提示，避免「配了不生效」的静默无效。
+    QStringList ignoredProcessDetails;
 };

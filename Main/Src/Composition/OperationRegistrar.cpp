@@ -11,6 +11,7 @@
 #include "PendingOperationRegistry.h"
 
 #include "../Hardware/DeviceHost.h"
+#include "../Hardware/ToolpathJobSpec.h"
 
 // HardwareProfileManager + LayerManager：注入后 specProvider 才能读取图层工艺参数
 #include "Engine2D/Interaction/HardwareProfileManager.h"
@@ -88,6 +89,47 @@ Eg::ProcessParams hwProfileToProcessParams(const HardwareProfile& hp)
 
 } // namespace
 
+ToolpathJobSpec buildToolpathJobSpec(const LayerManager* layerManager, const Eg::MachineFrameConfig& frame)
+{
+    ToolpathJobSpec spec;
+    spec.machineFrame = frame;
+
+    if (layerManager)
+    {
+        const auto layerIds = layerManager->getAllLayerIds();
+        for (int layerId : layerIds)
+        {
+            // 文档里带 ProcessData 的图层优先用它：这是 .apr v2 回灌进来的
+            // 完整工艺参数（含割缝/引入线/填充），比旧 HardwareProfile 全。
+            // 没有文档参数的图层仍走 Profile，旧文档与旧行为逐字节不变。
+            if (layerManager->hasLayerProcessParams(layerId))
+            {
+                spec.layerParams.insert(layerId, layerManager->layerProcessParams(layerId));
+            }
+            else
+            {
+                const auto hp = layerManager->layerHardwareProfile(layerId);
+                spec.layerParams.insert(layerId, hwProfileToProcessParams(hp));
+            }
+
+            // 穿孔等工艺细节只存在于文档 ProcessModel 里，按图层解析后填入。
+            // 没有细节的层不写 —— 保持「继承/关闭」，绝不用默认值填充。
+            Eg::ProcessDetail detail;
+            if (layerManager->layerProcessDetail(layerId, detail) && detail.hasPierce)
+            {
+                spec.layerPierce.insert(layerId, detail.pierce);
+            }
+        }
+    }
+
+    // defaultParams 取第一个图层的参数（如果有），否则 ProcessParams 默认值
+    if (!spec.layerParams.isEmpty())
+    {
+        spec.defaultParams = spec.layerParams.first();
+    }
+    return spec;
+}
+
 OperationRegistrar::OperationRegistrar(ApplicationCompositionRoot& root, AlgorithmRunner* algorithmRunner)
     : m_root(root)
     , m_algorithmRunner(algorithmRunner)
@@ -158,35 +200,9 @@ void OperationRegistrar::registerAll()
     // 作业规格：把机器坐标系从设备档案注入，同时从 LayerManager +
     // HardwareProfileManager 读取各图层工艺参数（功率/速度/遍数），
     // 避免用户在 UI 里设置的参数在加工时被静默忽略。
-    laserConfig.specProvider = [this, dev = m_root.deviceHost(),
-                                layerManager = m_root.layerManager()] {
-        ToolpathJobSpec spec;
-        spec.machineFrame = dev ? dev->machineFrameConfig() : Eg::MachineFrameConfig{};
-
-        if (layerManager)
-        {
-            const auto layerIds = layerManager->getAllLayerIds();
-            for (int layerId : layerIds)
-            {
-                // 文档里带 ProcessData 的图层优先用它：这是 .apr v2 回灌进来的
-                // 完整工艺参数（含割缝/引入线/填充），比旧 HardwareProfile 全。
-                // 没有文档参数的图层仍走 Profile，旧文档与旧行为逐字节不变。
-                if (layerManager->hasLayerProcessParams(layerId))
-                {
-                    spec.layerParams.insert(layerId, layerManager->layerProcessParams(layerId));
-                    continue;
-                }
-                const auto hp = layerManager->layerHardwareProfile(layerId);
-                spec.layerParams.insert(layerId, hwProfileToProcessParams(hp));
-            }
-        }
-
-        // defaultParams 取第一个图层的参数（如果有），否则 ProcessParams 默认值
-        if (!spec.layerParams.isEmpty())
-        {
-            spec.defaultParams = spec.layerParams.first();
-        }
-        return spec;
+    laserConfig.specProvider = [dev = m_root.deviceHost(), layerManager = m_root.layerManager()] {
+        return buildToolpathJobSpec(layerManager,
+            dev ? dev->machineFrameConfig() : Eg::MachineFrameConfig{});
     };
 
     m_laserOperationRegistry = std::make_unique<LaserOperationRegistry>(laserConfig);

@@ -214,6 +214,7 @@ namespace
             hp.leadInLengthMm = p.leadInLengthMm;
             hp.leadInMode = p.leadInMode;
             hp.leadInAngleDeg = p.leadInAngleDeg;
+            hp.contourOrdering = p.contourOrdering;
             batch.push_back(std::move(hp));
         }
 
@@ -306,6 +307,7 @@ namespace
         p.leadInLengthMm = src.leadInLengthMm;
         p.leadInMode = src.leadInMode;
         p.leadInAngleDeg = src.leadInAngleDeg;
+        p.contourOrdering = src.contourOrdering;
         return p;
     }
 
@@ -1070,7 +1072,14 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
                 meshAdded);
             for (auto& mesh : meshEntities)
             {
-                m_sceneManager3D->addEntity(mesh.release());
+#if BUILD_UI3D
+                SceneEditService3D::addEntityDirect(m_sceneManager3D, mesh.release());
+#else
+                // 无 UI3D 构建没有 SceneEditService3D，也就不存在授权的结构写入口
+                // （收口后 SceneManager3D::addEntity 只对编辑服务/撤销栈开放）。
+                APR_ERROR("[ImportService] BUILD_UI3D=0: no authorized 3D scene write entry, mesh dropped");
+                mesh.reset();
+#endif
             }
         }
 
@@ -1584,6 +1593,36 @@ int ImportService::restoreImportedLayers(
     // 工艺对象回灌必须排在图层落地之后：ProcessData 的目标是文档图层 ID，
     // 而运行时图层 ID 可能因「按名复用」与文件里的不同，只能经 sourceToLayerId 换算。
     const int appliedProcesses = restoreNativeProcesses(m_layerManager, parseResult, sourceToLayerId, outWarnings);
+
+    // 工艺细节模型（ProcessModelData）：按图层回灌到 LayerManager，供加工启动时读取
+    // （穿孔等细节只存在于这个块里，ProcessData 只有基础参数）。
+    // 模型里的 layerId 是文档 ID，必须经 sourceToLayerId 换成运行时 ID，
+    // 否则「按名复用」的图层会查到别的层的细节。
+    if (parseResult.hasProcessModel)
+    {
+        Eg::ProcessModel model = parseResult.processModel;
+        std::vector<Eg::LayerProcessEntry> translated;
+        translated.reserve(model.layers.size());
+        for (const Eg::LayerProcessEntry& entry : model.layers)
+        {
+            const auto it = sourceToLayerId.find(static_cast<uint32_t>(entry.layerId));
+            if (it == sourceToLayerId.end())
+            {
+                // 该层本次没有落地（被跳过/超限），不保留悬空细节
+                continue;
+            }
+            Eg::LayerProcessEntry copy = entry;
+            copy.layerId = static_cast<int32_t>(it->second);
+            translated.push_back(std::move(copy));
+        }
+        model.layers = std::move(translated);
+        m_layerManager->setProcessModel(std::move(model));
+    }
+    else
+    {
+        // 旧档案/外来格式没有模型块：清空，避免沿用上一份文档的细节
+        m_layerManager->clearProcessModel();
+    }
 
     APR_DEBUGF("[ImportService] Layer restore: %zu total, %d created, %d reused, %zu entity assignment(s), "
                "%d process assignment(s)",

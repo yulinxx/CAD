@@ -350,7 +350,7 @@ TEST(MotionPlanProcessMigrationTest, LegacyArchiveMigratesWithoutFillingDefaults
     EXPECT_TRUE(resolved.kerf.enabled);
     EXPECT_TRUE(resolved.leadInOut.enabled);
     EXPECT_DOUBLE_EQ(2.4, resolved.leadInOut.leadInLengthMm);
-    EXPECT_EQ(1, resolved.leadInOut.leadInMode);
+    EXPECT_EQ(Eg::LeadInMode::Normal, resolved.leadInOut.leadInMode);
     EXPECT_FALSE(resolved.hasPierce);
 }
 

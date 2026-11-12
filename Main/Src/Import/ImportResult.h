@@ -10,6 +10,8 @@
 #include "FileIO/FioTypes.h"
 #include "FileIO/AprDocument.h"
 
+#include "Engine/Process/ProcessModel.h"
+
 /// 导入错误类型：区分不同的失败原因，便于上层展示和处理
 enum class ImportErrorType
 {
@@ -95,6 +97,14 @@ struct ImportResult
         std::vector<uint32_t> targetLayerIds;      ///< 显式目标图层（文档图层 ID）
     };
     std::vector<ProcessBinding> importedProcesses;
+
+    /// 原生 .apr v2 的工艺细节模型（ProcessModelData）。
+    ///
+    /// ProcessData 只承载基础参数；割缝/引线/穿孔/共边/功率曲线等细节在
+    /// ProcessModel 里。旧档案或外来格式没有该块：hasProcessModel=false 时
+    /// 读端必须保持「继承/关闭」，不得用默认值填充。
+    Eg::ProcessModel processModel;
+    bool hasProcessModel = false;
 
     /// 这份文件是否带了完整的原生加工语义快照（图层表 + 非空 Profile 值集）。
     /// true 时即便图层按名复用，也要用文件里的加工语义覆盖运行时设置；

@@ -118,6 +118,7 @@ namespace
         out.leadInLengthMm = src.leadInLengthMm;
         out.leadInMode = src.leadInMode;
         out.leadInAngleDeg = src.leadInAngleDeg;
+        out.contourOrdering = src.contourOrdering;
     }
 
     // 原生 .apr 的加工语义快照：图层表 + 硬件 Profile 值集 + ProcessData。
@@ -207,6 +208,7 @@ namespace
             info.leadInLengthMm = hp.leadInLengthMm;
             info.leadInMode = hp.leadInMode;
             info.leadInAngleDeg = hp.leadInAngleDeg;
+            info.contourOrdering = hp.contourOrdering;
             snapshot.profiles.push_back(info);
         }
         return snapshot;
