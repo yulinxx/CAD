@@ -47,12 +47,26 @@ jobs:
 
       - name: Build
         run: |
+          # 目标名必须与各模块 CMakeLists 里 add_executable 的真实名字一致：
+          # 不存在的目标会让 --target 直接以非零退出（Ninja: "unknown target"，
+          # 本作业的 VS 生成器同样会在 Build 步骤失败），不存在“静默忽略”。
+          #
+          # UI3D 的 ModelSplitPick/BRepUndo 依赖 BUILD_GEOMODELCORE=ON，
+          # Relief 依赖 BUILD_ENGRAVING=ON；本作业为控制时长把两者关掉，
+          # 因此这三个目标不在此列（不是用例被删，配置打开后仍会构建）。
           cmake --build build --config Debug --parallel \
             --target UICommon UI2D UI3D April \
             UtilityTests LogTests Engine2DTests Engine3DTests \
             FileIOTests NestingTests CAMTests \
-            RenderxTests RenderBridgeTests \
-            UICommonTests UI2DTests UI3DTests MainTests
+            RenderxTests RenderBridgeTests MainTests \
+            UI2DCoreTests TextEditServiceTests FillDialogColorTests \
+            DialogDefaultsTests RasterImageBridgeTests RasterVectorizeTests \
+            RasterBitmapProcessTests BooleanRoutingTests AsyncPipelineExecutorTests \
+            UI3DCommandCatalogTests UI3DRenderMathTests UI3DEditServiceIdTests \
+            UI3DRefreshTests UI3DOperationTests UI3DLightingTests UI3DExportTests \
+            UI3DStorageTests UI3DEditTests UI3DChangeStreamTests \
+            UI3DUndoRedoVisibilityTests UI3DCameraTests UI3DViewportMathTests \
+            UI3DRenderPipelineTests
 
       # unity 依赖盲区体检（只读）：Ninja 下校验每个 unity 分块的 deps 记录是否覆盖
       # 它 #include 的全部 .cpp（#deps 0 会让改动静默不重编）。只跑 ninja -t deps，不构建。
@@ -300,12 +314,27 @@ jobs:
 
       - name: Build
         run: |
+          # 目标名必须与各模块 CMakeLists 里 add_executable 的真实名字一致：
+          # 不存在的目标会让 cmake --build --target 以非零退出（Ninja 报
+          # "unknown target"），不会静默忽略。
+          #
+          # UI3D 的 ModelSplitPick/BRepUndo 依赖 BUILD_GEOMODELCORE=ON，
+          # Relief 依赖 BUILD_ENGRAVING=ON；本作业为控制时长把两者关掉，
+          # 因此这三个目标不在此列（不是用例被删，配置打开后仍会构建）。
           cmake --build build-ci --config "${{ matrix.build_type }}" --parallel \
             --target UICommon UI2D UI3D April PythonHost AprPyBindCore \
             UtilityTests LogTests EngineCommonTests Engine2DTests Engine3DTests \
             FileIOTests NestingTests CAMTests RenderxTests RenderBridgeTests \
             LicenseTests CrashHandlerTests PythonHostTests \
-            UICommonTests UI2DTests UI3DTests MainTests
+            UI2DCoreTests TextEditServiceTests FillDialogColorTests \
+            DialogDefaultsTests RasterImageBridgeTests RasterVectorizeTests \
+            RasterBitmapProcessTests BooleanRoutingTests AsyncPipelineExecutorTests \
+            UI3DCommandCatalogTests UI3DRenderMathTests UI3DEditServiceIdTests \
+            UI3DRefreshTests UI3DOperationTests UI3DLightingTests UI3DExportTests \
+            UI3DStorageTests UI3DEditTests UI3DChangeStreamTests \
+            UI3DUndoRedoVisibilityTests UI3DCameraTests UI3DViewportMathTests \
+            UI3DRenderPipelineTests \
+            MainTests
 
       - name: Test
         run: |

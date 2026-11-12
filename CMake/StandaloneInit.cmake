@@ -36,6 +36,26 @@ macro(apr_setup_compiler_options)
             add_compile_options(-Wno-deprecated-declarations)
         endif()
     endif()
+
+    # 与根构建的 APR_WERROR 语义保持一致（独立模块无 ThirdParty 源码）。
+    if(APR_WERROR)
+        if(MSVC)
+            add_compile_options(/WX)
+        else()
+            add_compile_options(-Werror)
+        endif()
+    endif()
+
+    # 与根构建的 APR_SANITIZE 语义保持一致，供独立模块在手动 sanitizer 作业里复用。
+    if(APR_SANITIZE)
+        if(MSVC)
+            message(FATAL_ERROR
+                "[Standalone] APR_SANITIZE is not supported with MSVC.")
+        endif()
+        message(STATUS "[Standalone] Sanitizers: ${APR_SANITIZE}")
+        add_compile_options("-fsanitize=${APR_SANITIZE}" -fno-omit-frame-pointer -g)
+        add_link_options("-fsanitize=${APR_SANITIZE}")
+    endif()
 endmacro()
 
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)

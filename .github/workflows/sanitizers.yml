@@ -1,0 +1,87 @@
+name: Sanitizers (manual)
+
+# 为什么单独成文件、且只手动触发：
+#   ASan/UBSan 会把运行时开销放大数倍，且第三方库（OCCT/Clipper2）的既有问题
+#   容易制造误报；放进主 CI 的每次 push 会让门禁变慢且不稳定。
+#   这里只覆盖不依赖 Qt 的独立模块（Nesting / GeoModelCore），
+#   全应用 sanitizer 在本地用同样的 -DAPR_SANITIZE=address,undefined 跑。
+on:
+  workflow_dispatch:
+    inputs:
+      sanitizer:
+        description: "Sanitizer set"
+        required: true
+        default: "address,undefined"
+        type: choice
+        options:
+          - address,undefined
+          - thread
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core-libs:
+    name: ${{ matrix.os }} / ${{ inputs.sanitizer }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            triplet: arm64-osx
+          - os: ubuntu-22.04
+            triplet: x64-linux
+    defaults:
+      run:
+        shell: bash
+    env:
+      ASAN_OPTIONS: detect_leaks=0:abort_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+      TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.workspace }}/vcpkg
+          key: vcpkg-san-${{ matrix.triplet }}-${{ runner.os }}-${{ runner.arch }}-v1
+
+      - name: Set up vcpkg
+        run: |
+          if [ ! -x "$GITHUB_WORKSPACE/vcpkg/vcpkg" ]; then
+            rm -rf "$GITHUB_WORKSPACE/vcpkg"
+            git clone --depth 1 https://github.com/microsoft/vcpkg.git "$GITHUB_WORKSPACE/vcpkg"
+            "$GITHUB_WORKSPACE/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+          echo "VCPKG_ROOT=$GITHUB_WORKSPACE/vcpkg" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: |
+          "$VCPKG_ROOT/vcpkg" install opencascade clipper2 gtest \
+            --triplet ${{ matrix.triplet }} --clean-after-build
+
+      - name: Configure & test Nesting (sanitized)
+        run: |
+          cmake -S Nesting -B build-nesting-san -DVCPKG_DIR="$VCPKG_ROOT" \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DAPR_SANITIZE=${{ inputs.sanitizer }} \
+            -DBUILD_NESTING_EXAMPLES=OFF \
+            -DBUILD_TESTS=ON \
+            -DNESTING_WITH_LOG=OFF
+          cmake --build build-nesting-san --parallel
+          ctest --test-dir build-nesting-san -C Debug --output-on-failure --no-tests=error --parallel
+
+      - name: Configure & test GeoModelCore (sanitized)
+        run: |
+          cmake -S GeoModelCore -B build-gmc-san -DVCPKG_DIR="$VCPKG_ROOT" \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DAPR_SANITIZE=${{ inputs.sanitizer }} \
+            -DBUILD_GEOMODELCORE_EXAMPLE=OFF \
+            -DBUILD_TESTS=ON
+          cmake --build build-gmc-san --parallel
+          ctest --test-dir build-gmc-san -C Debug --output-on-failure --no-tests=error --parallel

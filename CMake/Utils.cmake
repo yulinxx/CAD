@@ -541,3 +541,6 @@ function(apr_add_client_plugin target)
         CONTENT "abi=1\nqt=${Qt6_VERSION}\ncompiler=${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}\narch=${CMAKE_SYSTEM_PROCESSOR}\n")
 endfunction()
 
+# 第一方告警 / sanitizer 门禁（定义 APR_WERROR、APR_SANITIZE）
+include("${CMAKE_CURRENT_LIST_DIR}/QualityGates.cmake")
+
