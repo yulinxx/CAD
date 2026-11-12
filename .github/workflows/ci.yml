@@ -346,6 +346,36 @@ jobs:
           ctest --test-dir build-ci -C "${{ matrix.build_type }}" \
             --output-on-failure --no-tests=error --parallel
 
+      # ABI 消费者链接闭环（P0 防线）：只用公开头实例化 SceneManager 的 inline 模板，
+      # 再链接 Engine2D 的 Debug 产物。Debug 下这些模板会引用 Detail::assertSceneThread，
+      # 一旦该符号被 Abi/engine2d_b2_hidden.txt 藏掉，本步链接失败。
+      # 基线校验只比对“已导出的符号集”，发现不了“公开头承诺但未导出”这类问题，故单列此步。
+      - name: ABI consumer smoke (Debug link closure)
+        if: matrix.build_type == 'Debug'
+        run: |
+          cmake --build build-ci --target Engine2DConsumerSmoke
+          ./build-ci/bin_Qt6/Debug/Engine2DConsumerSmoke
+
+  # ---------------------------------------------------------------------------
+  # ABI 工具契约：check_exports.py 必须显式传 -l（禁止自动探测产物）
+  #
+  # 历史实现按 mtime 在 build*/bin_Qt6/{Release,Debug} 里挑最新产物，Debug/Release
+  # 混选会让比对结果不可复现。本作业只验证「不传 -l 必然失败」，防止该约束被改回去。
+  # ---------------------------------------------------------------------------
+  abi-tooling:
+    name: ABI tooling contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require explicit -l
+        run: |
+          if python3 Tools/Abi/check_exports.py Engine2D >/dev/null 2>&1; then
+            echo "check_exports.py must reject a missing --library (explicit -l is required)"
+            exit 1
+          fi
+          echo "OK: check_exports.py refuses to guess the library path"
+
   # ---------------------------------------------------------------------------
   # 文档链接与过期检查
   #

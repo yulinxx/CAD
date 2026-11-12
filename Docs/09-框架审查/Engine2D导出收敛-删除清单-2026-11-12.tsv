@@ -99,7 +99,7 @@ B2	D-完全无引用	Eg::BBoxSpatialIndex	Engine/2D/Include/Engine2D/Algorithm/F
 B2	D-完全无引用	Eg::BBoxSpatialIndex	Engine/2D/Include/Engine2D/Algorithm/FillColor/BBoxSpatialIndex.h	Eg::BBoxSpatialIndex::queryContainingPoint(Ut::Vec<double, 2ul> const&) const	__ZNK2Eg16BBoxSpatialIndex20queryContainingPointERKN2Ut3VecIdLm2EEE	0	0
 B2	D-完全无引用	Eg::BBoxSpatialIndex	Engine/2D/Include/Engine2D/Algorithm/FillColor/BBoxSpatialIndex.h	Eg::BBoxSpatialIndex::remove(int)	__ZN2Eg16BBoxSpatialIndex6removeEi	0	0
 B2	D-完全无引用	Eg::BBoxSpatialIndex	Engine/2D/Include/Engine2D/Algorithm/FillColor/BBoxSpatialIndex.h	Eg::BBoxSpatialIndex::unindexItem(unsigned long)	__ZN2Eg16BBoxSpatialIndex11unindexItemEm	0	0
-B2	D-完全无引用	Eg::Detail	(free function / 未定位)	Eg::Detail::assertSceneThread(char const*)	__ZN2Eg6Detail17assertSceneThreadEPKc	0	0
+P0(B2误判修正)	A-必须导出	Eg::Detail	Core/SceneManager.h	Eg::Detail::assertSceneThread(char const*)	__ZN2Eg6Detail17assertSceneThreadEPKc	0	0
 B2	D-完全无引用	Eg::DocumentTransaction	Engine/2D/Include/Engine2D/Core/DocumentTransaction.h	Eg::DocumentTransaction::DocumentTransaction(Eg::SceneManager&)	__ZN2Eg19DocumentTransactionC2ERNS_12SceneManagerE	0	0
 B2	D-完全无引用	Eg::DocumentTransaction	Engine/2D/Include/Engine2D/Core/DocumentTransaction.h	Eg::DocumentTransaction::DocumentTransaction(Eg::SceneManager&, IUndoRedoManager*)	__ZN2Eg19DocumentTransactionC2ERNS_12SceneManagerEP16IUndoRedoManager	0	0
 B2	D-完全无引用	Eg::DocumentTransaction	Engine/2D/Include/Engine2D/Core/DocumentTransaction.h	Eg::DocumentTransaction::applyChanges()	__ZN2Eg19DocumentTransaction12applyChangesEv	0	0
@@ -276,7 +276,7 @@ B2	D-完全无引用	SnapEngine	Engine/2D/Include/Engine2D/Interaction/SnapEngin
 B2	D-完全无引用	UndoRedoManager::Command	Engine/2D/Include/Engine2D/Edit/UndoRedoManager.h	UndoRedoManager::Command::~Command()	__ZN15UndoRedoManager7CommandD0Ev	0	0
 B2	D-完全无引用	UndoRedoManager::Command	Engine/2D/Include/Engine2D/Edit/UndoRedoManager.h	UndoRedoManager::Command::~Command()	__ZN15UndoRedoManager7CommandD1Ev	0	0
 B2	D-完全无引用	UndoRedoManager::Command	Engine/2D/Include/Engine2D/Edit/UndoRedoManager.h	UndoRedoManager::Command::~Command()	__ZN15UndoRedoManager7CommandD2Ev	0	0
-B2	D-完全无引用	UndoRedoManager::Command	Engine/2D/Include/Engine2D/Edit/UndoRedoManager.h	typeinfo for UndoRedoManager::Command	__ZTIN15UndoRedoManager7CommandE	0	0
+P0(B2误判修正)	A-必须导出	UndoRedoManager::Command	Engine/2D/Include/Engine2D/Edit/UndoRedoManager.h	typeinfo for UndoRedoManager::Command	__ZTIN15UndoRedoManager7CommandE	0	0
 B2	D-完全无引用	UndoRedoManager::Command	Engine/2D/Include/Engine2D/Edit/UndoRedoManager.h	typeinfo name for UndoRedoManager::Command	__ZTSN15UndoRedoManager7CommandE	0	0
 B2	D-完全无引用	UndoRedoManager::Command	Engine/2D/Include/Engine2D/Edit/UndoRedoManager.h	vtable for UndoRedoManager::Command	__ZTVN15UndoRedoManager7CommandE	0	0
 B2	D-完全无引用	UndoRedoManager::LambdaCommand	Engine/2D/Include/Engine2D/Edit/UndoRedoManager.h	UndoRedoManager::LambdaCommand::LambdaCommand(std::__1::function<void ()>, std::__1::function<void ()>, char const*)	__ZN15UndoRedoManager13LambdaCommandC2ENSt3__18functionIFvvEEES4_PKc	0	0

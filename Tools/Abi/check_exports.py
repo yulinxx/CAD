@@ -19,11 +19,7 @@
 协商一起判断，本脚本只能保证「符号集合不缩水」。
 
 用法：
-    # 按库名自动探测产物，使用 Tools/Abi/baseline/<target>.txt
-    python3 Tools/Abi/check_exports.py Renderx
-    python3 Tools/Abi/check_exports.py Engine2D
-
-    # 显式指定产物（多构建目录、打包前的正式产物）
+    # 显式指定产物（必须）：只认调用方给的路径，不自动探测
     python3 Tools/Abi/check_exports.py Engine2D -l <path>/libEngine2D.dylib
 
     # 显式接受当前导出集（仅在该变更已被评审为向后兼容时执行）
@@ -32,19 +28,21 @@
     # 完全手动：不传库名，只给产物与基线文件
     python3 Tools/Abi/check_exports.py -l <dylib> -b <baseline.txt>
 
+为什么不再自动探测：历史实现按 `build*/bin_Qt6/{Release,Debug}` 取 mtime 最新的
+产物，同一台机器上 Debug 与 Release 并存时会随机混选——Debug 产物符号集与
+Release 不同，比对结果不可复现。现在路径必须由调用方显式给出，缺了就报错退出。
+
 符号归一化：Mach-O 的符号带一个前导下划线（_rxRuntimeCreate / __ZN...），
 ELF 不带（rxRuntimeCreate / _ZN...）。基线统一剥离一个前导下划线，保证同一份
 文件跨平台可比。
 """
 
 import argparse
-import glob
 import os
 import subprocess
 import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
 BASELINE_DIR = os.path.join(SCRIPT_DIR, "baseline")
 
 # 只登记有外部消费者的库：库名 -> 产物主文件名
@@ -54,29 +52,6 @@ TARGETS = {
     "Engine3D": "libEngine3D",
     "RenderBridge": "libRenderBridge",
 }
-
-# 自动探测构建产物时尝试的布局（根工程构建 + Renderx 独立构建）
-LIBRARY_PATTERNS = [
-    "build*/bin_Qt6/Release/{lib}.dylib",
-    "build*/bin_Qt6/Debug/{lib}.dylib",
-    "build*/bin_Qt6/Release/{lib}.so",
-    "build*/bin_Qt6/Debug/{lib}.so",
-    "Renderx/build*/bin_Qt6/Release/{lib}.dylib",
-    "Renderx/build*/bin_Qt6/Debug/{lib}.dylib",
-    "build*/{lib}.dylib",
-    "build*/{lib}.so",
-]
-
-
-def find_library(target):
-    """按常见布局探测目标库，取最新修改的一个。"""
-    lib = TARGETS[target]
-    candidates = []
-    for pattern in LIBRARY_PATTERNS:
-        candidates.extend(glob.glob(os.path.join(REPO_ROOT, pattern.format(lib=lib))))
-    if not candidates:
-        return None
-    return max(candidates, key=os.path.getmtime)
 
 
 def read_symbols(library):
@@ -140,22 +115,19 @@ def write_baseline(path, symbols, library):
 def main():
     parser = argparse.ArgumentParser(description="Compare DLL exported symbols against a baseline.")
     parser.add_argument("target", nargs="?", choices=sorted(TARGETS), help="library name (Renderx/Engine2D/Engine3D/RenderBridge)")
-    parser.add_argument("-l", "--library", help="path to the built library (auto-detected when omitted)")
+    parser.add_argument("-l", "--library", required=True, help="path to the built library (required; no auto-detection)")
     parser.add_argument("-b", "--baseline", help="baseline file (defaults to Tools/Abi/baseline/<target>.txt)")
     parser.add_argument("-u", "--update", action="store_true", help="rewrite the baseline from the library")
     args = parser.parse_args()
 
     if args.target:
         baseline_path = args.baseline or os.path.join(BASELINE_DIR, f"{args.target}.txt")
-        library = args.library or find_library(args.target)
+        library = args.library
     else:
-        if not (args.library and args.baseline):
+        if not args.baseline:
             parser.error("pass a target name, or both --library and --baseline")
         baseline_path = args.baseline
         library = args.library
-
-    if not library:
-        sys.exit("[abi] cannot locate the library; pass --library explicitly")
 
     current = read_symbols(library)
 
