@@ -29,8 +29,6 @@ namespace BuildConfig
     constexpr bool kEngraving = @_bc_BUILD_ENGRAVING@;
     /// 几何内核（3D 布尔/曲面）
     constexpr bool kGeoModelCore = @_bc_BUILD_GEOMODELCORE@;
-    /// Renderx 渲染后端
-    constexpr bool kRenderx = @_bc_BUILD_RENDERX@;
     /// Python 宿主集成
     constexpr bool kPythonHost = @_bc_APR_PYTHON_HOST@;
     /// Python 模块（与 kPythonHost 等价，用于统一命名）

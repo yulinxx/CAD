@@ -180,7 +180,7 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/VersionInfo.h" "${_version_info_configur
 # ---------------------------------------------------------------------------
 foreach(_bc_opt
         BUILD_UI3D BUILD_NESTING BUILD_HARDWARE BUILD_VISION BUILD_ENGRAVING
-        BUILD_GEOMODELCORE BUILD_RENDERX APR_PYTHON_HOST BUILD_PYTHON APR_ENABLE_LICENSE)
+        BUILD_GEOMODELCORE APR_PYTHON_HOST BUILD_PYTHON APR_ENABLE_LICENSE)
     if(${_bc_opt})
         set(_bc_${_bc_opt} "true")
     else()
@@ -211,9 +211,9 @@ foreach(_cfg ${_client_config_json})
 endforeach()
 if(_configs_qrc_missing)
     message(FATAL_ERROR
-        "[Main] configs.qrc 已陈旧：以下客户配置存在于磁盘但未登记进资源，"
-        "打包后运行期取不到、会静默回退到默认客户：\n  ${_configs_qrc_missing}\n"
-        "请在 ${SRC_ROOT}/UI/ClientConfig/configs.qrc 里补上对应 <file alias=...> 条目。")
+        "[Main] configs.qrc is stale: these customer configs exist on disk but are not registered as resources, "
+        "so they are unavailable at runtime after packaging and silently fall back to the default customer:\n  ${_configs_qrc_missing}\n"
+        "Add the corresponding <file alias=...> entries to ${SRC_ROOT}/UI/ClientConfig/configs.qrc.")
 endif()
 
 
@@ -313,7 +313,6 @@ endif()
 target_include_directories(${APP_NAME}
     PRIVATE
         ${SHARED_PROJECT_INCLUDE_DIRS}
-        "${APR_RENDERX_DIR}/include"
 )
 if(BUILD_CRASHHANDLER)
     target_include_directories(${APP_NAME} PRIVATE
@@ -355,7 +354,6 @@ target_link_libraries(${APP_NAME}
         EngineCommon
         Engine2D
         EnginePersistence
-        RenderX
         # 应用退出时要显式销毁 Metal 的进程级共享 Runtime
         # （AppBootstrapper::shutdown → RenderSessionHost::shutdownSharedRuntime）。
         # 此前只是经由 UI2D/UI3D 传递进来，属「用了但没声明」。
@@ -765,6 +763,8 @@ if(_main_tests AND GTest_FOUND)
             "${SRC_ROOT}/Import"
             "${SRC_ROOT}/Export"
             "${CMAKE_CURRENT_SOURCE_DIR}/../FileIO/FileIO/Src"
+            # AprEntitySerializer / 旧档案迁移回归测试需要 AprDocument.pb.h（构建期生成）
+            "${_proto_gen_dir}"
     )
 if(BUILD_CRASHHANDLER)
     target_include_directories(MainTests
@@ -810,7 +810,6 @@ target_link_libraries(MainTests
             UICommon
             UI2D
             Log
-            RenderX
             # 合成 ID 号段隔离回归测试用 RenderBridge::RenderXAdapter 建 Null 设备 + 假场景
             RenderBridge
             FileIO

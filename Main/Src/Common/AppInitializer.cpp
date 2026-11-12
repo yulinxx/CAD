@@ -66,18 +66,6 @@ void AppInitializer::initialize()
         MainApp::appVersion().c_str());
     APR_INFO("==============================================================\n\n");
 
-    // 这里只能声明「本构建把视口编译成了哪个后端」——那是编译期事实，启动瞬间即可知。
-    // 真实生效的后端与设备名要等视口建 Surface 后由
-    // RenderSessionHost::logCapabilities 打印（只有那里拿得到 caps）。
-    // 后端名这里直接写字面量：它只描述「本构建选了哪个后端」，
-    // 不必为一个字符串去引渲染后端的头文件（应用层与后端零耦合）。
-#ifdef APR_ENABLE_METAL_VIEWPORT
-    const char* configuredBackendName = "Metal";
-#else
-    const char* configuredBackendName = "OpenGL";
-#endif
-    APR_INFOF("[Render] Viewport backend (compile-time): %s", configuredBackendName);
-
     CrashHandlerBootstrap::logPendingDumps();
 
     auto* languageManager = LanguageManager::instance();
