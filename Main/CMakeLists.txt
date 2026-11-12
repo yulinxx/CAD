@@ -810,7 +810,7 @@ target_link_libraries(MainTests
             UICommon
             UI2D
             Log
-            # 合成 ID 号段隔离回归测试用 RenderBridge::RenderXAdapter 建 Null 设备 + 假场景
+            # 合成 ID 号段隔离回归测试用 RenderBridge 的中性离屏工厂建 Null 设备 + 假场景
             RenderBridge
             FileIO
             protobuf::libprotobuf-lite
