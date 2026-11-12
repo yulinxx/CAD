@@ -10,6 +10,7 @@
 #include "Log/AprLogger.h"
 
 #include "UI/Safety/EmergencyStopController.h"
+#include "UI/Safety/EmergencyStopFeature.h"
 
 #include "../Hardware/DeviceHost.h"
 #include "../Hardware/ProcessingJobService.h"
@@ -100,8 +101,11 @@ void LaserOperationRegistry::registerAll()
             // canExec 决定菜单/工具栏的可用态：设备没起来、安全门没关、
             // 或者已经在加工时，「开始加工」必须是灰的 ——
             // 让操作员点了之后才看到报错，是最容易被投诉的交互
+            // 急停校验随总开关一起失效（软件尚未交付急停硬件链路，v1.1 开启）：
+            // 关闭时 canExec 不再看 isReadOnly，其余设备/加工态判断保持原样
+            const bool safetyReady = !EmergencyStopFeature::kEnabled || !safety || !safety->isReadOnly();
             return job && host && host->isRunning() && host->canStartProcessing() && !job->isRunning() &&
-                !job->isPaused() && (!safety || !safety->isReadOnly());
+                !job->isPaused() && safetyReady;
         });
 
     // --- 暂停 / 恢复（同一个命令来回切） ---

@@ -133,6 +133,7 @@
 #include "UI/ClientConfig/UiBrandManager.h"
 #include "UI/ClientConfig/UiLabelLocalizer.h"
 #include "UI/Safety/EmergencyStopController.h"
+#include "UI/Safety/EmergencyStopFeature.h"
 #include "UI/Widgets/EmergencyStopOverlay.h"
 
 #include <QCloseEvent>
@@ -1054,6 +1055,13 @@ void WorkbenchWindow::reportFrameworkError(const QString& errorCode, const QStri
 
 void WorkbenchWindow::bindSafetyServices(EmergencyStopController* safety, OperationBus* bus)
 {
+    // 总开关关闭：不创建浮层、不接只读闸门（软件尚未交付急停硬件链路，v1.1 开启）
+    if (!EmergencyStopFeature::kEnabled)
+    {
+        APR_INFO("[WorkbenchWindow] Emergency stop disabled by feature switch (v1.1)");
+        return;
+    }
+
     // 服务缺失必须留痕：静默返回正是本入口长期没被创建的原因
     if (!safety)
     {

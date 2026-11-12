@@ -10,6 +10,7 @@
 
 #include "Log/AprLogger.h"
 #include "UI/Safety/EmergencyStopController.h"
+#include "UI/Safety/EmergencyStopFeature.h"
 
 namespace
 {
@@ -199,7 +200,8 @@ void EmergencyStopOverlay::syncVisibility()
 {
     // 只有急停流程未完成时才出现：正常态完全不存在。
     // 之前这里无条件 show()，浮层从启动起就贴在右上角挡住编辑区。
-    const bool active = m_controller &&
+    // 总开关关闭时一律不显示（软件尚未交付急停硬件链路，v1.1 开启）
+    const bool active = EmergencyStopFeature::kEnabled && m_controller &&
         (m_controller->state() == EmergencyStopController::State::EmergencyStopped ||
             m_controller->state() == EmergencyStopController::State::ResetConfirmed);
     if (!active || !m_window || !m_window->isVisible())

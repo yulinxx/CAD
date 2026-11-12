@@ -14,6 +14,7 @@
 #include <memory>
 
 #include "UI/Safety/EmergencyStopController.h"
+#include "UI/Safety/EmergencyStopFeature.h"
 #include "UI/Widgets/EmergencyStopOverlay.h"
 #include "UI/Workbench/WorkbenchWindow.h"
 #include "UI2D/Operation/OperationBus.h"
@@ -110,8 +111,17 @@ TEST(EmergencyStopTests, PersistedLatchSurvivesRestartAsEmergencyState)
     controller->setDeviceStateProviders(
         [&device]() { return device.monitoring; }, [&device]() { return device.inputActive; });
 
-    EXPECT_EQ(controller->state(), EmergencyStopController::State::EmergencyStopped);
-    EXPECT_TRUE(controller->isReadOnly());
+    if constexpr (EmergencyStopFeature::kEnabled)
+    {
+        EXPECT_EQ(controller->state(), EmergencyStopController::State::EmergencyStopped);
+        EXPECT_TRUE(controller->isReadOnly());
+    }
+    else
+    {
+        // 总开关关闭：不读闭锁，ini 残留 true 也不得进入只读
+        EXPECT_EQ(controller->state(), EmergencyStopController::State::Normal);
+        EXPECT_FALSE(controller->isReadOnly());
+    }
 }
 
 TEST(EmergencyStopTests, OverlayTriggersImmediatelyAndKeepsTwoSeparateActions)
@@ -177,15 +187,23 @@ TEST(EmergencyStopTests, OverlayExistsOnlyDuringEmergencySequence)
     EXPECT_FALSE(overlay.isVisible());
 
     controller->triggerEmergencyStop();
-    EXPECT_TRUE(overlay.isVisible()) << "overlay must stay visible while emergency stop is not reset";
+    if constexpr (EmergencyStopFeature::kEnabled)
+    {
+        EXPECT_TRUE(overlay.isVisible()) << "overlay must stay visible while emergency stop is not reset";
 
-    device.inputActive = true;
-    controller->pollDeviceState();
-    device.inputActive = false;
-    controller->pollDeviceState();
-    ASSERT_TRUE(controller->confirmReset());
-    // ResetConfirmed 仍属急停流程（开光是独立的第二个动作），保持可见
-    EXPECT_TRUE(overlay.isVisible());
+        device.inputActive = true;
+        controller->pollDeviceState();
+        device.inputActive = false;
+        controller->pollDeviceState();
+        ASSERT_TRUE(controller->confirmReset());
+        // ResetConfirmed 仍属急停流程（开光是独立的第二个动作），保持可见
+        EXPECT_TRUE(overlay.isVisible());
+    }
+    else
+    {
+        // 总开关关闭：任何状态都不显示浮层
+        EXPECT_FALSE(overlay.isVisible());
+    }
 }
 
 TEST(EmergencyStopTests, LatchedStartupStaysResettableFromOverlay)
@@ -206,12 +224,21 @@ TEST(EmergencyStopTests, LatchedStartupStaysResettableFromOverlay)
     EmergencyStopOverlay overlay(controller.get(), []() {}, []() {});
     overlay.attachToWindow(&host);
 
-    ASSERT_TRUE(controller->isReadOnly());
-    ASSERT_TRUE(overlay.isVisible());
-    // 只读态下必须有可点的非菜单复位入口，否则用户被永久锁死
-    ASSERT_TRUE(overlay.confirmResetButton()->isEnabled());
-    overlay.confirmResetButton()->click();
-    EXPECT_FALSE(controller->isReadOnly());
+    if constexpr (EmergencyStopFeature::kEnabled)
+    {
+        ASSERT_TRUE(controller->isReadOnly());
+        ASSERT_TRUE(overlay.isVisible());
+        // 只读态下必须有可点的非菜单复位入口，否则用户被永久锁死
+        ASSERT_TRUE(overlay.confirmResetButton()->isEnabled());
+        overlay.confirmResetButton()->click();
+        EXPECT_FALSE(controller->isReadOnly());
+    }
+    else
+    {
+        // 总开关关闭：残留闭锁不生效，既不只读也不显示浮层
+        EXPECT_FALSE(controller->isReadOnly());
+        EXPECT_FALSE(overlay.isVisible());
+    }
 }
 
 TEST(EmergencyStopTests, BindSafetyServicesCreatesOverlayAndAppliesReadOnly)
@@ -229,23 +256,34 @@ TEST(EmergencyStopTests, BindSafetyServicesCreatesOverlayAndAppliesReadOnly)
     ASSERT_FALSE(window.hasEmergencyStopOverlay());
 
     window.bindSafetyServices(controller.get(), &bus);
-    ASSERT_TRUE(window.hasEmergencyStopOverlay());
 
     ASSERT_NE(window.centralWidget(), nullptr);
     EXPECT_TRUE(window.centralWidget()->isEnabled());
 
-    // 触发急停 → 只读态必须立即落到编辑区
-    controller->triggerEmergencyStop();
-    EXPECT_TRUE(controller->isReadOnly());
-    EXPECT_FALSE(window.centralWidget()->isEnabled());
+    if constexpr (EmergencyStopFeature::kEnabled)
+    {
+        ASSERT_TRUE(window.hasEmergencyStopOverlay());
 
-    // 物理复位 + 确认复位后恢复可操作
-    device.inputActive = true;
-    controller->pollDeviceState();
-    device.inputActive = false;
-    controller->pollDeviceState();
-    ASSERT_TRUE(controller->confirmReset());
-    EXPECT_TRUE(window.centralWidget()->isEnabled());
+        // 触发急停 → 只读态必须立即落到编辑区
+        controller->triggerEmergencyStop();
+        EXPECT_TRUE(controller->isReadOnly());
+        EXPECT_FALSE(window.centralWidget()->isEnabled());
+
+        // 物理复位 + 确认复位后恢复可操作
+        device.inputActive = true;
+        controller->pollDeviceState();
+        device.inputActive = false;
+        controller->pollDeviceState();
+        ASSERT_TRUE(controller->confirmReset());
+        EXPECT_TRUE(window.centralWidget()->isEnabled());
+    }
+    else
+    {
+        // 总开关关闭：不创建浮层，编辑区也不做只读封锁
+        EXPECT_FALSE(window.hasEmergencyStopOverlay());
+        controller->triggerEmergencyStop();
+        EXPECT_TRUE(window.centralWidget()->isEnabled());
+    }
 }
 
 TEST(EmergencyStopTests, RestartLatchKeepsStartActionDisabled)
@@ -261,6 +299,15 @@ TEST(EmergencyStopTests, RestartLatchKeepsStartActionDisabled)
     int startRequests = 0;
     EmergencyStopOverlay overlay(controller.get(), []() {}, [&startRequests]() { ++startRequests; });
 
-    EXPECT_EQ(controller->state(), EmergencyStopController::State::EmergencyStopped);
-    EXPECT_FALSE(overlay.startLaserButton()->isEnabled());
+    if constexpr (EmergencyStopFeature::kEnabled)
+    {
+        EXPECT_EQ(controller->state(), EmergencyStopController::State::EmergencyStopped);
+        EXPECT_FALSE(overlay.startLaserButton()->isEnabled());
+    }
+    else
+    {
+        // 总开关关闭：残留闭锁不生效，重启即普通态；开始加工只在复位确认后可用
+        EXPECT_EQ(controller->state(), EmergencyStopController::State::Normal);
+        EXPECT_FALSE(overlay.startLaserButton()->isEnabled());
+    }
 }

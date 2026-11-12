@@ -6,6 +6,7 @@
 
 #include "Hardware/DeviceHost.h"
 #include "Log/AprLogger.h"
+#include "UI/Safety/EmergencyStopFeature.h"
 
 namespace
 {
@@ -70,8 +71,9 @@ EmergencyStopController::EmergencyStopController(
     , m_loadLatch(std::move(loadLatch))
     , m_saveLatch(std::move(saveLatch))
 {
-    // 重启后不得自动回到可出光态：上次退出时仍在急停闭锁则直接进入急停态
-    if (m_loadLatch && m_loadLatch())
+    // 重启后不得自动回到可出光态：上次退出时仍在急停闭锁则直接进入急停态。
+    // 总开关关闭时不读闭锁：ini 里残留 true 也不得让软件进入只读
+    if (EmergencyStopFeature::kEnabled && m_loadLatch && m_loadLatch())
     {
         m_state = State::EmergencyStopped;
         // 重启时无法得知物理急停是否已复位，先假定需要一次输入放行来确认
@@ -153,7 +155,7 @@ void EmergencyStopController::triggerEmergencyStop()
 {
     m_estopInputSeenActive = false;
     setPhysicalResetObserved(false);
-    if (m_saveLatch)
+    if (EmergencyStopFeature::kEnabled && m_saveLatch)
     {
         m_saveLatch(true);
     }
@@ -175,7 +177,7 @@ bool EmergencyStopController::confirmReset()
     }
 
     m_physicalResetObserved = false;
-    if (m_saveLatch)
+    if (EmergencyStopFeature::kEnabled && m_saveLatch)
     {
         m_saveLatch(false);
     }

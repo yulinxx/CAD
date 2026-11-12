@@ -10,6 +10,7 @@
 #include "UiStateCenter.h"
 #include "BuildConfig.h"
 #include "Log/AprLogger.h"
+#include "UI/Safety/EmergencyStopFeature.h"
 #include "UI/Dlg/AboutDialog.h"
 #include "UI/Services/HelpDialogService.h"
 #include "UI/ThemeManager.h"
@@ -153,10 +154,12 @@ void MenuDispatcher::dispatch(const QString& commandId, const QVariantMap& param
     }
 
     // 急停只读态：除安全、视图、帮助与保存外，其余命令一律拦下并提示，
-    // 避免操作员在未完成复位流程时继续编辑或启动新的加工
+    // 避免操作员在未完成复位流程时继续编辑或启动新的加工。
+    // 总开关关闭时整段失效（软件尚未交付急停硬件链路，v1.1 开启）；
+    // 拦截日志保留在分支内，重新开启后可直接用于定位
     auto* root = ApplicationCompositionRoot::instance();
     auto* safety = root ? root->emergencyStopController() : nullptr;
-    if (safety && safety->isReadOnly())
+    if (EmergencyStopFeature::kEnabled && safety && safety->isReadOnly())
     {
         const bool allowed = commandId == QLatin1String("laser.emergency_stop") ||
             commandId == QLatin1String("laser.reset_safety") || commandId.startsWith(QLatin1String("view.")) ||
