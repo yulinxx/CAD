@@ -57,4 +57,12 @@ if [[ -f "${POINTER_GUARD}" ]]; then
     bash "${POINTER_GUARD}" check
 fi
 
+# 代码 CJK 校验：注释允许中文，代码/日志/断言里的 CJK 一律拦截。
+# 该脚本只在父仓库内执行，需要沿用钩子环境里的 GIT_INDEX_FILE，
+# 不要像子模块调用那样清除 GIT_* 变量。
+CJK_GUARD="${REPO_ROOT}/Tools/check-cjk-in-code.py"
+if [[ -f "${CJK_GUARD}" ]]; then
+    python3 "${CJK_GUARD}" --staged
+fi
+
 exit 0
