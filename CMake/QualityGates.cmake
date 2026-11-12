@@ -11,6 +11,15 @@
 #      不归本项目修，也不该阻断第一方构建；
 #   2. 测试目标由各模块直接 add_executable 创建，不经过共享库辅助函数，
 #      所以必须在所有 add_subdirectory 结束后统一遍历目标挂载。
+#
+# 硬约束（新增告警时必须遵守）：
+#   ThirdParty 与外部子模块（如 Raster、FileIO 里的 libdxfrw）的**源码不因为
+#   -Werror 而修改**。它们有独立上游历史，改源码会让以后同步上游产生冲突。
+#   这类告警只能在构建层做**源文件作用域**抑制，例如：
+#     set_source_files_properties(<该模块源码> PROPERTIES
+#         COMPILE_OPTIONS "-Wno-unused-function")   # MSVC 用 /wd<编号>
+#   已落地示例：FileIO/FileIO/CMakeLists.txt（libdxfrw）、
+#               Raster/Raster/CMakeLists.txt（signedArea / cvJoinType）。
 # =============================================================================
 
 # Utils.cmake 会被多个模块重复 include；本文件只应生效一次
@@ -22,13 +31,14 @@ set(APR_QUALITY_GATES_INCLUDED TRUE)
 option(APR_WERROR "Treat first-party compiler warnings as errors" ON)
 # 默认排除项（每一项都必须写清原因，不允许无声豁免）：
 #   Engine/2D、Engine/3D、UI/2D、UI/3D
-#       正在由并行分支改写，开 -Werror 遇到告警就必须改这些目录的源码，
-#       会与对方冲突。待其合并后从列表移除即可铺满全仓。
+#       TODO(并行分支合入后移除)：这四个目录正被并行分支改写，开 -Werror 遇到
+#       告警就必须改这些源码，会与对方冲突。合入后从默认排除列表删掉，铺满全仓。
 #   GeoModelCore/GeoModelCore
 #       git submodule（独立仓库、固定 SHA）。其中的 OCCT 7.8 废弃 API
 #       （GetMessageString / TopTools_HSequenceOfShape / ConnectEdgesToWires）
-#       只能在子模块仓库里修，改了主仓库记录的 SHA 会让 CI 的
-#       submodules: recursive 拉不到提交。待子模块侧修完再移除本项。
+#       只能在子模块仓库里修。注意：不是不想开，是受子模块约束——改了主仓库
+#       记录的 SHA 会让 CI 的 submodules: recursive 拉不到提交。待子模块侧
+#       修完并推送后再移除本项。
 # 默认排除列表用普通变量而不是 cache：默认值随代码更新，旧构建目录不会残留过期的豁免表。
 # 需要临时扩大范围时用 -DAPR_WERROR_EXTRA_EXCLUDED_DIRS=<dir>[;<dir>...] 追加。
 set(_APR_WERROR_EXCLUDED_DEFAULT
