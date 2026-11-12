@@ -28,6 +28,8 @@
     #include "Engine2D/Edit/LayerSnapshot.h"
     #include "Engine2D/Geo/GeometryContext.h"
 
+    #include "Engine/Process/ProcessModel.h"
+
     #include "Log/AprLogger.h"
 
 namespace
@@ -47,6 +49,7 @@ namespace
     {
         int layerId = 0;
         LayerProcessParams params;
+        Eg::PierceSpec pierce;
         std::vector<const Eg::AprEntity*> entities;
     };
 
@@ -264,14 +267,17 @@ namespace
         const double nx = -ty * sign;  // 切线左法向 × 方向符号
         const double ny = tx * sign;
 
+        // 历史 int 按生产链语义显式映射：3 在这里一直是切线，不是圆弧
+        const Eg::LeadInMode mode = Eg::LeadInModeFromLegacyProcessMode(params.leadInMode);
+
         double dx = -tx;
         double dy = -ty;
-        if (params.leadInMode == 1)
+        if (mode == Eg::LeadInMode::Normal)
         {
             dx = nx;
             dy = ny;
         }
-        else if (params.leadInMode == 2)
+        else if (mode == Eg::LeadInMode::Straight)
         {
             const double rad = params.leadInAngleDeg * (3.14159265358979323846 / 180.0);
             dx = -tx * std::cos(rad) + nx * std::sin(rad);
@@ -544,7 +550,10 @@ namespace
      * 轮廓的段只有 Line 与 Arc 两种（Cam 层的统一约定，见 ToolpathTypes.h）。
      *
      * @param preferArcs true = 圆弧直接编译成 ArcTo；false = 按弦高容差离散成直线
+     * @param pierce      穿孔参数；enabled=false 时不产生任何额外指令
      * @param degraded    出参：该轮廓因弧被离散而整体降级时置 true
+     * @param pierced     出参：本轮廓是否实际插入了穿孔延时
+     * @param pierceDwellCount 出参：本轮廓插入的穿孔延时指令条数
      *
      * 首点必须空移过去：若第一段就带出光，激光会从上一个轮廓的终点一路烧过来。
      */
@@ -552,28 +561,108 @@ namespace
         bool preferArcs,
         double chordToleranceMm,
         const Ut::Vec2d* leadInStart,
+        const LayerProcessParams& params,
+        const Eg::PierceSpec& pierce,
         const FrameTransform& frame,
         Hw::MotionPlanBuilder& out,
-        bool& degraded)
+        bool& degraded,
+        bool& pierced,
+        int32_t& pierceDwellCount)
     {
         degraded = false;
+        pierced = false;
+        pierceDwellCount = 0;
         if (contour.segments.empty())
         {
             return false;
         }
 
-        // 轮廓起点：第一个段的 ptStart
-        const Ut::Vec2d start = frame.point(contour.segments.front().ptStart);
-        if (leadInStart)
+        // 预穿孔 = 上一道工序已经打过孔：不插延时、不改功率
+        const bool wantsPierce = pierce.enabled && !pierce.prePierced;
+
+        // ---- 入口点：引线起点优先；无引线且闭合时可按 pierceOffsetMm 沿废料侧外移 ----
+        Ut::Vec2d entryPoint = contour.segments.front().ptStart;
+        bool hasEntry = false;
+        if (wantsPierce && leadInStart == nullptr && contour.closed && pierce.pierceOffsetMm > 0.0)
         {
-            // 空移到引入起点，再沿引入线出光切到轮廓起点
-            const Ut::Vec2d lead = frame.point(*leadInStart);
-            out.emitRapidTo(lead.x(), lead.y());
-            out.emitLineTo(start.x(), start.y(), true);
+            LayerProcessParams pierceParams = params;
+            pierceParams.leadInEnabled = true;
+            pierceParams.leadInLengthMm = pierce.pierceOffsetMm;
+            pierceParams.leadInMode = static_cast<int32_t>(Eg::LeadInMode::Normal);
+            Ut::Vec2d offsetPoint;
+            if (makeLeadInPoint(contour, pierceParams, chordToleranceMm, offsetPoint))
+            {
+                entryPoint = offsetPoint;
+                hasEntry = true;
+            }
         }
-        else
+        if (leadInStart != nullptr)
         {
-            out.emitRapidTo(start.x(), start.y());
+            entryPoint = *leadInStart;
+            hasEntry = true;
+        }
+
+        const Ut::Vec2d start = frame.point(contour.segments.front().ptStart);
+        const Ut::Vec2d entry = frame.point(entryPoint);
+        out.emitRapidTo(entry.x(), entry.y());
+
+        // ---- 穿孔：切到穿孔功率/速度，打孔延时，首条切削段结束后恢复层参数 ----
+        // needRestore 只在穿孔生效时置位，保证 enabled=false 时指令流逐字节不变。
+        bool needRestore = false;
+        if (wantsPierce)
+        {
+            Hw::LaserParams pierceLaser;
+            pierceLaser.powerPercent = (pierce.piercePowerPercent >= 0.0)
+                                           ? std::max(0.0, std::min(100.0, pierce.piercePowerPercent))
+                                           : params.powerPercent;
+            pierceLaser.frequencyHz = params.frequencyHz;
+            pierceLaser.pulseWidthUs = params.pulseWidthUs;
+            pierceLaser.waveformIndex = params.waveformIndex;
+            out.emitSetLaserParams(pierceLaser);
+            if (pierce.pierceSpeedMmPerSec > 0.0)
+            {
+                out.emitSetFeedRate(pierce.pierceSpeedMmPerSec);
+            }
+
+            const int32_t repeats = std::max<int32_t>(1, pierce.pierceCount);
+            if (pierce.pierceDelayUs > 0)
+            {
+                for (int32_t i = 0; i < repeats; ++i)
+                {
+                    out.emitDwell(static_cast<int64_t>(pierce.pierceDelayUs));
+                    ++pierceDwellCount;
+                }
+            }
+            if (pierce.dwellUs > 0)
+            {
+                out.emitDwell(static_cast<int64_t>(pierce.dwellUs));
+                ++pierceDwellCount;
+            }
+            pierced = pierceDwellCount > 0;
+            needRestore = true;
+        }
+
+        // 穿孔功率只覆盖穿孔后的首条切削段（偏置切入段 / 引线 / 轮廓首段）
+        auto restoreAfterFirstCut = [&]() {
+            if (!needRestore)
+            {
+                return;
+            }
+            Hw::LaserParams layerLaser;
+            layerLaser.powerPercent = params.powerPercent;
+            layerLaser.frequencyHz = params.frequencyHz;
+            layerLaser.pulseWidthUs = params.pulseWidthUs;
+            layerLaser.waveformIndex = params.waveformIndex;
+            out.emitSetLaserParams(layerLaser);
+            out.emitSetFeedRate(params.speedMmPerSec);
+            needRestore = false;
+        };
+
+        if (hasEntry)
+        {
+            // 空移到入口后，沿偏置切入段 / 引线出光切到轮廓起点
+            out.emitLineTo(start.x(), start.y(), true);
+            restoreAfterFirstCut();
         }
 
         for (const Eg::Cam::PathSegment& seg : contour.segments)
@@ -582,6 +671,7 @@ namespace
             {
                 const Ut::Vec2d end = frame.point(seg.ptEnd);
                 out.emitLineTo(end.x(), end.y(), true);
+                restoreAfterFirstCut();
                 continue;
             }
 
@@ -600,6 +690,7 @@ namespace
                     center.y(),
                     frame.arcDirection(seg.counterClockwise),
                     true);
+                restoreAfterFirstCut();
                 continue;
             }
 
@@ -610,6 +701,7 @@ namespace
             {
                 const Ut::Vec2d p = frame.point(pts[i]);
                 out.emitLineTo(p.x(), p.y(), true);
+                restoreAfterFirstCut();
             }
         }
         return true;
@@ -626,6 +718,7 @@ namespace
         const Eg::Cam::ExtractOptions& options,
         const std::vector<Eg::Cam::Contour>* preparedContours,
         const LayerProcessParams& params,
+        const Eg::PierceSpec& pierce,
         bool countLeadStats,
         bool preferArcs,
         double chordToleranceMm,
@@ -647,6 +740,8 @@ namespace
             for (const Eg::Cam::Contour& contour : *preparedContours)
             {
                 bool contourDegraded = false;
+                bool contourPierced = false;
+                int32_t contourDwells = 0;
                 Ut::Vec2d leadStart;
                 const bool hasLead = makeLeadInPoint(contour, params, chordToleranceMm, leadStart);
                 if (countLeadStats)
@@ -664,14 +759,27 @@ namespace
                         preferArcs,
                         chordToleranceMm,
                         hasLead ? &leadStart : nullptr,
+                        params,
+                        pierce,
                         frame,
                         out,
-                        contourDegraded))
+                        contourDegraded,
+                        contourPierced,
+                        contourDwells))
                 {
                     anyEmitted = true;
                     if (contourDegraded)
                     {
                         degraded = true;
+                    }
+                    if (countLeadStats)
+                    {
+                        // 穿孔统计按轮廓计一次，不随遍次倍增
+                        if (contourPierced)
+                        {
+                            ++result.pierceAppliedContourCount;
+                        }
+                        result.pierceDwellSegmentCount += contourDwells;
                     }
                 }
             }
@@ -726,6 +834,8 @@ namespace
         for (const Eg::Cam::Contour& contour : extracted.contours)
         {
             bool contourDegraded = false;
+            bool contourPierced = false;
+            int32_t contourDwells = 0;
             Ut::Vec2d leadStart;
             const bool hasLead = makeLeadInPoint(contour, params, chordToleranceMm, leadStart);
             if (countLeadStats)
@@ -743,14 +853,27 @@ namespace
                     preferArcs,
                     chordToleranceMm,
                     hasLead ? &leadStart : nullptr,
+                    params,
+                    pierce,
                     frame,
                     out,
-                    contourDegraded))
+                    contourDegraded,
+                    contourPierced,
+                    contourDwells))
             {
                 anyEmitted = true;
                 if (contourDegraded)
                 {
                     degraded = true;
+                }
+                if (countLeadStats)
+                {
+                    // 穿孔统计按轮廓计一次，不随遍次倍增
+                    if (contourPierced)
+                    {
+                        ++result.pierceAppliedContourCount;
+                    }
+                    result.pierceDwellSegmentCount += contourDwells;
                 }
             }
         }
@@ -837,6 +960,9 @@ namespace MotionPlanCompiler
             LayerBucket b;
             b.layerId = layerId;
             b.params = paramsForLayer(spec, layerId);
+            const auto pierceIt = spec.layerPierce.constFind(layerId);
+            b.pierce = (pierceIt != spec.layerPierce.constEnd()) ? pierceIt.value()
+                                                                 : spec.defaultPierce;
             buckets.push_back(b);
             return buckets.back();
         };
@@ -989,6 +1115,7 @@ namespace MotionPlanCompiler
                             extractOptions,
                             preparedContours,
                             bucket.params,
+                            bucket.pierce,
                             pass == 0,
                             spec.emitArcs,
                             spec.chordToleranceMm,

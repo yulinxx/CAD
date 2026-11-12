@@ -12,6 +12,7 @@
 #include "CAM/ToolpathJobInput.h"
 
 #include "Engine/Process/ProcessParams.h"
+#include "Engine/Process/ProcessModel.h"
 #include "Engine/AprEntity/AprEntity.h"
 #include "Engine2D/Cam/ContourContainment.h"
 #include "Engine2D/Cam/GeometryExtractor.h"
@@ -530,11 +531,12 @@ namespace CamBridge
                     bucket.layerId, bucket.kerf.widthMm, bucket.kerf.side);
             }
 
-            // 引入线：与 MotionPlanCompiler 共用同一份 Eg::ProcessParams，
-            // 默认 leadInEnabled=false / 长度 0 时不改变任何既有刀路。
+            // 引入线 mode 语义按来源显式转换：Eg 历史值里的 3 在生产链是切线，
+            // 直接赋给 CAM 会被当成真正的圆弧，同一份档案两条编译链几何不同。
             bucket.leadInOut.enabled = egParams.leadInEnabled && egParams.leadInLengthMm > 0.0;
             bucket.leadInOut.leadInLengthMm = egParams.leadInLengthMm;
-            bucket.leadInOut.leadInMode = egParams.leadInMode;
+            bucket.leadInOut.leadInMode = Eg::CamModeFromLeadInMode(
+                Eg::LeadInModeFromLegacyProcessMode(egParams.leadInMode));
             bucket.leadInOut.leadInAngleDeg = egParams.leadInAngleDeg;
 
             // 3) 定型为 CAM 轮廓

@@ -28,24 +28,13 @@
     #include "Hardware/Device/MotionPlan.h"
     #include "Hardware/MotionPlanCompiler.h"
     #include "MotionCommandCompare.h"
+    #include "MotionPlanTestScene.h"
 
 namespace
 {
-    Eg::AprEntity* addPolygon(Eg::SceneManager& scene, const std::vector<Ut::Vec2d>& vertices)
-    {
-        Eg::AprPolygon poly;
-        poly.setVertices(vertices);
-        poly.bClosed = true;
-        Eg::SceneWriteGateway::addEntity(scene, &poly);
-
-        const std::vector<Eg::AprEntity*> all = scene.getAllEntities();
-        return all.empty() ? nullptr : all.back();
-    }
-
-    std::vector<Ut::Vec2d> rectPoints(double x0, double y0, double x1, double y1)
-    {
-        return { Ut::Vec2d(x0, y0), Ut::Vec2d(x1, y0), Ut::Vec2d(x1, y1), Ut::Vec2d(x0, y1) };
-    }
+    using MotionTest::addPolygon;
+    using MotionTest::compileRect;
+    using MotionTest::rectPoints;
 
     size_t countLitLine(const Hw::MotionPlanView& view)
     {
@@ -114,13 +103,6 @@ namespace
             b.valid = true;
         }
         return b;
-    }
-
-    ToolpathCompileResult compileRect(Eg::SceneManager& scene,
-                                      const ToolpathJobSpec& spec,
-                                      Hw::MotionPlanBuilder& builder)
-    {
-        return MotionPlanCompiler::compile(scene, nullptr, spec, builder);
     }
 }  // namespace
 
@@ -312,6 +294,79 @@ TEST(MotionPlanKerfLeadTest, LeadInWithInvalidLengthIsRejected)
     const ToolpathCompileResult r = compileRect(scene, spec, builder);
     EXPECT_FALSE(r.ok);
     EXPECT_FALSE(r.error.isEmpty());
+}
+
+// ============================================================
+//  mode 语义锁定：2 号必须是同一条「直线」定义
+// ============================================================
+
+namespace
+{
+    /// 第一条 RapidTo 的落点 = 引入线起点
+    Ut::Vec2d firstRapidTarget(const Hw::MotionPlanView& view)
+    {
+        for (size_t i = 0; i < view.commandCount; ++i)
+        {
+            if (view.commands[i].op == Hw::MotionOp::RapidTo)
+            {
+                return Ut::Vec2d(view.commands[i].target.v[0], view.commands[i].target.v[1]);
+            }
+        }
+        return Ut::Vec2d(0.0, 0.0);
+    }
+
+    Ut::Vec2d compileLeadStart(int32_t mode, double angleDeg)
+    {
+        Eg::SceneManager scene;
+        addPolygon(scene, rectPoints(0.0, 0.0, 100.0, 80.0));
+
+        ToolpathJobSpec spec;
+        spec.defaultParams.leadInEnabled = true;
+        spec.defaultParams.leadInLengthMm = 5.0;
+        spec.defaultParams.leadInMode = mode;
+        spec.defaultParams.leadInAngleDeg = angleDeg;
+
+        Hw::MotionPlanBuilder builder;
+        EXPECT_TRUE(compileRect(scene, spec, builder).ok);
+        return firstRapidTarget(builder.view());
+    }
+}  // namespace
+
+TEST(MotionPlanKerfLeadTest, NormalLeadIn_LeavesAlongScrapSideNormal)
+{
+    const Ut::Vec2d start = compileLeadStart(1, 0.0);
+    EXPECT_NEAR(0.0, start.x(), 1e-4);
+    EXPECT_NEAR(-5.0, start.y(), 1e-4);
+}
+
+TEST(MotionPlanKerfLeadTest, StraightLeadIn_DegeneratesToTangentAtZeroAndNormalAtNinety)
+{
+    // 2 号是「沿 leadInAngleDeg 的直线」这一条定义：
+    // 角度 0 必须与切线引入完全重合，90 必须与法向引入完全重合。
+    const Ut::Vec2d zero = compileLeadStart(2, 0.0);
+    EXPECT_NEAR(-5.0, zero.x(), 1e-4);
+    EXPECT_NEAR(0.0, zero.y(), 1e-4);
+
+    const Ut::Vec2d ninety = compileLeadStart(2, 90.0);
+    EXPECT_NEAR(0.0, ninety.x(), 1e-4);
+    EXPECT_NEAR(-5.0, ninety.y(), 1e-4);
+}
+
+TEST(MotionPlanKerfLeadTest, StraightLeadIn_FortyFiveDegreesBisectsTangentAndNormal)
+{
+    const Ut::Vec2d start = compileLeadStart(2, 45.0);
+    const double expected = 5.0 / std::sqrt(2.0);
+    EXPECT_NEAR(-expected, start.x(), 1e-4);
+    EXPECT_NEAR(-expected, start.y(), 1e-4);
+}
+
+TEST(MotionPlanKerfLeadTest, LegacyModeThreeStaysTangent)
+{
+    // 旧档案里的 leadInMode=3 在生产链一直是切线；映射成 Arc 会改变刀路。
+    const Ut::Vec2d three = compileLeadStart(3, 0.0);
+    const Ut::Vec2d tangent = compileLeadStart(0, 0.0);
+    EXPECT_NEAR(tangent.x(), three.x(), 1e-9);
+    EXPECT_NEAR(tangent.y(), three.y(), 1e-9);
 }
 
 #endif  // ENABLE_HARDWARE

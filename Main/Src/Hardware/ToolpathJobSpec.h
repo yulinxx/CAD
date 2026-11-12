@@ -36,6 +36,7 @@
 #include <cstdint>
 
 #include "Engine/Process/ProcessParams.h"
+#include "Engine/Process/ProcessModel.h"
 #include "Engine2D/Machine/MachineFrame.h"
 
 /**
@@ -58,6 +59,13 @@ struct ToolpathJobSpec
 
     /// 图层 ID → 工艺参数
     QMap<int, LayerProcessParams> layerParams;
+
+    /// 作业默认穿孔参数。默认 enabled=false：不产生任何额外指令，
+    /// 刀路与未接入穿孔前逐字节一致。
+    Eg::PierceSpec defaultPierce;
+
+    /// 图层 ID → 穿孔参数；缺省回退到 defaultPierce
+    QMap<int, Eg::PierceSpec> layerPierce;
 
     /// 只加工选中图元。为空且本标志为 true 时视为「没有可加工内容」而报错，
     /// 不会静默退化成加工全图 —— 那会直接烧废整块料。
@@ -150,4 +158,8 @@ struct ToolpathCompileResult
     // ---- 尾部追加（M1）：文字缺字汇总 ----
     int32_t missingGlyphCount = 0;        ///< 因字体缺字而被跳过的字符总数
     QStringList missingGlyphDetails;      ///< 缺字明细（字符、U+码点、原文行列、版面落点）
+
+    // ---- 尾部追加（M2）：穿孔统计 ----
+    int32_t pierceAppliedContourCount = 0;  ///< 实际插入穿孔延时的轮廓数
+    int32_t pierceDwellSegmentCount = 0;    ///< 插入的穿孔延时指令条数
 };
