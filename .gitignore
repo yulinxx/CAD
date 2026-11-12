@@ -239,6 +239,9 @@ Tools/*
 # 三平台打包脚本是交付资产，packaging-smoke CI 直接调用，必须入库。
 # 只需放行目录本身：Tools/* 只匹配一级子项，目录放行后内部文件不再被规则命中。
 !Tools/Packaging/
+# 导出符号基线与比对脚本：四个外部链接库共用，属长期资产，必须入库。
+# 同样只需放行目录本身（Tools/* 只匹配一级子项）。
+!Tools/Abi/
 # .github/workflows/ 下的工作流一律入库（含 package-smoke.yml），不要再单独忽略；
 # 文件末尾曾残留一条针对 package-smoke.yml 的反向规则，已删除。
 
