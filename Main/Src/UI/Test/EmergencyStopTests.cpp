@@ -14,6 +14,8 @@
 
 #include "UI/Safety/EmergencyStopController.h"
 #include "UI/Widgets/EmergencyStopOverlay.h"
+#include "UI/Workbench/WorkbenchWindow.h"
+#include "UI2D/Operation/OperationBus.h"
 
 namespace
 {
@@ -154,6 +156,40 @@ TEST(EmergencyStopTests, OverlayTriggersImmediatelyAndKeepsTwoSeparateActions)
     // 开光是独立的第二次动作
     overlay.startLaserButton()->click();
     EXPECT_EQ(startRequests, 1);
+}
+
+TEST(EmergencyStopTests, BindSafetyServicesCreatesOverlayAndAppliesReadOnly)
+{
+    ensureEmergencyApplication();
+
+    FakeDeviceState device;
+    auto controller = device.createController();
+    controller->setDeviceStateProviders(
+        [&device]() { return device.monitoring; }, [&device]() { return device.inputActive; });
+
+    OperationBus bus;
+    WorkbenchWindow window;
+    // 构造期不创建：窗口由组合根在服务就绪前构造，那时安全服务必然为空
+    ASSERT_FALSE(window.hasEmergencyStopOverlay());
+
+    window.bindSafetyServices(controller.get(), &bus);
+    ASSERT_TRUE(window.hasEmergencyStopOverlay());
+
+    ASSERT_NE(window.centralWidget(), nullptr);
+    EXPECT_TRUE(window.centralWidget()->isEnabled());
+
+    // 触发急停 → 只读态必须立即落到编辑区
+    controller->triggerEmergencyStop();
+    EXPECT_TRUE(controller->isReadOnly());
+    EXPECT_FALSE(window.centralWidget()->isEnabled());
+
+    // 物理复位 + 确认复位后恢复可操作
+    device.inputActive = true;
+    controller->pollDeviceState();
+    device.inputActive = false;
+    controller->pollDeviceState();
+    ASSERT_TRUE(controller->confirmReset());
+    EXPECT_TRUE(window.centralWidget()->isEnabled());
 }
 
 TEST(EmergencyStopTests, RestartLatchKeepsStartActionDisabled)

@@ -193,7 +193,9 @@ WorkbenchWindow::WorkbenchWindow(QWidget* parent)
     // 启用鼠标追踪，确保 3D 视口中的 QOpenGLWidget 能收到无按键 mouseMoveEvent
     setMouseTracking(true);
     initializeWorkbenchShell();
-    initializeEmergencyStopOverlay();
+    // 急停入口不在这里创建：本窗口由组合根在成员初始化阶段构造，
+    // 彼时 m_emergencyStopController 尚未创建（构造函数体才建），
+    // 只能拿到空服务。改由组合根在安全服务就绪后调用 bindSafetyServices()。
 
     APR_INFO("[WorkbenchWindow] Main window created successfully");
 }
@@ -1050,13 +1052,17 @@ void WorkbenchWindow::reportFrameworkError(const QString& errorCode, const QStri
     }
 }
 
-void WorkbenchWindow::initializeEmergencyStopOverlay()
+void WorkbenchWindow::bindSafetyServices(EmergencyStopController* safety, OperationBus* bus)
 {
-    auto* root = ApplicationCompositionRoot::instance();
-    auto* safety = root ? root->emergencyStopController() : nullptr;
-    OperationBus* bus = root ? root->operationBus() : nullptr;
+    // 服务缺失必须留痕：静默返回正是本入口长期没被创建的原因
     if (!safety)
     {
+        APR_ERROR("[WorkbenchWindow] Emergency stop overlay not created: EmergencyStopController is not ready");
+        return;
+    }
+    if (!bus)
+    {
+        APR_ERROR("[WorkbenchWindow] Emergency stop overlay not created: OperationBus is not ready");
         return;
     }
 
@@ -1064,16 +1070,10 @@ void WorkbenchWindow::initializeEmergencyStopOverlay()
     m_emergencyStopOverlay = std::make_unique<EmergencyStopOverlay>(
         safety,
         [bus]() {
-            if (bus)
-            {
-                bus->run(OperationId::Laser_EmergencyStop);
-            }
+            bus->run(OperationId::Laser_EmergencyStop);
         },
         [bus]() {
-            if (bus)
-            {
-                bus->run(OperationId::Laser_StartProcess);
-            }
+            bus->run(OperationId::Laser_StartProcess);
         });
     m_emergencyStopOverlay->attachToWindow(this);
 
@@ -1081,6 +1081,8 @@ void WorkbenchWindow::initializeEmergencyStopOverlay()
         applySafetyReadOnly(safety->isReadOnly());
     });
     applySafetyReadOnly(safety->isReadOnly());
+
+    APR_INFO("[WorkbenchWindow] Emergency stop overlay created");
 }
 
 void WorkbenchWindow::applySafetyReadOnly(bool readOnly)

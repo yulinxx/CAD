@@ -32,6 +32,7 @@ class SceneTreePanel;
 class PropertiesPanelWidget;
 class FileDropHandler;
 class EmergencyStopOverlay;
+class EmergencyStopController;
 class QDragEnterEvent;
 class QDragMoveEvent;
 class QDragLeaveEvent;
@@ -88,6 +89,18 @@ public:
     /// 初始化工作台窗口骨架
     /// 仅负责顶层容器与基础入口，不在此处挂接具体工作台业务
     void initializeWorkbenchShell();
+    /// 绑定急停安全服务并创建常驻急停入口。
+    /// 窗口在组合根成员初始化阶段就构造完成，那时急停状态机尚未创建，
+    /// 因此不能在构造函数里取 ApplicationCompositionRoot 的服务；
+    /// 由组合根在 m_emergencyStopController 就绪后显式调用一次。
+    /// @param safety 急停状态机（必须非空）
+    /// @param bus 操作总线（必须非空）
+    void bindSafetyServices(EmergencyStopController* safety, OperationBus* bus);
+    /// 常驻急停入口是否已创建（供装配与测试断言）
+    bool hasEmergencyStopOverlay() const
+    {
+        return m_emergencyStopOverlay != nullptr;
+    }
     /// 设置框架级服务桥接
     /// @param services 框架级服务集合
     void setFrameworkServices(const UiFrameworkServices& services);
@@ -221,8 +234,6 @@ private:
     /// 按当前工作台应用**默认**面板显隐策略（2D 显示骨架面板；3D 单独显示 Scene/Properties）。
     /// 只是初值：restoreLayoutSnapshot 里保存的用户状态（含手动关闭的面板）必须在它之后应用。
     void applyDefaultDockVisibility();
-    /// 创建常驻急停入口并绑定急停状态机；非置顶窗口，不随面板显隐
-    void initializeEmergencyStopOverlay();
     /// 急停只读态：禁用画布与菜单/工具栏，保留置顶急停入口可操作
     void applySafetyReadOnly(bool readOnly);
 

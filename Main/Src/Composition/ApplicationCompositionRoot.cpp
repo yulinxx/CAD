@@ -332,6 +332,13 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     m_emergencyStopController = std::make_unique<EmergencyStopController>();
     m_emergencyStopController->attachDeviceHost(m_deviceHost.get());
 
+    // 主窗口在 m_shellHost 的成员初始化阶段就构造完成，那时急停状态机还不存在。
+    // 安全服务就绪后必须显式补绑定，否则急停入口永远不会被创建（急停后编辑区仍可操作）。
+    if (auto* window = m_shellHost ? m_shellHost->mainWindow() : nullptr)
+    {
+        window->bindSafetyServices(m_emergencyStopController.get(), m_operationBus.get());
+    }
+
 #ifdef ENABLE_VISION
     // 视觉门面在设备装配完成后立刻注入宿主能力：标定向导与飞拍在设备
     // 启动前就要能回答"有没有这个能力"，不能等到第一次调用才去补指针。
