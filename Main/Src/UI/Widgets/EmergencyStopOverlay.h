@@ -39,6 +39,8 @@ protected:
 private:
     void buildUi();
     void updateUi();
+    /// 按急停状态决定是否显示：未触发急停时完全不存在，不做半透明常驻控件
+    void syncVisibility();
     void reposition();
 
     EmergencyStopController* m_controller{ nullptr };

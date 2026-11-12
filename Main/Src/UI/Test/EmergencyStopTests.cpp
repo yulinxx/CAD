@@ -9,6 +9,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QStringList>
+#include <QWidget>
 
 #include <memory>
 
@@ -156,6 +157,61 @@ TEST(EmergencyStopTests, OverlayTriggersImmediatelyAndKeepsTwoSeparateActions)
     // 开光是独立的第二次动作
     overlay.startLaserButton()->click();
     EXPECT_EQ(startRequests, 1);
+}
+
+TEST(EmergencyStopTests, OverlayExistsOnlyDuringEmergencySequence)
+{
+    ensureEmergencyApplication();
+
+    FakeDeviceState device;
+    auto controller = device.createController();
+    controller->setDeviceStateProviders(
+        [&device]() { return device.monitoring; }, [&device]() { return device.inputActive; });
+
+    QWidget host;
+    host.show();
+
+    EmergencyStopOverlay overlay(controller.get(), []() {}, []() {});
+    overlay.attachToWindow(&host);
+    // 正常态不允许常驻：之前无条件 show()，启动就贴右上角挡住编辑区
+    EXPECT_FALSE(overlay.isVisible());
+
+    controller->triggerEmergencyStop();
+    EXPECT_TRUE(overlay.isVisible()) << "overlay must stay visible while emergency stop is not reset";
+
+    device.inputActive = true;
+    controller->pollDeviceState();
+    device.inputActive = false;
+    controller->pollDeviceState();
+    ASSERT_TRUE(controller->confirmReset());
+    // ResetConfirmed 仍属急停流程（开光是独立的第二个动作），保持可见
+    EXPECT_TRUE(overlay.isVisible());
+}
+
+TEST(EmergencyStopTests, LatchedStartupStaysResettableFromOverlay)
+{
+    ensureEmergencyApplication();
+
+    // 复现现场：重启时闭锁仍在，进程一启动就是只读态
+    FakeDeviceState device;
+    device.persistedLatch = true;
+    auto controller = device.createController();
+    controller->setDeviceStateProviders(
+        [&device]() { return device.monitoring; }, [&device]() { return device.inputActive; });
+    controller->pollDeviceState();
+
+    QWidget host;
+    host.show();
+
+    EmergencyStopOverlay overlay(controller.get(), []() {}, []() {});
+    overlay.attachToWindow(&host);
+
+    ASSERT_TRUE(controller->isReadOnly());
+    ASSERT_TRUE(overlay.isVisible());
+    // 只读态下必须有可点的非菜单复位入口，否则用户被永久锁死
+    ASSERT_TRUE(overlay.confirmResetButton()->isEnabled());
+    overlay.confirmResetButton()->click();
+    EXPECT_FALSE(controller->isReadOnly());
 }
 
 TEST(EmergencyStopTests, BindSafetyServicesCreatesOverlayAndAppliesReadOnly)

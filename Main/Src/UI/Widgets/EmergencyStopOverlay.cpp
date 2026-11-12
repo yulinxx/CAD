@@ -8,6 +8,7 @@
 #include <QScreen>
 #include <QVBoxLayout>
 
+#include "Log/AprLogger.h"
 #include "UI/Safety/EmergencyStopController.h"
 
 namespace
@@ -191,7 +192,36 @@ void EmergencyStopOverlay::updateUi()
     }
 
     adjustSize();
+    syncVisibility();
+}
+
+void EmergencyStopOverlay::syncVisibility()
+{
+    // 只有急停流程未完成时才出现：正常态完全不存在。
+    // 之前这里无条件 show()，浮层从启动起就贴在右上角挡住编辑区。
+    const bool active = m_controller &&
+        (m_controller->state() == EmergencyStopController::State::EmergencyStopped ||
+            m_controller->state() == EmergencyStopController::State::ResetConfirmed);
+    if (!active || !m_window || !m_window->isVisible())
+    {
+        if (isVisible())
+        {
+            const int state = m_controller ? static_cast<int>(m_controller->state()) : 0;
+            APR_DEBUGF("[EmergencyStopOverlay] hidden: state=%d", state);
+        }
+        hide();
+        return;
+    }
+
+    if (!isVisible())
+    {
+        APR_INFOF("[EmergencyStopOverlay] shown: state=%d readOnly=%d",
+            static_cast<int>(m_controller->state()),
+            m_controller->isReadOnly() ? 1 : 0);
+    }
     reposition();
+    show();
+    raise();
 }
 
 void EmergencyStopOverlay::attachToWindow(QWidget* window)
@@ -208,18 +238,8 @@ void EmergencyStopOverlay::attachToWindow(QWidget* window)
 
     m_window = window;
     m_window->installEventFilter(this);
-    // 主窗口尚未显示时先保持隐藏，等 Show 事件到来再定位显示，
-    // 避免启动阶段在屏幕角落短暂出现一个孤立窗口
-    if (m_window->isVisible())
-    {
-        reposition();
-        show();
-        raise();
-    }
-    else
-    {
-        hide();
-    }
+    // 主窗口尚未显示或急停未触发时保持隐藏，可见性统一由 syncVisibility() 裁决
+    syncVisibility();
 }
 
 bool EmergencyStopOverlay::eventFilter(QObject* watched, QEvent* event)
@@ -234,9 +254,7 @@ bool EmergencyStopOverlay::eventFilter(QObject* watched, QEvent* event)
             break;
         case QEvent::Show:
         case QEvent::WindowActivate:
-            reposition();
-            show();
-            raise();
+            syncVisibility();
             break;
         case QEvent::WindowStateChange:
             // 主窗口最小化时一并隐藏，避免急停入口孤立悬浮在桌面上
@@ -244,11 +262,9 @@ bool EmergencyStopOverlay::eventFilter(QObject* watched, QEvent* event)
             {
                 hide();
             }
-            else if (m_window->isVisible())
+            else
             {
-                reposition();
-                show();
-                raise();
+                syncVisibility();
             }
             break;
         case QEvent::Hide:

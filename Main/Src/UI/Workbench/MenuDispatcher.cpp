@@ -164,12 +164,17 @@ void MenuDispatcher::dispatch(const QString& commandId, const QVariantMap& param
             commandId == QLatin1String("file.save_as");
         if (!allowed)
         {
+            // 拦截必须留痕：之前只在状态栏闪 5 秒，日志里没有任何记录，
+            // 现场表现为"菜单点了完全没反应"，无法定位
+            APR_WARNF("[MenuDispatcher] Command blocked by emergency stop read-only: '%s'",
+                commandId.toUtf8().constData());
             if (m_self && m_self->workbenchWindow())
             {
+                // 文案要指向复位入口，时长拉长到 15 秒，避免被误判成软件故障
                 m_self->workbenchWindow()->statusBar()->showMessage(
                     QCoreApplication::translate(
                         "MenuDispatcher", "Emergency stop active. Complete reset before editing or processing."),
-                    5000);
+                    15000);
             }
             return;
         }
