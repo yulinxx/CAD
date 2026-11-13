@@ -11,6 +11,7 @@
 
 #include "FileIO/FileFormat.h"
 #include "FileIO/FormatRegistry.h"
+#include "Import/ImportService.h"
 #include "Log/AprLogger.h"
 
 // ==================== 对话框调用 ====================
@@ -35,21 +36,48 @@ QString FileDialogService::getSaveFileName(QWidget* parent, const QString& title
 
 // ==================== 过滤器映射 ====================
 
-QString FileDialogService::allSupportedFilter()
+QString FileDialogService::importFilter(const QString& label, const QStringList& extensions)
 {
-    return QObject::tr("All Supported Files (*.apr *.dxf *.plt *.stp *.step *.svg *.pdf *.ai *.obj *.stl *.png *.jpg "
-                       "*.jpeg *.bmp *.tga *.tiff *.gif *.webp);;"
-                       "April Files (*.apr);;DXF Files (*.dxf);;PLT Files (*.plt);;"
-                       "STEP Files (*.stp *.step);;SVG Files (*.svg);;PDF Files (*.pdf);;"
-                       "AI Files (*.ai);;OBJ Files (*.obj);;STL Files (*.stl);;"
-                       "Image Files (*.png *.jpg *.jpeg *.bmp *.tga *.tiff *.gif *.webp);;All Files (*.*)");
+    if (extensions.isEmpty())
+    {
+        return QObject::tr("All Files (*.*)");
+    }
+
+    QString wildcards;
+    for (const QString& ext : extensions)
+    {
+        if (!wildcards.isEmpty())
+        {
+            wildcards += QLatin1Char(' ');
+        }
+        wildcards += QStringLiteral("*.") + ext;
+    }
+    return QStringLiteral("%1 (%2);;All Files (*.*)").arg(label, wildcards);
 }
 
-QString FileDialogService::importFilterForFormat(Fio::FileFormat fmt)
+QString FileDialogService::allSupportedFilter(const QStringList& extensions)
 {
-    // 过滤器字符串统一来自 FormatRegistry
-    const char* filter = Fio::FormatRegistry::instance().importFilter(fmt);
-    return filter ? QString::fromUtf8(filter) : QObject::tr("All Files (*.*)");
+    return importFilter(QObject::tr("All Supported Files"), extensions);
+}
+
+QString FileDialogService::importFilterForFormat(Fio::FileFormat fmt, const QStringList& extensions)
+{
+    if (extensions.isEmpty())
+    {
+        // 读取器未登记扩展名时退回 FormatRegistry，避免对话框失去过滤能力
+        const char* filter = Fio::FormatRegistry::instance().importFilter(fmt);
+        return filter ? QString::fromUtf8(filter) : QObject::tr("All Files (*.*)");
+    }
+
+    // 扩展名以读取器判据为准；格式名仍复用 FormatRegistry，避免两处维护文案
+    QString label = QObject::tr("Files");
+    if (const char* registryFilter = Fio::FormatRegistry::instance().importFilter(fmt))
+    {
+        const QString full = QString::fromUtf8(registryFilter);
+        const int suffixPos = full.indexOf(QStringLiteral(" ("));
+        label = suffixPos > 0 ? full.left(suffixPos) : full;
+    }
+    return importFilter(label, extensions);
 }
 
 QString FileDialogService::exportFilterForFormat(Fio::FileFormat fmt)
@@ -72,5 +100,6 @@ QString FileDialogService::saveFileFilter()
 
 QString FileDialogService::imageImportFilter()
 {
-    return QObject::tr("Image Files (*.png *.jpg *.jpeg *.bmp *.tga *.tiff *.gif *.webp);;All Files (*.*)");
+    // 位图判据唯一来源：与拖拽共用 ImportService::imageExtensions()
+    return importFilter(QObject::tr("Image Files"), ImportService::imageExtensions());
 }

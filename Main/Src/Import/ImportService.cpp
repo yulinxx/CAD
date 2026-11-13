@@ -865,6 +865,44 @@ QStringList ImportService::supportedExtensions(const QString& workbenchId) const
     return m_dispatcher->supportedExtensions(workbenchId);
 }
 
+const QStringList& ImportService::imageExtensions()
+{
+    // 位图判据唯一来源：拖拽与菜单（图片对话框 / 全部支持）都从这里取，
+    // 禁止在 UI 侧再抄一份列表，否则必然出现「拖拽能导入、菜单选不到」。
+    static const QStringList kImageExtensions = { QStringLiteral("jpg"),
+        QStringLiteral("jpeg"),
+        QStringLiteral("png"),
+        QStringLiteral("bmp"),
+        QStringLiteral("tga"),
+        QStringLiteral("tiff"),
+        QStringLiteral("tif"),
+        QStringLiteral("gif"),
+        QStringLiteral("webp") };
+    return kImageExtensions;
+}
+
+bool ImportService::isImageExtension(const QString& extension)
+{
+    // 调用方负责把后缀转成小写
+    return imageExtensions().contains(extension);
+}
+
+QStringList ImportService::importableExtensions(const QString& workbenchId) const
+{
+    // 未知工作台（含空串与初始化期的 "default"）不按维度过滤，与拖拽侧语义一致
+    const bool knownWorkbench = (workbenchId == QStringLiteral("2D") || workbenchId == QStringLiteral("3D"));
+    QStringList exts = knownWorkbench ? supportedExtensions(workbenchId) : supportedExtensions();
+    // 位图不经过读取器，必须由同一判据补入
+    exts.append(imageExtensions());
+    exts.removeDuplicates();
+    return exts;
+}
+
+QStringList ImportService::extensionsForFormat(Fio::FileFormat format) const
+{
+    return m_dispatcher ? m_dispatcher->extensionsForFormat(format) : QStringList();
+}
+
 bool ImportService::canImport(const QString& filePath, const QString& workbenchId, QString* reasonOut) const
 {
     if (!m_dispatcher)

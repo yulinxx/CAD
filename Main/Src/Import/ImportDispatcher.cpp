@@ -151,6 +151,12 @@ QStringList ImportDispatcher::supportedExtensions(const QString& workbenchId) co
     return exts;
 }
 
+QStringList ImportDispatcher::extensionsForFormat(Fio::FileFormat format) const
+{
+    const IImportReader* reader = findReader(format);
+    return reader ? reader->supportedExtensions() : QStringList();
+}
+
 bool ImportDispatcher::canImport(const QString& filePath, QString* reasonOut) const
 {
     Fio::FileFormat fmt = detectFormat(filePath);

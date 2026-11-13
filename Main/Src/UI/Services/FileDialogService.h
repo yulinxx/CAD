@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <QStringList>
 
 class QWidget;
 
@@ -35,11 +36,18 @@ public:
 
     // ---- 过滤器映射 ----
 
+    /// 由扩展名列表生成「label (*.a *.b);;All Files (*.*)」过滤器
+    /// 扩展名判据由调用方从 ImportService 获取，本类不再硬编码任何格式列表
+    static QString importFilter(const QString& label, const QStringList& extensions);
+
     /// 打开/导入时的通用过滤器（所有支持格式）
-    static QString allSupportedFilter();
+    /// @param extensions 当前工作台可导入的扩展名（来自 ImportService::importableExtensions）
+    static QString allSupportedFilter(const QStringList& extensions);
 
     /// 按导入格式返回对应过滤器
-    static QString importFilterForFormat(Fio::FileFormat fmt);
+    /// @param fmt 文件格式（格式名仍取自 FormatRegistry）
+    /// @param extensions 该格式的实际扩展名（来自 ImportService::extensionsForFormat）
+    static QString importFilterForFormat(Fio::FileFormat fmt, const QStringList& extensions);
 
     /// 按导出格式返回对应过滤器
     static QString exportFilterForFormat(Fio::FileFormat fmt);

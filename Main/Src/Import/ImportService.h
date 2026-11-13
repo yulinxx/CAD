@@ -146,6 +146,20 @@ public:
     /// @return 该工作台支持的扩展名列表
     QStringList supportedExtensions(const QString& workbenchId) const;
 
+    /// 位图（经 QImage/图像解码，不走读取器）导入扩展名
+    /// 拖拽与菜单必须共用这一份判据，UI 侧不得再维护图片扩展名列表
+    static const QStringList& imageExtensions();
+
+    /// 扩展名（小写，不含点号）是否为位图格式
+    static bool isImageExtension(const QString& extension);
+
+    /// 指定工作台可导入的全部扩展名：读取器按维度过滤后 + 位图判据
+    /// @param workbenchId "2D" 或 "3D"；为空或未知时按全部读取器能力返回
+    QStringList importableExtensions(const QString& workbenchId) const;
+
+    /// 指定格式的实际导入扩展名（来自已注册读取器，避免与 FormatRegistry 登记漂移）
+    QStringList extensionsForFormat(Fio::FileFormat format) const;
+
     /// 检查指定路径是否可在指定工作台导入
     /// @param filePath 文件路径
     /// @param workbenchId 工作台 ID ("2D" 或 "3D")

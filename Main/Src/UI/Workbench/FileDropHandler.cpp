@@ -30,22 +30,6 @@
 
 namespace
 {
-    // 位图/图片扩展名（与 FileOperationRegistry::doImportImage 一致），
-    // 这些格式走 QImage 导入路径，不经过 ImportService 的矢量读取器。
-    const QStringList& imageExtensions()
-    {
-        static const QStringList exts = { QStringLiteral("jpg"),
-            QStringLiteral("jpeg"),
-            QStringLiteral("png"),
-            QStringLiteral("bmp"),
-            QStringLiteral("tga"),
-            QStringLiteral("tiff"),
-            QStringLiteral("tif"),
-            QStringLiteral("gif"),
-            QStringLiteral("webp") };
-        return exts;
-    }
-
     // 将图片文件解码为 RGBA8888 QImage。
     // 优先 QImage（覆盖 png/bmp/jpg/gif/ico/svg 等）；失败时回退到
     // Fio::loadImageToRgba（libwebp 解 webp、libtiff 解 tiff、stb_image 解 tga 等），
@@ -163,20 +147,9 @@ bool FileDropHandler::eventFilter(QObject* watched, QEvent* event)
 
 QStringList FileDropHandler::supportedExtensions() const
 {
-    QStringList exts = imageExtensions();
-    if (m_importService)
-    {
-        if (!m_currentWorkbenchId.isEmpty())
-        {
-            // 根据当前工作台过滤扩展名
-            exts.append(m_importService->supportedExtensions(m_currentWorkbenchId));
-        }
-        else
-        {
-            exts.append(m_importService->supportedExtensions());
-        }
-    }
-    return exts;
+    // 判据唯一来源：ImportService 汇总读取器（按工作台维度过滤）与位图扩展名，
+    // 拖拽不再单独维护图片列表。
+    return m_importService ? m_importService->importableExtensions(m_currentWorkbenchId) : QStringList();
 }
 
 bool FileDropHandler::handleDragEnter(QDragEnterEvent* event)
@@ -265,7 +238,7 @@ bool FileDropHandler::handleDrop(QDropEvent* event)
         emit sigFileImported(filePath, false);
 
         // 位图/图片文件走 QImage 导入路径（与 FileOperationRegistry::doImportImage 一致）
-        if (imageExtensions().contains(ext))
+        if (ImportService::isImageExtension(ext))
         {
             if (!m_sceneManager)
             {

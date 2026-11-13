@@ -37,6 +37,11 @@ public:
     /// @return 该工作台支持的扩展名列表
     QStringList supportedExtensions(const QString& workbenchId) const;
 
+    /// 获取指定格式读取器实际支持的扩展名列表
+    /// @param format 文件格式
+    /// @return 扩展名列表；未注册读取器时为空
+    QStringList extensionsForFormat(Fio::FileFormat format) const;
+
     /// 检查指定路径是否可导入
     /// @param reasonOut 可选，返回不可导入的具体原因（无读取器 / 格式不支持），不再静默失败
     bool canImport(const QString& filePath, QString* reasonOut = nullptr) const;
