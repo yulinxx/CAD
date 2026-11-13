@@ -1095,31 +1095,40 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
             m_sceneManager3D->clearScene();
         }
 
-        meshAdded = static_cast<int>(meshEntities.size());
 #if BUILD_UI3D
+        // 入场前图元数：撞号/非法 id 会被场景拒绝，用差值回填真实入场数
+        const size_t entityCountBefore = m_sceneManager3D->entityCount();
         if (m_sceneEditService3D)
         {
-            APR_DEBUGF("[ImportService] Adding %d mesh entity(ies) via SceneEditService3D (undoable)", meshAdded);
+            // 可撤销路径：整批只产生一条撤销记录
+            APR_DEBUGF("[ImportService] Adding %zu mesh entity(ies) via SceneEditService3D (undoable)",
+                meshEntities.size());
             m_sceneEditService3D->addEntities(std::move(meshEntities), "Import 3D mesh");
         }
         else
-#endif
         {
-            // 回退：直写 SceneManager3D，无 Undo 支持
-            APR_DEBUGF("[ImportService] SceneEditService3D not set, adding %d mesh entity(ies) without undo support",
-                meshAdded);
+            // 直通路径：直接入场、不入撤销栈、保留文件 id（与 2D 的 CommitMode::Direct 同语义）。
+            // SceneManager3D 的结构写已降为 private，*Direct 是唯一授权的直通入口，
+            // 本文件在 CMake/SceneWriteSurface.cmake 的 *Direct 白名单内。
+            // 被拒绝的图元由场景就地销毁，所有权随之交出，调用方不再持有。
+            APR_DEBUGF("[ImportService] SceneEditService3D not set, adding %zu mesh entity(ies) without undo",
+                meshEntities.size());
+            std::vector<Eg::AprMeshEntity*> rawMeshes;
+            rawMeshes.reserve(meshEntities.size());
             for (auto& mesh : meshEntities)
             {
-#if BUILD_UI3D
-                SceneEditService3D::addEntityDirect(m_sceneManager3D, mesh.release());
-#else
-                // 无 UI3D 构建没有 SceneEditService3D，也就不存在授权的结构写入口
-                // （收口后 SceneManager3D::addEntity 只对编辑服务/撤销栈开放）。
-                APR_ERROR("[ImportService] BUILD_UI3D=0: no authorized 3D scene write entry, mesh dropped");
-                mesh.reset();
-#endif
+                rawMeshes.push_back(mesh.release());
             }
+            SceneEditService3D::addEntitiesDirect(
+                m_sceneManager3D, rawMeshes.data(), static_cast<int>(rawMeshes.size()));
         }
+        meshAdded = static_cast<int>(m_sceneManager3D->entityCount() - entityCountBefore);
+#else
+        // 无 UI3D 构建没有授权的 3D 结构写入口，网格只能丢弃
+        APR_ERRORF("[ImportService] BUILD_UI3D=0: no authorized 3D scene write entry, %zu mesh entity(ies) dropped",
+            meshEntities.size());
+        meshEntities.clear();
+#endif
 
         m_sceneManager3D->markDataChanged();
         APR_DEBUGF("[ImportService] %d mesh entity(ies) added to SceneManager3D", meshAdded);
