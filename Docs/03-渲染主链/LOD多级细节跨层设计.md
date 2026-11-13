@@ -220,7 +220,8 @@ flowchart TB
 
 ## 6. 范围外
 
-* 不做 3D LOD（3D 已有 `DisplayCache3D`）
+* 不做 3D LOD —— 3D 的显示 LOD 单独设计，见 [3D LOD 与分块数据层设计](3D%20LOD与分块数据层设计.md)。
+  （原文「3D 已有 `DisplayCache3D`」不成立：该类只有分块统计、没有几何、级别恒为 0，且全仓零引用。）
 * 不改 RenderX 公共 ABI
 
 > 注：「不做折线 Douglas-Peucker 抽稀」已不成立 —— POLYGON 在 zoom out 时
