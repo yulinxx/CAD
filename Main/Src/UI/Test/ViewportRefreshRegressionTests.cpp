@@ -360,7 +360,7 @@ TEST(RefreshSuppressionTest, Suppression_NestedDepth)
 
     coordinator.endRefreshSuppression();
     EXPECT_EQ(coordinator.pendingLevel(), UI::SceneRefreshLevel::None)
-        << "深度未归零时不得派发刷新";
+        << "must not dispatch a refresh while suppression depth is non-zero";
 
     coordinator.endRefreshSuppression();
     EXPECT_EQ(coordinator.pendingLevel(), UI::SceneRefreshLevel::LightUpdate);
@@ -1071,7 +1071,7 @@ TEST(CurveLodPumpRegressionTest, ContinuesPastFirstBatch)
     }
 
     EXPECT_EQ(coordinator.pendingCurveLodCount(), 0u)
-        << "LOD 定时器触发后未继续消费队列：ensurePump 的回调续跑链路断了";
+        << "queue was not drained after the LOD timer fired: the ensurePump callback chain is broken";
     // 6001 个图元完整消费需要 4 批；中断的泵最多 2 批，>=3 即可区分。
     EXPECT_GE(coordinator.curveLodBatchCount(), 3u);
     coordinator.stop();
@@ -1108,7 +1108,7 @@ TEST(CurveLodSelectionRegressionTest, HiddenSelectedEntityNotQueued)
 
     // 选中本体正在被虚线轮廓替代，不该再由 LOD 提交到世界层。
     EXPECT_EQ(coordinator.pendingCurveLodCount(), 0u)
-        << "隐藏中的选中图元被重新排进 LOD 队列，缩放后本体会重新出现";
+        << "a hidden selected entity was re-queued for LOD; the body will reappear after zoom";
 
     coordinator.stop();
 }
@@ -1186,12 +1186,12 @@ TEST(RenderSubmitSchedulerTest, ContinuousRequestKeepsQueueProgress)
     scheduler.processBatch(renderedIds);
     ASSERT_EQ(batches.size(), 2u);
     // 恰为剩余 501 个：进度未被重置、未重新收集
-    EXPECT_EQ(batches[1].size(), 501u) << "第二批不是剩余部分，队列进度被重置或重新收集了";
+    EXPECT_EQ(batches[1].size(), 501u) << "second batch is not the remainder: queue progress was reset or recollected";
     // 两批无重叠：ID 不会被重复提交
     const std::unordered_set<uint64_t> firstBatch(batches[0].begin(), batches[0].end());
     for (uint64_t uid : batches[1])
     {
-        EXPECT_EQ(firstBatch.count(uid), 0u) << "第二批重复提交了首批的图元";
+        EXPECT_EQ(firstBatch.count(uid), 0u) << "second batch re-submitted entities from the first batch";
     }
     EXPECT_EQ(scheduler.processedBatchCount(), 2u);
     EXPECT_TRUE(scheduler.empty());
@@ -1266,7 +1266,7 @@ TEST(RenderSubmitSchedulerTest, ExtensionQueueConsumedBeforeLodQueue)
     // 前 3 个是扩展队列的直线（保持入队顺序）：扩展优先
     for (size_t i = 0; i < lineIds.size(); ++i)
     {
-        EXPECT_EQ(batch[i], lineIds[i]) << "扩展队列未优先消费，画面缺块会晚于精度更新";
+        EXPECT_EQ(batch[i], lineIds[i]) << "extension queue was not consumed first; missing tiles will lag behind precision updates";
     }
     // 后 3 个是 LOD 队列的圆（收集顺序不保证，按集合比较）
     const std::unordered_set<uint64_t> circleBatch(batch.begin() + 3, batch.end());
@@ -1342,12 +1342,12 @@ TEST(RenderSubmitSchedulerTest, FailedBatchRetriedUntilSuccess_NoPermanentLoss)
         ++ticks;
     }
 
-    ASSERT_TRUE(scheduler.empty()) << "重试后队列仍未排空：失败条目被丢弃或重试链路断了";
+    ASSERT_TRUE(scheduler.empty()) << "queue still not drained after retry: failed entries were dropped or the retry chain is broken";
     ASSERT_GE(attempts.size(), 3u);
     // 失败批次原样重试：游标回退保证重试的批次与失败批次完全一致
-    EXPECT_EQ(attempts[0], attempts[2]) << "重试批次与失败批次不一致：条目丢失或顺序被打乱";
+    EXPECT_EQ(attempts[0], attempts[2]) << "retry batch differs from the failed batch: entries lost or order shuffled";
     // 无永久缺失：全部图元最终都提交进账本
-    EXPECT_EQ(renderedIds, expectedIds) << "有图元在失败后永久丢失";
+    EXPECT_EQ(renderedIds, expectedIds) << "some entities were permanently lost after the failure";
 }
 
 // GL 上下文不可用（整批必然失败）：挂起队列，不做任何提交尝试；
@@ -1393,8 +1393,8 @@ TEST(RenderSubmitSchedulerTest, UnavailableSubmitSuspendsWithoutPointlessRetries
         scheduler.processBatch(renderedIds);
     }
     // 不可用期间：零提交尝试、队列原封不动、批次数为零（挂起而非重试失败）
-    EXPECT_EQ(attempts, 0u) << "上下文不可用期间仍在做无意义的提交尝试";
-    EXPECT_EQ(scheduler.size(), static_cast<size_t>(kCircleCount)) << "挂起期间队列被动了";
+    EXPECT_EQ(attempts, 0u) << "pointless submit attempts were made while the context was unavailable";
+    EXPECT_EQ(scheduler.size(), static_cast<size_t>(kCircleCount)) << "queue was modified while suspended";
     EXPECT_EQ(scheduler.processedBatchCount(), 0u);
     EXPECT_TRUE(renderedIds.empty());
 
@@ -1457,12 +1457,12 @@ TEST(RenderSubmitSchedulerTest, ExtensionQueueNonCurveEntriesRetriedAfterFailure
         ++ticks;
     }
 
-    ASSERT_TRUE(scheduler.empty()) << "扩展队列失败条目没有被补上";
+    ASSERT_TRUE(scheduler.empty()) << "failed extension queue entries were not re-queued";
     ASSERT_GE(attempts.size(), 2u);
-    EXPECT_EQ(attempts[0], attempts[1]) << "重试批次与失败批次不一致：扩展条目丢失或重排";
+    EXPECT_EQ(attempts[0], attempts[1]) << "retry batch differs from the failed batch: extension entries lost or reordered";
     for (uint64_t uid : lineIds)
     {
-        EXPECT_EQ(renderedIds.count(uid), 1u) << "非曲线图元在批次失败后永久丢失";
+        EXPECT_EQ(renderedIds.count(uid), 1u) << "non-curve entities were permanently lost after the batch failed";
     }
 }
 
@@ -1507,9 +1507,9 @@ TEST(RenderSubmitSchedulerTest, PersistentSubmitFailureBacksOff_WithoutDroppingE
         scheduler.processBatch(renderedIds);
     }
 
-    EXPECT_GE(attempts, 6u) << "重试停了：失败条目会被永久卡死";
-    EXPECT_LE(attempts, 12u) << "退避失效：持续失败期间每 tick 都在空转重试";
-    EXPECT_EQ(scheduler.size(), static_cast<size_t>(kCircleCount)) << "失败条目被丢弃了";
+    EXPECT_GE(attempts, 6u) << "retries stopped: failed entries will be stuck forever";
+    EXPECT_LE(attempts, 12u) << "backoff is ineffective: retrying every tick while failures persist";
+    EXPECT_EQ(scheduler.size(), static_cast<size_t>(kCircleCount)) << "failed entries were dropped";
     EXPECT_TRUE(renderedIds.empty());
 }
 
@@ -1658,7 +1658,7 @@ TEST(RenderSubmitLodBenchmark, DISABLED_MillionEntityZoomOutRebuild)
     const Clock::time_point tCollect0 = Clock::now();
     scheduler.requestRefresh();
     const double collectMs = elapsedMs(tCollect0, Clock::now());
-    ASSERT_EQ(scheduler.size(), kEntityCount) << "收集口径异常：不是全部曲线都入队了";
+    ASSERT_EQ(scheduler.size(), kEntityCount) << "collection mismatch: not all curves were enqueued";
 
     // 逐批重建耗时 —— 「zoom out 后逐帧重建」的无 GPU 侧代理：
     // 每个 processBatch tick 消费一批（自适应批 128~8192），
@@ -1677,14 +1677,14 @@ TEST(RenderSubmitLodBenchmark, DISABLED_MillionEntityZoomOutRebuild)
         ++batchCount;
     }
 
-    std::cout << "[LOD基准] 构造+入库 " << setupMs << " ms | 收集 " << collectMs << " ms | 批数 " << batchCount
-              << " | 重建提交合计 " << submitTotalMs << " ms（avg "
-              << (batchCount > 0 ? submitTotalMs / batchCount : 0.0) << " ms/批，max " << submitMaxMs << " ms/批）"
+    std::cout << "[LOD benchmark] build+ingest " << setupMs << " ms | collect " << collectMs << " ms | batches " << batchCount
+              << " | rebuild submit total " << submitTotalMs << " ms (avg "
+              << (batchCount > 0 ? submitTotalMs / batchCount : 0.0) << " ms/batch, max " << submitMaxMs << " ms/batch)"
               << std::endl;
 
     // ---- 正确性不变量（与机器速度无关） ----
-    EXPECT_TRUE(scheduler.empty()) << "队列未排空：有图元被丢弃或卡死";
-    EXPECT_EQ(renderedIds.size(), kEntityCount) << "有图元未提交进账本";
+    EXPECT_TRUE(scheduler.empty()) << "queue not drained: some entities were dropped or stuck";
+    EXPECT_EQ(renderedIds.size(), kEntityCount) << "some entities were not submitted to the ledger";
     // 每个样条恰发射一条折线
     EXPECT_EQ(sink.polylineCount, kEntityCount);
     // 顶点上界（钳制）在整个百万批次上全程有效
@@ -1717,12 +1717,12 @@ TEST(RenderSubmitLodBenchmark, DISABLED_MillionEntityZoomOutRebuild)
         reference.push_back(wavy.value(static_cast<double>(i) / (kRefSamples - 1)));
     }
     const double errorPx = maxChordHeight(reference, captureSink.capturedPolyline) * kZoomOutScale;
-    std::cout << "[LOD基准] zoom out 档离散误差 " << errorPx << " px（预算 " << kErrorBudgetPx << " px）" << std::endl;
-    EXPECT_LE(errorPx, kErrorBudgetPx) << "zoom out 档离散误差超过预算";
+    std::cout << "[LOD benchmark] zoom out discretization error " << errorPx << " px (budget " << kErrorBudgetPx << " px)" << std::endl;
+    EXPECT_LE(errorPx, kErrorBudgetPx) << "zoom out discretization error exceeds budget";
 
     // ---- 超放大档钳制抽查：点数上界在发射边界同样有效 ----
     LodBenchmarkSink zoomInSink;
     ASSERT_TRUE(Eg::emitEntityGeometry(wavy, zoomInSink, 1000.0));
     EXPECT_LE(zoomInSink.maxPolylinePoints, static_cast<size_t>(Eg::tess::kLodMaxCurvePoints));
-    EXPECT_GE(zoomInSink.maxPolylinePoints, 16u) << "钳制是拉平而非截断，密度不该塌掉";
+    EXPECT_GE(zoomInSink.maxPolylinePoints, 16u) << "clamping must flatten, not truncate; density must not collapse";
 }

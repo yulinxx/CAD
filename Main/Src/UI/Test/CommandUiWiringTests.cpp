@@ -78,7 +78,7 @@ TEST(CommandUiWiringTest, DefaultToolBarContextIdsAllResolveToMenuActionId)
     {
         const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(commandId);
         EXPECT_NE(static_cast<int>(menuId), 0)
-            << "顶部工具栏命令 id 无法解析，按钮将退化为非托管 QAction（启用状态不再联动）: " << commandId.toStdString();
+            << "top toolbar command id cannot be resolved; the button degrades to an unmanaged QAction (enable state no longer synced): " << commandId.toStdString();
     }
 }
 
@@ -88,9 +88,9 @@ TEST(CommandUiWiringTest, DefaultToolBarContextIdsAllHaveCatalogEntry)
     {
         const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(commandId);
         const CommandEntry2D* entry = CommandCatalog::findByMenuId(menuId);
-        ASSERT_NE(entry, nullptr) << "命令目录缺少条目: " << commandId.toStdString();
+        ASSERT_NE(entry, nullptr) << "command catalog is missing an entry: " << commandId.toStdString();
         EXPECT_TRUE(hasSurface(entry->surfaces, CommandSurface2DValues::TopToolbar))
-            << "命令未声明 TopToolbar 暴露面，工具栏会跳过它: " << commandId.toStdString();
+            << "command does not declare the TopToolbar surface; the toolbar will skip it: " << commandId.toStdString();
     }
 }
 
@@ -185,7 +185,7 @@ TEST(CommandUiWiringTest, CatalogShortcutIdsResolveBackToOwnMenuId)
         const QString commandId = QString::fromUtf8(entry.shortcutId);
         const UI::MenuActionId resolved = CommandCatalog::menuIdForCommandId(commandId);
         EXPECT_EQ(static_cast<int>(resolved), static_cast<int>(entry.menuId))
-            << "shortcutId 反向解析漂移: " << commandId.toStdString();
+            << "shortcutId reverse resolution drift: " << commandId.toStdString();
     }
 }
 
@@ -233,7 +233,7 @@ TEST(CommandUiWiringTest, MenuBarEditCommandsResolveAndCarryExpectedRules)
         const QString commandId = QString::fromUtf8(expectation.commandId);
         const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(commandId);
         ASSERT_NE(static_cast<int>(menuId), 0)
-            << "菜单项 commandId 解析落空，菜单栏刷新会跳过它（恢复永远可点）: " << commandId.toStdString();
+            << "menu item commandId failed to resolve; menu bar refresh will skip it (restores always enabled): " << commandId.toStdString();
 
         const CommandEntry2D* entry = CommandCatalog::findByMenuId(menuId);
         ASSERT_NE(entry, nullptr) << commandId.toStdString();
@@ -251,7 +251,7 @@ TEST(CommandUiWiringTest, MenuBarEditCommandRulesAreNotAlways)
         const UI::MenuActionId menuId = CommandCatalog::menuIdForCommandId(commandId);
         const CommandEntry2D* entry = CommandCatalog::findByMenuId(menuId);
         ASSERT_NE(entry, nullptr) << commandId.toStdString();
-        EXPECT_NE(entry->enableRule, Cmd::Always) << "规则为 Always 会被菜单栏刷新跳过: " << commandId.toStdString();
+        EXPECT_NE(entry->enableRule, Cmd::Always) << "a rule of Always is skipped by menu bar refresh: " << commandId.toStdString();
     }
 }
 
@@ -310,7 +310,7 @@ TEST(UnitMenuStateTest, PopulateChecksExactlyOneActionMatchingGivenUnit)
                 unitActions.append(action);
             }
         }
-        ASSERT_EQ(unitActions.size(), 3) << "mm/cm/inch 三个单位动作必须齐全";
+        ASSERT_EQ(unitActions.size(), 3) << "all three unit actions mm/cm/inch must exist";
 
         const QString expectedCmd = UnitSelectionMenu::commandIdForUnit(unit);
         int checkedCount = 0;
@@ -320,10 +320,10 @@ TEST(UnitMenuStateTest, PopulateChecksExactlyOneActionMatchingGivenUnit)
             {
                 ++checkedCount;
                 EXPECT_EQ(action->property("commandId").toString(), expectedCmd)
-                    << "被勾选的单位必须与传入的 displayUnit 一致";
+                    << "the checked unit must match the passed displayUnit";
             }
         }
-        EXPECT_EQ(checkedCount, 1) << "恰好一个单位被勾选";
+        EXPECT_EQ(checkedCount, 1) << "exactly one unit must be checked";
     }
 }
 
@@ -521,7 +521,7 @@ TEST(CommandUiWiringTest, Switch_TwoDimensionalOnlyCommandsDoNotResolveIn3DCatal
     for (const QString& commandId : twoDOnlyIds)
     {
         EXPECT_EQ(CommandCatalog3D::operationForCommandId(commandId), OperationId3D::None)
-            << "2D 命令在 3D 目录里被解析出来了，切换后会互相改启用态: " << commandId.toStdString();
+            << "a 2D command resolved in the 3D catalog; after switching the two sides overwrite each other's enable state: " << commandId.toStdString();
     }
 }
 
@@ -536,7 +536,7 @@ TEST(CommandUiWiringTest, Switch_ThreeDimensionalOnlyCommandsDoNotResolveIn2DCat
     for (const QString& commandId : threeDOnlyIds)
     {
         EXPECT_EQ(static_cast<int>(CommandCatalog::menuIdForCommandId(commandId)), 0)
-            << "3D 命令在 2D 目录里被解析出来了，切换后会互相改启用态: " << commandId.toStdString();
+            << "a 3D command resolved in the 2D catalog; after switching the two sides overwrite each other's enable state: " << commandId.toStdString();
     }
 }
 
@@ -574,7 +574,7 @@ TEST(CommandUiWiringTest, Switch_SharedCommandIdsCarrySameRuleInBothCatalogs)
         ASSERT_NE(entry2D, nullptr) << commandId.toStdString();
         ASSERT_NE(entry3D, nullptr) << commandId.toStdString();
         EXPECT_EQ(static_cast<int>(entry2D->enableRule), static_cast<int>(entry3D->enableRule))
-            << "同名命令两侧启用规则不一致: " << commandId.toStdString();
+            << "enable rules differ between the two sides for the same command name: " << commandId.toStdString();
     }
 }
 
@@ -716,9 +716,9 @@ TEST(CommandConfigContractTest, EveryConfiguredCommandIdResolvesInItsWorkbenchCa
         }
     }
 
-    EXPECT_GT(checked, 0) << "一个命令引用都没收集到，说明遍历逻辑或配置加载失效";
-    EXPECT_TRUE(violations.isEmpty()) << "以下配置项的 commandId 无法解析，按钮会永久点不动（共 " << violations.size()
-                                      << " 条）:\n"
+    EXPECT_GT(checked, 0) << "no command references were collected; traversal logic or config loading is broken";
+    EXPECT_TRUE(violations.isEmpty()) << "the following config items have an unresolvable commandId; their buttons will be permanently dead (" << violations.size()
+                                      << " total):\n"
                                       << violations.join(QLatin1Char('\n')).toStdString();
 }
 
@@ -740,8 +740,8 @@ TEST(CommandConfigContractTest, NoConfiguredShortcutBindsBareEscape)
         {
             const QKeySequence sequence(sc.keySequence);
             EXPECT_TRUE(sequence.isEmpty() || sequence != bareEscape)
-                << path.toStdString() << ": 命令 '" << sc.commandId.toStdString()
-                << "' 绑定了裸 Esc，会与窗口级 Esc（取消选择）冲突: '" << sc.keySequence.toStdString() << "'";
+                << path.toStdString() << ": command '" << sc.commandId.toStdString()
+                << "' binds a bare Esc, which conflicts with the window-level Esc (cancel selection): '" << sc.keySequence.toStdString() << "'";
         }
     }
 }
@@ -812,7 +812,7 @@ TEST(UiConfigSelfCheckTest, EveryFeatureUsedInConfigsHasABuildSwitchMapping)
 
     // 没有映射的 feature 自检对它完全无感：授权放行但模块没编译时不会有任何提示。
     // 新增授权功能时必须同步 UiConfigSelfCheck::isFeatureCompiledIn 里的对应表。
-    EXPECT_TRUE(unmapped.isEmpty()) << "以下 feature 在 JSON 里被引用，但没有登记编译开关映射：\n"
+    EXPECT_TRUE(unmapped.isEmpty()) << "the following features are referenced in JSON but have no compile-switch mapping registered:\n"
                                     << unmapped.join(QLatin1Char('\n')).toStdString();
 }
 
@@ -859,7 +859,7 @@ TEST(DrawToolBarWidgetTest, ButtonsAreShellsOfHubToolActions)
     ASSERT_FALSE(actions.isEmpty());
     for (QAction* action : actions)
     {
-        ASSERT_NE(action, nullptr) << "目录声明了 LeftToolbar 面，中枢却没建出对应动作";
+        ASSERT_NE(action, nullptr) << "catalog declares the LeftToolbar surface, but the hub built no matching action";
     }
 
     DrawToolBarWidget widget;
@@ -896,7 +896,7 @@ TEST(DrawToolBarWidgetTest, ButtonClickTriggersHubActionAndReportsLeftToolbarSou
     });
     buttons[0]->click();
 
-    EXPECT_EQ(triggered, 1) << "点击按钮必须触发中枢 QAction，而不是走展示层自己的派发";
+    EXPECT_EQ(triggered, 1) << "clicking the button must trigger the hub QAction, not the presentation layer's own dispatch";
     // 来源判定不能依赖宿主 objectName：按钮的关联对象是按钮本身，
     // 靠名字匹配会落到 Shortcut，日志与"按来源分流"的行为都会错。
     EXPECT_EQ(hub.detectOperationSource(lineAction), OperationSource::LeftToolbar);
@@ -972,12 +972,12 @@ TEST(DrawToolBarWidgetTest, LeftToolbarEntriesResolveToRegisteredTools)
 
     for (const CommandEntry2D* entry : entries)
     {
-        ASSERT_NE(entry->toolName, nullptr) << "LeftToolbar 面的条目必须声明 toolName，否则会被静默跳过";
+        ASSERT_NE(entry->toolName, nullptr) << "LeftToolbar entries must declare toolName, otherwise they are silently skipped";
         EXPECT_NE(entry->operationId, OperationId::None) << entry->toolName;
 
         const QString toolName = QString::fromUtf8(entry->toolName);
         EXPECT_TRUE(tm.getTool(toolName) != nullptr)
-            << "目录声明了 LeftToolbar 面，ToolInitializer 却没注册同名工具: " << toolName.toStdString();
+            << "catalog declares the LeftToolbar surface, but ToolInitializer registered no tool with that name: " << toolName.toStdString();
     }
 }
 
@@ -992,13 +992,13 @@ TEST(CommandCatalogTest, BitmapAliasesResolveToMenuIds)
     for (const QString& id : aliasIds)
     {
         EXPECT_NE(static_cast<int>(CommandCatalog::menuIdForCommandId(id)), 0)
-            << "command id 缺少目录条目: " << id.toStdString();
+            << "command id has no catalog entry: " << id.toStdString();
         EXPECT_NE(CommandCatalog::operationForCommandId(id), OperationId::None)
-            << "command id 未登记别名: " << id.toStdString();
+            << "command id has no alias registered: " << id.toStdString();
     }
     EXPECT_NE(static_cast<int>(CommandCatalog::menuIdForCommandId(QStringLiteral("algo.bitmap_process"))),
               static_cast<int>(CommandCatalog::menuIdForCommandId(QStringLiteral("algo.vectorize_bitmap"))))
-        << "两条位图命令不能共用同一个 MenuActionId";
+        << "the two bitmap commands must not share the same MenuActionId";
 }
 
 #if BUILD_UI3D
@@ -1012,7 +1012,7 @@ TEST(CommandUiWiringTest, ToolpathXrayCommandIsRegisteredAsCheckable)
               OperationId3D::View_ToolpathXray);
 
     const CommandEntry3D* entry = CommandCatalog3D::findByOperation(OperationId3D::View_ToolpathXray);
-    ASSERT_NE(entry, nullptr) << "目录里没有条目时菜单项会被静默跳过，右键/菜单都看不到穿透开关";
+    ASSERT_NE(entry, nullptr) << "without a catalog entry the menu item is silently skipped; the xray toggle is missing from both context and menu bars";
     EXPECT_TRUE(entry->checkable);
     EXPECT_EQ(CommandCatalog3D::operationForMenu(UI3D::MenuActionId3D::View_ToolpathXray),
               OperationId3D::View_ToolpathXray);
@@ -1025,7 +1025,7 @@ TEST(CommandUiWiringTest, ToolpathXrayDefaultsOffAndShowsStateBadge)
     // 默认关闭：与既有「被模型遮挡」的语义保持一致
     EXPECT_FALSE(widget.isToolpathXrayEnabled());
     EXPECT_EQ(widget.findChild<QLabel*>(QStringLiteral("toolpathXrayBadge")), nullptr)
-        << "未开启时不应创建角标";
+        << "no badge should be created while disabled";
 
     widget.setToolpathXrayEnabled(true);
     EXPECT_TRUE(widget.isToolpathXrayEnabled());
@@ -1050,7 +1050,7 @@ TEST(CommandUiWiringTest, RenderErrorBadgeShowsReasonAndClears3D)
     // 正常状态：不创建角标，也不占用任何可见面积
     EXPECT_TRUE(widget.renderError().isEmpty());
     EXPECT_EQ(widget.findChild<QLabel*>(QStringLiteral("renderErrorBadge")), nullptr)
-        << "没有失败时不应创建错误角标";
+        << "no error badge should be created without a failure";
 
     // 失败必须可感知：文本直接带原因，而不是留一块与空场景无法区分的背景
     widget.reportRenderError(QStringLiteral("frame acquisition failed (device lost)"));
@@ -1078,7 +1078,7 @@ TEST(CommandUiWiringTest, RenderErrorBadgeShowsReasonAndClears2D)
     // 正常状态：不创建角标，也不占用任何可见面积
     EXPECT_TRUE(widget.renderError().isEmpty());
     EXPECT_EQ(widget.findChild<QLabel*>(QStringLiteral("renderErrorBadge")), nullptr)
-        << "没有失败时不应创建错误角标";
+        << "no error badge should be created without a failure";
 
     // 失败必须可感知：文本直接带原因，而不是留一块与空图纸无法区分的白底
     widget.reportRenderError(QStringLiteral("renderer initialization failed (see application log)"));

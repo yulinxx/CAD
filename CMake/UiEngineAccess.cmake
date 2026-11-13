@@ -33,8 +33,8 @@ function(apr_define_ui_engine_access)
     foreach(_t IN LISTS _engine_targets)
         if(NOT TARGET ${_t})
             message(FATAL_ERROR
-                "[apr_define_ui_engine_access] 缺少目标 ${_t}；"
-                "请在 add_subdirectory(Engine/*) 之后再调用本函数。")
+                "[apr_define_ui_engine_access] missing target ${_t}; "
+                "call this function after add_subdirectory(Engine/*).")
         endif()
     endforeach()
 
@@ -59,5 +59,5 @@ function(apr_define_ui_engine_access)
         DESCRIPTION "Single access facade: UI -> Engine (dependency choke point)"
     )
 
-    message(STATUS "[UiEngineAccess] UI → Engine 唯一访问门面已定义（链接层收口）")
+    message(STATUS "[UiEngineAccess] UI -> Engine single access facade defined (link chokepoint)")
 endfunction()

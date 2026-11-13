@@ -117,7 +117,7 @@ if(APPLE)
     check_linker_flag(CXX "LINKER:-no_warn_duplicate_libraries" APR_LINKER_NO_WARN_DUP_LIBS)
     if(APR_LINKER_NO_WARN_DUP_LIBS)
         add_link_options("LINKER:-no_warn_duplicate_libraries")
-        message(STATUS "  链接器 -no_warn_duplicate_libraries: ON（抑制重复静态库告警）")
+        message(STATUS "  linker -no_warn_duplicate_libraries: ON (suppress duplicate static library warnings)")
     endif()
 endif()
 
@@ -300,7 +300,7 @@ endif()
 
 option(APR_PYTHON_HOST "Enable PythonHost integration framework" ${APR_PYTHON_HOST_DEFAULT})
 option(APR_PYTHON_EMBED "Enable in-process Python bridge (Phase 3)" OFF)
-set(APR_PYTHON_VERSION "" CACHE STRING "Python version override（留空 = 自动匹配 vcpkg pybind11 自带的版本）")
+set(APR_PYTHON_VERSION "" CACHE STRING "Python version override (empty = match the version bundled with vcpkg pybind11)")
 
 if(APR_PYTHON_HOST)
     # 必须进内层目录：外层 PythonHost/CMakeLists.txt 是独立构建入口，
@@ -388,8 +388,8 @@ if(NOT APPLE)
 endif()
 if(APR_ENABLE_METAL_VIEWPORT AND NOT APR_DEFAULT_RENDER_BACKEND STREQUAL "METAL")
     message(WARNING
-        "[April] APR_ENABLE_METAL_VIEWPORT=ON 但 APR_DEFAULT_RENDER_BACKEND="
-        "${APR_DEFAULT_RENDER_BACKEND}；视口将编译 Metal 路径，默认后端却不是 METAL。")
+        "[April] APR_ENABLE_METAL_VIEWPORT=ON but APR_DEFAULT_RENDER_BACKEND="
+        "${APR_DEFAULT_RENDER_BACKEND}; the viewport will build the Metal path while the default backend is not METAL.")
 endif()
 if(APR_ENABLE_METAL_VIEWPORT)
     message(STATUS "[April] viewport backend: Metal")

@@ -2200,7 +2200,7 @@ TEST(ImportExportRegressionTest, ImportServiceRestoresAprProfileValueSetAndLayer
     ASSERT_TRUE(result.success) << result.message.toStdString();
 
     const int layerId = layers.findLayerByName("Cut-7");
-    ASSERT_GE(layerId, 0) << "图层表没还原";
+    ASSERT_GE(layerId, 0) << "layer table was not restored";
     EXPECT_FALSE(layers.isLayerOutput(layerId));
     EXPECT_EQ(layers.layerDefaultProcessId(layerId), 11u);
     EXPECT_EQ(layers.layerHardwareProfileId(layerId), 3);
@@ -2209,7 +2209,7 @@ TEST(ImportExportRegressionTest, ImportServiceRestoresAprProfileValueSetAndLayer
     EXPECT_TRUE(layers.isLayerFill(layerId));
 
     // 值集必须连原始 id 一起还原，否则图层绑定会指到另一组功率/速度上
-    EXPECT_FALSE(profiles.setPower(stale, 1.0)) << "旧运行时 Profile 必须已被文档值集替换";
+    EXPECT_FALSE(profiles.setPower(stale, 1.0)) << "stale runtime profile must have been replaced by the document value set";
     EXPECT_STREQ(profiles.profile(3).name.c_str(), "Steel-3mm");
     EXPECT_DOUBLE_EQ(profiles.profile(3).power, 77.5);
     EXPECT_DOUBLE_EQ(profiles.profile(3).speed, 245.25);
@@ -2480,7 +2480,7 @@ TEST(ImportExportRegressionTest, AprProcessDataMissingTargetLayerIsReported)
     const int layerId = layers.findLayerByName("Ghost-7");
     ASSERT_GE(layerId, 0);
     EXPECT_FALSE(layers.hasLayerProcessParams(layerId))
-        << "找不到目标图层的工艺对象不能悄悄套到别的图层上";
+        << "a process object for a missing target layer must not silently attach to another layer";
 
     const QString warnings = result.warnings.join(QStringLiteral(" | "));
     EXPECT_NE(warnings.indexOf(QStringLiteral("do not exist")), -1) << warnings.toStdString();
@@ -2513,6 +2513,6 @@ TEST(ImportExportRegressionTest, LegacyAprWithoutProfileValueSetKeepsRuntimeProf
     ASSERT_TRUE(readResult.success) << readResult.message.toStdString();
     EXPECT_FALSE(readResult.hasNativeMachiningSnapshot);
     EXPECT_TRUE(readResult.importedHardwareProfiles.empty());
-    EXPECT_FALSE(readResult.warnings.isEmpty()) << "悬空绑定必须提醒操作员";
-    EXPECT_EQ(profiles.profile(existing).name, "KeepMe") << "读端不得动运行时 Profile";
+    EXPECT_FALSE(readResult.warnings.isEmpty()) << "dangling binding must warn the operator";
+    EXPECT_EQ(profiles.profile(existing).name, "KeepMe") << "reader must not modify runtime profiles";
 }
