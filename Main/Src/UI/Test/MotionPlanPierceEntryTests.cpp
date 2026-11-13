@@ -32,6 +32,7 @@
 
 #include "Composition/ImportExportServiceSetup.h"
 #include "Composition/OperationRegistrar.h"
+#include "Export/ExportContext.h"
 #include "Import/ImportDispatcher.h"
 #include "Import/ImportService.h"
 #include "Import/Readers/NativeImportReader.h"
