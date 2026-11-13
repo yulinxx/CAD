@@ -11,47 +11,85 @@
 # ============================================================================
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  [1] Qt6 路径（根据操作系统自动选择）
+#  [1] Qt6 路径（机器无关：按候选清单取第一个存在的）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Qt/vcpkg 等全部第三方配置只集中在本文件，不引入额外的本地配置文件。
+# 优先级：命令行 -D / 已有缓存 > 环境变量 QT_ROOT_DIR > 常见安装位置。
+# 常见位置按 <root>/<version>/<kit> 结构展开，版本自然倒序（优先新版本），
+# 用户目录用 USERPROFILE/HOME 推导，不写死具体用户名。
+function(apr_expand_versioned_candidates _roots _kits _out)
+    set(_result "")
+    foreach(_root IN LISTS _roots)
+        if(NOT IS_DIRECTORY "${_root}")
+            continue()
+        endif()
+        file(GLOB _versions LIST_DIRECTORIES true "${_root}/*")
+        list(SORT _versions COMPARE NATURAL ORDER DESCENDING)
+        foreach(_ver IN LISTS _versions)
+            foreach(_kit IN LISTS _kits)
+                if(IS_DIRECTORY "${_ver}/${_kit}")
+                    list(APPEND _result "${_ver}/${_kit}")
+                endif()
+            endforeach()
+        endforeach()
+    endforeach()
+    set(${_out} "${_result}" PARENT_SCOPE)
+endfunction()
+
+set(_apr_qt_candidates "")
+if(DEFINED ENV{QT_ROOT_DIR} AND NOT "$ENV{QT_ROOT_DIR}" STREQUAL "")
+    list(APPEND _apr_qt_candidates "$ENV{QT_ROOT_DIR}")
+endif()
 if(WIN32)
-    if(DEFINED ENV{QT_ROOT_DIR} AND NOT "$ENV{QT_ROOT_DIR}" STREQUAL "")
-        set(Qt_INSTALL_DIR "$ENV{QT_ROOT_DIR}" CACHE PATH "Qt6 Windows")
-    else()
-        set(Qt_INSTALL_DIR "C:/Qt/6.12.0/msvc2022_64/" CACHE PATH "Qt6 Windows")
-    endif()
+    set(_apr_qt_roots "C:/Qt" "$ENV{USERPROFILE}/Qt")
+    set(_apr_qt_kits msvc2022_64 msvc2019_64 msvc2017_64)
 elseif(APPLE)
-    if(DEFINED ENV{QT_ROOT_DIR} AND NOT "$ENV{QT_ROOT_DIR}" STREQUAL "")
-        set(Qt_INSTALL_DIR "$ENV{QT_ROOT_DIR}" CACHE PATH "Qt6 macOS")
-    else()
-        set(Qt_INSTALL_DIR "$ENV{HOME}/Qt/6.12.0/macos/" CACHE PATH "Qt6 macOS")
-    endif()
-elseif(UNIX)
-    if(DEFINED ENV{QT_ROOT_DIR} AND NOT "$ENV{QT_ROOT_DIR}" STREQUAL "")
-        set(Qt_INSTALL_DIR "$ENV{QT_ROOT_DIR}" CACHE PATH "Qt6 Linux")
-    else()
-        set(Qt_INSTALL_DIR "$ENV{HOME}/Install/Qt/6.12.0/gcc_64/" CACHE PATH "Qt6 Linux")
-    endif()
+    set(_apr_qt_roots "$ENV{HOME}/Qt" "/opt/Qt")
+    set(_apr_qt_kits macos)
+else()
+    set(_apr_qt_roots "$ENV{HOME}/Qt" "$ENV{HOME}/Install/Qt" "/opt/Qt")
+    set(_apr_qt_kits gcc_64)
+endif()
+apr_expand_versioned_candidates("${_apr_qt_roots}" "${_apr_qt_kits}" _apr_qt_expanded)
+list(APPEND _apr_qt_candidates ${_apr_qt_expanded})
+
+# 缓存/命令行已有合法路径时保持原值，不再探测（CACHE PATH 语义不变）
+if(NOT Qt_INSTALL_DIR OR NOT EXISTS "${Qt_INSTALL_DIR}/lib/cmake/Qt6/Qt6Config.cmake")
+    foreach(_apr_candidate IN LISTS _apr_qt_candidates)
+        if(EXISTS "${_apr_candidate}/lib/cmake/Qt6/Qt6Config.cmake")
+            set(Qt_INSTALL_DIR "${_apr_candidate}" CACHE PATH "Qt6 install dir" FORCE)
+            break()
+        endif()
+    endforeach()
 endif()
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  [2] vcpkg 路径（根据操作系统自动选择）
+#  [2] vcpkg 路径（机器无关：按候选清单取第一个存在的）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 优先读取标准环境变量 VCPKG_ROOT（vcpkg 自身也使用该变量），其次 VCPKG_DIR，
-# 最后才回退到平台默认路径。CI 与多机开发通过环境变量注入即可，不再依赖
-# 某台机器的绝对路径。
-if(DEFINED ENV{VCPKG_ROOT} AND NOT "$ENV{VCPKG_ROOT}" STREQUAL "")
-    set(VCPKG_DIR "$ENV{VCPKG_ROOT}" CACHE PATH "vcpkg root")
-elseif(DEFINED ENV{VCPKG_DIR} AND NOT "$ENV{VCPKG_DIR}" STREQUAL "")
-    set(VCPKG_DIR "$ENV{VCPKG_DIR}" CACHE PATH "vcpkg root")
-elseif(DEFINED ENV{VCPKG_INSTALLATION_ROOT} AND NOT "$ENV{VCPKG_INSTALLATION_ROOT}" STREQUAL "")
-    # GitHub Actions 的 windows-latest / ubuntu-latest 使用该变量指向预装 vcpkg。
-    set(VCPKG_DIR "$ENV{VCPKG_INSTALLATION_ROOT}" CACHE PATH "vcpkg root")
-elseif(WIN32)
-    set(VCPKG_DIR "C:/vcpkg/" CACHE PATH "vcpkg Windows")
+# 优先级：命令行 -D / 已有缓存 > 环境变量 VCPKG_ROOT、VCPKG_DIR、
+# VCPKG_INSTALLATION_ROOT（GitHub Actions 预装 vcpkg 用后者）> 常见安装位置。
+set(_apr_vcpkg_candidates "")
+foreach(_apr_env IN ITEMS VCPKG_ROOT VCPKG_DIR VCPKG_INSTALLATION_ROOT)
+    if(DEFINED ENV{${_apr_env}} AND NOT "$ENV{${_apr_env}}" STREQUAL "")
+        list(APPEND _apr_vcpkg_candidates "$ENV{${_apr_env}}")
+    endif()
+endforeach()
+if(WIN32)
+    list(APPEND _apr_vcpkg_candidates "C:/vcpkg" "$ENV{USERPROFILE}/vcpkg" "C:/tools/vcpkg")
 elseif(APPLE)
-    set(VCPKG_DIR "$ENV{HOME}/vcpkg/" CACHE PATH "vcpkg macOS")
-elseif(UNIX)
-    set(VCPKG_DIR "$ENV{HOME}/Install/vcpkg/" CACHE PATH "vcpkg Linux")
+    list(APPEND _apr_vcpkg_candidates "$ENV{HOME}/vcpkg" "/opt/homebrew/opt/vcpkg")
+else()
+    list(APPEND _apr_vcpkg_candidates "$ENV{HOME}/vcpkg" "$ENV{HOME}/Install/vcpkg"
+        "/usr/local/vcpkg" "/opt/vcpkg")
+endif()
+
+if(NOT VCPKG_DIR OR NOT EXISTS "${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake")
+    foreach(_apr_candidate IN LISTS _apr_vcpkg_candidates)
+        if(EXISTS "${_apr_candidate}/scripts/buildsystems/vcpkg.cmake")
+            set(VCPKG_DIR "${_apr_candidate}" CACHE PATH "vcpkg root" FORCE)
+            break()
+        endif()
+    endforeach()
 endif()
 
 # 构建类型: Debug | Release | RelWithDebInfo | MinSizeRel
@@ -83,7 +121,7 @@ endif()
 # 测试总开关：全工程唯一开关。
 # ON  = 按各模块是否具备测试源码正常构建（GTest 缺失时自动降级为 OFF）
 # OFF = 任何模块都不生成测试目标
-option(BUILD_TESTS "构建全部模块测试" ON)
+option(BUILD_TESTS "Build tests for all modules" ON)
 
 # ============================================================================
 
@@ -97,20 +135,24 @@ set(APR_CONFIG_INCLUDED TRUE)
 # Qt 主版本号
 set(QT_VERSION_MAJOR 6)
 
-# 路径未命中时明确失败，避免后续 configure 产生难懂的连锁错误
+# 路径未命中时明确失败，列出已尝试的候选位置与设置方式
 if(VCPKG_DIR STREQUAL "" OR NOT EXISTS "${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake")
+    string(REPLACE ";" "\n    " _apr_vcpkg_tried "${_apr_vcpkg_candidates}")
     message(FATAL_ERROR
-        "[Config] VCPKG_DIR not found or invalid: '${VCPKG_DIR}'\n"
-        "  Set environment variable VCPKG_DIR, or pass -DVCPKG_DIR=<path> to cmake.")
+        "[Config] VCPKG_DIR not found: '${VCPKG_DIR}'\n"
+        "  Tried candidates:\n    ${_apr_vcpkg_tried}\n"
+        "  Set env VCPKG_ROOT, or pass -DVCPKG_DIR=<path> to cmake.")
 endif()
 if(Qt_INSTALL_DIR STREQUAL "" OR NOT EXISTS "${Qt_INSTALL_DIR}/lib/cmake/Qt6/Qt6Config.cmake")
     # 纯算法模块（如 Nesting）不链接 Qt：它的独立入口会在 include 本文件之前设
     # APR_ALLOW_MISSING_QT=ON，从而在没有 Qt 的机器/CI 上也能配置。
     # 默认关闭该旁路，其他模块的报错与行为保持原样。
     if(NOT APR_ALLOW_MISSING_QT)
+        string(REPLACE ";" "\n    " _apr_qt_tried "${_apr_qt_candidates}")
         message(FATAL_ERROR
-            "[Config] Qt_INSTALL_DIR not found or invalid: '${Qt_INSTALL_DIR}'\n"
-            "  Set environment variable Qt_INSTALL_DIR, or pass -DQt_INSTALL_DIR=<path> to cmake.")
+            "[Config] Qt_INSTALL_DIR not found: '${Qt_INSTALL_DIR}'\n"
+            "  Tried candidates:\n    ${_apr_qt_tried}\n"
+            "  Set env QT_ROOT_DIR, or pass -DQt_INSTALL_DIR=<path> to cmake.")
     endif()
 endif()
 
@@ -254,13 +296,13 @@ function(apr_module_option _name _dir _doc)
         option(${_name} "${_doc}" ON)
     else()
         option(${_name} "${_doc}" OFF)
-        message(STATUS "[April] ${_name}: 默认 OFF（子模块 ${_dir}/ 未检出）")
+        message(STATUS "[April] ${_name}: default OFF (submodule ${_dir}/ not checked out)")
     endif()
     if(${_name} AND NOT EXISTS "${_cmakelists}")
         message(FATAL_ERROR
-            "[April] ${_name}=ON 但子模块 ${_dir}/ 未检出（缺 ${_cmakelists}）。\n"
-            "  请先执行: git submodule update --init ${_dir}\n"
-            "  或改用:   -D${_name}=OFF")
+            "[April] ${_name}=ON but submodule ${_dir}/ is not checked out (missing ${_cmakelists}).\n"
+            "  Run first: git submodule update --init ${_dir}\n"
+            "  Or use:    -D${_name}=OFF")
     endif()
 endfunction()
 
@@ -291,7 +333,7 @@ elseif(BUILD_UI_DIMENSION STREQUAL "BOTH")
     set(APR_DEFAULT_UI_DIMENSION "2D" CACHE STRING "Default UI dimension (derived)" FORCE)
 else()
     message(FATAL_ERROR
-        "[April] BUILD_UI_DIMENSION 取值非法: '${BUILD_UI_DIMENSION}'（应为 2D|3D|BOTH）")
+        "[April] invalid BUILD_UI_DIMENSION: '${BUILD_UI_DIMENSION}' (expected 2D|3D|BOTH)")
 endif()
 
 apr_module_option(BUILD_NESTING "Nesting/Nesting" "Build Nesting module (2D/3D nesting/arrangement algorithm)")
@@ -310,7 +352,7 @@ apr_module_option(BUILD_PYTHON "PythonHost/PythonHost" "Build Python module (Pyt
 # 许可校验开关：默认 ON；开发构建如需关闭，用 -DAPR_ENABLE_LICENSE=OFF。
 # 宏编进 License 库本身（LicenseInternal.cpp 依据它决定运行期默认值），
 # Main 的 BuildConfig.h 镜像同步该取值供启动自检交叉核对。
-option(APR_ENABLE_LICENSE "启用许可校验（发货构建应设 ON）" ON)
+option(APR_ENABLE_LICENSE "Enable license check (ON for shipping builds)" ON)
 
 # ===== 工具 =====
 option(BUILD_KEYGEN_TOOL "Build KeygenTool (offline license key generator)" OFF)
@@ -356,7 +398,7 @@ set(APR_LEGACY_TEST_SWITCHES
     BUILD_MAIN_TESTS
     BUILD_VIEWPORT_REFRESH_TESTS
     BUILD_SCENE_EDIT_TESTS
-    CACHE INTERNAL "已废弃的旧测试开关清单")
+    CACHE INTERNAL "Deprecated legacy test switch list")
 
 # 模块键清单：独立构建裁剪与状态输出使用。键名必须与内层
 # apr_module_tests_enabled(<键>) 的调用一致。
@@ -386,7 +428,7 @@ set(APR_TEST_MODULES
     VIEWPORT_REFRESH
     SCENE_EDIT
     CAM
-    CACHE INTERNAL "测试模块键清单")
+    CACHE INTERNAL "Test module key list")
 
 # 旧开关迁移告警：缓存里残留旧变量时明确提示，旧值不得影响新行为。
 # 每次 configure 都检查，直到用户删除缓存项或换全新构建目录。
@@ -398,9 +440,9 @@ foreach(_apr_legacy IN LISTS APR_LEGACY_TEST_SWITCHES)
 endforeach()
 if(_apr_legacy_found)
     message(WARNING
-        "[Tests] 检测到已废弃的测试开关：${_apr_legacy_found}\n"
-        "  BUILD_ALL_TESTS 与 BUILD_*_TESTS 已废弃并被忽略，当前只认 BUILD_TESTS。\n"
-        "  请删除对应缓存项（cmake -U <变量名> ...）或使用全新构建目录重新 configure。")
+        "[Tests] deprecated test switches detected: ${_apr_legacy_found}\n"
+        "  BUILD_ALL_TESTS and BUILD_*_TESTS are deprecated and ignored; only BUILD_TESTS is used.\n"
+        "  Remove those cache entries (cmake -U <name> ...) or reconfigure in a new build dir.")
 endif()
 unset(_apr_legacy_found)
 unset(_apr_legacy)
