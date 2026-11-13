@@ -10,8 +10,10 @@ $titleZh = [string]([char]0x8BD5) + [char]0x7528 + [char]0x671F
 # "ji xu shi yong" (continue trial)
 $btnZh = [string]([char]0x7EE7) + [char]0x7EED + [char]0x8BD5 + [char]0x7528
 
-$exe = "c:\Users\xx\Documents\Cpp\CAD\build\bin_Qt6\Release\April.exe"
-$outFile = "c:\Users\xx\Documents\Cpp\CAD\crash-stderr.txt"
+# 从仓库根定位产物，避免写死某台机器的绝对路径
+$repoRoot = $PSScriptRoot
+$exe = Join-Path $repoRoot "build\bin_Qt6\Release\April.exe"
+$outFile = Join-Path $repoRoot "crash-stderr.txt"
 if (Test-Path $outFile) { Remove-Item $outFile -Force }
 
 Start-Process -FilePath $exe -RedirectStandardError $outFile
