@@ -11,6 +11,7 @@
 #include <QPlainTextEdit>
 #include <QLineEdit>
 #include <QApplication>
+#include <QCoreApplication>
 #include <QGuiApplication>
 #include <QScreen>
 #include <QToolBar>
@@ -1090,7 +1091,14 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // 注册 Default 上下文（通用编辑命令）——从 JSON toolbars 配置读取
     {
         // 查找配置中 id="top.toolbar.2d.default" 的条目，按 separator 拆成 section
-        ToolBarContextConfig defaultCfg{ ToolBarContext::Default, tr("Edit"), {} };
+        // Workbench2D 自身未声明 Q_OBJECT（Q_OBJECT 在基类 WorkbenchBase），
+        // 裸 tr() 运行时会落到 WorkbenchBase context，与 .ts 的 Workbench2D
+        // context 不匹配；这里及下文工具栏配置统一显式指定 context。
+        ToolBarContextConfig defaultCfg{
+            ToolBarContext::Default,
+            QCoreApplication::translate("Workbench2D", "Edit"),
+            {}
+        };
         const UiConfigData* config = UiConfigurationManager::shared().configData();
         if (config)
         {
@@ -1138,29 +1146,31 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     // 注意：不注册到 TopToolBar，因为字体/字号等控件已经在 TextFontToolBar 自定义工具栏中显示
     m_contextManager->registerContext(ToolBarContext::TextEditing,
         {
-            ToolBarContext::TextEditing, tr("Text Format"), {}  // 空 action 列表，控件通过 registerCustomToolBar 显示
+            ToolBarContext::TextEditing,
+            QCoreApplication::translate("Workbench2D", "Text Format"),
+            {}  // 空 action 列表，控件通过 registerCustomToolBar 显示
         });
 
     // 注册 QRCodeEditing 上下文（二维码编辑工具栏）
     m_contextManager->registerContext(ToolBarContext::QREditing,
         {
             ToolBarContext::QREditing,
-            tr("QR Code"),
+            QCoreApplication::translate("Workbench2D", "QR Code"),
             {
-                { tr("Content"),
+                { QCoreApplication::translate("Workbench2D", "Content"),
                     {
-                        { "QR_Content", tr("Content"), "", false, "", "", "", "", "", true },
-                        { "QR_ErrorCorrection", tr("Error Correction"), "", false, "", "", "", "", "", true },
+                        { "QR_Content", QCoreApplication::translate("Workbench2D", "Content"), "", false, "", "", "", "", "", true },
+                        { "QR_ErrorCorrection", QCoreApplication::translate("Workbench2D", "Error Correction"), "", false, "", "", "", "", "", true },
                     } },
-                { tr("Appearance"),
+                { QCoreApplication::translate("Workbench2D", "Appearance"),
                     {
-                        { "QR_Size", tr("Size"), "", false, "", "", "", "", "", true },
-                        { "QR_Foreground", tr("Foreground"), "", false, "", "", "", "", "", true },
-                        { "QR_Background", tr("Background"), "", false, "", "", "", "", "", true },
+                        { "QR_Size", QCoreApplication::translate("Workbench2D", "Size"), "", false, "", "", "", "", "", true },
+                        { "QR_Foreground", QCoreApplication::translate("Workbench2D", "Foreground"), "", false, "", "", "", "", "", true },
+                        { "QR_Background", QCoreApplication::translate("Workbench2D", "Background"), "", false, "", "", "", "", "", true },
                     } },
-                { tr("Advanced"),
+                { QCoreApplication::translate("Workbench2D", "Advanced"),
                     {
-                        { "QR_Logo", tr("Logo"), "", false, "", "", "", "", "", true },
+                        { "QR_Logo", QCoreApplication::translate("Workbench2D", "Logo"), "", false, "", "", "", "", "", true },
                     } },
             },
         });
@@ -1169,18 +1179,18 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     m_contextManager->registerContext(ToolBarContext::BitmapEditing,
         {
             ToolBarContext::BitmapEditing,
-            tr("Bitmap"),
+            QCoreApplication::translate("Workbench2D", "Bitmap"),
             {
-                { tr("Adjust"),
+                { QCoreApplication::translate("Workbench2D", "Adjust"),
                     {
-                        { "Bitmap_Crop", tr("Crop"), "", false, "", "", "", "", "", true },
-                        { "Bitmap_Rotate", tr("Rotate"), "", false, "", "", "", "", "", true },
-                        { "Bitmap_Brightness", tr("Brightness"), "", false, "", "", "", "", "", true },
-                        { "Bitmap_Contrast", tr("Contrast"), "", false, "", "", "", "", "", true },
+                        { "Bitmap_Crop", QCoreApplication::translate("Workbench2D", "Crop"), "", false, "", "", "", "", "", true },
+                        { "Bitmap_Rotate", QCoreApplication::translate("Workbench2D", "Rotate"), "", false, "", "", "", "", "", true },
+                        { "Bitmap_Brightness", QCoreApplication::translate("Workbench2D", "Brightness"), "", false, "", "", "", "", "", true },
+                        { "Bitmap_Contrast", QCoreApplication::translate("Workbench2D", "Contrast"), "", false, "", "", "", "", "", true },
                     } },
-                { tr("Filter"),
+                { QCoreApplication::translate("Workbench2D", "Filter"),
                     {
-                        { "Bitmap_Filter", tr("Filter"), "", false, "", "", "", "", "", true },
+                        { "Bitmap_Filter", QCoreApplication::translate("Workbench2D", "Filter"), "", false, "", "", "", "", "", true },
                     } },
             },
         });
@@ -1189,18 +1199,18 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     m_contextManager->registerContext(ToolBarContext::VectorEditing,
         {
             ToolBarContext::VectorEditing,
-            tr("Vector"),
+            QCoreApplication::translate("Workbench2D", "Vector"),
             {
-                { tr("Path"),
+                { QCoreApplication::translate("Workbench2D", "Path"),
                     {
-                        { "Vector_NodeEdit", tr("Node Edit"), "", false, "", "", "", "", "", true },
-                        { "Vector_Simplify", tr("Simplify"), "", false, "", "", "", "", "", true },
-                        { "Vector_Boolean", tr("Boolean"), "", false, "", "", "", "", "", true },
+                        { "Vector_NodeEdit", QCoreApplication::translate("Workbench2D", "Node Edit"), "", false, "", "", "", "", "", true },
+                        { "Vector_Simplify", QCoreApplication::translate("Workbench2D", "Simplify"), "", false, "", "", "", "", "", true },
+                        { "Vector_Boolean", QCoreApplication::translate("Workbench2D", "Boolean"), "", false, "", "", "", "", "", true },
                     } },
-                { tr("Style"),
+                { QCoreApplication::translate("Workbench2D", "Style"),
                     {
-                        { "Vector_Stroke", tr("Stroke"), "", false, "", "", "", "", "", true },
-                        { "Vector_Fill", tr("Fill"), "", false, "", "", "", "", "", true },
+                        { "Vector_Stroke", QCoreApplication::translate("Workbench2D", "Stroke"), "", false, "", "", "", "", "", true },
+                        { "Vector_Fill", QCoreApplication::translate("Workbench2D", "Fill"), "", false, "", "", "", "", "", true },
                     } },
             },
         });
@@ -1209,22 +1219,22 @@ void Workbench2D::createToolbars(WorkbenchWindow& window)
     m_contextManager->registerContext(ToolBarContext::ImageEditing,
         {
             ToolBarContext::ImageEditing,
-            tr("Image"),
+            QCoreApplication::translate("Workbench2D", "Image"),
             {
-                { tr("Transform"),
+                { QCoreApplication::translate("Workbench2D", "Transform"),
                     {
-                        { "Image_Crop", tr("Crop"), "", false, "", "", "", "", "", true },
-                        { "Image_Rotate", tr("Rotate"), "", false, "", "", "", "", "", true },
-                        { "Image_Flip", tr("Flip"), "", false, "", "", "", "", "", true },
+                        { "Image_Crop", QCoreApplication::translate("Workbench2D", "Crop"), "", false, "", "", "", "", "", true },
+                        { "Image_Rotate", QCoreApplication::translate("Workbench2D", "Rotate"), "", false, "", "", "", "", "", true },
+                        { "Image_Flip", QCoreApplication::translate("Workbench2D", "Flip"), "", false, "", "", "", "", "", true },
                     } },
-                { tr("Adjust"),
+                { QCoreApplication::translate("Workbench2D", "Adjust"),
                     {
-                        { "Image_Brightness", tr("Brightness"), "", false, "", "", "", "", "", true },
-                        { "Image_Contrast", tr("Contrast"), "", false, "", "", "", "", "", true },
+                        { "Image_Brightness", QCoreApplication::translate("Workbench2D", "Brightness"), "", false, "", "", "", "", "", true },
+                        { "Image_Contrast", QCoreApplication::translate("Workbench2D", "Contrast"), "", false, "", "", "", "", "", true },
                     } },
-                { tr("Filter"),
+                { QCoreApplication::translate("Workbench2D", "Filter"),
                     {
-                        { "Image_Filter", tr("Filter"), "", false, "", "", "", "", "", true },
+                        { "Image_Filter", QCoreApplication::translate("Workbench2D", "Filter"), "", false, "", "", "", "", "", true },
                     } },
             },
         });

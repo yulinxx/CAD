@@ -315,8 +315,12 @@ bool FileOperationRegistry::doOpenFile(const QString& filePath)
 void FileOperationRegistry::doImportByFormat(Fio::FileFormat fmt)
 {
     executeWithExceptionGuard("Import", [this, fmt] {
+        // 过滤器扩展名以读取器判据为准；服务缺失时传空列表，由 FileDialogService
+        // 退回 FormatRegistry，避免两处维护同一份扩展名
+        const QStringList extensions =
+            m_importService ? m_importService->extensionsForFormat(fmt) : QStringList();
         QString filePath = FileDialogService::getOpenFileName(
-            m_parentWidget, QObject::tr("Import File"), FileDialogService::importFilterForFormat(fmt));
+            m_parentWidget, QObject::tr("Import File"), FileDialogService::importFilterForFormat(fmt, extensions));
         if (filePath.isEmpty())
         {
             return;
@@ -625,8 +629,11 @@ void FileOperationRegistry::registerImportOps()
     // 原实现走 doOpenFile 会清空当前文档且不弹未保存提示，与注释和菜单语义都不符；
     // 要替换当前文档请用 File ▸ Open（仅 .apr）
     Ops::declare(reg, OperationId::File_ImportAll, [this] {
+        // 空工作台 ID = 全部读取器能力 + 位图判据，与「所有支持格式」的语义一致
+        const QStringList extensions =
+            m_importService ? m_importService->importableExtensions(QString()) : QStringList();
         QString filePath = FileDialogService::getOpenFileName(
-            m_parentWidget, QObject::tr("Import File"), FileDialogService::allSupportedFilter());
+            m_parentWidget, QObject::tr("Import File"), FileDialogService::allSupportedFilter(extensions));
         if (filePath.isEmpty())
         {
             return;

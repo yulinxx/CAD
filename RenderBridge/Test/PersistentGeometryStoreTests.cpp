@@ -96,8 +96,8 @@ namespace
 
         RenderBridge::GeometryBlock block{};
         ASSERT_TRUE(m_store.allocBlock(kBlockBytes, block));
-        EXPECT_TRUE(RenderAbstraction::isValid(block.buffer)) << "块应当带回一个有效的缓冲句柄";
-        EXPECT_EQ(m_store.storeCount(), 1u) << "一块都还没超上限，不该分片";
+        EXPECT_TRUE(RenderAbstraction::isValid(block.buffer)) << "the block should come back with a valid buffer handle";
+        EXPECT_EQ(m_store.storeCount(), 1u) << "not over the limit with a single block; must not shard";
         EXPECT_TRUE(writePattern(block.id, 0x11));
     }
 
@@ -111,11 +111,11 @@ namespace
         for (int i = 0; i < 1024 && m_store.storeCount() == 1; ++i)
         {
             RenderBridge::GeometryBlock block{};
-            ASSERT_TRUE(m_store.allocBlock(kBlockBytes, block)) << "第 " << i << " 块分配失败";
+            ASSERT_TRUE(m_store.allocBlock(kBlockBytes, block)) << "failed to allocate block " << i;
             blocks.push_back(block);
         }
 
-        ASSERT_EQ(m_store.storeCount(), 2u) << "主仓 4KB 上限用尽后必须开第二个仓，否则总容量卡在单仓上限";
+        ASSERT_EQ(m_store.storeCount(), 2u) << "must open a second store once the primary 4KB limit is exhausted; otherwise total capacity is capped at one store";
 
         RenderBridge::GeometryBlock sharded{};
         ASSERT_TRUE(m_store.allocBlock(kBlockBytes, sharded));
@@ -125,7 +125,7 @@ namespace
         for (size_t i = 0; i < blocks.size(); ++i)
         {
             EXPECT_TRUE(writePattern(blocks[i].id, static_cast<uint8_t>(i + 1)))
-                << "第 " << i << " 块写入失败（跨仓路由错误？）";
+                << "failed to write block " << i << " (wrong cross-store routing?)";
         }
 
         // 落进第二仓的块，其 buffer 必须与主仓的块不同 —— 证明它真的换了 buffer
@@ -137,7 +137,7 @@ namespace
                 sawDistinctBuffer = true;
             }
         }
-        EXPECT_TRUE(sawDistinctBuffer) << "分片后应当出现第二个缓冲句柄";
+        EXPECT_TRUE(sawDistinctBuffer) << "a second buffer handle should appear after sharding";
     }
 
     /// 释放跨仓的块后，统计里的已用量必须正确回落（释放也要路由到正确的仓）
@@ -164,7 +164,7 @@ namespace
         // 释放分片块（在第二仓里）——它必须把该仓的 usedBytes 降下来
         m_store.freeBlock(sharded.id);
         const uint64_t usedAfter = m_store.totalStats().usedBytes;
-        EXPECT_LT(usedAfter, usedBefore) << "释放分片块没有反映到聚合统计上，说明释放时路由到了错误的仓";
+        EXPECT_LT(usedAfter, usedBefore) << "freeing a sharded block did not show up in aggregate stats; the free was routed to the wrong store";
     }
 
     /// 统计是各仓之和：分片后总容量必须超过单仓上限
@@ -181,7 +181,7 @@ namespace
 
         const RenderBridge::GeometryStoreStats stats = m_store.totalStats();
         EXPECT_GT(stats.capacityBytes, kTinyStoreMax)
-            << "分片之后总容量必须大于单仓上限，否则「4GB 天花板」并没有被突破";
+            << "total capacity after sharding must exceed a single store's limit; otherwise the 4 GB ceiling is not broken";
     }
 
     /// 仓数上限生效：到顶后分配必须明确失败，而不是无限开仓把内存耗光
@@ -200,8 +200,8 @@ namespace
             ++allocated;
         }
 
-        EXPECT_EQ(m_store.storeCount(), 2u) << "不得突破 maxStores";
-        EXPECT_GT(allocated, 0) << "至少应该能分配出两块仓的容量";
+        EXPECT_EQ(m_store.storeCount(), 2u) << "must not exceed maxStores";
+        EXPECT_GT(allocated, 0) << "should be able to allocate at least two stores' worth of capacity";
         // 到顶之后仍必须明确失败（而不是返回一个不可用的块）
         RenderBridge::GeometryBlock overflow{};
         EXPECT_FALSE(m_store.allocBlock(kBlockBytes, overflow));

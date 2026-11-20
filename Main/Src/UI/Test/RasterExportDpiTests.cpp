@@ -246,7 +246,7 @@ TEST(RasterExportDpi, CircleBoundingBoxMatchesDpi)
     const QImage image(target);
     ASSERT_FALSE(image.isNull());
     int minX = 0, minY = 0, maxX = 0, maxY = 0;
-    ASSERT_TRUE(measureDarkBBox(image, minX, minY, maxX, maxY)) << "圆未落在画布上";
+    ASSERT_TRUE(measureDarkBBox(image, minX, minY, maxX, maxY)) << "circle does not land on the canvas";
     const int width = maxX - minX + 1;
     const int height = maxY - minY + 1;
     std::printf("[export-circle] bbox=%dx%d expected=236.22 (20mm@300dpi)\n", width, height);
@@ -285,7 +285,7 @@ TEST(RasterExportDpi, QuarterArcCoversRadiusBoxAndLeavesCenterEmpty)
     const QImage image(target);
     ASSERT_FALSE(image.isNull());
     int minX = 0, minY = 0, maxX = 0, maxY = 0;
-    ASSERT_TRUE(measureDarkBBox(image, minX, minY, maxX, maxY)) << "圆弧未落在画布上";
+    ASSERT_TRUE(measureDarkBBox(image, minX, minY, maxX, maxY)) << "arc does not land on the canvas";
     const int width = maxX - minX + 1;
     const int height = maxY - minY + 1;
     std::printf("[export-arc] bbox=%dx%d expected=118.11 (10mm radius@300dpi)\n", width, height);
@@ -309,10 +309,10 @@ TEST(RasterExportDpi, QuarterArcCoversRadiusBoxAndLeavesCenterEmpty)
         }
         return false;
     };
-    EXPECT_TRUE(darkNear(minX, minY, 4)) << "起点未落在包围盒左上角";
-    EXPECT_TRUE(darkNear(maxX, maxY, 4)) << "终点未落在包围盒右下角";
+    EXPECT_TRUE(darkNear(minX, minY, 4)) << "start point is not at the top-left of the bounding box";
+    EXPECT_TRUE(darkNear(maxX, maxY, 4)) << "end point is not at the bottom-right of the bounding box";
     // 圆心那个角不应有像素：这段弧不经过圆心一侧
-    EXPECT_FALSE(darkNear(minX, maxY, 10)) << "弧外的圆心角落被误填充";
+    EXPECT_FALSE(darkNear(minX, maxY, 10)) << "the center corner outside the arc was filled by mistake";
 }
 
 /**
@@ -376,12 +376,12 @@ TEST(RasterExportDpi, ClosedQuadHonoursFillRule)
                 outlineDark, filledDark);
 
     // FILL_NONE：内部中心必须仍是背景色
-    EXPECT_LT(outlineCenter, 64) << "FILL_NONE 下内部被填充";
+    EXPECT_LT(outlineCenter, 64) << "interior was filled under FILL_NONE";
     // 20x10mm 的周长约 60mm ≈ 709 像素，描边像素数应远小于面积像素数
     EXPECT_LT(outlineDark, 1500);
 
     // FILL_WINDING：内部中心必须是图元色
-    EXPECT_GT(filledCenter, 128) << "FILL_WINDING 下内部未被填充";
+    EXPECT_GT(filledCenter, 128) << "interior was not filled under FILL_WINDING";
     // 20x10mm 面积 ≈ 236*118 ≈ 27848 像素
     EXPECT_GT(filledDark, 20000);
 }
@@ -431,8 +431,8 @@ TEST(RasterExportDpi, PngAndJpegRoundTripSmoke)
 
     EXPECT_EQ(pngImage.size(), QSize(611, 21));
     EXPECT_EQ(jpegImage.size(), QSize(611, 21));
-    EXPECT_EQ(pngChannels, 1) << "PNG 应为单通道灰度";
-    EXPECT_EQ(jpegChannels, 1) << "单通道输入编码为灰度 JPEG";
+    EXPECT_EQ(pngChannels, 1) << "PNG should be single-channel grayscale";
+    EXPECT_EQ(jpegChannels, 1) << "single-channel input must encode as grayscale JPEG";
     EXPECT_EQ(pngImage.depth(), 8);
     EXPECT_EQ(jpegImage.depth(), 8);
 

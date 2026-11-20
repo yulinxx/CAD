@@ -494,6 +494,7 @@ AlgorithmRunner* ApplicationCompositionRoot::algorithmRunner()
         m_algorithmRunner = std::make_unique<AlgorithmRunner>(m_algorithmService.get(),
             m_sceneManager.get(),
             m_sceneEditService.get(),
+            m_layerEditService.get(),
             m_unitManager.get(),
             m_shellHost ? m_shellHost->mainWindow() : nullptr);
     }

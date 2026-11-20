@@ -173,7 +173,7 @@ TEST(DrawListBatchMeasurementTest, Granularity256WithMergingStillDrawsPerEntity)
 {
     const Measured m = runScene(256, true, false);
     EXPECT_EQ(m.entryCount, kMeasureEntities);
-    EXPECT_EQ(m.drawCallCount, kMeasureEntities) << "块起点不满足步长整数倍时无法合批";
+    EXPECT_EQ(m.drawCallCount, kMeasureEntities) << "cannot merge when block starts are not multiples of the stride";
     EXPECT_EQ(m.mergedDrawCount, 0u);
 }
 
@@ -181,8 +181,8 @@ TEST(DrawListBatchMeasurementTest, Granularity256WithMergingStillDrawsPerEntity)
 TEST(DrawListBatchMeasurementTest, Granularity8WithoutMergingStillDrawsPerEntity)
 {
     const Measured m = runScene(8, false, false);
-    EXPECT_TRUE(m.blocksContiguous) << "粒度 8 应让 72 字节的块紧排";
-    EXPECT_EQ(m.drawCallCount, kMeasureEntities) << "只满足连续性、没开合批，draw 数不降";
+    EXPECT_TRUE(m.blocksContiguous) << "granularity 8 should pack 72-byte blocks tightly";
+    EXPECT_EQ(m.drawCallCount, kMeasureEntities) << "contiguity alone without merging must not reduce the draw count";
     EXPECT_EQ(m.mergedDrawCount, 0u);
 }
 
@@ -191,9 +191,9 @@ TEST(DrawListBatchMeasurementTest, Granularity8WithMergingFusesIntoSingleDraw)
 {
     const Measured m = runScene(8, true, false);
     EXPECT_TRUE(m.blocksContiguous);
-    EXPECT_EQ(m.drawCallCount, 1u) << "连续块 + 同材质同管线应合成一次 draw";
+    EXPECT_EQ(m.drawCallCount, 1u) << "contiguous blocks with the same material and pipeline should fuse into a single draw";
     EXPECT_EQ(m.mergedDrawCount, kMeasureEntities - 1);
-    EXPECT_EQ(m.triangleCount, kMeasureEntities) << "合批不能丢图元";
+    EXPECT_EQ(m.triangleCount, kMeasureEntities) << "merging must not drop entities";
 }
 
 /// D：同样连续 + 开合批，但材质编号各不同 → 不能共批，回到逐条画
@@ -201,7 +201,7 @@ TEST(DrawListBatchMeasurementTest, DistinctMaterialIndicesBlockMerging)
 {
     const Measured m = runScene(8, true, true);
     EXPECT_TRUE(m.blocksContiguous);
-    EXPECT_EQ(m.drawCallCount, kMeasureEntities) << "材质编号不同即不能共批";
+    EXPECT_EQ(m.drawCallCount, kMeasureEntities) << "different material indices must not be batched together";
     EXPECT_EQ(m.mergedDrawCount, 0u);
 }
 

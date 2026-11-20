@@ -221,6 +221,8 @@ namespace
     }
 
     // 复合属性（点/点列表/颜色）编辑弹窗：提供充足空间，保证控件完整显示
+    // 本类位于匿名 namespace 且无 Q_OBJECT，裸 tr() 会落到 QObject context，
+    // 与 .ts 中的 PropertyEditDialog context 不匹配；统一显式指定 context。
     class PropertyEditDialog : public QDialog
     {
     public:
@@ -233,7 +235,7 @@ namespace
             // 设置焦点策略，确保 Tab 键可以切换焦点（macOS 默认行为不同）
             setFocusPolicy(Qt::StrongFocus);
 
-            setWindowTitle(tr("Edit %1").arg(m_item.name));  // 编辑 %1
+            setWindowTitle(QCoreApplication::translate("PropertyEditDialog", "Edit %1").arg(m_item.name));  // 编辑 %1
             // 编辑对话框最小宽度:屏幕 19% 自适应 + 288 保底
             {
                 QScreen* screen = QGuiApplication::primaryScreen();
@@ -255,7 +257,7 @@ namespace
             {
                 m_point = new PointCoordEditor(this);
                 m_point->setPoint(m_target ? m_target->pointAt(m_item, 0) : QPointF());
-                form->addRow(tr("Coordinates:"), m_point);  // 坐标
+                form->addRow(QCoreApplication::translate("PropertyEditDialog", "Coordinates:"), m_point);  // 坐标
                 break;
             }
             case PropertyEditType::PointList:
@@ -264,13 +266,14 @@ namespace
                 const QVariantMap data = m_item.editData.toMap();
                 const int count = data.value(QStringLiteral("count"), 0).toInt();
                 const int current = data.value(QStringLiteral("currentIndex"), 0).toInt();
-                const QString label = data.value(QStringLiteral("label"), tr("Point")).toString();  // 点
+                const QString label = data.value(
+                    QStringLiteral("label"), QCoreApplication::translate("PropertyEditDialog", "Point")).toString();  // 点
                 m_list->setup(count, current, label);
                 m_list->setPointProvider([target = this->m_target, item = this->m_item](int idx) -> QPointF {
                     return target ? target->pointAt(item, idx) : QPointF();
                 });
                 m_list->setPoint(m_target ? m_target->pointAt(m_item, current) : QPointF());
-                form->addRow(tr("Vertices:"), m_list);  // 顶点
+                form->addRow(QCoreApplication::translate("PropertyEditDialog", "Vertices:"), m_list);  // 顶点
                 break;
             }
             case PropertyEditType::Color:
@@ -278,7 +281,7 @@ namespace
                 m_color = new ColorEditor(this);
                 QColor c(m_item.value);
                 m_color->setColor(c.isValid() ? c : QColor(Qt::white));
-                form->addRow(tr("Color:"), m_color);  // 颜色
+                form->addRow(QCoreApplication::translate("PropertyEditDialog", "Color:"), m_color);  // 颜色
                 break;
             }
             default:
@@ -294,7 +297,9 @@ namespace
                 }
                 else
                 {
-                    QMessageBox::warning(this, tr("Edit"), tr("Invalid value, change was not applied."));  // 编辑, 无效值，更改未应用
+                    QMessageBox::warning(this,
+                        QCoreApplication::translate("PropertyEditDialog", "Edit"),
+                        QCoreApplication::translate("PropertyEditDialog", "Invalid value, change was not applied."));  // 编辑, 无效值，更改未应用
                 }
             });
             connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
@@ -346,6 +351,8 @@ public:
 };
 
 // ---- 值列的内联编辑代理 ----
+// 无 Q_OBJECT 的 .cpp 局部类，裸 tr() 运行时会落到 QObject context，
+// 与 .ts 中的 PropertyItemDelegate context 不匹配；统一显式指定 context。
 class PropertyItemDelegate : public QStyledItemDelegate
 {
 public:
@@ -386,7 +393,10 @@ public:
         case PropertyEditType::CheckBox:
         {
             auto* combo = new QComboBox(parent);
-            combo->addItems({ tr("No"), tr("Yes") });  // 否 / 是
+            combo->addItems({
+                QCoreApplication::translate("PropertyItemDelegate", "No"),
+                QCoreApplication::translate("PropertyItemDelegate", "Yes")
+            });  // 否 / 是
             return combo;
         }
         case PropertyEditType::Point2d:
