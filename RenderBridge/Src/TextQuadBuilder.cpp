@@ -179,6 +179,11 @@ namespace Render
         {
             worldToPixel(view, item.worldPos.x(), item.worldPos.y(), vpWidth, vpHeight, anchorX, anchorY);
         }
+        // 像素偏移在换算之后叠加：偏移量因此与缩放无关（标注与图元的视觉间距恒定）。
+        // 与缩放无关的前提是它不参与世界→像素换算，直接作用在像素空间。
+        // dpr：item 的 fontSize 语义是物理像素（与字形图集一致），偏移同口径，不再乘 dpr。
+        anchorX += item.offsetPx.x();
+        anchorY += item.offsetPx.y();
 
         float penX = anchorX;
         switch (item.hAlign)

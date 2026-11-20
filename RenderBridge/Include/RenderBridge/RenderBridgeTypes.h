@@ -99,8 +99,10 @@ namespace RenderBridge
     {
         /// 零终止 UTF-8 字符串（调用方保证生命周期长于本次 addText 调用）
         const char* utf8 = "";
-        /// 锚点世界坐标（coordMode=1 时由 view 矩阵换算到像素）
+        /// 锚点坐标（coordMode=1 时由 view 矩阵换算到像素）
         Ut::Vec2f worldPos;
+        /// 锚点换算后叠加的屏幕像素偏移（+x 右、+y 下）；像素坐标模式也可使用
+        Ut::Vec2f offsetPx;
         /// 像素字号
         int fontSize = 10;
         /// RGBA 颜色

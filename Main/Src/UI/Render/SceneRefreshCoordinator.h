@@ -32,6 +32,7 @@
 #include "Ut/BBox2d.h"
 #include "BitmapReconciler.h"
 #include "TextReconciler.h"
+#include "EntityIdLabelReconciler.h"
 #include "RenderSubmitScheduler.h"
 
 class FrameTimer;
@@ -327,6 +328,8 @@ private:
     //   - 各协调器的账本不再暴露给调度逻辑，状态归属清晰
     BitmapReconciler m_bitmapReconciler{ nullptr };
     TextReconciler m_textReconciler{ nullptr };
+    // 图元 ID 标注账本：与位图/文字同构，独立通道逐帧绘制（世界锚点 + 屏幕定尺寸）
+    EntityIdLabelReconciler m_entityIdLabelReconciler{ nullptr };
     RenderSubmitScheduler m_submitScheduler{ nullptr };
 
     // 帧耗时追踪器（性能监控基础设施）

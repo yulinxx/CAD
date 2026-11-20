@@ -963,6 +963,8 @@ if(_viewport_tests AND GTest_FOUND)
         "${UI_ROOT}/Render/SceneRefreshCoordinator.cpp"
         "${UI_ROOT}/Render/BitmapReconciler.cpp"
         "${UI_ROOT}/Render/TextReconciler.cpp"
+        "${UI_ROOT}/Render/EntityIdLabelReconciler.cpp"
+        "${UI_ROOT}/Test/EntityIdLabelReconcilerTests.cpp"
         "${UI_ROOT}/Render/RenderSubmitScheduler.cpp"
     )
     target_compile_features(ViewportRefreshTests PRIVATE cxx_std_17)

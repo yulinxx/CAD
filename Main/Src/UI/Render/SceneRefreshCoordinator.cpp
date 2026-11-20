@@ -155,6 +155,7 @@ void SceneRefreshCoordinator::setRenderWidget(RenderWidget* widget)
     // 拆分出的三个辅助类各自持有 widget 指针，同步更新
     m_bitmapReconciler.setRenderWidget(widget);
     m_textReconciler.setRenderWidget(widget);
+    m_entityIdLabelReconciler.setRenderWidget(widget);
     m_submitScheduler.setRenderWidget(widget);
     // 反向注入：视口内部的覆盖层 / 位图 / 文字 / 视图矩阵这几类刷新
     // 原来是裸调 update() 完全绕过调度器的，注入后统一经 requestRepaint() 汇入。
@@ -530,6 +531,8 @@ void SceneRefreshCoordinator::applyLayerVisibilityChanged(int layerId, bool visi
     const std::unordered_set<Eg::EntityId> noDirty;
     m_bitmapReconciler.reconcile(m_sceneManager, false, m_cachedSelectedIds, false, noDirty);
     m_textReconciler.reconcile(m_sceneManager, false, m_cachedSelectedIds, false, noDirty);
+    // 图层显隐不进入图元 dirty 流，必须用全量标签对账摘掉隐藏图层的残留。
+    m_entityIdLabelReconciler.reconcile(m_sceneManager, true, noDirty);
 
     // 隐藏图层的曲线不再参与 LOD 收集：RenderSubmitScheduler 的 isRenderable 已按图层可见性过滤，
     // 队列里残留的条目在消费时会被跳过，这里不需要额外清理队列（清了反而会让下一次
@@ -1343,6 +1346,14 @@ void SceneRefreshCoordinator::applyLightRefresh(Eg::SceneManager* sm)
         // 文字同理没有轮廓替代视觉，选中时保留本体
         m_textReconciler.reconcile(sm, /*fullReconcile=*/false, m_cachedSelectedIds, false, m_pendingDirtyIds);
     }
+
+    // 图元 ID 标注层协调：有脏图元、已删除图元或账本非空时对账。
+    // 账本非空兜底原因与位图/文字相同：图层显隐只改标志位不进脏集合，需靠对账摘除残影。
+    if (!m_pendingDirtyIds.empty() || !m_pendingDeletedIds.empty() || !m_entityIdLabelReconciler.empty())
+    {
+        m_entityIdLabelReconciler.reconcile(sm, /*fullReconcile=*/false, m_pendingDirtyIds,
+            m_pendingDeletedIds);
+    }
 }
 
 void SceneRefreshCoordinator::processCurveLodBatch()
@@ -1463,6 +1474,9 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
 
     // 世界文字层全量协调：同上
     m_textReconciler.reconcile(sm, /*fullReconcile=*/true, m_cachedSelectedIds, false, {});
+
+    // 图元 ID 标注全量协调：以场景为真源整体重建
+    m_entityIdLabelReconciler.reconcile(sm, /*fullReconcile=*/true, {}, {});
 }
 
 // 渲染刷新分发：按 RefreshLevel 级别选择刷新策略
