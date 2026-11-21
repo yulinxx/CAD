@@ -5,8 +5,10 @@
 #include "Engine/AprEntity/AprEntity.h"
 #include "Engine/Layer/AprLayer.h"
 
+#include <algorithm>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace
 {
@@ -36,89 +38,189 @@ void EntityIdLabelReconciler::reconcile(Eg::SceneManager* sm,
         if (!m_labels.empty())
         {
             m_labels.clear();
+            m_stats = {};
             m_renderWidget->clearEntityIdLabels();
         }
         return;
     }
 
-    bool changed = false;
-
     if (fullReconcile)
     {
-        // 图层显隐等未必产生图元 dirty/deleted 记录的变化，必须以场景为真源全量对账。
-        std::unordered_map<Eg::EntityId, Render::EntityIdLabelItem> rebuilt;
-        sm->forEachEntity([&](Eg::AprEntity* e) {
-            if (!e || e->id <= 0)
-            {
-                return;
-            }
-            Render::EntityIdLabelItem item;
-            if (buildLabel(sm, e->id, item))
-            {
-                rebuilt.emplace(e->id, std::move(item));
-            }
-        });
-        changed = rebuilt.size() != m_labels.size();
-        if (!changed)
+        if (rebuildAll(sm))
         {
-            for (const auto& entry : rebuilt)
+            pushToWidget();
+        }
+        return;
+    }
+
+    bool changed = false;
+    for (Eg::EntityId id : deletedIds)
+    {
+        changed = m_labels.erase(id) != 0 || changed;
+    }
+
+    // 增量路径只查本轮脏 ID，不遍历全场景。不可见、出视口和无效包围盒的图元在此处移除。
+    for (Eg::EntityId id : dirtyIds)
+    {
+        Render::EntityIdLabelItem item;
+        if (buildLabel(sm, id, item))
+        {
+            const auto old = m_labels.find(id);
+            const bool differs = old == m_labels.end() || old->second.anchorWorld.x() != item.anchorWorld.x() ||
+                old->second.anchorWorld.y() != item.anchorWorld.y() || old->second.text != item.text ||
+                old->second.offsetPx.x() != item.offsetPx.x() || old->second.offsetPx.y() != item.offsetPx.y();
+            if (differs)
             {
-                const auto old = m_labels.find(entry.first);
-                if (old == m_labels.end() || old->second.anchorWorld.x() != entry.second.anchorWorld.x() ||
-                    old->second.anchorWorld.y() != entry.second.anchorWorld.y() || old->second.text != entry.second.text)
-                {
-                    changed = true;
-                    break;
-                }
+                m_labels[id] = std::move(item);
+                changed = true;
             }
         }
-        m_labels = std::move(rebuilt);
-    }
-    else
-    {
-        for (Eg::EntityId id : deletedIds)
+        else
         {
             changed = m_labels.erase(id) != 0 || changed;
         }
+    }
 
-        // 增量路径只查本轮脏 ID，不遍历全场景。不可见图元和无效包围盒在此处移除。
-        for (Eg::EntityId id : dirtyIds)
+    // 增量新增可能使预算超限：按与全量一致的稳定规则裁掉 ID 最大的标签，
+    // 正常拖动已有标签不会触发重选（数量不变时不会进入这里）。
+    const size_t maxLabels = effectiveMaxLabels();
+    if (maxLabels != 0 && m_labels.size() > maxLabels)
+    {
+        std::vector<Eg::EntityId> ids;
+        ids.reserve(m_labels.size());
+        for (const auto& entry : m_labels)
         {
-            Render::EntityIdLabelItem item;
-            if (buildLabel(sm, id, item))
-            {
-                const auto old = m_labels.find(id);
-                const bool differs = old == m_labels.end() || old->second.anchorWorld.x() != item.anchorWorld.x() ||
-                    old->second.anchorWorld.y() != item.anchorWorld.y() || old->second.text != item.text;
-                if (differs)
-                {
-                    m_labels[id] = std::move(item);
-                    changed = true;
-                }
-            }
-            else
-            {
-                changed = m_labels.erase(id) != 0 || changed;
-            }
+            ids.push_back(entry.first);
+        }
+        std::sort(ids.begin(), ids.end());
+        while (ids.size() > maxLabels)
+        {
+            m_labels.erase(ids.back());
+            ids.pop_back();
+            changed = true;
         }
     }
 
+    m_stats.shown = m_labels.size();
     if (changed)
     {
         pushToWidget();
     }
 }
 
+bool EntityIdLabelReconciler::rebuildAll(Eg::SceneManager* sm)
+{
+    std::vector<Render::EntityIdLabelItem> candidates;
+    size_t culledByViewport = 0;
+
+    auto consider = [&](Eg::AprEntity* e) {
+        if (!e || e->id <= 0)
+        {
+            return;
+        }
+        Render::EntityIdLabelItem item;
+        bool viewportCulled = false;
+        if (buildLabel(sm, e->id, item, &viewportCulled))
+        {
+            candidates.push_back(std::move(item));
+        }
+        else if (viewportCulled)
+        {
+            ++culledByViewport;
+        }
+    };
+
+    // 视口盒有效时用空间索引做范围查询（O(log n + k)），避免大场景全量遍历；
+    // 无效盒（首载/矩阵退化兜底）才退化为全场景遍历。
+    if (m_visibleBounds.isValid())
+    {
+        const Eg::VecAprEntityPtr inBox = sm->queryByBox(m_visibleBounds, /*containedOnly=*/false);
+        for (Eg::AprEntity* e : inBox)
+        {
+            consider(e);
+        }
+    }
+    else
+    {
+        sm->forEachEntity(consider);
+    }
+
+    std::sort(candidates.begin(), candidates.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.entityId < rhs.entityId;
+    });
+
+    m_stats = {};
+    m_stats.candidates = candidates.size();
+    m_stats.culledByViewport = culledByViewport;
+
+    const size_t maxLabels = effectiveMaxLabels();
+    const size_t shownCount = maxLabels == 0 ? candidates.size() : std::min(candidates.size(), maxLabels);
+    m_stats.shown = shownCount;
+    m_stats.culledByBudget = candidates.size() - shownCount;
+
+    std::unordered_map<Eg::EntityId, Render::EntityIdLabelItem> rebuilt;
+    rebuilt.reserve(shownCount);
+
+    // 保留已有标签优先（按 ID 升序截断），剩余名额再按 ID 升序补新标签。
+    // 候选已按 ID 排序，因此选择结果稳定，不依赖 unordered_map 遍历顺序 ——
+    // 平移时标签不会整片随机换人。
+    if (maxLabels != 0 && !m_labels.empty())
+    {
+        for (const auto& candidate : candidates)
+        {
+            if (rebuilt.size() >= shownCount)
+            {
+                break;
+            }
+            if (m_labels.count(candidate.entityId) != 0)
+            {
+                rebuilt.emplace(candidate.entityId, candidate);
+            }
+        }
+    }
+    for (const auto& candidate : candidates)
+    {
+        if (rebuilt.size() >= shownCount)
+        {
+            break;
+        }
+        rebuilt.emplace(candidate.entityId, candidate);
+    }
+
+    bool changed = rebuilt.size() != m_labels.size();
+    if (!changed)
+    {
+        for (const auto& entry : rebuilt)
+        {
+            const auto old = m_labels.find(entry.first);
+            if (old == m_labels.end() || old->second.anchorWorld.x() != entry.second.anchorWorld.x() ||
+                old->second.anchorWorld.y() != entry.second.anchorWorld.y() || old->second.text != entry.second.text)
+            {
+                changed = true;
+                break;
+            }
+        }
+    }
+    m_labels = std::move(rebuilt);
+    return changed;
+}
+
+size_t EntityIdLabelReconciler::effectiveMaxLabels() const
+{
+    return m_renderWidget != nullptr ? m_renderWidget->entityIdLabelMaxCount() : 0;
+}
+
 bool EntityIdLabelReconciler::buildLabel(Eg::SceneManager* sm,
     Eg::EntityId id,
-    Render::EntityIdLabelItem& outItem) const
+    Render::EntityIdLabelItem& outItem,
+    bool* outViewportCulled) const
 {
     Eg::AprEntity* e = sm->findEntityById(id);
-    if (!e || !e->visible() || e->id <= 0)
+    if (!e || !e->visible() || e->id <= 0 || !e->isValid())
     {
         return false;
     }
-    if (e->layer() && !e->layer()->isVisible())
+    if (e->layer() == nullptr || !e->layer()->isVisible())
     {
         return false;
     }
@@ -126,6 +228,15 @@ bool EntityIdLabelReconciler::buildLabel(Eg::SceneManager* sm,
     const Ut::BBox2d bbox = e->getBbox();
     if (!bbox.isValid())
     {
+        return false;
+    }
+    // 视口裁剪：与几何层共用同一查询盒，出盒图元不生成标签（只做诊断区分）
+    if (m_visibleBounds.isValid() && !bbox.intersects(m_visibleBounds))
+    {
+        if (outViewportCulled != nullptr)
+        {
+            *outViewportCulled = true;
+        }
         return false;
     }
 
@@ -136,6 +247,17 @@ bool EntityIdLabelReconciler::buildLabel(Eg::SceneManager* sm,
     outItem.anchorWorld = Ut::Vec2f(static_cast<float>(bbox.maxPt.x()), static_cast<float>(bbox.maxPt.y()));
     outItem.offsetPx = Ut::Vec2f(kEntityIdLabelMarginPx, -kEntityIdLabelMarginPx);
     return true;
+}
+
+void EntityIdLabelReconciler::reset()
+{
+    m_labels.clear();
+    m_visibleBounds = Ut::BBox2d{};
+    m_stats = {};
+    if (m_renderWidget != nullptr)
+    {
+        m_renderWidget->clearEntityIdLabels();
+    }
 }
 
 void EntityIdLabelReconciler::pushToWidget()

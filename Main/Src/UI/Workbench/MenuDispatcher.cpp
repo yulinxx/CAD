@@ -15,7 +15,6 @@
 #include "UI/Services/HelpDialogService.h"
 #include "UI/ThemeManager.h"
 #include "UI/LanguageManager.h"
-#include "Composition/ApplicationCompositionRoot.h"
 #include "UI/Safety/EmergencyStopController.h"
 #include "UI/Settings/SettingsService.h"
 
@@ -46,6 +45,16 @@ void MenuDispatcher::setWorkbenchWindow(WorkbenchWindow* window)
 void MenuDispatcher::setStateCenter(UiStateCenter* stateCenter)
 {
     Q_UNUSED(stateCenter);
+}
+
+void MenuDispatcher::setEmergencyStopController(EmergencyStopController* safety)
+{
+    m_safety = safety;
+}
+
+void MenuDispatcher::setSettingsService(SettingsService* settings)
+{
+    m_settingsService = settings;
 }
 
 bool MenuDispatcher::isWorkbenchSwitchCommand(const QString& commandId)
@@ -125,7 +134,10 @@ void MenuDispatcher::dispatch(const QString& commandId, const QVariantMap& param
             APR_WARNF("[MenuDispatcher] unknown language code '%s', ignore", qPrintable(code));
             return;
         }
-        if (auto* settings = ApplicationCompositionRoot::getSettingsService(); settings && settings->isInitialized())
+        // 设置服务由 WorkbenchMenuManager 经 setSettingsService 注入；未注入时回退到
+        // LanguageManager 内存切换（不落盘），保持与此前 getSettingsService 为空时一致的行为。
+        SettingsService* settings = m_settingsService;
+        if (settings && settings->isInitialized())
         {
             if (!settings->setLanguage(lang))
             {
@@ -157,9 +169,7 @@ void MenuDispatcher::dispatch(const QString& commandId, const QVariantMap& param
     // 避免操作员在未完成复位流程时继续编辑或启动新的加工。
     // 总开关关闭时整段失效（软件尚未交付急停硬件链路，v1.1 开启）；
     // 拦截日志保留在分支内，重新开启后可直接用于定位
-    auto* root = ApplicationCompositionRoot::instance();
-    auto* safety = root ? root->emergencyStopController() : nullptr;
-    if (EmergencyStopFeature::kEnabled && safety && safety->isReadOnly())
+    if (EmergencyStopFeature::kEnabled && m_safety && m_safety->isReadOnly())
     {
         const bool allowed = commandId == QLatin1String("laser.emergency_stop") ||
             commandId == QLatin1String("laser.reset_safety") || commandId.startsWith(QLatin1String("view.")) ||

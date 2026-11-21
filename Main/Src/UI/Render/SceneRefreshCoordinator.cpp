@@ -209,6 +209,8 @@ void SceneRefreshCoordinator::setSceneContext(Eg::ISceneContext* ctx)
 
     // 换场景后旧的覆盖范围不再成立：首次相机变化会强制做一次全量装配。
     m_builtVisibleBox = Ut::BBox2d{};
+    // 标签账本与图元 ID 不能跨场景复用；同时清除旧的视口裁剪盒。
+    m_entityIdLabelReconciler.reset();
 }
 
 std::unordered_set<uint64_t> SceneRefreshCoordinator::takePendingDirtyIds()
@@ -645,9 +647,15 @@ void SceneRefreshCoordinator::requestViewportExtension()
     if (!newBox.isValid())
     {
         // 矩阵退化拿不到可视盒：无法做范围差分，退回全量重建兜底
+        m_entityIdLabelReconciler.clearVisibleWorldBounds();
         requestFullRefresh();
         return;
     }
+
+    // 标签与几何扩展路径同步更新查询盒。标签只依赖场景空间索引和文字账本，
+    // 不等待几何扩展队列消费即可先在下一帧显示/摘除。
+    m_entityIdLabelReconciler.setVisibleWorldBounds(newBox);
+    m_entityIdLabelReconciler.reconcile(m_sceneManager, /*fullReconcile=*/true, {}, {});
 
     // 目标可见集：与全量账本收集共用同一判据（collectDesiredGeometryIds → isDesiredOnGeometryLayer）
     const bool hideSelected = hideSelectedEffective();
@@ -1475,7 +1483,16 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
     // 世界文字层全量协调：同上
     m_textReconciler.reconcile(sm, /*fullReconcile=*/true, m_cachedSelectedIds, false, {});
 
-    // 图元 ID 标注全量协调：以场景为真源整体重建
+    // 图元 ID 标注全量协调：以场景为真源整体重建。
+    // 标签查询盒与几何层共用同一个 1.25 倍余量盒：可见集与 GPU 上实际存在的图元同口径。
+    if (hasAccountBox)
+    {
+        m_entityIdLabelReconciler.setVisibleWorldBounds(accountBox);
+    }
+    else
+    {
+        m_entityIdLabelReconciler.clearVisibleWorldBounds();
+    }
     m_entityIdLabelReconciler.reconcile(sm, /*fullReconcile=*/true, {}, {});
 }
 

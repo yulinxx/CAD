@@ -161,7 +161,7 @@ void OperationRegistrar::registerAll()
         m_root.layerEditService(),
         m_root.unitManager(),
         m_root.shellHost() ? m_root.shellHost()->mainWindow() : nullptr,
-        m_root.uiServices().captureService);
+        m_root.uiServices().view.captureService);
 
     coreOps.registerAll();
 
@@ -172,7 +172,7 @@ void OperationRegistrar::registerAll()
     fileConfig.layerManager = m_root.layerManager();
     fileConfig.importService = m_root.importService();
     fileConfig.exportService = m_root.exportService();
-    fileConfig.recentFiles = m_root.uiServices().recentFileService;
+    fileConfig.recentFiles = m_root.uiServices().persistence.recentFileService;
     fileConfig.helpDialog = m_root.helpDialogService();
     fileConfig.stateCenter = m_root.stateCenter();
     fileConfig.layerPersistence = m_root.layerPersistenceBridge();

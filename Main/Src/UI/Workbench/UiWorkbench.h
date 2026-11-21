@@ -29,32 +29,8 @@ class SceneMonitor;
 struct UiStateSnapshot;
 struct CommandUiSnapshot;
 
-// 3D 类型前向声明（避免头文件膨胀，实际 include 下沉到 .cpp）
-#if BUILD_UI3D
-    #include <QShortcut>
-    #include "UI3D/Service/ServicePack3D.h"  // 值成员需要完整定义
-    #include "UI/MainWindow/MainWindow3D.h"  // unique_ptr 成员，MOC 需要完整类型
-
-namespace Eg
-{
-    class SceneManager3D;
-}
-class OperationBus3D;
-class DocumentManager3D;
-class UndoRedoManager3D;
-class SceneEditService3D;
-class SceneMonitor3D;
-class SceneDocument3D;
-class CameraController3D;
-class SettingsUiCoordinator3D;
-class CommandActionHub3D;
-class AlgorithmRunner3D;
-class AlgorithmApplicationService;
-class StatusBar3D;
-    #ifdef ENABLE_GEOMODELCORE
-class BRepModelService3D;
-    #endif
-#endif
+// 3D 类型的前向声明与完整 include 已下沉到 Workbench3D.h；
+// 基类 UiWorkbench 不依赖任何 BUILD_UI3D 类型，保持接口头不随构建开关变化。
 
 /**
  * @file UiWorkbench.h
@@ -196,10 +172,11 @@ protected:
     virtual void restoreFromSnapshot(const UiStateSnapshot& snapshot);
 
 protected:
-    /// UI 服务分组（由 initialize 从 UiServices 拆出后缓存）
+    /// UI 服务分组（由 initialize 从 WorkbenchServices 缓存）。
+    /// 注意：SceneServices（LayerManager/SceneEditService 等 2D 专属概念）
+    /// 已下移到 Workbench2D 私有成员，3D 工作台不再背负它用不到的 2D 服务。
     UiStateServices m_uiState;
     CommandServices m_commands;
-    SceneServices m_scene;
     PersistenceServices m_persistence;
     ViewServices m_view;
     UiStateSnapshot m_initialState;                 ///< 初始化时缓存的状态

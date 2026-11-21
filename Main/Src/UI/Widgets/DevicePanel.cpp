@@ -8,12 +8,12 @@
 #include <QShowEvent>
 #include <QVBoxLayout>
 
-#include "Composition/ApplicationCompositionRoot.h"
 #include "Hardware/DeviceHost.h"
 #include "Hardware/ProcessingJobService.h"
 #include "UI/Command/OperationId.h"
 #include "UI/LanguageManager.h"
 #include "UI/Safety/EmergencyStopController.h"
+#include "UI/Workbench/WorkbenchWindow.h"
 #include "UI2D/Operation/OperationBus.h"
 #include "Log/AprLogger.h"
 
@@ -87,18 +87,17 @@ void DevicePanel::bindServicesIfNeeded()
     {
         return;
     }
-    auto* root = ApplicationCompositionRoot::instance();
-    if (!root || !root->deviceHost())
+    // 依赖由宿主窗口在组合根装配完成后注入（WorkbenchWindow::bindDeviceServices /
+    // bindSafetyServices），取自所属窗口；不再回查 ApplicationCompositionRoot 单例。
+    // 若窗口尚未就绪，保持 m_bound = false，showEvent 会重试。
+    if (auto* win = qobject_cast<WorkbenchWindow*>(window()))
     {
-        // 工作台窗口在组合根成员初始化阶段就被构造出来了，此时 deviceHost 还没创建；
-        // 等窗口真正显示（组合根已装配完成）再绑定一次。
-        return;
+        m_host = win->deviceHost();
+        m_jobService = win->processingJobService();
+        m_bus = win->operationBus();
+        m_safety = win->emergencyStopController();
+        m_bound = true;
     }
-    m_host = root->deviceHost();
-    m_jobService = root->processingJobService();
-    m_bus = root->operationBus();
-    m_safety = root->emergencyStopController();
-    m_bound = true;
 }
 
 void DevicePanel::buildUi()

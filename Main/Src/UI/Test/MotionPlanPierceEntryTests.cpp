@@ -30,6 +30,9 @@
 #include "FileIO/AprSerializer.h"
 #include "Internal/AprDocumentData.h"
 
+// NativeDocumentSnapshot 完整定义在此（ImportExportServiceSetup.h 仅前向声明，
+// 不足以支撑返回值/局部值的使用）。
+#include "Export/ExportContext.h"
 #include "Composition/ImportExportServiceSetup.h"
 #include "Composition/OperationRegistrar.h"
 #include "Export/ExportContext.h"

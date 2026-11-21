@@ -30,7 +30,6 @@
 #include <vector>
 #include <functional>
 
-#include "Composition/ApplicationCompositionRoot.h"
 #include "UI/Algorithm/AlgorithmApplicationService.h"
 #include "SceneDocument2D.h"
 #include "UiServices.h"
@@ -95,6 +94,7 @@
 #include "Engine2D/Interaction/LayerManager.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Core/SceneManager.h"
+#include "Engine2D/Core/EntityClipboard.h"
 #include "Engine/Edit/IUndoRedoManager.h"
 
 #include "Engine/EntityIdUtils.h"
@@ -262,11 +262,13 @@ bool Workbench2D::initialize(const WorkbenchServices& services)
     m_uiState = services.uiState;
     m_commands = services.commands;
     m_scene = services.scene;
+    m_algorithm = services.algorithm;
     m_persistence = services.persistence;
     m_view = services.view;
 
-    // 使用应用共享 SettingsService singleton，2D/3D 逻辑一致
-    m_settingsCoordinator = std::make_unique<SettingsUiCoordinator2D>(ApplicationCompositionRoot::getSettingsService());
+    // 设置服务由组合根经 WorkbenchServices 显式注入（2D/3D 共用同一实例），
+    // 不再经 ApplicationCompositionRoot::getSettingsService() 静态回查组合根单例
+    m_settingsCoordinator = std::make_unique<SettingsUiCoordinator2D>(services.settings.settingsService);
 
     // 注册 2D 专属设置项，确保设置页已存在
     if (m_settingsCoordinator)
@@ -298,18 +300,20 @@ void Workbench2D::attachToWindow(WorkbenchWindow& window)
         setupViewportServices(vp, window);
         vp->initializeTools();
         // 注入交互控制回调：算法运行时禁用工具交互，防止误操作
-        if (auto* appRoot = ApplicationCompositionRoot::instance())
+        // （算法服务经 WorkbenchServices 显式注入，不再回查组合根单例）
+        if (auto* algoService = m_algorithm.algorithmApplicationService)
         {
-            if (auto* algoService = appRoot->algorithmService())
-            {
-                algoService->setInteractionControlCallback([vp](bool enabled) {
-                    if (auto* tm = vp->toolManager())
-                    {
-                        tm->setInteractionEnabled(enabled);
-                    }
-                });
-                APR_INFO("[Workbench2D] interaction control callback registered");
-            }
+            algoService->setInteractionControlCallback([vp](bool enabled) {
+                if (auto* tm = vp->toolManager())
+                {
+                    tm->setInteractionEnabled(enabled);
+                }
+            });
+            APR_INFO("[Workbench2D] interaction control callback registered");
+        }
+        else
+        {
+            APR_WARN("[Workbench2D] interaction control callback not registered: algorithm service missing");
         }
         // LOD 参数调用链收敛：设置面板经 ViewRenderCoordinator 读写曲线精度
         // （initializeTools 之后 coordinator 才创建）
@@ -2415,6 +2419,7 @@ void Workbench2D::shutdown()
     m_uiState = {};
     m_commands = {};
     m_scene = {};
+    m_algorithm = {};
     m_persistence = {};
     m_view = {};
 }

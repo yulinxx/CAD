@@ -96,6 +96,16 @@ bool AppBootstrapper::initialize()
         return false;
     }
 
+    // 显式装配：构造函数只做成员初始化，服务接管/接线/注册集中在 build()。
+    // 装配失败时组合根不对外暴露（instance() 为空），此处中止启动。
+    if (!m_compositionRoot->build())
+    {
+        APR_ERROR("[AppBootstrapper] error code=bootstrap.root_build_failed message=ApplicationCompositionRoot "
+                 "build failed");
+        m_compositionRoot.reset();
+        return false;
+    }
+
     if (!m_compositionRoot->stateCenter())
     {
         APR_ERROR("[AppBootstrapper] error code=bootstrap.root_missing_service message=ApplicationCompositionRoot "
@@ -122,13 +132,13 @@ bool AppBootstrapper::initialize()
     // 而不是等界面加载完才开始判断。
     // 也刻意不因失败而返回 false —— 没有机器同样要能画图、改工艺参数。
     {
-        QString hardwareWarning;
         const QString configDir = QString::fromStdWString(m_paths.configDir.wstring());
-        if (m_compositionRoot->startHardware(configDir, hardwareWarning))
+        const auto hw = m_compositionRoot->startHardware(configDir);
+        if (hw.started)
         {
-            if (!hardwareWarning.isEmpty())
+            if (!hw.message.isEmpty())
             {
-                // 这里不把 hardwareWarning 原文打进日志：那是给界面看的中文文案，
+                // 这里不把 hw.message 原文打进日志：那是给界面看的中文文案，
                 // 落到控制台/现场日志文件里就是 mojibake。具体原因由 Hardware 侧
                 // 用英文各自记过一遍，这里只标记「带告警启动」。
                 APR_WARN("[AppBootstrapper] hardware started with a warning "
@@ -146,7 +156,7 @@ bool AppBootstrapper::initialize()
             if (DeviceHost::isHardwareSupportCompiled())
             {
                 APR_ERRORF("[AppBootstrapper] error code=bootstrap.hardware_start_failed message=%s",
-                    hardwareWarning.toUtf8().constData());
+                    hw.message.toUtf8().constData());
             }
             else
             {

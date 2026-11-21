@@ -158,13 +158,21 @@ int CADApplicationRuntime::run()
     }
 
     // 退出时自动保存 common 设置（字体/主题/语言）到 SQLite 数据库
-    // 以及当前工作台的 2D/3D 域设置（兜底防崩溃丢失）
-    QObject::connect(m_app.get(), &QCoreApplication::aboutToQuit, []() {
-        if (auto* svc = ApplicationCompositionRoot::getSettingsService())
+    // 以及当前工作台的 2D/3D 域设置（兜底防崩溃丢失）。
+    // 经 m_bootstrapper 持有的组合根取服务，不再走 getSettingsService() /
+    // saveCurrentWorkbenchSettings() 两个静态入口；aboutToQuit 触发时 runtime 与
+    // bootstrapper 均存活（exec 尚未返回），捕获 this 安全。
+    QObject::connect(m_app.get(), &QCoreApplication::aboutToQuit, [this]() {
+        auto* root = m_bootstrapper ? m_bootstrapper->compositionRoot() : nullptr;
+        if (!root)
+        {
+            return;
+        }
+        if (auto* svc = root->settingsService())
         {
             svc->saveCurrentCommonSettings();
         }
-        ApplicationCompositionRoot::saveCurrentWorkbenchSettings();
+        root->saveCurrentWorkbenchSettings();
     });
 
     // 启动冒烟开关：仅在显式传入 --smoke-exit-ms=N 时生效，走标准退出路径（aboutToQuit 仍会保存设置）

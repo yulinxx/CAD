@@ -15,6 +15,8 @@ class UiWorkbench;
 class WorkbenchWindow;
 class IRecentFileService;
 class UnitManager;
+class EmergencyStopController;
+class SettingsService;
 struct MenuDef;
 class IUiCommandDispatcher;
 class UiConfigurationManager;
@@ -48,6 +50,10 @@ public:
     void setWorkbench(UiWorkbench* workbench);
     /// 注入单位管理器（显示单位勾选态来源，与状态栏共用同一实例）
     void setUnitManager(UnitManager* unitManager);
+    /// 注入急停状态机，供菜单分发器做只读态命令拦截（由 WorkbenchWindow 在急停就绪后同步）
+    void setEmergencyStopController(EmergencyStopController* safety);
+    /// 注入设置服务，供菜单分发器做语言切换落盘（由 WorkbenchWindow 在 configureServices 时同步）
+    void setSettingsService(SettingsService* settings);
 
 
     void buildMenus();
@@ -164,6 +170,10 @@ private:
     std::unique_ptr<IShortcutSettingsModel> m_shortcutSettingsModel;
     // 配置菜单命令分发器：生命周期随本对象，菜单项触发回调期间必须长期有效
     std::unique_ptr<MenuDispatcher> m_dispatcher;
+    // 急停状态机（由 WorkbenchWindow 在急停就绪后同步；只读态拦截在 MenuDispatcher 中使用）
+    EmergencyStopController* m_emergencyStopController{ nullptr };
+    // 设置服务（由 WorkbenchWindow 在 configureServices 时同步；语言切换落盘在 MenuDispatcher 中使用）
+    SettingsService* m_settingsService{ nullptr };
     // 防止每次 rebuildAllMenus 重复连接状态中心信号
     bool m_configStateBound{ false };
 };

@@ -25,7 +25,6 @@
 #include "UiStateCenter.h"
 #include "UiWorkbench.h"
 #include "UiFrameworkServices.h"
-#include "Composition/ApplicationCompositionRoot.h"
 #include "UI/Settings/SettingsService.h"
 #include "UI/Services/IRecentFileService.h"
 #include "UI/ClientConfig/IMenuBuilder.h"
@@ -217,10 +216,32 @@ IUiCommandDispatcher* WorkbenchMenuManager::commandDispatcher()
         m_dispatcher->setWorkbenchWindow(m_window);
         m_dispatcher->setStateCenter(m_stateCenter);
     }
-    // 每次取用都同步工作台：菜单/工具栏的构建时机早于 setWorkbench 的场景是常态，
-    // 而 isCommandRegistered() 要靠当前工作台的命令目录才能给出正确答案。
+    // 每次取用都同步工作台、急停状态机与设置服务：菜单/工具栏的构建时机早于
+    // setWorkbench / setEmergencyStopController / setSettingsService 的场景是常态，
+    // 而 isCommandRegistered() 要靠当前工作台的命令目录、dispatch() 的只读闸门要靠
+    // 急停状态机、语言切换落盘要靠设置服务才能给出正确答案。
     m_dispatcher->setWorkbench(m_workbench);
+    m_dispatcher->setEmergencyStopController(m_emergencyStopController);
+    m_dispatcher->setSettingsService(m_settingsService);
     return m_dispatcher.get();
+}
+
+void WorkbenchMenuManager::setEmergencyStopController(EmergencyStopController* safety)
+{
+    m_emergencyStopController = safety;
+    if (m_dispatcher)
+    {
+        m_dispatcher->setEmergencyStopController(safety);
+    }
+}
+
+void WorkbenchMenuManager::setSettingsService(SettingsService* settings)
+{
+    m_settingsService = settings;
+    if (m_dispatcher)
+    {
+        m_dispatcher->setSettingsService(settings);
+    }
 }
 
 IShortcutSettingsModel* WorkbenchMenuManager::shortcutSettingsModel() const

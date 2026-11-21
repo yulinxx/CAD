@@ -33,6 +33,9 @@ class PropertiesPanelWidget;
 class FileDropHandler;
 class EmergencyStopOverlay;
 class EmergencyStopController;
+class DeviceHost;
+class ProcessingJobService;
+class SettingsService;
 class QDragEnterEvent;
 class QDragMoveEvent;
 class QDragLeaveEvent;
@@ -96,11 +99,43 @@ public:
     /// @param safety 急停状态机（必须非空）
     /// @param bus 操作总线（必须非空）
     void bindSafetyServices(EmergencyStopController* safety, OperationBus* bus);
+
+    /// 绑定设备服务（设备宿主与加工作业服务），供设备面板取用。
+    /// 由组合根在 build() 中显式调用一次；不通过 ApplicationCompositionRoot 单例回查。
+    /// @param host 设备宿主
+    /// @param jobService 加工作业服务
+    void bindDeviceServices(DeviceHost* host, ProcessingJobService* jobService);
+
+    /// 获取设备宿主（可能为空，取决于组合根何时注入）
+    DeviceHost* deviceHost() const
+    {
+        return m_deviceHost;
+    }
+
+    /// 获取加工作业服务（可能为空）
+    ProcessingJobService* processingJobService() const
+    {
+        return m_jobService;
+    }
+
+    /// 获取操作总线（由 configureServices 注入）
+    OperationBus* operationBus() const
+    {
+        return m_operationBus;
+    }
+
+    /// 获取急停状态机（可能为空，取决于 BUILD_HARDWARE 与组合根装配时机）
+    EmergencyStopController* emergencyStopController() const
+    {
+        return m_emergencyStopController;
+    }
+
     /// 常驻急停入口是否已创建（供装配与测试断言）
     bool hasEmergencyStopOverlay() const
     {
         return m_emergencyStopOverlay != nullptr;
     }
+
     /// 设置框架级服务桥接
     /// @param services 框架级服务集合
     void setFrameworkServices(const UiFrameworkServices& services);
@@ -263,6 +298,14 @@ private:
     std::unique_ptr<WorkbenchStateManager> m_stateManager;
     /// 常驻急停入口（独立置顶窗口，不参与停靠布局）
     std::unique_ptr<EmergencyStopOverlay> m_emergencyStopOverlay;
+    /// 急停状态机（由组合根注入，生命周期由组合根持有）
+    EmergencyStopController* m_emergencyStopController{ nullptr };
+    /// 设备宿主（由组合根注入）
+    DeviceHost* m_deviceHost{ nullptr };
+    /// 加工作业服务（由组合根注入）
+    ProcessingJobService* m_jobService{ nullptr };
+    /// 设置服务（由组合根经 UiServices 注入，供主题/语言等运行期同步使用）
+    SettingsService* m_settingsService{ nullptr };
     /// 是否正在切换工作台（防止重复触发）
     bool m_switchingWorkbench{ false };
 

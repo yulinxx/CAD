@@ -326,6 +326,7 @@ namespace CamBridge
         input.skipLockedLayers = spec.skipLockedLayers;
         input.emitTrailingLaserOff = spec.emitTrailingLaserOff;
         input.failOnUnmachinable = spec.failOnUnmachinableEntity;
+        input.optimizeTravel = spec.defaultParams.contourOrdering == 1;
 
         // 坐标系：输入全程用户坐标，桥接层不做任何机器坐标变换；
         // "用户坐标 → 机器坐标"由 Main 侧发射器在 M2 一步完成
@@ -538,6 +539,34 @@ namespace CamBridge
             bucket.leadInOut.leadInMode = Eg::CamModeFromLeadInMode(
                 Eg::LeadInModeFromLegacyProcessMode(egParams.leadInMode));
             bucket.leadInOut.leadInAngleDeg = egParams.leadInAngleDeg;
+            bucket.leadInOut.leadOutLengthMm = 0.0;
+            bucket.leadInOut.leadOutMode = bucket.leadInOut.leadInMode;
+            bucket.leadInOut.leadOutAngleDeg = bucket.leadInOut.leadInAngleDeg;
+
+            // 基础 ProcessParams 中的填充设置直接进入 FillRegion；CAM 只消费毫米坐标，
+            // 不重新读取 Engine2D 或图片数据。
+            for (auto& snapshot : bucket.entities)
+            {
+                if (snapshot.kind == Cam::EntitySnapshot::GeometryKind::Fillable)
+                {
+                    snapshot.fillRegion.scanAngleDeg = egParams.fillAngleDeg;
+                    snapshot.fillRegion.lineSpacing = egParams.fillIntervalMm;
+                }
+            }
+
+            // 穿孔属于作业规格的独立细节，按图层覆盖回退到默认值。
+            const Eg::PierceSpec& pierce = [&]() -> const Eg::PierceSpec& {
+                auto it = spec.layerPierce.constFind(bucket.layerId);
+                return it != spec.layerPierce.constEnd() ? it.value() : spec.defaultPierce;
+            }();
+            bucket.pierce.enabled = pierce.enabled;
+            bucket.pierce.pierceDelayUs = pierce.pierceDelayUs;
+            bucket.pierce.piercePowerPercent = pierce.piercePowerPercent;
+            bucket.pierce.pierceSpeedMmPerSec = pierce.pierceSpeedMmPerSec;
+            bucket.pierce.pierceCount = std::max<int32_t>(1, pierce.pierceCount);
+            bucket.pierce.dwellUs = pierce.dwellUs;
+            bucket.pierce.pierceOffsetMm = pierce.pierceOffsetMm;
+            bucket.pierce.prePierced = pierce.prePierced;
 
             // 3) 定型为 CAM 轮廓
             for (auto& snapshot : bucket.entities)

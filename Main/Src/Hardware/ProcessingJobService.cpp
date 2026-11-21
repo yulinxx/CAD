@@ -26,6 +26,13 @@
     #include "Hardware/Device/MotionPlan.h"
 
     #include "MotionPlanCompiler.h"
+    #include "Engine2D/Machine/MachineFrame.h"
+
+    #if defined(BUILD_CAM)
+        #include "CAM/CamCore.h"
+        #include "CAM/CamInputBridge.h"
+        #include "CAM/CamPlanEmitter.h"
+    #endif
 
 namespace ProcessingJobDetail
 {
@@ -126,6 +133,51 @@ namespace ProcessingJobDetail
     {
         return state == Hw::PlanState::Completed || state == Hw::PlanState::Aborted
             || state == Hw::PlanState::Error;
+    }
+
+    /**
+     * @brief 设备软限位预检。
+     *
+     * 计划在 CamPlanEmitter 里已换算到机器坐标（header.bounds*），在此处
+     * 与机台行程（MachineFrameConfig.tableW/tableH）比对。越界的计划
+     * 拒绝下发，避免把一份保证撞限位的指令流送进设备再由卡本身报错——
+     * 后者发生时计划已部分下发，现场排查难度远高于「开始加工即拒绝」。
+     *
+     * frameCfg.enabled=false 时不做几何阻断（恒等变换下无法确认
+     * 坐标语义与行程的对应关系），交给设备适配器自行保护。
+     */
+    bool preflightPlanBounds(const Hw::MotionPlanView& view,
+                             const Eg::MachineFrameConfig& frameCfg,
+                             QString& errorOut)
+    {
+        if (!frameCfg.enabled)
+        {
+            return true;
+        }
+        constexpr double kEpsMm = 1e-6;
+        const double w = static_cast<double>(frameCfg.tableW);
+        const double h = static_cast<double>(frameCfg.tableH);
+        if (!(w > 0.0) || !(h > 0.0))
+        {
+            return true;
+        }
+        const auto& b = view.header;
+        if (b.boundsMinX < -kEpsMm || b.boundsMinY < -kEpsMm ||
+            b.boundsMaxX > w + kEpsMm || b.boundsMaxY > h + kEpsMm)
+        {
+            errorOut = ProcessingJobService::tr(
+                "Processing plan exceeds machine travel limits "
+                "(min=(%1,%2) mm, max=(%3,%4) mm, table=(%5,%6) mm)")
+                .arg(b.boundsMinX, 0, 'f', 3)
+                .arg(b.boundsMinY, 0, 'f', 3)
+                .arg(b.boundsMaxX, 0, 'f', 3)
+                .arg(b.boundsMaxY, 0, 'f', 3)
+                .arg(w, 0, 'f', 3)
+                .arg(h, 0, 'f', 3);
+            APR_ERRORF("[ProcessingJob] Preflight rejected: %s", errorOut.toUtf8().constData());
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -445,6 +497,39 @@ bool ProcessingJobService::startJob(
         return false;
     }
 
+#if defined(BUILD_CAM)
+    Cam::ToolpathJobInput input = CamBridge::buildJobInput(scene, layers, spec);
+    Cam::CamPlan camPlan;
+    Cam::CamResult camResult = Cam::compile(input, camPlan);
+    if (!camResult.ok)
+    {
+        errorOut = QString::fromUtf8(camResult.errorText);
+        APR_ERRORF("[ProcessingJob] CAM compile failed: %s", errorOut.toUtf8().constData());
+        return false;
+    }
+
+    m_impl->builder.clear();
+    Eg::MachineFrame machineFrame(spec.machineFrame);
+    const size_t emitted = CamPlanEmitter::emitCamPlan(camPlan, machineFrame, m_impl->builder);
+    if (emitted == 0 || !m_impl->builder.view().valid())
+    {
+        errorOut = tr("CAM produced no executable motion commands");
+        APR_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
+        return false;
+    }
+
+    m_impl->lastResult.ok = true;
+    m_impl->lastResult.error.clear();
+    m_impl->lastResult.layerCount = camResult.layerCount;
+    m_impl->lastResult.entityCount = camResult.entityCount;
+    m_impl->lastResult.skippedEntityCount = camResult.skippedEntityCount;
+    m_impl->lastResult.unmachinableEntityCount = camResult.unmachinableEntityCount;
+    m_impl->lastResult.commandCount = m_impl->builder.view().commandCount;
+    m_impl->lastResult.boundsMinX = camPlan.boundsMinX;
+    m_impl->lastResult.boundsMinY = camPlan.boundsMinY;
+    m_impl->lastResult.boundsMaxX = camPlan.boundsMaxX;
+    m_impl->lastResult.boundsMaxY = camPlan.boundsMaxY;
+#else
     m_impl->lastResult = MotionPlanCompiler::compile(scene, layers, spec, m_impl->builder);
     if (!m_impl->lastResult.ok)
     {
@@ -452,6 +537,7 @@ bool ProcessingJobService::startJob(
         APR_ERRORF("[ProcessingJob] Compile failed: %s", errorOut.toUtf8().constData());
         return false;
     }
+#endif
 
     return startPlan(m_impl->builder.view(), spec.jobId, errorOut);
 }
@@ -468,6 +554,13 @@ bool ProcessingJobService::startPlan(const Hw::MotionPlanView& view, const QStri
     {
         errorOut = tr("Processing plan is empty, no executable commands");  // 加工计划为空，没有任何可执行指令
         APR_ERRORF("[ProcessingJob] %s", errorOut.toUtf8().constData());
+        return false;
+    }
+
+    // === 软限位预检 ===
+    // 必须在激光参数路由与出光使能之前：越界计划根本不该走到「准备出光」这一步
+    if (!preflightPlanBounds(view, m_impl->host->machineFrameConfig(), errorOut))
+    {
         return false;
     }
 

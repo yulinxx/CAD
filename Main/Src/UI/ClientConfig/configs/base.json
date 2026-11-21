@@ -92,24 +92,7 @@
           { "type": "action", "id": "edit.align_center_v", "label": "Center Vertically", "command": "edit.align_center_v", "icon": ":/ui/common/Icons/Actions/align_center_v.svg", "workbenches": ["2D"] }
         ] },
         { "type": "action", "id": "edit.group", "label": "Group", "command": "edit.group", "icon": ":/ui/common/Icons/Actions/group.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "edit.ungroup", "label": "Ungroup", "command": "edit.ungroup", "icon": ":/ui/common/Icons/Actions/ungroup.svg", "workbenches": ["2D"] },
-        { "type": "separator" },
-        { "type": "submenu", "id": "edit.path_operations", "label": "Path Operations", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"], "items": [
-        { "type": "action", "id": "edit.offset", "label": "Offset...", "tooltip": "Create a parallel curve at a set distance from the selected path", "command": "edit.offset", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"] },
-        { "type": "separator" },
-        { "type": "action", "id": "edit.trim", "label": "Trim", "tooltip": "Trim entities back to the nearest cutting edge", "command": "edit.trim", "icon": ":/ui/common/Icons/Actions/trim.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "edit.extend", "label": "Extend", "tooltip": "Extend entities to the next boundary edge", "command": "edit.extend", "icon": ":/ui/common/Icons/Actions/extend.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "edit.fillet", "label": "Fillet...", "tooltip": "Round the corner between two lines or arcs with a radius", "command": "edit.fillet", "icon": ":/ui/common/Icons/Actions/fillet.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "edit.chamfer", "label": "Chamfer...", "tooltip": "Bevel the corner between two lines at a set distance", "command": "edit.chamfer", "icon": ":/ui/common/Icons/Actions/chamfer.svg", "workbenches": ["2D"] },
-        { "type": "separator" },
-        { "type": "action", "id": "edit.boolean_union", "label": "Union", "tooltip": "Merge overlapping paths into one outline", "command": "edit.boolean_union", "icon": ":/ui/common/Icons/Actions/boolean_union.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "edit.boolean_intersection", "label": "Intersection", "tooltip": "Keep only the region where selected paths overlap", "command": "edit.boolean_intersection", "icon": ":/ui/common/Icons/Actions/boolean_intersection.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "edit.boolean_difference", "label": "Difference", "tooltip": "Subtract the top path from the bottom path", "command": "edit.boolean_difference", "icon": ":/ui/common/Icons/Actions/boolean_difference.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "edit.boolean_xor", "label": "Xor", "tooltip": "Keep non-overlapping regions of the selected paths", "command": "edit.boolean_xor", "icon": ":/ui/common/Icons/Actions/boolean_xor.svg", "workbenches": ["2D"] },
-        { "type": "separator" },
-        { "type": "action", "id": "algo.bitmap_process", "label": "Process Bitmap...", "tooltip": "Apply threshold / dither / halftone to the selected image for laser engraving", "command": "algo.bitmap_process", "icon": ":/ui/common/Icons/View3D/bitmap.svg", "workbenches": ["2D"] },
-        { "type": "action", "id": "algo.vectorize_bitmap", "label": "Vectorize Bitmap...", "tooltip": "Trace contours from the selected image into editable polyline entities", "command": "algo.vectorize_bitmap", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"] }
-        ] }
+        { "type": "action", "id": "edit.ungroup", "label": "Ungroup", "command": "edit.ungroup", "icon": ":/ui/common/Icons/Actions/ungroup.svg", "workbenches": ["2D"] }
       ]
     },
     {
@@ -206,6 +189,28 @@
           { "type": "action", "id": "model.split_half_z", "label": "Half by Z", "command": "model.split_half_z", "icon": ":/ui/common/Icons/Actions/cut.svg", "workbenches": ["3D"] },
           { "type": "action", "id": "model.split_by_pick_plane", "label": "By Picked Plane", "command": "model.split_by_pick_plane", "icon": ":/ui/common/Icons/Actions/cut.svg", "workbenches": ["3D"] }
         ] }
+      ]
+    },
+    {
+      "id": "modify",
+      "label": "Modify",
+      "visible": true,
+      "workbenches": ["2D"],
+      "items": [
+        { "type": "action", "id": "edit.offset", "label": "Offset...", "tooltip": "Create a parallel curve at a set distance from the selected path", "command": "edit.offset", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"] },
+        { "type": "separator" },
+        { "type": "action", "id": "edit.trim", "label": "Trim", "tooltip": "Trim entities back to the nearest cutting edge", "command": "edit.trim", "icon": ":/ui/common/Icons/Actions/trim.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "edit.extend", "label": "Extend", "tooltip": "Extend entities to the next boundary edge", "command": "edit.extend", "icon": ":/ui/common/Icons/Actions/extend.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "edit.fillet", "label": "Fillet...", "tooltip": "Round the corner between two lines or arcs with a radius", "command": "edit.fillet", "icon": ":/ui/common/Icons/Actions/fillet.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "edit.chamfer", "label": "Chamfer...", "tooltip": "Bevel the corner between two lines at a set distance", "command": "edit.chamfer", "icon": ":/ui/common/Icons/Actions/chamfer.svg", "workbenches": ["2D"] },
+        { "type": "separator" },
+        { "type": "action", "id": "edit.boolean_union", "label": "Union", "tooltip": "Merge overlapping paths into one outline", "command": "edit.boolean_union", "icon": ":/ui/common/Icons/Actions/boolean_union.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "edit.boolean_intersection", "label": "Intersection", "tooltip": "Keep only the region where selected paths overlap", "command": "edit.boolean_intersection", "icon": ":/ui/common/Icons/Actions/boolean_intersection.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "edit.boolean_difference", "label": "Difference", "tooltip": "Subtract the top path from the bottom path", "command": "edit.boolean_difference", "icon": ":/ui/common/Icons/Actions/boolean_difference.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "edit.boolean_xor", "label": "Xor", "tooltip": "Keep non-overlapping regions of the selected paths", "command": "edit.boolean_xor", "icon": ":/ui/common/Icons/Actions/boolean_xor.svg", "workbenches": ["2D"] },
+        { "type": "separator" },
+        { "type": "action", "id": "algo.bitmap_process", "label": "Process Bitmap...", "tooltip": "Apply threshold / dither / halftone to the selected image for laser engraving", "command": "algo.bitmap_process", "icon": ":/ui/common/Icons/View3D/bitmap.svg", "workbenches": ["2D"] },
+        { "type": "action", "id": "algo.vectorize_bitmap", "label": "Vectorize Bitmap...", "tooltip": "Trace contours from the selected image into editable polyline entities", "command": "algo.vectorize_bitmap", "icon": ":/ui/common/Icons/Actions/offset.svg", "workbenches": ["2D"] }
       ]
     },
     {

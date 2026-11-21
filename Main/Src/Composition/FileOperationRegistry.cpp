@@ -341,6 +341,28 @@ void FileOperationRegistry::doImportFilePath(const QString& filePath)
         return;
     }
 
+    // 与拖拽同一条路由：位图没有读取器，必须走图片导入，否则菜单选中即失败
+    const QString ext = QFileInfo(filePath).suffix().toLower();
+    if (ImportService::isImageExtension(ext))
+    {
+        doImportImage(filePath);
+        return;
+    }
+
+    // 菜单入口此前不带工作台，2D 下能选到 3D 格式：这里用与拖拽相同的判据校验维度
+    const QString workbenchId = m_stateCenter ? m_stateCenter->currentWorkbenchId() : QString();
+    const bool knownWorkbench = (workbenchId == QStringLiteral("2D") || workbenchId == QStringLiteral("3D"));
+    if (knownWorkbench)
+    {
+        QString reason;
+        if (!m_importService->canImport(filePath, workbenchId, &reason))
+        {
+            APR_WARNF("[FileOperation] Import rejected: %s", reason.toUtf8().constData());
+            showFileError(QObject::tr("Import Error"), reason);
+            return;
+        }
+    }
+
     // 追加语义：导入不替换当前文档（与 doOpenFile 的替换语义相对）
     ImportOptions opts;
     opts.importAsNewDocument = false;
@@ -629,9 +651,10 @@ void FileOperationRegistry::registerImportOps()
     // 原实现走 doOpenFile 会清空当前文档且不弹未保存提示，与注释和菜单语义都不符；
     // 要替换当前文档请用 File ▸ Open（仅 .apr）
     Ops::declare(reg, OperationId::File_ImportAll, [this] {
-        // 空工作台 ID = 全部读取器能力 + 位图判据，与「所有支持格式」的语义一致
+        // 过滤器与拖拽共用一份判据，并按当前工作台过滤维度
+        const QString workbenchId = m_stateCenter ? m_stateCenter->currentWorkbenchId() : QString();
         const QStringList extensions =
-            m_importService ? m_importService->importableExtensions(QString()) : QStringList();
+            m_importService ? m_importService->importableExtensions(workbenchId) : QStringList();
         QString filePath = FileDialogService::getOpenFileName(
             m_parentWidget, QObject::tr("Import File"), FileDialogService::allSupportedFilter(extensions));
         if (filePath.isEmpty())

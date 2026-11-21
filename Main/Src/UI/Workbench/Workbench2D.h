@@ -127,6 +127,10 @@ private:
     void applyLayerClick(int layerId);
 
 private:
+    /// 2D 场景服务分组（从 UiWorkbench 基类下移：这是 2D 专属概念，3D 不需要）
+    SceneServices m_scene;
+    /// 算法应用服务分组：算法运行期间禁用工具交互（此前经组合根单例回查）
+    AlgorithmServices m_algorithm;
     std::unique_ptr<CommandActionHub> m_commandHub;
     void onViewportContextMenu(QContextMenuEvent* event);
     QMenu* buildConfiguredContextMenu(const QString& contextMenuId, bool hasSelection);

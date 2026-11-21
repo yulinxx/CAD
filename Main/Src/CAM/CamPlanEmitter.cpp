@@ -35,7 +35,6 @@ namespace
         laser.powerPercent = powerPercent;
         laser.frequencyHz = layer.frequencyHz;
         laser.pulseWidthUs = layer.pulseWidthUs;
-        // 波形序号不在 CamPlan 的契约里，保持默认值 0
         return laser;
     }
 
@@ -97,11 +96,25 @@ namespace CamPlanEmitter
 
                     if (segment.isRapid)
                     {
-                        // 停光段只做空移：功率覆盖被忽略（CAM 对停光段会把功率填 0，
-                        // 原样下发会变成「以 0% 功率切一段」的无意义参数），
-                        // 空移速度由图层头的 SetRapidRate 统一决定。
+                        // 停光段只做空移：功率覆盖被忽略，空移速度由图层头统一决定。
                         const Ut::Vec2d target = frame.toMachine(segment.ptEnd);
                         out.emitRapidTo(target.x(), target.y());
+                        ++emittedSegments;
+                        continue;
+                    }
+
+                    if (segment.type == Cam::PlanPathSegment::Type::Dwell)
+                    {
+                        const double dwellPower = segment.dwellPowerPercent >= 0.0
+                            ? segment.dwellPowerPercent : currentPower;
+                        if (dwellPower != currentPower)
+                        {
+                            out.emitSetLaserParams(laserParamsFor(layer, dwellPower));
+                            currentPower = dwellPower;
+                        }
+                        out.emitLaserOn();
+                        out.emitDwell(segment.dwellUs);
+                        out.emitLaserOff();
                         ++emittedSegments;
                         continue;
                     }

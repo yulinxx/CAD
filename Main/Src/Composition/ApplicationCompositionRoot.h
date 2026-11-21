@@ -82,6 +82,24 @@ public:
     ApplicationCompositionRoot();
     ~ApplicationCompositionRoot();
 
+    /// 显式装配阶段：构造函数只做成员初始化，本方法完成服务接管、接线与注册。
+    /// 由 AppBootstrapper 在构造后立即调用；装配全部完成才对外暴露 instance()。
+    ///
+    /// 语义契约：
+    ///  - **幂等**：装配已完成时重复调用直接返回 true，并记一条 WARN，不会重复注册/
+    ///    重复接线（观察者、命令、桥接都是不可重入的）。
+    ///  - **失败可见**：核心服务缺失（状态中心 / 操作总线 / ShellHost / 主窗口）时
+    ///    返回 false，instance() 保持为空，调用方应中止启动。失败后对象不再可用，
+    ///    调用方应销毁它（析构会清理已装配的部分）。
+    bool build();
+
+    /// 装配是否已完成（build() 成功返回 true 后为真）。
+    /// 供启动流程断言「此刻可以安全取用服务」，避免再靠 instance() 非空推断。
+    bool isBuilt() const noexcept
+    {
+        return m_buildCompleted;
+    }
+
     /// 获取应用共享的 SettingsService
     ///
     /// 正常路径返回组合根持有的实例（生命周期随组合根）。
@@ -91,12 +109,15 @@ public:
     /// 获取 ApplicationCompositionRoot 单例实例（由 AppBootstrapper 创建时设置）
     static ApplicationCompositionRoot* instance();
 
-    /// 保存当前工作台的运行时设置到数据库（退出时兜底）
-    static void saveCurrentWorkbenchSettings();
+    /// 保存当前工作台的运行时设置到数据库（退出时兜底；由 CADApplicationRuntime 在 aboutToQuit 经根指针调用）
+    void saveCurrentWorkbenchSettings();
 
 public:
     /// 获取 UI Shell 宿主
     UiShellHost* shellHost();
+
+    /// 获取设置服务（运行期设置保存 / 主题 / 语言同步的唯一入口，生命周期随组合根）
+    SettingsService* settingsService();
 
     /// 获取状态中心
     UiStateCenter* stateCenter();
@@ -234,16 +255,22 @@ public:
     EmergencyStopController* emergencyStopController();
 
 
+    /// 硬件启动结果：用单一返回值承载成败与提示文案，替代「bool + 出参」的分散语义。
+    struct HardwareStartResult
+    {
+        bool started{ false };  ///< 设备是否成功启动
+        QString message;        ///< started=true 时为档案提示（可空）；false 时为启动失败原因
+    };
+
     /**
      * @brief 读取机器档案并启动硬件。
-     * @param configDir  应用配置目录（用于定位 machine.json）
-     * @param warningOut 需要提示用户的说明（如「已进入模拟设备模式」或启动失败原因）
-     * @return 设备成功启动返回 true
+     * @param configDir 应用配置目录（用于定位 machine.json）
+     * @return 启动结果（started 成败 + message 提示文案）
      *
      * 失败**不应阻止应用启动**：没有机器也要能画图、能改工艺参数。
-     * 但失败必须可见 —— warningOut 里的文案设计成可以直接显示在状态栏/提示条上。
+     * 但失败必须可见 —— message 里的文案设计成可以直接显示在状态栏/提示条上。
      */
-    bool startHardware(const QString& configDir, QString& warningOut);
+    HardwareStartResult startHardware(const QString& configDir);
 
     /**
      * @brief 当前机器档案里的机器坐标系（台面尺寸 + 原点角点）
@@ -266,6 +293,10 @@ private:
     void setupDialogServices();
     // 场景变更 → 脏状态同步
     void setupDirtyStateSync();
+    // 按装配逆序撤销已完成的接线（观察者注册 / 桥接 attach / 单例回调），
+    // 供 build() 中途失败时立即回滚，以及析构时显式清理，不依赖成员声明顺序。
+    // 幂等：每步都做空值守卫，重复调用安全。
+    void teardownAssembled();
     // 惰性创建 2D 算法服务与执行器
     AlgorithmRunner* algorithmRunner();
 
@@ -415,5 +446,8 @@ private:
     /// 生命周期说明），本对象声明为最后的成员（最先析构），
     /// 与此前两注册表位于组合根成员末位的时序一致。
     std::unique_ptr<OperationRegistrar> m_operationRegistrar;
+
+    /// 装配是否已完成：build() 成功后置 true。instance() 据此判断对象是否可用。
+    bool m_buildCompleted{ false };
 };
 

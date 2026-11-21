@@ -3,6 +3,17 @@
 #include "WorkbenchBase.h"
 
 #if BUILD_UI3D
+// 3D 完整定义：m_services3D 是值成员、m_mainWindow3D 是 unique_ptr（MOC 需完整类型）。
+// 这些 include 原先在 UiWorkbench.h，基类不用 3D 类型，下沉到此处避免接口头依赖构建开关。
+#include <QShortcut>
+#include "UI3D/Service/ServicePack3D.h"
+#include "UI/MainWindow/MainWindow3D.h"
+
+namespace Eg
+{
+class SceneManager3D;  // m_sceneManager3D 裸指针成员需要前向声明
+}
+
 class QShortcut;
 class QMenu;
 class QTimer;
@@ -17,6 +28,7 @@ class SceneEditService3D;
 class SceneDocument3D;
 class CameraController3D;
 class SettingsUiCoordinator3D;
+class SettingsService;
 class CommandActionHub3D;
 class AlgorithmRunner3D;
 class RenderWidget3D;
@@ -169,6 +181,9 @@ private:
     SceneTreePanel* m_scenePanel3D{ nullptr };
 
     Eg::SceneManager3D* m_sceneManager3D{ nullptr };
+    /// 设置服务（由组合根经 WorkbenchServices 注入，在 initialize 时缓存，
+    /// 供 create3DServices 构建 SettingsUiCoordinator3D；不再回查组合根单例）
+    SettingsService* m_settingsService{ nullptr };
 
     /// 3D 撤销/重做栈与文档管理器（跨工作台切换存活）。
     ///

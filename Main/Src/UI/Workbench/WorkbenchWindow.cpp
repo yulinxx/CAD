@@ -113,7 +113,6 @@
 #include "UiSceneTreePanel.h"
 #include "UiPropertiesPanel.h"
 #include "UiLayoutService.h"
-#include "Composition/ApplicationCompositionRoot.h"
 #include "Persistence/PersistenceService.h"
 #include "Persistence/Repositories/WorkspaceSnapshotRepository.h"
 #include "Persistence/Models/WorkspaceSnapshotRecord.h"
@@ -287,14 +286,16 @@ void WorkbenchWindow::setUiServices(const UiServices& services)
 
 void WorkbenchWindow::configureServices(const UiServices& services)
 {
-    m_stateCenter = services.stateCenter;
+    m_stateCenter = services.uiState.stateCenter;
+    // 设置服务经 UiServices 显式注入，供主题/语言运行期同步；不再回查组合根
+    m_settingsService = services.settings.settingsService;
 
     // 单位管理器：状态栏坐标按当前显示单位换算，切换单位时实时刷新
-    if (m_unitManager && m_unitManager != services.unitManager)
+    if (m_unitManager && m_unitManager != services.view.unitManager)
     {
         disconnect(m_unitManager, &UnitManager::sigDisplayUnitChanged, this, &WorkbenchWindow::refreshPositionLabel);
     }
-    m_unitManager = services.unitManager;
+    m_unitManager = services.view.unitManager;
     if (m_unitManager)
     {
         connect(m_unitManager, &UnitManager::sigDisplayUnitChanged, this, &WorkbenchWindow::refreshPositionLabel);
@@ -303,16 +304,16 @@ void WorkbenchWindow::configureServices(const UiServices& services)
     // 注入导入服务到文件拖放处理器（2D/3D 工作台共用统一导入入口）
     if (m_fileDropHandler)
     {
-        m_fileDropHandler->setImportService(services.importService);
+        m_fileDropHandler->setImportService(services.persistence.importService);
         // 图片/位图拖放导入需要访问 2D 场景管理器
-        if (services.sceneEditService)
+        if (services.scene.sceneEditService)
         {
-            m_fileDropHandler->setSceneManager(services.sceneEditService->sceneManager());
+            m_fileDropHandler->setSceneManager(services.scene.sceneEditService->sceneManager());
         }
         // 注入图层管理器，用于将拖放的位图分配到位图图层
-        if (services.layerManager)
+        if (services.scene.layerManager)
         {
-            m_fileDropHandler->setLayerManager(services.layerManager);
+            m_fileDropHandler->setLayerManager(services.scene.layerManager);
         }
     }
 
@@ -336,26 +337,27 @@ void WorkbenchWindow::configureServices(const UiServices& services)
 
     if (m_actionManager)
     {
-        m_actionManager->setStateCenter(services.stateCenter);
+        m_actionManager->setStateCenter(services.uiState.stateCenter);
     }
 
     if (m_stateManager)
     {
-        m_stateManager->setUiStateCenter(services.stateCenter);
+        m_stateManager->setUiStateCenter(services.uiState.stateCenter);
     }
 
     if (m_layoutManager)
     {
-        m_layoutManager->setPersistenceService(services.persistenceService);
+        m_layoutManager->setPersistenceService(services.persistence.persistenceService);
     }
 
     if (m_menuManager)
     {
-        m_menuManager->setOperationBus(services.operationBus);
-        m_menuManager->setStateCenter(services.stateCenter);
-        m_menuManager->setRecentFileService(services.recentFileService);
+        m_menuManager->setOperationBus(services.commands.operationBus);
+        m_menuManager->setStateCenter(services.uiState.stateCenter);
+        m_menuManager->setRecentFileService(services.persistence.recentFileService);
         m_menuManager->setWorkbench(m_workbench);
-        m_menuManager->setUnitManager(services.unitManager);
+        m_menuManager->setUnitManager(services.view.unitManager);
+        m_menuManager->setSettingsService(services.settings.settingsService);
         if (m_workbench)
         {
             m_menuManager->rebuildAllMenus();
@@ -363,9 +365,9 @@ void WorkbenchWindow::configureServices(const UiServices& services)
     }
 
     // 设置页切换皮肤后同步菜单勾选：SettingsService::themeChanged → UiStateCenter + 菜单刷新
-    if (auto* settings = ApplicationCompositionRoot::getSettingsService(); settings && m_stateCenter)
+    if (m_settingsService && m_stateCenter)
     {
-        connect(settings, &SettingsService::themeChanged, this, [this](AppTheme theme) {
+        connect(m_settingsService, &SettingsService::themeChanged, this, [this](AppTheme theme) {
             const QString themeId = ThemeManager::menuIdFor(theme);
             m_stateCenter->setCurrentThemeId(themeId);
             refreshThemeMenuChecks(themeId);
@@ -1019,9 +1021,9 @@ void WorkbenchWindow::triggerTheme(const QString& themeId)
     // 必须落盘：只调 TM->setTheme 的话主题只活在内存里，后续任何一次
     // applyCommonSettings（设置对话框确定、SettingsService 懒初始化）都会用库里的
     // common/theme 覆盖回去。SettingsService::setTheme 内部会写库并调 TM->setTheme。
-    if (auto* settings = ApplicationCompositionRoot::getSettingsService(); settings && settings->isInitialized())
+    if (m_settingsService && m_settingsService->isInitialized())
     {
-        settings->setTheme(appTheme);
+        m_settingsService->setTheme(appTheme);
     }
     else
     {
@@ -1055,6 +1057,15 @@ void WorkbenchWindow::reportFrameworkError(const QString& errorCode, const QStri
 
 void WorkbenchWindow::bindSafetyServices(EmergencyStopController* safety, OperationBus* bus)
 {
+    // 急停状态机就绪后同步到菜单管理器：MenuDispatcher 的只读态拦截需要它，
+    // 不再通过 ApplicationCompositionRoot 单例回查。不因总开关关闭而跳过同步，
+    // 避免开关重新打开后丢失注入。
+    m_emergencyStopController = safety;
+    if (m_menuManager)
+    {
+        m_menuManager->setEmergencyStopController(safety);
+    }
+
     // 总开关关闭：不创建浮层、不接只读闸门（软件尚未交付急停硬件链路，v1.1 开启）
     if (!EmergencyStopFeature::kEnabled)
     {
@@ -1074,7 +1085,6 @@ void WorkbenchWindow::bindSafetyServices(EmergencyStopController* safety, Operat
         return;
     }
 
-    // 急停入口是独立置顶窗口：不挂在任何 Dock/工具栏上，面板显隐与工作台切换都影响不到它
     m_emergencyStopOverlay = std::make_unique<EmergencyStopOverlay>(
         safety,
         [bus]() {
@@ -1091,6 +1101,15 @@ void WorkbenchWindow::bindSafetyServices(EmergencyStopController* safety, Operat
     applySafetyReadOnly(safety->isReadOnly());
 
     APR_INFO("[WorkbenchWindow] Emergency stop overlay created");
+}
+
+void WorkbenchWindow::bindDeviceServices(DeviceHost* host, ProcessingJobService* jobService)
+{
+    m_deviceHost = host;
+    m_jobService = jobService;
+
+    APR_INFOF("[WorkbenchWindow] device services bound (host=%p job=%p)",
+        static_cast<const void*>(host), static_cast<const void*>(jobService));
 }
 
 void WorkbenchWindow::applySafetyReadOnly(bool readOnly)

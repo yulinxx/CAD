@@ -31,6 +31,13 @@ public:
     /// 供测试直接刷新状态。
     void refreshState();
 
+    /// 供测试校验：默认构造后面板是否已从所属窗口拉取到依赖；
+    /// 未拉到时为 false，showEvent 会重试补绑。
+    bool isBound() const noexcept
+    {
+        return m_bound;
+    }
+
 protected:
     void changeEvent(QEvent* event) override;
     void showEvent(QShowEvent* event) override;

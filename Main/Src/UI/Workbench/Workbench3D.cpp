@@ -26,7 +26,6 @@
     #include <variant>
     #include <vector>
 
-    #include "Composition/ApplicationCompositionRoot.h"
     #include "Composition/DocumentRecoveryController.h"
     #include "Import/ImportService.h"
     #include "Log/AprLogger.h"
@@ -313,9 +312,10 @@ bool Workbench3D::initialize(const WorkbenchServices& services)
     }
     m_uiState = services.uiState;
     m_commands = services.commands;
-    m_scene = services.scene;
     m_persistence = services.persistence;
     m_view = services.view;
+    // 缓存设置服务：create3DServices 在 initialize 之外调用，需从成员取而非 services 入参
+    m_settingsService = services.settings.settingsService;
 
     // 使用 ApplicationCompositionRoot 中的共享 SceneManager3D，
     // 确保导入的 3D 图元与 3D 工作台使用同一数据源
@@ -501,8 +501,17 @@ void Workbench3D::create3DServices()
     own.selectionService = std::make_unique<SelectionService3D>(m_sceneManager3D);
     own.cameraController = std::make_unique<CameraController3D>();
     own.algorithmService = std::make_unique<AlgorithmApplicationService>(nullptr);
-    own.settingsService = ApplicationCompositionRoot::getSettingsService();
-    own.settingsService->init();
+    // 设置服务由组合根经 WorkbenchServices 注入（initialize 时缓存到 m_settingsService），
+    // 不再经 ApplicationCompositionRoot::getSettingsService() 静态回查组合根单例。
+    own.settingsService = m_settingsService;
+    if (own.settingsService)
+    {
+        own.settingsService->init();
+    }
+    else
+    {
+        APR_WARN("[Workbench3D] create3DServices: injected SettingsService is null");
+    }
     own.settingsCoordinator = std::make_unique<SettingsUiCoordinator3D>(own.settingsService);
 
     #ifdef ENABLE_GEOMODELCORE
@@ -1894,9 +1903,9 @@ void Workbench3D::shutdown()
 
     m_uiState = {};
     m_commands = {};
-    m_scene = {};
     m_persistence = {};
     m_view = {};
+    m_settingsService = nullptr;
 
     // 撤销栈与文档管理器随工作台实例一起结束（这里才释放）。
     // 不能放在 deactivate() 里 —— 那会让 3D 的撤销历史在每次切台时清空。

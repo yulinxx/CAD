@@ -82,6 +82,7 @@ private:
 #include "UI/Services/IRecentFileService.h"
 #include "UI/Services/RecentFileService.h"
 
+#include "Engine/FrameworkSingletonRegistry.h"
 #include "Engine/Text/FontManager.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/UndoRedoManager.h"
@@ -115,8 +116,16 @@ static std::unique_ptr<SettingsService> s_settingsFallback;
 // 作为依赖注入的中心点，管理UI层和命令系统的生命周期
 ApplicationCompositionRoot::~ApplicationCompositionRoot()
 {
-    // 清理静态实例指针
-    s_instance = nullptr;
+    // 清理静态实例指针，仅在是自身时清空：避免连续构造两个组合根时，
+// 旧实例析构把新实例的 s_instance 误清。
+    if (s_instance == this)
+    {
+        s_instance = nullptr;
+    }
+
+    // 显式撤销装配期建立的接线（观察者注册 / 桥接 attach / 单例回调 / 场景回调），
+    // 不依赖成员声明顺序；teardownAssembled 幂等，此处与 build() 失败路径共用。
+    teardownAssembled();
 
     // 加工服务先销毁：它的析构会把还在跑的作业 abort 掉，
     // 而 abort 需要设备还活着。反过来先停设备，作业就无处可停了。
@@ -151,14 +160,11 @@ ApplicationCompositionRoot::~ApplicationCompositionRoot()
         m_deviceHost->stop();
     }
 
-    // 进程退出时，FillGeometryUpdater（Meyers 单例）的析构晚于本组合根，
-    // 若不在 SceneEditService 仍存活时解绑，其析构会访问已销毁对象导致崩溃。
-    Eg::FillGeometryUpdater::instance().detach();
-
-    // FontManager 的 FT_Library 同为 Meyers 单例持有，静态析构顺序不可控。
-    // 在此显式释放，析构函数兜底保证恰好释放一次（见 FontManager::shutdown）。
-    // GmcKernel 只持 atomic 标志、无可释放资源，无需在此收口。
-    Eg::FontManager::instance().shutdown();
+    // 框架级单例统一清理：FillGeometryUpdater / FontManager 等在首次创建时
+    // 已向 FrameworkSingletonRegistry 注册清理回调，此处按注册逆序统一执行。
+    // 组合根不再需要逐个手工 detach/shutdown，新增单例也不会漏清理，析构顺序
+    // 由注册顺序保证（GmcKernel 只持 atomic 标志、无可释放资源，未注册）。
+    Eg::FrameworkSingletonRegistry::clearAll();
 }
 
 DeviceHost* ApplicationCompositionRoot::deviceHost()
@@ -176,8 +182,10 @@ EmergencyStopController* ApplicationCompositionRoot::emergencyStopController()
     return m_emergencyStopController.get();
 }
 
-bool ApplicationCompositionRoot::startHardware(const QString& configDir, QString& warningOut)
+ApplicationCompositionRoot::HardwareStartResult ApplicationCompositionRoot::startHardware(const QString& configDir)
 {
+    HardwareStartResult result;
+
     QString loadWarning;
 
     const MachineProfile profile = MachineProfileLoader::loadOrFallback(configDir, loadWarning);
@@ -185,8 +193,8 @@ bool ApplicationCompositionRoot::startHardware(const QString& configDir, QString
     QString startError;
     if (!m_deviceHost->start(profile, startError))
     {
-        warningOut = startError;
-        return false;
+        result.message = startError;
+        return result;  // started=false
     }
 
 #ifdef ENABLE_VISION
@@ -199,8 +207,9 @@ bool ApplicationCompositionRoot::startHardware(const QString& configDir, QString
 
     // 档案层的提示（例如「没有档案，已用模拟设备」）要继续往上传：
     // 设备确实起来了，但用户必须知道起来的是模拟设备而不是真机
-    warningOut = loadWarning;
-    return true;
+    result.started = true;
+    result.message = loadWarning;
+    return result;
 }
 
 Eg::MachineFrameConfig ApplicationCompositionRoot::machineFrameConfig() const
@@ -275,8 +284,34 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     , m_exportService(std::make_unique<ExportService>())
     , m_exportDispatcher(std::make_unique<ExportDispatcher>())
 {
-    // 设置静态实例指针
-    s_instance = this;
+    // 构造函数只做成员初始化；装配逻辑集中在 build()，由 AppBootstrapper 显式调用。
+}
+
+// 显式装配阶段：接管持久化/设置服务、装配 UI 服务、接线、注册操作。
+// 全部完成后才设置 s_instance，杜绝半初始化对象被 instance() 取用；
+// 失败时 s_instance 保持为空，调用方应中止启动。
+bool ApplicationCompositionRoot::build()
+{
+    // 幂等：装配已完成时直接返回。观察者、命令、桥接都不可重入，
+    // 重复装配会重复注册（撤销观察者双发信号、命令二次覆盖）——
+    // 这里显式拦下并留痕，而不是让调用方悄悄触发一遍副作用。
+    if (m_buildCompleted)
+    {
+        APR_WARN("[ApplicationCompositionRoot] build() called again after completion; ignored");
+        return true;
+    }
+
+    // 核心服务必须就绪：它们由构造函数成员初始化列表创建，为空意味着初始化失败。
+    // 缺失时立即失败，绝不把一个缺关键依赖的根对象暴露成可用状态。
+    if (!m_stateCenter || !m_operationBus || !m_shellHost || !m_shellHost->mainWindow())
+    {
+        APR_ERROR("[ApplicationCompositionRoot] build failed: core service missing");
+        // 当前失败发生在任何接线之前，teardownAssembled 为空操作；
+        // 但后续若在装配中途新增失败点，必须同样先调用它再 return false，
+        // 以保证已完成的接线（观察者/桥接/单例回调）被即时撤销。
+        teardownAssembled();
+        return false;
+    }
 
     // 接管持久化服务的唯一所有权（AppInitializer 创建，此处移交，不做惰性获取）。
     // 必须在任何持有 PersistenceService* 裸指针的消费方创建之前完成。
@@ -334,9 +369,11 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
 
     // 主窗口在 m_shellHost 的成员初始化阶段就构造完成，那时急停状态机还不存在。
     // 安全服务就绪后必须显式补绑定，否则急停入口永远不会被创建（急停后编辑区仍可操作）。
+    // 设备服务同样在此注入：设备面板取自所属窗口，不再回查组合根单例。
     if (auto* window = m_shellHost ? m_shellHost->mainWindow() : nullptr)
     {
         window->bindSafetyServices(m_emergencyStopController.get(), m_operationBus.get());
+        window->bindDeviceServices(m_deviceHost.get(), m_processingJobService.get());
     }
 
 #ifdef ENABLE_VISION
@@ -355,6 +392,13 @@ ApplicationCompositionRoot::ApplicationCompositionRoot()
     m_undoRedoManager->addObserver(m_undoRedoObserver.get());
 
     APR_INFO("[ApplicationCompositionRoot] initialized with module-based operation registration");
+
+    // 装配全部完成后才对外暴露：在此之前 instance() 返回 nullptr，
+    // 杜绝外部拿到半初始化对象。失败分支（未来扩展）必须先调用 teardownAssembled()
+    // 再 return false，且不设置 s_instance，调用方据此中止启动。
+    s_instance = this;
+    m_buildCompleted = true;
+    return true;
 }
 
 // ==================== 构造函数拆分子方法（P5 结构性优化） ====================
@@ -364,30 +408,40 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
     // 创建最近文件服务
     m_recentFileService = std::make_unique<RecentFileService>(persistenceService());
 
+    // 算法应用服务（供工作台在算法运行期间禁用工具交互）
+    // 提前创建，避免装配容器在注册器创建前就拿到空算法服务；
+    // 后续 OperationRegistrar 仍会复用 m_algorithmService，不再重复创建。
+    AlgorithmRunner* algorithmRunnerPtr = algorithmRunner();
+    (void)algorithmRunnerPtr;
+
     // 组装 UI 服务集合
     UiServices uiServices;
-    uiServices.stateCenter = m_stateCenter.get();
-    uiServices.operationBus = m_operationBus.get();
-    uiServices.document2D = m_document2D.get();
-    uiServices.sceneEditService = m_sceneEditService.get();
+    uiServices.uiState.stateCenter = m_stateCenter.get();
+    uiServices.commands.operationBus = m_operationBus.get();
+    uiServices.scene.document2D = m_document2D.get();
+    uiServices.scene.sceneEditService = m_sceneEditService.get();
     // 撤销/重做管理器必须填进 UiServices：Workbench2D::createToolbars 会把
-    // m_services.undoManager **按值捕进** setUndoRedoProvider 的闭包，而
+    // m_commands.undoManager **按值捕进** setUndoRedoProvider 的闭包，而
     // CommandActionHub::captureSnapshot 拿这个 provider 的结果**覆盖**
     // snapshot.canUndo / canRedo。这里漏填时闭包捕到的是 nullptr，
     // canUndo 恒为 false，edit.undo / edit.redo 的 RequiresUndo / RequiresRedo
     // 判定永远不通过 —— 菜单和工具栏的撤销/重做一直置灰，而置灰的 QAction
     // 连它的 Ctrl+Z / Ctrl+Y 都不会触发，表现就是「撤销完全没反应」。
-    uiServices.undoManager = m_undoRedoManager.get();
+    uiServices.commands.undoManager = m_undoRedoManager.get();
 
-    uiServices.selectionService = m_selectionService.get();
-    uiServices.viewportActionHub = m_viewportActionHub.get();
-    uiServices.unitManager = m_unitManager.get();
-    uiServices.layerManager = m_layerManager.get();
-    uiServices.layerManagerBridge = m_layerManagerBridge.get();
-    uiServices.layerEditService = m_layerEditService.get();
-    uiServices.persistenceService = persistenceService();
-    uiServices.recentFileService = m_recentFileService.get();
-    uiServices.clipboard = m_clipboard.get();
+    uiServices.scene.selectionService = m_selectionService.get();
+    uiServices.view.viewportActionHub = m_viewportActionHub.get();
+    uiServices.view.unitManager = m_unitManager.get();
+    uiServices.scene.layerManager = m_layerManager.get();
+    uiServices.scene.layerManagerBridge = m_layerManagerBridge.get();
+    uiServices.scene.layerEditService = m_layerEditService.get();
+    uiServices.persistence.persistenceService = persistenceService();
+    uiServices.persistence.recentFileService = m_recentFileService.get();
+    uiServices.scene.clipboard = m_clipboard.get();
+    uiServices.algorithm.algorithmApplicationService = m_algorithmService.get();
+    // 设置服务显式注入各消费方（窗口/工作台/菜单分发器），消费方不再经
+    // ApplicationCompositionRoot::getSettingsService() 静态回查组合根实例。
+    uiServices.settings.settingsService = m_settingsService.get();
 
     // LayerManagerBridge 注册为 LayerManager 观察者
     m_layerManager->addObserver(m_layerManagerBridge.get());
@@ -426,26 +480,29 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
 
 void ApplicationCompositionRoot::setupImportExportServices(UiServices& uiServices)
 {
-    // 读取器/写入器注册、服务注入与进度信号接线统一在 ImportExportServiceSetup
-    ImportExportServiceSetup setup(m_stateCenter.get(),
-        m_importService.get(),
-        m_importDispatcher.get(),
-        m_exportService.get(),
-        m_exportDispatcher.get(),
-        m_sceneManager.get(),
-        m_sceneManager3D.get(),
-        m_sceneEditService.get(),
-        m_layerManager.get(),
-        m_persistenceService.get(),
-        m_captureService.get());
+    // 读取器/写入器注册、服务注入与进度信号接线统一在 ImportExportServiceSetup。
+    // 用命名成员传参，避免 11 个位置参数中相邻同构类型写错顺序的静默 bug。
+    ImportExportSetupContext ctx;
+    ctx.stateCenter = m_stateCenter.get();
+    ctx.importService = m_importService.get();
+    ctx.importDispatcher = m_importDispatcher.get();
+    ctx.exportService = m_exportService.get();
+    ctx.exportDispatcher = m_exportDispatcher.get();
+    ctx.sceneManager = m_sceneManager.get();
+    ctx.sceneManager3D = m_sceneManager3D.get();
+    ctx.editService = m_sceneEditService.get();
+    ctx.layerManager = m_layerManager.get();
+    ctx.persistence = m_persistenceService.get();
+    ctx.captureService = m_captureService.get();
+    ImportExportServiceSetup setup(ctx);
     setup.setup(uiServices);
 
     // 最近文件的服务级兜底回调：ImportContext 只有 FileOperationRegistry 的打开路径
     // 才带 recentFileAddCallback，普通导入（各格式菜单项、拖放）的 context 是空的，
     // 回写阶段会走这里 —— 否则导入过的文件永远进不了"最近文件"列表。
-    if (m_importService && uiServices.recentFileService)
+    if (m_importService && uiServices.persistence.recentFileService)
     {
-        IRecentFileService* recentFiles = uiServices.recentFileService;
+        IRecentFileService* recentFiles = uiServices.persistence.recentFileService;
         m_importService->setRecentFileAddCallback(
             [recentFiles](const QString& path, const QString& workbenchId) {
                 recentFiles->addRecentFile(path, workbenchId);
@@ -482,6 +539,48 @@ void ApplicationCompositionRoot::setupDirtyStateSync()
                 }
             },
             this);
+    }
+}
+
+void ApplicationCompositionRoot::teardownAssembled()
+{
+    // 按 build() 装配的逆序撤销已完成的接线。每步做空值守卫，保证幂等：
+    // build() 中途失败会调用一次，析构时再调用一次，不得因重复调用崩溃。
+    // 只撤销「外部/回调侧效应」（观察者注册、桥接 attach、单例回调、场景回调），
+    // 不释放任何 owned 服务——那是 unique_ptr 成员与析构的职责。
+
+    // 撤销栈观察者（build 末尾注册，反向先撤）
+    if (m_undoRedoManager && m_undoRedoObserver)
+    {
+        m_undoRedoManager->removeObserver(m_undoRedoObserver.get());
+    }
+
+    // 场景变更回调（setupDirtyStateSync 注册，捕获 this）—— 先清，避免销毁途中触发
+    if (m_sceneManager)
+    {
+        m_sceneManager->setSceneChangedCallback({}, nullptr);
+    }
+
+    // 填充几何更新协调器是进程级单例：解绑场景并清空延迟派发器
+    // （派发器 lambda 捕获宿主 QObject，不清空会在宿主销毁后悬空）
+    Eg::FillGeometryUpdater::instance().detach();
+
+    // 图层持久化桥接 detach
+    if (m_layerPersistenceBridge)
+    {
+        m_layerPersistenceBridge->detach();
+    }
+
+    // LayerManagerBridge 观察者注销
+    if (m_layerManager && m_layerManagerBridge)
+    {
+        m_layerManager->removeObserver(m_layerManagerBridge.get());
+    }
+
+    // SceneEditService 持有的 LayerManager 回指清空
+    if (m_sceneEditService)
+    {
+        m_sceneEditService->setLayerManager(nullptr);
     }
 }
 
@@ -572,27 +671,33 @@ SettingsService* ApplicationCompositionRoot::getSettingsService()
 
 ApplicationCompositionRoot* ApplicationCompositionRoot::instance()
 {
+    // 防御性断言：s_instance 非空但 m_buildCompleted 为假，意味着在装配完成前
+    // 就对外暴露了半初始化对象（框架层违规）。s_instance 在 build() 末尾才设置，
+    // 正常情况下两者同时为真；此检查兜底防止未来回归（如有人提前设置 s_instance）。
+    // APR_ERROR 只记日志不崩溃，且 instance() 调用均在运行期，不会误报。
+    if (s_instance != nullptr && !s_instance->m_buildCompleted)
+    {
+        APR_ERROR("[ApplicationCompositionRoot] instance() called before build() completed; half-initialized object exposed");
+        return nullptr;   // 不再把半初始化对象暴露给外部
+    }
     return s_instance;
+}
+
+SettingsService* ApplicationCompositionRoot::settingsService()
+{
+    return m_settingsService.get();
 }
 
 void ApplicationCompositionRoot::saveCurrentWorkbenchSettings()
 {
-    // 获取 ShellHost 并尝试保存当前工作台的设置
-    auto* self = instance();
-    if (!self)
+    // 由 CADApplicationRuntime 在 aboutToQuit 经根指针调用：直接用本对象持有的 shellHost，
+    // 不再经 instance() 静态回查单例（避免静态入口成为隐式全局注册表）。
+    if (!m_shellHost)
     {
         return;
     }
 
-    auto* shellHost = self->shellHost();
-    if (!shellHost)
-    {
-        return;
-    }
-
-    // 尝试获取当前工作台
-    auto* workbench = shellHost->currentWorkbench();
-    if (workbench)
+    if (auto* workbench = m_shellHost->currentWorkbench())
     {
         workbench->saveCurrentSettings();
     }

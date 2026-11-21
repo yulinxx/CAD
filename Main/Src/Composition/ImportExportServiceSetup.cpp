@@ -251,28 +251,18 @@ NativeDocumentSnapshot aprSetupCaptureMachiningSnapshot(LayerManager* layerManag
     return aprSetupCaptureSnapshotImpl(layerManager);
 }
 
-ImportExportServiceSetup::ImportExportServiceSetup(UiStateCenter* stateCenter,
-    ImportService* importService,
-    ImportDispatcher* importDispatcher,
-    ExportService* exportService,
-    ExportDispatcher* exportDispatcher,
-    Eg::SceneManager* sceneManager,
-    Eg::SceneManager3D* sceneManager3D,
-    SceneEditService* editService,
-    LayerManager* layerManager,
-    PersistenceService* persistence,
-    Ui::ViewCaptureService* captureService)
-    : m_stateCenter(stateCenter)
-    , m_importService(importService)
-    , m_importDispatcher(importDispatcher)
-    , m_exportService(exportService)
-    , m_exportDispatcher(exportDispatcher)
-    , m_sceneManager(sceneManager)
-    , m_sceneManager3D(sceneManager3D)
-    , m_editService(editService)
-    , m_layerManager(layerManager)
-    , m_persistence(persistence)
-    , m_captureService(captureService)
+ImportExportServiceSetup::ImportExportServiceSetup(const ImportExportSetupContext& context)
+    : m_stateCenter(context.stateCenter)
+    , m_importService(context.importService)
+    , m_importDispatcher(context.importDispatcher)
+    , m_exportService(context.exportService)
+    , m_exportDispatcher(context.exportDispatcher)
+    , m_sceneManager(context.sceneManager)
+    , m_sceneManager3D(context.sceneManager3D)
+    , m_editService(context.editService)
+    , m_layerManager(context.layerManager)
+    , m_persistence(context.persistence)
+    , m_captureService(context.captureService)
 {
 }
 
@@ -284,10 +274,10 @@ void ImportExportServiceSetup::setup(UiServices& uiServices)
 
     // 注入到 UI 服务集合。导出服务不进 UiServices：唯一的消费者
     // FileOperationRegistry 走 FileOperationConfig::exportService 单独注入。
-    uiServices.importService = m_importService;
+    uiServices.persistence.importService = m_importService;
     // 视图导出服务：2D 与 3D 的「导出视图」命令都要用同一个实例，
     // 保证两次导出的落盘目录与命名规则一致。
-    uiServices.captureService = m_captureService;
+    uiServices.view.captureService = m_captureService;
 
     connectProgressSignals();
 }

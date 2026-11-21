@@ -20,6 +20,8 @@ class WorkbenchWindow;
 class UiWorkbench;
 class UiStateCenter;
 class WorkbenchMenuManager;  // 前置声明，避免循环依赖
+class EmergencyStopController;  // 急停状态机，由 WorkbenchMenuManager 显式注入
+class SettingsService;  // 设置服务，由 WorkbenchMenuManager 显式注入（语言切换落盘用）
 enum class AppMode;
 
 class MenuDispatcher : public QObject, public IUiCommandDispatcher
@@ -34,6 +36,10 @@ public:
     void setWorkbench(class UiWorkbench* workbench);
     void setWorkbenchWindow(WorkbenchWindow* window);
     void setStateCenter(class UiStateCenter* stateCenter);
+    /// 急停状态机：只读态命令拦截需要它；不注入时急停只读闸门不生效。
+    void setEmergencyStopController(EmergencyStopController* safety);
+    /// 设置服务：语言切换需要落盘；不注入时回退到 LanguageManager 内存切换。
+    void setSettingsService(SettingsService* settings);
 
     // 命令分发入口
     void dispatch(const QString& commandId, const QVariantMap& params = {}) override;
@@ -50,4 +56,6 @@ public:
 private:
     WorkbenchMenuManager* m_self{ nullptr };
     class UiWorkbench* m_workbench{ nullptr };
+    EmergencyStopController* m_safety{ nullptr };
+    SettingsService* m_settingsService{ nullptr };
 };
