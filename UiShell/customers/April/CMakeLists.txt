@@ -12,3 +12,8 @@ msUiAddCustomerLibrary(${UI_CUSTOMER_TARGET})
 if(TARGET AprilUi)
     target_link_libraries(${UI_CUSTOMER_TARGET} PRIVATE AprilUi)
 endif()
+
+# M3.5：AprilUi 引用非 UI 符号；链接 AprilCore 让 UiApril / AprilShell 独立链接。
+if(TARGET AprilCore)
+    target_link_libraries(${UI_CUSTOMER_TARGET} PRIVATE AprilCore)
+endif()

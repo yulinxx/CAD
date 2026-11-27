@@ -216,12 +216,9 @@ if(APPLE)
 endif()
 
 add_executable(${APP_NAME}
-    ${MAIN_APP_SOURCES}
-    ${MAIN_APP_HEADERS}
+    ${SRC_ROOT}/main.cpp
     ${MAIN_RESOURCES}
 )
-
-source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${MAIN_APP_SOURCES} ${MAIN_APP_HEADERS})
 
 set(QT_COMPONENTS Core Gui Widgets OpenGLWidgets)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS ${QT_COMPONENTS} REQUIRED)
@@ -461,6 +458,32 @@ function(april_apply_app_target_settings target)
 endfunction()
 
 # ---------------------------------------------------------------------------
+# AprilCore：Main/Src/** 非 UI 静态库（Main/Src/Composition / Import / Export /
+# Persistence / Hardware / Runtime / Bootstrap / Common / Platform / CAM /
+# License / Vision ...），即 `Main/Src/UI` 之外的部分，且不含 main.cpp。
+#
+# 动机：AprilUi（UI）会引用非 UI 符号；把非 UI 也拆成库，
+# customers/April / UiShell 的 AprilShell 才能独立链接，
+# ApplicationCompositionRoot（在 AprilCore）才能装配 UiServices 等。
+# 与 AprilUi 互相引用：组合根用 UI，UI 用非 UI；由最终 EXE 一起链接。
+# ---------------------------------------------------------------------------
+set(APRIL_CORE_SOURCES ${MAIN_APP_SOURCES})
+list(FILTER APRIL_CORE_SOURCES EXCLUDE REGEX ".*/main\\.cpp$")
+
+add_library(AprilCore STATIC
+    ${APRIL_CORE_SOURCES}
+    ${MAIN_APP_HEADERS}
+)
+set_target_properties(AprilCore PROPERTIES
+    AUTOMOC ON
+    AUTOUIC OFF
+    AUTORCC OFF
+    CXX_VISIBILITY_PRESET default
+)
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${APRIL_CORE_SOURCES} ${MAIN_APP_HEADERS})
+april_apply_app_target_settings(AprilCore)
+
+# ---------------------------------------------------------------------------
 # AprilUi：Main/Src/UI/** 静态库（M1）
 #
 # 新外壳（UiShell/customers/April）链接它即可复用现有工作台；April 仍是
@@ -500,9 +523,12 @@ target_link_libraries(AprilUi
         EnginePersistence
         Engine3D
 )
+# 互相引用；最终 EXE 同时链接 AprilUi + AprilCore。
+target_link_libraries(AprilUi PRIVATE AprilCore)
+target_link_libraries(AprilCore PRIVATE AprilUi)
 
 april_apply_app_target_settings(${APP_NAME})
-target_link_libraries(${APP_NAME} PRIVATE AprilUi)
+target_link_libraries(${APP_NAME} PRIVATE AprilUi AprilCore)
 
 if(APR_PYTHON_HOST)
     add_custom_command(TARGET ${APP_NAME} POST_BUILD
