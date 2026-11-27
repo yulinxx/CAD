@@ -8,6 +8,7 @@
 #include "UiShell/Assembly/ShellServices.h"        // RD::ShellServices
 #include "ports/ICadViewport.h"                    // Apr::ICadViewport + Apr::IViewportFactory
 #include "ports/IViewportServices.h"               // Apr::IViewportServices
+#include "ports/ICadServiceFactory.h"             // Apr::ICadServiceFactory
 
 // ---- AprilUi（Main/Src/UI，静态库 AprilUi，M1）----
 #include "UI/Services/UiServices.h"                // UiServices（七分组装配容器）
@@ -57,35 +58,20 @@ namespace Apr
         ViewportKind viewportKind() const;
 
         // ---------------- CAD 视口服务（由 customers/April 持有并注入）----------------
-        void setUiServices(const UiServices& services);     ///< 复制一份装配容器（七分组）
-        const UiServices& uiServices() const;
-        void setWorkbenchServices(const WorkbenchServices& services);
-        const WorkbenchServices& workbenchServices() const;
 
-        void setSceneDocument2D(SceneDocument2D* document); ///< 2D 场景文档
-        SceneDocument2D* sceneDocument2D() const;
 
-        void setSceneDocument3D(SceneDocument3D* document); ///< 3D 场景文档（BUILD_UI3D）
-        SceneDocument3D* sceneDocument3D() const;
 
-        void setUiStateCenter(UiStateCenter* center);       ///< UI 状态中心
-        UiStateCenter* uiStateCenter() const;
 
-        void setOperationBus(OperationBus* bus);            ///< 操作总线（撤销/重做等）
-        OperationBus* operationBus() const;
 
-        void setSelectionService(ISelectionService* service);
-        ISelectionService* selectionService() const;
 
-        void setLayerManager(LayerManager* manager);        ///< 图层管理器
-        LayerManager* layerManager() const;
 
-        void setCameraController3D(CameraController3D* controller);
-        CameraController3D* cameraController3D() const;
 
         // ---------------- 低耦合 port ----------------
         // UI 只走 Apr::IViewportFactory + Apr::ICadViewport；不持有/不暴露 RenderViewport2D/Viewport3D/SceneDocument2D/OperationBus 给 UiShell。
         void setViewportFactory(IViewportFactory* factory);
+        // 低耦合：service factory + services view，不直接 set SceneDocument2D/OperationBus/...
+        void setServiceFactory(ICadServiceFactory* services);
+        ICadServiceFactory* serviceFactory() const;
         IViewportFactory* viewportFactory() const;
         ICadViewport* cadViewport() const;   ///< 最近 createCenterView 产出的 port（不暴露 raw 旧视口）
 
@@ -104,8 +90,6 @@ namespace Apr
 
         // ---------------- 产出 ----------------
         QWidget* centerWidget() const;             ///< 最近一次 createCenterView 返回的部件
-        RenderViewport2D* viewport2D() const;
-        Viewport3D* viewport3D() const;
 
     protected:
         QWidget* createCenterView2D(QWidget* parent);
@@ -114,21 +98,11 @@ namespace Apr
     private:
         ViewportKind m_kind = ViewportKind::TwoD;
 
-        UiServices m_uiServices;                   // 装配容器（由 ApplicationCompositionRoot 填充，M3 接上）
-        WorkbenchServices m_workbenchServices;     // 工作台分组（m_uiServices.workbench() 或单独注入）
 
-        SceneDocument2D* m_sceneDocument2D = nullptr;
-        SceneDocument3D* m_sceneDocument3D = nullptr;
-        UiStateCenter* m_uiStateCenter = nullptr;
-        OperationBus* m_operationBus = nullptr;
-        ISelectionService* m_selectionService = nullptr;
-        LayerManager* m_layerManager = nullptr;
-        CameraController3D* m_cameraController3D = nullptr;
 
         QWidget* m_centerWidget = nullptr;
-        RenderViewport2D* m_viewport2D = nullptr;   // 不持有，Qt parent 树负责生命周期（不暴露给 UiShell；用 port）
-        Viewport3D* m_viewport3D = nullptr;         // 不持有
         IViewportFactory* m_viewportFactory = nullptr;
+        ICadServiceFactory* m_serviceFactory = nullptr;
         ICadViewport* m_cadViewport = nullptr;      // 不持有；factory 产出，widget() 交给 Qt
 
         // UiShell 侧只读信息

@@ -20,6 +20,8 @@ namespace Apr
         virtual bool hasCameraController3D() const = 0;
         virtual bool hasUiServices() const = 0;
 
-        // UI 意图 -> 算法层 adapter 实现；不暴露具体对象。
+        // 低耦合：不向 UI 暴露具体对象；UI 意图 -> 算法层 adapter。
+        // 这里保持抽象；具体 adapter（Apr::CompositionRootAdapter）负责转发到 AprilCore。
+    
     };
 }  // namespace Apr
