@@ -3,9 +3,9 @@
 #include <QString>
 #include <QWidget>
 
-// ---- AprilUi 视口 ----
-#include "UI/Render/RenderViewport2D.h"   // RenderViewport2D
-#include "UI/Render/UiViewport3D.h"       // Viewport3D
+// ---- AprilUi 视口：只在 adapter 内部 include；本文件不直接依赖 RenderViewport2D/Viewport3D 构造 ----
+#include "UI/Render/RenderViewport2D.h"   // RenderViewport2D*（历史 raw 访问；UiShell 不见）
+#include "UI/Render/UiViewport3D.h"       // Viewport3D*（历史 raw 访问；UiShell 不见）
 
 // ---- 组合根（AprilCore）----
 #include "Composition/ApplicationCompositionRoot.h"
@@ -77,26 +77,6 @@ namespace Apr
         Q_UNUSED(services);
     }
 
-    // ---------------- 组合根注入（M3.5）----------------
-    bool AprilWorkbench::bindCompositionRoot(ApplicationCompositionRoot& root)
-    {
-        if (!root.isBuilt())
-            return false;
-
-        setUiServices(root.uiServices());                 // 七分组 + workbench()
-        setWorkbenchServices(root.uiServices().workbench());
-        if (root.document2D())
-            setSceneDocument2D(root.document2D());
-        if (root.stateCenter())
-            setUiStateCenter(root.stateCenter());
-        if (root.operationBus())
-            setOperationBus(root.operationBus());
-        if (root.selectionService())
-            setSelectionService(root.selectionService());
-        if (root.layerManager())
-            setLayerManager(root.layerManager());
-        return true;
-    }
 
     // ---------------- UiShell ShellServices 互转 ----------------
     void AprilWorkbench::populateShellServices(RD::ShellServices& shell) const

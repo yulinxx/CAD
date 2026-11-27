@@ -93,8 +93,6 @@ namespace Apr
         // 若 root.isBuilt()，把已装配的 UiServices / SceneDocument2D / UiStateCenter /
         // OperationBus / ISelectionService / LayerManager 注入本视口。
         // 返回是否实际注入。root 未 build() 时什么都不做。
-        bool bindCompositionRoot(ApplicationCompositionRoot& root);
-
         // 低耦合：UI 只见 Apr::IViewportServices，不见 ApplicationCompositionRoot/SceneDocument2D/OperationBus。
         void bindViewportServices(IViewportServices& services);
 
