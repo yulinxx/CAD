@@ -28,6 +28,7 @@ namespace Apr
         {
         public:
             CenterView centerView;
+            PanelFactory panels;
             Commands commands;
 
             void destroy() override
@@ -60,6 +61,7 @@ namespace RD
         module.strProfilePath = QString::fromUtf8(UI_CUSTOMER_PROFILE);
         module.strStyleSeries = QStringLiteral("april");
         module.centerView = &parts->centerView;
+        module.listWidgetFactoriesBind.append({ QStringLiteral("april.panel"), &parts->panels });  // M4：旧 UI 界面部件
         module.cmdCatalog = &parts->commands;    // M4
         module.cmdInvoker = &parts->commands;    // M4
         module.cmdState = &parts->commands;      // M4
