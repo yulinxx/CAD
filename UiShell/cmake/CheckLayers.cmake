@@ -209,6 +209,28 @@ _scan_scope("${_ref}(${_layer_model}|${_layer_titlebar}|${_layer_platform})/|win
 
 # 祖先窗口强转属于越界依赖：标题栏与客户模块不得向上查找主窗口。
 # 用代码级扫描补住 include 检查抓不到的口子。
+# ============================================================
+# 低耦合守卫：UiShell 核心（Contract/Model/Assembly/TitleBar/Platform/i18n + UiDialogs + main）
+# 不得 include / 引用 Main 框架、AprilCore/AprilUi、Main::AppBootstrapper、ApplicationCompositionRoot、UiWorkbench。
+# customers/<X> 是唯一允许耦合 AprilCore/AprilUi 的层，不在此扫描范围内。
+# ============================================================
+set(_forbid_main_coupling
+    "Main/Src|Main/|Composition/|ApplicationCompositionRoot|AppBootstrapper|AprilCore|AprilUi|UiWorkbench|MainApp")
+
+_scan_scope("${_forbid_main_coupling}"
+    "include/UiShell/**"
+    "src/**"
+    "dialogs/**"
+    "main/**"
+)
+
+_scan_lines("${_forbid_main_coupling}"
+    "include/UiShell/**"
+    "src/**"
+    "dialogs/**"
+    "main/**"
+)
+
 _scan_lines("parentWidget\\s*\\(\\s*\\)\\s*->"
     "${_pub_root}/${_layer_titlebar}/*.h" "src/${_layer_titlebar}/*.h" "src/${_layer_titlebar}/*.cpp"
     "customers/*/CustomerModule.cpp")
