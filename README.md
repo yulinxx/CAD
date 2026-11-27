@@ -25,6 +25,13 @@ April/
 │   │   ├── License/          # 激活对话框（LicenseDialog，核心实现见 Licensing/License）
 │   │   └── Composition/      # 依赖注入、命令注册
 │   └── CMakeLists.txt        # 主应用构建配置
+├── UiShell/                  # 新 UI 外壳（SampleFrame 架构，与 Main 并行迁移）
+│   ├── include/UiShell/      # Contract 契约层（纯接口、稳定 id、纯数据）
+│   ├── src/                  # Model / Assembly / i18n / TitleBar / Platform
+│   ├── dialogs/              # UiDialogs 共享对话框（静态库）
+│   ├── customers/            # 客户模块（MantiSoft / TyvokStudio / GoodLaser）
+│   ├── main/                 # 薄 EXE 入口（AppBootstrap / StartupSession）
+│   └── MIGRATION.md          # Main → UiShell 迁移计划（M0~M6）
 ├── Engine/                   # 图形引擎
 │   ├── Common/               # 通用几何算法、数学工具
 │   ├── Persistence/          # 引擎持久化基类
@@ -115,6 +122,11 @@ April/
 | **UICommon** | 通用 UI 组件、状态中心、命令系统 | Qt Widgets | UiEngineAccess（链接层门面） |
 | **UI2D** | 2D UI 组件：工具栏、绘制工具、属性面板、视口画布（工作台窗口在 Main） | Qt Widgets | UICommon, UiEngineAccess |
 | **UI3D** | 3D 工作台：场景树、设置对话框、3D 视口 | Qt Widgets | UICommon, UiEngineAccess, GeoModelCore |
+
+> **UiShell（迁移中）**：`UiShell/` 是按 SampleFrame 架构建立的新 UI 外壳，
+> 与现有 `Main` 并行存在，默认随根工程构建（`-DBUILD_UI_SHELL=OFF` 可关闭）。
+> 产物在 `build/bin_Qt6/shell/`，测试用 `ctest -R "UiTst|UiLayerCheck"`。
+> 搬迁路线见 `UiShell/MIGRATION.md`。
 
 ### 功能模块
 

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 52</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="icon" transform="translate(-743.000000, -286.000000)">
+            <g id="编组-52" transform="translate(743.000000, 286.000000)">
+                <rect id="矩形备份-66" x="0" y="0" width="16" height="16"></rect>
+                <g id="编组-12备份" transform="translate(8.000000, 8.000000) rotate(-180.000000) translate(-8.000000, -8.000000) ">
+                    <rect id="矩形" fill="#C2C2C2" transform="translate(8.000000, 0.500000) rotate(-90.000000) translate(-8.000000, -0.500000) " x="7.5" y="-7.5" width="1" height="16" rx="0.5"></rect>
+                    <rect id="矩形" stroke="#C2C2C2" transform="translate(4.500000, 7.500000) rotate(-90.000000) translate(-4.500000, -7.500000) " x="-0.5" y="5.5" width="10" height="4" rx="1"></rect>
+                    <rect id="矩形备份-59" stroke="#C2C2C2" transform="translate(11.500000, 9.000000) rotate(-90.000000) translate(-11.500000, -9.000000) " x="5" y="7" width="13" height="4" rx="1"></rect>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

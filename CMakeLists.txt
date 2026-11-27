@@ -352,6 +352,13 @@ endif()
 # 8. 应用入口
 add_subdirectory(Main)
 
+# 8.1 新 UI 外壳（SampleFrame 架构）——与现有 Main 并行，逐步迁移。
+# 默认开启；不需要时 -DBUILD_UI_SHELL=OFF。产物落在 <build>/bin_Qt6/shell。
+option(BUILD_UI_SHELL "Build the SampleFrame-style UiShell subsystem" ON)
+if(BUILD_UI_SHELL AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/UiShell/CMakeLists.txt")
+    add_subdirectory(UiShell)
+endif()
+
 # 9. 客户 UI 插件（Clients/<clientId> 独立仓库 / submodule）
 option(APR_BUILD_CLIENT_PLUGINS "Build per-client UI plugins from Clients/*" ON)
 if(APR_BUILD_CLIENT_PLUGINS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Clients/CMakeLists.txt")
@@ -661,9 +668,28 @@ if(APR_PYTHON_HOST)
 endif()
 
 # ============================================================================
-# CPack 配置
+# GUI 测试 offscreen 说明
+#
+# 当前 offscreen 注入在两处：
+#   1. 各 Test/CMakeLists.txt 里 gtest_discover_tests(... PROPERTIES ENVIRONMENT ...)
+#      UI2DCoreTests 已有 PATH 设置；其他 GUI 测试（TextEditService/FillDialog/
+#      BooleanRouting 等）在独立构建/CI 上通过 workflow 层全局设 QT_QPA_PLATFORM。
+#   2. apr_add_test(... GUI) 封装函数（Utils.cmake）——新模块用这个函数写测试，
+#      自动注入 offscreen + Qt 组件 + DLL 部署。
+#
+# 为什么不在根 CMakeLists.txt 用 set_tests_properties 批量打：
+#   gtest_discover_tests(PRE_TEST) 模式下，测试条目在 configure 阶段还不存在
+#   （推迟到 ctest 运行时发现）。configure 阶段 set_tests_properties 找不到它们。
 # ============================================================================
-include(CMake/Packaging.cmake)
 
-# 全部模块与降级动作都已完成后，再打印最终测试状态（唯一打印点）
-apr_print_test_status()
+# ============================================================================
+# 关于静态分析门禁的 CTest 注册
+#
+# CheckDependencies / UiEngineAccessRatchet / SceneWriteSurface / CheckCApi /
+# ENABLE_* 宏传播校验 —— 这些脚本不能用 cmake -P 独立执行（依赖 configure 阶段
+# add_subdirectory 完的 target 列表）。configure 硬门禁已经能在 configure 阶段
+# 阻断流程，CI 里看到 "Configure failed" 就能定位。
+#
+# 如果后续重做成独立可执行脚本，可在这里加 add_test(NAME Gate.XXX
+# COMMAND ${CMAKE_COMMAND} -P xxx.cmake) 并 set_tests_properties(LABELS gate)。
+# ============================================================================

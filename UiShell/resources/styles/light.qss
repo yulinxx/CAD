@@ -1,0 +1,638 @@
+/* ============================================================
+   浅色皮肤（light）
+   由 UiShell 在启动与皮肤切换时统一应用到 QApplication；
+   应用到 qApp 后，框架、客户 DLL 与宿主 exe 里的控件都会被同一份
+   样式命中，不需要每个 DLL 自己加载样式。
+   选择器约定：
+     控件语义 → 动态属性 msuiRole（QSS 的 #id 选择器无法表达含
+                '.'/':' 的 objectName，属性选择器更稳）
+     客户品牌 → 动态属性 msuiSeries（demo / mantisoft / tyvokstudio / goodlaser）
+   ============================================================ */
+
+/* 底色与文字由Shell切换时设置的 QPalette 提供（浅色=系统标准调色板），
+   这里只定义需要 QSS 表达的部分：边框、选中态、悬停态与品牌色。
+   这样 profile 通过 palette 指定的标题栏颜色仍然有效。 */
+
+/* ---------- 菜单栏 ---------- */
+QMenuBar {
+    background-color: #e9ecf1;
+    border-bottom: 1px solid #c6ccd6;
+}
+
+QMenuBar::item {
+    background: transparent;
+    padding: 5px 10px;
+    border-radius: 3px;
+}
+
+QMenuBar::item:selected {
+    background-color: #d5dce6;
+    color: #0b2e4f;
+}
+
+/* 标题栏内嵌菜单：透明背景、无边框，文字色由 TitleBar 的调色板提供，
+   这样 profile 配置 textColor 时菜单与标题文字始终一致。 */
+QMenuBar[msuiRole="titlebarMenu"] {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+QMenuBar[msuiRole="titlebarMenu"]::item {
+    background: transparent;
+    /* 菜单项基础内边距；垂直居中由 C++ 布局层 AlignVCenter 保证 */
+    padding: 4px 8px;
+}
+
+QMenuBar[msuiRole="titlebarMenu"]::item:selected {
+    background-color: rgba(0, 0, 0, 0.10);
+}
+
+QMenuBar[msuiRole="titlebarMenu"]::item:pressed {
+    background-color: rgba(0, 0, 0, 0.16);
+    color: palette(window-text);
+}
+
+/* ---------- 菜单 ---------- */
+QMenu {
+    background-color: #ffffff;
+    border: 1px solid #c6ccd6;
+    color: #1f2328;
+    padding: 4px;
+}
+
+QMenu::item {
+    padding: 5px 24px 5px 18px;
+    border-radius: 3px;
+}
+
+QMenu::item:selected {
+    background-color: #d5e4f5;
+    color: #0b2e4f;
+}
+
+QMenu::item:disabled {
+    color: #9aa3ad;
+}
+
+QMenu::separator {
+    height: 1px;
+    background: #d7dce3;
+    margin: 4px 8px;
+}
+
+/* ---------- 标题栏 ---------- */
+QWidget[msuiRole="titlebar"] {
+    border-bottom: 1px solid #c6ccd6;
+}
+
+QLabel[msuiRole="titlebarText"] {
+    background: transparent;
+}
+
+QWidget[msuiRole="titlebarButtons"] QToolButton {
+    background: transparent;
+    border: none;
+    font-size: 14px;
+}
+
+QWidget[msuiRole="titlebarButtons"] QToolButton:hover {
+    background-color: rgba(0, 0, 0, 28);
+}
+
+QWidget[msuiRole="titlebarButtons"] QToolButton:pressed {
+    background-color: rgba(0, 0, 0, 52);
+}
+
+/* ---------- 面板：演示（demo） ---------- */
+QFrame[msuiRole="panel"],
+QLabel[msuiRole="panel"] {
+    border-radius: 2px;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="demo"],
+QLabel[msuiRole="panel"][msuiSeries="demo"] {
+    background-color: #dbeafe;
+    border: 1px solid #3b82f6;
+    color: #1e3a8a;
+}
+
+/* ---------- 面板：MantiSoft（蓝） ---------- */
+QFrame[msuiRole="panel"][msuiSeries="mantisoft"] {
+    background-color: #eff6ff;
+    border: 1px solid #7ab3ef;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="mantisoft"] QLabel {
+    color: #14508c;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="mantisoft"] QPushButton {
+    background-color: #2563eb;
+    color: #ffffff;
+    border: 1px solid #1d4ed8;
+    border-radius: 3px;
+    padding: 4px 10px;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="mantisoft"] QPushButton:hover {
+    background-color: #1d4ed8;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="mantisoft"] QPushButton:pressed {
+    background-color: #1e40af;
+}
+
+QLabel[msuiRole="panelStatus"][msuiSeries="mantisoft"] {
+    background-color: #dbeafe;
+    border: 1px solid #7ab3ef;
+    color: #1e3a8a;
+    padding-left: 8px;
+}
+
+/* ---------- 面板：TyvokStudio（绿） ---------- */
+QFrame[msuiRole="panel"][msuiSeries="tyvokstudio"] {
+    background-color: #f0fdf4;
+    border: 1px solid #86efac;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="tyvokstudio"] QLabel {
+    color: #14532d;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="tyvokstudio"] QPushButton {
+    background-color: #16a34a;
+    color: #ffffff;
+    border: 1px solid #15803d;
+    border-radius: 3px;
+    padding: 5px 12px;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="tyvokstudio"] QPushButton:hover {
+    background-color: #15803d;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="tyvokstudio"] QPushButton:pressed {
+    background-color: #166534;
+}
+
+QLabel[msuiRole="panelStatus"][msuiSeries="tyvokstudio"] {
+    background-color: #dcfce7;
+    border: 1px solid #86efac;
+    color: #166534;
+    padding-left: 8px;
+}
+
+/* ---------- 面板：GoodLaser（橙） ---------- */
+QFrame[msuiRole="panel"][msuiSeries="goodlaser"] {
+    background-color: #fff7ed;
+    border: 1px solid #fdba74;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="goodlaser"] QLabel {
+    color: #7c2d12;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="goodlaser"] QPushButton {
+    background-color: #ea580c;
+    color: #ffffff;
+    border: 1px solid #c2410c;
+    border-radius: 3px;
+    padding: 5px 12px;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="goodlaser"] QPushButton:hover {
+    background-color: #c2410c;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="goodlaser"] QPushButton:pressed {
+    background-color: #9a3412;
+}
+
+QLabel[msuiRole="panelStatus"][msuiSeries="goodlaser"] {
+    background-color: #fff7ed;
+    border: 1px solid #fdba74;
+    color: #9a3412;
+    padding-left: 8px;
+}
+
+/* ---------- 面板标题 ---------- */
+QLabel[msuiRole="panelTitle"] {
+    background: transparent;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+QLabel[msuiRole="panelTitle"][msuiSeries="tyvokstudio"] {
+    font-size: 16px;
+}
+
+/* ---------- 中央视图 ---------- */
+QLabel[msuiRole="centerView"][msuiSeries="demo"] {
+    background-color: #f3f4f6;
+    border: 1px dashed #9ca3af;
+    color: #6b7280;
+    font-size: 16px;
+}
+
+QLabel[msuiRole="centerView"][msuiSeries="mantisoft"] {
+    background-color: #f8fbff;
+    border: 1px dashed #7ab3ef;
+    color: #14508c;
+    font-size: 22px;
+}
+
+QLabel[msuiRole="centerView"][msuiSeries="tyvokstudio"] {
+    background-color: #f7fdf9;
+    border: 2px dashed #22c55e;
+    color: #166534;
+    font-size: 22px;
+}
+
+QLabel[msuiRole="centerView"][msuiSeries="goodlaser"] {
+    background-color: #fffbf5;
+    border: 2px dashed #fb923c;
+    color: #9a3412;
+    font-size: 22px;
+}
+
+/* ---------- 列表 / 文本框 ---------- */
+QListWidget {
+    background-color: #ffffff;
+    border: 1px solid #d0d5dc;
+    color: #1f2328;
+    outline: none;
+}
+
+QListWidget::item {
+    padding: 3px 6px;
+}
+
+QListWidget::item:selected {
+    background-color: #d5e4f5;
+    color: #0b2e4f;
+}
+
+QListWidget[msuiRole="panelList"][msuiSeries="tyvokstudio"] {
+    background-color: #f0fdf4;
+    border: 1px solid #86efac;
+    color: #14532d;
+}
+
+QListWidget[msuiRole="panelList"][msuiSeries="tyvokstudio"]::item:selected {
+    background-color: #bbf7d0;
+    color: #14532d;
+}
+
+QListWidget[msuiRole="panelList"][msuiSeries="goodlaser"] {
+    background-color: #fff7ed;
+    border: 1px solid #fdba74;
+    color: #7c2d12;
+}
+
+QListWidget[msuiRole="panelList"][msuiSeries="goodlaser"]::item:selected {
+    background-color: #fed7aa;
+    color: #7c2d12;
+}
+
+QTextEdit,
+QPlainTextEdit {
+    background-color: #ffffff;
+    border: 1px solid #d0d5dc;
+    color: #1f2328;
+}
+
+QTextEdit[msuiRole="panelLog"][msuiSeries="goodlaser"] {
+    background-color: #fff7ed;
+    border: 1px solid #fdba74;
+    color: #7c2d12;
+    font-family: Consolas, monospace;
+}
+
+/* ---------- 按钮 / 输入 ---------- */
+QPushButton {
+    background-color: #e6eaf0;
+    border: 1px solid #c6ccd6;
+    border-radius: 3px;
+    color: #1f2328;
+    padding: 4px 10px;
+}
+
+QPushButton:hover {
+    background-color: #dbe2ea;
+}
+
+QPushButton:pressed {
+    background-color: #cfd7e0;
+}
+
+QPushButton:disabled {
+    background-color: #eef0f3;
+    color: #9aa3ad;
+    border-color: #d7dce3;
+}
+
+QComboBox {
+    background-color: #ffffff;
+    border: 1px solid #c6ccd6;
+    border-radius: 3px;
+    color: #1f2328;
+    padding: 2px 6px;
+}
+
+QComboBox:hover {
+    border-color: #9aa3ad;
+}
+
+QComboBox:focus {
+    border-color: #3b82f6;
+}
+
+QComboBox::drop-down {
+    border-left: 1px solid #d7dce3;
+    width: 18px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #ffffff;
+    border: 1px solid #c6ccd6;
+    color: #1f2328;
+    selection-background-color: #d5e4f5;
+    selection-color: #0b2e4f;
+}
+
+/* ---------- 宿主状态文字 ---------- */
+QLabel[msuiRole="status"] {
+    background: transparent;
+    color: #b91c1c;
+}
+
+/* ---------- 数值 / 文本输入 ---------- */
+/* 只设外框与颜色，上下箭头仍由平台样式绘制。 */
+QSpinBox,
+QDoubleSpinBox,
+QLineEdit {
+    background-color: #ffffff;
+    border: 1px solid #c6ccd6;
+    border-radius: 3px;
+    color: #1f2328;
+    padding: 2px 4px;
+    selection-background-color: #d5e4f5;
+    selection-color: #0b2e4f;
+}
+
+QSpinBox:hover,
+QDoubleSpinBox:hover,
+QLineEdit:hover {
+    border-color: #9aa3ad;
+}
+
+QSpinBox:focus,
+QDoubleSpinBox:focus,
+QLineEdit:focus,
+QPlainTextEdit:focus {
+    border-color: #3b82f6;
+}
+
+QSpinBox:disabled,
+QDoubleSpinBox:disabled,
+QLineEdit:disabled {
+    background-color: #eef0f3;
+    color: #9aa3ad;
+    border-color: #d7dce3;
+}
+
+/* 数值框、可编辑下拉框内部的编辑框：不要再画一层边框 */
+QSpinBox QLineEdit,
+QDoubleSpinBox QLineEdit,
+QComboBox QLineEdit {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+/* ---------- 滑块（水平） ---------- */
+QSlider::groove:horizontal {
+    height: 4px;
+    background: #d7dce3;
+    border-radius: 2px;
+}
+
+QSlider::sub-page:horizontal {
+    background: #93b4f7;
+    border-radius: 2px;
+}
+
+QSlider::handle:horizontal {
+    width: 14px;
+    margin: -6px 0;
+    border-radius: 7px;
+    background: #ffffff;
+    border: 1px solid #9aa3ad;
+}
+
+QSlider::handle:horizontal:hover {
+    border-color: #3b82f6;
+}
+
+/* ---------- 工具栏（shell 的 msui.toolbar） ---------- */
+QToolBar[msuiRole="toolbar"] {
+    background-color: #f3f5f8;
+    border: none;
+    border-bottom: 1px solid #d7dce3;
+    spacing: 2px;
+    padding: 2px 4px;
+}
+
+QToolBar[msuiRole="toolbar"]::separator {
+    background: #d7dce3;
+    width: 1px;
+    margin: 4px 4px;
+}
+
+QToolBar QToolButton {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    padding: 3px 6px;
+    color: #1f2328;
+}
+
+QToolBar QToolButton:hover {
+    background-color: #e2e7ee;
+    border-color: #c6ccd6;
+}
+
+QToolBar QToolButton:pressed {
+    background-color: #d5dce6;
+}
+
+QToolBar QToolButton:checked {
+    background-color: #d5e4f5;
+    border-color: #3b82f6;
+    color: #0b2e4f;
+}
+
+QToolBar QToolButton:disabled {
+    color: #9aa3ad;
+}
+
+/* ---------- 提示 ---------- */
+QToolTip {
+    background-color: #ffffff;
+    border: 1px solid #c6ccd6;
+    color: #1f2328;
+    padding: 3px 6px;
+}
+
+/* ---------- 对话框 ---------- */
+/* 对话框底色与文字来自调色板；工厂经 markDialog() 打上 msuiRole="dialog" 与客户的 msuiSeries，
+   下面按系列给默认按钮、焦点边框与滑块套用品牌色。 */
+
+/* MantiSoft（蓝） */
+QDialog[msuiRole="dialog"][msuiSeries="mantisoft"] QPushButton:default {
+    background-color: #2563eb;
+    border-color: #1d4ed8;
+    color: #ffffff;
+}
+
+QDialog[msuiRole="dialog"][msuiSeries="mantisoft"] QPushButton:default:hover {
+    background-color: #1d4ed8;
+}
+
+QDialog[msuiRole="dialog"][msuiSeries="mantisoft"] QSpinBox:focus,
+QDialog[msuiRole="dialog"][msuiSeries="mantisoft"] QDoubleSpinBox:focus,
+QDialog[msuiRole="dialog"][msuiSeries="mantisoft"] QLineEdit:focus,
+QDialog[msuiRole="dialog"][msuiSeries="mantisoft"] QComboBox:focus,
+QDialog[msuiRole="dialog"][msuiSeries="mantisoft"] QPlainTextEdit:focus {
+    border-color: #2563eb;
+}
+
+QDialog[msuiRole="dialog"][msuiSeries="mantisoft"] QSlider::sub-page:horizontal {
+    background: #7ab3ef;
+}
+
+QDialog[msuiRole="dialog"][msuiSeries="mantisoft"] QSlider::handle:horizontal {
+    background: #2563eb;
+    border-color: #1d4ed8;
+}
+
+/* TyvokStudio（绿） */
+QDialog[msuiRole="dialog"][msuiSeries="tyvokstudio"] QPushButton:default {
+    background-color: #16a34a;
+    border-color: #15803d;
+    color: #ffffff;
+}
+
+QDialog[msuiRole="dialog"][msuiSeries="tyvokstudio"] QPushButton:default:hover {
+    background-color: #15803d;
+}
+
+QDialog[msuiRole="dialog"][msuiSeries="tyvokstudio"] QSpinBox:focus,
+QDialog[msuiRole="dialog"][msuiSeries="tyvokstudio"] QDoubleSpinBox:focus,
+QDialog[msuiRole="dialog"][msuiSeries="tyvokstudio"] QLineEdit:focus,
+QDialog[msuiRole="dialog"][msuiSeries="tyvokstudio"] QComboBox:focus,
+QDialog[msuiRole="dialog"][msuiSeries="tyvokstudio"] QPlainTextEdit:focus {
+    border-color: #16a34a;
+}
+
+QDialog[msuiRole="dialog"][msuiSeries="tyvokstudio"] QSlider::sub-page:horizontal {
+    background: #86efac;
+}
+
+QDialog[msuiRole="dialog"][msuiSeries="tyvokstudio"] QSlider::handle:horizontal {
+    background: #16a34a;
+    border-color: #15803d;
+}
+
+/* GoodLaser（橙） */
+QDialog[msuiRole="dialog"][msuiSeries="goodlaser"] QPushButton:default {
+    background-color: #ea580c;
+    border-color: #c2410c;
+    color: #ffffff;
+}
+
+QDialog[msuiRole="dialog"][msuiSeries="goodlaser"] QPushButton:default:hover {
+    background-color: #c2410c;
+}
+
+QDialog[msuiRole="dialog"][msuiSeries="goodlaser"] QSpinBox:focus,
+QDialog[msuiRole="dialog"][msuiSeries="goodlaser"] QDoubleSpinBox:focus,
+QDialog[msuiRole="dialog"][msuiSeries="goodlaser"] QLineEdit:focus,
+QDialog[msuiRole="dialog"][msuiSeries="goodlaser"] QComboBox:focus,
+QDialog[msuiRole="dialog"][msuiSeries="goodlaser"] QPlainTextEdit:focus {
+    border-color: #ea580c;
+}
+
+QDialog[msuiRole="dialog"][msuiSeries="goodlaser"] QSlider::sub-page:horizontal {
+    background: #fdba74;
+}
+
+QDialog[msuiRole="dialog"][msuiSeries="goodlaser"] QSlider::handle:horizontal {
+    background: #ea580c;
+    border-color: #c2410c;
+}
+
+/* 面板里的工具按钮（如共用命令动作的按钮）与同系列 QPushButton 一致 */
+QFrame[msuiRole="panel"][msuiSeries="mantisoft"] QToolButton {
+    background-color: #2563eb;
+    color: #ffffff;
+    border: 1px solid #1d4ed8;
+    border-radius: 3px;
+    padding: 4px 10px;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="mantisoft"] QToolButton:hover {
+    background-color: #1d4ed8;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="mantisoft"] QToolButton:pressed {
+    background-color: #1e40af;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="tyvokstudio"] QToolButton {
+    background-color: #16a34a;
+    color: #ffffff;
+    border: 1px solid #15803d;
+    border-radius: 3px;
+    padding: 5px 12px;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="tyvokstudio"] QToolButton:hover {
+    background-color: #15803d;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="tyvokstudio"] QToolButton:pressed {
+    background-color: #166534;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="goodlaser"] QToolButton {
+    background-color: #ea580c;
+    color: #ffffff;
+    border: 1px solid #c2410c;
+    border-radius: 3px;
+    padding: 5px 12px;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="goodlaser"] QToolButton:hover {
+    background-color: #c2410c;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="goodlaser"] QToolButton:pressed {
+    background-color: #9a3412;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="mantisoft"] QToolButton:disabled {
+    background-color: transparent;
+    color: #9aa3ad;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="tyvokstudio"] QToolButton:disabled {
+    background-color: transparent;
+    color: #9aa3ad;
+}
+
+QFrame[msuiRole="panel"][msuiSeries="goodlaser"] QToolButton:disabled {
+    background-color: transparent;
+    color: #9aa3ad;
+}

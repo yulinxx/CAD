@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>向内移动_move-in</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="icon" transform="translate(-1911.000000, -174.000000)">
+            <g id="向内移动_move-in" transform="translate(1911.000000, 174.000000)">
+                <polyline id="路径" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round" points="6.47619048 3.42857143 8 4.95238095 9.52380952 3.42857143"></polyline>
+                <line x1="8" y1="4.95238095" x2="8" y2="0.5" id="路径" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round"></line>
+                <polyline id="路径" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round" points="6.47619048 12.5714286 8 11.047619 9.52380952 12.5714286"></polyline>
+                <line x1="8" y1="11.047619" x2="8" y2="15.5" id="路径" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round"></line>
+                <polyline id="路径" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round" points="12.5714286 6.47619048 11.047619 8 12.5714286 9.52380952"></polyline>
+                <line x1="11.047619" y1="8" x2="15.5" y2="8" id="路径" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round"></line>
+                <polyline id="路径" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round" points="3.42857143 6.47619048 4.95238095 8 3.42857143 9.52380952"></polyline>
+                <line x1="4.95238095" y1="8" x2="0.5" y2="8" id="路径" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round"></line>
+                <rect id="矩形" fill="#C2C2C2" x="7" y="7" width="2" height="2" rx="0.5"></rect>
+            </g>
+        </g>
+    </g>
+</svg>

@@ -1,0 +1,24 @@
+# 所有文本文件统一 LF 入库，工作区也保持 LF（跨平台一致）
+* text=auto eol=lf
+
+# —— Windows 原生脚本保留 CRLF ——
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# —— 二进制不做行尾转换 ——
+*.png   binary
+*.ico   binary
+*.bmp   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.exe   binary
+*.dll   binary
+*.lib   binary
+*.pdb   binary
+*.obj   binary
+*.pch   binary
+*.zip   binary
+*.7z    binary
+*.pdf   binary

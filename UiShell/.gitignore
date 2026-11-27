@@ -1,0 +1,114 @@
+# ============================================================
+# 构建输出
+# CMakePresets 的 binaryDir 为 build/<presetName>（customer-a / customer-b / customer-c）
+# ============================================================
+/build*/
+/out/
+/install/
+
+# 本树 build/ 下实际用过的构建目录名与截图导出目录；
+# 一旦直接在源码根用这些名字配置/导出，同样不该入库。
+/vs20*/
+/manual-vs-*/
+/msui-*/
+/customer_[abc]/
+/verifyShots/
+/.cmake/
+_deps/
+*_autogen/
+
+# 在源码树内直接配置时产生的 CMake 产物
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+Testing/
+compile_commands.json
+*.cmake.stamp
+*.dir/
+Makefile
+*.ninja
+.ninja_*
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.vcproj
+*.vcproj.user
+
+# 本机私有配置（团队共享的是 CMakePresets.json 与 CMakeUserPresets.json.example）
+CMakeUserPresets.json
+
+# ============================================================
+# 编译器 / 链接器中间产物
+# ============================================================
+*.obj
+*.o
+*.pdb
+*.ilk
+*.idb
+*.exp
+*.lib
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.dll.a
+*.tlog
+*.lastbuildstate
+*.res
+*.aps
+*.log
+*.tmp
+*.bak
+*.orig
+*.rej
+*.swp
+
+# ============================================================
+# windeployqt 部署产物（Qt 运行库、插件目录、语言包）
+# 源码里的 translations/*.ts 需要跟踪，编译出的 *.qm 不入库
+# ============================================================
+Qt5*.dll
+Qt6*.dll
+D3Dcompiler_*.dll
+opengl32sw.dll
+libEGL.dll
+libGLESv2.dll
+vc_redist.*.exe
+*.qm
+
+/platforms/
+/imageformats/
+/iconengines/
+/styles/
+/sqldrivers/
+/tls/
+/networkinformation/
+/translations/qt_*.qm
+
+# ============================================================
+# IDE / 编辑器本地目录
+# ============================================================
+.vs/
+.idea/
+.vscode/
+.clangd/
+.cache/
+*.user
+*.suo
+*.sdf
+*.opensdf
+*.VC.db
+*.code-workspace
+
+# ============================================================
+# 操作系统产生的杂项
+# ============================================================
+Thumbs.db
+ehthumbs.db
+desktop.ini
+.DS_Store

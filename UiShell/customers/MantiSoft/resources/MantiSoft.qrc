@@ -1,0 +1,118 @@
+<RCC>
+    <qresource prefix="/MantiSoft">
+        <!-- 客户自管样式表：ThemeController 先查 :/MantiSoft/styles/<id>.qss，
+             找不到才回退框架默认 :/UiShell/styles/<id>.qss。
+             资源路径 = prefix + "/" + file 相对路径，
+             例如这里的 styles/dark.qss 运行时就是 :/MantiSoft/styles/dark.qss。 -->
+        <file alias="styles/dark.qss">styles/dark.qss</file>
+        <file alias="styles/light.qss">styles/light.qss</file>
+    </qresource>
+
+    <!-- 图标资源：prefix /MantiSoft/icons，alias 保持文件名简短。
+         运行时访问路径如 :/MantiSoft/icons/Pen.svg -->
+    <qresource prefix="/MantiSoft/icons">
+        <file alias="AlignBottom.svg">../assets/icons/svg/AlignBottom.svg</file>
+        <file alias="AlignLeft.svg">../assets/icons/svg/AlignLeft.svg</file>
+        <file alias="AlignRight.svg">../assets/icons/svg/AlignRight.svg</file>
+        <file alias="AlignTop.svg">../assets/icons/svg/AlignTop.svg</file>
+        <file alias="AngularMirroring.svg">../assets/icons/svg/AngularMirroring.svg</file>
+        <file alias="ArtLibrary.svg">../assets/icons/svg/ArtLibrary.svg</file>
+        <file alias="BitmapClipping.svg">../assets/icons/svg/BitmapClipping.svg</file>
+        <file alias="BitmapEdge.svg">../assets/icons/svg/BitmapEdge.svg</file>
+        <file alias="BooleanAndOperations.svg">../assets/icons/svg/BooleanAndOperations.svg</file>
+        <file alias="BooleanSubtractionAB.svg">../assets/icons/svg/BooleanSubtractionAB.svg</file>
+        <file alias="BooleanSubtractionBA.svg">../assets/icons/svg/BooleanSubtractionBA.svg</file>
+        <file alias="BooleanSumOperation.svg">../assets/icons/svg/BooleanSumOperation.svg</file>
+        <file alias="Bridge.svg">../assets/icons/svg/Bridge.svg</file>
+        <file alias="CenterAlignmentGeneral.svg">../assets/icons/svg/CenterAlignmentGeneral.svg</file>
+        <file alias="Chamfer.svg">../assets/icons/svg/Chamfer.svg</file>
+        <file alias="Circle.svg">../assets/icons/svg/Circle.svg</file>
+        <file alias="CircularRow.svg">../assets/icons/svg/CircularRow.svg</file>
+        <file alias="ConsoleProcessControl.svg">../assets/icons/svg/ConsoleProcessControl.svg</file>
+        <file alias="Coordinate.svg">../assets/icons/svg/Coordinate.svg</file>
+        <file alias="Disband.svg">../assets/icons/svg/Disband.svg</file>
+        <file alias="DisbandAll.svg">../assets/icons/svg/DisbandAll.svg</file>
+        <file alias="Ellipse.svg">../assets/icons/svg/Ellipse.svg</file>
+        <file alias="Enlarge.svg">../assets/icons/svg/Enlarge.svg</file>
+        <file alias="ExpandDown.svg">../assets/icons/svg/ExpandDown.svg</file>
+        <file alias="ExpandUp.svg">../assets/icons/svg/ExpandUp.svg</file>
+        <file alias="FitToCanvasRegular.svg">../assets/icons/svg/FitToCanvasRegular.svg</file>
+        <file alias="FusionWelding.svg">../assets/icons/svg/FusionWelding.svg</file>
+        <file alias="GraphicsLibrary.svg">../assets/icons/svg/GraphicsLibrary.svg</file>
+        <file alias="Group.svg">../assets/icons/svg/Group.svg</file>
+        <file alias="HandOpenGeneral.svg">../assets/icons/svg/HandOpenGeneral.svg</file>
+        <file alias="HorizontalCenterIsometric.svg">../assets/icons/svg/HorizontalCenterIsometric.svg</file>
+        <file alias="HorizontalMirroring.svg">../assets/icons/svg/HorizontalMirroring.svg</file>
+        <file alias="HorizontallyCentered.svg">../assets/icons/svg/HorizontallyCentered.svg</file>
+        <file alias="HorizontallyEquallySpaced.svg">../assets/icons/svg/HorizontallyEquallySpaced.svg</file>
+        <file alias="ImageProcessingRegular.svg">../assets/icons/svg/ImageProcessingRegular.svg</file>
+        <file alias="InTheExternalExpansion.svg">../assets/icons/svg/InTheExternalExpansion.svg</file>
+        <file alias="Layer.svg">../assets/icons/svg/Layer.svg</file>
+        <file alias="Lead.svg">../assets/icons/svg/Lead.svg</file>
+        <file alias="Log.svg">../assets/icons/svg/Log.svg</file>
+        <file alias="MandatoryContour.svg">../assets/icons/svg/MandatoryContour.svg</file>
+        <file alias="MandatoryEqualWidth.svg">../assets/icons/svg/MandatoryEqualWidth.svg</file>
+        <file alias="Manual.svg">../assets/icons/svg/Manual.svg</file>
+        <file alias="Material.svg">../assets/icons/svg/Material.svg</file>
+        <file alias="Measurement.svg">../assets/icons/svg/Measurement.svg</file>
+        <file alias="MicroEven.svg">../assets/icons/svg/MicroEven.svg</file>
+        <file alias="MoveBottomGeneral.svg">../assets/icons/svg/MoveBottomGeneral.svg</file>
+        <file alias="MoveLeftGeneral.svg">../assets/icons/svg/MoveLeftGeneral.svg</file>
+        <file alias="MoveRightGeneral.svg">../assets/icons/svg/MoveRightGeneral.svg</file>
+        <file alias="MoveTopGeneral.svg">../assets/icons/svg/MoveTopGeneral.svg</file>
+        <file alias="MoveTheLaserHeadPosition.svg">../assets/icons/svg/MoveTheLaserHeadPosition.svg</file>
+        <file alias="MoveToCenterOfPage.svg">../assets/icons/svg/MoveToCenterOfPage.svg</file>
+        <file alias="MoveToTheBottomLeftCornerOfThePage.svg">../assets/icons/svg/MoveToTheBottomLeftCornerOfThePage.svg</file>
+        <file alias="MoveToTheBottomRightCornerOfThePage.svg">../assets/icons/svg/MoveToTheBottomRightCornerOfThePage.svg</file>
+        <file alias="MoveToTheTopLeftCornerOfThePage.svg">../assets/icons/svg/MoveToTheTopLeftCornerOfThePage.svg</file>
+        <file alias="MoveToTheTopRightCornerOfThePage.svg">../assets/icons/svg/MoveToTheTopRightCornerOfThePage.svg</file>
+        <file alias="MoveToTopRightCorner.svg">../assets/icons/svg/MoveToTopRightCorner.svg</file>
+        <file alias="MoveToUpperLeftCorner.svg">../assets/icons/svg/MoveToUpperLeftCorner.svg</file>
+        <file alias="MoveToBottomLeft.svg">../assets/icons/svg/MoveToBottomLeft.svg</file>
+        <file alias="MoveToBottomRight.svg">../assets/icons/svg/MoveToBottomRight.svg</file>
+        <file alias="NestingMenuBarB.svg">../assets/icons/svg/Nest/NestingMenuBarB.svg</file>
+        <file alias="NodeShows.svg">../assets/icons/svg/NodeShows.svg</file>
+        <file alias="OneDimensionCode.svg">../assets/icons/svg/OneDimensionCode.svg</file>
+        <file alias="PartialZoom.svg">../assets/icons/svg/PartialZoom.svg</file>
+        <file alias="PathOpt.svg">../assets/icons/svg/PathOpt.svg</file>
+        <file alias="Pen.svg">../assets/icons/svg/Pen.svg</file>
+        <file alias="Point.svg">../assets/icons/svg/Point.svg</file>
+        <file alias="Polygon.svg">../assets/icons/svg/Polygon.svg</file>
+        <file alias="QrCode.svg">../assets/icons/svg/QrCode.svg</file>
+        <file alias="RealArray.svg">../assets/icons/svg/RealArray.svg</file>
+        <file alias="Rectangle.svg">../assets/icons/svg/Rectangle.svg</file>
+        <file alias="Round.svg">../assets/icons/svg/Round.svg</file>
+        <file alias="SelectTool.svg">../assets/icons/svg/SelectTool.svg</file>
+        <file alias="ShowOpenGraph.svg">../assets/icons/svg/ShowOpenGraph.svg</file>
+        <file alias="Star.svg">../assets/icons/svg/Star.svg</file>
+        <file alias="StartingPointToModify.svg">../assets/icons/svg/StartingPointToModify.svg</file>
+        <file alias="Text.svg">../assets/icons/svg/Text.svg</file>
+        <file alias="Trim.png">../assets/icons/png/Trim.png</file>
+        <file alias="TotalOfEdge.svg">../assets/icons/svg/TotalOfEdge.svg</file>
+        <file alias="VerticalCenterEquidistant.svg">../assets/icons/svg/VerticalCenterEquidistant.svg</file>
+        <file alias="VerticalMirror.svg">../assets/icons/svg/VerticalMirror.svg</file>
+        <file alias="VerticallyCentered.svg">../assets/icons/svg/VerticallyCentered.svg</file>
+        <file alias="VerticallyEquallySpaced.svg">../assets/icons/svg/VerticallyEquallySpaced.svg</file>
+        <file alias="ZoomInToPage.svg">../assets/icons/svg/ZoomInToPage.svg</file>
+        <file alias="ZoomOut.svg">../assets/icons/svg/ZoomOut.svg</file>
+    </qresource>
+
+    <!-- 皮肤装饰图标：prefix /svg，与 dark.qss / light.qss 里的 url(:/svg/Xxx.svg) 对齐。
+         这些 SVG 从旧项目 res/svg/ 搬来；旧项目 resource.qrc 用根前缀 "/" 注册，
+         运行时路径即 :/svg/Xxx.svg。这里保持同样的运行时路径，QSS 无需改动。 -->
+    <qresource prefix="/svg">
+        <file alias="Up.svg">svg/up.svg</file>
+        <file alias="Down.svg">svg/down.svg</file>
+        <file alias="Check12x12.svg">svg/Check12x12.svg</file>
+        <file alias="Indeterminate12x12.svg">svg/indeterminate12x12.svg</file>
+        <file alias="Close.svg">svg/close.svg</file>
+        <file alias="Search.svg">svg/search.svg</file>
+        <file alias="Choose.svg">svg/choose.svg</file>
+        <file alias="ArrowUp6x10.svg">svg/ArrowUp6x10.svg</file>
+        <file alias="ArrowDown6x10.svg">svg/ArrowDown6x10.svg</file>
+        <file alias="ArrowLeft6x10.svg">svg/ArrowLeft6x10.svg</file>
+        <file alias="ArrowRight6x10.svg">svg/ArrowRight6x10.svg</file>
+        <file alias="ViewTabBarDarkClose.svg">svg/ViewTabBarDarkClose.svg</file>
+        <file alias="ViewTabBarLightClose.svg">svg/ViewTabBarLightClose.svg</file>
+    </qresource>
+</RCC>

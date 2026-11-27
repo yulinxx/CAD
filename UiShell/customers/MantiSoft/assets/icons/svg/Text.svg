@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 8</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="icon" transform="translate(-365.000000, -51.000000)">
+            <g id="编组-8" transform="translate(365.000000, 51.000000)">
+                <rect id="矩形备份-11" x="0" y="0" width="16" height="16"></rect>
+                <g id="orion-svg-sprite" transform="translate(1.500000, 0.500000)" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6.41851495,2.27373675e-13 C6.41851495,2.27373675e-13 6.41851495,14.9992279 6.41851495,14.9992279 M3.94985535,15 L8.88717454,15" id="形状"></path>
+                    <polyline id="路径" points="4.17443857e-14 1.48119576 4.17443857e-14 -2.58681965e-14 12.8370299 -2.58681965e-14 12.8370299 1.48119576"></polyline>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

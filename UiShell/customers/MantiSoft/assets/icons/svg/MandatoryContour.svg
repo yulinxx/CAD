@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 54</title>
+    <defs>
+        <rect id="path-1" x="0" y="0" width="1" height="1"></rect>
+        <mask id="mask-2" maskContentUnits="userSpaceOnUse" maskUnits="objectBoundingBox" x="0" y="0" width="1" height="1" fill="white">
+            <use xlink:href="#path-1"></use>
+        </mask>
+        <rect id="path-3" x="0" y="2" width="1" height="1"></rect>
+        <mask id="mask-4" maskContentUnits="userSpaceOnUse" maskUnits="objectBoundingBox" x="0" y="0" width="1" height="1" fill="white">
+            <use xlink:href="#path-3"></use>
+        </mask>
+        <rect id="path-5" x="0" y="4" width="1" height="1"></rect>
+        <mask id="mask-6" maskContentUnits="userSpaceOnUse" maskUnits="objectBoundingBox" x="0" y="0" width="1" height="1" fill="white">
+            <use xlink:href="#path-5"></use>
+        </mask>
+        <rect id="path-7" x="0" y="6" width="1" height="1"></rect>
+        <mask id="mask-8" maskContentUnits="userSpaceOnUse" maskUnits="objectBoundingBox" x="0" y="0" width="1" height="1" fill="white">
+            <use xlink:href="#path-7"></use>
+        </mask>
+        <rect id="path-9" x="0" y="8" width="1" height="1"></rect>
+        <mask id="mask-10" maskContentUnits="userSpaceOnUse" maskUnits="objectBoundingBox" x="0" y="0" width="1" height="1" fill="white">
+            <use xlink:href="#path-9"></use>
+        </mask>
+        <rect id="path-11" x="0" y="0" width="1" height="1"></rect>
+        <mask id="mask-12" maskContentUnits="userSpaceOnUse" maskUnits="objectBoundingBox" x="0" y="0" width="1" height="1" fill="white">
+            <use xlink:href="#path-11"></use>
+        </mask>
+        <rect id="path-13" x="0" y="2" width="1" height="1"></rect>
+        <mask id="mask-14" maskContentUnits="userSpaceOnUse" maskUnits="objectBoundingBox" x="0" y="0" width="1" height="1" fill="white">
+            <use xlink:href="#path-13"></use>
+        </mask>
+        <rect id="path-15" x="0" y="4" width="1" height="1"></rect>
+        <mask id="mask-16" maskContentUnits="userSpaceOnUse" maskUnits="objectBoundingBox" x="0" y="0" width="1" height="1" fill="white">
+            <use xlink:href="#path-15"></use>
+        </mask>
+        <rect id="path-17" x="0" y="6" width="1" height="1"></rect>
+        <mask id="mask-18" maskContentUnits="userSpaceOnUse" maskUnits="objectBoundingBox" x="0" y="0" width="1" height="1" fill="white">
+            <use xlink:href="#path-17"></use>
+        </mask>
+        <rect id="path-19" x="0" y="8" width="1" height="1"></rect>
+        <mask id="mask-20" maskContentUnits="userSpaceOnUse" maskUnits="objectBoundingBox" x="0" y="0" width="1" height="1" fill="white">
+            <use xlink:href="#path-19"></use>
+        </mask>
+    </defs>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="icon" transform="translate(-875.000000, -286.000000)">
+            <g id="编组-54" transform="translate(875.000000, 286.000000)">
+                <rect id="矩形备份-70" x="0" y="2.27373675e-13" width="16" height="16"></rect>
+                <g id="编组-2" transform="translate(8.000000, 8.000000) rotate(-270.000000) translate(-8.000000, -8.000000) " stroke="#C2C2C2">
+                    <rect id="矩形" x="0.5" y="0.5" width="15" height="5" rx="1"></rect>
+                    <rect id="矩形备份-7" x="6" y="10.5" width="4" height="4" rx="1"></rect>
+                    <g id="orion-svg-sprite" transform="translate(1.500000, 11.500000)" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="0" y1="1.01414286" x2="3.5" y2="1" id="路径"></line>
+                        <polyline id="路径" points="1 0 0 1 1 2"></polyline>
+                    </g>
+                    <g id="orion-svg-sprite备份" transform="translate(12.500000, 12.500000) rotate(-180.000000) translate(-12.500000, -12.500000) translate(10.500000, 11.500000)" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="3.86535248e-12" y1="1.01414286" x2="3.5" y2="1" id="路径"></line>
+                        <polyline id="路径" points="1 0 4.09272616e-12 1 1 2"></polyline>
+                    </g>
+                    <g id="编组" transform="translate(0.000000, 7.000000)" stroke-dasharray="2,2" stroke-width="2">
+                        <use id="矩形备份-2" mask="url(#mask-2)" xlink:href="#path-1"></use>
+                        <use id="矩形备份-3" mask="url(#mask-4)" xlink:href="#path-3"></use>
+                        <use id="矩形备份-4" mask="url(#mask-6)" xlink:href="#path-5"></use>
+                        <use id="矩形备份-5" mask="url(#mask-8)" xlink:href="#path-7"></use>
+                        <use id="矩形备份-6" mask="url(#mask-10)" xlink:href="#path-9"></use>
+                    </g>
+                    <g id="编组备份" transform="translate(15.000000, 7.000000)" stroke-dasharray="2,2" stroke-width="2">
+                        <use id="矩形备份-2" mask="url(#mask-12)" xlink:href="#path-11"></use>
+                        <use id="矩形备份-3" mask="url(#mask-14)" xlink:href="#path-13"></use>
+                        <use id="矩形备份-4" mask="url(#mask-16)" xlink:href="#path-15"></use>
+                        <use id="矩形备份-5" mask="url(#mask-18)" xlink:href="#path-17"></use>
+                        <use id="矩形备份-6" mask="url(#mask-20)" xlink:href="#path-19"></use>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

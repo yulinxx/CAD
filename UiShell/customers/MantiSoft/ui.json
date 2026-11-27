@@ -1,0 +1,493 @@
+// 客户 MantiSoft UI 配置
+{
+  "version": 2, // 配置版本，当前固定为 2
+  "profileId": "mantisoft", // 用于诊断与默认标题回退
+
+  "titleBar": {
+    "titleKey": "mantisoft.title", // 文本 id，由语言包解析，不在 profile 里写死语种
+    "icon": ":/UiMantiSoft/profile/assets/logo.svg", // 标题栏左侧图标：内嵌 logo 资源（路径见 UiCustomerProfile.cmake）
+    "buttons": [ "minimize", "maximize", "close" ], // 按钮集合与顺序
+    "height": 26, // 标题栏高度（像素，24..96）
+    "backgroundColor": "#1E3A8A", // 自绘标题栏背景色
+    "textColor": "#FFFFFF" // 自绘标题栏文字色
+  },
+
+  "window": {
+    "minWidth": 900,
+    "minHeight": 600,
+    // 菜单栏形态：false=窗口内菜单栏（菜单项图标可见、可套 QSS 皮肤）；
+    // true=系统原生菜单栏（macOS 上位于屏幕顶部，但原生菜单不画图标，只有文字）。
+    "nativeMenuBar": true
+  }, // 窗口最小尺寸（像素）+ 菜单栏形态
+
+  "regions": [
+    {
+      "id": "titlebar",
+      "type": "TitleBar",
+      "order": 1
+    }, // 自绘标题栏区域
+    {
+      "id": "menubar",
+      "type": "MenuBar",
+      "order": 5
+    }, // 菜单栏区域
+    /* 顶部横幅：高度固定，内容由面板工厂提供 */
+    {
+      "id": "top",
+      "type": "TopBar",
+      "order": 10,
+      "areas": [
+        {
+          "id": "top.toolbar",
+          "order": 5
+        },
+        {
+          "id": "top.main",
+          "order": 10,
+          "preferredHeight": 52,
+          "stretch": 1
+        }
+      ]
+    },
+    {
+      "id": "left",
+      "type": "LeftDock",
+      "order": 20,
+      "areas": [
+        {
+          "id": "left.main",
+          // 0 = 宽度交给面板的 sizeHint：LeftSidePanel 收起时 40px，展开时 40+340px。
+          // 若固定成 240，收起状态会在窄条右侧留出空白，展开状态又会裁掉内容。
+          "preferredWidth": 0
+        }
+      ]
+    },
+    {
+      "id": "center",
+      "type": "CenterView",
+      "order": 30
+    },
+    {
+      "id": "right",
+      "type": "RightDock",
+      "order": 40,
+      "areas": [
+        {
+          "id": "right.main",
+          // 同上：收起 40px，展开 40+240px，由 RightSidePanel 的 sizeHint 决定。
+          "preferredWidth": 0
+        }
+      ]
+    },
+    {
+      "id": "bottom",
+      "type": "StatusBar",
+      "order": 50,
+      "areas": [
+        {
+          "id": "bottom.main",
+          "preferredHeight": 32
+        }
+      ]
+    }
+  ],
+
+  "panels": [
+    /* 工具栏：shell 自带的通用面板，像菜单一样只列命令 id（"|" 是分隔符）。
+       按钮与菜单项是同一个命令动作：标题、快捷键、置灰（如「保存」要先新建）完全一致。 */
+    {
+      "id": "toolbar",
+      "factory": "msui.toolbar",
+      "area": "top.toolbar",
+      "order": 10,
+      "props": {
+        "commands": [
+          "file.new",
+          "file.open",
+          "file.save",
+          "|",
+          "test.edit.undo",
+          "test.edit.redo",
+          "|",
+          "sample.run"
+        ]
+      }
+    },
+    {
+      "id": "top.banner",
+      "factory": "mantisoft.panel",
+      "area": "top.main",
+      "order": 10
+    },
+    {
+      "id": "tools",
+      "factory": "mantisoft.panel",
+      "area": "left.main",
+      "order": 10
+    },
+    {
+      "id": "inspector",
+      "factory": "mantisoft.panel",
+      "area": "right.main",
+      "order": 10
+    },
+    {
+      "id": "status",
+      "factory": "mantisoft.panel",
+      "area": "bottom.main",
+      "order": 10
+    }
+  ],
+
+  "menus": [
+    // 照搬 MantiSoft/src/Widget/TopMenu.cpp：仅保留标准 MantiSoft 构建下可见的条目；
+    // 已剔除框架自带的演示菜单（file/edit/tools/help），以及原版中 NO_SHOW / setVisible(false)
+    // 或其它定制构建宏（RDEC2_3060G / TyvokStudio）下才出现的条目。
+    {
+      "id": "file",
+      "type": "submenu",
+      "titleKey": "menu.file",
+      "order": 100,
+      "children": [
+        "file.new",
+        "file.open",
+        "file.close",
+        { "type": "separator" },
+        {
+          "id": "file.recent",
+          "type": "submenu",
+          "titleKey": "menu.Recent Projects",
+          "iconKey": ":/UiMantiSoft/profile/assets/icons/svg/Menu/RecentProjects.svg",
+          "children": []
+        },
+        { "type": "separator" },
+        "file.save",
+        "file.saveAs",
+        "file.saveAll",
+        "file.import",
+        "file.export",
+        "file.send",
+        "file.graphLib",
+        "file.collect",
+        "file.fileOption",
+        { "type": "separator" },
+        "file.exit"
+      ]
+    },
+    {
+      "id": "edit",
+      "type": "submenu",
+      "titleKey": "menu.edit",
+      "order": 110,
+      "children": [
+        "test.edit.undo",
+        "test.edit.redo",
+        { "type": "separator" },
+        "edit.cut",
+        "edit.copy",
+        "edit.paste",
+        "edit.delete",
+        { "type": "separator" },
+        "edit.selectAll",
+        "edit.selectReverse",
+        { "type": "separator" },
+        {
+          "id": "edit.group",
+          "type": "submenu",
+          "titleKey": "menu.Group",
+          "iconKey": ":/UiMantiSoft/profile/assets/icons/svg/Group.svg",
+          "children": [
+            "edit.group.group",
+            "edit.group.unGroup",
+            "edit.group.unGroupAll"
+          ]
+        },
+        {
+          "id": "edit.mirror",
+          "type": "submenu",
+          "titleKey": "menu.Mirror",
+          "iconKey": ":/UiMantiSoft/profile/assets/icons/svg/HorizontalMirroring.svg",
+          "children": [
+            "edit.mirror.vertical",
+            "edit.mirror.horizon",
+            "edit.mirror.angle"
+          ]
+        },
+        {
+          "id": "edit.rotate",
+          "type": "submenu",
+          "titleKey": "menu.Rotate",
+          "iconKey": ":/UiMantiSoft/profile/assets/icons/svg/Menu/GraphicRotation.svg",
+          "children": [
+            "edit.rotate.left",
+            "edit.rotate.right",
+            "edit.rotate.flipH",
+            "edit.rotate.flipV"
+          ]
+        },
+        {
+          "id": "edit.align",
+          "type": "submenu",
+          "titleKey": "menu.Alignment",
+          "iconKey": ":/UiMantiSoft/profile/assets/icons/svg/Menu/GraphicAlignment.svg",
+          "children": [
+            "edit.align.left",
+            "edit.align.right",
+            "edit.align.top",
+            "edit.align.bottom",
+            "edit.align.horizon",
+            "edit.align.vertical",
+            "edit.align.center"
+          ]
+        },
+        {
+          "id": "edit.move",
+          "type": "submenu",
+          "titleKey": "menu.Move",
+          "iconKey": ":/UiMantiSoft/profile/assets/icons/svg/Menu/GraphicMovement.svg",
+          "children": [
+            "edit.move.center",
+            "edit.move.lb",
+            "edit.move.rb",
+            "edit.move.lt",
+            "edit.move.rt",
+            "edit.move.left",
+            "edit.move.right",
+            "edit.move.top",
+            "edit.move.bottom"
+          ]
+        },
+        {
+          "id": "edit.equidistant",
+          "type": "submenu",
+          "titleKey": "menu.Equidistant",
+          "iconKey": ":/UiMantiSoft/profile/assets/icons/svg/MandatoryEqualWidth.svg",
+          "children": [
+            "edit.equi.width",
+            "edit.equi.height",
+            "edit.equi.hCenter",
+            "edit.equi.hDistribute",
+            "edit.equi.vSpace",
+            "edit.equi.hSpace"
+          ]
+        },
+        {
+          "id": "edit.zoom",
+          "type": "submenu",
+          "titleKey": "menu.Zoom",
+          "iconKey": ":/UiMantiSoft/profile/assets/icons/svg/ZoomInToPage.svg",
+          "children": [
+            "edit.zoom.page",
+            "edit.zoom.selected",
+            "edit.zoom.in",
+            "edit.zoom.out",
+            "edit.zoom.all"
+          ]
+        },
+        {
+          "id": "edit.moveHead",
+          "type": "submenu",
+          "titleKey": "menu.Move The Cutting Head",
+          "iconKey": ":/UiMantiSoft/profile/assets/icons/svg/MoveToCenterOfPage.svg",
+          "children": [
+            "edit.moveHead.center",
+            "edit.moveHead.lb",
+            "edit.moveHead.rb",
+            "edit.moveHead.lt",
+            "edit.moveHead.rt"
+          ]
+        },
+        "edit.measure",
+        "edit.showSpecial",
+        { "type": "separator" },
+        {
+          "id": "edit.pathOption",
+          "type": "submenu",
+          "titleKey": "menu.Path option",
+          "iconKey": ":/UiMantiSoft/profile/assets/icons/svg/PathOpt.svg",
+          "children": [
+            "edit.pathOption.cutSeq",
+            "edit.pathOption.idlePath",
+            "edit.pathOption.cutDir",
+            "edit.pathOption.showAll"
+          ]
+        },
+        { "type": "separator" },
+        "edit.options"
+      ]
+    },
+    {
+      "id": "draw",
+      "type": "submenu",
+      "titleKey": "menu.Draw",
+      "order": 120,
+      "children": [
+        "draw.select",
+        {
+          "id": "draw.line",
+          "type": "submenu",
+          "titleKey": "menu.Line",
+          "iconKey": ":/UiMantiSoft/profile/assets/icons/svg/Menu/Pen3.svg",
+          "children": [
+            "draw.line.line",
+            "draw.line.ellipse",
+            "draw.line.circle",
+            "draw.line.polygon",
+            "draw.line.rectangle",
+            "draw.line.star",
+            "draw.line.point"
+          ]
+        },
+        "draw.text",
+        "draw.qrcode",
+        { "type": "separator" },
+        {
+          "id": "draw.array",
+          "type": "submenu",
+          "titleKey": "menu.array",
+          "iconKey": ":/UiMantiSoft/profile/assets/icons/svg/Menu/Array3.svg",
+          "children": [
+            "draw.array.matrix",
+            "draw.array.circle"
+          ]
+        },
+        "draw.offset",
+        {
+          "id": "draw.bool",
+          "type": "submenu",
+          "titleKey": "menu.bool",
+          "iconKey": ":/UiMantiSoft/profile/assets/icons/svg/Menu/BooleanOperations3.svg",
+          "children": [
+            "draw.bool.weld",
+            "draw.bool.intersect",
+            "draw.bool.union",
+            "draw.bool.subAB",
+            "draw.bool.subBA"
+          ]
+        },
+        "draw.nodeEdit",
+        { "type": "separator" },
+        {
+          "id": "draw.chamfer",
+          "type": "submenu",
+          "titleKey": "menu.chamfer",
+          "iconKey": ":/UiMantiSoft/profile/assets/icons/svg/Menu/Chamfer3.svg",
+          "children": [
+            "draw.chamfer.round",
+            "draw.chamfer.linear"
+          ]
+        },
+        "draw.startPoint",
+        {
+          "id": "draw.link",
+          "type": "submenu",
+          "titleKey": "menu.link",
+          "iconKey": ":/UiMantiSoft/profile/assets/icons/svg/Lead.svg",
+          "children": [
+            "draw.link.lead",
+            "draw.link.bridge",
+            "draw.link.micro",
+            "draw.link.coedge"
+          ]
+        },
+        {
+          "id": "draw.bitmap",
+          "type": "submenu",
+          "titleKey": "menu.Bitmap",
+          "iconKey": ":/UiMantiSoft/profile/assets/icons/svg/BitmapEdge.svg",
+          "children": [
+            "draw.bitmap.vec",
+            "draw.bitmap.trim",
+            "draw.bitmap.process"
+          ]
+        },
+        { "type": "separator" },
+        "draw.grid"
+      ]
+    },
+    {
+      "id": "setting",
+      "type": "submenu",
+      "titleKey": "menu.Setting",
+      "order": 130,
+      "children": [
+        "setting.system",
+        "setting.file",
+        "setting.factory",
+        "setting.user"
+      ]
+    },
+    {
+      "id": "handle",
+      "type": "submenu",
+      "titleKey": "menu.handle",
+      "order": 140,
+      "children": [
+        "handle.text2Curve",
+        "handle.textSplit",
+        "handle.vec2Bmp",
+        { "type": "separator" },
+        "handle.vecSmooth",
+        "handle.pathPlan",
+        { "type": "separator" },
+        "handle.itemHandle",
+        "handle.nest"
+      ]
+    },
+    {
+      "id": "debug",
+      "type": "submenu",
+      "titleKey": "menu.debug",
+      "order": 150,
+      "children": [
+        "debug.monitor",
+        { "type": "separator" },
+        "debug.backlash"
+      ]
+    },
+    {
+      "id": "function",
+      "type": "submenu",
+      "titleKey": "menu.function",
+      "order": 160,
+      "children": [
+        "function.rotary",
+        "function.license",
+        "function.feed",
+        "function.overCut",
+        "function.multiShift",
+        "function.plc",
+        "function.wireless"
+      ]
+    },
+    {
+      "id": "simulation",
+      "type": "submenu",
+      "titleKey": "menu.simulation",
+      "order": 170,
+      "children": [
+        "simulation.soft",
+        "simulation.motion"
+      ]
+    },
+    {
+      "id": "help",
+      "type": "submenu",
+      "titleKey": "menu.help",
+      "order": 180,
+      "children": [
+        {
+          "type": "builtin",
+          "id": "language",
+          "iconKey": ":/UiMantiSoft/profile/assets/icons/svg/Menu/help/Language.svg"
+        },
+        "help.about",
+        "help.notes",
+        "help.feedback",
+        "help.help",
+        "help.checkUpdate",
+        "help.menuManage"
+      ]
+    }
+  ]
+}

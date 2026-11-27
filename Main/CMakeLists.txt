@@ -90,42 +90,6 @@ if(NOT BUILD_CAM OR NOT BUILD_HARDWARE)
     list(FILTER MAIN_APP_SOURCES EXCLUDE REGEX ".*/Src/CAM/CamPlanEmitter\\.cpp")
 endif()
 
-# 从 Hardware 迁出的 Qt 封装实现统一编入应用层 HardwareApp，不随 exe/测试重复编译
-list(FILTER MAIN_APP_SOURCES EXCLUDE REGEX ".*/Src/Hardware/(SafetyManager|MaterialDatabase|ToolpathExecutor)\\.cpp")
-
-# --- 应用层硬件 Qt 封装（由 Hardware.dll 迁出）---
-# SafetyManager / MaterialDatabase / ToolpathExecutor 的公共声明保留在 Hardware 头，
-# 实现放到应用层并单独成 DLL：Hardware.dll 不再导出 Qt 容器与 vtable。
-# 公共头声明使用 HARDWARE_API，因此实现必须由定义了导出宏的 DLL 承载。
-if(BUILD_HARDWARE)
-    apr_add_shared_library(HardwareApp
-        FOLDER "Modules"
-        DESCRIPTION "Application-layer hardware Qt wrappers"
-        EXPORT_MACRO "HARDWAREAPP_EXPORTS"
-        VERSION_MAJOR 1
-        VERSION_MINOR 0
-        VERSION_PATCH 0
-        SOURCES
-            "${SRC_ROOT}/Hardware/SafetyManager.cpp"
-            "${SRC_ROOT}/Hardware/MaterialDatabase.cpp"
-            "${SRC_ROOT}/Hardware/ToolpathExecutor.cpp"
-        HEADERS
-            "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include/Hardware/SafetyManager.h"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include/Hardware/MaterialDatabase.h"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include/Hardware/ToolpathExecutor.h"
-        AUTOMOC
-        PRIVATE_INCLUDE_DIRS
-            "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include"
-        PUBLIC_LINK_LIBRARIES
-            Hardware
-        PRIVATE_LINK_LIBRARIES
-            Log
-            Utility
-        PUBLIC_QT_COMPONENTS
-            Core
-    )
-endif()
-
 # macOS 平台专用 Objective-C++ 文件：.mm 已被上面的 glob 自动收集。
 # 但需要排除非 macOS 平台的 .mm 文件
 if(NOT APPLE)
@@ -698,15 +662,6 @@ if(_main_tests AND GTest_FOUND)
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*RasterExportDpiTests\\.cpp$")
     endif()
 
-    if(BUILD_HARDWARE)
-        # 从 Hardware 模块迁出的 Qt 封装单元测试：实现已在应用层 HardwareApp，
-        # 测试随 MainTests 编译并链接 HardwareApp
-        list(APPEND MAIN_TEST_SOURCES
-            "${SRC_ROOT}/Hardware/Test/SafetyManagerTests.cpp"
-            "${SRC_ROOT}/Hardware/Test/MaterialDatabaseTests.cpp"
-        )
-    endif()
-
     if(BUILD_CAM AND BUILD_HARDWARE)
         # CamPlan → MotionPlan 发射器：纯数据翻译的单测，不依赖整机与设备
         list(APPEND MAIN_TEST_SOURCES
@@ -821,12 +776,6 @@ target_link_libraries(MainTests
             GTest::gmock
     )
 
-    if(BUILD_HARDWARE)
-        # 迁到应用层的 Qt 封装：测试需要 Hardware 公共头路径与 HardwareApp.dll 的实现
-        target_include_directories(MainTests PRIVATE "${PROJECT_ROOT}/Hardware/Hardware/Include")
-        target_link_libraries(MainTests PRIVATE Hardware HardwareApp)
-    endif()
-
     if(WIN32)
         # MainTests 编译了全部 MAIN_APP_SOURCES，其中 CrashHandlerBootstrap.cpp 的
         # printSymbolizedBacktrace 依赖 dbghelp。主程序在上面已单独链接，测试目标必须同步，
@@ -872,16 +821,7 @@ target_link_libraries(MainTests
             PRIVATE
                 "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include"
         )
-        target_link_libraries(MainTests PRIVATE Hardware HardwareApp)
-        # 迁移后的实现位于 HardwareApp，Q_OBJECT 头必须列入目标源集合，AUTOMOC 才会生成 moc。
-        # 同一个头在 HardwareApp 与测试目标里都要 moc：测试目标需声明 HARDWAREAPP_EXPORTS，
-        # 否则 HARDWARE_API 在测试里是 dllimport，生成 staticMetaObject 定义会触发 C2491。
-        target_sources(MainTests PRIVATE
-            "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include/Hardware/SafetyManager.h"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include/Hardware/MaterialDatabase.h"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include/Hardware/ToolpathExecutor.h"
-        )
-        target_compile_definitions(MainTests PRIVATE HARDWAREAPP_EXPORTS)
+        target_link_libraries(MainTests PRIVATE Hardware)
     endif()
 
 

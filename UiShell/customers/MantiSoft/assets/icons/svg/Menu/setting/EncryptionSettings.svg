@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 50</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="菜单栏" transform="translate(-255.000000, -262.000000)">
+            <g id="编组-50" transform="translate(255.000000, 262.000000)">
+                <rect id="矩形备份-18" x="0" y="0" width="14" height="14"></rect>
+                <g id="加密文件_file-lock" transform="translate(1.750000, 0.500000)" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M0.65625,13 L9.84375,13 C10.2061969,13 10.5,12.708995 10.5,12.35 L10.5,3.25 L7.546875,0 L0.65625,0 C0.293812969,0 0,0.29101475 0,0.65 L0,12.35 C0,12.708995 0.293812969,13 0.65625,13 Z" id="路径"></path>
+                    <rect id="矩形" x="3" y="7.5" width="4.5" height="3"></rect>
+                    <path d="M6.5,7.5 L6.5,6.25 C6.5,5.73221875 6.1875,5 5.25,5 C4.3125,5 4,5.73221875 4,6.25 L4,7.5" id="路径"></path>
+                    <polyline id="路径" points="7.15 0 7.15 3.25 10.4 3.25"></polyline>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

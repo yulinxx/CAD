@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 60</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="icon" transform="translate(-1551.000000, -286.000000)">
+            <g id="编组-60" transform="translate(1551.000000, 286.000000)">
+                <rect id="矩形备份-90" x="0" y="0" width="16" height="16"></rect>
+                <g id="编组-20" transform="translate(4.000000, 0.000000)">
+                    <rect id="矩形" stroke="#C2C2C2" x="0.5" y="0.5" width="7" height="15" rx="1"></rect>
+                    <rect id="矩形" fill="#C2C2C2" x="0" y="1.88235294" width="3" height="1" rx="0.5"></rect>
+                    <rect id="矩形备份-17" fill="#C2C2C2" x="0" y="7.52941176" width="3" height="1" rx="0.5"></rect>
+                    <rect id="矩形备份-25" fill="#C2C2C2" x="0" y="13.1764706" width="3" height="1" rx="0.5"></rect>
+                    <rect id="矩形备份-16" fill="#C2C2C2" x="0" y="4.70588235" width="5" height="1" rx="0.5"></rect>
+                    <rect id="矩形备份-18" fill="#C2C2C2" x="0" y="10.3529412" width="5" height="1" rx="0.5"></rect>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 48</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="菜单栏" transform="translate(-97.000000, -262.000000)">
+            <g id="编组-48" transform="translate(97.000000, 262.000000)">
+                <rect id="矩形" x="0" y="0" width="14" height="14"></rect>
+                <g id="orion-svg-sprite" transform="translate(0.500000, 0.500000)" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M0,0 L13,0 L13,13 L0,13 L0,0 Z M10.4,3.03333333 L3.03333333,3.03333333 M10.4,6.5 L2.6,6.5 M10.4,9.96666667 L2.6,9.96666667" id="形状"></path>
+                    <path d="M6.5,5.2 L6.5,7.8 M9.1,8.66666667 L9.1,11.2666667 M3.03333333,1.73333333 L3.03333333,4.33333333" id="形状"></path>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

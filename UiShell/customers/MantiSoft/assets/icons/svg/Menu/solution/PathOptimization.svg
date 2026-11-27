@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>分界线_dividing-line</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="菜单栏" transform="translate(-412.000000, -322.000000)">
+            <g id="分界线_dividing-line" transform="translate(412.000000, 322.000000)">
+                <rect id="矩形备份-18" x="0" y="0" width="14" height="14"></rect>
+                <line x1="0.5" y1="7" x2="13.5" y2="7" id="路径" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round"></line>
+                <line x1="0.5" y1="2.5" x2="2.5" y2="2.5" id="路径" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round"></line>
+                <line x1="0.5" y1="11.5" x2="3.5" y2="11.5" id="路径备份-3" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round"></line>
+                <line x1="11.5" y1="2.5" x2="13.5" y2="2.5" id="路径备份-2" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round"></line>
+                <path d="M4.5,2.5 C5.33333333,2.5 7,2.5 9.5,2.5" id="路径备份-4" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path d="M5.5,11.5 C8.83333333,11.5 11.5,11.5 13.5,11.5" id="路径备份-5" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round"></path>
+            </g>
+        </g>
+    </g>
+</svg>

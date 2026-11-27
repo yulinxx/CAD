@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>文件-word_file-word</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="菜单栏" transform="translate(-1576.000000, -558.000000)">
+            <g id="文件-word_file-word" transform="translate(1576.000000, 558.000000)">
+                <rect id="矩形备份-27" x="0" y="0" width="14" height="14"></rect>
+                <path d="M2.1875,0.5 L9.0625,0.5 L12.5,3.75 L12.5,12.85 C12.5,13.208995 12.1922062,13.5 11.8125,13.5 L2.1875,13.5 C1.80780406,13.5 1.5,13.208995 1.5,12.85 L1.5,1.15 C1.5,0.79101475 1.80780406,0.5 2.1875,0.5 Z" id="路径" stroke="#FFFFFF" stroke-linejoin="round"></path>
+                <line x1="4" y1="5" x2="10" y2="5" id="路径" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round"></line>
+                <line x1="7" y1="11" x2="7" y2="5.5" id="路径-6" stroke="#FFFFFF" stroke-linecap="round"></line>
+            </g>
+        </g>
+    </g>
+</svg>

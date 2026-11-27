@@ -1,0 +1,16 @@
+// 由 cmake/UiBuildInfo.cmake 生成，不要手改。
+#pragma once
+
+#define UI_BUILD_ID "@UI_BUILD_ID@"
+#define UI_BUILD_QT_VERSION "@UI_QT_COMPILE_VERSION@"
+#define UI_BUILD_FINGERPRINT_BASE "@UI_BUILD_FINGERPRINT_BASE@"
+
+// Debug / Release 的 CRT 不可混装；RelWithDebInfo 与 MinSizeRel 都使用 Release CRT。
+#if defined(NDEBUG)
+#  define UI_BUILD_CONFIG_NAME "Release"
+#else
+#  define UI_BUILD_CONFIG_NAME "Debug"
+#endif
+
+#define UI_BUILD_FINGERPRINT \
+    UI_BUILD_FINGERPRINT_BASE "|config=" UI_BUILD_CONFIG_NAME

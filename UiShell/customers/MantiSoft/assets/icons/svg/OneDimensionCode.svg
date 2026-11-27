@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 12</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="icon" transform="translate(-550.000000, -51.000000)">
+            <g id="编组-12" transform="translate(550.000000, 51.000000)">
+                <rect id="矩形备份-14" x="0" y="0" width="16" height="16"></rect>
+                <g id="条码2" transform="translate(0.000000, 1.000000)" fill="#C2C2C2" fill-rule="nonzero">
+                    <path d="M5.86664776,14 L6.39997438,14 L6.39997438,0 L5.86664776,0 L5.86664776,14 Z M6.93330101,14 L7.46668252,14 L7.46668252,0 L6.93330101,0 L6.93330101,14 Z M3.19995975,14 L4.79999452,14 L4.79999452,0 L3.19995975,0 L3.19995975,14 Z M0,14 L2.13330649,14 L2.13330649,0 L0,0 L0,14 Z M8.00000915,14 L9.59998901,14 L9.59998901,0 L8.00000915,0 L8.00000915,14 Z M13.8666386,0 L13.8666386,14 L16,14 L16,0 L13.8666386,0 Z M12.266677,14 L13.3333303,14 L13.3333303,0 L12.266677,0 L12.266677,14 Z M10.1333156,14 L11.1999689,14 L11.1999689,0 L10.1333156,0 L10.1333156,14 Z" id="形状备份"></path>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

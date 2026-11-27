@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/GoodLaser">
+        <file>QmlPanel.qml</file>
+        <file>AboutDialog.qml</file>
+        <file>SampleDialog.qml</file>
+    </qresource>
+</RCC>

@@ -1,0 +1,163 @@
+// TyvokStudio 的 UI 配置（JSONC）
+{
+  "version": 2,
+  "profileId": "tyvokstudio",
+
+  "titleBar": {
+    "titleKey": "tyvokstudio.title", // 文本 id，由语言包解析
+    "icon": ":/UiTyvokStudio/profile/assets/logo.png",
+    "buttons": [ "minimize", "close" ], // 没有最大化按钮，顺序即呈现顺序
+    "height": 30, // 标题栏高度（24..96），比默认 36 略矮
+    "backgroundColor": "#065F46",
+    "textColor": "#FFFFFF"
+  },
+
+  "window": {
+    "minWidth": 800,
+    "minHeight": 560,
+    "nativeTitleBar": true
+  },
+
+  "regions": [
+    {
+      "id": "titlebar",
+      "type": "TitleBar",
+      "order": 1
+    },
+    {
+      "id": "menubar",
+      "type": "MenuBar",
+      "order": 5
+    },
+    {
+      "id": "top",
+      "type": "TopBar",
+      "order": 10,
+      "areas": [
+        {
+          "id": "top.left",
+          "order": 10,
+          "stretch": 1
+        }, // 左侧自适应
+        {
+          "id": "top.right",
+          "order": 20,
+          "preferredWidth": 320
+        } // 右侧固定宽
+      ]
+    },
+    {
+      "id": "center",
+      "type": "CenterView",
+      "order": 30
+    },
+    {
+      "id": "right",
+      "type": "RightDock",
+      "order": 40,
+      "areas": [
+        {
+          "id": "right.top",
+          "order": 10,
+          "preferredWidth": 320,
+          "preferredHeight": 260
+        },
+        {
+          "id": "right.bottom",
+          "order": 20,
+          "preferredWidth": 320,
+          "stretch": 1
+        }
+      ]
+    },
+    {
+      "id": "bottom",
+      "type": "StatusBar",
+      "order": 50,
+      "areas": [
+        {
+          "id": "bottom.main",
+          "preferredHeight": 28
+        }
+      ]
+    }
+  ],
+
+  "panels": [
+    {
+      "id": "top.brand",
+      "factory": "tyvokstudio.panel",
+      "area": "top.left",
+      "order": 10
+    },
+    {
+      // 工具栏：shell 自带的 msui.toolbar，与「加工」菜单共用同一组命令动作——
+      // 点「开始」后「暂停」在菜单和工具栏里同时变为可用；「暂停」是开关类命令，两处勾选同步。
+      "id": "top.actions",
+      "factory": "msui.toolbar",
+      "area": "top.right",
+      "order": 10,
+      "props": { "commands": [ "machining.start", "machining.pause", "|", "sample.run" ] }
+    },
+    {
+      "id": "properties",
+      "factory": "tyvokstudio.panel",
+      "area": "right.top",
+      "order": 10
+    },
+    {
+      "id": "layers",
+      "factory": "tyvokstudio.panel",
+      "area": "right.bottom",
+      "order": 10
+    },
+    {
+      "id": "status",
+      "factory": "tyvokstudio.panel",
+      "area": "bottom.main",
+      "order": 10
+    }
+  ],
+
+  "menus": [
+    {
+      "type": "submenu",
+      "id": "project",
+      "titleKey": "menu.project",
+      "order": 10,
+      "children": [ "project.new", "project.open" ]
+    },
+    {
+      "type": "submenu",
+      "id": "machining",
+      "titleKey": "menu.machining",
+      "order": 20,
+      "children": [ "machining.start", "machining.pause" ]
+    },
+    {
+      "type": "submenu",
+      "id": "tools",
+      "titleKey": "menu.tools",
+      "order": 30,
+      "children": [ "tools.settings", "sample.run" ]
+    },
+    {
+      "type": "submenu",
+      "id": "help",
+      "titleKey": "menu.help",
+      "order": 40,
+      "children": [
+        "help.about",
+        { "type": "separator" },
+        {
+          "type": "builtin",
+          "id": "language"
+        },
+        {
+          "type": "builtin",
+          "id": "theme"
+        }
+      ]
+    }
+  ]
+}

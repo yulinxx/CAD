@@ -34,15 +34,6 @@ void registerExampleCustomizations()
     });
 
     qDebug() << "Example customizations registered: ExamplePanel";
-
-    // ---- 更多面板注册示例 ----
-    // registry->registerPanel("StatisticsPanel", [](QWidget* parent) {
-    //     return new StatisticsPanel(parent);
-    // });
-    //
-    // registry->registerPanel("ToolPalettePanel", [](QWidget* parent) {
-    //     return new ToolPalettePanel(parent);
-    // });
 }
 
 /**

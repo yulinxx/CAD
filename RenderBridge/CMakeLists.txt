@@ -129,34 +129,19 @@ message(STATUS "")
 #
 apr_module_tests_enabled(RENDERBRIDGE _renderbridge_tests)
 if(_renderbridge_tests AND GTest_FOUND)
-    add_executable(RenderBridgeTests
-        "${CMAKE_CURRENT_SOURCE_DIR}/Test/PersistentGeometryStoreTests.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/Test/DrawListBatchMeasurementTests.cpp"
-    )
-    target_compile_features(RenderBridgeTests PRIVATE cxx_std_17)
+    apr_add_test(NAME RenderBridgeTests
+        SOURCES
+            "${CMAKE_CURRENT_SOURCE_DIR}/Test/PersistentGeometryStoreTests.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/Test/DrawListBatchMeasurementTests.cpp"
+        LIBS RenderBridge RenderX Log
+        LABELS core render bridge
+        TIMEOUT 30
+        EXTRA_COMPILE_DEFS QT_NO_P0846)
+
     target_include_directories(RenderBridgeTests PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/Include"
         "${APR_RENDERX_DIR}/include"
-        "${APR_LOG_DIR}/Include"
-    )
-    # 被测类的实现已从容头文件移到 RenderBridge 源码里（类型隔离改造），
-    # 因此测试需要链 RenderBridge 这个 DLL，不能再只依赖头文件
-    target_link_libraries(RenderBridgeTests PRIVATE
-        RenderBridge
-        RenderX
-        Log
-        GTest::gtest
-        GTest::gtest_main
-    )
-    # 与 apr_add_library 的 Qt 目标保持同一套 C++17 兼容定义（见 CMake/Utils.cmake）
-    target_compile_definitions(RenderBridgeTests PRIVATE QT_NO_P0846)
-    if(MSVC)
-        target_compile_options(RenderBridgeTests PRIVATE /utf-8)
-    endif()
-    gtest_discover_tests(RenderBridgeTests
-        DISCOVERY_TIMEOUT 30
-    )
-    set_property(TARGET RenderBridgeTests PROPERTY FOLDER "Tests")
+        "${APR_LOG_DIR}/Include")
 elseif(NOT _renderbridge_tests)
     message(STATUS "[RenderBridge] tests disabled")
 endif()

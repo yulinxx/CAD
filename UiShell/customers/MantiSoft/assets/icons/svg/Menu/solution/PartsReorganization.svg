@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 51</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="菜单栏" transform="translate(-862.000000, -322.000000)">
+            <g id="编组-51" transform="translate(859.000000, 319.000000)">
+                <rect id="矩形备份-20" x="3" y="3" width="14" height="14"></rect>
+                <g id="圆形组合_graphic-stitching" transform="translate(9.899495, 9.899495) rotate(-45.000000) translate(-9.899495, -9.899495) translate(2.899495, 2.899495)" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M7,7 L10.5,3.5 C10.5,1.5670025 8.93298,0 7,0 C5.06702,0 3.5,1.5670025 3.5,3.5 L7,7 Z" id="路径"></path>
+                    <path d="M3.5,10.5 L7,7 L3.5,3.5 C1.5670025,3.5 0,5.06702 0,7 C0,8.93298 1.5670025,10.5 3.5,10.5 Z" id="路径"></path>
+                    <path d="M10.5,10.5 C12.43298,10.5 14,8.93298 14,7 C14,5.06702 12.43298,3.5 10.5,3.5 L7,7 L10.5,10.5 Z" id="路径"></path>
+                    <path d="M7,14 C8.93298,14 10.5,12.43298 10.5,10.5 L7,7 L3.5,10.5 C3.5,12.43298 5.06702,14 7,14 Z" id="路径"></path>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

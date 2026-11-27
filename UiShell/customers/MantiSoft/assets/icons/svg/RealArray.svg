@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 16备份 2</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="icon" transform="translate(-801.000000, -25.000000)">
+            <g id="编组-16备份-2" transform="translate(801.000000, 25.000000)">
+                <rect id="矩形备份-18" x="0" y="0" width="16" height="16"></rect>
+                <g id="orion-svg-sprite备份-2" transform="translate(0.000000, 0.000000)" fill-rule="nonzero" stroke="#C2C2C2" stroke-linejoin="round">
+                    <path d="M6,0.5 L10,0.5 L10,4.5 L6,4.5 L6,0.5 Z M11.5,0.5 L15.5,0.5 L15.5,4.5 L11.5,4.5 L11.5,0.5 Z" id="形状"></path>
+                    <polygon id="路径" points="0.5 11.5 4.5 11.5 4.5 15.5 0.5 15.5"></polygon>
+                    <path d="M6,11.5 L10,11.5 L10,15.5 L6,15.5 L6,11.5 Z M11.5,11.5 L15.5,11.5 L15.5,15.5 L11.5,15.5 L11.5,11.5 Z" id="形状"></path>
+                    <polygon id="路径" points="0.5 5.997 4.5 5.997 4.5 9.997 0.5 9.997"></polygon>
+                    <polygon id="路径备份-3" points="0.5 0.5 4.5 0.5 4.5 4.5 0.5 4.5"></polygon>
+                    <path d="M6,5.997 L10,5.997 L10,9.997 L6,9.997 L6,5.997 Z M11.5,5.997 L15.5,5.997 L15.5,9.997 L11.5,9.997 L11.5,5.997 Z" id="形状"></path>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

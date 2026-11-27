@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 54</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round">
+        <g id="icon" transform="translate(-1636.000000, -174.000000)" stroke="#C2C2C2">
+            <g id="编组-54" transform="translate(1636.500000, 174.500000)">
+                <polyline id="路径" transform="translate(7.500000, 7.500000) scale(-1, 1) translate(-7.500000, -7.500000) " points="0 15 0 0 15 0"></polyline>
+                <g id="箭头左上_arrow-left-up" transform="translate(6.500000, 8.500000) scale(-1, 1) translate(-6.500000, -8.500000) translate(2.500000, 4.500000)">
+                    <line x1="0.285742857" y1="0.285714286" x2="7.55885714" y2="7.5588" id="路径"></line>
+                    <polyline id="路径" points="5.42857143 0.285714286 0.285714286 0.285714286 0.285714286 5.42857143"></polyline>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

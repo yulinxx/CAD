@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 23</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="icon" transform="translate(-1442.000000, -51.000000)">
+            <g id="编组-23" transform="translate(1442.000000, 51.000000)">
+                <rect id="矩形备份-33" x="0" y="0" width="16" height="16"></rect>
+                <g id="编组-22" transform="translate(0.796960, 0.000000)" fill="#C2C2C2">
+                    <rect id="矩形" x="2.20303973" y="7.5" width="10" height="1"></rect>
+                    <rect id="矩形备份-54" transform="translate(10.991731, 5.046846) rotate(65.000000) translate(-10.991731, -5.046846) " x="6.4917306" y="4.54684611" width="9" height="1"></rect>
+                    <rect id="矩形备份-85" transform="translate(5.000000, 11.500000) rotate(50.000000) translate(-5.000000, -11.500000) " x="0" y="11" width="10" height="1"></rect>
+                    <circle id="椭圆形" cx="2.20303973" cy="8" r="1.5"></circle>
+                    <circle id="椭圆形备份" cx="12.2030397" cy="8" r="1.5"></circle>
+                    <circle id="椭圆形备份-2" cx="9.10303973" cy="1" r="1"></circle>
+                    <circle id="椭圆形备份-3" cx="7.90303973" cy="15" r="1"></circle>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

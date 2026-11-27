@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/UiTestCustomerStyle">
+        <file alias="styles/dark.qss">tstCustomerStyle.qss</file>
+    </qresource>
+</RCC>
