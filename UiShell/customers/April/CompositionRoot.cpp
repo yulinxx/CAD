@@ -30,6 +30,14 @@ namespace Apr
         Apr::CompositionRootAdapter adapter(root);
         workbench.bindViewportServices(adapter);
         workbench.setServiceFactory(&adapter);                 // Apr::ICadServiceFactory
+        // 低耦合转发：AprilCore -> Apr::DefaultViewportFactory -> Apr::RenderViewport2DAdapter -> RenderViewport2D；不暴露 raw 给 UiShell。
+        if (auto* dvf = dynamic_cast<Apr::DefaultViewportFactory*>(adapter.viewportFactory()))
+        {
+            dvf->setSceneDocument2D(root.document2D());
+            dvf->setOperationBus(root.operationBus());
+            dvf->setSelectionService(root.selectionService());
+            dvf->setLayerManager(root.layerManager());
+        }
         workbench.setViewportFactory(adapter.viewportFactory()); // Apr::IViewportFactory -> Apr::DefaultViewportFactory
         const bool viewportWired = adapter.hasSceneDocument2D() || adapter.hasOperationBus() || adapter.hasUiServices();
 
