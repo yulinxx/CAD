@@ -6,6 +6,7 @@
 #include <QDialog>
 #include <QDir>
 #include <QFile>
+#include <QIcon>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -392,6 +393,9 @@ private slots:
     void titleBarViewContractSurvivesTakeShell();
     void lastErrorReflectsRealFailure();
     void customerStyleSheetLoadsFromQrc();
+    void externalProfileBrandOverridesWindow();
+    void externalProfileResolvesRelativeAssets();
+    void externalProfileStylesheetOverridesTheme();
     void customerModuleIsUsable();
     void buildFingerprintsMatchHost();
     void customerDialogBindingsAreValid();
@@ -1127,9 +1131,10 @@ void InteractionTest::languageSwitchUpdatesMenusAndActions()
         zhAction = action->text();
     }
 
-    QCOMPARE(zhTitle, QStringLiteral("MantiSoft · 制造工作台"));
-    QCOMPARE(zhMenu, QStringLiteral("文件"));
-    QCOMPARE(zhAction, QStringLiteral("新建"));
+    // 翻译数据是中文，但源码里用 \u 转义，满足代码区禁止字面 CJK 的门禁。
+    QCOMPARE(zhTitle, QStringLiteral("MantiSoft \u00b7 \u5236\u9020\u5de5\u4f5c\u53f0"));
+    QCOMPARE(zhMenu, QStringLiteral("\u6587\u4ef6"));
+    QCOMPARE(zhAction, QStringLiteral("\u65b0\u5efa"));
     QVERIFY(enTitle != zhTitle);
     QVERIFY(enMenu != zhMenu);
     QVERIFY(enAction != zhAction);
@@ -1307,6 +1312,101 @@ void InteractionTest::customerStyleSheetLoadsFromQrc()
     QVERIFY(!qApp->styleSheet().contains(QStringLiteral("msui-test-customer-style")));
 }
 
+// M5：外置 ui.json 的 brand 段覆盖客户模块写死的标题/皮肤，无需重编客户库。
+void InteractionTest::externalProfileBrandOverridesWindow()
+{
+    const QByteArray json = R"json({
+  "version": 2,
+  "profileId": "interaction.brand",
+  "brand": {
+    "product": "Site Product",
+    "theme": "dark"
+  },
+  "regions": [ { "id": "center", "type": "CenterView", "order": 30 } ]
+})json";
+
+    ShellServices shellServices;
+    ApiPtr<IShellRuntime> runtime(createShellRuntime(shellServices));
+    QVERIFY(runtime);
+    QVERIFY2(runtime->loadFromJson(json), qPrintable(runtime->lastError()));
+    QCOMPARE(runtime->theme(), QStringLiteral("dark"));
+
+    QMainWindow window;
+    window.setWindowTitle(QStringLiteral("Module Default Title"));
+    QVERIFY(runtime->attachWindow(&window));
+    QCOMPARE(window.windowTitle(), QStringLiteral("Site Product"));
+
+    // 复位浅色，避免影响后续用例的全局样式表。
+    runtime->switchTheme(QStringLiteral("light"));
+}
+
+// M5：外置 profile 的相对图标按 ui.json 所在目录解析（brand 与自绘标题栏都生效）。
+void InteractionTest::externalProfileResolvesRelativeAssets()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QDir root(dir.path());
+    QVERIFY(root.mkpath(QStringLiteral("assets")));
+
+    // 1x1 PNG：只验证图标能从相对路径加载，不依赖 SVG 插件。
+    const QByteArray png = QByteArray::fromBase64(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
+    QFile logo(root.absoluteFilePath(QStringLiteral("assets/logo.png")));
+    QVERIFY(logo.open(QIODevice::WriteOnly));
+    QCOMPARE(logo.write(png), png.size());
+    logo.close();
+
+    const QByteArray json = R"json({
+  "version": 2,
+  "profileId": "interaction.assets",
+  "brand": { "product": "Site Window", "icon": "assets/logo.png" },
+  "titleBar": { "title": "Ignored Title", "icon": "assets/logo.png" },
+  "regions": [ { "id": "center", "type": "CenterView", "order": 30 } ]
+})json";
+    QFile profile(root.absoluteFilePath(QStringLiteral("ui.json")));
+    QVERIFY(profile.open(QIODevice::WriteOnly));
+    QCOMPARE(profile.write(json), json.size());
+    profile.close();
+
+    ShellServices shellServices;
+    ApiPtr<IShellRuntime> runtime(createShellRuntime(shellServices));
+    QVERIFY(runtime);
+    QVERIFY2(runtime->loadFromFile(profile.fileName()), qPrintable(runtime->lastError()));
+
+    QMainWindow window;
+    QVERIFY(runtime->attachWindow(&window));
+    QCOMPARE(window.windowTitle(), QStringLiteral("Site Window"));
+    QVERIFY(!window.windowIcon().isNull());
+}
+
+// M5：外置 profile 的 styles/<id>.qss 覆盖内置皮肤，无需重编客户库。
+void InteractionTest::externalProfileStylesheetOverridesTheme()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QDir root(dir.path());
+    QVERIFY(root.mkpath(QStringLiteral("styles")));
+    const QByteArray marker = "/* msui-external-profile-style */";
+
+    QFile sheet(root.absoluteFilePath(QStringLiteral("styles/dark.qss")));
+    QVERIFY(sheet.open(QIODevice::WriteOnly));
+    QCOMPARE(sheet.write(marker), marker.size());
+    sheet.close();
+
+    ShellServices shellServices;
+    shellServices.strStyleDir = dir.path();
+    ApiPtr<IShellRuntime> runtime(createShellRuntime(shellServices));
+    QVERIFY(runtime);
+
+    runtime->switchTheme(QStringLiteral("dark"));
+    QCOMPARE(runtime->theme(), QStringLiteral("dark"));
+    QVERIFY(qApp->styleSheet().contains(QStringLiteral("msui-external-profile-style")));
+
+    // 复位浅色，避免影响同一进程里的后续用例。
+    runtime->switchTheme(QStringLiteral("light"));
+    QVERIFY(!qApp->styleSheet().contains(QStringLiteral("msui-external-profile-style")));
+}
+
 // 客户模块入口：返回可用的模块描述。
 void InteractionTest::customerModuleIsUsable()
 {
@@ -1323,6 +1423,7 @@ void InteractionTest::customerModuleIsUsable()
     QVERIFY(module.cmdCatalog != nullptr);
     QVERIFY(module.cmdInvoker != nullptr);
     QVERIFY(module.cmdState != nullptr);
+    QVERIFY(module.cmdProfileRegistrar != nullptr);  // 外置 --profile 的菜单命令可补登记
 
     // strProfilePath 指向客户库内嵌的 profile 资源：换机器 / 漏拷外置文件时仍能兜底启动。
     QVERIFY2(module.strProfilePath.startsWith(QLatin1Char(':')), qPrintable(module.strProfilePath));

@@ -2,6 +2,7 @@
 
 #include <QByteArray>
 #include <QList>
+#include <QPointer>
 #include <QString>
 
 #include <memory>
@@ -107,6 +108,15 @@ namespace RD
         // 命令分发（客户代码绑定表 → ICommandInvoker）；invoke() 在它之后刷新命令状态。
         void dispatch(const QString& commandId);
 
+        // M5：把 profile 的 brand 元数据应用到宿主窗口与全局外观。
+        // 未声明 brand 时不改客户模块/命令行的既有设置。
+        void applyBrand();
+        void applyBrandToWindow();
+        void applyTheme(const QString& themeId, bool force);
+
+        // 命令行 --lang 优先于 profile 里的默认语言。
+        static bool hasExplicitLanguageArgument();
+
         // 交给面板（PanelCreateRequest::host）的窄宿主：只转发 IShellHost 方法，
         // 避免面板直接持有 ShellRuntime 引用。
         class PanelHost final : public IShellHost
@@ -184,6 +194,9 @@ namespace RD
         std::unique_ptr<MenuController> m_menuCtrl;     // 菜单
         std::unique_ptr<DialogController> m_dlgCtrl;    // 对话框
         std::unique_ptr<CommandActions> m_cmdActions;   // 命令动作
+
+        QPointer<QMainWindow> m_window;  // M5：brand 变化后重刷窗口标题/图标
+        QString m_translationDir;        // M5：profile 自带翻译目录（可为空）
 
         // 开关订阅：store 变化时重新规划；析构时退订。
         FeatureObserver m_ftObserver{ *this };

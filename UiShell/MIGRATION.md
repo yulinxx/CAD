@@ -6,7 +6,8 @@
 > `UiDialogs`、客户库、ports & adapters、命令适配）已落地；M3 已修掉一个真实的
 > 启动崩溃（悬空 adapter），视口服务改为经 port 真注入；**M3 交互运行时 / M4
 > 菜单运行时仍未验收**（`IUiCommandDispatcher` 接线、`configs/base.json` → `ui.json`
-> 菜单转换）；M5/M6 未完成。`SampleFrame/` 是只读参考工程，任何改动都不落到该目录。
+> 菜单转换）；M5 数据化首片已落地（profile 驱动品牌/主题/默认语言/外置资源），M6 未完成。
+> `SampleFrame/` 是只读参考工程，任何改动都不落到该目录。
 >
 > 目标是把现有 `Main` 的 UI 外壳改成 SampleFrame 的架构：`UiContract` 契约层 +
 > `UiShell` 运行时 + `UiDialogs` 共享对话框 + `customers/<产品>` 客户库 + 薄 EXE。
@@ -257,12 +258,26 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
 - 菜单点击/工具栏/面板按钮/快捷键“走同一条命令路径”的**运行时验收**，待真实窗口环境验证
   （offscreen 下完整 profile 会崩在 `MetalSurface`，见 §0.5）。
 
-### M5：品牌、主题、i18n、部署
+### M5：品牌、主题、i18n、部署（数据化首片完成）
 
-- 品牌数据全部进 `ui.json` / `assets/`，删除 `WorkbenchWindow.cpp` 里的硬编码。
-- 主题走 `UiShell` 的 `ThemeController`，保留现有 6 套 QSS。
-- 翻译沿用 `TranslationService`，`--lang` 在客户模块加载前生效。
-- 验收：改外部 `ui.json` + `assets/` 即可换客户，不重编。
+- **品牌元数据**：profile 新增可选 `brand` 段（`product` / `organization` / `icon` / `theme` /
+  `language`）；`ProfileParser` 校验类型并忽略未知字段，`ProfilePipeline::brand()` 暴露给运行时。
+  `ShellRuntime` 在加载后应用：`product` 覆盖窗口标题、`organization` 写 `QCoreApplication`、
+  `icon` 设置窗口图标；未声明 `brand` 时完全沿用客户模块与命令行设置。
+- **相对资源**：`titleBar.icon` / `brand.icon` 的外置相对路径按 `ui.json` 所在目录解析
+  （`:/...` 与绝对路径原样保留）；自绘标题栏与顶层窗口用同一解析结果。
+- **主题**：`ThemeController::apply()` 新增第三层 `<profileDir>/styles/<id>.qss`，叠加在框架
+  `:/UiShell/styles/` 与客户 qrc 之后；`ShellServices::strStyleDir` 由 `loadFromFile()` 填充。
+  仍只有框架 `light` / `dark` 两套 QSS；旧 `UICommon` 的六套皮肤尚未搬入 UiShell。
+- **i18n**：显式 `--lang` 仍优先（`AppBootstrap` 在客户模块加载前安装）；未指定 `--lang` 时
+  用 `brand.language` 走 `ShellRuntime::switchLanguage()`，并可读取 `<profileDir>/translations/`。
+- **部署**：`UiDeployProfile()` 除 `ui.json` + `assets/` 外，客户目录自带的 `styles/`、
+  `translations/` 也复制到 `<exe>/profile/`。
+- **验收**：新增 `UiTstProfileLoader` 的 brand 解析用例（含非法类型）、`UiTstInteraction` 的
+  外置标题/图标/皮肤用例；端到端用临时 profile（含 `assets/` + `styles/`）启动 `AprilShell`
+  （offscreen + 最小 profile），事件循环正常、unknown-command 告警 0。
+- **未做**：`Main/Src/UI/WorkbenchWindow.cpp` 等旧硬编码仍留在旧 `April` 可执行文件的路径上，
+  待 M6 切入口后处理；关于框 logo/版权等仍由客户 C++ binding 提供，尚未进 `ui.json`。
 
 ### M6：切换入口，删除旧 Main
 
@@ -305,6 +320,7 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
 
 - 没有删除或修改 `Main/` 的任何源码；
 - M3 的 2D 交互与 M4 的菜单点击/快捷键运行时验收，仍待真实 GUI 会话（offscreen 限制见 §0.5）；
-- M5 品牌/主题/i18n/部署与 M6 入口切换尚未开始。
+- M5 的旧 `Main` 品牌硬编码清理与六套 QSS 搬迁尚未开始；
+- M6 的 `April` 入口切换与旧 UI 删除尚未开始。
 
-后续按 M5 → M6 逐项推进。
+后续按 M6 推进，并在真实 GUI 会话补 M3/M4 运行时验收。

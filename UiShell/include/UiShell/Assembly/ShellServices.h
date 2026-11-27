@@ -59,8 +59,11 @@ namespace RD
         // 当前皮肤 id
         QString strThemeId;
 
-        // 客户样式表
+        // 客户样式表（qrc 前缀）
         QString strCustomStyle;
+
+        // M5：外置 profile 的 styles/ 目录（可为空）
+        QString strStyleDir;
 
         // 皮肤样式
         QString strStyleSeries;

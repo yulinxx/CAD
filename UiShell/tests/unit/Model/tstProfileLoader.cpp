@@ -52,6 +52,8 @@ private slots:
     void rejectsMissingProfileId();
     void rejectsInvalidJson();
     void parsesTitleBarAndWindow();
+    void parsesBrandMetadata();
+    void rejectsInvalidBrandType();
     void titleBarDefaultsWhenAbsent();
     void warnsUnknownTopLevelField();
     void rejectsOversizedProfile();
@@ -194,7 +196,7 @@ void ProfileLoaderTest::parsesTitleBarAndWindow()
   "version": 2,
   "profileId": "p",
   "titleBar": {
-    "title": "工作台",
+    "title": "\u5de5\u4f5c\u53f0",
     "icon": "◆",
     "buttons": [ "close", "maximize", "minimize" ],
     "height": 44,
@@ -211,7 +213,7 @@ void ProfileLoaderTest::parsesTitleBarAndWindow()
     QVERIFY(result.profileModel.has_value());
 
     const ProfileModel& model = *result.profileModel;
-    QCOMPARE(model.titleBar.strTitle.toStdString(), std::string("工作台"));
+    QCOMPARE(model.titleBar.strTitle.toStdString(), std::string("\u5de5\u4f5c\u53f0"));
     QCOMPARE(model.titleBar.strIcon.toStdString(), std::string("◆"));
     QCOMPARE(model.titleBar.listButtons.size(), 3);
     QCOMPARE(model.titleBar.listButtons.at(0).toStdString(), std::string("close"));
@@ -223,6 +225,47 @@ void ProfileLoaderTest::parsesTitleBarAndWindow()
     // window 段只做原样读取，最小尺寸的夹取留给 AssemblyPlanner，加载器不擅自改数据。
     QCOMPARE(model.window.minWidth, 960);
     QCOMPARE(model.window.minHeight, 640);
+}
+
+void ProfileLoaderTest::parsesBrandMetadata()
+{
+    const QByteArray json = R"json({
+  "version": 2,
+  "profileId": "p",
+  "brand": {
+    "product": "Site Product",
+    "organization": "Site Org",
+    "icon": "assets/logo.svg",
+    "theme": "DARK",
+    "language": "zh_CN"
+  },
+  "regions": [ { "id": "center", "type": "CenterView" } ]
+})json";
+
+    const ProfileLoadResult result = ProfileParser::loadFromJson(json);
+    QVERIFY(result.isOk());
+    QVERIFY(result.profileModel.has_value());
+
+    const BrandSpec& brand = result.profileModel->brand;
+    QCOMPARE(brand.strProduct, QStringLiteral("Site Product"));
+    QCOMPARE(brand.strOrganization, QStringLiteral("Site Org"));
+    QCOMPARE(brand.strIcon, QStringLiteral("assets/logo.svg"));
+    QCOMPARE(brand.strTheme, QStringLiteral("dark"));
+    QCOMPARE(brand.strLanguage, QStringLiteral("zh_CN"));
+}
+
+void ProfileLoaderTest::rejectsInvalidBrandType()
+{
+    const QByteArray json = R"json({
+  "version": 2,
+  "profileId": "p",
+  "brand": "not-an-object",
+  "regions": [ { "id": "center", "type": "CenterView" } ]
+})json";
+
+    const ProfileLoadResult result = ProfileParser::loadFromJson(json);
+    QVERIFY(!result.isOk());
+    QVERIFY(hasErrorContaining(result.diagnostics, QStringLiteral("must be an object")));
 }
 
 // 未声明 titleBar 时保持可用默认：启用、可拖拽、三个按钮、800x600 最小尺寸。

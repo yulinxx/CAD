@@ -80,11 +80,24 @@ namespace RD
         QList<MenuNodeSpec> children;  // Submenu 的子项
     };
 
+    // M5：品牌/外观元数据。全部可选，未配置时沿用客户代码与命令行设置。
+    // 站点改外置 ui.json 即可换产品名、图标、默认皮肤与默认语言，无需重编。
+    struct BrandSpec
+    {
+        QString strProduct;       // 窗口标题 / 品牌展示名
+        QString strOrganization;  // 组织名
+        QString strIcon;          // 图标：qrc 路径或相对 profile 目录的路径
+        QString strTheme;         // 默认皮肤 id（light / dark / 客户皮肤）
+        QString strLanguage;      // 默认语言 id；显式 --lang 优先
+    };
+
     // profile 解析结果
     struct ProfileModel
     {
         int nVersion = 2;
         QString strProfileId;
+
+        BrandSpec brand;
 
         QList<RegionSpec> regions;
         QList<PanelSpec> panels;

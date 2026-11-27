@@ -3,6 +3,7 @@
 #include <QApplication>
 #include <QColor>
 #include <QCoreApplication>
+#include <QDir>
 #include <QFile>
 #include <QStringList>
 #include <QStyle>
@@ -47,7 +48,9 @@ namespace RD
         return palette;
     }
 
-    bool ThemeController::apply(const QString& themeId, const QString& customPrefix)
+    bool ThemeController::apply(const QString& themeId,
+                                const QString& customPrefix,
+                                const QString& profileDir)
     {
         auto* app = qobject_cast<QApplication*>(QCoreApplication::instance());
         if (!app)
@@ -74,6 +77,16 @@ namespace RD
 
             if (!customerSheet.isEmpty())
                 sheets.append(customerSheet);
+        }
+
+        // 外置 profile：<profileDir>/styles/<themeId>.qss 覆盖内置与客户 qrc 皮肤。
+        if (!profileDir.isEmpty())
+        {
+            const QString externalSheet = readStyleSheet(
+                QDir(profileDir).absoluteFilePath(
+                    QStringLiteral("styles/") + themeId + QStringLiteral(".qss")));
+            if (!externalSheet.isEmpty())
+                sheets.append(externalSheet);
         }
 
         if (sheets.isEmpty())

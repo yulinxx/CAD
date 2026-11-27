@@ -90,6 +90,7 @@ function(UiDeployRuntime target)
 endfunction()
 
 # profile 外置部署：把客户的 ui.json 与 assets/ 复制到 <exe>/profile/。
+# M5：客户目录若自带 styles/、translations/，也一并复制，站点改文件即可换皮肤/语言。
 #   UiDeployProfile(<exe-target> <customer-target>)
 # 启动时 ProfileLocator 按 --profile → <exe>/profile/ui.json → 客户库内嵌资源的顺序查找；
 # 此处放置的副本让现场可以直接改配置。与 .qm 复制一样，不受 UI_DEPLOY_QT 影响。
@@ -104,12 +105,15 @@ function(UiDeployProfile target customer_target)
     set(_commands
         COMMAND ${CMAKE_COMMAND} -E make_directory "${_dst}"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_dir}/ui.json" "${_dst}/ui.json")
-    if(IS_DIRECTORY "${_dir}/assets")
-        list(APPEND _commands
-            COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${_dir}/assets" "${_dst}/assets")
-    endif()
+    foreach(_subdir assets styles translations)
+        if(IS_DIRECTORY "${_dir}/${_subdir}")
+            list(APPEND _commands
+                COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+                    "${_dir}/${_subdir}" "${_dst}/${_subdir}")
+        endif()
+    endforeach()
 
     add_custom_command(TARGET ${target} POST_BUILD
         ${_commands}
-        COMMENT "Copy UI profile (ui.json + assets) next to ${target}")
+        COMMENT "Copy UI profile (ui.json + assets/styles/translations) next to ${target}")
 endfunction()

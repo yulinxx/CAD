@@ -1,5 +1,6 @@
 #include "Assembly/Runtime/ProfilePipeline.h"
 
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 
@@ -11,9 +12,32 @@
 
 namespace RD
 {
+    namespace
+    {
+        // 外置 profile 的相对图标按 profile 目录解析；:/ 与绝对路径原样保留。
+        QString resolveAssetPath(const QString& path, const QString& profileDir)
+        {
+            if (path.isEmpty() || profileDir.isEmpty() || path.startsWith(QLatin1Char(':'))
+                || QFileInfo(path).isAbsolute())
+            {
+                return path;
+            }
+            return QDir(profileDir).absoluteFilePath(path);
+        }
+    }  // namespace
+
     bool ProfilePipeline::loadFromJson(const QByteArray& utf8Json, const ShellServices& shellServices)
     {
+        m_strProfileDir.clear();
+        return loadFromJsonImpl(utf8Json, shellServices, QString());
+    }
+
+    bool ProfilePipeline::loadFromJsonImpl(const QByteArray& utf8Json,
+                                           const ShellServices& shellServices,
+                                           const QString& profileDir)
+    {
         m_strLastError.clear();
+        m_strProfileDir = profileDir;
 
         // 缓存
         m_strProfileJson = utf8Json;
@@ -37,12 +61,18 @@ namespace RD
         }
 
         m_profileModel = *result.profileModel;
+
+        // M5：自绘标题栏在 Windows 上直接用这里的图标路径；先把相对路径
+        // 解析成 <profileDir>/assets/... 再规划，外置 profile 才能换图标。
+        m_profileModel->titleBar.strIcon = resolveAssetPath(
+            m_profileModel->titleBar.strIcon, profileDir);
+
         return replan(shellServices);
     }
 
     bool ProfilePipeline::loadFromFile(const QString& filePath, const ShellServices& shellServices)
     {
-        m_strProfileDir = QFileInfo(filePath).absolutePath();
+        const QString profileDir = QFileInfo(filePath).absolutePath();
 
         QFile file(filePath);
         if (!file.open(QIODevice::ReadOnly))
@@ -55,11 +85,12 @@ namespace RD
             m_assemblyDiagnostics.clear();
             m_profileModel.reset();
             m_strProfileJson.clear();
+            m_strProfileDir.clear();
             clearInfo();
             composeDiagnostics();
             return false;
         }
-        return loadFromJson(file.readAll(), shellServices);
+        return loadFromJsonImpl(file.readAll(), shellServices, profileDir);
     }
 
     bool ProfilePipeline::replan(const ShellServices& shellServices)

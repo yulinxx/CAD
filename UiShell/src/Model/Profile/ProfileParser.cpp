@@ -108,6 +108,7 @@ namespace RD
         // 同时让拼写错误（如 "menues"）在诊断里可见。
         const QSet<QString> kTopLevel{ QStringLiteral("version"),
             QStringLiteral("profileId"),
+            QStringLiteral("brand"),
             QStringLiteral("titleBar"),
             QStringLiteral("window"),
             QStringLiteral("regions"),
@@ -125,6 +126,22 @@ namespace RD
         }
 
         model.strProfileId = root.value(QStringLiteral("profileId")).toString().trimmed();
+
+        // ---- brand（M5：外置 profile 驱动品牌/外观）----
+        const QJsonValue brandValue = root.value(QStringLiteral("brand"));
+        if (!brandValue.isUndefined() && !brandValue.isObject())
+        {
+            addError(diagnostics, QStringLiteral("$.brand"), QStringLiteral("must be an object"));
+        }
+        else if (brandValue.isObject())
+        {
+            const QJsonObject brand = brandValue.toObject();
+            model.brand.strProduct = brand.value(QStringLiteral("product")).toString().trimmed();
+            model.brand.strOrganization = brand.value(QStringLiteral("organization")).toString().trimmed();
+            model.brand.strIcon = brand.value(QStringLiteral("icon")).toString().trimmed();
+            model.brand.strTheme = brand.value(QStringLiteral("theme")).toString().trimmed().toLower();
+            model.brand.strLanguage = brand.value(QStringLiteral("language")).toString().trimmed();
+        }
 
         // ---- titleBar ----
         const QJsonValue titleBarValue = root.value(QStringLiteral("titleBar"));

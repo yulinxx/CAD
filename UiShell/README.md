@@ -354,7 +354,7 @@ JSON → `ProfileModel` → `AssemblyInfo` 的全过程不创建控件，因此�
 flowchart LR
     JSON["ui.json<br/>JSONC + UTF-8"] --> LOAD["ProfilePipeline<br/>文件 IO + 缓存"]
     LOAD --> PARSE["ProfileParser<br/>大小检查 · 去 BOM/注释<br/>JSON 解析 · 字段解析"]
-    PARSE --> MODEL["ProfileModel<br/>Region / Slot / Panel / Menu<br/>titleBar / window"]
+    PARSE --> MODEL["ProfileModel<br/>Region / Slot / Panel / Menu<br/>titleBar / window / brand"]
     MODEL --> VALID["ProfileValidator<br/>id 唯一 · 槽位引用 · factory 必填"]
     VALID --> PLAN["planAssembly()<br/>排序 · 能力过滤 · 文本解析 · props 透传"]
     PLAN --> INFO["AssemblyInfo<br/>纯数据快照 · 无 QWidget"]
@@ -366,6 +366,29 @@ flowchart LR
     TEXT["ITextProvider<br/>稳定 key → 当前语种"] --> PLAN
     REG["IWidgetFactoryRegistry<br/>客户注入的面板工厂"] --> REBUILD
 ```
+
+### 品牌元数据（可选）
+
+`ui.json` 顶层可加 `brand`，全部字段可选；缺省时沿用客户模块与命令行设置：
+
+```json
+{
+  "brand": {
+    "product": "Site CAD",
+    "organization": "Site Technology",
+    "icon": "assets/logo.png",
+    "theme": "dark",
+    "language": "zh_CN"
+  }
+}
+```
+
+- `product` 覆盖窗口标题（没有 `brand` 时退回 `titleBar.title`）；`organization` 写入
+  `QCoreApplication::setOrganizationName()`；`icon` 设置顶层窗口图标。
+- `icon` 与 `titleBar.icon` 的相对路径按 `ui.json` 所在目录解析，`:/...` 与绝对路径原样保留。
+- `theme` 在加载后覆盖客户默认皮肤；显式 `--lang` 优先于 `language`，未指定时按 `language`
+  重新装载译文（可读取 `<profileDir>/translations/`）。
+- 非法 `brand` 类型会产生解析错误；未知子字段被忽略。旧 profile 不加这个段即可保持原行为。
 
 ### 加载与失败分支
 
@@ -909,6 +932,7 @@ C:\Qt\5.15.2\msvc2019_64\bin\lupdate.exe Main -recursive -extensions cpp,h `
 - `ThemeController::apply()` 先 `QApplication::setPalette()`（`paletteFor(themeId)`）再 `setStyleSheet()`；
   皮肤分两层：框架默认 `:/UiShell/styles/<id>.qss` 打底（提供 `msuiRole` / `msuiSeries` 角色契约），
   客户 qrc 前缀 `:<prefix>/styles/<id>.qss` 叠加在上面（只写差异规则，同特异性的写法由客户覆盖）；
+  外置 profile 的 `<profileDir>/styles/<id>.qss` 再叠加在最后一层，站点换皮肤无需重编；
 - 控件不使用内联 `setStyleSheet`，靠稳定 `objectName` / 动态属性选择器命中；
 - 需要感知皮肤/语言的控件实现 `IHostContextAware`，由宿主在创建后与切换后调用 `setHostContext()`。
 
@@ -992,7 +1016,8 @@ UI_SHELL_API IFeatureFlagStore* createFeatureFlagStore();
 
 `UI_DEPLOY_QT=OFF` 时跳过 windeployqt（`.qm` 复制仍执行）。
 
-`UiDeployProfile(<exe> <customer-target>)` 另把客户 `ui.json` 与 `assets/` 复制到 `<exe>/profile/`，同样不受 `UI_DEPLOY_QT` 影响。
+`UiDeployProfile(<exe> <customer-target>)` 另把客户 `ui.json` 与 `assets/` 复制到 `<exe>/profile/`；
+客户目录若自带 `styles/`、`translations/` 也一并复制，同样不受 `UI_DEPLOY_QT` 影响。
 Debug/Release 各自部署对应版本，自检按导入表里的确切文件名比对。
 
 ### Qt5 与 Qt6 的差异
@@ -1193,6 +1218,8 @@ customers/customerX/
 6. GoodLaser 额外依赖 Qt Qml / QuickWidgets；MantiSoft / TyvokStudio 只需要 Widgets。
 7. 部分终端安全软件会把构建产物移入回收站，导致链接或部署出现“文件消失”类报错；
    构建失败时先检查回收站。
+8. `brand` 只影响 UiShell 外壳；旧 `April` 可执行文件仍读 `brand.json`，其品牌硬编码待 M6 清理。
+   UiShell 框架目前只有 `light` / `dark` 两套 QSS，外置 `styles/` 只能覆盖已有主题 id。
 
 ## 相关文档
 

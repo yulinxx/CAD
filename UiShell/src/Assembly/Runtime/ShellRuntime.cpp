@@ -1,5 +1,10 @@
 #include "Assembly/Runtime/ShellRuntime.h"
 
+#include <QCoreApplication>
+#include <QDir>
+#include <QFileInfo>
+#include <QIcon>
+#include <QStringList>
 #include <QWidget>
 
 #include <optional>
@@ -18,6 +23,35 @@ static void rdInitShellResources()
 {
     Q_INIT_RESOURCE(UiShell);
 }
+
+namespace
+{
+    // 外置 profile 里的相对路径按 profile 所在目录解析；:/ 与绝对路径原样保留。
+    QString resolveProfileAsset(const QString& path, const QString& profileDir)
+    {
+        if (path.isEmpty() || path.startsWith(QLatin1Char(':')) || QFileInfo(path).isAbsolute())
+            return path;
+        return QDir(profileDir).absoluteFilePath(path);
+    }
+
+    QString profileTranslationDir(const QString& profileDir)
+    {
+        if (profileDir.isEmpty())
+            return QString();
+        const QDir dir(profileDir);
+        return dir.exists(QStringLiteral("translations"))
+            ? dir.absoluteFilePath(QStringLiteral("translations")) : QString();
+    }
+
+    QString profileStylesDir(const QString& profileDir)
+    {
+        if (profileDir.isEmpty())
+            return QString();
+        const QDir dir(profileDir);
+        return dir.exists(QStringLiteral("styles"))
+            ? dir.absoluteFilePath(QStringLiteral("styles")) : QString();
+    }
+}  // namespace
 
 namespace RD
 {
@@ -57,12 +91,14 @@ namespace RD
             });
 
         // 默认皮肤
-        if (!ThemeController::apply(m_shellServices.strThemeId, m_shellServices.strCustomStyle))
+        if (!ThemeController::apply(m_shellServices.strThemeId,
+                m_shellServices.strCustomStyle, m_shellServices.strStyleDir))
         {
             m_strLastMsg = QStringLiteral("style sheet '%1' not found").arg(m_shellServices.strThemeId);
 
             const QString light = QString::fromLatin1(ThemeId::Light);
-            if (m_shellServices.strThemeId != light && ThemeController::apply(light, m_shellServices.strCustomStyle))
+            if (m_shellServices.strThemeId != light
+                && ThemeController::apply(light, m_shellServices.strCustomStyle, m_shellServices.strStyleDir))
                 m_shellServices.strThemeId = light;
         }
 
@@ -95,25 +131,107 @@ namespace RD
 
     bool ShellRuntime::attachWindow(QMainWindow* window)
     {
-        return m_shellView->attachWindow(window);
+        const bool attached = m_shellView->attachWindow(window);
+        if (attached)
+        {
+            m_window = window;
+            applyBrandToWindow();
+        }
+        return attached;
     }
 
     bool ShellRuntime::loadFromJson(const QByteArray& json)
     {
+        m_translationDir.clear();
+        // strStyleDir 可能由宿主在构造时给初值，纯 JSON 加载不覆盖它。
         const bool bValid = m_profilePipeline.loadFromJson(json, m_shellServices);
 
         // 加载失败重建空 shell
         m_shellView->rebuild();
         m_profilePipeline.setAssemblyDiagnostics(m_shellView->assemblyDiagnostics());
+        if (bValid)
+        {
+            applyBrand();
+            applyBrandToWindow();
+        }
         return bValid;
     }
 
     bool ShellRuntime::loadFromFile(const QString& filePath)
     {
+        m_translationDir.clear();
         const bool bValid = m_profilePipeline.loadFromFile(filePath, m_shellServices);
         m_shellView->rebuild();
         m_profilePipeline.setAssemblyDiagnostics(m_shellView->assemblyDiagnostics());
+        if (bValid)
+        {
+            m_translationDir = profileTranslationDir(m_profilePipeline.profileDir());
+            m_shellServices.strStyleDir = profileStylesDir(m_profilePipeline.profileDir());
+            applyBrand();
+            applyBrandToWindow();
+        }
         return bValid;
+    }
+
+    bool ShellRuntime::hasExplicitLanguageArgument()
+    {
+        const QStringList args = QCoreApplication::arguments();
+        for (int i = 0; i < args.size(); ++i)
+        {
+            if (args.at(i).startsWith(QStringLiteral("--lang=")))
+                return true;
+            if (args.at(i) == QStringLiteral("--lang") && i + 1 < args.size())
+                return true;
+        }
+        return false;
+    }
+
+    void ShellRuntime::applyBrand()
+    {
+        const BrandSpec* brand = m_profilePipeline.brand();
+        if (!brand)
+            return;
+
+        if (!brand->strOrganization.isEmpty())
+            QCoreApplication::setOrganizationName(brand->strOrganization);
+
+        // 主题在 ShellRuntime 构造时已按客户默认值应用；profile 可再覆盖。
+        // force=true：即使 id 相同也要重新加载，外置 styles/ 可能带来新皮肤文件。
+        if (!brand->strTheme.isEmpty())
+            applyTheme(brand->strTheme, true);
+
+        // 命令行显式语言优先；未指定时才用 profile 的默认语言。
+        if (!brand->strLanguage.isEmpty() && !hasExplicitLanguageArgument()
+            && m_shellServices.transService
+            && m_shellServices.transService->language()
+                != m_shellServices.transService->normalizeLanguageId(brand->strLanguage))
+        {
+            switchLanguage(brand->strLanguage);
+        }
+    }
+
+    void ShellRuntime::applyBrandToWindow()
+    {
+        if (!m_window || !m_profilePipeline.hasModel())
+            return;
+
+        const BrandSpec* brand = m_profilePipeline.brand();
+        const AssemblyInfo& info = m_profilePipeline.info();
+
+        if (brand && !brand->strProduct.isEmpty())
+            m_window->setWindowTitle(brand->strProduct);
+        else if (!info.titleBar.strTitle.isEmpty())
+            m_window->setWindowTitle(info.titleBar.strTitle);
+
+        const QString iconPath = (brand && !brand->strIcon.isEmpty())
+            ? brand->strIcon : info.titleBar.strIcon;
+        const QString resolved = resolveProfileAsset(iconPath, m_profilePipeline.profileDir());
+        if (!resolved.isEmpty())
+        {
+            const QIcon icon(resolved);
+            if (!icon.isNull())
+                m_window->setWindowIcon(icon);
+        }
     }
 
     IRegionContainer* ShellRuntime::regionContainer(const QString& regionId) const
@@ -250,8 +368,8 @@ namespace RD
         if (!m_shellServices.transService)
             return;
 
-        // 回退英文
-        if (!m_shellServices.transService->install(language))
+        // 外置 profile 可自带 translations/；命令行语言仍由 TranslationSetup 提前装载。
+        if (!m_shellServices.transService->install(language, m_translationDir))
             m_strLastMsg = m_shellServices.transService->lastError();
 
         if (m_profilePipeline.hasModel())
@@ -274,15 +392,24 @@ namespace RD
 
         if (m_shellServices.shellListener)
             m_shellServices.shellListener->onLanguageChanged(m_shellServices.transService->language());
+
+        // 宿主回调可能把窗口标题改回客户模块默认名；profile 品牌优先。
+        applyBrandToWindow();
     }
 
     void ShellRuntime::switchTheme(const QString& themeId)
     {
+        applyTheme(themeId, false);
+    }
+
+    void ShellRuntime::applyTheme(const QString& themeId, bool force)
+    {
         const QString normalized = themeId.trimmed().toLower();
-        if (normalized.isEmpty() || normalized == m_shellServices.strThemeId)
+        if (normalized.isEmpty() || (!force && normalized == m_shellServices.strThemeId))
             return;
 
-        if (!ThemeController::apply(normalized, m_shellServices.strCustomStyle))
+        if (!ThemeController::apply(normalized,
+                m_shellServices.strCustomStyle, m_shellServices.strStyleDir))
             return;
 
         m_shellServices.strThemeId = normalized;

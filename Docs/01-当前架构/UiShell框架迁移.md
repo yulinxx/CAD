@@ -2,7 +2,7 @@
 
 > **状态唯一事实源：`UiShell/MIGRATION.md`（本文只做摘要，不再维护另一套状态）。**
 > M0–M4 的框架脚手架 + 低耦合 + 数据化已落地；M3 启动崩溃已修、交互运行时与
-> M4 菜单运行时未验收；M5/M6 未完成。
+> M4 菜单运行时未验收；M5 数据化首片（brand/主题/默认语言/外置资源）已落地，M6 未完成。
 > Step 0 基线（2026-11-27）：`UI_CUSTOMER=April` 下 configure / build / 25 项
 > `UiTst|UiLayerCheck` 全绿（含 `UiTstAprilMenuCatalog`、`UiTstProfileCommands`），旧 `April` 与 `AprilShell`（最小 profile）均可进入
 > 事件循环；一键门禁 `UiShell/ci/ui-shell-baseline.sh` 已固化进 CI。
@@ -72,7 +72,9 @@ AprilCore ──x──> UiShell                                 // 算法不依
 - `Apr::IViewportServices` 现在经 `ICadViewport::bindServices` 真注入（不再空实现），服务转发到 `DefaultViewportFactory`；2D 交互语义仍待验证。
 - `AprilWorkbench` 只保存 `IViewportServices`/`IViewportFactory`/`ICadViewport` 等 port；组合根与 adapter 由 `ModuleParts.wiring` 持有；不返回 raw 旧视口。
 - **M4** 菜单转换、目录登记与外置 profile 同步已完成（unknown-command 警告为 0），但点击/快捷键同一命令路径的运行时未验证；`setDispatcher` 已在 `wireCompositionRoot()` 接线，但 `UiWorkbench` 可能未设置。
-- **M5** 品牌/主题/i18n/部署、`AprilShell` CAD `:/configs` 资源注册未做。
+- **M5** 首片已做：`ui.json` 可选 `brand`（产品名/组织/图标/默认皮肤/默认语言）、外置 `styles/` 与
+  `translations/` 叠加、相对资源按 profile 目录解析、`UiDeployProfile` 一并部署；旧 `Main` 品牌
+  硬编码、六套 QSS 搬迁与 `AprilShell` CAD `:/configs` 资源注册未做。
 - **M6** `April`→`UiShell` 未切；`Main/Src/UI` 未删；全量回归未跑。
 - `AprilUi`↔`AprilCore` 互相引用；旧 `Main::AppBootstrapper` 未删；`April` 仍可运行。
 - `Engine` 子模块 WIP + GeometryContext 补丁未提交。

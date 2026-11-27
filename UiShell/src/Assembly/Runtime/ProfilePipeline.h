@@ -17,10 +17,10 @@ namespace RD
     class ProfilePipeline
     {
     public:
-        // 解析 UTF-8 JSON
+        // 解析 UTF-8 JSON（无文件位置时，相对图标路径无法解析）
         bool loadFromJson(const QByteArray& utf8Json, const ShellServices& shellServices);
 
-        // 读取文件后交给 loadFromJson
+        // 读取文件后解析；相对图标路径按文件所在目录解析
         bool loadFromFile(const QString& filePath, const ShellServices& shellServices);
 
         // 重新规划
@@ -59,6 +59,12 @@ namespace RD
             return m_profileModel.has_value();
         }
 
+        // M5：品牌/外观元数据（无 profile 时为 nullptr；未声明 brand 时字段为空）。
+        const BrandSpec* brand() const
+        {
+            return m_profileModel ? &m_profileModel->brand : nullptr;
+        }
+
         // 最近一次成功规划时消费的开关版本,用于跳过重复的开关通知
         quint64 featureRevision() const
         {
@@ -66,6 +72,10 @@ namespace RD
         }
 
     private:
+        bool loadFromJsonImpl(const QByteArray& utf8Json,
+                              const ShellServices& shellServices,
+                              const QString& profileDir);
+
         void setFirstError();
         void clearInfo();
 
