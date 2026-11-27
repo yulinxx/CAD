@@ -479,6 +479,27 @@ set_target_properties(AprilUi PROPERTIES
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${APRIL_UI_SOURCES} ${APRIL_UI_HEADERS})
 april_apply_app_target_settings(AprilUi)
 
+# 对外暴露头文件目录与关键链接依赖，让 customers/April 等消费者能
+# #include "UI/..." 并直接用 RenderViewport2D / Viewport3D / UiServices 等类型。
+# （M3 框架移植；当前不保证编译，待 Engine 子模块处理后一并验证。）
+target_include_directories(AprilUi
+    PUBLIC
+        "${SRC_ROOT}"
+        "${UI_ROOT}"
+        "${UI_ROOT}/Services"
+        "${UI_ROOT}/Render"
+        "${UI_ROOT}/Workbench"
+)
+target_link_libraries(AprilUi
+    PUBLIC
+        UICommon
+        UI2D
+        EngineCommon
+        Engine2D
+        EnginePersistence
+        Engine3D
+)
+
 april_apply_app_target_settings(${APP_NAME})
 target_link_libraries(${APP_NAME} PRIVATE AprilUi)
 

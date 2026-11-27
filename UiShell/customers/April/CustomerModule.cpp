@@ -58,8 +58,10 @@ namespace RD
         module.strProfilePath = QString::fromUtf8(UI_CUSTOMER_PROFILE);
         module.strStyleSeries = QStringLiteral("april");
         module.centerView = &parts->centerView;
-        // M2：命令表尚未接入（M4）；留空。
-        // 对话框工厂尚未接入（M5）；共享默认仍可用。
+        // M3：centerView 是 Apr::CenterView（: Apr::AprilWorkbench），
+        // createCenterView 返回现有 RenderViewport2D / Viewport3D；
+        // 视口服务由本客户持有并注入；与 UiShell ShellServices 互转。
+        // 命令表尚未接入（M4）；留空。
 
         return module;
     }

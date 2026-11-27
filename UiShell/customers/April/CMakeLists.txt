@@ -3,12 +3,11 @@ msUiAddCustomerLibrary(${UI_CUSTOMER_TARGET})
 
 # ---------------------------------------------------------------------------
 # M1/M2：复用现有 CAD UI 静态库 AprilUi（Main/Src/UI/**）。
+# M3：AprilWorkbench 把现有 RenderViewport2D / Viewport3D 框架移植到
+#     ICenterViewProvider::createCenterView；视口服务由本客户持有并注入。
 #
-# M2 阶段只验证可链接；CAD 视口/命令/资源在后续里程碑接入：
-#   M3 ICenterViewProvider::createCenterView() → 现有 Workbench
-#   M4 ICommandCatalog / ICommandInvoker → 现有命令表
-#   M5 Q_INIT_RESOURCE + profile 外置
-# 资源注册由宿主（April 或 AprilShell）负责，本库不在 M2 引入 qrc。
+# 资源注册由宿主（April 或 AprilShell）负责；本库不在此引入 qrc。
+# 本轮“框架移植”不保证编译；Engine 子模块处理后再一并验证。
 # ---------------------------------------------------------------------------
 if(TARGET AprilUi)
     target_link_libraries(${UI_CUSTOMER_TARGET} PRIVATE AprilUi)

@@ -125,13 +125,42 @@
 
 **注**：M1 里 `AprilUi` 已链接；M2 只验证 `UiApril` 可链接 `AprilUi`，CAD 视口/命令/资源在 M3/M4/M5 接入。
 
-### M3：视口接入
+### M3：视口接入（框架已移植；本轮不保证编译，待处理 `Engine` 子模块后验证）
 
-- 实现 `ICenterViewProvider::createCenterView()`，返回现有
-  `RenderViewport2D` / `UiViewport3D` 的宿主 QWidget。
-- 视口所需的服务（`UiServices`、`SceneDocument2D`、`UiStateCenter`）
-  由 `customers/April` 持有，经 `ShellServices` 注入。
-- 验收：2D 绘图、选择、变换、撤销重做在新外壳内可用。
+**做法**（`UiShell/customers/April`）：
+
+- 新增 `panels/AprilWorkbench.{h,cpp}`：
+  - `AprilWorkbench : RD::ICenterViewProvider`；
+  - `createCenterView()` → `createCenterView2D` / `createCenterView3D`：
+    - **2D**：返回现有 `RenderViewport2D`（`Main/Src/UI/Render/RenderViewport2D.h`，`AprilUi`），
+      注入 `setDocument` / `setSelectionService` / `setOperationBus` / `setLayerManager`，
+      再 `initializeTools()`；`objectName=center.view`；
+    - **3D**：返回现有 `Viewport3D`（`Main/Src/UI/Render/UiViewport3D.h`，**类名是 `Viewport3D`，不是 `UiViewport3D`**），
+      `setRenderer(std::make_unique<RenderWidget3DAdapter>())`、`setSceneDocument`、`setCameraController`、`initialize()`；
+      未开 `BUILD_UI3D` 时保留调用点、退回空中央视图；
+  - `ViewportKind { TwoD, ThreeD }`；
+  - 视口所需服务由 `customers/April` 持有并注入：
+    `UiServices`（七分组装配容器，`setUiServices` 同步 `workbench()`）、`WorkbenchServices`、
+    `SceneDocument2D`、`SceneDocument3D`、`UiStateCenter`、`OperationBus`、`ISelectionService`、`LayerManager`、`CameraController3D`；
+  - 与 `UiShell` 的 `RD::ShellServices` 互转：`populateShellServices()` / `applyShellServices()`；
+  - 不重写工作台，复用 `AprilUi` 现有实现。
+- `PanelFactory.h`：`CenterView : public AprilWorkbench`（M2 空 `QWidget` 已替换为 M3 视口宿主）。
+- `CustomerModule.cpp`：`module.centerView` 指向 `CenterView`（即 `AprilWorkbench`）。
+- `Main/CMakeLists.txt`：`AprilUi` 的 include 目录与 `UICommon/UI2D/Engine*/Engine3D` 链接改 `PUBLIC`，
+  供 `customers/April` `#include "UI/..."`。
+
+**真实 API 名（不重新发明）**：`RenderViewport2D`（`QWidget` + `UI::IViewportHost`）、`Viewport3D`、
+`RenderWidget3DAdapter`、`UiServices`、`WorkbenchServices`、`SceneDocument2D`、`UiStateCenter`、`OperationBus`、`ISelectionService`。
+
+**暂未做 / 本轮不保证**：
+
+- **编译**：用户明确“编译先不管；框架移植成功后，再考虑这个子模块处理”。本轮只移植框架，**未**在 `Engine` 子模块修复后实际 `ninja` 验证。
+- **组合根**：`ApplicationCompositionRoot` 在 `Main/Src/Composition`（不在 `AprilUi` 内），现在填充 `UiServices`/`SceneDocument2D`/`OperationBus`；
+  如何为 `customers/April` 提供已装配好的实例，留到处理 `Engine` 子模块时一并接上。
+- **资源注册**：`AprilUi` 的 `:/configs/...` 等仍在 `April` 可执行目标注册；`AprilShell` 的 CAD 资源在 **M5/M6**。
+- **验收（待 `Engine` 可编译后）**：2D 绘图、选择、变换、撤销重做在新外壳内可用。
+
+**注**：原 M3 文本写 `UiViewport3D`，实际类为 `Viewport3D`（头文件 `UiViewport3D.h`）。
 
 ### M4：菜单、工具栏、命令、快捷键
 

@@ -1,16 +1,13 @@
 #pragma once
 
-#include "UiShell/Contract/WidgetFactory.h"
-
-class QWidget;
+#include "AprilWorkbench.h"
 
 namespace Apr
 {
-    // M2：April 客户的中央视图。
-    // 现阶段是占位的空 QWidget；M3 改为返回现有 CAD 工作台/视口宿主。
-    class CenterView : public RD::ICenterViewProvider
+    // M2/M3：April 客户的中央视图。
+    // 继承 M3 的 AprilWorkbench：把现有 CAD 工作台/视口框架移植到 UiShell。
+    // createCenterView 返回现有 RenderViewport2D / Viewport3D 宿主。
+    class CenterView : public AprilWorkbench
     {
-    public:
-        QWidget* createCenterView(QWidget* parent) override;
     };
 }  // namespace Apr
