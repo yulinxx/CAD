@@ -170,6 +170,20 @@ msUiAddTest(NAME ModalDialog
 # 客户自定义关于框：源文件直接编进测试，三套构建都会跑。
 # 仅依赖契约、UiDialogs 与 Qt（GoodLaser 另需 Qt Quick），不链接 shell 与客户库。
 # ------------------------------------------------------------
+# April 菜单目录：直接编译客户的 Commands.cpp，验证 ui.json 菜单节点都能被登记。
+set(_UI_April_dir "${UI_SHELL_SOURCE_DIR}/customers/April")
+msUiAddTest(NAME AprilMenuCatalog
+    SOURCES unit/Customers/tstAprilMenuCatalog.cpp
+            "${_UI_April_dir}/commands/Commands.cpp"
+    LIBS ${UI_CONTRACT_TARGET}
+    LABELS unit)
+msUiTestTargetName(_tstAprilMenuCatalog AprilMenuCatalog)
+target_include_directories(${_tstAprilMenuCatalog} PRIVATE
+    "${_UI_April_dir}"
+    "${CMAKE_SOURCE_DIR}/Main/Src")
+target_compile_definitions(${_tstAprilMenuCatalog} PRIVATE
+    APRIL_PROFILE_PATH="${_UI_April_dir}/ui.json")
+
 set(_UI_TyvokStudio_dir "${UI_SHELL_SOURCE_DIR}/customers/TyvokStudio")
 msUiAddTest(NAME TyvokStudioAboutDialog
     SOURCES unit/Customers/tstTyvokStudioAboutDialog.cpp

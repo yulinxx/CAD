@@ -25,12 +25,14 @@ namespace Apr
     IViewportFactory* AprilWorkbench::viewportFactory() const { return m_viewportFactory; }
     void AprilWorkbench::setServiceFactory(ICadServiceFactory* services) { m_serviceFactory = services; }
     ICadServiceFactory* AprilWorkbench::serviceFactory() const { return m_serviceFactory; }
+    IViewportServices* AprilWorkbench::viewportServices() const { return m_viewportServices; }
     ICadViewport* AprilWorkbench::cadViewport() const { return m_cadViewport; }
 
     void AprilWorkbench::bindViewportServices(IViewportServices& services)
     {
-        // 低耦合：不暴露具体对象；服务是否齐全由 adapter（Apr::CompositionRootAdapter）回答。
-        Q_UNUSED(services);
+        // 低耦合：只保存服务视图，不持有 SceneDocument2D/OperationBus 等具体对象；
+        // 服务是否齐全由 adapter（Apr::CompositionRootAdapter）回答。
+        m_viewportServices = &services;
     }
 
     // ---------------- UiShell ShellServices 互转 ----------------
@@ -65,6 +67,8 @@ namespace Apr
         if (m_viewportFactory)
         {
             m_cadViewport = m_viewportFactory->create2D(parent);
+            if (m_cadViewport && m_viewportServices)
+                m_cadViewport->bindServices(*m_viewportServices);  // 经 port 注入，不暴露 raw 算法对象
             QWidget* w = m_cadViewport ? m_cadViewport->widget() : nullptr;
             if (w)
             {
@@ -88,6 +92,8 @@ namespace Apr
         if (m_viewportFactory)
         {
             m_cadViewport = m_viewportFactory->create3D(parent);
+            if (m_cadViewport && m_viewportServices)
+                m_cadViewport->bindServices(*m_viewportServices);
             QWidget* w = m_cadViewport ? m_cadViewport->widget() : nullptr;
             if (w)
             {

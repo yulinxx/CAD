@@ -2,13 +2,34 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QFileInfo>
 #include <QMainWindow>
 #include <QMessageBox>
 #include <QString>
+#include <QStringList>
 
 #include <cstdio>
 
 #include "Launcher/ProfileLocator.h"
+
+namespace
+{
+    // README 约定：--profile <path> / --profile=<path> 优先级最高，
+    // 文件不存在直接失败，不回退到 appDir / 内嵌 profile。
+    QString explicitProfilePath()
+    {
+        const QStringList args = QCoreApplication::arguments();
+        for (int i = 0; i < args.size(); ++i)
+        {
+            const QString& arg = args.at(i);
+            if (arg.startsWith(QStringLiteral("--profile=")))
+                return arg.mid(QStringLiteral("--profile=").size());
+            if (arg == QStringLiteral("--profile") && i + 1 < args.size())
+                return args.at(i + 1);
+        }
+        return {};
+    }
+}  // namespace
 
 StartupSession::StartupSession(RD::IShellRuntime* runtime)
     : m_shellRT(runtime)
@@ -19,6 +40,21 @@ bool StartupSession::loadProfile(const QString& path)
 {
     if (!m_shellRT)
         return false;
+
+    const QString explicitPath = explicitProfilePath();
+    if (!explicitPath.isEmpty())
+    {
+        const QFileInfo info(explicitPath);
+        if (!info.isFile())
+        {
+            reportError(QCoreApplication::translate("App", "Profile does not exist:\n%1")
+                            .arg(QDir::toNativeSeparators(explicitPath)));
+            return false;
+        }
+        const QString path = info.absoluteFilePath();
+        std::fprintf(stderr, "App: ui profile = %s (argument)\n", qPrintable(path));
+        return loadFromPath(path);
+    }
 
     const ProfileInfo info = ProfileLocator::locate(
         QCoreApplication::applicationDirPath(), path);

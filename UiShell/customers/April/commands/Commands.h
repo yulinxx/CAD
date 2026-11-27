@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QByteArray>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QList>
 #include <QString>
@@ -36,12 +38,15 @@ namespace Apr
 
         // ---------------- 装配 ----------------
         void addCommand(const RD::CommandView& command);              ///< 登记命令元数据
+        int addCommandsFromProfile(const QByteArray& profileJson);    ///< 从客户 profile 的 menus 递归登记命令
         void setDispatcher(IUiCommandDispatcher* dispatcher);        ///< 现有工作台/命令分发器
         IUiCommandDispatcher* dispatcher() const;
 
         const QList<RD::CommandView>& commands() const;
 
     private:
+        void collectCommands(const QJsonArray& nodes);               ///< 递归收集 type=command 的节点
+
         QList<RD::CommandView> m_commands;
         IUiCommandDispatcher* m_dispatcher = nullptr;
     };

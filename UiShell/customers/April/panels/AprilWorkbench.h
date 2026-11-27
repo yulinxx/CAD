@@ -72,6 +72,7 @@ namespace Apr
         // 低耦合：service factory + services view，不直接 set SceneDocument2D/OperationBus/...
         void setServiceFactory(ICadServiceFactory* services);
         ICadServiceFactory* serviceFactory() const;
+        IViewportServices* viewportServices() const;  ///< 已注入的服务视图（仅 customer 层可见）
         IViewportFactory* viewportFactory() const;
         ICadViewport* cadViewport() const;   ///< 最近 createCenterView 产出的 port（不暴露 raw 旧视口）
 
@@ -103,6 +104,7 @@ namespace Apr
         QWidget* m_centerWidget = nullptr;
         IViewportFactory* m_viewportFactory = nullptr;
         ICadServiceFactory* m_serviceFactory = nullptr;
+        IViewportServices* m_viewportServices = nullptr;
         ICadViewport* m_cadViewport = nullptr;      // 不持有；factory 产出，widget() 交给 Qt
 
         // UiShell 侧只读信息

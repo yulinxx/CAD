@@ -1,6 +1,8 @@
 #include "Commands.h"
 
+#include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonValue>
 
 namespace Apr
 {
@@ -43,6 +45,49 @@ namespace Apr
     void Commands::addCommand(const RD::CommandView& command)
     {
         m_commands.append(command);
+    }
+
+    // M4：ui.json 的 menus 是菜单/命令的唯一事实源。把里面的 command 节点登记进目录，
+    // AssemblyPlanner 才不会把它们当“未知命令”过滤掉。菜单标题/图标也取自 profile，
+    // 不在这里重复维护一份 176 项的命令表。
+    int Commands::addCommandsFromProfile(const QByteArray& profileJson)
+    {
+        const QJsonDocument doc = QJsonDocument::fromJson(profileJson);
+        if (!doc.isObject())
+            return 0;
+        const QJsonValue menus = doc.object().value(QStringLiteral("menus"));
+        if (!menus.isArray())
+            return 0;
+
+        const int before = m_commands.size();
+        collectCommands(menus.toArray());
+        return m_commands.size() - before;
+    }
+
+    void Commands::collectCommands(const QJsonArray& nodes)
+    {
+        for (const QJsonValue& value : nodes)
+        {
+            if (!value.isObject())
+                continue;
+            const QJsonObject obj = value.toObject();
+
+            const QString id = obj.value(QStringLiteral("commandId")).toString();
+            if (obj.value(QStringLiteral("type")).toString() == QStringLiteral("command")
+                && !id.isEmpty() && !find(id))
+            {
+                RD::CommandView view;
+                view.strId = id;
+                view.strTitleKey = obj.value(QStringLiteral("titleKey")).toString();
+                view.strIconKey = obj.value(QStringLiteral("iconKey")).toString();
+                view.bCheckable = obj.value(QStringLiteral("checkable")).toBool(false);
+                m_commands.append(view);
+            }
+
+            const QJsonValue children = obj.value(QStringLiteral("children"));
+            if (children.isArray())
+                collectCommands(children.toArray());
+        }
     }
 
     void Commands::setDispatcher(IUiCommandDispatcher* dispatcher)

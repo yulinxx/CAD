@@ -20,6 +20,8 @@ namespace Apr
 
     QWidget* RenderViewport2DAdapter::widget() { return m_vp; }
 
+    void RenderViewport2DAdapter::bindServices(IViewportServices& services) { m_services = &services; }
+
     void RenderViewport2DAdapter::resetView() { if (m_vp) m_vp->resetView(); }
     void RenderViewport2DAdapter::zoomToSelection() { if (m_vp) m_vp->zoomToSelection(); }
     void RenderViewport2DAdapter::setDrawingEnabled(bool enabled) { if (m_vp) m_vp->setDrawingEnabled(enabled); }

@@ -18,6 +18,8 @@ namespace Apr
         ~RenderViewport2DAdapter() override;
 
         QWidget* widget() override;
+        void bindServices(IViewportServices& services) override;
+        IViewportServices* services() const { return m_services; }
         void resetView() override;
         void zoomToSelection() override;
         void setDrawingEnabled(bool enabled) override;
@@ -35,5 +37,6 @@ namespace Apr
 
     private:
         RenderViewport2D* m_vp = nullptr;
+        IViewportServices* m_services = nullptr;
     };
 }  // namespace Apr

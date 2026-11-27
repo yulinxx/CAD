@@ -21,14 +21,15 @@ namespace Apr
 
     bool wireCompositionRoot(ApplicationCompositionRoot& root,
                              AprilWorkbench& workbench,
-                             Commands& commands)
+                             Commands& commands,
+                             CompositionRootAdapter& adapter)
     {
         if (!root.isBuilt())
             return false;
 
         // 视口服务注入：低耦合，AprilWorkbench 只见 Apr::IViewportServices，不见 ApplicationCompositionRoot 具体对象。
-        Apr::CompositionRootAdapter adapter(root);
-        workbench.bindViewportServices(adapter);
+        // adapter 由调用方（customer 的模块部件）持有，函数返回后不能留下悬空指针。
+        workbench.bindViewportServices(*adapter.viewportServices());
         workbench.setServiceFactory(&adapter);                 // Apr::ICadServiceFactory
         // 低耦合转发：AprilCore -> Apr::DefaultViewportFactory -> Apr::RenderViewport2DAdapter -> RenderViewport2D；不暴露 raw 给 UiShell。
         if (auto* dvf = dynamic_cast<Apr::DefaultViewportFactory*>(adapter.viewportFactory()))
@@ -57,12 +58,11 @@ namespace Apr
         return viewportWired;   // 命令 dispatcher 可为 null（未 setWorkbench），不算失败
     }
 
-    CompositionRootWiring attachCompositionRoot(AprilWorkbench& workbench,
-                                                Commands& commands,
-                                                ApplicationCompositionRoot* existing)
+    bool attachCompositionRoot(AprilWorkbench& workbench,
+                               Commands& commands,
+                               CompositionRootWiring& wiring,
+                               ApplicationCompositionRoot* existing)
     {
-        CompositionRootWiring wiring;
-
         ApplicationCompositionRoot* root = existing;
         if (!root)
             root = ApplicationCompositionRoot::instance();
@@ -78,9 +78,15 @@ namespace Apr
 
         wiring.root = root;
         wiring.built = root->isBuilt();
-        if (wiring.built)
-            wiring.wired = wireCompositionRoot(*root, workbench, commands);
+        if (!wiring.built)
+            return false;
 
-        return wiring;
+        // adapter 与它内部的 DefaultViewportFactory 必须和 workbench 同寿命：
+        // 它们由 customer 的 ModuleParts 持有（wiring 成员），不是本函数栈对象。
+        if (!wiring.adapter)
+            wiring.adapter = std::make_unique<CompositionRootAdapter>(*root);
+
+        wiring.wired = wireCompositionRoot(*root, workbench, commands, *wiring.adapter);
+        return wiring.wired;
     }
 }  // namespace Apr
