@@ -1,5 +1,6 @@
 #include "Assembly/Menus/MenuPresenter.h"
 #include "UiShell/Assembly/IMenuPresenter.h"
+#include "UiShell/Contract/HostContext.h"
 #include "UiShell/i18n/ITranslationService.h"
 
 #include <QActionGroup>
@@ -161,21 +162,13 @@ namespace RD
                     const QString currentTheme =
                         services.strThemeId.isEmpty() ? QStringLiteral("light") : services.strThemeId;
 
-                    struct ThemeEntry
+                    for (const ThemeCatalog::Entry& e : ThemeCatalog::entries())
                     {
-                        QString id;
-                        QString label;
-                    };
-
-                    for (const auto& e : {
-                             ThemeEntry{ QStringLiteral("light"), QCoreApplication::translate("ThemeMenu", "Light") },
-                             ThemeEntry{ QStringLiteral("dark"), QCoreApplication::translate("ThemeMenu", "Dark") },
-                        })
-                    {
-                        auto* action = themeMenu->addAction(e.label);
-                        action->setObjectName(QStringLiteral("msui.action.theme.") + e.id);
+                        auto* action = themeMenu->addAction(
+                            QCoreApplication::translate("ThemeMenu", e.label));
+                        action->setObjectName(QStringLiteral("msui.action.theme.") + e.strId);
                         action->setCheckable(true);
-                        action->setChecked(e.id == currentTheme);
+                        action->setChecked(e.strId == currentTheme);
                         themeGroup->addAction(action);
                     }
                 }
@@ -266,21 +259,13 @@ namespace RD
                         themeGroup->setExclusive(true);
                         const QString currentTheme = services.strThemeId.isEmpty() ? QStringLiteral("light") : services.strThemeId;
 
-                        struct ThemeEntry
+                        for (const ThemeCatalog::Entry& e : ThemeCatalog::entries())
                         {
-                            QString id;
-                            QString label;
-                        };
-
-                        for (const auto& e : {
-                                 ThemeEntry{ QStringLiteral("light"), QCoreApplication::translate("ThemeMenu", "Light") },
-                                 ThemeEntry{ QStringLiteral("dark"), QCoreApplication::translate("ThemeMenu", "Dark") },
-                            })
-                        {
-                            auto* action = themeMenu->addAction(e.label);
-                            action->setObjectName(QStringLiteral("msui.action.theme.") + e.id);
+                            auto* action = themeMenu->addAction(
+                                QCoreApplication::translate("ThemeMenu", e.label));
+                            action->setObjectName(QStringLiteral("msui.action.theme.") + e.strId);
                             action->setCheckable(true);
-                            action->setChecked(e.id == currentTheme);
+                            action->setChecked(e.strId == currentTheme);
                             themeGroup->addAction(action);
                         }
                     }

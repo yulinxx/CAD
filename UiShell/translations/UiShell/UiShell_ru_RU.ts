@@ -53,6 +53,26 @@
         <source>Theme</source>
         <translation>Тема</translation>
     </message>
+    <message>
+        <location filename="../../include/UiShell/Contract/HostContext.h" line="36"/>
+        <source>Blue</source>
+        <translation>Синий</translation>
+    </message>
+    <message>
+        <location filename="../../include/UiShell/Contract/HostContext.h" line="37"/>
+        <source>Slate</source>
+        <translation>Сланцевый</translation>
+    </message>
+    <message>
+        <location filename="../../include/UiShell/Contract/HostContext.h" line="38"/>
+        <source>High Contrast</source>
+        <translation>Высокий контраст</translation>
+    </message>
+    <message>
+        <location filename="../../include/UiShell/Contract/HostContext.h" line="39"/>
+        <source>System</source>
+        <translation>Системная</translation>
+    </message>
 </context>
 <context>
     <name>TitleBar</name>

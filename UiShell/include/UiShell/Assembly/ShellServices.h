@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QJsonObject>
 #include <QString>
 
 #include "UiShell/Contract/CustomerModule.h"
@@ -64,6 +65,9 @@ namespace RD
 
         // M5：外置 profile 的 styles/ 目录（可为空）
         QString strStyleDir;
+
+        // M5：profile 的 brand 段转成的对话框参数；显式 binding 优先。
+        QJsonObject brandParams;
 
         // 皮肤样式
         QString strStyleSeries;

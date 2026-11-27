@@ -53,6 +53,26 @@
         <source>Theme</source>
         <translation>主题</translation>
     </message>
+    <message>
+        <location filename="../../include/UiShell/Contract/HostContext.h" line="36"/>
+        <source>Blue</source>
+        <translation>蓝色</translation>
+    </message>
+    <message>
+        <location filename="../../include/UiShell/Contract/HostContext.h" line="37"/>
+        <source>Slate</source>
+        <translation>石板灰</translation>
+    </message>
+    <message>
+        <location filename="../../include/UiShell/Contract/HostContext.h" line="38"/>
+        <source>High Contrast</source>
+        <translation>高对比度</translation>
+    </message>
+    <message>
+        <location filename="../../include/UiShell/Contract/HostContext.h" line="39"/>
+        <source>System</source>
+        <translation>系统</translation>
+    </message>
 </context>
 <context>
     <name>TitleBar</name>

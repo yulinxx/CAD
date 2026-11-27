@@ -378,14 +378,21 @@ flowchart LR
     "organization": "Site Technology",
     "icon": "assets/logo.png",
     "theme": "dark",
-    "language": "zh_CN"
+    "language": "zh_CN",
+    "copyright": "Copyright Site",
+    "website": "https://site.example",
+    "email": "support@site.example",
+    "license": "Site license",
+    "logo": "assets/logo.png"
   }
 }
 ```
 
 - `product` 覆盖窗口标题（没有 `brand` 时退回 `titleBar.title`）；`organization` 写入
   `QCoreApplication::setOrganizationName()`；`icon` 设置顶层窗口图标。
-- `icon` 与 `titleBar.icon` 的相对路径按 `ui.json` 所在目录解析，`:/...` 与绝对路径原样保留。
+- `product` / `organization` / `copyright` / `website` / `email` / `license` / `logo` 会作为
+  对话框参数注入；显式 `dialogBindings` 里的同名字段优先，关于框无需改客户 C++。
+- `icon`、`logo` 与 `titleBar.icon` 的相对路径按 `ui.json` 所在目录解析，`:/...` 与绝对路径原样保留。
 - `theme` 在加载后覆盖客户默认皮肤；显式 `--lang` 优先于 `language`，未指定时按 `language`
   重新装载译文（可读取 `<profileDir>/translations/`）。
 - 非法 `brand` 类型会产生解析错误；未知子字段被忽略。旧 profile 不加这个段即可保持原行为。
@@ -925,10 +932,11 @@ C:\Qt\5.15.2\msvc2019_64\bin\lupdate.exe Main -recursive -extensions cpp,h `
 
 ## 皮肤
 
-- 两套 QSS：`resources/styles/light.qss`、`dark.qss`，随 `resources/UiShell.qrc` 编进 shell；
+- 六套主题：`light` / `dark` / `blue` / `slate` / `high_contrast` / `system`，随 `resources/UiShell.qrc`
+  编进 shell；`light.qss`、`dark.qss` 是完整基础皮肤，其余四套是薄差异层（见 `ThemeCatalog::baseId()`）；
 - `ShellRuntime` 构造时调用 `Q_INIT_RESOURCE(UiShell)` 显式保留资源（静态链接下必需）；
 - 当前皮肤只保存在 `ShellServices::strThemeId`（宿主可给初值，为空用 `light`），构造时 `ThemeController::apply()`；样式缺失回退 `light`，`IShellRuntime::theme()` 读同一个值；
-- 主题 id 只用稳定字符串 `light` / `dark`，不导出枚举；
+- 主题 id 只用稳定字符串（`ThemeId` / `ThemeCatalog::entries()` 列出六套），不导出枚举；
 - `ThemeController::apply()` 先 `QApplication::setPalette()`（`paletteFor(themeId)`）再 `setStyleSheet()`；
   皮肤分两层：框架默认 `:/UiShell/styles/<id>.qss` 打底（提供 `msuiRole` / `msuiSeries` 角色契约），
   客户 qrc 前缀 `:<prefix>/styles/<id>.qss` 叠加在上面（只写差异规则，同特异性的写法由客户覆盖）；
@@ -1219,7 +1227,7 @@ customers/customerX/
 7. 部分终端安全软件会把构建产物移入回收站，导致链接或部署出现“文件消失”类报错；
    构建失败时先检查回收站。
 8. `brand` 只影响 UiShell 外壳；旧 `April` 可执行文件仍读 `brand.json`，其品牌硬编码待 M6 清理。
-   UiShell 框架目前只有 `light` / `dark` 两套 QSS，外置 `styles/` 只能覆盖已有主题 id。
+   外置 `styles/` 只能覆盖 `ThemeCatalog` 已知的六个主题 id。
 
 ## 相关文档
 

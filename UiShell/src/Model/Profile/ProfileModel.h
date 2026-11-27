@@ -84,11 +84,16 @@ namespace RD
     // 站点改外置 ui.json 即可换产品名、图标、默认皮肤与默认语言，无需重编。
     struct BrandSpec
     {
-        QString strProduct;       // 窗口标题 / 品牌展示名
-        QString strOrganization;  // 组织名
+        QString strProduct;       // 窗口标题 / 关于框产品名
+        QString strOrganization;  // 组织名（关于框 company）
         QString strIcon;          // 图标：qrc 路径或相对 profile 目录的路径
         QString strTheme;         // 默认皮肤 id（light / dark / 客户皮肤）
         QString strLanguage;      // 默认语言 id；显式 --lang 优先
+        QString strCopyright;     // 关于框版权
+        QString strWebsite;       // 关于框主页
+        QString strEmail;         // 关于框支持邮箱
+        QString strLicense;       // 关于框许可文本（可含换行）
+        QString strLogo;          // 关于框 logo：qrc 或相对 profile 目录的路径
     };
 
     // profile 解析结果

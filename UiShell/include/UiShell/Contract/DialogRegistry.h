@@ -31,6 +31,14 @@ namespace RD
         constexpr const char* AppName = "appName";        // 
         constexpr const char* AppVersion = "appVersion";  // 
         constexpr const char* Series = "series";          // 皮肤品牌系列
+        // M5：profile 的 brand 段注入的通用品牌参数，显式 dialog binding 优先。
+        constexpr const char* Product = "product";
+        constexpr const char* Company = "company";
+        constexpr const char* Copyright = "copyright";
+        constexpr const char* Website = "website";
+        constexpr const char* Email = "email";
+        constexpr const char* License = "license";
+        constexpr const char* LogoPath = "logoPath";
     }  // namespace DialogParam
 
     // 对话框工厂接口

@@ -17,6 +17,7 @@
 #include "Assembly/Host/ThemedIcon.h"
 #include "Model/Assembly/AssemblyInfo.h"
 #include "UiShell/Assembly/ShellServices.h"
+#include "UiShell/Contract/HostContext.h"
 #include "UiShell/i18n/ITranslationService.h"
 
 namespace RD
@@ -164,21 +165,13 @@ namespace RD
             ? m_shellServices->strThemeId
             : QString::fromLatin1(ThemeId::Light);
 
-        struct ThemeEntry
+        for (const ThemeCatalog::Entry& entry : ThemeCatalog::entries())
         {
-            QString id;
-            QString label;
-        };
-
-        for (const ThemeEntry& entry : {
-                 ThemeEntry{ QString::fromLatin1(ThemeId::Light), QCoreApplication::translate("ThemeMenu", "Light") },
-                 ThemeEntry{ QString::fromLatin1(ThemeId::Dark), QCoreApplication::translate("ThemeMenu", "Dark") },
-            })
-        {
-            auto* action = themeMenu->addAction(entry.label);
-            action->setObjectName(QStringLiteral("msui.action.theme.") + entry.id);
+            const QString label = QCoreApplication::translate("ThemeMenu", entry.label);
+            auto* action = themeMenu->addAction(label);
+            action->setObjectName(QStringLiteral("msui.action.theme.") + entry.strId);
             action->setCheckable(true);
-            action->setChecked(entry.id == current);
+            action->setChecked(entry.strId == current);
             group->addAction(action);
         }
     }

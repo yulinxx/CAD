@@ -53,6 +53,26 @@
         <source>Theme</source>
         <translation>테마</translation>
     </message>
+    <message>
+        <location filename="../../include/UiShell/Contract/HostContext.h" line="36"/>
+        <source>Blue</source>
+        <translation>파랑</translation>
+    </message>
+    <message>
+        <location filename="../../include/UiShell/Contract/HostContext.h" line="37"/>
+        <source>Slate</source>
+        <translation>슬레이트</translation>
+    </message>
+    <message>
+        <location filename="../../include/UiShell/Contract/HostContext.h" line="38"/>
+        <source>High Contrast</source>
+        <translation>고대비</translation>
+    </message>
+    <message>
+        <location filename="../../include/UiShell/Contract/HostContext.h" line="39"/>
+        <source>System</source>
+        <translation>시스템</translation>
+    </message>
 </context>
 <context>
     <name>TitleBar</name>

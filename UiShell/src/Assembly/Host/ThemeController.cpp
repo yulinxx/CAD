@@ -27,8 +27,11 @@ namespace RD
 
     QPalette ThemeController::paletteFor(const QString& themeId)
     {
-        if (themeId != QLatin1String(ThemeId::Dark))
+        if (themeId != QLatin1String(ThemeId::Dark)
+            && themeId != QLatin1String(ThemeId::HighContrast))
+        {
             return QApplication::style()->standardPalette();
+        }
 
         QPalette palette;
         palette.setColor(QPalette::Window, QColor(QStringLiteral("#1b212a")));
@@ -56,37 +59,47 @@ namespace RD
         if (!app)
             return false;
 
-        // 皮肤有 框架 与 客户 两個
+        // 派生皮肤（blue / slate / system / high_contrast）先套基础皮肤，
+        // 再叠加差异规则；三层来源都遵循同一顺序，后写入的优先级更高。
+        const QString baseId = ThemeCatalog::baseId(themeId);
+        const QStringList ids = (baseId == themeId)
+            ? QStringList{ themeId } : QStringList{ baseId, themeId };
         QStringList sheets;
 
-        const QString frameworkSheet = readStyleSheet(
-            QStringLiteral(":/UiShell/styles/") + themeId + QStringLiteral(".qss"));
-
-        if (!frameworkSheet.isEmpty())
-            sheets.append(frameworkSheet);
+        for (const QString& id : ids)
+        {
+            const QString frameworkSheet = readStyleSheet(
+                QStringLiteral(":/UiShell/styles/") + id + QStringLiteral(".qss"));
+            if (!frameworkSheet.isEmpty())
+                sheets.append(frameworkSheet);
+        }
 
         if (!customPrefix.isEmpty())
         {
             QString strPrefix = customPrefix;
-
             if (!strPrefix.startsWith(QLatin1Char(':')))
                 strPrefix.prepend(QLatin1Char(':'));
 
-            const QString customerSheet = readStyleSheet(
-                strPrefix + QStringLiteral("/styles/") + themeId + QStringLiteral(".qss"));
-
-            if (!customerSheet.isEmpty())
-                sheets.append(customerSheet);
+            for (const QString& id : ids)
+            {
+                const QString customerSheet = readStyleSheet(
+                    strPrefix + QStringLiteral("/styles/") + id + QStringLiteral(".qss"));
+                if (!customerSheet.isEmpty())
+                    sheets.append(customerSheet);
+            }
         }
 
-        // 外置 profile：<profileDir>/styles/<themeId>.qss 覆盖内置与客户 qrc 皮肤。
+        // 外置 profile：<profileDir>/styles/<id>.qss 覆盖内置与客户 qrc 皮肤。
         if (!profileDir.isEmpty())
         {
-            const QString externalSheet = readStyleSheet(
-                QDir(profileDir).absoluteFilePath(
-                    QStringLiteral("styles/") + themeId + QStringLiteral(".qss")));
-            if (!externalSheet.isEmpty())
-                sheets.append(externalSheet);
+            for (const QString& id : ids)
+            {
+                const QString externalSheet = readStyleSheet(
+                    QDir(profileDir).absoluteFilePath(
+                        QStringLiteral("styles/") + id + QStringLiteral(".qss")));
+                if (!externalSheet.isEmpty())
+                    sheets.append(externalSheet);
+            }
         }
 
         if (sheets.isEmpty())

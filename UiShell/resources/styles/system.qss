@@ -1,0 +1,3 @@
+/* System theme: keep the light base rules and the platform palette.
+   This file exists so the theme id is discoverable and overridable by a
+   customer qrc or an external profile's styles/system.qss. */

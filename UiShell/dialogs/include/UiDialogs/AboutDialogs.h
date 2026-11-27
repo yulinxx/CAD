@@ -13,16 +13,17 @@ namespace RD::about
 
     namespace Param
     {
+        // 与 RD::DialogParam 共用品牌字段名，避免 profile 注入与对话框解析漂移。
         constexpr const char* Title = "title";
-        constexpr const char* Product = "product";
+        constexpr const char* Product = DialogParam::Product;
         constexpr const char* Version = "version";
         constexpr const char* VersionDate = "versionDate";
-        constexpr const char* Copyright = "copyright";
-        constexpr const char* Company = "company";
-        constexpr const char* Website = "website";
-        constexpr const char* Email = "email";
-        constexpr const char* License = "license";
-        constexpr const char* LogoPath = "logoPath";
+        constexpr const char* Copyright = DialogParam::Copyright;
+        constexpr const char* Company = DialogParam::Company;
+        constexpr const char* Website = DialogParam::Website;
+        constexpr const char* Email = DialogParam::Email;
+        constexpr const char* License = DialogParam::License;
+        constexpr const char* LogoPath = DialogParam::LogoPath;
     }  // namespace Param
 
     // 关于对话框的数据

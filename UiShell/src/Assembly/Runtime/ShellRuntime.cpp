@@ -143,6 +143,7 @@ namespace RD
     bool ShellRuntime::loadFromJson(const QByteArray& json)
     {
         m_translationDir.clear();
+        m_shellServices.brandParams = QJsonObject{};
         // strStyleDir 可能由宿主在构造时给初值，纯 JSON 加载不覆盖它。
         const bool bValid = m_profilePipeline.loadFromJson(json, m_shellServices);
 
@@ -160,6 +161,7 @@ namespace RD
     bool ShellRuntime::loadFromFile(const QString& filePath)
     {
         m_translationDir.clear();
+        m_shellServices.brandParams = QJsonObject{};
         const bool bValid = m_profilePipeline.loadFromFile(filePath, m_shellServices);
         m_shellView->rebuild();
         m_profilePipeline.setAssemblyDiagnostics(m_shellView->assemblyDiagnostics());
@@ -188,9 +190,24 @@ namespace RD
 
     void ShellRuntime::applyBrand()
     {
+        m_shellServices.brandParams = QJsonObject{};
         const BrandSpec* brand = m_profilePipeline.brand();
         if (!brand)
             return;
+
+        // 关于框等共享对话框读取这些参数；logo 的相对路径在这里解析一次。
+        const auto putParam = [this, brand](const char* key, const QString& value) {
+            if (!value.isEmpty())
+                m_shellServices.brandParams.insert(QString::fromLatin1(key), value);
+            };
+        putParam(DialogParam::Product, brand->strProduct);
+        putParam(DialogParam::Company, brand->strOrganization);
+        putParam(DialogParam::Copyright, brand->strCopyright);
+        putParam(DialogParam::Website, brand->strWebsite);
+        putParam(DialogParam::Email, brand->strEmail);
+        putParam(DialogParam::License, brand->strLicense);
+        putParam(DialogParam::LogoPath,
+            resolveProfileAsset(brand->strLogo, m_profilePipeline.profileDir()));
 
         if (!brand->strOrganization.isEmpty())
             QCoreApplication::setOrganizationName(brand->strOrganization);

@@ -31,6 +31,7 @@
 #include "UiShell/Contract/Command.h"
 #include "UiShell/Contract/CommandTable.h"
 #include "UiShell/Contract/CustomerModule.h"
+#include "UiShell/Contract/HostContext.h"
 #include "UiShell/Titlebar/ITitleBarView.h"
 #include "UiShell/i18n/IQtTextProvider.h"
 #include "UiShell/i18n/ITranslationService.h"
@@ -396,6 +397,7 @@ private slots:
     void externalProfileBrandOverridesWindow();
     void externalProfileResolvesRelativeAssets();
     void externalProfileStylesheetOverridesTheme();
+    void externalProfileBrandFeedsAboutDialog();
     void customerModuleIsUsable();
     void buildFingerprintsMatchHost();
     void customerDialogBindingsAreValid();
@@ -408,6 +410,7 @@ private slots:
     void toolbarPropsAreValidated();
     void dialogParamsCarryStyleSeries();
     void skinCoversSharedWidgets();
+    void allSixThemesApply();
 };
 
 // 真实点击菜单栏展开下拉，再点击菜单项：全程走 QTest 事件，不直接 trigger。
@@ -1407,6 +1410,76 @@ void InteractionTest::externalProfileStylesheetOverridesTheme()
     QVERIFY(!qApp->styleSheet().contains(QStringLiteral("msui-external-profile-style")));
 }
 
+// M5：brand 段自动填充关于框参数；显式 dialog binding 仍可覆盖。
+void InteractionTest::externalProfileBrandFeedsAboutDialog()
+{
+    class RecordingFactory final : public IDialogFactory
+    {
+    public:
+        DialogResult openDialog(QWidget*, const QJsonObject& params) override
+        {
+            received = params;
+            return DialogResult{};
+        }
+        QJsonObject received;
+    } factory;
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QDir root(dir.path());
+    QVERIFY(root.mkpath(QStringLiteral("assets")));
+    const QByteArray png = QByteArray::fromBase64(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
+    QFile logo(root.absoluteFilePath(QStringLiteral("assets/logo.png")));
+    QVERIFY(logo.open(QIODevice::WriteOnly));
+    QCOMPARE(logo.write(png), png.size());
+    logo.close();
+
+    const QByteArray json = R"json({
+  "version": 2,
+  "profileId": "interaction.about-brand",
+  "brand": {
+    "product": "Site Product",
+    "organization": "Site Org",
+    "copyright": "Copyright Site",
+    "website": "https://site.example",
+    "email": "support@site.example",
+    "license": "Site license",
+    "logo": "assets/logo.png"
+  },
+  "regions": [ { "id": "center", "type": "CenterView", "order": 30 } ]
+})json";
+    QFile profile(root.absoluteFilePath(QStringLiteral("ui.json")));
+    QVERIFY(profile.open(QIODevice::WriteOnly));
+    QCOMPARE(profile.write(json), json.size());
+    profile.close();
+
+    ApiPtr<IDialogFactoryRegistry> dialogs(createDialogRegistry());
+    QVERIFY(dialogs);
+    dialogs->registerFactory(QString::fromLatin1(about::kAboutDlgId), &factory);
+
+    ShellServices shellServices;
+    shellServices.dlgReg = dialogs.get();
+    ApiPtr<IShellRuntime> runtime(createShellRuntime(shellServices));
+    QVERIFY(runtime);
+    QVERIFY2(runtime->loadFromFile(profile.fileName()), qPrintable(runtime->lastError()));
+
+    runtime->openDialog(QString::fromLatin1(about::kAboutDlgId), nullptr);
+    QCOMPARE(factory.received.value(QString::fromLatin1(DialogParam::Product)).toString(),
+        QStringLiteral("Site Product"));
+    QCOMPARE(factory.received.value(QString::fromLatin1(DialogParam::Company)).toString(),
+        QStringLiteral("Site Org"));
+    QCOMPARE(factory.received.value(QString::fromLatin1(DialogParam::Copyright)).toString(),
+        QStringLiteral("Copyright Site"));
+    QCOMPARE(factory.received.value(QString::fromLatin1(DialogParam::LogoPath)).toString(),
+        root.absoluteFilePath(QStringLiteral("assets/logo.png")));
+
+    const QJsonObject explicitParams{ { QStringLiteral("product"), QStringLiteral("Explicit Product") } };
+    runtime->openDialog(QString::fromLatin1(about::kAboutDlgId), nullptr, explicitParams);
+    QCOMPARE(factory.received.value(QString::fromLatin1(DialogParam::Product)).toString(),
+        QStringLiteral("Explicit Product"));
+}
+
 // 客户模块入口：返回可用的模块描述。
 void InteractionTest::customerModuleIsUsable()
 {
@@ -1721,18 +1794,43 @@ void InteractionTest::skinCoversSharedWidgets()
         QStringLiteral("QFrame[msuiRole=\"panel\"][msuiSeries=\"mantisoft\"] QToolButton"),
     };
 
-    for (const QString& themeId : { QString::fromLatin1(ThemeId::Light), QString::fromLatin1(ThemeId::Dark) })
+    // 派生皮肤由基础 QSS + 差异 QSS 组成，按实际叠加后的内容检查契约选择器。
+    for (const ThemeCatalog::Entry& entry : ThemeCatalog::entries())
     {
-        QFile file(QStringLiteral(":/UiShell/styles/") + themeId + QStringLiteral(".qss"));
-        QVERIFY2(file.open(QIODevice::ReadOnly), qPrintable(file.fileName()));
-        const QString qss = QString::fromUtf8(file.readAll());
+        const QString baseId = ThemeCatalog::baseId(entry.strId);
+        const QStringList ids = (baseId == entry.strId)
+            ? QStringList{ entry.strId } : QStringList{ baseId, entry.strId };
+        QString qss;
+        for (const QString& id : ids)
+        {
+            QFile file(QStringLiteral(":/UiShell/styles/") + id + QStringLiteral(".qss"));
+            QVERIFY2(file.open(QIODevice::ReadOnly), qPrintable(file.fileName()));
+            qss.append(QString::fromUtf8(file.readAll()));
+        }
 
         for (const QString& selector : required)
-            QVERIFY2(qss.contains(selector), qPrintable(themeId + QStringLiteral(": missing ") + selector));
+            QVERIFY2(qss.contains(selector), qPrintable(entry.strId + QStringLiteral(": missing ") + selector));
 
         // 旧版 GoodLaser Widgets 关于框已删除，它的横幅规则不应再留在皮肤里。
-        QVERIFY2(!qss.contains(QStringLiteral("aboutBanner")), qPrintable(themeId));
+        QVERIFY2(!qss.contains(QStringLiteral("aboutBanner")), qPrintable(entry.strId));
     }
+}
+
+// M5：六套皮肤都能通过运行时应用；派生皮肤靠 ThemeCatalog 的基础 id 叠加。
+void InteractionTest::allSixThemesApply()
+{
+    ShellServices shellServices;
+    ApiPtr<IShellRuntime> runtime(createShellRuntime(shellServices));
+    QVERIFY(runtime);
+
+    for (const ThemeCatalog::Entry& entry : ThemeCatalog::entries())
+    {
+        runtime->switchTheme(entry.strId);
+        QCOMPARE(runtime->theme(), entry.strId);
+        QVERIFY(!qApp->styleSheet().isEmpty());
+    }
+
+    runtime->switchTheme(QString::fromLatin1(ThemeId::Light));
 }
 
 QTEST_MAIN(InteractionTest)

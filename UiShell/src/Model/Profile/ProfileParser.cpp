@@ -141,6 +141,11 @@ namespace RD
             model.brand.strIcon = brand.value(QStringLiteral("icon")).toString().trimmed();
             model.brand.strTheme = brand.value(QStringLiteral("theme")).toString().trimmed().toLower();
             model.brand.strLanguage = brand.value(QStringLiteral("language")).toString().trimmed();
+            model.brand.strCopyright = brand.value(QStringLiteral("copyright")).toString().trimmed();
+            model.brand.strWebsite = brand.value(QStringLiteral("website")).toString().trimmed();
+            model.brand.strEmail = brand.value(QStringLiteral("email")).toString().trimmed();
+            model.brand.strLicense = brand.value(QStringLiteral("license")).toString().trimmed();
+            model.brand.strLogo = brand.value(QStringLiteral("logo")).toString().trimmed();
         }
 
         // ---- titleBar ----

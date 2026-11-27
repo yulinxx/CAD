@@ -237,7 +237,12 @@ void ProfileLoaderTest::parsesBrandMetadata()
     "organization": "Site Org",
     "icon": "assets/logo.svg",
     "theme": "DARK",
-    "language": "zh_CN"
+    "language": "zh_CN",
+    "copyright": "Copyright Site",
+    "website": "https://site.example",
+    "email": "support@site.example",
+    "license": "Site license",
+    "logo": "assets/logo.svg"
   },
   "regions": [ { "id": "center", "type": "CenterView" } ]
 })json";
@@ -252,6 +257,11 @@ void ProfileLoaderTest::parsesBrandMetadata()
     QCOMPARE(brand.strIcon, QStringLiteral("assets/logo.svg"));
     QCOMPARE(brand.strTheme, QStringLiteral("dark"));
     QCOMPARE(brand.strLanguage, QStringLiteral("zh_CN"));
+    QCOMPARE(brand.strCopyright, QStringLiteral("Copyright Site"));
+    QCOMPARE(brand.strWebsite, QStringLiteral("https://site.example"));
+    QCOMPARE(brand.strEmail, QStringLiteral("support@site.example"));
+    QCOMPARE(brand.strLicense, QStringLiteral("Site license"));
+    QCOMPARE(brand.strLogo, QStringLiteral("assets/logo.svg"));
 }
 
 void ProfileLoaderTest::rejectsInvalidBrandType()

@@ -53,6 +53,18 @@ namespace RD
     {
         QJsonObject effective = params;
 
+        // M5：profile 的 brand 段提供通用品牌参数；显式 dialog binding 优先。
+        // logoPath 已在 ShellRuntime 中按 profile 目录解析成绝对路径。
+        if (m_shellServices)
+        {
+            const QJsonObject& brandParams = m_shellServices->brandParams;
+            for (auto it = brandParams.constBegin(); it != brandParams.constEnd(); ++it)
+            {
+                if (!effective.contains(it.key()))
+                    effective.insert(it.key(), it.value());
+            }
+        }
+
         const ITextProvider* text = m_shellServices ? m_shellServices->text : nullptr;
         const QString profileDir = m_strProfileDir ? *m_strProfileDir : QString();
 
