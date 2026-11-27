@@ -109,13 +109,38 @@ if(APPLE)
     endif()
 endif()
 
+# ---------------------------------------------------------------------------
+# UI 源码拆分：Main/Src/UI/** 编成静态库 AprilUi（M1）
+#
+# 目的：让 SampleFrame 风格的新外壳（UiShell/customers/April）可以链接现有工作台，
+# 而不是重写。April 可执行目标保留非 UI 源码（Bootstrap/Runtime/Composition/
+# Import/Export/Persistence 等），UI 部分独立成库；MainTests 仍按原样整体编译。
+#
+# 注意：拆分后同一个 Q_OBJECT 头只能属于一个目标，否则 moc 产物会重复定义。
+# ---------------------------------------------------------------------------
+set(MAIN_ALL_SOURCES ${MAIN_APP_SOURCES})
+set(APRIL_UI_SOURCES "")
+set(MAIN_APP_SOURCES "")
+foreach(_src IN LISTS MAIN_ALL_SOURCES)
+    string(FIND "${_src}" "${UI_ROOT}/" _ui_prefix_pos)
+    if(_ui_prefix_pos EQUAL 0)
+        list(APPEND APRIL_UI_SOURCES "${_src}")
+    else()
+        list(APPEND MAIN_APP_SOURCES "${_src}")
+    endif()
+endforeach()
+unset(_ui_prefix_pos)
+
 set(MAIN_APP_HEADERS
     ${SRC_ROOT}/Common/VersionInfo.h.in
-    ${SRC_ROOT}/UI/ClientConfig/ExampleCustomPanel.h
 )
 
+# UI 头随 AprilUi 走，避免在 April 里被 AUTOMOC 再生成一份 moc。
+set(APRIL_UI_HEADERS
+    ${SRC_ROOT}/UI/ClientConfig/ExampleCustomPanel.h
+)
 if(BUILD_UI3D)
-    list(APPEND MAIN_APP_HEADERS ${SRC_ROOT}/UI/Workbench/Workbench3D.h)
+    list(APPEND APRIL_UI_HEADERS ${SRC_ROOT}/UI/Workbench/Workbench3D.h)
 endif()
 
 file(GLOB_RECURSE MAIN_RESOURCES CONFIGURE_DEPENDS
@@ -302,129 +327,168 @@ if(BUILD_CRASHHANDLER)
     )
 endif()
 
-target_include_directories(${APP_NAME} PRIVATE ${_app_project_include_dirs})
+# ============================================================================
+# 应用目标公共编译配置
+#
+# April 与 AprilUi 必须使用完全相同的 include、宏与链接依赖：UI 代码依赖的
+# 模块开关（BUILD_UI3D / BUILD_CAM / BUILD_RASTER / APR_PYTHON_HOST ...）
+# 若两个目标不一致，会编出 ABI 不一致的实现。
+# ============================================================================
+function(april_apply_app_target_settings target)
+    target_compile_features(${target} PRIVATE cxx_std_17)
 
-target_link_libraries(${APP_NAME}
-    PRIVATE
-        Utility
-        License
-)
-if(BUILD_CRASHHANDLER)
-    target_link_libraries(${APP_NAME} PRIVATE CrashHandler)
-endif()
-
-target_link_libraries(${APP_NAME}
-    PRIVATE
-        EngineCommon
-        Engine2D
-        EnginePersistence
-        # 应用退出时要显式销毁 Metal 的进程级共享 Runtime
-        # （AppBootstrapper::shutdown → RenderSessionHost::shutdownSharedRuntime）。
-        # 此前只是经由 UI2D/UI3D 传递进来，属「用了但没声明」。
-        RenderBridge
-        UICommon
-        UI2D
-        Log
-        FileIO
-        ${QT_LIBRARIES}
-)
-
-# 客户化 UI 配置
-# 注意：APR_CLIENT_ID 已不再作为编译期宏注入。
-# 客户 ID 现由 UiClientContext 在运行时解析（环境变量 / QSettings / 默认值），
-# 同一份二进制可服务多个客户。这里只把默认客户 ID 传给安装包脚本使用。
-target_compile_definitions(${APP_NAME} PRIVATE APR_DEFAULT_CLIENT_ID="${APR_DEFAULT_CLIENT_ID}")
-
-# Qt 调试输出控制已在 Config.cmake 中统一处理
-
-# 可选模块宏传播:通过 UI2D/UI3D 的 PUBLIC INTERFACE_COMPILE_DEFINITIONS 自动传播
-# Main 不再手工重复 ENABLE_NESTING / ENABLE_HARDWARE / ENABLE_GEOMODELCORE,
-# 这些宏影响公共头类型布局(SENE 必须让所有消费者看到一致的值)
-# 保留 link 语句因为 Main 自身源码也需要直接 link Nesting/Hardware/GeoModelCore 库
-
-if(BUILD_NESTING)
-    target_link_libraries(${APP_NAME} PRIVATE Nesting)
-endif()
-
-# 位图导出（PNG/BMP）需要 Raster 光栅化库
-if(BUILD_RASTER)
-    target_link_libraries(${APP_NAME} PRIVATE Raster)
-    target_compile_definitions(${APP_NAME} PRIVATE ENABLE_RASTER_EXPORT_MAIN=1 BUILD_RASTER)
-endif()
-
-# CAM 工艺编译层：桥接 Engine2D → Cam::ToolpathJobInput → Cam::compile
-if(BUILD_CAM)
-    target_link_libraries(${APP_NAME} PRIVATE CAM)
-    target_compile_definitions(${APP_NAME} PRIVATE BUILD_CAM)
-endif()
-
-# 硬件抽象层:DeviceHost / MachineProfile 需要直接使用 Hw:: 接口装配设备。
-# ENABLE_HARDWARE 宏已通过 UI2D PUBLIC 自动传播,此处不再手工定义
-if(BUILD_HARDWARE)
-    target_include_directories(${APP_NAME}
+    target_include_directories(${target}
         PRIVATE
-            "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include"
+            ${SHARED_PROJECT_INCLUDE_DIRS}
+            ${_app_project_include_dirs}
     )
-    target_link_libraries(${APP_NAME} PRIVATE Hardware)
-endif()
-
-# 视觉模块:宿主桥接层（VisionHostBridges）实现 Vis:: 的四个宿主接口，
-# 因此 Main 源码要直接 include Vision 头并链接 Vision.dll。
-# ENABLE_VISION 宏已通过 UI2D PUBLIC 自动传播,此处不再手工定义
-if(BUILD_VISION)
-    target_include_directories(${APP_NAME}
-        PRIVATE
-            "${CMAKE_CURRENT_SOURCE_DIR}/../Vision/Vision/Include"
-    )
-    target_link_libraries(${APP_NAME} PRIVATE Vision)
-endif()
-
-
-if(BUILD_UI3D)
-    target_link_libraries(${APP_NAME} PRIVATE UI3D)
-    # BUILD_UI3D 是顶层构建开关,UI2D/UI3D 都未 PUBLIC 传播此宏
-    # (它们只是消费它来条件编译内部代码),Main 源码直接用 #if BUILD_UI3D,
-    # 因此必须在 Main 这里手工定义
-    target_compile_definitions(${APP_NAME} PRIVATE BUILD_UI3D=1)
-    # ENABLE_GEOMODELCORE 已通过 UI3D PUBLIC 自动传播(Main link UI3D PRIVATE),
-    # 此处不再手工重复定义宏,但仍需 link GeoModelCore 因为 Main 的 Workbench3D.cpp
-    # 里直接 include 了 GeoModelCore 头文件
-    if(BUILD_GEOMODELCORE)
-        target_link_libraries(${APP_NAME} PRIVATE GeoModelCore)
+    if(BUILD_CRASHHANDLER)
+        target_include_directories(${target} PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/../CrashHandler"
+        )
     endif()
-endif()
-# Engine3D 始终链接：Main 模块的 ImportService / SceneBuilder3D 等核心
-# 代码无条件依赖 Engine3D（SceneManager3D、AprMeshEntity），与 BUILD_UI3D 无关
-target_link_libraries(${APP_NAME} PRIVATE Engine3D)
+
+    target_link_libraries(${target}
+        PRIVATE
+            Utility
+            License
+    )
+    if(BUILD_CRASHHANDLER)
+        target_link_libraries(${target} PRIVATE CrashHandler)
+    endif()
+
+    target_link_libraries(${target}
+        PRIVATE
+            EngineCommon
+            Engine2D
+            EnginePersistence
+            # 应用退出时要显式销毁 Metal 的进程级共享 Runtime
+            # （AppBootstrapper::shutdown → RenderSessionHost::shutdownSharedRuntime）。
+            # 此前只是经由 UI2D/UI3D 传递进来，属「用了但没声明」。
+            RenderBridge
+            UICommon
+            UI2D
+            Log
+            FileIO
+            ${QT_LIBRARIES}
+    )
+
+    # 客户化 UI 配置
+    # 注意：APR_CLIENT_ID 已不再作为编译期宏注入。
+    # 客户 ID 现由 UiClientContext 在运行时解析（环境变量 / QSettings / 默认值），
+    # 同一份二进制可服务多个客户。这里只把默认客户 ID 传给安装包脚本使用。
+    target_compile_definitions(${target} PRIVATE APR_DEFAULT_CLIENT_ID="${APR_DEFAULT_CLIENT_ID}")
+
+    # 可选模块宏传播:通过 UI2D/UI3D 的 PUBLIC INTERFACE_COMPILE_DEFINITIONS 自动传播
+    # Main 不再手工重复 ENABLE_NESTING / ENABLE_HARDWARE / ENABLE_GEOMODELCORE,
+    # 这些宏影响公共头类型布局(SENE 必须让所有消费者看到一致的值)
+    if(BUILD_NESTING)
+        target_link_libraries(${target} PRIVATE Nesting)
+    endif()
+
+    # 位图导出（PNG/BMP）需要 Raster 光栅化库
+    if(BUILD_RASTER)
+        target_link_libraries(${target} PRIVATE Raster)
+        target_compile_definitions(${target} PRIVATE ENABLE_RASTER_EXPORT_MAIN=1 BUILD_RASTER)
+    endif()
+
+    # CAM 工艺编译层：桥接 Engine2D → Cam::ToolpathJobInput → Cam::compile
+    if(BUILD_CAM)
+        target_link_libraries(${target} PRIVATE CAM)
+        target_compile_definitions(${target} PRIVATE BUILD_CAM)
+    endif()
+
+    # 硬件抽象层:DeviceHost / MachineProfile 需要直接使用 Hw:: 接口装配设备。
+    # ENABLE_HARDWARE 宏已通过 UI2D PUBLIC 自动传播,此处不再手工定义
+    if(BUILD_HARDWARE)
+        target_include_directories(${target}
+            PRIVATE
+                "${CMAKE_CURRENT_SOURCE_DIR}/../Hardware/Hardware/Include"
+        )
+        target_link_libraries(${target} PRIVATE Hardware)
+    endif()
+
+    # 视觉模块:宿主桥接层（VisionHostBridges）实现 Vis:: 的四个宿主接口，
+    # 因此 Main 源码要直接 include Vision 头并链接 Vision.dll。
+    # ENABLE_VISION 宏已通过 UI2D PUBLIC 自动传播,此处不再手工定义
+    if(BUILD_VISION)
+        target_include_directories(${target}
+            PRIVATE
+                "${CMAKE_CURRENT_SOURCE_DIR}/../Vision/Vision/Include"
+        )
+        target_link_libraries(${target} PRIVATE Vision)
+    endif()
+
+    if(BUILD_UI3D)
+        target_link_libraries(${target} PRIVATE UI3D)
+        # BUILD_UI3D 是顶层构建开关,UI2D/UI3D 都未 PUBLIC 传播此宏
+        # (它们只是消费它来条件编译内部代码),Main 源码直接用 #if BUILD_UI3D,
+        # 因此必须在 Main 这里手工定义
+        target_compile_definitions(${target} PRIVATE BUILD_UI3D=1)
+        # ENABLE_GEOMODELCORE 已通过 UI3D PUBLIC 自动传播(Main link UI3D PRIVATE),
+        # 此处不再手工重复定义宏,但仍需 link GeoModelCore 因为 Workbench3D.cpp
+        # 里直接 include 了 GeoModelCore 头文件
+        if(BUILD_GEOMODELCORE)
+            target_link_libraries(${target} PRIVATE GeoModelCore)
+        endif()
+    endif()
+    # Engine3D 始终链接：Main 模块的 ImportService / SceneBuilder3D 等核心
+    # 代码无条件依赖 Engine3D（SceneManager3D、AprMeshEntity），与 BUILD_UI3D 无关
+    target_link_libraries(${target} PRIVATE Engine3D)
+
+    if(APR_PYTHON_HOST)
+        target_compile_definitions(${target} PRIVATE APR_PYTHON_HOST=1)
+        target_compile_definitions(${target} PRIVATE "CMAKE_SOURCE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/..\"")
+        target_include_directories(${target}
+            PRIVATE
+                "${CMAKE_CURRENT_SOURCE_DIR}/../PythonHost/PythonHost/Include"
+        )
+        target_link_libraries(${target} PRIVATE PythonHost)
+        add_dependencies(${target} PythonHost)
+    endif()
+
+    if(APR_PYBIND_CORE AND APR_PYTHON_HOST)
+        add_dependencies(${target} AprPyBindCore)
+    endif()
+
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /utf-8 /FS)
+        # dbghelp：崩溃回调中符号化调用栈（CrashHandlerBootstrap.cpp）。
+        # 现场机器普遍没有 WinDbg/cdb，只留 .dmp 等于没有线索，
+        # 因此崩溃时直接把带函数名与行号的调用栈打到 stderr。
+        target_link_libraries(${target} PRIVATE dbghelp)
+    endif()
+endfunction()
+
+# ---------------------------------------------------------------------------
+# AprilUi：Main/Src/UI/** 静态库（M1）
+#
+# 新外壳（UiShell/customers/April）链接它即可复用现有工作台；April 仍是
+# 完整可运行应用，只是 UI 源码改由静态库提供。
+# ---------------------------------------------------------------------------
+add_library(AprilUi STATIC
+    ${APRIL_UI_SOURCES}
+    ${APRIL_UI_HEADERS}
+)
+set_target_properties(AprilUi PROPERTIES
+    AUTOMOC ON
+    AUTOUIC OFF
+    AUTORCC OFF
+    CXX_VISIBILITY_PRESET default
+)
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${APRIL_UI_SOURCES} ${APRIL_UI_HEADERS})
+april_apply_app_target_settings(AprilUi)
+
+april_apply_app_target_settings(${APP_NAME})
+target_link_libraries(${APP_NAME} PRIVATE AprilUi)
 
 if(APR_PYTHON_HOST)
-    target_compile_definitions(${APP_NAME} PRIVATE APR_PYTHON_HOST=1)
-    target_compile_definitions(${APP_NAME} PRIVATE "CMAKE_SOURCE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/..\"")
-    target_include_directories(${APP_NAME}
-        PRIVATE
-            "${CMAKE_CURRENT_SOURCE_DIR}/../PythonHost/PythonHost/Include"
-    )
-    target_link_libraries(${APP_NAME} PRIVATE PythonHost)
-    add_dependencies(${APP_NAME} PythonHost)
-
     add_custom_command(TARGET ${APP_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_CURRENT_SOURCE_DIR}/../Python"
             "$<TARGET_FILE_DIR:${APP_NAME}>/Python"
         COMMENT "Deploying Python package to output directory"
     )
-endif()
-
-if(APR_PYBIND_CORE AND APR_PYTHON_HOST)
-    add_dependencies(${APP_NAME} AprPyBindCore)
-endif()
-
-if(MSVC)
-    target_compile_options(${APP_NAME} PRIVATE /utf-8 /FS)
-    # dbghelp：崩溃回调中符号化调用栈（CrashHandlerBootstrap.cpp）。
-    # 现场机器普遍没有 WinDbg/cdb，只留 .dmp 等于没有线索，
-    # 因此崩溃时直接把带函数名与行号的调用栈打到 stderr。
-    target_link_libraries(${APP_NAME} PRIVATE dbghelp)
 endif()
 
 # ============================================================================
@@ -678,7 +742,9 @@ if(_main_tests AND GTest_FOUND)
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*CrossImageRttiTests\\.cpp$")
     endif()
 
-        set(MAIN_TEST_DEP_SOURCES ${MAIN_APP_SOURCES})
+        # 测试目标编译全部源码（含 UI），因此使用拆分前的完整列表；
+        # 它不链接 AprilUi，避免同一批 UI 符号在同一个可执行文件里出现两份。
+        set(MAIN_TEST_DEP_SOURCES ${MAIN_ALL_SOURCES})
         # 测试目标必须使用 gtest_main 作为入口，而不能复用应用本身的 main.cpp
         # （否则 gtest 发现阶段会真正启动 GUI 应用并卡死，导致构建超时失败）。
         list(FILTER MAIN_TEST_DEP_SOURCES EXCLUDE REGEX ".*/main\\.cpp$")

@@ -52,16 +52,44 @@
 
 ## 3. 里程碑
 
-### M1：把现有 CAD UI 提取成库
+### M1：把现有 CAD UI 提取成库（已完成，2026-11-27）
 
 目标：让新外壳能链接现有工作台，而不是重写。
 
-- 在 `Main/CMakeLists.txt` 增加 `AprilUi`（STATIC 或 SHARED）目标，
-  源文件为 `Main/Src/UI/**`（排除 `Test/`），必要时带上
-  `Main/Src/Composition/**`、`Main/Src/Import/**`、`Main/Src/Export/**`。
-- `April` 可执行目标改为：`main.cpp` + `Runtime/**` + 链接 `AprilUi`。
-- 处理 `Q_INIT_RESOURCE`、静态初始化与重复符号；先保证 `April` 行为不变。
-- 验收：`April` 可启动，现有测试通过；`AprilUi` 可被其他目标链接。
+**做法**（`Main/CMakeLists.txt`）：
+
+- 从收集到的 `MAIN_APP_SOURCES`（已做 Test/Raster/CAM 过滤）里把
+  `Main/Src/UI/**` 切出 `APRIL_UI_SOURCES`，其余保留 `MAIN_APP_SOURCES`；
+  切分前的完整列表保存为 `MAIN_ALL_SOURCES`，供 `MainTests` 仍然整体编译。
+- 新增 `AprilUi` **STATIC** 库，源码为 `Main/Src/UI/**`（已排除 `Test/`）。
+- `April` 可执行目标改为：非 UI 源码 + 链接 `AprilUi`；`main.cpp` 不变。
+- `April` 与 `AprilUi` 共用 `april_apply_app_target_settings()`，include、宏、
+  链接依赖完全一致，避免编出 ABI 不一致的实现。
+- `MainTests` 维持原样（编译全部源码，不链接 `AprilUi`），避免 UI 符号两份。
+
+**已处理的坑**：
+
+- **Q_OBJECT 头只能属于一个目标**：`ExampleCustomPanel.h` / `Workbench3D.h`
+  从 `April` 移到 `AprilUi` 的源码，否则 moc 产物重复定义。
+- **`Q_INIT_RESOURCE` / qrc**：qrc 仍只编进 `April` 与 `MainTests`；
+  `AprilUi` 关闭 `AUTORCC`，资源在进程内共享，不需要重复注册。
+- **Unity build**：`AprilUi` 与 `April` 分成两个 target 会重新分批；
+  已确认 `-Werror` 下干净编译。
+- **RTTI / 可见性**：`AprilUi` 设 `CXX_VISIBILITY_PRESET default`，与 `April` 一致。
+- **`MainTests` 源集合**改用拆分前的 `MAIN_ALL_SOURCES`。
+
+**验收（在临时 stash 掉无关的 `Engine` 子模块 WIP 后，用已提交的 Engine 状态验证）**：
+
+1. `cmake -S . -B build` 配置成功；
+2. `ninja April` / `cmake --build build --target April` **exit 0**，`AprilUi` 产出 `libAprilUi.a`；
+3. `ninja MainTests` **exit 0**；`MainTests --gtest_filter='ViewportInputRegressionTest.*'` **28/28**；
+4. `ctest -R "UiTst|UiLayerCheck"` **23/23**；
+5. `April` 可启动（offscreen，正常初始化 DB / 语言 / 许可 / UI）；
+   `nm -C April` 能看到 `WorkbenchWindow::*` 等 `AprilUi` 符号；
+6. `Engine` 子模块 WIP 已 `stash pop` 恢复原样。
+
+**注**：`MainTests` 仍编译全部源码，未切到链接 `AprilUi`（见“本轮未做”）。
+
 
 ### M2：建立 `customers/April` 客户模块
 
