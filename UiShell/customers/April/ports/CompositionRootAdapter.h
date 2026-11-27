@@ -1,6 +1,7 @@
 #pragma once
 
 #include "IViewportServices.h"
+#include "ICadServiceFactory.h"
 
 class ApplicationCompositionRoot;   // AprilCore；只在 .cpp include
 
@@ -8,7 +9,7 @@ namespace Apr
 {
     // 低耦合 adapter：把 AprilCore::ApplicationCompositionRoot 适配到 Apr::IViewportServices。
     // UI 只见 IViewportServices（has*），不见 SceneDocument2D/OperationBus/UiServices/UiWorkbench。
-    class CompositionRootAdapter : public IViewportServices
+    class CompositionRootAdapter : public IViewportServices, public ICadServiceFactory
     {
     public:
         explicit CompositionRootAdapter(ApplicationCompositionRoot& root);
@@ -21,6 +22,10 @@ namespace Apr
         bool hasUiStateCenter() const override;
         bool hasCameraController3D() const override;
         bool hasUiServices() const override;
+
+        // ICadServiceFactory
+        IViewportFactory* viewportFactory() override;
+        IViewportServices* viewportServices() override;
 
     private:
         ApplicationCompositionRoot* m_root = nullptr;
