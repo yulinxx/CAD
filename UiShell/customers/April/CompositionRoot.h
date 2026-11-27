@@ -5,6 +5,8 @@
 // 需要完整类型（unique_ptr 成员）
 #include "Composition/ApplicationCompositionRoot.h"
 
+class IUiCommandDispatcher;   // AprilUi / Main: 全局接口，本头不 include，只转发指针
+
 namespace Apr
 {
     class AprilWorkbench;
@@ -25,6 +27,10 @@ namespace Apr
     bool wireCompositionRoot(ApplicationCompositionRoot& root,
                              AprilWorkbench& workbench,
                              Commands& commands);
+
+    // 低耦合：UiShell 不知道 Main。customers/April 自己提供 IUiCommandDispatcher* 并注入 Commands。
+    // 传 nullptr 可清空。不要求 ApplicationCompositionRoot::instance()->isBuilt()。
+    void attachCommandDispatcher(Commands& commands, IUiCommandDispatcher* dispatcher);
 
     // #2 全链路：AprilShell -> ApplicationCompositionRoot::build() -> bindCompositionRoot + setDispatcher。
     //   existing 非空用它；否则优先 ApplicationCompositionRoot::instance()；都没有则自建一个。
