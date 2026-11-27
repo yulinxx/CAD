@@ -17,7 +17,18 @@
   "regions": [
     { "id": "titlebar", "type": "TitleBar",  "order": 1 },
     { "id": "menubar",  "type": "MenuBar",   "order": 5 },
+    { "id": "top",      "type": "TopBar",    "order": 10, "areas": [ { "id": "top.toolbar", "order": 5 }, { "id": "top.main", "order": 10 } ] },
+    { "id": "left",     "type": "LeftDock",  "order": 20, "areas": [ { "id": "left.main", "order": 10 } ] },
     { "id": "center",   "type": "CenterView","order": 30 },
-    { "id": "bottom",   "type": "StatusBar", "order": 50 }
+    { "id": "right",    "type": "RightDock", "order": 40, "areas": [ { "id": "right.main", "order": 10 } ] },
+    { "id": "bottom",   "type": "StatusBar", "order": 50, "areas": [ { "id": "bottom.main", "order": 10 } ] }
+  ],
+
+  // M4：把旧 UI 界面部件放进 UiShell；factory="april.panel"，对应 Apr::PanelFactory。
+  "panels": [
+    { "id": "tools",     "factory": "april.panel", "area": "top.toolbar", "order": 10 },
+    { "id": "scene",     "factory": "april.panel", "area": "left.main",   "order": 10 },
+    { "id": "inspector", "factory": "april.panel", "area": "right.main",  "order": 10 },
+    { "id": "status",    "factory": "april.panel", "area": "bottom.main", "order": 10 }
   ]
 }
