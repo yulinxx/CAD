@@ -2,6 +2,10 @@
 
 // ---- AprilCore ----
 #include "Composition/ApplicationCompositionRoot.h"
+#include "UI/Services/UiShellHost.h"
+#include "UI/Workbench/WorkbenchWindow.h"
+#include "UI/Workbench/UiWorkbench.h"
+#include <QVariantMap>
 
 namespace Apr
 {
@@ -46,6 +50,33 @@ namespace Apr
 
 namespace Apr
 {
+    bool CompositionRootAdapter::canUndo() const
+    {
+        return m_root && m_root->isBuilt() && m_root->undoRedoManager() && m_root->undoRedoManager()->canUndo();
+    }
+    bool CompositionRootAdapter::canRedo() const
+    {
+        return m_root && m_root->isBuilt() && m_root->undoRedoManager() && m_root->undoRedoManager()->canRedo();
+    }
+    void CompositionRootAdapter::undo()
+    {
+        if (m_root && m_root->isBuilt() && m_root->undoRedoManager())
+            m_root->undoRedoManager()->undo();
+    }
+    void CompositionRootAdapter::redo()
+    {
+        if (m_root && m_root->isBuilt() && m_root->undoRedoManager())
+            m_root->undoRedoManager()->redo();
+    }
+    bool CompositionRootAdapter::dispatchOperation(const QString& commandId)
+    {
+        if (!m_root || !m_root->isBuilt() || !m_root->shellHost() || !m_root->shellHost()->mainWindow()
+            || !m_root->shellHost()->mainWindow()->currentWorkbench())
+            return false;
+        m_root->shellHost()->mainWindow()->currentWorkbench()->dispatch(commandId, QVariantMap{});
+        return true;
+    }
+
     IViewportFactory* CompositionRootAdapter::viewportFactory() { return &m_viewportFactory; }
     IViewportServices* CompositionRootAdapter::viewportServices() { return this; }
 }

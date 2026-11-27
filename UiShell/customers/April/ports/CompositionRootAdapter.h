@@ -24,6 +24,13 @@ namespace Apr
         bool hasCameraController3D() const override;
         bool hasUiServices() const override;
 
+        // 抽象访问 + 转发（不暴露 raw 给 UiShell；算法在 AprilCore）
+        bool canUndo() const override;
+        bool canRedo() const override;
+        void undo() override;
+        void redo() override;
+        bool dispatchOperation(const QString& commandId) override;
+
         // ICadServiceFactory
         IViewportFactory* viewportFactory() override;
         IViewportServices* viewportServices() override;
