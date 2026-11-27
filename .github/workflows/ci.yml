@@ -79,6 +79,12 @@ jobs:
       - name: Audit unity dependency coverage
         run: python Tools/check_unity_deps.py --build-dir build
 
+      # 2D 算法分层门禁（只读）：L1/L2 不得 include UI/场景/平行模块。
+      # 配置期 apr_check_2d_layer_deps() 已跑一遍；这里独立再跑一次，
+      # 保证即使有人用 -DAPR_STRICT_2D_LAYERS=OFF Configure，CI 仍然拦住。
+      - name: Audit 2D algorithm layer dependencies
+        run: python Tools/check_2d_layer_deps.py
+
       - name: Test
         run: ctest --test-dir build -C Debug --output-on-failure --no-tests=error --parallel
 

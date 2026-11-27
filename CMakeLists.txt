@@ -437,6 +437,13 @@ include("${APR_ROOT}/CMake/UiEngineAccessRatchet.cmake")
 apr_check_ui_engine_include_ratchet()
 
 # ============================================================================
+# 2D 算法分层依赖门禁 — L1/L2 不得依赖 UI/场景/平行模块
+# 说明见 CMake/Check2DLayerDeps.cmake 与 Tools/check_2d_layer_deps.py。
+# ============================================================================
+include("${APR_ROOT}/CMake/Check2DLayerDeps.cmake")
+apr_check_2d_layer_deps()
+
+# ============================================================================
 # 2D 场景写面门禁 — SceneEditService 是唯一写入口
 # 说明见 CMake/SceneWriteSurface.cmake 文件头。
 # ============================================================================
