@@ -91,16 +91,39 @@
 **注**：`MainTests` 仍编译全部源码，未切到链接 `AprilUi`（见“本轮未做”）。
 
 
-### M2：建立 `customers/April` 客户模块
+### M2：建立 `customers/April` 客户模块（已完成，2026-11-27）
 
-- 在 `UiShell/customers/April/` 提供：
-  - `CustomerModule.cpp`：`createCustomerModule()`；
-  - `panels/PanelFactory.*`：场景树、属性、图层、状态栏；
-  - `commands/Commands.*`：包装现有命令表；
-  - `ui.json`：由 `configs/base.json` + `april.json` 转换而来；
-  - `assets/`、`translations/`。
-- `UiProjectDefaults.cmake` 的 `UI_CUSTOMER` 增加 `April`。
-- 验收：`-DUI_CUSTOMER=April` 构建出的 `April.exe` 显示新外壳 + 空白中央视图。
+**做法**：
+
+- `UiShell/customers/April/`：
+  - `CustomerModule.cpp`：`createCustomerModule()` + `customerBuildFingerprint()`；
+    `strId=april`、`strDisplayName=April`、`strProfilePath=:/UiApril/profile/ui.json`；
+    `Q_INIT_RESOURCE(UiAprilProfile)`（静态链接兜底）；`centerView` 指向本客户实现。
+  - `panels/PanelFactory.*`：`CenterView : RD::ICenterViewProvider`，M2 返回空 `QWidget`；
+    **M3** 改为返回现有 CAD 工作台/视口宿主。
+  - `ui.json`：version 2 最小集（titlebar / menubar / CenterView / StatusBar）。
+- `UiProjectDefaults.cmake`：`UI_CUSTOMER` 增加 `April`；`UI_CUSTOMER_TARGET=UiApril`；
+  customer 目录 `customers/April`；宿主 EXE 用 **`AprilShell`**（避免与 `Main` 的 `April` 目标冲突；M6 切换入口前不替换现有 `April`）。
+- `UiApril`（`msUiAddCustomerLibrary`）链接 `AprilUi`（`if(TARGET AprilUi)`）。
+
+**暂未做（后续里程碑）**：
+
+- `commands/Commands.*`：`ICommandCatalog` / `ICommandInvoker` → 现有命令表（**M4**）；`cmdCatalog/cmdInvoker/cmdState` 留空。
+- `ui.json` 由 `configs/base.json` + `april.json` 转换（**M4**）；`panels`/`menus` 目前空。
+- `assets/`、`translations/`（**M5**）。
+- 完整资源注册：`AprilUi` 里的 `:/configs/...` 等 CAD 资源目前只在 `April` 可执行目标里注册；
+  `AprilShell` 的 CAD 资源注册在 **M5/M6** 处理（M2 空中央视图不依赖它们，已可构建/启动）。
+- 完整 exe 替换（**M6**）。
+
+**验收（临时 stash `Engine` WIP，用已提交 Engine 状态；验证后已 `stash pop` 恢复 50 文件）**：
+
+1. `cmake -S . -B build -DUI_CUSTOMER=April` 配置成功，`customer : April`；
+2. `ninja UiApril` **exit 0** → `libUiApril.dylib`（链接 `AprilUi`）；
+3. `ninja AprilShell` **exit 0** → `AprilShell`（新外壳 + 空中央视图，profile 外置到 `<exe>/profile/ui.json`）；
+4. `AprilShell` offscreen 启动，加载 `UiAprilProfile`；
+5. `Engine` 子模块 WIP 已恢复。
+
+**注**：M1 里 `AprilUi` 已链接；M2 只验证 `UiApril` 可链接 `AprilUi`，CAD 视口/命令/资源在 M3/M4/M5 接入。
 
 ### M3：视口接入
 

@@ -1,0 +1,23 @@
+// April UI 配置（SampleFrame 风格，version 2）。M2 最小集：标题栏 + 菜单栏 + 空中央视图 + 状态栏。
+{
+  "version": 2,
+  "profileId": "april",
+
+  "titleBar": {
+    "title": "April",
+    "buttons": [ "minimize", "maximize", "close" ]
+  },
+
+  "window": {
+    "minWidth": 900,
+    "minHeight": 600,
+    "nativeMenuBar": false
+  },
+
+  "regions": [
+    { "id": "titlebar", "type": "TitleBar",  "order": 1 },
+    { "id": "menubar",  "type": "MenuBar",   "order": 5 },
+    { "id": "center",   "type": "CenterView","order": 30 },
+    { "id": "bottom",   "type": "StatusBar", "order": 50 }
+  ]
+}

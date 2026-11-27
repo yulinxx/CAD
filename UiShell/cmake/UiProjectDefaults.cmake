@@ -53,25 +53,33 @@ endif()
 
 # ------------------------------------------------------------
 # 客户选择：UI_CUSTOMER 值即产品正式名（大小写不敏感）。
-# 合法值：MantiSoft / TyvokStudio / GoodLaser。
+# 合法值：MantiSoft / TyvokStudio / GoodLaser / April。
 # ------------------------------------------------------------
-set(UI_CUSTOMER "MantiSoft" CACHE STRING "UiShell customer: MantiSoft / TyvokStudio / GoodLaser")
+set(UI_CUSTOMER "MantiSoft" CACHE STRING "UiShell customer: MantiSoft / TyvokStudio / GoodLaser / April")
 string(TOLOWER "${UI_CUSTOMER}" _UI_customer_lower)
-if(NOT _UI_customer_lower MATCHES "^(mantisoft|tyvokstudio|goodlaser)$")
-    message(FATAL_ERROR "UI_CUSTOMER must be one of MantiSoft/TyvokStudio/GoodLaser, got '${UI_CUSTOMER}'")
+if(NOT _UI_customer_lower MATCHES "^(mantisoft|tyvokstudio|goodlaser|april)$")
+    message(FATAL_ERROR "UI_CUSTOMER must be one of MantiSoft/TyvokStudio/GoodLaser/April, got '${UI_CUSTOMER}'")
 endif()
 
 if(_UI_customer_lower STREQUAL "mantisoft")
     set(_UI_customer_name "MantiSoft")
 elseif(_UI_customer_lower STREQUAL "tyvokstudio")
     set(_UI_customer_name "TyvokStudio")
-else()
+elseif(_UI_customer_lower STREQUAL "goodlaser")
     set(_UI_customer_name "GoodLaser")
+else()
+    set(_UI_customer_name "April")
 endif()
 
 set(_UI_customer_dir "${_UI_customer_name}")
 set(UI_CUSTOMER_TARGET "Ui${_UI_customer_name}")
 set(APP_TARGET "${_UI_customer_name}")
+
+# customer=April 时，宿主 EXE 目标名会与 Main 的 April 冲突。
+# 用独立名 AprilShell；现有 April 应用在 M6 之前保持不变。
+if(_UI_customer_lower STREQUAL "april")
+    set(APP_TARGET "AprilShell")
+endif()
 
 # ------------------------------------------------------------
 # 目标名集中定义：改名只动此处；子目录通过父作用域继承。
