@@ -214,6 +214,18 @@
 | 新旧两套菜单/命令短期并存 | 以 `ui.json` 为唯一事实源，旧 `configs/*.json` 只读兼容 |
 | 一次改动过大无法回滚 | 每个里程碑独立可构建、可测试；`BUILD_UI_SHELL=OFF` 即回滚 |
 
+## 5.1 低耦合 + 算法/UI 分离（当前状态）
+
+- `UiShell` core + `UiLayerCheck`：不依赖 `Main/April*`；customer 唯一差异 `customers/<X>`。
+- `UiContract` 纯接口；`UiShell` 不知道 customer。
+- `AprilCore`(算法) 不链 `UiShell`；UI 经 `RD::ICommand*` + `Apr::ICadViewport` + `Apr::IViewportServices` + `OperationBus`/`SceneDocument2D` 契约，不直接改 `SceneManager`。
+- `Apr::IViewportFactory` + `Apr::RenderViewport2DAdapter`(2D) + `Apr::Viewport3DAdapter`(3D) + `Apr::CompositionRootAdapter`；旧 `RenderViewport2D`/`Viewport3D`/`ApplicationCompositionRoot` 关进 adapter。
+- `customers/April` 唯一耦合 `AprilUi`/`AprilCore`；`UiShell` 不见。
+- `AprilShell` 不 `Main::AppBootstrapper`。
+- 仍：`AprilWorkbench` customer 层持有服务用于适配；M3 运行时/M5/M6 未完成。
+
+同步 `Docs/01-当前架构/UiShell框架迁移.md`。
+
 ## 6. 本轮未做的事
 
 - 没有删除或修改 `Main/` 的任何源码；
