@@ -4,6 +4,7 @@
 
 #include "panels/PanelFactory.h"
 #include "commands/Commands.h"
+#include "CompositionRoot.h"
 
 // 静态链接时 qrc 资源对象需要显式引用一次，否则可能被链接器丢弃。
 // Q_INIT_RESOURCE 会就地声明资源初始化函数，必须在全局命名空间里调用。
@@ -65,6 +66,11 @@ namespace RD
         module.cmdCatalog = &parts->commands;    // M4
         module.cmdInvoker = &parts->commands;    // M4
         module.cmdState = &parts->commands;      // M4
+
+        // #2 组合根接线：AprilShell -> ApplicationCompositionRoot::build()
+        //   -> AprilWorkbench::bindCompositionRoot + Commands::setDispatcher(UiWorkbench)
+        // 不抛；build()/接线失败返回 built/wired=false（见 CompositionRoot.h）。
+        attachCompositionRoot(parts->centerView, parts->commands);
         // M3：centerView 是 Apr::CenterView（: Apr::AprilWorkbench），
         // createCenterView 返回现有 RenderViewport2D / Viewport3D；
         // 视口服务由本客户持有并注入；与 UiShell ShellServices 互转。
