@@ -2,7 +2,10 @@
 
 ## 背景
 
-`UiServices` 是 UI 层所需服务的聚合结构，当前暴露 15 个指针，其中只有 3 个是抽象接口（`ISelectionService`、`IUndoRedoManager`、`IRecentFileService`；原 `IInteractionDispatcher` 已整层删除），其余为具体实现类，违反"UI 只保留入口、交互和状态同步"原则。
+`UiServices` 是 UI 层所需服务的聚合结构。收口已完成：它现在只是装配容器，
+唯一存储是七个聚焦分组（UiState/Command/Scene/Persistence/View/Algorithm/Settings，
+见 `UiServiceGroups.h`）；消费者通过分组或具体接口访问，不再有扁平指针字段。
+本文以下内容是当时的收口过程记录，状态以本段为准。
 
 ---
 

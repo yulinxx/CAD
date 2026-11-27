@@ -1,8 +1,8 @@
 > **本目录已接入 April 根工程（M0）。**
 >
-> - 构建：`cmake -S . -B build -DBUILD_UI_SHELL=ON && cmake --build build --target MantiSoft`
-> - 测试：`ctest --test-dir build -R "UiTst|UiLayerCheck" --output-on-failure`
-> - 产物：`build/bin_Qt6/shell/<Config>/`
+> - 一键基线：`bash UiShell/ci/ui-shell-baseline.sh`（`-DUI_CUSTOMER=April -DBUILD_TESTS=ON`，构建 `AprilShell/UiApril/AprilUi/AprilCore/April` 并全量重编）
+> - 测试：`ctest --test-dir build -R "UiTst|UiLayerCheck" --output-on-failure`，再跑 `python3 UiShell/ci/ui-shell-smoke.py`
+> - 产物：`build/bin_Qt6/shell/<Config>/AprilShell`
 > - 迁移计划：见同目录 `MIGRATION.md`
 >
 > 下文是 SampleFrame 的原始架构文档；其中出现的 `Main/` 对应本目录 `UiShell/`，
@@ -444,7 +444,7 @@ flowchart TD
 
 | 项 | 默认 / 范围 |
 | --- | --- |
-| `version` | 必须等于 `1` |
+| `version` | 必须等于 `2`（当前 `kProfileVersion=2`；冒烟用的最小 profile 也是 `version: 2`） |
 | 窗口最小尺寸 | `800 × 600`；`0` 回退默认，宽度夹到 `320..10000`，高度夹到 `240..10000` |
 | 初始窗口尺寸 | `1200 × 800`（`AppBootstrap::start()` 中 `resize`）；保存过窗口状态时由 `MainWindow::restoreWindowState()` 覆盖 |
 | `titleBar.height` | `36`；`<=0` 回退默认，最终夹到 `24..96` |
@@ -1072,10 +1072,10 @@ Model 层（`ProfileParser`、`planAssembly()`，以及 `ProfileModel`、`Assemb
 ## 测试
 
 ```powershell
-ctest --preset test-MantiSoft
+bash UiShell/ci/ui-shell-baseline.sh   # CI：ui-shell-baseline.yml，ubuntu/macos + Qt 6.11.2 + Ninja
 ```
 
-默认 22 个测试目标（三套客户一致；找不到 Qt Quick 时少 `GoodLaserAboutDialog`、`GoodLaserQmlPanel`，为 20 个），加上源码级检查：
+`UI_CUSTOMER=April` 基线下 23 个 `UiTst*` 目标（22 个单元测试，含 `UiTstAprilMenuCatalog`，+ `UiTstInteraction`），加 `UiLayerCheck` 共 24/24 通过；找不到 Qt Quick 时少 `GoodLaserAboutDialog`、`GoodLaserQmlPanel` 两个目标（22/22）。再加上源码级检查：
 
 - 模型层 4：`Jsonc`、`ProfileLoader`、`AssemblyPlanner`、`CustomerProfile`（直接链接内部静态库 `UiShellModel`；`CustomerProfile` 还检查三个客户都绑定了 `help.about`）；
 - 入口 2：`ProfileLocator`（`--profile` / exe 旁 / 内嵌资源的优先级与报错）、`MainWindow`（窗口状态保存 / 恢复，写临时 ini，不碰注册表）；

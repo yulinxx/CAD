@@ -188,7 +188,7 @@ case EType::POLYGON: {
 6. 继续按 §3.4 归位导出头：把 `Src/` 下带导出宏的头文件迁入 `Include/`，并逐步撤掉转发头。2026-11-10 复核：`UI/2D/Src` 下带 `UI2D_API` 的头文件已为 **0**，该项完成。
 7. 继续统一 `Include` / `Src` 的目录名大小写（多数模块用 `Include` / `Src`，`Renderx` 用 `include` / `src`）。
 8. 继续把 `Engine/2D/Src/Algorithm/` 下残留的 `dynamic_cast` 判型替换为 `eType`（见 §3.5）。
-9. `UiServices` 仍暴露具体类型（20 个字段里仅 4 个是接口指针），未完成收口 —— 见 [`耦合性分析.md`](耦合性分析.md) §2.2 C。
+9. `UiServices` 已收口为七分组装配容器（不再是 20 个字段里仅 4 个接口指针的旧结构）—— 见 [`耦合性分析.md`](耦合性分析.md) §2.2 C。
 10. CMake 导出体系统一 —— 当前 `install(EXPORT)` 与手搓 Config 两套并存，新增模块时需人工选择。
 11. 可直接拆出复用的 DLL：Nesting、Raster、Log、Licensing、GeoModelCore（均已支持独立构建）；需先解依赖才能拆的：UICommon、EngineCommon、RenderBridge（有跨层耦合）。
 

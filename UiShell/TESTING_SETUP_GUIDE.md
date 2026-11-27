@@ -130,7 +130,9 @@ function(msAddTest)
     set_tests_properties(${_tst_target} PROPERTIES LABELS "${ARG_LABELS}")
 
     # --- GUI 测试特殊处理 ---
-    # offscreen 让 QApplication 不弹真窗口；CI 和无 GPU 环境都能跑
+    # offscreen 可避免真窗口，适合多数纯 Widgets 测试；依赖原生表面的路径
+    # （如 AprilShell 完整 profile 的 MetalSurface/CenterView）在 offscreen 下失败，
+    # 外壳冒烟需用最小 profile 排除该区域
     if(ARG_GUI)
         target_link_libraries(${_tst_target} PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
 

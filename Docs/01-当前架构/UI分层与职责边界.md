@@ -58,7 +58,7 @@ UI/Common    ──依赖──▶  Engine/Utility/Log
 
 | 角色 | 类 | 位置 | 行数 |
 |---|---|---|---|
-| 视口编排 | `UiViewport3D` | `Main/Src/UI/Render/` | — |
+| 视口编排 | `Viewport3D` | `Main/Src/UI/Render/` | — |
 | 适配层 | `RenderWidget3DAdapter`（RenderWidget3D → IRenderer3D） | `Main/Src/UI/Render/` | — |
 | 统一接口 | `IRenderer3D` | `UI/3D/Include/UI3D/Render3D/` | — |
 | 渲染内核 | `RenderWidget3D`（旧 Qt OpenGL widget） | `UI/3D/Src/Render/` | **3469** |
@@ -73,7 +73,7 @@ UI/Common    ──依赖──▶  Engine/Utility/Log
    `IRenderer2D` 接口，`RenderViewport2D` 直接持有具体 `RenderWidget`。
 3. **Main/Src/UI/Render 混杂两个维度**：同一目录下既有 2D 视口
    （RenderViewport2D/ViewportInputRouter）又有 3D 视口
-   （UiViewport3D/RenderWidget3DAdapter），维度未隔离。
+   （Viewport3D/RenderWidget3DAdapter），维度未隔离。
 
 ---
 
@@ -84,14 +84,14 @@ UI/Common    ──依赖──▶  Engine/Utility/Log
 ### 路线 A：编排下沉（推荐）
 把「视口编排」从 Main 下沉到对应维度组件层，Main 只保留工作台宿主：
 - `RenderViewport2D` + `ViewportInputRouter` + `ViewportNavigation2D` → `UI/2D`
-- `UiViewport3D` + `RenderWidget3DAdapter` → `UI/3D`
+- `Viewport3D` + `RenderWidget3DAdapter` → `UI/3D`
 - Main/Src/UI/Render 只留 `SceneRefreshCoordinator`（跨维度刷新编排）与
   `EntityToVertices`（离散化契约实现）
 
 **收益**：视口内聚到组件层，Main 瘦身为纯装配；2D 可顺势补 `IRenderer2D`
 对齐 3D 的 `IRenderer3D`。
-**风险**：RenderViewport2D 持有 UiServices/UiStateCenter，下沉时需把这些
-依赖改为接口注入（与 UiServices 收口任务联动）。
+**风险**：`RenderViewport2D` 持有显式注入的 `SceneDocument2D`/`ISelectionService`/
+`OperationBus`/`LayerManager` 等依赖，下沉时需继续接口化。
 
 ### 路线 B：内核上提
 把「渲染内核」从 UI/2D·3D 上提到 Main/Src/UI/Render，与视口编排放一起：
@@ -129,7 +129,7 @@ UI/Common    ──依赖──▶  Engine/Utility/Log
 
 | 任务 | 与本边界的关系 |
 |---|---|
-| UiServices 收口（P0 进行中） | 路线 A 下沉视口时，RenderViewport2D 对 UiServices 的依赖需改为接口注入 |
+| UiServices 收口（已收口为七分组） | 路线 A 下沉视口时，继续把 RenderViewport2D 的具体依赖改为接口注入 |
 | 拆解 RenderWidget3D（P2） | 3D 内核拆解是路线 A/B 的前置条件 |
 | 拆解 Workbench2D（P2） | Workbench2D 瘦身后，视口编排职责更清晰地下沉 |
 | SceneDocument3D 对齐 ISceneContext（P1） | 3D 文档接口收口后，RenderWidget3DAdapter 对 SceneDocument3D 的直依赖可收敛 |

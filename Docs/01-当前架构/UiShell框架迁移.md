@@ -1,7 +1,12 @@
 # UiShell 框架迁移（SampleFrame 风格，低耦合 + 算法/UI 分离）
 
-> 状态：M0–M4 框架脚手架 + 低耦合 + 数据化完成；M3 运行时 / M5 / M6 未完成。
-> 详细里程碑见 `UiShell/MIGRATION.md`。本文把现状同步进 `Docs/`。
+> **状态唯一事实源：`UiShell/MIGRATION.md`（本文只做摘要，不再维护另一套状态）。**
+> M0–M4 的框架脚手架 + 低耦合 + 数据化已落地；M3 启动崩溃已修、交互运行时与
+> M4 菜单运行时未验收；M5/M6 未完成。
+> Step 0 基线（2026-11-27）：`UI_CUSTOMER=April` 下 configure / build / 24 项
+> `UiTst|UiLayerCheck` 全绿（含 `UiTstAprilMenuCatalog`），旧 `April` 与 `AprilShell`（最小 profile）均可进入
+> 事件循环；一键门禁 `UiShell/ci/ui-shell-baseline.sh` 已固化进 CI。
+> 命令、产物与启动崩溃根因见 `UiShell/MIGRATION.md` §0.5。
 
 ## 1. 分层（已成立 + `UiLayerCheck` 守卫）
 
@@ -39,7 +44,7 @@ AprilCore ──x──> UiShell                                 // 算法不依
 - `Apr::ICadViewport` + `Apr::IViewportFactory`
   - `Apr::RenderViewport2DAdapter`：`AprilUi::RenderViewport2D` 藏后，只在 `.cpp` include；UI 意图 `resetView/zoomToSelection/setDrawingEnabled/setMeasureMode/setActiveTool`；算法注入留 adapter。
   - `Apr::Viewport3DAdapter`：`Viewport3D + RenderWidget3DAdapter` 藏后（`BUILD_UI3D`）。
-  - `Apr::AprilWorkbench::createCenterView2D/3D` 走 `IViewportFactory` + `widget()`；**不** `new RenderViewport2D/Viewport3D`；不把 raw 旧视口暴露给 `UiShell`；`m_viewport2D/m_viewport3D` 置空。
+  - `Apr::AprilWorkbench::createCenterView2D/3D` 走 `IViewportFactory` + `widget()`；**不** `new RenderViewport2D/Viewport3D`；旧视口藏在 adapter 中，不再持有 raw 指针。
 - `Apr::IViewportServices` + `Apr::CompositionRootAdapter`
   - `hasSceneDocument2D/hasSceneDocument3D/hasOperationBus/hasSelectionService/hasLayerManager/hasUiStateCenter/hasCameraController3D/hasUiServices`；
   - 从 `AprilCore::ApplicationCompositionRoot` 适配；`Apr::AprilWorkbench::bindViewportServices(IViewportServices&)`；`UiShell` 不见 `ApplicationCompositionRoot`/`SceneDocument2D`/`OperationBus`。
@@ -55,15 +60,17 @@ AprilCore ──x──> UiShell                                 // 算法不依
 - **3D** `Viewport3D`（头文件 `UiViewport3D.h`，类 `Viewport3D`，**非 `UiViewport3D`**）+ `RenderWidget3DAdapter`；`ViewportKind::ThreeD`；`BUILD_UI3D`。
 - **旧界面部件进 `UiShell`**：`Apr::PanelFactory : RD::IWidgetFactory` `factory="april.panel"`：
   `tools→DrawToolBarWidget`, `scene→SceneTreePanel`, `inspector→PropertiesPanelWidget`, `status→StatusBar`, 未识别→空 `QWidget`。
-- `ui.json` `regions` + `panels` + `menus`；`configs/base.json` `menus`(8)→`UiShell MenuNodeSpec` **8 menus / 162 commands**（`type action→command`, `command→commandId`, `label→titleKey`, `icon→iconKey`, `separator`, `submenu`）。
+- `ui.json` `regions` + `panels` + `menus`；`configs/base.json` `menus`(8)→`UiShell MenuNodeSpec` **8 menus / 184 个 id**（`type action→command`, `command→commandId`, `label→titleKey`, `icon→iconKey`, `separator`, `submenu`），已覆盖 `base.json` 全部 id。
+- `Apr::Commands::addCommandsFromProfile()` 从 ui.json 递归登记 `type=command` 节点到目录，`AssemblyPlanner` 才不会把菜单当未知命令剔除；`UiTstAprilMenuCatalog` 校验随附 profile 的每个菜单命令都可被 `find()`。
 - `PanelCreateRequest`/`ShellServices`/`UiTranslations`/`UiDeploy`；`UiCustomerProfile` `ui.json`+`assets` 外置。
 
 ## 5. 当前不成立（未完成）
 
-- **M3 运行时** 2D 绘图/选择/变换/撤销未验证；`ApplicationCompositionRoot::instance()->isBuilt()` + `currentWorkbench()` 不保证；`UiWorkbench` 可能未 `setWorkbench`。
-- `Apr::IViewportServices` 只 `has*`，未传具体服务；`bindViewportServices` 未真正用。
-- `AprilWorkbench` 仍持有 `SceneDocument2D/OperationBus/UiServices/ApplicationCompositionRoot`；`viewport2D/viewport3D` raw 返回；但不进 `UiShell`。
-- **M4** 菜单运行时未验证；`setDispatcher` 接线不保证 `UiWorkbench` 非空。
+- **`AprilShell` 完整 profile + offscreen** 仍会崩在 `MetalSurface`：offscreen 无原生窗口，属环境限制；最小 profile 冒烟已通过。原“profile 加载后立即崩溃”的真因（栈上 adapter 悬空）已修，见 `MIGRATION.md` §0.5。
+- **M3 运行时** 2D 绘图/选择/变换/撤销未验证；需在真实窗口环境验收；`UiWorkbench` 可能未 `setWorkbench`。
+- `Apr::IViewportServices` 现在经 `ICadViewport::bindServices` 真注入（不再空实现），服务转发到 `DefaultViewportFactory`；2D 交互语义仍待验证。
+- `AprilWorkbench` 只保存 `IViewportServices`/`IViewportFactory`/`ICadViewport` 等 port；组合根与 adapter 由 `ModuleParts.wiring` 持有；不返回 raw 旧视口。
+- **M4** 菜单转换与目录登记已完成（unknown-command 警告为 0），但点击/快捷键同一命令路径的运行时未验证；`setDispatcher` 接线不保证 `UiWorkbench` 非空。
 - **M5** 品牌/主题/i18n/部署、`AprilShell` CAD `:/configs` 资源注册未做。
 - **M6** `April`→`UiShell` 未切；`Main/Src/UI` 未删；全量回归未跑。
 - `AprilUi`↔`AprilCore` 互相引用；旧 `Main::AppBootstrapper` 未删；`April` 仍可运行。

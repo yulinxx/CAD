@@ -226,7 +226,7 @@ UI 源码中直接 `#include` 低层模块的次数（去重前）：
 | 能力 | 证据 |
 |---|---|
 | 运行时后端选择 | `RenderBridge/Src/RenderSessionHost.cpp:182-221` 按 `cfg.backend` 创建 Runtime |
-| 多后端实现 | `Renderx` 支持 GL/Metal/Null/Vulkan；`renderx.h` 是唯一公共 ABI 头 |
+| 多后端实现 | `Renderx/src/rhi/` 已实现 GL/Metal/Null 三套 RHI，Vulkan 仅为 `renderx.h` 的枚举占位；`renderx.h` 是唯一公共 ABI 头 |
 | widget 传后端 | `RenderWidget.cpp:350`、`RenderWidget3D.cpp:1204` 设置 `cfg.backend` |
 | 唯一公共视口接口 | `UI::IViewportHost`（`UI/Common/Include/UI/IViewportHost.h:35`） |
 
