@@ -1,7 +1,11 @@
 #pragma once
 
+#include <QByteArray>
 #include <QHash>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonValue>
 #include <QList>
 #include <QString>
 #include <QStringList>
@@ -14,7 +18,10 @@
 namespace RD
 {
     // 命令表
-    class CommandTable : public ICommandCatalog, public ICommandInvoker, public ICommandState
+    class CommandTable : public ICommandCatalog,
+                         public ICommandInvoker,
+                         public ICommandState,
+                         public ICommandProfileRegistrar
     {
     public:
         using Handler = std::function<void(const QJsonObject& args)>;
@@ -136,7 +143,50 @@ namespace RD
                 status.bChecked = entry->checked();
         }
 
+        // ICommandProfileRegistrar：从实际加载的 profile 补充登记菜单命令。
+        // 站点外置 ui.json 引用了客户代码未预登记的命令时，避免被装配器过滤。
+        int registerFromProfile(const QByteArray& profileJson) override
+        {
+            const QJsonDocument doc = QJsonDocument::fromJson(profileJson);
+            if (!doc.isObject())
+                return 0;
+            const QJsonValue menus = doc.object().value(QStringLiteral("menus"));
+            if (!menus.isArray())
+                return 0;
+
+            const int before = m_entries.size();
+            registerProfileNodes(menus.toArray());
+            return m_entries.size() - before;
+        }
+
     private:
+        void registerProfileNodes(const QJsonArray& nodes)
+        {
+            for (const QJsonValue& value : nodes)
+            {
+                if (!value.isObject())
+                    continue;
+                const QJsonObject obj = value.toObject();
+
+                const QString commandId = obj.value(QStringLiteral("commandId")).toString();
+                if (obj.value(QStringLiteral("type")).toString() == QStringLiteral("command")
+                    && !commandId.isEmpty() && !lookup(commandId))
+                {
+                    add(commandId);
+                    const QString titleKey = obj.value(QStringLiteral("titleKey")).toString();
+                    const QString iconKey = obj.value(QStringLiteral("iconKey")).toString();
+                    if (!titleKey.isEmpty())
+                        title(titleKey);
+                    if (!iconKey.isEmpty())
+                        icon(iconKey);
+                }
+
+                const QJsonValue children = obj.value(QStringLiteral("children"));
+                if (children.isArray())
+                    registerProfileNodes(children.toArray());
+            }
+        }
+
         struct Entry
         {
             CommandView view;

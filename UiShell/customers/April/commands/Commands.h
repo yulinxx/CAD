@@ -21,7 +21,8 @@ namespace Apr
     // customers/April 持有本对象，经 CustomerModule 提供给 UiShell，并可注入到 AprilWorkbench。
     class Commands : public RD::ICommandCatalog,
                      public RD::ICommandInvoker,
-                     public RD::ICommandState
+                     public RD::ICommandState,
+                     public RD::ICommandProfileRegistrar
     {
     public:
         Commands() = default;
@@ -39,6 +40,7 @@ namespace Apr
         // ---------------- 装配 ----------------
         void addCommand(const RD::CommandView& command);              ///< 登记命令元数据
         int addCommandsFromProfile(const QByteArray& profileJson);    ///< 从客户 profile 的 menus 递归登记命令
+        int registerFromProfile(const QByteArray& profileJson) override;  ///< RD::ICommandProfileRegistrar
         void setDispatcher(IUiCommandDispatcher* dispatcher);        ///< 现有工作台/命令分发器
         IUiCommandDispatcher* dispatcher() const;
 

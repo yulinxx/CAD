@@ -14,6 +14,7 @@ namespace RD
     class ICommandCatalog;
     class ICommandInvoker;
     class ICommandState;
+    class ICommandProfileRegistrar;
 
     struct WidgetFactoryBinding
     {
@@ -63,6 +64,9 @@ namespace RD
         ITitleBarFactory* titleBar = nullptr;
         const ICommandCatalog* cmdCatalog = nullptr;
         ICommandInvoker* cmdInvoker = nullptr;
+
+        // 可选：由实际加载的 profile 补充登记菜单命令（外置 ui.json 场景）。
+        ICommandProfileRegistrar* cmdProfileRegistrar = nullptr;
 
         // 命令状态
         const ICommandState* cmdState = nullptr;

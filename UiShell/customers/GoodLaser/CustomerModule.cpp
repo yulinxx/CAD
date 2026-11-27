@@ -74,6 +74,7 @@ namespace RD
         module.cmdCatalog = &parts->commands;
         module.cmdInvoker = &parts->commands;
         module.cmdState = &parts->commands;
+        module.cmdProfileRegistrar = &parts->commands;  // 外置 --profile 也能补齐菜单命令
 
         module.listDlgFactoriesBind.append({ QString::fromLatin1(RD::about::kAboutDlgId), &parts->aboutDialog });
         module.listDlgFactoriesBind.append({ QString::fromLatin1(RD::samples::kSampleParamsDlgId), &parts->sampleParams });

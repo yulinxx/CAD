@@ -104,6 +104,7 @@ int AppBootstrap::start(QMainWindow* window)
     services.centerView = module.centerView;
     services.cmdCatalog = module.cmdCatalog;
     services.cmdInvoker = module.cmdInvoker;
+    services.cmdProfileRegistrar = module.cmdProfileRegistrar;
     services.cmdState = module.cmdState;
     services.strStyleSeries = module.strStyleSeries;
     services.featureFlags = m_featureFlags.get();

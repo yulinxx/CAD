@@ -18,6 +18,12 @@ namespace RD
         // 缓存
         m_strProfileJson = utf8Json;
 
+        // 站点可能用 --profile 换成外置 ui.json：在规划前让客户目录按这份
+        // profile 补充登记菜单命令，否则新命令会被 AssemblyPlanner 过滤掉。
+        // 该接口是可选的；core 不认识任何客户类型。
+        if (shellServices.cmdProfileRegistrar)
+            shellServices.cmdProfileRegistrar->registerFromProfile(utf8Json);
+
         const ProfileLoadResult result = ProfileParser::loadFromJson(utf8Json);
         m_parseDiagnostics = result.diagnostics;
         m_assemblyDiagnostics.clear();

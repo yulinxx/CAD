@@ -56,6 +56,7 @@ private slots:
     void registersNestedMenuCommandsWithMetadata();
     void shippedProfileRegistersEveryMenuCommand();
     void repeatedLoadDoesNotDuplicate();
+    void interfaceRegistersExternalProfileCommand();
 };
 
 void AprilMenuCatalogTest::registersNestedMenuCommandsWithMetadata()
@@ -113,6 +114,27 @@ void AprilMenuCatalogTest::repeatedLoadDoesNotDuplicate()
     QVERIFY(first > 0);
     QCOMPARE(commands.addCommandsFromProfile(json), 0);
     QCOMPARE(commands.commands().size(), first);
+}
+
+void AprilMenuCatalogTest::interfaceRegistersExternalProfileCommand()
+{
+    // core 只看到 ICommandProfileRegistrar，不认识 Apr::Commands。
+    const QByteArray json = R"({
+        "version": 2,
+        "menus": [
+            { "type": "submenu", "id": "site", "children": [
+                { "type": "command", "commandId": "site.external.command", "titleKey": "Site command" }
+            ] }
+        ]
+    })";
+
+    Apr::Commands commands;
+    RD::ICommandProfileRegistrar* registrar = &commands;
+    QCOMPARE(registrar->registerFromProfile(json), 1);
+    const RD::CommandView* view = commands.find(QStringLiteral("site.external.command"));
+    QVERIFY(view != nullptr);
+    QCOMPARE(view->strTitleKey, QStringLiteral("Site command"));
+    QCOMPARE(registrar->registerFromProfile(json), 0);
 }
 
 QTEST_GUILESS_MAIN(AprilMenuCatalogTest)

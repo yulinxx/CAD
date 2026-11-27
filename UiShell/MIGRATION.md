@@ -51,7 +51,7 @@ python3 UiShell/ci/ui-shell-smoke.py
 | --- | --- |
 | configure（依赖方向审计 + UI→Engine include ratchet） | 通过 |
 | `ninja AprilShell UiApril AprilUi AprilCore April` | 通过；产物 `build/bin_Qt6/shell/Release/AprilShell`、`libUiShell.dylib`、`libUiApril.dylib` |
-| `ctest -R "UiTst|UiLayerCheck"` | **24/24 通过**（22 个 `UiTst*` 单测，含新增 `UiTstAprilMenuCatalog` + `UiTstInteraction` + `UiLayerCheck`） |
+| `ctest -R "UiTst|UiLayerCheck"` | **25/25 通过**（24 个 `UiTst*` 单测，含 `UiTstAprilMenuCatalog`、`UiTstProfileCommands` + `UiTstInteraction` + `UiLayerCheck`） |
 | 旧 `April`（`QT_QPA_PLATFORM=offscreen`） | 进入事件循环，未退出 |
 | `AprilShell` 最小 profile 冒烟（`--profile=`，无 CenterView） | **通过**：进入事件循环；同时验证 `--profile` 命令行优先级 |
 | `AprilShell` 完整 `ui.json`（offscreen） | 仍会崩在 `MetalSurface` 创建：offscreen 平台没有原生窗口，属环境限制，不是 UiShell 代码缺陷；真实 macOS 窗口下另行验收 |
@@ -78,7 +78,7 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
 | 新子系统 | `UiShell/`（源码来自 SampleFrame，构建脚本已适配根工程） |
 | 根工程接入 | `CMakeLists.txt` 新增 `BUILD_UI_SHELL`，默认 `ON` |
 | 产物 | `build/bin_Qt6/shell/Release/MantiSoft`、`libUiShell.dylib`、`libUiMantiSoft.dylib` |
-| 测试 | 22 个 Qt Test + `UiLayerCheck`，共 23 项全部通过 |
+| 测试 | 24 个 Qt Test + `UiLayerCheck`，共 25 项全部通过 |
 | 旧应用 | `April` 目标未改动；configure 的依赖方向审计仍通过 |
 
 ### 移植时修掉的三个问题
@@ -140,7 +140,7 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
 1. `cmake -S . -B build` 配置成功；
 2. `ninja April` / `cmake --build build --target April` **exit 0**，`AprilUi` 产出 `libAprilUi.a`；
 3. `ninja MainTests` **exit 0**；`MainTests --gtest_filter='ViewportInputRegressionTest.*'` **28/28**；
-4. `ctest -R "UiTst|UiLayerCheck"` **24/24**；
+4. `ctest -R "UiTst|UiLayerCheck"` **25/25**；
 5. `April` 可启动（offscreen，正常初始化 DB / 语言 / 许可 / UI）；
    `nm -C April` 能看到 `WorkbenchWindow::*` 等 `AprilUi` 符号；
 6. `Engine` 子模块 WIP 已 `stash pop` 恢复原样。
@@ -224,7 +224,7 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
 
 **注**：原 M3 文本写 `UiViewport3D`，实际类为 `Viewport3D`（头文件 `UiViewport3D.h`）。
 
-### M4：菜单、工具栏、命令、快捷键（菜单转换与目录登记已完成；运行时待验收）
+### M4：菜单、工具栏、命令、快捷键（菜单/目录/外置 profile 同步已完成；运行时待验收）
 
 **做法**（`UiShell/customers/April`）：
 
@@ -242,15 +242,20 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
   会把菜单命令当“未知命令”剔除。新增 `UiTstAprilMenuCatalog` 单测校验嵌套菜单、元数据、
   去重，以及**随附 ui.json 的每个菜单命令都能在目录里找到**；实测完整 profile 启动
   的 unknown-command 警告为 0。
+- **外置 profile 同步**：契约新增可选 `RD::ICommandProfileRegistrar`，`ProfilePipeline::loadFromJson()`
+  在规划前调用它；四套客户的 `Commands` 均已实现（April 复用 `addCommandsFromProfile()`，
+  其余继承 `CommandTable` 的默认实现）。因此 `--profile` 指向的站点 ui.json 即使引入新命令 id，
+  目录也会在加载时补齐，无需重编或改客户代码。新增 `UiTstProfileCommands` 验证“有/无登记钩子”
+  的装配诊断差异、元数据与幂等性；端到端用外置 profile 启动 `AprilShell`（offscreen + 最小 profile）
+  实测 unknown-command 警告为 0。
 
 **暂未做**：
 
-- `IUiCommandDispatcher`（现有 `UiWorkbench`）的 `setDispatcher()` 注入：`customers/April` 装配完工作台后接上；
+- `setDispatcher()` 已在 `wireCompositionRoot()` 中接线（`UiWorkbench` 实现 `IUiCommandDispatcher`），
+  但指针取自 `UiShellHost::mainWindow()->currentWorkbench()`，未 setWorkbench 时为空；
   `UiApril` 单独 dylib 链接仍受“`AprilUi` 引用 `Main` 非 UI 符号 / 组合根”缺口影响（见 M3 注）。
 - 菜单点击/工具栏/面板按钮/快捷键“走同一条命令路径”的**运行时验收**，待真实窗口环境验证
   （offscreen 下完整 profile 会崩在 `MetalSurface`，见 §0.5）。
-- 站点用 `--profile` 换成另一份菜单时，客户目录仍来自内嵌 ui.json；若新 profile 引入新命令 id，
-  需由该客户同步登记。
 
 ### M5：品牌、主题、i18n、部署
 
@@ -299,7 +304,7 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
 ## 6. 本轮未做的事
 
 - 没有删除或修改 `Main/` 的任何源码；
-- 没有把 CAD 视口接进新外壳（M3）；
-- 没有把 `configs/base.json` 转成 `customers/April/ui.json`（M2/M4）。
+- M3 的 2D 交互与 M4 的菜单点击/快捷键运行时验收，仍待真实 GUI 会话（offscreen 限制见 §0.5）；
+- M5 品牌/主题/i18n/部署与 M6 入口切换尚未开始。
 
-这些是后续里程碑的工作，需要按 M1 → M6 逐项推进。
+后续按 M5 → M6 逐项推进。

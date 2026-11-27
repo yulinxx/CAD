@@ -89,6 +89,14 @@ msUiTestTargetName(_tstProfileLoader ProfileLoader)
 # ProfileSchema.h 是 src/Model/ 下的内部头：测试显式加 src 包含路径。
 target_include_directories(${_tstProfileLoader} PRIVATE "${UI_SHELL_SOURCE_DIR}/src")
 
+# profile 加载期的命令登记钩子：外置 ui.json 的菜单命令也能进入客户目录。
+msUiAddTest(NAME ProfileCommands
+    SOURCES unit/Model/tstProfileCommands.cpp
+    LIBS ${UI_SHELL_TARGET} ${UI_MODEL_TARGET}
+    LABELS unit)
+msUiTestTargetName(_tstProfileCommands ProfileCommands)
+target_include_directories(${_tstProfileCommands} PRIVATE "${UI_SHELL_SOURCE_DIR}/src")
+
 msUiAddTest(NAME AssemblyPlanner
     SOURCES unit/Model/tstAssemblyPlanner.cpp
     LIBS ${UI_SHELL_TARGET} ${UI_MODEL_TARGET}

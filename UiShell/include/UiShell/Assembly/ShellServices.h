@@ -35,6 +35,9 @@ namespace RD
         const ICommandCatalog* cmdCatalog = nullptr;
         ICommandInvoker* cmdInvoker = nullptr;
 
+        // 可选：加载 profile 时补充登记菜单命令（外置 ui.json 场景）。
+        ICommandProfileRegistrar* cmdProfileRegistrar = nullptr;
+
         const ICommandState* cmdState = nullptr;
 
         const ITextProvider* text = nullptr;

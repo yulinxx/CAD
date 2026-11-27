@@ -3,8 +3,8 @@
 > **状态唯一事实源：`UiShell/MIGRATION.md`（本文只做摘要，不再维护另一套状态）。**
 > M0–M4 的框架脚手架 + 低耦合 + 数据化已落地；M3 启动崩溃已修、交互运行时与
 > M4 菜单运行时未验收；M5/M6 未完成。
-> Step 0 基线（2026-11-27）：`UI_CUSTOMER=April` 下 configure / build / 24 项
-> `UiTst|UiLayerCheck` 全绿（含 `UiTstAprilMenuCatalog`），旧 `April` 与 `AprilShell`（最小 profile）均可进入
+> Step 0 基线（2026-11-27）：`UI_CUSTOMER=April` 下 configure / build / 25 项
+> `UiTst|UiLayerCheck` 全绿（含 `UiTstAprilMenuCatalog`、`UiTstProfileCommands`），旧 `April` 与 `AprilShell`（最小 profile）均可进入
 > 事件循环；一键门禁 `UiShell/ci/ui-shell-baseline.sh` 已固化进 CI。
 > 命令、产物与启动崩溃根因见 `UiShell/MIGRATION.md` §0.5。
 
@@ -62,6 +62,7 @@ AprilCore ──x──> UiShell                                 // 算法不依
   `tools→DrawToolBarWidget`, `scene→SceneTreePanel`, `inspector→PropertiesPanelWidget`, `status→StatusBar`, 未识别→空 `QWidget`。
 - `ui.json` `regions` + `panels` + `menus`；`configs/base.json` `menus`(8)→`UiShell MenuNodeSpec` **8 menus / 184 个 id**（`type action→command`, `command→commandId`, `label→titleKey`, `icon→iconKey`, `separator`, `submenu`），已覆盖 `base.json` 全部 id。
 - `Apr::Commands::addCommandsFromProfile()` 从 ui.json 递归登记 `type=command` 节点到目录，`AssemblyPlanner` 才不会把菜单当未知命令剔除；`UiTstAprilMenuCatalog` 校验随附 profile 的每个菜单命令都可被 `find()`。
+- 外置 `--profile` 走契约 `RD::ICommandProfileRegistrar`：`ProfilePipeline::loadFromJson()` 在规划前调用，四套客户 `Commands` 均实现（April 复用上述函数，其余继承 `CommandTable` 默认实现）；新菜单命令无需重编即可入目录，`UiTstProfileCommands` 校验有/无钩子的诊断差异与幂等性。
 - `PanelCreateRequest`/`ShellServices`/`UiTranslations`/`UiDeploy`；`UiCustomerProfile` `ui.json`+`assets` 外置。
 
 ## 5. 当前不成立（未完成）
@@ -70,7 +71,7 @@ AprilCore ──x──> UiShell                                 // 算法不依
 - **M3 运行时** 2D 绘图/选择/变换/撤销未验证；需在真实窗口环境验收；`UiWorkbench` 可能未 `setWorkbench`。
 - `Apr::IViewportServices` 现在经 `ICadViewport::bindServices` 真注入（不再空实现），服务转发到 `DefaultViewportFactory`；2D 交互语义仍待验证。
 - `AprilWorkbench` 只保存 `IViewportServices`/`IViewportFactory`/`ICadViewport` 等 port；组合根与 adapter 由 `ModuleParts.wiring` 持有；不返回 raw 旧视口。
-- **M4** 菜单转换与目录登记已完成（unknown-command 警告为 0），但点击/快捷键同一命令路径的运行时未验证；`setDispatcher` 接线不保证 `UiWorkbench` 非空。
+- **M4** 菜单转换、目录登记与外置 profile 同步已完成（unknown-command 警告为 0），但点击/快捷键同一命令路径的运行时未验证；`setDispatcher` 已在 `wireCompositionRoot()` 接线，但 `UiWorkbench` 可能未设置。
 - **M5** 品牌/主题/i18n/部署、`AprilShell` CAD `:/configs` 资源注册未做。
 - **M6** `April`→`UiShell` 未切；`Main/Src/UI` 未删；全量回归未跑。
 - `AprilUi`↔`AprilCore` 互相引用；旧 `Main::AppBootstrapper` 未删；`April` 仍可运行。

@@ -64,6 +64,11 @@ namespace Apr
         return m_commands.size() - before;
     }
 
+    int Commands::registerFromProfile(const QByteArray& profileJson)
+    {
+        return addCommandsFromProfile(profileJson);
+    }
+
     void Commands::collectCommands(const QJsonArray& nodes)
     {
         for (const QJsonValue& value : nodes)

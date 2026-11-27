@@ -1075,7 +1075,7 @@ Model 层（`ProfileParser`、`planAssembly()`，以及 `ProfileModel`、`Assemb
 bash UiShell/ci/ui-shell-baseline.sh   # CI：ui-shell-baseline.yml，ubuntu/macos + Qt 6.11.2 + Ninja
 ```
 
-`UI_CUSTOMER=April` 基线下 23 个 `UiTst*` 目标（22 个单元测试，含 `UiTstAprilMenuCatalog`，+ `UiTstInteraction`），加 `UiLayerCheck` 共 24/24 通过；找不到 Qt Quick 时少 `GoodLaserAboutDialog`、`GoodLaserQmlPanel` 两个目标（22/22）。再加上源码级检查：
+`UI_CUSTOMER=April` 基线下 24 个 `UiTst*` 目标（23 个单元测试，含 `UiTstAprilMenuCatalog`、`UiTstProfileCommands`，+ `UiTstInteraction`），加 `UiLayerCheck` 共 25/25 通过；找不到 Qt Quick 时少 `GoodLaserAboutDialog`、`GoodLaserQmlPanel` 两个目标（23/23）。再加上源码级检查：
 
 - 模型层 4：`Jsonc`、`ProfileLoader`、`AssemblyPlanner`、`CustomerProfile`（直接链接内部静态库 `UiShellModel`；`CustomerProfile` 还检查三个客户都绑定了 `help.about`）；
 - 入口 2：`ProfileLocator`（`--profile` / exe 旁 / 内嵌资源的优先级与报错）、`MainWindow`（窗口状态保存 / 恢复，写临时 ini，不碰注册表）；

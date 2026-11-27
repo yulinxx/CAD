@@ -70,6 +70,7 @@ namespace RD
         module.cmdCatalog = &parts->commands;
         module.cmdInvoker = &parts->commands;
         module.cmdState = &parts->commands;  // 命令表同时提供可用 / 勾选状态。
+        module.cmdProfileRegistrar = &parts->commands;  // 外置 --profile 也能补齐菜单命令
 
         // 关于对话框：注册本客户定制实现；产品/版本等内容由 AboutDialogFactory 自翻译。
         module.listDlgFactoriesBind.append({ QString::fromLatin1(RD::about::kAboutDlgId), &parts->aboutDialog });

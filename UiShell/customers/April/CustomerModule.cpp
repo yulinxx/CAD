@@ -78,6 +78,7 @@ namespace RD
         module.cmdCatalog = &parts->commands;    // M4
         module.cmdInvoker = &parts->commands;    // M4
         module.cmdState = &parts->commands;      // M4
+        module.cmdProfileRegistrar = &parts->commands;  // 外置 --profile 也能补齐菜单命令
 
         // M4：从客户自己的 ui.json 登记菜单引用的命令。AssemblyPlanner 只认目录里
         // 已有的命令，少了这一步整个 April 菜单都会被当“未知命令”过滤掉。
