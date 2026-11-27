@@ -19,6 +19,7 @@ class OperationBus;
 class ISelectionService;
 class LayerManager;
 class CameraController3D;
+class ApplicationCompositionRoot;   // Main/Src/Composition（AprilCore，M3.5）
 class RenderViewport2D;  // Main/Src/UI/Render/RenderViewport2D.h
 class Viewport3D;        // Main/Src/UI/Render/UiViewport3D.h（类名是 Viewport3D，不是 UiViewport3D）
 
@@ -79,6 +80,12 @@ namespace Apr
 
         void setCameraController3D(CameraController3D* controller);
         CameraController3D* cameraController3D() const;
+
+        // ---------------- 组合根注入（M3.5：ApplicationCompositionRoot，在 AprilCore）----------------
+        // 若 root.isBuilt()，把已装配的 UiServices / SceneDocument2D / UiStateCenter /
+        // OperationBus / ISelectionService / LayerManager 注入本视口。
+        // 返回是否实际注入。root 未 build() 时什么都不做。
+        bool bindCompositionRoot(ApplicationCompositionRoot& root);
 
         // ---------------- UiShell ShellServices 互转 ----------------
         // 把本客户持有的信息写进 UiShell 的 ShellServices（centerView/cmd*/style）。

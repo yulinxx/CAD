@@ -7,6 +7,9 @@
 #include "UI/Render/RenderViewport2D.h"   // RenderViewport2D
 #include "UI/Render/UiViewport3D.h"       // Viewport3D
 
+// ---- 组合根（AprilCore）----
+#include "Composition/ApplicationCompositionRoot.h"
+
 #if BUILD_UI3D
 #include "UI/Render/RenderWidget3DAdapter.h"  // RenderWidget3DAdapter : IRenderer3D
 #endif
@@ -62,6 +65,27 @@ namespace Apr
 
     void AprilWorkbench::setCameraController3D(CameraController3D* controller) { m_cameraController3D = controller; }
     CameraController3D* AprilWorkbench::cameraController3D() const { return m_cameraController3D; }
+
+    // ---------------- 组合根注入（M3.5）----------------
+    bool AprilWorkbench::bindCompositionRoot(ApplicationCompositionRoot& root)
+    {
+        if (!root.isBuilt())
+            return false;
+
+        setUiServices(root.uiServices());                 // 七分组 + workbench()
+        setWorkbenchServices(root.uiServices().workbench());
+        if (root.document2D())
+            setSceneDocument2D(root.document2D());
+        if (root.stateCenter())
+            setUiStateCenter(root.stateCenter());
+        if (root.operationBus())
+            setOperationBus(root.operationBus());
+        if (root.selectionService())
+            setSelectionService(root.selectionService());
+        if (root.layerManager())
+            setLayerManager(root.layerManager());
+        return true;
+    }
 
     // ---------------- UiShell ShellServices 互转 ----------------
     void AprilWorkbench::populateShellServices(RD::ShellServices& shell) const
