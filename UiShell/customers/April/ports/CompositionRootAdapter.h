@@ -2,6 +2,7 @@
 
 #include "IViewportServices.h"
 #include "ICadServiceFactory.h"
+#include "DefaultViewportFactory.h"
 
 class ApplicationCompositionRoot;   // AprilCore；只在 .cpp include
 
@@ -29,5 +30,6 @@ namespace Apr
 
     private:
         ApplicationCompositionRoot* m_root = nullptr;
+        DefaultViewportFactory m_viewportFactory;
     };
 }  // namespace Apr

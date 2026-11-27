@@ -29,6 +29,8 @@ namespace Apr
         // 视口服务注入：低耦合，AprilWorkbench 只见 Apr::IViewportServices，不见 ApplicationCompositionRoot 具体对象。
         Apr::CompositionRootAdapter adapter(root);
         workbench.bindViewportServices(adapter);
+        workbench.setServiceFactory(&adapter);                 // Apr::ICadServiceFactory
+        workbench.setViewportFactory(adapter.viewportFactory()); // Apr::IViewportFactory -> Apr::DefaultViewportFactory
         const bool viewportWired = adapter.hasSceneDocument2D() || adapter.hasOperationBus() || adapter.hasUiServices();
 
         // 命令分发注入：现有 UiWorkbench（: public IUiCommandDispatcher）

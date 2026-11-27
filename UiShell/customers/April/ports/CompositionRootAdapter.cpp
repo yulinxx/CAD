@@ -46,6 +46,6 @@ namespace Apr
 
 namespace Apr
 {
-    IViewportFactory* CompositionRootAdapter::viewportFactory() { return nullptr; }
+    IViewportFactory* CompositionRootAdapter::viewportFactory() { return &m_viewportFactory; }
     IViewportServices* CompositionRootAdapter::viewportServices() { return this; }
 }
