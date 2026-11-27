@@ -6,6 +6,7 @@
 
 #include "UiShell/Contract/WidgetFactory.h"        // RD::ICenterViewProvider
 #include "UiShell/Assembly/ShellServices.h"        // RD::ShellServices
+#include "ports/ICadViewport.h"                    // Apr::ICadViewport + Apr::IViewportFactory
 
 // ---- AprilUi（Main/Src/UI，静态库 AprilUi，M1）----
 #include "UI/Services/UiServices.h"                // UiServices（七分组装配容器）
@@ -81,6 +82,12 @@ namespace Apr
         void setCameraController3D(CameraController3D* controller);
         CameraController3D* cameraController3D() const;
 
+        // ---------------- 低耦合 port ----------------
+        // UI 只走 Apr::IViewportFactory + Apr::ICadViewport；不持有/不暴露 RenderViewport2D/Viewport3D/SceneDocument2D/OperationBus 给 UiShell。
+        void setViewportFactory(IViewportFactory* factory);
+        IViewportFactory* viewportFactory() const;
+        ICadViewport* cadViewport() const;   ///< 最近 createCenterView 产出的 port（不暴露 raw 旧视口）
+
         // ---------------- 组合根注入（M3.5：ApplicationCompositionRoot，在 AprilCore）----------------
         // 若 root.isBuilt()，把已装配的 UiServices / SceneDocument2D / UiStateCenter /
         // OperationBus / ISelectionService / LayerManager 注入本视口。
@@ -117,8 +124,10 @@ namespace Apr
         CameraController3D* m_cameraController3D = nullptr;
 
         QWidget* m_centerWidget = nullptr;
-        RenderViewport2D* m_viewport2D = nullptr;   // 不持有，Qt parent 树负责生命周期
+        RenderViewport2D* m_viewport2D = nullptr;   // 不持有，Qt parent 树负责生命周期（不暴露给 UiShell；用 port）
         Viewport3D* m_viewport3D = nullptr;         // 不持有
+        IViewportFactory* m_viewportFactory = nullptr;
+        ICadViewport* m_cadViewport = nullptr;      // 不持有；factory 产出，widget() 交给 Qt
 
         // UiShell 侧只读信息
         QString m_themeId;

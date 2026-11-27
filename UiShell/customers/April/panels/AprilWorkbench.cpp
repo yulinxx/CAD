@@ -63,6 +63,11 @@ namespace Apr
     void AprilWorkbench::setLayerManager(LayerManager* manager) { m_layerManager = manager; }
     LayerManager* AprilWorkbench::layerManager() const { return m_layerManager; }
 
+    // ---------------- 低耦合 port ----------------
+    void AprilWorkbench::setViewportFactory(IViewportFactory* factory) { m_viewportFactory = factory; }
+    IViewportFactory* AprilWorkbench::viewportFactory() const { return m_viewportFactory; }
+    ICadViewport* AprilWorkbench::cadViewport() const { return m_cadViewport; }
+
     void AprilWorkbench::setCameraController3D(CameraController3D* controller) { m_cameraController3D = controller; }
     CameraController3D* AprilWorkbench::cameraController3D() const { return m_cameraController3D; }
 
@@ -114,23 +119,32 @@ namespace Apr
     RenderViewport2D* AprilWorkbench::viewport2D() const { return m_viewport2D; }
     Viewport3D* AprilWorkbench::viewport3D() const { return m_viewport3D; }
 
-    // ---------------- 2D 视口：复用 AprilUi 的 RenderViewport2D ----------------
+    // ---------------- 2D 视口：优先走 Apr::IViewportFactory + Apr::ICadViewport port ----------------
     QWidget* AprilWorkbench::createCenterView2D(QWidget* parent)
     {
+        // 低耦合：UI 只拿 QWidget；旧 RenderViewport2D 藏在 adapter（Apr::RenderViewport2DAdapter）里。
+        if (m_viewportFactory)
+        {
+            m_cadViewport = m_viewportFactory->create2D(parent);
+            QWidget* w = m_cadViewport ? m_cadViewport->widget() : nullptr;
+            if (w)
+            {
+                w->setObjectName(QStringLiteral("center.view"));
+                m_viewport2D = nullptr;   // 不暴露 raw 旧视口给 UiShell
+                m_viewport3D = nullptr;
+                m_centerWidget = w;
+                return w;
+            }
+        }
+
+        // 兼容回退（无 factory 时）：仍复用 AprilUi::RenderViewport2D，但不把 raw 作为 port 暴露。
         auto* vp = new RenderViewport2D(parent);
         vp->setObjectName(QStringLiteral("center.view"));
-
-        // 注入视口服务（现有 API；不在 M3 重新造一套）。
-        if (m_sceneDocument2D)
-            vp->setDocument(m_sceneDocument2D);
-        if (m_selectionService)
-            vp->setSelectionService(m_selectionService);
-        if (m_operationBus)
-            vp->setOperationBus(m_operationBus);
-        if (m_layerManager)
-            vp->setLayerManager(m_layerManager);
-        vp->initializeTools();   // 在服务就绪后建工具
-
+        if (m_sceneDocument2D) vp->setDocument(m_sceneDocument2D);
+        if (m_selectionService) vp->setSelectionService(m_selectionService);
+        if (m_operationBus) vp->setOperationBus(m_operationBus);
+        if (m_layerManager) vp->setLayerManager(m_layerManager);
+        vp->initializeTools();
         m_viewport2D = vp;
         m_viewport3D = nullptr;
         m_centerWidget = vp;
