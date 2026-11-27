@@ -489,6 +489,7 @@ target_include_directories(AprilUi
         "${UI_ROOT}/Services"
         "${UI_ROOT}/Render"
         "${UI_ROOT}/Workbench"
+        "${UI_ROOT}/Widgets"
 )
 target_link_libraries(AprilUi
     PUBLIC
