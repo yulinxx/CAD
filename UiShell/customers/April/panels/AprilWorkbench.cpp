@@ -71,6 +71,12 @@ namespace Apr
     void AprilWorkbench::setCameraController3D(CameraController3D* controller) { m_cameraController3D = controller; }
     CameraController3D* AprilWorkbench::cameraController3D() const { return m_cameraController3D; }
 
+    void AprilWorkbench::bindViewportServices(IViewportServices& services)
+    {
+        // 不暴露具体对象；服务是否齐全由 adapter（Apr::CompositionRootAdapter）回答。
+        Q_UNUSED(services);
+    }
+
     // ---------------- 组合根注入（M3.5）----------------
     bool AprilWorkbench::bindCompositionRoot(ApplicationCompositionRoot& root)
     {
@@ -137,40 +143,35 @@ namespace Apr
             }
         }
 
-        // 兼容回退（无 factory 时）：仍复用 AprilUi::RenderViewport2D，但不把 raw 作为 port 暴露。
-        auto* vp = new RenderViewport2D(parent);
-        vp->setObjectName(QStringLiteral("center.view"));
-        if (m_sceneDocument2D) vp->setDocument(m_sceneDocument2D);
-        if (m_selectionService) vp->setSelectionService(m_selectionService);
-        if (m_operationBus) vp->setOperationBus(m_operationBus);
-        if (m_layerManager) vp->setLayerManager(m_layerManager);
-        vp->initializeTools();
-        m_viewport2D = vp;
-        m_viewport3D = nullptr;
-        m_centerWidget = vp;
-        return vp;
+        // 无 factory：不再直接 new RenderViewport2D；返回空中央视图（factory 由 customer/adapter 提供）。
+        QWidget* placeholder = new QWidget(parent);
+        placeholder->setObjectName(QStringLiteral("center.view"));
+        m_centerWidget = placeholder;
+        return placeholder;
     }
 
     // ---------------- 3D 视口：复用 AprilUi 的 Viewport3D + RenderWidget3DAdapter ----------------
     QWidget* AprilWorkbench::createCenterView3D(QWidget* parent)
     {
 #if BUILD_UI3D
-        auto* vp = new Viewport3D(parent);
-        vp->setObjectName(QStringLiteral("center.view"));
-
-        // 3D 渲染器适配层（过渡层，见 RenderWidget3DAdapter）。
-        vp->setRenderer(std::make_unique<RenderWidget3DAdapter>());
-
-        if (m_sceneDocument3D)
-            vp->setSceneDocument(m_sceneDocument3D);
-        if (m_cameraController3D)
-            vp->setCameraController(m_cameraController3D);
-        vp->initialize(nullptr);   // native window 由 Qt 创建后再绑定；M3 框架先保留调用点
-
-        m_viewport3D = vp;
-        m_viewport2D = nullptr;
-        m_centerWidget = vp;
-        return vp;
+        // 低耦合：UI 只拿 QWidget；旧 Viewport3D + RenderWidget3DAdapter 藏在 adapter（Apr::Viewport3DAdapter）里。
+        if (m_viewportFactory)
+        {
+            m_cadViewport = m_viewportFactory->create3D(parent);
+            QWidget* w = m_cadViewport ? m_cadViewport->widget() : nullptr;
+            if (w)
+            {
+                w->setObjectName(QStringLiteral("center.view"));
+                m_viewport3D = nullptr;   // 不暴露 raw 旧视口给 UiShell
+                m_viewport2D = nullptr;
+                m_centerWidget = w;
+                return w;
+            }
+        }
+        QWidget* placeholder = new QWidget(parent);
+        placeholder->setObjectName(QStringLiteral("center.view"));
+        m_centerWidget = placeholder;
+        return placeholder;
 #else
         // 未开 BUILD_UI3D：3D 框架保留调用点，但不创建 3D 视口；退回空中央视图。
         QWidget* placeholder = new QWidget(parent);

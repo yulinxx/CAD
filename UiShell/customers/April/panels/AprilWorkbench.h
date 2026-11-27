@@ -7,6 +7,7 @@
 #include "UiShell/Contract/WidgetFactory.h"        // RD::ICenterViewProvider
 #include "UiShell/Assembly/ShellServices.h"        // RD::ShellServices
 #include "ports/ICadViewport.h"                    // Apr::ICadViewport + Apr::IViewportFactory
+#include "ports/IViewportServices.h"               // Apr::IViewportServices
 
 // ---- AprilUi（Main/Src/UI，静态库 AprilUi，M1）----
 #include "UI/Services/UiServices.h"                // UiServices（七分组装配容器）
@@ -93,6 +94,9 @@ namespace Apr
         // OperationBus / ISelectionService / LayerManager 注入本视口。
         // 返回是否实际注入。root 未 build() 时什么都不做。
         bool bindCompositionRoot(ApplicationCompositionRoot& root);
+
+        // 低耦合：UI 只见 Apr::IViewportServices，不见 ApplicationCompositionRoot/SceneDocument2D/OperationBus。
+        void bindViewportServices(IViewportServices& services);
 
         // ---------------- UiShell ShellServices 互转 ----------------
         // 把本客户持有的信息写进 UiShell 的 ShellServices（centerView/cmd*/style）。

@@ -1,6 +1,7 @@
 #include "CompositionRoot.h"
 
 #include "panels/AprilWorkbench.h"
+#include "ports/CompositionRootAdapter.h"
 #include "commands/Commands.h"
 
 // ---- AprilCore ----
@@ -25,8 +26,10 @@ namespace Apr
         if (!root.isBuilt())
             return false;
 
-        // 视口服务注入（UiServices / SceneDocument2D / UiStateCenter / OperationBus / ISelectionService / LayerManager）
-        const bool viewportWired = workbench.bindCompositionRoot(root);
+        // 视口服务注入：低耦合，AprilWorkbench 只见 Apr::IViewportServices，不见 ApplicationCompositionRoot 具体对象。
+        const bool viewportWired = workbench.bindCompositionRoot(root);   // 兼容
+        Apr::CompositionRootAdapter adapter(root);
+        workbench.bindViewportServices(adapter);                          // 低耦合 port
 
         // 命令分发注入：现有 UiWorkbench（: public IUiCommandDispatcher）
         IUiCommandDispatcher* dispatcher = nullptr;
