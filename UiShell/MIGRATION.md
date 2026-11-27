@@ -162,12 +162,25 @@
 
 **注**：原 M3 文本写 `UiViewport3D`，实际类为 `Viewport3D`（头文件 `UiViewport3D.h`）。
 
-### M4：菜单、工具栏、命令、快捷键
+### M4：菜单、工具栏、命令、快捷键（命令适配框架已移植；`ui.json` 菜单转换未做）
 
-- 把 `configs/base.json` 的 176 个 action 映射到新 `ui.json` 的 `menus`。
-- `ICommandCatalog` / `ICommandInvoker` 包装现有 `OperationRegistry`。
-- 验收：菜单点击、工具栏、面板按钮、快捷键走同一条命令路径；
-  `tstInteraction` 等集成测试在新客户上通过。
+**做法**（`UiShell/customers/April`）：
+
+- 新增 `commands/Commands.{h,cpp}`：`Apr::Commands : RD::ICommandCatalog + RD::ICommandInvoker + RD::ICommandState`
+  - `find()`；`invoke()` → `IUiCommandDispatcher::dispatch(commandId, {})`；
+    `invokeWithArgs()` → `dispatch(commandId, QJsonObject→QVariantMap)`（透传/补齐，不整体覆盖）；
+  - `queryState()` → `isCommandRegistered` → `bEnabled`；`addCommand(RD::CommandView)`；`setDispatcher()`；
+  - **不重写命令系统**，复用 `AprilUi` 的 `IUiCommandDispatcher`（`UiWorkbench` 实现）/ `OperationBus` / `OperationRegistry`。
+- `CustomerModule.cpp`：`ModuleParts` 持有 `Commands commands`；`module.cmdCatalog/cmdInvoker/cmdState = &parts->commands`。
+- `AprilWorkbench::applyShellServices` / `populateShellServices` 已转发 `cmdCatalog/cmdInvoker/cmdState`。
+
+**暂未做**：
+
+- `IUiCommandDispatcher`（现有 `UiWorkbench`）的 `setDispatcher()` 注入：`customers/April` 装配完工作台后接上；
+  `UiApril` 单独 dylib 链接仍受“`AprilUi` 引用 `Main` 非 UI 符号 / 组合根”缺口影响（见 M3 注）。
+- **`configs/base.json` 的 176 个 action 映射到新 `ui.json` 的 `menus`**（需要 `UiShell` menu 转换，未做）；
+  菜单点击/工具栏/面板按钮/快捷键“走同一条命令路径”的**运行时验收**与 `tstInteraction` 在新客户上通过，待 `AprilShell` 完整链接后验证。
+- `ui.json` 的 `menus`/`panels` 目前空。
 
 ### M5：品牌、主题、i18n、部署
 
