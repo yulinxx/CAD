@@ -11,7 +11,6 @@
 class OperationBus;
 class UiStateCenter;
 class LayerManager;
-class LayerPersistenceBridge;
 class PersistenceService;
 class ImportService;
 class ExportService;
@@ -43,7 +42,6 @@ struct FileOperationConfig
     IRecentFileService* recentFiles = nullptr;
     HelpDialogService* helpDialog = nullptr;
     UiStateCenter* stateCenter = nullptr;
-    LayerPersistenceBridge* layerPersistence = nullptr;
     PersistenceService* persistence = nullptr;
     QWidget* parentWidget = nullptr;
 
@@ -141,7 +139,6 @@ private:
     IRecentFileService* m_recentFiles;
     HelpDialogService* m_helpDialog;
     UiStateCenter* m_stateCenter;
-    LayerPersistenceBridge* m_layerPersistence;
     PersistenceService* m_persistence;
     QWidget* m_parentWidget;
     IUndoRedoManager* m_undoRedoManager;

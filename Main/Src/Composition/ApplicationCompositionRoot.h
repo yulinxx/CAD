@@ -26,7 +26,6 @@
 class SettingsService;  // forward
 class SharedDatabaseAdapter;
 
-class LayerPersistenceBridge;
 class ImportService;
 class ImportDispatcher;
 class ExportService;
@@ -139,9 +138,6 @@ public:
 
     /// 获取图层编辑服务
     LayerEditService* layerEditService();
-
-    /// 获取图层持久化桥接器
-    LayerPersistenceBridge* layerPersistenceBridge();
 
     /// 获取持久化服务
     PersistenceService* persistenceService();
@@ -314,7 +310,7 @@ private:
     ///
     /// 【声明位置约束】必须是第一个数据成员：成员按声明逆序析构，
     /// 声明在最前意味着析构在最后 —— 所有持有 PersistenceService* 裸指针的
-    /// 服务（RecentFileService / LayerPersistenceBridge / ExportService /
+    /// 服务（RecentFileService / ExportService /
     /// FileOperationRegistry / UI 窗口等）都会在它之前销毁，析构期间访问
     /// 裸指针是安全的。此前 shared_ptr 双持有 + 后置声明的组合意味着
     /// 「谁最后释放谁决定析构时机」，存在悬空访问窗口。
@@ -391,9 +387,6 @@ private:
 
     /// 图层编辑服务（带 Undo 的图层操作入口）
     std::unique_ptr<LayerEditService> m_layerEditService;
-
-    /// 图层持久化桥接器（将运行态图层变更同步写入数据库）
-    std::unique_ptr<LayerPersistenceBridge> m_layerPersistenceBridge;
 
     /// 文件IO管理器（导入/导出底层库）
     std::unique_ptr<Fio::FileIOManager> m_fileIOManager;

@@ -30,6 +30,7 @@ namespace Eg
 
 // LayerManager 定义在全局命名空间（Engine2D/Interaction/LayerManager.h）
 class LayerManager;
+class ILayerQuery;
 struct ToolpathJobSpec;
 
 namespace CamBridge
@@ -38,12 +39,12 @@ namespace CamBridge
     /// 唯一桥接点：Engine2D 类型在这里被消化，之后 CAM 不再向上感知。
     ///
     /// @param scene     2D 场景（只读，调用方保证主线程）
-    /// @param layers    图层管理器（可为 nullptr）
+    /// @param layers    图层只读查询（传 LayerManager* 即可；可为 nullptr）
     /// @param spec      作业规格（工艺参数 + 选集 + 跳过规则 + 机器坐标系）
     /// @return          完整的 ToolpathJobInput；jobId 从 spec 带过来
     Cam::ToolpathJobInput buildJobInput(
         const Eg::SceneManager& scene,
-        const LayerManager* layers,
+        const ILayerQuery* layers,
         const ToolpathJobSpec& spec);
 
     /// ABI 自检：打印 CAM 的 ABI 版本号与关键结构 sizeof。

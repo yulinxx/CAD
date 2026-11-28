@@ -16,28 +16,10 @@
 #include "Persistence/Repositories/RecentFileRepository.h"
 #include "Persistence/Models/RecentFileRecord.h"
 
-namespace
-{
-    // 3D 工作台可打开的原生/模型格式；其余扩展名一律归 2D。
-    // 仅用于没有工作台归属的旧记录（迁移前的 DB 行、legacy QSettings key）。
-    const QStringList& k3DExtensions()
-    {
-        static const QStringList exts = { QStringLiteral("apr3d"), QStringLiteral("stl"),
-            QStringLiteral("obj"), QStringLiteral("step"), QStringLiteral("stp") };
-        return exts;
-    }
-}  // namespace
-
 QString RecentFileService::normalizeWorkbench(const QString& workbenchId)
 {
     const QString trimmed = workbenchId.trimmed().toUpper();
     return trimmed.isEmpty() ? QStringLiteral("2D") : trimmed;
-}
-
-QString RecentFileService::classifyWorkbenchByExtension(const QString& filePath)
-{
-    const QString suffix = QFileInfo(filePath).suffix().toLower();
-    return k3DExtensions().contains(suffix) ? QStringLiteral("3D") : QStringLiteral("2D");
 }
 
 RecentFileService::RecentFileService(PersistenceService* persistence)
@@ -72,8 +54,7 @@ void RecentFileService::addRecentFile(const QString& filePath, const QString& wo
         }
         else
         {
-            // 最近文件不是关键数据：数据库失败时 QSettings 兜底仍然写入，
-            // 但不能像旧代码那样继续打印“已添加”。
+            // 最近文件不是关键数据：数据库失败时 QSettings 兜底仍然写入
             APR_WARNF("[RecentFileService] Failed to add recent file to database: %s (QSettings fallback still updated)",
                 qPrintable(filePath));
         }
@@ -98,65 +79,24 @@ QStringList RecentFileService::loadRecentFiles(const QString& workbenchId) const
 {
     const QString wb = normalizeWorkbench(workbenchId);
 
-    // 数据库优先
+    // 数据库可用时以数据库为准（每行都带工作台归属）
     if (m_persistence && m_persistence->isOpen() && m_persistence->recentFiles())
     {
-        auto records = m_persistence->recentFiles()->loadAll();
-        if (!records.empty())
+        QStringList result;
+        for (const auto& rec : m_persistence->recentFiles()->loadAll())
         {
-            QStringList result;
-            std::vector<RecentFileRecord> legacyFixups;
-            result.reserve(static_cast<int>(records.size()));
-            for (const auto& rec : records)
+            if (QString::fromStdString(rec.workbench) == wb && result.size() < kMaxRecentFiles)
             {
-                // 旧记录 workbench 为空（迁移前的 DB 行），按扩展名归类，避免 2D/3D 混显
-                const bool legacyRow = rec.workbench.empty();
-                const QString recWb = legacyRow
-                    ? classifyWorkbenchByExtension(QString::fromStdString(rec.filePath))
-                    : QString::fromStdString(rec.workbench);
-                if (legacyRow)
-                {
-                    // 回写归类结果：workbench='' 的行不属于任何桶，
-                    // append 的按桶裁剪永远裁不到它 —— 不修就会在库里无限累积
-                    RecentFileRecord fixed = rec;
-                    fixed.workbench = recWb.toStdString();
-                    legacyFixups.push_back(std::move(fixed));
-                }
-                if (recWb == wb && result.size() < kMaxRecentFiles)
-                {
-                    result.append(QString::fromStdString(rec.filePath));
-                }
+                result.append(QString::fromStdString(rec.filePath));
             }
-            for (const auto& fix : legacyFixups)
-            {
-                m_persistence->recentFiles()->append(fix);
-            }
-
-            if (!result.empty())
-            {
-                return result;
-            }
-            // DB 里有数据但没有**当前工作台**的条目：不能直接返回空列表 ——
-            // 老版本写在 QSettings 里的 RecentFiles/<wb> 兜底数据会被整体吞掉。
-            // 落到下方 QSettings 分支继续读。
         }
+        return result;
     }
 
-    // QSettings 兜底：先读当前工作台的 key，为空再读 legacy key 按扩展名过滤
-    APR_DEBUG("[RecentFileService] Database empty, falling back to QSettings");
+    // 数据库不可用：读 QSettings 兜底（addRecentFile 双写的那份）
+    APR_DEBUG("[RecentFileService] Database not available, reading QSettings fallback");
     QSettings settings;
     QStringList files = settings.value(QStringLiteral("RecentFiles/%1").arg(wb), QStringList()).toStringList();
-    if (files.isEmpty())
-    {
-        const QStringList legacy = settings.value(QStringLiteral("RecentFiles"), QStringList()).toStringList();
-        for (const QString& path : legacy)
-        {
-            if (classifyWorkbenchByExtension(path) == wb)
-            {
-                files.append(path);
-            }
-        }
-    }
     while (files.size() > kMaxRecentFiles)
     {
         files.removeLast();

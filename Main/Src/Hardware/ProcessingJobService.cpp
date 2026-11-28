@@ -19,6 +19,9 @@
 #include "LaserRoute.h"
 #include "Log/AprLogger.h"
 
+// LayerManager → ILayerQuery 的隐式转换需要完整类型
+#include "Engine2D/Interaction/LayerManager.h"
+
 #ifdef ENABLE_HARDWARE
 
     #include "Hardware/Device/IGalvoCard.h"

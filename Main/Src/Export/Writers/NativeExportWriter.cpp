@@ -6,6 +6,7 @@
 
 #include "FileIO/Writers/NativeWriter.h"
 #include "FileIO/AprDocument.h"
+#include "FileIO/ProcessModelSnapshot.h"
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine3D/SceneManager3D.h"
 #include "Engine3D/AprEntity/AprMeshEntity.h"
@@ -24,15 +25,9 @@ static void addMeshEntityToDoc(Eg::AprMeshEntity* entity, void* ctx)
 /**
  * @brief 加工语义快照没采到时的告警。
  *
- * 历史问题：AprDocument.proto 里 LayerData 的 output / default_process_id /
- * hardware_profile_id / fill_hardware_profile_id 早就有字段，AprSerializer 也能读写，
- * 但生产导出路径只把图元借/克隆进一份新建的 AprDocument，从来不填图层表与
- * 硬件 Profile 值集 —— 保存成功提示照常出现，重开后功率/速度/遍数静默退回默认值。
- *
- * 现在 ExportService 在导出 Phase 1（主线程）采集 NativeDocumentSnapshot，本写入器
- * 把它写进 AprDocument。组合根没注入 provider、或快照采集抛异常时
- * hasMachiningSnapshot 保持 false，必须继续显式告警：宁可吵，也不能让操作员
- * 以为参数已经落盘。
+ * ExportService 在导出 Phase 1（主线程）采集 NativeDocumentSnapshot，本写入器把它写进
+ * AprDocument。组合根没注入 provider、或快照采集抛异常时 hasMachiningSnapshot 保持 false，
+ * 必须显式告警：宁可吵，也不能让操作员以为参数已经落盘。
  */
 static QString nativeMachiningSnapshotMissingWarning()
 {
@@ -65,7 +60,7 @@ static void applyMachiningSnapshot(
 
     for (const auto& layer : context.machiningSnapshot.layers)
     {
-        doc.addLayerDetail(layer);
+        doc.addLayer(layer);
     }
     for (const auto& profile : context.machiningSnapshot.profiles)
     {
@@ -74,11 +69,20 @@ static void applyMachiningSnapshot(
     for (const auto& process : context.machiningSnapshot.processes)
     {
         doc.addProcess(process.info);
-        // 显式目标图层走独立 API：AprProcessInfo 是冻结 POD，装不下变长数组
+        // 显式目标图层走独立 API：AprProcessInfo 是 POD，装不下变长数组
         for (uint32_t layerId : process.targetLayerIds)
         {
             doc.addProcessTargetLayer(process.info.id, layerId);
         }
+    }
+    if (!context.machiningSnapshot.machiningLayerOrder.empty())
+    {
+        doc.setMachiningLayerOrder(context.machiningSnapshot.machiningLayerOrder.data(),
+            context.machiningSnapshot.machiningLayerOrder.size());
+    }
+    if (context.machiningSnapshot.hasProcessModel)
+    {
+        Fio::WriteProcessModelToDocument(doc, context.machiningSnapshot.processModel);
     }
 
     layersWritten = !context.machiningSnapshot.layers.empty();
@@ -117,11 +121,8 @@ ExportResult NativeExportWriter::write(const ExportContext& context, const Fio::
     }
     else
     {
-        // 降级路径：没有 sceneManager，用导出服务已经克隆好的图元。
-        // 刻意不再走 ExportWriterBase::write → FileIOManager::exportFile：那条链
-        // 只接收裸图元数组，没有把图层表 / Profile 值集塞进 AprDocument 的入口，
-        // 走它等于又回到「只存几何」的老问题。两条路径统一由 NativeWriter
-        // 写同一份 AprDocument，加工语义才不会因导出路径不同而随机丢失。
+        // 没有 sceneManager：用导出服务已经克隆好的图元。两条路径统一由 NativeWriter
+        // 写同一份 AprDocument（不走 FileIOManager::exportFile，那条链没有图层表入口）。
         for (const auto& e : entities)
         {
             if (e)
@@ -138,13 +139,9 @@ ExportResult NativeExportWriter::write(const ExportContext& context, const Fio::
     applyMachiningSnapshot(context, doc, layersWritten, profilesWritten);
 
     Fio::NativeWriter writer(fmt);
-    // 路径按 UTF-8 全量传递：旧实现先 memcpy 进 char[1024]，中文长路径会被静默
-    // 截断到 1023 字节，结果是写到一个错路径或者直接失败，且没有任何提示。
+    // 路径按 UTF-8 全量传递（不截断到固定长度缓冲区）
     const QByteArray targetPathUtf8 = context.targetPath.toUtf8();
-    // 生产导出走 writeDocumentWithMetadata：老降级路径经 FileIOManager::exportFile
-    // → NativeWriter::write() 会由 MetadataFiller 填好软件名/版本/时间戳/溯源信息；
-    // 统一到 writeDocument() 后若不补这一步，.apr 的元数据会整片写空（文件仍可打开，
-    // 但创建时间与来源丢失），等于用持久化闭环换出一个溯源回归。
+    // writeDocumentWithMetadata 由 MetadataFiller 填好软件名/版本/时间戳/溯源信息
     const auto writeResult = writer.writeDocumentWithMetadata(targetPathUtf8.constData(), doc);
     if (!writeResult.success)
     {

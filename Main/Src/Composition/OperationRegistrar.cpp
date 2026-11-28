@@ -25,71 +25,7 @@
 
 #include "Log/AprLogger.h"
 
-namespace {
-
-/// @brief 把旧版 HardwareProfile 转成新版 Eg::ProcessParams，
-///        单位换算：HardwareProfile.frequency 是 kHz → ProcessParams.frequencyHz 是 Hz
-///
-/// HardwareProfile 仍是当前运行时唯一可达的工艺参数入口（.apr v2 的 ProcessData
-/// 尚未回灌到 LayerManager）。因此割缝与引入线也在这里显式搬进 ProcessParams，
-/// 默认值保持 0/关闭 —— 不改变任何既有档案的刀路。
-Eg::ProcessParams hwProfileToProcessParams(const HardwareProfile& hp)
-{
-    Eg::ProcessParams p;
-
-    // ---- 旧模型能表达的 5 项 ----
-    p.powerPercent = hp.power;
-    p.speedMmPerSec = hp.speed;
-    p.frequencyHz = hp.frequency * 1000.0;
-    p.passes = hp.passes;
-    p.focusOffsetMm = hp.focusOffset;
-
-    // ---- 割缝/引入线：来自 profile 尾部追加字段，默认 0 = 不启用 ----
-    p.kerfMm = hp.kerfMm;
-    p.leadInEnabled = hp.leadInLengthMm > 0.0;
-    p.leadInLengthMm = hp.leadInLengthMm > 0.0 ? hp.leadInLengthMm : 0.0;
-    p.leadInMode = hp.leadInMode;
-    p.leadInAngleDeg = (hp.leadInAngleDeg >= 0.0 && hp.leadInAngleDeg <= 180.0)
-                           ? hp.leadInAngleDeg
-                           : 0.0;
-
-    // ---- 轮廓加工顺序：只接受 0/1，其余按“文档顺序”处理并告警 ----
-    if (hp.contourOrdering == 0 || hp.contourOrdering == 1)
-    {
-        p.contourOrdering = hp.contourOrdering;
-    }
-    else
-    {
-        APR_WARNF("[OperationRegistrar] hardware profile %d has invalid contourOrdering %d; "
-                 "falling back to document order", hp.id, hp.contourOrdering);
-        p.contourOrdering = 0;
-    }
-
-    // ---- 旧模型没有对应项的其余字段：显式固定为保守默认值 ----
-    p.pulseWidthUs = 0.0;
-    p.waveformIndex = 0;
-    p.rapidSpeedMmPerSec = 0.0;   // 0 = 使用工程默认空移速度
-    p.fillEnabled = false;
-    p.fillIntervalMm = 0.1;
-    p.fillAngleDeg = 0.0;
-    p.fillMode = Eg::FillMode::Zigzag;
-    p.enabled = true;
-
-    // HardwareProfileManager::setSpeed 会把 <= 0 静默钳到 0.01，但直接构造或
-    // 反序列化出来的 profile 仍可能带 0；ProcessParams 把速度 0 判为非法
-    // （原地出光会烧穿工件）。这里回退到保守默认，不把非法值送进编译器。
-    if (!(p.speedMmPerSec > 0.0))
-    {
-        APR_WARNF("[OperationRegistrar] hardware profile %d has invalid speed %.3f; "
-                 "falling back to 100.0 mm/s", hp.id, hp.speed);
-        p.speedMmPerSec = 100.0;
-    }
-    return p;
-}
-
-} // namespace
-
-ToolpathJobSpec buildToolpathJobSpec(const LayerManager* layerManager, const Eg::MachineFrameConfig& frame)
+ToolpathJobSpec buildToolpathJobSpec(const ILayerQuery* layerManager, const Eg::MachineFrameConfig& frame)
 {
     ToolpathJobSpec spec;
     spec.machineFrame = frame;
@@ -99,18 +35,9 @@ ToolpathJobSpec buildToolpathJobSpec(const LayerManager* layerManager, const Eg:
         const auto layerIds = layerManager->getAllLayerIds();
         for (int layerId : layerIds)
         {
-            // 文档里带 ProcessData 的图层优先用它：这是 .apr v2 回灌进来的
-            // 完整工艺参数（含割缝/引入线/填充），比旧 HardwareProfile 全。
-            // 没有文档参数的图层仍走 Profile，旧文档与旧行为逐字节不变。
-            if (layerManager->hasLayerProcessParams(layerId))
-            {
-                spec.layerParams.insert(layerId, layerManager->layerProcessParams(layerId));
-            }
-            else
-            {
-                const auto hp = layerManager->layerHardwareProfile(layerId);
-                spec.layerParams.insert(layerId, hwProfileToProcessParams(hp));
-            }
+            // 取参规则（文档 ProcessData 优先，否则 HardwareProfile 换算）只在
+            // LayerManager::effectiveProcessParams 里写一次，这里不再自己判断
+            spec.layerParams.insert(layerId, layerManager->effectiveProcessParams(layerId));
 
             // 穿孔等工艺细节只存在于文档 ProcessModel 里，按图层解析后填入。
             // 没有细节的层不写 —— 保持「继承/关闭」，绝不用默认值填充。
@@ -175,7 +102,6 @@ void OperationRegistrar::registerAll()
     fileConfig.recentFiles = m_root.uiServices().persistence.recentFileService;
     fileConfig.helpDialog = m_root.helpDialogService();
     fileConfig.stateCenter = m_root.stateCenter();
-    fileConfig.layerPersistence = m_root.layerPersistenceBridge();
     fileConfig.persistence = m_root.persistenceService();
     fileConfig.parentWidget = m_root.shellHost() ? m_root.shellHost()->mainWindow() : nullptr;
     // 新建/打开时清空撤销栈：跨文档撤销会把上一份文档的图元插回新文档

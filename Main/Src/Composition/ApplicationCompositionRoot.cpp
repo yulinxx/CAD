@@ -70,7 +70,6 @@ private:
     OperationBus* m_bus{ nullptr };
 };
 
-#include "Persistence/LayerPersistenceBridge.h"
 #include "Persistence/PersistenceService.h"
 #include "Persistence/SharedDatabaseAdapter.h"
 
@@ -446,15 +445,6 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
     // LayerManagerBridge 注册为 LayerManager 观察者
     m_layerManager->addObserver(m_layerManagerBridge.get());
 
-    // 创建图层持久化桥接器（运行态图层变更同步写入数据库）
-    if (persistenceService() && persistenceService()->isOpen() && persistenceService()->layers())
-    {
-        m_layerPersistenceBridge =
-            std::make_unique<LayerPersistenceBridge>(m_layerManager.get(), persistenceService()->layers());
-
-        m_layerPersistenceBridge->attach();
-    }
-
     // LayerManager 注入 SceneEditService，添加图元时自动分配图层
     m_sceneEditService->setLayerManager(m_layerManager.get());
 
@@ -565,12 +555,6 @@ void ApplicationCompositionRoot::teardownAssembled()
     // （派发器 lambda 捕获宿主 QObject，不清空会在宿主销毁后悬空）
     Eg::FillGeometryUpdater::instance().detach();
 
-    // 图层持久化桥接 detach
-    if (m_layerPersistenceBridge)
-    {
-        m_layerPersistenceBridge->detach();
-    }
-
     // LayerManagerBridge 观察者注销
     if (m_layerManager && m_layerManagerBridge)
     {
@@ -638,11 +622,6 @@ QtLayerManagerBridge* ApplicationCompositionRoot::layerManagerBridge()
 LayerEditService* ApplicationCompositionRoot::layerEditService()
 {
     return m_layerEditService.get();
-}
-
-LayerPersistenceBridge* ApplicationCompositionRoot::layerPersistenceBridge()
-{
-    return m_layerPersistenceBridge.get();
 }
 
 PersistenceService* ApplicationCompositionRoot::persistenceService()

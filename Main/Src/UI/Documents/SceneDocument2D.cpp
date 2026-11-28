@@ -183,8 +183,10 @@ QString SceneDocument2D::createArc(const QPointF& center, double radius, double 
     auto arc = std::make_unique<Eg::AprArc>();
     arc->basePoint = toVec2d(center);
     arc->dRadius = radius;
-    arc->dStartAngle = startDeg;
-    arc->dEndAngle = endDeg;
+    // 参数是角度制，AprArc 存弧度（旧实现直接赋值，90° 被当成 90 弧度）
+    constexpr double kDegToRad = 3.14159265358979323846 / 180.0;
+    arc->dStartAngle = startDeg * kDegToRad;
+    arc->dEndAngle = endDeg * kDegToRad;
     Eg::AprEntity* added = nullptr;
 
     if (m_editService)

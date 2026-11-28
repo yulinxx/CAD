@@ -53,7 +53,7 @@ namespace MotionPlanCompiler
     /**
      * @brief 编译整个文档（或选集）为一段 MotionPlan。
      * @param scene   2D 场景（只读；调用方必须在主线程调用，见 SceneManager 的线程约定）
-     * @param layers  图层管理器；可为 nullptr，此时所有图元视为同一图层
+     * @param layers  图层只读查询（传 LayerManager* 即可）；可为 nullptr，此时所有图元视为同一图层
      * @param spec    作业规格（工艺参数、选集、容差、跳过规则、机器坐标系）
      * @param out     输出。函数内部会先 clear()，失败时其内容不保证有意义
      *
@@ -66,7 +66,7 @@ namespace MotionPlanCompiler
      * 操作者按下去什么都不发生，且没有任何错误提示 —— 最难排查的一类现场问题。
      */
     ToolpathCompileResult compile(const Eg::SceneManager& scene,
-                                  const LayerManager* layers,
+                                  const ILayerQuery* layers,
                                   const ToolpathJobSpec& spec,
                                   Hw::MotionPlanBuilder& out);
 }

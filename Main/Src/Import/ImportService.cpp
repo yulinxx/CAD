@@ -11,10 +11,12 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <cstdio>
 #include <future>
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -30,6 +32,7 @@
 #include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/SceneEditService.h"
 #include "Engine2D/Interaction/LayerManager.h"
+#include "Engine2D/Edit/LayerSnapshot.h"
 #include "Engine2D/Interaction/HardwareProfileManager.h"
 #include "Engine3D/SceneManager3D.h"
 #include "Engine3D/AprEntity/AprMeshEntity.h"
@@ -170,32 +173,36 @@ namespace
         SceneRefreshCoordinator* m_coordinator;
     };
 
-    // ---- 原生 .apr 加工语义还原 ----
+    // ---- 原生 .apr 图层文档还原 ----
 
-    /// 把 .apr 的硬件 Profile **值集**整体还原进 HardwareProfileManager。
-    ///
-    /// 必须在图层绑定之前执行：LayerManager::setLayerHardwareProfileId 会校验
-    /// id 是否存在，值集没落地时所有绑定都会被拒，表现仍是「参数全丢」。
-    /// restoreProfiles 保留文件里的原始 id —— 重新分配 id 会让图层指向错误的
-    /// 功率/速度，属加工事故而不是普通显示错误。
-    ///
-    /// @return false = 还原失败，调用方必须跳过图层绑定还原；true = 无需还原或已成功
-    bool restoreNativeProfileValueSet(LayerManager* layerManager, const ImportResult& parseResult)
+    /// ARGB（高 8 位 alpha）→ Ut::Color，alpha 原样保留
+    Ut::Color aprArgbToColor(uint32_t argb)
     {
-        if (!parseResult.hasNativeMachiningSnapshot)
-        {
-            // 旧文件没有值集：保持运行时现有 Profile，绝不清空用户参数
-            return true;
-        }
+        return Ut::Color::fromRGB255(static_cast<int>((argb >> 16) & 0xFF),
+            static_cast<int>((argb >> 8) & 0xFF),
+            static_cast<int>(argb & 0xFF),
+            static_cast<int>((argb >> 24) & 0xFF));
+    }
 
-        HardwareProfileManager* profiles =
-            layerManager ? layerManager->hardwareProfileManager() : nullptr;
+    /// 把 .apr 的硬件 Profile 值集整体替换进 HardwareProfileManager（保留文件里的原始 id：
+    /// 图层上的 profile id 引用它，重新分配 id 会让图层指向错误的功率/速度）。
+    /// 文件值集为空或被拒绝时重置为默认 Profile。
+    void restoreNativeProfileValueSet(LayerManager* layerManager, const ImportResult& parseResult, QStringList* outWarnings)
+    {
+        HardwareProfileManager* profiles = layerManager ? layerManager->hardwareProfileManager() : nullptr;
         if (!profiles)
         {
-            APR_ERRORF("[ImportService] .apr carries %zu profile(s) but HardwareProfileManager is not "
-                      "injected; profile bindings cannot be restored",
-                parseResult.importedHardwareProfiles.size());
-            return false;
+            if (!parseResult.importedHardwareProfiles.empty())
+            {
+                APR_ERRORF("[ImportService] .apr carries %zu profile(s) but HardwareProfileManager is not injected",
+                    parseResult.importedHardwareProfiles.size());
+            }
+            return;
+        }
+        if (parseResult.importedHardwareProfiles.empty())
+        {
+            profiles->resetToDefault();
+            return;
         }
 
         std::vector<HardwareProfile> batch;
@@ -220,73 +227,22 @@ namespace
 
         if (!profiles->restoreProfiles(batch))
         {
-            APR_ERRORF("[ImportService] .apr profile value set rejected (%zu entr(y/ies)); keeping runtime "
-                      "profiles and skipping layer bindings",
+            APR_ERRORF("[ImportService] .apr profile value set rejected (%zu entr(y/ies)); default profiles used",
                 batch.size());
-            return false;
+            profiles->resetToDefault();
+            if (outWarnings)
+            {
+                outWarnings->append(QStringLiteral(
+                    "The hardware-profile value set in this .apr file is invalid; default profiles are used."));
+            }
+            return;
         }
         APR_DEBUGF("[ImportService] Restored %zu hardware profile(s) from .apr", batch.size());
-        return true;
-    }
-
-    /// 把一条图层的加工语义落到运行时图层上。
-    /// @param bindingsRestorable 值集是否成功还原；false 时不能套用 profile id
-    ///        （旧文件可能只有悬空引用，套到运行时 Profile 上会串层）
-    void applyLayerMachining(LayerManager* layerManager,
-        int layerId,
-        const ImportResult::LayerMachining& machining,
-        bool bindingsRestorable)
-    {
-        layerManager->setLayerOutput(layerId, machining.output);
-        if (machining.defaultProcessId != 0)
-        {
-            layerManager->setLayerDefaultProcessId(layerId, machining.defaultProcessId);
-        }
-        if (!bindingsRestorable)
-        {
-            return;
-        }
-        if (!layerManager->setLayerHardwareProfileId(layerId, machining.hardwareProfileId))
-        {
-            APR_WARNF("[ImportService] Layer %d: hardware profile id %d from .apr not found, binding skipped",
-                layerId,
-                machining.hardwareProfileId);
-        }
-        if (!layerManager->setLayerFillHardwareProfileId(layerId, machining.fillHardwareProfileId))
-        {
-            APR_WARNF("[ImportService] Layer %d: fill hardware profile id %d from .apr not found, binding skipped",
-                layerId,
-                machining.fillHardwareProfileId);
-        }
-    }
-
-    /// 图层显示扩展（矢量/位图、填充开关、填充色）。IrLayerInfo 是冻结的跨 DLL
-    /// POD 装不下这些字段，只有原生 .apr 走这条补充通道。
-    void applyLayerDisplayExtension(
-        LayerManager* layerManager, int layerId, const ImportResult::LayerMachining& machining)
-    {
-        if (!machining.hasDisplayExtension)
-        {
-            return;
-        }
-        layerManager->setLayerType(layerId, static_cast<Eg::LayerType>(machining.layerType));
-        layerManager->setLayerFill(layerId, machining.fill);
-        const uint32_t fillColor = machining.fillColor;
-        const int alphaBits = static_cast<int>((fillColor >> 24) & 0xFF);
-        // 历史零 alpha 位代表「旧版本没这个概念」，不是真的全透明
-        const int alpha = (alphaBits == 0) ? 255 : alphaBits;
-        layerManager->setLayerFillColor(layerId,
-            Ut::Color::fromRGB255(static_cast<int>((fillColor >> 16) & 0xFF),
-                static_cast<int>((fillColor >> 8) & 0xFF),
-                static_cast<int>(fillColor & 0xFF),
-                alpha));
     }
 
     // ---- 原生 .apr ProcessData → 图层工艺参数 ----
 
-    /// FileIO 的工艺参数 POD → Eg::ProcessParams。
-    /// 两边字段一一对应；focusOffsetMm 在文档 v2 的 ProcessParamsData 里没有对应字段，
-    /// 保持默认 0（与旧档案读出来的语义一致）。
+    /// FileIO 的工艺参数 POD → Eg::ProcessParams（字段一一对应）
     Eg::ProcessParams aprProcessParamsToEg(const Fio::AprProcessParamsInfo& src)
     {
         Eg::ProcessParams p;
@@ -307,55 +263,24 @@ namespace
         p.leadInLengthMm = src.leadInLengthMm;
         p.leadInMode = src.leadInMode;
         p.leadInAngleDeg = src.leadInAngleDeg;
+        p.focusOffsetMm = src.focusOffsetMm;
         p.contourOrdering = src.contourOrdering;
         return p;
     }
 
-    /// 把 .apr v2 的 ProcessData 按图层 ID 回灌到 LayerManager。
+    /// 把 .apr 的 ProcessData 写进待恢复的图层快照（文档图层 ID = 运行时图层 ID）。
     ///
-    /// 目标图层解析顺序与 proto 注释一致：
-    ///   1. target_layer_ids 非空 → 只作用于这些源图层（显式优先）；
-    ///   2. 否则 → 作用于 default_process_id == process.id 的源图层（图层反向绑定）。
-    ///
-    /// 幂等性：回灌前先清空本次落地图层的旧参数。否则「同名图层复用」会沿用上一份
-    /// 文档的参数，而 `setLayerProcessParams` 是整体覆盖、不做字段累加，因此
-    /// 连续打开同一文件、或「打开→保存→再打开」都不会让功率/速度漂移。
-    ///
-    /// 找不到对应图层的条目必须如实告警并计数，不能静默丢弃。
-    /// 旧档案（processCount()==0）直接跳过：保持「同名图层沿用用户设置」的旧行为。
-    /// @return 成功落到运行时图层上的（工艺, 图层）条目数
-    int restoreNativeProcesses(LayerManager* layerManager,
-        const ImportResult& parseResult,
-        const std::unordered_map<uint32_t, int>& sourceToLayerId,
-        QStringList* outWarnings)
+    /// 目标图层：target_layer_ids 非空 → 只作用于这些图层；否则 → default_process_id == process.id
+    /// 的图层（反向绑定）。工艺按 order 稳定排序，多条命中同一图层时后者覆盖，结果确定。
+    /// 找不到对应图层的条目如实告警，不静默丢弃。
+    /// @return 成功落到图层上的（工艺, 图层）条目数
+    int applyNativeProcesses(const ImportResult& parseResult, LayerDocumentSnapshot& snapshot, QStringList* outWarnings)
     {
         if (parseResult.importedProcesses.empty())
         {
             return 0;
         }
-        if (!layerManager)
-        {
-            const QString msg = QStringLiteral(
-                "This .apr file carries %1 process object(s) but no layer manager is available; "
-                "their machining parameters were not applied.")
-                                    .arg(parseResult.importedProcesses.size());
-            APR_WARNF("[ImportService] .apr carries %zu process object(s) but LayerManager is not set",
-                parseResult.importedProcesses.size());
-            if (outWarnings)
-            {
-                outWarnings->append(msg);
-            }
-            return 0;
-        }
 
-        // 先清后写：本次导入涉及的运行时图层一律从「无文档参数」开始
-        for (const auto& entry : sourceToLayerId)
-        {
-            layerManager->clearLayerProcessParams(entry.second);
-        }
-
-        // 工艺对象按 order 稳定排序：多条工艺命中同一图层时结果确定，
-        // 不会因为文件里的条目顺序变化而出现「同样的文件、不同的参数」
         std::vector<const ImportResult::ProcessBinding*> ordered;
         ordered.reserve(parseResult.importedProcesses.size());
         for (const auto& binding : parseResult.importedProcesses)
@@ -370,26 +295,19 @@ namespace
         int applied = 0;
         int missingTargetLayerCount = 0;
         int emptyTargetProcessCount = 0;
-
         for (const ImportResult::ProcessBinding* binding : ordered)
         {
-            std::vector<uint32_t> targets;
-            if (!binding->targetLayerIds.empty())
+            std::vector<uint32_t> targets = binding->targetLayerIds;
+            if (targets.empty())
             {
-                targets = binding->targetLayerIds;
-            }
-            else
-            {
-                for (const auto& machining : parseResult.importedLayerMachining)
+                for (const Fio::AprLayerInfo& layer : parseResult.nativeLayers)
                 {
-                    if (machining.defaultProcessId != 0
-                        && machining.defaultProcessId == binding->info.id)
+                    if (layer.defaultProcessId != 0 && layer.defaultProcessId == binding->info.id)
                     {
-                        targets.push_back(machining.sourceId);
+                        targets.push_back(layer.id);
                     }
                 }
             }
-
             if (targets.empty())
             {
                 ++emptyTargetProcessCount;
@@ -401,29 +319,17 @@ namespace
             }
 
             const Eg::ProcessParams params = aprProcessParamsToEg(binding->info.params);
-            int appliedForProcess = 0;
-            for (uint32_t sourceLayerId : targets)
+            for (uint32_t layerId : targets)
             {
-                const auto it = sourceToLayerId.find(sourceLayerId);
-                if (it == sourceToLayerId.end())
+                const auto it = snapshot.layers.find(static_cast<int>(layerId));
+                if (it == snapshot.layers.end())
                 {
                     ++missingTargetLayerCount;
                     continue;
                 }
-                if (layerManager->setLayerProcessParams(it->second, params))
-                {
-                    ++appliedForProcess;
-                    ++applied;
-                }
-            }
-
-            if (appliedForProcess == 0)
-            {
-                APR_WARNF("[ImportService] Process #%u ('%s') references %zu layer(s) but none exists in this "
-                          "document; parameters dropped",
-                    binding->info.id,
-                    binding->info.name,
-                    targets.size());
+                it->second.hasProcessParams = true;
+                it->second.processParams = params;
+                ++applied;
             }
         }
 
@@ -433,7 +339,7 @@ namespace
             {
                 outWarnings->append(QStringLiteral(
                     "This .apr file has %1 process target-layer reference(s) that do not exist in the "
-                    "document; their machining parameters were kept from the file but not applied.")
+                    "document; their machining parameters were not applied.")
                                         .arg(missingTargetLayerCount));
             }
             if (emptyTargetProcessCount > 0)
@@ -444,7 +350,6 @@ namespace
                                         .arg(emptyTargetProcessCount));
             }
         }
-
         APR_DEBUGF("[ImportService] ProcessData reflow: %d applied, %d missing target layer(s), "
                    "%d process(es) without target",
             applied,
@@ -596,6 +501,26 @@ ImportResult ImportService::importWithContext(const ImportContext& context, cons
         return r;
     }
 
+    // 重入保护：上一次导入（含异步导入的后台解析）还没走完时拒绝本次，
+    // 否则两次导入的落库会在 processEvents 泵送中交错写场景。
+    // 拒绝不发 importFinished：那是上一次导入的信号，监听方会误以为它结束了。
+    if (m_importInFlight)
+    {
+        APR_WARNF("[ImportService] importWithContext refused: another import is still in progress (%s)",
+            context.sourcePath.toUtf8().constData());
+        return ImportResult::fail(
+            tr("Another import is still in progress, please try again after it finishes"), ImportErrorType::Unknown);
+    }
+    m_importInFlight = true;
+    struct InFlightReset
+    {
+        bool& flag;
+        ~InFlightReset()
+        {
+            flag = false;
+        }
+    } inFlightReset{ m_importInFlight };
+
     // RAII 守卫：自动管理忙状态和最终状态提示
     ScopedImportGuard guard(this, context.sourcePath);
 
@@ -660,10 +585,9 @@ ImportResult ImportService::importWithContext(const ImportContext& context, cons
             return fail(result);
         }
 
-        if (isCanceled(mutableCtx))
-        {
-            return fail(ImportResult::fail(tr("Import canceled"), ImportErrorType::Canceled));
-        }
+        // 落库完成后不再检查取消：图元已经进了场景、无法回滚，此时返回 Canceled
+        // 会让调用方以为什么都没发生，却跳过了刷新显示与状态回写（与 ImportProgressRunner
+        // 「落库阶段起不可取消」的约定一致）。
 
         // ===== 4：刷新显示 =====
         phaseRefreshDisplay(mutableCtx, result, options);
@@ -696,10 +620,31 @@ void ImportService::importAsync(
         return;
     }
 
-    // 收掉上一条可能还在跑的异步 worker（同 service 不允许并发 importAsync）
+    // 重入保护：上一次导入还没收尾（典型场景：进度对话框被连续取消强制关闭，worker 仍在解析）。
+    // 旧实现直接 shutdownAsyncThread()，会在主线程 join 到上一次解析结束，界面整段卡死。
+    // 这里改为立即拒绝；结果必须排队投递 —— 调用方（ImportProgressRunner）在 importAsync
+    // 返回之后才连接对话框的 finished 信号并进入事件循环，同步回调会让它永远等不到结束。
+    // 拒绝不发 importFinished：那是上一次导入的信号，监听方会误以为它结束了。
+    if (m_importInFlight)
+    {
+        APR_WARNF("[ImportService] importAsync refused: another import is still in progress (%s)",
+            context.sourcePath.toUtf8().constData());
+        const ImportResult refused = ImportResult::fail(
+            tr("Another import is still in progress, please try again after it finishes"), ImportErrorType::Unknown);
+        if (onComplete)
+        {
+            QMetaObject::invokeMethod(
+                qApp, [onComplete, refused]() { onComplete(refused); }, Qt::QueuedConnection);
+        }
+        return;
+    }
+
+    // 收掉上一条异步 worker（同 service 不允许并发 importAsync）。
+    // 走到这里它必然已经跑完（m_importInFlight 在它的收尾回调里才清掉），join 不会阻塞主线程。
     shutdownAsyncThread();
     // 重置取消标志：新的 importAsync 开始，旧的 cancel 信号作废
     m_asyncCancelFlag.store(false);
+    m_importInFlight = true;
 
     // 忙状态与开始通知都在调用线程（主线程）发出：
     // 这些回调最终会动 UI，放到后台线程里发是跨线程访问
@@ -725,6 +670,8 @@ void ImportService::importAsync(
             [safeSelf, onComplete, r]() {
                 if (safeSelf.isNull())
                     return;
+                // 所有异步返回路径（失败 / 取消 / 成功）都经过这里：本次导入到此才算收尾
+                safeSelf->m_importInFlight = false;
                 if (safeSelf->m_busyStateCallback)
                 {
                     safeSelf->m_busyStateCallback(false);
@@ -1040,12 +987,7 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
         return ImportResult::fail(tr("No valid entities to import"), ImportErrorType::ParseFailed);
     }
 
-    // 如果作为新文档导入，先清空场景
-    if (options.importAsNewDocument && m_sceneManager)
-    {
-        APR_DEBUG("[ImportService] Clearing 2D scene before import");
-        m_sceneManager->clearScene();
-    }
+    // 替换文档时的清空挪到分拣之后：必须先确认本次有图元能落地（见 3.1.1）
 
     // ===== 3.1 按图元类型分拣：网格进 3D 场景，其余进 2D 场景 =====
     // 混合文件（例如同一个 OBJ 里既有网格又有线框标注）两侧都必须落地。
@@ -1085,6 +1027,56 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
         static_cast<long long>(meshEntities.size()),
         static_cast<long long>(flatEntities.size()));
 
+    // ===== 3.1.1 替换文档：先确认能落地，再清空 =====
+    // 清空不可回滚。旧实现在分拣之前就 clearScene()，之后若两侧都落不了地（例如全是网格
+    // 而 BUILD_UI3D=0）会返回失败 —— 场景已经空了，当前文件路径却还指向旧文件，
+    // 用户一次保存就会用空场景覆盖它。
+#if BUILD_UI3D
+    const bool meshLandable = hasMeshEntities;
+#else
+    const bool meshLandable = false;  // 无 UI3D 构建没有授权的 3D 写入口，网格只能丢弃
+#endif
+    const bool flatLandable = !flatEntities.empty() && (m_editService || m_sceneManager);
+    if (!meshLandable && !flatLandable)
+    {
+        APR_ERRORF("[ImportService] Nothing can land in any scene (%zu mesh, %zu flat, editService=%d, "
+                   "sceneManager=%d), current document left untouched",
+            meshEntities.size(),
+            flatEntities.size(),
+            m_editService ? 1 : 0,
+            m_sceneManager ? 1 : 0);
+        return ImportResult::fail(tr("No entity could be added to the scene"), ImportErrorType::Unknown);
+    }
+
+    // 从这里起场景可能已被清空：之后的失败结果都要带上 documentCleared，调用方据此复位文档状态
+    bool documentCleared = false;
+    const auto failAfterClear = [&documentCleared](const QString& msg) {
+        ImportResult r = ImportResult::fail(msg, ImportErrorType::Unknown);
+        r.documentCleared = documentCleared;
+        return r;
+    };
+
+    if (options.importAsNewDocument)
+    {
+        // 先让调用方清掉上一份文档的撤销栈等状态，再清空（时序原因见 ImportContext）
+        if (context.beforeReplaceDocumentCallback)
+        {
+            context.beforeReplaceDocumentCallback();
+        }
+        if (m_sceneManager)
+        {
+            APR_DEBUG("[ImportService] Clearing 2D scene before import");
+            m_sceneManager->clearScene();
+            documentCleared = true;
+        }
+        // 新文档从默认图层文档开始（图层表、Profile、加工顺序、工艺模型都不沿用上一份文档）。
+        // 必须在图元入场之前：入场图元先落在默认当前层，再由图层还原按文件/颜色重新归属
+        if (m_layerManager)
+        {
+            m_layerManager->resetToDefaultDocument();
+        }
+    }
+
     // ===== 3.2 网格图元落地到 3D 场景 =====
     int meshAdded = 0;
     if (hasMeshEntities)
@@ -1093,6 +1085,7 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
         {
             APR_DEBUG("[ImportService] Clearing 3D scene before import");
             m_sceneManager3D->clearScene();
+            documentCleared = true;
         }
 
 #if BUILD_UI3D
@@ -1138,6 +1131,10 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     int flatAdded = 0;
     // 转换期 ID → 入库后最终 ID 的修正表（见下方 addEntities 处的说明）
     std::unordered_map<int64_t, int64_t> idRemap;
+    // 修正表是否可信：入场数与入参数对不上时为 false，此时跳过图层/群组还原
+    bool idMappingReliable = true;
+    // 入场后的最终 ID（按色落层要逐个看图元颜色；没有编辑服务的回退路径留空）
+    std::vector<int64_t> importedFlatIds;
     if (!flatEntities.empty())
     {
         // 大批量导入前按图元数预留几何仓容量：写入过程中 GPU 顶点仓不再反复 grow-拷贝
@@ -1182,14 +1179,30 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
                 CommitMode::Direct,
                 commitProgress);
 
-            // 下标一一对应：addEntities 按入参顺序为每个非空图元返回最终 ID
-            const size_t mapped = std::min(preInsertIds.size(), finalIds.size());
-            for (size_t i = 0; i < mapped; ++i)
+            // 实际入场数以返回值为准（分不到 id 的图元会被 addEntities 丢弃）
+            flatAdded = static_cast<int>(finalIds.size());
+            importedFlatIds.assign(finalIds.begin(), finalIds.end());
+
+            // 下标对齐的前提：addEntities 按入参顺序返回最终 ID，且**一个都没丢**。
+            // 它丢弃图元时不留占位，丢一个之后的下标全部错开一格，按下标建表会把
+            // 图层/群组归属成串地套到别的图元上。数量对不上时宁可不还原，也不能错还原。
+            if (finalIds.size() == preInsertIds.size())
             {
-                if (preInsertIds[i] != finalIds[i])
+                for (size_t i = 0; i < finalIds.size(); ++i)
                 {
-                    idRemap[static_cast<int64_t>(preInsertIds[i])] = static_cast<int64_t>(finalIds[i]);
+                    if (preInsertIds[i] != finalIds[i])
+                    {
+                        idRemap[static_cast<int64_t>(preInsertIds[i])] = static_cast<int64_t>(finalIds[i]);
+                    }
                 }
+            }
+            else
+            {
+                idMappingReliable = false;
+                APR_WARNF("[ImportService] addEntities returned %zu id(s) for %zu input entit(y/ies): id mapping is "
+                          "ambiguous, source layer/group structure will not be restored",
+                    finalIds.size(),
+                    preInsertIds.size());
             }
             if (!idRemap.empty())
             {
@@ -1214,7 +1227,7 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
         else
         {
             APR_ERRORF("[ImportService] No 2D scene available, %d entity(ies) cannot be imported", flatAdded);
-            return ImportResult::fail(tr("No scene manager available"), ImportErrorType::Unknown);
+            return failAfterClear(tr("No scene manager available"));
         }
         APR_DEBUGF("[ImportService] %d entity(ies) added to the 2D scene", flatAdded);
     }
@@ -1222,8 +1235,9 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     const int entityCount = meshAdded + flatAdded;
     if (entityCount == 0)
     {
+        // 场景都在，只是没有一个图元真正入场（撞号被拒、网格被丢弃等）：别再报「没有场景」误导排查
         APR_ERROR("[ImportService] No entity landed in any scene");
-        return ImportResult::fail(tr("No scene manager available"), ImportErrorType::Unknown);
+        return failAfterClear(tr("No entity could be added to the scene"));
     }
 
     // ===== 3.4 还原源文件的图层与群组结构 =====
@@ -1232,10 +1246,16 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
     // 图层/工艺还原阶段的告警必须在最终结果里露出来：
     // ProcessData 找不到目标图层属于「参数没生效」，不能只写日志。
     QStringList layerRestoreWarnings;
-    if (flatAdded > 0)
+
+    if (flatAdded > 0 && !idMappingReliable)
+    {
+        layerRestoreWarnings.append(
+            tr("Some entities could not be added; source layer and group structure was not restored"));
+    }
+    else if (flatAdded > 0)
     {
         const int createdLayers = restoreImportedLayers(
-            context, parseResult, idRemap, &layerRestoreWarnings);
+            context, parseResult, idRemap, importedFlatIds, options.importAsNewDocument, &layerRestoreWarnings);
         APR_DEBUGF("[ImportService] Layer restore: %d created from %lld source layer(s), %lld entity mapping(s)",
             createdLayers,
             static_cast<long long>(parseResult.importedLayers.size()),
@@ -1265,9 +1285,9 @@ ImportResult ImportService::phaseBuildDocument(const ImportContext& context,
 
     // 根据图元类型设置目标工作台 ID
     auto result = ImportResult::ok(tr("Imported %1 entities successfully").arg(entityCount), entityCount);
+    result.documentCleared = documentCleared;
     result.usedWorkbenchId = hasMeshEntities ? QStringLiteral("3D") : QStringLiteral("2D");
-    // phaseParse 的告警（例如旧 .apr 只有图层 Profile 绑定、没有值集）必须带进
-    // 最终结果，否则在构建阶段被整个吞掉，状态栏只显示「导入成功」。
+    // phaseParse 的告警必须带进最终结果，否则在构建阶段被整个吞掉，状态栏只显示「导入成功」。
     for (const auto& warn : parseResult.warnings)
     {
         result.addWarning(warn);
@@ -1452,15 +1472,13 @@ void ImportService::phaseWriteBackState(const ImportContext& context, ImportResu
     updateProgress(context, ImportPhase::WriteBackState, 1.0f);
 }
 
-int ImportService::restoreImportedLayers(
-    const ImportContext& context, const ImportResult& parseResult, const std::unordered_map<int64_t, int64_t>& idRemap,
+int ImportService::restoreImportedLayers(const ImportContext& context,
+    const ImportResult& parseResult,
+    const std::unordered_map<int64_t, int64_t>& idRemap,
+    const std::vector<int64_t>& importedEntityIds,
+    bool replacingDocument,
     QStringList* outWarnings)
 {
-    if (parseResult.importedLayers.empty())
-    {
-        // 该格式本身不带图层信息（OBJ / STL / PLT 等），无需还原
-        return 0;
-    }
     if (!m_layerManager)
     {
         APR_WARNF("[ImportService] Layer restore skipped: LayerManager not set, %zu source layer(s) dropped",
@@ -1474,211 +1492,480 @@ int ImportService::restoreImportedLayers(
         return 0;
     }
 
-    // 查找某源图层的加工语义（只有原生 .apr 有这个概念）
-    const auto findMachining = [&parseResult](uint32_t sourceId) -> const ImportResult::LayerMachining* {
-        for (const auto& m : parseResult.importedLayerMachining)
+    // 打开自己的 .apr：图层文档按文件原样重建；其余一律按颜色落层（图层 = 颜色）
+    if (context.format == Fio::FileFormat::Native && replacingDocument)
+    {
+        return restoreNativeDocument(parseResult, idRemap, importedEntityIds, outWarnings);
+    }
+    return restoreLayersByColor(parseResult, idRemap, importedEntityIds, outWarnings);
+}
+
+int ImportService::restoreNativeDocument(const ImportResult& parseResult,
+    const std::unordered_map<int64_t, int64_t>& idRemap,
+    const std::vector<int64_t>& importedEntityIds,
+    QStringList* outWarnings)
+{
+    // 1. 硬件 Profile 值集先落地：下面要按它校验图层上的 profile id 引用
+    restoreNativeProfileValueSet(m_layerManager, parseResult, outWarnings);
+    std::unordered_set<int> validProfileIds;
+    if (HardwareProfileManager* profiles = m_layerManager->hardwareProfileManager())
+    {
+        for (int pid : profiles->allProfileIds())
         {
-            if (m.sourceId == sourceId)
-            {
-                return &m;
-            }
+            validProfileIds.insert(pid);
         }
-        return nullptr;
+    }
+    const auto profileExists = [&validProfileIds, this](int pid) {
+        return !m_layerManager->hardwareProfileManager() || validProfileIds.count(pid) != 0;
     };
 
-    // 值集必须**先于**图层绑定落地：setLayerHardwareProfileId 会校验 id 存在。
-    // 返回值 false 时跳过绑定还原，避免把悬空 id 套到运行时 Profile 上串层。
-    const bool bindingsRestorable = restoreNativeProfileValueSet(m_layerManager, parseResult);
-    const bool isNativeSnapshot = parseResult.hasNativeMachiningSnapshot && bindingsRestorable;
-
-    // 源图层 sourceId → 运行时 LayerManager 图层 ID
-    std::unordered_map<uint32_t, int> sourceToLayerId;
-    int createdCount = 0;
-    int reusedCount = 0;
-    // 逐个记住来源图层的落地结果，供下面按层输出日志（每层只输出一次）
-    struct ResolvedSourceLayer
+    // 2. 图层表：id / 顺序 / 全部属性按文件原样
+    LayerDocumentSnapshot snapshot;
+    int maxLayerId = 0;
+    int danglingProfileRefs = 0;
+    for (const Fio::AprLayerInfo& src : parseResult.nativeLayers)
     {
-        std::string sourceName;
-        uint32_t sourceColor = 0;
-        int runtimeLayerId = 0;
-        const char* status = "reused";
-    };
-
-    std::vector<ResolvedSourceLayer> resolvedLayers;
-    resolvedLayers.reserve(parseResult.importedLayers.size());
-
-    // DXF 标准图层 "0" 直接对应内置默认图层（id 0），不按名再建一层
-    const bool isDxf = (context.format == Fio::FileFormat::DXF);
-
-    for (const auto& src : parseResult.importedLayers)
+        const int id = static_cast<int>(src.id);
+        if (snapshot.layers.count(id) != 0)
+        {
+            APR_WARNF("[ImportService] .apr layer id %d appears twice; the later entry is ignored", id);
+            continue;
+        }
+        LayerPropertiesSnapshot props;
+        props.layerId = id;
+        props.exists = true;
+        props.name = src.name;
+        props.color = aprArgbToColor(src.color);
+        props.visible = src.visible;
+        props.locked = src.locked;
+        props.layerType = static_cast<Eg::LayerType>(src.layerType);
+        props.fill = src.fill;
+        props.fillColor = aprArgbToColor(src.fillColor);
+        props.output = src.output;
+        props.defaultProcessId = src.defaultProcessId;
+        props.hardwareProfileId = src.hardwareProfileId;
+        props.fillHardwareProfileId = src.fillHardwareProfileId;
+        // 图层类型约束（同 LayerManager）：0 层恒为矢量层；位图层不能是填充层
+        if (id == 0)
+        {
+            props.layerType = Eg::LayerType::VECTOR;
+        }
+        if (props.layerType == Eg::LayerType::BITMAP)
+        {
+            props.fill = false;
+        }
+        if (!profileExists(props.hardwareProfileId))
+        {
+            props.hardwareProfileId = 0;
+            ++danglingProfileRefs;
+        }
+        if (props.fillHardwareProfileId >= 0 && !profileExists(props.fillHardwareProfileId))
+        {
+            props.fillHardwareProfileId = -1;
+            ++danglingProfileRefs;
+        }
+        snapshot.layers[id] = props;
+        snapshot.layerOrder.push_back(id);
+        maxLayerId = std::max(maxLayerId, id);
+    }
+    // 0 号矢量图层是全局兜底层，文档里必须有
+    if (snapshot.layers.count(0) == 0)
     {
-        const std::string srcName(src.name);
-
-        int layerId = (isDxf && srcName == "0") ? 0 : m_layerManager->findLayerByName(srcName);
-        const char* status = "reused";
-
-        if (layerId >= 0)
-        {
-            // 同名图层视为同一个工艺层：保留用户已有的颜色/可见性/锁定设置，
-            // 不用源文件属性覆盖，避免重复导入污染既有图层。
-            //
-            // 但**带完整加工语义快照的 .apr 是例外**：那是一次「打开文档」，
-            // 文件里的加工语义必须是权威的，否则重建的图层会沿用上一份文档的
-            // 输出开关/工艺/Profile 绑定，参数看似存下来了实则没还原。
-            // 显示属性仍按上面的规则保留，只覆盖加工语义。
-            ++reusedCount;
-            if (isNativeSnapshot)
-            {
-                const auto machining = findMachining(src.sourceId);
-                if (machining)
-                {
-                    applyLayerMachining(m_layerManager, layerId, *machining, true);
-                }
-            }
-        }
-        else
-        {
-            // 严格按源图层名新建，并带上源图层的颜色/可见性/锁定。
-            // 刻意不再按颜色复用：内置 8 个默认图层恰好覆盖黑/红/绿/蓝等常见色，
-            // 按颜色去重会把源图层全部吸进默认图层，图层名永远建不出来。
-            layerId = m_layerManager->createLayer(srcName);
-            if (layerId >= 0)
-            {
-                ++createdCount;
-                status = "created";
-                const uint8_t r = static_cast<uint8_t>((src.color >> 16) & 0xFF);
-                const uint8_t g = static_cast<uint8_t>((src.color >> 8) & 0xFF);
-                const uint8_t b = static_cast<uint8_t>(src.color & 0xFF);
-                // 高 8 位为 alpha；历史文件 alpha 位为 0 时按不透明处理，
-                // 否则旧工程加载后整层会变透明
-                const uint8_t a = static_cast<uint8_t>((src.color >> 24) & 0xFF);
-                const int alpha = (a == 0) ? 255 : static_cast<int>(a);
-                m_layerManager->setLayerColor(layerId, Ut::Color::fromRGB255(r, g, b, alpha));
-                m_layerManager->setLayerVisible(layerId, src.visible);
-                m_layerManager->setLayerLocked(layerId, src.locked);
-                // 加工语义：输出开关、默认工艺、硬件 Profile 绑定跟着图层一起还原。
-                // 少了这一步，打开 .apr 后「这一层要加工 / 用哪组功率速度」的信息
-                // 就丢了 —— 表现是图纸明明设了输出，机器却不烧这一层，或者用
-                // 默认参数把工件打坏。数据走独立 machining 通道（IrLayerInfo
-                // 是冻结的跨 DLL POD，装不下这些字段）。
-                const auto machining = findMachining(src.sourceId);
-                if (machining)
-                {
-                    applyLayerMachining(m_layerManager, layerId, *machining, isNativeSnapshot);
-                    applyLayerDisplayExtension(m_layerManager, layerId, *machining);
-                }
-            }
-            else
-            {
-                // 图层数量已达上限：回退到内置默认图层，图元不会因此丢失
-                APR_WARNF("[ImportService] Layer count limit reached, falling back to default layer for '%s'",
-                    srcName.c_str());
-                layerId = 0;
-                status = "fell back to default (layer limit)";
-            }
-        }
-
-        sourceToLayerId[src.sourceId] = layerId;
-        resolvedLayers.push_back(ResolvedSourceLayer{ srcName, src.color, layerId, status });
+        LayerPropertiesSnapshot props;
+        props.layerId = 0;
+        props.exists = true;
+        props.name = "Layer 0";
+        props.color = Ut::Color::fromRGB255(0, 0, 0);
+        snapshot.layers[0] = props;
+        snapshot.layerOrder.insert(snapshot.layerOrder.begin(), 0);
+    }
+    if (danglingProfileRefs > 0 && outWarnings)
+    {
+        outWarnings->append(QStringLiteral("%1 layer profile reference(s) in this .apr file point at missing "
+                                           "hardware profiles; the default profile is used instead.")
+                                .arg(danglingProfileRefs));
     }
 
-    // 图元归属只认解析层产出的 entityLayerMap（实体运行时 ID → 源图层 sourceId），
-    // 键全部来自本次导入，因此不会误改场景里已有的其他图元；映射缺失的实体留在默认层。
-    std::unordered_map<int64_t, int> runtimeLayerMap;
-    runtimeLayerMap.reserve(parseResult.entityLayerMap.size());
+    // 3. ProcessData → 图层工艺参数
+    const int appliedProcesses = applyNativeProcesses(parseResult, snapshot, outWarnings);
+
+    // 4. 图元归属：本次入场的图元一律先归 0 层，再按文件映射落到各自图层
+    for (int64_t id : importedEntityIds)
+    {
+        snapshot.entityLayerMap[static_cast<Eg::EntityId>(id)] = 0;
+    }
     int unresolvedCount = 0;
     for (const auto& [entityId, sourceLayerId] : parseResult.entityLayerMap)
     {
-        const auto it = sourceToLayerId.find(sourceLayerId);
-        if (it == sourceToLayerId.end())
+        const auto remapIt = idRemap.find(entityId);
+        const int64_t finalId = remapIt != idRemap.end() ? remapIt->second : entityId;
+        const int layerId = static_cast<int>(sourceLayerId);
+        if (snapshot.layers.count(layerId) == 0)
         {
             ++unresolvedCount;
             continue;
         }
-        // 入库时被换过 ID 的图元要按修正表换成最终 ID，否则这里查不到它
-        const auto remapIt = idRemap.find(entityId);
-        runtimeLayerMap[remapIt != idRemap.end() ? remapIt->second : entityId] = it->second;
+        snapshot.entityLayerMap[static_cast<Eg::EntityId>(finalId)] = layerId;
     }
-
-    if (!runtimeLayerMap.empty())
-    {
-        m_layerManager->applyEntityLayerMap(runtimeLayerMap);
-    }
-
     if (unresolvedCount > 0)
     {
-        APR_WARNF("[ImportService] %d imported entit(y/ies) reference unknown source layer(s), left on default layer",
+        APR_WARNF("[ImportService] %d entit(y/ies) reference unknown layer(s) in the .apr file, placed on layer 0",
             unresolvedCount);
     }
 
-    // 源文件带了图层就逐层记录一行、每层只记一次。
-    // 汇总数字看不出「某层是被新建、被复用、还是回退到了默认层」，也无法核对图层名与颜色，
-    // 多图层文件排查分层问题（DXF / SVG 等）时这组日志是第一手依据。
-    if (!resolvedLayers.empty())
+    // 5. 加工顺序：原样（不存在的图层 id 丢掉）
+    for (uint32_t layerId : parseResult.importedMachiningLayerOrder)
     {
-        // 每个运行时图层在**本次导入**中落了多少图元（不是场景里的总数，合并导入时才有区分）
-        std::unordered_map<int, int> importedCountByLayer;
-        for (const auto& entry : runtimeLayerMap)
+        if (snapshot.layers.count(static_cast<int>(layerId)) != 0)
         {
-            ++importedCountByLayer[entry.second];
-        }
-
-        for (const auto& layer : resolvedLayers)
-        {
-            const auto countIt = importedCountByLayer.find(layer.runtimeLayerId);
-            APR_INFOF(
-                "[ImportService] Source layer '%s' #%06X -> runtime id=%d ('%s') %s, %d entity(ies) in this import",
-                layer.sourceName.c_str(),
-                static_cast<unsigned>(layer.sourceColor & 0x00FFFFFFu),
-                layer.runtimeLayerId,
-                m_layerManager->layerName(layer.runtimeLayerId).c_str(),
-                layer.status,
-                countIt != importedCountByLayer.end() ? countIt->second : 0);
+            snapshot.machiningOrder.push_back(static_cast<int>(layerId));
         }
     }
 
-    // 工艺对象回灌必须排在图层落地之后：ProcessData 的目标是文档图层 ID，
-    // 而运行时图层 ID 可能因「按名复用」与文件里的不同，只能经 sourceToLayerId 换算。
-    const int appliedProcesses = restoreNativeProcesses(m_layerManager, parseResult, sourceToLayerId, outWarnings);
-
-    // 工艺细节模型（ProcessModelData）：按图层回灌到 LayerManager，供加工启动时读取
-    // （穿孔等细节只存在于这个块里，ProcessData 只有基础参数）。
-    // 模型里的 layerId 是文档 ID，必须经 sourceToLayerId 换成运行时 ID，
-    // 否则「按名复用」的图层会查到别的层的细节。
-    if (parseResult.hasProcessModel)
+    // 类型不符的归属（位图放进矢量层 / 矢量放进位图层）先记下，恢复后交给 applyEntityLayerMap 改投
+    std::unordered_map<Eg::EntityId, int> mismatched;
+    if (m_sceneManager)
     {
-        Eg::ProcessModel model = parseResult.processModel;
-        std::vector<Eg::LayerProcessEntry> translated;
-        translated.reserve(model.layers.size());
-        for (const Eg::LayerProcessEntry& entry : model.layers)
+        for (auto& [entityId, layerId] : snapshot.entityLayerMap)
         {
-            const auto it = sourceToLayerId.find(static_cast<uint32_t>(entry.layerId));
-            if (it == sourceToLayerId.end())
+            const Eg::AprEntity* entity = m_sceneManager->findAprEntityById(entityId);
+            if (!entity)
             {
-                // 该层本次没有落地（被跳过/超限），不保留悬空细节
                 continue;
             }
-            Eg::LayerProcessEntry copy = entry;
-            copy.layerId = static_cast<int32_t>(it->second);
-            translated.push_back(std::move(copy));
+            const bool bitmapLayer = snapshot.layers[layerId].layerType == Eg::LayerType::BITMAP;
+            if ((entity->eType == Eg::EType::IMAGE) != bitmapLayer)
+            {
+                mismatched[entityId] = layerId;
+                layerId = 0;
+            }
         }
-        model.layers = std::move(translated);
-        m_layerManager->setProcessModel(std::move(model));
+    }
+
+    snapshot.currentLayerId = 0;
+    snapshot.nextLayerId = maxLayerId + 1;
+    m_layerManager->restoreDocument(snapshot);
+    m_layerManager->setCurrentLayer(0);
+    if (!mismatched.empty())
+    {
+        APR_WARNF("[ImportService] %zu entit(y/ies) sit on a layer of the wrong type in the .apr file; redirected",
+            mismatched.size());
+        m_layerManager->applyEntityLayerMap(mismatched);
+    }
+
+    // 6. 工艺细节模型：文件有就用（图层 id 即运行时 id），没有就清空
+    if (parseResult.hasProcessModel)
+    {
+        m_layerManager->setProcessModel(parseResult.processModel);
     }
     else
     {
-        // 旧档案/外来格式没有模型块：清空，避免沿用上一份文档的细节
         m_layerManager->clearProcessModel();
     }
 
-    APR_DEBUGF("[ImportService] Layer restore: %zu total, %d created, %d reused, %zu entity assignment(s), "
-               "%d process assignment(s)",
-        parseResult.importedLayers.size(),
-        createdCount,
-        reusedCount,
-        runtimeLayerMap.size(),
-        appliedProcesses);
-    return createdCount;
+    APR_DEBUGF("[ImportService] Native document restored: %zu layer(s), %zu entity assignment(s), "
+               "%d process assignment(s), machining order %zu",
+        snapshot.layers.size(),
+        snapshot.entityLayerMap.size(),
+        appliedProcesses,
+        snapshot.machiningOrder.size());
+    return static_cast<int>(snapshot.layers.size());
+}
+
+int ImportService::restoreLayersByColor(const ImportResult& parseResult,
+    const std::unordered_map<int64_t, int64_t>& idRemap,
+    const std::vector<int64_t>& importedEntityIds,
+    QStringList* outWarnings)
+{
+    // 一次导入最多新建多少个颜色层。图层 = 颜色，图层数 ≈ 文件里的颜色数；
+    // 真彩色渐变之类的文件可能有上千种颜色，不设上限就会刷出上千个图层。
+    // 超出部分按最接近的颜色落到已有图层，并保留图元自己的显示色。
+    constexpr int kMaxNewColorLayersPerImport = 64;
+
+    if (!m_sceneManager)
+    {
+        return 0;
+    }
+
+    const auto rgbKey = [](const Ut::Color& c) -> uint32_t {
+        return (static_cast<uint32_t>(c.red255()) << 16) | (static_cast<uint32_t>(c.green255()) << 8) |
+               static_cast<uint32_t>(c.blue255());
+    };
+    // 图层身份只看 RGB：源图层色一律按不透明取
+    const auto argbToColor = [](uint32_t argb) {
+        return Ut::Color::fromRGB255(static_cast<int>((argb >> 16) & 0xFF),
+            static_cast<int>((argb >> 8) & 0xFF),
+            static_cast<int>(argb & 0xFF));
+    };
+
+    std::unordered_map<uint32_t, const Fio::IrLayerInfo*> sourceById;
+    for (const auto& src : parseResult.importedLayers)
+    {
+        sourceById[src.sourceId] = &src;
+    }
+    // 最终 ID → 转换期 ID（entityLayerMap 以转换期 ID 为键）
+    std::unordered_map<int64_t, int64_t> finalToPre;
+    for (const auto& [pre, fin] : idRemap)
+    {
+        finalToPre[fin] = pre;
+    }
+
+    std::vector<int64_t> candidates = importedEntityIds;
+    if (candidates.empty())
+    {
+        // 回退路径拿不到入场 ID：只能处理带源图层映射的图元
+        for (const auto& [pre, srcId] : parseResult.entityLayerMap)
+        {
+            (void)srcId;
+            const auto it = idRemap.find(pre);
+            candidates.push_back(it != idRemap.end() ? it->second : pre);
+        }
+    }
+
+    // ---- 1. 按显示色分组：显式色（DXF 真彩/ACI）优先，否则取源图层色（ByLayer）----
+    struct ColorGroup
+    {
+        Ut::Color color;
+        std::string name;            // 第一个提供该颜色的源图层名
+        bool anyVisible = false;     // 合并后的可见性：任一源图层可见即可见
+        std::vector<int64_t> ids;
+        std::vector<int64_t> overrideIds;  // 颜色来自显式色的图元：落层后清掉显式色，改为随层色
+        int layerId = -1;
+        bool snapped = false;        // 超出新建上限、落到最接近颜色的已有图层
+    };
+    std::unordered_map<uint32_t, size_t> groupIndex;
+    std::vector<ColorGroup> groups;
+    int uncolored = 0;
+    for (int64_t id : candidates)
+    {
+        Eg::AprEntity* entity = m_sceneManager->findAprEntityById(static_cast<Eg::EntityId>(id));
+        if (!entity || entity->eType == Eg::EType::IMAGE || entity->eType == Eg::EType::GROUP ||
+            entity->eType == Eg::EType::FILL_REGION)
+        {
+            continue;  // 位图由类型规则进位图层；群组只是容器；色块随填充层
+        }
+        const Fio::IrLayerInfo* src = nullptr;
+        {
+            const auto pre = finalToPre.find(id);
+            const auto mapIt = parseResult.entityLayerMap.find(pre != finalToPre.end() ? pre->second : id);
+            if (mapIt != parseResult.entityLayerMap.end())
+            {
+                const auto s = sourceById.find(mapIt->second);
+                src = (s != sourceById.end()) ? s->second : nullptr;
+            }
+        }
+        const std::optional<Ut::Color> own = entity->overrideColor();
+        if (!own && !src)
+        {
+            ++uncolored;  // 格式本身没有颜色信息：留在落层时分到的当前图层
+            continue;
+        }
+        const Ut::Color color = own ? *own : argbToColor(src->color);
+        const uint32_t key = rgbKey(color);
+        auto gi = groupIndex.find(key);
+        if (gi == groupIndex.end())
+        {
+            gi = groupIndex.emplace(key, groups.size()).first;
+            ColorGroup g;
+            g.color = color;
+            groups.push_back(std::move(g));
+        }
+        ColorGroup& g = groups[gi->second];
+        if (g.name.empty() && src && src->name[0] != '\0')
+        {
+            g.name = src->name;
+        }
+        g.anyVisible = g.anyVisible || !src || src->visible;
+        g.ids.push_back(id);
+        if (own)
+        {
+            g.overrideIds.push_back(id);
+        }
+    }
+    if (groups.empty())
+    {
+        return 0;
+    }
+
+    // ---- 2. 每种颜色对应一个图层：复用同色图层，没有就新建 ----
+    // 图元多的颜色先分配，保证超上限时被「就近合并」的是零星颜色
+    std::vector<size_t> order(groups.size());
+    for (size_t i = 0; i < order.size(); ++i)
+    {
+        order[i] = i;
+    }
+    std::stable_sort(order.begin(), order.end(),
+        [&groups](size_t a, size_t b) { return groups[a].ids.size() > groups[b].ids.size(); });
+
+    // 可接收导入图元的同色图层：矢量层、非填充层（填充层上的图元会参与色块剖分）、未锁定
+    const auto usableLayer = [this](int id) {
+        return m_layerManager->layerType(id) == Eg::LayerType::VECTOR && !m_layerManager->isLayerFill(id) &&
+               !m_layerManager->isLayerLocked(id);
+    };
+    int created = 0;
+    int reused = 0;
+    std::vector<std::string> blockedColors;
+    for (size_t gi : order)
+    {
+        ColorGroup& g = groups[gi];
+        const uint32_t key = rgbKey(g.color);
+        char hex[8];
+        std::snprintf(hex, sizeof(hex), "#%06X", static_cast<unsigned>(key));
+        // 同色只能有一个图层：找到它就看它能不能收图元，不能收就不另建同色层
+        const int sameColorLayer = m_layerManager->findLayerByColor(g.color);
+        if (sameColorLayer >= 0)
+        {
+            if (usableLayer(sameColorLayer))
+            {
+                g.layerId = sameColorLayer;
+                ++reused;
+            }
+            else
+            {
+                blockedColors.push_back(hex);  // 同色层是锁定/填充/位图层：下面就近合并
+                g.snapped = true;
+            }
+            continue;
+        }
+        if (created < kMaxNewColorLayersPerImport)
+        {
+            const int id = m_layerManager->createLayer(g.name.empty() ? std::string(hex) : g.name);
+            if (id >= 0)
+            {
+                if (m_layerManager->setLayerColor(id, g.color))
+                {
+                    m_layerManager->setLayerVisible(id, g.anyVisible);
+                    g.layerId = id;
+                    ++created;
+                    continue;
+                }
+                m_layerManager->deleteLayer(id);
+            }
+        }
+        g.snapped = true;  // 上限到了（本次或全局）：下面就近合并
+    }
+
+    // ---- 3. 超上限的颜色：落到 RGB 距离最近的可用图层，保留图元自己的显示色 ----
+    int snappedEntities = 0;
+    for (ColorGroup& g : groups)
+    {
+        if (!g.snapped)
+        {
+            continue;
+        }
+        long bestDist = -1;
+        for (int id : m_layerManager->getAllLayerIds())
+        {
+            if (!usableLayer(id))
+            {
+                continue;
+            }
+            const Ut::Color c = m_layerManager->layerColor(id);
+            const long dr = c.red255() - g.color.red255();
+            const long dg = c.green255() - g.color.green255();
+            const long db = c.blue255() - g.color.blue255();
+            const long dist = dr * dr + dg * dg + db * db;
+            if (bestDist < 0 || dist < bestDist)
+            {
+                bestDist = dist;
+                g.layerId = id;
+            }
+        }
+        if (g.layerId >= 0)
+        {
+            snappedEntities += static_cast<int>(g.ids.size());
+        }
+    }
+
+    // ---- 4. 落层，并把显式色改为随层色（层色就是它原来的颜色，显示不变）----
+    std::unordered_map<int64_t, int> mapping;
+    for (const ColorGroup& g : groups)
+    {
+        if (g.layerId < 0)
+        {
+            continue;  // 一个可用图层都没有（全被锁定）：留在当前层
+        }
+        for (int64_t id : g.ids)
+        {
+            mapping[id] = g.layerId;
+        }
+    }
+    m_layerManager->applyEntityLayerMap(mapping);
+    for (const ColorGroup& g : groups)
+    {
+        if (g.layerId < 0)
+        {
+            continue;
+        }
+        if (g.snapped)
+        {
+            // 就近合并的图元保留自己的显示色：随层色来的也钉成显式色
+            for (int64_t id : g.ids)
+            {
+                Eg::AprEntity* entity = m_sceneManager->findAprEntityById(static_cast<Eg::EntityId>(id));
+                if (entity && !entity->overrideColor())
+                {
+                    entity->setOverrideColor(g.color);
+                    entity->setModified();
+                    m_sceneManager->markEntityLayerChanged(entity->id);
+                }
+            }
+            continue;
+        }
+        for (int64_t id : g.overrideIds)
+        {
+            if (Eg::AprEntity* entity = m_sceneManager->findAprEntityById(static_cast<Eg::EntityId>(id)))
+            {
+                // 只有真的落进了该层才去掉显式色（类型规则可能把它改投了别处）
+                if (m_layerManager->getEntityLayer(entity) == g.layerId)
+                {
+                    entity->clearOverrideColor();
+                    entity->setModified();
+                    m_sceneManager->markEntityLayerChanged(entity->id);
+                }
+            }
+        }
+    }
+
+    for (const ColorGroup& g : groups)
+    {
+        APR_INFOF("[ImportService] Color #%06X -> layer %d ('%s')%s, %zu entit(y/ies)",
+            static_cast<unsigned>(rgbKey(g.color)),
+            g.layerId,
+            g.layerId >= 0 ? m_layerManager->layerName(g.layerId).c_str() : "",
+            g.snapped ? " [nearest color, over new-layer limit]" : "",
+            g.ids.size());
+    }
+    if (outWarnings)
+    {
+        if (snappedEntities > 0)
+        {
+            outWarnings->append(tr("This file uses %1 colors; at most %2 new color layers are created per import. "
+                                   "%3 entity(ies) were placed on the nearest-color layer and keep their own color.")
+                                    .arg(groups.size())
+                                    .arg(kMaxNewColorLayersPerImport)
+                                    .arg(snappedEntities));
+        }
+        if (!blockedColors.empty())
+        {
+            QStringList names;
+            for (const std::string& c : blockedColors)
+            {
+                names << QString::fromStdString(c);
+            }
+            outWarnings->append(tr("Color(s) %1 already belong to a locked, fill or bitmap layer; those entities were "
+                                   "placed on the nearest-color layer and keep their own color.")
+                                    .arg(names.join(QStringLiteral(", "))));
+        }
+    }
+    APR_DEBUGF("[ImportService] Color layering: %zu color(s), %d layer(s) created, %d reused, %d snapped entit(y/ies), "
+               "%d entit(y/ies) without color info",
+        groups.size(),
+        created,
+        reused,
+        snappedEntities,
+        uncolored);
+    return created;
 }
 
 int ImportService::restoreImportedGroups(

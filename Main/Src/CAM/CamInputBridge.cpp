@@ -306,7 +306,7 @@ namespace CamBridge
 
     Cam::ToolpathJobInput buildJobInput(
         const Eg::SceneManager& scene,
-        const LayerManager* layers,
+        const ILayerQuery* layers,
         const ToolpathJobSpec& spec)
     {
         Cam::ToolpathJobInput input;
@@ -341,12 +341,11 @@ namespace CamBridge
             }
         }
 
-        // ---- 图层顺序（来自 LayerManager 快照，不来自 SceneManager 图元自然顺序）----
+        // ---- 图层顺序（加工顺序，不来自 SceneManager 图元自然顺序）----
         std::vector<int> layerOrder;
         if (layers)
         {
-            const LayerDocumentSnapshot snapshot = layers->captureDocument();
-            layerOrder = snapshot.layerOrder;
+            layerOrder = layers->machiningLayerOrder();
         }
 
         // ---- 先为每个图层创建空的 LayerBucket ----
@@ -589,7 +588,7 @@ namespace CamBridge
         }
 
         // ---- 按图层顺序重排 LayerBucket ----
-        // 以 LayerDocumentSnapshot.layerOrder 为准（文档绘制顺序），
+        // 以 ILayerQuery::machiningLayerOrder 为准（未自定义时等于显示顺序），
         // 不在 layerOrder 里的图层补在末尾
         if (!layerOrder.empty())
         {

@@ -31,11 +31,6 @@ protected:
                            Fio::VecAprEntityPtr& outEntities,
                            bool collectLayers) const;
 
-    /// 旧路径读取：importFile → 构建结果（含错误分类与警告收集）
-    ImportResult readViaLegacy(const ImportContext& context,
-                               Fio::FileFormat format,
-                               Fio::VecAprEntityPtr& outEntities) const;
-
     /// 错误分类：根据错误信息判断 ImportErrorType
     static ImportErrorType classifyError(const QString& msg);
 

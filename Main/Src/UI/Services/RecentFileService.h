@@ -26,11 +26,8 @@ private:
     /// 最大每工作台最近文件数量
     static constexpr int kMaxRecentFiles = 10;
 
-    /// 工作台 ID 归一化：统一大写，空值兜底 "2D"（与旧行为兼容）
+    /// 工作台 ID 归一化：统一大写，空值兜底 "2D"
     static QString normalizeWorkbench(const QString& workbenchId);
-
-    /// 旧记录没有工作台归属，按扩展名归类：3D 格式归 "3D"，其余归 "2D"
-    static QString classifyWorkbenchByExtension(const QString& filePath);
 
     /// QSettings 兜底写入（仅指定工作台的 key）
     void saveWorkbenchFiles(const QString& workbenchId, const QStringList& files) const;

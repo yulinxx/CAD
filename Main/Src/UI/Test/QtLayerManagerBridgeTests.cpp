@@ -182,8 +182,7 @@ TEST_F(QtLayerManagerBridgeTest, OnLayerChanged_ColorChangeEmitsSignal)
 {
     int layerId = m_layerManager->createLayer("ColorLayer");
 
-    // 改色：图层身份是 id，颜色只是视觉属性，撞色不再被拒绝；
-    // 这里仍用一个未被占用的颜色，只验证"改色成功必然发出一次变更信号"这条契约。
+    // 用一个未被占用的颜色，验证"改色成功必然发出一次变更信号"这条契约。
     const Ut::Color newColor(0.25f, 0.5f, 0.75f);
     ASSERT_TRUE(m_layerManager->setLayerColor(layerId, newColor));
 
@@ -191,17 +190,15 @@ TEST_F(QtLayerManagerBridgeTest, OnLayerChanged_ColorChangeEmitsSignal)
     EXPECT_EQ(m_log.lastChangedId, layerId);
 }
 
-TEST_F(QtLayerManagerBridgeTest, OnLayerChanged_DuplicateColorAllowed_EmitsSignal)
+TEST_F(QtLayerManagerBridgeTest, OnLayerChanged_DuplicateColorRejected_NoSignal)
 {
     int layerId = m_layerManager->createLayer("ColorLayer");
 
-    // 撞色语义已改为"只警告不阻止"：图层身份是 id，同色图层合法共存。
-    // 因此设置成已有图层的颜色必须成功，并照常发出一次变更信号。
+    // 图层 = 颜色：改成已有图层的颜色被拒绝，不发变更信号
     const Ut::Color defaultRed(1.0f, 0.0f, 0.0f);
-    EXPECT_TRUE(m_layerManager->setLayerColor(layerId, defaultRed));
+    EXPECT_FALSE(m_layerManager->setLayerColor(layerId, defaultRed));
 
-    EXPECT_EQ(m_log.changedCount, 1);
-    EXPECT_EQ(m_log.lastChangedId, layerId);
+    EXPECT_EQ(m_log.changedCount, 0);
 }
 
 // ==================== onCurrentLayerChanged 信号测试 ====================

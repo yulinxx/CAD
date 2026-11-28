@@ -141,7 +141,7 @@ namespace
         int order = 0;
         for (int id : layerIds)
         {
-            Fio::AprLayerDetailInfo info;
+            Fio::AprLayerInfo info;
             info.id = static_cast<uint32_t>(id);
             const std::string name = layerManager->layerName(id);
             std::strncpy(info.name, name.c_str(), sizeof(info.name) - 1);
@@ -157,10 +157,9 @@ namespace
             info.hardwareProfileId = layerManager->layerHardwareProfileId(id);
             info.fillHardwareProfileId = layerManager->layerFillHardwareProfileId(id);
 
-            // 图层带文档工艺参数（.apr v2 ProcessData 回灌的）时，才写 ProcessData。
+            // 图层带文档工艺参数（.apr ProcessData 回灌的）时，才写 ProcessData。
             // 工艺 ID 用「图层 ID + 1」：文档要求 >= 1，且同一文档内唯一；
             // 图层表里的 default_process_id 同步指向它，形成双向绑定。
-            // 旧文档（只有 HardwareProfile）不会生成本组数据，保存结果与之前一致。
             if (layerManager->hasLayerProcessParams(id))
             {
                 NativeDocumentSnapshot::ProcessEntry entry;
@@ -176,6 +175,22 @@ namespace
             }
 
             snapshot.layers.push_back(info);
+        }
+
+        // 加工顺序：只有自定义过才写（空 = 跟随显示顺序）
+        if (layerManager->hasCustomMachiningOrder())
+        {
+            for (int id : layerManager->machiningLayerOrder())
+            {
+                snapshot.machiningLayerOrder.push_back(static_cast<uint32_t>(id));
+            }
+        }
+
+        // 作业级工艺模型（割缝/引线/穿孔等细节 + 作业全局设置）：有就原样存
+        if (const Eg::ProcessModel* model = layerManager->processModel())
+        {
+            snapshot.hasProcessModel = true;
+            snapshot.processModel = *model;
         }
 
         // Profile 管理器由 OperationRegistrar 在启动稍后阶段才注入 LayerManager，

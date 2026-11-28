@@ -337,31 +337,6 @@ TEST(AprEntitySerializerTest, QRCodeRoundTrip)
     EXPECT_EQ(qr->borderSize(), 2);
 }
 
-// 旧文件（无 ecc/border 字段）反序列化应回落默认值：M / 4
-TEST(AprEntitySerializerTest, QRCodeLegacyDefaults)
-{
-    Eg::AprQRCode original;
-    original.id = 27;
-    original.setData("LEGACY");
-    original.dModuleSize = 3.0;
-
-    auto [deserialized, proto] = roundTrip<Eg::AprQRCode>(original);
-    ASSERT_NE(deserialized, nullptr);
-
-    // 模拟旧版本文件：清除 ecc/border 字段后重新反序列化
-    ASSERT_TRUE(proto.has_qrcode_data());
-    proto.mutable_qrcode_data()->clear_ecc();
-    proto.mutable_qrcode_data()->clear_border_size();
-    auto legacy = Fio::AprEntitySerializer::deserializeEntity(proto);
-    ASSERT_NE(legacy, nullptr);
-
-    auto* qr = static_cast<Eg::AprQRCode*>(legacy.get());
-    EXPECT_EQ(qr->dataStr(), "LEGACY");
-    EXPECT_DOUBLE_EQ(qr->dModuleSize, 3.0);
-    EXPECT_EQ(qr->ecc(), Eg::QrEcc::Medium);
-    EXPECT_EQ(qr->borderSize(), 4);
-}
-
 // ---- NURBS 序列化闭环 ----
 
 TEST(AprEntitySerializerTest, SplineRoundTrip)

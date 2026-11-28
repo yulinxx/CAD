@@ -884,7 +884,7 @@ namespace
 namespace MotionPlanCompiler
 {
     ToolpathCompileResult compile(const Eg::SceneManager& scene,
-        const LayerManager* layers,
+        const ILayerQuery* layers,
         const ToolpathJobSpec& spec,
         Hw::MotionPlanBuilder& out)
     {
@@ -994,15 +994,16 @@ namespace MotionPlanCompiler
             bucketFor(layerId).entities.push_back(entity);
         }
 
-        // ---- 图层顺序：以文档的绘制顺序为准 ----
+        // ---- 图层顺序：以加工顺序为准（未自定义时等于显示顺序，见 ILayerQuery::machiningLayerOrder）----
+        // 以前取整份 captureDocument() 只为拿顺序表，顺带拷了整张图元→图层映射与全部 Profile
         if (layers)
         {
-            const LayerDocumentSnapshot snapshot = layers->captureDocument();
-            if (!snapshot.layerOrder.empty())
+            const std::vector<int> layerOrder = layers->machiningLayerOrder();
+            if (!layerOrder.empty())
             {
                 std::vector<LayerBucket> ordered;
                 ordered.reserve(buckets.size());
-                for (int layerId : snapshot.layerOrder)
+                for (int layerId : layerOrder)
                 {
                     for (LayerBucket& b : buckets)
                     {
@@ -1138,7 +1139,9 @@ namespace MotionPlanCompiler
                 continue;
             }
             // 图层「不参与加工输出」：与「不可见」「锁定」并列的第三种跳过理由。
-            // 三者的区别：不可见 = 只是不显示；不输出 = 不送机器（尺寸标注、参考底图）。
+            // 三者叠加判定：不输出 = 无条件不送机器（尺寸标注、参考底图）；
+            // 隐藏 / 锁定 = 仅在 skipHiddenLayers / skipLockedLayers 打开时（默认打开）才跳过。
+            // 想要「隐藏但加工」需关掉 skipHiddenLayers，而不是指望 output=true。
             if (layers && !layers->isLayerOutput(bucket.layerId))
             {
                 result.skippedEntityCount += static_cast<int32_t>(bucket.entities.size());

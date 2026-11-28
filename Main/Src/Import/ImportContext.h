@@ -51,4 +51,10 @@ struct ImportContext
     std::function<void(const QString&, const QString&)> recentFileAddCallback;
     /// 当前文档路径更新回调（回写状态使用）
     std::function<void(const QString&)> currentDocumentPathCallback;
+
+    /// 替换文档前回调（仅 importAsNewDocument=true）：已确认本次有图元能落地、即将清空场景时，
+    /// 在主线程调用一次。调用方在此清掉上一份文档的跨文档状态（撤销栈等）。
+    /// 必须在清空**之前**做：落库阶段的进度回调会泵送事件循环，若此时撤销栈里还是旧文档的命令，
+    /// 一次 Ctrl+Z 就会在已清空的场景上重放上一份文档的图元。
+    std::function<void()> beforeReplaceDocumentCallback;
 };

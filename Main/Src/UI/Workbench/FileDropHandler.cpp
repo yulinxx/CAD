@@ -360,27 +360,13 @@ bool FileDropHandler::importImage(const QString& filePath, const QPointF& anchor
         return false;
     }
 
-    // 分配到位图图层
+    // 放进位图图层：类型路由只在 LayerManager::assignEntityToCurrentLayer 一处
+    // （当前层是位图层就用它，否则取未锁定的位图层，一个都没有就新建；位图不会落进矢量层）
     if (m_layerManager && m_sceneManager)
     {
-        Eg::AprEntity* added = m_sceneManager->findAprEntityById(persistentId);
-        if (added)
+        if (Eg::AprEntity* added = m_sceneManager->findAprEntityById(persistentId))
         {
-            const int curId = m_layerManager->currentLayerId();
-            Eg::LayerType curType = m_layerManager->layerType(curId);
-            int bitmapLayerId;
-            if (curType == Eg::LayerType::BITMAP)
-            {
-                bitmapLayerId = curId;
-            }
-            else
-            {
-                bitmapLayerId = m_layerManager->findOrCreateLayerByType(Eg::LayerType::BITMAP);
-            }
-            if (bitmapLayerId >= 0)
-            {
-                m_layerManager->assignEntityToLayer(added, bitmapLayerId);
-            }
+            m_layerManager->assignEntityToCurrentLayer(added);
         }
     }
 

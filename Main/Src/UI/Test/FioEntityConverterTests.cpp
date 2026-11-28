@@ -13,6 +13,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <cmath>
 #include <cstring>
 
 #include "Engine3D/Import/FioEntityConverter.h"
@@ -629,4 +630,75 @@ TEST(FioEntityConverterTest, EntityInfoLayoutIsStable)
     // 结构体大小必须稳定，跨 DLL 边界时 layout 一致
     EXPECT_GE(sizeof(Fio::EntityInfo), 300u);
     EXPECT_LT(sizeof(Fio::EntityInfo), 2000u);
+}
+
+// ---- 圆弧/椭圆弧方向规整（2026-11-22）----
+// IR 约定「从 sa 逆时针到 ea」，引擎按 ea - sa 的符号判方向（负 = 顺时针）。
+// 不规整时，DXF 跨 0° 的弧、块旋转后 atan2 得到的端角会被画成顺时针补弧。
+
+TEST(FioEntityConverterTest, ArcCrossingZeroBecomesShortCcwArc)
+{
+    const double deg = 3.14159265358979323846 / 180.0;
+    Fio::EntityInfo info;
+    info.type = Fio::EntityType::Arc;
+    info.arc.cx = 0.0;
+    info.arc.cy = 0.0;
+    info.arc.r = 10.0;
+    info.arc.sa = 350.0 * deg;
+    info.arc.ea = 10.0 * deg;
+
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
+    ASSERT_NE(entity, nullptr);
+    auto* arc = static_cast<Eg::AprArc*>(entity.get());
+    EXPECT_NEAR(arc->dStartAngle, 350.0 * deg, 1e-12);
+    EXPECT_NEAR(arc->dEndAngle - arc->dStartAngle, 20.0 * deg, 1e-9);
+}
+
+TEST(FioEntityConverterTest, ArcWithAtan2EndAnglesBecomesCcw)
+{
+    // 块旋转 180° 后的 0°→90° 圆弧：atan2 给出 π → -π/2，本应是 90° 的逆时针弧
+    const double pi = 3.14159265358979323846;
+    Fio::EntityInfo info;
+    info.type = Fio::EntityType::Arc;
+    info.arc.r = 2.0;
+    info.arc.sa = pi;
+    info.arc.ea = -pi / 2.0;
+
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
+    ASSERT_NE(entity, nullptr);
+    auto* arc = static_cast<Eg::AprArc*>(entity.get());
+    EXPECT_NEAR(arc->dEndAngle - arc->dStartAngle, pi / 2.0, 1e-9);
+}
+
+TEST(FioEntityConverterTest, FullEllipseUsesEngineFullMarker)
+{
+    Fio::EntityInfo info;
+    info.type = Fio::EntityType::Ellipse;
+    info.ellipse.rx = 5.0;
+    info.ellipse.ry = 2.0;
+    info.ellipse.sa = -6.283185307179586;  // 镜像后的整椭圆
+    info.ellipse.ea = 0.0;
+
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
+    ASSERT_NE(entity, nullptr);
+    auto* ell = static_cast<Eg::AprEllipse*>(entity.get());
+    EXPECT_DOUBLE_EQ(ell->dStartAngle, 0.0);
+    EXPECT_DOUBLE_EQ(ell->dEndAngle, 0.0);
+}
+
+TEST(FioEntityConverterTest, EllipticArcCrossingZeroBecomesCcw)
+{
+    const double pi = 3.14159265358979323846;
+    Fio::EntityInfo info;
+    info.type = Fio::EntityType::Ellipse;
+    info.ellipse.rx = 5.0;
+    info.ellipse.ry = 2.0;
+    info.ellipse.sa = 1.5 * pi;
+    info.ellipse.ea = 0.25 * pi;
+
+    auto entity = Eg::FioEntityConverter::convertEntity(info);
+    ASSERT_NE(entity, nullptr);
+    auto* ell = static_cast<Eg::AprEllipse*>(entity.get());
+    EXPECT_NEAR(ell->dStartAngle, 1.5 * pi, 1e-12);
+    EXPECT_NEAR(ell->dEndAngle - ell->dStartAngle, 0.75 * pi, 1e-9);
 }

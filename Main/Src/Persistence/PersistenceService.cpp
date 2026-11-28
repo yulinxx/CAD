@@ -12,7 +12,6 @@
 #include "Repositories/SqliteRepositoryBase.h"
 #include "Repositories/RecentFileRepository.h"
 #include "Repositories/WorkspaceSnapshotRepository.h"
-#include "Repositories/LayerRepository.h"
 #include "Repositories/SettingsRepository.h"
 #include "Repositories/DocumentRepository.h"
 #include "Repositories/DialogStateRepository.h"
@@ -53,7 +52,6 @@ bool PersistenceService::initialize(const std::string& dbPath)
     // 创建所有仓储
     m_recentFiles = std::make_unique<RecentFileRepository>(*m_database);
     m_workspaceSnapshots = std::make_unique<WorkspaceSnapshotRepository>(*m_database);
-    m_layers = std::make_unique<LayerRepository>(*m_database);
     m_settings = std::make_unique<SettingsRepository>(*m_database);
     m_documents = std::make_unique<DocumentRepository>(*m_database);
 
@@ -76,7 +74,7 @@ void PersistenceService::shutdown()
     // 加过（没有任何 RAII 守卫去 increment），等待条件恒为真 —— 是一段看起来能
     // 保护并发、实际什么都没做的假保护。真正的并发保护在 Eg::Database 内部：
     // 每个操作都持互斥量，close() 也持同一把锁，不会出现「操作做一半被关库」。
-    // 仓库层的写入（导入、图层同步、设置）都在 UI 线程，没有后台写库。
+    // 仓库层的写入（导入、设置）都在 UI 线程，没有后台写库。
 
     // 清理注册表中的仓储
     m_repositories.clear();
@@ -85,7 +83,6 @@ void PersistenceService::shutdown()
     m_dialogStates.reset();
     m_documents.reset();
     m_settings.reset();
-    m_layers.reset();
     m_workspaceSnapshots.reset();
     m_recentFiles.reset();
     m_bootstrapper.reset();
@@ -107,11 +104,6 @@ RecentFileRepository* PersistenceService::recentFiles()
 WorkspaceSnapshotRepository* PersistenceService::workspaceSnapshots()
 {
     return m_workspaceSnapshots.get();
-}
-
-LayerRepository* PersistenceService::layers()
-{
-    return m_layers.get();
 }
 
 SettingsRepository* PersistenceService::settings()

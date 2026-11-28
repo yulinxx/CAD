@@ -8,6 +8,7 @@
 
 #include "FileIO/FileFormat.h"
 #include "FileIO/AprDocument.h"
+#include "Engine/Process/ProcessModel.h"
 
 namespace Eg
 {
@@ -25,19 +26,22 @@ namespace Eg
 ///     或让 Main 去包含 FileIO 的内部头 AprDocumentData.h。
 struct NativeDocumentSnapshot
 {
-    /// 一条工艺对象快照：参数体 + 显式目标图层。
-    /// 目标图层要单独带，是因为 `Fio::AprProcessInfo` 是冻结 POD，装不下变长数组。
+    /// 一条工艺对象快照：参数体 + 显式目标图层（`Fio::AprProcessInfo` 是 POD，装不下变长数组）。
     struct ProcessEntry
     {
         Fio::AprProcessInfo info;
         std::vector<uint32_t> targetLayerIds;
     };
 
-    std::vector<Fio::AprLayerDetailInfo> layers;
+    std::vector<Fio::AprLayerInfo> layers;
     std::vector<Fio::AprHardwareProfileInfo> profiles;
-    /// .apr v2 的 ProcessData（参数的一等载体）。
-    /// 图层表里的 default_process_id 只是引用，没这一组等于参数体没存。
+    /// ProcessData（参数的一等载体）。图层表里的 default_process_id 只是引用。
     std::vector<ProcessEntry> processes;
+    /// 自定义加工顺序（运行时图层 ID = 文档图层 ID）。空 = 未自定义，不写该字段。
+    std::vector<uint32_t> machiningLayerOrder;
+    /// 作业级工艺模型（LayerManager 有模型时才带）
+    bool hasProcessModel{ false };
+    Eg::ProcessModel processModel;
 };
 
 /// 统一导出上下文：承载导出操作所需的所有参数和状态信息
@@ -69,7 +73,7 @@ struct ExportContext
     QStringList warnings;
 
     /// 场景管理器指针（用于 Native 格式导出时借用实体，避免深拷贝）
-    /// 为 nullptr 时导出服务会使用 clone 方式（向后兼容）
+    /// 为 nullptr 时导出服务会使用 clone 方式
     Eg::SceneManager* sceneManager{ nullptr };
     /// 3D 场景管理器指针（用于 3D 网格图元借用）
     Eg::SceneManager3D* sceneManager3D{ nullptr };

@@ -196,15 +196,49 @@ private:
     /// 5：回写状态（状态栏、最近文件、文档记录）
     void phaseWriteBackState(const ImportContext& context, ImportResult& result);
 
-    /// 还原源文件图层结构（DXF 等支持图层的格式）
-    /// 按源图层表在 LayerManager 中创建/匹配图层，并把图元分配到对应图层
+    /// 还原图层结构：
+    ///   - 打开原生 .apr（replacingDocument）：restoreNativeDocument，图层表按文件原样重建；
+    ///   - 其余（外来格式、追加导入 .apr）：restoreLayersByColor，按颜色落层（图层 = 颜色）。
     /// @param idRemap 转换期 ID → 入库后最终 ID 的修正表（入库前 ID 被换过的图元才有条目）
+    /// @param importedEntityIds 本次入场图元的最终 ID
+    /// @param replacingDocument 本次是否为「打开/替换文档」（importAsNewDocument=true）
     /// @param outWarnings 可选：图层/工艺还原过程中需要如实告知用户的告警
-    /// @return 成功创建的图层数量（仅计算新建图层）
+    /// @return 新建/重建的图层数量
     int restoreImportedLayers(const ImportContext& context,
         const ImportResult& parseResult,
         const std::unordered_map<int64_t, int64_t>& idRemap,
+        const std::vector<int64_t>& importedEntityIds,
+        bool replacingDocument,
         QStringList* outWarnings = nullptr);
+
+    /**
+     * @brief 打开原生 .apr：图层文档按文件原样重建
+     *
+     * 图层表（id / 顺序 / 显示属性 / 加工语义 / Profile 绑定）、硬件 Profile 值集、ProcessData
+     * 回灌的图层工艺参数、加工顺序、工艺细节模型一律以文件为准，整体替换当前图层文档，
+     * 不与当前图层按名或按色合并。调用前场景已清空、图层文档已重置。
+     * @return 重建的图层数
+     */
+    int restoreNativeDocument(const ImportResult& parseResult,
+        const std::unordered_map<int64_t, int64_t>& idRemap,
+        const std::vector<int64_t>& importedEntityIds,
+        QStringList* outWarnings);
+
+    /**
+     * @brief 按颜色落层（图层 = 颜色）：外来格式与追加导入的 .apr
+     *
+     * 图元显示色 = 显式色（DXF 真彩 / ACI）优先，否则源图层色（ByLayer）。每种颜色一个图层：
+     * 有同色的矢量、非填充、未锁定图层就复用（含内置默认层），否则新建一个该颜色的图层
+     * （名称取第一个提供该颜色的源图层名）。落层后显式色清掉、改为随层色，显示不变。
+     * 同色图层不能接收图元（锁定/填充/位图层）时不另建同色层（同色只能有一个图层），
+     * 而是落到 RGB 最近的可用图层并保留自身显示色、告警；超过每次 64 个新颜色层的上限同样处理。
+     * 没有颜色信息的图元留在当前层。
+     * @return 新建的图层数
+     */
+    int restoreLayersByColor(const ImportResult& parseResult,
+        const std::unordered_map<int64_t, int64_t>& idRemap,
+        const std::vector<int64_t>& importedEntityIds,
+        QStringList* outWarnings);
 
     /// 还原源文件群组结构（DXF 块引用 / SVG 的 g 元素 / OBJ 的 o-g-usemtl 等）
     /// 按 IR 群组表在 SceneManager::groupManager() 中新建群组，重建父子层级，并把图元挂到所属群组
@@ -274,6 +308,12 @@ private:
     /// 当前 worker 的完成信号：worker 在所有返回路径上置位，shutdownAsyncThread
     /// 先等它就绪再 join，替代旧实现里固定的 3 秒 sleep
     std::shared_future<void> m_asyncDone;
+    /// 是否有一次导入尚未走完（importAsync 发起 → finishOnMainThread 收尾；importWithContext 全程）。
+    /// 只在主线程读写。用于拒绝重入：
+    ///   - 进度对话框被强制关闭后 worker 仍在解析，此时再发起导入若直接 shutdownAsyncThread，
+    ///     会在主线程 join 到上一次解析结束，界面整段卡死；
+    ///   - 落库阶段会泵送事件循环，第二次导入的落库若在第一次的落库中途被派发，两批写入会交错。
+    bool m_importInFlight{ false };
     /// 收掉上一条异步 worker：先置取消标志，等完成信号（正常立即返回）后 join
     /// 必须在主线程调用（std::thread 只能在 owner 线程 join）
     void shutdownAsyncThread();

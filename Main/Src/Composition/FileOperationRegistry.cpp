@@ -28,7 +28,6 @@
 #include "Import/ImportProgressRunner.h"
 #include "Export/ExportService.h"
 #include "Persistence/PersistenceService.h"
-#include "Persistence/LayerPersistenceBridge.h"
 #include "FileIO/FileIOManager.h"
 #include "FileIO/ImageUtils.h"
 #include "Log/AprLogger.h"
@@ -94,7 +93,6 @@ FileOperationRegistry::FileOperationRegistry(const FileOperationConfig& config)
     , m_recentFiles(config.recentFiles)
     , m_helpDialog(config.helpDialog)
     , m_stateCenter(config.stateCenter)
-    , m_layerPersistence(config.layerPersistence)
     , m_persistence(config.persistence)
     , m_parentWidget(config.parentWidget)
     , m_undoRedoManager(config.undoRedoManager)
@@ -227,10 +225,6 @@ bool FileOperationRegistry::doExport(const std::string& filePath)
         m_stateCenter->refreshDirty();
         m_stateCenter->setCurrentDocumentId(QString::fromStdString(filePath));
     }
-    if (m_layerPersistence)
-    {
-        m_layerPersistence->setDocumentId(filePath);
-    }
     if (m_recentFiles)
     {
         m_recentFiles->addRecentFile(QString::fromStdString(filePath), QStringLiteral("2D"));
@@ -273,18 +267,28 @@ bool FileOperationRegistry::doOpenFile(const QString& filePath)
     context.currentDocumentPathCallback = [this](const QString& path) {
         *m_currentFilePath = path.toStdString();
     };
+    // 清空场景之前就清撤销栈：落库阶段会泵送事件循环，若此时栈里还是上一份文档的命令，
+    // 一次 Ctrl+Z 就会在已清空的场景上把旧图元按 id 插回来。
+    // 只在确认有图元能落地后才会回调（导入早期失败时旧文档与撤销栈都原样保留）。
+    context.beforeReplaceDocumentCallback = [this]() {
+        if (m_undoRedoManager)
+        {
+            m_undoRedoManager->clear();
+        }
+    };
 
     // 使用异步导入 + 进度对话框，避免大文件阻塞主界面
     const ImportResult result = ImportProgressRunner::run(m_importService, context, opts, m_parentWidget);
     if (!result.success)
     {
+        // 旧文档已被清空、新文档却没进来：回到「未命名」干净状态。
+        // 不复位的话当前路径仍指向上一份文件，一次 Save 就会用空场景把它覆盖掉。
+        if (result.documentCleared)
+        {
+            resetDocumentState();
+        }
         showFileError(QObject::tr("Import Error"), result.message);
         return false;
-    }
-
-    if (m_layerPersistence)
-    {
-        m_layerPersistence->setDocumentId(filePath.toStdString());
     }
 
     // 打开即换文档：上一份文档残留在撤销栈里的命令必须清掉。
@@ -466,27 +470,13 @@ void FileOperationRegistry::doImportImage(const QString& filePath)
             return;
         }
 
-        // 分配到位图图层
+        // 放进位图图层：类型路由只在 LayerManager::assignEntityToCurrentLayer 一处
+        // （当前层是位图层就用它，否则取未锁定的位图层，一个都没有就新建；位图不会落进矢量层）
         if (m_layerManager && m_sceneManager)
         {
-            Eg::AprEntity* added = m_sceneManager->findAprEntityById(persistentId);
-            if (added)
+            if (Eg::AprEntity* added = m_sceneManager->findAprEntityById(persistentId))
             {
-                const int curId = m_layerManager->currentLayerId();
-                Eg::LayerType curType = m_layerManager->layerType(curId);
-                int bitmapLayerId;
-                if (curType == Eg::LayerType::BITMAP)
-                {
-                    bitmapLayerId = curId;
-                }
-                else
-                {
-                    bitmapLayerId = m_layerManager->findOrCreateLayerByType(Eg::LayerType::BITMAP);
-                }
-                if (bitmapLayerId >= 0)
-                {
-                    m_layerManager->assignEntityToLayer(added, bitmapLayerId);
-                }
+                m_layerManager->assignEntityToCurrentLayer(added);
             }
         }
 
@@ -757,10 +747,22 @@ bool FileOperationRegistry::restoreRecoveryFile(
 
     ImportContext context;
     context.sourcePath = recoveryPath;
+    // 与 doOpenFile 相同：清空场景之前先清撤销栈（原因见 doOpenFile）
+    context.beforeReplaceDocumentCallback = [this]() {
+        if (m_undoRedoManager)
+        {
+            m_undoRedoManager->clear();
+        }
+    };
 
     const ImportResult result = ImportProgressRunner::run(m_importService, context, opts, m_parentWidget);
     if (!result.success)
     {
+        // 场景已清空但恢复失败：复位为未命名，避免保存时覆盖原文档
+        if (result.documentCleared)
+        {
+            resetDocumentState();
+        }
         error = result.message;
         return false;
     }
@@ -770,10 +772,6 @@ bool FileOperationRegistry::restoreRecoveryFile(
     if (m_currentFilePath)
     {
         *m_currentFilePath = restoredPath;
-    }
-    if (m_layerPersistence)
-    {
-        m_layerPersistence->setDocumentId(restoredPath);
     }
     if (m_undoRedoManager)
     {

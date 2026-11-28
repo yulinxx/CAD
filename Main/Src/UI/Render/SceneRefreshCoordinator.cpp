@@ -712,6 +712,22 @@ void SceneRefreshCoordinator::requestViewportExtension()
         }
     }
 
+    // 可视盒内要同步补入的量过大时改走一次全量重建：逐图元 upsert 绕开了
+    // gatherGeometry 的网格排序批量装配，海量图元下比带裁剪的全量重建慢得多。
+    // 典型触发：导入后 zoomToFit（导入末尾的全量刷新用的还是 fit 之前的相机，
+    // fit 后几乎整份场景都落在「已构建盒」之外）。与 onSceneChanged 共用同一阈值。
+    // 同步执行（不等 16ms 定时器）：上面已经回收了移出盒的图元，拖到下一拍会空一帧。
+    if (toAddNow.size() > kBulkChangeThreshold)
+    {
+        APR_DEBUGF("[SceneRefreshCoordinator] viewport extension needs %zu sync upsert(s) > %zu, "
+                   "escalating to full refresh",
+            toAddNow.size(),
+            kBulkChangeThreshold);
+        requestFullRefresh();
+        flushPendingRefresh();
+        return;
+    }
+
     // 可视盒内同步补入；失败（几何仓写入失败等）的条目回落到异步队列重试，
     // 只把真正提交成功的写进账本，避免账本与 GPU 内容不一致。
     if (!toAddNow.empty())
@@ -1395,7 +1411,28 @@ void SceneRefreshCoordinator::applyFullRefresh(Eg::SceneManager* sm)
 
     // 全量重建：几何与台账都由 RenderSceneBuilder 的装配轮次自行对齐
     // （本轮没出现的图元会被回收），这里不需要再做任何缓存失效
-    m_renderWidget->submitSceneFromDataSource(sm);
+    //
+    // 提交失败（拿不到 GL 上下文 / 场景几何仓无效）时 GPU 上什么都没变：
+    // 绝不能往下更新游标、账本和已构建盒，否则之后的增量刷新与视口扩展都以为图元
+    // 已经在 GPU 上，画面会一直缺块直到下一次全量刷新。保持全量级别，交给定时器重试。
+    const bool submitted =
+        m_fullSubmitCallback ? m_fullSubmitCallback(sm) : m_renderWidget->submitSceneFromDataSource(sm);
+    if (!submitted)
+    {
+        static std::chrono::steady_clock::time_point s_lastSubmitFailLog;
+        const auto failNow = std::chrono::steady_clock::now();
+        if (failNow - s_lastSubmitFailLog >= std::chrono::milliseconds(1000))
+        {
+            s_lastSubmitFailLog = failNow;
+            APR_WARN("[SceneRefreshCoordinator] applyFullRefresh: submitSceneFromDataSource failed, will retry");
+        }
+        m_refreshLevel = RefreshLevel::FullRefresh;
+        if (m_sceneUpdateTimer && !m_sceneUpdateTimer->isActive())
+        {
+            m_sceneUpdateTimer->start();
+        }
+        return;
+    }
 
     // 游标必须对齐到当前修订号：全量重建走到这里通常是因为 readChanges 判定 cursor stale
     // （变更日志被 prune 截断，旧游标落在 floor 之前）。若不更新游标，之后每次
@@ -1511,7 +1548,8 @@ void SceneRefreshCoordinator::updateSceneRender()
         return;
     }
 
-    if (!m_renderWidget->isInitialized())
+    const bool renderReady = m_renderReadyPredicate ? m_renderReadyPredicate() : m_renderWidget->isInitialized();
+    if (!renderReady)
     {
         // 渲染控件尚未初始化时,脏集合不能被消费(GL 上下文不存在,提交也会空转)。
         // 这里确保定时器持续运行,一旦初始化完成立刻补发。pendingDirtyIds/pendingDeletedIds

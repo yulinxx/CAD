@@ -60,59 +60,34 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecAprE
     ImportResult result = ImportResult::ok(
         successMessage(format), static_cast<int>(doc.entityCount()), static_cast<int>(doc.layerCount()), {});
 
-    // 工艺细节模型（ProcessModelData）：只在原生 2D .apr 里存在。
-    // 读不到就保持 false —— 旧档案必须走「继承/关闭」，不能填默认值。
+    // 工艺细节模型（ProcessModelData）：只在原生 2D .apr 里存在；没有就保持 false（继承/关闭）。
     if (!is3D)
     {
         result.hasProcessModel = Fio::ReadProcessModelFromDocument(doc, result.processModel);
     }
 
-    // 1. 提取图层
+    // 1. 提取图层：完整图层表进 nativeLayers（打开时原样重建）；
+    //    IrLayerInfo 视图供追加导入按颜色落层时查图元的源图层颜色。
     result.importedLayers.reserve(doc.layerCount());
+    result.nativeLayers.reserve(doc.layerCount());
     for (size_t i = 0; i < doc.layerCount(); ++i)
     {
         Fio::AprLayerInfo layerInfo;
-        if (doc.getLayerAt(i, layerInfo))
+        if (!doc.getLayerAt(i, layerInfo))
         {
-            Fio::IrLayerInfo irLayer;
-            irLayer.sourceId = layerInfo.id;
-            std::strncpy(irLayer.name, layerInfo.name, sizeof(irLayer.name) - 1);
-            irLayer.color = layerInfo.color;
-            irLayer.visible = layerInfo.visible;
-            irLayer.locked = layerInfo.locked;
-            // 加工语义（output / defaultProcessId）**不在 IrLayerInfo 里** ——
-            // 那是冻结的跨 DLL POD（裸指针数组，步长即 ABI），
-            // 且 DXF/SVG/PLT 这些外来格式根本没有这个概念。
-            // 原生 .apr 的加工语义通过 ImportResult 的独立通道传递（见 ImportResult）。
-            result.importedLayers.push_back(irLayer);
-
-            // 加工语义走独立通道（ImportResult::LayerMachining）——
-            // IrLayerInfo 是冻结的跨 DLL POD，不能加字段。
-            ImportResult::LayerMachining machining;
-            machining.sourceId = layerInfo.id;
-            machining.output = layerInfo.output;
-            machining.defaultProcessId = layerInfo.defaultProcessId;
-
-            // 旧 POD 只有 6 个字段；硬件 Profile 绑定与填充/图层类型走新增的
-            // AprLayerDetailInfo（另一个 POD，不动 AprLayerInfo 的 sizeof/ABI）。
-            Fio::AprLayerDetailInfo detail;
-            if (doc.getLayerDetailAt(i, detail))
-            {
-                machining.hardwareProfileId = detail.hardwareProfileId;
-                machining.fillHardwareProfileId = detail.fillHardwareProfileId;
-                machining.hasDisplayExtension = true;
-                machining.layerType = detail.layerType;
-                machining.fill = detail.fill;
-                machining.fillColor = detail.fillColor;
-            }
-            result.importedLayerMachining.push_back(machining);
+            continue;
         }
+        Fio::IrLayerInfo irLayer;
+        irLayer.sourceId = layerInfo.id;
+        std::strncpy(irLayer.name, layerInfo.name, sizeof(irLayer.name) - 1);
+        irLayer.color = layerInfo.color;
+        irLayer.visible = layerInfo.visible;
+        irLayer.locked = layerInfo.locked;
+        result.importedLayers.push_back(irLayer);
+        result.nativeLayers.push_back(layerInfo);
     }
 
-    // 1b. 提取硬件 Profile 值集。
-    // LayerData.hardware_profile_id 只是引用，没有这组值就等于功率/速度/频率没存。
-    // 旧文件（v2 之前）没有本字段 → 空值集；读端据此保持运行时现有 Profile，
-    // 绝不静默清空用户参数。
+    // 1b. 硬件 Profile 值集（图层上的 profile id 引用指向它）
     result.importedHardwareProfiles.reserve(doc.hardwareProfileCount());
     for (size_t i = 0; i < doc.hardwareProfileCount(); ++i)
     {
@@ -122,12 +97,10 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecAprE
             result.importedHardwareProfiles.push_back(profile);
         }
     }
-    result.hasNativeMachiningSnapshot = !result.importedHardwareProfiles.empty();
 
     // 1c. 提取工艺对象（ProcessData）。
     //
     // 图层表只存 default_process_id 这个引用，真正的参数体在 ProcessData 里。
-    // 旧文件 processCount()==0 → 空列表，读端保持现有运行时参数不动（与旧行为一致）。
     result.importedProcesses.reserve(doc.processCount());
     for (size_t i = 0; i < doc.processCount(); ++i)
     {
@@ -153,19 +126,15 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecAprE
         result.importedProcesses.push_back(std::move(binding));
     }
 
-    // 老版本写过图层 profile id 但没写值集：这些绑定是悬空的。
-    // 只在确实引用了非默认 Profile 时提醒，避免每次打开旧文件都刷告警。
-    if (!result.hasNativeMachiningSnapshot)
+    // 1d. 加工顺序（文档图层 ID 列表）。先探长度再取，与 getProcessTargetLayers 同一约定。
     {
-        for (const auto& machining : result.importedLayerMachining)
+        size_t orderCount = 0;
+        if (doc.getMachiningLayerOrder(nullptr, 0, &orderCount) && orderCount > 0)
         {
-            if (machining.hardwareProfileId > 0 || machining.fillHardwareProfileId >= 0)
-            {
-                result.addWarning(QStringLiteral(
-                    "This .apr file has layer profile bindings but no profile value set; "
-                    "existing runtime profiles are kept and machining parameters may differ."));
-                break;
-            }
+            result.importedMachiningLayerOrder.resize(orderCount);
+            size_t written = 0;
+            doc.getMachiningLayerOrder(result.importedMachiningLayerOrder.data(), orderCount, &written);
+            result.importedMachiningLayerOrder.resize(written);
         }
     }
 
@@ -186,9 +155,9 @@ ImportResult NativeImportReader::read(const ImportContext& context, Fio::VecAprE
 
     // 3. 计算导入侧 ID：直接沿用文档持久 ID，让 entityLayerMap / entityGroupMap
     //    的键与入库前的图元 ID 天然对齐。clone() 会生成新 ID（id 是身份不是状态），
-    //    不还原就会让整批换层映射查不到图元，表现为「导入后全部落在默认图层」。
-    //    缺失（<=0）或档案内重复的 ID 用批次内唯一的负数占位：SceneEditService
-    //    遇到 <=0 会重新分配，并按「旧 ID -> 新 ID」修正映射，归属仍能落到正确图层。
+    //    不还原就会让整批换层映射查不到图元。
+    //    非法（<=0）或档案内重复的 ID 用批次内唯一的负数占位：SceneEditService
+    //    遇到 <=0 会重新分配，并按「旧 ID -> 新 ID」修正映射。
     std::unordered_set<Eg::EntityId> usedIds;
     usedIds.reserve(doc.entityCount());
     std::vector<Eg::EntityId> importIds(doc.entityCount(), 0);

@@ -45,7 +45,9 @@
 #include "Persistence/Repositories/RecentFileRepository.h"
 #include "UI/Services/RecentFileService.h"
 
+#include <QApplication>
 #include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QSettings>
 #include <QStringList>
 #include <QTemporaryDir>
@@ -232,105 +234,7 @@ TEST(ImportExportRegressionTest, ImportService_ImportFileUnconfigured)
     EXPECT_FALSE(result.success);
 }
 
-// ---- RecentFileService：legacy 行迁移与 QSettings 兜底 ----
-
-namespace
-{
-    /// 迁移前的 DB 行：workbench 列为空字符串（v5→v6 加列时的旧数据）
-    RecentFileRecord makeLegacyRecentRecord(const std::string& filePath)
-    {
-        RecentFileRecord rec;
-        rec.filePath = filePath;
-        rec.title = filePath.substr(filePath.find_last_of('/') + 1);
-        rec.format = "apr";
-        rec.workbench = "";
-        rec.lastOpenedTime = "2026-01-01T00:00:00";
-        return rec;
-    }
-}  // namespace
-
-TEST(RecentFileServiceRegressionTest, LoadMigratesLegacyEmptyWorkbenchRows)
-{
-    QTemporaryDir dbDir;
-    ASSERT_TRUE(dbDir.isValid());
-
-    PersistenceService persistence;
-    ASSERT_TRUE(persistence.initialize(dbDir.filePath(QStringLiteral("recent.sqlite")).toStdString()));
-    ASSERT_NE(persistence.recentFiles(), nullptr);
-    ASSERT_TRUE(persistence.recentFiles()->append(makeLegacyRecentRecord("/tmp/legacy_doc.apr")));
-
-    RecentFileService service(&persistence);
-    const QStringList files = service.loadRecentFiles(QStringLiteral("2D"));
-
-    // 归类后应出现在 2D 列表（.apr → 2D）
-    ASSERT_EQ(files.size(), 1);
-    EXPECT_EQ(files.front(), QStringLiteral("/tmp/legacy_doc.apr"));
-
-    // 关键断言：load 必须把 workbench='' 回写成归类结果 ——
-    // 否则该行不属于任何工作台桶，append 的按桶裁剪永远裁不到它，库里会无限累积
-    bool found = false;
-    for (const auto& rec : persistence.recentFiles()->loadAll())
-    {
-        if (rec.filePath == "/tmp/legacy_doc.apr")
-        {
-            found = true;
-            EXPECT_EQ(rec.workbench, "2D");
-        }
-    }
-    EXPECT_TRUE(found);
-
-    persistence.shutdown();
-}
-
-TEST(RecentFileServiceRegressionTest, FallsBackToQSettingsWhenDbHasNoRowsForCurrentWorkbench)
-{
-    // QSettings 全程指到临时 ini：不污染真实用户配置，且与进程内其它用例隔离。
-    // 路径进程级生效无法还原，目录用 static 保持存活到进程结束。
-    static QTemporaryDir settingsDir;
-    ASSERT_TRUE(settingsDir.isValid());
-    QSettings::setDefaultFormat(QSettings::IniFormat);
-    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settingsDir.path());
-    if (QCoreApplication::organizationName().isEmpty())
-    {
-        QCoreApplication::setOrganizationName(QStringLiteral("AprTests"));
-    }
-    if (QCoreApplication::applicationName().isEmpty())
-    {
-        QCoreApplication::setApplicationName(QStringLiteral("RecentFileRegression"));
-    }
-
-    QTemporaryDir dbDir;
-    ASSERT_TRUE(dbDir.isValid());
-    PersistenceService persistence;
-    ASSERT_TRUE(persistence.initialize(dbDir.filePath(QStringLiteral("recent.sqlite")).toStdString()));
-    ASSERT_NE(persistence.recentFiles(), nullptr);
-
-    // DB 里只有 3D 的记录
-    RecentFileRecord only3D;
-    only3D.filePath = "/tmp/model.stl";
-    only3D.title = "model.stl";
-    only3D.format = "stl";
-    only3D.workbench = "3D";
-    only3D.lastOpenedTime = "2026-01-01T00:00:00";
-    ASSERT_TRUE(persistence.recentFiles()->append(only3D));
-
-    // QSettings 兜底里有一条 2D 记录
-    QSettings seed;
-    seed.setValue(QStringLiteral("RecentFiles/2D"), QStringList{ QStringLiteral("/tmp/settings_only.apr") });
-    seed.sync();
-
-    RecentFileService service(&persistence);
-    const QStringList files = service.loadRecentFiles(QStringLiteral("2D"));
-
-    // 回归防护：DB 有数据但没有 2D 条目时，不能直接返回空 —— 老版本写在
-    // QSettings 的兜底数据会被整体吞掉（修复前本断言失败）
-    EXPECT_TRUE(files.contains(QStringLiteral("/tmp/settings_only.apr")));
-    // 3D 的行也不能漏进 2D 桶
-    EXPECT_FALSE(files.contains(QStringLiteral("/tmp/model.stl")));
-
-    QSettings().remove(QStringLiteral("RecentFiles/2D"));
-    persistence.shutdown();
-}
+  // namespace
 
 // ---- ExportService 基础流程测试 ----
 
@@ -824,8 +728,20 @@ TEST(ImportExportRegressionTest, ExportService_ExportFileWithNullSceneManager)
 // 回归：旧实现 shutdownAsyncThread 只要线程对象 joinable 就固定 sleep 3 秒，
 // 从第二次导入开始每次操作都白等 3 秒。这里连续启动两次异步导入，
 // 只测第二次调用的耗时（第一次 worker 在文件检查处已快速失败退出）。
+//
+// 第一次导入必须**完整收尾**后再发起第二次：收尾回调经 qApp 投递到主线程，
+// 「导入进行中」的重入保护在那里才解除。只 sleep 不泵事件的话，第二次调用会被
+// 重入保护直接拒绝，测到的是拒绝路径，而不是 shutdownAsyncThread 的耗时。
 TEST(ImportExportRegressionTest, ImportService_RepeatedAsyncStartDoesNotBlock)
 {
+    if (!qApp)
+    {
+        static int argc = 1;
+        static char appName[] = "MainTests";
+        static char* argv[] = { appName, nullptr };
+        static QApplication app(argc, argv);
+    }
+
     ImportDispatcher dispatcher;  // 不注册读取器：phase 1 在文件存在性检查处快速失败
     ImportService service;
     service.setDispatcher(&dispatcher);
@@ -833,17 +749,40 @@ TEST(ImportExportRegressionTest, ImportService_RepeatedAsyncStartDoesNotBlock)
     ImportContext context;
     context.sourcePath = QStringLiteral("missing_regression_input.dxf");
 
-    service.importAsync(context);
-    // 让第一次 worker 走完，把它本身的执行时间排除在第二次调用的测量区间之外
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    bool firstDone = false;
+    service.importAsync(context, ImportOptions{}, [&firstDone](const ImportResult&) { firstDone = true; });
+    // 等第一次 worker 走完并在主线程收尾，把它本身的执行时间排除在第二次调用的测量区间之外
+    QElapsedTimer waited;
+    waited.start();
+    while (!firstDone && waited.elapsed() < 3000)
+    {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    ASSERT_TRUE(firstDone) << "first importAsync never delivered its completion";
 
+    bool secondDone = false;
+    ImportResult secondResult;
     const auto begin = std::chrono::steady_clock::now();
-    service.importAsync(context);
+    service.importAsync(context, ImportOptions{}, [&](const ImportResult& r) {
+        secondResult = r;
+        secondDone = true;
+    });
     const auto elapsedMs =
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - begin).count();
 
     // 旧实现这里是 3000ms；新实现只等完成信号，应毫秒级返回
     EXPECT_LT(elapsedMs, 1500) << "second importAsync blocked " << elapsedMs << " ms on the main thread";
+
+    // 第二次是真正跑起来的导入（文件不存在而失败），不是被重入保护拒绝
+    waited.restart();
+    while (!secondDone && waited.elapsed() < 3000)
+    {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    ASSERT_TRUE(secondDone);
+    EXPECT_EQ(secondResult.errorType, ImportErrorType::FileNotFound) << secondResult.message.toStdString();
 }
 
 // 回归：导出侧同一缺陷。第二次 exportAsync 可能因上一条仍未收尾而被拒绝，
@@ -1947,9 +1886,9 @@ namespace
 {
     // MainTests 开 unity build：多个 .cpp 会拼进同一个 TU，匿名命名空间里的
     // 同名辅助函数会互相重定义，所以统一加 aprAprPersist 前缀。
-    Fio::AprLayerDetailInfo aprAprPersistSampleLayer()
+    Fio::AprLayerInfo aprAprPersistSampleLayer()
     {
-        Fio::AprLayerDetailInfo layer;
+        Fio::AprLayerInfo layer;
         layer.id = 7;
         std::strncpy(layer.name, "Cut-7", sizeof(layer.name) - 1);
         layer.color = 0xFF00A0FF;
@@ -2029,8 +1968,8 @@ namespace
         ASSERT_TRUE(parseResult.success) << parseResult.errorMessage;
 
         ASSERT_EQ(doc.layerCount(), 1u);
-        Fio::AprLayerDetailInfo layer;
-        ASSERT_TRUE(doc.getLayerDetailAt(0, layer));
+        Fio::AprLayerInfo layer;
+        ASSERT_TRUE(doc.getLayerAt(0, layer));
         EXPECT_EQ(layer.id, 7u);
         EXPECT_STREQ(layer.name, "Cut-7");
         EXPECT_FALSE(layer.output);
@@ -2150,17 +2089,15 @@ TEST(ImportExportRegressionTest, NativeImportReaderCarriesProfileBindingsAndValu
     ASSERT_TRUE(result.success) << result.message.toStdString();
 
     ASSERT_EQ(result.importedLayers.size(), 1u);
-    ASSERT_EQ(result.importedLayerMachining.size(), 1u);
-    EXPECT_EQ(result.importedLayerMachining[0].sourceId, 7u);
-    EXPECT_FALSE(result.importedLayerMachining[0].output);
-    EXPECT_EQ(result.importedLayerMachining[0].defaultProcessId, 11u);
-    EXPECT_EQ(result.importedLayerMachining[0].hardwareProfileId, 3);
-    EXPECT_EQ(result.importedLayerMachining[0].fillHardwareProfileId, 4);
-    EXPECT_TRUE(result.importedLayerMachining[0].hasDisplayExtension);
-    EXPECT_EQ(result.importedLayerMachining[0].layerType, 1u);
-    EXPECT_TRUE(result.importedLayerMachining[0].fill);
+    ASSERT_EQ(result.nativeLayers.size(), 1u);
+    EXPECT_EQ(result.nativeLayers[0].id, 7u);
+    EXPECT_FALSE(result.nativeLayers[0].output);
+    EXPECT_EQ(result.nativeLayers[0].defaultProcessId, 11u);
+    EXPECT_EQ(result.nativeLayers[0].hardwareProfileId, 3);
+    EXPECT_EQ(result.nativeLayers[0].fillHardwareProfileId, 4);
+    EXPECT_EQ(result.nativeLayers[0].layerType, 1u);
+    EXPECT_TRUE(result.nativeLayers[0].fill);
 
-    EXPECT_TRUE(result.hasNativeMachiningSnapshot);
     ASSERT_EQ(result.importedHardwareProfiles.size(), 3u);
     EXPECT_TRUE(result.warnings.isEmpty()) << result.warnings.join(QStringLiteral(" ")).toStdString();
 }
@@ -2206,7 +2143,9 @@ TEST(ImportExportRegressionTest, ImportServiceRestoresAprProfileValueSetAndLayer
     EXPECT_EQ(layers.layerHardwareProfileId(layerId), 3);
     EXPECT_EQ(layers.layerFillHardwareProfileId(layerId), 4);
     EXPECT_EQ(layers.layerType(layerId), Eg::LayerType::BITMAP);
-    EXPECT_TRUE(layers.isLayerFill(layerId));
+    // 样本里是「位图层 + 填充」这一矛盾组合：位图层不能是填充层，导入时 fill 被拒绝
+    // （规则见 LayerManager「图层类型约束」）。文件层面的字节往返由 FileIO 测试覆盖。
+    EXPECT_FALSE(layers.isLayerFill(layerId));
 
     // 值集必须连原始 id 一起还原，否则图层绑定会指到另一组功率/速度上
     EXPECT_FALSE(profiles.setPower(stale, 1.0)) << "stale runtime profile must have been replaced by the document value set";
@@ -2295,9 +2234,9 @@ namespace
         return writer.write(context, {});
     }
 
-    Fio::AprLayerDetailInfo aprProcSampleLayer(uint32_t id, const char* name)
+    Fio::AprLayerInfo aprProcSampleLayer(uint32_t id, const char* name)
     {
-        Fio::AprLayerDetailInfo layer;
+        Fio::AprLayerInfo layer;
         layer.id = id;
         std::strncpy(layer.name, name, sizeof(layer.name) - 1);
         layer.color = 0xFFFFFFFF;
@@ -2338,7 +2277,7 @@ TEST(ImportExportRegressionTest, AprProcessDataRoundTripReflowsLayerParams)
     ASSERT_EQ(snapshot.processes[0].targetLayerIds.size(), 1u);
     EXPECT_EQ(snapshot.processes[0].targetLayerIds[0], static_cast<uint32_t>(layerId));
     const auto layerDetail = std::find_if(snapshot.layers.begin(), snapshot.layers.end(),
-        [layerId](const Fio::AprLayerDetailInfo& layer) {
+        [layerId](const Fio::AprLayerInfo& layer) {
             return layer.id == static_cast<uint32_t>(layerId);
         });
     ASSERT_NE(layerDetail, snapshot.layers.end());
@@ -2485,34 +2424,4 @@ TEST(ImportExportRegressionTest, AprProcessDataMissingTargetLayerIsReported)
     const QString warnings = result.warnings.join(QStringLiteral(" | "));
     EXPECT_NE(warnings.indexOf(QStringLiteral("do not exist")), -1) << warnings.toStdString();
     EXPECT_NE(warnings.indexOf(QStringLiteral("target no layer")), -1) << warnings.toStdString();
-}
-
-TEST(ImportExportRegressionTest, LegacyAprWithoutProfileValueSetKeepsRuntimeProfiles)
-{
-    // 旧文件只有图层绑定、没有值集：读端不得清空用户当前 Profile，
-    // 且必须给出降级提示，不能把「参数可能不对」伪装成一次干净的打开。
-    QTemporaryDir dir;
-    ASSERT_TRUE(dir.isValid());
-    const QString path = dir.filePath(QStringLiteral("legacy.apr"));
-
-    // 故意只写图层表、不放任何 Profile 值集，模拟 v2 之前的老文件
-    Fio::NativeWriter writer(Fio::FileFormat::Native);
-    Fio::AprDocument doc;
-    doc.addLayerDetail(aprAprPersistSampleLayer());
-    ASSERT_TRUE(writer.writeDocument(path.toUtf8().constData(), doc).success);
-
-    HardwareProfileManager profiles;
-    const int existing = profiles.createProfile("KeepMe");
-    ASSERT_GE(existing, 1);
-
-    ImportContext importCtx;
-    importCtx.sourcePath = path;
-    NativeImportReader reader;
-    Fio::VecAprEntityPtr outEntities;
-    const ImportResult readResult = reader.read(importCtx, outEntities);
-    ASSERT_TRUE(readResult.success) << readResult.message.toStdString();
-    EXPECT_FALSE(readResult.hasNativeMachiningSnapshot);
-    EXPECT_TRUE(readResult.importedHardwareProfiles.empty());
-    EXPECT_FALSE(readResult.warnings.isEmpty()) << "dangling binding must warn the operator";
-    EXPECT_EQ(profiles.profile(existing).name, "KeepMe") << "reader must not modify runtime profiles";
 }

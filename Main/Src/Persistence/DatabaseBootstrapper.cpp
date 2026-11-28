@@ -2,7 +2,7 @@
  * @file DatabaseBootstrapper.cpp
  * @brief 数据库引导程序实现
  *
- * 管理数据库 Schema 版本和升级。
+ * 只建当前表结构，不做迁移：表结构版本不一致的库整库重建。
  */
 #include "DatabaseBootstrapper.h"
 
@@ -14,15 +14,8 @@
 #include <map>
 #include <vector>
 
-// 当前 Schema 版本号（每次修改表结构时递增）
-// v1: 初始表结构
-// v2: 新增 documents 表
-// v3: layers 表新增 fill 列（填充图层标志，色块填充）
-// v4: layers 表新增 fill_color 列（填充色，色块填充）
-// v5: 新增 dialog_states 表和索引，为对话框数据持久化提供支持
-// v6: recent_files 表新增 workbench 列（2D/3D 最近文件分桶，互不混显）
-// v7: documents 表新增 workbench 列（2D/3D 文档历史分桶）
-static constexpr int kSchemaVersion = 7;
+// 当前 Schema 版本号：改表结构时递增。库里记录的版本与它不一致时整库重建（不做迁移）
+static constexpr int kSchemaVersion = 8;
 
 // ---- 注册所有表名和列名白名单，用于 Database 层 SQL 注入防护 ----
 static void registerSchemaWhiteList()
@@ -30,7 +23,6 @@ static void registerSchemaWhiteList()
     Eg::Database::registerTableName("app_meta");
     Eg::Database::registerTableName("recent_files");
     Eg::Database::registerTableName("workspace_snapshots");
-    Eg::Database::registerTableName("layers");
     Eg::Database::registerTableName("documents");
     Eg::Database::registerTableName("settings");
     Eg::Database::registerTableName("dialog_states");
@@ -39,19 +31,6 @@ static void registerSchemaWhiteList()
     Eg::Database::registerColumnNames("recent_files", { "id", "file_path", "title", "format", "workbench", "last_opened_at" });
     Eg::Database::registerColumnNames(
         "workspace_snapshots", { "id", "workbench_id", "geometry", "window_state", "updated_at" });
-    Eg::Database::registerColumnNames("layers",
-        { "id",
-            "document_id",
-            "layer_id",
-            "name",
-            "color",
-            "visible",
-            "locked",
-            "fill",
-            "fill_color",
-            "layer_type",
-            "order_index",
-            "updated_at" });
     Eg::Database::registerColumnNames("documents",
         { "id", "file_path", "title", "format", "workbench", "entity_count", "file_size", "last_opened_at", "last_saved_at", "created_at" });
     Eg::Database::registerColumnNames("settings", { "id", "group_name", "key", "value", "data_type", "updated_at" });
@@ -83,65 +62,29 @@ bool DatabaseBootstrapper::ensureSchema()
         return false;
     }
 
-    // 检查应用版本兼容性
-    std::string dbAppVersion = databaseAppVersion();
-    if (!dbAppVersion.empty() && dbAppVersion != MainApp::appVersion().c_str())
+    // 不做迁移：别的表结构版本的库整库重建（最近文件、设置等应用状态随之清空）
+    const int currentVersion = schemaVersion();
+    if (currentVersion != 0 && currentVersion != kSchemaVersion)
     {
-        APR_WARNF("[DatabaseBootstrapper] App version mismatch: db=%s current=%s - resetting schema for re-migration",
-            dbAppVersion.c_str(),
-            MainApp::appVersion().c_str());
-        // 版本不匹配时保留用户数据（最近文件、图层、设置等），
-        // 仅重置 schema 版本号让 runMigrations 重新执行迁移，
-        // 确保表结构升级。
-        m_database.execute("DELETE FROM app_meta WHERE key = 'schema_version'");
-    }
-
-    // 记录当前应用版本
-    {
-        std::map<std::string, std::string> values;
-        values["key"] = "app_version";
-        values["value"] = MainApp::appVersion().c_str();
-        m_database.insertOrReplace("app_meta", values);
-    }
-
-    int currentVersion = schemaVersion();
-
-    if (currentVersion == 0)
-    {
-        // 首次创建：建表
-        if (!createMetaTable())
-        {
-            return false;
-        }
-        if (!createBusinessTables())
-        {
-            return false;
-        }
-    }
-    else if (currentVersion < kSchemaVersion)
-    {
-        // 需要迁移
-        APR_DEBUGF("[DatabaseBootstrapper] Migrating schema from v%d to v%d", currentVersion, kSchemaVersion);
-        if (!runMigrations(currentVersion, kSchemaVersion))
+        APR_WARNF("[DatabaseBootstrapper] Schema v%d differs from v%d: rebuilding all tables",
+            currentVersion,
+            kSchemaVersion);
+        if (!dropBusinessTables())
         {
             return false;
         }
     }
 
-    // 无论走哪条路径都做一次列兜底：
-    // 版本号被重置（app 版本变化触发的重新迁移）后可能走「首次建表」分支，
-    // 此时表已存在，CREATE TABLE IF NOT EXISTS 不会补列，版本号却被写成最新，
-    // 下次启动直接跳过迁移，缺列就永远补不上。这里无条件补列，保证幂等修复。
-    ensureRecentFileWorkbenchColumn();
-    ensureDocumentWorkbenchColumn();
-
-    // 为常用查询字段创建索引，提升查询性能
-    if (!createIndices())
+    if (!createBusinessTables() || !createMetaTable() || !createIndices())
     {
-        APR_ERRORF("[DatabaseBootstrapper] Failed to create indices: %s", m_lastError.c_str());
         return false;
     }
 
+    // 记录写库的应用版本（仅供诊断）
+    std::map<std::string, std::string> values;
+    values["key"] = "app_version";
+    values["value"] = MainApp::appVersion().c_str();
+    m_database.insertOrReplace("app_meta", values);
     return true;
 }
 
@@ -235,10 +178,8 @@ bool DatabaseBootstrapper::createMetaTable()
         return false;
     }
 
-    // 写入当前 schema 版本号。
-    // 必须用 INSERT OR REPLACE：Database::set() 底层是 UPDATE，影响 0 行时仍返回成功，
-    // 表刚创建或版本号被重新迁移流程删除时不会插入任何行，导致版本号永远缺失、
-    // 每次启动都退化成「首次建表」分支（旧表因此永远拿不到新列）。
+    // 写入当前 schema 版本号。必须用 INSERT OR REPLACE：Database::set() 底层是 UPDATE，
+    // 影响 0 行时仍返回成功，表刚创建时不会插入任何行。
     std::map<std::string, std::string> values;
     values["key"] = "schema_version";
     values["value"] = std::to_string(kSchemaVersion);
@@ -274,10 +215,6 @@ bool DatabaseBootstrapper::createBusinessTables()
         return false;
     }
 
-    // 兼容已存在的旧格式 recent_files 表：CREATE TABLE IF NOT EXISTS 不会为其补列，
-    // 缺 workbench 时写最近文件会报 "no column named workbench"。
-    ensureRecentFileWorkbenchColumn();
-
     // 工作台布局快照表
     std::string sqlWorkspaceSnapshots = R"(
         CREATE TABLE IF NOT EXISTS workspace_snapshots (
@@ -296,39 +233,7 @@ bool DatabaseBootstrapper::createBusinessTables()
         return false;
     }
 
-    // 图层表
-    std::string sqlLayers = R"(
-        CREATE TABLE IF NOT EXISTS layers (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            document_id     TEXT    NOT NULL,
-            layer_id        INTEGER NOT NULL,
-            name            TEXT    NOT NULL DEFAULT '',
-            color           TEXT    DEFAULT '#000000',
-            visible         INTEGER DEFAULT 1,
-            locked          INTEGER DEFAULT 0,
-            fill            INTEGER DEFAULT 0,
-            fill_color      TEXT    DEFAULT '',
-            layer_type      INTEGER DEFAULT 0,
-            order_index     INTEGER DEFAULT 0,
-            updated_at      TEXT    DEFAULT (datetime('now'))
-        )
-    )";
-
-    if (!m_database.execute(sqlLayers))
-    {
-        m_lastError = "Failed to create layers table: " + m_database.lastError();
-        APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
-        return false;
-    }
-
-    // 兼容已存在的旧格式 layers 表：CREATE TABLE IF NOT EXISTS 不会为其补列，
-    // 确保 fill / fill_color 列存在，否则持久化时会出现 "no such column" 错误。
-    if (!ensureLayerColumns())
-    {
-        return false;
-    }
-
-    // 文档元数据表（v2 新增）
+    // 文档元数据表
     if (!createDocumentsTable())
     {
         return false;
@@ -354,24 +259,8 @@ bool DatabaseBootstrapper::createBusinessTables()
         return false;
     }
 
-    // 对话框状态表（v5 新增）
+    // 对话框状态表
     if (!createDialogStateTable())
-    {
-        return false;
-    }
-
-    return true;
-}
-
-bool DatabaseBootstrapper::ensureLayerColumns()
-{
-    // 表不存在时由调用方负责建表，这里无需补列
-    if (m_database.query("PRAGMA table_info(layers)").empty())
-    {
-        return true;
-    }
-
-    if (!ensureLayerFillColumn() || !ensureLayerFillColorColumn() || !ensureLayerTypeColumn())
     {
         return false;
     }
@@ -404,173 +293,28 @@ bool DatabaseBootstrapper::createDocumentsTable()
         return false;
     }
 
-    // 同上：旧库的 documents 表可能缺 workbench 列，这里幂等补齐
-    ensureDocumentWorkbenchColumn();
     return true;
 }
 
-bool DatabaseBootstrapper::ensureColumn(
-    const std::string& table, const std::string& column, const std::string& definition, bool fatal)
+bool DatabaseBootstrapper::dropBusinessTables()
 {
-    auto columns = m_database.query("PRAGMA table_info(" + table + ")");
-    // 表不存在时无需补列，由调用方负责建表
-    if (columns.empty())
+    // 除 app_meta 外的全部表（含已不再使用的表）一律删除，随后按当前结构重建
+    const auto tables = m_database.query(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT IN ('app_meta', 'sqlite_sequence')");
+    for (const auto& row : tables)
     {
-        return true;
-    }
-
-    for (const auto& row : columns)
-    {
-        if (row.at("name") == column)
+        const auto it = row.find("name");
+        if (it == row.end() || it->second.empty())
         {
-            return true;
+            continue;
         }
-    }
-
-    std::string sql = "ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition;
-    if (!m_database.execute(sql))
-    {
-        std::string message =
-            "Failed to add " + table + "." + column + " column: " + m_database.lastError();
-        if (fatal)
+        if (!m_database.execute("DROP TABLE IF EXISTS \"" + it->second + "\""))
         {
-            m_lastError = message;
-            APR_ERRORF("[DatabaseBootstrapper] %s", message.c_str());
+            m_lastError = "Failed to drop table " + it->second + ": " + m_database.lastError();
+            APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
             return false;
         }
-        // 补列失败只降级告警：缺列会让对应功能不可用，但不应阻塞应用启动
-        APR_WARNF("[DatabaseBootstrapper] %s (degraded: continuing startup)", message.c_str());
-        return true;
     }
-    APR_DEBUGF("[DatabaseBootstrapper] Added missing %s.%s column", table.c_str(), column.c_str());
-    return true;
-}
-
-bool DatabaseBootstrapper::ensureLayerColumn(const std::string& column, const std::string& definition)
-{
-    return ensureColumn("layers", column, definition, true);
-}
-
-bool DatabaseBootstrapper::ensureRecentFileWorkbenchColumn()
-{
-    return ensureColumn("recent_files", "workbench", "TEXT DEFAULT ''", false);
-}
-
-bool DatabaseBootstrapper::ensureDocumentWorkbenchColumn()
-{
-    return ensureColumn("documents", "workbench", "TEXT DEFAULT ''", false);
-}
-
-bool DatabaseBootstrapper::ensureLayerFillColumn()
-{
-    return ensureLayerColumn("fill", "INTEGER DEFAULT 0");
-}
-
-bool DatabaseBootstrapper::ensureLayerFillColorColumn()
-{
-    return ensureLayerColumn("fill_color", "TEXT DEFAULT ''");
-}
-
-bool DatabaseBootstrapper::ensureLayerTypeColumn()
-{
-    return ensureLayerColumn("layer_type", "INTEGER DEFAULT 0");
-}
-
-bool DatabaseBootstrapper::runMigrations(int currentVersion, int targetVersion)
-{
-    // 逐版本递增执行迁移，保证幂等性和可追溯性
-    for (int v = currentVersion; v < targetVersion; ++v)
-    {
-        APR_DEBUGF("[DatabaseBootstrapper] Running migration v%d -> v%d", v, v + 1);
-
-        if (v == 1)
-        {
-            // v1 -> v2: 新增 documents 表，用于存储文档元数据
-            if (!createDocumentsTable())
-            {
-                m_lastError = "Migration v1->v2 failed: " + m_database.lastError();
-                APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
-                return false;
-            }
-            APR_DEBUG("[DatabaseBootstrapper] Migration v1->v2: created documents table");
-        }
-        else if (v == 2)
-        {
-            // v2 -> v3: layers 表新增 fill 列（填充图层标志）
-            if (!ensureLayerFillColumn())
-            {
-                m_lastError = "Migration v2->v3 failed: " + m_database.lastError();
-                APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
-                return false;
-            }
-            APR_DEBUG("[DatabaseBootstrapper] Migration v2->v3: added layers.fill column");
-        }
-        else if (v == 3)
-        {
-            // v3 -> v4: layers 表新增 fill_color 列（填充色）
-            if (!ensureLayerFillColorColumn())
-            {
-                m_lastError = "Migration v3->v4 failed: " + m_database.lastError();
-                APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
-                return false;
-            }
-            APR_DEBUG("[DatabaseBootstrapper] Migration v3->v4: added layers.fill_color column");
-        }
-        else if (v == 4)
-        {
-            // v4 -> v5: 新增 dialog_states 表，用于对话框界面数据持久化
-            if (!createDialogStateTable())
-            {
-                m_lastError = "Migration v4->v5 failed: " + m_database.lastError();
-                APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
-                return false;
-            }
-            APR_DEBUG("[DatabaseBootstrapper] Migration v4->v5: created dialog_states table");
-
-            // 为 layers 表创建 (document_id, layer_id) 唯一索引，确保图层数据唯一性
-            // 使用 IF NOT EXISTS 保证幂等性，旧数据库若存在重复数据会跳过
-            if (!m_database.execute(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_layers_doc_layer ON layers(document_id, layer_id)"))
-            {
-                // 旧数据可能有重复，此处忽略错误，后续 createIndices() 会创建普通索引兜底
-                APR_WARNF("[DatabaseBootstrapper] Could not create unique index on layers(document_id, layer_id): %s",
-                    m_database.lastError().c_str());
-            }
-            else
-            {
-                APR_DEBUG("[DatabaseBootstrapper] Created unique index idx_layers_doc_layer");
-            }
-        }
-        else if (v == 5)
-        {
-            // v5 -> v6: recent_files 表新增 workbench 列（2D/3D 最近文件分桶）
-            // 走幂等补列：版本号被重置导致重复迁移时，列已存在也不会 ALTER 失败
-            ensureRecentFileWorkbenchColumn();
-            APR_DEBUG("[DatabaseBootstrapper] Migration v5->v6: recent_files.workbench column ensured");
-        }
-        else if (v == 6)
-        {
-            // v6 -> v7: documents 表新增 workbench 列（2D/3D 文档历史分桶）
-            ensureDocumentWorkbenchColumn();
-            APR_DEBUG("[DatabaseBootstrapper] Migration v6->v7: documents.workbench column ensured");
-        }
-        // 后续版本迁移在此追加 else if 分支
-    }
-
-    // 更新 schema 版本号
-    std::string versionStr = std::to_string(targetVersion);
-    m_database.execute("DELETE FROM app_meta WHERE key = 'schema_version'");
-    std::map<std::string, std::string> values;
-    values["key"] = "schema_version";
-    values["value"] = versionStr;
-    if (!m_database.insert("app_meta", values))
-    {
-        m_lastError = "Failed to update schema version after migration";
-        APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
-        return false;
-    }
-
-    APR_DEBUGF("[DatabaseBootstrapper] Schema migrated to v%d", targetVersion);
     return true;
 }
 
@@ -602,25 +346,6 @@ bool DatabaseBootstrapper::createDialogStateTable()
 
 bool DatabaseBootstrapper::createIndices()
 {
-    // 为 layers 表的 document_id 字段创建索引，加速按文档查询
-    // 使用 IF NOT EXISTS 保证幂等性
-    if (!m_database.execute("CREATE INDEX IF NOT EXISTS idx_layers_document_id ON layers(document_id)"))
-    {
-        m_lastError = "Failed to create index idx_layers_document_id: " + m_database.lastError();
-        APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
-        return false;
-    }
-
-    // 为 layers 表的 (document_id, layer_id) 组合创建唯一索引
-    // 确保同一文档下的图层ID唯一，支持 INSERT OR REPLACE 语义
-    // 旧数据库中若存在重复数据，此语句会跳过（IF NOT EXISTS 不会覆盖已有非唯一索引）
-    if (!m_database.execute("CREATE INDEX IF NOT EXISTS idx_layers_doc_layer ON layers(document_id, layer_id)"))
-    {
-        m_lastError = "Failed to create index idx_layers_doc_layer: " + m_database.lastError();
-        APR_ERRORF("[DatabaseBootstrapper] %s", m_lastError.c_str());
-        return false;
-    }
-
     // 为 recent_files 表的 last_opened_at 字段创建索引，加速按时间排序查询
     if (!m_database.execute(
             "CREATE INDEX IF NOT EXISTS idx_recent_files_opened_at ON recent_files(last_opened_at DESC)"))

@@ -97,7 +97,7 @@ namespace NativeImportLayerRestore
         Fio::AprDocument doc;
         for (const auto& layer : snapshot.layers)
         {
-            doc.addLayerDetail(layer);
+            doc.addLayer(layer);
         }
         for (const auto& profile : snapshot.profiles)
         {

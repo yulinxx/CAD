@@ -57,37 +57,31 @@ function(apr_deploy_qt_dlls target)
                 set(_output_dir "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
             endif()
 
-            if(EXISTS "${_qt_bin_dir}/windeployqt.exe")
-                add_custom_command(TARGET ${target} POST_BUILD
-                    COMMAND "${_qt_bin_dir}/windeployqt.exe"
-                        --no-translations
-                        --no-system-d3d-compiler
-                        --no-opengl-sw
-                        --no-quick
-                        --no-quick-import
-                        --dir "${_output_dir}"
-                        "$<TARGET_FILE:${target}>"
-                    COMMENT "Deploying Qt DLLs for ${target}"
-                    VERBATIM
-                )
-            else()
-                message(WARNING "windeployqt not found at ${_qt_bin_dir}/windeployqt.exe")
+            set(_windeployqt "${_qt_bin_dir}/windeployqt.exe")
+            if(NOT EXISTS "${_windeployqt}")
+                message(WARNING "windeployqt not found at ${_windeployqt}")
+                set(_windeployqt "")
             endif()
 
             # 无头测试需要 offscreen 平台插件：windeployqt 默认只部署 qwindows，
             # 而部分测试（如 CursorThemeTests）会设 QT_QPA_PLATFORM=offscreen；
             # 缺插件时 Qt 直接 abort（退出码 3），表现为测试静默失败。
             set(_qt_platforms_dir "${_qt_bin_dir}/../plugins/platforms")
-            if(EXISTS "${_qt_platforms_dir}")
-                add_custom_command(TARGET ${target} POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E make_directory "${_output_dir}/platforms"
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                        "$<IF:$<CONFIG:Debug>,${_qt_platforms_dir}/qoffscreend.dll,${_qt_platforms_dir}/qoffscreen.dll>"
-                        "${_output_dir}/platforms/"
-                    COMMENT "Deploying Qt offscreen platform plugin for ${target}"
-                    VERBATIM
-                )
-            endif()
+
+            # 所有目标共用同一输出目录：并行构建时多个 POST_BUILD 同时覆盖同一批 Qt DLL
+            # 会触发共享冲突（MSB3073 / 退出码 32）。改由 AprDeployQt.cmake 在
+            # 跨进程文件锁内串行执行 windeployqt 与 offscreen 插件复制。
+            add_custom_command(TARGET ${target} POST_BUILD
+                COMMAND ${CMAKE_COMMAND}
+                    "-DWINDEPLOYQT=${_windeployqt}"
+                    "-DTARGET_FILE=$<TARGET_FILE:${target}>"
+                    "-DOUTPUT_DIR=${_output_dir}"
+                    "-DOFFSCREEN_PLUGIN=$<IF:$<CONFIG:Debug>,${_qt_platforms_dir}/qoffscreend.dll,${_qt_platforms_dir}/qoffscreen.dll>"
+                    "-DLOCK_FILE=${CMAKE_BINARY_DIR}/apr_qt_deploy.lock"
+                    -P "${APR_UTILS_DIR}/AprDeployQt.cmake"
+                COMMENT "Deploying Qt runtime for ${target}"
+                VERBATIM
+            )
         endif()
     endif()
 endfunction()

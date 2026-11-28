@@ -20,6 +20,7 @@
 
 #include <QObject>
 #include <QTimer>
+#include <functional>
 #include <memory>
 #include <unordered_set>
 #include <vector>
@@ -138,6 +139,20 @@ public:
     void setSubmitBatchCallback(RenderSubmitScheduler::SubmitBatchFn fn)
     {
         m_submitScheduler.setSubmitBatchCallback(std::move(fn));
+    }
+
+    /// 测试缝隙：替换「渲染控件是否就绪」判定（默认读 RenderWidget::isInitialized）。
+    /// 无 GL 的回归测试注入 true，才能走到全量 / 增量 / 视口扩展的真实分支。生产路径不调用。
+    void setRenderReadyPredicate(std::function<bool()> fn)
+    {
+        m_renderReadyPredicate = std::move(fn);
+    }
+
+    /// 测试缝隙：替换全量提交（默认调 RenderWidget::submitSceneFromDataSource）。
+    /// 返回 false 模拟「拿不到上下文 / 几何仓无效」，用于验证提交失败后的重试语义。生产路径不调用。
+    void setFullSubmitCallback(std::function<bool(Eg::SceneManager*)> fn)
+    {
+        m_fullSubmitCallback = std::move(fn);
     }
 
     void flushPendingRefresh() override;
@@ -331,6 +346,10 @@ private:
     // 图元 ID 标注账本：与位图/文字同构，独立通道逐帧绘制（世界锚点 + 屏幕定尺寸）
     EntityIdLabelReconciler m_entityIdLabelReconciler{ nullptr };
     RenderSubmitScheduler m_submitScheduler{ nullptr };
+
+    // 测试缝隙（见 setRenderReadyPredicate / setFullSubmitCallback）：为空时走 RenderWidget
+    std::function<bool()> m_renderReadyPredicate;
+    std::function<bool(Eg::SceneManager*)> m_fullSubmitCallback;
 
     // 帧耗时追踪器（性能监控基础设施）
     std::unique_ptr<FrameTimer> m_frameTimer;

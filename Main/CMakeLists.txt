@@ -911,18 +911,18 @@ target_link_libraries(MainTests
 endif()
 
 # ============================================================================
-# 数据库 Schema 迁移回归测试（与 MainTests 共用 MAIN 模块键的独立目标）
+# 数据库表结构引导测试（与 MainTests 共用 MAIN 模块键的独立目标）
 # ============================================================================
 # 单独开一个目标的原因：这批用例只依赖 DatabaseBootstrapper 与 EnginePersistence，
 # 而 MainTests 会把整个 Main 应用源码拖进 unity 编译，容易被无关测试文件的
-# 匿名命名空间同名类型冲突阻塞。独立目标可快速、稳定地验证迁移逻辑。
+# 匿名命名空间同名类型冲突阻塞。独立目标可快速、稳定地验证建表逻辑。
 if(_main_tests AND GTest_FOUND)
-    add_executable(DatabaseSchemaMigrationTests
-        "${UI_ROOT}/Test/DatabaseSchemaMigrationTests.cpp"
+    add_executable(DatabaseSchemaTests
+        "${UI_ROOT}/Test/DatabaseSchemaTests.cpp"
         "${SRC_ROOT}/Persistence/DatabaseBootstrapper.cpp"
     )
-    target_compile_features(DatabaseSchemaMigrationTests PRIVATE cxx_std_17)
-    target_include_directories(DatabaseSchemaMigrationTests PRIVATE
+    target_compile_features(DatabaseSchemaTests PRIVATE cxx_std_17)
+    target_include_directories(DatabaseSchemaTests PRIVATE
         "${CMAKE_CURRENT_BINARY_DIR}"   # 配置期生成的 VersionInfo.h
         "${SRC_ROOT}"
         "${SRC_ROOT}/Persistence"
@@ -930,7 +930,7 @@ if(_main_tests AND GTest_FOUND)
         "${PROJECT_ROOT}/Log/Log/Include"
         "${PROJECT_ROOT}/Utility/Utility/Include"
     )
-    target_link_libraries(DatabaseSchemaMigrationTests PRIVATE
+    target_link_libraries(DatabaseSchemaTests PRIVATE
         EnginePersistence
         Log
         Utility
@@ -938,13 +938,13 @@ if(_main_tests AND GTest_FOUND)
         GTest::gtest_main
     )
     if(MSVC)
-        target_compile_options(DatabaseSchemaMigrationTests PRIVATE /utf-8 /FS)
+        target_compile_options(DatabaseSchemaTests PRIVATE /utf-8 /FS)
     endif()
-    gtest_discover_tests(DatabaseSchemaMigrationTests
+    gtest_discover_tests(DatabaseSchemaTests
         DISCOVERY_MODE PRE_TEST
         WORKING_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
     )
-    set_property(TARGET DatabaseSchemaMigrationTests PROPERTY FOLDER "Tests/Main")
+    set_property(TARGET DatabaseSchemaTests PROPERTY FOLDER "Tests/Main")
 endif()
 
 # 位图导出用例由 MAIN_TEST_SOURCES 的 GLOB 自动收录，不再单独开目标

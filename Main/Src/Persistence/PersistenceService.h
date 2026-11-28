@@ -13,7 +13,6 @@ namespace Eg
 class DatabaseBootstrapper;
 class RecentFileRepository;
 class WorkspaceSnapshotRepository;
-class LayerRepository;
 class SettingsRepository;
 class DocumentRepository;
 class DialogStateRepository;
@@ -92,7 +91,6 @@ public:
 
     RecentFileRepository* recentFiles();
     WorkspaceSnapshotRepository* workspaceSnapshots();
-    LayerRepository* layers();
     SettingsRepository* settings();
     DocumentRepository* documents();
 
@@ -110,7 +108,6 @@ private:
     // 仓储对象
     std::unique_ptr<RecentFileRepository> m_recentFiles;
     std::unique_ptr<WorkspaceSnapshotRepository> m_workspaceSnapshots;
-    std::unique_ptr<LayerRepository> m_layers;
     std::unique_ptr<SettingsRepository> m_settings;
     std::unique_ptr<DocumentRepository> m_documents;
     std::unique_ptr<DialogStateRepository> m_dialogStates;

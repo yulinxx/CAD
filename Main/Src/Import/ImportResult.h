@@ -44,49 +44,23 @@ struct ImportResult
     int layerCount{ 0 };
     /// 导入后使用的工作台 ID
     QString usedWorkbenchId;
+    /// 本次导入是否已清空过当前场景（importAsNewDocument=true 时才会发生）。
+    /// 失败结果里为 true 表示「旧文档已经没了、新文档也没进来」：调用方必须把文档状态
+    /// 复位为未命名（清当前路径 / 撤销栈 / 脏标记），否则一次保存就会用空场景覆盖上一份文件。
+    bool documentCleared{ false };
 
     /// 源文件图层表（DXF 等支持图层的格式解析结果，供构建文档阶段重建图层）
     std::vector<Fio::IrLayerInfo> importedLayers;
 
-    /// 图元的**加工语义**（与显示语义严格分离）
-    ///
-    /// 为什么不放在 `Fio::IrLayerInfo` 里：
-    ///   - 它是冻结的跨 DLL POD（`FioParseResult::layers` 是指向 DLL 内部内存的
-    ///     裸指针，步长即 ABI），加字段会改 sizeof；
-    ///   - 而且 DXF / SVG / PLT 这些外来格式根本没有「是否输出」「默认工艺」的概念，
-    ///     把它塞进通用导入 IR 是为一两种格式的便利污染所有格式的公共契约。
-    ///
-    /// 只有原生 .apr 有加工语义，所以它走这条独立通道。
-    /// `sourceId` 对应 `importedLayers[i].sourceId`。
-    struct LayerMachining
-    {
-        uint32_t sourceId = 0;
-        bool output = true;             // 是否参与加工输出
-        uint32_t defaultProcessId = 0;  // 默认工艺 ID，0 = 未指定
+    /// 原生 .apr 的完整图层表（显示属性 + 加工语义 + 硬件 Profile 绑定），按文件顺序。
+    /// 打开 .apr 时图层表按它原样重建（图层 id 不变）；外来格式为空。
+    std::vector<Fio::AprLayerInfo> nativeLayers;
 
-        // ---- 原生 .apr 的硬件 Profile 绑定（只是 id 引用，值集见下）----
-        // 0 = 默认 Profile；fill 为 -1 表示未设置、回退到 hardwareProfileId。
-        int32_t hardwareProfileId = 0;
-        int32_t fillHardwareProfileId = -1;
-
-        // ---- 原生 .apr 的显示扩展（IrLayerInfo 是冻结 POD，不能加字段）----
-        // hasDisplayExtension=false 时下面三项无效，读端必须保持现有图层显示设置。
-        bool hasDisplayExtension = false;
-        uint32_t layerType = 0;         // 0=VECTOR, 1=BITMAP
-        bool fill = false;
-        uint32_t fillColor = 0xFFFFFFFF;
-    };
-    std::vector<LayerMachining> importedLayerMachining;
-
-    /// 原生 .apr 图层绑定所指向的**参数值集**。
-    ///
-    /// 只有 id 引用没有值集，等于参数没存：重开文件时引用会落到运行时默认
-    /// Profile 上。空 = 旧格式文件（v2 之前不写本字段），读端必须**保持**
-    /// 运行时现有 Profile，绝不能清空或重置用户的工艺参数。
-    /// 元素直接复用 FileIO 的跨 DLL POD，避免 Main 侧再定义一套重复结构。
+    /// 原生 .apr 的硬件 Profile 值集（图层上的 profile id 引用指向它）。
+    /// 打开 .apr 时整体替换运行时 Profile；为空则重置为默认 Profile。
     std::vector<Fio::AprHardwareProfileInfo> importedHardwareProfiles;
 
-    /// 原生 .apr v2 的工艺对象（ProcessData）。
+    /// 原生 .apr 的工艺对象（ProcessData）。
     ///
     /// 参数体不能只靠图层表还原：ProcessData 才是参数的一等载体，
     /// 图层表里的 default_process_id 只是反向绑定。这里把参数体与显式目标图层
@@ -98,18 +72,17 @@ struct ImportResult
     };
     std::vector<ProcessBinding> importedProcesses;
 
-    /// 原生 .apr v2 的工艺细节模型（ProcessModelData）。
+    /// 原生 .apr 的自定义加工顺序（文档图层 ID，按加工先后）。
+    /// 空 = 从未调整过：打开时加工顺序跟随显示顺序。
+    std::vector<uint32_t> importedMachiningLayerOrder;
+
+    /// 原生 .apr 的工艺细节模型（ProcessModelData）。
     ///
     /// ProcessData 只承载基础参数；割缝/引线/穿孔/共边/功率曲线等细节在
-    /// ProcessModel 里。旧档案或外来格式没有该块：hasProcessModel=false 时
-    /// 读端必须保持「继承/关闭」，不得用默认值填充。
+    /// ProcessModel 里。文件没有该块或外来格式：hasProcessModel=false，
+    /// 细节一律按「继承/关闭」，不得用默认值填充。
     Eg::ProcessModel processModel;
     bool hasProcessModel = false;
-
-    /// 这份文件是否带了完整的原生加工语义快照（图层表 + 非空 Profile 值集）。
-    /// true 时即便图层按名复用，也要用文件里的加工语义覆盖运行时设置；
-    /// false 时沿用 DXF 等外来格式「同名图层保留用户设置」的旧行为。
-    bool hasNativeMachiningSnapshot = false;
 
     /// 图元图层归属映射：转换后图元的 EntityId(int64) → 源图层 sourceId
     /// 与 importedLayers 配合，在构建文档阶段将图元还原到对应图层

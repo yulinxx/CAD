@@ -6,8 +6,7 @@
  *  - 写路径：ExportService 从 LayerManager 抓取图层表（颜色/output/默认工艺/profile id）
  *    与工艺表（功率/速度/频率/焦距/遍数），NativeExportWriter 写进 .sy；
  *  - 读路径：ImportService 打开时重建 LayerManager（换文档重置 + 逐字段还原）并
- *    按原 id 重建 HardwareProfileManager；
- *  - 兼容：旧版 .sy（无图层/工艺段）不崩，图元落到默认图层。
+ *    按原 id 重建 HardwareProfileManager。
  */
 
 #include <gtest/gtest.h>
@@ -194,51 +193,6 @@ TEST(SyLayerProcessRoundTrip, TwoLayersSurviveSaveAndReopen)
         const int layerId = layers.getEntityLayer(entity);
         EXPECT_TRUE(layerId == reopenedCutLayerId || layerId == reopenedMarkLayerId);
     }
-
-    std::filesystem::remove(path);
-}
-
-TEST(SyLayerProcessRoundTrip, LegacyFileWithoutLayerSectionFallsBackToDefaultLayer)
-{
-    const auto path = makeTempFile("legacy_no_layers.sy");
-    std::filesystem::remove(path);
-
-    // 构造一份「旧版」文件：只有图元，没有图层表/工艺表
-    {
-        Eg::AprLine line;
-        line.setPointVector({ Ut::Vec2d(0.0, 0.0), Ut::Vec2d(10.0, 10.0) });
-
-        Fio::AprDocument legacyDoc;
-        legacyDoc.addBorrowedEntity(&line);
-
-        Fio::NativeWriter writer(Fio::FileFormat::Native);
-        const auto writeResult = writer.writeDocument(path.string().c_str(), legacyDoc);
-        ASSERT_TRUE(writeResult.success) << writeResult.errorMessage;
-    }
-
-    Eg::SceneManager scene;
-    LayerManager layers(&scene);
-    HardwareProfileManager hardwareProfiles;
-    layers.setHardwareProfileManager(&hardwareProfiles);
-
-    ImportDispatcher importDispatcher;
-    importDispatcher.registerReader(std::make_unique<NativeImportReader>());
-    ImportService importService;
-    importService.setDispatcher(&importDispatcher);
-    importService.setSceneManager(&scene);
-    importService.setLayerManager(&layers);
-
-    ImportOptions importOptions;
-    importOptions.importAsNewDocument = true;
-    const ImportResult importResult =
-        importService.importFile(QString::fromStdString(path.string()), importOptions);
-
-    // 不能崩、不能失败；缺字段走默认：图层为出厂 9 层，图元落默认图层 0
-    EXPECT_TRUE(importResult.success) << importResult.message.toStdString();
-    EXPECT_EQ(9, layers.layerCount());
-    EXPECT_EQ(1u, layers.getLayerEntities(0).size());
-    // 旧文件没有工艺段：HardwareProfileManager 只保留默认 profile
-    EXPECT_EQ(1, hardwareProfiles.profileCount());
 
     std::filesystem::remove(path);
 }

@@ -82,6 +82,9 @@ EXCEPTIONS = (
     ("Renderx/CMake/EmbedShaders.cmake", "自动生成"),
     ("Renderx/CMake/EmbedShaders.cmake", "shader 请改"),
     ("Renderx/CMake/EmbedShaders.cmake", "文件已声明为构建依赖"),
+    # 中文字体与文本序列化测试数据
+    ("Main/Src/UI/Test/AprEntitySerializerTests.cpp", "宋体"),
+    ("Main/Src/UI/Test/AprEntitySerializerTests.cpp", "你好世界"),
 )
 
 

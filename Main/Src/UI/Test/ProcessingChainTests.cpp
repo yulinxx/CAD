@@ -630,8 +630,8 @@ namespace
         EXPECT_EQ(1, r.skippedEntityCount);
     }
 
-    /// 锁定图层 + skipLockedLayers=false：锁定只表示「不许编辑」，
-    /// 显式关掉跳过开关后必须照常加工。
+    /// 锁定图层 + skipLockedLayers=false：默认「锁定 = 不许改也不许加工」，
+    /// 但显式关掉跳过开关后锁定只剩「不许编辑」，必须照常加工。
     TEST(MotionPlanCompilerTest, LockedLayerIsCompiledWhenSkipDisabled)
     {
         Eg::SceneManager scene;

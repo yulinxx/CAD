@@ -63,13 +63,15 @@ April/
 │   ├── KeygenTool/           # 离线注册码生成工具
 │   └── encrypt_string.py     # 字符串加密工具
 ├── ThirdParty/               # 第三方库
-├── Testing/                  # 跨模块测试
 ├── CMake/                    # 公共 CMake 函数与工具链
 ├── Docs/                     # 架构与专题文档
 ├── CMakeLists.txt            # 根构建配置
 ├── Config.cmake                # 用户配置（vcpkg/Qt 路径、编译开关）
 └── README.md                 # 项目说明（本文档）
 ```
+
+> 测试不设跨模块总目录：各模块在自身目录下带 `Test/`（如 `FileIO/FileIO/Test`、`Engine/2D/Test`），
+> 主程序的集成/回归测试在 `Main/Src/UI/Test`（目标 `MainTests`、`ViewportRefreshTests`），统一由 `BUILD_TESTS` 开关控制。
 
 ---
 

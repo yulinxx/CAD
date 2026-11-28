@@ -690,7 +690,12 @@ TEST(FillColorPixelTest, SpiralFillFollowsSourceLayerColor)
     auto sampleFilledPixel = [&](const Ut::Color& layerColor) -> std::array<uint8_t, 3> {
         Eg::SceneManager scene;
         LayerManager layerManager(&scene);
-        const int nLayerId = layerManager.createLayer("FillLayer");
+        // 图层 = 颜色：默认图层已占用的颜色直接用那个图层，否则新建一个该色图层
+        int nLayerId = layerManager.findLayerByColor(layerColor);
+        if (nLayerId < 0)
+        {
+            nLayerId = layerManager.createLayer("FillLayer");
+        }
         if (nLayerId <= 0 || !layerManager.setLayerColor(nLayerId, layerColor))
         {
             ADD_FAILURE() << "test layer must be created with the requested color";
