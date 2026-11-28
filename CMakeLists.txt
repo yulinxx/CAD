@@ -342,6 +342,12 @@ if(BUILD_RENDER_BENCHMARK)
     message(STATUS "  RenderBenchmark: ENABLED")
 endif()
 
+# 7.57 同一输入双实现对照工具（P3 前置数据）
+# 在合并两份偏移实现之前，先拿到可复现的数值差异基线。
+if(BUILD_ENGRAVING)
+    add_subdirectory(Tools/OffsetCompare)
+endif()
+
 # 7.6 Metal 原生视口原型（仅 Apple）——一次性可行性验证，不是产品代码。
 # 用来回答「Qt 宿主能否把 NSView 交给 Metal」，默认关闭。
 option(BUILD_METAL_VIEWPORT_PROTO "Build Metal native viewport prototype (Apple only)" OFF)
