@@ -40,34 +40,7 @@ FORBIDDEN = (
 # 存量例外（棘轮基线，2026-11-27）：格式 (相对路径, 违规 include, 原因)
 # 只允许减少，不允许增加。每一条都是 P2 阶段「计算/写入分离」的待办，
 # 不是认可这种依赖；新代码复制这些写法会被守卫直接拦下。
-EXEMPT: tuple[tuple[str, str, str], ...] = (
-    ("Engine/2D/Src/Algorithm/Boolean/EntityBoolean.cpp",
-     "Engine2D/Core/SceneManager.h", "写入函数与计算函数同 TU，P2 分离"),
-    ("Engine/2D/Src/Algorithm/Discretizer/EntityDiscretizer.cpp",
-     "Engine2D/Core/SceneManager.h", "离散化缓存读场景，P2 剥离"),
-    ("Engine/2D/Src/Algorithm/EntityColorFiller.cpp",
-     "Engine2D/Core/SceneManager.h", "写入函数与计算函数同 TU，P2 分离"),
-    ("Engine/2D/Src/Algorithm/EntityColorFiller.cpp",
-     "Engine2D/Edit/SceneEditService.h", "写入函数与计算函数同 TU，P2 分离"),
-    ("Engine/2D/Src/Algorithm/EntityColorFiller.cpp",
-     "Engine2D/Interaction/LayerManager.h", "写入函数与计算函数同 TU，P2 分离"),
-    ("Engine/2D/Src/Algorithm/EntityContourFiller.cpp",
-     "Engine2D/Core/SceneManager.h", "写入函数与计算函数同 TU，P2 分离"),
-    ("Engine/2D/Src/Algorithm/EntityContourFiller.cpp",
-     "Engine2D/Edit/SceneEditService.h", "写入函数与计算函数同 TU，P2 分离"),
-    ("Engine/2D/Src/Algorithm/EntityContourFiller.cpp",
-     "Engine2D/Interaction/LayerManager.h", "写入函数与计算函数同 TU，P2 分离"),
-    ("Engine/2D/Src/Algorithm/EntityTransform.cpp",
-     "Engine2D/Core/SceneManager.h", "变换服务含场景写入，长期归 L4"),
-    ("Engine/2D/Src/Algorithm/FillGeometryUpdater.cpp",
-     "Engine2D/Core/SceneManager.h", "图元移动回调，属 L4 职责"),
-    ("Engine/2D/Src/Algorithm/FillGeometryUpdater.cpp",
-     "Engine2D/Edit/SceneEditService.h", "图元移动回调，属 L4 职责"),
-    ("Engine/2D/Src/Algorithm/FillGeometryUpdater.cpp",
-     "Engine2D/Interaction/LayerManager.h", "图元移动回调，属 L4 职责"),
-    ("Engine/2D/Src/Algorithm/Offset/EntityOffset.cpp",
-     "Engine2D/Core/SceneManager.h", "写入函数与计算函数同 TU，P2 分离"),
-)
+EXEMPT: tuple[tuple[str, str, str], ...] = ()
 
 
 def layer_of(path: Path, root: Path) -> str | None:
@@ -79,8 +52,9 @@ def layer_of(path: Path, root: Path) -> str | None:
         return "L1"
     if "/Algorithm/Discretizer/" in rel:
         return "L1"
-    # Writers/ 是 L4 场景写入实现，故意允许依赖场景设施；不属于 L1/L2。
-    if "/Algorithm/Writers/" in rel:
+    # Writers/ 与 Integration/ 是 L4 场景写入/编排实现，故意允许依赖场景设施；
+    # 它们不属于 L1/L2，不参与纯度检查。
+    if "/Algorithm/Writers/" in rel or "/Algorithm/Integration/" in rel:
         return None
     if "/Include/Engine2D/Algorithm/" in rel or "/Src/Algorithm/" in rel:
         return "L2"
