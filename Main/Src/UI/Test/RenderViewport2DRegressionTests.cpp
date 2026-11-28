@@ -17,6 +17,7 @@
 
 #include <gtest/gtest.h>
 
+#include <QCoreApplication>
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QKeyEvent>
@@ -27,6 +28,7 @@
 
 #include "UI/Render/SceneRefreshCoordinator.h"
 #include "UI/Render/Camera2D.h"
+#include "UI/Render/RenderViewport2D.h"
 #include "UI/Render/ViewportInputRouter.h"
 #include "RenderWidget.h"
 #include "UI/Widgets/ViewportSelector.h"
@@ -1145,6 +1147,25 @@ TEST(RenderViewport2DRegressionTest, WheelGesture_MacPinchInwardZoomsOut)
     EXPECT_NEAR(rig.camera.zoomX, 0.8, 1e-4);
 }
 
+// Direct router tests prove the math; this one proves the gesture reaches the
+// router from the render widget (eventFilter install + native-gesture branch).
+TEST(RenderViewport2DRegressionTest, NativeGesture_ReachesViewportAndZoomsCamera)
+{
+    RenderViewport2D viewport;
+    viewport.resize(800, 600);
+    RenderWidget* renderWidget = viewport.findChild<RenderWidget*>();
+    ASSERT_NE(renderWidget, nullptr);
+    renderWidget->resize(800, 600);
+
+    auto* dev = QPointingDevice::primaryPointingDevice();
+    QNativeGestureEvent gesture(Qt::ZoomNativeGesture, dev, 2, QPointF(400, 300),
+        QPointF(400, 300), QPointF(400, 300), 0.2, QPointF());
+    QCoreApplication::sendEvent(renderWidget, &gesture);
+
+    EXPECT_NEAR(viewport.cameraState().zoomX, 1.2, 1e-4);
+    EXPECT_NEAR(viewport.cameraState().zoomY, 1.2, 1e-4);
+}
+
 TEST(RenderViewport2DRegressionTest, SpaceKey_FingerMovePansCamera)
 {
     WheelRig rig;
@@ -1183,6 +1204,37 @@ TEST(RenderViewport2DRegressionTest, InputRouter_PositionCallback)
     });
     // 回调注入不崩溃
     SUCCEED();
+}
+
+// 真实控件路径：鼠标事件经 RenderViewport2D::eventFilter → ViewportInputRouter →
+// 客户坐标 sink。只测回调注入无法发现“状态栏 sink 没接到视口”的回归。
+TEST(RenderViewport2DRegressionTest, PositionCallbackReceivesWorldPointFromViewportMouseMove)
+{
+    RenderViewport2D viewport;
+    viewport.resize(800, 600);
+    RenderWidget* renderWidget = viewport.findChild<RenderWidget*>();
+    ASSERT_NE(renderWidget, nullptr);
+    renderWidget->resize(800, 600);
+
+    int calls = 0;
+    double lastX = 0.0;
+    double lastY = 0.0;
+    viewport.setPositionCallback([&](double x, double y) {
+        ++calls;
+        lastX = x;
+        lastY = y;
+    });
+
+    QMouseEvent move(QEvent::MouseMove, QPointF(400, 300), QPointF(400, 300),
+        Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+    QCoreApplication::sendEvent(renderWidget, &move);
+
+    // Event delivery may update the position more than once per mouse move; the
+    // regression is a missing callback, not the exact update count.
+    EXPECT_GE(calls, 1);
+    // Default camera centers the table at (600, 400) in world coordinates.
+    EXPECT_NEAR(lastX, 600.0, 1.0);
+    EXPECT_NEAR(lastY, 400.0, 1.0);
 }
 
 TEST(RenderViewport2DRegressionTest, InputRouter_StatusCallback)

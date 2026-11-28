@@ -768,6 +768,13 @@ if(_main_tests AND GTest_FOUND)
         )
     endif()
 
+    # Customer wiring under test: compile the production April workbench port and
+    # left-toolbar registry directly so their regression tests exercise shipped code.
+    list(APPEND MAIN_TEST_SOURCES
+        "${PROJECT_ROOT}/UiShell/customers/April/panels/AprilWorkbench.cpp"
+        "${PROJECT_ROOT}/UiShell/customers/April/ports/DrawToolSwitchRegistry.cpp"
+    )
+
     if(NOT BUILD_UI3D)
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*RenderWidget3DAdapterTests\\.cpp$")
         list(FILTER MAIN_TEST_SOURCES EXCLUDE REGEX ".*Scene3DRegressionTests\\.cpp$")
@@ -848,6 +855,8 @@ endif()
 set(_test_project_include_dirs
     "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Include"
     "${CMAKE_CURRENT_SOURCE_DIR}/../UI/3D/Src"
+    "${PROJECT_ROOT}/UiShell/include"
+    "${PROJECT_ROOT}/UiShell/customers/April"
 )
 if(BUILD_CRASHHANDLER)
     list(APPEND _test_project_include_dirs

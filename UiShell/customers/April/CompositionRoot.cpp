@@ -10,9 +10,7 @@
 #include "Composition/ApplicationCompositionRoot.h"
 
 // ---- UiShell ----
-#include "UiShell/Assembly/ActiveRuntime.h"
 #include "UiShell/Assembly/HostWindow.h"
-#include "UiShell/Assembly/IShellRuntime.h"
 
 namespace Apr
 {
@@ -50,12 +48,11 @@ namespace Apr
         // 直接把 2D 命令交给 OperationBus，把 theme/language/help 交回 UiShell。
         sink.setBus(root.operationBus());
         sink.setWorkbenchSwitch([&workbench](const QString& commandId) {
+            // Customer only records the desired kind. OperationCommandSink owns the
+            // command-level handoff and asks the shell to remount the center widget.
             workbench.setViewportKind(commandId == QLatin1String("view.switch_to_3d")
                 ? ViewportKind::ThreeD
                 : ViewportKind::TwoD);
-            // Kind alone is data; the shell owns the widget tree and must remount it.
-            if (AA::IShellRuntime* runtime = AA::activeRuntime())
-                runtime->refreshCenterView();
         });
         adapter.setCommandSink(&sink);
 

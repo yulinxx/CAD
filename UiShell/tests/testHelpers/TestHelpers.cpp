@@ -36,6 +36,7 @@ namespace AA::test
     {
         auto* widget = new QLabel(QStringLiteral("center"), parent);
         widget->setObjectName(QStringLiteral("center.view"));
+        ++created;
         return widget;
     }
 

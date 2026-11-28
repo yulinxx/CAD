@@ -319,12 +319,46 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
   调用 `ensureMacMenuImagesVisible()` 恢复原生菜单图标（旧路径原在测试专用的
   `WorkbenchMenuManager` 中调用）。`UiTstCustomerProfile` 覆盖该 profile 配置，
   `SampleFrame/` 仍未修改。
-- **验收**：`BUILD_DIR=build bash UiShell/ci/ui-shell-baseline.sh` 通过（25/25 层检/单测 +
-  `AprilShell smoke OK`）；`cmake --build build` 全目标构建通过；`Tools/package_smoke_test.py`
-  的 staged 安装/运行/升级/卸载冒烟通过。默认 `-DUI_CUSTOMER=MantiSoft` 不生成
-  `AprilShell` / `UiApril`。全量 `ctest` 为 4881/4891 通过；10 个失败集中在 SY 格式注册、
-  Raster/CAM 运动规划与 Hardware 加工链路径（M6 未触碰，且与用户 WIP 子模块改动一致），
-  需在这些 WIP 合入前单独复位验证。
+
+### M6 后续回归修复与自动化（2026-11-28）
+
+本轮把生产 April 切换到新外壳后逐项暴露的问题都补上了回归测试，避免只能靠人工逐项点验：
+
+- **菜单顺序**：April profile 顶层菜单显式写 `order`（file/edit/view/draw/modify/algorithm/laser/help），
+  不再靠 id 字母序。`UiTstCustomerProfile` 断言完整顺序，顺序漂移直接失败。
+- **语言**：内置语言扩到 14 种，`normalizeLanguageId()` 覆盖短码、连字符与地区变体；
+  历史 `<Module>_<short>.qm` 作为别名补装，`m_loadedFiles` 防止重复 translator。
+  profile 命令动作带 `msui.profileCommand` 标记，`MenuController` 跳过内置直连，
+  一条 `language.*` 命令只分发一次。`UiTstTranslation` 覆盖 14 语言、短码别名、重复安装；
+  `UiTstInteraction` 用计数 listener 锁定单次分发。显式 `--lang` 仍优先于 `brand.language`。
+- **2D/3D 中心视图**：新增通用 `AA::IShellRuntime::refreshCenterView()`，外壳负责重建中心控件；
+  客户侧只通过窄接口改 `AprilWorkbench::setViewportKind()`。单一 owner 是
+  `OperationCommandSink`：先改客户状态，再请外壳重建一次，避免组合根与命令出口重复刷新。
+  `UiTstInteraction` 用可计数 `FakeCenterViewProvider` 验证重建前后旧控件被替换。
+- **状态栏坐标**：`PanelFactory` 把 `StatusBar` 的 sink 注册到 `AprilWorkbench`，
+  workbench 在每次视口创建后把 sink 装到 `Apr::ICadViewport::setPositionCallback()`。
+  `MainTests` 用生产 `AprilWorkbench` + 窄 port 替身验证 sink 到达视口，另从
+  `RenderWidget` 发真实 `QMouseEvent`，验证事件过滤器 → 世界坐标回调整条链路。
+- **左侧工具栏**：客户层 `DrawToolSwitchRegistry` 从 `CommandCatalog` 的 LeftToolbar 面取
+  `OperationId`，注册到 `OperationBus`，执行时把 `toolName` 交给当前视口。
+  `MainTests` 直接编译生产 registry / workbench，断言每个 LeftToolbar 命令都能激活对应工具；
+  原有按钮点击 → QAction → LeftToolbar 来源测试继续保留。
+- **触控板捏合**：除直接测 `ViewportInputRouter::handleNativeGesture()` 的数学外，新增从
+  `RenderWidget` 投递真实 `QNativeGestureEvent` 的用例，锁定事件过滤器安装与原生手势分支。
+
+这些回归全部并入既有测试二进制（`UiTstCustomerProfile` / `UiTstTranslation` /
+`UiTstInteraction` / `MainTests`），不新增 M5 测试目标；`ctest -R "UiTst|UiLayerCheck"`
+仍保持 25/25。`SampleFrame/` SHA-256 快照未改。
+
+- **验收（M6 提交时）**：`BUILD_DIR=build bash UiShell/ci/ui-shell-baseline.sh` 通过（25/25
+  层检/单测 + `AprilShell smoke OK`）；`cmake --build build` 全目标构建通过；
+  `Tools/package_smoke_test.py` 的 staged 安装/运行/升级/卸载冒烟通过。默认
+  `-DUI_CUSTOMER=MantiSoft` 不生成 `AprilShell` / `UiApril`。全量 `ctest` 为 4881/4891 通过；
+  10 个失败集中在 SY 格式注册、Raster/CAM 运动规划与 Hardware 加工链路径（M6 未触碰）。
+- **当前工作区复验**：`ctest -R "UiTst|UiLayerCheck"` 仍为 25/25；本轮 `MainTests` 新增的
+  4 条生产接线用例全部通过。全目标构建此刻被用户 WIP 阻塞（Engine/2D 缺
+  `Engine2D/Geometry/Geo2DEdit.h`、`IPropertySink::addInt/addBool`、`Vec::sqrLength`），
+  按约定不修改这些 WIP；待其复位后重跑 baseline 与打包冒烟。
 
 ## 4. 验收标准（每个里程碑都要满足）
 

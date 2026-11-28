@@ -2,6 +2,7 @@
 
 #include <QFile>
 #include <QJsonArray>
+#include <QStringList>
 
 #include "Model/Profile/ProfileParser.h"
 #include "Model/Profile/ProfileLoadResult.h"
@@ -204,6 +205,15 @@ void CustomerProfileTest::aprilProfileRestoresToolbarsAndNativeMenu()
     QVERIFY(findPanel(model, QStringLiteral("scene")) != nullptr);
     QVERIFY(findPanel(model, QStringLiteral("inspector")) != nullptr);
     QVERIFY(findPanel(model, QStringLiteral("status")) != nullptr);
+
+    // Top-level menu order comes from profile order, not from id alphabetical order.
+    // Without order the parser sorts by id and Draw/Edit jump ahead of File.
+    const QStringList expectedMenus{ QStringLiteral("file"), QStringLiteral("edit"),
+        QStringLiteral("view"), QStringLiteral("draw"), QStringLiteral("modify"),
+        QStringLiteral("algorithm"), QStringLiteral("laser"), QStringLiteral("help") };
+    QCOMPARE(model.menus.size(), expectedMenus.size());
+    for (int i = 0; i < expectedMenus.size(); ++i)
+        QCOMPARE(model.menus.at(i).strId, expectedMenus.at(i));
 }
 
 QTEST_GUILESS_MAIN(CustomerProfileTest)

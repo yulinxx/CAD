@@ -147,6 +147,7 @@
       "id": "file",
       "type": "submenu",
       "titleKey": "File",
+      "order": 10,
       "children": [
         {
           "id": "file.new",
@@ -371,6 +372,7 @@
       "id": "edit",
       "type": "submenu",
       "titleKey": "Edit",
+      "order": 20,
       "children": [
         {
           "id": "edit.undo",
@@ -418,6 +420,20 @@
           "iconKey": ":/ui/common/Icons/Actions/clear.svg"
         },
         {
+          "id": "edit.select_open",
+          "type": "command",
+          "commandId": "edit.select_open",
+          "titleKey": "Select Open Shapes",
+          "iconKey": ":/ui/common/Icons/Actions/select_all.svg"
+        },
+        {
+          "id": "edit.select_duplicates",
+          "type": "command",
+          "commandId": "edit.select_duplicates",
+          "titleKey": "Select Duplicates",
+          "iconKey": ":/ui/common/Icons/Actions/select_all.svg"
+        },
+        {
           "type": "separator"
         },
         {
@@ -454,6 +470,20 @@
           "commandId": "edit.paste_image",
           "titleKey": "Paste as Image",
           "iconKey": ":/ui/common/Icons/Actions/paste.svg"
+        },
+        {
+          "id": "edit.paste_in_place",
+          "type": "command",
+          "commandId": "edit.paste_in_place",
+          "titleKey": "Paste in Place",
+          "iconKey": ":/ui/common/Icons/Actions/paste.svg"
+        },
+        {
+          "id": "edit.duplicate",
+          "type": "command",
+          "commandId": "edit.duplicate",
+          "titleKey": "Duplicate",
+          "iconKey": ":/ui/common/Icons/Actions/copy.svg"
         },
         {
           "type": "separator"
@@ -600,6 +630,16 @@
               "commandId": "edit.align_center_v",
               "titleKey": "Center Vertically",
               "iconKey": ":/ui/common/Icons/Actions/align_center_v.svg"
+            },
+            {
+              "type": "separator"
+            },
+            {
+              "id": "edit.distribute",
+              "type": "command",
+              "commandId": "edit.distribute",
+              "titleKey": "Distribute",
+              "iconKey": ":/ui/common/Icons/Actions/align_center_h.svg"
             }
           ]
         },
@@ -623,6 +663,7 @@
       "id": "view",
       "type": "submenu",
       "titleKey": "View",
+      "order": 30,
       "children": [
         {
           "id": "view.zoom",
@@ -666,6 +707,13 @@
               "iconKey": ":/ui/common/Icons/View3D/reset.svg"
             }
           ]
+        },
+        {
+          "id": "view.measure",
+          "type": "command",
+          "commandId": "view.measure",
+          "titleKey": "Measure",
+          "iconKey": ":/ui/common/Icons/Actions/ruler.svg"
         },
         {
           "id": "view.pan",
@@ -892,6 +940,7 @@
       "id": "draw",
       "type": "submenu",
       "titleKey": "Draw",
+      "order": 40,
       "children": [
         {
           "id": "tool.select",
@@ -1119,6 +1168,7 @@
       "id": "modify",
       "type": "submenu",
       "titleKey": "Modify",
+      "order": 50,
       "children": [
         {
           "id": "edit.offset",
@@ -1157,6 +1207,61 @@
           "commandId": "edit.chamfer",
           "titleKey": "Chamfer...",
           "iconKey": ":/ui/common/Icons/Actions/chamfer.svg"
+        },
+        {
+          "id": "edit.break",
+          "type": "command",
+          "commandId": "edit.break",
+          "titleKey": "Break",
+          "iconKey": ":/ui/common/Icons/Actions/cut.svg"
+        },
+        {
+          "id": "edit.join",
+          "type": "command",
+          "commandId": "edit.join",
+          "titleKey": "Join",
+          "iconKey": ":/ui/common/Icons/Actions/group.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "edit.split_bezier",
+          "type": "command",
+          "commandId": "edit.split_bezier",
+          "titleKey": "Split Bezier",
+          "iconKey": ":/ui/common/Icons/Actions/cut.svg"
+        },
+        {
+          "id": "edit.merge_bezier",
+          "type": "command",
+          "commandId": "edit.merge_bezier",
+          "titleKey": "Merge Bezier",
+          "iconKey": ":/ui/common/Icons/Actions/group.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "edit.text_to_path",
+          "type": "command",
+          "commandId": "edit.text_to_path",
+          "titleKey": "Convert Text to Path",
+          "iconKey": ":/ui/common/Icons/Tools/text.svg"
+        },
+        {
+          "id": "edit.text_on_path",
+          "type": "command",
+          "commandId": "edit.text_on_path",
+          "titleKey": "Text on Path",
+          "iconKey": ":/ui/common/Icons/Tools/text.svg"
+        },
+        {
+          "id": "edit.variable_text",
+          "type": "command",
+          "commandId": "edit.variable_text",
+          "titleKey": "Variable Text...",
+          "iconKey": ":/ui/common/Icons/Tools/text.svg"
         },
         {
           "type": "separator"
@@ -1212,6 +1317,7 @@
       "id": "algorithm",
       "type": "submenu",
       "titleKey": "Algorithm",
+      "order": 60,
       "children": [
         {
           "id": "algo.fill",
@@ -1281,6 +1387,7 @@
       "id": "laser",
       "type": "submenu",
       "titleKey": "Laser",
+      "order": 70,
       "children": [
         {
           "id": "laser.start_process",
@@ -1319,6 +1426,7 @@
       "id": "help",
       "type": "submenu",
       "titleKey": "Help",
+      "order": 80,
       "children": [
         {
           "id": "help.docs",

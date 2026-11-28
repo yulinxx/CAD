@@ -69,6 +69,8 @@ namespace AA::test
     {
     public:
         QWidget* createCenterView(QWidget* parent) override;
+
+        int created = 0;
     };
 
     // 记录标题栏请求次数的窄宿主替身；isMaximized 可随时改写。

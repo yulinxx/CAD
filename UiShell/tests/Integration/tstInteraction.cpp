@@ -268,6 +268,65 @@ namespace
         QList<CommandView> m_views;
     };
 
+    // 内置语言动作与 profile 命令动作共用 language.* id；目录需要登记这个命令，
+    // 否则 AssemblyPlanner 会把 profile 节点当成未知命令剔除。
+    class LanguageCommandCatalog : public ICommandCatalog
+    {
+    public:
+        const CommandView* find(const QString& commandId) const override
+        {
+            if (commandId != QLatin1String("language.zh_CN"))
+                return nullptr;
+            return &m_view;
+        }
+
+    private:
+        CommandView m_view{ QStringLiteral("language.zh_CN"),
+            QStringLiteral("command.language.zh_CN") };
+    };
+
+    // 记录 switchLanguage() 实际被调用的次数，用来抓 profile 动作重复绑定。
+    class CountingShellListener : public IShellListener
+    {
+    public:
+        void onLanguageChanged(const QString& languageId) override
+        {
+            ++count;
+            lastLanguageId = languageId;
+        }
+
+        int count = 0;
+        QString lastLanguageId;
+    };
+
+    QByteArray languageCommandProfileJson()
+    {
+        QJsonArray regions{
+            QJsonObject{ { QStringLiteral("id"), QStringLiteral("menubar") },
+                { QStringLiteral("type"), QStringLiteral("MenuBar") },
+                { QStringLiteral("order"), 5 } },
+            QJsonObject{ { QStringLiteral("id"), QStringLiteral("center") },
+                { QStringLiteral("type"), QStringLiteral("CenterView") },
+                { QStringLiteral("order"), 30 } }
+        };
+        QJsonArray viewChildren{
+            QJsonObject{ { QStringLiteral("type"), QStringLiteral("builtin") },
+                { QStringLiteral("id"), QStringLiteral("language") } },
+            QJsonObject{ { QStringLiteral("type"), QStringLiteral("command") },
+                { QStringLiteral("commandId"), QStringLiteral("language.zh_CN") },
+                { QStringLiteral("titleKey"), QStringLiteral("command.language.zh_CN") } }
+        };
+        QJsonArray menus{
+            QJsonObject{ { QStringLiteral("type"), QStringLiteral("submenu") },
+                { QStringLiteral("id"), QStringLiteral("view") },
+                { QStringLiteral("titleKey"), QStringLiteral("View") },
+                { QStringLiteral("order"), 10 },
+                { QStringLiteral("children"), viewChildren } }
+        };
+        return test::makeProfileJson(QStringLiteral("interaction.language.binding"), regions,
+            QJsonObject(), menus);
+    }
+
     // 客户标题栏：只验证“视图契约 + 控件所有权”这条链路，不绘制任何东西。
     class RecordingTitleBar : public QWidget, public ITitleBarView
     {
@@ -387,6 +446,8 @@ private slots:
     void builtinMenusComeFromProfile();
     void dialogResultReachesCommandArgs();
     void panelVisibilityFollowsProfileAndActivate();
+    void refreshCenterViewRecreatesCustomerWidget();
+    void profileLanguageCommandHasSingleBinding();
     void languageSwitchUpdatesMenusAndActions();
     void liveLanguageSwitchDoesNotCrash();
     void titleBarTracksExternalStateAfterRebuild();
@@ -1024,6 +1085,75 @@ void InteractionTest::panelVisibilityFollowsProfileAndActivate()
     QVERIFY(!tools->isVisible());
     QVERIFY(runtime->activatePanel(QStringLiteral("tools")));
     QVERIFY(tools->isVisible());
+}
+
+// 客户切换 2D/3D 后只改自己的 viewport kind；外壳必须能通用地重建中央视图，
+// 且不需要认识 RenderViewport2D / Viewport3D 中的任何一个。
+void InteractionTest::refreshCenterViewRecreatesCustomerWidget()
+{
+    test::FakeCenterViewProvider provider;
+    ShellServices shellServices;
+    shellServices.centerView = &provider;
+
+    ApiPtr<IShellRuntime> runtime(createShellRuntime(shellServices));
+    QVERIFY(runtime);
+    QVERIFY2(runtime->loadFromJson(test::minimalProfileJson()), qPrintable(runtime->lastError()));
+
+    showShell(*runtime);
+    QCOMPARE(provider.created, 1);
+
+    QPointer<QWidget> first = runtime->shell()->findChild<QWidget*>(QStringLiteral("center.view"));
+    QVERIFY(!first.isNull());
+
+    runtime->refreshCenterView();
+    QCOMPARE(provider.created, 2);
+
+    QWidget* second = runtime->shell()->findChild<QWidget*>(QStringLiteral("center.view"));
+    QVERIFY(second != nullptr);
+    // A raw pointer comparison is flaky: the allocator may reuse the same address.
+    // QPointer proves the original widget was actually destroyed before remounting.
+    QVERIFY(first.isNull());
+}
+
+// profile 命令动作不能被内置语言菜单再直连一次：触发一次只走命令分发，
+// 不允许 shell 的 switchLanguage() 被重复调用（重复重装 translator + 重建界面）。
+void InteractionTest::profileLanguageCommandHasSingleBinding()
+{
+    LanguageCommandCatalog catalog;
+    test::FakeCommandInvoker invoker;
+    CountingShellListener listener;
+    ApiPtr<ITranslationService> trans(createTranslationService());
+    QVERIFY(trans);
+    QVERIFY2(trans->install(QStringLiteral("en_US"), QString::fromUtf8(UI_TEST_TRANSLATIONS_DIR)),
+        qPrintable(trans->lastError()));
+
+    ShellServices shellServices;
+    shellServices.cmdCatalog = &catalog;
+    shellServices.cmdInvoker = &invoker;
+    shellServices.transService = trans.get();
+    shellServices.shellListener = &listener;
+
+    ApiPtr<IShellRuntime> runtime(createShellRuntime(shellServices));
+    QVERIFY(runtime);
+    QVERIFY2(runtime->loadFromJson(languageCommandProfileJson()), qPrintable(runtime->lastError()));
+
+    showShell(*runtime);
+
+    const QList<QAction*> actions = runtime->shell()->findChildren<QAction*>(
+        QStringLiteral("msui.action.language.zh_CN"));
+    QCOMPARE(actions.size(), 2);
+
+    QAction* profileAction = nullptr;
+    for (QAction* action : actions)
+    {
+        if (action->property("msui.profileCommand").toBool())
+            profileAction = action;
+    }
+    QVERIFY(profileAction != nullptr);
+
+    profileAction->trigger();
+    QCOMPARE(invoker.invoked, QStringList{ QStringLiteral("language.zh_CN") });
+    QCOMPARE(listener.count, 0);
 }
 
 // 诊断用例：对已加载的运行期反复调用 switchLanguage，覆盖 install / refreshShell / retranslate 全链路。

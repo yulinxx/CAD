@@ -65,12 +65,14 @@ namespace Apr
         }
         if (commandId == QLatin1String("view.switch_to_2d") || commandId == QLatin1String("view.switch_to_3d"))
         {
-            if (m_workbenchSwitch)
-                m_workbenchSwitch(commandId);
-            else
+            if (!m_workbenchSwitch)
+            {
                 APR_WARNF("[OperationCommandSink] Workbench switch has no host: %s", qPrintable(commandId));
-            // The workbench switch only changes customer state; the shell owns the
-            // central widget and must be asked to mount the new viewport.
+                return;
+            }
+            // Single owner: the command sink changes customer state first, then asks
+            // the shell (which owns the widget tree) to mount the new viewport once.
+            m_workbenchSwitch(commandId);
             if (runtime)
                 runtime->refreshCenterView();
             return;

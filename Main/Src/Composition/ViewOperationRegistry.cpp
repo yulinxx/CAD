@@ -9,6 +9,7 @@
 
 #include <QDesktopServices>
 #include <QFileInfo>
+#include <QMessageBox>
 #include <QUrl>
 
 #include "UI2D/Operation/OperationBus.h"
@@ -21,7 +22,10 @@
 #include "UI/Services/UiStateCenter.h"
 #include "UI/Service/ViewCaptureService.h"
 #include "UI/Render/RenderViewport2D.h"
+#include "Engine2D/Core/SceneManager.h"
 #include "Engine2D/Edit/LayerEditService.h"
+#include "Engine2D/Geo/GeometryContext.h"
+#include "Engine2D/Geometry/Geo2DQuery.h"
 #include "UI/TestView/TestViewWindow.h"
 
 ViewOperationRegistry::ViewOperationRegistry(OperationBus* bus,
@@ -139,5 +143,61 @@ void ViewOperationRegistry::registerAll()
                 window->show();
             }
         }
+    });
+
+    Ops::declare(reg, OperationId::View_Measure, [hub, parentWidget] {
+        if (!hub)
+            return;
+        auto* vp = hub->viewport();
+        if (!vp)
+            return;
+        auto* scene = vp->sceneManager();
+        if (!scene)
+            return;
+        const auto selected = scene->getSelectedEntities();
+        if (selected.empty())
+            return;
+
+        const Eg::GeometryContext ctx;
+        Ut::BBox2d bbox;
+        double totalLength = 0.0;
+        double totalArea = 0.0;
+        int closedCount = 0;
+        int openCount = 0;
+        for (Eg::AprEntity* e : selected)
+        {
+            if (!e)
+                continue;
+            const Ut::BBox2d b = e->getBbox();
+            if (b.isValid())
+                bbox.expand(b);
+            totalLength += Eg::Geo2DQuery::length(e, ctx);
+            if (Eg::Geo2DQuery::isClosedByType(e))
+            {
+                ++closedCount;
+                totalArea += Eg::Geo2DQuery::area(e, ctx);
+            }
+            else
+            {
+                ++openCount;
+            }
+        }
+
+        QString msg = QObject::tr("Selected: %1\nClosed: %2  Open: %3\n")
+                          .arg(selected.size())
+                          .arg(closedCount)
+                          .arg(openCount);
+        if (bbox.isValid())
+        {
+            msg += QObject::tr("BBox: X [%1, %2]  Y [%3, %4]\nWidth: %5  Height: %6\n")
+                       .arg(bbox.minPt.x(), 0, 'f', 3)
+                       .arg(bbox.maxPt.x(), 0, 'f', 3)
+                       .arg(bbox.minPt.y(), 0, 'f', 3)
+                       .arg(bbox.maxPt.y(), 0, 'f', 3)
+                       .arg(bbox.maxPt.x() - bbox.minPt.x(), 0, 'f', 3)
+                       .arg(bbox.maxPt.y() - bbox.minPt.y(), 0, 'f', 3);
+        }
+        msg += QObject::tr("Total length: %1\nTotal area: %2").arg(totalLength, 0, 'f', 3).arg(totalArea, 0, 'f', 3);
+        QMessageBox::information(parentWidget, QObject::tr("Measure"), msg);
     });
 }

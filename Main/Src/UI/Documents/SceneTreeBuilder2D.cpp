@@ -75,6 +75,8 @@ QString SceneTreeBuilder2D::typeName(Eg::EType eType)
         return QObject::tr("NURBS");  // NURBS
     case Eg::EType::SMARTLINE:
         return QObject::tr("SmartLine");  // 智能直线
+    case Eg::EType::PATH:
+        return QObject::tr("Path");  // 路径
     case Eg::EType::TEXT:
         return QObject::tr("Text");  // 文本
     case Eg::EType::BAR_CODE:

@@ -41,10 +41,12 @@ private:
     void registerTransformOps();
     void registerGroupOps();
     void registerTrimExtendOps();
+    void registerBreakJoinOps();
     void registerBboxOps();
     void registerDiscretizeOp();
     void registerBezierOps();
     void registerArrayOp();
+    void registerTextOps();
 
     OperationBus* m_bus;
     SceneEditService* m_editService;

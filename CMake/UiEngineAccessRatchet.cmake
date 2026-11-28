@@ -171,6 +171,7 @@ function(apr_check_ui_engine_include_ratchet)
         "Engine2D/AprEntity/AprLine.h"
         "Engine2D/AprEntity/AprNurbs.h"
         "Engine2D/AprEntity/AprPoint.h"
+        "Engine2D/AprEntity/AprPath.h"
         "Engine2D/AprEntity/AprPolygon.h"
         "Engine2D/AprEntity/AprQRCode.h"
         "Engine2D/AprEntity/AprSmartLine.h"

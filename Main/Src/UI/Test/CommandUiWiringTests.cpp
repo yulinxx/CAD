@@ -15,6 +15,8 @@
 
 #include "UI2D/Operation/CommandActionHub.h"
 #include "UI2D/Operation/CommandCatalog.h"
+#include "UI2D/Operation/IOperation.h"
+#include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Manager/UnitManager.h"
 #include "UI2D/Manager/UnitSelectionMenu.h"
 #include "UI2D/DrawTools/ToolManager.h"
@@ -27,6 +29,10 @@
 #include "UI/Widgets/DrawToolBarWidget.h"
 #include "RenderWidget.h"
 
+#include "panels/AprilWorkbench.h"
+#include "ports/DrawToolSwitchRegistry.h"
+#include "ports/ICadViewport.h"
+
 #include "UI/Workbench/WorkbenchMenuManager.h"
 
 #if BUILD_UI3D
@@ -37,6 +43,7 @@
 
 #include <QAction>
 #include <QKeySequence>
+#include <memory>
 #include <QLabel>
 #include <QMainWindow>
 #include <QMenu>
@@ -44,6 +51,8 @@
 #include <QStringList>
 #include <QToolButton>
 #include <QVector>
+
+#include <utility>
 
 namespace
 {
@@ -70,6 +79,65 @@ namespace
             QStringLiteral("edit.group"),
         };
     }
+
+    // Narrow fake of the customer viewport port. The production workbench and
+    // DrawToolSwitchRegistry are compiled into MainTests; only the old rendering
+    // viewport is replaced, so the shipped wiring is what runs in these tests.
+    class RecordingCadViewport final : public Apr::ICadViewport
+    {
+    public:
+        explicit RecordingCadViewport(QWidget* parent)
+            : m_widget(new QWidget(parent))
+        {
+        }
+
+        QWidget* widget() override { return m_widget; }
+
+        void setPositionCallback(PositionCallback callback) override
+        {
+            m_positionCallback = std::move(callback);
+        }
+
+        void resetView() override {}
+        void zoomToSelection() override {}
+        void setDrawingEnabled(bool) override {}
+        void setMeasureMode(bool) override {}
+
+        bool setActiveTool(const QString& toolName) override
+        {
+            activeTool = toolName;
+            return true;
+        }
+
+        void emitPosition(double x, double y)
+        {
+            if (m_positionCallback)
+                m_positionCallback(x, y);
+        }
+
+        QString activeTool;
+
+    private:
+        QWidget* m_widget = nullptr;
+        PositionCallback m_positionCallback;
+    };
+
+    class FakeViewportFactory final : public Apr::IViewportFactory
+    {
+    public:
+        Apr::ICadViewport* create2D(QWidget* parent) override
+        {
+            m_viewport = std::make_unique<RecordingCadViewport>(parent);
+            return m_viewport.get();
+        }
+
+        Apr::ICadViewport* create3D(QWidget*) override { return nullptr; }
+
+        RecordingCadViewport* viewport() const { return m_viewport.get(); }
+
+    private:
+        std::unique_ptr<RecordingCadViewport> m_viewport;
+    };
 }  // namespace
 
 TEST(CommandUiWiringTest, DefaultToolBarContextIdsAllResolveToMenuActionId)
@@ -978,6 +1046,60 @@ TEST(DrawToolBarWidgetTest, LeftToolbarEntriesResolveToRegisteredTools)
         const QString toolName = QString::fromUtf8(entry->toolName);
         EXPECT_TRUE(tm.getTool(toolName) != nullptr)
             << "catalog declares the LeftToolbar surface, but ToolInitializer registered no tool with that name: " << toolName.toStdString();
+    }
+}
+
+// Production wiring: the customer status bar registers one sink on AprilWorkbench;
+// the workbench must install it on the viewport created later (and after each rebuild).
+TEST(AprilWorkbenchWiringTest, PositionSinkReachesCurrentViewport)
+{
+    Apr::AprilWorkbench workbench;
+    FakeViewportFactory factory;
+    workbench.setViewportFactory(&factory);
+
+    int calls = 0;
+    double lastX = 0.0;
+    double lastY = 0.0;
+    workbench.setPositionSink([&](double x, double y) {
+        ++calls;
+        lastX = x;
+        lastY = y;
+    });
+
+    ASSERT_NE(workbench.createCenterView(nullptr), nullptr);
+    ASSERT_NE(factory.viewport(), nullptr);
+
+    factory.viewport()->emitPosition(12.5, 34.5);
+    EXPECT_EQ(calls, 1);
+    EXPECT_DOUBLE_EQ(lastX, 12.5);
+    EXPECT_DOUBLE_EQ(lastY, 34.5);
+}
+
+// Production wiring: the shipped DrawToolSwitchRegistry must bridge every left
+// toolbar OperationId to the active viewport's setActiveTool(toolName) port.
+TEST(DrawToolBarWidgetTest, ProductionRegistryActivatesViewportTool)
+{
+    Apr::AprilWorkbench workbench;
+    FakeViewportFactory factory;
+    workbench.setViewportFactory(&factory);
+    ASSERT_NE(workbench.createCenterView(nullptr), nullptr);
+    ASSERT_NE(factory.viewport(), nullptr);
+
+    OperationBus bus;
+    Apr::DrawToolSwitchRegistry registry;
+    registry.setBus(&bus);
+    registry.setWorkbench(&workbench);
+    registry.registerAll();
+
+    for (const CommandEntry2D* entry : leftToolbarEntries())
+    {
+        ASSERT_NE(entry, nullptr);
+        ASSERT_NE(entry->toolName, nullptr);
+        const QString toolName = QString::fromUtf8(entry->toolName);
+        EXPECT_TRUE(bus.run(entry->operationId, {}, OperationSource::LeftToolbar).success)
+            << "left toolbar operation failed: " << toolName.toStdString();
+        EXPECT_EQ(factory.viewport()->activeTool.toStdString(), toolName.toStdString())
+            << "production registry did not activate the catalog tool: " << toolName.toStdString();
     }
 }
 

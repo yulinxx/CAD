@@ -10,6 +10,10 @@
 > 全量 `ctest`：4881/4891 通过；10 个失败位于未触碰的 SY/Raster/CAM/Hardware 路径，
 > 与用户 WIP 子模块一致，需单独复位验证。
 > 命令、产物与启动崩溃根因见 `UiShell/MIGRATION.md` §0.5。
+> 2026-11-28 回归补齐：菜单顺序、14 语言/短码别名、语言命令单次分发、
+> 通用中心视图刷新、状态栏坐标、左侧工具栏工具激活、原生捏合手势均已补自动化测试；
+> `ctest -R "UiTst|UiLayerCheck"` 仍为 25/25。当前全目标构建被用户 WIP 的 Engine/2D 阻塞，
+> 不改动 WIP，详见 `UiShell/MIGRATION.md` §M6 后续回归修复与自动化。
 
 ## 1. 分层（已成立 + `UiLayerCheck` 守卫）
 
@@ -53,27 +57,28 @@ AprilCore ──x──> UiShell                                 // 算法不依
 - `Apr::IViewportServices` + `Apr::CompositionRootAdapter`
   - `hasSceneDocument2D/hasSceneDocument3D/hasOperationBus/hasSelectionService/hasLayerManager/hasUiStateCenter/hasCameraController3D/hasUiServices`；
   - 从 `AprilCore::ApplicationCompositionRoot` 适配；`Apr::AprilWorkbench::bindViewportServices(IViewportServices&)`；`UiShell` 不见 `ApplicationCompositionRoot`/`SceneDocument2D`/`OperationBus`。
-- **命令**：`Apr::Commands : RD::ICommandCatalog + RD::ICommandInvoker + RD::ICommandState`
+- **命令**：`Apr::Commands : AA::ICommandCatalog + AA::ICommandInvoker + AA::ICommandState`
   - `setSink(Apr::ICommandSink*)`；生产实现为 `OperationCommandSink`（主题/语言/关于框/工作台切换走 `IShellRuntime`，2D 命令走 `CommandCatalog`/`OperationRouting`/`OperationBus`）；
-  - `invoke/invokeWithArgs -> ICommandSink::dispatch -> OperationBus`；`UiShell` 只见 `RD::ICommand*`。
+  - `invoke/invokeWithArgs -> ICommandSink::dispatch -> OperationBus`；`UiShell` 只见 `AA::ICommand*`。
   - `Apr::attachCommandSink(Commands&, ICommandSink*)`；`Apr::attachCompositionRoot(...)` 可选 `ApplicationCompositionRoot::instance()`。
   - `AppBootstrap` 通过 `IHostWindow` 在创建客户模块前发布宿主 `QMainWindow`；`ShellRuntime` 通过 `IActiveRuntime` 发布活动运行时。
-- `AprilWorkbench`（`customers/April`，`RD::ICenterViewProvider`）仍持有服务用于适配，但**`UiShell` core 不见**。
+- `AprilWorkbench`（`customers/April`，`AA::ICenterViewProvider`）仍持有服务用于适配，但**`UiShell` core 不见**。
 
 ## 4. M3/M4 视口与旧 UI 界面
 
 - **2D** `RenderViewport2D`（`QWidget`+`UI::IViewportHost`）；`ViewportKind::TwoD`。
 - **3D** `Viewport3D`（头文件 `UiViewport3D.h`，类 `Viewport3D`，**非 `UiViewport3D`**）+ `RenderWidget3DAdapter`；`ViewportKind::ThreeD`；`BUILD_UI3D`。
-- **旧界面部件进 `UiShell`**：`Apr::PanelFactory : RD::IWidgetFactory` `factory="april.panel"`：
+- **旧界面部件进 `UiShell`**：`Apr::PanelFactory : AA::IWidgetFactory` `factory="april.panel"`：
   `drawTools/tools→DrawToolBarWidget`（左侧绘图工具栏，绑定外壳 QAction），
   `editToolbar→TopToolBar`（顶部编辑工具栏，命令顺序来自 `props.commands`），
   `scene→SceneTreePanel`, `inspector→PropertiesPanelWidget`, `status→StatusBar`, 未识别→空 `QWidget`。
   `ui.json.window.nativeMenuBar=true` 让 macOS 使用屏幕顶部原生菜单栏；`props.kind` 可显式指定面板类型。
   macOS 27+ 由 `aprilShellAfterBootstrap()` 调 `ensureMacMenuImagesVisible()` 显式打开
   `NSMenuItem.preferredImageVisibility`，补回原生菜单项图标。
+   `ui.json` 顶层 `order` 固定菜单顺序；`UiTstCustomerProfile` 锁定 file/edit/view/draw/modify/algorithm/laser/help。
 - `ui.json` `regions` + `panels` + `menus`；`configs/base.json` `menus`(8)→`UiShell MenuNodeSpec` **8 menus / 184 个 id**（`type action→command`, `command→commandId`, `label→titleKey`, `icon→iconKey`, `separator`, `submenu`），已覆盖 `base.json` 全部 id。
 - `Apr::Commands::addCommandsFromProfile()` 从 ui.json 递归登记 `type=command` 节点到目录，`AssemblyPlanner` 才不会把菜单当未知命令剔除；`UiTstAprilMenuCatalog` 校验随附 profile 的每个菜单命令都可被 `find()`。
-- 外置 `--profile` 走契约 `RD::ICommandProfileRegistrar`：`ProfilePipeline::loadFromJson()` 在规划前调用，四套客户 `Commands` 均实现（April 复用上述函数，其余继承 `CommandTable` 默认实现）；新菜单命令无需重编即可入目录，`UiTstProfileCommands` 校验有/无钩子的诊断差异与幂等性。
+- 外置 `--profile` 走契约 `AA::ICommandProfileRegistrar`：`ProfilePipeline::loadFromJson()` 在规划前调用，四套客户 `Commands` 均实现（April 复用上述函数，其余继承 `CommandTable` 默认实现）；新菜单命令无需重编即可入目录，`UiTstProfileCommands` 校验有/无钩子的诊断差异与幂等性。
 - `PanelCreateRequest`/`ShellServices`/`UiTranslations`/`UiDeploy`；`UiCustomerProfile` `ui.json`+`assets` 外置。
 
 ## 5. 当前不成立（未完成）
@@ -90,6 +95,11 @@ AprilCore ──x──> UiShell                                 // 算法不依
   并由 `MainTests` 保留覆盖；生产 April 不编译该目录。`UiFeatureGate` 生产头在 `UI/Services/`，
   测试侧保留兼容头。部署由 `UiShell/CMakeLists.txt` 的 `AprilRuntimeDeploy ALL` 承接，
   安装树同时带上 `UiShell`/`UiApril` 动态库与 `profile/`。
+- **M6 回归自动化**：中心视图刷新收敛到 `IShellRuntime::refreshCenterView()`，由 `OperationCommandSink`
+  单一 owner 调用；状态栏 sink 经 `AprilWorkbench` → `ICadViewport::setPositionCallback()` 接线；
+  左侧工具栏经客户层 `DrawToolSwitchRegistry` → `OperationBus` → 视口 `setActiveTool()`；
+  14 语言 + 短码 alias + profile 命令单次分发均有断言。新增用例全部并入既有测试二进制，
+  `ctest -R "UiTst|UiLayerCheck"` 保持 25/25。
 - `AprilUi`↔`AprilCore` 的边界仍由客户层 port/adapter 管理；旧 `Main::AppBootstrapper` 已删；`April` 仍可运行。
 - `Engine` 子模块 WIP + GeometryContext 补丁未提交。
 

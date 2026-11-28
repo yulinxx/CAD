@@ -20,10 +20,17 @@
 #include "Engine2D/Algorithm/EntityTransform.h"
 #include "Engine2D/Algorithm/Discretizer/EntityDiscretizer.h"
 #include "Engine2D/Geometry/BezierAlgorithms.h"
+#include "Engine2D/Geometry/Geo2DQuery.h"
+#include "Engine2D/Algorithm/Geo2DEdit.h"
+#include "Engine2D/Geo/GeometryContext.h"
 #include "Engine2D/Core/SceneEditBatch.h"
 #include "Engine2D/AprEntity/AprLine.h"
 #include "Engine2D/AprEntity/AprBezier.h"
 #include "Engine2D/AprEntity/AprBezier2.h"
+#include "Engine2D/AprEntity/AprText.h"
+#include "Engine2D/AprEntity/AprSmartLine.h"
+#include "Engine2D/Text/TextConverter.h"
+#include "Engine/Text/FontParameters.h"
 
 #include "UI/Services/HelpDialogService.h"
 #include "UI/Adapters/TransformDialogAdapter.h"
@@ -152,6 +159,110 @@ void EditOperationRegistry::registerAll()
             editService->sceneManager()->invertSelection();
     });
 
+    Ops::declare(reg, OperationId::Edit_SelectOpen, [editService] {
+        if (!editService || !editService->sceneManager())
+            return;
+        auto* scene = editService->sceneManager();
+        const Eg::GeometryContext ctx;
+        Eg::VecAprEntityPtr openEntities;
+        scene->forEachEntity([&](Eg::AprEntity* e) {
+            if (!e || !e->visible())
+                return;
+            if (auto* layer = e->layer())
+            {
+                if (!layer->isVisible() || layer->isLocked())
+                    return;
+            }
+            if (!Eg::Geo2DQuery::isClosedByType(e))
+                openEntities.push_back(e);
+        });
+        scene->selectEntities(openEntities);
+        APR_INFOF("[EditOperationRegistry] SelectOpen: selected %zu entities", openEntities.size());
+    });
+
+    Ops::declare(reg, OperationId::Edit_SelectDuplicates, [editService] {
+        if (!editService || !editService->sceneManager())
+            return;
+        auto* scene = editService->sceneManager();
+        const Eg::GeometryContext ctx;
+        std::vector<Eg::AprEntity*> entities;
+        scene->forEachEntity([&](Eg::AprEntity* e) {
+            if (!e || !e->visible())
+                return;
+            if (auto* layer = e->layer())
+            {
+                if (!layer->isVisible() || layer->isLocked())
+                    return;
+            }
+            entities.push_back(e);
+        });
+
+        std::vector<char> isDuplicate(entities.size(), 0);
+        for (size_t i = 0; i < entities.size(); ++i)
+        {
+            for (size_t j = i + 1; j < entities.size(); ++j)
+            {
+                Eg::AprEntity* a = entities[i];
+                Eg::AprEntity* b = entities[j];
+                if (a->eType != b->eType)
+                    continue;
+                const Ut::BBox2d ba = a->getBbox();
+                const Ut::BBox2d bb = b->getBbox();
+                if (!ba.isValid() || !bb.isValid())
+                    continue;
+                const double tol = std::max(ctx.dTopology, 1e-6);
+                if (std::abs(ba.minPt.x() - bb.minPt.x()) > tol || std::abs(ba.minPt.y() - bb.minPt.y()) > tol ||
+                    std::abs(ba.maxPt.x() - bb.maxPt.x()) > tol || std::abs(ba.maxPt.y() - bb.maxPt.y()) > tol)
+                    continue;
+                const double lenA = Eg::Geo2DQuery::length(a, ctx);
+                const double lenB = Eg::Geo2DQuery::length(b, ctx);
+                if (std::abs(lenA - lenB) > tol)
+                    continue;
+                const double areaA = Eg::Geo2DQuery::area(a, ctx);
+                const double areaB = Eg::Geo2DQuery::area(b, ctx);
+                if (std::abs(areaA - areaB) > std::max(ctx.dArea, 1e-9))
+                    continue;
+                // Sampled point distance check: quick duplicate heuristic
+                bool same = true;
+                Ut::Vec2d bufA[64], bufB[64];
+                const size_t na = a->getControlPoints(bufA, 64);
+                const size_t nb = b->getControlPoints(bufB, 64);
+                if (na == nb && na > 0 && na <= 64)
+                {
+                    for (size_t k = 0; k < na; ++k)
+                    {
+                        if ((bufA[k] - bufB[k]).length() > tol)
+                        {
+                            same = false;
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    // Fallback: coarse check by center distance
+                    const Ut::Vec2d ca = (ba.minPt + ba.maxPt) * 0.5;
+                    const Ut::Vec2d cb = (bb.minPt + bb.maxPt) * 0.5;
+                    same = (ca - cb).length() <= tol;
+                }
+                if (same)
+                {
+                    isDuplicate[i] = 1;
+                    isDuplicate[j] = 1;
+                }
+            }
+        }
+
+        Eg::VecAprEntityPtr duplicates;
+        for (size_t i = 0; i < entities.size(); ++i)
+        {
+            if (isDuplicate[i])
+                duplicates.push_back(entities[i]);
+        }
+        scene->selectEntities(duplicates);
+        APR_INFOF("[EditOperationRegistry] SelectDuplicates: selected %zu entities", duplicates.size());
+    });
+
     Ops::declareParam(reg, OperationId::Edit_Nudge, [editService](const QVariantMap& params) {
         if (!editService)
             return;
@@ -204,10 +315,12 @@ void EditOperationRegistry::registerAll()
     registerTransformOps();
     registerGroupOps();
     registerTrimExtendOps();
+    registerBreakJoinOps();
     registerBboxOps();
     registerDiscretizeOp();
     registerBezierOps();
     registerArrayOp();
+    registerTextOps();
 }
 
 void EditOperationRegistry::registerClipboardOps()
@@ -372,6 +485,28 @@ void EditOperationRegistry::registerClipboardOps()
             QMessageBox::warning(parent, QObject::tr("Paste as Image"),
                 QObject::tr("Clipboard does not contain an image that can be pasted."));
         }
+    });
+
+    Ops::declare(reg, OperationId::Edit_PasteInPlace, [editService, clipboard] {
+        if (!editService || !clipboard)
+            return;
+        auto* scene = editService->sceneManager();
+        if (!scene || !clipboard->hasContent())
+            return;
+        auto pasted = clipboard->pasteInPlace();
+        if (pasted.empty())
+            return;
+        scene->clearSelection();
+        const std::vector<Eg::EntityId> insertedIds = editService->addEntities(std::move(pasted), "Paste in Place");
+        Eg::VecAprEntityPtr pastedEntities;
+        pastedEntities.reserve(insertedIds.size());
+        for (Eg::EntityId id : insertedIds)
+        {
+            if (auto* ent = scene->findEntityById(id))
+                pastedEntities.push_back(ent);
+        }
+        if (!pastedEntities.empty())
+            scene->selectEntities(pastedEntities);
     });
 
     Ops::declareParam(reg, OperationId::Edit_Duplicate, [=](const QVariantMap& params) {
@@ -663,6 +798,67 @@ void EditOperationRegistry::registerTransformOps()
             "Align",
             false);
     });
+
+    Ops::declareParamMutating(reg, OperationId::Edit_Distribute, [editService](const QVariantMap& params) {
+        if (!editService)
+            return;
+        auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
+        auto selected = scene->getSelectedEntities();
+        if (selected.size() < 3)
+            return;
+        const int mode = params.value(QStringLiteral("mode"), 0).toInt(); // 0=H,1=V
+        const auto ids = OpRegistryHelpers::collectIds(selected);
+
+        struct Item
+        {
+            Eg::EntityId id{ 0 };
+            double center{ 0.0 };
+        };
+        std::vector<Item> items;
+        items.reserve(selected.size());
+        for (Eg::AprEntity* e : selected)
+        {
+            if (!e)
+                continue;
+            const Ut::BBox2d b = e->getBbox();
+            if (!b.isValid())
+                continue;
+            const Ut::Vec2d c = (b.minPt + b.maxPt) * 0.5;
+            items.push_back({ e->id, mode == 1 ? c.y() : c.x() });
+        }
+        if (items.size() < 3)
+            return;
+        std::sort(items.begin(), items.end(), [](const Item& a, const Item& b) { return a.center < b.center; });
+        const double first = items.front().center;
+        const double last = items.back().center;
+        const double step = (last - first) / static_cast<double>(items.size() - 1);
+        if (std::abs(step) < 1e-12)
+            return;
+
+        std::vector<std::pair<Eg::EntityId, double>> moves;
+        for (size_t i = 1; i + 1 < items.size(); ++i)
+        {
+            const double target = first + step * static_cast<double>(i);
+            moves.push_back({ items[i].id, target - items[i].center });
+        }
+
+        editService->transformEntities(
+            ids,
+            [&]() {
+                EntityTransform transform(scene);
+                for (const auto& m : moves)
+                {
+                    if (mode == 1)
+                        transform.moveById(m.first, 0.0, m.second);
+                    else
+                        transform.moveById(m.first, m.second, 0.0);
+                }
+            },
+            "Distribute",
+            false);
+    });
 }
 
 void EditOperationRegistry::registerGroupOps()
@@ -838,6 +1034,127 @@ void EditOperationRegistry::registerTrimExtendOps()
     });
 }
 
+void EditOperationRegistry::registerBreakJoinOps()
+{
+    auto& reg = m_bus->registry();
+    auto* editService = m_editService;
+
+    Ops::declareMutating(reg, OperationId::Edit_Break, [editService] {
+        if (!editService)
+            return;
+        auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
+        auto selected = scene->getSelectedEntities();
+        if (selected.size() < 2)
+            return;
+        const Eg::GeometryContext ctx;
+
+        SceneEditBatch batch;
+        // Split each selected entity by intersections with other selected entities.
+        for (Eg::AprEntity* entity : selected)
+        {
+            if (!entity)
+                continue;
+            std::vector<std::unique_ptr<Eg::AprEntity>> pieces;
+            pieces.push_back(std::unique_ptr<Eg::AprEntity>(entity->clone()));
+
+            bool changed = false;
+            for (Eg::AprEntity* cutter : selected)
+            {
+                if (!cutter || cutter == entity)
+                    continue;
+                std::vector<std::unique_ptr<Eg::AprEntity>> nextPieces;
+                for (auto& piece : pieces)
+                {
+                    auto split = Eg::Geo2DEdit::splitAtIntersections(piece.get(), cutter, ctx);
+                    if (split.size() > 1)
+                    {
+                        changed = true;
+                        for (auto& s : split)
+                            nextPieces.push_back(std::move(s));
+                    }
+                    else
+                    {
+                        nextPieces.push_back(std::move(piece));
+                    }
+                }
+                pieces = std::move(nextPieces);
+            }
+
+            if (changed && !pieces.empty())
+            {
+                batch.toRemove.push_back(entity->id);
+                for (auto& p : pieces)
+                {
+                    if (p)
+                        batch.toAdd.push_back(std::move(p));
+                }
+            }
+        }
+        if (!batch.empty())
+            editService->applyEditBatch(std::move(batch), "Break");
+    });
+
+    Ops::declareMutating(reg, OperationId::Edit_Join, [editService] {
+        if (!editService)
+            return;
+        auto* scene = editService->sceneManager();
+        if (!scene)
+            return;
+        auto selected = scene->getSelectedEntities();
+        if (selected.size() < 2)
+            return;
+        const Eg::GeometryContext ctx;
+
+        std::vector<std::unique_ptr<Eg::AprEntity>> items;
+        std::vector<Eg::EntityId> removeIds;
+        items.reserve(selected.size());
+        for (Eg::AprEntity* e : selected)
+        {
+            if (!e)
+                continue;
+            items.push_back(std::unique_ptr<Eg::AprEntity>(e->clone()));
+            removeIds.push_back(e->id);
+        }
+
+        bool mergedAny = false;
+        bool merged = true;
+        while (merged && items.size() > 1)
+        {
+            merged = false;
+            for (size_t i = 0; i < items.size() && !merged; ++i)
+            {
+                for (size_t j = i + 1; j < items.size(); ++j)
+                {
+                    auto res = Eg::Geo2DEdit::merge(items[i].get(), items[j].get(), ctx);
+                    if (!res.empty() && res.front())
+                    {
+                        items[i] = std::move(res.front());
+                        items.erase(items.begin() + static_cast<long>(j));
+                        merged = true;
+                        mergedAny = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!mergedAny)
+            return;
+
+        SceneEditBatch batch;
+        batch.toRemove = std::move(removeIds);
+        for (auto& it : items)
+        {
+            if (it)
+                batch.toAdd.push_back(std::move(it));
+        }
+        if (!batch.empty())
+            editService->applyEditBatch(std::move(batch), "Join");
+    });
+}
+
 void EditOperationRegistry::registerBboxOps()
 {
     auto& reg = m_bus->registry();
@@ -999,5 +1316,85 @@ void EditOperationRegistry::registerArrayOp()
         req.id = OperationId::Algo_Array;
         req.source = OperationSource::Menu;
         m_algorithmRunner->runForOperation(OperationId::Algo_Array, req);
+    });
+}
+
+void EditOperationRegistry::registerTextOps()
+{
+    auto& reg = m_bus->registry();
+    auto* editService = m_editService;
+    QWidget* parentWidget = m_parentWidget;
+
+    Ops::declare(reg, OperationId::Edit_TextToPath, [editService] {
+        if (!editService || !editService->sceneManager())
+            return;
+        auto* scene = editService->sceneManager();
+        const auto selected = scene->getSelectedEntities();
+        if (selected.empty())
+            return;
+
+        SceneEditBatch batch;
+        Eg::TextConverter converter;
+        int converted = 0;
+        for (Eg::AprEntity* e : selected)
+        {
+            if (!e || e->eType != Eg::EType::TEXT)
+                continue;
+            auto* text = static_cast<Eg::AprText*>(e);
+            Eg::InputTextParam param;
+            param.strText = text->textStr();
+            param.strFontFamily = text->fontNameStr();
+            param.dFontSize = text->dHeight;
+            param.bBold = text->bBold;
+            param.bItalic = text->bItalic;
+            param.pos = Ut::Vec2d(text->basePoint.x(), text->basePoint.y());
+            param.nAlignment = (text->hAlign == Eg::AprTextHAlign::Center) ? 1
+                : (text->hAlign == Eg::AprTextHAlign::Right)                 ? 2
+                                                                              : 0;
+
+            auto lines = converter.doConvert(param);
+            if (lines.empty())
+                continue;
+            if (std::abs(text->dRotation) > 1e-12)
+            {
+                const Ut::Mat3d rot = Ut::Mat3d::rotateAround(text->dRotation, Ut::Vec2d(text->basePoint.x(), text->basePoint.y()));
+                for (auto& line : lines)
+                {
+                    if (line)
+                        line->transform(rot);
+                }
+            }
+            for (auto& line : lines)
+            {
+                if (line)
+                    batch.toAdd.push_back(std::move(line));
+            }
+            batch.toRemove.push_back(text->id);
+            ++converted;
+        }
+
+        if (converted > 0 && !batch.empty())
+        {
+            editService->applyEditBatch(std::move(batch), "Convert Text to Path");
+            APR_INFOF("[EditOperationRegistry] TextToPath: converted %d text entities", converted);
+        }
+    });
+
+    Ops::declare(reg, OperationId::Edit_TextOnPath, [parentWidget] {
+        if (parentWidget)
+        {
+            QMessageBox::information(parentWidget, QObject::tr("Text on Path"),
+                QObject::tr("Text on Path is planned. Current data model does not yet store path-following text; "
+                            "this command will be enabled once the text/path binding model is added."));
+        }
+    });
+
+    Ops::declare(reg, OperationId::Edit_VariableText, [parentWidget] {
+        if (parentWidget)
+        {
+            QMessageBox::information(parentWidget, QObject::tr("Variable Text"),
+                QObject::tr("Variable Text is planned. It requires a variable placeholder model and render-time substitution; "
+                            "the command entry is now wired for future implementation."));
+        }
     });
 }
