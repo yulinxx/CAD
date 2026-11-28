@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 6</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="icon" transform="translate(-625.000000, -696.000000)">
+            <g id="编组-6" transform="translate(625.000000, 696.000000)">
+                <rect id="矩形备份-37" fill="#C2C2C2" x="1" y="4" width="1" height="3" rx="0.5"></rect>
+                <rect id="矩形备份-53" fill="#C2C2C2" x="14" y="4" width="1" height="3" rx="0.5"></rect>
+                <rect id="矩形备份-52" fill="#C2C2C2" x="1" y="9" width="1" height="3" rx="0.5"></rect>
+                <rect id="矩形备份-71" fill="#C2C2C2" x="14" y="9" width="1" height="3" rx="0.5"></rect>
+                <path d="M4.5,1 L6.5,1 C6.77614237,1 7,1.22385763 7,1.5 C7,1.77614237 6.77614237,2 6.5,2 L4.5,2 C4.22385763,2 4,1.77614237 4,1.5 C4,1.22385763 4.22385763,1 4.5,1 Z" id="矩形备份-33" fill="#C2C2C2"></path>
+                <path d="M4.5,14 L6.5,14 C6.77614237,14 7,14.2238576 7,14.5 C7,14.7761424 6.77614237,15 6.5,15 L4.5,15 C4.22385763,15 4,14.7761424 4,14.5 C4,14.2238576 4.22385763,14 4.5,14 Z" id="矩形备份-34" fill="#C2C2C2"></path>
+                <path d="M9.5,1 L11.5,1 C11.7761424,1 12,1.22385763 12,1.5 C12,1.77614237 11.7761424,2 11.5,2 L9.5,2 C9.22385763,2 9,1.77614237 9,1.5 C9,1.22385763 9.22385763,1 9.5,1 Z" id="矩形备份-35" fill="#C2C2C2"></path>
+                <path d="M9.5,14 L11.5,14 C11.7761424,14 12,14.2238576 12,14.5 C12,14.7761424 11.7761424,15 11.5,15 L9.5,15 C9.22385763,15 9,14.7761424 9,14.5 C9,14.2238576 9.22385763,14 9.5,14 Z" id="矩形备份-36" fill="#C2C2C2"></path>
+                <rect id="矩形备份-24" stroke="#C2C2C2" x="0.5" y="0.5" width="2" height="2" rx="0.5"></rect>
+                <rect id="矩形备份-30" stroke="#C2C2C2" x="13.5" y="0.5" width="2" height="2" rx="0.5"></rect>
+                <rect id="矩形备份-29" stroke="#C2C2C2" x="0.5" y="13.5" width="2" height="2" rx="0.5"></rect>
+                <rect id="矩形备份-32" stroke="#C2C2C2" x="13.5" y="13.5" width="2" height="2" rx="0.5"></rect>
+                <rect id="矩形备份-73" stroke="#C2C2C2" x="4.5" y="4.5" width="7" height="7" rx="1"></rect>
+                <polygon id="路径备份-2" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round" fill-rule="nonzero" points="5.75 9.17943 7.1 7.3725 7.775 8.0475 8.5625 6.81 10.25 9.17943"></polygon>
+            </g>
+        </g>
+    </g>
+</svg>

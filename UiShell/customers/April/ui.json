@@ -1,0 +1,1501 @@
+{
+  "version": 2,
+  "profileId": "april",
+  "titleBar": {
+    "title": "April",
+    "buttons": [
+      "minimize",
+      "maximize",
+      "close"
+    ]
+  },
+  "window": {
+    "minWidth": 900,
+    "minHeight": 600,
+    "nativeMenuBar": true
+  },
+  "regions": [
+    {
+      "id": "titlebar",
+      "type": "TitleBar",
+      "order": 1
+    },
+    {
+      "id": "menubar",
+      "type": "MenuBar",
+      "order": 5
+    },
+    {
+      "id": "top",
+      "type": "TopBar",
+      "order": 10,
+      "areas": [
+        {
+          "id": "top.toolbar",
+          "order": 5
+        },
+        {
+          "id": "top.main",
+          "order": 10
+        }
+      ]
+    },
+    {
+      "id": "left",
+      "type": "LeftDock",
+      "order": 20,
+      "areas": [
+        {
+          "id": "left.main",
+          "order": 10
+        }
+      ]
+    },
+    {
+      "id": "center",
+      "type": "CenterView",
+      "order": 30
+    },
+    {
+      "id": "right",
+      "type": "RightDock",
+      "order": 40,
+      "areas": [
+        {
+          "id": "right.main",
+          "order": 10
+        }
+      ]
+    },
+    {
+      "id": "bottom",
+      "type": "StatusBar",
+      "order": 50,
+      "areas": [
+        {
+          "id": "bottom.main",
+          "order": 10
+        }
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "id": "drawTools",
+      "factory": "april.panel",
+      "area": "left.main",
+      "order": 5,
+      "preferredWidth": 56,
+      "props": {
+        "kind": "drawTools"
+      }
+    },
+    {
+      "id": "editToolbar",
+      "factory": "april.panel",
+      "area": "top.toolbar",
+      "order": 5,
+      "props": {
+        "kind": "topToolbar",
+        "commands": [
+          "edit.undo",
+          "edit.redo",
+          "separator",
+          "edit.mirror_horizontal",
+          "edit.mirror_vertical",
+          "separator",
+          "edit.align_left",
+          "edit.align_right",
+          "edit.align_center_h",
+          "edit.align_top",
+          "edit.align_bottom",
+          "edit.align_center_v",
+          "separator",
+          "edit.select_all",
+          "edit.invert_selection",
+          "edit.deselect",
+          "separator",
+          "edit.copy",
+          "edit.paste",
+          "edit.delete",
+          "separator",
+          "edit.group"
+        ]
+      }
+    },
+    {
+      "id": "scene",
+      "factory": "april.panel",
+      "area": "left.main",
+      "order": 10
+    },
+    {
+      "id": "inspector",
+      "factory": "april.panel",
+      "area": "right.main",
+      "order": 10
+    },
+    {
+      "id": "status",
+      "factory": "april.panel",
+      "area": "bottom.main",
+      "order": 10
+    }
+  ],
+  "menus": [
+    {
+      "id": "file",
+      "type": "submenu",
+      "titleKey": "File",
+      "children": [
+        {
+          "id": "file.new",
+          "type": "command",
+          "commandId": "file.new",
+          "titleKey": "New",
+          "iconKey": ":/ui/common/Icons/File/new.svg"
+        },
+        {
+          "id": "file.new_3d",
+          "type": "command",
+          "commandId": "file.new_scene",
+          "titleKey": "New",
+          "iconKey": ":/ui/common/Icons/File/new.svg"
+        },
+        {
+          "id": "file.open",
+          "type": "command",
+          "commandId": "file.open",
+          "titleKey": "Open...",
+          "iconKey": ":/ui/common/Icons/File/open.svg"
+        },
+        {
+          "id": "file.save",
+          "type": "command",
+          "commandId": "file.save",
+          "titleKey": "Save",
+          "iconKey": ":/ui/common/Icons/File/save.svg"
+        },
+        {
+          "id": "file.save_as",
+          "type": "command",
+          "commandId": "file.save_as",
+          "titleKey": "Save As...",
+          "iconKey": ":/ui/common/Icons/File/save_as.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "file.recent",
+          "type": "submenu",
+          "titleKey": "Recent Files",
+          "iconKey": ":/ui/common/Icons/File/recent.svg",
+          "children": []
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "file.import",
+          "type": "submenu",
+          "titleKey": "Import",
+          "iconKey": ":/ui/common/Icons/File/import.svg",
+          "children": [
+            {
+              "id": "file.import_all",
+              "type": "command",
+              "commandId": "file.import_all",
+              "titleKey": "All Supported...",
+              "iconKey": ":/ui/common/Icons/File/import.svg"
+            },
+            {
+              "id": "file.import_all_3d",
+              "type": "command",
+              "commandId": "file.import_model",
+              "titleKey": "All Supported...",
+              "iconKey": ":/ui/common/Icons/File/import.svg"
+            },
+            {
+              "type": "separator"
+            },
+            {
+              "id": "file.import_dxf",
+              "type": "command",
+              "commandId": "file.import_dxf",
+              "titleKey": "DXF...",
+              "iconKey": ":/ui/common/Icons/File/import.svg"
+            },
+            {
+              "id": "file.import_plt",
+              "type": "command",
+              "commandId": "file.import_plt",
+              "titleKey": "PLT...",
+              "iconKey": ":/ui/common/Icons/File/import.svg"
+            },
+            {
+              "id": "file.import_svg",
+              "type": "command",
+              "commandId": "file.import_svg",
+              "titleKey": "SVG...",
+              "iconKey": ":/ui/common/Icons/File/import.svg"
+            },
+            {
+              "id": "file.import_pdf",
+              "type": "command",
+              "commandId": "file.import_pdf",
+              "titleKey": "PDF...",
+              "iconKey": ":/ui/common/Icons/File/import.svg"
+            },
+            {
+              "id": "file.import_ai",
+              "type": "command",
+              "commandId": "file.import_ai",
+              "titleKey": "AI...",
+              "iconKey": ":/ui/common/Icons/File/import.svg"
+            },
+            {
+              "id": "file.import_ug",
+              "type": "command",
+              "commandId": "file.import_ug",
+              "titleKey": "UG...",
+              "iconKey": ":/ui/common/Icons/File/import.svg"
+            },
+            {
+              "id": "file.import_image",
+              "type": "command",
+              "commandId": "file.import_image",
+              "titleKey": "Image...",
+              "iconKey": ":/ui/common/Icons/File/import.svg"
+            },
+            {
+              "id": "file.import_step",
+              "type": "command",
+              "commandId": "file.import_step",
+              "titleKey": "STEP...",
+              "iconKey": ":/ui/common/Icons/File/import.svg"
+            },
+            {
+              "id": "file.import_obj",
+              "type": "command",
+              "commandId": "file.import_obj",
+              "titleKey": "OBJ...",
+              "iconKey": ":/ui/common/Icons/File/import.svg"
+            },
+            {
+              "id": "file.import_stl",
+              "type": "command",
+              "commandId": "file.import_stl",
+              "titleKey": "STL...",
+              "iconKey": ":/ui/common/Icons/File/import.svg"
+            }
+          ]
+        },
+        {
+          "id": "file.export",
+          "type": "submenu",
+          "titleKey": "Export",
+          "iconKey": ":/ui/common/Icons/File/export.svg",
+          "children": [
+            {
+              "id": "file.export_dxf",
+              "type": "command",
+              "commandId": "file.export_dxf",
+              "titleKey": "DXF",
+              "iconKey": ":/ui/common/Icons/File/export.svg"
+            },
+            {
+              "id": "file.export_svg",
+              "type": "command",
+              "commandId": "file.export_svg",
+              "titleKey": "SVG",
+              "iconKey": ":/ui/common/Icons/File/export.svg"
+            },
+            {
+              "id": "file.export_plt",
+              "type": "command",
+              "commandId": "file.export_plt",
+              "titleKey": "PLT",
+              "iconKey": ":/ui/common/Icons/File/export.svg"
+            },
+            {
+              "id": "file.export_bmp",
+              "type": "command",
+              "commandId": "file.export_bmp",
+              "titleKey": "BMP",
+              "iconKey": ":/ui/common/Icons/File/export.svg"
+            },
+            {
+              "id": "file.export_obj",
+              "type": "command",
+              "commandId": "file.export_obj",
+              "titleKey": "OBJ",
+              "iconKey": ":/ui/common/Icons/File/export.svg"
+            },
+            {
+              "id": "file.export_stl",
+              "type": "command",
+              "commandId": "file.export_stl",
+              "titleKey": "STL",
+              "iconKey": ":/ui/common/Icons/File/export.svg"
+            },
+            {
+              "id": "file.export_step",
+              "type": "command",
+              "commandId": "file.export_step",
+              "titleKey": "STEP",
+              "iconKey": ":/ui/common/Icons/File/export.svg"
+            },
+            {
+              "id": "file.export_png",
+              "type": "command",
+              "commandId": "file.export_png",
+              "titleKey": "PNG",
+              "iconKey": ":/ui/common/Icons/File/export.svg"
+            }
+          ]
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "file.exit",
+          "type": "command",
+          "commandId": "file.exit",
+          "titleKey": "Exit",
+          "iconKey": ":/ui/common/Icons/File/exit.svg"
+        }
+      ]
+    },
+    {
+      "id": "edit",
+      "type": "submenu",
+      "titleKey": "Edit",
+      "children": [
+        {
+          "id": "edit.undo",
+          "type": "command",
+          "commandId": "edit.undo",
+          "titleKey": "Undo",
+          "iconKey": ":/ui/common/Icons/Actions/undo.svg"
+        },
+        {
+          "id": "edit.redo",
+          "type": "command",
+          "commandId": "edit.redo",
+          "titleKey": "Redo",
+          "iconKey": ":/ui/common/Icons/Actions/redo.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "edit.select_all",
+          "type": "command",
+          "commandId": "edit.select_all",
+          "titleKey": "Select All",
+          "iconKey": ":/ui/common/Icons/Actions/select_all.svg"
+        },
+        {
+          "id": "edit.invert_selection",
+          "type": "command",
+          "commandId": "edit.invert_selection",
+          "titleKey": "Invert Selection",
+          "iconKey": ":/ui/common/Icons/Actions/invert.svg"
+        },
+        {
+          "id": "edit.deselect",
+          "type": "command",
+          "commandId": "edit.deselect",
+          "titleKey": "Clear Selection",
+          "iconKey": ":/ui/common/Icons/Actions/clear.svg"
+        },
+        {
+          "id": "edit.deselect_3d",
+          "type": "command",
+          "commandId": "edit.clear_selection",
+          "titleKey": "Clear Selection",
+          "iconKey": ":/ui/common/Icons/Actions/clear.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "edit.cut",
+          "type": "command",
+          "commandId": "edit.cut",
+          "titleKey": "Cut",
+          "iconKey": ":/ui/common/Icons/Actions/cut.svg"
+        },
+        {
+          "id": "edit.copy",
+          "type": "command",
+          "commandId": "edit.copy",
+          "titleKey": "Copy",
+          "iconKey": ":/ui/common/Icons/Actions/copy.svg"
+        },
+        {
+          "id": "edit.paste",
+          "type": "command",
+          "commandId": "edit.paste",
+          "titleKey": "Paste",
+          "iconKey": ":/ui/common/Icons/Actions/paste.svg"
+        },
+        {
+          "id": "edit.paste_text",
+          "type": "command",
+          "commandId": "edit.paste_text",
+          "titleKey": "Paste as Text",
+          "iconKey": ":/ui/common/Icons/Actions/paste.svg"
+        },
+        {
+          "id": "edit.paste_image",
+          "type": "command",
+          "commandId": "edit.paste_image",
+          "titleKey": "Paste as Image",
+          "iconKey": ":/ui/common/Icons/Actions/paste.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "edit.delete",
+          "type": "command",
+          "commandId": "edit.delete",
+          "titleKey": "Delete",
+          "iconKey": ":/ui/common/Icons/Actions/delete.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "edit.transform",
+          "type": "submenu",
+          "titleKey": "Transform",
+          "iconKey": ":/ui/common/Icons/Actions/move.svg",
+          "children": [
+            {
+              "id": "edit.move",
+              "type": "command",
+              "commandId": "edit.move",
+              "titleKey": "Move",
+              "iconKey": ":/ui/common/Icons/Actions/move.svg"
+            },
+            {
+              "id": "edit.rotate_90cw",
+              "type": "command",
+              "commandId": "edit.rotate_90cw",
+              "titleKey": "Rotate 90 CW",
+              "iconKey": ":/ui/common/Icons/Actions/rotate.svg"
+            },
+            {
+              "id": "edit.rotate_90ccw",
+              "type": "command",
+              "commandId": "edit.rotate_90ccw",
+              "titleKey": "Rotate 90 CCW",
+              "iconKey": ":/ui/common/Icons/Actions/rotate.svg"
+            },
+            {
+              "id": "edit.rotate_180",
+              "type": "command",
+              "commandId": "edit.rotate_180",
+              "titleKey": "Rotate 180",
+              "iconKey": ":/ui/common/Icons/Actions/rotate.svg"
+            },
+            {
+              "id": "edit.mirror_horizontal",
+              "type": "command",
+              "commandId": "edit.mirror_horizontal",
+              "titleKey": "Mirror Horizontal",
+              "iconKey": ":/ui/common/Icons/Actions/mirror_h.svg"
+            },
+            {
+              "id": "edit.mirror_vertical",
+              "type": "command",
+              "commandId": "edit.mirror_vertical",
+              "titleKey": "Mirror Vertical",
+              "iconKey": ":/ui/common/Icons/Actions/mirror_v.svg"
+            },
+            {
+              "id": "edit.scale",
+              "type": "command",
+              "commandId": "edit.scale",
+              "titleKey": "Scale",
+              "iconKey": ":/ui/common/Icons/View3D/scale.svg"
+            },
+            {
+              "id": "edit.transform_translate",
+              "type": "command",
+              "commandId": "edit.transform_translate",
+              "titleKey": "Move",
+              "iconKey": ":/ui/common/Icons/Actions/move.svg"
+            },
+            {
+              "id": "edit.transform_rotate",
+              "type": "command",
+              "commandId": "edit.transform_rotate",
+              "titleKey": "Rotate",
+              "iconKey": ":/ui/common/Icons/Actions/rotate.svg"
+            },
+            {
+              "id": "edit.transform_scale",
+              "type": "command",
+              "commandId": "edit.transform_scale",
+              "titleKey": "Scale",
+              "iconKey": ":/ui/common/Icons/View3D/scale.svg"
+            },
+            {
+              "id": "edit.transform_mirror",
+              "type": "command",
+              "commandId": "edit.mirror",
+              "titleKey": "Mirror",
+              "iconKey": ":/ui/common/Icons/Actions/mirror_h.svg"
+            }
+          ]
+        },
+        {
+          "id": "edit.align",
+          "type": "submenu",
+          "titleKey": "Align",
+          "iconKey": ":/ui/common/Icons/Actions/align_left.svg",
+          "children": [
+            {
+              "id": "edit.align_left",
+              "type": "command",
+              "commandId": "edit.align_left",
+              "titleKey": "Align Left",
+              "iconKey": ":/ui/common/Icons/Actions/align_left.svg"
+            },
+            {
+              "id": "edit.align_right",
+              "type": "command",
+              "commandId": "edit.align_right",
+              "titleKey": "Align Right",
+              "iconKey": ":/ui/common/Icons/Actions/align_right.svg"
+            },
+            {
+              "id": "edit.align_center_h",
+              "type": "command",
+              "commandId": "edit.align_center_h",
+              "titleKey": "Center Horizontally",
+              "iconKey": ":/ui/common/Icons/Actions/align_center_h.svg"
+            },
+            {
+              "id": "edit.align_top",
+              "type": "command",
+              "commandId": "edit.align_top",
+              "titleKey": "Align Top",
+              "iconKey": ":/ui/common/Icons/Actions/align_top.svg"
+            },
+            {
+              "id": "edit.align_bottom",
+              "type": "command",
+              "commandId": "edit.align_bottom",
+              "titleKey": "Align Bottom",
+              "iconKey": ":/ui/common/Icons/Actions/align_bottom.svg"
+            },
+            {
+              "id": "edit.align_center_v",
+              "type": "command",
+              "commandId": "edit.align_center_v",
+              "titleKey": "Center Vertically",
+              "iconKey": ":/ui/common/Icons/Actions/align_center_v.svg"
+            }
+          ]
+        },
+        {
+          "id": "edit.group",
+          "type": "command",
+          "commandId": "edit.group",
+          "titleKey": "Group",
+          "iconKey": ":/ui/common/Icons/Actions/group.svg"
+        },
+        {
+          "id": "edit.ungroup",
+          "type": "command",
+          "commandId": "edit.ungroup",
+          "titleKey": "Ungroup",
+          "iconKey": ":/ui/common/Icons/Actions/ungroup.svg"
+        }
+      ]
+    },
+    {
+      "id": "view",
+      "type": "submenu",
+      "titleKey": "View",
+      "children": [
+        {
+          "id": "view.zoom",
+          "type": "submenu",
+          "titleKey": "Zoom",
+          "iconKey": ":/ui/common/Icons/View/zoom_in.svg",
+          "children": [
+            {
+              "id": "view.zoom_in",
+              "type": "command",
+              "commandId": "view.zoom_in",
+              "titleKey": "Zoom In",
+              "iconKey": ":/ui/common/Icons/View/zoom_in.svg"
+            },
+            {
+              "id": "view.zoom_out",
+              "type": "command",
+              "commandId": "view.zoom_out",
+              "titleKey": "Zoom Out",
+              "iconKey": ":/ui/common/Icons/View/zoom_out.svg"
+            },
+            {
+              "id": "view.zoom_fit",
+              "type": "command",
+              "commandId": "view.zoom_fit",
+              "titleKey": "Fit All",
+              "iconKey": ":/ui/common/Icons/View3D/fit.svg"
+            },
+            {
+              "id": "view.zoom_selection",
+              "type": "command",
+              "commandId": "view.zoom_selection",
+              "titleKey": "Zoom to Selection",
+              "iconKey": ":/ui/common/Icons/View/zoom_selection.svg"
+            },
+            {
+              "id": "view.reset",
+              "type": "command",
+              "commandId": "view.reset",
+              "titleKey": "Reset View",
+              "iconKey": ":/ui/common/Icons/View3D/reset.svg"
+            }
+          ]
+        },
+        {
+          "id": "view.pan",
+          "type": "command",
+          "commandId": "view.pan",
+          "titleKey": "Pan",
+          "iconKey": ":/ui/common/Icons/View/pan.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "view.unit",
+          "type": "submenu",
+          "titleKey": "Unit",
+          "iconKey": ":/ui/common/Icons/View/unit.svg",
+          "children": [
+            {
+              "id": "view.unit_mm",
+              "type": "command",
+              "commandId": "view.unit_mm",
+              "titleKey": "mm"
+            },
+            {
+              "id": "view.unit_cm",
+              "type": "command",
+              "commandId": "view.unit_cm",
+              "titleKey": "cm"
+            },
+            {
+              "id": "view.unit_inch",
+              "type": "command",
+              "commandId": "view.unit_inch",
+              "titleKey": "inch"
+            }
+          ]
+        },
+        {
+          "id": "view.grid_snap",
+          "type": "submenu",
+          "titleKey": "Grid && Snap",
+          "iconKey": ":/ui/common/Icons/View3D/grid.svg",
+          "children": [
+            {
+              "id": "view.grid_visible",
+              "type": "command",
+              "commandId": "view.grid_visible",
+              "titleKey": "Show Grid",
+              "iconKey": ":/ui/common/Icons/View3D/grid.svg"
+            },
+            {
+              "id": "view.snap_enabled",
+              "type": "command",
+              "commandId": "view.snap_enabled",
+              "titleKey": "Snap Enabled",
+              "iconKey": ":/ui/common/Icons/View/snap.svg"
+            },
+            {
+              "id": "view.ortho_mode",
+              "type": "command",
+              "commandId": "view.ortho_mode",
+              "titleKey": "Ortho Mode",
+              "iconKey": ":/ui/common/Icons/View/ortho.svg"
+            },
+            {
+              "id": "view.angle_snap",
+              "type": "command",
+              "commandId": "view.angle_snap",
+              "titleKey": "Angle Snap",
+              "iconKey": ":/ui/common/Icons/View/angle_snap.svg"
+            }
+          ]
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "view.layer_manager",
+          "type": "command",
+          "commandId": "view.layer_manager",
+          "titleKey": "Layer Manager...",
+          "iconKey": ":/ui/common/Icons/View/layers.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "view.camera",
+          "type": "submenu",
+          "titleKey": "Camera",
+          "iconKey": ":/ui/common/Icons/View3D/camera.svg",
+          "children": [
+            {
+              "id": "view.fit_all",
+              "type": "command",
+              "commandId": "view.fit_all",
+              "titleKey": "Fit All",
+              "iconKey": ":/ui/common/Icons/View3D/fit.svg"
+            },
+            {
+              "id": "view.front",
+              "type": "command",
+              "commandId": "view.front",
+              "titleKey": "Front",
+              "iconKey": ":/ui/common/Icons/View3D/view_front.svg"
+            },
+            {
+              "id": "view.back",
+              "type": "command",
+              "commandId": "view.back",
+              "titleKey": "Back",
+              "iconKey": ":/ui/common/Icons/View3D/view_back.svg"
+            },
+            {
+              "id": "view.left",
+              "type": "command",
+              "commandId": "view.left",
+              "titleKey": "Left",
+              "iconKey": ":/ui/common/Icons/View3D/view_left.svg"
+            },
+            {
+              "id": "view.right",
+              "type": "command",
+              "commandId": "view.right",
+              "titleKey": "Right",
+              "iconKey": ":/ui/common/Icons/View3D/view_right.svg"
+            },
+            {
+              "id": "view.top",
+              "type": "command",
+              "commandId": "view.top",
+              "titleKey": "Top",
+              "iconKey": ":/ui/common/Icons/View3D/view_top.svg"
+            },
+            {
+              "id": "view.bottom",
+              "type": "command",
+              "commandId": "view.bottom",
+              "titleKey": "Bottom",
+              "iconKey": ":/ui/common/Icons/View3D/view_bottom.svg"
+            },
+            {
+              "id": "view.isometric",
+              "type": "command",
+              "commandId": "view.isometric",
+              "titleKey": "Isometric",
+              "iconKey": ":/ui/common/Icons/View3D/view_isometric.svg"
+            },
+            {
+              "id": "view.dimetric",
+              "type": "command",
+              "commandId": "view.dimetric",
+              "titleKey": "Dimetric",
+              "iconKey": ":/ui/common/Icons/View3D/view_dimetric.svg"
+            },
+            {
+              "id": "view.trimetric",
+              "type": "command",
+              "commandId": "view.trimetric",
+              "titleKey": "Trimetric",
+              "iconKey": ":/ui/common/Icons/View3D/view_trimetric.svg"
+            }
+          ]
+        },
+        {
+          "id": "view.display",
+          "type": "submenu",
+          "titleKey": "Display",
+          "iconKey": ":/ui/common/Icons/View3D/wireframe.svg",
+          "children": [
+            {
+              "id": "view.wireframe",
+              "type": "command",
+              "commandId": "view.wireframe",
+              "titleKey": "Wireframe",
+              "iconKey": ":/ui/common/Icons/View3D/wireframe.svg"
+            },
+            {
+              "id": "view.grid",
+              "type": "command",
+              "commandId": "view.grid",
+              "titleKey": "Show Grid",
+              "iconKey": ":/ui/common/Icons/View3D/grid.svg"
+            },
+            {
+              "id": "view.bbox",
+              "type": "command",
+              "commandId": "view.bbox",
+              "titleKey": "Show Bounding Box",
+              "iconKey": ":/ui/common/Icons/View3D/bbox.svg"
+            },
+            {
+              "id": "view.floor",
+              "type": "command",
+              "commandId": "view.floor",
+              "titleKey": "Show Floor",
+              "iconKey": ":/ui/common/Icons/View3D/floor.svg"
+            },
+            {
+              "id": "view.toolpath_xray",
+              "type": "command",
+              "commandId": "view.toolpath_xray",
+              "titleKey": "Toolpath X-Ray"
+            }
+          ]
+        },
+        {
+          "id": "view.switch_to_2d",
+          "type": "command",
+          "commandId": "view.switch_to_2d",
+          "titleKey": "Switch to 2D",
+          "iconKey": ":/ui/common/Icons/View3D/switch_to_2d.svg"
+        },
+        {
+          "id": "view.switch_to_3d",
+          "type": "command",
+          "commandId": "view.switch_to_3d",
+          "titleKey": "Switch to 3D",
+          "iconKey": ":/ui/common/Icons/View/switch_to_3d.svg"
+        }
+      ]
+    },
+    {
+      "id": "draw",
+      "type": "submenu",
+      "titleKey": "Draw",
+      "children": [
+        {
+          "id": "tool.select",
+          "type": "command",
+          "commandId": "tool.select",
+          "titleKey": "Select",
+          "iconKey": ":/ui/common/Icons/Tools/select.svg"
+        },
+        {
+          "id": "tool.point",
+          "type": "command",
+          "commandId": "tool.point",
+          "titleKey": "Point",
+          "iconKey": ":/ui/common/Icons/Tools/point.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "tool.line",
+          "type": "command",
+          "commandId": "tool.line",
+          "titleKey": "Line",
+          "iconKey": ":/ui/common/Icons/Tools/line.svg"
+        },
+        {
+          "id": "tool.polyline",
+          "type": "command",
+          "commandId": "tool.polyline",
+          "titleKey": "Polyline",
+          "iconKey": ":/ui/common/Icons/Tools/polyline.svg"
+        },
+        {
+          "id": "tool.polygon",
+          "type": "command",
+          "commandId": "tool.polygon",
+          "titleKey": "Polygon",
+          "iconKey": ":/ui/common/Icons/Tools/polygon.svg"
+        },
+        {
+          "id": "tool.smartline",
+          "type": "command",
+          "commandId": "tool.smartline",
+          "titleKey": "Smart Line",
+          "iconKey": ":/ui/common/Icons/Tools/smartline.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "tool.circle",
+          "type": "command",
+          "commandId": "tool.circle",
+          "titleKey": "Circle",
+          "iconKey": ":/ui/common/Icons/Tools/circle.svg"
+        },
+        {
+          "id": "tool.arc",
+          "type": "command",
+          "commandId": "tool.arc",
+          "titleKey": "Arc",
+          "iconKey": ":/ui/common/Icons/Tools/arc.svg"
+        },
+        {
+          "id": "tool.ellipse",
+          "type": "command",
+          "commandId": "tool.ellipse",
+          "titleKey": "Ellipse",
+          "iconKey": ":/ui/common/Icons/Tools/ellipse.svg"
+        },
+        {
+          "id": "tool.rectangle",
+          "type": "command",
+          "commandId": "tool.rectangle",
+          "titleKey": "Rectangle",
+          "iconKey": ":/ui/common/Icons/Tools/rectangle.svg"
+        },
+        {
+          "id": "tool.triangle",
+          "type": "command",
+          "commandId": "tool.triangle",
+          "titleKey": "Triangle",
+          "iconKey": ":/ui/common/Icons/Tools/triangle.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "tool.bezier2",
+          "type": "command",
+          "commandId": "tool.bezier2",
+          "titleKey": "Quadratic Bezier",
+          "iconKey": ":/ui/common/Icons/Tools/bezier2.svg"
+        },
+        {
+          "id": "tool.bezier",
+          "type": "command",
+          "commandId": "tool.bezier",
+          "titleKey": "Cubic Bezier",
+          "iconKey": ":/ui/common/Icons/Tools/bezier.svg"
+        },
+        {
+          "id": "tool.spline",
+          "type": "command",
+          "commandId": "tool.spline",
+          "titleKey": "Spline",
+          "iconKey": ":/ui/common/Icons/Tools/spline.svg"
+        },
+        {
+          "id": "tool.nurbs",
+          "type": "command",
+          "commandId": "tool.nurbs",
+          "titleKey": "Nurbs",
+          "iconKey": ":/ui/common/Icons/Tools/nurbs.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "tool.text",
+          "type": "command",
+          "commandId": "tool.text",
+          "titleKey": "Text",
+          "iconKey": ":/ui/common/Icons/Tools/text.svg"
+        },
+        {
+          "id": "tool.bitmap",
+          "type": "command",
+          "commandId": "tool.bitmap",
+          "titleKey": "Bitmap",
+          "iconKey": ":/ui/common/Icons/Tools/bitmap.svg"
+        },
+        {
+          "id": "tool.qrcode",
+          "type": "command",
+          "commandId": "tool.qrcode",
+          "titleKey": "QR Code",
+          "iconKey": ":/ui/common/Icons/Tools/qrcode.svg"
+        },
+        {
+          "id": "model.make_box",
+          "type": "command",
+          "commandId": "model.make_box",
+          "titleKey": "Box",
+          "iconKey": ":/ui/common/Icons/Model3D/primitive_box.svg"
+        },
+        {
+          "id": "model.make_sphere",
+          "type": "command",
+          "commandId": "model.make_sphere",
+          "titleKey": "Sphere",
+          "iconKey": ":/ui/common/Icons/Model3D/primitive_sphere.svg"
+        },
+        {
+          "id": "model.make_cylinder",
+          "type": "command",
+          "commandId": "model.make_cylinder",
+          "titleKey": "Cylinder",
+          "iconKey": ":/ui/common/Icons/Model3D/primitive_cylinder.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "model.boolean",
+          "type": "submenu",
+          "titleKey": "Boolean",
+          "iconKey": ":/ui/common/Icons/Actions/boolean_union.svg",
+          "children": [
+            {
+              "id": "model.boolean_fuse",
+              "type": "command",
+              "commandId": "model.boolean_fuse",
+              "titleKey": "Fuse",
+              "iconKey": ":/ui/common/Icons/Actions/boolean_union.svg"
+            },
+            {
+              "id": "model.boolean_cut",
+              "type": "command",
+              "commandId": "model.boolean_cut",
+              "titleKey": "Cut",
+              "iconKey": ":/ui/common/Icons/Actions/boolean_difference.svg"
+            }
+          ]
+        },
+        {
+          "id": "model.split",
+          "type": "submenu",
+          "titleKey": "Split",
+          "iconKey": ":/ui/common/Icons/Actions/cut.svg",
+          "children": [
+            {
+              "id": "model.split_half_x",
+              "type": "command",
+              "commandId": "model.split_half_x",
+              "titleKey": "Half by X",
+              "iconKey": ":/ui/common/Icons/Actions/cut.svg"
+            },
+            {
+              "id": "model.split_half_y",
+              "type": "command",
+              "commandId": "model.split_half_y",
+              "titleKey": "Half by Y",
+              "iconKey": ":/ui/common/Icons/Actions/cut.svg"
+            },
+            {
+              "id": "model.split_half_z",
+              "type": "command",
+              "commandId": "model.split_half_z",
+              "titleKey": "Half by Z",
+              "iconKey": ":/ui/common/Icons/Actions/cut.svg"
+            },
+            {
+              "id": "model.split_by_pick_plane",
+              "type": "command",
+              "commandId": "model.split_by_pick_plane",
+              "titleKey": "By Picked Plane",
+              "iconKey": ":/ui/common/Icons/Actions/cut.svg"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "modify",
+      "type": "submenu",
+      "titleKey": "Modify",
+      "children": [
+        {
+          "id": "edit.offset",
+          "type": "command",
+          "commandId": "edit.offset",
+          "titleKey": "Offset...",
+          "iconKey": ":/ui/common/Icons/Actions/offset.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "edit.trim",
+          "type": "command",
+          "commandId": "edit.trim",
+          "titleKey": "Trim",
+          "iconKey": ":/ui/common/Icons/Actions/trim.svg"
+        },
+        {
+          "id": "edit.extend",
+          "type": "command",
+          "commandId": "edit.extend",
+          "titleKey": "Extend",
+          "iconKey": ":/ui/common/Icons/Actions/extend.svg"
+        },
+        {
+          "id": "edit.fillet",
+          "type": "command",
+          "commandId": "edit.fillet",
+          "titleKey": "Fillet...",
+          "iconKey": ":/ui/common/Icons/Actions/fillet.svg"
+        },
+        {
+          "id": "edit.chamfer",
+          "type": "command",
+          "commandId": "edit.chamfer",
+          "titleKey": "Chamfer...",
+          "iconKey": ":/ui/common/Icons/Actions/chamfer.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "edit.boolean_union",
+          "type": "command",
+          "commandId": "edit.boolean_union",
+          "titleKey": "Union",
+          "iconKey": ":/ui/common/Icons/Actions/boolean_union.svg"
+        },
+        {
+          "id": "edit.boolean_intersection",
+          "type": "command",
+          "commandId": "edit.boolean_intersection",
+          "titleKey": "Intersection",
+          "iconKey": ":/ui/common/Icons/Actions/boolean_intersection.svg"
+        },
+        {
+          "id": "edit.boolean_difference",
+          "type": "command",
+          "commandId": "edit.boolean_difference",
+          "titleKey": "Difference",
+          "iconKey": ":/ui/common/Icons/Actions/boolean_difference.svg"
+        },
+        {
+          "id": "edit.boolean_xor",
+          "type": "command",
+          "commandId": "edit.boolean_xor",
+          "titleKey": "Xor",
+          "iconKey": ":/ui/common/Icons/Actions/boolean_xor.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "algo.bitmap_process",
+          "type": "command",
+          "commandId": "algo.bitmap_process",
+          "titleKey": "Process Bitmap...",
+          "iconKey": ":/ui/common/Icons/Tools/bitmap.svg"
+        },
+        {
+          "id": "algo.vectorize_bitmap",
+          "type": "command",
+          "commandId": "algo.vectorize_bitmap",
+          "titleKey": "Vectorize Bitmap...",
+          "iconKey": ":/ui/common/Icons/Actions/offset.svg"
+        }
+      ]
+    },
+    {
+      "id": "algorithm",
+      "type": "submenu",
+      "titleKey": "Algorithm",
+      "children": [
+        {
+          "id": "algo.fill",
+          "type": "command",
+          "commandId": "algo.fill",
+          "titleKey": "Fill",
+          "iconKey": ":/ui/common/Icons/Actions/algo_fill.svg"
+        },
+        {
+          "id": "algo.nesting",
+          "type": "command",
+          "commandId": "algo.nesting",
+          "titleKey": "Nesting",
+          "iconKey": ":/ui/common/Icons/Actions/algo_nesting.svg"
+        },
+        {
+          "id": "algo.array",
+          "type": "command",
+          "commandId": "algo.array",
+          "titleKey": "Array",
+          "iconKey": ":/ui/common/Icons/Actions/algo_array.svg"
+        },
+        {
+          "id": "algo.offset",
+          "type": "command",
+          "commandId": "algo.offset",
+          "titleKey": "Offset...",
+          "iconKey": ":/ui/common/Icons/Actions/offset.svg"
+        },
+        {
+          "id": "algo.relief_engraving",
+          "type": "command",
+          "commandId": "algo.relief_engraving",
+          "titleKey": "Bitmap Relief Engraving...",
+          "iconKey": ":/ui/common/Icons/Actions/algo_relief.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "algo.test_shapes",
+          "type": "command",
+          "commandId": "algo.test_shapes",
+          "titleKey": "Test: Generate Shapes",
+          "iconKey": ":/ui/common/Icons/Actions/algo_fill.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "algo.relief_engraving_mesh",
+          "type": "command",
+          "commandId": "algo.relief_engraving_mesh",
+          "titleKey": "Mesh Relief Engraving...",
+          "iconKey": ":/ui/common/Icons/Actions/algo_relief.svg"
+        },
+        {
+          "id": "algo.nesting_from_mesh",
+          "type": "command",
+          "commandId": "algo.nesting_from_mesh",
+          "titleKey": "Nesting from Mesh",
+          "iconKey": ":/ui/common/Icons/Actions/group.svg"
+        }
+      ]
+    },
+    {
+      "id": "laser",
+      "type": "submenu",
+      "titleKey": "Laser",
+      "children": [
+        {
+          "id": "laser.start_process",
+          "type": "command",
+          "commandId": "laser.start_process",
+          "titleKey": "Start Process",
+          "iconKey": ":/ui/common/Icons/Actions/laser.svg"
+        },
+        {
+          "id": "laser.pause_process",
+          "type": "command",
+          "commandId": "laser.pause_process",
+          "titleKey": "Pause Process",
+          "iconKey": ":/ui/common/Icons/Actions/laser.svg"
+        },
+        {
+          "id": "laser.stop_process",
+          "type": "command",
+          "commandId": "laser.stop_process",
+          "titleKey": "Stop Process",
+          "iconKey": ":/ui/common/Icons/Actions/laser.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "laser.emergency_stop",
+          "type": "command",
+          "commandId": "laser.emergency_stop",
+          "titleKey": "Emergency Stop",
+          "iconKey": ":/ui/common/Icons/Actions/laser_emergency.svg"
+        }
+      ]
+    },
+    {
+      "id": "help",
+      "type": "submenu",
+      "titleKey": "Help",
+      "children": [
+        {
+          "id": "help.docs",
+          "type": "command",
+          "commandId": "help.docs",
+          "titleKey": "Documentation",
+          "iconKey": ":/ui/common/Icons/Help/docs.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "help.settings",
+          "type": "command",
+          "commandId": "help.settings",
+          "titleKey": "Settings",
+          "iconKey": ":/ui/common/Icons/Help/settings.svg"
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "help.theme",
+          "type": "submenu",
+          "titleKey": "Theme",
+          "iconKey": ":/ui/common/Icons/Help/theme.svg",
+          "children": [
+            {
+              "id": "theme.system",
+              "type": "command",
+              "commandId": "theme.system",
+              "titleKey": "System"
+            },
+            {
+              "id": "theme.light",
+              "type": "command",
+              "commandId": "theme.light",
+              "titleKey": "Light"
+            },
+            {
+              "id": "theme.dark",
+              "type": "command",
+              "commandId": "theme.dark",
+              "titleKey": "Dark"
+            },
+            {
+              "id": "theme.blue",
+              "type": "command",
+              "commandId": "theme.blue",
+              "titleKey": "Blue"
+            },
+            {
+              "id": "theme.slate",
+              "type": "command",
+              "commandId": "theme.slate",
+              "titleKey": "Slate"
+            },
+            {
+              "id": "theme.highcontrast",
+              "type": "command",
+              "commandId": "theme.highcontrast",
+              "titleKey": "High Contrast"
+            },
+            {
+              "id": "theme.default",
+              "type": "command",
+              "commandId": "theme.default",
+              "titleKey": "Default"
+            }
+          ]
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "help.language",
+          "type": "submenu",
+          "titleKey": "Language",
+          "iconKey": ":/ui/common/Icons/Help/language.svg",
+          "children": [
+            {
+              "id": "language.en",
+              "type": "command",
+              "commandId": "language.en",
+              "titleKey": "English"
+            },
+            {
+              "id": "language.zh",
+              "type": "command",
+              "commandId": "language.zh",
+              "titleKey": "简体中文"
+            },
+            {
+              "id": "language.ja",
+              "type": "command",
+              "commandId": "language.ja",
+              "titleKey": "日本語"
+            },
+            {
+              "id": "language.ko",
+              "type": "command",
+              "commandId": "language.ko",
+              "titleKey": "한국어"
+            },
+            {
+              "id": "language.fr",
+              "type": "command",
+              "commandId": "language.fr",
+              "titleKey": "Français"
+            },
+            {
+              "id": "language.de",
+              "type": "command",
+              "commandId": "language.de",
+              "titleKey": "Deutsch"
+            },
+            {
+              "id": "language.es",
+              "type": "command",
+              "commandId": "language.es",
+              "titleKey": "Español"
+            },
+            {
+              "id": "language.pt",
+              "type": "command",
+              "commandId": "language.pt",
+              "titleKey": "Português"
+            },
+            {
+              "id": "language.ru",
+              "type": "command",
+              "commandId": "language.ru",
+              "titleKey": "Русский"
+            },
+            {
+              "id": "language.ar",
+              "type": "command",
+              "commandId": "language.ar",
+              "titleKey": "العربية"
+            },
+            {
+              "id": "language.it",
+              "type": "command",
+              "commandId": "language.it",
+              "titleKey": "Italiano"
+            },
+            {
+              "id": "language.hi",
+              "type": "command",
+              "commandId": "language.hi",
+              "titleKey": "हिन्दी"
+            },
+            {
+              "id": "language.tr",
+              "type": "command",
+              "commandId": "language.tr",
+              "titleKey": "Türkçe"
+            },
+            {
+              "id": "language.vi",
+              "type": "command",
+              "commandId": "language.vi",
+              "titleKey": "Tiếng Việt"
+            }
+          ]
+        },
+        {
+          "type": "separator"
+        },
+        {
+          "id": "help.about",
+          "type": "command",
+          "commandId": "help.about",
+          "titleKey": "About",
+          "iconKey": ":/ui/common/Icons/Help/about.svg"
+        }
+      ]
+    }
+  ]
+}

@@ -44,8 +44,6 @@
 #include "Ut/Vec.h"
 #include "Log/AprLogger.h"
 #include "UI/Service/ViewCaptureService.h"
-#include "UI/Workbench/WorkbenchWindow.h"
-#include "UI/Workbench/UiWorkbench.h"
 #include "UI/Render/RenderViewport2D.h"
 
 #include <QObject>

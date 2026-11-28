@@ -1,0 +1,55 @@
+﻿/* ============================================================
+   MantiSoft 客户差异样式：仅在框架 dark.qss 之上叠加差异规则。
+   框架已提供 msuiRole / msuiSeries 动态属性选择器，本文件仅作补足。
+   ============================================================ */
+
+/* ── 工具栏/面板对象名规则（防止与框架冲突，仅作边框/基础布局微调） ── */
+QWidget#LeftToolBar, QWidget#RightToolBar {
+    border: none;
+}
+
+QWidget#LeftToolWidget {
+    border: 1px solid #CCCCCC;
+    border-top: 0px;
+}
+
+QWidget#RightToolWidget {
+    border-left: 1px solid #CCCCCC;
+    border-top: 0px;
+}
+
+/* ── 图片引用修复：确保 url() 前缀与 qrc 资源一致 ── */
+ToolItem {
+    text-align: left;
+    background: #FFFFFF;
+}
+ToolItem:checked {
+    color:#3399FF;
+    background: #FFFFFF;
+}
+ToolItem:disabled {
+    color: #6B6B6B;
+    background: #FFFFFF;
+}
+ToolItem:hover {
+    background: #DBE6F2;
+}
+
+/* ── 调色板相关的辅助选择器（框架提供 palette，此处仅微调） ── */
+LayerParamWidget {
+    qproperty-itemColor: rgba(255, 255, 255, 1);
+    qproperty-itemSelectColor: rgba(191, 191, 191, 1);
+}
+
+LayerParamWidget QListWidget {
+    border: 1px solid #CCCCCC;
+    border-bottom: 0px;
+}
+
+LayerParamWidget QListWidget::item {
+    height: 78px;
+}
+
+/* 兼容旧版规则的兜底（不含硬编码颜色，避免与框架 QSS 冲突） */
+/* 若需要品牌色，请在代码中通过 markPanel(widget, "panel", "mantisoft") 设属性，
+   并在框架 QSS 中使用 [msuiSeries="mantisoft"] 属性选择器。 */

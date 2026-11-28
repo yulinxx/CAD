@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="菜单栏" transform="translate(-36.000000, -322.000000)">
+            <g id="编组" transform="translate(36.000000, 322.000000)">
+                <rect id="矩形" x="0" y="0" width="14" height="14"></rect>
+                <g id="编组-6" stroke="#FFFFFF">
+                    <path d="M12.5,2.5 L12.5,11.5 M11.5,12.5 L2.5,12.5 M1.5,11.5 L1.5,2.5 M2.5,1.5 L11.5,1.5" id="形状"></path>
+                    <rect id="矩形备份-26" x="11.5" y="0.5" width="2" height="2" rx="1"></rect>
+                    <rect id="矩形备份-30" x="11.5" y="11.5" width="2" height="2" rx="1"></rect>
+                    <rect id="矩形备份-35" x="0.5" y="11.5" width="2" height="2" rx="1"></rect>
+                    <rect id="矩形备份-36" x="0.5" y="0.5" width="2" height="2" rx="1"></rect>
+                </g>
+                <g id="文本样式_text-style" transform="translate(3.500000, 3.000000)" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M0,8 L1.09375,5.5 M7,8 L5.90625,5.5 M1.09375,5.5 L3.5,0 L5.90625,5.5 M1.09375,5.5 L5.90625,5.5" id="形状"></path>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

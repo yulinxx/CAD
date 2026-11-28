@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ms_ui 框架全景图集</title>
+<style>
+:root{
+  --bg:#f6f8fb; --surface:#ffffff; --text:#1e2430; --muted:#5f6b7f; --border:#e2e8f0;
+  --blue:#2563eb; --blue-bg:#eff5ff;
+  --purple:#7c3aed; --purple-bg:#f5f1ff;
+  --teal:#0d9488; --teal-bg:#eafaf6;
+  --amber:#c2740a; --amber-bg:#fff6e8;
+  --rose:#e11d48; --rose-bg:#fff0f3;
+  --slate:#475569; --slate-bg:#f1f5f9;
+  --shadow:0 1px 2px rgba(16,24,40,.04),0 8px 24px rgba(16,24,40,.05);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+
+.hero{background:linear-gradient(180deg,#111a2e 0%,#16233f 100%);color:#fff;padding:56px 24px 46px}
+.hero-inner{max-width:1180px;margin:0 auto}
+.kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8fa6cc;font-weight:600}
+.hero h1{font-size:34px;line-height:1.25;margin:12px 0 10px;font-weight:650;letter-spacing:-.02em}
+.hero p{margin:0;color:#c2cfe4;max-width:820px;font-size:15px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:30px}
+.stat{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:14px 16px}
+.stat b{display:block;font-size:24px;font-weight:650;line-height:1.2}
+.stat span{font-size:12px;color:#a9bcd9}
+
+nav.toc{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.94);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--border)}
+.toc-inner{max-width:1180px;margin:0 auto;padding:10px 24px;display:flex;gap:6px;overflow-x:auto;white-space:nowrap}
+.toc a{color:var(--muted);text-decoration:none;font-size:13px;padding:6px 11px;border-radius:8px;transition:.15s}
+.toc a:hover{background:var(--slate-bg);color:var(--text)}
+.toc a.active{background:var(--blue-bg);color:var(--blue);font-weight:600}
+
+main{max-width:1180px;margin:0 auto;padding:0 24px 80px}
+section{padding-top:52px;scroll-margin-top:64px}
+.sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:6px}
+.sec-num{font-size:13px;color:var(--blue);font-weight:700;background:var(--blue-bg);
+  border-radius:7px;padding:2px 9px;letter-spacing:.04em}
+h2{font-size:23px;margin:0;font-weight:650;letter-spacing:-.01em}
+.lead{color:var(--muted);margin:6px 0 20px;max-width:900px}
+
+.figure{background:var(--surface);border:1px solid var(--border);border-radius:16px;
+  box-shadow:var(--shadow);padding:18px 18px 14px;margin:18px 0}
+.figure .figcap{font-size:12.5px;color:var(--muted);border-top:1px dashed var(--border);
+  margin-top:10px;padding-top:10px}
+.figure svg{display:block;width:100%;height:auto}
+svg text{font-family:inherit}
+.s-t{font-size:14px;font-weight:600;fill:#1e2430}
+.s-s{font-size:11.5px;fill:#5f6b7f}
+.s-l{font-size:11px;fill:#5f6b7f}
+.s-b{font-size:13px;font-weight:600}
+
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.note{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px}
+.note h3{margin:0 0 8px;font-size:15px;font-weight:650}
+.note ul{margin:0;padding-left:18px;color:var(--muted);font-size:13.5px}
+.note li{margin:5px 0}
+.note.blue{border-left:3px solid var(--blue)}
+.note.teal{border-left:3px solid var(--teal)}
+.note.amber{border-left:3px solid var(--amber)}
+.note.rose{border-left:3px solid var(--rose)}
+
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted);margin:12px 0 0}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--surface);
+  border:1px solid var(--border);border-radius:12px;overflow:hidden}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--border)}
+th{background:var(--slate-bg);font-weight:600;font-size:12.5px;color:var(--slate)}
+tr:last-child td{border-bottom:0}
+code{background:var(--slate-bg);border:1px solid var(--border);border-radius:5px;
+  padding:1px 5px;font-size:12.5px;color:#0f3d73;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{font-size:12.5px;background:var(--slate-bg);border:1px solid var(--border);
+  border-radius:999px;padding:4px 11px;color:var(--slate)}
+.chip.ok{background:var(--teal-bg);border-color:#b8e6da;color:#0b6b60}
+.chip.todo{background:var(--amber-bg);border-color:#f0d9a8;color:#8a5606}
+
+footer{border-top:1px solid var(--border);margin-top:64px;padding-top:22px;
+  color:var(--muted);font-size:12.5px}
+@media print{nav.toc{display:none}.hero{background:#16233f}.figure{break-inside:avoid;box-shadow:none}}
+@media(max-width:640px){.hero h1{font-size:26px}main{padding:0 14px 60px}.figure{padding:12px}}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="kicker">Architecture atlas · 自包含离线图集</div>
+    <h1>ms_ui 框架全景图集</h1>
+    <p>从分层、启动、装配、布局、扩展点，到 ABI、部署与演进路线。每张图聚焦一个问题，按阅读顺序排列，可单独跳读。</p>
+    <p class="lead" style="margin-top:10px">定位：替换现有 MantiSoft UI 的多客户 OEM 外壳。默认动态库交付（EXE + shell DLL + 客户 DLL），客户差异由 profile + 客户模块提供；静态单 EXE 是可选的简化形态。</p>
+    <div class="stats">
+      <div class="stat"><b>4</b><span>核心目标（契约 / 框架 / 客户 / EXE）</span></div>
+      <div class="stat"><b>2</b><span>扩展注册表（面板 / 对话框）</span></div>
+      <div class="stat"><b>7</b><span>固定语义区域类型</span></div>
+      <div class="stat"><b>3</b><span>客户预设 A / B / C</span></div>
+      <div class="stat"><b>1</b><span>ABI 契约版本 kUiApiVersion</span></div>
+    </div>
+  </div>
+</div>
+
+<nav class="toc">
+  <div class="toc-inner">
+    <a href="#arch">分层架构</a>
+    <a href="#deps">依赖与产物</a>
+    <a href="#startup">启动时序</a>
+    <a href="#pipeline">装配流水线</a>
+    <a href="#layout">区域布局</a>
+    <a href="#ext">扩展点</a>
+    <a href="#typekey">跨模块规则</a>
+    <a href="#refresh">运行期刷新</a>
+    <a href="#abi">ABI 与导出</a>
+    <a href="#deploy">部署链</a>
+    <a href="#roadmap">演进路线</a>
+  </div>
+</nav>
+
+<main>
+
+<!-- ============ 1 分层架构 ============ -->
+<section id="arch">
+  <div class="sec-head"><span class="sec-num">01</span><h2>全局分层架构</h2></div>
+  <p class="lead">一句话：EXE 只做编排，框架库做装配，客户模块提供控件与命令，契约头是三者唯一共同依赖。默认动态库交付，shell 与客户模块各自导出接口；关闭 <code>UI_BUILD_SHARED</code> 后合并成静态单 EXE。</p>
+
+  <div class="figure">
+    <svg viewBox="0 0 1000 600" role="img" aria-label="全局分层架构图">
+      <defs>
+        <marker id="a-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1 L9 5 L0 9 z" fill="#94a3b8"/></marker>
+        <marker id="a-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1 L9 5 L0 9 z" fill="#2563eb"/></marker>
+      </defs>
+
+      <rect x="50" y="24" width="900" height="112" rx="14" fill="#eef2f7" stroke="#cbd5e1" stroke-width="1.5"/>
+      <text x="70" y="50" class="s-t">MantiSoft.exe · 薄入口（C++ 目标 MantiSoft）</text>
+      <text x="930" y="50" text-anchor="end" class="s-l">启动 · 注入 · 生命周期</text>
+      <g>
+        <rect x="70" y="66" width="164" height="52" rx="9" fill="#fff" stroke="#cbd5e1"/>
+        <text x="82" y="88" class="s-t">main.cpp</text><text x="82" y="106" class="s-s">QApplication + MainWindow</text>
+        <rect x="248" y="66" width="164" height="52" rx="9" fill="#fff" stroke="#cbd5e1"/>
+        <text x="260" y="88" class="s-t">AppBootstrap</text><text x="260" y="106" class="s-s">编排 + 退出码</text>
+        <rect x="426" y="66" width="164" height="52" rx="9" fill="#fff" stroke="#cbd5e1"/>
+        <text x="438" y="88" class="s-t">Provider</text><text x="438" y="106" class="s-s">校验 → 取模块</text>
+        <rect x="604" y="66" width="164" height="52" rx="9" fill="#fff" stroke="#cbd5e1"/>
+        <text x="616" y="88" class="s-t">Builder</text><text x="616" y="106" class="s-s">注册 + 依赖注入</text>
+        <rect x="782" y="66" width="148" height="52" rx="9" fill="#fff" stroke="#cbd5e1"/>
+        <text x="794" y="88" class="s-t">Session</text><text x="794" y="106" class="s-s">profile + attach</text>
+      </g>
+
+      <rect x="50" y="180" width="600" height="200" rx="14" fill="#eff5ff" stroke="#93b4f7" stroke-width="1.5"/>
+      <text x="70" y="207" class="s-t" fill="#1d4ed8">UiShell · 默认 SHARED</text>
+      <text x="630" y="207" text-anchor="end" class="s-l">装配运行期 · 不含具体对话框</text>
+      <g>
+        <rect x="70" y="224" width="182" height="56" rx="9" fill="#fff" stroke="#bfd4fb"/>
+        <text x="82" y="247" class="s-t">model</text><text x="82" y="265" class="s-s">Jsonc / Loader / Planner</text>
+        <rect x="264" y="224" width="182" height="56" rx="9" fill="#fff" stroke="#bfd4fb"/>
+        <text x="276" y="247" class="s-t">assembly</text><text x="276" y="265" class="s-s">ShellRuntime / 双注册表</text>
+        <rect x="458" y="224" width="172" height="56" rx="9" fill="#fff" stroke="#bfd4fb"/>
+        <text x="470" y="247" class="s-t">i18n</text><text x="470" y="265" class="s-s">翻译 / 文本 key</text>
+        <rect x="70" y="294" width="274" height="56" rx="9" fill="#fff" stroke="#bfd4fb"/>
+        <text x="82" y="317" class="s-t">titlebar</text><text x="82" y="335" class="s-s">自绘标题栏</text>
+        <rect x="356" y="294" width="274" height="56" rx="9" fill="#fff" stroke="#bfd4fb"/>
+        <text x="368" y="317" class="s-t">platform</text><text x="368" y="335" class="s-s">窗口框架适配</text>
+      </g>
+
+      <rect x="670" y="180" width="280" height="200" rx="14" fill="#fff6e8" stroke="#f0cf94" stroke-width="1.5"/>
+      <text x="690" y="207" class="s-t" fill="#9a5b06">UiCustomerX · 编译期选中</text>
+      <g>
+        <rect x="690" y="224" width="240" height="42" rx="8" fill="#fff" stroke="#f0d9a8"/>
+        <text x="702" y="250" class="s-s">指纹比对 → createCustomerModule()</text>
+        <rect x="690" y="274" width="240" height="42" rx="8" fill="#fff" stroke="#f0d9a8"/>
+        <text x="702" y="300" class="s-s">面板 / QML 面板工厂 · 中央视图</text>
+        <rect x="690" y="324" width="240" height="42" rx="8" fill="#fff" stroke="#f0d9a8"/>
+        <text x="702" y="350" class="s-s">命令目录 / 调用器 · 对话框工厂（含关于框）</text>
+      </g>
+
+      <rect x="50" y="438" width="900" height="96" rx="14" fill="#f5f1ff" stroke="#cbb8f8" stroke-width="1.5"/>
+      <text x="70" y="465" class="s-t" fill="#6d28d9">UiContract · INTERFACE · 仅 QtCore</text>
+      <text x="70" y="490" class="s-s">IApiObject / ApiPtr · IShellHost · Command / CommandView · FeatureFlagSet · WidgetFactory · DialogRegistry · HostContext · Diagnostic</text>
+      <text x="70" y="514" class="s-s">只含纯接口与稳定字符串 id，不出现 QWidget / 业务类型 / Win32</text>
+
+      <path d="M 350 136 L 350 178" stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#a-gray)"/>
+      <path d="M 810 136 L 810 178" stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#a-gray)"/>
+      <path d="M 350 380 L 350 436" stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#a-gray)"/>
+      <path d="M 810 380 L 810 436" stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#a-gray)"/>
+      <text x="360" y="162" class="s-l">创建 / 调用</text>
+      <text x="360" y="420" class="s-l">实现接口</text>
+      <text x="820" y="420" class="s-l">实现接口</text>
+    </svg>
+    <div class="figcap">读图顺序：从顶部薄入口往下看依赖，底部契约是所有层的公共底座。默认动态模式下 shell 与客户模块各自编成 DLL 并在编译期链接；关闭 <code>UI_BUILD_SHARED</code> 后合并进单 EXE，不按名称运行期加载。</div>
+  </div>
+
+  <div class="grid2">
+    <div class="note blue"><h3>框架负责什么</h3><ul>
+      <li>解析并校验 profile，生成纯数据装配信息 <code>AssemblyInfo</code></li>
+      <li>创建容器级控件：区域、槽位、布局、标题栏、菜单</li>
+      <li>按 id 向注册表索取面板 / 对话框工厂并挂载</li>
+    </ul></div>
+    <div class="note amber"><h3>客户负责什么</h3><ul>
+      <li>实现 <code>IWidgetFactory</code> 返回真正的业务面板</li>
+      <li>实现 <code>ICommandCatalog/Invoker</code> 提供命令语义</li>
+      <li>实现 <code>customerBuildFingerprint()</code> 与 <code>createCustomerModule()</code>，只依赖契约</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- ============ 2 依赖与产物 ============ -->
+<section id="deps">
+  <div class="sec-head"><span class="sec-num">02</span><h2>依赖方向与构建产物</h2></div>
+  <p class="lead">一个客户一个 EXE。默认动态链接，交付 MantiSoft.exe + shell DLL + 客户 DLL；切换客户改 <code>UI_CUSTOMER</code>（A/B/C）重新配置。需要单 EXE 时使用 <code>-DUI_BUILD_SHARED=OFF</code>。</p>
+
+  <div class="figure">
+    <svg viewBox="0 0 1000 430" role="img" aria-label="依赖方向与构建产物图">
+      <defs><marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 1 L9 5 L0 9 z" fill="#94a3b8"/></marker></defs>
+      <rect x="370" y="26" width="260" height="62" rx="11" fill="#eef2f7" stroke="#cbd5e1" stroke-width="1.5"/>
+      <text x="500" y="52" text-anchor="middle" class="s-t">MantiSoft.exe</text>
+      <text x="500" y="72" text-anchor="middle" class="s-s">WIN32 · 入口 + 部署</text>
+
+      <rect x="60" y="150" width="250" height="70" rx="11" fill="#eff5ff" stroke="#93b4f7" stroke-width="1.5"/>
+      <text x="185" y="178" text-anchor="middle" class="s-t" fill="#1d4ed8">UiShell 库</text>
+      <text x="185" y="199" text-anchor="middle" class="s-s">SHARED（默认）/ STATIC · 六层实现</text>
+      <rect x="375" y="150" width="250" height="70" rx="11" fill="#fff6e8" stroke="#f0cf94" stroke-width="1.5"/>
+      <text x="500" y="178" text-anchor="middle" class="s-t" fill="#9a5b06">UiCustomerX</text>
+      <text x="500" y="199" text-anchor="middle" class="s-s">SHARED（默认）/ STATIC · 选中的客户</text>
+      <rect x="690" y="150" width="250" height="70" rx="11" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+      <text x="815" y="178" text-anchor="middle" class="s-t">UiTestHelpers</text>
+      <text x="815" y="199" text-anchor="middle" class="s-s">跟随主库形态 · 测试替身</text>
+
+      <rect x="330" y="312" width="340" height="72" rx="11" fill="#f5f1ff" stroke="#cbb8f8" stroke-width="1.5"/>
+      <text x="500" y="340" text-anchor="middle" class="s-t" fill="#6d28d9">UiContract · INTERFACE</text>
+      <text x="500" y="362" text-anchor="middle" class="s-s">include/ + QtCore · 无产物</text>
+
+      <path d="M 400 88 L 200 148" stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#a2)"/>
+      <path d="M 500 88 L 500 148" stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#a2)"/>
+      <path d="M 600 88 L 800 148" stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#a2)"/>
+      <path d="M 185 220 L 420 310" stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#a2)"/>
+      <path d="M 500 220 L 500 310" stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#a2)"/>
+      <path d="M 815 220 L 580 310" stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#a2)"/>
+      <text x="500" y="410" text-anchor="middle" class="s-l">箭头方向 = 依赖方向；契约不反向依赖任何实现</text>
+    </svg>
+    <div class="figcap">注意大小写：<code>include/UiShell/</code> 是目录，<code>UiShell</code> 是库目标；默认产物是 <code>UiShell.dll</code> 与 <code>UiCustomerX.dll</code>，关闭 <code>UI_BUILD_SHARED</code> 后才变成静态库并合并进 <code>MantiSoft.exe</code>。</div>
+  </div>
+
+  <table>
+    <tr><th>预设</th><th>客户</th><th>构建目录</th><th>差异点</th></tr>
+    <tr><td><code>customer-a</code></td><td>A</td><td><code>build/customer-a</code></td><td>左工具 + 右属性，自绘标题栏</td></tr>
+    <tr><td><code>customer-b</code></td><td>B</td><td><code>build/customer-b</code></td><td>右侧属性 + 图层</td></tr>
+    <tr><td><code>customer-c</code></td><td>C</td><td><code>build/customer-c</code></td><td>左分栏 + QML 面板 + QML 关于对话框</td></tr>
+  </table>
+</section>
+
+<!-- ============ 3 启动时序 ============ -->
+<section id="startup">
+  <div class="sec-head"><span class="sec-num">03</span><h2>启动到装配的时序</h2></div>
+  <p class="lead">翻译必须先装，否则客户显示名停在源语言；<code>attachWindow()</code> 必须在窗口 <code>show()</code> 之前。启动由 <code>main.cpp → AppBootstrap::start()</code> 编排，加载失败通过明确退出码返回。</p>
+
+  <table>
+    <tr><th>阶段</th><th>入口/组件</th><th>主要动作</th><th>失败处理</th></tr>
+    <tr><td>1. 进程启动</td><td><code>main.cpp</code> / <code>AppBootstrap</code></td><td>Qt&lt;6.5 HighDPI、创建 <code>QApplication</code> 与窗口，执行 <code>AppBootstrap::start()</code></td><td>返回非 0 直接作为退出码</td></tr>
+    <tr><td>2. 翻译初始化</td><td><code>TranslationSetup</code></td><td><code>create()</code> + <code>installFromArguments(--lang/系统语言)</code></td><td>创建失败退出码 <b>5</b></td></tr>
+    <tr><td>3. 客户模块加载</td><td><code>CustomerModuleProvider</code></td><td>Qt 运行期版本检查 → <code>customerBuildFingerprint</code> 与宿主一致 → <code>createCustomerModule()</code></td><td>任一校验失败退出码 <b>6</b></td></tr>
+    <tr><td>4. 运行期装配</td><td><code>RuntimeBuilder</code></td><td>注册面板/对话框工厂，组装 <code>ShellServices</code>（功能开关 store、翻译、文本、命令目录/调用器），校验 <code>shellBuildFingerprint</code>，创建 runtime</td><td>指纹不一致或创建失败退出码 <b>4</b></td></tr>
+    <tr><td>5. Runtime 初始化</td><td><code>ShellRuntime</code> 构造</td><td>创建菜单/对话框/视图控制器，应用 <code>ShellServices.strThemeId</code>（为空用 light），以观察者订阅 <code>IFeatureFlagStore</code></td><td>主题缺失回退 light 并记录 <code>lastMessage</code></td></tr>
+    <tr><td>6. Profile 加载</td><td><code>StartupSession</code> → <code>ShellRuntime</code></td><td><code>loadFromFile</code> → <code>ProfileParser</code> 解析 + <code>ProfileValidator</code> 校验 → <code>AssemblyPlanner::build</code> → <code>ShellView::rebuild</code></td><td>失败弹 <code>QMessageBox::critical</code> 并退出码 <b>2</b>；<code>rebuild()</code> 照常执行（空壳），但不会 attach / show</td></tr>
+    <tr><td>7. 窗口接管</td><td><code>attachWindow</code></td><td><code>ShellView::attachWindow</code> 接管窗口/标题栏，挂载 shell 容器</td><td>失败退出码 <b>3</b></td></tr>
+    <tr><td>8. 显示运行</td><td><code>main.cpp</code></td><td><code>window.restoreWindowState()</code> → <code>window.show()</code> → <code>app.exec()</code></td><td>—</td></tr>
+  </table>
+
+  <div class="figure">
+    <svg viewBox="0 0 1100 620" role="img" aria-label="启动装配详细时序图">
+      <defs><marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 1 L9 5 L0 9 z" fill="#64748b"/></marker></defs>
+      <g>
+        <rect x="18" y="22" width="98" height="38" rx="8" fill="#eef2f7" stroke="#cbd5e1"/><text x="67" y="46" text-anchor="middle" class="s-t">main</text>
+        <rect x="128" y="22" width="112" height="38" rx="8" fill="#eef2f7" stroke="#cbd5e1"/><text x="184" y="46" text-anchor="middle" class="s-t">AppBootstrap</text>
+        <rect x="252" y="22" width="116" height="38" rx="8" fill="#eff5ff" stroke="#bfd4fb"/><text x="310" y="46" text-anchor="middle" class="s-t">Translator</text>
+        <rect x="380" y="22" width="110" height="38" rx="8" fill="#fff6e8" stroke="#f0d9a8"/><text x="435" y="46" text-anchor="middle" class="s-t">Provider</text>
+        <rect x="502" y="22" width="116" height="38" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/><text x="560" y="46" text-anchor="middle" class="s-t">Builder</text>
+        <rect x="630" y="22" width="110" height="38" rx="8" fill="#eff5ff" stroke="#bfd4fb"/><text x="685" y="46" text-anchor="middle" class="s-t">ShellRuntime</text>
+        <rect x="752" y="22" width="120" height="38" rx="8" fill="#f5f1ff" stroke="#cbb8f8"/><text x="812" y="46" text-anchor="middle" class="s-t">Parser/Planner</text>
+        <rect x="884" y="22" width="110" height="38" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/><text x="939" y="46" text-anchor="middle" class="s-t">Session</text>
+        <rect x="1006" y="22" width="76" height="38" rx="8" fill="#eafaf6" stroke="#8dd8c8"/><text x="1044" y="46" text-anchor="middle" class="s-t">Chrome</text>
+      </g>
+      <g stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4 5">
+        <path d="M67 60 L67 580"/><path d="M184 60 L184 580"/><path d="M310 60 L310 580"/><path d="M435 60 L435 580"/>
+        <path d="M560 60 L560 580"/><path d="M685 60 L685 580"/><path d="M812 60 L812 580"/><path d="M939 60 L939 580"/><path d="M1044 60 L1044 580"/>
+      </g>
+      <g stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#a3)">
+        <path d="M67 90 L182 90"/><text x="92" y="84" class="s-l">start(&amp;window, args)</text>
+        <path d="M184 120 L308 120"/><text x="200" y="114" class="s-l">create / installFromArguments</text>
+        <path d="M184 155 L433 155"/><text x="232" y="149" class="s-l">load() 校验 Qt 运行时/指纹后取模块</text>
+        <path d="M184 190 L558 190"/><text x="260" y="184" class="s-l">build(window, module, translations, text)</text>
+        <path d="M560 225 L683 225"/><text x="575" y="219" class="s-l">createShellRuntime(deps)</text>
+        <path d="M685 255 L685 285"/><path d="M685 285 L700 285"/><path d="M700 285 L687 285"/><text x="708" y="276" class="s-l">控制器/默认主题/订阅功能开关</text>
+        <path d="M184 315 L937 315"/><text x="420" y="309" class="s-l">loadProfile(args, 内嵌 profilePath)</text>
+        <path d="M939 345 L683 345"/><text x="700" y="339" class="s-l">ProfileLocator 定位 → loadFromFile</text>
+        <path d="M685 375 L810 375"/><text x="700" y="369" class="s-l">解析/校验/规划</text>
+        <path d="M812 405 L687 405"/><text x="715" y="399" class="s-l">Model → AssemblyInfo</text>
+        <path d="M685 435 L685 465"/><path d="M685 465 L700 465"/><path d="M700 465 L687 465"/><text x="708" y="456" class="s-l">ShellView::rebuild + 绑定/上下文通知</text>
+        <path d="M184 495 L937 495"/><text x="430" y="489" class="s-l">attach(window)</text>
+        <path d="M939 525 L683 525"/><path d="M685 525 L1042 525"/><text x="760" y="519" class="s-l">attachWindow → Chrome 接管与挂载</text>
+        <path d="M67 555 L67 555"/><text x="92" y="552" class="s-l">start()==0 → restoreWindowState() → show() → exec()</text>
+      </g>
+      <g>
+        <rect x="250" y="126" width="150" height="22" rx="6" fill="#fff0f3" stroke="#f4b8c6"/><text x="258" y="141" class="s-l" fill="#9f1239">失败 exit 5</text>
+        <rect x="376" y="161" width="150" height="22" rx="6" fill="#fff0f3" stroke="#f4b8c6"/><text x="384" y="176" class="s-l" fill="#9f1239">失败 exit 6</text>
+        <rect x="500" y="231" width="150" height="22" rx="6" fill="#fff0f3" stroke="#f4b8c6"/><text x="508" y="246" class="s-l" fill="#9f1239">失败 exit 4</text>
+        <rect x="744" y="411" width="168" height="22" rx="6" fill="#fff0f3" stroke="#f4b8c6"/><text x="752" y="426" class="s-l" fill="#9f1239">profile 失败 exit 2</text>
+        <rect x="878" y="531" width="150" height="22" rx="6" fill="#fff0f3" stroke="#f4b8c6"/><text x="886" y="546" class="s-l" fill="#9f1239">attach 失败 exit 3</text>
+      </g>
+      <rect x="620" y="560" width="450" height="34" rx="8" fill="#eafaf6" stroke="#b8e6da"/>
+      <text x="634" y="582" class="s-s" fill="#0b6b60">关键约束：翻译先于模块加载；attachWindow 必须在 show 之前；功能开关变化先重规划，再按结构差异决定重建或仅刷新 chrome</text>
+    </svg>
+    <div class="figcap">时序图突出启动主链路与失败退出点。Profile 解析/规划与控件树构建细节见下一节“装配流水线”。</div>
+  </div>
+</section>
+
+<!-- ============ 4 装配流水线 ============ -->
+<section id="pipeline">
+  <div class="sec-head"><span class="sec-num">04</span><h2>从配置到界面：装配流水线</h2></div>
+  <p class="lead"><code>AssemblyInfo</code> 是不含 QWidget 的纯数据快照，所以解析、校验、排序、功能开关过滤都能脱离 GUI 单测。props 从 profile 解析一路透传到工厂。</p>
+
+  <div class="figure">
+    <svg viewBox="0 0 900 760" role="img" aria-label="装配流水线图">
+      <defs><marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 1 L9 5 L0 9 z" fill="#94a3b8"/></marker></defs>
+      <g>
+        <rect x="330" y="30" width="240" height="62" rx="10" fill="#eff5ff" stroke="#93b4f7" stroke-width="1.5"/>
+        <text x="450" y="56" text-anchor="middle" class="s-t" fill="#1d4ed8">ui.json · JSONC</text>
+        <text x="450" y="76" text-anchor="middle" class="s-s">UTF-8 · 注释可写</text>
+
+        <rect x="330" y="132" width="240" height="62" rx="10" fill="#eff5ff" stroke="#93b4f7" stroke-width="1.5"/>
+        <text x="450" y="158" text-anchor="middle" class="s-t" fill="#1d4ed8">ProfileParser</text>
+        <text x="450" y="178" text-anchor="middle" class="s-s">解析 + 校验 + 诊断行号</text>
+
+        <rect x="330" y="234" width="240" height="62" rx="10" fill="#f5f1ff" stroke="#cbb8f8" stroke-width="1.5"/>
+        <text x="450" y="260" text-anchor="middle" class="s-t" fill="#6d28d9">ProfileModel</text>
+        <text x="450" y="280" text-anchor="middle" class="s-s">Region/Slot/Panel/Menu + props</text>
+
+        <rect x="330" y="336" width="240" height="62" rx="10" fill="#f5f1ff" stroke="#cbb8f8" stroke-width="1.5"/>
+        <text x="450" y="362" text-anchor="middle" class="s-t" fill="#6d28d9">AssemblyPlanner</text>
+        <text x="450" y="382" text-anchor="middle" class="s-s">排序 · 能力过滤 · 文本解析</text>
+
+        <rect x="330" y="438" width="240" height="62" rx="10" fill="#eafaf6" stroke="#8dd8c8" stroke-width="1.5"/>
+        <text x="450" y="464" text-anchor="middle" class="s-t" fill="#0b6b60">AssemblyInfo</text>
+        <text x="450" y="484" text-anchor="middle" class="s-s">纯数据快照 · 无 QWidget</text>
+
+        <rect x="330" y="540" width="240" height="62" rx="10" fill="#eafaf6" stroke="#8dd8c8" stroke-width="1.5"/>
+        <text x="450" y="566" text-anchor="middle" class="s-t" fill="#0b6b60">ShellView::rebuild</text>
+        <text x="450" y="586" text-anchor="middle" class="s-s">Region → Slot → Panel</text>
+
+        <rect x="330" y="642" width="240" height="62" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+        <text x="450" y="668" text-anchor="middle" class="s-t">QWidget 树</text>
+        <text x="450" y="688" text-anchor="middle" class="s-s">面板 / 标题栏 / 菜单</text>
+      </g>
+      <g stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#a4)">
+        <path d="M450 92 L450 130"/><path d="M450 194 L450 232"/><path d="M450 296 L450 334"/>
+        <path d="M450 398 L450 436"/><path d="M450 500 L450 538"/><path d="M450 602 L450 640"/>
+      </g>
+      <g>
+        <rect x="30" y="350" width="250" height="36" rx="8" fill="#fff" stroke="#cbd5e1"/>
+        <text x="42" y="373" class="s-s">FeatureFlagSet · 能力过滤</text>
+        <rect x="620" y="350" width="250" height="36" rx="8" fill="#fff" stroke="#cbd5e1"/>
+        <text x="632" y="373" class="s-s">ITextProvider · key → 当前语种</text>
+        <rect x="30" y="552" width="250" height="36" rx="8" fill="#fff" stroke="#cbd5e1"/>
+        <text x="42" y="575" class="s-s">IWidgetFactoryRegistry · 面板工厂</text>
+        <rect x="620" y="552" width="250" height="36" rx="8" fill="#fff" stroke="#cbd5e1"/>
+        <text x="632" y="575" class="s-s">HostContext · 皮肤/语言/文本</text>
+      </g>
+      <g stroke="#94a3b8" stroke-width="1.4" fill="none" marker-end="url(#a4)">
+        <path d="M280 368 L328 368"/><path d="M620 368 L572 368"/>
+        <path d="M280 570 L328 570"/><path d="M620 570 L572 570"/>
+      </g>
+      <text x="30" y="740" class="s-l">面板 props 在 model → info → PanelCreateRequest 全程原样透传，框架不解释其内容</text>
+    </svg>
+    <div class="figcap"><code>requiredFeatures</code> 不满足的面板在装配阶段静默跳过；菜单命令在 catalog 中找不到时丢弃并记 warning；菜单项 enabled 在渲染时按 <code>requiredFeatures</code> 计算。</div>
+  </div>
+
+  <div class="figure">
+    <svg viewBox="0 0 980 860" role="img" aria-label="Profile 加载与 UI 装配细化流程">
+      <defs><marker id="a4b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 1 L9 5 L0 9 z" fill="#94a3b8"/></marker></defs>
+
+      <rect x="350" y="20" width="280" height="54" rx="10" fill="#eff5ff" stroke="#93b4f7" stroke-width="1.5"/>
+      <text x="490" y="44" text-anchor="middle" class="s-t" fill="#1d4ed8">loadFromFile(path)</text>
+      <text x="490" y="62" text-anchor="middle" class="s-s">读取 profile 文件</text>
+
+      <polygon points="490,110 560,150 490,190 420,150" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+      <text x="490" y="154" text-anchor="middle" class="s-s">读取成功?</text>
+
+      <rect x="640" y="122" width="290" height="56" rx="10" fill="#fff0f3" stroke="#f4b8c6"/>
+      <text x="785" y="145" text-anchor="middle" class="s-t" fill="#9f1239">清空 model / 装配信息 / 原文</text>
+      <text x="785" y="164" text-anchor="middle" class="s-s">记录错误 · rebuild 空壳 · 返回 false</text>
+
+      <rect x="350" y="230" width="280" height="54" rx="10" fill="#eff5ff" stroke="#93b4f7" stroke-width="1.5"/>
+      <text x="490" y="254" text-anchor="middle" class="s-t" fill="#1d4ed8">loadFromJson(utf8)</text>
+      <text x="490" y="272" text-anchor="middle" class="s-s">ProfileParser 解析 + ProfileValidator 校验</text>
+
+      <polygon points="490,320 560,360 490,400 420,360" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+      <text x="490" y="356" text-anchor="middle" class="s-s">存在 Error</text>
+      <text x="490" y="372" text-anchor="middle" class="s-s">诊断?</text>
+
+      <rect x="640" y="332" width="290" height="56" rx="10" fill="#fff0f3" stroke="#f4b8c6"/>
+      <text x="785" y="355" text-anchor="middle" class="s-t" fill="#9f1239">保存 diagnostics/lastError</text>
+      <text x="785" y="374" text-anchor="middle" class="s-s">重建空壳 · 返回 false（exit 2 链路）</text>
+
+      <rect x="350" y="440" width="280" height="54" rx="10" fill="#f5f1ff" stroke="#cbb8f8" stroke-width="1.5"/>
+      <text x="490" y="464" text-anchor="middle" class="s-t" fill="#6d28d9">AssemblyPlanner::build</text>
+      <text x="490" y="482" text-anchor="middle" class="s-s">功能开关/平台/文本决策 · 排序过滤 · 生成 AssemblyInfo</text>
+
+      <rect x="350" y="530" width="280" height="62" rx="10" fill="#eafaf6" stroke="#8dd8c8" stroke-width="1.5"/>
+      <text x="490" y="554" text-anchor="middle" class="s-t" fill="#0b6b60">ShellView::rebuild()</text>
+      <text x="490" y="572" text-anchor="middle" class="s-s">创建 Region/Slot/Panel/TitleBar/Menu</text>
+      <text x="490" y="588" text-anchor="middle" class="s-s">syncMenuPlacement · bindTitleBarToWindow · notifyHostContext</text>
+
+      <rect x="350" y="632" width="280" height="54" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+      <text x="490" y="656" text-anchor="middle" class="s-t">attachWindow(window)</text>
+      <text x="490" y="674" text-anchor="middle" class="s-s">Chrome 接管 + 容器挂载 + 绑定标题栏</text>
+
+      <rect x="350" y="724" width="280" height="46" rx="10" fill="#eafaf6" stroke="#0d9488" stroke-width="2"/>
+      <text x="490" y="752" text-anchor="middle" class="s-t" fill="#0b6b60">界面可 show / 进入事件循环</text>
+
+      <g stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#a4b)">
+        <path d="M490 74 L490 108"/>
+        <path d="M560 150 L638 150"/><text x="575" y="142" class="s-l">否</text>
+        <path d="M490 190 L490 228"/><text x="500" y="212" class="s-l">是</text>
+        <path d="M490 284 L490 318"/>
+        <path d="M560 360 L638 360"/><text x="575" y="352" class="s-l">是</text>
+        <path d="M490 400 L490 438"/><text x="500" y="422" class="s-l">否</text>
+        <path d="M490 494 L490 528"/>
+        <path d="M490 592 L490 630"/>
+        <path d="M490 686 L490 722"/>
+      </g>
+
+      <rect x="40" y="470" width="250" height="160" rx="10" fill="#fff" stroke="#cbd5e1"/>
+      <text x="56" y="496" class="s-t">运行期刷新范围</text>
+      <text x="56" y="522" class="s-s">· 语言切换：复用 model 重规划 + refreshShell</text>
+      <text x="56" y="544" class="s-s">  保留面板实例，再 retranslate()</text>
+      <text x="56" y="570" class="s-s">· 皮肤切换：应用 QSS/Palette + 刷新菜单勾选态</text>
+      <text x="56" y="596" class="s-s">· 功能开关变化：重规划 → 比较 structureKey</text>
+      <text x="56" y="618" class="s-s">  结构变化才全量重建，否则仅刷新 chrome</text>
+
+      <text x="40" y="820" class="s-l">props 从 ProfileParser → ProfileModel → planAssembly() → AssemblyInfo → PanelCreateRequest 全程透传；平台能力决定 nativeTitleBar 并可能产生 warning。</text>
+    </svg>
+    <div class="figcap">细化流程覆盖失败分支与空壳回退策略。首次加载与运行期刷新共用同一套装配/通知机制，但刷新粒度不同（全壳重建 / 仅 chrome / 视结构变化）。</div>
+  </div>
+</section>
+
+<!-- ============ 5 区域布局 ============ -->
+<section id="layout">
+  <div class="sec-head"><span class="sec-num">05</span><h2>区域 · 槽位 · 面板布局模型</h2></div>
+  <p class="lead">7 类区域是产品语义，不随客户变化；客户能改的是区域的可见性、顺序、槽位划分和面板归属。</p>
+
+  <div class="figure">
+    <svg viewBox="0 0 900 500" role="img" aria-label="区域布局模型图">
+      <rect x="40" y="30" width="820" height="370" rx="16" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+      <text x="60" y="56" class="s-t">窗口 · 上 / 中 / 下三组固定堆叠</text>
+
+      <rect x="60" y="72" width="780" height="112" rx="11" fill="#eff5ff" stroke="#bfd4fb" stroke-dasharray="5 4"/>
+      <text x="74" y="92" class="s-s" fill="#1d4ed8">上组 · 垂直堆叠</text>
+      <rect x="76" y="102" width="244" height="64" rx="9" fill="#fff" stroke="#93b4f7"/>
+      <text x="88" y="126" class="s-t">TitleBar</text><text x="88" y="146" class="s-s">自绘（仅 Windows）或原生</text>
+      <rect x="330" y="102" width="244" height="64" rx="9" fill="#fff" stroke="#93b4f7"/>
+      <text x="342" y="126" class="s-t">MenuBar</text><text x="342" y="146" class="s-s">自绘时内嵌标题栏</text>
+      <rect x="584" y="102" width="240" height="64" rx="9" fill="#fff" stroke="#93b4f7"/>
+      <text x="596" y="126" class="s-t">TopBar</text><text x="596" y="146" class="s-s">顶部横幅</text>
+
+      <rect x="60" y="200" width="780" height="150" rx="11" fill="#eafaf6" stroke="#8dd8c8" stroke-dasharray="5 4"/>
+      <text x="74" y="220" class="s-s" fill="#0b6b60">中组 · 水平排列 · 仅中央区吃剩余空间</text>
+      <rect x="76" y="232" width="200" height="100" rx="9" fill="#fff" stroke="#8dd8c8"/>
+      <text x="88" y="258" class="s-t">LeftDock</text><text x="88" y="278" class="s-s">左停靠</text><text x="88" y="300" class="s-s">多槽位</text>
+      <rect x="288" y="232" width="320" height="100" rx="9" fill="#fff" stroke="#0d9488" stroke-width="2"/>
+      <text x="300" y="258" class="s-t">CenterView</text><text x="300" y="278" class="s-s">中央视图 · 自动槽 stretch = 1</text><text x="300" y="300" class="s-s">ICenterViewProvider 注入</text>
+      <rect x="620" y="232" width="204" height="100" rx="9" fill="#fff" stroke="#8dd8c8"/>
+      <text x="632" y="258" class="s-t">RightDock</text><text x="632" y="278" class="s-s">右停靠</text><text x="632" y="300" class="s-s">多槽位</text>
+
+      <rect x="60" y="366" width="780" height="24" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="74" y="382" class="s-s">StatusBar · 下组 · 可按左右拆槽</text>
+
+      <text x="40" y="440" class="s-l">组内顺序 = order 升序 + id 字典序；自绘标题栏仅 Windows 可用，Linux/macOS 始终原生，菜单独立一行</text>
+      <text x="40" y="466" class="s-l">中央视图通常只有一个，由 ICenterViewProvider 直接创建，不走工厂注册表</text>
+    </svg>
+    <div class="figcap">面板只声明 <code>slot</code> id，由 planner 的反查索引确定所属区域；区域隐藏时其下所有面板一起不装配。</div>
+  </div>
+
+  <div class="figure">
+    <svg viewBox="0 0 980 190" role="img" aria-label="Region 到 Panel 的包含关系">
+      <defs><marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 1 L9 5 L0 9 z" fill="#94a3b8"/></marker></defs>
+      <rect x="30" y="40" width="200" height="60" rx="10" fill="#eff5ff" stroke="#93b4f7"/>
+      <text x="130" y="66" text-anchor="middle" class="s-t">Region "left"</text><text x="130" y="86" text-anchor="middle" class="s-s">type = LeftDock</text>
+      <rect x="300" y="20" width="230" height="52" rx="9" fill="#fff" stroke="#cbd5e1"/>
+      <text x="312" y="43" class="s-t">Slot "left.top"</text><text x="312" y="60" class="s-s">width 260 · stretch 1</text>
+      <rect x="300" y="100" width="230" height="52" rx="9" fill="#fff" stroke="#cbd5e1"/>
+      <text x="312" y="123" class="s-t">Slot "left.bottom"</text><text x="312" y="140" class="s-s">height 160</text>
+      <rect x="610" y="20" width="250" height="52" rx="9" fill="#f5f1ff" stroke="#cbb8f8"/>
+      <text x="622" y="43" class="s-t">Panel "tree"</text><text x="622" y="60" class="s-s">factory = goodlaser.panel</text>
+      <rect x="610" y="100" width="250" height="52" rx="9" fill="#f5f1ff" stroke="#cbb8f8"/>
+      <text x="622" y="123" class="s-t">Panel "qmlPanel"</text><text x="622" y="140" class="s-s">factory = goodlaser.qml</text>
+      <g stroke="#94a3b8" stroke-width="1.5" fill="none" marker-end="url(#a5)">
+        <path d="M230 68 L298 46"/><path d="M230 72 L298 126"/>
+        <path d="M530 46 L608 46"/><path d="M530 126 L608 126"/>
+      </g>
+      <text x="30" y="178" class="s-l">widget 面板与 QML 面板共用同一个工厂注册表和同一套槽位布局</text>
+    </svg>
+    <div class="figcap">每个槽位是一个独立布局容器；面板挂载时先落位再按计划设置可见性，避免默认可见状态闪出。</div>
+  </div>
+</section>
+
+<!-- ============ 6 扩展点 ============ -->
+<section id="ext">
+  <div class="sec-head"><span class="sec-num">06</span><h2>扩展点：两个注册表</h2></div>
+  <p class="lead">加新面板或新对话框只需要 append 一条绑定，不改 ShellServices、CustomerModule 的结构或 RuntimeBuilder 的代码。</p>
+
+  <div class="figure">
+    <svg viewBox="0 0 980 590" role="img" aria-label="双注册表扩展点图">
+      <defs><marker id="a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 1 L9 5 L0 9 z" fill="#94a3b8"/></marker></defs>
+      <rect x="350" y="26" width="280" height="58" rx="10" fill="#fff6e8" stroke="#f0cf94" stroke-width="1.5"/>
+      <text x="490" y="50" text-anchor="middle" class="s-t" fill="#9a5b06">CustomerModule</text>
+      <text x="490" y="70" text-anchor="middle" class="s-s">factories · dialogFactories · centerView · commands(catalog/invoker/state)</text>
+
+      <rect x="60" y="140" width="250" height="60" rx="10" fill="#fff" stroke="#cbd5e1"/>
+      <text x="185" y="165" text-anchor="middle" class="s-t">factories</text><text x="185" y="184" text-anchor="middle" class="s-s">FactoryBinding</text>
+      <rect x="670" y="140" width="250" height="60" rx="10" fill="#fff" stroke="#cbd5e1"/>
+      <text x="795" y="165" text-anchor="middle" class="s-t">dialogFactories</text><text x="795" y="184" text-anchor="middle" class="s-s">DialogFactoryBinding { id, factory }</text>
+
+      <rect x="60" y="250" width="250" height="60" rx="10" fill="#eff5ff" stroke="#93b4f7" stroke-width="1.5"/>
+      <text x="185" y="275" text-anchor="middle" class="s-t" fill="#1d4ed8">IWidgetFactoryRegistry</text><text x="185" y="294" text-anchor="middle" class="s-s">factoryId → IWidgetFactory</text>
+      <rect x="670" y="250" width="250" height="60" rx="10" fill="#f5f1ff" stroke="#cbb8f8" stroke-width="1.5"/>
+      <text x="795" y="275" text-anchor="middle" class="s-t" fill="#6d28d9">IDialogRegistry</text><text x="795" y="294" text-anchor="middle" class="s-s">dialogId → IDialogFactory</text>
+
+      <rect x="350" y="360" width="280" height="58" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+      <text x="490" y="384" text-anchor="middle" class="s-t">ShellServices</text>
+      <text x="490" y="404" text-anchor="middle" class="s-s">widgetFactory · dialogs · invoker · catalog · commandState · text</text>
+
+      <rect x="60" y="478" width="250" height="60" rx="10" fill="#eafaf6" stroke="#8dd8c8"/>
+      <text x="185" y="503" text-anchor="middle" class="s-t" fill="#0b6b60">RegionContainer</text><text x="185" y="522" text-anchor="middle" class="s-s">按 factory 创建并挂载面板</text>
+      <rect x="670" y="478" width="250" height="60" rx="10" fill="#eafaf6" stroke="#8dd8c8"/>
+      <text x="795" y="503" text-anchor="middle" class="s-t" fill="#0b6b60">DialogController</text><text x="795" y="522" text-anchor="middle" class="s-s">按 id 查注册表 · params 通用规则</text>
+
+      <g stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#a6)">
+        <path d="M420 84 L210 138"/><path d="M560 84 L770 138"/>
+        <path d="M185 200 L185 248"/><path d="M795 200 L795 248"/>
+        <path d="M220 310 L400 358"/><path d="M760 310 L580 358"/>
+        <path d="M420 418 L210 476"/><path d="M560 418 L770 476"/>
+      </g>
+      <text x="490" y="574" text-anchor="middle" class="s-l">注册表不持有工厂，生命周期由客户模块自管；commandCatalog/commandInvoker/commandState 三个指针指向同一 CommandTable 实例；shell 没有内置对话框，关于框与业务对话框都由客户模块按 id 注册</text>
+    </svg>
+    <div class="figcap">两个注册表对称：都按字符串 id 查一个纯虚接口。对话框注册表不做类型擦除（没有 void* 与类型键），所有对话框都实现 IDialogFactory。</div>
+  </div>
+</section>
+
+<!-- ============ 7 跨模块规则 ============ -->
+<section id="typekey">
+  <div class="sec-head"><span class="sec-num">07</span><h2>跨模块规则：不传标准库对象、谁创建谁释放</h2></div>
+  <p class="lead">EXE、UiShell.dll、UiCustomerX.dll 是三个独立链接的模块，各自内联了一份标准库模板。跨模块只传「两边布局一定相同」的东西；完整规则写在 <code>include/UiShell/Export.h</code> 顶部，并由检查与编译期断言兜底。</p>
+
+  <div class="figure">
+    <svg viewBox="0 0 980 430" role="img" aria-label="跨模块可传与禁止传递的类型">
+      <rect x="30" y="30" width="430" height="360" rx="14" fill="#eafaf6" stroke="#8dd8c8" stroke-width="1.5"/>
+      <text x="50" y="60" class="s-t" fill="#0b6b60">可以跨模块</text>
+      <rect x="50" y="80" width="390" height="54" rx="9" fill="#fff" stroke="#8dd8c8"/>
+      <text x="62" y="103" class="s-t">基本类型 · 裸指针 · const char*</text>
+      <text x="62" y="122" class="s-s">构建指纹只经 const char* 返回，最先比较</text>
+      <rect x="50" y="148" width="390" height="54" rx="9" fill="#fff" stroke="#8dd8c8"/>
+      <text x="62" y="171" class="s-t">纯虚接口（只传虚函数表指针）</text>
+      <text x="62" y="190" class="s-s">回调：IFeatureFlagObserver · IShellListener</text>
+      <rect x="50" y="216" width="390" height="54" rx="9" fill="#fff" stroke="#8dd8c8"/>
+      <text x="62" y="239" class="s-t">Qt 值类型：QString · QList · QJsonObject</text>
+      <text x="62" y="258" class="s-s">内存由 Qt6Core.dll 统一分配，各模块共用同一份堆</text>
+      <rect x="50" y="284" width="390" height="86" rx="9" fill="#fff" stroke="#0d9488" stroke-width="2"/>
+      <text x="62" y="308" class="s-t">释放回到创建方</text>
+      <text x="62" y="328" class="s-s">IApiObject::destroy() / ApiPtr，析构函数 protected</text>
+      <text x="62" y="346" class="s-s">QWidget 交给 Qt 父对象：deleting destructor</text>
+      <text x="62" y="362" class="s-s">在对象自身模块里释放，不跨堆</text>
+
+      <rect x="520" y="30" width="430" height="360" rx="14" fill="#fff0f3" stroke="#f4b8c6" stroke-width="1.5"/>
+      <text x="540" y="60" class="s-t" fill="#9f1239">不跨模块</text>
+      <rect x="540" y="80" width="390" height="54" rx="9" fill="#fff" stroke="#f4b8c6"/>
+      <text x="552" y="103" class="s-t">std::string · vector · function · unique_ptr …</text>
+      <text x="552" y="122" class="s-s">布局随编译器 / CRT / _ITERATOR_DEBUG_LEVEL 变化</text>
+      <rect x="540" y="148" width="390" height="54" rx="9" fill="#fff" stroke="#f4b8c6"/>
+      <text x="552" y="171" class="s-t">导出类（class UI_SHELL_API）</text>
+      <text x="552" y="190" class="s-s">成员与内联实现会进入导出表，只导出自由函数</text>
+      <rect x="540" y="216" width="390" height="54" rx="9" fill="#fff" stroke="#f4b8c6"/>
+      <text x="552" y="239" class="s-t">对接口指针 delete</text>
+      <text x="552" y="258" class="s-s">析构函数 protected，编译不过</text>
+      <rect x="540" y="284" width="390" height="86" rx="9" fill="#fff" stroke="#e11d48" stroke-width="2"/>
+      <text x="552" y="308" class="s-t">异常 · 混装</text>
+      <text x="552" y="328" class="s-s">异常不得逃出接口虚函数调用</text>
+      <text x="552" y="346" class="s-s">三个产物必须同一次构建（指纹含 CRT 与</text>
+      <text x="552" y="362" class="s-s">Debug / Release），否则拒绝启动</text>
+
+      <text x="30" y="418" class="s-l">兜底：CheckLayers 禁止公开头出现 std:: 类型（Retranslatable.h 例外：模板只在客户模块内实例化）· CheckExports 禁止导出具体类与内部函数 · tstApiPtr 的 static_assert(!is_destructible)</text>
+    </svg>
+    <div class="figcap">原先跨模块的两处 std::function（ShellServices::languageChanged、IFeatureFlagStore::subscribe）已改为观察者接口；对话框注册表的 void* + 类型键已改为直接存 IDialogFactory*。</div>
+  </div>
+</section>
+
+<!-- ============ 8 运行期刷新 ============ -->
+<section id="refresh">
+  <div class="sec-head"><span class="sec-num">08</span><h2>运行期刷新的三条路径</h2></div>
+  <p class="lead">语言切换重建 chrome 但保留面板；皮肤切换只应用 QSS/Palette 并刷新菜单勾选态；功能开关变化先重规划并比较 <code>structureKey</code>，结构变了才重建 shell，否则只刷新 chrome。三者复用同一组扩展点与刷新入口。</p>
+
+  <div class="figure">
+    <svg viewBox="0 0 980 460" role="img" aria-label="语言与皮肤切换流程对比">
+      <rect x="30" y="30" width="450" height="390" rx="14" fill="#eff5ff" stroke="#93b4f7" stroke-width="1.5"/>
+      <text x="50" y="60" class="s-t" fill="#1d4ed8">语言切换 · 重建 chrome</text>
+      <g>
+        <rect x="50" y="78" width="410" height="44" rx="8" fill="#fff" stroke="#bfd4fb"/>
+        <text x="62" y="105" class="s-s">1 · TranslationService::install(lang)</text>
+        <rect x="50" y="134" width="410" height="44" rx="8" fill="#fff" stroke="#bfd4fb"/>
+        <text x="62" y="161" class="s-s">2 · 用缓存 model 重新 AssemblyPlanner::build</text>
+        <rect x="50" y="190" width="410" height="44" rx="8" fill="#fff" stroke="#bfd4fb"/>
+        <text x="62" y="217" class="s-s">3 · refreshShell：只重建标题栏与菜单</text>
+        <rect x="50" y="246" width="410" height="44" rx="8" fill="#fff" stroke="#bfd4fb"/>
+        <text x="62" y="273" class="s-s">4 · notifyHostContext 推新上下文（retranslate 内）</text>
+        <rect x="50" y="302" width="410" height="44" rx="8" fill="#fff" stroke="#bfd4fb"/>
+        <text x="62" y="329" class="s-s">5 · IRetranslatable::retranslate()</text>
+      </g>
+      <rect x="50" y="362" width="410" height="40" rx="8" fill="#fff" stroke="#2563eb" stroke-width="2"/>
+      <text x="62" y="387" class="s-s" fill="#1d4ed8">面板实例与用户状态保留</text>
+
+      <rect x="500" y="30" width="450" height="390" rx="14" fill="#eafaf6" stroke="#8dd8c8" stroke-width="1.5"/>
+      <text x="520" y="60" class="s-t" fill="#0b6b60">皮肤切换 · 只重建菜单勾选态</text>
+      <g>
+        <rect x="520" y="78" width="410" height="44" rx="8" fill="#fff" stroke="#b8e6da"/>
+        <text x="532" y="105" class="s-s">1 · 客户 customPrefix 优先，失败回退 :/UiShell/styles/&lt;id&gt;.qss</text>
+        <rect x="520" y="134" width="410" height="44" rx="8" fill="#fff" stroke="#b8e6da"/>
+        <text x="532" y="161" class="s-s">2 · QApplication::setPalette + setStyleSheet</text>
+        <rect x="520" y="190" width="410" height="44" rx="8" fill="#fff" stroke="#b8e6da"/>
+        <text x="532" y="217" class="s-s">3 · refreshShell：重建菜单勾选态</text>
+        <rect x="520" y="246" width="410" height="44" rx="8" fill="#fff" stroke="#b8e6da"/>
+        <text x="532" y="273" class="s-s">4 · notifyHostContext 遍历子孙控件</text>
+      </g>
+      <rect x="520" y="302" width="410" height="60" rx="8" fill="#fff" stroke="#0d9488" stroke-width="2"/>
+      <text x="532" y="327" class="s-s" fill="#0b6b60">只有实现 IHostContextAware 的控件收到通知</text>
+      <text x="532" y="349" class="s-s">普通控件靠 QSS / 动态属性自动重绘</text>
+      <rect x="520" y="374" width="410" height="30" rx="8" fill="#fff" stroke="#0d9488" stroke-width="2"/>
+      <text x="532" y="394" class="s-s" fill="#0b6b60">面板一个都不重建</text>
+
+      <text x="30" y="446" class="s-l">皮肤 id 是字符串（light / dark），不导出枚举；主题色同时维护在 qss 与 ThemeController::paletteFor() 两处</text>
+    </svg>
+    <div class="figcap">菜单文字与勾选态在创建时一次性写入 QAction，所以皮肤切换也需要重建菜单（MenuController 按 ShellServices.strThemeId 设 checked）；面板和其他控件靠 QSS 自动刷新。功能开关变化走第三条路径：FeatureFlagStore 通知 → 重规划 → structureKey 比较 → 结构变化则全量重建，否则 refreshShell + 菜单 enabled 刷新。客户可用 ShellServices.customStylePrefix 只覆盖 light/dark 其中一套，另一套自动回退框架默认。</div>
+  </div>
+</section>
+
+<!-- ============ 9 ABI 与导出 ============ -->
+<section id="abi">
+  <div class="sec-head"><span class="sec-num">09</span><h2>ABI 校验与导出面（动态模式）</h2></div>
+  <p class="lead">默认动态链接下 shell 与客户模块都是独立 DLL，这一节的约束默认生效；<code>-DUI_BUILD_SHARED=OFF</code> 静态链接时没有跨 DLL 边界，可忽略。EXE、shell DLL、客户 DLL 必须来自同一次构建：宿主先检查 Qt 运行时版本，再分别比较客户与 shell 的构建指纹（只经 <code>const char*</code> 返回），一致后才让 CustomerModule 按值返回、才创建运行期。指纹已包含契约代际 <code>kUiApiVersion</code>、Qt、编译器、CRT、客户与提交，运行期不再做结构体版本 / 大小校验。</p>
+
+  <div class="figure">
+    <svg viewBox="0 0 980 420" role="img" aria-label="ABI 校验流程图">
+      <defs><marker id="a9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 1 L9 5 L0 9 z" fill="#94a3b8"/></marker></defs>
+      <rect x="260" y="26" width="460" height="52" rx="10" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="490" y="50" text-anchor="middle" class="s-t">Qt 运行时版本 == 编译版本</text>
+      <text x="490" y="69" text-anchor="middle" class="s-s">qVersion() 对比 QT_VERSION_STR，发现部署目录混入的旧 Qt</text>
+      <rect x="280" y="120" width="420" height="58" rx="10" fill="#eff5ff" stroke="#93b4f7" stroke-width="1.5"/>
+      <text x="490" y="145" text-anchor="middle" class="s-t" fill="#1d4ed8">customerBuildFingerprint() == host</text>
+      <text x="490" y="165" text-anchor="middle" class="s-s">一致后才 createCustomerModule()；改跨 DLL 结构体时提升 kUiApiVersion</text>
+      <rect x="280" y="212" width="420" height="58" rx="10" fill="#eff5ff" stroke="#93b4f7" stroke-width="1.5"/>
+      <text x="490" y="237" text-anchor="middle" class="s-t" fill="#1d4ed8">shellBuildFingerprint() == host</text>
+      <text x="490" y="257" text-anchor="middle" class="s-s">一致后才 createShellRuntime()，结构体不再带版本 / 大小头</text>
+
+      <rect x="80" y="316" width="300" height="64" rx="10" fill="#eafaf6" stroke="#8dd8c8"/>
+      <text x="230" y="342" text-anchor="middle" class="s-t" fill="#0b6b60">校验通过</text>
+      <text x="230" y="363" text-anchor="middle" class="s-s">继续创建 / 装配</text>
+      <rect x="600" y="316" width="300" height="64" rx="10" fill="#fff0f3" stroke="#f4b8c6"/>
+      <text x="750" y="342" text-anchor="middle" class="s-t" fill="#9f1239">校验失败</text>
+      <text x="750" y="363" text-anchor="middle" class="s-s">shell 指纹不一致或运行期创建失败 · 退出码 4；Qt 运行时 / 客户指纹不一致 · 退出码 6</text>
+
+      <g stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#a9)">
+        <path d="M490 78 L490 118"/><path d="M490 178 L490 210"/>
+        <path d="M380 270 L240 314"/><path d="M600 270 L740 314"/>
+      </g>
+    </svg>
+    <div class="figcap">Qt5 与 Qt6 二进制不兼容：两者不能共用同一个构建目录，需分别配置。导出表检查仅在 Windows 且 <code>UI_BUILD_SHARED=ON</code> 时注册，macOS 本机不可验证，需 Windows CI 覆盖。</div>
+  </div>
+
+  <div class="grid2">
+    <div class="note blue"><h3>导出工厂（允许）</h3><ul>
+      <li>createTranslationService / createQtTextProvider</li>
+      <li>createTitleBar</li>
+      <li>createShellRuntime / createWidgetFactoryRegistry</li>
+      <li>createDialogRegistry / createFeatureFlagStore</li>
+      <li>shellBuildFingerprint</li>
+    </ul></div>
+    <div class="note rose"><h3>具体类（禁止导出）</h3><ul>
+      <li>ShellRuntime / ShellView / RegionContainer / ProfilePipeline</li>
+      <li>ProfileParser / ProfileValidator</li>
+      <li>AssemblyPlanner</li>
+      <li>TranslationService / QtTextProvider / TitleBar</li>
+      <li>WidgetFactoryRegistry / DialogRegistry / FeatureFlagStore</li>
+      <li>TitleBarHostAdapter / Jsonc</li>
+      <li>内部函数 createWindowFrame / createWindowCapabilities / textContextForKey（由 ctest 导出表检查自动扫描）</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- ============ 10 部署链 ============ -->
+<section id="deploy">
+  <div class="sec-head"><span class="sec-num">10</span><h2>部署链</h2></div>
+  <p class="lead">部署集中在一处。默认动态模式把 shell/客户库和 EXE 分别传给 windeployqt；静态模式只分析 EXE。工具只分析命令行里二进制的导入表，所以每个需要部署的二进制都必须显式列出。</p>
+
+  <div class="figure">
+    <svg viewBox="0 0 1000 300" role="img" aria-label="部署流程图">
+      <defs><marker id="a10" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 1 L9 5 L0 9 z" fill="#94a3b8"/></marker></defs>
+      <rect x="24" y="70" width="180" height="76" rx="10" fill="#eff5ff" stroke="#93b4f7"/>
+      <text x="114" y="98" text-anchor="middle" class="s-t">1 · 复制 .qm</text><text x="114" y="120" text-anchor="middle" class="s-s">&lt;exe&gt;/translations/</text>
+      <rect x="248" y="70" width="180" height="76" rx="10" fill="#eff5ff" stroke="#93b4f7"/>
+      <text x="338" y="98" text-anchor="middle" class="s-t">2 · windeployqt</text><text x="338" y="120" text-anchor="middle" class="s-s">EXE（+ 可选库）</text>
+      <rect x="472" y="70" width="180" height="76" rx="10" fill="#f5f1ff" stroke="#cbb8f8"/>
+      <text x="562" y="98" text-anchor="middle" class="s-t">3 · QML 模块</text><text x="562" y="120" text-anchor="middle" class="s-s">GoodLaser 传 --qmldir</text>
+      <rect x="696" y="70" width="180" height="76" rx="10" fill="#eafaf6" stroke="#8dd8c8"/>
+      <text x="786" y="98" text-anchor="middle" class="s-t">4 · VerifyDeploy</text><text x="786" y="120" text-anchor="middle" class="s-s">dumpbin 读导入表</text>
+      <rect x="888" y="70" width="88" height="76" rx="10" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="932" y="104" text-anchor="middle" class="s-t">完成</text>
+      <g stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#a10)">
+        <path d="M204 108 L246 108"/><path d="M428 108 L470 108"/><path d="M652 108 L694 108"/><path d="M876 108 L886 108"/>
+      </g>
+      <rect x="248" y="186" width="470" height="70" rx="10" fill="#fff6e8" stroke="#f0cf94"/>
+      <text x="262" y="211" class="s-s">任一 Qt 模块缺失、或需要 QML 但 qml 目录不存在 → 构建直接失败</text>
+      <text x="262" y="234" class="s-s">Debug/Release 各自部署对应版本（带 d 后缀的 Qt 库），自检按导入表确切文件名比对</text>
+      <text x="24" y="286" class="s-l">windeployqt 必须取自当前构建的 Qt 版本，否则会报 "does not seem to be a Qt executable"</text>
+    </svg>
+    <div class="figcap">Qt5 的 qml 模块落在 <code>QtQuick.2</code>，Qt6 落在 <code>QtQuick</code>；自检对两种都接受。</div>
+  </div>
+</section>
+
+<!-- ============ 11 演进路线 ============ -->
+<section id="roadmap">
+  <div class="sec-head"><span class="sec-num">11</span><h2>现状与演进路线</h2></div>
+  <p class="lead">骨架方向正确，但离"客户完全可控的数据驱动 UI + 多业务对话框"还有几步。下表是本轮审查的结论。</p>
+
+  <div class="grid2">
+    <div class="note teal">
+      <h3>已具备</h3>
+      <ul>
+        <li>契约 / profile / 装配信息 / 运行时分层，分层检查自动守边界</li>
+        <li>Region → Slot → Panel 配置驱动，顺序与可见性可配</li>
+        <li>默认动态库交付（EXE + shell DLL + 客户 DLL）；可关闭切换静态单 EXE，并保留 ABI + 构建指纹校验</li>
+        <li>两个扩展注册表；面板 props 完整透传</li>
+        <li>翻译按模块分组，语言/皮肤切换保留面板实例</li>
+        <li>widget 与 QML 面板共用工厂注册点</li>
+      </ul>
+    </div>
+    <div class="note amber">
+      <h3>待建设（按建议顺序）</h3>
+      <ul>
+        <li>命令 → 对话框的结构化入参 / 结果回传协议</li>
+        <li>Windows x64 + Qt5.15 / Qt6 双版本的 CI 覆盖（部署与导出表检查）</li>
+        <li>运行期换客户（目前一客户一 EXE）</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="chips">
+    <span class="chip ok">已修复 · 对话框注册表按 id 查 IDialogFactory</span>
+    <span class="chip ok">已修复 · 面板 props 透传</span>
+    <span class="chip ok">已修复 · 导出表检查</span>
+    <span class="chip ok">已修复 · ABI 版本 = 1</span>
+    <span class="chip ok">已修复 · 客户 ABI 前置校验</span>
+    <span class="chip ok">已修复 · 工厂 destroy() 纯虚契约</span>
+    <span class="chip ok">已修复 · MenuController + objectName 前缀约定</span>
+    <span class="chip ok">已修复 · FeatureFlagStore QObject + 订阅链路</span>
+    <span class="chip ok">已修复 · 命令置灰（CommandView.listRequiredFeatures）</span>
+    <span class="chip ok">已处理 · 默认动态库 + UI_BUILD_SHARED</span>
+    <span class="chip ok">已处理 · ShellRuntime 拆 Theme/Menu/Dialog 控制器</span>
+    <span class="chip ok">已处理 · 删除 placements / statusCells / collapsible</span>
+    <span class="chip todo">待办 · 业务对话框协议</span>
+  </div>
+
+  <div class="figure" style="margin-top:22px">
+    <svg viewBox="0 0 980 250" role="img" aria-label="建议实施顺序">
+      <defs><marker id="a11" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 1 L9 5 L0 9 z" fill="#94a3b8"/></marker></defs>
+      <rect x="30" y="70" width="190" height="80" rx="10" fill="#eafaf6" stroke="#8dd8c8"/>
+      <text x="125" y="100" text-anchor="middle" class="s-t" fill="#0b6b60">第一步 · 补全数据 ✓</text>
+      <text x="125" y="124" text-anchor="middle" class="s-s">props / 类型键 / 校验 / 导出</text>
+      <rect x="270" y="70" width="190" height="80" rx="10" fill="#eafaf6" stroke="#8dd8c8"/>
+      <text x="365" y="100" text-anchor="middle" class="s-t" fill="#0b6b60">第二步 · 菜单与命名 ✓</text>
+      <text x="365" y="124" text-anchor="middle" class="s-s">MenuController + objectName 约定</text>
+      <rect x="510" y="70" width="190" height="80" rx="10" fill="#eafaf6" stroke="#8dd8c8"/>
+      <text x="605" y="100" text-anchor="middle" class="s-t" fill="#0b6b60">第三步 · 动态能力 ✓</text>
+      <text x="605" y="124" text-anchor="middle" class="s-s">Store 订阅 → 结构比较 + 刷新</text>
+      <rect x="750" y="70" width="190" height="80" rx="10" fill="#fff6e8" stroke="#f0cf94"/>
+      <text x="845" y="100" text-anchor="middle" class="s-t" fill="#9a5b06">第四步 · 对话框协议增强</text>
+      <text x="845" y="124" text-anchor="middle" class="s-s">异步对话框 · 结构化结果</text>
+      <g stroke="#94a3b8" stroke-width="1.6" fill="none" marker-end="url(#a11)">
+        <path d="M220 110 L268 110"/><path d="M460 110 L508 110"/><path d="M700 110 L748 110"/>
+      </g>
+      <text x="30" y="206" class="s-l">前三步已全部完成（类型键修复 → MenuController → FeatureFlagStore 订阅）</text>
+      <text x="30" y="232" class="s-l">下一步是结构化结果协议与 Windows CI 覆盖</text>
+    </svg>
+    <div class="figcap">本轮已完成前三步，并额外处理了默认动态库交付、ShellRuntime 控制器拆分与未消费配置删除。剩下的对话框协议增强（异步、富结果）是真正"补上尚不存在的抽象"，建议按顺序推进。</div>
+  </div>
+</section>
+
+<footer>
+  图集依据 <code>Main/</code> 源码与 <code>README.md</code> 整理 · 更新于 2026-11-21（与 README 同步）· 纯内联 SVG，无外部依赖
+</footer>
+
+</main>
+
+<script>
+(function(){
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var sections = links.map(function(a){ return document.querySelector(a.getAttribute('href')); });
+  function update(){
+    var y = window.scrollY + 120, idx = 0;
+    for (var i=0;i<sections.length;i++){
+      if (sections[i] && sections[i].offsetTop <= y) idx = i;
+    }
+    links.forEach(function(a,i){ a.classList.toggle('active', i===idx); });
+  }
+  window.addEventListener('scroll', update, {passive:true});
+  update();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 18</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="菜单栏" transform="translate(-1314.000000, -558.000000)">
+            <g id="编组-18" transform="translate(1314.000000, 558.000000)">
+                <rect id="矩形备份-22" x="0" y="0" width="14" height="14"></rect>
+                <g id="编组-17" transform="translate(3.000000, 1.000000)">
+                    <path d="M2.13333333,12 L1.06666667,11 L1.06666667,5.5 L0,4 L0,1 L1.06666667,0 L6.93333333,0 L8,1 L8,4 L6.93333333,5.5 L6.93333333,11 L5.86666667,12 L2.13333333,12 Z" id="形状结合" stroke="#FFFFFF" stroke-linejoin="bevel"></path>
+                    <g id="编组-4" transform="translate(2.000000, 6.500000)" fill="#FFFFFF">
+                        <g id="编组-3">
+                            <rect id="矩形" x="0" y="0" width="1" height="1" rx="0.15"></rect>
+                            <rect id="矩形备份-16" x="1.5" y="0" width="1" height="1" rx="0.15"></rect>
+                            <rect id="矩形备份-28" x="3" y="0" width="1" height="1" rx="0.15"></rect>
+                        </g>
+                        <g id="编组-3备份" transform="translate(0.000000, 1.500000)">
+                            <rect id="矩形" x="0" y="0" width="1" height="1" rx="0.15"></rect>
+                            <rect id="矩形备份-16" x="1.5" y="0" width="1" height="1" rx="0.15"></rect>
+                            <rect id="矩形备份-28" x="3" y="0" width="1" height="1" rx="0.15"></rect>
+                        </g>
+                        <g id="编组-3备份-2" transform="translate(0.000000, 3.000000)">
+                            <rect id="矩形" x="0" y="0" width="1" height="1" rx="0.15"></rect>
+                            <rect id="矩形备份-16" x="1.5" y="0" width="1" height="1" rx="0.15"></rect>
+                            <rect id="矩形备份-28" x="3" y="0" width="1" height="1" rx="0.15"></rect>
+                        </g>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

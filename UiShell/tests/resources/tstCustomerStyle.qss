@@ -1,0 +1,5 @@
+/* msui-test-customer-style: only used by tstInteraction to prove
+   services.customStylePrefix resolves inside the Qt resource system. */
+QWidget[msuiRole="panel"] {
+    border: 1px solid #123456;
+}

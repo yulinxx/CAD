@@ -9,13 +9,8 @@
 
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationId.h"
-#include "UI2D/Operation/IOperation.h"
 
 #include "UI/Services/HelpDialogService.h"
-#include "UI/Shortcut/IShortcutSettingsModel.h"
-#include "UI/Workbench/WorkbenchWindow.h"
-#include "UI/Workbench/WorkbenchMenuManager.h"
-#include "UI/Workbench/UiWorkbench.h"
 
 #include <QWidget>
 
@@ -38,31 +33,13 @@ void HelpOperationRegistry::registerAll()
     });
 
     Ops::declare(reg, OperationId::Help_Settings, [parentWidget] {
-        // Help > Settings / 设置对话框入口
-        APR_DEBUGF("[HelpOperationRegistry] Help_Settings triggered, parentWidget=%p", static_cast<void*>(parentWidget));
-        auto* window = qobject_cast<WorkbenchWindow*>(parentWidget);
-        APR_DEBUGF("[HelpOperationRegistry] window=%p", static_cast<void*>(window));
-        UiWorkbench* activeWb = window ? window->currentWorkbench() : nullptr;
-        APR_DEBUGF("[HelpOperationRegistry] activeWb=%p", static_cast<void*>(activeWb));
-        if (activeWb)
-        {
-            APR_DEBUGF("[HelpOperationRegistry] calling showSettingsDialog");
-            activeWb->showSettingsDialog(parentWidget);
-        }
-        else
-        {
-            APR_WARNF("[HelpOperationRegistry] Cannot show settings: no active workbench");
-        }
+        // M6：旧工作台设置对话框随 Workbench 移入测试专用目录；新外壳的设置入口
+        // 由 UiShell 自身的对话框绑定提供，这里只保留 OperationBus 上的稳定命令 id。
+        Q_UNUSED(parentWidget);
+        APR_WARNF("[HelpOperationRegistry] Settings dialog is provided by the shell host (M6)");
     });
 
     Ops::declare(reg, OperationId::Help_Docs, [parentWidget] {
         HelpDialogService::showDocumentationDialog(parentWidget);
     });
-
-#if 0
-    Ops::declare(reg, OperationId::Help_Shortcut, [parentWidget] {
-        // 2D 与 3D 共用 HelpDialogService 的同一条实现，内容取当前工作台的台账
-        HelpDialogService::showShortcutsDialog(parentWidget, activeShortcutModel(parentWidget));
-    });
-#endif
 }

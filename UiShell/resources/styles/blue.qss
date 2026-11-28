@@ -1,0 +1,33 @@
+/* Blue: light base + blue accents (M5 six-theme parity). */
+
+QWidget {
+    background-color: #f0f6ff;
+    color: #1e293b;
+}
+
+QMainWindow {
+    background-color: #f0f6ff;
+}
+
+QMenuBar {
+    background-color: #ffffff;
+    border-bottom: 1px solid #bfdbfe;
+}
+
+QMenuBar::item:selected {
+    background-color: #dbeafe;
+    color: #1d4ed8;
+}
+
+QFrame[msuiRole="panel"] {
+    background-color: #ffffff;
+}
+
+QToolBar[msuiRole="toolbar"] {
+    background-color: #e8f1ff;
+    border-bottom: 1px solid #bfdbfe;
+}
+
+QStatusBar {
+    background-color: #e8f1ff;
+}

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 83</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="icon" transform="translate(-1379.000000, -51.000000)">
+            <g id="编组-83" transform="translate(1379.000000, 51.000000)">
+                <rect id="矩形备份-32" x="0" y="1.27897692e-13" width="16" height="16"></rect>
+                <g id="编组-81备份" transform="translate(8.000000, 8.000000) scale(-1, 1) translate(-8.000000, -8.000000) translate(0.000000, 0.000000)" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round">
+                    <g id="编组-29">
+                        <polyline id="路径-4" points="0.5 2.5 0.5 0.5 2.5 0.5"></polyline>
+                        <polyline id="路径-4备份-33" points="13.5 15.5 15.5 15.5 15.5 13.5"></polyline>
+                        <polyline id="路径-4备份-30" points="2.5 15.5 0.5 15.5 0.5 13.5"></polyline>
+                        <line x1="0.5" y1="4.5" x2="0.5" y2="7" id="路径-4备份-29"></line>
+                        <line x1="4.5" y1="0.5" x2="6.5" y2="0.5" id="路径-4备份-36"></line>
+                        <line x1="4.5" y1="15.5" x2="7" y2="15.5" id="路径-4备份-38"></line>
+                        <line x1="9" y1="15.5" x2="11.5" y2="15.5" id="路径-4备份-39"></line>
+                        <line x1="0.5" y1="9" x2="0.5" y2="11.5" id="路径-4备份-31"></line>
+                        <line x1="15.5" y1="9.5" x2="15.5" y2="11.5" id="路径-4备份-35"></line>
+                    </g>
+                </g>
+                <g id="设置圆角" transform="translate(4.000000, 4.000000) rotate(-180.000000) translate(-4.000000, -4.000000) " fill="#C2C2C2" fill-rule="nonzero">
+                    <path d="M7.00022048,0.011184875 C7.00022048,3.86529719 3.8599462,7.00093575 0.000176382801,7.00093573 L0.000176382801,7.99964772 C4.41151826,7.99964772 8.00017638,4.41590981 8.00017638,0.011184875 L7.00022048,0.011184875 Z" id="形状"></path>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

@@ -342,6 +342,12 @@ if(BUILD_RENDER_BENCHMARK)
     message(STATUS "  RenderBenchmark: ENABLED")
 endif()
 
+# 7.57 同一输入双实现对照工具（P3 前置数据）
+# 在合并两份偏移实现之前，先拿到可复现的数值差异基线。
+if(BUILD_ENGRAVING)
+    add_subdirectory(Tools/OffsetCompare)
+endif()
+
 # 7.6 Metal 原生视口原型（仅 Apple）——一次性可行性验证，不是产品代码。
 # 用来回答「Qt 宿主能否把 NSView 交给 Metal」，默认关闭。
 option(BUILD_METAL_VIEWPORT_PROTO "Build Metal native viewport prototype (Apple only)" OFF)
@@ -351,6 +357,13 @@ endif()
 
 # 8. 应用入口
 add_subdirectory(Main)
+
+# 8.1 新 UI 外壳（SampleFrame 架构）——与现有 Main 并行，逐步迁移。
+# 默认开启；不需要时 -DBUILD_UI_SHELL=OFF。产物落在 <build>/bin_Qt6/shell。
+option(BUILD_UI_SHELL "Build the SampleFrame-style UiShell subsystem" ON)
+if(BUILD_UI_SHELL AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/UiShell/CMakeLists.txt")
+    add_subdirectory(UiShell)
+endif()
 
 # 9. 客户 UI 插件（Clients/<clientId> 独立仓库 / submodule）
 option(APR_BUILD_CLIENT_PLUGINS "Build per-client UI plugins from Clients/*" ON)
@@ -428,6 +441,13 @@ apr_check_dependency_directions()
 # ============================================================================
 include("${APR_ROOT}/CMake/UiEngineAccessRatchet.cmake")
 apr_check_ui_engine_include_ratchet()
+
+# ============================================================================
+# 2D 算法分层依赖门禁 — L1/L2 不得依赖 UI/场景/平行模块
+# 说明见 CMake/Check2DLayerDeps.cmake 与 Tools/check_2d_layer_deps.py。
+# ============================================================================
+include("${APR_ROOT}/CMake/Check2DLayerDeps.cmake")
+apr_check_2d_layer_deps()
 
 # ============================================================================
 # 2D 场景写面门禁 — SceneEditService 是唯一写入口
@@ -584,12 +604,36 @@ if(APR_PYTHON_HOST)
     list(APPEND APR_PROJECT_LIBS PythonHost)
 endif()
 
+# M6：`April` 现在链接外壳与客户 DLL；装出来的程序必须带上它们，
+# 否则 `cmake --install` 的产物仍会在 dyld/加载器阶段直接缺库退出。
+if(BUILD_UI_SHELL AND UI_CUSTOMER STREQUAL "April")
+    list(APPEND APR_PROJECT_LIBS UiShell UiApril)
+endif()
+
 # 安装所有项目 DLL/SO 文件
 install(TARGETS ${APR_PROJECT_LIBS}
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION bin
     ARCHIVE DESTINATION lib
 )
+
+# M6：April 的生产 profile 由 UiShell 部署在可执行文件旁；安装树也要保留，
+# 否则装出来的 April 找不到 ui.json（内嵌资源仅作为兜底）。
+if(BUILD_UI_SHELL AND UI_CUSTOMER STREQUAL "April")
+    if(APPLE)
+        install(DIRECTORY "$<TARGET_BUNDLE_CONTENT_DIR:April>/profile"
+            DESTINATION "${PROJECT_NAME}.app/Contents/MacOS"
+            COMPONENT Runtime
+            OPTIONAL
+        )
+    else()
+        install(DIRECTORY "$<TARGET_FILE_DIR:April>/profile"
+            DESTINATION bin
+            COMPONENT Runtime
+            OPTIONAL
+        )
+    endif()
+endif()
 
 # 安装 PyBindCore 模块
 if(APR_PYBIND_CORE AND APR_PYTHON_HOST)
@@ -661,9 +705,28 @@ if(APR_PYTHON_HOST)
 endif()
 
 # ============================================================================
-# CPack 配置
+# GUI 测试 offscreen 说明
+#
+# 当前 offscreen 注入在两处：
+#   1. 各 Test/CMakeLists.txt 里 gtest_discover_tests(... PROPERTIES ENVIRONMENT ...)
+#      UI2DCoreTests 已有 PATH 设置；其他 GUI 测试（TextEditService/FillDialog/
+#      BooleanRouting 等）在独立构建/CI 上通过 workflow 层全局设 QT_QPA_PLATFORM。
+#   2. apr_add_test(... GUI) 封装函数（Utils.cmake）——新模块用这个函数写测试，
+#      自动注入 offscreen + Qt 组件 + DLL 部署。
+#
+# 为什么不在根 CMakeLists.txt 用 set_tests_properties 批量打：
+#   gtest_discover_tests(PRE_TEST) 模式下，测试条目在 configure 阶段还不存在
+#   （推迟到 ctest 运行时发现）。configure 阶段 set_tests_properties 找不到它们。
 # ============================================================================
-include(CMake/Packaging.cmake)
 
-# 全部模块与降级动作都已完成后，再打印最终测试状态（唯一打印点）
-apr_print_test_status()
+# ============================================================================
+# 关于静态分析门禁的 CTest 注册
+#
+# CheckDependencies / UiEngineAccessRatchet / SceneWriteSurface / CheckCApi /
+# ENABLE_* 宏传播校验 —— 这些脚本不能用 cmake -P 独立执行（依赖 configure 阶段
+# add_subdirectory 完的 target 列表）。configure 硬门禁已经能在 configure 阶段
+# 阻断流程，CI 里看到 "Configure failed" 就能定位。
+#
+# 如果后续重做成独立可执行脚本，可在这里加 add_test(NAME Gate.XXX
+# COMMAND ${CMAKE_COMMAND} -P xxx.cmake) 并 set_tests_properties(LABELS gate)。
+# ============================================================================

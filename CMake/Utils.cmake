@@ -538,3 +538,177 @@ endfunction()
 # 第一方告警 / sanitizer 门禁（定义 APR_WERROR、APR_SANITIZE）
 include("${CMAKE_CURRENT_LIST_DIR}/QualityGates.cmake")
 
+# ============================================================================
+# apr_add_test —— 一行注册一个测试目标
+#
+# 用法：
+#   apr_add_test(NAME XxxTests
+#       SOURCES xxx_test.cpp ...
+#       LIBS Engine2D Utility
+#       LABELS core engine2d          # CTest ctest -L <label> 筛选
+#       FOLDER Tests/Engine/2D
+#       MOCK                          # 需要 gmock
+#       GUI                           # 需要 QApplication，自动 offscreen
+#       TIMEOUT 30                    # 单测试超时（秒）
+#       EXTRA_COMPILE_DEFS UI2D_EXPORTS
+#       EXTRA_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/Stub")
+#
+# 设计原则：
+#   - 吸收 80% 重复样板：gtest 注入、MSVC /OPT:NOREF、PRE_TEST 发现、FOLDER
+#   - 不强行统一 include 路径 / compile defs —— 各模块差异过大（Stub 拦截、
+#     非导出源码直接编译、条件宏），留给调用方自己 target_include_directories
+#   - GUI 模式只注入 offscreen + Qt DLL 部署；macOS/Linux CI 上 QT_QPA_PLATFORM
+#     可在 workflow 层全局设，本函数只保证本地 ctest 也能无头跑
+#   - 只在 BUILD_TESTS=ON 且 GTest_FOUND 时真正 add_executable；否则静默跳过
+#     （与 APR_STANDALONE_OWN_MODULES 独立构建机制兼容）
+# ============================================================================
+function(apr_add_test)
+    cmake_parse_arguments(APR_AT
+        "GUI;MOCK"                                   # options
+        "TIMEOUT;WORKING_DIR"                        # one-value
+        "NAME;SOURCES;LIBS;LABELS;FOLDER;EXTRA_COMPILE_DEFS;EXTRA_INCLUDE_DIRS"
+        ${ARGN})
+
+    # cmake_parse_arguments 把 multiValueArgs 存成 CMake list（元素用 ; 分隔）。
+    # 但函数调用传参时 CMake 会把 ; 当作参数分隔符 —— 导致 LABELS "core;utility"
+    # 传进子函数后又变回两个参数。
+    #
+    # 只把 PROPERTIES-LABELS 强制转回空格分隔的标量字符串 —— 因为它要经过子函数
+    # 参数传递，必须作为一个完整参数到达。
+    # SOURCES / LIBS / EXTRA_COMPILE_DEFS / EXTRA_INCLUDE_DIRS 保持原生 CMake list
+    # —— 下游 add_executable / target_link_libraries / target_compile_definitions
+    # 都需要能展开成多个参数。
+    if(APR_AT_LABELS)
+        string(REPLACE ";" " " APR_AT_LABELS "${APR_AT_LABELS}")
+    endif()
+
+    if(NOT APR_AT_NAME OR NOT APR_AT_SOURCES)
+        message(FATAL_ERROR "apr_add_test: NAME and SOURCES required")
+    endif()
+
+    # 守卫：与 Config.cmake 的 BUILD_TESTS + apr_module_tests_enabled 两层判定对齐
+    if(NOT DEFINED BUILD_TESTS OR NOT BUILD_TESTS)
+        return()
+    endif()
+    if(NOT GTest_FOUND)
+        return()
+    endif()
+
+    # --- 目标名 ---
+    set(_tgt "${APR_AT_NAME}")
+
+    # --- 创建可执行 ---
+    add_executable(${_tgt} ${APR_AT_SOURCES})
+    target_compile_features(${_tgt} PRIVATE cxx_std_17)
+
+    # --- GTest 自动注入 ---
+    target_link_libraries(${_tgt} PRIVATE GTest::gtest GTest::gtest_main)
+    if(APR_AT_MOCK)
+        target_link_libraries(${_tgt} PRIVATE GTest::gmock GTest::gmock_main)
+    endif()
+
+    # --- 业务库 ---
+    if(APR_AT_LIBS)
+        target_link_libraries(${_tgt} PRIVATE ${APR_AT_LIBS})
+    endif()
+
+    # --- 扩展点 ---
+    if(APR_AT_EXTRA_COMPILE_DEFS)
+        target_compile_definitions(${_tgt} PRIVATE ${APR_AT_EXTRA_COMPILE_DEFS})
+    endif()
+    if(APR_AT_EXTRA_INCLUDE_DIRS)
+        target_include_directories(${_tgt} PRIVATE ${APR_AT_EXTRA_INCLUDE_DIRS})
+    endif()
+
+    # --- MSVC 统一处理 ---
+    # gtest TEST() 宏的静态注册成员无显式 odr-use，/OPT:REF 会剥掉 → 0 tests
+    # /OPT:NOICF 避免相同函数被合并导致 test class 身份丢失
+    if(MSVC)
+        set_target_properties(${_tgt} PROPERTIES
+            LINK_FLAGS "/OPT:NOREF /OPT:NOICF")
+        target_compile_options(${_tgt} PRIVATE /utf-8)
+    endif()
+
+    # --- FOLDER ---
+    if(APR_AT_FOLDER)
+        set_target_properties(${_tgt} PROPERTIES FOLDER "${APR_AT_FOLDER}")
+    endif()
+
+    # --- gtest_discover_tests ---
+    #
+    # PRE_TEST 模式：推迟到 ctest 运行时发现，避免 Windows 上 DLL 部署时序
+    # 造成 "NOT_BUILT"。
+    #
+    # PROPERTIES 传参陷阱（CMake 4.4+）：
+    #   "先 list(APPEND ...) 再 ${list} 展开" 会把带空格的值拆成多个参数
+    #   （"core utility" → LABELS=core, utility 丢）。根因是 CMake 列表展开不保留
+    #   内部引号。${var:+keyword} 条件展开语法在函数调用参数里也会解析失败。
+    #
+    #   正确做法：按"有 PROPERTIES / 没 PROPERTIES"两个分支，在调用里直接 inline
+    #   所有 value。用 cmake_parse_arguments 接收 + 内部变量引用 → 引号保护空格。
+
+    # WORKING_DIR 兜底
+    if(APR_AT_WORKING_DIR)
+        set(_wd "${APR_AT_WORKING_DIR}")
+    else()
+        set(_wd "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+    endif()
+
+    if(APR_AT_GUI OR APR_AT_LABELS OR APR_AT_TIMEOUT)
+        # 有 PROPERTIES → 走辅助函数。所有 value 都是函数变量，引号保护 → 不会拆。
+        _apr_gdt_with_props(${_tgt} "${_wd}"
+            GUI_PROPS "${APR_AT_GUI}"
+            LABELS_PROPS "${APR_AT_LABELS}"
+            TIMEOUT_PROPS "${APR_AT_TIMEOUT}")
+    else()
+        gtest_discover_tests(${_tgt}
+            DISCOVERY_MODE PRE_TEST
+            WORKING_DIRECTORY "${_wd}")
+    endif()
+
+endfunction()
+
+# ============================================================================
+# _apr_gdt_with_props —— 内部辅助函数，专门处理 gtest_discover_tests 的 PROPERTIES
+#
+# 为什么单独一个函数？
+#   cmake_parse_arguments 把每个参数当作独立值接收。LABELS_PROPS="core utility"
+#   进来出去都是一个变量值，不会被拆分。然后在 gtest_discover_tests 调用里直接
+#   用 "${_AGP_LABELS_PROPS}" 作为参数 → cmake_parse_arguments 再正确收进去。
+# ============================================================================
+function(_apr_gdt_with_props _tgt _wd)
+    cmake_parse_arguments(_AGP "" "GUI_PROPS;LABELS_PROPS;TIMEOUT_PROPS" "" ${ARGN})
+
+    set(_has_env OFF)
+    if(_AGP_GUI_PROPS)
+        find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Widgets)
+        # QT_QPA_PLATFORM 强制 offscreen；QT_QUICK_BACKEND 在无 GPU 环境走软件渲染
+        set(_env_val "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
+        set(_has_env ON)
+    endif()
+
+    # 按 PROPERTIES 的组合分 8 个小分支（GUI × LABELS × TIMEOUT）
+    if(_AGP_LABELS_PROPS AND _AGP_TIMEOUT_PROPS AND _has_env)
+        gtest_discover_tests(${_tgt} DISCOVERY_MODE PRE_TEST WORKING_DIRECTORY "${_wd}"
+            PROPERTIES LABELS "${_AGP_LABELS_PROPS}" TIMEOUT "${_AGP_TIMEOUT_PROPS}" ENVIRONMENT "${_env_val}")
+    elseif(_AGP_LABELS_PROPS AND _AGP_TIMEOUT_PROPS)
+        gtest_discover_tests(${_tgt} DISCOVERY_MODE PRE_TEST WORKING_DIRECTORY "${_wd}"
+            PROPERTIES LABELS "${_AGP_LABELS_PROPS}" TIMEOUT "${_AGP_TIMEOUT_PROPS}")
+    elseif(_AGP_LABELS_PROPS AND _has_env)
+        gtest_discover_tests(${_tgt} DISCOVERY_MODE PRE_TEST WORKING_DIRECTORY "${_wd}"
+            PROPERTIES LABELS "${_AGP_LABELS_PROPS}" ENVIRONMENT "${_env_val}")
+    elseif(_AGP_TIMEOUT_PROPS AND _has_env)
+        gtest_discover_tests(${_tgt} DISCOVERY_MODE PRE_TEST WORKING_DIRECTORY "${_wd}"
+            PROPERTIES TIMEOUT "${_AGP_TIMEOUT_PROPS}" ENVIRONMENT "${_env_val}")
+    elseif(_AGP_LABELS_PROPS)
+        gtest_discover_tests(${_tgt} DISCOVERY_MODE PRE_TEST WORKING_DIRECTORY "${_wd}"
+            PROPERTIES LABELS "${_AGP_LABELS_PROPS}")
+    elseif(_AGP_TIMEOUT_PROPS)
+        gtest_discover_tests(${_tgt} DISCOVERY_MODE PRE_TEST WORKING_DIRECTORY "${_wd}"
+            PROPERTIES TIMEOUT "${_AGP_TIMEOUT_PROPS}")
+    elseif(_has_env)
+        gtest_discover_tests(${_tgt} DISCOVERY_MODE PRE_TEST WORKING_DIRECTORY "${_wd}"
+            PROPERTIES ENVIRONMENT "${_env_val}")
+    endif()
+endfunction()
+

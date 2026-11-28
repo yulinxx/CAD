@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="12" height="12" viewBox="0 0 12 12" version="1.1"
+     xmlns="http://www.w3.org/2000/svg"
+     shape-rendering="crispEdges">
+  <title>Check Mark</title>
+  <g id="icon" fill="none" stroke="#333333" stroke-width="1"
+     stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="3,6 5,8 9,4" />
+  </g>
+</svg>

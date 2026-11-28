@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "UI/Services/UiLayoutService.h"
-#include "UI/Services/UiShellHost.h"
+#include "UI/Services/UiServices.h"
 #include "UI/Services/UiStateCenter.h"
 #include "UI/Documents/SceneDocument2D.h"
 #include "UI2D/Operation/OperationBus.h"
@@ -23,6 +23,7 @@
 
 #include "FileIO/FileIOManager.h"
 
+class QMainWindow;
 class SettingsService;  // forward
 class SharedDatabaseAdapter;
 
@@ -112,8 +113,12 @@ public:
     void saveCurrentWorkbenchSettings();
 
 public:
-    /// 获取 UI Shell 宿主
-    UiShellHost* shellHost();
+    /// 注入宿主主窗口（M6：由 UiShell 的 QMainWindow 提供，不再是旧 WorkbenchWindow）。
+    /// 组合根只借用指针，不拥有窗口；必须在 build() 前设置。
+    void setMainWindow(QMainWindow* window) { m_mainWindow = window; }
+
+    /// 宿主主窗口（未注入时为空）
+    QMainWindow* mainWindow() const { return m_mainWindow; }
 
     /// 获取设置服务（运行期设置保存 / 主题 / 语言同步的唯一入口，生命周期随组合根）
     SettingsService* settingsService();
@@ -316,8 +321,8 @@ private:
     /// 「谁最后释放谁决定析构时机」，存在悬空访问窗口。
     std::unique_ptr<PersistenceService> m_persistenceService;
 
-    /// UI Shell 宿主
-    std::unique_ptr<UiShellHost> m_shellHost;
+    /// 宿主主窗口（借用指针，生命周期由 UiShell 管理）
+    QMainWindow* m_mainWindow{ nullptr };
 
     /// UI 状态中心
     std::unique_ptr<UiStateCenter> m_stateCenter;

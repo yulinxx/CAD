@@ -20,9 +20,7 @@
 
 #include "UI/Services/UiLayoutService.h"
 #include "UI/Services/UiServices.h"
-#include "UI/Services/UiShellHost.h"
-#include "UI/Workbench/WorkbenchWindow.h"
-#include "UI/Workbench/UiWorkbench.h"
+#include <QMainWindow>
 #include "UI/Services/UiStateCenter.h"
 #include "UI/Services/HelpDialogService.h"
 #include "UI/Safety/EmergencyStopController.h"
@@ -260,7 +258,6 @@ ISelectionService* ApplicationCompositionRoot::selectionService()
 ApplicationCompositionRoot::ApplicationCompositionRoot()
     : m_stateCenter(std::make_unique<UiStateCenter>())
     , m_layoutService(std::make_unique<DefaultUiLayoutService>())
-    , m_shellHost(std::make_unique<UiShellHost>())
     , m_operationBus(std::make_unique<OperationBus>())
     , m_sceneManager(std::make_unique<Eg::SceneManager>())
     , m_sceneManager3D(std::make_unique<Eg::SceneManager3D>())
@@ -302,7 +299,7 @@ bool ApplicationCompositionRoot::build()
 
     // 核心服务必须就绪：它们由构造函数成员初始化列表创建，为空意味着初始化失败。
     // 缺失时立即失败，绝不把一个缺关键依赖的根对象暴露成可用状态。
-    if (!m_stateCenter || !m_operationBus || !m_shellHost || !m_shellHost->mainWindow())
+    if (!m_stateCenter || !m_operationBus || !m_mainWindow)
     {
         APR_ERROR("[ApplicationCompositionRoot] build failed: core service missing");
         // 当前失败发生在任何接线之前，teardownAssembled 为空操作；
@@ -350,7 +347,6 @@ bool ApplicationCompositionRoot::build()
     UiServices uiServices = assembleUiServices();
     setupImportExportServices(uiServices);
     m_uiServices = uiServices;
-    m_shellHost->setUiServices(uiServices);
     setupDialogServices();
     setupDirtyStateSync();
 
@@ -366,14 +362,8 @@ bool ApplicationCompositionRoot::build()
     m_emergencyStopController = std::make_unique<EmergencyStopController>();
     m_emergencyStopController->attachDeviceHost(m_deviceHost.get());
 
-    // 主窗口在 m_shellHost 的成员初始化阶段就构造完成，那时急停状态机还不存在。
-    // 安全服务就绪后必须显式补绑定，否则急停入口永远不会被创建（急停后编辑区仍可操作）。
-    // 设备服务同样在此注入：设备面板取自所属窗口，不再回查组合根单例。
-    if (auto* window = m_shellHost ? m_shellHost->mainWindow() : nullptr)
-    {
-        window->bindSafetyServices(m_emergencyStopController.get(), m_operationBus.get());
-        window->bindDeviceServices(m_deviceHost.get(), m_processingJobService.get());
-    }
+    // M6：主窗口由 UiShell 持有，旧 WorkbenchWindow 的急停/设备面板绑定也随之移到
+    // 客户自己的面板工厂；组合根只负责服务生命周期与 OperationBus 注册。
 
 #ifdef ENABLE_VISION
     // 视觉门面在设备装配完成后立刻注入宿主能力：标定向导与飞拍在设备
@@ -460,10 +450,6 @@ UiServices ApplicationCompositionRoot::assembleUiServices()
     Eg::FillGeometryUpdater::instance().setDeferredDispatcher([](std::function<void()> task) {
         QTimer::singleShot(0, QCoreApplication::instance(), std::move(task));
     });
-
-    // 配置 ShellHost 核心依赖
-    m_shellHost->setStateCenter(m_stateCenter.get());
-    m_shellHost->setOperationBus(m_operationBus.get());
 
     return uiServices;
 }
@@ -579,14 +565,9 @@ AlgorithmRunner* ApplicationCompositionRoot::algorithmRunner()
             m_sceneEditService.get(),
             m_layerEditService.get(),
             m_unitManager.get(),
-            m_shellHost ? m_shellHost->mainWindow() : nullptr);
+            m_mainWindow);
     }
     return m_algorithmRunner.get();
-}
-
-UiShellHost* ApplicationCompositionRoot::shellHost()
-{
-    return m_shellHost.get();
 }
 
 UiStateCenter* ApplicationCompositionRoot::stateCenter()
@@ -669,15 +650,6 @@ SettingsService* ApplicationCompositionRoot::settingsService()
 
 void ApplicationCompositionRoot::saveCurrentWorkbenchSettings()
 {
-    // 由 CADApplicationRuntime 在 aboutToQuit 经根指针调用：直接用本对象持有的 shellHost，
-    // 不再经 instance() 静态回查单例（避免静态入口成为隐式全局注册表）。
-    if (!m_shellHost)
-    {
-        return;
-    }
-
-    if (auto* workbench = m_shellHost->currentWorkbench())
-    {
-        workbench->saveCurrentSettings();
-    }
+    // M6：旧 WorkbenchWindow/UiWorkbench 已移到测试专用目录；窗口布局由 UiShell
+    // 自己的 MainWindow::saveWindowState() 负责，这里保留接口以兼容退出流程。
 }

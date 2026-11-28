@@ -13,7 +13,11 @@
 
 #include "Log/AprLogger.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#pragma clang diagnostic ignored "-Wavailability"
 #import <Cocoa/Cocoa.h>
+#pragma clang diagnostic pop
 
 
 /// 判断 NSMenuItem 是否为 macOS 系统注入项

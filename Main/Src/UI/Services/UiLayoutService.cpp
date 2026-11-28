@@ -8,12 +8,12 @@
 
 #include <QSettings>
 
-#include "WorkbenchWindow.h"
+#include <QMainWindow>
 
 /// 保存布局快照到 QSettings
 /// @param workbenchId 工作台 ID
 /// @param window 主窗口指针
-void DefaultUiLayoutService::saveLayout(const QString& workbenchId, WorkbenchWindow* window)
+void DefaultUiLayoutService::saveLayout(const QString& workbenchId, QMainWindow* window)
 {
     if (!window)
     {
@@ -30,7 +30,7 @@ void DefaultUiLayoutService::saveLayout(const QString& workbenchId, WorkbenchWin
 /// 从 QSettings 恢复布局快照
 /// @param workbenchId 工作台 ID
 /// @param window 主窗口指针
-void DefaultUiLayoutService::restoreLayout(const QString& workbenchId, WorkbenchWindow* window)
+void DefaultUiLayoutService::restoreLayout(const QString& workbenchId, QMainWindow* window)
 {
     if (!window)
     {

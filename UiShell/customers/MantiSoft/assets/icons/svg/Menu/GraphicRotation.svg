@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 24</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="菜单栏" transform="translate(-696.000000, -92.000000)">
+            <g id="编组-24" transform="translate(696.000000, 92.000000)">
+                <rect id="矩形备份-20" x="0" y="0" width="14" height="14"></rect>
+                <path d="M11.3931803,7.89121311 C11.6775827,5.4107673 10.1307029,3.08710257 7.73259647,2.39242162 C5.33449002,1.69774067 2.78510983,2.8348051 1.69966496,5.08320579 C0.614220102,7.33160647 1.30952732,10.0350862 3.34506129,11.4808032 C5.38059526,12.9265202 8.16222978,12.6925025 9.92760656,10.9270164" id="路径" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round"></path>
+                <polyline id="路径" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round" points="13 5.54098361 11.3931803 7.89121311 9.26504918 5.93442623"></polyline>
+            </g>
+        </g>
+    </g>
+</svg>

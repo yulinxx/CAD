@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 7</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="菜单栏" transform="translate(-753.000000, -429.000000)">
+            <g id="编组-7" transform="translate(753.000000, 429.000000)">
+                <rect id="矩形备份-20" x="0" y="0" width="14" height="14"></rect>
+                <g id="提示_tips" transform="translate(2.000000, 1.000000)" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9.6,4.8 C9.6,6.84231 8.32452,8.58672 6.52665,9.28008 L4.8,9.28008 L3.07335,9.28008 C1.27548,8.58672 0,6.84231 0,4.8 C0,2.14902 2.14902,0 4.8,0 C7.45098,0 9.6,2.14902 9.6,4.8 Z" id="路径"></path>
+                    <path d="M6.52665,9.28008 L6.32292,11.7249 C6.30996,11.88039 6.17997,12 6.02394,12 L3.57603,12 C3.42,12 3.29004,11.88039 3.27708,11.7249 L3.07332,9.28008" id="路径"></path>
+                    <polyline id="路径" points="2.4 5.7 4.2 4.1 5.7 5.6 7.2 3.6"></polyline>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

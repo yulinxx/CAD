@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>对焦1_focus-one</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="icon" transform="translate(-2017.000000, -174.000000)">
+            <g id="对焦1_focus-one" transform="translate(2017.500000, 174.500000)">
+                <path d="M5,0 L1,0 C0.447715,0 0,0.447715 0,1 L0,5" id="路径" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path d="M5,15 L1,15 C0.447715,15 0,14.5523 0,14 L0,10" id="路径" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path d="M10,15 L14,15 C14.5523,15 15,14.5523 15,14 L15,10" id="路径" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path d="M10,0 L14,0 C14.5523,0 15,0.447715 15,1 L15,5" id="路径" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path d="M7.5,10.5 C9.15685714,10.5 10.5,9.15685714 10.5,7.5 C10.5,5.84314286 9.15685714,4.5 7.5,4.5 C5.84314286,4.5 4.5,5.84314286 4.5,7.5 C4.5,9.15685714 5.84314286,10.5 7.5,10.5 Z" id="路径" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round"></path>
+                <line x1="7.5" y1="4.5" x2="7.5" y2="2.5" id="路径" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round"></line>
+                <line x1="7.5" y1="12.5" x2="7.5" y2="10.5" id="路径" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round"></line>
+                <line x1="12.5" y1="7.5" x2="10.5" y2="7.5" id="路径" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round"></line>
+                <line x1="4.5" y1="7.5" x2="2.5" y2="7.5" id="路径" stroke="#C2C2C2" stroke-linecap="round" stroke-linejoin="round"></line>
+                <path d="M7.5,8.5 C8.0523,8.5 8.5,8.0523 8.5,7.5 C8.5,6.9477 8.0523,6.5 7.5,6.5 C6.9477,6.5 6.5,6.9477 6.5,7.5 C6.5,8.0523 6.9477,8.5 7.5,8.5 Z" id="路径" fill="#C2C2C2" fill-rule="nonzero"></path>
+            </g>
+        </g>
+    </g>
+</svg>

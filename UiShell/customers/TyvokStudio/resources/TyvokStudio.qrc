@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/TyvokStudio">
+        <!-- 客户自管样式表：ThemeController 先查这里，找不到回退框架默认。
+             客户若想定制 light/dark 任一皮肤，把 .qss 放到 customers/TyvokStudio/resources/styles/ 下即可。 -->
+    </qresource>
+</RCC>

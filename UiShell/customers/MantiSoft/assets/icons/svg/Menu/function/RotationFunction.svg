@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 11</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="菜单栏" transform="translate(-528.000000, -558.000000)">
+            <g id="编组-11" transform="translate(528.000000, 558.000000)">
+                <rect id="矩形备份-17" x="0" y="0" width="14" height="14"></rect>
+                <g id="orion-svg-sprite" transform="translate(6.000000, 5.500000)" stroke="#FFFFFF" stroke-linejoin="round">
+                    <rect id="矩形" x="0" y="0" width="3" height="3"></rect>
+                </g>
+                <g id="orion-svg-sprite" transform="translate(0.500000, 1.500000)" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1.51102561,5.84482588 C1.34916221,3.28701776 2.98383593,0.938023932 5.46968957,0.217924467 C8.04664252,-0.528564552 10.7861509,0.693300121 11.9525463,3.10938252 C13.1189417,5.52546491 12.3717798,8.43056536 10.1844393,9.98410135 C7.99709883,11.5376373 5.00801498,11.2861669 3.11097955,9.38901409" id="路径"></path>
+                    <polyline id="形状" points="0 3.96667564 1.53075 6.05079231 3.46666667 4.40000897"></polyline>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

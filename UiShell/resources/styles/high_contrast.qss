@@ -1,0 +1,36 @@
+/* High contrast: dark base + maximum-contrast borders (M5 six-theme parity). */
+
+QWidget {
+    background-color: #000000;
+    color: #ffffff;
+}
+
+QMainWindow {
+    background-color: #000000;
+}
+
+QMenuBar {
+    background-color: #000000;
+    border-bottom: 2px solid #ffffff;
+}
+
+QMenuBar::item:selected {
+    background-color: #ffff00;
+    color: #000000;
+}
+
+QFrame[msuiRole="panel"] {
+    background-color: #000000;
+    border: 2px solid #ffffff;
+}
+
+QToolBar[msuiRole="toolbar"] {
+    background-color: #000000;
+    border-bottom: 2px solid #ffffff;
+}
+
+QStatusBar {
+    background-color: #000000;
+    color: #ffffff;
+    border-top: 2px solid #ffffff;
+}

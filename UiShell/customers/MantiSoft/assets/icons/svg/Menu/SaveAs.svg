@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 6</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="菜单栏" transform="translate(-305.000000, -23.000000)">
+            <g id="编组-6" transform="translate(305.000000, 23.000000)">
+                <rect id="矩形备份-17" x="0" y="0" width="14" height="14"></rect>
+                <polyline id="路径" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round" points="7.34 11 1 11 1 1 9.66 1 11 2.34 11 7.2"></polyline>
+                <path d="M9.4,8.78 L9.4,6.2 L2.6,6.2 L2.6,11 M7.4,2.6 L7.4,3.4 M9,1 L9,4.26 C9,4.44777681 8.84777681,4.6 8.66,4.6 L5.34,4.6 C5.15222319,4.6 5,4.44777681 5,4.26 L5,1" id="形状" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path d="M11.6,6.6 L7.44,10.74 L6.56,13 L8.84,12.14 L13,8 L11.6,6.6 Z M7.44,10.74 L8.84,12.14" id="形状" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round"></path>
+            </g>
+        </g>
+    </g>
+</svg>

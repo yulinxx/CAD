@@ -1,0 +1,64 @@
+name: UiShell Baseline (Step 0)
+
+# UiShell 迁移的固定验收门禁。任何里程碑提交都必须保持本工作流全绿。
+# 必须显式 -DUI_CUSTOMER=April：UiShell 默认客户是 MantiSoft。
+on:
+  push:
+    branches: [main, master, develop]
+    paths:
+      - 'UiShell/**'
+      - 'Main/**'
+      - 'UI/**'
+      - 'CMakeLists.txt'
+      - 'CMake/**'
+      - 'cmake/**'
+      - '.github/workflows/ui-shell-baseline.yml'
+  pull_request:
+    branches: [main, master, develop]
+    paths:
+      - 'UiShell/**'
+      - 'Main/**'
+      - 'UI/**'
+      - 'CMakeLists.txt'
+      - 'CMake/**'
+      - 'cmake/**'
+      - '.github/workflows/ui-shell-baseline.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    name: ${{ matrix.os }} / April
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    env:
+      QT_VERSION: 6.11.2
+      BUILD_TYPE: Release
+      BUILD_DIR: build
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: ${{ env.QT_VERSION }}
+          target: desktop
+          cache: true
+
+      - name: Verify CMake / Ninja (preinstalled on GitHub runners)
+        run: cmake --version && ninja --version
+
+      - name: Step 0 baseline (configure / build / UiTst + UiLayerCheck + shell smoke)
+        run: bash UiShell/ci/ui-shell-baseline.sh

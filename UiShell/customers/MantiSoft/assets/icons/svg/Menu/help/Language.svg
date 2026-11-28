@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>Language - Black version</title>
+    <g id="帮助-" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Language---Black-version">
+            <rect id="矩形" x="0" y="0" width="14" height="14"></rect>
+            <g id="地球仪_earth" transform="translate(1, 1)" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6,12 C9.31371,12 12,9.31371 12,6 C12,2.68629 9.31371,0 6,0 C2.68629,0 0,2.68629 0,6 C0,9.31371 2.68629,12 6,12 Z" id="路径"></path>
+                <line x1="0" y1="6" x2="12" y2="6" id="路径"></line>
+                <path d="M6,12 C7.32549,12 8.4,9.31371 8.4,6 C8.4,2.68629 7.32549,0 6,0 C4.67451,0 3.6,2.68629 3.6,6 C3.6,9.31371 4.67451,12 6,12 Z" id="路径"></path>
+                <path d="M1.757373,1.84263 C2.84316,2.92842 4.34316,3.6 6,3.6 C7.65687,3.6 9.15687,2.92842 10.24266,1.84263" id="路径"></path>
+                <path d="M10.24266,10.15737 C9.15687,9.07158 7.65687,8.4 6,8.4 C4.34316,8.4 2.84316,9.07158 1.757373,10.15737" id="路径"></path>
+            </g>
+        </g>
+    </g>
+</svg>

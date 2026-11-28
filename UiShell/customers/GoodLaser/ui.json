@@ -1,0 +1,182 @@
+// GoodLaser 的 UI 配置（JSONC）
+{
+  "version": 2,
+  "profileId": "goodlaser",
+
+  "titleBar": {
+    "titleKey": "goodlaser.title",
+    "icon": ":/UiGoodLaser/profile/assets/logo.png", // 标题栏左侧图标
+    "buttons": [ "minimize", "maximize", "close" ], // 标题按钮顺序
+    "height": 44, // 标题栏高度
+    "backgroundColor": "#9A3412",
+    "textColor": "#FFFFFF"
+  },
+
+  "window": {
+    "minWidth": 960,
+    "minHeight": 640
+  },
+
+  "regions": [
+    {
+      "id": "titlebar",
+      "type": "TitleBar",
+      "order": 1
+    },
+    {
+      "id": "menubar",
+      "type": "MenuBar",
+      "order": 5
+    },
+    {
+      "id": "top",
+      "type": "TopBar",
+      "order": 10,
+      "areas": [
+        {
+          "id": "top.main",
+          "preferredHeight": 56
+        }
+      ]
+    },
+    {
+      "id": "left",
+      "type": "LeftDock",
+      "order": 20,
+      "areas": [
+        {
+          "id": "left.top",
+          "order": 10,
+          "preferredWidth": 260,
+          "stretch": 1
+        },
+        /* QML 面板 */
+        {
+          "id": "left.qml",
+          "order": 15,
+          "preferredWidth": 260,
+          "preferredHeight": 170
+        },
+        {
+          "id": "left.bottom",
+          "order": 20,
+          "preferredWidth": 260,
+          "preferredHeight": 160
+        }
+      ]
+    },
+    {
+      "id": "center",
+      "type": "CenterView",
+      "order": 30
+    },
+    /* 底部状态栏*/
+    {
+      "id": "bottom",
+      "type": "StatusBar",
+      "order": 50,
+      "areas": [
+        {
+          "id": "status.left",
+          "order": 10,
+          "stretch": 1,
+          "preferredHeight": 34
+        },
+        {
+          "id": "status.right",
+          "order": 20,
+          "preferredWidth": 260,
+          "preferredHeight": 34
+        }
+      ]
+    }
+  ],
+
+  "panels": [
+    {
+      "id": "toolbar",
+      "factory": "goodlaser.panel",
+      "area": "top.main",
+      "order": 10
+    },
+    {
+      "id": "tree",
+      "factory": "goodlaser.panel",
+      "area": "left.top",
+      "order": 10
+    },
+    {
+      "id": "qmlPanel",
+      "factory": "goodlaser.qml",
+      "area": "left.qml",
+      "order": 10
+    },
+    {
+      "id": "log",
+      "factory": "goodlaser.panel",
+      "area": "left.bottom",
+      "order": 10
+    },
+    {
+      "id": "status",
+      "factory": "goodlaser.panel",
+      "area": "status.left",
+      "order": 10
+    },
+    {
+      "id": "clock",
+      "factory": "goodlaser.panel",
+      "area": "status.right",
+      "order": 10
+    }
+  ],
+
+  "menus": [
+    {
+      "type": "submenu",
+      "id": "design",
+      "titleKey": "menu.design",
+      "order": 10,
+      "children": [ "design.new", "design.sketch" ]
+    },
+    {
+      "type": "submenu",
+      "id": "manufacture",
+      "titleKey": "menu.manufacture",
+      "order": 20,
+      "children": [ "manufacture.preview", "manufacture.run" ]
+    },
+    {
+      "type": "submenu",
+      "id": "analysis",
+      "titleKey": "menu.analysis",
+      "order": 30,
+      "children": [ "analysis.measure", "sample.run" ]
+    },
+    {
+      "type": "submenu",
+      "id": "window",
+      "titleKey": "menu.window",
+      "order": 40,
+      "children": [ "window.reset" ]
+    },
+    {
+      "type": "submenu",
+      "id": "help",
+      "titleKey": "menu.help",
+      "order": 50,
+      "children": [
+        "help.about",
+        { "type": "separator" },
+        {
+          "type": "builtin",
+          "id": "language"
+        },
+        {
+          "type": "builtin",
+          "id": "theme"
+        }
+      ]
+    }
+  ]
+}

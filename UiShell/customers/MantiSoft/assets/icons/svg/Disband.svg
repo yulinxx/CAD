@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 46</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="icon" transform="translate(-102.000000, -286.000000)">
+            <g id="编组-46" transform="translate(102.000000, 286.000000)">
+                <rect id="矩形备份-69" x="0" y="0" width="16" height="16"></rect>
+                <g id="解组_ungroup" transform="translate(0.500000, 0.500000)">
+                    <polygon id="路径" stroke="#C2C2C2" stroke-linejoin="round" points="2.5 0 0 0 0 2.5 2.5 2.5"></polygon>
+                    <polygon id="路径" stroke="#C2C2C2" stroke-linejoin="round" points="15 12.5 12.5 12.5 12.5 15 15 15"></polygon>
+                    <polygon id="路径" stroke="#C2C2C2" stroke-linejoin="round" points="2.5 8 0 8 0 10.5 2.5 10.5"></polygon>
+                    <polygon id="路径" stroke="#C2C2C2" stroke-linejoin="round" points="7 12.5 4.5 12.5 4.5 15 7 15"></polygon>
+                    <polygon id="路径" stroke="#C2C2C2" stroke-linejoin="round" points="10.5 0 8 0 8 2.5 10.5 2.5"></polygon>
+                    <polygon id="路径备份-7" stroke="#C2C2C2" stroke-linejoin="round" points="10.5 8 8 8 8 10.5 10.5 10.5"></polygon>
+                    <polygon id="路径" stroke="#C2C2C2" stroke-linejoin="round" points="15 4.5 12.5 4.5 12.5 7 15 7"></polygon>
+                    <rect id="矩形" fill="#C2C2C2" x="2.5" y="0.75" width="5" height="1"></rect>
+                    <rect id="矩形备份-30" fill="#C2C2C2" x="2.5" y="8.75" width="5" height="1"></rect>
+                    <rect id="矩形备份-32" fill="#C2C2C2" x="7.5" y="13.25" width="5" height="1"></rect>
+                    <rect id="矩形备份-34" fill="#C2C2C2" x="9.5" y="5.25" width="3" height="1"></rect>
+                    <rect id="矩形备份-29" fill="#C2C2C2" x="0.75" y="2.75" width="1" height="5"></rect>
+                    <rect id="矩形备份-31" fill="#C2C2C2" x="8.75" y="2.5" width="1" height="5"></rect>
+                    <rect id="矩形备份-33" fill="#C2C2C2" x="13.25" y="7.5" width="1" height="5"></rect>
+                    <rect id="矩形备份-35" fill="#C2C2C2" x="5.25" y="9.5" width="1" height="3"></rect>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

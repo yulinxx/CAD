@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="8px" height="8px" viewBox="0 0 8 8" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>orion-svg-sprite</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round">
+        <g id="icon" transform="translate(-693.000000, -524.000000)" stroke="#DDDDDD">
+            <g id="orion-svg-sprite" transform="translate(694.000000, 525.000000)">
+                <path d="M5.99972727,0.000545454545 L-0.000272727273,6.00054545 M5.99972727,6.00054545 L1.21105383e-16,0" id="形状"></path>
+            </g>
+        </g>
+    </g>
+</svg>

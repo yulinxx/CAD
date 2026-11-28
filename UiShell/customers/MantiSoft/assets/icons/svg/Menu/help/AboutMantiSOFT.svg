@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="菜单栏" transform="translate(-65.000000, -429.000000)">
+            <g id="编组" transform="translate(65.000000, 429.000000)">
+                <rect id="矩形" x="0" y="0" width="14" height="14"></rect>
+                <g id="信息_info-(1)" transform="translate(1.000000, 1.000000)">
+                    <path d="M6,12 C7.65684,12 9.15684,11.32842 10.24263,10.24263 C11.32842,9.15684 12,7.65684 12,6 C12,4.34316 11.32842,2.84316 10.24263,1.757358 C9.15684,0.671574 7.65684,0 6,0 C4.34316,0 2.84316,0.671574 1.757358,1.757358 C0.671574,2.84316 0,4.34316 0,6 C0,7.65684 0.671574,9.15684 1.757358,10.24263 C2.84316,11.32842 4.34316,12 6,12 Z" id="路径" stroke="#FFFFFF" stroke-linejoin="round"></path>
+                    <path d="M6,2.1 C6.41421,2.1 6.75,2.43579 6.75,2.85 C6.75,3.26421 6.41421,3.6 6,3.6 C5.58579,3.6 5.25,3.26421 5.25,2.85 C5.25,2.43579 5.58579,2.1 6,2.1 Z" id="路径" fill="#FFFFFF"></path>
+                    <polyline id="路径" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round" points="6.15 9 6.15 4.8 5.85 4.8 5.55 4.8"></polyline>
+                    <line x1="5.1" y1="9" x2="7.2" y2="9" id="路径" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round"></line>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

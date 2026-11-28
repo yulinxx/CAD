@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 36</title>
+    <defs>
+        <circle id="path-1" cx="7" cy="7" r="4.5"></circle>
+        <mask id="mask-2" maskContentUnits="userSpaceOnUse" maskUnits="objectBoundingBox" x="0" y="0" width="9" height="9" fill="white">
+            <use xlink:href="#path-1"></use>
+        </mask>
+    </defs>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="菜单栏" transform="translate(-346.000000, -186.000000)">
+            <g id="编组-36" transform="translate(346.000000, 186.000000)">
+                <rect id="矩形" x="0" y="0" width="14" height="14"></rect>
+                <g id="编组-35" stroke="#FFFFFF">
+                    <circle id="椭圆形" cx="7" cy="7" r="6.5"></circle>
+                    <use id="椭圆形" mask="url(#mask-2)" stroke-width="2" stroke-dasharray="2,2" xlink:href="#path-1"></use>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

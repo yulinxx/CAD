@@ -1,38 +1,20 @@
 find_package(GTest CONFIG REQUIRED)
 find_package(OpenSSL CONFIG REQUIRED)
-include(GoogleTest)
 
-add_executable(LicenseTests
-    LicenseTests.cpp
-    "${CMAKE_CURRENT_SOURCE_DIR}/../License/Src/KeygenTool.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../License/Src/LicenseKeygenDLL.cpp"
-)
+apr_add_test(NAME LicenseTests
+    SOURCES
+        LicenseTests.cpp
+        "${CMAKE_CURRENT_SOURCE_DIR}/../License/Src/KeygenTool.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../License/Src/LicenseKeygenDLL.cpp"
+    LIBS License OpenSSL::SSL OpenSSL::Crypto
+    LABELS license
+    TIMEOUT 120
+    WORKING_DIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+    EXTRA_COMPILE_DEFS LICENSE_TEST_HOOKS LICENSE_KEYGEN_EXPORTS)
 
-target_compile_features(LicenseTests PRIVATE cxx_std_17)
-
-target_compile_definitions(LicenseTests PRIVATE LICENSE_TEST_HOOKS LICENSE_KEYGEN_EXPORTS)
-
+# 被测实现直接编入二进制，License 库头不在当前目录层级
 target_include_directories(LicenseTests PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/../License/Include"
-)
-
-target_link_libraries(LicenseTests PRIVATE
-    License
-    OpenSSL::SSL
-    OpenSSL::Crypto
-    GTest::gtest
-    GTest::gtest_main
-)
-
-# PRE_TEST：LicenseTests 经 Log 间接依赖 Qt DLL，构建环境 PATH 缺 Qt 时
-# 构建后立即发现会 0xc0000135 失败；推迟到 ctest 运行时（与 UI/PythonHost 一致）。
-gtest_discover_tests(LicenseTests DISCOVERY_MODE PRE_TEST DISCOVERY_TIMEOUT 120)
-
-set_property(TARGET LicenseTests PROPERTY FOLDER "Tests")
-
-if(MSVC)
-    target_compile_options(LicenseTests PRIVATE /utf-8)
-endif()
+    "${CMAKE_CURRENT_SOURCE_DIR}/../License/Include")
 
 message(STATUS "[License Tests]")
 message(STATUS "  Target: LicenseTests")

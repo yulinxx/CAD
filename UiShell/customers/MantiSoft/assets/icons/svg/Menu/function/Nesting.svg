@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 8</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="菜单栏" transform="translate(-975.000000, -558.000000)">
+            <g id="编组-8" transform="translate(975.000000, 558.000000)">
+                <rect id="矩形备份-19" x="0" y="0" width="14" height="14"></rect>
+                <rect id="矩形备份-19" stroke="#FFFFFF" x="0.5" y="0.5" width="13" height="13" rx="1"></rect>
+                <g id="嵌套图形_stereo-nesting" transform="translate(0.500000, 0.500000)" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline id="路径" points="4.5 13 0 9.93333333 0 3.06666667 4.5 7.95807864e-13 9 3.06666667 9 7.46666667"></polyline>
+                    <polyline id="路径备份-2" transform="translate(8.500000, 6.500000) rotate(-180.000000) translate(-8.500000, -6.500000) " points="8.5 13 4 9.93333333 4 3.06666667 8.5 0 13 3.06666667 13 7.46666667"></polyline>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

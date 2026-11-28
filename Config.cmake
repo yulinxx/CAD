@@ -1,572 +1,197 @@
 # ============================================================================
-# Config.cmake - April CAD 全局构建配置
-# ============================================================================
-#
-# 使用方法：
-#   cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-#   cmake --build build --config Release
-#
-# ============================================================================
-#                         📌 常用配置（在此修改）
+# Config.cmake - April CAD 全局构建配置（手动配置）
 # ============================================================================
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  [1] Qt6 路径（机器无关：按候选清单取第一个存在的）
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Qt/vcpkg 等全部第三方配置只集中在本文件，不引入额外的本地配置文件。
-# 优先级：命令行 -D / 已有缓存 > 环境变量 QT_ROOT_DIR > 常见安装位置。
-# 常见位置按 <root>/<version>/<kit> 结构展开，版本自然倒序（优先新版本），
-# 用户目录用 USERPROFILE/HOME 推导，不写死具体用户名。
-function(apr_expand_versioned_candidates _roots _kits _out)
-    set(_result "")
-    foreach(_root IN LISTS _roots)
-        if(NOT IS_DIRECTORY "${_root}")
-            continue()
-        endif()
-        file(GLOB _versions LIST_DIRECTORIES true "${_root}/*")
-        list(SORT _versions COMPARE NATURAL ORDER DESCENDING)
-        foreach(_ver IN LISTS _versions)
-            foreach(_kit IN LISTS _kits)
-                if(IS_DIRECTORY "${_ver}/${_kit}")
-                    list(APPEND _result "${_ver}/${_kit}")
-                endif()
-            endforeach()
-        endforeach()
-    endforeach()
-    set(${_out} "${_result}" PARENT_SCOPE)
-endfunction()
-
-set(_apr_qt_candidates "")
-if(DEFINED ENV{QT_ROOT_DIR} AND NOT "$ENV{QT_ROOT_DIR}" STREQUAL "")
-    list(APPEND _apr_qt_candidates "$ENV{QT_ROOT_DIR}")
-endif()
-if(WIN32)
-    set(_apr_qt_roots "C:/Qt" "$ENV{USERPROFILE}/Qt")
-    set(_apr_qt_kits msvc2022_64 msvc2019_64 msvc2017_64)
-elseif(APPLE)
-    set(_apr_qt_roots "$ENV{HOME}/Qt" "/opt/Qt")
-    set(_apr_qt_kits macos)
-else()
-    set(_apr_qt_roots "$ENV{HOME}/Qt" "$ENV{HOME}/Install/Qt" "/opt/Qt")
-    set(_apr_qt_kits gcc_64)
-endif()
-apr_expand_versioned_candidates("${_apr_qt_roots}" "${_apr_qt_kits}" _apr_qt_expanded)
-list(APPEND _apr_qt_candidates ${_apr_qt_expanded})
-
-# 缓存/命令行已有合法路径时保持原值，不再探测（CACHE PATH 语义不变）
-if(NOT Qt_INSTALL_DIR OR NOT EXISTS "${Qt_INSTALL_DIR}/lib/cmake/Qt6/Qt6Config.cmake")
-    foreach(_apr_candidate IN LISTS _apr_qt_candidates)
-        if(EXISTS "${_apr_candidate}/lib/cmake/Qt6/Qt6Config.cmake")
-            set(Qt_INSTALL_DIR "${_apr_candidate}" CACHE PATH "Qt6 install dir" FORCE)
-            break()
-        endif()
-    endforeach()
-endif()
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  [2] vcpkg 路径（机器无关：按候选清单取第一个存在的）
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 优先级：命令行 -D / 已有缓存 > 环境变量 VCPKG_ROOT、VCPKG_DIR、
-# VCPKG_INSTALLATION_ROOT（GitHub Actions 预装 vcpkg 用后者）> 常见安装位置。
-set(_apr_vcpkg_candidates "")
-foreach(_apr_env IN ITEMS VCPKG_ROOT VCPKG_DIR VCPKG_INSTALLATION_ROOT)
-    if(DEFINED ENV{${_apr_env}} AND NOT "$ENV{${_apr_env}}" STREQUAL "")
-        list(APPEND _apr_vcpkg_candidates "$ENV{${_apr_env}}")
-    endif()
-endforeach()
-if(WIN32)
-    list(APPEND _apr_vcpkg_candidates "C:/vcpkg" "$ENV{USERPROFILE}/vcpkg" "C:/tools/vcpkg")
-elseif(APPLE)
-    list(APPEND _apr_vcpkg_candidates "$ENV{HOME}/vcpkg" "/opt/homebrew/opt/vcpkg")
-else()
-    list(APPEND _apr_vcpkg_candidates "$ENV{HOME}/vcpkg" "$ENV{HOME}/Install/vcpkg"
-        "/usr/local/vcpkg" "/opt/vcpkg")
-endif()
-
-if(NOT VCPKG_DIR OR NOT EXISTS "${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake")
-    foreach(_apr_candidate IN LISTS _apr_vcpkg_candidates)
-        if(EXISTS "${_apr_candidate}/scripts/buildsystems/vcpkg.cmake")
-            set(VCPKG_DIR "${_apr_candidate}" CACHE PATH "vcpkg root" FORCE)
-            break()
-        endif()
-    endforeach()
-endif()
-
-# 构建类型: Debug | Release | RelWithDebInfo | MinSizeRel
-#
-# 只在「调用方没有指定」时给默认值。**不能用裸 set()**：那会创建一个普通变量，
-# 遮蔽 cache 里由 -DCMAKE_BUILD_TYPE= 或 CMakePresets 写入的值，且本文件每次
-# configure 都会重新执行一遍。实测后果是 CMakeCache.txt 里记着 Debug，
-# 实际编译却按 Release（-O3 -DNDEBUG）产出——全仓 assert() 因此被编译掉，
-# 其中包含 ParallelRegion 构造/析构配对的唯一检查。
-#
-# 多配置生成器（VS/Xcode）不使用 CMAKE_BUILD_TYPE，此处置默认值对它们无副作用；
-# 这里不能查 CMAKE_CONFIGURATION_TYPES，因为它由 project() 设置，而本文件在
-# project() 之前被 include。
-if(NOT DEFINED CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
-    set(CMAKE_BUILD_TYPE "Release" CACHE STRING
-        "Build type: Debug | Release | RelWithDebInfo | MinSizeRel")
-endif()
-
-# ============================================================================
-#                         📌 模块开关（按需启用）
-#
-# 模块开关的唯一声明处在下方「核心功能模块」一节（约 200 行处）。
-# 之前这里还有一份重复的 option() 列表，且 BUILD_GEOMODELCORE 两处默认值相反
-# （此处 ON、下方 OFF）—— option() 对已存在的缓存项是空操作，于是「默认开还是关」
-# 取决于构建目录的历史，干净机器上会默认开启 GeoModelCore 并要求 OpenCASCADE。
-# 重复声明已删除，模块开关只保留一份。
-# ============================================================================
-
-# 测试总开关：全工程唯一开关。
-# ON  = 按各模块是否具备测试源码正常构建（GTest 缺失时自动降级为 OFF）
-# OFF = 任何模块都不生成测试目标
-option(BUILD_TESTS "Build tests for all modules" ON)
-
-# ============================================================================
-
-# 本文件是路径配置与测试开关的**唯一配置处**
-# 重复 include 保护
 if(APR_CONFIG_INCLUDED)
     return()
 endif()
 set(APR_CONFIG_INCLUDED TRUE)
 
-# Qt 主版本号
-set(QT_VERSION_MAJOR 6)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  [1] 路径配置
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+set(QT_VERSION_MAJOR    6                       CACHE STRING "Qt 主版本" FORCE)
+set(Qt_INSTALL_DIR      "$ENV{HOME}/Qt/6.12.0/macos"  CACHE PATH "Qt6 安装路径" FORCE)
+set(VCPKG_DIR           "$ENV{HOME}/vcpkg"      CACHE PATH "vcpkg 根目录" FORCE)
 
-# 路径未命中时明确失败，列出已尝试的候选位置与设置方式
 if(VCPKG_DIR STREQUAL "" OR NOT EXISTS "${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake")
-    string(REPLACE ";" "\n    " _apr_vcpkg_tried "${_apr_vcpkg_candidates}")
     message(FATAL_ERROR
-        "[Config] VCPKG_DIR not found: '${VCPKG_DIR}'\n"
-        "  Tried candidates:\n    ${_apr_vcpkg_tried}\n"
-        "  Set env VCPKG_ROOT, or pass -DVCPKG_DIR=<path> to cmake.")
+        "[Config] VCPKG_DIR not found: '${VCPKG_DIR}' — 请在 Config.cmake 修改")
 endif()
 if(Qt_INSTALL_DIR STREQUAL "" OR NOT EXISTS "${Qt_INSTALL_DIR}/lib/cmake/Qt6/Qt6Config.cmake")
-    # 纯算法模块（如 Nesting）不链接 Qt：它的独立入口会在 include 本文件之前设
-    # APR_ALLOW_MISSING_QT=ON，从而在没有 Qt 的机器/CI 上也能配置。
-    # 默认关闭该旁路，其他模块的报错与行为保持原样。
     if(NOT APR_ALLOW_MISSING_QT)
-        string(REPLACE ";" "\n    " _apr_qt_tried "${_apr_qt_candidates}")
         message(FATAL_ERROR
-            "[Config] Qt_INSTALL_DIR not found: '${Qt_INSTALL_DIR}'\n"
-            "  Tried candidates:\n    ${_apr_qt_tried}\n"
-            "  Set env QT_ROOT_DIR, or pass -DQt_INSTALL_DIR=<path> to cmake.")
+            "[Config] Qt_INSTALL_DIR not found: '${Qt_INSTALL_DIR}' — 请在 Config.cmake 修改")
     endif()
 endif()
 
-# --------------------------------------------------------------------
-# vcpkg 工具链
-# --------------------------------------------------------------------
-# 必须在 project() 之前生效 —— 根脚本在 project() 之前 include 本文件，正是为此。
-# 各模块不得再自行 set(CMAKE_TOOLCHAIN_FILE ...)。
 set(CMAKE_TOOLCHAIN_FILE "${VCPKG_DIR}/scripts/buildsystems/vcpkg.cmake"
     CACHE STRING "Vcpkg toolchain file")
-
-# 仓库内 vcpkg overlay ports（不修改 ~/vcpkg/ports，避免 vcpkg 升级时被覆盖）。
-# 当前仅 breakpad：官方 port 在 macOS 上未把 src/common/dwarf/*.cc 编入
-# libbreakpad_client，导致 google_breakpad::GetSectionByName 未定义。
-# 重建该依赖时必须显式带上 overlay，例如：
-#   vcpkg install breakpad:arm64-osx --classic \
-#       --overlay-ports=<repo>/CMake/vcpkg-overlays
 set(VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_LIST_DIR}/CMake/vcpkg-overlays"
     CACHE STRING "vcpkg overlay ports (repo-local)")
 
-# --------------------------------------------------------------------
-# vcpkg 依赖锁定（manifest 模式）
-# --------------------------------------------------------------------
-# 仓库根的 vcpkg.json 使用 builtin-baseline 固定端口版本；manifest 模式会在
-# configure 阶段按锁定版本安装依赖。默认保持经典模式，原因：
-#   1) 已有构建目录的 CMakeCache 里 VCPKG_MANIFEST_MODE=OFF，直接升级不会被迫
-#      重建 build/vcpkg_installed；
-#   2) 离线开发机可继续复用已安装的经典模式端口。
-# 发布 / CI 构建显式启用锁定版本：
-#   cmake -S . -B build -DVCPKG_MANIFEST_MODE=ON
-# 启用 GeoModelCore / Engraving 时追加可选 feature：
-#   -DVCPKG_MANIFEST_FEATURES=opencascade
-if(NOT DEFINED VCPKG_MANIFEST_MODE)
-    set(VCPKG_MANIFEST_MODE OFF CACHE BOOL
-        "Install dependencies from vcpkg.json (locked versions) instead of classic mode")
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  [2] 构建基础
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+if(NOT DEFINED CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
 endif()
 
-
-# Python 绑定依赖（仅 APR_PYBIND_CORE=ON 时需要，header-only）：
-#   python3.11 -m pip install "pybind11>=2.11"
-# 不要使用 vcpkg 的 pybind11 port：它依赖 vcpkg python3，并会通过 cmake wrapper
-# 强制接管 FindPython，把扩展 ABI 从工程固定的 Python ${APR_PYTHON_VERSION} 改掉。
-
-# PyBindCore 在找不到 pybind11 时会依次从工具链 config、Python 解释器推导，
-# 仍失败才给出可复制的安装命令。
-
-# --------------------------------------------------------------------
-# 构建类型：唯一默认值定义在上面的「构建类型」小节（见 set(CMAKE_BUILD_TYPE ...)）。
-# 这里只做状态输出。原先此处还有一份重复的 `if(NOT CMAKE_BUILD_TYPE)` 兜底，
-# 与上面那份是同一个配置的两个来源 —— 已删除，保持单一事实源。
-message(STATUS "======================================================================")
-message(STATUS "[Config] Build Type: ${CMAKE_BUILD_TYPE}")
-message(STATUS "======================================================================")
-
-# --------------------------------------------------------------------
-# C++ 标准配置
-# --------------------------------------------------------------------
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-# --------------------------------------------------------------------
-# 符号可见性控制
-# --------------------------------------------------------------------
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
+set(CMAKE_UNITY_BUILD ON)
 
-# --------------------------------------------------------------------
-# Unity Build 配置 (可加速编译)
-# --------------------------------------------------------------------
-option(APR_UNITY_BUILD "Enable unity build (faster compilation)" ON)
-if(APR_UNITY_BUILD)
-    set(CMAKE_UNITY_BUILD ON)
-endif()
-
-# --------------------------------------------------------------------
-# 输出目录配置
-# --------------------------------------------------------------------
-# 统一带 Qt 版本后缀，避免同机多 Qt 版本的产物互相覆盖。
-# 这是本项目输出目录的唯一配置处：各模块不得再自行 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ...)。
+# 输出目录
 set(_APR_BIN_DIR "${CMAKE_BINARY_DIR}/bin_Qt${QT_VERSION_MAJOR}")
 set(_APR_LIB_DIR "${CMAKE_BINARY_DIR}/lib_Qt${QT_VERSION_MAJOR}")
-
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${_APR_BIN_DIR}" CACHE PATH "Runtime output directory")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${_APR_BIN_DIR}" CACHE PATH "Library output directory")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${_APR_LIB_DIR}" CACHE PATH "Archive output directory")
-
-# 多配置生成器（Visual Studio / Xcode）需要再按配置分子目录
+foreach(_apr_type RUNTIME LIBRARY ARCHIVE)
+    set(CMAKE_${_apr_type}_OUTPUT_DIRECTORY "${_APR_BIN_DIR}" CACHE PATH "" FORCE)
+endforeach()
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${_APR_LIB_DIR}" CACHE PATH "" FORCE)
 foreach(_apr_cfg Debug Release RelWithDebInfo MinSizeRel)
     string(TOUPPER "${_apr_cfg}" _apr_cfg_u)
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_apr_cfg_u} "${_APR_BIN_DIR}/${_apr_cfg}")
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${_apr_cfg_u} "${_APR_BIN_DIR}/${_apr_cfg}")
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_apr_cfg_u}  "${_APR_BIN_DIR}/${_apr_cfg}")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${_apr_cfg_u}  "${_APR_BIN_DIR}/${_apr_cfg}")
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${_apr_cfg_u} "${_APR_LIB_DIR}/${_apr_cfg}")
 endforeach()
-
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-# --------------------------------------------------------------------
-# Qt 配置
-# --------------------------------------------------------------------
-set(Qt6_DIR "${Qt_INSTALL_DIR}/lib/cmake/Qt6" CACHE PATH "Qt CMake configuration directory")
+# Qt
+set(Qt6_DIR "${Qt_INSTALL_DIR}/lib/cmake/Qt6" CACHE PATH "Qt CMake config dir" FORCE)
 list(INSERT CMAKE_PREFIX_PATH 0 "${Qt_INSTALL_DIR}")
-
-# Windows: 配置 PATH 以包含 Qt 和 vcpkg 二进制目录
 if(WIN32 AND EXISTS "${Qt_INSTALL_DIR}")
-    set(_APR_QT_BIN "${Qt_INSTALL_DIR}/bin")
-    set(_APR_VCPKG_BIN "${VCPKG_DIR}/installed/x64-windows/bin")
-    set(ENV{PATH} "${_APR_QT_BIN};${_APR_VCPKG_BIN};$ENV{PATH}")
-    set(QT_PLUGIN_PATH "${Qt_INSTALL_DIR}/plugins" CACHE PATH "Qt plugins directory")
+    set(ENV{PATH} "${Qt_INSTALL_DIR}/bin;${VCPKG_DIR}/installed/x64-windows/bin;$ENV{PATH}")
+    set(QT_PLUGIN_PATH "${Qt_INSTALL_DIR}/plugins" CACHE PATH "" FORCE)
 endif()
 
-# ===== 渲染后端配置 =====
-set(APR_RENDER_BACKENDS "OPENGL;METAL;VULKAN" CACHE STRING "Available render backends")
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  [3] 渲染 & UI 配置
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if(APPLE)
-    set(APR_DEFAULT_RENDER_BACKEND "METAL" CACHE STRING "Default render backend: OPENGL|METAL|VULKAN")
+    set(APR_DEFAULT_RENDER_BACKEND "METAL"  CACHE STRING "Render backend: METAL|OPENGL" FORCE)
 else()
-    set(APR_DEFAULT_RENDER_BACKEND "OPENGL" CACHE STRING "Default render backend: OPENGL|METAL|VULKAN")
+    set(APR_DEFAULT_RENDER_BACKEND "OPENGL" CACHE STRING "Render backend: METAL|OPENGL" FORCE)
 endif()
 
-# ===== UI 维度配置 =====
-set(APR_UI_DIMENSIONS "2D;3D" CACHE STRING "Available UI dimensions")
-set(APR_DEFAULT_UI_DIMENSION "2D" CACHE STRING "Default UI dimension: 2D|3D")
-
-# ===== 可选模块开关：默认值按「子模块是否已检出」自适应 =====
-# 干净 clone 里没跑 `git submodule update --init` 时子模块目录是空的，
-# 而这些 BUILD_xxx 原本一律默认 ON，根 CMakeLists 随即
-# `add_subdirectory(<空目录>)` → configure 直接失败；连根本不需要该模块的
-# 2D-only 构建也被拖垮。约定：
-#   - 目录已检出 → 默认 ON（保持原行为）
-#   - 目录缺失   → 默认 OFF，并打印原因
-#   - 用户显式 -DBUILD_XXX=ON 但目录缺失 → 明确报错并给出初始化命令，
-#     不静默改写用户意图，也不让它落到 CMake 那句看不懂的报错上。
-# option() 不覆盖命令行 / cache 里已有的值，显式设置始终被尊重。
-# 注意：本文件在顶层 project() 之前被 include，用 CMAKE_CURRENT_LIST_DIR
-# 捕获源码根，别依赖 PROJECT_SOURCE_DIR。
-# ============================================================================
-set(APR_CONFIG_ROOT "${CMAKE_CURRENT_LIST_DIR}")
-function(apr_module_option _name _dir _doc)
-    set(_cmakelists "${APR_CONFIG_ROOT}/${_dir}/CMakeLists.txt")
-    if(EXISTS "${_cmakelists}")
-        option(${_name} "${_doc}" ON)
-    else()
-        option(${_name} "${_doc}" OFF)
-        message(STATUS "[April] ${_name}: default OFF (submodule ${_dir}/ not checked out)")
-    endif()
-    if(${_name} AND NOT EXISTS "${_cmakelists}")
-        message(FATAL_ERROR
-            "[April] ${_name}=ON but submodule ${_dir}/ is not checked out (missing ${_cmakelists}).\n"
-            "  Run first: git submodule update --init ${_dir}\n"
-            "  Or use:    -D${_name}=OFF")
-    endif()
-endfunction()
-
-# ===== 核心功能模块 =====
-# 建议保持默认开启状态
-apr_module_option(BUILD_RENDERX "Renderx" "Build Renderx rendering engine (3D rendering core)")
-option(BUILD_UI2D "Build UI2D module (2D user interface, always ON)" ON)
-
-# ---- UI 维度门控（唯一权威开关）----
-# 用法：cmake -DBUILD_UI_DIMENSION=2D
-#   BOTH（默认）：UI2D + UI3D 都构建（保持历史行为）
-#   2D          ：关闭 UI3D，只产出 2D 目标（Main 自动走 UI3D 桩头文件回退）
-#   3D          ：构建 UI3D，并把运行时默认视口设为 3D
-# 注意：UI2D 是全应用必需（Main 有数百处 UI2D 引用），任何取值都不会关闭它；
-#       因此 "3D" 表示"启用 3D 且默认 3D"，而非"仅 3D"。
-# BUILD_UI3D / APR_DEFAULT_UI_DIMENSION 均由本开关派生（FORCE 写回缓存，
-# 避免 2D→BOTH 切换时缓存粘滞）。
-set(BUILD_UI_DIMENSION "BOTH" CACHE STRING "UI build dimension gate: 2D|3D|BOTH")
+set(BUILD_UI_DIMENSION "BOTH" CACHE STRING "UI 维度: 2D|3D|BOTH" FORCE)
 set_property(CACHE BUILD_UI_DIMENSION PROPERTY STRINGS 2D 3D BOTH)
 if(BUILD_UI_DIMENSION STREQUAL "2D")
-    set(BUILD_UI3D OFF CACHE BOOL "Build UI3D module (derived from BUILD_UI_DIMENSION)" FORCE)
-    set(APR_DEFAULT_UI_DIMENSION "2D" CACHE STRING "Default UI dimension (derived)" FORCE)
-elseif(BUILD_UI_DIMENSION STREQUAL "3D")
-    set(BUILD_UI3D ON CACHE BOOL "Build UI3D module (derived from BUILD_UI_DIMENSION)" FORCE)
-    set(APR_DEFAULT_UI_DIMENSION "3D" CACHE STRING "Default UI dimension (derived)" FORCE)
-elseif(BUILD_UI_DIMENSION STREQUAL "BOTH")
-    set(BUILD_UI3D ON CACHE BOOL "Build UI3D module (derived from BUILD_UI_DIMENSION)" FORCE)
-    set(APR_DEFAULT_UI_DIMENSION "2D" CACHE STRING "Default UI dimension (derived)" FORCE)
+    set(BUILD_UI3D OFF  CACHE BOOL "Build UI3D" FORCE)
 else()
-    message(FATAL_ERROR
-        "[April] invalid BUILD_UI_DIMENSION: '${BUILD_UI_DIMENSION}' (expected 2D|3D|BOTH)")
+    set(BUILD_UI3D ON   CACHE BOOL "Build UI3D" FORCE)
 endif()
 
-apr_module_option(BUILD_NESTING "Nesting/Nesting" "Build Nesting module (2D/3D nesting/arrangement algorithm)")
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  [4] 模块开关（手动配置，FORCE 每次覆盖）
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# ===== 可选功能模块 =====
-# 按需启用（默认值见上方 apr_module_option：子模块未检出时自动 OFF）
-apr_module_option(BUILD_VISION "Vision/Vision" "Build Vision module (image processing, computer vision)")
-apr_module_option(BUILD_CAM "CAM/CAM" "Build CAM layer (toolpath planning, process compilation)")
-apr_module_option(BUILD_RASTER "Raster/Raster" "Build Raster module (OpenCV bitmap processing for laser engraving/cutting)")
-apr_module_option(BUILD_NETWORK "Network/Network" "Build Network module (HTTP, WebSocket, cloud sync)")
-apr_module_option(BUILD_HARDWARE "Hardware/Hardware" "Build Hardware module (laser control, material database)")
-apr_module_option(BUILD_ENGRAVING "Engraving/Engraving" "Build Engraving module (3D laser engraving)")
-apr_module_option(BUILD_GEOMODELCORE "GeoModelCore/GeoModelCore" "Build GeoModelCore module (OpenCASCADE-based geometry modeling)")
-apr_module_option(BUILD_CRASHHANDLER "CrashHandler/CrashHandler" "Build CrashHandler module (crash capture and reporting)")
-apr_module_option(BUILD_PYTHON "PythonHost/PythonHost" "Build Python module (PythonHost integration framework)")
-# 许可校验开关：默认 ON；开发构建如需关闭，用 -DAPR_ENABLE_LICENSE=OFF。
-# 宏编进 License 库本身（LicenseInternal.cpp 依据它决定运行期默认值），
-# Main 的 BuildConfig.h 镜像同步该取值供启动自检交叉核对。
-option(APR_ENABLE_LICENSE "Enable license check (ON for shipping builds)" ON)
+# 核心模块
+option(BUILD_RENDERX    "Renderx 渲染引擎"          ON)
+option(BUILD_UI2D       "UI2D 界面（必需）"          ON)
+option(BUILD_NESTING    "套料算法"                    ON)
 
-# ===== 工具 =====
-option(BUILD_KEYGEN_TOOL "Build KeygenTool (offline license key generator)" OFF)
-# 百万级图元性能基准（Tools/PerfBenchmark）。默认构建，便于随时复测与优化前后对比；
-# 本项按 CMake 常规：首次 configure 写入缓存，需要关闭时用 -DBUILD_PERF_BENCHMARK=OFF。
-option(BUILD_PERF_BENCHMARK "Build million-entity performance benchmark" ON)
-# 渲染帧路径基准（Tools/RenderBenchmark）。走 RenderX 的 Null 后端，
-# 不依赖 GPU 与窗口系统，可无人值守复现，默认构建。
-option(BUILD_RENDER_BENCHMARK "Build headless render frame-path benchmark" ON)
+# 可选模块
+option(BUILD_VISION     "视觉模块"                    OFF)
+option(BUILD_CAM        "CAM 加工层"                  ON)
+option(BUILD_RASTER     "Raster 位图处理"             ON)
+option(BUILD_NETWORK    "网络模块"                    OFF)
+option(BUILD_HARDWARE   "硬件控制"                    OFF)
+option(BUILD_ENGRAVING  "3D 激光雕刻"                 OFF)
+option(BUILD_GEOMODELCORE "OpenCASCADE 几何建模"      OFF)
+# OpenCASCADE 最低版本：GeoModelCore 源码已切到 OCCT 8.0+ API
+# （Standard_Failure::what() / 直用 NCollection_HSequence<TopoDS_Shape> /
+# ConnectEdgesToWires() 返回值重载等），低于此版本会在编译期给出晦涩错误。
+# 这里集中定义下限，由 CMake/VcpkgPreflight.cmake（全局）与
+# GeoModelCore/CMakeLists.txt（模块本地）双重门禁在 configure 阶段明确提示。
+set(APR_OCCT_MIN_VERSION "8.0.0")
+option(BUILD_CRASHHANDLER "崩溃捕获"                  OFF)
+option(BUILD_PYTHON     "PythonHost 集成"             OFF)
 
-# --------------------------------------------------------------------
-# 测试开关（本项目测试开关的唯一配置处）
-# --------------------------------------------------------------------
-# 唯一总开关 BUILD_TESTS 在本文件开头「测试开关」一节声明，默认 ON。
-# 旧的 BUILD_ALL_TESTS 与逐模块 BUILD_*_TESTS 已全部废弃，任何模块都不得再
-# 定义同名开关。是否生成测试目标只看 BUILD_TESTS 与当前构建范围
-# （集成构建 = 全部模块；独立构建 = apr_only_own_tests 声明的模块键）。
+# 工具 & 开关
+option(BUILD_KEYGEN_TOOL   "离线授权工具"             OFF)
+option(BUILD_PERF_BENCHMARK "性能基准测试"             ON)
+option(BUILD_RENDER_BENCHMARK "渲染帧路径基准"         ON)
+option(APR_ENABLE_LICENSE  "启用许可证校验"           ON)
+option(BUILD_TESTS         "构建单元测试"              ON)
 
-# 已废弃的旧开关清单：只用于迁移告警，不参与任何新判断。
-set(APR_LEGACY_TEST_SWITCHES
-    BUILD_ALL_TESTS
-    BUILD_UTILITY_TESTS
-    BUILD_LOG_TESTS
-    BUILD_ENGINECOMMON_TESTS
-    BUILD_ENGINE2D_TESTS
-    BUILD_ENGINE3D_TESTS
-    BUILD_GEOMODELCORE_TESTS
-    BUILD_FILEIO_TESTS
-    BUILD_LICENSE_TESTS
-    BUILD_NESTING_TESTS
-    BUILD_ENGRAVING_TESTS
-    BUILD_HARDWARE_TESTS
-    BUILD_VISION_TESTS
-    BUILD_RASTER_TESTS
-    BUILD_NETWORK_TESTS
-    BUILD_PYTHONHOST_TESTS
-    BUILD_CRASHHANDLER_TESTS
-    BUILD_RENDERX_TESTS
-    BUILD_RENDERBRIDGE_TESTS
-    BUILD_UI_COMMON_TESTS
-    BUILD_UI2D_TESTS
-    BUILD_UI3D_TESTS
-    BUILD_MAIN_TESTS
-    BUILD_VIEWPORT_REFRESH_TESTS
-    BUILD_SCENE_EDIT_TESTS
-    CACHE INTERNAL "Deprecated legacy test switch list")
-
-# 模块键清单：独立构建裁剪与状态输出使用。键名必须与内层
-# apr_module_tests_enabled(<键>) 的调用一致。
-set(APR_TEST_MODULES
-    UTILITY
-    LOG
-    ENGINECOMMON
-    ENGINE2D
-    ENGINE3D
-    GEOMODELCORE
-    FILEIO
-    LICENSE
-    NESTING
-    ENGRAVING
-    HARDWARE
-    VISION
-    RASTER
-    NETWORK
-    PYTHONHOST
-    CRASHHANDLER
-    RENDERX
-    RENDERBRIDGE
-    UI_COMMON
-    UI2D
-    UI3D
-    MAIN
-    VIEWPORT_REFRESH
-    SCENE_EDIT
-    CAM
-    CACHE INTERNAL "Test module key list")
-
-# 旧开关迁移告警：缓存里残留旧变量时明确提示，旧值不得影响新行为。
-# 每次 configure 都检查，直到用户删除缓存项或换全新构建目录。
-set(_apr_legacy_found "")
-foreach(_apr_legacy IN LISTS APR_LEGACY_TEST_SWITCHES)
-    if(DEFINED ${_apr_legacy})
-        list(APPEND _apr_legacy_found "${_apr_legacy}=${${_apr_legacy}}")
+# 子模块缺失保护：用户显式 ON 但目录不存在时明确报错
+foreach(_apr_pair
+    "Renderx:Renderx"
+    "Nesting:Nesting/Nesting"
+    "Vision:Vision/Vision"
+    "CAM:CAM/CAM"
+    "Raster:Raster/Raster"
+    "Network:Network/Network"
+    "Hardware:Hardware/Hardware"
+    "Engraving:Engraving/Engraving"
+    "GeoModelCore:GeoModelCore/GeoModelCore"
+    "CrashHandler:CrashHandler/CrashHandler"
+    "Python:PythonHost/PythonHost")
+    string(REPLACE ":" ";" _apr_list "${_apr_pair}")
+    list(GET _apr_list 0 _apr_name)
+    list(GET _apr_list 1 _apr_dir)
+    if(BUILD_${_apr_name} AND NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/${_apr_dir}/CMakeLists.txt")
+        message(FATAL_ERROR
+            "BUILD_${_apr_name}=ON 但子模块 ${_apr_dir}/ 未检出\n"
+            "  git submodule update --init ${_apr_dir}")
     endif()
 endforeach()
-if(_apr_legacy_found)
-    message(WARNING
-        "[Tests] deprecated test switches detected: ${_apr_legacy_found}\n"
-        "  BUILD_ALL_TESTS and BUILD_*_TESTS are deprecated and ignored; only BUILD_TESTS is used.\n"
-        "  Remove those cache entries (cmake -U <name> ...) or reconfigure in a new build dir.")
-endif()
-unset(_apr_legacy_found)
-unset(_apr_legacy)
 
-# 判定单个模块是否构建测试：BUILD_TESTS 与独立构建允许范围同时成立。
-# 用法：apr_module_tests_enabled(VISION _vision_tests)
-# APR_STANDALONE_OWN_MODULES 未定义 = 集成构建，默认全部模块放行；
-# 已定义（含空字符串）= 独立构建，只有列表中的模块键放行。
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  [5] 渲染后端校验
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+if(APR_DEFAULT_RENDER_BACKEND STREQUAL "METAL" AND NOT APPLE)
+    message(FATAL_ERROR "Metal 后端仅 macOS 支持")
+endif()
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  [6] 测试基础设施（被各模块 CMakeLists.txt include）
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+set(APR_TEST_MODULES
+    UTILITY LOG ENGINECOMMON ENGINE2D ENGINE3D
+    GEOMODELCORE FILEIO LICENSE NESTING ENGRAVING
+    HARDWARE VISION RASTER NETWORK PYTHONHOST
+    CRASHHANDLER RENDERX RENDERBRIDGE
+    UI_COMMON UI2D UI3D MAIN VIEWPORT_REFRESH SCENE_EDIT CAM
+    CACHE INTERNAL "Test module keys")
+
 macro(apr_module_tests_enabled _module _out_var)
     set(${_out_var} OFF)
     if(BUILD_TESTS)
-        if(NOT DEFINED APR_STANDALONE_OWN_MODULES)
-            set(${_out_var} ON)
-        elseif("${_module}" IN_LIST APR_STANDALONE_OWN_MODULES)
+        if(NOT DEFINED APR_STANDALONE_OWN_MODULES
+           OR "${_module}" IN_LIST APR_STANDALONE_OWN_MODULES)
             set(${_out_var} ON)
         endif()
     endif()
 endmacro()
 
-# 测试不可用时统一降级：写回缓存并记录原因，供状态输出使用。
-# 必须同时更新当前作用域的普通变量：option() 会创建同名普通变量，
-# CMP0126 NEW 下 set(... CACHE) 不会清除它，只改缓存会让 if(BUILD_TESTS) 仍看到 ON。
 macro(apr_force_tests_off _reason)
-    set(BUILD_TESTS OFF CACHE BOOL "BUILD_TESTS forced OFF: ${_reason}" FORCE)
+    set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
     set(BUILD_TESTS OFF)
     set(APR_TESTS_DISABLED_REASON "${_reason}")
+    message(WARNING "[Tests] BUILD_TESTS forced OFF: ${_reason}")
 endmacro()
 
-# 测试状态输出：必须在全部降级动作之后调用，展示最终生效值。
-# 只在顶层工程打印，避免集成构建里被各模块重复调用。
 function(apr_print_test_status)
     if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
         return()
     endif()
-    message(STATUS "[Tests]")
-    if(BUILD_TESTS)
-        message(STATUS "  BUILD_TESTS: ON (final)")
-    else()
-        set(_reason "${APR_TESTS_DISABLED_REASON}")
-        if(NOT _reason)
-            set(_reason "disabled by user")
-        endif()
-        message(STATUS "  BUILD_TESTS: OFF (final, reason: ${_reason})")
-    endif()
-    if(DEFINED APR_STANDALONE_OWN_MODULES)
-        if(APR_STANDALONE_OWN_MODULES)
-            message(STATUS "  Scope: standalone (${APR_STANDALONE_OWN_MODULES})")
-        else()
-            message(STATUS "  Scope: standalone (none)")
-        endif()
-    else()
-        message(STATUS "  Scope: all modules")
+    message(STATUS "[Tests] BUILD_TESTS: ${BUILD_TESTS}")
+    if(NOT BUILD_TESTS AND APR_TESTS_DISABLED_REASON)
+        message(STATUS "  reason: ${APR_TESTS_DISABLED_REASON}")
     endif()
 endfunction()
 
-# --------------------------------------------------------------------
-# 依赖库查找配置
-# --------------------------------------------------------------------
-
-# Vulkan 支持开关。
-# 必须在这里（读取它的分支之前）声明：option() 只在首次读取时生效，
-# 声明在使用之后会让「首次 configure」与「二次 configure」行为不同 ——
-# 干净构建目录里变量未定义，VULKAN 分支会误报「已禁用」。
-option(APR_ENABLE_VULKAN "Enable Vulkan rendering support (not implemented yet)" ON)
-
-# 渲染后端选择逻辑（OpenGL 查找已延迟至 CMakeLists.txt project() 之后）
-if(APR_DEFAULT_RENDER_BACKEND STREQUAL "METAL")
-    if(APPLE)
-        # Metal 是 macOS 系统框架，不需要 find_package
-        message(STATUS "[Render] Backend: Metal (Apple)")
-    else()
-        message(FATAL_ERROR "[Render] Metal backend only supported on macOS")
-    endif()
-elseif(APR_DEFAULT_RENDER_BACKEND STREQUAL "VULKAN")
-    # 渲染层当前只有 GL / Metal / Null 三套 RHI 实现（Renderx/src/rhi），
-    # 没有 Vulkan 后端。开关保留是为了让「选 Vulkan」得到一个明确的失败，
-    # 而不是配到一半才在运行时找不到后端。
-    message(FATAL_ERROR
-        "[Render] Vulkan backend is not implemented yet (available: OPENGL, METAL). "
-        "Renderx/src/rhi has gl/ metal/ null only.")
-else()
-    # OpenGL：不在此处 find_package，改而在 CMakeLists.txt project() 之后调用
-    # 参见 CMakeLists.txt 中在 project() 后的 openGL 初始化
-    if(APPLE)
-        message(STATUS "[Render] Backend: Metal (fallback from OpenGL on macOS)")
-    else()
-        message(STATUS "[Render] Backend: OpenGL (will be found after project())")
-    endif()
-endif()
-
-# OpenCASCADE 配置 (GeoModelCore 需要)
-if(BUILD_GEOMODELCORE)
-    # OpenCASCADE 通常通过 vcpkg 安装
-    # 如需指定自定义路径，取消注释下面一行:
-    # set(OpenCASCADE_DIR "${VCPKG_DIR}/installed/x64-windows/share/opencascade")
-endif()
-
-# --------------------------------------------------------------------
-# 最终配置汇总
-# --------------------------------------------------------------------
-message(STATUS "")
-message(STATUS "[Qt]")
-message(STATUS "  Install Directory: ${Qt_INSTALL_DIR}")
-message(STATUS "  Config Directory: ${Qt6_DIR}")
-message(STATUS "[vcpkg]")
-message(STATUS "  VCPKG_DIR: ${VCPKG_DIR}")
-message(STATUS "[Render Backend]")
-message(STATUS "  Default: ${APR_DEFAULT_RENDER_BACKEND}")
-message(STATUS "[UI Dimension]")
-message(STATUS "  Default: ${APR_DEFAULT_UI_DIMENSION}")
-message(STATUS "[Modules]")
-message(STATUS "  RenderX:        ${BUILD_RENDERX}")
-message(STATUS "  UI2D:           ${BUILD_UI2D}")
-message(STATUS "  UI3D:           ${BUILD_UI3D}")
-message(STATUS "  Vision:         ${BUILD_VISION}")
-message(STATUS "  Raster:         ${BUILD_RASTER}")
-message(STATUS "  Network:        ${BUILD_NETWORK}")
-message(STATUS "  Hardware:       ${BUILD_HARDWARE}")
-message(STATUS "  Engraving:      ${BUILD_ENGRAVING}")
-message(STATUS "  Nesting:        ${BUILD_NESTING}")
-message(STATUS "  GeoModelCore:   ${BUILD_GEOMODELCORE}")
-message(STATUS "  CrashHandler:   ${BUILD_CRASHHANDLER}")
-message(STATUS "  Python:         ${BUILD_PYTHON}")
-# [Tests] 状态块已移除：include 时刻的取值不是最终值（GTest 降级发生在
-# 根 CMakeLists.txt / apr_find_gtest 之后）。最终状态统一由
-# apr_print_test_status() 在降级完成后打印。
-message(STATUS "")
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  [7] 配置汇总
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+message(STATUS "======================================================================")
+message(STATUS "[Config] Build Type:    ${CMAKE_BUILD_TYPE}")
+message(STATUS "[Config] Qt:           ${Qt_INSTALL_DIR}")
+message(STATUS "[Config] vcpkg:         ${VCPKG_DIR}")
+message(STATUS "[Config] Render:       ${APR_DEFAULT_RENDER_BACKEND}")
+message(STATUS "[Config] UI Dimension:  ${BUILD_UI_DIMENSION}")
+message(STATUS "======================================================================")

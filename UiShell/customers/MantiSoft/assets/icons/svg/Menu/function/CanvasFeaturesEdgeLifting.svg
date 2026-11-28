@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 7</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="菜单栏" transform="translate(-765.000000, -558.000000)">
+            <g id="编组-7" transform="translate(765.000000, 558.000000)">
+                <rect id="矩形备份-18" x="0" y="0" width="14" height="14"></rect>
+                <path d="M1,7 C2.33333333,7 3,7 3,7 C3,7 2.33333333,7 1,7 Z" id="路径-4" stroke="#979797" stroke-width="0.5"></path>
+                <path d="M4,7 C5.33333333,7 6,7 6,7 C6,7 5.33333333,7 4,7 Z" id="路径-4备份" stroke="#979797" stroke-width="0.5"></path>
+                <path d="M8,7 C9.33333333,7 10,7 10,7 C10,7 9.33333333,7 8,7 Z" id="路径-4备份-2" stroke="#979797" stroke-width="0.5"></path>
+                <path d="M11,7 C12.3333333,7 13,7 13,7 C13,7 12.3333333,7 11,7 Z" id="路径-4备份-3" stroke="#979797" stroke-width="0.5"></path>
+                <line x1="7" y1="1" x2="7" y2="3" id="路径-5" stroke="#979797" stroke-width="0.5"></line>
+                <line x1="7" y1="4" x2="7" y2="6" id="路径-5备份" stroke="#979797" stroke-width="0.5"></line>
+                <line x1="7" y1="8" x2="7" y2="10" id="路径-5备份-2" stroke="#979797" stroke-width="0.5"></line>
+                <line x1="7" y1="11" x2="7" y2="13" id="路径-5备份-3" stroke="#979797" stroke-width="0.5"></line>
+                <rect id="矩形备份-18" stroke="#FFFFFF" x="0.5" y="0.5" width="13" height="13" rx="1"></rect>
+            </g>
+        </g>
+    </g>
+</svg>

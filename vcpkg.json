@@ -26,7 +26,10 @@
     "opencascade": {
       "description": "OpenCASCADE-based GeoModelCore and Engraving modules.",
       "dependencies": [
-        "opencascade"
+        {
+          "name": "opencascade",
+          "version>=": "8.0.0"
+        }
       ]
     }
   }

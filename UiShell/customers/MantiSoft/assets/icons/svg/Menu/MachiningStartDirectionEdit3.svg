@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="14px" viewBox="0 0 14 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 39</title>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="菜单栏" transform="translate(-721.000000, -186.000000)">
+            <g id="编组-39" transform="translate(721.000000, 186.000000)">
+                <rect id="矩形备份-20" x="0" y="0" width="14" height="14"></rect>
+                <g id="编组-34" transform="translate(0.000000, 0.500000)">
+                    <path d="M7,2 C8.24264069,2 9.36764069,2.50367966 10.1819805,3.31801948 C10.9963203,4.13235931 11.5,5.25735931 11.5,6.5 C11.5,7.74264069 10.9963203,8.86764069 10.1819805,9.68198052 C9.36764069,10.4963203 8.24264069,11 7,11 L7,11 L2.5,11 L2.5,6.5 C2.5,5.25735931 3.00367966,4.13235931 3.81801948,3.31801948 C4.63235931,2.50367966 5.75735931,2 7,2 Z" id="矩形" stroke="#FFFFFF"></path>
+                    <rect id="矩形" fill="#FFFFFF" x="2" y="10.5" width="1" height="3"></rect>
+                    <rect id="矩形备份-22" fill="#FFFFFF" x="0" y="10.5" width="3" height="1"></rect>
+                    <polyline id="路径" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round" transform="translate(7.300557, 2.131811) rotate(-351.000000) translate(-7.300557, -2.131811) " points="6.30055727 4.13181115 8.30055727 2.13181115 6.30055727 0.131811146"></polyline>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

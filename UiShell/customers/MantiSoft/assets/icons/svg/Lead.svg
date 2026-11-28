@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 19</title>
+    <defs>
+        <rect id="path-1" x="8.00381538" y="1" width="7" height="1"></rect>
+        <mask id="mask-2" maskContentUnits="userSpaceOnUse" maskUnits="objectBoundingBox" x="0" y="0" width="7" height="1" fill="white">
+            <use xlink:href="#path-1"></use>
+        </mask>
+        <rect id="path-3" x="1" y="1" width="7" height="1"></rect>
+        <mask id="mask-4" maskContentUnits="userSpaceOnUse" maskUnits="objectBoundingBox" x="0" y="0" width="7" height="1" fill="white">
+            <use xlink:href="#path-3"></use>
+        </mask>
+    </defs>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="icon" transform="translate(-1819.000000, -51.000000)">
+            <g id="编组-19" transform="translate(1819.000000, 51.000000)">
+                <rect id="矩形备份-40" x="0" y="0" width="16" height="16"></rect>
+                <g id="编组-26" stroke="#C2C2C2">
+                    <circle id="椭圆形" cx="8" cy="8.92117111" r="6.5"></circle>
+                    <use id="矩形" mask="url(#mask-2)" stroke-width="2" stroke-dasharray="1" transform="translate(11.503815, 1.500000) rotate(-15.000000) translate(-11.503815, -1.500000) " xlink:href="#path-1"></use>
+                    <use id="矩形" mask="url(#mask-4)" stroke-width="2" stroke-dasharray="1" transform="translate(4.500000, 1.500000) scale(-1, 1) rotate(-15.000000) translate(-4.500000, -1.500000) " xlink:href="#path-3"></use>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

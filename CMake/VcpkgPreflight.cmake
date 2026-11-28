@@ -176,8 +176,33 @@ function(apr_check_vcpkg_dependencies)
         endif()
     endforeach()
 
+    # ---- 版本敏感依赖：端口存在但版本过低同样拦截 ----
+    # OCCT 的 ConfigVersion 用 SamePatchVersion 策略，不能靠 find_package(<ver>)
+    # 做下限判断（会误拒 8.0.1 / 8.1.0 等更新版本），这里手动 VERSION_LESS 比对，
+    # 允许任何 >= 下限的版本。OpenCASCADE_VERSION 由上面 find_package 写入本作用域。
+    if(BUILD_GEOMODELCORE AND OpenCASCADE_FOUND)
+        if(NOT DEFINED APR_OCCT_MIN_VERSION)
+            set(APR_OCCT_MIN_VERSION "8.0.0")
+        endif()
+        set(_occt_ver "${OpenCASCADE_VERSION}")
+        if(NOT _occt_ver)
+            set(_occt_ver "unknown")
+        endif()
+        if(NOT OpenCASCADE_VERSION OR OpenCASCADE_VERSION VERSION_LESS "${APR_OCCT_MIN_VERSION}")
+            list(APPEND _missing
+                "    - opencascade (version ${_occt_ver} found, but >= ${APR_OCCT_MIN_VERSION} required; GeoModelCore uses OCCT 8.0+ APIs)")
+            if(NOT "opencascade" IN_LIST _missing_ports)
+                list(APPEND _missing_ports "opencascade")
+            endif()
+        endif()
+    endif()
+
     if(NOT _missing)
-        message(STATUS "[April] vcpkg dependency preflight: OK (${_checked} required ports available for triplet ${_triplet})")
+        set(_extra "")
+        if(BUILD_GEOMODELCORE AND OpenCASCADE_FOUND AND OpenCASCADE_VERSION)
+            set(_extra " (OpenCASCADE ${OpenCASCADE_VERSION} >= ${APR_OCCT_MIN_VERSION})")
+        endif()
+        message(STATUS "[April] vcpkg dependency preflight: OK (${_checked} required ports available for triplet ${_triplet}${_extra})")
         return()
     endif()
 
