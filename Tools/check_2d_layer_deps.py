@@ -57,10 +57,6 @@ EXEMPT: tuple[tuple[str, str, str], ...] = (
      "Engine2D/Edit/SceneEditService.h", "写入函数与计算函数同 TU，P2 分离"),
     ("Engine/2D/Src/Algorithm/EntityContourFiller.cpp",
      "Engine2D/Interaction/LayerManager.h", "写入函数与计算函数同 TU，P2 分离"),
-    ("Engine/2D/Src/Algorithm/EntityFiller.cpp",
-     "Engine2D/Core/SceneManager.h", "写入函数与计算函数同 TU，P2 分离"),
-    ("Engine/2D/Src/Algorithm/EntityFiller.cpp",
-     "Engine2D/Edit/SceneEditService.h", "写入函数与计算函数同 TU，P2 分离"),
     ("Engine/2D/Src/Algorithm/EntityTransform.cpp",
      "Engine2D/Core/SceneManager.h", "变换服务含场景写入，长期归 L4"),
     ("Engine/2D/Src/Algorithm/FillGeometryUpdater.cpp",
@@ -83,6 +79,9 @@ def layer_of(path: Path, root: Path) -> str | None:
         return "L1"
     if "/Algorithm/Discretizer/" in rel:
         return "L1"
+    # Writers/ 是 L4 场景写入实现，故意允许依赖场景设施；不属于 L1/L2。
+    if "/Algorithm/Writers/" in rel:
+        return None
     if "/Include/Engine2D/Algorithm/" in rel or "/Src/Algorithm/" in rel:
         return "L2"
     return None
